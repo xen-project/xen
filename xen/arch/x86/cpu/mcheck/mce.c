@@ -30,8 +30,8 @@
 #include "util.h"
 #include "vmce.h"
 
-bool_t __read_mostly mce_disabled;
-invbool_param("mce", mce_disabled);
+bool_t __read_mostly opt_mce = 1;
+boolean_param("mce", opt_mce);
 bool_t __read_mostly mce_broadcast = 0;
 bool_t is_mc_panic;
 unsigned int __read_mostly nr_mce_banks;
@@ -627,7 +627,7 @@ static void set_poll_bankmask(struct cpuinfo_x86 *c)
     mb = per_cpu(poll_bankmask, cpu);
     BUG_ON(!mb);
 
-    if (cmci_support && !mce_disabled) {
+    if (cmci_support && opt_mce) {
         mb->num = per_cpu(no_cmci_banks, cpu)->num;
         bitmap_copy(mb->bank_map, per_cpu(no_cmci_banks, cpu)->bank_map,
                     nr_mce_banks);
@@ -734,7 +734,7 @@ void mcheck_init(struct cpuinfo_x86 *c, bool_t bsp)
 {
     enum mcheck_type inited = mcheck_none;
 
-    if ( mce_disabled )
+    if ( !opt_mce )
     {
         if ( bsp )
             printk(XENLOG_INFO "MCE support disabled by bootparam\n");

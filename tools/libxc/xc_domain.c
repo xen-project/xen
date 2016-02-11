@@ -2229,7 +2229,7 @@ int xc_domain_memory_mapping(
 {
     DECLARE_DOMCTL;
     xc_dominfo_t info;
-    int ret = 0, err;
+    int ret = 0, rc;
     unsigned long done = 0, nr, max_batch_sz;
 
     if ( xc_domain_getinfo(xch, domid, 1, &info) != 1 ||
@@ -2254,19 +2254,24 @@ int xc_domain_memory_mapping(
         domctl.u.memory_mapping.nr_mfns = nr;
         domctl.u.memory_mapping.first_gfn = first_gfn + done;
         domctl.u.memory_mapping.first_mfn = first_mfn + done;
-        err = do_domctl(xch, &domctl);
-        if ( err && errno == E2BIG )
+        rc = do_domctl(xch, &domctl);
+        if ( rc < 0 && errno == E2BIG )
         {
             if ( max_batch_sz <= 1 )
                 break;
             max_batch_sz >>= 1;
             continue;
         }
+        if ( rc > 0 )
+        {
+            done += rc;
+            continue;
+        }
         /* Save the first error... */
         if ( !ret )
-            ret = err;
+            ret = rc;
         /* .. and ignore the rest of them when removing. */
-        if ( err && add_mapping != DPCI_REMOVE_MAPPING )
+        if ( rc && add_mapping != DPCI_REMOVE_MAPPING )
             break;
 
         done += nr;

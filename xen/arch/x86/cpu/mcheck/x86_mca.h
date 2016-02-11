@@ -153,6 +153,6 @@ struct mca_error_handler
 };
 
 /* Global variables */
-extern bool_t mce_disabled;
+extern bool_t opt_mce;
 
 #endif /* X86_MCA_H */

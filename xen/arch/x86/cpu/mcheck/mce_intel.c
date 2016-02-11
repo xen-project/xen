@@ -587,7 +587,7 @@ static void cmci_discover(void)
 
 static void mce_set_owner(void)
 {
-    if (!cmci_support || mce_disabled == 1)
+    if (!cmci_support || !opt_mce)
         return;
 
     cmci_discover();
@@ -600,7 +600,7 @@ static void __cpu_mcheck_distribute_cmci(void *unused)
 
 static void cpu_mcheck_distribute_cmci(void)
 {
-    if (cmci_support && !mce_disabled)
+    if (cmci_support && opt_mce)
         on_each_cpu(__cpu_mcheck_distribute_cmci, NULL, 0);
 }
 
@@ -608,7 +608,7 @@ static void clear_cmci(void)
 {
     int i;
 
-    if (!cmci_support || mce_disabled == 1)
+    if (!cmci_support || !opt_mce)
         return;
 
     mce_printk(MCE_VERBOSE, "CMCI: clear_cmci support on CPU%d\n",
@@ -630,7 +630,7 @@ static void cpu_mcheck_disable(void)
 {
     clear_in_cr4(X86_CR4_MCE);
 
-    if (cmci_support && !mce_disabled)
+    if (cmci_support && opt_mce)
         clear_cmci();
 }
 

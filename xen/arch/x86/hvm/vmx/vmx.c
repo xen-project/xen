@@ -2504,7 +2504,7 @@ static int vmx_alloc_vlapic_mapping(struct domain *d)
     share_xen_page_with_guest(pg, d, XENSHARE_writable);
     d->arch.hvm_domain.vmx.apic_access_mfn = mfn;
     set_mmio_p2m_entry(d, paddr_to_pfn(APIC_DEFAULT_PHYS_BASE), _mfn(mfn),
-                       p2m_get_hostp2m(d)->default_access);
+                       PAGE_ORDER_4K, p2m_get_hostp2m(d)->default_access);
 
     return 0;
 }

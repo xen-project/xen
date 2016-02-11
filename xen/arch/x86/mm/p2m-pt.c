@@ -72,7 +72,8 @@ static const unsigned long pgt[] = {
     PGT_l3_page_table
 };
 
-static unsigned long p2m_type_to_flags(p2m_type_t t, mfn_t mfn)
+static unsigned long p2m_type_to_flags(p2m_type_t t, mfn_t mfn,
+                                       unsigned int level)
 {
     unsigned long flags;
     /*
@@ -107,6 +108,8 @@ static unsigned long p2m_type_to_flags(p2m_type_t t, mfn_t mfn)
     case p2m_mmio_direct:
         if ( !rangeset_contains_singleton(mmio_ro_ranges, mfn_x(mfn)) )
             flags |= _PAGE_RW;
+        else
+            ASSERT(!level);
         return flags | P2M_BASE_FLAGS | _PAGE_PCD;
     }
 }
@@ -436,7 +439,7 @@ static int do_recalc(struct p2m_domain *p2m, unsigned long gfn)
             p2m_type_t p2mt = p2m_is_logdirty_range(p2m, gfn & mask, gfn | ~mask)
                               ? p2m_ram_logdirty : p2m_ram_rw;
             unsigned long mfn = l1e_get_pfn(e);
-            unsigned long flags = p2m_type_to_flags(p2mt, _mfn(mfn));
+            unsigned long flags = p2m_type_to_flags(p2mt, _mfn(mfn), level);
 
             if ( level )
             {
@@ -573,7 +576,7 @@ p2m_pt_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
         ASSERT(!mfn_valid(mfn) || p2mt != p2m_mmio_direct);
         l3e_content = mfn_valid(mfn) || p2m_allows_invalid_mfn(p2mt)
             ? l3e_from_pfn(mfn_x(mfn),
-                           p2m_type_to_flags(p2mt, mfn) | _PAGE_PSE)
+                           p2m_type_to_flags(p2mt, mfn, 2) | _PAGE_PSE)
             : l3e_empty();
         entry_content.l1 = l3e_content.l3;
 
@@ -609,7 +612,7 @@ p2m_pt_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
 
         if ( mfn_valid(mfn) || p2m_allows_invalid_mfn(p2mt) )
             entry_content = p2m_l1e_from_pfn(mfn_x(mfn),
-                                             p2m_type_to_flags(p2mt, mfn));
+                                             p2m_type_to_flags(p2mt, mfn, 0));
         else
             entry_content = l1e_empty();
 
@@ -645,7 +648,7 @@ p2m_pt_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
         ASSERT(!mfn_valid(mfn) || p2mt != p2m_mmio_direct);
         if ( mfn_valid(mfn) || p2m_allows_invalid_mfn(p2mt) )
             l2e_content = l2e_from_pfn(mfn_x(mfn),
-                                       p2m_type_to_flags(p2mt, mfn) |
+                                       p2m_type_to_flags(p2mt, mfn, 1) |
                                        _PAGE_PSE);
         else
             l2e_content = l2e_empty();

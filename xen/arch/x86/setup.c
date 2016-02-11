@@ -60,12 +60,12 @@ static unsigned int __initdata max_cpus;
 integer_param("maxcpus", max_cpus);
 
 /* smep: Enable/disable Supervisor Mode Execution Protection (default on). */
-static bool_t __initdata disable_smep;
-invbool_param("smep", disable_smep);
+static bool_t __initdata opt_smep = 1;
+boolean_param("smep", opt_smep);
 
 /* smap: Enable/disable Supervisor Mode Access Prevention (default on). */
-static bool_t __initdata disable_smap;
-invbool_param("smap", disable_smap);
+static bool_t __initdata opt_smap = 1;
+boolean_param("smap", opt_smap);
 
 /* Boot dom0 in pvh mode */
 static bool_t __initdata opt_dom0pvh;
@@ -1297,12 +1297,12 @@ void __init noreturn __start_xen(unsigned long mbi_p)
 
     set_in_cr4(X86_CR4_OSFXSR | X86_CR4_OSXMMEXCPT);
 
-    if ( disable_smep )
+    if ( !opt_smep )
         setup_clear_cpu_cap(X86_FEATURE_SMEP);
     if ( cpu_has_smep )
         set_in_cr4(X86_CR4_SMEP);
 
-    if ( disable_smap )
+    if ( !opt_smap )
         setup_clear_cpu_cap(X86_FEATURE_SMAP);
     if ( cpu_has_smap )
         set_in_cr4(X86_CR4_SMAP);

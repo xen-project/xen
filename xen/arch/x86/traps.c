@@ -114,6 +114,74 @@ boolean_param("ler", opt_ler);
 #define stack_words_per_line 4
 #define ESP_BEFORE_EXCEPTION(regs) ((unsigned long *)regs->rsp)
 
+static void show_code(const struct cpu_user_regs *regs)
+{
+    unsigned char insns_before[8] = {}, insns_after[16] = {};
+    unsigned int i, tmp, missing_before, missing_after;
+
+    if ( guest_mode(regs) )
+        return;
+
+    stac();
+
+    /*
+     * Copy forward from regs->rip.  In the case of a fault, %ecx contains the
+     * number of bytes remaining to copy.
+     */
+    asm volatile ("1: rep movsb; 2:"
+                  _ASM_EXTABLE(1b, 2b)
+                  : "=&c" (missing_after),
+                    "=&D" (tmp), "=&S" (tmp)
+                  : "0" (ARRAY_SIZE(insns_after)),
+                    "1" (insns_after),
+                    "2" (regs->rip));
+
+    /*
+     * Copy backwards from regs->rip - 1.  In the case of a fault, %ecx
+     * contains the number of bytes remaining to copy.
+     */
+    asm volatile ("std;"
+                  "1: rep movsb;"
+                  "2: cld;"
+                  _ASM_EXTABLE(1b, 2b)
+                  : "=&c" (missing_before),
+                    "=&D" (tmp), "=&S" (tmp)
+                  : "0" (ARRAY_SIZE(insns_before)),
+                    "1" (insns_before + ARRAY_SIZE(insns_before)),
+                    "2" (regs->rip - 1));
+    clac();
+
+    printk("Xen code around <%p> (%ps)%s:\n",
+           _p(regs->rip), _p(regs->rip),
+           (missing_before || missing_after) ? " [fault on access]" : "");
+
+    /* Print bytes from insns_before[]. */
+    for ( i = 0; i < ARRAY_SIZE(insns_before); ++i )
+    {
+        if ( i < missing_before )
+            printk(" --");
+        else
+            printk(" %02x", insns_before[i]);
+    }
+
+    /* Print the byte under %rip. */
+    if ( missing_after != ARRAY_SIZE(insns_after) )
+        printk(" <%02x>", insns_after[0]);
+    else
+        printk(" <-->");
+
+    /* Print bytes from insns_after[]. */
+    for ( i = 1; i < ARRAY_SIZE(insns_after); ++i )
+    {
+        if ( i < (ARRAY_SIZE(insns_after) - missing_after) )
+            printk(" %02x", insns_after[i]);
+        else
+            printk(" --");
+    }
+
+    printk("\n");
+}
+
 static void show_guest_stack(struct vcpu *v, const struct cpu_user_regs *regs)
 {
     int i;
@@ -416,12 +484,20 @@ void show_stack_overflow(unsigned int cpu, const struct cpu_user_regs *regs)
 
 void show_execution_state(const struct cpu_user_regs *regs)
 {
+    /* Prevent interleaving of output. */
+    unsigned long flags = console_lock_recursive_irqsave();
+
     show_registers(regs);
+    show_code(regs);
     show_stack(regs);
+
+    console_unlock_recursive_irqrestore(flags);
 }
 
 void vcpu_show_execution_state(struct vcpu *v)
 {
+    unsigned long flags;
+
     printk("*** Dumping Dom%d vcpu#%d state: ***\n",
            v->domain->domain_id, v->vcpu_id);
 
@@ -433,9 +509,14 @@ void vcpu_show_execution_state(struct vcpu *v)
 
     vcpu_pause(v); /* acceptably dangerous */
 
+    /* Prevent interleaving of output. */
+    flags = console_lock_recursive_irqsave();
+
     vcpu_show_registers(v);
     if ( guest_kernel_mode(v, &v->arch.user_regs) )
         show_guest_stack(v, &v->arch.user_regs);
+
+    console_unlock_recursive_irqrestore(flags);
 
     vcpu_unpause(v);
 }

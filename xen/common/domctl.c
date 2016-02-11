@@ -1046,10 +1046,12 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
              (gfn + nr_mfns - 1) < gfn ) /* wrap? */
             break;
 
+#ifndef CONFIG_X86 /* XXX ARM!? */
         ret = -E2BIG;
         /* Must break hypercall up as this could take a while. */
         if ( nr_mfns > 64 )
             break;
+#endif
 
         ret = -EPERM;
         if ( !iomem_access_permitted(current->domain, mfn, mfn_end) ||
@@ -1067,7 +1069,7 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
                    d->domain_id, gfn, mfn, nr_mfns);
 
             ret = map_mmio_regions(d, gfn, nr_mfns, mfn);
-            if ( ret )
+            if ( ret < 0 )
                 printk(XENLOG_G_WARNING
                        "memory_map:fail: dom%d gfn=%lx mfn=%lx nr=%lx ret:%ld\n",
                        d->domain_id, gfn, mfn, nr_mfns, ret);
@@ -1079,7 +1081,7 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
                    d->domain_id, gfn, mfn, nr_mfns);
 
             ret = unmap_mmio_regions(d, gfn, nr_mfns, mfn);
-            if ( ret && is_hardware_domain(current->domain) )
+            if ( ret < 0 && is_hardware_domain(current->domain) )
                 printk(XENLOG_ERR
                        "memory_map: error %ld removing dom%d access to [%lx,%lx]\n",
                        ret, d->domain_id, mfn, mfn_end);

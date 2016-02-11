@@ -440,9 +440,12 @@ static void init_amd(struct cpuinfo_x86 *c)
 		wrmsrl(MSR_K7_HWCR, value);
 	}
 
-	/* Bit 31 in normal CPUID used for nonstandard 3DNow ID;
-	   3DNow is IDd by bit 31 in extended CPUID (1*32+31) anyway */
-	__clear_bit(X86_FEATURE_3DNOW_ALT, c->x86_capability);
+	/*
+	 * Some AMD CPUs duplicate the 3DNow bit in base and extended CPUID
+	 * leaves.  Unfortunately, this aliases PBE on Intel CPUs. Clobber the
+	 * alias, leaving 3DNow in the extended leaf.
+	 */
+	__clear_bit(X86_FEATURE_PBE, c->x86_capability);
 	
 	if (c->x86 == 0xf && c->x86_model < 0x14
 	    && cpu_has(c, X86_FEATURE_LAHF_LM)) {
@@ -472,8 +475,7 @@ static void init_amd(struct cpuinfo_x86 *c)
 	}
 
 	if (c->extended_cpuid_level >= 0x80000007) {
-		c->x86_power = cpuid_edx(0x80000007);
-		if (c->x86_power & (1<<8)) {
+		if (cpuid_edx(0x80000007) & (1<<8)) {
 			__set_bit(X86_FEATURE_CONSTANT_TSC, c->x86_capability);
 			__set_bit(X86_FEATURE_NONSTOP_TSC, c->x86_capability);
 			if (c->x86 != 0x11)

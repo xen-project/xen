@@ -545,8 +545,15 @@ DEFINE_XEN_GUEST_HANDLE(xen_domctl_bind_pt_irq_t);
 
 
 /* Bind machine I/O address range -> HVM address range. */
-/* If this returns -E2BIG lower nr_mfns value. */
 /* XEN_DOMCTL_memory_mapping */
+/* Returns
+   - zero     success, everything done
+   - -E2BIG   passed in nr_mfns value too large for the implementation
+   - positive partial success for the first <result> page frames (with
+              <result> less than nr_mfns), requiring re-invocation by the
+              caller after updating inputs
+   - negative error; other than -E2BIG
+*/
 #define DPCI_ADD_MAPPING         1
 #define DPCI_REMOVE_MAPPING      0
 struct xen_domctl_memory_mapping {

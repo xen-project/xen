@@ -32,7 +32,7 @@
 #define X86_FEATURE_PAT		(0*32+16) /* Page Attribute Table */
 #define X86_FEATURE_PSE36	(0*32+17) /* 36-bit PSEs */
 #define X86_FEATURE_PN		(0*32+18) /* Processor serial number */
-#define X86_FEATURE_CLFLSH	(0*32+19) /* Supports the CLFLUSH instruction */
+#define X86_FEATURE_CLFLUSH	(0*32+19) /* Supports the CLFLUSH instruction */
 #define X86_FEATURE_DS		(0*32+21) /* Debug Store */
 #define X86_FEATURE_ACPI	(0*32+22) /* ACPI via MSR */
 #define X86_FEATURE_MMX		(0*32+23) /* Multimedia Extensions */
@@ -45,7 +45,6 @@
 #define X86_FEATURE_ACC		(0*32+29) /* Automatic clock control */
 #define X86_FEATURE_IA64	(0*32+30) /* IA-64 processor */
 #define X86_FEATURE_PBE		(0*32+31) /* Pending Break Enable */
-#define X86_FEATURE_3DNOW_ALT	(0*32+31) /* AMD nonstandard 3DNow (Aliases PBE) */
 
 /* AMD-defined CPU features, CPUID level 0x80000001, word 1 */
 /* Don't duplicate feature flags which are redundant with Intel! */
@@ -110,17 +109,7 @@
 #define X86_FEATURE_RDRAND 	(4*32+30) /* Digital Random Number Generator */
 #define X86_FEATURE_HYPERVISOR	(4*32+31) /* Running under some hypervisor */
 
-/* VIA/Cyrix/Centaur-defined CPU features, CPUID level 0xC0000001, word 5 */
-#define X86_FEATURE_XSTORE	(5*32+ 2) /* on-CPU RNG present (xstore insn) */
-#define X86_FEATURE_XSTORE_EN	(5*32+ 3) /* on-CPU RNG enabled */
-#define X86_FEATURE_XCRYPT	(5*32+ 6) /* on-CPU crypto (xcrypt insn) */
-#define X86_FEATURE_XCRYPT_EN	(5*32+ 7) /* on-CPU crypto enabled */
-#define X86_FEATURE_ACE2	(5*32+ 8) /* Advanced Cryptography Engine v2 */
-#define X86_FEATURE_ACE2_EN	(5*32+ 9) /* ACE v2 enabled */
-#define X86_FEATURE_PHE		(5*32+ 10) /* PadLock Hash Engine */
-#define X86_FEATURE_PHE_EN	(5*32+ 11) /* PHE enabled */
-#define X86_FEATURE_PMM		(5*32+ 12) /* PadLock Montgomery Multiplier */
-#define X86_FEATURE_PMM_EN	(5*32+ 13) /* PMM enabled */
+/* UNUSED, word 5 */
 
 /* More extended AMD flags: CPUID level 0x80000001, ecx, word 6 */
 #define X86_FEATURE_LAHF_LM     (6*32+ 0) /* LAHF/SAHF in long mode */
@@ -163,6 +152,7 @@
 #define X86_FEATURE_ADX		(7*32+19) /* ADCX, ADOX instructions */
 #define X86_FEATURE_SMAP	(7*32+20) /* Supervisor Mode Access Prevention */
 #define X86_FEATURE_PCOMMIT	(7*32+22) /* PCOMMIT instruction */
+#define X86_FEATURE_CLFLUSHOPT	(7*32+23) /* CLFLUSHOPT instruction */
 
 /* Intel-defined CPU features, CPUID level 0x00000007:0 (ecx), word 8 */
 #define X86_FEATURE_PKU	(8*32+ 3) /* Protection Keys for Userspace */
@@ -197,7 +187,7 @@
 #define cpu_has_ht		boot_cpu_has(X86_FEATURE_HT)
 #define cpu_has_mp		1
 #define cpu_has_nx		boot_cpu_has(X86_FEATURE_NX)
-#define cpu_has_clflush		boot_cpu_has(X86_FEATURE_CLFLSH)
+#define cpu_has_clflush		boot_cpu_has(X86_FEATURE_CLFLUSH)
 #define cpu_has_page1gb		boot_cpu_has(X86_FEATURE_PAGE1GB)
 #define cpu_has_fsgsbase	boot_cpu_has(X86_FEATURE_FSGSBASE)
 #define cpu_has_aperfmperf	boot_cpu_has(X86_FEATURE_APERFMPERF)

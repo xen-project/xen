@@ -436,7 +436,8 @@ static __init void pvh_add_mem_mapping(struct domain *d, unsigned long gfn,
         else
             a = p2m_access_rw;
 
-        if ( (rc = set_mmio_p2m_entry(d, gfn + i, _mfn(mfn + i), a)) )
+        if ( (rc = set_mmio_p2m_entry(d, gfn + i, _mfn(mfn + i),
+                                      PAGE_ORDER_4K, a)) )
             panic("pvh_add_mem_mapping: gfn:%lx mfn:%lx i:%ld rc:%d\n",
                   gfn, mfn, i, rc);
         if ( !(i & 0xfffff) )

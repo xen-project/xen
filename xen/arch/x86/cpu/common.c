@@ -206,7 +206,7 @@ static void __init early_cpu_detect(void)
 	c->x86_mask = eax & 15;
 	edx &= ~cleared_caps[cpufeat_word(X86_FEATURE_FPU)];
 	ecx &= ~cleared_caps[cpufeat_word(X86_FEATURE_XMM3)];
-	if (edx & cpufeat_mask(X86_FEATURE_CLFLSH))
+	if (edx & cpufeat_mask(X86_FEATURE_CLFLUSH))
 		c->x86_cache_alignment = ((ebx >> 8) & 0xff) * 8;
 	/* Leaf 0x1 capabilities filled in early for Xen. */
 	c->x86_capability[cpufeat_word(X86_FEATURE_FPU)] = edx;
@@ -251,7 +251,7 @@ static void generic_identify(struct cpuinfo_x86 *c)
 	c->x86_capability[cpufeat_word(X86_FEATURE_FPU)] = edx;
 	c->x86_capability[cpufeat_word(X86_FEATURE_XMM3)] = ecx;
 
-	if ( cpu_has(c, X86_FEATURE_CLFLSH) )
+	if ( cpu_has(c, X86_FEATURE_CLFLUSH) )
 		c->x86_clflush_size = ((ebx >> 8) & 0xff) * 8;
 
 	if ( (c->cpuid_level >= CPUID_PM_LEAF) &&

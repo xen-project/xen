@@ -136,6 +136,7 @@ static void ept_p2m_type_to_flags(struct p2m_domain *p2m, ept_entry_t *entry,
             entry->r = entry->x = 1;
             entry->w = !rangeset_contains_singleton(mmio_ro_ranges,
                                                     entry->mfn);
+            ASSERT(entry->w || !is_epte_superpage(entry));
             entry->a = !!cpu_has_vmx_ept_ad;
             entry->d = entry->w && cpu_has_vmx_ept_ad;
             break;
@@ -1201,6 +1202,20 @@ void ept_p2m_uninit(struct p2m_domain *p2m)
     free_cpumask_var(ept->invalidate);
 }
 
+static const char *memory_type_to_str(unsigned int x)
+{
+    static const char memory_types[8][2] = {
+        [MTRR_TYPE_UNCACHABLE]     = "UC",
+        [MTRR_TYPE_WRCOMB]         = "WC",
+        [MTRR_TYPE_WRTHROUGH]      = "WT",
+        [MTRR_TYPE_WRPROT]         = "WP",
+        [MTRR_TYPE_WRBACK]         = "WB",
+        [MTRR_NUM_TYPES]           = "??"
+    };
+
+    return x < ARRAY_SIZE(memory_types) ? (memory_types[x] ?: "?") : "?";
+}
+
 static void ept_dump_p2m_table(unsigned char key)
 {
     struct domain *d;
@@ -1212,15 +1227,6 @@ static void ept_dump_p2m_table(unsigned char key)
     unsigned long record_counter = 0;
     struct p2m_domain *p2m;
     struct ept_data *ept;
-    static const char memory_types[8][2] = {
-        [0 ... 7] = "?",
-        [MTRR_TYPE_UNCACHABLE]     = "UC",
-        [MTRR_TYPE_WRCOMB]         = "WC",
-        [MTRR_TYPE_WRTHROUGH]      = "WT",
-        [MTRR_TYPE_WRPROT]         = "WP",
-        [MTRR_TYPE_WRBACK]         = "WB",
-        [MTRR_NUM_TYPES]           = "??"
-    };
 
     for_each_domain(d)
     {
@@ -1260,8 +1266,8 @@ static void ept_dump_p2m_table(unsigned char key)
                            ept_entry->r ? 'r' : ' ',
                            ept_entry->w ? 'w' : ' ',
                            ept_entry->x ? 'x' : ' ',
-                           memory_types[ept_entry->emt][0],
-                           memory_types[ept_entry->emt][1]
+                           memory_type_to_str(ept_entry->emt)[0],
+                           memory_type_to_str(ept_entry->emt)[1]
                            ?: ept_entry->emt + '0',
                            c ?: ept_entry->ipat ? '!' : ' ');
 
