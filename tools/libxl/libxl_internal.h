@@ -617,7 +617,9 @@ _hidden void *libxl__zalloc(libxl__gc *gc_opt, size_t size) NN1;
 _hidden void *libxl__calloc(libxl__gc *gc_opt, size_t nmemb, size_t size) NN1;
 /* change the size of the memory block pointed to by @ptr to @new_size bytes.
  * unlike other allocation functions here any additional space between the
- * oldsize and @new_size is not initialised (similar to a gc'd realloc(3)). */
+ * oldsize and @new_size is not initialised (similar to a gc'd realloc(3)).
+ * if @ptr is non-NULL and @gc_opt is not nogc_gc then @ptr must have been
+ * registered with @gc_opt previously. */
 _hidden void *libxl__realloc(libxl__gc *gc_opt, void *ptr, size_t new_size) NN1;
 /* print @fmt into an allocated string large enoughto contain the result.
  * (similar to gc'd asprintf(3)). */

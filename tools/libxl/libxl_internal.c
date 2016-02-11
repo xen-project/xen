@@ -122,6 +122,10 @@ void *libxl__realloc(libxl__gc *gc, void *ptr, size_t new_size)
                 break;
             }
         }
+        if (i == gc->alloc_maxsize) {
+            LOG(CRITICAL, "pointer is not tracked by the given gc");
+            abort();
+        }
     }
 
     return new_ptr;
