@@ -865,6 +865,22 @@ void console_end_log_everything(void)
     atomic_dec(&print_everything);
 }
 
+unsigned long console_lock_recursive_irqsave(void)
+{
+    unsigned long flags;
+
+    local_irq_save(flags);
+    spin_lock_recursive(&console_lock);
+
+    return flags;
+}
+
+void console_unlock_recursive_irqrestore(unsigned long flags)
+{
+    spin_unlock_recursive(&console_lock);
+    local_irq_restore(flags);
+}
+
 void console_force_unlock(void)
 {
     watchdog_disable();

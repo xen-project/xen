@@ -416,12 +416,19 @@ void show_stack_overflow(unsigned int cpu, const struct cpu_user_regs *regs)
 
 void show_execution_state(const struct cpu_user_regs *regs)
 {
+    /* Prevent interleaving of output. */
+    unsigned long flags = console_lock_recursive_irqsave();
+
     show_registers(regs);
     show_stack(regs);
+
+    console_unlock_recursive_irqrestore(flags);
 }
 
 void vcpu_show_execution_state(struct vcpu *v)
 {
+    unsigned long flags;
+
     printk("*** Dumping Dom%d vcpu#%d state: ***\n",
            v->domain->domain_id, v->vcpu_id);
 
@@ -433,9 +440,14 @@ void vcpu_show_execution_state(struct vcpu *v)
 
     vcpu_pause(v); /* acceptably dangerous */
 
+    /* Prevent interleaving of output. */
+    flags = console_lock_recursive_irqsave();
+
     vcpu_show_registers(v);
     if ( guest_kernel_mode(v, &v->arch.user_regs) )
         show_guest_stack(v, &v->arch.user_regs);
+
+    console_unlock_recursive_irqrestore(flags);
 
     vcpu_unpause(v);
 }

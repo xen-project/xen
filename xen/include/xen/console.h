@@ -21,6 +21,8 @@ int console_has(const char *device);
 
 int fill_console_start_info(struct dom0_vga_console_info *);
 
+unsigned long console_lock_recursive_irqsave(void);
+void console_unlock_recursive_irqrestore(unsigned long flags);
 void console_force_unlock(void);
 
 void console_start_sync(void);
