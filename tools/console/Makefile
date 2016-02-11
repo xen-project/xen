@@ -30,7 +30,8 @@ daemon/io.o: CFLAGS += $(CFLAGS_libxenevtchn) $(CFLAGS_libxengnttab)
 xenconsoled: $(patsubst %.c,%.o,$(wildcard daemon/*.c))
 	$(CC) $(LDFLAGS) $^ -o $@ $(LDLIBS) $(LDLIBS_libxenevtchn) $(LDLIBS_libxengnttab) $(LDLIBS_xenconsoled) $(APPEND_LDFLAGS)
 
-xenconsole: client/_paths.h $(patsubst %.c,%.o,$(wildcard client/*.c))
+client/main.o: client/_paths.h
+xenconsole: $(patsubst %.c,%.o,$(wildcard client/*.c))
 	$(CC) $(LDFLAGS) $^ -o $@ $(LDLIBS) $(LDLIBS_xenconsole) $(APPEND_LDFLAGS)
 
 genpath-target = $(call buildmakevars2header,client/_paths.h)
