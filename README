@@ -38,7 +38,7 @@ provided by your OS distributor:
     * GCC
       - For x86 4.1.2_20070115 or later
       - For ARM 4.8 or later
-    * GNU Make
+    * GNU Make v3.80 or later
     * GNU Binutils:
       - For x86 2.16.91.0.5 or later
       - For ARM 2.24 or later
