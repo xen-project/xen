@@ -78,7 +78,6 @@ struct kernel_param {
         OPT_STR,
         OPT_UINT,
         OPT_BOOL,
-        OPT_INVBOOL,
         OPT_SIZE,
         OPT_CUSTOM
     } type;
@@ -98,10 +97,6 @@ extern struct kernel_param __setup_start, __setup_end;
     __setup_str __setup_str_##_var[] = _name; \
     __kparam __setup_##_var = \
         { __setup_str_##_var, OPT_BOOL, &_var, sizeof(_var) }
-#define invbool_param(_name, _var) \
-    __setup_str __setup_str_##_var[] = _name; \
-    __kparam __setup_##_var = \
-        { __setup_str_##_var, OPT_INVBOOL, &_var, sizeof(_var) }
 #define integer_param(_name, _var) \
     __setup_str __setup_str_##_var[] = _name; \
     __kparam __setup_##_var = \

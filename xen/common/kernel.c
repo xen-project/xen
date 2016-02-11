@@ -121,12 +121,9 @@ void __init cmdline_parse(const char *cmdline)
                     simple_strtoll(optval, NULL, 0));
                 break;
             case OPT_BOOL:
-            case OPT_INVBOOL:
                 if ( !parse_bool(optval) )
                     bool_assert = !bool_assert;
-                assign_integer_param(
-                    param,
-                    (param->type == OPT_BOOL) == bool_assert);
+                assign_integer_param(param, bool_assert);
                 break;
             case OPT_SIZE:
                 assign_integer_param(
