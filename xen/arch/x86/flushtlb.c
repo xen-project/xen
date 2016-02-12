@@ -141,10 +141,11 @@ void flush_area_local(const void *va, unsigned int flags)
         {
             alternative(ASM_NOP3, "sfence", X86_FEATURE_CLFLUSHOPT);
             for ( i = 0; i < sz; i += c->x86_clflush_size )
-                 alternative_input("rex clflush %0",
-                                   "data16 clflush %0",
-                                   X86_FEATURE_CLFLUSHOPT,
-                                   "m" (((const char *)va)[i]));
+                alternative_input(".byte " __stringify(NOP_DS_PREFIX) ";"
+                                  " clflush %0",
+                                  "data16 clflush %0",      /* clflushopt */
+                                  X86_FEATURE_CLFLUSHOPT,
+                                  "m" (((const char *)va)[i]));
         }
         else
         {

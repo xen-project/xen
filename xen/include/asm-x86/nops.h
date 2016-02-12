@@ -7,6 +7,8 @@
  * Define nops for use with alternative().
  */
 
+#define NOP_DS_PREFIX 0x3e
+
 /*
  * Opteron 64bit nops
  * 1: nop
