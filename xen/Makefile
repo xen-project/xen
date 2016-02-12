@@ -81,6 +81,7 @@ _uninstall: D=$(DESTDIR)
 _uninstall: T=$(notdir $(TARGET))
 _uninstall: Z=$(CONFIG_XEN_INSTALL_SUFFIX)
 _uninstall:
+	rm -f $(D)$(BOOT_DIR)/$(T)-$(XEN_FULLVERSION).config
 	rm -f $(D)$(BOOT_DIR)/$(T)-$(XEN_FULLVERSION)$(Z)
 	rm -f $(D)$(BOOT_DIR)/$(T)-$(XEN_VERSION).$(XEN_SUBVERSION)$(Z)
 	rm -f $(D)$(BOOT_DIR)/$(T)-$(XEN_VERSION)$(Z)
