@@ -274,17 +274,6 @@ typedef uint64_t   UINTN;
 #endif
 #endif
 
-#if __GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 4)
-#define uefi_call_wrapper(func, va_num, ...)	func(__VA_ARGS__)
-#else
-/* for x86_64, EFI_FUNCTION_WRAPPER must be defined */
-#ifdef  EFI_FUNCTION_WRAPPER
-UINTN uefi_call_wrapper(void *func, unsigned long va_num, ...);
-#else
-#error "EFI_FUNCTION_WRAPPER must be defined for x86_64 architecture"
-#endif
-#endif
-
 #ifdef _MSC_EXTENSIONS
 #pragma warning ( disable : 4731 )  // Suppress warnings about modification of EBP
 #endif
