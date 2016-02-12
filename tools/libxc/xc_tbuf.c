@@ -70,11 +70,13 @@ int xc_tbuf_get_size(xc_interface *xch, unsigned long *size)
                     sysctl.u.tbuf_op.buffer_mfn);
 
     if ( t_info == NULL || t_info->tbuf_size == 0 )
-        return -1;
+        rc = -1;
+    else
+	*size = t_info->tbuf_size;
 
-    *size = t_info->tbuf_size;
+    xenforeignmemory_unmap(xch->fmem, t_info, sysctl.u.tbuf_op.size);
 
-    return 0;
+    return rc;
 }
 
 int xc_tbuf_enable(xc_interface *xch, unsigned long pages, unsigned long *mfn,
