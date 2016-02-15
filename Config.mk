@@ -255,9 +255,9 @@ MINIOS_UPSTREAM_REVISION ?= 89268f00b0b0215057cb74edd94e866536a02489
 # Fri Jan 15 13:24:03 2016 +0000
 # mini-os: Include libxenforeignmemory with libxc
 
-SEABIOS_UPSTREAM_REVISION ?= 3403ac4313812752be6e6aac35239ca6888a8cab
-# Mon Dec 28 13:50:41 2015 +0100
-# build: fix typo in buildversion.py
+SEABIOS_UPSTREAM_REVISION ?= rel-1.9.1
+# Fri Jan 15 15:49:32 2016 +0000
+# biostables: Support SMBIOS 2.6+ UUID format
 
 ETHERBOOT_NICS ?= rtl8139 8086100e
 
