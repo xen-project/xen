@@ -2101,17 +2101,6 @@ int xc_set_mem_access(xc_interface *xch, domid_t domain_id,
 int xc_get_mem_access(xc_interface *xch, domid_t domain_id,
                       uint64_t pfn, xenmem_access_t *access);
 
-/*
- * Instructions causing a mem_access violation can be emulated by Xen
- * to progress the execution without having to relax the mem_access
- * permissions.
- * This feature has to be first enabled, then in the vm_event
- * response to a mem_access event it can be indicated if the instruction
- * should be emulated.
- */
-int xc_mem_access_enable_emulate(xc_interface *xch, domid_t domain_id);
-int xc_mem_access_disable_emulate(xc_interface *xch, domid_t domain_id);
-
 /***
  * Monitor control operations.
  *

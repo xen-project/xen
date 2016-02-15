@@ -390,7 +390,6 @@ struct arch_domain
     } monitor;
 
     /* Mem_access emulation control */
-    bool_t mem_access_emulate_enabled;
     bool_t mem_access_emulate_each_rep;
 
     /* Emulated devices enabled bitmap. */

@@ -89,20 +89,6 @@ typedef enum {
 } p2m_type_t;
 
 static inline
-int p2m_mem_access_enable_emulate(struct domain *d)
-{
-    /* Not supported on ARM */
-    return -ENOSYS;
-}
-
-static inline
-int p2m_mem_access_disable_emulate(struct domain *d)
-{
-    /* Not supported on ARM */
-    return -ENOSYS;
-}
-
-static inline
 void p2m_mem_access_emulate_check(struct vcpu *v,
                                   const vm_event_response_t *rsp)
 {

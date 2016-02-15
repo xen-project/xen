@@ -648,30 +648,6 @@ bool_t p2m_mem_access_check(paddr_t gpa, unsigned long gla,
                             struct npfec npfec,
                             vm_event_request_t **req_ptr);
 
-/*
- * Emulating a memory access requires custom handling. These non-atomic
- * functions should be called under domctl lock.
- */
-static inline
-int p2m_mem_access_enable_emulate(struct domain *d)
-{
-    if ( d->arch.mem_access_emulate_enabled )
-        return -EEXIST;
-
-    d->arch.mem_access_emulate_enabled = 1;
-    return 0;
-}
-
-static inline
-int p2m_mem_access_disable_emulate(struct domain *d)
-{
-    if ( !d->arch.mem_access_emulate_enabled )
-        return -EEXIST;
-
-    d->arch.mem_access_emulate_enabled = 0;
-    return 0;
-}
-
 /* Check for emulation and mark vcpu for skipping one instruction
  * upon rescheduling if required. */
 void p2m_mem_access_emulate_check(struct vcpu *v,

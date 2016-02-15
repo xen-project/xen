@@ -390,8 +390,13 @@ DEFINE_XEN_GUEST_HANDLE(xen_mem_paging_op_t);
 #define XENMEM_access_op                    21
 #define XENMEM_access_op_set_access         0
 #define XENMEM_access_op_get_access         1
-#define XENMEM_access_op_enable_emulate     2
-#define XENMEM_access_op_disable_emulate    3
+/*
+ * XENMEM_access_op_enable_emulate and XENMEM_access_op_disable_emulate are
+ * currently unused, but since they have been in use please do not reuse them.
+ *
+ * #define XENMEM_access_op_enable_emulate     2
+ * #define XENMEM_access_op_disable_emulate    3
+ */
 
 typedef enum {
     XENMEM_access_n,

@@ -98,14 +98,6 @@ int mem_access_memop(unsigned long cmd,
         break;
     }
 
-    case XENMEM_access_op_enable_emulate:
-        rc = p2m_mem_access_enable_emulate(d);
-        break;
-
-    case XENMEM_access_op_disable_emulate:
-        rc = p2m_mem_access_disable_emulate(d);
-        break;
-
     default:
         rc = -ENOSYS;
         break;

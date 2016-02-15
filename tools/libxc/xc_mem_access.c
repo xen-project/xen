@@ -62,30 +62,6 @@ int xc_get_mem_access(xc_interface *xch,
     return rc;
 }
 
-int xc_mem_access_enable_emulate(xc_interface *xch,
-                                 domid_t domain_id)
-{
-    xen_mem_access_op_t mao =
-    {
-        .op     = XENMEM_access_op_enable_emulate,
-        .domid  = domain_id,
-    };
-
-    return do_memory_op(xch, XENMEM_access_op, &mao, sizeof(mao));
-}
-
-int xc_mem_access_disable_emulate(xc_interface *xch,
-                                  domid_t domain_id)
-{
-    xen_mem_access_op_t mao =
-    {
-        .op     = XENMEM_access_op_disable_emulate,
-        .domid  = domain_id,
-    };
-
-    return do_memory_op(xch, XENMEM_access_op, &mao, sizeof(mao));
-}
-
 /*
  * Local variables:
  * mode: C
