@@ -905,51 +905,24 @@ int cpuid_hypervisor_leaves( uint32_t idx, uint32_t sub_idx,
 
 void pv_cpuid(struct cpu_user_regs *regs)
 {
-    uint32_t a, b, c, d;
+    uint32_t leaf, subleaf, a, b, c, d;
     struct vcpu *curr = current;
     struct domain *currd = curr->domain;
 
-    a = regs->eax;
+    leaf = a = regs->eax;
     b = regs->ebx;
-    c = regs->ecx;
+    subleaf = c = regs->ecx;
     d = regs->edx;
 
-    if ( !is_control_domain(currd) && !is_hardware_domain(currd) )
-    {
-        unsigned int cpuid_leaf = a, sub_leaf = c;
-
-        if ( !cpuid_hypervisor_leaves(a, c, &a, &b, &c, &d) )
-            domain_cpuid(currd, a, c, &a, &b, &c, &d);
-
-        switch ( cpuid_leaf )
-        {
-        case XSTATE_CPUID:
-        {
-            unsigned int _eax, _ebx, _ecx, _edx;
-            /* EBX value of main leaf 0 depends on enabled xsave features */
-            if ( sub_leaf == 0 && curr->arch.xcr0 )
-            {
-                /* reset EBX to default value first */
-                b = XSTATE_AREA_MIN_SIZE;
-                for ( sub_leaf = 2; sub_leaf < 63; sub_leaf++ )
-                {
-                    if ( !(curr->arch.xcr0 & (1ULL << sub_leaf)) )
-                        continue;
-                    domain_cpuid(currd, cpuid_leaf, sub_leaf,
-                                 &_eax, &_ebx, &_ecx, &_edx);
-                    if ( (_eax + _ebx) > b )
-                        b = _eax + _ebx;
-                }
-            }
-            goto xstate;
-        }
-        }
+    if ( cpuid_hypervisor_leaves(leaf, subleaf, &a, &b, &c, &d) )
         goto out;
-    }
 
-    cpuid_count(a, c, &a, &b, &c, &d);
+    if ( !is_control_domain(currd) && !is_hardware_domain(currd) )
+        domain_cpuid(currd, leaf, subleaf, &a, &b, &c, &d);
+    else
+        cpuid_count(leaf, subleaf, &a, &b, &c, &d);
 
-    if ( (regs->eax & 0x7fffffff) == 0x00000001 )
+    if ( (leaf & 0x7fffffff) == 0x00000001 )
     {
         /* Modify Feature Information. */
         if ( !cpu_has_apic )
@@ -964,7 +937,7 @@ void pv_cpuid(struct cpu_user_regs *regs)
         }
     }
 
-    switch ( regs->_eax )
+    switch ( leaf )
     {
     case 0x00000001:
         /* Modify Feature Information. */
@@ -999,7 +972,7 @@ void pv_cpuid(struct cpu_user_regs *regs)
         break;
 
     case 0x00000007:
-        if ( regs->_ecx == 0 )
+        if ( subleaf == 0 )
             b &= (cpufeat_mask(X86_FEATURE_BMI1) |
                   cpufeat_mask(X86_FEATURE_HLE)  |
                   cpufeat_mask(X86_FEATURE_AVX2) |
@@ -1015,14 +988,29 @@ void pv_cpuid(struct cpu_user_regs *regs)
         break;
 
     case XSTATE_CPUID:
-    xstate:
         if ( !cpu_has_xsave )
             goto unsupported;
-        if ( regs->_ecx == 1 )
+        switch ( subleaf )
         {
+        case 0:
+        {
+            uint32_t tmp;
+
+            /*
+             * Always read CPUID.0xD[ECX=0].EBX from hardware, rather than
+             * domain policy.  It varies with enabled xstate, and the correct
+             * xcr0 is in context.
+             */
+            if ( !is_control_domain(currd) && !is_hardware_domain(currd) )
+                cpuid_count(leaf, subleaf, &tmp, &b, &tmp, &tmp);
+            break;
+        }
+
+        case 1:
             a &= (boot_cpu_data.x86_capability[cpufeat_word(X86_FEATURE_XSAVEOPT)] &
                   ~cpufeat_mask(X86_FEATURE_XSAVES));
             b = c = d = 0;
+            break;
         }
         break;
 
@@ -1064,15 +1052,11 @@ void pv_cpuid(struct cpu_user_regs *regs)
     unsupported:
         a = b = c = d = 0;
         break;
-
-    default:
-        (void)cpuid_hypervisor_leaves(regs->eax, 0, &a, &b, &c, &d);
-        break;
     }
 
  out:
     /* VPMU may decide to modify some of the leaves */
-    vpmu_do_cpuid(regs->eax, &a, &b, &c, &d);
+    vpmu_do_cpuid(leaf, &a, &b, &c, &d);
 
     regs->eax = a;
     regs->ebx = b;
