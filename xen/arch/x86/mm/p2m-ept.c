@@ -1204,7 +1204,7 @@ void ept_p2m_uninit(struct p2m_domain *p2m)
 
 static const char *memory_type_to_str(unsigned int x)
 {
-    static const char memory_types[8][2] = {
+    static const char memory_types[8][3] = {
         [MTRR_TYPE_UNCACHABLE]     = "UC",
         [MTRR_TYPE_WRCOMB]         = "WC",
         [MTRR_TYPE_WRTHROUGH]      = "WT",
@@ -1213,7 +1213,8 @@ static const char *memory_type_to_str(unsigned int x)
         [MTRR_NUM_TYPES]           = "??"
     };
 
-    return x < ARRAY_SIZE(memory_types) ? (memory_types[x] ?: "?") : "?";
+    ASSERT(x < ARRAY_SIZE(memory_types));
+    return memory_types[x][0] ? memory_types[x] : "?";
 }
 
 static void ept_dump_p2m_table(unsigned char key)
