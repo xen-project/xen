@@ -3192,8 +3192,10 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
                 break;
             }
             else {
-                int handled = hvm_event_int3(regs->eip);
-                
+                int handled =
+                        hvm_event_breakpoint(regs->eip,
+                                             HVM_EVENT_SOFTWARE_BREAKPOINT);
+
                 if ( handled < 0 ) 
                 {
                     struct hvm_trap trap = {
@@ -3517,10 +3519,11 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
     case EXIT_REASON_MONITOR_TRAP_FLAG:
         v->arch.hvm_vmx.exec_control &= ~CPU_BASED_MONITOR_TRAP_FLAG;
         vmx_update_cpu_exec_control(v);
-        if ( v->arch.hvm_vcpu.single_step ) {
-          hvm_event_single_step(regs->eip);
-          if ( v->domain->debugger_attached )
-              domain_pause_for_debugger();
+        if ( v->arch.hvm_vcpu.single_step )
+        {
+            hvm_event_breakpoint(regs->eip, HVM_EVENT_SINGLESTEP_BREAKPOINT);
+            if ( v->domain->debugger_attached )
+                domain_pause_for_debugger();
         }
 
         break;

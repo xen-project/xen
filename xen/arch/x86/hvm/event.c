@@ -1,22 +1,24 @@
 /*
-* event.c: Common hardware virtual machine event abstractions.
-*
-* Copyright (c) 2004, Intel Corporation.
-* Copyright (c) 2005, International Business Machines Corporation.
-* Copyright (c) 2008, Citrix Systems, Inc.
-*
-* This program is free software; you can redistribute it and/or modify it
-* under the terms and conditions of the GNU General Public License,
-* version 2, as published by the Free Software Foundation.
-*
-* This program is distributed in the hope it will be useful, but WITHOUT
-* ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-* FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
-* more details.
-*
-* You should have received a copy of the GNU General Public License along with
-* this program; If not, see <http://www.gnu.org/licenses/>.
-*/
+ * arch/x86/hvm/event.c
+ *
+ * Arch-specific hardware virtual machine event abstractions.
+ *
+ * Copyright (c) 2004, Intel Corporation.
+ * Copyright (c) 2005, International Business Machines Corporation.
+ * Copyright (c) 2008, Citrix Systems, Inc.
+ *
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms and conditions of the GNU General Public License,
+ * version 2, as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program; If not, see <http://www.gnu.org/licenses/>.
+ */
 
 #include <xen/vm_event.h>
 #include <xen/paging.h>
@@ -151,61 +153,51 @@ void hvm_event_guest_request(void)
     }
 }
 
-int hvm_event_int3(unsigned long rip)
+static inline unsigned long gfn_of_rip(unsigned long rip)
 {
-    int rc = 0;
     struct vcpu *curr = current;
+    struct segment_register sreg;
+    uint32_t pfec = PFEC_page_present | PFEC_insn_fetch;
 
-    if ( curr->domain->arch.monitor.software_breakpoint_enabled )
-    {
-        struct segment_register sreg;
-        uint32_t pfec = PFEC_page_present | PFEC_insn_fetch;
-        vm_event_request_t req = {
-            .reason = VM_EVENT_REASON_SOFTWARE_BREAKPOINT,
-            .vcpu_id = curr->vcpu_id,
-        };
+    hvm_get_segment_register(curr, x86_seg_ss, &sreg);
+    if ( sreg.attr.fields.dpl == 3 )
+        pfec |= PFEC_user_mode;
 
-        hvm_get_segment_register(curr, x86_seg_ss, &sreg);
-        if ( sreg.attr.fields.dpl == 3 )
-            pfec |= PFEC_user_mode;
+    hvm_get_segment_register(curr, x86_seg_cs, &sreg);
 
-        hvm_get_segment_register(curr, x86_seg_cs, &sreg);
-        req.u.software_breakpoint.gfn = paging_gva_to_gfn(curr,
-                                                          sreg.base + rip,
-                                                          &pfec);
-
-        rc = hvm_event_traps(1, &req);
-    }
-
-    return rc;
+    return paging_gva_to_gfn(curr, sreg.base + rip, &pfec);
 }
 
-int hvm_event_single_step(unsigned long rip)
+int hvm_event_breakpoint(unsigned long rip,
+                         enum hvm_event_breakpoint_type type)
 {
-    int rc = 0;
     struct vcpu *curr = current;
+    struct arch_domain *ad = &curr->domain->arch;
+    vm_event_request_t req;
 
-    if ( curr->domain->arch.monitor.singlestep_enabled )
+    switch ( type )
     {
-        struct segment_register sreg;
-        uint32_t pfec = PFEC_page_present | PFEC_insn_fetch;
-        vm_event_request_t req = {
-            .reason = VM_EVENT_REASON_SINGLESTEP,
-            .vcpu_id = curr->vcpu_id,
-        };
+    case HVM_EVENT_SOFTWARE_BREAKPOINT:
+        if ( !ad->monitor.software_breakpoint_enabled )
+            return 0;
+        req.reason = VM_EVENT_REASON_SOFTWARE_BREAKPOINT;
+        req.u.software_breakpoint.gfn = gfn_of_rip(rip);
+        break;
 
-        hvm_get_segment_register(curr, x86_seg_ss, &sreg);
-        if ( sreg.attr.fields.dpl == 3 )
-            pfec |= PFEC_user_mode;
+    case HVM_EVENT_SINGLESTEP_BREAKPOINT:
+        if ( !ad->monitor.singlestep_enabled )
+            return 0;
+        req.reason = VM_EVENT_REASON_SINGLESTEP;
+        req.u.singlestep.gfn = gfn_of_rip(rip);
+        break;
 
-        hvm_get_segment_register(curr, x86_seg_cs, &sreg);
-        req.u.singlestep.gfn = paging_gva_to_gfn(curr, sreg.base + rip,
-                                                 &pfec);
-
-        rc = hvm_event_traps(1, &req);
+    default:
+        return -EOPNOTSUPP;
     }
 
-    return rc;
+    req.vcpu_id = curr->vcpu_id;
+
+    return hvm_event_traps(1, &req);
 }
 
 /*
