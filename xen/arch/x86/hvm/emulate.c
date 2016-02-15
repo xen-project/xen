@@ -966,7 +966,7 @@ static int hvmemul_write_io_discard(
 }
 
 static int hvmemul_write_msr_discard(
-    unsigned long reg,
+    unsigned int reg,
     uint64_t val,
     struct x86_emulate_ctxt *ctxt)
 {
@@ -1439,7 +1439,7 @@ static int hvmemul_write_cr(
 }
 
 static int hvmemul_read_msr(
-    unsigned long reg,
+    unsigned int reg,
     uint64_t *val,
     struct x86_emulate_ctxt *ctxt)
 {
@@ -1447,7 +1447,7 @@ static int hvmemul_read_msr(
 }
 
 static int hvmemul_write_msr(
-    unsigned long reg,
+    unsigned int reg,
     uint64_t val,
     struct x86_emulate_ctxt *ctxt)
 {

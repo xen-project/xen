@@ -334,7 +334,7 @@ struct x86_emulate_ops
      *  @reg:   [IN ] Register to read.
      */
     int (*read_msr)(
-        unsigned long reg,
+        unsigned int reg,
         uint64_t *val,
         struct x86_emulate_ctxt *ctxt);
 
@@ -343,7 +343,7 @@ struct x86_emulate_ops
      *  @reg:   [IN ] Register to write.
      */
     int (*write_msr)(
-        unsigned long reg,
+        unsigned int reg,
         uint64_t val,
         struct x86_emulate_ctxt *ctxt);
 
