@@ -451,10 +451,17 @@ void show_stack(const struct cpu_user_regs *regs)
 
 void show_stack_overflow(unsigned int cpu, const struct cpu_user_regs *regs)
 {
-#ifdef MEMORY_GUARD
     unsigned long esp = regs->rsp;
+    unsigned long curr_stack_base = esp & ~(STACK_SIZE - 1);
+#ifdef MEMORY_GUARD
     unsigned long esp_top, esp_bottom;
+#endif
 
+    if ( _p(curr_stack_base) != stack_base[cpu] )
+        printk("Current stack base %p differs from expected %p\n",
+               _p(curr_stack_base), stack_base[cpu]);
+
+#ifdef MEMORY_GUARD
     esp_bottom = (esp | (STACK_SIZE - 1)) + 1;
     esp_top    = esp_bottom - PRIMARY_STACK_SIZE;
 
@@ -462,9 +469,12 @@ void show_stack_overflow(unsigned int cpu, const struct cpu_user_regs *regs)
            (void *)esp_top, (void *)esp_bottom, (void *)esp,
            (void *)per_cpu(init_tss, cpu).esp0);
 
-    /* Trigger overflow trace if %esp is within 512 bytes of the guard page. */
-    if ( ((unsigned long)(esp - esp_top) > 512) &&
-         ((unsigned long)(esp_top - esp) > 512) )
+    /*
+     * Trigger overflow trace if %esp is anywhere within the guard page, or
+     * with fewer than 512 bytes remaining on the primary stack.
+     */
+    if ( (esp > (esp_top + 512)) ||
+         (esp < (esp_top - PAGE_SIZE)) )
     {
         printk("No stack overflow detected. Skipping stack trace.\n");
         return;
