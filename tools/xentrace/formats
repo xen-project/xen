@@ -62,6 +62,9 @@
 0x00022804  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  rtds:repl_budget   [ dom:vcpu = 0x%(1)08x, cur_deadline = 0x%(3)08x%(2)08x, cur_budget = 0x%(5)08x%(4)08x ]
 0x00022805  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  rtds:sched_tasklet
 
+0x00041001  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  domain_create   [ dom = 0x%(1)08x ]
+0x00041002  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  domain_destroy  [ dom = 0x%(1)08x ]
+
 0x00081001  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  VMENTRY
 0x00081002  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  VMEXIT      [ exitcode = 0x%(1)08x, rIP  = 0x%(2)08x ]
 0x00081102  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  VMEXIT      [ exitcode = 0x%(1)08x, rIP  = 0x%(3)08x%(2)08x ]
