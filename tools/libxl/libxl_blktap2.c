@@ -47,6 +47,7 @@ char *libxl__blktap_devpath(libxl__gc *gc,
         return devname;
     }
 
+    free(devname);
     return NULL;
 }
 
