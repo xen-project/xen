@@ -119,6 +119,23 @@ void libxl__save_helper_init(libxl__save_helper_state *shs)
 
 /*----- helper execution -----*/
 
+/* This function can not fail. */
+static int dup_cloexec(libxl__gc *gc, int fd, const char *what)
+{
+    int dup_fd = fd;
+
+    if (fd <= 2) {
+        dup_fd = dup(fd);
+        if (dup_fd < 0) {
+            LOGE(ERROR,"dup %s", what);
+            exit(-1);
+        }
+    }
+    libxl_fd_set_cloexec(CTX, dup_fd, 0);
+
+    return dup_fd;
+}
+
 /*
  * Both save and restore share four parameters:
  * 1) Path to libxl-save-helper.
@@ -186,14 +203,7 @@ static void run_helper(libxl__egc *egc, libxl__save_helper_state *shs,
 
     pid_t pid = libxl__ev_child_fork(gc, &shs->child, helper_exited);
     if (!pid) {
-        if (stream_fd <= 2) {
-            stream_fd = dup(stream_fd);
-            if (stream_fd < 0) {
-                LOGE(ERROR,"dup migration stream fd");
-                exit(-1);
-            }
-        }
-        libxl_fd_set_cloexec(CTX, stream_fd, 0);
+        stream_fd = dup_cloexec(gc, stream_fd, "migration stream fd");
         *stream_fd_arg = GCSPRINTF("%d", stream_fd);
 
         for (i=0; i<num_preserve_fds; i++)
