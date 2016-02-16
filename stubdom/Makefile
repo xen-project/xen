@@ -314,9 +314,9 @@ mk-headers-$(XEN_TARGET_ARCH): $(IOEMU_LINKFARM_TARGET)
 	  ln -sf $(wildcard $(XEN_ROOT)/tools/include/xen-foreign/*) include/xen-foreign/ && \
 	  $(MAKE) DESTDIR= -C include/xen-foreign/ && \
 	  ( [ -h include/xen/foreign ] || ln -sf ../xen-foreign include/xen/foreign )
-	mkdir -p libs-$(XEN_TARGET_ARCH)/toollog
+	mkdir -p libs-$(XEN_TARGET_ARCH)/toollog/include
 	[ -h libs-$(XEN_TARGET_ARCH)/toollog/Makefile ] || ( cd libs-$(XEN_TARGET_ARCH)/toollog && \
-	  ln -sf $(XEN_ROOT)/tools/libs/toollog/include/*.h . && \
+	  ln -sf $(XEN_ROOT)/tools/libs/toollog/include/*.h include/ && \
 	  ln -sf $(XEN_ROOT)/tools/libs/toollog/*.c . && \
 	  ln -sf $(XEN_ROOT)/tools/libs/toollog/Makefile . )
 	mkdir -p libs-$(XEN_TARGET_ARCH)/evtchn/include
@@ -343,17 +343,17 @@ mk-headers-$(XEN_TARGET_ARCH): $(IOEMU_LINKFARM_TARGET)
 	  ln -sf $(XEN_ROOT)/tools/libs/foreignmemory/include/*.h include/ && \
 	  ln -sf $(XEN_ROOT)/tools/libs/foreignmemory/*.c . && \
 	  ln -sf $(XEN_ROOT)/tools/libs/foreignmemory/Makefile . )
-	mkdir -p libxc-$(XEN_TARGET_ARCH)
+	mkdir -p libxc-$(XEN_TARGET_ARCH)/include
 	[ -h libxc-$(XEN_TARGET_ARCH)/Makefile ] || ( cd libxc-$(XEN_TARGET_ARCH) && \
 	  ln -sf $(XEN_ROOT)/tools/libxc/*.h . && \
-	  ln -sf $(XEN_ROOT)/tools/libxc/include/*.h . && \
+	  ln -sf $(XEN_ROOT)/tools/libxc/include/*.h include/ && \
 	  ln -sf $(XEN_ROOT)/tools/libxc/*.c . && \
 	  ln -sf $(XEN_ROOT)/tools/libxc/Makefile . )
-	mkdir -p xenstore
+	mkdir -p xenstore/include
 	[ -h xenstore/Makefile ] || ( cd xenstore && \
 	  ln -sf $(XEN_ROOT)/tools/xenstore/*.c . && \
 	  ln -sf $(XEN_ROOT)/tools/xenstore/*.h . && \
-	  ln -sf $(XEN_ROOT)/tools/xenstore/include/*.h . && \
+	  ln -sf $(XEN_ROOT)/tools/xenstore/include/*.h include/ && \
 	  ln -sf $(XEN_ROOT)/tools/xenstore/Makefile . )
 	$(MAKE) DESTDIR= -C $(MINI_OS) links
 	touch mk-headers-$(XEN_TARGET_ARCH)
