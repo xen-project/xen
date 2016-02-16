@@ -899,6 +899,8 @@ static void libxl__remus_setup(libxl__egc *egc,
     /* Convenience aliases */
     libxl__remus_devices_state *const rds = &dss->rds;
     const libxl_domain_remus_info *const info = dss->remus;
+    libxl__srm_save_autogen_callbacks *const callbacks =
+        &dss->sws.shs.callbacks.save.a;
 
     STATE_AO_GC(dss->ao);
 
@@ -916,6 +918,12 @@ static void libxl__remus_setup(libxl__egc *egc,
     rds->ao = ao;
     rds->domid = dss->domid;
     rds->callback = remus_setup_done;
+
+    dss->sws.checkpoint_callback = remus_checkpoint_stream_written;
+
+    callbacks->suspend = libxl__remus_domain_suspend_callback;
+    callbacks->postcopy = libxl__remus_domain_resume_callback;
+    callbacks->checkpoint = libxl__remus_domain_save_checkpoint_callback;
 
     libxl__remus_devices_setup(egc, rds);
     return;

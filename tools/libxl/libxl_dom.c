@@ -1489,7 +1489,7 @@ static void remus_devices_preresume_cb(libxl__egc *egc,
                                        libxl__remus_devices_state *rds,
                                        int rc);
 
-static void libxl__remus_domain_suspend_callback(void *data)
+void libxl__remus_domain_suspend_callback(void *data)
 {
     libxl__save_helper_state *shs = data;
     libxl__egc *egc = shs->egc;
@@ -1532,7 +1532,7 @@ out:
     libxl__xc_domain_saverestore_async_callback_done(egc, &dss->sws.shs, !rc);
 }
 
-static void libxl__remus_domain_resume_callback(void *data)
+void libxl__remus_domain_resume_callback(void *data)
 {
     libxl__save_helper_state *shs = data;
     libxl__egc *egc = shs->egc;
@@ -1569,8 +1569,6 @@ out:
 
 /*----- remus asynchronous checkpoint callback -----*/
 
-static void remus_checkpoint_stream_written(
-    libxl__egc *egc, libxl__stream_write_state *sws, int rc);
 static void remus_devices_commit_cb(libxl__egc *egc,
                                     libxl__remus_devices_state *rds,
                                     int rc);
@@ -1578,7 +1576,7 @@ static void remus_next_checkpoint(libxl__egc *egc, libxl__ev_time *ev,
                                   const struct timeval *requested_abs,
                                   int rc);
 
-static void libxl__remus_domain_save_checkpoint_callback(void *data)
+void libxl__remus_domain_save_checkpoint_callback(void *data)
 {
     libxl__save_helper_state *shs = data;
     libxl__domain_suspend_state *dss = shs->caller_state;
@@ -1588,7 +1586,7 @@ static void libxl__remus_domain_save_checkpoint_callback(void *data)
     libxl__stream_write_start_checkpoint(egc, &dss->sws);
 }
 
-static void remus_checkpoint_stream_written(
+void remus_checkpoint_stream_written(
     libxl__egc *egc, libxl__stream_write_state *sws, int rc)
 {
     libxl__domain_suspend_state *dss = CONTAINER_OF(sws, *dss, sws);
@@ -1756,13 +1754,7 @@ void libxl__domain_save(libxl__egc *egc, libxl__domain_suspend_state *dss)
         }
     }
 
-    memset(callbacks, 0, sizeof(*callbacks));
-    if (r_info != NULL) {
-        callbacks->suspend = libxl__remus_domain_suspend_callback;
-        callbacks->postcopy = libxl__remus_domain_resume_callback;
-        callbacks->checkpoint = libxl__remus_domain_save_checkpoint_callback;
-        dss->sws.checkpoint_callback = remus_checkpoint_stream_written;
-    } else
+    if (r_info == NULL)
         callbacks->suspend = libxl__domain_suspend_callback;
 
     callbacks->switch_qemu_logdirty = libxl__domain_suspend_common_switch_qemu_logdirty;
