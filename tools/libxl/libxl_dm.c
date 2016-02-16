@@ -1999,12 +1999,12 @@ void libxl__spawn_qdisk_backend(libxl__egc *egc, libxl__dm_spawn_state *dmss)
     logfile_w = libxl__create_qemu_logfile(gc, GCSPRINTF("qdisk-%u", domid));
     if (logfile_w < 0) {
         rc = logfile_w;
-        goto error;
+        goto out;
     }
     null = open("/dev/null", O_RDONLY);
     if (null < 0) {
        rc = ERROR_FAIL;
-       goto error;
+       goto out;
     }
 
     dmss->guest_config = NULL;
@@ -2030,19 +2030,18 @@ void libxl__spawn_qdisk_backend(libxl__egc *egc, libxl__dm_spawn_state *dmss)
     dmss->spawn.detached_cb = device_model_detached;
     rc = libxl__spawn_spawn(egc, &dmss->spawn);
     if (rc < 0)
-        goto error;
+        goto out;
     if (!rc) { /* inner child */
         setsid();
         libxl__exec(gc, null, logfile_w, logfile_w, dm, args, NULL);
     }
 
-    return;
-
-error:
-    assert(rc);
+    rc = 0;
+out:
     if (logfile_w >= 0) close(logfile_w);
     if (null >= 0) close(null);
-    dmss->callback(egc, dmss, rc);
+    /* callback on error only, success goes via dmss->spawn.*_cb */
+    if (rc) dmss->callback(egc, dmss, rc);
     return;
 }
 
