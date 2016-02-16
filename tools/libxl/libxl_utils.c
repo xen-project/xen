@@ -780,7 +780,7 @@ char *libxl_bitmap_to_hex_string(libxl_ctx *ctx, const libxl_bitmap *bitmap)
     int i = bitmap->size;
     char *p = libxl__zalloc(NOGC, bitmap->size * 2 + 3);
     char *q = p;
-    strncpy(p, "0x", 2);
+    strncpy(p, "0x", 3);
     p += 2;
     while(--i >= 0) {
         sprintf(p, "%02x", bitmap->map[i]);
