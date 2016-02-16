@@ -8388,6 +8388,30 @@ void hw_process(struct pcpu_info *p)
     }
 
 }
+
+#define TRC_DOM0_SUB_DOMOPS 1
+void dom0_process(struct pcpu_info *p)
+{
+    struct record_info *ri = &p->ri;
+
+    switch(ri->evt.sub)
+    {
+    case TRC_DOM0_SUB_DOMOPS:
+        if(opt.dump_all) {
+            struct {
+                unsigned int domid;
+            } *r = (typeof(r))ri->d;
+
+        printf(" %s %s domain d%u\n", ri->dump_header,
+               ri->event == TRC_DOM0_DOM_ADD ? "creating" : "destroying",
+               r->domid);
+        }
+        break;
+    default:
+        process_generic(&p->ri);
+    }
+}
+
 /* ---- Base ----- */
 void dump_generic(FILE * f, struct record_info *ri)
 {
@@ -9224,6 +9248,8 @@ void process_record(struct pcpu_info *p) {
             hw_process(p);
             break;
         case TRC_DOM0OP_MAIN:
+            dom0_process(p);
+            break;
         default:
             process_generic(ri);
         }
