@@ -208,7 +208,7 @@ void __init mtrr_state_warn(void)
 /* Doesn't attempt to pass an error out to MTRR users
    because it's quite complicated in some cases and probably not
    worth it because the best error handling is to ignore it. */
-void mtrr_wrmsr(unsigned int msr, uint64_t msr_content)
+static void mtrr_wrmsr(unsigned int msr, uint64_t msr_content)
 {
 	if (wrmsr_safe(msr, msr_content) < 0)
 		printk(KERN_ERR
@@ -483,8 +483,8 @@ static void generic_set_mtrr(unsigned int reg, unsigned long base,
 	if (size == 0) {
 		/* The invalid bit is kept in the mask, so we simply clear the
 		   relevant mask register to disable a range. */
+		memset(vr, 0, sizeof(*vr));
 		mtrr_wrmsr(MSR_IA32_MTRR_PHYSMASK(reg), 0);
-		memset(vr, 0, sizeof(struct mtrr_var_range));
 	} else {
 		uint32_t base_lo, base_hi, mask_lo, mask_hi;
 

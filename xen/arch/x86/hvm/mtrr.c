@@ -29,8 +29,6 @@
 #include <asm/hvm/support.h>
 #include <asm/hvm/cacheattr.h>
 
-static uint32_t size_or_mask;
-
 /* Get page attribute fields (PAn) from PAT MSR. */
 #define pat_cr_2_paf(pat_cr,n)  ((((uint64_t)pat_cr) >> ((n)<<3)) & 0xff)
 
@@ -80,61 +78,28 @@ static uint8_t __read_mostly mtrr_epat_tbl[MTRR_NUM_TYPES][MEMORY_NUM_TYPES] =
 static uint8_t __read_mostly pat_entry_tbl[PAT_TYPE_NUMS] =
     { [0 ... PAT_TYPE_NUMS-1] = INVALID_MEM_TYPE };
 
-static void get_mtrr_range(uint64_t base_msr, uint64_t mask_msr,
-                           uint64_t *base, uint64_t *end)
+bool_t is_var_mtrr_overlapped(const struct mtrr_state *m)
 {
-    uint32_t mask_lo = (uint32_t)mask_msr;
-    uint32_t mask_hi = (uint32_t)(mask_msr >> 32);
-    uint32_t base_lo = (uint32_t)base_msr;
-    uint32_t base_hi = (uint32_t)(base_msr >> 32);
-    uint32_t size;
-
-    if ( !(mask_lo & MTRR_PHYSMASK_VALID) )
-    {
-        /* Invalid (i.e. free) range */
-        *base = 0;
-        *end = 0;
-        return;
-    }
-
-    /* Work out the shifted address mask. */
-    mask_lo = (size_or_mask | (mask_hi << (32 - PAGE_SHIFT)) |
-               (mask_lo >> PAGE_SHIFT));
-
-    /* This works correctly if size is a power of two (a contiguous range). */
-    size = -mask_lo;
-    *base = base_hi << (32 - PAGE_SHIFT) | base_lo >> PAGE_SHIFT;
-    *end = *base + size - 1;
-}
-
-bool_t is_var_mtrr_overlapped(struct mtrr_state *m)
-{
-    int32_t seg, i;
-    uint64_t phys_base, phys_mask, phys_base_pre, phys_mask_pre;
-    uint64_t base_pre, end_pre, base, end;
-    uint8_t num_var_ranges = (uint8_t)m->mtrr_cap;
+    unsigned int seg, i;
+    unsigned int num_var_ranges = (uint8_t)m->mtrr_cap;
 
     for ( i = 0; i < num_var_ranges; i++ )
     {
-        phys_base_pre = ((uint64_t*)m->var_ranges)[i*2];
-        phys_mask_pre = ((uint64_t*)m->var_ranges)[i*2 + 1];
+        uint64_t base1 = m->var_ranges[i].base >> PAGE_SHIFT;
+        uint64_t mask1 = m->var_ranges[i].mask >> PAGE_SHIFT;
 
-        get_mtrr_range(phys_base_pre, phys_mask_pre,
-                        &base_pre, &end_pre);
+        if ( !(m->var_ranges[i].mask & MTRR_PHYSMASK_VALID) )
+            continue;
 
         for ( seg = i + 1; seg < num_var_ranges; seg ++ )
         {
-            phys_base = ((uint64_t*)m->var_ranges)[seg*2];
-            phys_mask = ((uint64_t*)m->var_ranges)[seg*2 + 1];
+            uint64_t base2 = m->var_ranges[seg].base >> PAGE_SHIFT;
+            uint64_t mask2 = m->var_ranges[seg].mask >> PAGE_SHIFT;
 
-            get_mtrr_range(phys_base, phys_mask,
-                            &base, &end);
+            if ( !(m->var_ranges[seg].mask & MTRR_PHYSMASK_VALID) )
+                continue;
 
-            if ( ((base_pre != end_pre) && (base != end))
-                 || ((base >= base_pre) && (base <= end_pre))
-                 || ((end >= base_pre) && (end <= end_pre))
-                 || ((base_pre >= base) && (base_pre <= end))
-                 || ((end_pre >= base) && (end_pre <= end)) )
+            if ( (base1 & mask1 & mask2) == (base2 & mask2 & mask1) )
             {
                 /* MTRR is overlapped. */
                 return 1;
@@ -170,8 +135,6 @@ static int __init hvm_mtrr_pat_init(void)
             }
         }
     }
-
-    size_or_mask = ~((1 << (paddr_bits - PAGE_SHIFT)) - 1);
 
     return 0;
 }
