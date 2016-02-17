@@ -550,11 +550,7 @@ static void xenpaging_teardown(struct xenpaging *paging)
     xs_close(paging->xs_handle);
 
     /* Close connection to Xen */
-    rc = xc_interface_close(xch);
-    if ( rc != 0 )
-    {
-        ERROR("Error closing connection to xen");
-    }
+    xc_interface_close(xch);
 }
 
 static void get_request(struct vm_event *vm_event, vm_event_request_t *req)
