@@ -91,7 +91,7 @@ extern bool_t mtrr_def_type_msr_set(struct domain *, struct mtrr_state *,
 extern void memory_type_changed(struct domain *);
 extern bool_t pat_msr_set(uint64_t *pat, uint64_t msr);
 
-bool_t is_var_mtrr_overlapped(struct mtrr_state *m);
+bool_t is_var_mtrr_overlapped(const struct mtrr_state *m);
 bool_t mtrr_pat_not_equal(struct vcpu *vd, struct vcpu *vs);
 
 #endif /* __ASM_X86_MTRR_H__ */
