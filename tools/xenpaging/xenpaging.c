@@ -232,6 +232,7 @@ static int xenpaging_getopts(struct xenpaging *paging, int argc, char *argv[])
             paging->vm_event.domain_id = atoi(optarg);
             break;
         case 'f':
+            free(filename);
             filename = strdup(optarg);
             break;
         case 'm':
