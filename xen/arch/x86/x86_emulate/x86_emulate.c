@@ -611,7 +611,7 @@ do {                                                    \
  */
 static bool_t even_parity(uint8_t v)
 {
-    asm ( "test %b0,%b0; setp %b0" : "=a" (v) : "0" (v) );
+    asm ( "test %1,%1; setp %0" : "=qm" (v) : "q" (v) );
     return v;
 }
 
@@ -813,9 +813,9 @@ static int read_ulong(
  */
 static bool_t mul_dbl(unsigned long m[2])
 {
-    bool_t rc = 0;
-    asm ( "mul %1; seto %b2"
-          : "+a" (m[0]), "+d" (m[1]), "+q" (rc) );
+    bool_t rc;
+    asm ( "mul %1; seto %2"
+          : "+a" (m[0]), "+d" (m[1]), "=qm" (rc) );
     return rc;
 }
 
@@ -826,9 +826,9 @@ static bool_t mul_dbl(unsigned long m[2])
  */
 static bool_t imul_dbl(unsigned long m[2])
 {
-    bool_t rc = 0;
-    asm ( "imul %1; seto %b2"
-          : "+a" (m[0]), "+d" (m[1]), "+q" (rc) );
+    bool_t rc;
+    asm ( "imul %1; seto %2"
+          : "+a" (m[0]), "+d" (m[1]), "=qm" (rc) );
     return rc;
 }
 
@@ -842,7 +842,7 @@ static bool_t div_dbl(unsigned long u[2], unsigned long v)
 {
     if ( (v == 0) || (u[1] >= v) )
         return 1;
-    asm ( "div %2" : "+a" (u[0]), "+d" (u[1]) : "r" (v) );
+    asm ( "divq %2" : "+a" (u[0]), "+d" (u[1]) : "rm" (v) );
     return 0;
 }
 
@@ -854,9 +854,9 @@ static bool_t div_dbl(unsigned long u[2], unsigned long v)
  * NB. We don't use idiv directly as it's moderately hard to work out
  *     ahead of time whether it will #DE, which we cannot allow to happen.
  */
-static bool_t idiv_dbl(unsigned long u[2], unsigned long v)
+static bool_t idiv_dbl(unsigned long u[2], long v)
 {
-    bool_t negu = (long)u[1] < 0, negv = (long)v < 0;
+    bool_t negu = (long)u[1] < 0, negv = v < 0;
 
     /* u = abs(u) */
     if ( negu )
@@ -4521,9 +4521,10 @@ x86_emulate(
 
     case 0xbc: /* bsf or tzcnt */ {
         bool_t zf;
-        asm ( "bsf %2,%0; setz %b1"
-              : "=r" (dst.val), "=q" (zf)
-              : "r" (src.val) );
+
+        asm ( "bsf %2,%0; setz %1"
+              : "=r" (dst.val), "=qm" (zf)
+              : "rm" (src.val) );
         _regs.eflags &= ~EFLG_ZF;
         if ( (vex.pfx == vex_f3) && vcpu_has_bmi1() )
         {
@@ -4546,9 +4547,10 @@ x86_emulate(
 
     case 0xbd: /* bsr or lzcnt */ {
         bool_t zf;
-        asm ( "bsr %2,%0; setz %b1"
-              : "=r" (dst.val), "=q" (zf)
-              : "r" (src.val) );
+
+        asm ( "bsr %2,%0; setz %1"
+              : "=r" (dst.val), "=qm" (zf)
+              : "rm" (src.val) );
         _regs.eflags &= ~EFLG_ZF;
         if ( (vex.pfx == vex_f3) && vcpu_has_lzcnt() )
         {
@@ -4677,7 +4679,7 @@ x86_emulate(
             break;
         case 4:
 #ifdef __x86_64__
-            asm ( "bswap %k0" : "=r" (dst.val) : "0" (*dst.reg) );
+            asm ( "bswap %k0" : "=r" (dst.val) : "0" (*(uint32_t *)dst.reg) );
             break;
         case 8:
 #endif
