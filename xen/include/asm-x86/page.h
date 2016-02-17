@@ -157,6 +157,9 @@ static inline l4_pgentry_t l4e_from_paddr(paddr_t pa, unsigned int flags)
 #define l3e_remove_flags(x, flags) ((x).l3 &= ~put_pte_flags(flags))
 #define l4e_remove_flags(x, flags) ((x).l4 &= ~put_pte_flags(flags))
 
+/* Flip flags in an existing L1 PTE. */
+#define l1e_flip_flags(x, flags)    ((x).l1 ^= put_pte_flags(flags))
+
 /* Check if a pte's page mapping or significant access flags have changed. */
 #define l1e_has_changed(x,y,flags) \
     ( !!(((x).l1 ^ (y).l1) & ((PADDR_MASK&PAGE_MASK)|put_pte_flags(flags))) )

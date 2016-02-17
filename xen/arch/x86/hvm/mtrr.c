@@ -770,8 +770,17 @@ int epte_get_entry_emt(struct domain *d, unsigned long gfn, mfn_t mfn,
     if ( v->domain != d )
         v = d->vcpu ? d->vcpu[0] : NULL;
 
-    if ( !mfn_valid(mfn_x(mfn)) )
+    if ( !mfn_valid(mfn_x(mfn)) ||
+         rangeset_contains_range(mmio_ro_ranges, mfn_x(mfn),
+                                 mfn_x(mfn) + (1UL << order) - 1) )
+    {
+        *ipat = 1;
         return MTRR_TYPE_UNCACHABLE;
+    }
+
+    if ( rangeset_overlaps_range(mmio_ro_ranges, mfn_x(mfn),
+                                 mfn_x(mfn) + (1UL << order) - 1) )
+        return -1;
 
     switch ( hvm_get_mem_pinned_cacheattr(d, gfn, order, &type) )
     {
