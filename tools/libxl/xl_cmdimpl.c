@@ -499,11 +499,16 @@ static int do_daemonize(char *name, const char *pidfile)
 
     CHK_SYSCALL(logfile = open(fullname, O_WRONLY|O_CREAT|O_APPEND, 0644));
     free(fullname);
+    assert(logfile >= 3);
 
     CHK_SYSCALL(nullfd = open("/dev/null", O_RDONLY));
+    assert(nullfd >= 3);
+
     dup2(nullfd, 0);
     dup2(logfile, 1);
     dup2(logfile, 2);
+
+    close(nullfd);
 
     CHK_SYSCALL(daemon(0, 1));
 
