@@ -697,6 +697,15 @@ limit is ignored by Xen.
 
 Specify if the MMConfig space should be enabled.
 
+### mmio-relax
+> `= <boolean> | all`
+
+> Default: `false`
+
+By default, domains may not create cached mappings to MMIO regions.
+This option relaxes the check for Domain 0 (or when using `all`, all PV
+domains), to permit the use of cacheable MMIO mappings.
+
 ### msi
 > `= <boolean>`
 

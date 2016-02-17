@@ -693,8 +693,12 @@ uint8_t epte_get_entry_emt(struct domain *d, unsigned long gfn, mfn_t mfn,
     if ( v->domain != d )
         v = d->vcpu ? d->vcpu[0] : NULL;
 
-    if ( !mfn_valid(mfn_x(mfn)) )
+    if ( !mfn_valid(mfn_x(mfn)) ||
+         rangeset_contains_singleton(mmio_ro_ranges, mfn_x(mfn)) )
+    {
+        *ipat = 1;
         return MTRR_TYPE_UNCACHABLE;
+    }
 
     if ( hvm_get_mem_pinned_cacheattr(d, gfn, &type) )
         return type;
