@@ -18,7 +18,10 @@
 
 #include "libxl_internal.h"
 
+extern const libxl__checkpoint_device_instance_ops colo_save_device_qdisk;
+
 static const libxl__checkpoint_device_instance_ops *colo_ops[] = {
+    &colo_save_device_qdisk,
     NULL,
 };
 
@@ -30,7 +33,11 @@ static int init_device_subkind(libxl__checkpoint_devices_state *cds)
     int rc;
     STATE_AO_GC(cds->ao);
 
+    rc = init_subkind_qdisk(cds);
+    if (rc) goto out;
+
     rc = 0;
+out:
     return rc;
 }
 
@@ -38,6 +45,8 @@ static void cleanup_device_subkind(libxl__checkpoint_devices_state *cds)
 {
     /* cleanup device subkind-specific state in the libxl ctx */
     STATE_AO_GC(cds->ao);
+
+    cleanup_subkind_qdisk(cds);
 }
 
 /* ================= colo: setup save environment ================= */
@@ -79,9 +88,12 @@ void libxl__colo_save_setup(libxl__egc *egc, libxl__colo_save_state *css)
     css->send_fd = dss->fd;
     css->recv_fd = dss->recv_fd;
     css->svm_running = false;
+    css->paused = true;
+    css->qdisk_setuped = false;
+    css->qdisk_used = false;
 
-    /* TODO: disk/nic support */
-    cds->device_kind_flags = 0;
+    /* TODO: nic support */
+    cds->device_kind_flags = (1 << LIBXL__DEVICE_KIND_VBD);
     cds->ops = colo_ops;
     cds->callback = colo_save_setup_done;
     cds->ao = ao;
@@ -162,6 +174,11 @@ void libxl__colo_save_teardown(libxl__egc *egc,
         " teardown COLO devices...", rc);
 
     libxl__stream_read_abort(egc, &css->srs, 1);
+
+    if (css->qdisk_setuped) {
+        libxl__qmp_stop_replication(gc, dss->domid, true);
+        css->qdisk_setuped = false;
+    }
 
     dss->cds.callback = colo_teardown_done;
     libxl__checkpoint_devices_teardown(egc, &dss->cds);
@@ -291,6 +308,11 @@ static void colo_read_svm_suspended_done(libxl__egc *egc,
         goto out;
     }
 
+    if (!css->paused && libxl__qmp_get_replication_error(gc, dss->domid)) {
+        LOG(ERROR, "replication error occurs when primary vm is running");
+        goto out;
+    }
+
     ok = 1;
 
 out:
@@ -389,10 +411,38 @@ static void colo_preresume_cb(libxl__egc *egc,
         goto out;
     }
 
+    if (css->qdisk_used && !css->qdisk_setuped) {
+        if (libxl__qmp_start_replication(gc, dss->domid, true)) {
+            LOG(ERROR, "starting replication fails");
+            goto out;
+        }
+        css->qdisk_setuped = true;
+    }
+
+    if (!css->paused) {
+        if (libxl__qmp_do_checkpoint(gc, dss->domid)) {
+            LOG(ERROR, "doing checkpoint fails");
+            goto out;
+        }
+    }
+
     /* Resumes the domain and the device model */
     if (libxl__domain_resume(gc, dss->domid, /* Fast Suspend */1)) {
         LOG(ERROR, "cannot resume primary vm");
         goto out;
+    }
+
+    /*
+     * The guest should be paused before doing colo because there is
+     * no disk migration.
+     */
+    if (css->paused) {
+        rc = libxl_domain_unpause(CTX, dss->domid);
+        if (rc) {
+            LOG(ERROR, "cannot unpause primary vm");
+            goto out;
+        }
+        css->paused = false;
     }
 
     /* read CHECKPOINT_SVM_RESUMED */

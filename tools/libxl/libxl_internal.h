@@ -3211,6 +3211,11 @@ struct libxl__colo_save_state {
     libxl__stream_read_state srs;
     void (*callback)(libxl__egc *, libxl__colo_save_state *, int);
     bool svm_running;
+    bool paused;
+
+    /* private, used by qdisk block replication */
+    bool qdisk_used;
+    bool qdisk_setuped;
 };
 
 typedef struct libxl__logdirty_switch {

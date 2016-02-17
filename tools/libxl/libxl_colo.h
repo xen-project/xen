@@ -19,12 +19,17 @@
 struct libxl__ao;
 struct libxl__egc;
 struct libxl__colo_save_state;
+struct libxl__checkpoint_devices_state;
 
 enum {
     LIBXL_COLO_SETUPED,
     LIBXL_COLO_SUSPENDED,
     LIBXL_COLO_RESUMED,
 };
+
+typedef struct libxl__colo_qdisk {
+    bool setuped;
+} libxl__colo_qdisk;
 
 typedef struct libxl__domain_create_state libxl__domain_create_state;
 typedef void libxl__domain_create_cb(struct libxl__egc *egc,
@@ -47,7 +52,17 @@ struct libxl__colo_restore_state {
     /* private, colo restore checkpoint state */
     libxl__domain_create_cb *saved_cb;
     void *crcs;
+
+    /* private, used by qdisk block replication */
+    bool qdisk_used;
+    bool qdisk_setuped;
+    const char *host;
+    const char *port;
 };
+
+int init_subkind_qdisk(struct libxl__checkpoint_devices_state *cds);
+
+void cleanup_subkind_qdisk(struct libxl__checkpoint_devices_state *cds);
 
 extern void libxl__colo_restore_setup(struct libxl__egc *egc,
                                       libxl__colo_restore_state *crs);

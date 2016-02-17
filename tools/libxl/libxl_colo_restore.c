@@ -37,7 +37,10 @@ struct libxl__colo_restore_checkpoint_state {
                      int);
 };
 
+extern const libxl__checkpoint_device_instance_ops colo_restore_device_qdisk;
+
 static const libxl__checkpoint_device_instance_ops *colo_restore_ops[] = {
+    &colo_restore_device_qdisk,
     NULL,
 };
 
@@ -137,7 +140,11 @@ static int init_device_subkind(libxl__checkpoint_devices_state *cds)
     int rc;
     STATE_AO_GC(cds->ao);
 
+    rc = init_subkind_qdisk(cds);
+    if (rc)  goto out;
+
     rc = 0;
+out:
     return rc;
 }
 
@@ -145,6 +152,8 @@ static void cleanup_device_subkind(libxl__checkpoint_devices_state *cds)
 {
     /* cleanup device subkind-specific state in the libxl ctx */
     STATE_AO_GC(cds->ao);
+
+    cleanup_subkind_qdisk(cds);
 }
 
 /* ================ colo: setup restore environment ================ */
@@ -213,6 +222,8 @@ void libxl__colo_restore_setup(libxl__egc *egc,
     GCNEW(crcs);
     crs->crcs = crcs;
     crcs->crs = crs;
+    crs->qdisk_setuped = false;
+    crs->qdisk_used = false;
 
     /* setup dsps */
     crcs->dsps.ao = ao;
@@ -300,6 +311,11 @@ void libxl__colo_restore_teardown(libxl__egc *egc, void *dcs_void,
         dcs->srs.completion_callback = NULL;
     }
     libxl__xc_domain_restore_done(egc, dcs, ret, retval, errnoval);
+
+    if (crs->qdisk_setuped) {
+        libxl__qmp_stop_replication(gc, crs->domid, false);
+        crs->qdisk_setuped = false;
+    }
 
     crcs->saved_rc = rc;
     if (!crcs->teardown_devices) {
@@ -573,6 +589,13 @@ static void colo_restore_preresume_cb(libxl__egc *egc,
         goto out;
     }
 
+    if (crs->qdisk_setuped) {
+        if (libxl__qmp_do_checkpoint(gc, crs->domid)) {
+            LOG(ERROR, "doing checkpoint fails");
+            goto out;
+        }
+    }
+
     colo_restore_resume_vm(egc, crcs);
 
     return;
@@ -730,8 +753,8 @@ static void colo_setup_checkpoint_devices(libxl__egc *egc,
 
     STATE_AO_GC(crs->ao);
 
-    /* TODO: disk/nic support */
-    cds->device_kind_flags = 0;
+    /* TODO: nic support */
+    cds->device_kind_flags = (1 << LIBXL__DEVICE_KIND_VBD);
     cds->callback = colo_restore_setup_cds_done;
     cds->ao = ao;
     cds->domid = crs->domid;
@@ -766,6 +789,14 @@ static void colo_restore_setup_cds_done(libxl__egc *egc,
         LOG(ERROR, "COLO: failed to setup device for guest with domid %u",
             cds->domid);
         goto out;
+    }
+
+    if (crs->qdisk_used && !crs->qdisk_setuped) {
+        if (libxl__qmp_start_replication(gc, crs->domid, false)) {
+            LOG(ERROR, "starting replication fails");
+            goto out;
+        }
+        crs->qdisk_setuped = true;
     }
 
     colo_send_svm_ready(egc, crcs);
@@ -922,13 +953,18 @@ static void colo_suspend_vm_done(libxl__egc *egc,
 
     crcs->status = LIBXL_COLO_SUSPENDED;
 
+    if (libxl__qmp_get_replication_error(gc, crs->domid)) {
+        LOG(ERROR, "replication error occurs when secondary vm is running");
+        goto out;
+    }
+
     cds->callback = colo_restore_postsuspend_cb;
     libxl__checkpoint_devices_postsuspend(egc, cds);
 
     return;
 
 out:
-    libxl__xc_domain_saverestore_async_callback_done(egc, &dcs->srs.shs, !rc);
+    libxl__xc_domain_saverestore_async_callback_done(egc, &dcs->srs.shs, 0);
 }
 
 static void colo_restore_postsuspend_cb(libxl__egc *egc,
