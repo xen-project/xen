@@ -299,6 +299,7 @@ F:	xen/common/sched*
 
 SEABIOS UPSTREAM
 M:	Ian Campbell <ian.campbell@citrix.com>
+M:	Wei Liu <wei.liu2@citrix.com>
 S:	Supported
 T:	git git://xenbits.xen.org/seabios.git
 
