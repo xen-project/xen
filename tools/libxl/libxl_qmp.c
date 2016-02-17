@@ -979,6 +979,102 @@ int libxl__qmp_cpu_add(libxl__gc *gc, int domid, int idx)
     return qmp_run_command(gc, domid, "cpu-add", args, NULL, NULL);
 }
 
+int libxl__qmp_nbd_server_start(libxl__gc *gc, int domid,
+                                const char *host, const char *port)
+{
+    libxl__json_object *args = NULL;
+    libxl__json_object *addr = NULL;
+    libxl__json_object *data = NULL;
+
+    /* 'addr': {
+     *   'type': 'inet',
+     *   'data': {
+     *     'host': '$nbd_host',
+     *     'port': '$nbd_port'
+     *   }
+     * }
+     */
+    qmp_parameters_add_string(gc, &data, "host", host);
+    qmp_parameters_add_string(gc, &data, "port", port);
+
+    qmp_parameters_add_string(gc, &addr, "type", "inet");
+    qmp_parameters_common_add(gc, &addr, "data", data);
+
+    qmp_parameters_common_add(gc, &args, "addr", addr);
+
+    return qmp_run_command(gc, domid, "nbd-server-start", args, NULL, NULL);
+}
+
+int libxl__qmp_nbd_server_add(libxl__gc *gc, int domid, const char *disk)
+{
+    libxl__json_object *args = NULL;
+
+    qmp_parameters_add_string(gc, &args, "device", disk);
+    qmp_parameters_add_bool(gc, &args, "writable", true);
+
+    return qmp_run_command(gc, domid, "nbd-server-add", args, NULL, NULL);
+}
+
+int libxl__qmp_start_replication(libxl__gc *gc, int domid, bool primary)
+{
+    libxl__json_object *args = NULL;
+
+    qmp_parameters_add_bool(gc, &args, "enable", true);
+    qmp_parameters_add_bool(gc, &args, "primary", primary);
+
+    return qmp_run_command(gc, domid, "xen-set-replication", args, NULL, NULL);
+}
+
+int libxl__qmp_get_replication_error(libxl__gc *gc, int domid)
+{
+    return qmp_run_command(gc, domid, "xen-get-replication-error", NULL,
+                           NULL, NULL);
+}
+
+int libxl__qmp_do_checkpoint(libxl__gc *gc, int domid)
+{
+    return qmp_run_command(gc, domid, "xen-do-checkpoint", NULL, NULL, NULL);
+}
+
+int libxl__qmp_stop_replication(libxl__gc *gc, int domid, bool primary)
+{
+    libxl__json_object *args = NULL;
+
+    qmp_parameters_add_bool(gc, &args, "enable", false);
+    qmp_parameters_add_bool(gc, &args, "primary", primary);
+
+    return qmp_run_command(gc, domid, "xen-set-replication", args, NULL, NULL);
+}
+
+int libxl__qmp_nbd_server_stop(libxl__gc *gc, int domid)
+{
+    return qmp_run_command(gc, domid, "nbd-server-stop", NULL, NULL, NULL);
+}
+
+int libxl__qmp_x_blockdev_change(libxl__gc *gc, int domid, const char *parent,
+                                 const char *child, const char *node)
+{
+    libxl__json_object *args = NULL;
+
+    qmp_parameters_add_string(gc, &args, "parent", parent);
+    if (child)
+        qmp_parameters_add_string(gc, &args, "child", child);
+    if (node)
+        qmp_parameters_add_string(gc, &args, "node", node);
+
+    return qmp_run_command(gc, domid, "x-blockdev-change", args, NULL, NULL);
+}
+
+int libxl__qmp_hmp(libxl__gc *gc, int domid, const char *command_line)
+{
+    libxl__json_object *args = NULL;
+
+    qmp_parameters_add_string(gc, &args, "command-line", command_line);
+
+    return qmp_run_command(gc, domid, "human-monitor-command", args,
+                           NULL, NULL);
+}
+
 int libxl__qmp_initializations(libxl__gc *gc, uint32_t domid,
                                const libxl_domain_config *guest_config)
 {

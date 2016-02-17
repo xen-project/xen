@@ -1774,6 +1774,30 @@ _hidden int libxl__qmp_set_global_dirty_log(libxl__gc *gc, int domid, bool enabl
 _hidden int libxl__qmp_insert_cdrom(libxl__gc *gc, int domid, const libxl_device_disk *disk);
 /* Add a virtual CPU */
 _hidden int libxl__qmp_cpu_add(libxl__gc *gc, int domid, int index);
+/* Start NBD server */
+_hidden int libxl__qmp_nbd_server_start(libxl__gc *gc, int domid,
+                                        const char *host, const char *port);
+/* Add a disk to NBD server */
+_hidden int libxl__qmp_nbd_server_add(libxl__gc *gc, int domid,
+                                      const char *disk);
+/* Start replication */
+_hidden int libxl__qmp_start_replication(libxl__gc *gc, int domid,
+                                         bool primary);
+/* Get replication error that occurs when the vm is running */
+_hidden int libxl__qmp_get_replication_error(libxl__gc *gc, int domid);
+/* Do checkpoint */
+_hidden int libxl__qmp_do_checkpoint(libxl__gc *gc, int domid);
+/* Stop replication */
+_hidden int libxl__qmp_stop_replication(libxl__gc *gc, int domid,
+                                        bool primary);
+/* Stop NBD server */
+_hidden int libxl__qmp_nbd_server_stop(libxl__gc *gc, int domid);
+/* Add or remove a child to/from quorum */
+_hidden int libxl__qmp_x_blockdev_change(libxl__gc *gc, int domid,
+                                         const char *parant,
+                                         const char *child, const char *node);
+/* run a hmp command in qmp mode */
+_hidden int libxl__qmp_hmp(libxl__gc *gc, int domid, const char *command_line);
 /* close and free the QMP handler */
 _hidden void libxl__qmp_close(libxl__qmp_handler *qmp);
 /* remove the socket file, if the file has already been removed,
