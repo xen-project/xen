@@ -533,6 +533,11 @@ char *xlu__cfgl_dequote(CfgParseContext *ctx, const char *src) {
                 NUMERIC_CHAR(2,2,16,"hex");
             } else if (nc>='0' && nc<='7') {
                 NUMERIC_CHAR(1,3,10,"octal");
+            } else {
+                xlu__cfgl_lexicalerror(ctx,
+                           "invalid character after backlash in quoted string");
+                ctx->err= EINVAL;
+                goto x;
             }
             assert(p <= src+len-1);
         } else {
