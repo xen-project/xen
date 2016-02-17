@@ -800,25 +800,46 @@ typedef struct start_info start_info_t;
 /*
  * Start of day structure passed to PVH guests in %ebx.
  *
- * NOTE: nothing will be loaded at physical address 0, so
- * a 0 value in any of the address fields should be treated
- * as not present.
+ * NOTE: nothing will be loaded at physical address 0, so a 0 value in any
+ * of the address fields should be treated as not present.
+ *
+ *  0 +----------------+
+ *    | magic          | Contains the magic value HVM_START_MAGIC_VALUE
+ *    |                | ("xEn3" with the 0x80 bit of the "E" set).
+ *  4 +----------------+
+ *    | version        | Version of this structure. Current version is 0. New
+ *    |                | versions are guaranteed to be backwards-compatible.
+ *  8 +----------------+
+ *    | flags          | SIF_xxx flags.
+ * 12 +----------------+
+ *    | cmdline_paddr  | Physical address of the command line,
+ *    |                | a zero-terminated ASCII string.
+ * 16 +----------------+
+ *    | nr_modules     | Number of modules passed to the kernel.
+ * 20 +----------------+
+ *    | modlist_paddr  | Physical address of an array of modules
+ *    |                | (layout of the structure below).
+ * 24 +----------------+
+ *    | rsdp_paddr     | Physical address of the RSDP ACPI data structure.
+ * 28 +----------------+
+ *
+ * The layout of each entry in the module structure is the following:
+ *
+ *  0 +----------------+
+ *    | paddr          | Physical address of the module.
+ *  8 +----------------+
+ *    | size           | Size of the module in bytes.
+ * 16 +----------------+
+ *    | cmdline_paddr  | Physical address of the command line,
+ *    |                | a zero-terminated ASCII string.
+ * 24 +----------------+
+ *    | reserved       |
+ * 32 +----------------+
+ *
+ * The address and size of the modules is a 64bit unsigned integer. However
+ * Xen will always try to place all modules below the 4GiB boundary.
  */
-struct hvm_start_info {
 #define HVM_START_MAGIC_VALUE 0x336ec578
-    uint32_t magic;             /* Contains the magic value 0x336ec578       */
-                                /* ("xEn3" with the 0x80 bit of the "E" set).*/
-    uint32_t flags;             /* SIF_xxx flags.                            */
-    uint32_t cmdline_paddr;     /* Physical address of the command line.     */
-    uint32_t nr_modules;        /* Number of modules passed to the kernel.   */
-    uint32_t modlist_paddr;     /* Physical address of an array of           */
-                                /* hvm_modlist_entry.                        */
-};
-
-struct hvm_modlist_entry {
-    uint32_t paddr;             /* Physical address of the module.           */
-    uint32_t size;              /* Size of the module in bytes.              */
-};
 
 /* New console union for dom0 introduced in 0x00030203. */
 #if __XEN_INTERFACE_VERSION__ < 0x00030203

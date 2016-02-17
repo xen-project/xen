@@ -216,6 +216,37 @@ struct xc_dom_image {
     struct xc_hvm_firmware_module smbios_module;
 };
 
+#if defined(__i386__) || defined(__x86_64__)
+/* C representation of the x86/HVM start info layout.
+ *
+ * The canonical definition of this layout resides in public/xen.h, this
+ * is just a way to represent the layout described there using C types.
+ *
+ * NB: the packed attribute is not really needed, but it helps us enforce
+ * the fact this this is just a representation, and it might indeed
+ * be required in the future if there are alignment changes.
+ */
+struct hvm_start_info {
+    uint32_t magic;             /* Contains the magic value 0x336ec578       */
+                                /* ("xEn3" with the 0x80 bit of the "E" set).*/
+    uint32_t version;           /* Version of this structure.                */
+    uint32_t flags;             /* SIF_xxx flags.                            */
+    uint32_t cmdline_paddr;     /* Physical address of the command line.     */
+    uint32_t nr_modules;        /* Number of modules passed to the kernel.   */
+    uint32_t modlist_paddr;     /* Physical address of an array of           */
+                                /* hvm_modlist_entry.                        */
+    uint32_t rsdp_paddr;        /* Physical address of the RSDP ACPI data    */
+                                /* structure.                                */
+} __attribute__((packed));
+
+struct hvm_modlist_entry {
+    uint64_t paddr;             /* Physical address of the module.           */
+    uint64_t size;              /* Size of the module in bytes.              */
+    uint64_t cmdline_paddr;     /* Physical address of the command line.     */
+    uint64_t reserved;
+} __attribute__((packed));
+#endif /* x86 */
+
 /* --- pluggable kernel loader ------------------------------------- */
 
 struct xc_dom_loader {
