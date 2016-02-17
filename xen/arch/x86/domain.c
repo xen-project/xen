@@ -991,7 +991,48 @@ int arch_set_info_guest(
         goto out;
 
     if ( v->vcpu_id == 0 )
+    {
+        /*
+         * In the restore case we need to deal with L4 pages which got
+         * initialized with m2p_strict still clear (and which hence lack the
+         * correct initial RO_MPT_VIRT_{START,END} L4 entry).
+         */
+        if ( d != current->domain && !VM_ASSIST(d, m2p_strict) &&
+             is_pv_domain(d) && !is_pv_32bit_domain(d) &&
+             test_bit(VMASST_TYPE_m2p_strict, &c.nat->vm_assist) &&
+             atomic_read(&d->arch.pv_domain.nr_l4_pages) )
+        {
+            bool_t done = 0;
+
+            spin_lock_recursive(&d->page_alloc_lock);
+
+            for ( i = 0; ; )
+            {
+                struct page_info *page = page_list_remove_head(&d->page_list);
+
+                if ( page_lock(page) )
+                {
+                    if ( (page->u.inuse.type_info & PGT_type_mask) ==
+                         PGT_l4_page_table )
+                        done = !fill_ro_mpt(page_to_mfn(page));
+
+                    page_unlock(page);
+                }
+
+                page_list_add_tail(page, &d->page_list);
+
+                if ( done || (!(++i & 0xff) && hypercall_preempt_check()) )
+                    break;
+            }
+
+            spin_unlock_recursive(&d->page_alloc_lock);
+
+            if ( !done )
+                return -ERESTART;
+        }
+
         d->vm_assist = c(vm_assist);
+    }
 
     rc = put_old_guest_table(current);
     if ( rc )

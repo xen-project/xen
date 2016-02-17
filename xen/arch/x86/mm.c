@@ -1493,13 +1493,20 @@ void init_guest_l4_table(l4_pgentry_t l4tab[], const struct domain *d,
         l4tab[l4_table_offset(RO_MPT_VIRT_START)] = l4e_empty();
 }
 
-void fill_ro_mpt(unsigned long mfn)
+bool_t fill_ro_mpt(unsigned long mfn)
 {
     l4_pgentry_t *l4tab = map_domain_page(_mfn(mfn));
+    bool_t ret = 0;
 
-    l4tab[l4_table_offset(RO_MPT_VIRT_START)] =
-        idle_pg_table[l4_table_offset(RO_MPT_VIRT_START)];
+    if ( !l4e_get_intpte(l4tab[l4_table_offset(RO_MPT_VIRT_START)]) )
+    {
+        l4tab[l4_table_offset(RO_MPT_VIRT_START)] =
+            idle_pg_table[l4_table_offset(RO_MPT_VIRT_START)];
+        ret = 1;
+    }
     unmap_domain_page(l4tab);
+
+    return ret;
 }
 
 void zap_ro_mpt(unsigned long mfn)
@@ -1557,10 +1564,15 @@ static int alloc_l4_table(struct page_info *page)
         adjust_guest_l4e(pl4e[i], d);
     }
 
-    init_guest_l4_table(pl4e, d, !VM_ASSIST(d, m2p_strict));
+    if ( rc >= 0 )
+    {
+        init_guest_l4_table(pl4e, d, !VM_ASSIST(d, m2p_strict));
+        atomic_inc(&d->arch.pv_domain.nr_l4_pages);
+        rc = 0;
+    }
     unmap_domain_page(pl4e);
 
-    return rc > 0 ? 0 : rc;
+    return rc;
 }
 
 static void free_l1_table(struct page_info *page)
@@ -1678,7 +1690,13 @@ static int free_l4_table(struct page_info *page)
 
     unmap_domain_page(pl4e);
 
-    return rc > 0 ? 0 : rc;
+    if ( rc >= 0 )
+    {
+        atomic_dec(&d->arch.pv_domain.nr_l4_pages);
+        rc = 0;
+    }
+
+    return rc;
 }
 
 int page_lock(struct page_info *page)

@@ -247,6 +247,8 @@ struct pv_domain
 {
     l1_pgentry_t **gdt_ldt_l1tab;
 
+    atomic_t nr_l4_pages;
+
     /* map_domain_page() mapping cache. */
     struct mapcache_domain mapcache;
 };
