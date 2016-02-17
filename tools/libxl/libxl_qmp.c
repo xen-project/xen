@@ -67,7 +67,7 @@ struct libxl__qmp_handler {
     /* wait_for_id will be used by the synchronous send function */
     int wait_for_id;
 
-    char buffer[QMP_RECEIVE_BUFFER_SIZE];
+    char buffer[QMP_RECEIVE_BUFFER_SIZE + 1];
     libxl__yajl_ctx *yajl_ctx;
 
     libxl_ctx *ctx;
@@ -457,6 +457,7 @@ static int qmp_next(libxl__gc *gc, libxl__qmp_handler *qmp)
             LOGE(ERROR, "Socket read error");
             return rd;
         }
+        qmp->buffer[rd] = '\0';
 
         DEBUG_REPORT_RECEIVED(qmp->buffer, rd);
 
