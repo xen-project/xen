@@ -93,6 +93,8 @@ static unsigned long p2m_type_to_flags(p2m_type_t t, mfn_t mfn)
     case p2m_mmio_direct:
         if ( !rangeset_contains_singleton(mmio_ro_ranges, mfn_x(mfn)) )
             flags |= _PAGE_RW;
+        else
+            flags |= _PAGE_PWT;
         return flags | P2M_BASE_FLAGS | _PAGE_PCD;
     }
 }

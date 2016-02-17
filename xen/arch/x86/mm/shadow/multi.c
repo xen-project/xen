@@ -521,6 +521,7 @@ _sh_propagate(struct vcpu *v,
     gfn_t target_gfn = guest_l1e_get_gfn(guest_entry);
     u32 pass_thru_flags;
     u32 gflags, sflags;
+    bool_t mmio_mfn;
 
     /* We don't shadow PAE l3s */
     ASSERT(GUEST_PAGING_LEVELS > 3 || level != 3);
@@ -561,7 +562,10 @@ _sh_propagate(struct vcpu *v,
     // mfn means that we can not usefully shadow anything, and so we
     // return early.
     //
-    if ( !mfn_valid(target_mfn)
+    mmio_mfn = !mfn_valid(target_mfn)
+               || (level == 1
+                   && page_get_owner(mfn_to_page(target_mfn)) == dom_io);
+    if ( mmio_mfn
          && !(level == 1 && (!shadow_mode_refcounts(d) 
                              || p2mt == p2m_mmio_direct)) )
     {
@@ -579,7 +583,7 @@ _sh_propagate(struct vcpu *v,
                        _PAGE_RW | _PAGE_PRESENT);
     if ( guest_supports_nx(v) )
         pass_thru_flags |= _PAGE_NX_BIT;
-    if ( !shadow_mode_refcounts(d) && !mfn_valid(target_mfn) )
+    if ( level == 1 && !shadow_mode_refcounts(d) && mmio_mfn )
         pass_thru_flags |= _PAGE_PAT | _PAGE_PCD | _PAGE_PWT;
     sflags = gflags & pass_thru_flags;
 
@@ -676,10 +680,14 @@ _sh_propagate(struct vcpu *v,
     }
 
     /* Read-only memory */
-    if ( p2m_is_readonly(p2mt) ||
-         (p2mt == p2m_mmio_direct &&
-          rangeset_contains_singleton(mmio_ro_ranges, mfn_x(target_mfn))) )
+    if ( p2m_is_readonly(p2mt) )
         sflags &= ~_PAGE_RW;
+    else if ( p2mt == p2m_mmio_direct &&
+              rangeset_contains_singleton(mmio_ro_ranges, mfn_x(target_mfn)) )
+    {
+        sflags &= ~(_PAGE_RW | _PAGE_PAT);
+        sflags |= _PAGE_PCD | _PAGE_PWT;
+    }
     
     // protect guest page tables
     //
@@ -1201,22 +1209,28 @@ static int shadow_set_l1e(struct vcpu *v,
          && !sh_l1e_is_magic(new_sl1e) ) 
     {
         /* About to install a new reference */        
-        if ( shadow_mode_refcounts(d) ) {
+        if ( shadow_mode_refcounts(d) )
+        {
+#define PAGE_FLIPPABLE (_PAGE_RW | _PAGE_PWT | _PAGE_PCD | _PAGE_PAT)
+            int rc;
+
             TRACE_SHADOW_PATH_FLAG(TRCE_SFLAG_SHADOW_L1_GET_REF);
-            switch ( shadow_get_page_from_l1e(new_sl1e, d, new_type) )
+            switch ( rc = shadow_get_page_from_l1e(new_sl1e, d, new_type) )
             {
             default:
                 /* Doesn't look like a pagetable. */
                 flags |= SHADOW_SET_ERROR;
                 new_sl1e = shadow_l1e_empty();
                 break;
-            case 1:
-                shadow_l1e_remove_flags(new_sl1e, _PAGE_RW);
+            case PAGE_FLIPPABLE & -PAGE_FLIPPABLE ... PAGE_FLIPPABLE:
+                ASSERT(!(rc & ~PAGE_FLIPPABLE));
+                new_sl1e = shadow_l1e_flip_flags(new_sl1e, rc);
                 /* fall through */
             case 0:
                 shadow_vram_get_l1e(new_sl1e, sl1e, sl1mfn, d);
                 break;
             }
+#undef PAGE_FLIPPABLE
         }
     } 
 

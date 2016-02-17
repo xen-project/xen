@@ -188,6 +188,18 @@ static uint32_t base_disallow_mask;
       !is_hvm_domain(d)) ?                                      \
      L1_DISALLOW_MASK : (L1_DISALLOW_MASK & ~PAGE_CACHE_ATTRS))
 
+static s8 __read_mostly opt_mmio_relax;
+static void __init parse_mmio_relax(const char *s)
+{
+    if ( !*s )
+        opt_mmio_relax = 1;
+    else
+        opt_mmio_relax = parse_bool(s);
+    if ( opt_mmio_relax < 0 && strcmp(s, "all") )
+        opt_mmio_relax = 0;
+}
+custom_param("mmio-relax", parse_mmio_relax);
+
 static void __init init_frametable_chunk(void *start, void *end)
 {
     unsigned long s = (unsigned long)start;
@@ -773,6 +785,8 @@ get_page_from_l1e(
     if ( !mfn_valid(mfn) ||
          (real_pg_owner = page_get_owner_and_reference(page)) == dom_io )
     {
+        int flip = 0;
+
         /* Only needed the reference to confirm dom_io ownership. */
         if ( mfn_valid(mfn) )
             put_page(page);
@@ -805,13 +819,41 @@ get_page_from_l1e(
             return -EINVAL;
         }
 
-        if ( !(l1f & _PAGE_RW) ||
-             !rangeset_contains_singleton(mmio_ro_ranges, mfn) )
-            return 0;
-        dprintk(XENLOG_G_WARNING,
-                "d%d: Forcing read-only access to MFN %lx\n",
-                l1e_owner->domain_id, mfn);
-        return 1;
+        if ( !rangeset_contains_singleton(mmio_ro_ranges, mfn) )
+        {
+            /* MMIO pages must not be mapped cachable unless requested so. */
+            switch ( opt_mmio_relax )
+            {
+            case 0:
+                break;
+            case 1:
+                if ( is_hardware_domain(l1e_owner) )
+            case -1:
+                    return 0;
+            default:
+                ASSERT(0);
+            }
+        }
+        else if ( l1f & _PAGE_RW )
+        {
+            dprintk(XENLOG_G_WARNING,
+                    "d%d: Forcing read-only access to MFN %lx\n",
+                    l1e_owner->domain_id, mfn);
+            flip = _PAGE_RW;
+        }
+
+        switch ( l1f & PAGE_CACHE_ATTRS )
+        {
+        case 0: /* WB */
+            flip |= _PAGE_PWT | _PAGE_PCD;
+            break;
+        case _PAGE_PWT: /* WT */
+        case _PAGE_PWT | _PAGE_PAT: /* WP */
+            flip |= _PAGE_PCD | (l1f & _PAGE_PAT);
+            break;
+        }
+
+        return flip;
     }
 
     if ( unlikely( (real_pg_owner != pg_owner) &&
@@ -1210,8 +1252,9 @@ static int alloc_l1_table(struct page_info *page)
                 goto fail;
             case 0:
                 break;
-            case 1:
-                l1e_remove_flags(pl1e[i], _PAGE_RW);
+            case _PAGE_RW ... _PAGE_RW | PAGE_CACHE_ATTRS:
+                ASSERT(!(ret & ~(_PAGE_RW | PAGE_CACHE_ATTRS)));
+                l1e_flip_flags(pl1e[i], ret);
                 break;
             }
 
@@ -1706,8 +1749,9 @@ static int mod_l1_entry(l1_pgentry_t *pl1e, l1_pgentry_t nl1e,
             return -EINVAL;
         }
 
-        /* Fast path for identical mapping, r/w and presence. */
-        if ( !l1e_has_changed(ol1e, nl1e, _PAGE_RW | _PAGE_PRESENT) )
+        /* Fast path for identical mapping, r/w, presence, and cachability. */
+        if ( !l1e_has_changed(ol1e, nl1e,
+                              PAGE_CACHE_ATTRS | _PAGE_RW | _PAGE_PRESENT) )
         {
             adjust_guest_l1e(nl1e, pt_dom);
             if ( UPDATE_ENTRY(l1, pl1e, ol1e, nl1e, gl1mfn, pt_vcpu,
@@ -1730,8 +1774,9 @@ static int mod_l1_entry(l1_pgentry_t *pl1e, l1_pgentry_t nl1e,
             return rc;
         case 0:
             break;
-        case 1:
-            l1e_remove_flags(nl1e, _PAGE_RW);
+        case _PAGE_RW ... _PAGE_RW | PAGE_CACHE_ATTRS:
+            ASSERT(!(rc & ~(_PAGE_RW | PAGE_CACHE_ATTRS)));
+            l1e_flip_flags(nl1e, rc);
             rc = 0;
             break;
         }
@@ -5010,6 +5055,7 @@ static int ptwr_emulated_update(
     l1_pgentry_t pte, ol1e, nl1e, *pl1e;
     struct vcpu *v = current;
     struct domain *d = v->domain;
+    int ret;
 
     /* Only allow naturally-aligned stores within the original %cr2 page. */
     if ( unlikely(((addr^ptwr_ctxt->cr2) & PAGE_MASK) || (addr & (bytes-1))) )
@@ -5057,7 +5103,7 @@ static int ptwr_emulated_update(
 
     /* Check the new PTE. */
     nl1e = l1e_from_intpte(val);
-    switch ( get_page_from_l1e(nl1e, d, d) )
+    switch ( ret = get_page_from_l1e(nl1e, d, d) )
     {
     default:
         if ( is_pv_32bit_domain(d) && (bytes == 4) && (unaligned_addr & 4) &&
@@ -5081,8 +5127,9 @@ static int ptwr_emulated_update(
         break;
     case 0:
         break;
-    case 1:
-        l1e_remove_flags(nl1e, _PAGE_RW);
+    case _PAGE_RW ... _PAGE_RW | PAGE_CACHE_ATTRS:
+        ASSERT(!(ret & ~(_PAGE_RW | PAGE_CACHE_ATTRS)));
+        l1e_flip_flags(nl1e, ret);
         break;
     }
 
