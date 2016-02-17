@@ -355,6 +355,7 @@ M:	Tamas K Lengyel <tamas@tklengyel.com>
 S:	Supported
 F:	xen/common/vm_event.c
 F:	xen/common/mem_access.c
+F:	xen/common/monitor.c
 F:	xen/arch/x86/hvm/event.c
 F:	xen/arch/x86/monitor.c
 F:	xen/arch/*/vm_event.c

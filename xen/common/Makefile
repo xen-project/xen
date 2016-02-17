@@ -20,6 +20,7 @@ obj-y += lib.o
 obj-y += lzo.o
 obj-$(CONFIG_HAS_MEM_ACCESS) += mem_access.o
 obj-y += memory.o
+obj-y += monitor.o
 obj-y += multicall.o
 obj-y += notifier.o
 obj-y += page_alloc.o

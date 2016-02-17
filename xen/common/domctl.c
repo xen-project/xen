@@ -25,11 +25,11 @@
 #include <xen/paging.h>
 #include <xen/hypercall.h>
 #include <xen/vm_event.h>
+#include <xen/monitor.h>
 #include <asm/current.h>
 #include <asm/irq.h>
 #include <asm/page.h>
 #include <asm/p2m.h>
-#include <asm/monitor.h>
 #include <public/domctl.h>
 #include <xsm/xsm.h>
 
