@@ -160,7 +160,7 @@ Mandatory:             No
 Default value:         Automatically determine which backend to use.
 
 This does not affect the guest's view of the device.  It controls
-which software implementation of the Xen backend driver us used.
+which software implementation of the Xen backend driver is used.
 
 Not all backend drivers support all combinations of other options.
 For example, "phy" does not support formats other than "raw".
