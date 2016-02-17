@@ -5191,13 +5191,6 @@ static long hvm_physdev_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
     }
 }
 
-typedef unsigned long hvm_hypercall_t(
-    unsigned long, unsigned long, unsigned long, unsigned long, unsigned long,
-    unsigned long);
-
-#define HYPERCALL(x)                                        \
-    [ __HYPERVISOR_ ## x ] = (hvm_hypercall_t *) do_ ## x
-
 static long hvm_grant_table_op_compat32(unsigned int cmd,
                                         XEN_GUEST_HANDLE_PARAM(void) uop,
                                         unsigned int count)
@@ -5242,35 +5235,34 @@ static long hvm_physdev_op_compat32(
     }
 }
 
-static hvm_hypercall_t *const hvm_hypercall64_table[NR_hypercalls] = {
-    [ __HYPERVISOR_memory_op ] = (hvm_hypercall_t *)hvm_memory_op,
-    [ __HYPERVISOR_grant_table_op ] = (hvm_hypercall_t *)hvm_grant_table_op,
-    HYPERCALL(vcpu_op),
-    [ __HYPERVISOR_physdev_op ] = (hvm_hypercall_t *)hvm_physdev_op,
-    HYPERCALL(xen_version),
-    HYPERCALL(console_io),
-    HYPERCALL(event_channel_op),
-    HYPERCALL(sched_op),
-    HYPERCALL(set_timer_op),
-    HYPERCALL(xsm_op),
-    HYPERCALL(hvm_op),
-    HYPERCALL(sysctl),
-    HYPERCALL(domctl),
-    HYPERCALL(tmem_op),
-    HYPERCALL(platform_op),
-    HYPERCALL(mmuext_op),
-    HYPERCALL(xenpmu_op),
-    [ __HYPERVISOR_arch_1 ] = (hvm_hypercall_t *)paging_domctl_continuation
-};
+typedef unsigned long hvm_hypercall_t(
+    unsigned long, unsigned long, unsigned long, unsigned long, unsigned long,
+    unsigned long);
 
-#define COMPAT_CALL(x)                                        \
-    [ __HYPERVISOR_ ## x ] = (hvm_hypercall_t *) compat_ ## x
+#define HYPERCALL(x)                                         \
+    [ __HYPERVISOR_ ## x ] = { (hvm_hypercall_t *) do_ ## x, \
+                               (hvm_hypercall_t *) do_ ## x }
 
-static hvm_hypercall_t *const hvm_hypercall32_table[NR_hypercalls] = {
-    [ __HYPERVISOR_memory_op ] = (hvm_hypercall_t *)hvm_memory_op_compat32,
-    [ __HYPERVISOR_grant_table_op ] = (hvm_hypercall_t *)hvm_grant_table_op_compat32,
+#define COMPAT_CALL(x)                                       \
+    [ __HYPERVISOR_ ## x ] = { (hvm_hypercall_t *) do_ ## x, \
+                               (hvm_hypercall_t *) compat_ ## x }
+
+#define do_memory_op          hvm_memory_op
+#define compat_memory_op      hvm_memory_op_compat32
+#define do_physdev_op         hvm_physdev_op
+#define compat_physdev_op     hvm_physdev_op_compat32
+#define do_grant_table_op     hvm_grant_table_op
+#define compat_grant_table_op hvm_grant_table_op_compat32
+#define do_arch_1             paging_domctl_continuation
+
+static const struct {
+    hvm_hypercall_t *native;
+    hvm_hypercall_t *compat;
+} hvm_hypercall_table[NR_hypercalls] = {
+    COMPAT_CALL(memory_op),
+    COMPAT_CALL(grant_table_op),
     COMPAT_CALL(vcpu_op),
-    [ __HYPERVISOR_physdev_op ] = (hvm_hypercall_t *)hvm_physdev_op_compat32,
+    COMPAT_CALL(physdev_op),
     COMPAT_CALL(xen_version),
     HYPERCALL(console_io),
     HYPERCALL(event_channel_op),
@@ -5284,8 +5276,19 @@ static hvm_hypercall_t *const hvm_hypercall32_table[NR_hypercalls] = {
     COMPAT_CALL(platform_op),
     COMPAT_CALL(mmuext_op),
     HYPERCALL(xenpmu_op),
-    [ __HYPERVISOR_arch_1 ] = (hvm_hypercall_t *)paging_domctl_continuation
+    HYPERCALL(arch_1)
 };
+
+#undef do_memory_op
+#undef compat_memory_op
+#undef do_physdev_op
+#undef compat_physdev_op
+#undef do_grant_table_op
+#undef compat_grant_table_op
+#undef do_arch_1
+
+#undef HYPERCALL
+#undef COMPAT_CALL
 
 extern const uint8_t hypercall_args_table[], compat_hypercall_args_table[];
 
@@ -5316,7 +5319,7 @@ int hvm_do_hypercall(struct cpu_user_regs *regs)
     if ( (eax & 0x80000000) && is_viridian_domain(currd) )
         return viridian_hypercall(regs);
 
-    if ( (eax >= NR_hypercalls) || !hvm_hypercall32_table[eax] )
+    if ( (eax >= NR_hypercalls) || !hvm_hypercall_table[eax].native )
     {
         regs->eax = -ENOSYS;
         return HVM_HCALL_completed;
@@ -5350,7 +5353,8 @@ int hvm_do_hypercall(struct cpu_user_regs *regs)
 #endif
 
         curr->arch.hvm_vcpu.hcall_64bit = 1;
-        regs->rax = hvm_hypercall64_table[eax](rdi, rsi, rdx, r10, r8, r9);
+        regs->rax = hvm_hypercall_table[eax].native(rdi, rsi, rdx, r10, r8,
+                                                    r9);
 
         curr->arch.hvm_vcpu.hcall_64bit = 0;
 
@@ -5395,7 +5399,8 @@ int hvm_do_hypercall(struct cpu_user_regs *regs)
         }
 #endif
 
-        regs->_eax = hvm_hypercall32_table[eax](ebx, ecx, edx, esi, edi, ebp);
+        regs->_eax = hvm_hypercall_table[eax].compat(ebx, ecx, edx, esi, edi,
+                                                     ebp);
 
 #ifndef NDEBUG
         if ( !curr->arch.hvm_vcpu.hcall_preempted )
