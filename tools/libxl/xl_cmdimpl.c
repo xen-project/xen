@@ -3063,6 +3063,13 @@ error_out:
     }
 
 out:
+    if (restore_fd_to_close >= 0) {
+        if (close(restore_fd_to_close))
+            fprintf(stderr, "Failed to close restoring file, fd %d, errno %d\n",
+                    restore_fd_to_close, errno);
+        restore_fd_to_close = -1;
+    }
+
     if (logfile != 2)
         close(logfile);
 
