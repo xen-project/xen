@@ -2793,12 +2793,8 @@ static uint32_t create_domain(struct domain_create *dom_info)
                 return ERROR_FAIL;
             }
             /* allocate space for the extra config plus two EOLs plus \0 */
-            config_data = realloc(config_data, config_len
+            config_data = xrealloc(config_data, config_len
                 + strlen(extra_config) + 2 + 1);
-            if (!config_data) {
-                fprintf(stderr, "Failed to realloc config_data\n");
-                return ERROR_FAIL;
-            }
             config_len += sprintf(config_data + config_len, "\n%s\n",
                 extra_config);
         }
