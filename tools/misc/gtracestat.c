@@ -58,7 +58,6 @@ void do_count(void);
 void do_px_count(void);
 void do_maxmin(void);
 void do_average(void);
-void do_cstate(uint64_t start, uint64_t end);
 void do_exp_ratio(void);
 void do_exp_pred(void);
 
@@ -971,98 +970,6 @@ void do_breakevents(void)
             }
             printf("\n");
         }
-    }
-}
-
-void single_cstate(int c, uint64_t t, uint64_t e,
-                   uint64_t *a,
-                   uint64_t *max_res,
-                   uint64_t *min_res,
-                   uint64_t *num);
-void do_cstate(uint64_t start, uint64_t end)
-{
-    uint64_t cxtime[MAX_CX_NR];
-    uint64_t max_res[MAX_CX_NR];
-    uint64_t min_res[MAX_CX_NR];
-    uint64_t num[MAX_CX_NR];
-    int i, j;
-
-    width = 20;
-    printf("       ");
-    for (i = 0; i < max_cx_num; i++) {
-        int l = printf("C%d", i);
-        nr_putchar(width-l, ' ');
-    }
-    printf("\n");
-
-    for (i = 0; i < max_cpu_num; i++) {
-        uint64_t sum = 0;
-        single_cstate(i, start, end, cxtime, max_res, min_res, num);
-        printf("CPU%2d ", i);
-        for (j = 0; j < max_cx_num; j++)
-            sum += cxtime[i];
-        for (j = 0; j < max_cx_num; j++) {
-            int l = printf("%.1f%%, %"PRIu64".%d, %"PRIu64".%d, %"PRIu64,
-                           100.0 * cxtime[j]/sum,
-                           max_res[j]/tsc2ms,
-                           (unsigned int)(max_res[j]/(tsc2ms/10))%10,
-                           min_res[j]/tsc2ms,
-                           (unsigned int)(min_res[j]/(tsc2ms/10))%10,
-                           cxtime[j]/num[j]/tsc2ms);
-            nr_putchar(width - l, ' ');
-        }
-    }
-}
-
-void single_cstate(int c, uint64_t t, uint64_t e,
-                   uint64_t *a,
-                   uint64_t *max_res,
-                   uint64_t *min_res,
-                   uint64_t *num)
-{
-    int cx;
-    int i;
-    int first = 1;
-
-    for (i = 0; i < max_cx_num; i++) {
-        a[i] = 0;
-        max_res[i] = 0;
-        min_res[i] = (uint64_t) -1;
-        num[i] = 0;
-    }
-
-    cx = determine_cx(c, t);
-    i = 0;
-    while (i < evt_len[c] && evt[c][i].tsc <= t)
-        i++;
-    for (; i+1 < evt_len[c] && evt[c][i].tsc <= e; i++) {
-        int cxidx = evt[c][i].cx;
-        uint64_t delta;
-
-        if (first && cx >= 0) {
-            /* Partial Cx, only once */
-            first = 0;
-
-            cxidx = cx;
-            delta = evt[c][i].tsc - max(evt[c][i-1].tsc, t);
-            a[cxidx] += delta;
-            num[cxidx]++;
-
-            /* update min and max residency */
-            if (delta > max_res[cxidx])
-                max_res[cxidx] = delta;
-            if (delta < min_res[cxidx])
-                min_res[cxidx] = delta;
-        }
-        delta = evt[c][i+1].tsc - evt[c][i].tsc;
-        a[cxidx] += delta;
-        num[cxidx]++;
-
-        /* update min and max residency */
-        if (delta > max_res[cxidx])
-            max_res[cxidx] = delta;
-        if (delta < min_res[cxidx])
-            min_res[cxidx] = delta;
     }
 }
 
