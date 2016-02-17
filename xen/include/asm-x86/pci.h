@@ -23,4 +23,7 @@ int pci_msi_conf_write_intercept(struct pci_dev *, unsigned int reg,
 bool_t pci_mmcfg_decode(unsigned long mfn, unsigned int *seg,
                         unsigned int *bdf);
 
+bool_t pci_ro_mmcfg_decode(unsigned long mfn, unsigned int *seg,
+                           unsigned int *bdf);
+
 #endif /* __X86_PCI_H__ */

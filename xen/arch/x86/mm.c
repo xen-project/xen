@@ -5275,31 +5275,14 @@ int ptwr_do_page_fault(struct vcpu *v, unsigned long addr,
  * fault handling for read-only MMIO pages
  */
 
-struct mmio_ro_emulate_ctxt {
-    struct x86_emulate_ctxt ctxt;
-    unsigned long cr2;
-    unsigned int seg, bdf;
-};
-
-static int mmio_ro_emulated_read(
+int mmio_ro_emulated_write(
     enum x86_segment seg,
     unsigned long offset,
     void *p_data,
     unsigned int bytes,
     struct x86_emulate_ctxt *ctxt)
 {
-    return X86EMUL_UNHANDLEABLE;
-}
-
-static int mmio_ro_emulated_write(
-    enum x86_segment seg,
-    unsigned long offset,
-    void *p_data,
-    unsigned int bytes,
-    struct x86_emulate_ctxt *ctxt)
-{
-    struct mmio_ro_emulate_ctxt *mmio_ro_ctxt =
-        container_of(ctxt, struct mmio_ro_emulate_ctxt, ctxt);
+    struct mmio_ro_emulate_ctxt *mmio_ro_ctxt = ctxt->data;
 
     /* Only allow naturally-aligned stores at the original %cr2 address. */
     if ( ((bytes | offset) & (bytes - 1)) || offset != mmio_ro_ctxt->cr2 )
@@ -5313,20 +5296,19 @@ static int mmio_ro_emulated_write(
 }
 
 static const struct x86_emulate_ops mmio_ro_emulate_ops = {
-    .read       = mmio_ro_emulated_read,
+    .read       = x86emul_unhandleable_rw,
     .insn_fetch = ptwr_emulated_read,
     .write      = mmio_ro_emulated_write,
 };
 
-static int mmio_intercept_write(
+int mmcfg_intercept_write(
     enum x86_segment seg,
     unsigned long offset,
     void *p_data,
     unsigned int bytes,
     struct x86_emulate_ctxt *ctxt)
 {
-    struct mmio_ro_emulate_ctxt *mmio_ctxt =
-        container_of(ctxt, struct mmio_ro_emulate_ctxt, ctxt);
+    struct mmio_ro_emulate_ctxt *mmio_ctxt = ctxt->data;
 
     /*
      * Only allow naturally-aligned stores no wider than 4 bytes to the
@@ -5335,7 +5317,7 @@ static int mmio_intercept_write(
     if ( ((bytes | offset) & (bytes - 1)) || bytes > 4 ||
          offset != mmio_ctxt->cr2 )
     {
-        MEM_LOG("mmio_intercept: bad write (cr2=%lx, addr=%lx, bytes=%u)",
+        MEM_LOG("mmcfg_intercept: bad write (cr2=%lx, addr=%lx, bytes=%u)",
                 mmio_ctxt->cr2, offset, bytes);
         return X86EMUL_UNHANDLEABLE;
     }
@@ -5350,10 +5332,10 @@ static int mmio_intercept_write(
     return X86EMUL_OKAY;
 }
 
-static const struct x86_emulate_ops mmio_intercept_ops = {
-    .read       = mmio_ro_emulated_read,
+static const struct x86_emulate_ops mmcfg_intercept_ops = {
+    .read       = x86emul_unhandleable_rw,
     .insn_fetch = ptwr_emulated_read,
-    .write      = mmio_intercept_write,
+    .write      = mmcfg_intercept_write,
 };
 
 /* Check if guest is trying to modify a r/o MMIO page. */
@@ -5363,14 +5345,14 @@ int mmio_ro_do_page_fault(struct vcpu *v, unsigned long addr,
     l1_pgentry_t pte;
     unsigned long mfn;
     unsigned int addr_size = is_pv_32bit_vcpu(v) ? 32 : BITS_PER_LONG;
-    struct mmio_ro_emulate_ctxt mmio_ro_ctxt = {
-        .ctxt.regs = regs,
-        .ctxt.addr_size = addr_size,
-        .ctxt.sp_size = addr_size,
-        .ctxt.swint_emulate = x86_swint_emulate_none,
-        .cr2 = addr
+    struct mmio_ro_emulate_ctxt mmio_ro_ctxt = { .cr2 = addr };
+    struct x86_emulate_ctxt ctxt = {
+        .regs = regs,
+        .addr_size = addr_size,
+        .sp_size = addr_size,
+        .swint_emulate = x86_swint_emulate_none,
+        .data = &mmio_ro_ctxt
     };
-    const unsigned long *ro_map;
     int rc;
 
     /* Attempt to read the PTE that maps the VA being accessed. */
@@ -5395,12 +5377,10 @@ int mmio_ro_do_page_fault(struct vcpu *v, unsigned long addr,
     if ( !rangeset_contains_singleton(mmio_ro_ranges, mfn) )
         return 0;
 
-    if ( pci_mmcfg_decode(mfn, &mmio_ro_ctxt.seg, &mmio_ro_ctxt.bdf) &&
-         ((ro_map = pci_get_ro_map(mmio_ro_ctxt.seg)) == NULL ||
-          !test_bit(mmio_ro_ctxt.bdf, ro_map)) )
-        rc = x86_emulate(&mmio_ro_ctxt.ctxt, &mmio_intercept_ops);
+    if ( pci_ro_mmcfg_decode(mfn, &mmio_ro_ctxt.seg, &mmio_ro_ctxt.bdf) )
+        rc = x86_emulate(&ctxt, &mmcfg_intercept_ops);
     else
-        rc = x86_emulate(&mmio_ro_ctxt.ctxt, &mmio_ro_emulate_ops);
+        rc = x86_emulate(&ctxt, &mmio_ro_emulate_ops);
 
     return rc != X86EMUL_UNHANDLEABLE ? EXCRET_fault_fixed : 0;
 }

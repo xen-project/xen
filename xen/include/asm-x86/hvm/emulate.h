@@ -57,6 +57,7 @@ void hvm_emulate_writeback(
 struct segment_register *hvmemul_get_seg_reg(
     enum x86_segment seg,
     struct hvm_emulate_ctxt *hvmemul_ctxt);
+int hvm_emulate_one_mmio(unsigned long mfn, unsigned long gla);
 
 int hvmemul_do_pio_buffer(uint16_t port,
                           unsigned int size,

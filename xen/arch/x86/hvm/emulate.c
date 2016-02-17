@@ -1778,6 +1778,52 @@ int hvm_emulate_one_no_write(
     return _hvm_emulate_one(hvmemul_ctxt, &hvm_emulate_ops_no_write);
 }
 
+int hvm_emulate_one_mmio(unsigned long mfn, unsigned long gla)
+{
+    static const struct x86_emulate_ops hvm_intercept_ops_mmcfg = {
+        .read       = x86emul_unhandleable_rw,
+        .insn_fetch = hvmemul_insn_fetch,
+        .write      = mmcfg_intercept_write,
+    };
+    static const struct x86_emulate_ops hvm_ro_emulate_ops_mmio = {
+        .read       = x86emul_unhandleable_rw,
+        .insn_fetch = hvmemul_insn_fetch,
+        .write      = mmio_ro_emulated_write
+    };
+    struct mmio_ro_emulate_ctxt mmio_ro_ctxt = { .cr2 = gla };
+    struct hvm_emulate_ctxt ctxt;
+    const struct x86_emulate_ops *ops;
+    unsigned int seg, bdf;
+    int rc;
+
+    if ( pci_ro_mmcfg_decode(mfn, &seg, &bdf) )
+    {
+        mmio_ro_ctxt.seg = seg;
+        mmio_ro_ctxt.bdf = bdf;
+        ops = &hvm_intercept_ops_mmcfg;
+    }
+    else
+        ops = &hvm_ro_emulate_ops_mmio;
+
+    hvm_emulate_prepare(&ctxt, guest_cpu_user_regs());
+    ctxt.ctxt.data = &mmio_ro_ctxt;
+    rc = _hvm_emulate_one(&ctxt, ops);
+    switch ( rc )
+    {
+    case X86EMUL_UNHANDLEABLE:
+        hvm_dump_emulation_state(XENLOG_G_WARNING "MMCFG", &ctxt);
+        break;
+    case X86EMUL_EXCEPTION:
+        if ( ctxt.exn_pending )
+            hvm_inject_trap(&ctxt.trap);
+        /* fallthrough */
+    default:
+        hvm_emulate_writeback(&ctxt);
+    }
+
+    return rc;
+}
+
 void hvm_mem_access_emulate_one(enum emul_kind kind, unsigned int trapnr,
     unsigned int errcode)
 {

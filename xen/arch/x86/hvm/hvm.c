@@ -3089,6 +3089,14 @@ int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
         goto out_put_gfn;
     }
 
+    if ( (p2mt == p2m_mmio_direct) && is_hardware_domain(currd) &&
+         npfec.write_access && npfec.present &&
+         (hvm_emulate_one_mmio(mfn_x(mfn), gla) == X86EMUL_OKAY) )
+    {
+        rc = 1;
+        goto out_put_gfn;
+    }
+
     /* If we fell through, the vcpu will retry now that access restrictions have
      * been removed. It may fault again if the p2m entry type still requires so.
      * Otherwise, this is an error condition. */
