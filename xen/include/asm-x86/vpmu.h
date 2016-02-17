@@ -121,9 +121,6 @@ static inline int vpmu_do_rdmsr(unsigned int msr, uint64_t *msr_content)
     return vpmu_do_msr(msr, msr_content, 0, 0);
 }
 
-extern int acquire_pmu_ownership(int pmu_ownership);
-extern void release_pmu_ownership(int pmu_ownership);
-
 extern unsigned int vpmu_mode;
 extern unsigned int vpmu_features;
 

@@ -73,8 +73,8 @@ int xenoprof_add_trace(struct vcpu *, uint64_t pc, int mode);
 #define PMU_OWNER_NONE          0
 #define PMU_OWNER_XENOPROF      1
 #define PMU_OWNER_HVM           2
-int acquire_pmu_ownship(int pmu_ownership);
-void release_pmu_ownship(int pmu_ownership);
+int acquire_pmu_ownership(int pmu_ownership);
+void release_pmu_ownership(int pmu_ownership);
 
 void xenoprof_log_event(struct vcpu *, const struct cpu_user_regs *,
                         uint64_t pc, int mode, int event);

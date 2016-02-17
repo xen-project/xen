@@ -393,7 +393,7 @@ static int amd_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content,
         vpmu_reset(vpmu, VPMU_RUNNING);
         if ( has_hvm_container_vcpu(v) && is_msr_bitmap_on(vpmu) )
              amd_vpmu_unset_msr_bitmap(v);
-        release_pmu_ownship(PMU_OWNER_HVM);
+        release_pmu_ownership(PMU_OWNER_HVM);
     }
 
     if ( !vpmu_is_set(vpmu, VPMU_CONTEXT_LOADED)
@@ -442,7 +442,7 @@ static void amd_vpmu_destroy(struct vcpu *v)
     vpmu->priv_context = NULL;
 
     if ( vpmu_is_set(vpmu, VPMU_RUNNING) )
-        release_pmu_ownship(PMU_OWNER_HVM);
+        release_pmu_ownership(PMU_OWNER_HVM);
 
     vpmu_clear(vpmu);
 }
