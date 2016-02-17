@@ -2053,46 +2053,25 @@ x86_emulate(
         src.val = x86_seg_ds;
         goto pop_seg;
 
-    case 0x27: /* daa */ {
-        uint8_t al = _regs.eax;
-        unsigned long eflags = _regs.eflags;
-        generate_exception_if(mode_64bit(), EXC_UD, -1);
-        _regs.eflags &= ~(EFLG_CF|EFLG_AF);
-        if ( ((al & 0x0f) > 9) || (eflags & EFLG_AF) )
-        {
-            *(uint8_t *)&_regs.eax += 6;
-            _regs.eflags |= EFLG_AF;
-        }
-        if ( (al > 0x99) || (eflags & EFLG_CF) )
-        {
-            *(uint8_t *)&_regs.eax += 0x60;
-            _regs.eflags |= EFLG_CF;
-        }
-        _regs.eflags &= ~(EFLG_SF|EFLG_ZF|EFLG_PF);
-        _regs.eflags |= ((uint8_t)_regs.eax == 0) ? EFLG_ZF : 0;
-        _regs.eflags |= (( int8_t)_regs.eax <  0) ? EFLG_SF : 0;
-        _regs.eflags |= even_parity(_regs.eax) ? EFLG_PF : 0;
-        break;
-    }
-
+    case 0x27: /* daa */
     case 0x2f: /* das */ {
         uint8_t al = _regs.eax;
         unsigned long eflags = _regs.eflags;
+
         generate_exception_if(mode_64bit(), EXC_UD, -1);
-        _regs.eflags &= ~(EFLG_CF|EFLG_AF);
+        _regs.eflags &= ~(EFLG_CF|EFLG_AF|EFLG_SF|EFLG_ZF|EFLG_PF);
         if ( ((al & 0x0f) > 9) || (eflags & EFLG_AF) )
         {
             _regs.eflags |= EFLG_AF;
-            if ( (al < 6) || (eflags & EFLG_CF) )
+            if ( b == 0x2f && (al < 6 || (eflags & EFLG_CF)) )
                 _regs.eflags |= EFLG_CF;
-            *(uint8_t *)&_regs.eax -= 6;
+            *(uint8_t *)&_regs.eax += (b == 0x27) ? 6 : -6;
         }
         if ( (al > 0x99) || (eflags & EFLG_CF) )
         {
-            *(uint8_t *)&_regs.eax -= 0x60;
+            *(uint8_t *)&_regs.eax += (b == 0x27) ? 0x60 : -0x60;
             _regs.eflags |= EFLG_CF;
         }
-        _regs.eflags &= ~(EFLG_SF|EFLG_ZF|EFLG_PF);
         _regs.eflags |= ((uint8_t)_regs.eax == 0) ? EFLG_ZF : 0;
         _regs.eflags |= (( int8_t)_regs.eax <  0) ? EFLG_SF : 0;
         _regs.eflags |= even_parity(_regs.eax) ? EFLG_PF : 0;
@@ -2833,24 +2812,24 @@ x86_emulate(
         src.val = _regs.ecx;
         goto grp2;
 
-    case 0xd4: /* aam */ {
-        unsigned int base = insn_fetch_type(uint8_t);
-        uint8_t al = _regs.eax;
-        generate_exception_if(mode_64bit(), EXC_UD, -1);
-        generate_exception_if(base == 0, EXC_DE, -1);
-        *(uint16_t *)&_regs.eax = ((al / base) << 8) | (al % base);
-        _regs.eflags &= ~(EFLG_SF|EFLG_ZF|EFLG_PF);
-        _regs.eflags |= ((uint8_t)_regs.eax == 0) ? EFLG_ZF : 0;
-        _regs.eflags |= (( int8_t)_regs.eax <  0) ? EFLG_SF : 0;
-        _regs.eflags |= even_parity(_regs.eax) ? EFLG_PF : 0;
-        break;
-    }
-
+    case 0xd4: /* aam */
     case 0xd5: /* aad */ {
         unsigned int base = insn_fetch_type(uint8_t);
-        uint16_t ax = _regs.eax;
+
         generate_exception_if(mode_64bit(), EXC_UD, -1);
-        *(uint16_t *)&_regs.eax = (uint8_t)(ax + ((ax >> 8) * base));
+        if ( b & 0x01 )
+        {
+            uint16_t ax = _regs.eax;
+
+            *(uint16_t *)&_regs.eax = (uint8_t)(ax + ((ax >> 8) * base));
+        }
+        else
+        {
+            uint8_t al = _regs.eax;
+
+            generate_exception_if(!base, EXC_DE, -1);
+            *(uint16_t *)&_regs.eax = ((al / base) << 8) | (al % base);
+        }
         _regs.eflags &= ~(EFLG_SF|EFLG_ZF|EFLG_PF);
         _regs.eflags |= ((uint8_t)_regs.eax == 0) ? EFLG_ZF : 0;
         _regs.eflags |= (( int8_t)_regs.eax <  0) ? EFLG_SF : 0;
