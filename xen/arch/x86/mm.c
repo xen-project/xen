@@ -3281,8 +3281,9 @@ long do_mmuext_op(
         case MMUEXT_INVLPG_LOCAL:
             if ( unlikely(d != pg_owner) )
                 rc = -EPERM;
-            else if ( !paging_mode_enabled(d) ||
-                      paging_invlpg(curr, op.arg1.linear_addr) != 0 )
+            else if ( !paging_mode_enabled(d)
+                      ? __addr_ok(op.arg1.linear_addr)
+                      : paging_invlpg(curr, op.arg1.linear_addr) )
                 flush_tlb_one_local(op.arg1.linear_addr);
             break;
 
@@ -3303,7 +3304,7 @@ long do_mmuext_op(
 
             if ( op.cmd == MMUEXT_TLB_FLUSH_MULTI )
                 flush_tlb_mask(&pmask);
-            else
+            else if ( __addr_ok(op.arg1.linear_addr) )
                 flush_tlb_one_mask(&pmask, op.arg1.linear_addr);
             break;
         }
@@ -3316,10 +3317,10 @@ long do_mmuext_op(
             break;
     
         case MMUEXT_INVLPG_ALL:
-            if ( likely(d == pg_owner) )
-                flush_tlb_one_mask(d->domain_dirty_cpumask, op.arg1.linear_addr);
-            else
+            if ( unlikely(d != pg_owner) )
                 rc = -EPERM;
+            else if ( __addr_ok(op.arg1.linear_addr) )
+                flush_tlb_one_mask(d->domain_dirty_cpumask, op.arg1.linear_addr);
             break;
 
         case MMUEXT_FLUSH_CACHE:
