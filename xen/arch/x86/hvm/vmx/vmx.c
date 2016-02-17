@@ -345,10 +345,13 @@ void vmx_update_secondary_exec_control(struct vcpu *v)
 
 void vmx_update_exception_bitmap(struct vcpu *v)
 {
+    u32 bitmap = unlikely(v->arch.hvm_vmx.vmx_realmode)
+        ? 0xffffffffu : v->arch.hvm_vmx.exception_bitmap;
+
     if ( nestedhvm_vcpu_in_guestmode(v) )
-        nvmx_update_exception_bitmap(v, v->arch.hvm_vmx.exception_bitmap);
+        nvmx_update_exception_bitmap(v, bitmap);
     else
-        __vmwrite(EXCEPTION_BITMAP, v->arch.hvm_vmx.exception_bitmap);
+        __vmwrite(EXCEPTION_BITMAP, bitmap);
 }
 
 static int vmx_guest_x86_mode(struct vcpu *v)
@@ -1260,8 +1263,6 @@ static void vmx_update_guest_cr(struct vcpu *v, unsigned int cr)
             {
                 for ( s = x86_seg_cs ; s <= x86_seg_tr ; s++ )
                     vmx_set_segment_register(v, s, &reg[s]);
-                v->arch.hvm_vmx.exception_bitmap = 0xffffffff;
-                vmx_update_exception_bitmap(v);
             }
             else 
             {
@@ -1269,13 +1270,9 @@ static void vmx_update_guest_cr(struct vcpu *v, unsigned int cr)
                     if ( !(v->arch.hvm_vmx.vm86_segment_mask & (1<<s)) )
                         vmx_set_segment_register(
                             v, s, &v->arch.hvm_vmx.vm86_saved_seg[s]);
-                v->arch.hvm_vmx.exception_bitmap = HVM_TRAP_MASK
-                          | (paging_mode_hap(v->domain) ?
-                             0 : (1U << TRAP_page_fault))
-                          | (1U << TRAP_no_device);
-                vmx_update_exception_bitmap(v);
-                vmx_update_debug_state(v);
             }
+
+            vmx_update_exception_bitmap(v);
         }
 
         v->arch.hvm_vcpu.hw_cr[0] =
