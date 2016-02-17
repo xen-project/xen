@@ -2981,7 +2981,7 @@ static int vmx_handle_apic_write(void)
 void vmx_vmexit_handler(struct cpu_user_regs *regs)
 {
     unsigned long exit_qualification, exit_reason, idtv_info, intr_info = 0;
-    unsigned int vector = 0;
+    unsigned int vector = 0, mode;
     struct vcpu *v = current;
 
     __vmread(GUEST_RIP,    &regs->rip);
@@ -3582,6 +3582,41 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
 out:
     if ( nestedhvm_vcpu_in_guestmode(v) )
         nvmx_idtv_handling();
+
+    /*
+     * VM entry will fail (causing the guest to get crashed) if rIP (and
+     * rFLAGS, but we don't have an issue there) doesn't meet certain
+     * criteria. As we must not allow less than fully privileged mode to have
+     * such an effect on the domain, we correct rIP in that case (accepting
+     * this not being architecturally correct behavior, as the injected #GP
+     * fault will then not see the correct [invalid] return address).
+     * And since we know the guest will crash, we crash it right away if it
+     * already is in most privileged mode.
+     */
+    mode = vmx_guest_x86_mode(v);
+    if ( mode == 8 ? !is_canonical_address(regs->rip)
+                   : regs->rip != regs->_eip )
+    {
+        struct segment_register ss;
+
+        gprintk(XENLOG_WARNING, "Bad rIP %lx for mode %u\n", regs->rip, mode);
+
+        vmx_get_segment_register(v, x86_seg_ss, &ss);
+        if ( ss.attr.fields.dpl )
+        {
+            __vmread(VM_ENTRY_INTR_INFO, &intr_info);
+            if ( !(intr_info & INTR_INFO_VALID_MASK) )
+                hvm_inject_hw_exception(TRAP_gp_fault, 0);
+            /* Need to fix rIP nevertheless. */
+            if ( mode == 8 )
+                regs->rip = (long)(regs->rip << (64 - VADDR_BITS)) >>
+                            (64 - VADDR_BITS);
+            else
+                regs->rip = regs->_eip;
+        }
+        else
+            domain_crash(v->domain);
+    }
 }
 
 void vmx_vmenter_helper(const struct cpu_user_regs *regs)
