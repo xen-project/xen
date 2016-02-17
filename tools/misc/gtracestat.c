@@ -49,40 +49,40 @@ struct rec {
 };
 
 /********** FORWARD DECLARATION **********/
-void show_help(void);
-void show_version(void);
-int load_file(char *fname);
-void do_digest(uint64_t start, uint64_t end, uint64_t scale);
-void do_breakevents(void);
-void do_count(void);
-void do_px_count(void);
-void do_maxmin(void);
-void do_average(void);
-void do_exp_ratio(void);
-void do_exp_pred(void);
+static void show_help(void);
+static void show_version(void);
+static int load_file(char *fname);
+static void do_digest(uint64_t start, uint64_t end, uint64_t scale);
+static void do_breakevents(void);
+static void do_count(void);
+static void do_px_count(void);
+static void do_maxmin(void);
+static void do_average(void);
+static void do_exp_ratio(void);
+static void do_exp_pred(void);
 
 /********** GLOBAL VARIABLES **********/
 /* store simplified xentrace data */
-struct rec *data;
-int64_t data_nr, data_cur;
+static struct rec *data;
+static int64_t data_nr, data_cur;
 /* store max cx state number and cpu number */
-int max_cx_num = -1, max_cpu_num = -1;
-int px_freq_table[MAX_PX_NR];
-int max_px_num = 0;
+static int max_cx_num = -1, max_cpu_num = -1;
+static int px_freq_table[MAX_PX_NR];
+static int max_px_num = 0;
 
-int is_menu_gov_enabled = 0;
+static int is_menu_gov_enabled = 0;
 
 /* user specified translation unit */
-uint64_t tsc2ms = 2793000UL;
-uint64_t tsc2us = 2793UL;
-uint64_t tsc2phase = 55800000UL;
+static uint64_t tsc2ms = 2793000UL;
+static uint64_t tsc2us = 2793UL;
+static uint64_t tsc2phase = 55800000UL;
 
 /* each cpu column width */
-int width = 0;
+static int width = 0;
 
 /* digest mode variables */
-struct rec *evt[MAX_CPU_NR];
-int evt_len[MAX_CPU_NR];
+static struct rec *evt[MAX_CPU_NR];
+static int evt_len[MAX_CPU_NR];
 
 /* hand-crafted min() */
 static inline uint64_t min(uint64_t a, uint64_t b)
@@ -94,7 +94,7 @@ static inline uint64_t max(uint64_t a, uint64_t b)
     return a > b ? a : b;
 }
 
-int is_px = 0;
+static int is_px = 0;
 
 int main(int argc, char *argv[])
 {
@@ -265,7 +265,7 @@ static int data_cmp(const void *_a, const void *_b)
  *   max_cpu_num, max_cx_num
  */
 #define LIST_PX 0
-int load_file(char *fname)
+static int load_file(char *fname)
 {
     /* file descriptor for raw xentrace file */
     int fd;
@@ -436,12 +436,12 @@ int load_file(char *fname)
     return 0;
 }
 
-void show_version(void)
+static void show_version(void)
 {
     printf("gtracestat - (C) 2009-2011 Intel Corporation\n");
 }
 
-void show_help(void)
+static void show_help(void)
 {
     show_version();
     printf("gtracestat <trace.data> [-vhdselbcmau]\n");
@@ -476,7 +476,7 @@ static inline int len_of_number(uint64_t n)
 /* determine the cx at time t
  * take advantage of evt and evt_len.
  */
-int determine_cx(int c, uint64_t t)
+static int determine_cx(int c, uint64_t t)
 {
     int i;
 
@@ -503,7 +503,7 @@ int determine_cx(int c, uint64_t t)
  * cx_i - number of cx index
  * cx_r - residency of each cx entry
  */
-int process(int c, uint64_t t, uint64_t s, int *cx_i, uint64_t *cx_r)
+static int process(int c, uint64_t t, uint64_t s, int *cx_i, uint64_t *cx_r)
 {
     int cx;
     uint64_t len;
@@ -536,7 +536,7 @@ int process(int c, uint64_t t, uint64_t s, int *cx_i, uint64_t *cx_r)
     return n;
 }
 
-void nr_putchar(int nr, int ch)
+static void nr_putchar(int nr, int ch)
 {
     int i;
     for (i = 0; i < nr; i++)
@@ -545,7 +545,7 @@ void nr_putchar(int nr, int ch)
 
 #define MAX_INTERVAL_ENTRY	1000
 /* process period [start_time, start_time + time_scale) */
-void single_digest(uint64_t start_time, uint64_t time_scale)
+static void single_digest(uint64_t start_time, uint64_t time_scale)
 {
     int cpu;
     int cx_i[MAX_CPU_NR][MAX_INTERVAL_ENTRY];
@@ -592,7 +592,7 @@ void single_digest(uint64_t start_time, uint64_t time_scale)
     }
 }
 
-void do_digest(uint64_t start, uint64_t end, uint64_t scale)
+static void do_digest(uint64_t start, uint64_t end, uint64_t scale)
 {
     int i;
     uint64_t ms = 0;
@@ -628,14 +628,7 @@ struct cond_rec {
     uint64_t res;
 };
 
-void cond_rec_init(struct cond_rec *r, uint64_t min, uint64_t max)
-{
-    r->min = min;
-    r->max = max;
-    r->cnt = 0;
-}
-
-void cond_rec_inc(uint64_t cur, struct cond_rec *r)
+static void cond_rec_inc(uint64_t cur, struct cond_rec *r)
 {
     if (r->min <= cur && cur < r->max) {
         r->cnt++;
@@ -648,7 +641,7 @@ void cond_rec_inc(uint64_t cur, struct cond_rec *r)
  * a	- conditonal array
  * n	- how many entries there are
  */
-void do_count_per_cpu(int c, int cx, struct cond_rec *a, int n)
+static void do_count_per_cpu(int c, int cx, struct cond_rec *a, int n)
 {
     int i;
     /* find Cx entry first */
@@ -668,7 +661,7 @@ void do_count_per_cpu(int c, int cx, struct cond_rec *a, int n)
     }
 }
 
-struct cond_rec *make_cond_rec(uint64_t *a, int n)
+static struct cond_rec *make_cond_rec(uint64_t *a, int n)
 {
     int i;
     struct cond_rec *t = malloc(sizeof(struct cond_rec) * (n+1));
@@ -688,12 +681,12 @@ struct cond_rec *make_cond_rec(uint64_t *a, int n)
     return t;
 }
 
-uint64_t max_res[MAX_CPU_NR][MAX_CX_NR];
-uint64_t min_res[MAX_CPU_NR][MAX_CX_NR];
-uint64_t max_tm[MAX_CPU_NR][MAX_CX_NR];
-uint64_t min_tm[MAX_CPU_NR][MAX_CX_NR];
+static uint64_t max_res[MAX_CPU_NR][MAX_CX_NR];
+static uint64_t min_res[MAX_CPU_NR][MAX_CX_NR];
+static uint64_t max_tm[MAX_CPU_NR][MAX_CX_NR];
+static uint64_t min_tm[MAX_CPU_NR][MAX_CX_NR];
 
-void do_maxmin_per_cpu(int c)
+static void do_maxmin_per_cpu(int c)
 {
     int i;
     /* find Cx entry first */
@@ -716,7 +709,7 @@ void do_maxmin_per_cpu(int c)
     }
 }
 
-void do_maxmin(void)
+static void do_maxmin(void)
 {
     int i, j;
     /* init */
@@ -746,7 +739,7 @@ void do_maxmin(void)
     }
 }
 
-void do_count(void)
+static void do_count(void)
 {
     uint64_t scale[100] = { 50UL, 100UL, 200UL, 400UL, 800UL, 1000UL };
     int a;
@@ -820,7 +813,7 @@ static void do_px_count_per_cpu(int c, int px, struct cond_rec *cond, int n)
     }
 }
 
-void do_px_count(void)
+static void do_px_count(void)
 {
     int a[100];
     uint64_t scale[100];
@@ -906,7 +899,7 @@ void do_px_count(void)
     }
 }
 
-void do_breakevents(void)
+static void do_breakevents(void)
 {
     int br[MAX_CPU_NR][257];
     float pc[MAX_CPU_NR][257];
@@ -973,7 +966,7 @@ void do_breakevents(void)
     }
 }
 
-void do_average_per_cpu(int c)
+static void do_average_per_cpu(int c)
 {
     int i;
     uint64_t tot[MAX_CX_NR] = { 0 };
@@ -1009,7 +1002,7 @@ void do_average_per_cpu(int c)
     printf("\n");
 }
 
-void do_average(void)
+static void do_average(void)
 {
     int i;
 
@@ -1055,7 +1048,7 @@ static void do_exp_ratio_per_cpu(int c)
     }
 }
 
-void do_exp_ratio(void)
+static void do_exp_ratio(void)
 {
     int i;
 
@@ -1105,7 +1098,7 @@ static void do_exp_pred_per_cpu(int c)
     }
 }
 
-void do_exp_pred(void)
+static void do_exp_pred(void)
 {
     int i;
 
