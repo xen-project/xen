@@ -1714,37 +1714,6 @@ int xc_hvm_unmap_io_range_from_ioreq_server(xc_interface *xch,
                                             int is_mmio,
                                             uint64_t start,
                                             uint64_t end);
-/**
- * This function registers a range of write-protected memory for emulation.
- *
- * @parm xch a handle to an open hypervisor interface.
- * @parm domid the domain id to be serviced
- * @parm id the IOREQ Server id.
- * @parm start start of range
- * @parm end end of range (inclusive).
- * @return 0 on success, -1 on failure.
- */
-int xc_hvm_map_wp_mem_range_to_ioreq_server(xc_interface *xch,
-                                            domid_t domid,
-                                            ioservid_t id,
-                                            xen_pfn_t start,
-                                            xen_pfn_t end);
-
-/**
- * This function deregisters a range of write-protected memory for emulation.
- *
- * @parm xch a handle to an open hypervisor interface.
- * @parm domid the domain id to be serviced
- * @parm id the IOREQ Server id.
- * @parm start start of range
- * @parm end end of range (inclusive).
- * @return 0 on success, -1 on failure.
- */
-int xc_hvm_unmap_wp_mem_range_from_ioreq_server(xc_interface *xch,
-                                                domid_t domid,
-                                                ioservid_t id,
-                                                xen_pfn_t start,
-                                                xen_pfn_t end);
 
 /**
  * This function registers a PCI device for config space emulation.
