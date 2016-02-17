@@ -6963,6 +6963,7 @@ static char *current_time_to_string(time_t now)
 static void print_dom0_uptime(int short_mode, time_t now)
 {
     int fd;
+    ssize_t nr;
     char buf[512];
     uint32_t uptime = 0;
     char *uptime_str = NULL;
@@ -6973,11 +6974,14 @@ static void print_dom0_uptime(int short_mode, time_t now)
     if (fd == -1)
         goto err;
 
-    if (read(fd, buf, sizeof(buf)) == -1) {
+    nr = read(fd, buf, sizeof(buf) - 1);
+    if (nr == -1) {
         close(fd);
         goto err;
     }
     close(fd);
+
+    buf[nr] = '\0';
 
     strtok(buf, " ");
     uptime = strtoul(buf, NULL, 10);
