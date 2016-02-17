@@ -52,6 +52,19 @@ DEFINE_XEN_GUEST_HANDLE(void);
 DEFINE_XEN_GUEST_HANDLE(uint64_t);
 DEFINE_XEN_GUEST_HANDLE(xen_pfn_t);
 DEFINE_XEN_GUEST_HANDLE(xen_ulong_t);
+
+/* Turn a plain number into a C unsigned (long) constant. */
+#define __xen_mk_uint(x)  x ## U
+#define __xen_mk_ulong(x) x ## UL
+#define xen_mk_uint(x)    __xen_mk_uint(x)
+#define xen_mk_ulong(x)   __xen_mk_ulong(x)
+
+#else
+
+/* In assembly code we cannot use C numeric constant suffixes. */
+#define xen_mk_uint(x)  x
+#define xen_mk_ulong(x) x
+
 #endif
 
 /*
@@ -451,13 +464,13 @@ DEFINE_XEN_GUEST_HANDLE(mmuext_op_t);
 /* When specifying UVMF_MULTI, also OR in a pointer to a CPU bitmap.   */
 /* UVMF_LOCAL is merely UVMF_MULTI with a NULL bitmap pointer.         */
 /* ` enum uvm_flags { */
-#define UVMF_NONE               (0UL<<0) /* No flushing at all.   */
-#define UVMF_TLB_FLUSH          (1UL<<0) /* Flush entire TLB(s).  */
-#define UVMF_INVLPG             (2UL<<0) /* Flush only one entry. */
-#define UVMF_FLUSHTYPE_MASK     (3UL<<0)
-#define UVMF_MULTI              (0UL<<2) /* Flush subset of TLBs. */
-#define UVMF_LOCAL              (0UL<<2) /* Flush local TLB.      */
-#define UVMF_ALL                (1UL<<2) /* Flush all TLBs.       */
+#define UVMF_NONE           (xen_mk_ulong(0)<<0) /* No flushing at all.   */
+#define UVMF_TLB_FLUSH      (xen_mk_ulong(1)<<0) /* Flush entire TLB(s).  */
+#define UVMF_INVLPG         (xen_mk_ulong(2)<<0) /* Flush only one entry. */
+#define UVMF_FLUSHTYPE_MASK (xen_mk_ulong(3)<<0)
+#define UVMF_MULTI          (xen_mk_ulong(0)<<2) /* Flush subset of TLBs. */
+#define UVMF_LOCAL          (xen_mk_ulong(0)<<2) /* Flush local TLB.      */
+#define UVMF_ALL            (xen_mk_ulong(1)<<2) /* Flush all TLBs.       */
 /* ` } */
 
 /*
@@ -504,15 +517,11 @@ DEFINE_XEN_GUEST_HANDLE(mmuext_op_t);
 #define MAX_VMASST_TYPE                  3
 #endif
 
-#ifndef __ASSEMBLY__
-
-typedef uint16_t domid_t;
-
 /* Domain ids >= DOMID_FIRST_RESERVED cannot be used for ordinary domains. */
-#define DOMID_FIRST_RESERVED (0x7FF0U)
+#define DOMID_FIRST_RESERVED xen_mk_uint(0x7FF0)
 
 /* DOMID_SELF is used in certain contexts to refer to oneself. */
-#define DOMID_SELF (0x7FF0U)
+#define DOMID_SELF           xen_mk_uint(0x7FF0)
 
 /*
  * DOMID_IO is used to restrict page-table updates to mapping I/O memory.
@@ -523,7 +532,7 @@ typedef uint16_t domid_t;
  * This only makes sense in MMUEXT_SET_FOREIGNDOM, but in that context can
  * be specified by any calling domain.
  */
-#define DOMID_IO   (0x7FF1U)
+#define DOMID_IO             xen_mk_uint(0x7FF1)
 
 /*
  * DOMID_XEN is used to allow privileged domains to map restricted parts of
@@ -531,17 +540,21 @@ typedef uint16_t domid_t;
  * This only makes sense in MMUEXT_SET_FOREIGNDOM, and is only permitted if
  * the caller is privileged.
  */
-#define DOMID_XEN  (0x7FF2U)
+#define DOMID_XEN            xen_mk_uint(0x7FF2)
 
 /*
  * DOMID_COW is used as the owner of sharable pages */
-#define DOMID_COW  (0x7FF3U)
+#define DOMID_COW            xen_mk_uint(0x7FF3)
 
 /* DOMID_INVALID is used to identify pages with unknown owner. */
-#define DOMID_INVALID (0x7FF4U)
+#define DOMID_INVALID        xen_mk_uint(0x7FF4)
 
 /* Idle domain. */
-#define DOMID_IDLE (0x7FFFU)
+#define DOMID_IDLE           xen_mk_uint(0x7FFF)
+
+#ifndef __ASSEMBLY__
+
+typedef uint16_t domid_t;
 
 /*
  * Send an array of these to HYPERVISOR_mmu_update().
@@ -901,19 +914,10 @@ typedef struct dom0_vga_console_info {
 
 typedef uint8_t xen_domain_handle_t[16];
 
-/* Turn a plain number into a C unsigned long constant. */
-#define __mk_unsigned_long(x) x ## UL
-#define mk_unsigned_long(x) __mk_unsigned_long(x)
-
 __DEFINE_XEN_GUEST_HANDLE(uint8,  uint8_t);
 __DEFINE_XEN_GUEST_HANDLE(uint16, uint16_t);
 __DEFINE_XEN_GUEST_HANDLE(uint32, uint32_t);
 __DEFINE_XEN_GUEST_HANDLE(uint64, uint64_t);
-
-#else /* __ASSEMBLY__ */
-
-/* In assembly code we cannot use C numeric constant suffixes. */
-#define mk_unsigned_long(x) x
 
 #endif /* !__ASSEMBLY__ */
 
