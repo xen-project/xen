@@ -133,7 +133,7 @@ int dev_invalidate_iotlb(struct iommu *iommu, u16 did,
         case DMA_TLB_GLOBAL_FLUSH:
             /* invalidate all translations: sbit=1,bit_63=0,bit[62:12]=1 */
             sbit = 1;
-            addr = (~0 << PAGE_SHIFT_4K) & 0x7FFFFFFFFFFFFFFF;
+            addr = (~0UL << PAGE_SHIFT_4K) & 0x7FFFFFFFFFFFFFFF;
             rc = qinval_device_iotlb(iommu, pdev->ats_queue_depth,
                                      sid, sbit, addr);
             break;
@@ -145,7 +145,7 @@ int dev_invalidate_iotlb(struct iommu *iommu, u16 did,
             sbit = size_order ? 1 : 0;
 
             /* clear lower bits */
-            addr &= ~0 << PAGE_SHIFT_4K;
+            addr &= ~0UL << PAGE_SHIFT_4K;
 
             /* if sbit == 1, zero out size_order bit and set lower bits to 1 */
             if ( sbit )

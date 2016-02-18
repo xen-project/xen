@@ -1675,7 +1675,7 @@ void *alloc_xenheap_pages(unsigned int order, unsigned int memflags)
     ASSERT(!in_irq());
 
     if ( xenheap_bits && (memflags >> _MEMF_bits) > xenheap_bits )
-        memflags &= ~MEMF_bits(~0);
+        memflags &= ~MEMF_bits(~0U);
     if ( !(memflags >> _MEMF_bits) )
         memflags |= MEMF_bits(xenheap_bits);
 
