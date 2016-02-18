@@ -360,9 +360,9 @@ boolean_param("tickle_one_idle_cpu", opt_tickle_one_idle);
 
 DEFINE_PER_CPU(unsigned int, last_tickle_cpu);
 
-static inline void
-__runq_tickle(unsigned int cpu, struct csched_vcpu *new)
+static inline void __runq_tickle(struct csched_vcpu *new)
 {
+    unsigned int cpu = new->vcpu->processor;
     struct csched_vcpu * const cur = CSCHED_VCPU(curr_on_cpu(cpu));
     struct csched_private *prv = CSCHED_PRIV(per_cpu(scheduler, cpu));
     cpumask_t mask, idle_mask, *online;
@@ -374,7 +374,6 @@ __runq_tickle(unsigned int cpu, struct csched_vcpu *new)
     online = cpupool_domain_cpumask(new->sdom->dom);
     cpumask_and(&idle_mask, prv->idlers, online);
     idlers_empty = cpumask_empty(&idle_mask);
-
 
     /*
      * If the pcpu is idle, or there are no idlers and the new
@@ -980,11 +979,10 @@ static void
 csched_vcpu_wake(const struct scheduler *ops, struct vcpu *vc)
 {
     struct csched_vcpu * const svc = CSCHED_VCPU(vc);
-    const unsigned int cpu = vc->processor;
 
     BUG_ON( is_idle_vcpu(vc) );
 
-    if ( unlikely(curr_on_cpu(cpu) == vc) )
+    if ( unlikely(curr_on_cpu(vc->processor) == vc) )
     {
         SCHED_STAT_CRANK(vcpu_wake_running);
         return;
@@ -1028,7 +1026,7 @@ csched_vcpu_wake(const struct scheduler *ops, struct vcpu *vc)
 
     /* Put the VCPU on the runq and tickle CPUs */
     __runq_insert(svc);
-    __runq_tickle(cpu, svc);
+    __runq_tickle(svc);
 }
 
 static void
