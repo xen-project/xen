@@ -382,7 +382,7 @@ __update_svc_load(const struct scheduler *ops,
 
     {
         struct {
-            unsigned dom:16,vcpu:16;
+            unsigned vcpu:16, dom:16;
             unsigned v_avgload:32;
         } d;
         d.dom = svc->vcpu->domain->domain_id;
@@ -450,7 +450,7 @@ runq_insert(const struct scheduler *ops, unsigned int cpu, struct csched2_vcpu *
 
     {
         struct {
-            unsigned dom:16,vcpu:16;
+            unsigned vcpu:16, dom:16;
             unsigned pos;
         } d;
         d.dom = svc->vcpu->domain->domain_id;
@@ -536,7 +536,7 @@ runq_tickle(const struct scheduler *ops, unsigned int cpu, struct csched2_vcpu *
 
         /* TRACE */ {
             struct {
-                unsigned dom:16,vcpu:16;
+                unsigned vcpu:16, dom:16;
                 unsigned credit;
             } d;
             d.dom = cur->vcpu->domain->domain_id;
@@ -561,9 +561,9 @@ tickle:
 
     /* TRACE */ {
         struct {
-            unsigned cpu:8;
+            unsigned cpu:16, pad:16;
         } d;
-        d.cpu = ipid;
+        d.cpu = ipid; d.pad = 0;
         trace_var(TRC_CSCHED2_TICKLE, 0,
                   sizeof(d),
                   (unsigned char *)&d);
@@ -634,7 +634,7 @@ static void reset_credit(const struct scheduler *ops, int cpu, s_time_t now,
 
         /* TRACE */ {
             struct {
-                unsigned dom:16,vcpu:16;
+                unsigned vcpu:16, dom:16;
                 unsigned credit_start, credit_end;
                 unsigned multiplier;
             } d;
@@ -683,7 +683,7 @@ void burn_credits(struct csched2_runqueue_data *rqd, struct csched2_vcpu *svc, s
     /* TRACE */
     {
         struct {
-            unsigned dom:16,vcpu:16;
+            unsigned vcpu:16, dom:16;
             unsigned credit;
             int delta;
         } d;
@@ -812,7 +812,7 @@ __runq_assign(struct csched2_vcpu *svc, struct csched2_runqueue_data *rqd)
     /* TRACE */
     {
         struct {
-            unsigned dom:16,vcpu:16;
+            unsigned vcpu:16, dom:16;
             unsigned rqi:16;
         } d;
         d.dom = svc->vcpu->domain->domain_id;
