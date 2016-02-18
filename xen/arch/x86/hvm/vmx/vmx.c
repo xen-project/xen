@@ -3103,6 +3103,7 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
                  && vector != TRAP_nmi 
                  && vector != TRAP_machine_check ) 
             {
+        default:
                 perfc_incr(realmode_exits);
                 v->arch.hvm_vmx.vmx_emulate = 1;
                 HVMTRACE_0D(REALMODE_EMULATE);
@@ -3121,12 +3122,6 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
         case EXIT_REASON_INVEPT:
         case EXIT_REASON_INVVPID:
             break;
-
-        default:
-            v->arch.hvm_vmx.vmx_emulate = 1;
-            perfc_incr(realmode_exits);
-            HVMTRACE_0D(REALMODE_EMULATE);
-            return;
         }
     }
 
