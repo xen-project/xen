@@ -116,15 +116,12 @@ void *libxl__realloc(libxl__gc *gc, void *ptr, size_t new_size)
     if (ptr == NULL) {
         libxl__ptr_add(gc, new_ptr);
     } else if (new_ptr != ptr && libxl__gc_is_real(gc)) {
-        for (i = 0; i < gc->alloc_maxsize; i++) {
+        for (i = 0; ; i++) {
+            assert(i < gc->alloc_maxsize);
             if (gc->alloc_ptrs[i] == ptr) {
                 gc->alloc_ptrs[i] = new_ptr;
                 break;
             }
-        }
-        if (i == gc->alloc_maxsize) {
-            LOG(CRITICAL, "pointer is not tracked by the given gc");
-            abort();
         }
     }
 
