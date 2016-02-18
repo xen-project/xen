@@ -1873,6 +1873,14 @@ static int mod_l1_entry(l1_pgentry_t *pl1e, l1_pgentry_t nl1e,
     {
         /* Translate foreign guest addresses. */
         struct page_info *page = NULL;
+
+        if ( unlikely(l1e_get_flags(nl1e) & l1_disallow_mask(pt_dom)) )
+        {
+            MEM_LOG("Bad L1 flags %x",
+                    l1e_get_flags(nl1e) & l1_disallow_mask(pt_dom));
+            return -EINVAL;
+        }
+
         if ( paging_mode_translate(pg_dom) )
         {
             page = get_page_from_gfn(pg_dom, l1e_get_pfn(nl1e), NULL, P2M_ALLOC);
@@ -1881,30 +1889,16 @@ static int mod_l1_entry(l1_pgentry_t *pl1e, l1_pgentry_t nl1e,
             nl1e = l1e_from_pfn(page_to_mfn(page), l1e_get_flags(nl1e));
         }
 
-        if ( unlikely(l1e_get_flags(nl1e) & l1_disallow_mask(pt_dom)) )
-        {
-            MEM_LOG("Bad L1 flags %x",
-                    l1e_get_flags(nl1e) & l1_disallow_mask(pt_dom));
-            if ( page )
-                put_page(page);
-            return -EINVAL;
-        }
-
         /* Fast path for identical mapping, r/w, presence, and cachability. */
         if ( !l1e_has_changed(ol1e, nl1e,
                               PAGE_CACHE_ATTRS | _PAGE_RW | _PAGE_PRESENT) )
         {
             adjust_guest_l1e(nl1e, pt_dom);
-            if ( UPDATE_ENTRY(l1, pl1e, ol1e, nl1e, gl1mfn, pt_vcpu,
-                              preserve_ad) )
-            {
-                if ( page )
-                    put_page(page);
-                return 0;
-            }
+            rc = UPDATE_ENTRY(l1, pl1e, ol1e, nl1e, gl1mfn, pt_vcpu,
+                              preserve_ad);
             if ( page )
                 put_page(page);
-            return -EBUSY;
+            return rc ? 0 : -EBUSY;
         }
 
         switch ( rc = get_page_from_l1e(nl1e, pt_dom, pg_dom) )
