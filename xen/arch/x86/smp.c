@@ -205,26 +205,30 @@ static unsigned int flush_flags;
 
 void invalidate_interrupt(struct cpu_user_regs *regs)
 {
+    unsigned int flags = flush_flags;
     ack_APIC_irq();
     perfc_incr(ipis);
-    if ( !__sync_local_execstate() ||
-         (flush_flags & (FLUSH_TLB_GLOBAL | FLUSH_CACHE)) )
-        flush_area_local(flush_va, flush_flags);
+    if ( __sync_local_execstate() )
+        flags &= ~(FLUSH_TLB | FLUSH_TLB_GLOBAL);
+    flush_area_local(flush_va, flags);
     cpumask_clear_cpu(smp_processor_id(), &flush_cpumask);
 }
 
 void flush_area_mask(const cpumask_t *mask, const void *va, unsigned int flags)
 {
+    unsigned int cpu = smp_processor_id();
+
     ASSERT(local_irq_is_enabled());
 
-    if ( cpumask_test_cpu(smp_processor_id(), mask) )
-        flush_area_local(va, flags);
+    if ( cpumask_test_cpu(cpu, mask) )
+        flags = flush_area_local(va, flags);
 
-    if ( !cpumask_subset(mask, cpumask_of(smp_processor_id())) )
+    if ( (flags & ~FLUSH_ORDER_MASK) &&
+         !cpumask_subset(mask, cpumask_of(cpu)) )
     {
         spin_lock(&flush_lock);
         cpumask_and(&flush_cpumask, mask, &cpu_online_map);
-        cpumask_clear_cpu(smp_processor_id(), &flush_cpumask);
+        cpumask_clear_cpu(cpu, &flush_cpumask);
         flush_va      = va;
         flush_flags   = flags;
         send_IPI_mask(&flush_cpumask, INVALIDATE_TLB_VECTOR);

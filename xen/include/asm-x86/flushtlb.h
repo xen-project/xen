@@ -87,7 +87,7 @@ void write_cr3(unsigned long cr3);
 #define FLUSH_CACHE      0x400
 
 /* Flush local TLBs/caches. */
-void flush_area_local(const void *va, unsigned int flags);
+unsigned int flush_area_local(const void *va, unsigned int flags);
 #define flush_local(flags) flush_area_local(NULL, flags)
 
 /* Flush specified CPUs' TLBs/caches */
