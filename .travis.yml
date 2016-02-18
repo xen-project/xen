@@ -8,6 +8,8 @@ matrix:
         - compiler: gcc
           env: XEN_TARGET_ARCH=x86_64
         - compiler: gcc
+          env: XEN_TARGET_ARCH=x86_64 XEN_CONFIG_EXPERT=y RANDCONFIG=y
+        - compiler: gcc
           env: XEN_TARGET_ARCH=x86_64 COMPILER=gcc-5
         - compiler: gcc
           env: XEN_TARGET_ARCH=x86_64 debug=y
@@ -24,9 +26,13 @@ matrix:
         - compiler: gcc
           env: XEN_TARGET_ARCH=arm32 CROSS_COMPILE=arm-linux-gnueabihf-
         - compiler: gcc
+          env: XEN_TARGET_ARCH=arm32 CROSS_COMPILE=arm-linux-gnueabihf- XEN_CONFIG_EXPERT=y RANDCONFIG=y
+        - compiler: gcc
           env: XEN_TARGET_ARCH=arm32 CROSS_COMPILE=arm-linux-gnueabihf- debug=y
         - compiler: gcc
           env: XEN_TARGET_ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu-
+        - compiler: gcc
+          env: XEN_TARGET_ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- XEN_CONFIG_EXPERT=y RANDCONFIG=y
         - compiler: gcc
           env: XEN_TARGET_ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- debug=y
 addons:
@@ -69,5 +75,9 @@ before_script:
     - export CC=${COMPILER:-${CC}}
     - ${CC} --version
 script:
+    - ( [ "x${RANDCONFIG}" = "xy" ] && ( make -C xen randconfig )
+      || exit 0 )
     - ( ./configure --disable-tools --disable-stubdom --enable-docs &&
       make CC="${CROSS_COMPILE}${CC}" HOSTCC="${CC}" dist )
+after_script:
+    - cat xen/.config
