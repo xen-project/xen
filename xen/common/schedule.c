@@ -381,7 +381,11 @@ void sched_destroy_domain(struct domain *d)
 void vcpu_sleep_nosync(struct vcpu *v)
 {
     unsigned long flags;
-    spinlock_t *lock = vcpu_schedule_lock_irqsave(v, &flags);
+    spinlock_t *lock;
+
+    TRACE_2D(TRC_SCHED_SLEEP, v->domain->domain_id, v->vcpu_id);
+
+    lock = vcpu_schedule_lock_irqsave(v, &flags);
 
     if ( likely(!vcpu_runnable(v)) )
     {
@@ -392,8 +396,6 @@ void vcpu_sleep_nosync(struct vcpu *v)
     }
 
     vcpu_schedule_unlock_irqrestore(lock, flags, v);
-
-    TRACE_2D(TRC_SCHED_SLEEP, v->domain->domain_id, v->vcpu_id);
 }
 
 void vcpu_sleep_sync(struct vcpu *v)
@@ -409,7 +411,11 @@ void vcpu_sleep_sync(struct vcpu *v)
 void vcpu_wake(struct vcpu *v)
 {
     unsigned long flags;
-    spinlock_t *lock = vcpu_schedule_lock_irqsave(v, &flags);
+    spinlock_t *lock;
+
+    TRACE_2D(TRC_SCHED_WAKE, v->domain->domain_id, v->vcpu_id);
+
+    lock = vcpu_schedule_lock_irqsave(v, &flags);
 
     if ( likely(vcpu_runnable(v)) )
     {
@@ -424,8 +430,6 @@ void vcpu_wake(struct vcpu *v)
     }
 
     vcpu_schedule_unlock_irqrestore(lock, flags, v);
-
-    TRACE_2D(TRC_SCHED_WAKE, v->domain->domain_id, v->vcpu_id);
 }
 
 void vcpu_unblock(struct vcpu *v)
