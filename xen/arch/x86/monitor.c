@@ -32,10 +32,15 @@ int arch_monitor_domctl_event(struct domain *d,
     {
     case XEN_DOMCTL_MONITOR_EVENT_WRITE_CTRLREG:
     {
-        unsigned int ctrlreg_bitmask =
-            monitor_ctrlreg_bitmask(mop->u.mov_to_cr.index);
-        bool_t old_status =
-            !!(ad->monitor.write_ctrlreg_enabled & ctrlreg_bitmask);
+        unsigned int ctrlreg_bitmask;
+        bool_t old_status;
+
+        /* sanity check: avoid left-shift undefined behavior */
+        if ( unlikely(mop->u.mov_to_cr.index > 31) )
+            return -EINVAL;
+
+        ctrlreg_bitmask = monitor_ctrlreg_bitmask(mop->u.mov_to_cr.index);
+        old_status = !!(ad->monitor.write_ctrlreg_enabled & ctrlreg_bitmask);
 
         if ( unlikely(old_status == requested_status) )
             return -EEXIST;
