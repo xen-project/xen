@@ -241,8 +241,6 @@ int sched_init_vcpu(struct vcpu *v, unsigned int processor)
     if ( v->sched_priv == NULL )
         return 1;
 
-    TRACE_2D(TRC_SCHED_DOM_ADD, v->domain->domain_id, v->vcpu_id);
-
     /* Idle VCPUs are scheduled immediately, so don't put them in runqueue. */
     if ( is_idle_domain(d) )
     {
@@ -369,12 +367,14 @@ void sched_destroy_vcpu(struct vcpu *v)
 int sched_init_domain(struct domain *d)
 {
     SCHED_STAT_CRANK(dom_init);
+    TRACE_1D(TRC_SCHED_DOM_ADD, d->domain_id);
     return SCHED_OP(DOM2OP(d), init_domain, d);
 }
 
 void sched_destroy_domain(struct domain *d)
 {
     SCHED_STAT_CRANK(dom_destroy);
+    TRACE_1D(TRC_SCHED_DOM_REM, d->domain_id);
     SCHED_OP(DOM2OP(d), destroy_domain, d);
 }
 

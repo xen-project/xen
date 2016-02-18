@@ -270,6 +270,8 @@ struct domain *domain_create(domid_t domid, unsigned int domcr_flags,
 
     d->domain_id = domid;
 
+    TRACE_1D(TRC_DOM0_DOM_ADD, d->domain_id);
+
     lock_profile_register_struct(LOCKPROF_TYPE_PERDOM, d, domid, "Domain");
 
     if ( (err = xsm_alloc_security_domain(d)) != 0 )
@@ -864,10 +866,11 @@ void domain_destroy(struct domain *d)
     if ( atomic_cmpxchg(&d->refcnt, 0, DOMAIN_DESTROYED) != 0 )
         return;
 
+    TRACE_1D(TRC_DOM0_DOM_REM, d->domain_id);
+
     cpupool_rm_domain(d);
 
     /* Delete from task list and task hashtable. */
-    TRACE_1D(TRC_SCHED_DOM_REM, d->domain_id);
     spin_lock(&domlist_update_lock);
     pd = &domain_list;
     while ( *pd != d ) 
