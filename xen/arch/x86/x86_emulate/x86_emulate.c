@@ -570,7 +570,6 @@ do{ asm volatile (                                                      \
 /* Fetch next part of the instruction being emulated. */
 #define insn_fetch_bytes(_size)                                         \
 ({ unsigned long _x = 0, _eip = _regs.eip;                              \
-   if ( !mode_64bit() ) _eip = (uint32_t)_eip; /* ignore upper dword */ \
    _regs.eip += (_size); /* real hardware doesn't truncate */           \
    generate_exception_if((uint8_t)(_regs.eip -                          \
                                    ctxt->regs->eip) > MAX_INST_LEN,     \
@@ -1491,6 +1490,10 @@ x86_emulate(
         return X86EMUL_UNHANDLEABLE;
 #endif
     }
+
+    /* Truncate rIP to def_ad_bytes (2 or 4) if necessary. */
+    if ( def_ad_bytes < sizeof(_regs.eip) )
+        _regs.eip &= (1UL << (def_ad_bytes * 8)) - 1;
 
     /* Prefix bytes. */
     for ( ; ; )
@@ -3783,6 +3786,21 @@ x86_emulate(
 
     /* Commit shadow register state. */
     _regs.eflags &= ~EFLG_RF;
+    switch ( __builtin_expect(def_ad_bytes, sizeof(_regs.eip)) )
+    {
+        uint16_t ip;
+
+    case 2:
+        ip = _regs.eip;
+        _regs.eip = ctxt->regs->eip;
+        *(uint16_t *)&_regs.eip = ip;
+        break;
+#ifdef __x86_64__
+    case 4:
+        _regs.rip = _regs._eip;
+        break;
+#endif
+    }
     *ctxt->regs = _regs;
 
  done:
