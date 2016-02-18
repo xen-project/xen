@@ -64,37 +64,7 @@ restore_all_guest:
 iret_exit_to_guest:
         addq  $8,%rsp
 .Lft0:  iretq
-
-.section .fixup,"ax"
-.Lfx0:  sti
-        SAVE_ALL
-        movq  UREGS_error_code(%rsp),%rsi
-        movq  %rsp,%rax
-        andq  $~0xf,%rsp
-        pushq $__HYPERVISOR_DS         # SS
-        pushq %rax                     # RSP
-        pushfq                         # RFLAGS
-        pushq $__HYPERVISOR_CS         # CS
-        leaq  .Ldf0(%rip),%rax
-        pushq %rax                     # RIP
-        pushq %rsi                     # error_code/entry_vector
-        jmp   handle_exception
-.Ldf0:  GET_CURRENT(%rbx)
-        jmp   test_all_events
-failsafe_callback:
-        GET_CURRENT(%rbx)
-        leaq  VCPU_trap_bounce(%rbx),%rdx
-        movq  VCPU_failsafe_addr(%rbx),%rax
-        movq  %rax,TRAPBOUNCE_eip(%rdx)
-        movb  $TBF_FAILSAFE,TRAPBOUNCE_flags(%rdx)
-        bt    $_VGCF_failsafe_disables_events,VCPU_guest_context_flags(%rbx)
-        jnc   1f
-        orb   $TBF_INTERRUPT,TRAPBOUNCE_flags(%rdx)
-1:      call  create_bounce_frame
-        jmp   test_all_events
-.previous
-        _ASM_PRE_EXTABLE(.Lft0, .Lfx0)
-        _ASM_EXTABLE(.Ldf0, failsafe_callback)
+        _ASM_PRE_EXTABLE(.Lft0, handle_exception)
 
         ALIGN
 /* No special register assumptions. */
@@ -405,18 +375,7 @@ __UNLIKELY_END(create_bounce_frame_bad_sp)
         subq  $8,%rsi
         movl  TRAPBOUNCE_error_code(%rdx),%eax
 .Lft7:  movq  %rax,(%rsi)               # ERROR CODE
-1:      testb $TBF_FAILSAFE,%cl
-UNLIKELY_START(nz, bounce_failsafe)
-        subq  $32,%rsi
-        movl  %gs,%eax
-.Lft8:  movq  %rax,24(%rsi)             # GS
-        movl  %fs,%eax
-.Lft9:  movq  %rax,16(%rsi)             # FS
-        movl  %es,%eax
-.Lft10: movq  %rax,8(%rsi)              # ES
-        movl  %ds,%eax
-.Lft11: movq  %rax,(%rsi)               # DS
-UNLIKELY_END(bounce_failsafe)
+1:
         subq  $16,%rsi
         movq  UREGS_r11+8(%rsp),%rax
 .Lft12: movq  %rax,8(%rsi)              # R11
@@ -446,10 +405,6 @@ __UNLIKELY_END(create_bounce_frame_bad_bounce_ip)
         _ASM_EXTABLE(.Lft5,  domain_crash_page_fault_16)
         _ASM_EXTABLE(.Lft6,  domain_crash_page_fault)
         _ASM_EXTABLE(.Lft7,  domain_crash_page_fault)
-        _ASM_EXTABLE(.Lft8,  domain_crash_page_fault_24)
-        _ASM_EXTABLE(.Lft9,  domain_crash_page_fault_16)
-        _ASM_EXTABLE(.Lft10, domain_crash_page_fault_8)
-        _ASM_EXTABLE(.Lft11, domain_crash_page_fault)
         _ASM_EXTABLE(.Lft12, domain_crash_page_fault_8)
         _ASM_EXTABLE(.Lft13, domain_crash_page_fault)
 

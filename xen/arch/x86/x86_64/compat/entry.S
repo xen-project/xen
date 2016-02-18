@@ -176,39 +176,7 @@ ENTRY(compat_restore_all_guest)
         ASSERT_INTERRUPTS_DISABLED
         RESTORE_ALL adj=8 compat=1
 .Lft0:  iretq
-
-.section .fixup,"ax"
-.Lfx0:  sti
-        SAVE_ALL
-        movq  UREGS_error_code(%rsp),%rsi
-        movq  %rsp,%rax
-        andq  $~0xf,%rsp
-        pushq $__HYPERVISOR_DS         # SS
-        pushq %rax                     # RSP
-        pushfq                         # RFLAGS
-        pushq $__HYPERVISOR_CS         # CS
-        leaq  .Ldf0(%rip),%rax
-        pushq %rax                     # RIP
-        pushq %rsi                     # error_code/entry_vector
-        jmp   handle_exception
-.Ldf0:  GET_CURRENT(%rbx)
-        jmp   compat_test_all_events
-compat_failsafe_callback:
-        GET_CURRENT(%rbx)
-        leaq  VCPU_trap_bounce(%rbx),%rdx
-        movl  VCPU_failsafe_addr(%rbx),%eax
-        movl  %eax,TRAPBOUNCE_eip(%rdx)
-        movl  VCPU_failsafe_sel(%rbx),%eax
-        movw  %ax,TRAPBOUNCE_cs(%rdx)
-        movb  $TBF_FAILSAFE,TRAPBOUNCE_flags(%rdx)
-        btq   $_VGCF_failsafe_disables_events,VCPU_guest_context_flags(%rbx)
-        jnc   1f
-        orb   $TBF_INTERRUPT,TRAPBOUNCE_flags(%rdx)
-1:      call  compat_create_bounce_frame
-        jmp   compat_test_all_events
-.previous
-        _ASM_PRE_EXTABLE(.Lft0, .Lfx0)
-        _ASM_EXTABLE(.Ldf0, compat_failsafe_callback)
+        _ASM_PRE_EXTABLE(.Lft0, handle_exception)
 
 /* %rdx: trap_bounce, %rbx: struct vcpu */
 ENTRY(compat_post_handle_exception)
@@ -322,17 +290,6 @@ compat_create_bounce_frame:
         movl  TRAPBOUNCE_error_code(%rdx),%eax
 .Lft8:  movl  %eax,%fs:(%rsi)           # ERROR CODE
 1:
-        testb $TBF_FAILSAFE,%cl
-UNLIKELY_START(nz, compat_bounce_failsafe)
-        subl  $4*4,%esi
-        movl  %gs,%eax
-.Lft9:  movl  %eax,%fs:3*4(%rsi)        # GS
-.Lft10: movl  %edi,%fs:2*4(%rsi)        # FS
-        movl  %es,%eax
-.Lft11: movl  %eax,%fs:1*4(%rsi)        # ES
-        movl  %ds,%eax
-.Lft12: movl  %eax,%fs:0*4(%rsi)        # DS
-UNLIKELY_END(compat_bounce_failsafe)
         /* Rewrite our stack frame and return to guest-OS mode. */
         /* IA32 Ref. Vol. 3: TF, VM, RF and NT flags are cleared on trap. */
         andl  $~(X86_EFLAGS_VM|X86_EFLAGS_RF|\
@@ -364,14 +321,8 @@ __UNLIKELY_END(compat_bounce_null_selector)
         _ASM_EXTABLE(.Lft6,  compat_crash_page_fault_8)
         _ASM_EXTABLE(.Lft7,  compat_crash_page_fault)
         _ASM_EXTABLE(.Lft8,  compat_crash_page_fault)
-        _ASM_EXTABLE(.Lft9,  compat_crash_page_fault_12)
-        _ASM_EXTABLE(.Lft10, compat_crash_page_fault_8)
-        _ASM_EXTABLE(.Lft11, compat_crash_page_fault_4)
-        _ASM_EXTABLE(.Lft12, compat_crash_page_fault)
         _ASM_EXTABLE(.Lft13, .Lfx13)
 
-compat_crash_page_fault_12:
-        addl  $4,%esi
 compat_crash_page_fault_8:
         addl  $4,%esi
 compat_crash_page_fault_4:
