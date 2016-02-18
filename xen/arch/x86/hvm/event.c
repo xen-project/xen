@@ -173,7 +173,7 @@ int hvm_event_breakpoint(unsigned long rip,
 {
     struct vcpu *curr = current;
     struct arch_domain *ad = &curr->domain->arch;
-    vm_event_request_t req;
+    vm_event_request_t req = {};
 
     switch ( type )
     {
