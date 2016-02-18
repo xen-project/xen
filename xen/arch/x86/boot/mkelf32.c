@@ -3,7 +3,7 @@
  * 
  * Usage: elf-prefix <in-image> <out-image> <load-base>
  * 
- * Converts an Elf32 or Elf64 executable binary <in-image> into a simple Elf32
+ * Converts an Elf64 executable binary <in-image> into a simple Elf32
  * image <out-image> comprising a single chunk to be loaded at <load-base>. 
  */
 
@@ -235,7 +235,6 @@ int main(int argc, char **argv)
     int        bytes, todo, i;
 
     Elf32_Ehdr in32_ehdr;
-    Elf32_Phdr in32_phdr;
 
     Elf64_Ehdr in64_ehdr;
     Elf64_Phdr in64_phdr;
@@ -271,70 +270,39 @@ int main(int argc, char **argv)
     big_endian = (*(u16 *)in32_ehdr.e_ident == ((ELFMAG0 << 8) | ELFMAG1));
 
     endianadjust_ehdr32(&in32_ehdr);
-    switch ( in32_ehdr.e_ident[EI_CLASS] )
+    if ( in32_ehdr.e_ident[EI_CLASS] != ELFCLASS64 )
     {
-    case ELFCLASS32:
-        if ( in32_ehdr.e_phentsize != sizeof(in32_phdr) )
-        {
-            fprintf(stderr, "Bad program header size (%d != %d).\n",
-                    (int)in32_ehdr.e_phentsize, (int)sizeof(in32_phdr));
-            return 1;
-        }
-
-        if ( in32_ehdr.e_phnum != 1 )
-        {
-            fprintf(stderr, "Expect precisely 1 program header; found %d.\n",
-                    (int)in32_ehdr.e_phnum);
-            return 1;
-        }
-
-        (void)lseek(infd, in32_ehdr.e_phoff, SEEK_SET);
-        do_read(infd, &in32_phdr, sizeof(in32_phdr));
-        endianadjust_phdr32(&in32_phdr);
-
-        (void)lseek(infd, in32_phdr.p_offset, SEEK_SET);
-        dat_siz = (u32)in32_phdr.p_filesz;
-
-        /* Do not use p_memsz: it does not include BSS alignment padding. */
-        /*mem_siz = (u32)in32_phdr.p_memsz;*/
-        mem_siz = (u32)(final_exec_addr - in32_phdr.p_vaddr);
-        break;
-
-    case ELFCLASS64:
-        (void)lseek(infd, 0, SEEK_SET);
-        do_read(infd, &in64_ehdr, sizeof(in64_ehdr));
-        endianadjust_ehdr64(&in64_ehdr);
-
-        if ( in64_ehdr.e_phentsize != sizeof(in64_phdr) )
-        {
-            fprintf(stderr, "Bad program header size (%d != %d).\n",
-                    (int)in64_ehdr.e_phentsize, (int)sizeof(in64_phdr));
-            return 1;
-        }
-
-        if ( in64_ehdr.e_phnum != 1 )
-        {
-            fprintf(stderr, "Expect precisly 1 program header; found %d.\n",
-                    (int)in64_ehdr.e_phnum);
-            return 1;
-        }
-
-        (void)lseek(infd, in64_ehdr.e_phoff, SEEK_SET);
-        do_read(infd, &in64_phdr, sizeof(in64_phdr));
-        endianadjust_phdr64(&in64_phdr);
-
-        (void)lseek(infd, in64_phdr.p_offset, SEEK_SET);
-        dat_siz = (u32)in64_phdr.p_filesz;
-
-        /* Do not use p_memsz: it does not include BSS alignment padding. */
-        /*mem_siz = (u32)in64_phdr.p_memsz;*/
-        mem_siz = (u32)(final_exec_addr - in64_phdr.p_vaddr);
-        break;
-
-    default:
-        fprintf(stderr, "Input image must be a 32- or 64-bit Elf image.\n");
+        fprintf(stderr, "Bad program header class - we only do 64-bit!.\n");
         return 1;
     }
+    (void)lseek(infd, 0, SEEK_SET);
+    do_read(infd, &in64_ehdr, sizeof(in64_ehdr));
+    endianadjust_ehdr64(&in64_ehdr);
+
+    if ( in64_ehdr.e_phentsize != sizeof(in64_phdr) )
+    {
+        fprintf(stderr, "Bad program header size (%d != %d).\n",
+                (int)in64_ehdr.e_phentsize, (int)sizeof(in64_phdr));
+        return 1;
+    }
+
+    if ( in64_ehdr.e_phnum != 1 )
+    {
+        fprintf(stderr, "Expect precisly 1 program header; found %d.\n",
+                (int)in64_ehdr.e_phnum);
+        return 1;
+    }
+
+    (void)lseek(infd, in64_ehdr.e_phoff, SEEK_SET);
+    do_read(infd, &in64_phdr, sizeof(in64_phdr));
+    endianadjust_phdr64(&in64_phdr);
+
+    (void)lseek(infd, in64_phdr.p_offset, SEEK_SET);
+    dat_siz = (u32)in64_phdr.p_filesz;
+
+    /* Do not use p_memsz: it does not include BSS alignment padding. */
+    /*mem_siz = (u32)in64_phdr.p_memsz;*/
+    mem_siz = (u32)(final_exec_addr - in64_phdr.p_vaddr);
 
     /*
      * End the image on a page boundary. This gets round alignment bugs
