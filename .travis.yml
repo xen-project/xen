@@ -52,8 +52,6 @@ addons:
             - libglib2.0-dev
             - libpixman-1-dev
             - pkg-config
-            - bridge-utils
-            - iproute2
             - flex
             - bison
             - gettext
