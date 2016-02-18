@@ -362,7 +362,7 @@ rt_update_deadline(s_time_t now, struct rt_vcpu *svc)
     /* TRACE */
     {
         struct {
-            unsigned dom:16,vcpu:16;
+            unsigned vcpu:16, dom:16;
             unsigned cur_deadline_lo, cur_deadline_hi;
             unsigned cur_budget_lo, cur_budget_hi;
         } d;
@@ -711,7 +711,7 @@ burn_budget(const struct scheduler *ops, struct rt_vcpu *svc, s_time_t now)
     /* TRACE */
     {
         struct {
-            unsigned dom:16, vcpu:16;
+            unsigned vcpu:16, dom:16;
             unsigned cur_budget_lo;
             unsigned cur_budget_hi;
             int delta;
@@ -763,7 +763,7 @@ __runq_pick(const struct scheduler *ops, const cpumask_t *mask)
         if( svc != NULL )
         {
             struct {
-                unsigned dom:16, vcpu:16;
+                unsigned vcpu:16, dom:16;
                 unsigned cur_deadline_lo, cur_deadline_hi;
                 unsigned cur_budget_lo, cur_budget_hi;
             } d;
@@ -777,8 +777,6 @@ __runq_pick(const struct scheduler *ops, const cpumask_t *mask)
                       sizeof(d),
                       (unsigned char *) &d);
         }
-        else
-            trace_var(TRC_RTDS_RUNQ_PICK, 1, 0, NULL);
     }
 
     return svc;
@@ -845,6 +843,7 @@ rt_schedule(const struct scheduler *ops, s_time_t now, bool_t tasklet_work_sched
 
     if ( tasklet_work_scheduled )
     {
+        trace_var(TRC_RTDS_SCHED_TASKLET, 1, 0,  NULL);
         snext = rt_vcpu(idle_vcpu[cpu]);
     }
     else
@@ -884,24 +883,6 @@ rt_schedule(const struct scheduler *ops, s_time_t now, bool_t tasklet_work_sched
 
     ret.time = MIN(snext->budget, MAX_SCHEDULE); /* sched quantum */
     ret.task = snext->vcpu;
-
-    /* TRACE */
-    {
-        struct {
-            unsigned dom:16,vcpu:16;
-            unsigned cur_deadline_lo, cur_deadline_hi;
-            unsigned cur_budget_lo, cur_budget_hi;
-        } d;
-        d.dom = snext->vcpu->domain->domain_id;
-        d.vcpu = snext->vcpu->vcpu_id;
-        d.cur_deadline_lo = (unsigned) snext->cur_deadline;
-        d.cur_deadline_hi = (unsigned) (snext->cur_deadline >> 32);
-        d.cur_budget_lo = (unsigned) snext->cur_budget;
-        d.cur_budget_hi = (unsigned) (snext->cur_budget >> 32);
-        trace_var(TRC_RTDS_SCHED_TASKLET, 1,
-                  sizeof(d),
-                  (unsigned char *)&d);
-    }
 
     return ret;
 }
