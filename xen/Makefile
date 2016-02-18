@@ -238,7 +238,8 @@ FORCE:
 	$(MAKE) -f $(BASEDIR)/Rules.mk -C $* built_in.o built_in_bin.o
 
 kconfig := silentoldconfig oldconfig config menuconfig defconfig \
-	nconfig xconfig gconfig savedefconfig listnewconfig olddefconfig
+	nconfig xconfig gconfig savedefconfig listnewconfig olddefconfig \
+	randconfig
 .PHONY: $(kconfig)
 $(kconfig):
 	$(MAKE) -f $(BASEDIR)/tools/kconfig/Makefile.kconfig ARCH=$(ARCH) SRCARCH=$(SRCARCH) $@
