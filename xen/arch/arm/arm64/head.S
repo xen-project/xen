@@ -309,8 +309,8 @@ common_start:
         b.eq  el2 /* Yes */
 
         /* OK, we're boned. */
-        PRINT("- Xen must be entered in NS EL2 mode -\r\n" \
-              "- Please update the bootloader -\r\n")
+        PRINT("- Xen must be entered in NS EL2 mode -\r\n")
+        PRINT("- Please update the bootloader -\r\n")
         b fail
 
 el2:    PRINT("- Xen starting at EL2 -\r\n")
