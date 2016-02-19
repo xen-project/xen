@@ -77,7 +77,11 @@ typedef struct xen_feature_info xen_feature_info_t;
 /* arg == NULL; returns host memory page size. */
 #define XENVER_pagesize 7
 
-/* arg == xen_domain_handle_t. */
+/* arg == xen_domain_handle_t.
+ *
+ * The toolstack fills it out for guest consumption. It is intended to hold
+ * the UUID of the guest.
+ */
 #define XENVER_guest_handle 8
 
 #define XENVER_commandline 9
