@@ -129,98 +129,54 @@ static elf_errorstatus xc_dom_parse_hvm_kernel(struct xc_dom_image *dom)
     return rc;
 }
 
-static int modules_init(struct xc_dom_image *dom,
-                        uint64_t vend, struct elf_binary *elf,
-                        uint64_t *mstart_out, uint64_t *mend_out)
+static int module_init_one(struct xc_dom_image *dom,
+                           struct xc_hvm_firmware_module *module,
+                           char *name)
 {
-#define MODULE_ALIGN 1UL << 7
-#define MB_ALIGN     1UL << 20
-#define MKALIGN(x, a) (((uint64_t)(x) + (a) - 1) & ~(uint64_t)((a) - 1))
-    uint64_t total_len = 0, offset1 = 0;
+    struct xc_dom_seg seg;
+    void *dest;
 
-    if ( dom->acpi_module.length == 0 && dom->smbios_module.length == 0 )
-        return 0;
+    if ( module->length )
+    {
+        if ( xc_dom_alloc_segment(dom, &seg, name, 0, module->length) )
+            goto err;
+        dest = xc_dom_seg_to_ptr(dom, &seg);
+        if ( dest == NULL )
+        {
+            DOMPRINTF("%s: xc_dom_seg_to_ptr(dom, &seg) => NULL",
+                      __FUNCTION__);
+            goto err;
+        }
+        memcpy(dest, module->data, module->length);
+        module->guest_addr_out = seg.vstart;
 
-    /* Find the total length for the firmware modules with a reasonable large
-     * alignment size to align each the modules.
-     */
-    total_len = MKALIGN(dom->acpi_module.length, MODULE_ALIGN);
-    offset1 = total_len;
-    total_len += MKALIGN(dom->smbios_module.length, MODULE_ALIGN);
-
-    /* Want to place the modules 1Mb+change behind the loader image. */
-    *mstart_out = MKALIGN(elf->pend, MB_ALIGN) + (MB_ALIGN);
-    *mend_out = *mstart_out + total_len;
-
-    if ( *mend_out > vend )
-        return -1;
-
-    if ( dom->acpi_module.length != 0 )
-        dom->acpi_module.guest_addr_out = *mstart_out;
-    if ( dom->smbios_module.length != 0 )
-        dom->smbios_module.guest_addr_out = *mstart_out + offset1;
+        assert(dom->mmio_start > 0 && dom->mmio_start < UINT32_MAX);
+        if ( module->guest_addr_out > dom->mmio_start ||
+             module->guest_addr_out + module->length > dom->mmio_start )
+        {
+            DOMPRINTF("%s: Module %s would be loaded abrove 4GB",
+                      __FUNCTION__, name);
+            goto err;
+        }
+    }
 
     return 0;
+err:
+    return -1;
 }
 
-static int loadmodules(struct xc_dom_image *dom,
-                       uint64_t mstart, uint64_t mend,
-                       uint32_t domid)
+static int modules_init(struct xc_dom_image *dom)
 {
-    privcmd_mmap_entry_t *entries = NULL;
-    unsigned long pfn_start;
-    unsigned long pfn_end;
-    size_t pages;
-    uint32_t i;
-    uint8_t *dest;
-    int rc = -1;
-    xc_interface *xch = dom->xch;
+    int rc;
 
-    if ( mstart == 0 || mend == 0 )
-        return 0;
+    rc = module_init_one(dom, &dom->acpi_module, "ACPI module");
+    if ( rc ) goto err;
+    rc = module_init_one(dom, &dom->smbios_module, "SMBIOS module");
+    if ( rc ) goto err;
 
-    pfn_start = (unsigned long)(mstart >> PAGE_SHIFT);
-    pfn_end = (unsigned long)((mend + PAGE_SIZE - 1) >> PAGE_SHIFT);
-    pages = pfn_end - pfn_start;
-
-    /* Map address space for module list. */
-    entries = calloc(pages, sizeof(privcmd_mmap_entry_t));
-    if ( entries == NULL )
-        goto error_out;
-
-    for ( i = 0; i < pages; i++ )
-        entries[i].mfn = (mstart >> PAGE_SHIFT) + i;
-
-    dest = xc_map_foreign_ranges(
-        xch, domid, pages << PAGE_SHIFT, PROT_READ | PROT_WRITE, 1 << PAGE_SHIFT,
-        entries, pages);
-    if ( dest == NULL )
-        goto error_out;
-
-    /* Zero the range so padding is clear between modules */
-    memset(dest, 0, pages << PAGE_SHIFT);
-
-    /* Load modules into range */
-    if ( dom->acpi_module.length != 0 )
-    {
-        memcpy(dest,
-               dom->acpi_module.data,
-               dom->acpi_module.length);
-    }
-    if ( dom->smbios_module.length != 0 )
-    {
-        memcpy(dest + (dom->smbios_module.guest_addr_out - mstart),
-               dom->smbios_module.data,
-               dom->smbios_module.length);
-    }
-
-    munmap(dest, pages << PAGE_SHIFT);
-    rc = 0;
-
- error_out:
-    free(entries);
-
-    return rc;
+    return 0;
+err:
+    return -1;
 }
 
 static elf_errorstatus xc_dom_load_hvm_kernel(struct xc_dom_image *dom)
@@ -229,7 +185,6 @@ static elf_errorstatus xc_dom_load_hvm_kernel(struct xc_dom_image *dom)
     privcmd_mmap_entry_t *entries = NULL;
     size_t pages = (elf->pend - elf->pstart + PAGE_SIZE - 1) >> PAGE_SHIFT;
     elf_errorstatus rc;
-    uint64_t m_start = 0, m_end = 0;
     int i;
 
     /* Map address space for initial elf image. */
@@ -262,15 +217,7 @@ static elf_errorstatus xc_dom_load_hvm_kernel(struct xc_dom_image *dom)
 
     munmap(elf->dest_base, elf->dest_size);
 
-    rc = modules_init(dom, dom->total_pages << PAGE_SHIFT, elf, &m_start,
-                      &m_end);
-    if ( rc != 0 )
-    {
-        DOMPRINTF("%s: insufficient space to load modules.", __func__);
-        goto error;
-    }
-
-    rc = loadmodules(dom, m_start, m_end, dom->guest_domid);
+    rc = modules_init(dom);
     if ( rc != 0 )
     {
         DOMPRINTF("%s: unable to load modules.", __func__);
