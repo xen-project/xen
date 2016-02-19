@@ -10,9 +10,9 @@ AS_IF([test x"$pyconfig" = x"no"], [
         print "-I" + distutils.sysconfig.get_config_var("INCLUDEPY")'`"
     CPPFLAGS="$CPPFLAGS `$PYTHON -c 'import distutils.sysconfig; \
         print distutils.sysconfig.get_config_var("CFLAGS")'`"
-    LDFLAGS="$LDFLAGS `$PYTHON -c 'import distutils.sysconfig; \
+    PYTHON_LIBS="$LDFLAGS `$PYTHON -c 'import distutils.sysconfig; \
         print distutils.sysconfig.get_config_var("LIBS")'`"
-    LDFLAGS="$LDFLAGS `$PYTHON -c 'import distutils.sysconfig; \
+    PYTHON_LIBS="$LDFLAGS `$PYTHON -c 'import distutils.sysconfig; \
         print distutils.sysconfig.get_config_var("SYSLIBS")'`"
     LDFLAGS="$LDFLAGS `$PYTHON -c 'import distutils.sysconfig; \
         print "-L" + distutils.sysconfig.get_python_lib(plat_specific=1,\
@@ -25,12 +25,14 @@ AS_IF([test x"$pyconfig" = x"no"], [
     dnl If python-config is found use it
     CPPFLAGS="$CFLAGS `$PYTHON-config --cflags`"
     LDFLAGS="$LDFLAGS `$PYTHON-config --ldflags`"
+    PYTHON_LIBS="$LIBS `$PYTHON-config --libs`"
 ])
 
 AC_CHECK_HEADER([Python.h], [],
     [AC_MSG_ERROR([Unable to find Python development headers])],)
 AC_CHECK_LIB(python$ac_python_version, PyArg_ParseTuple, [],
-    [AC_MSG_ERROR([Unable to find a suitable python development library])])
+    [AC_MSG_ERROR([Unable to find a suitable python development library])],
+    [$PYTHON_LIBS])
 CPPFLAGS=$ac_previous_cppflags
 LDFLAGS=$ac_previous_ldflags
 ])
