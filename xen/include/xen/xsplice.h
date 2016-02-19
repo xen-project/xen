@@ -10,6 +10,9 @@ struct xen_sysctl_xsplice_op;
 
 #ifdef CONFIG_XSPLICE
 
+/* Convenience define for printk. */
+#define XSPLICE             "xsplice: "
+
 int xsplice_op(struct xen_sysctl_xsplice_op *);
 
 #else

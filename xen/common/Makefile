@@ -59,6 +59,7 @@ obj-y += wait.o
 obj-$(CONFIG_XENOPROF) += xenoprof.o
 obj-y += xmalloc_tlsf.o
 obj-$(CONFIG_XSPLICE) += xsplice.o
+obj-$(CONFIG_XSPLICE) += xsplice_elf.o
 
 obj-bin-$(CONFIG_X86) += $(foreach n,decompress bunzip2 unxz unlzma unlzo unlz4 earlycpio,$(n).init.o)
 
