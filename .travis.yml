@@ -77,3 +77,7 @@ script:
       make CC="${CROSS_COMPILE}${CC}" HOSTCC="${CC}" dist )
 after_script:
     - cat xen/.config
+notifications:
+    irc:
+        channels:
+            - secure: "mPIFllF6eW3F3talvccMy55Tfcid66IPkkXZYCxDKRF2DQrMyvmg4qt0xN6gGZsdfOBMNr+/YfO5PxusBCUkVdBGBzd3QhFoIDYZbJZgzVh3yNDQ+x4L7p1cZNrwJ2loMmSX6KxGKZxZX9NRStrTUkVyp0jGZB9xkwT8Rl6jXj7EQkgQ95K1Wqafx0ycLfyDQmzX9bzi/3KIBFKMGmK18AFMh+R30zK0FPUUsS4+VhepIkVqO5puU3OYePd34wRnWlt7hjU2Vj5vYmVXp3UOE+E8/Lf9IGVAhitDi+EC35b8zo2BHJ9z6xZARYPvfSqbXcXV20RycabI+e3ufZJ40eatssly5QjWH+HhKS42C4gV1psmQhkTCNCM62Ty5uf6R1hsZJQuiOZrc8ojdje8ey2MxJk4R+Xz+Igg1/kD6+WX9/Y6Y3iRuj5HL1xCYfpTbK4mC7ofw0SofW2aAGI68jHpCqJdQCDzMl6748PlDMM0eKe0MPKIEenYHcoBnOEC/jciXUDa6wduV75EEip7oq2i+m44MopcsEDTpdliH077GhKapF0ActjvBTLpyoTRSfkKm0NZol/dgwd3PGG/mY8clIoeXWRb4opk93ejPC967KmSNC68SlfwaJmFZS5T9vAgb6k7r6i9G3dmYtrLKzws8IV1CPWqLzk58+v4pRk="
