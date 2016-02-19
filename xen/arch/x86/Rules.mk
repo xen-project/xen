@@ -10,6 +10,8 @@ CFLAGS += -I$(BASEDIR)/include/asm-x86/mach-generic
 CFLAGS += -I$(BASEDIR)/include/asm-x86/mach-default
 CFLAGS += '-D__OBJECT_LABEL__=$(subst /,$$,$(subst -,_,$(subst $(BASEDIR)/,,$(CURDIR))/$@))'
 
+CFLAGS-$(xenoprof) += -DCONFIG_XENOPROF
+
 # Prevent floating-point variables from creeping into Xen.
 CFLAGS += -msoft-float
 

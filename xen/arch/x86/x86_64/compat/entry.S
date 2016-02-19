@@ -345,6 +345,10 @@ compat_crash_page_fault:
 #define compat_kexec_op do_ni_hypercall
 #endif
 
+#ifndef CONFIG_XENOPROF
+#define compat_xenoprof_op do_ni_hypercall
+#endif
+
 ENTRY(compat_hypercall_table)
         .quad compat_set_trap_table     /*  0 */
         .quad do_mmu_update

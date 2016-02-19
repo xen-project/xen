@@ -14,6 +14,12 @@
 #include <public/xenoprof.h>
 #include <asm/xenoprof.h>
 
+#define PMU_OWNER_NONE          0
+#define PMU_OWNER_XENOPROF      1
+#define PMU_OWNER_HVM           2
+
+#ifdef CONFIG_XENOPROF
+
 #define XENOPROF_DOMAIN_IGNORED    0
 #define XENOPROF_DOMAIN_ACTIVE     1
 #define XENOPROF_DOMAIN_PASSIVE    2
@@ -64,19 +70,28 @@ struct xenoprof {
 #endif
 
 struct domain;
+
+int acquire_pmu_ownership(int pmu_ownership);
+void release_pmu_ownership(int pmu_ownership);
+
 int is_active(struct domain *d);
 int is_passive(struct domain *d);
 void free_xenoprof_pages(struct domain *d);
 
 int xenoprof_add_trace(struct vcpu *, uint64_t pc, int mode);
 
-#define PMU_OWNER_NONE          0
-#define PMU_OWNER_XENOPROF      1
-#define PMU_OWNER_HVM           2
-int acquire_pmu_ownership(int pmu_ownership);
-void release_pmu_ownership(int pmu_ownership);
-
 void xenoprof_log_event(struct vcpu *, const struct cpu_user_regs *,
                         uint64_t pc, int mode, int event);
+
+#else
+static inline int acquire_pmu_ownership(int pmu_ownership)
+{
+    return 1;
+}
+
+static inline void release_pmu_ownership(int pmu_ownership)
+{
+}
+#endif /* CONFIG_XENOPROF */
 
 #endif  /* __XEN__XENOPROF_H__ */
