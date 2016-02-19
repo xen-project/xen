@@ -22,6 +22,8 @@
 #ifndef __ASM_X86_XENOPROF_H__
 #define __ASM_X86_XENOPROF_H__
 
+#ifdef CONFIG_XENOPROF
+
 int nmi_reserve_counters(void);
 int nmi_setup_events(void);
 int nmi_enable_virq(void);
@@ -67,9 +69,28 @@ void xenoprof_backtrace(struct vcpu *, const struct cpu_user_regs *,
                  "xenoprof/x86 with autotranslated mode enabled"    \
                  "isn't supported yet\n");                          \
     } while (0)
+
 int passive_domain_do_rdmsr(unsigned int msr, uint64_t *msr_content);
 int passive_domain_do_wrmsr(unsigned int msr, uint64_t msr_content);
 void passive_domain_destroy(struct vcpu *v);
+
+#else
+
+static inline int passive_domain_do_rdmsr(unsigned int msr,
+                                          uint64_t *msr_content)
+{
+    return 0;
+}
+
+static inline int passive_domain_do_wrmsr(unsigned int msr,
+                                          uint64_t msr_content)
+{
+    return 0;
+}
+
+static inline void passive_domain_destroy(struct vcpu *v) {}
+
+#endif /* CONFIG_XENOPROF */
 
 #endif /* __ASM_X86_XENOPROF_H__ */
 

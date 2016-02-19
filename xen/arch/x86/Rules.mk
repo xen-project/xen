@@ -3,7 +3,6 @@
 
 HAS_NUMA := y
 HAS_CORE_PARKING := y
-xenoprof := y
 
 CFLAGS += -I$(BASEDIR)/include 
 CFLAGS += -I$(BASEDIR)/include/asm-x86/mach-generic

@@ -3,7 +3,7 @@ subdir-y += cpu
 subdir-y += genapic
 subdir-y += hvm
 subdir-y += mm
-subdir-y += oprofile
+subdir-$(CONFIG_XENOPROF) += oprofile
 subdir-y += x86_64
 
 obj-bin-y += alternative.init.o

@@ -682,6 +682,10 @@ ENTRY(exception_table)
 #define do_kexec_op do_ni_hypercall
 #endif
 
+#ifndef CONFIG_XENOPROF
+#define do_xenoprof_op do_ni_hypercall
+#endif
+
 ENTRY(hypercall_table)
         .quad do_set_trap_table     /*  0 */
         .quad do_mmu_update
