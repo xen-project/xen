@@ -84,6 +84,19 @@ config LATE_HWDOM
 
 	  If unsure, say N.
 
+# Adds support for Xenoprof
+config XENOPROF
+	def_bool y
+	prompt "Xen Oprofile Support" if EXPERT = "y"
+	depends on X86
+	---help---
+	  Xen OProfile (Xenoprof) is a system-wide profiler for Xen virtual
+	  machine environments, capable of profiling the Xen virtual machine
+	  monitor, multiple Linux guest operating systems, and applications
+	  running on them.
+
+	  If unsure, say Y.
+
 # Enable/Disable XSM support
 config XSM
 	bool "Xen Security Modules support"

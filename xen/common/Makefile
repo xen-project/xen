@@ -57,13 +57,13 @@ obj-y += vm_event.o
 obj-y += vmap.o
 obj-y += vsprintf.o
 obj-y += wait.o
+obj-$(CONFIG_XENOPROF) += xenoprof.o
 obj-y += xmalloc_tlsf.o
 
 obj-bin-$(CONFIG_X86) += $(foreach n,decompress bunzip2 unxz unlzma unlzo unlz4 earlycpio,$(n).init.o)
 
 obj-$(perfc)       += perfc.o
 obj-$(crash_debug) += gdbstub.o
-obj-$(xenoprof)    += xenoprof.o
 
 obj-$(CONFIG_COMPAT) += $(addprefix compat/,domain.o kernel.o memory.o multicall.o tmem_xen.o xlat.o)
 
