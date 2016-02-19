@@ -7227,7 +7227,7 @@ else
 fi
 
 CPPFLAGS=$ac_previous_cppflags
-LDLFAGS=$ac_previous_ldflags
+LDFLAGS=$ac_previous_ldflags
 
 
     { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether Python setup.py brokenly enables -D_FORTIFY_SOURCE" >&5
