@@ -337,6 +337,12 @@ F:	xen/common/tmem*
 F:	xen/include/xen/tmem*
 F:	docs/misc/tmem*
 
+TRAVIS CI
+M:	Doug Goldstein <cardoe@cardoe.com>
+W:	https://travis-ci.org/xen-project/xen
+S:	Supported
+F:	.travis.yml
+
 UNMODIFIED LINUX PV DRIVERS
 M:	Keir Fraser <keir@xen.org>
 M:	Jan Beulich <jbeulich@suse.com>
