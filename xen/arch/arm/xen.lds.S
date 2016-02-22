@@ -115,6 +115,12 @@ SECTIONS
   .init.data : {
        *(.init.rodata)
        *(.init.rodata.str*)
+
+       . = ALIGN(8);
+       __setup_start = .;
+       *(.init.setup)
+       __setup_end = .;
+
        *(.init.data)
        *(.init.data.rel)
        *(.init.data.rel.*)
@@ -125,11 +131,6 @@ SECTIONS
        __ctors_end = .;
   } :text
   . = ALIGN(32);
-  .init.setup : {
-       __setup_start = .;
-       *(.init.setup)
-       __setup_end = .;
-  } :text
   .init.proc.info : {
        __proc_info_start = .;
        *(.init.proc.info)

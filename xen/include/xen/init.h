@@ -87,8 +87,8 @@ struct kernel_param {
 
 extern struct kernel_param __setup_start, __setup_end;
 
-#define __setup_str static __initdata __attribute__((__aligned__(1))) char
-#define __kparam static __initsetup struct kernel_param
+#define __setup_str static const __initconst __attribute__((__aligned__(1))) char
+#define __kparam static const __initsetup struct kernel_param
 
 #define custom_param(_name, _var) \
     __setup_str __setup_str_##_var[] = _name; \
