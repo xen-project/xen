@@ -1753,7 +1753,7 @@ static int bootlate_hvm(struct xc_dom_image *dom)
             start_info->nr_modules = 1;
         }
 
-        start_info->magic = HVM_START_MAGIC_VALUE;
+        start_info->magic = XEN_HVM_START_MAGIC_VALUE;
 
         munmap(start_page, start_info_size);
     }

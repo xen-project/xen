@@ -25,39 +25,8 @@
 #include <asm/hvm/event.h>
 #include <asm/monitor.h>
 #include <asm/altp2m.h>
+#include <asm/vm_event.h>
 #include <public/vm_event.h>
-
-static void hvm_event_fill_regs(vm_event_request_t *req)
-{
-    const struct cpu_user_regs *regs = guest_cpu_user_regs();
-    const struct vcpu *curr = current;
-
-    req->data.regs.x86.rax = regs->eax;
-    req->data.regs.x86.rcx = regs->ecx;
-    req->data.regs.x86.rdx = regs->edx;
-    req->data.regs.x86.rbx = regs->ebx;
-    req->data.regs.x86.rsp = regs->esp;
-    req->data.regs.x86.rbp = regs->ebp;
-    req->data.regs.x86.rsi = regs->esi;
-    req->data.regs.x86.rdi = regs->edi;
-
-    req->data.regs.x86.r8  = regs->r8;
-    req->data.regs.x86.r9  = regs->r9;
-    req->data.regs.x86.r10 = regs->r10;
-    req->data.regs.x86.r11 = regs->r11;
-    req->data.regs.x86.r12 = regs->r12;
-    req->data.regs.x86.r13 = regs->r13;
-    req->data.regs.x86.r14 = regs->r14;
-    req->data.regs.x86.r15 = regs->r15;
-
-    req->data.regs.x86.rflags = regs->eflags;
-    req->data.regs.x86.rip    = regs->eip;
-
-    req->data.regs.x86.msr_efer = curr->arch.hvm_vcpu.guest_efer;
-    req->data.regs.x86.cr0 = curr->arch.hvm_vcpu.guest_cr[0];
-    req->data.regs.x86.cr3 = curr->arch.hvm_vcpu.guest_cr[3];
-    req->data.regs.x86.cr4 = curr->arch.hvm_vcpu.guest_cr[4];
-}
 
 static int hvm_event_traps(uint8_t sync, vm_event_request_t *req)
 {
@@ -92,7 +61,7 @@ static int hvm_event_traps(uint8_t sync, vm_event_request_t *req)
         req->altp2m_idx = vcpu_altp2m(curr).p2midx;
     }
 
-    hvm_event_fill_regs(req);
+    vm_event_fill_regs(req);
     vm_event_put_request(currd, &currd->vm_event->monitor, req);
 
     return 1;

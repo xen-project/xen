@@ -456,7 +456,7 @@ runq_insert(const struct scheduler *ops, unsigned int cpu, struct csched2_vcpu *
         d.dom = svc->vcpu->domain->domain_id;
         d.vcpu = svc->vcpu->vcpu_id;
         d.pos = pos;
-        trace_var(TRC_CSCHED2_RUNQ_POS, 0,
+        trace_var(TRC_CSCHED2_RUNQ_POS, 1,
                   sizeof(d),
                   (unsigned char *)&d);
     }
@@ -564,7 +564,7 @@ tickle:
             unsigned cpu:16, pad:16;
         } d;
         d.cpu = ipid; d.pad = 0;
-        trace_var(TRC_CSCHED2_TICKLE, 0,
+        trace_var(TRC_CSCHED2_TICKLE, 1,
                   sizeof(d),
                   (unsigned char *)&d);
     }
@@ -1721,7 +1721,7 @@ csched2_schedule(
      */
     if ( tasklet_work_scheduled )
     {
-        trace_var(TRC_CSCHED2_SCHED_TASKLET, 0, 0,  NULL);
+        trace_var(TRC_CSCHED2_SCHED_TASKLET, 1, 0,  NULL);
         snext = CSCHED2_VCPU(idle_vcpu[cpu]);
     }
     else

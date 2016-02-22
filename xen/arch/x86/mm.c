@@ -5957,8 +5957,8 @@ void destroy_xen_mappings(unsigned long s, unsigned long e)
     unsigned int  i;
     unsigned long v = s;
 
-    ASSERT((s & ~PAGE_MASK) == 0);
-    ASSERT((e & ~PAGE_MASK) == 0);
+    ASSERT(IS_ALIGNED(s, PAGE_SIZE));
+    ASSERT(IS_ALIGNED(e, PAGE_SIZE));
 
     while ( v < e )
     {
@@ -6369,8 +6369,8 @@ static void __memguard_change_range(void *p, unsigned long l, int guard)
     unsigned int flags = __PAGE_HYPERVISOR_RW | MAP_SMALL_PAGES;
 
     /* Ensure we are dealing with a page-aligned whole number of pages. */
-    ASSERT((_p&~PAGE_MASK) == 0);
-    ASSERT((_l&~PAGE_MASK) == 0);
+    ASSERT(IS_ALIGNED(_p, PAGE_SIZE));
+    ASSERT(IS_ALIGNED(_l, PAGE_SIZE));
 
     if ( guard )
         flags &= ~_PAGE_PRESENT;
