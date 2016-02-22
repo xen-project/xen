@@ -1541,61 +1541,6 @@ void p2m_mem_paging_resume(struct domain *d, vm_event_response_t *rsp)
     }
 }
 
-static void p2m_vm_event_fill_regs(vm_event_request_t *req)
-{
-    const struct cpu_user_regs *regs = guest_cpu_user_regs();
-    struct segment_register seg;
-    struct hvm_hw_cpu ctxt;
-    struct vcpu *curr = current;
-
-    /* Architecture-specific vmcs/vmcb bits */
-    hvm_funcs.save_cpu_ctxt(curr, &ctxt);
-
-    req->data.regs.x86.rax = regs->eax;
-    req->data.regs.x86.rcx = regs->ecx;
-    req->data.regs.x86.rdx = regs->edx;
-    req->data.regs.x86.rbx = regs->ebx;
-    req->data.regs.x86.rsp = regs->esp;
-    req->data.regs.x86.rbp = regs->ebp;
-    req->data.regs.x86.rsi = regs->esi;
-    req->data.regs.x86.rdi = regs->edi;
-
-    req->data.regs.x86.r8  = regs->r8;
-    req->data.regs.x86.r9  = regs->r9;
-    req->data.regs.x86.r10 = regs->r10;
-    req->data.regs.x86.r11 = regs->r11;
-    req->data.regs.x86.r12 = regs->r12;
-    req->data.regs.x86.r13 = regs->r13;
-    req->data.regs.x86.r14 = regs->r14;
-    req->data.regs.x86.r15 = regs->r15;
-
-    req->data.regs.x86.rflags = regs->eflags;
-    req->data.regs.x86.rip    = regs->eip;
-
-    req->data.regs.x86.dr7 = curr->arch.debugreg[7];
-    req->data.regs.x86.cr0 = ctxt.cr0;
-    req->data.regs.x86.cr2 = ctxt.cr2;
-    req->data.regs.x86.cr3 = ctxt.cr3;
-    req->data.regs.x86.cr4 = ctxt.cr4;
-
-    req->data.regs.x86.sysenter_cs = ctxt.sysenter_cs;
-    req->data.regs.x86.sysenter_esp = ctxt.sysenter_esp;
-    req->data.regs.x86.sysenter_eip = ctxt.sysenter_eip;
-
-    req->data.regs.x86.msr_efer = ctxt.msr_efer;
-    req->data.regs.x86.msr_star = ctxt.msr_star;
-    req->data.regs.x86.msr_lstar = ctxt.msr_lstar;
-
-    hvm_get_segment_register(curr, x86_seg_fs, &seg);
-    req->data.regs.x86.fs_base = seg.base;
-
-    hvm_get_segment_register(curr, x86_seg_gs, &seg);
-    req->data.regs.x86.gs_base = seg.base;
-
-    hvm_get_segment_register(curr, x86_seg_cs, &seg);
-    req->data.regs.x86.cs_arbytes = seg.attr.bytes;
-}
-
 void p2m_mem_access_emulate_check(struct vcpu *v,
                                   const vm_event_response_t *rsp)
 {
@@ -1760,7 +1705,7 @@ bool_t p2m_mem_access_check(paddr_t gpa, unsigned long gla,
         req->u.mem_access.flags |= npfec.insn_fetch     ? MEM_ACCESS_X : 0;
         req->vcpu_id = v->vcpu_id;
 
-        p2m_vm_event_fill_regs(req);
+        vm_event_fill_regs(req);
 
         if ( altp2m_active(v->domain) )
         {
