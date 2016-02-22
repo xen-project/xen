@@ -985,7 +985,7 @@ out:
         } d;
         d.cpu = cpu_to_tickle;
         d.pad = 0;
-        trace_var(TRC_RTDS_TICKLE, 0,
+        trace_var(TRC_RTDS_TICKLE, 1,
                   sizeof(d),
                   (unsigned char *)&d);
     }

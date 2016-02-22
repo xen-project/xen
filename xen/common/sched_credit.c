@@ -476,7 +476,7 @@ static inline void __runq_tickle(struct csched_vcpu *new)
         {
             /* Avoid TRACE_*: saves checking !tb_init_done each step */
             for_each_cpu(cpu, &mask)
-                __trace_var(TRC_CSCHED_TICKLE, 0, sizeof(cpu), &cpu);
+                __trace_var(TRC_CSCHED_TICKLE, 1, sizeof(cpu), &cpu);
         }
 
         /* Send scheduler interrupts to designated CPUs */
