@@ -230,4 +230,4 @@ ASSERT(__image_base__ > XEN_VIRT_START ||
 ASSERT(kexec_reloc_size - kexec_reloc <= PAGE_SIZE, "kexec_reloc is too large")
 #endif
 
-ASSERT((cpu0_stack & (STACK_SIZE - 1)) == 0, "cpu0_stack misaligned")
+ASSERT(IS_ALIGNED(cpu0_stack, STACK_SIZE), "cpu0_stack misaligned")
