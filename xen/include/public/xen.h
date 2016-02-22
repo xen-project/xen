@@ -804,7 +804,7 @@ typedef struct start_info start_info_t;
  * of the address fields should be treated as not present.
  *
  *  0 +----------------+
- *    | magic          | Contains the magic value HVM_START_MAGIC_VALUE
+ *    | magic          | Contains the magic value XEN_HVM_START_MAGIC_VALUE
  *    |                | ("xEn3" with the 0x80 bit of the "E" set).
  *  4 +----------------+
  *    | version        | Version of this structure. Current version is 0. New
@@ -839,7 +839,7 @@ typedef struct start_info start_info_t;
  * The address and size of the modules is a 64bit unsigned integer. However
  * Xen will always try to place all modules below the 4GiB boundary.
  */
-#define HVM_START_MAGIC_VALUE 0x336ec578
+#define XEN_HVM_START_MAGIC_VALUE 0x336ec578
 
 /* New console union for dom0 introduced in 0x00030203. */
 #if __XEN_INTERFACE_VERSION__ < 0x00030203
