@@ -286,7 +286,6 @@ ENTRY(int80_direct_trap)
 UNLIKELY_START(ne, msi_check)
         movl  $0x80,%edi
         call  check_for_unexpected_msi
-        LOAD_C_CLOBBERED
 UNLIKELY_END(msi_check)
 
         GET_CURRENT(%rbx)
