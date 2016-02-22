@@ -32,5 +32,5 @@ AC_CHECK_HEADER([Python.h], [],
 AC_CHECK_LIB(python$ac_python_version, PyArg_ParseTuple, [],
     [AC_MSG_ERROR([Unable to find a suitable python development library])])
 CPPFLAGS=$ac_previous_cppflags
-LDLFAGS=$ac_previous_ldflags
+LDFLAGS=$ac_previous_ldflags
 ])
