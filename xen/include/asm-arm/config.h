@@ -7,12 +7,6 @@
 #ifndef __ARM_CONFIG_H__
 #define __ARM_CONFIG_H__
 
-#if defined(__aarch64__)
-# define CONFIG_ARM_64 1
-#elif defined(__arm__)
-# define CONFIG_ARM_32 1
-#endif
-
 #if defined(CONFIG_ARM_64)
 # define LONG_BYTEORDER 3
 #else
