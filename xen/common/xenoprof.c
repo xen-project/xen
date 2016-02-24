@@ -177,11 +177,14 @@ xenoprof_shared_gmfn_with_guest(
     struct domain *d, unsigned long maddr, unsigned long gmaddr, int npages)
 {
     int i;
-    
+
     for ( i = 0; i < npages; i++, maddr += PAGE_SIZE, gmaddr += PAGE_SIZE )
     {
         BUG_ON(page_get_owner(maddr_to_page(maddr)) != d);
-        xenoprof_shared_gmfn(d, gmaddr, maddr);
+        if ( i == 0 )
+            gdprintk(XENLOG_WARNING,
+                     "xenoprof unsupported with autotranslated guests\n");
+
     }
 }
 

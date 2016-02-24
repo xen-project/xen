@@ -62,14 +62,6 @@ static inline int xenoprof_backtrace_supported(void)
 void xenoprof_backtrace(struct vcpu *, const struct cpu_user_regs *,
                         unsigned long depth, int mode);
 
-#define xenoprof_shared_gmfn(d, gmaddr, maddr)                      \
-    do {                                                            \
-        (void)(maddr);                                              \
-        gdprintk(XENLOG_WARNING,                                    \
-                 "xenoprof/x86 with autotranslated mode enabled"    \
-                 "isn't supported yet\n");                          \
-    } while (0)
-
 int passive_domain_do_rdmsr(unsigned int msr, uint64_t *msr_content);
 int passive_domain_do_wrmsr(unsigned int msr, uint64_t msr_content);
 void passive_domain_destroy(struct vcpu *v);
