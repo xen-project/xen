@@ -126,6 +126,8 @@
 #define TRC_CSCHED_STOLEN_VCPU   TRC_SCHED_CLASS_EVT(CSCHED, 4)
 #define TRC_CSCHED_PICKED_CPU    TRC_SCHED_CLASS_EVT(CSCHED, 5)
 #define TRC_CSCHED_TICKLE        TRC_SCHED_CLASS_EVT(CSCHED, 6)
+#define TRC_CSCHED_BOOST_START   TRC_SCHED_CLASS_EVT(CSCHED, 7)
+#define TRC_CSCHED_BOOST_END     TRC_SCHED_CLASS_EVT(CSCHED, 8)
 
 
 /*
@@ -855,7 +857,11 @@ csched_vcpu_acct(struct csched_private *prv, unsigned int cpu)
      * amount of CPU resources and should no longer be boosted.
      */
     if ( svc->pri == CSCHED_PRI_TS_BOOST )
+    {
         svc->pri = CSCHED_PRI_TS_UNDER;
+        TRACE_2D(TRC_CSCHED_BOOST_END, svc->sdom->dom->domain_id,
+                 svc->vcpu->vcpu_id);
+    }
 
     /*
      * Update credits
@@ -1021,6 +1027,8 @@ csched_vcpu_wake(const struct scheduler *ops, struct vcpu *vc)
     if ( svc->pri == CSCHED_PRI_TS_UNDER &&
          !test_bit(CSCHED_FLAG_VCPU_PARKED, &svc->flags) )
     {
+        TRACE_2D(TRC_CSCHED_BOOST_START, vc->domain->domain_id, vc->vcpu_id);
+        SCHED_STAT_CRANK(vcpu_boost);
         svc->pri = CSCHED_PRI_TS_BOOST;
     }
 
