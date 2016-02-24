@@ -4619,9 +4619,11 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
             __clear_bit(X86_FEATURE_APIC & 31, edx);
 
         /* Fix up OSXSAVE. */
-        if ( cpu_has_xsave )
-            *ecx |= (v->arch.hvm_vcpu.guest_cr[4] & X86_CR4_OSXSAVE) ?
-                     cpufeat_mask(X86_FEATURE_OSXSAVE) : 0;
+        if ( *ecx & cpufeat_mask(X86_FEATURE_XSAVE) &&
+             (v->arch.hvm_vcpu.guest_cr[4] & X86_CR4_OSXSAVE) )
+            *ecx |= cpufeat_mask(X86_FEATURE_OSXSAVE);
+        else
+            *ecx &= ~cpufeat_mask(X86_FEATURE_OSXSAVE);
 
         /* Don't expose PCID to non-hap hvm. */
         if ( !hap_enabled(d) )
@@ -4640,16 +4642,26 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
             if ( !cpu_has_smap )
                 *ebx &= ~cpufeat_mask(X86_FEATURE_SMAP);
 
-            /* Don't expose MPX to hvm when VMX support is not available */
+            /* Don't expose MPX to hvm when VMX support is not available. */
             if ( !(vmx_vmexit_control & VM_EXIT_CLEAR_BNDCFGS) ||
                  !(vmx_vmentry_control & VM_ENTRY_LOAD_BNDCFGS) )
                 *ebx &= ~cpufeat_mask(X86_FEATURE_MPX);
 
-            /* Don't expose INVPCID to non-hap hvm. */
             if ( !hap_enabled(d) )
-                *ebx &= ~cpufeat_mask(X86_FEATURE_INVPCID);
+            {
+                 /* Don't expose INVPCID to non-hap hvm. */
+                 *ebx &= ~cpufeat_mask(X86_FEATURE_INVPCID);
+                 /* X86_FEATURE_PKU is not yet implemented for shadow paging. */
+                 *ecx &= ~cpufeat_mask(X86_FEATURE_PKU);
+            }
 
-            /* Don't expose PCOMMIT to hvm when VMX support is not available */
+            if ( (*ecx & cpufeat_mask(X86_FEATURE_PKU)) &&
+                 (v->arch.hvm_vcpu.guest_cr[4] & X86_CR4_PKE) )
+                *ecx |= cpufeat_mask(X86_FEATURE_OSPKE);
+            else
+                *ecx &= ~cpufeat_mask(X86_FEATURE_OSPKE);
+
+            /* Don't expose PCOMMIT to hvm when VMX support is not available. */
             if ( !cpu_has_vmx_pcommit )
                 *ebx &= ~cpufeat_mask(X86_FEATURE_PCOMMIT);
         }

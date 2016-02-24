@@ -430,9 +430,11 @@ static void xc_cpuid_hvm_policy(xc_interface *xch,
                         bitmaskof(X86_FEATURE_PCOMMIT) |
                         bitmaskof(X86_FEATURE_CLWB) |
                         bitmaskof(X86_FEATURE_CLFLUSHOPT));
+            regs[2] &= bitmaskof(X86_FEATURE_PKU);
         } else
-            regs[1] = 0;
-        regs[0] = regs[2] = regs[3] = 0;
+            regs[1] = regs[2] = 0;
+
+        regs[0] = regs[3] = 0;
         break;
 
     case 0x0000000d:

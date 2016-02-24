@@ -144,4 +144,7 @@
 #define X86_FEATURE_CLFLUSHOPT  23 /* CLFLUSHOPT instruction */
 #define X86_FEATURE_CLWB        24 /* CLWB instruction */
 
+/* Intel-defined CPU features, CPUID level 0x00000007:0 (ecx) */
+#define X86_FEATURE_PKU     3
+
 #endif /* __LIBXC_CPUFEATURE_H */
