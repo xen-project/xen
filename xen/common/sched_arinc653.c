@@ -367,9 +367,10 @@ a653sched_init(struct scheduler *ops)
  * @param ops       Pointer to this instance of the scheduler structure
  */
 static void
-a653sched_deinit(const struct scheduler *ops)
+a653sched_deinit(struct scheduler *ops)
 {
     xfree(SCHED_PRIV(ops));
+    ops->sched_data = NULL;
 }
 
 /**

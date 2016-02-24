@@ -2183,22 +2183,20 @@ csched2_init(struct scheduler *ops)
 }
 
 static void
-csched2_deinit(const struct scheduler *ops)
+csched2_deinit(struct scheduler *ops)
 {
     struct csched2_private *prv;
 
     prv = CSCHED2_PRIV(ops);
+    ops->sched_data = NULL;
     xfree(prv);
 }
-
-
-static struct csched2_private _csched2_priv;
 
 static const struct scheduler sched_credit2_def = {
     .name           = "SMP Credit Scheduler rev2",
     .opt_name       = "credit2",
     .sched_id       = XEN_SCHEDULER_CREDIT2,
-    .sched_data     = &_csched2_priv,
+    .sched_data     = NULL,
 
     .init_domain    = csched2_dom_init,
     .destroy_domain = csched2_dom_destroy,

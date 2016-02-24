@@ -462,7 +462,7 @@ rt_init(struct scheduler *ops)
 }
 
 static void
-rt_deinit(const struct scheduler *ops)
+rt_deinit(struct scheduler *ops)
 {
     struct rt_private *prv = rt_priv(ops);
 
@@ -473,6 +473,7 @@ rt_deinit(const struct scheduler *ops)
         xfree(_cpumask_scratch);
         _cpumask_scratch = NULL;
     }
+    ops->sched_data = NULL;
     xfree(prv);
 }
 
@@ -1149,13 +1150,11 @@ rt_dom_cntl(
     return rc;
 }
 
-static struct rt_private _rt_priv;
-
 static const struct scheduler sched_rtds_def = {
     .name           = "SMP RTDS Scheduler",
     .opt_name       = "rtds",
     .sched_id       = XEN_SCHEDULER_RTDS,
-    .sched_data     = &_rt_priv,
+    .sched_data     = NULL,
 
     .dump_cpu_state = rt_dump_pcpu,
     .dump_settings  = rt_dump,

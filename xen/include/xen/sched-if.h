@@ -126,7 +126,7 @@ struct scheduler {
     int          (*global_init)    (void);
 
     int          (*init)           (struct scheduler *);
-    void         (*deinit)         (const struct scheduler *);
+    void         (*deinit)         (struct scheduler *);
 
     void         (*free_vdata)     (const struct scheduler *, void *);
     void *       (*alloc_vdata)    (const struct scheduler *, struct vcpu *,

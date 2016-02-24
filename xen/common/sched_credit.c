@@ -1957,13 +1957,14 @@ csched_init(struct scheduler *ops)
 }
 
 static void
-csched_deinit(const struct scheduler *ops)
+csched_deinit(struct scheduler *ops)
 {
     struct csched_private *prv;
 
     prv = CSCHED_PRIV(ops);
     if ( prv != NULL )
     {
+        ops->sched_data = NULL;
         free_cpumask_var(prv->cpus);
         free_cpumask_var(prv->idlers);
         xfree(prv);
@@ -1993,13 +1994,11 @@ static void csched_tick_resume(const struct scheduler *ops, unsigned int cpu)
             - now % MICROSECS(prv->tick_period_us) );
 }
 
-static struct csched_private _csched_priv;
-
 static const struct scheduler sched_credit_def = {
     .name           = "SMP Credit Scheduler",
     .opt_name       = "credit",
     .sched_id       = XEN_SCHEDULER_CREDIT,
-    .sched_data     = &_csched_priv,
+    .sched_data     = NULL,
 
     .init_domain    = csched_dom_init,
     .destroy_domain = csched_dom_destroy,
