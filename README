@@ -61,7 +61,6 @@ provided by your OS distributor:
     * iproute package (/sbin/ip)
     * GNU bison and GNU flex
     * GNU gettext
-    * 16-bit x86 assembler, loader and compiler (dev86 rpm or bin86 & bcc debs)
     * ACPI ASL compiler (iasl)
     * Libc multiarch package (e.g. libc6-dev-i386 / glibc-devel.i686).
       Required when building on a 64-bit platform to build
@@ -81,6 +80,8 @@ disabled at compile time:
       libnl-3-dev, etc).  Required if network buffering is desired
       when using Remus with libxl.  See docs/README.remus for detailed
       information.
+    * 16-bit x86 assembler, loader and compiler for qemu-traditional / rombios
+      (dev86 rpm or bin86 & bcc debs)
 
 Second, you need to acquire a suitable kernel for use in domain 0. If
 possible you should use a kernel provided by your OS distributor. If

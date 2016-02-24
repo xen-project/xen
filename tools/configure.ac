@@ -164,7 +164,13 @@ AC_ARG_ENABLE([rombios],
     ])
 ])
 AS_IF([test "x$enable_rombios" = "xyes"], [
-AC_DEFINE([HAVE_ROMBIOS], [1], [ROMBIOS enabled])
+    dnl as86, ld86, and bcc are only required when building rombios. They
+    dnl are only needed when the host system is x86 but that check is done
+    dnl for us above when checking if we should build with qemu-traditional.
+    AX_PATH_PROG_OR_FAIL([AS86], [as86])
+    AX_PATH_PROG_OR_FAIL([LD86], [ld86])
+    AX_PATH_PROG_OR_FAIL([BCC], [bcc])
+    AC_DEFINE([HAVE_ROMBIOS], [1], [ROMBIOS enabled])
     rombios=y],[
     rombios=n
 ])
@@ -320,9 +326,6 @@ dnl going to run, not the platform on which we are building (known as
 dnl "build" in gnu speak).
 case "$host_cpu" in
 i[[3456]]86|x86_64)
-    AX_PATH_PROG_OR_FAIL([AS86], [as86])
-    AX_PATH_PROG_OR_FAIL([LD86], [ld86])
-    AX_PATH_PROG_OR_FAIL([BCC], [bcc])
     AX_PATH_PROG_OR_FAIL([IASL], [iasl])
     ;;
 esac
