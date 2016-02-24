@@ -629,6 +629,10 @@ int handle_xsetbv(u32 index, u64 new_bv)
     if ( (new_bv & ~xfeature_mask) || !valid_xcr0(new_bv) )
         return -EINVAL;
 
+    /* XCR0.PKRU is disabled on PV mode. */
+    if ( is_pv_vcpu(curr) && (new_bv & XSTATE_PKRU) )
+        return -EOPNOTSUPP;
+
     if ( !set_xcr0(new_bv) )
         return -EFAULT;
 
