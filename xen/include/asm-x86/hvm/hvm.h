@@ -286,6 +286,8 @@ int hvm_girq_dest_2_vcpu_id(struct domain *d, uint8_t dest, uint8_t dest_mode);
     (hvm_paging_enabled(v) && ((v)->arch.hvm_vcpu.guest_cr[4] & X86_CR4_SMAP))
 #define hvm_nx_enabled(v) \
     (!!((v)->arch.hvm_vcpu.guest_efer & EFER_NX))
+#define hvm_pku_enabled(v) \
+    (hvm_paging_enabled(v) && ((v)->arch.hvm_vcpu.guest_cr[4] & X86_CR4_PKE))
 
 /* Can we use superpages in the HAP p2m table? */
 #define hap_has_1gb (!!(hvm_funcs.hap_capabilities & HVM_HAP_SUPERPAGE_1GB))

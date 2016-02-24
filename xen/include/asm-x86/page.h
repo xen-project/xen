@@ -93,6 +93,11 @@
 #define l3e_get_flags(x)           (get_pte_flags((x).l3))
 #define l4e_get_flags(x)           (get_pte_flags((x).l4))
 
+/* Get pte pkeys (unsigned int). */
+#define l1e_get_pkey(x)           get_pte_pkey((x).l1)
+#define l2e_get_pkey(x)           get_pte_pkey((x).l2)
+#define l3e_get_pkey(x)           get_pte_pkey((x).l3)
+
 /* Construct an empty pte. */
 #define l1e_empty()                ((l1_pgentry_t) { 0 })
 #define l2e_empty()                ((l2_pgentry_t) { 0 })

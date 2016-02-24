@@ -330,6 +330,11 @@ static inline unsigned long read_cr2(void)
 
 DECLARE_PER_CPU(unsigned long, cr4);
 
+static inline void raw_write_cr4(unsigned long val)
+{
+    asm volatile ( "mov %0,%%cr4" : : "r" (val) );
+}
+
 static inline unsigned long read_cr4(void)
 {
     return this_cpu(cr4);
@@ -338,7 +343,7 @@ static inline unsigned long read_cr4(void)
 static inline void write_cr4(unsigned long val)
 {
     this_cpu(cr4) = val;
-    asm volatile ( "mov %0,%%cr4" : : "r" (val) );
+    raw_write_cr4(val);
 }
 
 /* Clear and set 'TS' bit respectively */
@@ -370,6 +375,46 @@ static always_inline void clear_in_cr4 (unsigned long mask)
 {
     mmu_cr4_features &= ~mask;
     write_cr4(read_cr4() & ~mask);
+}
+
+static inline unsigned int read_pkru(void)
+{
+    unsigned int pkru;
+    unsigned long cr4 = read_cr4();
+
+    /*
+     * _PAGE_PKEY_BITS have a conflict with _PAGE_GNTTAB used by PV guests,
+     * so that X86_CR4_PKE  is disabled on hypervisor. To use RDPKRU, CR4.PKE
+     * gets temporarily enabled.
+     */
+    raw_write_cr4(cr4 | X86_CR4_PKE);
+    asm volatile (".byte 0x0f,0x01,0xee"
+        : "=a" (pkru) : "c" (0) : "dx");
+    raw_write_cr4(cr4);
+
+    return pkru;
+}
+
+/* Macros for PKRU domain */
+#define PKRU_READ  (0)
+#define PKRU_WRITE (1)
+#define PKRU_ATTRS (2)
+
+/*
+ * PKRU defines 32 bits, there are 16 domains and 2 attribute bits per
+ * domain in pkru, pkeys is index to a defined domain, so the value of
+ * pte_pkeys * PKRU_ATTRS + R/W is offset of a defined domain attribute.
+ */
+static inline bool_t read_pkru_ad(uint32_t pkru, unsigned int pkey)
+{
+    ASSERT(pkey < 16);
+    return (pkru >> (pkey * PKRU_ATTRS + PKRU_READ)) & 1;
+}
+
+static inline bool_t read_pkru_wd(uint32_t pkru, unsigned int pkey)
+{
+    ASSERT(pkey < 16);
+    return (pkru >> (pkey * PKRU_ATTRS + PKRU_WRITE)) & 1;
 }
 
 /*

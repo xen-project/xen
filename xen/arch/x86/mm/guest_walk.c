@@ -90,6 +90,54 @@ static uint32_t set_ad_bits(void *guest_p, void *walk_p, int set_dirty)
     return 0;
 }
 
+#if GUEST_PAGING_LEVELS >= 4
+static bool_t pkey_fault(struct vcpu *vcpu, uint32_t pfec,
+        uint32_t pte_flags, uint32_t pte_pkey)
+{
+    uint32_t pkru;
+
+    /* When page isn't present,  PKEY isn't checked. */
+    if ( !(pfec & PFEC_page_present) || is_pv_vcpu(vcpu) )
+        return 0;
+
+    /*
+     * PKU:  additional mechanism by which the paging controls
+     * access to user-mode addresses based on the value in the
+     * PKRU register. A fault is considered as a PKU violation if all
+     * of the following conditions are true:
+     * 1.CR4_PKE=1.
+     * 2.EFER_LMA=1.
+     * 3.Page is present with no reserved bit violations.
+     * 4.The access is not an instruction fetch.
+     * 5.The access is to a user page.
+     * 6.PKRU.AD=1 or
+     *      the access is a data write and PKRU.WD=1 and
+     *          either CR0.WP=1 or it is a user access.
+     */
+    if ( !hvm_pku_enabled(vcpu) ||
+         !hvm_long_mode_enabled(vcpu) ||
+         (pfec & PFEC_reserved_bit) ||
+         (pfec & PFEC_insn_fetch) ||
+         !(pte_flags & _PAGE_USER) )
+        return 0;
+
+    pkru = read_pkru();
+    if ( unlikely(pkru) )
+    {
+        bool_t pkru_ad = read_pkru_ad(pkru, pte_pkey);
+        bool_t pkru_wd = read_pkru_wd(pkru, pte_pkey);
+
+        /* Condition 6 */
+        if ( pkru_ad ||
+             (pkru_wd && (pfec & PFEC_write_access) &&
+              (hvm_wp_enabled(vcpu) || (pfec & PFEC_user_mode))) )
+            return 1;
+    }
+
+    return 0;
+}
+#endif
+
 /* Walk the guest pagetables, after the manner of a hardware walker. */
 /* Because the walk is essentially random, it can cause a deadlock 
  * warning in the p2m locking code. Highly unlikely this is an actual
@@ -107,6 +155,7 @@ guest_walk_tables(struct vcpu *v, struct p2m_domain *p2m,
     guest_l3e_t *l3p = NULL;
     guest_l4e_t *l4p;
 #endif
+    unsigned int pkey;
     uint32_t gflags, mflags, iflags, rc = 0;
     bool_t smep = 0, smap = 0;
     bool_t pse1G = 0, pse2M = 0;
@@ -190,6 +239,7 @@ guest_walk_tables(struct vcpu *v, struct p2m_domain *p2m,
         goto out;
     /* Get the l3e and check its flags*/
     gw->l3e = l3p[guest_l3_table_offset(va)];
+    pkey = guest_l3e_get_pkey(gw->l3e);
     gflags = guest_l3e_get_flags(gw->l3e) ^ iflags;
     if ( !(gflags & _PAGE_PRESENT) ) {
         rc |= _PAGE_PRESENT;
@@ -261,6 +311,7 @@ guest_walk_tables(struct vcpu *v, struct p2m_domain *p2m,
 
 #endif /* All levels... */
 
+    pkey = guest_l2e_get_pkey(gw->l2e);
     gflags = guest_l2e_get_flags(gw->l2e) ^ iflags;
     if ( !(gflags & _PAGE_PRESENT) ) {
         rc |= _PAGE_PRESENT;
@@ -324,6 +375,7 @@ guest_walk_tables(struct vcpu *v, struct p2m_domain *p2m,
         if(l1p == NULL)
             goto out;
         gw->l1e = l1p[guest_l1_table_offset(va)];
+        pkey = guest_l1e_get_pkey(gw->l1e);
         gflags = guest_l1e_get_flags(gw->l1e) ^ iflags;
         if ( !(gflags & _PAGE_PRESENT) ) {
             rc |= _PAGE_PRESENT;
@@ -334,6 +386,8 @@ guest_walk_tables(struct vcpu *v, struct p2m_domain *p2m,
 
 #if GUEST_PAGING_LEVELS >= 4 /* 64-bit only... */
 set_ad:
+    if ( pkey_fault(v, pfec, gflags, pkey) )
+        rc |= _PAGE_PKEY_BITS;
 #endif
     /* Now re-invert the user-mode requirement for SMEP and SMAP */
     if ( smep || smap )

@@ -130,6 +130,9 @@ unsigned long hap_p2m_ga_to_gfn(GUEST_PAGING_LEVELS)(
     if ( missing & _PAGE_INVALID_BITS ) 
         pfec[0] |= PFEC_reserved_bit;
 
+    if ( missing & _PAGE_PKEY_BITS )
+        pfec[0] |= PFEC_prot_key;
+
     if ( missing & _PAGE_PAGED )
         pfec[0] = PFEC_page_paged;
 

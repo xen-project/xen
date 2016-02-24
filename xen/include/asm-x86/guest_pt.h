@@ -81,6 +81,11 @@ static inline u32 guest_l1e_get_flags(guest_l1e_t gl1e)
 static inline u32 guest_l2e_get_flags(guest_l2e_t gl2e)
 { return gl2e.l2 & 0xfff; }
 
+static inline u32 guest_l1e_get_pkey(guest_l1e_t gl1e)
+{ return 0; }
+static inline u32 guest_l2e_get_pkey(guest_l2e_t gl2e)
+{ return 0; }
+
 static inline guest_l1e_t guest_l1e_from_gfn(gfn_t gfn, u32 flags)
 { return (guest_l1e_t) { (gfn_x(gfn) << PAGE_SHIFT) | flags }; }
 static inline guest_l2e_t guest_l2e_from_gfn(gfn_t gfn, u32 flags)
@@ -153,6 +158,13 @@ static inline u32 guest_l3e_get_flags(guest_l3e_t gl3e)
 static inline u32 guest_l4e_get_flags(guest_l4e_t gl4e)
 { return l4e_get_flags(gl4e); }
 #endif
+
+static inline u32 guest_l1e_get_pkey(guest_l1e_t gl1e)
+{ return l1e_get_pkey(gl1e); }
+static inline u32 guest_l2e_get_pkey(guest_l2e_t gl2e)
+{ return l2e_get_pkey(gl2e); }
+static inline u32 guest_l3e_get_pkey(guest_l3e_t gl3e)
+{ return l3e_get_pkey(gl3e); }
 
 static inline guest_l1e_t guest_l1e_from_gfn(gfn_t gfn, u32 flags)
 { return l1e_from_pfn(gfn_x(gfn), flags); }
