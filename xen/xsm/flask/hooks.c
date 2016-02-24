@@ -529,14 +529,14 @@ static int flask_sysctl_scheduler_op(int op)
 {
     switch ( op )
     {
-    case XEN_DOMCTL_SCHEDOP_putinfo:
+    case XEN_SYSCTL_SCHEDOP_putinfo:
         return domain_has_xen(current->domain, XEN__SETSCHEDULER);
 
-    case XEN_DOMCTL_SCHEDOP_getinfo:
+    case XEN_SYSCTL_SCHEDOP_getinfo:
         return domain_has_xen(current->domain, XEN__GETSCHEDULER);
 
     default:
-        printk("flask_domctl_scheduler_op: Unknown op %d\n", op);
+        printk("flask_sysctl_scheduler_op: Unknown op %d\n", op);
         return -EPERM;
     }
 }

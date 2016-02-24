@@ -1171,8 +1171,8 @@ long sched_adjust_global(struct xen_sysctl_scheduler_op *op)
     if ( rc )
         return rc;
 
-    if ( (op->cmd != XEN_DOMCTL_SCHEDOP_putinfo) &&
-         (op->cmd != XEN_DOMCTL_SCHEDOP_getinfo) )
+    if ( (op->cmd != XEN_SYSCTL_SCHEDOP_putinfo) &&
+         (op->cmd != XEN_SYSCTL_SCHEDOP_getinfo) )
         return -EINVAL;
 
     pool = cpupool_get_by_id(op->cpupool_id);
