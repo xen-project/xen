@@ -42,10 +42,6 @@ asm(".file \"" __FILE__ "\"");
 
 unsigned int __read_mostly m2p_compat_vstart = __HYPERVISOR_COMPAT_VIRT_START;
 
-/* Enough page directories to map into the bottom 1GB. */
-l3_pgentry_t __section(".bss.page_aligned") l3_bootmap[L3_PAGETABLE_ENTRIES];
-l2_pgentry_t __section(".bss.page_aligned") l2_bootmap[L2_PAGETABLE_ENTRIES];
-
 l2_pgentry_t *compat_idle_pg_table_l2;
 
 void *do_page_walk(struct vcpu *v, unsigned long addr)

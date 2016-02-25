@@ -184,3 +184,22 @@ GLOBAL(idle_pg_table)
         .size idle_pg_table, . - idle_pg_table
 
 GLOBAL(__page_tables_end)
+
+/* Init pagetables.  Enough page directories to map into the bottom 1GB. */
+        .section .init.data, "a", @progbits
+        .align PAGE_SIZE, 0
+
+GLOBAL(l2_bootmap)
+        .quad sym_phys(l1_identmap) + __PAGE_HYPERVISOR
+        idx = 1
+        .rept 7
+        .quad (idx << L2_PAGETABLE_SHIFT) | __PAGE_HYPERVISOR | _PAGE_PSE
+        idx = idx + 1
+        .endr
+        .fill L2_PAGETABLE_ENTRIES - 8, 8, 0
+        .size l2_bootmap, . - l2_bootmap
+
+GLOBAL(l3_bootmap)
+        .quad sym_phys(l2_bootmap) + __PAGE_HYPERVISOR
+        .fill L3_PAGETABLE_ENTRIES - 1, 8, 0
+        .size l3_bootmap, . - l3_bootmap

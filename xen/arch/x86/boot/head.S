@@ -150,21 +150,13 @@ __start:
         mov     %eax,sym_phys(boot_tsc_stamp)
         mov     %edx,sym_phys(boot_tsc_stamp+4)
 
-        /* Initialise L2 boot-map page table entries (16MB). */
-        mov     $sym_phys(l2_bootmap),%edx
-        mov     $PAGE_HYPERVISOR|_PAGE_PSE,%eax
-        mov     $8,%ecx
-1:      mov     %eax,(%edx)
-        add     $8,%edx
-        add     $(1<<L2_PAGETABLE_SHIFT),%eax
-        loop    1b
-        /* Initialise L3 boot-map page directory entry. */
-        mov     $sym_phys(l2_bootmap)+__PAGE_HYPERVISOR,%eax
-        mov     %eax,sym_phys(l3_bootmap) + 0*8
-        /* Hook 4kB mappings of first 2MB of memory into L2. */
+        /*
+         * During boot, hook 4kB mappings of first 2MB of memory into L2.
+         * This avoids mixing cachability for the legacy VGA region, and is
+         * corrected when Xen relocates itself.
+         */
         mov     $sym_phys(l1_identmap)+__PAGE_HYPERVISOR,%edi
         mov     %edi,sym_phys(l2_xenmap)
-        mov     %edi,sym_phys(l2_bootmap)
 
         /* Apply relocations to bootstrap trampoline. */
         mov     sym_phys(trampoline_phys),%edx
