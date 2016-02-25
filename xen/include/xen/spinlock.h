@@ -79,7 +79,7 @@ struct lock_profile_qhead {
 
 #define _LOCK_PROFILE(name) { 0, #name, &name, 0, 0, 0, 0, 0 }
 #define _LOCK_PROFILE_PTR(name)                                               \
-    static struct lock_profile *__lock_profile_##name                         \
+    static struct lock_profile * const __lock_profile_##name                  \
     __used_section(".lockprofile.data") =                                     \
     &__lock_profile_data_##name
 #define _SPIN_LOCK_UNLOCKED(x) { { 0 }, SPINLOCK_NO_CPU, 0, _LOCK_DEBUG, x }

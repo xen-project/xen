@@ -15,6 +15,7 @@
 
 #define BYTES_PER_LONG (1 << LONG_BYTEORDER)
 #define BITS_PER_LONG (BYTES_PER_LONG << 3)
+#define POINTER_ALIGN BYTES_PER_LONG
 
 /* xen_ulong_t is always 64 bits */
 #define BITS_PER_XEN_ULONG 64

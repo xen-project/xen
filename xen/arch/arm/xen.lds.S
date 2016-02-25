@@ -50,6 +50,14 @@ SECTIONS
        __stop_bug_frames_2 = .;
        *(.rodata)
        *(.rodata.*)
+
+#ifdef LOCK_PROFILE
+       . = ALIGN(POINTER_ALIGN);
+       __lock_profile_start = .;
+       *(.lockprofile.data)
+       __lock_profile_end = .;
+#endif
+
         _erodata = .;          /* End of read-only data */
   } :text
 
@@ -82,13 +90,6 @@ SECTIONS
        *(.data.rel.ro)
        *(.data.rel.ro.*)
   } :text
-
-#ifdef LOCK_PROFILE
-  . = ALIGN(32);
-  __lock_profile_start = .;
-  .lockprofile.data : { *(.lockprofile.data) } :text
-  __lock_profile_end = .;
-#endif
 
   . = ALIGN(8);
   .arch.info : {

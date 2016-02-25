@@ -65,6 +65,13 @@ SECTIONS
 
        *(.rodata)
        *(.rodata.*)
+
+#ifdef LOCK_PROFILE
+       . = ALIGN(POINTER_ALIGN);
+       __lock_profile_start = .;
+       *(.lockprofile.data)
+       __lock_profile_end = .;
+#endif
   } :text
 
   . = ALIGN(SMP_CACHE_BYTES);
@@ -96,13 +103,6 @@ SECTIONS
        *(.data.rel.*)
        CONSTRUCTORS
   } :text
-
-#ifdef LOCK_PROFILE
-  . = ALIGN(32);
-  __lock_profile_start = .;
-  .lockprofile.data : { *(.lockprofile.data) } :text
-  __lock_profile_end = .;
-#endif
 
   . = ALIGN(PAGE_SIZE);             /* Init code and data */
   __init_begin = .;
