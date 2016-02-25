@@ -331,7 +331,6 @@ unsigned long domain_get_maximum_gpfn(struct domain *d);
 
 extern struct domain *dom_xen, *dom_io, *dom_cow;
 
-#define memguard_init(_s)              (_s)
 #define memguard_guard_stack(_p)       ((void)0)
 #define memguard_guard_range(_p,_l)    ((void)0)
 #define memguard_unguard_range(_p,_l)  ((void)0)

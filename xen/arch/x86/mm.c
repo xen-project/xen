@@ -6346,22 +6346,6 @@ void free_perdomain_mappings(struct domain *d)
 
 #ifdef MEMORY_GUARD
 
-void memguard_init(void)
-{
-    unsigned long start = max_t(unsigned long, xen_phys_start, 1UL << 20);
-    map_pages_to_xen(
-        (unsigned long)__va(start),
-        start >> PAGE_SHIFT,
-        (__pa(&_end) + PAGE_SIZE - 1 - start) >> PAGE_SHIFT,
-        __PAGE_HYPERVISOR_RW|MAP_SMALL_PAGES);
-    BUG_ON(start != xen_phys_start);
-    map_pages_to_xen(
-        XEN_VIRT_START,
-        start >> PAGE_SHIFT,
-        (__pa(&_end) + PAGE_SIZE - 1 - start) >> PAGE_SHIFT,
-        __PAGE_HYPERVISOR|MAP_SMALL_PAGES);
-}
-
 static void __memguard_change_range(void *p, unsigned long l, int guard)
 {
     unsigned long _p = (unsigned long)p;
