@@ -86,32 +86,40 @@ GLOBAL(__page_tables_start)
  * Mapping of first 2 megabytes of memory. This is mapped with 4kB mappings
  * to avoid type conflicts with fixed-range MTRRs covering the lowest megabyte
  * of physical memory. In any case the VGA hole should be mapped with type UC.
+ * Uses 1x 4k page.
  */
 GLOBAL(l1_identmap)
         pfn = 0
         .rept L1_PAGETABLE_ENTRIES
         /* VGA hole (0xa0000-0xc0000) should be mapped UC. */
         .if pfn >= 0xa0 && pfn < 0xc0
-        .long (pfn << PAGE_SHIFT) | PAGE_HYPERVISOR_NOCACHE | MAP_SMALL_PAGES
+        .quad (pfn << PAGE_SHIFT) | PAGE_HYPERVISOR_NOCACHE | MAP_SMALL_PAGES
         .else
-        .long (pfn << PAGE_SHIFT) | PAGE_HYPERVISOR | MAP_SMALL_PAGES
+        .quad (pfn << PAGE_SHIFT) | PAGE_HYPERVISOR | MAP_SMALL_PAGES
         .endif
-        .long 0
         pfn = pfn + 1
         .endr
         .size l1_identmap, . - l1_identmap
 
-/* Mapping of first 16 megabytes of memory. */
+/*
+ * Space for mapping the first 4GB of memory, with the first 16 megabytes
+ * actualy mapped (mostly using superpages).  Uses 4x 4k pages.
+ */
 GLOBAL(l2_identmap)
         .quad sym_phys(l1_identmap) + __PAGE_HYPERVISOR
-        pfn = 0
+        idx = 1
         .rept 7
-        pfn = pfn + (1 << PAGETABLE_ORDER)
-        .quad (pfn << PAGE_SHIFT) | PAGE_HYPERVISOR | _PAGE_PSE
+        .quad (idx << L2_PAGETABLE_SHIFT) | PAGE_HYPERVISOR | _PAGE_PSE
+        idx = idx + 1
         .endr
         .fill 4 * L2_PAGETABLE_ENTRIES - 8, 8, 0
         .size l2_identmap, . - l2_identmap
 
+/*
+ * L2 mapping the 1GB Xen text/data/bss region.  At boot it maps 16MB from
+ * __image_base__, and is modified when Xen relocates itself.  Uses 1x 4k
+ * page.
+ */
 GLOBAL(l2_xenmap)
         idx = 0
         .rept 8
@@ -121,6 +129,7 @@ GLOBAL(l2_xenmap)
         .fill L2_PAGETABLE_ENTRIES - 8, 8, 0
         .size l2_xenmap, . - l2_xenmap
 
+/* L2 mapping the fixmap.  Uses 1x 4k page. */
 l2_fixmap:
         idx = 0
         .rept L2_PAGETABLE_ENTRIES
@@ -133,6 +142,7 @@ l2_fixmap:
         .endr
         .size l2_fixmap, . - l2_fixmap
 
+/* Identity map, covering the 4 l2_identmap tables.  Uses 1x 4k page. */
 GLOBAL(l3_identmap)
         idx = 0
         .rept 4
@@ -142,6 +152,7 @@ GLOBAL(l3_identmap)
         .fill L3_PAGETABLE_ENTRIES - 4, 8, 0
         .size l3_identmap, . - l3_identmap
 
+/* L3 mapping the fixmap.  Uses 1x 4k page. */
 l3_xenmap:
         idx = 0
         .rept L3_PAGETABLE_ENTRIES
