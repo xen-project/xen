@@ -38,7 +38,7 @@ static const unsigned char k8nops[] __initconst = {
     K8_NOP7,
     K8_NOP8
 };
-static const unsigned char * const k8_nops[ASM_NOP_MAX+1] = {
+static const unsigned char * const k8_nops[ASM_NOP_MAX+1] __initconstrel = {
     NULL,
     k8nops,
     k8nops + 1,
@@ -62,7 +62,7 @@ static const unsigned char p6nops[] __initconst = {
     P6_NOP7,
     P6_NOP8
 };
-static const unsigned char * const p6_nops[ASM_NOP_MAX+1] = {
+static const unsigned char * const p6_nops[ASM_NOP_MAX+1] __initconstrel = {
     NULL,
     p6nops,
     p6nops + 1,

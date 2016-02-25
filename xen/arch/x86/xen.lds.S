@@ -119,6 +119,7 @@ SECTIONS
   } :text
   .init.data : {
        *(.init.rodata)
+       *(.init.rodata.rel)
        *(.init.rodata.str*)
        *(.init.data)
        *(.init.data.rel)
