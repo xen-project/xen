@@ -1965,7 +1965,7 @@ _hidden char *libxl__device_model_xs_path(libxl__gc *gc, uint32_t dm_domid,
  * their own callback function and should just use the one they're
  * given.
  *
- * Functions using LIBXL__INIT_EGC may *not* generally be called from
+ * Functions using LIBXL_INIT_EGC may *not* generally be called from
  * within libxl, because libxl__egc_cleanup may call back into the
  * application.  This should be enforced by declaring all such
  * functions in libxl.h or libxl_event.h with
