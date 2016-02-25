@@ -363,6 +363,8 @@ void parse_symbol_file(char *fn) {
             p=&((*p)->next);
         }
     }
+
+    fclose(symbol_file);
 }
 
 /* WARNING not thread safe */
