@@ -74,36 +74,6 @@ SECTIONS
 #endif
   } :text
 
-  . = ALIGN(SMP_CACHE_BYTES);
-  .data.read_mostly : {
-       /* Exception table */
-       __start___ex_table = .;
-       *(.ex_table)
-       __stop___ex_table = .;
-
-       /* Pre-exception table */
-       __start___pre_ex_table = .;
-       *(.ex_table.pre)
-       __stop___pre_ex_table = .;
-
-       *(.data.read_mostly)
-       . = ALIGN(8);
-       __start_schedulers_array = .;
-       *(.data.schedulers)
-       __end_schedulers_array = .;
-       *(.data.rel.ro)
-       *(.data.rel.ro.*)
-  } :text
-
-  .data : {                    /* Data */
-       . = ALIGN(PAGE_SIZE);
-       *(.data.page_aligned)
-       *(.data)
-       *(.data.rel)
-       *(.data.rel.*)
-       CONSTRUCTORS
-  } :text
-
   . = ALIGN(PAGE_SIZE);             /* Init code and data */
   __init_begin = .;
   .init.text : {
@@ -164,10 +134,41 @@ SECTIONS
        *(.xsm_initcall.init)
        __xsm_initcall_end = .;
   } :text
-  . = ALIGN(STACK_SIZE);
+  . = ALIGN(PAGE_SIZE);
   __init_end = .;
 
+  . = ALIGN(SMP_CACHE_BYTES);
+  .data.read_mostly : {
+       /* Exception table */
+       __start___ex_table = .;
+       *(.ex_table)
+       __stop___ex_table = .;
+
+       /* Pre-exception table */
+       __start___pre_ex_table = .;
+       *(.ex_table.pre)
+       __stop___pre_ex_table = .;
+
+       *(.data.read_mostly)
+       . = ALIGN(8);
+       __start_schedulers_array = .;
+       *(.data.schedulers)
+       __end_schedulers_array = .;
+       *(.data.rel.ro)
+       *(.data.rel.ro.*)
+  } :text
+
+  .data : {                    /* Data */
+       . = ALIGN(PAGE_SIZE);
+       *(.data.page_aligned)
+       *(.data)
+       *(.data.rel)
+       *(.data.rel.*)
+       CONSTRUCTORS
+  } :text
+
   .bss : {                     /* BSS */
+       . = ALIGN(STACK_SIZE);
        __bss_start = .;
        *(.bss.stack_aligned)
        . = ALIGN(PAGE_SIZE);
