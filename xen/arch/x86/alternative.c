@@ -147,10 +147,14 @@ static void __init apply_alternatives(struct alt_instr *start, struct alt_instr 
     struct alt_instr *a;
     u8 *instr, *replacement;
     u8 insnbuf[MAX_PATCH_LEN];
+    unsigned long cr0 = read_cr0();
 
     ASSERT(!local_irq_is_enabled());
 
     printk(KERN_INFO "alt table %p -> %p\n", start, end);
+
+    /* Disable WP to allow application of alternatives to read-only pages. */
+    write_cr0(cr0 & ~X86_CR0_WP);
 
     /*
      * The scan order should be from start to end. A later scanned
@@ -181,6 +185,9 @@ static void __init apply_alternatives(struct alt_instr *start, struct alt_instr 
                  a->instrlen - a->replacementlen);
         text_poke_early(instr, insnbuf, a->instrlen);
     }
+
+    /* Reinstate WP. */
+    write_cr0(cr0);
 }
 
 void __init alternative_instructions(void)
