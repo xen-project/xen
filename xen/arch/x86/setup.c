@@ -920,14 +920,46 @@ void __init noreturn __start_xen(unsigned long mbi_p)
 
             /* The only data mappings to be relocated are in the Xen area. */
             pl2e = __va(__pa(l2_xenmap));
+            /*
+             * Undo the temporary-hooking of the l1_identmap.  __2M_text_start
+             * is contained in this PTE.
+             */
             *pl2e++ = l2e_from_pfn(xen_phys_start >> PAGE_SHIFT,
-                                   PAGE_HYPERVISOR_RWX | _PAGE_PSE);
+                                   PAGE_HYPERVISOR_RX | _PAGE_PSE);
             for ( i = 1; i < L2_PAGETABLE_ENTRIES; i++, pl2e++ )
             {
+                unsigned int flags;
+
                 if ( !(l2e_get_flags(*pl2e) & _PAGE_PRESENT) )
                     continue;
-                *pl2e = l2e_from_intpte(l2e_get_intpte(*pl2e) +
-                                        xen_phys_start);
+
+                if ( i < l2_table_offset((unsigned long)&__2M_text_end) )
+                {
+                    flags = PAGE_HYPERVISOR_RX | _PAGE_PSE;
+                }
+                else if ( i >= l2_table_offset((unsigned long)&__2M_rodata_start) &&
+                          i <  l2_table_offset((unsigned long)&__2M_rodata_end) )
+                {
+                    flags = PAGE_HYPERVISOR_RO | _PAGE_PSE;
+                }
+                else if ( i >= l2_table_offset((unsigned long)&__2M_init_start) &&
+                          i <  l2_table_offset((unsigned long)&__2M_init_end) )
+                {
+                    flags = PAGE_HYPERVISOR_RWX | _PAGE_PSE;
+                }
+                else if ( (i >= l2_table_offset((unsigned long)&__2M_rwdata_start) &&
+                           i <  l2_table_offset((unsigned long)&__2M_rwdata_end)) )
+                {
+                    flags = PAGE_HYPERVISOR_RW | _PAGE_PSE;
+                }
+                else
+                {
+                    *pl2e = l2e_empty();
+                    continue;
+                }
+
+                *pl2e = l2e_from_paddr(
+                    l2e_get_paddr(*pl2e) + xen_phys_start, flags);
             }
 
             /* Re-sync the stack and then switch to relocated pagetables. */

@@ -4,6 +4,11 @@
 #include <xen/multiboot.h>
 #include <asm/numa.h>
 
+extern const char __2M_text_start[], __2M_text_end[];
+extern const char __2M_rodata_start[], __2M_rodata_end[];
+extern char __2M_init_start[], __2M_init_end[];
+extern char __2M_rwdata_start[], __2M_rwdata_end[];
+
 extern unsigned long xenheap_initial_phys_start;
 
 void early_cpu_init(void);

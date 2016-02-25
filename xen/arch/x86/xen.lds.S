@@ -38,6 +38,9 @@ SECTIONS
   . = __XEN_VIRT_START;
   __image_base__ = .;
 #endif
+
+  __2M_text_start = .;         /* Start of 2M superpages, mapped RX. */
+
   . = __XEN_VIRT_START + MB(1);
   _start = .;
   .text : {
@@ -50,6 +53,10 @@ SECTIONS
        _etext = .;             /* End of text section */
   } :text = 0x9090
 
+  . = ALIGN(MB(2));
+  __2M_text_end = .;
+
+  __2M_rodata_start = .;       /* Start of 2M superpages, mapped RO. */
   .rodata : {
        /* Bug frames table */
        . = ALIGN(4);
@@ -74,6 +81,10 @@ SECTIONS
 #endif
   } :text
 
+  . = ALIGN(MB(2));
+  __2M_rodata_end = .;
+
+  __2M_init_start = .;         /* Start of 2M superpages, mapped RWX (boot only). */
   . = ALIGN(PAGE_SIZE);             /* Init code and data */
   __init_begin = .;
   .init.text : {
@@ -137,6 +148,10 @@ SECTIONS
   . = ALIGN(PAGE_SIZE);
   __init_end = .;
 
+  . = ALIGN(MB(2));
+  __2M_init_end = .;
+
+  __2M_rwdata_start = .;       /* Start of 2M superpages, mapped RW. */
   . = ALIGN(SMP_CACHE_BYTES);
   .data.read_mostly : {
        /* Exception table */
@@ -185,6 +200,9 @@ SECTIONS
   } :text
   _end = . ;
 
+  . = ALIGN(MB(2));
+  __2M_rwdata_end = .;
+
 #ifdef EFI
   . = ALIGN(4);
   .reloc : {
@@ -230,5 +248,14 @@ ASSERT(__image_base__ > XEN_VIRT_START ||
 #ifdef CONFIG_KEXEC
 ASSERT(kexec_reloc_size - kexec_reloc <= PAGE_SIZE, "kexec_reloc is too large")
 #endif
+
+ASSERT(IS_ALIGNED(__2M_text_start,   MB(2)), "__2M_text_start misaligned")
+ASSERT(IS_ALIGNED(__2M_text_end,     MB(2)), "__2M_text_end misaligned")
+ASSERT(IS_ALIGNED(__2M_rodata_start, MB(2)), "__2M_rodata_start misaligned")
+ASSERT(IS_ALIGNED(__2M_rodata_end,   MB(2)), "__2M_rodata_end misaligned")
+ASSERT(IS_ALIGNED(__2M_init_start,   MB(2)), "__2M_init_start misaligned")
+ASSERT(IS_ALIGNED(__2M_init_end,     MB(2)), "__2M_init_end misaligned")
+ASSERT(IS_ALIGNED(__2M_rwdata_start, MB(2)), "__2M_rwdata_start misaligned")
+ASSERT(IS_ALIGNED(__2M_rwdata_end,   MB(2)), "__2M_rwdata_end misaligned")
 
 ASSERT(IS_ALIGNED(cpu0_stack, STACK_SIZE), "cpu0_stack misaligned")
