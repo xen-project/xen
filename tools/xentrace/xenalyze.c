@@ -3547,7 +3547,7 @@ struct outstanding_ipi *find_vec(struct vlapic_struct *vla, int vec)
             o = vla->outstanding.list + i;
     }
 
-    if(!o->valid) {
+    if(o && !o->valid) {
         o->vec = vec;
         o->valid = 1;
     }
