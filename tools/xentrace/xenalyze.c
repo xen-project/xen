@@ -4146,9 +4146,6 @@ void cr3_dump_list(struct cr3_value_struct *head){
     for(p=head; p; p=p->next)
         N++;
 
-    if(!N)
-        return;
-
     /* Alloc a struct of the right size */
     qsort_array = malloc(N * sizeof(struct eip_list_struct *));
 
