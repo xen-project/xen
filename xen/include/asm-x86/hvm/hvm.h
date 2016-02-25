@@ -222,7 +222,18 @@ struct hvm_function_table {
     bool_t (*altp2m_vcpu_emulate_ve)(struct vcpu *v);
     int (*altp2m_vcpu_emulate_vmfunc)(struct cpu_user_regs *regs);
 
-    uint64_t (*scale_tsc)(const struct vcpu *v, uint64_t tsc);
+    /*
+     * Parameters and callbacks for hardware-assisted TSC scaling,
+     * which are valid only when the hardware feature is available.
+     */
+    struct {
+        /* number of bits of the fractional part of TSC scaling ratio */
+        uint8_t  ratio_frac_bits;
+        /* maximum-allowed TSC scaling ratio */
+        uint64_t max_ratio;
+
+        uint64_t (*scale_tsc)(const struct vcpu *v, uint64_t tsc);
+    } tsc_scaling;
 };
 
 extern struct hvm_function_table hvm_funcs;
@@ -257,6 +268,9 @@ void hvm_set_guest_tsc_fixed(struct vcpu *v, u64 guest_tsc, u64 at_tsc);
 #define hvm_set_guest_tsc(v, t) hvm_set_guest_tsc_fixed(v, t, 0)
 u64 hvm_get_guest_tsc_fixed(struct vcpu *v, u64 at_tsc);
 #define hvm_get_guest_tsc(v) hvm_get_guest_tsc_fixed(v, 0)
+
+#define hvm_tsc_scaling_supported \
+    (!!hvm_funcs.tsc_scaling.ratio_frac_bits)
 
 int hvm_set_mode(struct vcpu *v, int mode);
 void hvm_init_guest_time(struct domain *d);

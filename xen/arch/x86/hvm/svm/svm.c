@@ -1465,6 +1465,9 @@ const struct hvm_function_table * __init start_svm(void)
     if ( !cpu_has_svm_nrips )
         clear_bit(SVM_FEATURE_DECODEASSISTS, &svm_feature_flags);
 
+    if ( cpu_has_tsc_ratio )
+        svm_function_table.tsc_scaling.ratio_frac_bits = 32;
+
 #define P(p,s) if ( p ) { printk(" - %s\n", s); printed = 1; }
     P(cpu_has_svm_npt, "Nested Page Tables (NPT)");
     P(cpu_has_svm_lbrv, "Last Branch Record (LBR) Virtualisation");
@@ -2286,7 +2289,10 @@ static struct hvm_function_table __initdata svm_function_table = {
     .nhvm_intr_blocked = nsvm_intr_blocked,
     .nhvm_hap_walk_L1_p2m = nsvm_hap_walk_L1_p2m,
 
-    .scale_tsc            = svm_scale_tsc,
+    .tsc_scaling = {
+        .max_ratio = ~TSC_RATIO_RSVD_BITS,
+        .scale_tsc = svm_scale_tsc,
+    },
 };
 
 void svm_vmexit_handler(struct cpu_user_regs *regs)

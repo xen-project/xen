@@ -60,7 +60,6 @@
 #include <asm/hvm/nestedhvm.h>
 #include <asm/hvm/event.h>
 #include <asm/hvm/vmx/vmx.h>
-#include <asm/hvm/svm/svm.h> /* for cpu_has_tsc_ratio */
 #include <asm/altp2m.h>
 #include <asm/mtrr.h>
 #include <asm/apic.h>
@@ -312,8 +311,8 @@ void hvm_set_guest_tsc_fixed(struct vcpu *v, u64 guest_tsc, u64 at_tsc)
     else
     {
         tsc = at_tsc ?: rdtsc();
-        if ( cpu_has_tsc_ratio )
-            tsc = hvm_funcs.scale_tsc(v, tsc);
+        if ( hvm_tsc_scaling_supported )
+            tsc = hvm_funcs.tsc_scaling.scale_tsc(v, tsc);
     }
 
     delta_tsc = guest_tsc - tsc;
@@ -344,8 +343,8 @@ u64 hvm_get_guest_tsc_fixed(struct vcpu *v, uint64_t at_tsc)
     else
     {
         tsc = at_tsc ?: rdtsc();
-        if ( cpu_has_tsc_ratio )
-            tsc = hvm_funcs.scale_tsc(v, tsc);
+        if ( hvm_tsc_scaling_supported )
+            tsc = hvm_funcs.tsc_scaling.scale_tsc(v, tsc);
     }
 
     return tsc + v->arch.hvm_vcpu.cache_tsc_offset;

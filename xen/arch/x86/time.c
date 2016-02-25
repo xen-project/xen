@@ -37,7 +37,6 @@
 #include <asm/hpet.h>
 #include <io_ports.h>
 #include <asm/setup.h> /* for early_time_init */
-#include <asm/hvm/svm/svm.h> /* for cpu_has_tsc_ratio */
 #include <public/arch-x86/cpuid.h>
 
 /* opt_clocksource: Force clocksource to one of: pit, hpet, acpi. */
@@ -815,9 +814,10 @@ static void __update_vcpu_system_time(struct vcpu *v, int force)
     }
     else
     {
-        if ( has_hvm_container_domain(d) && cpu_has_tsc_ratio )
+        if ( has_hvm_container_domain(d) && hvm_tsc_scaling_supported )
         {
-            tsc_stamp            = hvm_funcs.scale_tsc(v, t->local_tsc_stamp);
+            tsc_stamp            =
+                hvm_funcs.tsc_scaling.scale_tsc(v, t->local_tsc_stamp);
             _u.tsc_to_system_mul = d->arch.vtsc_to_ns.mul_frac;
             _u.tsc_shift         = d->arch.vtsc_to_ns.shift;
         }
@@ -1758,7 +1758,7 @@ void tsc_get_info(struct domain *d, uint32_t *tsc_mode,
                   uint32_t *incarnation)
 {
     bool_t enable_tsc_scaling = has_hvm_container_domain(d) &&
-                                cpu_has_tsc_ratio && !d->arch.vtsc;
+                                hvm_tsc_scaling_supported && !d->arch.vtsc;
 
     *incarnation = d->arch.incarnation;
     *tsc_mode = d->arch.tsc_mode;
@@ -1865,7 +1865,7 @@ void tsc_set_info(struct domain *d,
          */
         if ( tsc_mode == TSC_MODE_DEFAULT && host_tsc_is_safe() &&
              (has_hvm_container_domain(d) ?
-              d->arch.tsc_khz == cpu_khz || cpu_has_tsc_ratio :
+              d->arch.tsc_khz == cpu_khz || hvm_tsc_scaling_supported :
               incarnation == 0) )
         {
     case TSC_MODE_NEVER_EMULATE:
@@ -1879,7 +1879,7 @@ void tsc_set_info(struct domain *d,
         d->arch.vtsc = !boot_cpu_has(X86_FEATURE_RDTSCP) ||
                        !host_tsc_is_safe();
         enable_tsc_scaling = has_hvm_container_domain(d) &&
-                             cpu_has_tsc_ratio && !d->arch.vtsc;
+                             hvm_tsc_scaling_supported && !d->arch.vtsc;
         d->arch.tsc_khz = (enable_tsc_scaling && gtsc_khz) ? gtsc_khz : cpu_khz;
         set_time_scale(&d->arch.vtsc_to_ns, d->arch.tsc_khz * 1000 );
         d->arch.ns_to_vtsc = scale_reciprocal(d->arch.vtsc_to_ns);
