@@ -259,3 +259,6 @@ ASSERT(IS_ALIGNED(__2M_rwdata_start, MB(2)), "__2M_rwdata_start misaligned")
 ASSERT(IS_ALIGNED(__2M_rwdata_end,   MB(2)), "__2M_rwdata_end misaligned")
 
 ASSERT(IS_ALIGNED(cpu0_stack, STACK_SIZE), "cpu0_stack misaligned")
+
+ASSERT(IS_ALIGNED(__init_begin, PAGE_SIZE), "__init_begin misaligned")
+ASSERT(IS_ALIGNED(__init_end,   PAGE_SIZE), "__init_end misaligned")

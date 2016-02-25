@@ -176,16 +176,6 @@ void __init discard_initial_images(void)
     initial_images = NULL;
 }
 
-static void free_xen_data(char *s, char *e)
-{
-#ifndef MEMORY_GUARD
-    init_xenheap_pages(__pa(s), __pa(e));
-#endif
-    memguard_guard_range(s, e-s);
-    /* Also zap the mapping in the 1:1 area. */
-    memguard_guard_range(__va(__pa(s)), e-s);
-}
-
 extern char __init_begin[], __init_end[], __bss_start[], __bss_end[];
 
 static void __init init_idle_domain(void)
@@ -509,13 +499,21 @@ static void __init kexec_reserve_area(struct e820map *e820)
 
 static void noinline init_done(void)
 {
+    void *va;
+
     system_state = SYS_STATE_active;
 
     domain_unpause_by_systemcontroller(hardware_domain);
 
-    /* Free (or page-protect) the init areas. */
-    memset(__init_begin, 0xcc, __init_end - __init_begin); /* int3 poison */
-    free_xen_data(__init_begin, __init_end);
+    /* Zero the .init code and data. */
+    for ( va = __init_begin; va < _p(__init_end); va += PAGE_SIZE )
+        clear_page(va);
+
+    /* Destroy Xen's mappings, and reuse the pages. */
+    destroy_xen_mappings((unsigned long)&__2M_init_start,
+                         (unsigned long)&__2M_init_end);
+    init_xenheap_pages(__pa(__2M_init_start), __pa(__2M_init_end));
+
     printk("Freed %ldkB init memory.\n", (long)(__init_end-__init_begin)>>10);
 
     startup_cpu_idle_loop();
