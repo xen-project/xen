@@ -9028,7 +9028,7 @@ void progress_init(void) {
         opt.progress = 0;
     }
 
-    if( (G.progress.out = fdopen(G.progress.pipe[1], "w")) < 0 ) {
+    if( (G.progress.out = fdopen(G.progress.pipe[1], "w")) == NULL ) {
         fprintf(stderr, "%s: could not fdopen pipe: %s, disabling progress bar\n",
                 __func__, strerror(errno));
         opt.progress = 0;
