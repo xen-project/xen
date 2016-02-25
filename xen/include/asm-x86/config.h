@@ -112,8 +112,6 @@ extern unsigned char boot_edid_info[128];
 
 #define asmlinkage
 
-#define CONFIG_COMPAT 1
-
 #include <xen/const.h>
 
 #define PML4_ENTRY_BITS  39
