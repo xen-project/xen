@@ -281,6 +281,11 @@ struct acpi_dbg2_device {
 
 #define ACPI_DBG2_16550_COMPATIBLE  0x0000
 #define ACPI_DBG2_16550_SUBSET      0x0001
+#define ACPI_DBG2_PL011             0x0003
+#define ACPI_DBG2_SBSA_32           0x000d
+#define ACPI_DBG2_SBSA              0x000e
+#define ACPI_DBG2_DCC               0x000f
+#define ACPI_DBG2_BCM2835           0x0010
 
 #define ACPI_DBG2_1394_STANDARD     0x0000
 
