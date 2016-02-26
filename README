@@ -35,13 +35,16 @@ Second, there are a number of prerequisites for building a Xen source
 release. Make sure you have all the following installed, either by
 visiting the project webpage or installing a pre-built package
 provided by your OS distributor:
-    * GCC
-      - For x86 4.1.2_20070115 or later
-      - For ARM 4.8 or later
     * GNU Make v3.80 or later
-    * GNU Binutils:
-      - For x86 2.16.91.0.5 or later
-      - For ARM 2.24 or later
+    * C compiler and linker:
+      - For x86:
+        - GCC 4.1.2_20070115 or later
+        - GNU Binutils 2.16.91.0.5 or later
+        or
+        - Clang/LLVM 3.5 or later
+      - For ARM:
+        - GCC 4.8 or later
+        - GNU Binutils 2.24 or later
     * Development install of zlib (e.g., zlib-dev)
     * Development install of Python v2.3 or later (e.g., python-dev)
     * Development install of curses (e.g., libncurses-dev)

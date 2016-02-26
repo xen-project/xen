@@ -2,8 +2,6 @@ language: c
 dist: trusty
 sudo: required
 matrix:
-    allow_failures:
-        - compiler: clang
     include:
         - compiler: gcc
           env: XEN_TARGET_ARCH=x86_64
