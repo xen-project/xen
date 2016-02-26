@@ -343,6 +343,8 @@ int switch_native(struct domain *d)
             hvm_set_mode(v, 8);
     }
 
+    d->arch.x87_fip_width = cpu_has_fpu_sel ? 0 : 8;
+
     return 0;
 }
 
@@ -376,6 +378,8 @@ int switch_compat(struct domain *d)
     }
 
     domain_set_alloc_bitsize(d);
+
+    d->arch.x87_fip_width = 4;
 
     return 0;
 
@@ -652,6 +656,12 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags,
 
     /* PV/PVH guests get an emulated PIT too for video BIOSes to use. */
     pit_init(d, cpu_khz);
+
+    /*
+     * If the FPU does not save FCS/FDS then we can always
+     * save/restore the 64-bit FIP/FDP and ignore the selectors.
+     */
+    d->arch.x87_fip_width = cpu_has_fpu_sel ? 0 : 8;
 
     return 0;
 

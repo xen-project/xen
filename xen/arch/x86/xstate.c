@@ -249,7 +249,7 @@ void xsave(struct vcpu *v, uint64_t mask)
     struct xsave_struct *ptr = v->arch.xsave_area;
     uint32_t hmask = mask >> 32;
     uint32_t lmask = mask;
-    int word_size = mask & XSTATE_FP ? (cpu_has_fpu_sel ? 8 : 0) : -1;
+    unsigned int fip_width = v->domain->arch.x87_fip_width;
 #define XSAVE(pfx) \
         alternative_io_3(".byte " pfx "0x0f,0xae,0x27\n", /* xsave */ \
                          ".byte " pfx "0x0f,0xae,0x37\n", /* xsaveopt */ \
@@ -261,7 +261,15 @@ void xsave(struct vcpu *v, uint64_t mask)
                          "=m" (*ptr), \
                          "a" (lmask), "d" (hmask), "D" (ptr))
 
-    if ( word_size <= 0 || !is_pv_32bit_vcpu(v) )
+    if ( fip_width == 8 || !(mask & XSTATE_FP) )
+    {
+        XSAVE("0x48,");
+    }
+    else if ( fip_width == 4 )
+    {
+        XSAVE("");
+    }
+    else
     {
         typeof(ptr->fpu_sse.fip.sel) fcs = ptr->fpu_sse.fip.sel;
         typeof(ptr->fpu_sse.fdp.sel) fds = ptr->fpu_sse.fdp.sel;
@@ -274,9 +282,8 @@ void xsave(struct vcpu *v, uint64_t mask)
              * we hence need to put the save image back into the state that
              * it was in right after the previous XSAVEOPT.
              */
-            if ( word_size > 0 &&
-                 (ptr->fpu_sse.x[FPU_WORD_SIZE_OFFSET] == 4 ||
-                  ptr->fpu_sse.x[FPU_WORD_SIZE_OFFSET] == 2) )
+            if ( ptr->fpu_sse.x[FPU_WORD_SIZE_OFFSET] == 4 ||
+                 ptr->fpu_sse.x[FPU_WORD_SIZE_OFFSET] == 2 )
             {
                 ptr->fpu_sse.fip.sel = 0;
                 ptr->fpu_sse.fdp.sel = 0;
@@ -285,7 +292,7 @@ void xsave(struct vcpu *v, uint64_t mask)
 
         XSAVE("0x48,");
 
-        if ( !(mask & ptr->xsave_hdr.xstate_bv & XSTATE_FP) ||
+        if ( !(ptr->xsave_hdr.xstate_bv & XSTATE_FP) ||
              /*
               * AMD CPUs don't save/restore FDP/FIP/FOP unless an exception
               * is pending.
@@ -293,7 +300,7 @@ void xsave(struct vcpu *v, uint64_t mask)
              (!(ptr->fpu_sse.fsw & 0x0080) &&
               boot_cpu_data.x86_vendor == X86_VENDOR_AMD) )
         {
-            if ( (cpu_has_xsaveopt || cpu_has_xsaves) && word_size > 0 )
+            if ( cpu_has_xsaveopt || cpu_has_xsaves )
             {
                 ptr->fpu_sse.fip.sel = fcs;
                 ptr->fpu_sse.fdp.sel = fds;
@@ -301,25 +308,25 @@ void xsave(struct vcpu *v, uint64_t mask)
             return;
         }
 
-        if ( word_size > 0 &&
-             !((ptr->fpu_sse.fip.addr | ptr->fpu_sse.fdp.addr) >> 32) )
+        /*
+         * If the FIP/FDP[63:32] are both zero, it is safe to use the
+         * 32-bit restore to also restore the selectors.
+         */
+        if ( !((ptr->fpu_sse.fip.addr | ptr->fpu_sse.fdp.addr) >> 32) )
         {
             struct ix87_env fpu_env;
 
             asm volatile ( "fnstenv %0" : "=m" (fpu_env) );
             ptr->fpu_sse.fip.sel = fpu_env.fcs;
             ptr->fpu_sse.fdp.sel = fpu_env.fds;
-            word_size = 4;
+            fip_width = 4;
         }
-    }
-    else
-    {
-        XSAVE("");
-        word_size = 4;
+        else
+            fip_width = 8;
     }
 #undef XSAVE
-    if ( word_size >= 0 )
-        ptr->fpu_sse.x[FPU_WORD_SIZE_OFFSET] = word_size;
+    if ( mask & XSTATE_FP )
+        ptr->fpu_sse.x[FPU_WORD_SIZE_OFFSET] = fip_width;
 }
 
 void xrstor(struct vcpu *v, uint64_t mask)
