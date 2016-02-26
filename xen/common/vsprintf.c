@@ -275,6 +275,7 @@ static char *pointer(char *str, char *end, const char **fmt_ptr,
     case 'h': /* Raw buffer as hex string. */
     {
         const uint8_t *hex_buffer = arg;
+        char sep = ' '; /* Separator character. */
         unsigned int i;
 
         /* Consumed 'h' from the format string. */
@@ -286,6 +287,28 @@ static char *pointer(char *str, char *end, const char **fmt_ptr,
         if ( field_width > 64 )
             field_width = 64;
 
+        /*
+         * Peek ahead in the format string to see if a recognised separator
+         * modifier is present.
+         */
+        switch ( fmt[2] )
+        {
+        case 'C': /* Colons. */
+            ++*fmt_ptr;
+            sep = ':';
+            break;
+
+        case 'D': /* Dashes. */
+            ++*fmt_ptr;
+            sep = '-';
+            break;
+
+        case 'N': /* No separator. */
+            ++*fmt_ptr;
+            sep = 0;
+            break;
+        }
+
         for ( i = 0; ; )
         {
             /* Each byte: 2 chars, 0-padded, base 16, no hex prefix. */
@@ -294,9 +317,12 @@ static char *pointer(char *str, char *end, const char **fmt_ptr,
             if ( ++i == field_width )
                 return str;
 
-            if ( str < end )
-                *str = ' ';
-            ++str;
+            if ( sep )
+            {
+                if ( str < end )
+                    *str = sep;
+                ++str;
+            }
         }
     }
 

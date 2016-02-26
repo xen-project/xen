@@ -5,8 +5,13 @@ pointers are fine.  Numbers should make use of the _p() macro.
 
 Raw buffer as hex string:
 
-       %*ph    Up to 64 characters, printed as "00 01 02 ... ff".  Buffer length
-               expected via the field_width paramter. i.e. printk("%*ph", 8, buffer);
+       %*ph    00 01 02  ...  3f
+       %*phC   00:01:02: ... :3f
+       %*phD   00-01-02- ... -3f
+       %*phN   000102 ... 3f
+
+       Up to 64 characters.  Buffer length expected via the field_width
+       paramter. i.e. printk("%*ph", 8, buffer);
 
 Symbol/Function pointers:
 
