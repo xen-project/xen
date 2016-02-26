@@ -1,7 +1,6 @@
 ########################################
 # x86-specific definitions
 
-HAS_NUMA := y
 HAS_CORE_PARKING := y
 
 CFLAGS += -I$(BASEDIR)/include 
