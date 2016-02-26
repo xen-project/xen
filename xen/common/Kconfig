@@ -8,6 +8,9 @@ config COMPAT
 	  HVM and PV guests. HVMLoader makes 32-bit hypercalls irrespective
 	  of the destination runmode of the guest.
 
+config CORE_PARKING
+	bool
+
 config FLASK
 	bool "FLux Advanced Security Kernel support"
 	default y

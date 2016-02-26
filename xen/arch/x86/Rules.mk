@@ -1,9 +1,7 @@
 ########################################
 # x86-specific definitions
 
-HAS_CORE_PARKING := y
-
-CFLAGS += -I$(BASEDIR)/include 
+CFLAGS += -I$(BASEDIR)/include
 CFLAGS += -I$(BASEDIR)/include/asm-x86/mach-generic
 CFLAGS += -I$(BASEDIR)/include/asm-x86/mach-default
 CFLAGS += '-D__OBJECT_LABEL__=$(subst /,$$,$(subst -,_,$(subst $(BASEDIR)/,,$(CURDIR))/$@))'
