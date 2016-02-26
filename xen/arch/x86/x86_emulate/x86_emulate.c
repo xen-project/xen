@@ -2490,9 +2490,11 @@ x86_emulate(
     case 0x9d: /* popf */ {
         uint32_t mask = EFLG_VIP | EFLG_VIF | EFLG_VM;
         if ( !mode_ring0() )
+        {
             mask |= EFLG_IOPL;
-        if ( !mode_iopl() )
-            mask |= EFLG_IF;
+            if ( !mode_iopl() )
+                mask |= EFLG_IF;
+        }
         /* 64-bit mode: POP defaults to a 64-bit operand. */
         if ( mode_64bit() && (op_bytes == 4) )
             op_bytes = 8;
@@ -2814,10 +2816,7 @@ x86_emulate(
     case 0xcf: /* iret */ {
         unsigned long sel, eip, eflags;
         uint32_t mask = EFLG_VIP | EFLG_VIF | EFLG_VM;
-        if ( !mode_ring0() )
-            mask |= EFLG_IOPL;
-        if ( !mode_iopl() )
-            mask |= EFLG_IF;
+
         fail_if(!in_realmode(ctxt, ops));
         if ( (rc = read_ulong(x86_seg_ss, sp_post_inc(op_bytes),
                               &eip, op_bytes, ctxt, ops)) ||
@@ -2830,7 +2829,7 @@ x86_emulate(
             eflags = (uint16_t)eflags | (_regs.eflags & 0xffff0000u);
         eflags &= 0x257fd5;
         _regs.eflags &= mask;
-        _regs.eflags |= (uint32_t)(eflags & ~mask) | 0x02;
+        _regs.eflags |= (eflags & ~mask) | 0x02;
         _regs.eip = eip;
         if ( (rc = load_seg(x86_seg_cs, sel, 1, &cs, ctxt, ops)) ||
              (rc = commit_far_branch(&cs, eip)) )
