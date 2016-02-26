@@ -181,18 +181,20 @@ enum vvmcs_encoding_type {
     VVMCS_TYPE_HSTATE,
 };
 
-u64 __get_vvmcs_virtual(void *vvmcs, u32 vmcs_encoding);
-u64 __get_vvmcs_real(void *vvmcs, u32 vmcs_encoding);
-void __set_vvmcs_virtual(void *vvmcs, u32 vmcs_encoding, u64 val);
-void __set_vvmcs_real(void *vvmcs, u32 vmcs_encoding, u64 val);
+u64 get_vvmcs_virtual(void *vvmcs, u32 encoding);
+u64 get_vvmcs_real(const struct vcpu *, u32 encoding);
+void set_vvmcs_virtual(void *vvmcs, u32 encoding, u64 val);
+void set_vvmcs_real(const struct vcpu *, u32 encoding, u64 val);
 
-#define __get_vvmcs(_vvmcs, _vmcs_encoding) \
-  (cpu_has_vmx_vmcs_shadowing ? __get_vvmcs_real(_vvmcs, _vmcs_encoding) \
-                              : __get_vvmcs_virtual(_vvmcs, _vmcs_encoding))
+#define get_vvmcs(vcpu, encoding) \
+  (cpu_has_vmx_vmcs_shadowing ? \
+   get_vvmcs_real(vcpu, encoding) : \
+   get_vvmcs_virtual(vcpu_nestedhvm(vcpu).nv_vvmcx, encoding))
 
-#define __set_vvmcs(_vvmcs, _vmcs_encoding, _val) \
-  (cpu_has_vmx_vmcs_shadowing ? __set_vvmcs_real(_vvmcs, _vmcs_encoding, _val) \
-                              : __set_vvmcs_virtual(_vvmcs, _vmcs_encoding, _val))
+#define set_vvmcs(vcpu, encoding, val) \
+  (cpu_has_vmx_vmcs_shadowing ? \
+   set_vvmcs_real(vcpu, encoding, val) : \
+   set_vvmcs_virtual(vcpu_nestedhvm(vcpu).nv_vvmcx, encoding, val))
 
 uint64_t get_shadow_eptp(struct vcpu *v);
 

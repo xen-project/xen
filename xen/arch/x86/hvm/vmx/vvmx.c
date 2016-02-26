@@ -175,11 +175,7 @@ int nvmx_vcpu_reset(struct vcpu *v)
 
 uint64_t nvmx_vcpu_eptp_base(struct vcpu *v)
 {
-    uint64_t eptp_base;
-    struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
-
-    eptp_base = __get_vvmcs(nvcpu->nv_vvmcx, EPT_POINTER);
-    return eptp_base & PAGE_MASK;
+    return get_vvmcs(v, EPT_POINTER) & PAGE_MASK;
 }
 
 bool_t nvmx_ept_enabled(struct vcpu *v)
@@ -236,7 +232,7 @@ static int vvmcs_offset(u32 width, u32 type, u32 index)
     return offset;
 }
 
-u64 __get_vvmcs_virtual(void *vvmcs, u32 vmcs_encoding)
+u64 get_vvmcs_virtual(void *vvmcs, u32 vmcs_encoding)
 {
     union vmcs_encoding enc;
     u64 *content = (u64 *) vvmcs;
@@ -266,12 +262,12 @@ u64 __get_vvmcs_virtual(void *vvmcs, u32 vmcs_encoding)
     return res;
 }
 
-u64 __get_vvmcs_real(void *vvmcs, u32 vmcs_encoding)
+u64 get_vvmcs_real(const struct vcpu *v, u32 encoding)
 {
-    return virtual_vmcs_vmread(vvmcs, vmcs_encoding);
+    return virtual_vmcs_vmread(v, encoding);
 }
 
-void __set_vvmcs_virtual(void *vvmcs, u32 vmcs_encoding, u64 val)
+void set_vvmcs_virtual(void *vvmcs, u32 vmcs_encoding, u64 val)
 {
     union vmcs_encoding enc;
     u64 *content = (u64 *) vvmcs;
@@ -307,9 +303,9 @@ void __set_vvmcs_virtual(void *vvmcs, u32 vmcs_encoding, u64 val)
     content[offset] = res;
 }
 
-void __set_vvmcs_real(void *vvmcs, u32 vmcs_encoding, u64 val)
+void set_vvmcs_real(const struct vcpu *v, u32 encoding, u64 val)
 {
-    virtual_vmcs_vmwrite(vvmcs, vmcs_encoding, val);
+    virtual_vmcs_vmwrite(v, encoding, val);
 }
 
 static unsigned long reg_read(struct cpu_user_regs *regs,
@@ -331,25 +327,20 @@ static void reg_write(struct cpu_user_regs *regs,
 
 static inline u32 __n2_pin_exec_control(struct vcpu *v)
 {
-    struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
-
-    return __get_vvmcs(nvcpu->nv_vvmcx, PIN_BASED_VM_EXEC_CONTROL);
+    return get_vvmcs(v, PIN_BASED_VM_EXEC_CONTROL);
 }
 
 static inline u32 __n2_exec_control(struct vcpu *v)
 {
-    struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
-
-    return __get_vvmcs(nvcpu->nv_vvmcx, CPU_BASED_VM_EXEC_CONTROL);
+    return get_vvmcs(v, CPU_BASED_VM_EXEC_CONTROL);
 }
 
 static inline u32 __n2_secondary_exec_control(struct vcpu *v)
 {
-    struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
     u64 second_ctrl = 0;
 
     if ( __n2_exec_control(v) & CPU_BASED_ACTIVATE_SECONDARY_CONTROLS )
-        second_ctrl = __get_vvmcs(nvcpu->nv_vvmcx, SECONDARY_VM_EXEC_CONTROL);
+        second_ctrl = get_vvmcs(v, SECONDARY_VM_EXEC_CONTROL);
 
     return second_ctrl;
 }
@@ -502,18 +493,17 @@ static void vmreturn(struct cpu_user_regs *regs, enum vmx_ops_result ops_res)
 bool_t nvmx_intercepts_exception(struct vcpu *v, unsigned int trap,
                                  int error_code)
 {
-    struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
     u32 exception_bitmap, pfec_match=0, pfec_mask=0;
     int r;
 
     ASSERT ( trap < 32 );
 
-    exception_bitmap = __get_vvmcs(nvcpu->nv_vvmcx, EXCEPTION_BITMAP);
+    exception_bitmap = get_vvmcs(v, EXCEPTION_BITMAP);
     r = exception_bitmap & (1 << trap) ? 1: 0;
 
     if ( trap == TRAP_page_fault ) {
-        pfec_match = __get_vvmcs(nvcpu->nv_vvmcx, PAGE_FAULT_ERROR_CODE_MATCH);
-        pfec_mask  = __get_vvmcs(nvcpu->nv_vvmcx, PAGE_FAULT_ERROR_CODE_MASK);
+        pfec_match = get_vvmcs(v, PAGE_FAULT_ERROR_CODE_MATCH);
+        pfec_mask  = get_vvmcs(v, PAGE_FAULT_ERROR_CODE_MASK);
         if ( (error_code & pfec_mask) != pfec_match )
             r = !r;
     }
@@ -528,9 +518,7 @@ static inline u32 __shadow_control(struct vcpu *v,
                                  unsigned int field,
                                  u32 host_value)
 {
-    struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
-
-    return (u32) __get_vvmcs(nvcpu->nv_vvmcx, field) | host_value;
+    return get_vvmcs(v, field) | host_value;
 }
 
 static void set_shadow_control(struct vcpu *v,
@@ -597,13 +585,12 @@ void nvmx_update_secondary_exec_control(struct vcpu *v,
                                         unsigned long host_cntrl)
 {
     u32 shadow_cntrl;
-    struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
     struct nestedvmx *nvmx = &vcpu_2_nvmx(v);
     u32 apicv_bit = SECONDARY_EXEC_APIC_REGISTER_VIRT |
                     SECONDARY_EXEC_VIRTUAL_INTR_DELIVERY;
 
     host_cntrl &= ~apicv_bit;
-    shadow_cntrl = __get_vvmcs(nvcpu->nv_vvmcx, SECONDARY_VM_EXEC_CONTROL);
+    shadow_cntrl = get_vvmcs(v, SECONDARY_VM_EXEC_CONTROL);
 
     /* No vAPIC-v support, so it shouldn't be set in vmcs12. */
     ASSERT(!(shadow_cntrl & apicv_bit));
@@ -616,10 +603,9 @@ void nvmx_update_secondary_exec_control(struct vcpu *v,
 static void nvmx_update_pin_control(struct vcpu *v, unsigned long host_cntrl)
 {
     u32 shadow_cntrl;
-    struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
 
     host_cntrl &= ~PIN_BASED_POSTED_INTERRUPT;
-    shadow_cntrl = __get_vvmcs(nvcpu->nv_vvmcx, PIN_BASED_VM_EXEC_CONTROL);
+    shadow_cntrl = get_vvmcs(v, PIN_BASED_VM_EXEC_CONTROL);
 
     /* No vAPIC-v support, so it shouldn't be set in vmcs12. */
     ASSERT(!(shadow_cntrl & PIN_BASED_POSTED_INTERRUPT));
@@ -631,9 +617,8 @@ static void nvmx_update_pin_control(struct vcpu *v, unsigned long host_cntrl)
 static void nvmx_update_exit_control(struct vcpu *v, unsigned long host_cntrl)
 {
     u32 shadow_cntrl;
-    struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
 
-    shadow_cntrl = __get_vvmcs(nvcpu->nv_vvmcx, VM_EXIT_CONTROLS);
+    shadow_cntrl = get_vvmcs(v, VM_EXIT_CONTROLS);
     shadow_cntrl &= ~(VM_EXIT_SAVE_DEBUG_CNTRLS 
                       | VM_EXIT_LOAD_HOST_PAT
                       | VM_EXIT_LOAD_HOST_EFER
@@ -645,9 +630,8 @@ static void nvmx_update_exit_control(struct vcpu *v, unsigned long host_cntrl)
 static void nvmx_update_entry_control(struct vcpu *v)
 {
     u32 shadow_cntrl;
-    struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
 
-    shadow_cntrl = __get_vvmcs(nvcpu->nv_vvmcx, VM_ENTRY_CONTROLS);
+    shadow_cntrl = get_vvmcs(v, VM_ENTRY_CONTROLS);
     shadow_cntrl &= ~(VM_ENTRY_LOAD_GUEST_PAT
                       | VM_ENTRY_LOAD_GUEST_EFER
                       | VM_ENTRY_LOAD_PERF_GLOBAL_CTRL);
@@ -661,7 +645,6 @@ void nvmx_update_exception_bitmap(struct vcpu *v, unsigned long value)
 
 static void nvmx_update_apic_access_address(struct vcpu *v)
 {
-    struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
     u32 ctrl;
 
     ctrl = __n2_secondary_exec_control(v);
@@ -671,7 +654,7 @@ static void nvmx_update_apic_access_address(struct vcpu *v)
         unsigned long apic_gpfn;
         struct page_info *apic_pg;
 
-        apic_gpfn = __get_vvmcs(nvcpu->nv_vvmcx, APIC_ACCESS_ADDR) >> PAGE_SHIFT;
+        apic_gpfn = get_vvmcs(v, APIC_ACCESS_ADDR) >> PAGE_SHIFT;
         apic_pg = get_page_from_gfn(v->domain, apic_gpfn, &p2mt, P2M_ALLOC);
         ASSERT(apic_pg && !p2m_is_paging(p2mt));
         __vmwrite(APIC_ACCESS_ADDR, page_to_maddr(apic_pg));
@@ -683,7 +666,6 @@ static void nvmx_update_apic_access_address(struct vcpu *v)
 
 static void nvmx_update_virtual_apic_address(struct vcpu *v)
 {
-    struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
     u32 ctrl;
 
     ctrl = __n2_exec_control(v);
@@ -693,7 +675,7 @@ static void nvmx_update_virtual_apic_address(struct vcpu *v)
         unsigned long vapic_gpfn;
         struct page_info *vapic_pg;
 
-        vapic_gpfn = __get_vvmcs(nvcpu->nv_vvmcx, VIRTUAL_APIC_PAGE_ADDR) >> PAGE_SHIFT;
+        vapic_gpfn = get_vvmcs(v, VIRTUAL_APIC_PAGE_ADDR) >> PAGE_SHIFT;
         vapic_pg = get_page_from_gfn(v->domain, vapic_gpfn, &p2mt, P2M_ALLOC);
         ASSERT(vapic_pg && !p2m_is_paging(p2mt));
         __vmwrite(VIRTUAL_APIC_PAGE_ADDR, page_to_maddr(vapic_pg));
@@ -705,23 +687,20 @@ static void nvmx_update_virtual_apic_address(struct vcpu *v)
 
 static void nvmx_update_tpr_threshold(struct vcpu *v)
 {
-    struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
     u32 ctrl = __n2_exec_control(v);
+
     if ( ctrl & CPU_BASED_TPR_SHADOW )
-        __vmwrite(TPR_THRESHOLD, __get_vvmcs(nvcpu->nv_vvmcx, TPR_THRESHOLD));
+        __vmwrite(TPR_THRESHOLD, get_vvmcs(v, TPR_THRESHOLD));
     else
         __vmwrite(TPR_THRESHOLD, 0);
 }
 
 static void nvmx_update_pfec(struct vcpu *v)
 {
-    struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
-    void *vvmcs = nvcpu->nv_vvmcx;
-
     __vmwrite(PAGE_FAULT_ERROR_CODE_MASK,
-        __get_vvmcs(vvmcs, PAGE_FAULT_ERROR_CODE_MASK));
+              get_vvmcs(v, PAGE_FAULT_ERROR_CODE_MASK));
     __vmwrite(PAGE_FAULT_ERROR_CODE_MATCH,
-        __get_vvmcs(vvmcs, PAGE_FAULT_ERROR_CODE_MATCH));
+              get_vvmcs(v, PAGE_FAULT_ERROR_CODE_MATCH));
 }
 
 static void __clear_current_vvmcs(struct vcpu *v)
@@ -739,7 +718,7 @@ static bool_t __must_check _map_msr_bitmap(struct vcpu *v)
 
     if ( nvmx->msrbitmap )
         hvm_unmap_guest_frame(nvmx->msrbitmap, 1);
-    gpa = __get_vvmcs(vcpu_nestedhvm(v).nv_vvmcx, MSR_BITMAP);
+    gpa = get_vvmcs(v, MSR_BITMAP);
     nvmx->msrbitmap = hvm_map_guest_frame_ro(gpa >> PAGE_SHIFT, 1);
 
     return nvmx->msrbitmap != NULL;
@@ -754,7 +733,7 @@ static bool_t __must_check _map_io_bitmap(struct vcpu *v, u64 vmcs_reg)
     index = vmcs_reg == IO_BITMAP_A ? 0 : 1;
     if (nvmx->iobitmap[index])
         hvm_unmap_guest_frame(nvmx->iobitmap[index], 1);
-    gpa = __get_vvmcs(vcpu_nestedhvm(v).nv_vvmcx, vmcs_reg);
+    gpa = get_vvmcs(v, vmcs_reg);
     nvmx->iobitmap[index] = hvm_map_guest_frame_ro(gpa >> PAGE_SHIFT, 1);
 
     return nvmx->iobitmap[index] != NULL;
@@ -777,6 +756,7 @@ static void nvmx_purge_vvmcs(struct vcpu *v)
         hvm_unmap_guest_frame(nvcpu->nv_vvmcx, 1);
     nvcpu->nv_vvmcx = NULL;
     nvcpu->nv_vvmcxaddr = VMCX_EADDR;
+    v->arch.hvm_vmx.vmcs_shadow_maddr = 0;
     for (i=0; i<2; i++) {
         if ( nvmx->iobitmap[i] ) {
             hvm_unmap_guest_frame(nvmx->iobitmap[i], 1);
@@ -792,11 +772,10 @@ static void nvmx_purge_vvmcs(struct vcpu *v)
 u64 nvmx_get_tsc_offset(struct vcpu *v)
 {
     u64 offset = 0;
-    struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
 
-    if ( __get_vvmcs(nvcpu->nv_vvmcx, CPU_BASED_VM_EXEC_CONTROL) &
+    if ( get_vvmcs(v, CPU_BASED_VM_EXEC_CONTROL) &
          CPU_BASED_USE_TSC_OFFSETING )
-        offset = __get_vvmcs(nvcpu->nv_vvmcx, TSC_OFFSET);
+        offset = get_vvmcs(v, TSC_OFFSET);
 
     return offset;
 }
@@ -911,19 +890,14 @@ static struct vmcs_host_to_guest {
     {HOST_SYSENTER_EIP, GUEST_SYSENTER_EIP},
 };
 
-static void vvmcs_to_shadow(void *vvmcs, unsigned int field)
+static void vvmcs_to_shadow(const struct vcpu *v, unsigned int field)
 {
-    u64 value;
-
-    value = __get_vvmcs(vvmcs, field);
-    __vmwrite(field, value);
+    __vmwrite(field, get_vvmcs(v, field));
 }
 
 static void vvmcs_to_shadow_bulk(struct vcpu *v, unsigned int n,
                                  const u16 *field)
 {
-    struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
-    void *vvmcs = nvcpu->nv_vvmcx;
     u64 *value = this_cpu(vvmcs_buf);
     unsigned int i;
 
@@ -938,10 +912,10 @@ static void vvmcs_to_shadow_bulk(struct vcpu *v, unsigned int n,
         goto fallback;
     }
 
-    virtual_vmcs_enter(vvmcs);
+    virtual_vmcs_enter(v);
     for ( i = 0; i < n; i++ )
         __vmread(field[i], &value[i]);
-    virtual_vmcs_exit(vvmcs);
+    virtual_vmcs_exit(v);
 
     for ( i = 0; i < n; i++ )
         __vmwrite(field[i], value[i]);
@@ -950,22 +924,20 @@ static void vvmcs_to_shadow_bulk(struct vcpu *v, unsigned int n,
 
 fallback:
     for ( i = 0; i < n; i++ )
-        vvmcs_to_shadow(vvmcs, field[i]);
+        vvmcs_to_shadow(v, field[i]);
 }
 
-static inline void shadow_to_vvmcs(void *vvmcs, unsigned int field)
+static inline void shadow_to_vvmcs(const struct vcpu *v, unsigned int field)
 {
     unsigned long value;
 
     if ( __vmread_safe(field, &value) )
-        __set_vvmcs(vvmcs, field, value);
+        set_vvmcs(v, field, value);
 }
 
 static void shadow_to_vvmcs_bulk(struct vcpu *v, unsigned int n,
                                  const u16 *field)
 {
-    struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
-    void *vvmcs = nvcpu->nv_vvmcx;
     u64 *value = this_cpu(vvmcs_buf);
     unsigned int i;
 
@@ -983,16 +955,16 @@ static void shadow_to_vvmcs_bulk(struct vcpu *v, unsigned int n,
     for ( i = 0; i < n; i++ )
         __vmread(field[i], &value[i]);
 
-    virtual_vmcs_enter(vvmcs);
+    virtual_vmcs_enter(v);
     for ( i = 0; i < n; i++ )
         __vmwrite(field[i], value[i]);
-    virtual_vmcs_exit(vvmcs);
+    virtual_vmcs_exit(v);
 
     return;
 
 fallback:
     for ( i = 0; i < n; i++ )
-        shadow_to_vvmcs(vvmcs, field[i]);
+        shadow_to_vvmcs(v, field[i]);
 }
 
 static void load_shadow_control(struct vcpu *v)
@@ -1017,7 +989,6 @@ static void load_shadow_control(struct vcpu *v)
 static void load_shadow_guest_state(struct vcpu *v)
 {
     struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
-    void *vvmcs = nvcpu->nv_vvmcx;
     u32 control;
     u64 cr_gh_mask, cr_read_shadow;
 
@@ -1031,18 +1002,18 @@ static void load_shadow_guest_state(struct vcpu *v)
     vvmcs_to_shadow_bulk(v, ARRAY_SIZE(vmcs_gstate_field),
                          vmcs_gstate_field);
 
-    nvcpu->guest_cr[0] = __get_vvmcs(vvmcs, CR0_READ_SHADOW);
-    nvcpu->guest_cr[4] = __get_vvmcs(vvmcs, CR4_READ_SHADOW);
-    hvm_set_cr0(__get_vvmcs(vvmcs, GUEST_CR0), 1);
-    hvm_set_cr4(__get_vvmcs(vvmcs, GUEST_CR4), 1);
-    hvm_set_cr3(__get_vvmcs(vvmcs, GUEST_CR3), 1);
+    nvcpu->guest_cr[0] = get_vvmcs(v, CR0_READ_SHADOW);
+    nvcpu->guest_cr[4] = get_vvmcs(v, CR4_READ_SHADOW);
+    hvm_set_cr0(get_vvmcs(v, GUEST_CR0), 1);
+    hvm_set_cr4(get_vvmcs(v, GUEST_CR4), 1);
+    hvm_set_cr3(get_vvmcs(v, GUEST_CR3), 1);
 
-    control = __get_vvmcs(vvmcs, VM_ENTRY_CONTROLS);
+    control = get_vvmcs(v, VM_ENTRY_CONTROLS);
     if ( control & VM_ENTRY_LOAD_GUEST_PAT )
-        hvm_set_guest_pat(v, __get_vvmcs(vvmcs, GUEST_PAT));
+        hvm_set_guest_pat(v, get_vvmcs(v, GUEST_PAT));
     if ( control & VM_ENTRY_LOAD_PERF_GLOBAL_CTRL )
         hvm_msr_write_intercept(MSR_CORE_PERF_GLOBAL_CTRL,
-                                __get_vvmcs(vvmcs, GUEST_PERF_GLOBAL_CTRL), 0);
+                                get_vvmcs(v, GUEST_PERF_GLOBAL_CTRL), 0);
 
     hvm_funcs.set_tsc_offset(v, v->arch.hvm_vcpu.cache_tsc_offset, 0);
 
@@ -1053,14 +1024,14 @@ static void load_shadow_guest_state(struct vcpu *v)
      * guest host mask to 0xffffffff in shadow VMCS (follow the host L1 VMCS),
      * then calculate the corresponding read shadow separately for CR0 and CR4.
      */
-    cr_gh_mask = __get_vvmcs(vvmcs, CR0_GUEST_HOST_MASK);
-    cr_read_shadow = (__get_vvmcs(vvmcs, GUEST_CR0) & ~cr_gh_mask) |
-                     (__get_vvmcs(vvmcs, CR0_READ_SHADOW) & cr_gh_mask);
+    cr_gh_mask = get_vvmcs(v, CR0_GUEST_HOST_MASK);
+    cr_read_shadow = (get_vvmcs(v, GUEST_CR0) & ~cr_gh_mask) |
+                     (get_vvmcs(v, CR0_READ_SHADOW) & cr_gh_mask);
     __vmwrite(CR0_READ_SHADOW, cr_read_shadow);
 
-    cr_gh_mask = __get_vvmcs(vvmcs, CR4_GUEST_HOST_MASK);
-    cr_read_shadow = (__get_vvmcs(vvmcs, GUEST_CR4) & ~cr_gh_mask) |
-                     (__get_vvmcs(vvmcs, CR4_READ_SHADOW) & cr_gh_mask);
+    cr_gh_mask = get_vvmcs(v, CR4_GUEST_HOST_MASK);
+    cr_read_shadow = (get_vvmcs(v, GUEST_CR4) & ~cr_gh_mask) |
+                     (get_vvmcs(v, CR4_READ_SHADOW) & cr_gh_mask);
     __vmwrite(CR4_READ_SHADOW, cr_read_shadow);
 
     /* TODO: CR3 target control */
@@ -1084,11 +1055,11 @@ static uint64_t get_host_eptp(struct vcpu *v)
     return ept_get_eptp(ept_data);
 }
 
-static bool_t nvmx_vpid_enabled(struct nestedvcpu *nvcpu)
+static bool_t nvmx_vpid_enabled(const struct vcpu *v)
 {
     uint32_t second_cntl;
 
-    second_cntl = __get_vvmcs(nvcpu->nv_vvmcx, SECONDARY_VM_EXEC_CONTROL);
+    second_cntl = get_vvmcs(v, SECONDARY_VM_EXEC_CONTROL);
     if ( second_cntl & SECONDARY_EXEC_ENABLE_VPID )
         return 1;
     return 0;
@@ -1096,12 +1067,10 @@ static bool_t nvmx_vpid_enabled(struct nestedvcpu *nvcpu)
 
 static void nvmx_set_vmcs_pointer(struct vcpu *v, struct vmcs_struct *vvmcs)
 {
-    unsigned long vvmcs_mfn = domain_page_map_to_mfn(vvmcs);
-    paddr_t vvmcs_maddr = vvmcs_mfn << PAGE_SHIFT;
+    paddr_t vvmcs_maddr = v->arch.hvm_vmx.vmcs_shadow_maddr;
 
     __vmpclear(vvmcs_maddr);
     vvmcs->vmcs_revision_id |= VMCS_RID_TYPE_MASK;
-    v->arch.hvm_vmx.vmcs_shadow_maddr = vvmcs_maddr;
     __vmwrite(VMCS_LINK_POINTER, vvmcs_maddr);
     __vmwrite(VMREAD_BITMAP, page_to_maddr(v->arch.hvm_vmx.vmread_bitmap));
     __vmwrite(VMWRITE_BITMAP, page_to_maddr(v->arch.hvm_vmx.vmwrite_bitmap));
@@ -1109,12 +1078,10 @@ static void nvmx_set_vmcs_pointer(struct vcpu *v, struct vmcs_struct *vvmcs)
 
 static void nvmx_clear_vmcs_pointer(struct vcpu *v, struct vmcs_struct *vvmcs)
 {
-    unsigned long vvmcs_mfn = domain_page_map_to_mfn(vvmcs);
-    paddr_t vvmcs_maddr = vvmcs_mfn << PAGE_SHIFT;
+    paddr_t vvmcs_maddr = v->arch.hvm_vmx.vmcs_shadow_maddr;
 
     __vmpclear(vvmcs_maddr);
     vvmcs->vmcs_revision_id &= ~VMCS_RID_TYPE_MASK;
-    v->arch.hvm_vmx.vmcs_shadow_maddr = 0;
     __vmwrite(VMCS_LINK_POINTER, ~0ul);
     __vmwrite(VMREAD_BITMAP, 0);
     __vmwrite(VMWRITE_BITMAP, 0);
@@ -1124,7 +1091,6 @@ static void virtual_vmentry(struct cpu_user_regs *regs)
 {
     struct vcpu *v = current;
     struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
-    void *vvmcs = nvcpu->nv_vvmcx;
     unsigned long lm_l1, lm_l2;
 
     vmx_vmcs_switch(v->arch.hvm_vmx.vmcs_pa, nvcpu->nv_n2vmcx_pa);
@@ -1143,8 +1109,7 @@ static void virtual_vmentry(struct cpu_user_regs *regs)
      * L1 exit_controls
      */
     lm_l1 = !!hvm_long_mode_enabled(v);
-    lm_l2 = !!(__get_vvmcs(vvmcs, VM_ENTRY_CONTROLS) &
-                           VM_ENTRY_IA32E_MODE);
+    lm_l2 = !!(get_vvmcs(v, VM_ENTRY_CONTROLS) & VM_ENTRY_IA32E_MODE);
 
     if ( lm_l2 )
         v->arch.hvm_vcpu.guest_efer |= EFER_LMA | EFER_LME;
@@ -1161,9 +1126,9 @@ static void virtual_vmentry(struct cpu_user_regs *regs)
          !(v->arch.hvm_vcpu.guest_efer & EFER_LMA) )
         vvmcs_to_shadow_bulk(v, ARRAY_SIZE(gpdpte_fields), gpdpte_fields);
 
-    regs->eip = __get_vvmcs(vvmcs, GUEST_RIP);
-    regs->esp = __get_vvmcs(vvmcs, GUEST_RSP);
-    regs->eflags = __get_vvmcs(vvmcs, GUEST_RFLAGS);
+    regs->eip = get_vvmcs(v, GUEST_RIP);
+    regs->esp = get_vvmcs(v, GUEST_RSP);
+    regs->eflags = get_vvmcs(v, GUEST_RFLAGS);
 
     /* updating host cr0 to sync TS bit */
     __vmwrite(HOST_CR0, v->arch.hvm_vmx.host_cr0);
@@ -1175,10 +1140,10 @@ static void virtual_vmentry(struct cpu_user_regs *regs)
         __vmwrite(EPT_POINTER, get_host_eptp(v));
 
     /* nested VPID support! */
-    if ( cpu_has_vmx_vpid && nvmx_vpid_enabled(nvcpu) )
+    if ( cpu_has_vmx_vpid && nvmx_vpid_enabled(v) )
     {
         struct nestedvmx *nvmx = &vcpu_2_nvmx(v);
-        uint32_t new_vpid =  __get_vvmcs(vvmcs, VIRTUAL_PROCESSOR_ID);
+        uint32_t new_vpid = get_vvmcs(v, VIRTUAL_PROCESSOR_ID);
 
         if ( nvmx->guest_vpid != new_vpid )
         {
@@ -1191,34 +1156,29 @@ static void virtual_vmentry(struct cpu_user_regs *regs)
 
 static void sync_vvmcs_guest_state(struct vcpu *v, struct cpu_user_regs *regs)
 {
-    struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
-    void *vvmcs = nvcpu->nv_vvmcx;
-
     /* copy shadow vmcs.gstate back to vvmcs.gstate */
     shadow_to_vvmcs_bulk(v, ARRAY_SIZE(vmcs_gstate_field),
                          vmcs_gstate_field);
     /* RIP, RSP are in user regs */
-    __set_vvmcs(vvmcs, GUEST_RIP, regs->eip);
-    __set_vvmcs(vvmcs, GUEST_RSP, regs->esp);
+    set_vvmcs(v, GUEST_RIP, regs->eip);
+    set_vvmcs(v, GUEST_RSP, regs->esp);
 
     /* CR3 sync if exec doesn't want cr3 load exiting: i.e. nested EPT */
     if ( !(__n2_exec_control(v) & CPU_BASED_CR3_LOAD_EXITING) )
-        shadow_to_vvmcs(vvmcs, GUEST_CR3);
+        shadow_to_vvmcs(v, GUEST_CR3);
 }
 
 static void sync_vvmcs_ro(struct vcpu *v)
 {
-    struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
     struct nestedvmx *nvmx = &vcpu_2_nvmx(v);
-    void *vvmcs = nvcpu->nv_vvmcx;
 
     shadow_to_vvmcs_bulk(v, ARRAY_SIZE(vmcs_ro_field), vmcs_ro_field);
 
     /* Adjust exit_reason/exit_qualifciation for violation case */
-    if ( __get_vvmcs(vvmcs, VM_EXIT_REASON) == EXIT_REASON_EPT_VIOLATION )
+    if ( get_vvmcs(v, VM_EXIT_REASON) == EXIT_REASON_EPT_VIOLATION )
     {
-        __set_vvmcs(vvmcs, EXIT_QUALIFICATION, nvmx->ept.exit_qual);
-        __set_vvmcs(vvmcs, VM_EXIT_REASON, nvmx->ept.exit_reason);
+        set_vvmcs(v, EXIT_QUALIFICATION, nvmx->ept.exit_qual);
+        set_vvmcs(v, VM_EXIT_REASON, nvmx->ept.exit_reason);
     }
 }
 
@@ -1226,34 +1186,32 @@ static void load_vvmcs_host_state(struct vcpu *v)
 {
     int i;
     u64 r;
-    void *vvmcs = vcpu_nestedhvm(v).nv_vvmcx;
     u32 control;
 
     for ( i = 0; i < ARRAY_SIZE(vmcs_h2g_field); i++ )
     {
-        r = __get_vvmcs(vvmcs, vmcs_h2g_field[i].host_field);
+        r = get_vvmcs(v, vmcs_h2g_field[i].host_field);
         __vmwrite(vmcs_h2g_field[i].guest_field, r);
     }
 
-    hvm_set_cr0(__get_vvmcs(vvmcs, HOST_CR0), 1);
-    hvm_set_cr4(__get_vvmcs(vvmcs, HOST_CR4), 1);
-    hvm_set_cr3(__get_vvmcs(vvmcs, HOST_CR3), 1);
+    hvm_set_cr0(get_vvmcs(v, HOST_CR0), 1);
+    hvm_set_cr4(get_vvmcs(v, HOST_CR4), 1);
+    hvm_set_cr3(get_vvmcs(v, HOST_CR3), 1);
 
-    control = __get_vvmcs(vvmcs, VM_EXIT_CONTROLS);
+    control = get_vvmcs(v, VM_EXIT_CONTROLS);
     if ( control & VM_EXIT_LOAD_HOST_PAT )
-        hvm_set_guest_pat(v, __get_vvmcs(vvmcs, HOST_PAT));
+        hvm_set_guest_pat(v, get_vvmcs(v, HOST_PAT));
     if ( control & VM_EXIT_LOAD_PERF_GLOBAL_CTRL )
         hvm_msr_write_intercept(MSR_CORE_PERF_GLOBAL_CTRL,
-                                __get_vvmcs(vvmcs, HOST_PERF_GLOBAL_CTRL), 1);
+                                get_vvmcs(v, HOST_PERF_GLOBAL_CTRL), 1);
 
     hvm_funcs.set_tsc_offset(v, v->arch.hvm_vcpu.cache_tsc_offset, 0);
 
-    __set_vvmcs(vvmcs, VM_ENTRY_INTR_INFO, 0);
+    set_vvmcs(v, VM_ENTRY_INTR_INFO, 0);
 }
 
 static void sync_exception_state(struct vcpu *v)
 {
-    struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
     struct nestedvmx *nvmx = &vcpu_2_nvmx(v);
 
     if ( !(nvmx->intr.intr_info & INTR_INFO_VALID_MASK) )
@@ -1263,10 +1221,9 @@ static void sync_exception_state(struct vcpu *v)
     {
     case X86_EVENTTYPE_EXT_INTR:
         /* rename exit_reason to EXTERNAL_INTERRUPT */
-        __set_vvmcs(nvcpu->nv_vvmcx, VM_EXIT_REASON,
-                    EXIT_REASON_EXTERNAL_INTERRUPT);
-        __set_vvmcs(nvcpu->nv_vvmcx, EXIT_QUALIFICATION, 0);
-        __set_vvmcs(nvcpu->nv_vvmcx, VM_EXIT_INTR_INFO,
+        set_vvmcs(v, VM_EXIT_REASON, EXIT_REASON_EXTERNAL_INTERRUPT);
+        set_vvmcs(v, EXIT_QUALIFICATION, 0);
+        set_vvmcs(v, VM_EXIT_INTR_INFO,
                     nvmx->intr.intr_info);
         break;
 
@@ -1274,17 +1231,13 @@ static void sync_exception_state(struct vcpu *v)
     case X86_EVENTTYPE_SW_INTERRUPT:
     case X86_EVENTTYPE_SW_EXCEPTION:
         /* throw to L1 */
-        __set_vvmcs(nvcpu->nv_vvmcx, VM_EXIT_INTR_INFO,
-                    nvmx->intr.intr_info);
-        __set_vvmcs(nvcpu->nv_vvmcx, VM_EXIT_INTR_ERROR_CODE,
-                    nvmx->intr.error_code);
+        set_vvmcs(v, VM_EXIT_INTR_INFO, nvmx->intr.intr_info);
+        set_vvmcs(v, VM_EXIT_INTR_ERROR_CODE, nvmx->intr.error_code);
         break;
     case X86_EVENTTYPE_NMI:
-        __set_vvmcs(nvcpu->nv_vvmcx, VM_EXIT_REASON,
-                    EXIT_REASON_EXCEPTION_NMI);
-        __set_vvmcs(nvcpu->nv_vvmcx, EXIT_QUALIFICATION, 0);
-        __set_vvmcs(nvcpu->nv_vvmcx, VM_EXIT_INTR_INFO,
-                    nvmx->intr.intr_info);
+        set_vvmcs(v, VM_EXIT_REASON, EXIT_REASON_EXCEPTION_NMI);
+        set_vvmcs(v, EXIT_QUALIFICATION, 0);
+        set_vvmcs(v, VM_EXIT_INTR_INFO, nvmx->intr.intr_info);
         break;
     default:
         gdprintk(XENLOG_ERR, "Exception state %lx not handled\n",
@@ -1296,9 +1249,8 @@ static void sync_exception_state(struct vcpu *v)
 static void nvmx_update_apicv(struct vcpu *v)
 {
     struct nestedvmx *nvmx = &vcpu_2_nvmx(v);
-    struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
-    unsigned long reason = __get_vvmcs(nvcpu->nv_vvmcx, VM_EXIT_REASON);
-    uint32_t intr_info = __get_vvmcs(nvcpu->nv_vvmcx, VM_EXIT_INTR_INFO);
+    unsigned long reason = get_vvmcs(v, VM_EXIT_REASON);
+    uint32_t intr_info = get_vvmcs(v, VM_EXIT_INTR_INFO);
 
     if ( reason == EXIT_REASON_EXTERNAL_INTERRUPT &&
          nvmx->intr.source == hvm_intsrc_lapic &&
@@ -1344,8 +1296,7 @@ static void virtual_vmexit(struct cpu_user_regs *regs)
     nvcpu->nv_vmswitch_in_progress = 1;
 
     lm_l2 = !!hvm_long_mode_enabled(v);
-    lm_l1 = !!(__get_vvmcs(nvcpu->nv_vvmcx, VM_EXIT_CONTROLS) &
-                           VM_EXIT_IA32E_MODE);
+    lm_l1 = !!(get_vvmcs(v, VM_EXIT_CONTROLS) & VM_EXIT_IA32E_MODE);
 
     if ( lm_l1 )
         v->arch.hvm_vcpu.guest_efer |= EFER_LMA | EFER_LME;
@@ -1361,8 +1312,8 @@ static void virtual_vmexit(struct cpu_user_regs *regs)
     if ( lm_l1 != lm_l2 )
         paging_update_paging_modes(v);
 
-    regs->eip = __get_vvmcs(nvcpu->nv_vvmcx, HOST_RIP);
-    regs->esp = __get_vvmcs(nvcpu->nv_vvmcx, HOST_RSP);
+    regs->eip = get_vvmcs(v, HOST_RIP);
+    regs->esp = get_vvmcs(v, HOST_RSP);
     /* VM exit clears all bits except bit 1 */
     regs->eflags = 0x2;
 
@@ -1539,7 +1490,6 @@ int nvmx_handle_vmresume(struct cpu_user_regs *regs)
 {
     bool_t launched;
     struct vcpu *v = current;
-    struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
     struct nestedvmx *nvmx = &vcpu_2_nvmx(v);
     int rc = vmx_inst_check_privilege(regs, 0);
 
@@ -1553,7 +1503,7 @@ int nvmx_handle_vmresume(struct cpu_user_regs *regs)
     }
 
     launched = vvmcs_launched(&nvmx->launched_list,
-                   domain_page_map_to_mfn(nvcpu->nv_vvmcx));
+                              PFN_DOWN(v->arch.hvm_vmx.vmcs_shadow_maddr));
     if ( !launched ) {
        vmreturn (regs, VMFAIL_VALID);
        return X86EMUL_OKAY;
@@ -1565,7 +1515,6 @@ int nvmx_handle_vmlaunch(struct cpu_user_regs *regs)
 {
     bool_t launched;
     struct vcpu *v = current;
-    struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
     struct nestedvmx *nvmx = &vcpu_2_nvmx(v);
     int rc = vmx_inst_check_privilege(regs, 0);
 
@@ -1579,7 +1528,7 @@ int nvmx_handle_vmlaunch(struct cpu_user_regs *regs)
     }
 
     launched = vvmcs_launched(&nvmx->launched_list,
-                   domain_page_map_to_mfn(nvcpu->nv_vvmcx));
+                              PFN_DOWN(v->arch.hvm_vmx.vmcs_shadow_maddr));
     if ( launched ) {
        vmreturn (regs, VMFAIL_VALID);
        return X86EMUL_OKAY;
@@ -1589,7 +1538,7 @@ int nvmx_handle_vmlaunch(struct cpu_user_regs *regs)
         if ( rc == X86EMUL_OKAY )
         {
             if ( set_vvmcs_launched(&nvmx->launched_list,
-                    domain_page_map_to_mfn(nvcpu->nv_vvmcx)) < 0 )
+                                    PFN_DOWN(v->arch.hvm_vmx.vmcs_shadow_maddr)) < 0 )
                 return X86EMUL_UNHANDLEABLE;
         }
     }
@@ -1628,6 +1577,8 @@ int nvmx_handle_vmptrld(struct cpu_user_regs *regs)
             {
                 nvcpu->nv_vvmcx = vvmcx;
                 nvcpu->nv_vvmcxaddr = gpa;
+                v->arch.hvm_vmx.vmcs_shadow_maddr =
+                    pfn_to_paddr(domain_page_map_to_mfn(vvmcx));
             }
             else
             {
@@ -1697,7 +1648,7 @@ int nvmx_handle_vmclear(struct cpu_user_regs *regs)
         if ( cpu_has_vmx_vmcs_shadowing )
             nvmx_clear_vmcs_pointer(v, nvcpu->nv_vvmcx);
         clear_vvmcs_launched(&nvmx->launched_list,
-            domain_page_map_to_mfn(nvcpu->nv_vvmcx));
+                             PFN_DOWN(v->arch.hvm_vmx.vmcs_shadow_maddr));
         nvmx_purge_vvmcs(v);
     }
     else 
@@ -1726,7 +1677,6 @@ int nvmx_handle_vmread(struct cpu_user_regs *regs)
 {
     struct vcpu *v = current;
     struct vmx_inst_decoded decode;
-    struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
     u64 value = 0;
     int rc;
 
@@ -1734,7 +1684,7 @@ int nvmx_handle_vmread(struct cpu_user_regs *regs)
     if ( rc != X86EMUL_OKAY )
         return rc;
 
-    value = __get_vvmcs(nvcpu->nv_vvmcx, reg_read(regs, decode.reg2));
+    value = get_vvmcs(v, reg_read(regs, decode.reg2));
 
     switch ( decode.type ) {
     case VMX_INST_MEMREG_TYPE_MEMORY:
@@ -1755,7 +1705,6 @@ int nvmx_handle_vmwrite(struct cpu_user_regs *regs)
 {
     struct vcpu *v = current;
     struct vmx_inst_decoded decode;
-    struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
     unsigned long operand; 
     u64 vmcs_encoding;
     bool_t okay = 1;
@@ -1765,7 +1714,7 @@ int nvmx_handle_vmwrite(struct cpu_user_regs *regs)
         return X86EMUL_EXCEPTION;
 
     vmcs_encoding = reg_read(regs, decode.reg2);
-    __set_vvmcs(nvcpu->nv_vvmcx, vmcs_encoding, operand);
+    set_vvmcs(v, vmcs_encoding, operand);
 
     switch ( vmcs_encoding & ~VMCS_HIGH(0) )
     {
@@ -2199,7 +2148,7 @@ int nvmx_n2_vmexit_handler(struct cpu_user_regs *regs,
         }
         else if ( (intr_info & valid_mask) == valid_mask )
         {
-            exec_bitmap =__get_vvmcs(nvcpu->nv_vvmcx, EXCEPTION_BITMAP);
+            exec_bitmap = get_vvmcs(v, EXCEPTION_BITMAP);
 
             if ( exec_bitmap & (1 << vector) )
                 nvcpu->nv_vmexit_pending = 1;
@@ -2319,8 +2268,7 @@ int nvmx_n2_vmexit_handler(struct cpu_user_regs *regs,
              * special handler is needed if L1 doesn't intercept rdtsc,
              * avoiding changing guest_tsc and messing up timekeeping in L1
              */
-            tsc = hvm_get_guest_tsc(v);
-            tsc += __get_vvmcs(nvcpu->nv_vvmcx, TSC_OFFSET);
+            tsc = hvm_get_guest_tsc(v) + get_vvmcs(v, TSC_OFFSET);
             regs->eax = (uint32_t)tsc;
             regs->edx = (uint32_t)(tsc >> 32);
             update_guest_eip();
@@ -2409,7 +2357,7 @@ int nvmx_n2_vmexit_handler(struct cpu_user_regs *regs,
                 val = *reg;
                 if ( cr == 0 )
                 {
-                    u64 cr0_gh_mask = __get_vvmcs(nvcpu->nv_vvmcx, CR0_GUEST_HOST_MASK);
+                    u64 cr0_gh_mask = get_vvmcs(v, CR0_GUEST_HOST_MASK);
 
                     __vmread(CR0_READ_SHADOW, &old_val);
                     changed_bits = old_val ^ val;
@@ -2417,14 +2365,15 @@ int nvmx_n2_vmexit_handler(struct cpu_user_regs *regs,
                         nvcpu->nv_vmexit_pending = 1;
                     else
                     {
-                        u64 guest_cr0 = __get_vvmcs(nvcpu->nv_vvmcx, GUEST_CR0);
-                        __set_vvmcs(nvcpu->nv_vvmcx, GUEST_CR0,
-                                    (guest_cr0 & cr0_gh_mask) | (val & ~cr0_gh_mask));
+                        u64 guest_cr0 = get_vvmcs(v, GUEST_CR0);
+
+                        set_vvmcs(v, GUEST_CR0,
+                                  (guest_cr0 & cr0_gh_mask) | (val & ~cr0_gh_mask));
                     }
                 }
                 else if ( cr == 4 )
                 {
-                    u64 cr4_gh_mask = __get_vvmcs(nvcpu->nv_vvmcx, CR4_GUEST_HOST_MASK);
+                    u64 cr4_gh_mask = get_vvmcs(v, CR4_GUEST_HOST_MASK);
 
                     __vmread(CR4_READ_SHADOW, &old_val);
                     changed_bits = old_val ^ val;
@@ -2432,9 +2381,10 @@ int nvmx_n2_vmexit_handler(struct cpu_user_regs *regs,
                         nvcpu->nv_vmexit_pending = 1;
                     else
                     {
-                        u64 guest_cr4 = __get_vvmcs(nvcpu->nv_vvmcx, GUEST_CR4);
-                        __set_vvmcs(nvcpu->nv_vvmcx, GUEST_CR4,
-                                    (guest_cr4 & cr4_gh_mask) | (val & ~cr4_gh_mask));
+                        u64 guest_cr4 = get_vvmcs(v, GUEST_CR4);
+
+                        set_vvmcs(v, GUEST_CR4,
+                                  (guest_cr4 & cr4_gh_mask) | (val & ~cr4_gh_mask));
                     }
                 }
                 else
@@ -2443,20 +2393,21 @@ int nvmx_n2_vmexit_handler(struct cpu_user_regs *regs,
             }
             case VMX_CONTROL_REG_ACCESS_TYPE_CLTS:
             {
-                u64 cr0_gh_mask = __get_vvmcs(nvcpu->nv_vvmcx, CR0_GUEST_HOST_MASK);
+                u64 cr0_gh_mask = get_vvmcs(v, CR0_GUEST_HOST_MASK);
 
                 if ( cr0_gh_mask & X86_CR0_TS )
                     nvcpu->nv_vmexit_pending = 1;
                 else
                 {
-                    u64 guest_cr0 = __get_vvmcs(nvcpu->nv_vvmcx, GUEST_CR0);
-                    __set_vvmcs(nvcpu->nv_vvmcx, GUEST_CR0, (guest_cr0 & ~X86_CR0_TS));
+                    u64 guest_cr0 = get_vvmcs(v, GUEST_CR0);
+
+                    set_vvmcs(v, GUEST_CR0, (guest_cr0 & ~X86_CR0_TS));
                 }
                 break;
             }
             case VMX_CONTROL_REG_ACCESS_TYPE_LMSW:
             {
-                u64 cr0_gh_mask = __get_vvmcs(nvcpu->nv_vvmcx, CR0_GUEST_HOST_MASK);
+                u64 cr0_gh_mask = get_vvmcs(v, CR0_GUEST_HOST_MASK);
 
                 __vmread(CR0_READ_SHADOW, &old_val);
                 old_val &= X86_CR0_PE|X86_CR0_MP|X86_CR0_EM|X86_CR0_TS;
@@ -2467,8 +2418,9 @@ int nvmx_n2_vmexit_handler(struct cpu_user_regs *regs,
                     nvcpu->nv_vmexit_pending = 1;
                 else
                 {
-                    u64 guest_cr0 = __get_vvmcs(nvcpu->nv_vvmcx, GUEST_CR0);
-                    __set_vvmcs(nvcpu->nv_vvmcx, GUEST_CR0, (guest_cr0 & cr0_gh_mask) | (val & ~cr0_gh_mask));
+                    u64 guest_cr0 = get_vvmcs(v, GUEST_CR0);
+
+                    set_vvmcs(v, GUEST_CR0, (guest_cr0 & cr0_gh_mask) | (val & ~cr0_gh_mask));
                 }
                 break;
             }
@@ -2520,7 +2472,7 @@ void nvmx_set_cr_read_shadow(struct vcpu *v, unsigned int cr)
     if ( !nestedhvm_vmswitch_in_progress(v) )
     {
         unsigned long virtual_cr_mask = 
-            __get_vvmcs(vcpu_nestedhvm(v).nv_vvmcx, mask_field);
+            get_vvmcs(v, mask_field);
 
         /*
          * We get here when L2 changed cr in a way that did not change
@@ -2532,7 +2484,7 @@ void nvmx_set_cr_read_shadow(struct vcpu *v, unsigned int cr)
          */
         v->arch.hvm_vcpu.guest_cr[cr] &= ~virtual_cr_mask;
         v->arch.hvm_vcpu.guest_cr[cr] |= virtual_cr_mask &
-            __get_vvmcs(vcpu_nestedhvm(v).nv_vvmcx, cr_field);
+            get_vvmcs(v, cr_field);
     }
 
     /* nvcpu.guest_cr is what L2 write to cr actually. */

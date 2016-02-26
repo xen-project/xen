@@ -1477,8 +1477,7 @@ void vmx_inject_extint(int trap, uint8_t source)
     u32    pin_based_cntrl;
 
     if ( nestedhvm_vcpu_in_guestmode(v) ) {
-        pin_based_cntrl = __get_vvmcs(vcpu_nestedhvm(v).nv_vvmcx, 
-                                     PIN_BASED_VM_EXEC_CONTROL);
+        pin_based_cntrl = get_vvmcs(v, PIN_BASED_VM_EXEC_CONTROL);
         if ( pin_based_cntrl & PIN_BASED_EXT_INTR_MASK ) {
             nvmx_enqueue_n2_exceptions (v, 
                INTR_INFO_VALID_MASK |
@@ -1498,8 +1497,7 @@ void vmx_inject_nmi(void)
     u32    pin_based_cntrl;
 
     if ( nestedhvm_vcpu_in_guestmode(v) ) {
-        pin_based_cntrl = __get_vvmcs(vcpu_nestedhvm(v).nv_vvmcx, 
-                                     PIN_BASED_VM_EXEC_CONTROL);
+        pin_based_cntrl = get_vvmcs(v, PIN_BASED_VM_EXEC_CONTROL);
         if ( pin_based_cntrl & PIN_BASED_NMI_EXITING ) {
             nvmx_enqueue_n2_exceptions (v, 
                INTR_INFO_VALID_MASK |

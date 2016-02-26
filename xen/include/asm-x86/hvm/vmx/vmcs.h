@@ -105,7 +105,7 @@ struct arch_vmx_struct {
     /* Physical address of VMCS. */
     paddr_t              vmcs_pa;
     /* VMCS shadow machine address. */
-    paddr_t             vmcs_shadow_maddr;
+    paddr_t              vmcs_shadow_maddr;
 
     /* Protects remote usage of VMCS (VMPTRLD/VMCLEAR). */
     spinlock_t           vmcs_lock;
@@ -508,10 +508,10 @@ void vmx_vmcs_switch(paddr_t from, paddr_t to);
 void vmx_set_eoi_exit_bitmap(struct vcpu *v, u8 vector);
 void vmx_clear_eoi_exit_bitmap(struct vcpu *v, u8 vector);
 int vmx_check_msr_bitmap(unsigned long *msr_bitmap, u32 msr, int access_type);
-void virtual_vmcs_enter(void *vvmcs);
-void virtual_vmcs_exit(void *vvmcs);
-u64 virtual_vmcs_vmread(void *vvmcs, u32 vmcs_encoding);
-void virtual_vmcs_vmwrite(void *vvmcs, u32 vmcs_encoding, u64 val);
+void virtual_vmcs_enter(const struct vcpu *);
+void virtual_vmcs_exit(const struct vcpu *);
+u64 virtual_vmcs_vmread(const struct vcpu *, u32 encoding);
+void virtual_vmcs_vmwrite(const struct vcpu *, u32 encoding, u64 val);
 
 static inline int vmx_add_guest_msr(u32 msr)
 {
