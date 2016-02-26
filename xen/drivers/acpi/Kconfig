@@ -1,6 +1,6 @@
 
-# Select HAS_ACPI if ACPI is supported
-config HAS_ACPI
+# Select ACPI if ACPI is supported
+config ACPI
 	bool
 
 config ACPI_LEGACY_TABLES_LOOKUP
