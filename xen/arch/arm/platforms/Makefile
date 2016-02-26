@@ -7,3 +7,4 @@ obj-$(CONFIG_ARM_32) += sunxi.o
 obj-$(CONFIG_ARM_32) += rcar2.o
 obj-$(CONFIG_ARM_64) += seattle.o
 obj-$(CONFIG_ARM_64) += xgene-storm.o
+obj-$(CONFIG_ARM_64) += xilinx-zynqmp.o
