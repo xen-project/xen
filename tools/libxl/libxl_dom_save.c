@@ -341,6 +341,7 @@ void libxl__domain_save(libxl__egc *egc, libxl__domain_save_state *dss)
     if (dss->checkpointed_stream != LIBXL_CHECKPOINTED_STREAM_NONE && !r_info) {
         LOG(ERROR, "Migration stream is checkpointed, but there's no "
                    "checkpoint info!");
+        rc = ERROR_INVAL;
         goto out;
     }
 
