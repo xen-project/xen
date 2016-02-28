@@ -1313,8 +1313,16 @@ deprecated. Options are:
 
 =item B<"default">
 
-Guest rdtsc/p executed natively when monotonicity can be guaranteed
+Guest rdtsc/p is executed natively when monotonicity can be guaranteed
 and emulated otherwise (with frequency scaled if necessary).
+
+If a HVM container in B<default> TSC mode is created on a host that
+provides constant host TSC, its guest TSC frequency will be the same
+as the host. If it is later migrated to another host that provide
+constant host TSC and supports Intel VMX TSC scaling/AMD SVM TSC
+ratio, its guest TSC frequency will be the same before and after
+migration, and guest rdtsc/p will be executed natively as well after
+migration.
 
 =item B<"always_emulate">
 
@@ -1336,6 +1344,10 @@ Same as B<native>, except xen manages TSC_AUX register so guest can
 determine when a restore/migration has occurred and assumes guest
 obtains/uses pvclock-like mechanism to adjust for monotonicity and
 frequency changes.
+
+If a HVM container in B<native_paravirt> TSC mode can execute both guest
+rdtsc and guest rdtscp natively, then the guest TSC frequency will be
+determined in the similar way to that of B<default> TSC mode.
 
 =back
 

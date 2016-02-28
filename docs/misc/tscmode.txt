@@ -297,3 +297,24 @@ and also much faster than nearly all OS-provided time mechanisms.
 While pvrtscp is too complex for most apps, certain enterprise
 TSC-sensitive high-TSC-frequency apps may find it useful to
 obtain a significant performance gain.
+
+Hardware TSC Scaling
+
+Intel VMX TSC scaling and AMD SVM TSC ratio allow the guest TSC read
+by guest rdtsc/p increasing in a different frequency than the host
+TSC frequency.
+
+If a HVM container in default TSC mode (tsc_mode=0) or PVRDTSCP mode
+(tsc_mode=3) is created on a host that provides constant TSC, its
+guest TSC frequency will be the same as the host. If it is later
+migrated to another host that provides constant TSC and supports Intel
+VMX TSC scaling/AMD SVM TSC ratio, its guest TSC frequency will be the
+same before and after migration.
+
+For above HVM container in default TSC mode (tsc_mode=0), if above
+hosts support rdtscp, both guest rdtsc and rdtscp instructions will be
+executed natively before and after migration.
+
+For above HVM container in PVRDTSCP mode (tsc_mode=3), if the
+destination host does not support rdtscp, the guest rdtscp instruction
+will be emulated with the guest TSC frequency.
