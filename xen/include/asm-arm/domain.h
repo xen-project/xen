@@ -124,6 +124,11 @@ struct arch_domain
     } vuart;
 
     unsigned int evtchn_irq;
+#ifdef CONFIG_ACPI
+    void *efi_acpi_table;
+    paddr_t efi_acpi_gpa;
+    paddr_t efi_acpi_len;
+#endif
 }  __cacheline_aligned;
 
 struct arch_vcpu
