@@ -1,0 +1,20 @@
+qemu-xen (git://xenbits.xen.org/qemu-xen.git) is only supported for
+security fixes when used together with the Xen hypervisor and only with
+a subset of all the possible QEMU emulators. Specifically:
+
+- network: e1000, rtl8139, virtio-net
+- storage: piix3 ide, ahci, xen_disk
+- graphics: cirris-vga, stdvga and xenfb
+- audio: sb16, es1370, ac97
+- input: Xen PV keyboard and mouse (part of xenfb), USB and PS/2
+         keyboard and mouse
+- serial cards: UART 16550A
+
+Core components, such as the PCI host bridge and the PIIX3 chipset, are
+supported. All devices of one the above classes, which are not explicitly
+mentioned, are not supported. For example the ne2000 network card is not
+supported. 
+
+If you think that a specific emulated device should be supported, please
+contact the QEMU UPSTREAM maintainer and the Xen Security Team
+(security@xenproject.org).
