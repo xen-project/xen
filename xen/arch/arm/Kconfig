@@ -22,7 +22,7 @@ config ARM
 	select HAS_MEM_ACCESS
 	select HAS_PASSTHROUGH
 	select HAS_PDX
-	select HAS_VIDEO
+	select VIDEO
 
 config ARCH_DEFCONFIG
 	string

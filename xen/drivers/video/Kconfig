@@ -1,12 +1,12 @@
 
-# Select HAS_VIDEO if video is supported
-config HAS_VIDEO
+# Select VIDEO if video is supported
+config VIDEO
 	bool
 
 # Select VGA if VGA is supported
 config VGA
 	bool
-	select HAS_VIDEO
+	select VIDEO
 
 # Select HAS_ARM_HDLCD if ARM HDLCD is supported
 config HAS_ARM_HDLCD
