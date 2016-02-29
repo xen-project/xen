@@ -127,7 +127,6 @@ F:	xen/common/sched_arinc653.c
 F:	tools/libxc/xc_arinc653.c
 
 ARM (W/ VIRTUALISATION EXTENSIONS) ARCHITECTURE
-M:	Ian Campbell <ian.campbell@citrix.com>
 M:	Stefano Stabellini <stefano.stabellini@citrix.com>
 S:	Supported
 L:	xen-devel@lists.xen.org
@@ -147,7 +146,6 @@ S:	Supported
 F:	xen/common/cpupool.c
 
 DEVICE TREE
-M:	Ian Campbell <ian.campbell@citrix.com>
 M:	Stefano Stabellini <stefano.stabellini@citrix.com>
 S:	Supported
 F:	xen/common/libfdt/
@@ -298,7 +296,6 @@ S:	Supported
 F:	xen/common/sched*
 
 SEABIOS UPSTREAM
-M:	Ian Campbell <ian.campbell@citrix.com>
 M:	Wei Liu <wei.liu2@citrix.com>
 S:	Supported
 T:	git git://xenbits.xen.org/seabios.git
@@ -314,7 +311,6 @@ F:	stubdom/
 TOOLSTACK
 M:	Ian Jackson <ian.jackson@eu.citrix.com>
 M:	Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-M:	Ian Campbell <ian.campbell@citrix.com>
 M:	Wei Liu <wei.liu2@citrix.com>
 S:	Supported
 F:	autogen.sh
@@ -424,7 +420,6 @@ F:  xen/xsm/
 F:  docs/misc/xsm-flask.txt
 
 THE REST
-M:	Ian Campbell <ian.campbell@citrix.com>
 M:	Ian Jackson <ian.jackson@eu.citrix.com>
 M:	Jan Beulich <jbeulich@suse.com>
 M:	Keir Fraser <keir@xen.org>
