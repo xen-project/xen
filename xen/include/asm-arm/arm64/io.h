@@ -20,6 +20,7 @@
 #ifndef _ARM_ARM64_IO_H
 #define _ARM_ARM64_IO_H
 
+#include <asm/system.h>
 #include <asm/byteorder.h>
 
 /*
@@ -108,5 +109,27 @@ static inline u64 __raw_readq(const volatile void __iomem *addr)
 #define writew(v,c)             ({ __iowmb(); writew_relaxed((v),(c)); })
 #define writel(v,c)             ({ __iowmb(); writel_relaxed((v),(c)); })
 #define writeq(v,c)             ({ __iowmb(); writeq_relaxed((v),(c)); })
+
+/*
+ * Emulate x86 io ports for ARM.
+ */
+static inline int emulate_read(u64 addr)
+{
+    printk(XENLOG_G_WARNING "Can't access IO %lx\n", addr);
+    return 0;
+}
+
+static inline void emulate_write(u64 addr)
+{
+    printk(XENLOG_G_WARNING "Can't access IO %lx\n", addr);
+}
+
+#define inb(c) ( emulate_read(c) )
+#define inw(c) ( emulate_read(c) )
+#define inl(c) ( emulate_read(c) )
+
+#define outb(v, c) ( emulate_write(c) )
+#define outw(v, c) ( emulate_write(c) )
+#define outl(v, c) ( emulate_write(c) )
 
 #endif /* _ARM_ARM64_IO_H */
