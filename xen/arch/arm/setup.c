@@ -45,10 +45,15 @@
 #include <asm/procinfo.h>
 #include <asm/setup.h>
 #include <xsm/xsm.h>
+#include <asm/acpi.h>
 
 struct bootinfo __initdata bootinfo;
 
 struct cpuinfo_arm __read_mostly boot_cpu_data;
+
+#ifdef CONFIG_ACPI
+bool_t __read_mostly acpi_disabled;
+#endif
 
 #ifdef CONFIG_ARM_32
 static unsigned long opt_xenheap_megabytes __initdata;
