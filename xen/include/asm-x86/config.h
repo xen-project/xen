@@ -42,7 +42,6 @@
 #define CONFIG_ACPI_SRAT 1
 #define CONFIG_ACPI_CSTATE 1
 
-#define CONFIG_VGA 1
 #define CONFIG_VIDEO 1
 
 #define CONFIG_WATCHDOG 1
