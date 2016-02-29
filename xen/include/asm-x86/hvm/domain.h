@@ -143,6 +143,8 @@ struct hvm_domain {
      */
     uint64_t sync_tsc;
 
+    uint64_t tsc_scaling_ratio;
+
     unsigned long *io_bitmap;
 
     /* List of permanently write-mapped pages. */

@@ -298,6 +298,41 @@ int hvm_set_guest_pat(struct vcpu *v, u64 guest_pat)
     return 1;
 }
 
+/*
+ * Get the ratio to scale host TSC frequency to gtsc_khz. zero will be
+ * returned if TSC scaling is unavailable or ratio cannot be handled
+ * by host CPU. Otherwise, a non-zero ratio will be returned.
+ */
+u64 hvm_get_tsc_scaling_ratio(u32 gtsc_khz)
+{
+    u8 ratio_frac_bits = hvm_funcs.tsc_scaling.ratio_frac_bits;
+    u64 max_ratio = hvm_funcs.tsc_scaling.max_ratio;
+    u64 ratio, dummy;
+
+    if ( !hvm_tsc_scaling_supported )
+        return 0;
+
+    /*
+     * Return early if the quotient is too large to fit in the integral
+     * part of TSC scaling ratio. This also avoids #DE from the following
+     * divq when the quotient can not fit in a 64-bit integer.
+     */
+    if ( gtsc_khz / cpu_khz > (max_ratio >> ratio_frac_bits) )
+        return 0;
+
+    /* ratio = (gtsc_khz << hvm_funcs.tsc_scaling.ratio_frac_bits) / cpu_khz */
+    asm ( "shldq %[frac],%[gkhz],%[zero] ; "
+          "shlq  %[frac],%[gkhz]         ; "
+          "divq  %[hkhz]                   "
+          : "=d" (dummy), "=a" (ratio)
+          : [frac] "c" (ratio_frac_bits),
+            [gkhz] "a" ((u64) gtsc_khz),
+            [zero] "d" (0ULL),
+            [hkhz] "rm" ((u64) cpu_khz) );
+
+    return ratio > max_ratio ? 0 : ratio;
+}
+
 void hvm_set_guest_tsc_fixed(struct vcpu *v, u64 guest_tsc, u64 at_tsc)
 {
     uint64_t tsc;
@@ -1640,6 +1675,9 @@ int hvm_domain_initialise(struct domain *d)
 
     register_portio_handler(d, 0xe9, 1, hvm_print_line);
     register_portio_handler(d, 0xcf8, 4, hvm_access_cf8);
+
+    if ( hvm_tsc_scaling_supported )
+        d->arch.hvm_domain.tsc_scaling_ratio = hvm_default_tsc_scaling_ratio;
 
     rc = hvm_funcs.domain_initialise(d);
     if ( rc != 0 )

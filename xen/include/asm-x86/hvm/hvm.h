@@ -272,6 +272,14 @@ u64 hvm_get_guest_tsc_fixed(struct vcpu *v, u64 at_tsc);
 #define hvm_tsc_scaling_supported \
     (!!hvm_funcs.tsc_scaling.ratio_frac_bits)
 
+#define hvm_default_tsc_scaling_ratio \
+    (1ULL << hvm_funcs.tsc_scaling.ratio_frac_bits)
+
+#define hvm_tsc_scaling_ratio(d) \
+    ((d)->arch.hvm_domain.tsc_scaling_ratio)
+
+u64 hvm_get_tsc_scaling_ratio(u32 gtsc_khz);
+
 int hvm_set_mode(struct vcpu *v, int mode);
 void hvm_init_guest_time(struct domain *d);
 void hvm_set_guest_time(struct vcpu *v, u64 guest_time);

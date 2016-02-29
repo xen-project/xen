@@ -1865,7 +1865,8 @@ void tsc_set_info(struct domain *d,
          */
         if ( tsc_mode == TSC_MODE_DEFAULT && host_tsc_is_safe() &&
              (has_hvm_container_domain(d) ?
-              d->arch.tsc_khz == cpu_khz || hvm_tsc_scaling_supported :
+              (d->arch.tsc_khz == cpu_khz ||
+               hvm_get_tsc_scaling_ratio(d->arch.tsc_khz)) :
               incarnation == 0) )
         {
     case TSC_MODE_NEVER_EMULATE:
@@ -1879,7 +1880,8 @@ void tsc_set_info(struct domain *d,
         d->arch.vtsc = !boot_cpu_has(X86_FEATURE_RDTSCP) ||
                        !host_tsc_is_safe();
         enable_tsc_scaling = has_hvm_container_domain(d) &&
-                             hvm_tsc_scaling_supported && !d->arch.vtsc;
+                             !d->arch.vtsc &&
+                             hvm_get_tsc_scaling_ratio(gtsc_khz ?: cpu_khz);
         d->arch.tsc_khz = (enable_tsc_scaling && gtsc_khz) ? gtsc_khz : cpu_khz;
         set_time_scale(&d->arch.vtsc_to_ns, d->arch.tsc_khz * 1000 );
         d->arch.ns_to_vtsc = scale_reciprocal(d->arch.vtsc_to_ns);
@@ -1897,6 +1899,10 @@ void tsc_set_info(struct domain *d,
     d->arch.incarnation = incarnation + 1;
     if ( has_hvm_container_domain(d) )
     {
+        if ( hvm_tsc_scaling_supported && !d->arch.vtsc )
+            d->arch.hvm_domain.tsc_scaling_ratio =
+                hvm_get_tsc_scaling_ratio(d->arch.tsc_khz);
+
         hvm_set_rdtsc_exiting(d, d->arch.vtsc);
         if ( d->vcpu && d->vcpu[0] && incarnation == 0 )
         {

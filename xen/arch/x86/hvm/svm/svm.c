@@ -823,7 +823,7 @@ static uint64_t svm_scale_tsc(const struct vcpu *v, uint64_t tsc)
 {
     ASSERT(cpu_has_tsc_ratio && !v->domain->arch.vtsc);
 
-    return scale_tsc(tsc, vcpu_tsc_ratio(v));
+    return scale_tsc(tsc, hvm_tsc_scaling_ratio(v->domain));
 }
 
 static uint64_t svm_get_tsc_offset(uint64_t host_tsc, uint64_t guest_tsc,
@@ -1000,7 +1000,7 @@ static inline void svm_tsc_ratio_save(struct vcpu *v)
 static inline void svm_tsc_ratio_load(struct vcpu *v)
 {
     if ( cpu_has_tsc_ratio && !v->domain->arch.vtsc ) 
-        wrmsrl(MSR_AMD64_TSC_RATIO, vcpu_tsc_ratio(v));
+        wrmsrl(MSR_AMD64_TSC_RATIO, hvm_tsc_scaling_ratio(v->domain));
 }
 
 static void svm_ctxt_switch_from(struct vcpu *v)

@@ -97,9 +97,6 @@ extern u32 svm_feature_flags;
 /* TSC rate */
 #define DEFAULT_TSC_RATIO       0x0000000100000000ULL
 #define TSC_RATIO_RSVD_BITS     0xffffff0000000000ULL
-#define TSC_RATIO(g_khz, h_khz) ( (((u64)(g_khz)<<32)/(u64)(h_khz)) & \
-                                  ~TSC_RATIO_RSVD_BITS )
-#define vcpu_tsc_ratio(v)       TSC_RATIO((v)->domain->arch.tsc_khz, cpu_khz)
 
 extern void svm_host_osvw_reset(void);
 extern void svm_host_osvw_init(void);
