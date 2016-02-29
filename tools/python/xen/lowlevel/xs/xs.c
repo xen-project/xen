@@ -191,7 +191,8 @@ static PyObject *xspy_ls(XsHandle *self, PyObject *args)
 
 #define xspy_mkdir_doc "\n"					\
 	"Make a directory.\n"					\
-	" path [string]: path to directory to create.\n"	\
+	" transaction [string]: transaction handle.\n"		\
+	" path [string]       : path to directory to create.\n"	\
 	"\n"							\
 	"Returns None on success.\n"				\
 	"Raises xen.lowlevel.xs.Error on error.\n"			\
@@ -555,7 +556,8 @@ static PyObject *xspy_transaction_start(XsHandle *self)
 #define xspy_transaction_end_doc "\n"					\
 	"End the current transaction.\n"				\
 	"Attempts to commit the transaction unless abort is true.\n"	\
-	" abort [int]: abort flag (default 0).\n"			\
+	" transaction [string] : transaction handle.\n"			\
+	" abort [int]          : abort flag (default 0).\n"		\
 	"\n"								\
 	"Returns True on success, False if you need to try again.\n"	\
 	"Raises xen.lowlevel.xs.Error on error.\n"				\
