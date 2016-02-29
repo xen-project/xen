@@ -30,6 +30,18 @@
 #define COMPILER_DEPENDENT_UINT64  unsigned long long
 #define ACPI_MAP_MEM_ATTR          PAGE_HYPERVISOR
 
+/* Tables marked as reserved in efi table */
+typedef enum {
+    TBL_FADT,
+    TBL_MADT,
+    TBL_STAO,
+    TBL_XSDT,
+    TBL_RSDP,
+    TBL_EFIT,
+    TBL_MMAP,
+    TBL_MMAX,
+} EFI_MEM_RES;
+
 #ifdef CONFIG_ACPI
 extern bool_t acpi_disabled;
 /* Basic configuration for ACPI */
