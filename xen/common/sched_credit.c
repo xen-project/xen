@@ -63,9 +63,14 @@
 
 /*
  * Flags
+ *
+ * Note that svc->flags (where these flags live) is protected by an
+ * inconsistent set of locks. Therefore atomic-safe bit operations must
+ * be used for accessing it.
  */
 #define CSCHED_FLAG_VCPU_PARKED    0x0  /* VCPU over capped credits */
 #define CSCHED_FLAG_VCPU_YIELD     0x1  /* VCPU yielding */
+#define CSCHED_FLAG_VCPU_MIGRATING 0x2  /* VCPU may have moved to a new pcpu */
 
 
 /*
@@ -786,6 +791,16 @@ _csched_cpu_pick(const struct scheduler *ops, struct vcpu *vc, bool_t commit)
 static int
 csched_cpu_pick(const struct scheduler *ops, struct vcpu *vc)
 {
+    struct csched_vcpu *svc = CSCHED_VCPU(vc);
+
+    /*
+     * We have been called by vcpu_migrate() (in schedule.c), as part
+     * of the process of seeing if vc can be migrated to another pcpu.
+     * We make a note about this in svc->flags so that later, in
+     * csched_vcpu_wake() (still called from vcpu_migrate()) we won't
+     * get boosted, which we don't deserve as we are "only" migrating.
+     */
+    set_bit(CSCHED_FLAG_VCPU_MIGRATING, &svc->flags);
     return _csched_cpu_pick(ops, vc, 1);
 }
 
@@ -985,6 +1000,7 @@ static void
 csched_vcpu_wake(const struct scheduler *ops, struct vcpu *vc)
 {
     struct csched_vcpu * const svc = CSCHED_VCPU(vc);
+    bool_t migrating;
 
     BUG_ON( is_idle_vcpu(vc) );
 
@@ -1020,11 +1036,15 @@ csched_vcpu_wake(const struct scheduler *ops, struct vcpu *vc)
      * more CPU resource intensive VCPUs without impacting overall 
      * system fairness.
      *
-     * The one exception is for VCPUs of capped domains unpausing
-     * after earning credits they had overspent. We don't boost
-     * those.
+     * There are two cases, when we don't want to boost:
+     *  - VCPUs that are waking up after a migration, rather than
+     *    after having block;
+     *  - VCPUs of capped domains unpausing after earning credits
+     *    they had overspent.
      */
-    if ( svc->pri == CSCHED_PRI_TS_UNDER &&
+    migrating = test_and_clear_bit(CSCHED_FLAG_VCPU_MIGRATING, &svc->flags);
+
+    if ( !migrating && svc->pri == CSCHED_PRI_TS_UNDER &&
          !test_bit(CSCHED_FLAG_VCPU_PARKED, &svc->flags) )
     {
         TRACE_2D(TRC_CSCHED_BOOST_START, vc->domain->domain_id, vc->vcpu_id);
