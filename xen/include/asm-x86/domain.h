@@ -391,7 +391,7 @@ struct arch_domain
     unsigned long *pirq_eoi_map;
     unsigned long pirq_eoi_map_mfn;
 
-    /* Monitor options */
+    /* Arch-specific monitor options */
     struct {
         unsigned int write_ctrlreg_enabled       : 4;
         unsigned int write_ctrlreg_sync          : 4;
@@ -400,8 +400,6 @@ struct arch_domain
         unsigned int mov_to_msr_extended         : 1;
         unsigned int singlestep_enabled          : 1;
         unsigned int software_breakpoint_enabled : 1;
-        unsigned int guest_request_enabled       : 1;
-        unsigned int guest_request_sync          : 1;
     } monitor;
 
     /* Mem_access emulation control */

@@ -6,6 +6,7 @@
  * Copyright (c) 2004, Intel Corporation.
  * Copyright (c) 2005, International Business Machines Corporation.
  * Copyright (c) 2008, Citrix Systems, Inc.
+ * Copyright (c) 2016, Bitdefender S.R.L.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -21,71 +22,32 @@
  */
 
 #include <xen/vm_event.h>
-#include <xen/paging.h>
 #include <asm/hvm/event.h>
 #include <asm/monitor.h>
-#include <asm/altp2m.h>
 #include <asm/vm_event.h>
 #include <public/vm_event.h>
 
-static int hvm_event_traps(uint8_t sync, vm_event_request_t *req)
-{
-    int rc;
-    struct vcpu *curr = current;
-    struct domain *currd = curr->domain;
-
-    rc = vm_event_claim_slot(currd, &currd->vm_event->monitor);
-    switch ( rc )
-    {
-    case 0:
-        break;
-    case -ENOSYS:
-        /*
-         * If there was no ring to handle the event, then
-         * simply continue executing normally.
-         */
-        return 1;
-    default:
-        return rc;
-    };
-
-    if ( sync )
-    {
-        req->flags |= VM_EVENT_FLAG_VCPU_PAUSED;
-        vm_event_vcpu_pause(curr);
-    }
-
-    if ( altp2m_active(currd) )
-    {
-        req->flags |= VM_EVENT_FLAG_ALTERNATE_P2M;
-        req->altp2m_idx = vcpu_altp2m(curr).p2midx;
-    }
-
-    vm_event_fill_regs(req);
-    vm_event_put_request(currd, &currd->vm_event->monitor, req);
-
-    return 1;
-}
-
 bool_t hvm_event_cr(unsigned int index, unsigned long value, unsigned long old)
 {
-    struct arch_domain *currad = &current->domain->arch;
+    struct vcpu *curr = current;
+    struct arch_domain *ad = &curr->domain->arch;
     unsigned int ctrlreg_bitmask = monitor_ctrlreg_bitmask(index);
 
-    if ( (currad->monitor.write_ctrlreg_enabled & ctrlreg_bitmask) &&
-         (!(currad->monitor.write_ctrlreg_onchangeonly & ctrlreg_bitmask) ||
+    if ( (ad->monitor.write_ctrlreg_enabled & ctrlreg_bitmask) &&
+         (!(ad->monitor.write_ctrlreg_onchangeonly & ctrlreg_bitmask) ||
           value != old) )
     {
+        bool_t sync = !!(ad->monitor.write_ctrlreg_sync & ctrlreg_bitmask);
+
         vm_event_request_t req = {
             .reason = VM_EVENT_REASON_WRITE_CTRLREG,
-            .vcpu_id = current->vcpu_id,
+            .vcpu_id = curr->vcpu_id,
             .u.write_ctrlreg.index = index,
             .u.write_ctrlreg.new_value = value,
             .u.write_ctrlreg.old_value = old
         };
 
-        hvm_event_traps(currad->monitor.write_ctrlreg_sync & ctrlreg_bitmask,
-                        &req);
+        vm_event_monitor_traps(curr, sync, &req);
         return 1;
     }
 
@@ -95,30 +57,18 @@ bool_t hvm_event_cr(unsigned int index, unsigned long value, unsigned long old)
 void hvm_event_msr(unsigned int msr, uint64_t value)
 {
     struct vcpu *curr = current;
-    vm_event_request_t req = {
-        .reason = VM_EVENT_REASON_MOV_TO_MSR,
-        .vcpu_id = curr->vcpu_id,
-        .u.mov_to_msr.msr = msr,
-        .u.mov_to_msr.value = value,
-    };
+    struct arch_domain *ad = &curr->domain->arch;
 
-    if ( curr->domain->arch.monitor.mov_to_msr_enabled )
-        hvm_event_traps(1, &req);
-}
-
-void hvm_event_guest_request(void)
-{
-    struct vcpu *curr = current;
-    struct arch_domain *currad = &curr->domain->arch;
-
-    if ( currad->monitor.guest_request_enabled )
+    if ( ad->monitor.mov_to_msr_enabled )
     {
         vm_event_request_t req = {
-            .reason = VM_EVENT_REASON_GUEST_REQUEST,
+            .reason = VM_EVENT_REASON_MOV_TO_MSR,
             .vcpu_id = curr->vcpu_id,
+            .u.mov_to_msr.msr = msr,
+            .u.mov_to_msr.value = value,
         };
 
-        hvm_event_traps(currad->monitor.guest_request_sync, &req);
+        vm_event_monitor_traps(curr, 1, &req);
     }
 }
 
@@ -166,7 +116,7 @@ int hvm_event_breakpoint(unsigned long rip,
 
     req.vcpu_id = curr->vcpu_id;
 
-    return hvm_event_traps(1, &req);
+    return vm_event_monitor_traps(curr, 1, &req);
 }
 
 /*

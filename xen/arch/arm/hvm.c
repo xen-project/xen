@@ -22,6 +22,7 @@
 #include <xen/errno.h>
 #include <xen/guest_access.h>
 #include <xen/sched.h>
+#include <xen/vm_event.h>
 
 #include <xsm/xsm.h>
 
@@ -71,6 +72,13 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
         rcu_unlock_domain(d);
         break;
     }
+
+    case HVMOP_guest_request_vm_event:
+        if ( guest_handle_is_null(arg) )
+            vm_event_monitor_guest_request();
+        else
+            rc = -EINVAL;
+        break;
 
     default:
     {

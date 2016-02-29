@@ -26,6 +26,7 @@
 #include <xen/vm_event.h>
 #include <xen/mem_access.h>
 #include <asm/p2m.h>
+#include <asm/altp2m.h>
 #include <asm/vm_event.h>
 #include <xsm/xsm.h>
 
@@ -778,6 +779,65 @@ void vm_event_vcpu_unpause(struct vcpu *v)
     } while ( prev != old );
 
     vcpu_unpause(v);
+}
+
+/*
+ * Monitor vm-events
+ */
+
+int vm_event_monitor_traps(struct vcpu *v, uint8_t sync,
+                           vm_event_request_t *req)
+{
+    int rc;
+    struct domain *d = v->domain;
+
+    rc = vm_event_claim_slot(d, &d->vm_event->monitor);
+    switch ( rc )
+    {
+    case 0:
+        break;
+    case -ENOSYS:
+        /*
+         * If there was no ring to handle the event, then
+         * simply continue executing normally.
+         */
+        return 1;
+    default:
+        return rc;
+    };
+
+    if ( sync )
+    {
+        req->flags |= VM_EVENT_FLAG_VCPU_PAUSED;
+        vm_event_vcpu_pause(v);
+    }
+
+    if ( altp2m_active(d) )
+    {
+        req->flags |= VM_EVENT_FLAG_ALTERNATE_P2M;
+        req->altp2m_idx = altp2m_vcpu_idx(v);
+    }
+
+    vm_event_fill_regs(req);
+    vm_event_put_request(d, &d->vm_event->monitor, req);
+
+    return 1;
+}
+
+void vm_event_monitor_guest_request(void)
+{
+    struct vcpu *curr = current;
+    struct domain *d = curr->domain;
+
+    if ( d->monitor.guest_request_enabled )
+    {
+        vm_event_request_t req = {
+            .reason = VM_EVENT_REASON_GUEST_REQUEST,
+            .vcpu_id = curr->vcpu_id,
+        };
+
+        vm_event_monitor_traps(curr, d->monitor.guest_request_sync, &req);
+    }
 }
 
 /*

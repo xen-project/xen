@@ -25,12 +25,6 @@
 #include <xen/sched.h>
 #include <public/domctl.h>
 
-static inline uint32_t arch_monitor_get_capabilities(struct domain *d)
-{
-    /* No monitor vm-events implemented on ARM. */
-    return 0;
-}
-
 static inline
 int arch_monitor_domctl_op(struct domain *d, struct xen_domctl_monitor_op *mop)
 {
@@ -45,7 +39,7 @@ int arch_monitor_domctl_event(struct domain *d,
     /*
      * No arch-specific monitor vm-events on ARM.
      *
-     * Should not be reached unless arch_monitor_get_capabilities() is not
+     * Should not be reached unless vm_event_monitor_get_capabilities() is not
      * properly implemented.
      */
     ASSERT_UNREACHABLE();

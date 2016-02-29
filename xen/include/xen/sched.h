@@ -464,6 +464,12 @@ struct domain
     /* vNUMA topology accesses are protected by rwlock. */
     rwlock_t vnuma_rwlock;
     struct vnuma_info *vnuma;
+
+    /* Common monitor options */
+    struct {
+        unsigned int guest_request_enabled       : 1;
+        unsigned int guest_request_sync          : 1;
+    } monitor;
 };
 
 /* Protect updates/reads (resp.) of domain_list and domain_hash. */
