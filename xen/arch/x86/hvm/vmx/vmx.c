@@ -84,7 +84,148 @@ static int vmx_msr_write_intercept(unsigned int msr, uint64_t msr_content);
 static void vmx_invlpg_intercept(unsigned long vaddr);
 static int vmx_vmfunc_intercept(struct cpu_user_regs *regs);
 
+struct vmx_pi_blocking_vcpu {
+    struct list_head     list;
+    spinlock_t           lock;
+};
+
+/*
+ * We maintain a per-CPU linked-list of vCPUs, so in PI wakeup
+ * handler we can find which vCPU should be woken up.
+ */
+static DEFINE_PER_CPU(struct vmx_pi_blocking_vcpu, vmx_pi_blocking);
+
 uint8_t __read_mostly posted_intr_vector;
+static uint8_t __read_mostly pi_wakeup_vector;
+
+void vmx_pi_per_cpu_init(unsigned int cpu)
+{
+    INIT_LIST_HEAD(&per_cpu(vmx_pi_blocking, cpu).list);
+    spin_lock_init(&per_cpu(vmx_pi_blocking, cpu).lock);
+}
+
+static void vmx_vcpu_block(struct vcpu *v)
+{
+    unsigned long flags;
+    unsigned int dest;
+    spinlock_t *old_lock;
+    spinlock_t *pi_blocking_list_lock =
+		&per_cpu(vmx_pi_blocking, v->processor).lock;
+    struct pi_desc *pi_desc = &v->arch.hvm_vmx.pi_desc;
+
+    spin_lock_irqsave(pi_blocking_list_lock, flags);
+    old_lock = cmpxchg(&v->arch.hvm_vmx.pi_blocking.lock, NULL,
+                       pi_blocking_list_lock);
+
+    /*
+     * 'v->arch.hvm_vmx.pi_blocking.lock' should be NULL before
+     * being assigned to a new value, since the vCPU is currently
+     * running and it cannot be on any blocking list.
+     */
+    ASSERT(old_lock == NULL);
+
+    list_add_tail(&v->arch.hvm_vmx.pi_blocking.list,
+                  &per_cpu(vmx_pi_blocking, v->processor).list);
+    spin_unlock_irqrestore(pi_blocking_list_lock, flags);
+
+    ASSERT(!pi_test_sn(pi_desc));
+
+    dest = cpu_physical_id(v->processor);
+
+    ASSERT(pi_desc->ndst ==
+           (x2apic_enabled ? dest : MASK_INSR(dest, PI_xAPIC_NDST_MASK)));
+
+    write_atomic(&pi_desc->nv, pi_wakeup_vector);
+}
+
+static void vmx_pi_switch_from(struct vcpu *v)
+{
+    struct pi_desc *pi_desc = &v->arch.hvm_vmx.pi_desc;
+
+    if ( test_bit(_VPF_blocked, &v->pause_flags) )
+        return;
+
+    pi_set_sn(pi_desc);
+}
+
+static void vmx_pi_switch_to(struct vcpu *v)
+{
+    struct pi_desc *pi_desc = &v->arch.hvm_vmx.pi_desc;
+    unsigned int dest = cpu_physical_id(v->processor);
+
+    write_atomic(&pi_desc->ndst,
+                 x2apic_enabled ? dest : MASK_INSR(dest, PI_xAPIC_NDST_MASK));
+
+    pi_clear_sn(pi_desc);
+}
+
+static void vmx_pi_do_resume(struct vcpu *v)
+{
+    unsigned long flags;
+    spinlock_t *pi_blocking_list_lock;
+    struct pi_desc *pi_desc = &v->arch.hvm_vmx.pi_desc;
+
+    ASSERT(!test_bit(_VPF_blocked, &v->pause_flags));
+
+    /*
+     * Set 'NV' field back to posted_intr_vector, so the
+     * Posted-Interrupts can be delivered to the vCPU when
+     * it is running in non-root mode.
+     */
+    write_atomic(&pi_desc->nv, posted_intr_vector);
+
+    /* The vCPU is not on any blocking list. */
+    pi_blocking_list_lock = v->arch.hvm_vmx.pi_blocking.lock;
+
+    /* Prevent the compiler from eliminating the local variable.*/
+    smp_rmb();
+
+    if ( pi_blocking_list_lock == NULL )
+        return;
+
+    spin_lock_irqsave(pi_blocking_list_lock, flags);
+
+    /*
+     * v->arch.hvm_vmx.pi_blocking.lock == NULL here means the vCPU
+     * was removed from the blocking list while we are acquiring the lock.
+     */
+    if ( v->arch.hvm_vmx.pi_blocking.lock != NULL )
+    {
+        ASSERT(v->arch.hvm_vmx.pi_blocking.lock == pi_blocking_list_lock);
+        list_del(&v->arch.hvm_vmx.pi_blocking.list);
+        v->arch.hvm_vmx.pi_blocking.lock = NULL;
+    }
+
+    spin_unlock_irqrestore(pi_blocking_list_lock, flags);
+}
+
+/* This function is called when pcidevs_lock is held */
+void vmx_pi_hooks_assign(struct domain *d)
+{
+    if ( !iommu_intpost || !has_hvm_container_domain(d) )
+        return;
+
+    ASSERT(!d->arch.hvm_domain.vmx.vcpu_block);
+
+    d->arch.hvm_domain.vmx.vcpu_block = vmx_vcpu_block;
+    d->arch.hvm_domain.vmx.pi_switch_from = vmx_pi_switch_from;
+    d->arch.hvm_domain.vmx.pi_switch_to = vmx_pi_switch_to;
+    d->arch.hvm_domain.vmx.pi_do_resume = vmx_pi_do_resume;
+}
+
+/* This function is called when pcidevs_lock is held */
+void vmx_pi_hooks_deassign(struct domain *d)
+{
+    if ( !iommu_intpost || !has_hvm_container_domain(d) )
+        return;
+
+    ASSERT(d->arch.hvm_domain.vmx.vcpu_block);
+
+    d->arch.hvm_domain.vmx.vcpu_block = NULL;
+    d->arch.hvm_domain.vmx.pi_switch_from = NULL;
+    d->arch.hvm_domain.vmx.pi_switch_to = NULL;
+    d->arch.hvm_domain.vmx.pi_do_resume = NULL;
+}
 
 static int vmx_domain_initialise(struct domain *d)
 {
@@ -112,6 +253,8 @@ static int vmx_vcpu_initialise(struct vcpu *v)
     int rc;
 
     spin_lock_init(&v->arch.hvm_vmx.vmcs_lock);
+
+    INIT_LIST_HEAD(&v->arch.hvm_vmx.pi_blocking.list);
 
     v->arch.schedule_tail    = vmx_do_resume;
     v->arch.ctxt_switch_from = vmx_ctxt_switch_from;
@@ -752,6 +895,9 @@ static void vmx_ctxt_switch_from(struct vcpu *v)
     vmx_save_guest_msrs(v);
     vmx_restore_host_msrs();
     vmx_save_dr(v);
+
+    if ( v->domain->arch.hvm_domain.vmx.pi_switch_from )
+        v->domain->arch.hvm_domain.vmx.pi_switch_from(v);
 }
 
 static void vmx_ctxt_switch_to(struct vcpu *v)
@@ -764,6 +910,9 @@ static void vmx_ctxt_switch_to(struct vcpu *v)
 
     vmx_restore_guest_msrs(v);
     vmx_restore_dr(v);
+
+    if ( v->domain->arch.hvm_domain.vmx.pi_switch_to )
+        v->domain->arch.hvm_domain.vmx.pi_switch_to(v);
 }
 
 
@@ -2030,6 +2179,38 @@ static struct hvm_function_table __initdata vmx_function_table = {
     },
 };
 
+/* Handle VT-d posted-interrupt when VCPU is blocked. */
+static void pi_wakeup_interrupt(struct cpu_user_regs *regs)
+{
+    struct arch_vmx_struct *vmx, *tmp;
+    spinlock_t *lock = &per_cpu(vmx_pi_blocking, smp_processor_id()).lock;
+    struct list_head *blocked_vcpus =
+		&per_cpu(vmx_pi_blocking, smp_processor_id()).list;
+
+    ack_APIC_irq();
+    this_cpu(irq_count)++;
+
+    spin_lock(lock);
+
+    /*
+     * XXX: The length of the list depends on how many vCPU is current
+     * blocked on this specific pCPU. This may hurt the interrupt latency
+     * if the list grows to too many entries.
+     */
+    list_for_each_entry_safe(vmx, tmp, blocked_vcpus, pi_blocking.list)
+    {
+        if ( pi_test_on(&vmx->pi_desc) )
+        {
+            list_del(&vmx->pi_blocking.list);
+            ASSERT(vmx->pi_blocking.lock == lock);
+            vmx->pi_blocking.lock = NULL;
+            vcpu_unblock(container_of(vmx, struct vcpu, arch.hvm_vmx));
+        }
+    }
+
+    spin_unlock(lock);
+}
+
 /* Handle VT-d posted-interrupt when VCPU is running. */
 static void pi_notification_interrupt(struct cpu_user_regs *regs)
 {
@@ -2116,7 +2297,10 @@ const struct hvm_function_table * __init start_vmx(void)
     if ( cpu_has_vmx_posted_intr_processing )
     {
         if ( iommu_intpost )
+        {
             alloc_direct_apic_vector(&posted_intr_vector, pi_notification_interrupt);
+            alloc_direct_apic_vector(&pi_wakeup_vector, pi_wakeup_interrupt);
+        }
         else
             alloc_direct_apic_vector(&posted_intr_vector, event_check_interrupt);
     }
@@ -3630,6 +3814,9 @@ void vmx_vmenter_helper(const struct cpu_user_regs *regs)
     u32 new_asid, old_asid;
     struct hvm_vcpu_asid *p_asid;
     bool_t need_flush;
+
+    if ( curr->domain->arch.hvm_domain.vmx.pi_do_resume )
+        curr->domain->arch.hvm_domain.vmx.pi_do_resume(curr);
 
     if ( !cpu_has_vmx_vpid )
         goto out;

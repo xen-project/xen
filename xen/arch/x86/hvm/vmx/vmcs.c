@@ -679,6 +679,8 @@ int vmx_cpu_up(void)
     if ( cpu_has_vmx_vpid )
         vpid_sync_all();
 
+    vmx_pi_per_cpu_init(cpu);
+
     return 0;
 }
 

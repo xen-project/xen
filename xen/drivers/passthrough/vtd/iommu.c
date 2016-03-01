@@ -2283,15 +2283,26 @@ static int reassign_device_ownership(
     if ( ret )
         return ret;
 
+    if ( !has_arch_pdevs(target) )
+        vmx_pi_hooks_assign(target);
+
     ret = domain_context_mapping(target, devfn, pdev);
     if ( ret )
+    {
+        if ( !has_arch_pdevs(target) )
+            vmx_pi_hooks_deassign(target);
+
         return ret;
+    }
 
     if ( devfn == pdev->devfn )
     {
         list_move(&pdev->domain_list, &target->arch.pdev_list);
         pdev->domain = target;
     }
+
+    if ( !has_arch_pdevs(source) )
+        vmx_pi_hooks_deassign(source);
 
     return ret;
 }

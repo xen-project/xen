@@ -803,6 +803,8 @@ void vcpu_block(void)
 
     set_bit(_VPF_blocked, &v->pause_flags);
 
+    arch_vcpu_block(v);
+
     /* Check for events /after/ blocking: avoids wakeup waiting race. */
     if ( local_events_need_delivery() )
     {
@@ -839,6 +841,8 @@ static long do_poll(struct sched_poll *sched_poll)
     set_bit(_VPF_blocked, &v->pause_flags);
     v->poll_evtchn = -1;
     set_bit(v->vcpu_id, d->poll_mask);
+
+    arch_vcpu_block(v);
 
 #ifndef CONFIG_X86 /* set_bit() implies mb() on x86 */
     /* Check for events /after/ setting flags: avoids wakeup waiting race. */

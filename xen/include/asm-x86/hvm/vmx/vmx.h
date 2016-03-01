@@ -564,6 +564,11 @@ int alloc_p2m_hap_data(struct p2m_domain *p2m);
 void free_p2m_hap_data(struct p2m_domain *p2m);
 void p2m_init_hap_data(struct p2m_domain *p2m);
 
+void vmx_pi_per_cpu_init(unsigned int cpu);
+
+void vmx_pi_hooks_assign(struct domain *d);
+void vmx_pi_hooks_deassign(struct domain *d);
+
 /* EPT violation qualifications definitions */
 #define _EPT_READ_VIOLATION         0
 #define EPT_READ_VIOLATION          (1UL<<_EPT_READ_VIOLATION)

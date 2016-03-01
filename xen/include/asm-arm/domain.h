@@ -315,6 +315,8 @@ static inline void free_vcpu_guest_context(struct vcpu_guest_context *vgc)
     xfree(vgc);
 }
 
+static inline void arch_vcpu_block(struct vcpu *v) {}
+
 #endif /* __ASM_DOMAIN_H__ */
 
 /*

@@ -606,6 +606,19 @@ const char *hvm_efer_valid(const struct vcpu *v, uint64_t value,
                            signed int cr0_pg);
 unsigned long hvm_cr4_guest_reserved_bits(const struct vcpu *v, bool_t restore);
 
+/*
+ * This must be defined as a macro instead of an inline function,
+ * because it uses 'struct vcpu' and 'struct domain' which have
+ * not been defined yet.
+ */
+#define arch_vcpu_block(v) ({                                   \
+    struct vcpu *v_ = (v);                                      \
+    struct domain *d_ = v_->domain;                             \
+    if ( has_hvm_container_domain(d_) &&                        \
+         d_->arch.hvm_domain.vmx.vcpu_block )                   \
+        d_->arch.hvm_domain.vmx.vcpu_block(v_);                 \
+})
+
 #endif /* __ASM_X86_HVM_HVM_H__ */
 
 /*
