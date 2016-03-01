@@ -15,7 +15,6 @@
 #include <asm/config.h>
 
 #define EXPORT_SYMBOL(var)
-#define EXPORT_SYMBOL_GPL(var)
 
 /*
  * The following log levels are as follows:
