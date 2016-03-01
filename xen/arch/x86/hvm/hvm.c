@@ -1819,6 +1819,8 @@ static int hvm_save_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
         /* Architecture-specific vmcs/vmcb bits */
         hvm_funcs.save_cpu_ctxt(v, &ctxt);
 
+        ctxt.tsc = hvm_get_guest_tsc_fixed(v, d->arch.hvm_domain.sync_tsc);
+
         ctxt.msr_tsc_aux = hvm_msr_tsc_aux(v);
 
         hvm_get_segment_register(v, x86_seg_idtr, &seg);
@@ -2123,6 +2125,8 @@ static int hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
         return -EINVAL;
 
     v->arch.hvm_vcpu.msr_tsc_aux = ctxt.msr_tsc_aux;
+
+    hvm_set_guest_tsc_fixed(v, ctxt.tsc, d->arch.hvm_domain.sync_tsc);
 
     seg.limit = ctxt.idtr_limit;
     seg.base = ctxt.idtr_base;
