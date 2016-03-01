@@ -819,13 +819,6 @@ static uint64_t scale_tsc(uint64_t host_tsc, uint64_t ratio)
     return scaled_host_tsc;
 }
 
-static uint64_t svm_scale_tsc(const struct vcpu *v, uint64_t tsc)
-{
-    ASSERT(cpu_has_tsc_ratio && !v->domain->arch.vtsc);
-
-    return scale_tsc(tsc, hvm_tsc_scaling_ratio(v->domain));
-}
-
 static uint64_t svm_get_tsc_offset(uint64_t host_tsc, uint64_t guest_tsc,
     uint64_t ratio)
 {
@@ -2291,7 +2284,6 @@ static struct hvm_function_table __initdata svm_function_table = {
 
     .tsc_scaling = {
         .max_ratio = ~TSC_RATIO_RSVD_BITS,
-        .scale_tsc = svm_scale_tsc,
     },
 };
 

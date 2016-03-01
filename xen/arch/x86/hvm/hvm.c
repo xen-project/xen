@@ -334,6 +334,23 @@ u64 hvm_get_tsc_scaling_ratio(u32 gtsc_khz)
     return ratio > max_ratio ? 0 : ratio;
 }
 
+u64 hvm_scale_tsc(const struct domain *d, u64 tsc)
+{
+    u64 ratio = d->arch.hvm_domain.tsc_scaling_ratio;
+    u64 dummy;
+
+    if ( ratio == hvm_default_tsc_scaling_ratio )
+        return tsc;
+
+    /* tsc = (tsc * ratio) >> hvm_funcs.tsc_scaling.ratio_frac_bits */
+    asm ( "mulq %[ratio]; shrdq %[frac],%%rdx,%[tsc]"
+          : [tsc] "+a" (tsc), "=&d" (dummy)
+          : [frac] "c" (hvm_funcs.tsc_scaling.ratio_frac_bits),
+            [ratio] "rm" (ratio) );
+
+    return tsc;
+}
+
 void hvm_set_guest_tsc_fixed(struct vcpu *v, u64 guest_tsc, u64 at_tsc)
 {
     uint64_t tsc;
@@ -348,7 +365,7 @@ void hvm_set_guest_tsc_fixed(struct vcpu *v, u64 guest_tsc, u64 at_tsc)
     {
         tsc = at_tsc ?: rdtsc();
         if ( hvm_tsc_scaling_supported )
-            tsc = hvm_funcs.tsc_scaling.scale_tsc(v, tsc);
+            tsc = hvm_scale_tsc(v->domain, tsc);
     }
 
     delta_tsc = guest_tsc - tsc;
@@ -380,7 +397,7 @@ u64 hvm_get_guest_tsc_fixed(struct vcpu *v, uint64_t at_tsc)
     {
         tsc = at_tsc ?: rdtsc();
         if ( hvm_tsc_scaling_supported )
-            tsc = hvm_funcs.tsc_scaling.scale_tsc(v, tsc);
+            tsc = hvm_scale_tsc(v->domain, tsc);
     }
 
     return tsc + v->arch.hvm_vcpu.cache_tsc_offset;

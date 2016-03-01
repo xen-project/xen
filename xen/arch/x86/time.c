@@ -816,8 +816,7 @@ static void __update_vcpu_system_time(struct vcpu *v, int force)
     {
         if ( has_hvm_container_domain(d) && hvm_tsc_scaling_supported )
         {
-            tsc_stamp            =
-                hvm_funcs.tsc_scaling.scale_tsc(v, t->local_tsc_stamp);
+            tsc_stamp            = hvm_scale_tsc(d, t->local_tsc_stamp);
             _u.tsc_to_system_mul = d->arch.vtsc_to_ns.mul_frac;
             _u.tsc_shift         = d->arch.vtsc_to_ns.shift;
         }

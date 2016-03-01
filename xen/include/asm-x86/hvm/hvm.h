@@ -231,8 +231,6 @@ struct hvm_function_table {
         uint8_t  ratio_frac_bits;
         /* maximum-allowed TSC scaling ratio */
         uint64_t max_ratio;
-
-        uint64_t (*scale_tsc)(const struct vcpu *v, uint64_t tsc);
     } tsc_scaling;
 };
 
@@ -278,6 +276,7 @@ u64 hvm_get_guest_tsc_fixed(struct vcpu *v, u64 at_tsc);
 #define hvm_tsc_scaling_ratio(d) \
     ((d)->arch.hvm_domain.tsc_scaling_ratio)
 
+u64 hvm_scale_tsc(const struct domain *d, u64 tsc);
 u64 hvm_get_tsc_scaling_ratio(u32 gtsc_khz);
 
 int hvm_set_mode(struct vcpu *v, int mode);
