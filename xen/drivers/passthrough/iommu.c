@@ -32,6 +32,7 @@ static void iommu_dump_p2m_table(unsigned char key);
  *   off|no|false|disable       Disable IOMMU (default)
  *   force|required             Don't boot unless IOMMU is enabled
  *   no-intremap                Disable interrupt remapping
+ *   intpost                    Enable VT-d Interrupt posting
  *   verbose                    Be more verbose
  *   debug                      Enable debugging messages and checks
  *   workaround_bios_bug        Workaround some bios issue to still enable
@@ -105,6 +106,8 @@ static void __init parse_iommu_param(char *s)
             iommu_qinval = val;
         else if ( !strcmp(s, "intremap") )
             iommu_intremap = val;
+        else if ( !strcmp(s, "intpost") )
+            iommu_intpost = val;
         else if ( !strcmp(s, "debug") )
         {
             iommu_debug = val;
