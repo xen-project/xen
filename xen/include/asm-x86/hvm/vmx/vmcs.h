@@ -237,6 +237,7 @@ extern u32 vmx_vmentry_control;
 #define SECONDARY_EXEC_ENABLE_VIRT_EXCEPTIONS   0x00040000
 #define SECONDARY_EXEC_XSAVES                   0x00100000
 #define SECONDARY_EXEC_PCOMMIT                  0x00200000
+#define SECONDARY_EXEC_TSC_SCALING              0x02000000
 extern u32 vmx_secondary_exec_control;
 
 #define VMX_EPT_EXEC_ONLY_SUPPORTED                         0x00000001
@@ -258,6 +259,8 @@ extern u64 vmx_ept_vpid_cap;
 
 #define VMX_MISC_CR3_TARGET                     0x01ff0000
 #define VMX_MISC_VMWRITE_ALL                    0x20000000
+
+#define VMX_TSC_MULTIPLIER_MAX                  0xffffffffffffffffULL
 
 #define cpu_has_wbinvd_exiting \
     (vmx_secondary_exec_control & SECONDARY_EXEC_WBINVD_EXITING)
@@ -306,6 +309,9 @@ extern u64 vmx_ept_vpid_cap;
     (vmx_secondary_exec_control & SECONDARY_EXEC_XSAVES)
 #define cpu_has_vmx_pcommit \
     (vmx_secondary_exec_control & SECONDARY_EXEC_PCOMMIT)
+#define cpu_has_vmx_tsc_scaling \
+    (vmx_secondary_exec_control & SECONDARY_EXEC_TSC_SCALING)
+
 #define VMCS_RID_TYPE_MASK              0x80000000
 
 /* GUEST_INTERRUPTIBILITY_INFO flags. */
@@ -380,6 +386,7 @@ enum vmcs_field {
     VMWRITE_BITMAP                  = 0x00002028,
     VIRT_EXCEPTION_INFO             = 0x0000202a,
     XSS_EXIT_BITMAP                 = 0x0000202c,
+    TSC_MULTIPLIER                  = 0x00002032,
     GUEST_PHYSICAL_ADDRESS          = 0x00002400,
     VMCS_LINK_POINTER               = 0x00002800,
     GUEST_IA32_DEBUGCTL             = 0x00002802,

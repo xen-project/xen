@@ -2124,6 +2124,9 @@ static int hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
     if ( hvm_funcs.load_cpu_ctxt(v, &ctxt) < 0 )
         return -EINVAL;
 
+    if ( hvm_funcs.tsc_scaling.setup )
+        hvm_funcs.tsc_scaling.setup(v);
+
     v->arch.hvm_vcpu.msr_tsc_aux = ctxt.msr_tsc_aux;
 
     hvm_set_guest_tsc_fixed(v, ctxt.tsc, d->arch.hvm_domain.sync_tsc);
@@ -5638,6 +5641,9 @@ void hvm_vcpu_reset_state(struct vcpu *v, uint16_t cs, uint16_t ip)
     reg.attr.bytes = 0;
     hvm_set_segment_register(v, x86_seg_gdtr, &reg);
     hvm_set_segment_register(v, x86_seg_idtr, &reg);
+
+    if ( hvm_funcs.tsc_scaling.setup )
+        hvm_funcs.tsc_scaling.setup(v);
 
     /* Sync AP's TSC with BSP's. */
     v->arch.hvm_vcpu.cache_tsc_offset =

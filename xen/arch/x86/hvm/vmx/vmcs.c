@@ -149,6 +149,7 @@ static void __init vmx_display_features(void)
     P(cpu_has_vmx_vmfunc, "VM Functions");
     P(cpu_has_vmx_virt_exceptions, "Virtualisation Exceptions");
     P(cpu_has_vmx_pml, "Page Modification Logging");
+    P(cpu_has_vmx_tsc_scaling, "TSC Scaling");
 #undef P
 
     if ( !printed )
@@ -243,7 +244,8 @@ static int vmx_init_vmcs_config(void)
                SECONDARY_EXEC_ENABLE_VM_FUNCTIONS |
                SECONDARY_EXEC_ENABLE_VIRT_EXCEPTIONS |
                SECONDARY_EXEC_XSAVES |
-               SECONDARY_EXEC_PCOMMIT);
+               SECONDARY_EXEC_PCOMMIT |
+               SECONDARY_EXEC_TSC_SCALING);
         rdmsrl(MSR_IA32_VMX_MISC, _vmx_misc_cap);
         if ( _vmx_misc_cap & VMX_MISC_VMWRITE_ALL )
             opt |= SECONDARY_EXEC_ENABLE_VMCS_SHADOWING;
@@ -999,7 +1001,7 @@ static int construct_vmcs(struct vcpu *v)
     __vmwrite(PIN_BASED_VM_EXEC_CONTROL, vmx_pin_based_exec_control);
 
     v->arch.hvm_vmx.exec_control = vmx_cpu_based_exec_control;
-    if ( d->arch.vtsc )
+    if ( d->arch.vtsc && !cpu_has_vmx_tsc_scaling )
         v->arch.hvm_vmx.exec_control |= CPU_BASED_RDTSC_EXITING;
 
     v->arch.hvm_vmx.secondary_exec_control = vmx_secondary_exec_control;
@@ -1286,6 +1288,9 @@ static int construct_vmcs(struct vcpu *v)
     }
     if ( cpu_has_vmx_xsaves )
         __vmwrite(XSS_EXIT_BITMAP, 0);
+
+    if ( cpu_has_vmx_tsc_scaling )
+        __vmwrite(TSC_MULTIPLIER, d->arch.hvm_domain.tsc_scaling_ratio);
 
     vmx_vmcs_exit(v);
 
@@ -1869,7 +1874,8 @@ void vmcs_dump_vcpu(struct vcpu *v)
            vmr32(VM_EXIT_REASON), vmr(EXIT_QUALIFICATION));
     printk("IDTVectoring: info=%08x errcode=%08x\n",
            vmr32(IDT_VECTORING_INFO), vmr32(IDT_VECTORING_ERROR_CODE));
-    printk("TSC Offset = 0x%016lx\n", vmr(TSC_OFFSET));
+    printk("TSC Offset = 0x%016lx  TSC Multiplier = 0x%016lx\n",
+           vmr(TSC_OFFSET), vmr(TSC_MULTIPLIER));
     if ( (v->arch.hvm_vmx.exec_control & CPU_BASED_TPR_SHADOW) ||
          (vmx_pin_based_exec_control & PIN_BASED_POSTED_INTERRUPT) )
         printk("TPR Threshold = 0x%02x  PostedIntrVec = 0x%02x\n",
