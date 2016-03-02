@@ -29,6 +29,8 @@
 #include <xen/device_tree.h>
 #include <xen/libfdt/libfdt.h>
 #include <xen/sizes.h>
+#include <xen/acpi.h>
+#include <acpi/actables.h>
 #include <asm/p2m.h>
 #include <asm/domain.h>
 #include <asm/platform.h>
@@ -36,6 +38,7 @@
 
 #include <asm/io.h>
 #include <asm/gic.h>
+#include <asm/acpi.h>
 
 /*
  * LR register definitions are GIC v2 specific.
@@ -681,11 +684,108 @@ static void __init gicv2_dt_init(void)
                csize, vsize);
 }
 
+#ifdef CONFIG_ACPI
+static int __init
+gic_acpi_parse_madt_cpu(struct acpi_subtable_header *header,
+                        const unsigned long end)
+{
+    static int cpu_base_assigned = 0;
+    struct acpi_madt_generic_interrupt *processor =
+               container_of(header, struct acpi_madt_generic_interrupt, header);
+
+    if ( BAD_MADT_ENTRY(processor, end) )
+        return -EINVAL;
+
+    /* Read from APIC table and fill up the GIC variables */
+    if ( cpu_base_assigned == 0 )
+    {
+        cbase = processor->base_address;
+        csize = SZ_8K;
+        hbase = processor->gich_base_address;
+        vbase = processor->gicv_base_address;
+        gicv2_info.maintenance_irq = processor->vgic_interrupt;
+
+        if ( processor->flags & ACPI_MADT_VGIC_IRQ_MODE )
+            irq_set_type(gicv2_info.maintenance_irq, IRQ_TYPE_EDGE_BOTH);
+        else
+            irq_set_type(gicv2_info.maintenance_irq, IRQ_TYPE_LEVEL_MASK);
+
+        cpu_base_assigned = 1;
+    }
+    else
+    {
+        if ( cbase != processor->base_address
+             || hbase != processor->gich_base_address
+             || vbase != processor->gicv_base_address
+             || gicv2_info.maintenance_irq != processor->vgic_interrupt )
+        {
+            printk("GICv2: GICC entries are not same in MADT table\n");
+            return -EINVAL;
+        }
+    }
+
+    return 0;
+}
+
+static int __init
+gic_acpi_parse_madt_distributor(struct acpi_subtable_header *header,
+                                const unsigned long end)
+{
+    struct acpi_madt_generic_distributor *dist =
+             container_of(header, struct acpi_madt_generic_distributor, header);
+
+    if ( BAD_MADT_ENTRY(dist, end) )
+        return -EINVAL;
+
+    dbase = dist->base_address;
+
+    return 0;
+}
+
+static void __init gicv2_acpi_init(void)
+{
+    acpi_status status;
+    struct acpi_table_header *table;
+    int count;
+
+    status = acpi_get_table(ACPI_SIG_MADT, 0, &table);
+
+    if ( ACPI_FAILURE(status) )
+    {
+        const char *msg = acpi_format_exception(status);
+
+        panic("GICv2: Failed to get MADT table, %s", msg);
+    }
+
+    /* Collect CPU base addresses */
+    count = acpi_parse_entries(ACPI_SIG_MADT, sizeof(struct acpi_table_madt),
+                               gic_acpi_parse_madt_cpu, table,
+                               ACPI_MADT_TYPE_GENERIC_INTERRUPT, 0);
+    if ( count <= 0 )
+        panic("GICv2: No valid GICC entries exists");
+
+    /*
+     * Find distributor base address. We expect one distributor entry since
+     * ACPI 5.0 spec neither support multi-GIC instances nor GIC cascade.
+     */
+    count = acpi_parse_entries(ACPI_SIG_MADT, sizeof(struct acpi_table_madt),
+                               gic_acpi_parse_madt_distributor, table,
+                               ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR, 0);
+    if ( count <= 0 )
+        panic("GICv2: No valid GICD entries exists");
+}
+#else
+static void __init gicv2_acpi_init(void) { }
+#endif
+
 static int __init gicv2_init(void)
 {
     uint32_t aliased_offset = 0;
 
-    gicv2_dt_init();
+    if ( acpi_disabled )
+        gicv2_dt_init();
+    else
+        gicv2_acpi_init();
 
     printk("GICv2 initialization:\n"
               "        gic_dist_addr=%"PRIpaddr"\n"
@@ -793,6 +893,21 @@ DT_DEVICE_START(gicv2, "GICv2", DEVICE_GIC)
         .init = gicv2_dt_preinit,
 DT_DEVICE_END
 
+#ifdef CONFIG_ACPI
+/* Set up the GIC */
+static int __init gicv2_acpi_preinit(const void *data)
+{
+    gicv2_info.hw_version = GIC_V2;
+    register_gic_ops(&gicv2_ops);
+
+    return 0;
+}
+
+ACPI_DEVICE_START(agicv2, "GICv2", DEVICE_GIC)
+        .class_type = ACPI_MADT_GIC_VERSION_V2,
+        .init = gicv2_acpi_preinit,
+ACPI_DEVICE_END
+#endif
 /*
  * Local variables:
  * mode: C
