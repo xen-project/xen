@@ -22,6 +22,7 @@
 #include <xen/mm.h>
 #include <xen/smp.h>
 #include <asm/psci.h>
+#include <asm/acpi.h>
 
 /*
  * While a 64-bit OS can make calls with SMC32 calling conventions, for
@@ -86,6 +87,12 @@ int __init psci_init_0_1(void)
     int ret;
     const struct dt_device_node *psci;
 
+    if ( !acpi_disabled )
+    {
+        printk("PSCI 0.1 is not supported when using ACPI\n");
+        return -EINVAL;
+    }
+
     psci = dt_find_compatible_node(NULL, NULL, "arm,psci");
     if ( !psci )
         return -EOPNOTSUPP;
@@ -116,15 +123,26 @@ int __init psci_init_0_2(void)
         { /* sentinel */ },
     };
     int ret;
-    const struct dt_device_node *psci;
 
-    psci = dt_find_matching_node(NULL, psci_ids);
-    if ( !psci )
-        return -EOPNOTSUPP;
+    if ( acpi_disabled )
+    {
+        const struct dt_device_node *psci;
 
-    ret = psci_is_smc_method(psci);
-    if ( ret )
-        return -EINVAL;
+        psci = dt_find_matching_node(NULL, psci_ids);
+        if ( !psci )
+            return -EOPNOTSUPP;
+
+        ret = psci_is_smc_method(psci);
+        if ( ret )
+            return -EINVAL;
+    }
+    else
+    {
+        if ( acpi_psci_hvc_present() ) {
+            printk("PSCI conduit must be SMC, but is HVC\n");
+            return -EINVAL;
+        }
+    }
 
     psci_ver = call_smc(PSCI_0_2_FN_PSCI_VERSION, 0, 0, 0);
 
@@ -147,6 +165,9 @@ int __init psci_init_0_2(void)
 int __init psci_init(void)
 {
     int ret;
+
+    if ( !acpi_disabled && !acpi_psci_present() )
+        return -EOPNOTSUPP;
 
     ret = psci_init_0_2();
     if ( ret )

@@ -31,6 +31,7 @@
 #include <xen/console.h>
 #include <asm/gic.h>
 #include <asm/psci.h>
+#include <asm/acpi.h>
 
 cpumask_t cpu_online_map;
 cpumask_t cpu_present_map;
@@ -247,7 +248,11 @@ void __init smp_init_cpus(void)
         return;
     }
 
-    dt_smp_init_cpus();
+    if ( acpi_disabled )
+        dt_smp_init_cpus();
+    else
+        acpi_smp_init_cpus();
+
 }
 
 int __init
