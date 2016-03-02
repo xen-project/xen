@@ -52,6 +52,8 @@ void arch_move_irqs(struct vcpu *v);
 /* Set IRQ type for an SPI */
 int irq_set_spi_type(unsigned int spi, unsigned int type);
 
+int irq_set_type(unsigned int irq, unsigned int type);
+
 int platform_get_irq(const struct dt_device_node *device, int index);
 
 void irq_set_affinity(struct irq_desc *desc, const cpumask_t *cpu_mask);

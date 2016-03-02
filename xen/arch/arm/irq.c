@@ -655,18 +655,9 @@ unlock:
     return ret;
 }
 
-int platform_get_irq(const struct dt_device_node *device, int index)
+int irq_set_type(unsigned int irq, unsigned int type)
 {
-    struct dt_irq dt_irq;
-    unsigned int type, irq;
     int res;
-
-    res = dt_device_get_irq(device, index, &dt_irq);
-    if ( res )
-        return -1;
-
-    irq = dt_irq.irq;
-    type = dt_irq.type;
 
     /* Setup the IRQ type */
     if ( irq < NR_LOCAL_IRQS )
@@ -674,8 +665,22 @@ int platform_get_irq(const struct dt_device_node *device, int index)
     else
         res = irq_set_spi_type(irq, type);
 
-    if ( res )
-            return -1;
+    return res;
+}
+
+int platform_get_irq(const struct dt_device_node *device, int index)
+{
+    struct dt_irq dt_irq;
+    unsigned int type, irq;
+
+    if ( dt_device_get_irq(device, index, &dt_irq) )
+        return -1;
+
+    irq = dt_irq.irq;
+    type = dt_irq.type;
+
+    if ( irq_set_type(irq, type) )
+        return -1;
 
     return irq;
 }
