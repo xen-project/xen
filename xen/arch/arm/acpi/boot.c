@@ -30,9 +30,11 @@
 #include <xen/errno.h>
 #include <acpi/actables.h>
 #include <xen/mm.h>
+#include <xen/device_tree.h>
 
 #include <asm/acpi.h>
 #include <asm/smp.h>
+#include <asm/setup.h>
 
 /* Processors with enabled flag and sane MPIDR */
 static unsigned int enabled_cpus;
@@ -174,6 +176,36 @@ static int __init acpi_parse_fadt(struct acpi_table_header *table)
     return -EINVAL;
 }
 
+static bool_t __initdata param_acpi_off;
+static bool_t __initdata param_acpi_force;
+
+static void __init parse_acpi_param(char *arg)
+{
+    if ( !arg )
+        return;
+
+    /* Interpret the parameter for use within Xen. */
+    if ( !parse_bool(arg) )
+        param_acpi_off = true;
+    else if ( !strcmp(arg, "force") ) /* force ACPI to be enabled */
+        param_acpi_force = true;
+}
+custom_param("acpi", parse_acpi_param);
+
+static int __init dt_scan_depth1_nodes(const void *fdt, int node,
+                                       const char *uname, int depth,
+                                       u32 address_cells, u32 size_cells,
+                                       void *data)
+{
+    /*
+     * Return 1 as soon as we encounter a node at depth 1 that is
+     * not the /chosen node.
+     */
+    if (depth == 1 && (strcmp(uname, "chosen") != 0))
+        return 1;
+    return 0;
+}
+
 /*
  * acpi_boot_table_init() called from setup_arch(), always.
  *      1. find RSDP and get its address, and then find XSDT
@@ -189,6 +221,26 @@ static int __init acpi_parse_fadt(struct acpi_table_header *table)
 int __init acpi_boot_table_init(void)
 {
     int error;
+
+    /*
+     * Enable ACPI instead of device tree unless
+     * - ACPI has been disabled explicitly (acpi=off), or
+     * - the device tree is not empty (it has more than just a /chosen node)
+     *   and ACPI has not been force enabled (acpi=force)
+     */
+    if ( param_acpi_off || ( !param_acpi_force
+                             && device_tree_for_each_node(device_tree_flattened,
+                                                   dt_scan_depth1_nodes, NULL)))
+    {
+        disable_acpi();
+        return 0;
+    }
+
+    /*
+     * ACPI is disabled at this point. Enable it in order to parse
+     * the ACPI tables.
+     */
+    enable_acpi();
 
     /* Initialize the ACPI boot-time table parser. */
     error = acpi_table_init();
