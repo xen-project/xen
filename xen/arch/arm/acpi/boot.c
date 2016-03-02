@@ -27,8 +27,31 @@
 
 #include <xen/init.h>
 #include <xen/acpi.h>
+#include <xen/errno.h>
+#include <acpi/actables.h>
+#include <xen/mm.h>
 
 #include <asm/acpi.h>
+
+static int __init acpi_parse_fadt(struct acpi_table_header *table)
+{
+    struct acpi_table_fadt *fadt = (struct acpi_table_fadt *)table;
+
+    /*
+     * Revision in table header is the FADT Major revision, and there
+     * is a minor revision of FADT which was introduced by ACPI 6.0,
+     * we only deal with ACPI 6.0 or newer revision to get GIC and SMP
+     * boot protocol configuration data, or we will disable ACPI.
+     */
+    if ( table->revision > 6
+         || (table->revision == 6 && fadt->minor_revision >= 0) )
+        return 0;
+
+    printk("Unsupported FADT revision %d.%d, should be 6.0+, will disable ACPI\n",
+            table->revision, fadt->minor_revision);
+
+    return -EINVAL;
+}
 
 /*
  * acpi_boot_table_init() called from setup_arch(), always.
@@ -52,6 +75,13 @@ int __init acpi_boot_table_init(void)
     {
         disable_acpi();
         return error;
+    }
+
+    if ( acpi_table_parse(ACPI_SIG_FADT, acpi_parse_fadt) )
+    {
+        /* disable ACPI if no FADT is found */
+        disable_acpi();
+        printk("Can't find FADT\n");
     }
 
     return 0;

@@ -42,6 +42,9 @@ typedef enum {
     TBL_MMAX,
 } EFI_MEM_RES;
 
+bool_t __init acpi_psci_present(void);
+bool_t __init acpi_psci_hvc_present(void);
+
 #ifdef CONFIG_ACPI
 extern bool_t acpi_disabled;
 /* Basic configuration for ACPI */
