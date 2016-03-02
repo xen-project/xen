@@ -80,6 +80,8 @@ int acpi_parse_entries(char *id, unsigned long table_size,
 		       int entry_id, unsigned int max_entries);
 int acpi_table_parse_entries(char *id, unsigned long table_size,
 	int entry_id, acpi_table_entry_handler handler, unsigned int max_entries);
+struct acpi_subtable_header *acpi_table_get_entry_madt(enum acpi_madt_type id,
+						      unsigned int entry_index);
 int acpi_table_parse_madt(enum acpi_madt_type id, acpi_table_entry_handler handler, unsigned int max_entries);
 int acpi_table_parse_srat(int id, acpi_madt_entry_handler handler,
 	unsigned int max_entries);
