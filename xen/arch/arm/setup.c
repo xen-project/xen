@@ -615,8 +615,6 @@ static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
        allocator. */
     init_xenheap_pages(pfn_to_paddr(xenheap_mfn_start),
                        pfn_to_paddr(boot_mfn_start));
-
-    end_boot_allocator();
 }
 #else /* CONFIG_ARM_64 */
 static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
@@ -684,8 +682,6 @@ static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
 
     setup_frametable_mappings(ram_start, ram_end);
     max_page = PFN_DOWN(ram_end);
-
-    end_boot_allocator();
 }
 #endif
 
@@ -758,6 +754,8 @@ void __init start_xen(unsigned long boot_phys_offset,
 
     /* Parse the ACPI tables for possible boot-time configuration */
     acpi_boot_table_init();
+
+    end_boot_allocator();
 
     vm_init();
     dt_unflatten_host_device_tree();
