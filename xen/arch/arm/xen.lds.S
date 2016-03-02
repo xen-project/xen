@@ -105,6 +105,13 @@ SECTIONS
       _edevice = .;
   } :text
 
+  . = ALIGN(8);
+  .adev.info : {
+      _asdevice = .;
+      *(.adev.info)
+      _aedevice = .;
+  } :text
+
   . = ALIGN(PAGE_SIZE);             /* Init code and data */
   __init_begin = .;
   .init.text : {

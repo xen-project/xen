@@ -22,6 +22,7 @@
 #include <xen/lib.h>
 
 extern const struct device_desc _sdevice[], _edevice[];
+extern const struct acpi_device_desc _asdevice[], _aedevice[];
 
 int __init device_init(struct dt_device_node *dev, enum device_class class,
                        const void *data)
@@ -45,6 +46,23 @@ int __init device_init(struct dt_device_node *dev, enum device_class class,
             return desc->init(dev, data);
         }
 
+    }
+
+    return -EBADF;
+}
+
+int __init acpi_device_init(enum device_class class, const void *data, int class_type)
+{
+    const struct acpi_device_desc *desc;
+
+    for ( desc = _asdevice; desc != _aedevice; desc++ )
+    {
+        if ( ( desc->class != class ) || ( desc->class_type != class_type ) )
+            continue;
+
+        ASSERT(desc->init != NULL);
+
+        return desc->init(data);
     }
 
     return -EBADF;
