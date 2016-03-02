@@ -768,7 +768,7 @@ void __init start_xen(unsigned long boot_phys_offset,
 
     gic_preinit();
 
-    dt_uart_init();
+    arm_uart_init();
     console_init_preirq();
     console_init_ring();
 

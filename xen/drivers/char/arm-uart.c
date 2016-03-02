@@ -1,7 +1,7 @@
 /*
  * xen/drivers/char/arm-uart.c
  *
- * Generic uart retrieved via the device tree
+ * Generic uart retrieved via the device tree or ACPI
  *
  * Julien Grall <julien.grall@linaro.org>
  * Copyright (c) 2013 Linaro Limited.
@@ -23,6 +23,7 @@
 #include <xen/device_tree.h>
 #include <xen/serial.h>
 #include <xen/errno.h>
+#include <xen/acpi.h>
 
 /*
  * Configure UART port with a string:
@@ -35,7 +36,7 @@
 static char __initdata opt_dtuart[256] = "";
 string_param("dtuart", opt_dtuart);
 
-void __init dt_uart_init(void)
+static void __init dt_uart_init(void)
 {
     struct dt_device_node *dev;
     int ret;
@@ -94,6 +95,38 @@ void __init dt_uart_init(void)
 
     if ( ret )
         printk("Unable to initialize dtuart: %d\n", ret);
+}
+
+#ifdef CONFIG_ACPI
+static void __init acpi_uart_init(void)
+{
+    struct acpi_table_spcr *spcr = NULL;
+    int ret;
+
+    acpi_get_table(ACPI_SIG_SPCR, 0, (struct acpi_table_header **)&spcr);
+
+    if ( spcr == NULL )
+    {
+        printk("Unable to get spcr table\n");
+    }
+    else
+    {
+        ret = acpi_device_init(DEVICE_SERIAL, NULL, spcr->interface_type);
+
+        if ( ret )
+            printk("Unable to initialize acpi uart: %d\n", ret);
+    }
+}
+#else
+static void __init acpi_uart_init(void) { }
+#endif
+
+void __init arm_uart_init(void)
+{
+    if ( acpi_disabled )
+        dt_uart_init();
+    else
+        acpi_uart_init();
 }
 
 /*
