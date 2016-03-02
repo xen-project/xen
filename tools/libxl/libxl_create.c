@@ -222,8 +222,12 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
         if (b_info->u.hvm.mmio_hole_memkb == LIBXL_MEMKB_DEFAULT)
             b_info->u.hvm.mmio_hole_memkb = 0;
 
-        if (!b_info->u.hvm.vga.kind)
-            b_info->u.hvm.vga.kind = LIBXL_VGA_INTERFACE_TYPE_CIRRUS;
+        if (b_info->u.hvm.vga.kind == LIBXL_VGA_INTERFACE_TYPE_UNKNOWN) {
+            if (b_info->device_model_version == LIBXL_DEVICE_MODEL_VERSION_NONE)
+                b_info->u.hvm.vga.kind = LIBXL_VGA_INTERFACE_TYPE_NONE;
+            else
+                b_info->u.hvm.vga.kind = LIBXL_VGA_INTERFACE_TYPE_CIRRUS;
+        }
 
         if (!b_info->u.hvm.hdtype)
             b_info->u.hvm.hdtype = LIBXL_HDTYPE_IDE;
@@ -257,6 +261,11 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
             }
             break;
         case LIBXL_DEVICE_MODEL_VERSION_NONE:
+            if (b_info->u.hvm.vga.kind != LIBXL_VGA_INTERFACE_TYPE_NONE) {
+                LOG(ERROR,
+        "guests without a device model cannot have an emulated video card");
+                return ERROR_INVAL;
+            }
             b_info->video_memkb = 0;
             break;
         case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN:

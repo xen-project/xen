@@ -531,6 +531,9 @@ static int libxl__build_device_model_args_old(libxl__gc *gc,
             break;
         case LIBXL_VGA_INTERFACE_TYPE_QXL:
             break;
+        default:
+            LOG(ERROR, "Invalid emulated video card specified");
+            return ERROR_INVAL;
         }
 
         if (b_info->u.hvm.boot) {
@@ -1108,6 +1111,9 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
                 GCSPRINTF("qxl-vga,vram_size_mb=%"PRIu64",ram_size_mb=%"PRIu64,
                 (b_info->video_memkb/2/1024), (b_info->video_memkb/2/1024) ) );
             break;
+        default:
+            LOG(ERROR, "Invalid emulated video card specified");
+            return ERROR_INVAL;
         }
 
         if (b_info->u.hvm.boot) {
