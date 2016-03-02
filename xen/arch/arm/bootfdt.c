@@ -85,9 +85,9 @@ static u32 __init device_tree_get_u32(const void *fdt, int node,
  * Returns 0 if all nodes were iterated over successfully.  If @func
  * returns a value different from 0, that value is returned immediately.
  */
-static int __init device_tree_for_each_node(const void *fdt,
-                                            device_tree_node_func func,
-                                            void *data)
+int __init device_tree_for_each_node(const void *fdt,
+                                     device_tree_node_func func,
+                                     void *data)
 {
     int node;
     int depth;
