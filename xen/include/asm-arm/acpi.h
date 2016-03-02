@@ -44,6 +44,7 @@ typedef enum {
 
 bool_t __init acpi_psci_present(void);
 bool_t __init acpi_psci_hvc_present(void);
+void __init acpi_smp_init_cpus(void);
 
 #ifdef CONFIG_ACPI
 extern bool_t acpi_disabled;

@@ -43,10 +43,6 @@
 #include <mach_apic.h>
 #include <mach_mpparse.h>
 
-#define BAD_MADT_ENTRY(entry, end) (					    \
-		(!entry) || (unsigned long)entry + sizeof(*entry) > end ||  \
-		((struct acpi_subtable_header *)entry)->length != sizeof(*entry))
-
 #define PREFIX			"ACPI: "
 
 bool_t __initdata acpi_noirq;	/* skip ACPI IRQ initialization */

@@ -45,6 +45,10 @@
  */
 #define NUM_FIXMAP_ACPI_PAGES  4
 
+#define BAD_MADT_ENTRY(entry, end) (                                        \
+                (!(entry)) || (unsigned long)(entry) + sizeof(*(entry)) > (end) ||  \
+                (entry)->header.length < sizeof(*(entry)))
+
 #ifdef CONFIG_ACPI_BOOT
 
 enum acpi_interrupt_id {
