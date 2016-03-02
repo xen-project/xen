@@ -36,6 +36,7 @@
 #include <xen/pfn.h>
 #include <xen/vmap.h>
 #include <xen/libfdt/libfdt.h>
+#include <xen/acpi.h>
 #include <asm/page.h>
 #include <asm/current.h>
 #include <asm/setup.h>
@@ -754,6 +755,9 @@ void __init start_xen(unsigned long boot_phys_offset,
     xen_bootmodule->start = xen_paddr;
 
     setup_mm(fdt_paddr, fdt_size);
+
+    /* Parse the ACPI tables for possible boot-time configuration */
+    acpi_boot_table_init();
 
     vm_init();
     dt_unflatten_host_device_tree();
