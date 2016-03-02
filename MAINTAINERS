@@ -273,7 +273,7 @@ T:	git git://xenbits.xen.org/qemu-xen.git
 
 REMUS
 M:	Shriram Rajagopalan <rshriram@cs.ubc.ca>
-M:	Yang Hongyang <yanghy@cn.fujitsu.com>
+M:	Yang Hongyang <imhy.yang@gmail.com>
 S:	Maintained
 F:	docs/README.remus
 F:	tools/blktap2/drivers/block-remus.c
