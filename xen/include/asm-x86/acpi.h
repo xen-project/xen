@@ -90,9 +90,6 @@ static inline void disable_acpi(void)
 	acpi_noirq = 1;
 }
 
-/* Fixmap pages to reserve for ACPI boot-time tables (see fixmap.h) */
-#define FIX_ACPI_PAGES 4
-
 static inline void acpi_noirq_set(void) { acpi_noirq = 1; }
 
 /* routines for saving/restoring kernel state */

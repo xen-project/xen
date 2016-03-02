@@ -1,0 +1,50 @@
+/*
+ *  lib.c - Architecture-Specific Low-Level ACPI Support
+ *
+ *  Copyright (C) 2015, Shannon Zhao <shannon.zhao@linaro.org>
+ *
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ *
+ *  This program is free software; you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation; either version 2 of the License, or
+ *  (at your option) any later version.
+ *
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License
+ *  along with this program; If not, see <http://www.gnu.org/licenses/>.
+ *
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ */
+
+#include <xen/acpi.h>
+#include <xen/mm.h>
+#include <asm/config.h>
+
+char *__acpi_map_table(paddr_t phys, unsigned long size)
+{
+    unsigned long base, offset, mapped_size;
+    int idx;
+
+    offset = phys & (PAGE_SIZE - 1);
+    mapped_size = PAGE_SIZE - offset;
+    set_fixmap(FIXMAP_ACPI_BEGIN, phys >> PAGE_SHIFT, PAGE_HYPERVISOR);
+    base = FIXMAP_ADDR(FIXMAP_ACPI_BEGIN);
+
+    /* Most cases can be covered by the below. */
+    idx = FIXMAP_ACPI_BEGIN;
+    while ( mapped_size < size )
+    {
+        if ( ++idx > FIXMAP_ACPI_END )
+            return NULL;    /* cannot handle this */
+        phys += PAGE_SIZE;
+        set_fixmap(idx, phys >> PAGE_SHIFT, PAGE_HYPERVISOR);
+        mapped_size += PAGE_SIZE;
+    }
+
+    return ((char *) base + offset);
+}

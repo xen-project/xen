@@ -39,6 +39,12 @@
 #define ACPI_MADT_GET_POLARITY(inti)	ACPI_MADT_GET_(POLARITY, inti)
 #define ACPI_MADT_GET_TRIGGER(inti)	ACPI_MADT_GET_(TRIGGER, inti)
 
+/*
+ * Fixmap pages to reserve for ACPI boot-time tables (see asm-x86/fixmap.h or
+ * asm-arm/config.h)
+ */
+#define NUM_FIXMAP_ACPI_PAGES  4
+
 #ifdef CONFIG_ACPI_BOOT
 
 enum acpi_interrupt_id {

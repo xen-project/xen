@@ -19,11 +19,11 @@
 
 #ifndef __ASSEMBLY__
 
+#include <xen/acpi.h>
 #include <xen/pfn.h>
 #include <xen/kexec.h>
 #include <xen/iommu.h>
 #include <asm/apicdef.h>
-#include <asm/acpi.h>
 #include <asm/amd-iommu.h>
 #include <asm/msi.h>
 #include <acpi/apei.h>
@@ -51,7 +51,7 @@ enum fixed_addresses {
     FIX_IO_APIC_BASE_0,
     FIX_IO_APIC_BASE_END = FIX_IO_APIC_BASE_0 + MAX_IO_APICS-1,
     FIX_ACPI_BEGIN,
-    FIX_ACPI_END = FIX_ACPI_BEGIN + FIX_ACPI_PAGES - 1,
+    FIX_ACPI_END = FIX_ACPI_BEGIN + NUM_FIXMAP_ACPI_PAGES - 1,
     FIX_HPET_BASE,
     FIX_TBOOT_SHARED_BASE,
     FIX_MSIX_IO_RESERV_BASE,

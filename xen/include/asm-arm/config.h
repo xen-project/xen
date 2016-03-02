@@ -173,6 +173,8 @@
 #define FIXMAP_GICC1    4  /* Interrupt controller: CPU registers (first page) */
 #define FIXMAP_GICC2    5  /* Interrupt controller: CPU registers (second page) */
 #define FIXMAP_GICH     6  /* Interrupt controller: virtual interface control registers */
+#define FIXMAP_ACPI_BEGIN  7  /* Start mappings of ACPI tables */
+#define FIXMAP_ACPI_END    (FIXMAP_ACPI_BEGIN + NUM_FIXMAP_ACPI_PAGES - 1)  /* End mappings of ACPI tables */
 
 #define PAGE_SHIFT              12
 

@@ -2,6 +2,7 @@ subdir-$(CONFIG_ARM_32) += arm32
 subdir-$(CONFIG_ARM_64) += arm64
 subdir-y += platforms
 subdir-$(CONFIG_ARM_64) += efi
+subdir-$(CONFIG_ACPI) += acpi
 
 obj-$(EARLY_PRINTK) += early_printk.o
 obj-y += cpu.o
