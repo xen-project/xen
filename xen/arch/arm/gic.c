@@ -98,7 +98,7 @@ void gic_restore_state(struct vcpu *v)
  * needs to be called with a valid cpu_mask, ie each cpu in the mask has
  * already called gic_cpu_init
  * - desc.lock must be held
- * - arch.type must be valid (i.e != DT_IRQ_TYPE_INVALID)
+ * - arch.type must be valid (i.e != IRQ_TYPE_INVALID)
  */
 static void gic_set_irq_properties(struct irq_desc *desc,
                                    const cpumask_t *cpu_mask,
@@ -223,7 +223,7 @@ int gic_irq_xlate(const u32 *intspec, unsigned int intsize,
         *out_hwirq += 16;
 
     if ( out_type )
-        *out_type = intspec[2] & DT_IRQ_TYPE_SENSE_MASK;
+        *out_type = intspec[2] & IRQ_TYPE_SENSE_MASK;
 
     return 0;
 }

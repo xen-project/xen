@@ -491,9 +491,9 @@ static void gicv3_set_irq_properties(struct irq_desc *desc,
     cfg = readl_relaxed(base);
 
     edgebit = 2u << (2 * (irq % 16));
-    if ( type & DT_IRQ_TYPE_LEVEL_MASK )
+    if ( type & IRQ_TYPE_LEVEL_MASK )
         cfg &= ~edgebit;
-    else if ( type & DT_IRQ_TYPE_EDGE_BOTH )
+    else if ( type & IRQ_TYPE_EDGE_BOTH )
         cfg |= edgebit;
 
     writel_relaxed(cfg, base);
@@ -508,8 +508,8 @@ static void gicv3_set_irq_properties(struct irq_desc *desc,
                cfg & edgebit ? "Edge" : "Level",
                actual & edgebit ? "Edge" : "Level");
         desc->arch.type = actual & edgebit ?
-            DT_IRQ_TYPE_EDGE_RISING :
-            DT_IRQ_TYPE_LEVEL_HIGH;
+            IRQ_TYPE_EDGE_RISING :
+            IRQ_TYPE_LEVEL_HIGH;
     }
 
     affinity = gicv3_mpidr_to_affinity(cpu);

@@ -650,7 +650,7 @@ static int make_hypervisor_node(const struct kernel_info *kinfo,
      * Placeholder for the event channel interrupt.  The values will be
      * replaced later.
      */
-    set_interrupt_ppi(intr, ~0, 0xf, DT_IRQ_TYPE_INVALID);
+    set_interrupt_ppi(intr, ~0, 0xf, IRQ_TYPE_INVALID);
     res = fdt_property_interrupts(fdt, &intr, 1);
     if ( res )
         return res;
@@ -923,15 +923,15 @@ static int make_timer_node(const struct domain *d, void *fdt,
 
     irq = timer_get_irq(TIMER_PHYS_SECURE_PPI);
     DPRINT("  Secure interrupt %u\n", irq);
-    set_interrupt_ppi(intrs[0], irq, 0xf, DT_IRQ_TYPE_LEVEL_LOW);
+    set_interrupt_ppi(intrs[0], irq, 0xf, IRQ_TYPE_LEVEL_LOW);
 
     irq = timer_get_irq(TIMER_PHYS_NONSECURE_PPI);
     DPRINT("  Non secure interrupt %u\n", irq);
-    set_interrupt_ppi(intrs[1], irq, 0xf, DT_IRQ_TYPE_LEVEL_LOW);
+    set_interrupt_ppi(intrs[1], irq, 0xf, IRQ_TYPE_LEVEL_LOW);
 
     irq = timer_get_irq(TIMER_VIRT_PPI);
     DPRINT("  Virt interrupt %u\n", irq);
-    set_interrupt_ppi(intrs[2], irq, 0xf, DT_IRQ_TYPE_LEVEL_LOW);
+    set_interrupt_ppi(intrs[2], irq, 0xf, IRQ_TYPE_LEVEL_LOW);
 
     res = fdt_property_interrupts(fdt, intrs, 3);
     if ( res )
@@ -1463,7 +1463,7 @@ static void evtchn_fixup(struct domain *d, struct kernel_info *kinfo)
      *  TODO: Handle properly the cpumask
      */
     set_interrupt_ppi(intr, d->arch.evtchn_irq, 0xf,
-                      DT_IRQ_TYPE_LEVEL_LOW);
+                      IRQ_TYPE_LEVEL_LOW);
     res = fdt_setprop_inplace(kinfo->fdt, node, "interrupts",
                               &intr, sizeof(intr));
     if ( res )

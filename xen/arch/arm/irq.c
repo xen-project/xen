@@ -66,7 +66,7 @@ irq_desc_t *__irq_to_desc(int irq)
 
 int __init arch_init_one_irq_desc(struct irq_desc *desc)
 {
-    desc->arch.type = DT_IRQ_TYPE_INVALID;
+    desc->arch.type = IRQ_TYPE_INVALID;
     return 0;
 }
 
@@ -117,7 +117,7 @@ void __init init_IRQ(void)
 
     spin_lock(&local_irqs_type_lock);
     for ( irq = 0; irq < NR_LOCAL_IRQS; irq++ )
-        local_irqs_type[irq] = DT_IRQ_TYPE_INVALID;
+        local_irqs_type[irq] = IRQ_TYPE_INVALID;
     spin_unlock(&local_irqs_type_lock);
 
     BUG_ON(init_local_irq_data() < 0);
@@ -449,7 +449,7 @@ int route_irq_to_guest(struct domain *d, unsigned int virq,
 
     spin_lock_irqsave(&desc->lock, flags);
 
-    if ( desc->arch.type == DT_IRQ_TYPE_INVALID )
+    if ( desc->arch.type == IRQ_TYPE_INVALID )
     {
         printk(XENLOG_G_ERR "IRQ %u has not been configured\n", irq);
         retval = -EIO;
@@ -591,7 +591,7 @@ void pirq_set_affinity(struct domain *d, int pirq, const cpumask_t *mask)
 
 static bool_t irq_validate_new_type(unsigned int curr, unsigned new)
 {
-    return (curr == DT_IRQ_TYPE_INVALID || curr == new );
+    return (curr == IRQ_TYPE_INVALID || curr == new );
 }
 
 int irq_set_spi_type(unsigned int spi, unsigned int type)

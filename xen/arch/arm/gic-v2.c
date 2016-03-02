@@ -209,16 +209,16 @@ static void gicv2_set_irq_properties(struct irq_desc *desc,
     unsigned int irq = desc->irq;
     unsigned int type = desc->arch.type;
 
-    ASSERT(type != DT_IRQ_TYPE_INVALID);
+    ASSERT(type != IRQ_TYPE_INVALID);
     ASSERT(spin_is_locked(&desc->lock));
 
     spin_lock(&gicv2.lock);
     /* Set edge / level */
     cfg = readl_gicd(GICD_ICFGR + (irq / 16) * 4);
     edgebit = 2u << (2 * (irq % 16));
-    if ( type & DT_IRQ_TYPE_LEVEL_MASK )
+    if ( type & IRQ_TYPE_LEVEL_MASK )
         cfg &= ~edgebit;
-    else if ( type & DT_IRQ_TYPE_EDGE_BOTH )
+    else if ( type & IRQ_TYPE_EDGE_BOTH )
         cfg |= edgebit;
     writel_gicd(cfg, GICD_ICFGR + (irq / 16) * 4);
 
@@ -232,8 +232,8 @@ static void gicv2_set_irq_properties(struct irq_desc *desc,
                cfg & edgebit ? "Edge" : "Level",
                actual & edgebit ? "Edge" : "Level");
         desc->arch.type = actual & edgebit ?
-            DT_IRQ_TYPE_EDGE_RISING :
-            DT_IRQ_TYPE_LEVEL_HIGH;
+            IRQ_TYPE_EDGE_RISING :
+            IRQ_TYPE_LEVEL_HIGH;
     }
 
     /* Set target CPU mask (RAZ/WI on uniprocessor) */
