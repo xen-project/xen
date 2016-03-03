@@ -17,7 +17,7 @@ void __flush_dcache_area(const void *vaddr, unsigned long size);
 static struct file __initdata dtbfile;
 static void __initdata *fdt;
 static void __initdata *memmap;
-#if defined (CONFIG_ACPI) && defined (CONFIG_ARM)
+#ifdef CONFIG_ACPI
 static struct meminfo __initdata acpi_mem;
 #endif
 
@@ -154,7 +154,7 @@ static EFI_STATUS __init efi_process_memory_map_bootinfo(EFI_MEMORY_DESCRIPTOR *
             bootinfo.mem.bank[i].size = desc_ptr->NumberOfPages * EFI_PAGE_SIZE;
             ++i;
         }
-#if defined (CONFIG_ACPI) && defined (CONFIG_ARM)
+#ifdef CONFIG_ACPI
         else if ( desc_ptr->Type == EfiACPIReclaimMemory )
         {
             if ( j >= NR_MEM_BANKS )
@@ -172,7 +172,7 @@ static EFI_STATUS __init efi_process_memory_map_bootinfo(EFI_MEMORY_DESCRIPTOR *
     }
 
     bootinfo.mem.nr_banks = i;
-#if defined (CONFIG_ACPI) && defined (CONFIG_ARM)
+#ifdef CONFIG_ACPI
     acpi_mem.nr_banks = j;
 #endif
     return EFI_SUCCESS;
