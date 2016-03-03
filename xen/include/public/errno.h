@@ -49,16 +49,19 @@ XEN_ERRNO(EBUSY,	16)	/* Device or resource busy */
 XEN_ERRNO(EEXIST,	17)	/* File exists */
 XEN_ERRNO(EXDEV,	18)	/* Cross-device link */
 XEN_ERRNO(ENODEV,	19)	/* No such device */
+XEN_ERRNO(EISDIR,	21)	/* Is a directory */
 XEN_ERRNO(EINVAL,	22)	/* Invalid argument */
 XEN_ERRNO(ENFILE,	23)	/* File table overflow */
 XEN_ERRNO(EMFILE,	24)	/* Too many open files */
 XEN_ERRNO(ENOSPC,	28)	/* No space left on device */
+XEN_ERRNO(EROFS,	30)	/* Read-only file system */
 XEN_ERRNO(EMLINK,	31)	/* Too many links */
 XEN_ERRNO(EDOM,		33)	/* Math argument out of domain of func */
 XEN_ERRNO(ERANGE,	34)	/* Math result not representable */
 XEN_ERRNO(EDEADLK,	35)	/* Resource deadlock would occur */
 XEN_ERRNO(ENAMETOOLONG,	36)	/* File name too long */
 XEN_ERRNO(ENOLCK,	37)	/* No record locks available */
+XEN_ERRNO(ENOTEMPTY,	39)	/* Directory not empty */
 XEN_ERRNO(ENOSYS,	38)	/* Function not implemented */
 XEN_ERRNO(ENODATA,	61)	/* No data available */
 XEN_ERRNO(ETIME,	62)	/* Timer expired */
