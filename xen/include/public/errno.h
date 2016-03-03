@@ -42,6 +42,7 @@ XEN_ERRNO(ENOEXEC,	 8)	/* Exec format error */
 XEN_ERRNO(EBADF,	 9)	/* Bad file number */
 XEN_ERRNO(ECHILD,	10)	/* No child processes */
 XEN_ERRNO(EAGAIN,	11)	/* Try again */
+XEN_ERRNO(EWOULDBLOCK,	11)	/* Operation would block.  Aliases EAGAIN */
 XEN_ERRNO(ENOMEM,	12)	/* Out of memory */
 XEN_ERRNO(EACCES,	13)	/* Permission denied */
 XEN_ERRNO(EFAULT,	14)	/* Bad address */
@@ -59,6 +60,7 @@ XEN_ERRNO(EMLINK,	31)	/* Too many links */
 XEN_ERRNO(EDOM,		33)	/* Math argument out of domain of func */
 XEN_ERRNO(ERANGE,	34)	/* Math result not representable */
 XEN_ERRNO(EDEADLK,	35)	/* Resource deadlock would occur */
+XEN_ERRNO(EDEADLOCK,	35)	/* Resource deadlock would occur. Aliases EDEADLK */
 XEN_ERRNO(ENAMETOOLONG,	36)	/* File name too long */
 XEN_ERRNO(ENOLCK,	37)	/* No record locks available */
 XEN_ERRNO(ENOTEMPTY,	39)	/* Directory not empty */
@@ -91,8 +93,5 @@ XEN_ERRNO(ETIMEDOUT,	110)	/* Connection timed out */
 #ifndef __ASSEMBLY__
 };
 #endif
-
-#define	XEN_EWOULDBLOCK	XEN_EAGAIN	/* Operation would block */
-#define	XEN_EDEADLOCK	XEN_EDEADLK	/* Resource deadlock would occur */
 
 #endif /*  __XEN_PUBLIC_ERRNO_H__ */
