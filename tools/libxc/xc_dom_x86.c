@@ -1550,13 +1550,10 @@ static int meminit_hvm(struct xc_dom_image *dom)
         }
 
         if ( rc != 0 )
-            break;
-    }
-
-    if ( rc != 0 )
-    {
-        DOMPRINTF("Could not allocate memory for HVM guest.");
-        goto error_out;
+        {
+            DOMPRINTF("Could not allocate memory for HVM guest.");
+            goto error_out;
+        }
     }
 
     DPRINTF("PHYSICAL MEMORY ALLOCATION:\n");
