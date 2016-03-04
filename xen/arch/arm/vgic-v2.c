@@ -361,11 +361,11 @@ static int vgic_v2_distr_mmio_write(struct vcpu *v, mmio_info_t *info)
         vgic_unlock_rank(v, rank, flags);
         return 1;
 
-    case GICD_ITARGETSR ... GICD_ITARGETSR + 7:
+    case GICD_ITARGETSR ... GICD_ITARGETSR7:
         /* SGI/PPI target is read only */
         goto write_ignore_32;
 
-    case GICD_ITARGETSR + 8 ... GICD_ITARGETSRN:
+    case GICD_ITARGETSR8 ... GICD_ITARGETSRN:
     {
         /* unsigned long needed for find_next_bit */
         unsigned long target;
