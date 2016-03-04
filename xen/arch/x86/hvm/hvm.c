@@ -2811,6 +2811,7 @@ void hvm_triple_fault(void)
     gprintk(XENLOG_INFO,
             "Triple fault - invoking HVM shutdown action %d\n",
             reason);
+    vcpu_show_execution_state(v);
     domain_shutdown(d, reason);
 }
 
