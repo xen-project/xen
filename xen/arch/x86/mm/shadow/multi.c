@@ -619,8 +619,7 @@ _sh_propagate(struct vcpu *v,
          *    gMTRR and gPAT.
          */
         if ( !mmio_mfn &&
-             (type = hvm_get_mem_pinned_cacheattr(d, gfn_x(target_gfn),
-                                                  0)) >= 0 )
+             (type = hvm_get_mem_pinned_cacheattr(d, target_gfn, 0)) >= 0 )
             sflags |= pat_type_2_pte_flags(type);
         else if ( d->arch.hvm_domain.is_in_uc_mode )
             sflags |= pat_type_2_pte_flags(PAT_TYPE_UNCACHABLE);

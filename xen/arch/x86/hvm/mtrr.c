@@ -545,7 +545,7 @@ void hvm_destroy_cacheattr_region_list(
 
 int hvm_get_mem_pinned_cacheattr(
     struct domain *d,
-    uint64_t guest_fn,
+    gfn_t gfn,
     unsigned int order)
 {
     struct hvm_mem_pinned_cacheattr_range *range;
@@ -559,14 +559,14 @@ int hvm_get_mem_pinned_cacheattr(
                               &d->arch.hvm_domain.pinned_cacheattr_ranges,
                               list )
     {
-        if ( ((guest_fn & mask) >= range->start) &&
-             ((guest_fn | ~mask) <= range->end) )
+        if ( ((gfn_x(gfn) & mask) >= range->start) &&
+             ((gfn_x(gfn) | ~mask) <= range->end) )
         {
             rc = range->type;
             break;
         }
-        if ( ((guest_fn & mask) <= range->end) &&
-             (range->start <= (guest_fn | ~mask)) )
+        if ( ((gfn_x(gfn) & mask) <= range->end) &&
+             ((gfn_x(gfn) | ~mask) >= range->start) )
         {
             rc = -EADDRNOTAVAIL;
             break;
@@ -808,7 +808,7 @@ int epte_get_entry_emt(struct domain *d, unsigned long gfn, mfn_t mfn,
         return MTRR_TYPE_WRBACK;
     }
 
-    gmtrr_mtype = hvm_get_mem_pinned_cacheattr(d, gfn, order);
+    gmtrr_mtype = hvm_get_mem_pinned_cacheattr(d, _gfn(gfn), order);
     if ( gmtrr_mtype >= 0 )
     {
         *ipat = 1;
