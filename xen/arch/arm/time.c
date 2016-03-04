@@ -119,7 +119,6 @@ static void __init preinit_dt_xen_time(void)
     };
     int res;
     u32 rate;
-    unsigned int i;
 
     timer = dt_find_matching_node(NULL, timer_ids);
     if ( !timer )
@@ -132,16 +131,6 @@ static void __init preinit_dt_xen_time(void)
     {
         cpu_khz = rate / 1000;
         timer_dt_clock_frequency = rate;
-    }
-
-    /* Retrieve all IRQs for the timer */
-    for ( i = TIMER_PHYS_SECURE_PPI; i < MAX_TIMER_PPI; i++ )
-    {
-        res = platform_get_irq(timer, i);
-
-        if ( res < 0 )
-            panic("Timer: Unable to retrieve IRQ %u from the device tree", i);
-        timer_irq[i] = res;
     }
 }
 
@@ -165,9 +154,28 @@ void __init preinit_xen_time(void)
     boot_count = READ_SYSREG64(CNTPCT_EL0);
 }
 
+static void __init init_dt_xen_time(void)
+{
+    int res;
+    unsigned int i;
+
+    /* Retrieve all IRQs for the timer */
+    for ( i = TIMER_PHYS_SECURE_PPI; i < MAX_TIMER_PPI; i++ )
+    {
+        res = platform_get_irq(timer, i);
+
+        if ( res < 0 )
+            panic("Timer: Unable to retrieve IRQ %u from the device tree", i);
+        timer_irq[i] = res;
+    }
+}
+
 /* Set up the timer on the boot CPU (late init function) */
 int __init init_xen_time(void)
 {
+    if ( acpi_disabled )
+        init_dt_xen_time();
+
     /* Check that this CPU supports the Generic Timer interface */
     if ( !cpu_has_gentimer )
         panic("CPU does not support the Generic Timer v1 interface");
