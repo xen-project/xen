@@ -802,7 +802,7 @@ int is_iomem_page(unsigned long mfn)
     return (page_get_owner(page) == dom_io);
 }
 
-static int update_xen_mappings(unsigned long mfn, unsigned long cacheattr)
+static int update_xen_mappings(unsigned long mfn, unsigned int cacheattr)
 {
     int err = 0;
     bool_t alias = mfn >= PFN_DOWN(xen_phys_start) &&
@@ -2136,7 +2136,7 @@ static int mod_l4_entry(l4_pgentry_t *pl4e,
 
 static int cleanup_page_cacheattr(struct page_info *page)
 {
-    uint32_t cacheattr =
+    unsigned int cacheattr =
         (page->count_info & PGC_cacheattr_mask) >> PGC_cacheattr_base;
 
     if ( likely(cacheattr == 0) )
