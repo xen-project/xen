@@ -2683,6 +2683,7 @@ void hvm_triple_fault(void)
     gdprintk(XENLOG_INFO, "Triple fault on VCPU%d - "
              "invoking HVM shutdown action %"PRIu8".\n",
              v->vcpu_id, reason);
+    vcpu_show_execution_state(v);
     domain_shutdown(d, reason);
 }
 
