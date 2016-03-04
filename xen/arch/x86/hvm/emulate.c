@@ -744,7 +744,7 @@ static int __hvmemul_read(
 
     rc = hvmemul_virtual_to_linear(
         seg, offset, bytes, &reps, access_type, hvmemul_ctxt, &addr);
-    if ( rc != X86EMUL_OKAY )
+    if ( rc != X86EMUL_OKAY || !bytes )
         return rc;
     if ( ((access_type != hvm_access_insn_fetch
            ? vio->mmio_access.read_access
@@ -810,13 +810,17 @@ static int hvmemul_insn_fetch(
         container_of(ctxt, struct hvm_emulate_ctxt, ctxt);
     unsigned int insn_off = offset - hvmemul_ctxt->insn_buf_eip;
 
-    /* Fall back if requested bytes are not in the prefetch cache. */
-    if ( unlikely((insn_off + bytes) > hvmemul_ctxt->insn_buf_bytes) )
+    /*
+     * Fall back if requested bytes are not in the prefetch cache.
+     * But always perform the (fake) read when bytes == 0.
+     */
+    if ( !bytes ||
+         unlikely((insn_off + bytes) > hvmemul_ctxt->insn_buf_bytes) )
     {
         int rc = __hvmemul_read(seg, offset, p_data, bytes,
                                 hvm_access_insn_fetch, hvmemul_ctxt);
 
-        if ( rc == X86EMUL_OKAY )
+        if ( rc == X86EMUL_OKAY && bytes )
         {
             ASSERT(insn_off + bytes <= sizeof(hvmemul_ctxt->insn_buf));
             memcpy(&hvmemul_ctxt->insn_buf[insn_off], p_data, bytes);
@@ -848,7 +852,7 @@ static int hvmemul_write(
 
     rc = hvmemul_virtual_to_linear(
         seg, offset, bytes, &reps, hvm_access_write, hvmemul_ctxt, &addr);
-    if ( rc != X86EMUL_OKAY )
+    if ( rc != X86EMUL_OKAY || !bytes )
         return rc;
 
     if ( vio->mmio_access.write_access &&

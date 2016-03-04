@@ -160,7 +160,7 @@ hvm_read(enum x86_segment seg,
 
     rc = hvm_translate_linear_addr(
         seg, offset, bytes, access_type, sh_ctxt, &addr);
-    if ( rc )
+    if ( rc || !bytes )
         return rc;
 
     if ( access_type == hvm_access_insn_fetch )
@@ -244,7 +244,7 @@ hvm_emulate_write(enum x86_segment seg,
 
     rc = hvm_translate_linear_addr(
         seg, offset, bytes, hvm_access_write, sh_ctxt, &addr);
-    if ( rc )
+    if ( rc || !bytes )
         return rc;
 
     return v->arch.paging.mode->shadow.x86_emulate_write(
