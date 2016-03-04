@@ -618,7 +618,8 @@ _sh_propagate(struct vcpu *v,
          * 3) if disables snoop control, compute the PAT index with
          *    gMTRR and gPAT.
          */
-        if ( hvm_get_mem_pinned_cacheattr(d, gfn_x(target_gfn), 0, &type) )
+        if ( !mmio_mfn &&
+             hvm_get_mem_pinned_cacheattr(d, gfn_x(target_gfn), 0, &type) )
             sflags |= pat_type_2_pte_flags(type);
         else if ( d->arch.hvm_domain.is_in_uc_mode )
             sflags |= pat_type_2_pte_flags(PAT_TYPE_UNCACHABLE);
