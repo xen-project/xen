@@ -521,14 +521,12 @@ struct hvm_mem_pinned_cacheattr_range {
 
 static DEFINE_RCU_READ_LOCK(pinned_cacheattr_rcu_lock);
 
-void hvm_init_cacheattr_region_list(
-    struct domain *d)
+void hvm_init_cacheattr_region_list(struct domain *d)
 {
     INIT_LIST_HEAD(&d->arch.hvm_domain.pinned_cacheattr_ranges);
 }
 
-void hvm_destroy_cacheattr_region_list(
-    struct domain *d)
+void hvm_destroy_cacheattr_region_list(struct domain *d)
 {
     struct list_head *head = &d->arch.hvm_domain.pinned_cacheattr_ranges;
     struct hvm_mem_pinned_cacheattr_range *range;
@@ -543,10 +541,8 @@ void hvm_destroy_cacheattr_region_list(
     }
 }
 
-int hvm_get_mem_pinned_cacheattr(
-    struct domain *d,
-    gfn_t gfn,
-    unsigned int order)
+int hvm_get_mem_pinned_cacheattr(struct domain *d, gfn_t gfn,
+                                 unsigned int order)
 {
     struct hvm_mem_pinned_cacheattr_range *range;
     uint64_t mask = ~(uint64_t)0 << order;
@@ -582,11 +578,8 @@ static void free_pinned_cacheattr_entry(struct rcu_head *rcu)
     xfree(container_of(rcu, struct hvm_mem_pinned_cacheattr_range, rcu));
 }
 
-int32_t hvm_set_mem_pinned_cacheattr(
-    struct domain *d,
-    uint64_t gfn_start,
-    uint64_t gfn_end,
-    uint32_t  type)
+int hvm_set_mem_pinned_cacheattr(struct domain *d, uint64_t gfn_start,
+                                 uint64_t gfn_end, uint32_t type)
 {
     struct hvm_mem_pinned_cacheattr_range *range;
     int rc = 1;
@@ -597,8 +590,9 @@ int32_t hvm_set_mem_pinned_cacheattr(
     if ( gfn_end < gfn_start || (gfn_start | gfn_end) >> paddr_bits )
         return -EINVAL;
 
-    if ( type == XEN_DOMCTL_DELETE_MEM_CACHEATTR )
+    switch ( type )
     {
+    case XEN_DOMCTL_DELETE_MEM_CACHEATTR:
         /* Remove the requested range. */
         rcu_read_lock(&pinned_cacheattr_rcu_lock);
         list_for_each_entry_rcu ( range,
@@ -630,16 +624,18 @@ int32_t hvm_set_mem_pinned_cacheattr(
             }
         rcu_read_unlock(&pinned_cacheattr_rcu_lock);
         return -ENOENT;
-    }
 
-    if ( !((type == PAT_TYPE_UNCACHABLE) ||
-           (type == PAT_TYPE_WRCOMB) ||
-           (type == PAT_TYPE_WRTHROUGH) ||
-           (type == PAT_TYPE_WRPROT) ||
-           (type == PAT_TYPE_WRBACK) ||
-           (type == PAT_TYPE_UC_MINUS)) ||
-         !is_hvm_domain(d) )
+    case PAT_TYPE_UC_MINUS:
+    case PAT_TYPE_UNCACHABLE:
+    case PAT_TYPE_WRBACK:
+    case PAT_TYPE_WRCOMB:
+    case PAT_TYPE_WRPROT:
+    case PAT_TYPE_WRTHROUGH:
+        break;
+
+    default:
         return -EINVAL;
+    }
 
     rcu_read_lock(&pinned_cacheattr_rcu_lock);
     list_for_each_entry_rcu ( range,
