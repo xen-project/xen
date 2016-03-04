@@ -14,20 +14,20 @@ matrix:
           env: XEN_TARGET_ARCH=x86_64
         - compiler: gcc
           env: XEN_TARGET_ARCH=x86_64 XEN_CONFIG_EXPERT=y RANDCONFIG=y
-        - compiler: gcc
-          env: XEN_TARGET_ARCH=x86_64 COMPILER=gcc-5
+        - compiler: gcc-5
+          env: XEN_TARGET_ARCH=x86_64
         - compiler: gcc
           env: XEN_TARGET_ARCH=x86_64 debug=y
-        - compiler: gcc
-          env: XEN_TARGET_ARCH=x86_64 COMPILER=gcc-5 debug=y
+        - compiler: gcc-5
+          env: XEN_TARGET_ARCH=x86_64 debug=y
         - compiler: clang
           env: XEN_TARGET_ARCH=x86_64 clang=y
-        - compiler: clang
-          env: XEN_TARGET_ARCH=x86_64 COMPILER=clang-3.8 clang=y
+        - compiler: clang-3.8
+          env: XEN_TARGET_ARCH=x86_64 clang=y
         - compiler: clang
           env: XEN_TARGET_ARCH=x86_64 clang=y debug=y
-        - compiler: clang
-          env: XEN_TARGET_ARCH=x86_64 COMPILER=clang-3.8 clang=y debug=y
+        - compiler: clang-3.8
+          env: XEN_TARGET_ARCH=x86_64 clang=y debug=y
         - compiler: gcc
           env: XEN_TARGET_ARCH=arm32 CROSS_COMPILE=arm-linux-gnueabihf-
         - compiler: gcc
@@ -73,15 +73,18 @@ addons:
             - gcc-arm-linux-gnueabihf
             - gcc-aarch64-linux-gnu
             - gcc-5
+            - g++-5
             - clang-3.8
+# we must set CXX manually instead of using 'language: cpp' due to
+# travis-ci/travis-ci#3871
 before_script:
-    - export CC=${COMPILER:-${CC}}
-    - ${CC} --version
+    - export CXX=${CC/cc/++}
+    - export CXX=${CXX/clang/clang++}
 script:
     - ( [ "x${RANDCONFIG}" = "xy" ] && ( make -C xen randconfig )
       || exit 0 )
     - ( ./configure --disable-tools --disable-stubdom --enable-docs &&
-      make CC="${CROSS_COMPILE}${CC}" HOSTCC="${CC}" dist )
+      make dist )
 after_script:
     - cat xen/.config
 notifications:
