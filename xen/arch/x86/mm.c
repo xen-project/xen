@@ -4942,10 +4942,11 @@ static int ptwr_emulated_read(
     unsigned int bytes,
     struct x86_emulate_ctxt *ctxt)
 {
-    unsigned int rc;
+    unsigned int rc = bytes;
     unsigned long addr = offset;
 
-    if ( (rc = copy_from_user(p_data, (void *)addr, bytes)) != 0 )
+    if ( !__addr_ok(addr) ||
+         (rc = __copy_from_user(p_data, (void *)addr, bytes)) )
     {
         propagate_page_fault(addr + bytes - rc, 0); /* read fault */
         return X86EMUL_EXCEPTION;
@@ -5094,7 +5095,7 @@ static int ptwr_emulated_write(
 {
     paddr_t val = 0;
 
-    if ( (bytes > sizeof(paddr_t)) || (bytes & (bytes -1)) )
+    if ( (bytes > sizeof(paddr_t)) || (bytes & (bytes - 1)) || !bytes )
     {
         MEM_LOG("ptwr_emulate: bad write size (addr=%lx, bytes=%u)",
                 offset, bytes);
@@ -5225,7 +5226,8 @@ static int mmio_ro_emulated_write(
         container_of(ctxt, struct mmio_ro_emulate_ctxt, ctxt);
 
     /* Only allow naturally-aligned stores at the original %cr2 address. */
-    if ( ((bytes | offset) & (bytes - 1)) || offset != mmio_ro_ctxt->cr2 )
+    if ( ((bytes | offset) & (bytes - 1)) || !bytes ||
+         offset != mmio_ro_ctxt->cr2 )
     {
         MEM_LOG("mmio_ro_emulate: bad access (cr2=%lx, addr=%lx, bytes=%u)",
                 mmio_ro_ctxt->cr2, offset, bytes);

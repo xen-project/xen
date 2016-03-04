@@ -8,6 +8,8 @@
 
 typedef bool bool_t;
 
+#define is_canonical_address(x) (((int64_t)(x) >> 47) == ((int64_t)(x) >> 63))
+
 #define BUG() abort()
 #define ASSERT assert
 

@@ -652,13 +652,25 @@ do {                                                                    \
 
 #define jmp_rel(rel)                                                    \
 do {                                                                    \
-    int _rel = (int)(rel);                                              \
-    _regs.eip += _rel;                                                  \
+    unsigned long ip = _regs.eip + (int)(rel);                          \
     if ( op_bytes == 2 )                                                \
-        _regs.eip = (uint16_t)_regs.eip;                                \
+        ip = (uint16_t)ip;                                              \
     else if ( !mode_64bit() )                                           \
-        _regs.eip = (uint32_t)_regs.eip;                                \
+        ip = (uint32_t)ip;                                              \
+    rc = ops->insn_fetch(x86_seg_cs, ip, NULL, 0, ctxt);                \
+    if ( rc ) goto done;                                                \
+    _regs.eip = ip;                                                     \
 } while (0)
+
+#define validate_far_branch(cs, ip)                                     \
+    generate_exception_if(in_longmode(ctxt, ops) && (cs)->attr.fields.l \
+                          ? !is_canonical_address(ip)                   \
+                          : (ip) > (cs)->limit, EXC_GP, 0)
+
+#define commit_far_branch(cs, ip) ({                                    \
+    validate_far_branch(cs, ip);                                        \
+    ops->write_segment(x86_seg_cs, cs, ctxt);                           \
+})
 
 struct fpu_insn_ctxt {
     uint8_t insn_bytes;
@@ -1104,29 +1116,30 @@ static int
 realmode_load_seg(
     enum x86_segment seg,
     uint16_t sel,
+    struct segment_register *sreg,
     struct x86_emulate_ctxt *ctxt,
     const struct x86_emulate_ops *ops)
 {
-    struct segment_register reg;
-    int rc;
+    int rc = ops->read_segment(seg, sreg, ctxt);
 
-    if ( (rc = ops->read_segment(seg, &reg, ctxt)) != 0 )
-        return rc;
+    if ( !rc )
+    {
+        sreg->sel  = sel;
+        sreg->base = (uint32_t)sel << 4;
+    }
 
-    reg.sel  = sel;
-    reg.base = (uint32_t)sel << 4;
-
-    return ops->write_segment(seg, &reg, ctxt);
+    return rc;
 }
 
 static int
 protmode_load_seg(
     enum x86_segment seg,
     uint16_t sel, bool_t is_ret,
+    struct segment_register *sreg,
     struct x86_emulate_ctxt *ctxt,
     const struct x86_emulate_ops *ops)
 {
-    struct segment_register desctab, ss, segr;
+    struct segment_register desctab, ss;
     struct { uint32_t a, b; } desc;
     uint8_t dpl, rpl, cpl;
     uint32_t new_desc_b, a_flag = 0x100;
@@ -1137,8 +1150,8 @@ protmode_load_seg(
     {
         if ( (seg == x86_seg_cs) || (seg == x86_seg_ss) )
             goto raise_exn;
-        memset(&segr, 0, sizeof(segr));
-        return ops->write_segment(seg, &segr, ctxt);
+        memset(sreg, 0, sizeof(*sreg));
+        return X86EMUL_OKAY;
     }
 
     /* System segment descriptors must reside in the GDT. */
@@ -1247,16 +1260,16 @@ protmode_load_seg(
     desc.b |= a_flag;
 
  skip_accessed_flag:
-    segr.base = (((desc.b <<  0) & 0xff000000u) |
-                 ((desc.b << 16) & 0x00ff0000u) |
-                 ((desc.a >> 16) & 0x0000ffffu));
-    segr.attr.bytes = (((desc.b >>  8) & 0x00ffu) |
-                       ((desc.b >> 12) & 0x0f00u));
-    segr.limit = (desc.b & 0x000f0000u) | (desc.a & 0x0000ffffu);
-    if ( segr.attr.fields.g )
-        segr.limit = (segr.limit << 12) | 0xfffu;
-    segr.sel = sel;
-    return ops->write_segment(seg, &segr, ctxt);
+    sreg->base = (((desc.b <<  0) & 0xff000000u) |
+                  ((desc.b << 16) & 0x00ff0000u) |
+                  ((desc.a >> 16) & 0x0000ffffu));
+    sreg->attr.bytes = (((desc.b >>  8) & 0x00ffu) |
+                        ((desc.b >> 12) & 0x0f00u));
+    sreg->limit = (desc.b & 0x000f0000u) | (desc.a & 0x0000ffffu);
+    if ( sreg->attr.fields.g )
+        sreg->limit = (sreg->limit << 12) | 0xfffu;
+    sreg->sel = sel;
+    return X86EMUL_OKAY;
 
  raise_exn:
     if ( ops->inject_hw_exception == NULL )
@@ -1270,17 +1283,29 @@ static int
 load_seg(
     enum x86_segment seg,
     uint16_t sel, bool_t is_ret,
+    struct segment_register *sreg,
     struct x86_emulate_ctxt *ctxt,
     const struct x86_emulate_ops *ops)
 {
+    struct segment_register reg;
+    int rc;
+
     if ( (ops->read_segment == NULL) ||
          (ops->write_segment == NULL) )
         return X86EMUL_UNHANDLEABLE;
 
-    if ( in_protmode(ctxt, ops) )
-        return protmode_load_seg(seg, sel, is_ret, ctxt, ops);
+    if ( !sreg )
+        sreg = &reg;
 
-    return realmode_load_seg(seg, sel, ctxt, ops);
+    if ( in_protmode(ctxt, ops) )
+        rc = protmode_load_seg(seg, sel, is_ret, sreg, ctxt, ops);
+    else
+        rc = realmode_load_seg(seg, sel, sreg, ctxt, ops);
+
+    if ( !rc && sreg == &reg )
+        rc = ops->write_segment(seg, sreg, ctxt);
+
+    return rc;
 }
 
 void *
@@ -1964,6 +1989,8 @@ x86_emulate(
 
     switch ( b )
     {
+        struct segment_register cs;
+
     case 0x00 ... 0x05: add: /* add */
         emulate_2op_SrcV("add", src, dst, _regs.eflags);
         break;
@@ -2025,7 +2052,7 @@ x86_emulate(
         if ( (rc = read_ulong(x86_seg_ss, sp_post_inc(op_bytes),
                               &dst.val, op_bytes, ctxt, ops)) != 0 )
             goto done;
-        if ( (rc = load_seg(src.val, dst.val, 0, ctxt, ops)) != 0 )
+        if ( (rc = load_seg(src.val, dst.val, 0, NULL, ctxt, ops)) != 0 )
             return rc;
         break;
 
@@ -2379,7 +2406,7 @@ x86_emulate(
         enum x86_segment seg = decode_segment(modrm_reg);
         generate_exception_if(seg == decode_segment_failed, EXC_UD, -1);
         generate_exception_if(seg == x86_seg_cs, EXC_UD, -1);
-        if ( (rc = load_seg(seg, src.val, 0, ctxt, ops)) != 0 )
+        if ( (rc = load_seg(seg, src.val, 0, NULL, ctxt, ops)) != 0 )
             goto done;
         if ( seg == x86_seg_ss )
             ctxt->retire.flags.mov_ss = 1;
@@ -2454,14 +2481,15 @@ x86_emulate(
         sel = insn_fetch_type(uint16_t);
 
         if ( (rc = ops->read_segment(x86_seg_cs, &reg, ctxt)) ||
-             (rc = ops->write(x86_seg_ss, sp_pre_dec(op_bytes),
+             (rc = load_seg(x86_seg_cs, sel, 0, &cs, ctxt, ops)) ||
+             (validate_far_branch(&cs, eip),
+              rc = ops->write(x86_seg_ss, sp_pre_dec(op_bytes),
                               &reg.sel, op_bytes, ctxt)) ||
              (rc = ops->write(x86_seg_ss, sp_pre_dec(op_bytes),
-                              &_regs.eip, op_bytes, ctxt)) )
+                              &_regs.eip, op_bytes, ctxt)) ||
+             (rc = ops->write_segment(x86_seg_cs, &cs, ctxt)) )
             goto done;
 
-        if ( (rc = load_seg(x86_seg_cs, sel, 0, ctxt, ops)) != 0 )
-            goto done;
         _regs.eip = eip;
         break;
     }
@@ -2669,7 +2697,8 @@ x86_emulate(
         int offset = (b == 0xc2) ? insn_fetch_type(uint16_t) : 0;
         op_bytes = ((op_bytes == 4) && mode_64bit()) ? 8 : op_bytes;
         if ( (rc = read_ulong(x86_seg_ss, sp_post_inc(op_bytes + offset),
-                              &dst.val, op_bytes, ctxt, ops)) != 0 )
+                              &dst.val, op_bytes, ctxt, ops)) != 0 ||
+             (rc = ops->insn_fetch(x86_seg_cs, dst.val, NULL, 0, ctxt)) )
             goto done;
         _regs.eip = dst.val;
         break;
@@ -2684,7 +2713,7 @@ x86_emulate(
         if ( (rc = read_ulong(src.mem.seg, src.mem.off + src.bytes,
                               &sel, 2, ctxt, ops)) != 0 )
             goto done;
-        if ( (rc = load_seg(dst.val, sel, 0, ctxt, ops)) != 0 )
+        if ( (rc = load_seg(dst.val, sel, 0, NULL, ctxt, ops)) != 0 )
             goto done;
         dst.val = src.val;
         break;
@@ -2758,7 +2787,8 @@ x86_emulate(
                               &dst.val, op_bytes, ctxt, ops)) ||
              (rc = read_ulong(x86_seg_ss, sp_post_inc(op_bytes + offset),
                               &src.val, op_bytes, ctxt, ops)) ||
-             (rc = load_seg(x86_seg_cs, src.val, 1, ctxt, ops)) )
+             (rc = load_seg(x86_seg_cs, src.val, 1, &cs, ctxt, ops)) ||
+             (rc = commit_far_branch(&cs, dst.val)) )
             goto done;
         _regs.eip = dst.val;
         break;
@@ -2787,7 +2817,7 @@ x86_emulate(
         goto swint;
 
     case 0xcf: /* iret */ {
-        unsigned long cs, eip, eflags;
+        unsigned long sel, eip, eflags;
         uint32_t mask = EFLG_VIP | EFLG_VIF | EFLG_VM;
         if ( !mode_ring0() )
             mask |= EFLG_IOPL;
@@ -2797,7 +2827,7 @@ x86_emulate(
         if ( (rc = read_ulong(x86_seg_ss, sp_post_inc(op_bytes),
                               &eip, op_bytes, ctxt, ops)) ||
              (rc = read_ulong(x86_seg_ss, sp_post_inc(op_bytes),
-                              &cs, op_bytes, ctxt, ops)) ||
+                              &sel, op_bytes, ctxt, ops)) ||
              (rc = read_ulong(x86_seg_ss, sp_post_inc(op_bytes),
                               &eflags, op_bytes, ctxt, ops)) )
             goto done;
@@ -2807,7 +2837,8 @@ x86_emulate(
         _regs.eflags &= mask;
         _regs.eflags |= (uint32_t)(eflags & ~mask) | 0x02;
         _regs.eip = eip;
-        if ( (rc = load_seg(x86_seg_cs, cs, 1, ctxt, ops)) != 0 )
+        if ( (rc = load_seg(x86_seg_cs, sel, 1, &cs, ctxt, ops)) ||
+             (rc = commit_far_branch(&cs, eip)) )
             goto done;
         break;
     }
@@ -3437,7 +3468,8 @@ x86_emulate(
         generate_exception_if(mode_64bit(), EXC_UD, -1);
         eip = insn_fetch_bytes(op_bytes);
         sel = insn_fetch_type(uint16_t);
-        if ( (rc = load_seg(x86_seg_cs, sel, 0, ctxt, ops)) != 0 )
+        if ( (rc = load_seg(x86_seg_cs, sel, 0, &cs, ctxt, ops)) ||
+             (rc = commit_far_branch(&cs, eip)) )
             goto done;
         _regs.eip = eip;
         break;
@@ -3707,10 +3739,14 @@ x86_emulate(
             break;
         case 2: /* call (near) */
             dst.val = _regs.eip;
+            if ( (rc = ops->insn_fetch(x86_seg_cs, src.val, NULL, 0, ctxt)) )
+                goto done;
             _regs.eip = src.val;
             src.val = dst.val;
             goto push;
         case 4: /* jmp (near) */
+            if ( (rc = ops->insn_fetch(x86_seg_cs, src.val, NULL, 0, ctxt)) )
+                goto done;
             _regs.eip = src.val;
             dst.type = OP_NONE;
             break;
@@ -3729,14 +3765,17 @@ x86_emulate(
                 struct segment_register reg;
                 fail_if(ops->read_segment == NULL);
                 if ( (rc = ops->read_segment(x86_seg_cs, &reg, ctxt)) ||
-                     (rc = ops->write(x86_seg_ss, sp_pre_dec(op_bytes),
+                     (rc = load_seg(x86_seg_cs, sel, 0, &cs, ctxt, ops)) ||
+                     (validate_far_branch(&cs, src.val),
+                      rc = ops->write(x86_seg_ss, sp_pre_dec(op_bytes),
                                       &reg.sel, op_bytes, ctxt)) ||
                      (rc = ops->write(x86_seg_ss, sp_pre_dec(op_bytes),
-                                      &_regs.eip, op_bytes, ctxt)) )
+                                      &_regs.eip, op_bytes, ctxt)) ||
+                     (rc = ops->write_segment(x86_seg_cs, &cs, ctxt)) )
                     goto done;
             }
-
-            if ( (rc = load_seg(x86_seg_cs, sel, 0, ctxt, ops)) != 0 )
+            else if ( (rc = load_seg(x86_seg_cs, sel, 0, &cs, ctxt, ops)) ||
+                      (rc = commit_far_branch(&cs, src.val)) )
                 goto done;
             _regs.eip = src.val;
 
@@ -3818,7 +3857,7 @@ x86_emulate(
         generate_exception_if(!in_protmode(ctxt, ops), EXC_UD, -1);
         generate_exception_if(!mode_ring0(), EXC_GP, 0);
         if ( (rc = load_seg((modrm_reg & 1) ? x86_seg_tr : x86_seg_ldtr,
-                            src.val, 0, ctxt, ops)) != 0 )
+                            src.val, 0, NULL, ctxt, ops)) != 0 )
             goto done;
         break;
 
@@ -4222,6 +4261,9 @@ x86_emulate(
             goto done;
 
         generate_exception_if(!(msr_content & 0xfffc), EXC_GP, 0);
+        generate_exception_if(user64 && (!is_canonical_address(_regs.edx) ||
+                                         !is_canonical_address(_regs.ecx)),
+                              EXC_GP, 0);
 
         cs.sel = (msr_content | 3) + /* SELECTOR_RPL_MASK */
                  (user64 ? 32 : 16);

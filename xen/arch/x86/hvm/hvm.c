@@ -3383,7 +3383,7 @@ int hvm_virtual_to_linear_addr(
          * Certain of them are not done in native real mode anyway.
          */
         addr = (uint32_t)(addr + reg->base);
-        last_byte = (uint32_t)addr + bytes - 1;
+        last_byte = (uint32_t)addr + bytes - !!bytes;
         if ( last_byte < addr )
             return 0;
     }
@@ -3407,7 +3407,7 @@ int hvm_virtual_to_linear_addr(
             break;
         }
 
-        last_byte = (uint32_t)offset + bytes - 1;
+        last_byte = (uint32_t)offset + bytes - !!bytes;
 
         /* Is this a grows-down data segment? Special limit check if so. */
         if ( (reg->attr.fields.type & 0xc) == 0x4 )
@@ -3438,7 +3438,7 @@ int hvm_virtual_to_linear_addr(
         if ( (seg == x86_seg_fs) || (seg == x86_seg_gs) )
             addr += reg->base;
 
-        last_byte = addr + bytes - 1;
+        last_byte = addr + bytes - !!bytes;
         if ( !is_canonical_address(addr) || last_byte < addr ||
              !is_canonical_address(last_byte) )
             return 0;
