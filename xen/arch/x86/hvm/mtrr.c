@@ -546,17 +546,13 @@ void hvm_destroy_cacheattr_region_list(
 int hvm_get_mem_pinned_cacheattr(
     struct domain *d,
     uint64_t guest_fn,
-    unsigned int order,
-    uint32_t *type)
+    unsigned int order)
 {
     struct hvm_mem_pinned_cacheattr_range *range;
     uint64_t mask = ~(uint64_t)0 << order;
-    int rc = 0;
+    int rc = -ENXIO;
 
-    *type = ~0;
-
-    if ( !is_hvm_domain(d) )
-        return 0;
+    ASSERT(has_hvm_container_domain(d));
 
     rcu_read_lock(&pinned_cacheattr_rcu_lock);
     list_for_each_entry_rcu ( range,
@@ -566,14 +562,13 @@ int hvm_get_mem_pinned_cacheattr(
         if ( ((guest_fn & mask) >= range->start) &&
              ((guest_fn | ~mask) <= range->end) )
         {
-            *type = range->type;
-            rc = 1;
+            rc = range->type;
             break;
         }
         if ( ((guest_fn & mask) <= range->end) &&
              (range->start <= (guest_fn | ~mask)) )
         {
-            rc = -1;
+            rc = -EADDRNOTAVAIL;
             break;
         }
     }
@@ -762,7 +757,6 @@ int epte_get_entry_emt(struct domain *d, unsigned long gfn, mfn_t mfn,
                        unsigned int order, uint8_t *ipat, bool_t direct_mmio)
 {
     int gmtrr_mtype, hmtrr_mtype;
-    uint32_t type;
     struct vcpu *v = current;
 
     *ipat = 0;
@@ -798,14 +792,15 @@ int epte_get_entry_emt(struct domain *d, unsigned long gfn, mfn_t mfn,
         return MTRR_TYPE_WRBACK;
     }
 
-    switch ( hvm_get_mem_pinned_cacheattr(d, gfn, order, &type) )
+    gmtrr_mtype = hvm_get_mem_pinned_cacheattr(d, gfn, order);
+    if ( gmtrr_mtype >= 0 )
     {
-    case 1:
         *ipat = 1;
-        return type != PAT_TYPE_UC_MINUS ? type : PAT_TYPE_UNCACHABLE;
-    case -1:
-        return -1;
+        return gmtrr_mtype != PAT_TYPE_UC_MINUS ? gmtrr_mtype
+                                                : MTRR_TYPE_UNCACHABLE;
     }
+    if ( gmtrr_mtype == -EADDRNOTAVAIL )
+        return -1;
 
     gmtrr_mtype = is_hvm_domain(d) && v ?
                   get_mtrr_type(&v->arch.hvm_vcpu.mtrr,

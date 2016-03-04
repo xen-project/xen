@@ -607,7 +607,7 @@ _sh_propagate(struct vcpu *v,
     if ( (level == 1) && is_hvm_domain(d) &&
          !is_xen_heap_mfn(mfn_x(target_mfn)) )
     {
-        unsigned int type;
+        int type;
 
         ASSERT(!(sflags & (_PAGE_PAT | _PAGE_PCD | _PAGE_PWT)));
 
@@ -619,7 +619,8 @@ _sh_propagate(struct vcpu *v,
          *    gMTRR and gPAT.
          */
         if ( !mmio_mfn &&
-             hvm_get_mem_pinned_cacheattr(d, gfn_x(target_gfn), 0, &type) )
+             (type = hvm_get_mem_pinned_cacheattr(d, gfn_x(target_gfn),
+                                                  0)) >= 0 )
             sflags |= pat_type_2_pte_flags(type);
         else if ( d->arch.hvm_domain.is_in_uc_mode )
             sflags |= pat_type_2_pte_flags(PAT_TYPE_UNCACHABLE);

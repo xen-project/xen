@@ -8,15 +8,13 @@ void hvm_destroy_cacheattr_region_list(
 
 /*
  * To see guest_fn is in the pinned range or not,
- * if yes, return 1, and set type to value in this range
- * if no,  return 0, setting type to ~0
- * if ambiguous, return -1, setting type to ~0 (possible only for order > 0)
+ * if yes, return the (non-negative) type
+ * if no or ambiguous, return a negative error code
  */
 int hvm_get_mem_pinned_cacheattr(
     struct domain *d,
     uint64_t guest_fn,
-    unsigned int order,
-    uint32_t *type);
+    unsigned int order);
 
 
 /* Set pinned caching type for a domain. */
