@@ -1,6 +1,13 @@
 language: c
 dist: trusty
 sudo: required
+# don't test master, smoke and coverity branches
+branches:
+    except:
+        - master
+        - smoke
+        - /^coverity-tested\/.*/
+        - /^stable-.*/
 matrix:
     include:
         - compiler: gcc
