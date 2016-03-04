@@ -591,8 +591,11 @@ int32_t hvm_set_mem_pinned_cacheattr(
     struct hvm_mem_pinned_cacheattr_range *range;
     int rc = 1;
 
-    if ( !is_hvm_domain(d) || gfn_end < gfn_start )
-        return 0;
+    if ( !is_hvm_domain(d) )
+        return -EOPNOTSUPP;
+
+    if ( gfn_end < gfn_start || (gfn_start | gfn_end) >> paddr_bits )
+        return -EINVAL;
 
     if ( type == XEN_DOMCTL_DELETE_MEM_CACHEATTR )
     {
