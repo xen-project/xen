@@ -1,18 +1,16 @@
 #ifndef __XEN_ERRNO_H__
 #define __XEN_ERRNO_H__
 
-#include <public/errno.h>
-
 #ifndef __ASSEMBLY__
 
-#define XEN_ERRNO(name, value) name = XEN_##name,
+#define XEN_ERRNO(name, value) name = value,
 enum {
 #include <public/errno.h>
 };
 
 #else /* !__ASSEMBLY__ */
 
-#define XEN_ERRNO(name, value) .equ name, XEN_##name
+#define XEN_ERRNO(name, value) .equ name, value
 #include <public/errno.h>
 
 #endif /* __ASSEMBLY__ */
