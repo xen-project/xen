@@ -27,7 +27,6 @@
 
 #include "util.h"
 #include "hypercall.h"
-#include <errno.h>
 #include <xen/sched.h>
 #include <xen/event_channel.h>
 #include <xen/hvm/params.h>

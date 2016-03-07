@@ -9,6 +9,15 @@
 #include <xen/hvm/hvm_info_table.h>
 #include "e820.h"
 
+/* Request un-prefixed values from errno.h. */
+#define XEN_ERRNO(name, value) name = value,
+enum {
+#include <xen/errno.h>
+};
+
+/* Cause xs_wire.h to give us xsd_errors[]. */
+#define EINVAL EINVAL
+
 #define __STR(...) #__VA_ARGS__
 #define STR(...) __STR(__VA_ARGS__)
 

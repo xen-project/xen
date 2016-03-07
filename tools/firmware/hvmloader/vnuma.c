@@ -28,7 +28,6 @@
 #include "util.h"
 #include "hypercall.h"
 #include "vnuma.h"
-#include <xen/errno.h>
 
 unsigned int nr_vnodes, nr_vmemranges;
 unsigned int *vcpu_to_vnode, *vdistance;
@@ -40,7 +39,7 @@ void init_vnuma_info(void)
     struct xen_vnuma_topology_info vnuma_topo = { .domid = DOMID_SELF };
 
     rc = hypercall_memory_op(XENMEM_get_vnumainfo, &vnuma_topo);
-    if ( rc != -XEN_ENOBUFS )
+    if ( rc != -ENOBUFS )
         return;
 
     ASSERT(vnuma_topo.nr_vcpus == hvm_info->nr_vcpus);
