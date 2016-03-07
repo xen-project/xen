@@ -1,4 +1,31 @@
+/*
+ * There are two expected ways of including this header.
+ *
+ * 1) The "default" case (expected from tools etc).
+ *
+ * Simply #include <public/errno.h>
+ *
+ * In this circumstance, normal header guards apply and the includer shall get
+ * an enumeration in the XEN_xxx namespace, appropriate for C or assembly.
+ *
+ * 2) The special case where the includer provides a XEN_ERRNO() in scope.
+ *
+ * In this case, no inclusion guards apply and the caller is responsible for
+ * their XEN_ERRNO() being appropriate in the included context.  The header
+ * will unilaterally #undef XEN_ERRNO().
+ */
+
+#ifndef XEN_ERRNO
+
+/*
+ * Includer has not provided a custom XEN_ERRNO().  Arrange for normal header
+ * guards, an automatic enum (for C code) and constants in the XEN_xxx
+ * namespace.
+ */
 #ifndef __XEN_PUBLIC_ERRNO_H__
+#define __XEN_PUBLIC_ERRNO_H__
+
+#define XEN_ERRNO_DEFAULT_INCLUDE
 
 #ifndef __ASSEMBLY__
 
@@ -11,10 +38,11 @@ enum xen_errno {
 
 #endif /* __ASSEMBLY__ */
 
+#endif /* __XEN_PUBLIC_ERRNO_H__ */
+#endif /* !XEN_ERRNO */
+
 /* ` enum neg_errnoval {  [ -Efoo for each Efoo in the list below ]  } */
 /* ` enum errnoval { */
-
-#endif /* __XEN_PUBLIC_ERRNO_H__ */
 
 #ifdef XEN_ERRNO
 
@@ -84,14 +112,13 @@ XEN_ERRNO(ETIMEDOUT,	110)	/* Connection timed out */
 
 #undef XEN_ERRNO
 #endif /* XEN_ERRNO */
-
-#ifndef __XEN_PUBLIC_ERRNO_H__
-#define __XEN_PUBLIC_ERRNO_H__
-
 /* ` } */
 
+/* Clean up from a default include.  Close the enum (for C). */
+#ifdef XEN_ERRNO_DEFAULT_INCLUDE
+#undef XEN_ERRNO_DEFAULT_INCLUDE
 #ifndef __ASSEMBLY__
 };
 #endif
 
-#endif /*  __XEN_PUBLIC_ERRNO_H__ */
+#endif /* XEN_ERRNO_DEFAULT_INCLUDE */
