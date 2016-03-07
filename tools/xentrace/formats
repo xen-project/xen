@@ -19,22 +19,51 @@
 0x00021311  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  offline_to_runnable [ dom:vcpu = 0x%(1)08x ]
 0x00021321  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  offline_to_blocked  [ dom:vcpu = 0x%(1)08x ]
 
-0x00028001  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  sched_add_domain  [ domid = 0x%(1)08x, edomid = 0x%(2)08x ]
-0x00028002  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  sched_rem_domain  [ domid = 0x%(1)08x, edomid = 0x%(2)08x ]
-0x00028003  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  domain_sleep      [ domid = 0x%(1)08x, edomid = 0x%(2)08x ]
-0x00028004  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  domain_wake       [ domid = 0x%(1)08x, edomid = 0x%(2)08x ]
-0x00028005  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  do_yield          [ domid = 0x%(1)08x, edomid = 0x%(2)08x ]
-0x00028006  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  do_block          [ domid = 0x%(1)08x, edomid = 0x%(2)08x ]
-0x00022006  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  do_block          [ dom:vcpu = 0x%(1)08x, domid = 0x%(2)08x ]
-0x00028007  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  domain_shutdown	  [ domid = 0x%(1)08x, edomid = 0x%(2)08x, reason = 0x%(3)08x ]
+0x00028001  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  sched_add_domain  [ domid = 0x%(1)08x ]
+0x00028002  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  sched_rem_domain  [ domid = 0x%(1)08x ]
+0x00028003  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  domain_sleep      [ dom:vcpu = 0x%(1)04x%(2)04x ]
+0x00028004  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  domain_wake       [ dom:vcpu = 0x%(1)04x%(2)04x ]
+0x00028005  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  do_yield          [ dom:vcpu = 0x%(1)04x%(2)04x ]
+0x00028006  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  do_block          [ dom:vcpu = 0x%(1)04x%(2)04x ]
+0x00028007  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  domain_shutdown	  [ dom:vcpu = 0x%(1)04x%(2)04x, reason = 0x%(3)08x ]
 0x00028008  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  sched_ctl
 0x00028009  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  sched_adjdom      [ domid = 0x%(1)08x ]
-0x0002800a  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  __enter_scheduler [ prev<domid:edomid> = 0x%(1)08x : 0x%(2)08x, next<domid:edomid> = 0x%(3)08x : 0x%(4)08x ]
+0x0002800a  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  __enter_scheduler [ prev<dom:vcpu> = 0x%(1)04x%(2)04x, next<dom:vcpu> = 0x%(3)04x%(4)04x ]
 0x0002800b  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  s_timer_fn
 0x0002800c  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  t_timer_fn
 0x0002800d  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  dom_timer_fn
 0x0002800e  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  switch_infprev    [ old_domid = 0x%(1)08x, runtime = %(2)d ]
 0x0002800f  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  switch_infnext    [ new_domid = 0x%(1)08x, time = %(2)d, r_time = %(3)d ]
+0x00028010  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  domain_shutdown_code [ dom:vcpu = 0x%(1)04x%(2)04x, reason = 0x%(3)08x ]
+
+0x00022001  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  csched:sched_tasklet
+0x00022002  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  csched:account_start [ dom:vcpu = 0x%(1)04x%(2)04x, active = %(3)d ]
+0x00022003  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  csched:account_stop  [ dom:vcpu = 0x%(1)04x%(2)04x, active = %(3)d ]
+0x00022004  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  csched:stolen_vcpu   [ dom:vcpu = 0x%(2)04x%(3)04x, from = %(1)d ]
+0x00022005  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  csched:picked_cpu    [ dom:vcpu = 0x%(1)04x%(2)04x, cpu = %(3)d ]
+0x00022006  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  csched:tickle        [ cpu = %(1)d ]
+
+0x00022201  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  csched2:tick
+0x00022202  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  csched2:runq_pos       [ dom:vcpu = 0x%(1)08x, pos = %(2)d]
+0x00022203  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  csched2:credit burn    [ dom:vcpu = 0x%(1)08x, credit = %(2)d, delta = %(3)d ]
+0x00022204  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  csched2:credit_add
+0x00022205  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  csched2:tickle_check   [ dom:vcpu = 0x%(1)08x, credit = %(2)d ]
+0x00022206  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  csched2:tickle         [ cpu = %(1)d ]
+0x00022207  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  csched2:credit_reset   [ dom:vcpu = 0x%(1)08x, cr_start = %(2)d, cr_end = %(3)d, mult = %(4)d ]
+0x00022208  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  csched2:sched_tasklet
+0x00022209  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  csched2:update_load
+0x0002220a  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  csched2:runq_assign    [ dom:vcpu = 0x%(1)08x, rq_id = %(2)d ]
+0x0002220b  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  csched2:updt_vcpu_load [ dom:vcpu = 0x%(1)08x, avgload = %(2)d ]
+0x0002220c  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  csched2:updt_runq_load [ rq_load[4]:rq_avgload[28] = 0x%(1)08x, rq_id[4]:b_avgload[28] = 0x%(2)08x ]
+
+0x00022801  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  rtds:tickle        [ cpu = %(1)d ]
+0x00022802  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  rtds:runq_pick     [ dom:vcpu = 0x%(1)08x, cur_deadline = 0x%(3)08x%(2)08x, cur_budget = 0x%(5)08x%(4)08x ]
+0x00022803  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  rtds:burn_budget   [ dom:vcpu = 0x%(1)08x, cur_budget = 0x%(3)08x%(2)08x, delta = %(4)d ]
+0x00022804  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  rtds:repl_budget   [ dom:vcpu = 0x%(1)08x, cur_deadline = 0x%(3)08x%(2)08x, cur_budget = 0x%(5)08x%(4)08x ]
+0x00022805  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  rtds:sched_tasklet
+
+0x00041001  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  domain_create   [ dom = 0x%(1)08x ]
+0x00041002  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  domain_destroy  [ dom = 0x%(1)08x ]
 
 0x00081001  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  VMENTRY
 0x00081002  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  VMEXIT      [ exitcode = 0x%(1)08x, rIP  = 0x%(2)08x ]

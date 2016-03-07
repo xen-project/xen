@@ -1520,27 +1520,6 @@ struct pv_data {
 };
 
 /* Sched data */
-
-enum {
-    SCHED_DOM_ADD=1,
-    SCHED_DOM_REM,
-    SCHED_SLEEP,
-    SCHED_WAKE,
-    SCHED_YIELD,
-    SCHED_BLOCK,
-    SCHED_SHUTDOWN,
-    SCHED_CTL,
-    SCHED_ADJDOM,
-    SCHED_SWITCH,
-    SCHED_S_TIMER_FN,
-    SCHED_T_TIMER_FN,
-    SCHED_DOM_TIMER_FN,
-    SCHED_SWITCH_INFPREV,
-    SCHED_SWITCH_INFNEXT,
-    SCHED_SHUTDOWN_CODE,
-    SCHED_MAX
-};
-
 enum {
     RUNSTATE_RUNNING=0,
     RUNSTATE_RUNNABLE,
@@ -7426,6 +7405,17 @@ no_update:
     return;
 }
 
+void dump_sched_switch(struct record_info *ri)
+{
+    struct {
+        unsigned int prev_dom, prev_vcpu, next_dom, next_vcpu;
+    } *r = (typeof(r))ri->d;
+
+    printf(" %s sched_switch prev d%uv%u next d%uv%u\n",
+           ri->dump_header, r->prev_dom, r->prev_vcpu,
+           r->next_dom, r->next_vcpu);
+}
+
 void sched_switch_process(struct pcpu_info *p)
 {
     struct vcpu_data *prev, *next;
@@ -7435,10 +7425,7 @@ void sched_switch_process(struct pcpu_info *p)
     } * r = (typeof(r))ri->d;
 
     if(opt.dump_all)
-        printf("%s sched_switch prev d%uv%u next d%uv%u\n",
-               ri->dump_header,
-               r->prev_dom, r->prev_vcpu,
-               r->next_dom, r->next_vcpu);
+        dump_sched_switch(ri);
 
     if(r->prev_vcpu > MAX_CPUS)
     {
@@ -7554,6 +7541,14 @@ void sched_summary_domain(struct domain_data *d)
     }
 }
 
+void dump_sched_vcpu_action(struct record_info *ri, const char *action)
+{
+    struct {
+        unsigned int domid, vcpuid;
+    } *r = (typeof(r))ri->d;
+
+    printf(" %s %s d%uv%u\n", ri->dump_header, action, r->domid, r->vcpuid);
+}
 
 void sched_process(struct pcpu_info *p)
 {
@@ -7568,13 +7563,272 @@ void sched_process(struct pcpu_info *p)
         default:
             process_generic(&p->ri);
         }
-    } else {
-        if(ri->evt.sub == 1)
-            sched_runstate_process(p);
-        else {
-            UPDATE_VOLUME(p, sched_verbose, ri->size);
+        return;
+    }
+
+    if(ri->evt.sub == 1) {
+        /* TRC_SCHED_MIN */
+        sched_runstate_process(p);
+    } else if (ri->evt.sub == 8) {
+        /* TRC_SCHED_VERBOSE */
+        switch(ri->event)
+        {
+        case TRC_SCHED_DOM_ADD:
+            if(opt.dump_all) {
+                struct {
+                    unsigned int domid;
+                } *r = (typeof(r))ri->d;
+
+                printf(" %s sched_init_domain d%u\n", ri->dump_header, r->domid);
+            }
+            break;
+        case TRC_SCHED_DOM_REM:
+            if(opt.dump_all) {
+                struct {
+                    unsigned int domid, vcpuid;
+                } *r = (typeof(r))ri->d;
+
+                printf(" %s sched_destroy_domain d%u\n", ri->dump_header, r->domid);
+            }
+            break;
+        case TRC_SCHED_SLEEP:
+            if(opt.dump_all)
+                dump_sched_vcpu_action(ri, "vcpu_sleep");
+            break;
+        case TRC_SCHED_WAKE:
+            if(opt.dump_all)
+                dump_sched_vcpu_action(ri, "vcpu_wake");
+            break;
+        case TRC_SCHED_YIELD:
+            if(opt.dump_all)
+                dump_sched_vcpu_action(ri, "vcpu_yield");
+            break;
+        case TRC_SCHED_BLOCK:
+            if(opt.dump_all)
+                dump_sched_vcpu_action(ri, "vcpu_block");
+            break;
+        case TRC_SCHED_SHUTDOWN:
+        case TRC_SCHED_SHUTDOWN_CODE:
+            if(opt.dump_all) {
+                struct {
+                    unsigned int domid, vcpuid, reason;
+                } *r = (typeof(r))ri->d;
+
+                printf(" %s %s d%uv%u, reason = %u\n", ri->dump_header,
+                       ri->event == TRC_SCHED_SHUTDOWN ? "sched_shutdown" :
+                       "sched_shutdown_code", r->domid, r->vcpuid, r->reason);
+            }
+            break;
+        case TRC_SCHED_ADJDOM:
+            if(opt.dump_all) {
+                struct {
+                    unsigned int domid;
+                } *r = (typeof(r))ri->d;
+
+                printf(" %s sched_adjust d%u\n", ri->dump_header, r->domid);
+            }
+            break;
+        case TRC_SCHED_SWITCH:
+            dump_sched_switch(ri);
+            break;
+        case TRC_SCHED_SWITCH_INFPREV:
+            if(opt.dump_all) {
+                struct {
+                    unsigned int domid, runtime;
+                } *r = (typeof(r))ri->d;
+
+                printf(" %s sched_switch prev d%u, run for %u.%uus\n",
+                       ri->dump_header, r->domid, r->runtime / 1000,
+                       r->runtime % 1000);
+            }
+            break;
+        case TRC_SCHED_SWITCH_INFNEXT:
+            if(opt.dump_all)
+            {
+                struct {
+                    unsigned int domid, rsince;
+                    int slice;
+                } *r = (typeof(r))ri->d;
+
+                printf(" %s sched_switch next d%u", ri->dump_header, r->domid);
+                if ( r->rsince != 0 )
+                    printf(", was runnable for %u.%uus, ", r->rsince / 1000,
+                           r->rsince % 1000);
+                if ( r->slice > 0 )
+                    printf("next slice %u.%uus\n", r->slice / 1000,
+                           r->slice % 1000);
+                printf("\n");
+            }
+            break;
+        case TRC_SCHED_CTL:
+        case TRC_SCHED_S_TIMER_FN:
+        case TRC_SCHED_T_TIMER_FN:
+        case TRC_SCHED_DOM_TIMER_FN:
+            break;
+        default:
             process_generic(&p->ri);
         }
+    } else if(ri->evt.sub == 2) {
+        /* TRC_SCHED_CLASS */
+        switch(ri->event)
+        {
+        /* CREDIT (TRC_CSCHED_xxx) */
+        case TRC_SCHED_CLASS_EVT(CSCHED, 1): /* SCHED_TASKLET */
+            if(opt.dump_all)
+                printf(" %s csched:sched_tasklet\n", ri->dump_header);
+            break;
+        case TRC_SCHED_CLASS_EVT(CSCHED, 2): /* ACCOUNT_START */
+        case TRC_SCHED_CLASS_EVT(CSCHED, 3): /* ACCOUNT_STOP  */
+            if(opt.dump_all) {
+                struct {
+                    unsigned int domid, vcpuid, actv_cnt;
+                } *r = (typeof(r))ri->d;
+
+                printf(" %s csched:acct_%s d%uv%u, active_vcpus %u\n",
+                       ri->dump_header,
+                       ri->event == TRC_SCHED_CLASS_EVT(CSCHED, 2) ?
+                       "start" : "stop",
+                       r->domid, r->vcpuid,
+                       r->actv_cnt);
+            }
+            break;
+        case TRC_SCHED_CLASS_EVT(CSCHED, 4): /* STOLEN_VCPU   */
+            if(opt.dump_all) {
+                struct {
+                    unsigned int peer_cpu, domid, vcpuid;
+                } *r = (typeof(r))ri->d;
+
+                printf(" %s csched:stolen_vcpu d%uv%u from cpu %u\n",
+                       ri->dump_header, r->domid, r->vcpuid, r->peer_cpu);
+            }
+            break;
+        case TRC_SCHED_CLASS_EVT(CSCHED, 5): /* PICKED_CPU    */
+            if(opt.dump_all) {
+                struct {
+                    unsigned int domid, vcpuid, cpu;
+                } *r = (typeof(r))ri->d;
+
+                printf(" %s csched:pick_cpu %u for d%uv%u\n",
+                       ri->dump_header, r->cpu, r->domid, r->vcpuid);
+            }
+            break;
+        case TRC_SCHED_CLASS_EVT(CSCHED, 6): /* TICKLE        */
+            if(opt.dump_all) {
+                struct {
+                    unsigned int cpu;
+                } *r = (typeof(r))ri->d;
+
+                printf(" %s csched:runq_tickle, cpu %u\n",
+                       ri->dump_header, r->cpu);
+            }
+            break;
+        /* CREDIT 2 (TRC_CSCHED2_xxx) */
+        case TRC_SCHED_CLASS_EVT(CSCHED2, 1): /* TICK              */
+        case TRC_SCHED_CLASS_EVT(CSCHED2, 4): /* CREDIT_ADD        */
+        case TRC_SCHED_CLASS_EVT(CSCHED2, 9): /* UPDATE_LOAD       */
+            break;
+        case TRC_SCHED_CLASS_EVT(CSCHED2, 2): /* RUNQ_POS          */
+            if(opt.dump_all) {
+                struct {
+                    unsigned int vcpuid:16, domid:16, pos;
+                } *r = (typeof(r))ri->d;
+
+                printf(" %s csched2:runq_insert d%uv%u, position %u\n",
+                       ri->dump_header, r->domid, r->vcpuid, r->pos);
+            }
+            break;
+        case TRC_SCHED_CLASS_EVT(CSCHED2, 3): /* CREDIT_BURN       */
+            if(opt.dump_all) {
+                struct {
+                    unsigned int vcpuid:16, domid:16, credit;
+                    int delta;
+                } *r = (typeof(r))ri->d;
+
+                printf(" %s csched2:burn_credits d%uv%u, credit = %u, delta = %d\n",
+                       ri->dump_header, r->domid, r->vcpuid,
+                       r->credit, r->delta);
+            }
+            break;
+        case TRC_SCHED_CLASS_EVT(CSCHED2, 5): /* TICKLE_CHECK      */
+            if(opt.dump_all) {
+                struct {
+                    unsigned int vcpuid:16, domid:16;
+                    unsigned int credit;
+                } *r = (typeof(r))ri->d;
+
+                printf(" %s csched2:tickle_check d%uv%u, credit = %u\n",
+                       ri->dump_header, r->domid, r->vcpuid, r->credit);
+            }
+            break;
+        case TRC_SCHED_CLASS_EVT(CSCHED2, 6): /* TICKLE            */
+            if(opt.dump_all) {
+                struct {
+                    unsigned int cpu:16;
+                } *r = (typeof(r))ri->d;
+
+                printf(" %s csched2:runq_tickle cpu %u\n",
+                       ri->dump_header, r->cpu);
+            }
+            break;
+        case TRC_SCHED_CLASS_EVT(CSCHED2, 7):  /* CREDIT_RESET     */
+            if(opt.dump_all) {
+                struct {
+                    unsigned int vcpuid:16, domid:16;
+                    unsigned int credit_start, credit_end;
+                    unsigned int multiplier;
+                } *r = (typeof(r))ri->d;
+
+                printf(" %s csched2:reset_credits d%uv%u, "
+                       "credit_start = %u, credit_end = %u, mult = %u\n",
+                       ri->dump_header, r->domid, r->vcpuid,
+                       r->credit_start, r->credit_end, r->multiplier);
+            }
+            break;
+        case TRC_SCHED_CLASS_EVT(CSCHED2, 8):  /* SCHED_TASKLET    */
+            if(opt.dump_all)
+                printf(" %s csched2:sched_tasklet\n", ri->dump_header);
+            break;
+        case TRC_SCHED_CLASS_EVT(CSCHED2, 10): /* RUNQ_ASSIGN      */
+            if(opt.dump_all) {
+                struct {
+                    unsigned int vcpuid:16, domid:16;
+                    unsigned int rqi;
+                } *r = (typeof(r))ri->d;
+
+                printf(" %s csched2:runq_assign d%uv%u on rq# %u\n",
+                       ri->dump_header, r->domid, r->vcpuid, r->rqi);
+            }
+            break;
+        case TRC_SCHED_CLASS_EVT(CSCHED2, 11): /* UPDATE_VCPU_LOAD */
+            if(opt.dump_all) {
+                struct {
+                    unsigned int vcpuid:16, domid:16;
+                    unsigned int avgload;
+                } *r = (typeof(r))ri->d;
+
+                printf(" %s csched2:update_vcpu_load d%uv%u, avg_load = %u\n",
+                       ri->dump_header, r->domid, r->vcpuid, r->avgload);
+            }
+            break;
+        case TRC_SCHED_CLASS_EVT(CSCHED2, 12): /* UPDATE_RUNQ_LOAD */
+            if(opt.dump_all) {
+                struct {
+                    unsigned int rq_load:4, rq_avgload:28;
+                    unsigned int rq_id:4, b_avgload:28;
+                } *r = (typeof(r))ri->d;
+
+                printf(" %s csched2:update_rq_load rq# %u, load = %u, "
+                       "avgload = %u, b_avgload = %u\n",
+                       ri->dump_header, r->rq_id, r->rq_load,
+                       r->rq_avgload, r->b_avgload);
+            }
+            break;
+        default:
+            process_generic(ri);
+        }
+    } else {
+        UPDATE_VOLUME(p, sched_verbose, ri->size);
+        process_generic(&p->ri);
     }
 }
 
