@@ -867,7 +867,7 @@ static int libxl__domain_firmware(libxl__gc *gc,
                                   struct xc_dom_image *dom)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
-    const char *firmware;
+    const char *firmware = NULL;
     int e, rc;
     int datalen = 0;
     void *data;
