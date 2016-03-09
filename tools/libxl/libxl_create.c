@@ -733,6 +733,10 @@ static void domcreate_launch_dm(libxl__egc *egc, libxl__multidev *aodevs,
 
 static void domcreate_attach_vtpms(libxl__egc *egc, libxl__multidev *multidev,
                                    int ret);
+static void domcreate_attach_usbctrls(libxl__egc *egc,
+                                      libxl__multidev *multidev, int ret);
+static void domcreate_attach_usbdevs(libxl__egc *egc, libxl__multidev *multidev,
+                                     int ret);
 static void domcreate_attach_pci(libxl__egc *egc, libxl__multidev *aodevs,
                                  int ret);
 static void domcreate_attach_dtdev(libxl__egc *egc,
@@ -1401,18 +1405,81 @@ static void domcreate_attach_vtpms(libxl__egc *egc,
    if (d_config->num_vtpms > 0) {
        /* Attach vtpms */
        libxl__multidev_begin(ao, &dcs->multidev);
-       dcs->multidev.callback = domcreate_attach_pci;
+       dcs->multidev.callback = domcreate_attach_usbctrls;
        libxl__add_vtpms(egc, ao, domid, d_config, &dcs->multidev);
        libxl__multidev_prepared(egc, &dcs->multidev, 0);
        return;
    }
 
-   domcreate_attach_pci(egc, multidev, 0);
+   domcreate_attach_usbctrls(egc, multidev, 0);
    return;
 
 error_out:
    assert(ret);
    domcreate_complete(egc, dcs, ret);
+}
+
+static void domcreate_attach_usbctrls(libxl__egc *egc,
+                                      libxl__multidev *multidev, int ret)
+{
+    libxl__domain_create_state *dcs = CONTAINER_OF(multidev, *dcs, multidev);
+    STATE_AO_GC(dcs->ao);
+    int domid = dcs->guest_domid;
+
+    libxl_domain_config *const d_config = dcs->guest_config;
+
+    if (ret) {
+        LOG(ERROR, "unable to add vtpm devices");
+        goto error_out;
+    }
+
+    if (d_config->num_usbctrls > 0) {
+        /* Attach usbctrls */
+        libxl__multidev_begin(ao, &dcs->multidev);
+        dcs->multidev.callback = domcreate_attach_usbdevs;
+        libxl__add_usbctrls(egc, ao, domid, d_config, &dcs->multidev);
+        libxl__multidev_prepared(egc, &dcs->multidev, 0);
+        return;
+    }
+
+    domcreate_attach_usbdevs(egc, multidev, 0);
+    return;
+
+error_out:
+    assert(ret);
+    domcreate_complete(egc, dcs, ret);
+}
+
+
+static void domcreate_attach_usbdevs(libxl__egc *egc, libxl__multidev *multidev,
+                                int ret)
+{
+    libxl__domain_create_state *dcs = CONTAINER_OF(multidev, *dcs, multidev);
+    STATE_AO_GC(dcs->ao);
+    int domid = dcs->guest_domid;
+
+    libxl_domain_config *const d_config = dcs->guest_config;
+
+    if (ret) {
+        LOG(ERROR, "unable to add usbctrl devices");
+        goto error_out;
+    }
+
+    if (d_config->num_usbdevs > 0) {
+        /* Attach usbctrls */
+        libxl__multidev_begin(ao, &dcs->multidev);
+        dcs->multidev.callback = domcreate_attach_pci;
+        libxl__add_usbdevs(egc, ao, domid, d_config, &dcs->multidev);
+        libxl__multidev_prepared(egc, &dcs->multidev, 0);
+        return;
+    }
+
+    domcreate_attach_pci(egc, multidev, 0);
+    return;
+
+error_out:
+    assert(ret);
+    domcreate_complete(egc, dcs, ret);
 }
 
 static void domcreate_attach_pci(libxl__egc *egc, libxl__multidev *multidev,
@@ -1427,7 +1494,7 @@ static void domcreate_attach_pci(libxl__egc *egc, libxl__multidev *multidev,
     libxl_domain_config *const d_config = dcs->guest_config;
 
     if (ret) {
-        LOG(ERROR, "unable to add vtpm devices");
+        LOG(ERROR, "unable to add usb devices");
         goto error_out;
     }
 

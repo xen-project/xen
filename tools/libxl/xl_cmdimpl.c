@@ -1260,6 +1260,58 @@ static void parse_vnuma_config(const XLU_Config *config,
     free(vcpu_parsed);
 }
 
+/* Parses usbctrl data and adds info into usbctrl
+ * Returns 1 if the input token does not match one of the keys
+ * or parsed values are not correct. Successful parse returns 0 */
+static int parse_usbctrl_config(libxl_device_usbctrl *usbctrl, char *token)
+{
+    char *oparg;
+
+    if (MATCH_OPTION("type", token, oparg)) {
+        if (libxl_usbctrl_type_from_string(oparg, &usbctrl->type)) {
+            fprintf(stderr, "Invalid usb controller type '%s'\n", oparg);
+            return 1;
+        }
+    } else if (MATCH_OPTION("version", token, oparg)) {
+        usbctrl->version = atoi(oparg);
+    } else if (MATCH_OPTION("ports", token, oparg)) {
+        usbctrl->ports = atoi(oparg);
+    } else {
+        fprintf(stderr, "Unknown string `%s' in usbctrl spec\n", token);
+        return 1;
+    }
+
+    return 0;
+}
+
+/* Parses usbdev data and adds info into usbdev
+ * Returns 1 if the input token does not match one of the keys
+ * or parsed values are not correct. Successful parse returns 0 */
+static int parse_usbdev_config(libxl_device_usbdev *usbdev, char *token)
+{
+    char *oparg;
+
+    if (MATCH_OPTION("type", token, oparg)) {
+        if (libxl_usbdev_type_from_string(oparg, &usbdev->type)) {
+            fprintf(stderr, "Invalid usb device type: %s\n", optarg);
+            return 1;
+        }
+    } else if (MATCH_OPTION("hostbus", token, oparg)) {
+        usbdev->u.hostdev.hostbus = strtoul(oparg, NULL, 0);
+    } else if (MATCH_OPTION("hostaddr", token, oparg)) {
+        usbdev->u.hostdev.hostaddr = strtoul(oparg, NULL, 0);
+    } else if (MATCH_OPTION("controller", token, oparg)) {
+        usbdev->ctrl = atoi(oparg);
+    } else if (MATCH_OPTION("port", token, oparg)) {
+        usbdev->port = atoi(oparg);
+    } else {
+        fprintf(stderr, "Unknown string `%s' in usbdev spec\n", token);
+        return 1;
+    }
+
+    return 0;
+}
+
 static void parse_config_data(const char *config_source,
                               const char *config_data,
                               int config_len,
@@ -1268,7 +1320,8 @@ static void parse_config_data(const char *config_source,
     const char *buf;
     long l, vcpus = 0;
     XLU_Config *config;
-    XLU_ConfigList *cpus, *vbds, *nics, *pcis, *cvfbs, *cpuids, *vtpms;
+    XLU_ConfigList *cpus, *vbds, *nics, *pcis, *cvfbs, *cpuids, *vtpms,
+                   *usbctrls, *usbdevs;
     XLU_ConfigList *channels, *ioports, *irqs, *iomem, *viridian, *dtdevs;
     int num_ioports, num_irqs, num_iomem, num_cpus, num_viridian;
     int pci_power_mgmt = 0;
@@ -2082,6 +2135,58 @@ skip_vfb:
                 fprintf(stderr, "unable to duplicate string for dtdevs\n");
                 exit(-1);
             }
+        }
+    }
+
+    if (!xlu_cfg_get_list(config, "usbctrl", &usbctrls, 0, 0)) {
+        d_config->num_usbctrls = 0;
+        d_config->usbctrls = NULL;
+        while ((buf = xlu_cfg_get_listitem(usbctrls, d_config->num_usbctrls))
+               != NULL) {
+            libxl_device_usbctrl *usbctrl;
+            char *buf2 = strdup(buf);
+            char *p;
+
+            usbctrl = ARRAY_EXTEND_INIT(d_config->usbctrls,
+                                        d_config->num_usbctrls,
+                                        libxl_device_usbctrl_init);
+            p = strtok(buf2, ",");
+            if (!p)
+                goto skip_usbctrl;
+            do {
+                while (*p == ' ')
+                    p++;
+                if (parse_usbctrl_config(usbctrl, p))
+                    exit(1);
+            } while ((p = strtok(NULL, ",")) != NULL);
+skip_usbctrl:
+            free(buf2);
+        }
+    }
+
+    if (!xlu_cfg_get_list(config, "usbdev", &usbdevs, 0, 0)) {
+        d_config->num_usbdevs = 0;
+        d_config->usbdevs = NULL;
+        while ((buf = xlu_cfg_get_listitem(usbdevs, d_config->num_usbdevs))
+               != NULL) {
+            libxl_device_usbdev *usbdev;
+            char *buf2 = strdup(buf);
+            char *p;
+
+            usbdev = ARRAY_EXTEND_INIT_NODEVID(d_config->usbdevs,
+                                               d_config->num_usbdevs,
+                                               libxl_device_usbdev_init);
+            p = strtok(buf2, ",");
+            if (!p)
+                goto skip_usbdev;
+            do {
+                while (*p == ' ')
+                    p++;
+                if (parse_usbdev_config(usbdev, p))
+                    exit(1);
+            } while ((p = strtok(NULL, ",")) != NULL);
+skip_usbdev:
+            free(buf2);
         }
     }
 

@@ -544,6 +544,8 @@ void libxl__multidev_prepared(libxl__egc *egc,
  * libxl__add_disks
  * libxl__add_nics
  * libxl__add_vtpms
+ * libxl__add_usbctrls
+ * libxl__add_usbs
  */
 
 #define DEFINE_DEVICES_ADD(type)                                        \
@@ -563,6 +565,8 @@ void libxl__multidev_prepared(libxl__egc *egc,
 DEFINE_DEVICES_ADD(disk)
 DEFINE_DEVICES_ADD(nic)
 DEFINE_DEVICES_ADD(vtpm)
+DEFINE_DEVICES_ADD(usbctrl)
+DEFINE_DEVICES_ADD(usbdev)
 
 #undef DEFINE_DEVICES_ADD
 

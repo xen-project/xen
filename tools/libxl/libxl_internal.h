@@ -3350,6 +3350,14 @@ _hidden void libxl__add_vtpms(libxl__egc *egc, libxl__ao *ao, uint32_t domid,
                              libxl_domain_config *d_config,
                              libxl__multidev *multidev);
 
+_hidden void libxl__add_usbctrls(libxl__egc *egc, libxl__ao *ao,
+                                 uint32_t domid, libxl_domain_config *d_config,
+                                 libxl__multidev *multidev);
+
+_hidden void libxl__add_usbdevs(libxl__egc *egc, libxl__ao *ao,
+                                uint32_t domid, libxl_domain_config *d_config,
+                                libxl__multidev *multidev);
+
 /*----- device model creation -----*/
 
 /* First layer; wraps libxl__spawn_spawn. */
