@@ -1180,6 +1180,9 @@ _hidden int libxl__init_console_from_channel(libxl__gc *gc,
                                              libxl__device_console *console,
                                              int dev_num,
                                              libxl_device_channel *channel);
+_hidden int libxl__device_nextid(libxl__gc *gc, uint32_t domid, char *device);
+_hidden int libxl__resolve_domid(libxl__gc *gc, const char *name,
+                                 uint32_t *domid);
 
 /*
  * For each aggregate type which can be used as an input we provide:

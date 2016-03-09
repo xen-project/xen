@@ -1966,7 +1966,7 @@ out:
 }
 
 /* common function to get next device id */
-static int libxl__device_nextid(libxl__gc *gc, uint32_t domid, char *device)
+int libxl__device_nextid(libxl__gc *gc, uint32_t domid, char *device)
 {
     char *dompath, **l;
     unsigned int nb;
@@ -1985,8 +1985,7 @@ static int libxl__device_nextid(libxl__gc *gc, uint32_t domid, char *device)
     return nextid;
 }
 
-static int libxl__resolve_domid(libxl__gc *gc, const char *name,
-                                uint32_t *domid)
+int libxl__resolve_domid(libxl__gc *gc, const char *name, uint32_t *domid)
 {
     if (!name)
         return 0;
