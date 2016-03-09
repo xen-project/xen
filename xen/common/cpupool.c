@@ -312,17 +312,25 @@ static long cpupool_unassign_cpu_helper(void *info)
     rcu_read_lock(&domlist_read_lock);
     ret = cpu_disable_scheduler(cpu);
     cpumask_set_cpu(cpu, &cpupool_free_cpus);
+
+    /*
+     * cpu_disable_scheduler() returning an error doesn't require resetting
+     * cpupool_free_cpus' cpu bit. All error cases should be of temporary
+     * nature and tools will retry the operation. Even if the number of
+     * retries may be limited, the in-between state can easily be repaired
+     * by adding the cpu to the cpupool again.
+     */
     if ( !ret )
     {
         ret = schedule_cpu_switch(cpu, NULL);
         if ( ret )
-        {
             cpumask_clear_cpu(cpu, &cpupool_free_cpus);
-            goto out;
+        else
+        {
+            cpupool_moving_cpu = -1;
+            cpupool_put(cpupool_cpu_moving);
+            cpupool_cpu_moving = NULL;
         }
-        cpupool_moving_cpu = -1;
-        cpupool_put(cpupool_cpu_moving);
-        cpupool_cpu_moving = NULL;
     }
 
     for_each_domain_in_cpupool(d, c)
