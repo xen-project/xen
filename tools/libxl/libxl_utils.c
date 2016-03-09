@@ -396,6 +396,80 @@ int libxl_read_file_contents(libxl_ctx *ctx, const char *filename,
     return e;
 }
 
+int libxl__read_sysfs_file_contents(libxl__gc *gc, const char *filename,
+                                    void **data_r, int *datalen_r)
+{
+    FILE *f = 0;
+    uint8_t *data = 0;
+    int datalen = 0;
+    int e;
+    struct stat stab;
+    ssize_t rs;
+
+    f = fopen(filename, "r");
+    if (!f) {
+        if (errno == ENOENT) return ENOENT;
+        LOGE(ERROR, "failed to open %s", filename);
+        goto xe;
+    }
+
+    if (fstat(fileno(f), &stab)) {
+        LOGE(ERROR, "failed to fstat %s", filename);
+        goto xe;
+    }
+
+    if (!S_ISREG(stab.st_mode)) {
+        LOGE(ERROR, "%s is not a plain file", filename);
+        errno = ENOTTY;
+        goto xe;
+    }
+
+    if (stab.st_size > INT_MAX) {
+        LOG(ERROR, "file %s is far too large", filename);
+        errno = EFBIG;
+        goto xe;
+    }
+
+    datalen = stab.st_size;
+
+    if (stab.st_size && data_r) {
+        data = libxl__malloc(gc, datalen);
+
+        /* For sysfs file, datalen is always PAGE_SIZE. 'read'
+         * will return the number of bytes of the actual content,
+         * rs <= datalen is expected.
+         */
+        rs = fread(data, 1, datalen, f);
+        if (rs < datalen) {
+            if (ferror(f)) {
+                LOGE(ERROR, "failed to read %s", filename);
+                goto xe;
+            }
+
+            datalen = rs;
+            data = libxl__realloc(gc, data, datalen);
+        }
+    }
+
+    if (fclose(f)) {
+        f = 0;
+        LOGE(ERROR, "failed to close %s", filename);
+        goto xe;
+    }
+
+    if (data_r) *data_r = data;
+    if (datalen_r) *datalen_r = datalen;
+
+    return 0;
+
+ xe:
+    e = errno;
+    assert(e != ENOENT);
+    if (f) fclose(f);
+    return e;
+}
+
+
 #define READ_WRITE_EXACTLY(rw, zero_is_eof, constdata)                    \
                                                                           \
   int libxl_##rw##_exactly(libxl_ctx *ctx, int fd,                 \

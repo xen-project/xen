@@ -4076,6 +4076,10 @@ void libxl__bitmap_copy_best_effort(libxl__gc *gc, libxl_bitmap *dptr,
 
 int libxl__count_physical_sockets(libxl__gc *gc, int *sockets);
 
+_hidden int libxl__read_sysfs_file_contents(libxl__gc *gc,
+                                            const char *filename,
+                                            void **data_r,
+                                            int *datalen_r);
 
 #define LIBXL_QEMU_USER_PREFIX "xen-qemuuser"
 #define LIBXL_QEMU_USER_BASE   LIBXL_QEMU_USER_PREFIX"-domid"
