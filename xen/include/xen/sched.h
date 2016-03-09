@@ -811,6 +811,7 @@ int cpu_disable_scheduler(unsigned int cpu);
 int vcpu_set_hard_affinity(struct vcpu *v, const cpumask_t *affinity);
 int vcpu_set_soft_affinity(struct vcpu *v, const cpumask_t *affinity);
 void restore_vcpu_affinity(struct domain *d);
+int vcpu_pin_override(struct vcpu *v, int cpu);
 
 void vcpu_runstate_get(struct vcpu *v, struct vcpu_runstate_info *runstate);
 uint64_t get_cpu_idle_time(unsigned int cpu);

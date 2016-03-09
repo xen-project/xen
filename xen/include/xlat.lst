@@ -104,6 +104,7 @@
 ?	pmu_data			pmu.h
 ?	pmu_params			pmu.h
 !	sched_poll			sched.h
+?	sched_pin_override		sched.h
 ?	sched_remote_shutdown		sched.h
 ?	sched_shutdown			sched.h
 ?	tmem_oid			tmem.h

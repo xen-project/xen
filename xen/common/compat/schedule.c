@@ -10,6 +10,10 @@
 
 #define do_sched_op compat_sched_op
 
+#define xen_sched_pin_override sched_pin_override
+CHECK_sched_pin_override;
+#undef xen_sched_pin_override
+
 #define xen_sched_shutdown sched_shutdown
 CHECK_sched_shutdown;
 #undef xen_sched_shutdown
