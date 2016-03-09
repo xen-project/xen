@@ -553,6 +553,31 @@ struct cmd_spec cmd_table[] = {
     },
 
 #endif
+    { "usbctrl-attach",
+      &main_usbctrl_attach, 0, 1,
+      "Create a virtual USB controller for a domain",
+      "<Domain> [type=pv] [version=<version>] [ports=<number>]",
+    },
+    { "usbctrl-detach",
+      &main_usbctrl_detach, 0, 1,
+      "Remove the virtual USB controller specified by <DevId> for a domain",
+      "<Domain> <DevId>",
+    },
+    { "usbdev-attach",
+      &main_usbdev_attach, 0, 1,
+      "Attach a USB device to a domain",
+      "<Domain> hostbus=<busnum> hostaddr=<devnum> [controller=<DevId> [port=<port>]]",
+    },
+    { "usbdev-detach",
+      &main_usbdev_detach, 0, 1,
+      "Detach a USB device from a domain",
+      "<Domain> <controller> <port>",
+    },
+    { "usb-list",
+      &main_usblist, 0, 0,
+      "List information about all USB controllers and devices for a domain",
+      "<Domain>",
+    },
 };
 
 int cmdtable_len = sizeof(cmd_table)/sizeof(struct cmd_spec);

@@ -1345,6 +1345,43 @@ List pass-through pci devices for a domain.
 
 =back
 
+=head1 USB PASS-THROUGH
+
+=over 4
+
+=item B<usbctrl-attach> I<domain-id> I<usbctrl-device>
+
+Create a new USB controller in the domain specified by I<domain-id>,
+I<usbctrl-device> describes the device to attach, using form
+C<KEY=VALUE KEY=VALUE ...> where B<KEY=VALUE> has the same
+meaning as the B<usbctrl> description in the domain config file.
+See L<xl.cfg> for more information.
+
+=item B<usbctrl-detach> I<domain-id> I<devid>
+
+Destroy a USB controller from the specified domain.
+B<devid> is devid of the USB controller.
+
+=item B<usbdev-attach> I<domain-id> I<usbdev-device>
+
+Hot-plug a new pass-through USB device to the domain specified by
+I<domain-id>, I<usbdev-device> describes the device to attach, using
+form C<KEY=VALUE KEY=VALUE ...> where B<KEY=VALUE> has the same
+meaning as the B<usbdev> description in the domain config file.
+See L<xl.cfg> for more information.
+
+=item B<usbdev-detach> I<domain-id> I<controller=devid> I<port=number>
+
+Hot-unplug a previously assigned USB device from a domain.
+B<controller=devid> and B<port=number> is USB controller:port in guest
+where the USB device is attached to.
+
+=item B<usb-list> I<domain-id>
+
+List pass-through usb devices for a domain.
+
+=back
+
 =head1 TMEM
 
 =over 4
