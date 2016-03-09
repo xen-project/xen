@@ -24,6 +24,8 @@
 #define _GNU_SOURCE
 
 #if defined(__NetBSD__)
+#define SYSFS_USB_DEV          "/sys/bus/usb/devices"
+#define SYSFS_USBBACK_DRIVER   "/kern/xen/usb"
 #define SYSFS_PCI_DEV          "/sys/bus/pci/devices"
 #define SYSFS_PCIBACK_DRIVER   "/kern/xen/pci"
 #define NETBACK_NIC_NAME       "xvif%ui%d"
@@ -31,6 +33,8 @@
 #elif defined(__OpenBSD__)
 #include <util.h>
 #elif defined(__linux__)
+#define SYSFS_USB_DEV          "/sys/bus/usb/devices"
+#define SYSFS_USBBACK_DRIVER   "/sys/bus/usb/drivers/usbback"
 #define SYSFS_PCI_DEV          "/sys/bus/pci/devices"
 #define SYSFS_PCIBACK_DRIVER   "/sys/bus/pci/drivers/pciback"
 #define NETBACK_NIC_NAME       "vif%u.%d"
@@ -38,11 +42,20 @@
 #elif defined(__sun__)
 #include <stropts.h>
 #elif defined(__FreeBSD__)
+#define SYSFS_USB_DEV          "/dev/null"
+#define SYSFS_USBBACK_DRIVER   "/dev/null"
 #define SYSFS_PCI_DEV          "/dev/null"
 #define SYSFS_PCIBACK_DRIVER   "/dev/null"
 #define NETBACK_NIC_NAME       "xnb%u.%d"
 #include <libutil.h>
 #include <sys/endian.h>
+#endif
+
+#ifndef SYSFS_USBBACK_DRIVER
+#error define SYSFS_USBBACK_DRIVER for your platform
+#endif
+#ifndef SYSFS_USB_DEV
+#error define SYSFS_USB_DEV for your platform
 #endif
 
 #ifndef SYSFS_PCIBACK_DRIVER

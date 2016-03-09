@@ -613,6 +613,35 @@ libxl_device_rdm = Struct("device_rdm", [
     ("policy", libxl_rdm_reserve_policy),
     ])
 
+libxl_usbctrl_type = Enumeration("usbctrl_type", [
+    (0, "AUTO"),
+    (1, "PV"),
+    (2, "DEVICEMODEL"),
+    ])
+
+libxl_usbdev_type = Enumeration("usbdev_type", [
+    (1, "hostdev"),
+    ])
+
+libxl_device_usbctrl = Struct("device_usbctrl", [
+    ("type", libxl_usbctrl_type),
+    ("devid", libxl_devid),
+    ("version", integer),
+    ("ports", integer),
+    ("backend_domid", libxl_domid),
+    ("backend_domname", string),
+   ])
+
+libxl_device_usbdev = Struct("device_usbdev", [
+    ("ctrl", libxl_devid),
+    ("port", integer),
+    ("u", KeyedUnion(None, libxl_usbdev_type, "type",
+           [("hostdev", Struct(None, [
+                 ("hostbus",   uint8),
+                 ("hostaddr",  uint8)])),
+           ])),
+    ])
+
 libxl_device_dtdev = Struct("device_dtdev", [
     ("path", string),
     ])
@@ -651,6 +680,8 @@ libxl_domain_config = Struct("domain_config", [
     # a channel manifests as a console with a name,
     # see docs/misc/channels.txt
     ("channels", Array(libxl_device_channel, "num_channels")),
+    ("usbctrls", Array(libxl_device_usbctrl, "num_usbctrls")),
+    ("usbdevs", Array(libxl_device_usbdev, "num_usbdevs")),
 
     ("on_poweroff", libxl_action_on_shutdown),
     ("on_reboot", libxl_action_on_shutdown),
@@ -692,6 +723,21 @@ libxl_vtpminfo = Struct("vtpminfo", [
     ("evtch", integer),
     ("rref", integer),
     ("uuid", libxl_uuid),
+    ], dir=DIR_OUT)
+
+libxl_usbctrlinfo = Struct("usbctrlinfo", [
+    ("type", libxl_usbctrl_type),
+    ("devid", libxl_devid),
+    ("version", integer),
+    ("ports", integer),
+    ("backend", string),
+    ("backend_id", uint32),
+    ("frontend", string),
+    ("frontend_id", uint32),
+    ("state", integer),
+    ("evtch", integer),
+    ("ref_urb", integer),
+    ("ref_conn", integer),
     ], dir=DIR_OUT)
 
 libxl_vcpuinfo = Struct("vcpuinfo", [

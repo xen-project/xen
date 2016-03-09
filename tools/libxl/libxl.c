@@ -4102,6 +4102,8 @@ out:
  * libxl_device_vkb_destroy
  * libxl_device_vfb_remove
  * libxl_device_vfb_destroy
+ * libxl_device_usbctrl_remove
+ * libxl_device_usbctrl_destroy
  */
 #define DEFINE_DEVICE_REMOVE_EXT(type, remtype, removedestroy, f)        \
     int libxl_device_##type##_##removedestroy(libxl_ctx *ctx,           \
@@ -4159,6 +4161,10 @@ DEFINE_DEVICE_REMOVE(vfb, destroy, 1)
 DEFINE_DEVICE_REMOVE(vtpm, remove, 0)
 DEFINE_DEVICE_REMOVE(vtpm, destroy, 1)
 
+/* usbctrl */
+DEFINE_DEVICE_REMOVE_CUSTOM(usbctrl, remove, 0)
+DEFINE_DEVICE_REMOVE_CUSTOM(usbctrl, destroy, 1)
+
 /* channel/console hotunplug is not implemented. There are 2 possibilities:
  * 1. add support for secondary consoles to xenconsoled
  * 2. dynamically add/remove qemu chardevs via qmp messages. */
@@ -4174,6 +4180,8 @@ DEFINE_DEVICE_REMOVE(vtpm, destroy, 1)
  * libxl_device_disk_add
  * libxl_device_nic_add
  * libxl_device_vtpm_add
+ * libxl_device_usbctrl_add
+ * libxl_device_usbdev_add
  */
 
 #define DEFINE_DEVICE_ADD(type)                                         \
@@ -4204,6 +4212,12 @@ DEFINE_DEVICE_ADD(nic)
 
 /* vtpm */
 DEFINE_DEVICE_ADD(vtpm)
+
+/* usbctrl */
+DEFINE_DEVICE_ADD(usbctrl)
+
+/* usb */
+DEFINE_DEVICE_ADD(usbdev)
 
 #undef DEFINE_DEVICE_ADD
 
@@ -6749,6 +6763,10 @@ int libxl_retrieve_domain_configuration(libxl_ctx *ctx, uint32_t domid,
     MERGE(vtpm, vtpms, COMPARE_DEVID, {});
 
     MERGE(pci, pcidevs, COMPARE_PCI, {});
+
+    MERGE(usbctrl, usbctrls, COMPARE_USBCTRL, {});
+
+    MERGE(usbdev, usbdevs, COMPARE_USB, {});
 
     /* Take care of removable device. We maintain invariant in the
      * insert / remove operation so that:

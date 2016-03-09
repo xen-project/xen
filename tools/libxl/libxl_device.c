@@ -676,7 +676,10 @@ void libxl__devices_destroy(libxl__egc *egc, libxl__devices_remove_state *drs)
                 aodev->action = LIBXL__DEVICE_ACTION_REMOVE;
                 aodev->dev = dev;
                 aodev->force = drs->force;
-                libxl__initiate_device_generic_remove(egc, aodev);
+                if (dev->backend_kind == LIBXL__DEVICE_KIND_VUSB)
+                    libxl__initiate_device_usbctrl_remove(egc, aodev);
+                else
+                    libxl__initiate_device_generic_remove(egc, aodev);
             }
         }
     }

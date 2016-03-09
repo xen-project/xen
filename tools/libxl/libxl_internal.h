@@ -2585,6 +2585,14 @@ _hidden void libxl__device_vtpm_add(libxl__egc *egc, uint32_t domid,
                                    libxl_device_vtpm *vtpm,
                                    libxl__ao_device *aodev);
 
+_hidden void libxl__device_usbctrl_add(libxl__egc *egc, uint32_t domid,
+                                       libxl_device_usbctrl *usbctrl,
+                                       libxl__ao_device *aodev);
+
+_hidden void libxl__device_usbdev_add(libxl__egc *egc, uint32_t domid,
+                                      libxl_device_usbdev *usbdev,
+                                      libxl__ao_device *aodev);
+
 /* Internal function to connect a vkb device */
 _hidden int libxl__device_vkb_add(libxl__gc *gc, uint32_t domid,
                                   libxl_device_vkb *vkb);
@@ -2615,6 +2623,13 @@ _hidden void libxl__wait_device_connection(libxl__egc*,
  * Once finished, aodev->callback will be executed.
  */
 _hidden void libxl__initiate_device_generic_remove(libxl__egc *egc,
+                                                   libxl__ao_device *aodev);
+
+_hidden int libxl__device_from_usbctrl(libxl__gc *gc, uint32_t domid,
+                               libxl_device_usbctrl *usbctrl,
+                               libxl__device *device);
+
+_hidden void libxl__initiate_device_usbctrl_remove(libxl__egc *egc,
                                                    libxl__ao_device *aodev);
 
 /*
@@ -4012,6 +4027,9 @@ static inline void libxl__update_config_vtpm(libxl__gc *gc,
 #define COMPARE_PCI(a, b) ((a)->func == (b)->func &&    \
                            (a)->bus == (b)->bus &&      \
                            (a)->dev == (b)->dev)
+#define COMPARE_USB(a, b) ((a)->ctrl == (b)->ctrl && \
+                           (a)->port == (b)->port)
+#define COMPARE_USBCTRL(a, b) ((a)->devid == (b)->devid)
 
 /* DEVICE_ADD
  *
