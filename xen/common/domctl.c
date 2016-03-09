@@ -782,6 +782,12 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
                 break;
             }
 
+            /* Undo a stuck SCHED_pin_override? */
+            if ( vcpuaff->flags & XEN_VCPUAFFINITY_FORCE )
+                vcpu_pin_override(v, -1);
+
+            ret = 0;
+
             /*
              * We both set a new affinity and report back to the caller what
              * the scheduler will be effectively using.

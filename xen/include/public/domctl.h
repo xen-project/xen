@@ -307,6 +307,9 @@ struct xen_domctl_vcpuaffinity {
  /* Set/get the soft affinity for vcpu */
 #define _XEN_VCPUAFFINITY_SOFT  1
 #define XEN_VCPUAFFINITY_SOFT   (1U<<_XEN_VCPUAFFINITY_SOFT)
+ /* Undo SCHEDOP_pin_override */
+#define _XEN_VCPUAFFINITY_FORCE 2
+#define XEN_VCPUAFFINITY_FORCE  (1U<<_XEN_VCPUAFFINITY_FORCE)
     uint32_t flags;
     /*
      * IN/OUT variables.
