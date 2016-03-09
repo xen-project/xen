@@ -676,7 +676,7 @@ void libxl__devices_destroy(libxl__egc *egc, libxl__devices_remove_state *drs)
                 aodev->action = LIBXL__DEVICE_ACTION_REMOVE;
                 aodev->dev = dev;
                 aodev->force = drs->force;
-                libxl__initiate_device_remove(egc, aodev);
+                libxl__initiate_device_generic_remove(egc, aodev);
             }
         }
     }
@@ -775,8 +775,8 @@ out:
     return;
 }
 
-void libxl__initiate_device_remove(libxl__egc *egc,
-                                   libxl__ao_device *aodev)
+void libxl__initiate_device_generic_remove(libxl__egc *egc,
+                                           libxl__ao_device *aodev)
 {
     STATE_AO_GC(aodev->ao);
     xs_transaction_t t = 0;
@@ -806,7 +806,7 @@ void libxl__initiate_device_remove(libxl__egc *egc,
             (info.paused || info.dying || info.shutdown)) {
             /*
              * TODO: 4.2 Bodge due to QEMU, see comment on top of
-             * libxl__initiate_device_remove in libxl_internal.h
+             * libxl__initiate_device_generic_remove in libxl_internal.h
              */
             rc = libxl__ev_time_register_rel(ao, &aodev->timeout,
                                              device_qemu_timeout,
@@ -942,7 +942,7 @@ static void device_backend_callback(libxl__egc *egc, libxl__ev_devstate *ds,
         !aodev->force) {
         LOG(DEBUG, "Timeout reached, initiating forced remove");
         aodev->force = 1;
-        libxl__initiate_device_remove(egc, aodev);
+        libxl__initiate_device_generic_remove(egc, aodev);
         return;
     }
 

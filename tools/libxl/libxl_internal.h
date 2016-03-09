@@ -2614,8 +2614,8 @@ _hidden void libxl__wait_device_connection(libxl__egc*,
  *
  * Once finished, aodev->callback will be executed.
  */
-_hidden void libxl__initiate_device_remove(libxl__egc *egc,
-                                           libxl__ao_device *aodev);
+_hidden void libxl__initiate_device_generic_remove(libxl__egc *egc,
+                                                   libxl__ao_device *aodev);
 
 /*
  * libxl__get_hotplug_script_info returns the args and env that should
