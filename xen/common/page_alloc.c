@@ -1837,7 +1837,7 @@ void free_domheap_pages(struct page_info *pg, unsigned int order)
         spin_lock_recursive(&d->page_alloc_lock);
 
         for ( i = 0; i < (1 << order); i++ )
-            page_list_del2(&pg[i], &d->xenpage_list, &d->arch.relmem_list);
+            arch_free_heap_page(d, &pg[i]);
 
         d->xenheap_pages -= 1 << order;
         drop_dom_ref = (d->xenheap_pages == 0);
@@ -1856,7 +1856,7 @@ void free_domheap_pages(struct page_info *pg, unsigned int order)
             for ( i = 0; i < (1 << order); i++ )
             {
                 BUG_ON((pg[i].u.inuse.type_info & PGT_count_mask) != 0);
-                page_list_del2(&pg[i], &d->page_list, &d->arch.relmem_list);
+                arch_free_heap_page(d, &pg[i]);
             }
 
             drop_dom_ref = !domain_adjust_tot_pages(d, -(1 << order));
