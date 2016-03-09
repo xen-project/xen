@@ -220,7 +220,7 @@ struct page_list_head
 # define INIT_PAGE_LIST_HEAD(head) ((head)->tail = (head)->next = NULL)
 # define INIT_PAGE_LIST_ENTRY(ent) ((ent)->prev = (ent)->next = PAGE_LIST_NULL)
 
-static inline int
+static inline bool_t
 page_list_empty(const struct page_list_head *head)
 {
     return !head->next;
@@ -392,31 +392,84 @@ page_list_splice(struct page_list_head *list, struct page_list_head *head)
 # define PAGE_LIST_HEAD                  LIST_HEAD
 # define INIT_PAGE_LIST_HEAD             INIT_LIST_HEAD
 # define INIT_PAGE_LIST_ENTRY            INIT_LIST_HEAD
-# define page_list_empty                 list_empty
-# define page_list_first(hd)             \
-    list_first_entry(hd, struct page_info, list)
-# define page_list_last(hd)              \
-    list_last_entry(hd, struct page_info, list)
-# define page_list_next(pg, hd)          list_next_entry(pg, list)
-# define page_list_prev(pg, hd)          list_prev_entry(pg, list)
-# define page_list_add(pg, hd)           list_add(&(pg)->list, hd)
-# define page_list_add_tail(pg, hd)      list_add_tail(&(pg)->list, hd)
-# define page_list_del(pg, hd)           list_del(&(pg)->list)
-# define page_list_del2(pg, hd1, hd2)    list_del(&(pg)->list)
-# define page_list_remove_head(hd)       (!page_list_empty(hd) ? \
-    ({ \
-        struct page_info *__pg = page_list_first(hd); \
-        list_del(&__pg->list); \
-        __pg; \
-    }) : NULL)
-# define page_list_move(dst, src)        (!list_empty(src) ? \
-    list_replace_init(src, dst) : (void)0)
+
+static inline bool_t
+page_list_empty(const struct page_list_head *head)
+{
+    return !!list_empty(head);
+}
+static inline struct page_info *
+page_list_first(const struct page_list_head *head)
+{
+    return list_first_entry(head, struct page_info, list);
+}
+static inline struct page_info *
+page_list_last(const struct page_list_head *head)
+{
+    return list_last_entry(head, struct page_info, list);
+}
+static inline struct page_info *
+page_list_next(const struct page_info *page,
+               const struct page_list_head *head)
+{
+    return list_entry(page->list.next, struct page_info, list);
+}
+static inline struct page_info *
+page_list_prev(const struct page_info *page,
+               const struct page_list_head *head)
+{
+    return list_entry(page->list.prev, struct page_info, list);
+}
+static inline void
+page_list_add(struct page_info *page, struct page_list_head *head)
+{
+    list_add(&page->list, head);
+}
+static inline void
+page_list_add_tail(struct page_info *page, struct page_list_head *head)
+{
+    list_add_tail(&page->list, head);
+}
+static inline void
+page_list_del(struct page_info *page, struct page_list_head *head)
+{
+    list_del(&page->list);
+}
+static inline void
+page_list_del2(struct page_info *page, struct page_list_head *head1,
+               struct page_list_head *head2)
+{
+    list_del(&page->list);
+}
+static inline struct page_info *
+page_list_remove_head(struct page_list_head *head)
+{
+    struct page_info *pg;
+
+    if ( page_list_empty(head) )
+        return NULL;
+
+    pg = page_list_first(head);
+    list_del(&pg->list);
+    return pg;
+}
+static inline void
+page_list_move(struct page_list_head *dst, struct page_list_head *src)
+{
+    if ( !list_empty(src) )
+        list_replace_init(src, dst);
+}
+static inline void
+page_list_splice(struct page_list_head *list, struct page_list_head *head)
+{
+    list_splice(list, head);
+}
+
 # define page_list_for_each(pos, head)   list_for_each_entry(pos, head, list)
 # define page_list_for_each_safe(pos, tmp, head) \
     list_for_each_entry_safe(pos, tmp, head, list)
 # define page_list_for_each_safe_reverse(pos, tmp, head) \
     list_for_each_entry_safe_reverse(pos, tmp, head, list)
-# define page_list_splice(list, hd)        list_splice(list, hd)
 #endif
 
 static inline unsigned int get_order_from_bytes(paddr_t size)
