@@ -118,6 +118,7 @@ static inline int send_notify(struct libxenvchan *ctrl, uint8_t bit)
 static inline int raw_get_data_ready(struct libxenvchan *ctrl)
 {
 	uint32_t ready = rd_prod(ctrl) - rd_cons(ctrl);
+	xen_mb(); /* Ensure 'ready' is read only once. */
 	if (ready >= rd_ring_size(ctrl))
 		/* We have no way to return errors.  Locking up the ring is
 		 * better than the alternatives. */
@@ -159,6 +160,7 @@ int libxenvchan_data_ready(struct libxenvchan *ctrl)
 static inline int raw_get_buffer_space(struct libxenvchan *ctrl)
 {
 	uint32_t ready = wr_ring_size(ctrl) - (wr_prod(ctrl) - wr_cons(ctrl));
+	xen_mb(); /* Ensure 'ready' is read only once. */
 	if (ready > wr_ring_size(ctrl))
 		/* We have no way to return errors.  Locking up the ring is
 		 * better than the alternatives. */
