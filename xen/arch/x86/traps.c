@@ -48,6 +48,7 @@
 #include <xen/kexec.h>
 #include <xen/trace.h>
 #include <xen/paging.h>
+#include <xen/virtual_region.h>
 #include <xen/watchdog.h>
 #include <asm/system.h>
 #include <asm/io.h>
@@ -1229,18 +1230,12 @@ static int emulate_forced_invalid_op(struct cpu_user_regs *regs)
 
 void do_invalid_op(struct cpu_user_regs *regs)
 {
-    const struct bug_frame *bug;
+    const struct bug_frame *bug = NULL;
     u8 bug_insn[2];
     const char *prefix = "", *filename, *predicate, *eip = (char *)regs->eip;
     unsigned long fixup;
-    int id, lineno;
-    static const struct bug_frame *const stop_frames[] = {
-        __stop_bug_frames_0,
-        __stop_bug_frames_1,
-        __stop_bug_frames_2,
-        __stop_bug_frames_3,
-        NULL
-    };
+    int id = -1, lineno;
+    const struct virtual_region *region;
 
     DEBUGGER_trap_entry(TRAP_invalid_op, regs);
 
@@ -1257,16 +1252,29 @@ void do_invalid_op(struct cpu_user_regs *regs)
          memcmp(bug_insn, "\xf\xb", sizeof(bug_insn)) )
         goto die;
 
-    for ( bug = __start_bug_frames, id = 0; stop_frames[id]; ++bug )
+    region = find_text_region(regs->eip);
+    if ( region )
     {
-        while ( unlikely(bug == stop_frames[id]) )
-            ++id;
-        if ( bug_loc(bug) == eip )
-            break;
-    }
-    if ( !stop_frames[id] )
-        goto die;
+        for ( id = 0; id < BUGFRAME_NR; id++ )
+        {
+            const struct bug_frame *b;
+            unsigned int i;
 
+            for ( i = 0, b = region->frame[id].bugs;
+                  i < region->frame[id].n_bugs; b++, i++ )
+            {
+                if ( bug_loc(b) == eip )
+                {
+                    bug = b;
+                    goto found;
+                }
+            }
+        }
+    }
+
+ found:
+    if ( !bug )
+        goto die;
     eip += sizeof(bug_insn);
     if ( id == BUGFRAME_run_fn )
     {

@@ -26,6 +26,7 @@
 #include <xen/pfn.h>
 #include <xen/nodemask.h>
 #include <xen/tmem_xen.h>
+#include <xen/virtual_region.h>
 #include <xen/watchdog.h>
 #include <public/version.h>
 #include <compat/platform.h>
@@ -515,6 +516,9 @@ static void noinline init_done(void)
 
     system_state = SYS_STATE_active;
 
+    /* MUST be done prior to removing .init data. */
+    unregister_init_virtual_region();
+
     domain_unpause_by_systemcontroller(hardware_domain);
 
     /* Zero the .init code and data. */
@@ -616,6 +620,8 @@ void __init noreturn __start_xen(unsigned long mbi_p)
 
     smp_prepare_boot_cpu();
     sort_exception_tables();
+
+    setup_virtual_regions(__start___ex_table, __stop___ex_table);
 
     /* Full exception support from here on in. */
 

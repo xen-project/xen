@@ -17,6 +17,7 @@
 #include <xen/lib.h>
 #include <xen/string.h>
 #include <xen/spinlock.h>
+#include <xen/virtual_region.h>
 #include <public/platform.h>
 #include <xen/guest_access.h>
 
@@ -97,8 +98,7 @@ static unsigned int get_symbol_offset(unsigned long pos)
 
 bool_t is_active_kernel_text(unsigned long addr)
 {
-    return (is_kernel_text(addr) ||
-            (system_state < SYS_STATE_active && is_kernel_inittext(addr)));
+    return !!find_text_region(addr);
 }
 
 const char *symbols_lookup(unsigned long addr,
@@ -108,12 +108,17 @@ const char *symbols_lookup(unsigned long addr,
 {
     unsigned long i, low, high, mid;
     unsigned long symbol_end = 0;
+    const struct virtual_region *region;
 
     namebuf[KSYM_NAME_LEN] = 0;
     namebuf[0] = 0;
 
-    if (!is_active_kernel_text(addr))
+    region = find_text_region(addr);
+    if (!region)
         return NULL;
+
+    if (region->symbols_lookup)
+        return region->symbols_lookup(addr, symbolsize, offset, namebuf);
 
         /* do a binary search on the sorted symbols_addresses array */
     low = 0;

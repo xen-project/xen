@@ -1,10 +1,12 @@
 
-#include <xen/config.h>
 #include <xen/init.h>
+#include <xen/list.h>
 #include <xen/perfc.h>
+#include <xen/rcupdate.h>
 #include <xen/sort.h>
 #include <xen/spinlock.h>
 #include <asm/uaccess.h>
+#include <xen/virtual_region.h>
 
 #define EX_FIELD(ptr, field) ((unsigned long)&(ptr)->field + (ptr)->field)
 
@@ -80,8 +82,12 @@ search_one_table(const struct exception_table_entry *first,
 unsigned long
 search_exception_table(unsigned long addr)
 {
-    return search_one_table(
-        __start___ex_table, __stop___ex_table-1, addr);
+    const struct virtual_region *region = find_text_region(addr);
+
+    if ( region && region->ex )
+        return search_one_table(region->ex, region->ex_end - 1, addr);
+
+    return 0;
 }
 
 unsigned long

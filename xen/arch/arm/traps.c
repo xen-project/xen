@@ -31,6 +31,7 @@
 #include <xen/softirq.h>
 #include <xen/domain_page.h>
 #include <xen/perfc.h>
+#include <xen/virtual_region.h>
 #include <public/sched.h>
 #include <public/xen.h>
 #include <asm/debugger.h>
@@ -101,6 +102,8 @@ integer_param("debug_stack_lines", debug_stack_lines);
 
 void init_traps(void)
 {
+    setup_virtual_regions(NULL, NULL);
+
     /* Setup Hyp vector base */
     WRITE_SYSREG((vaddr_t)hyp_traps_vector, VBAR_EL2);
 
@@ -1117,27 +1120,33 @@ void do_unexpected_trap(const char *msg, struct cpu_user_regs *regs)
 
 int do_bug_frame(struct cpu_user_regs *regs, vaddr_t pc)
 {
-    const struct bug_frame *bug;
+    const struct bug_frame *bug = NULL;
     const char *prefix = "", *filename, *predicate;
     unsigned long fixup;
-    int id, lineno;
-    static const struct bug_frame *const stop_frames[] = {
-        __stop_bug_frames_0,
-        __stop_bug_frames_1,
-        __stop_bug_frames_2,
-        NULL
-    };
+    int id = -1, lineno;
+    const struct virtual_region *region;
 
-    for ( bug = __start_bug_frames, id = 0; stop_frames[id]; ++bug )
+    region = find_text_region(pc);
+    if ( region )
     {
-        while ( unlikely(bug == stop_frames[id]) )
-            ++id;
+        for ( id = 0; id < BUGFRAME_NR; id++ )
+        {
+            const struct bug_frame *b;
+            unsigned int i;
 
-        if ( ((vaddr_t)bug_loc(bug)) == pc )
-            break;
+            for ( i = 0, b = region->frame[id].bugs;
+                  i < region->frame[id].n_bugs; b++, i++ )
+            {
+                if ( ((vaddr_t)bug_loc(b)) == pc )
+                {
+                    bug = b;
+                    goto found;
+                }
+            }
+        }
     }
-
-    if ( !stop_frames[id] )
+ found:
+    if ( !bug )
         return -ENOENT;
 
     /* WARN, BUG or ASSERT: decode the filename pointer and line number. */
