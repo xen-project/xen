@@ -126,6 +126,7 @@ F:	tools/libxc/xc_arinc653.c
 
 ARM (W/ VIRTUALISATION EXTENSIONS) ARCHITECTURE
 M:	Stefano Stabellini <stefano.stabellini@citrix.com>
+M:	Julien Grall <julien.grall@arm.com>
 S:	Supported
 L:	xen-devel@lists.xen.org
 F:	xen/arch/arm/
@@ -145,6 +146,7 @@ F:	xen/common/cpupool.c
 
 DEVICE TREE
 M:	Stefano Stabellini <stefano.stabellini@citrix.com>
+M:	Julien Grall <julien.grall@arm.com>
 S:	Supported
 F:	xen/common/libfdt/
 F:	xen/common/device_tree.c
