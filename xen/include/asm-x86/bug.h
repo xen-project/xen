@@ -10,6 +10,8 @@
 #define BUGFRAME_bug    2
 #define BUGFRAME_assert 3
 
+#define BUGFRAME_NR     4
+
 #ifndef __ASSEMBLY__
 
 struct bug_frame {
@@ -51,6 +53,7 @@ struct bug_frame {
 
 #define BUG_FRAME(type, line, ptr, second_frame, msg) do {                   \
     BUILD_BUG_ON((line) >> (BUG_LINE_LO_WIDTH + BUG_LINE_HI_WIDTH));         \
+    BUILD_BUG_ON((type) >= BUGFRAME_NR);                                     \
     asm volatile ( _ASM_BUGFRAME_TEXT(second_frame)                          \
                    :: _ASM_BUGFRAME_INFO(type, line, ptr, msg) );            \
 } while (0)
@@ -83,6 +86,11 @@ extern const struct bug_frame __start_bug_frames[],
  * in .rodata
  */
     .macro BUG_FRAME type, line, file_str, second_frame, msg
+
+    .if \type >= BUGFRAME_NR
+        .error "Invalid BUGFRAME index"
+    .endif
+
     .L\@ud: ud2a
 
     .pushsection .rodata.str1, "aMS", @progbits, 1

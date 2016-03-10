@@ -32,6 +32,8 @@ struct bug_frame {
 #define BUGFRAME_bug    1
 #define BUGFRAME_assert 2
 
+#define BUGFRAME_NR     3
+
 /* Many versions of GCC doesn't support the asm %c parameter which would
  * be preferable to this unpleasantness. We use mergeable string
  * sections to avoid multiple copies of the string appearing in the
@@ -39,6 +41,7 @@ struct bug_frame {
  */
 #define BUG_FRAME(type, line, file, has_msg, msg) do {                      \
     BUILD_BUG_ON((line) >> 16);                                             \
+    BUILD_BUG_ON((type) >= BUGFRAME_NR);                                    \
     asm ("1:"BUG_INSTR"\n"                                                  \
          ".pushsection .rodata.str, \"aMS\", %progbits, 1\n"                \
          "2:\t.asciz " __stringify(file) "\n"                               \
