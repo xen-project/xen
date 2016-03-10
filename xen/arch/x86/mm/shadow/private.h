@@ -727,7 +727,7 @@ struct sh_emulate_ctxt {
     struct segment_register seg_reg[6];
 
     /* MFNs being written to in write/cmpxchg callbacks */
-    mfn_t mfn1, mfn2;
+    mfn_t mfn[2];
 
 #if (SHADOW_OPTIMIZATIONS & SHOPT_SKIP_VERIFY)
     /* Special case for avoiding having to verify writes: remember

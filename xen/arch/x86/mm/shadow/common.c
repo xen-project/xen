@@ -1746,11 +1746,11 @@ void *sh_emulate_map_dest(struct vcpu *v, unsigned long vaddr,
     struct domain *d = v->domain;
     void *map;
 
-    sh_ctxt->mfn1 = emulate_gva_to_mfn(v, vaddr, sh_ctxt);
-    if ( !mfn_valid(sh_ctxt->mfn1) )
-        return ((mfn_x(sh_ctxt->mfn1) == BAD_GVA_TO_GFN) ?
+    sh_ctxt->mfn[0] = emulate_gva_to_mfn(v, vaddr, sh_ctxt);
+    if ( !mfn_valid(sh_ctxt->mfn[0]) )
+        return ((mfn_x(sh_ctxt->mfn[0]) == BAD_GVA_TO_GFN) ?
                 MAPPING_EXCEPTION :
-                (mfn_x(sh_ctxt->mfn1) == READONLY_GFN) ?
+                (mfn_x(sh_ctxt->mfn[0]) == READONLY_GFN) ?
                 MAPPING_SILENT_FAIL : MAPPING_UNHANDLEABLE);
 
 #ifndef NDEBUG
@@ -1767,39 +1767,36 @@ void *sh_emulate_map_dest(struct vcpu *v, unsigned long vaddr,
 
     /* Unaligned writes mean probably this isn't a pagetable. */
     if ( vaddr & (bytes - 1) )
-        sh_remove_shadows(d, sh_ctxt->mfn1, 0, 0 /* Slow, can fail. */ );
+        sh_remove_shadows(d, sh_ctxt->mfn[0], 0, 0 /* Slow, can fail. */ );
 
     if ( likely(((vaddr + bytes - 1) & PAGE_MASK) == (vaddr & PAGE_MASK)) )
     {
         /* Whole write fits on a single page. */
-        sh_ctxt->mfn2 = _mfn(INVALID_MFN);
-        map = map_domain_page(sh_ctxt->mfn1) + (vaddr & ~PAGE_MASK);
+        sh_ctxt->mfn[1] = _mfn(INVALID_MFN);
+        map = map_domain_page(sh_ctxt->mfn[0]) + (vaddr & ~PAGE_MASK);
     }
-    else
+    else if ( !is_hvm_domain(d) )
     {
-        mfn_t mfns[2];
-
         /*
          * Cross-page emulated writes are only supported for HVM guests;
          * PV guests ought to know better.
          */
-        if ( !is_hvm_domain(d) )
-            return MAPPING_UNHANDLEABLE;
-
+        return MAPPING_UNHANDLEABLE;
+    }
+    else
+    {
         /* This write crosses a page boundary. Translate the second page. */
-        sh_ctxt->mfn2 = emulate_gva_to_mfn(v, vaddr + bytes - 1, sh_ctxt);
-        if ( !mfn_valid(sh_ctxt->mfn2) )
-            return ((mfn_x(sh_ctxt->mfn2) == BAD_GVA_TO_GFN) ?
+        sh_ctxt->mfn[1] = emulate_gva_to_mfn(v, vaddr + bytes - 1, sh_ctxt);
+        if ( !mfn_valid(sh_ctxt->mfn[1]) )
+            return ((mfn_x(sh_ctxt->mfn[1]) == BAD_GVA_TO_GFN) ?
                     MAPPING_EXCEPTION :
-                    (mfn_x(sh_ctxt->mfn2) == READONLY_GFN) ?
+                    (mfn_x(sh_ctxt->mfn[1]) == READONLY_GFN) ?
                     MAPPING_SILENT_FAIL : MAPPING_UNHANDLEABLE);
 
         /* Cross-page writes mean probably not a pagetable. */
-        sh_remove_shadows(d, sh_ctxt->mfn2, 0, 0 /* Slow, can fail. */ );
+        sh_remove_shadows(d, sh_ctxt->mfn[1], 0, 0 /* Slow, can fail. */ );
 
-        mfns[0] = sh_ctxt->mfn1;
-        mfns[1] = sh_ctxt->mfn2;
-        map = vmap(mfns, 2);
+        map = vmap(sh_ctxt->mfn, 2);
         if ( !map )
             return MAPPING_UNHANDLEABLE;
         map += (vaddr & ~PAGE_MASK);
@@ -1831,7 +1828,7 @@ void sh_emulate_unmap_dest(struct vcpu *v, void *addr, unsigned int bytes,
      *  - it was aligned to the PTE boundaries; and
      *  - _PAGE_PRESENT was clear before and after the write.
      */
-    shflags = mfn_to_page(sh_ctxt->mfn1)->shadow_flags;
+    shflags = mfn_to_page(sh_ctxt->mfn[0])->shadow_flags;
 #if (SHADOW_OPTIMIZATIONS & SHOPT_SKIP_VERIFY)
     if ( sh_ctxt->low_bit_was_clear
          && !(*(u8 *)addr & _PAGE_PRESENT)
@@ -1852,12 +1849,12 @@ void sh_emulate_unmap_dest(struct vcpu *v, void *addr, unsigned int bytes,
               && bytes <= 4)) )
     {
         /* Writes with this alignment constraint can't possibly cross pages. */
-        ASSERT(!mfn_valid(sh_ctxt->mfn2));
+        ASSERT(!mfn_valid(sh_ctxt->mfn[1]));
     }
     else
 #endif /* SHADOW_OPTIMIZATIONS & SHOPT_SKIP_VERIFY */
     {
-        if ( unlikely(mfn_valid(sh_ctxt->mfn2)) )
+        if ( unlikely(mfn_valid(sh_ctxt->mfn[1])) )
         {
             /* Validate as two writes, one to each page. */
             b1 = PAGE_SIZE - (((unsigned long)addr) & ~PAGE_MASK);
@@ -1865,16 +1862,16 @@ void sh_emulate_unmap_dest(struct vcpu *v, void *addr, unsigned int bytes,
             ASSERT(b2 < bytes);
         }
         if ( likely(b1 > 0) )
-            sh_validate_guest_pt_write(v, sh_ctxt->mfn1, addr, b1);
+            sh_validate_guest_pt_write(v, sh_ctxt->mfn[0], addr, b1);
         if ( unlikely(b2 > 0) )
-            sh_validate_guest_pt_write(v, sh_ctxt->mfn2, addr + b1, b2);
+            sh_validate_guest_pt_write(v, sh_ctxt->mfn[1], addr + b1, b2);
     }
 
-    paging_mark_dirty(v->domain, mfn_x(sh_ctxt->mfn1));
+    paging_mark_dirty(v->domain, mfn_x(sh_ctxt->mfn[0]));
 
-    if ( unlikely(mfn_valid(sh_ctxt->mfn2)) )
+    if ( unlikely(mfn_valid(sh_ctxt->mfn[1])) )
     {
-        paging_mark_dirty(v->domain, mfn_x(sh_ctxt->mfn2));
+        paging_mark_dirty(v->domain, mfn_x(sh_ctxt->mfn[1]));
         vunmap((void *)((unsigned long)addr & PAGE_MASK));
     }
     else

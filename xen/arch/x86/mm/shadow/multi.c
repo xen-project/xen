@@ -4615,13 +4615,13 @@ static void emulate_unmap_dest(struct vcpu *v,
                                u32 bytes,
                                struct sh_emulate_ctxt *sh_ctxt)
 {
-    ASSERT(mfn_valid(sh_ctxt->mfn1));
+    ASSERT(mfn_valid(sh_ctxt->mfn[0]));
 
     /* If we are writing lots of PTE-aligned zeros, might want to unshadow */
     if ( likely(bytes >= 4) && (*(u32 *)addr == 0) )
     {
         if ( ((unsigned long) addr & ((sizeof (guest_intpte_t)) - 1)) == 0 )
-            check_for_early_unshadow(v, sh_ctxt->mfn1);
+            check_for_early_unshadow(v, sh_ctxt->mfn[0]);
         /* Don't reset the heuristic if we're writing zeros at non-aligned
          * addresses, otherwise it doesn't catch REP MOVSD on PAE guests */
     }
