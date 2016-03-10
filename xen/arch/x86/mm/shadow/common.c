@@ -1679,6 +1679,211 @@ static unsigned int shadow_get_allocation(struct domain *d)
 }
 
 /**************************************************************************/
+/* Handling guest writes to pagetables. */
+
+/* Translate a VA to an MFN, injecting a page-fault if we fail. */
+#define BAD_GVA_TO_GFN (~0UL)
+#define BAD_GFN_TO_MFN (~1UL)
+#define READONLY_GFN   (~2UL)
+static mfn_t emulate_gva_to_mfn(struct vcpu *v, unsigned long vaddr,
+                                struct sh_emulate_ctxt *sh_ctxt)
+{
+    unsigned long gfn;
+    struct page_info *page;
+    mfn_t mfn;
+    p2m_type_t p2mt;
+    uint32_t pfec = PFEC_page_present | PFEC_write_access;
+
+    /* Translate the VA to a GFN. */
+    gfn = paging_get_hostmode(v)->gva_to_gfn(v, NULL, vaddr, &pfec);
+    if ( gfn == INVALID_GFN )
+    {
+        if ( is_hvm_vcpu(v) )
+            hvm_inject_page_fault(pfec, vaddr);
+        else
+            propagate_page_fault(vaddr, pfec);
+        return _mfn(BAD_GVA_TO_GFN);
+    }
+
+    /* Translate the GFN to an MFN. */
+    ASSERT(!paging_locked_by_me(v->domain));
+
+    page = get_page_from_gfn(v->domain, gfn, &p2mt, P2M_ALLOC);
+
+    /* Sanity checking. */
+    if ( page == NULL )
+    {
+        return _mfn(BAD_GFN_TO_MFN);
+    }
+    if ( p2m_is_discard_write(p2mt) )
+    {
+        put_page(page);
+        return _mfn(READONLY_GFN);
+    }
+    if ( !p2m_is_ram(p2mt) )
+    {
+        put_page(page);
+        return _mfn(BAD_GFN_TO_MFN);
+    }
+    mfn = page_to_mfn(page);
+    ASSERT(mfn_valid(mfn));
+
+    v->arch.paging.last_write_was_pt = !!sh_mfn_is_a_page_table(mfn);
+    /*
+     * Note shadow cannot page out or unshare this mfn, so the map won't
+     * disappear. Otherwise, caller must hold onto page until done.
+     */
+    put_page(page);
+
+    return mfn;
+}
+
+/* Check that the user is allowed to perform this write. */
+void *sh_emulate_map_dest(struct vcpu *v, unsigned long vaddr,
+                          unsigned int bytes,
+                          struct sh_emulate_ctxt *sh_ctxt)
+{
+    struct domain *d = v->domain;
+    void *map;
+
+    sh_ctxt->mfn1 = emulate_gva_to_mfn(v, vaddr, sh_ctxt);
+    if ( !mfn_valid(sh_ctxt->mfn1) )
+        return ((mfn_x(sh_ctxt->mfn1) == BAD_GVA_TO_GFN) ?
+                MAPPING_EXCEPTION :
+                (mfn_x(sh_ctxt->mfn1) == READONLY_GFN) ?
+                MAPPING_SILENT_FAIL : MAPPING_UNHANDLEABLE);
+
+#ifndef NDEBUG
+    /* We don't emulate user-mode writes to page tables. */
+    if ( has_hvm_container_domain(d)
+         ? hvm_get_seg_reg(x86_seg_ss, sh_ctxt)->attr.fields.dpl == 3
+         : !guest_kernel_mode(v, guest_cpu_user_regs()) )
+    {
+        gdprintk(XENLOG_DEBUG, "User-mode write to pagetable reached "
+                 "emulate_map_dest(). This should never happen!\n");
+        return MAPPING_UNHANDLEABLE;
+    }
+#endif
+
+    /* Unaligned writes mean probably this isn't a pagetable. */
+    if ( vaddr & (bytes - 1) )
+        sh_remove_shadows(d, sh_ctxt->mfn1, 0, 0 /* Slow, can fail. */ );
+
+    if ( likely(((vaddr + bytes - 1) & PAGE_MASK) == (vaddr & PAGE_MASK)) )
+    {
+        /* Whole write fits on a single page. */
+        sh_ctxt->mfn2 = _mfn(INVALID_MFN);
+        map = map_domain_page(sh_ctxt->mfn1) + (vaddr & ~PAGE_MASK);
+    }
+    else
+    {
+        mfn_t mfns[2];
+
+        /*
+         * Cross-page emulated writes are only supported for HVM guests;
+         * PV guests ought to know better.
+         */
+        if ( !is_hvm_domain(d) )
+            return MAPPING_UNHANDLEABLE;
+
+        /* This write crosses a page boundary. Translate the second page. */
+        sh_ctxt->mfn2 = emulate_gva_to_mfn(v, vaddr + bytes - 1, sh_ctxt);
+        if ( !mfn_valid(sh_ctxt->mfn2) )
+            return ((mfn_x(sh_ctxt->mfn2) == BAD_GVA_TO_GFN) ?
+                    MAPPING_EXCEPTION :
+                    (mfn_x(sh_ctxt->mfn2) == READONLY_GFN) ?
+                    MAPPING_SILENT_FAIL : MAPPING_UNHANDLEABLE);
+
+        /* Cross-page writes mean probably not a pagetable. */
+        sh_remove_shadows(d, sh_ctxt->mfn2, 0, 0 /* Slow, can fail. */ );
+
+        mfns[0] = sh_ctxt->mfn1;
+        mfns[1] = sh_ctxt->mfn2;
+        map = vmap(mfns, 2);
+        if ( !map )
+            return MAPPING_UNHANDLEABLE;
+        map += (vaddr & ~PAGE_MASK);
+    }
+
+#if (SHADOW_OPTIMIZATIONS & SHOPT_SKIP_VERIFY)
+    /*
+     * Remember if the bottom bit was clear, so we can choose not to run
+     * the change through the verify code if it's still clear afterwards.
+     */
+    sh_ctxt->low_bit_was_clear = map != NULL && !(*(u8 *)map & _PAGE_PRESENT);
+#endif
+
+    return map;
+}
+
+/*
+ * Tidy up after the emulated write: mark pages dirty, verify the new
+ * contents, and undo the mapping.
+ */
+void sh_emulate_unmap_dest(struct vcpu *v, void *addr, unsigned int bytes,
+                           struct sh_emulate_ctxt *sh_ctxt)
+{
+    u32 b1 = bytes, b2 = 0, shflags;
+
+    /*
+     * We can avoid re-verifying the page contents after the write if:
+     *  - it was no larger than the PTE type of this pagetable;
+     *  - it was aligned to the PTE boundaries; and
+     *  - _PAGE_PRESENT was clear before and after the write.
+     */
+    shflags = mfn_to_page(sh_ctxt->mfn1)->shadow_flags;
+#if (SHADOW_OPTIMIZATIONS & SHOPT_SKIP_VERIFY)
+    if ( sh_ctxt->low_bit_was_clear
+         && !(*(u8 *)addr & _PAGE_PRESENT)
+         && ((!(shflags & SHF_32)
+              /*
+               * Not shadowed 32-bit: aligned 64-bit writes that leave
+               * the present bit unset are safe to ignore.
+               */
+              && ((unsigned long)addr & 7) == 0
+              && bytes <= 8)
+             ||
+             (!(shflags & (SHF_PAE|SHF_64))
+              /*
+               * Not shadowed PAE/64-bit: aligned 32-bit writes that
+               * leave the present bit unset are safe to ignore.
+               */
+              && ((unsigned long)addr & 3) == 0
+              && bytes <= 4)) )
+    {
+        /* Writes with this alignment constraint can't possibly cross pages. */
+        ASSERT(!mfn_valid(sh_ctxt->mfn2));
+    }
+    else
+#endif /* SHADOW_OPTIMIZATIONS & SHOPT_SKIP_VERIFY */
+    {
+        if ( unlikely(mfn_valid(sh_ctxt->mfn2)) )
+        {
+            /* Validate as two writes, one to each page. */
+            b1 = PAGE_SIZE - (((unsigned long)addr) & ~PAGE_MASK);
+            b2 = bytes - b1;
+            ASSERT(b2 < bytes);
+        }
+        if ( likely(b1 > 0) )
+            sh_validate_guest_pt_write(v, sh_ctxt->mfn1, addr, b1);
+        if ( unlikely(b2 > 0) )
+            sh_validate_guest_pt_write(v, sh_ctxt->mfn2, addr + b1, b2);
+    }
+
+    paging_mark_dirty(v->domain, mfn_x(sh_ctxt->mfn1));
+
+    if ( unlikely(mfn_valid(sh_ctxt->mfn2)) )
+    {
+        paging_mark_dirty(v->domain, mfn_x(sh_ctxt->mfn2));
+        vunmap((void *)((unsigned long)addr & PAGE_MASK));
+    }
+    else
+        unmap_domain_page(addr);
+
+    atomic_inc(&v->domain->arch.paging.shadow.gtable_dirty_version);
+}
+
+/**************************************************************************/
 /* Hash table for storing the guest->shadow mappings.
  * The table itself is an array of pointers to shadows; the shadows are then
  * threaded on a singly-linked list of shadows with the same hash value */

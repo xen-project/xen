@@ -393,6 +393,17 @@ void shadow_update_paging_modes(struct vcpu *v);
  * With user_only == 1, unhooks only the user-mode mappings. */
 void shadow_unhook_mappings(struct domain *d, mfn_t smfn, int user_only);
 
+/* Returns a mapped pointer to write to, or one of the following error
+ * indicators. */
+#define MAPPING_UNHANDLEABLE ((void *)(unsigned long)X86EMUL_UNHANDLEABLE)
+#define MAPPING_EXCEPTION    ((void *)(unsigned long)X86EMUL_EXCEPTION)
+#define MAPPING_SILENT_FAIL  ((void *)(unsigned long)X86EMUL_OKAY)
+#define sh_emulate_map_dest_failed(rc) ((unsigned long)(rc) <= 3)
+void *sh_emulate_map_dest(struct vcpu *v, unsigned long vaddr,
+                          unsigned int bytes, struct sh_emulate_ctxt *sh_ctxt);
+void sh_emulate_unmap_dest(struct vcpu *v, void *addr, unsigned int bytes,
+                           struct sh_emulate_ctxt *sh_ctxt);
+
 #if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC)
 /* Allow a shadowed page to go out of sync */
 int sh_unsync(struct vcpu *v, mfn_t gmfn);
