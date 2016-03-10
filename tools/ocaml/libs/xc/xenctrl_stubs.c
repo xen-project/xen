@@ -853,21 +853,21 @@ CAMLprim value stub_xc_version_version(value xch)
 	CAMLparam1(xch);
 	CAMLlocal1(result);
 	xen_extraversion_t extra;
-	long packed;
+	xen_version_op_val_t packed;
 	int retval;
 
 	caml_enter_blocking_section();
-	packed = xc_version(_H(xch), XENVER_version, NULL);
+	retval = xc_version(_H(xch), XEN_VERSION_version, &packed, sizeof(packed));
 	caml_leave_blocking_section();
 
-	if (packed < 0)
+	if (retval < 0)
 		failwith_xc(_H(xch));
 
 	caml_enter_blocking_section();
-	retval = xc_version(_H(xch), XENVER_extraversion, &extra);
+	retval = xc_version(_H(xch), XEN_VERSION_extraversion, &extra, sizeof(extra));
 	caml_leave_blocking_section();
 
-	if (retval)
+	if (retval < 0)
 		failwith_xc(_H(xch));
 
 	result = caml_alloc_tuple(3);
@@ -884,37 +884,28 @@ CAMLprim value stub_xc_version_compile_info(value xch)
 {
 	CAMLparam1(xch);
 	CAMLlocal1(result);
-	xen_compile_info_t ci;
-	int retval;
-
-	caml_enter_blocking_section();
-	retval = xc_version(_H(xch), XENVER_compile_info, &ci);
-	caml_leave_blocking_section();
-
-	if (retval)
-		failwith_xc(_H(xch));
 
 	result = caml_alloc_tuple(4);
 
-	Store_field(result, 0, caml_copy_string(ci.compiler));
-	Store_field(result, 1, caml_copy_string(ci.compile_by));
-	Store_field(result, 2, caml_copy_string(ci.compile_domain));
-	Store_field(result, 3, caml_copy_string(ci.compile_date));
+	Store_field(result, 0, caml_copy_string(""));
+	Store_field(result, 1, caml_copy_string(""));
+	Store_field(result, 2, caml_copy_string(""));
+	Store_field(result, 3, caml_copy_string(""));
 
 	CAMLreturn(result);
 }
 
 
-static value xc_version_single_string(value xch, int code, void *info)
+static value xc_version_single_string(value xch, int code, void *info, ssize_t len)
 {
 	CAMLparam1(xch);
 	int retval;
 
 	caml_enter_blocking_section();
-	retval = xc_version(_H(xch), code, info);
+	retval = xc_version(_H(xch), code, info, len);
 	caml_leave_blocking_section();
 
-	if (retval)
+	if (retval < 0)
 		failwith_xc(_H(xch));
 
 	CAMLreturn(caml_copy_string((char *)info));
@@ -925,7 +916,8 @@ CAMLprim value stub_xc_version_changeset(value xch)
 {
 	xen_changeset_info_t ci;
 
-	return xc_version_single_string(xch, XENVER_changeset, &ci);
+	return xc_version_single_string(xch, XEN_VERSION_changeset,
+					&ci, sizeof(ci));
 }
 
 
@@ -933,7 +925,8 @@ CAMLprim value stub_xc_version_capabilities(value xch)
 {
 	xen_capabilities_info_t ci;
 
-	return xc_version_single_string(xch, XENVER_capabilities, &ci);
+	return xc_version_single_string(xch, XEN_VERSION_capabilities,
+					&ci, sizeof(ci));
 }
 
 
