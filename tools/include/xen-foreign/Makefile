@@ -34,7 +34,10 @@ x86_32.h: mkheader.py structs.py $(ROOT)/arch-x86/xen-x86_32.h $(ROOT)/arch-x86/
 	$(PYTHON) $< $* $@ $(filter %.h,$^)
 
 x86_64.h: mkheader.py structs.py $(ROOT)/arch-x86/xen-x86_64.h $(ROOT)/arch-x86/xen.h $(ROOT)/xen.h
-	$(PYTHON) $< $* $@ $(filter %.h,$^)
+	$(PYTHON) $< $* $@.tmp $(filter %.h,$^)
+	#Avoid mixing an alignment directive with a uint64_t cast or sizeof expression
+	sed 's/(__align8__ \(u\?int64_t\))/(\1)/g' -i $@.tmp
+	$(call move-if-changed,$@.tmp,$@)
 
 checker.c: mkchecker.py structs.py
 	$(PYTHON) $< $@ $(architectures)
