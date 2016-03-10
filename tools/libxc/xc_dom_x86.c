@@ -1259,7 +1259,6 @@ static int meminit_hvm(struct xc_dom_image *dom)
     unsigned long target_pages = dom->target_pages;
     unsigned long cur_pages, cur_pfn;
     int rc;
-    xen_capabilities_info_t caps;
     unsigned long stat_normal_pages = 0, stat_2mb_pages = 0, 
         stat_1gb_pages = 0;
     unsigned int memflags = 0;
@@ -1336,12 +1335,6 @@ static int meminit_hvm(struct xc_dom_image *dom)
     {
         DOMPRINTF("vNUMA memory pages mismatch (0x%"PRIx64" != 0x%lx)",
                total_pages, nr_pages);
-        goto error_out;
-    }
-
-    if ( xc_version(xch, XENVER_capabilities, &caps) != 0 )
-    {
-        DOMPRINTF("Could not get Xen capabilities");
         goto error_out;
     }
 
