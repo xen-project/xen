@@ -498,6 +498,7 @@ static int hvmemul_virtual_to_linear(
 {
     struct segment_register *reg;
     int okay;
+    unsigned long max_reps = 4096;
 
     if ( seg == x86_seg_none )
     {
@@ -506,16 +507,21 @@ static int hvmemul_virtual_to_linear(
     }
 
     /*
+     * If introspection has been enabled for this domain, and we're emulating
+     * becase a vm_reply asked us to (i.e. not doing regular IO) reps should
+     * be at most 1, since optimization might otherwise cause a single
+     * vm_event being triggered for repeated writes to a whole page.
+     */
+    if ( unlikely(current->domain->arch.mem_access_emulate_each_rep) &&
+         current->arch.vm_event->emulate_flags != 0 )
+       max_reps = 1;
+
+    /*
      * Clip repetitions to avoid overflow when multiplying by @bytes_per_rep.
      * The chosen maximum is very conservative but it's what we use in
      * hvmemul_linear_to_phys() so there is no point in using a larger value.
-     * If introspection has been enabled for this domain, *reps should be
-     * at most 1, since optimization might otherwise cause a single vm_event
-     * being triggered for repeated writes to a whole page.
      */
-    *reps = min_t(unsigned long, *reps,
-                  unlikely(current->domain->arch.mem_access_emulate_each_rep)
-                           ? 1 : 4096);
+    *reps = min_t(unsigned long, *reps, max_reps);
 
     reg = hvmemul_get_seg_reg(seg, hvmemul_ctxt);
 
