@@ -286,6 +286,7 @@ F:	tools/hotplug/Linux/block-drbd-probe
 
 RTDS SCHEDULER
 M:	Dario Faggioli <dario.faggioli@citrix.com>
+M:	Meng Xu <mengxu@cis.upenn.edu>
 S:	Supported
 F:	xen/common/sched_rt.c
 
