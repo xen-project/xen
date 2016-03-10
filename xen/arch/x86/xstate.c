@@ -292,7 +292,7 @@ void xsave(struct vcpu *v, uint64_t mask)
 
         XSAVE("0x48,");
 
-        if ( !(ptr->xsave_hdr.xstate_bv & XSTATE_FP) ||
+        if ( !(mask & ptr->xsave_hdr.xstate_bv & XSTATE_FP) ||
              /*
               * AMD CPUs don't save/restore FDP/FIP/FOP unless an exception
               * is pending.
