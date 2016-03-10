@@ -89,10 +89,6 @@ static inline uint64_t min(uint64_t a, uint64_t b)
 {
     return a < b ? a : b;
 }
-static inline uint64_t max(uint64_t a, uint64_t b)
-{
-    return a > b ? a : b;
-}
 
 static int is_px = 0;
 
