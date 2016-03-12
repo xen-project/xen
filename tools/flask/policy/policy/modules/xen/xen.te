@@ -73,6 +73,14 @@ allow dom0_t xen_t:xen2 {
     pmu_ctrl
     get_symbol
 };
+
+# Allow dom0 to use all XENVER_ subops that have checks.
+# Note that dom0 is part of domain_type so this has duplicates.
+allow dom0_t xen_t:version {
+    xen_extraversion xen_compile_info xen_capabilities
+    xen_changeset xen_pagesize xen_guest_handle xen_commandline
+};
+
 allow dom0_t xen_t:mmu memorymap;
 
 # Allow dom0 to use these domctls on itself. For domctls acting on other
@@ -136,6 +144,12 @@ if (guest_writeconsole) {
 # Allow all domains to use PMU (but not to change its settings --- that's what
 # pmu_ctrl is for)
 allow domain_type xen_t:xen2 pmu_use;
+
+# For normal guests all possible except XENVER_commandline.
+allow domain_type xen_t:version {
+    xen_extraversion xen_compile_info xen_capabilities
+    xen_changeset xen_pagesize xen_guest_handle
+};
 
 ###############################################################################
 #

@@ -55,3 +55,18 @@ const char *xen_banner(void)
 {
     return XEN_BANNER;
 }
+
+const char *xen_deny(void)
+{
+    return "<denied>";
+}
+
+/*
+ * Local variables:
+ * mode: C
+ * c-file-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

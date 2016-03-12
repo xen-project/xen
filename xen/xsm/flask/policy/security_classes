@@ -18,5 +18,6 @@ class shadow
 class event
 class grant
 class security
+class version
 
 # FLASK

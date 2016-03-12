@@ -12,5 +12,6 @@ unsigned int xen_minor_version(void);
 const char *xen_extra_version(void);
 const char *xen_changeset(void);
 const char *xen_banner(void);
+const char *xen_deny(void);
 
 #endif /* __XEN_VERSION_H__ */

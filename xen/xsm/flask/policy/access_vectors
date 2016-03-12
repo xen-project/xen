@@ -495,3 +495,28 @@ class security
 # remove ocontext label definitions for resources
     del_ocontext
 }
+
+# Class version is used to describe the XENVER_ hypercall.
+# Almost all sub-ops are described here - in the default case all of them should
+# be allowed except the XENVER_commandline.
+#
+# The ones that are omitted are XENVER_version, XENVER_platform_parameters,
+# and XENVER_get_features  - as they MUST always be returned to a guest.
+#
+class version
+{
+# Extra informations (-unstable).
+    xen_extraversion
+# Compile information of the hypervisor.
+    xen_compile_info
+# Such as "xen-3.0-x86_64 xen-3.0-x86_32p hvm-3.0-x86_32 hvm-3.0-x86_32p hvm-3.0-x86_64".
+    xen_capabilities
+# Source code changeset.
+    xen_changeset
+# Page size the hypervisor uses.
+    xen_pagesize
+# An value that the control stack can choose.
+    xen_guest_handle
+# Xen command line.
+    xen_commandline
+}

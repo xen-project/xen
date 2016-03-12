@@ -727,3 +727,27 @@ static XSM_INLINE int xsm_pmu_op (XSM_DEFAULT_ARG struct domain *d, unsigned int
 }
 
 #endif /* CONFIG_X86 */
+
+#include <public/version.h>
+static XSM_INLINE int xsm_xen_version (XSM_DEFAULT_ARG uint32_t op)
+{
+    XSM_ASSERT_ACTION(XSM_OTHER);
+    switch ( op )
+    {
+    case XENVER_version:
+    case XENVER_platform_parameters:
+    case XENVER_get_features:
+        /* These sub-ops ignore the permission checks and return data. */
+        return 0;
+    case XENVER_extraversion:
+    case XENVER_compile_info:
+    case XENVER_capabilities:
+    case XENVER_changeset:
+    case XENVER_pagesize:
+    case XENVER_guest_handle:
+        /* These MUST always be accessible to any guest by default. */
+        return xsm_default_action(XSM_HOOK, current->domain, NULL);
+    default:
+        return xsm_default_action(XSM_PRIV, current->domain, NULL);
+    }
+}

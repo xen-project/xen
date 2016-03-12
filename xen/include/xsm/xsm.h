@@ -193,6 +193,7 @@ struct xsm_operations {
     int (*ioport_mapping) (struct domain *d, uint32_t s, uint32_t e, uint8_t allow);
     int (*pmu_op) (struct domain *d, unsigned int op);
 #endif
+    int (*xen_version) (uint32_t cmd);
 };
 
 #ifdef CONFIG_XSM
@@ -730,6 +731,11 @@ static inline int xsm_pmu_op (xsm_default_t def, struct domain *d, unsigned int 
 }
 
 #endif /* CONFIG_X86 */
+
+static inline int xsm_xen_version (xsm_default_t def, uint32_t op)
+{
+    return xsm_ops->xen_version(op);
+}
 
 #endif /* XSM_NO_WRAPPERS */
 
