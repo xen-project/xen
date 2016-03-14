@@ -853,7 +853,7 @@ static bool_t div_dbl(unsigned long u[2], unsigned long v)
 {
     if ( (v == 0) || (u[1] >= v) )
         return 1;
-    asm ( "divq %2" : "+a" (u[0]), "+d" (u[1]) : "rm" (v) );
+    asm ( "div"__OS" %2" : "+a" (u[0]), "+d" (u[1]) : "rm" (v) );
     return 0;
 }
 
