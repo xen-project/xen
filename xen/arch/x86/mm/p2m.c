@@ -2081,6 +2081,12 @@ void *map_domain_gfn(struct p2m_domain *p2m, gfn_t gfn, mfn_t *mfn,
 {
     struct page_info *page;
 
+    if ( gfn_x(gfn) >> p2m->domain->arch.paging.gfn_bits )
+    {
+        *rc = _PAGE_INVALID_BIT;
+        return NULL;
+    }
+
     /* Translate the gfn, unsharing if shared. */
     page = get_page_from_gfn_p2m(p2m->domain, p2m, gfn_x(gfn), p2mt, NULL, q);
     if ( p2m_is_paging(*p2mt) )
