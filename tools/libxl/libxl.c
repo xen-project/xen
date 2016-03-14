@@ -90,7 +90,7 @@ int libxl_ctx_alloc(libxl_ctx **pctx, int version,
     /* The mutex is special because we can't idempotently destroy it */
 
     if (libxl__init_recursive_mutex(ctx, &ctx->lock) < 0) {
-        LOG(ERROR, "Failed to initialize mutex");
+        LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "Failed to initialize mutex");
         free(ctx);
         ctx = 0;
         rc = ERROR_FAIL;
