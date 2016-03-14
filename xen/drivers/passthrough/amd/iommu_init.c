@@ -778,7 +778,6 @@ static bool_t __init set_iommu_interrupt_handler(struct amd_iommu *iommu)
 {
     int irq, ret;
     hw_irq_controller *handler;
-    unsigned long flags;
     u16 control;
 
     irq = create_irq(NUMA_NO_NODE);
@@ -788,10 +787,10 @@ static bool_t __init set_iommu_interrupt_handler(struct amd_iommu *iommu)
         return 0;
     }
 
-    spin_lock_irqsave(&pcidevs_lock, flags);
+    spin_lock(&pcidevs_lock);
     iommu->msi.dev = pci_get_pdev(iommu->seg, PCI_BUS(iommu->bdf),
                                   PCI_DEVFN2(iommu->bdf));
-    spin_unlock_irqrestore(&pcidevs_lock, flags);
+    spin_unlock(&pcidevs_lock);
     if ( !iommu->msi.dev )
     {
         AMD_IOMMU_DEBUG("IOMMU: no pdev for %04x:%02x:%02x.%u\n",
