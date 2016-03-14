@@ -984,7 +984,7 @@ int pi_update_irte(const struct vcpu *v, const struct pirq *pirq,
 
     spin_unlock_irq(&desc->lock);
 
-    ASSERT(spin_is_locked(&pcidevs_lock));
+    ASSERT(pcidevs_locked());
 
     /*
      * FIXME: For performance reasons we should store the 'iommu' pointer in

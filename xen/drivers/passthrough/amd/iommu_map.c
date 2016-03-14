@@ -593,7 +593,7 @@ static int update_paging_mode(struct domain *d, unsigned long gfn)
         hd->arch.paging_mode = level;
         hd->arch.root_table = new_root;
 
-        if ( !spin_is_locked(&pcidevs_lock) )
+        if ( !pcidevs_locked() )
             AMD_IOMMU_DEBUG("%s Try to access pdev_list "
                             "without aquiring pcidevs_lock.\n", __func__);
 

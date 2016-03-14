@@ -388,7 +388,7 @@ int msixtbl_pt_register(struct domain *d, struct pirq *pirq, uint64_t gtable)
     struct msixtbl_entry *entry, *new_entry;
     int r = -EINVAL;
 
-    ASSERT(spin_is_locked(&pcidevs_lock));
+    ASSERT(pcidevs_locked());
     ASSERT(spin_is_locked(&d->event_lock));
 
     if ( !has_vlapic(d) )
@@ -446,7 +446,7 @@ void msixtbl_pt_unregister(struct domain *d, struct pirq *pirq)
     struct pci_dev *pdev;
     struct msixtbl_entry *entry;
 
-    ASSERT(spin_is_locked(&pcidevs_lock));
+    ASSERT(pcidevs_locked());
     ASSERT(spin_is_locked(&d->event_lock));
 
     if ( !has_vlapic(d) )

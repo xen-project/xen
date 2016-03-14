@@ -1960,7 +1960,7 @@ int map_domain_pirq(
         struct pci_dev *pdev;
         unsigned int nr = 0;
 
-        ASSERT(spin_is_locked(&pcidevs_lock));
+        ASSERT(pcidevs_locked());
 
         ret = -ENODEV;
         if ( !cpu_has_apic )
@@ -2105,7 +2105,7 @@ int unmap_domain_pirq(struct domain *d, int pirq)
     if ( (pirq < 0) || (pirq >= d->nr_pirqs) )
         return -EINVAL;
 
-    ASSERT(spin_is_locked(&pcidevs_lock));
+    ASSERT(pcidevs_locked());
     ASSERT(spin_is_locked(&d->event_lock));
 
     info = pirq_info(d, pirq);
@@ -2231,7 +2231,7 @@ void free_domain_pirqs(struct domain *d)
 {
     int i;
 
-    spin_lock(&pcidevs_lock);
+    pcidevs_lock();
     spin_lock(&d->event_lock);
 
     for ( i = 0; i < d->nr_pirqs; i++ )
@@ -2239,7 +2239,7 @@ void free_domain_pirqs(struct domain *d)
             unmap_domain_pirq(d, i);
 
     spin_unlock(&d->event_lock);
-    spin_unlock(&pcidevs_lock);
+    pcidevs_unlock();
 }
 
 static void dump_irqs(unsigned char key)

@@ -1282,7 +1282,7 @@ int domain_context_mapping_one(
     u16 seg = iommu->intel->drhd->segment;
     int agaw;
 
-    ASSERT(spin_is_locked(&pcidevs_lock));
+    ASSERT(pcidevs_locked());
     spin_lock(&iommu->lock);
     maddr = bus_to_context_maddr(iommu, bus);
     context_entries = (struct context_entry *)map_vtd_domain_page(maddr);
@@ -1424,7 +1424,7 @@ static int domain_context_mapping(
     if ( !drhd )
         return -ENODEV;
 
-    ASSERT(spin_is_locked(&pcidevs_lock));
+    ASSERT(pcidevs_locked());
 
     switch ( pdev->type )
     {
@@ -1506,7 +1506,7 @@ int domain_context_unmap_one(
     u64 maddr;
     int iommu_domid;
 
-    ASSERT(spin_is_locked(&pcidevs_lock));
+    ASSERT(pcidevs_locked());
     spin_lock(&iommu->lock);
 
     maddr = bus_to_context_maddr(iommu, bus);
@@ -1816,7 +1816,7 @@ static int rmrr_identity_mapping(struct domain *d, bool_t map,
     struct mapped_rmrr *mrmrr;
     struct hvm_iommu *hd = domain_hvm_iommu(d);
 
-    ASSERT(spin_is_locked(&pcidevs_lock));
+    ASSERT(pcidevs_locked());
     ASSERT(rmrr->base_address < rmrr->end_address);
 
     /*
@@ -1881,7 +1881,7 @@ static int intel_iommu_add_device(u8 devfn, struct pci_dev *pdev)
     u16 bdf;
     int ret, i;
 
-    ASSERT(spin_is_locked(&pcidevs_lock));
+    ASSERT(pcidevs_locked());
 
     if ( !pdev->domain )
         return -EINVAL;
@@ -2109,7 +2109,7 @@ static void __hwdom_init setup_hwdom_rmrr(struct domain *d)
     u16 bdf;
     int ret, i;
 
-    spin_lock(&pcidevs_lock);
+    pcidevs_lock();
     for_each_rmrr_device ( rmrr, bdf, i )
     {
         /*
@@ -2123,7 +2123,7 @@ static void __hwdom_init setup_hwdom_rmrr(struct domain *d)
             dprintk(XENLOG_ERR VTDPREFIX,
                      "IOMMU: mapping reserved region failed\n");
     }
-    spin_unlock(&pcidevs_lock);
+    pcidevs_unlock();
 }
 
 int __init intel_vtd_setup(void)

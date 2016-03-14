@@ -673,9 +673,9 @@ void parse_ppr_log_entry(struct amd_iommu *iommu, u32 entry[])
     bus = PCI_BUS(device_id);
     devfn = PCI_DEVFN2(device_id);
 
-    spin_lock(&pcidevs_lock);
+    pcidevs_lock();
     pdev = pci_get_real_pdev(iommu->seg, bus, devfn);
-    spin_unlock(&pcidevs_lock);
+    pcidevs_unlock();
 
     if ( pdev )
         guest_iommu_add_ppr_log(pdev->domain, entry);
@@ -787,10 +787,10 @@ static bool_t __init set_iommu_interrupt_handler(struct amd_iommu *iommu)
         return 0;
     }
 
-    spin_lock(&pcidevs_lock);
+    pcidevs_lock();
     iommu->msi.dev = pci_get_pdev(iommu->seg, PCI_BUS(iommu->bdf),
                                   PCI_DEVFN2(iommu->bdf));
-    spin_unlock(&pcidevs_lock);
+    pcidevs_unlock();
     if ( !iommu->msi.dev )
     {
         AMD_IOMMU_DEBUG("IOMMU: no pdev for %04x:%02x:%02x.%u\n",

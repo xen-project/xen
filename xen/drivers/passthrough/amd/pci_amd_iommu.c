@@ -158,7 +158,7 @@ static void amd_iommu_setup_domain_device(
 
     spin_unlock_irqrestore(&iommu->lock, flags);
 
-    ASSERT(spin_is_locked(&pcidevs_lock));
+    ASSERT(pcidevs_locked());
 
     if ( pci_ats_device(iommu->seg, bus, pdev->devfn) &&
          !pci_ats_enabled(iommu->seg, bus, pdev->devfn) )
@@ -345,7 +345,7 @@ void amd_iommu_disable_domain_device(struct domain *domain,
     }
     spin_unlock_irqrestore(&iommu->lock, flags);
 
-    ASSERT(spin_is_locked(&pcidevs_lock));
+    ASSERT(pcidevs_locked());
 
     if ( devfn == pdev->devfn &&
          pci_ats_device(iommu->seg, bus, devfn) &&

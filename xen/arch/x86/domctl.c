@@ -472,9 +472,9 @@ long arch_do_domctl(
         ret = -ESRCH;
         if ( iommu_enabled )
         {
-            spin_lock(&pcidevs_lock);
+            pcidevs_lock();
             ret = pt_irq_create_bind(d, bind);
-            spin_unlock(&pcidevs_lock);
+            pcidevs_unlock();
         }
         if ( ret < 0 )
             printk(XENLOG_G_ERR "pt_irq_create_bind failed (%ld) for dom%d\n",
@@ -497,9 +497,9 @@ long arch_do_domctl(
 
         if ( iommu_enabled )
         {
-            spin_lock(&pcidevs_lock);
+            pcidevs_lock();
             ret = pt_irq_destroy_bind(d, bind);
-            spin_unlock(&pcidevs_lock);
+            pcidevs_unlock();
         }
         if ( ret < 0 )
             printk(XENLOG_G_ERR "pt_irq_destroy_bind failed (%ld) for dom%d\n",
