@@ -1093,6 +1093,21 @@ static bool_t vcpu_has(
 #define vcpu_must_have_cx16() vcpu_must_have(0x00000001, ECX, 13)
 #define vcpu_must_have_avx()  vcpu_must_have(0x00000001, ECX, 28)
 
+#ifdef __XEN__
+/*
+ * Note the difference between vcpu_must_have_<feature>() and
+ * host_and_vcpu_must_have(<feature>): The latter needs to be used when
+ * emulation code is using the same instruction class for carrying out
+ * the actual operation.
+ */
+#define host_and_vcpu_must_have(feat) ({ \
+    generate_exception_if(!cpu_has_##feat, EXC_UD, -1); \
+    vcpu_must_have_##feat(); \
+})
+#else
+#define host_and_vcpu_must_have(feat) vcpu_must_have_##feat()
+#endif
+
 static int
 in_longmode(
     struct x86_emulate_ctxt *ctxt,
@@ -3102,7 +3117,7 @@ x86_emulate(
                 emulate_fpu_insn_memsrc("fildl", src.val);
                 break;
             case 1: /* fisttp m32i */
-                vcpu_must_have_sse3();
+                host_and_vcpu_must_have(sse3);
                 ea.bytes = 4;
                 dst = ea;
                 dst.type = OP_MEM;
@@ -3211,7 +3226,7 @@ x86_emulate(
                 emulate_fpu_insn_memsrc("fldl", src.val);
                 break;
             case 1: /* fisttp m64i */
-                vcpu_must_have_sse3();
+                host_and_vcpu_must_have(sse3);
                 ea.bytes = 8;
                 dst = ea;
                 dst.type = OP_MEM;
@@ -3319,7 +3334,7 @@ x86_emulate(
                 emulate_fpu_insn_memsrc("filds", src.val);
                 break;
             case 1: /* fisttp m16i */
-                vcpu_must_have_sse3();
+                host_and_vcpu_must_have(sse3);
                 ea.bytes = 2;
                 dst = ea;
                 dst.type = OP_MEM;
@@ -4115,9 +4130,9 @@ x86_emulate(
         if ( vex.opcx == vex_none )
         {
             if ( vex.pfx & VEX_PREFIX_DOUBLE_MASK )
-                vcpu_must_have_sse2();
+                host_and_vcpu_must_have(sse2);
             else
-                vcpu_must_have_sse();
+                host_and_vcpu_must_have(sse);
             ea.bytes = 16;
             SET_SSE_PREFIX(buf[0], vex.pfx);
             get_fpu(X86EMUL_FPU_xmm, &fic);
@@ -4128,7 +4143,7 @@ x86_emulate(
                     ((vex.reg != 0xf) &&
                      ((ea.type == OP_MEM) ||
                       !(vex.pfx & VEX_PREFIX_SCALAR_MASK))));
-            vcpu_must_have_avx();
+            host_and_vcpu_must_have(avx);
             get_fpu(X86EMUL_FPU_ymm, &fic);
             ea.bytes = 16 << vex.l;
         }
@@ -4361,16 +4376,16 @@ x86_emulate(
             {
             case vex_66:
             case vex_f3:
-                vcpu_must_have_sse2();
+                host_and_vcpu_must_have(sse2);
                 buf[0] = 0x66; /* movdqa */
                 get_fpu(X86EMUL_FPU_xmm, &fic);
                 ea.bytes = 16;
                 break;
             case vex_none:
                 if ( b != 0xe7 )
-                    vcpu_must_have_mmx();
+                    host_and_vcpu_must_have(mmx);
                 else
-                    vcpu_must_have_sse();
+                    host_and_vcpu_must_have(sse);
                 get_fpu(X86EMUL_FPU_mmx, &fic);
                 ea.bytes = 8;
                 break;
@@ -4382,7 +4397,7 @@ x86_emulate(
         {
             fail_if((vex.opcx != vex_0f) || (vex.reg != 0xf) ||
                     ((vex.pfx != vex_66) && (vex.pfx != vex_f3)));
-            vcpu_must_have_avx();
+            host_and_vcpu_must_have(avx);
             get_fpu(X86EMUL_FPU_ymm, &fic);
             ea.bytes = 16 << vex.l;
         }
@@ -4688,7 +4703,7 @@ x86_emulate(
         generate_exception_if((modrm_reg & 7) != 1, EXC_UD, -1);
         generate_exception_if(ea.type != OP_MEM, EXC_UD, -1);
         if ( op_bytes == 8 )
-            vcpu_must_have_cx16();
+            host_and_vcpu_must_have(cx16);
         op_bytes *= 2;
 
         /* Get actual old value. */
