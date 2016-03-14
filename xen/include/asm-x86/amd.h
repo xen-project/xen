@@ -22,7 +22,7 @@
 	cpufeat_mask(X86_FEATURE_CMOV)  | cpufeat_mask(X86_FEATURE_PAT)    | \
 	cpufeat_mask(X86_FEATURE_PSE36) | cpufeat_mask(X86_FEATURE_CLFLUSH)| \
 	cpufeat_mask(X86_FEATURE_MMX)   | cpufeat_mask(X86_FEATURE_FXSR)   | \
-	cpufeat_mask(X86_FEATURE_XMM)   | cpufeat_mask(X86_FEATURE_XMM2))
+	cpufeat_mask(X86_FEATURE_SSE)   | cpufeat_mask(X86_FEATURE_SSE2))
 #define AMD_EXTFEATURES_K8_REV_C_ECX  0
 #define AMD_EXTFEATURES_K8_REV_C_EDX  (					       \
 	cpufeat_mask(X86_FEATURE_FPU)	   | cpufeat_mask(X86_FEATURE_VME)   | \
@@ -48,7 +48,7 @@
 
 /* Family 0Fh, Revision E */
 #define AMD_FEATURES_K8_REV_E_ECX        (AMD_FEATURES_K8_REV_D_ECX |	\
-	cpufeat_mask(X86_FEATURE_XMM3))
+	cpufeat_mask(X86_FEATURE_SSE3))
 #define AMD_FEATURES_K8_REV_E_EDX        (AMD_FEATURES_K8_REV_D_EDX | 	\
 	cpufeat_mask(X86_FEATURE_HT))
 #define AMD_EXTFEATURES_K8_REV_E_ECX     (AMD_EXTFEATURES_K8_REV_D_ECX |\

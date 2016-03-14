@@ -38,8 +38,8 @@
 #define X86_FEATURE_MMX		(0*32+23) /* Multimedia Extensions */
 #define X86_FEATURE_FXSR	(0*32+24) /* FXSAVE and FXRSTOR instructions (fast save and restore */
 				          /* of FPU context), and CR4.OSFXSR available */
-#define X86_FEATURE_XMM		(0*32+25) /* Streaming SIMD Extensions */
-#define X86_FEATURE_XMM2	(0*32+26) /* Streaming SIMD Extensions-2 */
+#define X86_FEATURE_SSE		(0*32+25) /* Streaming SIMD Extensions */
+#define X86_FEATURE_SSE2	(0*32+26) /* Streaming SIMD Extensions-2 */
 #define X86_FEATURE_SELFSNOOP	(0*32+27) /* CPU self snoop */
 #define X86_FEATURE_HT		(0*32+28) /* Hyper-Threading */
 #define X86_FEATURE_ACC		(0*32+29) /* Automatic clock control */
@@ -78,7 +78,7 @@
 #define X86_FEATURE_APERFMPERF   (3*32+16) /* APERFMPERF */
 
 /* Intel-defined CPU features, CPUID level 0x00000001 (ecx), word 4 */
-#define X86_FEATURE_XMM3	(4*32+ 0) /* Streaming SIMD Extensions-3 */
+#define X86_FEATURE_SSE3	(4*32+ 0) /* Streaming SIMD Extensions-3 */
 #define X86_FEATURE_PCLMULQDQ	(4*32+ 1) /* Carry-less mulitplication */
 #define X86_FEATURE_DTES64	(4*32+ 2) /* 64-bit Debug Store */
 #define X86_FEATURE_MWAIT	(4*32+ 3) /* Monitor/Mwait support */
@@ -183,7 +183,9 @@
 #define cpu_has_sep		boot_cpu_has(X86_FEATURE_SEP)
 #define cpu_has_mtrr		1
 #define cpu_has_mmx		1
-#define cpu_has_xmm3		boot_cpu_has(X86_FEATURE_XMM3)
+#define cpu_has_sse		boot_cpu_has(X86_FEATURE_SSE)
+#define cpu_has_sse2		boot_cpu_has(X86_FEATURE_SSE2)
+#define cpu_has_sse3		boot_cpu_has(X86_FEATURE_SSE3)
 #define cpu_has_ht		boot_cpu_has(X86_FEATURE_HT)
 #define cpu_has_mp		1
 #define cpu_has_nx		boot_cpu_has(X86_FEATURE_NX)

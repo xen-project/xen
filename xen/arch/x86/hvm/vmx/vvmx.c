@@ -1963,7 +1963,7 @@ int nvmx_msr_read_intercept(unsigned int msr, u64 *msr_content)
             data |= X86_CR4_PGE;
         if ( edx & cpufeat_mask(X86_FEATURE_FXSR) )
             data |= X86_CR4_OSFXSR;
-        if ( edx & cpufeat_mask(X86_FEATURE_XMM) )
+        if ( edx & cpufeat_mask(X86_FEATURE_SSE) )
             data |= X86_CR4_OSXMMEXCPT;
         if ( ecx & cpufeat_mask(X86_FEATURE_VMXE) )
             data |= X86_CR4_VMXE;
