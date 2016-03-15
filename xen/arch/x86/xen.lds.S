@@ -76,6 +76,17 @@ SECTIONS
        *(.rodata)
        *(.rodata.*)
 
+       . = ALIGN(8);
+       /* Exception table */
+       __start___ex_table = .;
+       *(.ex_table)
+       __stop___ex_table = .;
+
+       /* Pre-exception table */
+       __start___pre_ex_table = .;
+       *(.ex_table.pre)
+       __stop___pre_ex_table = .;
+
 #ifdef LOCK_PROFILE
        . = ALIGN(POINTER_ALIGN);
        __lock_profile_start = .;
@@ -162,16 +173,6 @@ SECTIONS
   __2M_rwdata_start = .;       /* Start of 2M superpages, mapped RW. */
   . = ALIGN(SMP_CACHE_BYTES);
   .data.read_mostly : {
-       /* Exception table */
-       __start___ex_table = .;
-       *(.ex_table)
-       __stop___ex_table = .;
-
-       /* Pre-exception table */
-       __start___pre_ex_table = .;
-       *(.ex_table.pre)
-       __stop___pre_ex_table = .;
-
        *(.data.read_mostly)
        . = ALIGN(8);
        __start_schedulers_array = .;
