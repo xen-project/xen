@@ -830,7 +830,7 @@ static int save(struct xc_sr_context *ctx, uint16_t guest_type)
 int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom,
                    uint32_t max_iters, uint32_t max_factor, uint32_t flags,
                    struct save_callbacks* callbacks, int hvm,
-                   int checkpointed_stream)
+                   xc_migration_stream_t stream_type)
 {
     struct xc_sr_context ctx =
         {
@@ -842,11 +842,11 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom,
     ctx.save.callbacks = callbacks;
     ctx.save.live  = !!(flags & XCFLAGS_LIVE);
     ctx.save.debug = !!(flags & XCFLAGS_DEBUG);
-    ctx.save.checkpointed = checkpointed_stream;
+    ctx.save.checkpointed = stream_type;
 
     /* If altering migration_stream update this assert too. */
-    assert(checkpointed_stream == XC_MIG_STREAM_NONE ||
-           checkpointed_stream == XC_MIG_STREAM_REMUS);
+    assert(stream_type == XC_MIG_STREAM_NONE ||
+           stream_type == XC_MIG_STREAM_REMUS);
 
     /*
      * TODO: Find some time to better tweak the live migration algorithm.

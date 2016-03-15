@@ -725,7 +725,7 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
                       domid_t store_domid, unsigned int console_evtchn,
                       unsigned long *console_gfn, domid_t console_domid,
                       unsigned int hvm, unsigned int pae, int superpages,
-                      int checkpointed_stream,
+                      xc_migration_stream_t stream_type,
                       struct restore_callbacks *callbacks)
 {
     struct xc_sr_context ctx =
@@ -739,16 +739,16 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
     ctx.restore.console_domid = console_domid;
     ctx.restore.xenstore_evtchn = store_evtchn;
     ctx.restore.xenstore_domid = store_domid;
-    ctx.restore.checkpointed = checkpointed_stream;
+    ctx.restore.checkpointed = stream_type;
     ctx.restore.callbacks = callbacks;
 
     /* Sanity checks for callbacks. */
-    if ( checkpointed_stream )
+    if ( stream_type )
         assert(callbacks->checkpoint);
 
     DPRINTF("fd %d, dom %u, hvm %u, pae %u, superpages %d"
-            ", checkpointed_stream %d", io_fd, dom, hvm, pae,
-            superpages, checkpointed_stream);
+            ", stream_type %d", io_fd, dom, hvm, pae,
+            superpages, stream_type);
 
     if ( xc_domain_getinfo(xch, dom, 1, &ctx.dominfo) != 1 )
     {

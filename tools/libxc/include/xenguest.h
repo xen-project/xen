@@ -86,14 +86,14 @@ typedef enum {
  * @parm xch a handle to an open hypervisor interface
  * @parm fd the file descriptor to save a domain to
  * @parm dom the id of the domain
- * @param checkpointed_stream XC_MIG_STREAM_NONE if the far end of the stream
+ * @param stream_type XC_MIG_STREAM_NONE if the far end of the stream
  *        doesn't use checkpointing
  * @return 0 on success, -1 on failure
  */
 int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iters,
                    uint32_t max_factor, uint32_t flags /* XCFLAGS_xxx */,
                    struct save_callbacks* callbacks, int hvm,
-                   int checkpointed_stream);
+                   xc_migration_stream_t stream_type);
 
 /* callbacks provided by xc_domain_restore */
 struct restore_callbacks {
@@ -121,7 +121,7 @@ struct restore_callbacks {
  * @parm hvm non-zero if this is a HVM restore
  * @parm pae non-zero if this HVM domain has PAE support enabled
  * @parm superpages non-zero to allocate guest memory with superpages
- * @parm checkpointed_stream non-zero if the far end of the stream is using checkpointing
+ * @parm stream_type non-zero if the far end of the stream is using checkpointing
  * @parm callbacks non-NULL to receive a callback to restore toolstack
  *       specific data
  * @return 0 on success, -1 on failure
@@ -131,7 +131,7 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
                       domid_t store_domid, unsigned int console_evtchn,
                       unsigned long *console_mfn, domid_t console_domid,
                       unsigned int hvm, unsigned int pae, int superpages,
-                      int checkpointed_stream,
+                      xc_migration_stream_t stream_type,
                       struct restore_callbacks *callbacks);
 
 /**
