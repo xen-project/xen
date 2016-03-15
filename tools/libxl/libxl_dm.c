@@ -828,6 +828,12 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
      */
     flexarray_append(dm_args, "-nodefaults");
 
+    /*
+     * Do not use any of the user-provided config files in sysconfdir,
+     * avoiding unkown and uncontrolled configuration.
+     */
+    flexarray_append(dm_args, "-no-user-config");
+
     if (b_info->type == LIBXL_DOMAIN_TYPE_PV) {
         flexarray_append(dm_args, "-xen-attach");
     }
