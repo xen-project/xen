@@ -263,7 +263,7 @@ nestedhvm_hap_nested_page_fault(struct vcpu *v, paddr_t *L2_gpa,
 
     switch ( p2ma_10 )
     {
-    case p2m_access_rwx ... p2m_access_n:
+    case p2m_access_n ... p2m_access_rwx:
         break;
     case p2m_access_rx2rw:
         p2ma_10 = p2m_access_rx;
