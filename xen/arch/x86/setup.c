@@ -497,6 +497,17 @@ static void __init kexec_reserve_area(struct e820map *e820)
 #endif
 }
 
+static inline bool_t using_2M_mapping(void)
+{
+    return !l1_table_offset((unsigned long)__2M_text_end) &&
+           !l1_table_offset((unsigned long)__2M_rodata_start) &&
+           !l1_table_offset((unsigned long)__2M_rodata_end) &&
+           !l1_table_offset((unsigned long)__2M_init_start) &&
+           !l1_table_offset((unsigned long)__2M_init_end) &&
+           !l1_table_offset((unsigned long)__2M_rwdata_start) &&
+           !l1_table_offset((unsigned long)__2M_rwdata_end);
+}
+
 static void noinline init_done(void)
 {
     void *va;
@@ -510,9 +521,18 @@ static void noinline init_done(void)
         clear_page(va);
 
     /* Destroy Xen's mappings, and reuse the pages. */
-    destroy_xen_mappings((unsigned long)&__2M_init_start,
-                         (unsigned long)&__2M_init_end);
-    init_xenheap_pages(__pa(__2M_init_start), __pa(__2M_init_end));
+    if ( using_2M_mapping() )
+    {
+        destroy_xen_mappings((unsigned long)&__2M_init_start,
+                             (unsigned long)&__2M_init_end);
+        init_xenheap_pages(__pa(__2M_init_start), __pa(__2M_init_end));
+    }
+    else
+    {
+        destroy_xen_mappings((unsigned long)&__init_begin,
+                             (unsigned long)&__init_end);
+        init_xenheap_pages(__pa(__init_begin), __pa(__init_end));
+    }
 
     printk("Freed %ldkB init memory.\n", (long)(__init_end-__init_begin)>>10);
 
@@ -922,6 +942,8 @@ void __init noreturn __start_xen(unsigned long mbi_p)
              * Undo the temporary-hooking of the l1_identmap.  __2M_text_start
              * is contained in this PTE.
              */
+            BUG_ON(l2_table_offset((unsigned long)_erodata) ==
+                   l2_table_offset((unsigned long)_stext));
             *pl2e++ = l2e_from_pfn(xen_phys_start >> PAGE_SHIFT,
                                    PAGE_HYPERVISOR_RX | _PAGE_PSE);
             for ( i = 1; i < L2_PAGETABLE_ENTRIES; i++, pl2e++ )
@@ -930,6 +952,13 @@ void __init noreturn __start_xen(unsigned long mbi_p)
 
                 if ( !(l2e_get_flags(*pl2e) & _PAGE_PRESENT) )
                     continue;
+
+                if ( !using_2M_mapping() )
+                {
+                    *pl2e = l2e_from_intpte(l2e_get_intpte(*pl2e) +
+                                            xen_phys_start);
+                    continue;
+                }
 
                 if ( i < l2_table_offset((unsigned long)&__2M_text_end) )
                 {

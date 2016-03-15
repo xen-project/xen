@@ -53,11 +53,14 @@ SECTIONS
        _etext = .;             /* End of text section */
   } :text = 0x9090
 
+#ifdef EFI
   . = ALIGN(MB(2));
+#endif
   __2M_text_end = .;
 
   __2M_rodata_start = .;       /* Start of 2M superpages, mapped RO. */
   .rodata : {
+       _srodata = .;
        /* Bug frames table */
        . = ALIGN(4);
        __start_bug_frames = .;
@@ -79,9 +82,12 @@ SECTIONS
        *(.lockprofile.data)
        __lock_profile_end = .;
 #endif
+       _erodata = .;
   } :text
 
+#ifdef EFI
   . = ALIGN(MB(2));
+#endif
   __2M_rodata_end = .;
 
   __2M_init_start = .;         /* Start of 2M superpages, mapped RWX (boot only). */
@@ -148,7 +154,9 @@ SECTIONS
   . = ALIGN(PAGE_SIZE);
   __init_end = .;
 
+#ifdef EFI
   . = ALIGN(MB(2));
+#endif
   __2M_init_end = .;
 
   __2M_rwdata_start = .;       /* Start of 2M superpages, mapped RW. */
@@ -200,7 +208,9 @@ SECTIONS
   } :text
   _end = . ;
 
+#ifdef EFI
   . = ALIGN(MB(2));
+#endif
   __2M_rwdata_end = .;
 
 #ifdef EFI
@@ -250,6 +260,7 @@ ASSERT(kexec_reloc_size - kexec_reloc <= PAGE_SIZE, "kexec_reloc is too large")
 #endif
 
 ASSERT(IS_ALIGNED(__2M_text_start,   MB(2)), "__2M_text_start misaligned")
+#ifdef EFI
 ASSERT(IS_ALIGNED(__2M_text_end,     MB(2)), "__2M_text_end misaligned")
 ASSERT(IS_ALIGNED(__2M_rodata_start, MB(2)), "__2M_rodata_start misaligned")
 ASSERT(IS_ALIGNED(__2M_rodata_end,   MB(2)), "__2M_rodata_end misaligned")
@@ -257,6 +268,7 @@ ASSERT(IS_ALIGNED(__2M_init_start,   MB(2)), "__2M_init_start misaligned")
 ASSERT(IS_ALIGNED(__2M_init_end,     MB(2)), "__2M_init_end misaligned")
 ASSERT(IS_ALIGNED(__2M_rwdata_start, MB(2)), "__2M_rwdata_start misaligned")
 ASSERT(IS_ALIGNED(__2M_rwdata_end,   MB(2)), "__2M_rwdata_end misaligned")
+#endif
 
 ASSERT(IS_ALIGNED(cpu0_stack, STACK_SIZE), "cpu0_stack misaligned")
 
