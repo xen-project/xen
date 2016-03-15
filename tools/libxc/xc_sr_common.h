@@ -180,16 +180,6 @@ struct xc_sr_context
 
     xc_dominfo_t dominfo;
 
-    /*
-     * migration stream
-     * 0: Plain VM
-     * 1: Remus
-     */
-    enum {
-        MIG_STREAM_NONE, /* plain stream */
-        MIG_STREAM_REMUS,
-    } migration_stream;
-
     union /* Common save or restore data. */
     {
         struct /* Save data. */

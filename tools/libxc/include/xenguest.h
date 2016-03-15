@@ -75,13 +75,18 @@ struct save_callbacks {
     void* data;
 };
 
+typedef enum {
+    XC_MIG_STREAM_NONE, /* plain stream */
+    XC_MIG_STREAM_REMUS,
+} xc_migration_stream_t;
+
 /**
  * This function will save a running domain.
  *
  * @parm xch a handle to an open hypervisor interface
  * @parm fd the file descriptor to save a domain to
  * @parm dom the id of the domain
- * @param checkpointed_stream MIG_STREAM_NONE if the far end of the stream
+ * @param checkpointed_stream XC_MIG_STREAM_NONE if the far end of the stream
  *        doesn't use checkpointing
  * @return 0 on success, -1 on failure
  */
