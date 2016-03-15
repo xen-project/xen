@@ -361,17 +361,14 @@ rt_update_deadline(s_time_t now, struct rt_vcpu *svc)
 
     /* TRACE */
     {
-        struct {
+        struct __packed {
             unsigned vcpu:16, dom:16;
-            unsigned cur_deadline_lo, cur_deadline_hi;
-            unsigned cur_budget_lo, cur_budget_hi;
+            uint64_t cur_deadline, cur_budget;
         } d;
         d.dom = svc->vcpu->domain->domain_id;
         d.vcpu = svc->vcpu->vcpu_id;
-        d.cur_deadline_lo = (unsigned) svc->cur_deadline;
-        d.cur_deadline_hi = (unsigned) (svc->cur_deadline >> 32);
-        d.cur_budget_lo = (unsigned) svc->cur_budget;
-        d.cur_budget_hi = (unsigned) (svc->cur_budget >> 32);
+        d.cur_deadline = (uint64_t) svc->cur_deadline;
+        d.cur_budget = (uint64_t) svc->cur_budget;
         trace_var(TRC_RTDS_BUDGET_REPLENISH, 1,
                   sizeof(d),
                   (unsigned char *) &d);
@@ -711,16 +708,14 @@ burn_budget(const struct scheduler *ops, struct rt_vcpu *svc, s_time_t now)
 
     /* TRACE */
     {
-        struct {
+        struct __packed {
             unsigned vcpu:16, dom:16;
-            unsigned cur_budget_lo;
-            unsigned cur_budget_hi;
+            uint64_t cur_budget;
             int delta;
         } d;
         d.dom = svc->vcpu->domain->domain_id;
         d.vcpu = svc->vcpu->vcpu_id;
-        d.cur_budget_lo = (unsigned) svc->cur_budget;
-        d.cur_budget_hi = (unsigned) (svc->cur_budget >> 32);
+        d.cur_budget = (uint64_t) svc->cur_budget;
         d.delta = delta;
         trace_var(TRC_RTDS_BUDGET_BURN, 1,
                   sizeof(d),
@@ -763,17 +758,14 @@ __runq_pick(const struct scheduler *ops, const cpumask_t *mask)
     {
         if( svc != NULL )
         {
-            struct {
+            struct __packed {
                 unsigned vcpu:16, dom:16;
-                unsigned cur_deadline_lo, cur_deadline_hi;
-                unsigned cur_budget_lo, cur_budget_hi;
+                uint64_t cur_deadline, cur_budget;
             } d;
             d.dom = svc->vcpu->domain->domain_id;
             d.vcpu = svc->vcpu->vcpu_id;
-            d.cur_deadline_lo = (unsigned) svc->cur_deadline;
-            d.cur_deadline_hi = (unsigned) (svc->cur_deadline >> 32);
-            d.cur_budget_lo = (unsigned) svc->cur_budget;
-            d.cur_budget_hi = (unsigned) (svc->cur_budget >> 32);
+            d.cur_deadline = (uint64_t) svc->cur_deadline;
+            d.cur_budget = (uint64_t) svc->cur_budget;
             trace_var(TRC_RTDS_RUNQ_PICK, 1,
                       sizeof(d),
                       (unsigned char *) &d);
