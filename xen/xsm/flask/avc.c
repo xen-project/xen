@@ -56,7 +56,7 @@ const struct selinux_class_perm selinux_class_perm = {
 #define AVC_DEF_CACHE_THRESHOLD        512
 #define AVC_CACHE_RECLAIM        16
 
-#ifdef FLASK_AVC_STATS
+#ifdef CONFIG_FLASK_AVC_STATS
 #define avc_cache_stats_incr(field)                 \
 do {                                \
     __get_cpu_var(avc_cache_stats).field++;        \
@@ -101,7 +101,7 @@ struct avc_callback_node {
 /* Exported via Flask hypercall */
 unsigned int avc_cache_threshold = AVC_DEF_CACHE_THRESHOLD;
 
-#ifdef FLASK_AVC_STATS
+#ifdef CONFIG_FLASK_AVC_STATS
 DEFINE_PER_CPU(struct avc_cache_stats, avc_cache_stats);
 #endif
 

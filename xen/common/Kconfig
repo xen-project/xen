@@ -23,6 +23,12 @@ config FLASK
 
 	  If unsure, say N.
 
+config FLASK_AVC_STATS
+	def_bool y
+	depends on FLASK
+	---help---
+	  Maintain statistics on the access vector cache
+
 # Select HAS_DEVICE_TREE if device tree is supported
 config HAS_DEVICE_TREE
 	bool
