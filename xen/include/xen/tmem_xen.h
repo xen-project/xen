@@ -63,6 +63,7 @@ static inline bool_t tmem_shared_auth(void)
     return opt_tmem_shared_auth;
 }
 
+#ifdef CONFIG_TMEM
 extern bool_t opt_tmem;
 static inline bool_t tmem_enabled(void)
 {
@@ -73,6 +74,16 @@ static inline void tmem_disable(void)
 {
     opt_tmem = 0;
 }
+#else
+static inline bool_t tmem_enabled(void)
+{
+    return 0;
+}
+
+static inline void tmem_disable(void)
+{
+}
+#endif /* CONFIG_TMEM */
 
 /*
  * Memory free page list management

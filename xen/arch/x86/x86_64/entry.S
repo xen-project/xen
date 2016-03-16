@@ -681,6 +681,10 @@ ENTRY(exception_table)
 #define do_kexec_op do_ni_hypercall
 #endif
 
+#ifndef CONFIG_TMEM
+#define do_tmem_op do_ni_hypercall
+#endif
+
 #ifndef CONFIG_XENOPROF
 #define do_xenoprof_op do_ni_hypercall
 #endif

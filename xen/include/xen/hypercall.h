@@ -133,9 +133,13 @@ extern long
 do_xsm_op(
     XEN_GUEST_HANDLE_PARAM(xsm_op_t) u_xsm_op);
 
+#ifdef CONFIG_TMEM
 extern long
 do_tmem_op(
     XEN_GUEST_HANDLE_PARAM(tmem_op_t) uops);
+#else
+#define do_tmem_op do_ni_hypercall
+#endif
 
 extern long
 do_xenoprof_op(int op, XEN_GUEST_HANDLE_PARAM(void) arg);

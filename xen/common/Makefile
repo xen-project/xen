@@ -49,8 +49,6 @@ obj-y += sysctl.o
 obj-y += tasklet.o
 obj-y += time.o
 obj-y += timer.o
-obj-y += tmem.o
-obj-y += tmem_xen.o
 obj-y += trace.o
 obj-y += version.o
 obj-y += vm_event.o
@@ -65,7 +63,11 @@ obj-bin-$(CONFIG_X86) += $(foreach n,decompress bunzip2 unxz unlzma unlzo unlz4 
 obj-$(perfc)       += perfc.o
 obj-$(crash_debug) += gdbstub.o
 
-obj-$(CONFIG_COMPAT) += $(addprefix compat/,domain.o kernel.o memory.o multicall.o tmem_xen.o xlat.o)
+obj-$(CONFIG_COMPAT) += $(addprefix compat/,domain.o kernel.o memory.o multicall.o xlat.o)
+
+tmem-y := tmem.o tmem_xen.o
+tmem-$(CONFIG_COMPAT) += compat/tmem_xen.o
+obj-$(CONFIG_TMEM) += $(tmem-y)
 
 subdir-$(CONFIG_X86) += hvm
 

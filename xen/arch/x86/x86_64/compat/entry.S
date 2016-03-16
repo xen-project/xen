@@ -345,6 +345,10 @@ compat_crash_page_fault:
 #define compat_kexec_op do_ni_hypercall
 #endif
 
+#ifndef CONFIG_TMEM
+#define do_tmem_op do_ni_hypercall
+#endif
+
 #ifndef CONFIG_XENOPROF
 #define compat_xenoprof_op do_ni_hypercall
 #endif

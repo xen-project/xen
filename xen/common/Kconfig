@@ -87,6 +87,20 @@ config LATE_HWDOM
 
 	  If unsure, say N.
 
+# Enables transcendent memory support
+config TMEM
+	def_bool y
+	prompt "Transcendent Memory Support" if EXPERT = "y"
+	---help---
+	  Transcendent memory allows PV-aware guests to collaborate on memory
+	  usage. Guests can 'swap' their memory to the hypervisor or have an
+	  collective pool of memory shared across guests. The end result is
+	  less memory usage by guests allowing higher guest density.
+
+	  You also have to enable it on the Xen commandline by using tmem=1
+
+	  If unsure, say Y.
+
 # Adds support for Xenoprof
 config XENOPROF
 	def_bool y
