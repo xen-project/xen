@@ -37,6 +37,7 @@ integer_param("cpuid_mask_ext_edx", opt_cpuid_mask_ext_edx);
 struct cpu_dev * cpu_devs[X86_VENDOR_NUM] = {};
 
 unsigned int paddr_bits __read_mostly = 36;
+unsigned int hap_paddr_bits __read_mostly = 36;
 
 /*
  * Default host IA32_CR_PAT value to cover all memory types.
@@ -209,7 +210,7 @@ static void __init early_cpu_detect(void)
 
 static void __cpuinit generic_identify(struct cpuinfo_x86 *c)
 {
-	u32 tfms, capability, excap, ebx;
+	u32 tfms, capability, excap, ebx, eax;
 
 	/* Get vendor name */
 	cpuid(0x00000000, &c->cpuid_level,
@@ -246,8 +247,11 @@ static void __cpuinit generic_identify(struct cpuinfo_x86 *c)
 		}
 		if ( c->extended_cpuid_level >= 0x80000004 )
 			get_model_name(c); /* Default name */
-		if ( c->extended_cpuid_level >= 0x80000008 )
-			paddr_bits = cpuid_eax(0x80000008) & 0xff;
+		if ( c->extended_cpuid_level >= 0x80000008 ) {
+			eax = cpuid_eax(0x80000008);
+			paddr_bits = eax & 0xff;
+			hap_paddr_bits = ((eax >> 16) & 0xff) ?: paddr_bits;
+		}
 	}
 
 	/* Might lift BIOS max_leaf=3 limit. */

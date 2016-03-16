@@ -48,6 +48,16 @@ void shadow_domain_init(struct domain *d, unsigned int domcr_flags)
     INIT_PAGE_LIST_HEAD(&d->arch.paging.shadow.freelist);
     INIT_PAGE_LIST_HEAD(&d->arch.paging.shadow.pinned_shadows);
 
+    d->arch.paging.gfn_bits = paddr_bits - PAGE_SHIFT;
+#ifndef CONFIG_BIGMEM
+    /*
+     * Shadowed superpages store GFNs in 32-bit page_info fields.
+     * Note that we cannot use guest_supports_superpages() here.
+     */
+    if ( !is_pv_domain(d) || opt_allow_superpage )
+        d->arch.paging.gfn_bits = 32;
+#endif
+
     /* Use shadow pagetables for log-dirty support */
     paging_log_dirty_init(d, shadow_enable_log_dirty, 
                           shadow_disable_log_dirty, shadow_clean_dirty_bitmap);
