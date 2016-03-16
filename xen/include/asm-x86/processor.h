@@ -212,6 +212,8 @@ extern u32 cpuid_ext_features;
 
 /* Maximum width of physical addresses supported by the hardware */
 extern unsigned int paddr_bits;
+/* Max physical address width supported within HAP guests */
+extern unsigned int hap_paddr_bits;
 
 extern const struct x86_cpu_id *x86_match_cpu(const struct x86_cpu_id table[]);
 
