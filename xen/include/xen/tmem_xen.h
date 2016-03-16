@@ -69,6 +69,11 @@ static inline bool_t tmem_enabled(void)
     return opt_tmem;
 }
 
+static inline void tmem_disable(void)
+{
+    opt_tmem = 0;
+}
+
 /*
  * Memory free page list management
  */

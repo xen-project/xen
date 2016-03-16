@@ -25,7 +25,7 @@
 #include <xen/dmi.h>
 #include <xen/pfn.h>
 #include <xen/nodemask.h>
-#include <xen/tmem_xen.h> /* for opt_tmem only */
+#include <xen/tmem_xen.h>
 #include <xen/watchdog.h>
 #include <public/version.h>
 #include <compat/platform.h>
@@ -1276,7 +1276,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
         {
            printk(XENLOG_WARNING
                   "TMEM physical RAM limit exceeded, disabling TMEM\n");
-           opt_tmem = 0;
+           tmem_disable();
         }
     }
     else
