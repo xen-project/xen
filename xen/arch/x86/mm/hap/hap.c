@@ -428,6 +428,7 @@ static void hap_destroy_monitor_table(struct vcpu* v, mfn_t mmfn)
 void hap_domain_init(struct domain *d)
 {
     INIT_PAGE_LIST_HEAD(&d->arch.paging.hap.freelist);
+    d->arch.paging.gfn_bits = hap_paddr_bits - PAGE_SHIFT;
 }
 
 /* return 0 for success, -errno for failure */

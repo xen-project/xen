@@ -94,6 +94,12 @@ void *map_domain_gfn(struct p2m_domain *p2m, gfn_t gfn, mfn_t *mfn,
     struct page_info *page;
     void *map;
 
+    if ( gfn_x(gfn) >> p2m->domain->arch.paging.gfn_bits )
+    {
+        *rc = _PAGE_INVALID_BIT;
+        return NULL;
+    }
+
     /* Translate the gfn, unsharing if shared */
     page = get_page_from_gfn_p2m(p2m->domain, p2m, gfn_x(gfn), p2mt, NULL,
                                  q);
@@ -294,20 +300,8 @@ guest_walk_tables(struct vcpu *v, struct p2m_domain *p2m,
             flags &= ~_PAGE_PAT;
 
         if ( gfn_x(start) & GUEST_L2_GFN_MASK & ~0x1 )
-        {
-#if GUEST_PAGING_LEVELS == 2
-            /*
-             * Note that _PAGE_INVALID_BITS is zero in this case, yielding a
-             * no-op here.
-             *
-             * Architecturally, the walk should fail if bit 21 is set (others
-             * aren't being checked at least in PSE36 mode), but we'll ignore
-             * this here in order to avoid specifying a non-natural, non-zero
-             * _PAGE_INVALID_BITS value just for that case.
-             */
-#endif
             rc |= _PAGE_INVALID_BITS;
-        }
+
         /* Increment the pfn by the right number of 4k pages.  
          * Mask out PAT and invalid bits. */
         start = _gfn((gfn_x(start) & ~GUEST_L2_GFN_MASK) +
@@ -389,6 +383,12 @@ set_ad:
         unmap_domain_page(l1p);
         put_page(mfn_to_page(mfn_x(gw->l1mfn)));
     }
+
+    /* If this guest has a restricted physical address space then the
+     * target GFN must fit within it. */
+    if ( !(rc & _PAGE_PRESENT)
+         && gfn_x(guest_l1e_get_gfn(gw->l1e)) >> d->arch.paging.gfn_bits )
+        rc |= _PAGE_INVALID_BITS;
 
     return rc;
 }
