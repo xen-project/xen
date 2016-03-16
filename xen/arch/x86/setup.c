@@ -1272,7 +1272,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
             init_domheap_pages(s, e);
         }
 
-        if ( opt_tmem )
+        if ( tmem_enabled() )
         {
            printk(XENLOG_WARNING
                   "TMEM physical RAM limit exceeded, disabling TMEM\n");

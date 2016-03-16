@@ -202,7 +202,7 @@ static void populate_physmap(struct memop_args *a)
 
                 if ( unlikely(!page) )
                 {
-                    if ( !opt_tmem || a->extent_order )
+                    if ( !tmem_enabled() || a->extent_order )
                         gdprintk(XENLOG_INFO,
                                  "Could not allocate order=%u extent: id=%d memflags=%#x (%u of %u)\n",
                                  a->extent_order, d->domain_id, a->memflags,

@@ -2837,6 +2837,9 @@ void *tmem_relinquish_pages(unsigned int order, unsigned int memflags)
 
 unsigned long tmem_freeable_pages(void)
 {
+    if ( !tmem_enabled() )
+        return 0;
+
     return tmem_page_list_pages + _atomic_read(freeable_page_count);
 }
 

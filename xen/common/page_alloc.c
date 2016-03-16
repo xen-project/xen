@@ -652,7 +652,7 @@ static void __init setup_low_mem_virq(void)
 static void check_low_mem_virq(void)
 {
     unsigned long avail_pages = total_avail_pages +
-        (opt_tmem ? tmem_freeable_pages() : 0) - outstanding_claims;
+        tmem_freeable_pages() - outstanding_claims;
 
     if ( unlikely(avail_pages <= low_mem_virq_th) )
     {
@@ -738,7 +738,7 @@ static struct page_info *alloc_heap_pages(
      * Others try tmem pools then fail.  This is a workaround until all
      * post-dom0-creation-multi-page allocations can be eliminated.
      */
-    if ( opt_tmem && ((order == 0) || (order >= 9)) &&
+    if ( ((order == 0) || (order >= 9)) &&
          (total_avail_pages <= midsize_alloc_zone_pages) &&
          tmem_freeable_pages() )
         goto try_tmem;
@@ -984,7 +984,7 @@ static void free_heap_pages(
     avail[node][zone] += 1 << order;
     total_avail_pages += 1 << order;
 
-    if ( opt_tmem )
+    if ( tmem_enabled() )
         midsize_alloc_zone_pages = max(
             midsize_alloc_zone_pages, total_avail_pages / MIDSIZE_ALLOC_FRAC);
 
@@ -1755,7 +1755,7 @@ int assign_pages(
     {
         if ( unlikely((d->tot_pages + (1 << order)) > d->max_pages) )
         {
-            if ( !opt_tmem || order != 0 || d->tot_pages != d->max_pages )
+            if ( !tmem_enabled() || order != 0 || d->tot_pages != d->max_pages )
                 gprintk(XENLOG_INFO, "Over-allocation for domain %u: "
                         "%u > %u\n", d->domain_id,
                         d->tot_pages + (1 << order), d->max_pages);
