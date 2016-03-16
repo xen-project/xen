@@ -23,8 +23,11 @@ DEFINE_XEN_GUEST_HANDLE(xsm_op_t);
 
 /* policy magic number (defined by XSM_MAGIC) */
 typedef u32 xsm_magic_t;
-#ifndef XSM_MAGIC
-#define XSM_MAGIC 0x00000000
+
+#ifdef CONFIG_FLASK
+#define XSM_MAGIC 0xf97cff8c
+#else
+#define XSM_MAGIC 0x0
 #endif
 
 /* These annotations are used by callers and in dummy.h to document the
