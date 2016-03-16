@@ -166,6 +166,7 @@ typedef l4_pgentry_t root_pgentry_t;
 
 #define USER_MAPPINGS_ARE_GLOBAL
 #ifdef USER_MAPPINGS_ARE_GLOBAL
+
 /*
  * Bit 12 of a 24-bit flag mask. This corresponds to bit 52 of a pte.
  * This is needed to distinguish between user and kernel PTEs since _PAGE_USER
@@ -175,6 +176,12 @@ typedef l4_pgentry_t root_pgentry_t;
 #else
 #define _PAGE_GUEST_KERNEL 0
 #endif
+
+/*
+ * Bit 24 of a 24-bit flag mask!  This is not any bit of a real pte,
+ * and is only used for signalling in variables that contain flags.
+ */
+#define _PAGE_INVALID_BIT (1U<<24)
 
 #endif /* __X86_64_PAGE_H__ */
 

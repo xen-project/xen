@@ -220,15 +220,17 @@ guest_supports_nx(struct vcpu *v)
 }
 
 
-/* Some bits are invalid in any pagetable entry. */
-#if GUEST_PAGING_LEVELS == 2
-#define _PAGE_INVALID_BITS (0)
-#elif GUEST_PAGING_LEVELS == 3
+/*
+ * Some bits are invalid in any pagetable entry.
+ * Normal flags values get represented in 24-bit values (see
+ * get_pte_flags() and put_pte_flags()), so set bit 24 in
+ * addition to be able to flag out of range frame numbers.
+ */
+#if GUEST_PAGING_LEVELS == 3
 #define _PAGE_INVALID_BITS \
-    get_pte_flags(((1ull<<63) - 1) & ~((1ull<<paddr_bits) - 1))
-#else /* GUEST_PAGING_LEVELS == 4 */
-#define _PAGE_INVALID_BITS \
-    get_pte_flags(((1ull<<52) - 1) & ~((1ull<<paddr_bits) - 1))
+    (_PAGE_INVALID_BIT | get_pte_flags(((1ull << 63) - 1) & ~(PAGE_SIZE - 1)))
+#else /* 2-level and 4-level */
+#define _PAGE_INVALID_BITS _PAGE_INVALID_BIT
 #endif
 
 

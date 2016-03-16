@@ -527,7 +527,8 @@ _sh_propagate(struct vcpu *v,
     ASSERT(GUEST_PAGING_LEVELS > 3 || level != 3);
 
     /* Check there's something for the shadows to map to */
-    if ( !p2m_is_valid(p2mt) && !p2m_is_grant(p2mt) )
+    if ( (!p2m_is_valid(p2mt) && !p2m_is_grant(p2mt))
+         || gfn_x(target_gfn) >> d->arch.paging.gfn_bits )
     {
         *sp = shadow_l1e_empty();
         goto done;
