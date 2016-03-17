@@ -279,8 +279,12 @@ void vfree(void *va)
     ASSERT(pages);
 
     for ( i = 0; i < pages; i++ )
-        page_list_add(vmap_to_page(va + i * PAGE_SIZE), &pg_list);
+    {
+        struct page_info *page = vmap_to_page(va + i * PAGE_SIZE);
 
+        ASSERT(page);
+        page_list_add(page, &pg_list);
+    }
     vunmap(va);
 
     while ( (pg = page_list_remove_head(&pg_list)) != NULL )
