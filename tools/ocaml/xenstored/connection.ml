@@ -233,7 +233,10 @@ let end_transaction con tid commit =
 	let trans = Hashtbl.find con.transactions tid in
 	Hashtbl.remove con.transactions tid;
 	Logging.end_transaction ~tid ~con:(get_domstr con);
-	if commit then Transaction.commit ~con:(get_domstr con) trans else true
+	match commit with
+	| None -> true
+	| Some transaction_replay_f ->
+		Transaction.commit ~con:(get_domstr con) trans || transaction_replay_f con trans
 
 let get_transaction con tid =
 	Hashtbl.find con.transactions tid
