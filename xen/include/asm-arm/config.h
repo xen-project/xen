@@ -9,8 +9,10 @@
 
 #if defined(CONFIG_ARM_64)
 # define LONG_BYTEORDER 3
+# define ELFSIZE 64
 #else
 # define LONG_BYTEORDER 2
+# define ELFSIZE 32
 #endif
 
 #define BYTES_PER_LONG (1 << LONG_BYTEORDER)
@@ -19,9 +21,6 @@
 
 /* xen_ulong_t is always 64 bits */
 #define BITS_PER_XEN_ULONG 64
-
-/* And ELF files are also 64-bit. */
-#define ELFSIZE 64
 
 #define CONFIG_PAGING_ASSISTANCE 1
 
