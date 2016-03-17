@@ -119,7 +119,7 @@ let do_getperms con t domains cons data =
 	let perms = Transaction.getperms t (Connection.get_perm con) path in
 	Perms.Node.to_string perms ^ "\000"
 
-let do_watch con t rid domains cons data =
+let do_watch con t domains cons data =
 	let (node, token) = 
 		match (split None '\000' data) with
 		| [node; token; ""]   -> node, token
@@ -299,25 +299,25 @@ let send_response ty con t rid response =
 	| Packet.Error e ->
 		Connection.send_error con (Transaction.get_id t) rid e
 
-let reply_ack fct ty con t rid doms cons data =
+let reply_ack fct con t doms cons data =
 	fct con t doms cons data;
 	Packet.Ack (fun () ->
 		if Transaction.get_id t = Transaction.none then
 			process_watch (Transaction.get_ops t) cons
 	)
 
-let reply_data fct ty con t rid doms cons data =
+let reply_data fct con t doms cons data =
 	let ret = fct con t doms cons data in
 	Packet.Reply ret
 
-let reply_data_or_ack fct ty con t rid doms cons data =
+let reply_data_or_ack fct con t doms cons data =
 	match fct con t doms cons data with
 		| Some ret -> Packet.Reply ret
 		| None -> Packet.Ack (fun () -> ())
 
-let reply_none fct ty con t rid doms cons data =
+let reply_none fct con t doms cons data =
 	(* let the function reply *)
-	fct con t rid doms cons data
+	fct con t doms cons data
 
 let function_of_type ty =
 	match ty with
@@ -348,7 +348,7 @@ let input_handle_error ~cons ~doms ~fct ~ty ~con ~t ~rid ~data =
 	let reply_error e =
 		Packet.Error e in
 	try
-		fct ty con t rid doms cons data
+		fct con t doms cons data
 	with
 	| Define.Invalid_path          -> reply_error "EINVAL"
 	| Define.Already_exist         -> reply_error "EEXIST"
