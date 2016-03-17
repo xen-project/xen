@@ -342,8 +342,8 @@ skip_bss:
          * Top byte is used
          * PT walks use Inner-Shareable accesses,
          * PT walks are write-back, write-allocate in both cache levels,
-         * Full 64-bit address space goes through this table. */
-        ldr   x0, =(TCR_RES1|TCR_SH0_IS|TCR_ORGN0_WBWA|TCR_IRGN0_WBWA|TCR_T0SZ(0))
+         * 48-bit virtual address space goes through this table. */
+        ldr   x0, =(TCR_RES1|TCR_SH0_IS|TCR_ORGN0_WBWA|TCR_IRGN0_WBWA|TCR_T0SZ(64-48))
         /* ID_AA64MMFR0_EL1[3:0] (PARange) corresponds to TCR_EL2[18:16] (PS) */
         mrs   x1, ID_AA64MMFR0_EL1
         bfi   x0, x1, #16, #3
