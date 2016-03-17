@@ -343,7 +343,6 @@ UNLIKELY_START(g, create_bounce_frame_bad_sp)
         lea   UNLIKELY_DISPATCH_LABEL(create_bounce_frame_bad_sp)(%rip), %rdi
         jmp   asm_domain_crash_synchronous  /* Does not return */
 __UNLIKELY_END(create_bounce_frame_bad_sp)
-        movb  TRAPBOUNCE_flags(%rdx),%cl
         subq  $40,%rsi
         movq  UREGS_ss+8(%rsp),%rax
         ASM_STAC
@@ -352,7 +351,7 @@ __UNLIKELY_END(create_bounce_frame_bad_sp)
 .Lft3:  movq  %rax,24(%rsi)             # RSP
         movq  VCPU_vcpu_info(%rbx),%rax
         pushq VCPUINFO_upcall_mask(%rax)
-        testb $TBF_INTERRUPT,%cl
+        testb $TBF_INTERRUPT,TRAPBOUNCE_flags(%rdx)
         setnz %ch                       # TBF_INTERRUPT -> set upcall mask
         orb   %ch,VCPUINFO_upcall_mask(%rax)
         popq  %rax
@@ -369,7 +368,7 @@ __UNLIKELY_END(create_bounce_frame_bad_sp)
 .Lft5:  movq  %rax,16(%rsi)             # RFLAGS
         movq  UREGS_rip+8(%rsp),%rax
 .Lft6:  movq  %rax,(%rsi)               # RIP
-        testb $TBF_EXCEPTION_ERRCODE,%cl
+        testb $TBF_EXCEPTION_ERRCODE,TRAPBOUNCE_flags(%rdx)
         jz    1f
         subq  $8,%rsi
         movl  TRAPBOUNCE_error_code(%rdx),%eax

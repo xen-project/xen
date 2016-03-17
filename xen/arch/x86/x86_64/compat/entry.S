@@ -263,11 +263,10 @@ compat_create_bounce_frame:
         movl  UREGS_rsp+8(%rsp),%esi
 .Lft4:  mov   UREGS_ss+8(%rsp),%fs
 2:
-        movb  TRAPBOUNCE_flags(%rdx),%cl
         subl  $3*4,%esi
         movq  VCPU_vcpu_info(%rbx),%rax
         pushq COMPAT_VCPUINFO_upcall_mask(%rax)
-        testb $TBF_INTERRUPT,%cl
+        testb $TBF_INTERRUPT,TRAPBOUNCE_flags(%rdx)
         setnz %ch                       # TBF_INTERRUPT -> set upcall mask
         orb   %ch,COMPAT_VCPUINFO_upcall_mask(%rax)
         popq  %rax
@@ -284,7 +283,7 @@ compat_create_bounce_frame:
 .Lft6:  movl  %eax,%fs:2*4(%rsi)        # EFLAGS
         movl  UREGS_rip+8(%rsp),%eax
 .Lft7:  movl  %eax,%fs:(%rsi)           # EIP
-        testb $TBF_EXCEPTION_ERRCODE,%cl
+        testb $TBF_EXCEPTION_ERRCODE,TRAPBOUNCE_flags(%rdx)
         jz    1f
         subl  $4,%esi
         movl  TRAPBOUNCE_error_code(%rdx),%eax
