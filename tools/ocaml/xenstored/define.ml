@@ -27,6 +27,7 @@ let default_config_dir = "/etc/xen"
 
 let maxwatch = ref (50)
 let maxtransaction = ref (20)
+let maxrequests = ref (-1)   (* maximum requests per transaction *)
 
 let domid_self = 0x7FF0
 
