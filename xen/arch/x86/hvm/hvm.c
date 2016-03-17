@@ -2576,13 +2576,6 @@ int hvm_vcpu_initialise(struct vcpu *v)
     if ( rc != 0 )
         goto fail6;
 
-    if ( is_viridian_domain(d) )
-    {
-        rc = viridian_vcpu_init(v);
-        if ( rc != 0 )
-            goto fail7;
-    }
-
     if ( v->vcpu_id == 0 )
     {
         /* NB. All these really belong in hvm_domain_initialise(). */
@@ -2597,8 +2590,6 @@ int hvm_vcpu_initialise(struct vcpu *v)
 
     return 0;
 
- fail7:
-    hvm_all_ioreq_servers_remove_vcpu(v->domain, v);
  fail6:
     nestedhvm_vcpu_destroy(v);
  fail5:
@@ -2615,9 +2606,6 @@ int hvm_vcpu_initialise(struct vcpu *v)
 
 void hvm_vcpu_destroy(struct vcpu *v)
 {
-    if ( is_viridian_domain(v->domain) )
-        viridian_vcpu_deinit(v);
-
     hvm_all_ioreq_servers_remove_vcpu(v->domain, v);
 
     if ( hvm_altp2m_supported() )

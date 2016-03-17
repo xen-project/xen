@@ -521,16 +521,7 @@ int rdmsr_viridian_regs(uint32_t idx, uint64_t *val)
     return 1;
 }
 
-int viridian_vcpu_init(struct vcpu *v)
-{
-    return alloc_cpumask_var(&v->arch.hvm_vcpu.viridian.flush_cpumask) ?
-           0 : -ENOMEM;
-}
-
-void viridian_vcpu_deinit(struct vcpu *v)
-{
-    free_cpumask_var(v->arch.hvm_vcpu.viridian.flush_cpumask);
-}
+static DEFINE_PER_CPU(cpumask_t, ipi_cpumask);
 
 int viridian_hypercall(struct cpu_user_regs *regs)
 {
@@ -627,7 +618,7 @@ int viridian_hypercall(struct cpu_user_regs *regs)
         if ( input_params.flags & HV_FLUSH_ALL_PROCESSORS )
             input_params.vcpu_mask = ~0ul;
 
-        pcpu_mask = curr->arch.hvm_vcpu.viridian.flush_cpumask;
+        pcpu_mask = &this_cpu(ipi_cpumask);
         cpumask_clear(pcpu_mask);
 
         /*
@@ -645,7 +636,7 @@ int viridian_hypercall(struct cpu_user_regs *regs)
                 continue;
 
             hvm_asid_flush_vcpu(v);
-            if ( v->is_running )
+            if ( v != curr && v->is_running )
                 __cpumask_set_cpu(v->processor, pcpu_mask);
         }
 
@@ -656,7 +647,9 @@ int viridian_hypercall(struct cpu_user_regs *regs)
          * so we may unnecessarily IPI some CPUs.
          */
         if ( !cpumask_empty(pcpu_mask) )
-            flush_tlb_mask(pcpu_mask);
+            smp_send_event_check_mask(pcpu_mask);
+
+        output.rep_complete = input.rep_count;
 
         status = HV_STATUS_SUCCESS;
         break;

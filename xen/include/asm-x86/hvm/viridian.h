@@ -22,7 +22,6 @@ union viridian_apic_assist
 struct viridian_vcpu
 {
     union viridian_apic_assist apic_assist;
-    cpumask_var_t flush_cpumask;
 };
 
 union viridian_guest_os_id
@@ -117,9 +116,6 @@ viridian_hypercall(struct cpu_user_regs *regs);
 
 void viridian_time_ref_count_freeze(struct domain *d);
 void viridian_time_ref_count_thaw(struct domain *d);
-
-int viridian_vcpu_init(struct vcpu *v);
-void viridian_vcpu_deinit(struct vcpu *v);
 
 #endif /* __ASM_X86_HVM_VIRIDIAN_H__ */
 
