@@ -2606,6 +2606,8 @@ int hvm_vcpu_initialise(struct vcpu *v)
 
 void hvm_vcpu_destroy(struct vcpu *v)
 {
+    viridian_vcpu_deinit(v);
+
     hvm_all_ioreq_servers_remove_vcpu(v->domain, v);
 
     if ( hvm_altp2m_supported() )

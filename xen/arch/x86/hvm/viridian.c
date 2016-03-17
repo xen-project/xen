@@ -1,7 +1,12 @@
 /******************************************************************************
  * viridian.c
  *
- * An implementation of the Viridian hypercall interface.
+ * An implementation of some Viridian enlightenments. See Microsoft's
+ * Hypervisor Top Level Functional Specification (v4.0b) at:
+ *
+ * https://msdn.microsoft.com/en-us/virtualization/hyperv_on_windows/develop/tlfs 
+ *
+ * for more information.
  */
 
 #include <xen/sched.h>
@@ -163,7 +168,7 @@ static void dump_apic_assist(const struct vcpu *v)
 {
     const union viridian_apic_assist *aa;
 
-    aa = &v->arch.hvm_vcpu.viridian.apic_assist;
+    aa = &v->arch.hvm_vcpu.viridian.apic_assist.msr;
 
     printk(XENLOG_G_INFO "%pv: VIRIDIAN APIC_ASSIST: enabled: %x pfn: %lx\n",
            v, aa->fields.enabled, (unsigned long)aa->fields.pfn);
@@ -217,9 +222,9 @@ static void enable_hypercall_page(struct domain *d)
 static void initialize_apic_assist(struct vcpu *v)
 {
     struct domain *d = v->domain;
-    unsigned long gmfn = v->arch.hvm_vcpu.viridian.apic_assist.fields.pfn;
+    unsigned long gmfn = v->arch.hvm_vcpu.viridian.apic_assist.msr.fields.pfn;
     struct page_info *page = get_page_from_gfn(d, gmfn, NULL, P2M_ALLOC);
-    uint8_t *p;
+    void *va;
 
     /*
      * We don't yet make use of the APIC assist page but by setting
@@ -227,25 +232,49 @@ static void initialize_apic_assist(struct vcpu *v)
      * bound to support the MSR. We therefore do just enough to keep windows
      * happy.
      *
-     * See http://msdn.microsoft.com/en-us/library/ff538657%28VS.85%29.aspx for
-     * details of how Windows uses the page.
+     * See section 13.3.4.1 of the specification for details of this
+     * enlightenment.
      */
 
-    if ( !page || !get_page_type(page, PGT_writable_page) )
+    if ( !page )
+        goto fail;
+
+    if ( !get_page_type(page, PGT_writable_page) )
     {
-        if ( page )
-            put_page(page);
-        gdprintk(XENLOG_WARNING, "Bad GMFN %lx (MFN %lx)\n", gmfn,
-                 page ? page_to_mfn(page) : INVALID_MFN);
-        return;
+        put_page(page);
+        goto fail;
     }
 
-    p = __map_domain_page(page);
+    va = __map_domain_page_global(page);
+    if ( !va )
+    {
+        put_page_and_type(page);
+        goto fail;
+    }
 
-    *(u32 *)p = 0;
+    *(uint32_t *)va = 0;
 
-    unmap_domain_page(p);
+    v->arch.hvm_vcpu.viridian.apic_assist.va = va;
+    return;
 
+ fail:
+    gdprintk(XENLOG_WARNING, "Bad GMFN %lx (MFN %lx)\n", gmfn,
+             page ? page_to_mfn(page) : INVALID_MFN);
+}
+
+static void teardown_apic_assist(struct vcpu *v)
+{
+    void *va = v->arch.hvm_vcpu.viridian.apic_assist.va;
+    struct page_info *page;
+
+    if ( !va )
+        return;
+
+    v->arch.hvm_vcpu.viridian.apic_assist.va = NULL;
+
+    page = mfn_to_page(domain_page_map_to_mfn(va));
+
+    unmap_domain_page_global(va);
     put_page_and_type(page);
 }
 
@@ -374,9 +403,10 @@ int wrmsr_viridian_regs(uint32_t idx, uint64_t val)
 
     case VIRIDIAN_MSR_APIC_ASSIST:
         perfc_incr(mshv_wrmsr_apic_msr);
-        v->arch.hvm_vcpu.viridian.apic_assist.raw = val;
+        teardown_apic_assist(v); /* release any previous mapping */
+        v->arch.hvm_vcpu.viridian.apic_assist.msr.raw = val;
         dump_apic_assist(v);
-        if (v->arch.hvm_vcpu.viridian.apic_assist.fields.enabled)
+        if ( v->arch.hvm_vcpu.viridian.apic_assist.msr.fields.enabled )
             initialize_apic_assist(v);
         break;
 
@@ -485,7 +515,7 @@ int rdmsr_viridian_regs(uint32_t idx, uint64_t *val)
 
     case VIRIDIAN_MSR_APIC_ASSIST:
         perfc_incr(mshv_rdmsr_apic_msr);
-        *val = v->arch.hvm_vcpu.viridian.apic_assist.raw;
+        *val = v->arch.hvm_vcpu.viridian.apic_assist.msr.raw;
         break;
 
     case VIRIDIAN_MSR_REFERENCE_TSC:
@@ -519,6 +549,11 @@ int rdmsr_viridian_regs(uint32_t idx, uint64_t *val)
     }
 
     return 1;
+}
+
+void viridian_vcpu_deinit(struct vcpu *v)
+{
+    teardown_apic_assist(v);
 }
 
 static DEFINE_PER_CPU(cpumask_t, ipi_cpumask);
@@ -721,7 +756,7 @@ static int viridian_save_vcpu_ctxt(struct domain *d, hvm_domain_context_t *h)
     for_each_vcpu( d, v ) {
         struct hvm_viridian_vcpu_context ctxt;
 
-        ctxt.apic_assist = v->arch.hvm_vcpu.viridian.apic_assist.raw;
+        ctxt.apic_assist = v->arch.hvm_vcpu.viridian.apic_assist.msr.raw;
 
         if ( hvm_save_entry(VIRIDIAN_VCPU, v->vcpu_id, h, &ctxt) != 0 )
             return 1;
@@ -747,7 +782,9 @@ static int viridian_load_vcpu_ctxt(struct domain *d, hvm_domain_context_t *h)
     if ( hvm_load_entry(VIRIDIAN_VCPU, h, &ctxt) != 0 )
         return -EINVAL;
 
-    v->arch.hvm_vcpu.viridian.apic_assist.raw = ctxt.apic_assist;
+    v->arch.hvm_vcpu.viridian.apic_assist.msr.raw = ctxt.apic_assist;
+    if ( v->arch.hvm_vcpu.viridian.apic_assist.msr.fields.enabled )
+        initialize_apic_assist(v);
 
     return 0;
 }
