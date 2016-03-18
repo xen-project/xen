@@ -1543,8 +1543,12 @@ csched2_runtime(const struct scheduler *ops, int cpu, struct csched2_vcpu *snext
     struct csched2_runqueue_data *rqd = RQD(ops, cpu);
     struct list_head *runq = &rqd->runq;
 
+    /*
+     * If we're idle, just stay so. Others (or external events)
+     * will poke us when necessary.
+     */
     if ( is_idle_vcpu(snext->vcpu) )
-        return CSCHED2_MAX_TIMER;
+        return -1;
 
     /* General algorithm:
      * 1) Run until snext's credit will be 0
