@@ -171,18 +171,7 @@ struct csched_pcpu {
     struct timer ticker;
     unsigned int tick;
     unsigned int idle_bias;
-    /* Store this here to avoid having too many cpumask_var_t-s on stack */
-    cpumask_var_t balance_mask;
 };
-
-/*
- * Convenience macro for accessing the per-PCPU cpumask we need for
- * implementing the two steps (soft and hard affinity) balancing logic.
- * It is stored in csched_pcpu so that serialization is not an issue,
- * as there is a csched_pcpu for each PCPU, and we always hold the
- * runqueue lock for the proper PCPU when using this.
- */
-#define csched_balance_mask(c) (CSCHED_PCPU(c)->balance_mask)
 
 /*
  * Virtual CPU
@@ -416,10 +405,10 @@ static inline void __runq_tickle(struct csched_vcpu *new)
 
             /* Are there idlers suitable for new (for this balance step)? */
             csched_balance_cpumask(new->vcpu, balance_step,
-                                   csched_balance_mask(cpu));
-            cpumask_and(csched_balance_mask(cpu),
-                        csched_balance_mask(cpu), &idle_mask);
-            new_idlers_empty = cpumask_empty(csched_balance_mask(cpu));
+                                   cpumask_scratch_cpu(cpu));
+            cpumask_and(cpumask_scratch_cpu(cpu),
+                        cpumask_scratch_cpu(cpu), &idle_mask);
+            new_idlers_empty = cpumask_empty(cpumask_scratch_cpu(cpu));
 
             /*
              * Let's not be too harsh! If there aren't idlers suitable
@@ -445,8 +434,8 @@ static inline void __runq_tickle(struct csched_vcpu *new)
             if ( new_idlers_empty && new->pri > cur->pri )
             {
                 csched_balance_cpumask(cur->vcpu, balance_step,
-                                       csched_balance_mask(cpu));
-                if ( cpumask_intersects(csched_balance_mask(cpu),
+                                       cpumask_scratch_cpu(cpu));
+                if ( cpumask_intersects(cpumask_scratch_cpu(cpu),
                                         &idle_mask) )
                 {
                     SCHED_VCPU_STAT_CRANK(cur, kicked_away);
@@ -519,7 +508,6 @@ csched_free_pdata(const struct scheduler *ops, void *pcpu, int cpu)
 
     spin_unlock_irqrestore(&prv->lock, flags);
 
-    free_cpumask_var(spc->balance_mask);
     xfree(spc);
 }
 
@@ -532,12 +520,6 @@ csched_alloc_pdata(const struct scheduler *ops, int cpu)
     spc = xzalloc(struct csched_pcpu);
     if ( spc == NULL )
         return ERR_PTR(-ENOMEM);
-
-    if ( !alloc_cpumask_var(&spc->balance_mask) )
-    {
-        xfree(spc);
-        return ERR_PTR(-ENOMEM);
-    }
 
     return spc;
 }
@@ -1592,9 +1574,9 @@ csched_runq_steal(int peer_cpu, int cpu, int pri, int balance_step)
                  && !__vcpu_has_soft_affinity(vc, vc->cpu_hard_affinity) )
                 continue;
 
-            csched_balance_cpumask(vc, balance_step, csched_balance_mask(cpu));
+            csched_balance_cpumask(vc, balance_step, cpumask_scratch_cpu(cpu));
             if ( __csched_vcpu_is_migrateable(vc, cpu,
-                                              csched_balance_mask(cpu)) )
+                                              cpumask_scratch_cpu(cpu)) )
             {
                 /* We got a candidate. Grab it! */
                 TRACE_3D(TRC_CSCHED_STOLEN_VCPU, peer_cpu,

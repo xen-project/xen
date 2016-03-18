@@ -2259,6 +2259,7 @@ csched2_init(struct scheduler *ops)
     if ( prv == NULL )
         return -ENOMEM;
     ops->sched_data = prv;
+
     spin_lock_init(&prv->lock);
     INIT_LIST_HEAD(&prv->sdom);
 

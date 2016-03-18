@@ -155,24 +155,6 @@
 #define TRC_RTDS_BUDGET_REPLENISH TRC_SCHED_CLASS_EVT(RTDS, 4)
 #define TRC_RTDS_SCHED_TASKLET    TRC_SCHED_CLASS_EVT(RTDS, 5)
 
- /*
-  * Useful to avoid too many cpumask_var_t on the stack.
-  */
-static cpumask_var_t *_cpumask_scratch;
-#define cpumask_scratch _cpumask_scratch[smp_processor_id()]
-
-/*
- * We want to only allocate the _cpumask_scratch array the first time an
- * instance of this scheduler is used, and avoid reallocating and leaking
- * the old one when more instance are activated inside new cpupools. We
- * also want to get rid of it when the last instance is de-inited.
- *
- * So we (sort of) reference count the number of initialized instances. This
- * does not need to happen via atomic_t refcounters, as it only happens either
- * during boot, or under the protection of the cpupool_lock spinlock.
- */
-static unsigned int nr_rt_ops;
-
 static void repl_timer_handler(void *data);
 
 /*
@@ -301,12 +283,11 @@ rt_dump_vcpu(const struct scheduler *ops, const struct rt_vcpu *svc)
     /*
      * We can't just use 'cpumask_scratch' because the dumping can
      * happen from a pCPU outside of this scheduler's cpupool, and
-     * hence it's not right to use the pCPU's scratch mask (which
-     * may even not exist!). On the other hand, it is safe to use
-     * svc->vcpu->processor's own scratch space, since we hold the
-     * runqueue lock.
+     * hence it's not right to use its pCPU's scratch mask.
+     * On the other hand, it is safe to use svc->vcpu->processor's
+     * own scratch space, since we hold the runqueue lock.
      */
-    mask = _cpumask_scratch[svc->vcpu->processor];
+    mask = cpumask_scratch_cpu(svc->vcpu->processor);
 
     cpupool_mask = cpupool_domain_cpumask(svc->vcpu->domain);
     cpumask_and(mask, cpupool_mask, svc->vcpu->cpu_hard_affinity);
@@ -609,16 +590,6 @@ rt_init(struct scheduler *ops)
     if ( prv == NULL )
         return -ENOMEM;
 
-    ASSERT( _cpumask_scratch == NULL || nr_rt_ops > 0 );
-
-    if ( !_cpumask_scratch )
-    {
-        _cpumask_scratch = xmalloc_array(cpumask_var_t, nr_cpu_ids);
-        if ( !_cpumask_scratch )
-            goto no_mem;
-    }
-    nr_rt_ops++;
-
     spin_lock_init(&prv->lock);
     INIT_LIST_HEAD(&prv->sdom);
     INIT_LIST_HEAD(&prv->runq);
@@ -636,24 +607,12 @@ rt_init(struct scheduler *ops)
     prv->repl_timer = NULL;
 
     return 0;
-
- no_mem:
-    xfree(prv);
-    return -ENOMEM;
 }
 
 static void
 rt_deinit(struct scheduler *ops)
 {
     struct rt_private *prv = rt_priv(ops);
-
-    ASSERT( _cpumask_scratch && nr_rt_ops > 0 );
-
-    if ( (--nr_rt_ops) == 0 )
-    {
-        xfree(_cpumask_scratch);
-        _cpumask_scratch = NULL;
-    }
 
     kill_timer(prv->repl_timer);
     xfree(prv->repl_timer);
@@ -718,9 +677,6 @@ rt_alloc_pdata(const struct scheduler *ops, int cpu)
 {
     struct rt_private *prv = rt_priv(ops);
 
-    if ( !alloc_cpumask_var(&_cpumask_scratch[cpu]) )
-        return ERR_PTR(-ENOMEM);
-
     if ( prv->repl_timer == NULL )
     {
         /* Allocate the timer on the first cpu of this pool. */
@@ -733,12 +689,6 @@ rt_alloc_pdata(const struct scheduler *ops, int cpu)
     }
 
     return NULL;
-}
-
-static void
-rt_free_pdata(const struct scheduler *ops, void *pcpu, int cpu)
-{
-    free_cpumask_var(_cpumask_scratch[cpu]);
 }
 
 static void *
@@ -1484,7 +1434,6 @@ static const struct scheduler sched_rtds_def = {
     .init           = rt_init,
     .deinit         = rt_deinit,
     .alloc_pdata    = rt_alloc_pdata,
-    .free_pdata     = rt_free_pdata,
     .init_pdata     = rt_init_pdata,
     .switch_sched   = rt_switch_sched,
     .alloc_domdata  = rt_alloc_domdata,
