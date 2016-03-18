@@ -99,8 +99,7 @@ static int collect_cpu_info(unsigned int cpu_num, struct cpu_signature *csig)
 
     memset(csig, 0, sizeof(*csig));
 
-    if ( (c->x86_vendor != X86_VENDOR_INTEL) || (c->x86 < 6) ||
-         cpu_has(c, X86_FEATURE_IA64) )
+    if ( (c->x86_vendor != X86_VENDOR_INTEL) || (c->x86 < 6) )
     {
         printk(KERN_ERR "microcode: CPU%d not a capable Intel "
                "processor\n", cpu_num);
