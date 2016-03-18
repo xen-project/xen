@@ -85,6 +85,8 @@ void write_cr3(unsigned long cr3);
 #define FLUSH_TLB_GLOBAL 0x200
  /* Flush data caches */
 #define FLUSH_CACHE      0x400
+ /* VA for the flush has a valid mapping */
+#define FLUSH_VA_VALID   0x800
 
 /* Flush local TLBs/caches. */
 void flush_area_local(const void *va, unsigned int flags);
