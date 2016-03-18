@@ -3035,6 +3035,72 @@ static inline bool libxl__conversion_helper_inuse
                     (const libxl__conversion_helper_state *chs)
 { return libxl__ev_child_inuse(&chs->child); }
 
+/* State for reading a libxl migration v2 stream */
+typedef struct libxl__stream_read_state libxl__stream_read_state;
+
+typedef struct libxl__sr_record_buf {
+    /* private to stream read helper */
+    LIBXL_STAILQ_ENTRY(struct libxl__sr_record_buf) entry;
+    libxl__sr_rec_hdr hdr;
+    void *body; /* iff hdr.length != 0 */
+} libxl__sr_record_buf;
+
+struct libxl__stream_read_state {
+    /* filled by the user */
+    libxl__ao *ao;
+    libxl__domain_create_state *dcs;
+    int fd;
+    bool legacy;
+    bool back_channel;
+    void (*completion_callback)(libxl__egc *egc,
+                                libxl__stream_read_state *srs,
+                                int rc);
+    void (*checkpoint_callback)(libxl__egc *egc,
+                                libxl__stream_read_state *srs,
+                                int rc);
+    /* Private */
+    int rc;
+    bool running;
+    bool in_checkpoint;
+    bool sync_teardown; /* Only used to coordinate shutdown on error path. */
+    bool in_checkpoint_state;
+    libxl__save_helper_state shs;
+    libxl__conversion_helper_state chs;
+
+    /* Main stream-reading data. */
+    libxl__datacopier_state dc; /* Only used when reading a record */
+    libxl__sr_hdr hdr;
+    LIBXL_STAILQ_HEAD(, libxl__sr_record_buf) record_queue; /* NOGC */
+    enum {
+        SRS_PHASE_NORMAL,
+        SRS_PHASE_BUFFERING,
+        SRS_PHASE_UNBUFFERING,
+    } phase;
+    bool recursion_guard;
+
+    /* Only used while actively reading a record from the stream. */
+    libxl__sr_record_buf *incoming_record; /* NOGC */
+
+    /* Both only used when processing an EMULATOR record. */
+    libxl__datacopier_state emu_dc;
+    libxl__carefd *emu_carefd;
+};
+
+_hidden void libxl__stream_read_init(libxl__stream_read_state *stream);
+_hidden void libxl__stream_read_start(libxl__egc *egc,
+                                      libxl__stream_read_state *stream);
+_hidden void libxl__stream_read_start_checkpoint(libxl__egc *egc,
+                                                 libxl__stream_read_state *stream);
+_hidden void libxl__stream_read_checkpoint_state(libxl__egc *egc,
+                                                 libxl__stream_read_state *stream);
+_hidden void libxl__stream_read_abort(libxl__egc *egc,
+                                      libxl__stream_read_state *stream, int rc);
+static inline bool
+libxl__stream_read_inuse(const libxl__stream_read_state *stream)
+{
+    return stream->running;
+}
+
 
 /*----- Domain suspend (save) state structure -----*/
 /*
@@ -3423,72 +3489,6 @@ _hidden void libxl__spawn_qdisk_backend(libxl__egc *egc,
 _hidden int libxl__destroy_qdisk_backend(libxl__gc *gc, uint32_t domid);
 
 /*----- Domain creation -----*/
-
-/* State for manipulating a libxl migration v2 stream */
-typedef struct libxl__stream_read_state libxl__stream_read_state;
-
-typedef struct libxl__sr_record_buf {
-    /* private to stream read helper */
-    LIBXL_STAILQ_ENTRY(struct libxl__sr_record_buf) entry;
-    libxl__sr_rec_hdr hdr;
-    void *body; /* iff hdr.length != 0 */
-} libxl__sr_record_buf;
-
-struct libxl__stream_read_state {
-    /* filled by the user */
-    libxl__ao *ao;
-    libxl__domain_create_state *dcs;
-    int fd;
-    bool legacy;
-    bool back_channel;
-    void (*completion_callback)(libxl__egc *egc,
-                                libxl__stream_read_state *srs,
-                                int rc);
-    void (*checkpoint_callback)(libxl__egc *egc,
-                                libxl__stream_read_state *srs,
-                                int rc);
-    /* Private */
-    int rc;
-    bool running;
-    bool in_checkpoint;
-    bool sync_teardown; /* Only used to coordinate shutdown on error path. */
-    bool in_checkpoint_state;
-    libxl__save_helper_state shs;
-    libxl__conversion_helper_state chs;
-
-    /* Main stream-reading data. */
-    libxl__datacopier_state dc; /* Only used when reading a record */
-    libxl__sr_hdr hdr;
-    LIBXL_STAILQ_HEAD(, libxl__sr_record_buf) record_queue; /* NOGC */
-    enum {
-        SRS_PHASE_NORMAL,
-        SRS_PHASE_BUFFERING,
-        SRS_PHASE_UNBUFFERING,
-    } phase;
-    bool recursion_guard;
-
-    /* Only used while actively reading a record from the stream. */
-    libxl__sr_record_buf *incoming_record; /* NOGC */
-
-    /* Both only used when processing an EMULATOR record. */
-    libxl__datacopier_state emu_dc;
-    libxl__carefd *emu_carefd;
-};
-
-_hidden void libxl__stream_read_init(libxl__stream_read_state *stream);
-_hidden void libxl__stream_read_start(libxl__egc *egc,
-                                      libxl__stream_read_state *stream);
-_hidden void libxl__stream_read_start_checkpoint(libxl__egc *egc,
-                                                 libxl__stream_read_state *stream);
-_hidden void libxl__stream_read_checkpoint_state(libxl__egc *egc,
-                                                 libxl__stream_read_state *stream);
-_hidden void libxl__stream_read_abort(libxl__egc *egc,
-                                      libxl__stream_read_state *stream, int rc);
-static inline bool
-libxl__stream_read_inuse(const libxl__stream_read_state *stream)
-{
-    return stream->running;
-}
 
 
 struct libxl__domain_create_state {
