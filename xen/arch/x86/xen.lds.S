@@ -49,6 +49,7 @@ SECTIONS
        *(.text.cold)
        *(.text.unlikely)
        *(.fixup)
+       *(.text.kexec)
        *(.gnu.warning)
        _etext = .;             /* End of text section */
   } :text = 0x9090

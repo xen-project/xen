@@ -18,7 +18,7 @@
 #include <asm/page.h>
 #include <asm/machine_kexec.h>
 
-        .text
+        .section .text.kexec, "ax", @progbits
         .align PAGE_SIZE
         .code64
 
