@@ -2807,24 +2807,31 @@ static int vmx_handle_eoi_write(void)
  * It is the callers responsibility to ensure that this function is only used
  * in the context of an appropriate vmexit.
  */
-static void vmx_propagate_intr(void)
+static void vmx_propagate_intr(unsigned long intr)
 {
-    unsigned long intr, tmp;
-
-    __vmread(VM_EXIT_INTR_INFO, &intr);
-
-    ASSERT(intr & INTR_INFO_VALID_MASK);
-
-    __vmwrite(VM_ENTRY_INTR_INFO, intr);
+    struct hvm_trap trap = {
+        .vector = MASK_EXTR(intr, INTR_INFO_VECTOR_MASK),
+        .type = MASK_EXTR(intr, INTR_INFO_INTR_TYPE_MASK),
+    };
+    unsigned long tmp;
 
     if ( intr & INTR_INFO_DELIVER_CODE_MASK )
     {
         __vmread(VM_EXIT_INTR_ERROR_CODE, &tmp);
-        __vmwrite(VM_ENTRY_EXCEPTION_ERROR_CODE, tmp);
+        trap.error_code = tmp;
     }
+    else
+        trap.error_code = HVM_DELIVER_NO_ERROR_CODE;
 
-    __vmread(VM_EXIT_INSTRUCTION_LEN, &tmp);
-    __vmwrite(VM_ENTRY_INSTRUCTION_LEN, tmp);
+    if ( trap.type >= X86_EVENTTYPE_SW_INTERRUPT )
+    {
+        __vmread(VM_EXIT_INSTRUCTION_LEN, &tmp);
+        trap.insn_len = tmp;
+    }
+    else
+        trap.insn_len = 0;
+
+    hvm_inject_trap(&trap);
 }
 
 static void vmx_idtv_reinject(unsigned long idtv_info)
@@ -3075,7 +3082,7 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
             HVMTRACE_1D(TRAP_DEBUG, exit_qualification);
             write_debugreg(6, exit_qualification | DR_STATUS_RESERVED_ONE);
             if ( !v->domain->debugger_attached )
-                vmx_propagate_intr();
+                vmx_propagate_intr(intr_info);
             else
                 domain_pause_for_debugger();
             break;
@@ -3144,7 +3151,7 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
             break;
         case TRAP_alignment_check:
             HVMTRACE_1D(TRAP, vector);
-            vmx_propagate_intr();
+            vmx_propagate_intr(intr_info);
             break;
         case TRAP_nmi:
             if ( MASK_EXTR(intr_info, INTR_INFO_INTR_TYPE_MASK) !=
