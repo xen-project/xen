@@ -5557,7 +5557,12 @@ int map_pages_to_xen(
         flush_flags |= FLUSH_TLB_GLOBAL;       \
     if ( (flags & _PAGE_PRESENT) &&            \
          (((o_) ^ flags) & PAGE_CACHE_ATTRS) ) \
+    {                                          \
         flush_flags |= FLUSH_CACHE;            \
+        if ( virt >= DIRECTMAP_VIRT_START &&   \
+             virt < HYPERVISOR_VIRT_END )      \
+            flush_flags |= FLUSH_VA_VALID;     \
+    }                                          \
 } while (0)
 
     while ( nr_mfns != 0 )
