@@ -99,6 +99,7 @@ void adjust_memory_map(void)
                 ((uint64_t)hvm_info->high_mem_pgend << PAGE_SHIFT) -
                     memory_map.map[i].addr;
         memory_map.map[i].type = E820_RAM;
+        memory_map.nr_map++;
     }
 }
 
