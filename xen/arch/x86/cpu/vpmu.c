@@ -140,7 +140,7 @@ int vpmu_do_msr(unsigned int msr, uint64_t *msr_content,
     return ret;
 
  nop:
-    if ( !is_write )
+    if ( !is_write && (msr != MSR_IA32_MISC_ENABLE) )
         *msr_content = 0;
 
     return 0;
