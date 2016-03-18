@@ -318,6 +318,36 @@ struct csched2_dom {
     uint16_t nr_vcpus;
 };
 
+/*
+ * When a hard affinity change occurs, we may not be able to check some
+ * (any!) of the other runqueues, when looking for the best new processor
+ * for svc (as trylock-s in choose_cpu() can fail). If that happens, we
+ * pick, in order of decreasing preference:
+ *  - svc's current pcpu;
+ *  - another pcpu from svc's current runq;
+ *  - any cpu.
+ */
+static int get_fallback_cpu(struct csched2_vcpu *svc)
+{
+    int cpu;
+
+    if ( likely(cpumask_test_cpu(svc->vcpu->processor,
+                                 svc->vcpu->cpu_hard_affinity)) )
+        return svc->vcpu->processor;
+
+    cpumask_and(cpumask_scratch, svc->vcpu->cpu_hard_affinity,
+                &svc->rqd->active);
+    cpu = cpumask_first(cpumask_scratch);
+    if ( likely(cpu < nr_cpu_ids) )
+        return cpu;
+
+    cpumask_and(cpumask_scratch, svc->vcpu->cpu_hard_affinity,
+                cpupool_domain_cpumask(svc->vcpu->domain));
+
+    ASSERT(!cpumask_empty(cpumask_scratch));
+
+    return cpumask_first(cpumask_scratch);
+}
 
 /*
  * Time-to-credit, credit-to-time.
@@ -551,8 +581,9 @@ runq_tickle(const struct scheduler *ops, unsigned int cpu, struct csched2_vcpu *
         goto tickle;
     }
     
-    /* Get a mask of idle, but not tickled */
+    /* Get a mask of idle, but not tickled, that new is allowed to run on. */
     cpumask_andnot(&mask, &rqd->idle, &rqd->tickled);
+    cpumask_and(&mask, &mask, new->vcpu->cpu_hard_affinity);
     
     /* If it's not empty, choose one */
     i = cpumask_cycle(cpu, &mask);
@@ -563,9 +594,11 @@ runq_tickle(const struct scheduler *ops, unsigned int cpu, struct csched2_vcpu *
     }
 
     /* Otherwise, look for the non-idle cpu with the lowest credit,
-     * skipping cpus which have been tickled but not scheduled yet */
+     * skipping cpus which have been tickled but not scheduled yet,
+     * that new is allowed to run on. */
     cpumask_andnot(&mask, &rqd->active, &rqd->idle);
     cpumask_andnot(&mask, &mask, &rqd->tickled);
+    cpumask_and(&mask, &mask, new->vcpu->cpu_hard_affinity);
 
     for_each_cpu(i, &mask)
     {
@@ -1115,9 +1148,8 @@ choose_cpu(const struct scheduler *ops, struct vcpu *vc)
             d2printk("%pv -\n", svc->vcpu);
             clear_bit(__CSFLAG_runq_migrate_request, &svc->flags);
         }
-        /* Leave it where it is for now.  When we actually pay attention
-         * to affinity we'll have to figure something out... */
-        return vc->processor;
+
+        return get_fallback_cpu(svc);
     }
 
     /* First check to see if we're here because someone else suggested a place
@@ -1128,17 +1160,20 @@ choose_cpu(const struct scheduler *ops, struct vcpu *vc)
         {
             printk("%s: Runqueue migrate aborted because target runqueue disappeared!\n",
                    __func__);
-            /* Fall-through to normal cpu pick */
         }
         else
         {
-            d2printk("%pv +\n", svc->vcpu);
-            new_cpu = cpumask_cycle(vc->processor, &svc->migrate_rqd->active);
-            goto out_up;
+            cpumask_and(cpumask_scratch, vc->cpu_hard_affinity,
+                        &svc->migrate_rqd->active);
+            new_cpu = cpumask_any(cpumask_scratch);
+            if ( new_cpu < nr_cpu_ids )
+            {
+                d2printk("%pv +\n", svc->vcpu);
+                goto out_up;
+            }
         }
+        /* Fall-through to normal cpu pick */
     }
-
-    /* FIXME: Pay attention to cpu affinity */                                                                                      
 
     min_avgload = MAX_LOAD;
 
@@ -1146,27 +1181,35 @@ choose_cpu(const struct scheduler *ops, struct vcpu *vc)
     for_each_cpu(i, &prv->active_queues)
     {
         struct csched2_runqueue_data *rqd;
-        s_time_t rqd_avgload;
+        s_time_t rqd_avgload = MAX_LOAD;
 
         rqd = prv->rqd + i;
 
-        /* If checking a different runqueue, grab the lock,
-         * read the avg, and then release the lock.
+        /*
+         * If checking a different runqueue, grab the lock, check hard
+         * affinity, read the avg, and then release the lock.
          *
          * If on our own runqueue, don't grab or release the lock;
          * but subtract our own load from the runqueue load to simulate
-         * impartiality */
+         * impartiality.
+         *
+         * Note that, if svc's hard affinity has changed, this is the
+         * first time when we see such change, so it is indeed possible
+         * that none of the cpus in svc's current runqueue is in our
+         * (new) hard affinity!
+         */
         if ( rqd == svc->rqd )
         {
-            rqd_avgload = rqd->b_avgload - svc->avgload;
+            if ( cpumask_intersects(vc->cpu_hard_affinity, &rqd->active) )
+                rqd_avgload = rqd->b_avgload - svc->avgload;
         }
         else if ( spin_trylock(&rqd->lock) )
         {
-            rqd_avgload = rqd->b_avgload;
+            if ( cpumask_intersects(vc->cpu_hard_affinity, &rqd->active) )
+                rqd_avgload = rqd->b_avgload;
+
             spin_unlock(&rqd->lock);
         }
-        else
-            continue;
 
         if ( rqd_avgload < min_avgload )
         {
@@ -1175,12 +1218,14 @@ choose_cpu(const struct scheduler *ops, struct vcpu *vc)
         }
     }
 
-    /* We didn't find anyone (most likely because of spinlock contention); leave it where it is */
+    /* We didn't find anyone (most likely because of spinlock contention). */
     if ( min_rqi == -1 )
-        new_cpu = vc->processor;
+        new_cpu = get_fallback_cpu(svc);
     else
     {
-        new_cpu = cpumask_cycle(vc->processor, &prv->rqd[min_rqi].active);
+        cpumask_and(cpumask_scratch, vc->cpu_hard_affinity,
+                    &prv->rqd[min_rqi].active);
+        new_cpu = cpumask_any(cpumask_scratch);
         BUG_ON(new_cpu >= nr_cpu_ids);
     }
 
@@ -1260,7 +1305,12 @@ static void migrate(const struct scheduler *ops,
             on_runq=1;
         }
         __runq_deassign(svc);
-        svc->vcpu->processor = cpumask_any(&trqd->active);
+
+        cpumask_and(cpumask_scratch, svc->vcpu->cpu_hard_affinity,
+                    &trqd->active);
+        svc->vcpu->processor = cpumask_any(cpumask_scratch);
+        BUG_ON(svc->vcpu->processor >= nr_cpu_ids);
+
         __runq_assign(svc, trqd);
         if ( on_runq )
         {
@@ -1274,6 +1324,17 @@ static void migrate(const struct scheduler *ops,
     }
 }
 
+/*
+ * It makes sense considering migrating svc to rqd, if:
+ *  - svc is not already flagged to migrate,
+ *  - if svc is allowed to run on at least one of the pcpus of rqd.
+ */
+static bool_t vcpu_is_migrateable(struct csched2_vcpu *svc,
+                                  struct csched2_runqueue_data *rqd)
+{
+    return !(svc->flags & CSFLAG_runq_migrate_request) &&
+           cpumask_intersects(svc->vcpu->cpu_hard_affinity, &rqd->active);
+}
 
 static void balance_load(const struct scheduler *ops, int cpu, s_time_t now)
 {
@@ -1382,8 +1443,7 @@ retry:
 
         __update_svc_load(ops, push_svc, 0, now);
 
-        /* Skip this one if it's already been flagged to migrate */
-        if ( push_svc->flags & CSFLAG_runq_migrate_request )
+        if ( !vcpu_is_migrateable(push_svc, st.orqd) )
             continue;
 
         list_for_each( pull_iter, &st.orqd->svc )
@@ -1395,8 +1455,7 @@ retry:
                 __update_svc_load(ops, pull_svc, 0, now);
             }
         
-            /* Skip this one if it's already been flagged to migrate */
-            if ( pull_svc->flags & CSFLAG_runq_migrate_request )
+            if ( !vcpu_is_migrateable(pull_svc, st.lrqd) )
                 continue;
 
             consider(&st, push_svc, pull_svc);
@@ -1412,8 +1471,7 @@ retry:
     {
         struct csched2_vcpu * pull_svc = list_entry(pull_iter, struct csched2_vcpu, rqd_elem);
         
-        /* Skip this one if it's already been flagged to migrate */
-        if ( pull_svc->flags & CSFLAG_runq_migrate_request )
+        if ( !vcpu_is_migrateable(pull_svc, st.lrqd) )
             continue;
 
         /* Consider pull only */
@@ -1452,11 +1510,22 @@ csched2_vcpu_migrate(
 
     /* Check if new_cpu is valid */
     BUG_ON(!cpumask_test_cpu(new_cpu, &CSCHED2_PRIV(ops)->initialized));
+    ASSERT(cpumask_test_cpu(new_cpu, vc->cpu_hard_affinity));
 
     trqd = RQD(ops, new_cpu);
 
+    /*
+     * Do the actual movement toward new_cpu, and update vc->processor.
+     * If we are changing runqueue, migrate() takes care of everything.
+     * If we are not changing runqueue, we need to update vc->processor
+     * here. In fact, if, for instance, we are here because the vcpu's
+     * hard affinity changed, we don't want to risk leaving vc->processor
+     * pointing to a pcpu where we can't run any longer.
+     */
     if ( trqd != svc->rqd )
         migrate(ops, svc, trqd, NOW());
+    else
+        vc->processor = new_cpu;
 }
 
 static int
@@ -1678,6 +1747,10 @@ runq_candidate(struct csched2_runqueue_data *rqd,
     list_for_each( iter, &rqd->runq )
     {
         struct csched2_vcpu * svc = list_entry(iter, struct csched2_vcpu, runq_elem);
+
+        /* Only consider vcpus that are allowed to run on this processor. */
+        if ( !cpumask_test_cpu(cpu, svc->vcpu->cpu_hard_affinity) )
+            continue;
 
         /* If this is on a different processor, don't pull it unless
          * its credit is at least CSCHED2_MIGRATE_RESIST higher. */
