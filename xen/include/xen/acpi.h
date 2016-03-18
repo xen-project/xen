@@ -49,7 +49,7 @@
                 (!(entry)) || (unsigned long)(entry) + sizeof(*(entry)) > (end) ||  \
                 (entry)->header.length < sizeof(*(entry)))
 
-#ifdef CONFIG_ACPI_BOOT
+#ifdef CONFIG_ACPI
 
 enum acpi_interrupt_id {
 	ACPI_INTERRUPT_PMI	= 1,
@@ -107,7 +107,7 @@ extern int acpi_mp_config;
 
 extern u32 pci_mmcfg_base_addr;
 
-#else	/*!CONFIG_ACPI_BOOT*/
+#else	/*!CONFIG_ACPI*/
 
 #define acpi_mp_config	0
 
@@ -121,7 +121,7 @@ static inline int acpi_boot_table_init(void)
 	return 0;
 }
 
-#endif 	/*!CONFIG_ACPI_BOOT*/
+#endif 	/*!CONFIG_ACPI*/
 
 int get_cpu_id(u32 acpi_id);
 

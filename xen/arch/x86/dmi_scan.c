@@ -498,9 +498,7 @@ static __init int reset_videomode_after_s3(struct dmi_blacklist *d)
 }
 #endif
 
-
-#ifdef	CONFIG_ACPI_BOOT
-static __init __attribute__((unused)) int dmi_disable_acpi(struct dmi_blacklist *d) 
+static __init int dmi_disable_acpi(struct dmi_blacklist *d) 
 { 
 	if (!acpi_force) { 
 		printk(KERN_NOTICE "%s detected: acpi off\n",d->ident);
@@ -515,7 +513,7 @@ static __init __attribute__((unused)) int dmi_disable_acpi(struct dmi_blacklist 
 /*
  * Limit ACPI to CPU enumeration for HT
  */
-static __init __attribute__((unused)) int force_acpi_ht(struct dmi_blacklist *d) 
+static __init int force_acpi_ht(struct dmi_blacklist *d) 
 { 
 	if (!acpi_force) { 
 		printk(KERN_NOTICE "%s detected: force use of acpi=ht\n", d->ident);
@@ -527,7 +525,6 @@ static __init __attribute__((unused)) int force_acpi_ht(struct dmi_blacklist *d)
 	}
 	return 0;
 } 
-#endif
 
 /*
  *	Process the DMI blacklists
@@ -564,7 +561,6 @@ static __initdata struct dmi_blacklist dmi_blacklist[]={
 		}
 	},
 
-#ifdef	CONFIG_ACPI_BOOT
 	/*
 	 * If your system is blacklisted here, but you find that acpi=force
 	 * works for you, please contact acpi-devel@sourceforge.net
@@ -642,8 +638,6 @@ static __initdata struct dmi_blacklist dmi_blacklist[]={
 			MATCH(DMI_BOARD_VENDOR, "IBM"),
 			MATCH(DMI_PRODUCT_NAME, "eserver xSeries 440"),
 			NO_MATCH, NO_MATCH }},
-
-#endif	// CONFIG_ACPI_BOOT
 
 	{ NULL, }
 };

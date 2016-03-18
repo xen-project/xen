@@ -2096,7 +2096,6 @@ void ioapic_resume(void)
                           ACPI-based IOAPIC Configuration
    -------------------------------------------------------------------------- */
 
-#ifdef CONFIG_ACPI_BOOT
 
 int __init io_apic_get_unique_id (int ioapic, int apic_id)
 {
@@ -2264,8 +2263,6 @@ int io_apic_set_pci_routing (int ioapic, int pin, int irq, int edge_level, int a
 
     return 0;
 }
-
-#endif /*CONFIG_ACPI_BOOT*/
 
 static int ioapic_physbase_to_id(unsigned long physbase)
 {
