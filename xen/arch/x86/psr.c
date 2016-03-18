@@ -120,7 +120,7 @@ static void __init init_psr_cmt(unsigned int rmid_max)
     unsigned int eax, ebx, ecx, edx;
     unsigned int rmid;
 
-    if ( !boot_cpu_has(X86_FEATURE_CMT) )
+    if ( !boot_cpu_has(X86_FEATURE_PQM) )
         return;
 
     cpuid_count(0xf, 0, &eax, &ebx, &ecx, &edx);
@@ -589,7 +589,7 @@ static void cat_cpu_init(void)
     uint64_t val;
     const struct cpuinfo_x86 *c = cpu_data + cpu;
 
-    if ( !cpu_has(c, X86_FEATURE_CAT) || c->cpuid_level < PSR_CPUID_LEVEL_CAT )
+    if ( !cpu_has(c, X86_FEATURE_PQE) || c->cpuid_level < PSR_CPUID_LEVEL_CAT )
         return;
 
     socket = cpu_to_socket(cpu);

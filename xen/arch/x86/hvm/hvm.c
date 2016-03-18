@@ -2032,7 +2032,7 @@ unsigned long hvm_cr4_guest_reserved_bits(const struct vcpu *v,bool_t restore)
              (leaf1_edx & cpufeat_mask(X86_FEATURE_SSE) ?
               X86_CR4_OSXMMEXCPT : 0) |
              ((restore || nestedhvm_enabled(v->domain)) &&
-              (leaf1_ecx & cpufeat_mask(X86_FEATURE_VMXE)) ?
+              (leaf1_ecx & cpufeat_mask(X86_FEATURE_VMX)) ?
               X86_CR4_VMXE : 0) |
              (leaf7_0_ebx & cpufeat_mask(X86_FEATURE_FSGSBASE) ?
               X86_CR4_FSGSBASE : 0) |

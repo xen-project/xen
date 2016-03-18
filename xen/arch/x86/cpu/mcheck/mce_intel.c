@@ -85,7 +85,7 @@ static int intel_thermal_supported(struct cpuinfo_x86 *c)
 {
     if (!cpu_has_apic)
         return 0;
-    if (!cpu_has(c, X86_FEATURE_ACPI) || !cpu_has(c, X86_FEATURE_ACC))
+    if (!cpu_has(c, X86_FEATURE_ACPI) || !cpu_has(c, X86_FEATURE_TM1))
         return 0;
     return 1;
 }

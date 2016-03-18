@@ -101,7 +101,7 @@ int arch_acpi_set_pdc_bits(u32 acpi_id, u32 *pdc, u32 mask)
 
 	pdc[2] |= ACPI_PDC_C_CAPABILITY_SMP & mask;
 
-	if (cpu_has(c, X86_FEATURE_EST))
+	if (cpu_has(c, X86_FEATURE_EIST))
 		pdc[2] |= ACPI_PDC_EST_CAPABILITY_SWSMP & mask;
 
 	if (cpu_has(c, X86_FEATURE_ACPI))
@@ -111,7 +111,7 @@ int arch_acpi_set_pdc_bits(u32 acpi_id, u32 *pdc, u32 mask)
 	 * If mwait/monitor or its break-on-interrupt extension are
 	 * unsupported, Cx_FFH will be disabled.
 	 */
-	if (!cpu_has(c, X86_FEATURE_MWAIT) ||
+	if (!cpu_has(c, X86_FEATURE_MONITOR) ||
 	    c->cpuid_level < CPUID_MWAIT_LEAF)
 		ecx = 0;
 	else if (c == &boot_cpu_data || cpu == smp_processor_id())

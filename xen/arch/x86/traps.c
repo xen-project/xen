@@ -954,16 +954,16 @@ void pv_cpuid(struct cpu_user_regs *regs)
         if ( !cpu_has_sep )
             __clear_bit(X86_FEATURE_SEP, &d);
         __clear_bit(X86_FEATURE_DS, &d);
-        __clear_bit(X86_FEATURE_ACC, &d);
+        __clear_bit(X86_FEATURE_TM1, &d);
         __clear_bit(X86_FEATURE_PBE, &d);
         if ( is_pvh_domain(currd) )
             __clear_bit(X86_FEATURE_MTRR, &d);
 
         __clear_bit(X86_FEATURE_DTES64 % 32, &c);
-        __clear_bit(X86_FEATURE_MWAIT % 32, &c);
+        __clear_bit(X86_FEATURE_MONITOR % 32, &c);
         __clear_bit(X86_FEATURE_DSCPL % 32, &c);
-        __clear_bit(X86_FEATURE_VMXE % 32, &c);
-        __clear_bit(X86_FEATURE_SMXE % 32, &c);
+        __clear_bit(X86_FEATURE_VMX % 32, &c);
+        __clear_bit(X86_FEATURE_SMX % 32, &c);
         __clear_bit(X86_FEATURE_TM2 % 32, &c);
         if ( is_pv_32bit_domain(currd) )
             __clear_bit(X86_FEATURE_CX16 % 32, &c);
@@ -1047,7 +1047,7 @@ void pv_cpuid(struct cpu_user_regs *regs)
         __clear_bit(X86_FEATURE_LWP % 32, &c);
         __clear_bit(X86_FEATURE_NODEID_MSR % 32, &c);
         __clear_bit(X86_FEATURE_TOPOEXT % 32, &c);
-        __clear_bit(X86_FEATURE_MWAITX % 32, &c);
+        __clear_bit(X86_FEATURE_MONITORX % 32, &c);
         break;
 
     case 0x0000000a: /* Architectural Performance Monitor Features (Intel) */

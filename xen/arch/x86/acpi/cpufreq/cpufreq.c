@@ -63,7 +63,7 @@ static int check_est_cpu(unsigned int cpuid)
     struct cpuinfo_x86 *cpu = &cpu_data[cpuid];
 
     if (cpu->x86_vendor != X86_VENDOR_INTEL ||
-        !cpu_has(cpu, X86_FEATURE_EST))
+        !cpu_has(cpu, X86_FEATURE_EIST))
         return 0;
 
     return 1;

@@ -452,7 +452,7 @@ void detect_ht(struct cpuinfo_x86 *c)
 	u32 	eax, ebx, ecx, edx;
 	int 	index_msb, core_bits;
 
-	if (!cpu_has(c, X86_FEATURE_HT) ||
+	if (!cpu_has(c, X86_FEATURE_HTT) ||
 	    cpu_has(c, X86_FEATURE_CMP_LEGACY) ||
 	    cpu_has(c, X86_FEATURE_XTOPOLOGY))
 		return;
@@ -510,7 +510,7 @@ unsigned int __init apicid_to_socket(unsigned int apicid)
 		return _phys_pkg_id(apicid, core_plus_mask_width);
 	}
 
-	if (boot_cpu_has(X86_FEATURE_HT) &&
+	if (boot_cpu_has(X86_FEATURE_HTT) &&
 	    !boot_cpu_has(X86_FEATURE_CMP_LEGACY)) {
 		unsigned int num_siblings = (cpuid_ebx(1) & 0xff0000) >> 16;
 

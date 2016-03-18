@@ -511,7 +511,7 @@ static void init_amd(struct cpuinfo_x86 *c)
 
 	/* Pointless to use MWAIT on Family10 as it does not deep sleep. */
 	if (c->x86 == 0x10)
-		__clear_bit(X86_FEATURE_MWAIT, c->x86_capability);
+		__clear_bit(X86_FEATURE_MONITOR, c->x86_capability);
 
 	if (!cpu_has_amd_erratum(c, AMD_ERRATUM_121))
 		opt_allow_unsafe = 1;

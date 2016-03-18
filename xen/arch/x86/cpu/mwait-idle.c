@@ -746,7 +746,7 @@ static const struct idle_cpu idle_cpu_avn = {
 };
 
 #define ICPU(model, cpu) \
-    { X86_VENDOR_INTEL, 6, model, X86_FEATURE_MWAIT, \
+    { X86_VENDOR_INTEL, 6, model, X86_FEATURE_MONITOR, \
         &idle_cpu_##cpu}
 
 static const struct x86_cpu_id intel_idle_ids[] __initconst = {

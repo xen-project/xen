@@ -1815,7 +1815,7 @@ int nvmx_msr_read_intercept(unsigned int msr, u64 *msr_content)
 
     /* VMX capablity MSRs are available only when guest supports VMX. */
     hvm_cpuid(0x1, NULL, NULL, &ecx, &edx);
-    if ( !(ecx & cpufeat_mask(X86_FEATURE_VMXE)) )
+    if ( !(ecx & cpufeat_mask(X86_FEATURE_VMX)) )
         return 0;
 
     /*
@@ -1965,9 +1965,9 @@ int nvmx_msr_read_intercept(unsigned int msr, u64 *msr_content)
             data |= X86_CR4_OSFXSR;
         if ( edx & cpufeat_mask(X86_FEATURE_SSE) )
             data |= X86_CR4_OSXMMEXCPT;
-        if ( ecx & cpufeat_mask(X86_FEATURE_VMXE) )
+        if ( ecx & cpufeat_mask(X86_FEATURE_VMX) )
             data |= X86_CR4_VMXE;
-        if ( ecx & cpufeat_mask(X86_FEATURE_SMXE) )
+        if ( ecx & cpufeat_mask(X86_FEATURE_SMX) )
             data |= X86_CR4_SMXE;
         if ( ecx & cpufeat_mask(X86_FEATURE_PCID) )
             data |= X86_CR4_PCIDE;
