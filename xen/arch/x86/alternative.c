@@ -174,7 +174,7 @@ static void __init apply_alternatives(struct alt_instr *start, struct alt_instr 
         memcpy(insnbuf, replacement, a->replacementlen);
 
         /* 0xe8/0xe9 are relative branches; fix the offset. */
-        if ( (*insnbuf & 0xfe) == 0xe8 && a->replacementlen == 5 )
+        if ( a->replacementlen >= 5 && (*insnbuf & 0xfe) == 0xe8 )
             *(s32 *)(insnbuf + 1) += replacement - instr;
 
         add_nops(insnbuf + a->replacementlen,
