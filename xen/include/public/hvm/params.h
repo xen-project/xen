@@ -115,12 +115,17 @@
 #define _HVMPV_hcall_remote_tlb_flush 4
 #define HVMPV_hcall_remote_tlb_flush (1 << _HVMPV_hcall_remote_tlb_flush)
 
+/* Use APIC assist */
+#define _HVMPV_apic_assist 5
+#define HVMPV_apic_assist (1 << _HVMPV_apic_assist)
+
 #define HVMPV_feature_mask \
         (HVMPV_base_freq | \
          HVMPV_no_freq | \
          HVMPV_time_ref_count | \
          HVMPV_reference_tsc | \
-         HVMPV_hcall_remote_tlb_flush)
+         HVMPV_hcall_remote_tlb_flush | \
+         HVMPV_apic_assist)
 
 #endif
 

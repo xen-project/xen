@@ -1568,10 +1568,20 @@ This set incorporates use of hypercalls for remote TLB flushing.
 This enlightenment may improve performance of Windows guests running
 on hosts with higher levels of (physical) CPU contention.
 
+=item B<apic_assist>
+
+This set incorporates use of the APIC assist page to avoid EOI of
+the local APIC.
+This enlightenment may improve performance of guests that make use of
+per-vcpu event channel upcall vectors.
+Note that this enlightenment will have no effect if the guest is
+using APICv posted interrupts.
+
 =item B<defaults>
 
 This is a special value that enables the default set of groups, which
-is currently the B<base>, B<freq> and B<time_ref_count> groups.
+is currently the B<base>, B<freq>, B<time_ref_count> and B<apic_assist>
+groups.
 
 =item B<all>
 

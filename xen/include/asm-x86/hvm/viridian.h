@@ -24,6 +24,7 @@ struct viridian_vcpu
     struct {
         union viridian_apic_assist msr;
         void *va;
+        int vector;
     } apic_assist;
 };
 
@@ -121,6 +122,10 @@ void viridian_time_ref_count_freeze(struct domain *d);
 void viridian_time_ref_count_thaw(struct domain *d);
 
 void viridian_vcpu_deinit(struct vcpu *v);
+
+void viridian_start_apic_assist(struct vcpu *v, int vector);
+int viridian_complete_apic_assist(struct vcpu *v);
+void viridian_abort_apic_assist(struct vcpu *v);
 
 #endif /* __ASM_X86_HVM_VIRIDIAN_H__ */
 

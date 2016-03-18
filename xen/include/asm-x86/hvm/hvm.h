@@ -402,6 +402,9 @@ static inline unsigned long hvm_get_shadow_gs_base(struct vcpu *v)
 #define has_viridian_time_ref_count(d) \
     (is_viridian_domain(d) && (viridian_feature_mask(d) & HVMPV_time_ref_count))
 
+#define has_viridian_apic_assist(d) \
+    (is_viridian_domain(d) && (viridian_feature_mask(d) & HVMPV_apic_assist))
+
 void hvm_hypervisor_cpuid_leaf(uint32_t sub_idx,
                                uint32_t *eax, uint32_t *ebx,
                                uint32_t *ecx, uint32_t *edx);

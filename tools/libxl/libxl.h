@@ -224,6 +224,12 @@
 #define LIBXL_HAVE_SOFT_RESET 1
 
 /*
+ * LIBXL_HAVE_APIC_ASSIST indicates that the 'apic_assist' value
+ * is present in the viridian enlightenment enumeration.
+ */
+#define LIBXL_HAVE_APIC_ASSIST 1
+
+/*
  * libxl ABI compatibility
  *
  * The only guarantee which libxl makes regarding ABI compatibility

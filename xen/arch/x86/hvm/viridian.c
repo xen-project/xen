@@ -227,11 +227,6 @@ static void initialize_apic_assist(struct vcpu *v)
     void *va;
 
     /*
-     * We don't yet make use of the APIC assist page but by setting
-     * the CPUID3A_MSR_APIC_ACCESS bit in CPUID leaf 40000003 we are duty
-     * bound to support the MSR. We therefore do just enough to keep windows
-     * happy.
-     *
      * See section 13.3.4.1 of the specification for details of this
      * enlightenment.
      */
@@ -254,7 +249,15 @@ static void initialize_apic_assist(struct vcpu *v)
 
     *(uint32_t *)va = 0;
 
-    v->arch.hvm_vcpu.viridian.apic_assist.va = va;
+    if ( viridian_feature_mask(v->domain) & HVMPV_apic_assist )
+    {
+        v->arch.hvm_vcpu.viridian.apic_assist.va = va;
+        v->arch.hvm_vcpu.viridian.apic_assist.vector = -1;
+        return;
+    }
+
+    unmap_domain_page_global(va);
+    put_page_and_type(page);
     return;
 
  fail:
@@ -276,6 +279,53 @@ static void teardown_apic_assist(struct vcpu *v)
 
     unmap_domain_page_global(va);
     put_page_and_type(page);
+}
+
+void viridian_start_apic_assist(struct vcpu *v, int vector)
+{
+    uint32_t *va = v->arch.hvm_vcpu.viridian.apic_assist.va;
+
+    if ( !va )
+        return;
+
+    /*
+     * If there is already an assist pending then something has gone
+     * wrong and the VM will most likely hang so force a crash now
+     * to make the problem clear.
+     */
+    if ( v->arch.hvm_vcpu.viridian.apic_assist.vector >= 0 )
+        domain_crash(v->domain);
+
+    v->arch.hvm_vcpu.viridian.apic_assist.vector = vector;
+    *va |= 1u;
+}
+
+int viridian_complete_apic_assist(struct vcpu *v)
+{
+    uint32_t *va = v->arch.hvm_vcpu.viridian.apic_assist.va;
+    int vector;
+
+    if ( !va )
+        return -1;
+
+    if ( *va & 1u )
+        return -1; /* Interrupt not yet processed by the guest. */
+
+    vector = v->arch.hvm_vcpu.viridian.apic_assist.vector;
+    v->arch.hvm_vcpu.viridian.apic_assist.vector = -1;
+
+    return vector;
+}
+
+void viridian_abort_apic_assist(struct vcpu *v)
+{
+    uint32_t *va = v->arch.hvm_vcpu.viridian.apic_assist.va;
+
+    if ( !va )
+        return;
+
+    *va &= ~1u;
+    v->arch.hvm_vcpu.viridian.apic_assist.vector = -1;
 }
 
 static void update_reference_tsc(struct domain *d, bool_t initialize)
