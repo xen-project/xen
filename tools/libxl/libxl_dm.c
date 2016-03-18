@@ -751,6 +751,51 @@ static int libxl__dm_runas_helper(libxl__gc *gc, const char *username)
     }
 }
 
+/* colo mode */
+enum {
+    LIBXL__COLO_NONE = 0,
+};
+
+static char *qemu_disk_scsi_drive_string(libxl__gc *gc, const char *pdev_path,
+                                         int unit, const char *format,
+                                         const libxl_device_disk *disk,
+                                         int colo_mode)
+{
+    char *drive = NULL;
+
+    switch (colo_mode) {
+    case LIBXL__COLO_NONE:
+        drive = libxl__sprintf
+            (gc, "file=%s,if=scsi,bus=0,unit=%d,format=%s,cache=writeback",
+             pdev_path, unit, format);
+        break;
+    default:
+         abort();
+    }
+
+    return drive;
+}
+
+static char *qemu_disk_ide_drive_string(libxl__gc *gc, const char *pdev_path,
+                                        int unit, const char *format,
+                                        const libxl_device_disk *disk,
+                                        int colo_mode)
+{
+    char *drive = NULL;
+
+    switch (colo_mode) {
+    case LIBXL__COLO_NONE:
+        drive = GCSPRINTF
+            ("file=%s,if=ide,index=%d,media=disk,format=%s,cache=writeback",
+             pdev_path, unit, format);
+        break;
+    default:
+         abort();
+    }
+
+    return drive;
+}
+
 static int libxl__build_device_model_args_new(libxl__gc *gc,
                                         const char *dm, int guest_domid,
                                         const libxl_domain_config *guest_config,
@@ -1170,6 +1215,7 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
             const char *format = qemu_disk_format_string(disks[i].format);
             char *drive;
             const char *pdev_path;
+            int colo_mode;
 
             if (dev_number == -1) {
                 LOG(WARN, "unable to determine"" disk number for %s",
@@ -1214,10 +1260,13 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
                  * For other disks we translate devices 0..3 into
                  * hd[a-d] and ignore the rest.
                  */
+
+                colo_mode = LIBXL__COLO_NONE;
                 if (strncmp(disks[i].vdev, "sd", 2) == 0) {
-                    drive = libxl__sprintf
-                        (gc, "file=%s,if=scsi,bus=0,unit=%d,format=%s,readonly=%s,cache=writeback",
-                         pdev_path, disk, format, disks[i].readwrite ? "off" : "on");
+                    drive = qemu_disk_scsi_drive_string(gc, pdev_path, disk,
+                                                        format,
+                                                        &disks[i],
+                                                        colo_mode);
                 } else if (strncmp(disks[i].vdev, "xvd", 3) == 0) {
                     /*
                      * Do not add any emulated disk when PV disk are
@@ -1240,12 +1289,16 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
                         LOG(ERROR, "qemu-xen doesn't support read-only IDE disk drivers");
                         return ERROR_INVAL;
                     }
-                    drive = libxl__sprintf
-                        (gc, "file=%s,if=ide,index=%d,media=disk,format=%s,cache=writeback",
-                         pdev_path, disk, format);
+                    drive = qemu_disk_ide_drive_string(gc, pdev_path, disk,
+                                                       format,
+                                                       &disks[i],
+                                                       colo_mode);
                 } else {
                     continue; /* Do not emulate this disk */
                 }
+
+                if (!drive)
+                    continue;
             }
 
             flexarray_append(dm_args, "-drive");
