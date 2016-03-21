@@ -450,12 +450,43 @@ Print huge (!) amount of debug during the migration process.
 Enable Remus HA or COLO HA for domain. By default B<xl> relies on ssh as a
 transport mechanism between the two hosts.
 
-N.B: Remus support in xl is still in experimental (proof-of-concept) phase.
-     Disk replication support is limited to DRBD disks.
+B<NOTES>
 
-     COLO support in xl is still in experimental (proof-of-concept) phase.
-     There is no support for network or disk, so the guest will corrupt its
-     disk and confuse its network peers at the moment.
+=over 4
+
+Remus support in xl is still in experimental (proof-of-concept) phase.
+Disk replication support is limited to DRBD disks.
+
+COLO support in xl is still in experimental (proof-of-concept) phase.
+There is no support for network, so the guest will confuse its network
+peers at the moment.
+
+=back
+
+B<EXAMPLE>
+
+=over 4
+
+(a) An example for COLO replication's configuration: disk =['...,colo,colo-host
+=xxx,colo-port=xxx,colo-export=xxx,active-disk=xxx,hidden-disk=xxx...']
+
+=item B<colo-host>      :Secondary host's ip address.
+
+=item B<colo-port>      :Secondary host's port, we will run a nbd server on
+secondary host, and the nbd server will listen this port.
+
+=item B<colo-export>    :Nbd server's disk export name of secondary host.
+
+=item B<active-disk>    :Secondary's guest write will be buffered in this disk,
+and it's used by secondary.
+
+=item B<hidden-disk>    :Primary's modified contents will be buffered in this
+disk, and it's used by secondary.
+
+Note that the COLO configuration settings should be considered unstable. They
+may change incompatibly in future versions of Xen.
+
+=back
 
 B<OPTIONS>
 

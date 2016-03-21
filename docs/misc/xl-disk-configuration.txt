@@ -234,6 +234,61 @@ were intentionally created non-sparse to avoid fragmentation of the
 file.
 
 
+===============
+COLO PARAMETERS
+===============
+
+
+colo
+----
+
+Enable COLO HA for disk. For better understanding block replication on
+QEMU, please refer to:
+http://wiki.qemu.org/Features/BlockReplication
+Note that the COLO configuration settings should be considered unstable.
+They may change incompatibly in future versions of Xen.
+
+
+colo-host
+---------
+
+Description:           Secondary host's address
+Mandatory:             Yes when COLO enabled
+
+
+colo-port
+---------
+
+Description:           Secondary port
+                       We will run a nbd server on secondary host,
+                       and the nbd server will listen this port.
+Mandatory:             Yes when COLO enabled
+
+
+colo-export
+-----------
+
+Description:           We will run a nbd server on secondary host,
+                       exportname is the nbd server's disk export name.
+Mandatory:             Yes when COLO enabled
+
+
+active-disk
+-----------
+
+Description:           This is used by secondary. Secondary guest's write
+                       will be buffered in this disk.
+Mandatory:             Yes when COLO enabled
+
+
+hidden-disk
+-----------
+
+Description:           This is used by secondary. It buffers the original
+                       content that is modified by the primary VM.
+Mandatory:             Yes when COLO enabled
+
+
 ============================================
 DEPRECATED PARAMETERS, PREFIXES AND SYNTAXES
 ============================================

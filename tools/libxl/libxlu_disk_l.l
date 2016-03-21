@@ -113,6 +113,16 @@ static void setbackendtype(DiskParseContext *dpc, const char *str) {
     else xlu__disk_err(dpc,str,"unknown value for backendtype");
 }
 
+/* Sets ->colo-port from the string.  COLO need this. */
+static void setcoloport(DiskParseContext *dpc, const char *str) {
+    int port = atoi(str);
+    if (port) {
+       dpc->disk->colo_port = port;
+    } else {
+	xlu__disk_err(dpc,str,"unknown value for colo_port");
+    }
+}
+
 #define DEPRECATE(usewhatinstead) /* not currently reported */
 
 /* Handles a vdev positional parameter which includes a devtype. */
@@ -176,6 +186,15 @@ script=[^,]*,?	{ STRIP(','); SAVESTRING("script", script, FROMEQUALS); }
 direct-io-safe,? { DPC->disk->direct_io_safe = 1; }
 discard,?	{ libxl_defbool_set(&DPC->disk->discard_enable, true); }
 no-discard,?	{ libxl_defbool_set(&DPC->disk->discard_enable, false); }
+ /* Note that the COLO configuration settings should be considered unstable.
+  * They may change incompatibly in future versions of Xen. */
+colo,?		{ libxl_defbool_set(&DPC->disk->colo_enable, true); }
+no-colo,?	{ libxl_defbool_set(&DPC->disk->colo_enable, false); }
+colo-host=[^,]*,?	{ STRIP(','); SAVESTRING("colo-host", colo_host, FROMEQUALS); }
+colo-port=[^,]*,?	{ STRIP(','); setcoloport(DPC, FROMEQUALS); }
+colo-export=[^,]*,?	{ STRIP(','); SAVESTRING("colo-export", colo_export, FROMEQUALS); }
+active-disk=[^,]*,?	{ STRIP(','); SAVESTRING("active-disk", active_disk, FROMEQUALS); }
+hidden-disk=[^,]*,?	{ STRIP(','); SAVESTRING("hidden-disk", hidden_disk, FROMEQUALS); }
 
  /* the target magic parameter, eats the rest of the string */
 

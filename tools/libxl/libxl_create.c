@@ -1876,12 +1876,30 @@ static void domain_create_cb(libxl__egc *egc,
 
     libxl__ao_complete(egc, ao, rc);
 }
-    
+
+
+static void set_disk_colo_restore(libxl_domain_config *d_config)
+{
+    int i;
+
+    for (i = 0; i < d_config->num_disks; i++)
+        libxl_defbool_set(&d_config->disks[i].colo_restore_enable, true);
+}
+
+static void unset_disk_colo_restore(libxl_domain_config *d_config)
+{
+    int i;
+
+    for (i = 0; i < d_config->num_disks; i++)
+        libxl_defbool_set(&d_config->disks[i].colo_restore_enable, false);
+}
+
 int libxl_domain_create_new(libxl_ctx *ctx, libxl_domain_config *d_config,
                             uint32_t *domid,
                             const libxl_asyncop_how *ao_how,
                             const libxl_asyncprogress_how *aop_console_how)
 {
+    unset_disk_colo_restore(d_config);
     return do_domain_create(ctx, d_config, domid, -1, -1, NULL,
                             ao_how, aop_console_how);
 }
@@ -1893,6 +1911,12 @@ int libxl_domain_create_restore(libxl_ctx *ctx, libxl_domain_config *d_config,
                                 const libxl_asyncop_how *ao_how,
                                 const libxl_asyncprogress_how *aop_console_how)
 {
+    if (params->checkpointed_stream == LIBXL_CHECKPOINTED_STREAM_COLO) {
+        set_disk_colo_restore(d_config);
+    } else {
+        unset_disk_colo_restore(d_config);
+    }
+
     return do_domain_create(ctx, d_config, domid, restore_fd, send_back_fd,
                             params, ao_how, aop_console_how);
 }
