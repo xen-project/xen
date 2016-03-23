@@ -252,7 +252,7 @@ QEMU_TRADITIONAL_URL ?= git://xenbits.xen.org/qemu-xen-traditional.git
 SEABIOS_UPSTREAM_URL ?= git://xenbits.xen.org/seabios.git
 endif
 OVMF_UPSTREAM_REVISION ?= 52a99493cce88a9d4ec8a02d7f1bd1a1001ce60d
-QEMU_UPSTREAM_REVISION ?= qemu-xen-4.5.2
+QEMU_UPSTREAM_REVISION ?= qemu-xen-4.5.3
 SEABIOS_UPSTREAM_REVISION ?= rel-1.7.5
 # Thu May 22 16:59:16 2014 -0400
 # python3 fixes for vgabios and csm builds.
@@ -260,7 +260,7 @@ SEABIOS_UPSTREAM_REVISION ?= rel-1.7.5
 ETHERBOOT_NICS ?= rtl8139 8086100e
 
 
-QEMU_TRADITIONAL_REVISION ?= f5bf3ed6eaa752d91e4d1fb1675b4c3e9f984c71
+QEMU_TRADITIONAL_REVISION ?= xen-4.5.3
 # Mon Jan 4 15:34:29 2016 +0000
 # MSI-X: avoid array overrun upon MSI-X table writes
 
