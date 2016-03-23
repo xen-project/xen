@@ -56,6 +56,8 @@ SECTIONS
 
 #ifdef EFI
   . = ALIGN(MB(2));
+#else
+  . = ALIGN(PAGE_SIZE);
 #endif
   __2M_text_end = .;
 
@@ -99,6 +101,8 @@ SECTIONS
 
 #ifdef EFI
   . = ALIGN(MB(2));
+#else
+  . = ALIGN(PAGE_SIZE);
 #endif
   __2M_rodata_end = .;
 
@@ -168,6 +172,8 @@ SECTIONS
 
 #ifdef EFI
   . = ALIGN(MB(2));
+#else
+  . = ALIGN(PAGE_SIZE);
 #endif
   __2M_init_end = .;
 
@@ -212,6 +218,8 @@ SECTIONS
 
 #ifdef EFI
   . = ALIGN(MB(2));
+#else
+  . = ALIGN(PAGE_SIZE);
 #endif
   __2M_rwdata_end = .;
 
@@ -270,6 +278,14 @@ ASSERT(IS_ALIGNED(__2M_init_start,   MB(2)), "__2M_init_start misaligned")
 ASSERT(IS_ALIGNED(__2M_init_end,     MB(2)), "__2M_init_end misaligned")
 ASSERT(IS_ALIGNED(__2M_rwdata_start, MB(2)), "__2M_rwdata_start misaligned")
 ASSERT(IS_ALIGNED(__2M_rwdata_end,   MB(2)), "__2M_rwdata_end misaligned")
+#else
+ASSERT(IS_ALIGNED(__2M_text_end,     PAGE_SIZE), "__2M_text_end misaligned")
+ASSERT(IS_ALIGNED(__2M_rodata_start, PAGE_SIZE), "__2M_rodata_start misaligned")
+ASSERT(IS_ALIGNED(__2M_rodata_end,   PAGE_SIZE), "__2M_rodata_end misaligned")
+ASSERT(IS_ALIGNED(__2M_init_start,   PAGE_SIZE), "__2M_init_start misaligned")
+ASSERT(IS_ALIGNED(__2M_init_end,     PAGE_SIZE), "__2M_init_end misaligned")
+ASSERT(IS_ALIGNED(__2M_rwdata_start, PAGE_SIZE), "__2M_rwdata_start misaligned")
+ASSERT(IS_ALIGNED(__2M_rwdata_end,   PAGE_SIZE), "__2M_rwdata_end misaligned")
 #endif
 
 ASSERT(IS_ALIGNED(cpu0_stack, STACK_SIZE), "cpu0_stack misaligned")

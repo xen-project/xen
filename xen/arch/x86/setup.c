@@ -1205,6 +1205,37 @@ void __init noreturn __start_xen(unsigned long mbi_p)
                    ~((1UL << L2_PAGETABLE_SHIFT) - 1);
     destroy_xen_mappings(xen_virt_end, XEN_VIRT_START + BOOTSTRAP_MAP_BASE);
 
+    /*
+     * If not using 2M mappings to gain suitable pagetable permissions
+     * directly from the relocation above, remap the code/data
+     * sections with decreased permissions.
+     */
+    if ( !using_2M_mapping() )
+    {
+        /* Mark .text as RX (avoiding the first 2M superpage). */
+        map_pages_to_xen(XEN_VIRT_START + MB(2),
+                         PFN_DOWN(__pa(XEN_VIRT_START + MB(2))),
+                         PFN_DOWN(__2M_text_end -
+                                  (const char *)(XEN_VIRT_START + MB(2))),
+                         PAGE_HYPERVISOR_RX);
+
+        /* Mark .rodata as RO. */
+        map_pages_to_xen((unsigned long)&__2M_rodata_start,
+                         PFN_DOWN(__pa(__2M_rodata_start)),
+                         PFN_DOWN(__2M_rodata_end - __2M_rodata_start),
+                         PAGE_HYPERVISOR_RO);
+
+        /* Mark .data and .bss as RW. */
+        map_pages_to_xen((unsigned long)&__2M_rwdata_start,
+                         PFN_DOWN(__pa(__2M_rwdata_start)),
+                         PFN_DOWN(__2M_rwdata_end - __2M_rwdata_start),
+                         PAGE_HYPERVISOR_RW);
+
+        /* Drop the remaining mappings in the shattered superpage. */
+        destroy_xen_mappings((unsigned long)&__2M_rwdata_end,
+                             ROUNDUP((unsigned long)&__2M_rwdata_end, MB(2)));
+    }
+
     nr_pages = 0;
     for ( i = 0; i < e820.nr_map; i++ )
         if ( e820.map[i].type == E820_RAM )
