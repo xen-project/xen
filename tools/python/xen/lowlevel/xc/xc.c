@@ -1620,7 +1620,7 @@ static PyObject *pyxc_tmem_control(XcObject *self,
 
     static char *kwd_list[] = { "pool_id", "subop", "cli_id", "arg1", "arg2", "buf", NULL };
 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iiiiiis", kwd_list,
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iiiiis", kwd_list,
                         &pool_id, &subop, &cli_id, &arg1, &arg2, &buf) )
         return NULL;
 
