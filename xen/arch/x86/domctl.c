@@ -714,7 +714,7 @@ long arch_do_domctl(
 
     case XEN_DOMCTL_set_cpuid:
     {
-        xen_domctl_cpuid_t *ctl = &domctl->u.cpuid;
+        const xen_domctl_cpuid_t *ctl = &domctl->u.cpuid;
         cpuid_input_t *cpuid, *unused = NULL;
 
         if ( d == currd ) /* no domain_pause() */
@@ -742,7 +742,12 @@ long arch_do_domctl(
 
         domain_pause(d);
 
-        if ( i < MAX_CPUID_INPUT )
+        if ( !(ctl->eax | ctl->ebx | ctl->ecx | ctl->edx) )
+        {
+            if ( i < MAX_CPUID_INPUT )
+                cpuid->input[0] = XEN_CPUID_INPUT_UNUSED;
+        }
+        else if ( i < MAX_CPUID_INPUT )
             *cpuid = *ctl;
         else if ( unused )
             *unused = *ctl;
