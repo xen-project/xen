@@ -328,11 +328,6 @@ static inline unsigned long read_cr2(void)
     return cr2;
 }
 
-static inline void raw_write_cr4(unsigned long val)
-{
-    asm volatile ( "mov %0,%%cr4" : : "r" (val) );
-}
-
 static inline unsigned long read_cr4(void)
 {
     return get_cpu_info()->cr4;
@@ -341,7 +336,7 @@ static inline unsigned long read_cr4(void)
 static inline void write_cr4(unsigned long val)
 {
     get_cpu_info()->cr4 = val;
-    raw_write_cr4(val);
+    asm volatile ( "mov %0,%%cr4" : : "r" (val) );
 }
 
 /* Clear and set 'TS' bit respectively */
@@ -385,10 +380,10 @@ static inline unsigned int read_pkru(void)
      * so that X86_CR4_PKE  is disabled on hypervisor. To use RDPKRU, CR4.PKE
      * gets temporarily enabled.
      */
-    raw_write_cr4(cr4 | X86_CR4_PKE);
+    write_cr4(cr4 | X86_CR4_PKE);
     asm volatile (".byte 0x0f,0x01,0xee"
         : "=a" (pkru) : "c" (0) : "dx");
-    raw_write_cr4(cr4);
+    write_cr4(cr4);
 
     return pkru;
 }
