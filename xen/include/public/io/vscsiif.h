@@ -60,7 +60,7 @@
  *
  *      A string specifying the backend device: either a 4-tuple "h:c:t:l"
  *      (host, controller, target, lun, all integers), or a WWN (e.g.
- *      "naa.60014054ac780582").
+ *      "naa.60014054ac780582:0").
  *
  * v-dev
  *      Values:         string
