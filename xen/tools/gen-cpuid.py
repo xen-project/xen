@@ -19,6 +19,8 @@ class State(object):
 
         # State calculated
         self.nr_entries = 0 # Number of words in a featureset
+        self.common_1d = 0 # Common features between 1d and e1d
+        self.known = [] # All known features
 
 def parse_definitions(state):
     """
@@ -95,6 +97,22 @@ def crunch_numbers(state):
     # Size of bitmaps
     state.nr_entries = nr_entries = (max(state.names.keys()) >> 5) + 1
 
+    # Features common between 1d and e1d.
+    common_1d = (FPU, VME, DE, PSE, TSC, MSR, PAE, MCE, CX8, APIC,
+                 MTRR, PGE, MCA, CMOV, PAT, PSE36, MMX, FXSR)
+
+    # All known features.  Duplicate the common features in e1d
+    e1d_base = SYSCALL & ~31
+    state.known = featureset_to_uint32s(
+        state.names.keys() + [ e1d_base + (x % 32) for x in common_1d ],
+        nr_entries)
+
+    # Fold common back into names
+    for f in common_1d:
+        state.names[e1d_base + (f % 32)] = "E1D_" + state.names[f]
+
+    state.common_1d = featureset_to_uint32s(common_1d, 1)[0]
+
 
 def write_results(state):
     state.output.write(
@@ -109,7 +127,13 @@ def write_results(state):
     state.output.write(
 """
 #define FEATURESET_NR_ENTRIES %sU
+
+#define CPUID_COMMON_1D_FEATURES %s
+
+#define INIT_KNOWN_FEATURES { \\\n%s\n} 
 """ % (state.nr_entries,
+       state.common_1d,
+       format_uint32s(state.known, 4),
        ))
 
     state.output.write(

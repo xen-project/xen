@@ -341,6 +341,8 @@ void identify_cpu(struct cpuinfo_x86 *c)
 	 * The vendor-specific functions might have changed features.  Now
 	 * we do "generic changes."
 	 */
+	for (i = 0; i < FSCAPINTS; ++i)
+		c->x86_capability[i] &= known_features[i];
 
 	for (i = 0 ; i < NCAPINTS ; ++i)
 		c->x86_capability[i] &= ~cleared_caps[i];
