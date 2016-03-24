@@ -2716,6 +2716,14 @@ static inline void libxl__device_disk_local_init(libxl__disk_local_state *dls)
     dls->rc = 0;
 }
 
+/* 
+ * See if we can find a way to access a disk locally
+ */
+_hidden char * libxl__device_disk_find_local_path(libxl__gc *gc, 
+                                                  const libxl_device_disk *disk,
+                                                  bool qdisk_direct);
+
+
 /* Make a disk available in this (the control) domain. Always calls
  * dls->callback when finished.
  * State Idle -> Attaching

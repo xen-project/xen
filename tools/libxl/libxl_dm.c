@@ -1327,23 +1327,42 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
 
             if (disks[i].format == LIBXL_DISK_FORMAT_EMPTY) {
                 if (!disks[i].is_cdrom) {
-                    LOG(WARN, "cannot support"" empty disk format for %s",
+                    LOG(WARN, "Cannot support empty disk format for %s",
                         disks[i].vdev);
                     continue;
                 }
             } else {
                 if (format == NULL) {
                     LOG(WARN,
-                        "unable to determine"" disk image format %s",
+                        "Unable to determine disk image format: %s\n"
+                        "Disk will be available via PV drivers but not as an"
+                        "emulated disk.",
                         disks[i].vdev);
                     continue;
                 }
 
+                /* 
+                 * We can't call libxl__blktap_devpath from
+                 * libxl__device_disk_find_local_path for now because
+                 * the bootloader is called before the disks are set
+                 * up, so this function would set up a blktap node,
+                 * but there's no TAP tear-down on error conditions in
+                 * the bootloader path.
+                 */
                 if (disks[i].backend == LIBXL_DISK_BACKEND_TAP)
                     target_path = libxl__blktap_devpath(gc, disks[i].pdev_path,
                                                         disks[i].format);
-                else     
-                    target_path = disks[i].pdev_path;
+                else
+                    target_path = libxl__device_disk_find_local_path(gc, 
+                                                            &disks[i], true);
+
+                if (!target_path) {
+                    LOG(WARN, "No way to get local access disk to image: %s\n"
+                        "Disk will be available via PV drivers but not as an"
+                        "emulated disk.",
+                        disks[i].vdev);
+                    continue;
+                }
             }
 
             if (disks[i].is_cdrom) {

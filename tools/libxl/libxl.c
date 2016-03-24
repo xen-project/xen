@@ -3069,8 +3069,9 @@ static char * libxl__alloc_vdev(libxl__gc *gc, void *get_vdev_user,
 
 /* Callbacks */
 
-static char *libxl__device_disk_find_local_path(libxl__gc *gc, 
-                                                const libxl_device_disk *disk)
+char *libxl__device_disk_find_local_path(libxl__gc *gc, 
+                                         const libxl_device_disk *disk,
+                                         bool qdisk_direct)
 {
     char *path = NULL;
 
@@ -3090,6 +3091,16 @@ static char *libxl__device_disk_find_local_path(libxl__gc *gc,
         LOG(DEBUG, "Directly accessing local RAW disk %s", path);
         goto out;
     } 
+
+    /*
+     * If we're being called for a qemu path, we can pass the target
+     * string directly as well
+     */
+    if (qdisk_direct && disk->backend == LIBXL_DISK_BACKEND_QDISK) {
+        path = libxl__strdup(gc, disk->pdev_path);
+        LOG(DEBUG, "Directly accessing local QDISK target %s", path);
+        goto out;
+    }
 
  out:
     return path;
@@ -3115,7 +3126,7 @@ void libxl__device_disk_local_initiate_attach(libxl__egc *egc,
 
     LOG(DEBUG, "Trying to find local path");
 
-    dls->diskpath = libxl__device_disk_find_local_path(gc, in_disk);
+    dls->diskpath = libxl__device_disk_find_local_path(gc, in_disk, false);
     if (dls->diskpath) {
         LOG(DEBUG, "Local path found, executing callback.");
         dls->callback(egc, dls, 0);
