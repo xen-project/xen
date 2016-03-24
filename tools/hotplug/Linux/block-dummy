@@ -1,0 +1,107 @@
+#!/bin/bash -e
+#
+# dummy Xen block device hotplug script
+#
+# Author George Dunlap <george.dunlap@eu.citrix.com>
+#
+# Based on block-iscsi by Roger Pau Monné <roger.pau@citrix.com>
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU Lesser General Public License as published
+# by the Free Software Foundation; version 2.1 only. with the special
+# exception on linking described in file LICENSE.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Lesser General Public License for more details.
+#
+# Usage:
+#
+# Target should be specified using the following syntax:
+#
+# script=block-dummy,vdev=xvda,target=dummy:<file>
+
+dir=$(dirname "$0")
+. "$dir/block-common.sh"
+
+check_tools()
+{
+    if ! command -v losetup > /dev/null 2>&1; then
+        fatal "Unable to find losetup"
+    fi
+}
+
+# Sets the following global variables based on the params field passed in as
+# a parameter: type file
+parse_target()
+{
+    params=($(echo "$1" | tr ":" "\n"))
+
+    type=${params[0]}
+    file=${params[1]}
+    if [ -z "$type" ] || [ -z "$file" ]; then
+        fatal "Cannot parse required parameters"
+    fi
+
+    if [ "$type" != "dummy" ] ; then
+	fatal "Invalid type: $type"
+    fi
+}
+
+# Attaches the device and writes xenstore backend entries to connect
+# the device
+add()
+{
+    test -f "$file" || fatal "$file does not exist."
+
+    loopdev=$(losetup -f 2>/dev/null || find_free_loopback_dev)
+    if [ "$loopdev" = '' ]
+    then
+        fatal 'Failed to find an unused loop device'
+    fi
+    
+    if LANG=C losetup -h 2>&1 | grep read-only >/dev/null
+    then
+        roflag="-$mode"; roflag="${roflag#-w}"; roflag="${roflag#-!}"
+    else
+        roflag=''
+    fi
+
+    do_or_die losetup $roflag "$loopdev" "$file"
+    # FIXME Is this OK?
+    xenstore_write "$XENBUS_PATH/node" "$loopdev"
+    write_dev "$loopdev"
+}
+
+# Disconnects the device
+remove()
+{
+    node=$(xenstore_read "$XENBUS_PATH/node")
+    losetup -d "$node"
+}
+
+command=$1
+target=$(xenstore-read $XENBUS_PATH/params || true)
+if [ -z "$target" ]; then
+    fatal "No information about the target"
+fi
+
+parse_target "$target"
+
+mode=$(xenstore_read "$XENBUS_PATH/mode")
+mode=$(canonicalise_mode "$mode")
+
+check_tools || exit 1
+
+case $command in
+add)
+    add
+    ;;
+remove)
+    remove
+    ;;
+*)
+    exit 1
+    ;;
+esac

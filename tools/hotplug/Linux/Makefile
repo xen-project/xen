@@ -27,6 +27,7 @@ XEN_SCRIPTS += vscsi
 XEN_SCRIPTS += block-iscsi
 XEN_SCRIPTS += block-tap
 XEN_SCRIPTS += block-drbd-probe
+XEN_SCRIPTS += block-dummy
 XEN_SCRIPTS += $(XEN_SCRIPTS-y)
 XEN_SCRIPTS += colo-proxy-setup
 
