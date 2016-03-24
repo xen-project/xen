@@ -133,6 +133,7 @@ struct scheduler {
                                     void *);
     void         (*free_pdata)     (const struct scheduler *, void *, int);
     void *       (*alloc_pdata)    (const struct scheduler *, int);
+    void         (*init_pdata)     (const struct scheduler *, void *, int);
     void         (*free_domdata)   (const struct scheduler *, void *);
     void *       (*alloc_domdata)  (const struct scheduler *, struct domain *);
 
