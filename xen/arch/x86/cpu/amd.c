@@ -294,21 +294,6 @@ int cpu_has_amd_erratum(const struct cpuinfo_x86 *cpu, int osvw_id, ...)
 	return 0;
 }
 
-/* Can this system suffer from TSC drift due to C1 clock ramping? */
-static int c1_ramping_may_cause_clock_drift(struct cpuinfo_x86 *c) 
-{ 
-	if (cpuid_edx(0x80000007) & (1<<8)) {
-		/*
-		 * CPUID.AdvPowerMgmtInfo.TscInvariant
-		 * EDX bit 8, 8000_0007
-		 * Invariant TSC on 8th Gen or newer, use it
-		 * (assume all cores have invariant TSC)
-		 */
-		return 0;
-	}
-	return 1;
-}
-
 /*
  * Disable C1-Clock ramping if enabled in PMM7.CpuLowPwrEnh on 8th-generation
  * cores only. Assume BIOS has setup all Northbridges equivalently.
@@ -475,7 +460,7 @@ static void init_amd(struct cpuinfo_x86 *c)
 	}
 
 	if (c->extended_cpuid_level >= 0x80000007) {
-		if (cpuid_edx(0x80000007) & (1<<8)) {
+		if (cpu_has(c, X86_FEATURE_ITSC)) {
 			__set_bit(X86_FEATURE_CONSTANT_TSC, c->x86_capability);
 			__set_bit(X86_FEATURE_NONSTOP_TSC, c->x86_capability);
 			if (c->x86 != 0x11)
@@ -600,14 +585,14 @@ static void init_amd(struct cpuinfo_x86 *c)
 		wrmsrl(MSR_K7_PERFCTR3, 0);
 	}
 
-	if (cpuid_edx(0x80000007) & (1 << 10)) {
+	if (cpu_has(c, X86_FEATURE_EFRO)) {
 		rdmsr(MSR_K7_HWCR, l, h);
 		l |= (1 << 27); /* Enable read-only APERF/MPERF bit */
 		wrmsr(MSR_K7_HWCR, l, h);
 	}
 
 	/* Prevent TSC drift in non single-processor, single-core platforms. */
-	if ((smp_processor_id() == 1) && c1_ramping_may_cause_clock_drift(c))
+	if ((smp_processor_id() == 1) && !cpu_has(c, X86_FEATURE_ITSC))
 		disable_c1_ramping();
 
 	set_cpuidmask(c);

@@ -281,7 +281,7 @@ static void init_intel(struct cpuinfo_x86 *c)
 	if ((c->x86 == 0xf && c->x86_model >= 0x03) ||
 		(c->x86 == 0x6 && c->x86_model >= 0x0e))
 		__set_bit(X86_FEATURE_CONSTANT_TSC, c->x86_capability);
-	if (cpuid_edx(0x80000007) & (1u<<8)) {
+	if (cpu_has(c, X86_FEATURE_ITSC)) {
 		__set_bit(X86_FEATURE_CONSTANT_TSC, c->x86_capability);
 		__set_bit(X86_FEATURE_NONSTOP_TSC, c->x86_capability);
 		__set_bit(X86_FEATURE_TSC_RELIABLE, c->x86_capability);

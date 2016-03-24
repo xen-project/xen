@@ -2614,7 +2614,7 @@ void domain_cpuid(
              */
             if ( (input == 0x80000007) && /* Advanced Power Management */
                  !d->disable_migrate && !d->arch.vtsc )
-                *edx &= ~(1u<<8); /* TSC Invariant */
+                *edx &= ~cpufeat_mask(X86_FEATURE_ITSC);
 
             return;
         }
