@@ -10,6 +10,7 @@
 #include <xen/types.h>
 
 extern const uint32_t known_features[FSCAPINTS];
+extern const uint32_t special_features[FSCAPINTS];
 
 #endif /* __ASSEMBLY__ */
 #endif /* !__X86_CPUID_H__ */

@@ -71,6 +71,18 @@ enum {
  * CPUID instruction, but this is not preclude other sources of information.
  */
 
+/*
+ * Attribute syntax:
+ *
+ * Attributes for a particular feature are provided as characters before the
+ * first space in the comment immediately following the feature value.
+ *
+ * Special: '!'
+ *   This bit has special properties and is not a straight indication of a
+ *   piece of new functionality.  Xen will handle these differently,
+ *   and may override toolstack settings completely.
+ */
+
 /* Intel-defined CPU features, CPUID level 0x00000001.edx, word 0 */
 XEN_CPUFEATURE(FPU,           0*32+ 0) /*   Onboard FPU */
 XEN_CPUFEATURE(VME,           0*32+ 1) /*   Virtual Mode Extensions */
@@ -81,7 +93,7 @@ XEN_CPUFEATURE(MSR,           0*32+ 5) /*   Model-Specific Registers, RDMSR, WRM
 XEN_CPUFEATURE(PAE,           0*32+ 6) /*   Physical Address Extensions */
 XEN_CPUFEATURE(MCE,           0*32+ 7) /*   Machine Check Architecture */
 XEN_CPUFEATURE(CX8,           0*32+ 8) /*   CMPXCHG8 instruction */
-XEN_CPUFEATURE(APIC,          0*32+ 9) /*   Onboard APIC */
+XEN_CPUFEATURE(APIC,          0*32+ 9) /*!  Onboard APIC */
 XEN_CPUFEATURE(SEP,           0*32+11) /*   SYSENTER/SYSEXIT */
 XEN_CPUFEATURE(MTRR,          0*32+12) /*   Memory Type Range Registers */
 XEN_CPUFEATURE(PGE,           0*32+13) /*   Page Global Enable */
@@ -96,7 +108,7 @@ XEN_CPUFEATURE(MMX,           0*32+23) /*   Multimedia Extensions */
 XEN_CPUFEATURE(FXSR,          0*32+24) /*   FXSAVE and FXRSTOR instructions */
 XEN_CPUFEATURE(SSE,           0*32+25) /*   Streaming SIMD Extensions */
 XEN_CPUFEATURE(SSE2,          0*32+26) /*   Streaming SIMD Extensions-2 */
-XEN_CPUFEATURE(HTT,           0*32+28) /*   Hyper-Threading Technology */
+XEN_CPUFEATURE(HTT,           0*32+28) /*!  Hyper-Threading Technology */
 XEN_CPUFEATURE(TM1,           0*32+29) /*   Thermal Monitor 1 */
 XEN_CPUFEATURE(PBE,           0*32+31) /*   Pending Break Enable */
 
@@ -119,17 +131,17 @@ XEN_CPUFEATURE(PCID,          1*32+17) /*   Process Context ID */
 XEN_CPUFEATURE(DCA,           1*32+18) /*   Direct Cache Access */
 XEN_CPUFEATURE(SSE4_1,        1*32+19) /*   Streaming SIMD Extensions 4.1 */
 XEN_CPUFEATURE(SSE4_2,        1*32+20) /*   Streaming SIMD Extensions 4.2 */
-XEN_CPUFEATURE(X2APIC,        1*32+21) /*   Extended xAPIC */
+XEN_CPUFEATURE(X2APIC,        1*32+21) /*!  Extended xAPIC */
 XEN_CPUFEATURE(MOVBE,         1*32+22) /*   movbe instruction */
 XEN_CPUFEATURE(POPCNT,        1*32+23) /*   POPCNT instruction */
 XEN_CPUFEATURE(TSC_DEADLINE,  1*32+24) /*   TSC Deadline Timer */
 XEN_CPUFEATURE(AESNI,         1*32+25) /*   AES instructions */
 XEN_CPUFEATURE(XSAVE,         1*32+26) /*   XSAVE/XRSTOR/XSETBV/XGETBV */
-XEN_CPUFEATURE(OSXSAVE,       1*32+27) /*   OSXSAVE */
+XEN_CPUFEATURE(OSXSAVE,       1*32+27) /*!  OSXSAVE */
 XEN_CPUFEATURE(AVX,           1*32+28) /*   Advanced Vector Extensions */
 XEN_CPUFEATURE(F16C,          1*32+29) /*   Half-precision convert instruction */
 XEN_CPUFEATURE(RDRAND,        1*32+30) /*   Digital Random Number Generator */
-XEN_CPUFEATURE(HYPERVISOR,    1*32+31) /*   Running under some hypervisor */
+XEN_CPUFEATURE(HYPERVISOR,    1*32+31) /*!  Running under some hypervisor */
 
 /* AMD-defined CPU features, CPUID level 0x80000001.edx, word 2 */
 XEN_CPUFEATURE(SYSCALL,       2*32+11) /*   SYSCALL/SYSRET */
@@ -144,7 +156,7 @@ XEN_CPUFEATURE(3DNOW,         2*32+31) /*   3DNow! */
 
 /* AMD-defined CPU features, CPUID level 0x80000001.ecx, word 3 */
 XEN_CPUFEATURE(LAHF_LM,       3*32+ 0) /*   LAHF/SAHF in long mode */
-XEN_CPUFEATURE(CMP_LEGACY,    3*32+ 1) /*   If yes HyperThreading not valid */
+XEN_CPUFEATURE(CMP_LEGACY,    3*32+ 1) /*!  If yes HyperThreading not valid */
 XEN_CPUFEATURE(SVM,           3*32+ 2) /*   Secure virtual machine */
 XEN_CPUFEATURE(EXTAPIC,       3*32+ 3) /*   Extended APIC space */
 XEN_CPUFEATURE(CR8_LEGACY,    3*32+ 4) /*   CR8 in 32-bit mode */
@@ -177,14 +189,14 @@ XEN_CPUFEATURE(TSC_ADJUST,    5*32+ 1) /*   TSC_ADJUST MSR available */
 XEN_CPUFEATURE(BMI1,          5*32+ 3) /*   1st bit manipulation extensions */
 XEN_CPUFEATURE(HLE,           5*32+ 4) /*   Hardware Lock Elision */
 XEN_CPUFEATURE(AVX2,          5*32+ 5) /*   AVX2 instructions */
-XEN_CPUFEATURE(FDP_EXCP_ONLY, 5*32+ 6) /*   x87 FDP only updated on exception. */
+XEN_CPUFEATURE(FDP_EXCP_ONLY, 5*32+ 6) /*!  x87 FDP only updated on exception. */
 XEN_CPUFEATURE(SMEP,          5*32+ 7) /*   Supervisor Mode Execution Protection */
 XEN_CPUFEATURE(BMI2,          5*32+ 8) /*   2nd bit manipulation extensions */
 XEN_CPUFEATURE(ERMS,          5*32+ 9) /*   Enhanced REP MOVSB/STOSB */
 XEN_CPUFEATURE(INVPCID,       5*32+10) /*   Invalidate Process Context ID */
 XEN_CPUFEATURE(RTM,           5*32+11) /*   Restricted Transactional Memory */
 XEN_CPUFEATURE(PQM,           5*32+12) /*   Platform QoS Monitoring */
-XEN_CPUFEATURE(NO_FPU_SEL,    5*32+13) /*   FPU CS/DS stored as zero */
+XEN_CPUFEATURE(NO_FPU_SEL,    5*32+13) /*!  FPU CS/DS stored as zero */
 XEN_CPUFEATURE(MPX,           5*32+14) /*   Memory Protection Extensions */
 XEN_CPUFEATURE(PQE,           5*32+15) /*   Platform QoS Enforcement */
 XEN_CPUFEATURE(RDSEED,        5*32+18) /*   RDSEED instruction */
@@ -198,7 +210,7 @@ XEN_CPUFEATURE(SHA,           5*32+29) /*   SHA1 & SHA256 instructions */
 /* Intel-defined CPU features, CPUID level 0x00000007:0.ecx, word 6 */
 XEN_CPUFEATURE(PREFETCHWT1,   6*32+ 0) /*   PREFETCHWT1 instruction */
 XEN_CPUFEATURE(PKU,           6*32+ 3) /*   Protection Keys for Userspace */
-XEN_CPUFEATURE(OSPKE,         6*32+ 4) /*   OS Protection Keys Enable */
+XEN_CPUFEATURE(OSPKE,         6*32+ 4) /*!  OS Protection Keys Enable */
 
 /* AMD-defined CPU features, CPUID level 0x80000007.edx, word 7 */
 XEN_CPUFEATURE(ITSC,          7*32+ 8) /*   Invariant TSC */

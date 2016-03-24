@@ -16,11 +16,13 @@ class State(object):
 
         # State parsed from input
         self.names = {} # Name => value mapping
+        self.raw_special = set()
 
         # State calculated
         self.nr_entries = 0 # Number of words in a featureset
         self.common_1d = 0 # Common features between 1d and e1d
         self.known = [] # All known features
+        self.special = [] # Features with special semantics
 
 def parse_definitions(state):
     """
@@ -29,7 +31,8 @@ def parse_definitions(state):
     """
     feat_regex = re.compile(
         r"^XEN_CPUFEATURE\(([A-Z0-9_]+),"
-        "\s+([\s\d]+\*[\s\d]+\+[\s\d]+)\).*$")
+        "\s+([\s\d]+\*[\s\d]+\+[\s\d]+)\)"
+        "\s+/\*([!]*) .*$")
 
     this = sys.modules[__name__]
 
@@ -45,6 +48,7 @@ def parse_definitions(state):
 
         name = res.groups()[0]
         val = eval(res.groups()[1]) # Regex confines this to a very simple expression
+        attr = res.groups()[2]
 
         if hasattr(this, name):
             raise Fail("Duplicate symbol %s" % (name,))
@@ -63,6 +67,13 @@ def parse_definitions(state):
 
         # Construct a reverse mapping of value to name
         state.names[val] = name
+
+        for a in attr:
+
+            if a == "!":
+                state.raw_special.add(val)
+            else:
+                raise Fail("Unrecognised attribute '%s' for %s" % (a, name))
 
     if len(state.names) == 0:
         raise Fail("No features found")
@@ -112,6 +123,7 @@ def crunch_numbers(state):
         state.names[e1d_base + (f % 32)] = "E1D_" + state.names[f]
 
     state.common_1d = featureset_to_uint32s(common_1d, 1)[0]
+    state.special = featureset_to_uint32s(state.raw_special, nr_entries)
 
 
 def write_results(state):
@@ -131,9 +143,12 @@ def write_results(state):
 #define CPUID_COMMON_1D_FEATURES %s
 
 #define INIT_KNOWN_FEATURES { \\\n%s\n} 
+
+#define INIT_SPECIAL_FEATURES { \\\n%s\n} 
 """ % (state.nr_entries,
        state.common_1d,
        format_uint32s(state.known, 4),
+       format_uint32s(state.special, 4),
        ))
 
     state.output.write(
