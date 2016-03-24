@@ -3451,7 +3451,7 @@ static int cd_insert(uint32_t domid, const char *virtdev, char *phys)
     char *buf = NULL;
     XLU_Config *config = 0;
     struct stat b;
-    int rc = 0;
+    int r;
 
     xasprintf(&buf, "vdev=%s,access=r,devtype=cdrom,target=%s",
               virtdev, phys ? phys : "");
@@ -3467,18 +3467,22 @@ static int cd_insert(uint32_t domid, const char *virtdev, char *phys)
         && stat(disk.pdev_path, &b)) {
         fprintf(stderr, "Cannot stat file: %s\n",
                 disk.pdev_path);
-        rc = 1;
+        r = EXIT_FAILURE;
         goto out;
     }
 
-    if (libxl_cdrom_insert(ctx, domid, &disk, NULL))
-        rc=1;
+    if (libxl_cdrom_insert(ctx, domid, &disk, NULL)) {
+        r = EXIT_FAILURE;
+        goto out;
+    }
+
+    r = EXIT_SUCCESS;
 
 out:
     libxl_device_disk_dispose(&disk);
     free(buf);
 
-    return rc;
+    return r;
 }
 
 int main_cd_eject(int argc, char **argv)
@@ -3512,8 +3516,7 @@ int main_cd_insert(int argc, char **argv)
     virtdev = argv[optind + 1];
     file = argv[optind + 2];
 
-    cd_insert(domid, virtdev, file);
-    return 0;
+    return cd_insert(domid, virtdev, file);
 }
 
 int main_usbctrl_attach(int argc, char **argv)
