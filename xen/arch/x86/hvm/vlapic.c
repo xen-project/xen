@@ -681,11 +681,10 @@ static void vlapic_tdt_pt_cb(struct vcpu *v, void *data)
     vcpu_vlapic(v)->hw.tdt_msr = 0;
 }
 
-static int vlapic_reg_write(struct vcpu *v,
-                            unsigned int offset, uint32_t val)
+static void vlapic_reg_write(struct vcpu *v,
+                             unsigned int offset, uint32_t val)
 {
     struct vlapic *vlapic = vcpu_vlapic(v);
-    int rc = X86EMUL_OKAY;
 
     memset(&vlapic->loaded, 0, sizeof(vlapic->loaded));
 
@@ -815,14 +814,7 @@ static int vlapic_reg_write(struct vcpu *v,
         HVM_DBG_LOG(DBG_LEVEL_VLAPIC_TIMER, "timer divisor is %#x",
                     vlapic->hw.timer_divisor);
         break;
-
-    default:
-        break;
     }
-    if (rc == X86EMUL_UNHANDLEABLE)
-        gdprintk(XENLOG_DEBUG,
-                "Local APIC Write wrong to register %#x\n", offset);
-    return rc;
 }
 
 static int vlapic_write(struct vcpu *v, unsigned long address,
@@ -871,7 +863,9 @@ static int vlapic_write(struct vcpu *v, unsigned long address,
     else if ( unlikely(offset & 3) )
         goto unaligned_exit_and_crash;
 
-    return vlapic_reg_write(v, offset, val);
+    vlapic_reg_write(v, offset, val);
+
+    return X86EMUL_OKAY;
 
  unaligned_exit_and_crash:
     gprintk(XENLOG_ERR, "Unaligned LAPIC write: len=%u offset=%#x.\n",
@@ -886,14 +880,18 @@ int vlapic_apicv_write(struct vcpu *v, unsigned int offset)
     struct vlapic *vlapic = vcpu_vlapic(v);
     uint32_t val = vlapic_get_reg(vlapic, offset);
 
-    if ( !vlapic_x2apic_mode(vlapic) )
-        return vlapic_reg_write(v, offset, val);
+    if ( vlapic_x2apic_mode(vlapic) )
+    {
+        if ( offset != APIC_SELF_IPI )
+            return X86EMUL_UNHANDLEABLE;
 
-    if ( offset != APIC_SELF_IPI )
-        return X86EMUL_UNHANDLEABLE;
+        offset = APIC_ICR;
+        val = APIC_DEST_SELF | (val & APIC_VECTOR_MASK);
+    }
 
-    return vlapic_reg_write(v, APIC_ICR,
-                            APIC_DEST_SELF | (val & APIC_VECTOR_MASK));
+    vlapic_reg_write(v, offset, val);
+
+    return X86EMUL_OKAY;
 }
 
 int hvm_x2apic_msr_write(struct vcpu *v, unsigned int msr, uint64_t msr_content)
@@ -971,7 +969,9 @@ int hvm_x2apic_msr_write(struct vcpu *v, unsigned int msr, uint64_t msr_content)
             return X86EMUL_UNHANDLEABLE;
     }
 
-    return vlapic_reg_write(v, offset, msr_content);
+    vlapic_reg_write(v, offset, msr_content);
+
+    return X86EMUL_OKAY;
 }
 
 static int vlapic_range(struct vcpu *v, unsigned long addr)
