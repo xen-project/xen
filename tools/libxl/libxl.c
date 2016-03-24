@@ -5322,18 +5322,20 @@ err:
     return NULL;
 }
 
-int libxl_set_vcpuaffinity(libxl_ctx *ctx, uint32_t domid, uint32_t vcpuid,
-                           const libxl_bitmap *cpumap_hard,
-                           const libxl_bitmap *cpumap_soft)
+static int libxl__set_vcpuaffinity(libxl_ctx *ctx, uint32_t domid,
+                                   uint32_t vcpuid,
+                                   const libxl_bitmap *cpumap_hard,
+                                   const libxl_bitmap *cpumap_soft,
+                                   unsigned flags)
 {
     GC_INIT(ctx);
     libxl_bitmap hard, soft;
-    int rc, flags = 0;
+    int rc;
 
     libxl_bitmap_init(&hard);
     libxl_bitmap_init(&soft);
 
-    if (!cpumap_hard && !cpumap_soft) {
+    if (!cpumap_hard && !cpumap_soft && !flags) {
         rc = ERROR_INVAL;
         goto out;
     }
@@ -5348,7 +5350,7 @@ int libxl_set_vcpuaffinity(libxl_ctx *ctx, uint32_t domid, uint32_t vcpuid,
             goto out;
 
         libxl__bitmap_copy_best_effort(gc, &hard, cpumap_hard);
-        flags = XEN_VCPUAFFINITY_HARD;
+        flags |= XEN_VCPUAFFINITY_HARD;
     }
     if (cpumap_soft) {
         rc = libxl_cpu_bitmap_alloc(ctx, &soft, 0);
@@ -5397,6 +5399,23 @@ int libxl_set_vcpuaffinity(libxl_ctx *ctx, uint32_t domid, uint32_t vcpuid,
     libxl_bitmap_dispose(&soft);
     GC_FREE;
     return rc;
+}
+
+int libxl_set_vcpuaffinity(libxl_ctx *ctx, uint32_t domid, uint32_t vcpuid,
+                           const libxl_bitmap *cpumap_hard,
+                           const libxl_bitmap *cpumap_soft)
+{
+    return libxl__set_vcpuaffinity(ctx, domid, vcpuid, cpumap_hard,
+                                   cpumap_soft, 0);
+}
+
+int libxl_set_vcpuaffinity_force(libxl_ctx *ctx, uint32_t domid,
+                                 uint32_t vcpuid,
+                                 const libxl_bitmap *cpumap_hard,
+                                 const libxl_bitmap *cpumap_soft)
+{
+    return libxl__set_vcpuaffinity(ctx, domid, vcpuid, cpumap_hard,
+                                   cpumap_soft, XEN_VCPUAFFINITY_FORCE);
 }
 
 int libxl_set_vcpuaffinity_all(libxl_ctx *ctx, uint32_t domid,
