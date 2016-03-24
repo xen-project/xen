@@ -67,7 +67,8 @@ write_dev() {
   fi
  
   xenstore_write "$XENBUS_PATH/physical-device" "$mm"
-
+  xenstore_write "$XENBUS_PATH/physical-device-path" "$1"
+  
   success
 }
 
