@@ -8011,8 +8011,10 @@ int main_cpupoolcpuremove(int argc, char **argv)
         goto out;
     }
 
-    if (libxl_cpupool_cpuremove_cpumap(ctx, poolid, &cpumap))
-        fprintf(stderr, "some cpus may not have been removed from %s\n", pool);
+    if (libxl_cpupool_cpuremove_cpumap(ctx, poolid, &cpumap)) {
+        fprintf(stderr, "Some cpus may have not or only partially been removed from '%s'.\n", pool);
+        fprintf(stderr, "If a cpu can't be added to another cpupool, add it to '%s' again and retry.\n", pool);
+    }
 
     rc = EXIT_SUCCESS;
 
