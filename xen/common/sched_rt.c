@@ -653,11 +653,16 @@ static void *
 rt_alloc_pdata(const struct scheduler *ops, int cpu)
 {
     struct rt_private *prv = rt_priv(ops);
+    spinlock_t *old_lock;
     unsigned long flags;
 
-    spin_lock_irqsave(&prv->lock, flags);
+    /* Move the scheduler lock to our global runqueue lock.  */
+    old_lock = pcpu_schedule_lock_irqsave(cpu, &flags);
+
     per_cpu(schedule_data, cpu).schedule_lock = &prv->lock;
-    spin_unlock_irqrestore(&prv->lock, flags);
+
+    /* _Not_ pcpu_schedule_unlock(): per_cpu().schedule_lock changed! */
+    spin_unlock_irqrestore(old_lock, flags);
 
     if ( !alloc_cpumask_var(&_cpumask_scratch[cpu]) )
         return NULL;
