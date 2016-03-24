@@ -3380,7 +3380,6 @@ static int def_getopt(int argc, char * const argv[],
 static int set_memory_max(uint32_t domid, const char *mem)
 {
     int64_t memorykb;
-    int rc;
 
     memorykb = parse_mem_size_kb(mem);
     if (memorykb == -1) {
@@ -3388,9 +3387,12 @@ static int set_memory_max(uint32_t domid, const char *mem)
         exit(3);
     }
 
-    rc = libxl_domain_setmaxmem(ctx, domid, memorykb);
+    if (libxl_domain_setmaxmem(ctx, domid, memorykb)) {
+        fprintf(stderr, "cannot set domid %d static max memory to : %s\n", domid, mem);
+        return EXIT_FAILURE;
+    }
 
-    return rc;
+    return EXIT_SUCCESS;
 }
 
 int main_memmax(int argc, char **argv)
@@ -3398,7 +3400,6 @@ int main_memmax(int argc, char **argv)
     uint32_t domid;
     int opt = 0;
     char *mem;
-    int rc;
 
     SWITCH_FOREACH_OPT(opt, "", NULL, "mem-max", 2) {
         /* No options */
@@ -3407,18 +3408,12 @@ int main_memmax(int argc, char **argv)
     domid = find_domain(argv[optind]);
     mem = argv[optind + 1];
 
-    rc = set_memory_max(domid, mem);
-    if (rc) {
-        fprintf(stderr, "cannot set domid %d static max memory to : %s\n", domid, mem);
-        return 1;
-    }
-
-    return 0;
+    return set_memory_max(domid, mem);
 }
 
-static void set_memory_target(uint32_t domid, const char *mem)
+static int set_memory_target(uint32_t domid, const char *mem)
 {
-    long long int memorykb;
+    int64_t memorykb;
 
     memorykb = parse_mem_size_kb(mem);
     if (memorykb == -1)  {
@@ -3426,7 +3421,12 @@ static void set_memory_target(uint32_t domid, const char *mem)
         exit(3);
     }
 
-    libxl_set_memory_target(ctx, domid, memorykb, 0, /* enforce */ 1);
+    if (libxl_set_memory_target(ctx, domid, memorykb, 0, /* enforce */ 1)) {
+        fprintf(stderr, "cannot set domid %d dynamic max memory to : %s\n", domid, mem);
+        return EXIT_FAILURE;
+    }
+
+    return EXIT_SUCCESS;
 }
 
 int main_memset(int argc, char **argv)
@@ -3442,8 +3442,7 @@ int main_memset(int argc, char **argv)
     domid = find_domain(argv[optind]);
     mem = argv[optind + 1];
 
-    set_memory_target(domid, mem);
-    return 0;
+    return set_memory_target(domid, mem);
 }
 
 static int cd_insert(uint32_t domid, const char *virtdev, char *phys)
