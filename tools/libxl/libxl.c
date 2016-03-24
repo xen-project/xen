@@ -2462,21 +2462,6 @@ static void device_disk_add(libxl__egc *egc, uint32_t domid,
                                          libxl__xen_script_dir_path());
                 flexarray_append_pair(back, "script", script);
 
-                /* If the user did not supply a block script then we
-                 * write the physical-device node ourselves.
-                 *
-                 * If the user did supply a script then that script is
-                 * responsible for this since the block device may not
-                 * exist yet.
-                 */
-                if (!disk->script &&
-                    disk->backend_domid == LIBXL_TOOLSTACK_DOMID) {
-                    int major, minor;
-                    if (!libxl__device_physdisk_major_minor(dev, &major, &minor))
-                        flexarray_append_pair(back, "physical-device",
-                                              GCSPRINTF("%x:%x", major, minor));
-                }
-
                 assert(device->backend_kind == LIBXL__DEVICE_KIND_VBD);
                 break;
 
