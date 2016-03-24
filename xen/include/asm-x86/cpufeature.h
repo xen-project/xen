@@ -11,8 +11,9 @@
 
 #include <xen/const.h>
 #include <asm/cpufeatureset.h>
+#include <asm/cpuid-autogen.h>
 
-#define FSCAPINTS 9
+#define FSCAPINTS FEATURESET_NR_ENTRIES
 #define NCAPINTS (FSCAPINTS + 1) /* N 32-bit words worth of info */
 
 /* Other features, Xen-defined mapping. */

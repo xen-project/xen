@@ -117,5 +117,15 @@ headers++.chk: $(PUBLIC_HEADERS) Makefile
 
 endif
 
+ifeq ($(XEN_TARGET_ARCH),x86_64)
+
+$(BASEDIR)/include/asm-x86/cpuid-autogen.h: $(BASEDIR)/include/public/arch-x86/cpufeatureset.h $(BASEDIR)/tools/gen-cpuid.py FORCE
+	$(PYTHON) $(BASEDIR)/tools/gen-cpuid.py -i $^ -o $@.new
+	$(call move-if-changed,$@.new,$@)
+
+all: $(BASEDIR)/include/asm-x86/cpuid-autogen.h
+endif
+
 clean::
 	rm -rf compat headers.chk headers++.chk
+	rm -f $(BASEDIR)/include/asm-x86/cpuid-autogen.h
