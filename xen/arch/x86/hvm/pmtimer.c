@@ -217,36 +217,30 @@ static int handle_pmt_io(
     struct vcpu *v = current;
     PMTState *s = &v->domain->arch.hvm_domain.pl_time->vpmt;
 
-    if ( bytes != 4 )
+    if ( bytes != 4 || dir != IOREQ_READ )
     {
         gdprintk(XENLOG_WARNING, "HVM_PMT bad access\n");
         *val = ~0;
-        return X86EMUL_OKAY;
     }
-    
-    if ( dir == IOREQ_READ )
+    else if ( spin_trylock(&s->lock) )
     {
-        if ( spin_trylock(&s->lock) )
-        {
-            /* We hold the lock: update timer value and return it. */
-            pmt_update_time(s);
-            *val = s->pm.tmr_val;
-            spin_unlock(&s->lock);
-        }
-        else
-        {
-            /*
-             * Someone else is updating the timer: rather than do the work
-             * again ourselves, wait for them to finish and then steal their
-             * updated value with a lock-free atomic read.
-             */
-            spin_barrier(&s->lock);
-            *val = *(volatile uint32_t *)&s->pm.tmr_val;
-        }
-        return X86EMUL_OKAY;
+        /* We hold the lock: update timer value and return it. */
+        pmt_update_time(s);
+        *val = s->pm.tmr_val;
+        spin_unlock(&s->lock);
+    }
+    else
+    {
+        /*
+         * Someone else is updating the timer: rather than do the work
+         * again ourselves, wait for them to finish and then steal their
+         * updated value with a lock-free atomic read.
+         */
+        spin_barrier(&s->lock);
+        *val = read_atomic(&s->pm.tmr_val);
     }
 
-    return X86EMUL_UNHANDLEABLE;
+    return X86EMUL_OKAY;
 }
 
 static int pmtimer_save(struct domain *d, hvm_domain_context_t *h)
