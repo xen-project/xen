@@ -3069,13 +3069,38 @@ static char * libxl__alloc_vdev(libxl__gc *gc, void *get_vdev_user,
 
 /* Callbacks */
 
+static char *libxl__device_disk_find_local_path(libxl__gc *gc, 
+                                                const libxl_device_disk *disk)
+{
+    char *path = NULL;
+
+    /* No local paths for driver domains */
+    if (disk->backend_domname != NULL) {
+        LOG(DEBUG, "Non-local backend, can't access locally.\n");
+        goto out;
+    }
+
+    /*
+     * If this is in raw format, and we're not using a script or a
+     * driver domain, we can access the target path directly.
+     */
+    if (disk->format == LIBXL_DISK_FORMAT_RAW
+        && disk->script == NULL) {
+        path = libxl__strdup(gc, disk->pdev_path);
+        LOG(DEBUG, "Directly accessing local RAW disk %s", path);
+        goto out;
+    } 
+
+ out:
+    return path;
+}
+
 static void local_device_attach_cb(libxl__egc *egc, libxl__ao_device *aodev);
 
 void libxl__device_disk_local_initiate_attach(libxl__egc *egc,
                                      libxl__disk_local_state *dls)
 {
     STATE_AO_GC(dls->ao);
-    char *dev = NULL;
     int rc;
     const libxl_device_disk *in_disk = dls->in_disk;
     libxl_device_disk *disk = &dls->disk;
@@ -3083,34 +3108,36 @@ void libxl__device_disk_local_initiate_attach(libxl__egc *egc,
 
     assert(in_disk->pdev_path);
 
-    memcpy(disk, in_disk, sizeof(libxl_device_disk));
-    disk->pdev_path = libxl__strdup(gc, in_disk->pdev_path);
-    if (in_disk->script != NULL)
-        disk->script = libxl__strdup(gc, in_disk->script);
     disk->vdev = NULL;
 
-    rc = libxl__device_disk_setdefault(gc, disk);
-    if (rc) goto out;
+    if (dls->diskpath)
+        LOG(DEBUG, "Strange, dls->diskpath already set: %s", dls->diskpath);
 
-    /* If this is in a driver domain, or it's not a raw format, or it involves
-     * running a script, we have to do a local attach. */
-    if (disk->backend_domname != NULL
-        || disk->format != LIBXL_DISK_FORMAT_RAW
-        || disk->script != NULL) {
+    LOG(DEBUG, "Trying to find local path");
+
+    dls->diskpath = libxl__device_disk_find_local_path(gc, in_disk);
+    if (dls->diskpath) {
+        LOG(DEBUG, "Local path found, executing callback.");
+        dls->callback(egc, dls, 0);
+    } else {
+        LOG(DEBUG, "Local path not found, initiating attach.");
+
+        memcpy(disk, in_disk, sizeof(libxl_device_disk));
+        disk->pdev_path = libxl__strdup(gc, in_disk->pdev_path);
+        if (in_disk->script != NULL)
+            disk->script = libxl__strdup(gc, in_disk->script);
+        disk->vdev = NULL;
+        
+        rc = libxl__device_disk_setdefault(gc, disk);
+        if (rc) goto out;
+
+        /* If we can't find a local path, attach it */
         libxl__prepare_ao_device(ao, &dls->aodev);
         dls->aodev.callback = local_device_attach_cb;
         device_disk_add(egc, LIBXL_TOOLSTACK_DOMID, disk, &dls->aodev,
                         libxl__alloc_vdev, (void *) blkdev_start);
-        return;
     }
 
-    LOG(DEBUG, "locally attaching RAW disk %s", disk->pdev_path);
-    dev = disk->pdev_path;
-
-    if (dev != NULL)
-        dls->diskpath = libxl__strdup(gc, dev);
-
-    dls->callback(egc, dls, 0);
     return;
 
  out:
