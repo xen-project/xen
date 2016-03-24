@@ -10,148 +10,22 @@
 #endif
 
 #include <xen/const.h>
+#include <asm/cpufeatureset.h>
 
-#define NCAPINTS	9	/* N 32-bit words worth of info */
+#define FSCAPINTS 9
+#define NCAPINTS (FSCAPINTS + 1) /* N 32-bit words worth of info */
 
-/* Intel-defined CPU features, CPUID level 0x00000001 (edx), word 0 */
-#define X86_FEATURE_FPU		(0*32+ 0) /* Onboard FPU */
-#define X86_FEATURE_VME		(0*32+ 1) /* Virtual Mode Extensions */
-#define X86_FEATURE_DE		(0*32+ 2) /* Debugging Extensions */
-#define X86_FEATURE_PSE 	(0*32+ 3) /* Page Size Extensions */
-#define X86_FEATURE_TSC		(0*32+ 4) /* Time Stamp Counter */
-#define X86_FEATURE_MSR		(0*32+ 5) /* Model-Specific Registers, RDMSR, WRMSR */
-#define X86_FEATURE_PAE		(0*32+ 6) /* Physical Address Extensions */
-#define X86_FEATURE_MCE		(0*32+ 7) /* Machine Check Architecture */
-#define X86_FEATURE_CX8		(0*32+ 8) /* CMPXCHG8 instruction */
-#define X86_FEATURE_APIC	(0*32+ 9) /* Onboard APIC */
-#define X86_FEATURE_SEP		(0*32+11) /* SYSENTER/SYSEXIT */
-#define X86_FEATURE_MTRR	(0*32+12) /* Memory Type Range Registers */
-#define X86_FEATURE_PGE		(0*32+13) /* Page Global Enable */
-#define X86_FEATURE_MCA		(0*32+14) /* Machine Check Architecture */
-#define X86_FEATURE_CMOV	(0*32+15) /* CMOV instruction (FCMOVCC and FCOMI too if FPU present) */
-#define X86_FEATURE_PAT		(0*32+16) /* Page Attribute Table */
-#define X86_FEATURE_PSE36	(0*32+17) /* 36-bit PSEs */
-#define X86_FEATURE_CLFLUSH	(0*32+19) /* Supports the CLFLUSH instruction */
-#define X86_FEATURE_DS		(0*32+21) /* Debug Store */
-#define X86_FEATURE_ACPI	(0*32+22) /* ACPI via MSR */
-#define X86_FEATURE_MMX		(0*32+23) /* Multimedia Extensions */
-#define X86_FEATURE_FXSR	(0*32+24) /* FXSAVE and FXRSTOR instructions (fast save and restore */
-				          /* of FPU context), and CR4.OSFXSR available */
-#define X86_FEATURE_SSE		(0*32+25) /* Streaming SIMD Extensions */
-#define X86_FEATURE_SSE2	(0*32+26) /* Streaming SIMD Extensions-2 */
-#define X86_FEATURE_HTT		(0*32+28) /* Hyper-Threading Technology */
-#define X86_FEATURE_TM1		(0*32+29) /* Thermal Monitor 1 */
-#define X86_FEATURE_PBE		(0*32+31) /* Pending Break Enable */
-
-/* AMD-defined CPU features, CPUID level 0x80000001, word 1 */
-/* Don't duplicate feature flags which are redundant with Intel! */
-#define X86_FEATURE_SYSCALL	(1*32+11) /* SYSCALL/SYSRET */
-#define X86_FEATURE_NX		(1*32+20) /* Execute Disable */
-#define X86_FEATURE_MMXEXT	(1*32+22) /* AMD MMX extensions */
-#define X86_FEATURE_FFXSR       (1*32+25) /* FFXSR instruction optimizations */
-#define X86_FEATURE_PAGE1GB	(1*32+26) /* 1Gb large page support */
-#define X86_FEATURE_RDTSCP	(1*32+27) /* RDTSCP */
-#define X86_FEATURE_LM		(1*32+29) /* Long Mode (x86-64) */
-#define X86_FEATURE_3DNOWEXT	(1*32+30) /* AMD 3DNow! extensions */
-#define X86_FEATURE_3DNOW	(1*32+31) /* 3DNow! */
-
-/* Intel-defined CPU features, CPUID level 0x0000000D:1 (eax), word 2 */
-#define X86_FEATURE_XSAVEOPT	(2*32+ 0) /* XSAVEOPT instruction. */
-#define X86_FEATURE_XSAVEC	(2*32+ 1) /* XSAVEC/XRSTORC instructions. */
-#define X86_FEATURE_XGETBV1	(2*32+ 2) /* XGETBV with %ecx=1. */
-#define X86_FEATURE_XSAVES	(2*32+ 3) /* XSAVES/XRSTORS instructions. */
-
-/* Other features, Linux-defined mapping, word 3 */
+/* Other features, Xen-defined mapping. */
 /* This range is used for feature bits which conflict or are synthesized */
-#define X86_FEATURE_CONSTANT_TSC (3*32+ 8) /* TSC ticks at a constant rate */
-#define X86_FEATURE_NONSTOP_TSC	(3*32+ 9) /* TSC does not stop in C states */
-#define X86_FEATURE_ARAT	(3*32+ 10) /* Always running APIC timer */
-#define X86_FEATURE_ARCH_PERFMON (3*32+11) /* Intel Architectural PerfMon */
-#define X86_FEATURE_TSC_RELIABLE (3*32+12) /* TSC is known to be reliable */
-#define X86_FEATURE_XTOPOLOGY    (3*32+13) /* cpu topology enum extensions */
-#define X86_FEATURE_CPUID_FAULTING (3*32+14) /* cpuid faulting */
-#define X86_FEATURE_CLFLUSH_MONITOR (3*32+15) /* clflush reqd with monitor */
-#define X86_FEATURE_APERFMPERF   (3*32+16) /* APERFMPERF */
-
-/* Intel-defined CPU features, CPUID level 0x00000001 (ecx), word 4 */
-#define X86_FEATURE_SSE3	(4*32+ 0) /* Streaming SIMD Extensions-3 */
-#define X86_FEATURE_PCLMULQDQ	(4*32+ 1) /* Carry-less mulitplication */
-#define X86_FEATURE_DTES64	(4*32+ 2) /* 64-bit Debug Store */
-#define X86_FEATURE_MONITOR	(4*32+ 3) /* Monitor/Mwait support */
-#define X86_FEATURE_DSCPL	(4*32+ 4) /* CPL Qualified Debug Store */
-#define X86_FEATURE_VMX		(4*32+ 5) /* Virtual Machine Extensions */
-#define X86_FEATURE_SMX		(4*32+ 6) /* Safer Mode Extensions */
-#define X86_FEATURE_EIST	(4*32+ 7) /* Enhanced SpeedStep */
-#define X86_FEATURE_TM2		(4*32+ 8) /* Thermal Monitor 2 */
-#define X86_FEATURE_SSSE3	(4*32+ 9) /* Supplemental Streaming SIMD Extensions-3 */
-#define X86_FEATURE_FMA		(4*32+12) /* Fused Multiply Add */
-#define X86_FEATURE_CX16        (4*32+13) /* CMPXCHG16B */
-#define X86_FEATURE_XTPR	(4*32+14) /* Send Task Priority Messages */
-#define X86_FEATURE_PDCM	(4*32+15) /* Perf/Debug Capability MSR */
-#define X86_FEATURE_PCID	(4*32+17) /* Process Context ID */
-#define X86_FEATURE_DCA		(4*32+18) /* Direct Cache Access */
-#define X86_FEATURE_SSE4_1	(4*32+19) /* Streaming SIMD Extensions 4.1 */
-#define X86_FEATURE_SSE4_2	(4*32+20) /* Streaming SIMD Extensions 4.2 */
-#define X86_FEATURE_X2APIC	(4*32+21) /* Extended xAPIC */
-#define X86_FEATURE_MOVBE	(4*32+22) /* movbe instruction */
-#define X86_FEATURE_POPCNT	(4*32+23) /* POPCNT instruction */
-#define X86_FEATURE_TSC_DEADLINE (4*32+24) /* "tdt" TSC Deadline Timer */
-#define X86_FEATURE_AESNI	(4*32+25) /* AES instructions */
-#define X86_FEATURE_XSAVE	(4*32+26) /* XSAVE/XRSTOR/XSETBV/XGETBV */
-#define X86_FEATURE_OSXSAVE	(4*32+27) /* OSXSAVE */
-#define X86_FEATURE_AVX 	(4*32+28) /* Advanced Vector Extensions */
-#define X86_FEATURE_F16C 	(4*32+29) /* Half-precision convert instruction */
-#define X86_FEATURE_RDRAND 	(4*32+30) /* Digital Random Number Generator */
-#define X86_FEATURE_HYPERVISOR	(4*32+31) /* Running under some hypervisor */
-
-/* UNUSED, word 5 */
-
-/* More extended AMD flags: CPUID level 0x80000001, ecx, word 6 */
-#define X86_FEATURE_LAHF_LM     (6*32+ 0) /* LAHF/SAHF in long mode */
-#define X86_FEATURE_CMP_LEGACY  (6*32+ 1) /* If yes HyperThreading not valid */
-#define X86_FEATURE_SVM         (6*32+ 2) /* Secure virtual machine */
-#define X86_FEATURE_EXTAPIC     (6*32+ 3) /* Extended APIC space */
-#define X86_FEATURE_CR8_LEGACY  (6*32+ 4) /* CR8 in 32-bit mode */
-#define X86_FEATURE_ABM         (6*32+ 5) /* Advanced bit manipulation */
-#define X86_FEATURE_SSE4A       (6*32+ 6) /* SSE-4A */
-#define X86_FEATURE_MISALIGNSSE (6*32+ 7) /* Misaligned SSE mode */
-#define X86_FEATURE_3DNOWPREFETCH (6*32+ 8) /* 3DNow prefetch instructions */
-#define X86_FEATURE_OSVW        (6*32+ 9) /* OS Visible Workaround */
-#define X86_FEATURE_IBS         (6*32+10) /* Instruction Based Sampling */
-#define X86_FEATURE_XOP         (6*32+11) /* extended AVX instructions */
-#define X86_FEATURE_SKINIT      (6*32+12) /* SKINIT/STGI instructions */
-#define X86_FEATURE_WDT         (6*32+13) /* Watchdog timer */
-#define X86_FEATURE_LWP         (6*32+15) /* Light Weight Profiling */
-#define X86_FEATURE_FMA4        (6*32+16) /* 4 operands MAC instructions */
-#define X86_FEATURE_NODEID_MSR  (6*32+19) /* NodeId MSR */
-#define X86_FEATURE_TBM         (6*32+21) /* trailing bit manipulations */
-#define X86_FEATURE_TOPOEXT     (6*32+22) /* topology extensions CPUID leafs */
-#define X86_FEATURE_DBEXT       (6*32+26) /* data breakpoint extension */
-#define X86_FEATURE_MONITORX    (6*32+29) /* MWAIT extension (MONITORX/MWAITX) */
-
-/* Intel-defined CPU features, CPUID level 0x00000007:0 (ebx), word 7 */
-#define X86_FEATURE_FSGSBASE	(7*32+ 0) /* {RD,WR}{FS,GS}BASE instructions */
-#define X86_FEATURE_BMI1	(7*32+ 3) /* 1st bit manipulation extensions */
-#define X86_FEATURE_HLE 	(7*32+ 4) /* Hardware Lock Elision */
-#define X86_FEATURE_AVX2	(7*32+ 5) /* AVX2 instructions */
-#define X86_FEATURE_SMEP	(7*32+ 7) /* Supervisor Mode Execution Protection */
-#define X86_FEATURE_BMI2	(7*32+ 8) /* 2nd bit manipulation extensions */
-#define X86_FEATURE_ERMS	(7*32+ 9) /* Enhanced REP MOVSB/STOSB */
-#define X86_FEATURE_INVPCID	(7*32+10) /* Invalidate Process Context ID */
-#define X86_FEATURE_RTM 	(7*32+11) /* Restricted Transactional Memory */
-#define X86_FEATURE_PQM 	(7*32+12) /* Platform QoS Monitoring */
-#define X86_FEATURE_NO_FPU_SEL 	(7*32+13) /* FPU CS/DS stored as zero */
-#define X86_FEATURE_MPX		(7*32+14) /* Memory Protection Extensions */
-#define X86_FEATURE_PQE 	(7*32+15) /* Platform QoS Enforcement */
-#define X86_FEATURE_RDSEED	(7*32+18) /* RDSEED instruction */
-#define X86_FEATURE_ADX		(7*32+19) /* ADCX, ADOX instructions */
-#define X86_FEATURE_SMAP	(7*32+20) /* Supervisor Mode Access Prevention */
-#define X86_FEATURE_PCOMMIT	(7*32+22) /* PCOMMIT instruction */
-#define X86_FEATURE_CLFLUSHOPT	(7*32+23) /* CLFLUSHOPT instruction */
-
-/* Intel-defined CPU features, CPUID level 0x00000007:0 (ecx), word 8 */
-#define X86_FEATURE_PKU	(8*32+ 3) /* Protection Keys for Userspace */
-#define X86_FEATURE_OSPKE	(8*32+ 4) /* OS Protection Keys Enable */
+#define X86_FEATURE_CONSTANT_TSC	((FSCAPINTS+0)*32+ 0) /* TSC ticks at a constant rate */
+#define X86_FEATURE_NONSTOP_TSC		((FSCAPINTS+0)*32+ 1) /* TSC does not stop in C states */
+#define X86_FEATURE_ARAT		((FSCAPINTS+0)*32+ 2) /* Always running APIC timer */
+#define X86_FEATURE_ARCH_PERFMON	((FSCAPINTS+0)*32+ 3) /* Intel Architectural PerfMon */
+#define X86_FEATURE_TSC_RELIABLE	((FSCAPINTS+0)*32+ 4) /* TSC is known to be reliable */
+#define X86_FEATURE_XTOPOLOGY		((FSCAPINTS+0)*32+ 5) /* cpu topology enum extensions */
+#define X86_FEATURE_CPUID_FAULTING	((FSCAPINTS+0)*32+ 6) /* cpuid faulting */
+#define X86_FEATURE_CLFLUSH_MONITOR	((FSCAPINTS+0)*32+ 7) /* clflush reqd with monitor */
+#define X86_FEATURE_APERFMPERF		((FSCAPINTS+0)*32+ 8) /* APERFMPERF */
 
 #define cpufeat_word(idx)	((idx) / 32)
 #define cpufeat_bit(idx)	((idx) % 32)
