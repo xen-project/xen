@@ -1,0 +1,112 @@
+Block scripts
+=============
+
+Block scripts are called at the moment anytime blkback is directly
+involved in providing access to a backend.  There are three general
+cases this happens:
+
+1. When a user passes a block device in the 'target' field of the disk
+specification
+
+2. When a user passes a file in the 'target' field of the disk
+specification
+
+3. When a user specifies a custom hotplug script.
+
+Setup
+-----
+
+It is highly recommended that custom hotplug scripts as much as
+possible include and use the common Xen functionality.  If the script
+is run from the normal block script location (/etc/xen/scripts by
+default), then this can be done by adding the following to the top of
+the script:
+
+dir=$(dirname "$0")
+. "$dir/block-common.sh"
+
+
+Inputs
+------
+
+Unfortunately the inputs to the block scripts look completely
+different for each operating system.
+
+Inputs (Linux)
+--------------
+
+In all cases, the scripts are called with either "add" or "remove" as
+the command.  For custom scripts, the command will be the first
+argument of the script (i.e. $1).
+
+The environment variable XENBUS_PATH will be set to the
+path for the block device to be created.
+
+When the script is run, the following nodes shall already have been
+written into xenstore:
+
+ $XENBUS/params    The contents of the 'target' section of the disk specification verbatim.
+ $XENBUS/mode      'r' (for readonly) or 'w' (for read-write)
+
+Inputs (NetBSD)
+---------------
+
+TODO
+
+Output
+-------
+
+Block scripts are responsible for making sure that if a file is
+provided to a VM read/write, that it is not provided to any other VM.
+
+FreeBSD block hotplug scripts must write
+"$XENBUS_PATH/physical-device-path" with the path to the physical
+device or file.  Linux and NetBSD block hotplug scripts *should* also
+write this node.
+
+For the time being, Linux and NetBSD block hotplug scripts must write
+"$XENBUS_PATH/physical-device" with the device's major and minor
+numbers, written in hex, and separated by a colon.
+
+Scripts which include block-common.sh can simply call write_dev "$dev"
+with a path to the device, and write_dev will do the right thing, now
+and going forward.  (See the discussion below.)
+
+Rationale and future work
+-------------------------
+
+Historically, the block scripts wrote a node called "physical-device",
+which contains the major and minor numbers, written in hex, and
+separated by a colon (e.g., "1a:2").  This is required by the Linux
+blkback driver.
+
+FreeBSD blkback, on the other hand, does not have the concept of
+major/minor numbers, and can give direct access to a file without
+going through loopback; so its driver will consume
+physical-device-path.
+
+On Linux, the device model (qemu) needs access to a file it can
+interpret to provide emulated disks before paravirtualized drivers are
+marked as up.  The easiest way to accomplish this is to allow qemu to
+consume physical-device-path (rather than, say, having dom0 act as
+both a frontend and a backend).
+
+Going forward, the plan is at some point to have all block scripts
+simply write "physical-device-path", and then have libxl write the
+other nodes.  The reason we haven't done this yet is that the main
+block script wants to check to make sure the *major/minor* number
+hasn't been re-used, rather than just checking that the *specific
+device node* isn't re-used.  To do this it currently uses
+physical-device; and to do this *safely* it needs physical-device to
+be written with the lock held.
+
+The simplest solution for sorting this out would be to have the block
+script use physical-device if it's present, but if not, to directly
+stat physical-device-path.  But there's not time before the 4.7
+release to make sure all that works.
+
+Another possibility would be to only call out to scripts when using
+custom hotplug scripts; and when doing files or physical devices, to
+do the duplicate checking inside of libxl instead.  The rationale for
+doing this in block scripts rather than in libxl isn't clear at thes
+point.
