@@ -1714,7 +1714,7 @@ _hidden char *libxl__blktap_devpath(libxl__gc *gc,
 _hidden int libxl__device_destroy_tapdisk(libxl__gc *gc, const char *params);
 
 _hidden int libxl__device_from_disk(libxl__gc *gc, uint32_t domid,
-                                   libxl_device_disk *disk,
+                                   const libxl_device_disk *disk,
                                    libxl__device *device);
 
 /* Calls poll() again - useful to check whether a signaled condition
@@ -2720,6 +2720,7 @@ static inline void libxl__device_disk_local_init(libxl__disk_local_state *dls)
  * See if we can find a way to access a disk locally
  */
 _hidden char * libxl__device_disk_find_local_path(libxl__gc *gc, 
+                                                  libxl_domid guest_domid,
                                                   const libxl_device_disk *disk,
                                                   bool qdisk_direct);
 

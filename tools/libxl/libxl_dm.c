@@ -1353,8 +1353,8 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
                     target_path = libxl__blktap_devpath(gc, disks[i].pdev_path,
                                                         disks[i].format);
                 else
-                    target_path = libxl__device_disk_find_local_path(gc, 
-                                                            &disks[i], true);
+                    target_path = libxl__device_disk_find_local_path(gc,
+                                                 guest_domid, &disks[i], true);
 
                 if (!target_path) {
                     LOG(WARN, "No way to get local access disk to image: %s\n"

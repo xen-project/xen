@@ -2317,7 +2317,7 @@ int libxl__device_disk_setdefault(libxl__gc *gc, libxl_device_disk *disk)
 }
 
 int libxl__device_from_disk(libxl__gc *gc, uint32_t domid,
-                                   libxl_device_disk *disk,
+                                   const libxl_device_disk *disk,
                                    libxl__device *device)
 {
     int devid;
@@ -3070,8 +3070,9 @@ static char * libxl__alloc_vdev(libxl__gc *gc, void *get_vdev_user,
 /* Callbacks */
 
 char *libxl__device_disk_find_local_path(libxl__gc *gc, 
-                                         const libxl_device_disk *disk,
-                                         bool qdisk_direct)
+                                          libxl_domid guest_domid,
+                                          const libxl_device_disk *disk,
+                                          bool qdisk_direct)
 {
     char *path = NULL;
 
@@ -3100,6 +3101,38 @@ char *libxl__device_disk_find_local_path(libxl__gc *gc,
         path = libxl__strdup(gc, disk->pdev_path);
         LOG(DEBUG, "Directly accessing local QDISK target %s", path);
         goto out;
+    } 
+
+    /* 
+     * If the format isn't raw and / or we're using a script, then see
+     * if the script has written a path to the "cooked" node
+     */
+    if (disk->script && guest_domid != INVALID_DOMID) {
+        libxl__device device;
+        char *be_path, *pdpath;
+        int rc;
+
+        LOG(DEBUG,
+            "Run from a script; checking for physical-device-path (vdev %s)",
+            disk->vdev);
+
+        rc = libxl__device_from_disk(gc, guest_domid, disk, &device);
+        if (rc < 0)
+            goto out;
+
+        be_path = libxl__device_backend_path(gc, &device);
+
+        pdpath = libxl__sprintf(gc, "%s/physical-device-path", be_path);
+
+        LOG(DEBUG, "Attempting to read node %s", pdpath);
+        path = libxl__xs_read(gc, XBT_NULL, pdpath);
+
+        if (path)
+            LOG(DEBUG, "Accessing cooked block device %s", path);
+        else
+            LOG(DEBUG, "No physical-device-path, can't access locally.");
+
+        goto out;
     }
 
  out:
@@ -3126,7 +3159,8 @@ void libxl__device_disk_local_initiate_attach(libxl__egc *egc,
 
     LOG(DEBUG, "Trying to find local path");
 
-    dls->diskpath = libxl__device_disk_find_local_path(gc, in_disk, false);
+    dls->diskpath = libxl__device_disk_find_local_path(gc, INVALID_DOMID,
+                                                       in_disk, false);
     if (dls->diskpath) {
         LOG(DEBUG, "Local path found, executing callback.");
         dls->callback(egc, dls, 0);
@@ -3142,7 +3176,6 @@ void libxl__device_disk_local_initiate_attach(libxl__egc *egc,
         rc = libxl__device_disk_setdefault(gc, disk);
         if (rc) goto out;
 
-        /* If we can't find a local path, attach it */
         libxl__prepare_ao_device(ao, &dls->aodev);
         dls->aodev.callback = local_device_attach_cb;
         device_disk_add(egc, LIBXL_TOOLSTACK_DOMID, disk, &dls->aodev,
