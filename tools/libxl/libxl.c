@@ -4810,11 +4810,6 @@ retry_transaction:
 
     libxl__xs_printf(gc, t, GCSPRINTF("%s/memory/target", dompath),
                      "%"PRIu32, new_target_memkb);
-    rc = xc_domain_getinfolist(ctx->xch, domid, 1, &info);
-    if (rc != 1 || info.domain != domid) {
-        abort_transaction = 1;
-        goto out;
-    }
 
     libxl_dominfo_init(&ptr);
     xcinfo2xlinfo(ctx, &info, &ptr);
