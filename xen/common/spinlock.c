@@ -188,7 +188,15 @@ void _spin_unlock_irqrestore(spinlock_t *lock, unsigned long flags)
 int _spin_is_locked(spinlock_t *lock)
 {
     check_lock(&lock->debug);
-    return lock->tickets.head != lock->tickets.tail;
+
+    /*
+     * Recursive locks may be locked by another CPU, yet we return
+     * "false" here, making this function suitable only for use in
+     * ASSERT()s and alike.
+     */
+    return lock->recurse_cpu == SPINLOCK_NO_CPU
+           ? lock->tickets.head != lock->tickets.tail
+           : lock->recurse_cpu == smp_processor_id();
 }
 
 int _spin_trylock(spinlock_t *lock)
