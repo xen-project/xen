@@ -46,6 +46,8 @@
 #define XSTATE_LAZY    (XSTATE_ALL & ~XSTATE_NONLAZY)
 #define XSTATE_COMPACTION_ENABLED  (1ULL << 63)
 
+#define XSTATE_ALIGN64 (1U << 1)
+
 extern u64 xfeature_mask;
 extern unsigned int *xstate_sizes;
 

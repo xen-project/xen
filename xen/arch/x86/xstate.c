@@ -26,8 +26,8 @@ u64 __read_mostly xfeature_mask;
 
 static unsigned int *__read_mostly xstate_offsets;
 unsigned int *__read_mostly xstate_sizes;
+static u64 __read_mostly xstate_align;
 static unsigned int __read_mostly xstate_features;
-static unsigned int __read_mostly xstate_comp_offsets[sizeof(xfeature_mask)*8];
 
 static uint32_t __read_mostly mxcsr_mask = 0x0000ffbf;
 
@@ -94,7 +94,7 @@ static bool_t xsave_area_compressed(const struct xsave_struct *xsave_area)
 
 static int setup_xstate_features(bool_t bsp)
 {
-    unsigned int leaf, tmp, eax, ebx;
+    unsigned int leaf, eax, ebx, ecx, edx;
 
     if ( bsp )
     {
@@ -111,57 +111,71 @@ static int setup_xstate_features(bool_t bsp)
     for ( leaf = 2; leaf < xstate_features; leaf++ )
     {
         if ( bsp )
+        {
             cpuid_count(XSTATE_CPUID, leaf, &xstate_sizes[leaf],
-                        &xstate_offsets[leaf], &tmp, &tmp);
+                        &xstate_offsets[leaf], &ecx, &edx);
+            if ( ecx & XSTATE_ALIGN64 )
+                __set_bit(leaf, &xstate_align);
+        }
         else
         {
             cpuid_count(XSTATE_CPUID, leaf, &eax,
-                        &ebx, &tmp, &tmp);
+                        &ebx, &ecx, &edx);
             BUG_ON(eax != xstate_sizes[leaf]);
             BUG_ON(ebx != xstate_offsets[leaf]);
+            BUG_ON(!(ecx & XSTATE_ALIGN64) != !test_bit(leaf, &xstate_align));
         }
     }
 
     return 0;
 }
 
-static void __init setup_xstate_comp(void)
+static void setup_xstate_comp(uint16_t *comp_offsets,
+                              const uint64_t xcomp_bv)
 {
     unsigned int i;
+    unsigned int offset;
 
     /*
      * The FP xstates and SSE xstates are legacy states. They are always
      * in the fixed offsets in the xsave area in either compacted form
      * or standard form.
      */
-    xstate_comp_offsets[0] = 0;
-    xstate_comp_offsets[1] = XSAVE_SSE_OFFSET;
+    comp_offsets[0] = 0;
+    comp_offsets[1] = XSAVE_SSE_OFFSET;
 
-    xstate_comp_offsets[2] = FXSAVE_SIZE + XSAVE_HDR_SIZE;
+    comp_offsets[2] = FXSAVE_SIZE + XSAVE_HDR_SIZE;
 
-    for ( i = 3; i < xstate_features; i++ )
+    offset = comp_offsets[2];
+    for ( i = 2; i < xstate_features; i++ )
     {
-        xstate_comp_offsets[i] = xstate_comp_offsets[i - 1] +
-                                 (((1ul << i) & xfeature_mask)
-                                  ? xstate_sizes[i - 1] : 0);
-        ASSERT(xstate_comp_offsets[i] + xstate_sizes[i] <= xsave_cntxt_size);
+        if ( (1ul << i) & xcomp_bv )
+        {
+            if ( test_bit(i, &xstate_align) )
+                offset = ROUNDUP(offset, 64);
+            comp_offsets[i] = offset;
+            offset += xstate_sizes[i];
+        }
     }
+    ASSERT(offset <= xsave_cntxt_size);
 }
 
 static void *get_xsave_addr(struct xsave_struct *xsave,
-        unsigned int xfeature_idx)
+                            const uint16_t *comp_offsets,
+                            unsigned int xfeature_idx)
 {
     if ( !((1ul << xfeature_idx) & xsave->xsave_hdr.xstate_bv) )
         return NULL;
 
-    return (void *)xsave + (xsave_area_compressed(xsave)
-            ? xstate_comp_offsets
-            : xstate_offsets)[xfeature_idx];
+    return (void *)xsave + (xsave_area_compressed(xsave) ?
+                            comp_offsets[xfeature_idx] :
+                            xstate_offsets[xfeature_idx]);
 }
 
 void expand_xsave_states(struct vcpu *v, void *dest, unsigned int size)
 {
     struct xsave_struct *xsave = v->arch.xsave_area;
+    uint16_t comp_offsets[sizeof(xfeature_mask)*8];
     u64 xstate_bv = xsave->xsave_hdr.xstate_bv;
     u64 valid;
 
@@ -172,6 +186,8 @@ void expand_xsave_states(struct vcpu *v, void *dest, unsigned int size)
     }
 
     ASSERT(xsave_area_compressed(xsave));
+    setup_xstate_comp(comp_offsets, xsave->xsave_hdr.xcomp_bv);
+
     /*
      * Copy legacy XSAVE area and XSAVE hdr area.
      */
@@ -188,7 +204,7 @@ void expand_xsave_states(struct vcpu *v, void *dest, unsigned int size)
     {
         u64 feature = valid & -valid;
         unsigned int index = fls(feature) - 1;
-        const void *src = get_xsave_addr(xsave, index);
+        const void *src = get_xsave_addr(xsave, comp_offsets, index);
 
         if ( src )
         {
@@ -203,6 +219,7 @@ void expand_xsave_states(struct vcpu *v, void *dest, unsigned int size)
 void compress_xsave_states(struct vcpu *v, const void *src, unsigned int size)
 {
     struct xsave_struct *xsave = v->arch.xsave_area;
+    uint16_t comp_offsets[sizeof(xfeature_mask)*8];
     u64 xstate_bv = ((const struct xsave_struct *)src)->xsave_hdr.xstate_bv;
     u64 valid;
 
@@ -223,6 +240,8 @@ void compress_xsave_states(struct vcpu *v, const void *src, unsigned int size)
     xsave->xsave_hdr.xstate_bv = xstate_bv;
     xsave->xsave_hdr.xcomp_bv = v->arch.xcr0_accum | XSTATE_COMPACTION_ENABLED;
 
+    setup_xstate_comp(comp_offsets, xsave->xsave_hdr.xcomp_bv);
+
     /*
      * Copy each region from the non-compacted offset to the
      * possibly compacted offset.
@@ -232,7 +251,7 @@ void compress_xsave_states(struct vcpu *v, const void *src, unsigned int size)
     {
         u64 feature = valid & -valid;
         unsigned int index = fls(feature) - 1;
-        void *dest = get_xsave_addr(xsave, index);
+        void *dest = get_xsave_addr(xsave, comp_offsets, index);
 
         if ( dest )
         {
@@ -564,8 +583,6 @@ void xstate_init(struct cpuinfo_x86 *c)
 
     if ( setup_xstate_features(bsp) && bsp )
         BUG();
-    if ( bsp && (cpu_has_xsaves || cpu_has_xsavec) )
-        setup_xstate_comp();
 }
 
 static bool_t valid_xcr0(u64 xcr0)
