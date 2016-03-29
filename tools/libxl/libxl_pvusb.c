@@ -22,6 +22,21 @@
 
 #define USBHUB_CLASS_CODE 9
 
+static int usbback_is_loaded(libxl__gc *gc)
+{
+    int r;
+    struct stat st;
+
+    r = lstat(SYSFS_USBBACK_DRIVER, &st);
+
+    if (r == 0)
+        return 1;
+    if (r < 0 && errno == ENOENT)
+        return 0;
+    LOGE(ERROR, "Accessing %s", SYSFS_USBBACK_DRIVER);
+    return ERROR_FAIL;
+}
+
 static int libxl__device_usbctrl_setdefault(libxl__gc *gc, uint32_t domid,
                                             libxl_device_usbctrl *usbctrl)
 {
@@ -36,7 +51,11 @@ static int libxl__device_usbctrl_setdefault(libxl__gc *gc, uint32_t domid,
 
     if (usbctrl->type == LIBXL_USBCTRL_TYPE_AUTO) {
         if (domtype == LIBXL_DOMAIN_TYPE_PV) {
-            usbctrl->type = LIBXL_USBCTRL_TYPE_PV;
+            rc = usbback_is_loaded(gc);
+            if (rc < 0)
+                goto out;
+            usbctrl->type = rc ? LIBXL_USBCTRL_TYPE_PV
+                               : LIBXL_USBCTRL_TYPE_QUSB;
         } else if (domtype == LIBXL_DOMAIN_TYPE_HVM) {
             /* FIXME: See if we can detect PV frontend */
             usbctrl->type = LIBXL_USBCTRL_TYPE_DEVICEMODEL;
@@ -45,6 +64,8 @@ static int libxl__device_usbctrl_setdefault(libxl__gc *gc, uint32_t domid,
 
     rc = libxl__resolve_domid(gc, usbctrl->backend_domname,
                               &usbctrl->backend_domid);
+
+out:
     return rc;
 }
 
@@ -54,7 +75,9 @@ int libxl__device_from_usbctrl(libxl__gc *gc, uint32_t domid,
 {
     device->backend_devid   = usbctrl->devid;
     device->backend_domid   = usbctrl->backend_domid;
-    device->backend_kind    = LIBXL__DEVICE_KIND_VUSB;
+    device->backend_kind    = (usbctrl->type == LIBXL_USBCTRL_TYPE_PV)
+                              ? LIBXL__DEVICE_KIND_VUSB
+                              : LIBXL__DEVICE_KIND_QUSB;
     device->devid           = usbctrl->devid;
     device->domid           = domid;
     device->kind            = LIBXL__DEVICE_KIND_VUSB;
@@ -64,9 +87,9 @@ int libxl__device_from_usbctrl(libxl__gc *gc, uint32_t domid,
 
 /* Add usbctrl information to xenstore.
  *
- * Adding a usb controller will add a new 'vusb' device in xenstore, and
- * add corresponding frontend, backend information to it. According to
- * "update_json", decide wether to update json config file.
+ * Adding a usb controller will add a new 'qusb' or 'vusb' device in xenstore,
+ * and add corresponding frontend, backend information to it. According to
+ * "update_json", decide whether to update json config file.
  */
 static int libxl__device_usbctrl_add_xenstore(libxl__gc *gc, uint32_t domid,
                                               libxl_device_usbctrl *usbctrl,
@@ -121,6 +144,15 @@ static int libxl__device_usbctrl_add_xenstore(libxl__gc *gc, uint32_t domid,
 
         DEVICE_ADD(usbctrl, usbctrls, domid, &usbctrl_saved,
                    COMPARE_USBCTRL, &d_config);
+
+        if (usbctrl->type == LIBXL_USBCTRL_TYPE_QUSB) {
+            if (!libxl__query_qemu_backend(gc, domid, usbctrl->backend_domid,
+                                           "qusb", false)) {
+                LOG(ERROR, "backend type not supported by device model");
+                rc = ERROR_FAIL;
+                goto out;
+            }
+        }
     }
 
     for (;;) {
@@ -159,6 +191,18 @@ out:
     return rc;
 }
 
+static char *pvusb_get_device_type(libxl_usbctrl_type type)
+{
+    switch (type) {
+    case LIBXL_USBCTRL_TYPE_PV:
+        return "vusb";
+    case LIBXL_USBCTRL_TYPE_QUSB:
+        return "qusb";
+    default:
+        return NULL;
+    }
+}
+
 /* AO operation to add a usb controller.
  *
  * Generally, it does:
@@ -190,7 +234,8 @@ void libxl__device_usbctrl_add(libxl__egc *egc, uint32_t domid,
         }
     }
 
-    if (usbctrl->type != LIBXL_USBCTRL_TYPE_PV) {
+    if (usbctrl->type != LIBXL_USBCTRL_TYPE_PV &&
+        usbctrl->type != LIBXL_USBCTRL_TYPE_QUSB) {
         LOG(ERROR, "Unsupported USB controller type");
         rc = ERROR_FAIL;
         goto out;
@@ -252,7 +297,8 @@ void libxl__initiate_device_usbctrl_remove(libxl__egc *egc,
     rc = libxl_device_usbctrl_getinfo(CTX, domid, &usbctrl, &usbctrlinfo);
     if (rc) goto out;
 
-    if (usbctrlinfo.type != LIBXL_USBCTRL_TYPE_PV) {
+    if (usbctrlinfo.type != LIBXL_USBCTRL_TYPE_PV &&
+        usbctrlinfo.type != LIBXL_USBCTRL_TYPE_QUSB) {
         LOG(ERROR, "Unsupported USB controller type");
         rc = ERROR_FAIL;
         goto out;
@@ -293,6 +339,7 @@ static const char *vusb_be_from_xs_fe(libxl__gc *gc, const char *fe_path,
     const char *be_path;
     int r;
     uint32_t be_domid, fe_domid;
+    char be_type[16];
 
     r = libxl__xs_read_checked(gc, XBT_NULL, GCSPRINTF("%s/backend", fe_path),
                                &be_path);
@@ -300,10 +347,10 @@ static const char *vusb_be_from_xs_fe(libxl__gc *gc, const char *fe_path,
 
     /* Check to see that it has the proper form, and that fe_domid ==
      * target domid */
-    r = sscanf(be_path, "/local/domain/%d/backend/vusb/%d",
-               &be_domid, &fe_domid);
+    r = sscanf(be_path, "/local/domain/%d/backend/%15[^/]/%d",
+               &be_domid, be_type, &fe_domid);
 
-    if (r != 2 || fe_domid != tgt_domid) {
+    if (r != 3 || fe_domid != tgt_domid) {
         LOG(ERROR, "Malformed backend, refusing to use");
         return NULL;
     }
@@ -740,8 +787,9 @@ libxl__device_usbdev_set_default_usbctrl(libxl__gc *gc, uint32_t domid,
         for (j = 0; j < usbctrls[i].ports; j++) {
             const char *path, *tmp;
 
-            path = GCSPRINTF("%s/backend/vusb/%d/%d/port/%d",
+            path = GCSPRINTF("%s/backend/%s/%d/%d/port/%d",
                              libxl__xs_get_dompath(gc, LIBXL_TOOLSTACK_DOMID),
+                             pvusb_get_device_type(usbctrls[i].type),
                              domid, usbctrls[i].devid, j + 1);
             rc = libxl__xs_read_checked(gc, XBT_NULL, path, &tmp);
             if (rc) goto out;
@@ -883,11 +931,12 @@ out:
 
 /* Add usb information to xenstore
  *
- * Adding a usb device won't create new 'vusb' device, but only write
+ * Adding a usb device won't create new 'qusb'/'vusb' device, but only write
  * the device busid to the controller:port in xenstore.
  */
 static int libxl__device_usbdev_add_xenstore(libxl__gc *gc, uint32_t domid,
                                              libxl_device_usbdev *usbdev,
+                                             libxl_usbctrl_type type,
                                              bool update_json)
 {
     char *be_path, *busid;
@@ -931,8 +980,9 @@ static int libxl__device_usbdev_add_xenstore(libxl__gc *gc, uint32_t domid,
             if (rc) goto out;
         }
 
-        be_path = GCSPRINTF("%s/backend/vusb/%d/%d/port/%d",
+        be_path = GCSPRINTF("%s/backend/%s/%d/%d/port/%d",
                             libxl__xs_get_dompath(gc, LIBXL_TOOLSTACK_DOMID),
+                            pvusb_get_device_type(type),
                             domid, usbdev->ctrl, usbdev->port);
 
         LOG(DEBUG, "Adding usb device %s to xenstore: controller %d, port %d",
@@ -956,12 +1006,14 @@ out:
 }
 
 static int libxl__device_usbdev_remove_xenstore(libxl__gc *gc, uint32_t domid,
-                                                libxl_device_usbdev *usbdev)
+                                                libxl_device_usbdev *usbdev,
+                                                libxl_usbctrl_type type)
 {
     char *be_path;
 
-    be_path = GCSPRINTF("%s/backend/vusb/%d/%d/port/%d",
+    be_path = GCSPRINTF("%s/backend/%s/%d/%d/port/%d",
                         libxl__xs_get_dompath(gc, LIBXL_TOOLSTACK_DOMID),
+                        pvusb_get_device_type(type),
                         domid, usbdev->ctrl, usbdev->port);
 
     LOG(DEBUG, "Removing usb device from xenstore: controller %d, port %d",
@@ -971,12 +1023,14 @@ static int libxl__device_usbdev_remove_xenstore(libxl__gc *gc, uint32_t domid,
 }
 
 static char *usbdev_busid_from_ctrlport(libxl__gc *gc, uint32_t domid,
-                                        libxl_device_usbdev *usbdev)
+                                        libxl_device_usbdev *usbdev,
+                                        libxl_usbctrl_type type)
 {
     return libxl__xs_read(gc, XBT_NULL,
-                          GCSPRINTF("%s/backend/vusb/%d/%d/port/%d",
+                          GCSPRINTF("%s/backend/%s/%d/%d/port/%d",
                               libxl__xs_get_dompath(gc, LIBXL_TOOLSTACK_DOMID),
-                          domid, usbdev->ctrl, usbdev->port));
+                              pvusb_get_device_type(type),
+                              domid, usbdev->ctrl, usbdev->port));
 }
 
 /* get original driver path of usb interface, stored in @drvpath */
@@ -1333,14 +1387,24 @@ static int do_usbdev_add(libxl__gc *gc, uint32_t domid,
             goto out;
         }
 
-        rc = libxl__device_usbdev_add_xenstore(gc, domid, usbdev, update_json);
+        rc = libxl__device_usbdev_add_xenstore(gc, domid, usbdev,
+                                               LIBXL_USBCTRL_TYPE_PV,
+                                               update_json);
         if (rc) goto out;
 
         rc = usbback_dev_assign(gc, busid);
         if (rc) {
-            libxl__device_usbdev_remove_xenstore(gc, domid, usbdev);
+            libxl__device_usbdev_remove_xenstore(gc, domid, usbdev,
+                                                 LIBXL_USBCTRL_TYPE_PV);
             goto out;
         }
+        break;
+    case LIBXL_USBCTRL_TYPE_QUSB:
+        rc = libxl__device_usbdev_add_xenstore(gc, domid, usbdev,
+                                               LIBXL_USBCTRL_TYPE_QUSB,
+                                               update_json);
+        if (rc) goto out;
+
         break;
     case LIBXL_USBCTRL_TYPE_DEVICEMODEL:
     default:
@@ -1458,7 +1522,7 @@ static int do_usbdev_remove(libxl__gc *gc, uint32_t domid,
 
     switch (usbctrlinfo.type) {
     case LIBXL_USBCTRL_TYPE_PV:
-        busid = usbdev_busid_from_ctrlport(gc, domid, usbdev);
+        busid = usbdev_busid_from_ctrlport(gc, domid, usbdev, usbctrlinfo.type);
         if (!busid) {
             rc = ERROR_FAIL;
             goto out;
@@ -1483,7 +1547,8 @@ static int do_usbdev_remove(libxl__gc *gc, uint32_t domid,
             goto out;
         }
 
-        rc = libxl__device_usbdev_remove_xenstore(gc, domid, usbdev);
+        rc = libxl__device_usbdev_remove_xenstore(gc, domid, usbdev,
+                                                  LIBXL_USBCTRL_TYPE_PV);
         if (rc) {
             LOG(ERROR, "Error removing device from guest."
                 " Try running usbdev-detach again.");
@@ -1497,6 +1562,12 @@ static int do_usbdev_remove(libxl__gc *gc, uint32_t domid,
                 " the USB device or reloading the driver modules.");
             goto out;
         }
+
+        break;
+    case LIBXL_USBCTRL_TYPE_QUSB:
+        rc = libxl__device_usbdev_remove_xenstore(gc, domid, usbdev,
+                                                  LIBXL_USBCTRL_TYPE_QUSB);
+        if (rc) goto out;
 
         break;
     case LIBXL_USBCTRL_TYPE_DEVICEMODEL:
@@ -1583,7 +1654,6 @@ int libxl_ctrlport_to_device_usbdev(libxl_ctx *ctx,
     dompath = libxl__xs_get_dompath(gc, domid);
 
     fe_path = GCSPRINTF("%s/device/vusb/%d", dompath, ctrl);
-
     be_path = vusb_be_from_xs_fe(gc, fe_path, domid);
     if (!be_path) {
         rc = ERROR_FAIL;

@@ -737,8 +737,15 @@ Possible B<KEY>s are:
 
 =item B<type=TYPE>
 
-Specifies the usb controller type.  Currently only 'pv' and 'auto'
-are supported.
+Specifies the usb controller type.
+
+"pv" denotes a kernel based pvusb backend.
+
+"qusb" specifies a qemu base backend for pvusb.
+
+"auto" (the default) determines whether a kernel based backend is installed.
+If this is the case, "pv" is selected, "qusb" will be selected if no kernel
+backend is currently available.
 
 =item B<version=VERSION>
 

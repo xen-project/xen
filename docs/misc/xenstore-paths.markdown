@@ -358,6 +358,13 @@ A PV USB backend. Described by
 
 A PV console backend. Described in [console.txt](console.txt)
 
+#### ~/backend/qusb/$DOMID/$DEVID/* []
+
+A PV USB device backend. Described by
+[xen/include/public/io/usbif.h][USBIF]
+
+Uses the qemu based USB backend.
+
 #### ~/device-model/$DOMID/* [INTERNAL]
 
 Information relating to device models running in the domain. $DOMID is

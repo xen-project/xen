@@ -2365,6 +2365,14 @@ int libxl__need_xenpv_qemu(libxl__gc *gc, libxl_domain_config *d_config)
         }
     }
 
+    for (i = 0; i < d_config->num_usbctrls; i++) {
+       if (d_config->usbctrls[i].type == LIBXL_USBCTRL_TYPE_QUSB &&
+           d_config->usbctrls[i].backend_domid == domid) {
+            ret = 1;
+            goto out;
+        }
+    }
+
 out:
     return ret;
 }

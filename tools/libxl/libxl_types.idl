@@ -633,6 +633,7 @@ libxl_usbctrl_type = Enumeration("usbctrl_type", [
     (0, "AUTO"),
     (1, "PV"),
     (2, "DEVICEMODEL"),
+    (3, "QUSB"),
     ])
 
 libxl_usbdev_type = Enumeration("usbdev_type", [
