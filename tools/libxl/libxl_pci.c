@@ -169,6 +169,9 @@ static int libxl__device_pci_add_xenstore(libxl__gc *gc, uint32_t domid, libxl_d
 
     DEVICE_ADD(pci, pcidevs, domid, &pcidev_saved, COMPARE_PCI, &d_config);
 
+    rc = libxl__dm_check_start(gc, &d_config, domid);
+    if (rc) goto out;
+
     for (;;) {
         rc = libxl__xs_transaction_start(gc, &t);
         if (rc) goto out;

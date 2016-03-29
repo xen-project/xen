@@ -145,6 +145,9 @@ static int libxl__device_usbctrl_add_xenstore(libxl__gc *gc, uint32_t domid,
         DEVICE_ADD(usbctrl, usbctrls, domid, &usbctrl_saved,
                    COMPARE_USBCTRL, &d_config);
 
+        rc = libxl__dm_check_start(gc, &d_config, domid);
+        if (rc) goto out;
+
         if (usbctrl->type == LIBXL_USBCTRL_TYPE_QUSB) {
             if (!libxl__query_qemu_backend(gc, domid, usbctrl->backend_domid,
                                            "qusb", false)) {
@@ -969,6 +972,9 @@ static int libxl__device_usbdev_add_xenstore(libxl__gc *gc, uint32_t domid,
 
         DEVICE_ADD(usbdev, usbdevs, domid, &usbdev_saved,
                    COMPARE_USB, &d_config);
+
+        rc = libxl__dm_check_start(gc, &d_config, domid);
+        if (rc) goto out;
     }
 
     for (;;) {

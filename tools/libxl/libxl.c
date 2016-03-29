@@ -2104,6 +2104,9 @@ void libxl__device_vtpm_add(libxl__egc *egc, uint32_t domid,
         if (rc) goto out;
 
         DEVICE_ADD(vtpm, vtpms, domid, &vtpm_saved, COMPARE_DEVID, &d_config);
+
+        rc = libxl__dm_check_start(gc, &d_config, domid);
+        if (rc) goto out;
     }
 
     for (;;) {
@@ -2410,6 +2413,9 @@ static void device_disk_add(libxl__egc *egc, uint32_t domid,
         if (rc) goto out;
 
         DEVICE_ADD(disk, disks, domid, &disk_saved, COMPARE_DISK, &d_config);
+
+        rc = libxl__dm_check_start(gc, &d_config, domid);
+        if (rc) goto out;
     }
 
     for (;;) {
@@ -2982,6 +2988,9 @@ int libxl_cdrom_insert(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk,
 
     DEVICE_ADD(disk, disks, domid, &disk_saved, COMPARE_DISK, &d_config);
 
+    rc = libxl__dm_check_start(gc, &d_config, domid);
+    if (rc) goto out;
+
     if (dm_ver == LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN) {
         rc = libxl__qmp_insert_cdrom(gc, domid, disk);
         if (rc) goto out;
@@ -3484,6 +3493,9 @@ void libxl__device_nic_add(libxl__egc *egc, uint32_t domid,
         if (rc) goto out;
 
         DEVICE_ADD(nic, nics, domid, &nic_saved, COMPARE_DEVID, &d_config);
+
+        rc = libxl__dm_check_start(gc, &d_config, domid);
+        if (rc) goto out;
     }
 
     for (;;) {

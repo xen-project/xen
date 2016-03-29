@@ -1626,6 +1626,9 @@ _hidden bool libxl__query_qemu_backend(libxl__gc *gc,
                                        const char *type,
                                        bool def);
 _hidden int libxl__dm_active(libxl__gc *gc, uint32_t domid);
+_hidden int libxl__dm_check_start(libxl__gc *gc,
+                                  libxl_domain_config *d_config,
+                                  uint32_t domid);
 
 /*
  * This function will fix reserved device memory conflict

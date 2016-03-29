@@ -2387,6 +2387,28 @@ int libxl__dm_active(libxl__gc *gc, uint32_t domid)
     return pid != NULL;
 }
 
+int libxl__dm_check_start(libxl__gc *gc, libxl_domain_config *d_config,
+                          uint32_t domid)
+{
+    int rc;
+
+    if (libxl__dm_active(gc, domid))
+        return 0;
+
+    rc = libxl__need_xenpv_qemu(gc, d_config);
+    if (rc < 0)
+        goto out;
+
+    if (!rc)
+        return 0;
+
+    LOG(ERROR, "device model required but not running");
+    rc = ERROR_FAIL;
+
+out:
+    return rc;
+}
+
 /*
  * Local variables:
  * mode: C
