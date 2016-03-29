@@ -74,7 +74,7 @@ static struct ns16550 {
     u32 bar64;
     u16 cr;
     u8 bar_idx;
-    bool_t enable_ro; /* Make MMIO devices read only to Dom0 */
+    const struct ns16550_config_param *param; /* Points into .init.*! */
 #endif
 } ns16550_com[2] = { { 0 } };
 
@@ -624,7 +624,7 @@ static void __init ns16550_init_postirq(struct serial_port *port)
 #ifdef CONFIG_HAS_PCI
     if ( uart->bar || uart->ps_bdf_enable )
     {
-        if ( !uart->enable_ro )
+        if ( !uart->param )
             pci_hide_device(uart->ps_bdf[0], PCI_DEVFN(uart->ps_bdf[1],
                             uart->ps_bdf[2]));
         else
@@ -900,7 +900,7 @@ pci_uart_config(struct ns16550 *uart, bool_t skip_amt, unsigned int bar_idx)
                     /* Check for params in uart_config lookup table */
                     for ( i = 0; i < ARRAY_SIZE(uart_config); i++)
                     {
-                        unsigned int p;
+                        const struct ns16550_config_param *param;
 
                         if ( uart_config[i].vendor_id != vendor )
                             continue;
@@ -908,33 +908,34 @@ pci_uart_config(struct ns16550 *uart, bool_t skip_amt, unsigned int bar_idx)
                         if ( uart_config[i].dev_id != device )
                             continue;
 
-                        p = uart_config[i].param;
+                        param = uart_param + uart_config[i].param;
+
                         /*
                          * Force length of mmio region to be at least
                          * 8 bytes times (1 << reg_shift)
                          */
-                        if ( size < (0x8 * (1 << uart_param[p].reg_shift)) )
+                        if ( size < (0x8 * (1 << param->reg_shift)) )
                             continue;
 
-                        if ( bar_idx >= uart_param[p].max_bars )
+                        if ( bar_idx >= param->max_bars )
                             continue;
 
-                        if ( uart_param[p].fifo_size )
-                            uart->fifo_size = uart_param[p].fifo_size;
+                        uart->param = param;
 
-                        uart->reg_shift = uart_param[p].reg_shift;
-                        uart->reg_width = uart_param[p].reg_width;
-                        uart->lsr_mask = uart_param[p].lsr_mask;
+                        if ( param->fifo_size )
+                            uart->fifo_size = param->fifo_size;
+
+                        uart->reg_shift = param->reg_shift;
+                        uart->reg_width = param->reg_width;
+                        uart->lsr_mask = param->lsr_mask;
                         uart->io_base = ((u64)bar_64 << 32) |
                                         (bar & PCI_BASE_ADDRESS_MEM_MASK);
-                        uart->io_base += uart_param[p].first_offset;
-                        uart->io_base += bar_idx * uart_param[p].uart_offset;
-                        if ( uart_param[p].base_baud )
-                            uart->clock_hz = uart_param[p].base_baud * 16;
-                        size = max(8U << uart_param[p].reg_shift,
-                                   uart_param[p].uart_offset);
-                        /* Set device and MMIO region read only to Dom0 */
-                        uart->enable_ro = 1;
+                        uart->io_base += param->first_offset;
+                        uart->io_base += bar_idx * param->uart_offset;
+                        if ( param->base_baud )
+                            uart->clock_hz = param->base_baud * 16;
+                        size = max(8U << param->reg_shift,
+                                   param->uart_offset);
                         break;
                     }
 
@@ -1093,10 +1094,6 @@ static void __init ns16550_parse_port_config(
 static void ns16550_init_common(struct ns16550 *uart)
 {
     uart->clock_hz  = UART_CLOCK_HZ;
-
-#ifdef CONFIG_HAS_PCI
-    uart->enable_ro = 0;
-#endif
 
     /* Default is no transmit FIFO. */
     uart->fifo_size = 1;
