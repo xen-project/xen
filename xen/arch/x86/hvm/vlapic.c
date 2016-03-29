@@ -1189,7 +1189,7 @@ int vlapic_has_pending_irq(struct vcpu *v)
      * comparing with the IRR.
      */
     vector = viridian_complete_apic_assist(v);
-    if ( vector != -1 )
+    if ( vector )
         vlapic_clear_vector(vector, &vlapic->regs->data[APIC_ISR]);
 
     isr = vlapic_find_highest_isr(vlapic);

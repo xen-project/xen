@@ -252,7 +252,6 @@ static void initialize_apic_assist(struct vcpu *v)
     if ( viridian_feature_mask(v->domain) & HVMPV_apic_assist )
     {
         v->arch.hvm_vcpu.viridian.apic_assist.va = va;
-        v->arch.hvm_vcpu.viridian.apic_assist.vector = -1;
         return;
     }
 
@@ -288,12 +287,15 @@ void viridian_start_apic_assist(struct vcpu *v, int vector)
     if ( !va )
         return;
 
+    if ( vector < 0x10 )
+        return;
+
     /*
      * If there is already an assist pending then something has gone
      * wrong and the VM will most likely hang so force a crash now
      * to make the problem clear.
      */
-    if ( v->arch.hvm_vcpu.viridian.apic_assist.vector >= 0 )
+    if ( v->arch.hvm_vcpu.viridian.apic_assist.vector )
         domain_crash(v->domain);
 
     v->arch.hvm_vcpu.viridian.apic_assist.vector = vector;
@@ -306,13 +308,13 @@ int viridian_complete_apic_assist(struct vcpu *v)
     int vector;
 
     if ( !va )
-        return -1;
+        return 0;
 
     if ( *va & 1u )
-        return -1; /* Interrupt not yet processed by the guest. */
+        return 0; /* Interrupt not yet processed by the guest. */
 
     vector = v->arch.hvm_vcpu.viridian.apic_assist.vector;
-    v->arch.hvm_vcpu.viridian.apic_assist.vector = -1;
+    v->arch.hvm_vcpu.viridian.apic_assist.vector = 0;
 
     return vector;
 }
@@ -325,7 +327,7 @@ void viridian_abort_apic_assist(struct vcpu *v)
         return;
 
     *va &= ~1u;
-    v->arch.hvm_vcpu.viridian.apic_assist.vector = -1;
+    v->arch.hvm_vcpu.viridian.apic_assist.vector = 0;
 }
 
 static void update_reference_tsc(struct domain *d, bool_t initialize)
@@ -806,7 +808,8 @@ static int viridian_save_vcpu_ctxt(struct domain *d, hvm_domain_context_t *h)
     for_each_vcpu( d, v ) {
         struct hvm_viridian_vcpu_context ctxt;
 
-        ctxt.apic_assist = v->arch.hvm_vcpu.viridian.apic_assist.msr.raw;
+        ctxt.apic_assist_msr = v->arch.hvm_vcpu.viridian.apic_assist.msr.raw;
+        ctxt.apic_assist_vector = v->arch.hvm_vcpu.viridian.apic_assist.vector;
 
         if ( hvm_save_entry(VIRIDIAN_VCPU, v->vcpu_id, h, &ctxt) != 0 )
             return 1;
@@ -829,12 +832,14 @@ static int viridian_load_vcpu_ctxt(struct domain *d, hvm_domain_context_t *h)
         return -EINVAL;
     }
 
-    if ( hvm_load_entry(VIRIDIAN_VCPU, h, &ctxt) != 0 )
+    if ( hvm_load_entry_zeroextend(VIRIDIAN_VCPU, h, &ctxt) != 0 )
         return -EINVAL;
 
-    v->arch.hvm_vcpu.viridian.apic_assist.msr.raw = ctxt.apic_assist;
+    v->arch.hvm_vcpu.viridian.apic_assist.msr.raw = ctxt.apic_assist_msr;
     if ( v->arch.hvm_vcpu.viridian.apic_assist.msr.fields.enabled )
         initialize_apic_assist(v);
+
+    v->arch.hvm_vcpu.viridian.apic_assist.vector = ctxt.apic_assist_vector;
 
     return 0;
 }
