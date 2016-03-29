@@ -96,45 +96,36 @@ void xsave(struct vcpu *v, uint64_t mask)
     }
     else
     {
-        typeof(ptr->fpu_sse.fip.sel) fcs = ptr->fpu_sse.fip.sel;
-        typeof(ptr->fpu_sse.fdp.sel) fds = ptr->fpu_sse.fdp.sel;
+        /*
+         * FIP/FDP may not be written in some cases (e.g., if XSAVEOPT/XSAVES
+         * is used, or on AMD CPUs if an exception isn't pending).
+         *
+         * To tell if the hardware writes these fields, poison the FIP field.
+         * The poison is
+         * a) non-canonical
+         * b) non-zero for the reserved part of a 32-bit FCS:FIP
+         * c) random with a vanishingly small probability to match a value the
+         *    hardware may write (1e-19) even if it did not canonicalize the
+         *    64-bit FIP or zero-extend the 16-bit FCS.
+         */
+        uint64_t orig_fip = ptr->fpu_sse.fip.addr;
+        const uint64_t bad_fip = 0x6a3f5c4b13a533f6;
+
+        ptr->fpu_sse.fip.addr = bad_fip;
 
         if ( cpu_has_xsaveopt )
-        {
-            /*
-             * xsaveopt may not write the FPU portion even when the respective
-             * mask bit is set. For the check further down to work we hence
-             * need to put the save image back into the state that it was in
-             * right after the previous xsaveopt.
-             */
-            if ( ptr->fpu_sse.x[FPU_WORD_SIZE_OFFSET] == 4 ||
-                 ptr->fpu_sse.x[FPU_WORD_SIZE_OFFSET] == 2 )
-            {
-                ptr->fpu_sse.fip.sel = 0;
-                ptr->fpu_sse.fdp.sel = 0;
-            }
             asm volatile ( ".byte 0x48,0x0f,0xae,0x37"
                            : "=m" (*ptr)
                            : "a" (lmask), "d" (hmask), "D" (ptr) );
-        }
         else
             asm volatile ( ".byte 0x48,0x0f,0xae,0x27"
                            : "=m" (*ptr)
                            : "a" (lmask), "d" (hmask), "D" (ptr) );
 
-        if ( !(mask & ptr->xsave_hdr.xstate_bv & XSTATE_FP) ||
-             /*
-              * AMD CPUs don't save/restore FDP/FIP/FOP unless an exception
-              * is pending.
-              */
-             (!(ptr->fpu_sse.fsw & 0x0080) &&
-              boot_cpu_data.x86_vendor == X86_VENDOR_AMD) )
+        /* FIP/FDP not updated? Restore the old FIP value. */
+        if ( ptr->fpu_sse.fip.addr == bad_fip )
         {
-            if ( cpu_has_xsaveopt )
-            {
-                ptr->fpu_sse.fip.sel = fcs;
-                ptr->fpu_sse.fdp.sel = fds;
-            }
+            ptr->fpu_sse.fip.addr = orig_fip;
             return;
         }
 
