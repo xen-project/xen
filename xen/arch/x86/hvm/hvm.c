@@ -5876,6 +5876,7 @@ static int hvm_allow_set_param(struct domain *d,
     case HVM_PARAM_VM_GENERATION_ID_ADDR:
     case HVM_PARAM_STORE_EVTCHN:
     case HVM_PARAM_CONSOLE_EVTCHN:
+    case HVM_PARAM_X87_FIP_WIDTH:
         break;
     /*
      * The following parameters must not be set by the guest
@@ -6071,6 +6072,14 @@ static int hvmop_set_param(
 
         break;
     }
+    case HVM_PARAM_X87_FIP_WIDTH:
+        if ( a.value != 0 && a.value != 4 && a.value != 8 )
+        {
+            rc = -EINVAL;
+            break;
+        }
+        d->arch.x87_fip_width = a.value;
+        break;
     }
 
     if ( rc != 0 )
@@ -6107,6 +6116,7 @@ static int hvm_allow_get_param(struct domain *d,
     case HVM_PARAM_CONSOLE_PFN:
     case HVM_PARAM_CONSOLE_EVTCHN:
     case HVM_PARAM_ALTP2M:
+    case HVM_PARAM_X87_FIP_WIDTH:
         break;
     /*
      * The following parameters must not be read by the guest
@@ -6155,6 +6165,9 @@ static int hvmop_get_param(
     {
     case HVM_PARAM_ACPI_S_STATE:
         a.value = d->arch.hvm_domain.is_s3_suspended ? 3 : 0;
+        break;
+    case HVM_PARAM_X87_FIP_WIDTH:
+        a.value = d->arch.x87_fip_width;
         break;
     case HVM_PARAM_IOREQ_PFN:
     case HVM_PARAM_BUFIOREQ_PFN:

@@ -76,6 +76,7 @@ static int write_hvm_params(struct xc_sr_context *ctx)
         HVM_PARAM_VM_GENERATION_ID_ADDR,
         HVM_PARAM_IOREQ_SERVER_PFN,
         HVM_PARAM_NR_IOREQ_SERVER_PAGES,
+        HVM_PARAM_X87_FIP_WIDTH,
     };
 
     xc_interface *xch = ctx->xch;
