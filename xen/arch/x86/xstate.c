@@ -333,7 +333,7 @@ void xrstor(struct vcpu *v, uint64_t mask)
      * data block as a safe address because it should be in L1.
      */
     if ( (mask & ptr->xsave_hdr.xstate_bv & XSTATE_FP) &&
-         !(ptr->fpu_sse.fsw & 0x0080) &&
+         !(ptr->fpu_sse.fsw & ~ptr->fpu_sse.fcw & 0x003f) &&
          boot_cpu_data.x86_vendor == X86_VENDOR_AMD )
         asm volatile ( "fnclex\n\t"        /* clear exceptions */
                        "ffree %%st(7)\n\t" /* clear stack tag */
