@@ -1552,7 +1552,6 @@ void libxl__destroy_domid(libxl__egc *egc, libxl__destroy_domid_state *dis)
     libxl_ctx *ctx = CTX;
     uint32_t domid = dis->domid;
     char *dom_path;
-    char *pid;
     int rc, dm_present;
 
     libxl__ev_child_init(&dis->destroyer);
@@ -1575,8 +1574,7 @@ void libxl__destroy_domid(libxl__egc *egc, libxl__destroy_domid_state *dis)
         }
         /* fall through */
     case LIBXL_DOMAIN_TYPE_PV:
-        pid = libxl__xs_read(gc, XBT_NULL, GCSPRINTF("/local/domain/%d/image/device-model-pid", domid));
-        dm_present = (pid != NULL);
+        dm_present = libxl__dm_active(gc, domid);
         break;
     case LIBXL_DOMAIN_TYPE_INVALID:
         rc = ERROR_FAIL;

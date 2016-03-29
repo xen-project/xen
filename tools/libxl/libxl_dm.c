@@ -2377,6 +2377,16 @@ out:
     return ret;
 }
 
+int libxl__dm_active(libxl__gc *gc, uint32_t domid)
+{
+    char *pid, *path;
+
+    path = GCSPRINTF("/local/domain/%d/image/device-model-pid", domid);
+    pid = libxl__xs_read(gc, XBT_NULL, path);
+
+    return pid != NULL;
+}
+
 /*
  * Local variables:
  * mode: C
