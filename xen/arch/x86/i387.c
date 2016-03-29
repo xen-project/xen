@@ -49,7 +49,7 @@ static inline void fpu_fxrstor(struct vcpu *v)
      * sometimes new user value. Both should be ok. Use the FPU saved
      * data block as a safe address because it should be in L1.
      */
-    if ( !(fpu_ctxt->fsw & 0x0080) &&
+    if ( !(fpu_ctxt->fsw & ~fpu_ctxt->fcw & 0x003f) &&
          boot_cpu_data.x86_vendor == X86_VENDOR_AMD )
     {
         asm volatile ( "fnclex\n\t"
