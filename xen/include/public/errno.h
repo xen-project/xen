@@ -32,7 +32,7 @@
 #define XEN_ERRNO(name, value) XEN_##name = value,
 enum xen_errno {
 
-#else /* !__ASSEMBLY__ */
+#elif __XEN_INTERFACE_VERSION__ < 0x00040700
 
 #define XEN_ERRNO(name, value) .equ XEN_##name, value
 
