@@ -730,6 +730,8 @@ void __init setup_xenheap_mappings(unsigned long base_mfn,
         else
         {
             unsigned long first_mfn = alloc_boot_pages(1, 1);
+
+            clear_page(mfn_to_virt(first_mfn));
             pte = mfn_to_xen_entry(first_mfn, WRITEALLOC);
             pte.pt.table = 1;
             write_pte(p, pte);
@@ -773,6 +775,7 @@ void __init setup_frametable_mappings(paddr_t ps, paddr_t pe)
     second = mfn_to_virt(second_base);
     for ( i = 0; i < nr_second; i++ )
     {
+        clear_page(mfn_to_virt(second_base + i));
         pte = mfn_to_xen_entry(second_base + i, WRITEALLOC);
         pte.pt.table = 1;
         write_pte(&xen_first[first_table_offset(FRAMETABLE_VIRT_START)+i], pte);
