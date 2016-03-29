@@ -78,10 +78,20 @@ static struct ns16550 {
 #endif
 } ns16550_com[2] = { { 0 } };
 
-struct ns16550_config_mmio {
+#ifdef CONFIG_HAS_PCI
+struct ns16550_config {
     u16 vendor_id;
     u16 dev_id;
-    unsigned int param;
+    enum {
+        param_default, /* Must not be referenced by any table entry. */
+        param_trumanage,
+        param_oxford,
+        param_oxford_2port,
+        param_pericom_1port,
+        param_pericom_2port,
+        param_pericom_4port,
+        param_pericom_8port,
+    } param;
 };
 
 /* Defining uart config options for MMIO devices */
@@ -90,57 +100,95 @@ struct ns16550_config_param {
     unsigned int reg_width;
     unsigned int fifo_size;
     u8 lsr_mask;
-    unsigned int max_bars;
+    bool_t mmio;
+    bool_t bar0;
+    unsigned int max_ports;
     unsigned int base_baud;
     unsigned int uart_offset;
     unsigned int first_offset;
 };
 
-
-#ifdef CONFIG_HAS_PCI
-enum {
-    param_default = 0,
-    param_trumanage,
-    param_oxford,
-    param_oxford_2port,
-};
 /*
- * Create lookup tables for specific MMIO devices..
- * It is assumed that if the device found is MMIO,
- * then you have indexed it here. Else, the driver
- * does nothing.
+ * Create lookup tables for specific devices. It is assumed that if
+ * the device found is MMIO, then you have indexed it here. Else, the
+ * driver does nothing for MMIO based devices.
  */
 static const struct ns16550_config_param __initconst uart_param[] = {
-    [param_default] = { }, /* Ignored. */
+    [param_default] = {
+        .reg_width = 1,
+        .lsr_mask = UART_LSR_THRE,
+        .max_ports = 1,
+    },
     [param_trumanage] = {
         .reg_shift = 2,
         .reg_width = 1,
         .fifo_size = 16,
         .lsr_mask = (UART_LSR_THRE | UART_LSR_TEMT),
-        .max_bars = 1,
+        .mmio = 1,
+        .max_ports = 1,
     },
     [param_oxford] = {
         .base_baud = 4000000,
         .uart_offset = 0x200,
         .first_offset = 0x1000,
         .reg_width = 1,
-        .reg_shift = 0,
         .fifo_size = 16,
         .lsr_mask = UART_LSR_THRE,
-        .max_bars = 1, /* It can do more, but we would need more custom code.*/
+        .mmio = 1,
+        .max_ports = 1, /* It can do more, but we would need more custom code.*/
     },
     [param_oxford_2port] = {
         .base_baud = 4000000,
         .uart_offset = 0x200,
         .first_offset = 0x1000,
         .reg_width = 1,
-        .reg_shift = 0,
         .fifo_size = 16,
         .lsr_mask = UART_LSR_THRE,
-        .max_bars = 2,
+        .mmio = 1,
+        .max_ports = 2,
+    },
+    [param_pericom_1port] = {
+        .base_baud = 921600,
+        .uart_offset = 8,
+        .reg_width = 1,
+        .fifo_size = 16,
+        .lsr_mask = UART_LSR_THRE,
+        .bar0 = 1,
+        .max_ports = 1,
+    },
+    [param_pericom_2port] = {
+        .base_baud = 921600,
+        .uart_offset = 8,
+        .reg_width = 1,
+        .fifo_size = 16,
+        .lsr_mask = UART_LSR_THRE,
+        .bar0 = 1,
+        .max_ports = 2,
+    },
+    /*
+     * Of the two following ones, we can't really use all of their ports,
+     * unless ns16550_com[] would get grown.
+     */
+    [param_pericom_4port] = {
+        .base_baud = 921600,
+        .uart_offset = 8,
+        .reg_width = 1,
+        .fifo_size = 16,
+        .lsr_mask = UART_LSR_THRE,
+        .bar0 = 1,
+        .max_ports = 4,
+    },
+    [param_pericom_8port] = {
+        .base_baud = 921600,
+        .uart_offset = 8,
+        .reg_width = 1,
+        .fifo_size = 16,
+        .lsr_mask = UART_LSR_THRE,
+        .bar0 = 1,
+        .max_ports = 8,
     }
 };
-static const struct ns16550_config_mmio __initconst uart_config[] =
+static const struct ns16550_config __initconst uart_config[] =
 {
     /* Broadcom TruManage device */
     {
@@ -339,6 +387,30 @@ static const struct ns16550_config_mmio __initconst uart_config[] =
         .vendor_id = PCI_VENDOR_ID_OXSEMI,
         .dev_id = 0xc4cf,
         .param = param_oxford,
+    },
+    /* Pericom PI7C9X7951 Uno UART */
+    {
+        .vendor_id = PCI_VENDOR_ID_PERICOM,
+        .dev_id = 0x7951,
+        .param = param_pericom_1port
+    },
+    /* Pericom PI7C9X7952 Duo UART */
+    {
+        .vendor_id = PCI_VENDOR_ID_PERICOM,
+        .dev_id = 0x7952,
+        .param = param_pericom_2port
+    },
+    /* Pericom PI7C9X7954 Quad UART */
+    {
+        .vendor_id = PCI_VENDOR_ID_PERICOM,
+        .dev_id = 0x7954,
+        .param = param_pericom_4port
+    },
+    /* Pericom PI7C9X7958 Octal UART */
+    {
+        .vendor_id = PCI_VENDOR_ID_PERICOM,
+        .dev_id = 0x7958,
+        .param = param_pericom_8port
     }
 };
 #endif
@@ -629,7 +701,8 @@ static void __init ns16550_init_postirq(struct serial_port *port)
                             uart->ps_bdf[2]));
         else
         {
-            if ( rangeset_add_range(mmio_ro_ranges,
+            if ( uart->param->mmio &&
+                 rangeset_add_range(mmio_ro_ranges,
                                     uart->io_base,
                                     uart->io_base + uart->io_size - 1) )
                 printk(XENLOG_INFO "Error while adding MMIO range of device to mmio_ro_ranges\n");
@@ -830,12 +903,11 @@ static int __init check_existence(struct ns16550 *uart)
 
 #ifdef CONFIG_HAS_PCI
 static int __init
-pci_uart_config(struct ns16550 *uart, bool_t skip_amt, unsigned int bar_idx)
+pci_uart_config(struct ns16550 *uart, bool_t skip_amt, unsigned int idx)
 {
     u64 orig_base = uart->io_base;
     unsigned int b, d, f, nextf, i;
 
-    uart->io_base = 0;
     /* NB. Start at bus 1 to avoid AMT: a plug-in card cannot be on bus 0. */
     for ( b = skip_amt ? 1 : 0; b < 0x100; b++ )
     {
@@ -843,8 +915,10 @@ pci_uart_config(struct ns16550 *uart, bool_t skip_amt, unsigned int bar_idx)
         {
             for ( f = 0; f < 8; f = nextf )
             {
+                unsigned int bar_idx = 0, port_idx = idx;
                 uint32_t bar, bar_64 = 0, len, len_64;
-                u64 size;
+                u64 size = 0;
+                const struct ns16550_config_param *param = uart_param;
 
                 nextf = (f || (pci_conf_read16(0, b, d, f, PCI_HEADER_TYPE) &
                                0x80)) ? f + 1 : 8;
@@ -863,15 +937,39 @@ pci_uart_config(struct ns16550 *uart, bool_t skip_amt, unsigned int bar_idx)
                     continue;
                 }
 
-                bar = pci_conf_read32(0, b, d, f,
-                                      PCI_BASE_ADDRESS_0 + bar_idx*4);
-
-                /* MMIO based */
-                if ( !(bar & PCI_BASE_ADDRESS_SPACE_IO) )
+                /* Check for params in uart_config lookup table */
+                for ( i = 0; i < ARRAY_SIZE(uart_config); i++ )
                 {
                     u16 vendor = pci_conf_read16(0, b, d, f, PCI_VENDOR_ID);
                     u16 device = pci_conf_read16(0, b, d, f, PCI_DEVICE_ID);
 
+                    if ( uart_config[i].vendor_id == vendor &&
+                         uart_config[i].dev_id == device )
+                    {
+                        param += uart_config[i].param;
+                        break;
+                    }
+                }
+
+                if ( !param->bar0 )
+                {
+                    bar_idx = idx;
+                    port_idx = 0;
+                }
+
+                if ( port_idx >= param->max_ports )
+                {
+                    idx -= param->max_ports;
+                    continue;
+                }
+
+                uart->io_base = 0;
+                bar = pci_conf_read32(0, b, d, f,
+                                      PCI_BASE_ADDRESS_0 + bar_idx*4);
+
+                /* MMIO based */
+                if ( param->mmio && !(bar & PCI_BASE_ADDRESS_SPACE_IO) )
+                {
                     pci_conf_write32(0, b, d, f,
                                      PCI_BASE_ADDRESS_0 + bar_idx*4, ~0u);
                     len = pci_conf_read32(0, b, d, f, PCI_BASE_ADDRESS_0 + bar_idx*4);
@@ -895,56 +993,11 @@ pci_uart_config(struct ns16550 *uart, bool_t skip_amt, unsigned int bar_idx)
                     else
                         size = len & PCI_BASE_ADDRESS_MEM_MASK;
 
-                    size &= -size;
-
-                    /* Check for params in uart_config lookup table */
-                    for ( i = 0; i < ARRAY_SIZE(uart_config); i++)
-                    {
-                        const struct ns16550_config_param *param;
-
-                        if ( uart_config[i].vendor_id != vendor )
-                            continue;
-
-                        if ( uart_config[i].dev_id != device )
-                            continue;
-
-                        param = uart_param + uart_config[i].param;
-
-                        /*
-                         * Force length of mmio region to be at least
-                         * 8 bytes times (1 << reg_shift)
-                         */
-                        if ( size < (0x8 * (1 << param->reg_shift)) )
-                            continue;
-
-                        if ( bar_idx >= param->max_bars )
-                            continue;
-
-                        uart->param = param;
-
-                        if ( param->fifo_size )
-                            uart->fifo_size = param->fifo_size;
-
-                        uart->reg_shift = param->reg_shift;
-                        uart->reg_width = param->reg_width;
-                        uart->lsr_mask = param->lsr_mask;
-                        uart->io_base = ((u64)bar_64 << 32) |
-                                        (bar & PCI_BASE_ADDRESS_MEM_MASK);
-                        uart->io_base += param->first_offset;
-                        uart->io_base += bar_idx * param->uart_offset;
-                        if ( param->base_baud )
-                            uart->clock_hz = param->base_baud * 16;
-                        size = max(8U << param->reg_shift,
-                                   param->uart_offset);
-                        break;
-                    }
-
-                    /* If we have an io_base, then we succeeded in the lookup */
-                    if ( !uart->io_base )
-                        continue;
+                    uart->io_base = ((u64)bar_64 << 32) |
+                                    (bar & PCI_BASE_ADDRESS_MEM_MASK);
                 }
                 /* IO based */
-                else
+                else if ( !param->mmio && (bar & PCI_BASE_ADDRESS_SPACE_IO) )
                 {
                     pci_conf_write32(0, b, d, f,
                                      PCI_BASE_ADDRESS_0 + bar_idx*4, ~0u);
@@ -952,14 +1005,36 @@ pci_uart_config(struct ns16550 *uart, bool_t skip_amt, unsigned int bar_idx)
                     pci_conf_write32(0, b, d, f,
                                      PCI_BASE_ADDRESS_0 + bar_idx*4, bar);
                     size = len & PCI_BASE_ADDRESS_IO_MASK;
-                    size &= -size;
-
-                    /* Not at least 8 bytes */
-                    if ( size < 8 )
-                        continue;
 
                     uart->io_base = bar & ~PCI_BASE_ADDRESS_SPACE_IO;
                 }
+
+                /* If we have an io_base, then we succeeded in the lookup. */
+                if ( !uart->io_base )
+                    continue;
+
+                size &= -size;
+
+                /*
+                 * Require length of actually used region to be at least
+                 * 8 bytes times (1 << reg_shift).
+                 */
+                if ( size < param->first_offset +
+                            port_idx * param->uart_offset +
+                            (8 << param->reg_shift) )
+                    continue;
+
+                uart->param = param;
+
+                uart->reg_shift = param->reg_shift;
+                uart->reg_width = param->reg_width;
+                uart->lsr_mask = param->lsr_mask;
+                uart->io_base += param->first_offset +
+                                 port_idx * param->uart_offset;
+                if ( param->base_baud )
+                    uart->clock_hz = param->base_baud * 16;
+                if ( param->fifo_size )
+                    uart->fifo_size = param->fifo_size;
 
                 uart->ps_bdf[0] = b;
                 uart->ps_bdf[1] = d;
@@ -967,7 +1042,8 @@ pci_uart_config(struct ns16550 *uart, bool_t skip_amt, unsigned int bar_idx)
                 uart->bar_idx = bar_idx;
                 uart->bar = bar;
                 uart->bar64 = bar_64;
-                uart->io_size = size;
+                uart->io_size = max(8U << param->reg_shift,
+                                    param->uart_offset);
                 uart->irq = pci_conf_read8(0, b, d, f, PCI_INTERRUPT_PIN) ?
                     pci_conf_read8(0, b, d, f, PCI_INTERRUPT_LINE) : 0;
 
