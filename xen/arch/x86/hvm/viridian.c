@@ -251,6 +251,14 @@ static void initialize_apic_assist(struct vcpu *v)
 
     if ( viridian_feature_mask(v->domain) & HVMPV_apic_assist )
     {
+        /*
+         * If we overwrite an existing address here then something has
+         * gone wrong and a domain page will leak. Instead crash the
+         * domain to make the problem obvious.
+         */
+        if ( v->arch.hvm_vcpu.viridian.apic_assist.va )
+            domain_crash(d);
+
         v->arch.hvm_vcpu.viridian.apic_assist.va = va;
         return;
     }
@@ -606,6 +614,14 @@ int rdmsr_viridian_regs(uint32_t idx, uint64_t *val)
 void viridian_vcpu_deinit(struct vcpu *v)
 {
     teardown_apic_assist(v);
+}
+
+void viridian_domain_deinit(struct domain *d)
+{
+    struct vcpu *v;
+
+    for_each_vcpu ( d, v )
+        teardown_apic_assist(v);
 }
 
 static DEFINE_PER_CPU(cpumask_t, ipi_cpumask);

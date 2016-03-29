@@ -122,6 +122,7 @@ void viridian_time_ref_count_freeze(struct domain *d);
 void viridian_time_ref_count_thaw(struct domain *d);
 
 void viridian_vcpu_deinit(struct vcpu *v);
+void viridian_domain_deinit(struct domain *d);
 
 void viridian_start_apic_assist(struct vcpu *v, int vector);
 int viridian_complete_apic_assist(struct vcpu *v);

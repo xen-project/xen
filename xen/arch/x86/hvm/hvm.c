@@ -1726,6 +1726,8 @@ void hvm_domain_relinquish_resources(struct domain *d)
     if ( hvm_funcs.nhvm_domain_relinquish_resources )
         hvm_funcs.nhvm_domain_relinquish_resources(d);
 
+    viridian_domain_deinit(d);
+
     hvm_destroy_all_ioreq_servers(d);
 
     msixtbl_pt_cleanup(d);
