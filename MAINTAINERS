@@ -125,7 +125,7 @@ F:	xen/common/sched_arinc653.c
 F:	tools/libxc/xc_arinc653.c
 
 ARM (W/ VIRTUALISATION EXTENSIONS) ARCHITECTURE
-M:	Stefano Stabellini <stefano.stabellini@citrix.com>
+M:	Stefano Stabellini <sstabellini@kernel.org>
 M:	Julien Grall <julien.grall@arm.com>
 S:	Supported
 L:	xen-devel@lists.xen.org
@@ -145,7 +145,7 @@ S:	Supported
 F:	xen/common/cpupool.c
 
 DEVICE TREE
-M:	Stefano Stabellini <stefano.stabellini@citrix.com>
+M:	Stefano Stabellini <sstabellini@kernel.org>
 M:	Julien Grall <julien.grall@arm.com>
 S:	Supported
 F:	xen/common/libfdt/
@@ -233,7 +233,6 @@ S:	Supported
 F:	xen/arch/x86/cpu/mcheck/
 
 MINI-OS
-M:	Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 M:	Samuel Thibault <samuel.thibault@ens-lyon.org>
 S:	Supported
 L:	minios-devel@lists.xenproject.org
@@ -267,7 +266,7 @@ S:	Supported
 T:	git git://xenbits.xen.org/qemu-xen-traditional.git
 
 QEMU UPSTREAM
-M:	Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+M:	Stefano Stabellini <sstabellini@kernel.org>
 M:	Anthony Perard <anthony.perard@citrix.com>
 S:	Supported
 T:	git git://xenbits.xen.org/qemu-xen.git
@@ -303,7 +302,6 @@ S:	Supported
 T:	git git://xenbits.xen.org/seabios.git
 
 STUB DOMAINS
-M:	Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 M:	Samuel Thibault <samuel.thibault@ens-lyon.org>
 S:	Supported
 F:	config/Stubdom.mk.in
@@ -312,7 +310,6 @@ F:	stubdom/
 
 TOOLSTACK
 M:	Ian Jackson <ian.jackson@eu.citrix.com>
-M:	Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 M:	Wei Liu <wei.liu2@citrix.com>
 S:	Supported
 F:	autogen.sh
