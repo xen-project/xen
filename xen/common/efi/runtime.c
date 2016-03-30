@@ -10,14 +10,16 @@ DEFINE_XEN_GUEST_HANDLE(CHAR16);
 
 #ifndef COMPAT
 
-#ifdef CONFIG_ARM  /* Disabled until runtime services implemented */
-const bool_t efi_enabled = 0;
-#else
+/*
+ * Currently runtime services are not implemented on ARM. To boot Xen with ACPI,
+ * set efi_enabled to 1, so that Xen can get the ACPI root pointer from EFI.
+ */
+const bool_t efi_enabled = 1;
+
+#ifndef CONFIG_ARM
 # include <asm/i387.h>
 # include <asm/xstate.h>
 # include <public/platform.h>
-
-const bool_t efi_enabled = 1;
 #endif
 
 unsigned int __read_mostly efi_num_ct;
