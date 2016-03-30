@@ -1138,6 +1138,9 @@ int xenmem_add_to_physmap_one(
         rcu_unlock_domain(od);
         break;
     }
+    case XENMAPSPACE_dev_mmio:
+        rc = map_dev_mmio_region(d, gpfn, 1, idx);
+        return rc;
 
     default:
         return -ENOSYS;

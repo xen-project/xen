@@ -834,6 +834,19 @@ static int get_reserved_device_memory(xen_pfn_t start, xen_ulong_t nr,
 }
 #endif
 
+static long xatp_permission_check(struct domain *d, unsigned int space)
+{
+    /*
+     * XENMAPSPACE_dev_mmio mapping is only supported for hardware Domain
+     * to map this kind of space to itself.
+     */
+    if ( (space == XENMAPSPACE_dev_mmio) &&
+         (!is_hardware_domain(current->domain) || (d != current->domain)) )
+        return -EACCES;
+
+    return xsm_add_to_physmap(XSM_TARGET, current->domain, d);
+}
+
 long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 {
     struct domain *d;
@@ -980,7 +993,7 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( d == NULL )
             return -ESRCH;
 
-        rc = xsm_add_to_physmap(XSM_TARGET, current->domain, d);
+        rc = xatp_permission_check(d, xatp.space);
         if ( rc )
         {
             rcu_unlock_domain(d);
@@ -1024,7 +1037,7 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( d == NULL )
             return -ESRCH;
 
-        rc = xsm_add_to_physmap(XSM_TARGET, current->domain, d);
+        rc = xatp_permission_check(d, xatpb.space);
         if ( rc )
         {
             rcu_unlock_domain(d);

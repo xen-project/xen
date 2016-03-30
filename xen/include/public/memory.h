@@ -220,6 +220,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_machphys_mapping_t);
 #define XENMAPSPACE_gmfn_range   3 /* GMFN range, XENMEM_add_to_physmap only. */
 #define XENMAPSPACE_gmfn_foreign 4 /* GMFN from another dom,
                                     * XENMEM_add_to_physmap_batch only. */
+#define XENMAPSPACE_dev_mmio     5 /* device mmio region */
 /* ` } */
 
 /*

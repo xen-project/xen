@@ -7,6 +7,7 @@
 #include <xen/bitops.h>
 #include <xen/vm_event.h>
 #include <xen/mem_access.h>
+#include <xen/iocap.h>
 #include <public/vm_event.h>
 #include <asm/flushtlb.h>
 #include <asm/gic.h>
@@ -1268,6 +1269,27 @@ int unmap_mmio_regions(struct domain *d,
                              pfn_to_paddr(mfn),
                              MATTR_DEV, 0, p2m_invalid,
                              d->arch.p2m.default_access);
+}
+
+int map_dev_mmio_region(struct domain *d,
+                        unsigned long start_gfn,
+                        unsigned long nr,
+                        unsigned long mfn)
+{
+    int res;
+
+    if ( !(nr && iomem_access_permitted(d, start_gfn, start_gfn + nr - 1)) )
+        return 0;
+
+    res = map_mmio_regions(d, start_gfn, nr, mfn);
+    if ( res < 0 )
+    {
+        printk(XENLOG_ERR "Unable to map [%#lx - %#lx] in Dom%d\n",
+               start_gfn, start_gfn + nr - 1, d->domain_id);
+        return res;
+    }
+
+    return 0;
 }
 
 int guest_physmap_add_entry(struct domain *d,
