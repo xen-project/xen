@@ -1357,6 +1357,44 @@ static int prepare_dtb(struct domain *d, struct kernel_info *kinfo)
 }
 
 #ifdef CONFIG_ACPI
+
+static int acpi_create_fadt(struct domain *d, struct membank tbl_add[])
+{
+    struct acpi_table_header *table = NULL;
+    struct acpi_table_fadt *fadt = NULL;
+    u64 table_size;
+    acpi_status status;
+    u8 *base_ptr;
+    u8 checksum;
+
+    status = acpi_get_table(ACPI_SIG_FADT, 0, &table);
+
+    if ( ACPI_FAILURE(status) )
+    {
+        const char *msg = acpi_format_exception(status);
+
+        printk("Failed to get FADT table, %s\n", msg);
+        return -EINVAL;
+    }
+
+    table_size = table->length;
+    base_ptr = d->arch.efi_acpi_table
+               + acpi_get_table_offset(tbl_add, TBL_FADT);
+    ACPI_MEMCPY(base_ptr, table, table_size);
+    fadt = (struct acpi_table_fadt *)base_ptr;
+
+    /* Set PSCI_COMPLIANT and PSCI_USE_HVC */
+    fadt->arm_boot_flags |= (ACPI_FADT_PSCI_COMPLIANT | ACPI_FADT_PSCI_USE_HVC);
+    checksum = acpi_tb_checksum(ACPI_CAST_PTR(u8, fadt), table_size);
+    fadt->header.checksum -= checksum;
+
+    tbl_add[TBL_FADT].start = d->arch.efi_acpi_gpa
+                              + acpi_get_table_offset(tbl_add, TBL_FADT);
+    tbl_add[TBL_FADT].size = table_size;
+
+    return 0;
+}
+
 static int estimate_acpi_efi_size(struct domain *d, struct kernel_info *kinfo)
 {
     size_t efi_size, acpi_size, madt_size;
@@ -1415,6 +1453,7 @@ static int prepare_acpi(struct domain *d, struct kernel_info *kinfo)
 {
     int rc = 0;
     int order;
+    struct membank tbl_add[TBL_MMAX] = {};
 
     rc = estimate_acpi_efi_size(d, kinfo);
     if ( rc != 0 )
@@ -1440,6 +1479,10 @@ static int prepare_acpi(struct domain *d, struct kernel_info *kinfo)
         printk("The grant table region is not enough to fit the ACPI tables!\n");
         return -EINVAL;
     }
+
+    rc = acpi_create_fadt(d, tbl_add);
+    if ( rc != 0 )
+        return rc;
 
     return 0;
 }
