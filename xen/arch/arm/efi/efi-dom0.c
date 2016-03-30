@@ -24,6 +24,7 @@
 #include "efi.h"
 #include "efi-dom0.h"
 #include <xen/sched.h>
+#include <xen/pfn.h>
 #include <asm/setup.h>
 #include <asm/acpi.h>
 #include "../../../common/decompress.h"
@@ -92,6 +93,49 @@ void __init acpi_create_efi_system_table(struct domain *d,
 
     tbl_add[TBL_EFIT].start = table_addr;
     tbl_add[TBL_EFIT].size = table_size;
+}
+
+void __init acpi_create_efi_mmap_table(struct domain *d,
+                                       const struct meminfo *mem,
+                                       struct membank tbl_add[])
+{
+    EFI_MEMORY_DESCRIPTOR *memory_map;
+    unsigned int i, offset;
+    u8 *base_ptr;
+
+    base_ptr = d->arch.efi_acpi_table
+               + acpi_get_table_offset(tbl_add, TBL_MMAP);
+    memory_map = (EFI_MEMORY_DESCRIPTOR *)base_ptr;
+
+    offset = 0;
+    for( i = 0; i < mem->nr_banks; i++, offset++ )
+    {
+        memory_map[offset].Type = EfiConventionalMemory;
+        memory_map[offset].PhysicalStart = mem->bank[i].start;
+        BUG_ON(mem->bank[i].size & EFI_PAGE_MASK);
+        memory_map[offset].NumberOfPages = EFI_SIZE_TO_PAGES(mem->bank[i].size);
+        memory_map[offset].Attribute = EFI_MEMORY_WB;
+    }
+
+    for( i = 0; i < acpi_mem.nr_banks; i++, offset++ )
+    {
+        memory_map[offset].Type = EfiACPIReclaimMemory;
+        memory_map[offset].PhysicalStart = acpi_mem.bank[i].start;
+        BUG_ON(acpi_mem.bank[i].size & EFI_PAGE_MASK);
+        memory_map[offset].NumberOfPages = EFI_SIZE_TO_PAGES(acpi_mem.bank[i].size);
+        memory_map[offset].Attribute = EFI_MEMORY_WB;
+    }
+
+    memory_map[offset].Type = EfiACPIReclaimMemory;
+    memory_map[offset].PhysicalStart = d->arch.efi_acpi_gpa;
+    BUG_ON(d->arch.efi_acpi_len & EFI_PAGE_MASK);
+    memory_map[offset].NumberOfPages = EFI_SIZE_TO_PAGES(d->arch.efi_acpi_len);
+    memory_map[offset].Attribute = EFI_MEMORY_WB;
+
+    tbl_add[TBL_MMAP].start = d->arch.efi_acpi_gpa
+                              + acpi_get_table_offset(tbl_add, TBL_MMAP);
+    tbl_add[TBL_MMAP].size = sizeof(EFI_MEMORY_DESCRIPTOR)
+                             * (mem->nr_banks + acpi_mem.nr_banks + 1);
 }
 
 /*

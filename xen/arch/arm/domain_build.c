@@ -1721,6 +1721,7 @@ static int prepare_acpi(struct domain *d, struct kernel_info *kinfo)
 
     acpi_map_other_tables(d);
     acpi_create_efi_system_table(d, tbl_add);
+    acpi_create_efi_mmap_table(d, &kinfo->mem, tbl_add);
 
     return 0;
 }

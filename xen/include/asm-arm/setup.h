@@ -56,6 +56,10 @@ size_t estimate_efi_size(int mem_nr_banks);
 void acpi_create_efi_system_table(struct domain *d,
                                   struct membank tbl_add[]);
 
+void acpi_create_efi_mmap_table(struct domain *d,
+                                const struct meminfo *mem,
+                                struct membank tbl_add[]);
+
 int construct_dom0(struct domain *d);
 
 void discard_initial_modules(void);
