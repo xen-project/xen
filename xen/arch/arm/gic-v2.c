@@ -22,6 +22,7 @@
 #include <xen/init.h>
 #include <xen/mm.h>
 #include <xen/irq.h>
+#include <xen/iocap.h>
 #include <xen/sched.h>
 #include <xen/errno.h>
 #include <xen/softirq.h>
@@ -684,6 +685,31 @@ static void __init gicv2_dt_init(void)
                csize, vsize);
 }
 
+static int gicv2_iomem_deny_access(const struct domain *d)
+{
+    int rc;
+    unsigned long gfn, nr;
+
+    gfn = dbase >> PAGE_SHIFT;
+    rc = iomem_deny_access(d, gfn, gfn + 1);
+    if ( rc )
+        return rc;
+
+    gfn = hbase >> PAGE_SHIFT;
+    rc = iomem_deny_access(d, gfn, gfn + 1);
+    if ( rc )
+        return rc;
+
+    gfn = cbase >> PAGE_SHIFT;
+    nr = DIV_ROUND_UP(csize, PAGE_SIZE);
+    rc = iomem_deny_access(d, gfn, gfn + nr);
+    if ( rc )
+        return rc;
+
+    gfn = vbase >> PAGE_SHIFT;
+    return iomem_deny_access(d, gfn, gfn + nr);
+}
+
 #ifdef CONFIG_ACPI
 static int gicv2_make_hwdom_madt(const struct domain *d, u32 offset)
 {
@@ -910,6 +936,7 @@ const static struct gic_hw_operations gicv2_ops = {
     .read_apr            = gicv2_read_apr,
     .make_hwdom_dt_node  = gicv2_make_hwdom_dt_node,
     .make_hwdom_madt     = gicv2_make_hwdom_madt,
+    .iomem_deny_access   = gicv2_iomem_deny_access,
 };
 
 /* Set up the GIC */

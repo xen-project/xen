@@ -27,6 +27,7 @@
 #include <xen/cpu.h>
 #include <xen/mm.h>
 #include <xen/irq.h>
+#include <xen/iocap.h>
 #include <xen/sched.h>
 #include <xen/errno.h>
 #include <xen/delay.h>
@@ -1235,6 +1236,45 @@ static void __init gicv3_dt_init(void)
                           &vbase, &vsize);
 }
 
+static int gicv3_iomem_deny_access(const struct domain *d)
+{
+    int rc, i;
+    unsigned long gfn, nr;
+
+    gfn = dbase >> PAGE_SHIFT;
+    nr = DIV_ROUND_UP(SZ_64K, PAGE_SIZE);
+    rc = iomem_deny_access(d, gfn, gfn + nr);
+    if ( rc )
+        return rc;
+
+    for ( i = 0; i < gicv3.rdist_count; i++ )
+    {
+        gfn = gicv3.rdist_regions[i].base >> PAGE_SHIFT;
+        nr = DIV_ROUND_UP(gicv3.rdist_regions[i].size, PAGE_SIZE);
+        rc = iomem_deny_access(d, gfn, gfn + nr);
+        if ( rc )
+            return rc;
+    }
+
+    if ( cbase != INVALID_PADDR )
+    {
+        gfn = cbase >> PAGE_SHIFT;
+        nr = DIV_ROUND_UP(csize, PAGE_SIZE);
+        rc = iomem_deny_access(d, gfn, gfn + nr);
+        if ( rc )
+            return rc;
+    }
+
+    if ( vbase != INVALID_PADDR )
+    {
+        gfn = vbase >> PAGE_SHIFT;
+        nr = DIV_ROUND_UP(csize, PAGE_SIZE);
+        return iomem_deny_access(d, gfn, gfn + nr);
+    }
+
+    return 0;
+}
+
 #ifdef CONFIG_ACPI
 static int gicv3_make_hwdom_madt(const struct domain *d, u32 offset)
 {
@@ -1530,6 +1570,7 @@ static const struct gic_hw_operations gicv3_ops = {
     .secondary_init      = gicv3_secondary_cpu_init,
     .make_hwdom_dt_node  = gicv3_make_hwdom_dt_node,
     .make_hwdom_madt     = gicv3_make_hwdom_madt,
+    .iomem_deny_access   = gicv3_iomem_deny_access,
 };
 
 static int __init gicv3_dt_preinit(struct dt_device_node *node, const void *data)
