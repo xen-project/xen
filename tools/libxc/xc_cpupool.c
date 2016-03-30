@@ -20,6 +20,7 @@
  */
 
 #include <stdarg.h>
+#include <unistd.h>
 #include "xc_private.h"
 
 static int do_sysctl_save(xc_interface *xch, struct xen_sysctl *sysctl)
@@ -137,17 +138,34 @@ int xc_cpupool_addcpu(xc_interface *xch,
     return do_sysctl_save(xch, &sysctl);
 }
 
+/*
+ * The hypervisor might return EBUSY when trying to remove a cpu from a
+ * cpupool when a domain running in this cpupool has pinned a vcpu
+ * temporarily. Do some retries in this case, perhaps the situation
+ * cleans up.
+ */
+#define NUM_RMCPU_BUSY_RETRIES 5
+
 int xc_cpupool_removecpu(xc_interface *xch,
                          uint32_t poolid,
                          int cpu)
 {
+    unsigned retries;
+    int err;
     DECLARE_SYSCTL;
 
     sysctl.cmd = XEN_SYSCTL_cpupool_op;
     sysctl.u.cpupool_op.op = XEN_SYSCTL_CPUPOOL_OP_RMCPU;
     sysctl.u.cpupool_op.cpupool_id = poolid;
     sysctl.u.cpupool_op.cpu = (cpu < 0) ? XEN_SYSCTL_CPUPOOL_PAR_ANY : cpu;
-    return do_sysctl_save(xch, &sysctl);
+    for ( retries = 0; retries < NUM_RMCPU_BUSY_RETRIES; retries++ ) {
+        err = do_sysctl_save(xch, &sysctl);
+        if ( err < 0 && errno == EBUSY )
+            sleep(1);
+        else
+            break;
+    }
+    return err;
 }
 
 int xc_cpupool_movedomain(xc_interface *xch,

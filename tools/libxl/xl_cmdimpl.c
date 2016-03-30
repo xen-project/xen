@@ -5641,6 +5641,10 @@ int main_vcpulist(int argc, char **argv)
 
 int main_vcpupin(int argc, char **argv)
 {
+    static struct option opts[] = {
+        {"force", 0, 0, 'f'},
+        COMMON_LONG_OPTS
+    };
     libxl_vcpuinfo *vcpuinfo;
     libxl_bitmap cpumap_hard, cpumap_soft;;
     libxl_bitmap *soft = &cpumap_soft, *hard = &cpumap_hard;
@@ -5653,12 +5657,17 @@ int main_vcpupin(int argc, char **argv)
     const char *vcpu, *hard_str, *soft_str;
     char *endptr;
     int opt, nb_cpu, nb_vcpu, rc = EXIT_FAILURE;
+    bool force = false;
 
     libxl_bitmap_init(&cpumap_hard);
     libxl_bitmap_init(&cpumap_soft);
 
-    SWITCH_FOREACH_OPT(opt, "", NULL, "vcpu-pin", 3) {
-        /* No options */
+    SWITCH_FOREACH_OPT(opt, "f", opts, "vcpu-pin", 3) {
+    case 'f':
+        force = true;
+        break;
+    default:
+        break;
     }
 
     domid = find_domain(argv[optind]);
@@ -5671,6 +5680,10 @@ int main_vcpupin(int argc, char **argv)
     if (vcpu == endptr || vcpuid < 0) {
         if (strcmp(vcpu, "all")) {
             fprintf(stderr, "Error: Invalid argument %s as VCPU.\n", vcpu);
+            goto out;
+        }
+        if (force) {
+            fprintf(stderr, "Error: --force and 'all' as VCPU not allowed.\n");
             goto out;
         }
         vcpuid = -1;
@@ -5734,7 +5747,14 @@ int main_vcpupin(int argc, char **argv)
         goto out;
     }
 
-    if (vcpuid != -1) {
+    if (force) {
+        if (libxl_set_vcpuaffinity_force(ctx, domid, vcpuid, hard, soft)) {
+            fprintf(stderr, "Could not set affinity for vcpu `%ld'.\n",
+                    vcpuid);
+            goto out;
+        }
+    }
+    else if (vcpuid != -1) {
         if (libxl_set_vcpuaffinity(ctx, domid, vcpuid, hard, soft)) {
             fprintf(stderr, "Could not set affinity for vcpu `%ld'.\n",
                     vcpuid);
@@ -8013,8 +8033,10 @@ int main_cpupoolcpuremove(int argc, char **argv)
         goto out;
     }
 
-    if (libxl_cpupool_cpuremove_cpumap(ctx, poolid, &cpumap))
-        fprintf(stderr, "some cpus may not have been removed from %s\n", pool);
+    if (libxl_cpupool_cpuremove_cpumap(ctx, poolid, &cpumap)) {
+        fprintf(stderr, "Some cpus may have not or only partially been removed from '%s'.\n", pool);
+        fprintf(stderr, "If a cpu can't be added to another cpupool, add it to '%s' again and retry.\n", pool);
+    }
 
     rc = EXIT_SUCCESS;
 

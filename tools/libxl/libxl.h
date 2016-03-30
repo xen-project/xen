@@ -154,6 +154,12 @@
 #define LIBXL_HAVE_VCPUINFO_SOFT_AFFINITY 1
 
 /*
+ * LIBXL_HAVE_SET_VCPUAFFINITY_FORCE indicates that the
+ * libxl_set_vcpuaffinity_force() library call is available.
+ */
+#define LIBXL_HAVE_SET_VCPUAFFINITY_FORCE 1
+
+/*
  * LIBXL_HAVE_DEVICE_DISK_DIRECT_IO_SAFE indicates that a
  * 'direct_io_safe' field (of boolean type) is present in
  * libxl_device_disk.
@@ -1798,6 +1804,10 @@ int libxl_get_physinfo(libxl_ctx *ctx, libxl_physinfo *physinfo);
 int libxl_set_vcpuaffinity(libxl_ctx *ctx, uint32_t domid, uint32_t vcpuid,
                            const libxl_bitmap *cpumap_hard,
                            const libxl_bitmap *cpumap_soft);
+int libxl_set_vcpuaffinity_force(libxl_ctx *ctx, uint32_t domid,
+                                 uint32_t vcpuid,
+                                 const libxl_bitmap *cpumap_hard,
+                                 const libxl_bitmap *cpumap_soft);
 int libxl_set_vcpuaffinity_all(libxl_ctx *ctx, uint32_t domid,
                                unsigned int max_vcpus,
                                const libxl_bitmap *cpumap_hard,

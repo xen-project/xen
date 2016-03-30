@@ -689,7 +689,7 @@ after B<vcpu-set>, go to B<SEE ALSO> section for information.
 Lists VCPU information for a specific domain.  If no domain is
 specified, VCPU information for all domains will be provided.
 
-=item B<vcpu-pin> I<domain-id> I<vcpu> I<cpus hard> I<cpus soft>
+=item B<vcpu-pin> [I<-f|--force>] I<domain-id> I<vcpu> I<cpus hard> I<cpus soft>
 
 Set hard and soft affinity for a I<vcpu> of <domain-id>. Normally VCPUs
 can float between available CPUs whenever Xen deems a different run state
@@ -715,6 +715,11 @@ leaving its hard affinity untouched. On the othe hand:
 
 will set both hard and soft affinity, the former to pCPUs 3 and 4, the
 latter to pCPUs 6,7,8, and 9.
+
+Specifying I<-f> or I<--force> will remove a temporary pinning done by the
+operating system (normally this should be done by the operating system).
+In case a temporary pinning is active for a vcpu the affinity of this vcpu
+can't be changed without this option.
 
 =item B<vm-list>
 
