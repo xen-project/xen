@@ -1357,6 +1357,62 @@ static int prepare_dtb(struct domain *d, struct kernel_info *kinfo)
 }
 
 #ifdef CONFIG_ACPI
+static int acpi_create_madt(struct domain *d, struct membank tbl_add[])
+{
+    struct acpi_table_header *table = NULL;
+    struct acpi_table_madt *madt = NULL;
+    struct acpi_subtable_header *header;
+    struct acpi_madt_generic_distributor *gicd;
+    u32 table_size = sizeof(struct acpi_table_madt);
+    u32 offset = acpi_get_table_offset(tbl_add, TBL_MADT);
+    int ret;
+    acpi_status status;
+    u8 *base_ptr, checksum;
+
+    status = acpi_get_table(ACPI_SIG_MADT, 0, &table);
+
+    if ( ACPI_FAILURE(status) )
+    {
+        const char *msg = acpi_format_exception(status);
+
+        printk("Failed to get MADT table, %s\n", msg);
+        return -EINVAL;
+    }
+
+    base_ptr = d->arch.efi_acpi_table + offset;
+    ACPI_MEMCPY(base_ptr, table, table_size);
+
+    /* Add Generic Distributor. */
+    header = acpi_table_get_entry_madt(ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR, 0);
+    if ( !header )
+    {
+        printk("Can't get GICD entry\n");
+        return -EINVAL;
+    }
+    gicd = container_of(header, struct acpi_madt_generic_distributor, header);
+    ACPI_MEMCPY(base_ptr + table_size, gicd,
+                sizeof(struct acpi_madt_generic_distributor));
+    table_size += sizeof(struct acpi_madt_generic_distributor);
+
+    /* Add other subtables. */
+    ret = gic_make_hwdom_madt(d, offset + table_size);
+    if ( ret < 0 )
+    {
+        printk("Failed to get other subtables\n");
+        return -EINVAL;
+    }
+    table_size += ret;
+
+    madt = (struct acpi_table_madt *)base_ptr;
+    madt->header.length = table_size;
+    checksum = acpi_tb_checksum(ACPI_CAST_PTR(u8, madt), table_size);
+    madt->header.checksum -= checksum;
+
+    tbl_add[TBL_MADT].start = d->arch.efi_acpi_gpa + offset;
+    tbl_add[TBL_MADT].size = table_size;
+
+    return 0;
+}
 
 static int acpi_create_fadt(struct domain *d, struct membank tbl_add[])
 {
@@ -1481,6 +1537,10 @@ static int prepare_acpi(struct domain *d, struct kernel_info *kinfo)
     }
 
     rc = acpi_create_fadt(d, tbl_add);
+    if ( rc != 0 )
+        return rc;
+
+    rc = acpi_create_madt(d, tbl_add);
     if ( rc != 0 )
         return rc;
 
