@@ -1723,6 +1723,28 @@ static int prepare_acpi(struct domain *d, struct kernel_info *kinfo)
     acpi_create_efi_system_table(d, tbl_add);
     acpi_create_efi_mmap_table(d, &kinfo->mem, tbl_add);
 
+    /* Map the EFI and ACPI tables to Dom0 */
+    rc = map_regions_rw_cache(d,
+                              paddr_to_pfn(d->arch.efi_acpi_gpa),
+                              PFN_UP(d->arch.efi_acpi_len),
+                              paddr_to_pfn(virt_to_maddr(d->arch.efi_acpi_table)));
+    if ( rc != 0 )
+    {
+        printk(XENLOG_ERR "Unable to map EFI/ACPI table 0x%"PRIx64
+               " - 0x%"PRIx64" in domain %d\n",
+               d->arch.efi_acpi_gpa & PAGE_MASK,
+               PAGE_ALIGN(d->arch.efi_acpi_gpa + d->arch.efi_acpi_len) - 1,
+               d->domain_id);
+        return rc;
+    }
+
+    /*
+     * Flush the cache for this region, otherwise DOM0 may read wrong data when
+     * the cache is disabled.
+     */
+    clean_and_invalidate_dcache_va_range(d->arch.efi_acpi_table,
+                                         d->arch.efi_acpi_len);
+
     return 0;
 }
 #else
