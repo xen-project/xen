@@ -1357,6 +1357,74 @@ static int prepare_dtb(struct domain *d, struct kernel_info *kinfo)
 }
 
 #ifdef CONFIG_ACPI
+static void acpi_xsdt_modify_entry(u64 entry[], unsigned long entry_count,
+                                   char *signature, u64 addr)
+{
+    int i;
+    struct acpi_table_header *table;
+    u64 size = sizeof(struct acpi_table_header);
+
+    for( i = 0; i < entry_count; i++ )
+    {
+        table = acpi_os_map_memory(entry[i], size);
+        if ( ACPI_COMPARE_NAME(table->signature, signature) )
+        {
+            entry[i] = addr;
+            acpi_os_unmap_memory(table, size);
+            break;
+        }
+        acpi_os_unmap_memory(table, size);
+    }
+}
+
+static int acpi_create_xsdt(struct domain *d, struct membank tbl_add[])
+{
+    struct acpi_table_header *table = NULL;
+    struct acpi_table_rsdp *rsdp_tbl;
+    struct acpi_table_xsdt *xsdt = NULL;
+    u64 table_size, addr;
+    unsigned long entry_count;
+    u8 *base_ptr;
+    u8 checksum;
+
+    addr = acpi_os_get_root_pointer();
+    if ( !addr )
+    {
+        printk("Unable to get acpi root pointer\n");
+        return -EINVAL;
+    }
+    rsdp_tbl = acpi_os_map_memory(addr, sizeof(struct acpi_table_rsdp));
+    table = acpi_os_map_memory(rsdp_tbl->xsdt_physical_address,
+                               sizeof(struct acpi_table_header));
+
+    /* Add place for STAO table in XSDT table */
+    table_size = table->length + sizeof(u64);
+    entry_count = (table->length - sizeof(struct acpi_table_header))
+                  / sizeof(u64);
+    base_ptr = d->arch.efi_acpi_table
+               + acpi_get_table_offset(tbl_add, TBL_XSDT);
+    ACPI_MEMCPY(base_ptr, table, table->length);
+    acpi_os_unmap_memory(table, sizeof(struct acpi_table_header));
+    acpi_os_unmap_memory(rsdp_tbl, sizeof(struct acpi_table_rsdp));
+
+    xsdt = (struct acpi_table_xsdt *)base_ptr;
+    acpi_xsdt_modify_entry(xsdt->table_offset_entry, entry_count,
+                           ACPI_SIG_FADT, tbl_add[TBL_FADT].start);
+    acpi_xsdt_modify_entry(xsdt->table_offset_entry, entry_count,
+                           ACPI_SIG_MADT, tbl_add[TBL_MADT].start);
+    xsdt->table_offset_entry[entry_count] = tbl_add[TBL_STAO].start;
+
+    xsdt->header.length = table_size;
+    checksum = acpi_tb_checksum(ACPI_CAST_PTR(u8, xsdt), table_size);
+    xsdt->header.checksum -= checksum;
+
+    tbl_add[TBL_XSDT].start = d->arch.efi_acpi_gpa
+                              + acpi_get_table_offset(tbl_add, TBL_XSDT);
+    tbl_add[TBL_XSDT].size = table_size;
+
+    return 0;
+}
+
 static int acpi_create_stao(struct domain *d, struct membank tbl_add[])
 {
     struct acpi_table_header *table = NULL;
@@ -1582,6 +1650,10 @@ static int prepare_acpi(struct domain *d, struct kernel_info *kinfo)
         return rc;
 
     rc = acpi_create_stao(d, tbl_add);
+    if ( rc != 0 )
+        return rc;
+
+    rc = acpi_create_xsdt(d, tbl_add);
     if ( rc != 0 )
         return rc;
 
