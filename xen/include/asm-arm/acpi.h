@@ -25,6 +25,7 @@
 
 #include <xen/init.h>
 #include <asm/page.h>
+#include <asm/setup.h>
 
 #define COMPILER_DEPENDENT_INT64   long long
 #define COMPILER_DEPENDENT_UINT64  unsigned long long
@@ -45,6 +46,15 @@ typedef enum {
 bool_t __init acpi_psci_present(void);
 bool_t __init acpi_psci_hvc_present(void);
 void __init acpi_smp_init_cpus(void);
+
+/*
+ * This function returns the offset of a given ACPI/EFI table in the allocated
+ * memory region. Currently, the tables should be created in the same order as
+ * their associated 'index' in the enum EFI_MEM_RES. This means the function
+ * won't return the correct offset until all the tables before a given 'index'
+ * are created.
+ */
+paddr_t acpi_get_table_offset(struct membank tbl_add[], EFI_MEM_RES index);
 
 #ifdef CONFIG_ACPI
 extern bool_t acpi_disabled;

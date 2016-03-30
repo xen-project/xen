@@ -60,3 +60,18 @@ bool_t __init acpi_psci_hvc_present(void)
 {
     return acpi_gbl_FADT.arm_boot_flags & ACPI_FADT_PSCI_USE_HVC;
 }
+
+paddr_t __init acpi_get_table_offset(struct membank tbl_add[],
+                                     EFI_MEM_RES index)
+{
+    int i;
+    paddr_t offset = 0;
+
+    for ( i = 0; i < index; i++ )
+    {
+        /* Aligned with 64bit (8 bytes) */
+        offset += ROUNDUP(tbl_add[i].size, 8);
+    }
+
+    return offset;
+}
