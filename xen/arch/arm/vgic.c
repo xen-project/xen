@@ -25,6 +25,8 @@
 #include <xen/irq.h>
 #include <xen/sched.h>
 #include <xen/perfc.h>
+#include <xen/iocap.h>
+#include <xen/acpi.h>
 
 #include <asm/current.h>
 
@@ -334,6 +336,19 @@ void vgic_disable_irqs(struct vcpu *v, uint32_t r, int n)
     }
 }
 
+#define VGIC_ICFG_MASK(intr) (1 << ((2 * ((intr) % 16)) + 1))
+
+static inline unsigned int get_the_irq_type(struct vcpu *v, int n, int index)
+{
+    struct vgic_irq_rank *vr = vgic_get_rank(v, n);
+    uint32_t tr = vr->icfg[index >> 4];
+
+    if ( tr & VGIC_ICFG_MASK(index) )
+        return IRQ_TYPE_EDGE_BOTH;
+    else
+        return IRQ_TYPE_LEVEL_MASK;
+}
+
 void vgic_enable_irqs(struct vcpu *v, uint32_t r, int n)
 {
     const unsigned long mask = r;
@@ -342,9 +357,26 @@ void vgic_enable_irqs(struct vcpu *v, uint32_t r, int n)
     unsigned long flags;
     int i = 0;
     struct vcpu *v_target;
+    struct domain *d = v->domain;
+    int ret;
 
     while ( (i = find_next_bit(&mask, 32, i)) < 32 ) {
         irq = i + (32 * n);
+        /* Set the irq type and route it to guest only for SPI and Dom0 */
+        if( irq_access_permitted(d, irq) && is_hardware_domain(d) &&
+            ( irq >= 32 ) && ( !acpi_disabled ) )
+        {
+            ret = irq_set_spi_type(irq, get_the_irq_type(v, n, i));
+            if ( ret )
+                gprintk(XENLOG_WARNING, "The irq type is not correct\n");
+
+            vgic_reserve_virq(d, irq);
+
+            ret = route_irq_to_guest(d, irq, irq, NULL);
+            if ( ret )
+                gprintk(XENLOG_ERR, "Unable to route IRQ %u to domain %u\n",
+                        irq, d->domain_id);
+        }
         v_target = __vgic_get_target_vcpu(v, irq);
         p = irq_to_pending(v_target, irq);
         set_bit(GIC_IRQ_GUEST_ENABLED, &p->status);
