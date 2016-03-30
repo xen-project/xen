@@ -2311,6 +2311,7 @@ int libxl__destroy_device_model(libxl__gc *gc, uint32_t domid)
                 GCSPRINTF("/local/domain/%d/image/device-model-pid", domid));
 }
 
+/* Return 0 if no dm needed, 1 if needed and <0 if error. */
 int libxl__need_xenpv_qemu(libxl__gc *gc,
         int nr_consoles, libxl__device_console *consoles,
         int nr_vfbs, libxl_device_vfb *vfbs,
