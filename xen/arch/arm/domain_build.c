@@ -1357,6 +1357,144 @@ static int prepare_dtb(struct domain *d, struct kernel_info *kinfo)
 }
 
 #ifdef CONFIG_ACPI
+#define ACPI_DOM0_FDT_MIN_SIZE 4096
+
+static int acpi_make_chosen_node(const struct kernel_info *kinfo)
+{
+    int res;
+    const char *bootargs = NULL;
+    const struct bootmodule *mod = kinfo->kernel_bootmodule;
+    void *fdt = kinfo->fdt;
+
+    DPRINT("Create chosen node\n");
+    res = fdt_begin_node(fdt, "chosen");
+    if ( res )
+        return res;
+
+    if ( mod && mod->cmdline[0] )
+    {
+        bootargs = &mod->cmdline[0];
+        res = fdt_property(fdt, "bootargs", bootargs, strlen(bootargs) + 1);
+        if ( res )
+           return res;
+    }
+
+    /*
+     * If the bootloader provides an initrd, we must create a placeholder
+     * for the initrd properties. The values will be replaced later.
+     */
+    if ( mod && mod->size )
+    {
+        u64 a = 0;
+        res = fdt_property(kinfo->fdt, "linux,initrd-start", &a, sizeof(a));
+        if ( res )
+            return res;
+
+        res = fdt_property(kinfo->fdt, "linux,initrd-end", &a, sizeof(a));
+        if ( res )
+            return res;
+    }
+
+    res = fdt_end_node(fdt);
+
+    return res;
+}
+
+static int acpi_make_hypervisor_node(const struct kernel_info *kinfo,
+                                     struct membank tbl_add[])
+{
+    const char compat[] =
+        "xen,xen-"__stringify(XEN_VERSION)"."__stringify(XEN_SUBVERSION)"\0"
+        "xen,xen";
+    int res;
+    /* Convenience alias */
+    void *fdt = kinfo->fdt;
+
+    DPRINT("Create hypervisor node\n");
+
+    /* See linux Documentation/devicetree/bindings/arm/xen.txt */
+    res = fdt_begin_node(fdt, "hypervisor");
+    if ( res )
+        return res;
+
+    /* Cannot use fdt_property_string due to embedded nulls */
+    res = fdt_property(fdt, "compatible", compat, sizeof(compat));
+    if ( res )
+        return res;
+
+    res = acpi_make_efi_nodes(fdt, tbl_add);
+    if ( res )
+        return res;
+
+    res = fdt_end_node(fdt);
+
+    return res;
+}
+
+/*
+ * Prepare a minimal DTB for Dom0 which contains bootargs, initrd, memory
+ * information, EFI table.
+ */
+static int create_acpi_dtb(struct kernel_info *kinfo, struct membank tbl_add[])
+{
+    int new_size;
+    int ret;
+
+    DPRINT("Prepare a min DTB for DOM0\n");
+
+    /* Allocate min size for DT */
+    new_size = ACPI_DOM0_FDT_MIN_SIZE;
+    kinfo->fdt = xmalloc_bytes(new_size);
+
+    if ( kinfo->fdt == NULL )
+        return -ENOMEM;
+
+    /* Create a new empty DT for DOM0 */
+    ret = fdt_create(kinfo->fdt, new_size);
+    if ( ret < 0 )
+        goto err;
+
+    ret = fdt_finish_reservemap(kinfo->fdt);
+    if ( ret < 0 )
+        goto err;
+
+    ret = fdt_begin_node(kinfo->fdt, "/");
+    if ( ret < 0 )
+        goto err;
+
+    ret = fdt_property_cell(kinfo->fdt, "#address-cells", 2);
+    if ( ret )
+        return ret;
+
+    ret = fdt_property_cell(kinfo->fdt, "#size-cells", 1);
+    if ( ret )
+        return ret;
+
+    /* Create a chosen node for DOM0 */
+    ret = acpi_make_chosen_node(kinfo);
+    if ( ret )
+        goto err;
+
+    ret = acpi_make_hypervisor_node(kinfo, tbl_add);
+    if ( ret )
+        goto err;
+
+    ret = fdt_end_node(kinfo->fdt);
+    if ( ret < 0 )
+        goto err;
+
+    ret = fdt_finish(kinfo->fdt);
+    if ( ret < 0 )
+        goto err;
+
+    return 0;
+
+  err:
+    printk("Device tree generation failed (%d).\n", ret);
+    xfree(kinfo->fdt);
+    return -EINVAL;
+}
+
 static void acpi_map_other_tables(struct domain *d)
 {
     int i;
@@ -1744,6 +1882,10 @@ static int prepare_acpi(struct domain *d, struct kernel_info *kinfo)
      */
     clean_and_invalidate_dcache_va_range(d->arch.efi_acpi_table,
                                          d->arch.efi_acpi_len);
+
+    rc = create_acpi_dtb(kinfo, tbl_add);
+    if ( rc != 0 )
+        return rc;
 
     return 0;
 }

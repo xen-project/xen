@@ -60,6 +60,8 @@ void acpi_create_efi_mmap_table(struct domain *d,
                                 const struct meminfo *mem,
                                 struct membank tbl_add[]);
 
+int acpi_make_efi_nodes(void *fdt, struct membank tbl_add[]);
+
 int construct_dom0(struct domain *d);
 
 void discard_initial_modules(void);

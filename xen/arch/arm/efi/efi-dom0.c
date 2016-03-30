@@ -25,6 +25,7 @@
 #include "efi-dom0.h"
 #include <xen/sched.h>
 #include <xen/pfn.h>
+#include <xen/libfdt/libfdt.h>
 #include <asm/setup.h>
 #include <asm/acpi.h>
 #include "../../../common/decompress.h"
@@ -136,6 +137,44 @@ void __init acpi_create_efi_mmap_table(struct domain *d,
                               + acpi_get_table_offset(tbl_add, TBL_MMAP);
     tbl_add[TBL_MMAP].size = sizeof(EFI_MEMORY_DESCRIPTOR)
                              * (mem->nr_banks + acpi_mem.nr_banks + 1);
+}
+
+/* Create /hypervisor/uefi node for efi properties. */
+int __init acpi_make_efi_nodes(void *fdt, struct membank tbl_add[])
+{
+    int res;
+
+    res = fdt_begin_node(fdt, "uefi");
+    if ( res )
+        return res;
+
+    res = fdt_property_u64(fdt, "xen,uefi-system-table",
+                           tbl_add[TBL_EFIT].start);
+    if ( res )
+        return res;
+
+    res = fdt_property_u64(fdt, "xen,uefi-mmap-start",
+                           tbl_add[TBL_MMAP].start);
+    if ( res )
+        return res;
+
+    res = fdt_property_u32(fdt, "xen,uefi-mmap-size",
+                           tbl_add[TBL_MMAP].size);
+    if ( res )
+        return res;
+
+    res = fdt_property_u32(fdt, "xen,uefi-mmap-desc-size",
+                           sizeof(EFI_MEMORY_DESCRIPTOR));
+    if ( res )
+        return res;
+
+    res = fdt_property_u32(fdt, "xen,uefi-mmap-desc-ver", 1);
+    if ( res )
+        return res;
+
+    res = fdt_end_node(fdt);
+
+    return res;
 }
 
 /*
