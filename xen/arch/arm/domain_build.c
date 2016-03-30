@@ -1359,6 +1359,38 @@ static int prepare_dtb(struct domain *d, struct kernel_info *kinfo)
 #ifdef CONFIG_ACPI
 #define ACPI_DOM0_FDT_MIN_SIZE 4096
 
+static int acpi_iomem_deny_access(struct domain *d)
+{
+    acpi_status status;
+    struct acpi_table_spcr *spcr = NULL;
+    unsigned long gfn;
+    int rc;
+
+    /* Firstly permit full MMIO capabilities. */
+    rc = iomem_permit_access(d, 0UL, ~0UL);
+    if ( rc )
+        return rc;
+
+    /* TODO: Deny MMIO access for SMMU, GIC ITS */
+    status = acpi_get_table(ACPI_SIG_SPCR, 0,
+                            (struct acpi_table_header **)&spcr);
+
+    if ( ACPI_FAILURE(status) )
+    {
+        printk("Failed to get SPCR table\n");
+        return -EINVAL;
+    }
+
+    gfn = spcr->serial_port.address >> PAGE_SHIFT;
+    /* Deny MMIO access for UART */
+    rc = iomem_deny_access(d, gfn, gfn + 1);
+    if ( rc )
+        return rc;
+
+    /* Deny MMIO access for GIC regions */
+    return gic_iomem_deny_access(d);
+}
+
 static int acpi_permit_spi_access(struct domain *d)
 {
     int i, res;
@@ -1919,6 +1951,10 @@ static int prepare_acpi(struct domain *d, struct kernel_info *kinfo)
         return rc;
 
     rc = acpi_permit_spi_access(d);
+    if ( rc != 0 )
+        return rc;
+
+    rc = acpi_iomem_deny_access(d);
     if ( rc != 0 )
         return rc;
 
