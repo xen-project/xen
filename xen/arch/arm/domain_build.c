@@ -1357,6 +1357,40 @@ static int prepare_dtb(struct domain *d, struct kernel_info *kinfo)
 }
 
 #ifdef CONFIG_ACPI
+static int acpi_create_rsdp(struct domain *d, struct membank tbl_add[])
+{
+
+    struct acpi_table_rsdp *rsdp = NULL;
+    u64 addr;
+    u64 table_size = sizeof(struct acpi_table_rsdp);
+    u8 *base_ptr;
+    u8 checksum;
+
+    addr = acpi_os_get_root_pointer();
+    if ( !addr  )
+    {
+        printk("Unable to get acpi root pointer\n");
+        return -EINVAL;
+    }
+    rsdp = acpi_os_map_memory(addr, table_size);
+    base_ptr = d->arch.efi_acpi_table
+               + acpi_get_table_offset(tbl_add, TBL_RSDP);
+    ACPI_MEMCPY(base_ptr, rsdp, table_size);
+    acpi_os_unmap_memory(rsdp, table_size);
+
+    rsdp = (struct acpi_table_rsdp *)base_ptr;
+    /* Replace xsdt_physical_address */
+    rsdp->xsdt_physical_address = tbl_add[TBL_XSDT].start;
+    checksum = acpi_tb_checksum(ACPI_CAST_PTR(u8, rsdp), table_size);
+    rsdp->checksum = rsdp->checksum - checksum;
+
+    tbl_add[TBL_RSDP].start = d->arch.efi_acpi_gpa
+                              + acpi_get_table_offset(tbl_add, TBL_RSDP);
+    tbl_add[TBL_RSDP].size = table_size;
+
+    return 0;
+}
+
 static void acpi_xsdt_modify_entry(u64 entry[], unsigned long entry_count,
                                    char *signature, u64 addr)
 {
@@ -1654,6 +1688,10 @@ static int prepare_acpi(struct domain *d, struct kernel_info *kinfo)
         return rc;
 
     rc = acpi_create_xsdt(d, tbl_add);
+    if ( rc != 0 )
+        return rc;
+
+    rc = acpi_create_rsdp(d, tbl_add);
     if ( rc != 0 )
         return rc;
 
