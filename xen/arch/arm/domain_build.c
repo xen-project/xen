@@ -12,6 +12,8 @@
 #include <xen/libfdt/libfdt.h>
 #include <xen/guest_access.h>
 #include <xen/iocap.h>
+#include <xen/acpi.h>
+#include <acpi/actables.h>
 #include <asm/device.h>
 #include <asm/setup.h>
 #include <asm/platform.h>
@@ -1354,6 +1356,101 @@ static int prepare_dtb(struct domain *d, struct kernel_info *kinfo)
     return -EINVAL;
 }
 
+#ifdef CONFIG_ACPI
+static int estimate_acpi_efi_size(struct domain *d, struct kernel_info *kinfo)
+{
+    size_t efi_size, acpi_size, madt_size;
+    u64 addr;
+    struct acpi_table_rsdp *rsdp_tbl;
+    struct acpi_table_header *table;
+
+    efi_size = estimate_efi_size(kinfo->mem.nr_banks);
+
+    acpi_size = ROUNDUP(sizeof(struct acpi_table_fadt), 8);
+    acpi_size += ROUNDUP(sizeof(struct acpi_table_stao), 8);
+
+    madt_size = sizeof(struct acpi_table_madt)
+                + sizeof(struct acpi_madt_generic_interrupt) * d->max_vcpus
+                + sizeof(struct acpi_madt_generic_distributor);
+    if ( d->arch.vgic.version == GIC_V3 )
+        madt_size += sizeof(struct acpi_madt_generic_redistributor)
+                     * d->arch.vgic.nr_regions;
+    acpi_size += ROUNDUP(madt_size, 8);
+
+    addr = acpi_os_get_root_pointer();
+    if ( !addr )
+    {
+        printk("Unable to get acpi root pointer\n");
+        return -EINVAL;
+    }
+
+    rsdp_tbl = acpi_os_map_memory(addr, sizeof(struct acpi_table_rsdp));
+    if ( !rsdp_tbl )
+    {
+        printk("Unable to map RSDP table\n");
+        return -EINVAL;
+    }
+
+    table = acpi_os_map_memory(rsdp_tbl->xsdt_physical_address,
+                               sizeof(struct acpi_table_header));
+    acpi_os_unmap_memory(rsdp_tbl, sizeof(struct acpi_table_rsdp));
+    if ( !table )
+    {
+        printk("Unable to map XSDT table\n");
+        return -EINVAL;
+    }
+
+    /* Add place for STAO table in XSDT table */
+    acpi_size += ROUNDUP(table->length + sizeof(u64), 8);
+    acpi_os_unmap_memory(table, sizeof(struct acpi_table_header));
+
+    acpi_size += ROUNDUP(sizeof(struct acpi_table_rsdp), 8);
+    d->arch.efi_acpi_len = PAGE_ALIGN(ROUNDUP(efi_size, 8)
+                                      + ROUNDUP(acpi_size, 8));
+
+    return 0;
+}
+
+static int prepare_acpi(struct domain *d, struct kernel_info *kinfo)
+{
+    int rc = 0;
+    int order;
+
+    rc = estimate_acpi_efi_size(d, kinfo);
+    if ( rc != 0 )
+        return rc;
+
+    order = get_order_from_bytes(d->arch.efi_acpi_len);
+    d->arch.efi_acpi_table = alloc_xenheap_pages(order, 0);
+    if ( d->arch.efi_acpi_table == NULL )
+    {
+        printk("unable to allocate memory!\n");
+        return -ENOMEM;
+    }
+    memset(d->arch.efi_acpi_table, 0, d->arch.efi_acpi_len);
+
+    /*
+     * For ACPI, Dom0 doesn't use kinfo->gnttab_start to get the grant table
+     * region. So we use it as the ACPI table mapped address. Also it needs to
+     * check if the size of grant table region is enough for those ACPI tables.
+     */
+    d->arch.efi_acpi_gpa = kinfo->gnttab_start;
+    if ( kinfo->gnttab_size < d->arch.efi_acpi_len )
+    {
+        printk("The grant table region is not enough to fit the ACPI tables!\n");
+        return -EINVAL;
+    }
+
+    return 0;
+}
+#else
+static int prepare_acpi(struct domain *d, struct kernel_info *kinfo)
+{
+    /* Only booting with ACPI will hit here */
+    BUG();
+    return -EINVAL;
+}
+#endif
 static void dtb_load(struct kernel_info *kinfo)
 {
     void * __user dtb_virt = (void * __user)(register_t)kinfo->dtb_paddr;
@@ -1540,7 +1637,11 @@ int construct_dom0(struct domain *d)
     allocate_memory(d, &kinfo);
     find_gnttab_region(d, &kinfo);
 
-    rc = prepare_dtb(d, &kinfo);
+    if ( acpi_disabled )
+        rc = prepare_dtb(d, &kinfo);
+    else
+        rc = prepare_acpi(d, &kinfo);
+
     if ( rc < 0 )
         return rc;
 

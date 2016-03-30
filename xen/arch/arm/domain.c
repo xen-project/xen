@@ -640,6 +640,10 @@ void arch_domain_destroy(struct domain *d)
     domain_vgic_free(d);
     domain_vuart_free(d);
     free_xenheap_page(d->shared_info);
+#ifdef CONFIG_ACPI
+    free_xenheap_pages(d->arch.efi_acpi_table,
+                       get_order_from_bytes(d->arch.efi_acpi_len));
+#endif
 }
 
 void arch_domain_shutdown(struct domain *d)

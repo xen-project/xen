@@ -7,6 +7,7 @@
 #include <xen/libfdt/libfdt.h>
 #include <asm/setup.h>
 #include <asm/smp.h>
+#include "efi-dom0.h"
 
 void noreturn efi_xen_start(void *fdt_ptr, uint32_t fdt_size);
 void __flush_dcache_area(const void *vaddr, unsigned long size);
@@ -17,9 +18,6 @@ void __flush_dcache_area(const void *vaddr, unsigned long size);
 static struct file __initdata dtbfile;
 static void __initdata *fdt;
 static void __initdata *memmap;
-#ifdef CONFIG_ACPI
-static struct meminfo __initdata acpi_mem;
-#endif
 
 static int __init setup_chosen_node(void *fdt, int *addr_cells, int *size_cells)
 {

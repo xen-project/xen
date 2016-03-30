@@ -51,6 +51,8 @@ void arch_init_memory(void);
 
 void copy_from_paddr(void *dst, paddr_t paddr, unsigned long len);
 
+size_t estimate_efi_size(int mem_nr_banks);
+
 int construct_dom0(struct domain *d);
 
 void discard_initial_modules(void);
