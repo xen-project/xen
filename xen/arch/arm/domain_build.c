@@ -1357,6 +1357,30 @@ static int prepare_dtb(struct domain *d, struct kernel_info *kinfo)
 }
 
 #ifdef CONFIG_ACPI
+static void acpi_map_other_tables(struct domain *d)
+{
+    int i;
+    unsigned long res;
+    u64 addr, size;
+
+    /* Map all ACPI tables to Dom0 using 1:1 mappings. */
+    for( i = 0; i < acpi_gbl_root_table_list.count; i++ )
+    {
+        addr = acpi_gbl_root_table_list.tables[i].address;
+        size = acpi_gbl_root_table_list.tables[i].length;
+        res = map_regions_rw_cache(d,
+                                   paddr_to_pfn(addr & PAGE_MASK),
+                                   DIV_ROUND_UP(size, PAGE_SIZE),
+                                   paddr_to_pfn(addr & PAGE_MASK));
+        if ( res )
+        {
+             panic(XENLOG_ERR "Unable to map ACPI region 0x%"PRIx64
+                   " - 0x%"PRIx64" in domain \n",
+                   addr & PAGE_MASK, PAGE_ALIGN(addr + size) - 1);
+        }
+    }
+}
+
 static int acpi_create_rsdp(struct domain *d, struct membank tbl_add[])
 {
 
@@ -1694,6 +1718,8 @@ static int prepare_acpi(struct domain *d, struct kernel_info *kinfo)
     rc = acpi_create_rsdp(d, tbl_add);
     if ( rc != 0 )
         return rc;
+
+    acpi_map_other_tables(d);
 
     return 0;
 }
