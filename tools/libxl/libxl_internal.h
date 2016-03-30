@@ -1619,6 +1619,11 @@ _hidden const char *libxl__domain_device_model(libxl__gc *gc,
                                         const libxl_domain_build_info *info);
 _hidden int libxl__need_xenpv_qemu(libxl__gc *gc,
                                    libxl_domain_config *d_config);
+_hidden bool libxl__query_qemu_backend(libxl__gc *gc,
+                                       uint32_t domid,
+                                       uint32_t backend_id,
+                                       const char *type,
+                                       bool def);
 
 /*
  * This function will fix reserved device memory conflict

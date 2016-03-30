@@ -2118,6 +2118,25 @@ out:
         device_model_spawn_outcome(egc, dmss, rc);
 }
 
+bool libxl__query_qemu_backend(libxl__gc *gc, uint32_t domid,
+                               uint32_t backend_id, const char *type, bool def)
+{
+    char *path;
+    char **dir;
+    unsigned int n;
+
+    path = GCSPRINTF("%s/device-model/%u/backends",
+                     libxl__xs_get_dompath(gc, backend_id), domid);
+    dir = libxl__xs_directory(gc, XBT_NULL, path, &n);
+    if (!dir)
+        return def;
+
+    path = GCSPRINTF("%s/device-model/%u/backends/%s",
+                     libxl__xs_get_dompath(gc, backend_id), domid, type);
+    dir = libxl__xs_directory(gc, XBT_NULL, path, &n);
+
+    return !!dir;
+}
 
 static void device_model_confirm(libxl__egc *egc, libxl__spawn_state *spawn,
                                  const char *xsdata)

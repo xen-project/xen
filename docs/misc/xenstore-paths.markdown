@@ -482,6 +482,13 @@ in the value supplied by the guest in this case).
 
 Contains the status of the device models running on the domain.
 
+#### ~/device-model/$DOMID/backends/* [w]
+
+Backend types the device model is supporting. Each entry below backends
+is a directory which may contain further nodes specific to the backend
+type. The name of each backend directory is the same as the backend type
+(e.g. "qdisk").
+
 #### ~/libxl/$DOMID/qdisk-backend-pid [w]
 
 Contains the PIDs of the device models running on the domain.
