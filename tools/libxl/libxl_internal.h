@@ -1618,10 +1618,7 @@ _hidden int libxl__domain_build(libxl__gc *gc,
 _hidden const char *libxl__domain_device_model(libxl__gc *gc,
                                         const libxl_domain_build_info *info);
 _hidden int libxl__need_xenpv_qemu(libxl__gc *gc,
-        int nr_consoles, libxl__device_console *consoles,
-        int nr_vfbs, libxl_device_vfb *vfbs,
-        int nr_disks, libxl_device_disk *disks,
-        int nr_channels, libxl_device_channel *channels);
+                                   libxl_domain_config *d_config);
 
 /*
  * This function will fix reserved device memory conflict

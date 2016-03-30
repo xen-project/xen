@@ -2312,61 +2312,37 @@ int libxl__destroy_device_model(libxl__gc *gc, uint32_t domid)
 }
 
 /* Return 0 if no dm needed, 1 if needed and <0 if error. */
-int libxl__need_xenpv_qemu(libxl__gc *gc,
-        int nr_consoles, libxl__device_console *consoles,
-        int nr_vfbs, libxl_device_vfb *vfbs,
-        int nr_disks, libxl_device_disk *disks,
-        int nr_channels, libxl_device_channel *channels)
+int libxl__need_xenpv_qemu(libxl__gc *gc, libxl_domain_config *d_config)
 {
-    int i, ret = 0;
+    int i, ret;
     uint32_t domid;
 
-    /*
-     * qemu is required in order to support 2 or more consoles. So switch all
-     * backends to qemu if this is the case
-     */
-    if (nr_consoles > 1) {
-        for (i = 0; i < nr_consoles; i++)
-            consoles[i].consback = LIBXL__CONSOLE_BACKEND_IOEMU;
+    ret = libxl__get_domid(gc, &domid);
+    if (ret) {
+        LOG(ERROR, "unable to get domain id");
+        goto out;
+    }
+
+    if (d_config->num_vfbs > 0) {
         ret = 1;
         goto out;
     }
 
-    for (i = 0; i < nr_consoles; i++) {
-        if (consoles[i].consback == LIBXL__CONSOLE_BACKEND_IOEMU) {
+    for (i = 0; i < d_config->num_disks; i++) {
+        if (d_config->disks[i].backend == LIBXL_DISK_BACKEND_QDISK &&
+            d_config->disks[i].backend_domid == domid) {
             ret = 1;
             goto out;
         }
     }
 
-    if (nr_vfbs > 0) {
-        ret = 1;
-        goto out;
-    }
-
-    if (nr_disks > 0) {
-        ret = libxl__get_domid(gc, &domid);
-        if (ret) goto out;
-        for (i = 0; i < nr_disks; i++) {
-            if (disks[i].backend == LIBXL_DISK_BACKEND_QDISK &&
-                disks[i].backend_domid == domid) {
-                ret = 1;
-                goto out;
-            }
-        }
-    }
-
-    if (nr_channels > 0) {
-        ret = libxl__get_domid(gc, &domid);
-        if (ret) goto out;
-        for (i = 0; i < nr_channels; i++) {
-            if (channels[i].backend_domid == domid) {
-                /* xenconsoled is limited to the first console only.
-                   Until this restriction is removed we must use qemu for
-                   secondary consoles which includes all channels. */
-                ret = 1;
-                goto out;
-            }
+    for (i = 0; i < d_config->num_channels; i++) {
+        if (d_config->channels[i].backend_domid == domid) {
+            /* xenconsoled is limited to the first console only.
+               Until this restriction is removed we must use qemu for
+               secondary consoles which includes all channels. */
+            ret = 1;
+            goto out;
         }
     }
 
