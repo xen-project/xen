@@ -192,7 +192,7 @@ static void __init apply_alternatives(struct alt_instr *start, struct alt_instr 
 
 void __init alternative_instructions(void)
 {
-    nmi_callback_t saved_nmi_callback;
+    nmi_callback_t *saved_nmi_callback;
 
     arch_init_ideal_nops();
 

@@ -12,7 +12,7 @@ extern bool_t opt_watchdog;
 /* Watchdog force parameter from the command line */
 extern bool_t watchdog_force;
  
-typedef int (*nmi_callback_t)(const struct cpu_user_regs *regs, int cpu);
+typedef int nmi_callback_t(const struct cpu_user_regs *regs, int cpu);
  
 /** 
  * set_nmi_callback
@@ -20,7 +20,7 @@ typedef int (*nmi_callback_t)(const struct cpu_user_regs *regs, int cpu);
  * Set a handler for an NMI. Only one handler may be
  * set. Return the old nmi callback handler.
  */
-nmi_callback_t set_nmi_callback(nmi_callback_t callback);
+nmi_callback_t *set_nmi_callback(nmi_callback_t *callback);
  
 /** 
  * unset_nmi_callback
