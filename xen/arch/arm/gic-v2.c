@@ -685,6 +685,43 @@ static void __init gicv2_dt_init(void)
 }
 
 #ifdef CONFIG_ACPI
+static int gicv2_make_hwdom_madt(const struct domain *d, u32 offset)
+{
+    struct acpi_subtable_header *header;
+    struct acpi_madt_generic_interrupt *host_gicc, *gicc;
+    u32 i, size, table_len = 0;
+    u8 *base_ptr = d->arch.efi_acpi_table + offset;
+
+    header = acpi_table_get_entry_madt(ACPI_MADT_TYPE_GENERIC_INTERRUPT, 0);
+    if ( !header )
+    {
+        printk("Can't get GICC entry");
+        return -EINVAL;
+    }
+
+    host_gicc = container_of(header, struct acpi_madt_generic_interrupt,
+                             header);
+    size = sizeof(struct acpi_madt_generic_interrupt);
+    /* Add Generic Interrupt */
+    for ( i = 0; i < d->max_vcpus; i++ )
+    {
+        gicc = (struct acpi_madt_generic_interrupt *)(base_ptr + table_len);
+        ACPI_MEMCPY(gicc, host_gicc, size);
+        gicc->cpu_interface_number = i;
+        gicc->uid = i;
+        gicc->flags = ACPI_MADT_ENABLED;
+        gicc->arm_mpidr = vcpuid_to_vaffinity(i);
+        gicc->parking_version = 0;
+        gicc->performance_interrupt = 0;
+        gicc->gicv_base_address = 0;
+        gicc->gich_base_address = 0;
+        gicc->vgic_interrupt = 0;
+        table_len += size;
+    }
+
+    return table_len;
+}
+
 static int __init
 gic_acpi_parse_madt_cpu(struct acpi_subtable_header *header,
                         const unsigned long end)
@@ -776,6 +813,10 @@ static void __init gicv2_acpi_init(void)
 }
 #else
 static void __init gicv2_acpi_init(void) { }
+static int gicv2_make_hwdom_madt(const struct domain *d, u32 offset)
+{
+    return 0;
+}
 #endif
 
 static int __init gicv2_init(void)
@@ -868,6 +909,7 @@ const static struct gic_hw_operations gicv2_ops = {
     .read_vmcr_priority  = gicv2_read_vmcr_priority,
     .read_apr            = gicv2_read_apr,
     .make_hwdom_dt_node  = gicv2_make_hwdom_dt_node,
+    .make_hwdom_madt     = gicv2_make_hwdom_madt,
 };
 
 /* Set up the GIC */

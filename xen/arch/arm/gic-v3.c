@@ -1236,6 +1236,57 @@ static void __init gicv3_dt_init(void)
 }
 
 #ifdef CONFIG_ACPI
+static int gicv3_make_hwdom_madt(const struct domain *d, u32 offset)
+{
+    struct acpi_subtable_header *header;
+    struct acpi_madt_generic_interrupt *host_gicc, *gicc;
+    struct acpi_madt_generic_redistributor *gicr;
+    u8 *base_ptr = d->arch.efi_acpi_table + offset;
+    u32 i, table_len = 0, size;
+
+    /* Add Generic Interrupt */
+    header = acpi_table_get_entry_madt(ACPI_MADT_TYPE_GENERIC_INTERRUPT, 0);
+    if ( !header )
+    {
+        printk("Can't get GICC entry");
+        return -EINVAL;
+    }
+
+    host_gicc = container_of(header, struct acpi_madt_generic_interrupt,
+                             header);
+    size = sizeof(struct acpi_madt_generic_interrupt);
+    for ( i = 0; i < d->max_vcpus; i++ )
+    {
+        gicc = (struct acpi_madt_generic_interrupt *)(base_ptr + table_len);
+        ACPI_MEMCPY(gicc, host_gicc, size);
+        gicc->cpu_interface_number = i;
+        gicc->uid = i;
+        gicc->flags = ACPI_MADT_ENABLED;
+        gicc->arm_mpidr = vcpuid_to_vaffinity(i);
+        gicc->parking_version = 0;
+        gicc->performance_interrupt = 0;
+        gicc->gicv_base_address = 0;
+        gicc->gich_base_address = 0;
+        gicc->gicr_base_address = 0;
+        gicc->vgic_interrupt = 0;
+        table_len += size;
+    }
+
+    /* Add Generic Redistributor */
+    size = sizeof(struct acpi_madt_generic_redistributor);
+    for ( i = 0; i < d->arch.vgic.nr_regions; i++ )
+    {
+        gicr = (struct acpi_madt_generic_redistributor *)(base_ptr + table_len);
+        gicr->header.type = ACPI_MADT_TYPE_GENERIC_REDISTRIBUTOR;
+        gicr->header.length = size;
+        gicr->base_address = d->arch.vgic.rdist_regions[i].base;
+        gicr->length = d->arch.vgic.rdist_regions[i].size;
+        table_len += size;
+    }
+
+    return table_len;
+}
+
 static int __init
 gic_acpi_parse_madt_cpu(struct acpi_subtable_header *header,
                         const unsigned long end)
@@ -1380,6 +1431,10 @@ static void __init gicv3_acpi_init(void)
 }
 #else
 static void __init gicv3_acpi_init(void) { }
+static int gicv3_make_hwdom_madt(const struct domain *d, u32 offset)
+{
+    return 0;
+}
 #endif
 
 /* Set up the GIC */
@@ -1474,6 +1529,7 @@ static const struct gic_hw_operations gicv3_ops = {
     .read_apr            = gicv3_read_apr,
     .secondary_init      = gicv3_secondary_cpu_init,
     .make_hwdom_dt_node  = gicv3_make_hwdom_dt_node,
+    .make_hwdom_madt     = gicv3_make_hwdom_madt,
 };
 
 static int __init gicv3_dt_preinit(struct dt_device_node *node, const void *data)
