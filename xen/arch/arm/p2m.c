@@ -1218,6 +1218,32 @@ int p2m_populate_ram(struct domain *d,
                              d->arch.p2m.default_access);
 }
 
+int map_regions_rw_cache(struct domain *d,
+                         unsigned long start_gfn,
+                         unsigned long nr,
+                         unsigned long mfn)
+{
+    return apply_p2m_changes(d, INSERT,
+                             pfn_to_paddr(start_gfn),
+                             pfn_to_paddr(start_gfn + nr),
+                             pfn_to_paddr(mfn),
+                             MATTR_MEM, 0, p2m_mmio_direct,
+                             p2m_access_rw);
+}
+
+int unmap_regions_rw_cache(struct domain *d,
+                           unsigned long start_gfn,
+                           unsigned long nr,
+                           unsigned long mfn)
+{
+    return apply_p2m_changes(d, REMOVE,
+                             pfn_to_paddr(start_gfn),
+                             pfn_to_paddr(start_gfn + nr),
+                             pfn_to_paddr(mfn),
+                             MATTR_MEM, 0, p2m_invalid,
+                             p2m_access_rw);
+}
+
 int map_mmio_regions(struct domain *d,
                      unsigned long start_gfn,
                      unsigned long nr,

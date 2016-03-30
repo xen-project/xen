@@ -144,6 +144,16 @@ int p2m_cache_flush(struct domain *d, xen_pfn_t start_mfn, xen_pfn_t end_mfn);
 /* Setup p2m RAM mapping for domain d from start-end. */
 int p2m_populate_ram(struct domain *d, paddr_t start, paddr_t end);
 
+int map_regions_rw_cache(struct domain *d,
+                         unsigned long start_gfn,
+                         unsigned long nr_mfns,
+                         unsigned long mfn);
+
+int unmap_regions_rw_cache(struct domain *d,
+                           unsigned long start_gfn,
+                           unsigned long nr_mfns,
+                           unsigned long mfn);
+
 int guest_physmap_add_entry(struct domain *d,
                             unsigned long gfn,
                             unsigned long mfn,
