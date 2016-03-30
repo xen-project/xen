@@ -1359,6 +1359,37 @@ static int prepare_dtb(struct domain *d, struct kernel_info *kinfo)
 #ifdef CONFIG_ACPI
 #define ACPI_DOM0_FDT_MIN_SIZE 4096
 
+static int acpi_permit_spi_access(struct domain *d)
+{
+    int i, res;
+    struct irq_desc *desc;
+
+    /*
+     * Here just permit Dom0 to access the SPIs which Xen doesn't use. Then when
+     * Dom0 configures the interrupt, set the interrupt type and route it to
+     * Dom0.
+     */
+    for( i = NR_LOCAL_IRQS; i < vgic_num_irqs(d); i++ )
+    {
+        /*
+	 * TODO: Exclude the SPIs SMMU uses which should not be routed to Dom0.
+	 */
+        desc = irq_to_desc(i);
+        if ( desc->action != NULL)
+            continue;
+
+        res = irq_permit_access(d, i);
+        if ( res )
+        {
+            printk(XENLOG_ERR "Unable to permit to dom%u access to IRQ %u\n",
+                   d->domain_id, i);
+            return res;
+        }
+    }
+
+    return 0;
+}
+
 static int acpi_make_chosen_node(const struct kernel_info *kinfo)
 {
     int res;
@@ -1884,6 +1915,10 @@ static int prepare_acpi(struct domain *d, struct kernel_info *kinfo)
                                          d->arch.efi_acpi_len);
 
     rc = create_acpi_dtb(kinfo, tbl_add);
+    if ( rc != 0 )
+        return rc;
+
+    rc = acpi_permit_spi_access(d);
     if ( rc != 0 )
         return rc;
 
