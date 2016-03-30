@@ -1357,6 +1357,43 @@ static int prepare_dtb(struct domain *d, struct kernel_info *kinfo)
 }
 
 #ifdef CONFIG_ACPI
+static int acpi_create_stao(struct domain *d, struct membank tbl_add[])
+{
+    struct acpi_table_header *table = NULL;
+    struct acpi_table_stao *stao = NULL;
+    u32 table_size = sizeof(struct acpi_table_stao);
+    u32 offset = acpi_get_table_offset(tbl_add, TBL_STAO);
+    acpi_status status;
+    u8 *base_ptr, checksum;
+
+    /* Copy OEM and ASL compiler fields from another table, use MADT */
+    status = acpi_get_table(ACPI_SIG_MADT, 0, &table);
+
+    if ( ACPI_FAILURE(status) )
+    {
+        const char *msg = acpi_format_exception(status);
+
+        printk("STAO: Failed to get MADT table, %s\n", msg);
+        return -EINVAL;
+    }
+
+    base_ptr = d->arch.efi_acpi_table + offset;
+    ACPI_MEMCPY(base_ptr, table, sizeof(struct acpi_table_header));
+
+    stao = (struct acpi_table_stao *)base_ptr;
+    ACPI_MEMCPY(stao->header.signature, ACPI_SIG_STAO, 4);
+    stao->header.revision = 1;
+    stao->header.length = table_size;
+    stao->ignore_uart = 1;
+    checksum = acpi_tb_checksum(ACPI_CAST_PTR(u8, stao), table_size);
+    stao->header.checksum -= checksum;
+
+    tbl_add[TBL_STAO].start = d->arch.efi_acpi_gpa + offset;
+    tbl_add[TBL_STAO].size = table_size;
+
+    return 0;
+}
+
 static int acpi_create_madt(struct domain *d, struct membank tbl_add[])
 {
     struct acpi_table_header *table = NULL;
@@ -1541,6 +1578,10 @@ static int prepare_acpi(struct domain *d, struct kernel_info *kinfo)
         return rc;
 
     rc = acpi_create_madt(d, tbl_add);
+    if ( rc != 0 )
+        return rc;
+
+    rc = acpi_create_stao(d, tbl_add);
     if ( rc != 0 )
         return rc;
 
