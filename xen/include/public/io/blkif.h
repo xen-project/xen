@@ -89,14 +89,22 @@
  *      Values:         string
  *
  *      A free formatted string providing sufficient information for the
- *      backend driver to open the backing device.  (e.g. the path to the
- *      file or block device representing the backing store.)
+ *      hotplug script to attach the device and provide a suitable
+ *      handler (ie: a block device) for blkback to use.
  *
  * physical-device
  *      Values:         "MAJOR:MINOR"
+ *      Notes: 11
  *
  *      MAJOR and MINOR are the major number and minor number of the
  *      backing device respectively.
+ *
+ * physical-device-path
+ *      Values:         path string
+ *
+ *      A string that contains the absolute path to the disk image. On
+ *      NetBSD and Linux this is always a block device, while on FreeBSD
+ *      it can be either a block device or a regular file.
  *
  * type
  *      Values:         "file", "phy", "tap"
@@ -391,6 +399,7 @@
  *     than RING_SIZE * BLKIF_MAX_SEGMENTS_PER_REQUEST.
  *(10) The discard-secure property may be present and will be set to 1 if the
  *     backing device supports secure discard.
+ *(11) Only used by Linux and NetBSD.
  */
 
 /*
