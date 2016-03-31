@@ -3065,7 +3065,7 @@ static char * libxl__alloc_vdev(libxl__gc *gc, void *get_vdev_user,
                     GCSPRINTF("%s/device/vbd/%d/backend",
                         dompath, devid)) == NULL) {
             if (errno == ENOENT)
-                return libxl__devid_to_localdev(gc, devid);
+                return libxl__devid_to_vdev(gc, devid);
             else
                 return NULL;
         }
@@ -3202,7 +3202,7 @@ static void local_device_attach_cb(libxl__egc *egc, libxl__ao_device *aodev)
 {
     STATE_AO_GC(aodev->ao);
     libxl__disk_local_state *dls = CONTAINER_OF(aodev, *dls, aodev);
-    char *dev = NULL, *be_path = NULL;
+    char *be_path = NULL;
     int rc;
     libxl__device device;
     libxl_device_disk *disk = &dls->disk;
@@ -3216,9 +3216,6 @@ static void local_device_attach_cb(libxl__egc *egc, libxl__ao_device *aodev)
         goto out;
     }
 
-    dev = GCSPRINTF("/dev/%s", disk->vdev);
-    LOG(DEBUG, "locally attaching disk %s", dev);
-
     rc = libxl__device_from_disk(gc, LIBXL_TOOLSTACK_DOMID, disk, &device);
     if (rc < 0)
         goto out;
@@ -3227,8 +3224,9 @@ static void local_device_attach_cb(libxl__egc *egc, libxl__ao_device *aodev)
     if (rc < 0)
         goto out;
 
-    if (dev != NULL)
-        dls->diskpath = libxl__strdup(gc, dev);
+    dls->diskpath = GCSPRINTF("/dev/%s",
+                              libxl__devid_to_localdev(gc, device.devid));
+    LOG(DEBUG, "locally attached disk %s", dls->diskpath);
 
     dls->callback(egc, dls, 0);
     return;
