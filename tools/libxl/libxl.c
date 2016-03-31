@@ -3209,10 +3209,7 @@ static void local_device_attach_cb(libxl__egc *egc, libxl__ao_device *aodev)
 
     rc = aodev->rc;
     if (rc) {
-        LOGE(ERROR, "unable to %s %s with id %u",
-                    libxl__device_action_to_string(aodev->action),
-                    libxl__device_kind_to_string(aodev->dev->kind),
-                    aodev->dev->devid);
+        LOGE(ERROR, "unable locally attach device: %s", disk->pdev_path);
         goto out;
     }
 
