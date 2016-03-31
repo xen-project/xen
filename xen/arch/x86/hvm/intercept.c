@@ -148,8 +148,8 @@ int hvm_process_io_intercept(const struct hvm_io_handler *handler,
                     ASSERT_UNREACHABLE();
                     /* fall through */
                 default:
-                    rc = X86EMUL_UNHANDLEABLE;
-                    break;
+                    domain_crash(current->domain);
+                    return X86EMUL_UNHANDLEABLE;
                 }
                 if ( rc != X86EMUL_OKAY )
                     break;
@@ -178,8 +178,8 @@ int hvm_process_io_intercept(const struct hvm_io_handler *handler,
                     ASSERT_UNREACHABLE();
                     /* fall through */
                 default:
-                    rc = X86EMUL_UNHANDLEABLE;
-                    break;
+                    domain_crash(current->domain);
+                    return X86EMUL_UNHANDLEABLE;
                 }
                 if ( rc != X86EMUL_OKAY )
                     break;
@@ -196,8 +196,20 @@ int hvm_process_io_intercept(const struct hvm_io_handler *handler,
         }
     }
 
-    if ( i != 0 && rc == X86EMUL_UNHANDLEABLE )
-        domain_crash(current->domain);
+    if ( i )
+    {
+        p->count = i;
+        rc = X86EMUL_OKAY;
+    }
+    else if ( rc == X86EMUL_UNHANDLEABLE )
+    {
+        /*
+         * Don't forward entire batches to the device model: This would
+         * prevent the internal handlers to see subsequent iterations of
+         * the request.
+         */
+        p->count = 1;
+    }
 
     return rc;
 }
