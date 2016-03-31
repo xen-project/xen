@@ -591,8 +591,7 @@ static void bootloader_copyfail(libxl__egc *egc, const char *which,
         } else {
             LOG(ERROR, "unexpected POLLHUP on %s", which);
         }
-    }
-    if (!rc) {
+    } else if (!rc) {
         LOG(ERROR, "unexpected eof copying %s", which);
         rc = ERROR_FAIL;
     }
