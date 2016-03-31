@@ -780,15 +780,15 @@ out:
 
 static int viridian_save_domain_ctxt(struct domain *d, hvm_domain_context_t *h)
 {
-    struct hvm_viridian_domain_context ctxt;
+    struct hvm_viridian_domain_context ctxt = {
+        .time_ref_count = d->arch.hvm_domain.viridian.time_ref_count.val,
+        .hypercall_gpa  = d->arch.hvm_domain.viridian.hypercall_gpa.raw,
+        .guest_os_id    = d->arch.hvm_domain.viridian.guest_os_id.raw,
+        .reference_tsc  = d->arch.hvm_domain.viridian.reference_tsc.raw,
+    };
 
     if ( !is_viridian_domain(d) )
         return 0;
-
-    ctxt.time_ref_count = d->arch.hvm_domain.viridian.time_ref_count.val;
-    ctxt.hypercall_gpa  = d->arch.hvm_domain.viridian.hypercall_gpa.raw;
-    ctxt.guest_os_id    = d->arch.hvm_domain.viridian.guest_os_id.raw;
-    ctxt.reference_tsc  = d->arch.hvm_domain.viridian.reference_tsc.raw;
 
     return (hvm_save_entry(VIRIDIAN_DOMAIN, 0, h, &ctxt) != 0);
 }
@@ -822,10 +822,10 @@ static int viridian_save_vcpu_ctxt(struct domain *d, hvm_domain_context_t *h)
         return 0;
 
     for_each_vcpu( d, v ) {
-        struct hvm_viridian_vcpu_context ctxt;
-
-        ctxt.apic_assist_msr = v->arch.hvm_vcpu.viridian.apic_assist.msr.raw;
-        ctxt.apic_assist_vector = v->arch.hvm_vcpu.viridian.apic_assist.vector;
+        struct hvm_viridian_vcpu_context ctxt = {
+            .apic_assist_msr = v->arch.hvm_vcpu.viridian.apic_assist.msr.raw,
+            .apic_assist_vector = v->arch.hvm_vcpu.viridian.apic_assist.vector,
+        };
 
         if ( hvm_save_entry(VIRIDIAN_VCPU, v->vcpu_id, h, &ctxt) != 0 )
             return 1;
@@ -849,6 +849,9 @@ static int viridian_load_vcpu_ctxt(struct domain *d, hvm_domain_context_t *h)
     }
 
     if ( hvm_load_entry_zeroextend(VIRIDIAN_VCPU, h, &ctxt) != 0 )
+        return -EINVAL;
+
+    if ( memcmp(&ctxt._pad, zero_page, sizeof(ctxt._pad)) )
         return -EINVAL;
 
     v->arch.hvm_vcpu.viridian.apic_assist.msr.raw = ctxt.apic_assist_msr;

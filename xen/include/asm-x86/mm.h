@@ -595,4 +595,6 @@ typedef struct mm_rwlock {
                        &(d)->xenpage_list : &(d)->page_list,            \
                    &(d)->arch.relmem_list)
 
+extern const char zero_page[];
+
 #endif /* __ASM_X86_MM_H__ */
