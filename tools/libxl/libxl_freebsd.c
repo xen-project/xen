@@ -111,6 +111,35 @@ out:
     return rc;
 }
 
+static int libxl__hotplug_disk(libxl__gc *gc, libxl__device *dev,
+                               char ***args, char ***env,
+                               libxl__device_action action)
+{
+    char *be_path = libxl__device_backend_path(gc, dev);
+    char *script;
+    int nr = 0, rc;
+
+    script = libxl__xs_read(gc, XBT_NULL,
+                            GCSPRINTF("%s/%s", be_path, "script"));
+    if (!script) {
+        LOGEV(ERROR, errno, "unable to read script from %s", be_path);
+        rc = ERROR_FAIL;
+        goto out;
+    }
+
+    const int arraysize = 4;
+    GCNEW_ARRAY(*args, arraysize);
+    (*args)[nr++] = script;
+    (*args)[nr++] = be_path;
+    (*args)[nr++] = (char *) libxl__device_action_to_string(action);
+    (*args)[nr++] = NULL;
+    assert(nr == arraysize);
+    rc = 1;
+
+out:
+    return rc;
+}
+
 int libxl__get_hotplug_script_info(libxl__gc *gc, libxl__device *dev,
                                    char ***args, char ***env,
                                    libxl__device_action action,
@@ -130,6 +159,13 @@ int libxl__get_hotplug_script_info(libxl__gc *gc, libxl__device *dev,
             goto out;
         }
         rc = libxl__hotplug_nic(gc, dev, args, env, action, num_exec);
+        break;
+    case LIBXL__DEVICE_KIND_VBD:
+        if (num_exec != 0) {
+            rc = 0;
+            goto out;
+        }
+        rc = libxl__hotplug_disk(gc, dev, args, env, action);
         break;
     default:
         /* No need to execute any hotplug scripts */
