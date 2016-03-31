@@ -48,6 +48,19 @@ written into xenstore:
  $XENBUS/params    The contents of the 'target' section of the disk specification verbatim.
  $XENBUS/mode      'r' (for readonly) or 'w' (for read-write)
 
+Inputs (FreeBSD)
+--------------
+
+The scripts are always called with the same set of arguments. The first
+parameter is the xenstore backend path of the device, while the second
+argument is the action, which is always either "add" or "remove".
+
+When the script is run, the following nodes shall already have been
+written into xenstore:
+
+ $XENBUS/params    The contents of the 'target' section of the disk specification verbatim.
+ $XENBUS/mode      'r' (for readonly) or 'w' (for read-write)
+
 Inputs (NetBSD)
 ---------------
 
