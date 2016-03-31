@@ -1,0 +1,25 @@
+#!/bin/sh -e
+#
+# FreeBSD hotplug script for attaching disks
+#
+# Parameters:
+#	$1: xenstore backend path of the vbd
+#	$2: action, either "add" or "remove"
+#
+# Environment variables:
+#	None
+#
+
+path=$1
+action=$2
+params=$(xenstore-read "$path/params")
+
+case $action in
+add)
+	xenstore-write $path/physical-device-path $params
+	exit 0
+	;;
+*)
+	exit 0
+	;;
+esac

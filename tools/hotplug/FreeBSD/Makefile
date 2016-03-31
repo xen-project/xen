@@ -2,7 +2,7 @@ XEN_ROOT = $(CURDIR)/../../..
 include $(XEN_ROOT)/tools/Rules.mk
 
 # Xen script dir and scripts to go there.
-XEN_SCRIPTS = vif-bridge
+XEN_SCRIPTS = vif-bridge block
 
 XEN_SCRIPT_DATA =
 
