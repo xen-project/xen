@@ -384,6 +384,16 @@ F:	xen/include/asm-x86/
 F:	tools/firmware/hvmloader/
 F:	tools/tests/x86_emulator/
 
+X86 I/O EMULATION
+M:	Paul Durrant <paul.durrant@citrix.com>
+S:	Supported
+F:	xen/arch/x86/hvm/emulate.c
+F:	xen/arch/x86/hvm/intercept.c
+F:	xen/arch/x86/hvm/io.c
+F:	xen/include/asm-x86/hvm/emulate.h
+F:	xen/include/asm-x86/hvm/io.h
+F:	xen/include/public/hvm/ioreq.h
+
 X86 MEMORY MANAGEMENT
 M:	George Dunlap <george.dunlap@eu.citrix.com>
 S:	Supported
@@ -403,6 +413,12 @@ X86 SHADOW PAGETABLES
 M:	Tim Deegan <tim@xen.org>
 S:	Maintained
 F:	xen/arch/x86/mm/shadow/
+
+X86 VIRIDIAN ENLIGHTENMENTS
+M:	Paul Durrant <paul.durrant@citrix.com>
+S:	Supported
+F:	xen/arch/x86/hvm/viridian.c
+F:	xen/include/asm-x86/hvm/viridian.h
 
 XENTRACE
 M:	George Dunlap <george.dunlap@eu.citrix.com>
