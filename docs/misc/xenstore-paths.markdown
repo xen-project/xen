@@ -270,6 +270,11 @@ A virtual network device frontend. Described by
 A virtual scsi device frontend. Described by
 [xen/include/public/io/vscsiif.h][SCSIIF]
 
+#### ~/device/vusb/$DEVID/* []
+
+A virtual usb device frontend. Described by
+[xen/include/public/io/usbif.h][USBIF]
+
 #### ~/console/* []
 
 The primary PV console device. Described in [console.txt](console.txt)
@@ -343,6 +348,11 @@ A virtual network device backend. Described by
 #### ~/backend/vscsi/$DOMID/$DEVID/* []
 
 A PV SCSI backend.
+
+#### ~/backend/vusb/$DOMID/$DEVID/* []
+
+A PV USB backend. Described by
+[xen/include/public/io/usbif.h][USBIF]
 
 #### ~/backend/console/$DOMID/$DEVID/* []
 
@@ -536,5 +546,6 @@ domain instead of a daemon in dom0.
 [NETIF]: http://xenbits.xen.org/docs/unstable/hypercall/x86_64/include,public,io,netif.h.html
 [SCSIIF]: http://xenbits.xen.org/docs/unstable/hypercall/x86_64/include,public,io,vscsiif.h.html
 [SI]: http://xenbits.xen.org/docs/unstable/hypercall/x86_64/include,public,xen.h.html#Struct_start_info
+[USBIF]: http://xenbits.xen.org/docs/unstable/hypercall/x86_64/include,public,io,usbif.h.html
 [VCPU]: http://xenbits.xen.org/docs/unstable/hypercall/x86_64/include,public,vcpu.h.html
 [XSWIRE]: http://xenbits.xen.org/docs/unstable/hypercall/x86_64/include,public,io,xs_wire.h.html
