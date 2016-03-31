@@ -27,8 +27,58 @@ int libxl__try_phy_backend(mode_t st_mode)
 
 char *libxl__devid_to_localdev(libxl__gc *gc, int devid)
 {
-    /* TODO */
-    return NULL;
+    /* This translation table has been copied from the FreeBSD blkfront code. */
+    const static struct vdev_info {
+        int major;
+        int shift;
+        int base;
+        const char *name;
+    } info[] = {
+        {3,     6,  0,      "ada"}, /* ide0 */
+        {22,    6,  2,      "ada"}, /* ide1 */
+        {33,    6,  4,      "ada"}, /* ide2 */
+        {34,    6,  6,      "ada"}, /* ide3 */
+        {56,    6,  8,      "ada"}, /* ide4 */
+        {57,    6,  10,     "ada"}, /* ide5 */
+        {88,    6,  12,     "ada"}, /* ide6 */
+        {89,    6,  14,     "ada"}, /* ide7 */
+        {90,    6,  16,     "ada"}, /* ide8 */
+        {91,    6,  18,     "ada"}, /* ide9 */
+
+        {8,     4,  0,      "da"},  /* scsi disk0 */
+        {65,    4,  16,     "da"},  /* scsi disk1 */
+        {66,    4,  32,     "da"},  /* scsi disk2 */
+        {67,    4,  48,     "da"},  /* scsi disk3 */
+        {68,    4,  64,     "da"},  /* scsi disk4 */
+        {69,    4,  80,     "da"},  /* scsi disk5 */
+        {70,    4,  96,     "da"},  /* scsi disk6 */
+        {71,    4,  112,    "da"},  /* scsi disk7 */
+        {128,   4,  128,    "da"},  /* scsi disk8 */
+        {129,   4,  144,    "da"},  /* scsi disk9 */
+        {130,   4,  160,    "da"},  /* scsi disk10 */
+        {131,   4,  176,    "da"},  /* scsi disk11 */
+        {132,   4,  192,    "da"},  /* scsi disk12 */
+        {133,   4,  208,    "da"},  /* scsi disk13 */
+        {134,   4,  224,    "da"},  /* scsi disk14 */
+        {135,   4,  240,    "da"},  /* scsi disk15 */
+
+        {202,   4,  0,      "xbd"}, /* xbd */
+
+        {0, 0,  0,  NULL},
+    };
+    int major = devid >> 8;
+    int minor = devid & 0xff;
+    int i;
+
+    if (devid & (1 << 28))
+        return GCSPRINTF("%s%d", "xbd", (devid & ((1 << 28) - 1)) >> 8);
+
+    for (i = 0; info[i].major; i++)
+        if (info[i].major == major)
+            return GCSPRINTF("%s%d", info[i].name,
+                             info[i].base + (minor >> info[i].shift));
+
+    return GCSPRINTF("%s%d", "xbd", minor >> 4);
 }
 
 /* Hotplug scripts caller functions */
