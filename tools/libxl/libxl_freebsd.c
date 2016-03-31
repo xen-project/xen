@@ -59,45 +59,15 @@ static int libxl__hotplug_env_nic(libxl__gc *gc, libxl__device *dev, char ***env
     return 0;
 }
 
-static int libxl__hotplug_nic(libxl__gc *gc, libxl__device *dev, char ***args,
-                              libxl__device_action action)
-{
-    char *be_path = libxl__device_backend_path(gc, dev);
-    char *script;
-    int nr = 0, rc = 0, arraysize = 4;
-
-    assert(dev->backend_kind == LIBXL__DEVICE_KIND_VIF);
-
-    script = libxl__xs_read(gc, XBT_NULL,
-                            GCSPRINTF("%s/%s", be_path, "script"));
-    if (!script) {
-        LOGEV(ERROR, errno, "unable to read script from %s", be_path);
-        rc = ERROR_FAIL;
-        goto out;
-    }
-
-    GCNEW_ARRAY(*args, arraysize);
-    (*args)[nr++] = script;
-    (*args)[nr++] = be_path;
-    (*args)[nr++] = GCSPRINTF("%s", action == LIBXL__DEVICE_ACTION_ADD ?
-                                    "add" : "remove");
-    (*args)[nr++] = NULL;
-    assert(nr == arraysize);
-
-out:
-    return rc;
-}
-
-int libxl__get_hotplug_script_info(libxl__gc *gc, libxl__device *dev,
-                                   char ***args, char ***env,
-                                   libxl__device_action action,
-                                   int num_exec)
+static int libxl__hotplug_nic(libxl__gc *gc, libxl__device *dev,
+                              char ***args, char ***env,
+                              libxl__device_action action,
+                              int num_exec)
 {
     libxl_nic_type nictype;
-    int rc;
-
-    if (dev->backend_kind != LIBXL__DEVICE_KIND_VIF || num_exec == 2)
-        return 0;
+    char *be_path = libxl__device_backend_path(gc, dev);
+    char *script;
+    int nr = 0, rc;
 
     rc = libxl__nic_type(gc, dev, &nictype);
     if (rc) {
@@ -120,8 +90,52 @@ int libxl__get_hotplug_script_info(libxl__gc *gc, libxl__device *dev,
     if (rc)
         goto out;
 
-    rc = libxl__hotplug_nic(gc, dev, args, action);
-    if (!rc) rc = 1;
+    script = libxl__xs_read(gc, XBT_NULL,
+                            GCSPRINTF("%s/%s", be_path, "script"));
+    if (!script) {
+        LOGEV(ERROR, errno, "unable to read script from %s", be_path);
+        rc = ERROR_FAIL;
+        goto out;
+    }
+
+    const int arraysize = 4;
+    GCNEW_ARRAY(*args, arraysize);
+    (*args)[nr++] = script;
+    (*args)[nr++] = be_path;
+    (*args)[nr++] = (char *) libxl__device_action_to_string(action);
+    (*args)[nr++] = NULL;
+    assert(nr == arraysize);
+    rc = 1;
+
+out:
+    return rc;
+}
+
+int libxl__get_hotplug_script_info(libxl__gc *gc, libxl__device *dev,
+                                   char ***args, char ***env,
+                                   libxl__device_action action,
+                                   int num_exec)
+{
+    int rc;
+
+    switch (dev->backend_kind) {
+    case LIBXL__DEVICE_KIND_VIF:
+        /*
+         * If domain has a stubdom we don't have to execute hotplug scripts
+         * for emulated interfaces
+         */
+        if ((num_exec > 1) ||
+            (libxl_get_stubdom_id(CTX, dev->domid) && num_exec)) {
+            rc = 0;
+            goto out;
+        }
+        rc = libxl__hotplug_nic(gc, dev, args, env, action, num_exec);
+        break;
+    default:
+        /* No need to execute any hotplug scripts */
+        rc = 0;
+        break;
+    }
 
 out:
     return rc;
