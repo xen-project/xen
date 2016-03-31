@@ -27,6 +27,7 @@
 #define __XEN_TOOLS__ 1
 #endif
 
+#include <unistd.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
