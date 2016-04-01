@@ -90,6 +90,22 @@
 #define RTDS_DEFAULT_PERIOD     (MICROSECS(10000))
 #define RTDS_DEFAULT_BUDGET     (MICROSECS(4000))
 
+/*
+ * Max period: max delta of time type, because period is added to the time
+ * a vcpu activates, so this must not overflow.
+ * Min period: 10 us, considering the scheduling overhead (when period is
+ * too low, scheduling is invoked too frequently, causing high overhead).
+ */
+#define RTDS_MAX_PERIOD     (STIME_DELTA_MAX)
+#define RTDS_MIN_PERIOD     (MICROSECS(10))
+
+/*
+ * Min budget: 10 us, considering the scheduling overhead (when budget is
+ * consumed too fast, scheduling is invoked too frequently, causing
+ * high overhead).
+ */
+#define RTDS_MIN_BUDGET     (MICROSECS(10))
+
 #define UPDATE_LIMIT_SHIFT      10
 
 /*
@@ -1266,24 +1282,16 @@ rt_dom_cntl(
     struct vcpu *v;
     unsigned long flags;
     int rc = 0;
+    xen_domctl_schedparam_vcpu_t local_sched;
+    s_time_t period, budget;
+    uint32_t index = 0;
 
     switch ( op->cmd )
     {
     case XEN_DOMCTL_SCHEDOP_getinfo:
-        if ( d->max_vcpus > 0 )
-        {
-            spin_lock_irqsave(&prv->lock, flags);
-            svc = rt_vcpu(d->vcpu[0]);
-            op->u.rtds.period = svc->period / MICROSECS(1);
-            op->u.rtds.budget = svc->budget / MICROSECS(1);
-            spin_unlock_irqrestore(&prv->lock, flags);
-        }
-        else
-        {
-            /* If we don't have vcpus yet, let's just return the defaults. */
-            op->u.rtds.period = RTDS_DEFAULT_PERIOD;
-            op->u.rtds.budget = RTDS_DEFAULT_BUDGET;
-        }
+        /* Return the default parameters. */
+        op->u.rtds.period = RTDS_DEFAULT_PERIOD / MICROSECS(1);
+        op->u.rtds.budget = RTDS_DEFAULT_BUDGET / MICROSECS(1);
         break;
     case XEN_DOMCTL_SCHEDOP_putinfo:
         if ( op->u.rtds.period == 0 || op->u.rtds.budget == 0 )
@@ -1299,6 +1307,63 @@ rt_dom_cntl(
             svc->budget = MICROSECS(op->u.rtds.budget);
         }
         spin_unlock_irqrestore(&prv->lock, flags);
+        break;
+    case XEN_DOMCTL_SCHEDOP_getvcpuinfo:
+    case XEN_DOMCTL_SCHEDOP_putvcpuinfo:
+        while ( index < op->u.v.nr_vcpus )
+        {
+            if ( copy_from_guest_offset(&local_sched,
+                                        op->u.v.vcpus, index, 1) )
+            {
+                rc = -EFAULT;
+                break;
+            }
+            if ( local_sched.vcpuid >= d->max_vcpus ||
+                 d->vcpu[local_sched.vcpuid] == NULL )
+            {
+                rc = -EINVAL;
+                break;
+            }
+
+            if ( op->cmd == XEN_DOMCTL_SCHEDOP_getvcpuinfo )
+            {
+                spin_lock_irqsave(&prv->lock, flags);
+                svc = rt_vcpu(d->vcpu[local_sched.vcpuid]);
+                local_sched.u.rtds.budget = svc->budget / MICROSECS(1);
+                local_sched.u.rtds.period = svc->period / MICROSECS(1);
+                spin_unlock_irqrestore(&prv->lock, flags);
+
+                if ( copy_to_guest_offset(op->u.v.vcpus, index,
+                                          &local_sched, 1) )
+                {
+                    rc = -EFAULT;
+                    break;
+                }
+            }
+            else
+            {
+                period = MICROSECS(local_sched.u.rtds.period);
+                budget = MICROSECS(local_sched.u.rtds.budget);
+                if ( period > RTDS_MAX_PERIOD || budget < RTDS_MIN_BUDGET ||
+                     budget > period || period < RTDS_MIN_PERIOD )
+                {
+                    rc = -EINVAL;
+                    break;
+                }
+
+                spin_lock_irqsave(&prv->lock, flags);
+                svc = rt_vcpu(d->vcpu[local_sched.vcpuid]);
+                svc->period = period;
+                svc->budget = budget;
+                spin_unlock_irqrestore(&prv->lock, flags);
+            }
+            /* Process a most 64 vCPUs without checking for preemptions. */
+            if ( (++index > 63) && hypercall_preempt_check() )
+                break;
+        }
+        if ( !rc )
+            /* notify upper caller how many vcpus have been processed. */
+            op->u.v.nr_vcpus = index;
         break;
     }
 

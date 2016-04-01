@@ -350,24 +350,63 @@ DEFINE_XEN_GUEST_HANDLE(xen_domctl_max_vcpus_t);
 #define XEN_SCHEDULER_ARINC653 7
 #define XEN_SCHEDULER_RTDS     8
 
-/* Set or get info? */
+typedef struct xen_domctl_sched_credit {
+    uint16_t weight;
+    uint16_t cap;
+} xen_domctl_sched_credit_t;
+
+typedef struct xen_domctl_sched_credit2 {
+    uint16_t weight;
+} xen_domctl_sched_credit2_t;
+
+typedef struct xen_domctl_sched_rtds {
+    uint32_t period;
+    uint32_t budget;
+} xen_domctl_sched_rtds_t;
+
+typedef struct xen_domctl_schedparam_vcpu {
+    union {
+        xen_domctl_sched_credit_t credit;
+        xen_domctl_sched_credit2_t credit2;
+        xen_domctl_sched_rtds_t rtds;
+    } u;
+    uint32_t vcpuid;
+} xen_domctl_schedparam_vcpu_t;
+DEFINE_XEN_GUEST_HANDLE(xen_domctl_schedparam_vcpu_t);
+
+/*
+ * Set or get info?
+ * For schedulers supporting per-vcpu settings (e.g., RTDS):
+ *  XEN_DOMCTL_SCHEDOP_putinfo sets params for all vcpus;
+ *  XEN_DOMCTL_SCHEDOP_getinfo gets default params;
+ *  XEN_DOMCTL_SCHEDOP_put(get)vcpuinfo sets (gets) params of vcpus;
+ *
+ * For schedulers not supporting per-vcpu settings:
+ *  XEN_DOMCTL_SCHEDOP_putinfo sets params for all vcpus;
+ *  XEN_DOMCTL_SCHEDOP_getinfo gets domain-wise params;
+ *  XEN_DOMCTL_SCHEDOP_put(get)vcpuinfo returns error;
+ */
 #define XEN_DOMCTL_SCHEDOP_putinfo 0
 #define XEN_DOMCTL_SCHEDOP_getinfo 1
+#define XEN_DOMCTL_SCHEDOP_putvcpuinfo 2
+#define XEN_DOMCTL_SCHEDOP_getvcpuinfo 3
 struct xen_domctl_scheduler_op {
     uint32_t sched_id;  /* XEN_SCHEDULER_* */
     uint32_t cmd;       /* XEN_DOMCTL_SCHEDOP_* */
+    /* IN/OUT */
     union {
-        struct xen_domctl_sched_credit {
-            uint16_t weight;
-            uint16_t cap;
-        } credit;
-        struct xen_domctl_sched_credit2 {
-            uint16_t weight;
-        } credit2;
-        struct xen_domctl_sched_rtds {
-            uint32_t period;
-            uint32_t budget;
-        } rtds;
+        xen_domctl_sched_credit_t credit;
+        xen_domctl_sched_credit2_t credit2;
+        xen_domctl_sched_rtds_t rtds;
+        struct {
+            XEN_GUEST_HANDLE_64(xen_domctl_schedparam_vcpu_t) vcpus;
+            /*
+             * IN: Number of elements in vcpus array.
+             * OUT: Number of processed elements of vcpus array.
+             */
+            uint32_t nr_vcpus;
+            uint32_t padding;
+        } v;
     } u;
 };
 typedef struct xen_domctl_scheduler_op xen_domctl_scheduler_op_t;

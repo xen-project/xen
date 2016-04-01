@@ -1421,14 +1421,12 @@ csched2_dom_cntl(
      * runq lock to update csvcs. */
     spin_lock_irqsave(&prv->lock, flags);
 
-    if ( op->cmd == XEN_DOMCTL_SCHEDOP_getinfo )
+    switch ( op->cmd )
     {
+    case XEN_DOMCTL_SCHEDOP_getinfo:
         op->u.credit2.weight = sdom->weight;
-    }
-    else
-    {
-        ASSERT(op->cmd == XEN_DOMCTL_SCHEDOP_putinfo);
-
+        break;
+    case XEN_DOMCTL_SCHEDOP_putinfo:
         if ( op->u.credit2.weight != 0 )
         {
             struct vcpu *v;
@@ -1457,6 +1455,9 @@ csched2_dom_cntl(
                 vcpu_schedule_unlock(lock, svc->vcpu);
             }
         }
+        break;
+    default:
+        return -EINVAL;
     }
 
     spin_unlock_irqrestore(&prv->lock, flags);

@@ -1235,10 +1235,19 @@ long sched_adjust(struct domain *d, struct xen_domctl_scheduler_op *op)
     if ( ret )
         return ret;
 
-    if ( (op->sched_id != DOM2OP(d)->sched_id) ||
-         ((op->cmd != XEN_DOMCTL_SCHEDOP_putinfo) &&
-          (op->cmd != XEN_DOMCTL_SCHEDOP_getinfo)) )
+    if ( op->sched_id != DOM2OP(d)->sched_id )
         return -EINVAL;
+
+    switch ( op->cmd )
+    {
+    case XEN_DOMCTL_SCHEDOP_putinfo:
+    case XEN_DOMCTL_SCHEDOP_getinfo:
+    case XEN_DOMCTL_SCHEDOP_putvcpuinfo:
+    case XEN_DOMCTL_SCHEDOP_getvcpuinfo:
+        break;
+    default:
+        return -EINVAL;
+    }
 
     /* NB: the pluggable scheduler code needs to take care
      * of locking by itself. */

@@ -1080,15 +1080,13 @@ csched_dom_cntl(
      * lock. Runq lock not needed anywhere in here. */
     spin_lock_irqsave(&prv->lock, flags);
 
-    if ( op->cmd == XEN_DOMCTL_SCHEDOP_getinfo )
+    switch ( op->cmd )
     {
+    case XEN_DOMCTL_SCHEDOP_getinfo:
         op->u.credit.weight = sdom->weight;
         op->u.credit.cap = sdom->cap;
-    }
-    else
-    {
-        ASSERT(op->cmd == XEN_DOMCTL_SCHEDOP_putinfo);
-
+        break;
+    case XEN_DOMCTL_SCHEDOP_putinfo:
         if ( op->u.credit.weight != 0 )
         {
             if ( !list_empty(&sdom->active_sdom_elem) )
@@ -1101,7 +1099,9 @@ csched_dom_cntl(
 
         if ( op->u.credit.cap != (uint16_t)~0U )
             sdom->cap = op->u.credit.cap;
-
+        break;
+    default:
+        return -EINVAL;
     }
 
     spin_unlock_irqrestore(&prv->lock, flags);
