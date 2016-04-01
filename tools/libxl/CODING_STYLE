@@ -294,7 +294,7 @@ Libxenlight coding style is super simple.  Avoid tricky expressions.
 
 5. Block structure
 
-Every indented statement is braced apart from blocks that contain just
+Every indented statement is braced, except blocks that contain just
 one statement.
 The opening brace is on the line that contains the control flow
 statement that introduces the new block; the closing brace is on the
