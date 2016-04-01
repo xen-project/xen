@@ -1107,6 +1107,10 @@ B<OPTIONS>
 Specify domain for which scheduler parameters are to be modified or retrieved.
 Mandatory for modifying scheduler parameters.
 
+=item B<-v VCPUID/all>, B<--vcpuid=VCPUID/all>
+
+Specify vcpu for which scheduler parameters are to be modified or retrieved.
+
 =item B<-p PERIOD>, B<--period=PERIOD>
 
 Period of time, in microseconds, over which to replenish the budget.
@@ -1119,6 +1123,69 @@ to run every period.
 =item B<-c CPUPOOL>, B<--cpupool=CPUPOOL>
 
 Restrict output to domains in the specified cpupool.
+
+=back
+
+B<EXAMPLE>
+
+=over 4
+
+1) Use B<-v all> to see the budget and period of all the VCPUs of
+all the domains:
+
+    xl sched-rtds -v all
+    Cpupool Pool-0: sched=RTDS
+    Name                        ID VCPU    Period    Budget
+    Domain-0                     0    0     10000      4000
+    vm1                          1    0       300       150
+    vm1                          1    1       400       200
+    vm1                          1    2     10000      4000
+    vm1                          1    3      1000       500
+    vm2                          2    0     10000      4000
+    vm2                          2    1     10000      4000
+
+Without any arguments, it will output the default scheduing
+parameters for each domain:
+
+    xl sched-rtds
+    Cpupool Pool-0: sched=RTDS
+    Name                        ID    Period    Budget
+    Domain-0                     0     10000      4000
+    vm1                          1     10000      4000
+    vm2                          2     10000      4000
+
+
+2) Use, for instance B<-d vm1, -v all> to see the budget and
+period of all VCPUs of a specific domain (B<vm1>):
+
+    xl sched-rtds -d vm1 -v all
+    Name                        ID VCPU    Period    Budget
+    vm1                          1    0       300       150
+    vm1                          1    1       400       200
+    vm1                          1    2     10000      4000
+    vm1                          1    3      1000       500
+
+To see the parameters of a subset of the VCPUs of a domain, use:
+
+    xl sched-rtds -d vm1 -v 0 -v 3
+    Name                        ID VCPU    Period    Budget
+    vm1                          1    0       300       150
+    vm1                          1    3      1000       500
+
+If no B<-v> is speficified, the default scheduling parameter for the
+domain are shown:
+
+    xl sched-rtds -d vm1
+    Name                        ID    Period    Budget
+    vm1                          1     10000      4000
+
+
+3) Users can set the budget and period of multiple VCPUs of a
+specific domain with only one command,
+e.g., "xl sched-rtds -d vm1 -v 0 -p 100 -b 50 -v 3 -p 300 -b 150".
+
+To change the parameters of all the VCPUs of a domain, use B<-v all>,
+e.g., "xl sched-rtds -d vm1 -v all -p 500 -b 250".
 
 =back
 

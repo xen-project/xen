@@ -6191,6 +6191,72 @@ static int sched_domain_set(int domid, const libxl_domain_sched_params *scinfo)
     return 0;
 }
 
+static int sched_vcpu_get(libxl_scheduler sched, int domid,
+                          libxl_vcpu_sched_params *scinfo)
+{
+    int rc;
+
+    rc = libxl_vcpu_sched_params_get(ctx, domid, scinfo);
+    if (rc) {
+        fprintf(stderr, "libxl_vcpu_sched_params_get failed.\n");
+        exit(EXIT_FAILURE);
+    }
+    if (scinfo->sched != sched) {
+        fprintf(stderr, "libxl_vcpu_sched_params_get returned %s not %s.\n",
+                libxl_scheduler_to_string(scinfo->sched),
+                libxl_scheduler_to_string(sched));
+        return 1;
+    }
+
+    return 0;
+}
+
+static int sched_vcpu_get_all(libxl_scheduler sched, int domid,
+                              libxl_vcpu_sched_params *scinfo)
+{
+    int rc;
+
+    rc = libxl_vcpu_sched_params_get_all(ctx, domid, scinfo);
+    if (rc) {
+        fprintf(stderr, "libxl_vcpu_sched_params_get_all failed.\n");
+        exit(EXIT_FAILURE);
+    }
+    if (scinfo->sched != sched) {
+        fprintf(stderr, "libxl_vcpu_sched_params_get_all returned %s not %s.\n",
+                libxl_scheduler_to_string(scinfo->sched),
+                libxl_scheduler_to_string(sched));
+        return 1;
+    }
+
+    return 0;
+}
+
+static int sched_vcpu_set(int domid, const libxl_vcpu_sched_params *scinfo)
+{
+    int rc;
+
+    rc = libxl_vcpu_sched_params_set(ctx, domid, scinfo);
+    if (rc) {
+        fprintf(stderr, "libxl_vcpu_sched_params_set failed.\n");
+        exit(EXIT_FAILURE);
+    }
+
+    return 0;
+}
+
+static int sched_vcpu_set_all(int domid, const libxl_vcpu_sched_params *scinfo)
+{
+    int rc;
+
+    rc = libxl_vcpu_sched_params_set_all(ctx, domid, scinfo);
+    if (rc) {
+        fprintf(stderr, "libxl_vcpu_sched_params_set_all failed.\n");
+        exit(EXIT_FAILURE);
+    }
+
+    return 0;
+}
+
 static int sched_credit_params_set(int poolid, libxl_sched_credit_params *scinfo)
 {
     if (libxl_sched_credit_params_set(ctx, poolid, scinfo)) {
@@ -6310,6 +6376,66 @@ static int sched_rtds_domain_output(
     return 0;
 }
 
+static int sched_rtds_vcpu_output(int domid, libxl_vcpu_sched_params *scinfo)
+{
+    char *domname;
+    int rc = 0;
+    int i;
+
+    if (domid < 0) {
+        printf("%-33s %4s %4s %9s %9s\n", "Name", "ID",
+               "VCPU", "Period", "Budget");
+        return 0;
+    }
+
+    rc = sched_vcpu_get(LIBXL_SCHEDULER_RTDS, domid, scinfo);
+    if (rc)
+        return 1;
+
+    domname = libxl_domid_to_name(ctx, domid);
+    for ( i = 0; i < scinfo->num_vcpus; i++ ) {
+        printf("%-33s %4d %4d %9"PRIu32" %9"PRIu32"\n",
+               domname,
+               domid,
+               scinfo->vcpus[i].vcpuid,
+               scinfo->vcpus[i].period,
+               scinfo->vcpus[i].budget);
+    }
+    free(domname);
+    return 0;
+}
+
+static int sched_rtds_vcpu_output_all(int domid,
+                                      libxl_vcpu_sched_params *scinfo)
+{
+    char *domname;
+    int rc = 0;
+    int i;
+
+    if (domid < 0) {
+        printf("%-33s %4s %4s %9s %9s\n", "Name", "ID",
+               "VCPU", "Period", "Budget");
+        return 0;
+    }
+
+    scinfo->num_vcpus = 0;
+    rc = sched_vcpu_get_all(LIBXL_SCHEDULER_RTDS, domid, scinfo);
+    if (rc)
+        return 1;
+
+    domname = libxl_domid_to_name(ctx, domid);
+    for ( i = 0; i < scinfo->num_vcpus; i++ ) {
+        printf("%-33s %4d %4d %9"PRIu32" %9"PRIu32"\n",
+               domname,
+               domid,
+               scinfo->vcpus[i].vcpuid,
+               scinfo->vcpus[i].period,
+               scinfo->vcpus[i].budget);
+    }
+    free(domname);
+    return 0;
+}
+
 static int sched_rtds_pool_output(uint32_t poolid)
 {
     char *poolname;
@@ -6373,6 +6499,61 @@ static int sched_domain_output(libxl_scheduler sched, int (*output)(int),
             if (info[i].cpupool != poolinfo[p].poolid)
                 continue;
             rc = output(info[i].domid);
+            if (rc)
+                break;
+        }
+    }
+
+    libxl_cpupoolinfo_list_free(poolinfo, n_pools);
+    libxl_dominfo_list_free(info, nb_domain);
+    return 0;
+}
+
+static int sched_vcpu_output(libxl_scheduler sched,
+                             int (*output)(int, libxl_vcpu_sched_params *),
+                             int (*pooloutput)(uint32_t), const char *cpupool)
+{
+    libxl_dominfo *info;
+    libxl_cpupoolinfo *poolinfo = NULL;
+    uint32_t poolid;
+    int nb_domain, n_pools = 0, i, p;
+    int rc = 0;
+
+    if (cpupool) {
+        if (libxl_cpupool_qualifier_to_cpupoolid(ctx, cpupool, &poolid, NULL)
+            || !libxl_cpupoolid_is_valid(ctx, poolid)) {
+            fprintf(stderr, "unknown cpupool \'%s\'\n", cpupool);
+            return 1;
+        }
+    }
+
+    info = libxl_list_domain(ctx, &nb_domain);
+    if (!info) {
+        fprintf(stderr, "libxl_list_domain failed.\n");
+        return 1;
+    }
+    poolinfo = libxl_list_cpupool(ctx, &n_pools);
+    if (!poolinfo) {
+        fprintf(stderr, "error getting cpupool info\n");
+        libxl_dominfo_list_free(info, nb_domain);
+        return 1;
+    }
+
+    for (p = 0; !rc && (p < n_pools); p++) {
+        if ((poolinfo[p].sched != sched) ||
+            (cpupool && (poolid != poolinfo[p].poolid)))
+            continue;
+
+        pooloutput(poolinfo[p].poolid);
+
+        output(-1, NULL);
+        for (i = 0; i < nb_domain; i++) {
+            libxl_vcpu_sched_params scinfo;
+            if (info[i].cpupool != poolinfo[p].poolid)
+                continue;
+            libxl_vcpu_sched_params_init(&scinfo);
+            rc = output(info[i].domid, &scinfo);
+            libxl_vcpu_sched_params_dispose(&scinfo);
             if (rc)
                 break;
         }
@@ -6586,84 +6767,198 @@ int main_sched_credit2(int argc, char **argv)
 
 /*
  * <nothing>            : List all domain paramters and sched params
- * -d [domid]           : List domain params for domain
+ * -d [domid]           : List default domain params for domain
  * -d [domid] [params]  : Set domain params for domain
+ * -d [domid] -v [vcpuid 1] -v [vcpuid 2] ...  :
+ * List per-VCPU params for domain
+ * -d [domid] -v all  : List all per-VCPU params for domain
+ * -v all  : List all per-VCPU params for all domains
+ * -d [domid] -v [vcpuid 1] [params] -v [vcpuid 2] [params] ...  :
+ * Set per-VCPU params for domain
+ * -d [domid] -v all [params]  : Set all per-VCPU params for domain
  */
 int main_sched_rtds(int argc, char **argv)
 {
     const char *dom = NULL;
     const char *cpupool = NULL;
-    int period = 0; /* period is in microsecond */
-    int budget = 0; /* budget is in microsecond */
+    int *vcpus = (int *)xmalloc(sizeof(int)); /* IDs of VCPUs that change */
+    int *periods = (int *)xmalloc(sizeof(int)); /* period is in microsecond */
+    int *budgets = (int *)xmalloc(sizeof(int)); /* budget is in microsecond */
+    int v_size = 1; /* size of vcpus array */
+    int p_size = 1; /* size of periods array */
+    int b_size = 1; /* size of budgets array */
+    int v_index = 0; /* index in vcpus array */
+    int p_index =0; /* index in periods array */
+    int b_index =0; /* index for in budgets array */
     bool opt_p = false;
     bool opt_b = false;
-    int opt, rc;
+    bool opt_v = false;
+    bool opt_all = false; /* output per-dom parameters */
+    int opt, i, rc, r;
     static struct option opts[] = {
         {"domain", 1, 0, 'd'},
         {"period", 1, 0, 'p'},
         {"budget", 1, 0, 'b'},
+        {"vcpuid",1, 0, 'v'},
         {"cpupool", 1, 0, 'c'},
         COMMON_LONG_OPTS
     };
 
-    SWITCH_FOREACH_OPT(opt, "d:p:b:c:", opts, "sched-rtds", 0) {
+    SWITCH_FOREACH_OPT(opt, "d:p:b:v:c", opts, "sched-rtds", 0) {
     case 'd':
         dom = optarg;
         break;
     case 'p':
-        period = strtol(optarg, NULL, 10);
-        opt_p = true;
+        if (p_index >= p_size) {
+            /*
+             * periods array is full
+             * double the array size for new elements
+             */
+            p_size *= 2;
+            periods = xrealloc(periods, p_size);
+        }
+        periods[p_index++] = strtol(optarg, NULL, 10);
+        opt_p = 1;
         break;
     case 'b':
-        budget = strtol(optarg, NULL, 10);
-        opt_b = true;
+        if (b_index >= b_size) { /* budgets array is full */
+            b_size *= 2;
+            budgets = xrealloc(budgets, b_size);
+        }
+        budgets[b_index++] = strtol(optarg, NULL, 10);
+        opt_b = 1;
+        break;
+    case 'v':
+        if (!strcmp(optarg, "all")) { /* get or set all vcpus of a domain */
+            opt_all = 1;
+            break;
+        }
+        if (v_index >= v_size) { /* vcpus array is full */
+            v_size *= 2;
+            vcpus = xrealloc(vcpus, v_size);
+        }
+        vcpus[v_index++] = strtol(optarg, NULL, 10);
+        opt_v = 1;
         break;
     case 'c':
         cpupool = optarg;
         break;
     }
 
-    if (cpupool && (dom || opt_p || opt_b)) {
+    if (cpupool && (dom || opt_p || opt_b || opt_v || opt_all)) {
         fprintf(stderr, "Specifying a cpupool is not allowed with "
                 "other options.\n");
-        return EXIT_FAILURE;
+        r = EXIT_FAILURE;
+        goto out;
     }
-    if (!dom && (opt_p || opt_b)) {
-        fprintf(stderr, "Must specify a domain.\n");
-        return EXIT_FAILURE;
+    if (!dom && (opt_p || opt_b || opt_v)) {
+        fprintf(stderr, "Missing parameters.\n");
+        r = EXIT_FAILURE;
+        goto out;
     }
-    if (opt_p != opt_b) {
-        fprintf(stderr, "Must specify period and budget\n");
-        return EXIT_FAILURE;
+    if (dom && !opt_v && !opt_all && (opt_p || opt_b)) {
+        fprintf(stderr, "Must specify VCPU.\n");
+        r = EXIT_FAILURE;
+        goto out;
+    }
+    if (opt_v && opt_all) {
+        fprintf(stderr, "Incorrect VCPU IDs.\n");
+        r = EXIT_FAILURE;
+        goto out;
+    }
+    if (((v_index > b_index) && opt_b) || ((v_index > p_index) && opt_p)
+        || p_index != b_index) {
+        fprintf(stderr, "Incorrect number of period and budget\n");
+        r = EXIT_FAILURE;
+        goto out;
     }
 
-    if (!dom) { /* list all domain's rt scheduler info */
-        if (sched_domain_output(LIBXL_SCHEDULER_RTDS,
-                                sched_rtds_domain_output,
+    if ((!dom) && opt_all) {
+        /* get all domain's per-vcpu rtds scheduler parameters */
+        rc = -sched_vcpu_output(LIBXL_SCHEDULER_RTDS,
+                                sched_rtds_vcpu_output_all,
                                 sched_rtds_pool_output,
-                                cpupool))
-            return EXIT_FAILURE;
+                                cpupool);
+        if (rc) {
+            r = EXIT_FAILURE;
+            goto out;
+        }
+    } else if (!dom && !opt_all) {
+        /* list all domain's default scheduling parameters */
+        rc = -sched_domain_output(LIBXL_SCHEDULER_RTDS,
+                                  sched_rtds_domain_output,
+                                  sched_rtds_pool_output,
+                                  cpupool);
+        if (rc) {
+            r = EXIT_FAILURE;
+            goto out;
+        }
     } else {
         uint32_t domid = find_domain(dom);
-        if (!opt_p && !opt_b) { /* output rt scheduler info */
+        if (!opt_v && !opt_all) { /* output default scheduling parameters */
             sched_rtds_domain_output(-1);
-            if (sched_rtds_domain_output(domid))
-                return EXIT_FAILURE;
-        } else { /* set rt scheduler paramaters */
-            libxl_domain_sched_params scinfo;
-            libxl_domain_sched_params_init(&scinfo);
+            rc = -sched_rtds_domain_output(domid);
+            if (rc) {
+                r = EXIT_FAILURE;
+                goto out;
+            }
+        } else if (!opt_p && !opt_b) {
+            /* get per-vcpu rtds scheduling parameters */
+            libxl_vcpu_sched_params scinfo;
+            libxl_vcpu_sched_params_init(&scinfo);
+            sched_rtds_vcpu_output(-1, &scinfo);
+            scinfo.num_vcpus = v_index;
+            if (v_index > 0) {
+                scinfo.vcpus = (libxl_sched_params *)
+                               xmalloc(sizeof(libxl_sched_params) * (v_index));
+                for (i = 0; i < v_index; i++)
+                    scinfo.vcpus[i].vcpuid = vcpus[i];
+                rc = -sched_rtds_vcpu_output(domid, &scinfo);
+            } else /* get params for all vcpus */
+                rc = -sched_rtds_vcpu_output_all(domid, &scinfo);
+            libxl_vcpu_sched_params_dispose(&scinfo);
+            if (rc) {
+                r = EXIT_FAILURE;
+                goto out;
+            }
+    } else if (opt_v || opt_all) {
+            /* set per-vcpu rtds scheduling parameters */
+            libxl_vcpu_sched_params scinfo;
+            libxl_vcpu_sched_params_init(&scinfo);
             scinfo.sched = LIBXL_SCHEDULER_RTDS;
-            scinfo.period = period;
-            scinfo.budget = budget;
+            if (v_index > 0) {
+                scinfo.num_vcpus = v_index;
+                scinfo.vcpus = (libxl_sched_params *)
+                               xmalloc(sizeof(libxl_sched_params) * (v_index));
+                for (i = 0; i < v_index; i++) {
+                    scinfo.vcpus[i].vcpuid = vcpus[i];
+                    scinfo.vcpus[i].period = periods[i];
+                    scinfo.vcpus[i].budget = budgets[i];
+                }
+                rc = sched_vcpu_set(domid, &scinfo);
+            } else { /* set params for all vcpus */
+                scinfo.num_vcpus = 1;
+                scinfo.vcpus = (libxl_sched_params *)
+                               xmalloc(sizeof(libxl_sched_params));
+                scinfo.vcpus[0].period = periods[0];
+                scinfo.vcpus[0].budget = budgets[0];
+                rc = sched_vcpu_set_all(domid, &scinfo);
+            }
 
-            rc = sched_domain_set(domid, &scinfo);
-            libxl_domain_sched_params_dispose(&scinfo);
-            if (rc)
-                return EXIT_FAILURE;
+            libxl_vcpu_sched_params_dispose(&scinfo);
+            if (rc) {
+                r = EXIT_FAILURE;
+                goto out;
+            }
         }
     }
 
-    return EXIT_SUCCESS;
+    r = EXIT_SUCCESS;
+out:
+    free(vcpus);
+    free(periods);
+    free(budgets);
+    return r;
 }
 
 int main_domid(int argc, char **argv)
