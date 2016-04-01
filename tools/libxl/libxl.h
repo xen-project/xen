@@ -218,6 +218,17 @@
 #define LIBXL_HAVE_DEVICE_MODEL_USER 1
 
 /*
+ * libxl_vcpu_sched_params is used to store per-vcpu params.
+ */
+#define LIBXL_HAVE_VCPU_SCHED_PARAMS 1
+
+/*
+ * LIBXL_HAVE_SCHED_RTDS_VCPU_PARAMS indicates RTDS scheduler
+ * now supports per-vcpu settings.
+ */
+#define LIBXL_HAVE_SCHED_RTDS_VCPU_PARAMS 1
+
+/*
  * libxl_domain_build_info has the arm.gic_version field.
  */
 #define LIBXL_HAVE_BUILDINFO_ARM_GIC_VERSION 1
@@ -1886,10 +1897,40 @@ int libxl_sched_credit_params_set(libxl_ctx *ctx, uint32_t poolid,
 #define LIBXL_DOMAIN_SCHED_PARAM_EXTRATIME_DEFAULT -1
 #define LIBXL_DOMAIN_SCHED_PARAM_BUDGET_DEFAULT    -1
 
+/* Per-VCPU parameters */
+#define LIBXL_SCHED_PARAM_VCPU_INDEX_DEFAULT   -1
+
+/* Get the per-domain scheduling parameters.
+ * For schedulers that support per-vcpu settings (e.g., RTDS),
+ * calling *_domain_get functions will get default scheduling
+ * parameters.
+ */
 int libxl_domain_sched_params_get(libxl_ctx *ctx, uint32_t domid,
                                   libxl_domain_sched_params *params);
+
+/* Set the per-domain scheduling parameters.
+ * For schedulers that support per-vcpu settings (e.g., RTDS),
+ * calling *_domain_set functions will set all vcpus with the same
+ * scheduling parameters.
+ */
 int libxl_domain_sched_params_set(libxl_ctx *ctx, uint32_t domid,
                                   const libxl_domain_sched_params *params);
+
+/* Get the per-vcpu scheduling parameters */
+int libxl_vcpu_sched_params_get(libxl_ctx *ctx, uint32_t domid,
+                                libxl_vcpu_sched_params *params);
+
+/* Get the per-vcpu scheduling parameters of all vcpus of a domain */
+int libxl_vcpu_sched_params_get_all(libxl_ctx *ctx, uint32_t domid,
+                                    libxl_vcpu_sched_params *params);
+
+/* Set the per-vcpu scheduling parameters */
+int libxl_vcpu_sched_params_set(libxl_ctx *ctx, uint32_t domid,
+                                const libxl_vcpu_sched_params *params);
+
+/* Set the per-vcpu scheduling parameters of all vcpus of a domain */
+int libxl_vcpu_sched_params_set_all(libxl_ctx *ctx, uint32_t domid,
+                                    const libxl_vcpu_sched_params *params);
 
 int libxl_send_trigger(libxl_ctx *ctx, uint32_t domid,
                        libxl_trigger trigger, uint32_t vcpuid);

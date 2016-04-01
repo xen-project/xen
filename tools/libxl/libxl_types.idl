@@ -390,6 +390,20 @@ libxl_domain_restore_params = Struct("domain_restore_params", [
     ("colo_proxy_script", string),
     ])
 
+libxl_sched_params = Struct("sched_params",[
+    ("vcpuid",       integer, {'init_val': 'LIBXL_SCHED_PARAM_VCPU_INDEX_DEFAULT'}),
+    ("weight",       integer, {'init_val': 'LIBXL_DOMAIN_SCHED_PARAM_WEIGHT_DEFAULT'}),
+    ("cap",          integer, {'init_val': 'LIBXL_DOMAIN_SCHED_PARAM_CAP_DEFAULT'}),
+    ("period",       integer, {'init_val': 'LIBXL_DOMAIN_SCHED_PARAM_PERIOD_DEFAULT'}),
+    ("extratime",    integer, {'init_val': 'LIBXL_DOMAIN_SCHED_PARAM_EXTRATIME_DEFAULT'}),
+    ("budget",       integer, {'init_val': 'LIBXL_DOMAIN_SCHED_PARAM_BUDGET_DEFAULT'}),
+    ])
+
+libxl_vcpu_sched_params = Struct("vcpu_sched_params",[
+    ("sched",        libxl_scheduler),
+    ("vcpus",        Array(libxl_sched_params, "num_vcpus")),
+    ])
+
 libxl_domain_sched_params = Struct("domain_sched_params",[
     ("sched",        libxl_scheduler),
     ("weight",       integer, {'init_val': 'LIBXL_DOMAIN_SCHED_PARAM_WEIGHT_DEFAULT'}),
