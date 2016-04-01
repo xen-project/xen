@@ -31,6 +31,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdbool.h>
+#include <unistd.h>
 #include <xen/xen.h>
 #include <xen/domctl.h>
 #include <xen/physdev.h>
