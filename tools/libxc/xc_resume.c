@@ -109,6 +109,7 @@ static int xc_domain_resume_cooperative(xc_interface *xch, uint32_t domid)
     return do_domctl(xch, &domctl);
 }
 
+#if defined(__i386__) || defined(__x86_64__)
 static int xc_domain_resume_hvm(xc_interface *xch, uint32_t domid)
 {
     DECLARE_DOMCTL;
@@ -128,6 +129,7 @@ static int xc_domain_resume_hvm(xc_interface *xch, uint32_t domid)
     domctl.domain = domid;
     return do_domctl(xch, &domctl);
 }
+#endif
 
 static int xc_domain_resume_any(xc_interface *xch, uint32_t domid)
 {
