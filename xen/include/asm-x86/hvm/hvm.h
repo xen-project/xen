@@ -25,7 +25,6 @@
 #include <asm/hvm/asid.h>
 #include <public/domctl.h>
 #include <public/hvm/save.h>
-#include <public/hvm/ioreq.h>
 #include <xen/mm.h>
 
 #ifndef NDEBUG
@@ -257,11 +256,6 @@ int hvm_vcpu_cacheattr_init(struct vcpu *v);
 void hvm_vcpu_cacheattr_destroy(struct vcpu *v);
 void hvm_vcpu_reset_state(struct vcpu *v, uint16_t cs, uint16_t ip);
 
-struct hvm_ioreq_server *hvm_select_ioreq_server(struct domain *d,
-                                                 ioreq_t *p);
-int hvm_send_ioreq(struct hvm_ioreq_server *s, ioreq_t *p, bool_t buffered);
-unsigned int hvm_broadcast_ioreq(ioreq_t *p, bool_t buffered);
-
 void hvm_get_guest_pat(struct vcpu *v, u64 *guest_pat);
 int hvm_set_guest_pat(struct vcpu *v, u64 guest_pat);
 
@@ -411,7 +405,6 @@ void hvm_hypervisor_cpuid_leaf(uint32_t sub_idx,
 void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
                                    unsigned int *ecx, unsigned int *edx);
 void hvm_migrate_timers(struct vcpu *v);
-bool_t hvm_io_pending(struct vcpu *v);
 void hvm_do_resume(struct vcpu *v);
 void hvm_migrate_pirqs(struct vcpu *v);
 

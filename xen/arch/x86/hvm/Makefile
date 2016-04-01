@@ -9,6 +9,7 @@ obj-y += hvm.o
 obj-y += i8254.o
 obj-y += intercept.o
 obj-y += io.o
+obj-y += ioreq.o
 obj-y += irq.o
 obj-y += mtrr.o
 obj-y += nestedhvm.o
