@@ -457,16 +457,18 @@ B<NOTES>
 Remus support in xl is still in experimental (proof-of-concept) phase.
 Disk replication support is limited to DRBD disks.
 
-COLO support in xl is still in experimental (proof-of-concept) phase.
+COLO support in xl is still in experimental (proof-of-concept)
+phase. All options are subject to change in the future.
 
 =back
 
-B<EXAMPLE>
+COLO disk configuration looks like:
+
+  disk = ['...,colo,colo-host=xxx,colo-port=xxx,colo-export=xxx,active-disk=xxx,hidden-disk=xxx...']
+
+The supported options are:
 
 =over 4
-
-(a) An example for COLO replication's configuration: disk =['...,colo,colo-host
-=xxx,colo-port=xxx,colo-export=xxx,active-disk=xxx,hidden-disk=xxx...']
 
 =item B<colo-host>      :Secondary host's ip address.
 
@@ -481,13 +483,19 @@ and it's used by secondary.
 =item B<hidden-disk>    :Primary's modified contents will be buffered in this
 disk, and it's used by secondary.
 
-(b) An example for COLO network configuration: vif =[ '...,forwarddev=xxx,...']
+=back
 
-=item B<forwarddev>     :Forward devices for primary and secondary, there are
+COLO network configuration looks like:
+
+  vif = [ '...,forwarddev=xxx,...']
+
+The supported options are:
+
+=over 4
+
+=item B<forwarddev>     :Forward devices for primary and secondary, they are
 directly connected.
 
-Note that the COLO configuration settings should be considered unstable. They
-may change incompatibly in future versions of Xen.
 
 =back
 
