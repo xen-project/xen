@@ -818,7 +818,7 @@ static char *qemu_disk_scsi_drive_string(libxl__gc *gc, const char *target_path,
             unit, active_disk, hidden_disk, exportname);
         break;
     default:
-         abort();
+        abort();
     }
 
     return drive;
