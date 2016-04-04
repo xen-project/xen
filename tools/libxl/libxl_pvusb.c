@@ -964,6 +964,7 @@ static int libxl__device_usbdev_add_xenstore(libxl__gc *gc, uint32_t domid,
                                     usbdev->u.hostdev.hostaddr);
     if (!busid) {
         LOG(DEBUG, "Fail to get busid of usb device");
+        rc = ERROR_FAIL;
         goto out;
     }
 
