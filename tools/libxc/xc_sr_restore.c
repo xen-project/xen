@@ -494,6 +494,8 @@ static int send_checkpoint_dirty_pfn_list(struct xc_sr_context *ctx)
 
     rc = 0;
  err:
+    free(pfns);
+    free(iov);
     return rc;
 }
 
