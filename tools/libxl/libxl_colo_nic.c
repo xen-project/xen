@@ -219,11 +219,6 @@ static void colo_save_setup_script_cb(libxl__egc *egc,
         goto out;
     }
 
-    if (status) {
-        rc = ERROR_FAIL;
-        goto out;
-    }
-
     rc = 0;
 
 out:
