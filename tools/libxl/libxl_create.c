@@ -1109,8 +1109,8 @@ static void domcreate_bootloader_done(libxl__egc *egc,
     domcreate_stream_done(egc, &dcs->srs, rc);
 }
 
-void libxl__srm_callout_callback_restore_results(unsigned long store_mfn,
-          unsigned long console_mfn, void *user)
+void libxl__srm_callout_callback_restore_results(xen_pfn_t store_mfn,
+          xen_pfn_t console_mfn, void *user)
 {
     libxl__save_helper_state *shs = user;
     libxl__domain_create_state *dcs = shs->caller_state;

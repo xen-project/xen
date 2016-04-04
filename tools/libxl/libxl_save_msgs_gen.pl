@@ -29,8 +29,8 @@ our @msgs = (
     [  6, 'srcxA',  "wait_checkpoint", [] ],
     [  7, 'scxA',   "switch_qemu_logdirty",  [qw(int domid
                                               unsigned enable)] ],
-    [  8, 'rcx',    "restore_results",       ['unsigned long', 'store_gfn',
-                                              'unsigned long', 'console_gfn'] ],
+    [  8, 'rcx',    "restore_results",       ['xen_pfn_t', 'store_gfn',
+                                              'xen_pfn_t', 'console_gfn'] ],
     [  9, 'srW',    "complete",              [qw(int retval
                                                  int errnoval)] ],
 );
@@ -70,9 +70,9 @@ END_BOTH
 
 END_CALLOUT
 
-#include "_libxl_save_msgs_${ah}.h"
 #include <xenctrl.h>
 #include <xenguest.h>
+#include "_libxl_save_msgs_${ah}.h"
 
 END_HELPER
 }
@@ -141,7 +141,7 @@ static void bytes_put(unsigned char *const buf, int *len,
 
 END
 
-foreach my $simpletype (qw(int uint16_t uint32_t unsigned), 'unsigned long') {
+foreach my $simpletype (qw(int uint16_t uint32_t unsigned), 'unsigned long', 'xen_pfn_t') {
     my $typeid = typeid($simpletype);
     $out_body{'callout'} .= <<END;
 static int ${typeid}_get(const unsigned char **msg,
