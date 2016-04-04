@@ -816,6 +816,7 @@ static char *qemu_disk_scsi_drive_string(libxl__gc *gc, const char *target_path,
             "file.backing.file.filename=%s,"
             "file.backing.backing=%s",
             unit, active_disk, hidden_disk, exportname);
+        break;
     default:
          abort();
     }
