@@ -390,8 +390,10 @@ S:	Supported
 F:	xen/arch/x86/hvm/emulate.c
 F:	xen/arch/x86/hvm/intercept.c
 F:	xen/arch/x86/hvm/io.c
+F:	xen/arch/x86/hvm/ioreq.c
 F:	xen/include/asm-x86/hvm/emulate.h
 F:	xen/include/asm-x86/hvm/io.h
+F:	xen/include/asm-x86/hvm/ioreq.h
 F:	xen/include/public/hvm/ioreq.h
 
 X86 MEMORY MANAGEMENT
