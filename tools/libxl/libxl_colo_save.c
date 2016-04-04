@@ -533,11 +533,11 @@ static void colo_proxy_async_wait_for_checkpoint(libxl__colo_save_state *css)
     if (req < 0) {
         /* some error happens */
         _exit(1);
-    } else if (!req) {
-        /* no checkpoint is needed, do a checkpoint every 5s */
-        _exit(0);
     } else {
-        /* net packets is not consistent, we need to start a checkpoint */
+        /* req == 0: no checkpoint is needed, do a checkpoint every 5s */
+        /* req > 0: net packets is not consistent, we need to start a
+         * checkpoint
+         */
         _exit(0);
     }
 }
