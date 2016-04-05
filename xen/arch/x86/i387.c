@@ -118,7 +118,24 @@ static inline uint64_t vcpu_xsave_mask(const struct vcpu *v)
     if ( v->fpu_dirtied )
         return v->arch.nonlazy_xstate_used ? XSTATE_ALL : XSTATE_LAZY;
 
-    return v->arch.nonlazy_xstate_used ? XSTATE_NONLAZY : 0;
+    ASSERT(v->arch.nonlazy_xstate_used);
+
+    /*
+     * The offsets of components which live in the extended region of
+     * compact xsave area are not fixed. Xsave area may be overwritten
+     * when a xsave with v->fpu_dirtied set is followed by one with
+     * v->fpu_dirtied clear.
+     * In such case, if hypervisor uses compact xsave area and guest
+     * has ever used lazy states (checking xcr0_accum excluding
+     * XSTATE_FP_SSE), vcpu_xsave_mask will return XSTATE_ALL. Otherwise
+     * return XSTATE_NONLAZY.
+     * XSTATE_FP_SSE may be excluded, because the offsets of XSTATE_FP_SSE
+     * (in the legacy region of xsave area) are fixed, so saving
+     * XSTATE_FP_SSE will not cause overwriting problem.
+     */
+    return (v->arch.xsave_area->xsave_hdr.xcomp_bv & XSTATE_COMPACTION_ENABLED)
+           && (v->arch.xcr0_accum & XSTATE_LAZY & ~XSTATE_FP_SSE)
+           ? XSTATE_ALL : XSTATE_NONLAZY;
 }
 
 /* Save x87 extended state */
@@ -275,11 +292,7 @@ int vcpu_init_fpu(struct vcpu *v)
         return rc;
 
     if ( v->arch.xsave_area )
-    {
         v->arch.fpu_ctxt = &v->arch.xsave_area->fpu_sse;
-        if ( cpu_has_xsaves )
-            v->arch.xsave_area->xsave_hdr.xcomp_bv = XSTATE_COMPACTION_ENABLED;
-    }
     else
     {
         BUILD_BUG_ON(__alignof(v->arch.xsave_area->fpu_sse) < 16);

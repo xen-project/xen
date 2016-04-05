@@ -927,7 +927,7 @@ long arch_do_domctl(
                 ret = -EFAULT;
 
             offset += sizeof(v->arch.xcr0_accum);
-            if ( !ret && (cpu_has_xsaves || cpu_has_xsavec) )
+            if ( !ret )
             {
                 void *xsave_area;
 
@@ -947,10 +947,6 @@ long arch_do_domctl(
                      ret = -EFAULT;
                 xfree(xsave_area);
            }
-           else if ( !ret && copy_to_guest_offset(evc->buffer, offset,
-                                                  (void *)v->arch.xsave_area,
-                                                  size - 2 * sizeof(uint64_t)) )
-                ret = -EFAULT;
 
             vcpu_unpause(v);
         }

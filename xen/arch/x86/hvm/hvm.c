@@ -1157,9 +1157,8 @@ static int hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
         xsave_area->xsave_hdr.xstate_bv = 0;
         xsave_area->fpu_sse.mxcsr = MXCSR_DEFAULT;
     }
-    if ( cpu_has_xsaves && xsave_area )
-        xsave_area->xsave_hdr.xcomp_bv = XSTATE_COMPACTION_ENABLED |
-            xsave_area->xsave_hdr.xstate_bv;
+    if ( xsave_area )
+        xsave_area->xsave_hdr.xcomp_bv = 0;
 
     v->arch.user_regs.eax = ctxt.rax;
     v->arch.user_regs.ebx = ctxt.rbx;
@@ -4273,8 +4272,7 @@ void hvm_vcpu_reset_state(struct vcpu *v, uint16_t cs, uint16_t ip)
     if ( v->arch.xsave_area )
     {
         v->arch.xsave_area->xsave_hdr.xstate_bv = XSTATE_FP;
-        v->arch.xsave_area->xsave_hdr.xcomp_bv = cpu_has_xsaves
-            ? XSTATE_COMPACTION_ENABLED | XSTATE_FP : 0;
+        v->arch.xsave_area->xsave_hdr.xcomp_bv = 0;
     }
 
     v->arch.vgc_flags = VGCF_online;

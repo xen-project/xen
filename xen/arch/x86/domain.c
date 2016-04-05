@@ -947,13 +947,7 @@ int arch_set_info_guest(
         fpu_sse->fcw = FCW_DEFAULT;
         fpu_sse->mxcsr = MXCSR_DEFAULT;
     }
-    if ( cpu_has_xsaves )
-    {
-        ASSERT(v->arch.xsave_area);
-        v->arch.xsave_area->xsave_hdr.xcomp_bv = XSTATE_COMPACTION_ENABLED |
-            v->arch.xsave_area->xsave_hdr.xstate_bv;
-    }
-    else if ( v->arch.xsave_area )
+    if ( v->arch.xsave_area )
         v->arch.xsave_area->xsave_hdr.xcomp_bv = 0;
 
     if ( !compat )
