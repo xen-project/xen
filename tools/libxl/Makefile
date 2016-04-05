@@ -65,10 +65,15 @@ LIBXL_OBJS-y += libxl_no_convert_callout.o
 endif
 
 LIBXL_OBJS-y += libxl_remus.o libxl_checkpoint_device.o libxl_remus_disk_drbd.o
+
+ifeq ($(CONFIG_LIBNL),y)
 LIBXL_OBJS-y += libxl_colo_restore.o libxl_colo_save.o
 LIBXL_OBJS-y += libxl_colo_qdisk.o
 LIBXL_OBJS-y += libxl_colo_proxy.o
 LIBXL_OBJS-y += libxl_colo_nic.o
+else
+LIBXL_OBJS-y += libxl_no_colo.o
+endif
 
 LIBXL_OBJS-$(CONFIG_X86) += libxl_cpuid.o libxl_x86.o libxl_psr.o
 LIBXL_OBJS-$(CONFIG_ARM) += libxl_nocpuid.o libxl_arm.o libxl_libfdt_compat.o

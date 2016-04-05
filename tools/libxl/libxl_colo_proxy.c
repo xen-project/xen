@@ -17,7 +17,7 @@
 
 #include "libxl_internal.h"
 
-#include <linux/netlink.h>
+#include <netlink/netlink.h>
 
 /* Consistent with the new COLO netlink channel in kernel side */
 #define NETLINK_COLO 28
