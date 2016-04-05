@@ -151,8 +151,6 @@ int hvm_process_io_intercept(const struct hvm_io_handler *handler,
                     domain_crash(current->domain);
                     return X86EMUL_UNHANDLEABLE;
                 }
-                if ( rc != X86EMUL_OKAY )
-                    break;
             }
             else
                 p->data = data;
@@ -181,8 +179,6 @@ int hvm_process_io_intercept(const struct hvm_io_handler *handler,
                     domain_crash(current->domain);
                     return X86EMUL_UNHANDLEABLE;
                 }
-                if ( rc != X86EMUL_OKAY )
-                    break;
             }
             else
                 data = p->data;
