@@ -17,10 +17,6 @@
 #define LIBXL_COLO_H
 
 #include "libxl_internal.h"
-#include <linux/netlink.h>
-
-/* Consistent with the new COLO netlink channel in kernel side */
-#define NETLINK_COLO 28
 
 /* Maximum time(5s) to wait for colo proxy checkpoit */
 #define COLO_PROXY_CHECKPOINT_TIMEOUT 5000000
@@ -51,14 +47,6 @@ enum {
     LIBXL_COLO_SETUPED,
     LIBXL_COLO_SUSPENDED,
     LIBXL_COLO_RESUMED,
-};
-
-enum colo_netlink_op {
-    COLO_QUERY_CHECKPOINT = (NLMSG_MIN_TYPE + 1),
-    COLO_CHECKPOINT,
-    COLO_FAILOVER,
-    COLO_PROXY_INIT,
-    COLO_PROXY_RESET, /* UNUSED, will be used for continuous FT */
 };
 
 struct libxl__colo_device_nic {

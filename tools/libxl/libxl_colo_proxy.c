@@ -17,6 +17,19 @@
 
 #include "libxl_internal.h"
 
+#include <linux/netlink.h>
+
+/* Consistent with the new COLO netlink channel in kernel side */
+#define NETLINK_COLO 28
+
+enum colo_netlink_op {
+    COLO_QUERY_CHECKPOINT = (NLMSG_MIN_TYPE + 1),
+    COLO_CHECKPOINT,
+    COLO_FAILOVER,
+    COLO_PROXY_INIT,
+    COLO_PROXY_RESET, /* UNUSED, will be used for continuous FT */
+};
+
 /* ========= colo-proxy: helper functions ========== */
 
 static int colo_proxy_send(libxl__colo_proxy_state *cps, uint8_t *buff,
