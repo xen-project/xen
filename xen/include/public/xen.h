@@ -615,9 +615,17 @@ struct vcpu_time_info {
      */
     uint32_t tsc_to_system_mul;
     int8_t   tsc_shift;
+#if __XEN_INTERFACE_VERSION__ > 0x040600
+    uint8_t  flags;
+    uint8_t  pad1[2];
+#else
     int8_t   pad1[3];
+#endif
 }; /* 32 bytes */
 typedef struct vcpu_time_info vcpu_time_info_t;
+
+#define XEN_PVCLOCK_TSC_STABLE_BIT     (1 << 0)
+#define XEN_PVCLOCK_GUEST_STOPPED      (1 << 1)
 
 struct vcpu_info {
     /*
