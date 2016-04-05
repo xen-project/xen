@@ -79,7 +79,6 @@ int __init xsm_dt_policy_init(void)
 {
     struct bootmodule *mod = boot_module_find_by_kind(BOOTMOD_XSM);
     paddr_t paddr, len;
-    xsm_magic_t magic;
 
     if ( !mod || !mod->size )
         return 0;
@@ -87,12 +86,9 @@ int __init xsm_dt_policy_init(void)
     paddr = mod->start;
     len = mod->size;
 
-    copy_from_paddr(&magic, paddr, sizeof(magic));
-
-    if ( magic != XSM_MAGIC )
+    if ( !has_xsm_magic(paddr) )
     {
-        printk(XENLOG_ERR "xsm: Invalid magic for XSM blob got 0x%x "
-               "expected 0x%x\n", magic, XSM_MAGIC);
+        printk(XENLOG_ERR "xsm: Invalid magic for XSM blob\n");
         return -EINVAL;
     }
 
