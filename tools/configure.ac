@@ -410,12 +410,12 @@ PKG_CHECK_MODULES(LIBNL3, [libnl-3.0 >= 3.2.8 libnl-route-3.0 >= 3.2.8],
     [libnl3_lib="y"], [libnl3_lib="n"])
 
 AS_IF([test "x$libnl3_lib" = "xn" ], [
-    AC_MSG_WARN([Disabling support for Remus network buffering.
-    Please install libnl3 libraries, command line tools and devel
+    AC_MSG_WARN([Disabling support for Remus network buffering and COLO.
+    Please install libnl3 libraries (including libnl3-route), command line tools and devel
     headers - version 3.2.8 or higher])
-    AC_SUBST(remus_netbuf, [n])
+    AC_SUBST(libnl, [n])
     ],[
-    AC_SUBST(remus_netbuf, [y])
+    AC_SUBST(libnl, [y])
 ])
 
 AC_SUBST(LIBNL3_LIBS)

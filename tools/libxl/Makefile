@@ -21,7 +21,7 @@ endif
 
 LIBXL_LIBS =
 LIBXL_LIBS = $(LDLIBS_libxentoollog) $(LDLIBS_libxenevtchn) $(LDLIBS_libxenctrl) $(LDLIBS_libxenguest) $(LDLIBS_libxenstore) $(LDLIBS_libblktapctl) $(PTYFUNCS_LIBS) $(LIBUUID_LIBS)
-ifeq ($(CONFIG_REMUS_NETBUF),y)
+ifeq ($(CONFIG_LIBNL),y)
 LIBXL_LIBS += $(LIBNL3_LIBS)
 endif
 
@@ -31,7 +31,7 @@ CFLAGS_LIBXL += $(CFLAGS_libxenctrl)
 CFLAGS_LIBXL += $(CFLAGS_libxenguest)
 CFLAGS_LIBXL += $(CFLAGS_libxenstore)
 CFLAGS_LIBXL += $(CFLAGS_libblktapctl) 
-ifeq ($(CONFIG_REMUS_NETBUF),y)
+ifeq ($(CONFIG_LIBNL),y)
 CFLAGS_LIBXL += $(LIBNL3_CFLAGS)
 endif
 CFLAGS_LIBXL += -Wshadow
@@ -52,7 +52,7 @@ else
 LIBXL_OBJS-y += libxl_noblktap2.o
 endif
 
-ifeq ($(CONFIG_REMUS_NETBUF),y)
+ifeq ($(CONFIG_LIBNL),y)
 LIBXL_OBJS-y += libxl_netbuffer.o
 else
 LIBXL_OBJS-y += libxl_nonetbuffer.o

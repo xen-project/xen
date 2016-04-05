@@ -629,7 +629,7 @@ SYSTEMD_CFLAGS
 SYSTEMD_MODULES_LOAD
 SYSTEMD_DIR
 systemd
-remus_netbuf
+libnl
 LIBNL3_LIBS
 LIBNL3_CFLAGS
 argp_ldflags
@@ -9068,18 +9068,18 @@ fi
 
 if test "x$libnl3_lib" = "xn" ; then :
 
-    { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: Disabling support for Remus network buffering.
-    Please install libnl3 libraries, command line tools and devel
+    { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: Disabling support for Remus network buffering and COLO.
+    Please install libnl3 libraries (including libnl3-route), command line tools and devel
     headers - version 3.2.8 or higher" >&5
-$as_echo "$as_me: WARNING: Disabling support for Remus network buffering.
-    Please install libnl3 libraries, command line tools and devel
+$as_echo "$as_me: WARNING: Disabling support for Remus network buffering and COLO.
+    Please install libnl3 libraries (including libnl3-route), command line tools and devel
     headers - version 3.2.8 or higher" >&2;}
-    remus_netbuf=n
+    libnl=n
 
 
 else
 
-    remus_netbuf=y
+    libnl=y
 
 
 fi
