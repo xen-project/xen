@@ -1075,6 +1075,7 @@ csched_dom_cntl(
     struct csched_dom * const sdom = CSCHED_DOM(d);
     struct csched_private *prv = CSCHED_PRIV(ops);
     unsigned long flags;
+    int rc = 0;
 
     /* Protect both get and put branches with the pluggable scheduler
      * lock. Runq lock not needed anywhere in here. */
@@ -1101,12 +1102,13 @@ csched_dom_cntl(
             sdom->cap = op->u.credit.cap;
         break;
     default:
-        return -EINVAL;
+        rc = -EINVAL;
+        break;
     }
 
     spin_unlock_irqrestore(&prv->lock, flags);
 
-    return 0;
+    return rc;
 }
 
 static inline void

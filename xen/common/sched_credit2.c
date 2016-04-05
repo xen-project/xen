@@ -1416,6 +1416,7 @@ csched2_dom_cntl(
     struct csched2_dom * const sdom = CSCHED2_DOM(d);
     struct csched2_private *prv = CSCHED2_PRIV(ops);
     unsigned long flags;
+    int rc = 0;
 
     /* Must hold csched2_priv lock to read and update sdom,
      * runq lock to update csvcs. */
@@ -1457,12 +1458,13 @@ csched2_dom_cntl(
         }
         break;
     default:
-        return -EINVAL;
+        rc = -EINVAL;
+        break;
     }
 
     spin_unlock_irqrestore(&prv->lock, flags);
 
-    return 0;
+    return rc;
 }
 
 static void *
