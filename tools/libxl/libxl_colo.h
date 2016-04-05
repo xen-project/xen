@@ -16,12 +16,8 @@
 #ifndef LIBXL_COLO_H
 #define LIBXL_COLO_H
 
+#include "libxl_internal.h"
 #include <linux/netlink.h>
-
-struct libxl__ao;
-struct libxl__egc;
-struct libxl__colo_save_state;
-struct libxl__checkpoint_devices_state;
 
 /* Consistent with the new COLO netlink channel in kernel side */
 #define NETLINK_COLO 28
@@ -65,16 +61,15 @@ enum colo_netlink_op {
     COLO_PROXY_RESET, /* UNUSED, will be used for continuous FT */
 };
 
-typedef struct libxl__colo_device_nic {
+struct libxl__colo_device_nic {
     int devid;
     const char *vif;
-} libxl__colo_device_nic;
+};
 
-typedef struct libxl__colo_qdisk {
+struct libxl__colo_qdisk {
     bool setuped;
-} libxl__colo_qdisk;
+};
 
-typedef struct libxl__colo_proxy_state libxl__colo_proxy_state;
 struct libxl__colo_proxy_state {
     /* set by caller of colo_proxy_setup */
     struct libxl__ao *ao;
@@ -83,12 +78,27 @@ struct libxl__colo_proxy_state {
     int index;
 };
 
-typedef struct libxl__domain_create_state libxl__domain_create_state;
-typedef void libxl__domain_create_cb(struct libxl__egc *egc,
-                                     libxl__domain_create_state *dcs,
-                                     int rc, uint32_t domid);
+struct libxl__colo_save_state {
+    int send_fd;
+    int recv_fd;
+    char *colo_proxy_script;
 
-typedef struct libxl__colo_restore_state libxl__colo_restore_state;
+    /* private */
+    libxl__stream_read_state srs;
+    void (*callback)(libxl__egc *, libxl__colo_save_state *, int);
+    bool svm_running;
+    bool paused;
+
+    /* private, used by qdisk block replication */
+    bool qdisk_used;
+    bool qdisk_setuped;
+
+    /* private, used by colo-proxy */
+    libxl__colo_proxy_state cps;
+    libxl__ev_child child;
+};
+
+
 typedef void libxl__colo_callback(struct libxl__egc *egc,
                                   libxl__colo_restore_state *crs, int rc);
 

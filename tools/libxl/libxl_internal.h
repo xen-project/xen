@@ -87,8 +87,6 @@
 #include "_libxl_types_internal.h"
 #include "_libxl_types_internal_json.h"
 
-#include "libxl_colo.h"
-
 #define LIBXL_INIT_TIMEOUT 10
 #define LIBXL_DESTROY_TIMEOUT 10
 #define LIBXL_HOTPLUG_TIMEOUT 40
@@ -183,6 +181,17 @@ typedef struct libxl__ao libxl__ao;
 typedef struct libxl__aop_occurred libxl__aop_occurred;
 typedef struct libxl__osevent_hook_nexus libxl__osevent_hook_nexus;
 typedef struct libxl__osevent_hook_nexi libxl__osevent_hook_nexi;
+
+typedef struct libxl__domain_create_state libxl__domain_create_state;
+typedef void libxl__domain_create_cb(struct libxl__egc *egc,
+                                     libxl__domain_create_state *dcs,
+                                     int rc, uint32_t domid);
+
+typedef struct libxl__colo_device_nic libxl__colo_device_nic;
+typedef struct libxl__colo_qdisk libxl__colo_qdisk;
+typedef struct libxl__colo_proxy_state libxl__colo_proxy_state;
+typedef struct libxl__colo_save_state libxl__colo_save_state;
+typedef struct libxl__colo_restore_state libxl__colo_restore_state;
 
 _hidden void libxl__alloc_failed(libxl_ctx *, const char *func,
                          size_t nmemb, size_t size) __attribute__((noreturn));
@@ -3141,6 +3150,7 @@ libxl__stream_read_inuse(const libxl__stream_read_state *stream)
     return stream->running;
 }
 
+#include "libxl_colo.h"
 
 /*----- Domain suspend (save) state structure -----*/
 /*
@@ -3216,28 +3226,6 @@ libxl__stream_write_inuse(const libxl__stream_write_state *stream)
 {
     return stream->running;
 }
-
-/*----- colo related state structure -----*/
-typedef struct libxl__colo_save_state libxl__colo_save_state;
-struct libxl__colo_save_state {
-    int send_fd;
-    int recv_fd;
-    char *colo_proxy_script;
-
-    /* private */
-    libxl__stream_read_state srs;
-    void (*callback)(libxl__egc *, libxl__colo_save_state *, int);
-    bool svm_running;
-    bool paused;
-
-    /* private, used by qdisk block replication */
-    bool qdisk_used;
-    bool qdisk_setuped;
-
-    /* private, used by colo-proxy */
-    libxl__colo_proxy_state cps;
-    libxl__ev_child child;
-};
 
 typedef struct libxl__logdirty_switch {
     /* Set by caller of libxl__domain_common_switch_qemu_logdirty */
