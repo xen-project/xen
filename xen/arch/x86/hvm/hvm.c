@@ -621,6 +621,8 @@ int hvm_domain_initialise(struct domain *d)
 
     register_dpci_portio_handler(d);
 
+    hvm_ioreq_init(d);
+
     if ( is_pvh_domain(d) )
     {
         register_portio_handler(d, 0, 0x10003, handle_pvh_io);
@@ -644,8 +646,6 @@ int hvm_domain_initialise(struct domain *d)
     msixtbl_init(d);
 
     register_portio_handler(d, 0xe9, 1, hvm_print_line);
-
-    hvm_ioreq_init(d);
 
     if ( hvm_tsc_scaling_supported )
         d->arch.hvm_domain.tsc_scaling_ratio = hvm_default_tsc_scaling_ratio;

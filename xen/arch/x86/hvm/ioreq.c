@@ -1361,7 +1361,8 @@ void hvm_ioreq_init(struct domain *d)
     spin_lock_init(&d->arch.hvm_domain.ioreq_server.lock);
     INIT_LIST_HEAD(&d->arch.hvm_domain.ioreq_server.list);
 
-    register_portio_handler(d, 0xcf8, 4, hvm_access_cf8);
+    if ( !is_pvh_domain(d) )
+        register_portio_handler(d, 0xcf8, 4, hvm_access_cf8);
 }
 
 /*
