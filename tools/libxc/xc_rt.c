@@ -68,7 +68,7 @@ int xc_sched_rtds_vcpu_set(xc_interface *xch,
                            struct xen_domctl_schedparam_vcpu *vcpus,
                            uint32_t num_vcpus)
 {
-    int rc;
+    int rc = 0;
     unsigned processed = 0;
     DECLARE_DOMCTL;
     DECLARE_HYPERCALL_BOUNCE(vcpus, sizeof(*vcpus) * num_vcpus,
@@ -102,7 +102,7 @@ int xc_sched_rtds_vcpu_get(xc_interface *xch,
                            struct xen_domctl_schedparam_vcpu *vcpus,
                            uint32_t num_vcpus)
 {
-    int rc;
+    int rc = 0;
     unsigned processed = 0;
     DECLARE_DOMCTL;
     DECLARE_HYPERCALL_BOUNCE(vcpus, sizeof(*vcpus) * num_vcpus,
