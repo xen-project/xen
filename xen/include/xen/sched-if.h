@@ -137,6 +137,9 @@ struct scheduler {
     void         (*free_domdata)   (const struct scheduler *, void *);
     void *       (*alloc_domdata)  (const struct scheduler *, struct domain *);
 
+    void         (*switch_sched)   (struct scheduler *, unsigned int,
+                                    void *, void *);
+
     int          (*init_domain)    (const struct scheduler *, struct domain *);
     void         (*destroy_domain) (const struct scheduler *, struct domain *);
 

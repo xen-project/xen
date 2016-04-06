@@ -578,10 +578,53 @@ csched_init_pdata(const struct scheduler *ops, void *pdata, int cpu)
 {
     unsigned long flags;
     struct csched_private *prv = CSCHED_PRIV(ops);
+    struct schedule_data *sd = &per_cpu(schedule_data, cpu);
+
+    /*
+     * This is called either during during boot, resume or hotplug, in
+     * case Credit1 is the scheduler chosen at boot. In such cases, the
+     * scheduler lock for cpu is already pointing to the default per-cpu
+     * spinlock, as Credit1 needs it, so there is no remapping to be done.
+     */
+    ASSERT(sd->schedule_lock == &sd->_lock && !spin_is_locked(&sd->_lock));
 
     spin_lock_irqsave(&prv->lock, flags);
     init_pdata(prv, pdata, cpu);
     spin_unlock_irqrestore(&prv->lock, flags);
+}
+
+/* Change the scheduler of cpu to us (Credit). */
+static void
+csched_switch_sched(struct scheduler *new_ops, unsigned int cpu,
+                    void *pdata, void *vdata)
+{
+    struct schedule_data *sd = &per_cpu(schedule_data, cpu);
+    struct csched_private *prv = CSCHED_PRIV(new_ops);
+    struct csched_vcpu *svc = vdata;
+
+    ASSERT(svc && is_idle_vcpu(svc->vcpu));
+
+    idle_vcpu[cpu]->sched_priv = vdata;
+
+    /*
+     * We are holding the runqueue lock already (it's been taken in
+     * schedule_cpu_switch()). It actually may or may not be the 'right'
+     * one for this cpu, but that is ok for preventing races.
+     */
+    spin_lock(&prv->lock);
+    init_pdata(prv, pdata, cpu);
+    spin_unlock(&prv->lock);
+
+    per_cpu(scheduler, cpu) = new_ops;
+    per_cpu(schedule_data, cpu).sched_priv = pdata;
+
+    /*
+     * (Re?)route the lock to the per pCPU lock as /last/ thing. In fact,
+     * if it is free (and it can be) we want that anyone that manages
+     * taking it, finds all the initializations we've done above in place.
+     */
+    smp_mb();
+    sd->schedule_lock = &sd->_lock;
 }
 
 #ifndef NDEBUG
@@ -2067,6 +2110,7 @@ static const struct scheduler sched_credit_def = {
     .alloc_pdata    = csched_alloc_pdata,
     .init_pdata     = csched_init_pdata,
     .free_pdata     = csched_free_pdata,
+    .switch_sched   = csched_switch_sched,
     .alloc_domdata  = csched_alloc_domdata,
     .free_domdata   = csched_free_domdata,
 

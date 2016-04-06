@@ -652,6 +652,38 @@ a653sched_pick_cpu(const struct scheduler *ops, struct vcpu *vc)
 }
 
 /**
+ * Xen scheduler callback to change the scheduler of a cpu
+ *
+ * @param new_ops   Pointer to this instance of the scheduler structure
+ * @param cpu       The cpu that is changing scheduler
+ * @param pdata     scheduler specific PCPU data (we don't have any)
+ * @param vdata     scheduler specific VCPU data of the idle vcpu
+ */
+static void
+a653_switch_sched(struct scheduler *new_ops, unsigned int cpu,
+                  void *pdata, void *vdata)
+{
+    struct schedule_data *sd = &per_cpu(schedule_data, cpu);
+    arinc653_vcpu_t *svc = vdata;
+
+    ASSERT(!pdata && svc && is_idle_vcpu(svc->vc));
+
+    idle_vcpu[cpu]->sched_priv = vdata;
+
+    per_cpu(scheduler, cpu) = new_ops;
+    per_cpu(schedule_data, cpu).sched_priv = NULL; /* no pdata */
+
+    /*
+     * (Re?)route the lock to its default location. We actually do not use
+     * it, but if we leave it pointing to where it does now (i.e., the
+     * runqueue lock for this PCPU in the default scheduler), we'd be
+     * causing unnecessary contention on that lock (in cases where it is
+     * shared among multiple PCPUs, like in Credit2 and RTDS).
+     */
+    sd->schedule_lock = &sd->_lock;
+}
+
+/**
  * Xen scheduler callback function to perform a global (not domain-specific)
  * adjustment. It is used by the ARINC 653 scheduler to put in place a new
  * ARINC 653 schedule or to retrieve the schedule currently in place.
@@ -726,6 +758,8 @@ static const struct scheduler sched_arinc653_def = {
     .do_schedule    = a653sched_do_schedule,
 
     .pick_cpu       = a653sched_pick_cpu,
+
+    .switch_sched   = a653_switch_sched,
 
     .adjust         = NULL,
     .adjust_global  = a653sched_adjust_global,

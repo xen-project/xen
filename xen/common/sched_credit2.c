@@ -1971,12 +1971,12 @@ static void deactivate_runqueue(struct csched2_private *prv, int rqi)
     cpumask_clear_cpu(rqi, &prv->active_queues);
 }
 
-static void
+/* Returns the ID of the runqueue the cpu is assigned to. */
+static unsigned
 init_pdata(struct csched2_private *prv, unsigned int cpu)
 {
     unsigned rqi;
     struct csched2_runqueue_data *rqd;
-    spinlock_t *old_lock;
 
     ASSERT(spin_is_locked(&prv->lock));
     ASSERT(!cpumask_test_cpu(cpu, &prv->initialized));
@@ -2007,35 +2007,81 @@ init_pdata(struct csched2_private *prv, unsigned int cpu)
         activate_runqueue(prv, rqi);
     }
     
-    /* IRQs already disabled */
-    old_lock = pcpu_schedule_lock(cpu);
-
-    /* Move spinlock to new runq lock.  */
-    per_cpu(schedule_data, cpu).schedule_lock = &rqd->lock;
-
     /* Set the runqueue map */
     prv->runq_map[cpu] = rqi;
     
     cpumask_set_cpu(cpu, &rqd->idle);
     cpumask_set_cpu(cpu, &rqd->active);
-
-    /* _Not_ pcpu_schedule_unlock(): per_cpu().schedule_lock changed! */
-    spin_unlock(old_lock);
-
     cpumask_set_cpu(cpu, &prv->initialized);
 
-    return;
+    return rqi;
 }
 
 static void
 csched2_init_pdata(const struct scheduler *ops, void *pdata, int cpu)
 {
     struct csched2_private *prv = CSCHED2_PRIV(ops);
+    spinlock_t *old_lock;
     unsigned long flags;
+    unsigned rqi;
 
     spin_lock_irqsave(&prv->lock, flags);
-    init_pdata(prv, cpu);
+    old_lock = pcpu_schedule_lock(cpu);
+
+    rqi = init_pdata(prv, cpu);
+    /* Move the scheduler lock to the new runq lock. */
+    per_cpu(schedule_data, cpu).schedule_lock = &prv->rqd[rqi].lock;
+
+    /* _Not_ pcpu_schedule_unlock(): schedule_lock may have changed! */
+    spin_unlock(old_lock);
     spin_unlock_irqrestore(&prv->lock, flags);
+}
+
+/* Change the scheduler of cpu to us (Credit2). */
+static void
+csched2_switch_sched(struct scheduler *new_ops, unsigned int cpu,
+                     void *pdata, void *vdata)
+{
+    struct csched2_private *prv = CSCHED2_PRIV(new_ops);
+    struct csched2_vcpu *svc = vdata;
+    unsigned rqi;
+
+    ASSERT(!pdata && svc && is_idle_vcpu(svc->vcpu));
+
+    /*
+     * We own one runqueue lock already (from schedule_cpu_switch()). This
+     * looks like it violates this scheduler's locking rules, but it does
+     * not, as what we own is the lock of another scheduler, that hence has
+     * no particular (ordering) relationship with our private global lock.
+     * And owning exactly that one (the lock of the old scheduler of this
+     * cpu) is what is necessary to prevent races.
+     */
+    spin_lock_irq(&prv->lock);
+
+    idle_vcpu[cpu]->sched_priv = vdata;
+
+    rqi = init_pdata(prv, cpu);
+
+    /*
+     * Now that we know what runqueue we'll go in, double check what's said
+     * above: the lock we already hold is not the one of this runqueue of
+     * this scheduler, and so it's safe to have taken it /before/ our
+     * private global lock.
+     */
+    ASSERT(per_cpu(schedule_data, cpu).schedule_lock != &prv->rqd[rqi].lock);
+
+    per_cpu(scheduler, cpu) = new_ops;
+    per_cpu(schedule_data, cpu).sched_priv = NULL; /* no pdata */
+
+    /*
+     * (Re?)route the lock to the per pCPU lock as /last/ thing. In fact,
+     * if it is free (and it can be) we want that anyone that manages
+     * taking it, find all the initializations we've done above in place.
+     */
+    smp_mb();
+    per_cpu(schedule_data, cpu).schedule_lock = &prv->rqd[rqi].lock;
+
+    spin_unlock_irq(&prv->lock);
 }
 
 static void
@@ -2044,7 +2090,6 @@ csched2_free_pdata(const struct scheduler *ops, void *pcpu, int cpu)
     unsigned long flags;
     struct csched2_private *prv = CSCHED2_PRIV(ops);
     struct csched2_runqueue_data *rqd;
-    struct schedule_data *sd = &per_cpu(schedule_data, cpu);
     int rqi;
 
     spin_lock_irqsave(&prv->lock, flags);
@@ -2071,11 +2116,6 @@ csched2_free_pdata(const struct scheduler *ops, void *pcpu, int cpu)
         printk(" No cpus left on runqueue, disabling\n");
         deactivate_runqueue(prv, rqi);
     }
-
-    /* Move spinlock to the original lock.  */
-    ASSERT(sd->schedule_lock == &rqd->lock);
-    ASSERT(!spin_is_locked(&sd->_lock));
-    sd->schedule_lock = &sd->_lock;
 
     spin_unlock(&rqd->lock);
 
@@ -2170,6 +2210,7 @@ static const struct scheduler sched_credit2_def = {
     .free_vdata     = csched2_free_vdata,
     .init_pdata     = csched2_init_pdata,
     .free_pdata     = csched2_free_pdata,
+    .switch_sched   = csched2_switch_sched,
     .alloc_domdata  = csched2_alloc_domdata,
     .free_domdata   = csched2_free_domdata,
 };

@@ -1635,11 +1635,11 @@ void __init scheduler_init(void)
 int schedule_cpu_switch(unsigned int cpu, struct cpupool *c)
 {
     struct vcpu *idle;
-    spinlock_t *lock;
     void *ppriv, *ppriv_old, *vpriv, *vpriv_old;
     struct scheduler *old_ops = per_cpu(scheduler, cpu);
     struct scheduler *new_ops = (c == NULL) ? &ops : c->sched;
     struct cpupool *old_pool = per_cpu(cpupool, cpu);
+    spinlock_t * old_lock;
 
     /*
      * pCPUs only move from a valid cpupool to free (i.e., out of any pool),
@@ -1658,11 +1658,21 @@ int schedule_cpu_switch(unsigned int cpu, struct cpupool *c)
     if ( old_ops == new_ops )
         goto out;
 
+    /*
+     * To setup the cpu for the new scheduler we need:
+     *  - a valid instance of per-CPU scheduler specific data, as it is
+     *    allocated by SCHED_OP(alloc_pdata). Note that we do not want to
+     *    initialize it yet (i.e., we are not calling SCHED_OP(init_pdata)).
+     *    That will be done by the target scheduler, in SCHED_OP(switch_sched),
+     *    in proper ordering and with locking.
+     *  - a valid instance of per-vCPU scheduler specific data, for the idle
+     *    vCPU of cpu. That is what the target scheduler will use for the
+     *    sched_priv field of the per-vCPU info of the idle domain.
+     */
     idle = idle_vcpu[cpu];
     ppriv = SCHED_OP(new_ops, alloc_pdata, cpu);
     if ( IS_ERR(ppriv) )
         return PTR_ERR(ppriv);
-    SCHED_OP(new_ops, init_pdata, ppriv, cpu);
     vpriv = SCHED_OP(new_ops, alloc_vdata, idle, idle->domain->sched_priv);
     if ( vpriv == NULL )
     {
@@ -1670,17 +1680,30 @@ int schedule_cpu_switch(unsigned int cpu, struct cpupool *c)
         return -ENOMEM;
     }
 
-    lock = pcpu_schedule_lock_irq(cpu);
-
     SCHED_OP(old_ops, tick_suspend, cpu);
-    vpriv_old = idle->sched_priv;
-    idle->sched_priv = vpriv;
-    per_cpu(scheduler, cpu) = new_ops;
-    ppriv_old = per_cpu(schedule_data, cpu).sched_priv;
-    per_cpu(schedule_data, cpu).sched_priv = ppriv;
-    SCHED_OP(new_ops, tick_resume, cpu);
 
-    pcpu_schedule_unlock_irq(lock, cpu);
+    /*
+     * The actual switch, including (if necessary) the rerouting of the
+     * scheduler lock to whatever new_ops prefers,  needs to happen in one
+     * critical section, protected by old_ops' lock, or races are possible.
+     * It is, in fact, the lock of another scheduler that we are taking (the
+     * scheduler of the cpupool that cpu still belongs to). But that is ok
+     * as, anyone trying to schedule on this cpu will spin until when we
+     * release that lock (bottom of this function). When he'll get the lock
+     * --thanks to the loop inside *_schedule_lock() functions-- he'll notice
+     * that the lock itself changed, and retry acquiring the new one (which
+     * will be the correct, remapped one, at that point).
+     */
+    old_lock = pcpu_schedule_lock(cpu);
+
+    vpriv_old = idle->sched_priv;
+    ppriv_old = per_cpu(schedule_data, cpu).sched_priv;
+    SCHED_OP(new_ops, switch_sched, cpu, ppriv, vpriv);
+
+    /* _Not_ pcpu_schedule_unlock(): schedule_lock may have changed! */
+    spin_unlock_irq(old_lock);
+
+    SCHED_OP(new_ops, tick_resume, cpu);
 
     SCHED_OP(old_ops, free_vdata, vpriv_old);
     SCHED_OP(old_ops, free_pdata, ppriv_old, cpu);

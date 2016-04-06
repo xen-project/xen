@@ -682,6 +682,37 @@ rt_init_pdata(const struct scheduler *ops, void *pdata, int cpu)
     spin_unlock_irqrestore(old_lock, flags);
 }
 
+/* Change the scheduler of cpu to us (RTDS). */
+static void
+rt_switch_sched(struct scheduler *new_ops, unsigned int cpu,
+                void *pdata, void *vdata)
+{
+    struct rt_private *prv = rt_priv(new_ops);
+    struct rt_vcpu *svc = vdata;
+
+    ASSERT(!pdata && svc && is_idle_vcpu(svc->vcpu));
+
+    /*
+     * We are holding the runqueue lock already (it's been taken in
+     * schedule_cpu_switch()). It's actually the runqueue lock of
+     * another scheduler, but that is how things need to be, for
+     * preventing races.
+     */
+    ASSERT(per_cpu(schedule_data, cpu).schedule_lock != &prv->lock);
+
+    idle_vcpu[cpu]->sched_priv = vdata;
+    per_cpu(scheduler, cpu) = new_ops;
+    per_cpu(schedule_data, cpu).sched_priv = NULL; /* no pdata */
+
+    /*
+     * (Re?)route the lock to the per pCPU lock as /last/ thing. In fact,
+     * if it is free (and it can be) we want that anyone that manages
+     * taking it, find all the initializations we've done above in place.
+     */
+    smp_mb();
+    per_cpu(schedule_data, cpu).schedule_lock = &prv->lock;
+}
+
 static void *
 rt_alloc_pdata(const struct scheduler *ops, int cpu)
 {
@@ -707,19 +738,6 @@ rt_alloc_pdata(const struct scheduler *ops, int cpu)
 static void
 rt_free_pdata(const struct scheduler *ops, void *pcpu, int cpu)
 {
-    struct rt_private *prv = rt_priv(ops);
-    struct schedule_data *sd = &per_cpu(schedule_data, cpu);
-    unsigned long flags;
-
-    spin_lock_irqsave(&prv->lock, flags);
-
-    /* Move spinlock back to the default lock */
-    ASSERT(sd->schedule_lock == &prv->lock);
-    ASSERT(!spin_is_locked(&sd->_lock));
-    sd->schedule_lock = &sd->_lock;
-
-    spin_unlock_irqrestore(&prv->lock, flags);
-
     free_cpumask_var(_cpumask_scratch[cpu]);
 }
 
@@ -1468,6 +1486,7 @@ static const struct scheduler sched_rtds_def = {
     .alloc_pdata    = rt_alloc_pdata,
     .free_pdata     = rt_free_pdata,
     .init_pdata     = rt_init_pdata,
+    .switch_sched   = rt_switch_sched,
     .alloc_domdata  = rt_alloc_domdata,
     .free_domdata   = rt_free_domdata,
     .init_domain    = rt_dom_init,
