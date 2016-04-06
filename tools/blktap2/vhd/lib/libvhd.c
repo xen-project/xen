@@ -2188,7 +2188,7 @@ vhd_write_block(vhd_context_t *ctx, uint32_t block, char *data)
 	if (block >= ctx->bat.entries)
 		return -ERANGE;
 
-	if ((unsigned long)data & ~(VHD_SECTOR_SIZE -1))
+	if ((unsigned long)data & (VHD_SECTOR_SIZE -1))
 		return -EINVAL;
 
 	blk  = ctx->bat.bat[block];
