@@ -283,12 +283,12 @@ for passthrough, run:
 
 This command must be rerun on each boot or after any policy reload.
 
-The example policy was only tested with simple domain creation and may be
-missing rules allowing accesses by dom0 or domU when a number of hypervisor
-features are used. When first loading or writing a policy, you should run FLASK
-in permissive mode (the default) and check the Xen logs (xl dmesg) for AVC
-denials before using it in enforcing mode (flask_enforcing=1 on the command
-line, or xl setenforce).
+When first loading or writing a policy, you should run FLASK in permissive mode
+(flask=permissive on the command line) and check the Xen logs (xl dmesg) for AVC
+denials before using it in enforcing mode (the default value of the boot
+parameter, which can also be changed using xl setenforce).  When using the
+default types for domains (domU_t), the example policy shipped with Xen should
+allow the same operations on or between domains as when not using FLASK.
 
 
 MLS/MCS policy

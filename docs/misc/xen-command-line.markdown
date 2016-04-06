@@ -681,7 +681,7 @@ to use the default.
 ### flask
 > `= permissive | enforcing | late | disabled`
 
-> Default: `permissive`
+> Default: `enforcing`
 
 Specify how the FLASK security server should be configured.  This option is only
 available if the hypervisor was compiled with XSM support (which can be enabled

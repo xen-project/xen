@@ -25,12 +25,11 @@
 #define _copy_to_guest copy_to_guest
 #define _copy_from_guest copy_from_guest
 
-enum flask_bootparam_t __read_mostly flask_bootparam = FLASK_BOOTPARAM_PERMISSIVE;
+enum flask_bootparam_t __read_mostly flask_bootparam = FLASK_BOOTPARAM_ENFORCING;
 static void parse_flask_param(char *s);
 custom_param("flask", parse_flask_param);
 
-bool_t __read_mostly flask_enforcing = 0;
-boolean_param("flask_enforcing", flask_enforcing);
+bool_t __read_mostly flask_enforcing = 1;
 
 #define MAX_POLICY_SIZE 0x4000000
 
@@ -64,15 +63,9 @@ extern struct xsm_operations *original_ops;
 static void __init parse_flask_param(char *s)
 {
     if ( !strcmp(s, "enforcing") )
-    {
-        flask_enforcing = 1;
         flask_bootparam = FLASK_BOOTPARAM_ENFORCING;
-    }
     else if ( !strcmp(s, "late") )
-    {
-        flask_enforcing = 1;
         flask_bootparam = FLASK_BOOTPARAM_LATELOAD;
-    }
     else if ( !strcmp(s, "disabled") )
         flask_bootparam = FLASK_BOOTPARAM_DISABLED;
     else if ( !strcmp(s, "permissive") )

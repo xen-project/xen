@@ -1845,6 +1845,9 @@ static __init void flask_init(void)
         return;
 
     case FLASK_BOOTPARAM_PERMISSIVE:
+        flask_enforcing = 0;
+        break;
+
     case FLASK_BOOTPARAM_ENFORCING:
     case FLASK_BOOTPARAM_LATELOAD:
         break;
