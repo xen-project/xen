@@ -518,6 +518,8 @@ static int prepare_payload(struct payload *payload,
     sec = xsplice_elf_sec_by_name(elf, ELF_BUILD_ID_NOTE);
     if ( sec )
     {
+        const struct payload *data;
+
         n = sec->load_addr;
 
         if ( sec->sec->sh_size <= sizeof(*n) )
@@ -529,6 +531,20 @@ static int prepare_payload(struct payload *payload,
 
         if ( !payload->id.len || !payload->id.p )
             return -EINVAL;
+
+        /* Make sure it is not a duplicate. */
+        list_for_each_entry ( data, &payload_list, list )
+        {
+            /* No way _this_ payload is on the list. */
+            ASSERT(data != payload);
+            if ( data->id.len == payload->id.len &&
+                 !memcmp(data->id.p, payload->id.p, data->id.len) )
+            {
+                dprintk(XENLOG_DEBUG, XSPLICE "%s: Already loaded as %s!\n",
+                        elf->name, data->name);
+                return -EEXIST;
+            }
+        }
     }
 
     sec = xsplice_elf_sec_by_name(elf, ELF_XSPLICE_DEPENDS);
