@@ -1307,7 +1307,7 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
                 libxl__device_disk_dev_number(disks[i].vdev, &disk, &part);
             const char *format;
             char *drive;
-            const char *target_path;
+            const char *target_path = NULL;
             int colo_mode;
 
             if (dev_number == -1) {
