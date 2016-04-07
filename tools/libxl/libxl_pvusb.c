@@ -1085,7 +1085,7 @@ static int unbind_usbintf(libxl__gc *gc, const char *intf)
         goto out;
     }
 
-    if (libxl_write_exactly(CTX, fd, intf, sizeof(intf), path, intf)) {
+    if (libxl_write_exactly(CTX, fd, intf, strlen(intf), path, intf)) {
         rc = ERROR_FAIL;
         goto out;
     }
@@ -1125,7 +1125,7 @@ static int bind_usbintf(libxl__gc *gc, const char *intf, const char *drvpath)
         goto out;
     }
 
-    if (libxl_write_exactly(CTX, fd, intf, sizeof(intf), path, intf)) {
+    if (libxl_write_exactly(CTX, fd, intf, strlen(intf), path, intf)) {
         rc = ERROR_FAIL;
         goto out;
     }
