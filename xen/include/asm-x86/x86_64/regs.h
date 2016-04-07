@@ -4,7 +4,6 @@
 #include <xen/types.h>
 #include <public/xen.h>
 
-#define vm86_mode(r) (0) /* No VM86 support in long mode. */
 #define ring_0(r)    (((r)->cs & 3) == 0)
 #define ring_1(r)    (((r)->cs & 3) == 1)
 #define ring_2(r)    (((r)->cs & 3) == 2)

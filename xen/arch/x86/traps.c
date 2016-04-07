@@ -198,17 +198,8 @@ static void show_guest_stack(struct vcpu *v, const struct cpu_user_regs *regs)
         return;
     }
 
-    if ( vm86_mode(regs) )
-    {
-        stack = (unsigned long *)((regs->ss << 4) + (regs->esp & 0xffff));
-        printk("Guest stack trace from ss:sp = %04x:%04x (VM86)\n  ",
-               regs->ss, (uint16_t)(regs->esp & 0xffff));
-    }
-    else
-    {
-        stack = (unsigned long *)regs->esp;
-        printk("Guest stack trace from "__OP"sp=%p:\n  ", stack);
-    }
+    stack = (unsigned long *)regs->esp;
+    printk("Guest stack trace from "__OP"sp=%p:\n  ", stack);
 
     if ( !access_ok(stack, sizeof(*stack)) )
     {
@@ -1683,28 +1674,20 @@ static int read_descriptor(unsigned int sel,
                            unsigned long *base,
                            unsigned long *limit,
                            unsigned int *ar,
-                           unsigned int vm86attr)
+                           bool_t insn_fetch)
 {
     struct desc_struct desc;
 
-    if ( !vm86_mode(regs) )
-    {
-        if ( sel < 4)
-            desc.b = desc.a = 0;
-        else if ( __get_user(desc,
-                        (const struct desc_struct *)(!(sel & 4)
-                                                     ? GDT_VIRT_START(v)
-                                                     : LDT_VIRT_START(v))
-                        + (sel >> 3)) )
-            return 0;
-        if ( !(vm86attr & _SEGMENT_CODE) )
-            desc.b &= ~_SEGMENT_L;
-    }
-    else
-    {
-        desc.a = (sel << 20) | 0xffff;
-        desc.b = vm86attr | (sel >> 12);
-    }
+    if ( sel < 4)
+        desc.b = desc.a = 0;
+    else if ( __get_user(desc,
+                         (const struct desc_struct *)(!(sel & 4)
+                                                      ? GDT_VIRT_START(v)
+                                                      : LDT_VIRT_START(v))
+                         + (sel >> 3)) )
+        return 0;
+    if ( !insn_fetch )
+        desc.b &= ~_SEGMENT_L;
 
     *ar = desc.b & 0x00f0ff00;
     if ( !(desc.b & _SEGMENT_L) )
@@ -1715,7 +1698,7 @@ static int read_descriptor(unsigned int sel,
         if ( desc.b & _SEGMENT_G )
             *limit = ((*limit + 1) << 12) - 1;
 #ifndef NDEBUG
-        if ( !vm86_mode(regs) && (sel > 3) )
+        if ( sel > 3 )
         {
             unsigned int a, l;
             unsigned char valid;
@@ -1805,8 +1788,7 @@ static int guest_io_okay(
     int user_mode = !(v->arch.flags & TF_kernel_mode);
 #define TOGGLE_MODE() if ( user_mode ) toggle_guest_mode(v)
 
-    if ( !vm86_mode(regs) &&
-         (v->arch.pv_vcpu.iopl >= (guest_kernel_mode(v, regs) ? 1 : 3)) )
+    if ( v->arch.pv_vcpu.iopl >= (guest_kernel_mode(v, regs) ? 1 : 3) )
         return 1;
 
     if ( v->arch.pv_vcpu.iobmp_limit > (port + bytes) )
@@ -2094,8 +2076,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
     bool_t vpmu_msr;
 
     if ( !read_descriptor(regs->cs, v, regs,
-                          &code_base, &code_limit, &ar,
-                          _SEGMENT_CODE|_SEGMENT_S|_SEGMENT_DPL|_SEGMENT_P) )
+                          &code_base, &code_limit, &ar, 1) )
         goto fail;
     op_default = op_bytes = (ar & (_SEGMENT_L|_SEGMENT_DB)) ? 4 : 2;
     ad_default = ad_bytes = (ar & _SEGMENT_L) ? 8 : op_default;
@@ -2187,9 +2168,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         if ( !(ar & _SEGMENT_L) )
         {
             if ( !read_descriptor(data_sel, v, regs,
-                                  &data_base, &data_limit, &ar,
-                                  _SEGMENT_WR|_SEGMENT_S|_SEGMENT_DPL|
-                                  _SEGMENT_P) )
+                                  &data_base, &data_limit, &ar, 0) )
                 goto fail;
             if ( !(ar & _SEGMENT_S) ||
                  !(ar & _SEGMENT_P) ||

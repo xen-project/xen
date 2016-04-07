@@ -1559,7 +1559,7 @@ static int hvmemul_get_fpu(
         break;
     case X86EMUL_FPU_ymm:
         if ( !(curr->arch.hvm_vcpu.guest_cr[0] & X86_CR0_PE) ||
-             vm86_mode(ctxt->regs) ||
+             (ctxt->regs->eflags & X86_EFLAGS_VM) ||
              !(curr->arch.hvm_vcpu.guest_cr[4] & X86_CR4_OSXSAVE) ||
              !(curr->arch.xcr0 & XSTATE_SSE) ||
              !(curr->arch.xcr0 & XSTATE_YMM) )

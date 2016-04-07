@@ -10,7 +10,7 @@
     /* Frame pointer must point into current CPU stack. */                    \
     ASSERT(diff < STACK_SIZE);                                                \
     /* If not a guest frame, it must be a hypervisor frame. */                \
-    ASSERT((diff == 0) || (!vm86_mode(r) && (r->cs == __HYPERVISOR_CS)));     \
+    ASSERT((diff == 0) || (r->cs == __HYPERVISOR_CS));                        \
     /* Return TRUE if it's a guest frame. */                                  \
     (diff == 0);                                                              \
 })
