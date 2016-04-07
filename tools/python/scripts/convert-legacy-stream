@@ -389,8 +389,7 @@ def read_chunks(vm):
             write_page_data(pfns, pages)
 
         elif marker == legacy.CHUNK_enable_verify_mode:
-            # For debugging purposes only.  Will not be seen in real migration
-            raise RuntimeError("Unable to convert a debug stream")
+            info("This is a debug stream")
 
         elif marker == legacy.CHUNK_vcpu_info:
             max_id, = unpack_exact("i")
