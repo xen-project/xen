@@ -751,13 +751,13 @@ libxl_device_usbdev_list(libxl_ctx *ctx, uint32_t domid, int *num)
     usbctrls = libxl__xs_directory(gc, XBT_NULL, path, &nc);
 
     for (i = 0; i < nc; i++) {
-        int r, nd = 0;
+        int rc, nd = 0;
         libxl_device_usbdev *tmp = NULL;
 
-        r = libxl__device_usbdev_list_for_usbctrl(gc, domid,
+        rc = libxl__device_usbdev_list_for_usbctrl(gc, domid,
                                                   atoi(usbctrls[i]),
                                                   &tmp, &nd);
-        if (!r || !nd) continue;
+        if (rc || !nd) continue;
 
         usbdevs = libxl__realloc(NOGC, usbdevs,
                                  sizeof(*usbdevs) * (*num + nd));
