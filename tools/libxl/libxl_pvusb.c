@@ -862,6 +862,13 @@ static int libxl__device_usbdev_setdefault(libxl__gc *gc,
                 }
             }
 
+            if (usbctrl->type != LIBXL_USBCTRL_TYPE_PV &&
+                usbctrl->type != LIBXL_USBCTRL_TYPE_QUSB) {
+                LOG(ERROR, "Unsupported USB controller type");
+                rc = ERROR_FAIL;
+                goto out;
+            }
+
             rc = libxl__device_usbctrl_add_xenstore(gc, domid, usbctrl,
                                                     update_json);
             if (rc) goto out;
