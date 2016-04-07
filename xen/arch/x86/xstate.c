@@ -164,12 +164,9 @@ static void *get_xsave_addr(struct xsave_struct *xsave,
                             const uint16_t *comp_offsets,
                             unsigned int xfeature_idx)
 {
-    if ( !((1ul << xfeature_idx) & xsave->xsave_hdr.xstate_bv) )
-        return NULL;
-
-    return (void *)xsave + (xsave_area_compressed(xsave) ?
-                            comp_offsets[xfeature_idx] :
-                            xstate_offsets[xfeature_idx]);
+    ASSERT(xsave_area_compressed(xsave));
+    return (1ul << xfeature_idx) & xsave->xsave_hdr.xstate_bv ?
+           (void *)xsave + comp_offsets[xfeature_idx] : NULL;
 }
 
 void expand_xsave_states(struct vcpu *v, void *dest, unsigned int size)
@@ -211,6 +208,8 @@ void expand_xsave_states(struct vcpu *v, void *dest, unsigned int size)
             ASSERT((xstate_offsets[index] + xstate_sizes[index]) <= size);
             memcpy(dest + xstate_offsets[index], src, xstate_sizes[index]);
         }
+        else
+            memset(dest + xstate_offsets[index], 0, xstate_sizes[index]);
 
         valid &= ~feature;
     }
