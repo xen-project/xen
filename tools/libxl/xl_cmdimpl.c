@@ -174,7 +174,7 @@ static uint32_t find_domain(const char *p)
     rc = libxl_domain_qualifier_to_domid(ctx, p, &domid);
     if (rc) {
         fprintf(stderr, "%s is an invalid domain identifier (rc=%d)\n", p, rc);
-        exit(2);
+        exit(EXIT_FAILURE);
     }
     common_domname = libxl_domid_to_name(ctx, domid);
     return domid;
@@ -221,7 +221,7 @@ static void autoconnect_vncviewer(uint32_t domid, int autopass)
 
     sleep(1);
     vncviewer(domid, autopass);
-    _exit(1);
+    _exit(EXIT_FAILURE);
 }
 
 static int acquire_lock(void)
@@ -435,7 +435,7 @@ static void flush_stream(FILE *fh)
 
     if (ferror(fh) || fflush(fh)) {
         perror(fh_name);
-        exit(-1);
+        exit(EXIT_FAILURE);
     }
 }
 
@@ -3735,7 +3735,7 @@ int main_console(int argc, char **argv)
             type = LIBXL_CONSOLE_TYPE_SERIAL;
         else {
             fprintf(stderr, "console type supported are: pv, serial\n");
-            return 2;
+            return EXIT_FAILURE;
         }
         break;
     case 'n':
@@ -3749,7 +3749,7 @@ int main_console(int argc, char **argv)
     else
         libxl_console_exec(ctx, domid, num, type);
     fprintf(stderr, "Unable to attach console\n");
-    return 1;
+    return EXIT_FAILURE;
 }
 
 int main_vncviewer(int argc, char **argv)
@@ -3771,8 +3771,8 @@ int main_vncviewer(int argc, char **argv)
     domid = find_domain(argv[optind]);
 
     if (vncviewer(domid, autopass))
-        return 1;
-    return 0;
+        return EXIT_FAILURE;
+    return EXIT_SUCCESS;
 }
 
 static void pcilist(uint32_t domid)
@@ -4010,10 +4010,10 @@ static void destroy_domain(uint32_t domid, int force)
         fprintf(stderr, "Not destroying domain 0; use -f to force.\n"
                         "This can only be done when using a disaggregated "
                         "hardware domain and toolstack.\n\n");
-        exit(-1);
+        exit(EXIT_FAILURE);
     }
     rc = libxl_domain_destroy(ctx, domid, 0);
-    if (rc) { fprintf(stderr,"destroy failed (rc=%d)\n",rc); exit(-1); }
+    if (rc) { fprintf(stderr,"destroy failed (rc=%d)\n",rc); exit(EXIT_FAILURE); }
 }
 
 static void wait_for_domain_deaths(libxl_evgen_domain_death **deathws, int nr)
@@ -4025,7 +4025,7 @@ static void wait_for_domain_deaths(libxl_evgen_domain_death **deathws, int nr)
         rc = libxl_event_wait(ctx, &event, LIBXL_EVENTMASK_ALL, 0,0);
         if (rc) {
             LOG("Failed to get event, quitting (rc=%d)", rc);
-            exit(-1);
+            exit(EXIT_FAILURE);
         }
 
         switch (event->type) {
@@ -4070,14 +4070,14 @@ static void shutdown_domain(uint32_t domid,
     }
 
     if (rc) {
-        fprintf(stderr,"shutdown failed (rc=%d)\n",rc);exit(-1);
+        fprintf(stderr,"shutdown failed (rc=%d)\n",rc);exit(EXIT_FAILURE);
     }
 
     if (deathw) {
         rc = libxl_evenable_domain_death(ctx, domid, for_user, deathw);
         if (rc) {
             fprintf(stderr,"wait for death failed (evgen, rc=%d)\n",rc);
-            exit(-1);
+            exit(EXIT_FAILURE);
         }
     }
 }
@@ -4101,14 +4101,14 @@ static void reboot_domain(uint32_t domid, libxl_evgen_domain_death **deathw,
         }
     }
     if (rc) {
-        fprintf(stderr,"reboot failed (rc=%d)\n",rc);exit(-1);
+        fprintf(stderr,"reboot failed (rc=%d)\n",rc);exit(EXIT_FAILURE);
     }
 
     if (deathw) {
         rc = libxl_evenable_domain_death(ctx, domid, for_user, deathw);
         if (rc) {
             fprintf(stderr,"wait for death failed (evgen, rc=%d)\n",rc);
-            exit(-1);
+            exit(EXIT_FAILURE);
         }
     }
 }
@@ -4241,12 +4241,12 @@ static void list_domains(bool verbose, bool context, bool claim, bool numa,
     if (numa) {
         if (libxl_node_bitmap_alloc(ctx, &nodemap, 0)) {
             fprintf(stderr, "libxl_node_bitmap_alloc_failed.\n");
-            exit(1);
+            exit(EXIT_FAILURE);
         }
         if (libxl_get_physinfo(ctx, &physinfo) != 0) {
             fprintf(stderr, "libxl_physinfo failed.\n");
             libxl_bitmap_dispose(&nodemap);
-            exit(1);
+            exit(EXIT_FAILURE);
         }
 
         printf(" NODE Affinity");
@@ -4310,7 +4310,7 @@ static void list_vm(void)
 
     if (!info) {
         fprintf(stderr, "libxl_list_vm failed.\n");
-        exit(1);
+        exit(EXIT_FAILURE);
     }
     printf("UUID                                  ID    name\n");
     for (i = 0; i < nb_vm; i++) {
@@ -4327,7 +4327,7 @@ static void core_dump_domain(uint32_t domid, const char *filename)
     int rc;
 
     rc=libxl_domain_core_dump(ctx, domid, filename, NULL);
-    if (rc) { fprintf(stderr,"core dump failed (rc=%d)\n",rc);exit(-1); }
+    if (rc) { fprintf(stderr,"core dump failed (rc=%d)\n",rc);exit(EXIT_FAILURE); }
 }
 
 #ifndef LIBXL_HAVE_NO_SUSPEND_RESUME
@@ -5118,7 +5118,7 @@ int main_dump_core(int argc, char **argv)
     }
 
     core_dump_domain(find_domain(argv[optind]), argv[optind + 1]);
-    return 0;
+    return EXIT_SUCCESS;
 }
 
 int main_pause(int argc, char **argv)
@@ -5131,7 +5131,7 @@ int main_pause(int argc, char **argv)
 
     pause_domain(find_domain(argv[optind]));
 
-    return 0;
+    return EXIT_SUCCESS;
 }
 
 int main_unpause(int argc, char **argv)
@@ -5144,7 +5144,7 @@ int main_unpause(int argc, char **argv)
 
     unpause_domain(find_domain(argv[optind]));
 
-    return 0;
+    return EXIT_SUCCESS;
 }
 
 int main_destroy(int argc, char **argv)
@@ -5159,7 +5159,7 @@ int main_destroy(int argc, char **argv)
     }
 
     destroy_domain(find_domain(argv[optind]), force);
-    return 0;
+    return EXIT_SUCCESS;
 }
 
 static int main_shutdown_or_reboot(int do_reboot, int argc, char **argv)
@@ -5191,7 +5191,7 @@ static int main_shutdown_or_reboot(int do_reboot, int argc, char **argv)
 
     if (!argv[optind] && !all) {
         fprintf(stderr, "You must specify -a or a domain id.\n\n");
-        return opt;
+        return EXIT_FAILURE;
     }
 
     if (all) {
@@ -5199,7 +5199,7 @@ static int main_shutdown_or_reboot(int do_reboot, int argc, char **argv)
         libxl_evgen_domain_death **deathws = NULL;
         if (!(dominfo = libxl_list_domain(ctx, &nb_domain))) {
             fprintf(stderr, "libxl_list_domain failed.\n");
-            return -1;
+            return EXIT_FAILURE;
         }
 
         if (wait_for_it)
@@ -5230,7 +5230,7 @@ static int main_shutdown_or_reboot(int do_reboot, int argc, char **argv)
     }
 
 
-    return 0;
+    return EXIT_SUCCESS;
 }
 
 int main_shutdown(int argc, char **argv)
@@ -5288,7 +5288,7 @@ int main_list(int argc, char **argv)
         info = libxl_list_domain(ctx, &nb_domain);
         if (!info) {
             fprintf(stderr, "libxl_list_domain failed.\n");
-            return 1;
+            return EXIT_FAILURE;
         }
         info_free = info;
     } else if (optind == argc-1) {
@@ -5297,17 +5297,17 @@ int main_list(int argc, char **argv)
         if (rc == ERROR_DOMAIN_NOTFOUND) {
             fprintf(stderr, "Error: Domain \'%s\' does not exist.\n",
                 argv[optind]);
-            return -rc;
+            return EXIT_FAILURE;
         }
         if (rc) {
             fprintf(stderr, "libxl_domain_info failed (code %d).\n", rc);
-            return -rc;
+            return EXIT_FAILURE;
         }
         info = &info_buf;
         nb_domain = 1;
     } else {
         help("list");
-        return 2;
+        return EXIT_FAILURE;
     }
 
     if (details)
@@ -5321,7 +5321,7 @@ int main_list(int argc, char **argv)
 
     libxl_dominfo_dispose(&info_buf);
 
-    return 0;
+    return EXIT_SUCCESS;
 }
 
 int main_vm_list(int argc, char **argv)
@@ -5333,7 +5333,7 @@ int main_vm_list(int argc, char **argv)
     }
 
     list_vm();
-    return 0;
+    return EXIT_SUCCESS;
 }
 
 static void string_realloc_append(char **accumulate, const char *more)
@@ -6980,12 +6980,12 @@ int main_domid(int argc, char **argv)
 
     if (libxl_name_to_domid(ctx, domname, &domid)) {
         fprintf(stderr, "Can't get domid of domain name '%s', maybe this domain does not exist.\n", domname);
-        return 1;
+        return EXIT_FAILURE;
     }
 
     printf("%d\n", domid);
 
-    return 0;
+    return EXIT_SUCCESS;
 }
 
 int main_domname(int argc, char **argv)
@@ -7003,19 +7003,19 @@ int main_domname(int argc, char **argv)
     if (domid == 0 && !strcmp(endptr, argv[optind])) {
         /*no digits at all*/
         fprintf(stderr, "Invalid domain id.\n\n");
-        return 1;
+        return EXIT_FAILURE;
     }
 
     domname = libxl_domid_to_name(ctx, domid);
     if (!domname) {
         fprintf(stderr, "Can't get domain name of domain id '%d', maybe this domain does not exist.\n", domid);
-        return 1;
+        return EXIT_FAILURE;
     }
 
     printf("%s\n", domname);
     free(domname);
 
-    return 0;
+    return EXIT_SUCCESS;
 }
 
 int main_rename(int argc, char **argv)
