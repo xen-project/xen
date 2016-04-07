@@ -2680,40 +2680,45 @@ static int preserve_domain(uint32_t *r_domid, libxl_event *event,
     return rc == 0 ? 1 : 0;
 }
 
-static int freemem(uint32_t domid, libxl_domain_build_info *b_info)
+/*
+ * Returns false if memory can't be freed, but also if we encounter errors.
+ * Returns true in case there is already, or we manage to free it, enough
+ * memory, but also if autoballoon is false.
+ */
+static bool freemem(uint32_t domid, libxl_domain_build_info *b_info)
 {
     int rc, retries = 3;
     uint32_t need_memkb, free_memkb;
 
     if (!autoballoon)
-        return 0;
+        return true;
 
     rc = libxl_domain_need_memory(ctx, b_info, &need_memkb);
     if (rc < 0)
-        return rc;
+        return false;
 
     do {
         rc = libxl_get_free_memory(ctx, &free_memkb);
         if (rc < 0)
-            return rc;
+            return false;
 
         if (free_memkb >= need_memkb)
-            return 0;
+            return true;
 
         rc = libxl_set_memory_target(ctx, 0, free_memkb - need_memkb, 1, 0);
         if (rc < 0)
-            return rc;
+            return false;
 
         /* wait until dom0 reaches its target, as long as we are making
          * progress */
         rc = libxl_wait_for_memory_target(ctx, 0, 10);
         if (rc < 0)
-            return rc;
+            return false;
 
         retries--;
     } while (retries > 0);
 
-    return ERROR_NOMEM;
+    return false;
 }
 
 static void autoconnect_console(libxl_ctx *ctx_ignored,
@@ -2980,8 +2985,7 @@ start:
         goto error_out;
 
     if (domid_soft_reset == INVALID_DOMID) {
-        ret = freemem(domid, &d_config.b_info);
-        if (ret < 0) {
+        if (!freemem(domid, &d_config.b_info)) {
             fprintf(stderr, "failed to free memory for the domain\n");
             ret = ERROR_FAIL;
             goto error_out;
@@ -3245,6 +3249,7 @@ void help(const char *command)
     }
 }
 
+/* Returns -1 on failure; the amount of memory on success. */
 static int64_t parse_mem_size_kb(const char *mem)
 {
     char *endptr;
@@ -3391,7 +3396,7 @@ static int set_memory_max(uint32_t domid, const char *mem)
     memorykb = parse_mem_size_kb(mem);
     if (memorykb == -1) {
         fprintf(stderr, "invalid memory size: %s\n", mem);
-        exit(3);
+        return EXIT_FAILURE;
     }
 
     if (libxl_domain_setmaxmem(ctx, domid, memorykb)) {
@@ -3425,7 +3430,7 @@ static int set_memory_target(uint32_t domid, const char *mem)
     memorykb = parse_mem_size_kb(mem);
     if (memorykb == -1)  {
         fprintf(stderr, "invalid memory size: %s\n", mem);
-        exit(3);
+        return EXIT_FAILURE;
     }
 
     if (libxl_set_memory_target(ctx, domid, memorykb, 0, /* enforce */ 1)) {
@@ -6132,7 +6137,7 @@ int main_sharing(int argc, char **argv)
         info = libxl_list_domain(ctx, &nb_domain);
         if (!info) {
             fprintf(stderr, "libxl_list_domain failed.\n");
-            return 1;
+            return EXIT_FAILURE;
         }
         info_free = info;
     } else if (optind == argc-1) {
@@ -6141,17 +6146,17 @@ int main_sharing(int argc, char **argv)
         if (rc == ERROR_DOMAIN_NOTFOUND) {
             fprintf(stderr, "Error: Domain \'%s\' does not exist.\n",
                 argv[optind]);
-            return -rc;
+            return EXIT_FAILURE;
         }
         if (rc) {
             fprintf(stderr, "libxl_domain_info failed (code %d).\n", rc);
-            return -rc;
+            return EXIT_FAILURE;
         }
         info = &info_buf;
         nb_domain = 1;
     } else {
         help("sharing");
-        return 2;
+        return EXIT_FAILURE;
     }
 
     sharing(info, nb_domain);
@@ -6161,7 +6166,7 @@ int main_sharing(int argc, char **argv)
     else
         libxl_dominfo_dispose(info);
 
-    return 0;
+    return EXIT_SUCCESS;
 }
 
 static int sched_domain_get(libxl_scheduler sched, int domid,
