@@ -50,8 +50,14 @@ ALL_OBJS-$(CONFIG_X86)   += $(BASEDIR)/crypto/built_in.o
 CFLAGS += -nostdinc -fno-builtin -fno-common
 CFLAGS += -Werror -Wredundant-decls -Wno-pointer-arith
 CFLAGS += -pipe -g -D__XEN__ -include $(BASEDIR)/include/xen/config.h
-CFLAGS += -Wa,--strip-local-absolute
 CFLAGS += '-D__OBJECT_FILE__="$@"'
+
+ifneq ($(clang),y)
+# Clang doesn't understand this command line argument, and doesn't appear to
+# have an suitable alternative.  The resulting compiled binary does function,
+# but has an excessively large symbol table.
+CFLAGS += -Wa,--strip-local-absolute
+endif
 
 CFLAGS-$(verbose)       += -DVERBOSE
 CFLAGS-$(crash_debug)   += -DCRASH_DEBUG
