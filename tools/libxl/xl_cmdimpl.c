@@ -50,7 +50,7 @@
         else if (chk_errnoval > 0) {                                    \
             fprintf(stderr,"xl: fatal error: %s:%d: %s: %s\n",          \
                     __FILE__,__LINE__, strerror(chk_errnoval), #call);  \
-            exit(-ERROR_FAIL);                                          \
+            exit(EXIT_FAILURE);                                         \
         }                                                               \
     })
 
@@ -59,7 +59,7 @@
         if ((call) == -1) {                                             \
             fprintf(stderr,"xl: fatal error: %s:%d: %s: %s\n",          \
                     __FILE__,__LINE__, strerror(errno), #call);         \
-            exit(-ERROR_FAIL);                                          \
+            exit(EXIT_FAILURE);                                         \
         }                                                               \
     })
 
@@ -68,7 +68,7 @@
         if (must_rc < 0) {                                                  \
             fprintf(stderr,"xl: fatal error: %s:%d, rc=%d: %s\n",       \
                     __FILE__,__LINE__, must_rc, #call);                 \
-            exit(-must_rc);                                             \
+            exit(EXIT_FAILURE);                                         \
         }                                                               \
     })
 
@@ -376,7 +376,7 @@ static void xvasprintf(char **strp, const char *fmt, va_list ap)
     int r = vasprintf(strp, fmt, ap);
     if (r == -1) {
         perror("asprintf failed");
-        exit(-ERROR_FAIL);
+        exit(EXIT_FAILURE);
     }
 }
 
@@ -4350,7 +4350,7 @@ static void save_domain_core_begin(uint32_t domid,
                                       &config_v, config_len_r);
         if (rc) {
             fprintf(stderr, "unable to read overridden config file\n");
-            exit(2);
+            exit(EXIT_FAILURE);
         }
         parse_config_data(override_config_file, config_v, *config_len_r,
                           &d_config);
@@ -4359,14 +4359,14 @@ static void save_domain_core_begin(uint32_t domid,
         rc = libxl_retrieve_domain_configuration(ctx, domid, &d_config);
         if (rc) {
             fprintf(stderr, "unable to retrieve domain configuration\n");
-            exit(2);
+            exit(EXIT_FAILURE);
         }
     }
 
     config_c = libxl_domain_config_to_json(ctx, &d_config);
     if (!config_c) {
         fprintf(stderr, "unable to convert config file to JSON\n");
-        exit(2);
+        exit(EXIT_FAILURE);
     }
     *config_data_r = (uint8_t *)config_c;
     *config_len_r = strlen(config_c) + 1; /* including trailing '\0' */
@@ -4436,7 +4436,7 @@ static int save_domain(uint32_t domid, const char *filename, int checkpoint,
     fd = open(filename, O_WRONLY|O_CREAT|O_TRUNC, 0644);
     if (fd < 0) {
         fprintf(stderr, "Failed to open temp file %s for writing\n", filename);
-        exit(2);
+        exit(EXIT_FAILURE);
     }
 
     save_domain_core_writeconfig(fd, filename, config_data, config_len);
@@ -4456,7 +4456,7 @@ static int save_domain(uint32_t domid, const char *filename, int checkpoint,
     else
         libxl_domain_destroy(ctx, domid, 0);
 
-    exit(rc < 0 ? 1 : 0);
+    exit(rc < 0 ? EXIT_FAILURE : EXIT_SUCCESS);
 }
 
 static pid_t create_migration_child(const char *rune, int *send_fd,
@@ -4480,7 +4480,7 @@ static pid_t create_migration_child(const char *rune, int *send_fd,
         close(recvpipe[0]); close(recvpipe[1]);
         execlp("sh","sh","-c",rune,(char*)0);
         perror("failed to exec sh");
-        exit(-1);
+        exit(EXIT_FAILURE);
     }
 
     close(sendpipe[0]);
@@ -4503,14 +4503,14 @@ static int migrate_read_fixedmessage(int fd, const void *msg, int msgsz,
 
     stream = rune ? "migration receiver stream" : "migration stream";
     rc = libxl_read_exactly(ctx, fd, buf, msgsz, stream, what);
-    if (rc) return ERROR_FAIL;
+    if (rc) return 1;
 
     if (memcmp(buf, msg, msgsz)) {
         fprintf(stderr, "%s contained unexpected data instead of %s\n",
                 stream, what);
         if (rune)
             fprintf(stderr, "(command run was: %s )\n", rune);
-        return ERROR_FAIL;
+        return 1;
     }
     return 0;
 }
@@ -4586,7 +4586,7 @@ static void migrate_do_preamble(int send_fd, int recv_fd, pid_t child,
 
     if (send_fd < 0 || recv_fd < 0) {
         fprintf(stderr, "migrate_do_preamble: invalid file descriptors\n");
-        exit(1);
+        exit(EXIT_FAILURE);
     }
 
     rc = migrate_read_fixedmessage(recv_fd, migrate_receiver_banner,
@@ -4595,7 +4595,7 @@ static void migrate_do_preamble(int send_fd, int recv_fd, pid_t child,
     if (rc) {
         close(send_fd);
         migration_child_report(recv_fd);
-        exit(-rc);
+        exit(EXIT_FAILURE);
     }
 
     save_domain_core_writeconfig(send_fd, "migration stream",
@@ -4620,7 +4620,7 @@ static void migrate_domain(uint32_t domid, const char *rune, int debug,
     if (!config_len) {
         fprintf(stderr, "No config file stored for running domain and "
                 "none supplied - cannot migrate.\n");
-        exit(1);
+        exit(EXIT_FAILURE);
     }
 
     child = create_migration_child(rune, &send_fd, &recv_fd);
@@ -4707,26 +4707,26 @@ static void migrate_domain(uint32_t domid, const char *rune, int debug,
         if (!rc) fprintf(stderr, "migration sender: Resumed OK.\n");
 
         fprintf(stderr, "Migration failed due to problems at target.\n");
-        exit(-ERROR_FAIL);
+        exit(EXIT_FAILURE);
     }
 
     fprintf(stderr, "migration sender: Target reports successful startup.\n");
     libxl_domain_destroy(ctx, domid, 0); /* bang! */
     fprintf(stderr, "Migration successful.\n");
-    exit(0);
+    exit(EXIT_SUCCESS);
 
  failed_suspend:
     close(send_fd);
     migration_child_report(recv_fd);
     fprintf(stderr, "Migration failed, failed to suspend at sender.\n");
-    exit(-ERROR_FAIL);
+    exit(EXIT_FAILURE);
 
  failed_resume:
     close(send_fd);
     migration_child_report(recv_fd);
     fprintf(stderr, "Migration failed, resuming at sender.\n");
     libxl_domain_resume(ctx, domid, 1, 0);
-    exit(-ERROR_FAIL);
+    exit(EXIT_FAILURE);
 
  failed_badly:
     fprintf(stderr,
@@ -4739,7 +4739,7 @@ static void migrate_domain(uint32_t domid, const char *rune, int debug,
 
     close(send_fd);
     migration_child_report(recv_fd);
-    exit(-ERROR_BADFAIL);
+    exit(EXIT_FAILURE);
 }
 
 static void migrate_receive(int debug, int daemonize, int monitor,
@@ -4780,7 +4780,7 @@ static void migrate_receive(int debug, int daemonize, int monitor,
     if (rc < 0) {
         fprintf(stderr, "migration target: Domain creation failed"
                 " (code %d).\n", rc);
-        exit(-rc);
+        exit(EXIT_FAILURE);
     }
 
     domid = rc;
@@ -4823,7 +4823,7 @@ static void migrate_receive(int debug, int daemonize, int monitor,
                     "Failed to unpause domain %s (id: %u):%d\n",
                     ha, common_domname, domid, rc);
 
-        exit(rc ? -ERROR_FAIL: 0);
+        exit(rc ? EXIT_FAILURE : EXIT_SUCCESS);
     default:
         /* do nothing */
         break;
@@ -4836,7 +4836,7 @@ static void migrate_receive(int debug, int daemonize, int monitor,
                              migrate_receiver_ready,
                              sizeof(migrate_receiver_ready),
                              "migration ack stream", "ready message");
-    if (rc) exit(-rc);
+    if (rc) exit(EXIT_FAILURE);
 
     rc = migrate_read_fixedmessage(recv_fd, migrate_permission_to_go,
                                    sizeof(migrate_permission_to_go),
@@ -4861,14 +4861,14 @@ static void migrate_receive(int debug, int daemonize, int monitor,
                               migrate_report, sizeof(migrate_report),
                               "migration ack stream",
                               "success/failure report");
-    if (rc2) exit(-ERROR_BADFAIL);
+    if (rc2) exit(EXIT_FAILURE);
 
     rc_buf = -rc;
     assert(!!rc_buf == !!rc);
     rc2 = libxl_write_exactly(ctx, send_fd, &rc_buf, 1,
                               "migration ack stream",
                               "success/failure code");
-    if (rc2) exit(-ERROR_BADFAIL);
+    if (rc2) exit(EXIT_FAILURE);
 
     if (rc) {
         fprintf(stderr, "migration target: Failure, destroying our copy.\n");
@@ -4877,7 +4877,7 @@ static void migrate_receive(int debug, int daemonize, int monitor,
         if (rc2) {
             fprintf(stderr, "migration target: Failed to destroy our copy"
                     " (code %d).\n", rc2);
-            exit(-ERROR_BADFAIL);
+            exit(EXIT_FAILURE);
         }
 
         fprintf(stderr, "migration target: Cleanup OK, granting sender"
@@ -4888,10 +4888,10 @@ static void migrate_receive(int debug, int daemonize, int monitor,
                                   sizeof(migrate_permission_to_go),
                                   "migration ack stream",
                                   "permission to sender to have domain back");
-        if (rc2) exit(-ERROR_BADFAIL);
+        if (rc2) exit(EXIT_FAILURE);
     }
 
-    exit(0);
+    exit(EXIT_SUCCESS);
 }
 
 int main_restore(int argc, char **argv)
@@ -4940,7 +4940,7 @@ int main_restore(int argc, char **argv)
         checkpoint_file = argv[optind + 1];
     } else {
         help("restore");
-        return 2;
+        return EXIT_FAILURE;
     }
 
     memset(&dom_info, 0, sizeof(dom_info));
@@ -4958,9 +4958,9 @@ int main_restore(int argc, char **argv)
 
     rc = create_domain(&dom_info);
     if (rc < 0)
-        return -rc;
+        return EXIT_FAILURE;
 
-    return 0;
+    return EXIT_SUCCESS;
 }
 
 int main_migrate_receive(int argc, char **argv)
@@ -5000,13 +5000,13 @@ int main_migrate_receive(int argc, char **argv)
 
     if (argc-optind != 0) {
         help("migrate-receive");
-        return 2;
+        return EXIT_FAILURE;
     }
     migrate_receive(debug, daemonize, monitor,
                     STDOUT_FILENO, STDIN_FILENO,
                     checkpointed, script);
 
-    return 0;
+    return EXIT_SUCCESS;
 }
 
 int main_save(int argc, char **argv)
@@ -5029,7 +5029,7 @@ int main_save(int argc, char **argv)
 
     if (argc-optind > 3) {
         help("save");
-        return 2;
+        return EXIT_FAILURE;
     }
 
     domid = find_domain(argv[optind]);
@@ -5038,7 +5038,7 @@ int main_save(int argc, char **argv)
         config_filename = argv[optind + 2];
 
     save_domain(domid, filename, checkpoint, leavepaused, config_filename);
-    return 0;
+    return EXIT_SUCCESS;
 }
 
 int main_migrate(int argc, char **argv)
@@ -5105,7 +5105,7 @@ int main_migrate(int argc, char **argv)
     }
 
     migrate_domain(domid, rune, debug, config_filename);
-    return 0;
+    return EXIT_SUCCESS;
 }
 #endif
 
@@ -8756,7 +8756,7 @@ int main_remus(int argc, char **argv)
         send_fd = open("/dev/null", O_RDWR, 0644);
         if (send_fd < 0) {
             perror("failed to open /dev/null");
-            exit(-1);
+            exit(EXIT_FAILURE);
         }
     } else {
 
@@ -8783,7 +8783,7 @@ int main_remus(int argc, char **argv)
         if (!config_len) {
             fprintf(stderr, "No config file stored for running domain and "
                     "none supplied - cannot start remus.\n");
-            exit(1);
+            exit(EXIT_FAILURE);
         }
 
         child = create_migration_child(rune, &send_fd, &recv_fd);
@@ -8805,7 +8805,7 @@ int main_remus(int argc, char **argv)
         fprintf(stderr, "%s: Primary domain has been destroyed.\n",
                 libxl_defbool_val(r_info.colo) ? "COLO" : "Remus");
         close(send_fd);
-        return 0;
+        return EXIT_SUCCESS;
     }
 
     /* If we are here, it means remus setup/domain suspend/backup has
@@ -8821,7 +8821,7 @@ int main_remus(int argc, char **argv)
     }
 
     close(send_fd);
-    return -ERROR_FAIL;
+    return EXIT_FAILURE;
 }
 #endif
 
