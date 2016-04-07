@@ -3432,14 +3432,18 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
         }
         if ( count == 1 )
         {
-            if ( cpu_has_xsaves && cpu_has_vmx_xsaves )
+            uint64_t xfeatures = v->arch.xcr0 | v->arch.hvm_vcpu.msr_xss;
+            if ( cpu_has_xsaves && cpu_has_vmx_xsaves && xfeatures )
             {
                 *ebx = XSTATE_AREA_MIN_SIZE;
-                if ( v->arch.xcr0 | v->arch.hvm_vcpu.msr_xss )
+                if ( xfeatures & ~XSTATE_FP_SSE )
                     for ( sub_leaf = 2; sub_leaf < 63; sub_leaf++ )
-                        if ( (v->arch.xcr0 | v->arch.hvm_vcpu.msr_xss) &
-                             (1ULL << sub_leaf) )
+                        if ( xfeatures & (1ULL << sub_leaf) )
+                        {
+                            if ( test_bit(sub_leaf, &xstate_align) )
+                                *ebx = ROUNDUP(*ebx, 64);
                             *ebx += xstate_sizes[sub_leaf];
+                        }
             }
             else
                 *ebx = *ecx = *edx = 0;

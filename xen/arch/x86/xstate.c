@@ -26,7 +26,7 @@ u64 __read_mostly xfeature_mask;
 
 static unsigned int *__read_mostly xstate_offsets;
 unsigned int *__read_mostly xstate_sizes;
-static u64 __read_mostly xstate_align;
+u64 __read_mostly xstate_align;
 static unsigned int __read_mostly xstate_features;
 
 static uint32_t __read_mostly mxcsr_mask = 0x0000ffbf;

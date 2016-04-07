@@ -50,6 +50,7 @@
 #define XSTATE_ALIGN64 (1U << 1)
 
 extern u64 xfeature_mask;
+extern u64 xstate_align;
 extern unsigned int *xstate_sizes;
 
 /* extended state save area */
