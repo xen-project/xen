@@ -5561,7 +5561,7 @@ static void button_press(uint32_t domid, const char *b)
         trigger = LIBXL_TRIGGER_SLEEP;
     } else {
         fprintf(stderr, "%s is an invalid button identifier\n", b);
-        exit(2);
+        exit(EXIT_FAILURE);
     }
 
     libxl_send_trigger(ctx, domid, trigger, 0);
@@ -7058,7 +7058,7 @@ int main_trigger(int argc, char **argv)
     trigger_name = argv[optind++];
     if (libxl_trigger_from_string(trigger_name, &trigger)) {
         fprintf(stderr, "Invalid trigger \"%s\"\n", trigger_name);
-        return -1;
+        return EXIT_FAILURE;
     }
 
     if (argv[optind]) {
@@ -7070,7 +7070,7 @@ int main_trigger(int argc, char **argv)
 
     libxl_send_trigger(ctx, domid, trigger, vcpuid);
 
-    return 0;
+    return EXIT_SUCCESS;
 }
 
 
@@ -7091,12 +7091,12 @@ int main_sysrq(int argc, char **argv)
     if (sysrq[1] != '\0') {
         fprintf(stderr, "Invalid sysrq.\n\n");
         help("sysrq");
-        return 1;
+        return EXIT_FAILURE;
     }
 
     libxl_send_sysrq(ctx, domid, sysrq[0]);
 
-    return 0;
+    return EXIT_SUCCESS;
 }
 
 int main_debug_keys(int argc, char **argv)
@@ -7112,10 +7112,10 @@ int main_debug_keys(int argc, char **argv)
 
     if (libxl_send_debug_keys(ctx, keys)) {
         fprintf(stderr, "cannot send debug keys: %s\n", keys);
-        return 1;
+        return EXIT_FAILURE;
     }
 
-    return 0;
+    return EXIT_SUCCESS;
 }
 
 int main_dmesg(int argc, char **argv)
@@ -7141,7 +7141,7 @@ int main_dmesg(int argc, char **argv)
 finish:
     if (cr)
         libxl_xen_console_read_finish(ctx, cr);
-    return ret;
+    return ret ? EXIT_FAILURE : EXIT_SUCCESS;
 }
 
 int main_top(int argc, char **argv)
