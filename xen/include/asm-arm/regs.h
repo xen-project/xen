@@ -50,11 +50,8 @@
 
 #define return_reg(v) ((v)->arch.cpu_info->guest_cpu_user_regs.r0)
 
-/*
- * Returns a pointer to the given register value in regs, taking the
- * processor mode (CPSR) into account.
- */
-extern register_t *select_user_reg(struct cpu_user_regs *regs, int reg);
+register_t get_user_reg(struct cpu_user_regs *regs, int reg);
+void set_user_reg(struct cpu_user_regs *regs, int reg, register_t val);
 
 #endif
 

@@ -24,12 +24,19 @@
 #include <asm/mmio.h>
 
 static int handle_read(const struct mmio_handler *handler, struct vcpu *v,
-                       mmio_info_t *info, register_t *r)
+                       mmio_info_t *info)
 {
     const struct hsr_dabt dabt = info->dabt;
+    struct cpu_user_regs *regs = guest_cpu_user_regs();
+    /*
+     * Initialize to zero to avoid leaking data if there is an
+     * implementation error in the emulation (such as not correctly
+     * setting r).
+     */
+    register_t r = 0;
     uint8_t size = (1 << dabt.size) * 8;
 
-    if ( !handler->ops->read(v, info, r, handler->priv) )
+    if ( !handler->ops->read(v, info, &r, handler->priv) )
         return 0;
 
     /*
@@ -37,7 +44,7 @@ static int handle_read(const struct mmio_handler *handler, struct vcpu *v,
      * Note that we expect the read handler to have zeroed the bits
      * outside the requested access size.
      */
-    if ( dabt.sign && (*r & (1UL << (size - 1))) )
+    if ( dabt.sign && (r & (1UL << (size - 1))) )
     {
         /*
          * We are relying on register_t using the same as
@@ -45,10 +52,22 @@ static int handle_read(const struct mmio_handler *handler, struct vcpu *v,
          * code smaller.
          */
         BUILD_BUG_ON(sizeof(register_t) != sizeof(unsigned long));
-        *r |= (~0UL) << size;
+        r |= (~0UL) << size;
     }
 
+    set_user_reg(regs, dabt.reg, r);
+
     return 1;
+}
+
+static int handle_write(const struct mmio_handler *handler, struct vcpu *v,
+                        mmio_info_t *info)
+{
+    const struct hsr_dabt dabt = info->dabt;
+    struct cpu_user_regs *regs = guest_cpu_user_regs();
+
+    return handler->ops->write(v, info, get_user_reg(regs, dabt.reg),
+                               handler->priv);
 }
 
 int handle_mmio(mmio_info_t *info)
@@ -57,9 +76,6 @@ int handle_mmio(mmio_info_t *info)
     int i;
     const struct mmio_handler *handler = NULL;
     const struct vmmio *vmmio = &v->domain->arch.vmmio;
-    struct hsr_dabt dabt = info->dabt;
-    struct cpu_user_regs *regs = guest_cpu_user_regs();
-    register_t *r = select_user_reg(regs, dabt.reg);
 
     for ( i = 0; i < vmmio->num_entries; i++ )
     {
@@ -74,9 +90,9 @@ int handle_mmio(mmio_info_t *info)
         return 0;
 
     if ( info->dabt.write )
-        return handler->ops->write(v, info, *r, handler->priv);
+        return handle_write(handler, v, info);
     else
-        return handle_read(handler, v, info, r);
+        return handle_read(handler, v, info);
 }
 
 void register_mmio_handler(struct domain *d,

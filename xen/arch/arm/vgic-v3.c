@@ -1304,7 +1304,6 @@ static int vgic_v3_emulate_sysreg(struct cpu_user_regs *regs, union hsr hsr)
 {
     struct vcpu *v = current;
     struct hsr_sysreg sysreg = hsr.sysreg;
-    register_t *r = select_user_reg(regs, sysreg.reg);
 
     ASSERT (hsr.ec == HSR_EC_SYSREG);
 
@@ -1318,7 +1317,7 @@ static int vgic_v3_emulate_sysreg(struct cpu_user_regs *regs, union hsr hsr)
     case HSR_SYSREG_ICC_SGI1R_EL1:
         /* WO */
         if ( !sysreg.read )
-            return vgic_v3_to_sgi(v, *r);
+            return vgic_v3_to_sgi(v, get_user_reg(regs, sysreg.reg));
         else
         {
             gprintk(XENLOG_WARNING, "Reading SGI1R_EL1 - WO register\n");

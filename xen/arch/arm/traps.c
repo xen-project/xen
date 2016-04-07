@@ -149,7 +149,31 @@ static void print_xen_info(void)
            debug_build() ? 'y' : 'n', print_tainted(taint_str));
 }
 
-register_t *select_user_reg(struct cpu_user_regs *regs, int reg)
+#ifdef CONFIG_ARM_32
+static inline bool_t is_zero_register(int reg)
+{
+    /* There is no zero register for ARM32 */
+    return 0;
+}
+#else
+static inline bool_t is_zero_register(int reg)
+{
+    /*
+     * For store/load and sysreg instruction, the encoding 31 always
+     * corresponds to {w,x}zr which is the zero register.
+     */
+    return (reg == 31);
+}
+#endif
+
+/*
+ * Returns a pointer to the given register value in regs, taking the
+ * processor mode (CPSR) into account.
+ *
+ * Note that this function should not be used directly but via
+ * {get,set}_user_reg.
+ */
+static register_t *select_user_reg(struct cpu_user_regs *regs, int reg)
 {
     BUG_ON( !guest_mode(regs) );
 
@@ -207,14 +231,29 @@ register_t *select_user_reg(struct cpu_user_regs *regs, int reg)
     }
 #undef REGOFFS
 #else
-    /* In 64 bit the syndrome register contains the AArch64 register
-     * number even if the trap was from AArch32 mode. Except that
-     * AArch32 R15 (PC) is encoded as 0b11111.
+    /*
+     * On 64-bit the syndrome register contains the register index as
+     * viewed in AArch64 state even if the trap was from AArch32 mode.
      */
-    if ( reg == 0x1f /* && is aarch32 guest */)
-        return &regs->pc;
+    BUG_ON(is_zero_register(reg)); /* Cannot be {w,x}zr */
     return &regs->x0 + reg;
 #endif
+}
+
+register_t get_user_reg(struct cpu_user_regs *regs, int reg)
+{
+    if ( is_zero_register(reg) )
+        return 0;
+
+    return *select_user_reg(regs, reg);
+}
+
+void set_user_reg(struct cpu_user_regs *regs, int reg, register_t value)
+{
+    if ( is_zero_register(reg) )
+        return;
+
+    *select_user_reg(regs, reg) = value;
 }
 
 static const char *decode_fsc(uint32_t fsc, int *level)
@@ -1241,22 +1280,19 @@ static arm_hypercall_t arm_hypercall_table[] = {
 #ifndef NDEBUG
 static void do_debug_trap(struct cpu_user_regs *regs, unsigned int code)
 {
-    register_t *r;
     uint32_t reg;
     uint32_t domid = current->domain->domain_id;
     switch ( code ) {
     case 0xe0 ... 0xef:
         reg = code - 0xe0;
-        r = select_user_reg(regs, reg);
         printk("DOM%d: R%d = 0x%"PRIregister" at 0x%"PRIvaddr"\n",
-               domid, reg, *r, regs->pc);
+               domid, reg, get_user_reg(regs, reg), regs->pc);
         break;
     case 0xfd:
         printk("DOM%d: Reached %"PRIvaddr"\n", domid, regs->pc);
         break;
     case 0xfe:
-        r = select_user_reg(regs, 0);
-        printk("%c", (char)(*r & 0xff));
+        printk("%c", (char)(get_user_reg(regs, 0) & 0xff));
         break;
     case 0xff:
         printk("DOM%d: DEBUG\n", domid);
@@ -1614,7 +1650,7 @@ static void advance_pc(struct cpu_user_regs *regs, const union hsr hsr)
 
 /* Read as zero and write ignore */
 static void handle_raz_wi(struct cpu_user_regs *regs,
-                          register_t *reg,
+                          int regidx,
                           bool_t read,
                           const union hsr hsr,
                           int min_el)
@@ -1625,7 +1661,7 @@ static void handle_raz_wi(struct cpu_user_regs *regs,
         return inject_undef_exception(regs, hsr);
 
     if ( read )
-        *reg = 0;
+        set_user_reg(regs, regidx, 0);
     /* else: write ignored */
 
     advance_pc(regs, hsr);
@@ -1633,7 +1669,7 @@ static void handle_raz_wi(struct cpu_user_regs *regs,
 
 /* Write only as write ignore */
 static void handle_wo_wi(struct cpu_user_regs *regs,
-                         register_t *reg,
+                         int regidx,
                          bool_t read,
                          const union hsr hsr,
                          int min_el)
@@ -1652,7 +1688,7 @@ static void handle_wo_wi(struct cpu_user_regs *regs,
 
 /* Read only as read as zero */
 static void handle_ro_raz(struct cpu_user_regs *regs,
-                          register_t *reg,
+                          int regidx,
                           bool_t read,
                           const union hsr hsr,
                           int min_el)
@@ -1666,7 +1702,7 @@ static void handle_ro_raz(struct cpu_user_regs *regs,
         return inject_undef_exception(regs, hsr);
     /* else: raz */
 
-    *reg = 0;
+    set_user_reg(regs, regidx, 0);
 
     advance_pc(regs, hsr);
 }
@@ -1675,7 +1711,7 @@ static void do_cp15_32(struct cpu_user_regs *regs,
                        const union hsr hsr)
 {
     const struct hsr_cp32 cp32 = hsr.cp32;
-    register_t *r = select_user_reg(regs, cp32.reg);
+    int regidx = cp32.reg;
     struct vcpu *v = current;
 
     if ( !check_conditional_instr(regs, hsr) )
@@ -1708,7 +1744,7 @@ static void do_cp15_32(struct cpu_user_regs *regs,
         if ( psr_mode_is_user(regs) )
             return inject_undef_exception(regs, hsr);
         if ( cp32.read )
-           *r = v->arch.actlr;
+            set_user_reg(regs, regidx, v->arch.actlr);
         break;
 
     /*
@@ -1740,13 +1776,13 @@ static void do_cp15_32(struct cpu_user_regs *regs,
     case HSR_CPREG32(PMUSERENR):
         /* RO at EL0. RAZ/WI at EL1 */
         if ( psr_mode_is_user(regs) )
-            return handle_ro_raz(regs, r, cp32.read, hsr, 0);
+            return handle_ro_raz(regs, regidx, cp32.read, hsr, 0);
         else
-            return handle_raz_wi(regs, r, cp32.read, hsr, 1);
+            return handle_raz_wi(regs, regidx, cp32.read, hsr, 1);
     case HSR_CPREG32(PMINTENSET):
     case HSR_CPREG32(PMINTENCLR):
         /* EL1 only, however MDCR_EL2.TPM==1 means EL0 may trap here also. */
-        return handle_raz_wi(regs, r, cp32.read, hsr, 1);
+        return handle_raz_wi(regs, regidx, cp32.read, hsr, 1);
     case HSR_CPREG32(PMCR):
     case HSR_CPREG32(PMCNTENSET):
     case HSR_CPREG32(PMCNTENCLR):
@@ -1763,7 +1799,7 @@ static void do_cp15_32(struct cpu_user_regs *regs,
          * Accessible at EL0 only if PMUSERENR_EL0.EN is set. We
          * emulate that register as 0 above.
          */
-        return handle_raz_wi(regs, r, cp32.read, hsr, 1);
+        return handle_raz_wi(regs, regidx, cp32.read, hsr, 1);
 
     /*
      * HCR_EL2.TIDCP
@@ -1866,7 +1902,7 @@ static void do_cp15_64(struct cpu_user_regs *regs,
 static void do_cp14_32(struct cpu_user_regs *regs, const union hsr hsr)
 {
     const struct hsr_cp32 cp32 = hsr.cp32;
-    register_t *r = select_user_reg(regs, cp32.reg);
+    int regidx = cp32.reg;
     struct domain *d = current->domain;
 
     if ( !check_conditional_instr(regs, hsr) )
@@ -1888,9 +1924,9 @@ static void do_cp14_32(struct cpu_user_regs *regs, const union hsr hsr)
      *    DBGPRCR
      */
     case HSR_CPREG32(DBGOSLAR):
-        return handle_wo_wi(regs, r, cp32.read, hsr, 1);
+        return handle_wo_wi(regs, regidx, cp32.read, hsr, 1);
     case HSR_CPREG32(DBGOSDLR):
-        return handle_raz_wi(regs, r, cp32.read, hsr, 1);
+        return handle_raz_wi(regs, regidx, cp32.read, hsr, 1);
 
     /*
      * MDCR_EL2.TDA
@@ -1915,6 +1951,9 @@ static void do_cp14_32(struct cpu_user_regs *regs, const union hsr hsr)
      *    DBGOSECCR
      */
     case HSR_CPREG32(DBGDIDR):
+    {
+        uint32_t val;
+
         /*
          * Read-only register. Accessible by EL0 if DBGDSCRext.UDCCdis
          * is set to 0, which we emulated below.
@@ -1928,23 +1967,26 @@ static void do_cp14_32(struct cpu_user_regs *regs, const union hsr hsr)
          *  - Version: ARMv7 v7.1
          *  - Variant and Revision bits match MDIR
          */
-        *r = (1 << 24) | (5 << 16);
-        *r |= ((d->arch.vpidr >> 20) & 0xf) | (d->arch.vpidr & 0xf);
+        val = (1 << 24) | (5 << 16);
+        val |= ((d->arch.vpidr >> 20) & 0xf) | (d->arch.vpidr & 0xf);
+        set_user_reg(regs, regidx, val);
+
         break;
+    }
 
     case HSR_CPREG32(DBGDSCRINT):
         /*
          * Read-only register. Accessible by EL0 if DBGDSCRext.UDCCdis
          * is set to 0, which we emulated below.
          */
-        return handle_ro_raz(regs, r, cp32.read, hsr, 1);
+        return handle_ro_raz(regs, regidx, cp32.read, hsr, 1);
 
     case HSR_CPREG32(DBGDSCREXT):
         /*
          * Implement debug status and control register as RAZ/WI.
          * The OS won't use Hardware debug if MDBGen not set.
          */
-        return handle_raz_wi(regs, r, cp32.read, hsr, 1);
+        return handle_raz_wi(regs, regidx, cp32.read, hsr, 1);
 
     case HSR_CPREG32(DBGVCR):
     case HSR_CPREG32(DBGBVR0):
@@ -1953,7 +1995,7 @@ static void do_cp14_32(struct cpu_user_regs *regs, const union hsr hsr)
     case HSR_CPREG32(DBGWCR0):
     case HSR_CPREG32(DBGBVR1):
     case HSR_CPREG32(DBGBCR1):
-        return handle_raz_wi(regs, r, cp32.read, hsr, 1);
+        return handle_raz_wi(regs, regidx, cp32.read, hsr, 1);
 
     /*
      * CPTR_EL2.TTA
@@ -2077,7 +2119,7 @@ static void do_cp(struct cpu_user_regs *regs, const union hsr hsr)
 static void do_sysreg(struct cpu_user_regs *regs,
                       const union hsr hsr)
 {
-    register_t *x = select_user_reg(regs, hsr.sysreg.reg);
+    int regidx = hsr.sysreg.reg;
     struct vcpu *v = current;
 
     switch ( hsr.bits & HSR_SYSREG_REGS_MASK )
@@ -2091,7 +2133,7 @@ static void do_sysreg(struct cpu_user_regs *regs,
         if ( psr_mode_is_user(regs) )
             return inject_undef_exception(regs, hsr);
         if ( hsr.sysreg.read )
-           *x = v->arch.actlr;
+            set_user_reg(regs, regidx, v->arch.actlr);
         break;
 
     /*
@@ -2100,7 +2142,7 @@ static void do_sysreg(struct cpu_user_regs *regs,
      * ARMv8 (DDI 0487A.d): D1-1508 Table D1-57
      */
     case HSR_SYSREG_MDRAR_EL1:
-        return handle_ro_raz(regs, x, hsr.sysreg.read, hsr, 1);
+        return handle_ro_raz(regs, regidx, hsr.sysreg.read, hsr, 1);
 
     /*
      * MDCR_EL2.TDOSA
@@ -2112,9 +2154,9 @@ static void do_sysreg(struct cpu_user_regs *regs,
      *    DBGPRCR_EL1
      */
     case HSR_SYSREG_OSLAR_EL1:
-        return handle_wo_wi(regs, x, hsr.sysreg.read, hsr, 1);
+        return handle_wo_wi(regs, regidx, hsr.sysreg.read, hsr, 1);
     case HSR_SYSREG_OSDLR_EL1:
-        return handle_raz_wi(regs, x, hsr.sysreg.read, hsr, 1);
+        return handle_raz_wi(regs, regidx, hsr.sysreg.read, hsr, 1);
 
     /*
      * MDCR_EL2.TDA
@@ -2134,18 +2176,18 @@ static void do_sysreg(struct cpu_user_regs *regs,
      *    DBGAUTHSTATUS_EL1
      */
     case HSR_SYSREG_MDSCR_EL1:
-        return handle_raz_wi(regs, x, hsr.sysreg.read, hsr, 1);
+        return handle_raz_wi(regs, regidx, hsr.sysreg.read, hsr, 1);
     case HSR_SYSREG_MDCCSR_EL0:
         /*
          * Accessible at EL0 only if MDSCR_EL1.TDCC is set to 0. We emulate that
          * register as RAZ/WI above. So RO at both EL0 and EL1.
          */
-        return handle_ro_raz(regs, x, hsr.sysreg.read, hsr, 0);
+        return handle_ro_raz(regs, regidx, hsr.sysreg.read, hsr, 0);
     HSR_SYSREG_DBG_CASES(DBGBVR):
     HSR_SYSREG_DBG_CASES(DBGBCR):
     HSR_SYSREG_DBG_CASES(DBGWVR):
     HSR_SYSREG_DBG_CASES(DBGWCR):
-        return handle_raz_wi(regs, x, hsr.sysreg.read, hsr, 1);
+        return handle_raz_wi(regs, regidx, hsr.sysreg.read, hsr, 1);
 
     /*
      * MDCR_EL2.TPM
@@ -2169,13 +2211,13 @@ static void do_sysreg(struct cpu_user_regs *regs,
          * Accessible from EL1 only, but if EL0 trap happens handle as
          * undef.
          */
-        return handle_raz_wi(regs, x, hsr.sysreg.read, hsr, 1);
+        return handle_raz_wi(regs, regidx, hsr.sysreg.read, hsr, 1);
     case HSR_SYSREG_PMUSERENR_EL0:
         /* RO at EL0. RAZ/WI at EL1 */
         if ( psr_mode_is_user(regs) )
-            return handle_ro_raz(regs, x, hsr.sysreg.read, hsr, 0);
+            return handle_ro_raz(regs, regidx, hsr.sysreg.read, hsr, 0);
         else
-            return handle_raz_wi(regs, x, hsr.sysreg.read, hsr, 1);
+            return handle_raz_wi(regs, regidx, hsr.sysreg.read, hsr, 1);
     case HSR_SYSREG_PMCR_EL0:
     case HSR_SYSREG_PMCNTENSET_EL0:
     case HSR_SYSREG_PMCNTENCLR_EL0:
@@ -2192,7 +2234,7 @@ static void do_sysreg(struct cpu_user_regs *regs,
          * Accessible at EL0 only if PMUSERENR_EL0.EN is set. We
          * emulate that register as 0 above.
          */
-        return handle_raz_wi(regs, x, hsr.sysreg.read, hsr, 1);
+        return handle_raz_wi(regs, regidx, hsr.sysreg.read, hsr, 1);
 
     /*
      * !CNTHCTL_EL2.EL1PCEN
