@@ -527,8 +527,6 @@ static void *
 csched_alloc_pdata(const struct scheduler *ops, int cpu)
 {
     struct csched_pcpu *spc;
-    struct csched_private *prv = CSCHED_PRIV(ops);
-    unsigned long flags;
 
     /* Allocate per-PCPU info */
     spc = xzalloc(struct csched_pcpu);
@@ -540,6 +538,19 @@ csched_alloc_pdata(const struct scheduler *ops, int cpu)
         xfree(spc);
         return ERR_PTR(-ENOMEM);
     }
+
+    return spc;
+}
+
+static void
+csched_init_pdata(const struct scheduler *ops, void *pdata, int cpu)
+{
+    struct csched_private *prv = CSCHED_PRIV(ops);
+    struct csched_pcpu * const spc = pdata;
+    unsigned long flags;
+
+    /* cpu data needs to be allocated, but STILL uninitialized */
+    ASSERT(spc && spc->runq.next == NULL && spc->runq.prev == NULL);
 
     spin_lock_irqsave(&prv->lock, flags);
 
@@ -561,16 +572,12 @@ csched_alloc_pdata(const struct scheduler *ops, int cpu)
     INIT_LIST_HEAD(&spc->runq);
     spc->runq_sort_last = prv->runq_sort;
     spc->idle_bias = nr_cpu_ids - 1;
-    if ( per_cpu(schedule_data, cpu).sched_priv == NULL )
-        per_cpu(schedule_data, cpu).sched_priv = spc;
 
     /* Start off idling... */
     BUG_ON(!is_idle_vcpu(curr_on_cpu(cpu)));
     cpumask_set_cpu(cpu, prv->idlers);
 
     spin_unlock_irqrestore(&prv->lock, flags);
-
-    return spc;
 }
 
 #ifndef NDEBUG
@@ -2054,6 +2061,7 @@ static const struct scheduler sched_credit_def = {
     .alloc_vdata    = csched_alloc_vdata,
     .free_vdata     = csched_free_vdata,
     .alloc_pdata    = csched_alloc_pdata,
+    .init_pdata     = csched_init_pdata,
     .free_pdata     = csched_free_pdata,
     .alloc_domdata  = csched_alloc_domdata,
     .free_domdata   = csched_free_domdata,

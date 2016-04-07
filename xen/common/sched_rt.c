@@ -666,8 +666,8 @@ rt_deinit(struct scheduler *ops)
  * Point per_cpu spinlock to the global system lock;
  * All cpu have same global system lock
  */
-static void *
-rt_alloc_pdata(const struct scheduler *ops, int cpu)
+static void
+rt_init_pdata(const struct scheduler *ops, void *pdata, int cpu)
 {
     struct rt_private *prv = rt_priv(ops);
     spinlock_t *old_lock;
@@ -680,6 +680,12 @@ rt_alloc_pdata(const struct scheduler *ops, int cpu)
 
     /* _Not_ pcpu_schedule_unlock(): per_cpu().schedule_lock changed! */
     spin_unlock_irqrestore(old_lock, flags);
+}
+
+static void *
+rt_alloc_pdata(const struct scheduler *ops, int cpu)
+{
+    struct rt_private *prv = rt_priv(ops);
 
     if ( !alloc_cpumask_var(&_cpumask_scratch[cpu]) )
         return ERR_PTR(-ENOMEM);
@@ -1461,6 +1467,7 @@ static const struct scheduler sched_rtds_def = {
     .deinit         = rt_deinit,
     .alloc_pdata    = rt_alloc_pdata,
     .free_pdata     = rt_free_pdata,
+    .init_pdata     = rt_init_pdata,
     .alloc_domdata  = rt_alloc_domdata,
     .free_domdata   = rt_free_domdata,
     .init_domain    = rt_dom_init,
