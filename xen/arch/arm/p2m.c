@@ -1284,7 +1284,7 @@ int map_dev_mmio_region(struct domain *d,
     res = map_mmio_regions(d, start_gfn, nr, mfn);
     if ( res < 0 )
     {
-        printk(XENLOG_ERR "Unable to map [%#lx - %#lx] in Dom%d\n",
+        printk(XENLOG_G_ERR "Unable to map [%#lx - %#lx] in Dom%d\n",
                start_gfn, start_gfn + nr - 1, d->domain_id);
         return res;
     }
