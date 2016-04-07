@@ -45,9 +45,9 @@ static Elf32_Ehdr out_ehdr = {
     0,                                       /* e_flags */
     sizeof(Elf32_Ehdr),                      /* e_ehsize */
     sizeof(Elf32_Phdr),                      /* e_phentsize */
-    1,                                       /* e_phnum */
+    1,  /* modify based on num_phdrs */      /* e_phnum */
     sizeof(Elf32_Shdr),                      /* e_shentsize */
-    3,                                       /* e_shnum */
+    3,  /* modify based on num_phdrs */      /* e_shnum */
     2                                        /* e_shstrndx */
 };
 
@@ -61,8 +61,20 @@ static Elf32_Phdr out_phdr = {
     PF_R|PF_W|PF_X,                          /* p_flags */
     64                                       /* p_align */
 };
+static Elf32_Phdr note_phdr = {
+    PT_NOTE,                                 /* p_type */
+    DYNAMICALLY_FILLED,                      /* p_offset */
+    DYNAMICALLY_FILLED,                      /* p_vaddr */
+    DYNAMICALLY_FILLED,                      /* p_paddr */
+    DYNAMICALLY_FILLED,                      /* p_filesz */
+    DYNAMICALLY_FILLED,                      /* p_memsz */
+    PF_R,                                    /* p_flags */
+    4                                        /* p_align */
+};
 
 static u8 out_shstrtab[] = "\0.text\0.shstrtab";
+/* If num_phdrs >= 2, we need to tack the .note. */
+static u8 out_shstrtab_extra[] = ".note\0";
 
 static Elf32_Shdr out_shdr[] = {
     { 0 },
@@ -88,6 +100,23 @@ static Elf32_Shdr out_shdr[] = {
       1,                                     /* sh_addralign */
       0                                      /* sh_entsize */
     }
+};
+
+/*
+ * The 17 points to the '.note' in the out_shstrtab and out_shstrtab_extra
+ * laid out in the file.
+ */
+static Elf32_Shdr out_shdr_note = {
+      17,                                    /* sh_name */
+      SHT_NOTE,                              /* sh_type */
+      0,                                     /* sh_flags */
+      DYNAMICALLY_FILLED,                    /* sh_addr */
+      DYNAMICALLY_FILLED,                    /* sh_offset */
+      DYNAMICALLY_FILLED,                    /* sh_size */
+      0,                                     /* sh_link */
+      0,                                     /* sh_info */
+      4,                                     /* sh_addralign */
+      0                                      /* sh_entsize */
 };
 
 /* Some system header files define these macros and pollute our namespace. */
@@ -228,28 +257,34 @@ static void do_read(int fd, void *data, int len)
 int main(int argc, char **argv)
 {
     u64        final_exec_addr;
-    u32        loadbase, dat_siz, mem_siz;
+    u32        loadbase, dat_siz, mem_siz, note_base, note_sz, offset;
     char      *inimage, *outimage;
     int        infd, outfd;
     char       buffer[1024];
-    int        bytes, todo, i;
+    int        bytes, todo, i = 1;
+    int        num_phdrs = 1;
 
     Elf32_Ehdr in32_ehdr;
 
     Elf64_Ehdr in64_ehdr;
     Elf64_Phdr in64_phdr;
 
-    if ( argc != 5 )
+    if ( argc < 5 )
     {
-        fprintf(stderr, "Usage: mkelf32 <in-image> <out-image> "
+        fprintf(stderr, "Usage: mkelf32 [--notes] <in-image> <out-image> "
                 "<load-base> <final-exec-addr>\n");
         return 1;
     }
 
-    inimage  = argv[1];
-    outimage = argv[2];
-    loadbase = strtoul(argv[3], NULL, 16);
-    final_exec_addr = strtoull(argv[4], NULL, 16);
+    if ( !strcmp(argv[1], "--notes") )
+    {
+        i = 2;
+        num_phdrs = 2;
+    }
+    inimage  = argv[i++];
+    outimage = argv[i++];
+    loadbase = strtoul(argv[i++], NULL, 16);
+    final_exec_addr = strtoull(argv[i++], NULL, 16);
 
     infd = open(inimage, O_RDONLY);
     if ( infd == -1 )
@@ -285,11 +320,10 @@ int main(int argc, char **argv)
                 (int)in64_ehdr.e_phentsize, (int)sizeof(in64_phdr));
         return 1;
     }
-
-    if ( in64_ehdr.e_phnum != 1 )
+    if ( in64_ehdr.e_phnum != num_phdrs )
     {
-        fprintf(stderr, "Expect precisly 1 program header; found %d.\n",
-                (int)in64_ehdr.e_phnum);
+        fprintf(stderr, "Expect precisly %d program header; found %d.\n",
+                num_phdrs, (int)in64_ehdr.e_phnum);
         return 1;
     }
 
@@ -303,6 +337,32 @@ int main(int argc, char **argv)
     /* Do not use p_memsz: it does not include BSS alignment padding. */
     /*mem_siz = (u32)in64_phdr.p_memsz;*/
     mem_siz = (u32)(final_exec_addr - in64_phdr.p_vaddr);
+
+    note_sz = note_base = offset = 0;
+    if ( num_phdrs > 1 )
+    {
+        offset = in64_phdr.p_offset;
+        note_base = in64_phdr.p_vaddr;
+
+        (void)lseek(infd, in64_ehdr.e_phoff+sizeof(in64_phdr), SEEK_SET);
+        do_read(infd, &in64_phdr, sizeof(in64_phdr));
+        endianadjust_phdr64(&in64_phdr);
+
+        (void)lseek(infd, offset, SEEK_SET);
+
+        note_sz = in64_phdr.p_memsz;
+        note_base = in64_phdr.p_vaddr - note_base;
+
+        if ( in64_phdr.p_offset > dat_siz || offset > in64_phdr.p_offset )
+        {
+            fprintf(stderr, "Expected .note section within .text section!\n" \
+                    "Offset %ld not within %d!\n",
+                    in64_phdr.p_offset, dat_siz);
+            return 1;
+        }
+        /* Gets us the absolute offset within the .text section. */
+        offset = in64_phdr.p_offset - offset;
+    }
 
     /*
      * End the image on a page boundary. This gets round alignment bugs
@@ -322,6 +382,31 @@ int main(int argc, char **argv)
     out_shdr[1].sh_size   = dat_siz;
     out_shdr[2].sh_offset = RAW_OFFSET + dat_siz + sizeof(out_shdr);
 
+    if ( num_phdrs > 1 )
+    {
+        /* We have two of them! */
+        out_ehdr.e_phnum = num_phdrs;
+        /* Extra .note section. */
+        out_ehdr.e_shnum++;
+
+        /* Fill out the PT_NOTE program header. */
+        note_phdr.p_vaddr   = note_base;
+        note_phdr.p_paddr   = note_base;
+        note_phdr.p_filesz  = note_sz;
+        note_phdr.p_memsz   = note_sz;
+        note_phdr.p_offset  = offset;
+
+        /* Tack on the .note\0 */
+        out_shdr[2].sh_size += sizeof(out_shstrtab_extra);
+        /* And move it past the .note section. */
+        out_shdr[2].sh_offset += sizeof(out_shdr_note);
+
+        /* Fill out the .note section. */
+        out_shdr_note.sh_size = note_sz;
+        out_shdr_note.sh_addr = note_base;
+        out_shdr_note.sh_offset = RAW_OFFSET + offset;
+    }
+
     outfd = open(outimage, O_WRONLY|O_CREAT|O_TRUNC, 0775);
     if ( outfd == -1 )
     {
@@ -335,8 +420,14 @@ int main(int argc, char **argv)
 
     endianadjust_phdr32(&out_phdr);
     do_write(outfd, &out_phdr, sizeof(out_phdr));
-    
-    if ( (bytes = RAW_OFFSET - sizeof(out_ehdr) - sizeof(out_phdr)) < 0 )
+
+    if ( num_phdrs > 1 )
+    {
+        endianadjust_phdr32(&note_phdr);
+        do_write(outfd, &note_phdr, sizeof(note_phdr));
+    }
+
+    if ( (bytes = RAW_OFFSET - sizeof(out_ehdr) - (num_phdrs * sizeof(out_phdr)) ) < 0 )
     {
         fprintf(stderr, "Header overflow.\n");
         return 1;
@@ -355,9 +446,22 @@ int main(int argc, char **argv)
         endianadjust_shdr32(&out_shdr[i]);
     do_write(outfd, &out_shdr[0], sizeof(out_shdr));
 
-    do_write(outfd, out_shstrtab, sizeof(out_shstrtab));
-    do_write(outfd, buffer, 4-((sizeof(out_shstrtab)+dat_siz)&3));
-
+    if ( num_phdrs > 1 )
+    {
+        endianadjust_shdr32(&out_shdr_note);
+        /* Append the .note section. */
+        do_write(outfd, &out_shdr_note, sizeof(out_shdr_note));
+        /* The normal strings - .text\0.. */
+        do_write(outfd, out_shstrtab, sizeof(out_shstrtab));
+        /* Our .note */
+        do_write(outfd, out_shstrtab_extra, sizeof(out_shstrtab_extra));
+        do_write(outfd, buffer, 4-((sizeof(out_shstrtab)+sizeof(out_shstrtab_extra)+dat_siz)&3));
+    }
+    else
+    {
+        do_write(outfd, out_shstrtab, sizeof(out_shstrtab));
+        do_write(outfd, buffer, 4-((sizeof(out_shstrtab)+dat_siz)&3));
+    }
     close(infd);
     close(outfd);
 

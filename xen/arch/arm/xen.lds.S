@@ -22,6 +22,9 @@ OUTPUT_ARCH(FORMAT)
 PHDRS
 {
   text PT_LOAD /* XXX should be AT ( XEN_PHYS_START ) */ ;
+#if defined(BUILD_ID)
+  note PT_NOTE ;
+#endif
 }
 SECTIONS
 {
@@ -57,9 +60,17 @@ SECTIONS
        *(.lockprofile.data)
        __lock_profile_end = .;
 #endif
-
-        _erodata = .;          /* End of read-only data */
   } :text
+
+#if defined(BUILD_ID)
+  . = ALIGN(4);
+  .note.gnu.build-id : {
+       __note_gnu_build_id_start = .;
+       *(.note.gnu.build-id)
+       __note_gnu_build_id_end = .;
+  } :note :text
+#endif
+  _erodata = .;                /* End of read-only data */
 
   .data : {                    /* Data */
        . = ALIGN(PAGE_SIZE);

@@ -135,6 +135,17 @@ endef
 check-$(gcc) = $(call cc-ver-check,CC,0x040100,"Xen requires at least gcc-4.1")
 $(eval $(check-y))
 
+ld-ver-build-id = $(shell $(1) --build-id 2>&1 | \
+					grep -q build-id && echo n || echo y)
+
+export XEN_HAS_BUILD_ID ?= n
+ifeq ($(call ld-ver-build-id,$(LD)),n)
+build_id_linker :=
+else
+CFLAGS += -DBUILD_ID
+build_id_linker := --build-id=sha1
+endif
+
 # as-insn: Check whether assembler supports an instruction.
 # Usage: cflags-y += $(call as-insn "insn",option-yes,option-no)
 as-insn = $(if $(shell echo 'void _(void) { asm volatile ( $(2) ); }' \

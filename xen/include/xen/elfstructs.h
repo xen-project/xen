@@ -40,6 +40,9 @@ typedef uint32_t	Elf64_Word;
 typedef int64_t		Elf64_Sxword;
 typedef uint64_t	Elf64_Xword;
 
+/* Unique build id string format when using --build-id. */
+#define NT_GNU_BUILD_ID 3
+
 /*
  * e_ident[] identification indexes
  * See http://www.caldera.com/developers/gabi/2000-07-17/ch4.eheader.html 

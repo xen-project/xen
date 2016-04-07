@@ -74,6 +74,12 @@ efi-y := $(shell if [ ! -r $(BASEDIR)/include/xen/compile.h -o \
                       -O $(BASEDIR)/include/xen/compile.h ]; then \
                          echo '$(TARGET).efi'; fi)
 
+ifneq ($(build_id_linker),)
+notes_phdrs = --notes
+else
+notes_phdrs =
+endif
+
 ifdef CONFIG_XSPLICE
 all_symbols = --all-symbols
 ifdef CONFIG_FAST_SYMBOL_LOOKUP
@@ -84,7 +90,7 @@ all_symbols =
 endif
 
 $(TARGET): $(TARGET)-syms $(efi-y) boot/mkelf32
-	./boot/mkelf32 $(TARGET)-syms $(TARGET) 0x100000 \
+	./boot/mkelf32 $(notes_phdrs) $(TARGET)-syms $(TARGET) 0x100000 \
 	`$(NM) -nr $(TARGET)-syms | head -n 1 | sed -e 's/^\([^ ]*\).*/0x\1/'`
 
 .PHONY: tests
@@ -119,21 +125,27 @@ $(BASEDIR)/common/symbols-dummy.o:
 	$(MAKE) -f $(BASEDIR)/Rules.mk -C $(BASEDIR)/common symbols-dummy.o
 
 $(TARGET)-syms: prelink.o xen.lds $(BASEDIR)/common/symbols-dummy.o
-	$(LD) $(LDFLAGS) -T xen.lds -N prelink.o \
+	$(LD) $(LDFLAGS) -T xen.lds -N prelink.o $(build_id_linker) \
 	    $(BASEDIR)/common/symbols-dummy.o -o $(@D)/.$(@F).0
 	$(NM) -pa --format=sysv $(@D)/.$(@F).0 \
 		| $(BASEDIR)/tools/symbols $(all_symbols) --sysv --sort \
 		>$(@D)/.$(@F).0.S
 	$(MAKE) -f $(BASEDIR)/Rules.mk $(@D)/.$(@F).0.o
-	$(LD) $(LDFLAGS) -T xen.lds -N prelink.o \
+	$(LD) $(LDFLAGS) -T xen.lds -N prelink.o $(build_id_linker) \
 	    $(@D)/.$(@F).0.o -o $(@D)/.$(@F).1
 	$(NM) -pa --format=sysv $(@D)/.$(@F).1 \
 		| $(BASEDIR)/tools/symbols $(all_symbols) --sysv --sort --warn-dup \
 		>$(@D)/.$(@F).1.S
 	$(MAKE) -f $(BASEDIR)/Rules.mk $(@D)/.$(@F).1.o
-	$(LD) $(LDFLAGS) -T xen.lds -N prelink.o \
+	$(LD) $(LDFLAGS) -T xen.lds -N prelink.o $(build_id_linker) \
 	    $(@D)/.$(@F).1.o -o $@
 	rm -f $(@D)/.$(@F).[0-9]*
+
+note.o: $(TARGET)-syms
+	$(OBJCOPY) -O binary --only-section=.note.gnu.build-id  $(BASEDIR)/xen-syms $@.bin
+	$(OBJCOPY) -I binary -O elf64-x86-64 -B i386:x86-64 \
+		--rename-section=.data=.note.gnu.build-id -S $@.bin $@
+	rm -f $@.bin
 
 EFI_LDFLAGS = $(patsubst -m%,-mi386pep,$(LDFLAGS)) --subsystem=10
 EFI_LDFLAGS += --image-base=$(1) --stack=0,0 --heap=0,0 --strip-debug
@@ -147,6 +159,13 @@ $(TARGET).efi: VIRT_BASE = 0x$(shell $(NM) efi/relocs-dummy.o | sed -n 's, A VIR
 $(TARGET).efi: ALT_BASE = 0x$(shell $(NM) efi/relocs-dummy.o | sed -n 's, A ALT_START$$,,p')
 # Don't use $(wildcard ...) here - at least make 3.80 expands this too early!
 $(TARGET).efi: guard = $(if $(shell echo efi/dis* | grep disabled),:)
+ifneq ($(build_id_linker),)
+$(TARGET).efi: note.o
+note_file := note.o
+else
+note_file :=
+endif
+
 $(TARGET).efi: prelink-efi.o efi.lds efi/relocs-dummy.o $(BASEDIR)/common/symbols-dummy.o efi/mkreloc
 	$(foreach base, $(VIRT_BASE) $(ALT_BASE), \
 	          $(guard) $(LD) $(call EFI_LDFLAGS,$(base)) -T efi.lds -N $< efi/relocs-dummy.o \
@@ -163,7 +182,7 @@ $(TARGET).efi: prelink-efi.o efi.lds efi/relocs-dummy.o $(BASEDIR)/common/symbol
 		| $(guard) $(BASEDIR)/tools/symbols $(all_symbols) --sysv --sort >$(@D)/.$(@F).1s.S
 	$(guard) $(MAKE) -f $(BASEDIR)/Rules.mk $(@D)/.$(@F).1r.o $(@D)/.$(@F).1s.o
 	$(guard) $(LD) $(call EFI_LDFLAGS,$(VIRT_BASE)) -T efi.lds -N $< \
-	                $(@D)/.$(@F).1r.o $(@D)/.$(@F).1s.o -o $@
+	                $(@D)/.$(@F).1r.o $(@D)/.$(@F).1s.o $(note_file) -o $@
 	if $(guard) false; then rm -f $@; echo 'EFI support disabled'; fi
 	rm -f $(@D)/.$(@F).[0-9]*
 
@@ -195,4 +214,5 @@ clean::
 	rm -f $(BASEDIR)/.xen-syms.[0-9]* boot/.*.d
 	rm -f $(BASEDIR)/.xen.efi.[0-9]* efi/*.o efi/.*.d efi/*.efi efi/disabled efi/mkreloc
 	rm -f boot/reloc.S boot/reloc.lnk boot/reloc.bin
+	rm -f note.o
 	$(MAKE) -f $(BASEDIR)/Rules.mk -C test clean

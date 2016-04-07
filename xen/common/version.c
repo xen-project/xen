@@ -1,5 +1,12 @@
 #include <xen/compile.h>
+#include <xen/init.h>
+#include <xen/errno.h>
+#include <xen/string.h>
+#include <xen/types.h>
+#include <xen/elf.h>
 #include <xen/version.h>
+
+#include <asm/cache.h>
 
 const char *xen_compile_date(void)
 {
@@ -61,6 +68,51 @@ const char *xen_deny(void)
     return "<denied>";
 }
 
+static const void *build_id_p __read_mostly;
+static unsigned int build_id_len __read_mostly;
+
+int xen_build_id(const void **p, unsigned int *len)
+{
+    if ( !build_id_len )
+        return -ENODATA;
+
+    *len = build_id_len;
+    *p = build_id_p;
+
+    return 0;
+}
+
+#ifdef BUILD_ID
+/* Defined in linker script. */
+extern const Elf_Note __note_gnu_build_id_start[], __note_gnu_build_id_end[];
+
+static int __init xen_build_init(void)
+{
+    const Elf_Note *n = __note_gnu_build_id_start;
+
+    /* --build-id invoked with wrong parameters. */
+    if ( __note_gnu_build_id_end <= &n[0] )
+        return -ENODATA;
+
+    /* Check for full Note header. */
+    if ( &n[1] > __note_gnu_build_id_end )
+        return -ENODATA;;
+
+    /* Check if we really have a build-id. */
+    if ( NT_GNU_BUILD_ID != n->type )
+        return -ENODATA;
+
+    /* Sanity check, name should be "GNU" for ld-generated build-id. */
+    if ( strncmp(ELFNOTE_NAME(n), "GNU", n->namesz) != 0 )
+        return -ENODATA;
+
+    build_id_len = n->descsz;
+    build_id_p = ELFNOTE_DESC(n);
+
+    return 0;
+}
+__initcall(xen_build_init);
+#endif
 /*
  * Local variables:
  * mode: C

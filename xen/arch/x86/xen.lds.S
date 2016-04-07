@@ -31,6 +31,9 @@ OUTPUT_ARCH(i386:x86-64)
 PHDRS
 {
   text PT_LOAD ;
+#if defined(BUILD_ID) && !defined(EFI)
+  note PT_NOTE ;
+#endif
 }
 SECTIONS
 {
@@ -79,6 +82,16 @@ SECTIONS
        *(.rodata)
        *(.rodata.*)
 
+#if defined(BUILD_ID) && defined(EFI)
+/*
+ * No mechanism to put an PT_NOTE in the EFI file - so put
+ * it in .rodata section. (notes.o supplies us with .note.gnu.build-id).
+ */
+       . = ALIGN(4);
+       __note_gnu_build_id_start = .;
+       *(.note.gnu.build-id)
+       __note_gnu_build_id_end = .;
+#endif
        . = ALIGN(8);
        /* Exception table */
        __start___ex_table = .;
@@ -96,8 +109,23 @@ SECTIONS
        *(.lockprofile.data)
        __lock_profile_end = .;
 #endif
-       _erodata = .;
   } :text
+
+#if defined(BUILD_ID) && !defined(EFI)
+/*
+ * What a strange section name. The reason is that on ELF builds this section
+ * is extracted to notes.o (which then is ingested in the EFI file). But the
+ * compiler may want to inject other things in the .note which we don't care
+ * about - hence this unique name.
+ */
+  . = ALIGN(4);
+  .note.gnu.build-id : {
+       __note_gnu_build_id_start = .;
+       *(.note.gnu.build-id)
+       __note_gnu_build_id_end = .;
+  } :note :text
+#endif
+  _erodata = .;
 
 #ifdef EFI
   . = ALIGN(MB(2));
