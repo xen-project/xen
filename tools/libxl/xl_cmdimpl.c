@@ -2777,7 +2777,7 @@ static void evdisable_disk_ejects(libxl_evgen_disk_eject **diskws,
     }
 }
 
-static uint32_t create_domain(struct domain_create *dom_info)
+static int create_domain(struct domain_create *dom_info)
 {
     uint32_t domid = INVALID_DOMID;
 
