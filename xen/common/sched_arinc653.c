@@ -456,34 +456,6 @@ a653sched_free_vdata(const struct scheduler *ops, void *priv)
 }
 
 /**
- * This function allocates scheduler-specific data for a physical CPU
- *
- * We do not actually make use of any per-CPU data but the hypervisor expects
- * a non-NULL return value
- *
- * @param ops       Pointer to this instance of the scheduler structure
- *
- * @return          Pointer to the allocated data
- */
-static void *
-a653sched_alloc_pdata(const struct scheduler *ops, int cpu)
-{
-    /* return a non-NULL value to keep schedule.c happy */
-    return SCHED_PRIV(ops);
-}
-
-/**
- * This function frees scheduler-specific data for a physical CPU
- *
- * @param ops       Pointer to this instance of the scheduler structure
- */
-static void
-a653sched_free_pdata(const struct scheduler *ops, void *pcpu, int cpu)
-{
-    /* nop */
-}
-
-/**
  * This function allocates scheduler-specific data for a domain
  *
  * We do not actually make use of any per-domain data but the hypervisor
@@ -736,9 +708,6 @@ static const struct scheduler sched_arinc653_def = {
 
     .free_vdata     = a653sched_free_vdata,
     .alloc_vdata    = a653sched_alloc_vdata,
-
-    .free_pdata     = a653sched_free_pdata,
-    .alloc_pdata    = a653sched_alloc_pdata,
 
     .free_domdata   = a653sched_free_domdata,
     .alloc_domdata  = a653sched_alloc_domdata,

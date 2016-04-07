@@ -2047,7 +2047,7 @@ csched2_alloc_pdata(const struct scheduler *ops, int cpu)
         printk("%s: cpu %d not online yet, deferring initializatgion\n",
                __func__, cpu);
 
-    return (void *)1;
+    return NULL;
 }
 
 static void

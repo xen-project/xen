@@ -37,6 +37,7 @@
 #include <xen/event.h>
 #include <public/sched.h>
 #include <xsm/xsm.h>
+#include <xen/err.h>
 
 /* opt_sched: scheduler - default to configured value */
 static char __initdata opt_sched[10] = CONFIG_SCHED_DEFAULT;
@@ -1462,6 +1463,7 @@ static void poll_timer_fn(void *data)
 static int cpu_schedule_up(unsigned int cpu)
 {
     struct schedule_data *sd = &per_cpu(schedule_data, cpu);
+    void *sched_priv;
 
     per_cpu(scheduler, cpu) = &ops;
     spin_lock_init(&sd->_lock);
@@ -1500,9 +1502,16 @@ static int cpu_schedule_up(unsigned int cpu)
     if ( idle_vcpu[cpu] == NULL )
         return -ENOMEM;
 
-    if ( (ops.alloc_pdata != NULL) &&
-         ((sd->sched_priv = ops.alloc_pdata(&ops, cpu)) == NULL) )
-        return -ENOMEM;
+    /*
+     * We don't want to risk calling xfree() on an sd->sched_priv
+     * (e.g., inside free_pdata, from cpu_schedule_down() called
+     * during CPU_UP_CANCELLED) that contains an IS_ERR value.
+     */
+    sched_priv = SCHED_OP(&ops, alloc_pdata, cpu);
+    if ( IS_ERR(sched_priv) )
+        return PTR_ERR(sched_priv);
+
+    sd->sched_priv = sched_priv;
 
     return 0;
 }
@@ -1512,8 +1521,7 @@ static void cpu_schedule_down(unsigned int cpu)
     struct schedule_data *sd = &per_cpu(schedule_data, cpu);
     struct scheduler *sched = per_cpu(scheduler, cpu);
 
-    if ( sd->sched_priv != NULL )
-        SCHED_OP(sched, free_pdata, sd->sched_priv, cpu);
+    SCHED_OP(sched, free_pdata, sd->sched_priv, cpu);
     SCHED_OP(sched, free_vdata, idle_vcpu[cpu]->sched_priv);
 
     idle_vcpu[cpu]->sched_priv = NULL;
@@ -1608,9 +1616,8 @@ void __init scheduler_init(void)
     idle_domain->max_vcpus = nr_cpu_ids;
     if ( alloc_vcpu(idle_domain, 0, 0) == NULL )
         BUG();
-    if ( ops.alloc_pdata &&
-         !(this_cpu(schedule_data).sched_priv = ops.alloc_pdata(&ops, 0)) )
-        BUG();
+    this_cpu(schedule_data).sched_priv = SCHED_OP(&ops, alloc_pdata, 0);
+    BUG_ON(IS_ERR(this_cpu(schedule_data).sched_priv));
     SCHED_OP(&ops, init_pdata, this_cpu(schedule_data).sched_priv, 0);
 }
 
@@ -1653,8 +1660,8 @@ int schedule_cpu_switch(unsigned int cpu, struct cpupool *c)
 
     idle = idle_vcpu[cpu];
     ppriv = SCHED_OP(new_ops, alloc_pdata, cpu);
-    if ( ppriv == NULL )
-        return -ENOMEM;
+    if ( IS_ERR(ppriv) )
+        return PTR_ERR(ppriv);
     SCHED_OP(new_ops, init_pdata, ppriv, cpu);
     vpriv = SCHED_OP(new_ops, alloc_vdata, idle, idle->domain->sched_priv);
     if ( vpriv == NULL )

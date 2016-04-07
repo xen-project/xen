@@ -29,6 +29,7 @@
 #include <xen/cpu.h>
 #include <xen/keyhandler.h>
 #include <xen/trace.h>
+#include <xen/err.h>
 #include <xen/guest_access.h>
 
 /*
@@ -681,7 +682,7 @@ rt_alloc_pdata(const struct scheduler *ops, int cpu)
     spin_unlock_irqrestore(old_lock, flags);
 
     if ( !alloc_cpumask_var(&_cpumask_scratch[cpu]) )
-        return NULL;
+        return ERR_PTR(-ENOMEM);
 
     if ( prv->repl_timer == NULL )
     {
@@ -689,13 +690,12 @@ rt_alloc_pdata(const struct scheduler *ops, int cpu)
         prv->repl_timer = xzalloc(struct timer);
 
         if ( prv->repl_timer == NULL )
-            return NULL;
+            return ERR_PTR(-ENOMEM);
 
         init_timer(prv->repl_timer, repl_timer_handler, (void *)ops, cpu);
     }
 
-    /* 1 indicates alloc. succeed in schedule.c */
-    return (void *)1;
+    return NULL;
 }
 
 static void

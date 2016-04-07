@@ -23,6 +23,7 @@
 #include <xen/errno.h>
 #include <xen/keyhandler.h>
 #include <xen/trace.h>
+#include <xen/err.h>
 
 
 /*
@@ -532,12 +533,12 @@ csched_alloc_pdata(const struct scheduler *ops, int cpu)
     /* Allocate per-PCPU info */
     spc = xzalloc(struct csched_pcpu);
     if ( spc == NULL )
-        return NULL;
+        return ERR_PTR(-ENOMEM);
 
     if ( !alloc_cpumask_var(&spc->balance_mask) )
     {
         xfree(spc);
-        return NULL;
+        return ERR_PTR(-ENOMEM);
     }
 
     spin_lock_irqsave(&prv->lock, flags);
