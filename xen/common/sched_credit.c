@@ -543,16 +543,11 @@ csched_alloc_pdata(const struct scheduler *ops, int cpu)
 }
 
 static void
-csched_init_pdata(const struct scheduler *ops, void *pdata, int cpu)
+init_pdata(struct csched_private *prv, struct csched_pcpu *spc, int cpu)
 {
-    struct csched_private *prv = CSCHED_PRIV(ops);
-    struct csched_pcpu * const spc = pdata;
-    unsigned long flags;
-
-    /* cpu data needs to be allocated, but STILL uninitialized */
+    ASSERT(spin_is_locked(&prv->lock));
+    /* cpu data needs to be allocated, but STILL uninitialized. */
     ASSERT(spc && spc->runq.next == NULL && spc->runq.prev == NULL);
-
-    spin_lock_irqsave(&prv->lock, flags);
 
     /* Initialize/update system-wide config */
     prv->credit += prv->credits_per_tslice;
@@ -576,7 +571,16 @@ csched_init_pdata(const struct scheduler *ops, void *pdata, int cpu)
     /* Start off idling... */
     BUG_ON(!is_idle_vcpu(curr_on_cpu(cpu)));
     cpumask_set_cpu(cpu, prv->idlers);
+}
 
+static void
+csched_init_pdata(const struct scheduler *ops, void *pdata, int cpu)
+{
+    unsigned long flags;
+    struct csched_private *prv = CSCHED_PRIV(ops);
+
+    spin_lock_irqsave(&prv->lock, flags);
+    init_pdata(prv, pdata, cpu);
     spin_unlock_irqrestore(&prv->lock, flags);
 }
 

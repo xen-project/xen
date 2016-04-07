@@ -1972,16 +1972,13 @@ static void deactivate_runqueue(struct csched2_private *prv, int rqi)
 }
 
 static void
-csched2_init_pdata(const struct scheduler *ops, void *pdata, int cpu)
+init_pdata(struct csched2_private *prv, unsigned int cpu)
 {
     unsigned rqi;
-    unsigned long flags;
-    struct csched2_private *prv = CSCHED2_PRIV(ops);
     struct csched2_runqueue_data *rqd;
     spinlock_t *old_lock;
 
-    spin_lock_irqsave(&prv->lock, flags);
-
+    ASSERT(spin_is_locked(&prv->lock));
     ASSERT(!cpumask_test_cpu(cpu, &prv->initialized));
 
     /* Figure out which runqueue to put it in */
@@ -2001,7 +1998,7 @@ csched2_init_pdata(const struct scheduler *ops, void *pdata, int cpu)
         BUG();
     }
 
-    rqd=prv->rqd + rqi;
+    rqd = prv->rqd + rqi;
 
     printk("Adding cpu %d to runqueue %d\n", cpu, rqi);
     if ( ! cpumask_test_cpu(rqi, &prv->active_queues) )
@@ -2011,13 +2008,13 @@ csched2_init_pdata(const struct scheduler *ops, void *pdata, int cpu)
     }
     
     /* IRQs already disabled */
-    old_lock=pcpu_schedule_lock(cpu);
+    old_lock = pcpu_schedule_lock(cpu);
 
     /* Move spinlock to new runq lock.  */
     per_cpu(schedule_data, cpu).schedule_lock = &rqd->lock;
 
     /* Set the runqueue map */
-    prv->runq_map[cpu]=rqi;
+    prv->runq_map[cpu] = rqi;
     
     cpumask_set_cpu(cpu, &rqd->idle);
     cpumask_set_cpu(cpu, &rqd->active);
@@ -2027,9 +2024,18 @@ csched2_init_pdata(const struct scheduler *ops, void *pdata, int cpu)
 
     cpumask_set_cpu(cpu, &prv->initialized);
 
-    spin_unlock_irqrestore(&prv->lock, flags);
-
     return;
+}
+
+static void
+csched2_init_pdata(const struct scheduler *ops, void *pdata, int cpu)
+{
+    struct csched2_private *prv = CSCHED2_PRIV(ops);
+    unsigned long flags;
+
+    spin_lock_irqsave(&prv->lock, flags);
+    init_pdata(prv, cpu);
+    spin_unlock_irqrestore(&prv->lock, flags);
 }
 
 static void
