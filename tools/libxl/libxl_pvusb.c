@@ -1043,25 +1043,14 @@ static char *usbdev_busid_from_ctrlport(libxl__gc *gc, uint32_t domid,
 static int usbintf_get_drvpath(libxl__gc *gc, const char *intf, char **drvpath)
 {
     char *spath, *dp = NULL;
-    struct stat st;
-    int r;
 
     spath = GCSPRINTF(SYSFS_USB_DEV "/%s/driver", intf);
 
-    r = lstat(spath, &st);
-    if (r == 0) {
-        /* Find the canonical path to the driver. */
-        dp = libxl__zalloc(gc, PATH_MAX);
-        dp = realpath(spath, dp);
-        if (!dp) {
-            LOGE(ERROR, "get realpath failed: '%s'", spath);
-            return ERROR_FAIL;
-        }
-    } else if (errno == ENOENT) {
-        /* driver path doesn't exist */
-        dp = NULL;
-    } else {
-        LOGE(ERROR, "lstat failed: '%s'", spath);
+    /* Find the canonical path to the driver. */
+    dp = libxl__zalloc(gc, PATH_MAX);
+    dp = realpath(spath, dp);
+    if (!dp && errno != ENOENT) {
+        LOGE(ERROR, "get realpath failed: '%s'", spath);
         return ERROR_FAIL;
     }
 
