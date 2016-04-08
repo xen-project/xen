@@ -60,7 +60,7 @@
 #include <asm/msr.h>
 #include <acpi/cpufreq/cpufreq.h>
 
-#define MWAIT_IDLE_VERSION "0.4"
+#define MWAIT_IDLE_VERSION "0.4.1"
 #undef PREFIX
 #define PREFIX "mwait-idle: "
 
@@ -100,6 +100,7 @@ static const struct cpuidle_state {
 	unsigned int	target_residency; /* in US */
 } *cpuidle_state_table;
 
+#define CPUIDLE_FLAG_DISABLED		0x1
 /*
  * Set this flag for states where the HW flushes the TLB for us
  * and so we don't need cross-calls to keep it consistent.
@@ -477,7 +478,7 @@ static const struct cpuidle_state bdw_cstates[] = {
 	{}
 };
 
-static const struct cpuidle_state skl_cstates[] = {
+static struct cpuidle_state skl_cstates[] = {
 	{
 		.name = "C1-SKL",
 		.flags = MWAIT2flg(0x00),
@@ -781,34 +782,84 @@ static const struct x86_cpu_id intel_idle_ids[] __initconst = {
 };
 
 /*
+ * ivt_idle_state_table_update(void)
+ *
+ * Tune IVT multi-socket targets
+ * Assumption: num_sockets == (max_package_num + 1)
+ */
+static void __init ivt_idle_state_table_update(void)
+{
+	/* IVT uses a different table for 1-2, 3-4, and > 4 sockets */
+	unsigned int cpu, max_apicid = boot_cpu_physical_apicid;
+
+	for_each_present_cpu(cpu)
+		if (max_apicid < x86_cpu_to_apicid[cpu])
+			max_apicid = x86_cpu_to_apicid[cpu];
+	switch (apicid_to_socket(max_apicid)) {
+	case 0: case 1:
+		/* 1 and 2 socket systems use default ivt_cstates */
+		break;
+	case 2: case 3:
+		cpuidle_state_table = ivt_cstates_4s;
+		break;
+	default:
+		cpuidle_state_table = ivt_cstates_8s;
+		break;
+	}
+}
+
+/*
+ * sklh_idle_state_table_update(void)
+ *
+ * On SKL-H (model 0x5e) disable C8 and C9 if:
+ * C10 is enabled and SGX disabled
+ */
+static void sklh_idle_state_table_update(void)
+{
+	u64 msr;
+
+	/* if PC10 disabled via cmdline max_cstate=7 or shallower */
+	if (max_cstate <= 7)
+		return;
+
+	/* if PC10 not present in CPUID.MWAIT.EDX */
+	if ((mwait_substates & (MWAIT_CSTATE_MASK << 28)) == 0)
+		return;
+
+	rdmsrl(MSR_NHM_SNB_PKG_CST_CFG_CTL, msr);
+
+	/* PC10 is not enabled in PKG C-state limit */
+	if ((msr & 0xF) != 8)
+		return;
+
+	/* if SGX is present */
+	if (boot_cpu_has(X86_FEATURE_SGX)) {
+		rdmsrl(MSR_IA32_FEATURE_CONTROL, msr);
+
+		/* if SGX is enabled */
+		if (msr & (1 << 18))
+			return;
+	}
+
+	skl_cstates[5].flags |= CPUIDLE_FLAG_DISABLED;	/* C8-SKL */
+	skl_cstates[6].flags |= CPUIDLE_FLAG_DISABLED;	/* C9-SKL */
+}
+
+/*
  * mwait_idle_state_table_update()
  *
  * Update the default state_table for this CPU-id
- *
- * Currently used to access tuned IVT multi-socket targets
- * Assumption: num_sockets == (max_package_num + 1)
  */
 static void __init mwait_idle_state_table_update(void)
 {
-	/* IVT uses a different table for 1-2, 3-4, and > 4 sockets */
-	if (boot_cpu_data.x86_model == 0x3e) { /* IVT */
-		unsigned int cpu, max_apicid = boot_cpu_physical_apicid;
-
-		for_each_present_cpu(cpu)
-			if (max_apicid < x86_cpu_to_apicid[cpu])
-				max_apicid = x86_cpu_to_apicid[cpu];
-		switch (apicid_to_socket(max_apicid)) {
-		case 0: case 1:
-			/* 1 and 2 socket systems use default ivt_cstates */
-			break;
-		case 2: case 3:
-			cpuidle_state_table = ivt_cstates_4s;
-			break;
-		default:
-			cpuidle_state_table = ivt_cstates_8s;
-			break;
-		}
-	}
+	switch (boot_cpu_data.x86_model) {
+	case 0x3e: /* IVT */
+		ivt_idle_state_table_update();
+		break;
+	case 0x5e: /* SKL-H */
+		sklh_idle_state_table_update();
+		break;
+ 	}
 }
 
 static int __init mwait_idle_probe(void)
@@ -896,6 +947,14 @@ static int mwait_idle_cpu_init(struct notifier_block *nfb,
 		/* If NO sub-states for this state in CPUID, skip it. */
 		if (num_substates == 0)
 			continue;
+
+		/* if state marked as disabled, skip it */
+		if (cpuidle_state_table[cstate].flags &
+		    CPUIDLE_FLAG_DISABLED) {
+			printk(XENLOG_DEBUG PREFIX "state %s is disabled",
+			       cpuidle_state_table[cstate].name);
+			continue;
+		}
 
 		if (dev->count >= ACPI_PROCESSOR_MAX_POWER) {
 			printk(PREFIX "max C-state count of %u reached\n",

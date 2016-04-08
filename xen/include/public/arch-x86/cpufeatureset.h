@@ -192,6 +192,7 @@ XEN_CPUFEATURE(XSAVES,        4*32+ 3) /*S  XSAVES/XRSTORS instructions */
 /* Intel-defined CPU features, CPUID level 0x00000007:0.ebx, word 5 */
 XEN_CPUFEATURE(FSGSBASE,      5*32+ 0) /*A  {RD,WR}{FS,GS}BASE instructions */
 XEN_CPUFEATURE(TSC_ADJUST,    5*32+ 1) /*S  TSC_ADJUST MSR available */
+XEN_CPUFEATURE(SGX,           5*32+ 2) /*   Software Guard extensions */
 XEN_CPUFEATURE(BMI1,          5*32+ 3) /*A  1st bit manipulation extensions */
 XEN_CPUFEATURE(HLE,           5*32+ 4) /*A  Hardware Lock Elision */
 XEN_CPUFEATURE(AVX2,          5*32+ 5) /*A  AVX2 instructions */
