@@ -2302,7 +2302,8 @@ int libxl_devid_to_device_vtpm(libxl_ctx *ctx,
 
 /******************************************************************************/
 
-int libxl__device_disk_setdefault(libxl__gc *gc, libxl_device_disk *disk)
+int libxl__device_disk_setdefault(libxl__gc *gc, libxl_device_disk *disk,
+                                  uint32_t domid)
 {
     int rc;
 
@@ -2312,6 +2313,19 @@ int libxl__device_disk_setdefault(libxl__gc *gc, libxl_device_disk *disk)
 
     rc = libxl__resolve_domid(gc, disk->backend_domname, &disk->backend_domid);
     if (rc < 0) return rc;
+
+    /* Force Qdisk backend for CDROM devices of guests with a device model. */
+    if (disk->is_cdrom != 0 &&
+        libxl__domain_type(gc, domid) == LIBXL_DOMAIN_TYPE_HVM &&
+        libxl__device_model_version_running(gc, domid) !=
+        LIBXL_DEVICE_MODEL_VERSION_NONE) {
+        if (!(disk->backend == LIBXL_DISK_BACKEND_QDISK ||
+              disk->backend == LIBXL_DISK_BACKEND_UNKNOWN)) {
+            LOG(ERROR, "Backend for CD devices on HVM guests must be Qdisk");
+            return ERROR_FAIL;
+        }
+        disk->backend = LIBXL_DISK_BACKEND_QDISK;
+    }
 
     rc = libxl__device_disk_set_backend(gc, disk);
     return rc;
@@ -2431,7 +2445,7 @@ static void device_disk_add(libxl__egc *egc, uint32_t domid,
             }
         }
 
-        rc = libxl__device_disk_setdefault(gc, disk);
+        rc = libxl__device_disk_setdefault(gc, disk, domid);
         if (rc) goto out;
 
         front = flexarray_make(gc, 16, 1);
@@ -2873,7 +2887,7 @@ int libxl_cdrom_insert(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk,
     disk_empty.vdev = libxl__strdup(NOGC, disk->vdev);
     disk_empty.pdev_path = libxl__strdup(NOGC, "");
     disk_empty.is_cdrom = 1;
-    libxl__device_disk_setdefault(gc, &disk_empty);
+    libxl__device_disk_setdefault(gc, &disk_empty, domid);
 
     libxl_domain_type type = libxl__domain_type(gc, domid);
     if (type == LIBXL_DOMAIN_TYPE_INVALID) {
@@ -2914,7 +2928,7 @@ int libxl_cdrom_insert(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk,
         goto out;
     }
 
-    rc = libxl__device_disk_setdefault(gc, disk);
+    rc = libxl__device_disk_setdefault(gc, disk, domid);
     if (rc) goto out;
 
     if (!disk->pdev_path) {
@@ -3180,7 +3194,7 @@ void libxl__device_disk_local_initiate_attach(libxl__egc *egc,
             disk->script = libxl__strdup(gc, in_disk->script);
         disk->vdev = NULL;
         
-        rc = libxl__device_disk_setdefault(gc, disk);
+        rc = libxl__device_disk_setdefault(gc, disk, LIBXL_TOOLSTACK_DOMID);
         if (rc) goto out;
 
         libxl__prepare_ao_device(ao, &dls->aodev);
