@@ -2913,6 +2913,12 @@ int libxl_cdrom_insert(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk,
         goto out;
     }
 
+    if (dm_ver == LIBXL_DEVICE_MODEL_VERSION_NONE) {
+        LOG(ERROR, "Guests without a device model cannot use cd-insert");
+        rc = ERROR_FAIL;
+        goto out;
+    }
+
     disks = libxl_device_disk_list(ctx, domid, &num);
     for (i = 0; i < num; i++) {
         if (disks[i].is_cdrom && !strcmp(disk->vdev, disks[i].vdev))
