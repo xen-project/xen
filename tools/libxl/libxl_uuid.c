@@ -64,27 +64,35 @@ uint8_t *libxl_uuid_bytearray(libxl_uuid *uuid)
 int libxl_uuid_is_nil(const libxl_uuid *uuid)
 {
     uint32_t status;
+    uuid_t nat_uuid;
 
-    return uuid_is_nil(&uuid->uuid, &status);
+    uuid_dec_be(uuid->uuid, &nat_uuid);
+
+    return uuid_is_nil(&nat_uuid, &status);
 }
 
 void libxl_uuid_generate(libxl_uuid *uuid)
 {
     uint32_t status;
+    uuid_t nat_uuid;
 
-    BUILD_BUG_ON(sizeof(libxl_uuid) != sizeof(uuid_t));
-    uuid_create(&uuid->uuid, &status);
+    uuid_create(&nat_uuid, &status);
     assert(status == uuid_s_ok);
+
+    uuid_enc_be(uuid->uuid, &nat_uuid);
 }
 
 #ifdef __FreeBSD__
 int libxl_uuid_from_string(libxl_uuid *uuid, const char *in)
 {
     uint32_t status;
+    uuid_t nat_uuid;
 
-    uuid_from_string(in, &uuid->uuid, &status);
+    uuid_from_string(in, &nat_uuid, &status);
     if (status != uuid_s_ok)
-        return -1;
+        return ERROR_FAIL;
+    uuid_enc_be(uuid->uuid, &nat_uuid);
+
     return 0;
 }
 #else
@@ -115,8 +123,12 @@ void libxl_uuid_clear(libxl_uuid *uuid)
 #ifdef __FreeBSD__
 int libxl_uuid_compare(const libxl_uuid *uuid1, const libxl_uuid *uuid2)
 {
+    uuid_t nat_uuid1, nat_uuid2;
 
-    return uuid_compare(&uuid1->uuid, &uuid2->uuid, NULL);
+    uuid_dec_be(uuid1->uuid, &nat_uuid1);
+    uuid_dec_be(uuid2->uuid, &nat_uuid2);
+
+    return uuid_compare(&nat_uuid1, &nat_uuid2, NULL);
 }
 #else
 int libxl_uuid_compare(const libxl_uuid *uuid1, const libxl_uuid *uuid2)
@@ -128,13 +140,13 @@ int libxl_uuid_compare(const libxl_uuid *uuid1, const libxl_uuid *uuid2)
 const uint8_t *libxl_uuid_bytearray_const(const libxl_uuid *uuid)
 {
 
-    return uuid->uuid_raw;
+    return uuid->uuid;
 }
 
 uint8_t *libxl_uuid_bytearray(libxl_uuid *uuid)
 {
 
-    return uuid->uuid_raw;
+    return uuid->uuid;
 }
 #else
 

@@ -30,6 +30,7 @@
 #define SYSFS_PCIBACK_DRIVER   "/kern/xen/pci"
 #define NETBACK_NIC_NAME       "xvif%ui%d"
 #include <util.h>
+#include <uuid.h>
 #elif defined(__OpenBSD__)
 #include <util.h>
 #elif defined(__linux__)
@@ -39,6 +40,7 @@
 #define SYSFS_PCIBACK_DRIVER   "/sys/bus/pci/drivers/pciback"
 #define NETBACK_NIC_NAME       "vif%u.%d"
 #include <pty.h>
+#include <uuid/uuid.h>
 #elif defined(__sun__)
 #include <stropts.h>
 #elif defined(__FreeBSD__)
@@ -49,6 +51,7 @@
 #define NETBACK_NIC_NAME       "xnb%u.%d"
 #include <libutil.h>
 #include <sys/endian.h>
+#include <uuid.h>
 #endif
 
 #ifndef SYSFS_USBBACK_DRIVER

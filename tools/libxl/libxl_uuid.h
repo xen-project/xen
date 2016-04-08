@@ -21,17 +21,18 @@
                                 uuid[4], uuid[5], uuid[6], uuid[7], \
                                 uuid[8], uuid[9], uuid[10], uuid[11], \
                                 uuid[12], uuid[13], uuid[14], uuid[15]
+#define LIBXL_UUID_BYTES(arg) LIBXL__UUID_BYTES((arg).uuid)
 
+typedef struct {
+    /* UUID as an octet stream in big-endian byte-order. */
+    unsigned char uuid[16];
+} libxl_uuid;
+
+#if defined(LIBXL_API_VERSION) && LIBXL_API_VERSION < 0x040700
 #if defined(__linux__)
 
 #include <uuid/uuid.h>
 #include <stdint.h>
-
-typedef struct {
-    uuid_t uuid;
-} libxl_uuid;
-
-#define LIBXL_UUID_BYTES(arg) LIBXL__UUID_BYTES(((uint8_t *)arg.uuid))
 
 #elif defined(__FreeBSD__) || defined(__NetBSD__)
 
@@ -42,17 +43,11 @@ typedef struct {
 #include <stdio.h>
 #include <assert.h>
 
-typedef union {
-    uuid_t uuid;
-    uint8_t uuid_raw[16];
-} libxl_uuid;
-
-#define LIBXL_UUID_BYTES(arg) LIBXL__UUID_BYTES(arg.uuid_raw)
-
 #else
 
 #error "Please update libxl_uuid.h for your OS"
 
+#endif
 #endif
 
 int libxl_uuid_is_nil(const libxl_uuid *uuid);
