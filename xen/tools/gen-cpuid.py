@@ -17,12 +17,18 @@ class State(object):
         # State parsed from input
         self.names = {} # Name => value mapping
         self.raw_special = set()
+        self.raw_pv = set()
+        self.raw_hvm_shadow = set()
+        self.raw_hvm_hap = set()
 
         # State calculated
         self.nr_entries = 0 # Number of words in a featureset
         self.common_1d = 0 # Common features between 1d and e1d
         self.known = [] # All known features
         self.special = [] # Features with special semantics
+        self.pv = []
+        self.hvm_shadow = []
+        self.hvm_hap = []
 
 def parse_definitions(state):
     """
@@ -32,7 +38,7 @@ def parse_definitions(state):
     feat_regex = re.compile(
         r"^XEN_CPUFEATURE\(([A-Z0-9_]+),"
         "\s+([\s\d]+\*[\s\d]+\+[\s\d]+)\)"
-        "\s+/\*([!]*) .*$")
+        "\s+/\*([\w!]*) .*$")
 
     this = sys.modules[__name__]
 
@@ -72,6 +78,16 @@ def parse_definitions(state):
 
             if a == "!":
                 state.raw_special.add(val)
+            elif a in "ASH":
+                if a == "A":
+                    state.raw_pv.add(val)
+                    state.raw_hvm_shadow.add(val)
+                    state.raw_hvm_hap.add(val)
+                elif attr == "S":
+                    state.raw_hvm_shadow.add(val)
+                    state.raw_hvm_hap.add(val)
+                elif attr == "H":
+                    state.raw_hvm_hap.add(val)
             else:
                 raise Fail("Unrecognised attribute '%s' for %s" % (a, name))
 
@@ -124,6 +140,9 @@ def crunch_numbers(state):
 
     state.common_1d = featureset_to_uint32s(common_1d, 1)[0]
     state.special = featureset_to_uint32s(state.raw_special, nr_entries)
+    state.pv = featureset_to_uint32s(state.raw_pv, nr_entries)
+    state.hvm_shadow = featureset_to_uint32s(state.raw_hvm_shadow, nr_entries)
+    state.hvm_hap = featureset_to_uint32s(state.raw_hvm_hap, nr_entries)
 
 
 def write_results(state):
@@ -145,10 +164,19 @@ def write_results(state):
 #define INIT_KNOWN_FEATURES { \\\n%s\n} 
 
 #define INIT_SPECIAL_FEATURES { \\\n%s\n} 
+
+#define INIT_PV_FEATURES { \\\n%s\n} 
+
+#define INIT_HVM_SHADOW_FEATURES { \\\n%s\n} 
+
+#define INIT_HVM_HAP_FEATURES { \\\n%s\n} 
 """ % (state.nr_entries,
        state.common_1d,
        format_uint32s(state.known, 4),
        format_uint32s(state.special, 4),
+       format_uint32s(state.pv, 4),
+       format_uint32s(state.hvm_shadow, 4),
+       format_uint32s(state.hvm_hap, 4),
        ))
 
     state.output.write(
