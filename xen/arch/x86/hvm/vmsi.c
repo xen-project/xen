@@ -295,6 +295,7 @@ static int msixtbl_write(struct vcpu *v, unsigned long address,
         if ( len != 8 || !index )
             goto out;
         val >>= 32;
+        address += 4;
     }
 
     /* Exit to device model when unmasking and address/data got modified. */
