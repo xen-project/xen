@@ -50,6 +50,7 @@
 #include <asm/nmi.h>
 #include <asm/alternative.h>
 #include <asm/mc146818rtc.h>
+#include <asm/cpuid.h>
 
 /* opt_nosmp: If true, secondary processors are ignored. */
 static bool_t __initdata opt_nosmp;
@@ -1524,6 +1525,8 @@ void __init noreturn __start_xen(unsigned long mbi_p)
         printk(XENLOG_WARNING
                "Multiple initrd candidates, picking module #%u\n",
                initrdidx);
+
+    calculate_featuresets();
 
     /*
      * Temporarily clear SMAP in CR4 to allow user-accesses in construct_dom0().
