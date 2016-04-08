@@ -310,6 +310,9 @@ unsigned long do_iret(void)
         toggle_guest_mode(v);
     }
 
+    if ( VM_ASSIST(v->domain, architectural_iopl) )
+        v->arch.pv_vcpu.iopl = iret_saved.rflags & X86_EFLAGS_IOPL;
+
     regs->rip    = iret_saved.rip;
     regs->cs     = iret_saved.cs | 3; /* force guest privilege */
     regs->rflags = ((iret_saved.rflags & ~(X86_EFLAGS_IOPL|X86_EFLAGS_VM))

@@ -331,6 +331,7 @@ extern unsigned long xen_phys_start;
                                   (1UL << VMASST_TYPE_4gb_segments_notify) | \
                                   (1UL << VMASST_TYPE_writable_pagetables) | \
                                   (1UL << VMASST_TYPE_pae_extended_cr3)    | \
+                                  (1UL << VMASST_TYPE_architectural_iopl)  | \
                                   (1UL << VMASST_TYPE_m2p_strict))
 #define VM_ASSIST_VALID          NATIVE_VM_ASSIST_VALID
 #define COMPAT_VM_ASSIST_VALID   (NATIVE_VM_ASSIST_VALID & \

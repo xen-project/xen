@@ -470,7 +470,9 @@ struct pv_vcpu
     /* I/O-port access bitmap. */
     XEN_GUEST_HANDLE(uint8) iobmp; /* Guest kernel vaddr of the bitmap. */
     unsigned int iobmp_limit; /* Number of ports represented in the bitmap. */
-    unsigned int iopl;        /* Current IOPL for this VCPU. */
+#define IOPL(val) MASK_INSR(val, X86_EFLAGS_IOPL)
+    unsigned int iopl;        /* Current IOPL for this VCPU, shifted left by
+                               * 12 to match the eflags register. */
 
     /* Current LDT details. */
     unsigned long shadow_ldt_mapcnt;

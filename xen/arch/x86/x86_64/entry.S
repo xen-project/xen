@@ -346,6 +346,7 @@ __UNLIKELY_END(create_bounce_frame_bad_sp)
         subq  $40,%rsi
         movq  UREGS_ss+8(%rsp),%rax
         ASM_STAC
+        movq  VCPU_domain(%rbx),%rdi
 .Lft2:  movq  %rax,32(%rsi)             # SS
         movq  UREGS_rsp+8(%rsp),%rax
 .Lft3:  movq  %rax,24(%rsi)             # RSP
@@ -362,9 +363,13 @@ __UNLIKELY_END(create_bounce_frame_bad_sp)
         testb $0xFF,%al                 # Bits 0-7: saved_upcall_mask
         setz  %ch                       # %ch == !saved_upcall_mask
         movl  UREGS_eflags+8(%rsp),%eax
-        andl  $~X86_EFLAGS_IF,%eax
+        andl  $~(X86_EFLAGS_IF|X86_EFLAGS_IOPL),%eax
         addb  %ch,%ch                   # Bit 9 (EFLAGS.IF)
         orb   %ch,%ah                   # Fold EFLAGS.IF into %eax
+        xorl  %ecx,%ecx                 # if ( VM_ASSIST(v->domain, architectural_iopl) )
+        testb $1 << VMASST_TYPE_architectural_iopl,DOMAIN_vm_assist(%rdi)
+        cmovnzl VCPU_iopl(%rbx),%ecx    # Bits 13:12 (EFLAGS.IOPL)
+        orl   %ecx,%eax                 # Fold EFLAGS.IOPL into %eax
 .Lft5:  movq  %rax,16(%rsi)             # RFLAGS
         movq  UREGS_rip+8(%rsp),%rax
 .Lft6:  movq  %rax,(%rsi)               # RIP

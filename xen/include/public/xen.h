@@ -503,6 +503,14 @@ DEFINE_XEN_GUEST_HANDLE(mmuext_op_t);
 #define VMASST_TYPE_pae_extended_cr3     3
 
 /*
+ * x86 guests: Sane behaviour for virtual iopl
+ *  - virtual iopl updated from do_iret() hypercalls.
+ *  - virtual iopl reported in bounce frames.
+ *  - guest kernels assumed to be level 0 for the purpose of iopl checks.
+ */
+#define VMASST_TYPE_architectural_iopl   4
+
+/*
  * x86/64 guests: strictly hide M2P from user mode.
  * This allows the guest to control respective hypervisor behavior:
  * - when not set, L4 tables get created with the respective slot blank,

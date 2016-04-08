@@ -1779,6 +1779,17 @@ static int read_gate_descriptor(unsigned int gate_sel,
     return 1;
 }
 
+/* Perform IOPL check between the vcpu's shadowed IOPL, and the assumed cpl. */
+static bool_t iopl_ok(const struct vcpu *v, const struct cpu_user_regs *regs)
+{
+    unsigned int cpl = guest_kernel_mode(v, regs) ?
+        (VM_ASSIST(v->domain, architectural_iopl) ? 0 : 1) : 3;
+
+    ASSERT((v->arch.pv_vcpu.iopl & ~X86_EFLAGS_IOPL) == 0);
+
+    return IOPL(cpl) <= v->arch.pv_vcpu.iopl;
+}
+
 /* Has the guest requested sufficient permission for this I/O access? */
 static int guest_io_okay(
     unsigned int port, unsigned int bytes,
@@ -1788,7 +1799,7 @@ static int guest_io_okay(
     int user_mode = !(v->arch.flags & TF_kernel_mode);
 #define TOGGLE_MODE() if ( user_mode ) toggle_guest_mode(v)
 
-    if ( v->arch.pv_vcpu.iopl >= (guest_kernel_mode(v, regs) ? 1 : 3) )
+    if ( iopl_ok(v, regs) )
         return 1;
 
     if ( v->arch.pv_vcpu.iobmp_limit > (port + bytes) )
@@ -2346,7 +2357,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
 
     case 0xfa: /* CLI */
     case 0xfb: /* STI */
-        if ( v->arch.pv_vcpu.iopl < (guest_kernel_mode(v, regs) ? 1 : 3) )
+        if ( !iopl_ok(v, regs) )
             goto fail;
         /*
          * This is just too dangerous to allow, in my opinion. Consider if the

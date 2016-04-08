@@ -99,6 +99,10 @@ unsigned int compat_iret(void)
         domain_crash(v->domain);
         return 0;
     }
+
+    if ( VM_ASSIST(v->domain, architectural_iopl) )
+        v->arch.pv_vcpu.iopl = eflags & X86_EFLAGS_IOPL;
+
     regs->_eflags = (eflags & ~X86_EFLAGS_IOPL) | X86_EFLAGS_IF;
 
     if ( unlikely(eflags & X86_EFLAGS_VM) )

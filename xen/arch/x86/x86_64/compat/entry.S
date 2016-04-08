@@ -263,6 +263,7 @@ compat_create_bounce_frame:
         movl  UREGS_rsp+8(%rsp),%esi
 .Lft4:  mov   UREGS_ss+8(%rsp),%fs
 2:
+        movq  VCPU_domain(%rbx),%r8
         subl  $3*4,%esi
         movq  VCPU_vcpu_info(%rbx),%rax
         pushq COMPAT_VCPUINFO_upcall_mask(%rax)
@@ -277,9 +278,13 @@ compat_create_bounce_frame:
         testb %al,%al                   # Bits 0-7: saved_upcall_mask
         setz  %ch                       # %ch == !saved_upcall_mask
         movl  UREGS_eflags+8(%rsp),%eax
-        andl  $~X86_EFLAGS_IF,%eax
+        andl  $~(X86_EFLAGS_IF|X86_EFLAGS_IOPL),%eax
         addb  %ch,%ch                   # Bit 9 (EFLAGS.IF)
         orb   %ch,%ah                   # Fold EFLAGS.IF into %eax
+        xorl  %ecx,%ecx                 # if ( VM_ASSIST(v->domain, architectural_iopl) )
+        testb $1 << VMASST_TYPE_architectural_iopl,DOMAIN_vm_assist(%r8)
+        cmovnzl VCPU_iopl(%rbx),%ecx    # Bits 13:12 (EFLAGS.IOPL)
+        orl   %ecx,%eax                 # Fold EFLAGS.IOPL into %eax
 .Lft6:  movl  %eax,%fs:2*4(%rsi)        # EFLAGS
         movl  UREGS_rip+8(%rsp),%eax
 .Lft7:  movl  %eax,%fs:(%rsi)           # EIP

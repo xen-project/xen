@@ -529,7 +529,7 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( set_iopl.iopl > 3 )
             break;
         ret = 0;
-        curr->arch.pv_vcpu.iopl = set_iopl.iopl;
+        curr->arch.pv_vcpu.iopl = MASK_INSR(set_iopl.iopl, X86_EFLAGS_IOPL);
         break;
     }
 

@@ -86,6 +86,7 @@ void __dummy__(void)
     OFFSET(VCPU_trap_ctxt, struct vcpu, arch.pv_vcpu.trap_ctxt);
     OFFSET(VCPU_kernel_sp, struct vcpu, arch.pv_vcpu.kernel_sp);
     OFFSET(VCPU_kernel_ss, struct vcpu, arch.pv_vcpu.kernel_ss);
+    OFFSET(VCPU_iopl, struct vcpu, arch.pv_vcpu.iopl);
     OFFSET(VCPU_guest_context_flags, struct vcpu, arch.vgc_flags);
     OFFSET(VCPU_nmi_pending, struct vcpu, nmi_pending);
     OFFSET(VCPU_mce_pending, struct vcpu, mce_pending);
@@ -166,4 +167,6 @@ void __dummy__(void)
     OFFSET(MB_flags, multiboot_info_t, flags);
     OFFSET(MB_cmdline, multiboot_info_t, cmdline);
     OFFSET(MB_mem_lower, multiboot_info_t, mem_lower);
+
+    OFFSET(DOMAIN_vm_assist, struct domain, vm_assist);
 }
