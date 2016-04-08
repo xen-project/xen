@@ -916,6 +916,12 @@ static void initiate_domain_create(libxl__egc *egc,
         goto error_out;
     }
 
+    /*
+     * Set the dm version quite early so that libxl doesn't have to pass the
+     * build info around just to know if the domain has a device model or not.
+     */
+    store_libxl_entry(gc, domid, &d_config->b_info);
+
     for (i = 0; i < d_config->num_disks; i++) {
         ret = libxl__device_disk_setdefault(gc, &d_config->disks[i]);
         if (ret) {
@@ -940,8 +946,7 @@ static void initiate_domain_create(libxl__egc *egc,
          * called libxl_device_nic_add when domcreate_launch_dm gets called,
          * but qemu needs the nic information to be complete.
          */
-        ret = libxl__device_nic_setdefault(gc, &d_config->nics[i], domid,
-                                           &d_config->b_info);
+        ret = libxl__device_nic_setdefault(gc, &d_config->nics[i], domid);
         if (ret) {
             LOG(ERROR, "Unable to set nic defaults for nic %d", i);
             goto error_out;

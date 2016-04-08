@@ -3299,7 +3299,7 @@ out:
 /******************************************************************************/
 
 int libxl__device_nic_setdefault(libxl__gc *gc, libxl_device_nic *nic,
-                                 uint32_t domid, libxl_domain_build_info *info)
+                                 uint32_t domid)
 {
     int rc;
 
@@ -3337,21 +3337,11 @@ int libxl__device_nic_setdefault(libxl__gc *gc, libxl_device_nic *nic,
     switch (libxl__domain_type(gc, domid)) {
     case LIBXL_DOMAIN_TYPE_HVM:
         if (!nic->nictype) {
-            if (info != NULL) {
-                /* Path taken at creation time. */
-                if (info->device_model_version ==
-                    LIBXL_DEVICE_MODEL_VERSION_NONE)
-                    nic->nictype = LIBXL_NIC_TYPE_VIF;
-                else
-                    nic->nictype = LIBXL_NIC_TYPE_VIF_IOEMU;
-            } else {
-                /* Path taken when hot-adding a nic. */
-                if (libxl__device_model_version_running(gc, domid) ==
-                    LIBXL_DEVICE_MODEL_VERSION_NONE)
-                    nic->nictype = LIBXL_NIC_TYPE_VIF;
-                else
-                    nic->nictype = LIBXL_NIC_TYPE_VIF_IOEMU;
-            }
+            if (libxl__device_model_version_running(gc, domid) ==
+                LIBXL_DEVICE_MODEL_VERSION_NONE)
+                nic->nictype = LIBXL_NIC_TYPE_VIF;
+            else
+                nic->nictype = LIBXL_NIC_TYPE_VIF_IOEMU;
         }
         break;
     case LIBXL_DOMAIN_TYPE_PV:
@@ -3401,7 +3391,7 @@ void libxl__device_nic_add(libxl__egc *egc, uint32_t domid,
     libxl_device_nic_init(&nic_saved);
     libxl_device_nic_copy(CTX, &nic_saved, nic);
 
-    rc = libxl__device_nic_setdefault(gc, nic, domid, NULL);
+    rc = libxl__device_nic_setdefault(gc, nic, domid);
     if (rc) goto out;
 
     front = flexarray_make(gc, 16, 1);
