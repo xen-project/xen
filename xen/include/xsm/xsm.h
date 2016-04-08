@@ -760,6 +760,7 @@ extern int xsm_multiboot_policy_init(unsigned long *module_map,
 #ifdef CONFIG_HAS_DEVICE_TREE
 extern int xsm_dt_init(void);
 extern int xsm_dt_policy_init(void);
+extern bool has_xsm_magic(paddr_t);
 #endif
 
 extern int register_xsm(struct xsm_operations *ops);
@@ -786,7 +787,12 @@ static inline int xsm_dt_init(void)
 {
     return 0;
 }
-#endif
+
+static inline bool has_xsm_magic(paddr_t start)
+{
+    return false;
+}
+#endif /* CONFIG_HAS_DEVICE_TREE */
 
 #endif /* CONFIG_XSM */
 

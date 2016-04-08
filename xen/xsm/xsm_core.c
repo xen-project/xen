@@ -19,6 +19,10 @@
 
 #ifdef CONFIG_XSM
 
+#ifdef CONFIG_HAS_DEVICE_TREE
+#include <asm/setup.h>
+#endif
+
 #define XSM_FRAMEWORK_VERSION    "1.0.0"
 
 struct xsm_operations *xsm_ops;
@@ -108,6 +112,29 @@ int __init xsm_dt_init(void)
     xfree(policy_buffer);
 
     return ret;
+}
+
+/**
+ * has_xsm_magic - Check XSM Magic of the module header by phy address
+ * A XSM module has a special header
+ * ------------------------------------------------
+ * uint magic | uint target_len | uchar target[8] |
+ * 0xf97cff8c |        8        |    "XenFlask"   |
+ * ------------------------------------------------
+ * 0xf97cff8c is policy magic number (XSM_MAGIC).
+ * Here we only check the "magic" of the module.
+ */
+bool __init has_xsm_magic(paddr_t start)
+{
+    xsm_magic_t magic;
+
+    if ( XSM_MAGIC )
+    {
+        copy_from_paddr(&magic, start, sizeof(magic) );
+        return ( magic == XSM_MAGIC );
+    }
+
+    return false;
 }
 #endif
 

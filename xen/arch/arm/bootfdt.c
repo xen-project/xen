@@ -14,6 +14,7 @@
 #include <xen/init.h>
 #include <xen/device_tree.h>
 #include <xen/libfdt/libfdt.h>
+#include <xsm/xsm.h>
 #include <asm/setup.h>
 
 static bool_t __init device_tree_node_matches(const void *fdt, int node,
@@ -175,6 +176,17 @@ static void __init process_multiboot_node(const void *fdt, int node,
     const char *cmdline;
     int len;
 
+    prop = fdt_get_property(fdt, node, "reg", &len);
+    if ( !prop )
+        panic("node %s missing `reg' property\n", name);
+
+    if ( len < dt_cells_to_size(address_cells + size_cells) )
+        panic("fdt: node `%s': `reg` property length is too short\n",
+                    name);
+
+    cell = (const __be32 *)prop->data;
+    device_tree_get_reg(&cell, address_cells, size_cells, &start, &size);
+
     if ( fdt_node_check_compatible(fdt, node, "xen,linux-zimage") == 0 ||
          fdt_node_check_compatible(fdt, node, "multiboot,kernel") == 0 )
         kind = BOOTMOD_KERNEL;
@@ -186,7 +198,17 @@ static void __init process_multiboot_node(const void *fdt, int node,
     else
         kind = BOOTMOD_UNKNOWN;
 
-    /* Guess that first two unknown are kernel and ramdisk respectively. */
+    /**
+     * Guess the kind of these first two unknowns respectively:
+     * (1) The first unknown must be kernel.
+     * (2) Detect the XSM Magic from the 2nd unknown:
+     *     a. If it's XSM, set the kind as XSM, and that also means we
+     *     won't load ramdisk;
+     *     b. if it's not XSM, set the kind as ramdisk.
+     *     So if user want to load ramdisk, it must be the 2nd unknown.
+     * We also detect the XSM Magic for the following unknowns,
+     * then set its kind according to the return value of has_xsm_magic.
+     */
     if ( kind == BOOTMOD_UNKNOWN )
     {
         switch ( kind_guess++ )
@@ -195,18 +217,9 @@ static void __init process_multiboot_node(const void *fdt, int node,
         case 1: kind = BOOTMOD_RAMDISK; break;
         default: break;
         }
+	if ( kind_guess > 1 && has_xsm_magic(start) )
+            kind = BOOTMOD_XSM;
     }
-
-    prop = fdt_get_property(fdt, node, "reg", &len);
-    if ( !prop )
-        panic("node %s missing `reg' property\n", name);
-
-    if ( len < dt_cells_to_size(address_cells + size_cells) )
-        panic("fdt: node `%s': `reg` property length is too short\n",
-                    name);
-
-    cell = (const __be32 *)prop->data;
-    device_tree_get_reg(&cell, address_cells, size_cells, &start, &size);
 
     prop = fdt_get_property(fdt, node, "bootargs", &len);
     if ( prop )

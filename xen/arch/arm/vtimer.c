@@ -249,32 +249,49 @@ static int vtimer_cntp_cval(struct cpu_user_regs *regs, uint64_t *r, int read)
 static int vtimer_emulate_cp32(struct cpu_user_regs *regs, union hsr hsr)
 {
     struct hsr_cp32 cp32 = hsr.cp32;
-    uint32_t *r = (uint32_t *)select_user_reg(regs, cp32.reg);
+    /*
+     * Initialize to zero to avoid leaking data if there is an
+     * implementation error in the emulation (such as not correctly
+     * setting r).
+     */
+    uint32_t r = 0;
+    int res;
+
 
     if ( cp32.read )
         perfc_incr(vtimer_cp32_reads);
     else
         perfc_incr(vtimer_cp32_writes);
 
+    if ( !cp32.read )
+        r = get_user_reg(regs, cp32.reg);
+
     switch ( hsr.bits & HSR_CP32_REGS_MASK )
     {
     case HSR_CPREG32(CNTP_CTL):
-        return vtimer_cntp_ctl(regs, r, cp32.read);
+        res = vtimer_cntp_ctl(regs, &r, cp32.read);
+        break;
 
     case HSR_CPREG32(CNTP_TVAL):
-        return vtimer_cntp_tval(regs, r, cp32.read);
+        res = vtimer_cntp_tval(regs, &r, cp32.read);
+        break;
 
     default:
         return 0;
     }
+
+    if ( res && cp32.read )
+        set_user_reg(regs, cp32.reg, r);
+
+    return res;
 }
 
 static int vtimer_emulate_cp64(struct cpu_user_regs *regs, union hsr hsr)
 {
     struct hsr_cp64 cp64 = hsr.cp64;
-    uint32_t *r1 = (uint32_t *)select_user_reg(regs, cp64.reg1);
-    uint32_t *r2 = (uint32_t *)select_user_reg(regs, cp64.reg2);
-    uint64_t x = (uint64_t)(*r1) | ((uint64_t)(*r2) << 32);
+    uint32_t r1 = get_user_reg(regs, cp64.reg1);
+    uint32_t r2 = get_user_reg(regs, cp64.reg2);
+    uint64_t x = (uint64_t)r1 | ((uint64_t)r2 << 32);
 
     if ( cp64.read )
         perfc_incr(vtimer_cp64_reads);
@@ -294,8 +311,8 @@ static int vtimer_emulate_cp64(struct cpu_user_regs *regs, union hsr hsr)
 
     if ( cp64.read )
     {
-        *r1 = (uint32_t)(x & 0xffffffff);
-        *r2 = (uint32_t)(x >> 32);
+        set_user_reg(regs, cp64.reg1, x & 0xffffffff);
+        set_user_reg(regs, cp64.reg2, x >> 32);
     }
 
     return 1;
@@ -311,14 +328,16 @@ static int vtimer_emulate_sysreg32(struct cpu_user_regs *regs, union hsr hsr,
                                    vtimer_sysreg32_fn_t fn)
 {
     struct hsr_sysreg sysreg = hsr.sysreg;
-    register_t *x = select_user_reg(regs, sysreg.reg);
-    uint32_t r = *x;
+    uint32_t r = 0;
     int ret;
+
+    if ( !sysreg.read )
+        r = get_user_reg(regs, sysreg.reg);
 
     ret = fn(regs, &r, sysreg.read);
 
     if ( ret && sysreg.read )
-        *x = r;
+        set_user_reg(regs, sysreg.reg, r);
 
     return ret;
 }
@@ -327,9 +346,23 @@ static int vtimer_emulate_sysreg64(struct cpu_user_regs *regs, union hsr hsr,
                                    vtimer_sysreg64_fn_t fn)
 {
     struct hsr_sysreg sysreg = hsr.sysreg;
-    uint64_t *x = select_user_reg(regs, sysreg.reg);
+    /*
+     * Initialize to zero to avoid leaking data if there is an
+     * implementation error in the emulation (such as not correctly
+     * setting x).
+     */
+    uint64_t x = 0;
+    int ret;
 
-    return fn(regs, x, sysreg.read);
+    if ( !sysreg.read )
+        x = get_user_reg(regs, sysreg.reg);
+
+    ret = fn(regs, &x, sysreg.read);
+
+    if ( ret && sysreg.read )
+        set_user_reg(regs, sysreg.reg, x);
+
+    return ret;
 }
 
 static int vtimer_emulate_sysreg(struct cpu_user_regs *regs, union hsr hsr)
