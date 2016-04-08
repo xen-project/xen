@@ -227,16 +227,16 @@ struct xc_dom_image {
  * be required in the future if there are alignment changes.
  */
 struct hvm_start_info {
-    uint64_t magic;         /* Contains the magic value 0x746f6f62336ec578   */
-                            /* ("xEn3boot" with the 0x80 bit of the "E" set).*/
-    uint64_t version;       /* Version of this structure.                    */
-    uint64_t flags;         /* SIF_xxx flags.                                */
-    uint64_t cmdline_paddr; /* Physical address of the command line.         */
-    uint64_t nr_modules;    /* Number of modules passed to the kernel.       */
-    uint64_t modlist_paddr; /* Physical address of an array of               */
-                            /* hvm_modlist_entry.                            */
-    uint64_t rsdp_paddr;    /* Physical address of the RSDP ACPI data        */
-                            /* structure.                                    */
+    uint32_t magic;             /* Contains the magic value 0x336ec578       */
+                                /* ("xEn3" with the 0x80 bit of the "E" set).*/
+    uint32_t version;           /* Version of this structure.                */
+    uint32_t flags;             /* SIF_xxx flags.                            */
+    uint32_t cmdline_paddr;     /* Physical address of the command line.     */
+    uint32_t nr_modules;        /* Number of modules passed to the kernel.   */
+    uint32_t modlist_paddr;     /* Physical address of an array of           */
+                                /* hvm_modlist_entry.                        */
+    uint32_t rsdp_paddr;        /* Physical address of the RSDP ACPI data    */
+                                /* structure.                                */
 } __attribute__((packed));
 
 struct hvm_modlist_entry {

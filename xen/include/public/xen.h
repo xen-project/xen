@@ -814,23 +814,23 @@ typedef struct start_info start_info_t;
  *
  *  0 +----------------+
  *    | magic          | Contains the magic value XEN_HVM_START_MAGIC_VALUE
- *    |                | ("xEn3boot" with the 0x80 bit of the "E" set).
- *  8 +----------------+
+ *    |                | ("xEn3" with the 0x80 bit of the "E" set).
+ *  4 +----------------+
  *    | version        | Version of this structure. Current version is 0. New
  *    |                | versions are guaranteed to be backwards-compatible.
- * 16 +----------------+
+ *  8 +----------------+
  *    | flags          | SIF_xxx flags.
- * 24 +----------------+
+ * 12 +----------------+
  *    | cmdline_paddr  | Physical address of the command line,
  *    |                | a zero-terminated ASCII string.
- * 32 +----------------+
+ * 16 +----------------+
  *    | nr_modules     | Number of modules passed to the kernel.
- * 40 +----------------+
+ * 20 +----------------+
  *    | modlist_paddr  | Physical address of an array of modules
  *    |                | (layout of the structure below).
- * 48 +----------------+
+ * 24 +----------------+
  *    | rsdp_paddr     | Physical address of the RSDP ACPI data structure.
- * 56 +----------------+
+ * 28 +----------------+
  *
  * The layout of each entry in the module structure is the following:
  *
@@ -845,12 +845,10 @@ typedef struct start_info start_info_t;
  *    | reserved       |
  * 32 +----------------+
  *
- * The address and sizes are always a 64bit little endian unsigned integer.
- *
- * NB: Xen on x86 will always try to place all the data below the 4GiB
- * boundary.
+ * The address and size of the modules is a 64bit unsigned integer. However
+ * Xen will always try to place all modules below the 4GiB boundary.
  */
-#define XEN_HVM_START_MAGIC_VALUE 0x746f6f62336ec578
+#define XEN_HVM_START_MAGIC_VALUE 0x336ec578
 
 /* New console union for dom0 introduced in 0x00030203. */
 #if __XEN_INTERFACE_VERSION__ < 0x00030203
