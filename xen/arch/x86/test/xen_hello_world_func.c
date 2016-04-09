@@ -5,6 +5,8 @@
 
 #include <xen/types.h>
 
+#include <asm/alternative.h>
+#include <asm/nops.h>
 #include <asm/uaccess.h>
 
 static unsigned long *non_canonical_addr = (unsigned long *)0xdead000000000000ULL;
@@ -14,6 +16,8 @@ const char *xen_hello_world(void)
 {
     unsigned long tmp;
     int rc;
+
+    alternative(ASM_NOP8, ASM_NOP1, X86_FEATURE_LM);
     /*
      * Any BUG, or WARN_ON will contain symbol and payload name. Furthermore
      * exceptions will be caught and processed properly.

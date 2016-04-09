@@ -532,6 +532,37 @@ static int prepare_payload(struct payload *payload,
     }
 
 #ifndef CONFIG_ARM
+    sec = xsplice_elf_sec_by_name(elf, ".altinstructions");
+    if ( sec )
+    {
+        struct alt_instr *a, *start, *end;
+
+        if ( sec->sec->sh_size % sizeof(*a) )
+        {
+            dprintk(XENLOG_ERR, XSPLICE "%s: Size of .alt_instr is not multiple of %zu!\n",
+                    elf->name, sizeof(*a));
+            return -EINVAL;
+        }
+
+        start = sec->load_addr;
+        end = sec->load_addr + sec->sec->sh_size;
+
+        for ( a = start; a < end; a++ )
+        {
+            const void *instr = &a->instr_offset + a->instr_offset;
+            const void *replacement = &a->repl_offset + a->repl_offset;
+
+            if ( (instr < region->start && instr >= region->end) ||
+                 (replacement < region->start && replacement >= region->end) )
+            {
+                dprintk(XENLOG_ERR, XSPLICE "%s Alt patching outside payload: %p!\n",
+                        elf->name, instr);
+                return -EINVAL;
+            }
+        }
+        apply_alternatives_nocheck(start, end);
+    }
+
     sec = xsplice_elf_sec_by_name(elf, ".ex_table");
     if ( sec )
     {
