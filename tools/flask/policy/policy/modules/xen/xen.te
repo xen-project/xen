@@ -74,6 +74,7 @@ allow dom0_t xen_t:xen2 {
     get_symbol
     get_cpu_levelling_caps
     get_cpu_featureset
+    xsplice_op
 };
 
 # Allow dom0 to use all XENVER_ subops that have checks.

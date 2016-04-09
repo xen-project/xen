@@ -28,6 +28,7 @@
 #include <xsm/xsm.h>
 #include <xen/pmstat.h>
 #include <xen/gcov.h>
+#include <xen/xsplice.h>
 
 long do_sysctl(XEN_GUEST_HANDLE_PARAM(xen_sysctl_t) u_sysctl)
 {
@@ -458,6 +459,12 @@ long do_sysctl(XEN_GUEST_HANDLE_PARAM(xen_sysctl_t) u_sysctl)
 
     case XEN_SYSCTL_tmem_op:
         ret = tmem_control(&op->u.tmem_op);
+        break;
+
+    case XEN_SYSCTL_xsplice_op:
+        ret = xsplice_op(&op->u.xsplice);
+        if ( ret != -ENOSYS && ret != -EOPNOTSUPP )
+            copyback = 1;
         break;
 
     default:

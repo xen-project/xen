@@ -188,4 +188,16 @@ config SCHED_DEFAULT
 
 endmenu
 
+# Enable/Disable xsplice support
+config XSPLICE
+	bool "xSplice live patching support (TECH PREVIEW)"
+	default n
+	depends on X86
+	---help---
+	  Allows a running Xen hypervisor to be dynamically patched using
+	  binary patches without rebooting. This is primarily used to binarily
+	  patch in the field an hypervisor with XSA fixes.
+
+	  If unsure, say Y.
+
 endmenu
