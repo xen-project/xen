@@ -1702,7 +1702,7 @@ int schedule_cpu_switch(unsigned int cpu, struct cpupool *c)
      * that the lock itself changed, and retry acquiring the new one (which
      * will be the correct, remapped one, at that point).
      */
-    old_lock = pcpu_schedule_lock(cpu);
+    old_lock = pcpu_schedule_lock_irq(cpu);
 
     vpriv_old = idle->sched_priv;
     ppriv_old = per_cpu(schedule_data, cpu).sched_priv;
