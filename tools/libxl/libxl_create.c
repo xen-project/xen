@@ -1829,7 +1829,7 @@ static int do_domain_soft_reset(libxl_ctx *ctx,
     free(xs_console_mfn);
 
     dss->ao = ao;
-    dss->domid = domid_soft_reset;
+    dss->domid = dss->dsps.domid = domid_soft_reset;
     dss->dsps.dm_savefile = GCSPRINTF(LIBXL_DEVICE_MODEL_SAVE_FILE".%d",
                                       domid_soft_reset);
 
