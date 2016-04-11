@@ -149,7 +149,7 @@ void __init acpi_smp_init_cpus(void)
         return;
     }
 
-    if ( enabled_cpus > 1 )
+    if ( !bootcpu_valid )
     {
         printk("MADT missing boot CPU MPIDR, not enabling secondaries\n");
         return;
