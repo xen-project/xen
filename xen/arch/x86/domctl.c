@@ -1512,7 +1512,7 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 
         /* IOPL privileges are virtualised: merge back into returned eflags. */
         BUG_ON((c(user_regs.eflags) & X86_EFLAGS_IOPL) != 0);
-        c(user_regs.eflags |= v->arch.pv_vcpu.iopl << 12);
+        c(user_regs.eflags |= v->arch.pv_vcpu.iopl);
 
         if ( !compat )
         {
