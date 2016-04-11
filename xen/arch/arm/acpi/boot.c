@@ -63,7 +63,10 @@ acpi_map_gic_cpu_interface(struct acpi_madt_generic_interrupt *processor)
 
     total_cpus++;
     if ( !enabled )
+    {
+        printk("Skipping disabled CPU entry with 0x%"PRIx64" MPIDR\n", mpidr);
         return;
+    }
 
     if ( enabled_cpus >=  NR_CPUS )
     {
@@ -101,7 +104,11 @@ acpi_map_gic_cpu_interface(struct acpi_madt_generic_interrupt *processor)
     }
 
     if ( !acpi_psci_present() )
+    {
+        printk("PSCI not present, skipping CPU MPIDR 0x%"PRIx64"\n",
+               mpidr);
         return;
+    }
 
     if ( (rc = arch_cpu_init(enabled_cpus, NULL)) < 0 )
     {
