@@ -327,7 +327,7 @@ static int __init pl011_acpi_uart_init(const void *data)
     }
 
     /* trigger/polarity information is not available in spcr */
-    irq_set_type(spcr->interrupt, IRQ_TYPE_EDGE_BOTH);
+    irq_set_type(spcr->interrupt, IRQ_TYPE_LEVEL_HIGH);
 
     res = pl011_uart_init(spcr->interrupt, spcr->serial_port.address,
                           PAGE_SIZE);
