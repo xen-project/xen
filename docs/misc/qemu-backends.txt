@@ -1,0 +1,21 @@
+In order to know whether qemu supports a specific backend type libxl
+needs a way to obtain this information.
+
+As each qemu instance owns a path (named $QEMU from now on) in
+Xenstore, the backend information is presented there. $QEMU is built
+from the domain id where the qemu instance is running $BACKEND_DOM,
+and the domain id of the target domain of the qemu process $DOMID:
+
+$QEMU = /local/domain/$BACKEND_DOM/device-model/$DOMID
+
+Before signalling qemu is running by writing "running" to $QEMU/state
+qemu will create a Xenstore node for each supported backend under
+$QEMU/backends with the backend type as name (e.g.  $QEMU/backends/qdisk
+for the qdisk backend). In case qemu is running de-privileged (not as
+user root) the backend nodes must be written before qemu is dropping
+privileges.
+
+libxl can assume a backend of a specific type $TYPE is supported if:
+- $QEMU/backends/$TYPE is existing in Xenstore
+- or $QEMU/backends is not existing and $TYPE is one of:
+  "console", "vkbd", "vfb", "qdisk", "qnic"
