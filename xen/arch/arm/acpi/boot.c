@@ -51,6 +51,7 @@ static void __init
 acpi_map_gic_cpu_interface(struct acpi_madt_generic_interrupt *processor)
 {
     int i;
+    int rc;
     u64 mpidr = processor->arm_mpidr & MPIDR_HWID_MASK;
     bool_t enabled = !!(processor->flags & ACPI_MADT_ENABLED);
 
@@ -102,15 +103,15 @@ acpi_map_gic_cpu_interface(struct acpi_madt_generic_interrupt *processor)
     if ( !acpi_psci_present() )
         return;
 
-    /* CPU 0 was already initialized */
-    if ( enabled_cpus )
+    if ( (rc = arch_cpu_init(enabled_cpus, NULL)) < 0 )
     {
-        if ( arch_cpu_init(enabled_cpus, NULL) < 0 )
-            return;
-
-        /* map the logical cpu id to cpu MPIDR */
-        cpu_logical_map(enabled_cpus) = mpidr;
+        printk("cpu%d: init failed (0x%"PRIx64" MPIDR): %d\n",
+               enabled_cpus, mpidr, rc);
+        return;
     }
+
+    /* map the logical cpu id to cpu MPIDR */
+    cpu_logical_map(enabled_cpus) = mpidr;
 
     enabled_cpus++;
 }
