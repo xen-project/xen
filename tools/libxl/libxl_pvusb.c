@@ -350,7 +350,7 @@ static const char *vusb_be_from_xs_fe(libxl__gc *gc, const char *fe_path,
 
     /* Check to see that it has the proper form, and that fe_domid ==
      * target domid */
-    r = sscanf(be_path, "/local/domain/%d/backend/%15[^/]/%d",
+    r = sscanf(be_path, "/local/domain/%u/backend/%15[^/]/%u",
                &be_domid, be_type, &fe_domid);
 
     if (r != 3 || fe_domid != tgt_domid) {
