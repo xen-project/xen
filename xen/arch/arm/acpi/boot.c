@@ -37,7 +37,8 @@
 #include <asm/setup.h>
 
 /* Processors with enabled flag and sane MPIDR */
-static unsigned int enabled_cpus;
+static unsigned int enabled_cpus = 1;
+static bool __initdata bootcpu_valid;
 
 /* total number of cpus in this system */
 static unsigned int __initdata total_cpus;
@@ -71,10 +72,15 @@ acpi_map_gic_cpu_interface(struct acpi_madt_generic_interrupt *processor)
     }
 
     /* Check if GICC structure of boot CPU is available in the MADT */
-    if ( (enabled_cpus == 0) && (cpu_logical_map(0) != mpidr) )
+    if ( cpu_logical_map(0) == mpidr )
     {
-        printk("Firmware bug, invalid CPU MPIDR for cpu0: 0x%"PRIx64" in MADT\n",
-               mpidr);
+        if ( bootcpu_valid )
+        {
+            printk("Firmware bug, duplicate boot CPU MPIDR: 0x%"PRIx64" in MADT\n",
+                   mpidr);
+            return;
+        }
+        bootcpu_valid = true;
         return;
     }
 
@@ -83,7 +89,7 @@ acpi_map_gic_cpu_interface(struct acpi_madt_generic_interrupt *processor)
      * all initialized entries and check for
      * duplicates. If any is found just ignore the CPU.
      */
-    for ( i = 0; i < enabled_cpus; i++ )
+    for ( i = 1; i < enabled_cpus; i++ )
     {
         if ( cpu_logical_map(i) == mpidr )
         {
