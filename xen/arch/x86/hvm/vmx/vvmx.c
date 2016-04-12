@@ -2036,6 +2036,8 @@ nvmx_hap_walk_L1_p2m(struct vcpu *v, paddr_t L2_gpa, paddr_t *L1_gpa,
     uint32_t rwx_rights = (access_x << 2) | (access_w << 1) | access_r;
     struct nestedvmx *nvmx = &vcpu_2_nvmx(v);
 
+    vmx_vmcs_enter(v);
+
     __vmread(EXIT_QUALIFICATION, &exit_qual);
     rc = nept_translate_l2ga(v, L2_gpa, page_order, rwx_rights, &gfn, p2m_acc,
                              &exit_qual, &exit_reason);
@@ -2059,6 +2061,8 @@ nvmx_hap_walk_L1_p2m(struct vcpu *v, paddr_t L2_gpa, paddr_t *L1_gpa,
         BUG();
         break;
     }
+
+    vmx_vmcs_exit(v);
 
     return rc;
 }
