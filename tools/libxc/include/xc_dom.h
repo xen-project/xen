@@ -231,11 +231,11 @@ struct hvm_start_info {
                                 /* ("xEn3" with the 0x80 bit of the "E" set).*/
     uint32_t version;           /* Version of this structure.                */
     uint32_t flags;             /* SIF_xxx flags.                            */
-    uint32_t cmdline_paddr;     /* Physical address of the command line.     */
     uint32_t nr_modules;        /* Number of modules passed to the kernel.   */
-    uint32_t modlist_paddr;     /* Physical address of an array of           */
+    uint64_t modlist_paddr;     /* Physical address of an array of           */
                                 /* hvm_modlist_entry.                        */
-    uint32_t rsdp_paddr;        /* Physical address of the RSDP ACPI data    */
+    uint64_t cmdline_paddr;     /* Physical address of the command line.     */
+    uint64_t rsdp_paddr;        /* Physical address of the RSDP ACPI data    */
                                 /* structure.                                */
 } __attribute__((packed));
 
