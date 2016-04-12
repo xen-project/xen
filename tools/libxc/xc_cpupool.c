@@ -151,7 +151,7 @@ int xc_cpupool_removecpu(xc_interface *xch,
                          int cpu)
 {
     unsigned retries;
-    int err;
+    int err = 0;
     DECLARE_SYSCTL;
 
     sysctl.cmd = XEN_SYSCTL_cpupool_op;
