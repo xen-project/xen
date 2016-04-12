@@ -262,6 +262,22 @@ struct p2m_domain {
                                           l1_pgentry_t new, unsigned int level);
     long               (*audit_p2m)(struct p2m_domain *p2m);
 
+    /*
+     * P2M updates may require TLBs to be flushed (invalidated).
+     *
+     * If 'defer_flush' is set, flushes may be deferred by setting
+     * 'need_flush' and then flushing in 'tlb_flush()'.
+     *
+     * 'tlb_flush()' is only called if 'need_flush' was set.
+     *
+     * If a flush may be being deferred but an immediate flush is
+     * required (e.g., if a page is being freed to pool other than the
+     * domheap), call p2m_tlb_flush_sync().
+     */
+    void (*tlb_flush)(struct p2m_domain *p2m);
+    unsigned int defer_flush;
+    bool_t need_flush;
+
     /* Default P2M access type for each page in the the domain: new pages,
      * swapped in pages, cleared pages, and pages that are ambiguously
      * retyped get this access type.  See definition of p2m_access_t. */
@@ -352,6 +368,12 @@ static inline bool_t p2m_is_altp2m(const struct p2m_domain *p2m)
 }
 
 #define p2m_get_pagetable(p2m)  ((p2m)->phys_table)
+
+/*
+ * Ensure any deferred p2m TLB flush has been completed on all VCPUs.
+ */
+void p2m_tlb_flush_sync(struct p2m_domain *p2m);
+void p2m_unlock_and_tlb_flush(struct p2m_domain *p2m);
 
 /**** p2m query accessors. They lock p2m_lock, and thus serialize
  * lookups wrt modifications. They _do not_ release the lock on exit.

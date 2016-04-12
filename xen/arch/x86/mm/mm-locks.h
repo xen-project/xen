@@ -265,14 +265,21 @@ declare_mm_lock(altp2mlist)
  */
 
 declare_mm_rwlock(altp2m);
-#define p2m_lock(p)                         \
-{                                           \
-    if ( p2m_is_altp2m(p) )                 \
-        mm_write_lock(altp2m, &(p)->lock);  \
-    else                                    \
-        mm_write_lock(p2m, &(p)->lock);     \
-}
-#define p2m_unlock(p)         mm_write_unlock(&(p)->lock);
+#define p2m_lock(p)                             \
+    do {                                        \
+        if ( p2m_is_altp2m(p) )                 \
+            mm_write_lock(altp2m, &(p)->lock);  \
+        else                                    \
+            mm_write_lock(p2m, &(p)->lock);     \
+        (p)->defer_flush++;                     \
+    } while (0)
+#define p2m_unlock(p)                           \
+    do {                                        \
+        if ( --(p)->defer_flush == 0 )          \
+            p2m_unlock_and_tlb_flush(p);        \
+        else                                    \
+            mm_write_unlock(&(p)->lock);        \
+    } while (0)
 #define gfn_lock(p,g,o)       p2m_lock(p)
 #define gfn_unlock(p,g,o)     p2m_unlock(p)
 #define p2m_read_lock(p)      mm_read_lock(p2m, &(p)->lock)

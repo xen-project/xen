@@ -264,6 +264,7 @@ static void ept_free_entry(struct p2m_domain *p2m, ept_entry_t *ept_entry, int l
         unmap_domain_page(epte);
     }
     
+    p2m_tlb_flush_sync(p2m);
     p2m_free_ptp(p2m, mfn_to_page(ept_entry->mfn));
 }
 
@@ -1096,15 +1097,10 @@ static void __ept_sync_domain(void *info)
      */
 }
 
-void ept_sync_domain(struct p2m_domain *p2m)
+static void ept_sync_domain_prepare(struct p2m_domain *p2m)
 {
     struct domain *d = p2m->domain;
     struct ept_data *ept = &p2m->ept;
-    /* Only if using EPT and this domain has some VCPUs to dirty. */
-    if ( !paging_mode_hap(d) || !d->vcpu || !d->vcpu[0] )
-        return;
-
-    ASSERT(local_irq_is_enabled());
 
     if ( nestedhvm_enabled(d) && !p2m_is_nestedp2m(p2m) )
         p2m_flush_nestedp2m(d);
@@ -1117,9 +1113,35 @@ void ept_sync_domain(struct p2m_domain *p2m)
      *    of an EP4TA reuse is still needed.
      */
     cpumask_setall(ept->invalidate);
+}
 
-    on_selected_cpus(d->domain_dirty_cpumask,
-                     __ept_sync_domain, p2m, 1);
+static void ept_sync_domain_mask(struct p2m_domain *p2m, const cpumask_t *mask)
+{
+    on_selected_cpus(mask, __ept_sync_domain, p2m, 1);
+}
+
+void ept_sync_domain(struct p2m_domain *p2m)
+{
+    struct domain *d = p2m->domain;
+
+    /* Only if using EPT and this domain has some VCPUs to dirty. */
+    if ( !paging_mode_hap(d) || !d->vcpu || !d->vcpu[0] )
+        return;
+
+    ept_sync_domain_prepare(p2m);
+
+    if ( p2m->defer_flush )
+    {
+        p2m->need_flush = 1;
+        return;
+    }
+
+    ept_sync_domain_mask(p2m, d->domain_dirty_cpumask);
+}
+
+static void ept_tlb_flush(struct p2m_domain *p2m)
+{
+    ept_sync_domain_mask(p2m, p2m->domain->domain_dirty_cpumask);
 }
 
 static void ept_enable_pml(struct p2m_domain *p2m)
@@ -1170,6 +1192,7 @@ int ept_p2m_init(struct p2m_domain *p2m)
     p2m->change_entry_type_range = ept_change_entry_type_range;
     p2m->memory_type_changed = ept_memory_type_changed;
     p2m->audit_p2m = NULL;
+    p2m->tlb_flush = ept_tlb_flush;
 
     /* Set the memory type used when accessing EPT paging structures. */
     ept->ept_mt = EPT_DEFAULT_MT;

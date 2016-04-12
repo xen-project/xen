@@ -626,6 +626,7 @@ p2m_pod_decrease_reservation(struct domain *d,
 
             p2m_set_entry(p2m, gpfn + i, _mfn(INVALID_MFN), cur_order,
                           p2m_invalid, p2m->default_access);
+            p2m_tlb_flush_sync(p2m);
             for ( j = 0; j < n; ++j )
                 set_gpfn_from_mfn(mfn_x(mfn), INVALID_M2P_ENTRY);
             p2m_pod_cache_add(p2m, page, cur_order);
@@ -755,6 +756,7 @@ p2m_pod_zero_check_superpage(struct p2m_domain *p2m, unsigned long gfn)
     /* Try to remove the page, restoring old mapping if it fails. */
     p2m_set_entry(p2m, gfn, _mfn(INVALID_MFN), PAGE_ORDER_2M,
                   p2m_populate_on_demand, p2m->default_access);
+    p2m_tlb_flush_sync(p2m);
 
     /* Make none of the MFNs are used elsewhere... for example, mapped
      * via the grant table interface, or by qemu.  Allow one refcount for
@@ -885,6 +887,8 @@ p2m_pod_zero_check(struct p2m_domain *p2m, unsigned long *gfns, int count)
             continue;
         }
     }
+
+    p2m_tlb_flush_sync(p2m);
 
     /* Now check each page for real */
     for ( i=0; i < count; i++ )
