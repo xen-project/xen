@@ -525,4 +525,6 @@ class version
     xen_guest_handle
 # Xen command line.
     xen_commandline
+# Xen build id
+    xen_build_id
 }

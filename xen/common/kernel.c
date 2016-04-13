@@ -376,6 +376,42 @@ DO(xen_version)(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
             return -EFAULT;
         return 0;
     }
+
+    case XENVER_build_id:
+    {
+        xen_build_id_t build_id;
+        unsigned int sz;
+        int rc;
+        const void *p;
+
+        if ( deny )
+            return -EPERM;
+
+        /* Only return size. */
+        if ( !guest_handle_is_null(arg) )
+        {
+            if ( copy_from_guest(&build_id, arg, 1) )
+                return -EFAULT;
+
+            if ( build_id.len == 0 )
+                return -EINVAL;
+        }
+
+        rc = xen_build_id(&p, &sz);
+        if ( rc )
+            return rc;
+
+        if ( guest_handle_is_null(arg) )
+            return sz;
+
+        if ( sz > build_id.len )
+            return -ENOBUFS;
+
+        if ( copy_to_guest_offset(arg, offsetof(xen_build_id_t, buf), p, sz) )
+            return -EFAULT;
+
+        return sz;
+    }
     }
 
     return -ENOSYS;

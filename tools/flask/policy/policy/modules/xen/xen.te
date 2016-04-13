@@ -82,6 +82,7 @@ allow dom0_t xen_t:xen2 {
 allow dom0_t xen_t:version {
     xen_extraversion xen_compile_info xen_capabilities
     xen_changeset xen_pagesize xen_guest_handle xen_commandline
+    xen_build_id
 };
 
 allow dom0_t xen_t:mmu memorymap;

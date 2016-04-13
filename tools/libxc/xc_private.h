@@ -197,6 +197,17 @@ enum {
 #define HYPERCALL_BOUNCE_SET_SIZE(_buf, _sz) do { (HYPERCALL_BUFFER(_buf))->sz = _sz; } while (0)
 
 /*
+ * Change the direction.
+ *
+ * Can only be used if the bounce_pre/bounce_post commands have
+ * not been used.
+ */
+#define HYPERCALL_BOUNCE_SET_DIR(_buf, _dir) do { if ((HYPERCALL_BUFFER(_buf))->hbuf)         \
+                                                        assert(1);                            \
+                                                   (HYPERCALL_BUFFER(_buf))->dir = _dir;      \
+                                                } while (0)
+
+/*
  * Initialise and free hypercall safe memory. Takes care of any required
  * copying.
  */

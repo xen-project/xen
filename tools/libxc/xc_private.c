@@ -495,6 +495,13 @@ int xc_version(xc_interface *xch, int cmd, void *arg)
     case XENVER_commandline:
         sz = sizeof(xen_commandline_t);
         break;
+    case XENVER_build_id:
+        {
+            xen_build_id_t *build_id = (xen_build_id_t *)arg;
+            sz = sizeof(*build_id) + build_id->len;
+            HYPERCALL_BOUNCE_SET_DIR(arg, XC_HYPERCALL_BUFFER_BOUNCE_BOTH);
+            break;
+        }
     default:
         ERROR("xc_version: unknown command %d\n", cmd);
         return -EINVAL;
