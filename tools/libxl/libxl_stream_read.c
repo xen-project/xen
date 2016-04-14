@@ -234,16 +234,16 @@ void libxl__stream_read_start(libxl__egc *egc,
     stream->running = true;
     stream->phase   = SRS_PHASE_NORMAL;
 
-    dc->ao       = stream->ao;
-    dc->copywhat = "restore v2 stream";
-    dc->readfd = stream->fd;
-    dc->writefd  = -1;
-
-    if (stream->back_channel)
-        return;
-
     if (stream->legacy) {
-        /* Convert the legacy stream. */
+        /*
+         * Convert the legacy stream.
+         *
+         * This results in a fork()/exec() of conversion helper script.  It is
+         * passed the exiting stream->fd as an input, and returns the
+         * transformed stream via a new pipe.  The fd of this new pipe then
+         * replaces stream->fd, to make the rest of the stream read code
+         * agnostic to whether legacy conversion is happening or not.
+         */
         libxl__conversion_helper_state *chs = &stream->chs;
 
         chs->legacy_fd = stream->fd;
@@ -258,10 +258,25 @@ void libxl__stream_read_start(libxl__egc *egc,
             goto err;
         }
 
+        /* There should be no interaction of COLO backchannels and legacy
+         * stream conversion. */
+        assert(!stream->back_channel);
+
+        /* Confirm *dc is still zeroed out, while we shuffle stream->fd. */
+        assert(dc->ao == NULL);
         assert(stream->chs.v2_carefd);
         stream->fd = libxl__carefd_fd(stream->chs.v2_carefd);
         stream->dcs->libxc_fd = stream->fd;
     }
+    /* stream->fd is now a v2 stream. */
+
+    dc->ao       = stream->ao;
+    dc->copywhat = "restore v2 stream";
+    dc->readfd   = stream->fd;
+    dc->writefd  = -1;
+
+    if (stream->back_channel)
+        return;
 
     /* Start reading the stream header. */
     rc = setup_read(stream, "stream header",
