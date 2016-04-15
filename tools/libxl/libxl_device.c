@@ -1167,6 +1167,24 @@ static void device_hotplug(libxl__egc *egc, libxl__ao_device *aodev)
     }
 
     LOG(DEBUG, "calling hotplug script: %s %s", args[0], args[1]);
+    LOG(DEBUG, "extra args:");
+    {
+        const char *arg;
+        unsigned int x;
+
+        for (x = 2; (arg = args[x]); x++)
+            LOG(DEBUG, "\t%s", arg);
+    }
+    LOG(DEBUG, "env:");
+    {
+        const char *k, *v;
+        unsigned int x;
+
+        for (x = 0; (k = env[x]); x += 2) {
+            v = env[x+1];
+            LOG(DEBUG, "\t%s: %s", k, v);
+        }
+    }
 
     nullfd = open("/dev/null", O_RDONLY);
     if (nullfd < 0) {
