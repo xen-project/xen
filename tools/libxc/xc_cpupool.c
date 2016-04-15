@@ -139,7 +139,7 @@ int xc_cpupool_addcpu(xc_interface *xch,
 }
 
 /*
- * The hypervisor might return EBUSY when trying to remove a cpu from a
+ * The hypervisor might return EADDRINUSE when trying to remove a cpu from a
  * cpupool when a domain running in this cpupool has pinned a vcpu
  * temporarily. Do some retries in this case, perhaps the situation
  * cleans up.
@@ -160,9 +160,7 @@ int xc_cpupool_removecpu(xc_interface *xch,
     sysctl.u.cpupool_op.cpu = (cpu < 0) ? XEN_SYSCTL_CPUPOOL_PAR_ANY : cpu;
     for ( retries = 0; retries < NUM_RMCPU_BUSY_RETRIES; retries++ ) {
         err = do_sysctl_save(xch, &sysctl);
-        if ( err < 0 && errno == EBUSY )
-            sleep(1);
-        else
+        if ( err == 0 || errno != EADDRINUSE )
             break;
     }
     return err;
