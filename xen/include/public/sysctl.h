@@ -559,6 +559,42 @@ struct xen_sysctl_cpupool_op {
 typedef struct xen_sysctl_cpupool_op xen_sysctl_cpupool_op_t;
 DEFINE_XEN_GUEST_HANDLE(xen_sysctl_cpupool_op_t);
 
+/*
+ * Error return values of cpupool operations:
+ *
+ * -EADDRINUSE:
+ *  XEN_SYSCTL_CPUPOOL_OP_RMCPU: A vcpu is temporarily pinned to the cpu
+ *    which is to be removed from a cpupool.
+ * -EADDRNOTAVAIL:
+ *  XEN_SYSCTL_CPUPOOL_OP_ADDCPU, XEN_SYSCTL_CPUPOOL_OP_RMCPU: A previous
+ *    request to remove a cpu from a cpupool was terminated with -EAGAIN
+ *    and has not been retried using the same parameters.
+ * -EAGAIN:
+ *  XEN_SYSCTL_CPUPOOL_OP_RMCPU: The cpu can't be removed from the cpupool
+ *    as it is active in the hypervisor. A retry will succeed soon.
+ * -EBUSY:
+ *  XEN_SYSCTL_CPUPOOL_OP_DESTROY, XEN_SYSCTL_CPUPOOL_OP_RMCPU: A cpupool
+ *    can't be destroyed or the last cpu can't be removed as there is still
+ *    a running domain in that cpupool.
+ * -EEXIST:
+ *  XEN_SYSCTL_CPUPOOL_OP_CREATE: A cpupool_id was specified and is already
+ *    existing.
+ * -EINVAL:
+ *  XEN_SYSCTL_CPUPOOL_OP_ADDCPU, XEN_SYSCTL_CPUPOOL_OP_RMCPU: An illegal
+ *    cpu was specified (cpu does not exist).
+ *  XEN_SYSCTL_CPUPOOL_OP_MOVEDOMAIN: An illegal domain was specified
+ *    (domain id illegal or not suitable for operation).
+ * -ENODEV:
+ *  XEN_SYSCTL_CPUPOOL_OP_ADDCPU, XEN_SYSCTL_CPUPOOL_OP_RMCPU: The specified
+ *    cpu is either not free (add) or not member of the specified cpupool
+ *    (remove).
+ * -ENOENT:
+ *  all: The cpupool with the specified cpupool_id doesn't exist.
+ *
+ * Some common error return values like -ENOMEM and -EFAULT are possible for
+ * all the operations.
+ */
+
 #define ARINC653_MAX_DOMAINS_PER_SCHEDULE   64
 /*
  * This structure is used to pass a new ARINC653 schedule from a
