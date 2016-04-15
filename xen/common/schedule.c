@@ -688,7 +688,7 @@ int cpu_disable_scheduler(unsigned int cpu)
                 {
                     /* The vcpu is temporarily pinned, can't move it. */
                     vcpu_schedule_unlock_irqrestore(lock, flags, v);
-                    ret = -EBUSY;
+                    ret = -EADDRINUSE;
                     break;
                 }
 

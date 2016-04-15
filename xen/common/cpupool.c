@@ -264,7 +264,7 @@ static int cpupool_assign_cpu_locked(struct cpupool *c, unsigned int cpu)
     struct domain *d;
 
     if ( (cpupool_moving_cpu == cpu) && (c != cpupool_cpu_moving) )
-        return -EBUSY;
+        return -EADDRNOTAVAIL;
     ret = schedule_cpu_switch(cpu, c);
     if ( ret )
         return ret;
@@ -301,7 +301,7 @@ static long cpupool_unassign_cpu_helper(void *info)
     spin_lock(&cpupool_lock);
     if ( c != cpupool_cpu_moving )
     {
-        ret = -EBUSY;
+        ret = -EADDRNOTAVAIL;
         goto out;
     }
 
@@ -366,7 +366,7 @@ static int cpupool_unassign_cpu(struct cpupool *c, unsigned int cpu)
                     c->cpupool_id, cpu);
 
     spin_lock(&cpupool_lock);
-    ret = -EBUSY;
+    ret = -EADDRNOTAVAIL;
     if ( (cpupool_moving_cpu != -1) && (cpu != cpupool_moving_cpu) )
         goto out;
     if ( cpumask_test_cpu(cpu, &cpupool_locked_cpus) )
@@ -537,7 +537,7 @@ static int cpupool_cpu_add(unsigned int cpu)
  */
 static int cpupool_cpu_remove(unsigned int cpu)
 {
-    int ret = -EBUSY;
+    int ret = -ENODEV;
 
     spin_lock(&cpupool_lock);
     if ( system_state == SYS_STATE_suspend )
@@ -647,7 +647,7 @@ int cpupool_do_sysctl(struct xen_sysctl_cpupool_op *op)
         ret = -EINVAL;
         if ( cpu >= nr_cpu_ids )
             goto addcpu_out;
-        ret = -EBUSY;
+        ret = -ENODEV;
         if ( !cpumask_test_cpu(cpu, &cpupool_free_cpus) )
             goto addcpu_out;
         c = cpupool_find_by_id(op->cpupool_id);
