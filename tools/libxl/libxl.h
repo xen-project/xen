@@ -1230,7 +1230,7 @@ int libxl_domain_create_restore(libxl_ctx *ctx, libxl_domain_config *d_config,
 
 #if defined(LIBXL_API_VERSION) && LIBXL_API_VERSION < 0x040400
 
-int static inline libxl_domain_create_restore_0x040200(
+static inline int libxl_domain_create_restore_0x040200(
     libxl_ctx *ctx, libxl_domain_config *d_config,
     uint32_t *domid, int restore_fd,
     const libxl_asyncop_how *ao_how,
@@ -1254,7 +1254,7 @@ int static inline libxl_domain_create_restore_0x040200(
 #elif defined(LIBXL_API_VERSION) && LIBXL_API_VERSION >= 0x040400 \
                                  && LIBXL_API_VERSION < 0x040700
 
-int static inline libxl_domain_create_restore_0x040400(
+static inline int libxl_domain_create_restore_0x040400(
     libxl_ctx *ctx, libxl_domain_config *d_config,
     uint32_t *domid, int restore_fd,
     const libxl_domain_restore_params *params,
