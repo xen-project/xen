@@ -460,7 +460,7 @@ static void xc_cpuid_config_xsave(xc_interface *xch,
     {
     case 0:
         /* EAX: low 32bits of xfeature_enabled_mask */
-        regs[0] = guest_xfeature_mask & 0xFFFFFFFF;
+        regs[0] = (uint32_t)guest_xfeature_mask;
         /* EDX: high 32bits of xfeature_enabled_mask */
         regs[3] = guest_xfeature_mask >> 32;
         /* ECX: max size required by all HW features */
@@ -487,8 +487,8 @@ static void xc_cpuid_config_xsave(xc_interface *xch,
 
         if ( test_bit(X86_FEATURE_XSAVES, info->featureset) )
         {
-            regs[2] = guest_xfeature_mask & X86_XSS_MASK & 0xFFFFFFFF;
-            regs[3] = (guest_xfeature_mask >> 32) & X86_XSS_MASK;
+            regs[2] = (uint32_t)(guest_xfeature_mask & X86_XSS_MASK);
+            regs[3] = (guest_xfeature_mask & X86_XSS_MASK) >> 32;
         }
         else
             regs[2] = regs[3] = 0;
