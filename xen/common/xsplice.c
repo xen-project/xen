@@ -531,6 +531,31 @@ static int prepare_payload(struct payload *payload,
                                   sizeof(*region->frame[i].bugs);
     }
 
+#ifndef CONFIG_ARM
+    sec = xsplice_elf_sec_by_name(elf, ".ex_table");
+    if ( sec )
+    {
+        struct exception_table_entry *s, *e;
+
+        if ( !sec->sec->sh_size ||
+             (sec->sec->sh_size % sizeof(*region->ex)) )
+        {
+            dprintk(XENLOG_ERR, XSPLICE "%s: Wrong size of .ex_table (exp:%lu vs %lu)!\n",
+                    elf->name, sizeof(*region->ex),
+                    sec->sec->sh_size);
+            return -EINVAL;
+        }
+
+        s = sec->load_addr;
+        e = sec->load_addr + sec->sec->sh_size;
+
+        sort_exception_table(s ,e);
+
+        region->ex = s;
+        region->ex_end = e;
+    }
+#endif
+
     return 0;
 }
 

@@ -14,6 +14,16 @@ struct xen_sysctl_xsplice_op;
 #include <xen/elfstructs.h>
 #ifdef CONFIG_XSPLICE
 
+/*
+ * We use alternative and exception table code - which by default are __init
+ * only, however we need them during runtime. These macros allows us to build
+ * the image with these functions built-in. (See the #else below).
+ */
+#define init_or_xsplice_const
+#define init_or_xsplice_constrel
+#define init_or_xsplice_data
+#define init_or_xsplice
+
 /* Convenience define for printk. */
 #define XSPLICE             "xsplice: "
 /* ELF payload special section names. */
@@ -69,6 +79,15 @@ void arch_xsplice_post_action(void);
 void arch_xsplice_mask(void);
 void arch_xsplice_unmask(void);
 #else
+
+/*
+ * If not compiling with xSplice certain functionality should stay as
+ * __init.
+ */
+#define init_or_xsplice_const       __initconst
+#define init_or_xsplice_constrel    __initconstrel
+#define init_or_xsplice_data        __initdata
+#define init_or_xsplice             __init
 
 #include <xen/errno.h> /* For -ENOSYS */
 static inline int xsplice_op(struct xen_sysctl_xsplice_op *op)

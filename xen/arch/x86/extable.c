@@ -7,6 +7,7 @@
 #include <xen/spinlock.h>
 #include <asm/uaccess.h>
 #include <xen/virtual_region.h>
+#include <xen/xsplice.h>
 
 #define EX_FIELD(ptr, field) ((unsigned long)&(ptr)->field + (ptr)->field)
 
@@ -20,7 +21,7 @@ static inline unsigned long ex_cont(const struct exception_table_entry *x)
 	return EX_FIELD(x, cont);
 }
 
-static int __init cmp_ex(const void *a, const void *b)
+static int init_or_xsplice cmp_ex(const void *a, const void *b)
 {
 	const struct exception_table_entry *l = a, *r = b;
 	unsigned long lip = ex_addr(l);
@@ -35,7 +36,7 @@ static int __init cmp_ex(const void *a, const void *b)
 }
 
 #ifndef swap_ex
-static void __init swap_ex(void *a, void *b, int size)
+static void init_or_xsplice swap_ex(void *a, void *b, int size)
 {
 	struct exception_table_entry *l = a, *r = b, tmp;
 	long delta = b - a;
@@ -48,19 +49,23 @@ static void __init swap_ex(void *a, void *b, int size)
 }
 #endif
 
-void __init sort_exception_tables(void)
+void init_or_xsplice sort_exception_table(struct exception_table_entry *start,
+                                 const struct exception_table_entry *stop)
 {
-    sort(__start___ex_table, __stop___ex_table - __start___ex_table,
-         sizeof(struct exception_table_entry), cmp_ex, swap_ex);
-    sort(__start___pre_ex_table,
-         __stop___pre_ex_table - __start___pre_ex_table,
+    sort(start, stop - start,
          sizeof(struct exception_table_entry), cmp_ex, swap_ex);
 }
 
-static inline unsigned long
-search_one_table(const struct exception_table_entry *first,
-                 const struct exception_table_entry *last,
-                 unsigned long value)
+void __init sort_exception_tables(void)
+{
+    sort_exception_table(__start___ex_table, __stop___ex_table);
+    sort_exception_table(__start___pre_ex_table, __stop___pre_ex_table);
+}
+
+unsigned long
+search_one_extable(const struct exception_table_entry *first,
+                   const struct exception_table_entry *last,
+                   unsigned long value)
 {
     const struct exception_table_entry *mid;
     long diff;
@@ -85,7 +90,7 @@ search_exception_table(unsigned long addr)
     const struct virtual_region *region = find_text_region(addr);
 
     if ( region && region->ex )
-        return search_one_table(region->ex, region->ex_end - 1, addr);
+        return search_one_extable(region->ex, region->ex_end - 1, addr);
 
     return 0;
 }
@@ -94,7 +99,7 @@ unsigned long
 search_pre_exception_table(struct cpu_user_regs *regs)
 {
     unsigned long addr = (unsigned long)regs->eip;
-    unsigned long fixup = search_one_table(
+    unsigned long fixup = search_one_extable(
         __start___pre_ex_table, __stop___pre_ex_table-1, addr);
     if ( fixup )
     {
