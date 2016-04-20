@@ -16,6 +16,7 @@
 #include <xen/spinlock.h>
 #include <xen/string.h>
 #include <xen/symbols.h>
+#include <xen/version.h>
 #include <xen/virtual_region.h>
 #include <xen/vmap.h>
 #include <xen/wait.h>
@@ -1352,9 +1353,14 @@ static const char *state2str(unsigned int state)
 static void xsplice_printall(unsigned char key)
 {
     struct payload *data;
+    const void *binary_id = NULL;
+    unsigned int len = 0;
     unsigned int i;
 
     printk("'%c' pressed - Dumping all xsplice patches\n", key);
+
+    if ( !xen_build_id(&binary_id, &len) )
+        printk("build-id: %*phN\n", len, binary_id);
 
     if ( !spin_trylock(&payload_lock) )
     {
@@ -1392,6 +1398,12 @@ static void xsplice_printall(unsigned char key)
 
 static int __init xsplice_init(void)
 {
+    const void *binary_id;
+    unsigned int len;
+
+    if ( !xen_build_id(&binary_id, &len) )
+        printk(XENLOG_INFO XSPLICE ": build-id: %*phN\n", len, binary_id);
+
     register_keyhandler('x', xsplice_printall, "print xsplicing info", 1);
 
     arch_xsplice_init();
