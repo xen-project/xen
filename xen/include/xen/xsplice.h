@@ -19,8 +19,15 @@ struct xen_sysctl_xsplice_op;
 /* ELF payload special section names. */
 #define ELF_XSPLICE_FUNC    ".xsplice.funcs"
 
+struct xsplice_symbol {
+    const char *name;
+    unsigned long value;
+    bool_t new_symbol;
+};
+
 int xsplice_op(struct xen_sysctl_xsplice_op *);
 void check_for_xsplice_work(void);
+unsigned long xsplice_symbols_lookup_by_name(const char *symname);
 
 /* Arch hooks. */
 int arch_xsplice_verify_elf(const struct xsplice_elf *elf);

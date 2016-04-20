@@ -5,6 +5,7 @@
 
 #include "config.h"
 #include <xen/types.h>
+#include <xen/version.h>
 #include <xen/xsplice.h>
 
 #include <public/sysctl.h>
@@ -16,7 +17,7 @@ struct xsplice_patch_func __section(".xsplice.funcs") xsplice_xen_hello_world = 
     .version = XSPLICE_PAYLOAD_VERSION,
     .name = hello_world_patch_this_fnc,
     .new_addr = xen_hello_world,
-    .old_addr = (void *)OLD_CODE,
+    .old_addr = xen_extra_version,
     .new_size = NEW_CODE_SZ,
     .old_size = OLD_CODE_SZ,
 };

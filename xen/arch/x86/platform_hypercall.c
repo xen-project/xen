@@ -798,12 +798,13 @@ ret_t do_platform_op(XEN_GUEST_HANDLE_PARAM(xen_platform_op_t) u_xenpf_op)
         static char name[KSYM_NAME_LEN + 1]; /* protected by xenpf_lock */
         XEN_GUEST_HANDLE(char) nameh;
         uint32_t namelen, copylen;
+        unsigned long addr;
 
         guest_from_compat_handle(nameh, op->u.symdata.name);
 
         ret = xensyms_read(&op->u.symdata.symnum, &op->u.symdata.type,
-                           &op->u.symdata.address, name);
-
+                           &addr, name);
+        op->u.symdata.address = addr;
         namelen = strlen(name) + 1;
 
         if ( namelen > op->u.symdata.namelen )

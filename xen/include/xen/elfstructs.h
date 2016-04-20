@@ -263,6 +263,7 @@ typedef struct {
 #define SHF_WRITE	0x1		/* Writable */
 #define SHF_ALLOC	0x2		/* occupies memory */
 #define SHF_EXECINSTR	0x4		/* executable */
+#define SHF_MERGE	0x10            /* mergeable */
 #define SHF_MASKPROC	0xf0000000	/* reserved bits for processor */
 					/*  specific section attributes */
 

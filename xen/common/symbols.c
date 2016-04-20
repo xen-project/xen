@@ -170,7 +170,7 @@ static char symbols_get_symbol_type(unsigned int off)
 }
 
 int xensyms_read(uint32_t *symnum, char *type,
-                 uint64_t *address, char *name)
+                 unsigned long *address, char *name)
 {
     /*
      * Symbols are most likely accessed sequentially so we remember position
@@ -207,3 +207,37 @@ int xensyms_read(uint32_t *symnum, char *type,
 
     return 0;
 }
+
+unsigned long symbols_lookup_by_name(const char *symname)
+{
+    char name[KSYM_NAME_LEN + 1];
+    uint32_t symnum = 0;
+    char type;
+    unsigned long addr;
+    int rc;
+
+    if ( *symname == '\0' )
+        return 0;
+
+    do {
+        rc = xensyms_read(&symnum, &type, &addr, name);
+        if ( rc )
+           break;
+
+        if ( !strcmp(name, symname) )
+            return addr;
+
+    } while ( name[0] != '\0' );
+
+    return 0;
+}
+
+/*
+ * Local variables:
+ * mode: C
+ * c-file-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */
