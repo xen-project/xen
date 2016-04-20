@@ -219,8 +219,11 @@ int parseNetDevLine(char *line, char *iface, unsigned long long *rxBytes, unsign
 				}
 				else
 				/* There were errors when parsing this directly in RE. strpbrk() helps */
-				if (iface != NULL)
-					strcpy(iface, strpbrk(tmp, "abcdefghijklmnopqrstvuwxyz0123456789"));
+				if (iface != NULL) {
+					char *tmp2 = strpbrk(tmp, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789");
+					if (tmp2 != NULL)
+						strcpy(iface, tmp2);
+				}
 
 				memset(tmp, 0, matches[i].rm_eo - matches[i].rm_so);
 			}
