@@ -153,11 +153,11 @@ static char *number(
     static const char large_digits[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
     int i;
 
+    ASSERT(base >= 2 && base <= 36);
+
     digits = (type & LARGE) ? large_digits : small_digits;
     if (type & LEFT)
         type &= ~ZEROPAD;
-    if (base < 2 || base > 36)
-        return NULL;
     c = (type & ZEROPAD) ? '0' : ' ';
     sign = 0;
     if (type & SIGN) {
