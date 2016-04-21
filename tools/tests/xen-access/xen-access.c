@@ -598,7 +598,7 @@ int main(int argc, char *argv[])
                 }
 
                 printf("PAGE ACCESS: %c%c%c for GFN %"PRIx64" (offset %06"
-                       PRIx64") gla %016"PRIx64" (valid: %c; fault in gpt: %c; fault with gla: %c) (vcpu %u, altp2m view %u)\n",
+                       PRIx64") gla %016"PRIx64" (valid: %c; fault in gpt: %c; fault with gla: %c) (vcpu %u [%c], altp2m view %u)\n",
                        (req.u.mem_access.flags & MEM_ACCESS_R) ? 'r' : '-',
                        (req.u.mem_access.flags & MEM_ACCESS_W) ? 'w' : '-',
                        (req.u.mem_access.flags & MEM_ACCESS_X) ? 'x' : '-',
@@ -609,13 +609,14 @@ int main(int argc, char *argv[])
                        (req.u.mem_access.flags & MEM_ACCESS_FAULT_IN_GPT) ? 'y' : 'n',
                        (req.u.mem_access.flags & MEM_ACCESS_FAULT_WITH_GLA) ? 'y': 'n',
                        req.vcpu_id,
+                       (req.flags & VM_EVENT_FLAG_VCPU_PAUSED) ? 'p' : 'r',
                        req.altp2m_idx);
 
                 if ( altp2m && req.flags & VM_EVENT_FLAG_ALTERNATE_P2M)
                 {
                     DPRINTF("\tSwitching back to default view!\n");
 
-                    rsp.flags |= VM_EVENT_FLAG_TOGGLE_SINGLESTEP;
+                    rsp.flags |= (VM_EVENT_FLAG_ALTERNATE_P2M | VM_EVENT_FLAG_TOGGLE_SINGLESTEP);
                     rsp.altp2m_idx = 0;
                 }
                 else if ( default_access != after_first_access )
@@ -652,9 +653,10 @@ int main(int argc, char *argv[])
 
                 break;
             case VM_EVENT_REASON_SINGLESTEP:
-                printf("Singlestep: rip=%016"PRIx64", vcpu %d\n",
+                printf("Singlestep: rip=%016"PRIx64", vcpu %d, altp2m %u\n",
                        req.data.regs.x86.rip,
-                       req.vcpu_id);
+                       req.vcpu_id,
+                       req.altp2m_idx);
 
                 if ( altp2m )
                 {
