@@ -565,6 +565,13 @@ union hsr {
 
 #define FSC_LL_MASK    (_AC(0x03,U)<<0)
 
+/* HPFAR_EL2: Hypervisor IPA Fault Address Register */
+#ifdef CONFIG_ARM_64
+#define HPFAR_MASK	GENMASK(39, 4)
+#else
+#define HPFAR_MASK	GENMASK(31, 4)
+#endif
+
 /* Time counter hypervisor control register */
 #define CNTHCTL_EL2_EL1PCTEN (1u<<0) /* Kernel/user access to physical counter */
 #define CNTHCTL_EL2_EL1PCEN  (1u<<1) /* Kernel/user access to CNTP timer regs */
