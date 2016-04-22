@@ -1608,7 +1608,22 @@ static int hvmemul_invlpg(
     rc = hvmemul_virtual_to_linear(
         seg, offset, 1, &reps, hvm_access_none, hvmemul_ctxt, &addr);
 
-    if ( rc == X86EMUL_OKAY )
+    if ( rc == X86EMUL_EXCEPTION )
+    {
+        /*
+         * `invlpg` takes segment bases into account, but is not subject to
+         * faults from segment type/limit checks, and is specified as a NOP
+         * when issued on non-canonical addresses.
+         *
+         * hvmemul_virtual_to_linear() raises exceptions for type/limit
+         * violations, so squash them.
+         */
+        hvmemul_ctxt->exn_pending = 0;
+        hvmemul_ctxt->trap = (struct hvm_trap){};
+        rc = X86EMUL_OKAY;
+    }
+
+    if ( rc == X86EMUL_OKAY && is_canonical_address(addr) )
         hvm_funcs.invlpg_intercept(addr);
 
     return rc;
