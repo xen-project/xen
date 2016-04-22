@@ -2362,6 +2362,13 @@ done:
     if (first) unmap_domain_page(first);
 }
 
+static inline paddr_t get_faulting_ipa(void)
+{
+    register_t hpfar = READ_SYSREG(HPFAR_EL2);
+
+    return ((paddr_t)(hpfar & HPFAR_MASK) << (12 - 4));
+}
+
 static void do_trap_instr_abort_guest(struct cpu_user_regs *regs,
                                       const union hsr hsr)
 {
@@ -2380,7 +2387,7 @@ static void do_trap_instr_abort_guest(struct cpu_user_regs *regs,
         };
 
         if ( hsr.iabt.s1ptw )
-            gpa = READ_SYSREG(HPFAR_EL2);
+            gpa = get_faulting_ipa();
         else
         {
             /*
@@ -2430,7 +2437,7 @@ static void do_trap_data_abort_guest(struct cpu_user_regs *regs,
 #endif
 
     if ( dabt.s1ptw )
-        info.gpa = READ_SYSREG(HPFAR_EL2);
+        info.gpa = get_faulting_ipa();
     else
     {
         rc = gva_to_ipa(info.gva, &info.gpa, GV2M_READ);
