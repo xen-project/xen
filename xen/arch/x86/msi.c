@@ -434,8 +434,13 @@ static bool_t msi_set_mask_bit(struct irq_desc *desc, bool_t host, bool_t guest)
         {
             writel(flag, entry->mask_base + PCI_MSIX_ENTRY_VECTOR_CTRL_OFFSET);
             readl(entry->mask_base + PCI_MSIX_ENTRY_VECTOR_CTRL_OFFSET);
+
             if ( likely(control & PCI_MSIX_FLAGS_ENABLE) )
                 break;
+
+            entry->msi_attrib.host_masked = host;
+            entry->msi_attrib.guest_masked = guest;
+
             flag = 1;
         }
         else if ( flag && !(control & PCI_MSIX_FLAGS_MASKALL) )
