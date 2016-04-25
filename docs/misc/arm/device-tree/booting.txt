@@ -26,19 +26,24 @@ Each node contains the following properties:
 	Xen will assume that the first module which lacks a more
 	specific compatible string is a "multiboot,kernel".
 
-	Xen will check all the modules for the XSM Magic from the second
-	module that lacks a specific compatible string. According to the
-	result of the detection:
-	- if it's an XSM, Xen will assume its compatible string is
+	Xen will examine each module, starting from the second
+	module that lacks a specific compatible string.  Xen will
+	check each such module for the XSM Magic number:
+
+	- For a module which has the XSM Magic number: it will be
+	  treated by Xen as if its compatible string was
 	  "xen,xsm-policy";
-	- if it's not an XSM, for the second module that lacks a specific
-	  compatible string, Xen will assume its compatible string is
-	  "multiboot,ramdisk"; the third and subsequent modules that
-	  lack a specific compatible string will not receive any special
-	  treatment.
-	This means that if the ramdisk module is present and does not have
-	the compatible string "multiboot,ramdisk", then it must always be
-	the second module.
+
+	- For a module which does not have the XSM Magic: the second
+	  module lacking a compatible string will be treated by Xen as
+	  if its compatible string was "multiboot,ramdisk"; for the
+	  third and subsequent modules which lack a specific
+	  compatible string, Xen will not apply any special treatment.
+
+	This means if the ramdisk module is present and does not have the
+	compatible string "multiboot,ramdisk", then it must always be the
+	second module.
+
 	Note: This XSM Magic detection behavior was introduced by Xen 4.7.
 	Xen 4.6 (and downwards) still requires the XSM module to have the
 	compatible string "xen,xsm-policy".
