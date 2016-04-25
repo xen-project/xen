@@ -180,21 +180,23 @@ txt/%.txt: %.markdown
 	@$(INSTALL_DIR) $(@D)
 	$(INSTALL_DATA) $< $@
 
-pdf/%.pdf: %.markdown
+# Metarule for generating pandoc rules.
+define GENERATE_PANDOC_RULE
+# $(1) is the target documentation format. $(2) is the source format.
+
+$(1)/%.$(1): %.$(2)
 ifneq ($(PANDOC),)
-	@$(INSTALL_DIR) $(@D)
-	$(PANDOC) --number-sections --toc --standalone $< --output $@
+	@$(INSTALL_DIR) $$(@D)
+	$(PANDOC) --number-sections --toc --standalone $$< --output $$@
 else
-	@echo "pandoc not installed; skipping $@"
+	@echo "pandoc not installed; skipping $$@"
 endif
 
-pdf/%.pdf txt/%.txt html/%.html: %.pandoc
-ifneq ($(PANDOC),)
-	@$(INSTALL_DIR) $(@D)
-	$(PANDOC) --number-sections --toc --standalone $< --output $@
-else
-	@echo "pandoc not installed; skipping $@"
-endif
+endef
+$(eval $(call GENERATE_PANDOC_RULE,pdf,pandoc))   # pdf/%.pdf: %.pandoc
+$(eval $(call GENERATE_PANDOC_RULE,txt,pandoc))   # txt/%.txt: %.pandoc
+$(eval $(call GENERATE_PANDOC_RULE,html,pandoc))  # html/%.html: %.pandoc
+$(eval $(call GENERATE_PANDOC_RULE,pdf,markdown)) # pdf/%.pdf: %.markdown
 
 ifeq (,$(findstring clean,$(MAKECMDGOALS)))
 $(XEN_ROOT)/config/Docs.mk:
