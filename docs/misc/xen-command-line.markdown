@@ -684,8 +684,10 @@ to use the default.
 > Default: `enforcing`
 
 Specify how the FLASK security server should be configured.  This option is only
-available if the hypervisor was compiled with XSM support (which can be enabled
-by setting XSM\_ENABLE = y in .config).
+available if the hypervisor was compiled with FLASK support.  This can be
+enabled by running either:
+- make -C xen config and enabling XSM and FLASK.
+- make -C xen menuconfig and enabling 'FLux Advanced Security Kernel support' and 'Xen Security Modules support'
 
 * `permissive`: This is intended for development and is not suitable for use
   with untrusted guests.  If a policy is provided by the bootloader, it will be
@@ -824,7 +826,7 @@ Paging (HAP).
 Enable late hardware domain creation using the specified domain ID.  This is
 intended to be used when domain 0 is a stub domain which builds a disaggregated
 system including a hardware domain with the specified domain ID.  This option is
-supported only when compiled with XSM\_ENABLE=y on x86.
+supported only when compiled with XSM on x86.
 
 ### hest\_disable
 > ` = <boolean>`
