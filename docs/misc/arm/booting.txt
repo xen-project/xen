@@ -23,6 +23,17 @@ The exceptions to this on 32-bit ARM are as follows:
 
 There are no exception on 64-bit ARM.
 
+
+Firmware/bootloader requirements
+--------------------------------
+
+Xen relies on some settings the firmware has to configure in EL3 before starting Xen.
+
+* Xen must be entered in NS EL2 mode
+
+* The bit SCR_EL3.HCR (resp. SCR.HCE for 32-bit ARM) must be set to 1.
+
+
 [1] linux/Documentation/arm/Booting
 Latest version: http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/Documentation/arm/Booting
 
