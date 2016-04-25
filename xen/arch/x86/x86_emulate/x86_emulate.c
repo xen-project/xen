@@ -652,13 +652,20 @@ do {                                                                    \
     _regs.eip = ip;                                                     \
 } while (0)
 
-#define validate_far_branch(cs, ip)                                     \
-    generate_exception_if(in_longmode(ctxt, ops) && (cs)->attr.fields.l \
-                          ? !is_canonical_address(ip)                   \
-                          : (ip) > (cs)->limit, EXC_GP, 0)
+#define validate_far_branch(cs, ip) ({                                  \
+    if ( sizeof(ip) <= 4 ) {                                            \
+        ASSERT(in_longmode(ctxt, ops) <= 0);                            \
+        generate_exception_if((ip) > (cs)->limit, EXC_GP, 0);           \
+    } else                                                              \
+        generate_exception_if(in_longmode(ctxt, ops) &&                 \
+                              (cs)->attr.fields.l                       \
+                              ? !is_canonical_address(ip)               \
+                              : (ip) > (cs)->limit, EXC_GP, 0);         \
+})
 
 #define commit_far_branch(cs, ip) ({                                    \
     validate_far_branch(cs, ip);                                        \
+    _regs.eip = (ip);                                                   \
     ops->write_segment(x86_seg_cs, cs, ctxt);                           \
 })
 
@@ -2802,7 +2809,6 @@ x86_emulate(
              (rc = load_seg(x86_seg_cs, src.val, 1, &cs, ctxt, ops)) ||
              (rc = commit_far_branch(&cs, dst.val)) )
             goto done;
-        _regs.eip = dst.val;
         break;
     }
 
@@ -2845,9 +2851,8 @@ x86_emulate(
         eflags &= 0x257fd5;
         _regs.eflags &= mask;
         _regs.eflags |= (eflags & ~mask) | 0x02;
-        _regs.eip = eip;
         if ( (rc = load_seg(x86_seg_cs, sel, 1, &cs, ctxt, ops)) ||
-             (rc = commit_far_branch(&cs, eip)) )
+             (rc = commit_far_branch(&cs, (uint32_t)eip)) )
             goto done;
         break;
     }
@@ -3480,7 +3485,6 @@ x86_emulate(
         if ( (rc = load_seg(x86_seg_cs, sel, 0, &cs, ctxt, ops)) ||
              (rc = commit_far_branch(&cs, eip)) )
             goto done;
-        _regs.eip = eip;
         break;
     }
 
@@ -3782,11 +3786,11 @@ x86_emulate(
                                       &_regs.eip, op_bytes, ctxt)) ||
                      (rc = ops->write_segment(x86_seg_cs, &cs, ctxt)) )
                     goto done;
+                _regs.eip = src.val;
             }
             else if ( (rc = load_seg(x86_seg_cs, sel, 0, &cs, ctxt, ops)) ||
                       (rc = commit_far_branch(&cs, src.val)) )
                 goto done;
-            _regs.eip = src.val;
 
             dst.type = OP_NONE;
             break;
