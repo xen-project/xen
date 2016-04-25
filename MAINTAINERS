@@ -340,7 +340,6 @@ S:	Supported
 F:	.travis.yml
 
 UNMODIFIED LINUX PV DRIVERS
-M:	Keir Fraser <keir@xen.org>
 M:	Jan Beulich <jbeulich@suse.com>
 S:	Obsolete
 L:	xen-devel@lists.xen.org
@@ -375,7 +374,6 @@ F:	stubdom/vtpmmgr/
 F:	docs/misc/vtpm.txt
 
 X86 ARCHITECTURE
-M:	Keir Fraser <keir@xen.org>
 M:	Jan Beulich <jbeulich@suse.com>
 M:	Andrew Cooper <andrew.cooper3@citrix.com>
 S:	Supported
@@ -442,7 +440,6 @@ M:	Andrew Cooper <andrew.cooper3@citrix.com>
 M:	George Dunlap <George.Dunlap@eu.citrix.com>
 M:	Ian Jackson <ian.jackson@eu.citrix.com>
 M:	Jan Beulich <jbeulich@suse.com>
-M:	Keir Fraser <keir@xen.org>
 M:	Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
 M:	Stefano Stabellini <sstabellini@kernel.org>
 M:	Tim Deegan <tim@xen.org>
