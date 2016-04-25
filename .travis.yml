@@ -75,18 +75,18 @@ addons:
             - gcc-5
             - g++-5
             - clang-3.8
+            - seabios
 # we must set CXX manually instead of using 'language: cpp' due to
 # travis-ci/travis-ci#3871
 before_script:
     - export CXX=${CC/cc/++}
     - export CXX=${CXX/clang/clang++}
 script:
-    - ( [ "x${RANDCONFIG}" = "xy" ] && ( make -C xen randconfig )
-      || exit 0 )
-    - ( ./configure --disable-tools --disable-stubdom --enable-docs &&
-      make dist )
+    - ./scripts/travis-build
 after_script:
     - cat xen/.config
+    - cat tools/config.log
+    - cat docs/config.log
 notifications:
     irc:
         channels:
