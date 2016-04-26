@@ -4,7 +4,8 @@ include $(XEN_ROOT)/tools/Rules.mk
 .PHONY: all
 all: build
 
-PY_CFLAGS = $(CFLAGS) $(PY_NOOPT_CFLAGS) $(LDFLAGS) $(APPEND_LDFLAGS)
+PY_CFLAGS = $(CFLAGS) $(PY_NOOPT_CFLAGS)
+PY_LDFLAGS = $(LDFLAGS) $(APPEND_LDFLAGS)
 
 .PHONY: build
 build:
@@ -14,8 +15,9 @@ build:
 install:
 	$(INSTALL_DIR) $(DESTDIR)$(LIBEXEC_BIN)
 
-	CC="$(CC)" CFLAGS="$(PY_CFLAGS)" $(PYTHON) setup.py install \
-		$(PYTHON_PREFIX_ARG) --root="$(DESTDIR)" --force
+	CC="$(CC)" CFLAGS="$(PY_CFLAGS)" LDFLAGS="$(PY_LDFLAGS)" $(PYTHON) \
+		setup.py install $(PYTHON_PREFIX_ARG) --root="$(DESTDIR)"  \
+		--force
 
 	$(INSTALL_PROG) scripts/convert-legacy-stream $(DESTDIR)$(LIBEXEC_BIN)
 	$(INSTALL_PROG) scripts/verify-stream-v2 $(DESTDIR)$(LIBEXEC_BIN)
