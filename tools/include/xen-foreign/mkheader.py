@@ -20,8 +20,8 @@ footer = {};
 inttypes["arm32"] = {
     "unsigned long" : "__danger_unsigned_long_on_arm32",
     "long"          : "__danger_long_on_arm32",
-    "xen_pfn_t"     : "__align8__ uint64_t",
-    "xen_ulong_t"   : "__align8__ uint64_t",
+    "xen_pfn_t"     : "uint64_t",
+    "xen_ulong_t"   : "uint64_t",
     "uint64_t"      : "__align8__ uint64_t",
 };
 header["arm32"] = """
@@ -41,8 +41,8 @@ footer["arm32"] = """
 inttypes["arm64"] = {
     "unsigned long" : "__danger_unsigned_long_on_arm64",
     "long"          : "__danger_long_on_arm64",
-    "xen_pfn_t"     : "__align8__ uint64_t",
-    "xen_ulong_t"   : "__align8__ uint64_t",
+    "xen_pfn_t"     : "uint64_t",
+    "xen_ulong_t"   : "uint64_t",
     "uint64_t"      : "__align8__ uint64_t",
 };
 header["arm64"] = """
