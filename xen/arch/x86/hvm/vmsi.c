@@ -349,6 +349,8 @@ static int msixtbl_range(struct vcpu *v, unsigned long addr)
     {
         const ioreq_t *r = &v->arch.hvm_vcpu.hvm_io.io_req;
 
+        if ( r->state != STATE_IOREQ_READY )
+            return 0;
         ASSERT(r->type == IOREQ_TYPE_COPY);
         if ( r->dir == IOREQ_WRITE && r->size == 4 && !r->data_is_ptr
              && !(r->data & PCI_MSIX_VECTOR_BITMASK) )
