@@ -270,43 +270,42 @@ elfnote_fill_xen_version(xc_interface *xch,
                          *xen_version)
 {
     int rc;
-    xen_version_op_val_t val = 0;
     memset(xen_version, 0, sizeof(*xen_version));
 
-    rc = xc_version(xch, XEN_VERSION_version, &val, sizeof(val));
+    rc = xc_version(xch, XENVER_version, NULL);
     if ( rc < 0 )
         return rc;
-    xen_version->major_version = val >> 16;
-    xen_version->minor_version = val & ((1 << 16) - 1);
+    xen_version->major_version = rc >> 16;
+    xen_version->minor_version = rc & ((1 << 16) - 1);
 
-    rc = xc_version(xch, XEN_VERSION_extraversion,
-                    xen_version->extra_version,
-                    sizeof(xen_version->extra_version));
-    if ( rc < 0 )
-        return rc;
-
-    rc = xc_version(xch, XEN_VERSION_capabilities,
-                    xen_version->capabilities,
-                    sizeof(xen_version->capabilities));
+    rc = xc_version(xch, XENVER_extraversion,
+                    &xen_version->extra_version);
     if ( rc < 0 )
         return rc;
 
-    rc = xc_version(xch, XEN_VERSION_changeset, xen_version->changeset,
-                    sizeof(xen_version->changeset));
+    rc = xc_version(xch, XENVER_compile_info,
+                    &xen_version->compile_info);
     if ( rc < 0 )
         return rc;
 
-    rc = xc_version(xch, XEN_VERSION_platform_parameters,
-                    &xen_version->platform_parameters,
-                    sizeof(xen_version->platform_parameters));
+    rc = xc_version(xch,
+                    XENVER_capabilities, &xen_version->capabilities);
     if ( rc < 0 )
         return rc;
 
-    val = 0;
-    rc = xc_version(xch, XEN_VERSION_pagesize, &val, sizeof(val));
+    rc = xc_version(xch, XENVER_changeset, &xen_version->changeset);
     if ( rc < 0 )
         return rc;
-    xen_version->pagesize = val;
+
+    rc = xc_version(xch, XENVER_platform_parameters,
+                    &xen_version->platform_parameters);
+    if ( rc < 0 )
+        return rc;
+
+    rc = xc_version(xch, XENVER_pagesize, NULL);
+    if ( rc < 0 )
+        return rc;
+    xen_version->pagesize = rc;
 
     return 0;
 }

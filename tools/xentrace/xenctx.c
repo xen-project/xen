@@ -1000,8 +1000,7 @@ static void dump_ctx(int vcpu)
             guest_word_size = (cpuctx.msr_efer & 0x400) ? 8 :
                 guest_protected_mode ? 4 : 2;
             /* HVM guest context records are always host-sized */
-            if (xc_version(xenctx.xc_handle, XEN_VERSION_capabilities,
-                           &xen_caps, sizeof(xen_caps)) < 0) {
+            if (xc_version(xenctx.xc_handle, XENVER_capabilities, &xen_caps) != 0) {
                 perror("xc_version");
                 return;
             }

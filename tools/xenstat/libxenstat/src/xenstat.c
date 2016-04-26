@@ -621,18 +621,20 @@ unsigned long long xenstat_network_tdrop(xenstat_network * network)
 /* Collect Xen version information */
 static int xenstat_collect_xen_version(xenstat_node * node)
 {
-	xen_version_op_val_t vnum = 0;
+	long vnum = 0;
 	xen_extraversion_t version;
 
 	/* Collect Xen version information if not already collected */
 	if (node->handle->xen_version[0] == '\0') {
 		/* Get the Xen version number and extraversion string */
-		if (xc_version(node->handle->xc_handle,
-			       XEN_VERSION_version, &vnum, sizeof(vnum)) < 0)
+		vnum = xc_version(node->handle->xc_handle,
+			XENVER_version, NULL);
+
+		if (vnum < 0)
 			return 0;
 
-		if (xc_version(node->handle->xc_handle, XEN_VERSION_extraversion,
-			       &version, sizeof(version)) < 0)
+		if (xc_version(node->handle->xc_handle, XENVER_extraversion,
+			&version) < 0)
 			return 0;
 		/* Format the version information as a string and store it */
 		snprintf(node->handle->xen_version, VERSION_SIZE, "%ld.%ld%s",

@@ -1536,37 +1536,7 @@ int xc_tbuf_set_evt_mask(xc_interface *xch, uint32_t mask);
 int xc_domctl(xc_interface *xch, struct xen_domctl *domctl);
 int xc_sysctl(xc_interface *xch, struct xen_sysctl *sysctl);
 
-/**
- * This function returns the size of buffer to be allocated for
- * the cmd. The cmd are XEN_VERSION_*.
- */
-ssize_t xc_version_len(xc_interface *xch, unsigned int cmd);
-
-/**
- * This function retrieves the information from the version_op hypercall.
- * The len is the size of the arg buffer. If arg is NULL, will not
- * perform hypercall - instead will just return the size of arg
- * buffer that is needed.
- *
- * Note that prior to Xen 4.7 this would return 0 for success and
- * negative value (-1) for error (with the error in errno). In Xen 4.7
- * and later for success it will return an positive value which is the
- * number of bytes copied in arg.
- *
- * It can also return -1 with various errno values:
- *  - EPERM - not permitted.
- *  - ENOBUFS - the len was to short, output in arg truncated.
- *  - ENOSYS - not implemented.
- *
- * @parm xch a handle to an open hypervisor interface
- * @parm cmd XEN_VERSION_* value
- * @param arg Pointer to xen_version_op_buf_t or xen_version_op_val_t
- * @param len Size of arg
- * @return size of bytes copied in arg on success, -1 on failure (and
- * errno will contain the error)
- *
- */
-int xc_version(xc_interface *xch, unsigned int cmd, void *arg, size_t len);
+int xc_version(xc_interface *xch, int cmd, void *arg);
 
 int xc_flask_op(xc_interface *xch, xen_flask_op_t *op);
 

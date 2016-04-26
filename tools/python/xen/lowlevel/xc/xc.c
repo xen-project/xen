@@ -1204,40 +1204,34 @@ static PyObject *pyxc_xeninfo(XcObject *self)
     xen_capabilities_info_t xen_caps;
     xen_platform_parameters_t p_parms;
     xen_commandline_t xen_commandline;
-    xen_version_op_val_t xen_version;
-    xen_version_op_val_t xen_pagesize;
+    long xen_version;
+    long xen_pagesize;
     char str[128];
 
-    if ( xc_version(self->xc_handle, XEN_VERSION_version, &xen_version,
-                    sizeof(xen_version)) < 0 )
+    xen_version = xc_version(self->xc_handle, XENVER_version, NULL);
+
+    if ( xc_version(self->xc_handle, XENVER_extraversion, &xen_extra) != 0 )
         return pyxc_error_to_exception(self->xc_handle);
 
-    if ( xc_version(self->xc_handle, XEN_VERSION_extraversion, &xen_extra,
-                    sizeof(xen_extra)) < 0 )
+    if ( xc_version(self->xc_handle, XENVER_compile_info, &xen_cc) != 0 )
         return pyxc_error_to_exception(self->xc_handle);
 
-    memset(&xen_cc, 0, sizeof(xen_cc));
-
-    if ( xc_version(self->xc_handle, XEN_VERSION_changeset, &xen_chgset,
-                    sizeof(xen_chgset)) < 0 )
+    if ( xc_version(self->xc_handle, XENVER_changeset, &xen_chgset) != 0 )
         return pyxc_error_to_exception(self->xc_handle);
 
-    if ( xc_version(self->xc_handle, XEN_VERSION_capabilities, &xen_caps,
-                    sizeof(xen_caps)) < 0 )
+    if ( xc_version(self->xc_handle, XENVER_capabilities, &xen_caps) != 0 )
         return pyxc_error_to_exception(self->xc_handle);
 
-    if ( xc_version(self->xc_handle, XEN_VERSION_platform_parameters,
-                    &p_parms, sizeof(p_parms)) < 0 )
+    if ( xc_version(self->xc_handle, XENVER_platform_parameters, &p_parms) != 0 )
         return pyxc_error_to_exception(self->xc_handle);
 
-    if ( xc_version(self->xc_handle, XEN_VERSION_commandline,
-                    &xen_commandline, sizeof(xen_commandline)) < 0 )
+    if ( xc_version(self->xc_handle, XENVER_commandline, &xen_commandline) != 0 )
         return pyxc_error_to_exception(self->xc_handle);
 
     snprintf(str, sizeof(str), "virt_start=0x%"PRI_xen_ulong, p_parms.virt_start);
 
-    if ( xc_version(self->xc_handle, XEN_VERSION_pagesize, &xen_pagesize,
-                    sizeof(xen_pagesize)) < 0 )
+    xen_pagesize = xc_version(self->xc_handle, XENVER_pagesize, NULL);
+    if (xen_pagesize < 0 )
         return pyxc_error_to_exception(self->xc_handle);
 
     return Py_BuildValue("{s:i,s:i,s:s,s:s,s:i,s:s,s:s,s:s,s:s,s:s,s:s,s:s}",

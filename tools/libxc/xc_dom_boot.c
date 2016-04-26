@@ -112,19 +112,11 @@ int xc_dom_compat_check(struct xc_dom_image *dom)
 
 int xc_dom_boot_xen_init(struct xc_dom_image *dom, xc_interface *xch, domid_t domid)
 {
-    xen_version_op_val_t val = 0;
-
-    if ( xc_version(xch, XEN_VERSION_version, &val, sizeof(val)) < 0 )
-    {
-        xc_dom_panic(xch, XC_INTERNAL_ERROR, "can't get Xen version!");
-        return -1;
-    }
-    dom->xen_version = val;
     dom->xch = xch;
     dom->guest_domid = domid;
 
-    if ( xc_version(xch, XEN_VERSION_capabilities, dom->xen_caps,
-                    sizeof(dom->xen_caps)) < 0 )
+    dom->xen_version = xc_version(xch, XENVER_version, NULL);
+    if ( xc_version(xch, XENVER_capabilities, &dom->xen_caps) < 0 )
     {
         xc_dom_panic(xch, XC_INTERNAL_ERROR, "can't get xen capabilities");
         return -1;

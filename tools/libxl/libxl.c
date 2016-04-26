@@ -5353,71 +5353,50 @@ libxl_numainfo *libxl_get_numainfo(libxl_ctx *ctx, int *nr)
     return ret;
 }
 
-
-static int libxl__xc_version_wrapper(libxl__gc *gc, unsigned int cmd,
-                                     char *buf, ssize_t len, char **dst)
-{
-    int r;
-
-    r = xc_version(CTX->xch, cmd, buf, len);
-    if ( r == -EPERM ) {
-        buf[0] = '\0';
-    } else if ( r < 0 ) {
-        return r;
-    }
-    *dst = libxl__strdup(NOGC, buf);
-    return 0;
-}
-
 const libxl_version_info* libxl_get_version_info(libxl_ctx *ctx)
 {
     GC_INIT(ctx);
-    char *buf;
-    xen_version_op_val_t val = 0;
+    union {
+        xen_extraversion_t xen_extra;
+        xen_compile_info_t xen_cc;
+        xen_changeset_info_t xen_chgset;
+        xen_capabilities_info_t xen_caps;
+        xen_platform_parameters_t p_parms;
+        xen_commandline_t xen_commandline;
+    } u;
+    long xen_version;
     libxl_version_info *info = &ctx->version_info;
 
     if (info->xen_version_extra != NULL)
         goto out;
 
-    if (xc_version(CTX->xch, XEN_VERSION_pagesize, &val, sizeof(val)) < 0)
-        goto out;
+    xen_version = xc_version(ctx->xch, XENVER_version, NULL);
+    info->xen_version_major = xen_version >> 16;
+    info->xen_version_minor = xen_version & 0xFF;
 
-    info->pagesize = val;
-    /* 4K buffer. */
-    buf = libxl__zalloc(gc, info->pagesize);
+    xc_version(ctx->xch, XENVER_extraversion, &u.xen_extra);
+    info->xen_version_extra = libxl__strdup(NOGC, u.xen_extra);
 
-    val = 0;
-    if (xc_version(CTX->xch, XEN_VERSION_version, &val, sizeof(val)) < 0)
-        goto out;
-    info->xen_version_major = val >> 16;
-    info->xen_version_minor = val & 0xFF;
+    xc_version(ctx->xch, XENVER_compile_info, &u.xen_cc);
+    info->compiler = libxl__strdup(NOGC, u.xen_cc.compiler);
+    info->compile_by = libxl__strdup(NOGC, u.xen_cc.compile_by);
+    info->compile_domain = libxl__strdup(NOGC, u.xen_cc.compile_domain);
+    info->compile_date = libxl__strdup(NOGC, u.xen_cc.compile_date);
 
-    if (libxl__xc_version_wrapper(gc, XEN_VERSION_extraversion, buf,
-                                  info->pagesize, &info->xen_version_extra) < 0)
-        goto out;
+    xc_version(ctx->xch, XENVER_capabilities, &u.xen_caps);
+    info->capabilities = libxl__strdup(NOGC, u.xen_caps);
 
-    info->compiler = libxl__strdup(NOGC, "");
-    info->compile_by = libxl__strdup(NOGC, "");
-    info->compile_domain = libxl__strdup(NOGC, "");
-    info->compile_date = libxl__strdup(NOGC, "");
+    xc_version(ctx->xch, XENVER_changeset, &u.xen_chgset);
+    info->changeset = libxl__strdup(NOGC, u.xen_chgset);
 
-    if (libxl__xc_version_wrapper(gc, XEN_VERSION_capabilities, buf,
-                                  info->pagesize, &info->capabilities) < 0)
-        goto out;
+    xc_version(ctx->xch, XENVER_platform_parameters, &u.p_parms);
+    info->virt_start = u.p_parms.virt_start;
 
-    if (libxl__xc_version_wrapper(gc, XEN_VERSION_changeset, buf,
-                                  info->pagesize, &info->changeset) < 0)
-        goto out;
+    info->pagesize = xc_version(ctx->xch, XENVER_pagesize, NULL);
 
-    val = 0;
-    if (xc_version(CTX->xch, XEN_VERSION_platform_parameters, &val,
-                   sizeof(val)) < 0)
-        goto out;
+    xc_version(ctx->xch, XENVER_commandline, &u.xen_commandline);
+    info->commandline = libxl__strdup(NOGC, u.xen_commandline);
 
-    info->virt_start = val;
-
-    (void)libxl__xc_version_wrapper(gc, XEN_VERSION_commandline, buf,
-                                    info->pagesize, &info->commandline);
  out:
     GC_FREE;
     return info;

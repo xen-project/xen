@@ -57,12 +57,10 @@ static inline int get_platform_info(xc_interface *xch, uint32_t dom,
     xen_capabilities_info_t xen_caps = "";
     xen_platform_parameters_t xen_params;
 
-    if (xc_version(xch, XEN_VERSION_platform_parameters, &xen_params,
-                   sizeof(xen_params)) < 0)
+    if (xc_version(xch, XENVER_platform_parameters, &xen_params) != 0)
         return 0;
 
-    if (xc_version(xch, XEN_VERSION_capabilities, xen_caps,
-                   sizeof(xen_caps)) < 0)
+    if (xc_version(xch, XENVER_capabilities, &xen_caps) != 0)
         return 0;
 
     if (xc_maximum_ram_page(xch, max_mfn))

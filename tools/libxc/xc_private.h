@@ -214,12 +214,11 @@ void xc__hypercall_buffer_cache_release(xc_interface *xch);
  * Hypercall interfaces.
  */
 
-static inline long do_version_op(xc_interface *xch, int cmd,
-                                 xc_hypercall_buffer_t *dest, ssize_t len)
+static inline int do_xen_version(xc_interface *xch, int cmd, xc_hypercall_buffer_t *dest)
 {
     DECLARE_HYPERCALL_BUFFER_ARGUMENT(dest);
-    return xencall3(xch->xcall, __HYPERVISOR_version_op,
-                    cmd, HYPERCALL_BUFFER_AS_ARG(dest), len);
+    return xencall2(xch->xcall, __HYPERVISOR_xen_version,
+                    cmd, HYPERCALL_BUFFER_AS_ARG(dest));
 }
 
 static inline int do_physdev_op(xc_interface *xch, int cmd, void *op, size_t len)

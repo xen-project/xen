@@ -457,23 +457,58 @@ int xc_sysctl(xc_interface *xch, struct xen_sysctl *sysctl)
     return do_sysctl(xch, sysctl);
 }
 
-ssize_t xc_version_len(xc_interface *xch, unsigned int cmd)
+int xc_version(xc_interface *xch, int cmd, void *arg)
 {
-    return do_version_op(xch, cmd, NULL, 0);
-}
-
-int xc_version(xc_interface *xch, unsigned int cmd, void *arg, size_t sz)
-{
-    DECLARE_HYPERCALL_BOUNCE(arg, sz, XC_HYPERCALL_BUFFER_BOUNCE_OUT);
+    DECLARE_HYPERCALL_BOUNCE(arg, 0, XC_HYPERCALL_BUFFER_BOUNCE_OUT); /* Size unknown until cmd decoded */
+    size_t sz;
     int rc;
 
-    if ( xc_hypercall_bounce_pre(xch, arg) )
+    switch ( cmd )
+    {
+    case XENVER_version:
+        sz = 0;
+        break;
+    case XENVER_extraversion:
+        sz = sizeof(xen_extraversion_t);
+        break;
+    case XENVER_compile_info:
+        sz = sizeof(xen_compile_info_t);
+        break;
+    case XENVER_capabilities:
+        sz = sizeof(xen_capabilities_info_t);
+        break;
+    case XENVER_changeset:
+        sz = sizeof(xen_changeset_info_t);
+        break;
+    case XENVER_platform_parameters:
+        sz = sizeof(xen_platform_parameters_t);
+        break;
+    case XENVER_get_features:
+        sz = sizeof(xen_feature_info_t);
+        break;
+    case XENVER_pagesize:
+        sz = 0;
+        break;
+    case XENVER_guest_handle:
+        sz = sizeof(xen_domain_handle_t);
+        break;
+    case XENVER_commandline:
+        sz = sizeof(xen_commandline_t);
+        break;
+    default:
+        ERROR("xc_version: unknown command %d\n", cmd);
+        return -EINVAL;
+    }
+
+    HYPERCALL_BOUNCE_SET_SIZE(arg, sz);
+
+    if ( (sz != 0) && xc_hypercall_bounce_pre(xch, arg) )
     {
         PERROR("Could not bounce buffer for version hypercall");
         return -ENOMEM;
     }
 
-    rc = do_version_op(xch, cmd, HYPERCALL_BUFFER(arg), sz);
+    rc = do_xen_version(xch, cmd, HYPERCALL_BUFFER(arg));
 
     if ( sz != 0 )
         xc_hypercall_bounce_post(xch, arg);

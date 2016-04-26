@@ -9,7 +9,7 @@
 static int write_headers(struct xc_sr_context *ctx, uint16_t guest_type)
 {
     xc_interface *xch = ctx->xch;
-    xen_version_op_val_t xen_version;
+    int32_t xen_version = xc_version(xch, XENVER_version, NULL);
     struct xc_sr_ihdr ihdr =
         {
             .marker  = IHDR_MARKER,
@@ -21,16 +21,15 @@ static int write_headers(struct xc_sr_context *ctx, uint16_t guest_type)
         {
             .type       = guest_type,
             .page_shift = XC_PAGE_SHIFT,
+            .xen_major  = (xen_version >> 16) & 0xffff,
+            .xen_minor  = (xen_version)       & 0xffff,
         };
 
-    if ( xc_version(xch, XEN_VERSION_version, &xen_version,
-                    sizeof(xen_version)) < 0 )
+    if ( xen_version < 0 )
     {
         PERROR("Unable to obtain Xen Version");
         return -1;
     }
-    dhdr.xen_major = (xen_version >> 16) & 0xffff;
-    dhdr.xen_minor = (xen_version)       & 0xffff;
 
     if ( write_exact(ctx->fd, &ihdr, sizeof(ihdr)) )
     {

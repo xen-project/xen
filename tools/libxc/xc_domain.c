@@ -2084,8 +2084,7 @@ int xc_map_domain_meminfo(xc_interface *xch, int domid,
     _di.guest_width = minfo->guest_width;
 
     /* Get page table levels (see get_platform_info() in xg_save_restore.h */
-    if ( xc_version(xch, XEN_VERSION_capabilities, xen_caps,
-                    sizeof(xen_caps)) < 0 )
+    if ( xc_version(xch, XENVER_capabilities, &xen_caps) )
     {
         PERROR("Could not get Xen capabilities (for page table levels)");
         return -1;
