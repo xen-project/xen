@@ -44,18 +44,18 @@ struct hvm_mmio_ops {
 
 static inline paddr_t hvm_mmio_first_byte(const ioreq_t *p)
 {
-    return p->df ?
+    return unlikely(p->df) ?
            p->addr - (p->count - 1ul) * p->size :
            p->addr;
 }
 
 static inline paddr_t hvm_mmio_last_byte(const ioreq_t *p)
 {
-    unsigned long count = p->count;
+    unsigned long size = p->size;
 
-    return p->df ?
-           p->addr + p->size - 1:
-           p->addr + (count * p->size) - 1;
+    return unlikely(p->df) ?
+           p->addr + size - 1:
+           p->addr + (p->count * size) - 1;
 }
 
 typedef int (*portio_action_t)(
