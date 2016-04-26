@@ -8,7 +8,7 @@
 #ifndef __ASM_XSTATE_H
 #define __ASM_XSTATE_H
 
-#include <xen/types.h>
+#include <xen/sched.h>
 #include <asm/cpufeature.h>
 
 #define FCW_DEFAULT               0x037f
@@ -106,5 +106,17 @@ void xstate_free_save_area(struct vcpu *v);
 int xstate_alloc_save_area(struct vcpu *v);
 void xstate_init(struct cpuinfo_x86 *c);
 unsigned int xstate_ctxt_size(u64 xcr0);
+
+static inline bool_t xstate_all(const struct vcpu *v)
+{
+    /*
+     * XSTATE_FP_SSE may be excluded, because the offsets of XSTATE_FP_SSE
+     * (in the legacy region of xsave area) are fixed, so saving
+     * XSTATE_FP_SSE will not cause overwriting problem with XSAVES/XSAVEC.
+     */
+    return (v->arch.xsave_area->xsave_hdr.xcomp_bv &
+            XSTATE_COMPACTION_ENABLED) &&
+           (v->arch.xcr0_accum & XSTATE_LAZY & ~XSTATE_FP_SSE);
+}
 
 #endif /* __ASM_XSTATE_H */

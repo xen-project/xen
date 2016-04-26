@@ -681,6 +681,14 @@ int handle_xsetbv(u32 index, u64 new_bv)
         clts();
         if ( curr->fpu_dirtied )
             asm ( "stmxcsr %0" : "=m" (curr->arch.xsave_area->fpu_sse.mxcsr) );
+        else if ( xstate_all(curr) )
+        {
+            /* See the comment in i387.c:vcpu_restore_fpu_eager(). */
+            mask |= XSTATE_LAZY;
+            curr->fpu_initialised = 1;
+            curr->fpu_dirtied = 1;
+            cr0 &= ~X86_CR0_TS;
+        }
         xrstor(curr, mask);
         if ( cr0 & X86_CR0_TS )
             write_cr0(cr0);

@@ -129,13 +129,8 @@ static inline uint64_t vcpu_xsave_mask(const struct vcpu *v)
      * has ever used lazy states (checking xcr0_accum excluding
      * XSTATE_FP_SSE), vcpu_xsave_mask will return XSTATE_ALL. Otherwise
      * return XSTATE_NONLAZY.
-     * XSTATE_FP_SSE may be excluded, because the offsets of XSTATE_FP_SSE
-     * (in the legacy region of xsave area) are fixed, so saving
-     * XSTATE_FP_SSE will not cause overwriting problem.
      */
-    return (v->arch.xsave_area->xsave_hdr.xcomp_bv & XSTATE_COMPACTION_ENABLED)
-           && (v->arch.xcr0_accum & XSTATE_LAZY & ~XSTATE_FP_SSE)
-           ? XSTATE_ALL : XSTATE_NONLAZY;
+    return xstate_all(v) ? XSTATE_ALL : XSTATE_NONLAZY;
 }
 
 /* Save x87 extended state */
@@ -215,11 +210,26 @@ void vcpu_restore_fpu_eager(struct vcpu *v)
 {
     ASSERT(!is_idle_vcpu(v));
     
-    /* save the nonlazy extended state which is not tracked by CR0.TS bit */
-    if ( v->arch.nonlazy_xstate_used )
+    /* Restore nonlazy extended state (i.e. parts not tracked by CR0.TS). */
+    if ( !v->arch.nonlazy_xstate_used )
+        return;
+
+    /* Avoid recursion */
+    clts();
+
+    /*
+     * When saving full state even with !v->fpu_dirtied (see vcpu_xsave_mask()
+     * above) we also need to restore full state, to prevent subsequently
+     * saving state belonging to another vCPU.
+     */
+    if ( xstate_all(v) )
     {
-        /* Avoid recursion */
-        clts();        
+        fpu_xrstor(v, XSTATE_ALL);
+        v->fpu_initialised = 1;
+        v->fpu_dirtied = 1;
+    }
+    else
+    {
         fpu_xrstor(v, XSTATE_NONLAZY);
         stts();
     }
