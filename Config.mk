@@ -36,7 +36,6 @@ CONFIG_$(XEN_OS) := y
 SHELL     ?= /bin/sh
 
 # Tools to run on system hosting the build
-HOSTCC      = gcc
 HOSTCFLAGS  = -Wall -Werror -Wstrict-prototypes -O2 -fomit-frame-pointer
 HOSTCFLAGS += -fno-strict-aliasing
 
@@ -50,8 +49,10 @@ DESTDIR     ?= /
 clang ?= n
 ifeq ($(clang),n)
 gcc := y
+HOSTCC ?= gcc
 else
 gcc := n
+HOSTCC ?= clang
 endif
 
 
