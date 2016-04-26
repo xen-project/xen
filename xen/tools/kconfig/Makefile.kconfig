@@ -36,8 +36,8 @@ KBUILD_DEFCONFIG := $(ARCH)_defconfig
 CONFIG_SHELL := $(SHELL)
 
 # provide the host compiler
-HOSTCC := gcc
-HOSTCXX := g++
+HOSTCC ?= gcc
+HOSTCXX ?= g++
 
 # force target
 PHONY += FORCE
