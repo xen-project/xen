@@ -4254,7 +4254,7 @@ static void list_domains(bool verbose, bool context, bool claim, bool numa,
     printf("\n");
     for (i = 0; i < nb_domain; i++) {
         char *domname;
-        unsigned shutdown_reason;
+        libxl_shutdown_reason shutdown_reason;
         domname = libxl_domid_to_name(ctx, info[i].domid);
         shutdown_reason = info[i].shutdown ? info[i].shutdown_reason : 0;
         printf("%-40s %5d %5lu %5d     %c%c%c%c%c%c  %8.1f",
