@@ -50,9 +50,11 @@ clang ?= n
 ifeq ($(clang),n)
 gcc := y
 HOSTCC ?= gcc
+HOSTCXX ?= g++
 else
 gcc := n
 HOSTCC ?= clang
+HOSTCXX ?= clang++
 endif
 
 
