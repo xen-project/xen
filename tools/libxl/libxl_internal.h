@@ -636,7 +636,7 @@ _hidden void *libxl__realloc(libxl__gc *gc_opt, void *ptr, size_t new_size) NN1;
 /* print @fmt into an allocated string large enoughto contain the result.
  * (similar to gc'd asprintf(3)). */
 _hidden char *libxl__sprintf(libxl__gc *gc_opt, const char *fmt, ...) PRINTF_ATTRIBUTE(2, 3) NN1;
-_hidden char *libxl__vsprintf(libxl__gc *gc, const char *format, va_list ap);
+_hidden char *libxl__vsprintf(libxl__gc *gc, const char *format, va_list ap) PRINTF_ATTRIBUTE(2, 0);
 /* duplicate the string @c (similar to a gc'd strdup(3)). */
 _hidden char *libxl__strdup(libxl__gc *gc_opt,
                             const char *c /* may be NULL */) NN1;
@@ -709,7 +709,7 @@ _hidden char *libxl__xs_libxl_path(libxl__gc *gc, uint32_t domid);
  */
 
 int libxl__xs_vprintf(libxl__gc *gc, xs_transaction_t t,
-                      const char *path, const char *fmt, va_list ap);
+                      const char *path, const char *fmt, va_list ap) PRINTF_ATTRIBUTE(4, 0);
 int libxl__xs_printf(libxl__gc *gc, xs_transaction_t t,
                      const char *path, const char *fmt, ...) PRINTF_ATTRIBUTE(4, 5);
 

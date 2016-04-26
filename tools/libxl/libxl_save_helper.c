@@ -52,6 +52,7 @@
 
 /*----- logger -----*/
 
+__attribute__((format(printf, 5, 0)))
 static void tellparent_vmessage(xentoollog_logger *logger_in,
                                 xentoollog_level level,
                                 int errnoval,
