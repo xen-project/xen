@@ -482,7 +482,7 @@ static int xc_try_lzo1x_decode(
         if ( !dst_len )
         {
             msg = "Error registering stream output";
-            if ( xc_dom_register_external(dom, out_buf, out_len) )
+            if ( xc_dom_register_external(dom, out_buf, *size) )
                 break;
 
             return 0;
