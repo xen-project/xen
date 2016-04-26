@@ -49,18 +49,18 @@
 #define DBG(_level, _f, _a...) tlog_write(_level, _f, ##_a)
 #define ERR(_err, _f, _a...) tlog_error(_err, _f, ##_a)
 
-#if 1                                                                        
+#if 1
 #define ASSERT(p)							\
 	do {								\
 		if (!(p)) {						\
 			DPRINTF("Assertion '%s' failed, line %d, "	\
 				"file %s", #p, __LINE__, __FILE__);	\
-			*(int*)0 = 0;					\
+			abort();					\
 		}							\
 	} while (0)
 #else
 #define ASSERT(p) ((void)0)
-#endif 
+#endif
 
 
 #define TD_VBD_EIO_RETRIES          10
