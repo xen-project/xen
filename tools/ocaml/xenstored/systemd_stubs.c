@@ -124,7 +124,7 @@ CAMLprim value ocaml_sd_listen_fds(value connect_to)
 	CAMLparam1(connect_to);
 	CAMLlocal1(sock_ret);
 
-	sock_ret = Val_int(-1);
+	sock_ret = Val_int(-1U);
 
 	CAMLreturn(sock_ret);
 }
@@ -144,7 +144,7 @@ CAMLprim value ocaml_sd_notify_ready(value ignore)
 	CAMLparam1(ignore);
 	CAMLlocal1(ret);
 
-	ret = Val_int(-1);
+	ret = Val_int(-1U);
 
 	CAMLreturn(ret);
 }
