@@ -615,6 +615,7 @@ csched_switch_sched(struct scheduler *new_ops, unsigned int cpu,
      * schedule_cpu_switch()). It actually may or may not be the 'right'
      * one for this cpu, but that is ok for preventing races.
      */
+    ASSERT(!local_irq_is_enabled());
     spin_lock(&prv->lock);
     init_pdata(prv, pdata, cpu);
     spin_unlock(&prv->lock);
