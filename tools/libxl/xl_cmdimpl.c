@@ -5894,16 +5894,19 @@ static void output_xeninfo(void)
 {
     const libxl_version_info *info;
     libxl_scheduler sched;
+    int rc;
 
     if (!(info = libxl_get_version_info(ctx))) {
         fprintf(stderr, "libxl_get_version_info failed.\n");
         return;
     }
 
-    if ((sched = libxl_get_scheduler(ctx)) < 0) {
+    rc = libxl_get_scheduler(ctx);
+    if (rc < 0) {
         fprintf(stderr, "get_scheduler sysctl failed.\n");
         return;
     }
+    sched = rc;
 
     printf("xen_major              : %d\n", info->xen_version_major);
     printf("xen_minor              : %d\n", info->xen_version_minor);
@@ -8084,10 +8087,12 @@ int main_cpupoolcreate(int argc, char **argv)
             goto out_cfg;
         }
     } else {
-        if ((sched = libxl_get_scheduler(ctx)) < 0) {
+        rc = libxl_get_scheduler(ctx);
+        if (rc < 0) {
             fprintf(stderr, "get_scheduler sysctl failed.\n");
             goto out_cfg;
         }
+        sched = rc;
     }
 
     if (libxl_get_freecpus(ctx, &freemap)) {
