@@ -500,14 +500,12 @@ class security
     del_ocontext
 }
 
-# Class version is used to describe the XENVER_ and VERSION hypercall.
+# Class version is used to describe the XENVER_ hypercall.
 # Almost all sub-ops are described here - in the default case all of them should
-# be allowed except the XENVER_commandline, VERSION_commandline, and
-# VERSION_changeset.
+# be allowed except the XENVER_commandline.
 #
 # The ones that are omitted are XENVER_version, XENVER_platform_parameters,
-# XENVER_get_features, XEN_VERSION_version, XEN_VERSION_platform_parameters,
-# and XEN_VERSION_get_features - as they MUST always be returned to a guest.
+# and XENVER_get_features  - as they MUST always be returned to a guest.
 #
 class version
 {
@@ -525,17 +523,4 @@ class version
     xen_guest_handle
 # Xen command line.
     xen_commandline
-# --- VERSION hypercall ---
-# Extra informations (-unstable).
-    extraversion
-# Such as "xen-3.0-x86_64 xen-3.0-x86_32p hvm-3.0-x86_32 hvm-3.0-x86_32p hvm-3.0-x86_64".
-    capabilities
-# Source code changeset.
-    changeset
-# Page size the hypervisor uses.
-    pagesize
-# An value that the control stack can choose.
-    guest_handle
-# Xen command line.
-    commandline
 }

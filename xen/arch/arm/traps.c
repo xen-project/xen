@@ -1274,7 +1274,6 @@ static arm_hypercall_t arm_hypercall_table[] = {
     HYPERCALL(multicall, 2),
     HYPERCALL(platform_op, 1),
     HYPERCALL_ARM(vcpu_op, 3),
-    HYPERCALL(version_op, 3),
 };
 
 #ifndef NDEBUG

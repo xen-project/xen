@@ -39,8 +39,6 @@ CHECK_TYPE(capabilities_info);
 
 CHECK_TYPE(domain_handle);
 
-CHECK_TYPE(version_op_val);
-
 #define xennmi_callback compat_nmi_callback
 #define xennmi_callback_t compat_nmi_callback_t
 

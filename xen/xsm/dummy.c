@@ -163,5 +163,4 @@ void xsm_fixup_ops (struct xsm_operations *ops)
     set_to_dummy_if_null(ops, pmu_op);
 #endif
     set_to_dummy_if_null(ops, xen_version);
-    set_to_dummy_if_null(ops, version_op);
 }

@@ -1664,40 +1664,6 @@ static int flask_xen_version (uint32_t op)
     }
 }
 
-static int flask_version_op (uint32_t op)
-{
-    u32 dsid = domain_sid(current->domain);
-
-    switch ( op )
-    {
-    case XEN_VERSION_version:
-    case XEN_VERSION_platform_parameters:
-    case XEN_VERSION_get_features:
-        /* These MUST always be accessible to any guest by default. */
-        return 0;
-    case XEN_VERSION_extraversion:
-        return avc_has_perm(dsid, SECINITSID_XEN, SECCLASS_VERSION,
-                            VERSION__EXTRAVERSION, NULL);
-    case XEN_VERSION_capabilities:
-        return avc_has_perm(dsid, SECINITSID_XEN, SECCLASS_VERSION,
-                            VERSION__CAPABILITIES, NULL);
-    case XEN_VERSION_changeset:
-        return avc_has_perm(dsid, SECINITSID_XEN, SECCLASS_VERSION,
-                            VERSION__CHANGESET, NULL);
-    case XEN_VERSION_pagesize:
-        return avc_has_perm(dsid, SECINITSID_XEN, SECCLASS_VERSION,
-                            VERSION__PAGESIZE, NULL);
-    case XEN_VERSION_guest_handle:
-        return avc_has_perm(dsid, SECINITSID_XEN, SECCLASS_VERSION,
-                            VERSION__GUEST_HANDLE, NULL);
-    case XEN_VERSION_commandline:
-        return avc_has_perm(dsid, SECINITSID_XEN, SECCLASS_VERSION,
-                            VERSION__COMMANDLINE, NULL);
-    default:
-        return -EPERM;
-    }
-}
-
 long do_flask_op(XEN_GUEST_HANDLE_PARAM(xsm_op_t) u_flask_op);
 int compat_flask_op(XEN_GUEST_HANDLE_PARAM(xsm_op_t) u_flask_op);
 
@@ -1837,7 +1803,6 @@ static struct xsm_operations flask_ops = {
     .pmu_op = flask_pmu_op,
 #endif
     .xen_version = flask_xen_version,
-    .version_op = flask_version_op,
 };
 
 static __init void flask_init(void)

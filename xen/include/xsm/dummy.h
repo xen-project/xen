@@ -751,24 +751,3 @@ static XSM_INLINE int xsm_xen_version (XSM_DEFAULT_ARG uint32_t op)
         return xsm_default_action(XSM_PRIV, current->domain, NULL);
     }
 }
-
-static XSM_INLINE int xsm_version_op (XSM_DEFAULT_ARG uint32_t op)
-{
-    XSM_ASSERT_ACTION(XSM_OTHER);
-    switch ( op )
-    {
-    case XEN_VERSION_version:
-    case XEN_VERSION_platform_parameters:
-    case XEN_VERSION_get_features:
-        /* These MUST always be accessible to any guest by default. */
-        return 0;
-    case XEN_VERSION_extraversion:
-    case XEN_VERSION_capabilities:
-    case XEN_VERSION_pagesize:
-    case XEN_VERSION_guest_handle:
-        /* These can be accessible to a guest. */
-        return xsm_default_action(XSM_HOOK, current->domain, NULL);
-    default:
-        return xsm_default_action(XSM_PRIV, current->domain, NULL);
-    }
-}

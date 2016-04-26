@@ -30,16 +30,7 @@
 
 #include "xen.h"
 
-/*
- * There are two hypercalls mentioned in here. The XENVER_ are for
- * HYPERCALL_xen_version (17), while VERSION_ are for the
- * HYPERCALL_version_op (41).
- *
- * The subops are very similar except that the later hypercall has a
- * sane interface.
- *
- * NB. All XENVER_ ops return zero on success, except XENVER_{version,pagesize}
- */
+/* NB. All ops return zero on success, except XENVER_{version,pagesize} */
 
 /* arg == NULL; returns major:minor (16:16). */
 #define XENVER_version      0
@@ -95,67 +86,6 @@ typedef struct xen_feature_info xen_feature_info_t;
 
 #define XENVER_commandline 9
 typedef char xen_commandline_t[1024];
-
-/*
- * The HYPERCALL_version_op has a set of sub-ops which mirror the
- * sub-ops of HYPERCALL_xen_version. However this hypercall differs
- * radically from the former:
- *  - It returns the amount of bytes copied, or
- *  - It will return -XEN_EPERM if the sub-op is denied to the guest.
- *    (Albeit XEN_VERSION_version, XEN_VERSION_platform_parameters, and
- *    XEN_VERSION_get_features will always return an value as guest cannot
- *    survive without this information).
- *  - It will return the requested data in arg.
- *  - It requires an third argument (len) for the length of the
- *    arg. Naturally the arg has to fit the requested data otherwise
- *    -XEN_ENOBUFS is returned.
- *
- * It also offers a mechanism to probe for the amount of bytes an
- * sub-op will require. Having the arg have a NULL handle will
- * return the number of bytes requested for the operation.
- * Or a negative value if an error is encountered.
- */
-
-typedef uint64_t xen_version_op_val_t;
-DEFINE_XEN_GUEST_HANDLE(xen_version_op_val_t);
-
-/*
- * arg == xen_version_op_val_t. Encoded as major:minor (31..16:15..0), while
- * 63..32 are zero.
- */
-#define XEN_VERSION_version             0
-
-/* arg == char[]. Contains NUL terminated utf-8 string. */
-#define XEN_VERSION_extraversion        1
-
-/* arg == char[]. Contains NUL terminated utf-8 string. */
-#define XEN_VERSION_capabilities        3
-
-/* arg == char[]. Contains NUL terminated utf-8 string. */
-#define XEN_VERSION_changeset           4
-
-/* arg == xen_version_op_val_t. */
-#define XEN_VERSION_platform_parameters 5
-
-/*
- * arg = xen_feature_info_t - shares the same structure
- * as the XENVER_get_features.
- */
-#define XEN_VERSION_get_features        6
-
-/* arg == xen_version_op_val_t. */
-#define XEN_VERSION_pagesize            7
-
-/*
- * arg == void.
- *
- * The toolstack fills it out for guest consumption. It is intended to hold
- * the UUID of the guest.
- */
-#define XEN_VERSION_guest_handle        8
-
-/* arg = char[]. Contains NUL terminated utf-8 string. */
-#define XEN_VERSION_commandline         9
 
 #endif /* __XEN_PUBLIC_VERSION_H__ */
 

@@ -128,8 +128,6 @@
  *    * VCPUOP_register_vcpu_info
  *    * VCPUOP_register_runstate_memory_area
  *
- *  HYPERVISOR_version_op
- *   All generic sub-operations
  *
  * Other notes on the ARM ABI:
  *

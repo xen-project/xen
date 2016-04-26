@@ -197,7 +197,6 @@ struct xsm_operations {
     int (*pmu_op) (struct domain *d, unsigned int op);
 #endif
     int (*xen_version) (uint32_t cmd);
-    int (*version_op) (uint32_t cmd);
 };
 
 #ifdef CONFIG_XSM
@@ -739,11 +738,6 @@ static inline int xsm_pmu_op (xsm_default_t def, struct domain *d, unsigned int 
 static inline int xsm_xen_version (xsm_default_t def, uint32_t op)
 {
     return xsm_ops->xen_version(op);
-}
-
-static inline int xsm_version_op (xsm_default_t def, uint32_t op)
-{
-    return xsm_ops->version_op(op);
 }
 
 #endif /* XSM_NO_WRAPPERS */

@@ -76,12 +76,11 @@ allow dom0_t xen_t:xen2 {
     get_cpu_featureset
 };
 
-# Allow dom0 to use all XENVER_ subops and VERSION subops that have checks.
+# Allow dom0 to use all XENVER_ subops that have checks.
 # Note that dom0 is part of domain_type so this has duplicates.
 allow dom0_t xen_t:version {
     xen_extraversion xen_compile_info xen_capabilities
     xen_changeset xen_pagesize xen_guest_handle xen_commandline
-    extraversion capabilities changeset pagesize guest_handle commandline
 };
 
 allow dom0_t xen_t:mmu memorymap;
@@ -148,12 +147,10 @@ if (guest_writeconsole) {
 # pmu_ctrl is for)
 allow domain_type xen_t:xen2 pmu_use;
 
-# For normal guests all possible except XENVER_commandline, VERSION_changeset,
-# and VERSION_commandline
+# For normal guests all possible except XENVER_commandline.
 allow domain_type xen_t:version {
     xen_extraversion xen_compile_info xen_capabilities
     xen_changeset xen_pagesize xen_guest_handle
-    extraversion capabilities pagesize guest_handle
 };
 
 ###############################################################################

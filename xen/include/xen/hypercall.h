@@ -147,10 +147,6 @@ do_xenoprof_op(int op, XEN_GUEST_HANDLE_PARAM(void) arg);
 extern long
 do_xenpmu_op(unsigned int op, XEN_GUEST_HANDLE_PARAM(xen_pmu_params_t) arg);
 
-extern long
-do_version_op(unsigned int cmd,
-    XEN_GUEST_HANDLE_PARAM(void) arg, unsigned int len);
-
 #ifdef CONFIG_COMPAT
 
 extern int
