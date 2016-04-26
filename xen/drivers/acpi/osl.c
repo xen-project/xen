@@ -97,7 +97,7 @@ acpi_os_map_memory(acpi_physical_address phys, acpi_size size)
 		if (IS_ENABLED(CONFIG_X86) && !((phys + size - 1) >> 20))
 			return __va(phys);
 		return __vmap(&mfn, PFN_UP(offs + size), 1, 1,
-			      ACPI_MAP_MEM_ATTR) + offs;
+			      ACPI_MAP_MEM_ATTR, VMAP_DEFAULT) + offs;
 	}
 	return __acpi_map_table(phys, size);
 }
