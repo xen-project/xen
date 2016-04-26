@@ -34,16 +34,16 @@
 static bool_t hvm_mmio_accept(const struct hvm_io_handler *handler,
                               const ioreq_t *p)
 {
-    paddr_t first = hvm_mmio_first_byte(p);
-    paddr_t last = hvm_mmio_last_byte(p);
+    paddr_t first = hvm_mmio_first_byte(p), last;
 
     BUG_ON(handler->type != IOREQ_TYPE_COPY);
 
     if ( !handler->mmio.ops->check(current, first) )
         return 0;
 
-    /* Make sure the handler will accept the whole access */
-    if ( p->size > 1 &&
+    /* Make sure the handler will accept the whole access. */
+    last = hvm_mmio_last_byte(p);
+    if ( last != first &&
          !handler->mmio.ops->check(current, last) )
         domain_crash(current->domain);
 
