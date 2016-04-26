@@ -1214,23 +1214,19 @@ void __init noreturn __start_xen(unsigned long mbi_p)
     if ( !using_2M_mapping() )
     {
         /* Mark .text as RX (avoiding the first 2M superpage). */
-        map_pages_to_xen(XEN_VIRT_START + MB(2),
-                         PFN_DOWN(__pa(XEN_VIRT_START + MB(2))),
-                         PFN_DOWN(__2M_text_end -
-                                  (const char *)(XEN_VIRT_START + MB(2))),
-                         PAGE_HYPERVISOR_RX);
+        modify_xen_mappings(XEN_VIRT_START + MB(2),
+                            (unsigned long)&__2M_text_end,
+                            PAGE_HYPERVISOR_RX);
 
         /* Mark .rodata as RO. */
-        map_pages_to_xen((unsigned long)&__2M_rodata_start,
-                         PFN_DOWN(__pa(__2M_rodata_start)),
-                         PFN_DOWN(__2M_rodata_end - __2M_rodata_start),
-                         PAGE_HYPERVISOR_RO);
+        modify_xen_mappings((unsigned long)&__2M_rodata_start,
+                            (unsigned long)&__2M_rodata_end,
+                            PAGE_HYPERVISOR_RO);
 
         /* Mark .data and .bss as RW. */
-        map_pages_to_xen((unsigned long)&__2M_rwdata_start,
-                         PFN_DOWN(__pa(__2M_rwdata_start)),
-                         PFN_DOWN(__2M_rwdata_end - __2M_rwdata_start),
-                         PAGE_HYPERVISOR_RW);
+        modify_xen_mappings((unsigned long)&__2M_rwdata_start,
+                            (unsigned long)&__2M_rwdata_end,
+                            PAGE_HYPERVISOR_RW);
 
         /* Drop the remaining mappings in the shattered superpage. */
         destroy_xen_mappings((unsigned long)&__2M_rwdata_end,

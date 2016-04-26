@@ -103,6 +103,8 @@ int map_pages_to_xen(
     unsigned long mfn,
     unsigned long nr_mfns,
     unsigned int flags);
+/* Alter the permissions of a range of Xen virtual address space. */
+void modify_xen_mappings(unsigned long s, unsigned long e, unsigned int flags);
 void destroy_xen_mappings(unsigned long v, unsigned long e);
 /*
  * Create only non-leaf page table entries for the

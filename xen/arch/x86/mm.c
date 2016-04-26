@@ -5956,13 +5956,29 @@ int populate_pt_range(unsigned long virt, unsigned long mfn,
     return map_pages_to_xen(virt, mfn, nr_mfns, MAP_SMALL_PAGES);
 }
 
-void destroy_xen_mappings(unsigned long s, unsigned long e)
+/*
+ * Alter the permissions of a range of Xen virtual address space.
+ *
+ * Does not create new mappings, and does not modify the mfn in existing
+ * mappings, but will shatter superpages if necessary, and will destroy
+ * mappings if not passed _PAGE_PRESENT.
+ *
+ * The only flags considered are NX, RW and PRESENT.  All other input flags
+ * are ignored.
+ *
+ * It is an error to call with present flags over an unpopulated range.
+ */
+void modify_xen_mappings(unsigned long s, unsigned long e, unsigned int nf)
 {
     bool_t locking = system_state > SYS_STATE_boot;
     l2_pgentry_t *pl2e;
     l1_pgentry_t *pl1e;
     unsigned int  i;
     unsigned long v = s;
+
+    /* Set of valid PTE bits which may be altered. */
+#define FLAGS_MASK (_PAGE_NX|_PAGE_RW|_PAGE_PRESENT)
+    nf &= FLAGS_MASK;
 
     ASSERT(IS_ALIGNED(s, PAGE_SIZE));
     ASSERT(IS_ALIGNED(e, PAGE_SIZE));
@@ -5973,6 +5989,9 @@ void destroy_xen_mappings(unsigned long s, unsigned long e)
 
         if ( !(l3e_get_flags(*pl3e) & _PAGE_PRESENT) )
         {
+            /* Confirm the caller isn't trying to create new mappings. */
+            ASSERT(!(nf & _PAGE_PRESENT));
+
             v += 1UL << L3_PAGETABLE_SHIFT;
             v &= ~((1UL << L3_PAGETABLE_SHIFT) - 1);
             continue;
@@ -5984,8 +6003,12 @@ void destroy_xen_mappings(unsigned long s, unsigned long e)
                  l1_table_offset(v) == 0 &&
                  ((e - v) >= (1UL << L3_PAGETABLE_SHIFT)) )
             {
-                /* PAGE1GB: whole superpage is destroyed. */
-                l3e_write_atomic(pl3e, l3e_empty());
+                /* PAGE1GB: whole superpage is modified. */
+                l3_pgentry_t nl3e = !(nf & _PAGE_PRESENT) ? l3e_empty()
+                    : l3e_from_pfn(l3e_get_pfn(*pl3e),
+                                   (l3e_get_flags(*pl3e) & ~FLAGS_MASK) | nf);
+
+                l3e_write_atomic(pl3e, nl3e);
                 v += 1UL << L3_PAGETABLE_SHIFT;
                 continue;
             }
@@ -6016,6 +6039,9 @@ void destroy_xen_mappings(unsigned long s, unsigned long e)
 
         if ( !(l2e_get_flags(*pl2e) & _PAGE_PRESENT) )
         {
+            /* Confirm the caller isn't trying to create new mappings. */
+            ASSERT(!(nf & _PAGE_PRESENT));
+
             v += 1UL << L2_PAGETABLE_SHIFT;
             v &= ~((1UL << L2_PAGETABLE_SHIFT) - 1);
             continue;
@@ -6026,8 +6052,12 @@ void destroy_xen_mappings(unsigned long s, unsigned long e)
             if ( (l1_table_offset(v) == 0) &&
                  ((e-v) >= (1UL << L2_PAGETABLE_SHIFT)) )
             {
-                /* PSE: whole superpage is destroyed. */
-                l2e_write_atomic(pl2e, l2e_empty());
+                /* PSE: whole superpage is modified. */
+                l2_pgentry_t nl2e = !(nf & _PAGE_PRESENT) ? l2e_empty()
+                    : l2e_from_pfn(l2e_get_pfn(*pl2e),
+                                   (l2e_get_flags(*pl2e) & ~FLAGS_MASK) | nf);
+
+                l2e_write_atomic(pl2e, nl2e);
                 v += 1UL << L2_PAGETABLE_SHIFT;
             }
             else
@@ -6055,13 +6085,27 @@ void destroy_xen_mappings(unsigned long s, unsigned long e)
         }
         else
         {
+            l1_pgentry_t nl1e;
+
             /* Ordinary 4kB mapping. */
             pl1e = l2e_to_l1e(*pl2e) + l1_table_offset(v);
-            l1e_write_atomic(pl1e, l1e_empty());
+
+            /* Confirm the caller isn't trying to create new mappings. */
+            if ( !(l1e_get_flags(*pl1e) & _PAGE_PRESENT) )
+                ASSERT(!(nf & _PAGE_PRESENT));
+
+            nl1e = !(nf & _PAGE_PRESENT) ? l1e_empty()
+                : l1e_from_pfn(l1e_get_pfn(*pl1e),
+                               (l1e_get_flags(*pl1e) & ~FLAGS_MASK) | nf);
+
+            l1e_write_atomic(pl1e, nl1e);
             v += PAGE_SIZE;
 
-            /* If we are done with the L2E, check if it is now empty. */
-            if ( (v != e) && (l1_table_offset(v) != 0) )
+            /*
+             * If we are not destroying mappings, or not done with the L2E,
+             * skip the empty&free check.
+             */
+            if ( (nf & _PAGE_PRESENT) || ((v != e) && (l1_table_offset(v) != 0)) )
                 continue;
             pl1e = l2e_to_l1e(*pl2e);
             for ( i = 0; i < L1_PAGETABLE_ENTRIES; i++ )
@@ -6076,8 +6120,12 @@ void destroy_xen_mappings(unsigned long s, unsigned long e)
             }
         }
 
-        /* If we are done with the L3E, check if it is now empty. */
-        if ( (v != e) && (l2_table_offset(v) + l1_table_offset(v) != 0) )
+        /*
+         * If we are not destroying mappings, or not done with the L3E,
+         * skip the empty&free check.
+         */
+        if ( (nf & _PAGE_PRESENT) ||
+             ((v != e) && (l2_table_offset(v) + l1_table_offset(v) != 0)) )
             continue;
         pl2e = l3e_to_l2e(*pl3e);
         for ( i = 0; i < L2_PAGETABLE_ENTRIES; i++ )
@@ -6093,9 +6141,16 @@ void destroy_xen_mappings(unsigned long s, unsigned long e)
     }
 
     flush_area(NULL, FLUSH_TLB_GLOBAL);
+
+#undef FLAGS_MASK
 }
 
 #undef flush_area
+
+void destroy_xen_mappings(unsigned long s, unsigned long e)
+{
+    modify_xen_mappings(s, e, _PAGE_NONE);
+}
 
 void __set_fixmap(
     enum fixed_addresses idx, unsigned long mfn, unsigned long flags)
