@@ -270,6 +270,21 @@ static int disk_try_backend(disk_try_backend_args *a,
     return 0;
 }
 
+int libxl__backendpath_parse_domid(libxl__gc *gc, const char *be_path,
+                                   libxl_domid *domid_out) {
+    int r;
+    unsigned int domid_sc;
+    char delim_sc;
+
+    r = sscanf(be_path, "/local/domain/%u%c", &domid_sc, &delim_sc);
+    if (!(r==2 && delim_sc=='/')) {
+        LOG(ERROR, "internal error: backend path %s unparseable!", be_path);
+        return ERROR_FAIL;
+    }
+    *domid_out = domid_sc;
+    return 0;
+}
+
 int libxl__device_disk_set_backend(libxl__gc *gc, libxl_device_disk *disk) {
     libxl_disk_backend ok;
     disk_try_backend_args a;
