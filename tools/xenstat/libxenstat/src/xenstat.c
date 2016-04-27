@@ -322,7 +322,7 @@ xenstat_domain *xenstat_node_domain(xenstat_node * node, unsigned int domid)
 xenstat_domain *xenstat_node_domain_by_index(xenstat_node * node,
 					     unsigned int index)
 {
-	if (0 <= index && index < node->num_domains)
+	if (index < node->num_domains)
 		return &(node->domains[index]);
 	return NULL;
 }
@@ -389,7 +389,7 @@ unsigned int xenstat_domain_num_vcpus(xenstat_domain * domain)
 
 xenstat_vcpu *xenstat_domain_vcpu(xenstat_domain * domain, unsigned int vcpu)
 {
-	if (0 <= vcpu && vcpu < domain->num_vcpus)
+	if (vcpu < domain->num_vcpus)
 		return &(domain->vcpus[vcpu]);
 	return NULL;
 }
@@ -457,7 +457,7 @@ unsigned int xenstat_domain_num_networks(xenstat_domain * domain)
 xenstat_network *xenstat_domain_network(xenstat_domain * domain,
 					unsigned int network)
 {
-	if (domain->networks && 0 <= network && network < domain->num_networks)
+	if (domain->networks && network < domain->num_networks)
 		return &(domain->networks[network]);
 	return NULL;
 }
@@ -472,7 +472,7 @@ unsigned int xenstat_domain_num_vbds(xenstat_domain * domain)
 xenstat_vbd *xenstat_domain_vbd(xenstat_domain * domain,
 				unsigned int vbd)
 {
-	if (domain->vbds && 0 <= vbd && vbd < domain->num_vbds)
+	if (domain->vbds && vbd < domain->num_vbds)
 		return &(domain->vbds[vbd]);
 	return NULL;
 }
