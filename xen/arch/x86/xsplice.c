@@ -11,6 +11,82 @@
 #include <xen/xsplice_elf.h>
 #include <xen/xsplice.h>
 
+#include <asm/nmi.h>
+
+#define PATCH_INSN_SIZE 5
+
+void arch_xsplice_patching_enter(void)
+{
+    /* Disable WP to allow changes to read-only pages. */
+    write_cr0(read_cr0() & ~X86_CR0_WP);
+}
+
+void arch_xsplice_patching_leave(void)
+{
+    /* Reinstate WP. */
+    write_cr0(read_cr0() | X86_CR0_WP);
+}
+
+int arch_xsplice_verify_func(const struct xsplice_patch_func *func)
+{
+    /* No NOP patching yet. */
+    if ( !func->new_size )
+        return -EOPNOTSUPP;
+
+    if ( func->old_size < PATCH_INSN_SIZE )
+        return -EINVAL;
+
+    return 0;
+}
+
+void arch_xsplice_apply_jmp(struct xsplice_patch_func *func)
+{
+    int32_t val;
+    uint8_t *old_ptr;
+
+    BUILD_BUG_ON(PATCH_INSN_SIZE > sizeof(func->opaque));
+    BUILD_BUG_ON(PATCH_INSN_SIZE != (1 + sizeof(val)));
+
+    old_ptr = func->old_addr;
+    memcpy(func->opaque, old_ptr, PATCH_INSN_SIZE);
+
+    *old_ptr++ = 0xe9; /* Relative jump */
+    val = func->new_addr - func->old_addr - PATCH_INSN_SIZE;
+    memcpy(old_ptr, &val, sizeof(val));
+}
+
+void arch_xsplice_revert_jmp(const struct xsplice_patch_func *func)
+{
+    memcpy(func->old_addr, func->opaque, PATCH_INSN_SIZE);
+}
+
+/* Serialise the CPU pipeline. */
+void arch_xsplice_post_action(void)
+{
+    cpuid_eax(0);
+}
+
+static nmi_callback_t *saved_nmi_callback;
+/*
+ * Note that because of this NOP code the do_nmi is not safely patchable.
+ * Also if we do receive 'real' NMIs we have lost them.
+ */
+static int mask_nmi_callback(const struct cpu_user_regs *regs, int cpu)
+{
+    /* TODO: Handle missing NMI/MCE.*/
+    return 1;
+}
+
+void arch_xsplice_mask(void)
+{
+    saved_nmi_callback = set_nmi_callback(mask_nmi_callback);
+}
+
+void arch_xsplice_unmask(void)
+{
+    set_nmi_callback(saved_nmi_callback);
+}
+
 int arch_xsplice_verify_elf(const struct xsplice_elf *elf)
 {
 

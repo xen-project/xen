@@ -3,6 +3,7 @@
  *
  */
 
+#include <xen/cpu.h>
 #include <xen/err.h>
 #include <xen/guest_access.h>
 #include <xen/keyhandler.h>
@@ -11,17 +12,29 @@
 #include <xen/mm.h>
 #include <xen/sched.h>
 #include <xen/smp.h>
+#include <xen/softirq.h>
 #include <xen/spinlock.h>
 #include <xen/vmap.h>
+#include <xen/wait.h>
 #include <xen/xsplice_elf.h>
 #include <xen/xsplice.h>
 
 #include <asm/event.h>
-#include <public/sysctl.h>
 
-/* Protects against payload_list operations. */
+/*
+ * Protects against payload_list operations and also allows only one
+ * caller in schedule_work.
+ */
 static DEFINE_SPINLOCK(payload_lock);
 static LIST_HEAD(payload_list);
+
+/*
+ * Patches which have been applied. Need RCU in case we crash (and then
+ * traps code would iterate via applied_list) when adding entries on the list.
+ *
+ * Note: There are no 'rcu_applied_lock' as we don't iterate yet the list.
+ */
+static LIST_HEAD(applied_list);
 
 static unsigned int payload_cnt;
 static unsigned int payload_version = 1;
@@ -37,8 +50,34 @@ struct payload {
     const void *ro_addr;                 /* Virtual address of .rodata. */
     size_t ro_size;                      /* .. and its size (if any). */
     unsigned int pages;                  /* Total pages for [text,rw,ro]_addr */
+    struct list_head applied_list;       /* Linked to 'applied_list'. */
+    struct xsplice_patch_func *funcs;    /* The array of functions to patch. */
+    unsigned int nfuncs;                 /* Nr of functions to patch. */
     char name[XEN_XSPLICE_NAME_SIZE];    /* Name of it. */
 };
+
+/* Defines an outstanding patching action. */
+struct xsplice_work
+{
+    atomic_t semaphore;          /* Used to rendezvous CPUs in
+                                    check_for_xsplice_work. */
+    uint32_t timeout;            /* Timeout to do the operation. */
+    struct payload *data;        /* The payload on which to act. */
+    volatile bool_t do_work;     /* Signals work to do. */
+    volatile bool_t ready;       /* Signals all CPUs synchronized. */
+    unsigned int cmd;            /* Action request: XSPLICE_ACTION_* */
+};
+
+/* There can be only one outstanding patching action. */
+static struct xsplice_work xsplice_work;
+
+/*
+ * Indicate whether the CPU needs to consult xsplice_work structure.
+ * We want an per-cpu data structure otherwise the check_for_xsplice_work
+ * would hammer a global xsplice_work structure on every guest VMEXIT.
+ * Having an per-cpu lessens the load.
+ */
+static DEFINE_PER_CPU(bool_t, work_to_do);
 
 static int get_name(const xen_xsplice_name_t *name, char *n)
 {
@@ -257,6 +296,89 @@ static int secure_payload(struct payload *payload, struct xsplice_elf *elf)
     return rc;
 }
 
+static int check_special_sections(const struct xsplice_elf *elf)
+{
+    unsigned int i;
+    static const char *const names[] = { ELF_XSPLICE_FUNC };
+    DECLARE_BITMAP(found, ARRAY_SIZE(names)) = { 0 };
+
+    for ( i = 0; i < ARRAY_SIZE(names); i++ )
+    {
+        const struct xsplice_elf_sec *sec;
+
+        sec = xsplice_elf_sec_by_name(elf, names[i]);
+        if ( !sec )
+        {
+            dprintk(XENLOG_ERR, XSPLICE "%s: %s is missing!\n",
+                    elf->name, names[i]);
+            return -EINVAL;
+        }
+
+        if ( !sec->sec->sh_size )
+        {
+            dprintk(XENLOG_ERR, XSPLICE "%s: %s is empty!\n",
+                    elf->name, names[i]);
+            return -EINVAL;
+        }
+
+        if ( test_and_set_bit(i, found) )
+        {
+            dprintk(XENLOG_ERR, XSPLICE "%s: %s was seen more than once!\n",
+                    elf->name, names[i]);
+            return -EINVAL;
+        }
+    }
+
+    return 0;
+}
+
+static int prepare_payload(struct payload *payload,
+                           struct xsplice_elf *elf)
+{
+    const struct xsplice_elf_sec *sec;
+    unsigned int i;
+    struct xsplice_patch_func *f;
+
+    sec = xsplice_elf_sec_by_name(elf, ELF_XSPLICE_FUNC);
+    ASSERT(sec);
+    if ( sec->sec->sh_size % sizeof(*payload->funcs) )
+    {
+        dprintk(XENLOG_ERR, XSPLICE "%s: Wrong size of "ELF_XSPLICE_FUNC"!\n",
+                elf->name);
+        return -EINVAL;
+    }
+
+    payload->funcs = sec->load_addr;
+    payload->nfuncs = sec->sec->sh_size / sizeof(*payload->funcs);
+
+    for ( i = 0; i < payload->nfuncs; i++ )
+    {
+        int rc;
+
+        f = &(payload->funcs[i]);
+
+        if ( f->version != XSPLICE_PAYLOAD_VERSION )
+        {
+            dprintk(XENLOG_ERR, XSPLICE "%s: Wrong version (%u). Expected %d!\n",
+                    elf->name, f->version, XSPLICE_PAYLOAD_VERSION);
+            return -EOPNOTSUPP;
+        }
+
+        if ( !f->new_addr || !f->new_size )
+        {
+            dprintk(XENLOG_ERR, XSPLICE "%s: Address or size fields are zero!\n",
+                    elf->name);
+            return -EINVAL;
+        }
+
+        rc = arch_xsplice_verify_func(f);
+        if ( rc )
+            return rc;
+    }
+
+    return 0;
+}
+
 static void free_payload(struct payload *data)
 {
     ASSERT(spin_is_locked(&payload_lock));
@@ -285,6 +407,14 @@ static int load_payload_data(struct payload *payload, void *raw, size_t len)
         goto out;
 
     rc = xsplice_elf_perform_relocs(&elf);
+    if ( rc )
+        goto out;
+
+    rc = check_special_sections(&elf);
+    if ( rc )
+        goto out;
+
+    rc = prepare_payload(payload, &elf);
     if ( rc )
         goto out;
 
@@ -335,6 +465,7 @@ static int xsplice_upload(xen_sysctl_xsplice_upload_t *upload)
 
         data->state = XSPLICE_STATE_CHECKED;
         INIT_LIST_HEAD(&data->list);
+        INIT_LIST_HEAD(&data->applied_list);
 
         list_add_tail(&data->list, &payload_list);
         payload_cnt++;
@@ -446,6 +577,313 @@ static int xsplice_list(xen_sysctl_xsplice_list_t *list)
     return rc ? : idx;
 }
 
+/*
+ * The following functions get the CPUs into an appropriate state and
+ * apply (or revert) each of the payload's functions. This is needed
+ * for XEN_SYSCTL_XSPLICE_ACTION operation (see xsplice_action).
+ */
+
+static int apply_payload(struct payload *data)
+{
+    unsigned int i;
+
+    printk(XENLOG_INFO XSPLICE "%s: Applying %u functions\n",
+            data->name, data->nfuncs);
+
+    arch_xsplice_patching_enter();
+
+    for ( i = 0; i < data->nfuncs; i++ )
+        arch_xsplice_apply_jmp(&data->funcs[i]);
+
+    arch_xsplice_patching_leave();
+
+    /*
+     * We need RCU variant (which has barriers) in case we crash here.
+     * The applied_list is iterated by the trap code.
+     */
+    list_add_tail_rcu(&data->applied_list, &applied_list);
+
+    return 0;
+}
+
+static int revert_payload(struct payload *data)
+{
+    unsigned int i;
+
+    printk(XENLOG_INFO XSPLICE "%s: Reverting\n", data->name);
+
+    arch_xsplice_patching_enter();
+
+    for ( i = 0; i < data->nfuncs; i++ )
+        arch_xsplice_revert_jmp(&data->funcs[i]);
+
+    arch_xsplice_patching_leave();
+
+    /*
+     * We need RCU variant (which has barriers) in case we crash here.
+     * The applied_list is iterated by the trap code.
+     */
+    list_del_rcu(&data->applied_list);
+
+    return 0;
+}
+
+/*
+ * This function is executed having all other CPUs with no deep stack (we may
+ * have cpu_idle on it) and IRQs disabled.
+ */
+static void xsplice_do_action(void)
+{
+    int rc;
+    struct payload *data, *other, *tmp;
+
+    data = xsplice_work.data;
+    /*
+     * This function and the transition from asm to C code should be the only
+     * one on any stack. No need to lock the payload list or applied list.
+     */
+    switch ( xsplice_work.cmd )
+    {
+    case XSPLICE_ACTION_APPLY:
+        rc = apply_payload(data);
+        if ( rc == 0 )
+            data->state = XSPLICE_STATE_APPLIED;
+        break;
+
+    case XSPLICE_ACTION_REVERT:
+        rc = revert_payload(data);
+        if ( rc == 0 )
+            data->state = XSPLICE_STATE_CHECKED;
+        break;
+
+    case XSPLICE_ACTION_REPLACE:
+        rc = 0;
+        /*
+	 * N.B: Use 'applied_list' member, not 'list'. We also abuse the
+	 * the 'normal' list iterator as the list is an RCU one.
+	 */
+        list_for_each_entry_safe_reverse ( other, tmp, &applied_list, applied_list )
+        {
+            other->rc = revert_payload(other);
+            if ( other->rc == 0 )
+                other->state = XSPLICE_STATE_CHECKED;
+            else
+            {
+                rc = -EINVAL;
+                break;
+            }
+        }
+
+        if ( rc == 0 )
+        {
+            rc = apply_payload(data);
+            if ( rc == 0 )
+                data->state = XSPLICE_STATE_APPLIED;
+        }
+        break;
+
+    default:
+        rc = -EINVAL; /* Make GCC5 happy. */
+        ASSERT_UNREACHABLE();
+        break;
+    }
+
+    /* We must set rc as xsplice_action sets it to -EAGAIN when kicking of. */
+    data->rc = rc;
+}
+
+static int schedule_work(struct payload *data, uint32_t cmd, uint32_t timeout)
+{
+    ASSERT(spin_is_locked(&payload_lock));
+
+    /* Fail if an operation is already scheduled. */
+    if ( xsplice_work.do_work )
+        return -EBUSY;
+
+    if ( !get_cpu_maps() )
+    {
+        printk(XENLOG_ERR XSPLICE "%s: unable to get cpu_maps lock!\n",
+               data->name);
+        return -EBUSY;
+    }
+
+    xsplice_work.cmd = cmd;
+    xsplice_work.data = data;
+    xsplice_work.timeout = timeout ?: MILLISECS(30);
+
+    dprintk(XENLOG_DEBUG, XSPLICE "%s: timeout is %"PRI_stime"ms\n",
+            data->name, xsplice_work.timeout / MILLISECS(1));
+
+    atomic_set(&xsplice_work.semaphore, -1);
+
+    xsplice_work.ready = 0;
+
+    smp_wmb();
+
+    xsplice_work.do_work = 1;
+    this_cpu(work_to_do) = 1;
+
+    put_cpu_maps();
+
+    return 0;
+}
+
+static void reschedule_fn(void *unused)
+{
+    this_cpu(work_to_do) = 1;
+    raise_softirq(SCHEDULE_SOFTIRQ);
+}
+
+static int xsplice_spin(atomic_t *counter, s_time_t timeout,
+                           unsigned int cpus, const char *s)
+{
+    int rc = 0;
+
+    while ( atomic_read(counter) != cpus && NOW() < timeout )
+        cpu_relax();
+
+    /* Log & abort. */
+    if ( atomic_read(counter) != cpus )
+    {
+        printk(XENLOG_ERR XSPLICE "%s: Timed out on semaphore in %s quiesce phase %u/%u\n",
+               xsplice_work.data->name, s, atomic_read(counter), cpus);
+        rc = -EBUSY;
+        xsplice_work.data->rc = rc;
+        smp_wmb();
+        xsplice_work.do_work = 0;
+    }
+
+    return rc;
+}
+
+/*
+ * The main function which manages the work of quiescing the system and
+ * patching code.
+ */
+void check_for_xsplice_work(void)
+{
+#define ACTION(x) [XSPLICE_ACTION_##x] = #x
+    static const char *const names[] = {
+            ACTION(APPLY),
+            ACTION(REVERT),
+            ACTION(REPLACE),
+    };
+#undef ACTION
+    unsigned int cpu = smp_processor_id();
+    s_time_t timeout;
+    unsigned long flags;
+
+    /* Fast path: no work to do. */
+    if ( !per_cpu(work_to_do, cpu ) )
+        return;
+
+    smp_rmb();
+    /* In case we aborted, other CPUs can skip right away. */
+    if ( !xsplice_work.do_work )
+    {
+        per_cpu(work_to_do, cpu) = 0;
+        return;
+    }
+
+    ASSERT(local_irq_is_enabled());
+
+    /* Set at -1, so will go up to num_online_cpus - 1. */
+    if ( atomic_inc_and_test(&xsplice_work.semaphore) )
+    {
+        struct payload *p;
+        unsigned int cpus;
+
+        p = xsplice_work.data;
+        if ( !get_cpu_maps() )
+        {
+            printk(XENLOG_ERR XSPLICE "%s: CPU%u - unable to get cpu_maps lock!\n",
+                   p->name, cpu);
+            per_cpu(work_to_do, cpu) = 0;
+            xsplice_work.data->rc = -EBUSY;
+            smp_wmb();
+            xsplice_work.do_work = 0;
+            /*
+             * Do NOT decrement xsplice_work.semaphore down - as that may cause
+             * the other CPU (which may be at this point ready to increment it)
+             * to assume the role of master and then needlessly time out
+             * out (as do_work is zero).
+             */
+            return;
+        }
+        /* "Mask" NMIs. */
+        arch_xsplice_mask();
+
+        barrier(); /* MUST do it after get_cpu_maps. */
+        cpus = num_online_cpus() - 1;
+
+        if ( cpus )
+        {
+            dprintk(XENLOG_DEBUG, XSPLICE "%s: CPU%u - IPIing the other %u CPUs\n",
+                    p->name, cpu, cpus);
+            smp_call_function(reschedule_fn, NULL, 0);
+        }
+
+        timeout = xsplice_work.timeout + NOW();
+        if ( xsplice_spin(&xsplice_work.semaphore, timeout, cpus, "CPU") )
+            goto abort;
+
+        /* All CPUs are waiting, now signal to disable IRQs. */
+        atomic_set(&xsplice_work.semaphore, 0);
+        /*
+         * MUST have a barrier after semaphore so that the other CPUs don't
+         * leak out of the 'Wait for all CPUs to rendezvous' loop and increment
+         * 'semaphore' before we set it to zero.
+         */
+        smp_wmb();
+        xsplice_work.ready = 1;
+
+        if ( !xsplice_spin(&xsplice_work.semaphore, timeout, cpus, "IRQ") )
+        {
+            local_irq_save(flags);
+            /* Do the patching. */
+            xsplice_do_action();
+            /* Serialize and flush out the CPU via CPUID instruction (on x86). */
+            arch_xsplice_post_action();
+            local_irq_restore(flags);
+        }
+        arch_xsplice_unmask();
+
+ abort:
+        per_cpu(work_to_do, cpu) = 0;
+        xsplice_work.do_work = 0;
+
+        /* put_cpu_maps has an barrier(). */
+        put_cpu_maps();
+
+        printk(XENLOG_INFO XSPLICE "%s finished %s with rc=%d\n",
+               p->name, names[xsplice_work.cmd], p->rc);
+    }
+    else
+    {
+        /* Wait for all CPUs to rendezvous. */
+        while ( xsplice_work.do_work && !xsplice_work.ready )
+            cpu_relax();
+
+        /* Disable IRQs and signal. */
+        local_irq_save(flags);
+        /*
+         * We re-use the sempahore, so MUST have it reset by master before
+         * we exit the loop above.
+         */
+        atomic_inc(&xsplice_work.semaphore);
+
+        /* Wait for patching to complete. */
+        while ( xsplice_work.do_work )
+            cpu_relax();
+
+        /* To flush out pipeline. */
+        arch_xsplice_post_action();
+        local_irq_restore(flags);
+
+        per_cpu(work_to_do, cpu) = 0;
+    }
+}
+
 static int xsplice_action(xen_sysctl_xsplice_action_t *action)
 {
     struct payload *data;
@@ -485,27 +923,24 @@ static int xsplice_action(xen_sysctl_xsplice_action_t *action)
     case XSPLICE_ACTION_REVERT:
         if ( data->state == XSPLICE_STATE_APPLIED )
         {
-            /* No implementation yet. */
-            data->state = XSPLICE_STATE_CHECKED;
-            data->rc = 0;
+            data->rc = -EAGAIN;
+            rc = schedule_work(data, action->cmd, action->timeout);
         }
         break;
 
     case XSPLICE_ACTION_APPLY:
         if ( data->state == XSPLICE_STATE_CHECKED )
         {
-            /* No implementation yet. */
-            data->state = XSPLICE_STATE_APPLIED;
-            data->rc = 0;
+            data->rc = -EAGAIN;
+            rc = schedule_work(data, action->cmd, action->timeout);
         }
         break;
 
     case XSPLICE_ACTION_REPLACE:
         if ( data->state == XSPLICE_STATE_CHECKED )
         {
-            /* No implementation yet. */
-            data->state = XSPLICE_STATE_CHECKED;
-            data->rc = 0;
+            data->rc = -EAGAIN;
+            rc = schedule_work(data, action->cmd, action->timeout);
         }
         break;
 
@@ -570,6 +1005,7 @@ static const char *state2str(unsigned int state)
 static void xsplice_printall(unsigned char key)
 {
     struct payload *data;
+    unsigned int i;
 
     printk("'%c' pressed - Dumping all xsplice patches\n", key);
 
@@ -580,9 +1016,29 @@ static void xsplice_printall(unsigned char key)
     }
 
     list_for_each_entry ( data, &payload_list, list )
+    {
         printk(" name=%s state=%s(%d) %p (.data=%p, .rodata=%p) using %u pages.\n",
                data->name, state2str(data->state), data->state, data->text_addr,
                data->rw_addr, data->ro_addr, data->pages);
+
+        for ( i = 0; i < data->nfuncs; i++ )
+        {
+            struct xsplice_patch_func *f = &(data->funcs[i]);
+            printk("    %s patch %p(%u) with %p (%u)\n",
+                   f->name, f->old_addr, f->old_size, f->new_addr, f->new_size);
+
+            if ( i && !(i % 64) )
+            {
+                spin_unlock(&payload_lock);
+                process_pending_softirqs();
+                if ( spin_trylock(&payload_lock) )
+                {
+                    printk("Couldn't reacquire lock. Try again.\n");
+                    return;
+                }
+            }
+        }
+    }
 
     spin_unlock(&payload_lock);
 }
