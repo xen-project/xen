@@ -124,7 +124,8 @@ void init_traps(void)
 
     /* Setup hypervisor traps */
     WRITE_SYSREG(HCR_PTW|HCR_BSU_INNER|HCR_AMO|HCR_IMO|HCR_FMO|HCR_VM|
-                 HCR_TWE|HCR_TWI|HCR_TSC|HCR_TAC|HCR_SWIO|HCR_TIDCP, HCR_EL2);
+                 HCR_TWE|HCR_TWI|HCR_TSC|HCR_TAC|HCR_SWIO|HCR_TIDCP|HCR_FB,
+                 HCR_EL2);
     isb();
 }
 
