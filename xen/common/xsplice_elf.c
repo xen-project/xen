@@ -100,6 +100,7 @@ static int elf_resolve_sections(struct xsplice_elf *elf, const void *data)
 
             elf->symtab = &sec[i];
 
+            elf->symtab_idx = i;
             /*
              * elf->symtab->sec->sh_link would point to the right section
              * but we hadn't finished parsing all the sections.
@@ -250,9 +251,122 @@ static int elf_get_sym(struct xsplice_elf *elf, const void *data)
     return 0;
 }
 
+int xsplice_elf_resolve_symbols(struct xsplice_elf *elf)
+{
+    unsigned int i;
+    int rc = 0;
+
+    ASSERT(elf->sym);
+
+    for ( i = 1; i < elf->nsym; i++ )
+    {
+        unsigned int idx = elf->sym[i].sym->st_shndx;
+        const Elf_Sym *sym = elf->sym[i].sym;
+        Elf_Addr st_value = sym->st_value;
+
+        switch ( idx )
+        {
+        case SHN_COMMON:
+            dprintk(XENLOG_ERR, XSPLICE "%s: Unexpected common symbol: %s\n",
+                    elf->name, elf->sym[i].name);
+            rc = -EINVAL;
+            break;
+
+        case SHN_UNDEF:
+            dprintk(XENLOG_ERR, XSPLICE "%s: Unknown symbol: %s\n",
+                    elf->name, elf->sym[i].name);
+            rc = -ENOENT;
+            break;
+
+        case SHN_ABS:
+            dprintk(XENLOG_DEBUG, XSPLICE "%s: Absolute symbol: %s => %#"PRIxElfAddr"\n",
+                    elf->name, elf->sym[i].name, sym->st_value);
+            break;
+
+        default:
+            /* SHN_COMMON and SHN_ABS are above. */
+            if ( idx >= SHN_LORESERVE )
+                rc = -EOPNOTSUPP;
+            else if ( idx >= elf->hdr->e_shnum )
+                rc = -EINVAL;
+
+            if ( rc )
+            {
+                dprintk(XENLOG_ERR, XSPLICE "%s: Out of bounds symbol section %#x\n",
+                        elf->name, idx);
+                break;
+            }
+
+            /* Matches 'move_payload' which ignores such sections. */
+            if ( !(elf->sec[idx].sec->sh_flags & SHF_ALLOC) )
+                break;
+
+            st_value += (unsigned long)elf->sec[idx].load_addr;
+            if ( elf->sym[i].name )
+                dprintk(XENLOG_DEBUG, XSPLICE "%s: Symbol resolved: %s => %#"PRIxElfAddr" (%s)\n",
+                       elf->name, elf->sym[i].name,
+                       st_value, elf->sec[idx].name);
+        }
+
+        if ( rc )
+            break;
+
+        ((Elf_Sym *)sym)->st_value = st_value;
+    }
+
+    return rc;
+}
+
+int xsplice_elf_perform_relocs(struct xsplice_elf *elf)
+{
+    struct xsplice_elf_sec *r, *base;
+    unsigned int i;
+    int rc = 0;
+
+    ASSERT(elf->sym);
+
+    for ( i = 1; i < elf->hdr->e_shnum; i++ )
+    {
+        r = &elf->sec[i];
+
+        if ( (r->sec->sh_type != SHT_RELA) &&
+             (r->sec->sh_type != SHT_REL) )
+            continue;
+
+         /* Is it a valid relocation section? */
+         if ( r->sec->sh_info >= elf->hdr->e_shnum )
+            continue;
+
+         base = &elf->sec[r->sec->sh_info];
+
+         /* Don't relocate non-allocated sections. */
+         if ( !(base->sec->sh_flags & SHF_ALLOC) )
+            continue;
+
+        if ( r->sec->sh_link != elf->symtab_idx )
+        {
+            dprintk(XENLOG_ERR, XSPLICE "%s: Relative link of %s is incorrect (%d, expected=%d)\n",
+                    elf->name, r->name, r->sec->sh_link, elf->symtab_idx);
+            rc = -EINVAL;
+            break;
+        }
+
+        if ( r->sec->sh_type == SHT_RELA )
+            rc = arch_xsplice_perform_rela(elf, base, r);
+        else /* SHT_REL */
+            rc = arch_xsplice_perform_rel(elf, base, r);
+
+        if ( rc )
+            break;
+    }
+
+    return rc;
+}
+
 static int xsplice_header_check(const struct xsplice_elf *elf)
 {
     const Elf_Ehdr *hdr = elf->hdr;
+    int rc;
 
     if ( sizeof(*elf->hdr) > elf->len )
     {
@@ -278,6 +392,10 @@ static int xsplice_header_check(const struct xsplice_elf *elf)
         dprintk(XENLOG_ERR, XSPLICE "%s: Invalid ELF payload!\n", elf->name);
         return -EOPNOTSUPP;
     }
+
+    rc = arch_xsplice_verify_elf(elf);
+    if ( rc )
+        return rc;
 
     if ( elf->hdr->e_shstrndx == SHN_UNDEF )
     {

@@ -61,6 +61,7 @@ obj-y += x86_emulate.o
 obj-y += tboot.o
 obj-y += hpet.o
 obj-y += vm_event.o
+obj-$(CONFIG_XSPLICE) += xsplice.o
 obj-y += xstate.o
 
 obj-$(crash_debug) += gdbstub.o
