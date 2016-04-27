@@ -998,7 +998,7 @@ void kdd_select_callback(kdd_state *s)
 }
 
 
-static void usage(void)
+static void __attribute__((noreturn)) usage(void)
 {
     fprintf(stderr, 
 " usage: kdd [-v] <domid> <address> <port>\n"
