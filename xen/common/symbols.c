@@ -31,6 +31,8 @@ extern const unsigned long symbols_addresses[];
 extern const unsigned int symbols_num_syms;
 extern const u8 symbols_names[];
 
+extern const struct symbol_offset symbols_sorted_offsets[];
+
 extern const u8 symbols_token_table[];
 extern const u16 symbols_token_index[];
 
@@ -211,14 +213,39 @@ int xensyms_read(uint32_t *symnum, char *type,
 unsigned long symbols_lookup_by_name(const char *symname)
 {
     char name[KSYM_NAME_LEN + 1];
+#ifdef CONFIG_FAST_SYMBOL_LOOKUP
+    unsigned long low, high;
+#else
     uint32_t symnum = 0;
     char type;
     unsigned long addr;
     int rc;
+#endif
 
     if ( *symname == '\0' )
         return 0;
 
+#ifdef CONFIG_FAST_SYMBOL_LOOKUP
+    low = 0;
+    high = symbols_num_syms;
+    while ( low < high )
+    {
+        unsigned long mid = low + ((high - low) / 2);
+        const struct symbol_offset *s;
+        int rc;
+
+        s = &symbols_sorted_offsets[mid];
+        (void)symbols_expand_symbol(s->stream, name);
+        /* Format is: [filename]#<symbol>. symbols_expand_symbol eats type.*/
+        rc = strcmp(symname, name);
+        if ( rc < 0 )
+            high = mid;
+        else if ( rc > 0 )
+            low = mid + 1;
+        else
+            return symbols_address(s->addr);
+    }
+#else
     do {
         rc = xensyms_read(&symnum, &type, &addr, name);
         if ( rc )
@@ -229,6 +256,7 @@ unsigned long symbols_lookup_by_name(const char *symname)
 
     } while ( name[0] != '\0' );
 
+#endif
     return 0;
 }
 

@@ -74,6 +74,9 @@ efi-y := $(shell if [ ! -r $(BASEDIR)/include/xen/compile.h -o \
 
 ifdef CONFIG_XSPLICE
 all_symbols = --all-symbols
+ifdef CONFIG_FAST_SYMBOL_LOOKUP
+all_symbols = --all-symbols --sort-by-name
+endif
 else
 all_symbols =
 endif

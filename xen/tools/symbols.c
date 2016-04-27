@@ -40,6 +40,10 @@ struct sym_entry {
 	unsigned long long addr;
 	unsigned int len;
 	unsigned char *sym;
+	char *orig_symbol;
+	unsigned int addr_idx;
+	unsigned int stream_offset;
+	unsigned char type;
 };
 #define SYMBOL_NAME(s) ((char *)(s)->sym + 1)
 
@@ -47,8 +51,10 @@ static struct sym_entry *table;
 static unsigned int table_size, table_cnt;
 static unsigned long long _stext, _etext, _sinittext, _einittext, _sextratext, _eextratext;
 static int all_symbols = 0;
+static int sort_by_name = 0;
 static char symbol_prefix_char = '\0';
 static enum { fmt_bsd, fmt_sysv } input_format;
+static int compare_name(const void *p1, const void *p2);
 
 int token_profit[0x10000];
 
@@ -175,8 +181,11 @@ static int read_symbol(FILE *in, struct sym_entry *s)
 		*sym++ = '#';
 	}
 	strcpy(sym, str);
+	if (sort_by_name) {
+		s->orig_symbol = strdup(SYMBOL_NAME(s));
+		s->type = stype; /* As s->sym[0] ends mangled. */
+	}
 	s->sym[0] = stype;
-
 	rc = 0;
 
  skip_tail:
@@ -276,6 +285,21 @@ static int expand_symbol(unsigned char *data, int len, char *result)
 	return total;
 }
 
+/* Sort by original (non mangled) symbol name, then type. */
+static int compare_name_orig(const void *p1, const void *p2)
+{
+	const struct sym_entry *sym1 = p1;
+	const struct sym_entry *sym2 = p2;
+	int rc;
+
+	rc = strcmp(sym1->orig_symbol, sym2->orig_symbol);
+
+	if (!rc)
+		rc = sym1->type - sym2->type;
+
+	return rc;
+}
+
 static void write_src(void)
 {
 	unsigned int i, k, off;
@@ -325,6 +349,7 @@ static void write_src(void)
 			printf(", 0x%02x", table[i].sym[k]);
 		printf("\n");
 
+		table[i].stream_offset = off;
 		off += table[i].len + 1;
 	}
 	printf("\n");
@@ -334,7 +359,6 @@ static void write_src(void)
 		printf("\t.long\t%d\n", markers[i]);
 	printf("\n");
 
-	free(markers);
 
 	output_label("symbols_token_table");
 	off = 0;
@@ -350,6 +374,25 @@ static void write_src(void)
 	for (i = 0; i < 256; i++)
 		printf("\t.short\t%d\n", best_idx[i]);
 	printf("\n");
+
+	if (!sort_by_name) {
+		free(markers);
+		return;
+	}
+
+	/* Sorted by original symbol names and type. */
+	qsort(table, table_cnt, sizeof(*table), compare_name_orig);
+
+	output_label("symbols_sorted_offsets");
+	/* A fixed sized array with two entries: offset in the
+	 * compressed stream (for symbol name), and offset in
+	 * symbols_addresses (or symbols_offset). */
+	for (i = 0; i < table_cnt; i++) {
+		printf("\t.long %u, %u\n", table[i].stream_offset, table[i].addr_idx);
+	}
+	printf("\n");
+
+	free(markers);
 }
 
 
@@ -410,6 +453,7 @@ static void compress_symbols(unsigned char *str, int idx)
 		len = table[i].len;
 		p1 = table[i].sym;
 
+		table[i].addr_idx = i;
 		/* find the token on the symbol */
 		p2 = memmem_pvt(p1, len, str, 2);
 		if (!p2) continue;
@@ -561,6 +605,8 @@ int main(int argc, char **argv)
 				input_format = fmt_sysv;
 			else if (strcmp(argv[i], "--sort") == 0)
 				unsorted = true;
+			else if (strcmp(argv[i], "--sort-by-name") == 0)
+				sort_by_name = 1;
 			else if (strcmp(argv[i], "--warn-dup") == 0)
 				warn_dup = true;
 			else

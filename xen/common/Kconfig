@@ -200,4 +200,16 @@ config XSPLICE
 
 	  If unsure, say Y.
 
+config FAST_SYMBOL_LOOKUP
+	bool "Fast symbol lookup (bigger binary)"
+	default y
+	depends on XSPLICE
+	---help---
+	  When searching for symbol addresses we can use the built-in system
+	  that is optimized for searching symbols using addresses as the key.
+	  However using it for the inverse (find address using the symbol name)
+	  it is slow. This extra data and code (~55kB) speeds up the search.
+	  The only user of this is xSplice.
+
+	  If unsure, say Y.
 endmenu

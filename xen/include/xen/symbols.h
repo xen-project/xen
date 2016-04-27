@@ -25,4 +25,12 @@ int xensyms_read(uint32_t *symnum, char *type,
 
 unsigned long symbols_lookup_by_name(const char *symname);
 
+/*
+ * A sorted (by symbols) lookup table table to symbols_names (stream)
+ * and symbols_address (or offset).
+ */
+struct symbol_offset {
+    uint32_t stream; /* .. in the compressed stream.*/
+    uint32_t addr;   /* .. and in the fixed size address array. */
+};
 #endif /*_XEN_SYMBOLS_H*/
