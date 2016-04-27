@@ -85,7 +85,7 @@ unsigned int SPB;
 		DBG(TLOG_WARN, "%s:%d: FAILED ASSERTION: '%s'\n",	\
 		    __FILE__, __LINE__, #_p);				\
 		tlog_flush();						\
-		*(int*)0 = 0;						\
+		abort();                                                \
 	}
 
 #if (DEBUGGING == 1)
