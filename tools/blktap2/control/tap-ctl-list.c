@@ -400,7 +400,7 @@ int
 _tap_list_join3(int n_minors, int *minorv, int n_taps, struct tapdisk *tapv,
 		tap_list_t ***_list)
 {
-	tap_list_t **list, **_entry, *entry;
+	tap_list_t **list, **_entry;
 	int i, _m, err;
 
 	list = tap_ctl_alloc_list(n_minors + n_taps);
@@ -454,7 +454,7 @@ _tap_list_join3(int n_minors, int *minorv, int n_taps, struct tapdisk *tapv,
 	}
 
 	/* free extraneous list entries */
-	for (; *_entry != NULL; ++entry) {
+	for (; *_entry != NULL; ++_entry) {
 		free_list(*_entry);
 		*_entry = NULL;
 	}
