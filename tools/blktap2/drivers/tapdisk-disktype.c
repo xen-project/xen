@@ -33,6 +33,8 @@
 #include "tapdisk-disktype.h"
 #include "tapdisk-message.h"
 
+#define ARRAY_SIZE(a) (sizeof (a) / sizeof *(a))
+
 static const disk_info_t aio_disk = {
        "aio",
        "raw image (aio)",
@@ -112,35 +114,25 @@ const disk_info_t *tapdisk_disk_types[] = {
 	[DISK_TYPE_LOG]	= &log_disk,
 	[DISK_TYPE_VINDEX]	= &vhd_index_disk,
 	[DISK_TYPE_REMUS]	= &remus_disk,
-	0,
 };
 
 extern struct tap_disk tapdisk_aio;
-extern struct tap_disk tapdisk_sync;
-extern struct tap_disk tapdisk_vmdk;
 extern struct tap_disk tapdisk_vhdsync;
 extern struct tap_disk tapdisk_vhd;
 extern struct tap_disk tapdisk_ram;
 extern struct tap_disk tapdisk_qcow;
 extern struct tap_disk tapdisk_block_cache;
-extern struct tap_disk tapdisk_vhd_index;
 extern struct tap_disk tapdisk_log;
 extern struct tap_disk tapdisk_remus;
 
-const struct tap_disk *tapdisk_disk_drivers[] = {
+const struct tap_disk *tapdisk_disk_drivers[ARRAY_SIZE(tapdisk_disk_types)] = {
 	[DISK_TYPE_AIO]         = &tapdisk_aio,
-#if 0
-	[DISK_TYPE_SYNC]        = &tapdisk_sync,
-	[DISK_TYPE_VMDK]        = &tapdisk_vmdk,
-#endif
 	[DISK_TYPE_VHD]         = &tapdisk_vhd,
 	[DISK_TYPE_RAM]         = &tapdisk_ram,
 	[DISK_TYPE_QCOW]        = &tapdisk_qcow,
 	[DISK_TYPE_BLOCK_CACHE] = &tapdisk_block_cache,
-	[DISK_TYPE_VINDEX]      = &tapdisk_vhd_index,
 	[DISK_TYPE_LOG]         = &tapdisk_log,
 	[DISK_TYPE_REMUS]       = &tapdisk_remus,
-	0,
 };
 
 int
@@ -149,7 +141,11 @@ tapdisk_disktype_find(const char *name)
 	const disk_info_t *info;
 	int i;
 
-	for (i = 0; info = tapdisk_disk_types[i], info != NULL; ++i) {
+	for (i = 0; i < ARRAY_SIZE(tapdisk_disk_types); ++i) {
+		info = tapdisk_disk_types[i];
+		if (!info)
+			continue;
+
 		if (strcmp(name, info->name))
 			continue;
 
