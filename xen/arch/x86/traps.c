@@ -50,6 +50,7 @@
 #include <xen/paging.h>
 #include <xen/virtual_region.h>
 #include <xen/watchdog.h>
+#include <xen/xsplice.h>
 #include <asm/system.h>
 #include <asm/io.h>
 #include <asm/atomic.h>
@@ -1287,7 +1288,7 @@ void do_invalid_op(struct cpu_user_regs *regs)
 
     /* WARN, BUG or ASSERT: decode the filename pointer and line number. */
     filename = bug_ptr(bug);
-    if ( !is_kernel(filename) )
+    if ( !is_kernel(filename) && !is_patch(filename) )
         goto die;
     fixup = strlen(filename);
     if ( fixup > 50 )
@@ -1314,7 +1315,7 @@ void do_invalid_op(struct cpu_user_regs *regs)
     case BUGFRAME_assert:
         /* ASSERT: decode the predicate string pointer. */
         predicate = bug_msg(bug);
-        if ( !is_kernel(predicate) )
+        if ( !is_kernel(predicate) && !is_patch(predicate) )
             predicate = "<unknown>";
 
         printk("Assertion '%s' failed at %s%s:%d\n",

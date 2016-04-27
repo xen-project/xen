@@ -29,6 +29,7 @@ struct xsplice_symbol {
 int xsplice_op(struct xen_sysctl_xsplice_op *);
 void check_for_xsplice_work(void);
 unsigned long xsplice_symbols_lookup_by_name(const char *symname);
+bool_t is_patch(const void *addr);
 
 /* Arch hooks. */
 int arch_xsplice_verify_elf(const struct xsplice_elf *elf);
@@ -76,6 +77,10 @@ static inline int xsplice_op(struct xen_sysctl_xsplice_op *op)
 }
 
 static inline void check_for_xsplice_work(void) { };
+static inline bool_t is_patch(const void *addr)
+{
+    return 0;
+}
 #endif /* CONFIG_XSPLICE */
 
 #endif /* __XEN_XSPLICE_H__ */
