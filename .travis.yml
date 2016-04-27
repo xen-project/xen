@@ -22,11 +22,7 @@ matrix:
           env: XEN_TARGET_ARCH=x86_64 debug=y
         - compiler: clang
           env: XEN_TARGET_ARCH=x86_64 clang=y debug=n
-        - compiler: clang-3.8
-          env: XEN_TARGET_ARCH=x86_64 clang=y debug=n
         - compiler: clang
-          env: XEN_TARGET_ARCH=x86_64 clang=y debug=y
-        - compiler: clang-3.8
           env: XEN_TARGET_ARCH=x86_64 clang=y debug=y
         - compiler: gcc
           env: XEN_TARGET_ARCH=arm32 CROSS_COMPILE=arm-linux-gnueabihf- debug=n

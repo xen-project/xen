@@ -1,5 +1,7 @@
 #!/bin/bash -ex
 
+$CC --version
+
 # random config or default config
 if [[ "${RANDCONFIG}" == "y" ]]; then
     make -C xen randconfig
