@@ -337,7 +337,7 @@ struct libxl__evgen_disk_eject {
     uint32_t domid;
     LIBXL_LIST_ENTRY(libxl_evgen_disk_eject) entry;
     libxl_ev_user user;
-    char *vdev;
+    char *vdev, *be_ptr_path;
 };
 _hidden void
 libxl__evdisable_disk_eject(libxl__gc*, libxl_evgen_disk_eject*);
