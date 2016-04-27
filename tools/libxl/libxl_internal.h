@@ -683,6 +683,8 @@ _hidden bool libxl__xs_mkdir(libxl__gc *gc, xs_transaction_t t,
 
 _hidden char *libxl__xs_libxl_path(libxl__gc *gc, uint32_t domid);
 
+_hidden int libxl__backendpath_parse_domid(libxl__gc *gc, const char *be_path,
+                                           libxl_domid *domid_out);
 
 /*----- "checked" xenstore access functions -----*/
 /* Each of these functions will check that it succeeded; if it
