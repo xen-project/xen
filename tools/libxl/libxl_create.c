@@ -617,6 +617,8 @@ retry_transaction:
 
     xs_rm(ctx->xsh, t, libxl_path);
     libxl__xs_mknod(gc, t, libxl_path, noperm, ARRAY_SIZE(noperm));
+    libxl__xs_mknod(gc, t, GCSPRINTF("%s/device", libxl_path),
+                    noperm, ARRAY_SIZE(noperm));
 
     xs_write(ctx->xsh, t, GCSPRINTF("%s/vm", dom_path), vm_path, strlen(vm_path));
     rc = libxl__domain_rename(gc, *domid, 0, info->name, t);
