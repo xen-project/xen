@@ -1312,9 +1312,10 @@ static void disk_eject_xswatch_callback(libxl__egc *egc, libxl__ev_xswatch *w,
                                         const char *wpath, const char *epath) {
     EGC_GC;
     libxl_evgen_disk_eject *evg = (void*)w;
-    char *backend;
+    const char *backend;
     char *value;
     char backend_type[BACKEND_STRING_SIZE+1];
+    int rc;
 
     value = libxl__xs_read(gc, XBT_NULL, wpath);
 
@@ -1330,9 +1331,16 @@ static void disk_eject_xswatch_callback(libxl__egc *egc, libxl__ev_xswatch *w,
     libxl_event *ev = NEW_EVENT(egc, DISK_EJECT, evg->domid, evg->user);
     libxl_device_disk *disk = &ev->u.disk_eject.disk;
     
-    backend = libxl__xs_read(gc, XBT_NULL,
-                             GCSPRINTF("%.*s/backend", (int)strlen(wpath)-6,
-                                       wpath));
+    rc = libxl__xs_read_checked(gc, XBT_NULL, evg->be_ptr_path, &backend);
+    if (rc) {
+        LIBXL__EVENT_DISASTER(egc, "xs_read failed reading be_ptr_path",
+                              errno, LIBXL_EVENT_TYPE_DISK_EJECT);
+        return;
+    }
+    if (!backend) {
+        /* device has been removed, not simply ejected */
+        return;
+    }
 
     sscanf(backend,
             "/local/domain/%d/backend/%" TOSTRING(BACKEND_STRING_SIZE)
@@ -1381,10 +1389,17 @@ int libxl_evenable_disk_eject(libxl_ctx *ctx, uint32_t guest_domid,
     if (!domid)
         domid = guest_domid;
 
+    int devid = libxl__device_disk_dev_number(vdev, NULL, NULL);
+
     path = GCSPRINTF("%s/device/vbd/%d/eject",
                  libxl__xs_get_dompath(gc, domid),
-                 libxl__device_disk_dev_number(vdev, NULL, NULL));
+                 devid);
     if (!path) { rc = ERROR_NOMEM; goto out; }
+
+    const char *libxl_path = GCSPRINTF("%s/device/vbd/%d",
+                                 libxl__xs_libxl_path(gc, domid),
+                                 devid);
+    evg->be_ptr_path = libxl__sprintf(NOGC, "%s/backend", libxl_path);
 
     rc = libxl__ev_xswatch_register(gc, &evg->watch,
                                     disk_eject_xswatch_callback, path);
@@ -1412,6 +1427,7 @@ void libxl__evdisable_disk_eject(libxl__gc *gc, libxl_evgen_disk_eject *evg) {
         libxl__ev_xswatch_deregister(gc, &evg->watch);
 
     free(evg->vdev);
+    free(evg->be_ptr_path);
     free(evg);
 
     CTX_UNLOCK;
