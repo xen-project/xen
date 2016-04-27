@@ -14,7 +14,9 @@
 #include <xen/smp.h>
 #include <xen/softirq.h>
 #include <xen/spinlock.h>
+#include <xen/string.h>
 #include <xen/symbols.h>
+#include <xen/virtual_region.h>
 #include <xen/vmap.h>
 #include <xen/wait.h>
 #include <xen/xsplice_elf.h>
@@ -31,10 +33,9 @@ static LIST_HEAD(payload_list);
 
 /*
  * Patches which have been applied. Need RCU in case we crash (and then
- * traps code would iterate via applied_list) when adding entries on the list.
- *
- * Note: There are no 'rcu_applied_lock' as we don't iterate yet the list.
+ * traps code would iterate via applied_list) when adding entries onthe list.
  */
+static DEFINE_RCU_READ_LOCK(rcu_applied_lock);
 static LIST_HEAD(applied_list);
 
 static unsigned int payload_cnt;
@@ -56,6 +57,8 @@ struct payload {
     unsigned int nfuncs;                 /* Nr of functions to patch. */
     const struct xsplice_symbol *symtab; /* All symbols. */
     const char *strtab;                  /* Pointer to .strtab. */
+    struct virtual_region region;        /* symbol, bug.frame patching and
+                                            exception table (x86). */
     unsigned int nsyms;                  /* Nr of entries in .strtab and symbols. */
     char name[XEN_XSPLICE_NAME_SIZE];    /* Name of it. */
 };
@@ -137,6 +140,55 @@ unsigned long xsplice_symbols_lookup_by_name(const char *symname)
     }
 
     return 0;
+}
+
+static const char *xsplice_symbols_lookup(unsigned long addr,
+                                          unsigned long *symbolsize,
+                                          unsigned long *offset,
+                                          char *namebuf)
+{
+    const struct payload *data;
+    unsigned int i, best;
+    const void *va = (const void *)addr;
+    const char *n = NULL;
+
+    /*
+     * Only RCU locking since this list is only ever changed during apply
+     * or revert context. And in case it dies there we need an safe list.
+     */
+    rcu_read_lock(&rcu_applied_lock);
+    list_for_each_entry_rcu ( data, &applied_list, applied_list )
+    {
+        if ( va < data->text_addr ||
+             va >= (data->text_addr + data->text_size) )
+            continue;
+
+        best = UINT_MAX;
+
+        for ( i = 0; i < data->nsyms; i++ )
+        {
+            if ( data->symtab[i].value <= addr &&
+                 (best == UINT_MAX ||
+                  data->symtab[best].value < data->symtab[i].value) )
+                best = i;
+        }
+
+        if ( best == UINT_MAX )
+            break;
+
+        if ( symbolsize )
+            *symbolsize = data->symtab[best].size;
+        if ( offset )
+            *offset = addr - data->symtab[best].value;
+        if ( namebuf )
+            strlcpy(namebuf, data->name, KSYM_NAME_LEN);
+
+        n = data->symtab[best].name;
+        break;
+    }
+    rcu_read_unlock(&rcu_applied_lock);
+
+    return n;
 }
 
 static struct payload *find_payload(const char *name)
@@ -364,6 +416,7 @@ static int prepare_payload(struct payload *payload,
     const struct xsplice_elf_sec *sec;
     unsigned int i;
     struct xsplice_patch_func *f;
+    struct virtual_region *region;
 
     sec = xsplice_elf_sec_by_name(elf, ELF_XSPLICE_FUNC);
     ASSERT(sec);
@@ -419,6 +472,13 @@ static int prepare_payload(struct payload *payload,
                     elf->name, f->name, f->old_addr);
         }
     }
+
+    /* Setup the virtual region with proper data. */
+    region = &payload->region;
+
+    region->symbols_lookup = xsplice_symbols_lookup;
+    region->start = payload->text_addr;
+    region->end = payload->text_addr + payload->text_size;
 
     return 0;
 }
@@ -496,6 +556,7 @@ static int build_symbol_table(struct payload *payload,
         if ( is_payload_symbol(elf, elf->sym + i) )
         {
             symtab[nsyms].name = strtab + strtab_len;
+            symtab[nsyms].size = elf->sym[i].sym->st_size;
             symtab[nsyms].value = elf->sym[i].sym->st_value;
             symtab[nsyms].new_symbol = 0; /* May be overwritten below. */
             strtab_len += strlcpy(strtab + strtab_len, elf->sym[i].name,
@@ -779,6 +840,7 @@ static int apply_payload(struct payload *data)
      * The applied_list is iterated by the trap code.
      */
     list_add_tail_rcu(&data->applied_list, &applied_list);
+    register_virtual_region(&data->region);
 
     return 0;
 }
@@ -801,6 +863,7 @@ static int revert_payload(struct payload *data)
      * The applied_list is iterated by the trap code.
      */
     list_del_rcu(&data->applied_list);
+    unregister_virtual_region(&data->region);
 
     return 0;
 }

@@ -20,6 +20,7 @@
 #include <xen/symbols.h>
 #include <xen/lib.h>
 #include <xen/sched.h>
+#include <xen/xsplice.h>
 #include <asm/div64.h>
 #include <asm/page.h>
 
@@ -352,6 +353,17 @@ static char *pointer(char *str, char *end, const char **fmt_ptr,
                 *str = '/';
             ++str;
             str = number(str, end, sym_size, 16, -1, -1, SPECIAL);
+        }
+
+        /*
+         * namebuf contents and s for core hypervisor are same but for xSplice
+         * payloads they differ (namebuf contains the name of the payload).
+         */
+        if ( namebuf != s )
+        {
+            str = string(str, end, " [", -1, -1, 0);
+            str = string(str, end, namebuf, -1, -1, 0);
+            str = string(str, end, "]", -1, -1, 0);
         }
 
         return str;
