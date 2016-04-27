@@ -230,6 +230,15 @@ int gic_irq_xlate(const u32 *intspec, unsigned int intsize,
     return 0;
 }
 
+/* Map extra GIC MMIO, irqs and other hw stuffs to the hardware domain. */
+int gic_map_hwdom_extra_mappings(struct domain *d)
+{
+    if ( gic_hw_ops->map_hwdom_extra_mappings )
+        return gic_hw_ops->map_hwdom_extra_mappings(d);
+
+    return 0;
+}
+
 static void __init gic_dt_preinit(void)
 {
     int rc;

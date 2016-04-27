@@ -21,6 +21,7 @@
 #include <xen/lib.h>
 #include <xen/init.h>
 #include <xen/mm.h>
+#include <xen/vmap.h>
 #include <xen/irq.h>
 #include <xen/iocap.h>
 #include <xen/sched.h>
@@ -65,6 +66,41 @@
 
 #define GICH_V2_VMCR_PRIORITY_MASK   0x1f
 #define GICH_V2_VMCR_PRIORITY_SHIFT  27
+
+/* GICv2m extension register definitions. */
+/*
+* MSI_TYPER:
+*     [31:26] Reserved
+*     [25:16] lowest SPI assigned to MSI
+*     [15:10] Reserved
+*     [9:0]   Number of SPIs assigned to MSI
+*/
+#define V2M_MSI_TYPER               0x008
+#define V2M_MSI_TYPER_BASE_SHIFT    16
+#define V2M_MSI_TYPER_BASE_MASK     0x3FF
+#define V2M_MSI_TYPER_NUM_MASK      0x3FF
+#define V2M_MSI_SETSPI_NS           0x040
+#define V2M_MIN_SPI                 32
+#define V2M_MAX_SPI                 1019
+#define V2M_MSI_IIDR                0xFCC
+
+#define V2M_MSI_TYPER_BASE_SPI(x)   \
+                (((x) >> V2M_MSI_TYPER_BASE_SHIFT) & V2M_MSI_TYPER_BASE_MASK)
+
+#define V2M_MSI_TYPER_NUM_SPI(x)    ((x) & V2M_MSI_TYPER_NUM_MASK)
+
+struct v2m_data {
+    struct list_head entry;
+    /* Pointer to the DT node representing the v2m frame */
+    const struct dt_device_node *dt_node;
+    paddr_t addr; /* Register frame base */
+    paddr_t size; /* Register frame size */
+    u32 spi_start; /* The SPI number that MSIs start */
+    u32 nr_spis; /* The number of SPIs for MSIs */
+};
+
+/* v2m extension register frame information list */
+static LIST_HEAD(gicv2m_info);
 
 /* Global state */
 static struct {
@@ -551,6 +587,167 @@ static void gicv2_irq_set_affinity(struct irq_desc *desc, const cpumask_t *cpu_m
     spin_unlock(&gicv2.lock);
 }
 
+static int gicv2_map_hwdown_extra_mappings(struct domain *d)
+{
+    const struct v2m_data *v2m_data;
+
+    /* For the moment, we'll assign all v2m frames to the hardware domain. */
+    list_for_each_entry( v2m_data, &gicv2m_info, entry )
+    {
+        int ret;
+        u32 spi;
+
+        printk("GICv2: Mapping v2m frame to d%d: addr=0x%lx size=0x%lx spi_base=%u num_spis=%u\n",
+               d->domain_id, v2m_data->addr, v2m_data->size,
+               v2m_data->spi_start, v2m_data->nr_spis);
+
+        ret = map_mmio_regions(d, paddr_to_pfn(v2m_data->addr),
+                            DIV_ROUND_UP(v2m_data->size, PAGE_SIZE),
+                            paddr_to_pfn(v2m_data->addr));
+        if ( ret )
+        {
+            printk(XENLOG_ERR "GICv2: Map v2m frame to d%d failed.\n",
+                   d->domain_id);
+            return ret;
+        }
+
+        /*
+         * Map all SPIs that are allocated to MSIs for the frame to the
+         * domain.
+         */
+        for ( spi = v2m_data->spi_start;
+              spi < (v2m_data->spi_start + v2m_data->nr_spis); spi++ )
+        {
+            /*
+             * MSIs are always edge-triggered. Configure the associated SPIs
+             * to be edge-rising as default type.
+             */
+            ret = irq_set_spi_type(spi, IRQ_TYPE_EDGE_RISING);
+            if ( ret )
+            {
+                printk(XENLOG_ERR
+                       "GICv2: Failed to set v2m MSI SPI[%d] type.\n", spi);
+                return ret;
+            }
+
+            /* Route a SPI that is allocated to MSI to the domain. */
+            ret = route_irq_to_guest(d, spi, spi, "v2m");
+            if ( ret )
+            {
+                printk(XENLOG_ERR
+                       "GICv2: Failed to route v2m MSI SPI[%d] to Dom%d.\n",
+                       spi, d->domain_id);
+                return ret;
+            }
+
+            /* Reserve a SPI that is allocated to MSI for the domain. */
+            if ( !vgic_reserve_virq(d, spi) )
+            {
+                printk(XENLOG_ERR
+                       "GICv2: Failed to reserve v2m MSI SPI[%d] for Dom%d.\n",
+                       spi, d->domain_id);
+                return -EINVAL;
+            }
+        }
+    }
+
+    return 0;
+}
+
+/*
+ * Set up gic v2m DT sub-node.
+ * Please refer to the binding document:
+ * https://www.kernel.org/doc/Documentation/devicetree/bindings/interrupt-controller/arm,gic.txt
+ */
+static int gicv2m_make_dt_node(const struct domain *d,
+                               const struct dt_device_node *gic,
+                               void *fdt)
+{
+    u32 len;
+    int res;
+    const void *prop = NULL;
+    const struct dt_device_node *v2m = NULL;
+    const struct v2m_data *v2m_data;
+
+    /* The sub-nodes require the ranges property */
+    prop = dt_get_property(gic, "ranges", &len);
+    if ( !prop )
+    {
+        printk(XENLOG_ERR "Can't find ranges property for the gic node\n");
+        return -FDT_ERR_XEN(ENOENT);
+    }
+
+    res = fdt_property(fdt, "ranges", prop, len);
+    if ( res )
+        return res;
+
+    list_for_each_entry( v2m_data, &gicv2m_info, entry )
+    {
+        v2m = v2m_data->dt_node;
+
+        printk("GICv2: Creating v2m DT node for d%d: addr=0x%lx size=0x%lx spi_base=%u num_spis=%u\n",
+               d->domain_id, v2m_data->addr, v2m_data->size,
+               v2m_data->spi_start, v2m_data->nr_spis);
+
+        res = fdt_begin_node(fdt, v2m->name);
+        if ( res )
+            return res;
+
+        res = fdt_property_string(fdt, "compatible", "arm,gic-v2m-frame");
+        if ( res )
+            return res;
+
+        res = fdt_property(fdt, "msi-controller", NULL, 0);
+        if ( res )
+            return res;
+
+        if ( v2m->phandle )
+        {
+            res = fdt_property_cell(fdt, "phandle", v2m->phandle);
+            if ( res )
+                return res;
+        }
+
+        /* Use the same reg regions as v2m node in host DTB. */
+        prop = dt_get_property(v2m, "reg", &len);
+        if ( !prop )
+        {
+            printk(XENLOG_ERR "GICv2: Can't find v2m reg property.\n");
+            res = -FDT_ERR_XEN(ENOENT);
+            return res;
+        }
+
+        res = fdt_property(fdt, "reg", prop, len);
+        if ( res )
+            return res;
+
+        /*
+         * The properties msi-base-spi and msi-num-spis are used to override
+         * the hardware settings. Therefore it is fine to always write them
+         * in the guest DT.
+         */
+        res = fdt_property_u32(fdt, "arm,msi-base-spi", v2m_data->spi_start);
+        if ( res )
+        {
+            printk(XENLOG_ERR
+                   "GICv2: Failed to create v2m msi-base-spi in Guest DT.\n");
+            return res;
+        }
+
+        res = fdt_property_u32(fdt, "arm,msi-num-spis", v2m_data->nr_spis);
+        if ( res )
+        {
+            printk(XENLOG_ERR
+                   "GICv2: Failed to create v2m msi-num-spis in Guest DT.\n");
+            return res;
+        }
+
+        fdt_end_node(fdt);
+    }
+
+    return res;
+}
+
 static int gicv2_make_hwdom_dt_node(const struct domain *d,
                                     const struct dt_device_node *gic,
                                     void *fdt)
@@ -587,6 +784,10 @@ static int gicv2_make_hwdom_dt_node(const struct domain *d,
     len *= 2;
 
     res = fdt_property(fdt, "reg", regs, len);
+    if ( res )
+        return res;
+
+    res = gicv2m_make_dt_node(d, gic, fdt);
 
     return res;
 }
@@ -630,6 +831,96 @@ static bool_t gicv2_is_aliased(paddr_t cbase, paddr_t csize)
     val_high = readl_gicc(GICC_IIDR + 0xf000);
 
     return ((val_low & 0xfff0fff) == 0x0202043B && val_low == val_high);
+}
+
+static void gicv2_add_v2m_frame_to_list(paddr_t addr, paddr_t size,
+                                        u32 spi_start, u32 nr_spis,
+                                        const struct dt_device_node *v2m)
+{
+    struct v2m_data *v2m_data;
+
+    /*
+     * If the hardware setting hasn't been overridden by DT or ACPI, we have
+     * to read base_spi and num_spis from hardware registers to reserve irqs.
+     */
+    if ( !spi_start || !nr_spis )
+    {
+        u32 msi_typer;
+        void __iomem *base;
+
+        base = ioremap_nocache(addr, size);
+        if ( !base )
+            panic("GICv2: Cannot remap v2m register frame");
+
+        msi_typer = readl_relaxed(base + V2M_MSI_TYPER);
+        spi_start = V2M_MSI_TYPER_BASE_SPI(msi_typer);
+        nr_spis = V2M_MSI_TYPER_NUM_SPI(msi_typer);
+
+        iounmap(base);
+    }
+
+    if ( spi_start < V2M_MIN_SPI )
+        panic("GICv2: Invalid v2m base SPI:%u\n", spi_start);
+
+    if ( ( nr_spis == 0 ) || ( spi_start + nr_spis > V2M_MAX_SPI ) )
+        panic("GICv2: Number of v2m SPIs (%u) exceed maximum (%u)\n",
+              nr_spis, V2M_MAX_SPI - V2M_MIN_SPI + 1);
+
+    /* Allocate an entry to record new v2m frame information. */
+    v2m_data = xzalloc_bytes(sizeof(struct v2m_data));
+    if ( !v2m_data )
+        panic("GICv2: Cannot allocate memory for v2m frame");
+
+    INIT_LIST_HEAD(&v2m_data->entry);
+    v2m_data->addr = addr;
+    v2m_data->size = size;
+    v2m_data->spi_start = spi_start;
+    v2m_data->nr_spis = nr_spis;
+    v2m_data->dt_node = v2m;
+
+    printk("GICv2m extension register frame:\n"
+           "        gic_v2m_addr=%"PRIpaddr"\n"
+           "        gic_v2m_size=%"PRIpaddr"\n"
+           "        gic_v2m_spi_base=%u\n"
+           "        gic_v2m_num_spis=%u\n",
+           v2m_data->addr, v2m_data->size,
+           v2m_data->spi_start, v2m_data->nr_spis);
+
+    list_add_tail(&v2m_data->entry, &gicv2m_info);
+}
+
+static void gicv2_extension_dt_init(const struct dt_device_node *node)
+{
+    const struct dt_device_node *v2m = NULL;
+
+    /*
+     * Check whether this GIC implements the v2m extension. If so,
+     * add v2m register frames to gicv2m_info.
+     */
+    dt_for_each_child_node(node, v2m)
+    {
+        u32 spi_start = 0, nr_spis = 0;
+        paddr_t addr, size;
+
+        if ( !dt_device_is_compatible(v2m, "arm,gic-v2m-frame") )
+            continue;
+
+        /* Get register frame resource from DT. */
+        if ( dt_device_get_address(v2m, 0, &addr, &size) )
+            panic("GICv2: Cannot find a valid v2m frame address");
+
+        /*
+         * Check whether DT uses msi-base-spi and msi-num-spis properties to
+         * override the hardware setting.
+         */
+        if ( dt_property_read_u32(v2m, "arm,msi-base-spi", &spi_start) &&
+             dt_property_read_u32(v2m, "arm,msi-num-spis", &nr_spis) )
+            printk("GICv2: DT overriding v2m hardware setting (base:%u, num:%u)\n",
+                   spi_start, nr_spis);
+
+        /* Add this v2m frame information to list. */
+        gicv2_add_v2m_frame_to_list(addr, size, spi_start, nr_spis, v2m);
+    }
 }
 
 static paddr_t __initdata hbase, dbase, cbase, csize, vbase;
@@ -683,6 +974,12 @@ static void __init gicv2_dt_init(void)
     if ( csize != vsize )
         panic("GICv2: Sizes of GICC (%#"PRIpaddr") and GICV (%#"PRIpaddr") don't match\n",
                csize, vsize);
+
+    /*
+     * Check whether this GIC implements the v2m extension. If so,
+     * add v2m register frames to gicv2_extension_info.
+     */
+    gicv2_extension_dt_init(node);
 }
 
 static int gicv2_iomem_deny_access(const struct domain *d)
@@ -936,6 +1233,7 @@ const static struct gic_hw_operations gicv2_ops = {
     .read_apr            = gicv2_read_apr,
     .make_hwdom_dt_node  = gicv2_make_hwdom_dt_node,
     .make_hwdom_madt     = gicv2_make_hwdom_madt,
+    .map_hwdom_extra_mappings = gicv2_map_hwdown_extra_mappings,
     .iomem_deny_access   = gicv2_iomem_deny_access,
 };
 
