@@ -702,6 +702,8 @@ _hidden char **libxl__xs_directory(libxl__gc *gc, xs_transaction_t t,
    /* On error: returns NULL, sets errno (no logging) */
 _hidden char *libxl__xs_libxl_path(libxl__gc *gc, uint32_t domid);
 
+_hidden int libxl__backendpath_parse_domid(libxl__gc *gc, const char *be_path,
+                                           libxl_domid *domid_out);
 
 /*----- "checked" xenstore access functions -----*/
 /* Each of these functions will check that it succeeded; if it
