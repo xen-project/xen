@@ -1995,9 +1995,10 @@ _hidden libxl__json_object *libxl__json_parse(libxl__gc *gc_opt, const char *s);
 _hidden int libxl__device_model_version_running(libxl__gc *gc, uint32_t domid);
   /* Return the system-wide default device model */
 _hidden libxl_device_model_version libxl__default_device_model(libxl__gc *gc);
-_hidden char *libxl__device_model_xs_path(libxl__gc *gc, uint32_t dm_domid,
-                                          uint32_t domid,
-                                          const char *format, ...) PRINTF_ATTRIBUTE(4, 5);
+
+#define DEVICE_MODEL_XS_PATH(gc, dm_domid, domid, fmt, _a...)              \
+    libxl__sprintf(gc, "/local/domain/%u/device-model/%u" fmt, dm_domid,   \
+                   domid, ##_a)
 
 /*
  * Calling context and GC for event-generating functions:

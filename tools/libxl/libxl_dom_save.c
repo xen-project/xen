@@ -62,10 +62,10 @@ static void domain_suspend_switch_qemu_xen_traditional_logdirty
 
     if (!lds->cmd_path) {
         uint32_t dm_domid = libxl_get_stubdom_id(CTX, domid);
-        lds->cmd_path = libxl__device_model_xs_path(gc, dm_domid, domid,
-                                                    "/logdirty/cmd");
-        lds->ret_path = libxl__device_model_xs_path(gc, dm_domid, domid,
-                                                    "/logdirty/ret");
+        lds->cmd_path = DEVICE_MODEL_XS_PATH(gc, dm_domid, domid,
+                                             "/logdirty/cmd");
+        lds->ret_path = DEVICE_MODEL_XS_PATH(gc, dm_domid, domid,
+                                             "/logdirty/ret");
     }
     lds->cmd = enable ? "enable" : "disable";
 
@@ -290,7 +290,7 @@ int libxl__save_emulator_xenstore_data(libxl__domain_save_state *dss,
     const uint32_t domid = dss->domid;
     const uint32_t dm_domid = libxl_get_stubdom_id(CTX, domid);
 
-    xs_root = libxl__device_model_xs_path(gc, dm_domid, domid, "");
+    xs_root = DEVICE_MODEL_XS_PATH(gc, dm_domid, domid, "");
 
     entries = libxl__xs_directory(gc, 0, GCSPRINTF("%s/physmap", xs_root),
                                   &nr_entries);
@@ -482,7 +482,7 @@ int libxl__restore_emulator_xenstore_data(libxl__domain_create_state *dcs,
 
     const uint32_t domid = dcs->guest_domid;
     const uint32_t dm_domid = libxl_get_stubdom_id(CTX, domid);
-    const char *xs_root = libxl__device_model_xs_path(gc, dm_domid, domid, "");
+    const char *xs_root = DEVICE_MODEL_XS_PATH(gc, dm_domid, domid, "");
 
     while (next < end) {
         key = next;

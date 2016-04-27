@@ -1762,11 +1762,9 @@ void libxl__spawn_stub_dm(libxl__egc *egc, libxl__stub_dm_spawn_state *sdss)
     perm[1].perms = XS_PERM_READ;
 retry_transaction:
     t = xs_transaction_start(ctx->xsh);
-    xs_mkdir(ctx->xsh, t,
-             libxl__device_model_xs_path(gc, dm_domid, guest_domid, ""));
+    xs_mkdir(ctx->xsh, t, DEVICE_MODEL_XS_PATH(gc, dm_domid, guest_domid, ""));
     xs_set_permissions(ctx->xsh, t,
-                       libxl__device_model_xs_path(gc, dm_domid,
-                                                   guest_domid, ""),
+                       DEVICE_MODEL_XS_PATH(gc, dm_domid, guest_domid, ""),
                        perm, ARRAY_SIZE(perm));
     if (!xs_transaction_end(ctx->xsh, t, 0))
         if (errno == EAGAIN)
@@ -1926,9 +1924,8 @@ static void stubdom_pvqemu_cb(libxl__egc *egc,
     sdss->xswait.ao = ao;
     sdss->xswait.what = GCSPRINTF("Stubdom %u for %u startup",
                                   dm_domid, sdss->dm.guest_domid);
-    sdss->xswait.path =
-        libxl__device_model_xs_path(gc, dm_domid, sdss->dm.guest_domid,
-                                    "/state");
+    sdss->xswait.path = DEVICE_MODEL_XS_PATH(gc, dm_domid, sdss->dm.guest_domid,
+                                             "/state");
     sdss->xswait.timeout_ms = LIBXL_STUBDOM_START_TIMEOUT * 1000;
     sdss->xswait.callback = stubdom_xswait_cb;
     rc = libxl__xswait_start(gc, &sdss->xswait);
@@ -2035,7 +2032,7 @@ void libxl__spawn_local_dm(libxl__egc *egc, libxl__dm_spawn_state *dmss)
         free(path);
     }
 
-    path = libxl__device_model_xs_path(gc, LIBXL_TOOLSTACK_DOMID, domid, "");
+    path = DEVICE_MODEL_XS_PATH(gc, LIBXL_TOOLSTACK_DOMID, domid, "");
     xs_mkdir(ctx->xsh, XBT_NULL, path);
 
     if (b_info->type == LIBXL_DOMAIN_TYPE_HVM &&
@@ -2089,8 +2086,8 @@ retry_transaction:
     }
 
     spawn->what = GCSPRINTF("domain %d device model", domid);
-    spawn->xspath = libxl__device_model_xs_path(gc, LIBXL_TOOLSTACK_DOMID,
-                                                domid, "/state");
+    spawn->xspath = DEVICE_MODEL_XS_PATH(gc, LIBXL_TOOLSTACK_DOMID, domid,
+                                         "/state");
     spawn->timeout_ms = LIBXL_DEVICE_MODEL_START_TIMEOUT * 1000;
     spawn->pidpath = GCSPRINTF("%s/image/device-model-pid", dom_path);
     spawn->midproc_cb = libxl__spawn_record_pid;
@@ -2320,8 +2317,7 @@ out:
 
 int libxl__destroy_device_model(libxl__gc *gc, uint32_t domid)
 {
-    char *path = libxl__device_model_xs_path(gc, LIBXL_TOOLSTACK_DOMID,
-                                             domid, "");
+    char *path = DEVICE_MODEL_XS_PATH(gc, LIBXL_TOOLSTACK_DOMID, domid, "");
     if (!xs_rm(CTX->xsh, XBT_NULL, path))
         LOG(ERROR, "xs_rm failed for %s", path);
     /* We should try to destroy the device model anyway. */

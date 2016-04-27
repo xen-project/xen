@@ -554,22 +554,6 @@ void libxl__update_domain_configuration(libxl__gc *gc,
     dst->b_info.video_memkb = src->b_info.video_memkb;
 }
 
-char *libxl__device_model_xs_path(libxl__gc *gc, uint32_t dm_domid,
-                                  uint32_t domid, const char *format,  ...)
-{
-    char *s, *fmt;
-    va_list ap;
-
-    fmt = GCSPRINTF("/local/domain/%u/device-model/%u%s", dm_domid,
-                    domid, format);
-
-    va_start(ap, format);
-    s = libxl__vsprintf(gc, fmt, ap);
-    va_end(ap);
-
-    return s;
-}
-
 /*
  * Local variables:
  * mode: C

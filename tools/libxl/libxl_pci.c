@@ -970,9 +970,9 @@ static int qemu_pci_add_xenstore(libxl__gc *gc, uint32_t domid,
     uint32_t dm_domid;
 
     dm_domid = libxl_get_stubdom_id(CTX, domid);
-    path = libxl__device_model_xs_path(gc, dm_domid, domid, "/state");
+    path = DEVICE_MODEL_XS_PATH(gc, dm_domid, domid, "/state");
     state = libxl__xs_read(gc, XBT_NULL, path);
-    path = libxl__device_model_xs_path(gc, dm_domid, domid, "/parameter");
+    path = DEVICE_MODEL_XS_PATH(gc, dm_domid, domid, "/parameter");
     if (pcidev->vdevfn) {
         libxl__xs_printf(gc, XBT_NULL, path, PCI_BDF_VDEVFN","PCI_OPTIONS,
                          pcidev->domain, pcidev->bus, pcidev->dev,
@@ -987,9 +987,9 @@ static int qemu_pci_add_xenstore(libxl__gc *gc, uint32_t domid,
     libxl__qemu_traditional_cmd(gc, domid, "pci-ins");
     rc = libxl__wait_for_device_model_deprecated(gc, domid, NULL, NULL,
                                       pci_ins_check, state);
-    path = libxl__device_model_xs_path(gc, dm_domid, domid, "/parameter");
+    path = DEVICE_MODEL_XS_PATH(gc, dm_domid, domid, "/parameter");
     vdevfn = libxl__xs_read(gc, XBT_NULL, path);
-    path = libxl__device_model_xs_path(gc, dm_domid, domid, "/state");
+    path = DEVICE_MODEL_XS_PATH(gc, dm_domid, domid, "/state");
     if ( rc < 0 )
         LOG(ERROR, "qemu refused to add device: %s", vdevfn);
     else if ( sscanf(vdevfn, "0x%x", &pcidev->vdevfn) != 1 ) {
@@ -1310,9 +1310,9 @@ static int qemu_pci_remove_xenstore(libxl__gc *gc, uint32_t domid,
 
     dm_domid = libxl_get_stubdom_id(CTX, domid);
 
-    path = libxl__device_model_xs_path(gc, dm_domid, domid, "/state");
+    path = DEVICE_MODEL_XS_PATH(gc, dm_domid, domid, "/state");
     state = libxl__xs_read(gc, XBT_NULL, path);
-    path = libxl__device_model_xs_path(gc, dm_domid, domid, "/parameter");
+    path = DEVICE_MODEL_XS_PATH(gc, dm_domid, domid, "/parameter");
     libxl__xs_printf(gc, XBT_NULL, path, PCI_BDF, pcidev->domain,
                      pcidev->bus, pcidev->dev, pcidev->func);
 
@@ -1330,7 +1330,7 @@ static int qemu_pci_remove_xenstore(libxl__gc *gc, uint32_t domid,
             return ERROR_FAIL;
         }
     }
-    path = libxl__device_model_xs_path(gc, dm_domid, domid, "/state");
+    path = DEVICE_MODEL_XS_PATH(gc, dm_domid, domid, "/state");
     xs_write(ctx->xsh, XBT_NULL, path, state, strlen(state));
 
     return 0;

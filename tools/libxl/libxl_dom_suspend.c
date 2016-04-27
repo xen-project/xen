@@ -432,7 +432,7 @@ int libxl__domain_resume_device_model(libxl__gc *gc, uint32_t domid)
     case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL: {
         uint32_t dm_domid = libxl_get_stubdom_id(CTX, domid);
 
-        path = libxl__device_model_xs_path(gc, dm_domid, domid, "/state");
+        path = DEVICE_MODEL_XS_PATH(gc, dm_domid, domid, "/state");
         state = libxl__xs_read(gc, XBT_NULL, path);
         if (state != NULL && !strcmp(state, "paused")) {
             libxl__qemu_traditional_cmd(gc, domid, "continue");

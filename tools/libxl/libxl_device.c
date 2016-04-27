@@ -1264,7 +1264,7 @@ int libxl__wait_for_device_model_deprecated(libxl__gc *gc,
     char *path;
     uint32_t dm_domid = libxl_get_stubdom_id(CTX, domid);
 
-    path = libxl__device_model_xs_path(gc, dm_domid, domid, "/state");
+    path = DEVICE_MODEL_XS_PATH(gc, dm_domid, domid, "/state");
     return libxl__xenstore_child_wait_deprecated(gc, domid,
                                      LIBXL_DEVICE_MODEL_START_TIMEOUT,
                                      "Device Model", path, state, spawning,

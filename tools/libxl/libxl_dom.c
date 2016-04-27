@@ -1106,7 +1106,7 @@ int libxl__qemu_traditional_cmd(libxl__gc *gc, uint32_t domid,
 {
     char *path = NULL;
     uint32_t dm_domid = libxl_get_stubdom_id(CTX, domid);
-    path = libxl__device_model_xs_path(gc, dm_domid, domid, "/command");
+    path = DEVICE_MODEL_XS_PATH(gc, dm_domid, domid, "/command");
     return libxl__xs_printf(gc, XBT_NULL, path, "%s", cmd);
 }
 
