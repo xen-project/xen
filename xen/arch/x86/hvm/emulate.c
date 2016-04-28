@@ -137,7 +137,7 @@ static int hvmemul_do_io(
         if ( (p.type != (is_mmio ? IOREQ_TYPE_COPY : IOREQ_TYPE_PIO)) ||
              (p.addr != addr) ||
              (p.size != size) ||
-             (p.count != *reps) ||
+             (p.count > *reps) ||
              (p.dir != dir) ||
              (p.df != df) ||
              (p.data_is_ptr != data_is_addr) )
@@ -145,6 +145,8 @@ static int hvmemul_do_io(
 
         if ( data_is_addr )
             return X86EMUL_UNHANDLEABLE;
+
+        *reps = p.count;
         goto finish_access;
     default:
         return X86EMUL_UNHANDLEABLE;
@@ -161,6 +163,13 @@ static int hvmemul_do_io(
     vio->io_req = p;
 
     rc = hvm_io_intercept(&p);
+
+    /*
+     * p.count may have got reduced (see hvm_process_io_intercept()) - inform
+     * our callers and mirror this into latched state.
+     */
+    ASSERT(p.count <= *reps);
+    *reps = vio->io_req.count = p.count;
 
     switch ( rc )
     {
