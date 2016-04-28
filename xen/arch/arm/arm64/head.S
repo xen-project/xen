@@ -361,6 +361,11 @@ skip_bss:
         ldr   x0, =(HSCTLR_BASE)
         msr   SCTLR_EL2, x0
 
+        /* Ensure that any exceptions encountered at EL2
+         * are handled using the EL2 stack pointer, rather
+         * than SP_EL0. */
+        msr spsel, #1
+
         /* Rebuild the boot pagetable's first-level entries. The structure
          * is described in mm.c.
          *
