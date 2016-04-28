@@ -1099,6 +1099,13 @@ static void xsplice_do_action(void)
     data->rc = rc;
 }
 
+static bool_t is_work_scheduled(const struct payload *data)
+{
+    ASSERT(spin_is_locked(&payload_lock));
+
+    return xsplice_work.do_work && xsplice_work.data == data;
+}
+
 static int schedule_work(struct payload *data, uint32_t cmd, uint32_t timeout)
 {
     ASSERT(spin_is_locked(&payload_lock));
@@ -1363,6 +1370,12 @@ static int xsplice_action(xen_sysctl_xsplice_action_t *action)
         return PTR_ERR(data);
     }
 
+    if ( is_work_scheduled(data) )
+    {
+        rc = -EBUSY;
+        goto out;
+    }
+
     switch ( action->cmd )
     {
     case XSPLICE_ACTION_UNLOAD:
@@ -1423,6 +1436,7 @@ static int xsplice_action(xen_sysctl_xsplice_action_t *action)
         break;
     }
 
+ out:
     spin_unlock(&payload_lock);
 
     return rc;
