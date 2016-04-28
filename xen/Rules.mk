@@ -38,8 +38,6 @@ override TARGET_ARCH     := $(shell echo $(XEN_TARGET_ARCH) | \
 
 TARGET := $(BASEDIR)/xen
 
-include $(BASEDIR)/arch/$(TARGET_ARCH)/Rules.mk
-
 # Note that link order matters!
 ALL_OBJS-y               += $(BASEDIR)/common/built_in.o
 ALL_OBJS-y               += $(BASEDIR)/drivers/built_in.o
@@ -91,6 +89,8 @@ AFLAGS += $(AFLAGS-y) $(filter-out -std=gnu%,$(filter-out -flto,$(CFLAGS)))
 LDFLAGS += $(LDFLAGS_DIRECT)
 
 LDFLAGS += $(LDFLAGS-y)
+
+include $(BASEDIR)/arch/$(TARGET_ARCH)/Rules.mk
 
 include Makefile
 

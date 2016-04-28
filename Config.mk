@@ -132,7 +132,7 @@ $(eval $(check-y))
 # as-insn: Check whether assembler supports an instruction.
 # Usage: cflags-y += $(call as-insn "insn",option-yes,option-no)
 as-insn = $(if $(shell echo 'void _(void) { asm volatile ( $(2) ); }' \
-                       | $(1) -c -x c -o /dev/null - 2>&1),$(4),$(3))
+                       | $(1) $(AFLAGS) -c -x c -o /dev/null - 2>&1),$(4),$(3))
 
 # as-insn-check: Add an option to compilation flags, but only if insn is
 #                supported by assembler.
