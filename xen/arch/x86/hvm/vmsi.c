@@ -349,7 +349,7 @@ static int msixtbl_range(struct vcpu *v, unsigned long addr)
     {
         const ioreq_t *r = &v->arch.hvm_vcpu.hvm_io.io_req;
 
-        if ( r->state != STATE_IOREQ_READY )
+        if ( r->state != STATE_IOREQ_READY || r->addr != addr )
             return 0;
         ASSERT(r->type == IOREQ_TYPE_COPY);
         if ( r->dir == IOREQ_WRITE && r->size == 4 && !r->data_is_ptr
@@ -457,7 +457,8 @@ out:
 
         for_each_vcpu ( d, v )
         {
-            if ( v->arch.hvm_vcpu.hvm_io.msix_snoop_address ==
+            if ( (v->pause_flags & VPF_blocked_in_xen) &&
+                 v->arch.hvm_vcpu.hvm_io.msix_snoop_address ==
                  (gtable + msi_desc->msi_attrib.entry_nr *
                            PCI_MSIX_ENTRY_SIZE +
                   PCI_MSIX_ENTRY_VECTOR_CTRL_OFFSET) )
