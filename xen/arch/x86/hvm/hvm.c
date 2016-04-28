@@ -5497,8 +5497,6 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
             get_gfn_query_unlocked(d, a.pfn, &t);
             if ( p2m_is_mmio(t) )
                 a.mem_type =  HVMMEM_mmio_dm;
-            else if ( t == p2m_mmio_write_dm )
-                a.mem_type = HVMMEM_mmio_write_dm;
             else if ( p2m_is_readonly(t) )
                 a.mem_type =  HVMMEM_ram_ro;
             else if ( p2m_is_ram(t) )
@@ -5529,7 +5527,7 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
             [HVMMEM_ram_rw]  = p2m_ram_rw,
             [HVMMEM_ram_ro]  = p2m_ram_ro,
             [HVMMEM_mmio_dm] = p2m_mmio_dm,
-            [HVMMEM_mmio_write_dm] = p2m_mmio_write_dm
+            [HVMMEM_unused] = p2m_invalid
         };
 
         if ( copy_from_guest(&a, arg, 1) )
@@ -5553,7 +5551,8 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
              ((a.first_pfn + a.nr - 1) > domain_get_maximum_gpfn(d)) )
             goto setmemtype_fail;
             
-        if ( a.hvmmem_type >= ARRAY_SIZE(memtype) )
+        if ( a.hvmmem_type >= ARRAY_SIZE(memtype) ||
+             unlikely(a.hvmmem_type == HVMMEM_unused) )
             goto setmemtype_fail;
 
         while ( a.nr > start_iter )
