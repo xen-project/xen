@@ -4,6 +4,7 @@
  */
 
 #include <xen/cpu.h>
+#include <xen/elf.h>
 #include <xen/err.h>
 #include <xen/guest_access.h>
 #include <xen/keyhandler.h>
@@ -42,6 +43,12 @@ static LIST_HEAD(applied_list);
 static unsigned int payload_cnt;
 static unsigned int payload_version = 1;
 
+/* To contain the ELF Note header. */
+struct xsplice_build_id {
+   const void *p;
+   unsigned int len;
+};
+
 struct payload {
     uint32_t state;                      /* One of the XSPLICE_STATE_*. */
     int32_t rc;                          /* 0 or -XEN_EXX. */
@@ -61,6 +68,8 @@ struct payload {
     struct virtual_region region;        /* symbol, bug.frame patching and
                                             exception table (x86). */
     unsigned int nsyms;                  /* Nr of entries in .strtab and symbols. */
+    struct xsplice_build_id id;          /* ELFNOTE_DESC(.note.gnu.build-id) of the payload. */
+    struct xsplice_build_id dep;         /* ELFNOTE_DESC(.xsplice.depends). */
     char name[XEN_XSPLICE_NAME_SIZE];    /* Name of it. */
 };
 
@@ -407,7 +416,9 @@ static int secure_payload(struct payload *payload, struct xsplice_elf *elf)
 static int check_special_sections(const struct xsplice_elf *elf)
 {
     unsigned int i;
-    static const char *const names[] = { ELF_XSPLICE_FUNC };
+    static const char *const names[] = { ELF_XSPLICE_FUNC,
+                                         ELF_XSPLICE_DEPENDS,
+                                         ELF_BUILD_ID_NOTE};
     DECLARE_BITMAP(found, ARRAY_SIZE(names)) = { 0 };
 
     for ( i = 0; i < ARRAY_SIZE(names); i++ )
@@ -447,6 +458,7 @@ static int prepare_payload(struct payload *payload,
     unsigned int i;
     struct xsplice_patch_func *f;
     struct virtual_region *region;
+    const Elf_Note *n;
 
     sec = xsplice_elf_sec_by_name(elf, ELF_XSPLICE_FUNC);
     ASSERT(sec);
@@ -501,6 +513,37 @@ static int prepare_payload(struct payload *payload,
             dprintk(XENLOG_DEBUG, XSPLICE "%s: Resolved old address %s => %p\n",
                     elf->name, f->name, f->old_addr);
         }
+    }
+
+    sec = xsplice_elf_sec_by_name(elf, ELF_BUILD_ID_NOTE);
+    if ( sec )
+    {
+        n = sec->load_addr;
+
+        if ( sec->sec->sh_size <= sizeof(*n) )
+            return -EINVAL;
+
+        if ( xen_build_id_check(n, sec->sec->sh_size,
+                                &payload->id.p, &payload->id.len) )
+            return -EINVAL;
+
+        if ( !payload->id.len || !payload->id.p )
+            return -EINVAL;
+    }
+
+    sec = xsplice_elf_sec_by_name(elf, ELF_XSPLICE_DEPENDS);
+    {
+        n = sec->load_addr;
+
+        if ( sec->sec->sh_size <= sizeof(*n) )
+            return -EINVAL;
+
+        if ( xen_build_id_check(n, sec->sec->sh_size,
+                                &payload->dep.p, &payload->dep.len) )
+            return -EINVAL;
+
+        if ( !payload->dep.len || !payload->dep.p )
+            return -EINVAL;
     }
 
     /* Setup the virtual region with proper data. */
@@ -1232,6 +1275,55 @@ void check_for_xsplice_work(void)
     }
 }
 
+/*
+ * Only allow dependent payload is applied on top of the correct
+ * build-id.
+ *
+ * This enforces an stacking order - the first payload MUST be against the
+ * hypervisor. The second against the first payload, and so on.
+ *
+ * Unless the 'internal' parameter is used - in which case we only
+ * check against the hypervisor.
+ */
+static int build_id_dep(struct payload *payload, bool_t internal)
+{
+    const void *id = NULL;
+    unsigned int len = 0;
+    int rc;
+    const char *name = "hypervisor";
+
+    ASSERT(payload->dep.len && payload->dep.p);
+
+    /* First time user is against hypervisor. */
+    if ( internal )
+    {
+        rc = xen_build_id(&id, &len);
+        if ( rc )
+            return rc;
+    }
+    else
+    {
+        /* We should be against the last applied one. */
+        const struct payload *data;
+
+        data = list_last_entry(&applied_list, struct payload, applied_list);
+
+        id = data->id.p;
+        len = data->id.len;
+        name = data->name;
+    }
+
+    if ( payload->dep.len != len ||
+         memcmp(id, payload->dep.p, len) )
+    {
+        dprintk(XENLOG_ERR, "%s%s: check against %s build-id failed!\n",
+                XSPLICE, payload->name, name);
+        return -EINVAL;
+    }
+
+    return 0;
+}
+
 static int xsplice_action(xen_sysctl_xsplice_action_t *action)
 {
     struct payload *data;
@@ -1271,6 +1363,18 @@ static int xsplice_action(xen_sysctl_xsplice_action_t *action)
     case XSPLICE_ACTION_REVERT:
         if ( data->state == XSPLICE_STATE_APPLIED )
         {
+            const struct payload *p;
+
+            p = list_last_entry(&applied_list, struct payload, applied_list);
+            ASSERT(p);
+            /* We should be the last applied one. */
+            if ( p != data )
+            {
+                dprintk(XENLOG_ERR, "%s%s: can't unload. Top is %s!\n",
+                        XSPLICE, data->name, p->name);
+                rc = -EBUSY;
+                break;
+            }
             data->rc = -EAGAIN;
             rc = schedule_work(data, action->cmd, action->timeout);
         }
@@ -1279,6 +1383,9 @@ static int xsplice_action(xen_sysctl_xsplice_action_t *action)
     case XSPLICE_ACTION_APPLY:
         if ( data->state == XSPLICE_STATE_CHECKED )
         {
+            rc = build_id_dep(data, !!list_empty(&applied_list));
+            if ( rc )
+                break;
             data->rc = -EAGAIN;
             rc = schedule_work(data, action->cmd, action->timeout);
         }
@@ -1287,6 +1394,9 @@ static int xsplice_action(xen_sysctl_xsplice_action_t *action)
     case XSPLICE_ACTION_REPLACE:
         if ( data->state == XSPLICE_STATE_CHECKED )
         {
+            rc = build_id_dep(data, 1 /* against hypervisor. */);
+            if ( rc )
+                break;
             data->rc = -EAGAIN;
             rc = schedule_work(data, action->cmd, action->timeout);
         }
@@ -1391,6 +1501,11 @@ static void xsplice_printall(unsigned char key)
                 }
             }
         }
+        if ( data->id.len )
+            printk("build-id=%*phN\n", data->id.len, data->id.p);
+
+        if ( data->dep.len )
+            printk("depend-on=%*phN\n", data->dep.len, data->dep.p);
     }
 
     spin_unlock(&payload_lock);

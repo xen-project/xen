@@ -6,13 +6,16 @@ CODE_SZ=$(shell nm --defined -S $(1) | grep $(2) | awk '{ print "0x"$$2}')
 .PHONY: default
 
 XSPLICE := xen_hello_world.xsplice
+XSPLICE_BYE := xen_bye_world.xsplice
 
 default: xsplice
 
 install: xsplice
 	$(INSTALL_DATA) $(XSPLICE) $(DESTDIR)$(DEBUG_DIR)/$(XSPLICE)
+	$(INSTALL_DATA) $(XSPLICE_BYE) $(DESTDIR)$(DEBUG_DIR)/$(XSPLICE_BYE)
 uninstall:
 	rm -f $(DESTDIR)$(DEBUG_DIR)/$(XSPLICE)
+	rm -f $(DESTDIR)$(DEBUG_DIR)/$(XSPLICE_BYE)
 
 .PHONY: clean
 clean::
@@ -33,8 +36,41 @@ config.h: xen_hello_world_func.o
 xen_hello_world.o: config.h
 
 .PHONY: $(XSPLICE)
-$(XSPLICE): xen_hello_world_func.o xen_hello_world.o
-	$(LD) $(LDFLAGS) -r -o $(XSPLICE) $^
+$(XSPLICE): xen_hello_world_func.o xen_hello_world.o note.o
+	$(LD) $(LDFLAGS) $(build_id_linker) -r -o $(XSPLICE) $^
+
+#
+# This target is only accessible if CONFIG_XSPLICE is defined, which
+# depends on $(build_id_linker) being available. Hence we do not
+# need any checks.
+#
+# N.B. The reason we don't use arch/x86/note.o is that it may
+# not be built (it is for EFI builds), and that we do not have
+# the note.o.bin to muck with (as it gets deleted)
+#
+.PHONY: note.o
+note.o:
+	$(OBJCOPY) -O binary --only-section=.note.gnu.build-id $(BASEDIR)/xen-syms $@.bin
+	$(OBJCOPY) -I binary -O elf64-x86-64 -B i386:x86-64 \
+		   --rename-section=.data=.xsplice.depends -S $@.bin $@
+	rm -f $@.bin
+
+#
+# Extract the build-id of the xen_hello_world.xsplice
+# (which xen_bye_world will depend on).
+#
+.PHONY: hello_world_note.o
+hello_world_note.o: $(XSPLICE)
+	$(OBJCOPY) -O binary --only-section=.note.gnu.build-id $(XSPLICE) $@.bin
+	$(OBJCOPY)  -I binary -O elf64-x86-64 -B i386:x86-64 \
+		   --rename-section=.data=.xsplice.depends -S $@.bin $@
+	rm -f $@.bin
+
+xen_bye_world.o: config.h
+
+.PHONY: $(XSPLICE_BYE)
+$(XSPLICE_BYE): xen_bye_world_func.o xen_bye_world.o hello_world_note.o
+	$(LD) $(LDFLAGS) $(build_id_linker) -r -o $(XSPLICE_BYE) $^
 
 .PHONY: xsplice
-xsplice: $(XSPLICE)
+xsplice: $(XSPLICE) $(XSPLICE_BYE)

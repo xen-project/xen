@@ -28,6 +28,8 @@ struct xen_sysctl_xsplice_op;
 #define XSPLICE             "xsplice: "
 /* ELF payload special section names. */
 #define ELF_XSPLICE_FUNC    ".xsplice.funcs"
+#define ELF_XSPLICE_DEPENDS ".xsplice.depends"
+#define ELF_BUILD_ID_NOTE   ".note.gnu.build-id"
 
 struct xsplice_symbol {
     const char *name;
@@ -40,6 +42,8 @@ int xsplice_op(struct xen_sysctl_xsplice_op *);
 void check_for_xsplice_work(void);
 unsigned long xsplice_symbols_lookup_by_name(const char *symname);
 bool_t is_patch(const void *addr);
+int xen_build_id_check(const Elf_Note *n, unsigned int n_sz,
+                       const void **p, unsigned int *len);
 
 /* Arch hooks. */
 int arch_xsplice_verify_elf(const struct xsplice_elf *elf);

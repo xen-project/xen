@@ -283,8 +283,17 @@ The xSplice core code loads the payload as a standard ELF binary, relocates it
 and handles the architecture-specifc sections as needed. This process is much
 like what the Linux kernel module loader does.
 
-The payload contains a section (xsplice_patch_func) with an array of structures
-describing the functions to be patched:
+The payload contains at least three sections:
+
+ * `.xsplice.funcs` - which is an array of xsplice_patch_func structures.
+ * `.xsplice.depends` - which is an ELF Note that describes what the payload
+    depends on. **MUST** have one.
+ *  `.note.gnu.build-id` - the build-id of this payload. **MUST** have one.
+
+### .xsplice.funcs
+
+The `.xsplice.funcs` contains an array of xsplice_patch_func structures
+which describe the functions to be patched:
 
 <pre>
 struct xsplice_patch_func {  
@@ -367,6 +376,23 @@ struct xsplice_patch_func xsplice_hello_world = {
 </pre>
 
 Code must be compiled with -fPIC.
+
+### .xsplice.depends and .note.gnu.build-id
+
+To support dependencies checking and safe loading (to load the
+appropiate payload against the right hypervisor) there is a need
+to embbed an build-id dependency.
+
+This is done by the payload containing an section `.xsplice.depends`
+which follows the format of an ELF Note. The contents of this
+(name, and description) are specific to the linker utilized to
+build the hypevisor and payload.
+
+If GNU linker is used then the name is `GNU` and the description
+is a NT_GNU_BUILD_ID type ID. The description can be an SHA1
+checksum, MD5 checksum or any unique value.
+
+The size of these structures varies with the --build-id linker option.
 
 ## Hypercalls
 
@@ -853,6 +879,42 @@ This is implemented in the Xen Project hypervisor.
 
 Only the privileged domain should be allowed to do this operation.
 
+### xSplice interdependencies
+
+xSplice patches interdependencies are tricky.
+
+There are the ways this can be addressed:
+ * A single large patch that subsumes and replaces all previous ones.
+   Over the life-time of patching the hypervisor this large patch
+   grows to accumulate all the code changes.
+ * Hotpatch stack - where an mechanism exists that loads the hotpatches
+   in the same order they were built in. We would need an build-id
+   of the hypevisor to make sure the hot-patches are build against the
+   correct build.
+ * Payload containing the old code to check against that. That allows
+   the hotpatches to be loaded indepedently (if they don't overlap) - or
+   if the old code also containst previously patched code - even if they
+   overlap.
+
+The disadvantage of the first large patch is that it can grow over
+time and not provide an bisection mechanism to identify faulty patches.
+
+The hot-patch stack puts stricts requirements on the order of the patches
+being loaded and requires an hypervisor build-id to match against.
+
+The old code allows much more flexibility and an additional guard,
+but is more complex to implement.
+
+The second option which requires an build-id of the hypervisor
+is implemented in the Xen Project hypervisor.
+
+Specifically each payload has two build-id ELF notes:
+ * The build-id of the payload itself (generated via --build-id).
+ * The build-id of the payload it depends on (extracted from the
+   the previous payload or hypervisor during build time).
+
+This means that the very first payload depends on the hypervisor
+build-id.
 
 # Not Yet Done
 
@@ -872,13 +934,6 @@ The implementation must also have a mechanism for (in no particular order):
  * NOP out the code sequence if `new_size` is zero.
  * Deal with other relocation types:  R_X86_64_[8,16,32,32S], R_X86_64_PC[8,16,64]
    in payload file.
- * An dependency mechanism for the payloads. To use that information to load:
-    - The appropiate payload. To verify that payload is built against the
-      hypervisor. This can be done via the `build-id`
-      or via providing an copy of the old code - so that the hypervisor can
-       verify it against the code in memory.
-    - To construct an appropiate order of payloads to load in case they
-      depend on each other.
 
 ### Handle inlined __LINE__
 
@@ -942,32 +997,6 @@ the function itself.
 
 Similar considerations are true to a lesser extent for __FILE__, but it
 could be argued that file renaming should be done outside of hotpatches.
-
-### xSplice interdependencies
-
-xSplice patches interdependencies are tricky.
-
-There are the ways this can be addressed:
- * A single large patch that subsumes and replaces all previous ones.
-   Over the life-time of patching the hypervisor this large patch
-   grows to accumulate all the code changes.
- * Hotpatch stack - where an mechanism exists that loads the hotpatches
-   in the same order they were built in. We would need an build-id
-   of the hypevisor to make sure the hot-patches are build against the
-   correct build.
- * Payload containing the old code to check against that. That allows
-   the hotpatches to be loaded indepedently (if they don't overlap) - or
-   if the old code also containst previously patched code - even if they
-   overlap.
-
-The disadvantage of the first large patch is that it can grow over
-time and not provide an bisection mechanism to identify faulty patches.
-
-The hot-patch stack puts stricts requirements on the order of the patches
-being loaded and requires an hypervisor build-id to match against.
-
-The old code allows much more flexibility and an additional guard,
-but is more complex to implement.
 
 ## Signature checking requirements.
 

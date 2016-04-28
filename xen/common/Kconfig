@@ -60,6 +60,10 @@ config HAS_GDBSX
 config HAS_IOPORTS
 	bool
 
+config HAS_BUILD_ID
+	string
+	option env="XEN_HAS_BUILD_ID"
+
 # Enable/Disable kexec support
 config KEXEC
 	bool "kexec support"
@@ -192,7 +196,7 @@ endmenu
 config XSPLICE
 	bool "xSplice live patching support (TECH PREVIEW)"
 	default n
-	depends on X86
+	depends on X86 && HAS_BUILD_ID = "y"
 	---help---
 	  Allows a running Xen hypervisor to be dynamically patched using
 	  binary patches without rebooting. This is primarily used to binarily

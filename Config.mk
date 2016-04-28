@@ -143,6 +143,7 @@ ifeq ($(call ld-ver-build-id,$(LD)),n)
 build_id_linker :=
 else
 CFLAGS += -DBUILD_ID
+export XEN_HAS_BUILD_ID=y
 build_id_linker := --build-id=sha1
 endif
 
