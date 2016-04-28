@@ -1368,8 +1368,8 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
 
             if (disks[i].is_cdrom) {
                 drive = libxl__sprintf(gc,
-                         "if=ide,index=%d,readonly=%s,media=cdrom,cache=writeback,id=ide-%i",
-                         disk, disks[i].readwrite ? "off" : "on", dev_number);
+                         "if=ide,index=%d,readonly=on,media=cdrom,id=ide-%i",
+                         disk, dev_number);
 
                 if (target_path)
                     drive = libxl__sprintf(gc, "%s,file=%s,format=%s",
