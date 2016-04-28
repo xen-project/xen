@@ -7,15 +7,18 @@ CODE_SZ=$(shell nm --defined -S $(1) | grep $(2) | awk '{ print "0x"$$2}')
 
 XSPLICE := xen_hello_world.xsplice
 XSPLICE_BYE := xen_bye_world.xsplice
+XSPLICE_REPLACE := xen_replace_world.xsplice
 
 default: xsplice
 
 install: xsplice
 	$(INSTALL_DATA) $(XSPLICE) $(DESTDIR)$(DEBUG_DIR)/$(XSPLICE)
 	$(INSTALL_DATA) $(XSPLICE_BYE) $(DESTDIR)$(DEBUG_DIR)/$(XSPLICE_BYE)
+	$(INSTALL_DATA) $(XSPLICE_REPLACE) $(DESTDIR)$(DEBUG_DIR)/$(XSPLICE_REPLACE)
 uninstall:
 	rm -f $(DESTDIR)$(DEBUG_DIR)/$(XSPLICE)
 	rm -f $(DESTDIR)$(DEBUG_DIR)/$(XSPLICE_BYE)
+	rm -f $(DESTDIR)$(DEBUG_DIR)/$(XSPLICE_REPLACE)
 
 .PHONY: clean
 clean::
@@ -72,5 +75,11 @@ xen_bye_world.o: config.h
 $(XSPLICE_BYE): xen_bye_world_func.o xen_bye_world.o hello_world_note.o
 	$(LD) $(LDFLAGS) $(build_id_linker) -r -o $(XSPLICE_BYE) $^
 
+xen_replace_world.o: config.h
+
+.PHONY: $(XSPLICE_REPLACE)
+$(XSPLICE_REPLACE): xen_replace_world_func.o xen_replace_world.o note.o
+	$(LD) $(LDFLAGS) $(build_id_linker) -r -o $(XSPLICE_REPLACE) $^
+
 .PHONY: xsplice
-xsplice: $(XSPLICE) $(XSPLICE_BYE)
+xsplice: $(XSPLICE) $(XSPLICE_BYE) $(XSPLICE_REPLACE)
