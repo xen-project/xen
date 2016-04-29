@@ -330,7 +330,7 @@ uint32_t tcpa_extend_acpi_log(uint32_t entry_ptr)
 	uint32_t res = 0;
 	unsigned char *lasa_last = tcpa_get_lasa_last_ptr();
 	unsigned char *lasa_base = tcpa_get_lasa_base_ptr();
-	uint32_t size;
+	uint32_t size = 0;
 	uint16_t entry_count = tcpa_acpi.entry_count;
 	struct pcpes *pcpes = (struct pcpes *)entry_ptr;
 
