@@ -335,7 +335,7 @@ vhd_util_check_footer(int fd, vhd_footer_t *footer, int ignore)
 {
 	size_t size;
 	int err, opened;
-	char *msg, *buf;
+	char *msg, *buf = NULL;
 	off_t eof, off;
 	vhd_footer_t primary, backup;
 
