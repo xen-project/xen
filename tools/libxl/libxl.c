@@ -2200,7 +2200,7 @@ libxl_device_vtpm *libxl_device_vtpm_list(libxl_ctx *ctx, uint32_t domid, int *n
                                               &vtpm->backend_domid);
           if (rc) return NULL;
 
-          tmp = libxl__xs_read(gc, XBT_NULL, GCSPRINTF("%s/uuid", be_path));
+          tmp = libxl__xs_read(gc, XBT_NULL, GCSPRINTF("%s/uuid", libxl_path));
           if (tmp) {
               if(libxl_uuid_from_string(&(vtpm->uuid), tmp)) {
                   LOG(ERROR, "%s/uuid is a malformed uuid?? (%s) Probably a bug!!\n", be_path, tmp);
@@ -2260,7 +2260,7 @@ int libxl_device_vtpm_getinfo(libxl_ctx *ctx,
     vtpminfo->frontend_id = domid;
 
     val = libxl__xs_read(gc, XBT_NULL,
-          GCSPRINTF("%s/uuid", vtpminfo->backend));
+          GCSPRINTF("%s/uuid", libxl_path));
     if(val == NULL) {
        LOG(ERROR, "%s/uuid does not exist!\n", vtpminfo->backend);
        goto err;
