@@ -1100,7 +1100,7 @@ uint32_t HashLogEvent32(struct hlei *hlei, struct hleo *hleo,
 	}
 
 	if (rc == 0) {
-		uint32_t entry;
+		uint32_t entry = 0;
 		hashdataptr = hlei->hashdataptr;
 		hashdatalen = hlei->hashdatalen;
 
