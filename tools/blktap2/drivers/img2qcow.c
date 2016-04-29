@@ -166,7 +166,7 @@ int main(int argc, const char *argv[])
         int ret = -1, fd, len, err;
 	struct timeval timeout;
 	uint64_t i;
-	char *buf;
+	char *buf = NULL;
 	td_request_t treq;
         td_disk_info_t info;
         td_vbd_request_t* vreq;
