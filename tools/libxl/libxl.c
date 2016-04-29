@@ -1925,9 +1925,6 @@ int libxl_device_vtpm_getinfo(libxl_ctx *ctx,
     if (!vtpminfo->backend) {
         goto err;
     }
-    if(!libxl__xs_read(gc, XBT_NULL, vtpminfo->backend)) {
-       goto err;
-    }
 
     rc = libxl__backendpath_parse_domid(gc, vtpminfo->backend,
                                         &vtpminfo->backend_id);
@@ -1946,11 +1943,8 @@ int libxl_device_vtpm_getinfo(libxl_ctx *ctx,
     vtpminfo->rref = val ? strtoul(val, NULL, 10) : -1;
 
     vtpminfo->frontend = xs_read(ctx->xsh, XBT_NULL,
-          GCSPRINTF("%s/frontend", vtpminfo->backend), NULL);
-
-    val = libxl__xs_read(gc, XBT_NULL,
-          GCSPRINTF("%s/frontend-id", vtpminfo->backend));
-    vtpminfo->frontend_id = val ? strtoul(val, NULL, 10) : -1;
+          GCSPRINTF("%s/frontend", libxl_path), NULL);
+    vtpminfo->frontend_id = domid;
 
     val = libxl__xs_read(gc, XBT_NULL,
           GCSPRINTF("%s/uuid", vtpminfo->backend));
