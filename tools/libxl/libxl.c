@@ -2470,7 +2470,8 @@ int libxl_cdrom_insert(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk,
     int rc, dm_ver;
 
     libxl__device device;
-    const char * path;
+    const char *path, *libxl_path;
+    xs_transaction_t t = XBT_NULL;
     char * tmp;
 
     flexarray_t *insert = NULL;
@@ -2531,6 +2532,7 @@ int libxl_cdrom_insert(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk,
     }
 
     path = libxl__device_backend_path(gc, &device);
+    libxl_path = libxl__device_libxl_path(gc, &device);
 
     /* Sanity check: make sure the backend exists before writing here */
     tmp = libxl__xs_read(gc, XBT_NULL, libxl__sprintf(gc, "%s/frontend", path));
@@ -2555,9 +2557,22 @@ int libxl_cdrom_insert(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk,
     else
         flexarray_append_pair(insert, "params", "");
 
-    rc = libxl__xs_writev_atonce(gc, path,
-                        libxl__xs_kvs_of_flexarray(gc, insert, insert->count));
-    if (rc) goto out;
+    char **kvs = libxl__xs_kvs_of_flexarray(gc, insert, insert->count);
+
+    for (;;) {
+        rc = libxl__xs_transaction_start(gc, &t);
+        if (rc) goto out;
+
+        rc = libxl__xs_writev(gc, t, path, kvs);
+        if (rc) goto out;
+
+        rc = libxl__xs_writev(gc, t, libxl_path, kvs);
+        if (rc) goto out;
+
+        rc = libxl__xs_transaction_commit(gc, &t);
+        if (!rc) break;
+        if (rc<0) goto out;
+    }
 
     /* success, no actual async */
     libxl__ao_complete(egc, ao, 0);
@@ -2568,6 +2583,8 @@ out:
     for (i = 0; i < num; i++)
         libxl_device_disk_dispose(&disks[i]);
     free(disks);
+
+    libxl__xs_transaction_abort(gc, &t);
 
     if (rc) return AO_ABORT(rc);
     return AO_INPROGRESS;
