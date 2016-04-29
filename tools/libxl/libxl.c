@@ -2843,7 +2843,7 @@ int libxl_cdrom_insert(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk,
     libxl_domain_config d_config;
     int rc, dm_ver;
     libxl__device device;
-    const char * path;
+    const char *path, *libxl_path;
     char * tmp;
     libxl__domain_userdata_lock *lock = NULL;
     xs_transaction_t t = XBT_NULL;
@@ -2911,6 +2911,7 @@ int libxl_cdrom_insert(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk,
     if (rc) goto out;
 
     path = libxl__device_backend_path(gc, &device);
+    libxl_path = libxl__device_libxl_path(gc, &device);
 
     insert = flexarray_make(gc, 4, 1);
 
@@ -2959,8 +2960,12 @@ int libxl_cdrom_insert(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk,
             goto out;
         }
 
-        rc = libxl__xs_writev(gc, t, path,
-                              libxl__xs_kvs_of_flexarray(gc, empty, empty->count));
+        char **kvs = libxl__xs_kvs_of_flexarray(gc, empty, empty->count);
+
+        rc = libxl__xs_writev(gc, t, path, kvs);
+        if (rc) goto out;
+
+        rc = libxl__xs_writev(gc, t, libxl_path, kvs);
         if (rc) goto out;
 
         rc = libxl__xs_transaction_commit(gc, &t);
@@ -2994,8 +2999,12 @@ int libxl_cdrom_insert(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk,
         rc = libxl__set_domain_configuration(gc, domid, &d_config);
         if (rc) goto out;
 
-        rc = libxl__xs_writev(gc, t, path,
-                              libxl__xs_kvs_of_flexarray(gc, insert, insert->count));
+        char **kvs = libxl__xs_kvs_of_flexarray(gc, insert, insert->count);
+
+        rc = libxl__xs_writev(gc, t, path, kvs);
+        if (rc) goto out;
+
+        rc = libxl__xs_writev(gc, t, libxl_path, kvs);
         if (rc) goto out;
 
         rc = libxl__xs_transaction_commit(gc, &t);
