@@ -2449,27 +2449,34 @@ int libxl_device_disk_getinfo(libxl_ctx *ctx, uint32_t domid,
                               libxl_device_disk *disk, libxl_diskinfo *diskinfo)
 {
     GC_INIT(ctx);
-    char *dompath, *diskpath;
+    char *dompath, *fe_path, *libxl_path;
     char *val;
+    int rc;
+
+    diskinfo->backend = NULL;
 
     dompath = libxl__xs_get_dompath(gc, domid);
     diskinfo->devid = libxl__device_disk_dev_number(disk->vdev, NULL, NULL);
 
     /* tap devices entries in xenstore are written as vbd devices. */
-    diskpath = libxl__sprintf(gc, "%s/device/vbd/%d", dompath, diskinfo->devid);
+    fe_path = GCSPRINTF("%s/device/vbd/%d", dompath, diskinfo->devid);
+    libxl_path = GCSPRINTF("%s/device/vbd/%d",
+                           libxl__xs_libxl_path(gc, domid), diskinfo->devid);
     diskinfo->backend = xs_read(ctx->xsh, XBT_NULL,
-                                libxl__sprintf(gc, "%s/backend", diskpath), NULL);
+                                GCSPRINTF("%s/backend", libxl_path), NULL);
     if (!diskinfo->backend) {
         GC_FREE;
         return ERROR_FAIL;
     }
-    val = libxl__xs_read(gc, XBT_NULL, libxl__sprintf(gc, "%s/backend-id", diskpath));
-    diskinfo->backend_id = val ? strtoul(val, NULL, 10) : -1;
-    val = libxl__xs_read(gc, XBT_NULL, libxl__sprintf(gc, "%s/state", diskpath));
+    rc = libxl__backendpath_parse_domid(gc, diskinfo->backend,
+                                        &diskinfo->backend_id);
+    if (rc) goto out;
+
+    val = libxl__xs_read(gc, XBT_NULL, GCSPRINTF("%s/state", fe_path));
     diskinfo->state = val ? strtoul(val, NULL, 10) : -1;
-    val = libxl__xs_read(gc, XBT_NULL, libxl__sprintf(gc, "%s/event-channel", diskpath));
+    val = libxl__xs_read(gc, XBT_NULL, GCSPRINTF("%s/event-channel", fe_path));
     diskinfo->evtch = val ? strtoul(val, NULL, 10) : -1;
-    val = libxl__xs_read(gc, XBT_NULL, libxl__sprintf(gc, "%s/ring-ref", diskpath));
+    val = libxl__xs_read(gc, XBT_NULL, GCSPRINTF("%s/ring-ref", fe_path));
     diskinfo->rref = val ? strtoul(val, NULL, 10) : -1;
     diskinfo->frontend = xs_read(ctx->xsh, XBT_NULL,
                                  libxl__sprintf(gc, "%s/frontend", diskinfo->backend), NULL);
@@ -2478,6 +2485,10 @@ int libxl_device_disk_getinfo(libxl_ctx *ctx, uint32_t domid,
 
     GC_FREE;
     return 0;
+
+ out:
+    free(diskinfo->backend);
+    return rc;
 }
 
 int libxl_cdrom_insert(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk,
