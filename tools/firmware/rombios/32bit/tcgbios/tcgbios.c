@@ -1062,7 +1062,7 @@ uint32_t HashLogEvent32(struct hlei *hlei, struct hleo *hleo,
 {
 	uint32_t rc = 0;
 	uint16_t size;
-	uint32_t logdataptr;
+	uint32_t logdataptr = 0;
 	uint32_t logdatalen;
 	uint32_t hashdataptr;
 	uint32_t hashdatalen;
