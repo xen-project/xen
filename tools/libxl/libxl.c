@@ -2635,8 +2635,8 @@ void libxl__device_disk_add(libxl__egc *egc, uint32_t domid,
     device_disk_add(egc, domid, disk, aodev, NULL, NULL);
 }
 
-static int libxl__device_disk_from_xs_be(libxl__gc *gc,
-                                         const char *be_path,
+static int libxl__device_disk_from_xenstore(libxl__gc *gc,
+                                         const char *libxl_path,
                                          libxl_device_disk *disk)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
@@ -2646,9 +2646,21 @@ static int libxl__device_disk_from_xs_be(libxl__gc *gc,
 
     libxl_device_disk_init(disk);
 
-    rc = sscanf(be_path, "/local/domain/%d/", &disk->backend_domid);
+    const char *backend_path;
+    rc = libxl__xs_read_checked(gc, XBT_NULL,
+                                GCSPRINTF("%s/backend", libxl_path),
+                                &backend_path);
+    if (rc) goto out;
+
+    if (!backend_path) {
+        LOG(ERROR, "disk %s does not exist (no backend path", libxl_path);
+        rc = ERROR_FAIL;
+        goto out;
+    }
+
+    rc = sscanf(backend_path, "/local/domain/%d/", &disk->backend_domid);
     if (rc != 1) {
-        LOG(ERROR, "Unable to fetch device backend domid from %s", be_path);
+        LOG(ERROR, "Unable to fetch device backend domid from %s", backend_path);
         goto cleanup;
     }
 
@@ -2659,7 +2671,7 @@ static int libxl__device_disk_from_xs_be(libxl__gc *gc,
      * enabled.
      */
     tmp = xs_read(ctx->xsh, XBT_NULL,
-                  GCSPRINTF("%s/params", be_path), &len);
+                  GCSPRINTF("%s/params", libxl_path), &len);
     if (tmp && strchr(tmp, ':')) {
         disk->pdev_path = strdup(strchr(tmp, ':') + 1);
         free(tmp);
@@ -2668,24 +2680,24 @@ static int libxl__device_disk_from_xs_be(libxl__gc *gc,
     }
 
     tmp = xs_read(ctx->xsh, XBT_NULL,
-                  GCSPRINTF("%s/colo-host", be_path), &len);
+                  GCSPRINTF("%s/colo-host", libxl_path), &len);
     if (tmp) {
         libxl_defbool_set(&disk->colo_enable, true);
         disk->colo_host = tmp;
 
         tmp = xs_read(ctx->xsh, XBT_NULL,
-                      GCSPRINTF("%s/colo-port", be_path), &len);
+                      GCSPRINTF("%s/colo-port", libxl_path), &len);
         if (!tmp) {
-            LOG(ERROR, "Missing xenstore node %s/colo-port", be_path);
+            LOG(ERROR, "Missing xenstore node %s/colo-port", libxl_path);
             goto cleanup;
         }
         disk->colo_port = atoi(tmp);
 
 #define XS_READ_COLO(param, item) do {                                  \
         tmp = xs_read(ctx->xsh, XBT_NULL,                               \
-                      GCSPRINTF("%s/"#param"", be_path), &len);         \
+                      GCSPRINTF("%s/"#param"", libxl_path), &len);         \
         if (!tmp) {                                                     \
-            LOG(ERROR, "Missing xenstore node %s/"#param"", be_path);   \
+            LOG(ERROR, "Missing xenstore node %s/"#param"", libxl_path);   \
             goto cleanup;                                               \
         }                                                               \
         disk->item = tmp;                                               \
@@ -2699,31 +2711,31 @@ static int libxl__device_disk_from_xs_be(libxl__gc *gc,
     }
 
     tmp = libxl__xs_read(gc, XBT_NULL,
-                         GCSPRINTF("%s/type", be_path));
+                         GCSPRINTF("%s/type", libxl_path));
     if (!tmp) {
-        LOG(ERROR, "Missing xenstore node %s/type", be_path);
+        LOG(ERROR, "Missing xenstore node %s/type", libxl_path);
         goto cleanup;
     }
     libxl_string_to_backend(ctx, tmp, &(disk->backend));
 
     disk->vdev = xs_read(ctx->xsh, XBT_NULL,
-                         GCSPRINTF("%s/dev", be_path), &len);
+                         GCSPRINTF("%s/dev", libxl_path), &len);
     if (!disk->vdev) {
-        LOG(ERROR, "Missing xenstore node %s/dev", be_path);
+        LOG(ERROR, "Missing xenstore node %s/dev", libxl_path);
         goto cleanup;
     }
 
     tmp = libxl__xs_read(gc, XBT_NULL, libxl__sprintf
-                         (gc, "%s/removable", be_path));
+                         (gc, "%s/removable", libxl_path));
     if (!tmp) {
-        LOG(ERROR, "Missing xenstore node %s/removable", be_path);
+        LOG(ERROR, "Missing xenstore node %s/removable", libxl_path);
         goto cleanup;
     }
     disk->removable = atoi(tmp);
 
-    tmp = libxl__xs_read(gc, XBT_NULL, GCSPRINTF("%s/mode", be_path));
+    tmp = libxl__xs_read(gc, XBT_NULL, GCSPRINTF("%s/mode", libxl_path));
     if (!tmp) {
-        LOG(ERROR, "Missing xenstore node %s/mode", be_path);
+        LOG(ERROR, "Missing xenstore node %s/mode", libxl_path);
         goto cleanup;
     }
     if (!strcmp(tmp, "w"))
@@ -2732,9 +2744,9 @@ static int libxl__device_disk_from_xs_be(libxl__gc *gc,
         disk->readwrite = 0;
 
     tmp = libxl__xs_read(gc, XBT_NULL,
-                         GCSPRINTF("%s/device-type", be_path));
+                         GCSPRINTF("%s/device-type", libxl_path));
     if (!tmp) {
-        LOG(ERROR, "Missing xenstore node %s/device-type", be_path);
+        LOG(ERROR, "Missing xenstore node %s/device-type", libxl_path);
         goto cleanup;
     }
     disk->is_cdrom = !strcmp(tmp, "cdrom");
@@ -2743,15 +2755,17 @@ static int libxl__device_disk_from_xs_be(libxl__gc *gc,
 
     return 0;
 cleanup:
+    rc = ERROR_FAIL;
+ out:
     libxl_device_disk_dispose(disk);
-    return ERROR_FAIL;
+    return rc;
 }
 
 int libxl_vdev_to_device_disk(libxl_ctx *ctx, uint32_t domid,
                               const char *vdev, libxl_device_disk *disk)
 {
     GC_INIT(ctx);
-    char *dompath, *path;
+    char *dom_xl_path, *libxl_path;
     int devid = libxl__device_disk_dev_number(vdev, NULL, NULL);
     int rc = ERROR_FAIL;
 
@@ -2760,39 +2774,34 @@ int libxl_vdev_to_device_disk(libxl_ctx *ctx, uint32_t domid,
 
     libxl_device_disk_init(disk);
 
-    dompath = libxl__xs_get_dompath(gc, domid);
-    if (!dompath) {
+    dom_xl_path = libxl__xs_libxl_path(gc, domid);
+    if (!dom_xl_path) {
         goto out;
     }
-    path = libxl__xs_read(gc, XBT_NULL,
-                          GCSPRINTF("%s/device/vbd/%d/backend", dompath,
-                                    devid));
-    if (!path)
-        goto out;
+    libxl_path = GCSPRINTF("%s/device/vbd/%d", dom_xl_path, devid);
 
-    rc = libxl__device_disk_from_xs_be(gc, path, disk);
+    rc = libxl__device_disk_from_xenstore(gc, libxl_path, disk);
 out:
     GC_FREE;
     return rc;
 }
 
 
-static int libxl__append_disk_list_of_type(libxl__gc *gc,
+static int libxl__append_disk_list(libxl__gc *gc,
                                            uint32_t domid,
-                                           const char *type,
                                            libxl_device_disk **disks,
                                            int *ndisks)
 {
-    char *be_path = NULL;
+    char *libxl_dir_path = NULL;
     char **dir = NULL;
     unsigned int n = 0;
     libxl_device_disk *pdisk = NULL, *pdisk_end = NULL;
     int rc=0;
     int initial_disks = *ndisks;
 
-    be_path = GCSPRINTF("%s/backend/%s/%d",
-                        libxl__xs_get_dompath(gc, 0), type, domid);
-    dir = libxl__xs_directory(gc, XBT_NULL, be_path, &n);
+    libxl_dir_path = GCSPRINTF("%s/device/vbd",
+                        libxl__xs_libxl_path(gc, domid));
+    dir = libxl__xs_directory(gc, XBT_NULL, libxl_dir_path, &n);
     if (dir && n) {
         libxl_device_disk *tmp;
         tmp = realloc(*disks, sizeof (libxl_device_disk) * (*ndisks + n));
@@ -2803,10 +2812,9 @@ static int libxl__append_disk_list_of_type(libxl__gc *gc,
         pdisk_end = *disks + initial_disks + n;
         for (; pdisk < pdisk_end; pdisk++, dir++) {
             const char *p;
-            p = GCSPRINTF("%s/%s", be_path, *dir);
-            if ((rc=libxl__device_disk_from_xs_be(gc, p, pdisk)))
+            p = GCSPRINTF("%s/%s", libxl_dir_path, *dir);
+            if ((rc=libxl__device_disk_from_xenstore(gc, p, pdisk)))
                 goto out;
-            pdisk->backend_domid = 0;
             *ndisks += 1;
         }
     }
@@ -2822,13 +2830,7 @@ libxl_device_disk *libxl_device_disk_list(libxl_ctx *ctx, uint32_t domid, int *n
 
     *num = 0;
 
-    rc = libxl__append_disk_list_of_type(gc, domid, "vbd", &disks, num);
-    if (rc) goto out_err;
-
-    rc = libxl__append_disk_list_of_type(gc, domid, "tap", &disks, num);
-    if (rc) goto out_err;
-
-    rc = libxl__append_disk_list_of_type(gc, domid, "qdisk", &disks, num);
+    rc = libxl__append_disk_list(gc, domid, &disks, num);
     if (rc) goto out_err;
 
     GC_FREE;
