@@ -202,7 +202,7 @@ int main(int argc, const char *argv[])
 	uint64_t size;
 	struct timeval timeout;
 	uint64_t i;
-	char *buf;
+	char *buf = NULL;
 	struct stat finfo;
 	td_request_t treq;
 	td_vbd_request_t* vreq;
