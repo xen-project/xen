@@ -2460,7 +2460,7 @@ int libxl_cdrom_insert(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk,
     int rc, dm_ver;
 
     libxl__device device;
-    const char *path, *libxl_path;
+    const char *be_path, *libxl_path;
     xs_transaction_t t = XBT_NULL;
     char * tmp;
 
@@ -2521,15 +2521,15 @@ int libxl_cdrom_insert(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk,
         if (rc) goto out;
     }
 
-    path = libxl__device_backend_path(gc, &device);
+    be_path = libxl__device_backend_path(gc, &device);
     libxl_path = libxl__device_libxl_path(gc, &device);
 
-    /* Sanity check: make sure the backend exists before writing here */
-    tmp = libxl__xs_read(gc, XBT_NULL, libxl__sprintf(gc, "%s/frontend", path));
+    /* Sanity check: make sure the device exists before writing here */
+    tmp = libxl__xs_read(gc, XBT_NULL, libxl__sprintf(gc, "%s/frontend", libxl_path));
     if (!tmp)
     {
         LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "Internal error: %s does not exist",
-            libxl__sprintf(gc, "%s/frontend", path));
+            libxl__sprintf(gc, "%s/frontend", libxl_path));
         rc = ERROR_FAIL;
         goto out;
     }
@@ -2553,7 +2553,7 @@ int libxl_cdrom_insert(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk,
         rc = libxl__xs_transaction_start(gc, &t);
         if (rc) goto out;
 
-        rc = libxl__xs_writev(gc, t, path, kvs);
+        rc = libxl__xs_writev(gc, t, be_path, kvs);
         if (rc) goto out;
 
         rc = libxl__xs_writev(gc, t, libxl_path, kvs);
