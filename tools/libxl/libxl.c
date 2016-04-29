@@ -2640,10 +2640,10 @@ static int libxl__device_disk_from_xenstore(libxl__gc *gc,
         goto out;
     }
 
-    rc = sscanf(backend_path, "/local/domain/%d/", &disk->backend_domid);
-    if (rc != 1) {
+    rc = libxl__backendpath_parse_domid(gc, backend_path, &disk->backend_domid);
+    if (rc) {
         LOG(ERROR, "Unable to fetch device backend domid from %s", backend_path);
-        goto cleanup;
+        goto out;
     }
 
     /* "params" may not be present; but everything else must be. */
