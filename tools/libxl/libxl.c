@@ -1186,8 +1186,7 @@ static void disk_eject_xswatch_callback(libxl__egc *egc, libxl__ev_xswatch *w,
     disk->pdev_path = strdup(""); /* xxx fixme malloc failure */
     disk->format = LIBXL_DISK_FORMAT_EMPTY;
     /* this value is returned to the user: do not free right away */
-    disk->vdev = xs_read(CTX->xsh, XBT_NULL,
-                         libxl__sprintf(gc, "%s/dev", backend), NULL);
+    disk->vdev = libxl__strdup(NOGC, evg->vdev);
     disk->removable = 1;
     disk->readwrite = 0;
     disk->is_cdrom = 1;
@@ -1210,9 +1209,6 @@ int libxl_evenable_disk_eject(libxl_ctx *ctx, uint32_t guest_domid,
     evg->domid = guest_domid;
     LIBXL_LIST_INSERT_HEAD(&CTX->disk_eject_evgens, evg, entry);
 
-    evg->vdev = strdup(vdev);
-    if (!evg->vdev) { rc = ERROR_NOMEM; goto out; }
-
     uint32_t domid = libxl_get_stubdom_id(ctx, guest_domid);
 
     if (!domid)
@@ -1229,6 +1225,13 @@ int libxl_evenable_disk_eject(libxl_ctx *ctx, uint32_t guest_domid,
                                  libxl__xs_libxl_path(gc, domid),
                                  devid);
     evg->be_ptr_path = libxl__sprintf(NOGC, "%s/backend", libxl_path);
+
+    const char *configured_vdev;
+    rc = libxl__xs_read_checked(gc, XBT_NULL,
+            GCSPRINTF("%s/vdev", libxl_path), &configured_vdev);
+    if (rc) goto out;
+
+    evg->vdev = libxl__strdup(NOGC, configured_vdev);
 
     rc = libxl__ev_xswatch_register(gc, &evg->watch,
                                     disk_eject_xswatch_callback, path);
