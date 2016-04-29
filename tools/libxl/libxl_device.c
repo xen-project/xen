@@ -185,6 +185,29 @@ retry_transaction:
         xs_write(ctx->xsh, t, GCSPRINTF("%s/frontend", backend_path),
                  frontend_path, strlen(frontend_path));
         libxl__xs_writev(gc, t, backend_path, bents);
+
+        /*
+         * We make a copy of everything for the backend in the libxl
+         * path as well.  This means we don't need to trust the
+         * backend.  Ideally this information would not be used and we
+         * would use the information from the json configuration
+         * instead.  But there are still places in libxl that try to
+         * reconstruct a config from xenstore.
+         *
+         * This duplication will typically produces duplicate keys
+         * which will go out of date, but that's OK because nothing
+         * reads those.  For example, there is usually
+         *   /libxl/$guest/device/$kind/$devid/state
+         * which starts out containing XenbusStateInitialising ("1")
+         * just like the copy in
+         *  /local/domain/$driverdom/backend/$guest/$kind/$devid/state
+         * but which won't ever be updated.
+         *
+         * This duplication is superfluous and messy but as discussed
+         * the proper fix is more intrusive than we want to do now.
+         */
+        rc = libxl__xs_writev(gc, t, libxl_path, bents);
+        if (rc) goto out;
     }
 
     if (!create_transaction)

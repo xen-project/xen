@@ -549,6 +549,10 @@ Path in xenstore to the frontend, normally
 Path in xenstore to the backend, normally
 /local/domain/$BACKEND_DOMID/backend/$KIND/$DOMID/$DEVID
 
+#### /libxl/$DOMID/device/$KIND/$DEVID/$NODE
+
+Trustworthy copy of /local/domain/$DOMID/backend/$KIND/$DEVID/$NODE.
+
 #### /libxl/$DOMID/dm-version ("qemu\_xen"|"qemu\_xen\_traditional") = [n,INTERNAL]
 
 The device model version for a domain.
