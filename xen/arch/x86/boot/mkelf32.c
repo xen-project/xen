@@ -356,7 +356,7 @@ int main(int argc, char **argv)
         if ( in64_phdr.p_offset > dat_siz || offset > in64_phdr.p_offset )
         {
             fprintf(stderr, "Expected .note section within .text section!\n" \
-                    "Offset %ld not within %d!\n",
+                    "Offset %"PRId64" not within %d!\n",
                     in64_phdr.p_offset, dat_siz);
             return 1;
         }
