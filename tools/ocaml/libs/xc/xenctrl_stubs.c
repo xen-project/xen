@@ -1218,6 +1218,7 @@ CAMLprim value stub_xc_get_cpu_featureset(value xch, value idx)
 {
 	CAMLparam2(xch, idx);
 	CAMLlocal1(bitmap_val);
+#if defined(__i386__) || defined(__x86_64__)
 
 	/* Safe, because of the global ocaml lock. */
 	static uint32_t fs_len;
@@ -1245,7 +1246,9 @@ CAMLprim value stub_xc_get_cpu_featureset(value xch, value idx)
 		for (i = 0; i < len; ++i)
 			Store_field(bitmap_val, i, caml_copy_int64(fs[i]));
 	}
-
+#else
+	caml_failwith("xc_get_cpu_featureset: not implemented");
+#endif
 	CAMLreturn(bitmap_val);
 }
 
