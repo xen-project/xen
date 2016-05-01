@@ -95,7 +95,7 @@ static int list_func(int argc, char *argv[])
         done = 0;
         /* The memset is done to catch errors. */
         memset(info, 'A', sizeof(*info) * MAX_LEN);
-        memset(name, 'B', sizeof(*name * MAX_LEN * XEN_XSPLICE_NAME_SIZE));
+        memset(name, 'B', sizeof(*name) * MAX_LEN * XEN_XSPLICE_NAME_SIZE);
         memset(len, 'C', sizeof(*len) * MAX_LEN);
         rc = xc_xsplice_list(xch, MAX_LEN, idx, info, name, len, &done, &left);
         if ( rc )
