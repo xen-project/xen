@@ -548,6 +548,7 @@ static int prepare_payload(struct payload *payload,
     }
 
     sec = xsplice_elf_sec_by_name(elf, ELF_XSPLICE_DEPENDS);
+    if ( sec )
     {
         n = sec->load_addr;
 
