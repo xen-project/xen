@@ -21,6 +21,7 @@
 
 bool_t hvm_io_pending(struct vcpu *v);
 bool_t handle_hvm_io_completion(struct vcpu *v);
+bool_t is_ioreq_server_page(struct domain *d, const struct page_info *page);
 
 int hvm_create_ioreq_server(struct domain *d, domid_t domid,
                             bool_t is_default, int bufioreq_handling,
