@@ -2991,7 +2991,7 @@ out:
 }
 
 static void libxl__device_nic_from_xenstore(libxl__gc *gc,
-                                         const char *be_path,
+                                        const char *libxl_path,
                                          libxl_device_nic *nic)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
@@ -3002,7 +3002,7 @@ static void libxl__device_nic_from_xenstore(libxl__gc *gc,
     libxl_device_nic_init(nic);
 
     tmp = xs_read(ctx->xsh, XBT_NULL,
-                  libxl__sprintf(gc, "%s/handle", be_path), &len);
+                  libxl__sprintf(gc, "%s/handle", libxl_path), &len);
     if ( tmp )
         nic->devid = atoi(tmp);
     else
@@ -3011,19 +3011,19 @@ static void libxl__device_nic_from_xenstore(libxl__gc *gc,
     /* nic->mtu = */
 
     tmp = xs_read(ctx->xsh, XBT_NULL,
-                  libxl__sprintf(gc, "%s/mac", be_path), &len);
+                  libxl__sprintf(gc, "%s/mac", libxl_path), &len);
     rc = libxl__parse_mac(tmp, nic->mac);
     if (rc)
         memset(nic->mac, 0, sizeof(nic->mac));
 
     nic->ip = xs_read(ctx->xsh, XBT_NULL,
-                      libxl__sprintf(gc, "%s/ip", be_path), &len);
+                      libxl__sprintf(gc, "%s/ip", libxl_path), &len);
 
     nic->bridge = xs_read(ctx->xsh, XBT_NULL,
-                      libxl__sprintf(gc, "%s/bridge", be_path), &len);
+                      libxl__sprintf(gc, "%s/bridge", libxl_path), &len);
 
     nic->script = xs_read(ctx->xsh, XBT_NULL,
-                      libxl__sprintf(gc, "%s/script", be_path), &len);
+                      libxl__sprintf(gc, "%s/script", libxl_path), &len);
 
     /* vif_ioemu nics use the same xenstore entries as vif interfaces */
     nic->nictype = LIBXL_NIC_TYPE_VIF;
