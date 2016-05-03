@@ -3664,10 +3664,8 @@ int libxl_device_nic_getinfo(libxl_ctx *ctx, uint32_t domid,
     nicinfo->rref_tx = val ? strtoul(val, NULL, 10) : -1;
     val = libxl__xs_read(gc, XBT_NULL, libxl__sprintf(gc, "%s/rx-ring-ref", nicpath));
     nicinfo->rref_rx = val ? strtoul(val, NULL, 10) : -1;
-    nicinfo->frontend = xs_read(ctx->xsh, XBT_NULL,
-                                 libxl__sprintf(gc, "%s/frontend", nicinfo->backend), NULL);
-    val = libxl__xs_read(gc, XBT_NULL, libxl__sprintf(gc, "%s/frontend-id", nicinfo->backend));
-    nicinfo->frontend_id = val ? strtoul(val, NULL, 10) : -1;
+    nicinfo->frontend = libxl__strdup(NOGC, nicpath);
+    nicinfo->frontend_id = domid;
 
     rc = 0;
  out:
