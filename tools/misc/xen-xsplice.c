@@ -13,6 +13,8 @@
 #include <xenctrl.h>
 #include <xenstore.h>
 
+#include <xen/errno.h>
+
 static xc_interface *xch;
 
 void show_help(void)
@@ -233,7 +235,7 @@ struct {
         .function = xc_xsplice_revert,
     },
     {   .allow = XSPLICE_STATE_CHECKED,
-        .expected = -ENOENT,
+        .expected = -XEN_ENOENT,
         .name = "unload",
         .function = xc_xsplice_unload,
     },
@@ -276,7 +278,7 @@ int action_func(int argc, char *argv[], unsigned int idx)
                 name, errno, strerror(errno));
         return -1;
     }
-    if ( status.rc == -EAGAIN )
+    if ( status.rc == -XEN_EAGAIN )
     {
         fprintf(stderr, "%s failed. Operation already in progress\n", name);
         return -1;
@@ -319,7 +321,7 @@ int action_func(int argc, char *argv[], unsigned int idx)
 
         if ( status.state != original_state )
             break;
-        if ( status.rc && status.rc != -EAGAIN )
+        if ( status.rc && status.rc != -XEN_EAGAIN )
         {
             rc = status.rc;
             break;
