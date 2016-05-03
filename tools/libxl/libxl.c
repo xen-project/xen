@@ -1928,7 +1928,7 @@ int libxl_device_vtpm_getinfo(libxl_ctx *ctx,
                               libxl_vtpminfo *vtpminfo)
 {
     GC_INIT(ctx);
-    char *dompath, *vtpmpath;
+    char *libxl_path, *dompath, *vtpmpath;
     char *val;
     int rc = 0;
 
@@ -1937,8 +1937,10 @@ int libxl_device_vtpm_getinfo(libxl_ctx *ctx,
     vtpminfo->devid = vtpm->devid;
 
     vtpmpath = GCSPRINTF("%s/device/vtpm/%d", dompath, vtpminfo->devid);
+    libxl_path = GCSPRINTF("%s/device/vtpm/%d",
+                           libxl__xs_libxl_path(gc, domid), vtpminfo->devid);
     vtpminfo->backend = xs_read(ctx->xsh, XBT_NULL,
-          GCSPRINTF("%s/backend", vtpmpath), NULL);
+          GCSPRINTF("%s/backend", libxl_path), NULL);
     if (!vtpminfo->backend) {
         goto err;
     }
@@ -1946,9 +1948,9 @@ int libxl_device_vtpm_getinfo(libxl_ctx *ctx,
        goto err;
     }
 
-    val = libxl__xs_read(gc, XBT_NULL,
-          GCSPRINTF("%s/backend-id", vtpmpath));
-    vtpminfo->backend_id = val ? strtoul(val, NULL, 10) : -1;
+    rc = libxl__backendpath_parse_domid(gc, vtpminfo->backend,
+                                        &vtpminfo->backend_id);
+    if (rc) goto exit;
 
     val = libxl__xs_read(gc, XBT_NULL,
           GCSPRINTF("%s/state", vtpmpath));
