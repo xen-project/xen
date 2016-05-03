@@ -867,7 +867,7 @@ csched2_alloc_vdata(const struct scheduler *ops, struct vcpu *vc, void *dd)
         svc->weight = svc->sdom->weight;
         /* Starting load of 50% */
         svc->avgload = 1ULL << (CSCHED2_PRIV(ops)->load_window_shift - 1);
-        svc->load_last_update = NOW();
+        svc->load_last_update = NOW() >> LOADAVG_GRANULARITY_SHIFT;
     }
     else
     {
@@ -1301,7 +1301,7 @@ static void migrate(const struct scheduler *ops,
         if ( __vcpu_on_runq(svc) )
         {
             __runq_remove(svc);
-            update_load(ops, svc->rqd, svc, -1, now);
+            update_load(ops, svc->rqd, NULL, -1, now);
             on_runq=1;
         }
         __runq_deassign(svc);
@@ -1314,7 +1314,7 @@ static void migrate(const struct scheduler *ops,
         __runq_assign(svc, trqd);
         if ( on_runq )
         {
-            update_load(ops, svc->rqd, svc, 1, now);
+            update_load(ops, svc->rqd, NULL, 1, now);
             runq_insert(ops, svc->vcpu->processor, svc);
             runq_tickle(ops, svc->vcpu->processor, svc, now);
             SCHED_STAT_CRANK(migrate_on_runq);
