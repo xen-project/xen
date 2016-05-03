@@ -2173,14 +2173,15 @@ libxl_device_vtpm *libxl_device_vtpm_list(libxl_ctx *ctx, uint32_t domid, int *n
     GC_INIT(ctx);
 
     libxl_device_vtpm* vtpms = NULL;
-    char* fe_path = NULL;
+    char *libxl_path;
     char** dir = NULL;
     unsigned int ndirs = 0;
+    int rc;
 
     *num = 0;
 
-    fe_path = libxl__sprintf(gc, "%s/device/vtpm", libxl__xs_get_dompath(gc, domid));
-    dir = libxl__xs_directory(gc, XBT_NULL, fe_path, &ndirs);
+    libxl_path = GCSPRINTF("%s/device/vtpm", libxl__xs_libxl_path(gc, domid));
+    dir = libxl__xs_directory(gc, XBT_NULL, libxl_path, &ndirs);
     if (dir && ndirs) {
        vtpms = malloc(sizeof(*vtpms) * ndirs);
        libxl_device_vtpm* vtpm;
@@ -2189,16 +2190,15 @@ libxl_device_vtpm *libxl_device_vtpm_list(libxl_ctx *ctx, uint32_t domid, int *n
           char* tmp;
           const char* be_path = libxl__xs_read(gc, XBT_NULL,
                 GCSPRINTF("%s/%s/backend",
-                   fe_path, *dir));
+                   libxl_path, *dir));
 
           libxl_device_vtpm_init(vtpm);
 
           vtpm->devid = atoi(*dir);
 
-          tmp = libxl__xs_read(gc, XBT_NULL,
-                GCSPRINTF("%s/%s/backend-id",
-                   fe_path, *dir));
-          vtpm->backend_domid = atoi(tmp);
+          rc = libxl__backendpath_parse_domid(gc, be_path,
+                                              &vtpm->backend_domid);
+          if (rc) return NULL;
 
           tmp = libxl__xs_read(gc, XBT_NULL, GCSPRINTF("%s/uuid", be_path));
           if (tmp) {
