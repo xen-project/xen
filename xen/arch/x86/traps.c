@@ -150,7 +150,7 @@ static void show_code(const struct cpu_user_regs *regs)
                   : "=&c" (missing_before),
                     "=&D" (tmp), "=&S" (tmp)
                   : "0" (ARRAY_SIZE(insns_before)),
-                    "1" (insns_before + ARRAY_SIZE(insns_before)),
+                    "1" (insns_before + ARRAY_SIZE(insns_before) - 1),
                     "2" (regs->rip - 1));
     clac();
 
