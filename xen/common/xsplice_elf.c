@@ -397,7 +397,8 @@ static int xsplice_header_check(const struct xsplice_elf *elf)
     if ( hdr->e_version != EV_CURRENT ||
          hdr->e_ident[EI_VERSION] != EV_CURRENT ||
          hdr->e_ident[EI_ABIVERSION] != 0 ||
-         hdr->e_ident[EI_OSABI] != ELFOSABI_NONE ||
+         (hdr->e_ident[EI_OSABI] != ELFOSABI_NONE &&
+          hdr->e_ident[EI_OSABI] != ELFOSABI_FREEBSD) ||
          hdr->e_type != ET_REL ||
          hdr->e_phnum != 0 )
     {
