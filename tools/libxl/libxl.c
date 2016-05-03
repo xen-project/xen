@@ -4035,22 +4035,28 @@ int libxl_device_channel_getinfo(libxl_ctx *ctx, uint32_t domid,
                                  libxl_channelinfo *channelinfo)
 {
     GC_INIT(ctx);
-    char *dompath, *fe_path;
+    char *dompath, *fe_path, *libxl_path;
     char *val;
+    int rc;
 
     dompath = libxl__xs_get_dompath(gc, domid);
     channelinfo->devid = channel->devid;
 
     fe_path = GCSPRINTF("%s/device/console/%d", dompath,
                         channelinfo->devid + 1);
+    libxl_path = GCSPRINTF("%s/device/console/%d",
+                           libxl__xs_libxl_path(gc, domid),
+                           channelinfo->devid + 1);
     channelinfo->backend = xs_read(ctx->xsh, XBT_NULL,
-                                   GCSPRINTF("%s/backend", fe_path), NULL);
+                                   GCSPRINTF("%s/backend", libxl_path), NULL);
     if (!channelinfo->backend) {
         GC_FREE;
         return ERROR_FAIL;
     }
-    val = libxl__xs_read(gc, XBT_NULL, GCSPRINTF("%s/backend-id", fe_path));
-    channelinfo->backend_id = val ? strtoul(val, NULL, 10) : -1;
+    rc = libxl__backendpath_parse_domid(gc, channelinfo->backend,
+                                        &channelinfo->backend_id);
+    if (rc) goto out;
+
     val = libxl__xs_read(gc, XBT_NULL, GCSPRINTF("%s/state", fe_path));
     channelinfo->state = val ? strtoul(val, NULL, 10) : -1;
     channelinfo->frontend = xs_read(ctx->xsh, XBT_NULL,
@@ -4068,13 +4074,36 @@ int libxl_device_channel_getinfo(libxl_ctx *ctx, uint32_t domid,
     switch (channel->connection) {
          case LIBXL_CHANNEL_CONNECTION_PTY:
              val = libxl__xs_read(gc, XBT_NULL, GCSPRINTF("%s/tty", fe_path));
+             /*
+              * It is obviously very wrong for this value to be in the
+              * frontend.  But in XSA-175 we don't want to re-engineer
+              * this because other xenconsole code elsewhere (some
+              * even out of tree, perhaps) expects this node to be
+              * here.
+              *
+              * FE/pty is readonly for the guest.  It always exists if
+              * FE does because libxl__device_console_add
+              * unconditionally creates it and nothing deletes it.
+              *
+              * The guest can delete the whole FE (which it has write
+              * privilege on) but the containing directories
+              * /local/GUEST[/device[/console]] are also RO for the
+              * guest.  So if the guest deletes FE it cannot recreate
+              * it.
+              *
+              * Therefore the guest cannot cause FE/pty to contain bad
+              * data, although it can cause it to not exist.
+              */
+             if (!val) val = "/NO-SUCH-PATH";
              channelinfo->u.pty.path = strdup(val);
              break;
          default:
              break;
     }
+    rc = 0;
+ out:
     GC_FREE;
-    return 0;
+    return rc;
 }
 
 /******************************************************************************/
