@@ -3718,21 +3718,26 @@ int libxl_device_nic_getinfo(libxl_ctx *ctx, uint32_t domid,
                               libxl_device_nic *nic, libxl_nicinfo *nicinfo)
 {
     GC_INIT(ctx);
-    char *dompath, *nicpath;
+    char *dompath, *nicpath, *libxl_path;
     char *val;
+    int rc;
 
     dompath = libxl__xs_get_dompath(gc, domid);
     nicinfo->devid = nic->devid;
 
     nicpath = GCSPRINTF("%s/device/vif/%d", dompath, nicinfo->devid);
+    libxl_path = GCSPRINTF("%s/device/vif/%d",
+                           libxl__xs_libxl_path(gc, domid), nicinfo->devid);
     nicinfo->backend = xs_read(ctx->xsh, XBT_NULL,
-                                GCSPRINTF("%s/backend", nicpath), NULL);
+                                GCSPRINTF("%s/backend", libxl_path), NULL);
     if (!nicinfo->backend) {
         GC_FREE;
         return ERROR_FAIL;
     }
-    val = libxl__xs_read(gc, XBT_NULL, GCSPRINTF("%s/backend-id", nicpath));
-    nicinfo->backend_id = val ? strtoul(val, NULL, 10) : -1;
+    rc = libxl__backendpath_parse_domid(gc, nicinfo->backend,
+                                        &nicinfo->backend_id);
+    if (rc) goto out;
+
     val = libxl__xs_read(gc, XBT_NULL, GCSPRINTF("%s/state", nicpath));
     nicinfo->state = val ? strtoul(val, NULL, 10) : -1;
     val = libxl__xs_read(gc, XBT_NULL, GCSPRINTF("%s/event-channel", nicpath));
@@ -3746,8 +3751,10 @@ int libxl_device_nic_getinfo(libxl_ctx *ctx, uint32_t domid,
     val = libxl__xs_read(gc, XBT_NULL, GCSPRINTF("%s/frontend-id", nicinfo->backend));
     nicinfo->frontend_id = val ? strtoul(val, NULL, 10) : -1;
 
+    rc = 0;
+ out:
     GC_FREE;
-    return 0;
+    return rc;
 }
 
 const char *libxl__device_nic_devname(libxl__gc *gc,
