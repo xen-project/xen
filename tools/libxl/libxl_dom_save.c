@@ -386,7 +386,7 @@ void libxl__domain_save(libxl__egc *egc, libxl__domain_save_state *dss)
      */
     ret = xc_domain_getvnuma(CTX->xch, domid, &nr_vnodes, &nr_vmemranges,
                              &nr_vcpus, NULL, NULL, NULL);
-    if (ret != -1 || errno != XEN_EOPNOTSUPP) {
+    if (ret != -1 || errno != EOPNOTSUPP) {
         LOG(ERROR, "Cannot save a guest with vNUMA configured");
         rc = ERROR_FAIL;
         goto out;
