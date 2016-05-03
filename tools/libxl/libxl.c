@@ -3031,7 +3031,7 @@ out:
 }
 
 static int libxl__device_nic_from_xenstore(libxl__gc *gc,
-                                        const char *be_path,
+                                        const char *libxl_path,
                                         libxl_device_nic *nic)
 {
     const char *tmp;
@@ -3041,7 +3041,7 @@ static int libxl__device_nic_from_xenstore(libxl__gc *gc,
 
 #define READ_LIBXLDEV(tgc, subpath) ({                                   \
         rc = libxl__xs_read_checked(tgc, XBT_NULL,                      \
-                                    GCSPRINTF("%s/" subpath, be_path),  \
+                                    GCSPRINTF("%s/" subpath, libxl_path),  \
                                     &tmp);                              \
         if (rc) goto out;                                               \
         (char*)tmp;                                                     \
