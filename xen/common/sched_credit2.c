@@ -2201,6 +2201,12 @@ csched2_init_pdata(const struct scheduler *ops, void *pdata, int cpu)
     unsigned long flags;
     unsigned rqi;
 
+    /*
+     * pdata contains what alloc_pdata returned. But since we don't (need to)
+     * implement alloc_pdata, either that's NULL, or something is very wrong!
+     */
+    ASSERT(!pdata);
+
     spin_lock_irqsave(&prv->lock, flags);
     old_lock = pcpu_schedule_lock(cpu);
 
@@ -2261,7 +2267,7 @@ csched2_switch_sched(struct scheduler *new_ops, unsigned int cpu,
 }
 
 static void
-csched2_free_pdata(const struct scheduler *ops, void *pcpu, int cpu)
+csched2_deinit_pdata(const struct scheduler *ops, void *pcpu, int cpu)
 {
     unsigned long flags;
     struct csched2_private *prv = CSCHED2_PRIV(ops);
@@ -2270,7 +2276,11 @@ csched2_free_pdata(const struct scheduler *ops, void *pcpu, int cpu)
 
     spin_lock_irqsave(&prv->lock, flags);
 
-    ASSERT(cpumask_test_cpu(cpu, &prv->initialized));
+    /*
+     * alloc_pdata is not implemented, so pcpu must be NULL. On the other
+     * hand, init_pdata must have been called for this pCPU.
+     */
+    ASSERT(!pcpu && cpumask_test_cpu(cpu, &prv->initialized));
     
     /* Find the old runqueue and remove this cpu from it */
     rqi = prv->runq_map[cpu];
@@ -2387,7 +2397,7 @@ static const struct scheduler sched_credit2_def = {
     .alloc_vdata    = csched2_alloc_vdata,
     .free_vdata     = csched2_free_vdata,
     .init_pdata     = csched2_init_pdata,
-    .free_pdata     = csched2_free_pdata,
+    .deinit_pdata   = csched2_deinit_pdata,
     .switch_sched   = csched2_switch_sched,
     .alloc_domdata  = csched2_alloc_domdata,
     .free_domdata   = csched2_free_domdata,

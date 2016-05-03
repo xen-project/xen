@@ -485,11 +485,35 @@ static void
 csched_free_pdata(const struct scheduler *ops, void *pcpu, int cpu)
 {
     struct csched_private *prv = CSCHED_PRIV(ops);
+
+    /*
+     * pcpu either points to a valid struct csched_pcpu, or is NULL, if we're
+     * beeing called from CPU_UP_CANCELLED, because bringing up a pCPU failed
+     * very early. xfree() does not really mind, but we want to be sure that,
+     * when we get here, either init_pdata has never been called, or
+     * deinit_pdata has been called already.
+     */
+    ASSERT(!cpumask_test_cpu(cpu, prv->cpus));
+
+    xfree(pcpu);
+}
+
+static void
+csched_deinit_pdata(const struct scheduler *ops, void *pcpu, int cpu)
+{
+    struct csched_private *prv = CSCHED_PRIV(ops);
     struct csched_pcpu *spc = pcpu;
     unsigned long flags;
 
-    if ( spc == NULL )
-        return;
+    /*
+     * Scheduler specific data for this pCPU must still be there and and be
+     * valid. In fact, if we are here:
+     *  1. alloc_pdata must have been called for this cpu, and free_pdata
+     *     must not have been called on it before us,
+     *  2. init_pdata must have been called on this cpu, and deinit_pdata
+     *     (us!) must not have been called on it already.
+     */
+    ASSERT(spc && cpumask_test_cpu(cpu, prv->cpus));
 
     spin_lock_irqsave(&prv->lock, flags);
 
@@ -507,8 +531,6 @@ csched_free_pdata(const struct scheduler *ops, void *pcpu, int cpu)
         kill_timer(&prv->master_ticker);
 
     spin_unlock_irqrestore(&prv->lock, flags);
-
-    xfree(spc);
 }
 
 static void *
@@ -2091,6 +2113,7 @@ static const struct scheduler sched_credit_def = {
     .free_vdata     = csched_free_vdata,
     .alloc_pdata    = csched_alloc_pdata,
     .init_pdata     = csched_init_pdata,
+    .deinit_pdata   = csched_deinit_pdata,
     .free_pdata     = csched_free_pdata,
     .switch_sched   = csched_switch_sched,
     .alloc_domdata  = csched_alloc_domdata,

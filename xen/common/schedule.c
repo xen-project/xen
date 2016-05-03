@@ -1546,6 +1546,38 @@ static int cpu_schedule_callback(
     struct schedule_data *sd = &per_cpu(schedule_data, cpu);
     int rc = 0;
 
+    /*
+     * From the scheduler perspective, bringing up a pCPU requires
+     * allocating and initializing the per-pCPU scheduler specific data,
+     * as well as "registering" this pCPU to the scheduler (which may
+     * involve modifying some scheduler wide data structures).
+     * This happens by calling the alloc_pdata and init_pdata hooks, in
+     * this order. A scheduler that does not need to allocate any per-pCPU
+     * data can avoid implementing alloc_pdata. init_pdata may, however, be
+     * necessary/useful in this case too (e.g., it can contain the "register
+     * the pCPU to the scheduler" part). alloc_pdata (if present) is called
+     * during CPU_UP_PREPARE. init_pdata (if present) is called during
+     * CPU_STARTING.
+     *
+     * On the other hand, at teardown, we need to reverse what has been done
+     * during initialization, and then free the per-pCPU specific data. This
+     * happens by calling the deinit_pdata and free_pdata hooks, in this
+     * order. If no per-pCPU memory was allocated, there is no need to
+     * provide an implementation of free_pdata. deinit_pdata may, however,
+     * be necessary/useful in this case too (e.g., it can undo something done
+     * on scheduler wide data structure during init_pdata). Both deinit_pdata
+     * and free_pdata are called during CPU_DEAD.
+     *
+     * If someting goes wrong during bringup, we go to CPU_UP_CANCELLED
+     * *before* having called init_pdata. In this case, as there is no
+     * initialization needing undoing, only free_pdata should be called.
+     * This means it is possible to call free_pdata just after alloc_pdata,
+     * without a init_pdata/deinit_pdata "cycle" in between the two.
+     *
+     * So, in summary, the usage pattern should look either
+     *  - alloc_pdata-->init_pdata-->deinit_pdata-->free_pdata, or
+     *  - alloc_pdata-->free_pdata.
+     */
     switch ( action )
     {
     case CPU_STARTING:
@@ -1554,8 +1586,10 @@ static int cpu_schedule_callback(
     case CPU_UP_PREPARE:
         rc = cpu_schedule_up(cpu);
         break;
-    case CPU_UP_CANCELED:
     case CPU_DEAD:
+        SCHED_OP(sched, deinit_pdata, sd->sched_priv, cpu);
+        /* Fallthrough */
+    case CPU_UP_CANCELED:
         cpu_schedule_down(cpu);
         break;
     default:
@@ -1712,6 +1746,8 @@ int schedule_cpu_switch(unsigned int cpu, struct cpupool *c)
     spin_unlock_irq(old_lock);
 
     SCHED_OP(new_ops, tick_resume, cpu);
+
+    SCHED_OP(old_ops, deinit_pdata, ppriv_old, cpu);
 
     SCHED_OP(old_ops, free_vdata, vpriv_old);
     SCHED_OP(old_ops, free_pdata, ppriv_old, cpu);
