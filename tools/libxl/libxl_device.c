@@ -656,7 +656,7 @@ void libxl__devices_destroy(libxl__egc *egc, libxl__devices_remove_state *drs)
     libxl__multidev_begin(ao, multidev);
     multidev->callback = devices_remove_callback;
 
-    path = libxl__sprintf(gc, "/local/domain/%d/device", domid);
+    path = GCSPRINTF("/libxl/%d/device", domid);
     kinds = libxl__xs_directory(gc, XBT_NULL, path, &num_kinds);
     if (!kinds) {
         if (errno != ENOENT) {
@@ -670,13 +670,13 @@ void libxl__devices_destroy(libxl__egc *egc, libxl__devices_remove_state *drs)
         if (libxl__device_kind_from_string(kinds[i], &kind))
             continue;
 
-        path = libxl__sprintf(gc, "/local/domain/%d/device/%s", domid, kinds[i]);
+        path = GCSPRINTF("/libxl/%d/device/%s", domid, kinds[i]);
         devs = libxl__xs_directory(gc, XBT_NULL, path, &num_dev_xsentries);
         if (!devs)
             continue;
         for (j = 0; j < num_dev_xsentries; j++) {
-            path = libxl__sprintf(gc, "/local/domain/%d/device/%s/%s/backend",
-                                  domid, kinds[i], devs[j]);
+            path = GCSPRINTF("/libxl/%d/device/%s/%s/backend",
+                             domid, kinds[i], devs[j]);
             path = libxl__xs_read(gc, XBT_NULL, path);
             GCNEW(dev);
             if (path && libxl__parse_backend_path(gc, path, dev) == 0) {
@@ -698,22 +698,6 @@ void libxl__devices_destroy(libxl__egc *egc, libxl__devices_remove_state *drs)
                 libxl__initiate_device_remove(egc, aodev);
             }
         }
-    }
-
-    /* console 0 frontend directory is not under /local/domain/<domid>/device */
-    path = libxl__sprintf(gc, "/local/domain/%d/console/backend", domid);
-    path = libxl__xs_read(gc, XBT_NULL, path);
-    GCNEW(dev);
-    if (path && strcmp(path, "") &&
-        libxl__parse_backend_path(gc, path, dev) == 0) {
-        dev->domid = domid;
-        dev->kind = LIBXL__DEVICE_KIND_CONSOLE;
-        dev->devid = 0;
-
-        /* Currently console devices can be destroyed synchronously by just
-         * removing xenstore entries, this is what libxl__device_destroy does.
-         */
-        libxl__device_destroy(gc, dev);
     }
 
 out:
