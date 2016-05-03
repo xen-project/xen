@@ -3034,17 +3034,17 @@ int libxl_devid_to_device_nic(libxl_ctx *ctx, uint32_t domid,
                               int devid, libxl_device_nic *nic)
 {
     GC_INIT(ctx);
-    char *dompath, *path;
+    char *libxl_dom_path, *path;
     int rc = ERROR_FAIL;
 
     libxl_device_nic_init(nic);
-    dompath = libxl__xs_get_dompath(gc, domid);
-    if (!dompath)
+    libxl_dom_path = libxl__xs_libxl_path(gc, domid);
+    if (!libxl_dom_path)
         goto out;
 
     path = libxl__xs_read(gc, XBT_NULL,
-                          libxl__sprintf(gc, "%s/device/vif/%d/backend",
-                                         dompath, devid));
+                          GCSPRINTF("%s/device/vif/%d/backend", libxl_dom_path,
+                                    devid));
     if (!path)
         goto out;
 
