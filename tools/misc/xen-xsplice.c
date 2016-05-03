@@ -272,8 +272,8 @@ int action_func(int argc, char *argv[], unsigned int idx)
     rc = xc_xsplice_get(xch, name, &status);
     if ( rc )
     {
-        fprintf(stderr, "%s failed to get status (rc=%d, %s)!\n",
-                name, -rc, strerror(-rc));
+        fprintf(stderr, "%s failed to get status %d(%s)!\n",
+                name, errno, strerror(errno));
         return -1;
     }
     if ( status.rc == -EAGAIN )
@@ -295,7 +295,8 @@ int action_func(int argc, char *argv[], unsigned int idx)
         rc = action_options[idx].function(xch, name, 0);
         if ( rc )
         {
-            fprintf(stderr, "%s failed with %d(%s)\n", name, -rc, strerror(-rc));
+            fprintf(stderr, "%s failed with %d(%s)\n", name, errno,
+                    strerror(errno));
             return -1;
         }
     }
