@@ -2587,7 +2587,7 @@ static char * libxl__alloc_vdev(libxl__gc *gc, void *get_vdev_user,
 {
     const char *blkdev_start = (const char *) get_vdev_user;
     int devid = 0, disk = 0, part = 0;
-    char *dompath = libxl__xs_get_dompath(gc, LIBXL_TOOLSTACK_DOMID);
+    char *libxl_dom_path = libxl__xs_libxl_path(gc, LIBXL_TOOLSTACK_DOMID);
 
     libxl__device_disk_dev_number(blkdev_start, &disk, &part);
     if (part != 0) {
@@ -2602,7 +2602,7 @@ static char * libxl__alloc_vdev(libxl__gc *gc, void *get_vdev_user,
             return NULL;
         if (libxl__xs_read(gc, t,
                     libxl__sprintf(gc, "%s/device/vbd/%d/backend",
-                        dompath, devid)) == NULL) {
+                        libxl_dom_path, devid)) == NULL) {
             if (errno == ENOENT)
                 return libxl__devid_to_localdev(gc, devid);
             else
