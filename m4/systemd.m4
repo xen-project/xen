@@ -41,7 +41,9 @@ AC_DEFUN([AX_ALLOW_SYSTEMD_OPTS], [
 ])
 
 AC_DEFUN([AX_CHECK_SYSTEMD_LIBS], [
-	PKG_CHECK_MODULES([SYSTEMD], [libsystemd-daemon])
+	PKG_CHECK_MODULES([SYSTEMD], [libsystemd-daemon],,
+		[PKG_CHECK_MODULES([SYSTEMD], [libsystemd >= 209])]
+        )
 	dnl pkg-config older than 0.24 does not set these for
 	dnl PKG_CHECK_MODULES() worth also noting is that as of version 208
 	dnl of systemd pkg-config --cflags currently yields no extra flags yet.
@@ -94,8 +96,10 @@ AC_DEFUN([AX_CHECK_SYSTEMD], [
 ])
 
 AC_DEFUN([AX_CHECK_SYSTEMD_ENABLE_AVAILABLE], [
-	PKG_CHECK_MODULES([SYSTEMD], [libsystemd-daemon], [systemd="y"],
-                          [systemd="n"])
+	PKG_CHECK_MODULES([SYSTEMD], [libsystemd-daemon], [systemd="y"],[
+		PKG_CHECK_MODULES([SYSTEMD], [libsystemd >= 209],
+				  [systemd="y"],[systemd="n"])
+	])
 ])
 
 dnl Enables systemd by default and requires a --disable-systemd option flag
