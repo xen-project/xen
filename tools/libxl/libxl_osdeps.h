@@ -52,6 +52,13 @@
 #include <libutil.h>
 #include <sys/endian.h>
 #include <uuid.h>
+/*
+ * FreeBSD doesn't have ENODATA errno ATM, so privcmd always translates
+ * ENODATA into ENOENT.
+ */
+#ifndef ENODATA
+#define ENODATA ENOENT
+#endif
 #endif
 
 #ifndef SYSFS_USBBACK_DRIVER
