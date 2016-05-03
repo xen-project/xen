@@ -21,10 +21,10 @@
 #define PAGE_TO_MEMKB(pages) ((pages) * 4)
 #define BACKEND_STRING_SIZE 5
 
-/* Utility to read /libxl or backend xenstore keys, from be_path */
+/* Utility to read /libxl xenstore keys, from libxl_path */
 #define READ_LIBXLDEV(tgc, subpath) ({                                  \
         rc = libxl__xs_read_checked(tgc, XBT_NULL,                      \
-                                    GCSPRINTF("%s/" subpath, be_path),  \
+                                    GCSPRINTF("%s/" subpath, libxl_path),  \
                                     &tmp);                              \
         if (rc) goto out;                                               \
         (char*)tmp;                                                     \
@@ -3587,7 +3587,7 @@ out:
 }
 
 static int libxl__device_nic_from_xenstore(libxl__gc *gc,
-                                        const char *be_path,
+                                        const char *libxl_path,
                                         libxl_device_nic *nic)
 {
     const char *tmp;
@@ -3936,7 +3936,7 @@ int libxl__init_console_from_channel(libxl__gc *gc,
 }
 
 static int libxl__device_channel_from_xenstore(libxl__gc *gc,
-                                            const char *be_path,
+                                            const char *libxl_path,
                                             libxl_device_channel *channel)
 {
     const char *tmp;
