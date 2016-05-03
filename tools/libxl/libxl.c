@@ -3698,6 +3698,8 @@ int libxl__device_console_add(libxl__gc *gc, uint32_t domid,
     if (console->name) {
         flexarray_append(ro_front, "name");
         flexarray_append(ro_front, console->name);
+        flexarray_append(back, "name");
+        flexarray_append(back, console->name);
     }
     if (console->connection) {
         flexarray_append(back, "connection");
@@ -3836,34 +3838,35 @@ static int libxl__device_channel_from_xs_be(libxl__gc *gc,
     return rc;
 }
 
-static int libxl__append_channel_list_of_type(libxl__gc *gc,
+static int libxl__append_channel_list(libxl__gc *gc,
                                               uint32_t domid,
-                                              const char *type,
                                               libxl_device_channel **channels,
                                               int *nchannels)
 {
-    char *fe_path = NULL, *be_path = NULL;
+    char *libxl_dir_path = NULL, *be_path = NULL;
     char **dir = NULL;
     unsigned int n = 0, devid = 0;
     libxl_device_channel *next = NULL;
     int rc = 0, i;
 
-    fe_path = GCSPRINTF("%s/device/%s",
-                        libxl__xs_get_dompath(gc, domid), type);
-    dir = libxl__xs_directory(gc, XBT_NULL, fe_path, &n);
+    libxl_dir_path = GCSPRINTF("%s/device/console",
+                               libxl__xs_libxl_path(gc, domid));
+    dir = libxl__xs_directory(gc, XBT_NULL, libxl_dir_path, &n);
     if (!dir || !n)
       goto out;
 
     for (i = 0; i < n; i++) {
-        const char *p, *name;
+        const char *libxl_path, *name;
         libxl_device_channel *tmp;
 
-        p = libxl__sprintf(gc, "%s/%s", fe_path, dir[i]);
-        name = libxl__xs_read(gc, XBT_NULL, GCSPRINTF("%s/name", p));
+        libxl_path = GCSPRINTF("%s/%s", libxl_dir_path, dir[i]);
+        be_path = libxl__xs_read(gc, XBT_NULL,
+                                 GCSPRINTF("%s/backend", libxl_path));
+        if (!be_path) continue;
+        name = libxl__xs_read(gc, XBT_NULL, GCSPRINTF("%s/name", be_path));
         /* 'channels' are consoles with names, so ignore all consoles
            without names */
         if (!name) continue;
-        be_path = libxl__xs_read(gc, XBT_NULL, GCSPRINTF("%s/backend", p));
         tmp = realloc(*channels,
                       sizeof(libxl_device_channel) * (*nchannels + devid + 1));
         if (!tmp) {
@@ -3894,7 +3897,7 @@ libxl_device_channel *libxl_device_channel_list(libxl_ctx *ctx,
 
     *num = 0;
 
-    rc = libxl__append_channel_list_of_type(gc, domid, "console", &channels, num);
+    rc = libxl__append_channel_list(gc, domid, &channels, num);
     if (rc) goto out_err;
 
     GC_FREE;
