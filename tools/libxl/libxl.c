@@ -2990,7 +2990,7 @@ out:
     return;
 }
 
-static void libxl__device_nic_from_xs_be(libxl__gc *gc,
+static void libxl__device_nic_from_xenstore(libxl__gc *gc,
                                          const char *be_path,
                                          libxl_device_nic *nic)
 {
@@ -3049,7 +3049,7 @@ int libxl_devid_to_device_nic(libxl_ctx *ctx, uint32_t domid,
     if (!path)
         goto out;
 
-    libxl__device_nic_from_xs_be(gc, path, nic);
+    libxl__device_nic_from_xenstore(gc, path, nic);
 
     rc = 0;
 out:
@@ -3083,7 +3083,7 @@ static int libxl__append_nic_list_of_type(libxl__gc *gc,
         for (; pnic < pnic_end; pnic++, dir++) {
             const char *p;
             p = libxl__sprintf(gc, "%s/%s", be_path, *dir);
-            libxl__device_nic_from_xs_be(gc, p, pnic);
+            libxl__device_nic_from_xenstore(gc, p, pnic);
             pnic->backend_domid = 0;
         }
     }
