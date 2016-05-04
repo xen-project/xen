@@ -213,7 +213,7 @@ The primary PV console device. Described in [console.txt](console.txt)
 
 A secondary PV console device. Described in [console.txt](console.txt)
 
-#### ~/device/serial/$DEVID/* [HVM]
+#### ~/serial/$DEVID/* [HVM]
 
 An emulated serial device. Described in [console.txt](console.txt)
 
