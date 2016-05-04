@@ -32,19 +32,29 @@
 static inline
 int arch_monitor_domctl_op(struct domain *d, struct xen_domctl_monitor_op *mop)
 {
+    int rc = 0;
+
     switch ( mop->op )
     {
     case XEN_DOMCTL_MONITOR_OP_EMULATE_EACH_REP:
         domain_pause(d);
-        d->arch.mem_access_emulate_each_rep = !!mop->event;
+        /*
+         * Enabling mem_access_emulate_each_rep without a vm_event subscriber
+         * is meaningless.
+         */
+        if ( d->max_vcpus && d->vcpu[0] && d->vcpu[0]->arch.vm_event )
+            d->arch.mem_access_emulate_each_rep = !!mop->event;
+        else
+            rc = -EINVAL;
+
         domain_unpause(d);
         break;
 
     default:
-        return -EOPNOTSUPP;
+        rc = -EOPNOTSUPP;
     }
 
-    return 0;
+    return rc;
 }
 
 int arch_monitor_domctl_event(struct domain *d,
