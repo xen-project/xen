@@ -3081,7 +3081,7 @@ int libxl_devid_to_device_nic(libxl_ctx *ctx, uint32_t domid,
                               int devid, libxl_device_nic *nic)
 {
     GC_INIT(ctx);
-    char *libxl_dom_path, *path;
+    char *libxl_dom_path, *libxl_path;
     int rc = ERROR_FAIL;
 
     libxl_device_nic_init(nic);
@@ -3089,13 +3089,9 @@ int libxl_devid_to_device_nic(libxl_ctx *ctx, uint32_t domid,
     if (!libxl_dom_path)
         goto out;
 
-    path = libxl__xs_read(gc, XBT_NULL,
-                          GCSPRINTF("%s/device/vif/%d/backend", libxl_dom_path,
-                                    devid));
-    if (!path)
-        goto out;
+    libxl_path = GCSPRINTF("%s/device/vif/%d", libxl_dom_path, devid);
 
-    rc = libxl__device_nic_from_xenstore(gc, path, nic);
+    rc = libxl__device_nic_from_xenstore(gc, libxl_path, nic);
     if (rc) goto out;
 
     rc = 0;
