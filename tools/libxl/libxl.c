@@ -3498,7 +3498,7 @@ out:
     return;
 }
 
-static int libxl__device_nic_from_xs_be(libxl__gc *gc,
+static int libxl__device_nic_from_xenstore(libxl__gc *gc,
                                         const char *be_path,
                                         libxl_device_nic *nic)
 {
@@ -3561,7 +3561,7 @@ int libxl_devid_to_device_nic(libxl_ctx *ctx, uint32_t domid,
     if (!path)
         goto out;
 
-    rc = libxl__device_nic_from_xs_be(gc, path, nic);
+    rc = libxl__device_nic_from_xenstore(gc, path, nic);
     if (rc) goto out;
 
     rc = 0;
@@ -3596,7 +3596,7 @@ static int libxl__append_nic_list_of_type(libxl__gc *gc,
         for (; pnic < pnic_end; pnic++, dir++) {
             const char *p;
             p = libxl__sprintf(gc, "%s/%s", be_path, *dir);
-            rc = libxl__device_nic_from_xs_be(gc, p, pnic);
+            rc = libxl__device_nic_from_xenstore(gc, p, pnic);
             if (rc) goto out;
             pnic->backend_domid = 0;
         }
@@ -3846,7 +3846,7 @@ int libxl__init_console_from_channel(libxl__gc *gc,
     return 0;
 }
 
-static int libxl__device_channel_from_xs_be(libxl__gc *gc,
+static int libxl__device_channel_from_xenstore(libxl__gc *gc,
                                             const char *be_path,
                                             libxl_device_channel *channel)
 {
@@ -3855,7 +3855,7 @@ static int libxl__device_channel_from_xs_be(libxl__gc *gc,
 
     libxl_device_channel_init(channel);
 
-    /* READ_BACKEND is from libxl__device_nic_from_xs_be above */
+    /* READ_BACKEND is from libxl__device_nic_from_xenstore above */
     channel->name = READ_BACKEND(NOGC, "name");
     tmp = READ_BACKEND(gc, "connection");
     if (!strcmp(tmp, "pty")) {
@@ -3910,7 +3910,7 @@ static int libxl__append_channel_list(libxl__gc *gc,
         }
         *channels = tmp;
         next = *channels + *nchannels + devid;
-        rc = libxl__device_channel_from_xs_be(gc, be_path, next);
+        rc = libxl__device_channel_from_xenstore(gc, be_path, next);
         if (rc) goto out;
         next->devid = devid;
         devid++;
