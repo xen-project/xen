@@ -3538,21 +3538,20 @@ out:
     return rc;
 }
 
-static int libxl__append_nic_list_of_type(libxl__gc *gc,
+static int libxl__append_nic_list(libxl__gc *gc,
                                            uint32_t domid,
-                                           const char *type,
                                            libxl_device_nic **nics,
                                            int *nnics)
 {
-    char *be_path = NULL;
+    char *libxl_dir_path = NULL;
     char **dir = NULL;
     unsigned int n = 0;
     libxl_device_nic *pnic = NULL, *pnic_end = NULL;
     int rc;
 
-    be_path = libxl__sprintf(gc, "%s/backend/%s/%d",
-                             libxl__xs_get_dompath(gc, 0), type, domid);
-    dir = libxl__xs_directory(gc, XBT_NULL, be_path, &n);
+    libxl_dir_path = GCSPRINTF("%s/device/vif",
+                               libxl__xs_libxl_path(gc, domid));
+    dir = libxl__xs_directory(gc, XBT_NULL, libxl_dir_path, &n);
     if (dir && n) {
         libxl_device_nic *tmp;
         tmp = realloc(*nics, sizeof (libxl_device_nic) * (*nnics + n));
@@ -3563,10 +3562,9 @@ static int libxl__append_nic_list_of_type(libxl__gc *gc,
         pnic_end = *nics + *nnics + n;
         for (; pnic < pnic_end; pnic++, dir++) {
             const char *p;
-            p = libxl__sprintf(gc, "%s/%s", be_path, *dir);
+            p = GCSPRINTF("%s/%s", libxl_dir_path, *dir);
             rc = libxl__device_nic_from_xenstore(gc, p, pnic);
             if (rc) goto out;
-            pnic->backend_domid = 0;
         }
         *nnics += n;
     }
@@ -3584,7 +3582,7 @@ libxl_device_nic *libxl_device_nic_list(libxl_ctx *ctx, uint32_t domid, int *num
 
     *num = 0;
 
-    rc = libxl__append_nic_list_of_type(gc, domid, "vif", &nics, num);
+    rc = libxl__append_nic_list(gc, domid, &nics, num);
     if (rc) goto out_err;
 
     GC_FREE;
