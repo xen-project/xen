@@ -3039,7 +3039,7 @@ static int libxl__device_nic_from_xenstore(libxl__gc *gc,
 
     libxl_device_nic_init(nic);
 
-#define READ_BACKEND(tgc, subpath) ({                                   \
+#define READ_LIBXLDEV(tgc, subpath) ({                                   \
         rc = libxl__xs_read_checked(tgc, XBT_NULL,                      \
                                     GCSPRINTF("%s/" subpath, be_path),  \
                                     &tmp);                              \
@@ -3047,7 +3047,7 @@ static int libxl__device_nic_from_xenstore(libxl__gc *gc,
         (char*)tmp;                                                     \
     });
 
-    tmp = READ_BACKEND(gc, "handle");
+    tmp = READ_LIBXLDEV(gc, "handle");
     if (tmp)
         nic->devid = atoi(tmp);
     else
@@ -3055,7 +3055,7 @@ static int libxl__device_nic_from_xenstore(libxl__gc *gc,
 
     /* nic->mtu = */
 
-    tmp = READ_BACKEND(gc, "mac");
+    tmp = READ_LIBXLDEV(gc, "mac");
     if (tmp) {
         rc = libxl__parse_mac(tmp, nic->mac);
         if (rc) goto out;
@@ -3063,9 +3063,9 @@ static int libxl__device_nic_from_xenstore(libxl__gc *gc,
         memset(nic->mac, 0, sizeof(nic->mac));
     }
 
-    nic->ip = READ_BACKEND(NOGC, "ip");
-    nic->bridge = READ_BACKEND(NOGC, "bridge");
-    nic->script = READ_BACKEND(NOGC, "script");
+    nic->ip = READ_LIBXLDEV(NOGC, "ip");
+    nic->bridge = READ_LIBXLDEV(NOGC, "bridge");
+    nic->script = READ_LIBXLDEV(NOGC, "script");
 
     /* vif_ioemu nics use the same xenstore entries as vif interfaces */
     nic->nictype = LIBXL_NIC_TYPE_VIF;
