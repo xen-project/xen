@@ -471,7 +471,7 @@ enum hvm_access_type {
     hvm_access_read,
     hvm_access_write
 };
-int hvm_virtual_to_linear_addr(
+bool_t hvm_virtual_to_linear_addr(
     enum x86_segment seg,
     struct segment_register *reg,
     unsigned long offset,

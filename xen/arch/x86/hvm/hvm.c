@@ -2411,7 +2411,7 @@ int hvm_set_cr4(unsigned long value, bool_t may_defer)
     return X86EMUL_EXCEPTION;
 }
 
-int hvm_virtual_to_linear_addr(
+bool_t hvm_virtual_to_linear_addr(
     enum x86_segment seg,
     struct segment_register *reg,
     unsigned long offset,
@@ -2421,6 +2421,7 @@ int hvm_virtual_to_linear_addr(
     unsigned long *linear_addr)
 {
     unsigned long addr = offset, last_byte;
+    bool_t okay = 0;
 
     if ( !(current->arch.hvm_vcpu.guest_cr[0] & X86_CR0_PE) )
     {
@@ -2431,7 +2432,7 @@ int hvm_virtual_to_linear_addr(
         addr = (uint32_t)(addr + reg->base);
         last_byte = (uint32_t)addr + bytes - !!bytes;
         if ( last_byte < addr )
-            return 0;
+            goto out;
     }
     else if ( addr_size != 64 )
     {
@@ -2439,15 +2440,21 @@ int hvm_virtual_to_linear_addr(
          * COMPATIBILITY MODE: Apply segment checks and add base.
          */
 
+        /*
+         * Hardware truncates to 32 bits in compatibility mode.
+         * It does not truncate to 16 bits in 16-bit address-size mode.
+         */
+        addr = (uint32_t)(addr + reg->base);
+
         switch ( access_type )
         {
         case hvm_access_read:
             if ( (reg->attr.fields.type & 0xa) == 0x8 )
-                return 0; /* execute-only code segment */
+                goto out; /* execute-only code segment */
             break;
         case hvm_access_write:
             if ( (reg->attr.fields.type & 0xa) != 0x2 )
-                return 0; /* not a writable data segment */
+                goto out; /* not a writable data segment */
             break;
         default:
             break;
@@ -2464,16 +2471,10 @@ int hvm_virtual_to_linear_addr(
 
             /* Check first byte and last byte against respective bounds. */
             if ( (offset <= reg->limit) || (last_byte < offset) )
-                return 0;
+                goto out;
         }
         else if ( (last_byte > reg->limit) || (last_byte < offset) )
-            return 0; /* last byte is beyond limit or wraps 0xFFFFFFFF */
-
-        /*
-         * Hardware truncates to 32 bits in compatibility mode.
-         * It does not truncate to 16 bits in 16-bit address-size mode.
-         */
-        addr = (uint32_t)(addr + reg->base);
+            goto out; /* last byte is beyond limit or wraps 0xFFFFFFFF */
     }
     else
     {
@@ -2487,11 +2488,19 @@ int hvm_virtual_to_linear_addr(
         last_byte = addr + bytes - !!bytes;
         if ( !is_canonical_address(addr) || last_byte < addr ||
              !is_canonical_address(last_byte) )
-            return 0;
+            goto out;
     }
 
+    /* All checks ok. */
+    okay = 1;
+
+ out:
+    /*
+     * Always return the correct linear address, even if a permission check
+     * failed.  The permissions failure is not relevant to some callers.
+     */
     *linear_addr = addr;
-    return 1;
+    return okay;
 }
 
 struct hvm_write_map {
