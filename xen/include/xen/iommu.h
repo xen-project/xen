@@ -86,6 +86,24 @@ enum iommu_feature
 
 bool_t iommu_has_feature(struct domain *d, enum iommu_feature feature);
 
+struct domain_iommu {
+    struct arch_iommu arch;
+
+    /* iommu_ops */
+    const struct iommu_ops *platform_ops;
+
+#ifdef CONFIG_HAS_DEVICE_TREE
+    /* List of DT devices assigned to this domain */
+    struct list_head dt_devices;
+#endif
+
+    /* Features supported by the IOMMU */
+    DECLARE_BITMAP(features, IOMMU_FEAT_count);
+};
+
+#define dom_iommu(d)              (&(d)->iommu)
+#define iommu_set_feature(d, f)   set_bit(f, dom_iommu(d)->features)
+#define iommu_clear_feature(d, f) clear_bit(f, dom_iommu(d)->features)
 
 #ifdef CONFIG_HAS_PCI
 void pt_pci_init(void);

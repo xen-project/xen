@@ -9,6 +9,7 @@
 #include <xen/timer.h>
 #include <xen/rangeset.h>
 #include <xen/domain.h>
+#include <xen/iommu.h>
 #include <xen/rcupdate.h>
 #include <xen/cpumask.h>
 #include <xen/nodemask.h>
@@ -368,6 +369,8 @@ struct domain
     int64_t          time_offset_seconds;
 
 #ifdef CONFIG_HAS_PASSTHROUGH
+    struct domain_iommu iommu;
+
     /* Does this guest need iommu mappings (-1 meaning "being set up")? */
     s8               need_iommu;
 #endif

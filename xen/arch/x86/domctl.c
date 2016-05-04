@@ -647,7 +647,7 @@ long arch_do_domctl(
 
     case XEN_DOMCTL_ioport_mapping:
     {
-        struct hvm_iommu *hd;
+        struct domain_iommu *hd;
         unsigned int fgp = domctl->u.ioport_mapping.first_gport;
         unsigned int fmp = domctl->u.ioport_mapping.first_mport;
         unsigned int np = domctl->u.ioport_mapping.nr_ports;
@@ -673,7 +673,7 @@ long arch_do_domctl(
         if ( ret )
             break;
 
-        hd = domain_hvm_iommu(d);
+        hd = dom_iommu(d);
         if ( add )
         {
             printk(XENLOG_G_INFO

@@ -24,7 +24,6 @@
 #include <xen/domain_page.h>
 #include <xen/iocap.h>
 #include <xen/iommu.h>
-#include <asm/hvm/iommu.h>
 #include <xen/numa.h>
 #include <xen/softirq.h>
 #include <xen/time.h>
@@ -253,7 +252,7 @@ static u64 addr_to_dma_page_maddr(struct domain *domain, u64 addr, int alloc)
 {
     struct acpi_drhd_unit *drhd;
     struct pci_dev *pdev;
-    struct hvm_iommu *hd = domain_hvm_iommu(domain);
+    struct domain_iommu *hd = dom_iommu(domain);
     int addr_width = agaw_to_width(hd->arch.agaw);
     struct dma_pte *parent, *pte = NULL;
     int level = agaw_to_level(hd->arch.agaw);
@@ -561,7 +560,7 @@ static void iommu_flush_all(void)
 static void __intel_iommu_iotlb_flush(struct domain *d, unsigned long gfn,
         int dma_old_pte_present, unsigned int page_count)
 {
-    struct hvm_iommu *hd = domain_hvm_iommu(d);
+    struct domain_iommu *hd = dom_iommu(d);
     struct acpi_drhd_unit *drhd;
     struct iommu *iommu;
     int flush_dev_iotlb;
@@ -612,7 +611,7 @@ static void intel_iommu_iotlb_flush_all(struct domain *d)
 /* clear one page's page table */
 static void dma_pte_clear_one(struct domain *domain, u64 addr)
 {
-    struct hvm_iommu *hd = domain_hvm_iommu(domain);
+    struct domain_iommu *hd = dom_iommu(domain);
     struct dma_pte *page = NULL, *pte = NULL;
     u64 pg_maddr;
 
@@ -1240,9 +1239,7 @@ void __init iommu_free(struct acpi_drhd_unit *drhd)
 
 static int intel_iommu_domain_init(struct domain *d)
 {
-    struct hvm_iommu *hd = domain_hvm_iommu(d);
-
-    hd->arch.agaw = width_to_agaw(DEFAULT_DOMAIN_ADDRESS_WIDTH);
+    dom_iommu(d)->arch.agaw = width_to_agaw(DEFAULT_DOMAIN_ADDRESS_WIDTH);
 
     return 0;
 }
@@ -1276,7 +1273,7 @@ int domain_context_mapping_one(
     struct iommu *iommu,
     u8 bus, u8 devfn, const struct pci_dev *pdev)
 {
-    struct hvm_iommu *hd = domain_hvm_iommu(domain);
+    struct domain_iommu *hd = dom_iommu(domain);
     struct context_entry *context, *context_entries;
     u64 maddr, pgd_maddr;
     u16 seg = iommu->intel->drhd->segment;
@@ -1646,10 +1643,9 @@ static int domain_context_unmap(
 
     if ( found == 0 )
     {
-        struct hvm_iommu *hd = domain_hvm_iommu(domain);
         int iommu_domid;
 
-        clear_bit(iommu->index, &hd->arch.iommu_bitmap);
+        clear_bit(iommu->index, &dom_iommu(domain)->arch.iommu_bitmap);
 
         iommu_domid = domain_iommu_domid(domain, iommu);
         if ( iommu_domid == -1 )
@@ -1668,7 +1664,7 @@ out:
 
 static void iommu_domain_teardown(struct domain *d)
 {
-    struct hvm_iommu *hd = domain_hvm_iommu(d);
+    struct domain_iommu *hd = dom_iommu(d);
     struct mapped_rmrr *mrmrr, *tmp;
 
     if ( list_empty(&acpi_drhd_units) )
@@ -1693,7 +1689,7 @@ static int intel_iommu_map_page(
     struct domain *d, unsigned long gfn, unsigned long mfn,
     unsigned int flags)
 {
-    struct hvm_iommu *hd = domain_hvm_iommu(d);
+    struct domain_iommu *hd = dom_iommu(d);
     struct dma_pte *page = NULL, *pte = NULL, old, new = { 0 };
     u64 pg_maddr;
 
@@ -1759,7 +1755,7 @@ void iommu_pte_flush(struct domain *d, u64 gfn, u64 *pte,
 {
     struct acpi_drhd_unit *drhd;
     struct iommu *iommu = NULL;
-    struct hvm_iommu *hd = domain_hvm_iommu(d);
+    struct domain_iommu *hd = dom_iommu(d);
     int flush_dev_iotlb;
     int iommu_domid;
 
@@ -1800,11 +1796,11 @@ static int __init vtd_ept_page_compatible(struct iommu *iommu)
  */
 static void iommu_set_pgd(struct domain *d)
 {
-    struct hvm_iommu *hd  = domain_hvm_iommu(d);
     mfn_t pgd_mfn;
 
     pgd_mfn = pagetable_get_mfn(p2m_get_pagetable(p2m_get_hostp2m(d)));
-    hd->arch.pgd_maddr = pagetable_get_paddr(pagetable_from_mfn(pgd_mfn));
+    dom_iommu(d)->arch.pgd_maddr =
+        pagetable_get_paddr(pagetable_from_mfn(pgd_mfn));
 }
 
 static int rmrr_identity_mapping(struct domain *d, bool_t map,
@@ -1814,7 +1810,7 @@ static int rmrr_identity_mapping(struct domain *d, bool_t map,
     unsigned long base_pfn = rmrr->base_address >> PAGE_SHIFT_4K;
     unsigned long end_pfn = PAGE_ALIGN_4K(rmrr->end_address) >> PAGE_SHIFT_4K;
     struct mapped_rmrr *mrmrr;
-    struct hvm_iommu *hd = domain_hvm_iommu(d);
+    struct domain_iommu *hd = dom_iommu(d);
 
     ASSERT(pcidevs_locked());
     ASSERT(rmrr->base_address < rmrr->end_address);
@@ -2525,12 +2521,12 @@ static void vtd_dump_p2m_table_level(paddr_t pt_maddr, int level, paddr_t gpa,
 
 static void vtd_dump_p2m_table(struct domain *d)
 {
-    struct hvm_iommu *hd;
+    const struct domain_iommu *hd;
 
     if ( list_empty(&acpi_drhd_units) )
         return;
 
-    hd = domain_hvm_iommu(d);
+    hd = dom_iommu(d);
     printk("p2m table has %d levels\n", agaw_to_level(hd->arch.agaw));
     vtd_dump_p2m_table_level(hd->arch.pgd_maddr, agaw_to_level(hd->arch.agaw), 0, 0);
 }

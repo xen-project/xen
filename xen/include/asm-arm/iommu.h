@@ -14,9 +14,14 @@
 #ifndef __ARCH_ARM_IOMMU_H__
 #define __ARCH_ARM_IOMMU_H__
 
+struct arch_iommu
+{
+    /* Private information for the IOMMU drivers */
+    void *priv;
+};
+
 /* Always share P2M Table between the CPU and the IOMMU */
 #define iommu_use_hap_pt(d) (1)
-#define domain_hvm_iommu(d) (&d->arch.hvm_domain.iommu)
 
 const struct iommu_ops *iommu_get_ops(void);
 void __init iommu_set_ops(const struct iommu_ops *ops);

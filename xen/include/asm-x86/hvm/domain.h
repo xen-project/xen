@@ -26,7 +26,6 @@
 #include <asm/hvm/vlapic.h>
 #include <asm/hvm/vioapic.h>
 #include <asm/hvm/io.h>
-#include <xen/hvm/iommu.h>
 #include <asm/hvm/viridian.h>
 #include <asm/hvm/vmx/vmcs.h>
 #include <asm/hvm/svm/vmcb.h>
@@ -122,9 +121,6 @@ struct hvm_domain {
      */
     spinlock_t             uc_lock;
     bool_t                 is_in_uc_mode;
-
-    /* Pass-through */
-    struct hvm_iommu       hvm_iommu;
 
     /* hypervisor intercepted msix table */
     struct list_head       msixtbl_list;

@@ -41,7 +41,7 @@ int __init iommu_setup_hpet_msi(struct msi_desc *msi)
 
 int arch_iommu_populate_page_table(struct domain *d)
 {
-    struct hvm_iommu *hd = domain_hvm_iommu(d);
+    const struct domain_iommu *hd = dom_iommu(d);
     struct page_info *page;
     int rc = 0, n = 0;
 
@@ -119,7 +119,7 @@ void __hwdom_init arch_iommu_check_autotranslated_hwdom(struct domain *d)
 
 int arch_iommu_domain_init(struct domain *d)
 {
-    struct hvm_iommu *hd = domain_hvm_iommu(d);
+    struct domain_iommu *hd = dom_iommu(d);
 
     spin_lock_init(&hd->arch.mapping_lock);
     INIT_LIST_HEAD(&hd->arch.g2m_ioport_list);
@@ -130,7 +130,7 @@ int arch_iommu_domain_init(struct domain *d)
 
 void arch_iommu_domain_destroy(struct domain *d)
 {
-    struct hvm_iommu *hd  = domain_hvm_iommu(d);
+    const struct domain_iommu *hd = dom_iommu(d);
     struct list_head *ioport_list, *tmp;
     struct g2m_ioport *ioport;
 

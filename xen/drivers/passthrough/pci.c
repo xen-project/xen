@@ -21,7 +21,6 @@
 #include <xen/prefetch.h>
 #include <xen/iommu.h>
 #include <xen/irq.h>
-#include <asm/hvm/iommu.h>
 #include <asm/hvm/irq.h>
 #include <xen/delay.h>
 #include <xen/keyhandler.h>
@@ -1256,7 +1255,7 @@ void iommu_read_msi_from_ire(
 
 int iommu_add_device(struct pci_dev *pdev)
 {
-    struct hvm_iommu *hd;
+    const struct domain_iommu *hd;
     int rc;
     u8 devfn;
 
@@ -1265,7 +1264,7 @@ int iommu_add_device(struct pci_dev *pdev)
 
     ASSERT(pcidevs_locked());
 
-    hd = domain_hvm_iommu(pdev->domain);
+    hd = dom_iommu(pdev->domain);
     if ( !iommu_enabled || !hd->platform_ops )
         return 0;
 
@@ -1287,14 +1286,14 @@ int iommu_add_device(struct pci_dev *pdev)
 
 int iommu_enable_device(struct pci_dev *pdev)
 {
-    struct hvm_iommu *hd;
+    const struct domain_iommu *hd;
 
     if ( !pdev->domain )
         return -EINVAL;
 
     ASSERT(pcidevs_locked());
 
-    hd = domain_hvm_iommu(pdev->domain);
+    hd = dom_iommu(pdev->domain);
     if ( !iommu_enabled || !hd->platform_ops ||
          !hd->platform_ops->enable_device )
         return 0;
@@ -1304,13 +1303,13 @@ int iommu_enable_device(struct pci_dev *pdev)
 
 int iommu_remove_device(struct pci_dev *pdev)
 {
-    struct hvm_iommu *hd;
+    const struct domain_iommu *hd;
     u8 devfn;
 
     if ( !pdev->domain )
         return -EINVAL;
 
-    hd = domain_hvm_iommu(pdev->domain);
+    hd = dom_iommu(pdev->domain);
     if ( !iommu_enabled || !hd->platform_ops )
         return 0;
 
@@ -1350,7 +1349,7 @@ static int device_assigned(u16 seg, u8 bus, u8 devfn)
 
 static int assign_device(struct domain *d, u16 seg, u8 bus, u8 devfn, u32 flag)
 {
-    struct hvm_iommu *hd = domain_hvm_iommu(d);
+    const struct domain_iommu *hd = dom_iommu(d);
     struct pci_dev *pdev;
     int rc = 0;
 
@@ -1410,7 +1409,7 @@ static int assign_device(struct domain *d, u16 seg, u8 bus, u8 devfn, u32 flag)
 /* caller should hold the pcidevs_lock */
 int deassign_device(struct domain *d, u16 seg, u8 bus, u8 devfn)
 {
-    struct hvm_iommu *hd = domain_hvm_iommu(d);
+    const struct domain_iommu *hd = dom_iommu(d);
     struct pci_dev *pdev = NULL;
     int ret = 0;
 
@@ -1460,7 +1459,7 @@ static int iommu_get_device_group(
     struct domain *d, u16 seg, u8 bus, u8 devfn,
     XEN_GUEST_HANDLE_64(uint32) buf, int max_sdevs)
 {
-    struct hvm_iommu *hd = domain_hvm_iommu(d);
+    const struct domain_iommu *hd = dom_iommu(d);
     struct pci_dev *pdev;
     int group_id, sdev_id;
     u32 bdf;

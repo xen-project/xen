@@ -174,12 +174,12 @@ static bool_t dpci_portio_accept(const struct hvm_io_handler *handler,
                                  const ioreq_t *p)
 {
     struct vcpu *curr = current;
-    struct hvm_iommu *hd = domain_hvm_iommu(curr->domain);
+    const struct domain_iommu *dio = dom_iommu(curr->domain);
     struct hvm_vcpu_io *vio = &curr->arch.hvm_vcpu.hvm_io;
     struct g2m_ioport *g2m_ioport;
     unsigned int start, end;
 
-    list_for_each_entry( g2m_ioport, &hd->arch.g2m_ioport_list, list )
+    list_for_each_entry( g2m_ioport, &dio->arch.g2m_ioport_list, list )
     {
         start = g2m_ioport->gport;
         end = start + g2m_ioport->np;

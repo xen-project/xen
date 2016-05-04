@@ -27,7 +27,7 @@ static spinlock_t dtdevs_lock = SPIN_LOCK_UNLOCKED;
 int iommu_assign_dt_device(struct domain *d, struct dt_device_node *dev)
 {
     int rc = -EBUSY;
-    struct hvm_iommu *hd = domain_hvm_iommu(d);
+    struct domain_iommu *hd = dom_iommu(d);
 
     if ( !iommu_enabled || !hd->platform_ops )
         return -EINVAL;
@@ -69,7 +69,7 @@ fail:
 
 int iommu_deassign_dt_device(struct domain *d, struct dt_device_node *dev)
 {
-    struct hvm_iommu *hd = domain_hvm_iommu(d);
+    const struct domain_iommu *hd = dom_iommu(d);
     int rc;
 
     if ( !iommu_enabled || !hd->platform_ops )
@@ -109,16 +109,14 @@ static bool_t iommu_dt_device_is_assigned(const struct dt_device_node *dev)
 
 int iommu_dt_domain_init(struct domain *d)
 {
-    struct hvm_iommu *hd = domain_hvm_iommu(d);
-
-    INIT_LIST_HEAD(&hd->dt_devices);
+    INIT_LIST_HEAD(&dom_iommu(d)->dt_devices);
 
     return 0;
 }
 
 int iommu_release_dt_devices(struct domain *d)
 {
-    struct hvm_iommu *hd = domain_hvm_iommu(d);
+    const struct domain_iommu *hd = dom_iommu(d);
     struct dt_device_node *dev, *_dev;
     int rc;
 

@@ -11,12 +11,10 @@
 #include <asm/gic.h>
 #include <public/hvm/params.h>
 #include <xen/serial.h>
-#include <xen/hvm/iommu.h>
 
 struct hvm_domain
 {
     uint64_t              params[HVM_NR_PARAMS];
-    struct hvm_iommu      iommu;
 }  __cacheline_aligned;
 
 #ifdef CONFIG_ARM_64

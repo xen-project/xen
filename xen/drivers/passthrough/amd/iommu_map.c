@@ -21,7 +21,6 @@
 #include <xen/acpi.h>
 #include <xen/sched.h>
 #include <asm/p2m.h>
-#include <xen/hvm/iommu.h>
 #include <asm/amd-iommu.h>
 #include <asm/hvm/svm/amd-iommu-proto.h>
 #include "../ats.h"
@@ -340,7 +339,7 @@ static int iommu_update_pde_count(struct domain *d, unsigned long pt_mfn,
     unsigned long first_mfn;
     u64 *table, *pde, *ntable;
     u64 ntable_maddr, mask;
-    struct hvm_iommu *hd = domain_hvm_iommu(d);
+    struct domain_iommu *hd = dom_iommu(d);
     bool_t ok = 0;
 
     ASSERT( spin_is_locked(&hd->arch.mapping_lock) && pt_mfn );
@@ -395,7 +394,7 @@ static int iommu_merge_pages(struct domain *d, unsigned long pt_mfn,
     u64 *table, *pde, *ntable;
     u64 ntable_mfn;
     unsigned long first_mfn;
-    struct hvm_iommu *hd = domain_hvm_iommu(d);
+    struct domain_iommu *hd = dom_iommu(d);
 
     ASSERT( spin_is_locked(&hd->arch.mapping_lock) && pt_mfn );
 
@@ -445,7 +444,7 @@ static int iommu_pde_from_gfn(struct domain *d, unsigned long pfn,
     unsigned long  next_table_mfn;
     unsigned int level;
     struct page_info *table;
-    struct hvm_iommu *hd = domain_hvm_iommu(d);
+    const struct domain_iommu *hd = dom_iommu(d);
 
     table = hd->arch.root_table;
     level = hd->arch.paging_mode;
@@ -554,7 +553,7 @@ static int update_paging_mode(struct domain *d, unsigned long gfn)
     struct page_info *old_root = NULL;
     void *new_root_vaddr;
     unsigned long old_root_mfn;
-    struct hvm_iommu *hd = domain_hvm_iommu(d);
+    struct domain_iommu *hd = dom_iommu(d);
 
     if ( gfn == INVALID_MFN )
         return -EADDRNOTAVAIL;
@@ -637,7 +636,7 @@ int amd_iommu_map_page(struct domain *d, unsigned long gfn, unsigned long mfn,
                        unsigned int flags)
 {
     bool_t need_flush = 0;
-    struct hvm_iommu *hd = domain_hvm_iommu(d);
+    struct domain_iommu *hd = dom_iommu(d);
     unsigned long pt_mfn[7];
     unsigned int merge_level;
 
@@ -717,7 +716,7 @@ out:
 int amd_iommu_unmap_page(struct domain *d, unsigned long gfn)
 {
     unsigned long pt_mfn[7];
-    struct hvm_iommu *hd = domain_hvm_iommu(d);
+    struct domain_iommu *hd = dom_iommu(d);
 
     BUG_ON( !hd->arch.root_table );
 
@@ -787,7 +786,7 @@ int amd_iommu_reserve_domain_unity_map(struct domain *domain,
 /* Share p2m table with iommu. */
 void amd_iommu_share_p2m(struct domain *d)
 {
-    struct hvm_iommu *hd  = domain_hvm_iommu(d);
+    struct domain_iommu *hd = dom_iommu(d);
     struct page_info *p2m_table;
     mfn_t pgd_mfn;
 
