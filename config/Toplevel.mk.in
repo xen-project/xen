@@ -1,1 +1,2 @@
 SUBSYSTEMS               := @SUBSYSTEMS@
+GIT_HTTP                 := @githttp@

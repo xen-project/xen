@@ -17,6 +17,7 @@ m4_include([m4/subsystem.m4])
 m4_include([m4/paths.m4])
 
 AX_XEN_EXPAND_CONFIG()
+AX_ARG_DEFAULT_DISABLE([githttp], [Download GIT repositories via HTTP])
 
 dnl mini-os is only ported to certain platforms
 case "$host_cpu" in

@@ -594,6 +594,7 @@ stubdom
 tools
 xen
 subdirs
+githttp
 XEN_DUMP_DIR
 XEN_PAGING_DIR
 XEN_LOCK_DIR
@@ -664,6 +665,7 @@ with_initddir
 with_sysconfig_leaf_dir
 with_libexec_leaf_dir
 with_xen_dumpdir
+enable_githttp
 enable_xen
 enable_tools
 enable_stubdom
@@ -1288,6 +1290,8 @@ Optional Features:
   --disable-option-checking  ignore unrecognized --enable/--with options
   --disable-FEATURE       do not include FEATURE (same as --enable-FEATURE=no)
   --enable-FEATURE[=ARG]  include FEATURE [ARG=yes]
+  --enable-githttp        Download GIT repositories via HTTP (default is
+                          DISABLED)
   --disable-xen           Disable build and install of xen
   --disable-tools         Disable build and install of tools
   --enable-stubdom        Enable build and install of stubdom
@@ -2002,6 +2006,29 @@ XEN_PAGING_DIR=$localstatedir/lib/xen/xenpaging
 
 
 XEN_DUMP_DIR=$xen_dumpdir_path
+
+
+
+# Check whether --enable-githttp was given.
+if test "${enable_githttp+set}" = set; then :
+  enableval=$enable_githttp;
+fi
+
+
+if test "x$enable_githttp" = "xno"; then :
+
+    ax_cv_githttp="n"
+
+elif test "x$enable_githttp" = "xyes"; then :
+
+    ax_cv_githttp="y"
+
+elif test -z $ax_cv_githttp; then :
+
+    ax_cv_githttp="n"
+
+fi
+githttp=$ax_cv_githttp
 
 
 
