@@ -3977,12 +3977,8 @@ int libxl_device_channel_getinfo(libxl_ctx *ctx, uint32_t domid,
 
     val = libxl__xs_read(gc, XBT_NULL, GCSPRINTF("%s/state", fe_path));
     channelinfo->state = val ? strtoul(val, NULL, 10) : -1;
-    channelinfo->frontend = xs_read(ctx->xsh, XBT_NULL,
-                                    GCSPRINTF("%s/frontend",
-                                    channelinfo->backend), NULL);
-    val = libxl__xs_read(gc, XBT_NULL, GCSPRINTF("%s/frontend-id",
-                         channelinfo->backend));
-    channelinfo->frontend_id = val ? strtoul(val, NULL, 10) : -1;
+    channelinfo->frontend = libxl__strdup(NOGC, fe_path);
+    channelinfo->frontend_id = domid;
     val = libxl__xs_read(gc, XBT_NULL, GCSPRINTF("%s/ring-ref", fe_path));
     channelinfo->rref = val ? strtoul(val, NULL, 10) : -1;
     val = libxl__xs_read(gc, XBT_NULL, GCSPRINTF("%s/port", fe_path));
