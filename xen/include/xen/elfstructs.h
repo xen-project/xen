@@ -81,6 +81,7 @@ typedef uint64_t	Elf64_Xword;
 
 /* e_ident[] Operating System/ABI */
 #define ELFOSABI_SYSV		0	/* UNIX System V ABI */
+#define ELFOSABI_NONE		0	/* Same as ELFOSABI_SYSV */
 #define ELFOSABI_HPUX		1	/* HP-UX operating system */
 #define ELFOSABI_NETBSD		2	/* NetBSD */
 #define ELFOSABI_LINUX		3	/* GNU/Linux */
