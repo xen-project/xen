@@ -2008,15 +2008,16 @@ out:
 /* common function to get next device id */
 static int libxl__device_nextid(libxl__gc *gc, uint32_t domid, char *device)
 {
-    char *dompath, **l;
+    char *libxl_dom_path, **l;
     unsigned int nb;
     int nextid = -1;
 
-    if (!(dompath = libxl__xs_get_dompath(gc, domid)))
+    if (!(libxl_dom_path = libxl__xs_libxl_path(gc, domid)))
         return nextid;
 
     l = libxl__xs_directory(gc, XBT_NULL,
-                            GCSPRINTF("%s/device/%s", dompath, device), &nb);
+        GCSPRINTF("%s/device/%s", libxl_dom_path, device),
+                            &nb);
     if (l == NULL || nb == 0)
         nextid = 0;
     else
