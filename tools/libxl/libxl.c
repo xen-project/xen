@@ -3959,7 +3959,7 @@ static int libxl__append_channel_list(libxl__gc *gc,
                                               libxl_device_channel **channels,
                                               int *nchannels)
 {
-    char *libxl_dir_path = NULL, *be_path = NULL;
+    char *libxl_dir_path = NULL;
     char **dir = NULL;
     unsigned int n = 0, devid = 0;
     libxl_device_channel *next = NULL;
@@ -3976,10 +3976,7 @@ static int libxl__append_channel_list(libxl__gc *gc,
         libxl_device_channel *tmp;
 
         libxl_path = GCSPRINTF("%s/%s", libxl_dir_path, dir[i]);
-        be_path = libxl__xs_read(gc, XBT_NULL,
-                                 GCSPRINTF("%s/backend", libxl_path));
-        if (!be_path) continue;
-        name = libxl__xs_read(gc, XBT_NULL, GCSPRINTF("%s/name", be_path));
+        name = libxl__xs_read(gc, XBT_NULL, GCSPRINTF("%s/name", libxl_path));
         /* 'channels' are consoles with names, so ignore all consoles
            without names */
         if (!name) continue;
@@ -3991,7 +3988,7 @@ static int libxl__append_channel_list(libxl__gc *gc,
         }
         *channels = tmp;
         next = *channels + *nchannels + devid;
-        rc = libxl__device_channel_from_xenstore(gc, be_path, next);
+        rc = libxl__device_channel_from_xenstore(gc, libxl_path, next);
         if (rc) goto out;
         next->devid = devid;
         devid++;
