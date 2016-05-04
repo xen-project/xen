@@ -21,8 +21,8 @@
 #define PAGE_TO_MEMKB(pages) ((pages) * 4)
 #define BACKEND_STRING_SIZE 5
 
-/* Utility to read backend xenstore keys */
-#define READ_BACKEND(tgc, subpath) ({                                   \
+/* Utility to read /libxl or backend xenstore keys, from be_path */
+#define READ_LIBXLDEV(tgc, subpath) ({                                  \
         rc = libxl__xs_read_checked(tgc, XBT_NULL,                      \
                                     GCSPRINTF("%s/" subpath, be_path),  \
                                     &tmp);                              \
@@ -3595,7 +3595,7 @@ static int libxl__device_nic_from_xenstore(libxl__gc *gc,
 
     libxl_device_nic_init(nic);
 
-    tmp = READ_BACKEND(gc, "handle");
+    tmp = READ_LIBXLDEV(gc, "handle");
     if (tmp)
         nic->devid = atoi(tmp);
     else
@@ -3603,7 +3603,7 @@ static int libxl__device_nic_from_xenstore(libxl__gc *gc,
 
     /* nic->mtu = */
 
-    tmp = READ_BACKEND(gc, "mac");
+    tmp = READ_LIBXLDEV(gc, "mac");
     if (tmp) {
         rc = libxl__parse_mac(tmp, nic->mac);
         if (rc) goto out;
@@ -3611,13 +3611,13 @@ static int libxl__device_nic_from_xenstore(libxl__gc *gc,
         memset(nic->mac, 0, sizeof(nic->mac));
     }
 
-    nic->ip = READ_BACKEND(NOGC, "ip");
-    nic->bridge = READ_BACKEND(NOGC, "bridge");
-    nic->script = READ_BACKEND(NOGC, "script");
-    nic->coloft_forwarddev = READ_BACKEND(NOGC, "forwarddev");
+    nic->ip = READ_LIBXLDEV(NOGC, "ip");
+    nic->bridge = READ_LIBXLDEV(NOGC, "bridge");
+    nic->script = READ_LIBXLDEV(NOGC, "script");
+    nic->coloft_forwarddev = READ_LIBXLDEV(NOGC, "forwarddev");
 
     /* vif_ioemu nics use the same xenstore entries as vif interfaces */
-    tmp = READ_BACKEND(gc, "type");
+    tmp = READ_LIBXLDEV(gc, "type");
     if (tmp) {
         rc = libxl_nic_type_from_string(tmp, &nic->nictype);
         if (rc) goto out;
@@ -3945,13 +3945,13 @@ static int libxl__device_channel_from_xenstore(libxl__gc *gc,
     libxl_device_channel_init(channel);
 
     /* READ_BACKEND is from libxl__device_nic_from_xenstore above */
-    channel->name = READ_BACKEND(NOGC, "name");
-    tmp = READ_BACKEND(gc, "connection");
+    channel->name = READ_LIBXLDEV(NOGC, "name");
+    tmp = READ_LIBXLDEV(gc, "connection");
     if (!strcmp(tmp, "pty")) {
         channel->connection = LIBXL_CHANNEL_CONNECTION_PTY;
     } else if (!strcmp(tmp, "socket")) {
         channel->connection = LIBXL_CHANNEL_CONNECTION_SOCKET;
-        channel->u.socket.path = READ_BACKEND(NOGC, "path");
+        channel->u.socket.path = READ_LIBXLDEV(NOGC, "path");
     } else {
         rc = ERROR_INVAL;
         goto out;
