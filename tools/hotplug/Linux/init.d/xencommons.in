@@ -107,14 +107,14 @@ do_stop () {
         echo Stopping xenconsoled
 	if read 2>/dev/null <$XENCONSOLED_PIDFILE pid; then
 		kill $pid
-		while kill -9 $pid >/dev/null 2>&1; do sleep 0.1; done
+		while kill -9 $pid >/dev/null 2>&1; do sleep 1; done
 		rm -f $XENCONSOLED_PIDFILE
 	fi
 
 	echo Stopping QEMU
 	if read 2>/dev/null <$QEMU_PIDFILE pid; then
 		kill $pid
-		while kill -9 $pid >/dev/null 2>&1; do sleep 0.1; done
+		while kill -9 $pid >/dev/null 2>&1; do sleep 1; done
 		rm -f $QEMU_PIDFILE
 	fi
 

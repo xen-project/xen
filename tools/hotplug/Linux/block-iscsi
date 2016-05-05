@@ -74,7 +74,7 @@ find_device()
 {
     count=0
     while [ ! -e /dev/disk/by-path/*"$iqn"-lun-0 ]; do
-        sleep 0.1
+        sleep 1
         count=`expr $count + 1`
         if [ count = 100 ]; then
             # 10s timeout while waiting for iSCSI disk to settle

@@ -56,7 +56,7 @@ do_stop () {
         echo Stopping xl devd...
 	if read 2>/dev/null <$XLDEVD_PIDFILE pid; then
 		kill $pid
-		while kill -9 $pid >/dev/null 2>&1; do sleep 0.1; done
+		while kill -9 $pid >/dev/null 2>&1; do sleep 1; done
 		rm -f $XLDEVD_PIDFILE
 	fi
 }
