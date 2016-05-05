@@ -401,7 +401,7 @@ libxl_device_usbctrl_list(libxl_ctx *ctx, uint32_t domid, int *num)
             if (ret) goto out;
             usbctrl->version = READ_SUBPATH_INT(be_path, "usb-ver");
             usbctrl->ports = READ_SUBPATH_INT(be_path, "num-ports");
-            libxl_usbctrl_type_from_string(READ_SUBPATH(be_path, "type"),
+            libxl_usbctrl_type_from_string(READ_SUBPATH(libxl_path, "type"),
                                            &usbctrl->type);
 
 #undef READ_SUBPATH
@@ -459,12 +459,11 @@ int libxl_device_usbctrl_getinfo(libxl_ctx *ctx, uint32_t domid,
     usbctrlinfo->evtch = READ_SUBPATH_INT(fe_path, "event-channel");
     usbctrlinfo->ref_urb = READ_SUBPATH_INT(fe_path, "urb-ring-ref");
     usbctrlinfo->ref_conn = READ_SUBPATH_INT(fe_path, "urb-ring-ref");
-    tmp = READ_SUBPATH(be_path, "frontend");
-    usbctrlinfo->frontend = libxl__strdup(NOGC, tmp);
-    usbctrlinfo->frontend_id = READ_SUBPATH_INT(be_path, "frontend-id");
+    usbctrlinfo->frontend = libxl__strdup(NOGC, fe_path);
+    usbctrlinfo->frontend_id = domid;
     usbctrlinfo->ports = READ_SUBPATH_INT(be_path, "num-ports");
     usbctrlinfo->version = READ_SUBPATH_INT(be_path, "usb-ver");;
-    tmp = READ_SUBPATH(be_path, "type");
+    tmp = READ_SUBPATH(libxl_path, "type");
     libxl_usbctrl_type_from_string(tmp, &usbctrlinfo->type);
 
 #undef READ_SUBPATH
