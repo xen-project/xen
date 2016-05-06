@@ -385,16 +385,16 @@ S:	Supported
 T:	hg http://xenbits.xen.org/linux-2.6.18-xen.hg
 F:	drivers/xen/usb*/
 
-VM EVENT AND MEM ACCESS
+VM EVENT, MEM ACCESS and MONITOR
 M:	Razvan Cojocaru <rcojocaru@bitdefender.com>
 M:	Tamas K Lengyel <tamas@tklengyel.com>
 S:	Supported
-F:	xen/common/vm_event.c
 F:	xen/common/mem_access.c
-F:	xen/common/monitor.c
-F:	xen/arch/x86/hvm/event.c
-F:	xen/arch/x86/monitor.c
-F:	xen/arch/*/vm_event.c
+F:	xen/*/vm_event.c
+F:	xen/*/monitor.c
+F:	xen/include/*/mem_access.h
+F:	xen/include/*/monitor.h
+F:	xen/include/*/vm_event.h
 F:	tools/tests/xen-access
 
 VTPM
