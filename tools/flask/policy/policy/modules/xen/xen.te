@@ -155,6 +155,15 @@ allow domain_type xen_t:version {
     xen_changeset xen_pagesize xen_guest_handle
 };
 
+# These queries don't need auditing when denied.  They can be
+# encountered in normal operation by xl or by reading sysfs files in
+# Linux, so without this they will show up in the logs.  Since these
+# operations return valid responses (like "denied"), hiding the denials
+# should not break anything.
+dontaudit domain_type xen_t:version {
+    xen_commandline xen_build_id
+};
+
 ###############################################################################
 #
 # Domain creation
