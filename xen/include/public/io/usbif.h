@@ -187,6 +187,7 @@ struct usbif_urb_request {
 	/* basic urb parameter */
 	uint32_t pipe;
 	uint16_t transfer_flags;
+#define USBIF_SHORT_NOT_OK	0x0001
 	uint16_t buffer_length;
 	union {
 		uint8_t ctrl[8]; /* setup_packet (Ctrl) */
