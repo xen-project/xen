@@ -148,7 +148,8 @@ static int hvm_translate_linear_addr(
 
     if ( !okay )
     {
-        hvm_inject_hw_exception(TRAP_gp_fault, 0);
+        hvm_inject_hw_exception(
+            (seg == x86_seg_ss) ? TRAP_stack_error : TRAP_gp_fault, 0);
         return X86EMUL_EXCEPTION;
     }
 

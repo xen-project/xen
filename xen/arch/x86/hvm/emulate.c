@@ -566,7 +566,8 @@ static int hvmemul_virtual_to_linear(
 
     /* This is a singleton operation: fail it with an exception. */
     hvmemul_ctxt->exn_pending = 1;
-    hvmemul_ctxt->trap.vector = TRAP_gp_fault;
+    hvmemul_ctxt->trap.vector =
+        (seg == x86_seg_ss) ? TRAP_stack_error : TRAP_gp_fault;
     hvmemul_ctxt->trap.type = X86_EVENTTYPE_HW_EXCEPTION;
     hvmemul_ctxt->trap.error_code = 0;
     hvmemul_ctxt->trap.insn_len = 0;
