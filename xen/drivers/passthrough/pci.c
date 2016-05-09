@@ -1241,16 +1241,15 @@ __initcall(setup_dump_pcidevs);
 int iommu_update_ire_from_msi(
     struct msi_desc *msi_desc, struct msi_msg *msg)
 {
-    const struct iommu_ops *ops = iommu_get_ops();
-    return iommu_intremap ? ops->update_ire_from_msi(msi_desc, msg) : 0;
+    return iommu_intremap
+           ? iommu_get_ops()->update_ire_from_msi(msi_desc, msg) : 0;
 }
 
 void iommu_read_msi_from_ire(
     struct msi_desc *msi_desc, struct msi_msg *msg)
 {
-    const struct iommu_ops *ops = iommu_get_ops();
     if ( iommu_intremap )
-        ops->read_msi_from_ire(msi_desc, msg);
+        iommu_get_ops()->read_msi_from_ire(msi_desc, msg);
 }
 
 int iommu_add_device(struct pci_dev *pdev)

@@ -337,11 +337,16 @@ int __init iommu_setup(void)
     return rc;
 }
 
+void iommu_suspend()
+{
+    if ( iommu_enabled )
+        iommu_get_ops()->suspend();
+}
+
 void iommu_resume()
 {
-    const struct iommu_ops *ops = iommu_get_ops();
     if ( iommu_enabled )
-        ops->resume();
+        iommu_get_ops()->resume();
 }
 
 int iommu_do_domctl(
@@ -365,34 +370,28 @@ int iommu_do_domctl(
     return ret;
 }
 
-void iommu_suspend()
-{
-    const struct iommu_ops *ops = iommu_get_ops();
-    if ( iommu_enabled )
-        ops->suspend();
-}
-
 void iommu_share_p2m_table(struct domain* d)
 {
-    const struct iommu_ops *ops = iommu_get_ops();
-
     if ( iommu_enabled && iommu_use_hap_pt(d) )
-        ops->share_p2m(d);
+        iommu_get_ops()->share_p2m(d);
 }
 
 void iommu_crash_shutdown(void)
 {
-    const struct iommu_ops *ops = iommu_get_ops();
     if ( iommu_enabled )
-        ops->crash_shutdown();
+        iommu_get_ops()->crash_shutdown();
     iommu_enabled = iommu_intremap = iommu_intpost = 0;
 }
 
 int iommu_get_reserved_device_memory(iommu_grdm_t *func, void *ctxt)
 {
-    const struct iommu_ops *ops = iommu_get_ops();
+    const struct iommu_ops *ops;
 
-    if ( !iommu_enabled || !ops->get_reserved_device_memory )
+    if ( !iommu_enabled )
+        return 0;
+
+    ops = iommu_get_ops();
+    if ( !ops->get_reserved_device_memory )
         return 0;
 
     return ops->get_reserved_device_memory(func, ctxt);
