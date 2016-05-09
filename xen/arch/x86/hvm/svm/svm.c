@@ -2222,10 +2222,13 @@ static void svm_invlpga_intercept(
 
 static void svm_invlpg_intercept(unsigned long vaddr)
 {
-    struct vcpu *curr = current;
     HVMTRACE_LONG_2D(INVLPG, 0, TRC_PAR_LONG(vaddr));
-    if ( paging_invlpg(curr, vaddr) )
-        svm_asid_g_invlpg(curr, vaddr);
+    paging_invlpg(current, vaddr);
+}
+
+static void svm_invlpg(struct vcpu *v, unsigned long vaddr)
+{
+    svm_asid_g_invlpg(v, vaddr);
 }
 
 static struct hvm_function_table __initdata svm_function_table = {
@@ -2258,12 +2261,12 @@ static struct hvm_function_table __initdata svm_function_table = {
     .inject_trap          = svm_inject_trap,
     .init_hypercall_page  = svm_init_hypercall_page,
     .event_pending        = svm_event_pending,
+    .invlpg               = svm_invlpg,
     .cpuid_intercept      = svm_cpuid_intercept,
     .wbinvd_intercept     = svm_wbinvd_intercept,
     .fpu_dirty_intercept  = svm_fpu_dirty_intercept,
     .msr_read_intercept   = svm_msr_read_intercept,
     .msr_write_intercept  = svm_msr_write_intercept,
-    .invlpg_intercept     = svm_invlpg_intercept,
     .set_rdtsc_exiting    = svm_set_rdtsc_exiting,
     .get_insn_bytes       = svm_get_insn_bytes,
 

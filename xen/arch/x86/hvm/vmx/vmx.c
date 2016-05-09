@@ -81,7 +81,7 @@ static void vmx_wbinvd_intercept(void);
 static void vmx_fpu_dirty_intercept(void);
 static int vmx_msr_read_intercept(unsigned int msr, uint64_t *msr_content);
 static int vmx_msr_write_intercept(unsigned int msr, uint64_t msr_content);
-static void vmx_invlpg_intercept(unsigned long vaddr);
+static void vmx_invlpg(struct vcpu *v, unsigned long vaddr);
 static int vmx_vmfunc_intercept(struct cpu_user_regs *regs);
 
 struct vmx_pi_blocking_vcpu {
@@ -2137,6 +2137,7 @@ static struct hvm_function_table __initdata vmx_function_table = {
     .inject_trap          = vmx_inject_trap,
     .init_hypercall_page  = vmx_init_hypercall_page,
     .event_pending        = vmx_event_pending,
+    .invlpg               = vmx_invlpg,
     .cpu_up               = vmx_cpu_up,
     .cpu_down             = vmx_cpu_down,
     .cpuid_intercept      = vmx_cpuid_intercept,
@@ -2144,7 +2145,6 @@ static struct hvm_function_table __initdata vmx_function_table = {
     .fpu_dirty_intercept  = vmx_fpu_dirty_intercept,
     .msr_read_intercept   = vmx_msr_read_intercept,
     .msr_write_intercept  = vmx_msr_write_intercept,
-    .invlpg_intercept     = vmx_invlpg_intercept,
     .vmfunc_intercept     = vmx_vmfunc_intercept,
     .handle_cd            = vmx_handle_cd,
     .set_info_guest       = vmx_set_info_guest,
@@ -2432,10 +2432,14 @@ static void vmx_dr_access(unsigned long exit_qualification,
 
 static void vmx_invlpg_intercept(unsigned long vaddr)
 {
-    struct vcpu *curr = current;
     HVMTRACE_LONG_2D(INVLPG, /*invlpga=*/ 0, TRC_PAR_LONG(vaddr));
-    if ( paging_invlpg(curr, vaddr) && cpu_has_vmx_vpid )
-        vpid_sync_vcpu_gva(curr, vaddr);
+    paging_invlpg(current, vaddr);
+}
+
+static void vmx_invlpg(struct vcpu *v, unsigned long vaddr)
+{
+    if ( cpu_has_vmx_vpid )
+        vpid_sync_vcpu_gva(v, vaddr);
 }
 
 static int vmx_vmfunc_intercept(struct cpu_user_regs *regs)

@@ -237,15 +237,8 @@ paging_fault(unsigned long va, struct cpu_user_regs *regs)
     return paging_get_hostmode(v)->page_fault(v, va, regs);
 }
 
-/* Handle invlpg requests on vcpus.
- * Returns 1 if the invlpg instruction should be issued on the hardware,
- * or 0 if it's safe not to do so. */
-static inline bool_t paging_invlpg(struct vcpu *v, unsigned long va)
-{
-    return (paging_mode_external(v->domain) ? is_canonical_address(va)
-                                            : __addr_ok(va)) &&
-           paging_get_hostmode(v)->invlpg(v, va);
-}
+/* Handle invlpg requests on vcpus. */
+void paging_invlpg(struct vcpu *v, unsigned long va);
 
 /* Translate a guest virtual address to the frame number that the
  * *guest* pagetables would map it to.  Returns INVALID_GFN if the guest

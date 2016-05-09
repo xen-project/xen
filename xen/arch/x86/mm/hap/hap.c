@@ -680,23 +680,20 @@ static int hap_page_fault(struct vcpu *v, unsigned long va,
 
 /*
  * HAP guests can handle invlpg without needing any action from Xen, so
- * should not be intercepting it.
+ * should not be intercepting it.  However, we need to correctly handle
+ * getting here from instruction emulation.
  */
 static bool_t hap_invlpg(struct vcpu *v, unsigned long va)
 {
-    if (nestedhvm_enabled(v->domain)) {
-        /* Emulate INVLPGA:
-         * Must perform the flush right now or an other vcpu may
-         * use it when we use the next VMRUN emulation, otherwise.
-         */
-        if ( vcpu_nestedhvm(v).nv_p2m )
-            p2m_flush(v, vcpu_nestedhvm(v).nv_p2m);
-        return 1;
-    }
+    /*
+     * Emulate INVLPGA:
+     * Must perform the flush right now or an other vcpu may
+     * use it when we use the next VMRUN emulation, otherwise.
+     */
+    if ( nestedhvm_enabled(v->domain) && vcpu_nestedhvm(v).nv_p2m )
+        p2m_flush(v, vcpu_nestedhvm(v).nv_p2m);
 
-    HAP_ERROR("Intercepted a guest INVLPG (%pv) with HAP enabled\n", v);
-    domain_crash(v->domain);
-    return 0;
+    return 1;
 }
 
 static void hap_update_cr3(struct vcpu *v, int do_locking)

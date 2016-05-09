@@ -1623,8 +1623,8 @@ static int hvmemul_invlpg(
         rc = X86EMUL_OKAY;
     }
 
-    if ( rc == X86EMUL_OKAY && is_canonical_address(addr) )
-        hvm_funcs.invlpg_intercept(addr);
+    if ( rc == X86EMUL_OKAY )
+        paging_invlpg(current, addr);
 
     return rc;
 }

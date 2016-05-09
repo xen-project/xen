@@ -154,6 +154,7 @@ struct hvm_function_table {
     void (*init_hypercall_page)(struct domain *d, void *hypercall_page);
 
     int  (*event_pending)(struct vcpu *v);
+    void (*invlpg)(struct vcpu *v, unsigned long vaddr);
 
     int  (*cpu_up_prepare)(unsigned int cpu);
     void (*cpu_dead)(unsigned int cpu);
@@ -172,7 +173,6 @@ struct hvm_function_table {
     void (*fpu_dirty_intercept)(void);
     int (*msr_read_intercept)(unsigned int msr, uint64_t *msr_content);
     int (*msr_write_intercept)(unsigned int msr, uint64_t msr_content);
-    void (*invlpg_intercept)(unsigned long vaddr);
     int (*vmfunc_intercept)(struct cpu_user_regs *regs);
     void (*handle_cd)(struct vcpu *v, unsigned long value);
     void (*set_info_guest)(struct vcpu *v);
