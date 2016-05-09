@@ -397,34 +397,33 @@ libxl_device_pci *libxl_device_pci_assignable_list(libxl_ctx *ctx, int *num)
     libxl_device_pci *pcidevs = NULL, *new, *assigned;
     struct dirent *de;
     DIR *dir;
-    int rc, num_assigned;
+    int r, num_assigned;
 
     *num = 0;
 
-    rc = get_all_assigned_devices(gc, &assigned, &num_assigned);
-    if ( rc )
-        goto out;
+    r = get_all_assigned_devices(gc, &assigned, &num_assigned);
+    if (r) goto out;
 
     dir = opendir(SYSFS_PCIBACK_DRIVER);
-    if ( NULL == dir ) {
-        if ( errno == ENOENT ) {
+    if (NULL == dir) {
+        if (errno == ENOENT) {
             LOG(ERROR, "Looks like pciback driver not loaded");
-        }else{
+        } else {
             LOGE(ERROR, "Couldn't open %s", SYSFS_PCIBACK_DRIVER);
         }
-        goto out_closedir;
+        goto out;
     }
 
-    while( (de = readdir(dir)) ) {
+    while((de = readdir(dir))) {
         unsigned dom, bus, dev, func;
-        if ( sscanf(de->d_name, PCI_BDF, &dom, &bus, &dev, &func) != 4 )
+        if (sscanf(de->d_name, PCI_BDF, &dom, &bus, &dev, &func) != 4)
             continue;
 
-        if ( is_pcidev_in_array(assigned, num_assigned, dom, bus, dev, func) )
+        if (is_pcidev_in_array(assigned, num_assigned, dom, bus, dev, func))
             continue;
 
         new = realloc(pcidevs, ((*num) + 1) * sizeof(*new));
-        if ( NULL == new )
+        if (NULL == new)
             continue;
 
         pcidevs = new;
@@ -435,7 +434,6 @@ libxl_device_pci *libxl_device_pci_assignable_list(libxl_ctx *ctx, int *num)
         (*num)++;
     }
 
-out_closedir:
     closedir(dir);
 out:
     GC_FREE;
