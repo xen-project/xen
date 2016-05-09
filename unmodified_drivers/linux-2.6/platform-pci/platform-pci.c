@@ -23,6 +23,7 @@
 #include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/errno.h>
+#include <linux/crash_dump.h>
 #include <linux/pci.h>
 #include <linux/init.h>
 #include <linux/version.h>
