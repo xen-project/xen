@@ -591,9 +591,11 @@ void p2m_teardown(struct p2m_domain *p2m)
 
 void p2m_final_teardown(struct domain *d)
 {
-    /* We must teardown unconditionally because
+    /*
+     * We must teardown both of them unconditionally because
      * we initialise them unconditionally.
      */
+    p2m_teardown_altp2m(d);
     p2m_teardown_nestedp2m(d);
 
     /* Iterate over all p2m tables per domain */
