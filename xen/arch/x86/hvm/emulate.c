@@ -132,7 +132,7 @@ static int hvmemul_do_io(
         p = vio->io_req;
 
         /* Verify the emulation request has been correctly re-issued */
-        if ( (p.type != is_mmio ? IOREQ_TYPE_COPY : IOREQ_TYPE_PIO) ||
+        if ( (p.type != (is_mmio ? IOREQ_TYPE_COPY : IOREQ_TYPE_PIO)) ||
              (p.addr != addr) ||
              (p.size != size) ||
              (p.count > *reps) ||
