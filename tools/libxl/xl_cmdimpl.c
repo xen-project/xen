@@ -3479,16 +3479,16 @@ static int cd_insert(uint32_t domid, const char *virtdev, char *phys)
         && stat(disk.pdev_path, &b)) {
         fprintf(stderr, "Cannot stat file: %s\n",
                 disk.pdev_path);
-        r = EXIT_FAILURE;
+        r = 1;
         goto out;
     }
 
     if (libxl_cdrom_insert(ctx, domid, &disk, NULL)) {
-        r = EXIT_FAILURE;
+        r = 1;
         goto out;
     }
 
-    r = EXIT_SUCCESS;
+    r = 0;
 
 out:
     libxl_device_disk_dispose(&disk);
@@ -3510,7 +3510,10 @@ int main_cd_eject(int argc, char **argv)
     domid = find_domain(argv[optind]);
     virtdev = argv[optind + 1];
 
-    return cd_insert(domid, virtdev, NULL);
+    if (cd_insert(domid, virtdev, NULL))
+        return EXIT_FAILURE;
+
+    return EXIT_SUCCESS;
 }
 
 int main_cd_insert(int argc, char **argv)
@@ -3528,7 +3531,10 @@ int main_cd_insert(int argc, char **argv)
     virtdev = argv[optind + 1];
     file = argv[optind + 2];
 
-    return cd_insert(domid, virtdev, file);
+    if (cd_insert(domid, virtdev, file))
+        return EXIT_FAILURE;
+
+    return EXIT_SUCCESS;
 }
 
 int main_usbctrl_attach(int argc, char **argv)
