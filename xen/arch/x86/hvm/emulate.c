@@ -94,7 +94,7 @@ static const struct hvm_io_handler null_handler = {
 };
 
 static int hvmemul_do_io(
-    bool_t is_mmio, paddr_t addr, unsigned long reps, unsigned int size,
+    bool_t is_mmio, paddr_t addr, unsigned long *reps, unsigned int size,
     uint8_t dir, bool_t df, bool_t data_is_addr, uintptr_t data)
 {
     struct vcpu *curr = current;
@@ -103,7 +103,7 @@ static int hvmemul_do_io(
         .type = is_mmio ? IOREQ_TYPE_COPY : IOREQ_TYPE_PIO,
         .addr = addr,
         .size = size,
-        .count = reps,
+        .count = *reps,
         .dir = dir,
         .df = df,
         .data = data,
@@ -135,7 +135,7 @@ static int hvmemul_do_io(
         if ( (p.type != is_mmio ? IOREQ_TYPE_COPY : IOREQ_TYPE_PIO) ||
              (p.addr != addr) ||
              (p.size != size) ||
-             (p.count != reps) ||
+             (p.count > *reps) ||
              (p.dir != dir) ||
              (p.df != df) ||
              (p.data_is_ptr != data_is_addr) )
@@ -143,6 +143,8 @@ static int hvmemul_do_io(
 
         if ( data_is_addr )
             return X86EMUL_UNHANDLEABLE;
+
+        *reps = p.count;
         goto finish_access;
     default:
         return X86EMUL_UNHANDLEABLE;
@@ -159,6 +161,13 @@ static int hvmemul_do_io(
     vio->io_req = p;
 
     rc = hvm_io_intercept(&p);
+
+    /*
+     * p.count may have got reduced (see hvm_process_io_intercept()) - inform
+     * our callers and mirror this into latched state.
+     */
+    ASSERT(p.count <= *reps);
+    *reps = vio->io_req.count = p.count;
 
     switch ( rc )
     {
@@ -213,7 +222,7 @@ static int hvmemul_do_io_buffer(
 
     BUG_ON(buffer == NULL);
 
-    rc = hvmemul_do_io(is_mmio, addr, *reps, size, dir, df, 0,
+    rc = hvmemul_do_io(is_mmio, addr, reps, size, dir, df, 0,
                        (uintptr_t)buffer);
     if ( rc == X86EMUL_UNHANDLEABLE && dir == IOREQ_READ )
         memset(buffer, 0xff, size);
@@ -304,13 +313,13 @@ static int hvmemul_do_io_addr(
         count = 1;
     }
 
-    rc = hvmemul_do_io(is_mmio, addr, count, size, dir, df, 1,
+    rc = hvmemul_do_io(is_mmio, addr, &count, size, dir, df, 1,
                        ram_gpa);
+
     if ( rc == X86EMUL_OKAY )
-    {
         v->arch.hvm_vcpu.hvm_io.mmio_retry = (count < *reps);
-        *reps = count;
-    }
+
+    *reps = count;
 
  out:
     while ( nr_pages )
