@@ -1292,17 +1292,17 @@ int pci_msi_conf_write_intercept(struct pci_dev *pdev, unsigned int reg,
                                           PCI_CAP_ID_MSIX);
         ASSERT(pos);
 
-        if ( reg < pos || reg >= msix_pba_offset_reg(pos) + 4 )
-            return 0;
+        if ( reg >= pos && reg < msix_pba_offset_reg(pos) + 4 )
+        {
+            if ( reg != msix_control_reg(pos) || size != 2 )
+                return -EACCES;
 
-        if ( reg != msix_control_reg(pos) || size != 2 )
-            return -EACCES;
+            pdev->msix->guest_maskall = !!(*data & PCI_MSIX_FLAGS_MASKALL);
+            if ( pdev->msix->host_maskall )
+                *data |= PCI_MSIX_FLAGS_MASKALL;
 
-        pdev->msix->guest_maskall = !!(*data & PCI_MSIX_FLAGS_MASKALL);
-        if ( pdev->msix->host_maskall )
-            *data |= PCI_MSIX_FLAGS_MASKALL;
-
-        return 1;
+            return 1;
+        }
     }
 
     entry = find_msi_entry(pdev, -1, PCI_CAP_ID_MSI);
