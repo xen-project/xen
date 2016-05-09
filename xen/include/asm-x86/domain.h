@@ -290,6 +290,21 @@ struct arch_domain
     /* Domain cannot handle spurious page faults? */
     bool_t suppress_spurious_page_faults;
 
+    /*
+     * The width of the FIP/FDP register in the FPU that needs to be
+     * saved/restored during a context switch.  This is needed because
+     * the FPU can either: a) restore the 64-bit FIP/FDP and clear FCS
+     * and FDS; or b) restore the 32-bit FIP/FDP (clearing the upper
+     * 32-bits of FIP/FDP) and restore FCS/FDS.
+     *
+     * Which one is needed depends on the guest.
+     *
+     * This can be either: 8, 4 or 0.  0 means auto-detect the size
+     * based on the width of FIP/FDP values that are written by the
+     * guest.
+     */
+    uint8_t x87_fip_width;
+
     /* Continuable domain_relinquish_resources(). */
     enum {
         RELMEM_not_started,

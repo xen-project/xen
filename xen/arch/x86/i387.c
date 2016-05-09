@@ -152,9 +152,9 @@ static inline void fpu_xsave(struct vcpu *v)
 static inline void fpu_fxsave(struct vcpu *v)
 {
     typeof(v->arch.xsave_area->fpu_sse) *fpu_ctxt = v->arch.fpu_ctxt;
-    int word_size = cpu_has_fpu_sel ? 8 : 0;
+    unsigned int fip_width = v->domain->arch.x87_fip_width;
 
-    if ( !is_pv_32bit_vcpu(v) )
+    if ( fip_width != 4 )
     {
         /*
          * The only way to force fxsaveq on a wide range of gas versions.
@@ -172,7 +172,11 @@ static inline void fpu_fxsave(struct vcpu *v)
              boot_cpu_data.x86_vendor == X86_VENDOR_AMD )
             return;
 
-        if ( word_size > 0 &&
+        /*
+         * If the FIP/FDP[63:32] are both zero, it is safe to use the
+         * 32-bit restore to also restore the selectors.
+         */
+        if ( !fip_width &&
              !((fpu_ctxt->fip.addr | fpu_ctxt->fdp.addr) >> 32) )
         {
             struct ix87_env fpu_env;
@@ -180,17 +184,18 @@ static inline void fpu_fxsave(struct vcpu *v)
             asm volatile ( "fnstenv %0" : "=m" (fpu_env) );
             fpu_ctxt->fip.sel = fpu_env.fcs;
             fpu_ctxt->fdp.sel = fpu_env.fds;
-            word_size = 4;
+            fip_width = 4;
         }
+        else
+            fip_width = 8;
     }
     else
     {
         asm volatile ( "fxsave %0" : "=m" (*fpu_ctxt) );
-        word_size = 4;
+        fip_width = 4;
     }
 
-    if ( word_size >= 0 )
-        fpu_ctxt->x[FPU_WORD_SIZE_OFFSET] = word_size;
+    fpu_ctxt->x[FPU_WORD_SIZE_OFFSET] = fip_width;
 }
 
 /* Save x87 FPU state */
