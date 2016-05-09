@@ -240,7 +240,9 @@ subdir-all-qemu-xen-dir: qemu-xen-dir-find
 		source=.; \
 	fi; \
 	cd qemu-xen-dir; \
-	if $$source/scripts/tracetool.py --check-backend --backend stderr ; then \
+	if $$source/scripts/tracetool.py --check-backend --backend log ; then \
+		enable_trace_backend='--enable-trace-backend=log'; \
+	elif $$source/scripts/tracetool.py --check-backend --backend stderr ; then \
 		enable_trace_backend='--enable-trace-backend=stderr'; \
 	else \
 		enable_trace_backend='' ; \
