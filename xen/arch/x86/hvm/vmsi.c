@@ -351,9 +351,10 @@ static int msixtbl_range(struct vcpu *v, unsigned long addr)
     ASSERT(r->type == IOREQ_TYPE_COPY);
     if ( r->dir == IOREQ_WRITE )
     {
+        unsigned int size = r->size;
+
         if ( !r->data_is_ptr )
         {
-            unsigned int size = r->size;
             uint64_t data = r->data;
 
             if ( size == 8 )
@@ -366,7 +367,29 @@ static int msixtbl_range(struct vcpu *v, unsigned long addr)
                  ((addr & (PCI_MSIX_ENTRY_SIZE - 1)) ==
                   PCI_MSIX_ENTRY_VECTOR_CTRL_OFFSET) &&
                  !(data & PCI_MSIX_VECTOR_BITMASK) )
+            {
                 v->arch.hvm_vcpu.hvm_io.msix_snoop_address = addr;
+                v->arch.hvm_vcpu.hvm_io.msix_snoop_gpa = 0;
+            }
+        }
+        else if ( (size == 4 || size == 8) &&
+                  /* Only support forward REP MOVS for now. */
+                  !r->df &&
+                  /*
+                   * Only fully support accesses to a single table entry for
+                   * now (if multiple ones get written to in one go, only the
+                   * final one gets dealt with).
+                   */
+                  r->count && r->count <= PCI_MSIX_ENTRY_SIZE / size &&
+                  !((addr + (size * r->count)) & (PCI_MSIX_ENTRY_SIZE - 1)) )
+        {
+            BUILD_BUG_ON((PCI_MSIX_ENTRY_VECTOR_CTRL_OFFSET + 4) &
+                         (PCI_MSIX_ENTRY_SIZE - 1));
+
+            v->arch.hvm_vcpu.hvm_io.msix_snoop_address =
+                addr + size * r->count - 4;
+            v->arch.hvm_vcpu.hvm_io.msix_snoop_gpa =
+                r->data + size * r->count - 4;
         }
     }
 
@@ -468,6 +491,7 @@ out:
         for_each_vcpu ( d, v )
         {
             if ( (v->pause_flags & VPF_blocked_in_xen) &&
+                 !v->arch.hvm_vcpu.hvm_io.msix_snoop_gpa &&
                  v->arch.hvm_vcpu.hvm_io.msix_snoop_address ==
                  (gtable + msi_desc->msi_attrib.entry_nr *
                            PCI_MSIX_ENTRY_SIZE +
@@ -549,8 +573,28 @@ void msixtbl_pt_cleanup(struct domain *d)
 void msix_write_completion(struct vcpu *v)
 {
     unsigned long ctrl_address = v->arch.hvm_vcpu.hvm_io.msix_unmask_address;
+    unsigned long snoop_addr = v->arch.hvm_vcpu.hvm_io.msix_snoop_address;
 
     v->arch.hvm_vcpu.hvm_io.msix_snoop_address = 0;
+
+    if ( !ctrl_address && snoop_addr &&
+         v->arch.hvm_vcpu.hvm_io.msix_snoop_gpa )
+    {
+        const struct msi_desc *desc;
+        uint32_t data;
+
+        rcu_read_lock(&msixtbl_rcu_lock);
+        desc = msixtbl_addr_to_desc(msixtbl_find_entry(v, snoop_addr),
+                                    snoop_addr);
+        rcu_read_unlock(&msixtbl_rcu_lock);
+
+        if ( desc &&
+             hvm_copy_from_guest_phys(&data,
+                                      v->arch.hvm_vcpu.hvm_io.msix_snoop_gpa,
+                                      sizeof(data)) == HVMCOPY_okay &&
+             !(data & PCI_MSIX_VECTOR_BITMASK) )
+            ctrl_address = snoop_addr;
+    }
 
     if ( !ctrl_address )
         return;

@@ -86,6 +86,7 @@ struct hvm_vcpu_io {
 
     unsigned long msix_unmask_address;
     unsigned long msix_snoop_address;
+    unsigned long msix_snoop_gpa;
 
     const struct g2m_ioport *g2m_ioport;
 };
