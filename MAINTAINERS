@@ -353,6 +353,7 @@ F:	install.sh
 F:	m4/
 F:	configure
 F:	docs/Makefile
+F:	docs/man/
 F:	stubdom/Makefile
 F:	*.ac
 F:	*/configure
