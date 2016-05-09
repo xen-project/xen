@@ -262,6 +262,7 @@
 /* These are a pair; it is an error for one to exist without the other */
 #define XC_SAVE_ID_HVM_IOREQ_SERVER_PFN -19
 #define XC_SAVE_ID_HVM_NR_IOREQ_SERVER_PAGES -20
+#define XC_SAVE_ID_HVM_X87_FIP_WIDTH  -21
 
 /*
 ** We process save/restore/migrate in batches of pages; the below

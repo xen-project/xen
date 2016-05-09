@@ -743,6 +743,7 @@ typedef struct {
     uint64_t vm_generationid_addr;
     uint64_t ioreq_server_pfn;
     uint64_t nr_ioreq_server_pages;
+    uint64_t x87_fip_width;
 
     struct toolstack_data_t tdata;
 } pagebuf_t;
@@ -1009,6 +1010,16 @@ static int pagebuf_get_one(xc_interface *xch, struct restore_ctx *ctx,
              RDEXACT(fd, &buf->nr_ioreq_server_pages, sizeof(uint64_t)) )
         {
             PERROR("error read the ioreq server gmfn count");
+            return -1;
+        }
+        return pagebuf_get_one(xch, ctx, buf, fd, dom);
+
+    case XC_SAVE_ID_HVM_X87_FIP_WIDTH:
+        /* Skip padding 4 bytes then read the x87 FIP width. */
+        if ( RDEXACT(fd, &buf->x87_fip_width, sizeof(uint32_t)) ||
+             RDEXACT(fd, &buf->x87_fip_width, sizeof(uint64_t)) )
+        {
+            PERROR("error reading the x87 FIP width");
             return -1;
         }
         return pagebuf_get_one(xch, ctx, buf, fd, dom);
@@ -1748,6 +1759,9 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
 
     if (pagebuf.viridian != 0)
         xc_hvm_param_set(xch, dom, HVM_PARAM_VIRIDIAN, pagebuf.viridian);
+    if (pagebuf.x87_fip_width != 0)
+        xc_hvm_param_set(xch, dom, HVM_PARAM_X87_FIP_WIDTH,
+                         pagebuf.x87_fip_width);
 
     /*
      * If we are migrating in from a host that does not support

@@ -1750,6 +1750,17 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
             PERROR("Error when writing the ioreq server gmfn count");
             goto out;
         }
+
+        chunk.id = XC_SAVE_ID_HVM_X87_FIP_WIDTH;
+        chunk.data = 0;
+        xc_hvm_param_get(xch, dom, HVM_PARAM_X87_FIP_WIDTH, &chunk.data);
+
+        if ( (chunk.data != 0) &&
+             wrexact(io_fd, &chunk, sizeof(chunk)) )
+        {
+            PERROR("Error writing the x87 FIP width");
+            goto out;
+        }
     }
 
     if ( callbacks != NULL && callbacks->toolstack_save != NULL )

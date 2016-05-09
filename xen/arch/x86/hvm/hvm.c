@@ -5744,6 +5744,14 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
 
                 break;
             }
+            case HVM_PARAM_X87_FIP_WIDTH:
+                if ( a.value != 0 && a.value != 4 && a.value != 8 )
+                {
+                    rc = -EINVAL;
+                    break;
+                }
+                d->arch.x87_fip_width = a.value;
+                break;
             }
 
             if ( rc == 0 ) 
@@ -5776,6 +5784,9 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
             {
             case HVM_PARAM_ACPI_S_STATE:
                 a.value = d->arch.hvm_domain.is_s3_suspended ? 3 : 0;
+                break;
+            case HVM_PARAM_X87_FIP_WIDTH:
+                a.value = d->arch.x87_fip_width;
                 break;
             case HVM_PARAM_IOREQ_SERVER_PFN:
             case HVM_PARAM_NR_IOREQ_SERVER_PAGES:
