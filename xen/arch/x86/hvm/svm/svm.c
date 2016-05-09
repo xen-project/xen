@@ -2224,8 +2224,8 @@ static void svm_invlpg_intercept(unsigned long vaddr)
 {
     struct vcpu *curr = current;
     HVMTRACE_LONG_2D(INVLPG, 0, TRC_PAR_LONG(vaddr));
-    paging_invlpg(curr, vaddr);
-    svm_asid_g_invlpg(curr, vaddr);
+    if ( paging_invlpg(curr, vaddr) )
+        svm_asid_g_invlpg(curr, vaddr);
 }
 
 static struct hvm_function_table __initdata svm_function_table = {
