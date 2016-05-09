@@ -336,6 +336,7 @@ out:
 static int msixtbl_range(struct vcpu *v, unsigned long addr)
 {
     const struct msi_desc *desc;
+    const ioreq_t *r;
 
     rcu_read_lock(&msixtbl_rcu_lock);
     desc = msixtbl_addr_to_desc(msixtbl_find_entry(v, addr), addr);
@@ -344,17 +345,29 @@ static int msixtbl_range(struct vcpu *v, unsigned long addr)
     if ( desc )
         return 1;
 
-    if ( (addr & (PCI_MSIX_ENTRY_SIZE - 1)) ==
-         PCI_MSIX_ENTRY_VECTOR_CTRL_OFFSET )
+    r = &v->arch.hvm_vcpu.hvm_io.io_req;
+    if ( r->state != STATE_IOREQ_READY || r->addr != addr )
+        return 0;
+    ASSERT(r->type == IOREQ_TYPE_COPY);
+    if ( r->dir == IOREQ_WRITE )
     {
-        const ioreq_t *r = &v->arch.hvm_vcpu.hvm_io.io_req;
+        if ( !r->data_is_ptr )
+        {
+            unsigned int size = r->size;
+            uint64_t data = r->data;
 
-        if ( r->state != STATE_IOREQ_READY || r->addr != addr )
-            return 0;
-        ASSERT(r->type == IOREQ_TYPE_COPY);
-        if ( r->dir == IOREQ_WRITE && r->size == 4 && !r->data_is_ptr
-             && !(r->data & PCI_MSIX_VECTOR_BITMASK) )
-            v->arch.hvm_vcpu.hvm_io.msix_snoop_address = addr;
+            if ( size == 8 )
+            {
+                BUILD_BUG_ON(!(PCI_MSIX_ENTRY_VECTOR_CTRL_OFFSET & 4));
+                data >>= 32;
+                addr += size = 4;
+            }
+            if ( size == 4 &&
+                 ((addr & (PCI_MSIX_ENTRY_SIZE - 1)) ==
+                  PCI_MSIX_ENTRY_VECTOR_CTRL_OFFSET) &&
+                 !(data & PCI_MSIX_VECTOR_BITMASK) )
+                v->arch.hvm_vcpu.hvm_io.msix_snoop_address = addr;
+        }
     }
 
     return 0;
