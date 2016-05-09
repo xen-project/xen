@@ -7815,11 +7815,11 @@ int main_tmem_list(int argc, char **argv)
 
     buf = libxl_tmem_list(ctx, domid, use_long);
     if (buf == NULL)
-        return -1;
+        return EXIT_FAILURE;
 
     printf("%s\n", buf);
     free(buf);
-    return 0;
+    return EXIT_SUCCESS;
 }
 
 int main_tmem_freeze(int argc, char **argv)
@@ -7839,7 +7839,7 @@ int main_tmem_freeze(int argc, char **argv)
     if (!dom && all == 0) {
         fprintf(stderr, "You must specify -a or a domain id.\n\n");
         help("tmem-freeze");
-        return 1;
+        return EXIT_FAILURE;
     }
 
     if (all)
@@ -7847,8 +7847,10 @@ int main_tmem_freeze(int argc, char **argv)
     else
         domid = find_domain(dom);
 
-    libxl_tmem_freeze(ctx, domid);
-    return 0;
+    if (libxl_tmem_freeze(ctx, domid) < 0)
+        return EXIT_FAILURE;
+
+    return EXIT_SUCCESS;
 }
 
 int main_tmem_thaw(int argc, char **argv)
@@ -7868,7 +7870,7 @@ int main_tmem_thaw(int argc, char **argv)
     if (!dom && all == 0) {
         fprintf(stderr, "You must specify -a or a domain id.\n\n");
         help("tmem-thaw");
-        return 1;
+        return EXIT_FAILURE;
     }
 
     if (all)
@@ -7876,8 +7878,10 @@ int main_tmem_thaw(int argc, char **argv)
     else
         domid = find_domain(dom);
 
-    libxl_tmem_thaw(ctx, domid);
-    return 0;
+    if (libxl_tmem_thaw(ctx, domid) < 0)
+        return EXIT_FAILURE;
+
+    return EXIT_SUCCESS;
 }
 
 int main_tmem_set(int argc, char **argv)
@@ -7888,6 +7892,7 @@ int main_tmem_set(int argc, char **argv)
     int opt_w = 0, opt_c = 0, opt_p = 0;
     int all = 0;
     int opt;
+    int rc = 0;
 
     SWITCH_FOREACH_OPT(opt, "aw:c:p:", NULL, "tmem-set", 0) {
     case 'a':
@@ -7911,7 +7916,7 @@ int main_tmem_set(int argc, char **argv)
     if (!dom && all == 0) {
         fprintf(stderr, "You must specify -a or a domain id.\n\n");
         help("tmem-set");
-        return 1;
+        return EXIT_FAILURE;
     }
 
     if (all)
@@ -7922,17 +7927,20 @@ int main_tmem_set(int argc, char **argv)
     if (!opt_w && !opt_c && !opt_p) {
         fprintf(stderr, "No set value specified.\n\n");
         help("tmem-set");
-        return 1;
+        return EXIT_FAILURE;
     }
 
     if (opt_w)
-        libxl_tmem_set(ctx, domid, "weight", weight);
+        rc = libxl_tmem_set(ctx, domid, "weight", weight);
     if (opt_c)
-        libxl_tmem_set(ctx, domid, "cap", cap);
+        rc = libxl_tmem_set(ctx, domid, "cap", cap);
     if (opt_p)
-        libxl_tmem_set(ctx, domid, "compress", compress);
+        rc = libxl_tmem_set(ctx, domid, "compress", compress);
 
-    return 0;
+    if (rc < 0)
+        return EXIT_FAILURE;
+
+    return EXIT_SUCCESS;
 }
 
 int main_tmem_shared_auth(int argc, char **argv)
@@ -7962,7 +7970,7 @@ int main_tmem_shared_auth(int argc, char **argv)
     if (!dom && all == 0) {
         fprintf(stderr, "You must specify -a or a domain id.\n\n");
         help("tmem-shared-auth");
-        return 1;
+        return EXIT_FAILURE;
     }
 
     if (all)
@@ -7973,18 +7981,19 @@ int main_tmem_shared_auth(int argc, char **argv)
     if (uuid == NULL || autharg == NULL) {
         fprintf(stderr, "No uuid or auth specified.\n\n");
         help("tmem-shared-auth");
-        return 1;
+        return EXIT_FAILURE;
     }
 
     auth = strtol(autharg, &endptr, 10);
     if (*endptr != '\0') {
         fprintf(stderr, "Invalid auth, valid auth are <0|1>.\n\n");
-        return 1;
+        return EXIT_FAILURE;
     }
 
-    libxl_tmem_shared_auth(ctx, domid, uuid, auth);
+    if (libxl_tmem_shared_auth(ctx, domid, uuid, auth) < 0)
+        return EXIT_FAILURE;
 
-    return 0;
+    return EXIT_SUCCESS;
 }
 
 int main_tmem_freeable(int argc, char **argv)
@@ -7998,10 +8007,10 @@ int main_tmem_freeable(int argc, char **argv)
 
     mb = libxl_tmem_freeable(ctx);
     if (mb == -1)
-        return -1;
+        return EXIT_FAILURE;
 
     printf("%d\n", mb);
-    return 0;
+    return EXIT_SUCCESS;
 }
 
 int main_cpupoolcreate(int argc, char **argv)
