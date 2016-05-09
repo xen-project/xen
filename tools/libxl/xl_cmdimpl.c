@@ -3808,10 +3808,11 @@ int main_pcilist(int argc, char **argv)
     return 0;
 }
 
-static void pcidetach(uint32_t domid, const char *bdf, int force)
+static int pcidetach(uint32_t domid, const char *bdf, int force)
 {
     libxl_device_pci pcidev;
     XLU_Config *config;
+    int r = 0;
 
     libxl_device_pci_init(&pcidev);
 
@@ -3822,13 +3823,18 @@ static void pcidetach(uint32_t domid, const char *bdf, int force)
         fprintf(stderr, "pci-detach: malformed BDF specification \"%s\"\n", bdf);
         exit(2);
     }
-    if (force)
-        libxl_device_pci_destroy(ctx, domid, &pcidev, 0);
-    else
-        libxl_device_pci_remove(ctx, domid, &pcidev, 0);
+    if (force) {
+        if (libxl_device_pci_destroy(ctx, domid, &pcidev, 0))
+            r = 1;
+    } else {
+        if (libxl_device_pci_remove(ctx, domid, &pcidev, 0))
+            r = 1;
+    }
 
     libxl_device_pci_dispose(&pcidev);
     xlu_cfg_destroy(config);
+
+    return r;
 }
 
 int main_pcidetach(int argc, char **argv)
@@ -3847,13 +3853,17 @@ int main_pcidetach(int argc, char **argv)
     domid = find_domain(argv[optind]);
     bdf = argv[optind + 1];
 
-    pcidetach(domid, bdf, force);
-    return 0;
+    if (pcidetach(domid, bdf, force))
+        return EXIT_FAILURE;
+
+    return EXIT_SUCCESS;
 }
-static void pciattach(uint32_t domid, const char *bdf, const char *vs)
+
+static int pciattach(uint32_t domid, const char *bdf, const char *vs)
 {
     libxl_device_pci pcidev;
     XLU_Config *config;
+    int r = 0;
 
     libxl_device_pci_init(&pcidev);
 
@@ -3864,10 +3874,14 @@ static void pciattach(uint32_t domid, const char *bdf, const char *vs)
         fprintf(stderr, "pci-attach: malformed BDF specification \"%s\"\n", bdf);
         exit(2);
     }
-    libxl_device_pci_add(ctx, domid, &pcidev, 0);
+
+    if (libxl_device_pci_add(ctx, domid, &pcidev, 0))
+        r = 1;
 
     libxl_device_pci_dispose(&pcidev);
     xlu_cfg_destroy(config);
+
+    return r;
 }
 
 int main_pciattach(int argc, char **argv)
@@ -3886,8 +3900,10 @@ int main_pciattach(int argc, char **argv)
     if (optind + 1 < argc)
         vs = argv[optind + 2];
 
-    pciattach(domid, bdf, vs);
-    return 0;
+    if (pciattach(domid, bdf, vs))
+        return EXIT_FAILURE;
+
+    return EXIT_SUCCESS;
 }
 
 static void pciassignable_list(void)
@@ -3919,10 +3935,11 @@ int main_pciassignable_list(int argc, char **argv)
     return 0;
 }
 
-static void pciassignable_add(const char *bdf, int rebind)
+static int pciassignable_add(const char *bdf, int rebind)
 {
     libxl_device_pci pcidev;
     XLU_Config *config;
+    int r = 0;
 
     libxl_device_pci_init(&pcidev);
 
@@ -3933,10 +3950,14 @@ static void pciassignable_add(const char *bdf, int rebind)
         fprintf(stderr, "pci-assignable-add: malformed BDF specification \"%s\"\n", bdf);
         exit(2);
     }
-    libxl_device_pci_assignable_add(ctx, &pcidev, rebind);
+
+    if (libxl_device_pci_assignable_add(ctx, &pcidev, rebind))
+        r = 1;
 
     libxl_device_pci_dispose(&pcidev);
     xlu_cfg_destroy(config);
+
+    return r;
 }
 
 int main_pciassignable_add(int argc, char **argv)
@@ -3950,14 +3971,17 @@ int main_pciassignable_add(int argc, char **argv)
 
     bdf = argv[optind];
 
-    pciassignable_add(bdf, 1);
-    return 0;
+    if (pciassignable_add(bdf, 1))
+        return EXIT_FAILURE;
+
+    return EXIT_SUCCESS;
 }
 
-static void pciassignable_remove(const char *bdf, int rebind)
+static int pciassignable_remove(const char *bdf, int rebind)
 {
     libxl_device_pci pcidev;
     XLU_Config *config;
+    int r = 0;
 
     libxl_device_pci_init(&pcidev);
 
@@ -3968,10 +3992,14 @@ static void pciassignable_remove(const char *bdf, int rebind)
         fprintf(stderr, "pci-assignable-remove: malformed BDF specification \"%s\"\n", bdf);
         exit(2);
     }
-    libxl_device_pci_assignable_remove(ctx, &pcidev, rebind);
+
+    if (libxl_device_pci_assignable_remove(ctx, &pcidev, rebind))
+        r = 1;
 
     libxl_device_pci_dispose(&pcidev);
     xlu_cfg_destroy(config);
+
+    return r;
 }
 
 int main_pciassignable_remove(int argc, char **argv)
@@ -3988,8 +4016,10 @@ int main_pciassignable_remove(int argc, char **argv)
 
     bdf = argv[optind];
 
-    pciassignable_remove(bdf, rebind);
-    return 0;
+    if (pciassignable_remove(bdf, rebind))
+        return EXIT_FAILURE;
+
+    return EXIT_SUCCESS;
 }
 
 static void pause_domain(uint32_t domid)
