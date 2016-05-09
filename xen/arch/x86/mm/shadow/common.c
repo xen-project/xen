@@ -2394,7 +2394,8 @@ int sh_remove_write_access_from_sl1p(struct vcpu *v, mfn_t gmfn,
 /* Remove all mappings of a guest frame from the shadow tables.
  * Returns non-zero if we need to flush TLBs. */
 
-int sh_remove_all_mappings(struct vcpu *v, mfn_t gmfn)
+static int sh_remove_all_mappings(struct vcpu *v, mfn_t gmfn,
+                                  unsigned long gfn)
 {
     struct page_info *page = mfn_to_page(gmfn);
 
@@ -2446,19 +2447,25 @@ int sh_remove_all_mappings(struct vcpu *v, mfn_t gmfn)
     /* If that didn't catch the mapping, something is very wrong */
     if ( !sh_check_page_has_no_refs(page) )
     {
-        /* Don't complain if we're in HVM and there are some extra mappings: 
+        /*
+         * Don't complain if we're in HVM and there are some extra mappings:
          * The qemu helper process has an untyped mapping of this dom's RAM 
          * and the HVM restore program takes another.
-         * Also allow one typed refcount for xenheap pages, to match
-         * share_xen_page_with_guest(). */
+         * Also allow one typed refcount for
+         * - Xen heap pages, to match share_xen_page_with_guest(),
+         * - ioreq server pages, to match prepare_ring_for_helper().
+         */
         if ( !(shadow_mode_external(v->domain)
                && (page->count_info & PGC_count_mask) <= 3
                && ((page->u.inuse.type_info & PGT_count_mask)
-                   == !!is_xen_heap_page(page))) )
+                   == (is_xen_heap_page(page) ||
+                       is_ioreq_server_page(v->domain, page)))) )
         {
-            SHADOW_ERROR("can't find all mappings of mfn %lx: "
-                          "c=%08lx t=%08lx\n", mfn_x(gmfn), 
-                          page->count_info, page->u.inuse.type_info);
+            SHADOW_ERROR("can't find all mappings of mfn %lx (gfn %lx): "
+                          "c=%lx t=%lx x=%d i=%d\n", mfn_x(gmfn), gfn,
+                          page->count_info, page->u.inuse.type_info,
+                          !!is_xen_heap_page(page),
+                          is_ioreq_server_page(v->domain, page));
         }
     }
 
@@ -3337,7 +3344,7 @@ static void sh_unshadow_for_p2m_change(struct domain *d, unsigned long gfn,
         if ( (p2m_is_valid(p2mt) || p2m_is_grant(p2mt)) && mfn_valid(mfn) ) 
         {
             sh_remove_all_shadows_and_parents(v, mfn);
-            if ( sh_remove_all_mappings(v, mfn) )
+            if ( sh_remove_all_mappings(v, mfn, gfn) )
                 flush_tlb_mask(d->domain_dirty_cpumask);
         }
     }
@@ -3372,7 +3379,8 @@ static void sh_unshadow_for_p2m_change(struct domain *d, unsigned long gfn,
                 {
                     /* This GFN->MFN mapping has gone away */
                     sh_remove_all_shadows_and_parents(v, omfn);
-                    if ( sh_remove_all_mappings(v, omfn) )
+                    if ( sh_remove_all_mappings(v, omfn,
+                                                gfn + (i << PAGE_SHIFT)) )
                         cpumask_or(&flushmask, &flushmask,
                                    d->domain_dirty_cpumask);
                 }
@@ -3588,7 +3596,8 @@ int shadow_track_dirty_vram(struct domain *d,
                         dirty = 1;
                         /* TODO: Heuristics for finding the single mapping of
                          * this gmfn */
-                        flush_tlb |= sh_remove_all_mappings(d->vcpu[0], mfn);
+                        flush_tlb |= sh_remove_all_mappings(d->vcpu[0], mfn,
+                                                            begin_pfn + i);
                     }
                     else
                     {

@@ -91,18 +91,6 @@ void shadow_clean_dirty_bitmap(struct domain *d);
  * has changed, and when bringing up a VCPU for the first time. */
 void shadow_update_paging_modes(struct vcpu *v);
 
-
-/* Remove all mappings of the guest page from the shadows. 
- * This is called from common code.  It does not flush TLBs. */
-int sh_remove_all_mappings(struct vcpu *v, mfn_t target_mfn);
-static inline void 
-shadow_drop_references(struct domain *d, struct page_info *p)
-{
-    if ( unlikely(shadow_mode_enabled(d)) )
-        /* See the comment about locking in sh_remove_all_mappings */
-        sh_remove_all_mappings(d->vcpu[0], _mfn(page_to_mfn(p)));
-}
-
 /* Remove all shadows of the guest mfn. */
 void sh_remove_shadows(struct vcpu *v, mfn_t gmfn, int fast, int all);
 static inline void shadow_remove_all_shadows(struct vcpu *v, mfn_t gmfn)

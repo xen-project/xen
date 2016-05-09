@@ -361,6 +361,7 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
 void hvm_migrate_timers(struct vcpu *v);
 bool_t hvm_has_dm(struct domain *d);
 bool_t hvm_io_pending(struct vcpu *v);
+bool_t is_ioreq_server_page(struct domain *d, const struct page_info *page);
 void hvm_do_resume(struct vcpu *v);
 void hvm_migrate_pirqs(struct vcpu *v);
 
