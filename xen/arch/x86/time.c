@@ -1744,7 +1744,12 @@ custom_param("tsc", tsc_parse);
 u64 gtime_to_gtsc(struct domain *d, u64 time)
 {
     if ( !is_hvm_domain(d) )
-        time = max_t(s64, time - d->arch.vtsc_offset, 0);
+    {
+        if ( time < d->arch.vtsc_offset )
+            return -scale_delta(d->arch.vtsc_offset - time,
+                                &d->arch.ns_to_vtsc);
+        time -= d->arch.vtsc_offset;
+    }
     return scale_delta(time, &d->arch.ns_to_vtsc);
 }
 
