@@ -637,6 +637,30 @@ static int hvm_map_ioreq_page(
     return 0;
 }
 
+bool_t is_ioreq_server_page(struct domain *d, const struct page_info *page)
+{
+    const struct hvm_ioreq_server *s;
+    bool_t found = 0;
+
+    spin_lock_recursive(&d->arch.hvm_domain.ioreq_server.lock);
+
+    list_for_each_entry ( s,
+                          &d->arch.hvm_domain.ioreq_server.list,
+                          list_entry )
+    {
+        if ( (s->ioreq.va && s->ioreq.page == page) ||
+             (s->bufioreq.va && s->bufioreq.page == page) )
+        {
+            found = 1;
+            break;
+        }
+    }
+
+    spin_unlock_recursive(&d->arch.hvm_domain.ioreq_server.lock);
+
+    return found;
+}
+
 static void hvm_remove_ioreq_gmfn(
     struct domain *d, struct hvm_ioreq_page *iorp)
 {
@@ -1118,7 +1142,7 @@ static int hvm_create_ioreq_server(struct domain *d, domid_t domid,
         goto fail1;
 
     domain_pause(d);
-    spin_lock(&d->arch.hvm_domain.ioreq_server.lock);
+    spin_lock_recursive(&d->arch.hvm_domain.ioreq_server.lock);
 
     rc = -EEXIST;
     if ( is_default && d->arch.hvm_domain.default_ioreq_server != NULL )
@@ -1141,14 +1165,14 @@ static int hvm_create_ioreq_server(struct domain *d, domid_t domid,
     if ( id )
         *id = s->id;
 
-    spin_unlock(&d->arch.hvm_domain.ioreq_server.lock);
+    spin_unlock_recursive(&d->arch.hvm_domain.ioreq_server.lock);
     domain_unpause(d);
 
     return 0;
 
  fail3:
  fail2:
-    spin_unlock(&d->arch.hvm_domain.ioreq_server.lock);
+    spin_unlock_recursive(&d->arch.hvm_domain.ioreq_server.lock);
     domain_unpause(d);
 
     xfree(s);
@@ -1161,7 +1185,7 @@ static int hvm_destroy_ioreq_server(struct domain *d, ioservid_t id)
     struct hvm_ioreq_server *s;
     int rc;
 
-    spin_lock(&d->arch.hvm_domain.ioreq_server.lock);
+    spin_lock_recursive(&d->arch.hvm_domain.ioreq_server.lock);
 
     rc = -ENOENT;
     list_for_each_entry ( s,
@@ -1190,7 +1214,7 @@ static int hvm_destroy_ioreq_server(struct domain *d, ioservid_t id)
         break;
     }
 
-    spin_unlock(&d->arch.hvm_domain.ioreq_server.lock);
+    spin_unlock_recursive(&d->arch.hvm_domain.ioreq_server.lock);
 
     return rc;
 }
@@ -1203,7 +1227,7 @@ static int hvm_get_ioreq_server_info(struct domain *d, ioservid_t id,
     struct hvm_ioreq_server *s;
     int rc;
 
-    spin_lock(&d->arch.hvm_domain.ioreq_server.lock);
+    spin_lock_recursive(&d->arch.hvm_domain.ioreq_server.lock);
 
     rc = -ENOENT;
     list_for_each_entry ( s,
@@ -1228,7 +1252,7 @@ static int hvm_get_ioreq_server_info(struct domain *d, ioservid_t id,
         break;
     }
 
-    spin_unlock(&d->arch.hvm_domain.ioreq_server.lock);
+    spin_unlock_recursive(&d->arch.hvm_domain.ioreq_server.lock);
 
     return rc;
 }
@@ -1239,7 +1263,7 @@ static int hvm_map_io_range_to_ioreq_server(struct domain *d, ioservid_t id,
     struct hvm_ioreq_server *s;
     int rc;
 
-    spin_lock(&d->arch.hvm_domain.ioreq_server.lock);
+    spin_lock_recursive(&d->arch.hvm_domain.ioreq_server.lock);
 
     rc = -ENOENT;
     list_for_each_entry ( s,
@@ -1279,7 +1303,7 @@ static int hvm_map_io_range_to_ioreq_server(struct domain *d, ioservid_t id,
         }
     }
 
-    spin_unlock(&d->arch.hvm_domain.ioreq_server.lock);
+    spin_unlock_recursive(&d->arch.hvm_domain.ioreq_server.lock);
 
     return rc;
 }
@@ -1290,7 +1314,7 @@ static int hvm_unmap_io_range_from_ioreq_server(struct domain *d, ioservid_t id,
     struct hvm_ioreq_server *s;
     int rc;
 
-    spin_lock(&d->arch.hvm_domain.ioreq_server.lock);
+    spin_lock_recursive(&d->arch.hvm_domain.ioreq_server.lock);
 
     rc = -ENOENT;
     list_for_each_entry ( s,
@@ -1330,7 +1354,7 @@ static int hvm_unmap_io_range_from_ioreq_server(struct domain *d, ioservid_t id,
         }
     }
 
-    spin_unlock(&d->arch.hvm_domain.ioreq_server.lock);
+    spin_unlock_recursive(&d->arch.hvm_domain.ioreq_server.lock);
 
     return rc;
 }
@@ -1341,7 +1365,7 @@ static int hvm_set_ioreq_server_state(struct domain *d, ioservid_t id,
     struct list_head *entry;
     int rc;
 
-    spin_lock(&d->arch.hvm_domain.ioreq_server.lock);
+    spin_lock_recursive(&d->arch.hvm_domain.ioreq_server.lock);
 
     rc = -ENOENT;
     list_for_each ( entry,
@@ -1370,7 +1394,7 @@ static int hvm_set_ioreq_server_state(struct domain *d, ioservid_t id,
         break;
     }
 
-    spin_unlock(&d->arch.hvm_domain.ioreq_server.lock);
+    spin_unlock_recursive(&d->arch.hvm_domain.ioreq_server.lock);
     return rc;
 }
 
@@ -1379,7 +1403,7 @@ static int hvm_all_ioreq_servers_add_vcpu(struct domain *d, struct vcpu *v)
     struct hvm_ioreq_server *s;
     int rc;
 
-    spin_lock(&d->arch.hvm_domain.ioreq_server.lock);
+    spin_lock_recursive(&d->arch.hvm_domain.ioreq_server.lock);
 
     list_for_each_entry ( s,
                           &d->arch.hvm_domain.ioreq_server.list,
@@ -1392,7 +1416,7 @@ static int hvm_all_ioreq_servers_add_vcpu(struct domain *d, struct vcpu *v)
             goto fail;
     }
 
-    spin_unlock(&d->arch.hvm_domain.ioreq_server.lock);
+    spin_unlock_recursive(&d->arch.hvm_domain.ioreq_server.lock);
 
     return 0;
 
@@ -1402,7 +1426,7 @@ static int hvm_all_ioreq_servers_add_vcpu(struct domain *d, struct vcpu *v)
                           list_entry )
         hvm_ioreq_server_remove_vcpu(s, v);
 
-    spin_unlock(&d->arch.hvm_domain.ioreq_server.lock);
+    spin_unlock_recursive(&d->arch.hvm_domain.ioreq_server.lock);
 
     return rc;
 }
@@ -1411,21 +1435,21 @@ static void hvm_all_ioreq_servers_remove_vcpu(struct domain *d, struct vcpu *v)
 {
     struct hvm_ioreq_server *s;
 
-    spin_lock(&d->arch.hvm_domain.ioreq_server.lock);
+    spin_lock_recursive(&d->arch.hvm_domain.ioreq_server.lock);
 
     list_for_each_entry ( s,
                           &d->arch.hvm_domain.ioreq_server.list,
                           list_entry )
         hvm_ioreq_server_remove_vcpu(s, v);
 
-    spin_unlock(&d->arch.hvm_domain.ioreq_server.lock);
+    spin_unlock_recursive(&d->arch.hvm_domain.ioreq_server.lock);
 }
 
 static void hvm_destroy_all_ioreq_servers(struct domain *d)
 {
     struct hvm_ioreq_server *s, *next;
 
-    spin_lock(&d->arch.hvm_domain.ioreq_server.lock);
+    spin_lock_recursive(&d->arch.hvm_domain.ioreq_server.lock);
 
     /* No need to domain_pause() as the domain is being torn down */
 
@@ -1448,7 +1472,7 @@ static void hvm_destroy_all_ioreq_servers(struct domain *d)
         xfree(s);
     }
 
-    spin_unlock(&d->arch.hvm_domain.ioreq_server.lock);
+    spin_unlock_recursive(&d->arch.hvm_domain.ioreq_server.lock);
 }
 
 static int hvm_replace_event_channel(struct vcpu *v, domid_t remote_domid,
@@ -1472,7 +1496,7 @@ static int hvm_set_dm_domain(struct domain *d, domid_t domid)
     struct hvm_ioreq_server *s;
     int rc = 0;
 
-    spin_lock(&d->arch.hvm_domain.ioreq_server.lock);
+    spin_lock_recursive(&d->arch.hvm_domain.ioreq_server.lock);
 
     /*
      * Lack of ioreq server is not a failure. HVM_PARAM_DM_DOMAIN will
@@ -1521,7 +1545,7 @@ static int hvm_set_dm_domain(struct domain *d, domid_t domid)
     domain_unpause(d);
 
  done:
-    spin_unlock(&d->arch.hvm_domain.ioreq_server.lock);
+    spin_unlock_recursive(&d->arch.hvm_domain.ioreq_server.lock);
     return rc;
 }
 
