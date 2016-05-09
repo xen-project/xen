@@ -36,7 +36,7 @@ static unsigned int pcidev_encode_bdf(libxl_device_pci *pcidev)
     return value;
 }
 
-static int pcidev_struct_fill(libxl_device_pci *pcidev, unsigned int domain,
+static void pcidev_struct_fill(libxl_device_pci *pcidev, unsigned int domain,
                                unsigned int bus, unsigned int dev,
                                unsigned int func, unsigned int vdevfn)
 {
@@ -45,7 +45,6 @@ static int pcidev_struct_fill(libxl_device_pci *pcidev, unsigned int domain,
     pcidev->dev = dev;
     pcidev->func = func;
     pcidev->vdevfn = vdevfn;
-    return 0;
 }
 
 static void libxl_create_pci_backend_device(libxl__gc *gc, flexarray_t *back, int num, libxl_device_pci *pcidev)
@@ -64,9 +63,9 @@ static void libxl_create_pci_backend_device(libxl__gc *gc, flexarray_t *back, in
     flexarray_append_pair(back, GCSPRINTF("state-%d", num), GCSPRINTF("%d", XenbusStateInitialising));
 }
 
-static int libxl__device_from_pcidev(libxl__gc *gc, uint32_t domid,
-                                     libxl_device_pci *pcidev,
-                                     libxl__device *device)
+static void libxl__device_from_pcidev(libxl__gc *gc, uint32_t domid,
+                                      libxl_device_pci *pcidev,
+                                      libxl__device *device)
 {
     device->backend_devid = 0;
     device->backend_domid = 0;
@@ -74,8 +73,6 @@ static int libxl__device_from_pcidev(libxl__gc *gc, uint32_t domid,
     device->devid = 0;
     device->domid = domid;
     device->kind = LIBXL__DEVICE_KIND_PCI;
-
-    return 0;
 }
 
 int libxl__create_pci_backend(libxl__gc *gc, uint32_t domid,
@@ -84,12 +81,10 @@ int libxl__create_pci_backend(libxl__gc *gc, uint32_t domid,
     flexarray_t *front = NULL;
     flexarray_t *back = NULL;
     libxl__device device;
-    int ret = ERROR_NOMEM, i;
+    int i;
 
     front = flexarray_make(gc, 16, 1);
     back = flexarray_make(gc, 16, 1);
-
-    ret = 0;
 
     LOG(DEBUG, "Creating pci backend");
 
@@ -108,12 +103,10 @@ int libxl__create_pci_backend(libxl__gc *gc, uint32_t domid,
     flexarray_append_pair(front, "backend-id", GCSPRINTF("%d", 0));
     flexarray_append_pair(front, "state", GCSPRINTF("%d", XenbusStateInitialising));
 
-    libxl__device_generic_add(gc, XBT_NULL, &device,
-                              libxl__xs_kvs_of_flexarray(gc, back, back->count),
-                              libxl__xs_kvs_of_flexarray(gc, front, front->count),
-                              NULL);
-
-    return 0;
+    return libxl__device_generic_add(gc, XBT_NULL, &device,
+                                     libxl__xs_kvs_of_flexarray(gc, back, back->count),
+                                     libxl__xs_kvs_of_flexarray(gc, front, front->count),
+                                     NULL);
 }
 
 static int libxl__device_pci_add_xenstore(libxl__gc *gc, uint32_t domid, libxl_device_pci *pcidev, int starting)
@@ -1612,7 +1605,7 @@ int libxl__device_pci_destroy_all(libxl__gc *gc, uint32_t domid)
     }
 
     free(pcidevs);
-    return 0;
+    return rc;
 }
 
 int libxl__grant_vga_iomem_permission(libxl__gc *gc, const uint32_t domid,
