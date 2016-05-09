@@ -85,6 +85,7 @@ struct hvm_vcpu_io {
     bool_t mmio_retry;
 
     unsigned long msix_unmask_address;
+    unsigned long msix_snoop_address;
 
     const struct g2m_ioport *g2m_ioport;
 };

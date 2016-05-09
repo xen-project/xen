@@ -341,7 +341,23 @@ static int msixtbl_range(struct vcpu *v, unsigned long addr)
     desc = msixtbl_addr_to_desc(msixtbl_find_entry(v, addr), addr);
     rcu_read_unlock(&msixtbl_rcu_lock);
 
-    return !!desc;
+    if ( desc )
+        return 1;
+
+    if ( (addr & (PCI_MSIX_ENTRY_SIZE - 1)) ==
+         PCI_MSIX_ENTRY_VECTOR_CTRL_OFFSET )
+    {
+        const ioreq_t *r = &v->arch.hvm_vcpu.hvm_io.io_req;
+
+        if ( r->state != STATE_IOREQ_READY || r->addr != addr )
+            return 0;
+        ASSERT(r->type == IOREQ_TYPE_COPY);
+        if ( r->dir == IOREQ_WRITE && r->size == 4 && !r->data_is_ptr
+             && !(r->data & PCI_MSIX_VECTOR_BITMASK) )
+            v->arch.hvm_vcpu.hvm_io.msix_snoop_address = addr;
+    }
+
+    return 0;
 }
 
 static const struct hvm_mmio_ops msixtbl_mmio_ops = {
@@ -407,9 +423,6 @@ int msixtbl_pt_register(struct domain *d, struct pirq *pirq, uint64_t gtable)
         return r;
     }
 
-    if ( !irq_desc->msi_desc )
-        goto out;
-
     msi_desc = irq_desc->msi_desc;
     if ( !msi_desc )
         goto out;
@@ -434,6 +447,23 @@ found:
 out:
     spin_unlock_irq(&irq_desc->lock);
     xfree(new_entry);
+
+    if ( !r )
+    {
+        struct vcpu *v;
+
+        for_each_vcpu ( d, v )
+        {
+            if ( (v->pause_flags & VPF_blocked_in_xen) &&
+                 v->arch.hvm_vcpu.hvm_io.msix_snoop_address ==
+                 (gtable + msi_desc->msi_attrib.entry_nr *
+                           PCI_MSIX_ENTRY_SIZE +
+                  PCI_MSIX_ENTRY_VECTOR_CTRL_OFFSET) )
+                v->arch.hvm_vcpu.hvm_io.msix_unmask_address =
+                    v->arch.hvm_vcpu.hvm_io.msix_snoop_address;
+        }
+    }
+
     return r;
 }
 
@@ -450,9 +480,6 @@ void msixtbl_pt_unregister(struct domain *d, struct pirq *pirq)
     irq_desc = pirq_spin_lock_irq_desc(pirq, NULL);
     if ( !irq_desc )
         return;
-
-    if ( !irq_desc->msi_desc )
-        goto out;
 
     msi_desc = irq_desc->msi_desc;
     if ( !msi_desc )
@@ -509,6 +536,8 @@ void msixtbl_pt_cleanup(struct domain *d)
 void msix_write_completion(struct vcpu *v)
 {
     unsigned long ctrl_address = v->arch.hvm_vcpu.hvm_io.msix_unmask_address;
+
+    v->arch.hvm_vcpu.hvm_io.msix_snoop_address = 0;
 
     if ( !ctrl_address )
         return;
