@@ -255,9 +255,9 @@ MINIOS_UPSTREAM_URL ?= git://xenbits.xen.org/mini-os.git
 endif
 OVMF_UPSTREAM_REVISION ?= 52a99493cce88a9d4ec8a02d7f1bd1a1001ce60d
 QEMU_UPSTREAM_REVISION ?= qemu-xen-4.6.1
-MINIOS_UPSTREAM_REVISION ?= xen-RELEASE-4.6.0
-# Fri Jun 26 11:58:40 2015 +0100
-# Correct printf formatting for tpm_tis message.
+MINIOS_UPSTREAM_REVISION ?= 6aadd46e0927763861b19eacce2f2aeac9f17835
+# Sat, 9 Apr 2016 23:46:32 +0100 (00:46 +0200)
+# Fix time update
 
 SEABIOS_UPSTREAM_REVISION ?= rel-1.8.2
 # Tue Mar 17 10:52:16 2015 -0400
