@@ -4901,7 +4901,7 @@ int libxl_set_memory_target(libxl_ctx *ctx, uint32_t domid,
         int32_t target_memkb, int relative, int enforce)
 {
     GC_INIT(ctx);
-    int rc = 1, abort_transaction = 0;
+    int rc, r, lrc, abort_transaction = 0;
     uint64_t memorykb;
     uint32_t videoram = 0;
     uint32_t current_target_memkb = 0, new_target_memkb = 0;
@@ -4929,15 +4929,15 @@ retry_transaction:
     if (!target && !domid) {
         if (!xs_transaction_end(ctx->xsh, t, 1))
             goto out_no_transaction;
-        rc = libxl__fill_dom0_memory_info(gc, &current_target_memkb,
+        lrc = libxl__fill_dom0_memory_info(gc, &current_target_memkb,
                                           &current_max_memkb);
-        if (rc < 0)
-            goto out_no_transaction;
+        if (lrc < 0) { rc = ERROR_FAIL; goto out_no_transaction; }
         goto retry_transaction;
     } else if (!target) {
         LOGE(ERROR, "cannot get target memory info from %s/memory/target",
              dompath);
         abort_transaction = 1;
+        rc = ERROR_FAIL;
         goto out;
     } else {
         current_target_memkb = strtoul(target, &endptr, 10);
@@ -4945,6 +4945,7 @@ retry_transaction:
             LOGE(ERROR, "invalid memory target %s from %s/memory/target\n",
                  target, dompath);
             abort_transaction = 1;
+            rc = ERROR_FAIL;
             goto out;
         }
     }
@@ -4953,6 +4954,7 @@ retry_transaction:
         LOGE(ERROR, "cannot get memory info from %s/memory/static-max",
              dompath);
         abort_transaction = 1;
+        rc = ERROR_FAIL;
         goto out;
     }
     memorykb = strtoul(memmax, &endptr, 10);
@@ -4960,6 +4962,7 @@ retry_transaction:
         LOGE(ERROR, "invalid max memory %s from %s/memory/static-max\n",
              memmax, dompath);
         abort_transaction = 1;
+        rc = ERROR_FAIL;
         goto out;
     }
 
@@ -4979,6 +4982,7 @@ retry_transaction:
             "memory_dynamic_max must be less than or equal to"
             " memory_static_max\n");
         abort_transaction = 1;
+        rc = ERROR_INVAL;
         goto out;
     }
 
@@ -4986,33 +4990,36 @@ retry_transaction:
         LOG(ERROR, "new target %d for dom0 is below the minimum threshold",
             new_target_memkb);
         abort_transaction = 1;
+        rc = ERROR_INVAL;
         goto out;
     }
 
     if (enforce) {
         memorykb = new_target_memkb + videoram;
-        rc = xc_domain_setmaxmem(ctx->xch, domid, memorykb +
+        r = xc_domain_setmaxmem(ctx->xch, domid, memorykb +
                 LIBXL_MAXMEM_CONSTANT);
-        if (rc != 0) {
+        if (r != 0) {
             LOGE(ERROR,
                  "xc_domain_setmaxmem domid=%u memkb=%"PRIu64" failed ""rc=%d\n",
                  domid,
                  memorykb + LIBXL_MAXMEM_CONSTANT,
-                 rc);
+                 r);
             abort_transaction = 1;
+            rc = ERROR_FAIL;
             goto out;
         }
     }
 
-    rc = xc_domain_set_pod_target(ctx->xch, domid,
+    r = xc_domain_set_pod_target(ctx->xch, domid,
             (new_target_memkb + LIBXL_MAXMEM_CONSTANT) / 4, NULL, NULL, NULL);
-    if (rc != 0) {
+    if (r != 0) {
         LOGE(ERROR,
              "xc_domain_set_pod_target domid=%d, memkb=%d ""failed rc=%d\n",
              domid,
              new_target_memkb / 4,
-             rc);
+             r);
         abort_transaction = 1;
+        rc = ERROR_FAIL;
         goto out;
     }
 
@@ -5026,6 +5033,7 @@ retry_transaction:
                      "%"PRIu32, new_target_memkb / 1024);
     libxl_dominfo_dispose(&ptr);
 
+    rc = 0;
 out:
     if (!xs_transaction_end(ctx->xsh, t, abort_transaction)
         && !abort_transaction)
