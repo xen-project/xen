@@ -590,6 +590,10 @@ rt_init(struct scheduler *ops)
     if ( prv == NULL )
         return -ENOMEM;
 
+    prv->repl_timer = xzalloc(struct timer);
+    if ( prv->repl_timer == NULL )
+        return -ENOMEM;
+
     spin_lock_init(&prv->lock);
     INIT_LIST_HEAD(&prv->sdom);
     INIT_LIST_HEAD(&prv->runq);
@@ -600,12 +604,6 @@ rt_init(struct scheduler *ops)
 
     ops->sched_data = prv;
 
-    /*
-     * The timer initialization will happen later when
-     * the first pcpu is added to this pool in alloc_pdata.
-     */
-    prv->repl_timer = NULL;
-
     return 0;
 }
 
@@ -614,7 +612,8 @@ rt_deinit(struct scheduler *ops)
 {
     struct rt_private *prv = rt_priv(ops);
 
-    kill_timer(prv->repl_timer);
+    ASSERT(prv->repl_timer->status == TIMER_STATUS_invalid ||
+           prv->repl_timer->status == TIMER_STATUS_killed);
     xfree(prv->repl_timer);
 
     ops->sched_data = NULL;
@@ -632,9 +631,19 @@ rt_init_pdata(const struct scheduler *ops, void *pdata, int cpu)
     spinlock_t *old_lock;
     unsigned long flags;
 
-    /* Move the scheduler lock to our global runqueue lock.  */
     old_lock = pcpu_schedule_lock_irqsave(cpu, &flags);
 
+    /*
+     * TIMER_STATUS_invalid means we are the first cpu that sees the timer
+     * allocated but not initialized, and so it's up to us to initialize it.
+     */
+    if ( prv->repl_timer->status == TIMER_STATUS_invalid )
+    {
+        init_timer(prv->repl_timer, repl_timer_handler, (void*) ops, cpu);
+        dprintk(XENLOG_DEBUG, "RTDS: timer initialized on cpu %u\n", cpu);
+    }
+
+    /* Move the scheduler lock to our global runqueue lock.  */
     per_cpu(schedule_data, cpu).schedule_lock = &prv->lock;
 
     /* _Not_ pcpu_schedule_unlock(): per_cpu().schedule_lock changed! */
@@ -659,6 +668,20 @@ rt_switch_sched(struct scheduler *new_ops, unsigned int cpu,
      */
     ASSERT(per_cpu(schedule_data, cpu).schedule_lock != &prv->lock);
 
+    /*
+     * If we are the absolute first cpu being switched toward this
+     * scheduler (in which case we'll see TIMER_STATUS_invalid), or the
+     * first one that is added back to the cpupool that had all its cpus
+     * removed (in which case we'll see TIMER_STATUS_killed), it's our
+     * job to (re)initialize the timer.
+     */
+    if ( prv->repl_timer->status == TIMER_STATUS_invalid ||
+         prv->repl_timer->status == TIMER_STATUS_killed )
+    {
+        init_timer(prv->repl_timer, repl_timer_handler, (void*) new_ops, cpu);
+        dprintk(XENLOG_DEBUG, "RTDS: timer initialized on cpu %u\n", cpu);
+    }
+
     idle_vcpu[cpu]->sched_priv = vdata;
     per_cpu(scheduler, cpu) = new_ops;
     per_cpu(schedule_data, cpu).sched_priv = NULL; /* no pdata */
@@ -672,23 +695,36 @@ rt_switch_sched(struct scheduler *new_ops, unsigned int cpu,
     per_cpu(schedule_data, cpu).schedule_lock = &prv->lock;
 }
 
-static void *
-rt_alloc_pdata(const struct scheduler *ops, int cpu)
+static void
+rt_deinit_pdata(const struct scheduler *ops, void *pcpu, int cpu)
 {
+    unsigned long flags;
     struct rt_private *prv = rt_priv(ops);
 
-    if ( prv->repl_timer == NULL )
+    spin_lock_irqsave(&prv->lock, flags);
+
+    if ( prv->repl_timer->cpu == cpu )
     {
-        /* Allocate the timer on the first cpu of this pool. */
-        prv->repl_timer = xzalloc(struct timer);
+        struct cpupool *c = per_cpu(cpupool, cpu);
+        unsigned int new_cpu = cpumask_cycle(cpu, cpupool_online_cpumask(c));
 
-        if ( prv->repl_timer == NULL )
-            return ERR_PTR(-ENOMEM);
-
-        init_timer(prv->repl_timer, repl_timer_handler, (void *)ops, cpu);
+        /*
+         * Make sure the timer run on one of the cpus that are still available
+         * to this scheduler. If there aren't any left, it means it's the time
+         * to just kill it.
+         */
+        if ( new_cpu >= nr_cpu_ids )
+        {
+            kill_timer(prv->repl_timer);
+            dprintk(XENLOG_DEBUG, "RTDS: timer killed on cpu %d\n", cpu);
+        }
+        else
+        {
+            migrate_timer(prv->repl_timer, new_cpu);
+        }
     }
 
-    return NULL;
+    spin_unlock_irqrestore(&prv->lock, flags);
 }
 
 static void *
@@ -1433,9 +1469,9 @@ static const struct scheduler sched_rtds_def = {
     .dump_settings  = rt_dump,
     .init           = rt_init,
     .deinit         = rt_deinit,
-    .alloc_pdata    = rt_alloc_pdata,
     .init_pdata     = rt_init_pdata,
     .switch_sched   = rt_switch_sched,
+    .deinit_pdata   = rt_deinit_pdata,
     .alloc_domdata  = rt_alloc_domdata,
     .free_domdata   = rt_free_domdata,
     .init_domain    = rt_dom_init,
