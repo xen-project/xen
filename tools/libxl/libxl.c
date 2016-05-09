@@ -6682,14 +6682,14 @@ uint32_t libxl_vm_get_start_time(libxl_ctx *ctx, uint32_t domid)
 
 char *libxl_tmem_list(libxl_ctx *ctx, uint32_t domid, int use_long)
 {
-    int rc;
+    int r;
     char _buf[32768];
     GC_INIT(ctx);
 
-    rc = xc_tmem_control(ctx->xch, -1, XEN_SYSCTL_TMEM_OP_LIST, domid, 32768, use_long,
-                         _buf);
-    if (rc < 0) {
-        LOGEV(ERROR, rc, "Can not get tmem list");
+    r = xc_tmem_control(ctx->xch, -1, XEN_SYSCTL_TMEM_OP_LIST, domid, 32768,
+                        use_long, _buf);
+    if (r < 0) {
+        LOGE(ERROR, "Can not get tmem list");
         GC_FREE;
         return NULL;
     }
@@ -6700,34 +6700,38 @@ char *libxl_tmem_list(libxl_ctx *ctx, uint32_t domid, int use_long)
 
 int libxl_tmem_freeze(libxl_ctx *ctx, uint32_t domid)
 {
-    int rc;
+    int r, rc;
     GC_INIT(ctx);
 
-    rc = xc_tmem_control(ctx->xch, -1, XEN_SYSCTL_TMEM_OP_FREEZE, domid, 0, 0,
-                         NULL);
-    if (rc < 0) {
-        LOGEV(ERROR, rc, "Can not freeze tmem pools");
-        GC_FREE;
-        return ERROR_FAIL;
+    r = xc_tmem_control(ctx->xch, -1, XEN_SYSCTL_TMEM_OP_FREEZE, domid, 0, 0,
+                        NULL);
+    if (r < 0) {
+        LOGE(ERROR, "Can not freeze tmem pools");
+        rc = ERROR_FAIL;
+        goto out;
     }
 
+    rc = 0;
+out:
     GC_FREE;
     return rc;
 }
 
 int libxl_tmem_thaw(libxl_ctx *ctx, uint32_t domid)
 {
-    int rc;
+    int r, rc;
     GC_INIT(ctx);
 
-    rc = xc_tmem_control(ctx->xch, -1, XEN_SYSCTL_TMEM_OP_THAW, domid, 0, 0,
-                         NULL);
-    if (rc < 0) {
-        LOGEV(ERROR, rc, "Can not thaw tmem pools");
-        GC_FREE;
-        return ERROR_FAIL;
+    r = xc_tmem_control(ctx->xch, -1, XEN_SYSCTL_TMEM_OP_THAW, domid, 0, 0,
+                        NULL);
+    if (r < 0) {
+        LOGE(ERROR, "Can not thaw tmem pools");
+        rc = ERROR_FAIL;
+        goto out;
     }
 
+    rc = 0;
+out:
     GC_FREE;
     return rc;
 }
@@ -6746,22 +6750,24 @@ static int32_t tmem_setop_from_string(char *set_name)
 
 int libxl_tmem_set(libxl_ctx *ctx, uint32_t domid, char* name, uint32_t set)
 {
-    int rc;
+    int r, rc;
     int32_t subop = tmem_setop_from_string(name);
     GC_INIT(ctx);
 
     if (subop == -1) {
         LOGEV(ERROR, -1, "Invalid set, valid sets are <weight|cap|compress>");
-        GC_FREE;
-        return ERROR_INVAL;
+        rc = ERROR_INVAL;
+        goto out;
     }
-    rc = xc_tmem_control(ctx->xch, -1, subop, domid, set, 0, NULL);
-    if (rc < 0) {
-        LOGEV(ERROR, rc, "Can not set tmem %s", name);
-        GC_FREE;
-        return ERROR_FAIL;
+    r = xc_tmem_control(ctx->xch, -1, subop, domid, set, 0, NULL);
+    if (r < 0) {
+        LOGE(ERROR, "Can not set tmem %s", name);
+        rc = ERROR_FAIL;
+        goto out;
     }
 
+    rc = 0;
+out:
     GC_FREE;
     return rc;
 }
@@ -6769,32 +6775,37 @@ int libxl_tmem_set(libxl_ctx *ctx, uint32_t domid, char* name, uint32_t set)
 int libxl_tmem_shared_auth(libxl_ctx *ctx, uint32_t domid,
                            char* uuid, int auth)
 {
-    int rc;
+    int r, rc;
     GC_INIT(ctx);
 
-    rc = xc_tmem_auth(ctx->xch, domid, uuid, auth);
-    if (rc < 0) {
-        LOGEV(ERROR, rc, "Can not set tmem shared auth");
-        GC_FREE;
-        return ERROR_FAIL;
+    r = xc_tmem_auth(ctx->xch, domid, uuid, auth);
+    if (r < 0) {
+        LOGE(ERROR, "Can not set tmem shared auth");
+        rc = ERROR_FAIL;
+        goto out;
     }
 
+    rc = 0;
+out:
     GC_FREE;
     return rc;
 }
 
 int libxl_tmem_freeable(libxl_ctx *ctx)
 {
-    int rc;
+    int r, rc;
     GC_INIT(ctx);
 
-    rc = xc_tmem_control(ctx->xch, -1, XEN_SYSCTL_TMEM_OP_QUERY_FREEABLE_MB, -1, 0, 0, 0);
-    if (rc < 0) {
-        LOGEV(ERROR, rc, "Can not get tmem freeable memory");
-        GC_FREE;
-        return ERROR_FAIL;
+    r = xc_tmem_control(ctx->xch, -1, XEN_SYSCTL_TMEM_OP_QUERY_FREEABLE_MB,
+                        -1, 0, 0, 0);
+    if (r < 0) {
+        LOGE(ERROR, "Can not get tmem freeable memory");
+        rc = ERROR_FAIL;
+        goto out;
     }
 
+    rc = 0;
+out:
     GC_FREE;
     return rc;
 }
