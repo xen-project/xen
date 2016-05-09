@@ -309,8 +309,8 @@ static int dpci_ioport_write(uint32_t mport, ioreq_t *p)
                 ASSERT(0);
                 /* fall through */
             default:
-                rc = X86EMUL_UNHANDLEABLE;
-                break;
+                domain_crash(current->domain);
+                return X86EMUL_UNHANDLEABLE;
             }
             if ( rc != X86EMUL_OKAY)
                 break;

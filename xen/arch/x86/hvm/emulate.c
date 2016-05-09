@@ -202,11 +202,17 @@ static int hvmemul_do_io(
         rc = hvm_portio_intercept(&p);
     }
 
+    /*
+     * p.count may have got reduced (see hvm_mmio_access() and
+     * process_portio_intercept()) - inform our callers.
+     */
+    ASSERT(p.count <= *reps);
+    *reps = p.count;
+
     switch ( rc )
     {
     case X86EMUL_OKAY:
     case X86EMUL_RETRY:
-        *reps = p.count;
         p.state = STATE_IORESP_READY;
         if ( !vio->mmio_retry )
         {

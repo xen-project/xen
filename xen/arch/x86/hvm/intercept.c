@@ -140,8 +140,8 @@ static int hvm_mmio_access(struct vcpu *v,
                 ASSERT(0);
                 /* fall through */
             default:
-                rc = X86EMUL_UNHANDLEABLE;
-                break;
+                domain_crash(v->domain);
+                return X86EMUL_UNHANDLEABLE;
             }
             if ( rc != X86EMUL_OKAY )
                 break;
@@ -158,6 +158,15 @@ static int hvm_mmio_access(struct vcpu *v,
     {
         p->count = i;
         rc = X86EMUL_OKAY;
+    }
+    else if ( rc == X86EMUL_UNHANDLEABLE )
+    {
+        /*
+         * Don't forward entire batches to the device model: This would
+         * prevent the internal handlers to see subsequent iterations of
+         * the request.
+         */
+        p->count = 1;
     }
 
     return rc;
@@ -302,8 +311,8 @@ static int process_portio_intercept(portio_action_t action, ioreq_t *p)
                 ASSERT(0);
                 /* fall through */
             default:
-                rc = X86EMUL_UNHANDLEABLE;
-                break;
+                domain_crash(current->domain);
+                return X86EMUL_UNHANDLEABLE;
             }
             if ( rc != X86EMUL_OKAY )
                 break;
@@ -320,6 +329,15 @@ static int process_portio_intercept(portio_action_t action, ioreq_t *p)
     {
         p->count = i;
         rc = X86EMUL_OKAY;
+    }
+    else if ( rc == X86EMUL_UNHANDLEABLE )
+    {
+        /*
+         * Don't forward entire batches to the device model: This would
+         * prevent the internal handlers to see subsequent iterations of
+         * the request.
+         */
+        p->count = 1;
     }
 
     return rc;
