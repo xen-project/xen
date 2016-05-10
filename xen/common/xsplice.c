@@ -748,7 +748,8 @@ static int build_symbol_table(struct payload *payload,
 
         if ( !found )
         {
-            if ( xsplice_symbols_lookup_by_name(symtab[i].name) )
+            if ( symbols_lookup_by_name(symtab[i].name) ||
+                 xsplice_symbols_lookup_by_name(symtab[i].name) )
             {
                 dprintk(XENLOG_ERR, XSPLICE "%s: duplicate new symbol: %s\n",
                         elf->name, symtab[i].name);
