@@ -260,9 +260,9 @@ SEABIOS_UPSTREAM_REVISION ?= rel-1.7.5
 ETHERBOOT_NICS ?= rtl8139 8086100e
 
 
-QEMU_TRADITIONAL_REVISION ?= xen-4.5.3
-# Mon Jan 4 15:34:29 2016 +0000
-# MSI-X: avoid array overrun upon MSI-X table writes
+QEMU_TRADITIONAL_REVISION ?= 6fe8ced84f21589cfa3ebd04e146c53fb09abcd6
+# Tue Apr 26 14:48:06 2016 +0200
+# vga: make sure vga register setup for vbe stays intact (CVE-2016-3712).
 
 # Specify which qemu-dm to use. This may be `ioemu' to use the old
 # Mercurial in-tree version, or a local directory, or a git URL.
