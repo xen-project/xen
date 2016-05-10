@@ -581,6 +581,7 @@ replq_reinsert(const struct scheduler *ops, struct rt_vcpu *svc)
 static int
 rt_init(struct scheduler *ops)
 {
+    int rc = -ENOMEM;
     struct rt_private *prv = xzalloc(struct rt_private);
 
     printk("Initializing RTDS scheduler\n"
@@ -588,11 +589,11 @@ rt_init(struct scheduler *ops)
            "Use at your own risk.\n");
 
     if ( prv == NULL )
-        return -ENOMEM;
+        goto err;
 
     prv->repl_timer = xzalloc(struct timer);
     if ( prv->repl_timer == NULL )
-        return -ENOMEM;
+        goto err;
 
     spin_lock_init(&prv->lock);
     INIT_LIST_HEAD(&prv->sdom);
@@ -603,8 +604,16 @@ rt_init(struct scheduler *ops)
     cpumask_clear(&prv->tickled);
 
     ops->sched_data = prv;
+    rc = 0;
 
-    return 0;
+ err:
+    if ( rc && prv )
+    {
+        xfree(prv->repl_timer);
+        xfree(prv);
+    }
+
+    return rc;
 }
 
 static void
