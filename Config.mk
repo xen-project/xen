@@ -266,9 +266,9 @@ SEABIOS_UPSTREAM_REVISION ?= rel-1.8.2
 ETHERBOOT_NICS ?= rtl8139 8086100e
 
 
-QEMU_TRADITIONAL_REVISION ?= 97042b958cc0fa87705ebd59d58559c81d4b5854
-# Tue Apr 26 14:48:06 2016 +0200
-# vga: make sure vga register setup for vbe stays intact (CVE-2016-3712).
+QEMU_TRADITIONAL_REVISION ?= 24f0ea5fcd2f7c07f56015d0d8a4bda5faf2a9bd
+# Wed Jul 15 18:17:04 2015 +0100
+# rtl8139: check TCP Data Offset field
 
 # Specify which qemu-dm to use. This may be `ioemu' to use the old
 # Mercurial in-tree version, or a local directory, or a git URL.
