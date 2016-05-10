@@ -234,7 +234,9 @@ QEMU_UPSTREAM_URL ?= git://xenbits.xen.org/qemu-xen.git
 SEABIOS_UPSTREAM_URL ?= git://xenbits.xen.org/seabios.git
 endif
 OVMF_UPSTREAM_REVISION ?= 52a99493cce88a9d4ec8a02d7f1bd1a1001ce60d
-QEMU_UPSTREAM_REVISION ?= qemu-xen-4.4.4
+QEMU_UPSTREAM_REVISION ?= a2fd7eba04d4c69e4ee18a43eb6cf32aaffb3c98
+# Tue Apr 26 14:48:06 2016 +0200
+# vga: make sure vga register setup for vbe stays intact (CVE-2016-3712).
 SEABIOS_UPSTREAM_TAG ?= rel-1.7.3.1
 # Fri Aug 2 14:12:09 2013 -0400
 # Fix bug in CBFS file walking with compressed files.
