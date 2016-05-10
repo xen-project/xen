@@ -212,7 +212,9 @@ QEMU_UPSTREAM_URL ?= git://xenbits.xen.org/qemu-xen.git
 SEABIOS_UPSTREAM_URL ?= git://xenbits.xen.org/seabios.git
 endif
 OVMF_UPSTREAM_REVISION ?= 52a99493cce88a9d4ec8a02d7f1bd1a1001ce60d
-QEMU_UPSTREAM_REVISION ?= qemu-xen-4.3.4
+QEMU_UPSTREAM_REVISION ?= c97c20f71240a538a19cb6b0e598bc1bbd5168f1
+# Wed May 4 17:43:36 2016 +0100
+# vga: make sure vga register setup for vbe stays intact (CVE-2016-3712).
 SEABIOS_UPSTREAM_TAG ?= 3a28511b46f0c2af5fae1b6ed2b0c19d7913cee3
 # Wed Jun 26 16:30:45 2013 +0100
 # xen: Don't perform SMP setup.
