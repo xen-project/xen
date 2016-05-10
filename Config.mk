@@ -254,7 +254,9 @@ SEABIOS_UPSTREAM_URL ?= git://xenbits.xen.org/seabios.git
 MINIOS_UPSTREAM_URL ?= git://xenbits.xen.org/mini-os.git
 endif
 OVMF_UPSTREAM_REVISION ?= 52a99493cce88a9d4ec8a02d7f1bd1a1001ce60d
-QEMU_UPSTREAM_REVISION ?= qemu-xen-4.6.1
+QEMU_UPSTREAM_REVISION ?= 14a60f98e0cd16e2636afb136129ed7f11cbfce0
+# Tue Apr 26 14:48:06 2016 +0200
+# vga: make sure vga register setup for vbe stays intact (CVE-2016-3712).
 MINIOS_UPSTREAM_REVISION ?= 6aadd46e0927763861b19eacce2f2aeac9f17835
 # Sat, 9 Apr 2016 23:46:32 +0100 (00:46 +0200)
 # Fix time update
