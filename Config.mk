@@ -246,9 +246,9 @@ ETHERBOOT_NICS ?= rtl8139 8086100e
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= xen-4.4.4
-# Mon Jan 4 15:34:29 2016 +0000
-# MSI-X: avoid array overrun upon MSI-X table writes
+QEMU_TAG ?= 92f74c3c19f1894cf57aa4df07b567c86393877b
+# Tue Apr 26 14:48:06 2016 +0200
+# vga: make sure vga register setup for vbe stays intact (CVE-2016-3712).
 
 # Short answer -- do not enable this unless you know what you are
 # doing and are prepared for some pain.
