@@ -252,7 +252,9 @@ QEMU_TRADITIONAL_URL ?= git://xenbits.xen.org/qemu-xen-traditional.git
 SEABIOS_UPSTREAM_URL ?= git://xenbits.xen.org/seabios.git
 endif
 OVMF_UPSTREAM_REVISION ?= 52a99493cce88a9d4ec8a02d7f1bd1a1001ce60d
-QEMU_UPSTREAM_REVISION ?= qemu-xen-4.5.3
+QEMU_UPSTREAM_REVISION ?= 63d6eab2fda43e9cfdaa33e9ffde755da8e98e32
+# Tue Apr 26 14:48:06 2016 +0200
+# vga: make sure vga register setup for vbe stays intact (CVE-2016-3712).
 SEABIOS_UPSTREAM_REVISION ?= rel-1.7.5
 # Thu May 22 16:59:16 2014 -0400
 # python3 fixes for vgabios and csm builds.
