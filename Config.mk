@@ -283,9 +283,9 @@ SEABIOS_UPSTREAM_REVISION ?= rel-1.9.2
 ETHERBOOT_NICS ?= rtl8139 8086100e
 
 
-QEMU_TRADITIONAL_REVISION ?= 21f6526d1da331611ac5fe12967549d1a04e149b
-# Fri Jan 15 13:23:56 2016 +0000
-# qemu-xen-traditional: Add libxenforeignmemory to rpath-link
+QEMU_TRADITIONAL_REVISION ?= 1f9da382d49765ce9f7e4d301fe1e51945b29218
+# Tue Apr 26 14:48:06 2016 +0200
+# vga: make sure vga register setup for vbe stays intact (CVE-2016-3712).
 
 # Specify which qemu-dm to use. This may be `ioemu' to use the old
 # Mercurial in-tree version, or a local directory, or a git URL.
