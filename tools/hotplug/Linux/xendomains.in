@@ -255,12 +255,13 @@ start()
 	return;
     fi
 
+    mkdir -p $(dirname "$LOCKFILE")
+    touch $LOCKFILE
+
     saved_domains=" "
     if [ "$XENDOMAINS_RESTORE" = "true" ] &&
        contains_something "$XENDOMAINS_SAVE"
     then
-	mkdir -p $(dirname "$LOCKFILE")
-	touch $LOCKFILE
 	echo -n "Restoring Xen domains:"
 	saved_domains=`ls $XENDOMAINS_SAVE`
         for dom in $XENDOMAINS_SAVE/*; do
@@ -286,7 +287,6 @@ start()
 
     if contains_something "$XENDOMAINS_AUTO"
     then
-	touch $LOCKFILE
 	echo -n "Starting auto Xen domains:"
 	# We expect config scripts for auto starting domains to be in
 	# XENDOMAINS_AUTO - they could just be symlinks to files elsewhere
