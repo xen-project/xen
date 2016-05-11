@@ -1146,6 +1146,7 @@ void pv_cpuid(struct cpu_user_regs *regs)
         break;
 
     case 0x80000008:
+        a = paddr_bits | (vaddr_bits << 8);
         b &= pv_featureset[FEATURESET_e8b];
         break;
 

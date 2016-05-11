@@ -451,11 +451,12 @@ static uint64_t __init mtrr_top_of_ram(void)
          return 0;
 
     /* Find the physical address size for this CPU. */
-    cpuid(0x80000000, &eax, &ebx, &ecx, &edx);
-    if ( eax >= 0x80000008 )
+    eax = cpuid_eax(0x80000000);
+    if ( (eax >> 16) == 0x8000 && eax >= 0x80000008 )
     {
-        cpuid(0x80000008, &eax, &ebx, &ecx, &edx);
-        phys_bits = (uint8_t)eax;
+        phys_bits = (uint8_t)cpuid_eax(0x80000008);
+        if ( phys_bits > PADDR_BITS )
+            phys_bits = PADDR_BITS;
     }
     addr_mask = ((1ull << phys_bits) - 1) & ~((1ull << 12) - 1);
 

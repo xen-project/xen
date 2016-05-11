@@ -46,6 +46,7 @@ const struct cpu_dev *__read_mostly cpu_devs[X86_VENDOR_NUM] = {};
 
 unsigned int paddr_bits __read_mostly = 36;
 unsigned int hap_paddr_bits __read_mostly = 36;
+unsigned int vaddr_bits __read_mostly = VADDR_BITS;
 
 /*
  * Default host IA32_CR_PAT value to cover all memory types.
@@ -237,10 +238,18 @@ static void __init early_cpu_detect(void)
 	c->x86_capability[cpufeat_word(X86_FEATURE_FPU)] = edx;
 	c->x86_capability[cpufeat_word(X86_FEATURE_SSE3)] = ecx;
 
-	if ( cpuid_eax(0x80000000) >= 0x80000008 ) {
+	eax = cpuid_eax(0x80000000);
+	if ((eax >> 16) == 0x8000 && eax >= 0x80000008) {
 		eax = cpuid_eax(0x80000008);
 		paddr_bits = eax & 0xff;
+		if (paddr_bits > PADDR_BITS)
+			paddr_bits = PADDR_BITS;
+		vaddr_bits = (eax >> 8) & 0xff;
+		if (vaddr_bits > VADDR_BITS)
+			vaddr_bits = VADDR_BITS;
 		hap_paddr_bits = ((eax >> 16) & 0xff) ?: paddr_bits;
+		if (hap_paddr_bits > PADDR_BITS)
+			hap_paddr_bits = PADDR_BITS;
 	}
 }
 

@@ -3513,19 +3513,19 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
         break;
 
     case 0x80000008:
+        *eax &= 0xff;
         count = d->arch.paging.gfn_bits + PAGE_SHIFT;
-        if ( (*eax & 0xff) > count )
-            *eax = (*eax & ~0xff) | count;
+        if ( *eax > count )
+            *eax = count;
 
         hvm_cpuid(1, NULL, NULL, NULL, &_edx);
         count = _edx & (cpufeat_mask(X86_FEATURE_PAE) |
                         cpufeat_mask(X86_FEATURE_PSE36)) ? 36 : 32;
-        if ( (*eax & 0xff) < count )
-            *eax = (*eax & ~0xff) | count;
+        if ( *eax < count )
+            *eax = count;
 
         hvm_cpuid(0x80000001, NULL, NULL, NULL, &_edx);
-        *eax = (*eax & ~0xffff00) | (_edx & cpufeat_mask(X86_FEATURE_LM)
-                                     ? 0x3000 : 0x2000);
+        *eax |= (_edx & cpufeat_mask(X86_FEATURE_LM) ? vaddr_bits : 32) << 8;
 
         *ebx &= hvm_featureset[FEATURESET_e8b];
         break;

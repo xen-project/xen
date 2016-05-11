@@ -216,10 +216,12 @@ extern bool_t opt_cpu_info;
 extern u32 cpuid_ext_features;
 extern u64 trampoline_misc_enable_off;
 
-/* Maximum width of physical addresses supported by the hardware */
+/* Maximum width of physical addresses supported by the hardware. */
 extern unsigned int paddr_bits;
-/* Max physical address width supported within HAP guests */
+/* Max physical address width supported within HAP guests. */
 extern unsigned int hap_paddr_bits;
+/* Maximum width of virtual addresses supported by the hardware. */
+extern unsigned int vaddr_bits;
 
 extern const struct x86_cpu_id *x86_match_cpu(const struct x86_cpu_id table[]);
 
