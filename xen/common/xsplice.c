@@ -1262,9 +1262,10 @@ void check_for_xsplice_work(void)
             arch_xsplice_post_action();
             local_irq_restore(flags);
         }
-        arch_xsplice_unmask();
 
  abort:
+        arch_xsplice_unmask();
+
         per_cpu(work_to_do, cpu) = 0;
         xsplice_work.do_work = 0;
 
