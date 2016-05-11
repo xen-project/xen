@@ -49,7 +49,13 @@ if [ ! -e /dev/xen/privcmd ] && [ ! -e /proc/xen/privcmd ]; then
 	exit 0
 fi
 
-LOCKFILE=${XEN_LOCK_DIR}/xendomains
+# RHEL-based systems only shutdown a service if they find a lockfile
+# in /var/lock/subsys
+if [[ -d ${XEN_LOCK_DIR}/subsys ]] ; then
+    LOCKFILE=${XEN_LOCK_DIR}/subsys/xendomains
+else
+    LOCKFILE=${XEN_LOCK_DIR}/xendomains
+fi
 
 XENDOM_CONFIG=@CONFIG_DIR@/@CONFIG_LEAF_DIR@/xendomains
 
