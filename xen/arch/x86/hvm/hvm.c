@@ -884,7 +884,7 @@ const char *hvm_efer_valid(const struct vcpu *v, uint64_t value,
 
         ASSERT(v->domain == current->domain);
         hvm_cpuid(0x80000000, &level, NULL, NULL, NULL);
-        if ( level >= 0x80000001 )
+        if ( (level >> 16) == 0x8000 && level > 0x80000000 )
         {
             unsigned int dummy;
 

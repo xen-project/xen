@@ -133,7 +133,10 @@ __start:
         /* Interrogate CPU extended features via CPUID. */
         mov     $0x80000000,%eax
         cpuid
+        shld    $16,%eax,%ecx
         xor     %edx,%edx
+        cmp     $0x8000,%cx         # any function @ 0x8000xxxx?
+        jne     1f
         cmp     $0x80000000,%eax    # any function > 0x80000000?
         jbe     1f
         mov     $0x80000001,%eax

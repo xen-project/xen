@@ -605,7 +605,9 @@ static void __init efi_arch_handle_module(struct file *file, const CHAR16 *name,
 
 static void __init efi_arch_cpu(void)
 {
-    if ( cpuid_eax(0x80000000) > 0x80000000 )
+    uint32_t eax = cpuid_eax(0x80000000);
+
+    if ( (eax >> 16) == 0x8000 && eax > 0x80000000 )
     {
         cpuid_ext_features = cpuid_edx(0x80000001);
         boot_cpu_data.x86_capability[cpufeat_word(X86_FEATURE_SYSCALL)]

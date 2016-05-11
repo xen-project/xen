@@ -297,9 +297,12 @@ static void generic_identify(struct cpuinfo_x86 *c)
 
 	/* AMD-defined flags: level 0x80000001 */
 	c->extended_cpuid_level = cpuid_eax(0x80000000);
-	cpuid(0x80000001, &tmp, &tmp,
-	      &c->x86_capability[cpufeat_word(X86_FEATURE_LAHF_LM)],
-	      &c->x86_capability[cpufeat_word(X86_FEATURE_SYSCALL)]);
+	if ((c->extended_cpuid_level >> 16) != 0x8000)
+		c->extended_cpuid_level = 0;
+	if (c->extended_cpuid_level > 0x80000000)
+		cpuid(0x80000001, &tmp, &tmp,
+		      &c->x86_capability[cpufeat_word(X86_FEATURE_LAHF_LM)],
+		      &c->x86_capability[cpufeat_word(X86_FEATURE_SYSCALL)]);
 	if (c == &boot_cpu_data)
 		bootsym(cpuid_ext_features) =
 			c->x86_capability[cpufeat_word(X86_FEATURE_NX)];

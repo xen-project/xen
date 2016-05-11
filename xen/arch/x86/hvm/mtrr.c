@@ -455,7 +455,7 @@ bool_t mtrr_var_range_msr_set(
     {
         phys_addr = 36;
         hvm_cpuid(0x80000000, &eax, NULL, NULL, NULL);
-        if ( eax >= 0x80000008 )
+        if ( (eax >> 16) == 0x8000 && eax >= 0x80000008 )
         {
             hvm_cpuid(0x80000008, &eax, NULL, NULL, NULL);
             phys_addr = (uint8_t)eax;
