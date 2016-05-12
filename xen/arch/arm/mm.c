@@ -443,11 +443,6 @@ void __init setup_pagetables(unsigned long boot_phys_offset, paddr_t xen_paddr)
     lpae_t pte, *p;
     int i;
 
-    /* Map the destination in the boot misc area. */
-    dest_va = BOOT_RELOC_VIRT_START;
-    pte = mfn_to_xen_entry(xen_paddr >> PAGE_SHIFT, WRITEALLOC);
-    write_pte(xen_second + second_table_offset(dest_va), pte);
-
     /* Calculate virt-to-phys offset for the new location */
     phys_offset = xen_paddr - (unsigned long) _start;
 
@@ -494,9 +489,12 @@ void __init setup_pagetables(unsigned long boot_phys_offset, paddr_t xen_paddr)
     pte = boot_second[second_table_offset(BOOT_FDT_VIRT_START)];
     xen_second[second_table_offset(BOOT_FDT_VIRT_START)] = pte;
 
-    /* Map the destination in the boot misc area. */
+    /* ... Boot Misc area for xen relocation */
     dest_va = BOOT_RELOC_VIRT_START;
     pte = mfn_to_xen_entry(xen_paddr >> PAGE_SHIFT, WRITEALLOC);
+    /* Map the destination in xen_second. */
+    xen_second[second_table_offset(dest_va)] = pte;
+    /* Map the destination in boot_second. */
     write_pte(boot_second + second_table_offset(dest_va), pte);
     flush_xen_data_tlb_range_va_local(dest_va, SECOND_SIZE);
 #ifdef CONFIG_ARM_64
