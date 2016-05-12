@@ -770,7 +770,8 @@ void __init setup_frametable_mappings(paddr_t ps, paddr_t pe)
     base_mfn = alloc_boot_pages(frametable_size >> PAGE_SHIFT, 32<<(20-12));
 
 #ifdef CONFIG_ARM_64
-    nr_second = frametable_size >> SECOND_SHIFT;
+    /* Compute the number of second level pages. */
+    nr_second = ROUNDUP(frametable_size, FIRST_SIZE) >> FIRST_SHIFT;
     second_base = alloc_boot_pages(nr_second, 1);
     second = mfn_to_virt(second_base);
     for ( i = 0; i < nr_second; i++ )
