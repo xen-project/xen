@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 #
 # xendriverdomain    Script to start services needed in a Xen driver domain
 #
