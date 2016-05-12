@@ -494,12 +494,11 @@ static int ctl_kick(struct tdlog_state* s, int fd)
   reqstart = s->bring.req_cons;
   reqend = s->sring->req_prod;
 
-  xen_mb();
   BDPRINTF("ctl: ring kicked (start = %u, end = %u)", reqstart, reqend);
 
   while (reqstart != reqend) {
     /* XXX actually submit these! */
-    RING_COPY_REQUEST(&s->bring, reqstart, &req);
+    memcpy(&req, RING_GET_REQUEST(&s->bring, reqstart), sizeof(req));
     BDPRINTF("ctl: read request %"PRIu64":%u", req.sector, req.count);
     s->bring.req_cons = ++reqstart;
 
