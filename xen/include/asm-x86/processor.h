@@ -134,12 +134,12 @@
 #define TF_kernel_mode         (1<<_TF_kernel_mode)
 
 /* #PF error code values. */
-#define PFEC_page_present   (1U<<0)
-#define PFEC_write_access   (1U<<1)
-#define PFEC_user_mode      (1U<<2)
-#define PFEC_reserved_bit   (1U<<3)
-#define PFEC_insn_fetch     (1U<<4)
-#define PFEC_prot_key       (1U<<5)
+#define PFEC_page_present   (_AC(1,U) << 0)
+#define PFEC_write_access   (_AC(1,U) << 1)
+#define PFEC_user_mode      (_AC(1,U) << 2)
+#define PFEC_reserved_bit   (_AC(1,U) << 3)
+#define PFEC_insn_fetch     (_AC(1,U) << 4)
+#define PFEC_prot_key       (_AC(1,U) << 5)
 /* Internally used only flags. */
 #define PFEC_page_paged     (1U<<16)
 #define PFEC_page_shared    (1U<<17)
