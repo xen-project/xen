@@ -313,6 +313,13 @@ static always_inline void stac(void)
 987:
 .endm
 
+#define LOAD_ONE_REG(reg, compat) \
+.if !(compat); \
+        movq  UREGS_r##reg(%rsp),%r##reg; \
+.else; \
+        movl  UREGS_r##reg(%rsp),%e##reg; \
+.endif
+
 /*
  * Reload registers not preserved by C code from frame.
  *
@@ -326,16 +333,14 @@ static always_inline void stac(void)
         movq  UREGS_r10(%rsp),%r10
         movq  UREGS_r9(%rsp),%r9
         movq  UREGS_r8(%rsp),%r8
+.endif
 .if \ax
-        movq  UREGS_rax(%rsp),%rax
+        LOAD_ONE_REG(ax, \compat)
 .endif
-.elseif \ax
-        movl  UREGS_rax(%rsp),%eax
-.endif
-        movq  UREGS_rcx(%rsp),%rcx
-        movq  UREGS_rdx(%rsp),%rdx
-        movq  UREGS_rsi(%rsp),%rsi
-        movq  UREGS_rdi(%rsp),%rdi
+        LOAD_ONE_REG(cx, \compat)
+        LOAD_ONE_REG(dx, \compat)
+        LOAD_ONE_REG(si, \compat)
+        LOAD_ONE_REG(di, \compat)
 .endm
 
 /*
@@ -372,8 +377,9 @@ static always_inline void stac(void)
         .subsection 0
 #endif
 .endif
-987:    movq  UREGS_rbp(%rsp),%rbp
-        movq  UREGS_rbx(%rsp),%rbx
+987:
+        LOAD_ONE_REG(bp, \compat)
+        LOAD_ONE_REG(bx, \compat)
         subq  $-(UREGS_error_code-UREGS_r15+\adj), %rsp
 .endm
 
