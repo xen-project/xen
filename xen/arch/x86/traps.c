@@ -1142,7 +1142,8 @@ void pv_cpuid(struct cpu_user_regs *regs)
         break;
 
     case 0x80000007:
-        d &= pv_featureset[FEATURESET_e7d];
+        d &= (pv_featureset[FEATURESET_e7d] |
+              (host_featureset[FEATURESET_e7d] & cpufeat_mask(X86_FEATURE_ITSC)));
         break;
 
     case 0x80000008:

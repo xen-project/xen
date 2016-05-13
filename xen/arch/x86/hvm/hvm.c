@@ -3509,7 +3509,8 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
         break;
 
     case 0x80000007:
-        *edx &= hvm_featureset[FEATURESET_e7d];
+        *edx &= (hvm_featureset[FEATURESET_e7d] |
+                 (host_featureset[FEATURESET_e7d] & cpufeat_mask(X86_FEATURE_ITSC)));
         break;
 
     case 0x80000008:
