@@ -26,7 +26,7 @@ UNLIKELY_START(ne, msi_check)
 UNLIKELY_END(msi_check)
 
         movl  UREGS_rax(%rsp),%eax
-        GET_CURRENT(%rbx)
+        GET_CURRENT(bx)
 
         cmpl  $NR_hypercalls,%eax
         jae   compat_bad_hypercall
@@ -202,7 +202,7 @@ ENTRY(compat_restore_all_guest)
 /* This mustn't modify registers other than %rax. */
 ENTRY(cr4_pv32_restore)
         push  %rdx
-        GET_CPUINFO_FIELD(cr4, %rdx)
+        GET_CPUINFO_FIELD(cr4, dx)
         mov   (%rdx), %rax
         test  $X86_CR4_SMEP|X86_CR4_SMAP,%eax
         jnz   0f
@@ -245,7 +245,7 @@ ENTRY(cstar_enter)
         pushq %rcx
         pushq $0
         SAVE_VOLATILE TRAP_syscall
-        GET_CURRENT(%rbx)
+        GET_CURRENT(bx)
         movq  VCPU_domain(%rbx),%rcx
         cmpb  $0,DOMAIN_is_32bit_pv(%rcx)
         je    switch_to_kernel

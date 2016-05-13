@@ -31,7 +31,7 @@
 #define CLGI   .byte 0x0F,0x01,0xDD
 
 ENTRY(svm_asm_do_resume)
-        GET_CURRENT(%rbx)
+        GET_CURRENT(bx)
 .Lsvm_do_resume:
         call svm_intr_assist
         mov  %rsp,%rdi
@@ -97,7 +97,7 @@ UNLIKELY_END(svm_trace)
 
         VMRUN
 
-        GET_CURRENT(%rax)
+        GET_CURRENT(ax)
         push %rdi
         push %rsi
         push %rdx

@@ -97,7 +97,7 @@ ENTRY(lstar_enter)
         pushq %rcx
         pushq $0
         SAVE_VOLATILE TRAP_syscall
-        GET_CURRENT(%rbx)
+        GET_CURRENT(bx)
         testb $TF_kernel_mode,VCPU_thread_flags(%rbx)
         jz    switch_to_kernel
 
@@ -246,7 +246,7 @@ GLOBAL(sysenter_eflags_saved)
         pushq $0 /* null rip */
         pushq $0
         SAVE_VOLATILE TRAP_syscall
-        GET_CURRENT(%rbx)
+        GET_CURRENT(bx)
         cmpb  $0,VCPU_sysenter_disables_events(%rbx)
         movq  VCPU_sysenter_addr(%rbx),%rax
         setne %cl
@@ -288,7 +288,7 @@ UNLIKELY_START(ne, msi_check)
         call  check_for_unexpected_msi
 UNLIKELY_END(msi_check)
 
-        GET_CURRENT(%rbx)
+        GET_CURRENT(bx)
 
         /* Check that the callback is non-null. */
         leaq  VCPU_int80_bounce(%rbx),%rdx
@@ -424,10 +424,10 @@ domain_crash_page_fault:
         call  show_page_walk
 ENTRY(dom_crash_sync_extable)
         # Get out of the guest-save area of the stack.
-        GET_STACK_BASE(%rax)
+        GET_STACK_END(ax)
         leaq  STACK_CPUINFO_FIELD(guest_cpu_user_regs)(%rax),%rsp
         # create_bounce_frame() temporarily clobbers CS.RPL. Fix up.
-        __GET_CURRENT(%rax)
+        __GET_CURRENT(ax)
         movq  VCPU_domain(%rax),%rax
         testb $1,DOMAIN_is_32bit_pv(%rax)
         setz  %al
@@ -445,7 +445,7 @@ ENTRY(common_interrupt)
 
 /* No special register assumptions. */
 ENTRY(ret_from_intr)
-        GET_CURRENT(%rbx)
+        GET_CURRENT(bx)
         testb $3,UREGS_cs(%rsp)
         jz    restore_all_xen
         movq  VCPU_domain(%rbx),%rax
@@ -459,7 +459,7 @@ ENTRY(page_fault)
 GLOBAL(handle_exception)
         SAVE_ALL CLAC
 handle_exception_saved:
-        GET_CURRENT(%rbx)
+        GET_CURRENT(bx)
         testb $X86_EFLAGS_IF>>8,UREGS_eflags+1(%rsp)
         jz    exception_with_ints_disabled
 
@@ -653,7 +653,7 @@ handle_ist_exception:
         testb $3,UREGS_cs(%rsp)
         jz    1f
         /* Interrupted guest context. Copy the context to stack bottom. */
-        GET_CPUINFO_FIELD(guest_cpu_user_regs,%rdi)
+        GET_CPUINFO_FIELD(guest_cpu_user_regs,di)
         movq  %rsp,%rsi
         movl  $UREGS_kernel_sizeof/8,%ecx
         movq  %rdi,%rsp
@@ -668,7 +668,7 @@ handle_ist_exception:
         /* We want to get straight to the IRET on the NMI exit path. */
         testb $3,UREGS_cs(%rsp)
         jz    restore_all_xen
-        GET_CURRENT(%rbx)
+        GET_CURRENT(bx)
         /* Send an IPI to ourselves to cover for the lack of event checking. */
         movl  VCPU_processor(%rbx),%eax
         shll  $IRQSTAT_shift,%eax

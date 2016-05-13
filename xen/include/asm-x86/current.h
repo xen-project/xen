@@ -55,7 +55,7 @@ static inline struct cpu_info *get_cpu_info(void)
     register unsigned long sp asm("rsp");
 #endif
 
-    return (struct cpu_info *)((sp & ~(STACK_SIZE-1)) + STACK_SIZE) - 1;
+    return (struct cpu_info *)((sp | (STACK_SIZE - 1)) + 1) - 1;
 }
 
 #define get_current()         (get_cpu_info()->current_vcpu)

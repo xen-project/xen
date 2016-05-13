@@ -127,19 +127,19 @@ void ret_from_intr(void);
         UNLIKELY_DONE(mp, tag);   \
         __UNLIKELY_END(tag)
 
-#define STACK_CPUINFO_FIELD(field) (STACK_SIZE-CPUINFO_sizeof+CPUINFO_##field)
-#define GET_STACK_BASE(reg)                       \
-        movq $~(STACK_SIZE-1),reg;                \
-        andq %rsp,reg
+#define STACK_CPUINFO_FIELD(field) (1 - CPUINFO_sizeof + CPUINFO_##field)
+#define GET_STACK_END(reg)                        \
+        movl $STACK_SIZE-1, %e##reg;              \
+        orq  %rsp, %r##reg
 
 #define GET_CPUINFO_FIELD(field, reg)             \
-        GET_STACK_BASE(reg);                      \
-        addq $STACK_CPUINFO_FIELD(field),reg
+        GET_STACK_END(reg);                       \
+        addq $STACK_CPUINFO_FIELD(field), %r##reg
 
 #define __GET_CURRENT(reg)                        \
-        movq STACK_CPUINFO_FIELD(current_vcpu)(reg),reg
+        movq STACK_CPUINFO_FIELD(current_vcpu)(%r##reg), %r##reg
 #define GET_CURRENT(reg)                          \
-        GET_STACK_BASE(reg);                      \
+        GET_STACK_END(reg);                       \
         __GET_CURRENT(reg)
 
 #ifndef NDEBUG

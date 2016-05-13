@@ -40,7 +40,7 @@ ENTRY(vmx_asm_vmexit_handler)
         push %r10
         push %r11
         push %rbx
-        GET_CURRENT(%rbx)
+        GET_CURRENT(bx)
         push %rbp
         push %r12
         push %r13
@@ -113,7 +113,7 @@ UNLIKELY_END(realmode)
         BUG  /* vmx_vmentry_failure() shouldn't return. */
 
 ENTRY(vmx_asm_do_vmentry)
-        GET_CURRENT(%rbx)
+        GET_CURRENT(bx)
         jmp  .Lvmx_do_vmentry
 
 .Lvmx_goto_emulator:
