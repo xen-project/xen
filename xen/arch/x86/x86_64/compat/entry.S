@@ -175,12 +175,7 @@ compat_bad_hypercall:
 ENTRY(compat_restore_all_guest)
         ASSERT_INTERRUPTS_DISABLED
 .Lcr4_orig:
-        ASM_NOP8 /* testb $3,UREGS_cs(%rsp) */
-        ASM_NOP2 /* jpe   .Lcr4_alt_end */
-        ASM_NOP8 /* mov   CPUINFO_cr4...(%rsp), %rax */
-        ASM_NOP6 /* and   $..., %rax */
-        ASM_NOP8 /* mov   %rax, CPUINFO_cr4...(%rsp) */
-        ASM_NOP3 /* mov   %rax, %cr4 */
+        .skip (.Lcr4_alt_end - .Lcr4_alt) - (. - .Lcr4_orig), 0x90
 .Lcr4_orig_end:
         .pushsection .altinstr_replacement, "ax"
 .Lcr4_alt:
@@ -192,6 +187,7 @@ ENTRY(compat_restore_all_guest)
         mov   %rax, %cr4
 .Lcr4_alt_end:
         .section .altinstructions, "a"
+        altinstruction_entry .Lcr4_orig, .Lcr4_orig, X86_FEATURE_ALWAYS, 12, 0
         altinstruction_entry .Lcr4_orig, .Lcr4_alt, X86_FEATURE_SMEP, \
                              (.Lcr4_orig_end - .Lcr4_orig), \
                              (.Lcr4_alt_end - .Lcr4_alt)

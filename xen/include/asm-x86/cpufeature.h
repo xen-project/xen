@@ -30,6 +30,9 @@
 #define cpufeat_bit(idx)	((idx) % 32)
 #define cpufeat_mask(idx)	(_AC(1, U) << cpufeat_bit(idx))
 
+/* An alias of a feature we know is always going to be present. */
+#define X86_FEATURE_ALWAYS      X86_FEATURE_LM
+
 #if !defined(__ASSEMBLY__) && !defined(X86_FEATURES_ONLY)
 #include <xen/bitops.h>
 
