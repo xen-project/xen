@@ -272,9 +272,9 @@ MINIOS_UPSTREAM_URL ?= git://xenbits.xen.org/mini-os.git
 endif
 OVMF_UPSTREAM_REVISION ?= 52a99493cce88a9d4ec8a02d7f1bd1a1001ce60d
 QEMU_UPSTREAM_REVISION ?= qemu-xen-4.7.0-rc1
-MINIOS_UPSTREAM_REVISION ?= 4464673ccbfd12dcd0ec08cc29ca62cc12f6e61e
-# Mon May 2 13:55:00 2016 +0100
-# build: change MINI-OS_ROOT to MINIOS_ROOT
+MINIOS_UPSTREAM_REVISION ?= 1a3ee6eeca136525aa2e6917ae500e7cf731c09d
+# Fri May 13 15:21:10 2016 +0100
+# lib/sys.c: enclose file_types in define guards
 
 SEABIOS_UPSTREAM_REVISION ?= rel-1.9.2
 # Tue, 1 Mar 2016 15:06:45 +0100 (16:06 +0200)
