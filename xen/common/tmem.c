@@ -28,25 +28,32 @@
 #define TMEM_SPEC_VERSION 1
 
 /* Global statistics (none need to be locked). */
-static unsigned long total_tmem_ops = 0;
-static unsigned long errored_tmem_ops = 0;
-static unsigned long total_flush_pool = 0;
-static unsigned long alloc_failed = 0, alloc_page_failed = 0;
-static unsigned long evicted_pgs = 0, evict_attempts = 0;
-static unsigned long relinq_pgs = 0, relinq_attempts = 0;
-static unsigned long max_evicts_per_relinq = 0;
-static unsigned long low_on_memory = 0;
-static unsigned long deduped_puts = 0;
-static unsigned long tot_good_eph_puts = 0;
-static int global_obj_count_max = 0;
-static int global_pgp_count_max = 0;
-static int global_pcd_count_max = 0;
-static int global_page_count_max = 0;
-static int global_rtree_node_count_max = 0;
-static long global_eph_count_max = 0;
-static unsigned long failed_copies;
-static unsigned long pcd_tot_tze_size = 0;
-static unsigned long pcd_tot_csize = 0;
+struct tmem_statistics {
+    unsigned long total_tmem_ops;
+    unsigned long errored_tmem_ops;
+    unsigned long total_flush_pool;
+    unsigned long alloc_failed;
+    unsigned long alloc_page_failed;
+    unsigned long evicted_pgs;
+    unsigned long evict_attempts;
+    unsigned long relinq_pgs;
+    unsigned long relinq_attempts;
+    unsigned long max_evicts_per_relinq;
+    unsigned long low_on_memory;
+    unsigned long deduped_puts;
+    unsigned long tot_good_eph_puts;
+    int global_obj_count_max;
+    int global_pgp_count_max;
+    int global_pcd_count_max;
+    int global_page_count_max;
+    int global_rtree_node_count_max;
+    long global_eph_count_max;
+    unsigned long failed_copies;
+    unsigned long pcd_tot_tze_size;
+    unsigned long pcd_tot_csize;
+};
+
+static struct tmem_statistics tmem_stats;
 
 /************ CORE DATA STRUCTURES ************************************/
 
@@ -225,8 +232,8 @@ static atomic_t global_rtree_node_count = ATOMIC_INIT(0);
 
 #define atomic_inc_and_max(_c) do { \
     atomic_inc(&_c); \
-    if ( _atomic_read(_c) > _c##_max ) \
-        _c##_max = _atomic_read(_c); \
+    if ( _atomic_read(_c) > tmem_stats._c##_max ) \
+        tmem_stats._c##_max = _atomic_read(_c); \
 } while (0)
 
 #define atomic_dec_and_assert(_c) do { \
@@ -273,7 +280,7 @@ static void *tmem_malloc(size_t size, struct tmem_pool *pool)
         v = xmem_pool_alloc(size, tmem_mempool);
     }
     if ( v == NULL )
-        alloc_failed++;
+        tmem_stats.alloc_failed++;
     return v;
 }
 
@@ -300,7 +307,7 @@ static struct page_info *tmem_alloc_page(struct tmem_pool *pool)
     else
         pfp = __tmem_alloc_page();
     if ( pfp == NULL )
-        alloc_page_failed++;
+        tmem_stats.alloc_page_failed++;
     else
         atomic_inc_and_max(global_page_count);
     return pfp;
@@ -437,20 +444,20 @@ static void pcd_disassociate(struct tmem_page_descriptor *pgp, struct tmem_pool 
     {
         /* Compressed data. */
         tmem_free(pcd_cdata, pool);
-        pcd_tot_csize -= pcd_csize;
+        tmem_stats.pcd_tot_csize -= pcd_csize;
     }
     else if ( pcd_size != PAGE_SIZE )
     {
         /* Trailing zero data. */
-        pcd_tot_tze_size -= pcd_size;
+        tmem_stats.pcd_tot_tze_size -= pcd_size;
         if ( pcd_size )
             tmem_free(pcd_tze, pool);
     } else {
         /* Real physical page. */
         if ( tmem_tze_enabled() )
-            pcd_tot_tze_size -= PAGE_SIZE;
+            tmem_stats.pcd_tot_tze_size -= PAGE_SIZE;
         if ( tmem_compression_enabled() )
-            pcd_tot_csize -= PAGE_SIZE;
+            tmem_stats.pcd_tot_csize -= PAGE_SIZE;
         tmem_free_page(pool,pfp);
     }
     write_unlock(&pcd_tree_rwlocks[firstbyte]);
@@ -533,7 +540,7 @@ static int pcd_associate(struct tmem_page_descriptor *pgp, char *cdata, pagesize
              */
             if ( cdata == NULL )
                 tmem_free_page(pgp->us.obj->pool,pgp->pfp);
-            deduped_puts++;
+            tmem_stats.deduped_puts++;
             goto match;
         }
     }
@@ -559,7 +566,7 @@ static int pcd_associate(struct tmem_page_descriptor *pgp, char *cdata, pagesize
     {
         memcpy(pcd->cdata,cdata,csize);
         pcd->size = csize;
-        pcd_tot_csize += csize;
+        tmem_stats.pcd_tot_csize += csize;
     } else if ( pfp_size == 0 ) {
         ASSERT(tmem_tze_enabled());
         pcd->size = 0;
@@ -568,15 +575,15 @@ static int pcd_associate(struct tmem_page_descriptor *pgp, char *cdata, pagesize
          ((pcd->tze = tmem_malloc(pfp_size,pgp->us.obj->pool)) != NULL) ) {
         tmem_tze_copy_from_pfp(pcd->tze,pgp->pfp,pfp_size);
         pcd->size = pfp_size;
-        pcd_tot_tze_size += pfp_size;
+        tmem_stats.pcd_tot_tze_size += pfp_size;
         tmem_free_page(pgp->us.obj->pool,pgp->pfp);
     } else {
         pcd->pfp = pgp->pfp;
         pcd->size = PAGE_SIZE;
         if ( tmem_tze_enabled() )
-            pcd_tot_tze_size += PAGE_SIZE;
+            tmem_stats.pcd_tot_tze_size += PAGE_SIZE;
         if ( tmem_compression_enabled() )
-            pcd_tot_csize += PAGE_SIZE;
+            tmem_stats.pcd_tot_csize += PAGE_SIZE;
     }
     rb_link_node(&pcd->pcd_rb_tree_node, parent, new);
     rb_insert_color(&pcd->pcd_rb_tree_node, root);
@@ -620,7 +627,9 @@ static struct tmem_page_descriptor *pgp_alloc(struct tmem_object_root *obj)
     pgp->index = -1;
     pgp->timestamp = get_cycles();
     atomic_inc_and_max(global_pgp_count);
-    atomic_inc_and_max(pool->pgp_count);
+    atomic_inc(&pool->pgp_count);
+    if ( _atomic_read(pool->pgp_count) > pool->pgp_count_max )
+        pool->pgp_count_max = _atomic_read(pool->pgp_count);
     return pgp;
 }
 
@@ -1295,7 +1304,7 @@ static int tmem_evict(void)
     int ret = 0;
     bool_t hold_pool_rwlock = 0;
 
-    evict_attempts++;
+    tmem_stats.evict_attempts++;
     spin_lock(&eph_lists_spinlock);
     if ( (client != NULL) && client_over_quota(client) &&
          !list_empty(&client->ephemeral_page_list) )
@@ -1353,7 +1362,7 @@ found:
         spin_unlock(&obj->obj_spinlock);
     if ( hold_pool_rwlock )
         write_unlock(&pool->pool_rwlock);
-    evicted_pgs++;
+    tmem_stats.evicted_pgs++;
     ret = 1;
 out:
     return ret;
@@ -1512,7 +1521,7 @@ done:
     return 1;
 
 bad_copy:
-    failed_copies++;
+    tmem_stats.failed_copies++;
     goto cleanup;
 
 failed_dup:
@@ -1650,8 +1659,8 @@ insert_page:
         spin_lock(&eph_lists_spinlock);
         list_add_tail(&pgp->global_eph_pages,
             &global_ephemeral_page_list);
-        if (++global_eph_count > global_eph_count_max)
-            global_eph_count_max = global_eph_count;
+        if (++global_eph_count > tmem_stats.global_eph_count_max)
+            tmem_stats.global_eph_count_max = global_eph_count;
         list_add_tail(&pgp->us.client_eph_pages,
             &client->ephemeral_page_list);
         if (++client->eph_count > client->eph_count_max)
@@ -1676,11 +1685,11 @@ insert_page:
     if ( is_persistent(pool) )
         client->succ_pers_puts++;
     else
-        tot_good_eph_puts++;
+        tmem_stats.tot_good_eph_puts++;
     return 1;
 
 bad_copy:
-    failed_copies++;
+    tmem_stats.failed_copies++;
 
 del_pgp_from_obj:
     ASSERT((obj != NULL) && (pgp != NULL) && (pgp->index != -1));
@@ -1778,7 +1787,7 @@ static int do_tmem_get(struct tmem_pool *pool,
 
 bad_copy:
     spin_unlock(&obj->obj_spinlock);
-    failed_copies++;
+    tmem_stats.failed_copies++;
     return rc;
 }
 
@@ -2190,22 +2199,24 @@ static int tmemc_list_global(tmem_cli_va_param_t buf, int off, uint32_t len,
     n += scnprintf(info,BSIZE,"G="
       "Tt:%lu,Te:%lu,Cf:%lu,Af:%lu,Pf:%lu,Ta:%lu,"
       "Lm:%lu,Et:%lu,Ea:%lu,Rt:%lu,Ra:%lu,Rx:%lu,Fp:%lu%c",
-      total_tmem_ops, errored_tmem_ops, failed_copies,
-      alloc_failed, alloc_page_failed, tmem_page_list_pages,
-      low_on_memory, evicted_pgs,
-      evict_attempts, relinq_pgs, relinq_attempts, max_evicts_per_relinq,
-      total_flush_pool, use_long ? ',' : '\n');
+      tmem_stats.total_tmem_ops, tmem_stats.errored_tmem_ops, tmem_stats.failed_copies,
+      tmem_stats.alloc_failed, tmem_stats.alloc_page_failed, tmem_page_list_pages,
+      tmem_stats.low_on_memory, tmem_stats.evicted_pgs,
+      tmem_stats.evict_attempts, tmem_stats.relinq_pgs, tmem_stats.relinq_attempts,
+      tmem_stats.max_evicts_per_relinq,
+      tmem_stats.total_flush_pool, use_long ? ',' : '\n');
     if (use_long)
         n += scnprintf(info+n,BSIZE-n,
           "Ec:%ld,Em:%ld,Oc:%d,Om:%d,Nc:%d,Nm:%d,Pc:%d,Pm:%d,"
           "Fc:%d,Fm:%d,Sc:%d,Sm:%d,Ep:%lu,Gd:%lu,Zt:%lu,Gz:%lu\n",
-          global_eph_count, global_eph_count_max,
-          _atomic_read(global_obj_count), global_obj_count_max,
-          _atomic_read(global_rtree_node_count), global_rtree_node_count_max,
-          _atomic_read(global_pgp_count), global_pgp_count_max,
-          _atomic_read(global_page_count), global_page_count_max,
-          _atomic_read(global_pcd_count), global_pcd_count_max,
-         tot_good_eph_puts,deduped_puts,pcd_tot_tze_size,pcd_tot_csize);
+          global_eph_count, tmem_stats.global_eph_count_max,
+          _atomic_read(global_obj_count), tmem_stats.global_obj_count_max,
+          _atomic_read(global_rtree_node_count), tmem_stats.global_rtree_node_count_max,
+          _atomic_read(global_pgp_count), tmem_stats.global_pgp_count_max,
+          _atomic_read(global_page_count), tmem_stats.global_page_count_max,
+          _atomic_read(global_pcd_count), tmem_stats.global_pcd_count_max,
+         tmem_stats.tot_good_eph_puts,tmem_stats.deduped_puts,tmem_stats.pcd_tot_tze_size,
+         tmem_stats.pcd_tot_csize);
     if ( sum + n >= len )
         return sum;
     if ( !copy_to_guest_offset(buf, off + sum, info, n + 1) )
@@ -2658,18 +2669,18 @@ long do_tmem_op(tmem_cli_op_t uops)
     if ( xsm_tmem_op(XSM_HOOK) )
         return -EPERM;
 
-    total_tmem_ops++;
+    tmem_stats.total_tmem_ops++;
 
     if ( client != NULL && client->domain->is_dying )
     {
-        errored_tmem_ops++;
+        tmem_stats.errored_tmem_ops++;
         return -ENODEV;
     }
 
     if ( unlikely(tmem_get_tmemop_from_client(&op, uops) != 0) )
     {
         tmem_client_err("tmem: can't get tmem struct from %s\n", tmem_client_str);
-        errored_tmem_ops++;
+        tmem_stats.errored_tmem_ops++;
         return -EFAULT;
     }
 
@@ -2764,14 +2775,14 @@ long do_tmem_op(tmem_cli_op_t uops)
             }
             read_unlock(&tmem_rwlock);
             if ( rc < 0 )
-                errored_tmem_ops++;
+                tmem_stats.errored_tmem_ops++;
             return rc;
         }
     }
 out:
     write_unlock(&tmem_rwlock);
     if ( rc < 0 )
-        errored_tmem_ops++;
+        tmem_stats.errored_tmem_ops++;
     return rc;
 }
 
@@ -2808,7 +2819,7 @@ void *tmem_relinquish_pages(unsigned int order, unsigned int memflags)
     if (!tmem_enabled() || !tmem_freeable_pages())
         return NULL;
 
-    relinq_attempts++;
+    tmem_stats.relinq_attempts++;
     if ( order > 0 )
     {
 #ifndef NDEBUG
@@ -2823,13 +2834,13 @@ void *tmem_relinquish_pages(unsigned int order, unsigned int memflags)
             break;
         evicts_per_relinq++;
     }
-    if ( evicts_per_relinq > max_evicts_per_relinq )
-        max_evicts_per_relinq = evicts_per_relinq;
+    if ( evicts_per_relinq > tmem_stats.max_evicts_per_relinq )
+        tmem_stats.max_evicts_per_relinq = evicts_per_relinq;
     if ( pfp != NULL )
     {
         if ( !(memflags & MEMF_tmem) )
             scrub_one_page(pfp);
-        relinq_pgs++;
+        tmem_stats.relinq_pgs++;
     }
 
     return pfp;
