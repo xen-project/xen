@@ -1007,7 +1007,7 @@ expecting such that it can properly do signature verification.
 
 The signature is based on the all of the payloads continuously laid out
 in memory. The signature is to be appended at the end of the ELF payload
-prefixed with the string '~Module signature appended~\n', followed by
+prefixed with the string `'~Module signature appended~\n'`, followed by
 an signature header then followed by the signature, key identifier, and signers
 name.
 
