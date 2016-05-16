@@ -222,13 +222,6 @@ struct tmem_page_content_descriptor {
 struct rb_root pcd_tree_roots[256]; /* Choose based on first byte of page. */
 rwlock_t pcd_tree_rwlocks[256]; /* Poor man's concurrency for now. */
 
-static LIST_HEAD(global_ephemeral_page_list); /* All pages in ephemeral pools. */
-
-static LIST_HEAD(global_client_list);
-
-static struct tmem_pool *global_shared_pools[MAX_GLOBAL_SHARED_POOLS] = { 0 };
-static bool_t global_shared_auth = 0;
-static atomic_t client_weight_total = ATOMIC_INIT(0);
 static int tmem_initialized = 0;
 
 struct xmem_pool *tmem_mempool = 0;
@@ -245,8 +238,20 @@ static DEFINE_SPINLOCK(pers_lists_spinlock);
 #define ASSERT_SPINLOCK(_l) ASSERT(spin_is_locked(_l))
 #define ASSERT_WRITELOCK(_l) ASSERT(rw_is_write_locked(_l))
 
-static long global_eph_count; /* Atomicity depends on eph_lists_spinlock. */
+struct tmem_global {
+    struct list_head ephemeral_page_list;  /* All pages in ephemeral pools. */
+    struct list_head client_list;
+    struct tmem_pool *shared_pools[MAX_GLOBAL_SHARED_POOLS];
+    bool_t shared_auth;
+    atomic_t client_weight_total;
+    long eph_count;  /* Atomicity depends on eph_lists_spinlock. */
+};
 
+struct tmem_global tmem_global = {
+    .ephemeral_page_list = LIST_HEAD_INIT(tmem_global.ephemeral_page_list),
+    .client_list = LIST_HEAD_INIT(tmem_global.client_list),
+    .client_weight_total = ATOMIC_INIT(0),
+};
 
 /*
  * There two types of memory allocation interfaces in tmem.
@@ -724,8 +729,8 @@ static void pgp_delist_free(struct tmem_page_descriptor *pgp)
         ASSERT(client->eph_count >= 0);
         list_del_init(&pgp->us.client_eph_pages);
         if ( !list_empty(&pgp->global_eph_pages) )
-            global_eph_count--;
-        ASSERT(global_eph_count >= 0);
+            tmem_global.eph_count--;
+        ASSERT(tmem_global.eph_count >= 0);
         list_del_init(&pgp->global_eph_pages);
         spin_unlock(&eph_lists_spinlock);
     }
@@ -1126,9 +1131,9 @@ static int shared_pool_quit(struct tmem_pool *pool, domid_t cli_id)
         if (pool->shared_count)
             return pool->shared_count;
         for (s_poolid = 0; s_poolid < MAX_GLOBAL_SHARED_POOLS; s_poolid++)
-            if ( (global_shared_pools[s_poolid]) == pool )
+            if ( (tmem_global.shared_pools[s_poolid]) == pool )
             {
-                global_shared_pools[s_poolid] = NULL;
+                tmem_global.shared_pools[s_poolid] = NULL;
                 break;
             }
         return 0;
@@ -1209,7 +1214,7 @@ static struct client *client_create(domid_t cli_id)
     for ( i = 0; i < MAX_GLOBAL_SHARED_POOLS; i++)
         client->shared_auth_uuid[i][0] =
             client->shared_auth_uuid[i][1] = -1L;
-    list_add_tail(&client->client_list, &global_client_list);
+    list_add_tail(&client->client_list, &tmem_global.client_list);
     INIT_LIST_HEAD(&client->ephemeral_page_list);
     INIT_LIST_HEAD(&client->persistent_invalidated_list);
     tmem_client_info("ok\n");
@@ -1245,13 +1250,13 @@ static void client_flush(struct client *client)
 
 static bool_t client_over_quota(struct client *client)
 {
-    int total = _atomic_read(client_weight_total);
+    int total = _atomic_read(tmem_global.client_weight_total);
 
     ASSERT(client != NULL);
     if ( (total == 0) || (client->weight == 0) ||
           (client->eph_count == 0) )
         return 0;
-    return ( ((global_eph_count*100L) / client->eph_count ) >
+    return ( ((tmem_global.eph_count*100L) / client->eph_count ) >
              ((total*100L) / client->weight) );
 }
 
@@ -1280,7 +1285,7 @@ static bool_t tmem_try_to_evict_pgp(struct tmem_page_descriptor *pgp, bool_t *ho
             {
                 pgp->eviction_attempted++;
                 list_del(&pgp->global_eph_pages);
-                list_add_tail(&pgp->global_eph_pages,&global_ephemeral_page_list);
+                list_add_tail(&pgp->global_eph_pages,&tmem_global.ephemeral_page_list);
                 list_del(&pgp->us.client_eph_pages);
                 list_add_tail(&pgp->us.client_eph_pages,&client->ephemeral_page_list);
                 goto pcd_unlock;
@@ -1320,9 +1325,9 @@ static int tmem_evict(void)
             if ( tmem_try_to_evict_pgp(pgp, &hold_pool_rwlock) )
                 goto found;
     }
-    else if ( !list_empty(&global_ephemeral_page_list) )
+    else if ( !list_empty(&tmem_global.ephemeral_page_list) )
     {
-        list_for_each_entry(pgp, &global_ephemeral_page_list, global_eph_pages)
+        list_for_each_entry(pgp, &tmem_global.ephemeral_page_list, global_eph_pages)
             if ( tmem_try_to_evict_pgp(pgp, &hold_pool_rwlock) )
             {
                 client = pgp->us.obj->pool->client;
@@ -1338,8 +1343,8 @@ found:
     list_del_init(&pgp->us.client_eph_pages);
     client->eph_count--;
     list_del_init(&pgp->global_eph_pages);
-    global_eph_count--;
-    ASSERT(global_eph_count >= 0);
+    tmem_global.eph_count--;
+    ASSERT(tmem_global.eph_count >= 0);
     ASSERT(client->eph_count >= 0);
     spin_unlock(&eph_lists_spinlock);
 
@@ -1664,10 +1669,9 @@ insert_page:
     if ( !is_persistent(pool) )
     {
         spin_lock(&eph_lists_spinlock);
-        list_add_tail(&pgp->global_eph_pages,
-            &global_ephemeral_page_list);
-        if (++global_eph_count > tmem_stats.global_eph_count_max)
-            tmem_stats.global_eph_count_max = global_eph_count;
+        list_add_tail(&pgp->global_eph_pages, &tmem_global.ephemeral_page_list);
+        if (++tmem_global.eph_count > tmem_stats.global_eph_count_max)
+            tmem_stats.global_eph_count_max = tmem_global.eph_count;
         list_add_tail(&pgp->us.client_eph_pages,
             &client->ephemeral_page_list);
         if (++client->eph_count > client->eph_count_max)
@@ -1774,7 +1778,7 @@ static int do_tmem_get(struct tmem_pool *pool,
         } else {
             spin_lock(&eph_lists_spinlock);
             list_del(&pgp->global_eph_pages);
-            list_add_tail(&pgp->global_eph_pages,&global_ephemeral_page_list);
+            list_add_tail(&pgp->global_eph_pages,&tmem_global.ephemeral_page_list);
             list_del(&pgp->us.client_eph_pages);
             list_add_tail(&pgp->us.client_eph_pages,&client->ephemeral_page_list);
             spin_unlock(&eph_lists_spinlock);
@@ -1962,7 +1966,7 @@ static int do_tmem_new_pool(domid_t this_cli_id,
             pool->shared = 0;
             goto out;
         }
-        if ( client->shared_auth_required && !global_shared_auth )
+        if ( client->shared_auth_required && !tmem_global.shared_auth )
         {
             for ( i = 0; i < MAX_GLOBAL_SHARED_POOLS; i++)
                 if ( (client->shared_auth_uuid[i][0] == uuid_lo) &&
@@ -1983,7 +1987,7 @@ static int do_tmem_new_pool(domid_t this_cli_id,
         first_unused_s_poolid = MAX_GLOBAL_SHARED_POOLS;
         for ( i = 0; i < MAX_GLOBAL_SHARED_POOLS; i++ )
         {
-            if ( (shpool = global_shared_pools[i]) != NULL )
+            if ( (shpool = tmem_global.shared_pools[i]) != NULL )
             {
                 if ( shpool->uuid[0] == uuid_lo && shpool->uuid[1] == uuid_hi )
                 {
@@ -2020,7 +2024,7 @@ static int do_tmem_new_pool(domid_t this_cli_id,
             pool->shared_count = 0;
             if ( shared_pool_join(pool, client) )
                 goto fail;
-            global_shared_pools[first_unused_s_poolid] = pool;
+            tmem_global.shared_pools[first_unused_s_poolid] = pool;
         }
     }
 
@@ -2046,7 +2050,7 @@ static int tmemc_freeze_pools(domid_t cli_id, int arg)
     s = destroy ? "destroyed" : ( freeze ? "frozen" : "thawed" );
     if ( cli_id == TMEM_CLI_ID_NULL )
     {
-        list_for_each_entry(client,&global_client_list,client_list)
+        list_for_each_entry(client,&tmem_global.client_list,client_list)
             client->frozen = freeze;
         tmem_client_info("tmem: all pools %s for all %ss\n", s, tmem_client_str);
     }
@@ -2152,7 +2156,7 @@ static int tmemc_list_shared(tmem_cli_va_param_t buf, int off, uint32_t len,
 
     for ( i = 0; i < MAX_GLOBAL_SHARED_POOLS; i++ )
     {
-        if ( (p = global_shared_pools[i]) == NULL )
+        if ( (p = tmem_global.shared_pools[i]) == NULL )
             continue;
         n = scnprintf(info+n,BSIZE-n,"S=SI:%d,PT:%c%c,U0:%"PRIx64",U1:%"PRIx64,
                       i, is_persistent(p) ? 'P' : 'E',
@@ -2216,7 +2220,7 @@ static int tmemc_list_global(tmem_cli_va_param_t buf, int off, uint32_t len,
         n += scnprintf(info+n,BSIZE-n,
           "Ec:%ld,Em:%ld,Oc:%d,Om:%d,Nc:%d,Nm:%d,Pc:%d,Pm:%d,"
           "Fc:%d,Fm:%d,Sc:%d,Sm:%d,Ep:%lu,Gd:%lu,Zt:%lu,Gz:%lu\n",
-          global_eph_count, tmem_stats.global_eph_count_max,
+          tmem_global.eph_count, tmem_stats.global_eph_count_max,
           _atomic_read(tmem_stats.global_obj_count), tmem_stats.global_obj_count_max,
           _atomic_read(tmem_stats.global_rtree_node_count), tmem_stats.global_rtree_node_count_max,
           _atomic_read(tmem_stats.global_pgp_count), tmem_stats.global_pgp_count_max,
@@ -2240,7 +2244,7 @@ static int tmemc_list(domid_t cli_id, tmem_cli_va_param_t buf, uint32_t len,
     if ( cli_id == TMEM_CLI_ID_NULL ) {
         off = tmemc_list_global(buf,0,len,use_long);
         off += tmemc_list_shared(buf,off,len-off,use_long);
-        list_for_each_entry(client,&global_client_list,client_list)
+        list_for_each_entry(client,&tmem_global.client_list,client_list)
             off += tmemc_list_client(client, buf, off, len-off, use_long);
         off += tmemc_list_global_perf(buf,off,len-off,use_long);
     }
@@ -2264,8 +2268,8 @@ static int __tmemc_set_var(struct client *client, uint32_t subop, uint32_t arg1)
         client->weight = arg1;
         tmem_client_info("tmem: weight set to %d for %s=%d\n",
                         arg1, tmem_cli_id_str, cli_id);
-        atomic_sub(old_weight,&client_weight_total);
-        atomic_add(client->weight,&client_weight_total);
+        atomic_sub(old_weight,&tmem_global.client_weight_total);
+        atomic_add(client->weight,&tmem_global.client_weight_total);
         break;
     case XEN_SYSCTL_TMEM_OP_SET_CAP:
         client->cap = arg1;
@@ -2298,7 +2302,7 @@ static int tmemc_set_var(domid_t cli_id, uint32_t subop, uint32_t arg1)
 
     if ( cli_id == TMEM_CLI_ID_NULL )
     {
-        list_for_each_entry(client,&global_client_list,client_list)
+        list_for_each_entry(client,&tmem_global.client_list,client_list)
         {
             ret =  __tmemc_set_var(client, subop, arg1);
             if (ret)
@@ -2322,7 +2326,7 @@ static int tmemc_shared_pool_auth(domid_t cli_id, uint64_t uuid_lo,
 
     if ( cli_id == TMEM_CLI_ID_NULL )
     {
-        global_shared_auth = auth;
+        tmem_global.shared_auth = auth;
         return 1;
     }
     client = tmem_client_from_cli_id(cli_id);
