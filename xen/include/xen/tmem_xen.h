@@ -16,6 +16,7 @@
 #include <xen/guest_access.h> /* copy_from_guest */
 #include <xen/hash.h> /* hash_long */
 #include <xen/domain_page.h> /* __map_domain_page */
+#include <xen/rbtree.h> /* struct rb_root */
 #include <xsm/xsm.h> /* xsm_tmem_control */
 #include <public/tmem.h>
 #ifdef CONFIG_COMPAT
@@ -340,5 +341,132 @@ extern int tmem_copy_tze_to_client(xen_pfn_t cmfn, void *tmem_va, pagesize_t len
 #define tmem_client_err(fmt, args...)  printk(XENLOG_G_ERR fmt, ##args)
 #define tmem_client_warn(fmt, args...) printk(XENLOG_G_WARNING fmt, ##args)
 #define tmem_client_info(fmt, args...) printk(XENLOG_G_INFO fmt, ##args)
+
+/* Global statistics (none need to be locked). */
+struct tmem_statistics {
+    unsigned long total_tmem_ops;
+    unsigned long errored_tmem_ops;
+    unsigned long total_flush_pool;
+    unsigned long alloc_failed;
+    unsigned long alloc_page_failed;
+    unsigned long evicted_pgs;
+    unsigned long evict_attempts;
+    unsigned long relinq_pgs;
+    unsigned long relinq_attempts;
+    unsigned long max_evicts_per_relinq;
+    unsigned long low_on_memory;
+    unsigned long deduped_puts;
+    unsigned long tot_good_eph_puts;
+    int global_obj_count_max;
+    int global_pgp_count_max;
+    int global_pcd_count_max;
+    int global_page_count_max;
+    int global_rtree_node_count_max;
+    long global_eph_count_max;
+    unsigned long failed_copies;
+    unsigned long pcd_tot_tze_size;
+    unsigned long pcd_tot_csize;
+    /* Global counters (should use long_atomic_t access). */
+    atomic_t global_obj_count;
+    atomic_t global_pgp_count;
+    atomic_t global_pcd_count;
+    atomic_t global_page_count;
+    atomic_t global_rtree_node_count;
+};
+
+#define atomic_inc_and_max(_c) do { \
+    atomic_inc(&tmem_stats._c); \
+    if ( _atomic_read(tmem_stats._c) > tmem_stats._c##_max ) \
+        tmem_stats._c##_max = _atomic_read(tmem_stats._c); \
+} while (0)
+
+#define atomic_dec_and_assert(_c) do { \
+    atomic_dec(&tmem_stats._c); \
+    ASSERT(_atomic_read(tmem_stats._c) >= 0); \
+} while (0)
+
+#define MAX_GLOBAL_SHARED_POOLS  16
+struct tmem_global {
+    struct list_head ephemeral_page_list;  /* All pages in ephemeral pools. */
+    struct list_head client_list;
+    struct tmem_pool *shared_pools[MAX_GLOBAL_SHARED_POOLS];
+    bool_t shared_auth;
+    long eph_count;  /* Atomicity depends on eph_lists_spinlock. */
+    atomic_t client_weight_total;
+};
+
+#define MAX_POOLS_PER_DOMAIN 16
+
+struct tmem_pool;
+struct tmem_page_descriptor;
+struct tmem_page_content_descriptor;
+struct client {
+    struct list_head client_list;
+    struct tmem_pool *pools[MAX_POOLS_PER_DOMAIN];
+    struct domain *domain;
+    struct xmem_pool *persistent_pool;
+    struct list_head ephemeral_page_list;
+    long eph_count, eph_count_max;
+    domid_t cli_id;
+    uint32_t weight;
+    uint32_t cap;
+    bool_t compress;
+    bool_t frozen;
+    bool_t shared_auth_required;
+    /* For save/restore/migration. */
+    bool_t live_migrating;
+    bool_t was_frozen;
+    struct list_head persistent_invalidated_list;
+    struct tmem_page_descriptor *cur_pgp;
+    /* Statistics collection. */
+    unsigned long compress_poor, compress_nomem;
+    unsigned long compressed_pages;
+    uint64_t compressed_sum_size;
+    uint64_t total_cycles;
+    unsigned long succ_pers_puts, succ_eph_gets, succ_pers_gets;
+    /* Shared pool authentication. */
+    uint64_t shared_auth_uuid[MAX_GLOBAL_SHARED_POOLS][2];
+};
+
+#define POOL_PAGESHIFT (PAGE_SHIFT - 12)
+#define OBJ_HASH_BUCKETS 256 /* Must be power of two. */
+#define OBJ_HASH_BUCKETS_MASK (OBJ_HASH_BUCKETS-1)
+
+#define is_persistent(_p)  (_p->persistent)
+#define is_shared(_p)      (_p->shared)
+
+struct tmem_pool {
+    bool_t shared;
+    bool_t persistent;
+    bool_t is_dying;
+    struct client *client;
+    uint64_t uuid[2]; /* 0 for private, non-zero for shared. */
+    uint32_t pool_id;
+    rwlock_t pool_rwlock;
+    struct rb_root obj_rb_root[OBJ_HASH_BUCKETS]; /* Protected by pool_rwlock. */
+    struct list_head share_list; /* Valid if shared. */
+    int shared_count; /* Valid if shared. */
+    /* For save/restore/migration. */
+    struct list_head persistent_page_list;
+    struct tmem_page_descriptor *cur_pgp;
+    /* Statistics collection. */
+    atomic_t pgp_count;
+    int pgp_count_max;
+    long obj_count;  /* Atomicity depends on pool_rwlock held for write. */
+    long obj_count_max;
+    unsigned long objnode_count, objnode_count_max;
+    uint64_t sum_life_cycles;
+    uint64_t sum_evicted_cycles;
+    unsigned long puts, good_puts, no_mem_puts;
+    unsigned long dup_puts_flushed, dup_puts_replaced;
+    unsigned long gets, found_gets;
+    unsigned long flushs, flushs_found;
+    unsigned long flush_objs, flush_objs_found;
+};
+
+struct share_list {
+    struct list_head share_list;
+    struct client *client;
+};
 
 #endif /* __XEN_TMEM_XEN_H__ */
