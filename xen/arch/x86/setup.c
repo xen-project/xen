@@ -1400,7 +1400,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
     if ( cpu_has_smap )
         set_in_cr4(X86_CR4_SMAP);
 
-    cr4_pv32_mask = mmu_cr4_features & (X86_CR4_SMEP | X86_CR4_SMAP);
+    cr4_pv32_mask = mmu_cr4_features & XEN_CR4_PV32_BITS;
 
     if ( cpu_has_fsgsbase )
         set_in_cr4(X86_CR4_FSGSBASE);

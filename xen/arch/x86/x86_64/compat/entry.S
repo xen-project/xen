@@ -204,7 +204,7 @@ ENTRY(cr4_pv32_restore)
         push  %rdx
         GET_CPUINFO_FIELD(cr4, dx)
         mov   (%rdx), %rax
-        test  $X86_CR4_SMEP|X86_CR4_SMAP,%eax
+        test  $XEN_CR4_PV32_BITS, %eax
         jnz   0f
         or    cr4_pv32_mask(%rip), %rax
         mov   %rax, %cr4
@@ -215,9 +215,11 @@ ENTRY(cr4_pv32_restore)
 #ifndef NDEBUG
         /* Check that _all_ of the bits intended to be set actually are. */
         mov   %cr4, %rax
-        and   cr4_pv32_mask(%rip), %eax
-        cmp   cr4_pv32_mask(%rip), %eax
+        and   cr4_pv32_mask(%rip), %rax
+        cmp   cr4_pv32_mask(%rip), %rax
         je    1f
+        /* Cause cr4_pv32_mask to be visible in the BUG register dump. */
+        mov   cr4_pv32_mask(%rip), %rdx
         BUG
 1:
 #endif
