@@ -528,6 +528,8 @@ retry_transaction:
 
     xs_rm(ctx->xsh, t, libxl_path);
     libxl__xs_mkdir(gc, t, libxl_path, noperm, ARRAY_SIZE(noperm));
+    libxl__xs_mkdir(gc, t, GCSPRINTF("%s/device", libxl_path),
+                    noperm, ARRAY_SIZE(noperm));
 
     xs_write(ctx->xsh, t, libxl__sprintf(gc, "%s/vm", dom_path), vm_path, strlen(vm_path));
     rc = libxl__domain_rename(gc, *domid, 0, info->name, t);

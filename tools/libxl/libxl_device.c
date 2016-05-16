@@ -40,6 +40,15 @@ char *libxl__device_backend_path(libxl__gc *gc, libxl__device *device)
                      device->domid, device->devid);
 }
 
+char *libxl__device_libxl_path(libxl__gc *gc, libxl__device *device)
+{
+    char *libxl_dom_path = libxl__xs_libxl_path(gc, device->domid);
+
+    return GCSPRINTF("%s/device/%s/%d", libxl_dom_path,
+                     libxl__device_kind_to_string(device->kind),
+                     device->devid);
+}
+
 int libxl__parse_backend_path(libxl__gc *gc,
                               const char *path,
                               libxl__device *dev)
@@ -87,14 +96,16 @@ int libxl__device_generic_add(libxl__gc *gc, xs_transaction_t t,
         libxl__device *device, char **bents, char **fents, char **ro_fents)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
-    char *frontend_path, *backend_path;
+    char *frontend_path, *backend_path, *libxl_path;
     struct xs_permissions frontend_perms[2];
     struct xs_permissions ro_frontend_perms[2];
     struct xs_permissions backend_perms[2];
     int create_transaction = t == XBT_NULL;
+    int rc;
 
     frontend_path = libxl__device_frontend_path(gc, device);
     backend_path = libxl__device_backend_path(gc, device);
+    libxl_path = libxl__device_libxl_path(gc, device);
 
     frontend_perms[0].id = device->domid;
     frontend_perms[0].perms = XS_PERM_NONE;
@@ -109,7 +120,21 @@ int libxl__device_generic_add(libxl__gc *gc, xs_transaction_t t,
 retry_transaction:
     if (create_transaction)
         t = xs_transaction_start(ctx->xsh);
+
     /* FIXME: read frontend_path and check state before removing stuff */
+
+    rc = libxl__xs_rm_checked(gc, t, libxl_path);
+    if (rc) goto out;
+
+    rc = libxl__xs_write_checked(gc, t, GCSPRINTF("%s/frontend",libxl_path),
+                                 frontend_path);
+    if (rc) goto out;
+
+    rc = libxl__xs_write_checked(gc, t, GCSPRINTF("%s/backend",libxl_path),
+                                 backend_path);
+    if (rc) goto out;
+
+    /* xxx much of this function lacks error checks! */
 
     if (fents || ro_fents) {
         xs_rm(ctx->xsh, t, frontend_path);
@@ -156,6 +181,11 @@ retry_transaction:
         }
     }
     return 0;
+
+ out:
+    if (create_transaction && t)
+        libxl__xs_transaction_abort(gc, &t);
+    return rc;
 }
 
 typedef struct {
@@ -552,6 +582,7 @@ int libxl__device_destroy(libxl__gc *gc, libxl__device *dev)
 {
     const char *be_path = libxl__device_backend_path(gc, dev);
     const char *fe_path = libxl__device_frontend_path(gc, dev);
+    const char *libxl_path = libxl__device_libxl_path(gc, dev);
     const char *tapdisk_path = GCSPRINTF("%s/%s", be_path, "tapdisk-params");
     const char *tapdisk_params;
     xs_transaction_t t = 0;
@@ -576,6 +607,7 @@ int libxl__device_destroy(libxl__gc *gc, libxl__device *dev)
              */
             libxl__xs_path_cleanup(gc, t, fe_path);
             libxl__xs_path_cleanup(gc, t, be_path);
+            libxl__xs_path_cleanup(gc, t, libxl_path);
         } else if (dev->backend_domid == domid) {
             /*
              * The driver domain is in charge for removing what it can
