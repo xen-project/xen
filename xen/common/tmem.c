@@ -51,9 +51,32 @@ struct tmem_statistics {
     unsigned long failed_copies;
     unsigned long pcd_tot_tze_size;
     unsigned long pcd_tot_csize;
+    /* Global counters (should use long_atomic_t access). */
+    atomic_t global_obj_count;
+    atomic_t global_pgp_count;
+    atomic_t global_pcd_count;
+    atomic_t global_page_count;
+    atomic_t global_rtree_node_count;
 };
 
-static struct tmem_statistics tmem_stats;
+#define atomic_inc_and_max(_c) do { \
+    atomic_inc(&tmem_stats._c); \
+    if ( _atomic_read(tmem_stats._c) > tmem_stats._c##_max ) \
+        tmem_stats._c##_max = _atomic_read(tmem_stats._c); \
+} while (0)
+
+#define atomic_dec_and_assert(_c) do { \
+    atomic_dec(&tmem_stats._c); \
+    ASSERT(_atomic_read(tmem_stats._c) >= 0); \
+} while (0)
+
+static struct tmem_statistics tmem_stats = {
+    .global_obj_count = ATOMIC_INIT(0),
+    .global_pgp_count = ATOMIC_INIT(0),
+    .global_pcd_count = ATOMIC_INIT(0),
+    .global_page_count = ATOMIC_INIT(0),
+    .global_rtree_node_count = ATOMIC_INIT(0),
+};
 
 /************ CORE DATA STRUCTURES ************************************/
 
@@ -222,24 +245,7 @@ static DEFINE_SPINLOCK(pers_lists_spinlock);
 #define ASSERT_SPINLOCK(_l) ASSERT(spin_is_locked(_l))
 #define ASSERT_WRITELOCK(_l) ASSERT(rw_is_write_locked(_l))
 
-/* Global counters (should use long_atomic_t access). */
-static long global_eph_count = 0; /* Atomicity depends on eph_lists_spinlock. */
-static atomic_t global_obj_count = ATOMIC_INIT(0);
-static atomic_t global_pgp_count = ATOMIC_INIT(0);
-static atomic_t global_pcd_count = ATOMIC_INIT(0);
-static atomic_t global_page_count = ATOMIC_INIT(0);
-static atomic_t global_rtree_node_count = ATOMIC_INIT(0);
-
-#define atomic_inc_and_max(_c) do { \
-    atomic_inc(&_c); \
-    if ( _atomic_read(_c) > tmem_stats._c##_max ) \
-        tmem_stats._c##_max = _atomic_read(_c); \
-} while (0)
-
-#define atomic_dec_and_assert(_c) do { \
-    atomic_dec(&_c); \
-    ASSERT(_atomic_read(_c) >= 0); \
-} while (0)
+static long global_eph_count; /* Atomicity depends on eph_lists_spinlock. */
 
 
 /*
@@ -685,7 +691,8 @@ static void pgp_free(struct tmem_page_descriptor *pgp)
     }
     pgp_free_data(pgp, pool);
     atomic_dec_and_assert(global_pgp_count);
-    atomic_dec_and_assert(pool->pgp_count);
+    atomic_dec(&pool->pgp_count);
+    ASSERT(_atomic_read(pool->pgp_count) >= 0);
     pgp->size = -1;
     if ( is_persistent(pool) && pool->client->live_migrating )
     {
@@ -2210,11 +2217,11 @@ static int tmemc_list_global(tmem_cli_va_param_t buf, int off, uint32_t len,
           "Ec:%ld,Em:%ld,Oc:%d,Om:%d,Nc:%d,Nm:%d,Pc:%d,Pm:%d,"
           "Fc:%d,Fm:%d,Sc:%d,Sm:%d,Ep:%lu,Gd:%lu,Zt:%lu,Gz:%lu\n",
           global_eph_count, tmem_stats.global_eph_count_max,
-          _atomic_read(global_obj_count), tmem_stats.global_obj_count_max,
-          _atomic_read(global_rtree_node_count), tmem_stats.global_rtree_node_count_max,
-          _atomic_read(global_pgp_count), tmem_stats.global_pgp_count_max,
-          _atomic_read(global_page_count), tmem_stats.global_page_count_max,
-          _atomic_read(global_pcd_count), tmem_stats.global_pcd_count_max,
+          _atomic_read(tmem_stats.global_obj_count), tmem_stats.global_obj_count_max,
+          _atomic_read(tmem_stats.global_rtree_node_count), tmem_stats.global_rtree_node_count_max,
+          _atomic_read(tmem_stats.global_pgp_count), tmem_stats.global_pgp_count_max,
+          _atomic_read(tmem_stats.global_page_count), tmem_stats.global_page_count_max,
+          _atomic_read(tmem_stats.global_pcd_count), tmem_stats.global_pcd_count_max,
          tmem_stats.tot_good_eph_puts,tmem_stats.deduped_puts,tmem_stats.pcd_tot_tze_size,
          tmem_stats.pcd_tot_csize);
     if ( sum + n >= len )
