@@ -186,6 +186,11 @@ guest_walk_tables(struct vcpu *v, struct p2m_domain *p2m,
         rc |= _PAGE_PRESENT;
         goto out;
     }
+    if ( gflags & _PAGE_PSE )
+    {
+        rc |= _PAGE_PSE | _PAGE_INVALID_BIT;
+        goto out;
+    }
     rc |= ((gflags & mflags) ^ mflags);
 
     /* Map the l3 table */
@@ -206,7 +211,7 @@ guest_walk_tables(struct vcpu *v, struct p2m_domain *p2m,
     }
     rc |= ((gflags & mflags) ^ mflags);
     
-    pse1G = (gflags & _PAGE_PSE) && guest_supports_1G_superpages(v); 
+    pse1G = !!(gflags & _PAGE_PSE);
 
     if ( pse1G )
     {
@@ -226,6 +231,8 @@ guest_walk_tables(struct vcpu *v, struct p2m_domain *p2m,
             /* _PAGE_PSE_PAT not set: remove _PAGE_PAT from flags. */
             flags &= ~_PAGE_PAT;
 
+        if ( !guest_supports_1G_superpages(v) )
+            rc |= _PAGE_PSE | _PAGE_INVALID_BIT;
         if ( gfn_x(start) & GUEST_L3_GFN_MASK & ~0x1 )
             rc |= _PAGE_INVALID_BITS;
 
