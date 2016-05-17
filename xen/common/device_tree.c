@@ -1176,6 +1176,23 @@ int dt_for_each_irq_map(const struct dt_device_node *dev,
         for ( i = 0; i < pintsize; i++ )
             dt_raw_irq.specifier[i] = dt_read_number(imap + i, 1);
 
+        if ( dt_raw_irq.controller != dt_interrupt_controller )
+        {
+            /*
+             * We don't map IRQs connected to secondary IRQ controllers as
+             * these IRQs have no meaning to us until they connect to the
+             * primary controller.
+             *
+             * Secondary IRQ controllers will at some point connect to
+             * the primary controller (possibly via other IRQ controllers).
+             * We map the IRQs at that last connection point.
+             */
+            imap += pintsize;
+            imaplen -= pintsize;
+            dt_dprintk(" -> Skipped IRQ for secondary IRQ controller\n");
+            continue;
+        }
+
         ret = dt_irq_translate(&dt_raw_irq, &dt_irq);
         if ( ret )
         {
