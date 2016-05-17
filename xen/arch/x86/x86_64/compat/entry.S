@@ -182,7 +182,7 @@ ENTRY(compat_restore_all_guest)
         testb $3,UREGS_cs(%rsp)
         jpe   .Lcr4_alt_end
         mov   CPUINFO_cr4-CPUINFO_guest_cpu_user_regs(%rsp), %rax
-        and   $~(X86_CR4_SMEP|X86_CR4_SMAP), %rax
+        and   $~XEN_CR4_PV32_BITS, %rax
         mov   %rax, CPUINFO_cr4-CPUINFO_guest_cpu_user_regs(%rsp)
         mov   %rax, %cr4
 .Lcr4_alt_end:
@@ -220,6 +220,10 @@ ENTRY(cr4_pv32_restore)
         je    1f
         /* Cause cr4_pv32_mask to be visible in the BUG register dump. */
         mov   cr4_pv32_mask(%rip), %rdx
+        /* Avoid coming back here while handling the #UD we cause below. */
+        mov   %cr4, %rcx
+        or    %rdx, %rcx
+        mov   %rcx, %cr4
         BUG
 1:
 #endif
