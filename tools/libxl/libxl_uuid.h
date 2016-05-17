@@ -61,7 +61,7 @@ int libxl_uuid_from_string(libxl_uuid *uuid, const char *in);
 void libxl_uuid_copy(libxl_ctx *ctx_opt, libxl_uuid *dst,
                      const libxl_uuid *src);
 #if defined(LIBXL_API_VERSION) && LIBXL_API_VERSION < 0x040500
-void static inline libxl_uuid_copy_0x040400(libxl_uuid *dst,
+static inline void libxl_uuid_copy_0x040400(libxl_uuid *dst,
                                             const libxl_uuid *src)
 {
     libxl_uuid_copy(NULL, dst, src);
