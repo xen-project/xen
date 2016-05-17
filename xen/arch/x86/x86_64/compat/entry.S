@@ -183,8 +183,21 @@ ENTRY(compat_restore_all_guest)
         jpe   .Lcr4_alt_end
         mov   CPUINFO_cr4-CPUINFO_guest_cpu_user_regs(%rsp), %rax
         and   $~XEN_CR4_PV32_BITS, %rax
+1:
         mov   %rax, CPUINFO_cr4-CPUINFO_guest_cpu_user_regs(%rsp)
         mov   %rax, %cr4
+        /*
+         * An NMI or MCE may have occurred between the previous two
+         * instructions, leaving register and cache in a state where
+         * the next exit from the guest would trigger the BUG in
+         * cr4_pv32_restore. If this happened, the cached value is no
+         * longer what we just set it to, which we can utilize to
+         * correct that state. Note that we do not have to fear this
+         * loop to cause a live lock: If NMIs/MCEs occurred at that
+         * high a rate, we'd be live locked anyway.
+         */
+        cmp   %rax, CPUINFO_cr4-CPUINFO_guest_cpu_user_regs(%rsp)
+        jne   1b
 .Lcr4_alt_end:
         .section .altinstructions, "a"
         altinstruction_entry .Lcr4_orig, .Lcr4_orig, X86_FEATURE_ALWAYS, 12, 0
