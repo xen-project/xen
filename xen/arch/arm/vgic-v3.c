@@ -427,11 +427,10 @@ static int __vgic_v3_distr_common_mmio_write(const char *name, struct vcpu *v,
         return 0;
 
     case GICD_ICACTIVER ... GICD_ICACTIVERN:
-        if ( dabt.size != DABT_WORD ) goto bad_width;
         printk(XENLOG_G_ERR
                "%pv: %s: unhandled word write %#"PRIregister" to ICACTIVER%d\n",
                v, name, *r, reg - GICD_ICACTIVER);
-        return 0;
+        goto write_ignore_32;
 
     case GICD_IPRIORITYR ... GICD_IPRIORITYRN:
         if ( dabt.size != DABT_BYTE && dabt.size != DABT_WORD ) goto bad_width;
