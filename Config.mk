@@ -271,7 +271,7 @@ SEABIOS_UPSTREAM_URL ?= git://xenbits.xen.org/seabios.git
 MINIOS_UPSTREAM_URL ?= git://xenbits.xen.org/mini-os.git
 endif
 OVMF_UPSTREAM_REVISION ?= b41ef32518095f783d0c2343b496cc857c6f3dff
-QEMU_UPSTREAM_REVISION ?= qemu-xen-4.7.0-rc1
+QEMU_UPSTREAM_REVISION ?= qemu-xen-4.7.0-rc4
 MINIOS_UPSTREAM_REVISION ?= 1a3ee6eeca136525aa2e6917ae500e7cf731c09d
 # Fri May 13 15:21:10 2016 +0100
 # lib/sys.c: enclose file_types in define guards
