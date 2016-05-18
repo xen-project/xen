@@ -283,9 +283,9 @@ SEABIOS_UPSTREAM_REVISION ?= rel-1.9.2
 ETHERBOOT_NICS ?= rtl8139 8086100e
 
 
-QEMU_TRADITIONAL_REVISION ?= e4ceb77cf88bc44f0b7fe39225c49d660735f327
-# Wed Jul 15 18:17:04 2015 +0100
-# rtl8139: check TCP Data Offset field
+QEMU_TRADITIONAL_REVISION ?= df553c056104e3dd8a2bd2e72539a57c4c085bae
+# Thu May 5 11:14:44 2016 +0100
+# Fix build with newer version of GNUTLS
 
 # Specify which qemu-dm to use. This may be `ioemu' to use the old
 # Mercurial in-tree version, or a local directory, or a git URL.
