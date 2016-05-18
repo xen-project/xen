@@ -257,9 +257,9 @@ OVMF_UPSTREAM_REVISION ?= 52a99493cce88a9d4ec8a02d7f1bd1a1001ce60d
 QEMU_UPSTREAM_REVISION ?= 14a60f98e0cd16e2636afb136129ed7f11cbfce0
 # Tue Apr 26 14:48:06 2016 +0200
 # vga: make sure vga register setup for vbe stays intact (CVE-2016-3712).
-MINIOS_UPSTREAM_REVISION ?= 6aadd46e0927763861b19eacce2f2aeac9f17835
-# Sat, 9 Apr 2016 23:46:32 +0100 (00:46 +0200)
-# Fix time update
+MINIOS_UPSTREAM_REVISION ?= e1cca557c64272d33da7bafc0ad25399267563d0
+# Fri May 13 15:21:10 2016 +0100
+# lib/sys.c: enclose file_types in define guards
 
 SEABIOS_UPSTREAM_REVISION ?= rel-1.8.2
 # Tue Mar 17 10:52:16 2015 -0400
