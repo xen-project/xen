@@ -310,7 +310,6 @@ void start_secondary(unsigned long boot_phys_offset,
     smp_wmb();
 
     /* Now report this CPU is up */
-    smp_up_cpu = MPIDR_INVALID;
     cpumask_set_cpu(cpuid, &cpu_online_map);
     smp_wmb();
 
