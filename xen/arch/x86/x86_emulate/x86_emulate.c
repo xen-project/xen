@@ -4178,6 +4178,8 @@ x86_emulate(
         if ( !rc && (b & 1) && (ea.type == OP_MEM) )
             rc = ops->write(ea.mem.seg, ea.mem.off, mmvalp,
                             ea.bytes, ctxt);
+        if ( rc )
+            goto done;
         dst.type = OP_NONE;
         break;
     }
@@ -4430,6 +4432,8 @@ x86_emulate(
         if ( !rc && (b != 0x6f) && (ea.type == OP_MEM) )
             rc = ops->write(ea.mem.seg, ea.mem.off, mmvalp,
                             ea.bytes, ctxt);
+        if ( rc )
+            goto done;
         dst.type = OP_NONE;
         break;
     }
