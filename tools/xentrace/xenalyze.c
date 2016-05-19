@@ -7655,7 +7655,7 @@ void sched_process(struct pcpu_info *p)
                     printf(", was runnable for %u.%uus, ", r->rsince / 1000,
                            r->rsince % 1000);
                 if ( r->slice > 0 )
-                    printf("next slice %u.%uus\n", r->slice / 1000,
+                    printf("next slice %u.%uus", r->slice / 1000,
                            r->slice % 1000);
                 printf("\n");
             }
