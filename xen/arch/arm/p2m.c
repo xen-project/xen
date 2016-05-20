@@ -1184,6 +1184,14 @@ out:
     while ( (pg = page_list_remove_head(&free_pages)) )
         free_domheap_page(pg);
 
+    for ( level = P2M_ROOT_LEVEL; level < 4; level ++ )
+    {
+        if ( mappings[level] )
+            unmap_domain_page(mappings[level]);
+    }
+
+    spin_unlock(&p2m->lock);
+
     if ( rc < 0 && ( op == INSERT || op == ALLOCATE ) &&
          addr != start_gpaddr )
     {
@@ -1195,14 +1203,6 @@ out:
         apply_p2m_changes(d, REMOVE, start_gpaddr, addr, orig_maddr,
                           mattr, 0, p2m_invalid, d->arch.p2m.default_access);
     }
-
-    for ( level = P2M_ROOT_LEVEL; level < 4; level ++ )
-    {
-        if ( mappings[level] )
-            unmap_domain_page(mappings[level]);
-    }
-
-    spin_unlock(&p2m->lock);
 
     return rc;
 }
