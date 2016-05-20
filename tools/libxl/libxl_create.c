@@ -946,7 +946,8 @@ static void initiate_domain_create(libxl__egc *egc,
          * called libxl_device_nic_add when domcreate_launch_dm gets called,
          * but qemu needs the nic information to be complete.
          */
-        ret = libxl__device_nic_setdefault(gc, &d_config->nics[i], domid);
+        ret = libxl__device_nic_setdefault(gc, &d_config->nics[i], domid,
+                                           false);
         if (ret) {
             LOG(ERROR, "Unable to set nic defaults for nic %d", i);
             goto error_out;

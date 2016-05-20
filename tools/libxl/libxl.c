@@ -3319,7 +3319,7 @@ out:
 /******************************************************************************/
 
 int libxl__device_nic_setdefault(libxl__gc *gc, libxl_device_nic *nic,
-                                 uint32_t domid)
+                                 uint32_t domid, bool hotplug)
 {
     int rc;
 
@@ -3357,8 +3357,9 @@ int libxl__device_nic_setdefault(libxl__gc *gc, libxl_device_nic *nic,
     switch (libxl__domain_type(gc, domid)) {
     case LIBXL_DOMAIN_TYPE_HVM:
         if (!nic->nictype) {
-            if (libxl__device_model_version_running(gc, domid) ==
-                LIBXL_DEVICE_MODEL_VERSION_NONE)
+            if (hotplug ||
+                (libxl__device_model_version_running(gc, domid) ==
+                 LIBXL_DEVICE_MODEL_VERSION_NONE))
                 nic->nictype = LIBXL_NIC_TYPE_VIF;
             else
                 nic->nictype = LIBXL_NIC_TYPE_VIF_IOEMU;
@@ -3411,7 +3412,7 @@ void libxl__device_nic_add(libxl__egc *egc, uint32_t domid,
     libxl_device_nic_init(&nic_saved);
     libxl_device_nic_copy(CTX, &nic_saved, nic);
 
-    rc = libxl__device_nic_setdefault(gc, nic, domid);
+    rc = libxl__device_nic_setdefault(gc, nic, domid, aodev->update_json);
     if (rc) goto out;
 
     front = flexarray_make(gc, 16, 1);

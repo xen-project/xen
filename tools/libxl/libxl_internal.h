@@ -1217,7 +1217,7 @@ _hidden int libxl__device_disk_setdefault(libxl__gc *gc,
                                           libxl_device_disk *disk,
                                           uint32_t domid);
 _hidden int libxl__device_nic_setdefault(libxl__gc *gc, libxl_device_nic *nic,
-                                         uint32_t domid);
+                                         uint32_t domid, bool hotplug);
 _hidden int libxl__device_vtpm_setdefault(libxl__gc *gc, libxl_device_vtpm *vtpm);
 _hidden int libxl__device_vfb_setdefault(libxl__gc *gc, libxl_device_vfb *vfb);
 _hidden int libxl__device_vkb_setdefault(libxl__gc *gc, libxl_device_vkb *vkb);
@@ -4095,6 +4095,7 @@ static inline void libxl__update_config_nic(libxl__gc *gc,
                                             libxl_device_nic *src)
 {
     dst->devid = src->devid;
+    dst->nictype = src->nictype;
     libxl_mac_copy(CTX, &dst->mac, &src->mac);
 }
 
