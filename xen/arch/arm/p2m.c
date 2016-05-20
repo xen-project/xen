@@ -1189,13 +1189,10 @@ out:
     {
         BUG_ON(addr == end_gpaddr);
         /*
-         * addr keeps the address of the last successfully-inserted mapping,
-         * while apply_p2m_changes() considers an address range which is
-         * exclusive of end_gpaddr: add level_size to addr to obtain the
-         * right end of the range
+         * addr keeps the address of the end of the last successfully-inserted
+         * mapping.
          */
-        apply_p2m_changes(d, REMOVE,
-                          start_gpaddr, addr + level_sizes[level], orig_maddr,
+        apply_p2m_changes(d, REMOVE, start_gpaddr, addr, orig_maddr,
                           mattr, 0, p2m_invalid, d->arch.p2m.default_access);
     }
 
