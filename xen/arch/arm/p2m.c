@@ -909,6 +909,14 @@ static int apply_p2m_changes(struct domain *d,
     rc = 0;
 
 out:
+    for ( level = P2M_ROOT_LEVEL; level < 4; level ++ )
+    {
+        if ( mappings[level] )
+            unmap_domain_page(mappings[level]);
+    }
+
+    spin_unlock(&p2m->lock);
+
     if ( rc < 0 && ( op == INSERT || op == ALLOCATE ) &&
          addr != start_gpaddr )
     {
@@ -920,14 +928,6 @@ out:
         apply_p2m_changes(d, REMOVE, start_gpaddr, addr, orig_maddr,
                           mattr, p2m_invalid);
     }
-
-    for ( level = P2M_ROOT_LEVEL; level < 4; level ++ )
-    {
-        if ( mappings[level] )
-            unmap_domain_page(mappings[level]);
-    }
-
-    spin_unlock(&p2m->lock);
 
     return rc;
 }
