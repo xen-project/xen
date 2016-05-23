@@ -1198,7 +1198,7 @@ static void
 rt_vcpu_wake(const struct scheduler *ops, struct vcpu *vc)
 {
     struct rt_vcpu * const svc = rt_vcpu(vc);
-    s_time_t now = NOW();
+    s_time_t now;
     bool_t missed;
 
     BUG_ON( is_idle_vcpu(vc) );
@@ -1225,6 +1225,7 @@ rt_vcpu_wake(const struct scheduler *ops, struct vcpu *vc)
      * If a deadline passed while svc was asleep/blocked, we need new
      * scheduling parameters (a new deadline and full budget).
      */
+    now = NOW();
 
     missed = ( now >= svc->cur_deadline );
     if ( missed )
@@ -1394,7 +1395,7 @@ rt_dom_cntl(
  * from the replq and does the actual replenishment.
  */
 static void repl_timer_handler(void *data){
-    s_time_t now = NOW();
+    s_time_t now;
     struct scheduler *ops = data;
     struct rt_private *prv = rt_priv(ops);
     struct list_head *replq = rt_replq(ops);
@@ -1405,6 +1406,8 @@ static void repl_timer_handler(void *data){
     LIST_HEAD(tmp_replq);
 
     spin_lock_irq(&prv->lock);
+
+    now = NOW();
 
     /*
      * Do the replenishment and move replenished vcpus
