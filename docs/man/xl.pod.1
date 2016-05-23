@@ -1286,6 +1286,10 @@ effect to the guest OS is much the same as any hotplug event.
 Create a new virtual block device.  This will trigger a hotplug event
 for the guest.
 
+Note that only PV block devices are supported by block-attach.
+Requests to attach emulated devices (eg, vdev=hdc) will result in only
+the PV view being available to the guest.
+
 B<OPTIONS>
 
 =over 4
@@ -1368,6 +1372,8 @@ I<network-device> describes the device to attach, using the same format as the
 B<vif> string in the domain config file. See L<xl.cfg> and
 L<http://xenbits.xen.org/docs/unstable/misc/xl-network-configuration.html>
 for more informations.
+
+Note that only attaching PV network interface is supported.
 
 =item B<network-detach> I<domain-id> I<devid|mac>
 
