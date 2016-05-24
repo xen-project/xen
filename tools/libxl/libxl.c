@@ -5354,8 +5354,8 @@ libxl_numainfo *libxl_get_numainfo(libxl_ctx *ctx, int *nr)
     return ret;
 }
 
-static const int libxl__xc_version_wrap(libxl__gc *gc, libxl_version_info *info,
-                                        xen_build_id_t *build)
+static int libxl__xc_version_wrap(libxl__gc *gc, libxl_version_info *info,
+                                  xen_build_id_t *build)
 {
     int r;
 
