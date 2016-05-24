@@ -42,6 +42,18 @@ gfn_to_paddr(gfn_t gfn)
 #undef get_gfn
 #define get_gfn(d, g, t) get_gfn_type((d), gfn_x(g), (t), P2M_ALLOC)
 
+/* Mask covering the reserved bits from superpage alignment. */
+#define SUPERPAGE_RSVD(bit)                                             \
+    (((1ul << (bit)) - 1) & ~(_PAGE_PSE_PAT | (_PAGE_PSE_PAT - 1ul)))
+
+static inline uint32_t fold_pse36(uint64_t val)
+{
+    return (val & ~(0x1fful << 13)) | ((val & (0x1fful << 32)) >> (32 - 13));
+}
+static inline uint64_t unfold_pse36(uint32_t val)
+{
+    return (val & ~(0x1fful << 13)) | ((val & (0x1fful << 13)) << (32 - 13));
+}
 
 /* Types of the guest's page tables and access functions for them */
 
@@ -49,8 +61,12 @@ gfn_to_paddr(gfn_t gfn)
 
 #define GUEST_L1_PAGETABLE_ENTRIES     1024
 #define GUEST_L2_PAGETABLE_ENTRIES     1024
+
 #define GUEST_L1_PAGETABLE_SHIFT         12
 #define GUEST_L2_PAGETABLE_SHIFT         22
+
+#define GUEST_L1_PAGETABLE_RSVD           0
+#define GUEST_L2_PAGETABLE_RSVD           0
 
 typedef uint32_t guest_intpte_t;
 typedef struct { guest_intpte_t l1; } guest_l1e_t;
@@ -86,21 +102,39 @@ static inline guest_l2e_t guest_l2e_from_gfn(gfn_t gfn, u32 flags)
 #else /* GUEST_PAGING_LEVELS != 2 */
 
 #if GUEST_PAGING_LEVELS == 3
+
 #define GUEST_L1_PAGETABLE_ENTRIES      512
 #define GUEST_L2_PAGETABLE_ENTRIES      512
 #define GUEST_L3_PAGETABLE_ENTRIES        4
+
 #define GUEST_L1_PAGETABLE_SHIFT         12
 #define GUEST_L2_PAGETABLE_SHIFT         21
 #define GUEST_L3_PAGETABLE_SHIFT         30
+
+#define GUEST_L1_PAGETABLE_RSVD            0x7ff0000000000000ul
+#define GUEST_L2_PAGETABLE_RSVD            0x7ff0000000000000ul
+#define GUEST_L3_PAGETABLE_RSVD                                      \
+    (0xfff0000000000000ul | _PAGE_GLOBAL | _PAGE_PSE | _PAGE_DIRTY | \
+     _PAGE_ACCESSED | _PAGE_USER | _PAGE_RW)
+
 #else /* GUEST_PAGING_LEVELS == 4 */
+
 #define GUEST_L1_PAGETABLE_ENTRIES      512
 #define GUEST_L2_PAGETABLE_ENTRIES      512
 #define GUEST_L3_PAGETABLE_ENTRIES      512
 #define GUEST_L4_PAGETABLE_ENTRIES      512
+
 #define GUEST_L1_PAGETABLE_SHIFT         12
 #define GUEST_L2_PAGETABLE_SHIFT         21
 #define GUEST_L3_PAGETABLE_SHIFT         30
 #define GUEST_L4_PAGETABLE_SHIFT         39
+
+#define GUEST_L1_PAGETABLE_RSVD            0
+#define GUEST_L2_PAGETABLE_RSVD            0
+#define GUEST_L3_PAGETABLE_RSVD            0
+/* NB L4e._PAGE_GLOBAL is reserved for AMD, but ignored for Intel. */
+#define GUEST_L4_PAGETABLE_RSVD            _PAGE_PSE
+
 #endif
 
 typedef l1_pgentry_t guest_l1e_t;
@@ -198,6 +232,24 @@ static inline bool guest_can_use_l3_superpages(const struct domain *d)
     return GUEST_PAGING_LEVELS >= 4 && paging_mode_hap(d) && cpu_has_page1gb;
 }
 
+static inline bool guest_can_use_pse36(const struct domain *d)
+{
+    /*
+     * Only called in the context of 2-level guests, after
+     * guest_can_use_l2_superpages() has indicated true.
+     *
+     * Shadow pagetables don't support PSE36 superpages at all, and will
+     * always treat them as reserved.
+     *
+     * With HAP however, once L2 superpages are active, here are no control
+     * register settings for the hardware pagewalk on the subject of PSE36.
+     * If the guest constructs a PSE36 superpage on capable hardware, it will
+     * function irrespective of whether the feature is advertised.  Xen's
+     * model of performing a pagewalk should match.
+     */
+    return paging_mode_hap(d) && cpu_has_pse36;
+}
+
 static inline bool guest_nx_enabled(const struct vcpu *v)
 {
     if ( GUEST_PAGING_LEVELS == 2 ) /* NX has no effect witout CR4.PAE. */
@@ -221,6 +273,52 @@ static inline bool guest_nx_enabled(const struct vcpu *v)
 #define _PAGE_INVALID_BITS _PAGE_INVALID_BIT
 #endif
 
+/* Helpers for identifying whether guest entries have reserved bits set. */
+
+/* Bits reserved because of maxphysaddr, and (lack of) EFER.NX */
+static inline uint64_t guest_rsvd_bits(const struct vcpu *v)
+{
+    return ((PADDR_MASK &
+             ~((1ul << v->domain->arch.cpuid->extd.maxphysaddr) - 1)) |
+            (guest_nx_enabled(v) ? 0 : put_pte_flags(_PAGE_NX_BIT)));
+}
+
+static inline bool guest_l1e_rsvd_bits(const struct vcpu *v, guest_l1e_t l1e)
+{
+    return l1e.l1 & (guest_rsvd_bits(v) | GUEST_L1_PAGETABLE_RSVD);
+}
+
+static inline bool guest_l2e_rsvd_bits(const struct vcpu *v, guest_l2e_t l2e)
+{
+    uint64_t rsvd_bits = guest_rsvd_bits(v);
+
+    return ((l2e.l2 & (rsvd_bits | GUEST_L2_PAGETABLE_RSVD |
+                       (guest_can_use_l2_superpages(v) ? 0 : _PAGE_PSE))) ||
+            ((l2e.l2 & _PAGE_PSE) &&
+             (l2e.l2 & ((GUEST_PAGING_LEVELS == 2 && guest_can_use_pse36(v->domain))
+                          /* PSE36 tops out at 40 bits of address width. */
+                        ? (fold_pse36(rsvd_bits | (1ul << 40)))
+                        : SUPERPAGE_RSVD(GUEST_L2_PAGETABLE_SHIFT)))));
+}
+
+#if GUEST_PAGING_LEVELS >= 3
+static inline bool guest_l3e_rsvd_bits(const struct vcpu *v, guest_l3e_t l3e)
+{
+    return ((l3e.l3 & (guest_rsvd_bits(v) | GUEST_L3_PAGETABLE_RSVD |
+                       (guest_can_use_l3_superpages(v->domain) ? 0 : _PAGE_PSE))) ||
+            ((l3e.l3 & _PAGE_PSE) &&
+             (l3e.l3 & SUPERPAGE_RSVD(GUEST_L3_PAGETABLE_SHIFT))));
+}
+
+#if GUEST_PAGING_LEVELS >= 4
+static inline bool guest_l4e_rsvd_bits(const struct vcpu *v, guest_l4e_t l4e)
+{
+    return l4e.l4 & (guest_rsvd_bits(v) | GUEST_L4_PAGETABLE_RSVD |
+                     ((v->domain->arch.cpuid->x86_vendor == X86_VENDOR_AMD)
+                      ? _PAGE_GLOBAL : 0));
+}
+#endif /* GUEST_PAGING_LEVELS >= 4 */
+#endif /* GUEST_PAGING_LEVELS >= 3 */
 
 /* Type used for recording a walk through guest pagetables.  It is
  * filled in by the pagetable walk function, and also used as a cache
