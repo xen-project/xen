@@ -241,8 +241,7 @@ struct guest_pagetable_walk
 
 /* Given a walk_t, translate the gw->va into the guest's notion of the
  * corresponding frame number. */
-static inline gfn_t
-guest_walk_to_gfn(walk_t *gw)
+static inline gfn_t guest_walk_to_gfn(const walk_t *gw)
 {
     if ( !(guest_l1e_get_flags(gw->l1e) & _PAGE_PRESENT) )
         return INVALID_GFN;
@@ -251,19 +250,19 @@ guest_walk_to_gfn(walk_t *gw)
 
 /* Given a walk_t, translate the gw->va into the guest's notion of the
  * corresponding physical address. */
-static inline paddr_t
-guest_walk_to_gpa(walk_t *gw)
+static inline paddr_t guest_walk_to_gpa(const walk_t *gw)
 {
-    if ( !(guest_l1e_get_flags(gw->l1e) & _PAGE_PRESENT) )
-        return 0;
-    return ((paddr_t)gfn_x(guest_l1e_get_gfn(gw->l1e)) << PAGE_SHIFT) +
-           (gw->va & ~PAGE_MASK);
+    gfn_t gfn = guest_walk_to_gfn(gw);
+
+    if ( gfn_eq(gfn, INVALID_GFN) )
+        return INVALID_PADDR;
+
+    return (gfn_x(gfn) << PAGE_SHIFT) | (gw->va & ~PAGE_MASK);
 }
 
 /* Given a walk_t from a successful walk, return the page-order of the 
  * page or superpage that the virtual address is in. */
-static inline unsigned int 
-guest_walk_to_page_order(walk_t *gw)
+static inline unsigned int guest_walk_to_page_order(const walk_t *gw)
 {
     /* This is only valid for successful walks - otherwise the 
      * PSE bits might be invalid. */

@@ -98,7 +98,7 @@ unsigned long hap_p2m_ga_to_gfn(GUEST_PAGING_LEVELS)(
     /* Interpret the answer */
     if ( missing == 0 )
     {
-        gfn_t gfn = guest_l1e_get_gfn(gw.l1e);
+        gfn_t gfn = guest_walk_to_gfn(&gw);
         struct page_info *page;
         page = get_page_from_gfn_p2m(p2m->domain, p2m, gfn_x(gfn), &p2mt,
                                      NULL, P2M_ALLOC | P2M_UNSHARE);

@@ -3104,7 +3104,7 @@ static int sh_page_fault(struct vcpu *v,
     }
 
     /* What mfn is the guest trying to access? */
-    gfn = guest_l1e_get_gfn(gw.l1e);
+    gfn = guest_walk_to_gfn(&gw);
     gmfn = get_gfn(d, gfn, &p2mt);
 
     if ( shadow_mode_refcounts(d) &&

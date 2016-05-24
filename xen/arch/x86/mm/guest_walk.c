@@ -438,7 +438,7 @@ set_ad:
 
     /* If this guest has a restricted physical address space then the
      * target GFN must fit within it. */
-    if ( !(rc & _PAGE_PRESENT) && !gfn_valid(d, guest_l1e_get_gfn(gw->l1e)) )
+    if ( !(rc & _PAGE_PRESENT) && !gfn_valid(d, guest_walk_to_gfn(gw)) )
         rc |= _PAGE_INVALID_BITS;
 
     return rc;
