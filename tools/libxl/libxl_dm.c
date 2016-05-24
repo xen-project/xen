@@ -1482,7 +1482,7 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
         }
 
         user = NULL;
-        LOG(WARN, "Could not find user %s, starting QEMU as root",
+        LOG(DEBUG, "Could not find user %s, starting QEMU as root",
             LIBXL_QEMU_USER_SHARED);
 
 end_search:
