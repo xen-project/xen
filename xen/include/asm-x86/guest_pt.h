@@ -310,21 +310,23 @@ guest_walk_tables(struct vcpu *v, struct p2m_domain *p2m, unsigned long va,
                   walk_t *gw, uint32_t pfec, mfn_t top_mfn, void *top_map);
 
 /* Pretty-print the contents of a guest-walk */
-static inline void print_gw(walk_t *gw)
+static inline void print_gw(const walk_t *gw)
 {
-    gdprintk(XENLOG_INFO, "GUEST WALK TO %#lx:\n", gw->va);
+    gprintk(XENLOG_INFO, "GUEST WALK TO %p\n", _p(gw->va));
 #if GUEST_PAGING_LEVELS >= 3 /* PAE or 64... */
 #if GUEST_PAGING_LEVELS >= 4 /* 64-bit only... */
-    gdprintk(XENLOG_INFO, "   l4mfn=%" PRI_mfn "\n", mfn_x(gw->l4mfn));
-    gdprintk(XENLOG_INFO, "   l4e=%" PRI_gpte "\n", gw->l4e.l4);
-    gdprintk(XENLOG_INFO, "   l3mfn=%" PRI_mfn "\n", mfn_x(gw->l3mfn));
+    gprintk(XENLOG_INFO, "   l4e=%" PRI_gpte " l4mfn=%" PRI_mfn "\n",
+            gw->l4e.l4, mfn_x(gw->l4mfn));
+    gprintk(XENLOG_INFO, "   l3e=%" PRI_gpte " l3mfn=%" PRI_mfn "\n",
+            gw->l3e.l3, mfn_x(gw->l3mfn));
+#else  /* PAE only... */
+    gprintk(XENLOG_INFO, "   l3e=%" PRI_gpte "\n", gw->l3e.l3);
 #endif /* PAE or 64... */
-    gdprintk(XENLOG_INFO, "   l3e=%" PRI_gpte "\n", gw->l3e.l3);
 #endif /* All levels... */
-    gdprintk(XENLOG_INFO, "   l2mfn=%" PRI_mfn "\n", mfn_x(gw->l2mfn));
-    gdprintk(XENLOG_INFO, "   l2e=%" PRI_gpte "\n", gw->l2e.l2);
-    gdprintk(XENLOG_INFO, "   l1mfn=%" PRI_mfn "\n", mfn_x(gw->l1mfn));
-    gdprintk(XENLOG_INFO, "   l1e=%" PRI_gpte "\n", gw->l1e.l1);
+    gprintk(XENLOG_INFO, "   l2e=%" PRI_gpte " l2mfn=%" PRI_mfn "\n",
+            gw->l2e.l2, mfn_x(gw->l2mfn));
+    gprintk(XENLOG_INFO, "   l1e=%" PRI_gpte " l1mfn=%" PRI_mfn "\n",
+            gw->l1e.l1, mfn_x(gw->l1mfn));
 }
 
 #endif /* _XEN_ASM_GUEST_PT_H */
