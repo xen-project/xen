@@ -840,12 +840,14 @@ static void
 rt_vcpu_insert(const struct scheduler *ops, struct vcpu *vc)
 {
     struct rt_vcpu *svc = rt_vcpu(vc);
-    s_time_t now = NOW();
+    s_time_t now;
     spinlock_t *lock;
 
     BUG_ON( is_idle_vcpu(vc) );
 
     lock = vcpu_schedule_lock_irq(vc);
+
+    now = NOW();
     if ( now >= svc->cur_deadline )
         rt_update_deadline(now, svc);
 
