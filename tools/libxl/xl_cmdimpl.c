@@ -847,7 +847,7 @@ static int update_cpumap_range(const char *str, libxl_bitmap *cpumap)
  */
 static int cpurange_parse(const char *cpu, libxl_bitmap *cpumap)
 {
-    char *ptr, *saveptr = NULL, *buf = strdup(cpu);
+    char *ptr, *saveptr = NULL, *buf = xstrdup(cpu);
     int rc = 0;
 
     for (ptr = strtok_r(buf, ",", &saveptr); ptr;
