@@ -722,6 +722,7 @@ void __init start_xen(unsigned long boot_phys_offset,
     set_current((struct vcpu *)0xfffff000); /* debug sanity */
     idle_vcpu[0] = current;
 
+    setup_virtual_regions(NULL, NULL);
     /* Initialize traps early allow us to get backtrace when an error occurred */
     init_traps();
 

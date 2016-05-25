@@ -102,8 +102,6 @@ integer_param("debug_stack_lines", debug_stack_lines);
 
 void init_traps(void)
 {
-    setup_virtual_regions(NULL, NULL);
-
     /* Setup Hyp vector base */
     WRITE_SYSREG((vaddr_t)hyp_traps_vector, VBAR_EL2);
 
