@@ -3305,10 +3305,12 @@ static int sh_page_fault(struct vcpu *v,
     {
         /*
          * If we are in the middle of injecting an exception or interrupt then
-         * we should not emulate: it is not the instruction at %eip that caused
-         * the fault. Furthermore it is almost certainly the case the handler
-         * stack is currently considered to be a page table, so we should
-         * unshadow the faulting page before exiting.
+         * we should not emulate: the fault is a side effect of the processor
+         * trying to deliver the exception (e.g. IDT/GDT accesses, pushing the
+         * exception frame onto the stack).  Furthermore it is almost
+         * certainly the case the handler stack is currently considered to be
+         * a page table, so we should unshadow the faulting page before
+         * exiting.
          */
         if ( unlikely(hvm_event_pending(v)) )
         {
@@ -3319,9 +3321,6 @@ static int sh_page_fault(struct vcpu *v,
                 v->arch.paging.last_write_emul_ok = 0;
             }
 #endif
-            gdprintk(XENLOG_DEBUG, "write to pagetable during event "
-                     "injection: cr2=%#lx, mfn=%#lx\n",
-                     va, mfn_x(gmfn));
             sh_remove_shadows(d, gmfn, 0 /* thorough */, 1 /* must succeed */);
             trace_shadow_emulate_other(TRC_SHADOW_EMULATE_UNSHADOW_EVTINJ,
                                        va, gfn);
