@@ -52,7 +52,7 @@ static unsigned long *__read_mostly cat_socket_enable;
 static struct psr_cat_socket_info *__read_mostly cat_socket_info;
 static unsigned long *__read_mostly cdp_socket_enable;
 
-static unsigned int __initdata opt_psr;
+static unsigned int opt_psr;
 static unsigned int __initdata opt_rmid_max = 255;
 static unsigned int __read_mostly opt_cos_max = 255;
 static uint64_t rmid_mask;
