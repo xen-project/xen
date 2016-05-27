@@ -220,7 +220,11 @@ DEFINE_XEN_GUEST_HANDLE(xen_machphys_mapping_t);
 #define XENMAPSPACE_gmfn_range   3 /* GMFN range, XENMEM_add_to_physmap only. */
 #define XENMAPSPACE_gmfn_foreign 4 /* GMFN from another dom,
                                     * XENMEM_add_to_physmap_batch only. */
-#define XENMAPSPACE_dev_mmio     5 /* device mmio region */
+#define XENMAPSPACE_dev_mmio     5 /* device mmio region
+                                      ARM only; the region is mapped in
+                                      Stage-2 using the memory attribute
+                                      "Device-nGnRE" (previously named
+                                      "Device" on ARMv7) */
 /* ` } */
 
 /*
