@@ -141,6 +141,11 @@ typedef unsigned int p2m_query_t;
                             | p2m_to_mask(p2m_ram_logdirty) )
 #define P2M_SHARED_TYPES   (p2m_to_mask(p2m_ram_shared))
 
+/* Valid types not necessarily associated with a (valid) MFN. */
+#define P2M_INVALID_MFN_TYPES (P2M_POD_TYPES                  \
+                               | p2m_to_mask(p2m_mmio_direct) \
+                               | P2M_PAGING_TYPES)
+
 /* Broken type: the frame backing this pfn has failed in hardware
  * and must not be touched. */
 #define P2M_BROKEN_TYPES (p2m_to_mask(p2m_ram_broken))
@@ -170,6 +175,8 @@ typedef unsigned int p2m_query_t;
 #define p2m_is_any_ram(_t)  (p2m_to_mask(_t) &                   \
                              (P2M_RAM_TYPES | P2M_GRANT_TYPES |  \
                               p2m_to_mask(p2m_map_foreign)))
+
+#define p2m_allows_invalid_mfn(t) (p2m_to_mask(t) & P2M_INVALID_MFN_TYPES)
 
 typedef enum {
     p2m_host,

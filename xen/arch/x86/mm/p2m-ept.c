@@ -772,8 +772,7 @@ ept_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
         ept_entry = table + (gfn_remainder >> (i * EPT_TABLE_ORDER));
     }
 
-    if ( mfn_valid(mfn_x(mfn)) || direct_mmio || p2m_is_paged(p2mt) ||
-         (p2mt == p2m_ram_paging_in) )
+    if ( mfn_valid(mfn_x(mfn)) || p2m_allows_invalid_mfn(p2mt) )
     {
         int emt = epte_get_entry_emt(p2m->domain, gfn, mfn,
                                      i * EPT_TABLE_ORDER, &ipat, direct_mmio);
