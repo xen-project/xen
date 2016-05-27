@@ -181,6 +181,16 @@ void ret_from_intr(void);
 
 #define ASM_STAC ASM_AC(STAC)
 #define ASM_CLAC ASM_AC(CLAC)
+
+#define CR4_PV32_RESTORE                                           \
+        667: ASM_NOP5;                                             \
+        .pushsection .altinstr_replacement, "ax";                  \
+        668: call cr4_pv32_restore;                                \
+        .section .altinstructions, "a";                            \
+        altinstruction_entry 667b, 668b, X86_FEATURE_SMEP, 5, 5;   \
+        altinstruction_entry 667b, 668b, X86_FEATURE_SMAP, 5, 5;   \
+        .popsection
+
 #else
 static always_inline void clac(void)
 {
@@ -280,14 +290,18 @@ static always_inline void stac(void)
  *
  * For the way it is used in RESTORE_ALL, this macro must preserve EFLAGS.ZF.
  */
-.macro LOAD_C_CLOBBERED compat=0
+.macro LOAD_C_CLOBBERED compat=0 ax=1
 .if !\compat
         movq  UREGS_r11(%rsp),%r11
         movq  UREGS_r10(%rsp),%r10
         movq  UREGS_r9(%rsp),%r9
         movq  UREGS_r8(%rsp),%r8
-.endif
+.if \ax
         movq  UREGS_rax(%rsp),%rax
+.endif
+.elseif \ax
+        movl  UREGS_rax(%rsp),%eax
+.endif
         movq  UREGS_rcx(%rsp),%rcx
         movq  UREGS_rdx(%rsp),%rdx
         movq  UREGS_rsi(%rsp),%rsi

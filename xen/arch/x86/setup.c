@@ -67,6 +67,8 @@ invbool_param("smep", disable_smep);
 static bool_t __initdata disable_smap;
 invbool_param("smap", disable_smap);
 
+unsigned long __read_mostly cr4_pv32_mask;
+
 /* Boot dom0 in pvh mode */
 static bool_t __initdata opt_dom0pvh;
 boolean_param("dom0pvh", opt_dom0pvh);
@@ -1304,6 +1306,8 @@ void __init noreturn __start_xen(unsigned long mbi_p)
     if ( cpu_has_smap )
         set_in_cr4(X86_CR4_SMAP);
 
+    cr4_pv32_mask = mmu_cr4_features & XEN_CR4_PV32_BITS;
+
     if ( cpu_has_fsgsbase )
         set_in_cr4(X86_CR4_FSGSBASE);
 
@@ -1440,7 +1444,10 @@ void __init noreturn __start_xen(unsigned long mbi_p)
      * copy_from_user().
      */
     if ( cpu_has_smap )
+    {
+        cr4_pv32_mask &= ~X86_CR4_SMAP;
         write_cr4(read_cr4() & ~X86_CR4_SMAP);
+    }
 
     printk("%sNX (Execute Disable) protection %sactive\n",
            cpu_has_nx ? XENLOG_INFO : XENLOG_WARNING "Warning: ",
@@ -1457,7 +1464,10 @@ void __init noreturn __start_xen(unsigned long mbi_p)
         panic("Could not set up DOM0 guest OS");
 
     if ( cpu_has_smap )
+    {
         write_cr4(read_cr4() | X86_CR4_SMAP);
+        cr4_pv32_mask |= X86_CR4_SMAP;
+    }
 
     /* Scrub RAM that is still free and so may go to an unprivileged domain. */
     scrub_heap_pages();
