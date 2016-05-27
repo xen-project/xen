@@ -590,7 +590,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
 
     if ( cpu_has_efer )
         rdmsrl(MSR_EFER, this_cpu(efer));
-    asm volatile ( "mov %%cr4,%0" : "=r" (this_cpu(cr4)) );
+    asm volatile ( "mov %%cr4,%0" : "=r" (get_cpu_info()->cr4) );
 
     /* We initialise the serial devices very early so we can get debugging. */
     ns16550.io_base = 0x3f8;

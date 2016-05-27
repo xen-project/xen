@@ -314,16 +314,14 @@ static inline unsigned long read_cr2(void)
     return cr2;
 }
 
-DECLARE_PER_CPU(unsigned long, cr4);
-
 static inline unsigned long read_cr4(void)
 {
-    return this_cpu(cr4);
+    return get_cpu_info()->cr4;
 }
 
 static inline void write_cr4(unsigned long val)
 {
-    this_cpu(cr4) = val;
+    get_cpu_info()->cr4 = val;
     asm volatile ( "mov %0,%%cr4" : : "r" (val) );
 }
 
