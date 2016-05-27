@@ -730,7 +730,7 @@ p2m_pod_zero_check_superpage(struct p2m_domain *p2m, unsigned long gfn)
     }
 
     /* Try to remove the page, restoring old mapping if it fails. */
-    p2m_set_entry(p2m, gfn, _mfn(0), PAGE_ORDER_2M,
+    p2m_set_entry(p2m, gfn, _mfn(INVALID_MFN), PAGE_ORDER_2M,
                   p2m_populate_on_demand, p2m->default_access);
 
     /* Make none of the MFNs are used elsewhere... for example, mapped
@@ -846,7 +846,7 @@ p2m_pod_zero_check(struct p2m_domain *p2m, unsigned long *gfns, int count)
         }
 
         /* Try to remove the page, restoring old mapping if it fails. */
-        p2m_set_entry(p2m, gfns[i], _mfn(0), PAGE_ORDER_4K,
+        p2m_set_entry(p2m, gfns[i], _mfn(INVALID_MFN), PAGE_ORDER_4K,
                       p2m_populate_on_demand, p2m->default_access);
 
         /* See if the page was successfully unmapped.  (Allow one refcount
@@ -1047,7 +1047,7 @@ p2m_pod_demand_populate(struct p2m_domain *p2m, unsigned long gfn,
          * NOTE: In a fine-grained p2m locking scenario this operation
          * may need to promote its locking from gfn->1g superpage
          */
-        p2m_set_entry(p2m, gfn_aligned, _mfn(0), PAGE_ORDER_2M,
+        p2m_set_entry(p2m, gfn_aligned, _mfn(INVALID_MFN), PAGE_ORDER_2M,
                       p2m_populate_on_demand, p2m->default_access);
         return 0;
     }
@@ -1129,7 +1129,7 @@ remap_and_retry:
      * need promoting the gfn lock from gfn->2M superpage */
     gfn_aligned = (gfn>>order)<<order;
     for(i=0; i<(1<<order); i++)
-        p2m_set_entry(p2m, gfn_aligned+i, _mfn(0), PAGE_ORDER_4K,
+        p2m_set_entry(p2m, gfn_aligned + i, _mfn(INVALID_MFN), PAGE_ORDER_4K,
                       p2m_populate_on_demand, p2m->default_access);
     if ( tb_init_done )
     {
@@ -1184,8 +1184,8 @@ guest_physmap_mark_populate_on_demand(struct domain *d, unsigned long gfn,
     }
 
     /* Now, actually do the two-way mapping */
-    rc = p2m_set_entry(p2m, gfn, _mfn(0), order, p2m_populate_on_demand,
-                       p2m->default_access);
+    rc = p2m_set_entry(p2m, gfn, _mfn(INVALID_MFN), order,
+                       p2m_populate_on_demand, p2m->default_access);
     if ( rc == 0 )
     {
         pod_lock(p2m);

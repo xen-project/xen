@@ -570,7 +570,7 @@ p2m_pt_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
         }
 
         ASSERT(!mfn_valid(mfn) || p2mt != p2m_mmio_direct);
-        l3e_content = mfn_valid(mfn) 
+        l3e_content = mfn_valid(mfn) || p2m_allows_invalid_mfn(p2mt)
             ? l3e_from_pfn(mfn_x(mfn),
                            p2m_type_to_flags(p2mt, mfn) | _PAGE_PSE)
             : l3e_empty();
@@ -606,8 +606,7 @@ p2m_pt_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
             p2m_get_iommu_flags(p2m_flags_to_type(l1e_get_flags(*p2m_entry)));
         old_mfn = l1e_get_pfn(*p2m_entry);
 
-        if ( mfn_valid(mfn) || (p2mt == p2m_mmio_direct)
-                            || p2m_is_paging(p2mt) )
+        if ( mfn_valid(mfn) || p2m_allows_invalid_mfn(p2mt) )
             entry_content = p2m_l1e_from_pfn(mfn_x(mfn),
                                              p2m_type_to_flags(p2mt, mfn));
         else
@@ -643,7 +642,7 @@ p2m_pt_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
         }
         
         ASSERT(!mfn_valid(mfn) || p2mt != p2m_mmio_direct);
-        if ( mfn_valid(mfn) || p2m_is_pod(p2mt) )
+        if ( mfn_valid(mfn) || p2m_allows_invalid_mfn(p2mt) )
             l2e_content = l2e_from_pfn(mfn_x(mfn),
                                        p2m_type_to_flags(p2mt, mfn) |
                                        _PAGE_PSE);
