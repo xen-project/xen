@@ -185,7 +185,7 @@ void dt_unreserved_regions(paddr_t s, paddr_t e,
             /* If we can't read it, pretend it doesn't exist... */
             continue;
 
-        r_e += r_s; /* fdt_get_mem_rsc returns length */
+        r_e += r_s; /* fdt_get_mem_rsv returns length */
 
         if ( s < r_e && r_s < e )
         {
