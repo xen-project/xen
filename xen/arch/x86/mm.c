@@ -4769,7 +4769,7 @@ static int handle_iomem_range(unsigned long s, unsigned long e, void *p)
 int xenmem_add_to_physmap_one(
     struct domain *d,
     unsigned int space,
-    domid_t foreign_domid,
+    union xen_add_to_physmap_batch_extra extra,
     unsigned long idx,
     xen_pfn_t gpfn)
 {
@@ -4830,7 +4830,7 @@ int xenmem_add_to_physmap_one(
             break;
         }
         case XENMAPSPACE_gmfn_foreign:
-            return p2m_add_foreign(d, idx, gpfn, foreign_domid);
+            return p2m_add_foreign(d, idx, gpfn, extra.foreign_domid);
         default:
             break;
     }

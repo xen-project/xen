@@ -1047,7 +1047,7 @@ void share_xen_page_with_privileged_guests(
 int xenmem_add_to_physmap_one(
     struct domain *d,
     unsigned int space,
-    domid_t foreign_domid,
+    union xen_add_to_physmap_batch_extra extra,
     unsigned long idx,
     xen_pfn_t gpfn)
 {
@@ -1103,7 +1103,8 @@ int xenmem_add_to_physmap_one(
     {
         struct domain *od;
         p2m_type_t p2mt;
-        od = rcu_lock_domain_by_any_id(foreign_domid);
+
+        od = rcu_lock_domain_by_any_id(extra.foreign_domid);
         if ( od == NULL )
             return -ESRCH;
 
@@ -1143,6 +1144,10 @@ int xenmem_add_to_physmap_one(
         break;
     }
     case XENMAPSPACE_dev_mmio:
+        /* extra should be 0. Reserved for future use. */
+        if ( extra.res0 )
+            return -EOPNOTSUPP;
+
         rc = map_dev_mmio_region(d, gpfn, 1, idx);
         return rc;
 

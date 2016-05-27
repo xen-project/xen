@@ -253,6 +253,13 @@ int compat_memory_op(unsigned int cmd, XEN_GUEST_HANDLE_PARAM(void) compat)
             unsigned int size = cmp.atpb.size;
             xen_ulong_t *idxs = (void *)(nat.atpb + 1);
             xen_pfn_t *gpfns = (void *)(idxs + limit);
+            /*
+             * The union will always be 16-bit width. So it is not
+             * necessary to have the exact field which correspond to the
+             * space.
+             */
+            enum XLAT_add_to_physmap_batch_u u =
+                XLAT_add_to_physmap_batch_u_res0;
 
             if ( copy_from_guest(&cmp.atpb, compat, 1) ||
                  !compat_handle_okay(cmp.atpb.idxs, size) ||

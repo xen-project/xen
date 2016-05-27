@@ -259,7 +259,15 @@ struct xen_add_to_physmap_batch {
 
     /* Number of pages to go through */
     uint16_t size;
-    domid_t foreign_domid; /* IFF gmfn_foreign */
+
+#if __XEN_INTERFACE_VERSION__ < 0x00040700
+    domid_t foreign_domid; /* IFF gmfn_foreign. Should be 0 for other spaces. */
+#else
+    union xen_add_to_physmap_batch_extra {
+        domid_t foreign_domid; /* gmfn_foreign */
+        uint16_t res0;  /* All the other spaces. Should be 0 */
+    } u;
+#endif
 
     /* Indexes into space being mapped. */
     XEN_GUEST_HANDLE(xen_ulong_t) idxs;

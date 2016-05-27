@@ -50,6 +50,7 @@
 #include <xen/list.h>
 #include <xen/spinlock.h>
 #include <xen/typesafe.h>
+#include <public/memory.h>
 
 TYPE_SAFE(unsigned long, mfn);
 #define PRI_mfn          "05lx"
@@ -505,7 +506,7 @@ void scrub_one_page(struct page_info *);
 #endif
 
 int xenmem_add_to_physmap_one(struct domain *d, unsigned int space,
-                              domid_t foreign_domid,
+                              union xen_add_to_physmap_batch_extra extra,
                               unsigned long idx, xen_pfn_t gpfn);
 
 /* Returns 1 on success, 0 on error, negative if the ring
