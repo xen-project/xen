@@ -142,7 +142,7 @@ nestedhap_fix_p2m(struct vcpu *v, struct p2m_domain *p2m,
  * walk is successful, the translated value is returned in
  * L1_gpa. The result value tells what to do next.
  */
-static int
+int
 nestedhap_walk_L1_p2m(struct vcpu *v, paddr_t L2_gpa, paddr_t *L1_gpa,
                       unsigned int *page_order, uint8_t *p2m_acc,
                       bool_t access_r, bool_t access_w, bool_t access_x)
