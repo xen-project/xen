@@ -948,7 +948,7 @@ static void
 csched2_vcpu_wake(const struct scheduler *ops, struct vcpu *vc)
 {
     struct csched2_vcpu * const svc = CSCHED2_VCPU(vc);
-    s_time_t now = 0;
+    s_time_t now;
 
     /* Schedule lock should be held at this point. */
 
@@ -1001,8 +1001,8 @@ static void
 csched2_context_saved(const struct scheduler *ops, struct vcpu *vc)
 {
     struct csched2_vcpu * const svc = CSCHED2_VCPU(vc);
-    s_time_t now = NOW();
     spinlock_t *lock = vcpu_schedule_lock_irq(vc);
+    s_time_t now = NOW();
 
     BUG_ON( !is_idle_vcpu(vc) && svc->rqd != RQD(ops, vc->processor));
 

@@ -547,7 +547,7 @@ static void
 rt_vcpu_insert(const struct scheduler *ops, struct vcpu *vc)
 {
     struct rt_vcpu *svc = rt_vcpu(vc);
-    s_time_t now = NOW();
+    s_time_t now;
     spinlock_t *lock;
 
     /* not addlocate idle vcpu to dom vcpu list */
@@ -555,6 +555,8 @@ rt_vcpu_insert(const struct scheduler *ops, struct vcpu *vc)
         return;
 
     lock = vcpu_schedule_lock_irq(vc);
+
+    now = NOW();
     if ( now >= svc->cur_deadline )
         rt_update_deadline(now, svc);
 
@@ -959,7 +961,7 @@ static void
 rt_vcpu_wake(const struct scheduler *ops, struct vcpu *vc)
 {
     struct rt_vcpu * const svc = rt_vcpu(vc);
-    s_time_t now = NOW();
+    s_time_t now;
     struct rt_private *prv = rt_priv(ops);
     struct rt_vcpu *snext = NULL; /* highest priority on RunQ */
     struct rt_dom *sdom = NULL;
@@ -984,6 +986,7 @@ rt_vcpu_wake(const struct scheduler *ops, struct vcpu *vc)
         return;
     }
 
+    now = NOW();
     if ( now >= svc->cur_deadline)
         rt_update_deadline(now, svc);
 

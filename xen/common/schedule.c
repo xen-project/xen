@@ -1162,7 +1162,7 @@ static void vcpu_periodic_timer_work(struct vcpu *v)
 static void schedule(void)
 {
     struct vcpu          *prev = current, *next = NULL;
-    s_time_t              now = NOW();
+    s_time_t              now;
     struct scheduler     *sched;
     unsigned long        *tasklet_work = &this_cpu(tasklet_work_to_do);
     bool_t                tasklet_work_scheduled = 0;
@@ -1195,6 +1195,8 @@ static void schedule(void)
     }
 
     lock = pcpu_schedule_lock_irq(cpu);
+
+    now = NOW();
 
     stop_timer(&sd->s_timer);
     
