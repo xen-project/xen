@@ -18,7 +18,6 @@
 
 #include <xen/err.h>
 #include <xen/sched.h>
-#include <xen/hvm/iommu.h>
 #include <asm/amd-iommu.h>
 #include <asm/hvm/svm/amd-iommu-proto.h>
 #include <asm/io_apic.h>

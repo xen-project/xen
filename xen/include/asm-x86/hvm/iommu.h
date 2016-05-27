@@ -48,7 +48,7 @@ struct g2m_ioport {
 
 #define DEFAULT_DOMAIN_ADDRESS_WIDTH 48
 
-struct arch_hvm_iommu
+struct arch_iommu
 {
     u64 pgd_maddr;                 /* io page directory machine address */
     spinlock_t mapping_lock;            /* io page table lock */

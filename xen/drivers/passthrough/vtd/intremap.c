@@ -20,7 +20,6 @@
 #include <xen/irq.h>
 #include <xen/sched.h>
 #include <xen/iommu.h>
-#include <asm/hvm/iommu.h>
 #include <xen/time.h>
 #include <xen/list.h>
 #include <xen/pci.h>

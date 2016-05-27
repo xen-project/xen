@@ -22,7 +22,6 @@
 #include <xen/cpu.h>
 #include <xen/irq.h>
 #include <asm/hvm/irq.h>
-#include <asm/hvm/iommu.h>
 #include <asm/hvm/support.h>
 #include <xen/hvm/irq.h>
 

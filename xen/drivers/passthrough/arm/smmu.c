@@ -2546,7 +2546,7 @@ static u32 platform_features = ARM_SMMU_FEAT_COHERENT_WALK;
 
 static void arm_smmu_iotlb_flush_all(struct domain *d)
 {
-	struct arm_smmu_xen_domain *smmu_domain = domain_hvm_iommu(d)->arch.priv;
+	struct arm_smmu_xen_domain *smmu_domain = dom_iommu(d)->arch.priv;
 	struct iommu_domain *cfg;
 
 	spin_lock(&smmu_domain->lock);
@@ -2577,7 +2577,7 @@ static struct iommu_domain *arm_smmu_get_domain(struct domain *d,
 	struct arm_smmu_xen_domain *xen_domain;
 	struct arm_smmu_device *smmu;
 
-	xen_domain = domain_hvm_iommu(d)->arch.priv;
+	xen_domain = dom_iommu(d)->arch.priv;
 
 	smmu = find_smmu_for_device(dev);
 	if (!smmu)
@@ -2610,7 +2610,7 @@ static int arm_smmu_assign_dev(struct domain *d, u8 devfn,
 	struct arm_smmu_xen_domain *xen_domain;
 	int ret = 0;
 
-	xen_domain = domain_hvm_iommu(d)->arch.priv;
+	xen_domain = dom_iommu(d)->arch.priv;
 
 	if (!dev->archdata.iommu) {
 		dev->archdata.iommu = xzalloc(struct arm_smmu_xen_device);
@@ -2671,7 +2671,7 @@ static int arm_smmu_deassign_dev(struct domain *d, struct device *dev)
 	struct iommu_domain *domain = dev_iommu_domain(dev);
 	struct arm_smmu_xen_domain *xen_domain;
 
-	xen_domain = domain_hvm_iommu(d)->arch.priv;
+	xen_domain = dom_iommu(d)->arch.priv;
 
 	if (!domain || domain->priv->cfg.domain != d) {
 		dev_err(dev, " not attached to domain %d\n", d->domain_id);
@@ -2728,7 +2728,7 @@ static int arm_smmu_iommu_domain_init(struct domain *d)
 	spin_lock_init(&xen_domain->lock);
 	INIT_LIST_HEAD(&xen_domain->contexts);
 
-	domain_hvm_iommu(d)->arch.priv = xen_domain;
+	dom_iommu(d)->arch.priv = xen_domain;
 
 	/* Coherent walk can be enabled only when all SMMUs support it. */
 	if (platform_features & ARM_SMMU_FEAT_COHERENT_WALK)
@@ -2743,7 +2743,7 @@ static void __hwdom_init arm_smmu_iommu_hwdom_init(struct domain *d)
 
 static void arm_smmu_iommu_domain_teardown(struct domain *d)
 {
-	struct arm_smmu_xen_domain *xen_domain = domain_hvm_iommu(d)->arch.priv;
+	struct arm_smmu_xen_domain *xen_domain = dom_iommu(d)->arch.priv;
 
 	ASSERT(list_empty(&xen_domain->contexts));
 	xfree(xen_domain);
