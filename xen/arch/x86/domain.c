@@ -64,7 +64,6 @@
 #include <asm/psr.h>
 
 DEFINE_PER_CPU(struct vcpu *, curr_vcpu);
-DEFINE_PER_CPU(unsigned long, cr4);
 
 static void default_idle(void);
 void (*pm_idle) (void) __read_mostly = default_idle;
