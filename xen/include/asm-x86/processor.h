@@ -134,15 +134,17 @@
 #define TF_kernel_mode         (1<<_TF_kernel_mode)
 
 /* #PF error code values. */
-#define PFEC_page_present   (1U<<0)
-#define PFEC_write_access   (1U<<1)
-#define PFEC_user_mode      (1U<<2)
-#define PFEC_reserved_bit   (1U<<3)
-#define PFEC_insn_fetch     (1U<<4)
+#define PFEC_page_present   (_AC(1,U) << 0)
+#define PFEC_write_access   (_AC(1,U) << 1)
+#define PFEC_user_mode      (_AC(1,U) << 2)
+#define PFEC_reserved_bit   (_AC(1,U) << 3)
+#define PFEC_insn_fetch     (_AC(1,U) << 4)
 #define PFEC_page_paged     (1U<<5)
 #define PFEC_page_shared    (1U<<6)
 
 #define XEN_MINIMAL_CR4 (X86_CR4_PSE | X86_CR4_PGE | X86_CR4_PAE)
+
+#define XEN_CR4_PV32_BITS (X86_CR4_SMEP | X86_CR4_SMAP)
 
 #define XEN_SYSCALL_MASK (X86_EFLAGS_AC|X86_EFLAGS_VM|X86_EFLAGS_RF|    \
                           X86_EFLAGS_NT|X86_EFLAGS_DF|X86_EFLAGS_IF|    \
