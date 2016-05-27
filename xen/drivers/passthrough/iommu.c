@@ -15,7 +15,6 @@
 
 #include <xen/sched.h>
 #include <xen/iommu.h>
-#include <asm/hvm/iommu.h>
 #include <xen/paging.h>
 #include <xen/guest_access.h>
 #include <xen/event.h>
@@ -116,7 +115,7 @@ static void __init parse_iommu_param(char *s)
 
 int iommu_domain_init(struct domain *d)
 {
-    struct hvm_iommu *hd = domain_hvm_iommu(d);
+    struct domain_iommu *hd = dom_iommu(d);
     int ret = 0;
 
     ret = arch_iommu_domain_init(d);
@@ -146,7 +145,7 @@ static void __hwdom_init check_hwdom_reqs(struct domain *d)
 
 void __hwdom_init iommu_hwdom_init(struct domain *d)
 {
-    struct hvm_iommu *hd = domain_hvm_iommu(d);
+    const struct domain_iommu *hd = dom_iommu(d);
 
     check_hwdom_reqs(d);
 
@@ -180,7 +179,7 @@ void __hwdom_init iommu_hwdom_init(struct domain *d)
 
 void iommu_teardown(struct domain *d)
 {
-    const struct hvm_iommu *hd = domain_hvm_iommu(d);
+    const struct domain_iommu *hd = dom_iommu(d);
 
     d->need_iommu = 0;
     hd->platform_ops->teardown(d);
@@ -189,9 +188,7 @@ void iommu_teardown(struct domain *d)
 
 void iommu_domain_destroy(struct domain *d)
 {
-    struct hvm_iommu *hd = domain_hvm_iommu(d);
-
-    if ( !iommu_enabled || !hd->platform_ops )
+    if ( !iommu_enabled || !dom_iommu(d)->platform_ops )
         return;
 
     if ( need_iommu(d) )
@@ -203,7 +200,7 @@ void iommu_domain_destroy(struct domain *d)
 int iommu_map_page(struct domain *d, unsigned long gfn, unsigned long mfn,
                    unsigned int flags)
 {
-    struct hvm_iommu *hd = domain_hvm_iommu(d);
+    const struct domain_iommu *hd = dom_iommu(d);
 
     if ( !iommu_enabled || !hd->platform_ops )
         return 0;
@@ -213,7 +210,7 @@ int iommu_map_page(struct domain *d, unsigned long gfn, unsigned long mfn,
 
 int iommu_unmap_page(struct domain *d, unsigned long gfn)
 {
-    struct hvm_iommu *hd = domain_hvm_iommu(d);
+    const struct domain_iommu *hd = dom_iommu(d);
 
     if ( !iommu_enabled || !hd->platform_ops )
         return 0;
@@ -240,7 +237,7 @@ static void iommu_free_pagetables(unsigned long unused)
 
 void iommu_iotlb_flush(struct domain *d, unsigned long gfn, unsigned int page_count)
 {
-    struct hvm_iommu *hd = domain_hvm_iommu(d);
+    const struct domain_iommu *hd = dom_iommu(d);
 
     if ( !iommu_enabled || !hd->platform_ops || !hd->platform_ops->iotlb_flush )
         return;
@@ -250,7 +247,7 @@ void iommu_iotlb_flush(struct domain *d, unsigned long gfn, unsigned int page_co
 
 void iommu_iotlb_flush_all(struct domain *d)
 {
-    struct hvm_iommu *hd = domain_hvm_iommu(d);
+    const struct domain_iommu *hd = dom_iommu(d);
 
     if ( !iommu_enabled || !hd->platform_ops || !hd->platform_ops->iotlb_flush_all )
         return;
@@ -346,12 +343,10 @@ void iommu_crash_shutdown(void)
 
 bool_t iommu_has_feature(struct domain *d, enum iommu_feature feature)
 {
-    const struct hvm_iommu *hd = domain_hvm_iommu(d);
-
     if ( !iommu_enabled )
         return 0;
 
-    return test_bit(feature, hd->features);
+    return test_bit(feature, dom_iommu(d)->features);
 }
 
 static void iommu_dump_p2m_table(unsigned char key)

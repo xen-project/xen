@@ -19,7 +19,6 @@
 
 #include <xen/sched.h>
 #include <asm/p2m.h>
-#include <asm/hvm/iommu.h>
 #include <asm/amd-iommu.h>
 #include <asm/hvm/svm/amd-iommu-proto.h>
 
@@ -60,12 +59,12 @@ static uint16_t guest_bdf(struct domain *d, uint16_t machine_bdf)
 
 static inline struct guest_iommu *domain_iommu(struct domain *d)
 {
-    return domain_hvm_iommu(d)->arch.g_iommu;
+    return dom_iommu(d)->arch.g_iommu;
 }
 
 static inline struct guest_iommu *vcpu_iommu(struct vcpu *v)
 {
-    return domain_hvm_iommu(v->domain)->arch.g_iommu;
+    return dom_iommu(v->domain)->arch.g_iommu;
 }
 
 static void guest_iommu_enable(struct guest_iommu *iommu)
@@ -872,7 +871,7 @@ static void guest_iommu_reg_init(struct guest_iommu *iommu)
 int guest_iommu_init(struct domain* d)
 {
     struct guest_iommu *iommu;
-    struct hvm_iommu *hd  = domain_hvm_iommu(d);
+    struct domain_iommu *hd = dom_iommu(d);
 
     if ( !is_hvm_domain(d) || !iommu_enabled || !iommuv2_enabled )
         return 0;
@@ -908,7 +907,7 @@ void guest_iommu_destroy(struct domain *d)
     tasklet_kill(&iommu->cmd_buffer_tasklet);
     xfree(iommu);
 
-    domain_hvm_iommu(d)->arch.g_iommu = NULL;
+    dom_iommu(d)->arch.g_iommu = NULL;
 }
 
 static int guest_iommu_mmio_range(struct vcpu *v, unsigned long addr)

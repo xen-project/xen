@@ -8,6 +8,7 @@
 #include <xen/timer.h>
 #include <xen/rangeset.h>
 #include <xen/domain.h>
+#include <xen/iommu.h>
 #include <xen/rcupdate.h>
 #include <xen/cpumask.h>
 #include <xen/nodemask.h>
@@ -357,6 +358,8 @@ struct domain
     enum guest_type guest_type;
 
 #ifdef HAS_PASSTHROUGH
+    struct domain_iommu iommu;
+
     /* Does this guest need iommu mappings (-1 meaning "being set up")? */
     s8               need_iommu;
 #endif

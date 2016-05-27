@@ -22,7 +22,6 @@
 #include <xen/xmalloc.h>
 #include <xen/domain_page.h>
 #include <xen/iommu.h>
-#include <asm/hvm/iommu.h>
 #include <xen/numa.h>
 #include <xen/softirq.h>
 #include <xen/time.h>

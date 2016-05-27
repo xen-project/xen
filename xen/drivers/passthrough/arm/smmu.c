@@ -673,7 +673,7 @@ static void arm_smmu_tlb_inv_context(struct arm_smmu_domain_cfg *cfg)
 
 static void arm_smmu_iotlb_flush_all(struct domain *d)
 {
-    struct arm_smmu_domain *smmu_domain = domain_hvm_iommu(d)->arch.priv;
+    struct arm_smmu_domain *smmu_domain = dom_iommu(d)->arch.priv;
     struct arm_smmu_domain_cfg *cfg;
 
     spin_lock(&smmu_domain->lock);
@@ -1030,7 +1030,7 @@ arm_smmu_alloc_domain_context(struct domain *d,
     unsigned int irq;
     int ret, start;
     struct arm_smmu_domain_cfg *cfg;
-    struct arm_smmu_domain *smmu_domain = domain_hvm_iommu(d)->arch.priv;
+    struct arm_smmu_domain *smmu_domain = dom_iommu(d)->arch.priv;
 
     ASSERT(spin_is_locked(&smmu_domain->lock));
 
@@ -1092,7 +1092,7 @@ out_free_mem:
 static void arm_smmu_destroy_domain_context(struct arm_smmu_domain_cfg *cfg)
 {
     struct domain *d = cfg->domain;
-    struct arm_smmu_domain *smmu_domain = domain_hvm_iommu(d)->arch.priv;
+    struct arm_smmu_domain *smmu_domain = dom_iommu(d)->arch.priv;
     struct arm_smmu_device *smmu = cfg->smmu;
     void __iomem *cb_base;
     unsigned int irq;
@@ -1140,7 +1140,7 @@ static int arm_smmu_attach_dev(struct domain *d,
 {
     struct arm_smmu_device *smmu = arm_smmu_find_smmu_by_dev(dev);
     struct arm_smmu_master *master;
-    struct arm_smmu_domain *smmu_domain = domain_hvm_iommu(d)->arch.priv;
+    struct arm_smmu_domain *smmu_domain = dom_iommu(d)->arch.priv;
     struct arm_smmu_domain_cfg *cfg = NULL;
     struct arm_smmu_domain_cfg *curr;
     int ret;
@@ -1200,7 +1200,7 @@ static int arm_smmu_attach_dev(struct domain *d,
 static int arm_smmu_detach_dev(struct domain *d,
                                const struct dt_device_node *dev)
 {
-    struct arm_smmu_domain *smmu_domain = domain_hvm_iommu(d)->arch.priv;
+    struct arm_smmu_domain *smmu_domain = dom_iommu(d)->arch.priv;
     struct arm_smmu_master *master;
     struct arm_smmu_device *smmu = arm_smmu_find_smmu_by_dev(dev);
     struct arm_smmu_domain_cfg *cfg;
@@ -1519,7 +1519,7 @@ static int arm_smmu_iommu_domain_init(struct domain *d)
     spin_lock_init(&smmu_domain->lock);
     INIT_LIST_HEAD(&smmu_domain->contexts);
 
-    domain_hvm_iommu(d)->arch.priv = smmu_domain;
+    dom_iommu(d)->arch.priv = smmu_domain;
 
     return 0;
 }
@@ -1530,7 +1530,7 @@ static void __hwdom_init arm_smmu_iommu_hwdom_init(struct domain *d)
 
 static void arm_smmu_iommu_domain_teardown(struct domain *d)
 {
-    struct arm_smmu_domain *smmu_domain = domain_hvm_iommu(d)->arch.priv;
+    struct arm_smmu_domain *smmu_domain = dom_iommu(d)->arch.priv;
 
     ASSERT(list_empty(&smmu_domain->contexts));
     xfree(smmu_domain);

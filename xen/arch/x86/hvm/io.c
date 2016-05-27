@@ -347,13 +347,13 @@ static int dpci_ioport_write(uint32_t mport, ioreq_t *p)
 int dpci_ioport_intercept(ioreq_t *p)
 {
     struct domain *d = current->domain;
-    struct hvm_iommu *hd = domain_hvm_iommu(d);
+    const struct domain_iommu *dio = dom_iommu(d);
     struct g2m_ioport *g2m_ioport;
     unsigned int mport, gport = p->addr;
     unsigned int s = 0, e = 0;
     int rc;
 
-    list_for_each_entry( g2m_ioport, &hd->arch.g2m_ioport_list, list )
+    list_for_each_entry( g2m_ioport, &dio->arch.g2m_ioport_list, list )
     {
         s = g2m_ioport->gport;
         e = s + g2m_ioport->np;
