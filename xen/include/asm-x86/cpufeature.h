@@ -156,6 +156,9 @@
 #define X86_FEATURE_ADX		(7*32+19) /* ADCX, ADOX instructions */
 #define X86_FEATURE_SMAP	(7*32+20) /* Supervisor Mode Access Prevention */
 
+/* An alias of a feature we know is always going to be present. */
+#define X86_FEATURE_ALWAYS      X86_FEATURE_LM
+
 #ifndef __ASSEMBLY__
 #define cpu_has(c, bit)		test_bit(bit, (c)->x86_capability)
 #define boot_cpu_has(bit)	test_bit(bit, boot_cpu_data.x86_capability)
