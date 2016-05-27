@@ -42,12 +42,6 @@ static void __init parse_dom0_mem(const char *s)
 }
 custom_param("dom0_mem", parse_dom0_mem);
 
-#ifdef CONFIG_DEVICE_TREE_DEBUG
-# define DPRINT(fmt, args...) printk(XENLOG_DEBUG fmt, ##args)
-#else
-# define DPRINT(fmt, args...) do {} while ( 0 )
-#endif
-
 //#define DEBUG_11_ALLOCATION
 #ifdef DEBUG_11_ALLOCATION
 # define D11PRINT(fmt, args...) printk(XENLOG_DEBUG fmt, ##args)
@@ -364,7 +358,7 @@ static void allocate_memory(struct domain *d, struct kernel_info *kinfo)
     {
         int l;
 
-        DPRINT("memory node\n");
+        dt_dprintk("memory node\n");
 
         reg_size = dt_cells_to_size(dt_n_addr_cells(memory) + dt_n_size_cells(memory));
 
@@ -571,7 +565,8 @@ static int make_memory_node(const struct domain *d,
     __be32 reg[nr_cells];
     __be32 *cells;
 
-    DPRINT("Create memory node (reg size %d, nr cells %d)\n", reg_size, nr_cells);
+    dt_dprintk("Create memory node (reg size %d, nr cells %d)\n",
+               reg_size, nr_cells);
 
     /* ePAPR 3.4 */
     res = fdt_begin_node(fdt, "memory");
@@ -588,8 +583,8 @@ static int make_memory_node(const struct domain *d,
         u64 start = kinfo->mem.bank[i].start;
         u64 size = kinfo->mem.bank[i].size;
 
-        DPRINT("  Bank %d: %#"PRIx64"->%#"PRIx64"\n",
-                i, start, start + size);
+        dt_dprintk("  Bank %d: %#"PRIx64"->%#"PRIx64"\n",
+                   i, start, start + size);
 
         dt_child_set_range(&cells, parent, start, size);
     }
@@ -618,7 +613,7 @@ static int make_hypervisor_node(const struct kernel_info *kinfo,
     int sizecells = dt_child_n_size_cells(parent);
     void *fdt = kinfo->fdt;
 
-    DPRINT("Create hypervisor node\n");
+    dt_dprintk("Create hypervisor node\n");
 
     /*
      * Sanity-check address sizes, since addresses and sizes which do
@@ -667,7 +662,7 @@ static int make_psci_node(void *fdt, const struct dt_device_node *parent)
         "arm,psci-0.2""\0"
         "arm,psci";
 
-    DPRINT("Create PSCI node\n");
+    dt_dprintk("Create PSCI node\n");
 
     /* See linux Documentation/devicetree/bindings/arm/psci.txt */
     res = fdt_begin_node(fdt, "psci");
@@ -710,7 +705,7 @@ static int make_cpus_node(const struct domain *d, void *fdt,
     bool_t clock_valid;
     uint64_t mpidr_aff;
 
-    DPRINT("Create cpus node\n");
+    dt_dprintk("Create cpus node\n");
 
     if ( !cpus )
     {
@@ -765,7 +760,8 @@ static int make_cpus_node(const struct domain *d, void *fdt,
          * is enough for the current max vcpu number.
          */
         mpidr_aff = vcpuid_to_vaffinity(cpu);
-        DPRINT("Create cpu@%"PRIx64" (logical CPUID: %d) node\n", mpidr_aff, cpu);
+        dt_dprintk("Create cpu@%"PRIx64" (logical CPUID: %d) node\n",
+                   mpidr_aff, cpu);
 
         snprintf(buf, sizeof(buf), "cpu@%"PRIx64, mpidr_aff);
         res = fdt_begin_node(fdt, buf);
@@ -821,11 +817,11 @@ static int make_gic_node(const struct domain *d, void *fdt,
      */
     if ( node != dt_interrupt_controller )
     {
-        DPRINT("  Skipping (secondary GIC)\n");
+        dt_dprintk("  Skipping (secondary GIC)\n");
         return 0;
     }
 
-    DPRINT("Create gic node\n");
+    dt_dprintk("Create gic node\n");
 
     res = fdt_begin_node(fdt, "interrupt-controller");
     if ( res )
@@ -837,7 +833,7 @@ static int make_gic_node(const struct domain *d, void *fdt,
      */
     if ( gic->phandle )
     {
-        DPRINT("  Set phandle = 0x%x\n", gic->phandle);
+        dt_dprintk("  Set phandle = 0x%x\n", gic->phandle);
         res = fdt_property_cell(fdt, "phandle", gic->phandle);
         if ( res )
             return res;
@@ -894,7 +890,7 @@ static int make_timer_node(const struct domain *d, void *fdt,
     u32 clock_frequency;
     bool_t clock_valid;
 
-    DPRINT("Create timer node\n");
+    dt_dprintk("Create timer node\n");
 
     dev = dt_find_matching_node(NULL, timer_ids);
     if ( !dev )
@@ -922,15 +918,15 @@ static int make_timer_node(const struct domain *d, void *fdt,
      * level-sensitive interrupt */
 
     irq = timer_get_irq(TIMER_PHYS_SECURE_PPI);
-    DPRINT("  Secure interrupt %u\n", irq);
+    dt_dprintk("  Secure interrupt %u\n", irq);
     set_interrupt_ppi(intrs[0], irq, 0xf, IRQ_TYPE_LEVEL_LOW);
 
     irq = timer_get_irq(TIMER_PHYS_NONSECURE_PPI);
-    DPRINT("  Non secure interrupt %u\n", irq);
+    dt_dprintk("  Non secure interrupt %u\n", irq);
     set_interrupt_ppi(intrs[1], irq, 0xf, IRQ_TYPE_LEVEL_LOW);
 
     irq = timer_get_irq(TIMER_VIRT_PPI);
-    DPRINT("  Virt interrupt %u\n", irq);
+    dt_dprintk("  Virt interrupt %u\n", irq);
     set_interrupt_ppi(intrs[2], irq, 0xf, IRQ_TYPE_LEVEL_LOW);
 
     res = fdt_property_interrupts(fdt, intrs, 3);
@@ -984,7 +980,7 @@ static int map_irq_to_domain(const struct dt_device_node *dev,
         }
     }
 
-    DPRINT("  - IRQ: %u\n", irq);
+    dt_dprintk("  - IRQ: %u\n", irq);
     return 0;
 }
 
@@ -1053,7 +1049,7 @@ static int map_range_to_domain(const struct dt_device_node *dev,
         }
     }
 
-    DPRINT("  - MMIO: %010"PRIx64" - %010"PRIx64"\n", addr, addr + len);
+    dt_dprintk("  - MMIO: %010"PRIx64" - %010"PRIx64"\n", addr, addr + len);
 
     return 0;
 }
@@ -1070,7 +1066,8 @@ static int map_device_children(struct domain *d,
 
     if ( dt_device_type_is_equal(dev, "pci") )
     {
-        DPRINT("Mapping children of %s to guest\n", dt_node_full_name(dev));
+        dt_dprintk("Mapping children of %s to guest\n",
+                   dt_node_full_name(dev));
 
         ret = dt_for_each_irq_map(dev, &map_dt_irq_to_domain, d);
         if ( ret < 0 )
@@ -1105,12 +1102,12 @@ static int handle_device(struct domain *d, struct dt_device_node *dev)
     nirq = dt_number_of_irq(dev);
     naddr = dt_number_of_address(dev);
 
-    DPRINT("%s passthrough = %d nirq = %d naddr = %u\n", dt_node_full_name(dev),
-           need_mapping, nirq, naddr);
+    dt_dprintk("%s passthrough = %d nirq = %d naddr = %u\n",
+               dt_node_full_name(dev), need_mapping, nirq, naddr);
 
     if ( dt_device_is_protected(dev) && need_mapping )
     {
-        DPRINT("%s setup iommu\n", dt_node_full_name(dev));
+        dt_dprintk("%s setup iommu\n", dt_node_full_name(dev));
         res = iommu_assign_dt_device(d, dev);
         if ( res )
         {
@@ -1137,8 +1134,8 @@ static int handle_device(struct domain *d, struct dt_device_node *dev)
          */
         if ( rirq.controller != dt_interrupt_controller )
         {
-            DPRINT("irq %u not connected to primary controller."
-                   "Connected to %s\n", i, dt_node_full_name(rirq.controller));
+            dt_dprintk("irq %u not connected to primary controller. Connected to %s\n",
+                      i, dt_node_full_name(rirq.controller));
             continue;
         }
 
@@ -1217,17 +1214,17 @@ static int handle_node(struct domain *d, struct kernel_info *kinfo,
 
     path = dt_node_full_name(node);
 
-    DPRINT("handle %s\n", path);
+    dt_dprintk("handle %s\n", path);
 
     /* Skip theses nodes and the sub-nodes */
     if ( dt_match_node(skip_matches, node) )
     {
-        DPRINT("  Skip it (matched)\n");
+        dt_dprintk("  Skip it (matched)\n");
         return 0;
     }
     if ( platform_device_is_blacklisted(node) )
     {
-        DPRINT("  Skip it (blacklisted)\n");
+        dt_dprintk("  Skip it (blacklisted)\n");
         return 0;
     }
 
@@ -1243,7 +1240,7 @@ static int handle_node(struct domain *d, struct kernel_info *kinfo,
     /* Skip nodes used by Xen */
     if ( dt_device_used_by(node) == DOMID_XEN )
     {
-        DPRINT("  Skip it (used by Xen)\n");
+        dt_dprintk("  Skip it (used by Xen)\n");
         return 0;
     }
 
@@ -1253,7 +1250,7 @@ static int handle_node(struct domain *d, struct kernel_info *kinfo,
      */
     if ( device_get_class(node) == DEVICE_IOMMU )
     {
-        DPRINT(" IOMMU, skip it\n");
+        dt_dprintk(" IOMMU, skip it\n");
         return 0;
     }
 
@@ -1428,7 +1425,7 @@ static int acpi_make_chosen_node(const struct kernel_info *kinfo)
     const struct bootmodule *mod = kinfo->kernel_bootmodule;
     void *fdt = kinfo->fdt;
 
-    DPRINT("Create chosen node\n");
+    dt_dprintk("Create chosen node\n");
     res = fdt_begin_node(fdt, "chosen");
     if ( res )
         return res;
@@ -1472,7 +1469,7 @@ static int acpi_make_hypervisor_node(const struct kernel_info *kinfo,
     /* Convenience alias */
     void *fdt = kinfo->fdt;
 
-    DPRINT("Create hypervisor node\n");
+    dt_dprintk("Create hypervisor node\n");
 
     /* See linux Documentation/devicetree/bindings/arm/xen.txt */
     res = fdt_begin_node(fdt, "hypervisor");
@@ -1502,7 +1499,7 @@ static int create_acpi_dtb(struct kernel_info *kinfo, struct membank tbl_add[])
     int new_size;
     int ret;
 
-    DPRINT("Prepare a min DTB for DOM0\n");
+    dt_dprintk("Prepare a min DTB for DOM0\n");
 
     /* Allocate min size for DT */
     new_size = ACPI_DOM0_FDT_MIN_SIZE;

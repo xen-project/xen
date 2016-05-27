@@ -55,7 +55,6 @@ struct dt_alias_prop {
 static LIST_HEAD(aliases_lookup);
 
 #ifdef CONFIG_DEVICE_TREE_DEBUG
-# define dt_dprintk(fmt, args...) printk(XENLOG_DEBUG fmt, ##args)
 static void dt_dump_addr(const char *s, const __be32 *addr, int na)
 {
     dt_dprintk("%s", s);
@@ -64,7 +63,6 @@ static void dt_dump_addr(const char *s, const __be32 *addr, int na)
     dt_dprintk("\n");
 }
 #else
-# define dt_dprintk(fmt, args...) do {} while ( 0 )
 static void dt_dump_addr(const char *s, const __be32 *addr, int na) { }
 #endif
 

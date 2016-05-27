@@ -753,6 +753,15 @@ int dt_parse_phandle_with_args(const struct dt_device_node *np,
                                const char *cells_name, int index,
                                struct dt_phandle_args *out_args);
 
+#ifdef CONFIG_DEVICE_TREE_DEBUG
+#define dt_dprintk(fmt, args...)  \
+    printk(XENLOG_DEBUG fmt, ## args)
+#else
+static inline void
+__attribute__ ((__format__ (__printf__, 1, 2)))
+dt_dprintk(const char *fmt, ...) {}
+#endif
+
 #endif /* __XEN_DEVICE_TREE_H */
 
 /*
