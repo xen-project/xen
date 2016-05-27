@@ -2033,20 +2033,39 @@ unsigned long paging_gva_to_gfn(struct vcpu *v,
 
     if ( is_hvm_vcpu(v) && paging_mode_hap(v->domain) && nestedhvm_is_n2(v) )
     {
-        unsigned long gfn;
+        unsigned long l2_gfn, l1_gfn;
         struct p2m_domain *p2m;
         const struct paging_mode *mode;
-        uint32_t pfec_21 = *pfec;
         uint64_t np2m_base = nhvm_vcpu_p2m_base(v);
+        uint8_t l1_p2ma;
+        unsigned int l1_page_order;
+        int rv;
 
         /* translate l2 guest va into l2 guest gfn */
         p2m = p2m_get_nestedp2m(v, np2m_base);
         mode = paging_get_nestedmode(v);
-        gfn = mode->gva_to_gfn(v, p2m, va, pfec);
+        l2_gfn = mode->gva_to_gfn(v, p2m, va, pfec);
+
+        if ( l2_gfn == INVALID_GFN )
+            return INVALID_GFN;
 
         /* translate l2 guest gfn into l1 guest gfn */
-        return hostmode->p2m_ga_to_gfn(v, hostp2m, np2m_base,
-                                       gfn << PAGE_SHIFT, &pfec_21, NULL);
+        rv = nestedhap_walk_L1_p2m(v, l2_gfn, &l1_gfn, &l1_page_order, &l1_p2ma,
+                                   1,
+                                   !!(*pfec & PFEC_write_access),
+                                   !!(*pfec & PFEC_insn_fetch));
+
+        if ( rv != NESTEDHVM_PAGEFAULT_DONE )
+            return INVALID_GFN;
+
+        /*
+         * Sanity check that l1_gfn can be used properly as a 4K mapping, even
+         * if it mapped by a nested superpage.
+         */
+        ASSERT((l2_gfn & ((1ul << l1_page_order) - 1)) ==
+               (l1_gfn & ((1ul << l1_page_order) - 1)));
+
+        return l1_gfn;
     }
 
     return hostmode->gva_to_gfn(v, hostp2m, va, pfec);
