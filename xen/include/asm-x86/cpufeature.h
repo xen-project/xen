@@ -155,6 +155,9 @@
 #define X86_FEATURE_ADX		(7*32+19) /* ADCX, ADOX instructions */
 #define X86_FEATURE_SMAP	(7*32+20) /* Supervisor Mode Access Prevention */
 
+/* An alias of a feature we know is always going to be present. */
+#define X86_FEATURE_ALWAYS      X86_FEATURE_LM
+
 #if !defined(__ASSEMBLY__) && !defined(X86_FEATURES_ONLY)
 #include <xen/bitops.h>
 
