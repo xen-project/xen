@@ -1608,6 +1608,11 @@ ACPI_DEVICE_START(agicv3, "GICv3", DEVICE_GIC)
         .class_type = ACPI_MADT_GIC_VERSION_V3,
         .init = gicv3_acpi_preinit,
 ACPI_DEVICE_END
+
+ACPI_DEVICE_START(agicv4, "GICv4", DEVICE_GIC)
+        .class_type = ACPI_MADT_GIC_VERSION_V4,
+        .init = gicv3_acpi_preinit,
+ACPI_DEVICE_END
 #endif
 
 /*
