@@ -1003,7 +1003,6 @@ static void pod_eager_record(struct p2m_domain *p2m,
 {
     struct pod_mrp_list *mrp = &p2m->pod.mrp;
 
-    ASSERT(mrp->list[mrp->idx] == INVALID_GFN);
     ASSERT(gfn != INVALID_GFN);
 
     mrp->list[mrp->idx++] =
@@ -1051,7 +1050,9 @@ p2m_pod_demand_populate(struct p2m_domain *p2m, unsigned long gfn,
         return 0;
     }
 
-    pod_eager_reclaim(p2m);
+    /* Only reclaim if we're in actual need of more cache. */
+    if ( p2m->pod.entry_count > p2m->pod.count )
+        pod_eager_reclaim(p2m);
 
     /* Only sweep if we're actually out of memory.  Doing anything else
      * causes unnecessary time and fragmentation of superpages in the p2m. */
