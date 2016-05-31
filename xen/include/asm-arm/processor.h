@@ -21,7 +21,6 @@
 #define MPIDR_HWID_MASK     _AC(0xffffff,U)
 #define MPIDR_INVALID       (~MPIDR_HWID_MASK)
 #define MPIDR_LEVEL_BITS    (8)
-#define AFFINITY_MASK(level)    ~((_AC(0x1,U) << ((level) * MPIDR_LEVEL_BITS)) - 1)
 
 
 /*
@@ -36,6 +35,8 @@
 
 #define MPIDR_AFFINITY_LEVEL(mpidr, level) \
          ((mpidr >> MPIDR_LEVEL_SHIFT(level)) & MPIDR_LEVEL_MASK)
+
+#define AFFINITY_MASK(level)    ~((_AC(0x1,UL) << MPIDR_LEVEL_SHIFT(level)) - 1)
 
 /* TTBCR Translation Table Base Control Register */
 #define TTBCR_EAE    _AC(0x80000000,U)
