@@ -872,7 +872,7 @@ next_resize:
 
     res = xc_dom_devicetree_mem(dom, fdt, fdt_totalsize(fdt));
     if (res) {
-        LOGE(ERROR, "xc_dom_devicetree_file failed");
+        LOGE(ERROR, "xc_dom_devicetree_mem failed");
         rc = ERROR_FAIL;
         goto out;
     }
