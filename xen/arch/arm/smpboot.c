@@ -40,7 +40,7 @@ cpumask_t cpu_possible_map;
 struct cpuinfo_arm cpu_data[NR_CPUS];
 
 /* CPU logical map: map xen cpuid to an MPIDR */
-u32 __cpu_logical_map[NR_CPUS] = { [0 ... NR_CPUS-1] = MPIDR_INVALID };
+register_t __cpu_logical_map[NR_CPUS] = { [0 ... NR_CPUS-1] = MPIDR_INVALID };
 
 /* Fake one node for now. See also include/asm-arm/numa.h */
 nodemask_t __read_mostly node_online_map = { { [0] = 1UL } };
@@ -100,7 +100,7 @@ static void __init dt_smp_init_cpus(void)
     struct dt_device_node *cpu;
     unsigned int i, j;
     unsigned int cpuidx = 1;
-    static u32 tmp_map[NR_CPUS] __initdata =
+    static register_t tmp_map[NR_CPUS] __initdata =
     {
         [0 ... NR_CPUS - 1] = MPIDR_INVALID
     };
@@ -120,7 +120,8 @@ static void __init dt_smp_init_cpus(void)
     {
         const __be32 *prop;
         u64 addr;
-        u32 reg_len, hwid;
+        u32 reg_len;
+        register_t hwid;
 
         if ( !dt_device_type_is_equal(cpu, "cpu") )
             continue;
@@ -160,7 +161,7 @@ static void __init dt_smp_init_cpus(void)
          */
         if ( hwid & ~MPIDR_HWID_MASK )
         {
-            printk(XENLOG_WARNING "cpu node `%s`: invalid hwid value (0x%x)\n",
+            printk(XENLOG_WARNING "cpu node `%s`: invalid hwid value (0x%"PRIregister")\n",
                    dt_node_full_name(cpu), hwid);
             continue;
         }
@@ -176,7 +177,7 @@ static void __init dt_smp_init_cpus(void)
             if ( tmp_map[j] == hwid )
             {
                 printk(XENLOG_WARNING
-                       "cpu node `%s`: duplicate /cpu reg properties %"PRIx32" in the DT\n",
+                       "cpu node `%s`: duplicate /cpu reg properties %"PRIregister" in the DT\n",
                        dt_node_full_name(cpu), hwid);
                 break;
             }
@@ -211,7 +212,7 @@ static void __init dt_smp_init_cpus(void)
 
         if ( (rc = arch_cpu_init(i, cpu)) < 0 )
         {
-            printk("cpu%d init failed (hwid %x): %d\n", i, hwid, rc);
+            printk("cpu%d init failed (hwid %"PRIregister"): %d\n", i, hwid, rc);
             tmp_map[i] = MPIDR_INVALID;
         }
         else

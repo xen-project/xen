@@ -674,7 +674,7 @@ static int __init gicv3_populate_rdist(void)
         } while ( !(typer & GICR_TYPER_LAST) );
     }
 
-    dprintk(XENLOG_ERR, "GICv3: CPU%d: mpidr 0x%x has no re-distributor!\n",
+    dprintk(XENLOG_ERR, "GICv3: CPU%d: mpidr 0x%"PRIregister" has no re-distributor!\n",
             smp_processor_id(), cpu_logical_map(smp_processor_id()));
 
     return -ENODEV;
