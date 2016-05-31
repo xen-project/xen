@@ -270,7 +270,7 @@ common_start:
         tbz   x0, _MPIDR_SMP, 1f     /* Multiprocessor extension not supported? */
         tbnz  x0, _MPIDR_UP, 1f      /* Uniprocessor system? */
 
-        mov   x13, #(~MPIDR_HWID_MASK)
+        ldr   x13, =(~MPIDR_HWID_MASK)
         bic   x24, x0, x13           /* Mask out flags to get CPU ID */
 1:
 

@@ -18,7 +18,11 @@
 #define MPIDR_SMP           (_AC(1,U) << _MPIDR_SMP)
 #define MPIDR_AFF0_SHIFT    (0)
 #define MPIDR_AFF0_MASK     (_AC(0xff,U) << MPIDR_AFF0_SHIFT)
+#ifdef CONFIG_ARM_64
+#define MPIDR_HWID_MASK     _AC(0xff00ffffff,UL)
+#else
 #define MPIDR_HWID_MASK     _AC(0xffffff,U)
+#endif
 #define MPIDR_INVALID       (~MPIDR_HWID_MASK)
 #define MPIDR_LEVEL_BITS    (8)
 
