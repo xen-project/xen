@@ -267,7 +267,6 @@ common_start:
                                       * find that multiprocessor extensions are
                                       * present and the system is SMP  */
         mrs   x0, mpidr_el1
-        tbz   x0, _MPIDR_SMP, 1f     /* Multiprocessor extension not supported? */
         tbnz  x0, _MPIDR_UP, 1f      /* Uniprocessor system? */
 
         ldr   x13, =(~MPIDR_HWID_MASK)
