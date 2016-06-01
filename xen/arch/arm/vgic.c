@@ -25,6 +25,8 @@
 #include <xen/irq.h>
 #include <xen/sched.h>
 #include <xen/perfc.h>
+#include <xen/iocap.h>
+#include <xen/acpi.h>
 
 #include <asm/current.h>
 
@@ -342,9 +344,22 @@ void vgic_enable_irqs(struct vcpu *v, uint32_t r, int n)
     unsigned long flags;
     int i = 0;
     struct vcpu *v_target;
+    struct domain *d = v->domain;
 
     while ( (i = find_next_bit(&mask, 32, i)) < 32 ) {
         irq = i + (32 * n);
+        /* Set the irq type and route it to guest only for SPI and Dom0 */
+        if( irq_access_permitted(d, irq) && is_hardware_domain(d) &&
+            ( irq >= 32 ) && ( !acpi_disabled ) )
+        {
+            static int log_once = 0;
+            if ( !log_once )
+            {
+                gprintk(XENLOG_WARNING, "Routing SPIs to Dom0 on ACPI systems is unimplemented.\n");
+                log_once++;
+            }
+        }
+
         v_target = __vgic_get_target_vcpu(v, irq);
         p = irq_to_pending(v_target, irq);
         set_bit(GIC_IRQ_GUEST_ENABLED, &p->status);
