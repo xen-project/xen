@@ -3433,7 +3433,13 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
         *edx = v->vcpu_id * 2;
         break;
 
-    case 0xd:
+    case XSTATE_CPUID:
+        hvm_cpuid(1, NULL, NULL, &_ecx, NULL);
+        if ( !(_ecx & cpufeat_mask(X86_FEATURE_XSAVE)) || count >= 63 )
+        {
+            *eax = *ebx = *ecx = *edx = 0;
+            break;
+        }
         /* EBX value of main leaf 0 depends on enabled xsave features */
         if ( count == 0 && v->arch.xcr0 ) 
         {

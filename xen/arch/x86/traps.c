@@ -928,6 +928,8 @@ void pv_cpuid(struct cpu_user_regs *regs)
 
     switch ( leaf )
     {
+        uint32_t tmp;
+
     case 0x00000001:
         c &= pv_featureset[FEATURESET_1c];
         d &= pv_featureset[FEATURESET_1d];
@@ -1085,14 +1087,19 @@ void pv_cpuid(struct cpu_user_regs *regs)
         break;
 
     case XSTATE_CPUID:
-        if ( !cpu_has_xsave )
+        if ( !((!is_control_domain(currd) && !is_hardware_domain(currd)
+                ? ({
+                    uint32_t ecx;
+
+                    domain_cpuid(currd, 1, 0, &tmp, &tmp, &ecx, &tmp);
+                    ecx & pv_featureset[FEATURESET_1c];
+                  })
+                : cpuid_ecx(1)) & cpufeat_mask(X86_FEATURE_XSAVE)) ||
+             subleaf >= 63 )
             goto unsupported;
         switch ( subleaf )
         {
         case 0:
-        {
-            uint32_t tmp;
-
             /*
              * Always read CPUID.0xD[ECX=0].EBX from hardware, rather than
              * domain policy.  It varies with enabled xstate, and the correct
@@ -1101,7 +1108,6 @@ void pv_cpuid(struct cpu_user_regs *regs)
             if ( !is_control_domain(currd) && !is_hardware_domain(currd) )
                 cpuid_count(leaf, subleaf, &tmp, &b, &tmp, &tmp);
             break;
-        }
 
         case 1:
             a &= pv_featureset[FEATURESET_Da1];
