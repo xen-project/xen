@@ -3362,7 +3362,7 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
 
     switch ( input )
     {
-        unsigned int sub_leaf, _eax, _ebx, _ecx, _edx;
+        unsigned int _ecx, _edx;
 
     case 0x1:
         /* Fix up VLAPIC details. */
@@ -3440,42 +3440,31 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
             *eax = *ebx = *ecx = *edx = 0;
             break;
         }
-        /* EBX value of main leaf 0 depends on enabled xsave features */
-        if ( count == 0 && v->arch.xcr0 ) 
+        switch ( count )
         {
-            /* reset EBX to default value first */
-            *ebx = XSTATE_AREA_MIN_SIZE; 
-            for ( sub_leaf = 2; sub_leaf < 63; sub_leaf++ )
-            {
-                if ( !(v->arch.xcr0 & (1ULL << sub_leaf)) )
-                    continue;
-                domain_cpuid(d, input, sub_leaf, &_eax, &_ebx, &_ecx, 
-                             &_edx);
-                if ( (_eax + _ebx) > *ebx )
-                    *ebx = _eax + _ebx;
-            }
-        }
-
-        if ( count == 1 )
-        {
+        case 0:
+            /*
+             * Always read CPUID[0xD,0].EBX from hardware, rather than domain
+             * policy.  It varies with enabled xstate, and the correct xcr0 is
+             * in context.
+             */
+            cpuid_count(input, count, &dummy, ebx, &dummy, &dummy);
+            break;
+        case 1:
             *eax &= hvm_featureset[FEATURESET_Da1];
 
             if ( *eax & cpufeat_mask(X86_FEATURE_XSAVES) )
             {
-                uint64_t xfeatures = v->arch.xcr0 | v->arch.hvm_vcpu.msr_xss;
-
-                *ebx = XSTATE_AREA_MIN_SIZE;
-                if ( xfeatures & ~XSTATE_FP_SSE )
-                    for ( sub_leaf = 2; sub_leaf < 63; sub_leaf++ )
-                        if ( xfeatures & (1ULL << sub_leaf) )
-                        {
-                            if ( test_bit(sub_leaf, &xstate_align) )
-                                *ebx = ROUNDUP(*ebx, 64);
-                            *ebx += xstate_sizes[sub_leaf];
-                        }
+                /*
+                 * Always read CPUID[0xD,1].EBX from hardware, rather than
+                 * domain policy.  It varies with enabled xstate, and the
+                 * correct xcr0/xss are in context.
+                 */
+                cpuid_count(input, count, &dummy, ebx, &dummy, &dummy);
             }
             else
                 *ebx = *ecx = *edx = 0;
+            break;
         }
         break;
 
