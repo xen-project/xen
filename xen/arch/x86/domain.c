@@ -36,7 +36,7 @@
 #include <xen/cpu.h>
 #include <xen/wait.h>
 #include <xen/guest_access.h>
-#include <xen/xsplice.h>
+#include <xen/livepatch.h>
 #include <public/sysctl.h>
 #include <public/hvm/hvm_vcpu.h>
 #include <asm/regs.h>
@@ -125,7 +125,7 @@ static void idle_loop(void)
          * We MUST be last (or before pm_idle). Otherwise after we get the
          * softirq we would execute pm_idle (and sleep) and not patch.
          */
-        check_for_xsplice_work();
+        check_for_livepatch_work();
     }
 }
 

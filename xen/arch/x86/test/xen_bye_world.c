@@ -7,15 +7,15 @@
 #include <xen/lib.h>
 #include <xen/types.h>
 #include <xen/version.h>
-#include <xen/xsplice.h>
+#include <xen/livepatch.h>
 
 #include <public/sysctl.h>
 
 static char bye_world_patch_this_fnc[] = "xen_extra_version";
 extern const char *xen_bye_world(void);
 
-struct xsplice_patch_func __section(".xsplice.funcs") xsplice_xen_bye_world = {
-    .version = XSPLICE_PAYLOAD_VERSION,
+struct livepatch_func __section(".livepatch.funcs") livepatch_xen_bye_world = {
+    .version = LIVEPATCH_PAYLOAD_VERSION,
     .name = bye_world_patch_this_fnc,
     .new_addr = xen_bye_world,
     .old_addr = xen_extra_version,

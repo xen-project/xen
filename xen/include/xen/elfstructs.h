@@ -353,7 +353,7 @@ typedef struct {
 #define	ELF64_R_TYPE(info)	((info) & 0xFFFFFFFF)
 #define ELF64_R_INFO(s,t) 	(((s) << 32) + (u_int32_t)(t))
 
-/* x86-64 relocation types. We list only the ones xSplice implements. */
+/* x86-64 relocation types. We list only the ones Live Patch implements. */
 #define R_X86_64_NONE		0	/* No reloc */
 #define R_X86_64_64	    	1	/* Direct 64 bit  */
 #define R_X86_64_PC32		2	/* PC relative 32 bit signed */

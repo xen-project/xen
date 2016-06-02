@@ -21,8 +21,8 @@
 #include <xen/virtual_region.h>
 #include <xen/vmap.h>
 #include <xen/wait.h>
-#include <xen/xsplice_elf.h>
-#include <xen/xsplice.h>
+#include <xen/livepatch_elf.h>
+#include <xen/livepatch.h>
 
 #include <asm/event.h>
 
@@ -44,13 +44,13 @@ static unsigned int payload_cnt;
 static unsigned int payload_version = 1;
 
 /* To contain the ELF Note header. */
-struct xsplice_build_id {
+struct livepatch_build_id {
    const void *p;
    unsigned int len;
 };
 
 struct payload {
-    uint32_t state;                      /* One of the XSPLICE_STATE_*. */
+    uint32_t state;                      /* One of the LIVEPATCH_STATE_*. */
     int32_t rc;                          /* 0 or -XEN_EXX. */
     struct list_head list;               /* Linked to 'payload_list'. */
     const void *text_addr;               /* Virtual address of .text. */
@@ -61,44 +61,44 @@ struct payload {
     size_t ro_size;                      /* .. and its size (if any). */
     unsigned int pages;                  /* Total pages for [text,rw,ro]_addr */
     struct list_head applied_list;       /* Linked to 'applied_list'. */
-    struct xsplice_patch_func *funcs;    /* The array of functions to patch. */
+    struct livepatch_func *funcs;        /* The array of functions to patch. */
     unsigned int nfuncs;                 /* Nr of functions to patch. */
-    const struct xsplice_symbol *symtab; /* All symbols. */
+    const struct livepatch_symbol *symtab; /* All symbols. */
     const char *strtab;                  /* Pointer to .strtab. */
     struct virtual_region region;        /* symbol, bug.frame patching and
                                             exception table (x86). */
     unsigned int nsyms;                  /* Nr of entries in .strtab and symbols. */
-    struct xsplice_build_id id;          /* ELFNOTE_DESC(.note.gnu.build-id) of the payload. */
-    struct xsplice_build_id dep;         /* ELFNOTE_DESC(.xsplice.depends). */
-    char name[XEN_XSPLICE_NAME_SIZE];    /* Name of it. */
+    struct livepatch_build_id id;        /* ELFNOTE_DESC(.note.gnu.build-id) of the payload. */
+    struct livepatch_build_id dep;       /* ELFNOTE_DESC(.livepatch.depends). */
+    char name[XEN_LIVEPATCH_NAME_SIZE]; /* Name of it. */
 };
 
 /* Defines an outstanding patching action. */
-struct xsplice_work
+struct livepatch_work
 {
     atomic_t semaphore;          /* Used to rendezvous CPUs in
-                                    check_for_xsplice_work. */
+                                    check_for_livepatch_work. */
     uint32_t timeout;            /* Timeout to do the operation. */
     struct payload *data;        /* The payload on which to act. */
     volatile bool_t do_work;     /* Signals work to do. */
     volatile bool_t ready;       /* Signals all CPUs synchronized. */
-    unsigned int cmd;            /* Action request: XSPLICE_ACTION_* */
+    unsigned int cmd;            /* Action request: LIVEPATCH_ACTION_* */
 };
 
 /* There can be only one outstanding patching action. */
-static struct xsplice_work xsplice_work;
+static struct livepatch_work livepatch_work;
 
 /*
- * Indicate whether the CPU needs to consult xsplice_work structure.
- * We want an per-cpu data structure otherwise the check_for_xsplice_work
- * would hammer a global xsplice_work structure on every guest VMEXIT.
+ * Indicate whether the CPU needs to consult livepatch_work structure.
+ * We want an per-cpu data structure otherwise the check_for_livepatch_work
+ * would hammer a global livepatch_work structure on every guest VMEXIT.
  * Having an per-cpu lessens the load.
  */
 static DEFINE_PER_CPU(bool_t, work_to_do);
 
-static int get_name(const xen_xsplice_name_t *name, char *n)
+static int get_name(const xen_livepatch_name_t *name, char *n)
 {
-    if ( !name->size || name->size > XEN_XSPLICE_NAME_SIZE )
+    if ( !name->size || name->size > XEN_LIVEPATCH_NAME_SIZE )
         return -EINVAL;
 
     if ( name->pad[0] || name->pad[1] || name->pad[2] )
@@ -113,7 +113,7 @@ static int get_name(const xen_xsplice_name_t *name, char *n)
     return 0;
 }
 
-static int verify_payload(const xen_sysctl_xsplice_upload_t *upload, char *n)
+static int verify_payload(const xen_sysctl_livepatch_upload_t *upload, char *n)
 {
     if ( get_name(&upload->name, n) )
         return -EINVAL;
@@ -159,7 +159,7 @@ bool_t is_patch(const void *ptr)
     return r;
 }
 
-unsigned long xsplice_symbols_lookup_by_name(const char *symname)
+unsigned long livepatch_symbols_lookup_by_name(const char *symname)
 {
     const struct payload *data;
 
@@ -181,10 +181,10 @@ unsigned long xsplice_symbols_lookup_by_name(const char *symname)
     return 0;
 }
 
-static const char *xsplice_symbols_lookup(unsigned long addr,
-                                          unsigned long *symbolsize,
-                                          unsigned long *offset,
-                                          char *namebuf)
+static const char *livepatch_symbols_lookup(unsigned long addr,
+                                            unsigned long *symbolsize,
+                                            unsigned long *offset,
+                                            char *namebuf)
 {
     const struct payload *data;
     unsigned int i, best;
@@ -248,8 +248,8 @@ static struct payload *find_payload(const char *name)
 }
 
 /*
- * Functions related to XEN_SYSCTL_XSPLICE_UPLOAD (see xsplice_upload), and
- * freeing payload (XEN_SYSCTL_XSPLICE_ACTION:XSPLICE_ACTION_UNLOAD).
+ * Functions related to XEN_SYSCTL_LIVEPATCH_UPLOAD (see livepatch_upload), and
+ * freeing payload (XEN_SYSCTL_LIVEPATCH_ACTION:LIVEPATCH_ACTION_UNLOAD).
  */
 
 static void free_payload_data(struct payload *payload)
@@ -270,7 +270,7 @@ static void free_payload_data(struct payload *payload)
 * address space for the payload (using passed in size). This is used in
 * move_payload to figure out the destination location (load_addr).
 */
-static void calc_section(const struct xsplice_elf_sec *sec, size_t *size,
+static void calc_section(const struct livepatch_elf_sec *sec, size_t *size,
                          unsigned int *offset)
 {
     const Elf_Shdr *s = sec->sec;
@@ -281,7 +281,7 @@ static void calc_section(const struct xsplice_elf_sec *sec, size_t *size,
     *size = s->sh_size + align_size;
 }
 
-static int move_payload(struct payload *payload, struct xsplice_elf *elf)
+static int move_payload(struct payload *payload, struct livepatch_elf *elf)
 {
     void *text_buf, *ro_buf, *rw_buf;
     unsigned int i;
@@ -315,7 +315,7 @@ static int move_payload(struct payload *payload, struct xsplice_elf *elf)
             calc_section(&elf->sec[i], &payload->ro_size, &offset[i]);
         else
         {
-            dprintk(XENLOG_DEBUG, XSPLICE "%s: Not supporting %s section!\n",
+            dprintk(XENLOG_DEBUG, LIVEPATCH "%s: Not supporting %s section!\n",
                     elf->name, elf->sec[i].name);
             rc = -EOPNOTSUPP;
             goto out;
@@ -335,7 +335,7 @@ static int move_payload(struct payload *payload, struct xsplice_elf *elf)
     text_buf = vmalloc_xen(size * PAGE_SIZE);
     if ( !text_buf )
     {
-        dprintk(XENLOG_ERR, XSPLICE "%s: Could not allocate memory for payload!\n",
+        dprintk(XENLOG_ERR, LIVEPATCH "%s: Could not allocate memory for payload!\n",
                 elf->name);
         rc = -ENOMEM;
         goto out;
@@ -370,7 +370,7 @@ static int move_payload(struct payload *payload, struct xsplice_elf *elf)
             {
                 memcpy(elf->sec[i].load_addr, elf->sec[i].data,
                        elf->sec[i].sec->sh_size);
-                dprintk(XENLOG_DEBUG, XSPLICE "%s: Loaded %s at %p\n",
+                dprintk(XENLOG_DEBUG, LIVEPATCH "%s: Loaded %s at %p\n",
                         elf->name, elf->sec[i].name, elf->sec[i].load_addr);
             }
             else
@@ -384,7 +384,7 @@ static int move_payload(struct payload *payload, struct xsplice_elf *elf)
     return rc;
 }
 
-static int secure_payload(struct payload *payload, struct xsplice_elf *elf)
+static int secure_payload(struct payload *payload, struct livepatch_elf *elf)
 {
     int rc;
     unsigned int text_pages, rw_pages, ro_pages;
@@ -392,57 +392,57 @@ static int secure_payload(struct payload *payload, struct xsplice_elf *elf)
     text_pages = PFN_UP(payload->text_size);
     ASSERT(text_pages);
 
-    rc = arch_xsplice_secure(payload->text_addr, text_pages, XSPLICE_VA_RX);
+    rc = arch_livepatch_secure(payload->text_addr, text_pages, LIVEPATCH_VA_RX);
     if ( rc )
         return rc;
 
     rw_pages = PFN_UP(payload->rw_size);
     if ( rw_pages )
     {
-        rc = arch_xsplice_secure(payload->rw_addr, rw_pages, XSPLICE_VA_RW);
+        rc = arch_livepatch_secure(payload->rw_addr, rw_pages, LIVEPATCH_VA_RW);
         if ( rc )
             return rc;
     }
 
     ro_pages = PFN_UP(payload->ro_size);
     if ( ro_pages )
-        rc = arch_xsplice_secure(payload->ro_addr, ro_pages, XSPLICE_VA_RO);
+        rc = arch_livepatch_secure(payload->ro_addr, ro_pages, LIVEPATCH_VA_RO);
 
     ASSERT(ro_pages + rw_pages + text_pages == payload->pages);
 
     return rc;
 }
 
-static int check_special_sections(const struct xsplice_elf *elf)
+static int check_special_sections(const struct livepatch_elf *elf)
 {
     unsigned int i;
-    static const char *const names[] = { ELF_XSPLICE_FUNC,
-                                         ELF_XSPLICE_DEPENDS,
+    static const char *const names[] = { ELF_LIVEPATCH_FUNC,
+                                         ELF_LIVEPATCH_DEPENDS,
                                          ELF_BUILD_ID_NOTE};
     DECLARE_BITMAP(found, ARRAY_SIZE(names)) = { 0 };
 
     for ( i = 0; i < ARRAY_SIZE(names); i++ )
     {
-        const struct xsplice_elf_sec *sec;
+        const struct livepatch_elf_sec *sec;
 
-        sec = xsplice_elf_sec_by_name(elf, names[i]);
+        sec = livepatch_elf_sec_by_name(elf, names[i]);
         if ( !sec )
         {
-            dprintk(XENLOG_ERR, XSPLICE "%s: %s is missing!\n",
+            dprintk(XENLOG_ERR, LIVEPATCH "%s: %s is missing!\n",
                     elf->name, names[i]);
             return -EINVAL;
         }
 
         if ( !sec->sec->sh_size )
         {
-            dprintk(XENLOG_ERR, XSPLICE "%s: %s is empty!\n",
+            dprintk(XENLOG_ERR, LIVEPATCH "%s: %s is empty!\n",
                     elf->name, names[i]);
             return -EINVAL;
         }
 
         if ( test_and_set_bit(i, found) )
         {
-            dprintk(XENLOG_ERR, XSPLICE "%s: %s was seen more than once!\n",
+            dprintk(XENLOG_ERR, LIVEPATCH "%s: %s was seen more than once!\n",
                     elf->name, names[i]);
             return -EINVAL;
         }
@@ -452,19 +452,19 @@ static int check_special_sections(const struct xsplice_elf *elf)
 }
 
 static int prepare_payload(struct payload *payload,
-                           struct xsplice_elf *elf)
+                           struct livepatch_elf *elf)
 {
-    const struct xsplice_elf_sec *sec;
+    const struct livepatch_elf_sec *sec;
     unsigned int i;
-    struct xsplice_patch_func *f;
+    struct livepatch_func *f;
     struct virtual_region *region;
     const Elf_Note *n;
 
-    sec = xsplice_elf_sec_by_name(elf, ELF_XSPLICE_FUNC);
+    sec = livepatch_elf_sec_by_name(elf, ELF_LIVEPATCH_FUNC);
     ASSERT(sec);
     if ( sec->sec->sh_size % sizeof(*payload->funcs) )
     {
-        dprintk(XENLOG_ERR, XSPLICE "%s: Wrong size of "ELF_XSPLICE_FUNC"!\n",
+        dprintk(XENLOG_ERR, LIVEPATCH "%s: Wrong size of "ELF_LIVEPATCH_FUNC"!\n",
                 elf->name);
         return -EINVAL;
     }
@@ -478,21 +478,21 @@ static int prepare_payload(struct payload *payload,
 
         f = &(payload->funcs[i]);
 
-        if ( f->version != XSPLICE_PAYLOAD_VERSION )
+        if ( f->version != LIVEPATCH_PAYLOAD_VERSION )
         {
-            dprintk(XENLOG_ERR, XSPLICE "%s: Wrong version (%u). Expected %d!\n",
-                    elf->name, f->version, XSPLICE_PAYLOAD_VERSION);
+            dprintk(XENLOG_ERR, LIVEPATCH "%s: Wrong version (%u). Expected %d!\n",
+                    elf->name, f->version, LIVEPATCH_PAYLOAD_VERSION);
             return -EOPNOTSUPP;
         }
 
         if ( !f->new_addr || !f->new_size )
         {
-            dprintk(XENLOG_ERR, XSPLICE "%s: Address or size fields are zero!\n",
+            dprintk(XENLOG_ERR, LIVEPATCH "%s: Address or size fields are zero!\n",
                     elf->name);
             return -EINVAL;
         }
 
-        rc = arch_xsplice_verify_func(f);
+        rc = arch_livepatch_verify_func(f);
         if ( rc )
             return rc;
 
@@ -502,20 +502,20 @@ static int prepare_payload(struct payload *payload,
             f->old_addr = (void *)symbols_lookup_by_name(f->name);
             if ( !f->old_addr )
             {
-                f->old_addr = (void *)xsplice_symbols_lookup_by_name(f->name);
+                f->old_addr = (void *)livepatch_symbols_lookup_by_name(f->name);
                 if ( !f->old_addr )
                 {
-                    dprintk(XENLOG_ERR, XSPLICE "%s: Could not resolve old address of %s\n",
+                    dprintk(XENLOG_ERR, LIVEPATCH "%s: Could not resolve old address of %s\n",
                             elf->name, f->name);
                     return -ENOENT;
                 }
             }
-            dprintk(XENLOG_DEBUG, XSPLICE "%s: Resolved old address %s => %p\n",
+            dprintk(XENLOG_DEBUG, LIVEPATCH "%s: Resolved old address %s => %p\n",
                     elf->name, f->name, f->old_addr);
         }
     }
 
-    sec = xsplice_elf_sec_by_name(elf, ELF_BUILD_ID_NOTE);
+    sec = livepatch_elf_sec_by_name(elf, ELF_BUILD_ID_NOTE);
     if ( sec )
     {
         const struct payload *data;
@@ -540,14 +540,14 @@ static int prepare_payload(struct payload *payload,
             if ( data->id.len == payload->id.len &&
                  !memcmp(data->id.p, payload->id.p, data->id.len) )
             {
-                dprintk(XENLOG_DEBUG, XSPLICE "%s: Already loaded as %s!\n",
+                dprintk(XENLOG_DEBUG, LIVEPATCH "%s: Already loaded as %s!\n",
                         elf->name, data->name);
                 return -EEXIST;
             }
         }
     }
 
-    sec = xsplice_elf_sec_by_name(elf, ELF_XSPLICE_DEPENDS);
+    sec = livepatch_elf_sec_by_name(elf, ELF_LIVEPATCH_DEPENDS);
     if ( sec )
     {
         n = sec->load_addr;
@@ -566,7 +566,7 @@ static int prepare_payload(struct payload *payload,
     /* Setup the virtual region with proper data. */
     region = &payload->region;
 
-    region->symbols_lookup = xsplice_symbols_lookup;
+    region->symbols_lookup = livepatch_symbols_lookup;
     region->start = payload->text_addr;
     region->end = payload->text_addr + payload->text_size;
 
@@ -576,13 +576,13 @@ static int prepare_payload(struct payload *payload,
         char str[14];
 
         snprintf(str, sizeof(str), ".bug_frames.%u", i);
-        sec = xsplice_elf_sec_by_name(elf, str);
+        sec = livepatch_elf_sec_by_name(elf, str);
         if ( !sec )
             continue;
 
         if ( sec->sec->sh_size % sizeof(*region->frame[i].bugs) )
         {
-            dprintk(XENLOG_ERR, XSPLICE "%s: Wrong size of .bug_frames.%u!\n",
+            dprintk(XENLOG_ERR, LIVEPATCH "%s: Wrong size of .bug_frames.%u!\n",
                     elf->name, i);
             return -EINVAL;
         }
@@ -593,14 +593,14 @@ static int prepare_payload(struct payload *payload,
     }
 
 #ifndef CONFIG_ARM
-    sec = xsplice_elf_sec_by_name(elf, ".altinstructions");
+    sec = livepatch_elf_sec_by_name(elf, ".altinstructions");
     if ( sec )
     {
         struct alt_instr *a, *start, *end;
 
         if ( sec->sec->sh_size % sizeof(*a) )
         {
-            dprintk(XENLOG_ERR, XSPLICE "%s: Size of .alt_instr is not multiple of %zu!\n",
+            dprintk(XENLOG_ERR, LIVEPATCH "%s: Size of .alt_instr is not multiple of %zu!\n",
                     elf->name, sizeof(*a));
             return -EINVAL;
         }
@@ -616,7 +616,7 @@ static int prepare_payload(struct payload *payload,
             if ( (instr < region->start && instr >= region->end) ||
                  (replacement < region->start && replacement >= region->end) )
             {
-                dprintk(XENLOG_ERR, XSPLICE "%s Alt patching outside payload: %p!\n",
+                dprintk(XENLOG_ERR, LIVEPATCH "%s Alt patching outside payload: %p!\n",
                         elf->name, instr);
                 return -EINVAL;
             }
@@ -624,7 +624,7 @@ static int prepare_payload(struct payload *payload,
         apply_alternatives_nocheck(start, end);
     }
 
-    sec = xsplice_elf_sec_by_name(elf, ".ex_table");
+    sec = livepatch_elf_sec_by_name(elf, ".ex_table");
     if ( sec )
     {
         struct exception_table_entry *s, *e;
@@ -632,7 +632,7 @@ static int prepare_payload(struct payload *payload,
         if ( !sec->sec->sh_size ||
              (sec->sec->sh_size % sizeof(*region->ex)) )
         {
-            dprintk(XENLOG_ERR, XSPLICE "%s: Wrong size of .ex_table (exp:%lu vs %lu)!\n",
+            dprintk(XENLOG_ERR, LIVEPATCH "%s: Wrong size of .ex_table (exp:%lu vs %lu)!\n",
                     elf->name, sizeof(*region->ex),
                     sec->sec->sh_size);
             return -EINVAL;
@@ -651,8 +651,8 @@ static int prepare_payload(struct payload *payload,
     return 0;
 }
 
-static bool_t is_payload_symbol(const struct xsplice_elf *elf,
-                                const struct xsplice_elf_sym *sym)
+static bool_t is_payload_symbol(const struct livepatch_elf *elf,
+                                const struct livepatch_elf_sym *sym)
 {
     if ( sym->sym->st_shndx == SHN_UNDEF ||
          sym->sym->st_shndx >= elf->hdr->e_shnum )
@@ -688,11 +688,11 @@ static bool_t is_payload_symbol(const struct xsplice_elf *elf,
 }
 
 static int build_symbol_table(struct payload *payload,
-                              const struct xsplice_elf *elf)
+                              const struct livepatch_elf *elf)
 {
     unsigned int i, j, nsyms = 0;
     size_t strtab_len = 0;
-    struct xsplice_symbol *symtab;
+    struct livepatch_symbol *symtab;
     char *strtab;
 
     ASSERT(payload->nfuncs);
@@ -707,7 +707,7 @@ static int build_symbol_table(struct payload *payload,
         }
     }
 
-    symtab = xmalloc_array(struct xsplice_symbol, nsyms);
+    symtab = xmalloc_array(struct livepatch_symbol, nsyms);
     strtab = xmalloc_array(char, strtab_len);
 
     if ( !strtab || !symtab )
@@ -749,22 +749,22 @@ static int build_symbol_table(struct payload *payload,
         if ( !found )
         {
             if ( symbols_lookup_by_name(symtab[i].name) ||
-                 xsplice_symbols_lookup_by_name(symtab[i].name) )
+                 livepatch_symbols_lookup_by_name(symtab[i].name) )
             {
-                dprintk(XENLOG_ERR, XSPLICE "%s: duplicate new symbol: %s\n",
+                dprintk(XENLOG_ERR, LIVEPATCH "%s: duplicate new symbol: %s\n",
                         elf->name, symtab[i].name);
                 xfree(symtab);
                 xfree(strtab);
                 return -EEXIST;
             }
             symtab[i].new_symbol = 1;
-            dprintk(XENLOG_DEBUG, XSPLICE "%s: new symbol %s\n",
+            dprintk(XENLOG_DEBUG, LIVEPATCH "%s: new symbol %s\n",
                      elf->name, symtab[i].name);
         }
         else
         {
             /* new_symbol is not set. */
-            dprintk(XENLOG_DEBUG, XSPLICE "%s: overriding symbol %s\n",
+            dprintk(XENLOG_DEBUG, LIVEPATCH "%s: overriding symbol %s\n",
                     elf->name, symtab[i].name);
         }
     }
@@ -790,10 +790,10 @@ static void free_payload(struct payload *data)
 
 static int load_payload_data(struct payload *payload, void *raw, size_t len)
 {
-    struct xsplice_elf elf = { .name = payload->name, .len = len };
+    struct livepatch_elf elf = { .name = payload->name, .len = len };
     int rc = 0;
 
-    rc = xsplice_elf_load(&elf, raw);
+    rc = livepatch_elf_load(&elf, raw);
     if ( rc )
         goto out;
 
@@ -801,11 +801,11 @@ static int load_payload_data(struct payload *payload, void *raw, size_t len)
     if ( rc )
         goto out;
 
-    rc = xsplice_elf_resolve_symbols(&elf);
+    rc = livepatch_elf_resolve_symbols(&elf);
     if ( rc )
         goto out;
 
-    rc = xsplice_elf_perform_relocs(&elf);
+    rc = livepatch_elf_perform_relocs(&elf);
     if ( rc )
         goto out;
 
@@ -828,15 +828,15 @@ static int load_payload_data(struct payload *payload, void *raw, size_t len)
         free_payload_data(payload);
 
     /* Free our temporary data structure. */
-    xsplice_elf_free(&elf);
+    livepatch_elf_free(&elf);
 
     return rc;
 }
 
-static int xsplice_upload(xen_sysctl_xsplice_upload_t *upload)
+static int livepatch_upload(xen_sysctl_livepatch_upload_t *upload)
 {
     struct payload *data, *found;
-    char n[XEN_XSPLICE_NAME_SIZE];
+    char n[XEN_LIVEPATCH_NAME_SIZE];
     void *raw_data;
     int rc;
 
@@ -866,7 +866,7 @@ static int xsplice_upload(xen_sysctl_xsplice_upload_t *upload)
         if ( rc )
             goto out;
 
-        data->state = XSPLICE_STATE_CHECKED;
+        data->state = LIVEPATCH_STATE_CHECKED;
         INIT_LIST_HEAD(&data->list);
         INIT_LIST_HEAD(&data->applied_list);
 
@@ -890,11 +890,11 @@ static int xsplice_upload(xen_sysctl_xsplice_upload_t *upload)
     return rc;
 }
 
-static int xsplice_get(xen_sysctl_xsplice_get_t *get)
+static int livepatch_get(xen_sysctl_livepatch_get_t *get)
 {
     struct payload *data;
     int rc;
-    char n[XEN_XSPLICE_NAME_SIZE];
+    char n[XEN_LIVEPATCH_NAME_SIZE];
 
     rc = get_name(&get->name, n);
     if ( rc )
@@ -921,9 +921,9 @@ static int xsplice_get(xen_sysctl_xsplice_get_t *get)
     return 0;
 }
 
-static int xsplice_list(xen_sysctl_xsplice_list_t *list)
+static int livepatch_list(xen_sysctl_livepatch_list_t *list)
 {
-    xen_xsplice_status_t status;
+    xen_livepatch_status_t status;
     struct payload *data;
     unsigned int idx = 0, i = 0;
     int rc = 0;
@@ -936,7 +936,7 @@ static int xsplice_list(xen_sysctl_xsplice_list_t *list)
 
     if ( list->nr &&
          (!guest_handle_okay(list->status, list->nr) ||
-          !guest_handle_okay(list->name, XEN_XSPLICE_NAME_SIZE * list->nr) ||
+          !guest_handle_okay(list->name, XEN_LIVEPATCH_NAME_SIZE * list->nr) ||
           !guest_handle_okay(list->len, list->nr)) )
         return -EINVAL;
 
@@ -961,7 +961,7 @@ static int xsplice_list(xen_sysctl_xsplice_list_t *list)
             len = strlen(data->name) + 1;
 
             /* N.B. 'idx' != 'i'. */
-            if ( __copy_to_guest_offset(list->name, idx * XEN_XSPLICE_NAME_SIZE,
+            if ( __copy_to_guest_offset(list->name, idx * XEN_LIVEPATCH_NAME_SIZE,
                                         data->name, len) ||
                 __copy_to_guest_offset(list->len, idx, &len, 1) ||
                 __copy_to_guest_offset(list->status, idx, &status, 1) )
@@ -987,22 +987,22 @@ static int xsplice_list(xen_sysctl_xsplice_list_t *list)
 /*
  * The following functions get the CPUs into an appropriate state and
  * apply (or revert) each of the payload's functions. This is needed
- * for XEN_SYSCTL_XSPLICE_ACTION operation (see xsplice_action).
+ * for XEN_SYSCTL_LIVEPATCH_ACTION operation (see livepatch_action).
  */
 
 static int apply_payload(struct payload *data)
 {
     unsigned int i;
 
-    printk(XENLOG_INFO XSPLICE "%s: Applying %u functions\n",
+    printk(XENLOG_INFO LIVEPATCH "%s: Applying %u functions\n",
             data->name, data->nfuncs);
 
-    arch_xsplice_patching_enter();
+    arch_livepatch_quiesce();
 
     for ( i = 0; i < data->nfuncs; i++ )
-        arch_xsplice_apply_jmp(&data->funcs[i]);
+        arch_livepatch_apply_jmp(&data->funcs[i]);
 
-    arch_xsplice_patching_leave();
+    arch_livepatch_revive();
 
     /*
      * We need RCU variant (which has barriers) in case we crash here.
@@ -1018,14 +1018,14 @@ static int revert_payload(struct payload *data)
 {
     unsigned int i;
 
-    printk(XENLOG_INFO XSPLICE "%s: Reverting\n", data->name);
+    printk(XENLOG_INFO LIVEPATCH "%s: Reverting\n", data->name);
 
-    arch_xsplice_patching_enter();
+    arch_livepatch_quiesce();
 
     for ( i = 0; i < data->nfuncs; i++ )
-        arch_xsplice_revert_jmp(&data->funcs[i]);
+        arch_livepatch_revert_jmp(&data->funcs[i]);
 
-    arch_xsplice_patching_leave();
+    arch_livepatch_revive();
 
     /*
      * We need RCU variant (which has barriers) in case we crash here.
@@ -1041,31 +1041,31 @@ static int revert_payload(struct payload *data)
  * This function is executed having all other CPUs with no deep stack (we may
  * have cpu_idle on it) and IRQs disabled.
  */
-static void xsplice_do_action(void)
+static void livepatch_do_action(void)
 {
     int rc;
     struct payload *data, *other, *tmp;
 
-    data = xsplice_work.data;
+    data = livepatch_work.data;
     /*
      * This function and the transition from asm to C code should be the only
      * one on any stack. No need to lock the payload list or applied list.
      */
-    switch ( xsplice_work.cmd )
+    switch ( livepatch_work.cmd )
     {
-    case XSPLICE_ACTION_APPLY:
+    case LIVEPATCH_ACTION_APPLY:
         rc = apply_payload(data);
         if ( rc == 0 )
-            data->state = XSPLICE_STATE_APPLIED;
+            data->state = LIVEPATCH_STATE_APPLIED;
         break;
 
-    case XSPLICE_ACTION_REVERT:
+    case LIVEPATCH_ACTION_REVERT:
         rc = revert_payload(data);
         if ( rc == 0 )
-            data->state = XSPLICE_STATE_CHECKED;
+            data->state = LIVEPATCH_STATE_CHECKED;
         break;
 
-    case XSPLICE_ACTION_REPLACE:
+    case LIVEPATCH_ACTION_REPLACE:
         rc = 0;
         /*
 	 * N.B: Use 'applied_list' member, not 'list'. We also abuse the
@@ -1075,7 +1075,7 @@ static void xsplice_do_action(void)
         {
             other->rc = revert_payload(other);
             if ( other->rc == 0 )
-                other->state = XSPLICE_STATE_CHECKED;
+                other->state = LIVEPATCH_STATE_CHECKED;
             else
             {
                 rc = -EINVAL;
@@ -1087,7 +1087,7 @@ static void xsplice_do_action(void)
         {
             rc = apply_payload(data);
             if ( rc == 0 )
-                data->state = XSPLICE_STATE_APPLIED;
+                data->state = LIVEPATCH_STATE_APPLIED;
         }
         break;
 
@@ -1097,7 +1097,7 @@ static void xsplice_do_action(void)
         break;
     }
 
-    /* We must set rc as xsplice_action sets it to -EAGAIN when kicking of. */
+    /* We must set rc as livepatch_action sets it to -EAGAIN when kicking of. */
     data->rc = rc;
 }
 
@@ -1105,7 +1105,7 @@ static bool_t is_work_scheduled(const struct payload *data)
 {
     ASSERT(spin_is_locked(&payload_lock));
 
-    return xsplice_work.do_work && xsplice_work.data == data;
+    return livepatch_work.do_work && livepatch_work.data == data;
 }
 
 static int schedule_work(struct payload *data, uint32_t cmd, uint32_t timeout)
@@ -1113,30 +1113,30 @@ static int schedule_work(struct payload *data, uint32_t cmd, uint32_t timeout)
     ASSERT(spin_is_locked(&payload_lock));
 
     /* Fail if an operation is already scheduled. */
-    if ( xsplice_work.do_work )
+    if ( livepatch_work.do_work )
         return -EBUSY;
 
     if ( !get_cpu_maps() )
     {
-        printk(XENLOG_ERR XSPLICE "%s: unable to get cpu_maps lock!\n",
+        printk(XENLOG_ERR LIVEPATCH "%s: unable to get cpu_maps lock!\n",
                data->name);
         return -EBUSY;
     }
 
-    xsplice_work.cmd = cmd;
-    xsplice_work.data = data;
-    xsplice_work.timeout = timeout ?: MILLISECS(30);
+    livepatch_work.cmd = cmd;
+    livepatch_work.data = data;
+    livepatch_work.timeout = timeout ?: MILLISECS(30);
 
-    dprintk(XENLOG_DEBUG, XSPLICE "%s: timeout is %"PRI_stime"ms\n",
-            data->name, xsplice_work.timeout / MILLISECS(1));
+    dprintk(XENLOG_DEBUG, LIVEPATCH "%s: timeout is %"PRI_stime"ms\n",
+            data->name, livepatch_work.timeout / MILLISECS(1));
 
-    atomic_set(&xsplice_work.semaphore, -1);
+    atomic_set(&livepatch_work.semaphore, -1);
 
-    xsplice_work.ready = 0;
+    livepatch_work.ready = 0;
 
     smp_wmb();
 
-    xsplice_work.do_work = 1;
+    livepatch_work.do_work = 1;
     this_cpu(work_to_do) = 1;
 
     put_cpu_maps();
@@ -1150,8 +1150,8 @@ static void reschedule_fn(void *unused)
     raise_softirq(SCHEDULE_SOFTIRQ);
 }
 
-static int xsplice_spin(atomic_t *counter, s_time_t timeout,
-                           unsigned int cpus, const char *s)
+static int livepatch_spin(atomic_t *counter, s_time_t timeout,
+                          unsigned int cpus, const char *s)
 {
     int rc = 0;
 
@@ -1161,12 +1161,12 @@ static int xsplice_spin(atomic_t *counter, s_time_t timeout,
     /* Log & abort. */
     if ( atomic_read(counter) != cpus )
     {
-        printk(XENLOG_ERR XSPLICE "%s: Timed out on semaphore in %s quiesce phase %u/%u\n",
-               xsplice_work.data->name, s, atomic_read(counter), cpus);
+        printk(XENLOG_ERR LIVEPATCH "%s: Timed out on semaphore in %s quiesce phase %u/%u\n",
+               livepatch_work.data->name, s, atomic_read(counter), cpus);
         rc = -EBUSY;
-        xsplice_work.data->rc = rc;
+        livepatch_work.data->rc = rc;
         smp_wmb();
-        xsplice_work.do_work = 0;
+        livepatch_work.do_work = 0;
     }
 
     return rc;
@@ -1176,9 +1176,9 @@ static int xsplice_spin(atomic_t *counter, s_time_t timeout,
  * The main function which manages the work of quiescing the system and
  * patching code.
  */
-void check_for_xsplice_work(void)
+void check_for_livepatch_work(void)
 {
-#define ACTION(x) [XSPLICE_ACTION_##x] = #x
+#define ACTION(x) [LIVEPATCH_ACTION_##x] = #x
     static const char *const names[] = {
             ACTION(APPLY),
             ACTION(REVERT),
@@ -1195,7 +1195,7 @@ void check_for_xsplice_work(void)
 
     smp_rmb();
     /* In case we aborted, other CPUs can skip right away. */
-    if ( !xsplice_work.do_work )
+    if ( !livepatch_work.do_work )
     {
         per_cpu(work_to_do, cpu) = 0;
         return;
@@ -1204,22 +1204,22 @@ void check_for_xsplice_work(void)
     ASSERT(local_irq_is_enabled());
 
     /* Set at -1, so will go up to num_online_cpus - 1. */
-    if ( atomic_inc_and_test(&xsplice_work.semaphore) )
+    if ( atomic_inc_and_test(&livepatch_work.semaphore) )
     {
         struct payload *p;
         unsigned int cpus;
 
-        p = xsplice_work.data;
+        p = livepatch_work.data;
         if ( !get_cpu_maps() )
         {
-            printk(XENLOG_ERR XSPLICE "%s: CPU%u - unable to get cpu_maps lock!\n",
+            printk(XENLOG_ERR LIVEPATCH "%s: CPU%u - unable to get cpu_maps lock!\n",
                    p->name, cpu);
             per_cpu(work_to_do, cpu) = 0;
-            xsplice_work.data->rc = -EBUSY;
+            livepatch_work.data->rc = -EBUSY;
             smp_wmb();
-            xsplice_work.do_work = 0;
+            livepatch_work.do_work = 0;
             /*
-             * Do NOT decrement xsplice_work.semaphore down - as that may cause
+             * Do NOT decrement livepatch_work.semaphore down - as that may cause
              * the other CPU (which may be at this point ready to increment it)
              * to assume the role of master and then needlessly time out
              * out (as do_work is zero).
@@ -1227,58 +1227,58 @@ void check_for_xsplice_work(void)
             return;
         }
         /* "Mask" NMIs. */
-        arch_xsplice_mask();
+        arch_livepatch_mask();
 
         barrier(); /* MUST do it after get_cpu_maps. */
         cpus = num_online_cpus() - 1;
 
         if ( cpus )
         {
-            dprintk(XENLOG_DEBUG, XSPLICE "%s: CPU%u - IPIing the other %u CPUs\n",
+            dprintk(XENLOG_DEBUG, LIVEPATCH "%s: CPU%u - IPIing the other %u CPUs\n",
                     p->name, cpu, cpus);
             smp_call_function(reschedule_fn, NULL, 0);
         }
 
-        timeout = xsplice_work.timeout + NOW();
-        if ( xsplice_spin(&xsplice_work.semaphore, timeout, cpus, "CPU") )
+        timeout = livepatch_work.timeout + NOW();
+        if ( livepatch_spin(&livepatch_work.semaphore, timeout, cpus, "CPU") )
             goto abort;
 
         /* All CPUs are waiting, now signal to disable IRQs. */
-        atomic_set(&xsplice_work.semaphore, 0);
+        atomic_set(&livepatch_work.semaphore, 0);
         /*
          * MUST have a barrier after semaphore so that the other CPUs don't
          * leak out of the 'Wait for all CPUs to rendezvous' loop and increment
          * 'semaphore' before we set it to zero.
          */
         smp_wmb();
-        xsplice_work.ready = 1;
+        livepatch_work.ready = 1;
 
-        if ( !xsplice_spin(&xsplice_work.semaphore, timeout, cpus, "IRQ") )
+        if ( !livepatch_spin(&livepatch_work.semaphore, timeout, cpus, "IRQ") )
         {
             local_irq_save(flags);
             /* Do the patching. */
-            xsplice_do_action();
+            livepatch_do_action();
             /* Serialize and flush out the CPU via CPUID instruction (on x86). */
-            arch_xsplice_post_action();
+            arch_livepatch_post_action();
             local_irq_restore(flags);
         }
 
  abort:
-        arch_xsplice_unmask();
+        arch_livepatch_unmask();
 
         per_cpu(work_to_do, cpu) = 0;
-        xsplice_work.do_work = 0;
+        livepatch_work.do_work = 0;
 
         /* put_cpu_maps has an barrier(). */
         put_cpu_maps();
 
-        printk(XENLOG_INFO XSPLICE "%s finished %s with rc=%d\n",
-               p->name, names[xsplice_work.cmd], p->rc);
+        printk(XENLOG_INFO LIVEPATCH "%s finished %s with rc=%d\n",
+               p->name, names[livepatch_work.cmd], p->rc);
     }
     else
     {
         /* Wait for all CPUs to rendezvous. */
-        while ( xsplice_work.do_work && !xsplice_work.ready )
+        while ( livepatch_work.do_work && !livepatch_work.ready )
             cpu_relax();
 
         /* Disable IRQs and signal. */
@@ -1287,14 +1287,14 @@ void check_for_xsplice_work(void)
          * We re-use the sempahore, so MUST have it reset by master before
          * we exit the loop above.
          */
-        atomic_inc(&xsplice_work.semaphore);
+        atomic_inc(&livepatch_work.semaphore);
 
         /* Wait for patching to complete. */
-        while ( xsplice_work.do_work )
+        while ( livepatch_work.do_work )
             cpu_relax();
 
         /* To flush out pipeline. */
-        arch_xsplice_post_action();
+        arch_livepatch_post_action();
         local_irq_restore(flags);
 
         per_cpu(work_to_do, cpu) = 0;
@@ -1343,17 +1343,17 @@ static int build_id_dep(struct payload *payload, bool_t internal)
          memcmp(id, payload->dep.p, len) )
     {
         dprintk(XENLOG_ERR, "%s%s: check against %s build-id failed!\n",
-                XSPLICE, payload->name, name);
+                LIVEPATCH, payload->name, name);
         return -EINVAL;
     }
 
     return 0;
 }
 
-static int xsplice_action(xen_sysctl_xsplice_action_t *action)
+static int livepatch_action(xen_sysctl_livepatch_action_t *action)
 {
     struct payload *data;
-    char n[XEN_XSPLICE_NAME_SIZE];
+    char n[XEN_LIVEPATCH_NAME_SIZE];
     int rc;
 
     rc = get_name(&action->name, n);
@@ -1381,8 +1381,8 @@ static int xsplice_action(xen_sysctl_xsplice_action_t *action)
 
     switch ( action->cmd )
     {
-    case XSPLICE_ACTION_UNLOAD:
-        if ( data->state == XSPLICE_STATE_CHECKED )
+    case LIVEPATCH_ACTION_UNLOAD:
+        if ( data->state == LIVEPATCH_STATE_CHECKED )
         {
             free_payload(data);
             /* No touching 'data' from here on! */
@@ -1392,8 +1392,8 @@ static int xsplice_action(xen_sysctl_xsplice_action_t *action)
             rc = -EINVAL;
         break;
 
-    case XSPLICE_ACTION_REVERT:
-        if ( data->state == XSPLICE_STATE_APPLIED )
+    case LIVEPATCH_ACTION_REVERT:
+        if ( data->state == LIVEPATCH_STATE_APPLIED )
         {
             const struct payload *p;
 
@@ -1403,7 +1403,7 @@ static int xsplice_action(xen_sysctl_xsplice_action_t *action)
             if ( p != data )
             {
                 dprintk(XENLOG_ERR, "%s%s: can't unload. Top is %s!\n",
-                        XSPLICE, data->name, p->name);
+                        LIVEPATCH, data->name, p->name);
                 rc = -EBUSY;
                 break;
             }
@@ -1412,8 +1412,8 @@ static int xsplice_action(xen_sysctl_xsplice_action_t *action)
         }
         break;
 
-    case XSPLICE_ACTION_APPLY:
-        if ( data->state == XSPLICE_STATE_CHECKED )
+    case LIVEPATCH_ACTION_APPLY:
+        if ( data->state == LIVEPATCH_STATE_CHECKED )
         {
             rc = build_id_dep(data, !!list_empty(&applied_list));
             if ( rc )
@@ -1423,8 +1423,8 @@ static int xsplice_action(xen_sysctl_xsplice_action_t *action)
         }
         break;
 
-    case XSPLICE_ACTION_REPLACE:
-        if ( data->state == XSPLICE_STATE_CHECKED )
+    case LIVEPATCH_ACTION_REPLACE:
+        if ( data->state == LIVEPATCH_STATE_CHECKED )
         {
             rc = build_id_dep(data, 1 /* against hypervisor. */);
             if ( rc )
@@ -1445,29 +1445,29 @@ static int xsplice_action(xen_sysctl_xsplice_action_t *action)
     return rc;
 }
 
-int xsplice_op(xen_sysctl_xsplice_op_t *xsplice)
+int livepatch_op(xen_sysctl_livepatch_op_t *livepatch)
 {
     int rc;
 
-    if ( xsplice->pad )
+    if ( livepatch->pad )
         return -EINVAL;
 
-    switch ( xsplice->cmd )
+    switch ( livepatch->cmd )
     {
-    case XEN_SYSCTL_XSPLICE_UPLOAD:
-        rc = xsplice_upload(&xsplice->u.upload);
+    case XEN_SYSCTL_LIVEPATCH_UPLOAD:
+        rc = livepatch_upload(&livepatch->u.upload);
         break;
 
-    case XEN_SYSCTL_XSPLICE_GET:
-        rc = xsplice_get(&xsplice->u.get);
+    case XEN_SYSCTL_LIVEPATCH_GET:
+        rc = livepatch_get(&livepatch->u.get);
         break;
 
-    case XEN_SYSCTL_XSPLICE_LIST:
-        rc = xsplice_list(&xsplice->u.list);
+    case XEN_SYSCTL_LIVEPATCH_LIST:
+        rc = livepatch_list(&livepatch->u.list);
         break;
 
-    case XEN_SYSCTL_XSPLICE_ACTION:
-        rc = xsplice_action(&xsplice->u.action);
+    case XEN_SYSCTL_LIVEPATCH_ACTION:
+        rc = livepatch_action(&livepatch->u.action);
         break;
 
     default:
@@ -1480,7 +1480,7 @@ int xsplice_op(xen_sysctl_xsplice_op_t *xsplice)
 
 static const char *state2str(unsigned int state)
 {
-#define STATE(x) [XSPLICE_STATE_##x] = #x
+#define STATE(x) [LIVEPATCH_STATE_##x] = #x
     static const char *const names[] = {
             STATE(CHECKED),
             STATE(APPLIED),
@@ -1493,14 +1493,14 @@ static const char *state2str(unsigned int state)
     return names[state];
 }
 
-static void xsplice_printall(unsigned char key)
+static void livepatch_printall(unsigned char key)
 {
     struct payload *data;
     const void *binary_id = NULL;
     unsigned int len = 0;
     unsigned int i;
 
-    printk("'%c' pressed - Dumping all xsplice patches\n", key);
+    printk("'%c' pressed - Dumping all livepatch patches\n", key);
 
     if ( !xen_build_id(&binary_id, &len) )
         printk("build-id: %*phN\n", len, binary_id);
@@ -1519,7 +1519,7 @@ static void xsplice_printall(unsigned char key)
 
         for ( i = 0; i < data->nfuncs; i++ )
         {
-            struct xsplice_patch_func *f = &(data->funcs[i]);
+            struct livepatch_func *f = &(data->funcs[i]);
             printk("    %s patch %p(%u) with %p (%u)\n",
                    f->name, f->old_addr, f->old_size, f->new_addr, f->new_size);
 
@@ -1544,20 +1544,20 @@ static void xsplice_printall(unsigned char key)
     spin_unlock(&payload_lock);
 }
 
-static int __init xsplice_init(void)
+static int __init livepatch_init(void)
 {
     const void *binary_id;
     unsigned int len;
 
     if ( !xen_build_id(&binary_id, &len) )
-        printk(XENLOG_INFO XSPLICE ": build-id: %*phN\n", len, binary_id);
+        printk(XENLOG_INFO LIVEPATCH ": build-id: %*phN\n", len, binary_id);
 
-    register_keyhandler('x', xsplice_printall, "print xsplicing info", 1);
+    register_keyhandler('x', livepatch_printall, "print livepatch info", 1);
 
-    arch_xsplice_init();
+    arch_livepatch_init();
     return 0;
 }
-__initcall(xsplice_init);
+__initcall(livepatch_init);
 
 /*
  * Local variables:

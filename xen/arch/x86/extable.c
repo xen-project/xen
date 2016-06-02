@@ -7,7 +7,7 @@
 #include <xen/spinlock.h>
 #include <asm/uaccess.h>
 #include <xen/virtual_region.h>
-#include <xen/xsplice.h>
+#include <xen/livepatch.h>
 
 #define EX_FIELD(ptr, field) ((unsigned long)&(ptr)->field + (ptr)->field)
 
@@ -21,7 +21,7 @@ static inline unsigned long ex_cont(const struct exception_table_entry *x)
 	return EX_FIELD(x, cont);
 }
 
-static int init_or_xsplice cmp_ex(const void *a, const void *b)
+static int init_or_livepatch cmp_ex(const void *a, const void *b)
 {
 	const struct exception_table_entry *l = a, *r = b;
 	unsigned long lip = ex_addr(l);
@@ -36,7 +36,7 @@ static int init_or_xsplice cmp_ex(const void *a, const void *b)
 }
 
 #ifndef swap_ex
-static void init_or_xsplice swap_ex(void *a, void *b, int size)
+static void init_or_livepatch swap_ex(void *a, void *b, int size)
 {
 	struct exception_table_entry *l = a, *r = b, tmp;
 	long delta = b - a;
@@ -49,7 +49,7 @@ static void init_or_xsplice swap_ex(void *a, void *b, int size)
 }
 #endif
 
-void init_or_xsplice sort_exception_table(struct exception_table_entry *start,
+void init_or_livepatch sort_exception_table(struct exception_table_entry *start,
                                  const struct exception_table_entry *stop)
 {
     sort(start, stop - start,

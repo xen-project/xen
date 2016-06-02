@@ -192,9 +192,9 @@ config SCHED_DEFAULT
 
 endmenu
 
-# Enable/Disable xsplice support
-config XSPLICE
-	bool "xSplice live patching support (TECH PREVIEW)"
+# Enable/Disable live patching support
+config LIVEPATCH
+	bool "Live patching support (TECH PREVIEW)"
 	default n
 	depends on X86 && HAS_BUILD_ID = "y"
 	---help---
@@ -207,13 +207,13 @@ config XSPLICE
 config FAST_SYMBOL_LOOKUP
 	bool "Fast symbol lookup (bigger binary)"
 	default y
-	depends on XSPLICE
+	depends on LIVEPATCH
 	---help---
 	  When searching for symbol addresses we can use the built-in system
 	  that is optimized for searching symbols using addresses as the key.
 	  However using it for the inverse (find address using the symbol name)
 	  it is slow. This extra data and code (~55kB) speeds up the search.
-	  The only user of this is xSplice.
+	  The only user of this is Live patching.
 
 	  If unsure, say Y.
 endmenu

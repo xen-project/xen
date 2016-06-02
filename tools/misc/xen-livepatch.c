@@ -20,8 +20,8 @@ static xc_interface *xch;
 void show_help(void)
 {
     fprintf(stderr,
-            "xen-xsplice: Xsplice test tool\n"
-            "Usage: xen-xsplice <command> [args]\n"
+            "xen-livepatch: live patching test tool\n"
+            "Usage: xen-livepatch <command> [args]\n"
             " <name> An unique name of payload. Up to %d characters.\n"
             "Commands:\n"
             "  help                   display this help\n"
@@ -33,7 +33,7 @@ void show_help(void)
             "  unload <name>          unload name <name> patch.\n"
             "  load  <file>           upload and apply <file>.\n"
             "                         name is the <file> name\n",
-            XEN_XSPLICE_NAME_SIZE);
+            XEN_LIVEPATCH_NAME_SIZE);
 }
 
 /* wrapper function */
@@ -47,7 +47,7 @@ static int help_func(int argc, char *argv[])
 
 static const char *state2str(unsigned int state)
 {
-#define STATE(x) [XSPLICE_STATE_##x] = #x
+#define STATE(x) [LIVEPATCH_STATE_##x] = #x
     static const char *const names[] = {
             STATE(CHECKED),
             STATE(APPLIED),
@@ -64,7 +64,7 @@ static const char *state2str(unsigned int state)
 static int list_func(int argc, char *argv[])
 {
     unsigned int idx, done, left, i;
-    xen_xsplice_status_t *info = NULL;
+    xen_livepatch_status_t *info = NULL;
     char *name = NULL;
     uint32_t *len = NULL;
     int rc = ENOMEM;
@@ -78,7 +78,7 @@ static int list_func(int argc, char *argv[])
     info = malloc(sizeof(*info) * MAX_LEN);
     if ( !info )
         return rc;
-    name = malloc(sizeof(*name) * XEN_XSPLICE_NAME_SIZE * MAX_LEN);
+    name = malloc(sizeof(*name) * XEN_LIVEPATCH_NAME_SIZE * MAX_LEN);
     if ( !name )
     {
         free(info);
@@ -97,9 +97,9 @@ static int list_func(int argc, char *argv[])
         done = 0;
         /* The memset is done to catch errors. */
         memset(info, 'A', sizeof(*info) * MAX_LEN);
-        memset(name, 'B', sizeof(*name) * MAX_LEN * XEN_XSPLICE_NAME_SIZE);
+        memset(name, 'B', sizeof(*name) * MAX_LEN * XEN_LIVEPATCH_NAME_SIZE);
         memset(len, 'C', sizeof(*len) * MAX_LEN);
-        rc = xc_xsplice_list(xch, MAX_LEN, idx, info, name, len, &done, &left);
+        rc = xc_livepatch_list(xch, MAX_LEN, idx, info, name, len, &done, &left);
         if ( rc )
         {
             fprintf(stderr, "Failed to list %d/%d: %d(%s)!\n",
@@ -113,8 +113,8 @@ static int list_func(int argc, char *argv[])
             char *str;
 
             sz = len[i];
-            str = name + (i * XEN_XSPLICE_NAME_SIZE);
-            for ( j = sz; j < XEN_XSPLICE_NAME_SIZE; j++ )
+            str = name + (i * XEN_LIVEPATCH_NAME_SIZE);
+            for ( j = sz; j < XEN_LIVEPATCH_NAME_SIZE; j++ )
                 str[j] = '\0';
 
             printf("%-40s| %s", str, state2str(info[i].state));
@@ -136,14 +136,14 @@ static int list_func(int argc, char *argv[])
 static int get_name(int argc, char *argv[], char *name)
 {
     ssize_t len = strlen(argv[0]);
-    if ( len > XEN_XSPLICE_NAME_SIZE )
+    if ( len > XEN_LIVEPATCH_NAME_SIZE )
     {
-        fprintf(stderr, "ID MUST be %d characters!\n", XEN_XSPLICE_NAME_SIZE);
+        fprintf(stderr, "ID MUST be %d characters!\n", XEN_LIVEPATCH_NAME_SIZE);
         errno = EINVAL;
         return errno;
     }
     /* Don't want any funny strings from the stack. */
-    memset(name, 0, XEN_XSPLICE_NAME_SIZE);
+    memset(name, 0, XEN_LIVEPATCH_NAME_SIZE);
     strncpy(name, argv[0], len);
     return 0;
 }
@@ -151,7 +151,7 @@ static int get_name(int argc, char *argv[], char *name)
 static int upload_func(int argc, char *argv[])
 {
     char *filename;
-    char name[XEN_XSPLICE_NAME_SIZE];
+    char name[XEN_LIVEPATCH_NAME_SIZE];
     int fd = 0, rc;
     struct stat buf;
     unsigned char *fbuf;
@@ -192,7 +192,7 @@ static int upload_func(int argc, char *argv[])
         return errno;
     }
     printf("Uploading %s (%zu bytes)\n", filename, len);
-    rc = xc_xsplice_upload(xch, name, fbuf, len);
+    rc = xc_livepatch_upload(xch, name, fbuf, len);
     if ( rc )
         fprintf(stderr, "Upload failed: %s, error: %d(%s)!\n",
                 filename, errno, strerror(errno));
@@ -224,25 +224,25 @@ struct {
     int (*function)(xc_interface *xch, char *name, uint32_t timeout);
     unsigned int executed; /* Has the function been called?. */
 } action_options[] = {
-    {   .allow = XSPLICE_STATE_CHECKED,
-        .expected = XSPLICE_STATE_APPLIED,
+    {   .allow = LIVEPATCH_STATE_CHECKED,
+        .expected = LIVEPATCH_STATE_APPLIED,
         .name = "apply",
-        .function = xc_xsplice_apply,
+        .function = xc_livepatch_apply,
     },
-    {   .allow = XSPLICE_STATE_APPLIED,
-        .expected = XSPLICE_STATE_CHECKED,
+    {   .allow = LIVEPATCH_STATE_APPLIED,
+        .expected = LIVEPATCH_STATE_CHECKED,
         .name = "revert",
-        .function = xc_xsplice_revert,
+        .function = xc_livepatch_revert,
     },
-    {   .allow = XSPLICE_STATE_CHECKED,
+    {   .allow = LIVEPATCH_STATE_CHECKED,
         .expected = -XEN_ENOENT,
         .name = "unload",
-        .function = xc_xsplice_unload,
+        .function = xc_livepatch_unload,
     },
-    {   .allow = XSPLICE_STATE_CHECKED,
-        .expected = XSPLICE_STATE_APPLIED,
+    {   .allow = LIVEPATCH_STATE_CHECKED,
+        .expected = LIVEPATCH_STATE_APPLIED,
         .name = "replace",
-        .function = xc_xsplice_replace,
+        .function = xc_livepatch_replace,
     },
 };
 
@@ -253,9 +253,9 @@ struct {
 
 int action_func(int argc, char *argv[], unsigned int idx)
 {
-    char name[XEN_XSPLICE_NAME_SIZE];
+    char name[XEN_LIVEPATCH_NAME_SIZE];
     int rc, original_state;
-    xen_xsplice_status_t status;
+    xen_livepatch_status_t status;
     unsigned int retry = 0;
 
     if ( argc != 1 )
@@ -271,7 +271,7 @@ int action_func(int argc, char *argv[], unsigned int idx)
         return EINVAL;
 
     /* Check initial status. */
-    rc = xc_xsplice_get(xch, name, &status);
+    rc = xc_livepatch_get(xch, name, &status);
     if ( rc )
     {
         fprintf(stderr, "%s failed to get status %d(%s)!\n",
@@ -312,7 +312,7 @@ int action_func(int argc, char *argv[], unsigned int idx)
 
     original_state = status.state;
     do {
-        rc = xc_xsplice_get(xch, name, &status);
+        rc = xc_livepatch_get(xch, name, &status);
         if ( rc )
         {
             rc = -errno;
@@ -432,7 +432,7 @@ int main(int argc, char *argv[])
         if ( j == ARRAY_SIZE(action_options) )
         {
             fprintf(stderr, "Unrecognised command '%s' -- try "
-                   "'xen-xsplice help'\n", argv[1]);
+                   "'xen-livepatch help'\n", argv[1]);
             return 1;
         }
     } else

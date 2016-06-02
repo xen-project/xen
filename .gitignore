@@ -182,7 +182,7 @@ tools/misc/xen_cpuperf
 tools/misc/xen-cpuid
 tools/misc/xen-detect
 tools/misc/xen-tmem-list-parse
-tools/misc/xen-xsplice
+tools/misc/xen-livepatch
 tools/misc/xenperf
 tools/misc/xenpm
 tools/misc/xen-hvmctx
@@ -247,9 +247,9 @@ xen/arch/x86/efi/check.efi
 xen/arch/x86/efi/disabled
 xen/arch/x86/efi/mkreloc
 xen/arch/x86/test/config.h
-xen/arch/x86/test/xen_hello_world.xsplice
-xen/arch/x86/test/xen_bye_world.xsplice
-xen/arch/x86/test/xen_replace_world.xsplice
+xen/arch/x86/test/xen_hello_world.livepatch
+xen/arch/x86/test/xen_bye_world.livepatch
+xen/arch/x86/test/xen_replace_world.livepatch
 xen/arch/*/efi/boot.c
 xen/arch/*/efi/compat.c
 xen/arch/*/efi/efi.h

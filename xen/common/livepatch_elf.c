@@ -5,11 +5,12 @@
 #include <xen/errno.h>
 #include <xen/lib.h>
 #include <xen/symbols.h>
-#include <xen/xsplice_elf.h>
-#include <xen/xsplice.h>
+#include <xen/livepatch_elf.h>
+#include <xen/livepatch.h>
 
-const struct xsplice_elf_sec *xsplice_elf_sec_by_name(const struct xsplice_elf *elf,
-                                                      const char *name)
+const struct livepatch_elf_sec *
+livepatch_elf_sec_by_name(const struct livepatch_elf *elf,
+                          const char *name)
 {
     unsigned int i;
 
@@ -22,7 +23,7 @@ const struct xsplice_elf_sec *xsplice_elf_sec_by_name(const struct xsplice_elf *
     return NULL;
 }
 
-static int elf_verify_strtab(const struct xsplice_elf_sec *sec)
+static int elf_verify_strtab(const struct livepatch_elf_sec *sec)
 {
     const Elf_Shdr *s;
     const char *contents;
@@ -43,25 +44,25 @@ static int elf_verify_strtab(const struct xsplice_elf_sec *sec)
     return 0;
 }
 
-static int elf_resolve_sections(struct xsplice_elf *elf, const void *data)
+static int elf_resolve_sections(struct livepatch_elf *elf, const void *data)
 {
-    struct xsplice_elf_sec *sec;
+    struct livepatch_elf_sec *sec;
     unsigned int i;
     Elf_Off delta;
     int rc;
 
-    /* xsplice_elf_load sanity checked e_shnum. */
-    sec = xmalloc_array(struct xsplice_elf_sec, elf->hdr->e_shnum);
+    /* livepatch_elf_load sanity checked e_shnum. */
+    sec = xmalloc_array(struct livepatch_elf_sec, elf->hdr->e_shnum);
     if ( !sec )
     {
-        dprintk(XENLOG_ERR, XSPLICE"%s: Could not allocate memory for section table!\n",
+        dprintk(XENLOG_ERR, LIVEPATCH"%s: Could not allocate memory for section table!\n",
                elf->name);
         return -ENOMEM;
     }
 
     elf->sec = sec;
 
-    /* e_shoff and e_shnum overflow checks are done in xsplice_header_check. */
+    /* e_shoff and e_shnum overflow checks are done in livepatch_header_check. */
     delta = elf->hdr->e_shoff + elf->hdr->e_shnum * elf->hdr->e_shentsize;
     ASSERT(delta <= elf->len);
 
@@ -80,7 +81,7 @@ static int elf_resolve_sections(struct xsplice_elf *elf, const void *data)
              (sec[i].sec->sh_type != SHT_NOBITS && /* Skip SHT_NOBITS */
               (delta > elf->len || (delta + sec[i].sec->sh_size > elf->len))) )
         {
-            dprintk(XENLOG_ERR, XSPLICE "%s: Section [%u] data %s of payload!\n",
+            dprintk(XENLOG_ERR, LIVEPATCH "%s: Section [%u] data %s of payload!\n",
                     elf->name, i,
                     delta < sizeof(Elf_Ehdr) ? "at ELF header" : "is past end");
             return -EINVAL;
@@ -94,7 +95,7 @@ static int elf_resolve_sections(struct xsplice_elf *elf, const void *data)
         {
             if ( elf->symtab )
             {
-                dprintk(XENLOG_ERR, XSPLICE "%s: Unsupported multiple symbol tables!\n",
+                dprintk(XENLOG_ERR, LIVEPATCH "%s: Unsupported multiple symbol tables!\n",
                         elf->name);
                 return -EOPNOTSUPP;
             }
@@ -108,7 +109,7 @@ static int elf_resolve_sections(struct xsplice_elf *elf, const void *data)
              */
             if ( elf->symtab->sec->sh_link >= elf->hdr->e_shnum )
             {
-                dprintk(XENLOG_ERR, XSPLICE
+                dprintk(XENLOG_ERR, LIVEPATCH
                         "%s: Symbol table idx (%u) to strtab past end (%u)\n",
                         elf->name, elf->symtab->sec->sh_link,
                         elf->hdr->e_shnum);
@@ -119,7 +120,7 @@ static int elf_resolve_sections(struct xsplice_elf *elf, const void *data)
 
     if ( !elf->symtab )
     {
-        dprintk(XENLOG_ERR, XSPLICE "%s: No symbol table found!\n",
+        dprintk(XENLOG_ERR, LIVEPATCH "%s: No symbol table found!\n",
                 elf->name);
         return -EINVAL;
     }
@@ -128,7 +129,7 @@ static int elf_resolve_sections(struct xsplice_elf *elf, const void *data)
          elf->symtab->sec->sh_entsize < sizeof(Elf_Sym) ||
          elf->symtab->sec->sh_size % elf->symtab->sec->sh_entsize )
     {
-        dprintk(XENLOG_ERR, XSPLICE "%s: Symbol table header is corrupted!\n",
+        dprintk(XENLOG_ERR, LIVEPATCH "%s: Symbol table header is corrupted!\n",
                 elf->name);
         return -EINVAL;
     }
@@ -142,19 +143,19 @@ static int elf_resolve_sections(struct xsplice_elf *elf, const void *data)
     rc = elf_verify_strtab(elf->strtab);
     if ( rc )
     {
-        dprintk(XENLOG_ERR, XSPLICE "%s: String table section is corrupted\n",
+        dprintk(XENLOG_ERR, LIVEPATCH "%s: String table section is corrupted\n",
                 elf->name);
     }
 
     return rc;
 }
 
-static int elf_resolve_section_names(struct xsplice_elf *elf, const void *data)
+static int elf_resolve_section_names(struct livepatch_elf *elf, const void *data)
 {
     const char *shstrtab;
     unsigned int i;
     Elf_Off offset, delta;
-    struct xsplice_elf_sec *sec;
+    struct livepatch_elf_sec *sec;
     int rc;
 
     /*
@@ -167,7 +168,7 @@ static int elf_resolve_section_names(struct xsplice_elf *elf, const void *data)
     rc = elf_verify_strtab(sec);
     if ( rc )
     {
-        dprintk(XENLOG_ERR, XSPLICE "%s: Section string table is corrupted\n",
+        dprintk(XENLOG_ERR, LIVEPATCH "%s: Section string table is corrupted\n",
                 elf->name);
         return rc;
     }
@@ -185,7 +186,7 @@ static int elf_resolve_section_names(struct xsplice_elf *elf, const void *data)
         /* Boundary check on offset of name within the .shstrtab. */
         if ( delta >= sec->sec->sh_size )
         {
-            dprintk(XENLOG_ERR, XSPLICE "%s: Section %u name is not within .shstrtab!\n",
+            dprintk(XENLOG_ERR, LIVEPATCH "%s: Section %u name is not within .shstrtab!\n",
                     elf->name, i);
             return -EINVAL;
         }
@@ -196,10 +197,10 @@ static int elf_resolve_section_names(struct xsplice_elf *elf, const void *data)
     return 0;
 }
 
-static int elf_get_sym(struct xsplice_elf *elf, const void *data)
+static int elf_get_sym(struct livepatch_elf *elf, const void *data)
 {
-    const struct xsplice_elf_sec *symtab_sec, *strtab_sec;
-    struct xsplice_elf_sym *sym;
+    const struct livepatch_elf_sec *symtab_sec, *strtab_sec;
+    struct livepatch_elf_sym *sym;
     unsigned int i, nsym;
     Elf_Off offset;
     Elf_Word delta;
@@ -220,10 +221,10 @@ static int elf_get_sym(struct xsplice_elf *elf, const void *data)
     /* No need to check values as elf_resolve_sections did it. */
     nsym = symtab_sec->sec->sh_size / symtab_sec->sec->sh_entsize;
 
-    sym = xmalloc_array(struct xsplice_elf_sym, nsym);
+    sym = xmalloc_array(struct livepatch_elf_sym, nsym);
     if ( !sym )
     {
-        dprintk(XENLOG_ERR, XSPLICE "%s: Could not allocate memory for symbols\n",
+        dprintk(XENLOG_ERR, LIVEPATCH "%s: Could not allocate memory for symbols\n",
                elf->name);
         return -ENOMEM;
     }
@@ -239,7 +240,7 @@ static int elf_get_sym(struct xsplice_elf *elf, const void *data)
         /* Boundary check within the .strtab. */
         if ( delta >= strtab_sec->sec->sh_size )
         {
-            dprintk(XENLOG_ERR, XSPLICE "%s: Symbol [%u] name is not within .strtab!\n",
+            dprintk(XENLOG_ERR, LIVEPATCH "%s: Symbol [%u] name is not within .strtab!\n",
                     elf->name, i);
             return -EINVAL;
         }
@@ -252,7 +253,7 @@ static int elf_get_sym(struct xsplice_elf *elf, const void *data)
     return 0;
 }
 
-int xsplice_elf_resolve_symbols(struct xsplice_elf *elf)
+int livepatch_elf_resolve_symbols(struct livepatch_elf *elf)
 {
     unsigned int i;
     int rc = 0;
@@ -268,7 +269,7 @@ int xsplice_elf_resolve_symbols(struct xsplice_elf *elf)
         switch ( idx )
         {
         case SHN_COMMON:
-            dprintk(XENLOG_ERR, XSPLICE "%s: Unexpected common symbol: %s\n",
+            dprintk(XENLOG_ERR, LIVEPATCH "%s: Unexpected common symbol: %s\n",
                     elf->name, elf->sym[i].name);
             rc = -EINVAL;
             break;
@@ -277,21 +278,21 @@ int xsplice_elf_resolve_symbols(struct xsplice_elf *elf)
             st_value = symbols_lookup_by_name(elf->sym[i].name);
             if ( !st_value )
             {
-                st_value = xsplice_symbols_lookup_by_name(elf->sym[i].name);
+                st_value = livepatch_symbols_lookup_by_name(elf->sym[i].name);
                 if ( !st_value )
                 {
-                    dprintk(XENLOG_ERR, XSPLICE "%s: Unknown symbol: %s\n",
+                    dprintk(XENLOG_ERR, LIVEPATCH "%s: Unknown symbol: %s\n",
                             elf->name, elf->sym[i].name);
                     rc = -ENOENT;
                     break;
                 }
             }
-            dprintk(XENLOG_DEBUG, XSPLICE "%s: Undefined symbol resolved: %s => %#"PRIxElfAddr"\n",
+            dprintk(XENLOG_DEBUG, LIVEPATCH "%s: Undefined symbol resolved: %s => %#"PRIxElfAddr"\n",
                     elf->name, elf->sym[i].name, st_value);
             break;
 
         case SHN_ABS:
-            dprintk(XENLOG_DEBUG, XSPLICE "%s: Absolute symbol: %s => %#"PRIxElfAddr"\n",
+            dprintk(XENLOG_DEBUG, LIVEPATCH "%s: Absolute symbol: %s => %#"PRIxElfAddr"\n",
                     elf->name, elf->sym[i].name, sym->st_value);
             break;
 
@@ -304,7 +305,7 @@ int xsplice_elf_resolve_symbols(struct xsplice_elf *elf)
 
             if ( rc )
             {
-                dprintk(XENLOG_ERR, XSPLICE "%s: Out of bounds symbol section %#x\n",
+                dprintk(XENLOG_ERR, LIVEPATCH "%s: Out of bounds symbol section %#x\n",
                         elf->name, idx);
                 break;
             }
@@ -315,7 +316,7 @@ int xsplice_elf_resolve_symbols(struct xsplice_elf *elf)
 
             st_value += (unsigned long)elf->sec[idx].load_addr;
             if ( elf->sym[i].name )
-                dprintk(XENLOG_DEBUG, XSPLICE "%s: Symbol resolved: %s => %#"PRIxElfAddr" (%s)\n",
+                dprintk(XENLOG_DEBUG, LIVEPATCH "%s: Symbol resolved: %s => %#"PRIxElfAddr" (%s)\n",
                        elf->name, elf->sym[i].name,
                        st_value, elf->sec[idx].name);
         }
@@ -329,9 +330,9 @@ int xsplice_elf_resolve_symbols(struct xsplice_elf *elf)
     return rc;
 }
 
-int xsplice_elf_perform_relocs(struct xsplice_elf *elf)
+int livepatch_elf_perform_relocs(struct livepatch_elf *elf)
 {
-    struct xsplice_elf_sec *r, *base;
+    struct livepatch_elf_sec *r, *base;
     unsigned int i;
     int rc = 0;
 
@@ -357,16 +358,16 @@ int xsplice_elf_perform_relocs(struct xsplice_elf *elf)
 
         if ( r->sec->sh_link != elf->symtab_idx )
         {
-            dprintk(XENLOG_ERR, XSPLICE "%s: Relative link of %s is incorrect (%d, expected=%d)\n",
+            dprintk(XENLOG_ERR, LIVEPATCH "%s: Relative link of %s is incorrect (%d, expected=%d)\n",
                     elf->name, r->name, r->sec->sh_link, elf->symtab_idx);
             rc = -EINVAL;
             break;
         }
 
         if ( r->sec->sh_type == SHT_RELA )
-            rc = arch_xsplice_perform_rela(elf, base, r);
+            rc = arch_livepatch_perform_rela(elf, base, r);
         else /* SHT_REL */
-            rc = arch_xsplice_perform_rel(elf, base, r);
+            rc = arch_livepatch_perform_rel(elf, base, r);
 
         if ( rc )
             break;
@@ -375,21 +376,21 @@ int xsplice_elf_perform_relocs(struct xsplice_elf *elf)
     return rc;
 }
 
-static int xsplice_header_check(const struct xsplice_elf *elf)
+static int livepatch_header_check(const struct livepatch_elf *elf)
 {
     const Elf_Ehdr *hdr = elf->hdr;
     int rc;
 
     if ( sizeof(*elf->hdr) > elf->len )
     {
-        dprintk(XENLOG_ERR, XSPLICE "%s: Section header is bigger than payload!\n",
+        dprintk(XENLOG_ERR, LIVEPATCH "%s: Section header is bigger than payload!\n",
                 elf->name);
         return -EINVAL;
     }
 
     if ( !IS_ELF(*hdr) )
     {
-        dprintk(XENLOG_ERR, XSPLICE "%s: Not an ELF payload!\n", elf->name);
+        dprintk(XENLOG_ERR, LIVEPATCH "%s: Not an ELF payload!\n", elf->name);
         return -EINVAL;
     }
 
@@ -402,17 +403,17 @@ static int xsplice_header_check(const struct xsplice_elf *elf)
          hdr->e_type != ET_REL ||
          hdr->e_phnum != 0 )
     {
-        dprintk(XENLOG_ERR, XSPLICE "%s: Invalid ELF payload!\n", elf->name);
+        dprintk(XENLOG_ERR, LIVEPATCH "%s: Invalid ELF payload!\n", elf->name);
         return -EOPNOTSUPP;
     }
 
-    rc = arch_xsplice_verify_elf(elf);
+    rc = arch_livepatch_verify_elf(elf);
     if ( rc )
         return rc;
 
     if ( elf->hdr->e_shstrndx == SHN_UNDEF )
     {
-        dprintk(XENLOG_ERR, XSPLICE "%s: Section name idx is undefined!?\n",
+        dprintk(XENLOG_ERR, LIVEPATCH "%s: Section name idx is undefined!?\n",
                 elf->name);
         return -EINVAL;
     }
@@ -420,7 +421,7 @@ static int xsplice_header_check(const struct xsplice_elf *elf)
     /* Arbitrary boundary limit. */
     if ( elf->hdr->e_shnum >= 1024 )
     {
-        dprintk(XENLOG_ERR, XSPLICE "%s: Too many (%u) sections!\n",
+        dprintk(XENLOG_ERR, LIVEPATCH "%s: Too many (%u) sections!\n",
                 elf->name, elf->hdr->e_shnum);
         return -EOPNOTSUPP;
     }
@@ -428,20 +429,20 @@ static int xsplice_header_check(const struct xsplice_elf *elf)
     /* Check that section name index is within the sections. */
     if ( elf->hdr->e_shstrndx >= elf->hdr->e_shnum )
     {
-        dprintk(XENLOG_ERR, XSPLICE "%s: Section name idx (%u) is past end of sections (%u)!\n",
+        dprintk(XENLOG_ERR, LIVEPATCH "%s: Section name idx (%u) is past end of sections (%u)!\n",
                 elf->name, elf->hdr->e_shstrndx, elf->hdr->e_shnum);
         return -EINVAL;
     }
 
     if ( elf->hdr->e_shoff >= elf->len )
     {
-        dprintk(XENLOG_ERR, XSPLICE "%s: Bogus e_shoff!\n", elf->name);
+        dprintk(XENLOG_ERR, LIVEPATCH "%s: Bogus e_shoff!\n", elf->name);
         return -EINVAL;
     }
 
     if ( elf->hdr->e_shentsize < sizeof(Elf_Shdr) )
     {
-        dprintk(XENLOG_ERR, XSPLICE "%s: Section header size is %u! Expected %zu!?\n",
+        dprintk(XENLOG_ERR, LIVEPATCH "%s: Section header size is %u! Expected %zu!?\n",
                 elf->name, elf->hdr->e_shentsize, sizeof(Elf_Shdr));
         return -EINVAL;
     }
@@ -449,7 +450,7 @@ static int xsplice_header_check(const struct xsplice_elf *elf)
     if ( ((elf->len - elf->hdr->e_shoff) / elf->hdr->e_shentsize) <
          elf->hdr->e_shnum )
     {
-        dprintk(XENLOG_ERR, XSPLICE "%s: Section header size is corrupted!\n",
+        dprintk(XENLOG_ERR, LIVEPATCH "%s: Section header size is corrupted!\n",
                 elf->name);
         return -EINVAL;
     }
@@ -457,13 +458,13 @@ static int xsplice_header_check(const struct xsplice_elf *elf)
     return 0;
 }
 
-int xsplice_elf_load(struct xsplice_elf *elf, const void *data)
+int livepatch_elf_load(struct livepatch_elf *elf, const void *data)
 {
     int rc;
 
     elf->hdr = data;
 
-    rc = xsplice_header_check(elf);
+    rc = livepatch_header_check(elf);
     if ( rc )
         return rc;
 
@@ -482,7 +483,7 @@ int xsplice_elf_load(struct xsplice_elf *elf, const void *data)
     return 0;
 }
 
-void xsplice_elf_free(struct xsplice_elf *elf)
+void livepatch_elf_free(struct livepatch_elf *elf)
 {
     xfree(elf->sec);
     elf->sec = NULL;

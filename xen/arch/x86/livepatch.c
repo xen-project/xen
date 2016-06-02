@@ -8,26 +8,26 @@
 #include <xen/mm.h>
 #include <xen/pfn.h>
 #include <xen/vmap.h>
-#include <xen/xsplice_elf.h>
-#include <xen/xsplice.h>
+#include <xen/livepatch_elf.h>
+#include <xen/livepatch.h>
 
 #include <asm/nmi.h>
 
 #define PATCH_INSN_SIZE 5
 
-void arch_xsplice_patching_enter(void)
+void arch_livepatch_quiesce(void)
 {
     /* Disable WP to allow changes to read-only pages. */
     write_cr0(read_cr0() & ~X86_CR0_WP);
 }
 
-void arch_xsplice_patching_leave(void)
+void arch_livepatch_revive(void)
 {
     /* Reinstate WP. */
     write_cr0(read_cr0() | X86_CR0_WP);
 }
 
-int arch_xsplice_verify_func(const struct xsplice_patch_func *func)
+int arch_livepatch_verify_func(const struct livepatch_func *func)
 {
     /* No NOP patching yet. */
     if ( !func->new_size )
@@ -39,7 +39,7 @@ int arch_xsplice_verify_func(const struct xsplice_patch_func *func)
     return 0;
 }
 
-void arch_xsplice_apply_jmp(struct xsplice_patch_func *func)
+void arch_livepatch_apply_jmp(struct livepatch_func *func)
 {
     int32_t val;
     uint8_t *old_ptr;
@@ -55,13 +55,13 @@ void arch_xsplice_apply_jmp(struct xsplice_patch_func *func)
     memcpy(old_ptr, &val, sizeof(val));
 }
 
-void arch_xsplice_revert_jmp(const struct xsplice_patch_func *func)
+void arch_livepatch_revert_jmp(const struct livepatch_func *func)
 {
     memcpy(func->old_addr, func->opaque, PATCH_INSN_SIZE);
 }
 
 /* Serialise the CPU pipeline. */
-void arch_xsplice_post_action(void)
+void arch_livepatch_post_action(void)
 {
     cpuid_eax(0);
 }
@@ -77,17 +77,17 @@ static int mask_nmi_callback(const struct cpu_user_regs *regs, int cpu)
     return 1;
 }
 
-void arch_xsplice_mask(void)
+void arch_livepatch_mask(void)
 {
     saved_nmi_callback = set_nmi_callback(mask_nmi_callback);
 }
 
-void arch_xsplice_unmask(void)
+void arch_livepatch_unmask(void)
 {
     set_nmi_callback(saved_nmi_callback);
 }
 
-int arch_xsplice_verify_elf(const struct xsplice_elf *elf)
+int arch_livepatch_verify_elf(const struct livepatch_elf *elf)
 {
 
     const Elf_Ehdr *hdr = elf->hdr;
@@ -96,7 +96,7 @@ int arch_xsplice_verify_elf(const struct xsplice_elf *elf)
          hdr->e_ident[EI_CLASS] != ELFCLASS64 ||
          hdr->e_ident[EI_DATA] != ELFDATA2LSB )
     {
-        dprintk(XENLOG_ERR, XSPLICE "%s: Unsupported ELF Machine type!\n",
+        dprintk(XENLOG_ERR, LIVEPATCH "%s: Unsupported ELF Machine type!\n",
                 elf->name);
         return -EOPNOTSUPP;
     }
@@ -104,18 +104,18 @@ int arch_xsplice_verify_elf(const struct xsplice_elf *elf)
     return 0;
 }
 
-int arch_xsplice_perform_rel(struct xsplice_elf *elf,
-                             const struct xsplice_elf_sec *base,
-                             const struct xsplice_elf_sec *rela)
+int arch_livepatch_perform_rel(struct livepatch_elf *elf,
+                               const struct livepatch_elf_sec *base,
+                               const struct livepatch_elf_sec *rela)
 {
-    dprintk(XENLOG_ERR, XSPLICE "%s: SHT_REL relocation unsupported\n",
+    dprintk(XENLOG_ERR, LIVEPATCH "%s: SHT_REL relocation unsupported\n",
             elf->name);
     return -EOPNOTSUPP;
 }
 
-int arch_xsplice_perform_rela(struct xsplice_elf *elf,
-                              const struct xsplice_elf_sec *base,
-                              const struct xsplice_elf_sec *rela)
+int arch_livepatch_perform_rela(struct livepatch_elf *elf,
+                                const struct livepatch_elf_sec *base,
+                                const struct livepatch_elf_sec *rela)
 {
     const Elf_RelA *r;
     unsigned int symndx, i;
@@ -129,7 +129,7 @@ int arch_xsplice_perform_rela(struct xsplice_elf *elf,
     if ( rela->sec->sh_entsize < sizeof(Elf_RelA) ||
          rela->sec->sh_size % rela->sec->sh_entsize )
     {
-        dprintk(XENLOG_ERR, XSPLICE "%s: Section relative header is corrupted!\n",
+        dprintk(XENLOG_ERR, LIVEPATCH "%s: Section relative header is corrupted!\n",
                 elf->name);
         return -EINVAL;
     }
@@ -142,7 +142,7 @@ int arch_xsplice_perform_rela(struct xsplice_elf *elf,
 
         if ( symndx > elf->nsym )
         {
-            dprintk(XENLOG_ERR, XSPLICE "%s: Relative relocation wants symbol@%u which is past end!\n",
+            dprintk(XENLOG_ERR, LIVEPATCH "%s: Relative relocation wants symbol@%u which is past end!\n",
                     elf->name, symndx);
             return -EINVAL;
         }
@@ -181,14 +181,14 @@ int arch_xsplice_perform_rela(struct xsplice_elf *elf,
             *(int32_t *)dest = val;
             if ( (int64_t)val != *(int32_t *)dest )
             {
-                dprintk(XENLOG_ERR, XSPLICE "%s: Overflow in relocation %u in %s for %s!\n",
+                dprintk(XENLOG_ERR, LIVEPATCH "%s: Overflow in relocation %u in %s for %s!\n",
                         elf->name, i, rela->name, base->name);
                 return -EOVERFLOW;
             }
             break;
 
         default:
-            dprintk(XENLOG_ERR, XSPLICE "%s: Unhandled relocation %lu\n",
+            dprintk(XENLOG_ERR, LIVEPATCH "%s: Unhandled relocation %lu\n",
                     elf->name, ELF64_R_TYPE(r->r_info));
             return -EOPNOTSUPP;
         }
@@ -197,7 +197,7 @@ int arch_xsplice_perform_rela(struct xsplice_elf *elf,
     return 0;
 
  bad_offset:
-    dprintk(XENLOG_ERR, XSPLICE "%s: Relative relocation offset is past %s section!\n",
+    dprintk(XENLOG_ERR, LIVEPATCH "%s: Relative relocation offset is past %s section!\n",
             elf->name, base->name);
     return -EINVAL;
 }
@@ -207,7 +207,7 @@ int arch_xsplice_perform_rela(struct xsplice_elf *elf,
  * we secure the memory by putting in the proper page table attributes
  * for the desired type.
  */
-int arch_xsplice_secure(const void *va, unsigned int pages, enum va_type type)
+int arch_livepatch_secure(const void *va, unsigned int pages, enum va_type type)
 {
     unsigned long start = (unsigned long)va;
     unsigned int flag;
@@ -215,9 +215,9 @@ int arch_xsplice_secure(const void *va, unsigned int pages, enum va_type type)
     ASSERT(va);
     ASSERT(pages);
 
-    if ( type == XSPLICE_VA_RX )
+    if ( type == LIVEPATCH_VA_RX )
         flag = PAGE_HYPERVISOR_RX;
-    else if ( type == XSPLICE_VA_RW )
+    else if ( type == LIVEPATCH_VA_RW )
         flag = PAGE_HYPERVISOR_RW;
     else
         flag = PAGE_HYPERVISOR_RO;
@@ -227,7 +227,7 @@ int arch_xsplice_secure(const void *va, unsigned int pages, enum va_type type)
     return 0;
 }
 
-void __init arch_xsplice_init(void)
+void __init arch_livepatch_init(void)
 {
     void *start, *end;
 

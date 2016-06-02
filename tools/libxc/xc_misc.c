@@ -696,16 +696,16 @@ int xc_hvm_inject_trap(
     return rc;
 }
 
-int xc_xsplice_upload(xc_interface *xch,
-                      char *name,
-                      unsigned char *payload,
-                      uint32_t size)
+int xc_livepatch_upload(xc_interface *xch,
+                        char *name,
+                        unsigned char *payload,
+                        uint32_t size)
 {
     int rc;
     DECLARE_SYSCTL;
     DECLARE_HYPERCALL_BUFFER(char, local);
     DECLARE_HYPERCALL_BOUNCE(name, 0 /* later */, XC_HYPERCALL_BUFFER_BOUNCE_IN);
-    xen_xsplice_name_t def_name = { .pad = { 0, 0, 0 } };
+    xen_livepatch_name_t def_name = { .pad = { 0, 0, 0 } };
 
     if ( !name || !payload )
     {
@@ -714,7 +714,7 @@ int xc_xsplice_upload(xc_interface *xch,
     }
 
     def_name.size = strlen(name) + 1;
-    if ( def_name.size > XEN_XSPLICE_NAME_SIZE )
+    if ( def_name.size > XEN_LIVEPATCH_NAME_SIZE )
     {
         errno = EINVAL;
         return -1;
@@ -733,14 +733,14 @@ int xc_xsplice_upload(xc_interface *xch,
     }
     memcpy(local, payload, size);
 
-    sysctl.cmd = XEN_SYSCTL_xsplice_op;
-    sysctl.u.xsplice.cmd = XEN_SYSCTL_XSPLICE_UPLOAD;
-    sysctl.u.xsplice.pad = 0;
-    sysctl.u.xsplice.u.upload.size = size;
-    set_xen_guest_handle(sysctl.u.xsplice.u.upload.payload, local);
+    sysctl.cmd = XEN_SYSCTL_livepatch_op;
+    sysctl.u.livepatch.cmd = XEN_SYSCTL_LIVEPATCH_UPLOAD;
+    sysctl.u.livepatch.pad = 0;
+    sysctl.u.livepatch.u.upload.size = size;
+    set_xen_guest_handle(sysctl.u.livepatch.u.upload.payload, local);
 
-    sysctl.u.xsplice.u.upload.name = def_name;
-    set_xen_guest_handle(sysctl.u.xsplice.u.upload.name.name, name);
+    sysctl.u.livepatch.u.upload.name = def_name;
+    set_xen_guest_handle(sysctl.u.livepatch.u.upload.name.name, name);
 
     rc = do_sysctl(xch, &sysctl);
 
@@ -750,14 +750,14 @@ int xc_xsplice_upload(xc_interface *xch,
     return rc;
 }
 
-int xc_xsplice_get(xc_interface *xch,
-                   char *name,
-                   xen_xsplice_status_t *status)
+int xc_livepatch_get(xc_interface *xch,
+                     char *name,
+                     xen_livepatch_status_t *status)
 {
     int rc;
     DECLARE_SYSCTL;
     DECLARE_HYPERCALL_BOUNCE(name, 0 /*adjust later */, XC_HYPERCALL_BUFFER_BOUNCE_IN);
-    xen_xsplice_name_t def_name = { .pad = { 0, 0, 0 } };
+    xen_livepatch_name_t def_name = { .pad = { 0, 0, 0 } };
 
     if ( !name )
     {
@@ -766,7 +766,7 @@ int xc_xsplice_get(xc_interface *xch,
     }
 
     def_name.size = strlen(name) + 1;
-    if ( def_name.size > XEN_XSPLICE_NAME_SIZE )
+    if ( def_name.size > XEN_LIVEPATCH_NAME_SIZE )
     {
         errno = EINVAL;
         return -1;
@@ -777,27 +777,27 @@ int xc_xsplice_get(xc_interface *xch,
     if ( xc_hypercall_bounce_pre(xch, name) )
         return -1;
 
-    sysctl.cmd = XEN_SYSCTL_xsplice_op;
-    sysctl.u.xsplice.cmd = XEN_SYSCTL_XSPLICE_GET;
-    sysctl.u.xsplice.pad = 0;
+    sysctl.cmd = XEN_SYSCTL_livepatch_op;
+    sysctl.u.livepatch.cmd = XEN_SYSCTL_LIVEPATCH_GET;
+    sysctl.u.livepatch.pad = 0;
 
-    sysctl.u.xsplice.u.get.status.state = 0;
-    sysctl.u.xsplice.u.get.status.rc = 0;
+    sysctl.u.livepatch.u.get.status.state = 0;
+    sysctl.u.livepatch.u.get.status.rc = 0;
 
-    sysctl.u.xsplice.u.get.name = def_name;
-    set_xen_guest_handle(sysctl.u.xsplice.u.get.name.name, name);
+    sysctl.u.livepatch.u.get.name = def_name;
+    set_xen_guest_handle(sysctl.u.livepatch.u.get.name.name, name);
 
     rc = do_sysctl(xch, &sysctl);
 
     xc_hypercall_bounce_post(xch, name);
 
-    memcpy(status, &sysctl.u.xsplice.u.get.status, sizeof(*status));
+    memcpy(status, &sysctl.u.livepatch.u.get.status, sizeof(*status));
 
     return rc;
 }
 
 /*
- * The heart of this function is to get an array of xen_xsplice_status_t.
+ * The heart of this function is to get an array of xen_livepatch_status_t.
  *
  * However it is complex because it has to deal with the hypervisor
  * returning some of the requested data or data being stale
@@ -817,10 +817,10 @@ int xc_xsplice_get(xc_interface *xch,
  * number of entries that 'info', 'name', and 'len' arrays can
  * be filled up with.
  *
- * Each entry in the 'name' array is expected to be of XEN_XSPLICE_NAME_SIZE
+ * Each entry in the 'name' array is expected to be of XEN_LIVEPATCH_NAME_SIZE
  * length.
  *
- * Each entry in the 'info' array is expected to be of xen_xsplice_status_t
+ * Each entry in the 'info' array is expected to be of xen_livepatch_status_t
  * structure size.
  *
  * Each entry in the 'len' array is expected to be of uint32_t size.
@@ -834,11 +834,11 @@ int xc_xsplice_get(xc_interface *xch,
  * will contain the number of entries that had been succesfully
  * retrieved (if any).
  */
-int xc_xsplice_list(xc_interface *xch, unsigned int max, unsigned int start,
-                    xen_xsplice_status_t *info,
-                    char *name, uint32_t *len,
-                    unsigned int *done,
-                    unsigned int *left)
+int xc_livepatch_list(xc_interface *xch, unsigned int max, unsigned int start,
+                      xen_livepatch_status_t *info,
+                      char *name, uint32_t *len,
+                      unsigned int *done,
+                      unsigned int *left)
 {
     int rc;
     DECLARE_SYSCTL;
@@ -857,16 +857,16 @@ int xc_xsplice_list(xc_interface *xch, unsigned int max, unsigned int start,
         return -1;
     }
 
-    sysctl.cmd = XEN_SYSCTL_xsplice_op;
-    sysctl.u.xsplice.cmd = XEN_SYSCTL_XSPLICE_LIST;
-    sysctl.u.xsplice.pad = 0;
-    sysctl.u.xsplice.u.list.version = 0;
-    sysctl.u.xsplice.u.list.idx = start;
-    sysctl.u.xsplice.u.list.pad = 0;
+    sysctl.cmd = XEN_SYSCTL_livepatch_op;
+    sysctl.u.livepatch.cmd = XEN_SYSCTL_LIVEPATCH_LIST;
+    sysctl.u.livepatch.pad = 0;
+    sysctl.u.livepatch.u.list.version = 0;
+    sysctl.u.livepatch.u.list.idx = start;
+    sysctl.u.livepatch.u.list.pad = 0;
 
     max_batch_sz = max;
     /* Convience value. */
-    sz = sizeof(*name) * XEN_XSPLICE_NAME_SIZE;
+    sz = sizeof(*name) * XEN_LIVEPATCH_NAME_SIZE;
     *done = 0;
     *left = 0;
     do {
@@ -886,7 +886,7 @@ int xc_xsplice_list(xc_interface *xch, unsigned int max, unsigned int start,
 
         nr = min(max - *done, max_batch_sz);
 
-        sysctl.u.xsplice.u.list.nr = nr;
+        sysctl.u.livepatch.u.list.nr = nr;
         /* Fix the size (may vary between hypercalls). */
         HYPERCALL_BOUNCE_SET_SIZE(info, nr * sizeof(*info));
         HYPERCALL_BOUNCE_SET_SIZE(name, nr * nr);
@@ -908,9 +908,9 @@ int xc_xsplice_list(xc_interface *xch, unsigned int max, unsigned int start,
         if ( rc )
             break;
 
-        set_xen_guest_handle(sysctl.u.xsplice.u.list.status, info);
-        set_xen_guest_handle(sysctl.u.xsplice.u.list.name, name);
-        set_xen_guest_handle(sysctl.u.xsplice.u.list.len, len);
+        set_xen_guest_handle(sysctl.u.livepatch.u.list.status, info);
+        set_xen_guest_handle(sysctl.u.livepatch.u.list.name, name);
+        set_xen_guest_handle(sysctl.u.livepatch.u.list.len, len);
 
         rc = do_sysctl(xch, &sysctl);
         /*
@@ -933,9 +933,9 @@ int xc_xsplice_list(xc_interface *xch, unsigned int max, unsigned int start,
             break;
 
         if ( !version )
-            version = sysctl.u.xsplice.u.list.version;
+            version = sysctl.u.livepatch.u.list.version;
 
-        if ( sysctl.u.xsplice.u.list.version != version )
+        if ( sysctl.u.livepatch.u.list.version != version )
         {
             /* We could make this configurable as parameter? */
             if ( retries++ > 3 )
@@ -945,7 +945,7 @@ int xc_xsplice_list(xc_interface *xch, unsigned int max, unsigned int start,
                 break;
             }
             *done = 0; /* Retry from scratch. */
-            version = sysctl.u.xsplice.u.list.version;
+            version = sysctl.u.livepatch.u.list.version;
             adjust = 1; /* And make sure we continue in the loop. */
             /* No memory leaks. */
             xc_hypercall_bounce_post(xch, info);
@@ -961,7 +961,7 @@ int xc_xsplice_list(xc_interface *xch, unsigned int max, unsigned int start,
             rc = -1;
             break;
         }
-        *left = sysctl.u.xsplice.u.list.nr; /* Total remaining count. */
+        *left = sysctl.u.livepatch.u.list.nr; /* Total remaining count. */
         /* Copy only up 'rc' of data' - we could add 'min(rc,nr) if desired. */
         HYPERCALL_BOUNCE_SET_SIZE(info, (rc * sizeof(*info)));
         HYPERCALL_BOUNCE_SET_SIZE(name, (rc * sz));
@@ -973,7 +973,7 @@ int xc_xsplice_list(xc_interface *xch, unsigned int max, unsigned int start,
         /* And update how many elements of info we have copied into. */
         *done += rc;
         /* Update idx. */
-        sysctl.u.xsplice.u.list.idx = *done;
+        sysctl.u.livepatch.u.list.idx = *done;
     } while ( adjust || (*done < max && *left != 0) );
 
     if ( rc < 0 )
@@ -986,20 +986,20 @@ int xc_xsplice_list(xc_interface *xch, unsigned int max, unsigned int start,
     return rc > 0 ? 0 : rc;
 }
 
-static int _xc_xsplice_action(xc_interface *xch,
-                              char *name,
-                              unsigned int action,
-                              uint32_t timeout)
+static int _xc_livepatch_action(xc_interface *xch,
+                                char *name,
+                                unsigned int action,
+                                uint32_t timeout)
 {
     int rc;
     DECLARE_SYSCTL;
     /* The size is figured out when we strlen(name) */
     DECLARE_HYPERCALL_BOUNCE(name, 0, XC_HYPERCALL_BUFFER_BOUNCE_IN);
-    xen_xsplice_name_t def_name = { .pad = { 0, 0, 0 } };
+    xen_livepatch_name_t def_name = { .pad = { 0, 0, 0 } };
 
     def_name.size = strlen(name) + 1;
 
-    if ( def_name.size > XEN_XSPLICE_NAME_SIZE )
+    if ( def_name.size > XEN_LIVEPATCH_NAME_SIZE )
     {
         errno = EINVAL;
         return -1;
@@ -1010,14 +1010,14 @@ static int _xc_xsplice_action(xc_interface *xch,
     if ( xc_hypercall_bounce_pre(xch, name) )
         return -1;
 
-    sysctl.cmd = XEN_SYSCTL_xsplice_op;
-    sysctl.u.xsplice.cmd = XEN_SYSCTL_XSPLICE_ACTION;
-    sysctl.u.xsplice.pad = 0;
-    sysctl.u.xsplice.u.action.cmd = action;
-    sysctl.u.xsplice.u.action.timeout = timeout;
+    sysctl.cmd = XEN_SYSCTL_livepatch_op;
+    sysctl.u.livepatch.cmd = XEN_SYSCTL_LIVEPATCH_ACTION;
+    sysctl.u.livepatch.pad = 0;
+    sysctl.u.livepatch.u.action.cmd = action;
+    sysctl.u.livepatch.u.action.timeout = timeout;
 
-    sysctl.u.xsplice.u.action.name = def_name;
-    set_xen_guest_handle(sysctl.u.xsplice.u.action.name.name, name);
+    sysctl.u.livepatch.u.action.name = def_name;
+    set_xen_guest_handle(sysctl.u.livepatch.u.action.name.name, name);
 
     rc = do_sysctl(xch, &sysctl);
 
@@ -1026,24 +1026,24 @@ static int _xc_xsplice_action(xc_interface *xch,
     return rc;
 }
 
-int xc_xsplice_apply(xc_interface *xch, char *name, uint32_t timeout)
+int xc_livepatch_apply(xc_interface *xch, char *name, uint32_t timeout)
 {
-    return _xc_xsplice_action(xch, name, XSPLICE_ACTION_APPLY, timeout);
+    return _xc_livepatch_action(xch, name, LIVEPATCH_ACTION_APPLY, timeout);
 }
 
-int xc_xsplice_revert(xc_interface *xch, char *name, uint32_t timeout)
+int xc_livepatch_revert(xc_interface *xch, char *name, uint32_t timeout)
 {
-    return _xc_xsplice_action(xch, name, XSPLICE_ACTION_REVERT, timeout);
+    return _xc_livepatch_action(xch, name, LIVEPATCH_ACTION_REVERT, timeout);
 }
 
-int xc_xsplice_unload(xc_interface *xch, char *name, uint32_t timeout)
+int xc_livepatch_unload(xc_interface *xch, char *name, uint32_t timeout)
 {
-    return _xc_xsplice_action(xch, name, XSPLICE_ACTION_UNLOAD, timeout);
+    return _xc_livepatch_action(xch, name, LIVEPATCH_ACTION_UNLOAD, timeout);
 }
 
-int xc_xsplice_replace(xc_interface *xch, char *name, uint32_t timeout)
+int xc_livepatch_replace(xc_interface *xch, char *name, uint32_t timeout)
 {
-    return _xc_xsplice_action(xch, name, XSPLICE_ACTION_REPLACE, timeout);
+    return _xc_livepatch_action(xch, name, LIVEPATCH_ACTION_REPLACE, timeout);
 }
 
 /*

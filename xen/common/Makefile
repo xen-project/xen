@@ -17,6 +17,7 @@ obj-y += keyhandler.o
 obj-$(CONFIG_KEXEC) += kexec.o
 obj-$(CONFIG_KEXEC) += kimage.o
 obj-y += lib.o
+obj-$(CONFIG_LIVEPATCH) += livepatch.o livepatch_elf.o
 obj-y += lzo.o
 obj-$(CONFIG_HAS_MEM_ACCESS) += mem_access.o
 obj-y += memory.o
@@ -58,8 +59,6 @@ obj-y += vsprintf.o
 obj-y += wait.o
 obj-$(CONFIG_XENOPROF) += xenoprof.o
 obj-y += xmalloc_tlsf.o
-obj-$(CONFIG_XSPLICE) += xsplice.o
-obj-$(CONFIG_XSPLICE) += xsplice_elf.o
 
 obj-bin-$(CONFIG_X86) += $(foreach n,decompress bunzip2 unxz unlzma unlzo unlz4 earlycpio,$(n).init.o)
 

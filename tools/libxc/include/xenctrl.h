@@ -2610,15 +2610,15 @@ const uint32_t *xc_get_feature_deep_deps(uint32_t feature);
 
 #endif
 
-int xc_xsplice_upload(xc_interface *xch,
-                      char *name, unsigned char *payload, uint32_t size);
+int xc_livepatch_upload(xc_interface *xch,
+                        char *name, unsigned char *payload, uint32_t size);
 
-int xc_xsplice_get(xc_interface *xch,
-                   char *name,
-                   xen_xsplice_status_t *status);
+int xc_livepatch_get(xc_interface *xch,
+                     char *name,
+                     xen_livepatch_status_t *status);
 
 /*
- * The heart of this function is to get an array of xen_xsplice_status_t.
+ * The heart of this function is to get an array of xen_livepatch_status_t.
  *
  * However it is complex because it has to deal with the hypervisor
  * returning some of the requested data or data being stale
@@ -2638,10 +2638,10 @@ int xc_xsplice_get(xc_interface *xch,
  * number of entries that 'info', 'name', and 'len' arrays can
  * be filled up with.
  *
- * Each entry in the 'name' array is expected to be of XEN_XSPLICE_NAME_SIZE
+ * Each entry in the 'name' array is expected to be of XEN_LIVEPATCH_NAME_SIZE
  * length.
  *
- * Each entry in the 'info' array is expected to be of xen_xsplice_status_t
+ * Each entry in the 'info' array is expected to be of xen_livepatch_status_t
  * structure size.
  *
  * Each entry in the 'len' array is expected to be of uint32_t size.
@@ -2655,10 +2655,10 @@ int xc_xsplice_get(xc_interface *xch,
  * will contain the number of entries that had been succesfully
  * retrieved (if any).
  */
-int xc_xsplice_list(xc_interface *xch, unsigned int max, unsigned int start,
-                    xen_xsplice_status_t *info, char *name,
-                    uint32_t *len, unsigned int *done,
-                    unsigned int *left);
+int xc_livepatch_list(xc_interface *xch, unsigned int max, unsigned int start,
+                      xen_livepatch_status_t *info, char *name,
+                      uint32_t *len, unsigned int *done,
+                      unsigned int *left);
 
 /*
  * The operations are asynchronous and the hypervisor may take a while
@@ -2666,10 +2666,10 @@ int xc_xsplice_list(xc_interface *xch, unsigned int max, unsigned int start,
  * operation if it could not be completed within the specified time
  * (in ms). Value of 0 means let hypervisor decide the best timeout.
  */
-int xc_xsplice_apply(xc_interface *xch, char *name, uint32_t timeout);
-int xc_xsplice_revert(xc_interface *xch, char *name, uint32_t timeout);
-int xc_xsplice_unload(xc_interface *xch, char *name, uint32_t timeout);
-int xc_xsplice_replace(xc_interface *xch, char *name, uint32_t timeout);
+int xc_livepatch_apply(xc_interface *xch, char *name, uint32_t timeout);
+int xc_livepatch_revert(xc_interface *xch, char *name, uint32_t timeout);
+int xc_livepatch_unload(xc_interface *xch, char *name, uint32_t timeout);
+int xc_livepatch_replace(xc_interface *xch, char *name, uint32_t timeout);
 
 /* Compat shims */
 #include "xenctrl_compat.h"

@@ -1,4 +1,4 @@
-# xSplice Design v1
+# Xen Live Patching Design v1
 
 ## Rationale
 
@@ -265,7 +265,7 @@ structures using Elf types, etc). This design will explain the structures
 and how they are used together and not dig in the ELF format - except mention
 that the section names should match the structure names.
 
-The xSplice payload is a relocatable ELF binary. A typical binary would have:
+The Xen Live Patch payload is a relocatable ELF binary. A typical binary would have:
 
  * One or more .text sections.
  * Zero or more read-only data sections.
@@ -279,24 +279,24 @@ It may also have some architecture-specific sections. For example:
  * Exception tables.
  * Relocations for each of these sections.
 
-The xSplice core code loads the payload as a standard ELF binary, relocates it
+The Xen Live Patch core code loads the payload as a standard ELF binary, relocates it
 and handles the architecture-specifc sections as needed. This process is much
 like what the Linux kernel module loader does.
 
 The payload contains at least three sections:
 
- * `.xsplice.funcs` - which is an array of xsplice_patch_func structures.
- * `.xsplice.depends` - which is an ELF Note that describes what the payload
+ * `.livepatch.funcs` - which is an array of livepatch_func structures.
+ * `.livepatch.depends` - which is an ELF Note that describes what the payload
     depends on. **MUST** have one.
  *  `.note.gnu.build-id` - the build-id of this payload. **MUST** have one.
 
-### .xsplice.funcs
+### .livepatch.funcs
 
-The `.xsplice.funcs` contains an array of xsplice_patch_func structures
+The `.livepatch.funcs` contains an array of livepatch_func structures
 which describe the functions to be patched:
 
 <pre>
-struct xsplice_patch_func {  
+struct livepatch_func {  
     const char *name;  
     void *new_addr;  
     void *old_addr;  
@@ -329,24 +329,24 @@ The size of the structure is 64 bytes on 64-bit hypervisors. It will be
 
 * `opaque` **MUST** be zero.
 
-The size of the `xsplice_patch_func` array is determined from the ELF section
+The size of the `livepatch_func` array is determined from the ELF section
 size.
 
-When applying the patch the hypervisor iterates over each `xsplice_patch_func`
+When applying the patch the hypervisor iterates over each `livepatch_func`
 structure and the core code inserts a trampoline at `old_addr` to `new_addr`.
 The `new_addr` is altered when the ELF payload is loaded.
 
-When reverting a patch, the hypervisor iterates over each `xsplice_patch_func`
+When reverting a patch, the hypervisor iterates over each `livepatch_func`
 and the core code copies the data from the undo buffer (private internal copy)
 to `old_addr`.
 
-### Example of .xsplice.funcs
+### Example of .livepatch.funcs
 
 A simple example of what a payload file can be:
 
 <pre>
 /* MUST be in sync with hypervisor. */  
-struct xsplice_patch_func {  
+struct livepatch_func {  
     const char *name;  
     void *new_addr;  
     void *old_addr;  
@@ -364,26 +364,26 @@ const char *xen_hello_world(void)
 
 static unsigned char patch_this_fnc[] = "xen_extra_version";  
 
-struct xsplice_patch_func xsplice_hello_world = {  
-    .version = XSPLICE_PAYLOAD_VERSION,
+struct livepatch_func livepatch_hello_world = {  
+    .version = LIVEPATCH_PAYLOAD_VERSION,
     .name = patch_this_fnc,  
     .new_addr = xen_hello_world,  
     .old_addr = (void *)0xffff82d08013963c, /* Extracted from xen-syms. */  
     .new_size = 13, /* To be be computed by scripts. */  
     .old_size = 13, /* -----------""---------------  */  
-} __attribute__((__section__(".xsplice.funcs")));  
+} __attribute__((__section__(".livepatch.funcs")));  
 
 </pre>
 
 Code must be compiled with -fPIC.
 
-### .xsplice.depends and .note.gnu.build-id
+### .livepatch.depends and .note.gnu.build-id
 
 To support dependencies checking and safe loading (to load the
 appropiate payload against the right hypervisor) there is a need
 to embbed an build-id dependency.
 
-This is done by the payload containing an section `.xsplice.depends`
+This is done by the payload containing an section `.livepatch.depends`
 which follows the format of an ELF Note. The contents of this
 (name, and description) are specific to the linker utilized to
 build the hypevisor and payload.
@@ -424,8 +424,8 @@ one uint32_t to determine the sub-operations and one padding field which
 *MUST* always be zero.
 
 <pre>
-struct xen_sysctl_xsplice_op {  
-    uint32_t cmd;                   /* IN: XEN_SYSCTL_XSPLICE_*. */  
+struct xen_sysctl_livepatch_op {  
+    uint32_t cmd;                   /* IN: XEN_SYSCTL_LIVEPATCH_*. */  
     uint32_t pad;                   /* IN: Always zero. */  
 	union {  
           ... see below ...  
@@ -435,9 +435,9 @@ struct xen_sysctl_xsplice_op {
 </pre>
 while the rest of hypercall specific structures are part of the this structure.
 
-### Basic type: struct xen_xsplice_name
+### Basic type: struct xen_livepatch_name
 
-Most of the hypercalls employ an shared structure called `struct xen_xsplice_name`
+Most of the hypercalls employ an shared structure called `struct xen_livepatch_name`
 which contains:
 
  * `name` - pointer where the string for the name is located.
@@ -451,25 +451,25 @@ The structure is as follow:
  *  Uniquely identifies the payload.  Should be human readable.  
  * Includes the NUL terminator  
  */  
-#define XEN_XSPLICE_NAME_SIZE 128  
-struct xen_xsplice_name {  
+#define XEN_LIVEPATCH_NAME_SIZE 128  
+struct xen_livepatch_name {  
     XEN_GUEST_HANDLE_64(char) name;         /* IN, pointer to name. */  
     uint16_t size;                          /* IN, size of name. May be upto   
-                                               XEN_XSPLICE_NAME_SIZE. */  
+                                               XEN_LIVEPATCH_NAME_SIZE. */  
     uint16_t pad[3];                        /* IN: MUST be zero. */ 
 };  
 </pre>
 
-### XEN_SYSCTL_XSPLICE_UPLOAD (0)
+### XEN_SYSCTL_LIVEPATCH_UPLOAD (0)
 
 Upload a payload to the hypervisor. The payload is verified
 against basic checks and if there are any issues the proper return code
 will be returned. The payload is not applied at this time - that is
-controlled by *XEN_SYSCTL_XSPLICE_ACTION*.
+controlled by *XEN_SYSCTL_LIVEPATCH_ACTION*.
 
 The caller provides:
 
- * A `struct xen_xsplice_name` called `name` which has the unique name.
+ * A `struct xen_livepatch_name` called `name` which has the unique name.
  * `size` the size of the ELF payload (in bytes).
  * `payload` the virtual address of where the ELF payload is.
 
@@ -485,29 +485,29 @@ The `payload` is the ELF payload as mentioned in the `Payload format` section.
 The structure is as follow:
 
 <pre>
-struct xen_sysctl_xsplice_upload {  
-    xen_xsplice_name_t name;            /* IN, name of the patch. */  
+struct xen_sysctl_livepatch_upload {  
+    xen_livepatch_name_t name;          /* IN, name of the patch. */  
     uint64_t size;                      /* IN, size of the ELF file. */  
     XEN_GUEST_HANDLE_64(uint8) payload; /* IN: ELF file. */  
 };  
 </pre>
 
-### XEN_SYSCTL_XSPLICE_GET (1)
+### XEN_SYSCTL_LIVEPATCH_GET (1)
 
 Retrieve an status of an specific payload. This caller provides:
 
- * A `struct xen_xsplice_name` called `name` which has the unique name.
- * A `struct xen_xsplice_status` structure. The member values will
+ * A `struct xen_livepatch_name` called `name` which has the unique name.
+ * A `struct xen_livepatch_status` structure. The member values will
    be over-written upon completion.
 
-Upon completion the `struct xen_xsplice_status` is updated.
+Upon completion the `struct xen_livepatch_status` is updated.
 
  * `status` - indicates the current status of the payload:
-   * *XSPLICE_STATUS_CHECKED*  (1) loaded and the ELF payload safety checks passed.
-   * *XSPLICE_STATUS_APPLIED* (2) loaded, checked, and applied.
+   * *LIVEPATCH_STATUS_CHECKED*  (1) loaded and the ELF payload safety checks passed.
+   * *LIVEPATCH_STATUS_APPLIED* (2) loaded, checked, and applied.
    *  No other value is possible.
  * `rc` - -XEN_EXX type errors encountered while performing the last
-   XSPLICE_ACTION_* operation. The normal values can be zero or -XEN_EAGAIN which
+   LIVEPATCH_ACTION_* operation. The normal values can be zero or -XEN_EAGAIN which
    respectively mean: success or operation in progress. Other values
    imply an error occurred. If there is an error in `rc`, `status` will **NOT**
    have changed.
@@ -519,15 +519,15 @@ rc=-XEN_EAGAIN and return value can be 0).
 For example, supposing there is an payload:
 
 <pre>
- status: XSPLICE_STATUS_CHECKED
+ status: LIVEPATCH_STATUS_CHECKED
  rc: 0
 </pre>
 
-We apply an action - XSPLICE_ACTION_REVERT - to revert it (which won't work
+We apply an action - LIVEPATCH_ACTION_REVERT - to revert it (which won't work
 as we have not even applied it. Afterwards we will have:
 
 <pre>
- status: XSPLICE_STATUS_CHECKED
+ status: LIVEPATCH_STATUS_CHECKED
  rc: -XEN_EINVAL
 </pre>
 
@@ -538,20 +538,20 @@ This operation is synchronous and does not require preemption.
 The structure is as follow:
 
 <pre>
-struct xen_xsplice_status {  
-#define XSPLICE_STATUS_CHECKED      1  
-#define XSPLICE_STATUS_APPLIED      2  
-    uint32_t state;                 /* OUT: XSPLICE_STATE_*. */  
+struct xen_livepatch_status {  
+#define LIVEPATCH_STATUS_CHECKED      1  
+#define LIVEPATCH_STATUS_APPLIED      2  
+    uint32_t state;                 /* OUT: LIVEPATCH_STATE_*. */  
     int32_t rc;                     /* OUT: 0 if no error, otherwise -XEN_EXX. */  
 };  
 
-struct xen_sysctl_xsplice_get {  
-    xen_xsplice_name_t name;        /* IN, the name of the payload. */  
-    xen_xsplice_status_t status;    /* IN/OUT: status of the payload. */  
+struct xen_sysctl_livepatch_get {  
+    xen_livepatch_name_t name;      /* IN, the name of the payload. */  
+    xen_livepatch_status_t status;  /* IN/OUT: status of the payload. */  
 };  
 </pre>
 
-### XEN_SYSCTL_XSPLICE_LIST (2)
+### XEN_SYSCTL_LIVEPATCH_LIST (2)
 
 Retrieve an array of abbreviated status and names of payloads that are loaded in the
 hypervisor.
@@ -568,11 +568,11 @@ The caller provides:
     in the hypercall being a probing one and return the number of payloads
     (and update the `version`).
  * `pad` - *MUST* be zero.
- * `status` virtual address of where to write `struct xen_xsplice_status`
+ * `status` virtual address of where to write `struct xen_livepatch_status`
    structures. Caller *MUST* allocate up to `nr` of them.
  * `name` - virtual address of where to write the unique name of the payload.
    Caller *MUST* allocate up to `nr` of them. Each *MUST* be of
-   **XEN_XSPLICE_NAME_SIZE** size. Note that **XEN_XSPLICE_NAME_SIZE** includes
+   **XEN_LIVEPATCH_NAME_SIZE** size. Note that **XEN_LIVEPATCH_NAME_SIZE** includes
    the NUL terminator.
  * `len` - virtual address of where to write the length of each unique name
    of the payload. Caller *MUST* allocate up to `nr` of them. Each *MUST* be
@@ -597,14 +597,14 @@ between each invocation. if the version differs it should discard the stale
 data and start from scratch. It is OK for the toolstack to use the new
 `version` field.
 
-The `struct xen_xsplice_status` structure contains an status of payload which includes:
+The `struct xen_livepatch_status` structure contains an status of payload which includes:
 
  * `status` - indicates the current status of the payload:
-   * *XSPLICE_STATUS_CHECKED*  (1) loaded and the ELF payload safety checks passed.
-   * *XSPLICE_STATUS_APPLIED* (2) loaded, checked, and applied.
+   * *LIVEPATCH_STATUS_CHECKED*  (1) loaded and the ELF payload safety checks passed.
+   * *LIVEPATCH_STATUS_APPLIED* (2) loaded, checked, and applied.
    *  No other value is possible.
  * `rc` - -XEN_EXX type errors encountered while performing the last
-   XSPLICE_ACTION_* operation. The normal values can be zero or -XEN_EAGAIN which
+   LIVEPATCH_ACTION_* operation. The normal values can be zero or -XEN_EAGAIN which
    respectively mean: success or operation in progress. Other values
    imply an error occurred. If there is an error in `rc`, `status` will **NOT**
    have changed.
@@ -612,7 +612,7 @@ The `struct xen_xsplice_status` structure contains an status of payload which in
 The structure is as follow:
 
 <pre>
-struct xen_sysctl_xsplice_list {  
+struct xen_sysctl_livepatch_list {  
     uint32_t version;                       /* OUT: Hypervisor stamps value.
                                                If varies between calls, we are  
                                                getting stale data. */  
@@ -622,38 +622,38 @@ struct xen_sysctl_xsplice_list {
                                                amount of payloads and version.  
                                                OUT: How many payloads left. */  
     uint32_t pad;                           /* IN: Must be zero. */  
-    XEN_GUEST_HANDLE_64(xen_xsplice_status_t) status;  /* OUT. Must have enough  
+    XEN_GUEST_HANDLE_64(xen_livepatch_status_t) status;  /* OUT. Must have enough  
                                                space allocate for nr of them. */  
     XEN_GUEST_HANDLE_64(char) id;           /* OUT: Array of names. Each member  
-                                               MUST XEN_XSPLICE_NAME_SIZE in size.  
+                                               MUST XEN_LIVEPATCH_NAME_SIZE in size.  
                                                Must have nr of them. */  
     XEN_GUEST_HANDLE_64(uint32) len;        /* OUT: Array of lengths of name's.  
                                                Must have nr of them. */  
 };  
 </pre>
 
-### XEN_SYSCTL_XSPLICE_ACTION (3)
+### XEN_SYSCTL_LIVEPATCH_ACTION (3)
 
 Perform an operation on the payload structure referenced by the `name` field.
 The operation request is asynchronous and the status should be retrieved
-by using either **XEN_SYSCTL_XSPLICE_GET** or **XEN_SYSCTL_XSPLICE_LIST** hypercall.
+by using either **XEN_SYSCTL_LIVEPATCH_GET** or **XEN_SYSCTL_LIVEPATCH_LIST** hypercall.
 
 The caller provides:
 
- * A 'struct xen_xsplice_name` `name` containing the unique name.
+ * A 'struct xen_livepatch_name` `name` containing the unique name.
  * `cmd` the command requested:
-  * *XSPLICE_ACTION_UNLOAD* (1) unload the payload.
+  * *LIVEPATCH_ACTION_UNLOAD* (1) unload the payload.
    Any further hypercalls against the `name` will result in failure unless
-   **XEN_SYSCTL_XSPLICE_UPLOAD** hypercall is perfomed with same `name`.
-  * *XSPLICE_ACTION_REVERT* (2) revert the payload. If the operation takes
-  more time than the upper bound of time the `rc` in `xen_xsplice_status'
-  retrieved via **XEN_SYSCTL_XSPLICE_GET** will be -XEN_EBUSY.
-  * *XSPLICE_ACTION_APPLY* (3) apply the payload. If the operation takes
-  more time than the upper bound of time the `rc` in `xen_xsplice_status'
-  retrieved via **XEN_SYSCTL_XSPLICE_GET** will be -XEN_EBUSY.
-  * *XSPLICE_ACTION_REPLACE* (4) revert all applied payloads and apply this
+   **XEN_SYSCTL_LIVEPATCH_UPLOAD** hypercall is perfomed with same `name`.
+  * *LIVEPATCH_ACTION_REVERT* (2) revert the payload. If the operation takes
+  more time than the upper bound of time the `rc` in `xen_livepatch_status'
+  retrieved via **XEN_SYSCTL_LIVEPATCH_GET** will be -XEN_EBUSY.
+  * *LIVEPATCH_ACTION_APPLY* (3) apply the payload. If the operation takes
+  more time than the upper bound of time the `rc` in `xen_livepatch_status'
+  retrieved via **XEN_SYSCTL_LIVEPATCH_GET** will be -XEN_EBUSY.
+  * *LIVEPATCH_ACTION_REPLACE* (4) revert all applied payloads and apply this
   payload. If the operation takes more time than the upper bound of time
-  the `rc` in `xen_xsplice_status' retrieved via **XEN_SYSCTL_XSPLICE_GET**
+  the `rc` in `xen_livepatch_status' retrieved via **XEN_SYSCTL_LIVEPATCH_GET**
   will be -XEN_EBUSY.
  * `time` the upper bound of time (ms) the cmd should take. Zero means infinite.
    If within the time the operation does not succeed the operation would go in
@@ -665,13 +665,13 @@ The return value will be zero unless the provided fields are incorrect.
 The structure is as follow:
 
 <pre>
-#define XSPLICE_ACTION_UNLOAD  1  
-#define XSPLICE_ACTION_REVERT  2  
-#define XSPLICE_ACTION_APPLY   3  
-#define XSPLICE_ACTION_REPLACE 4  
-struct xen_sysctl_xsplice_action {  
-    xen_xsplice_name_t name;                /* IN, name of the patch. */  
-    uint32_t cmd;                           /* IN: XSPLICE_ACTION_* */  
+#define LIVEPATCH_ACTION_UNLOAD  1  
+#define LIVEPATCH_ACTION_REVERT  2  
+#define LIVEPATCH_ACTION_APPLY   3  
+#define LIVEPATCH_ACTION_REPLACE 4  
+struct xen_sysctl_livepatch_action {  
+    xen_livepatch_name_t name;              /* IN, name of the patch. */  
+    uint32_t cmd;                           /* IN: LIVEPATCH_ACTION_* */  
     uint32_t time;                          /* IN: Zero if no timeout. */   
                                             /* Or upper bound of time (ms) */   
                                             /* for operation to take. */  
@@ -679,11 +679,11 @@ struct xen_sysctl_xsplice_action {
 
 </pre>
 
-## State diagrams of XSPLICE_ACTION commands.
+## State diagrams of LIVEPATCH_ACTION commands.
 
 There is a strict ordering state of what the commands can be.
-The XSPLICE_ACTION prefix has been dropped to easy reading and
-does not include the XSPLICE_STATES:
+The LIVEPATCH_ACTION prefix has been dropped to easy reading and
+does not include the LIVEPATCH_STATES:
 
 <pre>
               /->\  
@@ -693,11 +693,11 @@ does not include the XSPLICE_STATES:
                  \-------------------<-------------/  
 
 </pre>
-## State transition table of XSPLICE_ACTION commands and XSPLICE_STATUS.
+## State transition table of LIVEPATCH_ACTION commands and LIVEPATCH_STATUS.
 
 Note that:
 
- - The CHECKED state is the starting one achieved with *XEN_SYSCTL_XSPLICE_UPLOAD* hypercall.
+ - The CHECKED state is the starting one achieved with *XEN_SYSCTL_LIVEPATCH_UPLOAD* hypercall.
  - The REVERT operation on success will automatically move to the CHECKED state.
  - There are two STATES: CHECKED and APPLIED.
  - There are four actions (aka commands): APPLY, REPLACE, REVERT, and UNLOAD.
@@ -735,10 +735,10 @@ All the other state transitions are invalid.
 
 The normal sequence of events is to:
 
- 1. *XEN_SYSCTL_XSPLICE_UPLOAD* to upload the payload. If there are errors *STOP* here.
- 2. *XEN_SYSCTL_XSPLICE_GET* to check the `->rc`. If *-XEN_EAGAIN* spin. If zero go to next step.
- 3. *XEN_SYSCTL_XSPLICE_ACTION* with *XSPLICE_ACTION_APPLY* to apply the patch.
- 4. *XEN_SYSCTL_XSPLICE_GET* to check the `->rc`. If in *-XEN_EAGAIN* spin. If zero exit with success.
+ 1. *XEN_SYSCTL_LIVEPATCH_UPLOAD* to upload the payload. If there are errors *STOP* here.
+ 2. *XEN_SYSCTL_LIVEPATCH_GET* to check the `->rc`. If *-XEN_EAGAIN* spin. If zero go to next step.
+ 3. *XEN_SYSCTL_LIVEPATCH_ACTION* with *LIVEPATCH_ACTION_APPLY* to apply the patch.
+ 4. *XEN_SYSCTL_LIVEPATCH_GET* to check the `->rc`. If in *-XEN_EAGAIN* spin. If zero exit with success.
 
 
 ## Addendum
@@ -809,14 +809,14 @@ Hotpatch generation often requires support for compiling the target
 with -ffunction-sections / -fdata-sections.  Changes would have to
 be done to the linker scripts to support this.
 
-### Generation of xSplice ELF payloads
+### Generation of Live Patch ELF payloads
 
 The design of that is not discussed in this design.
 
 This is implemented in a seperate tool which lives in a seperate
 GIT repo.
 
-Currently it resides at https://github.com/rosslagerwall/xsplice-build
+Currently it resides at https://github.com/rosslagerwall/livepatch-build
 
 ### Exception tables and symbol tables growth
 
@@ -879,9 +879,9 @@ This is implemented in the Xen Project hypervisor.
 
 Only the privileged domain should be allowed to do this operation.
 
-### xSplice interdependencies
+### Live patch interdependencies
 
-xSplice patches interdependencies are tricky.
+Live patch patches interdependencies are tricky.
 
 There are the ways this can be addressed:
  * A single large patch that subsumes and replaces all previous ones.
@@ -918,7 +918,7 @@ build-id.
 
 # Not Yet Done
 
-This is for further development of xSplice.
+This is for further development of live patching.
 
 ## TODO Goals
 
@@ -930,7 +930,7 @@ The implementation must also have a mechanism for (in no particular order):
  * Deal with NMI/MCE checks during patching instead of ignoring them.
  * Further safety checks (blacklist of which functions cannot be patched, check
    the stack, make sure the payload is built with same compiler as hypervisor).
-   Specifically we want to make sure that xSplice codepaths cannot be patched.
+   Specifically we want to make sure that live patching codepaths cannot be patched.
  * NOP out the code sequence if `new_size` is zero.
  * Deal with other relocation types:  R_X86_64_[8,16,32,32S], R_X86_64_PC[8,16,64]
    in payload file.

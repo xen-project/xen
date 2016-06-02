@@ -20,7 +20,7 @@
 #include <xen/symbols.h>
 #include <xen/lib.h>
 #include <xen/sched.h>
-#include <xen/xsplice.h>
+#include <xen/livepatch.h>
 #include <asm/div64.h>
 #include <asm/page.h>
 
@@ -356,7 +356,7 @@ static char *pointer(char *str, char *end, const char **fmt_ptr,
         }
 
         /*
-         * namebuf contents and s for core hypervisor are same but for xSplice
+         * namebuf contents and s for core hypervisor are same but for Live Patch
          * payloads they differ (namebuf contains the name of the payload).
          */
         if ( namebuf != s )

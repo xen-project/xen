@@ -25,7 +25,7 @@ static struct virtual_region core_init __initdata = {
  * RCU locking. Additions are done either at startup (when there is only
  * one CPU) or when all CPUs are running without IRQs.
  *
- * Deletions are bit tricky. We do it when xSplicing (all CPUs running
+ * Deletions are bit tricky. We do it when Live Patch (all CPUs running
  * without IRQs) or during bootup (when clearing the init).
  *
  * Hence we use list_del_rcu (which sports an memory fence) and a spinlock
@@ -85,7 +85,7 @@ static void remove_virtual_region(struct virtual_region *r)
 
 void unregister_virtual_region(struct virtual_region *r)
 {
-    /* Expected to be called from xSplice - which has IRQs disabled. */
+    /* Expected to be called from Live Patch - which has IRQs disabled. */
     ASSERT(!local_irq_is_enabled());
 
     remove_virtual_region(r);
