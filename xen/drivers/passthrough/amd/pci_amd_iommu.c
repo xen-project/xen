@@ -272,9 +272,6 @@ static int amd_iommu_domain_init(struct domain *d)
     hd->arch.paging_mode = is_hvm_domain(d) ?
                       IOMMU_PAGING_MODE_LEVEL_2 :
                       get_paging_mode(max_page);
-
-    guest_iommu_init(d);
-
     return 0;
 }
 
@@ -474,7 +471,6 @@ static void deallocate_iommu_page_tables(struct domain *d)
 
 static void amd_iommu_domain_destroy(struct domain *d)
 {
-    guest_iommu_destroy(d);
     deallocate_iommu_page_tables(d);
     amd_iommu_flush_all_pages(d);
 }
