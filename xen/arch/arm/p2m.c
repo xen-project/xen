@@ -615,7 +615,8 @@ void p2m_teardown(struct domain *d)
     while ( (pg = page_list_remove_head(&p2m->pages)) )
         free_domheap_page(pg);
 
-    free_domheap_pages(p2m->first_level, P2M_FIRST_ORDER);
+    if ( p2m->first_level )
+        free_domheap_pages(p2m->first_level, P2M_FIRST_ORDER);
 
     p2m->first_level = NULL;
 
