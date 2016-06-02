@@ -26,16 +26,27 @@
 #define XSAVE_HDR_OFFSET          FXSAVE_SIZE
 #define XSTATE_AREA_MIN_SIZE      (FXSAVE_SIZE + XSAVE_HDR_SIZE)
 
-#define XSTATE_FP      (1ULL << 0)
-#define XSTATE_SSE     (1ULL << 1)
-#define XSTATE_YMM     (1ULL << 2)
-#define XSTATE_BNDREGS (1ULL << 3)
-#define XSTATE_BNDCSR  (1ULL << 4)
-#define XSTATE_OPMASK  (1ULL << 5)
-#define XSTATE_ZMM     (1ULL << 6)
-#define XSTATE_HI_ZMM  (1ULL << 7)
-#define XSTATE_PKRU    (1ULL << 9)
-#define XSTATE_LWP     (1ULL << 62) /* AMD lightweight profiling */
+#define _XSTATE_FP                0
+#define XSTATE_FP                 (1ULL << _XSTATE_FP)
+#define _XSTATE_SSE               1
+#define XSTATE_SSE                (1ULL << _XSTATE_SSE)
+#define _XSTATE_YMM               2
+#define XSTATE_YMM                (1ULL << _XSTATE_YMM)
+#define _XSTATE_BNDREGS           3
+#define XSTATE_BNDREGS            (1ULL << _XSTATE_BNDREGS)
+#define _XSTATE_BNDCSR            4
+#define XSTATE_BNDCSR             (1ULL << _XSTATE_BNDCSR)
+#define _XSTATE_OPMASK            5
+#define XSTATE_OPMASK             (1ULL << _XSTATE_OPMASK)
+#define _XSTATE_ZMM               6
+#define XSTATE_ZMM                (1ULL << _XSTATE_ZMM)
+#define _XSTATE_HI_ZMM            7
+#define XSTATE_HI_ZMM             (1ULL << _XSTATE_HI_ZMM)
+#define _XSTATE_PKRU              9
+#define XSTATE_PKRU               (1ULL << _XSTATE_PKRU)
+#define _XSTATE_LWP               62
+#define XSTATE_LWP                (1ULL << _XSTATE_LWP)
+
 #define XSTATE_FP_SSE  (XSTATE_FP | XSTATE_SSE)
 #define XCNTXT_MASK    (XSTATE_FP | XSTATE_SSE | XSTATE_YMM | XSTATE_OPMASK | \
                         XSTATE_ZMM | XSTATE_HI_ZMM | XSTATE_NONLAZY)
@@ -51,6 +62,7 @@
 
 extern u64 xfeature_mask;
 extern u64 xstate_align;
+extern unsigned int *xstate_offsets;
 extern unsigned int *xstate_sizes;
 
 /* extended state save area */

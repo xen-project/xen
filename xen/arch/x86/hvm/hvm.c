@@ -3362,7 +3362,7 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
 
     switch ( input )
     {
-        unsigned int _ecx, _edx;
+        unsigned int _ebx, _ecx, _edx;
 
     case 0x1:
         /* Fix up VLAPIC details. */
@@ -3443,6 +3443,51 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
         switch ( count )
         {
         case 0:
+        {
+            uint64_t xfeature_mask = XSTATE_FP_SSE;
+            uint32_t xstate_size = XSTATE_AREA_MIN_SIZE;
+
+            if ( _ecx & cpufeat_mask(X86_FEATURE_AVX) )
+            {
+                xfeature_mask |= XSTATE_YMM;
+                xstate_size = max(xstate_size,
+                                  xstate_offsets[_XSTATE_YMM] +
+                                  xstate_sizes[_XSTATE_YMM]);
+            }
+
+            _ecx = 0;
+            hvm_cpuid(7, NULL, &_ebx, &_ecx, NULL);
+
+            if ( _ebx & cpufeat_mask(X86_FEATURE_MPX) )
+            {
+                xfeature_mask |= XSTATE_BNDREGS | XSTATE_BNDCSR;
+                xstate_size = max(xstate_size,
+                                  xstate_offsets[_XSTATE_BNDCSR] +
+                                  xstate_sizes[_XSTATE_BNDCSR]);
+            }
+
+            if ( _ebx & cpufeat_mask(X86_FEATURE_PKU) )
+            {
+                xfeature_mask |= XSTATE_PKRU;
+                xstate_size = max(xstate_size,
+                                  xstate_offsets[_XSTATE_PKRU] +
+                                  xstate_sizes[_XSTATE_PKRU]);
+            }
+
+            hvm_cpuid(0x80000001, NULL, NULL, &_ecx, NULL);
+
+            if ( _ecx & cpufeat_mask(X86_FEATURE_LWP) )
+            {
+                xfeature_mask |= XSTATE_LWP;
+                xstate_size = max(xstate_size,
+                                  xstate_offsets[_XSTATE_LWP] +
+                                  xstate_sizes[_XSTATE_LWP]);
+            }
+
+            *eax = (uint32_t)xfeature_mask;
+            *edx = (uint32_t)(xfeature_mask >> 32);
+            *ecx = xstate_size;
+
             /*
              * Always read CPUID[0xD,0].EBX from hardware, rather than domain
              * policy.  It varies with enabled xstate, and the correct xcr0 is
@@ -3450,6 +3495,8 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
              */
             cpuid_count(input, count, &dummy, ebx, &dummy, &dummy);
             break;
+        }
+
         case 1:
             *eax &= hvm_featureset[FEATURESET_Da1];
 
@@ -3463,7 +3510,9 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
                 cpuid_count(input, count, &dummy, ebx, &dummy, &dummy);
             }
             else
-                *ebx = *ecx = *edx = 0;
+                *ebx = 0;
+
+            *ecx = *edx = 0;
             break;
         }
         break;

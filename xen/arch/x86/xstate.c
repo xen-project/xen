@@ -24,7 +24,7 @@ static u32 __read_mostly xsave_cntxt_size;
 /* A 64-bit bitmask of the XSAVE/XRSTOR features supported by processor. */
 u64 __read_mostly xfeature_mask;
 
-static unsigned int *__read_mostly xstate_offsets;
+unsigned int *__read_mostly xstate_offsets;
 unsigned int *__read_mostly xstate_sizes;
 u64 __read_mostly xstate_align;
 static unsigned int __read_mostly xstate_features;
