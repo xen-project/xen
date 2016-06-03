@@ -7249,6 +7249,55 @@ void libxl_mac_copy(libxl_ctx *ctx, libxl_mac *dst, const libxl_mac *src)
         (*dst)[i] = (*src)[i];
 }
 
+/* For QEMU upstream we always need to provide the number of cpus present to
+ * QEMU whether they are online or not; otherwise QEMU won't accept the saved
+ * state. See implementation of libxl__qmp_query_cpus.
+ */
+static int libxl__update_avail_vcpus_qmp(libxl__gc *gc, uint32_t domid,
+                                         unsigned int max_vcpus,
+                                         libxl_bitmap *map)
+{
+    int rc;
+
+    rc = libxl__qmp_query_cpus(gc, domid, map);
+    if (rc) {
+        LOG(ERROR, "fail to get number of cpus for domain %d", domid);
+        goto out;
+    }
+
+    rc = 0;
+out:
+    return rc;
+}
+
+static int libxl__update_avail_vcpus_xenstore(libxl__gc *gc, uint32_t domid,
+                                              unsigned int max_vcpus,
+                                              libxl_bitmap *map)
+{
+    int rc;
+    unsigned int i;
+    const char *dompath;
+
+    dompath = libxl__xs_get_dompath(gc, domid);
+    if (!dompath) {
+        rc = ERROR_FAIL;
+        goto out;
+    }
+
+    for (i = 0; i < max_vcpus; i++) {
+        const char *path = GCSPRINTF("%s/cpu/%u/availability", dompath, i);
+        const char *content;
+        rc = libxl__xs_read_checked(gc, XBT_NULL, path, &content);
+        if (rc) goto out;
+        if (content && !strcmp(content, "online"))
+            libxl_bitmap_set(map, i);
+    }
+
+    rc = 0;
+out:
+    return rc;
+}
+
 int libxl_retrieve_domain_configuration(libxl_ctx *ctx, uint32_t domid,
                                         libxl_domain_config *d_config)
 {
@@ -7295,6 +7344,49 @@ int libxl_retrieve_domain_configuration(libxl_ctx *ctx, uint32_t domid,
         }
         libxl_uuid_copy(ctx, &d_config->c_info.uuid, &info.uuid);
         libxl_dominfo_dispose(&info);
+    }
+
+    /* VCPUs */
+    {
+        libxl_bitmap *map = &d_config->b_info.avail_vcpus;
+        unsigned int max_vcpus = d_config->b_info.max_vcpus;
+        libxl_device_model_version version;
+
+        libxl_bitmap_dispose(map);
+        libxl_bitmap_init(map);
+        libxl_bitmap_alloc(CTX, map, max_vcpus);
+        libxl_bitmap_set_none(map);
+
+        switch (d_config->b_info.type) {
+        case LIBXL_DOMAIN_TYPE_HVM:
+            version = libxl__device_model_version_running(gc, domid);
+            assert(version != LIBXL_DEVICE_MODEL_VERSION_UNKNOWN);
+            switch (version) {
+            case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN:
+                rc = libxl__update_avail_vcpus_qmp(gc, domid,
+                                                   max_vcpus, map);
+                break;
+            case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL:
+            case LIBXL_DEVICE_MODEL_VERSION_NONE:
+                rc = libxl__update_avail_vcpus_xenstore(gc, domid,
+                                                        max_vcpus, map);
+                break;
+            default:
+                abort();
+            }
+            break;
+        case LIBXL_DOMAIN_TYPE_PV:
+            rc = libxl__update_avail_vcpus_xenstore(gc, domid,
+                                                    max_vcpus, map);
+            break;
+        default:
+            abort();
+        }
+
+        if (rc) {
+            LOG(ERROR, "fail to update available cpu map for domain %d", domid);
+            goto out;
+        }
     }
 
     /* Memory limits:
