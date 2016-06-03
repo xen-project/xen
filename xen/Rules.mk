@@ -88,9 +88,10 @@ LDFLAGS += $(LDFLAGS-y)
 
 include $(BASEDIR)/arch/$(TARGET_ARCH)/Rules.mk
 
+DEPS = .*.d
+
 include Makefile
 
-DEPS = .*.d
 define gendep
     ifneq ($(1),$(subst /,:,$(1)))
         DEPS += $(dir $(1)).$(notdir $(1)).d
