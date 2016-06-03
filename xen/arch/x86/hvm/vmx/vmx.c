@@ -824,7 +824,7 @@ static int vmx_load_msr(struct vcpu *v, struct hvm_msr *ctxt)
         case MSR_IA32_BNDCFGS:
             if ( cpu_has_mpx )
                 __vmwrite(GUEST_BNDCFGS, ctxt->msr[i].val);
-            else
+            else if ( ctxt->msr[i].val )
                 err = -ENXIO;
             break;
         case MSR_IA32_XSS:
