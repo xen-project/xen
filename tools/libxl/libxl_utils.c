@@ -548,14 +548,12 @@ int libxl__remove_directory(libxl__gc *gc, const char *dirpath)
         goto out;
     }
 
-    size_t need = offsetof(struct dirent, d_name) +
-        pathconf(dirpath, _PC_NAME_MAX) + 1;
-    struct dirent *de_buf = libxl__zalloc(gc, need);
     struct dirent *de;
 
     for (;;) {
-        int r = readdir_r(d, de_buf, &de);
-        if (r) {
+        errno = 0;
+        de = readdir(d);
+        if (!de && errno) {
             LOGE(ERROR, "failed to readdir %s for removal", dirpath);
             rc = ERROR_FAIL;
             break;
