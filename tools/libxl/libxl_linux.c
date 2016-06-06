@@ -300,3 +300,11 @@ int libxl__pci_topology_init(libxl__gc *gc,
 
     return err;
 }
+
+/*
+ * Local variables:
+ * mode: C
+ * c-basic-offset: 4
+ * indent-tabs-mode: nil
+ * End:
+ */
