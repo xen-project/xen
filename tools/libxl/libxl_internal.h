@@ -3570,7 +3570,7 @@ struct libxl__domain_create_state {
     libxl__colo_restore_state crs;
     libxl__checkpoint_devices_state cds;
     libxl__bootloader_state bl;
-    libxl__stub_dm_spawn_state dmss;
+    libxl__stub_dm_spawn_state sdss;
         /* If we're not doing stubdom, we use only dmss.dm,
          * for the non-stubdom device model. */
     libxl__stream_read_state srs;

@@ -903,7 +903,7 @@ static void initiate_domain_create(libxl__egc *egc,
     }
 
     dcs->guest_domid = domid;
-    dcs->dmss.dm.guest_domid = 0; /* means we haven't spawned */
+    dcs->sdss.dm.guest_domid = 0; /* means we haven't spawned */
 
     ret = libxl__domain_build_info_setdefault(gc, &d_config->b_info);
     if (ret) {
@@ -1050,11 +1050,11 @@ static void domcreate_bootloader_done(libxl__egc *egc,
     /* We might be going to call libxl__spawn_local_dm, or _spawn_stub_dm.
      * Fill in any field required by either, including both relevant
      * callbacks (_spawn_stub_dm will overwrite our trespass if needed). */
-    dcs->dmss.dm.spawn.ao = ao;
-    dcs->dmss.dm.guest_config = dcs->guest_config;
-    dcs->dmss.dm.build_state = &dcs->build_state;
-    dcs->dmss.dm.callback = domcreate_devmodel_started;
-    dcs->dmss.callback = domcreate_devmodel_started;
+    dcs->sdss.dm.spawn.ao = ao;
+    dcs->sdss.dm.guest_config = dcs->guest_config;
+    dcs->sdss.dm.build_state = &dcs->build_state;
+    dcs->sdss.dm.callback = domcreate_devmodel_started;
+    dcs->sdss.callback = domcreate_devmodel_started;
 
     if (restore_fd < 0 && dcs->domid_soft_reset == INVALID_DOMID) {
         rc = libxl__domain_build(gc, d_config, domid, state);
@@ -1344,7 +1344,7 @@ static void domcreate_launch_dm(libxl__egc *egc, libxl__multidev *multidev,
 
         if (d_config->b_info.device_model_version ==
             LIBXL_DEVICE_MODEL_VERSION_NONE) {
-            domcreate_devmodel_started(egc, &dcs->dmss.dm, 0);
+            domcreate_devmodel_started(egc, &dcs->sdss.dm, 0);
             return;
         }
 
@@ -1352,11 +1352,11 @@ static void domcreate_launch_dm(libxl__egc *egc, libxl__multidev *multidev,
         libxl__device_vkb_add(gc, domid, &vkb);
         libxl_device_vkb_dispose(&vkb);
 
-        dcs->dmss.dm.guest_domid = domid;
+        dcs->sdss.dm.guest_domid = domid;
         if (libxl_defbool_val(d_config->b_info.device_model_stubdomain))
-            libxl__spawn_stub_dm(egc, &dcs->dmss);
+            libxl__spawn_stub_dm(egc, &dcs->sdss);
         else
-            libxl__spawn_local_dm(egc, &dcs->dmss.dm);
+            libxl__spawn_local_dm(egc, &dcs->sdss.dm);
 
         /*
          * Handle the domain's (and the related stubdomain's) access to
@@ -1387,12 +1387,12 @@ static void domcreate_launch_dm(libxl__egc *egc, libxl__multidev *multidev,
         if (ret < 0)
             goto error_out;
         if (ret) {
-            dcs->dmss.dm.guest_domid = domid;
-            libxl__spawn_local_dm(egc, &dcs->dmss.dm);
+            dcs->sdss.dm.guest_domid = domid;
+            libxl__spawn_local_dm(egc, &dcs->sdss.dm);
             return;
         } else {
-            assert(!dcs->dmss.dm.guest_domid);
-            domcreate_devmodel_started(egc, &dcs->dmss.dm, 0);
+            assert(!dcs->sdss.dm.guest_domid);
+            domcreate_devmodel_started(egc, &dcs->sdss.dm, 0);
             return;
         }
     }
@@ -1411,7 +1411,7 @@ static void domcreate_devmodel_started(libxl__egc *egc,
                                        libxl__dm_spawn_state *dmss,
                                        int ret)
 {
-    libxl__domain_create_state *dcs = CONTAINER_OF(dmss, *dcs, dmss.dm);
+    libxl__domain_create_state *dcs = CONTAINER_OF(dmss, *dcs, sdss.dm);
     STATE_AO_GC(dmss->spawn.ao);
     int domid = dcs->guest_domid;
 
@@ -1423,7 +1423,7 @@ static void domcreate_devmodel_started(libxl__egc *egc,
         goto error_out;
     }
 
-    if (dcs->dmss.dm.guest_domid) {
+    if (dcs->sdss.dm.guest_domid) {
         if (d_config->b_info.device_model_version
             == LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN) {
             libxl__qmp_initializations(gc, domid, d_config);
