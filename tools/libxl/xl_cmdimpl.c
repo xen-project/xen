@@ -4788,8 +4788,6 @@ static void migrate_receive(int debug, int daemonize, int monitor,
     char rc_buf;
     char *migration_domname;
     struct domain_create dom_info;
-    const char *ha = checkpointed == LIBXL_CHECKPOINTED_STREAM_COLO ?
-                     "COLO" : "Remus";
 
     signal(SIGPIPE, SIG_IGN);
     /* if we get SIGPIPE we'd rather just have it as an error */
@@ -4824,6 +4822,9 @@ static void migrate_receive(int debug, int daemonize, int monitor,
     switch (checkpointed) {
     case LIBXL_CHECKPOINTED_STREAM_REMUS:
     case LIBXL_CHECKPOINTED_STREAM_COLO:
+    {
+        const char *ha = checkpointed == LIBXL_CHECKPOINTED_STREAM_COLO ?
+                         "COLO" : "Remus";
         /* If we are here, it means that the sender (primary) has crashed.
          * TODO: Split-Brain Check.
          */
@@ -4860,6 +4861,7 @@ static void migrate_receive(int debug, int daemonize, int monitor,
                     ha, common_domname, domid, rc);
 
         exit(rc ? EXIT_FAILURE : EXIT_SUCCESS);
+    }
     default:
         /* do nothing */
         break;
