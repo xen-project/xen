@@ -39,12 +39,7 @@ static char **get_hotplug_env(libxl__gc *gc,
     const char *type = libxl__device_kind_to_string(dev->backend_kind);
     char *be_path = libxl__device_backend_path(gc, dev);
     char **env;
-    char *gatewaydev;
     int nr = 0;
-    libxl_nic_type nictype;
-
-    gatewaydev = libxl__xs_read(gc, XBT_NULL, GCSPRINTF("%s/%s", be_path,
-                                                        "gatewaydev"));
 
     const int arraysize = 15;
     GCNEW_ARRAY(env, arraysize);
@@ -56,9 +51,15 @@ static char **get_hotplug_env(libxl__gc *gc,
     env[nr++] = GCSPRINTF("backend/%s/%u/%d", type, dev->domid, dev->devid);
     env[nr++] = "XENBUS_BASE_PATH";
     env[nr++] = "backend";
-    env[nr++] = "netdev";
-    env[nr++] = gatewaydev ? : "";
     if (dev->backend_kind == LIBXL__DEVICE_KIND_VIF) {
+        libxl_nic_type nictype;
+        char *gatewaydev;
+
+        gatewaydev = libxl__xs_read(gc, XBT_NULL,
+                                    GCSPRINTF("%s/%s", be_path, "gatewaydev"));
+        env[nr++] = "netdev";
+        env[nr++] = gatewaydev ? : "";
+
         if (libxl__nic_type(gc, dev, &nictype)) {
             LOG(ERROR, "unable to get nictype");
             return NULL;
