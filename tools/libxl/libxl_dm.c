@@ -52,12 +52,14 @@ static int libxl__create_qemu_logfile(libxl__gc *gc, char *name)
     if (rc) return rc;
 
     logfile_w = open(logfile, O_WRONLY|O_CREAT|O_APPEND, 0644);
-    free(logfile);
 
     if (logfile_w < 0) {
-        LOGE(ERROR, "unable to open Qemu logfile");
+        LOGE(ERROR, "unable to open Qemu logfile: %s", logfile);
+        free(logfile);
         return ERROR_FAIL;
     }
+
+    free(logfile);
 
     return logfile_w;
 }
