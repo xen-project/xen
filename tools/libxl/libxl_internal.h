@@ -1794,6 +1794,9 @@ _hidden int libxl__qmp_set_global_dirty_log(libxl__gc *gc, int domid, bool enabl
 _hidden int libxl__qmp_insert_cdrom(libxl__gc *gc, int domid, const libxl_device_disk *disk);
 /* Add a virtual CPU */
 _hidden int libxl__qmp_cpu_add(libxl__gc *gc, int domid, int index);
+/* Query the bitmap of CPUs */
+_hidden int libxl__qmp_query_cpus(libxl__gc *gc, int domid,
+                                  libxl_bitmap *map);
 /* Start NBD server */
 _hidden int libxl__qmp_nbd_server_start(libxl__gc *gc, int domid,
                                         const char *host, const char *port);

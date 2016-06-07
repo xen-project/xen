@@ -979,6 +979,44 @@ int libxl__qmp_cpu_add(libxl__gc *gc, int domid, int idx)
     return qmp_run_command(gc, domid, "cpu-add", args, NULL, NULL);
 }
 
+static int query_cpus_callback(libxl__qmp_handler *qmp,
+                               const libxl__json_object *response,
+                               void *opaque)
+{
+    libxl_bitmap *map = opaque;
+    unsigned int i;
+    const libxl__json_object *cpu = NULL;
+    int rc;
+    GC_INIT(qmp->ctx);
+
+    libxl_bitmap_set_none(map);
+    for (i = 0; (cpu = libxl__json_array_get(response, i)); i++) {
+        unsigned int idx;
+        const libxl__json_object *o;
+
+        o = libxl__json_map_get("CPU", cpu, JSON_INTEGER);
+        if (!o) {
+            LOG(ERROR, "Failed to retrieve CPU index.");
+            rc = ERROR_FAIL;
+            goto out;
+        }
+
+        idx = libxl__json_object_get_integer(o);
+        libxl_bitmap_set(map, idx);
+    }
+
+    rc = 0;
+out:
+    GC_FREE;
+    return rc;
+}
+
+int libxl__qmp_query_cpus(libxl__gc *gc, int domid, libxl_bitmap *map)
+{
+    return qmp_run_command(gc, domid, "query-cpus", NULL,
+                           query_cpus_callback, map);
+}
+
 int libxl__qmp_nbd_server_start(libxl__gc *gc, int domid,
                                 const char *host, const char *port)
 {
