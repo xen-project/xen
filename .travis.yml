@@ -40,7 +40,6 @@ addons:
     apt:
         sources:
             - ubuntu-toolchain-r-test
-            - llvm-toolchain-precise
         packages:
             - zlib1g-dev
             - libncurses5-dev
@@ -70,7 +69,6 @@ addons:
             - gcc-aarch64-linux-gnu
             - gcc-5
             - g++-5
-            - clang-3.8
             - seabios
 # we must set CXX manually instead of using 'language: cpp' due to
 # travis-ci/travis-ci#3871
