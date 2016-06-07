@@ -17,7 +17,7 @@ or       = $(if $(strip $(1)),$(1),$(if $(strip $(2)),$(2),$(if $(strip $(3)),$(
 -include $(XEN_ROOT)/.config
 
 # A debug build of Xen and tools?
-debug ?= n
+debug ?= y
 debug_symbols ?= $(debug)
 
 # Test coverage support
@@ -272,7 +272,7 @@ SEABIOS_UPSTREAM_URL ?= git://xenbits.xen.org/seabios.git
 MINIOS_UPSTREAM_URL ?= git://xenbits.xen.org/mini-os.git
 endif
 OVMF_UPSTREAM_REVISION ?= 52a99493cce88a9d4ec8a02d7f1bd1a1001ce60d
-QEMU_UPSTREAM_REVISION ?= qemu-xen-4.7.0-rc5
+QEMU_UPSTREAM_REVISION ?= master
 MINIOS_UPSTREAM_REVISION ?= 1a3ee6eeca136525aa2e6917ae500e7cf731c09d
 # Fri May 13 15:21:10 2016 +0100
 # lib/sys.c: enclose file_types in define guards
