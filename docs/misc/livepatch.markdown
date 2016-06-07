@@ -816,7 +816,7 @@ The design of that is not discussed in this design.
 This is implemented in a seperate tool which lives in a seperate
 GIT repo.
 
-Currently it resides at https://github.com/rosslagerwall/livepatch-build
+Currently it resides at git://xenbits.xen.org/livepatch-build-tools.git
 
 ### Exception tables and symbol tables growth
 
