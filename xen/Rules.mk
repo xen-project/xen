@@ -20,13 +20,14 @@ include $(XEN_ROOT)/Config.mk
 ifeq ($(debug),y)
 verbose       := y
 frame_pointer := y
-else
-CFLAGS += -DNDEBUG
 endif
 ifeq ($(perfc_arrays),y)
 perfc := y
 endif
 
+ifeq ($(origin debug),command line)
+$(warning "You must use 'make menuconfig' to enable/disable debug now.")
+endif
 ifneq ($(origin kexec),undefined)
 $(error "You must use 'make menuconfig' to enable/disable kexec now.")
 endif

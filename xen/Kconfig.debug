@@ -1,0 +1,14 @@
+
+menu "Debugging Options"
+
+config DEBUG
+	bool "Developer Checks"
+	default y
+	---help---
+	  If you say Y here this will enable developer checks such as asserts
+	  and extra printks. This option is intended for development purposes
+	  only, and not for production use.
+
+	  You probably want to say 'N' here.
+
+endmenu

@@ -26,3 +26,5 @@ config DEFCONFIG_LIST
 config EXPERT
 	string
 	option env="XEN_CONFIG_EXPERT"
+
+source "Kconfig.debug"

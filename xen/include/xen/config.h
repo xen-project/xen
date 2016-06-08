@@ -81,4 +81,8 @@
 /* allow existing code to work with Kconfig variable */
 #define NR_CPUS CONFIG_NR_CPUS
 
+#ifndef CONFIG_DEBUG
+#define NDEBUG
+#endif
+
 #endif /* __XEN_CONFIG_H__ */
