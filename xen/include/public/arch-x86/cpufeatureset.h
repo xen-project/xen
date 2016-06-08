@@ -209,7 +209,6 @@ XEN_CPUFEATURE(PQE,           5*32+15) /*   Platform QoS Enforcement */
 XEN_CPUFEATURE(RDSEED,        5*32+18) /*A  RDSEED instruction */
 XEN_CPUFEATURE(ADX,           5*32+19) /*A  ADCX, ADOX instructions */
 XEN_CPUFEATURE(SMAP,          5*32+20) /*S  Supervisor Mode Access Prevention */
-XEN_CPUFEATURE(PCOMMIT,       5*32+22) /*A  PCOMMIT instruction */
 XEN_CPUFEATURE(CLFLUSHOPT,    5*32+23) /*A  CLFLUSHOPT instruction */
 XEN_CPUFEATURE(CLWB,          5*32+24) /*A  CLWB instruction */
 XEN_CPUFEATURE(SHA,           5*32+29) /*A  SHA1 & SHA256 instructions */
