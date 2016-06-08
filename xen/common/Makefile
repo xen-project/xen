@@ -8,6 +8,7 @@ obj-y += domain.o
 obj-y += event_2l.o
 obj-y += event_channel.o
 obj-y += event_fifo.o
+obj-$(CONFIG_CRASH_DEBUG) += gdbstub.o
 obj-y += grant_table.o
 obj-y += guestcopy.o
 obj-bin-y += gunzip.init.o
@@ -63,7 +64,6 @@ obj-y += xmalloc_tlsf.o
 obj-bin-$(CONFIG_X86) += $(foreach n,decompress bunzip2 unxz unlzma unlzo unlz4 earlycpio,$(n).init.o)
 
 obj-$(perfc)       += perfc.o
-obj-$(crash_debug) += gdbstub.o
 
 obj-$(CONFIG_COMPAT) += $(addprefix compat/,domain.o kernel.o memory.o multicall.o xlat.o)
 

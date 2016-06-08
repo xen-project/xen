@@ -39,7 +39,7 @@
 #define DEBUGGER_trap_fatal(_v, _r) \
     if ( debugger_trap_fatal(_v, _r) ) return;
 
-#if defined(CRASH_DEBUG)
+#ifdef CONFIG_CRASH_DEBUG
 
 #include <xen/gdbstub.h>
 

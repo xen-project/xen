@@ -23,7 +23,7 @@
 #include <asm/atomic.h>
 #include <asm/page.h>
 
-#ifdef CRASH_DEBUG
+#ifdef CONFIG_CRASH_DEBUG
 
 struct gdb_context {
     int                 serhnd;           /* handle on our serial line */

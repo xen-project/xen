@@ -27,6 +27,7 @@ obj-y += domain_page.o
 obj-y += e820.o
 obj-y += extable.o
 obj-y += flushtlb.o
+obj-$(CONFIG_CRASH_DEBUG) += gdbstub.o
 obj-y += i387.o
 obj-y += i8259.o
 obj-y += io_apic.o
@@ -65,8 +66,6 @@ obj-y += tboot.o
 obj-y += hpet.o
 obj-y += vm_event.o
 obj-y += xstate.o
-
-obj-$(crash_debug) += gdbstub.o
 
 x86_emulate.o: x86_emulate/x86_emulate.c x86_emulate/x86_emulate.h
 

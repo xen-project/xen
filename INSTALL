@@ -231,7 +231,6 @@ verbose=y
 perfc=y
 perfc_arrays=y
 lock_profile=y
-crash_debug=y
 frame_pointer=y
 lto=y
 

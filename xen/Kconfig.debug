@@ -11,4 +11,15 @@ config DEBUG
 
 	  You probably want to say 'N' here.
 
+if DEBUG || EXPERT = "y"
+
+config CRASH_DEBUG
+	bool "Crash Debugging Support"
+	depends on X86
+	---help---
+	  If you want to attach gdb to Xen to debug Xen if it crashes
+	  then say Y.
+
+endif # DEBUG || EXPERT
+
 endmenu

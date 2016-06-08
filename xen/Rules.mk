@@ -7,7 +7,6 @@ verbose       ?= n
 perfc         ?= n
 perfc_arrays  ?= n
 lock_profile  ?= n
-crash_debug   ?= n
 frame_pointer ?= n
 lto           ?= n
 
@@ -25,6 +24,9 @@ ifeq ($(perfc_arrays),y)
 perfc := y
 endif
 
+ifneq ($(origin crash_debug),undefined)
+$(error "You must use 'make menuconfig' to enable/disable crash_debug now.")
+endif
 ifeq ($(origin debug),command line)
 $(warning "You must use 'make menuconfig' to enable/disable debug now.")
 endif
@@ -59,7 +61,6 @@ CFLAGS += -Wa,--strip-local-absolute
 endif
 
 CFLAGS-$(verbose)       += -DVERBOSE
-CFLAGS-$(crash_debug)   += -DCRASH_DEBUG
 CFLAGS-$(perfc)         += -DPERF_COUNTERS
 CFLAGS-$(perfc_arrays)  += -DPERF_ARRAYS
 CFLAGS-$(lock_profile)  += -DLOCK_PROFILE

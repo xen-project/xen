@@ -14,4 +14,4 @@ obj-y += cpu_idle.o
 obj-y += cpufreq.o
 obj-bin-$(CONFIG_KEXEC) += kexec_reloc.o
 
-obj-$(crash_debug)   += gdbstub.o
+obj-$(CONFIG_CRASH_DEBUG)   += gdbstub.o

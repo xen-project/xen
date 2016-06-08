@@ -5,7 +5,7 @@ Xen has a simple gdb stub for doing post-mortem debugging i.e. once
 you've crashed it, you get to poke around and find out why.  There's
 also a special key handler for making it crash, which is handy.
 
-You need to have crash_debug=y set when compiling , and you also need
+You need to have CRASH_DEBUG=y set when compiling, and you also need
 to enable it on the Xen command line, eg by gdb=com1.
 
 If you need to have a serial port shared between gdb and the console,
@@ -19,7 +19,7 @@ if you have a simple null modem connection between the test box and
 the workstation, and aren't using a H/L split console:
 
   * Set debug=y in Config.mk
-  * Set crash_debug=y in xen/Rules.mk
+  * Set CRASH_DEBUG=y with `make -C xen menuconfig`
   * Make the changes in the attached patch, and build.
   * Arrange to pass gdb=com1 as a hypervisor command line argument
     (I already have com1=38400,8n1 console=com1,vga sync_console)
