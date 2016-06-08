@@ -307,7 +307,6 @@ extern u32 vmx_vmentry_control;
 #define SECONDARY_EXEC_ENABLE_PML               0x00020000
 #define SECONDARY_EXEC_ENABLE_VIRT_EXCEPTIONS   0x00040000
 #define SECONDARY_EXEC_XSAVES                   0x00100000
-#define SECONDARY_EXEC_PCOMMIT                  0x00200000
 #define SECONDARY_EXEC_TSC_SCALING              0x02000000
 extern u32 vmx_secondary_exec_control;
 
@@ -378,8 +377,6 @@ extern u64 vmx_ept_vpid_cap;
     (vmx_secondary_exec_control & SECONDARY_EXEC_ENABLE_PML)
 #define cpu_has_vmx_xsaves \
     (vmx_secondary_exec_control & SECONDARY_EXEC_XSAVES)
-#define cpu_has_vmx_pcommit \
-    (vmx_secondary_exec_control & SECONDARY_EXEC_PCOMMIT)
 #define cpu_has_vmx_tsc_scaling \
     (vmx_secondary_exec_control & SECONDARY_EXEC_TSC_SCALING)
 

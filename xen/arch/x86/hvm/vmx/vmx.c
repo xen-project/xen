@@ -3759,7 +3759,6 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
     case EXIT_REASON_ACCESS_LDTR_OR_TR:
     case EXIT_REASON_VMX_PREEMPTION_TIMER_EXPIRED:
     case EXIT_REASON_INVPCID:
-    case EXIT_REASON_PCOMMIT:
     /* fall through */
     default:
     exit_and_crash:

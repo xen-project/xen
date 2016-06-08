@@ -244,7 +244,6 @@ static int vmx_init_vmcs_config(void)
                SECONDARY_EXEC_ENABLE_VM_FUNCTIONS |
                SECONDARY_EXEC_ENABLE_VIRT_EXCEPTIONS |
                SECONDARY_EXEC_XSAVES |
-               SECONDARY_EXEC_PCOMMIT |
                SECONDARY_EXEC_TSC_SCALING);
         rdmsrl(MSR_IA32_VMX_MISC, _vmx_misc_cap);
         if ( _vmx_misc_cap & VMX_MISC_VMWRITE_ALL )
@@ -1078,12 +1077,6 @@ static int construct_vmcs(struct vcpu *v)
         __vmwrite(PLE_GAP, ple_gap);
         __vmwrite(PLE_WINDOW, ple_window);
     }
-
-    /*
-     * We do not intercept pcommit for L1 guest and allow L1 hypervisor to
-     * intercept pcommit for L2 guest (see nvmx_n2_vmexit_handler()).
-     */
-    v->arch.hvm_vmx.secondary_exec_control &= ~SECONDARY_EXEC_PCOMMIT;
 
     if ( cpu_has_vmx_secondary_exec_control )
         __vmwrite(SECONDARY_VM_EXEC_CONTROL,
