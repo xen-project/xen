@@ -54,7 +54,7 @@ SECTIONS
        *(.rodata)
        *(.rodata.*)
 
-#ifdef LOCK_PROFILE
+#ifdef CONFIG_LOCK_PROFILE
        . = ALIGN(POINTER_ALIGN);
        __lock_profile_start = .;
        *(.lockprofile.data)

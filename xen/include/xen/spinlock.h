@@ -20,7 +20,7 @@ struct lock_debug { };
 #define spin_debug_disable() ((void)0)
 #endif
 
-#ifdef LOCK_PROFILE
+#ifdef CONFIG_LOCK_PROFILE
 
 #include <public/sysctl.h>
 
@@ -144,7 +144,7 @@ typedef struct spinlock {
     u16 recurse_cnt:4;
 #define SPINLOCK_MAX_RECURSE 0xfu
     struct lock_debug debug;
-#ifdef LOCK_PROFILE
+#ifdef CONFIG_LOCK_PROFILE
     struct lock_profile *profile;
 #endif
 } spinlock_t;

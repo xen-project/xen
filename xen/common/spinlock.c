@@ -85,7 +85,7 @@ void spin_debug_disable(void)
 
 #endif
 
-#ifdef LOCK_PROFILE
+#ifdef CONFIG_LOCK_PROFILE
 
 #define LOCK_PROFILE_REL                                                     \
     if (lock->profile)                                                       \
@@ -212,7 +212,7 @@ int _spin_trylock(spinlock_t *lock)
     if ( cmpxchg(&lock->tickets.head_tail,
                  old.head_tail, new.head_tail) != old.head_tail )
         return 0;
-#ifdef LOCK_PROFILE
+#ifdef CONFIG_LOCK_PROFILE
     if (lock->profile)
         lock->profile->time_locked = NOW();
 #endif
@@ -227,7 +227,7 @@ int _spin_trylock(spinlock_t *lock)
 void _spin_barrier(spinlock_t *lock)
 {
     spinlock_tickets_t sample;
-#ifdef LOCK_PROFILE
+#ifdef CONFIG_LOCK_PROFILE
     s_time_t block = NOW();
 #endif
 
@@ -238,7 +238,7 @@ void _spin_barrier(spinlock_t *lock)
     {
         while ( observe_head(&lock->tickets) == sample.head )
             arch_lock_relax();
-#ifdef LOCK_PROFILE
+#ifdef CONFIG_LOCK_PROFILE
         if ( lock->profile )
         {
             lock->profile->time_block += NOW() - block;
@@ -296,7 +296,7 @@ void _spin_unlock_recursive(spinlock_t *lock)
     }
 }
 
-#ifdef LOCK_PROFILE
+#ifdef CONFIG_LOCK_PROFILE
 
 struct lock_profile_anc {
     struct lock_profile_qhead *head_q;   /* first head of this type */

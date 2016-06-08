@@ -227,7 +227,6 @@ VGABIOS_REL_DATE="dd Mon yyyy"
 
 The following variables can be used to tweak some aspects of the
 hypervisor build.
-lock_profile=y
 lto=y
 
 During tools build external repos will be cloned into the source tree.

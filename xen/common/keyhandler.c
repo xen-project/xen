@@ -64,7 +64,7 @@ static struct keyhandler {
     KEYHANDLER('P', perfc_reset, "reset performance counters", 0),
 #endif
 
-#ifdef LOCK_PROFILE
+#ifdef CONFIG_LOCK_PROFILE
     KEYHANDLER('l', spinlock_profile_printall, "print lock profile info", 1),
     KEYHANDLER('L', spinlock_profile_reset, "reset lock profile info", 0),
 #endif

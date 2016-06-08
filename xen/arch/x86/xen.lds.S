@@ -103,7 +103,7 @@ SECTIONS
        *(.ex_table.pre)
        __stop___pre_ex_table = .;
 
-#ifdef LOCK_PROFILE
+#ifdef CONFIG_LOCK_PROFILE
        . = ALIGN(POINTER_ALIGN);
        __lock_profile_start = .;
        *(.lockprofile.data)

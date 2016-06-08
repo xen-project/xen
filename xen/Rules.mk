@@ -3,7 +3,6 @@
 # If you change any of these configuration options then you must
 # 'make clean' before rebuilding.
 #
-lock_profile  ?= n
 lto           ?= n
 
 -include $(BASEDIR)/include/config/auto.conf
@@ -22,6 +21,9 @@ $(error "You must use 'make menuconfig' to enable/disable frame_pointer now.")
 endif
 ifneq ($(origin kexec),undefined)
 $(error "You must use 'make menuconfig' to enable/disable kexec now.")
+endif
+ifneq ($(origin lock_profile),undefined)
+$(error "You must use 'make menuconfig' to enable/disable lock_profile now.")
 endif
 ifneq ($(origin perfc),undefined)
 $(error "You must use 'make menuconfig' to enable/disable perfc now.")
@@ -56,7 +58,6 @@ ifneq ($(clang),y)
 CFLAGS += -Wa,--strip-local-absolute
 endif
 
-CFLAGS-$(lock_profile)  += -DLOCK_PROFILE
 CFLAGS-$(CONFIG_FRAME_POINTER) += -fno-omit-frame-pointer
 
 ifneq ($(max_phys_irqs),)
