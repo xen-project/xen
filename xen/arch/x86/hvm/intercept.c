@@ -258,6 +258,8 @@ struct hvm_io_handler *hvm_next_io_handler(struct domain *d)
 {
     unsigned int i = d->arch.hvm_domain.io_handler_count++;
 
+    ASSERT(d->arch.hvm_domain.io_handler);
+
     if ( i == NR_IO_HANDLERS )
     {
         domain_crash(d);
