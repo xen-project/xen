@@ -310,7 +310,7 @@ int __init serial_parse_handle(char *conf)
         goto common;
     }
 
-    if ( !strncmp(conf, "dtuart", 5) )
+    if ( !strncmp(conf, "dtuart", 6) )
     {
         handle = SERHND_DTUART;
         goto common;
