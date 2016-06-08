@@ -317,7 +317,10 @@ static int inject_mci_addr(xc_interface *xc_handle,
                            domid_t domid)
 {
     return add_msr_bank_intpose(xc_handle, cpu_nr,
-                                MC_MSRINJ_F_INTERPOSE | MC_MSRINJ_F_GPADDR,
+                                MC_MSRINJ_F_INTERPOSE |
+                                ((domid >= DOMID_FIRST_RESERVED &&
+                                  domid != DOMID_SELF) ?
+                                 0 : MC_MSRINJ_F_GPADDR),
                                 MCi_type_ADDR, bank, val, domid);
 }
 
