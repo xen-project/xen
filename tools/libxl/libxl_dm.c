@@ -1422,12 +1422,6 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
                                                         format,
                                                         &disks[i],
                                                         colo_mode);
-                } else if (strncmp(disks[i].vdev, "xvd", 3) == 0) {
-                    /*
-                     * Do not add any emulated disk when PV disk are
-                     * explicitly asked for.
-                     */
-                    continue;
                 } else if (disk < 6 && b_info->u.hvm.hdtype == LIBXL_HDTYPE_AHCI) {
                     if (!disks[i].readwrite) {
                         LOG(ERROR, "qemu-xen doesn't support read-only AHCI disk drivers");
