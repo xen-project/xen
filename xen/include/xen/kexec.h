@@ -14,6 +14,7 @@ typedef struct xen_kexec_reserve {
 } xen_kexec_reserve_t;
 
 extern xen_kexec_reserve_t kexec_crash_area;
+extern paddr_t kexec_crash_area_limit;
 
 extern bool_t kexecing;
 

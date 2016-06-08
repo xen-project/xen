@@ -1044,13 +1044,23 @@ void __init noreturn __start_xen(unsigned long mbi_p)
         }
 
 #ifdef CONFIG_KEXEC
-        /* Don't overlap with modules. */
-        e = consider_modules(s, e, PAGE_ALIGN(kexec_crash_area.size),
-                             mod, mbi->mods_count, -1);
-        if ( !kexec_crash_area.start && (s < e) )
+        /*
+         * Looking backwards from the crash area limit, find a large
+         * enough range that does not overlap with modules.
+         */
+        while ( !kexec_crash_area.start )
         {
-            e = (e - kexec_crash_area.size) & PAGE_MASK;
-            kexec_crash_area.start = e;
+            /* Don't overlap with modules. */
+            e = consider_modules(s, e, PAGE_ALIGN(kexec_crash_area.size),
+                                 mod, mbi->mods_count, -1);
+            if ( s >= e )
+                break;
+            if ( e > kexec_crash_area_limit )
+            {
+                e = kexec_crash_area_limit & PAGE_MASK;
+                continue;
+            }
+            kexec_crash_area.start = (e - kexec_crash_area.size) & PAGE_MASK;
         }
 #endif
     }

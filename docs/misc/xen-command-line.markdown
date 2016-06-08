@@ -458,7 +458,18 @@ Specify the maximum address to allocate certain structures, if used in
 combination with the `low_crashinfo` command line option.
 
 ### crashkernel
-> `= <ramsize-range>:<size>[,...][@<offset>]`
+> `= <ramsize-range>:<size>[,...][{@,<}<offset>]`
+> `= <size>[{@,<}<offset>]`
+
+Specify sizes and optionally placement of the crash kernel reservation
+area.  The `<ramsize-range>:<size>` pairs indicate how much memory to
+set aside for a crash kernel (`<size>`) for a given range of installed
+RAM (`<ramsize-range>`).  Each `<ramsize-range>` is of the form
+`<start>-[<end>]`.
+
+A trailing `@<offset>` specifies the exact address this area should be
+placed at, whereas `<` in place of `@` just specifies an upper bound of
+the address range the area should fall into.
 
 ### credit2\_balance\_over
 > `= <integer>`
