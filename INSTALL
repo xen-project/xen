@@ -230,7 +230,6 @@ hypervisor build.
 perfc=y
 perfc_arrays=y
 lock_profile=y
-frame_pointer=y
 lto=y
 
 During tools build external repos will be cloned into the source tree.

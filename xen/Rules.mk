@@ -6,7 +6,6 @@
 perfc         ?= n
 perfc_arrays  ?= n
 lock_profile  ?= n
-frame_pointer ?= n
 lto           ?= n
 
 -include $(BASEDIR)/include/config/auto.conf
@@ -15,9 +14,6 @@ include $(XEN_ROOT)/Config.mk
 
 # Hardcoded configuration implications and dependencies.
 # Do this is a neater way if it becomes unwieldy.
-ifeq ($(debug),y)
-frame_pointer := y
-endif
 ifeq ($(perfc_arrays),y)
 perfc := y
 endif
@@ -27,6 +23,9 @@ $(error "You must use 'make menuconfig' to enable/disable crash_debug now.")
 endif
 ifeq ($(origin debug),command line)
 $(warning "You must use 'make menuconfig' to enable/disable debug now.")
+endif
+ifneq ($(origin frame_pointer),undefined)
+$(error "You must use 'make menuconfig' to enable/disable frame_pointer now.")
 endif
 ifneq ($(origin kexec),undefined)
 $(error "You must use 'make menuconfig' to enable/disable kexec now.")
@@ -64,7 +63,7 @@ endif
 CFLAGS-$(perfc)         += -DPERF_COUNTERS
 CFLAGS-$(perfc_arrays)  += -DPERF_ARRAYS
 CFLAGS-$(lock_profile)  += -DLOCK_PROFILE
-CFLAGS-$(frame_pointer) += -fno-omit-frame-pointer -DCONFIG_FRAME_POINTER
+CFLAGS-$(CONFIG_FRAME_POINTER) += -fno-omit-frame-pointer
 
 ifneq ($(max_phys_irqs),)
 CFLAGS-y                += -DMAX_PHYS_IRQS=$(max_phys_irqs)

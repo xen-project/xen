@@ -20,6 +20,14 @@ config CRASH_DEBUG
 	  If you want to attach gdb to Xen to debug Xen if it crashes
 	  then say Y.
 
+config FRAME_POINTER
+	bool "Compile Xen with frame pointers"
+	default DEBUG
+	---help---
+	  If you say Y here the resulting Xen will be slightly larger and
+	  maybe slower, but it gives very useful debugging information
+	  in case of any Xen bugs.
+
 config VERBOSE_DEBUG
 	bool "Verbose debug messages"
 	default DEBUG
