@@ -1399,7 +1399,7 @@ int libxl_evenable_disk_eject(libxl_ctx *ctx, uint32_t guest_domid,
 
     const char *configured_vdev;
     rc = libxl__xs_read_checked(gc, XBT_NULL,
-            GCSPRINTF("%s/vdev", libxl_path), &configured_vdev);
+            GCSPRINTF("%s/dev", libxl_path), &configured_vdev);
     if (rc) goto out;
 
     evg->vdev = libxl__strdup(NOGC, configured_vdev);
