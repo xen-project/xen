@@ -385,7 +385,7 @@ static always_inline void stac(void)
 
 #endif
 
-#ifdef PERF_COUNTERS
+#ifdef CONFIG_PERF_COUNTERS
 #define PERFC_INCR(_name,_idx,_cur)             \
         pushq _cur;                             \
         movslq VCPU_processor(_cur),_cur;       \

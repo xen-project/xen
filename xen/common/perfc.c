@@ -78,7 +78,7 @@ void perfc_printall(unsigned char key)
             printk("TOTAL[%12Lu]", sum);
             if (sum)
             {
-#ifdef PERF_ARRAYS
+#ifdef CONFIG_PERF_ARRAYS
                 for ( k = 0; k < perfc_info[i].nr_elements; k++ )
                 {
                     sum = 0;

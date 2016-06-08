@@ -3580,7 +3580,7 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
 static uint64_t _hvm_rdtsc_intercept(void)
 {
     struct vcpu *curr = current;
-#if !defined(NDEBUG) || defined(PERF_COUNTERS)
+#if !defined(NDEBUG) || defined(CONFIG_PERF_COUNTERS)
     struct domain *currd = curr->domain;
 
     if ( currd->arch.vtsc )

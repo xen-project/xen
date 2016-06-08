@@ -59,7 +59,7 @@ static struct keyhandler {
     IRQ_KEYHANDLER('%', do_debug_key, "trap to xendbg", 0),
     IRQ_KEYHANDLER('*', run_all_keyhandlers, "print all diagnostics", 0),
 
-#ifdef PERF_COUNTERS
+#ifdef CONFIG_PERF_COUNTERS
     KEYHANDLER('p', perfc_printall, "print performance counters", 1),
     KEYHANDLER('P', perfc_reset, "reset performance counters", 0),
 #endif

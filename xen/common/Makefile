@@ -27,6 +27,7 @@ obj-y += multicall.o
 obj-y += notifier.o
 obj-y += page_alloc.o
 obj-$(CONFIG_HAS_PDX) += pdx.o
+obj-$(CONFIG_PERF_COUNTERS) += perfc.o
 obj-y += preempt.o
 obj-y += random.o
 obj-y += rangeset.o
@@ -63,7 +64,6 @@ obj-y += xmalloc_tlsf.o
 
 obj-bin-$(CONFIG_X86) += $(foreach n,decompress bunzip2 unxz unlzma unlzo unlz4 earlycpio,$(n).init.o)
 
-obj-$(perfc)       += perfc.o
 
 obj-$(CONFIG_COMPAT) += $(addprefix compat/,domain.o kernel.o memory.o multicall.o xlat.o)
 

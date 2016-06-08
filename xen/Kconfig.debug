@@ -28,6 +28,21 @@ config FRAME_POINTER
 	  maybe slower, but it gives very useful debugging information
 	  in case of any Xen bugs.
 
+config PERF_COUNTERS
+	bool "Performance Counters"
+	---help---
+	  Enables software performance counters that allows you to analyze
+	  bottlenecks in the system.  To access this data you can use serial
+	  console to print (and reset) using 'p' and 'P' respectively, or
+	  the 'xenperf' tool.
+
+config PERF_ARRAYS
+	bool "Performance Counter Array Histograms"
+	depends on PERF_COUNTERS
+	---help---
+	  Enables software performance counter array histograms.
+
+
 config VERBOSE_DEBUG
 	bool "Verbose debug messages"
 	default DEBUG

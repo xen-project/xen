@@ -39,7 +39,7 @@ DEFINE_XEN_GUEST_HANDLE(vcpu_runstate_info_compat_t);
  * Enable and ease the use of scheduling related performance counters.
  *
  */
-#ifdef PERF_COUNTERS
+#ifdef CONFIG_PERF_COUNTERS
 #define SCHED_STATS
 #endif
 

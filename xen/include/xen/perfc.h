@@ -1,7 +1,7 @@
 #ifndef __XEN_PERFC_H__
 #define __XEN_PERFC_H__
 
-#ifdef PERF_COUNTERS
+#ifdef CONFIG_PERF_COUNTERS
 
 #include <xen/lib.h>
 #include <xen/smp.h>
@@ -76,7 +76,7 @@ DECLARE_PER_CPU(perfc_t[NUM_PERFCOUNTERS], perfcounters);
  * Histogram: special treatment for 0 and 1 count. After that equally spaced 
  * with last bucket taking the rest.
  */
-#ifdef PERF_ARRAYS
+#ifdef CONFIG_PERF_ARRAYS
 #define perfc_incr_histo(x,v)                                           \
     do {                                                                \
         if ( (v) == 0 )                                                 \
@@ -100,7 +100,7 @@ extern void perfc_printall(unsigned char key);
 extern void perfc_reset(unsigned char key);
 
     
-#else /* PERF_COUNTERS */
+#else /* CONFIG_PERF_COUNTERS */
 
 #define perfc_value(x)    (0)
 #define perfc_valuea(x,y) (0)
@@ -114,6 +114,6 @@ extern void perfc_reset(unsigned char key);
 #define perfc_adda(x,y,z) ((void)0)
 #define perfc_incr_histo(x,y,z) ((void)0)
 
-#endif /* PERF_COUNTERS */
+#endif /* CONFIG_PERF_COUNTERS */
 
 #endif /* __XEN_PERFC_H__ */

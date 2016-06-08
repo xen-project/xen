@@ -3,8 +3,6 @@
 # If you change any of these configuration options then you must
 # 'make clean' before rebuilding.
 #
-perfc         ?= n
-perfc_arrays  ?= n
 lock_profile  ?= n
 lto           ?= n
 
@@ -12,11 +10,6 @@ lto           ?= n
 
 include $(XEN_ROOT)/Config.mk
 
-# Hardcoded configuration implications and dependencies.
-# Do this is a neater way if it becomes unwieldy.
-ifeq ($(perfc_arrays),y)
-perfc := y
-endif
 
 ifneq ($(origin crash_debug),undefined)
 $(error "You must use 'make menuconfig' to enable/disable crash_debug now.")
@@ -29,6 +22,9 @@ $(error "You must use 'make menuconfig' to enable/disable frame_pointer now.")
 endif
 ifneq ($(origin kexec),undefined)
 $(error "You must use 'make menuconfig' to enable/disable kexec now.")
+endif
+ifneq ($(origin perfc),undefined)
+$(error "You must use 'make menuconfig' to enable/disable perfc now.")
 endif
 ifneq ($(origin verbose),undefined)
 $(error "You must use 'make menuconfig' to enable/disable verbose now.")
@@ -60,8 +56,6 @@ ifneq ($(clang),y)
 CFLAGS += -Wa,--strip-local-absolute
 endif
 
-CFLAGS-$(perfc)         += -DPERF_COUNTERS
-CFLAGS-$(perfc_arrays)  += -DPERF_ARRAYS
 CFLAGS-$(lock_profile)  += -DLOCK_PROFILE
 CFLAGS-$(CONFIG_FRAME_POINTER) += -fno-omit-frame-pointer
 

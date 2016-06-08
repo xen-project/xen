@@ -227,8 +227,6 @@ VGABIOS_REL_DATE="dd Mon yyyy"
 
 The following variables can be used to tweak some aspects of the
 hypervisor build.
-perfc=y
-perfc_arrays=y
 lock_profile=y
 lto=y
 

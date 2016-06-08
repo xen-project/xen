@@ -1688,7 +1688,7 @@ void pv_soft_rdtsc(struct vcpu *v, struct cpu_user_regs *regs, int rdtscp)
 
     spin_lock(&d->arch.vtsc_lock);
 
-#if !defined(NDEBUG) || defined(PERF_COUNTERS)
+#if !defined(NDEBUG) || defined(CONFIG_PERF_COUNTERS)
     if ( guest_kernel_mode(v, regs) )
         d->arch.vtsc_kerncount++;
     else
@@ -1959,7 +1959,7 @@ static void dump_softtsc(unsigned char key)
             printk(",khz=%"PRIu32, d->arch.tsc_khz);
         if ( d->arch.incarnation )
             printk(",inc=%"PRIu32, d->arch.incarnation);
-#if !defined(NDEBUG) || defined(PERF_COUNTERS)
+#if !defined(NDEBUG) || defined(CONFIG_PERF_COUNTERS)
         if ( !(d->arch.vtsc_kerncount | d->arch.vtsc_usercount) )
             printk("\n");
         else

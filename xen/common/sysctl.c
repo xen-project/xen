@@ -115,7 +115,7 @@ long do_sysctl(XEN_GUEST_HANDLE_PARAM(xen_sysctl_t) u_sysctl)
     }
     break;
 
-#ifdef PERF_COUNTERS
+#ifdef CONFIG_PERF_COUNTERS
     case XEN_SYSCTL_perfc_op:
         ret = perfc_control(&op->u.perfc_op);
         break;

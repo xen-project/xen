@@ -152,7 +152,7 @@ void __dummy__(void)
     OFFSET(TRAPBOUNCE_eip, struct trap_bounce, eip);
     BLANK();
 
-#if PERF_COUNTERS
+#ifdef CONFIG_PERF_COUNTERS
     DEFINE(ASM_PERFC_hypercalls, PERFC_hypercalls);
     DEFINE(ASM_PERFC_exceptions, PERFC_exceptions);
     BLANK();
