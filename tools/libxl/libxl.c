@@ -5756,19 +5756,38 @@ static int libxl__set_vcpuonline_qmp(libxl__gc *gc, uint32_t domid,
                                      libxl_bitmap *cpumap,
                                      const libxl_dominfo *info)
 {
-    int i;
+    int i, rc;
+    libxl_bitmap current_map, final_map;
 
-    for (i = 0; i <= info->vcpu_max_id; i++) {
-        if (libxl_bitmap_test(cpumap, i)) {
-            /* Return value is ignore because it does not tell anything useful
-             * on the completion of the command.
-             * (For instance, "CPU already plugged-in" give the same return
-             * value as "command not supported".)
-             */
-            libxl__qmp_cpu_add(gc, domid, i);
+    libxl_bitmap_init(&current_map);
+    libxl_bitmap_init(&final_map);
+
+    libxl_bitmap_alloc(CTX, &current_map, info->vcpu_max_id + 1);
+    libxl_bitmap_set_none(&current_map);
+    rc = libxl__qmp_query_cpus(gc, domid, &current_map);
+    if (rc) {
+        LOG(ERROR, "failed to query cpus for domain %d", domid);
+        goto out;
+    }
+
+    libxl_bitmap_copy_alloc(CTX, &final_map, cpumap);
+
+    libxl_for_each_set_bit(i, current_map)
+        libxl_bitmap_reset(&final_map, i);
+
+    libxl_for_each_set_bit(i, final_map) {
+        rc = libxl__qmp_cpu_add(gc, domid, i);
+        if (rc) {
+            LOG(ERROR, "failed to add cpu %d to domain %d", i, domid);
+            goto out;
         }
     }
-    return 0;
+
+    rc = 0;
+out:
+    libxl_bitmap_dispose(&current_map);
+    libxl_bitmap_dispose(&final_map);
+    return rc;
 }
 
 int libxl_set_vcpuonline(libxl_ctx *ctx, uint32_t domid, libxl_bitmap *cpumap)
