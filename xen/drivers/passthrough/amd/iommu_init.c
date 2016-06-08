@@ -35,6 +35,7 @@ static int __initdata nr_amd_iommus;
 static struct tasklet amd_iommu_irq_tasklet;
 
 unsigned int __read_mostly ivrs_bdf_entries;
+u8 __read_mostly ivhd_type;
 static struct radix_tree_root ivrs_maps;
 struct list_head amd_iommu_head;
 struct table_struct device_table;
@@ -1232,8 +1233,15 @@ int __init amd_iommu_init(void)
          amd_sp5100_erratum28() )
         goto error_out;
 
-    ivrs_bdf_entries = amd_iommu_get_ivrs_dev_entries();
+    /* We implies no IOMMU if ACPI indicates no MSI. */
+    if ( unlikely(acpi_gbl_FADT.boot_flags & ACPI_FADT_NO_MSI) )
+        goto error_out;
 
+    ivhd_type = amd_iommu_get_supported_ivhd_type();
+    if ( ivhd_type < 0 )
+        goto error_out;
+
+    ivrs_bdf_entries = amd_iommu_get_ivrs_dev_entries();
     if ( !ivrs_bdf_entries )
         goto error_out;
 

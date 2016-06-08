@@ -42,6 +42,7 @@ struct acpi_ivrs_hardware;
 
 /* amd-iommu-detect functions */
 int amd_iommu_get_ivrs_dev_entries(void);
+int amd_iommu_get_supported_ivhd_type(void);
 int amd_iommu_detect_one_acpi(const struct acpi_ivrs_hardware *);
 int amd_iommu_detect_acpi(void);
 void get_iommu_features(struct amd_iommu *iommu);
