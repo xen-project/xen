@@ -3,7 +3,6 @@
 # If you change any of these configuration options then you must
 # 'make clean' before rebuilding.
 #
-verbose       ?= n
 perfc         ?= n
 perfc_arrays  ?= n
 lock_profile  ?= n
@@ -17,7 +16,6 @@ include $(XEN_ROOT)/Config.mk
 # Hardcoded configuration implications and dependencies.
 # Do this is a neater way if it becomes unwieldy.
 ifeq ($(debug),y)
-verbose       := y
 frame_pointer := y
 endif
 ifeq ($(perfc_arrays),y)
@@ -32,6 +30,9 @@ $(warning "You must use 'make menuconfig' to enable/disable debug now.")
 endif
 ifneq ($(origin kexec),undefined)
 $(error "You must use 'make menuconfig' to enable/disable kexec now.")
+endif
+ifneq ($(origin verbose),undefined)
+$(error "You must use 'make menuconfig' to enable/disable verbose now.")
 endif
 
 # Set ARCH/SUBARCH appropriately.
@@ -60,7 +61,6 @@ ifneq ($(clang),y)
 CFLAGS += -Wa,--strip-local-absolute
 endif
 
-CFLAGS-$(verbose)       += -DVERBOSE
 CFLAGS-$(perfc)         += -DPERF_COUNTERS
 CFLAGS-$(perfc_arrays)  += -DPERF_ARRAYS
 CFLAGS-$(lock_profile)  += -DLOCK_PROFILE

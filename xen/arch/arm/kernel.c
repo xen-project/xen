@@ -472,7 +472,7 @@ static int kernel_elf_probe(struct kernel_info *info,
 
     if ( (rc = elf_init(&info->elf.elf, info->elf.kernel_img, size )) != 0 )
         goto err;
-#ifdef VERBOSE
+#ifdef CONFIG_VERBOSE_DEBUG
     elf_set_verbose(&info->elf.elf);
 #endif
     elf_parse_binary(&info->elf.elf);

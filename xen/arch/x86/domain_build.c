@@ -942,7 +942,7 @@ int __init construct_dom0(
 
     if ( (rc = elf_init(&elf, image_start, image_len)) != 0 )
         return rc;
-#ifdef VERBOSE
+#ifdef CONFIG_VERBOSE_DEBUG
     elf_set_verbose(&elf);
 #endif
     elf_parse_binary(&elf);

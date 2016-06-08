@@ -215,7 +215,7 @@ static XSM_INLINE int xsm_memory_stat_reservation(XSM_DEFAULT_ARG struct domain 
 static XSM_INLINE int xsm_console_io(XSM_DEFAULT_ARG struct domain *d, int cmd)
 {
     XSM_ASSERT_ACTION(XSM_OTHER);
-#ifdef VERBOSE
+#ifdef CONFIG_VERBOSE_DEBUG
     if ( cmd == CONSOLEIO_write )
         return xsm_default_action(XSM_HOOK, d, NULL);
 #endif

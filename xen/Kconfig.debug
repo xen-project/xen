@@ -20,6 +20,13 @@ config CRASH_DEBUG
 	  If you want to attach gdb to Xen to debug Xen if it crashes
 	  then say Y.
 
+config VERBOSE_DEBUG
+	bool "Verbose debug messages"
+	default DEBUG
+	---help---
+	  Guest output from HYPERVISOR_console_io and hypervisor parsing
+	  ELF images (dom0) will be logged in the Xen ring buffer.
+
 endif # DEBUG || EXPERT
 
 endmenu
