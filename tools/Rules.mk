@@ -92,8 +92,9 @@ LDLIBS_libxenevtchn = $(XEN_LIBXENEVTCHN)/libxenevtchn$(libextension)
 SHLIB_libxenevtchn  = -Wl,-rpath-link=$(XEN_LIBXENEVTCHN)
 
 CFLAGS_libxengnttab = -I$(XEN_LIBXENGNTTAB)/include $(CFLAGS_xeninclude)
-LDLIBS_libxengnttab = $(XEN_LIBXENGNTTAB)/libxengnttab$(libextension)
-SHLIB_libxengnttab  = -Wl,-rpath-link=$(XEN_LIBXENGNTTAB)
+SHDEPS_libxengnttab = $(SHLIB_libxentoollog)
+LDLIBS_libxengnttab = $(SHDEPS_libxengnttab) $(XEN_LIBXENGNTTAB)/libxengnttab$(libextension)
+SHLIB_libxengnttab  = $(SHDEPS_libxengnttab) -Wl,-rpath-link=$(XEN_LIBXENGNTTAB)
 
 # xengntshr_* interfaces are actually part of libxengnttab.so
 CFLAGS_libxengntshr = -I$(XEN_LIBXENGNTTAB)/include $(CFLAGS_xeninclude)
