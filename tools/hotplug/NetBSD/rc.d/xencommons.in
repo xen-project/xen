@@ -20,16 +20,16 @@ status_cmd="xen_status"
 extra_commands="status"
 required_files="/kern/xen/privcmd"
 
-XENSTORED_PIDFILE="/var/run/xenstored.pid"
-XENCONSOLED_PIDFILE="/var/run/xenconsoled.pid"
-XENBACKENDD_PIDFILE="/var/run/xenbackendd.pid"
+XENSTORED_PIDFILE="@XEN_RUN_DIR@/xenstored.pid"
+XENCONSOLED_PIDFILE="@XEN_RUN_DIR@/xenconsoled.pid"
+XENBACKENDD_PIDFILE="@XEN_RUN_DIR@/xenbackendd.pid"
 #XENBACKENDD_DEBUG=1
-#XENCONSOLED_TRACE="/var/log/xen/xenconsole-trace.log"
-#XENSTORED_TRACE="/var/log/xen/xenstore-trace.log"
+#XENCONSOLED_TRACE="@XEN_LOG_DIR@/xenconsole-trace.log"
+#XENSTORED_TRACE="@XEN_LOG_DIR@/xenstore-trace.log"
 
 xen_precmd()
 {
-	mkdir -p /var/run/xenstored || exit 1
+	mkdir -p @XEN_RUN_DIR@/xenstored || exit 1
 }
 
 xen_startcmd()
@@ -47,7 +47,7 @@ xen_startcmd()
 		printf "Starting xenservices: xenstored, xenconsoled."
 		XENSTORED_ARGS=" --pid-file ${XENSTORED_PIDFILE}"
 		if [ -n "${XENSTORED_TRACE}" ]; then
-			XENSTORED_ARGS="${XENSTORED_ARGS} -T /var/log/xen/xenstored-trace.log"
+			XENSTORED_ARGS="${XENSTORED_ARGS} -T @XEN_LOG_DIR@/xenstored-trace.log"
 		fi
 		${sbindir}/xenstored ${XENSTORED_ARGS}
 		while [ $time -lt $timeout ] && ! `${bindir}/xenstore-read -s / >/dev/null 2>&1` ; do
