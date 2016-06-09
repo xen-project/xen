@@ -141,6 +141,10 @@ SECTIONS
        *(.init.setup)
        __setup_end = .;
 
+       __proc_info_start = .;
+       *(.init.proc.info)
+       __proc_info_end = .;
+
        *(.init.data)
        *(.init.data.rel)
        *(.init.data.rel.*)
@@ -151,11 +155,6 @@ SECTIONS
        __ctors_end = .;
   } :text
   . = ALIGN(32);
-  .init.proc.info : {
-       __proc_info_start = .;
-       *(.init.proc.info)
-       __proc_info_end = .;
-  } :text
   .initcall.init : {
        __initcall_start = .;
        *(.initcallpresmp.init)
