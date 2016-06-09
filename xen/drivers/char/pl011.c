@@ -53,11 +53,17 @@ static struct pl011 {
 #define pl011_read(uart, off)           readl((uart)->regs + (off))
 #define pl011_write(uart, off,val)      writel((val), (uart)->regs + (off))
 
+static unsigned int pl011_intr_status(struct pl011 *uart)
+{
+    /* UARTMIS is not documented in SBSA v2.x, so use UARTRIS/UARTIMSC. */
+    return (pl011_read(uart, RIS) & pl011_read(uart, IMSC));
+}
+
 static void pl011_interrupt(int irq, void *data, struct cpu_user_regs *regs)
 {
     struct serial_port *port = data;
     struct pl011 *uart = port->uart;
-    unsigned int status = pl011_read(uart, MIS);
+    unsigned int status = pl011_intr_status(uart);
 
     if ( status )
     {
@@ -76,7 +82,7 @@ static void pl011_interrupt(int irq, void *data, struct cpu_user_regs *regs)
             if ( status & (TXI) )
                 serial_tx_interrupt(port, regs);
 
-            status = pl011_read(uart, MIS);
+            status = pl011_intr_status(uart);
         } while (status != 0);
     }
 }
