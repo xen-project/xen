@@ -530,6 +530,28 @@ static struct cpuidle_state skl_cstates[] = {
 	{}
 };
 
+static const struct cpuidle_state skx_cstates[] = {
+	{
+		.name = "C1-SKX",
+		.flags = MWAIT2flg(0x00),
+		.exit_latency = 2,
+		.target_residency = 2,
+	},
+	{
+		.name = "C1E-SKX",
+		.flags = MWAIT2flg(0x01),
+		.exit_latency = 10,
+		.target_residency = 20,
+	},
+	{
+		.name = "C6-SKX",
+		.flags = MWAIT2flg(0x20) | CPUIDLE_FLAG_TLB_FLUSHED,
+		.exit_latency = 133,
+		.target_residency = 600,
+	},
+	{}
+};
+
 static const struct cpuidle_state atom_cstates[] = {
 	{
 		.name = "C1E-ATM",
@@ -757,6 +779,11 @@ static const struct idle_cpu idle_cpu_skl = {
 	.disable_promotion_to_c1e = 1,
 };
 
+static const struct idle_cpu idle_cpu_skx = {
+	.state_table = skx_cstates,
+	.disable_promotion_to_c1e = 1,
+};
+
 static const struct idle_cpu idle_cpu_avn = {
 	.state_table = avn_cstates,
 	.disable_promotion_to_c1e = 1,
@@ -798,6 +825,7 @@ static const struct x86_cpu_id intel_idle_ids[] __initconst = {
 	ICPU(0x56, bdw),
 	ICPU(0x4e, skl),
 	ICPU(0x5e, skl),
+	ICPU(0x55, skx),
 	ICPU(0x57, knl),
 	{}
 };
