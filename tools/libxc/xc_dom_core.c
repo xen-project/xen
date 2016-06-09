@@ -33,13 +33,14 @@
 
 #include "xg_private.h"
 #include "xc_dom.h"
+#include "_paths.h"
 
 /* ------------------------------------------------------------------------ */
 /* debugging                                                                */
 
 
 
-static const char *default_logfile = "/var/log/xen/domain-builder-ng.log";
+static const char *default_logfile = XEN_LOG_DIR "/domain-builder-ng.log";
 
 int xc_dom_loginit(xc_interface *xch) {
     if (xch->dombuild_logger) return 0;
