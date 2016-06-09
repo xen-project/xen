@@ -61,7 +61,8 @@ build all: subdirs-all
 .PHONY: install
 install: subdirs-install
 	$(INSTALL_DIR) -m 700 $(DESTDIR)$(XEN_DUMP_DIR)
-	$(INSTALL_DIR) $(DESTDIR)/var/log/xen
+	$(INSTALL_DIR) $(DESTDIR)$(XEN_LOG_DIR)
+	$(INSTALL_DIR) $(DESTDIR)$(XEN_RUN_DIR)
 	$(INSTALL_DIR) $(DESTDIR)/var/lib/xen
 
 .PHONY: uninstall
