@@ -2413,7 +2413,7 @@ int hvm_set_cr4(unsigned long value, bool_t may_defer)
 
 bool_t hvm_virtual_to_linear_addr(
     enum x86_segment seg,
-    struct segment_register *reg,
+    const struct segment_register *reg,
     unsigned long offset,
     unsigned int bytes,
     enum hvm_access_type access_type,
