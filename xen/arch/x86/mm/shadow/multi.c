@@ -4501,7 +4501,6 @@ static void sh_pagetable_dying(struct vcpu *v, paddr_t gpa)
     p2m_type_t p2mt;
     char *gl3pa = NULL;
     guest_l3e_t *gl3e = NULL;
-    paddr_t gl2a = 0;
     unsigned long l3gfn;
     mfn_t l3mfn;
 
@@ -4528,7 +4527,6 @@ static void sh_pagetable_dying(struct vcpu *v, paddr_t gpa)
     }
     for ( i = 0; i < 4; i++ )
     {
-        unsigned long gfn;
         mfn_t smfn, gmfn;
 
         if ( fast_path ) {
@@ -4540,10 +4538,11 @@ static void sh_pagetable_dying(struct vcpu *v, paddr_t gpa)
         else
         {
             /* retrieving the l2s */
-            gl2a = guest_l3e_get_paddr(gl3e[i]);
-            gfn = gl2a >> PAGE_SHIFT;
-            gmfn = get_gfn_query_unlocked(d, gfn, &p2mt);
-            smfn = shadow_hash_lookup(d, mfn_x(gmfn), SH_type_l2_pae_shadow);
+            gmfn = get_gfn_query_unlocked(d, gfn_x(guest_l3e_get_gfn(gl3e[i])),
+                                          &p2mt);
+            smfn = unlikely(mfn_x(gmfn) == INVALID_MFN)
+                   ? _mfn(INVALID_MFN)
+                   : shadow_hash_lookup(d, mfn_x(gmfn), SH_type_l2_pae_shadow);
         }
 
         if ( mfn_valid(smfn) )
