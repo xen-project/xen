@@ -983,7 +983,7 @@ static void __init bxt_idle_state_table_update(void)
  * On SKL-H (model 0x5e) disable C8 and C9 if:
  * C10 is enabled and SGX disabled
  */
-static void sklh_idle_state_table_update(void)
+static void __init sklh_idle_state_table_update(void)
 {
 	u64 msr;
 
