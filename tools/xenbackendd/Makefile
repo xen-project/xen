@@ -30,12 +30,16 @@ install: build
 
 .PHONY: clean
 clean:
-	$(RM) *.a *.so *.o $(DEPS) xenbackendd
+	$(RM) *.a *.so *.o $(DEPS) xenbackendd _paths.h
 
 .PHONY: distclean
 distclean: clean
 
+xenbackendd.o: _paths.h
 xenbackendd: xenbackendd.o
 	$(CC) $(LDFLAGS) $< -o $@ $(LDLIBS) $(APPEND_LDFLAGS)
+
+genpath-target = $(call buildmakevars2header,_paths.h)
+$(eval $(genpath-target))
 
 -include $(DEPS)
