@@ -24,7 +24,7 @@
 ## Default: ""
 #
 # Additional commandline arguments to start xenstored,
-# like "--trace-file /var/log/xen/xenstored-trace.log"
+# like "--trace-file @XEN_LOG_DIR@/xenstored-trace.log"
 # See "@sbindir@/xenstored --help" for possible options.
 XENSTORED_ARGS=
 

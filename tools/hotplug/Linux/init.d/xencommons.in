@@ -66,7 +66,7 @@ do_start () {
 	then
 		test -z "$XENSTORED_ROOTDIR" && XENSTORED_ROOTDIR="@XEN_LIB_STORED@"
 		rm -f "$XENSTORED_ROOTDIR"/tdb* &>/dev/null
-		test -z "$XENSTORED_TRACE" || XENSTORED_ARGS=" -T /var/log/xen/xenstored-trace.log"
+		test -z "$XENSTORED_TRACE" || XENSTORED_ARGS=" -T @XEN_LOG_DIR@/xenstored-trace.log"
 
 		if [ -n "$XENSTORED" ] ; then
 		    echo -n Starting $XENSTORED...

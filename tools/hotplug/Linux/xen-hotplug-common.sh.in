@@ -20,7 +20,7 @@ dir=$(dirname "$0")
 . "$dir/xen-script-common.sh"
 . "$dir/locking.sh"
 
-exec 2>>/var/log/xen/xen-hotplug.log
+exec 2>>@XEN_LOG_DIR@/xen-hotplug.log
 
 export PATH="${bindir}:${sbindir}:${LIBEXEC_BIN}:/sbin:/bin:/usr/bin:/usr/sbin:$PATH"
 export LD_LIBRARY_PATH="${libdir}${LD_LIBRARY_PATH+:}$LD_LIBRARY_PATH"
