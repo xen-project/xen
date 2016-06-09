@@ -435,8 +435,7 @@ int main(int argc, char *argv[])
                    "'xen-livepatch help'\n", argv[1]);
             return 1;
         }
-    } else
-        j = ARRAY_SIZE(action_options);
+    }
 
     xch = xc_interface_open(0,0,0);
     if ( !xch )
