@@ -597,7 +597,7 @@ static int gicv2_map_hwdown_extra_mappings(struct domain *d)
         int ret;
         u32 spi;
 
-        printk("GICv2: Mapping v2m frame to d%d: addr=0x%lx size=0x%lx spi_base=%u num_spis=%u\n",
+        printk("GICv2: Mapping v2m frame to d%d: addr=0x%"PRIpaddr" size=0x%"PRIpaddr" spi_base=%u num_spis=%u\n",
                d->domain_id, v2m_data->addr, v2m_data->size,
                v2m_data->spi_start, v2m_data->nr_spis);
 
@@ -685,7 +685,7 @@ static int gicv2m_make_dt_node(const struct domain *d,
     {
         v2m = v2m_data->dt_node;
 
-        printk("GICv2: Creating v2m DT node for d%d: addr=0x%lx size=0x%lx spi_base=%u num_spis=%u\n",
+        printk("GICv2: Creating v2m DT node for d%d: addr=0x%"PRIpaddr" size=0x%"PRIpaddr" spi_base=%u num_spis=%u\n",
                d->domain_id, v2m_data->addr, v2m_data->size,
                v2m_data->spi_start, v2m_data->nr_spis);
 
