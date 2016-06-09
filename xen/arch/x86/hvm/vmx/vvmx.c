@@ -1852,7 +1852,7 @@ int nvmx_msr_read_intercept(unsigned int msr, u64 *msr_content)
     }
     case MSR_IA32_VMX_PINBASED_CTLS:
     case MSR_IA32_VMX_TRUE_PINBASED_CTLS:
-        /* 1-seetings */
+        /* 1-settings */
         data = PIN_BASED_EXT_INTR_MASK |
                PIN_BASED_NMI_EXITING |
                PIN_BASED_PREEMPT_TIMER;
@@ -1862,7 +1862,7 @@ int nvmx_msr_read_intercept(unsigned int msr, u64 *msr_content)
     case MSR_IA32_VMX_TRUE_PROCBASED_CTLS:
     {
         u32 default1_bits = VMX_PROCBASED_CTLS_DEFAULT1;
-        /* 1-seetings */
+        /* 1-settings */
         data = CPU_BASED_HLT_EXITING |
                CPU_BASED_VIRTUAL_INTR_PENDING |
                CPU_BASED_CR8_LOAD_EXITING |
@@ -1894,7 +1894,7 @@ int nvmx_msr_read_intercept(unsigned int msr, u64 *msr_content)
         break;
     }
     case MSR_IA32_VMX_PROCBASED_CTLS2:
-        /* 1-seetings */
+        /* 1-settings */
         data = SECONDARY_EXEC_DESCRIPTOR_TABLE_EXITING |
                SECONDARY_EXEC_VIRTUALIZE_APIC_ACCESSES |
                SECONDARY_EXEC_ENABLE_VPID |
@@ -1904,7 +1904,7 @@ int nvmx_msr_read_intercept(unsigned int msr, u64 *msr_content)
         break;
     case MSR_IA32_VMX_EXIT_CTLS:
     case MSR_IA32_VMX_TRUE_EXIT_CTLS:
-        /* 1-seetings */
+        /* 1-settings */
         data = VM_EXIT_ACK_INTR_ON_EXIT |
                VM_EXIT_IA32E_MODE |
                VM_EXIT_SAVE_PREEMPT_TIMER |
@@ -1917,7 +1917,7 @@ int nvmx_msr_read_intercept(unsigned int msr, u64 *msr_content)
         break;
     case MSR_IA32_VMX_ENTRY_CTLS:
     case MSR_IA32_VMX_TRUE_ENTRY_CTLS:
-        /* 1-seetings */
+        /* 1-settings */
         data = VM_ENTRY_LOAD_GUEST_PAT |
                VM_ENTRY_LOAD_GUEST_EFER |
                VM_ENTRY_LOAD_PERF_GLOBAL_CTRL |
