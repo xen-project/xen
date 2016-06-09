@@ -1119,8 +1119,7 @@ void pv_cpuid(struct cpu_user_regs *regs)
              * domain policy.  It varies with enabled xstate, and the correct
              * xcr0 is in context.
              */
-            if ( !is_control_domain(currd) && !is_hardware_domain(currd) )
-                cpuid_count(leaf, subleaf, &tmp, &b, &tmp, &tmp);
+            cpuid_count(leaf, subleaf, &tmp, &b, &tmp, &tmp);
             break;
         }
 
