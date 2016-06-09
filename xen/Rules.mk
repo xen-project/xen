@@ -64,7 +64,7 @@ ifneq ($(max_phys_irqs),)
 CFLAGS-y                += -DMAX_PHYS_IRQS=$(max_phys_irqs)
 endif
 
-AFLAGS-y                += -D__ASSEMBLY__ -include $(BASEDIR)/include/xen/config.h
+AFLAGS-y                += -D__ASSEMBLY__
 
 # Clang's built-in assembler can't handle .code16/.code32/.code64 yet
 AFLAGS-$(clang)         += -no-integrated-as
@@ -79,7 +79,7 @@ CFLAGS += $(CFLAGS-y)
 # Most CFLAGS are safe for assembly files:
 #  -std=gnu{89,99} gets confused by #-prefixed end-of-line comments
 #  -flto makes no sense and annoys clang
-AFLAGS += $(AFLAGS-y) $(filter-out -std=gnu%,$(filter-out -flto,$(CFLAGS)))
+AFLAGS += $(AFLAGS-y) $(filter-out -std=gnu% -flto,$(CFLAGS))
 
 # LDFLAGS are only passed directly to $(LD)
 LDFLAGS += $(LDFLAGS_DIRECT)
