@@ -14,9 +14,68 @@
 #ifndef __ARCH_X86_IOMMU_H__
 #define __ARCH_X86_IOMMU_H__
 
-#include <asm/hvm/iommu.h> /* For now - should really be merged here. */
+#include <xen/errno.h>
+#include <xen/list.h>
+#include <xen/spinlock.h>
+#include <asm/processor.h>
 
+#define DEFAULT_DOMAIN_ADDRESS_WIDTH 48
 #define MAX_IOMMUS 32
+
+struct g2m_ioport {
+    struct list_head list;
+    unsigned int gport;
+    unsigned int mport;
+    unsigned int np;
+};
+
+struct arch_iommu
+{
+    u64 pgd_maddr;                 /* io page directory machine address */
+    spinlock_t mapping_lock;            /* io page table lock */
+    int agaw;     /* adjusted guest address width, 0 is level 2 30-bit */
+    struct list_head g2m_ioport_list;   /* guest to machine ioport mapping */
+    u64 iommu_bitmap;              /* bitmap of iommu(s) that the domain uses */
+    struct list_head mapped_rmrrs;
+
+    /* amd iommu support */
+    int paging_mode;
+    struct page_info *root_table;
+    struct guest_iommu *g_iommu;
+};
+
+extern const struct iommu_ops intel_iommu_ops;
+extern const struct iommu_ops amd_iommu_ops;
+int intel_vtd_setup(void);
+int amd_iov_detect(void);
+
+static inline const struct iommu_ops *iommu_get_ops(void)
+{
+    switch ( boot_cpu_data.x86_vendor )
+    {
+    case X86_VENDOR_INTEL:
+        return &intel_iommu_ops;
+    case X86_VENDOR_AMD:
+        return &amd_iommu_ops;
+    }
+
+    BUG();
+
+    return NULL;
+}
+
+static inline int iommu_hardware_setup(void)
+{
+    switch ( boot_cpu_data.x86_vendor )
+    {
+    case X86_VENDOR_INTEL:
+        return intel_vtd_setup();
+    case X86_VENDOR_AMD:
+        return amd_iov_detect();
+    }
+
+    return -ENODEV;
+}
 
 /* Does this domain have a P2M table we can use as its IOMMU pagetable? */
 #define iommu_use_hap_pt(d) (hap_enabled(d) && iommu_hap_pt_share)
