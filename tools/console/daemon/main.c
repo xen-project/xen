@@ -31,6 +31,7 @@
 
 #include "utils.h"
 #include "io.h"
+#include "_paths.h"
 
 int log_reload = 0;
 int log_guest = 0;
@@ -176,7 +177,7 @@ int main(int argc, char **argv)
 	}
 
 	if (!log_dir) {
-		log_dir = strdup("/var/log/xen/console");
+		log_dir = strdup(XEN_LOG_DIR "/console");
 	}
 
 	if (geteuid() != 0) {

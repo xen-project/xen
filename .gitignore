@@ -111,6 +111,7 @@ tools/blktap2/vhd/vhd-util
 tools/console/xenconsole
 tools/console/xenconsoled
 tools/console/client/_paths.h
+tools/console/daemon/_paths.h
 tools/debugger/gdb/gdb-6.2.1-linux-i386-xen/*
 tools/debugger/gdb/gdb-6.2.1/*
 tools/debugger/gdb/gdb-6.2.1.tar.bz2
