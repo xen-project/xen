@@ -91,8 +91,8 @@ XEN_ERRNO(EDEADLK,	35)	/* Resource deadlock would occur */
 XEN_ERRNO(EDEADLOCK,	35)	/* Resource deadlock would occur. Aliases EDEADLK */
 XEN_ERRNO(ENAMETOOLONG,	36)	/* File name too long */
 XEN_ERRNO(ENOLCK,	37)	/* No record locks available */
-XEN_ERRNO(ENOTEMPTY,	39)	/* Directory not empty */
 XEN_ERRNO(ENOSYS,	38)	/* Function not implemented */
+XEN_ERRNO(ENOTEMPTY,	39)	/* Directory not empty */
 XEN_ERRNO(ENODATA,	61)	/* No data available */
 XEN_ERRNO(ETIME,	62)	/* Timer expired */
 XEN_ERRNO(EBADMSG,	74)	/* Not a data message */
