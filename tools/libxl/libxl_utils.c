@@ -18,6 +18,7 @@
 #include <ctype.h>
 
 #include "libxl_internal.h"
+#include "_paths.h"
 
 #ifndef LIBXL_HAVE_NONCONST_LIBXL_BASENAME_RETURN_VALUE
 const
@@ -261,20 +262,20 @@ int libxl_create_logfile(libxl_ctx *ctx, const char *name, char **full_name)
     char *logfile, *logfile_new;
     int i, rc;
 
-    logfile = GCSPRINTF("/var/log/xen/%s.log", name);
+    logfile = GCSPRINTF(XEN_LOG_DIR "/%s.log", name);
     if (stat(logfile, &stat_buf) == 0) {
         /* file exists, rotate */
-        logfile = GCSPRINTF("/var/log/xen/%s.log.10", name);
+        logfile = GCSPRINTF(XEN_LOG_DIR "/%s.log.10", name);
         unlink(logfile);
         for (i = 9; i > 0; i--) {
-            logfile = GCSPRINTF("/var/log/xen/%s.log.%d", name, i);
-            logfile_new = GCSPRINTF("/var/log/xen/%s.log.%d", name, i + 1);
+            logfile = GCSPRINTF(XEN_LOG_DIR "/%s.log.%d", name, i);
+            logfile_new = GCSPRINTF(XEN_LOG_DIR "/%s.log.%d", name, i + 1);
             rc = logrename(gc, logfile, logfile_new);
             if (rc)
                 goto out;
         }
-        logfile = GCSPRINTF("/var/log/xen/%s.log", name);
-        logfile_new = GCSPRINTF("/var/log/xen/%s.log.1", name);
+        logfile = GCSPRINTF(XEN_LOG_DIR "/%s.log", name);
+        logfile_new = GCSPRINTF(XEN_LOG_DIR "/%s.log.1", name);
 
         rc = logrename(gc, logfile, logfile_new);
         if (rc)
