@@ -387,8 +387,11 @@ void xrstor(struct vcpu *v, uint64_t mask)
         { \
             if ( unlikely(!(ptr->xsave_hdr.xcomp_bv & \
                             XSTATE_COMPACTION_ENABLED)) ) \
-                ptr->xsave_hdr.xcomp_bv |= ptr->xsave_hdr.xstate_bv | \
-                                           XSTATE_COMPACTION_ENABLED; \
+            { \
+                ASSERT(!ptr->xsave_hdr.xcomp_bv); \
+                ptr->xsave_hdr.xcomp_bv = ptr->xsave_hdr.xstate_bv | \
+                                          XSTATE_COMPACTION_ENABLED; \
+            } \
             _xrstor(pfx "0x0f,0xc7,0x1f"); /* xrstors */ \
         } \
         else \
