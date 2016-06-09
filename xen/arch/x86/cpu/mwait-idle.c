@@ -825,6 +825,8 @@ static const struct x86_cpu_id intel_idle_ids[] __initconst = {
 	ICPU(0x56, bdw),
 	ICPU(0x4e, skl),
 	ICPU(0x5e, skl),
+	ICPU(0x8e, skl),
+	ICPU(0x9e, skl),
 	ICPU(0x55, skx),
 	ICPU(0x57, knl),
 	{}
