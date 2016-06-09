@@ -31,7 +31,7 @@
 #include <asm/io.h>
 
 static struct pl011 {
-    unsigned int baud, clock_hz, data_bits, parity, stop_bits;
+    unsigned int data_bits, parity, stop_bits;
     unsigned int irq;
     void __iomem *regs;
     /* UART with IRQ line: interrupt-driven I/O. */
@@ -84,7 +84,6 @@ static void pl011_interrupt(int irq, void *data, struct cpu_user_regs *regs)
 static void __init pl011_init_preirq(struct serial_port *port)
 {
     struct pl011 *uart = port->uart;
-    unsigned int divisor;
     unsigned int cr;
 
     /* No interrupts, please. */
@@ -93,22 +92,6 @@ static void __init pl011_init_preirq(struct serial_port *port)
     /* Definitely no DMA */
     pl011_write(uart, DMACR, 0x0);
 
-    /* Line control and baud-rate generator. */
-    if ( uart->baud != BAUD_AUTO )
-    {
-        /* Baud rate specified: program it into the divisor latch. */
-        divisor = (uart->clock_hz << 2) / uart->baud; /* clk << 6 / bd << 4 */
-        pl011_write(uart, FBRD, divisor & 0x3f);
-        pl011_write(uart, IBRD, divisor >> 6);
-    }
-    else
-    {
-        /* Baud rate already set: read it out from the divisor latch. */
-        divisor = (pl011_read(uart, IBRD) << 6) | (pl011_read(uart, FBRD));
-        if (!divisor)
-            panic("pl011: No Baud rate configured\n");
-        uart->baud = (uart->clock_hz << 2) / divisor;
-    }
     /* This write must follow FBRD and IBRD writes. */
     pl011_write(uart, LCR_H, (uart->data_bits - 5) << 5
                             | FEN
@@ -232,8 +215,6 @@ static int __init pl011_uart_init(int irq, u64 addr, u64 size)
 
     uart = &pl011_com;
     uart->irq       = irq;
-    uart->clock_hz  = 0x16e3600;
-    uart->baud      = BAUD_AUTO;
     uart->data_bits = 8;
     uart->parity    = PARITY_NONE;
     uart->stop_bits = 1;
