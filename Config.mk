@@ -248,9 +248,9 @@ ETHERBOOT_NICS ?= rtl8139 8086100e
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= 760ff3b7e8ecb8e47217e8254ca22bd4adb4e4a6
-# Wed Jul 15 18:17:04 2015 +0100
-# rtl8139: check TCP Data Offset field
+QEMU_TAG ?= 564f935e958bd102df822c978bd021673365dc78
+# Thu May 19 19:38:35 2016 +0100
+# main loop: Big hammer to fix logfile disk DoS in Xen setups
 
 # Short answer -- do not enable this unless you know what you are
 # doing and are prepared for some pain.
