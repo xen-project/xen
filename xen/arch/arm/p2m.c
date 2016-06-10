@@ -1469,16 +1469,17 @@ int relinquish_p2m_mapping(struct domain *d)
                               d->arch.p2m.default_access);
 }
 
-int p2m_cache_flush(struct domain *d, xen_pfn_t start_mfn, xen_pfn_t end_mfn)
+int p2m_cache_flush(struct domain *d, gfn_t start, unsigned long nr)
 {
     struct p2m_domain *p2m = &d->arch.p2m;
+    gfn_t end = gfn_add(start, nr);
 
-    start_mfn = MAX(start_mfn, p2m->lowest_mapped_gfn);
-    end_mfn = MIN(end_mfn, p2m->max_mapped_gfn);
+    start = gfn_max(start, _gfn(p2m->lowest_mapped_gfn));
+    end = gfn_min(end, _gfn(p2m->max_mapped_gfn));
 
     return apply_p2m_changes(d, CACHEFLUSH,
-                             pfn_to_paddr(start_mfn),
-                             pfn_to_paddr(end_mfn),
+                             pfn_to_paddr(gfn_x(start)),
+                             pfn_to_paddr(gfn_x(end)),
                              pfn_to_paddr(mfn_x(INVALID_MFN)),
                              MATTR_MEM, 0, p2m_invalid,
                              d->arch.p2m.default_access);
