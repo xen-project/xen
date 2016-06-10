@@ -3466,7 +3466,7 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
                                   xstate_sizes[_XSTATE_BNDCSR]);
             }
 
-            if ( _ebx & cpufeat_mask(X86_FEATURE_PKU) )
+            if ( _ecx & cpufeat_mask(X86_FEATURE_PKU) )
             {
                 xfeature_mask |= XSTATE_PKRU;
                 xstate_size = max(xstate_size,
