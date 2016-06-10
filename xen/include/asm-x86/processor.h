@@ -618,9 +618,8 @@ int microcode_update(XEN_GUEST_HANDLE_PARAM(const_void), unsigned long len);
 int microcode_resume_cpu(unsigned int cpu);
 
 enum get_cpu_vendor {
-   gcv_host_early,
-   gcv_host_late,
-   gcv_guest
+    gcv_host,
+    gcv_guest,
 };
 
 int get_cpu_vendor(const char vendor_id[], enum get_cpu_vendor);

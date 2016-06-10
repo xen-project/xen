@@ -166,8 +166,7 @@ int get_cpu_vendor(const char v[], enum get_cpu_vendor mode)
 			if (!strcmp(v,cpu_devs[i]->c_ident[0]) ||
 			    (cpu_devs[i]->c_ident[1] && 
 			     !strcmp(v,cpu_devs[i]->c_ident[1]))) {
-				if (mode == gcv_host_late)
-					this_cpu = cpu_devs[i];
+				this_cpu = cpu_devs[i];
 				return i;
 			}
 		}
@@ -220,7 +219,7 @@ static void __init early_cpu_detect(void)
 	      (int *)&c->x86_vendor_id[8],
 	      (int *)&c->x86_vendor_id[4]);
 
-	c->x86_vendor = get_cpu_vendor(c->x86_vendor_id, gcv_host_early);
+	c->x86_vendor = get_cpu_vendor(c->x86_vendor_id, gcv_host);
 
 	cpuid(0x00000001, &eax, &ebx, &ecx, &edx);
 	c->x86 = (eax >> 8) & 15;
@@ -237,6 +236,10 @@ static void __init early_cpu_detect(void)
 	/* Leaf 0x1 capabilities filled in early for Xen. */
 	c->x86_capability[cpufeat_word(X86_FEATURE_FPU)] = edx;
 	c->x86_capability[cpufeat_word(X86_FEATURE_SSE3)] = ecx;
+
+	printk(XENLOG_INFO
+	       "CPU Vendor: %s, Family %u, Model %u, Stepping %u (raw %08x)\n",
+	       this_cpu->c_vendor, c->x86, c->x86_model, c->x86_mask, eax);
 
 	eax = cpuid_eax(0x80000000);
 	if ((eax >> 16) == 0x8000 && eax >= 0x80000008) {
@@ -263,7 +266,7 @@ static void generic_identify(struct cpuinfo_x86 *c)
 	      (int *)&c->x86_vendor_id[8],
 	      (int *)&c->x86_vendor_id[4]);
 
-	c->x86_vendor = get_cpu_vendor(c->x86_vendor_id, gcv_host_late);
+	c->x86_vendor = get_cpu_vendor(c->x86_vendor_id, gcv_host);
 	/* Initialize the standard set of capabilities */
 	/* Note that the vendor-specific code below might override */
 
