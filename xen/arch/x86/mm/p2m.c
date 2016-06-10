@@ -2214,9 +2214,9 @@ static unsigned int mmio_order(const struct domain *d,
 #define MAP_MMIO_MAX_ITER 64 /* pretty arbitrary */
 
 int map_mmio_regions(struct domain *d,
-                     unsigned long start_gfn,
+                     gfn_t start_gfn,
                      unsigned long nr,
-                     unsigned long mfn)
+                     mfn_t mfn)
 {
     int ret = 0;
     unsigned long i;
@@ -2229,10 +2229,11 @@ int map_mmio_regions(struct domain *d,
           i += 1UL << order, ++iter )
     {
         /* OR'ing gfn and mfn values will return an order suitable to both. */
-        for ( order = mmio_order(d, (start_gfn + i) | (mfn + i), nr - i); ;
+        for ( order = mmio_order(d, (gfn_x(start_gfn) + i) | (mfn_x(mfn) + i), nr - i); ;
               order = ret - 1 )
         {
-            ret = set_mmio_p2m_entry(d, start_gfn + i, _mfn(mfn + i), order,
+            ret = set_mmio_p2m_entry(d, gfn_x(start_gfn) + i,
+                                     mfn_add(mfn, i), order,
                                      p2m_get_hostp2m(d)->default_access);
             if ( ret <= 0 )
                 break;
@@ -2246,9 +2247,9 @@ int map_mmio_regions(struct domain *d,
 }
 
 int unmap_mmio_regions(struct domain *d,
-                       unsigned long start_gfn,
+                       gfn_t start_gfn,
                        unsigned long nr,
-                       unsigned long mfn)
+                       mfn_t mfn)
 {
     int ret = 0;
     unsigned long i;
@@ -2261,10 +2262,11 @@ int unmap_mmio_regions(struct domain *d,
           i += 1UL << order, ++iter )
     {
         /* OR'ing gfn and mfn values will return an order suitable to both. */
-        for ( order = mmio_order(d, (start_gfn + i) | (mfn + i), nr - i); ;
+        for ( order = mmio_order(d, (gfn_x(start_gfn) + i) | (mfn_x(mfn) + i), nr - i); ;
               order = ret - 1 )
         {
-            ret = clear_mmio_p2m_entry(d, start_gfn + i, _mfn(mfn + i), order);
+            ret = clear_mmio_p2m_entry(d, gfn_x(start_gfn) + i,
+                                       mfn_add(mfn, i), order);
             if ( ret <= 0 )
                 break;
             ASSERT(ret <= order);

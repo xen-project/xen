@@ -1036,9 +1036,9 @@ static int map_range_to_domain(const struct dt_device_node *dev,
     if ( need_mapping )
     {
         res = map_mmio_regions(d,
-                               paddr_to_pfn(addr),
+                               _gfn(paddr_to_pfn(addr)),
                                DIV_ROUND_UP(len, PAGE_SIZE),
-                               paddr_to_pfn(addr));
+                               _mfn(paddr_to_pfn(addr)));
         if ( res < 0 )
         {
             printk(XENLOG_ERR "Unable to map 0x%"PRIx64

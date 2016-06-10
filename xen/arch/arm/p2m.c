@@ -1245,27 +1245,27 @@ int unmap_regions_rw_cache(struct domain *d,
 }
 
 int map_mmio_regions(struct domain *d,
-                     unsigned long start_gfn,
+                     gfn_t start_gfn,
                      unsigned long nr,
-                     unsigned long mfn)
+                     mfn_t mfn)
 {
     return apply_p2m_changes(d, INSERT,
-                             pfn_to_paddr(start_gfn),
-                             pfn_to_paddr(start_gfn + nr),
-                             pfn_to_paddr(mfn),
+                             pfn_to_paddr(gfn_x(start_gfn)),
+                             pfn_to_paddr(gfn_x(start_gfn) + nr),
+                             pfn_to_paddr(mfn_x(mfn)),
                              MATTR_DEV, 0, p2m_mmio_direct,
                              d->arch.p2m.default_access);
 }
 
 int unmap_mmio_regions(struct domain *d,
-                       unsigned long start_gfn,
+                       gfn_t start_gfn,
                        unsigned long nr,
-                       unsigned long mfn)
+                       mfn_t mfn)
 {
     return apply_p2m_changes(d, REMOVE,
-                             pfn_to_paddr(start_gfn),
-                             pfn_to_paddr(start_gfn + nr),
-                             pfn_to_paddr(mfn),
+                             pfn_to_paddr(gfn_x(start_gfn)),
+                             pfn_to_paddr(gfn_x(start_gfn) + nr),
+                             pfn_to_paddr(mfn_x(mfn)),
                              MATTR_DEV, 0, p2m_invalid,
                              d->arch.p2m.default_access);
 }
@@ -1280,7 +1280,7 @@ int map_dev_mmio_region(struct domain *d,
     if ( !(nr && iomem_access_permitted(d, mfn, mfn + nr - 1)) )
         return 0;
 
-    res = map_mmio_regions(d, start_gfn, nr, mfn);
+    res = map_mmio_regions(d, _gfn(start_gfn), nr, _mfn(mfn));
     if ( res < 0 )
     {
         printk(XENLOG_G_ERR "Unable to map [%#lx - %#lx] in Dom%d\n",

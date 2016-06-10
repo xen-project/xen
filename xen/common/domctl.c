@@ -1074,7 +1074,7 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
                    "memory_map:add: dom%d gfn=%lx mfn=%lx nr=%lx\n",
                    d->domain_id, gfn, mfn, nr_mfns);
 
-            ret = map_mmio_regions(d, gfn, nr_mfns, mfn);
+            ret = map_mmio_regions(d, _gfn(gfn), nr_mfns, _mfn(mfn));
             if ( ret < 0 )
                 printk(XENLOG_G_WARNING
                        "memory_map:fail: dom%d gfn=%lx mfn=%lx nr=%lx ret:%ld\n",
@@ -1086,7 +1086,7 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
                    "memory_map:remove: dom%d gfn=%lx mfn=%lx nr=%lx\n",
                    d->domain_id, gfn, mfn, nr_mfns);
 
-            ret = unmap_mmio_regions(d, gfn, nr_mfns, mfn);
+            ret = unmap_mmio_regions(d, _gfn(gfn), nr_mfns, _mfn(mfn));
             if ( ret < 0 && is_hardware_domain(current->domain) )
                 printk(XENLOG_ERR
                        "memory_map: error %ld removing dom%d access to [%lx,%lx]\n",

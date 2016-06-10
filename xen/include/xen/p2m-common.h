@@ -37,13 +37,13 @@ typedef enum {
  *  * the guest physical address space to map, starting from the machine
  *   * frame number mfn. */
 int map_mmio_regions(struct domain *d,
-                     unsigned long start_gfn,
+                     gfn_t start_gfn,
                      unsigned long nr,
-                     unsigned long mfn);
+                     mfn_t mfn);
 int unmap_mmio_regions(struct domain *d,
-                       unsigned long start_gfn,
+                       gfn_t start_gfn,
                        unsigned long nr,
-                       unsigned long mfn);
+                       mfn_t mfn);
 
 /*
  * Set access type for a region of gfns.

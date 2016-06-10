@@ -601,9 +601,9 @@ static int gicv2_map_hwdown_extra_mappings(struct domain *d)
                d->domain_id, v2m_data->addr, v2m_data->size,
                v2m_data->spi_start, v2m_data->nr_spis);
 
-        ret = map_mmio_regions(d, paddr_to_pfn(v2m_data->addr),
+        ret = map_mmio_regions(d, _gfn(paddr_to_pfn(v2m_data->addr)),
                             DIV_ROUND_UP(v2m_data->size, PAGE_SIZE),
-                            paddr_to_pfn(v2m_data->addr));
+                            _mfn(paddr_to_pfn(v2m_data->addr)));
         if ( ret )
         {
             printk(XENLOG_ERR "GICv2: Map v2m frame to d%d failed.\n",
