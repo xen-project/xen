@@ -284,9 +284,9 @@ SEABIOS_UPSTREAM_REVISION ?= rel-1.9.2
 ETHERBOOT_NICS ?= rtl8139 8086100e
 
 
-QEMU_TRADITIONAL_REVISION ?= df553c056104e3dd8a2bd2e72539a57c4c085bae
-# Thu May 5 11:14:44 2016 +0100
-# Fix build with newer version of GNUTLS
+QEMU_TRADITIONAL_REVISION ?= 698d6d6f8d095edadb0c23612b552a89dd3eee4c
+# Thu May 19 19:38:35 2016 +0100
+# main loop: Big hammer to fix logfile disk DoS in Xen setups
 
 # Specify which qemu-dm to use. This may be `ioemu' to use the old
 # Mercurial in-tree version, or a local directory, or a git URL.
