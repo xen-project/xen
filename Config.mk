@@ -254,9 +254,9 @@ SEABIOS_UPSTREAM_URL ?= git://xenbits.xen.org/seabios.git
 MINIOS_UPSTREAM_URL ?= git://xenbits.xen.org/mini-os.git
 endif
 OVMF_UPSTREAM_REVISION ?= 52a99493cce88a9d4ec8a02d7f1bd1a1001ce60d
-QEMU_UPSTREAM_REVISION ?= 14a60f98e0cd16e2636afb136129ed7f11cbfce0
-# Tue Apr 26 14:48:06 2016 +0200
-# vga: make sure vga register setup for vbe stays intact (CVE-2016-3712).
+QEMU_UPSTREAM_REVISION ?= aa38966b6fb6008c290f1c6af97af24906ee5159
+# Thu May 26 16:21:56 2016 +0100
+# main loop: Big hammer to fix logfile disk DoS in Xen setups
 MINIOS_UPSTREAM_REVISION ?= e1cca557c64272d33da7bafc0ad25399267563d0
 # Fri May 13 15:21:10 2016 +0100
 # lib/sys.c: enclose file_types in define guards
