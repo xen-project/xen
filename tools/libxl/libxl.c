@@ -4927,10 +4927,12 @@ retry_transaction:
 
     target = libxl__xs_read(gc, t, GCSPRINTF("%s/memory/target", dompath));
     if (!target && !domid) {
-        if (!xs_transaction_end(ctx->xsh, t, 1))
+        if (!xs_transaction_end(ctx->xsh, t, 1)) {
+            rc = ERROR_FAIL;
             goto out_no_transaction;
+        }
         lrc = libxl__fill_dom0_memory_info(gc, &current_target_memkb,
-                                          &current_max_memkb);
+                                           &current_max_memkb);
         if (lrc < 0) { rc = ERROR_FAIL; goto out_no_transaction; }
         goto retry_transaction;
     } else if (!target) {
