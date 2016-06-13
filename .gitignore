@@ -41,6 +41,8 @@ config/Paths.mk
 build-*
 dist/*
 docs/html/
+docs/man/xl.cfg.pod.5
+docs/man/xl.pod.1
 docs/man1/
 docs/man5/
 docs/man8/

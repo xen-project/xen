@@ -343,12 +343,12 @@ destroy`.
 
 =item B<coredump-destroy>
 
-write a "coredump" of the domain to F</var/lib/xen/dump/NAME> and then
+write a "coredump" of the domain to F<@XEN_DUMP_DIR@/NAME> and then
 destroy the domain.
 
 =item B<coredump-restart>
 
-write a "coredump" of the domain to F</var/lib/xen/dump/NAME> and then
+write a "coredump" of the domain to F<@XEN_DUMP_DIR@/NAME> and then
 restart the domain.
 
 =item B<soft-reset>
@@ -2017,7 +2017,7 @@ natively or via hardware backwards compatibility support.
 =head1 FILES
 
 F</etc/xen/NAME.cfg>
-F</var/lib/xen/dump/NAME>
+F<@XEN_DUMP_DIR@/NAME>
 
 =head1 BUGS
 

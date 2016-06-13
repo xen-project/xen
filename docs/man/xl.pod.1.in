@@ -280,7 +280,7 @@ Change the domain name of I<domain-id> to I<new-name>.
 Dumps the virtual machine's memory for the specified domain to the
 I<filename> specified, without pausing the domain.  The dump file will
 be written to a distribution specific directory for dump files.  Such
-as: /var/lib/xen/dump.
+as: @XEN_DUMP_DIR@/dump.
 
 =item B<help> [I<--long>]
 

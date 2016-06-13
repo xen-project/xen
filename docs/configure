@@ -594,6 +594,24 @@ POD2TEXT
 POD2HTML
 POD2MAN
 FIG2DEV
+XEN_DUMP_DIR
+XEN_PAGING_DIR
+XEN_LOCK_DIR
+XEN_SCRIPT_DIR
+XEN_CONFIG_DIR
+INITD_DIR
+CONFIG_DIR
+SHAREDIR
+XEN_LIB_DIR
+XEN_LIB_STORED
+XEN_LOG_DIR
+XEN_RUN_DIR
+XENFIRMWAREDIR
+LIBEXEC_INC
+LIBEXEC_LIB
+LIBEXEC_BIN
+LIBEXEC
+CONFIG_LEAF_DIR
 target_alias
 host_alias
 build_alias
@@ -635,6 +653,10 @@ SHELL'
 ac_subst_files=''
 ac_user_opts='
 enable_option_checking
+with_initddir
+with_sysconfig_leaf_dir
+with_libexec_leaf_dir
+with_xen_dumpdir
 '
       ac_precious_vars='build_alias
 host_alias
@@ -1251,6 +1273,21 @@ if test -n "$ac_init_help"; then
    esac
   cat <<\_ACEOF
 
+Optional Packages:
+  --with-PACKAGE[=ARG]    use PACKAGE [ARG=yes]
+  --without-PACKAGE       do not use PACKAGE (same as --with-PACKAGE=no)
+  --with-initddir=DIR     Path to directory with sysv runlevel scripts.
+                          [SYSCONFDIR/init.d]
+  --with-sysconfig-leaf-dir=SUBDIR
+                          Name of subdirectory in /etc to store runtime
+                          options for runlevel scripts and daemons such as
+                          xenstored. This should be either "sysconfig" or
+                          "default". [sysconfig]
+  --with-libexec-leaf-dir=SUBDIR
+                          Name of subdirectory in libexecdir to use.
+  --with-xen-dumpdir=DIR  Path to directory for domU crash dumps.
+                          [LOCALSTATEDIR/lib/xen/dump]
+
 Some influential environment variables:
   FIG2DEV     Path to fig2dev tool
   POD2MAN     Path to pod2man tool
@@ -1693,7 +1730,7 @@ ac_compiler_gnu=$ac_cv_c_compiler_gnu
 
 
 
-ac_config_files="$ac_config_files ../config/Docs.mk"
+ac_config_files="$ac_config_files ../config/Docs.mk man/xl.cfg.pod.5 man/xl.pod.1"
 
 ac_aux_dir=
 for ac_dir in ../ "$srcdir"/../; do
@@ -1736,6 +1773,149 @@ ac_configure="$SHELL $ac_aux_dir/configure"  # Please don't use this var.
 
 
 
+
+
+
+
+
+
+test "x$prefix" = "xNONE" && prefix=$ac_default_prefix
+test "x$exec_prefix" = "xNONE" && exec_prefix=${prefix}
+
+if test "$localstatedir" = '${prefix}/var' ; then
+    localstatedir=/var
+fi
+
+bindir=`eval echo $bindir`
+sbindir=`eval echo $sbindir`
+libdir=`eval echo $libdir`
+
+if test "x$sysconfdir" = 'x${prefix}/etc' ; then
+    case "$host_os" in
+         *freebsd*)
+         sysconfdir=$prefix/etc
+         ;;
+         *solaris*)
+         if test "$prefix" = "/usr" ; then
+             sysconfdir=/etc
+         else
+             sysconfdir=$prefix/etc
+         fi
+         ;;
+         *)
+         sysconfdir=/etc
+         ;;
+    esac
+fi
+
+
+# Check whether --with-initddir was given.
+if test "${with_initddir+set}" = set; then :
+  withval=$with_initddir; initddir_path=$withval
+else
+  case "$host_os" in
+         *linux*)
+         if test -d $sysconfdir/rc.d/init.d ; then
+             initddir_path=$sysconfdir/rc.d/init.d
+         else
+             initddir_path=$sysconfdir/init.d
+         fi
+         ;;
+         *)
+         initddir_path=$sysconfdir/rc.d
+         ;;
+     esac
+fi
+
+
+
+# Check whether --with-sysconfig-leaf-dir was given.
+if test "${with_sysconfig_leaf_dir+set}" = set; then :
+  withval=$with_sysconfig_leaf_dir; config_leaf_dir=$withval
+else
+  config_leaf_dir=sysconfig
+    if test ! -d /etc/sysconfig ; then config_leaf_dir=default ; fi
+fi
+
+CONFIG_LEAF_DIR=$config_leaf_dir
+
+
+
+# Check whether --with-libexec-leaf-dir was given.
+if test "${with_libexec_leaf_dir+set}" = set; then :
+  withval=$with_libexec_leaf_dir; libexec_subdir=$withval
+else
+  libexec_subdir=$PACKAGE_TARNAME
+fi
+
+
+
+# Check whether --with-xen-dumpdir was given.
+if test "${with_xen_dumpdir+set}" = set; then :
+  withval=$with_xen_dumpdir; xen_dumpdir_path=$withval
+else
+  xen_dumpdir_path=$localstatedir/lib/xen/dump
+fi
+
+
+if test "$libexecdir" = '${exec_prefix}/libexec' ; then
+    case "$host_os" in
+         *netbsd*) ;;
+         *)
+         libexecdir='${exec_prefix}/lib'
+         ;;
+    esac
+fi
+LIBEXEC=`eval echo $libexecdir/$libexec_subdir`
+
+
+LIBEXEC_BIN=${LIBEXEC}/bin
+
+LIBEXEC_LIB=${LIBEXEC}/lib
+
+LIBEXEC_INC=${LIBEXEC}/include
+
+XENFIRMWAREDIR=${LIBEXEC}/boot
+
+
+XEN_RUN_DIR=$localstatedir/run/xen
+
+
+XEN_LOG_DIR=$localstatedir/log/xen
+
+
+XEN_LIB_STORED=$localstatedir/lib/xenstored
+
+
+XEN_LIB_DIR=$localstatedir/lib/xen
+
+
+SHAREDIR=$prefix/share
+
+
+CONFIG_DIR=$sysconfdir
+
+
+INITD_DIR=$initddir_path
+
+
+XEN_CONFIG_DIR=$CONFIG_DIR/xen
+
+
+XEN_SCRIPT_DIR=$XEN_CONFIG_DIR/scripts
+
+
+case "$host_os" in
+*freebsd*) XEN_LOCK_DIR=$localstatedir/lib ;;
+*netbsd*) XEN_LOCK_DIR=$localstatedir/lib ;;
+*) XEN_LOCK_DIR=$localstatedir/lock ;;
+esac
+
+
+XEN_PAGING_DIR=$localstatedir/lib/xen/xenpaging
+
+
+XEN_DUMP_DIR=$xen_dumpdir_path
 
 
 
@@ -2793,6 +2973,8 @@ for ac_config_target in $ac_config_targets
 do
   case $ac_config_target in
     "../config/Docs.mk") CONFIG_FILES="$CONFIG_FILES ../config/Docs.mk" ;;
+    "man/xl.cfg.pod.5") CONFIG_FILES="$CONFIG_FILES man/xl.cfg.pod.5" ;;
+    "man/xl.pod.1") CONFIG_FILES="$CONFIG_FILES man/xl.pod.1" ;;
 
   *) as_fn_error $? "invalid argument: \`$ac_config_target'" "$LINENO" 5;;
   esac
