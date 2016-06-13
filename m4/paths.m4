@@ -107,6 +107,9 @@ AC_SUBST(XEN_LOG_DIR)
 XEN_LIB_STORED=$localstatedir/lib/xenstored
 AC_SUBST(XEN_LIB_STORED)
 
+XEN_LIB_DIR=$localstatedir/lib/xen
+AC_SUBST(XEN_LIB_DIR)
+
 SHAREDIR=$prefix/share
 AC_SUBST(SHAREDIR)
 
