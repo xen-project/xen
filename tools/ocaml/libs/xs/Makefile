@@ -11,7 +11,7 @@ OCAMLOPTFLAGS += -for-pack Xenstore
 PREINTF = xsraw.cmi xst.cmi
 PREOBJS = queueop xsraw xst
 PRELIBS = $(foreach obj, $(PREOBJS),$(obj).cmo) $(foreach obj,$(PREOJBS),$(obj).cmx)
-OBJS = queueop xsraw xst xs
+OBJS = paths queueop xsraw xst xs
 INTF = xsraw.cmi xst.cmi xs.cmi
 LIBS = xenstore.cma xenstore.cmxa
 
@@ -45,3 +45,7 @@ uninstall:
 
 include $(TOPLEVEL)/Makefile.rules
 
+genpath-target = $(call buildmakevars2module,paths.ml)
+$(eval $(genpath-target))
+
+GENERATED_FILES += paths.ml
