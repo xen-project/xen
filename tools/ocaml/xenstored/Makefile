@@ -32,7 +32,8 @@ OCAML_LIBRARY += systemd
 
 LIBS_systemd += $(LDFLAGS-y)
 
-OBJS = define \
+OBJS = paths \
+	define \
 	stdext \
 	trie \
 	config \
@@ -87,3 +88,8 @@ install: all
 	$(INSTALL_DATA) oxenstored.conf $(DESTDIR)$(XEN_CONFIG_DIR)
 
 include $(OCAML_TOPLEVEL)/Makefile.rules
+
+genpath-target = $(call buildmakevars2module,paths.ml)
+$(eval $(genpath-target))
+
+GENERATED_FILES += paths.ml

@@ -95,3 +95,14 @@ $(foreach lib,$(OCAML_LIBRARY),$(eval $(call OCAML_LIBRARY_template,$(lib))))
 $(foreach lib,$(OCAML_NOC_LIBRARY),$(eval $(call OCAML_NOC_LIBRARY_template,$(lib))))
 $(foreach p,$(OCAML_PROGRAM),$(eval $(call OCAML_PROGRAM_template,$(p))))
 $(foreach p,$(C_PROGRAM),$(eval $(call C_PROGRAM_template,$(p))))
+
+buildmakevars2module = $(eval $(call buildmakevars2module-closure,$(1)))
+define buildmakevars2module-closure
+    $(1): .phony
+	rm -f $(1).tmp; \
+	$(foreach var, $(BUILD_MAKE_VARS), \
+	          printf "let %s = \"%s\";;\n" \
+                      $(shell echo $(var) | tr '[:upper:]' '[:lower:]') \
+                      $($(var)) >>$(1).tmp;) \
+	$(call move-if-changed,$(1).tmp,$(1))
+endef
