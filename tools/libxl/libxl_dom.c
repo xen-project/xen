@@ -25,6 +25,8 @@
 #include <xen/hvm/hvm_xs_strings.h>
 #include <xen/hvm/e820.h>
 
+#include "_paths.h"
+
 libxl_domain_type libxl__domain_type(libxl__gc *gc, uint32_t domid)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
@@ -1129,7 +1131,7 @@ const char *libxl__userdata_path(libxl__gc *gc, uint32_t domid,
         goto out;
     }
     uuid_string = GCSPRINTF(LIBXL_UUID_FMT, LIBXL_UUID_BYTES(info.uuid));
-    path = GCSPRINTF("/var/lib/xen/userdata-%s.%u.%s.%s",
+    path = GCSPRINTF(XEN_LIB_DIR "/userdata-%s.%u.%s.%s",
                      wh, domid, uuid_string, userdata_userid);
 
  out:

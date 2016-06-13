@@ -93,8 +93,8 @@
 /* QEMU may be slow to load and start due to a bug in Linux where the I/O
  * subsystem sometime produce high latency under load. */
 #define LIBXL_DEVICE_MODEL_START_TIMEOUT 60
-#define LIBXL_DEVICE_MODEL_SAVE_FILE "/var/lib/xen/qemu-save" /* .$domid */
-#define LIBXL_DEVICE_MODEL_RESTORE_FILE "/var/lib/xen/qemu-resume" /* .$domid */
+#define LIBXL_DEVICE_MODEL_SAVE_FILE XEN_LIB_DIR "/qemu-save" /* .$domid */
+#define LIBXL_DEVICE_MODEL_RESTORE_FILE XEN_LIB_DIR "/qemu-resume" /* .$domid */
 #define LIBXL_STUBDOM_START_TIMEOUT 30
 #define LIBXL_QEMU_BODGE_TIMEOUT 2
 #define LIBXL_XENCONSOLE_LIMIT 1048576
