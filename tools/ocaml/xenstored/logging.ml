@@ -154,7 +154,7 @@ let make_syslog_logger facility =
 		Syslog.log facility level s in
 	{ stop = nothing; restart = nothing; rotate = nothing; write=write }
 
-let xenstored_log_destination = ref (File "/var/log/xenstored.log")
+let xenstored_log_destination = ref (File (Paths.xen_log_dir ^ "/xenstored.log"))
 let xenstored_log_level = ref Warn
 let xenstored_log_nb_files = ref 10
 let xenstored_log_nb_lines = ref 13215
@@ -262,7 +262,7 @@ let sanitize_data data =
 	String.escaped data
 
 let activate_access_log = ref true
-let access_log_destination = ref (File "/var/log/xenstored-access.log")
+let access_log_destination = ref (File (Paths.xen_log_dir ^ "/xenstored-access.log"))
 let access_log_nb_files = ref 20
 let access_log_nb_lines = ref 13215
 let access_log_nb_chars = ref 180
