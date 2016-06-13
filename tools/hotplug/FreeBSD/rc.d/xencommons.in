@@ -25,7 +25,7 @@ XENCONSOLED_PIDFILE="@XEN_RUN_DIR@/xenconsoled.pid"
 
 xen_precmd()
 {
-	mkdir -p /var/run/xenstored || exit 1
+	mkdir -p @XEN_LIB_STORED@ || exit 1
 }
 
 xen_startcmd()
