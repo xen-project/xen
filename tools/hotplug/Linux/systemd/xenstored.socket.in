@@ -5,7 +5,7 @@ After=proc-xen.mount var-lib-xenstored.mount
 ConditionPathExists=/proc/xen/capabilities
 
 [Socket]
-ListenStream=/var/run/xenstored/socket
+ListenStream=@XEN_RUN_STORED@/socket
 SocketMode=0600
 Service=xenstored.service
 
