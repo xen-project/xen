@@ -1,7 +1,7 @@
 # default xenstored config
 
 # Where the pid file is stored
-pid-file = /var/run/xenstored.pid
+pid-file = @XEN_RUN_DIR@/xenstored.pid
 
 # Randomly failed a transaction with EAGAIN. Used for testing Xs user
 test-eagain = false
@@ -24,12 +24,12 @@ quota-maxrequests = 1024
 persistent = false
 
 # Xenstored logs
-# xenstored-log-file = /var/log/xenstored.log
+# xenstored-log-file = @XEN_LOG_DIR@/xenstored.log
 # xenstored-log-level = null
 # xenstored-log-nb-files = 10
 
 # Xenstored access logs
-# access-log-file = /var/log/xenstored-access.log
+# access-log-file = @XEN_LOG_DIR@/xenstored-access.log
 # access-log-nb-lines = 13215
 # acesss-log-nb-chars = 180
 # access-log-special-ops = false

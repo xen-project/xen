@@ -346,6 +346,7 @@ tools/ocaml/libs/xentoollog/_xtl_levels.*
 tools/ocaml/libs/xentoollog/xentoollog.ml
 tools/ocaml/libs/xentoollog/xentoollog.mli
 tools/ocaml/xenstored/oxenstored
+tools/ocaml/xenstored/oxenstored.conf
 tools/ocaml/test/xtl
 tools/ocaml/test/send_debug_keys
 tools/ocaml/test/list_domains

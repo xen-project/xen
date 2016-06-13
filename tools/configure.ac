@@ -21,6 +21,7 @@ hotplug/NetBSD/rc.d/xencommons
 hotplug/NetBSD/rc.d/xendriverdomain
 libxl/xenlight.pc.in
 libxl/xlutil.pc.in
+ocaml/xenstored/oxenstored.conf
 ])
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_AUX_DIR([../])
