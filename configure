@@ -604,6 +604,7 @@ INITD_DIR
 CONFIG_DIR
 SHAREDIR
 XEN_LIB_DIR
+XEN_RUN_STORED
 XEN_LIB_STORED
 XEN_LOG_DIR
 XEN_RUN_DIR
@@ -1979,6 +1980,9 @@ XEN_LOG_DIR=$localstatedir/log/xen
 
 
 XEN_LIB_STORED=$localstatedir/lib/xenstored
+
+
+XEN_RUN_STORED=$localstatedir/run/xenstored
 
 
 XEN_LIB_DIR=$localstatedir/lib/xen

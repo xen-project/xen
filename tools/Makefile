@@ -64,6 +64,7 @@ install: subdirs-install
 	$(INSTALL_DIR) $(DESTDIR)$(XEN_LOG_DIR)
 	$(INSTALL_DIR) $(DESTDIR)$(XEN_RUN_DIR)
 	$(INSTALL_DIR) $(DESTDIR)$(XEN_LIB_DIR)
+	$(INSTALL_DIR) $(DESTDIR)$(XEN_RUN_STORED)
 
 .PHONY: uninstall
 uninstall: D=$(DESTDIR)
@@ -78,6 +79,7 @@ uninstall:
 	rm -f  $(D)$(SYSCONFIG_DIR)/xencommons
 	rm -rf $(D)$(XEN_LIB_DIR)
 	rm -rf $(D)$(XEN_LIB_STORED)
+	rm -rf $(D)$(XEN_RUN_STORED)
 	rm -rf $(D)$(bindir)/cpuperf-perfcntr $(D)$(bindir)/cpuperf-xen
 	rm -rf $(D)$(bindir)/xc_shadow
 	rm -rf $(D)$(bindir)/pygrub

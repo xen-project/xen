@@ -42,6 +42,7 @@ XEN_RUN_DIR              := @XEN_RUN_DIR@
 XEN_LOG_DIR              := @XEN_LOG_DIR@
 XEN_LIB_DIR              := @XEN_LIB_DIR@
 XEN_LIB_STORED           := @XEN_LIB_STORED@
+XEN_RUN_STORED           := @XEN_RUN_STORED@
 
 CONFIG_DIR               := @CONFIG_DIR@
 INITD_DIR                := @INITD_DIR@
