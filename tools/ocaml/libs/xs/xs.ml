@@ -147,7 +147,7 @@ let monitor_paths xsh l time callback =
 	end;
 	unwatch ()
 
-let daemon_socket = "/var/run/xenstored/socket"
+let daemon_socket = Paths.xen_run_stored ^ "/socket"
 
 (** Throws this rather than a miscellaneous Unix.connect failed *)
 exception Failed_to_connect
