@@ -15,7 +15,7 @@
  *)
 
 let enable = ref false
-let xs_daemon_database = "/var/run/xenstored/db"
+let xs_daemon_database = Paths.xen_run_stored ^ "/db"
 
 let error fmt = Logging.error "disk" fmt
 

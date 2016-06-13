@@ -20,10 +20,10 @@ let xenstored_minor = 0
 let xenstored_proc_kva = "/proc/xen/xsd_kva"
 let xenstored_proc_port = "/proc/xen/xsd_port"
 
-let xs_daemon_socket = "/var/run/xenstored/socket"
-let xs_daemon_socket_ro = "/var/run/xenstored/socket_ro"
+let xs_daemon_socket = Paths.xen_run_stored ^ "/socket"
+let xs_daemon_socket_ro = Paths.xen_run_stored ^ "/socket_ro"
 
-let default_config_dir = "/etc/xen"
+let default_config_dir = Paths.xen_config_dir
 
 let maxwatch = ref (50)
 let maxtransaction = ref (20)
