@@ -35,7 +35,7 @@ const char *xs_daemon_rootdir(void)
 const char *xs_daemon_rundir(void)
 {
 	char *s = getenv("XENSTORED_RUNDIR");
-	return (s ? s : "/var/run/xenstored");
+	return (s ? s : XEN_RUN_STORED);
 }
 
 static const char *xs_daemon_path(void)
