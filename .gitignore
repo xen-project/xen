@@ -149,6 +149,7 @@ tools/hotplug/common/hotplugpath.sh
 tools/hotplug/FreeBSD/rc.d/xencommons
 tools/hotplug/FreeBSD/rc.d/xendriverdomain
 tools/hotplug/Linux/init.d/sysconfig.xencommons
+tools/hotplug/Linux/init.d/sysconfig.xendomains
 tools/hotplug/Linux/init.d/xen-watchdog
 tools/hotplug/Linux/init.d/xencommons
 tools/hotplug/Linux/init.d/xendomains

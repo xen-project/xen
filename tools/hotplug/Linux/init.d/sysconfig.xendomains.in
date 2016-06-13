@@ -45,7 +45,7 @@ XENDOMAINS_CREATE_USLEEP=5000000
 XENDOMAINS_MIGRATE=""
 
 ## Type: string
-## Default: /var/lib/xen/save
+## Default: @XEN_LIB_DIR@/save
 #
 # Directory to save running domains to when the system (dom0) is
 # shut down. Will also be used to restore domains from if # XENDOMAINS_RESTORE
@@ -53,7 +53,7 @@ XENDOMAINS_MIGRATE=""
 # (e.g. because you rather shut domains down).
 # If domain saving does succeed, SHUTDOWN will not be executed.
 #
-XENDOMAINS_SAVE=/var/lib/xen/save
+XENDOMAINS_SAVE=@XEN_LIB_DIR@/save
 
 ## Type: string
 ## Default: "--wait"

@@ -10,6 +10,7 @@ AC_CONFIG_FILES([
 hotplug/FreeBSD/rc.d/xencommons
 hotplug/FreeBSD/rc.d/xendriverdomain
 hotplug/Linux/init.d/sysconfig.xencommons
+hotplug/Linux/init.d/sysconfig.xendomains
 hotplug/Linux/init.d/xen-watchdog
 hotplug/Linux/init.d/xencommons
 hotplug/Linux/init.d/xendomains
