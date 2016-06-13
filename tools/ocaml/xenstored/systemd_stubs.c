@@ -28,6 +28,8 @@
 #include <sys/socket.h>
 #include <systemd/sd-daemon.h>
 
+#include "_paths.h"
+
 /* Will work regardless of the order systemd gives them to us */
 static int oxen_get_sd_fd(const char *connect_to)
 {
@@ -46,8 +48,8 @@ static int oxen_get_sd_fd(const char *connect_to)
 
 static int oxen_verify_socket_socket(const char *connect_to)
 {
-	if ((strcmp("/var/run/xenstored/socket_ro", connect_to) != 0) &&
-	    (strcmp("/var/run/xenstored/socket", connect_to) != 0)) {
+	if ((strcmp(XEN_RUN_STORED "/socket_ro", connect_to) != 0) &&
+	    (strcmp(XEN_RUN_STORED "/socket", connect_to) != 0)) {
 		sd_notifyf(0, "STATUS=unexpected socket: %s\n"
 			   "ERRNO=%i",
 			   connect_to,
