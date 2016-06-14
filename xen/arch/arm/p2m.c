@@ -1277,14 +1277,14 @@ int map_dev_mmio_region(struct domain *d,
 {
     int res;
 
-    if ( !(nr && iomem_access_permitted(d, start_gfn, start_gfn + nr - 1)) )
+    if ( !(nr && iomem_access_permitted(d, mfn, mfn + nr - 1)) )
         return 0;
 
     res = map_mmio_regions(d, start_gfn, nr, mfn);
     if ( res < 0 )
     {
         printk(XENLOG_G_ERR "Unable to map [%#lx - %#lx] in Dom%d\n",
-               start_gfn, start_gfn + nr - 1, d->domain_id);
+               mfn, mfn + nr - 1, d->domain_id);
         return res;
     }
 
