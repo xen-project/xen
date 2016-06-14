@@ -998,7 +998,7 @@ static void local_time_calibration(void)
         /* Atomically read cpu_calibration struct and write cpu_time struct. */
         local_irq_disable();
         t->local_tsc_stamp    = c->local_tsc_stamp;
-        t->stime_local_stamp  = c->stime_master_stamp;
+        t->stime_local_stamp  = c->stime_local_stamp;
         t->stime_master_stamp = c->stime_master_stamp;
         local_irq_enable();
         update_vcpu_system_time(current);
@@ -1275,7 +1275,7 @@ static void time_calibration_tsc_rendezvous(void *_r)
     }
 
     c->local_tsc_stamp = rdtsc();
-    c->stime_local_stamp = get_s_time();
+    c->stime_local_stamp = get_s_time_fixed(c->local_tsc_stamp);
     c->stime_master_stamp = r->master_stime;
 
     raise_softirq(TIME_CALIBRATE_SOFTIRQ);
@@ -1305,7 +1305,7 @@ static void time_calibration_std_rendezvous(void *_r)
     }
 
     c->local_tsc_stamp = rdtsc();
-    c->stime_local_stamp = get_s_time();
+    c->stime_local_stamp = get_s_time_fixed(c->local_tsc_stamp);
     c->stime_master_stamp = r->master_stime;
 
     raise_softirq(TIME_CALIBRATE_SOFTIRQ);
