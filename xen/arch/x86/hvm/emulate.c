@@ -678,6 +678,19 @@ static struct hvm_mmio_cache *hvmemul_find_mmio_cache(
     return cache;
 }
 
+static void latch_linear_to_phys(struct hvm_vcpu_io *vio, unsigned long gla,
+                                 unsigned long gpa, bool_t write)
+{
+    if ( vio->mmio_access.gla_valid )
+        return;
+
+    vio->mmio_gva = gla & PAGE_MASK;
+    vio->mmio_gpfn = PFN_DOWN(gpa);
+    vio->mmio_access = (struct npfec){ .gla_valid = 1,
+                                       .read_access = 1,
+                                       .write_access = write };
+}
+
 static int hvmemul_linear_mmio_access(
     unsigned long gla, unsigned int size, uint8_t dir, void *buffer,
     uint32_t pfec, struct hvm_emulate_ctxt *hvmemul_ctxt, bool_t known_gpfn)
@@ -703,6 +716,8 @@ static int hvmemul_linear_mmio_access(
                                     hvmemul_ctxt);
         if ( rc != X86EMUL_OKAY )
             return rc;
+
+        latch_linear_to_phys(vio, gla, gpa, dir == IOREQ_WRITE);
     }
 
     for ( ;; )
