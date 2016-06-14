@@ -7766,7 +7766,11 @@ int main_cpupoolnumasplit(int argc, char **argv)
             n++;
         }
     }
-    if (libxl_set_vcpuonline(ctx, 0, &cpumap)) {
+    if (libxl_domain_info(ctx, &info, 0)) {
+        fprintf(stderr, "error on getting info for Domain-0\n");
+        goto out;
+    }
+    if (info.vcpu_online > n && libxl_set_vcpuonline(ctx, 0, &cpumap)) {
         fprintf(stderr, "error on removing vcpus for Domain-0\n");
         goto out;
     }
@@ -7781,7 +7785,7 @@ int main_cpupoolnumasplit(int argc, char **argv)
             fprintf(stderr, "error on getting info for Domain-0\n");
             goto out;
         }
-        if (info.vcpu_online == n) {
+        if (info.vcpu_online <= n) {
             break;
         }
         sleep(1);
