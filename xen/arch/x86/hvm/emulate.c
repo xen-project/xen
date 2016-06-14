@@ -1156,6 +1156,7 @@ static int hvmemul_rep_movs(
 {
     struct hvm_emulate_ctxt *hvmemul_ctxt =
         container_of(ctxt, struct hvm_emulate_ctxt, ctxt);
+    struct hvm_vcpu_io *vio = &current->arch.hvm_vcpu.hvm_io;
     unsigned long saddr, daddr, bytes;
     paddr_t sgpa, dgpa;
     uint32_t pfec = PFEC_page_present;
@@ -1178,16 +1179,43 @@ static int hvmemul_rep_movs(
     if ( hvmemul_ctxt->seg_reg[x86_seg_ss].attr.fields.dpl == 3 )
         pfec |= PFEC_user_mode;
 
-    rc = hvmemul_linear_to_phys(
-        saddr, &sgpa, bytes_per_rep, reps, pfec, hvmemul_ctxt);
-    if ( rc != X86EMUL_OKAY )
-        return rc;
+    bytes = PAGE_SIZE - (saddr & ~PAGE_MASK);
+    if ( vio->mmio_access.read_access &&
+         (vio->mmio_gva == (saddr & PAGE_MASK)) &&
+         bytes >= bytes_per_rep )
+    {
+        sgpa = pfn_to_paddr(vio->mmio_gpfn) | (saddr & ~PAGE_MASK);
+        if ( *reps * bytes_per_rep > bytes )
+            *reps = bytes / bytes_per_rep;
+    }
+    else
+    {
+        rc = hvmemul_linear_to_phys(saddr, &sgpa, bytes_per_rep, reps, pfec,
+                                    hvmemul_ctxt);
+        if ( rc != X86EMUL_OKAY )
+            return rc;
 
-    rc = hvmemul_linear_to_phys(
-        daddr, &dgpa, bytes_per_rep, reps,
-        pfec | PFEC_write_access, hvmemul_ctxt);
-    if ( rc != X86EMUL_OKAY )
-        return rc;
+        latch_linear_to_phys(vio, saddr, sgpa, 0);
+    }
+
+    bytes = PAGE_SIZE - (daddr & ~PAGE_MASK);
+    if ( vio->mmio_access.write_access &&
+         (vio->mmio_gva == (daddr & PAGE_MASK)) &&
+         bytes >= bytes_per_rep )
+    {
+        dgpa = pfn_to_paddr(vio->mmio_gpfn) | (daddr & ~PAGE_MASK);
+        if ( *reps * bytes_per_rep > bytes )
+            *reps = bytes / bytes_per_rep;
+    }
+    else
+    {
+        rc = hvmemul_linear_to_phys(daddr, &dgpa, bytes_per_rep, reps,
+                                    pfec | PFEC_write_access, hvmemul_ctxt);
+        if ( rc != X86EMUL_OKAY )
+            return rc;
+
+        latch_linear_to_phys(vio, daddr, dgpa, 1);
+    }
 
     /* Check for MMIO ops */
     (void) get_gfn_query_unlocked(current->domain, sgpa >> PAGE_SHIFT, &sp2mt);
@@ -1279,25 +1307,40 @@ static int hvmemul_rep_stos(
 {
     struct hvm_emulate_ctxt *hvmemul_ctxt =
         container_of(ctxt, struct hvm_emulate_ctxt, ctxt);
-    unsigned long addr;
+    struct hvm_vcpu_io *vio = &current->arch.hvm_vcpu.hvm_io;
+    unsigned long addr, bytes;
     paddr_t gpa;
     p2m_type_t p2mt;
     bool_t df = !!(ctxt->regs->eflags & X86_EFLAGS_DF);
     int rc = hvmemul_virtual_to_linear(seg, offset, bytes_per_rep, reps,
                                        hvm_access_write, hvmemul_ctxt, &addr);
 
-    if ( rc == X86EMUL_OKAY )
+    if ( rc != X86EMUL_OKAY )
+        return rc;
+
+    bytes = PAGE_SIZE - (addr & ~PAGE_MASK);
+    if ( vio->mmio_access.write_access &&
+         (vio->mmio_gva == (addr & PAGE_MASK)) &&
+         bytes >= bytes_per_rep )
+    {
+        gpa = pfn_to_paddr(vio->mmio_gpfn) | (addr & ~PAGE_MASK);
+        if ( *reps * bytes_per_rep > bytes )
+            *reps = bytes / bytes_per_rep;
+    }
+    else
     {
         uint32_t pfec = PFEC_page_present | PFEC_write_access;
 
         if ( hvmemul_ctxt->seg_reg[x86_seg_ss].attr.fields.dpl == 3 )
             pfec |= PFEC_user_mode;
 
-        rc = hvmemul_linear_to_phys(
-            addr, &gpa, bytes_per_rep, reps, pfec, hvmemul_ctxt);
+        rc = hvmemul_linear_to_phys(addr, &gpa, bytes_per_rep, reps, pfec,
+                                    hvmemul_ctxt);
+        if ( rc != X86EMUL_OKAY )
+            return rc;
+
+        latch_linear_to_phys(vio, addr, gpa, 1);
     }
-    if ( rc != X86EMUL_OKAY )
-        return rc;
 
     /* Check for MMIO op */
     (void)get_gfn_query_unlocked(current->domain, gpa >> PAGE_SHIFT, &p2mt);
