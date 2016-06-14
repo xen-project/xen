@@ -57,14 +57,14 @@
  * requires VT or similar mechanisms */
 #define PG_external    (XEN_DOMCTL_SHADOW_ENABLE_EXTERNAL << PG_mode_shift)
 
-#define paging_mode_enabled(_d)   ((_d)->arch.paging.mode)
-#define paging_mode_shadow(_d)    ((_d)->arch.paging.mode & PG_SH_enable)
-#define paging_mode_hap(_d)       ((_d)->arch.paging.mode & PG_HAP_enable)
+#define paging_mode_enabled(_d)   (!!(_d)->arch.paging.mode)
+#define paging_mode_shadow(_d)    (!!((_d)->arch.paging.mode & PG_SH_enable))
+#define paging_mode_hap(_d)       (!!((_d)->arch.paging.mode & PG_HAP_enable))
 
-#define paging_mode_refcounts(_d) ((_d)->arch.paging.mode & PG_refcounts)
-#define paging_mode_log_dirty(_d) ((_d)->arch.paging.mode & PG_log_dirty)
-#define paging_mode_translate(_d) ((_d)->arch.paging.mode & PG_translate)
-#define paging_mode_external(_d)  ((_d)->arch.paging.mode & PG_external)
+#define paging_mode_refcounts(_d) (!!((_d)->arch.paging.mode & PG_refcounts))
+#define paging_mode_log_dirty(_d) (!!((_d)->arch.paging.mode & PG_log_dirty))
+#define paging_mode_translate(_d) (!!((_d)->arch.paging.mode & PG_translate))
+#define paging_mode_external(_d)  (!!((_d)->arch.paging.mode & PG_external))
 
 /* flags used for paging debug */
 #define PAGING_DEBUG_LOGDIRTY 0
