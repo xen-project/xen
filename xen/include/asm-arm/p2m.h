@@ -135,8 +135,8 @@ void p2m_restore_state(struct vcpu *n);
 /* Print debugging/statistial info about a domain's p2m */
 void p2m_dump_info(struct domain *d);
 
-/* Look up the MFN corresponding to a domain's PFN. */
-paddr_t p2m_lookup(struct domain *d, paddr_t gpfn, p2m_type_t *t);
+/* Look up the MFN corresponding to a domain's GFN. */
+mfn_t p2m_lookup(struct domain *d, gfn_t gfn, p2m_type_t *t);
 
 /* Clean & invalidate caches corresponding to a region of guest address space */
 int p2m_cache_flush(struct domain *d, xen_pfn_t start_mfn, xen_pfn_t end_mfn);
@@ -201,8 +201,7 @@ static inline struct page_info *get_page_from_gfn(
 {
     struct page_info *page;
     p2m_type_t p2mt;
-    paddr_t maddr = p2m_lookup(d, pfn_to_paddr(gfn), &p2mt);
-    unsigned long mfn = maddr >> PAGE_SHIFT;
+    unsigned long mfn = mfn_x(p2m_lookup(d, _gfn(gfn), &p2mt));
 
     if (t)
         *t = p2mt;

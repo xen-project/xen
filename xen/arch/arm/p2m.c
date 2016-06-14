@@ -140,14 +140,15 @@ void flush_tlb_domain(struct domain *d)
 }
 
 /*
- * Lookup the MFN corresponding to a domain's PFN.
+ * Lookup the MFN corresponding to a domain's GFN.
  *
  * There are no processor functions to do a stage 2 only lookup therefore we
  * do a a software walk.
  */
-static paddr_t __p2m_lookup(struct domain *d, paddr_t paddr, p2m_type_t *t)
+static mfn_t __p2m_lookup(struct domain *d, gfn_t gfn, p2m_type_t *t)
 {
     struct p2m_domain *p2m = &d->arch.p2m;
+    const paddr_t paddr = pfn_to_paddr(gfn_x(gfn));
     const unsigned int offsets[4] = {
         zeroeth_table_offset(paddr),
         first_table_offset(paddr),
@@ -158,7 +159,7 @@ static paddr_t __p2m_lookup(struct domain *d, paddr_t paddr, p2m_type_t *t)
         ZEROETH_MASK, FIRST_MASK, SECOND_MASK, THIRD_MASK
     };
     lpae_t pte, *map;
-    paddr_t maddr = INVALID_PADDR;
+    mfn_t mfn = INVALID_MFN;
     paddr_t mask = 0;
     p2m_type_t _t;
     unsigned int level, root_table;
@@ -216,21 +217,22 @@ static paddr_t __p2m_lookup(struct domain *d, paddr_t paddr, p2m_type_t *t)
     {
         ASSERT(mask);
         ASSERT(pte.p2m.type != p2m_invalid);
-        maddr = (pte.bits & PADDR_MASK & mask) | (paddr & ~mask);
+        mfn = _mfn(paddr_to_pfn((pte.bits & PADDR_MASK & mask) |
+                                (paddr & ~mask)));
         *t = pte.p2m.type;
     }
 
 err:
-    return maddr;
+    return mfn;
 }
 
-paddr_t p2m_lookup(struct domain *d, paddr_t paddr, p2m_type_t *t)
+mfn_t p2m_lookup(struct domain *d, gfn_t gfn, p2m_type_t *t)
 {
-    paddr_t ret;
+    mfn_t ret;
     struct p2m_domain *p2m = &d->arch.p2m;
 
     spin_lock(&p2m->lock);
-    ret = __p2m_lookup(d, paddr, t);
+    ret = __p2m_lookup(d, gfn, t);
     spin_unlock(&p2m->lock);
 
     return ret;
@@ -493,8 +495,9 @@ static int __p2m_get_mem_access(struct domain *d, gfn_t gfn,
          * No setting was found in the Radix tree. Check if the
          * entry exists in the page-tables.
          */
-        paddr_t maddr = __p2m_lookup(d, gfn_x(gfn) << PAGE_SHIFT, NULL);
-        if ( INVALID_PADDR == maddr )
+        mfn_t mfn = __p2m_lookup(d, gfn, NULL);
+
+        if ( mfn_eq(mfn, INVALID_MFN) )
             return -ESRCH;
 
         /* If entry exists then its rwx. */
@@ -1483,8 +1486,7 @@ int p2m_cache_flush(struct domain *d, xen_pfn_t start_mfn, xen_pfn_t end_mfn)
 
 mfn_t gfn_to_mfn(struct domain *d, gfn_t gfn)
 {
-    paddr_t p = p2m_lookup(d, pfn_to_paddr(gfn_x(gfn)), NULL);
-    return _mfn(p >> PAGE_SHIFT);
+    return p2m_lookup(d, gfn, NULL);
 }
 
 /*
@@ -1498,8 +1500,8 @@ p2m_mem_access_check_and_get_page(vaddr_t gva, unsigned long flag)
 {
     long rc;
     paddr_t ipa;
-    unsigned long maddr;
-    unsigned long mfn;
+    gfn_t gfn;
+    mfn_t mfn;
     xenmem_access_t xma;
     p2m_type_t t;
     struct page_info *page = NULL;
@@ -1508,11 +1510,13 @@ p2m_mem_access_check_and_get_page(vaddr_t gva, unsigned long flag)
     if ( rc < 0 )
         goto err;
 
+    gfn = _gfn(paddr_to_pfn(ipa));
+
     /*
      * We do this first as this is faster in the default case when no
      * permission is set on the page.
      */
-    rc = __p2m_get_mem_access(current->domain, _gfn(paddr_to_pfn(ipa)), &xma);
+    rc = __p2m_get_mem_access(current->domain, gfn, &xma);
     if ( rc < 0 )
         goto err;
 
@@ -1561,12 +1565,11 @@ p2m_mem_access_check_and_get_page(vaddr_t gva, unsigned long flag)
      * We had a mem_access permission limiting the access, but the page type
      * could also be limiting, so we need to check that as well.
      */
-    maddr = __p2m_lookup(current->domain, ipa, &t);
-    if ( maddr == INVALID_PADDR )
+    mfn = __p2m_lookup(current->domain, gfn, &t);
+    if ( mfn_eq(mfn, INVALID_MFN) )
         goto err;
 
-    mfn = maddr >> PAGE_SHIFT;
-    if ( !mfn_valid(mfn) )
+    if ( !mfn_valid(mfn_x(mfn)) )
         goto err;
 
     /*
@@ -1575,7 +1578,7 @@ p2m_mem_access_check_and_get_page(vaddr_t gva, unsigned long flag)
     if ( t != p2m_ram_rw )
         goto err;
 
-    page = mfn_to_page(mfn);
+    page = mfn_to_page(mfn_x(mfn));
 
     if ( unlikely(!get_page(page, current->domain)) )
         page = NULL;

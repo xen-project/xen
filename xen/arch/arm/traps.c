@@ -2318,14 +2318,16 @@ void dump_guest_s1_walk(struct domain *d, vaddr_t addr)
 {
     register_t ttbcr = READ_SYSREG(TCR_EL1);
     uint64_t ttbr0 = READ_SYSREG64(TTBR0_EL1);
-    paddr_t paddr;
     uint32_t offset;
     uint32_t *first = NULL, *second = NULL;
+    mfn_t mfn;
+
+    mfn = p2m_lookup(d, _gfn(paddr_to_pfn(ttbr0)), NULL);
 
     printk("dom%d VA 0x%08"PRIvaddr"\n", d->domain_id, addr);
     printk("    TTBCR: 0x%08"PRIregister"\n", ttbcr);
     printk("    TTBR0: 0x%016"PRIx64" = 0x%"PRIpaddr"\n",
-           ttbr0, p2m_lookup(d, ttbr0 & PAGE_MASK, NULL));
+           ttbr0, pfn_to_paddr(mfn_x(mfn)));
 
     if ( ttbcr & TTBCR_EAE )
     {
@@ -2338,32 +2340,31 @@ void dump_guest_s1_walk(struct domain *d, vaddr_t addr)
         return;
     }
 
-    paddr = p2m_lookup(d, ttbr0 & PAGE_MASK, NULL);
-    if ( paddr == INVALID_PADDR )
+    if ( mfn_eq(mfn, INVALID_MFN) )
     {
         printk("Failed TTBR0 maddr lookup\n");
         goto done;
     }
-    first = map_domain_page(_mfn(paddr_to_pfn(paddr)));
+    first = map_domain_page(mfn);
 
     offset = addr >> (12+10);
     printk("1ST[0x%"PRIx32"] (0x%"PRIpaddr") = 0x%08"PRIx32"\n",
-           offset, paddr, first[offset]);
+           offset, pfn_to_paddr(mfn_x(mfn)), first[offset]);
     if ( !(first[offset] & 0x1) ||
          !(first[offset] & 0x2) )
         goto done;
 
-    paddr = p2m_lookup(d, first[offset] & PAGE_MASK, NULL);
+    mfn = p2m_lookup(d, _gfn(paddr_to_pfn(first[offset])), NULL);
 
-    if ( paddr == INVALID_PADDR )
+    if ( mfn_eq(mfn, INVALID_MFN) )
     {
         printk("Failed L1 entry maddr lookup\n");
         goto done;
     }
-    second = map_domain_page(_mfn(paddr_to_pfn(paddr)));
+    second = map_domain_page(mfn);
     offset = (addr >> 12) & 0x3FF;
     printk("2ND[0x%"PRIx32"] (0x%"PRIpaddr") = 0x%08"PRIx32"\n",
-           offset, paddr, second[offset]);
+           offset, pfn_to_paddr(mfn_x(mfn)), second[offset]);
 
 done:
     if (second) unmap_domain_page(second);
