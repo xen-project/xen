@@ -2774,7 +2774,7 @@ static int arm_smmu_map_page(struct domain *d, unsigned long gfn,
 	return guest_physmap_add_entry(d, gfn, mfn, 0, t);
 }
 
-static int arm_smmu_unmap_page(struct domain *d, unsigned long gfn)
+static int __must_check arm_smmu_unmap_page(struct domain *d, unsigned long gfn)
 {
 	/*
 	 * This function should only be used by gnttab code when the domain

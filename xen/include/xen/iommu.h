@@ -168,7 +168,7 @@ struct iommu_ops {
     void (*teardown)(struct domain *d);
     int (*map_page)(struct domain *d, unsigned long gfn, unsigned long mfn,
                     unsigned int flags);
-    int (*unmap_page)(struct domain *d, unsigned long gfn);
+    int __must_check (*unmap_page)(struct domain *d, unsigned long gfn);
     void (*free_page_table)(struct page_info *);
 #ifdef CONFIG_X86
     void (*update_ire_from_apic)(unsigned int apic, unsigned int reg, unsigned int value);
