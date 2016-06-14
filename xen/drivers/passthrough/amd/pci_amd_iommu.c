@@ -282,6 +282,8 @@ static void __hwdom_init amd_iommu_hwdom_init(struct domain *d)
 
     if ( !iommu_passthrough && !need_iommu(d) )
     {
+        int rc = 0;
+
         /* Set up 1:1 page table for dom0 */
         for ( i = 0; i < max_pdx; i++ )
         {
@@ -292,12 +294,21 @@ static void __hwdom_init amd_iommu_hwdom_init(struct domain *d)
              * a pfn_valid() check would seem desirable here.
              */
             if ( mfn_valid(pfn) )
-                amd_iommu_map_page(d, pfn, pfn, 
-                                   IOMMUF_readable|IOMMUF_writable);
+            {
+                int ret = amd_iommu_map_page(d, pfn, pfn,
+                                             IOMMUF_readable|IOMMUF_writable);
+
+                if ( !rc )
+                    rc = ret;
+            }
 
             if ( !(i & 0xfffff) )
                 process_pending_softirqs();
         }
+
+        if ( rc )
+            AMD_IOMMU_DEBUG("d%d: IOMMU mapping failed: %d\n",
+                            d->domain_id, rc);
     }
 
     for_each_amd_iommu ( iommu )

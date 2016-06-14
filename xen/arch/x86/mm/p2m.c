@@ -641,10 +641,20 @@ p2m_remove_page(struct p2m_domain *p2m, unsigned long gfn, unsigned long mfn,
 
     if ( !paging_mode_translate(p2m->domain) )
     {
+        int rc = 0;
+
         if ( need_iommu(p2m->domain) )
+        {
             for ( i = 0; i < (1 << page_order); i++ )
-                iommu_unmap_page(p2m->domain, mfn + i);
-        return 0;
+            {
+                int ret = iommu_unmap_page(p2m->domain, mfn + i);
+
+                if ( !rc )
+                    rc = ret;
+            }
+        }
+
+        return rc;
     }
 
     ASSERT(gfn_locked_by_me(p2m, gfn));
@@ -700,7 +710,10 @@ guest_physmap_add_entry(struct domain *d, unsigned long gfn,
                 if ( rc != 0 )
                 {
                     while ( i-- > 0 )
-                        iommu_unmap_page(d, mfn + i);
+                        /* If statement to satisfy __must_check. */
+                        if ( iommu_unmap_page(d, mfn + i) )
+                            continue;
+
                     return rc;
                 }
             }

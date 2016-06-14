@@ -171,20 +171,31 @@ void __hwdom_init iommu_hwdom_init(struct domain *d)
     {
         struct page_info *page;
         unsigned int i = 0;
+        int rc = 0;
+
         page_list_for_each ( page, &d->page_list )
         {
             unsigned long mfn = page_to_mfn(page);
             unsigned long gfn = mfn_to_gmfn(d, mfn);
             unsigned int mapping = IOMMUF_readable;
+            int ret;
 
             if ( ((page->u.inuse.type_info & PGT_count_mask) == 0) ||
                  ((page->u.inuse.type_info & PGT_type_mask)
                   == PGT_writable_page) )
                 mapping |= IOMMUF_writable;
-            hd->platform_ops->map_page(d, gfn, mfn, mapping);
+
+            ret = hd->platform_ops->map_page(d, gfn, mfn, mapping);
+            if ( !rc )
+                rc = ret;
+
             if ( !(i++ & 0xfffff) )
                 process_pending_softirqs();
         }
+
+        if ( rc )
+            printk(XENLOG_WARNING "d%d: IOMMU mapping failed: %d\n",
+                   d->domain_id, rc);
     }
 
     return hd->platform_ops->hwdom_init(d);

@@ -1436,7 +1436,10 @@ int memory_add(unsigned long spfn, unsigned long epfn, unsigned int pxm)
         if ( i != epfn )
         {
             while (i-- > old_max)
-                iommu_unmap_page(hardware_domain, i);
+                /* If statement to satisfy __must_check. */
+                if ( iommu_unmap_page(hardware_domain, i) )
+                    continue;
+
             goto destroy_m2p;
         }
     }

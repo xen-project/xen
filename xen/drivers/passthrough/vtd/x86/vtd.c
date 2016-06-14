@@ -118,6 +118,8 @@ void __hwdom_init vtd_set_hwdom_mapping(struct domain *d)
 
     for ( i = 0; i < top; i++ )
     {
+        int rc = 0;
+
         /*
          * Set up 1:1 mapping for dom0. Default to use only conventional RAM
          * areas and let RMRRs include needed reserved regions. When set, the
@@ -140,8 +142,17 @@ void __hwdom_init vtd_set_hwdom_mapping(struct domain *d)
 
         tmp = 1 << (PAGE_SHIFT - PAGE_SHIFT_4K);
         for ( j = 0; j < tmp; j++ )
-            iommu_map_page(d, pfn * tmp + j, pfn * tmp + j,
-                           IOMMUF_readable|IOMMUF_writable);
+        {
+            int ret = iommu_map_page(d, pfn * tmp + j, pfn * tmp + j,
+                                     IOMMUF_readable|IOMMUF_writable);
+
+            if ( !rc )
+               rc = ret;
+        }
+
+        if ( rc )
+           printk(XENLOG_WARNING VTDPREFIX " d%d: IOMMU mapping failed: %d\n",
+                  d->domain_id, rc);
 
         if (!(i & (0xfffff >> (PAGE_SHIFT - PAGE_SHIFT_4K))))
             process_pending_softirqs();

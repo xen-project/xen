@@ -667,6 +667,7 @@ ept_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
     unsigned long gfn_remainder = gfn;
     unsigned int i, target = order / EPT_TABLE_ORDER;
     int ret, rc = 0;
+    bool_t entry_written = 0;
     bool_t direct_mmio = (p2mt == p2m_mmio_direct);
     uint8_t ipat = 0;
     bool_t need_modify_vtd_table = 1;
@@ -812,10 +813,15 @@ ept_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
     rc = atomic_write_ept_entry(ept_entry, new_entry, target);
     if ( unlikely(rc) )
         old_entry.epte = 0;
-    else if ( p2mt != p2m_invalid &&
-              (gfn + (1UL << order) - 1 > p2m->max_mapped_pfn) )
-        /* Track the highest gfn for which we have ever had a valid mapping */
-        p2m->max_mapped_pfn = gfn + (1UL << order) - 1;
+    else
+    {
+        entry_written = 1;
+
+        if ( p2mt != p2m_invalid &&
+             (gfn + (1UL << order) - 1 > p2m->max_mapped_pfn) )
+            /* Track the highest gfn for which we have ever had a valid mapping */
+            p2m->max_mapped_pfn = gfn + (1UL << order) - 1;
+    }
 
 out:
     if ( needs_sync )
@@ -831,10 +837,25 @@ out:
         {
             if ( iommu_flags )
                 for ( i = 0; i < (1 << order); i++ )
-                    iommu_map_page(d, gfn + i, mfn_x(mfn) + i, iommu_flags);
+                {
+                    rc = iommu_map_page(d, gfn + i, mfn_x(mfn) + i, iommu_flags);
+                    if ( unlikely(rc) )
+                    {
+                        while ( i-- )
+                            /* If statement to satisfy __must_check. */
+                            if ( iommu_unmap_page(p2m->domain, gfn + i) )
+                                continue;
+
+                        break;
+                    }
+                }
             else
                 for ( i = 0; i < (1 << order); i++ )
-                    iommu_unmap_page(d, gfn + i);
+                {
+                    ret = iommu_unmap_page(d, gfn + i);
+                    if ( !rc )
+                        rc = ret;
+                }
         }
     }
 
@@ -847,7 +868,7 @@ out:
     if ( is_epte_present(&old_entry) )
         ept_free_entry(p2m, &old_entry, target);
 
-    if ( rc == 0 && p2m_is_hostp2m(p2m) )
+    if ( entry_written && p2m_is_hostp2m(p2m) )
         p2m_altp2m_propagate_change(d, _gfn(gfn), mfn, order, p2mt, p2ma);
 
     return rc;

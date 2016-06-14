@@ -673,6 +673,8 @@ p2m_pt_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
     if ( iommu_enabled && need_iommu(p2m->domain) &&
          (iommu_old_flags != iommu_pte_flags || old_mfn != mfn_x(mfn)) )
     {
+        ASSERT(rc == 0);
+
         if ( iommu_use_hap_pt(p2m->domain) )
         {
             if ( iommu_old_flags )
@@ -680,11 +682,27 @@ p2m_pt_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
         }
         else if ( iommu_pte_flags )
             for ( i = 0; i < (1UL << page_order); i++ )
-                iommu_map_page(p2m->domain, gfn + i, mfn_x(mfn) + i,
-                               iommu_pte_flags);
+            {
+                rc = iommu_map_page(p2m->domain, gfn + i, mfn_x(mfn) + i,
+                                    iommu_pte_flags);
+                if ( unlikely(rc) )
+                {
+                    while ( i-- )
+                        /* If statement to satisfy __must_check. */
+                        if ( iommu_unmap_page(p2m->domain, gfn + i) )
+                            continue;
+
+                    break;
+                }
+            }
         else
             for ( i = 0; i < (1UL << page_order); i++ )
-                iommu_unmap_page(p2m->domain, gfn + i);
+            {
+                int ret = iommu_unmap_page(p2m->domain, gfn + i);
+
+                if ( !rc )
+                    rc = ret;
+            }
     }
 
     /*

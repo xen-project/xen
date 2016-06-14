@@ -2467,7 +2467,7 @@ static int __get_page_type(struct page_info *page, unsigned long type,
                            int preemptible)
 {
     unsigned long nx, x, y = page->u.inuse.type_info;
-    int rc = 0;
+    int rc = 0, iommu_ret = 0;
 
     ASSERT(!(type & ~(PGT_type_mask | PGT_pae_xen_l2)));
 
@@ -2578,11 +2578,11 @@ static int __get_page_type(struct page_info *page, unsigned long type,
         if ( d && is_pv_domain(d) && unlikely(need_iommu(d)) )
         {
             if ( (x & PGT_type_mask) == PGT_writable_page )
-                iommu_unmap_page(d, mfn_to_gmfn(d, page_to_mfn(page)));
+                iommu_ret = iommu_unmap_page(d, mfn_to_gmfn(d, page_to_mfn(page)));
             else if ( type == PGT_writable_page )
-                iommu_map_page(d, mfn_to_gmfn(d, page_to_mfn(page)),
-                               page_to_mfn(page),
-                               IOMMUF_readable|IOMMUF_writable);
+                iommu_ret = iommu_map_page(d, mfn_to_gmfn(d, page_to_mfn(page)),
+                                           page_to_mfn(page),
+                                           IOMMUF_readable|IOMMUF_writable);
         }
     }
 
@@ -2598,6 +2598,9 @@ static int __get_page_type(struct page_info *page, unsigned long type,
 
     if ( (x & PGT_partial) && !(nx & PGT_partial) )
         put_page(page);
+
+    if ( !rc )
+        rc = iommu_ret;
 
     return rc;
 }
