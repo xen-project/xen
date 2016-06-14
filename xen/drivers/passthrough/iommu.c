@@ -240,21 +240,47 @@ int iommu_map_page(struct domain *d, unsigned long gfn, unsigned long mfn,
                    unsigned int flags)
 {
     const struct domain_iommu *hd = dom_iommu(d);
+    int rc;
 
     if ( !iommu_enabled || !hd->platform_ops )
         return 0;
 
-    return hd->platform_ops->map_page(d, gfn, mfn, flags);
+    rc = hd->platform_ops->map_page(d, gfn, mfn, flags);
+    if ( unlikely(rc) )
+    {
+        if ( !d->is_shutting_down && printk_ratelimit() )
+            printk(XENLOG_ERR
+                   "d%d: IOMMU mapping gfn %#lx to mfn %#lx failed: %d\n",
+                   d->domain_id, gfn, mfn, rc);
+
+        if ( !is_hardware_domain(d) )
+            domain_crash(d);
+    }
+
+    return rc;
 }
 
 int iommu_unmap_page(struct domain *d, unsigned long gfn)
 {
     const struct domain_iommu *hd = dom_iommu(d);
+    int rc;
 
     if ( !iommu_enabled || !hd->platform_ops )
         return 0;
 
-    return hd->platform_ops->unmap_page(d, gfn);
+    rc = hd->platform_ops->unmap_page(d, gfn);
+    if ( unlikely(rc) )
+    {
+        if ( !d->is_shutting_down && printk_ratelimit() )
+            printk(XENLOG_ERR
+                   "d%d: IOMMU unmapping gfn %#lx failed: %d\n",
+                   d->domain_id, gfn, rc);
+
+        if ( !is_hardware_domain(d) )
+            domain_crash(d);
+    }
+
+    return rc;
 }
 
 static void iommu_free_pagetables(unsigned long unused)
