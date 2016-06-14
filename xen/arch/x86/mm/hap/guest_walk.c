@@ -50,7 +50,7 @@ unsigned long hap_p2m_ga_to_gfn(GUEST_PAGING_LEVELS)(
     struct vcpu *v, struct p2m_domain *p2m, unsigned long cr3,
     paddr_t ga, uint32_t *pfec, unsigned int *page_order)
 {
-    uint32_t missing;
+    bool walk_ok;
     mfn_t top_mfn;
     void *top_map;
     p2m_type_t p2mt;
@@ -91,12 +91,12 @@ unsigned long hap_p2m_ga_to_gfn(GUEST_PAGING_LEVELS)(
 #if GUEST_PAGING_LEVELS == 3
     top_map += (cr3 & ~(PAGE_MASK | 31));
 #endif
-    missing = guest_walk_tables(v, p2m, ga, &gw, *pfec, top_mfn, top_map);
+    walk_ok = guest_walk_tables(v, p2m, ga, &gw, *pfec, top_mfn, top_map);
     unmap_domain_page(top_map);
     put_page(top_page);
 
     /* Interpret the answer */
-    if ( missing == 0 )
+    if ( walk_ok )
     {
         gfn_t gfn = guest_walk_to_gfn(&gw);
         struct page_info *page;
@@ -123,20 +123,7 @@ unsigned long hap_p2m_ga_to_gfn(GUEST_PAGING_LEVELS)(
         return gfn_x(gfn);
     }
 
-    if ( missing & _PAGE_PRESENT )
-        *pfec &= ~PFEC_page_present;
-
-    if ( missing & _PAGE_INVALID_BITS ) 
-        *pfec |= PFEC_reserved_bit;
-
-    if ( missing & _PAGE_PKEY_BITS )
-        *pfec |= PFEC_prot_key;
-
-    if ( missing & _PAGE_PAGED )
-        *pfec = PFEC_page_paged;
-
-    if ( missing & _PAGE_SHARED )
-        *pfec = PFEC_page_shared;
+    *pfec = gw.pfec;
 
  out_tweak_pfec:
     /*

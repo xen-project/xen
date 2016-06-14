@@ -259,19 +259,26 @@ static inline bool guest_nx_enabled(const struct vcpu *v)
     return is_pv_vcpu(v) ? cpu_has_nx : hvm_nx_enabled(v);
 }
 
+static inline bool guest_wp_enabled(const struct vcpu *v)
+{
+    /* PV guests can't control CR0.WP, and it is unconditionally set by Xen. */
+    return is_pv_vcpu(v) || hvm_wp_enabled(v);
+}
 
-/*
- * Some bits are invalid in any pagetable entry.
- * Normal flags values get represented in 24-bit values (see
- * get_pte_flags() and put_pte_flags()), so set bit 24 in
- * addition to be able to flag out of range frame numbers.
- */
-#if GUEST_PAGING_LEVELS == 3
-#define _PAGE_INVALID_BITS \
-    (_PAGE_INVALID_BIT | get_pte_flags(((1ull << 63) - 1) & ~(PAGE_SIZE - 1)))
-#else /* 2-level and 4-level */
-#define _PAGE_INVALID_BITS _PAGE_INVALID_BIT
-#endif
+static inline bool guest_smep_enabled(const struct vcpu *v)
+{
+    return !is_pv_vcpu(v) && hvm_smep_enabled(v);
+}
+
+static inline bool guest_smap_enabled(const struct vcpu *v)
+{
+    return !is_pv_vcpu(v) && hvm_smap_enabled(v);
+}
+
+static inline bool guest_pku_enabled(const struct vcpu *v)
+{
+    return !is_pv_vcpu(v) && hvm_pku_enabled(v);
+}
 
 /* Helpers for identifying whether guest entries have reserved bits set. */
 
@@ -336,13 +343,19 @@ struct guest_pagetable_walk
     guest_l3e_t l3e;            /* Guest's level 3 entry */
 #endif
     guest_l2e_t l2e;            /* Guest's level 2 entry */
-    guest_l1e_t l1e;            /* Guest's level 1 entry (or fabrication) */
+    union
+    {
+        guest_l1e_t l1e;        /* Guest's level 1 entry (or fabrication). */
+        uint64_t   el1e;        /* L2 PSE36 superpages wider than 32 bits. */
+    };
 #if GUEST_PAGING_LEVELS >= 4
     mfn_t l4mfn;                /* MFN that the level 4 entry was in */
     mfn_t l3mfn;                /* MFN that the level 3 entry was in */
 #endif
     mfn_t l2mfn;                /* MFN that the level 2 entry was in */
     mfn_t l1mfn;                /* MFN that the level 1 entry was in */
+
+    uint32_t pfec;              /* Accumulated PFEC_* error code from walk. */
 };
 
 /* Given a walk_t, translate the gw->va into the guest's notion of the
@@ -351,7 +364,9 @@ static inline gfn_t guest_walk_to_gfn(const walk_t *gw)
 {
     if ( !(guest_l1e_get_flags(gw->l1e) & _PAGE_PRESENT) )
         return INVALID_GFN;
-    return guest_l1e_get_gfn(gw->l1e);
+    return (GUEST_PAGING_LEVELS == 2
+            ? _gfn(gw->el1e >> PAGE_SHIFT)
+            : guest_l1e_get_gfn(gw->l1e));
 }
 
 /* Given a walk_t, translate the gw->va into the guest's notion of the
@@ -397,8 +412,8 @@ static inline unsigned int guest_walk_to_page_order(const walk_t *gw)
  * we go.  For the purposes of reading pagetables we treat all non-RAM
  * memory as contining zeroes.
  *
- * Returns 0 for success, or the set of permission bits that we failed on
- * if the walk did not complete.
+ * Returns a boolean indicating success or failure.  walk_t.pfec contains
+ * the accumulated error code on failure.
  */
 
 /* Macro-fu so you can call guest_walk_tables() and get the right one. */
@@ -406,7 +421,7 @@ static inline unsigned int guest_walk_to_page_order(const walk_t *gw)
 #define GPT_RENAME(_n, _l) GPT_RENAME2(_n, _l)
 #define guest_walk_tables GPT_RENAME(guest_walk_tables, GUEST_PAGING_LEVELS)
 
-extern uint32_t
+bool
 guest_walk_tables(struct vcpu *v, struct p2m_domain *p2m, unsigned long va,
                   walk_t *gw, uint32_t pfec, mfn_t top_mfn, void *top_map);
 
@@ -426,8 +441,21 @@ static inline void print_gw(const walk_t *gw)
 #endif /* All levels... */
     gprintk(XENLOG_INFO, "   l2e=%" PRI_gpte " l2mfn=%" PRI_mfn "\n",
             gw->l2e.l2, mfn_x(gw->l2mfn));
+#if GUEST_PAGING_LEVELS == 2
+    gprintk(XENLOG_INFO, "  el1e=%08" PRIx64 " l1mfn=%" PRI_mfn "\n",
+            gw->el1e, mfn_x(gw->l1mfn));
+#else
     gprintk(XENLOG_INFO, "   l1e=%" PRI_gpte " l1mfn=%" PRI_mfn "\n",
             gw->l1e.l1, mfn_x(gw->l1mfn));
+#endif
+    gprintk(XENLOG_INFO, "   pfec=%02x[%c%c%c%c%c%c]\n", gw->pfec,
+            gw->pfec & PFEC_prot_key     ? 'K' : '-',
+            gw->pfec & PFEC_insn_fetch   ? 'I' : 'd',
+            gw->pfec & PFEC_reserved_bit ? 'R' : '-',
+            gw->pfec & PFEC_user_mode    ? 'U' : 's',
+            gw->pfec & PFEC_write_access ? 'W' : 'r',
+            gw->pfec & PFEC_page_present ? 'P' : '-'
+        );
 }
 
 #endif /* _XEN_ASM_GUEST_PT_H */

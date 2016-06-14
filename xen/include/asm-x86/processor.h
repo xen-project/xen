@@ -73,10 +73,12 @@
 #define PFEC_reserved_bit   (_AC(1,U) << 3)
 #define PFEC_insn_fetch     (_AC(1,U) << 4)
 #define PFEC_prot_key       (_AC(1,U) << 5)
+#define PFEC_arch_mask      (_AC(0xffff,U)) /* Architectural PFEC values. */
 /* Internally used only flags. */
 #define PFEC_page_paged     (1U<<16)
 #define PFEC_page_shared    (1U<<17)
 #define PFEC_implicit       (1U<<18) /* Pagewalk input for ldt/gdt/idt/tr accesses. */
+#define PFEC_synth_mask     (~PFEC_arch_mask) /* Synthetic PFEC values. */
 
 /* Other exception error code values. */
 #define X86_XEC_EXT         (_AC(1,U) << 0)

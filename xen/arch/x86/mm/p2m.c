@@ -1774,17 +1774,18 @@ unsigned long paging_gva_to_gfn(struct vcpu *v,
 }
 
 /*
- * If the map is non-NULL, we leave this function having
- * acquired an extra ref on mfn_to_page(*mfn).
+ * If the map is non-NULL, we leave this function having acquired an extra ref
+ * on mfn_to_page(*mfn).  In all cases, *pfec contains appropriate
+ * synthetic/structure PFEC_* bits.
  */
 void *map_domain_gfn(struct p2m_domain *p2m, gfn_t gfn, mfn_t *mfn,
-                     p2m_type_t *p2mt, p2m_query_t q, uint32_t *rc)
+                     p2m_type_t *p2mt, p2m_query_t q, uint32_t *pfec)
 {
     struct page_info *page;
 
     if ( !gfn_valid(p2m->domain, gfn) )
     {
-        *rc = _PAGE_INVALID_BIT;
+        *pfec = PFEC_reserved_bit | PFEC_page_present;
         return NULL;
     }
 
@@ -1796,21 +1797,23 @@ void *map_domain_gfn(struct p2m_domain *p2m, gfn_t gfn, mfn_t *mfn,
         if ( page )
             put_page(page);
         p2m_mem_paging_populate(p2m->domain, gfn_x(gfn));
-        *rc = _PAGE_PAGED;
+        *pfec = PFEC_page_paged;
         return NULL;
     }
     if ( p2m_is_shared(*p2mt) )
     {
         if ( page )
             put_page(page);
-        *rc = _PAGE_SHARED;
+        *pfec = PFEC_page_shared;
         return NULL;
     }
     if ( !page )
     {
-        *rc |= _PAGE_PRESENT;
+        *pfec = 0;
         return NULL;
     }
+
+    *pfec = PFEC_page_present;
     *mfn = page_to_mfn(page);
     ASSERT(mfn_valid(*mfn));
 

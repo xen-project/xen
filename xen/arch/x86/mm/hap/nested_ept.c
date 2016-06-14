@@ -208,7 +208,7 @@ done:
     goto out;
 
 map_err:
-    if ( rc == _PAGE_PAGED )
+    if ( rc == PFEC_page_paged )
     {
         ret = EPT_TRANSLATE_RETRY;
         goto out;

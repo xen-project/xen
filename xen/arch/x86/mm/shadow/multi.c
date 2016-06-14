@@ -171,7 +171,7 @@ delete_shadow_status(struct domain *d, mfn_t gmfn, u32 shadow_type, mfn_t smfn)
 /**************************************************************************/
 /* Functions for walking the guest page tables */
 
-static inline uint32_t
+static inline bool
 sh_walk_guest_tables(struct vcpu *v, unsigned long va, walk_t *gw,
                      uint32_t pfec)
 {
@@ -2858,6 +2858,7 @@ static int sh_page_fault(struct vcpu *v,
     int r;
     p2m_type_t p2mt;
     uint32_t rc, error_code;
+    bool walk_ok;
     int version;
     const struct npfec access = {
          .read_access = 1,
@@ -3075,21 +3076,20 @@ static int sh_page_fault(struct vcpu *v,
      * shadow page table. */
     version = atomic_read(&d->arch.paging.shadow.gtable_dirty_version);
     rmb();
-    rc = sh_walk_guest_tables(v, va, &gw, error_code);
+    walk_ok = sh_walk_guest_tables(v, va, &gw, error_code);
 
 #if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC)
     regs->error_code &= ~PFEC_page_present;
-    if ( !(rc & _PAGE_PRESENT) )
+    if ( gw.pfec & PFEC_page_present )
         regs->error_code |= PFEC_page_present;
 #endif
 
-    if ( rc != 0 )
+    if ( !walk_ok )
     {
         perfc_incr(shadow_fault_bail_real_fault);
         SHADOW_PRINTK("not a shadow fault\n");
         reset_early_unshadow(v);
-        if ( (rc & _PAGE_INVALID_BITS) )
-            regs->error_code |= PFEC_reserved_bit;
+        regs->error_code = gw.pfec & PFEC_arch_mask;
         goto propagate;
     }
 
@@ -3723,7 +3723,7 @@ sh_gva_to_gfn(struct vcpu *v, struct p2m_domain *p2m,
 {
     walk_t gw;
     gfn_t gfn;
-    uint32_t missing;
+    bool walk_ok;
 
 #if (SHADOW_OPTIMIZATIONS & SHOPT_VIRTUAL_TLB)
     /* Check the vTLB cache first */
@@ -3732,18 +3732,9 @@ sh_gva_to_gfn(struct vcpu *v, struct p2m_domain *p2m,
         return vtlb_gfn;
 #endif /* (SHADOW_OPTIMIZATIONS & SHOPT_VIRTUAL_TLB) */
 
-    if ( (missing = sh_walk_guest_tables(v, va, &gw, *pfec)) != 0 )
+    if ( !(walk_ok = sh_walk_guest_tables(v, va, &gw, *pfec)) )
     {
-        if ( (missing & _PAGE_PRESENT) )
-            *pfec &= ~PFEC_page_present;
-        if ( missing & _PAGE_INVALID_BITS )
-            *pfec |= PFEC_reserved_bit;
-        /*
-         * SDM Intel 64 Volume 3, Chapter Paging, PAGE-FAULT EXCEPTIONS:
-         * The PFEC_insn_fetch flag is set only when NX or SMEP are enabled.
-         */
-        if ( is_hvm_vcpu(v) && !hvm_nx_enabled(v) && !hvm_smep_enabled(v) )
-            *pfec &= ~PFEC_insn_fetch;
+        *pfec = gw.pfec;
         return gfn_x(INVALID_GFN);
     }
     gfn = guest_walk_to_gfn(&gw);

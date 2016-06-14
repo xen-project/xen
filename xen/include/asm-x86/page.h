@@ -314,9 +314,6 @@ void efi_update_l4_pgtable(unsigned int l4idx, l4_pgentry_t);
 #define _PAGE_PSE_PAT  _AC(0x1000,U)
 #define _PAGE_AVAIL_HIGH (_AC(0x7ff, U) << 12)
 #define _PAGE_NX       (cpu_has_nx ? _PAGE_NX_BIT : 0)
-/* non-architectural flags */
-#define _PAGE_PAGED   0x2000U
-#define _PAGE_SHARED  0x4000U
 
 /*
  * Debug option: Ensure that granted mappings are not implicitly unmapped.

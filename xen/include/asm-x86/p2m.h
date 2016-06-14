@@ -679,7 +679,7 @@ int p2m_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
 extern void p2m_pt_init(struct p2m_domain *p2m);
 
 void *map_domain_gfn(struct p2m_domain *p2m, gfn_t gfn, mfn_t *mfn,
-                     p2m_type_t *p2mt, p2m_query_t q, uint32_t *rc);
+                     p2m_type_t *p2mt, p2m_query_t q, uint32_t *pfec);
 
 /* Debugging and auditing of the P2M code? */
 #ifndef NDEBUG
