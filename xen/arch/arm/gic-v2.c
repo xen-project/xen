@@ -669,6 +669,10 @@ static int gicv2m_make_dt_node(const struct domain *d,
     const struct dt_device_node *v2m = NULL;
     const struct v2m_data *v2m_data;
 
+    /* It is not necessary to create the node if there are not GICv2m frames */
+    if ( list_empty(&gicv2m_info) )
+        return 0;
+
     /* The sub-nodes require the ranges property */
     prop = dt_get_property(gic, "ranges", &len);
     if ( !prop )
