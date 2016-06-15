@@ -350,6 +350,7 @@ ENTRY(compat_int80_direct_trap)
 compat_create_bounce_frame:
         ASSERT_INTERRUPTS_ENABLED
         mov   %fs,%edi
+        ASM_STAC
         testb $2,UREGS_cs+8(%rsp)
         jz    1f
         /* Push new frame at registered guest-OS stack base. */
@@ -403,6 +404,7 @@ UNLIKELY_START(nz, compat_bounce_failsafe)
         movl  %ds,%eax
 .Lft12: movl  %eax,%fs:0*4(%rsi)        # DS
 UNLIKELY_END(compat_bounce_failsafe)
+        ASM_CLAC
         /* Rewrite our stack frame and return to guest-OS mode. */
         /* IA32 Ref. Vol. 3: TF, VM, RF and NT flags are cleared on trap. */
         andl  $~(X86_EFLAGS_VM|X86_EFLAGS_RF|\
@@ -448,6 +450,7 @@ compat_crash_page_fault_4:
         addl  $4,%esi
 compat_crash_page_fault:
 .Lft14: mov   %edi,%fs
+        ASM_CLAC
         movl  %esi,%edi
         call  show_page_walk
         jmp   dom_crash_sync_extable
