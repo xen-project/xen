@@ -412,7 +412,7 @@ struct {
 
 int main(int argc, char *argv[])
 {
-    int i, j, ret;
+    int i, j = 0, ret;
 
     if ( argc  <= 1 )
     {
