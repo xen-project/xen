@@ -420,9 +420,11 @@ domain_crash_page_fault_16:
 domain_crash_page_fault_8:
         addq  $8,%rsi
 domain_crash_page_fault:
+        ASM_CLAC
         movq  %rsi,%rdi
         call  show_page_walk
 ENTRY(dom_crash_sync_extable)
+        ASM_CLAC
         # Get out of the guest-save area of the stack.
         GET_STACK_END(ax)
         leaq  STACK_CPUINFO_FIELD(guest_cpu_user_regs)(%rax),%rsp
