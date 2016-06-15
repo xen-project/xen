@@ -1226,6 +1226,7 @@ static bool_t __init amd_sp5100_erratum28(void)
 int __init amd_iommu_init(void)
 {
     struct amd_iommu *iommu;
+    int rc = -ENODEV;
 
     BUG_ON( !iommu_found() );
 
@@ -1237,28 +1238,39 @@ int __init amd_iommu_init(void)
     if ( unlikely(acpi_gbl_FADT.boot_flags & ACPI_FADT_NO_MSI) )
         goto error_out;
 
-    ivhd_type = amd_iommu_get_supported_ivhd_type();
-    if ( ivhd_type < 0 )
+    rc = amd_iommu_get_supported_ivhd_type();
+    if ( rc < 0 )
         goto error_out;
+    ivhd_type = rc;
 
-    ivrs_bdf_entries = amd_iommu_get_ivrs_dev_entries();
-    if ( !ivrs_bdf_entries )
+    rc = amd_iommu_get_ivrs_dev_entries();
+    if ( !rc )
+        rc = -ENODEV;
+    if ( rc < 0 )
         goto error_out;
+    ivrs_bdf_entries = rc;
 
     radix_tree_init(&ivrs_maps);
     for_each_amd_iommu ( iommu )
-        if ( alloc_ivrs_mappings(iommu->seg) != 0 )
+    {
+        rc = alloc_ivrs_mappings(iommu->seg);
+        if ( rc )
             goto error_out;
+    }
 
-    if ( amd_iommu_update_ivrs_mapping_acpi() != 0 )
+    rc = amd_iommu_update_ivrs_mapping_acpi();
+    if ( rc )
         goto error_out;
 
     /* initialize io-apic interrupt remapping entries */
-    if ( iommu_intremap && amd_iommu_setup_ioapic_remapping() != 0 )
+    if ( iommu_intremap )
+        rc = amd_iommu_setup_ioapic_remapping();
+    if ( rc )
         goto error_out;
 
     /* allocate and initialize a global device table shared by all iommus */
-    if ( iterate_ivrs_mappings(amd_iommu_setup_device_table) != 0 )
+    rc = iterate_ivrs_mappings(amd_iommu_setup_device_table);
+    if ( rc )
         goto error_out;
 
     /*
@@ -1271,14 +1283,17 @@ int __init amd_iommu_init(void)
 
     /* per iommu initialization  */
     for_each_amd_iommu ( iommu )
-        if ( amd_iommu_init_one(iommu) != 0 )
+    {
+        rc = amd_iommu_init_one(iommu);
+        if ( rc )
             goto error_out;
+    }
 
     return 0;
 
 error_out:
     amd_iommu_init_cleanup();
-    return -ENODEV;
+    return rc;
 }
 
 static void disable_iommu(struct amd_iommu *iommu)
