@@ -684,7 +684,7 @@ static void latch_linear_to_phys(struct hvm_vcpu_io *vio, unsigned long gla,
     if ( vio->mmio_access.gla_valid )
         return;
 
-    vio->mmio_gva = gla & PAGE_MASK;
+    vio->mmio_gla = gla & PAGE_MASK;
     vio->mmio_gpfn = PFN_DOWN(gpa);
     vio->mmio_access = (struct npfec){ .gla_valid = 1,
                                        .read_access = 1,
@@ -782,7 +782,7 @@ static int __hvmemul_read(
     if ( ((access_type != hvm_access_insn_fetch
            ? vio->mmio_access.read_access
            : vio->mmio_access.insn_fetch)) &&
-         (vio->mmio_gva == (addr & PAGE_MASK)) )
+         (vio->mmio_gla == (addr & PAGE_MASK)) )
         return hvmemul_linear_mmio_read(addr, bytes, p_data, pfec, hvmemul_ctxt, 1);
 
     if ( (seg != x86_seg_none) &&
@@ -889,7 +889,7 @@ static int hvmemul_write(
         return rc;
 
     if ( vio->mmio_access.write_access &&
-         (vio->mmio_gva == (addr & PAGE_MASK)) )
+         (vio->mmio_gla == (addr & PAGE_MASK)) )
         return hvmemul_linear_mmio_write(addr, bytes, p_data, pfec, hvmemul_ctxt, 1);
 
     if ( (seg != x86_seg_none) &&

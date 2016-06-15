@@ -60,12 +60,12 @@ struct hvm_vcpu_io {
 
     /*
      * HVM emulation:
-     *  Virtual address @mmio_gva maps to MMIO physical frame @mmio_gpfn.
+     *  Linear address @mmio_gla maps to MMIO physical frame @mmio_gpfn.
      *  The latter is known to be an MMIO frame (not RAM).
      *  This translation is only valid for accesses as per @mmio_access.
      */
     struct npfec        mmio_access;
-    unsigned long       mmio_gva;
+    unsigned long       mmio_gla;
     unsigned long       mmio_gpfn;
 
     /*

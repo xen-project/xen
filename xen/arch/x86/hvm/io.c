@@ -114,7 +114,7 @@ int handle_mmio(void)
     return 1;
 }
 
-int handle_mmio_with_translation(unsigned long gva, unsigned long gpfn,
+int handle_mmio_with_translation(unsigned long gla, unsigned long gpfn,
                                  struct npfec access)
 {
     struct hvm_vcpu_io *vio = &current->arch.hvm_vcpu.hvm_io;
@@ -122,7 +122,7 @@ int handle_mmio_with_translation(unsigned long gva, unsigned long gpfn,
     vio->mmio_access = access.gla_valid &&
                        access.kind == npfec_kind_with_gla
                        ? access : (struct npfec){};
-    vio->mmio_gva = gva & PAGE_MASK;
+    vio->mmio_gla = gla & PAGE_MASK;
     vio->mmio_gpfn = gpfn;
     return handle_mmio();
 }
