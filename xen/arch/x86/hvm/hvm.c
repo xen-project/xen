@@ -3978,6 +3978,8 @@ void hvm_ud_intercept(struct cpu_user_regs *regs)
     {
         struct vcpu *cur = current;
         const struct segment_register *cs = &ctxt.seg_reg[x86_seg_cs];
+        uint32_t walk = (ctxt.seg_reg[x86_seg_ss].attr.fields.dpl == 3)
+            ? PFEC_user_mode : 0;
         unsigned long addr;
         char sig[5]; /* ud2; .ascii "xen" */
 
@@ -3987,7 +3989,7 @@ void hvm_ud_intercept(struct cpu_user_regs *regs)
                                          cs->attr.fields.l) ? 64 :
                                         cs->attr.fields.db ? 32 : 16, &addr) &&
              (hvm_fetch_from_guest_virt_nofault(sig, addr, sizeof(sig),
-                                                0) == HVMCOPY_okay) &&
+                                                walk) == HVMCOPY_okay) &&
              (memcmp(sig, "\xf\xbxen", sizeof(sig)) == 0) )
         {
             regs->eip += sizeof(sig);
