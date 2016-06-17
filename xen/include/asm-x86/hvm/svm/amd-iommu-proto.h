@@ -120,7 +120,7 @@ extern unsigned long *shared_intremap_inuse;
 
 /* power management support */
 void amd_iommu_resume(void);
-void amd_iommu_suspend(void);
+int __must_check amd_iommu_suspend(void);
 void amd_iommu_crash_shutdown(void);
 
 /* guest iommu support */

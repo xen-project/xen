@@ -175,7 +175,7 @@ struct iommu_ops {
     unsigned int (*read_apic_from_ire)(unsigned int apic, unsigned int reg);
     int (*setup_hpet_msi)(struct msi_desc *);
 #endif /* CONFIG_X86 */
-    void (*suspend)(void);
+    int __must_check (*suspend)(void);
     void (*resume)(void);
     void (*share_p2m)(struct domain *d);
     void (*crash_shutdown)(void);
@@ -185,7 +185,7 @@ struct iommu_ops {
     void (*dump_p2m_table)(struct domain *d);
 };
 
-void iommu_suspend(void);
+int __must_check iommu_suspend(void);
 void iommu_resume(void);
 void iommu_crash_shutdown(void);
 int iommu_get_reserved_device_memory(iommu_grdm_t *, void *);

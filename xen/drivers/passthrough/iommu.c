@@ -379,10 +379,12 @@ int __init iommu_setup(void)
     return rc;
 }
 
-void iommu_suspend()
+int iommu_suspend()
 {
     if ( iommu_enabled )
-        iommu_get_ops()->suspend();
+        return iommu_get_ops()->suspend();
+
+    return 0;
 }
 
 void iommu_resume()

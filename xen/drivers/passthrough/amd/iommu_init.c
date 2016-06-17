@@ -1362,7 +1362,14 @@ static void invalidate_all_devices(void)
     iterate_ivrs_mappings(_invalidate_all_devices);
 }
 
-void amd_iommu_suspend(void)
+int amd_iommu_suspend(void)
+{
+    amd_iommu_crash_shutdown();
+
+    return 0;
+}
+
+void amd_iommu_crash_shutdown(void)
 {
     struct amd_iommu *iommu;
 

@@ -541,7 +541,7 @@ static int iommu_flush_iotlb_psi(
     return status;
 }
 
-static void iommu_flush_all(void)
+static int __must_check iommu_flush_all(void)
 {
     struct acpi_drhd_unit *drhd;
     struct iommu *iommu;
@@ -555,6 +555,8 @@ static void iommu_flush_all(void)
         flush_dev_iotlb = find_ats_dev_drhd(iommu) ? 1 : 0;
         iommu_flush_iotlb_global(iommu, 0, flush_dev_iotlb);
     }
+
+    return 0;
 }
 
 static void __intel_iommu_iotlb_flush(struct domain *d, unsigned long gfn,
@@ -1259,7 +1261,9 @@ static void __hwdom_init intel_iommu_hwdom_init(struct domain *d)
     setup_hwdom_pci_devices(d, setup_hwdom_device);
     setup_hwdom_rmrr(d);
 
-    iommu_flush_all();
+    if ( iommu_flush_all() )
+        printk(XENLOG_WARNING VTDPREFIX
+               " IOMMU flush all failed for hardware domain\n");
 
     for_each_drhd_unit ( drhd )
     {
@@ -2001,7 +2005,7 @@ int adjust_vtd_irq_affinities(void)
 }
 __initcall(adjust_vtd_irq_affinities);
 
-static int init_vtd_hw(void)
+static int __must_check init_vtd_hw(void)
 {
     struct acpi_drhd_unit *drhd;
     struct iommu *iommu;
@@ -2099,8 +2103,8 @@ static int init_vtd_hw(void)
             return -EIO;
         }
     }
-    iommu_flush_all();
-    return 0;
+
+    return iommu_flush_all();
 }
 
 static void __hwdom_init setup_hwdom_rmrr(struct domain *d)
@@ -2389,16 +2393,25 @@ static int intel_iommu_group_id(u16 seg, u8 bus, u8 devfn)
 }
 
 static u32 iommu_state[MAX_IOMMUS][MAX_IOMMU_REGS];
-static void vtd_suspend(void)
+
+static int __must_check vtd_suspend(void)
 {
     struct acpi_drhd_unit *drhd;
     struct iommu *iommu;
     u32    i;
+    int rc;
 
     if ( !iommu_enabled )
-        return;
+        return 0;
 
-    iommu_flush_all();
+    rc = iommu_flush_all();
+    if ( unlikely(rc) )
+    {
+        printk(XENLOG_WARNING VTDPREFIX
+               " suspend: IOMMU flush all failed: %d\n", rc);
+
+        return rc;
+    }
 
     for_each_drhd_unit ( drhd )
     {
@@ -2427,6 +2440,8 @@ static void vtd_suspend(void)
         if ( !iommu_intremap && iommu_qinval )
             disable_qinval(iommu);
     }
+
+    return 0;
 }
 
 static void vtd_crash_shutdown(void)
@@ -2437,7 +2452,9 @@ static void vtd_crash_shutdown(void)
     if ( !iommu_enabled )
         return;
 
-    iommu_flush_all();
+    if ( iommu_flush_all() )
+        printk(XENLOG_WARNING VTDPREFIX
+               " crash shutdown: IOMMU flush all failed\n");
 
     for_each_drhd_unit ( drhd )
     {

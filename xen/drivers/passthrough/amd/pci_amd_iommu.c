@@ -633,6 +633,6 @@ const struct iommu_ops amd_iommu_ops = {
     .suspend = amd_iommu_suspend,
     .resume = amd_iommu_resume,
     .share_p2m = amd_iommu_share_p2m,
-    .crash_shutdown = amd_iommu_suspend,
+    .crash_shutdown = amd_iommu_crash_shutdown,
     .dump_p2m_table = amd_dump_p2m_table,
 };

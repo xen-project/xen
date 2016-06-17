@@ -43,36 +43,70 @@ struct acpi_sleep_info acpi_sinfo;
 
 void do_suspend_lowlevel(void);
 
+enum dev_power_saved
+{
+    SAVED_NONE,
+    SAVED_CONSOLE,
+    SAVED_TIME,
+    SAVED_I8259A,
+    SAVED_IOAPIC,
+    SAVED_IOMMU,
+    SAVED_LAPIC,
+    SAVED_ALL,
+};
+
 static int device_power_down(void)
 {
-    console_suspend();
+    if ( console_suspend() )
+        return SAVED_NONE;
 
-    time_suspend();
+    if ( time_suspend() )
+        return SAVED_CONSOLE;
 
-    i8259A_suspend();
+    if ( i8259A_suspend() )
+        return SAVED_TIME;
 
+    /* ioapic_suspend cannot fail */
     ioapic_suspend();
 
-    iommu_suspend();
+    if ( iommu_suspend() )
+        return SAVED_IOAPIC;
 
-    lapic_suspend();
+    if ( lapic_suspend() )
+        return SAVED_IOMMU;
 
-    return 0;
+    return SAVED_ALL;
 }
 
-static void device_power_up(void)
+static void device_power_up(enum dev_power_saved saved)
 {
-    lapic_resume();
-
-    iommu_resume();
-
-    ioapic_resume();
-
-    i8259A_resume();
-
-    time_resume();
-
-    console_resume();
+    switch ( saved )
+    {
+    case SAVED_ALL:
+    case SAVED_LAPIC:
+        lapic_resume();
+        /* fall through */
+    case SAVED_IOMMU:
+        iommu_resume();
+        /* fall through */
+    case SAVED_IOAPIC:
+        ioapic_resume();
+        /* fall through */
+    case SAVED_I8259A:
+        i8259A_resume();
+        /* fall through */
+    case SAVED_TIME:
+        time_resume();
+        /* fall through */
+    case SAVED_CONSOLE:
+        console_resume();
+        /* fall through */
+    case SAVED_NONE:
+        break;
+    default:
+        BUG();
+        break;
+    }
 }
 
 static void freeze_domains(void)
@@ -165,12 +199,16 @@ static int enter_state(u32 state)
     local_irq_save(flags);
     spin_debug_disable();
 
-    if ( (error = device_power_down()) )
+    if ( (error = device_power_down()) != SAVED_ALL )
     {
         printk(XENLOG_ERR "Some devices failed to power down.");
         system_state = SYS_STATE_resume;
+        device_power_up(error);
+        error = -EIO;
         goto done;
     }
+    else
+        error = 0;
 
     ACPI_FLUSH_CPU_CACHE();
 
@@ -196,7 +234,7 @@ static int enter_state(u32 state)
     write_cr4(cr4 & ~X86_CR4_MCE);
     write_efer(read_efer());
 
-    device_power_up();
+    device_power_up(SAVED_ALL);
 
     mcheck_init(&boot_cpu_data, 0);
     write_cr4(cr4);
