@@ -559,8 +559,10 @@ static int __must_check iommu_flush_all(void)
     return 0;
 }
 
-static void __intel_iommu_iotlb_flush(struct domain *d, unsigned long gfn,
-        int dma_old_pte_present, unsigned int page_count)
+static int __must_check iommu_flush_iotlb(struct domain *d,
+                                          unsigned long gfn,
+                                          bool_t dma_old_pte_present,
+                                          unsigned int page_count)
 {
     struct domain_iommu *hd = dom_iommu(d);
     struct acpi_drhd_unit *drhd;
@@ -598,16 +600,20 @@ static void __intel_iommu_iotlb_flush(struct domain *d, unsigned long gfn,
                 iommu_flush_write_buffer(iommu);
         }
     }
+
+    return 0;
 }
 
-static void intel_iommu_iotlb_flush(struct domain *d, unsigned long gfn, unsigned int page_count)
+static int __must_check iommu_flush_iotlb_pages(struct domain *d,
+                                                unsigned long gfn,
+                                                unsigned int page_count)
 {
-    __intel_iommu_iotlb_flush(d, gfn, 1, page_count);
+    return iommu_flush_iotlb(d, gfn, 1, page_count);
 }
 
-static void intel_iommu_iotlb_flush_all(struct domain *d)
+static int __must_check iommu_flush_iotlb_all(struct domain *d)
 {
-    __intel_iommu_iotlb_flush(d, INVALID_GFN, 0, 0);
+    return iommu_flush_iotlb(d, INVALID_GFN, 0, 0);
 }
 
 /* clear one page's page table */
@@ -616,6 +622,7 @@ static int __must_check dma_pte_clear_one(struct domain *domain, u64 addr)
     struct domain_iommu *hd = dom_iommu(domain);
     struct dma_pte *page = NULL, *pte = NULL;
     u64 pg_maddr;
+    int rc = 0;
 
     spin_lock(&hd->arch.mapping_lock);
     /* get last level pte */
@@ -641,11 +648,11 @@ static int __must_check dma_pte_clear_one(struct domain *domain, u64 addr)
     iommu_flush_cache_entry(pte, sizeof(struct dma_pte));
 
     if ( !this_cpu(iommu_dont_flush_iotlb) )
-        __intel_iommu_iotlb_flush(domain, addr >> PAGE_SHIFT_4K, 1, 1);
+        rc = iommu_flush_iotlb_pages(domain, addr >> PAGE_SHIFT_4K, 1);
 
     unmap_vtd_domain_page(page);
 
-    return 0;
+    return rc;
 }
 
 static void iommu_free_pagetable(u64 pt_maddr, int level)
@@ -1699,6 +1706,7 @@ static int __must_check intel_iommu_map_page(struct domain *d,
     struct domain_iommu *hd = dom_iommu(d);
     struct dma_pte *page = NULL, *pte = NULL, old, new = { 0 };
     u64 pg_maddr;
+    int rc = 0;
 
     /* Do nothing if VT-d shares EPT page table */
     if ( iommu_use_hap_pt(d) )
@@ -1741,9 +1749,9 @@ static int __must_check intel_iommu_map_page(struct domain *d,
     unmap_vtd_domain_page(page);
 
     if ( !this_cpu(iommu_dont_flush_iotlb) )
-        __intel_iommu_iotlb_flush(d, gfn, dma_pte_present(old), 1);
+        rc = iommu_flush_iotlb(d, gfn, dma_pte_present(old), 1);
 
-    return 0;
+    return rc;
 }
 
 static int __must_check intel_iommu_unmap_page(struct domain *d,
@@ -2574,8 +2582,8 @@ const struct iommu_ops intel_iommu_ops = {
     .resume = vtd_resume,
     .share_p2m = iommu_set_pgd,
     .crash_shutdown = vtd_crash_shutdown,
-    .iotlb_flush = intel_iommu_iotlb_flush,
-    .iotlb_flush_all = intel_iommu_iotlb_flush_all,
+    .iotlb_flush = iommu_flush_iotlb_pages,
+    .iotlb_flush_all = iommu_flush_iotlb_all,
     .get_reserved_device_memory = intel_iommu_get_reserved_device_memory,
     .dump_p2m_table = vtd_dump_p2m_table,
 };

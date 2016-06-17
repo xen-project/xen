@@ -319,9 +319,7 @@ int iommu_iotlb_flush(struct domain *d, unsigned long gfn,
     if ( !iommu_enabled || !hd->platform_ops || !hd->platform_ops->iotlb_flush )
         return 0;
 
-    hd->platform_ops->iotlb_flush(d, gfn, page_count);
-
-    return 0;
+    return hd->platform_ops->iotlb_flush(d, gfn, page_count);
 }
 
 int iommu_iotlb_flush_all(struct domain *d)
@@ -331,9 +329,7 @@ int iommu_iotlb_flush_all(struct domain *d)
     if ( !iommu_enabled || !hd->platform_ops || !hd->platform_ops->iotlb_flush_all )
         return 0;
 
-    hd->platform_ops->iotlb_flush_all(d);
-
-    return 0;
+    return hd->platform_ops->iotlb_flush_all(d);
 }
 
 int __init iommu_setup(void)

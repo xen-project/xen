@@ -179,8 +179,9 @@ struct iommu_ops {
     void (*resume)(void);
     void (*share_p2m)(struct domain *d);
     void (*crash_shutdown)(void);
-    void (*iotlb_flush)(struct domain *d, unsigned long gfn, unsigned int page_count);
-    void (*iotlb_flush_all)(struct domain *d);
+    int __must_check (*iotlb_flush)(struct domain *d, unsigned long gfn,
+                                    unsigned int page_count);
+    int __must_check (*iotlb_flush_all)(struct domain *d);
     int (*get_reserved_device_memory)(iommu_grdm_t *, void *);
     void (*dump_p2m_table)(struct domain *d);
 };
