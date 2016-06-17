@@ -1752,8 +1752,8 @@ static int __must_check intel_iommu_unmap_page(struct domain *d,
     return dma_pte_clear_one(d, (paddr_t)gfn << PAGE_SHIFT_4K);
 }
 
-void iommu_pte_flush(struct domain *d, u64 gfn, u64 *pte,
-                     int order, int present)
+int iommu_pte_flush(struct domain *d, u64 gfn, u64 *pte,
+                    int order, int present)
 {
     struct acpi_drhd_unit *drhd;
     struct iommu *iommu = NULL;
@@ -1778,6 +1778,8 @@ void iommu_pte_flush(struct domain *d, u64 gfn, u64 *pte,
                                    order, !present, flush_dev_iotlb) )
             iommu_flush_write_buffer(iommu);
     }
+
+    return 0;
 }
 
 static int __init vtd_ept_page_compatible(struct iommu *iommu)

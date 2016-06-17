@@ -832,7 +832,7 @@ out:
          need_modify_vtd_table )
     {
         if ( iommu_hap_pt_share )
-            iommu_pte_flush(d, gfn, &ept_entry->epte, order, vtd_pte_present);
+            rc = iommu_pte_flush(d, gfn, &ept_entry->epte, order, vtd_pte_present);
         else
         {
             if ( iommu_flags )
