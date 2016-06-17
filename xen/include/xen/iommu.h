@@ -200,8 +200,9 @@ int iommu_do_pci_domctl(struct xen_domctl *, struct domain *d,
 int iommu_do_domctl(struct xen_domctl *, struct domain *d,
                     XEN_GUEST_HANDLE_PARAM(xen_domctl_t));
 
-void iommu_iotlb_flush(struct domain *d, unsigned long gfn, unsigned int page_count);
-void iommu_iotlb_flush_all(struct domain *d);
+int __must_check iommu_iotlb_flush(struct domain *d, unsigned long gfn,
+                                   unsigned int page_count);
+int __must_check iommu_iotlb_flush_all(struct domain *d);
 
 /*
  * The purpose of the iommu_dont_flush_iotlb optional cpu flag is to

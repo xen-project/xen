@@ -104,8 +104,9 @@ int arch_iommu_populate_page_table(struct domain *d)
     this_cpu(iommu_dont_flush_iotlb) = 0;
 
     if ( !rc )
-        iommu_iotlb_flush_all(d);
-    else if ( rc != -ERESTART )
+        rc = iommu_iotlb_flush_all(d);
+
+    if ( rc && rc != -ERESTART )
         iommu_teardown(d);
 
     return rc;

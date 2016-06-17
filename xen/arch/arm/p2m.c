@@ -1178,7 +1178,9 @@ out:
     if ( flush )
     {
         flush_tlb_domain(d);
-        iommu_iotlb_flush(d, sgfn, egfn - sgfn);
+        ret = iommu_iotlb_flush(d, sgfn, egfn - sgfn);
+        if ( !rc )
+            rc = ret;
     }
 
     while ( (pg = page_list_remove_head(&free_pages)) )

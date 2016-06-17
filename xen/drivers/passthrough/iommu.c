@@ -311,24 +311,29 @@ static void iommu_free_pagetables(unsigned long unused)
                             cpumask_cycle(smp_processor_id(), &cpu_online_map));
 }
 
-void iommu_iotlb_flush(struct domain *d, unsigned long gfn, unsigned int page_count)
+int iommu_iotlb_flush(struct domain *d, unsigned long gfn,
+                      unsigned int page_count)
 {
     const struct domain_iommu *hd = dom_iommu(d);
 
     if ( !iommu_enabled || !hd->platform_ops || !hd->platform_ops->iotlb_flush )
-        return;
+        return 0;
 
     hd->platform_ops->iotlb_flush(d, gfn, page_count);
+
+    return 0;
 }
 
-void iommu_iotlb_flush_all(struct domain *d)
+int iommu_iotlb_flush_all(struct domain *d)
 {
     const struct domain_iommu *hd = dom_iommu(d);
 
     if ( !iommu_enabled || !hd->platform_ops || !hd->platform_ops->iotlb_flush_all )
-        return;
+        return 0;
 
     hd->platform_ops->iotlb_flush_all(d);
+
+    return 0;
 }
 
 int __init iommu_setup(void)

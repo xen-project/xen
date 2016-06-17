@@ -683,9 +683,17 @@ static int xenmem_add_to_physmap(struct domain *d,
 #ifdef CONFIG_HAS_PASSTHROUGH
     if ( need_iommu(d) )
     {
+        int ret;
+
         this_cpu(iommu_dont_flush_iotlb) = 0;
-        iommu_iotlb_flush(d, xatp->idx - done, done);
-        iommu_iotlb_flush(d, xatp->gpfn - done, done);
+
+        ret = iommu_iotlb_flush(d, xatp->idx - done, done);
+        if ( unlikely(ret) && rc >= 0 )
+            rc = ret;
+
+        ret = iommu_iotlb_flush(d, xatp->gpfn - done, done);
+        if ( unlikely(ret) && rc >= 0 )
+            rc = ret;
     }
 #endif
 
