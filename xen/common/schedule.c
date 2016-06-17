@@ -1625,7 +1625,8 @@ void __init scheduler_init(void)
     {
         printk("Could not find scheduler: %s\n", opt_sched);
         for ( i = 0; i < NUM_SCHEDULERS; i++ )
-            if ( schedulers[i] )
+            if ( schedulers[i] &&
+                 !strcmp(schedulers[i]->opt_name, CONFIG_SCHED_DEFAULT) )
             {
                 ops = *schedulers[i];
                 break;
