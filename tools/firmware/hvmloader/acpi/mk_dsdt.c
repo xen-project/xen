@@ -150,6 +150,14 @@ int main(int argc, char **argv)
     indent(); printf("MSU, 8\n");
     pop_block();
 
+    /* Processor object helpers. */
+    push_block("Method", "PMAT, 2");
+    push_block("If", "LLess(Arg0, NCPU)");
+    stmt("Return", "ToBuffer(Arg1)");
+    pop_block();
+    stmt("Return", "Buffer() {0, 8, 0xff, 0xff, 0, 0, 0, 0}");
+    pop_block();
+
     /* Define processor objects and control methods. */
     for ( cpu = 0; cpu < max_cpus; cpu++)
     {
@@ -171,16 +179,21 @@ int main(int argc, char **argv)
         pop_block();
 
         push_block("Method", "_MAT, 0");
-        stmt("Return", "ToBuffer(MAT)");
+        if ( cpu )
+            stmt("Return", "PMAT (%d, MAT)", cpu);
+        else
+            stmt("Return", "ToBuffer(MAT)");
         pop_block();
 
         push_block("Method", "_STA");
+        if ( cpu )
+            push_block("If", "LLess(%d, \\_SB.NCPU)", cpu);
         push_block("If", "FLG");
         stmt("Return", "0xF");
         pop_block();
-        push_block("Else", NULL);
+        if ( cpu )
+            pop_block();
         stmt("Return", "0x0");
-        pop_block();
         pop_block();
 
         push_block("Method", "_EJ0, 1, NotSerialized");

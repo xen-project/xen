@@ -48,15 +48,13 @@ struct acpi_info {
     uint8_t  com2_present:1;    /* 0[1] - System has COM2? */
     uint8_t  lpt1_present:1;    /* 0[2] - System has LPT1? */
     uint8_t  hpet_present:1;    /* 0[3] - System has HPET? */
+    uint16_t nr_cpus;           /* 2    - Number of CPUs */
     uint32_t pci_min, pci_len;  /* 4, 8 - PCI I/O hole boundaries */
     uint32_t madt_csum_addr;    /* 12   - Address of MADT checksum */
     uint32_t madt_lapic0_addr;  /* 16   - Address of first MADT LAPIC struct */
     uint32_t vm_gid_addr;       /* 20   - Address of VM generation id buffer */
     uint64_t pci_hi_min, pci_hi_len; /* 24, 32 - PCI I/O hole boundaries */
 };
-
-/* Number of processor objects in the chosen DSDT. */
-static unsigned int nr_processor_objects;
 
 static void set_checksum(
     void *table, uint32_t checksum_offset, uint32_t length)
@@ -89,7 +87,7 @@ static struct acpi_20_madt *construct_madt(struct acpi_info *info)
     sz  = sizeof(struct acpi_20_madt);
     sz += sizeof(struct acpi_20_madt_intsrcovr) * 16;
     sz += sizeof(struct acpi_20_madt_ioapic);
-    sz += sizeof(struct acpi_20_madt_lapic) * nr_processor_objects;
+    sz += sizeof(struct acpi_20_madt_lapic) * hvm_info->nr_vcpus;
 
     madt = mem_alloc(sz, 16);
     if (!madt) return NULL;
@@ -142,8 +140,9 @@ static struct acpi_20_madt *construct_madt(struct acpi_info *info)
     io_apic->ioapic_addr = IOAPIC_BASE_ADDRESS;
 
     lapic = (struct acpi_20_madt_lapic *)(io_apic + 1);
+    info->nr_cpus = hvm_info->nr_vcpus;
     info->madt_lapic0_addr = (uint32_t)lapic;
-    for ( i = 0; i < nr_processor_objects; i++ )
+    for ( i = 0; i < hvm_info->nr_vcpus; i++ )
     {
         memset(lapic, 0, sizeof(*lapic));
         lapic->type    = ACPI_PROCESSOR_LOCAL_APIC;
@@ -151,8 +150,7 @@ static struct acpi_20_madt *construct_madt(struct acpi_info *info)
         /* Processor ID must match processor-object IDs in the DSDT. */
         lapic->acpi_processor_id = i;
         lapic->apic_id = LAPIC_ID(i);
-        lapic->flags = ((i < hvm_info->nr_vcpus) &&
-                        test_bit(i, hvm_info->vcpu_online)
+        lapic->flags = (test_bit(i, hvm_info->vcpu_online)
                         ? ACPI_LOCAL_APIC_ENABLED : 0);
         lapic++;
     }
@@ -534,14 +532,12 @@ void acpi_build_tables(struct acpi_config *config, unsigned int physical)
         dsdt = mem_alloc(config->dsdt_15cpu_len, 16);
         if (!dsdt) goto oom;
         memcpy(dsdt, config->dsdt_15cpu, config->dsdt_15cpu_len);
-        nr_processor_objects = 15;
     }
     else
     {
         dsdt = mem_alloc(config->dsdt_anycpu_len, 16);
         if (!dsdt) goto oom;
         memcpy(dsdt, config->dsdt_anycpu, config->dsdt_anycpu_len);
-        nr_processor_objects = HVM_MAX_VCPUS;
     }
 
     /*

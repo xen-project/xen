@@ -50,7 +50,8 @@ DefinitionBlock ("DSDT.aml", "DSDT", 2, "Xen", "HVM", 0)
            UAR2, 1,
            LTP1, 1,
            HPET, 1,
-           Offset(4),
+           Offset(2),
+           NCPU, 16,
            PMIN, 32,
            PLEN, 32,
            MSUA, 32, /* MADT checksum address */
