@@ -672,9 +672,11 @@ static ssize_t __erst_read(u64 record_id, struct cper_record_header *record,
 	if (rcd_tmp->record_length > buflen)
 		return -ENOBUFS;
 	len = rcd_tmp->record_length;
+	if (len < 0)
+		return -ERANGE;
 	memcpy(record, rcd_tmp, len);
 
-	return len >= 0 ? len : -ERANGE;
+	return len;
 }
 
 /*
