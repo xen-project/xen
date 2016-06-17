@@ -174,6 +174,7 @@ int __init parse_bool(const char *s)
  *  'S' - SMP with CPUs not designed for SMP.
  *  'M' - Machine had a machine check experience.
  *  'B' - System has hit bad_page.
+ *  'C' - Console output is synchronous.
  *
  *      The string is overwritten by the next call to print_taint().
  */
