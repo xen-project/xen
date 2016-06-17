@@ -3886,19 +3886,27 @@ void hvm_ud_intercept(struct cpu_user_regs *regs)
 {
     struct hvm_emulate_ctxt ctxt;
 
+    hvm_emulate_prepare(&ctxt, regs);
+
     if ( opt_hvm_fep )
     {
         struct vcpu *cur = current;
-        struct segment_register cs;
+        const struct segment_register *cs = &ctxt.seg_reg[x86_seg_cs];
         unsigned long addr;
         char sig[5]; /* ud2; .ascii "xen" */
 
-        hvm_get_segment_register(cur, x86_seg_cs, &cs);
-        if ( hvm_virtual_to_linear_addr(x86_seg_cs, &cs, regs->eip,
-                                        sizeof(sig), hvm_access_insn_fetch,
+        /*
+         * Note that in the call below we pass 1 more than the signature
+         * size, to guard against the overall code sequence wrapping between
+         * "prefix" and actual instruction. There's necessarily at least one
+         * actual instruction byte required, so this won't cause failure on
+         * legitimate uses.
+         */
+        if ( hvm_virtual_to_linear_addr(x86_seg_cs, cs, regs->eip,
+                                        sizeof(sig) + 1, hvm_access_insn_fetch,
                                         (hvm_long_mode_enabled(cur) &&
-                                         cs.attr.fields.l) ? 64 :
-                                        cs.attr.fields.db ? 32 : 16, &addr) &&
+                                         cs->attr.fields.l) ? 64 :
+                                        cs->attr.fields.db ? 32 : 16, &addr) &&
              (hvm_fetch_from_guest_virt_nofault(sig, addr, sizeof(sig),
                                                 0) == HVMCOPY_okay) &&
              (memcmp(sig, "\xf\xbxen", sizeof(sig)) == 0) )
@@ -3907,8 +3915,6 @@ void hvm_ud_intercept(struct cpu_user_regs *regs)
             regs->eflags &= ~X86_EFLAGS_RF;
         }
     }
-
-    hvm_emulate_prepare(&ctxt, regs);
 
     switch ( hvm_emulate_one(&ctxt) )
     {
