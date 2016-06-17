@@ -2745,8 +2745,8 @@ static void arm_smmu_iommu_domain_teardown(struct domain *d)
 	xfree(xen_domain);
 }
 
-static int arm_smmu_map_page(struct domain *d, unsigned long gfn,
-			     unsigned long mfn, unsigned int flags)
+static int __must_check arm_smmu_map_page(struct domain *d, unsigned long gfn,
+			unsigned long mfn, unsigned int flags)
 {
 	p2m_type_t t;
 

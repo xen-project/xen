@@ -1687,9 +1687,10 @@ static void iommu_domain_teardown(struct domain *d)
     spin_unlock(&hd->arch.mapping_lock);
 }
 
-static int intel_iommu_map_page(
-    struct domain *d, unsigned long gfn, unsigned long mfn,
-    unsigned int flags)
+static int __must_check intel_iommu_map_page(struct domain *d,
+                                             unsigned long gfn,
+                                             unsigned long mfn,
+                                             unsigned int flags)
 {
     struct domain_iommu *hd = dom_iommu(d);
     struct dma_pte *page = NULL, *pte = NULL, old, new = { 0 };

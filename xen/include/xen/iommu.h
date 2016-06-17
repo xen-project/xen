@@ -166,8 +166,8 @@ struct iommu_ops {
 #endif /* HAS_PCI */
 
     void (*teardown)(struct domain *d);
-    int (*map_page)(struct domain *d, unsigned long gfn, unsigned long mfn,
-                    unsigned int flags);
+    int __must_check (*map_page)(struct domain *d, unsigned long gfn,
+                                 unsigned long mfn, unsigned int flags);
     int __must_check (*unmap_page)(struct domain *d, unsigned long gfn);
     void (*free_page_table)(struct page_info *);
 #ifdef CONFIG_X86
