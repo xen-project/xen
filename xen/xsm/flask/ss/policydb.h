@@ -246,6 +246,8 @@ struct policydb {
 
     unsigned int policyvers;
 
+    unsigned int allow_unknown : 1;
+
     u16 target_type;
 };
 
@@ -260,6 +262,10 @@ extern int policydb_read(struct policydb *p, void *fp);
 #define PERM_SYMTAB_SIZE 32
 
 #define POLICYDB_CONFIG_MLS    1
+
+/* the config flags related to unknown classes/perms are bits 2 and 3 */
+#define REJECT_UNKNOWN 0x00000002
+#define ALLOW_UNKNOWN  0x00000004
 
 #define OBJECT_R "object_r"
 #define OBJECT_R_VAL 1

@@ -1465,6 +1465,11 @@ err:
 
 }
 
+int security_get_allow_unknown(void)
+{
+    return policydb.allow_unknown;
+}
+
 /**
  * security_irq_sid - Obtain the SID for a physical irq.
  * @pirq: physical irq

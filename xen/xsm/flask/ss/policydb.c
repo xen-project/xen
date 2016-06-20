@@ -1843,6 +1843,7 @@ int policydb_read(struct policydb *p, void *fp)
             goto bad;
         }
     }
+    p->allow_unknown = !!(le32_to_cpu(buf[1]) & ALLOW_UNKNOWN);
 
     if ( p->policyvers >= POLICYDB_VERSION_POLCAP &&
          ebitmap_read(&p->policycaps, fp) != 0 )
