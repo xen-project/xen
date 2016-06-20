@@ -127,7 +127,7 @@ bool __init has_xsm_magic(paddr_t start)
 }
 #endif
 
-int register_xsm(struct xsm_operations *ops)
+int __init register_xsm(struct xsm_operations *ops)
 {
     if ( verify(ops) )
     {

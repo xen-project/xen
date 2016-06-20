@@ -27,7 +27,7 @@ struct xsm_operations dummy_xsm_ops;
         }                                                              \
     } while (0)
 
-void xsm_fixup_ops (struct xsm_operations *ops)
+void __init xsm_fixup_ops (struct xsm_operations *ops)
 {
     set_to_dummy_if_null(ops, security_domaininfo);
     set_to_dummy_if_null(ops, domain_create);
