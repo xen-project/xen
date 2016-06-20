@@ -1,0 +1,16 @@
+# The vm role is used as part of user separation.  Allow all domain types to use
+# this role except dom0.
+role vm_r;
+role vm_r types { domain_type -dom0_t };
+
+# Define some users that must use this role (full type "user_1:vm_r:domU_t").
+gen_user(user_1,, vm_r, s0, s0)
+gen_user(user_2,, vm_r, s0, s0)
+gen_user(user_3,, vm_r, s0, s0)
+
+# Alternate: define and use a macro to generate 1000 users
+define(`def_vm_users',`gen_user(user_$1,, vm_r, s0, s0)
+ifelse(`$1',`$2',,`def_vm_users(incr($1),$2)')dnl
+')
+
+# def_vm_users(0,999)

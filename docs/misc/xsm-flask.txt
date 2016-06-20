@@ -147,9 +147,11 @@ it relies on the SELinux compiler "checkpolicy"; run
 	make -C tools/flask/policy
 
 to compile the example policy included with Xen. The policy is generated from
-definition files under this directory. When creating or modifying security
-policy, most modifications will be made to the xen type enforcement (.te) file
-tools/flask/policy/policy/modules/xen/xen.te or the macro definitions in xen.if.
+definition files under this directory. Most changes to security policy will
+involve creating or modifying modules found in tools/flask/policy/modules/.  The
+modules.conf file there defines what modules are enabled and has short
+descriptions of each module.
+
 The XSM policy file needs to be copied to /boot and loaded as a module by grub.
 The exact position of the module does not matter as long as it is after the Xen
 kernel; it is normally placed either just above the dom0 kernel or at the end.
@@ -210,17 +212,16 @@ Type transitions are also used to compute the labels of event channels.
 Users and roles
 ---------------
 
-Users are defined in tools/flask/policy/policy/users. The example policy defines
-two users (customer_1 and customer_2) in addition to the system user system_u.
-Users are visible in the labels of domains and associated objects (event
-channels); in the example policy, "customer_1:vm_r:domU_t" is a valid label for
-the customer_1 user.
+The default user and role used for domains is system_u and system_r.  Users are
+visible in the labels of domains and associated objects (event channels); when
+the vm_role module is enabled, "user_1:vm_r:domU_t" is a valid label for a
+domain created by the user_1 user.
 
-Access control rules involving users and roles are defined in the policy
-constraints file (tools/flask/policy/policy/constraints). The example policy
-provides constraints that prevent different users from communicating using
-grants or event channels, while still allowing communication with the system_u
-user where dom0 resides.
+Access control rules involving users and roles are defined in a module's
+constraints file (for example, vm_rule.cons). The vm_role module defines one
+role (vm_r) and three users (user_1 .. user_3), along with constraints that
+prevent different users from communicating using grants or event channels, while
+still allowing communication with the system_u user where dom0 resides.
 
 Resource Policy
 ---------------
@@ -268,10 +269,9 @@ declare_domain and create_domain interfaces:
 Existing SELinux tools such as audit2allow can be applied to these denials, e.g.
 xl dmesg | audit2allow
 
-The generated allow rules can then be fed back into the policy by
-adding them to xen.te, although manual review is advised and will
-often lead to adding parameterized rules to the interfaces in xen.if
-to address the general case.
+The generated allow rules can then be fed back into the policy by adding them to
+a module, although manual review is advised and will often lead to adding
+parameterized rules to the interfaces in xen.if to address the general case.
 
 
 Device Labeling in Policy

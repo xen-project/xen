@@ -1,11 +1,1 @@
-##################################
-#
-# System User configuration.
-#
-
-# system_u is the user identity for system domains and objects
-gen_user(system_u,, system_r, s0, s0 - mls_systemhigh)
-
-# Other users are defined using the vm role
-gen_user(customer_1,, vm_r, s0, s0)
-gen_user(customer_2,, vm_r, s0, s0)
+gen_all_users()

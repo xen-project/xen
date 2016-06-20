@@ -49,9 +49,11 @@ define(`refpolicyerr',`errprint(__file__:__line__: Error: `$1'__endline__)')
 #
 # gen_user(username, prefix, role_set, mls_defaultlevel, mls_range)
 #
-define(`gen_user',`dnl
+define(`gen_user',`define(`gen_all_users', gen_all_users `dnl
 user $1 roles { $3 }`'ifdef(`enable_mls', ` level $4 range $5')`';
-')
+')')
+
+define(`gen_all_users',`')
 
 ########################################
 #

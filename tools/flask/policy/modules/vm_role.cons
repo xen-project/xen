@@ -1,6 +1,5 @@
-
 #
-# Define the constraints
+# Constraints are defined by:
 #
 # constrain class_set perm_set expression ;
 #
@@ -25,8 +24,9 @@
 # name_list : name | name_list name
 #
 
-# Prevent event channels and grants between different customers
 
+# Prevent event channels and grants between different users.  This could be
+# further limited to only restricting those domains using the vm_r role.
 constrain event bind (
 	u1 == system_u or
 	u2 == system_u or

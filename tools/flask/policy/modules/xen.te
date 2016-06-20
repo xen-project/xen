@@ -71,14 +71,17 @@ neverallow * ~event_type:event { create send status };
 
 ################################################################################
 #
-# Roles
+# Users and Roles
 #
 ################################################################################
 
 # The object role (object_r) is used for devices, resources, and event channels;
 # it does not need to be defined here and should not be used for domains.
 
-# The system role is used for utility domains and pseudo-domains.  If roles are
-# not being used for separation, all domains can use the system role.
+# The system user and role are used for utility domains and pseudo-domains.  In
+# systems where users and roles are not being used for separation, all domains
+# can use the system user and role.
+gen_user(system_u,, system_r, s0, s0 - mls_systemhigh)
+
 role system_r;
 role system_r types { xen_type dom0_t };

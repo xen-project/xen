@@ -54,7 +54,6 @@ AVS += $(POLDIR)/access_vectors
 M4SUPPORT := $(wildcard $(POLDIR)/support/*.spt)
 MLSSUPPORT := $(POLDIR)/mls
 USERS := $(POLDIR)/users
-CONSTRAINTS := $(POLDIR)/constraints
 ISID_DEFS := $(POLDIR)/initial_sids
 DEV_OCONS := $(POLDIR)/device_contexts
 
@@ -90,8 +89,12 @@ MODENABLED := on
 # extract settings from modules.conf
 ENABLED_LIST := $(shell awk '/^[ \t]*[a-z]/{ if ($$3 == "$(MODENABLED)") print $$1 }' $(MOD_CONF) 2> /dev/null)
 
+# Modules must provide a .te file, although it could be empty
 ALL_MODULES := $(foreach mod,$(ENABLED_LIST),$(MODDIR)/$(mod).te)
+
+# Modules may also provide interfaces and constraint definitions
 ALL_INTERFACES := $(wildcard $(ALL_MODULES:.te=.if))
+ALL_CONSTRAINTS := $(wildcard $(ALL_MODULES:.te=.cons))
 
 # The order of these files is important
 POLICY_SECTIONS := $(SECCLASS) $(ISID_DECLS) $(AVS)
@@ -99,7 +102,9 @@ POLICY_SECTIONS += $(M4SUPPORT) $(MLSSUPPORT)
 POLICY_SECTIONS += $(ALL_INTERFACES)
 POLICY_SECTIONS += $(GLOBALTUN)
 POLICY_SECTIONS += $(ALL_MODULES)
-POLICY_SECTIONS += $(USERS) $(CONSTRAINTS) $(ISID_DEFS) $(DEV_OCONS)
+POLICY_SECTIONS += $(USERS)
+POLICY_SECTIONS += $(ALL_CONSTRAINTS)
+POLICY_SECTIONS += $(ISID_DEFS) $(DEV_OCONS)
 
 all: $(POLICY_FILENAME)
 
