@@ -36,6 +36,17 @@ static inline int verify(struct xsm_operations *ops)
     return 0;
 }
 
+extern char __xsm_init_policy_start[], __xsm_init_policy_end[];
+
+static void __init xsm_policy_init(void)
+{
+    if ( policy_size == 0 && __xsm_init_policy_end != __xsm_init_policy_start )
+    {
+        policy_buffer = __xsm_init_policy_start;
+        policy_size = __xsm_init_policy_end - __xsm_init_policy_start;
+    }
+}
+
 static int __init xsm_core_init(void)
 {
     if ( verify(&dummy_xsm_ops) )
@@ -46,6 +57,7 @@ static int __init xsm_core_init(void)
     }
 
     xsm_ops = &dummy_xsm_ops;
+    xsm_policy_init();
     flask_init();
 
     return 0;
@@ -98,7 +110,8 @@ int __init xsm_dt_init(void)
 
     ret = xsm_core_init();
 
-    xfree(policy_buffer);
+    if ( policy_buffer != __xsm_init_policy_start )
+        xfree(policy_buffer);
 
     return ret;
 }

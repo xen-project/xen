@@ -167,6 +167,11 @@ SECTIONS
        *(.init.data)
        *(.init.data.rel)
        *(.init.data.rel.*)
+
+       __xsm_init_policy_start = .;
+       *(.init.xsm_policy)
+       __xsm_init_policy_end = .;
+
        . = ALIGN(4);
        __trampoline_rel_start = .;
        *(.trampoline_rel)
