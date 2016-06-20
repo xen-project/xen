@@ -630,10 +630,16 @@ static int flask_domctl(struct domain *d, int cmd)
     case XEN_DOMCTL_setdomainhandle:
         return current_has_perm(d, SECCLASS_DOMAIN, DOMAIN__SETDOMAINHANDLE);
 
+    case XEN_DOMCTL_set_ext_vcpucontext:
+    case XEN_DOMCTL_set_vcpu_msrs:
     case XEN_DOMCTL_setvcpucontext:
+    case XEN_DOMCTL_setvcpuextstate:
         return current_has_perm(d, SECCLASS_DOMAIN, DOMAIN__SETVCPUCONTEXT);
 
+    case XEN_DOMCTL_get_ext_vcpucontext:
+    case XEN_DOMCTL_get_vcpu_msrs:
     case XEN_DOMCTL_getvcpucontext:
+    case XEN_DOMCTL_getvcpuextstate:
         return current_has_perm(d, SECCLASS_DOMAIN, DOMAIN__GETVCPUCONTEXT);
 
     case XEN_DOMCTL_getvcpuinfo:
@@ -674,20 +680,6 @@ static int flask_domctl(struct domain *d, int cmd)
 
     case XEN_DOMCTL_pin_mem_cacheattr:
         return current_has_perm(d, SECCLASS_HVM, HVM__CACHEATTR);
-
-    case XEN_DOMCTL_set_ext_vcpucontext:
-    case XEN_DOMCTL_set_vcpu_msrs:
-        return current_has_perm(d, SECCLASS_DOMAIN, DOMAIN__SETEXTVCPUCONTEXT);
-
-    case XEN_DOMCTL_get_ext_vcpucontext:
-    case XEN_DOMCTL_get_vcpu_msrs:
-        return current_has_perm(d, SECCLASS_DOMAIN, DOMAIN__GETEXTVCPUCONTEXT);
-
-    case XEN_DOMCTL_setvcpuextstate:
-        return current_has_perm(d, SECCLASS_DOMAIN, DOMAIN__SETVCPUEXTSTATE);
-
-    case XEN_DOMCTL_getvcpuextstate:
-        return current_has_perm(d, SECCLASS_DOMAIN, DOMAIN__GETVCPUEXTSTATE);
 
     case XEN_DOMCTL_sendtrigger:
         return current_has_perm(d, SECCLASS_DOMAIN, DOMAIN__TRIGGER);

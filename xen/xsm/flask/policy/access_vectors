@@ -111,6 +111,9 @@ class xen2
 class domain
 {
 # XEN_DOMCTL_setvcpucontext
+# XEN_DOMCTL_setvcpuextstate
+# XEN_DOMCTL_set_ext_vcpucontext
+# XEN_DOMCTL_set_vcpu_msrs
     setvcpucontext
 # XEN_DOMCTL_pausedomain
     pause
@@ -142,6 +145,9 @@ class domain
 # XEN_DOMCTL_getvcpuinfo
     getvcpuinfo
 # XEN_DOMCTL_getvcpucontext
+# XEN_DOMCTL_get_ext_vcpucontext
+# XEN_DOMCTL_getvcpuextstate
+# XEN_DOMCTL_get_vcpu_msrs
     getvcpucontext
 # XEN_DOMCTL_max_mem
     setdomainmaxmem
@@ -166,16 +172,6 @@ class domain
     getaddrsize
 # XEN_DOMCTL_sendtrigger
     trigger
-# XEN_DOMCTL_get_ext_vcpucontext
-# XEN_DOMCTL_set_vcpu_msrs
-    getextvcpucontext
-# XEN_DOMCTL_set_ext_vcpucontext
-# XEN_DOMCTL_get_vcpu_msrs
-    setextvcpucontext
-# XEN_DOMCTL_getvcpuextstate
-    getvcpuextstate
-# XEN_DOMCTL_setvcpuextstate
-    setvcpuextstate
 # XENMEM_get_pod_target
     getpodtarget
 # XENMEM_set_pod_target

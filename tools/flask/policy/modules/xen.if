@@ -47,9 +47,8 @@ define(`declare_build_label', `
 
 define(`create_domain_common', `
 	allow $1 $2:domain { create max_vcpus setdomainmaxmem setaddrsize
-			getdomaininfo hypercall setvcpucontext setextvcpucontext
-			getscheduler getvcpuinfo getvcpuextstate getaddrsize
-			getaffinity setaffinity setvcpuextstate };
+			getdomaininfo hypercall setvcpucontext getscheduler
+			getvcpuinfo getaddrsize getaffinity setaffinity };
 	allow $1 $2:domain2 { set_cpuid settsc setscheduler setclaim
 			set_max_evtchn set_vnumainfo get_vnumainfo cacheflush
 			psr_cmt_op psr_cat_op soft_reset };
@@ -94,7 +93,7 @@ define(`migrate_domain_out', `
 	allow $1 domxen_t:mmu map_read;
 	allow $1 $2:hvm { gethvmc getparam irqlevel };
 	allow $1 $2:mmu { stat pageinfo map_read };
-	allow $1 $2:domain { getaddrsize getvcpucontext getextvcpucontext getvcpuextstate pause destroy };
+	allow $1 $2:domain { getaddrsize getvcpucontext pause destroy };
 	allow $1 $2:domain2 gettsc;
 	allow $1 $2:shadow { enable disable logdirty };
 ')
