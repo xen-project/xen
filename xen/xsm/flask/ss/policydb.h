@@ -158,8 +158,8 @@ struct ocontext {
                 u64 high_iomem;
         } iomem;
     } u;
-    struct context context[2];    /* security context(s) */
-    u32 sid[2];    /* SID(s) */
+    struct context context;
+    u32 sid;
     struct ocontext *next;
 };
 
