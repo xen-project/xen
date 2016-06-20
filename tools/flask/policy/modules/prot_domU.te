@@ -1,0 +1,13 @@
+# This is an alternative to nomigrate_t: a policy boolean controls the ability
+# to create or migrate a domain of type prot_domU_t.  If disabled, dom0 cannot
+# map memory belonging to those domains.
+gen_bool(prot_doms_locked, false)
+declare_domain(prot_domU_t)
+if (!prot_doms_locked) {
+	create_domain(dom0_t, prot_domU_t)
+	migrate_domain_out(dom0_t, prot_domU_t)
+}
+domain_comms(dom0_t, prot_domU_t)
+domain_comms(domU_t, prot_domU_t)
+domain_comms(prot_domU_t, prot_domU_t)
+domain_self_comms(prot_domU_t)

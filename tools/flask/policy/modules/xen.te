@@ -1,0 +1,89 @@
+################################################################################
+#
+# Attributes for types
+#
+# An attribute may be used in a rule as shorthand for all types with that
+# attribute.
+#
+################################################################################
+attribute xen_type;
+attribute domain_type;
+attribute domain_self_type;
+attribute domain_target_type;
+attribute resource_type;
+attribute event_type;
+attribute mls_priv;
+
+################################################################################
+#
+# Types for the initial SIDs
+#
+# These types are used internally for objects created during Xen startup or for
+# devices that have not yet been labeled
+#
+################################################################################
+
+# The hypervisor itself
+type xen_t, xen_type, mls_priv;
+
+# Domain 0
+declare_singleton_domain(dom0_t, mls_priv);
+
+# I/O memory (DOMID_IO pseudo-domain)
+type domio_t, xen_type;
+
+# Xen heap (DOMID_XEN pseudo-domain)
+type domxen_t, xen_type;
+
+# Unlabeled objects
+type unlabeled_t, xen_type;
+
+# The XSM/FLASK security server
+type security_t, xen_type;
+
+# Unlabeled device resources
+# Note: don't allow access to these types directly; see below for how to label
+#       devices and use that label for allow rules
+type irq_t, resource_type;
+type ioport_t, resource_type;
+type iomem_t, resource_type;
+type device_t, resource_type;
+
+################################################################################
+#
+# Policy constraints
+#
+# Neverallow rules will cause the policy build to fail if an allow rule exists
+# that violates the expression. This is used to ensure proper labeling of
+# objects.
+#
+################################################################################
+
+# Domains must be declared using domain_type
+neverallow * ~domain_type:domain { create transition };
+
+# Resources must be declared using resource_type
+neverallow * ~resource_type:resource use;
+
+# Events must use event_type (see create_channel for a template)
+neverallow ~event_type *:event bind;
+neverallow * ~event_type:event { create send status };
+
+################################################################################
+#
+# Roles
+#
+################################################################################
+
+# The object role (object_r) is used for devices, resources, and event channels;
+# it does not need to be defined here and should not be used for domains.
+
+# The system role is used for utility domains and pseudo-domains
+role system_r;
+role system_r types { xen_type domain_type };
+# If you want to prevent domUs from being placed in system_r:
+##role system_r types { xen_type dom0_t };
+
+# The vm role is used for customer virtual machines
+role vm_r;
+role vm_r types { domain_type -dom0_t };

@@ -1,0 +1,8 @@
+# Domains of type nomigrate_t must be built via the nomigrate_t_building label;
+# once built, dom0 cannot read their memory.
+declare_domain(nomigrate_t)
+declare_build_label(nomigrate_t)
+create_domain_build_label(dom0_t, nomigrate_t)
+manage_domain(dom0_t, nomigrate_t)
+domain_comms(dom0_t, nomigrate_t)
+domain_self_comms(nomigrate_t)

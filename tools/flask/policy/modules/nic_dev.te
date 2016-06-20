@@ -1,0 +1,14 @@
+###############################################################################
+#
+# Device delegation
+#
+# This requires that the device be labeled with a type defined here.  You can
+# use flask-label-pci to dynamically label devices on each boot or define the
+# labels statically in tools/flask/policy/policy/device_contexts
+#
+###############################################################################
+
+type nic_dev_t, resource_type;
+
+admin_device(dom0_t, nic_dev_t)
+use_device(domU_t, nic_dev_t)

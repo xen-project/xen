@@ -1,0 +1,7 @@
+declare_domain(isolated_domU_t)
+create_domain(dom0_t, isolated_domU_t)
+manage_domain(dom0_t, isolated_domU_t)
+domain_comms(dom0_t, isolated_domU_t)
+migrate_domain_out(dom0_t, isolated_domU_t)
+domain_self_comms(isolated_domU_t)
+

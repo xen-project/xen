@@ -37,7 +37,7 @@ POLICY_VER_LIST_HV = 24 30
 
 # policy source layout
 POLDIR := policy
-MODDIR := $(POLDIR)/modules
+MODDIR := modules
 
 # Classes and access vectors defined in the hypervisor. Changes to these require
 # a recompile of both the hypervisor and security policy.
@@ -60,7 +60,7 @@ DEV_OCONS := $(POLDIR)/device_contexts
 
 # config file paths
 GLOBALTUN := $(POLDIR)/global_tunables
-MOD_CONF := $(POLDIR)/modules.conf
+MOD_CONF := $(MODDIR)/modules.conf
 
 # checkpolicy can use the #line directives provided by -s for error reporting:
 M4PARAM := -D self_contained_policy -s
@@ -84,22 +84,14 @@ endif
 M4PARAM += -D mls_num_sens=$(MLS_SENS) -D mls_num_cats=$(MLS_CATS)
 
 
-# Find modules
-ALL_LAYERS := $(filter-out $(MODDIR)/CVS,$(shell find $(wildcard $(MODDIR)/*) -maxdepth 0 -type d))
-
-# sort here since it removes duplicates, which can happen
-# when a generated file is already generated
-DETECTED_MODS := $(sort $(foreach dir,$(ALL_LAYERS),$(wildcard $(dir)/*.te)))
-
 # modules.conf setting for policy configuration
 MODENABLED := on
 
 # extract settings from modules.conf
-ENABLED_MODS := $(foreach mod,$(shell awk '/^[ \t]*[a-z]/{ if ($$3 == "$(MODENABLED)") print $$1 }' $(MOD_CONF) 2> /dev/null),$(subst ./,,$(shell find -iname $(mod).te)))
+ENABLED_LIST := $(shell awk '/^[ \t]*[a-z]/{ if ($$3 == "$(MODENABLED)") print $$1 }' $(MOD_CONF) 2> /dev/null)
 
-ALL_MODULES := $(filter $(ENABLED_MODS),$(DETECTED_MODS))
-
-ALL_INTERFACES := $(ALL_MODULES:.te=.if)
+ALL_MODULES := $(foreach mod,$(ENABLED_LIST),$(MODDIR)/$(mod).te)
+ALL_INTERFACES := $(wildcard $(ALL_MODULES:.te=.if))
 
 # The order of these files is important
 POLICY_SECTIONS := $(SECCLASS) $(ISID_DECLS) $(AVS)
@@ -118,8 +110,8 @@ install: $(POLICY_FILENAME)
 $(POLICY_FILENAME): policy.conf
 	$(CHECKPOLICY) $(CHECKPOLICY_PARAM) $^ -o $@
 
-policy.conf: $(POLICY_SECTIONS)
-	$(M4) $(M4PARAM) $^ > $@
+policy.conf: $(POLICY_SECTIONS) $(MOD_CONF)
+	$(M4) $(M4PARAM) $(POLICY_SECTIONS) > $@
 
 clean:
 	$(RM) tmp policy.conf $(POLICY_FILENAME)

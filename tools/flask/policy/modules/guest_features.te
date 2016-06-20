@@ -1,0 +1,31 @@
+# Allow all domains to use (unprivileged parts of) the tmem hypercall
+allow domain_type xen_t:xen tmem_op;
+
+# Allow all domains to use PMU (but not to change its settings --- that's what
+# pmu_ctrl is for)
+allow domain_type xen_t:xen2 pmu_use;
+
+# Allow guest console output to the serial console.  This is used by PV Linux
+# and stub domains for early boot output, so don't audit even when we deny it.
+# Without XSM, this is enabled only if the Xen was compiled in debug mode.
+gen_bool(guest_writeconsole, true)
+if (guest_writeconsole) {
+	allow domain_type xen_t : xen writeconsole;
+} else {
+	dontaudit domain_type xen_t : xen writeconsole;
+}
+
+# For normal guests, allow all queries except XENVER_commandline.
+allow domain_type xen_t:version {
+    xen_extraversion xen_compile_info xen_capabilities
+    xen_changeset xen_pagesize xen_guest_handle
+};
+
+# Version queries don't need auditing when denied.  They can be
+# encountered in normal operation by xl or by reading sysfs files in
+# Linux, so without this they will show up in the logs.  Since these
+# operations return valid responses (like "denied"), hiding the denials
+# should not break anything.
+dontaudit domain_type xen_t:version {
+	xen_commandline xen_build_id
+};
