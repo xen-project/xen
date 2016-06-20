@@ -1,0 +1,24 @@
+################################################################################
+#
+# Xenstore stubdomain
+#
+################################################################################
+declare_singleton_domain(xenstore_t)
+create_domain(dom0_t, xenstore_t)
+manage_domain(dom0_t, xenstore_t)
+
+# Xenstore requires the global VIRQ for domain destroy operations
+allow dom0_t xenstore_t:domain set_virq_handler;
+# Current xenstore stubdom uses the hypervisor console, not "xl console"
+allow xenstore_t xen_t:xen writeconsole;
+# Xenstore queries domaininfo on all domains
+allow xenstore_t domain_type:domain getdomaininfo;
+
+# As a shortcut, the following 3 rules are used instead of adding a domain_comms
+# rule between xenstore_t and every domain type that talks to xenstore
+create_channel(xenstore_t, domain_type, xenstore_t_channel)
+allow event_type xenstore_t: event bind;
+allow xenstore_t domain_type:grant { map_read map_write unmap };
+
+# Xenstore is a utility domain, so it should use the system role
+role system_r types xenstore_t;
