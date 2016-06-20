@@ -61,6 +61,8 @@ define(`gen_all_users',`')
 #
 define(`gen_context',`$1`'ifdef(`enable_mls',`:$2')`'')
 
+define(`dflt_or_overr',`ifdef(`$1',$1,$2)')
+
 ########################################
 #
 # gen_bool(name,default_value)
