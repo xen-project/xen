@@ -78,12 +78,7 @@ neverallow * ~event_type:event { create send status };
 # The object role (object_r) is used for devices, resources, and event channels;
 # it does not need to be defined here and should not be used for domains.
 
-# The system role is used for utility domains and pseudo-domains
+# The system role is used for utility domains and pseudo-domains.  If roles are
+# not being used for separation, all domains can use the system role.
 role system_r;
-role system_r types { xen_type domain_type };
-# If you want to prevent domUs from being placed in system_r:
-##role system_r types { xen_type dom0_t };
-
-# The vm role is used for customer virtual machines
-role vm_r;
-role vm_r types { domain_type -dom0_t };
+role system_r types { xen_type dom0_t };

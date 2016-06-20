@@ -1,0 +1,8 @@
+# Allow all domains to use system_r so that systems that are not using the
+# user/role separation feature will work properly.
+role system_r types domain_type;
+
+# The vm role is used as part of user separation.  Allow all domain types to use
+# this role except dom0.
+role vm_r;
+role vm_r types { domain_type -dom0_t };
