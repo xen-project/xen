@@ -254,10 +254,10 @@ SEABIOS_UPSTREAM_URL ?= git://xenbits.xen.org/seabios.git
 MINIOS_UPSTREAM_URL ?= git://xenbits.xen.org/mini-os.git
 endif
 OVMF_UPSTREAM_REVISION ?= 52a99493cce88a9d4ec8a02d7f1bd1a1001ce60d
-QEMU_UPSTREAM_REVISION ?= 7a88f1257d5261a7bee98facdb97f50d5553060e
+QEMU_UPSTREAM_REVISION ?= qemu-xen-4.6.3
 # Wed Sep 16 17:38:44 2015 +0200
 # trace: remove malloc tracing
-MINIOS_UPSTREAM_REVISION ?= e1cca557c64272d33da7bafc0ad25399267563d0
+MINIOS_UPSTREAM_REVISION ?= xen-RELEASE-4.6.3
 # Fri May 13 15:21:10 2016 +0100
 # lib/sys.c: enclose file_types in define guards
 
@@ -268,7 +268,7 @@ SEABIOS_UPSTREAM_REVISION ?= rel-1.8.2
 ETHERBOOT_NICS ?= rtl8139 8086100e
 
 
-QEMU_TRADITIONAL_REVISION ?= 29b39dac29529b9989e4f597adb354f7879b6f63
+QEMU_TRADITIONAL_REVISION ?= xen-4.6.3
 # Thu May 19 19:38:35 2016 +0100
 # main loop: Big hammer to fix logfile disk DoS in Xen setups
 
