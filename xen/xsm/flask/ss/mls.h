@@ -32,8 +32,5 @@ int mls_convert_context(struct policydb *oldp, struct policydb *newp,
 int mls_compute_sid(struct context *scontext, struct context *tcontext,
                         u16 tclass, u32 specified, struct context *newcontext);
 
-int mls_setup_user_range(struct context *fromcon, struct user_datum *user,
-                                                     struct context *usercon);
-
 #endif    /* _SS_MLS_H */
 

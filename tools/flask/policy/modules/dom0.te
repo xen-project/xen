@@ -47,7 +47,7 @@ allow dom0_t dom0_t:resource { add remove };
 # that does not have its own security server to make access decisions based on
 # Xen's security policy.
 allow dom0_t security_t:security {
-	compute_av compute_create compute_member compute_relabel compute_user
+	compute_av compute_create compute_member compute_relabel
 };
 
 # Allow string/SID conversions (for "xl list -Z" and similar)

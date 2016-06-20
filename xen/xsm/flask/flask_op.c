@@ -86,43 +86,6 @@ static int domain_has_security(struct domain *d, u32 perms)
                         perms, NULL);
 }
 
-#endif /* COMPAT */
-
-static int flask_security_user(struct xen_flask_userlist *arg)
-{
-    char *user;
-    u32 *sids;
-    u32 nsids;
-    int rv;
-
-    rv = domain_has_security(current->domain, SECURITY__COMPUTE_USER);
-    if ( rv )
-        return rv;
-
-    user = safe_copy_string_from_guest(arg->u.user, arg->size, PAGE_SIZE);
-    if ( IS_ERR(user) )
-        return PTR_ERR(user);
-
-    rv = security_get_user_sids(arg->start_sid, user, &sids, &nsids);
-    if ( rv < 0 )
-        goto out;
-
-    if ( nsids * sizeof(sids[0]) > arg->size )
-        nsids = arg->size / sizeof(sids[0]);
-
-    arg->size = nsids;
-
-    if ( _copy_to_guest(arg->u.sids, sids, nsids) )
-        rv = -EFAULT;
-
-    xfree(sids);
- out:
-    xfree(user);
-    return rv;
-}
-
-#ifndef COMPAT
-
 static int flask_security_relabel(struct xen_flask_transition *arg)
 {
     int rv;
@@ -714,10 +677,6 @@ ret_t do_flask_op(XEN_GUEST_HANDLE_PARAM(xsm_op_t) u_flask_op)
         rv = flask_security_relabel(&op.u.transition);
         break;
 
-    case FLASK_USER:
-        rv = flask_security_user(&op.u.userlist);
-        break;
-
     case FLASK_POLICYVERS:
         rv = POLICYDB_VERSION_MAX;
         break;
@@ -831,7 +790,6 @@ CHECK_flask_transition;
 #define flask_security_load compat_security_load
 
 #define xen_flask_userlist compat_flask_userlist
-#define flask_security_user compat_security_user
 
 #define xen_flask_sid_context compat_flask_sid_context
 #define flask_security_context compat_security_context

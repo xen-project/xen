@@ -129,4 +129,3 @@
 ?	flask_setenforce		xsm/flask_op.h
 !	flask_sid_context		xsm/flask_op.h
 ?	flask_transition		xsm/flask_op.h
-!	flask_userlist			xsm/flask_op.h

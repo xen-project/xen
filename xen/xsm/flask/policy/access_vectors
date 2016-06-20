@@ -484,8 +484,6 @@ class security
     load_policy
 # use the security server to compute an object relabel
     compute_relabel
-# use the security server to list the SIDs reachable by a given user
-    compute_user
 # allow switching between enforcing and permissive mode
     setenforce
 # allow changing policy booleans

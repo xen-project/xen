@@ -78,8 +78,6 @@ int security_sid_to_context(u32 sid, char **scontext, u32 *scontext_len);
 
 int security_context_to_sid(char *scontext, u32 scontext_len, u32 *out_sid);
 
-int security_get_user_sids(u32 callsid, char *username, u32 **sids, u32 *nel);
-
 int security_irq_sid(int pirq, u32 *out_sid);
 
 int security_iomem_sid(unsigned long, u32 *out_sid);
