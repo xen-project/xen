@@ -272,10 +272,8 @@ SEABIOS_UPSTREAM_URL ?= git://xenbits.xen.org/seabios.git
 MINIOS_UPSTREAM_URL ?= git://xenbits.xen.org/mini-os.git
 endif
 OVMF_UPSTREAM_REVISION ?= 52a99493cce88a9d4ec8a02d7f1bd1a1001ce60d
-QEMU_UPSTREAM_REVISION ?= qemu-xen-4.7.0-rc5
-MINIOS_UPSTREAM_REVISION ?= 1a3ee6eeca136525aa2e6917ae500e7cf731c09d
-# Fri May 13 15:21:10 2016 +0100
-# lib/sys.c: enclose file_types in define guards
+QEMU_UPSTREAM_REVISION ?= qemu-xen-4.7.0
+MINIOS_UPSTREAM_REVISION ?= xen-RELEASE-4.7.0
 
 SEABIOS_UPSTREAM_REVISION ?= rel-1.9.2
 # Tue, 1 Mar 2016 15:06:45 +0100 (16:06 +0200)
@@ -284,9 +282,7 @@ SEABIOS_UPSTREAM_REVISION ?= rel-1.9.2
 ETHERBOOT_NICS ?= rtl8139 8086100e
 
 
-QEMU_TRADITIONAL_REVISION ?= 698d6d6f8d095edadb0c23612b552a89dd3eee4c
-# Thu May 19 19:38:35 2016 +0100
-# main loop: Big hammer to fix logfile disk DoS in Xen setups
+QEMU_TRADITIONAL_REVISION ?= xen-4.7.0
 
 # Specify which qemu-dm to use. This may be `ioemu' to use the old
 # Mercurial in-tree version, or a local directory, or a git URL.
