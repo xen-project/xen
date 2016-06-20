@@ -1817,7 +1817,7 @@ static struct xsm_operations flask_ops = {
     .xen_version = flask_xen_version,
 };
 
-static __init void flask_init(void)
+__init void flask_init(void)
 {
     int ret = -ENOENT;
 
@@ -1859,8 +1859,6 @@ static __init void flask_init(void)
     else
         printk(XENLOG_INFO "Flask:  Starting in permissive mode.\n");
 }
-
-xsm_initcall(flask_init);
 
 /*
  * Local variables:

@@ -36,17 +36,6 @@ static inline int verify(struct xsm_operations *ops)
     return 0;
 }
 
-static void __init do_xsm_initcalls(void)
-{
-    xsm_initcall_t *call;
-    call = __xsm_initcall_start;
-    while ( call < __xsm_initcall_end )
-    {
-        (*call) ();
-        call++;
-    }
-}
-
 static int __init xsm_core_init(void)
 {
     if ( verify(&dummy_xsm_ops) )
@@ -57,7 +46,7 @@ static int __init xsm_core_init(void)
     }
 
     xsm_ops = &dummy_xsm_ops;
-    do_xsm_initcalls();
+    flask_init();
 
     return 0;
 }

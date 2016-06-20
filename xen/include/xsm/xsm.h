@@ -46,14 +46,6 @@ typedef enum xsm_default xsm_default_t;
 extern char *policy_buffer;
 extern u32 policy_size;
 
-typedef void (*xsm_initcall_t)(void);
-
-extern xsm_initcall_t __xsm_initcall_start[], __xsm_initcall_end[];
-
-#define xsm_initcall(fn) \
-    static xsm_initcall_t __initcall_##fn \
-    __used_section(".xsm_initcall.init") = fn
-
 struct xsm_operations {
     void (*security_domaininfo) (struct domain *d,
                                         struct xen_domctl_getdomaininfo *info);
@@ -762,6 +754,14 @@ extern int unregister_xsm(struct xsm_operations *ops);
 
 extern struct xsm_operations dummy_xsm_ops;
 extern void xsm_fixup_ops(struct xsm_operations *ops);
+
+#ifdef CONFIG_FLASK
+extern void flask_init(void);
+#else
+static inline void flask_init(void)
+{
+}
+#endif
 
 #else /* CONFIG_XSM */
 

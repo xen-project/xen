@@ -162,11 +162,6 @@ SECTIONS
        *(.initcall1.init)
        __initcall_end = .;
   } :text
-  .xsm_initcall.init : {
-       __xsm_initcall_start = .;
-       *(.xsm_initcall.init)
-       __xsm_initcall_end = .;
-  } :text
   __init_end_efi = .;
   . = ALIGN(STACK_SIZE);
   __init_end = .;
