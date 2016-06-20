@@ -134,9 +134,14 @@ config FLASK
 
 config FLASK_AVC_STATS
 	def_bool y
+	prompt "Maintain statistics on the FLASK access vector cache" if EXPERT = "y"
 	depends on FLASK
 	---help---
-	  Maintain statistics on the access vector cache
+	  Maintain counters on the access vector cache that can be viewed using
+	  the FLASK_AVC_CACHESTATS sub-op of the xsm_op hypercall.  Disabling
+	  this will save a tiny amount of memory and time to update the stats.
+
+	  If unsure, say Y.
 
 # Enable schedulers
 menu "Schedulers"
