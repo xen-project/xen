@@ -57,6 +57,14 @@ config VERBOSE_DEBUG
 	  Guest output from HYPERVISOR_console_io and hypervisor parsing
 	  ELF images (dom0) will be logged in the Xen ring buffer.
 
+config DEVICE_TREE_DEBUG
+	bool "Device tree debug messages"
+	depends on HAS_DEVICE_TREE
+	---help---
+	  Device tree parsing and DOM0 device tree building messages are
+	  logged in the Xen ring buffer.
+	  If unsure, say N here.
+
 endif # DEBUG || EXPERT
 
 endmenu
