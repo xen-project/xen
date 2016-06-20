@@ -144,22 +144,6 @@ int __init register_xsm(struct xsm_operations *ops)
     return 0;
 }
 
-
-int unregister_xsm(struct xsm_operations *ops)
-{
-    if ( ops != xsm_ops )
-    {
-        printk("%s: trying to unregister "
-               "a security_opts structure that is not "
-               "registered, failing.\n", __FUNCTION__);
-        return -EINVAL;
-    }
-
-    xsm_ops = &dummy_xsm_ops;
-
-    return 0;
-}
-
 #endif
 
 long do_xsm_op (XEN_GUEST_HANDLE_PARAM(xsm_op_t) op)

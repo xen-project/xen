@@ -750,7 +750,6 @@ extern bool has_xsm_magic(paddr_t);
 #endif
 
 extern int register_xsm(struct xsm_operations *ops);
-extern int unregister_xsm(struct xsm_operations *ops);
 
 extern struct xsm_operations dummy_xsm_ops;
 extern void xsm_fixup_ops(struct xsm_operations *ops);

@@ -58,8 +58,6 @@ static int flask_security_make_bools(void);
 
 extern int ss_initialized;
 
-extern struct xsm_operations *original_ops;
-
 static void __init parse_flask_param(char *s)
 {
     if ( !strcmp(s, "enforcing") )
@@ -243,7 +241,7 @@ static int flask_disable(void)
     flask_disabled = 1;
 
     /* Reset xsm_ops to the original module. */
-    xsm_ops = original_ops;
+    xsm_ops = &dummy_xsm_ops;
 
     return 0;
 }

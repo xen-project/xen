@@ -35,8 +35,6 @@
 #include <objsec.h>
 #include <conditional.h>
 
-struct xsm_operations *original_ops = NULL;
-
 static u32 domain_sid(struct domain *dom)
 {
     struct domain_security_struct *dsec = dom->ssid;
@@ -1842,7 +1840,6 @@ __init void flask_init(void)
 
     avc_init();
 
-    original_ops = xsm_ops;
     if ( register_xsm(&flask_ops) )
         panic("Flask: Unable to register with XSM");
 
