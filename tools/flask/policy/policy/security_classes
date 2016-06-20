@@ -5,4 +5,3 @@
 # security policy.
 #
 # Access vectors for these classes must be defined in the access_vectors file.
-class xenstore
