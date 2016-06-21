@@ -401,10 +401,9 @@ struct arch_domain
         unsigned int write_ctrlreg_enabled       : 4;
         unsigned int write_ctrlreg_sync          : 4;
         unsigned int write_ctrlreg_onchangeonly  : 4;
-        unsigned int mov_to_msr_enabled          : 1;
-        unsigned int mov_to_msr_extended         : 1;
         unsigned int singlestep_enabled          : 1;
         unsigned int software_breakpoint_enabled : 1;
+        struct monitor_msr_bitmap *msr_bitmap;
     } monitor;
 
     /* Mem_access emulation control */

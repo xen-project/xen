@@ -559,13 +559,6 @@ enum vmcs_field {
     HOST_RIP                        = 0x00006c16,
 };
 
-/*
- * A set of MSR-s that need to be enabled for memory introspection
- * to work.
- */
-extern const u32 vmx_introspection_force_enabled_msrs[];
-extern const unsigned int vmx_introspection_force_enabled_msrs_size;
-
 #define VMCS_VPID_WIDTH 16
 
 #define MSR_TYPE_R 1

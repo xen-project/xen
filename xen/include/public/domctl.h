@@ -37,7 +37,7 @@
 #include "hvm/save.h"
 #include "memory.h"
 
-#define XEN_DOMCTL_INTERFACE_VERSION 0x0000000b
+#define XEN_DOMCTL_INTERFACE_VERSION 0x0000000c
 
 /*
  * NB. xen_domctl.domain is an IN/OUT parameter for this operation.
@@ -1107,8 +1107,7 @@ struct xen_domctl_monitor_op {
         } mov_to_cr;
 
         struct {
-            /* Enable the capture of an extended set of MSRs */
-            uint8_t extended_capture;
+            uint32_t msr;
         } mov_to_msr;
 
         struct {

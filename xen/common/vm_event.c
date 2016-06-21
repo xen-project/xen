@@ -27,6 +27,7 @@
 #include <xen/mem_access.h>
 #include <asm/p2m.h>
 #include <asm/altp2m.h>
+#include <asm/monitor.h>
 #include <asm/vm_event.h>
 #include <xsm/xsm.h>
 
@@ -665,6 +666,9 @@ int vm_event_domctl(struct domain *d, xen_domctl_vm_event_op_t *vec,
         {
         case XEN_VM_EVENT_ENABLE:
             /* domain_pause() not required here, see XSA-99 */
+            rc = arch_monitor_init_domain(d);
+            if ( rc )
+                break;
             rc = vm_event_enable(d, vec, ved, _VPF_mem_access,
                                  HVM_PARAM_MONITOR_RING_PFN,
                                  monitor_notification);
@@ -675,6 +679,7 @@ int vm_event_domctl(struct domain *d, xen_domctl_vm_event_op_t *vec,
             {
                 domain_pause(d);
                 rc = vm_event_disable(d, ved);
+                arch_monitor_cleanup_domain(d);
                 domain_unpause(d);
             }
             break;

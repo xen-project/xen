@@ -37,6 +37,7 @@
 #include <asm/hvm/vmx/vvmx.h>
 #include <asm/hvm/vmx/vmcs.h>
 #include <asm/flushtlb.h>
+#include <asm/monitor.h>
 #include <asm/shadow.h>
 #include <asm/tboot.h>
 #include <asm/apic.h>
@@ -107,18 +108,6 @@ u32 vmx_vmentry_control __read_mostly;
 u64 vmx_ept_vpid_cap __read_mostly;
 u64 vmx_vmfunc __read_mostly;
 bool_t vmx_virt_exception __read_mostly;
-
-const u32 vmx_introspection_force_enabled_msrs[] = {
-    MSR_IA32_SYSENTER_EIP,
-    MSR_IA32_SYSENTER_ESP,
-    MSR_IA32_SYSENTER_CS,
-    MSR_IA32_MC0_CTL,
-    MSR_STAR,
-    MSR_LSTAR
-};
-
-const unsigned int vmx_introspection_force_enabled_msrs_size =
-    ARRAY_SIZE(vmx_introspection_force_enabled_msrs);
 
 static DEFINE_PER_CPU_READ_MOSTLY(paddr_t, vmxon_region);
 static DEFINE_PER_CPU(paddr_t, current_vmcs);
@@ -809,17 +798,8 @@ void vmx_disable_intercept_for_msr(struct vcpu *v, u32 msr, int type)
     if ( msr_bitmap == NULL )
         return;
 
-    if ( unlikely(d->arch.monitor.mov_to_msr_enabled &&
-                  d->arch.monitor.mov_to_msr_extended) &&
-         vm_event_check_ring(&d->vm_event->monitor) )
-    {
-        unsigned int i;
-
-        /* Filter out MSR-s needed for memory introspection */
-        for ( i = 0; i < vmx_introspection_force_enabled_msrs_size; i++ )
-            if ( msr == vmx_introspection_force_enabled_msrs[i] )
-                return;
-    }
+    if ( unlikely(monitored_msr(d, msr)) )
+        return;
 
     /*
      * See Intel PRM Vol. 3, 20.6.9 (MSR-Bitmap Address). Early manuals

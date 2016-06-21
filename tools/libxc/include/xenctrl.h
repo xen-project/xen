@@ -2153,8 +2153,13 @@ int xc_monitor_get_capabilities(xc_interface *xch, domid_t domain_id,
 int xc_monitor_write_ctrlreg(xc_interface *xch, domid_t domain_id,
                              uint16_t index, bool enable, bool sync,
                              bool onchangeonly);
-int xc_monitor_mov_to_msr(xc_interface *xch, domid_t domain_id, bool enable,
-                          bool extended_capture);
+/*
+ * A list of MSR indices can usually be found in /usr/include/asm/msr-index.h.
+ * Please consult the Intel/AMD manuals for more information on
+ * non-architectural indices.
+ */
+int xc_monitor_mov_to_msr(xc_interface *xch, domid_t domain_id, uint32_t msr,
+                          bool enable);
 int xc_monitor_singlestep(xc_interface *xch, domid_t domain_id, bool enable);
 int xc_monitor_software_breakpoint(xc_interface *xch, domid_t domain_id,
                                    bool enable);

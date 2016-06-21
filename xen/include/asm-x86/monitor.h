@@ -29,6 +29,12 @@
 
 #define monitor_ctrlreg_bitmask(ctrlreg_index) (1U << (ctrlreg_index))
 
+struct monitor_msr_bitmap {
+    DECLARE_BITMAP(low, 8192);
+    DECLARE_BITMAP(hypervisor, 8192);
+    DECLARE_BITMAP(high, 8192);
+};
+
 static inline
 int arch_monitor_domctl_op(struct domain *d, struct xen_domctl_monitor_op *mop)
 {
@@ -59,5 +65,11 @@ int arch_monitor_domctl_op(struct domain *d, struct xen_domctl_monitor_op *mop)
 
 int arch_monitor_domctl_event(struct domain *d,
                               struct xen_domctl_monitor_op *mop);
+
+int arch_monitor_init_domain(struct domain *d);
+
+void arch_monitor_cleanup_domain(struct domain *d);
+
+bool_t monitored_msr(const struct domain *d, u32 msr);
 
 #endif /* __ASM_X86_MONITOR_H__ */

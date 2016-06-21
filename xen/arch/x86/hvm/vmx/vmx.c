@@ -1958,16 +1958,12 @@ void vmx_hypervisor_cpuid_leaf(uint32_t sub_idx,
         *eax |= XEN_HVM_CPUID_X2APIC_VIRT;
 }
 
-static void vmx_enable_msr_exit_interception(struct domain *d)
+static void vmx_enable_msr_interception(struct domain *d, uint32_t msr)
 {
     struct vcpu *v;
-    unsigned int i;
 
-    /* Enable interception for MSRs needed for memory introspection. */
     for_each_vcpu ( d, v )
-        for ( i = 0; i < vmx_introspection_force_enabled_msrs_size; i++ )
-            vmx_enable_intercept_for_msr(v, vmx_introspection_force_enabled_msrs[i],
-                                         MSR_TYPE_W);
+        vmx_enable_intercept_for_msr(v, msr, MSR_TYPE_W);
 }
 
 static bool_t vmx_is_singlestep_supported(void)
@@ -2166,7 +2162,7 @@ static struct hvm_function_table __initdata vmx_function_table = {
     .handle_eoi           = vmx_handle_eoi,
     .nhvm_hap_walk_L1_p2m = nvmx_hap_walk_L1_p2m,
     .hypervisor_cpuid_leaf = vmx_hypervisor_cpuid_leaf,
-    .enable_msr_exit_interception = vmx_enable_msr_exit_interception,
+    .enable_msr_interception = vmx_enable_msr_interception,
     .is_singlestep_supported = vmx_is_singlestep_supported,
     .set_mode = vmx_set_mode,
     .altp2m_vcpu_update_p2m = vmx_vcpu_update_eptp,

@@ -86,8 +86,8 @@ int xc_monitor_write_ctrlreg(xc_interface *xch, domid_t domain_id,
     return do_domctl(xch, &domctl);
 }
 
-int xc_monitor_mov_to_msr(xc_interface *xch, domid_t domain_id, bool enable,
-                          bool extended_capture)
+int xc_monitor_mov_to_msr(xc_interface *xch, domid_t domain_id, uint32_t msr,
+                          bool enable)
 {
     DECLARE_DOMCTL;
 
@@ -96,7 +96,7 @@ int xc_monitor_mov_to_msr(xc_interface *xch, domid_t domain_id, bool enable,
     domctl.u.monitor_op.op = enable ? XEN_DOMCTL_MONITOR_OP_ENABLE
                                     : XEN_DOMCTL_MONITOR_OP_DISABLE;
     domctl.u.monitor_op.event = XEN_DOMCTL_MONITOR_EVENT_MOV_TO_MSR;
-    domctl.u.monitor_op.u.mov_to_msr.extended_capture = extended_capture;
+    domctl.u.monitor_op.u.mov_to_msr.msr = msr;
 
     return do_domctl(xch, &domctl);
 }

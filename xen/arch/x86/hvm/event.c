@@ -57,9 +57,8 @@ bool_t hvm_event_cr(unsigned int index, unsigned long value, unsigned long old)
 void hvm_event_msr(unsigned int msr, uint64_t value)
 {
     struct vcpu *curr = current;
-    struct arch_domain *ad = &curr->domain->arch;
 
-    if ( ad->monitor.mov_to_msr_enabled )
+    if ( monitored_msr(curr->domain, msr) )
     {
         vm_event_request_t req = {
             .reason = VM_EVENT_REASON_MOV_TO_MSR,

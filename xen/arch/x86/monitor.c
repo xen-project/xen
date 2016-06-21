@@ -22,6 +22,103 @@
 #include <asm/monitor.h>
 #include <public/vm_event.h>
 
+int arch_monitor_init_domain(struct domain *d)
+{
+    if ( !d->arch.monitor.msr_bitmap )
+        d->arch.monitor.msr_bitmap = xzalloc(struct monitor_msr_bitmap);
+
+    if ( !d->arch.monitor.msr_bitmap )
+        return -ENOMEM;
+
+    return 0;
+}
+
+void arch_monitor_cleanup_domain(struct domain *d)
+{
+    xfree(d->arch.monitor.msr_bitmap);
+
+    memset(&d->arch.monitor, 0, sizeof(d->arch.monitor));
+    memset(&d->monitor, 0, sizeof(d->monitor));
+}
+
+static unsigned long *monitor_bitmap_for_msr(const struct domain *d, u32 *msr)
+{
+    ASSERT(d->arch.monitor.msr_bitmap && msr);
+
+    switch ( *msr )
+    {
+    case 0 ... 0x1fff:
+        BUILD_BUG_ON(sizeof(d->arch.monitor.msr_bitmap->low) * 8 <= 0x1fff);
+        return d->arch.monitor.msr_bitmap->low;
+
+    case 0x40000000 ... 0x40001fff:
+        BUILD_BUG_ON(
+            sizeof(d->arch.monitor.msr_bitmap->hypervisor) * 8 <= 0x1fff);
+        *msr &= 0x1fff;
+        return d->arch.monitor.msr_bitmap->hypervisor;
+
+    case 0xc0000000 ... 0xc0001fff:
+        BUILD_BUG_ON(sizeof(d->arch.monitor.msr_bitmap->high) * 8 <= 0x1fff);
+        *msr &= 0x1fff;
+        return d->arch.monitor.msr_bitmap->high;
+
+    default:
+        return NULL;
+    }
+}
+
+static int monitor_enable_msr(struct domain *d, u32 msr)
+{
+    unsigned long *bitmap;
+    u32 index = msr;
+
+    if ( !d->arch.monitor.msr_bitmap )
+        return -ENXIO;
+
+    bitmap = monitor_bitmap_for_msr(d, &index);
+
+    if ( !bitmap )
+        return -EINVAL;
+
+    __set_bit(index, bitmap);
+
+    hvm_enable_msr_interception(d, msr);
+
+    return 0;
+}
+
+static int monitor_disable_msr(struct domain *d, u32 msr)
+{
+    unsigned long *bitmap;
+
+    if ( !d->arch.monitor.msr_bitmap )
+        return -ENXIO;
+
+    bitmap = monitor_bitmap_for_msr(d, &msr);
+
+    if ( !bitmap )
+        return -EINVAL;
+
+    __clear_bit(msr, bitmap);
+
+    return 0;
+}
+
+bool_t monitored_msr(const struct domain *d, u32 msr)
+{
+    const unsigned long *bitmap;
+
+    if ( !d->arch.monitor.msr_bitmap )
+        return 0;
+
+    bitmap = monitor_bitmap_for_msr(d, &msr);
+
+    if ( !bitmap )
+        return 0;
+
+    return test_bit(msr, bitmap);
+}
+
 int arch_monitor_domctl_event(struct domain *d,
                               struct xen_domctl_monitor_op *mop)
 {
@@ -77,25 +174,28 @@ int arch_monitor_domctl_event(struct domain *d,
 
     case XEN_DOMCTL_MONITOR_EVENT_MOV_TO_MSR:
     {
-        bool_t old_status = ad->monitor.mov_to_msr_enabled;
-
-        if ( unlikely(old_status == requested_status) )
-            return -EEXIST;
-
-        if ( requested_status && mop->u.mov_to_msr.extended_capture &&
-             !hvm_enable_msr_exit_interception(d) )
-            return -EOPNOTSUPP;
+        bool_t old_status;
+        int rc;
+        u32 msr = mop->u.mov_to_msr.msr;
 
         domain_pause(d);
 
-        if ( requested_status && mop->u.mov_to_msr.extended_capture )
-            ad->monitor.mov_to_msr_extended = 1;
-        else
-            ad->monitor.mov_to_msr_extended = 0;
+        old_status = monitored_msr(d, msr);
 
-        ad->monitor.mov_to_msr_enabled = requested_status;
+        if ( unlikely(old_status == requested_status) )
+        {
+            domain_unpause(d);
+            return -EEXIST;
+        }
+
+        if ( requested_status )
+            rc = monitor_enable_msr(d, msr);
+        else
+            rc = monitor_disable_msr(d, msr);
+
         domain_unpause(d);
-        break;
+
+        return rc;
     }
 
     case XEN_DOMCTL_MONITOR_EVENT_SINGLESTEP:

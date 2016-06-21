@@ -46,4 +46,17 @@ int arch_monitor_domctl_event(struct domain *d,
     return -EOPNOTSUPP;
 }
 
+static inline
+int arch_monitor_init_domain(struct domain *d)
+{
+    /* No arch-specific domain initialization on ARM. */
+    return 0;
+}
+
+static inline
+void arch_monitor_cleanup_domain(struct domain *d)
+{
+    /* No arch-specific domain cleanup on ARM. */
+}
+
 #endif /* __ASM_ARM_MONITOR_H__ */

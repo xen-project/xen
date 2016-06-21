@@ -20,6 +20,7 @@
 
 #include <xen/sched.h>
 #include <asm/hvm/hvm.h>
+#include <asm/monitor.h>
 #include <asm/vm_event.h>
 
 /* Implicitly serialized by the domctl lock. */
@@ -56,8 +57,6 @@ void vm_event_cleanup_domain(struct domain *d)
     }
 
     d->arch.mem_access_emulate_each_rep = 0;
-    memset(&d->arch.monitor, 0, sizeof(d->arch.monitor));
-    memset(&d->monitor, 0, sizeof(d->monitor));
 }
 
 void vm_event_toggle_singlestep(struct domain *d, struct vcpu *v)

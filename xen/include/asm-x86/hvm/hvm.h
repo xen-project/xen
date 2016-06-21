@@ -211,7 +211,7 @@ struct hvm_function_table {
                                   uint32_t *eax, uint32_t *ebx,
                                   uint32_t *ecx, uint32_t *edx);
 
-    void (*enable_msr_exit_interception)(struct domain *d);
+    void (*enable_msr_interception)(struct domain *d, uint32_t msr);
     bool_t (*is_singlestep_supported)(void);
     int (*set_mode)(struct vcpu *v, int mode);
 
@@ -565,11 +565,11 @@ static inline enum hvm_intblk nhvm_interrupt_blocked(struct vcpu *v)
     return hvm_funcs.nhvm_intr_blocked(v);
 }
 
-static inline bool_t hvm_enable_msr_exit_interception(struct domain *d)
+static inline bool_t hvm_enable_msr_interception(struct domain *d, uint32_t msr)
 {
-    if ( hvm_funcs.enable_msr_exit_interception )
+    if ( hvm_funcs.enable_msr_interception )
     {
-        hvm_funcs.enable_msr_exit_interception(d);
+        hvm_funcs.enable_msr_interception(d, msr);
         return 1;
     }
 
