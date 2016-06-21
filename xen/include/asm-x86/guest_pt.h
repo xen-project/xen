@@ -66,15 +66,10 @@ typedef struct { guest_intpte_t l2; } guest_l2e_t;
 
 #define PRI_gpte "08x"
 
-static inline paddr_t guest_l1e_get_paddr(guest_l1e_t gl1e)
-{ return ((paddr_t) gl1e.l1) & (PADDR_MASK & PAGE_MASK); }
-static inline paddr_t guest_l2e_get_paddr(guest_l2e_t gl2e)
-{ return ((paddr_t) gl2e.l2) & (PADDR_MASK & PAGE_MASK); }
-
 static inline gfn_t guest_l1e_get_gfn(guest_l1e_t gl1e)
-{ return _gfn(guest_l1e_get_paddr(gl1e) >> PAGE_SHIFT); }
+{ return _gfn(gl1e.l1 >> PAGE_SHIFT); }
 static inline gfn_t guest_l2e_get_gfn(guest_l2e_t gl2e)
-{ return _gfn(guest_l2e_get_paddr(gl2e) >> PAGE_SHIFT); }
+{ return _gfn(gl2e.l2 >> PAGE_SHIFT); }
 
 static inline u32 guest_l1e_get_flags(guest_l1e_t gl1e)
 { return gl1e.l1 & 0xfff; }
@@ -125,17 +120,6 @@ typedef l4_pgentry_t guest_l4e_t;
 typedef intpte_t guest_intpte_t;
 
 #define PRI_gpte "016"PRIx64
-
-static inline paddr_t guest_l1e_get_paddr(guest_l1e_t gl1e)
-{ return l1e_get_paddr(gl1e); }
-static inline paddr_t guest_l2e_get_paddr(guest_l2e_t gl2e)
-{ return l2e_get_paddr(gl2e); }
-static inline paddr_t guest_l3e_get_paddr(guest_l3e_t gl3e)
-{ return l3e_get_paddr(gl3e); }
-#if GUEST_PAGING_LEVELS >= 4
-static inline paddr_t guest_l4e_get_paddr(guest_l4e_t gl4e)
-{ return l4e_get_paddr(gl4e); }
-#endif
 
 static inline gfn_t guest_l1e_get_gfn(guest_l1e_t gl1e)
 { return _gfn(l1e_get_paddr(gl1e) >> PAGE_SHIFT); }
@@ -278,7 +262,8 @@ guest_walk_to_gpa(walk_t *gw)
 {
     if ( !(guest_l1e_get_flags(gw->l1e) & _PAGE_PRESENT) )
         return 0;
-    return guest_l1e_get_paddr(gw->l1e) + (gw->va & ~PAGE_MASK);
+    return ((paddr_t)gfn_x(guest_l1e_get_gfn(gw->l1e)) << PAGE_SHIFT) +
+           (gw->va & ~PAGE_MASK);
 }
 
 /* Given a walk_t from a successful walk, return the page-order of the 
