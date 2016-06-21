@@ -11,24 +11,6 @@ config COMPAT
 config CORE_PARKING
 	bool
 
-config FLASK
-	bool "FLux Advanced Security Kernel support"
-	default y
-	depends on XSM
-	---help---
-	  Enables the FLASK (FLux Advanced Security Kernel) support which
-	  provides a mandatory access control framework by which security
-	  enforcement, isolation, and auditing can be achieved with fine
-	  granular control via a security policy.
-
-	  If unsure, say N.
-
-config FLASK_AVC_STATS
-	def_bool y
-	depends on FLASK
-	---help---
-	  Maintain statistics on the access vector cache
-
 # Select HAS_DEVICE_TREE if device tree is supported
 config HAS_DEVICE_TREE
 	bool
@@ -136,6 +118,25 @@ config XSM
 	  devices.
 
 	  If unsure, say N.
+
+config FLASK
+	def_bool y
+	prompt "FLux Advanced Security Kernel support" if EXPERT = "y"
+	depends on XSM
+	---help---
+	  Enables FLASK (FLux Advanced Security Kernel) as the access control
+	  mechanism used by the XSM framework.  This provides a mandatory access
+	  control framework by which security enforcement, isolation, and
+	  auditing can be achieved with fine granular control via a security
+	  policy.
+
+	  If unsure, say Y.
+
+config FLASK_AVC_STATS
+	def_bool y
+	depends on FLASK
+	---help---
+	  Maintain statistics on the access vector cache
 
 # Enable schedulers
 menu "Schedulers"
