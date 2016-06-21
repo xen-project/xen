@@ -199,6 +199,8 @@ extern unsigned long frametable_virt_end;
 #define watchdog_disable() ((void)0)
 #define watchdog_enable()  ((void)0)
 
+#define VM_ASSIST_VALID          (0)
+
 #endif /* __ARM_CONFIG_H__ */
 /*
  * Local variables:
