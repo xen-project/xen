@@ -3,28 +3,29 @@
  *
  * Defines x86 CPU feature bits
  */
+#if defined(XEN_CPUFEATURE)
 
-#ifndef __ASM_I386_CPUFEATURE_H
+/* Other features, Xen-defined mapping. */
+/* This range is used for feature bits which conflict or are synthesized */
+XEN_CPUFEATURE(CONSTANT_TSC,    (FSCAPINTS+0)*32+ 0) /* TSC ticks at a constant rate */
+XEN_CPUFEATURE(NONSTOP_TSC,     (FSCAPINTS+0)*32+ 1) /* TSC does not stop in C states */
+XEN_CPUFEATURE(ARAT,            (FSCAPINTS+0)*32+ 2) /* Always running APIC timer */
+XEN_CPUFEATURE(ARCH_PERFMON,    (FSCAPINTS+0)*32+ 3) /* Intel Architectural PerfMon */
+XEN_CPUFEATURE(TSC_RELIABLE,    (FSCAPINTS+0)*32+ 4) /* TSC is known to be reliable */
+XEN_CPUFEATURE(XTOPOLOGY,       (FSCAPINTS+0)*32+ 5) /* cpu topology enum extensions */
+XEN_CPUFEATURE(CPUID_FAULTING,  (FSCAPINTS+0)*32+ 6) /* cpuid faulting */
+XEN_CPUFEATURE(CLFLUSH_MONITOR, (FSCAPINTS+0)*32+ 7) /* clflush reqd with monitor */
+XEN_CPUFEATURE(APERFMPERF,      (FSCAPINTS+0)*32+ 8) /* APERFMPERF */
+
+#define NCAPINTS (FSCAPINTS + 1) /* N 32-bit words worth of info */
+
+#elif !defined(__ASM_I386_CPUFEATURE_H)
 #ifndef X86_FEATURES_ONLY
 #define __ASM_I386_CPUFEATURE_H
 #endif
 
 #include <xen/const.h>
 #include <asm/cpuid.h>
-
-#define NCAPINTS (FSCAPINTS + 1) /* N 32-bit words worth of info */
-
-/* Other features, Xen-defined mapping. */
-/* This range is used for feature bits which conflict or are synthesized */
-#define X86_FEATURE_CONSTANT_TSC	((FSCAPINTS+0)*32+ 0) /* TSC ticks at a constant rate */
-#define X86_FEATURE_NONSTOP_TSC		((FSCAPINTS+0)*32+ 1) /* TSC does not stop in C states */
-#define X86_FEATURE_ARAT		((FSCAPINTS+0)*32+ 2) /* Always running APIC timer */
-#define X86_FEATURE_ARCH_PERFMON	((FSCAPINTS+0)*32+ 3) /* Intel Architectural PerfMon */
-#define X86_FEATURE_TSC_RELIABLE	((FSCAPINTS+0)*32+ 4) /* TSC is known to be reliable */
-#define X86_FEATURE_XTOPOLOGY		((FSCAPINTS+0)*32+ 5) /* cpu topology enum extensions */
-#define X86_FEATURE_CPUID_FAULTING	((FSCAPINTS+0)*32+ 6) /* cpuid faulting */
-#define X86_FEATURE_CLFLUSH_MONITOR	((FSCAPINTS+0)*32+ 7) /* clflush reqd with monitor */
-#define X86_FEATURE_APERFMPERF		((FSCAPINTS+0)*32+ 8) /* APERFMPERF */
 
 #define cpufeat_word(idx)	((idx) / 32)
 #define cpufeat_bit(idx)	((idx) % 32)

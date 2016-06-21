@@ -219,7 +219,8 @@ long arch_do_sysctl(
         }
 
         /* Clip the number of entries. */
-        nr = min(sysctl->u.cpu_featureset.nr_features, FSCAPINTS);
+        nr = min_t(unsigned int, sysctl->u.cpu_featureset.nr_features,
+                   FSCAPINTS);
 
         /* Look up requested featureset. */
         if ( sysctl->u.cpu_featureset.index < ARRAY_SIZE(featureset_table) )

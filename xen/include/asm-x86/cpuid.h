@@ -1,11 +1,12 @@
 #ifndef __X86_CPUID_H__
 #define __X86_CPUID_H__
 
-#include <asm/cpufeatureset.h>
 #include <asm/cpuid-autogen.h>
-#include <asm/percpu.h>
 
 #define FSCAPINTS FEATURESET_NR_ENTRIES
+
+#include <asm/cpufeatureset.h>
+#include <asm/percpu.h>
 
 #define FEATURESET_1d     0 /* 0x00000001.edx      */
 #define FEATURESET_1c     1 /* 0x00000001.ecx      */

@@ -291,7 +291,7 @@ def write_results(state):
 
     state.output.write(
 """
-#define FEATURESET_NR_ENTRIES %sU
+#define FEATURESET_NR_ENTRIES %s
 
 #define CPUID_COMMON_1D_FEATURES %s
 
