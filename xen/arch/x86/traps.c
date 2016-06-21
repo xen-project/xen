@@ -525,6 +525,25 @@ void vcpu_show_execution_state(struct vcpu *v)
     vcpu_unpause(v);
 }
 
+static cpumask_t show_state_mask;
+static bool_t opt_show_all;
+boolean_param("async-show-all", opt_show_all);
+
+static int nmi_show_execution_state(const struct cpu_user_regs *regs, int cpu)
+{
+    if ( !cpumask_test_cpu(cpu, &show_state_mask) )
+        return 0;
+
+    if ( opt_show_all )
+        show_execution_state(regs);
+    else
+        printk(XENLOG_ERR "CPU%d @ %04x:%08lx (%pS)\n", cpu, regs->cs, regs->rip,
+               guest_mode(regs) ? _p(regs->rip) : NULL);
+    cpumask_clear_cpu(cpu, &show_state_mask);
+
+    return 1;
+}
+
 static const char *trapstr(unsigned int trapnr)
 {
     static const char * const strings[] = {
@@ -544,7 +563,7 @@ static const char *trapstr(unsigned int trapnr)
  * are disabled). In such situations we can't do much that is safe. We try to
  * print out some tracing and then we just spin.
  */
-void fatal_trap(const struct cpu_user_regs *regs)
+void fatal_trap(const struct cpu_user_regs *regs, bool_t show_remote)
 {
     static DEFINE_PER_CPU(char, depth);
     unsigned int trapnr = regs->entry_vector;
@@ -569,6 +588,34 @@ void fatal_trap(const struct cpu_user_regs *regs)
             unsigned long cr2 = read_cr2();
             printk("Faulting linear address: %p\n", _p(cr2));
             show_page_walk(cr2);
+        }
+
+        if ( show_remote )
+        {
+            unsigned int msecs, pending;
+
+            cpumask_andnot(&show_state_mask, &cpu_online_map,
+                           cpumask_of(smp_processor_id()));
+            set_nmi_callback(nmi_show_execution_state);
+            /* Ensure new callback is set before sending out the NMI. */
+            smp_wmb();
+            smp_send_nmi_allbutself();
+
+            /* Wait at most 10ms for some other CPU to respond. */
+            msecs = 10;
+            pending = cpumask_weight(&show_state_mask);
+            while ( pending && msecs-- )
+            {
+                unsigned int left;
+
+                mdelay(1);
+                left = cpumask_weight(&show_state_mask);
+                if ( left < pending )
+                {
+                    pending = left;
+                    msecs = 10;
+                }
+            }
         }
     }
 
@@ -1711,7 +1758,7 @@ void do_page_fault(struct cpu_user_regs *regs)
         {
             console_start_sync();
             printk("Xen SM%cP violation\n", (pf_type == smep_fault) ? 'E' : 'A');
-            fatal_trap(regs);
+            fatal_trap(regs, 0);
         }
 
         if ( pf_type != real_fault )
@@ -1782,7 +1829,7 @@ void __init do_early_page_fault(struct cpu_user_regs *regs)
         console_start_sync();
         printk("Early fatal page fault at %04x:%p (cr2=%p, ec=%04x)\n",
                regs->cs, _p(regs->eip), _p(cr2), regs->error_code);
-        fatal_trap(regs);
+        fatal_trap(regs, 0);
     }
 }
 
@@ -3598,7 +3645,7 @@ static void pci_serr_error(const struct cpu_user_regs *regs)
     default:  /* 'fatal' */
         console_force_unlock();
         printk("\n\nNMI - PCI system error (SERR)\n");
-        fatal_trap(regs);
+        fatal_trap(regs, 0);
     }
 }
 
@@ -3613,7 +3660,7 @@ static void io_check_error(const struct cpu_user_regs *regs)
     default:  /* 'fatal' */
         console_force_unlock();
         printk("\n\nNMI - I/O ERROR\n");
-        fatal_trap(regs);
+        fatal_trap(regs, 0);
     }
 
     outb((inb(0x61) & 0x0f) | 0x08, 0x61); /* clear-and-disable IOCK */
@@ -3633,7 +3680,7 @@ static void unknown_nmi_error(const struct cpu_user_regs *regs, unsigned char re
         console_force_unlock();
         printk("Uhhuh. NMI received for unknown reason %02x.\n", reason);
         printk("Do you have a strange power saving mode enabled?\n");
-        fatal_trap(regs);
+        fatal_trap(regs, 0);
     }
 }
 

@@ -198,6 +198,14 @@ Permit Xen to use Address Space Identifiers.  This is an optimisation which
 tags the TLB entries with an ID per vcpu.  This allows for guest TLB flushes
 to be performed without the overhead of a complete TLB flush.
 
+### async-show-all
+> `= <boolean>`
+
+> Default: `false`
+
+Forces all CPUs' full state to be logged upon certain fatal asynchronous
+exceptions (watchdog NMIs and unexpected MCEs).
+
 ### ats
 > `= <boolean>`
 
