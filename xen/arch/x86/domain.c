@@ -1926,11 +1926,24 @@ bool_t update_runstate_area(struct vcpu *v)
 {
     bool_t rc;
     smap_check_policy_t smap_policy;
+    void __user *guest_handle = NULL;
 
     if ( guest_handle_is_null(runstate_guest(v)) )
         return 1;
 
     smap_policy = smap_policy_change(v, SMAP_CHECK_ENABLED);
+
+    if ( VM_ASSIST(v->domain, runstate_update_flag) )
+    {
+        guest_handle = has_32bit_shinfo(v->domain)
+            ? &v->runstate_guest.compat.p->state_entry_time + 1
+            : &v->runstate_guest.native.p->state_entry_time + 1;
+        guest_handle--;
+        v->runstate.state_entry_time |= XEN_RUNSTATE_UPDATE;
+        __raw_copy_to_guest(guest_handle,
+                            (void *)(&v->runstate.state_entry_time + 1) - 1, 1);
+        smp_wmb();
+    }
 
     if ( has_32bit_shinfo(v->domain) )
     {
@@ -1943,6 +1956,14 @@ bool_t update_runstate_area(struct vcpu *v)
     else
         rc = __copy_to_guest(runstate_guest(v), &v->runstate, 1) !=
              sizeof(v->runstate);
+
+    if ( guest_handle )
+    {
+        v->runstate.state_entry_time &= ~XEN_RUNSTATE_UPDATE;
+        smp_wmb();
+        __raw_copy_to_guest(guest_handle,
+                            (void *)(&v->runstate.state_entry_time + 1) - 1, 1);
+    }
 
     smap_policy_change(v, smap_policy);
 

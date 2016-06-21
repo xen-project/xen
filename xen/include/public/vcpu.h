@@ -84,6 +84,12 @@ struct vcpu_runstate_info {
     /* When was current state entered (system time, ns)? */
     uint64_t state_entry_time;
     /*
+     * Update indicator set in state_entry_time:
+     * When activated via VMASST_TYPE_runstate_update_flag, set during
+     * updates in guest memory mapped copy of vcpu_runstate_info.
+     */
+#define XEN_RUNSTATE_UPDATE          (1ULL << 63)
+    /*
      * Time spent in each RUNSTATE_* (ns). The sum of these times is
      * guaranteed not to drift from system time.
      */
