@@ -1156,6 +1156,7 @@ static int hvmemul_rep_movs(
 {
     struct hvm_emulate_ctxt *hvmemul_ctxt =
         container_of(ctxt, struct hvm_emulate_ctxt, ctxt);
+    struct hvm_vcpu_io *vio = &current->arch.hvm_vcpu.hvm_io;
     unsigned long saddr, daddr, bytes;
     paddr_t sgpa, dgpa;
     uint32_t pfec = PFEC_page_present;
@@ -1178,16 +1179,41 @@ static int hvmemul_rep_movs(
     if ( hvmemul_ctxt->seg_reg[x86_seg_ss].attr.fields.dpl == 3 )
         pfec |= PFEC_user_mode;
 
-    rc = hvmemul_linear_to_phys(
-        saddr, &sgpa, bytes_per_rep, reps, pfec, hvmemul_ctxt);
-    if ( rc != X86EMUL_OKAY )
-        return rc;
+    if ( vio->mmio_access.read_access &&
+         (vio->mmio_gla == (saddr & PAGE_MASK)) &&
+         /*
+          * Upon initial invocation don't truncate large batches just because
+          * of a hit for the translation: Doing the guest page table walk is
+          * cheaper than multiple round trips through the device model. Yet
+          * when processing a response we can always re-use the translation.
+          */
+         (vio->io_req.state == STATE_IORESP_READY ||
+          ((!df || *reps == 1) &&
+           PAGE_SIZE - (saddr & ~PAGE_MASK) >= *reps * bytes_per_rep)) )
+        sgpa = pfn_to_paddr(vio->mmio_gpfn) | (saddr & ~PAGE_MASK);
+    else
+    {
+        rc = hvmemul_linear_to_phys(saddr, &sgpa, bytes_per_rep, reps, pfec,
+                                    hvmemul_ctxt);
+        if ( rc != X86EMUL_OKAY )
+            return rc;
+    }
 
-    rc = hvmemul_linear_to_phys(
-        daddr, &dgpa, bytes_per_rep, reps,
-        pfec | PFEC_write_access, hvmemul_ctxt);
-    if ( rc != X86EMUL_OKAY )
-        return rc;
+    bytes = PAGE_SIZE - (daddr & ~PAGE_MASK);
+    if ( vio->mmio_access.write_access &&
+         (vio->mmio_gla == (daddr & PAGE_MASK)) &&
+         /* See comment above. */
+         (vio->io_req.state == STATE_IORESP_READY ||
+          ((!df || *reps == 1) &&
+           PAGE_SIZE - (daddr & ~PAGE_MASK) >= *reps * bytes_per_rep)) )
+        dgpa = pfn_to_paddr(vio->mmio_gpfn) | (daddr & ~PAGE_MASK);
+    else
+    {
+        rc = hvmemul_linear_to_phys(daddr, &dgpa, bytes_per_rep, reps,
+                                    pfec | PFEC_write_access, hvmemul_ctxt);
+        if ( rc != X86EMUL_OKAY )
+            return rc;
+    }
 
     /* Check for MMIO ops */
     (void) get_gfn_query_unlocked(current->domain, sgpa >> PAGE_SHIFT, &sp2mt);
@@ -1198,12 +1224,18 @@ static int hvmemul_rep_movs(
         return X86EMUL_UNHANDLEABLE;
 
     if ( sp2mt == p2m_mmio_dm )
+    {
+        latch_linear_to_phys(vio, saddr, sgpa, 0);
         return hvmemul_do_mmio_addr(
             sgpa, reps, bytes_per_rep, IOREQ_READ, df, dgpa);
+    }
 
     if ( dp2mt == p2m_mmio_dm )
+    {
+        latch_linear_to_phys(vio, daddr, dgpa, 1);
         return hvmemul_do_mmio_addr(
             dgpa, reps, bytes_per_rep, IOREQ_WRITE, df, sgpa);
+    }
 
     /* RAM-to-RAM copy: emulate as equivalent of memmove(dgpa, sgpa, bytes). */
     bytes = *reps * bytes_per_rep;
@@ -1279,25 +1311,37 @@ static int hvmemul_rep_stos(
 {
     struct hvm_emulate_ctxt *hvmemul_ctxt =
         container_of(ctxt, struct hvm_emulate_ctxt, ctxt);
-    unsigned long addr;
+    struct hvm_vcpu_io *vio = &current->arch.hvm_vcpu.hvm_io;
+    unsigned long addr, bytes;
     paddr_t gpa;
     p2m_type_t p2mt;
     bool_t df = !!(ctxt->regs->eflags & X86_EFLAGS_DF);
     int rc = hvmemul_virtual_to_linear(seg, offset, bytes_per_rep, reps,
                                        hvm_access_write, hvmemul_ctxt, &addr);
 
-    if ( rc == X86EMUL_OKAY )
+    if ( rc != X86EMUL_OKAY )
+        return rc;
+
+    bytes = PAGE_SIZE - (addr & ~PAGE_MASK);
+    if ( vio->mmio_access.write_access &&
+         (vio->mmio_gla == (addr & PAGE_MASK)) &&
+         /* See respective comment in MOVS processing. */
+         (vio->io_req.state == STATE_IORESP_READY ||
+          ((!df || *reps == 1) &&
+           PAGE_SIZE - (addr & ~PAGE_MASK) >= *reps * bytes_per_rep)) )
+        gpa = pfn_to_paddr(vio->mmio_gpfn) | (addr & ~PAGE_MASK);
+    else
     {
         uint32_t pfec = PFEC_page_present | PFEC_write_access;
 
         if ( hvmemul_ctxt->seg_reg[x86_seg_ss].attr.fields.dpl == 3 )
             pfec |= PFEC_user_mode;
 
-        rc = hvmemul_linear_to_phys(
-            addr, &gpa, bytes_per_rep, reps, pfec, hvmemul_ctxt);
+        rc = hvmemul_linear_to_phys(addr, &gpa, bytes_per_rep, reps, pfec,
+                                    hvmemul_ctxt);
+        if ( rc != X86EMUL_OKAY )
+            return rc;
     }
-    if ( rc != X86EMUL_OKAY )
-        return rc;
 
     /* Check for MMIO op */
     (void)get_gfn_query_unlocked(current->domain, gpa >> PAGE_SHIFT, &p2mt);
@@ -1371,6 +1415,7 @@ static int hvmemul_rep_stos(
         return X86EMUL_UNHANDLEABLE;
 
     case p2m_mmio_dm:
+        latch_linear_to_phys(vio, addr, gpa, 1);
         return hvmemul_do_mmio_buffer(gpa, reps, bytes_per_rep, IOREQ_WRITE, df,
                                       p_data);
     }
