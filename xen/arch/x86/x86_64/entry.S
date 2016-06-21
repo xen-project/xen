@@ -866,11 +866,11 @@ autogen_stubs: /* Automatically generated stubs. */
 
         vec = 0
         .rept NR_VECTORS
-        ALIGN
 
         /* Common interrupts, heading towards do_IRQ(). */
         .if vec >= FIRST_DYNAMIC_VECTOR && vec != HYPERCALL_VECTOR && vec != LEGACY_SYSCALL_VECTOR
 
+        ALIGN
 1:      pushq $0
         movb  $vec,4(%rsp)
         jmp   common_interrupt
