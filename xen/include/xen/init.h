@@ -61,9 +61,9 @@ typedef int (*initcall_t)(void);
 typedef void (*exitcall_t)(void);
 
 #define presmp_initcall(fn) \
-    static initcall_t __initcall_##fn __init_call("presmp") = fn
+    const static initcall_t __initcall_##fn __init_call("presmp") = fn
 #define __initcall(fn) \
-    static initcall_t __initcall_##fn __init_call("1") = fn
+    const static initcall_t __initcall_##fn __init_call("1") = fn
 #define __exitcall(fn) \
     static exitcall_t __exitcall_##fn __exit_call = fn
 

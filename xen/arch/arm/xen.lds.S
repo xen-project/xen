@@ -145,6 +145,12 @@ SECTIONS
        *(.init.proc.info)
        __proc_info_end = .;
 
+       __initcall_start = .;
+       *(.initcallpresmp.init)
+       __presmp_initcall_end = .;
+       *(.initcall1.init)
+       __initcall_end = .;
+
        *(.init.data)
        *(.init.data.rel)
        *(.init.data.rel.*)
@@ -153,14 +159,6 @@ SECTIONS
        __ctors_start = .;
        *(.init_array)
        __ctors_end = .;
-  } :text
-  . = ALIGN(32);
-  .initcall.init : {
-       __initcall_start = .;
-       *(.initcallpresmp.init)
-       __presmp_initcall_end = .;
-       *(.initcall1.init)
-       __initcall_end = .;
   } :text
   __init_end_efi = .;
   . = ALIGN(STACK_SIZE);

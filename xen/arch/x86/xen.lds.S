@@ -158,6 +158,12 @@ SECTIONS
        *(.init.setup)
        __setup_end = .;
 
+       __initcall_start = .;
+       *(.initcallpresmp.init)
+       __presmp_initcall_end = .;
+       *(.initcall1.init)
+       __initcall_end = .;
+
        *(.init.data)
        *(.init.data.rel)
        *(.init.data.rel.*)
@@ -182,14 +188,6 @@ SECTIONS
        __ctors_start = .;
        *(.ctors)
        __ctors_end = .;
-  } :text
-  . = ALIGN(32);
-  .initcall.init : {
-       __initcall_start = .;
-       *(.initcallpresmp.init)
-       __presmp_initcall_end = .;
-       *(.initcall1.init)
-       __initcall_end = .;
   } :text
   . = ALIGN(PAGE_SIZE);
   __init_end = .;
