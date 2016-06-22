@@ -35,6 +35,35 @@
 #endif
 #define cpu_has_security  (boot_cpu_feature32(security) > 0)
 
+#define ARM_NCAPS           0
+
+#ifndef __ASSEMBLY__
+
+#include <xen/types.h>
+#include <xen/lib.h>
+#include <xen/bitops.h>
+
+extern DECLARE_BITMAP(cpu_hwcaps, ARM_NCAPS);
+
+static inline bool_t cpus_have_cap(unsigned int num)
+{
+    if ( num >= ARM_NCAPS )
+        return 0;
+
+    return test_bit(num, cpu_hwcaps);
+}
+
+static inline void cpus_set_cap(unsigned int num)
+{
+    if (num >= ARM_NCAPS)
+        printk(XENLOG_WARNING "Attempt to set an illegal CPU capability (%d >= %d)\n",
+               num, ARM_NCAPS);
+    else
+        __set_bit(num, cpu_hwcaps);
+}
+
+#endif /* __ASSEMBLY__ */
+
 #endif
 /*
  * Local variables:

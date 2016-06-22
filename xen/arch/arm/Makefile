@@ -6,6 +6,7 @@ subdir-$(CONFIG_ACPI) += acpi
 
 obj-y += bootfdt.o
 obj-y += cpu.o
+obj-y += cpufeature.o
 obj-y += decode.o
 obj-y += device.o
 obj-y += domain.o
