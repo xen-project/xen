@@ -2371,11 +2371,15 @@ done:
     if (first) unmap_domain_page(first);
 }
 
-static inline paddr_t get_faulting_ipa(void)
+static inline paddr_t get_faulting_ipa(vaddr_t gva)
 {
     register_t hpfar = READ_SYSREG(HPFAR_EL2);
+    paddr_t ipa;
 
-    return ((paddr_t)(hpfar & HPFAR_MASK) << (12 - 4));
+    ipa = (paddr_t)(hpfar & HPFAR_MASK) << (12 - 4);
+    ipa |= gva & ~PAGE_MASK;
+
+    return ipa;
 }
 
 static void do_trap_instr_abort_guest(struct cpu_user_regs *regs,
@@ -2396,7 +2400,7 @@ static void do_trap_instr_abort_guest(struct cpu_user_regs *regs,
         };
 
         if ( hsr.iabt.s1ptw )
-            gpa = get_faulting_ipa();
+            gpa = get_faulting_ipa(gva);
         else
         {
             /*
@@ -2446,7 +2450,7 @@ static void do_trap_data_abort_guest(struct cpu_user_regs *regs,
 #endif
 
     if ( dabt.s1ptw )
-        info.gpa = get_faulting_ipa();
+        info.gpa = get_faulting_ipa(info.gva);
     else
     {
         rc = gva_to_ipa(info.gva, &info.gpa, GV2M_READ);
