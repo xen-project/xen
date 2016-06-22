@@ -2436,12 +2436,6 @@ static void do_trap_data_abort_guest(struct cpu_user_regs *regs,
     int rc;
     mmio_info_t info;
 
-    if ( !check_conditional_instr(regs, hsr) )
-    {
-        advance_pc(regs, hsr);
-        return;
-    }
-
     info.dabt = dabt;
 #ifdef CONFIG_ARM_32
     info.gva = READ_CP32(HDFAR);
