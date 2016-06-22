@@ -1202,7 +1202,7 @@ static void do_trap_brk(struct cpu_user_regs *regs, const union hsr hsr)
 
     switch (hsr.brk.comment)
     {
-    case BRK_BUG_FRAME:
+    case BRK_BUG_FRAME_IMM:
         if ( do_bug_frame(regs, regs->pc) )
             goto die;
 
