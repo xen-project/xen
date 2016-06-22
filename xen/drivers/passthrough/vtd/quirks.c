@@ -331,10 +331,12 @@ void __init platform_quirks_init(void)
  * assigning Intel integrated wifi device to a guest.
  */
 
-static void map_me_phantom_function(struct domain *domain, u32 dev, int map)
+static int __must_check map_me_phantom_function(struct domain *domain,
+                                                u32 dev, int map)
 {
     struct acpi_drhd_unit *drhd;
     struct pci_dev *pdev;
+    int rc;
 
     /* find ME VT-d engine base on a real ME device */
     pdev = pci_get_pdev(0, 0, PCI_DEVFN(dev, 0));
@@ -342,23 +344,26 @@ static void map_me_phantom_function(struct domain *domain, u32 dev, int map)
 
     /* map or unmap ME phantom function */
     if ( map )
-        domain_context_mapping_one(domain, drhd->iommu, 0,
-                                   PCI_DEVFN(dev, 7), NULL);
+        rc = domain_context_mapping_one(domain, drhd->iommu, 0,
+                                        PCI_DEVFN(dev, 7), NULL);
     else
-        domain_context_unmap_one(domain, drhd->iommu, 0,
-                                 PCI_DEVFN(dev, 7));
+        rc = domain_context_unmap_one(domain, drhd->iommu, 0,
+                                      PCI_DEVFN(dev, 7));
+
+    return rc;
 }
 
-void me_wifi_quirk(struct domain *domain, u8 bus, u8 devfn, int map)
+int me_wifi_quirk(struct domain *domain, u8 bus, u8 devfn, int map)
 {
     u32 id;
+    int rc = 0;
 
     id = pci_conf_read32(0, 0, 0, 0, 0);
     if ( IS_CTG(id) )
     {
         /* quit if ME does not exist */
         if ( pci_conf_read32(0, 0, 3, 0, 0) == 0xffffffff )
-            return;
+            return 0;
 
         /* if device is WLAN device, map ME phantom device 0:3.7 */
         id = pci_conf_read32(0, bus, PCI_SLOT(devfn), PCI_FUNC(devfn), 0);
@@ -372,7 +377,7 @@ void me_wifi_quirk(struct domain *domain, u8 bus, u8 devfn, int map)
             case 0x423b8086:
             case 0x423c8086:
             case 0x423d8086:
-                map_me_phantom_function(domain, 3, map);
+                rc = map_me_phantom_function(domain, 3, map);
                 break;
             default:
                 break;
@@ -382,7 +387,7 @@ void me_wifi_quirk(struct domain *domain, u8 bus, u8 devfn, int map)
     {
         /* quit if ME does not exist */
         if ( pci_conf_read32(0, 0, 22, 0, 0) == 0xffffffff )
-            return;
+            return 0;
 
         /* if device is WLAN device, map ME phantom device 0:22.7 */
         id = pci_conf_read32(0, bus, PCI_SLOT(devfn), PCI_FUNC(devfn), 0);
@@ -398,12 +403,14 @@ void me_wifi_quirk(struct domain *domain, u8 bus, u8 devfn, int map)
             case 0x42388086:        /* Puma Peak */
             case 0x422b8086:
             case 0x422c8086:
-                map_me_phantom_function(domain, 22, map);
+                rc = map_me_phantom_function(domain, 22, map);
                 break;
             default:
                 break;
         }
     }
+
+    return rc;
 }
 
 void pci_vtd_quirk(const struct pci_dev *pdev)

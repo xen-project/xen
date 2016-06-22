@@ -91,7 +91,8 @@ int is_igd_vt_enabled_quirk(void);
 void platform_quirks_init(void);
 void vtd_ops_preamble_quirk(struct iommu* iommu);
 void vtd_ops_postamble_quirk(struct iommu* iommu);
-void me_wifi_quirk(struct domain *domain, u8 bus, u8 devfn, int map);
+int __must_check me_wifi_quirk(struct domain *domain,
+                               u8 bus, u8 devfn, int map);
 void pci_vtd_quirk(const struct pci_dev *);
 bool_t platform_supports_intremap(void);
 bool_t platform_supports_x2apic(void);

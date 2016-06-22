@@ -1455,8 +1455,8 @@ int domain_context_mapping_one(
 
     unmap_vtd_domain_page(context_entries);
 
-    if ( !seg )
-        me_wifi_quirk(domain, bus, devfn, MAP_ME_PHANTOM_FUNC);
+    if ( !seg && !rc )
+        rc = me_wifi_quirk(domain, bus, devfn, MAP_ME_PHANTOM_FUNC);
 
     return rc;
 }
@@ -1605,8 +1605,8 @@ int domain_context_unmap_one(
     spin_unlock(&iommu->lock);
     unmap_vtd_domain_page(context_entries);
 
-    if ( !iommu->intel->drhd->segment )
-        me_wifi_quirk(domain, bus, devfn, UNMAP_ME_PHANTOM_FUNC);
+    if ( !iommu->intel->drhd->segment && !rc )
+        rc = me_wifi_quirk(domain, bus, devfn, UNMAP_ME_PHANTOM_FUNC);
 
     return rc;
 }
