@@ -50,6 +50,7 @@
 #include <xen/list.h>
 #include <xen/spinlock.h>
 #include <xen/typesafe.h>
+#include <xen/kernel.h>
 #include <public/memory.h>
 
 TYPE_SAFE(unsigned long, mfn);
@@ -61,6 +62,26 @@ TYPE_SAFE(unsigned long, mfn);
 #undef mfn_t
 #endif
 
+static inline mfn_t mfn_add(mfn_t mfn, unsigned long i)
+{
+    return _mfn(mfn_x(mfn) + i);
+}
+
+static inline mfn_t mfn_max(mfn_t x, mfn_t y)
+{
+    return _mfn(max(mfn_x(x), mfn_x(y)));
+}
+
+static inline mfn_t mfn_min(mfn_t x, mfn_t y)
+{
+    return _mfn(min(mfn_x(x), mfn_x(y)));
+}
+
+static inline bool_t mfn_eq(mfn_t x, mfn_t y)
+{
+    return mfn_x(x) == mfn_x(y);
+}
+
 TYPE_SAFE(unsigned long, gfn);
 #define PRI_gfn          "05lx"
 #define INVALID_GFN      (~0UL)
@@ -69,6 +90,26 @@ TYPE_SAFE(unsigned long, gfn);
 #define gfn_t /* Grep fodder: gfn_t, _gfn() and gfn_x() are defined above */
 #undef gfn_t
 #endif
+
+static inline gfn_t gfn_add(gfn_t gfn, unsigned long i)
+{
+    return _gfn(gfn_x(gfn) + i);
+}
+
+static inline gfn_t gfn_max(gfn_t x, gfn_t y)
+{
+    return _gfn(max(gfn_x(x), gfn_x(y)));
+}
+
+static inline gfn_t gfn_min(gfn_t x, gfn_t y)
+{
+    return _gfn(min(gfn_x(x), gfn_x(y)));
+}
+
+static inline bool_t gfn_eq(gfn_t x, gfn_t y)
+{
+    return gfn_x(x) == gfn_x(y);
+}
 
 TYPE_SAFE(unsigned long, pfn);
 #define PRI_pfn          "05lx"
