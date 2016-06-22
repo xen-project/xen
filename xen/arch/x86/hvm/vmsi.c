@@ -199,9 +199,8 @@ static struct msi_desc *msixtbl_addr_to_desc(
     return NULL;
 }
 
-static int msixtbl_read(
-    struct vcpu *v, unsigned long address,
-    unsigned int len, unsigned long *pval)
+static int msixtbl_read(const struct hvm_io_handler *handler,
+                        uint64_t address, uint32_t len, uint64_t *pval)
 {
     unsigned long offset;
     struct msixtbl_entry *entry;
@@ -213,7 +212,7 @@ static int msixtbl_read(
 
     rcu_read_lock(&msixtbl_rcu_lock);
 
-    entry = msixtbl_find_entry(v, address);
+    entry = msixtbl_find_entry(current, address);
     if ( !entry )
         goto out;
     offset = address & (PCI_MSIX_ENTRY_SIZE - 1);
@@ -333,23 +332,29 @@ out:
     return r;
 }
 
-static int msixtbl_range(struct vcpu *v, unsigned long addr)
+static int _msixtbl_write(const struct hvm_io_handler *handler,
+                          uint64_t address, uint32_t len, uint64_t val)
 {
+    return msixtbl_write(current, address, len, val);
+}
+
+static bool_t msixtbl_range(const struct hvm_io_handler *handler,
+                            const ioreq_t *r)
+{
+    struct vcpu *curr = current;
+    unsigned long addr = r->addr;
     const struct msi_desc *desc;
-    const ioreq_t *r;
+
+    ASSERT(r->type == IOREQ_TYPE_COPY);
 
     rcu_read_lock(&msixtbl_rcu_lock);
-    desc = msixtbl_addr_to_desc(msixtbl_find_entry(v, addr), addr);
+    desc = msixtbl_addr_to_desc(msixtbl_find_entry(curr, addr), addr);
     rcu_read_unlock(&msixtbl_rcu_lock);
 
     if ( desc )
         return 1;
 
-    r = &v->arch.hvm_vcpu.hvm_io.io_req;
-    if ( r->state != STATE_IOREQ_READY || r->addr != addr )
-        return 0;
-    ASSERT(r->type == IOREQ_TYPE_COPY);
-    if ( r->dir == IOREQ_WRITE )
+    if ( r->state == STATE_IOREQ_READY && r->dir == IOREQ_WRITE )
     {
         unsigned int size = r->size;
 
@@ -368,8 +373,8 @@ static int msixtbl_range(struct vcpu *v, unsigned long addr)
                   PCI_MSIX_ENTRY_VECTOR_CTRL_OFFSET) &&
                  !(data & PCI_MSIX_VECTOR_BITMASK) )
             {
-                v->arch.hvm_vcpu.hvm_io.msix_snoop_address = addr;
-                v->arch.hvm_vcpu.hvm_io.msix_snoop_gpa = 0;
+                curr->arch.hvm_vcpu.hvm_io.msix_snoop_address = addr;
+                curr->arch.hvm_vcpu.hvm_io.msix_snoop_gpa = 0;
             }
         }
         else if ( (size == 4 || size == 8) &&
@@ -386,9 +391,9 @@ static int msixtbl_range(struct vcpu *v, unsigned long addr)
             BUILD_BUG_ON((PCI_MSIX_ENTRY_VECTOR_CTRL_OFFSET + 4) &
                          (PCI_MSIX_ENTRY_SIZE - 1));
 
-            v->arch.hvm_vcpu.hvm_io.msix_snoop_address =
+            curr->arch.hvm_vcpu.hvm_io.msix_snoop_address =
                 addr + size * r->count - 4;
-            v->arch.hvm_vcpu.hvm_io.msix_snoop_gpa =
+            curr->arch.hvm_vcpu.hvm_io.msix_snoop_gpa =
                 r->data + size * r->count - 4;
         }
     }
@@ -396,10 +401,10 @@ static int msixtbl_range(struct vcpu *v, unsigned long addr)
     return 0;
 }
 
-static const struct hvm_mmio_ops msixtbl_mmio_ops = {
-    .check = msixtbl_range,
+static const struct hvm_io_ops msixtbl_mmio_ops = {
+    .accept = msixtbl_range,
     .read = msixtbl_read,
-    .write = msixtbl_write
+    .write = _msixtbl_write,
 };
 
 static void add_msixtbl_entry(struct domain *d,
@@ -544,13 +549,20 @@ found:
 
 void msixtbl_init(struct domain *d)
 {
+    struct hvm_io_handler *handler;
+
     if ( !has_hvm_container_domain(d) || !has_vlapic(d) ||
          d->arch.hvm_domain.msixtbl_list.next )
         return;
 
     INIT_LIST_HEAD(&d->arch.hvm_domain.msixtbl_list);
 
-    register_mmio_handler(d, &msixtbl_mmio_ops);
+    handler = hvm_next_io_handler(d);
+    if ( handler )
+    {
+        handler->type = IOREQ_TYPE_COPY;
+        handler->ops = &msixtbl_mmio_ops;
+    }
 }
 
 void msixtbl_pt_cleanup(struct domain *d)
