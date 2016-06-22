@@ -1380,6 +1380,9 @@ static int assign_device(struct domain *d, u16 seg, u8 bus, u8 devfn, u32 flag)
         goto done;
     }
 
+    if ( pdev->msix )
+        msixtbl_init(d);
+
     pdev->fault.count = 0;
 
     if ( (rc = hd->platform_ops->assign_device(d, devfn, pci_to_dev(pdev), flag)) )

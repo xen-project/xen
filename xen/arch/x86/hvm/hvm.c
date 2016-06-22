@@ -644,8 +644,6 @@ int hvm_domain_initialise(struct domain *d)
 
     rtc_init(d);
 
-    msixtbl_init(d);
-
     register_portio_handler(d, 0xe9, 1, hvm_print_line);
 
     if ( hvm_tsc_scaling_supported )
