@@ -22,7 +22,6 @@
 #define __ASM_ARM_SCIF_UART_H
 
 #define SCIF_FIFO_MAX_SIZE    16
-#define SCIF_CLK_FREQ         14745600
 
 /* Register offsets */
 #define SCIF_SCSMR     (0x00)    /* Serial mode register           */

@@ -41,7 +41,7 @@
 #define scif_writew(uart, off, val)    writew((val), (uart)->regs + (off))
 
 static struct scif_uart {
-    unsigned int baud, clock_hz, data_bits, parity, stop_bits;
+    unsigned int data_bits, parity, stop_bits;
     unsigned int irq;
     char __iomem *regs;
     struct irqaction irqaction;
@@ -87,7 +87,6 @@ static void scif_uart_interrupt(int irq, void *data, struct cpu_user_regs *regs)
 static void __init scif_uart_init_preirq(struct serial_port *port)
 {
     struct scif_uart *uart = port->uart;
-    unsigned int divisor;
     uint16_t val;
 
     /*
@@ -141,25 +140,6 @@ static void __init scif_uart_init_preirq(struct serial_port *port)
         break;
     }
     scif_writew(uart, SCIF_SCSMR, val);
-
-    ASSERT( uart->clock_hz > 0 );
-    if ( uart->baud != BAUD_AUTO )
-    {
-        /* Setup desired Baud rate */
-        divisor = uart->clock_hz / (uart->baud << 4);
-        ASSERT( divisor >= 1 && divisor <= (uint16_t)UINT_MAX );
-        scif_writew(uart, SCIF_DL, (uint16_t)divisor);
-        /* Selects the frequency divided clock (SC_CLK external input) */
-        scif_writew(uart, SCIF_CKS, 0);
-        udelay(1000000 / uart->baud + 1);
-    }
-    else
-    {
-        /* Read current Baud rate */
-        divisor = scif_readw(uart, SCIF_DL);
-        ASSERT( divisor >= 1 && divisor <= (uint16_t)UINT_MAX );
-        uart->baud = uart->clock_hz / (divisor << 4);
-    }
 
     /* Setup trigger level for TX/RX FIFOs */
     scif_writew(uart, SCIF_SCFCR, SCFCR_RTRG11 | SCFCR_TTRG11);
@@ -303,8 +283,6 @@ static int __init scif_uart_init(struct dt_device_node *dev,
 
     uart = &scif_com;
 
-    uart->clock_hz  = SCIF_CLK_FREQ;
-    uart->baud      = BAUD_AUTO;
     uart->data_bits = 8;
     uart->parity    = PARITY_NONE;
     uart->stop_bits = 1;
