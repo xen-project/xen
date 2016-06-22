@@ -468,8 +468,6 @@ int msixtbl_pt_register(struct domain *d, struct pirq *pirq, uint64_t gtable)
 
     pdev = msi_desc->dev;
 
-    spin_lock(&d->arch.hvm_domain.msixtbl_list_lock);
-
     list_for_each_entry( entry, &d->arch.hvm_domain.msixtbl_list, list )
         if ( pdev == entry->pdev )
             goto found;
@@ -480,7 +478,6 @@ int msixtbl_pt_register(struct domain *d, struct pirq *pirq, uint64_t gtable)
 
 found:
     atomic_inc(&entry->refcnt);
-    spin_unlock(&d->arch.hvm_domain.msixtbl_list_lock);
     r = 0;
 
 out:
@@ -530,14 +527,9 @@ void msixtbl_pt_unregister(struct domain *d, struct pirq *pirq)
 
     pdev = msi_desc->dev;
 
-    spin_lock(&d->arch.hvm_domain.msixtbl_list_lock);
-
     list_for_each_entry( entry, &d->arch.hvm_domain.msixtbl_list, list )
         if ( pdev == entry->pdev )
             goto found;
-
-    spin_unlock(&d->arch.hvm_domain.msixtbl_list_lock);
-
 
 out:
     spin_unlock_irq(&irq_desc->lock);
@@ -547,7 +539,6 @@ found:
     if ( !atomic_dec_and_test(&entry->refcnt) )
         del_msixtbl_entry(entry);
 
-    spin_unlock(&d->arch.hvm_domain.msixtbl_list_lock);
     spin_unlock_irq(&irq_desc->lock);
 }
 
@@ -558,7 +549,6 @@ void msixtbl_init(struct domain *d)
         return;
 
     INIT_LIST_HEAD(&d->arch.hvm_domain.msixtbl_list);
-    spin_lock_init(&d->arch.hvm_domain.msixtbl_list_lock);
 
     register_mmio_handler(d, &msixtbl_mmio_ops);
 }
@@ -566,21 +556,17 @@ void msixtbl_init(struct domain *d)
 void msixtbl_pt_cleanup(struct domain *d)
 {
     struct msixtbl_entry *entry, *temp;
-    unsigned long flags;
 
     if ( !d->arch.hvm_domain.msixtbl_list.next )
         return;
 
-    /* msixtbl_list_lock must be acquired with irq_disabled for check_lock() */
-    local_irq_save(flags); 
-    spin_lock(&d->arch.hvm_domain.msixtbl_list_lock);
+    spin_lock(&d->event_lock);
 
     list_for_each_entry_safe( entry, temp,
                               &d->arch.hvm_domain.msixtbl_list, list )
         del_msixtbl_entry(entry);
 
-    spin_unlock(&d->arch.hvm_domain.msixtbl_list_lock);
-    local_irq_restore(flags);
+    spin_unlock(&d->event_lock);
 }
 
 void msix_write_completion(struct vcpu *v)

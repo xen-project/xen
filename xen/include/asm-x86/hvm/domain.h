@@ -124,7 +124,6 @@ struct hvm_domain {
 
     /* hypervisor intercepted msix table */
     struct list_head       msixtbl_list;
-    spinlock_t             msixtbl_list_lock;
 
     struct viridian_domain viridian;
 
