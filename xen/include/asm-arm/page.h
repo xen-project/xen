@@ -84,6 +84,7 @@
 #include <xen/errno.h>
 #include <xen/types.h>
 #include <xen/lib.h>
+#include <asm/system.h>
 
 /* WARNING!  Unlike the Intel pagetable code, where l1 is the lowest
  * level and l4 is the root of the trie, the ARM pagetables follow ARM's
