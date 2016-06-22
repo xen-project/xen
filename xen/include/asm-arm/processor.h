@@ -9,7 +9,40 @@
 #include <public/arch-arm.h>
 
 /* MIDR Main ID Register */
-#define MIDR_MASK    0xff0ffff0
+#define MIDR_REVISION_MASK      0xf
+#define MIDR_RESIVION(midr)     ((midr) & MIDR_REVISION_MASK)
+#define MIDR_PARTNUM_SHIFT      4
+#define MIDR_PARTNUM_MASK       (0xfff << MIDR_PARTNUM_SHIFT)
+#define MIDR_PARTNUM(midr) \
+    (((midr) & MIDR_PARTNUM_MASK) >> MIDR_PARTNUM_SHIFT)
+#define MIDR_ARCHITECTURE_SHIFT 16
+#define MIDR_ARCHITECTURE_MASK  (0xf << MIDR_ARCHITECTURE_SHIFT)
+#define MIDR_ARCHITECTURE(midr) \
+    (((midr) & MIDR_ARCHITECTURE_MASK) >> MIDR_ARCHITECTURE_SHIFT)
+#define MIDR_VARIANT_SHIFT      20
+#define MIDR_VARIANT_MASK       (0xf << MIDR_VARIANT_SHIFT)
+#define MIDR_VARIANT(midr) \
+    (((midr) & MIDR_VARIANT_MASK) >> MIDR_VARIANT_SHIFT)
+#define MIDR_IMPLEMENTOR_SHIFT  24
+#define MIDR_IMPLEMENTOR_MASK   (0xff << MIDR_IMPLEMENTOR_SHIFT)
+#define MIDR_IMPLEMENTOR(midr) \
+    (((midr) & MIDR_IMPLEMENTOR_MASK) >> MIDR_IMPLEMENTOR_SHIFT)
+
+#define MIDR_CPU_MODEL(imp, partnum)            \
+    (((imp)     << MIDR_IMPLEMENTOR_SHIFT) |    \
+     (0xf       << MIDR_ARCHITECTURE_SHIFT) |   \
+     ((partnum) << MIDR_PARTNUM_SHIFT))
+
+#define MIDR_CPU_MODEL_MASK \
+     (MIDR_IMPLEMENTOR_MASK | MIDR_PARTNUM_MASK | MIDR_ARCHITECTURE_MASK)
+
+#define MIDR_IS_CPU_MODEL_RANGE(midr, model, rv_min, rv_max)            \
+({                                                                      \
+        u32 _model = (midr) & MIDR_CPU_MODEL_MASK;                      \
+        u32 _rv = (midr) & (MIDR_REVISION_MASK | MIDR_VARIANT_MASK);    \
+                                                                        \
+        _model == (model) && _rv >= (rv_min) && _rv <= (rv_max);        \
+})
 
 /* MPIDR Multiprocessor Affinity Register */
 #define _MPIDR_UP           (30)
