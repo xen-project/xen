@@ -514,10 +514,13 @@ struct ir_ctrl {
 };
 
 struct iommu_flush {
-    int (*context)(void *iommu, u16 did, u16 source_id,
-                   u8 function_mask, u64 type, int non_present_entry_flush);
-    int (*iotlb)(void *iommu, u16 did, u64 addr, unsigned int size_order,
-                 u64 type, int flush_non_present_entry, int flush_dev_iotlb);
+    int __must_check (*context)(void *iommu, u16 did, u16 source_id,
+                                u8 function_mask, u64 type,
+                                bool_t non_present_entry_flush);
+    int __must_check (*iotlb)(void *iommu, u16 did, u64 addr,
+                              unsigned int size_order, u64 type,
+                              bool_t flush_non_present_entry,
+                              bool_t flush_dev_iotlb);
 };
 
 struct intel_iommu {

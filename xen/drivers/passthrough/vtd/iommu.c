@@ -335,10 +335,9 @@ static void iommu_flush_write_buffer(struct iommu *iommu)
 }
 
 /* return value determine if we need a write buffer flush */
-static int flush_context_reg(
-    void *_iommu,
-    u16 did, u16 source_id, u8 function_mask, u64 type,
-    int flush_non_present_entry)
+static int __must_check flush_context_reg(void *_iommu, u16 did, u16 source_id,
+                                          u8 function_mask, u64 type,
+                                          bool_t flush_non_present_entry)
 {
     struct iommu *iommu = (struct iommu *) _iommu;
     u64 val = 0;
@@ -389,7 +388,7 @@ static int flush_context_reg(
 }
 
 static int __must_check iommu_flush_context_global(struct iommu *iommu,
-                                                   int flush_non_present_entry)
+                                                   bool_t flush_non_present_entry)
 {
     struct iommu_flush *flush = iommu_get_flush(iommu);
     return flush->context(iommu, 0, 0, 0, DMA_CCMD_GLOBAL_INVL,
@@ -399,7 +398,7 @@ static int __must_check iommu_flush_context_global(struct iommu *iommu,
 static int __must_check iommu_flush_context_device(struct iommu *iommu,
                                                    u16 did, u16 source_id,
                                                    u8 function_mask,
-                                                   int flush_non_present_entry)
+                                                   bool_t flush_non_present_entry)
 {
     struct iommu_flush *flush = iommu_get_flush(iommu);
     return flush->context(iommu, did, source_id, function_mask,
@@ -408,9 +407,10 @@ static int __must_check iommu_flush_context_device(struct iommu *iommu,
 }
 
 /* return value determine if we need a write buffer flush */
-static int flush_iotlb_reg(void *_iommu, u16 did,
-                           u64 addr, unsigned int size_order, u64 type,
-                           int flush_non_present_entry, int flush_dev_iotlb)
+static int __must_check flush_iotlb_reg(void *_iommu, u16 did, u64 addr,
+                                        unsigned int size_order, u64 type,
+                                        bool_t flush_non_present_entry,
+                                        bool_t flush_dev_iotlb)
 {
     struct iommu *iommu = (struct iommu *) _iommu;
     int tlb_offset = ecap_iotlb_offset(iommu->ecap);
@@ -475,8 +475,8 @@ static int flush_iotlb_reg(void *_iommu, u16 did,
 }
 
 static int __must_check iommu_flush_iotlb_global(struct iommu *iommu,
-                                                 int flush_non_present_entry,
-                                                 int flush_dev_iotlb)
+                                                 bool_t flush_non_present_entry,
+                                                 bool_t flush_dev_iotlb)
 {
     struct iommu_flush *flush = iommu_get_flush(iommu);
     int status;
@@ -494,8 +494,8 @@ static int __must_check iommu_flush_iotlb_global(struct iommu *iommu,
 }
 
 static int __must_check iommu_flush_iotlb_dsi(struct iommu *iommu, u16 did,
-                                              int flush_non_present_entry,
-                                              int flush_dev_iotlb)
+                                              bool_t flush_non_present_entry,
+                                              bool_t flush_dev_iotlb)
 {
     struct iommu_flush *flush = iommu_get_flush(iommu);
     int status;
@@ -514,8 +514,8 @@ static int __must_check iommu_flush_iotlb_dsi(struct iommu *iommu, u16 did,
 
 static int __must_check iommu_flush_iotlb_psi(struct iommu *iommu, u16 did,
                                               u64 addr, unsigned int order,
-                                              int flush_non_present_entry,
-                                              int flush_dev_iotlb)
+                                              bool_t flush_non_present_entry,
+                                              bool_t flush_dev_iotlb)
 {
     struct iommu_flush *flush = iommu_get_flush(iommu);
     int status;
@@ -549,7 +549,7 @@ static int __must_check iommu_flush_all(void)
 {
     struct acpi_drhd_unit *drhd;
     struct iommu *iommu;
-    int flush_dev_iotlb;
+    bool_t flush_dev_iotlb;
     int rc = 0;
 
     flush_all_cache();
@@ -559,7 +559,7 @@ static int __must_check iommu_flush_all(void)
 
         iommu = drhd->iommu;
         context_rc = iommu_flush_context_global(iommu, 0);
-        flush_dev_iotlb = find_ats_dev_drhd(iommu) ? 1 : 0;
+        flush_dev_iotlb = !!find_ats_dev_drhd(iommu);
         iotlb_rc = iommu_flush_iotlb_global(iommu, 0, flush_dev_iotlb);
 
         /*
@@ -591,7 +591,7 @@ static int __must_check iommu_flush_iotlb(struct domain *d,
     struct domain_iommu *hd = dom_iommu(d);
     struct acpi_drhd_unit *drhd;
     struct iommu *iommu;
-    int flush_dev_iotlb;
+    bool_t flush_dev_iotlb;
     int iommu_domid;
     int rc = 0;
 
@@ -606,7 +606,7 @@ static int __must_check iommu_flush_iotlb(struct domain *d,
         if ( !test_bit(iommu->index, &hd->arch.iommu_bitmap) )
             continue;
 
-        flush_dev_iotlb = find_ats_dev_drhd(iommu) ? 1 : 0;
+        flush_dev_iotlb = !!find_ats_dev_drhd(iommu);
         iommu_domid= domain_iommu_domid(d, iommu);
         if ( iommu_domid == -1 )
             continue;
@@ -1318,7 +1318,7 @@ int domain_context_mapping_one(
     u64 maddr, pgd_maddr;
     u16 seg = iommu->intel->drhd->segment;
     int agaw, rc, ret;
-    int flush_dev_iotlb;
+    bool_t flush_dev_iotlb;
 
     ASSERT(pcidevs_locked());
     spin_lock(&iommu->lock);
@@ -1434,7 +1434,7 @@ int domain_context_mapping_one(
     /* Context entry was previously non-present (with domid 0). */
     rc = iommu_flush_context_device(iommu, 0, PCI_BDF2(bus, devfn),
                                     DMA_CCMD_MASK_NOBIT, 1);
-    flush_dev_iotlb = find_ats_dev_drhd(iommu) ? 1 : 0;
+    flush_dev_iotlb = !!find_ats_dev_drhd(iommu);
     ret = iommu_flush_iotlb_dsi(iommu, 0, 1, flush_dev_iotlb);
 
     /*
@@ -1553,7 +1553,7 @@ int domain_context_unmap_one(
     struct context_entry *context, *context_entries;
     u64 maddr;
     int iommu_domid, rc, ret;
-    int flush_dev_iotlb;
+    bool_t flush_dev_iotlb;
 
     ASSERT(pcidevs_locked());
     spin_lock(&iommu->lock);
@@ -1585,7 +1585,7 @@ int domain_context_unmap_one(
                                     PCI_BDF2(bus, devfn),
                                     DMA_CCMD_MASK_NOBIT, 0);
 
-    flush_dev_iotlb = find_ats_dev_drhd(iommu) ? 1 : 0;
+    flush_dev_iotlb = !!find_ats_dev_drhd(iommu);
     ret = iommu_flush_iotlb_dsi(iommu, iommu_domid, 0, flush_dev_iotlb);
 
     /*
@@ -1820,7 +1820,7 @@ int iommu_pte_flush(struct domain *d, u64 gfn, u64 *pte,
     struct acpi_drhd_unit *drhd;
     struct iommu *iommu = NULL;
     struct domain_iommu *hd = dom_iommu(d);
-    int flush_dev_iotlb;
+    bool_t flush_dev_iotlb;
     int iommu_domid;
     int rc = 0;
 
@@ -1832,7 +1832,7 @@ int iommu_pte_flush(struct domain *d, u64 gfn, u64 *pte,
         if ( !test_bit(iommu->index, &hd->arch.iommu_bitmap) )
             continue;
 
-        flush_dev_iotlb = find_ats_dev_drhd(iommu) ? 1 : 0;
+        flush_dev_iotlb = !!find_ats_dev_drhd(iommu);
         iommu_domid= domain_iommu_domid(d, iommu);
         if ( iommu_domid == -1 )
             continue;

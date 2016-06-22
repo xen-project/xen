@@ -274,9 +274,9 @@ int iommu_flush_iec_index(struct iommu *iommu, u8 im, u16 iidx)
    return __iommu_flush_iec(iommu, IEC_INDEX_INVL, im, iidx);
 }
 
-static int flush_context_qi(
-    void *_iommu, u16 did, u16 sid, u8 fm, u64 type,
-    int flush_non_present_entry)
+static int __must_check flush_context_qi(void *_iommu, u16 did,
+                                         u16 sid, u8 fm, u64 type,
+                                         bool_t flush_non_present_entry)
 {
     int ret = 0;
     struct iommu *iommu = (struct iommu *)_iommu;
@@ -305,10 +305,10 @@ static int flush_context_qi(
     return ret;
 }
 
-static int flush_iotlb_qi(
-    void *_iommu, u16 did,
-    u64 addr, unsigned int size_order, u64 type,
-    int flush_non_present_entry, int flush_dev_iotlb)
+static int __must_check flush_iotlb_qi(void *_iommu, u16 did, u64 addr,
+                                       unsigned int size_order, u64 type,
+                                       bool_t flush_non_present_entry,
+                                       bool_t flush_dev_iotlb)
 {
     u8 dr = 0, dw = 0;
     int ret = 0;
