@@ -411,7 +411,7 @@ static void add_msixtbl_entry(struct domain *d,
     INIT_RCU_HEAD(&entry->rcu);
     atomic_set(&entry->refcnt, 0);
 
-    entry->table_len = pci_msix_get_table_len(pdev);
+    entry->table_len = pdev->msix->nr_entries * PCI_MSIX_ENTRY_SIZE;
     entry->pdev = pdev;
     entry->gtable = (unsigned long) gtable;
 
