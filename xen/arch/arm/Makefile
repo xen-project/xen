@@ -5,6 +5,7 @@ subdir-$(arm64) += efi
 
 obj-$(EARLY_PRINTK) += early_printk.o
 obj-y += cpu.o
+obj-y += cpufeature.o
 obj-y += domain.o
 obj-y += psci.o
 obj-y += vpsci.o
