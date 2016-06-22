@@ -176,12 +176,7 @@
 #define FIXMAP_ACPI_END    (FIXMAP_ACPI_BEGIN + NUM_FIXMAP_ACPI_PAGES - 1)  /* End mappings of ACPI tables */
 
 #define PAGE_SHIFT              12
-
-#ifndef __ASSEMBLY__
-#define PAGE_SIZE           (1L << PAGE_SHIFT)
-#else
-#define PAGE_SIZE           (1 << PAGE_SHIFT)
-#endif
+#define PAGE_SIZE           (_AC(1,L) << PAGE_SHIFT)
 #define PAGE_MASK           (~(PAGE_SIZE-1))
 #define PAGE_FLAG_MASK      (~0)
 
