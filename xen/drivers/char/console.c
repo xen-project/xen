@@ -18,7 +18,6 @@
 #include <xen/serial.h>
 #include <xen/softirq.h>
 #include <xen/keyhandler.h>
-#include <xen/delay.h>
 #include <xen/guest_access.h>
 #include <xen/watchdog.h>
 #include <xen/shutdown.h>
@@ -30,6 +29,7 @@
 #include <asm/div64.h>
 #include <xen/hypercall.h> /* for do_console_io */
 #include <xen/early_printk.h>
+#include <xen/warning.h>
 
 /* console: comma-separated list of console outputs. */
 static char __initdata opt_console[30] = OPT_CONSOLE_STR;
@@ -45,6 +45,12 @@ string_param("conswitch", opt_conswitch);
 /* sync_console: force synchronous console output (useful for debugging). */
 static bool_t __initdata opt_sync_console;
 boolean_param("sync_console", opt_sync_console);
+static const char __initconst warning_sync_console[] =
+    "WARNING: CONSOLE OUTPUT IS SYNCHRONOUS\n"
+    "This option is intended to aid debugging of Xen by ensuring\n"
+    "that all output is synchronously delivered on the serial line.\n"
+    "However it can introduce SIGNIFICANT latencies and affect\n"
+    "timekeeping. It is NOT recommended for production use!\n";
 
 /* console_to_ring: send guest (incl. dom 0) console data to console ring. */
 static bool_t __read_mostly opt_console_to_ring;
@@ -740,6 +746,7 @@ void __init console_init_preirq(void)
         serial_start_sync(sercon_handle);
         add_taint(TAINT_SYNC_CONSOLE);
         printk("Console output is synchronous.\n");
+        warning_add(warning_sync_console);
     }
 }
 
@@ -787,8 +794,6 @@ void __init console_init_postirq(void)
 
 void __init console_endboot(void)
 {
-    int i, j;
-
     printk("Std. Loglevel: %s", loglvl_str(xenlog_lower_thresh));
     if ( xenlog_upper_thresh != xenlog_lower_thresh )
         printk(" (Rate-limited: %s)", loglvl_str(xenlog_upper_thresh));
@@ -798,31 +803,6 @@ void __init console_endboot(void)
     printk("\n");
 
     warning_print();
-
-    if ( opt_sync_console )
-    {
-        printk("**********************************************\n");
-        printk("******* WARNING: CONSOLE OUTPUT IS SYNCHRONOUS\n");
-        printk("******* This option is intended to aid debugging "
-               "of Xen by ensuring\n");
-        printk("******* that all output is synchronously delivered "
-               "on the serial line.\n");
-        printk("******* However it can introduce SIGNIFICANT latencies "
-               "and affect\n");
-        printk("******* timekeeping. It is NOT recommended for "
-               "production use!\n");
-        printk("**********************************************\n");
-        for ( i = 0; i < 3; i++ )
-        {
-            printk("%d... ", 3-i);
-            for ( j = 0; j < 100; j++ )
-            {
-                process_pending_softirqs();
-                mdelay(10);
-            }
-        }
-        printk("\n");
-    }
 
     video_endboot();
 
