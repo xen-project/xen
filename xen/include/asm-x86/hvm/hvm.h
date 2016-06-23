@@ -27,7 +27,7 @@
 #include <public/hvm/save.h>
 #include <xen/mm.h>
 
-#ifndef NDEBUG
+#ifdef CONFIG_HVM_FEP
 /* Permit use of the Forced Emulation Prefix in HVM guests */
 extern bool_t opt_hvm_fep;
 #else

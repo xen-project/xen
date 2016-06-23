@@ -142,6 +142,7 @@ uint64_t muldiv64(uint64_t a, uint32_t b, uint32_t c);
 #define TAINT_BAD_PAGE                  (1<<2)
 #define TAINT_SYNC_CONSOLE              (1<<3)
 #define TAINT_ERROR_INJECT              (1<<4)
+#define TAINT_HVM_FEP                   (1<<5)
 extern int tainted;
 #define TAINT_STRING_MAX_LEN            20
 extern char *print_tainted(char *str);

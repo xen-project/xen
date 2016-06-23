@@ -175,6 +175,7 @@ int __init parse_bool(const char *s)
  *  'M' - Machine had a machine check experience.
  *  'B' - System has hit bad_page.
  *  'C' - Console output is synchronous.
+ *  'H' - HVM forced emulation prefix is permitted.
  *
  *      The string is overwritten by the next call to print_taint().
  */
@@ -182,11 +183,12 @@ char *print_tainted(char *str)
 {
     if ( tainted )
     {
-        snprintf(str, TAINT_STRING_MAX_LEN, "Tainted: %c%c%c%c",
+        snprintf(str, TAINT_STRING_MAX_LEN, "Tainted: %c%c%c%c%c",
                  tainted & TAINT_UNSAFE_SMP ? 'S' : ' ',
                  tainted & TAINT_MACHINE_CHECK ? 'M' : ' ',
                  tainted & TAINT_BAD_PAGE ? 'B' : ' ',
-                 tainted & TAINT_SYNC_CONSOLE ? 'C' : ' ');
+                 tainted & TAINT_SYNC_CONSOLE ? 'C' : ' ',
+                 tainted & TAINT_HVM_FEP ? 'H' : ' ');
     }
     else
     {

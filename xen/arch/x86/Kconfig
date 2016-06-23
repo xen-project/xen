@@ -59,6 +59,23 @@ config BIGMEM
 
 	  If unsure, say N.
 
+config HVM_FEP
+	bool "HVM Forced Emulation Prefix support" if EXPERT = "y"
+	default DEBUG
+	---help---
+
+	  Compiles in a feature that allows HVM guest to arbitrarily
+	  exercise the instruction emulator.
+
+	  This feature can only be enabled during boot time with
+	  appropriate hypervisor command line option. Please read
+	  hypervisor command line documentation before trying to use
+	  this feature.
+
+	  This is strictly for testing purposes, and not appropriate
+	  for use in production.
+
+	  If unsure, say N.
 endmenu
 
 source "common/Kconfig"

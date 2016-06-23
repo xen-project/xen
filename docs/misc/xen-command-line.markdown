@@ -886,8 +886,12 @@ Recognized in debug builds of the hypervisor only.
 Allow use of the Forced Emulation Prefix in HVM guests, to allow emulation of
 arbitrary instructions.
 
-This option is intended for development purposes, and is only available in
-debug builds of the hypervisor.
+This option is intended for development and testing purposes.
+
+*Warning*
+As this feature opens up the instruction emulator to arbitrary
+instruction from an HVM guest, don't use this in production system. No
+security support is provided when this flag is set.
 
 ### hvm\_port80
 > `= <boolean>`

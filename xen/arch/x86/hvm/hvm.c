@@ -37,6 +37,7 @@
 #include <xen/mem_access.h>
 #include <xen/rangeset.h>
 #include <xen/vm_event.h>
+#include <xen/warning.h>
 #include <asm/shadow.h>
 #include <asm/hap.h>
 #include <asm/current.h>
@@ -97,9 +98,14 @@ boolean_param("hap", opt_hap_enabled);
 
 #ifndef opt_hvm_fep
 /* Permit use of the Forced Emulation Prefix in HVM guests */
-bool_t opt_hvm_fep;
+bool_t __read_mostly opt_hvm_fep;
 boolean_param("hvm_fep", opt_hvm_fep);
 #endif
+static const char __initconst warning_hvm_fep[] =
+    "WARNING: HVM FORCED EMULATION PREFIX IS AVAILABLE\n"
+    "This option is *ONLY* intended to aid testing of Xen.\n"
+    "It has implications on the security of the system.\n"
+    "Please *DO NOT* use this in production.\n";
 
 /* Xen command-line option to enable altp2m */
 static bool_t __initdata opt_altp2m_enabled = 0;
@@ -181,6 +187,9 @@ static int __init hvm_enable(void)
 
     if ( !opt_altp2m_enabled )
         hvm_funcs.altp2m_supported = 0;
+
+    if ( opt_hvm_fep )
+        warning_add(warning_hvm_fep);
 
     /*
      * Allow direct access to the PC debug ports 0x80 and 0xed (they are
@@ -3910,6 +3919,7 @@ void hvm_ud_intercept(struct cpu_user_regs *regs)
         {
             regs->eip += sizeof(sig);
             regs->eflags &= ~X86_EFLAGS_RF;
+            add_taint(TAINT_HVM_FEP);
         }
     }
 
