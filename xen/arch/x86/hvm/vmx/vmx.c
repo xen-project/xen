@@ -321,20 +321,23 @@ static void vmx_vcpu_destroy(struct vcpu *v)
 
 static DEFINE_PER_CPU(struct vmx_msr_state, host_msr_state);
 
-static const u32 msr_index[] =
+static const u32 msr_index[VMX_MSR_COUNT] =
 {
-    MSR_LSTAR, MSR_STAR, MSR_SYSCALL_MASK
+    [VMX_INDEX_MSR_LSTAR]        = MSR_LSTAR,
+    [VMX_INDEX_MSR_STAR]         = MSR_STAR,
+    [VMX_INDEX_MSR_SYSCALL_MASK] = MSR_SYSCALL_MASK
 };
-
-#define MSR_INDEX_SIZE (ARRAY_SIZE(msr_index))
 
 void vmx_save_host_msrs(void)
 {
     struct vmx_msr_state *host_msr_state = &this_cpu(host_msr_state);
-    int i;
+    unsigned int i;
 
-    for ( i = 0; i < MSR_INDEX_SIZE; i++ )
+    for ( i = 0; i < ARRAY_SIZE(msr_index); i++ )
+    {
+        ASSERT(msr_index[i]);
         rdmsrl(msr_index[i], host_msr_state->msrs[i]);
+    }
 }
 
 #define WRITE_MSR(address) do {                                         \
