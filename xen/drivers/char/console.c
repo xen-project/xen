@@ -25,6 +25,7 @@
 #include <xen/video.h>
 #include <xen/kexec.h>
 #include <xen/ctype.h>
+#include <xen/warning.h>
 #include <asm/debugger.h>
 #include <asm/div64.h>
 #include <xen/hypercall.h> /* for do_console_io */
@@ -795,6 +796,8 @@ void __init console_endboot(void)
     if ( xenlog_guest_upper_thresh != xenlog_guest_lower_thresh )
         printk(" (Rate-limited: %s)", loglvl_str(xenlog_guest_upper_thresh));
     printk("\n");
+
+    warning_print();
 
     if ( opt_sync_console )
     {
