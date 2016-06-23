@@ -264,7 +264,7 @@ int guest_remove_page(struct domain *d, unsigned long gmfn)
         return 1;
     }
 #else
-    mfn = gmfn_to_mfn(d, gmfn);
+    mfn = mfn_x(gfn_to_mfn(d, _gfn(gmfn)));
 #endif
     if ( unlikely(!mfn_valid(mfn)) )
     {
@@ -488,7 +488,7 @@ static long memory_exchange(XEN_GUEST_HANDLE_PARAM(xen_memory_exchange_t) arg)
                     goto fail; 
                 }
 #else /* !CONFIG_X86 */
-                mfn = gmfn_to_mfn(d, gmfn + k);
+                mfn = mfn_x(gfn_to_mfn(d, _gfn(gmfn + k)));
 #endif
                 if ( unlikely(!mfn_valid(mfn)) )
                 {

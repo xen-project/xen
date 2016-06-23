@@ -256,7 +256,7 @@ static int __get_paged_frame(unsigned long gfn, unsigned long *frame, struct pag
     }
     *frame = page_to_mfn(*page);
 #else
-    *frame = gmfn_to_mfn(rd, gfn);
+    *frame = mfn_x(gfn_to_mfn(rd, _gfn(gfn)));
     *page = mfn_valid(*frame) ? mfn_to_page(*frame) : NULL;
     if ( (!(*page)) || (!get_page(*page, rd)) )
     {
@@ -1788,7 +1788,7 @@ gnttab_transfer(
                 mfn = INVALID_MFN;
         }
 #else
-        mfn = gmfn_to_mfn(d, gop.mfn);
+        mfn = mfn_x(gfn_to_mfn(d, _gfn(gop.mfn)));
 #endif
 
         /* Check the passed page frame for basic validity. */

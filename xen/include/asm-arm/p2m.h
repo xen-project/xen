@@ -178,7 +178,7 @@ void guest_physmap_remove_page(struct domain *d,
                                unsigned long gpfn,
                                unsigned long mfn, unsigned int page_order);
 
-unsigned long gmfn_to_mfn(struct domain *d, unsigned long gpfn);
+mfn_t gfn_to_mfn(struct domain *d, gfn_t gfn);
 
 /*
  * Populate-on-demand

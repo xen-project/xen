@@ -1481,10 +1481,10 @@ int p2m_cache_flush(struct domain *d, xen_pfn_t start_mfn, xen_pfn_t end_mfn)
                              d->arch.p2m.default_access);
 }
 
-unsigned long gmfn_to_mfn(struct domain *d, unsigned long gpfn)
+mfn_t gfn_to_mfn(struct domain *d, gfn_t gfn)
 {
-    paddr_t p = p2m_lookup(d, pfn_to_paddr(gpfn), NULL);
-    return p >> PAGE_SHIFT;
+    paddr_t p = p2m_lookup(d, pfn_to_paddr(gfn_x(gfn)), NULL);
+    return _mfn(p >> PAGE_SHIFT);
 }
 
 /*
