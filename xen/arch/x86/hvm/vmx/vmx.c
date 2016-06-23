@@ -339,9 +339,9 @@ void vmx_save_host_msrs(void)
 
 #define WRITE_MSR(address) do {                                         \
         guest_msr_state->msrs[VMX_INDEX_MSR_ ## address] = msr_content; \
-        set_bit(VMX_INDEX_MSR_ ## address, &guest_msr_state->flags);    \
+        __set_bit(VMX_INDEX_MSR_ ## address, &guest_msr_state->flags);  \
         wrmsrl(MSR_ ## address, msr_content);                           \
-        set_bit(VMX_INDEX_MSR_ ## address, &host_msr_state->flags);     \
+        __set_bit(VMX_INDEX_MSR_ ## address, &host_msr_state->flags);   \
     } while ( 0 )
 
 static enum handler_return
@@ -462,7 +462,7 @@ static void vmx_restore_host_msrs(void)
     {
         i = find_first_set_bit(host_msr_state->flags);
         wrmsrl(msr_index[i], host_msr_state->msrs[i]);
-        clear_bit(i, &host_msr_state->flags);
+        __clear_bit(i, &host_msr_state->flags);
     }
 }
 
@@ -495,9 +495,9 @@ static void vmx_restore_guest_msrs(struct vcpu *v)
         HVM_DBG_LOG(DBG_LEVEL_2,
                     "restore guest's index %d msr %x with value %lx",
                     i, msr_index[i], guest_msr_state->msrs[i]);
-        set_bit(i, &host_msr_state->flags);
+        __set_bit(i, &host_msr_state->flags);
         wrmsrl(msr_index[i], guest_msr_state->msrs[i]);
-        clear_bit(i, &guest_flags);
+        __clear_bit(i, &guest_flags);
     }
 
     if ( (v->arch.hvm_vcpu.guest_efer ^ read_efer()) & EFER_SCE )
