@@ -78,7 +78,14 @@ static int cpuid(
     unsigned int *edx,
     struct x86_emulate_ctxt *ctxt)
 {
+    unsigned int leaf = *eax;
+
     asm ("cpuid" : "+a" (*eax), "+c" (*ecx), "=d" (*edx), "=b" (*ebx));
+
+    /* The emulator doesn't itself use MOVBE, so we can always run the test. */
+    if ( leaf == 1 )
+        *ecx |= 1U << 22;
+
     return X86EMUL_OKAY;
 }
 
@@ -604,6 +611,34 @@ int main(int argc, char **argv)
 #else
     printf("skipped\n");
 #endif
+
+    printf("%-40s", "Testing movbe (%%ecx),%%eax...");
+    instr[0] = 0x0f; instr[1] = 0x38; instr[2] = 0xf0; instr[3] = 0x01;
+    regs.eflags = 0x200;
+    regs.eip    = (unsigned long)&instr[0];
+    regs.ecx    = (unsigned long)res;
+    regs.eax    = 0x11111111;
+    *res        = 0x12345678;
+    rc = x86_emulate(&ctxt, &emulops);
+    if ( (rc != X86EMUL_OKAY) ||
+         (*res != 0x12345678) ||
+         (regs.eax != 0x78563412) ||
+         (regs.eflags != 0x200) ||
+         (regs.eip != (unsigned long)&instr[4]) )
+        goto fail;
+    printf("okay\n");
+
+    printf("%-40s", "Testing movbe %%ax,(%%ecx)...");
+    instr[0] = 0x66; instr[1] = 0x0f; instr[2] = 0x38; instr[3] = 0xf1; instr[4] = 0x01;
+    regs.eip = (unsigned long)&instr[0];
+    rc = x86_emulate(&ctxt, &emulops);
+    if ( (rc != X86EMUL_OKAY) ||
+         (*res != 0x12341234) ||
+         (regs.eax != 0x78563412) ||
+         (regs.eflags != 0x200) ||
+         (regs.eip != (unsigned long)&instr[5]) )
+        goto fail;
+    printf("okay\n");
 
 #define decl_insn(which) extern const unsigned char which[], which##_len[]
 #define put_insn(which, insn) ".pushsection .test, \"ax\", @progbits\n" \

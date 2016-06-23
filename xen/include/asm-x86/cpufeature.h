@@ -58,6 +58,7 @@ XEN_CPUFEATURE(APERFMPERF,      (FSCAPINTS+0)*32+ 8) /* APERFMPERF */
 #define cpu_has_sse		boot_cpu_has(X86_FEATURE_SSE)
 #define cpu_has_sse2		boot_cpu_has(X86_FEATURE_SSE2)
 #define cpu_has_sse3		boot_cpu_has(X86_FEATURE_SSE3)
+#define cpu_has_sse4_2		boot_cpu_has(X86_FEATURE_SSE4_2)
 #define cpu_has_htt		boot_cpu_has(X86_FEATURE_HTT)
 #define cpu_has_nx		boot_cpu_has(X86_FEATURE_NX)
 #define cpu_has_clflush		boot_cpu_has(X86_FEATURE_CLFLUSH)

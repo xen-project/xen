@@ -188,7 +188,7 @@ static uint8_t twobyte_table[256] = {
     ImplicitOps, ImplicitOps, ImplicitOps, 0,
     ImplicitOps, ImplicitOps, 0, 0,
     /* 0x38 - 0x3F */
-    0, 0, 0, 0, 0, 0, 0, 0,
+    DstReg|SrcMem|ModRM, 0, 0, 0, 0, 0, 0, 0,
     /* 0x40 - 0x47 */
     DstReg|SrcMem|ModRM|Mov, DstReg|SrcMem|ModRM|Mov,
     DstReg|SrcMem|ModRM|Mov, DstReg|SrcMem|ModRM|Mov,
@@ -1098,6 +1098,8 @@ static bool_t vcpu_has(
 #define vcpu_must_have_sse2() vcpu_must_have(0x00000001, EDX, 26)
 #define vcpu_must_have_sse3() vcpu_must_have(0x00000001, ECX,  0)
 #define vcpu_must_have_cx16() vcpu_must_have(0x00000001, ECX, 13)
+#define vcpu_must_have_sse4_2() vcpu_must_have(0x00000001, ECX, 20)
+#define vcpu_must_have_movbe() vcpu_must_have(0x00000001, ECX, 22)
 #define vcpu_must_have_avx()  vcpu_must_have(0x00000001, ECX, 28)
 
 #ifdef __XEN__
@@ -1509,8 +1511,9 @@ x86_emulate(
     /* Shadow copy of register state. Committed on successful emulation. */
     struct cpu_user_regs _regs = *ctxt->regs;
 
-    uint8_t b, d, sib, sib_index, sib_base, twobyte = 0, rex_prefix = 0;
+    uint8_t b, d, sib, sib_index, sib_base, rex_prefix = 0;
     uint8_t modrm = 0, modrm_mod = 0, modrm_reg = 0, modrm_rm = 0;
+    enum { ext_none, ext_0f, ext_0f38 } ext = ext_none;
     union vex vex = {};
     unsigned int op_bytes, def_op_bytes, ad_bytes, def_ad_bytes;
     bool_t lock_prefix = 0;
@@ -1606,9 +1609,18 @@ x86_emulate(
         /* Two-byte opcode? */
         if ( b == 0x0f )
         {
-            twobyte = 1;
             b = insn_fetch_type(uint8_t);
             d = twobyte_table[b];
+            switch ( b )
+            {
+            default:
+                ext = ext_0f;
+                break;
+            case 0x38:
+                b = insn_fetch_type(uint8_t);
+                ext = ext_0f38;
+                break;
+            }
         }
 
         /* Unrecognised? */
@@ -1625,7 +1637,7 @@ x86_emulate(
         modrm = insn_fetch_type(uint8_t);
         modrm_mod = (modrm & 0xc0) >> 6;
 
-        if ( !twobyte && ((b & ~1) == 0xc4) )
+        if ( !ext && ((b & ~1) == 0xc4) )
             switch ( def_ad_bytes )
             {
             default:
@@ -1671,12 +1683,12 @@ x86_emulate(
                     rex_prefix |= REX_R;
 
                 fail_if(vex.opcx != vex_0f);
-                twobyte = 1;
+                ext = ext_0f;
                 b = insn_fetch_type(uint8_t);
                 d = twobyte_table[b];
 
                 /* Unrecognised? */
-                if ( d == 0 )
+                if ( d == 0 || b == 0x38 )
                     goto cannot_emulate;
 
                 modrm = insn_fetch_type(uint8_t);
@@ -1762,7 +1774,7 @@ x86_emulate(
                 {
                     ea.mem.seg  = x86_seg_ss;
                     ea.mem.off += _regs.esp;
-                    if ( !twobyte && (b == 0x8f) )
+                    if ( !ext && (b == 0x8f) )
                         /* POP <rm> computes its EA post increment. */
                         ea.mem.off += ((mode_64bit() && (op_bytes == 4))
                                        ? 8 : op_bytes);
@@ -1797,12 +1809,12 @@ x86_emulate(
                         ((op_bytes == 8) ? 4 : op_bytes);
                 else if ( (d & SrcMask) == SrcImmByte )
                     ea.mem.off += 1;
-                else if ( !twobyte && ((b & 0xfe) == 0xf6) &&
+                else if ( !ext && ((b & 0xfe) == 0xf6) &&
                           ((modrm_reg & 7) <= 1) )
                     /* Special case in Grp3: test has immediate operand. */
                     ea.mem.off += (d & ByteOp) ? 1
                         : ((op_bytes == 8) ? 4 : op_bytes);
-                else if ( twobyte && ((b & 0xf7) == 0xa4) )
+                else if ( ext == ext_0f && ((b & 0xf7) == 0xa4) )
                     /* SHLD/SHRD with immediate byte third operand. */
                     ea.mem.off++;
                 break;
@@ -1821,7 +1833,9 @@ x86_emulate(
         ea.mem.seg = override_seg;
 
     /* Early operand adjustments. */
-    if ( !twobyte )
+    switch ( ext )
+    {
+    case ext_none:
         switch ( b )
         {
         case 0xf6 ... 0xf7: /* Grp3 */
@@ -1854,6 +1868,29 @@ x86_emulate(
             }
             break;
         }
+        break;
+
+    case ext_0f:
+        break;
+
+    case ext_0f38:
+        switch ( b )
+        {
+        case 0xf0: /* movbe / crc32 */
+            d |= repne_prefix() ? ByteOp : Mov;
+            break;
+        case 0xf1: /* movbe / crc32 */
+            if ( !repne_prefix() )
+                d = (d & ~(DstMask | SrcMask)) | DstMem | SrcReg | Mov;
+            break;
+        default: /* Until it is worth making this table based ... */
+            goto cannot_emulate;
+        }
+        break;
+
+    default:
+        ASSERT_UNREACHABLE();
+    }
 
     /* Decode and fetch the source operand: register, memory or immediate. */
     switch ( d & SrcMask )
@@ -2012,8 +2049,18 @@ x86_emulate(
         break;
     }
 
-    if ( twobyte )
-        goto twobyte_insn;
+    switch ( ext )
+    {
+    case ext_none:
+        break;
+    case ext_0f:
+        goto ext_0f_insn;
+    case ext_0f38:
+        goto ext_0f38_insn;
+    default:
+        ASSERT_UNREACHABLE();
+        goto cannot_emulate;
+    }
 
     switch ( b )
     {
@@ -2056,7 +2103,7 @@ x86_emulate(
         struct segment_register reg;
         src.val = x86_seg_es;
     push_seg:
-        generate_exception_if(mode_64bit() && !twobyte, EXC_UD, -1);
+        generate_exception_if(mode_64bit() && !ext, EXC_UD, -1);
         fail_if(ops->read_segment == NULL);
         if ( (rc = ops->read_segment(src.val, &reg, ctxt)) != 0 )
             return rc;
@@ -2072,7 +2119,7 @@ x86_emulate(
     case 0x07: /* pop %%es */
         src.val = x86_seg_es;
     pop_seg:
-        generate_exception_if(mode_64bit() && !twobyte, EXC_UD, -1);
+        generate_exception_if(mode_64bit() && !ext, EXC_UD, -1);
         fail_if(ops->write_segment == NULL);
         /* 64-bit mode: POP defaults to a 64-bit operand. */
         if ( mode_64bit() && (op_bytes == 4) )
@@ -2727,7 +2774,7 @@ x86_emulate(
         unsigned long sel;
         dst.val = x86_seg_es;
     les: /* dst.val identifies the segment */
-        generate_exception_if(mode_64bit() && !twobyte, EXC_UD, -1);
+        generate_exception_if(mode_64bit() && !ext, EXC_UD, -1);
         generate_exception_if(src.type != OP_MEM, EXC_UD, -1);
         if ( (rc = read_ulong(src.mem.seg, src.mem.off + src.bytes,
                               &sel, 2, ctxt, ops)) != 0 )
@@ -3865,7 +3912,7 @@ x86_emulate(
     put_stub(stub);
     return rc;
 
- twobyte_insn:
+ ext_0f_insn:
     switch ( b )
     {
     case 0x00: /* Grp6 */
@@ -4769,6 +4816,72 @@ x86_emulate(
             break;
         }
         break;
+    }
+    goto writeback;
+
+ ext_0f38_insn:
+    switch ( b )
+    {
+    case 0xf0: case 0xf1: /* movbe / crc32 */
+        generate_exception_if(repe_prefix(), EXC_UD, -1);
+        if ( repne_prefix() )
+        {
+            /* crc32 */
+#ifdef HAVE_GAS_SSE4_2
+            host_and_vcpu_must_have(sse4_2);
+            dst.bytes = rex_prefix & REX_W ? 8 : 4;
+            switch ( op_bytes )
+            {
+            case 1:
+                asm ( "crc32b %1,%k0" : "+r" (dst.val)
+                                      : "qm" (*(uint8_t *)&src.val) );
+                break;
+            case 2:
+                asm ( "crc32w %1,%k0" : "+r" (dst.val)
+                                      : "rm" (*(uint16_t *)&src.val) );
+                break;
+            case 4:
+                asm ( "crc32l %1,%k0" : "+r" (dst.val)
+                                      : "rm" (*(uint32_t *)&src.val) );
+                break;
+# ifdef __x86_64__
+            case 8:
+                asm ( "crc32q %1,%0" : "+r" (dst.val) : "rm" (src.val) );
+                break;
+# endif
+            default:
+                ASSERT_UNREACHABLE();
+            }
+#else /* !HAVE_GAS_SSE4_2 */
+            goto cannot_emulate;
+#endif
+        }
+        else
+        {
+            /* movbe */
+            vcpu_must_have_movbe();
+            switch ( op_bytes )
+            {
+            case 2:
+                asm ( "xchg %h0,%b0" : "=Q" (dst.val)
+                                     : "0" (*(uint32_t *)&src.val) );
+                break;
+            case 4:
+#ifdef __x86_64__
+                asm ( "bswap %k0" : "=r" (dst.val)
+                                  : "0" (*(uint32_t *)&src.val) );
+                break;
+            case 8:
+#endif
+                asm ( "bswap %0" : "=r" (dst.val) : "0" (src.val) );
+                break;
+            default:
+                ASSERT_UNREACHABLE();
+            }
+        }
+        break;
+    default:
+        goto cannot_emulate;
     }
     goto writeback;
 
