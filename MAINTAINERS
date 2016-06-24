@@ -171,6 +171,7 @@ F:	xen/drivers/char/arm-uart.c
 F:	xen/drivers/char/exynos4210-uart.c
 F:	xen/drivers/char/omap-uart.c
 F:	xen/drivers/char/pl011.c
+F:	xen/drivers/char/scif-uart.c
 F:	xen/drivers/passthrough/arm/
 
 CPU POOLS
