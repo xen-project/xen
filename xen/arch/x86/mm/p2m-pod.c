@@ -559,7 +559,7 @@ p2m_pod_decrease_reservation(struct domain *d,
     {
         /* All PoD: Mark the whole region invalid and tell caller
          * we're done. */
-        p2m_set_entry(p2m, gpfn, _mfn(INVALID_MFN), order, p2m_invalid,
+        p2m_set_entry(p2m, gpfn, INVALID_MFN, order, p2m_invalid,
                       p2m->default_access);
         p2m->pod.entry_count-=(1<<order);
         BUG_ON(p2m->pod.entry_count < 0);
@@ -602,7 +602,7 @@ p2m_pod_decrease_reservation(struct domain *d,
         n = 1UL << cur_order;
         if ( t == p2m_populate_on_demand )
         {
-            p2m_set_entry(p2m, gpfn + i, _mfn(INVALID_MFN), cur_order,
+            p2m_set_entry(p2m, gpfn + i, INVALID_MFN, cur_order,
                           p2m_invalid, p2m->default_access);
             p2m->pod.entry_count -= n;
             BUG_ON(p2m->pod.entry_count < 0);
@@ -624,7 +624,7 @@ p2m_pod_decrease_reservation(struct domain *d,
 
             page = mfn_to_page(mfn);
 
-            p2m_set_entry(p2m, gpfn + i, _mfn(INVALID_MFN), cur_order,
+            p2m_set_entry(p2m, gpfn + i, INVALID_MFN, cur_order,
                           p2m_invalid, p2m->default_access);
             p2m_tlb_flush_sync(p2m);
             for ( j = 0; j < n; ++j )
@@ -671,7 +671,7 @@ void p2m_pod_dump_data(struct domain *d)
 static int
 p2m_pod_zero_check_superpage(struct p2m_domain *p2m, unsigned long gfn)
 {
-    mfn_t mfn, mfn0 = _mfn(INVALID_MFN);
+    mfn_t mfn, mfn0 = INVALID_MFN;
     p2m_type_t type, type0 = 0;
     unsigned long * map = NULL;
     int ret=0, reset = 0;
@@ -754,7 +754,7 @@ p2m_pod_zero_check_superpage(struct p2m_domain *p2m, unsigned long gfn)
     }
 
     /* Try to remove the page, restoring old mapping if it fails. */
-    p2m_set_entry(p2m, gfn, _mfn(INVALID_MFN), PAGE_ORDER_2M,
+    p2m_set_entry(p2m, gfn, INVALID_MFN, PAGE_ORDER_2M,
                   p2m_populate_on_demand, p2m->default_access);
     p2m_tlb_flush_sync(p2m);
 
@@ -871,7 +871,7 @@ p2m_pod_zero_check(struct p2m_domain *p2m, unsigned long *gfns, int count)
         }
 
         /* Try to remove the page, restoring old mapping if it fails. */
-        p2m_set_entry(p2m, gfns[i], _mfn(INVALID_MFN), PAGE_ORDER_4K,
+        p2m_set_entry(p2m, gfns[i], INVALID_MFN, PAGE_ORDER_4K,
                       p2m_populate_on_demand, p2m->default_access);
 
         /* See if the page was successfully unmapped.  (Allow one refcount
@@ -1073,7 +1073,7 @@ p2m_pod_demand_populate(struct p2m_domain *p2m, unsigned long gfn,
          * NOTE: In a fine-grained p2m locking scenario this operation
          * may need to promote its locking from gfn->1g superpage
          */
-        p2m_set_entry(p2m, gfn_aligned, _mfn(INVALID_MFN), PAGE_ORDER_2M,
+        p2m_set_entry(p2m, gfn_aligned, INVALID_MFN, PAGE_ORDER_2M,
                       p2m_populate_on_demand, p2m->default_access);
         return 0;
     }
@@ -1157,7 +1157,7 @@ remap_and_retry:
      * need promoting the gfn lock from gfn->2M superpage */
     gfn_aligned = (gfn>>order)<<order;
     for(i=0; i<(1<<order); i++)
-        p2m_set_entry(p2m, gfn_aligned + i, _mfn(INVALID_MFN), PAGE_ORDER_4K,
+        p2m_set_entry(p2m, gfn_aligned + i, INVALID_MFN, PAGE_ORDER_4K,
                       p2m_populate_on_demand, p2m->default_access);
     if ( tb_init_done )
     {
@@ -1215,7 +1215,7 @@ guest_physmap_mark_populate_on_demand(struct domain *d, unsigned long gfn,
     }
 
     /* Now, actually do the two-way mapping */
-    rc = p2m_set_entry(p2m, gfn, _mfn(INVALID_MFN), order,
+    rc = p2m_set_entry(p2m, gfn, INVALID_MFN, order,
                        p2m_populate_on_demand, p2m->default_access);
     if ( rc == 0 )
     {

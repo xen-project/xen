@@ -1461,7 +1461,7 @@ int relinquish_p2m_mapping(struct domain *d)
     return apply_p2m_changes(d, RELINQUISH,
                               pfn_to_paddr(p2m->lowest_mapped_gfn),
                               pfn_to_paddr(p2m->max_mapped_gfn),
-                              pfn_to_paddr(INVALID_MFN),
+                              pfn_to_paddr(mfn_x(INVALID_MFN)),
                               MATTR_MEM, 0, p2m_invalid,
                               d->arch.p2m.default_access);
 }
@@ -1476,7 +1476,7 @@ int p2m_cache_flush(struct domain *d, xen_pfn_t start_mfn, xen_pfn_t end_mfn)
     return apply_p2m_changes(d, CACHEFLUSH,
                              pfn_to_paddr(start_mfn),
                              pfn_to_paddr(end_mfn),
-                             pfn_to_paddr(INVALID_MFN),
+                             pfn_to_paddr(mfn_x(INVALID_MFN)),
                              MATTR_MEM, 0, p2m_invalid,
                              d->arch.p2m.default_access);
 }

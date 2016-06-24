@@ -1455,7 +1455,7 @@ long do_mca(XEN_GUEST_HANDLE_PARAM(xen_mc_t) u_xen_mc)
                 gfn = PFN_DOWN(gaddr);
                 mfn = mfn_x(get_gfn(d, gfn, &t));
 
-                if ( mfn == INVALID_MFN )
+                if ( mfn == mfn_x(INVALID_MFN) )
                 {
                     put_gfn(d, gfn);
                     put_domain(d);

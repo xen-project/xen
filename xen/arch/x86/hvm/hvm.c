@@ -1794,7 +1794,7 @@ int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
         p2m = hostp2m;
 
     /* Check access permissions first, then handle faults */
-    if ( mfn_x(mfn) != INVALID_MFN )
+    if ( !mfn_eq(mfn, INVALID_MFN) )
     {
         bool_t violation;
 
@@ -5297,8 +5297,8 @@ static int do_altp2m_op(
             rc = -EINVAL;
 
         if ( (gfn_x(vcpu_altp2m(curr).veinfo_gfn) != INVALID_GFN) ||
-             (mfn_x(get_gfn_query_unlocked(curr->domain,
-                    a.u.enable_notify.gfn, &p2mt)) == INVALID_MFN) )
+             mfn_eq(get_gfn_query_unlocked(curr->domain,
+                    a.u.enable_notify.gfn, &p2mt), INVALID_MFN) )
             return -EINVAL;
 
         vcpu_altp2m(curr).veinfo_gfn = _gfn(a.u.enable_notify.gfn);

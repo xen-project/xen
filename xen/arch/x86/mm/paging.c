@@ -67,7 +67,7 @@ static mfn_t paging_new_log_dirty_page(struct domain *d)
     if ( unlikely(page == NULL) )
     {
         d->arch.paging.log_dirty.failed_allocs++;
-        return _mfn(INVALID_MFN);
+        return INVALID_MFN;
     }
 
     d->arch.paging.log_dirty.allocs++;
@@ -95,7 +95,7 @@ static mfn_t paging_new_log_dirty_node(struct domain *d)
         int i;
         mfn_t *node = map_domain_page(mfn);
         for ( i = 0; i < LOGDIRTY_NODE_ENTRIES; i++ )
-            node[i] = _mfn(INVALID_MFN);
+            node[i] = INVALID_MFN;
         unmap_domain_page(node);
     }
     return mfn;
@@ -167,7 +167,7 @@ static int paging_free_log_dirty_bitmap(struct domain *d, int rc)
 
             unmap_domain_page(l2);
             paging_free_log_dirty_page(d, l3[i3]);
-            l3[i3] = _mfn(INVALID_MFN);
+            l3[i3] = INVALID_MFN;
 
             if ( i3 < LOGDIRTY_NODE_ENTRIES - 1 && hypercall_preempt_check() )
             {
@@ -182,7 +182,7 @@ static int paging_free_log_dirty_bitmap(struct domain *d, int rc)
         if ( rc )
             break;
         paging_free_log_dirty_page(d, l4[i4]);
-        l4[i4] = _mfn(INVALID_MFN);
+        l4[i4] = INVALID_MFN;
 
         if ( i4 < LOGDIRTY_NODE_ENTRIES - 1 && hypercall_preempt_check() )
         {
@@ -198,7 +198,7 @@ static int paging_free_log_dirty_bitmap(struct domain *d, int rc)
     if ( !rc )
     {
         paging_free_log_dirty_page(d, d->arch.paging.log_dirty.top);
-        d->arch.paging.log_dirty.top = _mfn(INVALID_MFN);
+        d->arch.paging.log_dirty.top = INVALID_MFN;
 
         ASSERT(d->arch.paging.log_dirty.allocs == 0);
         d->arch.paging.log_dirty.failed_allocs = 0;
@@ -660,7 +660,7 @@ int paging_domain_init(struct domain *d, unsigned int domcr_flags)
     /* This must be initialized separately from the rest of the
      * log-dirty init code as that can be called more than once and we
      * don't want to leak any active log-dirty bitmaps */
-    d->arch.paging.log_dirty.top = _mfn(INVALID_MFN);
+    d->arch.paging.log_dirty.top = INVALID_MFN;
 
     /*
      * Shadow pagetables are the default, but we will use

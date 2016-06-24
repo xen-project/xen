@@ -177,7 +177,7 @@ sh_walk_guest_tables(struct vcpu *v, unsigned long va, walk_t *gw,
 {
     return guest_walk_tables(v, p2m_get_hostp2m(v->domain), va, gw, pfec,
 #if GUEST_PAGING_LEVELS == 3 /* PAE */
-                             _mfn(INVALID_MFN),
+                             INVALID_MFN,
                              v->arch.paging.shadow.gl3e
 #else /* 32 or 64 */
                              pagetable_get_mfn(v->arch.guest_table),
@@ -336,32 +336,32 @@ static void sh_audit_gw(struct vcpu *v, walk_t *gw)
     if ( mfn_valid(gw->l4mfn)
          && mfn_valid((smfn = get_shadow_status(d, gw->l4mfn,
                                                 SH_type_l4_shadow))) )
-        (void) sh_audit_l4_table(v, smfn, _mfn(INVALID_MFN));
+        (void) sh_audit_l4_table(v, smfn, INVALID_MFN);
     if ( mfn_valid(gw->l3mfn)
          && mfn_valid((smfn = get_shadow_status(d, gw->l3mfn,
                                                 SH_type_l3_shadow))) )
-        (void) sh_audit_l3_table(v, smfn, _mfn(INVALID_MFN));
+        (void) sh_audit_l3_table(v, smfn, INVALID_MFN);
 #endif /* PAE or 64... */
     if ( mfn_valid(gw->l2mfn) )
     {
         if ( mfn_valid((smfn = get_shadow_status(d, gw->l2mfn,
                                                  SH_type_l2_shadow))) )
-            (void) sh_audit_l2_table(v, smfn, _mfn(INVALID_MFN));
+            (void) sh_audit_l2_table(v, smfn, INVALID_MFN);
 #if GUEST_PAGING_LEVELS == 3
         if ( mfn_valid((smfn = get_shadow_status(d, gw->l2mfn,
                                                  SH_type_l2h_shadow))) )
-            (void) sh_audit_l2_table(v, smfn, _mfn(INVALID_MFN));
+            (void) sh_audit_l2_table(v, smfn, INVALID_MFN);
 #endif
     }
     if ( mfn_valid(gw->l1mfn)
          && mfn_valid((smfn = get_shadow_status(d, gw->l1mfn,
                                                 SH_type_l1_shadow))) )
-        (void) sh_audit_l1_table(v, smfn, _mfn(INVALID_MFN));
+        (void) sh_audit_l1_table(v, smfn, INVALID_MFN);
     else if ( (guest_l2e_get_flags(gw->l2e) & _PAGE_PRESENT)
               && (guest_l2e_get_flags(gw->l2e) & _PAGE_PSE)
               && mfn_valid(
               (smfn = get_fl1_shadow_status(d, guest_l2e_get_gfn(gw->l2e)))) )
-        (void) sh_audit_fl1_table(v, smfn, _mfn(INVALID_MFN));
+        (void) sh_audit_fl1_table(v, smfn, INVALID_MFN);
 }
 
 #else
@@ -1752,7 +1752,7 @@ static shadow_l2e_t * shadow_get_and_create_l2e(struct vcpu *v,
 {
 #if GUEST_PAGING_LEVELS >= 4 /* 64bit... */
     struct domain *d = v->domain;
-    mfn_t sl3mfn = _mfn(INVALID_MFN);
+    mfn_t sl3mfn = INVALID_MFN;
     shadow_l3e_t *sl3e;
     if ( !mfn_valid(gw->l2mfn) ) return NULL; /* No guest page. */
     /* Get the l3e */
@@ -2158,7 +2158,7 @@ static int validate_gl4e(struct vcpu *v, void *new_ge, mfn_t sl4mfn, void *se)
     shadow_l4e_t new_sl4e;
     guest_l4e_t new_gl4e = *(guest_l4e_t *)new_ge;
     shadow_l4e_t *sl4p = se;
-    mfn_t sl3mfn = _mfn(INVALID_MFN);
+    mfn_t sl3mfn = INVALID_MFN;
     struct domain *d = v->domain;
     p2m_type_t p2mt;
     int result = 0;
@@ -2217,7 +2217,7 @@ static int validate_gl3e(struct vcpu *v, void *new_ge, mfn_t sl3mfn, void *se)
     shadow_l3e_t new_sl3e;
     guest_l3e_t new_gl3e = *(guest_l3e_t *)new_ge;
     shadow_l3e_t *sl3p = se;
-    mfn_t sl2mfn = _mfn(INVALID_MFN);
+    mfn_t sl2mfn = INVALID_MFN;
     p2m_type_t p2mt;
     int result = 0;
 
@@ -2250,7 +2250,7 @@ static int validate_gl2e(struct vcpu *v, void *new_ge, mfn_t sl2mfn, void *se)
     shadow_l2e_t new_sl2e;
     guest_l2e_t new_gl2e = *(guest_l2e_t *)new_ge;
     shadow_l2e_t *sl2p = se;
-    mfn_t sl1mfn = _mfn(INVALID_MFN);
+    mfn_t sl1mfn = INVALID_MFN;
     p2m_type_t p2mt;
     int result = 0;
 
@@ -2608,7 +2608,7 @@ static inline void check_for_early_unshadow(struct vcpu *v, mfn_t gmfn)
 static inline void reset_early_unshadow(struct vcpu *v)
 {
 #if SHADOW_OPTIMIZATIONS & SHOPT_EARLY_UNSHADOW
-    v->arch.paging.shadow.last_emulated_mfn_for_unshadow = INVALID_MFN;
+    v->arch.paging.shadow.last_emulated_mfn_for_unshadow = mfn_x(INVALID_MFN);
 #endif
 }
 
@@ -4105,10 +4105,10 @@ sh_update_cr3(struct vcpu *v, int do_locking)
                                            ? SH_type_l2h_shadow
                                            : SH_type_l2_shadow);
                 else
-                    sh_set_toplevel_shadow(v, i, _mfn(INVALID_MFN), 0);
+                    sh_set_toplevel_shadow(v, i, INVALID_MFN, 0);
             }
             else
-                sh_set_toplevel_shadow(v, i, _mfn(INVALID_MFN), 0);
+                sh_set_toplevel_shadow(v, i, INVALID_MFN, 0);
         }
     }
 #elif GUEST_PAGING_LEVELS == 4
@@ -4531,7 +4531,7 @@ static void sh_pagetable_dying(struct vcpu *v, paddr_t gpa)
 
         if ( fast_path ) {
             if ( pagetable_is_null(v->arch.shadow_table[i]) )
-                smfn = _mfn(INVALID_MFN);
+                smfn = INVALID_MFN;
             else
                 smfn = _mfn(pagetable_get_pfn(v->arch.shadow_table[i]));
         }
@@ -4540,8 +4540,8 @@ static void sh_pagetable_dying(struct vcpu *v, paddr_t gpa)
             /* retrieving the l2s */
             gmfn = get_gfn_query_unlocked(d, gfn_x(guest_l3e_get_gfn(gl3e[i])),
                                           &p2mt);
-            smfn = unlikely(mfn_x(gmfn) == INVALID_MFN)
-                   ? _mfn(INVALID_MFN)
+            smfn = unlikely(mfn_eq(gmfn, INVALID_MFN))
+                   ? INVALID_MFN
                    : shadow_hash_lookup(d, mfn_x(gmfn), SH_type_l2_pae_shadow);
         }
 
@@ -4846,7 +4846,7 @@ int sh_audit_fl1_table(struct vcpu *v, mfn_t sl1mfn, mfn_t x)
 {
     guest_l1e_t *gl1e, e;
     shadow_l1e_t *sl1e;
-    mfn_t gl1mfn = _mfn(INVALID_MFN);
+    mfn_t gl1mfn = INVALID_MFN;
     int f;
     int done = 0;
 

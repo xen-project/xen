@@ -281,7 +281,7 @@ guest_walk_tables(struct vcpu *v, struct p2m_domain *p2m,
         start = _gfn((gfn_x(start) & ~GUEST_L3_GFN_MASK) +
                      ((va >> PAGE_SHIFT) & GUEST_L3_GFN_MASK));
         gw->l1e = guest_l1e_from_gfn(start, flags);
-        gw->l2mfn = gw->l1mfn = _mfn(INVALID_MFN);
+        gw->l2mfn = gw->l1mfn = INVALID_MFN;
         goto set_ad;
     }
 
@@ -356,7 +356,7 @@ guest_walk_tables(struct vcpu *v, struct p2m_domain *p2m,
         start = _gfn((gfn_x(start) & ~GUEST_L2_GFN_MASK) +
                      guest_l1_table_offset(va));
         gw->l1e = guest_l1e_from_gfn(start, flags);
-        gw->l1mfn = _mfn(INVALID_MFN);
+        gw->l1mfn = INVALID_MFN;
     } 
     else 
     {

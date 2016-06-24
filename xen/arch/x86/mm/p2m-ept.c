@@ -50,7 +50,7 @@ static int atomic_write_ept_entry(ept_entry_t *entryptr, ept_entry_t new,
                                   int level)
 {
     int rc;
-    unsigned long oldmfn = INVALID_MFN;
+    unsigned long oldmfn = mfn_x(INVALID_MFN);
     bool_t check_foreign = (new.mfn != entryptr->mfn ||
                             new.sa_p2mt != entryptr->sa_p2mt);
 
@@ -91,7 +91,7 @@ static int atomic_write_ept_entry(ept_entry_t *entryptr, ept_entry_t new,
 
     write_atomic(&entryptr->epte, new.epte);
 
-    if ( unlikely(oldmfn != INVALID_MFN) )
+    if ( unlikely(oldmfn != mfn_x(INVALID_MFN)) )
         put_page(mfn_to_page(oldmfn));
 
     rc = 0;
@@ -887,7 +887,7 @@ static mfn_t ept_get_entry(struct p2m_domain *p2m,
     int i;
     int ret = 0;
     bool_t recalc = 0;
-    mfn_t mfn = _mfn(INVALID_MFN);
+    mfn_t mfn = INVALID_MFN;
     struct ept_data *ept = &p2m->ept;
 
     *t = p2m_mmio_dm;

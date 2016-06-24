@@ -55,7 +55,7 @@
 
 TYPE_SAFE(unsigned long, mfn);
 #define PRI_mfn          "05lx"
-#define INVALID_MFN      (~0UL)
+#define INVALID_MFN      _mfn(~0UL)
 
 #ifndef mfn_t
 #define mfn_t /* Grep fodder: mfn_t, _mfn() and mfn_x() are defined above */

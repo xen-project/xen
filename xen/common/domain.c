@@ -117,7 +117,7 @@ static void vcpu_info_reset(struct vcpu *v)
     v->vcpu_info = ((v->vcpu_id < XEN_LEGACY_MAX_VCPUS)
                     ? (vcpu_info_t *)&shared_info(d, vcpu_info[v->vcpu_id])
                     : &dummy_vcpu_info);
-    v->vcpu_info_mfn = INVALID_MFN;
+    v->vcpu_info_mfn = mfn_x(INVALID_MFN);
 }
 
 struct vcpu *alloc_vcpu(
@@ -1141,7 +1141,7 @@ int map_vcpu_info(struct vcpu *v, unsigned long gfn, unsigned offset)
     if ( offset > (PAGE_SIZE - sizeof(vcpu_info_t)) )
         return -EINVAL;
 
-    if ( v->vcpu_info_mfn != INVALID_MFN )
+    if ( v->vcpu_info_mfn != mfn_x(INVALID_MFN) )
         return -EINVAL;
 
     /* Run this command on yourself or on other offline VCPUS. */
@@ -1205,7 +1205,7 @@ void unmap_vcpu_info(struct vcpu *v)
 {
     unsigned long mfn;
 
-    if ( v->vcpu_info_mfn == INVALID_MFN )
+    if ( v->vcpu_info_mfn == mfn_x(INVALID_MFN) )
         return;
 
     mfn = v->vcpu_info_mfn;

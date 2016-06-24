@@ -430,7 +430,7 @@ static mfn_t hap_make_monitor_table(struct vcpu *v)
  oom:
     HAP_ERROR("out of memory building monitor pagetable\n");
     domain_crash(d);
-    return _mfn(INVALID_MFN);
+    return INVALID_MFN;
 }
 
 static void hap_destroy_monitor_table(struct vcpu* v, mfn_t mmfn)
@@ -509,7 +509,7 @@ int hap_enable(struct domain *d, u32 mode)
         }
 
         for ( i = 0; i < MAX_EPTP; i++ )
-            d->arch.altp2m_eptp[i] = INVALID_MFN;
+            d->arch.altp2m_eptp[i] = mfn_x(INVALID_MFN);
 
         for ( i = 0; i < MAX_ALTP2M; i++ )
         {

@@ -244,7 +244,7 @@ static int __get_paged_frame(unsigned long gfn, unsigned long *frame, struct pag
                               (readonly) ? P2M_ALLOC : P2M_UNSHARE);
     if ( !(*page) )
     {
-        *frame = INVALID_MFN;
+        *frame = mfn_x(INVALID_MFN);
         if ( p2m_is_shared(p2mt) )
             return GNTST_eagain;
         if ( p2m_is_paging(p2mt) )
@@ -260,7 +260,7 @@ static int __get_paged_frame(unsigned long gfn, unsigned long *frame, struct pag
     *page = mfn_valid(*frame) ? mfn_to_page(*frame) : NULL;
     if ( (!(*page)) || (!get_page(*page, rd)) )
     {
-        *frame = INVALID_MFN;
+        *frame = mfn_x(INVALID_MFN);
         *page = NULL;
         rc = GNTST_bad_page;
     }
@@ -1785,7 +1785,7 @@ gnttab_transfer(
             p2m_type_t __p2mt;
             mfn = mfn_x(get_gfn_unshare(d, gop.mfn, &__p2mt));
             if ( p2m_is_shared(__p2mt) || !p2m_is_valid(__p2mt) )
-                mfn = INVALID_MFN;
+                mfn = mfn_x(INVALID_MFN);
         }
 #else
         mfn = mfn_x(gfn_to_mfn(d, _gfn(gop.mfn)));

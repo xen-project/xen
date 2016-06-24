@@ -43,11 +43,11 @@ typedef unsigned long dbgva_t;
 typedef unsigned char dbgbyte_t;
 
 /* Returns: mfn for the given (hvm guest) vaddr */
-static unsigned long 
+static mfn_t
 dbg_hvm_va2mfn(dbgva_t vaddr, struct domain *dp, int toaddr,
                 unsigned long *gfn)
 {
-    unsigned long mfn;
+    mfn_t mfn;
     uint32_t pfec = PFEC_page_present;
     p2m_type_t gfntype;
 
@@ -60,16 +60,17 @@ dbg_hvm_va2mfn(dbgva_t vaddr, struct domain *dp, int toaddr,
         return INVALID_MFN;
     }
 
-    mfn = mfn_x(get_gfn(dp, *gfn, &gfntype)); 
+    mfn = get_gfn(dp, *gfn, &gfntype);
     if ( p2m_is_readonly(gfntype) && toaddr )
     {
         DBGP2("kdb:p2m_is_readonly: gfntype:%x\n", gfntype);
         mfn = INVALID_MFN;
     }
     else
-        DBGP2("X: vaddr:%lx domid:%d mfn:%lx\n", vaddr, dp->domain_id, mfn);
+        DBGP2("X: vaddr:%lx domid:%d mfn:%#"PRI_mfn"\n",
+              vaddr, dp->domain_id, mfn_x(mfn));
 
-    if ( mfn == INVALID_MFN )
+    if ( mfn_eq(mfn, INVALID_MFN) )
     {
         put_gfn(dp, *gfn);
         *gfn = INVALID_GFN;
@@ -91,7 +92,7 @@ dbg_hvm_va2mfn(dbgva_t vaddr, struct domain *dp, int toaddr,
  *       mode.
  * Returns: mfn for the given (pv guest) vaddr 
  */
-static unsigned long 
+static mfn_t
 dbg_pv_va2mfn(dbgva_t vaddr, struct domain *dp, uint64_t pgd3val)
 {
     l4_pgentry_t l4e, *l4t;
@@ -99,31 +100,31 @@ dbg_pv_va2mfn(dbgva_t vaddr, struct domain *dp, uint64_t pgd3val)
     l2_pgentry_t l2e, *l2t;
     l1_pgentry_t l1e, *l1t;
     unsigned long cr3 = (pgd3val ? pgd3val : dp->vcpu[0]->arch.cr3);
-    unsigned long mfn = cr3 >> PAGE_SHIFT;
+    mfn_t mfn = _mfn(cr3 >> PAGE_SHIFT);
 
     DBGP2("vaddr:%lx domid:%d cr3:%lx pgd3:%lx\n", vaddr, dp->domain_id, 
           cr3, pgd3val);
 
     if ( pgd3val == 0 )
     {
-        l4t = map_domain_page(_mfn(mfn));
+        l4t = map_domain_page(mfn);
         l4e = l4t[l4_table_offset(vaddr)];
         unmap_domain_page(l4t);
-        mfn = l4e_get_pfn(l4e);
-        DBGP2("l4t:%p l4to:%lx l4e:%lx mfn:%lx\n", l4t, 
-              l4_table_offset(vaddr), l4e, mfn);
+        mfn = _mfn(l4e_get_pfn(l4e));
+        DBGP2("l4t:%p l4to:%lx l4e:%lx mfn:%#"PRI_mfn"\n", l4t,
+              l4_table_offset(vaddr), l4e, mfn_x(mfn));
         if ( !(l4e_get_flags(l4e) & _PAGE_PRESENT) )
         {
             DBGP1("l4 PAGE not present. vaddr:%lx cr3:%lx\n", vaddr, cr3);
             return INVALID_MFN;
         }
 
-        l3t = map_domain_page(_mfn(mfn));
+        l3t = map_domain_page(mfn);
         l3e = l3t[l3_table_offset(vaddr)];
         unmap_domain_page(l3t);
-        mfn = l3e_get_pfn(l3e);
-        DBGP2("l3t:%p l3to:%lx l3e:%lx mfn:%lx\n", l3t, 
-              l3_table_offset(vaddr), l3e, mfn);
+        mfn = _mfn(l3e_get_pfn(l3e));
+        DBGP2("l3t:%p l3to:%lx l3e:%lx mfn:%#"PRI_mfn"\n", l3t,
+              l3_table_offset(vaddr), l3e, mfn_x(mfn));
         if ( !(l3e_get_flags(l3e) & _PAGE_PRESENT) ||
              (l3e_get_flags(l3e) & _PAGE_PSE) )
         {
@@ -132,26 +133,26 @@ dbg_pv_va2mfn(dbgva_t vaddr, struct domain *dp, uint64_t pgd3val)
         }
     }
 
-    l2t = map_domain_page(_mfn(mfn));
+    l2t = map_domain_page(mfn);
     l2e = l2t[l2_table_offset(vaddr)];
     unmap_domain_page(l2t);
-    mfn = l2e_get_pfn(l2e);
-    DBGP2("l2t:%p l2to:%lx l2e:%lx mfn:%lx\n", l2t, l2_table_offset(vaddr),
-          l2e, mfn);
+    mfn = _mfn(l2e_get_pfn(l2e));
+    DBGP2("l2t:%p l2to:%lx l2e:%lx mfn:%#"PRI_mfn"\n",
+          l2t, l2_table_offset(vaddr), l2e, mfn_x(mfn));
     if ( !(l2e_get_flags(l2e) & _PAGE_PRESENT) ||
          (l2e_get_flags(l2e) & _PAGE_PSE) )
     {
         DBGP1("l2 PAGE not present. vaddr:%lx cr3:%lx\n", vaddr, cr3);
         return INVALID_MFN;
     }
-    l1t = map_domain_page(_mfn(mfn));
+    l1t = map_domain_page(mfn);
     l1e = l1t[l1_table_offset(vaddr)];
     unmap_domain_page(l1t);
-    mfn = l1e_get_pfn(l1e);
-    DBGP2("l1t:%p l1to:%lx l1e:%lx mfn:%lx\n", l1t, l1_table_offset(vaddr),
-          l1e, mfn);
+    mfn = _mfn(l1e_get_pfn(l1e));
+    DBGP2("l1t:%p l1to:%lx l1e:%lx mfn:%#"PRI_mfn"\n", l1t, l1_table_offset(vaddr),
+          l1e, mfn_x(mfn));
 
-    return mfn_valid(mfn) ? mfn : INVALID_MFN;
+    return mfn_valid(mfn_x(mfn)) ? mfn : INVALID_MFN;
 }
 
 /* Returns: number of bytes remaining to be copied */
@@ -163,23 +164,24 @@ unsigned int dbg_rw_guest_mem(struct domain *dp, void * __user gaddr,
     {
         char *va;
         unsigned long addr = (unsigned long)gaddr;
-        unsigned long mfn, gfn = INVALID_GFN, pagecnt;
+        mfn_t mfn;
+        unsigned long gfn = INVALID_GFN, pagecnt;
 
         pagecnt = min_t(long, PAGE_SIZE - (addr & ~PAGE_MASK), len);
 
         mfn = (has_hvm_container_domain(dp)
                ? dbg_hvm_va2mfn(addr, dp, toaddr, &gfn)
                : dbg_pv_va2mfn(addr, dp, pgd3));
-        if ( mfn == INVALID_MFN ) 
+        if ( mfn_eq(mfn, INVALID_MFN) )
             break;
 
-        va = map_domain_page(_mfn(mfn));
+        va = map_domain_page(mfn);
         va = va + (addr & (PAGE_SIZE-1));
 
         if ( toaddr )
         {
             copy_from_user(va, buf, pagecnt);    /* va = buf */
-            paging_mark_dirty(dp, mfn);
+            paging_mark_dirty(dp, mfn_x(mfn));
         }
         else
         {
