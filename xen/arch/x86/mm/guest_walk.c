@@ -161,6 +161,10 @@ guest_walk_tables(struct vcpu *v, struct p2m_domain *p2m,
     bool_t pse1G = 0, pse2M = 0;
     p2m_query_t qt = P2M_ALLOC | P2M_UNSHARE;
 
+    /* Only implicit supervisor data accesses exist. */
+    ASSERT(!(pfec & PFEC_implicit) ||
+           !(pfec & (PFEC_insn_fetch|PFEC_user_mode)));
+
     perfc_incr(guest_walk);
     memset(gw, 0, sizeof(*gw));
     gw->va = va;

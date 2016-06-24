@@ -76,6 +76,7 @@
 /* Internally used only flags. */
 #define PFEC_page_paged     (1U<<16)
 #define PFEC_page_shared    (1U<<17)
+#define PFEC_implicit       (1U<<18) /* Pagewalk input for ldt/gdt/idt/tr accesses. */
 
 /* Other exception error code values. */
 #define X86_XEC_EXT         (_AC(1,U) << 0)

@@ -783,6 +783,11 @@ static int __hvmemul_read(
     struct hvm_vcpu_io *vio = &curr->arch.hvm_vcpu.hvm_io;
     int rc;
 
+    if ( is_x86_system_segment(seg) )
+        pfec |= PFEC_implicit;
+    else if ( hvmemul_ctxt->seg_reg[x86_seg_ss].attr.fields.dpl == 3 )
+        pfec |= PFEC_user_mode;
+
     rc = hvmemul_virtual_to_linear(
         seg, offset, bytes, &reps, access_type, hvmemul_ctxt, &addr);
     if ( rc != X86EMUL_OKAY || !bytes )
@@ -792,10 +797,6 @@ static int __hvmemul_read(
            : vio->mmio_access.insn_fetch)) &&
          (vio->mmio_gla == (addr & PAGE_MASK)) )
         return hvmemul_linear_mmio_read(addr, bytes, p_data, pfec, hvmemul_ctxt, 1);
-
-    if ( (seg != x86_seg_none) &&
-         (hvmemul_ctxt->seg_reg[x86_seg_ss].attr.fields.dpl == 3) )
-        pfec |= PFEC_user_mode;
 
     rc = ((access_type == hvm_access_insn_fetch) ?
           hvm_fetch_from_guest_linear(p_data, addr, bytes, pfec, &pfinfo) :
@@ -893,6 +894,11 @@ static int hvmemul_write(
     struct hvm_vcpu_io *vio = &curr->arch.hvm_vcpu.hvm_io;
     int rc;
 
+    if ( is_x86_system_segment(seg) )
+        pfec |= PFEC_implicit;
+    else if ( hvmemul_ctxt->seg_reg[x86_seg_ss].attr.fields.dpl == 3 )
+        pfec |= PFEC_user_mode;
+
     rc = hvmemul_virtual_to_linear(
         seg, offset, bytes, &reps, hvm_access_write, hvmemul_ctxt, &addr);
     if ( rc != X86EMUL_OKAY || !bytes )
@@ -901,10 +907,6 @@ static int hvmemul_write(
     if ( vio->mmio_access.write_access &&
          (vio->mmio_gla == (addr & PAGE_MASK)) )
         return hvmemul_linear_mmio_write(addr, bytes, p_data, pfec, hvmemul_ctxt, 1);
-
-    if ( (seg != x86_seg_none) &&
-         (hvmemul_ctxt->seg_reg[x86_seg_ss].attr.fields.dpl == 3) )
-        pfec |= PFEC_user_mode;
 
     rc = hvm_copy_to_guest_linear(addr, p_data, bytes, pfec, &pfinfo);
 
