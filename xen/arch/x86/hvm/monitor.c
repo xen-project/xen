@@ -1,5 +1,5 @@
 /*
- * arch/x86/hvm/event.c
+ * arch/x86/hvm/monitor.c
  *
  * Arch-specific hardware virtual machine event abstractions.
  *
@@ -7,6 +7,7 @@
  * Copyright (c) 2005, International Business Machines Corporation.
  * Copyright (c) 2008, Citrix Systems, Inc.
  * Copyright (c) 2016, Bitdefender S.R.L.
+ * Copyright (c) 2016, Tamas K Lengyel (tamas@tklengyel.com)
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -22,12 +23,12 @@
  */
 
 #include <xen/vm_event.h>
-#include <asm/hvm/event.h>
+#include <asm/hvm/monitor.h>
 #include <asm/monitor.h>
 #include <asm/vm_event.h>
 #include <public/vm_event.h>
 
-bool_t hvm_event_cr(unsigned int index, unsigned long value, unsigned long old)
+bool_t hvm_monitor_cr(unsigned int index, unsigned long value, unsigned long old)
 {
     struct vcpu *curr = current;
     struct arch_domain *ad = &curr->domain->arch;
@@ -54,7 +55,7 @@ bool_t hvm_event_cr(unsigned int index, unsigned long value, unsigned long old)
     return 0;
 }
 
-void hvm_event_msr(unsigned int msr, uint64_t value)
+void hvm_monitor_msr(unsigned int msr, uint64_t value)
 {
     struct vcpu *curr = current;
 
@@ -86,8 +87,8 @@ static inline unsigned long gfn_of_rip(unsigned long rip)
     return paging_gva_to_gfn(curr, sreg.base + rip, &pfec);
 }
 
-int hvm_event_breakpoint(unsigned long rip,
-                         enum hvm_event_breakpoint_type type)
+int hvm_monitor_breakpoint(unsigned long rip,
+                           enum hvm_monitor_breakpoint_type type)
 {
     struct vcpu *curr = current;
     struct arch_domain *ad = &curr->domain->arch;
@@ -95,14 +96,14 @@ int hvm_event_breakpoint(unsigned long rip,
 
     switch ( type )
     {
-    case HVM_EVENT_SOFTWARE_BREAKPOINT:
+    case HVM_MONITOR_SOFTWARE_BREAKPOINT:
         if ( !ad->monitor.software_breakpoint_enabled )
             return 0;
         req.reason = VM_EVENT_REASON_SOFTWARE_BREAKPOINT;
         req.u.software_breakpoint.gfn = gfn_of_rip(rip);
         break;
 
-    case HVM_EVENT_SINGLESTEP_BREAKPOINT:
+    case HVM_MONITOR_SINGLESTEP_BREAKPOINT:
         if ( !ad->monitor.singlestep_enabled )
             return 0;
         req.reason = VM_EVENT_REASON_SINGLESTEP;

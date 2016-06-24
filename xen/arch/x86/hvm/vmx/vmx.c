@@ -50,7 +50,7 @@
 #include <asm/hvm/vpt.h>
 #include <public/hvm/save.h>
 #include <asm/hvm/trace.h>
-#include <asm/hvm/event.h>
+#include <asm/hvm/monitor.h>
 #include <asm/xenoprof.h>
 #include <asm/debugger.h>
 #include <asm/apic.h>
@@ -2476,10 +2476,10 @@ static int vmx_cr_access(unsigned long exit_qualification)
 
         /*
          * Special case unlikely to be interesting to a
-         * VM_EVENT_FLAG_DENY-capable application, so the hvm_event_crX()
+         * VM_EVENT_FLAG_DENY-capable application, so the hvm_monitor_crX()
          * return value is ignored for now.
          */
-        hvm_event_crX(CR0, value, old);
+        hvm_monitor_crX(CR0, value, old);
         curr->arch.hvm_vcpu.guest_cr[0] = value;
         vmx_update_guest_cr(curr, 0);
         HVMTRACE_0D(CLTS);
@@ -3392,8 +3392,8 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
             }
             else {
                 int handled =
-                        hvm_event_breakpoint(regs->eip,
-                                             HVM_EVENT_SOFTWARE_BREAKPOINT);
+                      hvm_monitor_breakpoint(regs->eip,
+                                             HVM_MONITOR_SOFTWARE_BREAKPOINT);
 
                 if ( handled < 0 ) 
                 {
@@ -3720,7 +3720,8 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
         vmx_update_cpu_exec_control(v);
         if ( v->arch.hvm_vcpu.single_step )
         {
-            hvm_event_breakpoint(regs->eip, HVM_EVENT_SINGLESTEP_BREAKPOINT);
+            hvm_monitor_breakpoint(regs->eip,
+                                   HVM_MONITOR_SINGLESTEP_BREAKPOINT);
             if ( v->domain->debugger_attached )
                 domain_pause_for_debugger();
         }

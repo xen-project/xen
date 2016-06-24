@@ -3,7 +3,6 @@ subdir-y += vmx
 
 obj-y += asid.o
 obj-y += emulate.o
-obj-y += event.o
 obj-y += hpet.o
 obj-y += hvm.o
 obj-y += i8254.o
@@ -11,6 +10,7 @@ obj-y += intercept.o
 obj-y += io.o
 obj-y += ioreq.o
 obj-y += irq.o
+obj-y += monitor.o
 obj-y += mtrr.o
 obj-y += nestedhvm.o
 obj-y += pmtimer.o
