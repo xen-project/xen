@@ -88,7 +88,7 @@ struct kernel_param {
 
 extern const struct kernel_param __setup_start[], __setup_end[];
 
-#define __setup_str static const  __initconstrel \
+#define __setup_str static const __initconst \
     __attribute__((__aligned__(1))) char
 #define __kparam static const __initsetup \
     __attribute__((__aligned__(sizeof(void *)))) struct kernel_param
