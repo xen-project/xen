@@ -226,7 +226,7 @@ int arch_monitor_domctl_event(struct domain *d,
 
     default:
         /*
-         * Should not be reached unless vm_event_monitor_get_capabilities() is
+         * Should not be reached unless arch_monitor_get_capabilities() is
          * not properly implemented.
          */
         ASSERT_UNREACHABLE();

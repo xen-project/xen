@@ -59,13 +59,4 @@ static inline void vm_event_fill_regs(vm_event_request_t *req)
     /* Not supported on ARM. */
 }
 
-static inline uint32_t vm_event_monitor_get_capabilities(struct domain *d)
-{
-    uint32_t capabilities = 0;
-
-    capabilities = (1U << XEN_DOMCTL_MONITOR_EVENT_GUEST_REQUEST);
-
-    return capabilities;
-}
-
 #endif /* __ASM_ARM_VM_EVENT_H__ */

@@ -39,7 +39,7 @@ int arch_monitor_domctl_event(struct domain *d,
     /*
      * No arch-specific monitor vm-events on ARM.
      *
-     * Should not be reached unless vm_event_monitor_get_capabilities() is not
+     * Should not be reached unless arch_monitor_get_capabilities() is not
      * properly implemented.
      */
     ASSERT_UNREACHABLE();
@@ -57,6 +57,15 @@ static inline
 void arch_monitor_cleanup_domain(struct domain *d)
 {
     /* No arch-specific domain cleanup on ARM. */
+}
+
+static inline uint32_t arch_monitor_get_capabilities(struct domain *d)
+{
+    uint32_t capabilities = 0;
+
+    capabilities = (1U << XEN_DOMCTL_MONITOR_EVENT_GUEST_REQUEST);
+
+    return capabilities;
 }
 
 #endif /* __ASM_ARM_MONITOR_H__ */

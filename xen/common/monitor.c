@@ -24,7 +24,6 @@
 #include <xsm/xsm.h>
 #include <public/domctl.h>
 #include <asm/monitor.h>
-#include <asm/vm_event.h>
 
 int monitor_domctl(struct domain *d, struct xen_domctl_monitor_op *mop)
 {
@@ -48,12 +47,12 @@ int monitor_domctl(struct domain *d, struct xen_domctl_monitor_op *mop)
         if ( unlikely(mop->event > 31) )
             return -EINVAL;
         /* Check if event type is available. */
-        if ( unlikely(!(vm_event_monitor_get_capabilities(d) & (1U << mop->event))) )
+        if ( unlikely(!(arch_monitor_get_capabilities(d) & (1U << mop->event))) )
             return -EOPNOTSUPP;
         break;
 
     case XEN_DOMCTL_MONITOR_OP_GET_CAPABILITIES:
-        mop->event = vm_event_monitor_get_capabilities(d);
+        mop->event = arch_monitor_get_capabilities(d);
         return 0;
 
     default:
