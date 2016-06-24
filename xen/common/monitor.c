@@ -21,6 +21,7 @@
 
 #include <xen/monitor.h>
 #include <xen/sched.h>
+#include <xen/vm_event.h>
 #include <xsm/xsm.h>
 #include <public/domctl.h>
 #include <asm/monitor.h>
@@ -82,6 +83,22 @@ int monitor_domctl(struct domain *d, struct xen_domctl_monitor_op *mop)
     }
 
     return 0;
+}
+
+void monitor_guest_request(void)
+{
+    struct vcpu *curr = current;
+    struct domain *d = curr->domain;
+
+    if ( d->monitor.guest_request_enabled )
+    {
+        vm_event_request_t req = {
+            .reason = VM_EVENT_REASON_GUEST_REQUEST,
+            .vcpu_id = curr->vcpu_id,
+        };
+
+        vm_event_monitor_traps(curr, d->monitor.guest_request_sync, &req);
+    }
 }
 
 /*

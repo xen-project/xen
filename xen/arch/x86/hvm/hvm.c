@@ -37,6 +37,7 @@
 #include <xen/mem_access.h>
 #include <xen/rangeset.h>
 #include <xen/vm_event.h>
+#include <xen/monitor.h>
 #include <xen/warning.h>
 #include <asm/shadow.h>
 #include <asm/hap.h>
@@ -5761,7 +5762,7 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
 
     case HVMOP_guest_request_vm_event:
         if ( guest_handle_is_null(arg) )
-            vm_event_monitor_guest_request();
+            monitor_guest_request();
         else
             rc = -EINVAL;
         break;

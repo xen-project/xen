@@ -26,5 +26,6 @@ struct domain;
 struct xen_domctl_monitor_op;
 
 int monitor_domctl(struct domain *d, struct xen_domctl_monitor_op *op);
+void monitor_guest_request(void);
 
 #endif /* __XEN_MONITOR_H__ */
