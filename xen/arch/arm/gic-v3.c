@@ -1382,28 +1382,15 @@ gic_acpi_get_madt_redistributor_num(struct acpi_subtable_header *header,
 
 static void __init gicv3_acpi_init(void)
 {
-    struct acpi_table_header *table;
     struct rdist_region *rdist_regs;
-    acpi_status status;
     int count, i;
-
-    status = acpi_get_table(ACPI_SIG_MADT, 0, &table);
-
-    if ( ACPI_FAILURE(status) )
-    {
-        const char *msg = acpi_format_exception(status);
-
-        panic("GICv3: Failed to get MADT table, %s", msg);
-    }
 
     /*
      * Find distributor base address. We expect one distributor entry since
      * ACPI 5.0 spec neither support multi-GIC instances nor GIC cascade.
      */
-    count = acpi_parse_entries(ACPI_SIG_MADT, sizeof(struct acpi_table_madt),
-                               gic_acpi_parse_madt_distributor, table,
-                               ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR, 0);
-
+    count = acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR,
+                                  gic_acpi_parse_madt_distributor, 0);
     if ( count <= 0 )
         panic("GICv3: No valid GICD entries exists");
 
@@ -1412,9 +1399,8 @@ static void __init gicv3_acpi_init(void)
               dbase);
 
     /* Get number of redistributor */
-    count = acpi_parse_entries(ACPI_SIG_MADT, sizeof(struct acpi_table_madt),
-                               gic_acpi_get_madt_redistributor_num, table,
-                               ACPI_MADT_TYPE_GENERIC_REDISTRIBUTOR, 0);
+    count = acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_REDISTRIBUTOR,
+                                  gic_acpi_get_madt_redistributor_num, 0);
     if ( count <= 0 )
         panic("GICv3: No valid GICR entries exists");
 
@@ -1447,9 +1433,8 @@ static void __init gicv3_acpi_init(void)
     gicv3.rdist_regions= rdist_regs;
 
     /* Collect CPU base addresses */
-    count = acpi_parse_entries(ACPI_SIG_MADT, sizeof(struct acpi_table_madt),
-                               gic_acpi_parse_madt_cpu, table,
-                               ACPI_MADT_TYPE_GENERIC_INTERRUPT, 0);
+    count = acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_INTERRUPT,
+                                  gic_acpi_parse_madt_cpu, 0);
     if ( count <= 0 )
         panic("GICv3: No valid GICC entries exists");
 
