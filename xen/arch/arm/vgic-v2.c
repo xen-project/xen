@@ -699,9 +699,15 @@ static int vgic_v2_domain_init(struct domain *d)
     return 0;
 }
 
+static void vgic_v2_domain_free(struct domain *d)
+{
+    /* Nothing to be cleanup for this driver */
+}
+
 static const struct vgic_ops vgic_v2_ops = {
     .vcpu_init   = vgic_v2_vcpu_init,
     .domain_init = vgic_v2_domain_init,
+    .domain_free = vgic_v2_domain_free,
     .max_vcpus = 8,
 };
 

@@ -107,7 +107,7 @@ struct arch_domain
             paddr_t base;                   /* Base address */
             paddr_t size;                   /* Size */
             unsigned int first_cpu;         /* First CPU handled */
-        } rdist_regions[MAX_RDIST_COUNT];
+        } *rdist_regions;
         int nr_regions;                     /* Number of rdist regions */
         uint32_t rdist_stride;              /* Re-Distributor stride */
 #endif

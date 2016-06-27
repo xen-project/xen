@@ -1391,9 +1391,26 @@ static int vgic_v3_vcpu_init(struct vcpu *v)
     return 0;
 }
 
+static inline unsigned int vgic_v3_rdist_count(struct domain *d)
+{
+    return is_hardware_domain(d) ? vgic_v3_hw.nr_rdist_regions :
+               GUEST_GICV3_RDIST_REGIONS;
+}
+
 static int vgic_v3_domain_init(struct domain *d)
 {
-    int i;
+    struct vgic_rdist_region *rdist_regions;
+    int rdist_count, i;
+
+    /* Allocate memory for Re-distributor regions */
+    rdist_count = vgic_v3_rdist_count(d);
+
+    rdist_regions = xzalloc_array(struct vgic_rdist_region, rdist_count);
+    if ( !rdist_regions )
+        return -ENOMEM;
+
+    d->arch.vgic.nr_regions = rdist_count;
+    d->arch.vgic.rdist_regions = rdist_regions;
 
     /*
      * Domain 0 gets the hardware address.
@@ -1426,7 +1443,6 @@ static int vgic_v3_domain_init(struct domain *d)
 
             first_cpu += size / d->arch.vgic.rdist_stride;
         }
-        d->arch.vgic.nr_regions = vgic_v3_hw.nr_rdist_regions;
     }
     else
     {
@@ -1435,7 +1451,6 @@ static int vgic_v3_domain_init(struct domain *d)
         /* XXX: Only one Re-distributor region mapped for the guest */
         BUILD_BUG_ON(GUEST_GICV3_RDIST_REGIONS != 1);
 
-        d->arch.vgic.nr_regions = GUEST_GICV3_RDIST_REGIONS;
         d->arch.vgic.rdist_stride = GUEST_GICV3_RDIST_STRIDE;
 
         /* The first redistributor should contain enough space for all CPUs */
@@ -1467,9 +1482,15 @@ static int vgic_v3_domain_init(struct domain *d)
     return 0;
 }
 
+static void vgic_v3_domain_free(struct domain *d)
+{
+    xfree(d->arch.vgic.rdist_regions);
+}
+
 static const struct vgic_ops v3_ops = {
     .vcpu_init   = vgic_v3_vcpu_init,
     .domain_init = vgic_v3_domain_init,
+    .domain_free = vgic_v3_domain_free,
     .emulate_sysreg  = vgic_v3_emulate_sysreg,
     /*
      * We use both AFF1 and AFF0 in (v)MPIDR. Thus, the max number of CPU
