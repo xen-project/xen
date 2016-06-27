@@ -90,19 +90,8 @@ static void vgic_rank_init(struct vgic_irq_rank *rank, uint8_t index,
         rank->vcpu[i] = vcpu;
 }
 
-int domain_vgic_init(struct domain *d, unsigned int nr_spis)
+static int domain_vgic_register(struct domain *d)
 {
-    int i;
-    int ret;
-
-    d->arch.vgic.ctlr = 0;
-
-    /* Limit the number of virtual SPIs supported to (1020 - 32) = 988  */
-    if ( nr_spis > (1020 - NR_LOCAL_IRQS) )
-        return -EINVAL;
-
-    d->arch.vgic.nr_spis = nr_spis;
-
     switch ( d->arch.vgic.version )
     {
 #ifdef CONFIG_HAS_GICV3
@@ -120,6 +109,26 @@ int domain_vgic_init(struct domain *d, unsigned int nr_spis)
                d->domain_id, d->arch.vgic.version);
         return -ENODEV;
     }
+
+    return 0;
+}
+
+int domain_vgic_init(struct domain *d, unsigned int nr_spis)
+{
+    int i;
+    int ret;
+
+    d->arch.vgic.ctlr = 0;
+
+    /* Limit the number of virtual SPIs supported to (1020 - 32) = 988  */
+    if ( nr_spis > (1020 - NR_LOCAL_IRQS) )
+        return -EINVAL;
+
+    d->arch.vgic.nr_spis = nr_spis;
+
+    ret = domain_vgic_register(d);
+    if ( ret < 0 )
+        return ret;
 
     spin_lock_init(&d->arch.vgic.lock);
 
