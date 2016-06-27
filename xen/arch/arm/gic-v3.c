@@ -1195,10 +1195,6 @@ static void __init gicv3_dt_init(void)
                 &gicv3.rdist_count) )
         gicv3.rdist_count = 1;
 
-    if ( gicv3.rdist_count > MAX_RDIST_COUNT )
-        panic("GICv3: Number of redistributor regions is more than"
-              "%d (Increase MAX_RDIST_COUNT!!)\n", MAX_RDIST_COUNT);
-
     rdist_regs = xzalloc_array(struct rdist_region, gicv3.rdist_count);
     if ( !rdist_regs )
         panic("GICv3: Failed to allocate memory for rdist regions\n");
@@ -1483,10 +1479,6 @@ static void __init gicv3_acpi_init(void)
 
         gicr_table = false;
     }
-
-    if ( count > MAX_RDIST_COUNT )
-        panic("GICv3: Number of redistributor regions is more than"
-              "%d (Increase MAX_RDIST_COUNT!!)\n", MAX_RDIST_COUNT);
 
     rdist_regs = xzalloc_array(struct rdist_region, count);
     if ( !rdist_regs )

@@ -20,7 +20,6 @@
 
 #define NR_GIC_LOCAL_IRQS  NR_LOCAL_IRQS
 #define NR_GIC_SGI         16
-#define MAX_RDIST_COUNT    4
 
 #define GICD_CTLR       (0x000)
 #define GICD_TYPER      (0x004)
