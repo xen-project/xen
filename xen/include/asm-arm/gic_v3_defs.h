@@ -141,6 +141,7 @@ struct rdist_region {
     paddr_t base;
     paddr_t size;
     void __iomem *map_base;
+    bool single_rdist;
 };
 
 #endif /* __ASM_ARM_GIC_V3_DEFS_H__ */

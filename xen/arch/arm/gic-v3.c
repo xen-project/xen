@@ -662,6 +662,10 @@ static int __init gicv3_populate_rdist(void)
                         smp_processor_id(), i, ptr);
                 return 0;
             }
+
+            if ( gicv3.rdist_regions[i].single_rdist )
+                break;
+
             if ( gicv3.rdist_stride )
                 ptr += gicv3.rdist_stride;
             else
@@ -1274,12 +1278,19 @@ static int gicv3_iomem_deny_access(const struct domain *d)
 }
 
 #ifdef CONFIG_ACPI
-static void __init gic_acpi_add_rdist_region(paddr_t base, paddr_t size)
+static void __init
+gic_acpi_add_rdist_region(paddr_t base, paddr_t size, bool single_rdist)
 {
     unsigned int idx = gicv3.rdist_count++;
 
+    gicv3.rdist_regions[idx].single_rdist = single_rdist;
     gicv3.rdist_regions[idx].base = base;
     gicv3.rdist_regions[idx].size = size;
+}
+
+static inline bool gic_dist_supports_dvis(void)
+{
+    return !!(readl_relaxed(GICD + GICD_TYPER) & GICD_TYPER_DVIS);
 }
 
 static int gicv3_make_hwdom_madt(const struct domain *d, u32 offset)
@@ -1389,6 +1400,36 @@ gic_acpi_parse_madt_distributor(struct acpi_subtable_header *header,
 }
 
 static int __init
+gic_acpi_parse_cpu_redistributor(struct acpi_subtable_header *header,
+                                 const unsigned long end)
+{
+    struct acpi_madt_generic_interrupt *processor;
+    u32 size;
+
+    processor = (struct acpi_madt_generic_interrupt *)header;
+    if ( !(processor->flags & ACPI_MADT_ENABLED) )
+        return 0;
+
+    size = gic_dist_supports_dvis() ? 4 * SZ_64K : 2 * SZ_64K;
+    gic_acpi_add_rdist_region(processor->gicr_base_address, size, true);
+
+    return 0;
+}
+
+static int __init
+gic_acpi_get_madt_cpu_num(struct acpi_subtable_header *header,
+                          const unsigned long end)
+{
+    struct acpi_madt_generic_interrupt *cpuif;
+
+    cpuif = (struct acpi_madt_generic_interrupt *)header;
+    if ( BAD_MADT_ENTRY(cpuif, end) || !cpuif->gicr_base_address )
+        return -EINVAL;
+
+    return 0;
+}
+
+static int __init
 gic_acpi_parse_madt_redistributor(struct acpi_subtable_header *header,
                                   const unsigned long end)
 {
@@ -1398,7 +1439,7 @@ gic_acpi_parse_madt_redistributor(struct acpi_subtable_header *header,
     if ( BAD_MADT_ENTRY(rdist, end) )
         return -EINVAL;
 
-    gic_acpi_add_rdist_region(rdist->base_address, rdist->length);
+    gic_acpi_add_rdist_region(rdist->base_address, rdist->length, false);
 
     return 0;
 }
@@ -1416,6 +1457,7 @@ gic_acpi_get_madt_redistributor_num(struct acpi_subtable_header *header,
 static void __init gicv3_acpi_init(void)
 {
     struct rdist_region *rdist_regs;
+    bool gicr_table = true;
     int count;
 
     /*
@@ -1432,8 +1474,15 @@ static void __init gicv3_acpi_init(void)
     /* Get number of redistributor */
     count = acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_REDISTRIBUTOR,
                                   gic_acpi_get_madt_redistributor_num, 0);
-    if ( count <= 0 )
-        panic("GICv3: No valid GICR entries exists");
+    /* Count the total number of CPU interface entries */
+    if ( count <= 0 ) {
+        count = acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_INTERRUPT,
+                                      gic_acpi_get_madt_cpu_num, 0);
+        if (count <= 0)
+            panic("GICv3: No valid GICR entries exists");
+
+        gicr_table = false;
+    }
 
     if ( count > MAX_RDIST_COUNT )
         panic("GICv3: Number of redistributor regions is more than"
@@ -1445,9 +1494,14 @@ static void __init gicv3_acpi_init(void)
 
     gicv3.rdist_regions = rdist_regs;
 
-    /* Parse always-on power domain Re-distributor entries */
-    count = acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_REDISTRIBUTOR,
-                                  gic_acpi_parse_madt_redistributor, count);
+    if ( gicr_table )
+        /* Parse always-on power domain Re-distributor entries */
+        count = acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_REDISTRIBUTOR,
+                                      gic_acpi_parse_madt_redistributor, count);
+    else
+        /* Parse Re-distributor entries described in CPU interface table */
+        count = acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_INTERRUPT,
+                                      gic_acpi_parse_cpu_redistributor, count);
     if ( count <= 0 )
         panic("GICv3: Can't get Redistributor entry");
 
