@@ -1164,6 +1164,17 @@ static void __init gicv3_init_v2(void)
     vgic_v2_setup_hw(dbase, cbase, csize, vbase, 0);
 }
 
+static void __init gicv3_ioremap_distributor(paddr_t dist_paddr)
+{
+    if ( dist_paddr & ~PAGE_MASK )
+        panic("GICv3:  Found unaligned distributor address %"PRIpaddr"",
+              dbase);
+
+    gicv3.map_dbase = ioremap_nocache(dist_paddr, SZ_64K);
+    if ( !gicv3.map_dbase )
+        panic("GICv3: Failed to ioremap for GIC distributor\n");
+}
+
 static void __init gicv3_dt_init(void)
 {
     struct rdist_region *rdist_regs;
@@ -1174,9 +1185,7 @@ static void __init gicv3_dt_init(void)
     if ( res )
         panic("GICv3: Cannot find a valid distributor address");
 
-    if ( (dbase & ~PAGE_MASK) )
-        panic("GICv3:  Found unaligned distributor address %"PRIpaddr"",
-              dbase);
+    gicv3_ioremap_distributor(dbase);
 
     if ( !dt_property_read_u32(node, "#redistributor-regions",
                 &gicv3.rdist_count) )
@@ -1394,9 +1403,7 @@ static void __init gicv3_acpi_init(void)
     if ( count <= 0 )
         panic("GICv3: No valid GICD entries exists");
 
-    if ( (dbase & ~PAGE_MASK) )
-        panic("GICv3: Found unaligned distributor address %"PRIpaddr"",
-              dbase);
+    gicv3_ioremap_distributor(dbase);
 
     /* Get number of redistributor */
     count = acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_REDISTRIBUTOR,
@@ -1464,10 +1471,6 @@ static int __init gicv3_init(void)
         gicv3_dt_init();
     else
         gicv3_acpi_init();
-
-    gicv3.map_dbase = ioremap_nocache(dbase, SZ_64K);
-    if ( !gicv3.map_dbase )
-        panic("GICv3: Failed to ioremap for GIC distributor\n");
 
     reg = readl_relaxed(GICD + GICD_PIDR2) & GIC_PIDR2_ARCH_MASK;
     if ( reg != GIC_PIDR2_ARCH_GICv3 && reg != GIC_PIDR2_ARCH_GICv4 )
