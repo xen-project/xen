@@ -1082,7 +1082,7 @@ int xenmem_add_to_physmap_one(
                 return -EINVAL;
         }
 
-        d->arch.grant_table_gpfn[idx] = gfn_x(gfn);
+        d->arch.grant_table_gfn[idx] = gfn;
 
         t = p2m_ram_rw;
 
