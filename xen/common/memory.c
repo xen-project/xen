@@ -649,7 +649,7 @@ static int xenmem_add_to_physmap(struct domain *d,
 
     if ( xatp->space != XENMAPSPACE_gmfn_range )
         return xenmem_add_to_physmap_one(d, xatp->space, extra,
-                                         xatp->idx, xatp->gpfn);
+                                         xatp->idx, _gfn(xatp->gpfn));
 
     if ( xatp->size < start )
         return -EILSEQ;
@@ -666,7 +666,7 @@ static int xenmem_add_to_physmap(struct domain *d,
     while ( xatp->size > done )
     {
         rc = xenmem_add_to_physmap_one(d, xatp->space, extra,
-                                       xatp->idx, xatp->gpfn);
+                                       xatp->idx, _gfn(xatp->gpfn));
         if ( rc < 0 )
             break;
 
@@ -735,7 +735,7 @@ static int xenmem_add_to_physmap_batch(struct domain *d,
 
         rc = xenmem_add_to_physmap_one(d, xatpb->space,
                                        xatpb->u,
-                                       idx, gpfn);
+                                       idx, _gfn(gpfn));
 
         if ( unlikely(__copy_to_guest_offset(xatpb->errs, 0, &rc, 1)) )
         {

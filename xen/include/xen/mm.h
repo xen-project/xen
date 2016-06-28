@@ -548,7 +548,7 @@ void scrub_one_page(struct page_info *);
 
 int xenmem_add_to_physmap_one(struct domain *d, unsigned int space,
                               union xen_add_to_physmap_batch_extra extra,
-                              unsigned long idx, xen_pfn_t gpfn);
+                              unsigned long idx, gfn_t gfn);
 
 /* Returns 1 on success, 0 on error, negative if the ring
  * for event propagation is full in the presence of paging */

@@ -1046,7 +1046,7 @@ int xenmem_add_to_physmap_one(
     unsigned int space,
     union xen_add_to_physmap_batch_extra extra,
     unsigned long idx,
-    xen_pfn_t gpfn)
+    gfn_t gfn)
 {
     unsigned long mfn = 0;
     int rc;
@@ -1081,8 +1081,8 @@ int xenmem_add_to_physmap_one(
             else
                 return -EINVAL;
         }
-        
-        d->arch.grant_table_gpfn[idx] = gpfn;
+
+        d->arch.grant_table_gpfn[idx] = gfn_x(gfn);
 
         t = p2m_ram_rw;
 
@@ -1145,7 +1145,7 @@ int xenmem_add_to_physmap_one(
         if ( extra.res0 )
             return -EOPNOTSUPP;
 
-        rc = map_dev_mmio_region(d, gpfn, 1, idx);
+        rc = map_dev_mmio_region(d, gfn_x(gfn), 1, idx);
         return rc;
 
     default:
@@ -1153,7 +1153,7 @@ int xenmem_add_to_physmap_one(
     }
 
     /* Map at new location. */
-    rc = guest_physmap_add_entry(d, _gfn(gpfn), _mfn(mfn), 0, t);
+    rc = guest_physmap_add_entry(d, gfn, _mfn(mfn), 0, t);
 
     /* If we fail to add the mapping, we need to drop the reference we
      * took earlier on foreign pages */

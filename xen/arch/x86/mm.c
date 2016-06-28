@@ -4775,7 +4775,7 @@ int xenmem_add_to_physmap_one(
     unsigned int space,
     union xen_add_to_physmap_batch_extra extra,
     unsigned long idx,
-    xen_pfn_t gpfn)
+    gfn_t gpfn)
 {
     struct page_info *page = NULL;
     unsigned long gfn = 0; /* gcc ... */
@@ -4834,7 +4834,7 @@ int xenmem_add_to_physmap_one(
             break;
         }
         case XENMAPSPACE_gmfn_foreign:
-            return p2m_add_foreign(d, idx, gpfn, extra.foreign_domid);
+            return p2m_add_foreign(d, idx, gfn_x(gpfn), extra.foreign_domid);
         default:
             break;
     }
@@ -4849,19 +4849,18 @@ int xenmem_add_to_physmap_one(
     }
 
     /* Remove previously mapped page if it was present. */
-    prev_mfn = mfn_x(get_gfn(d, gpfn, &p2mt));
+    prev_mfn = mfn_x(get_gfn(d, gfn_x(gpfn), &p2mt));
     if ( mfn_valid(prev_mfn) )
     {
         if ( is_xen_heap_mfn(prev_mfn) )
             /* Xen heap frames are simply unhooked from this phys slot. */
-            guest_physmap_remove_page(d, _gfn(gpfn), _mfn(prev_mfn),
-                                      PAGE_ORDER_4K);
+            guest_physmap_remove_page(d, gpfn, _mfn(prev_mfn), PAGE_ORDER_4K);
         else
             /* Normal domain memory is freed, to avoid leaking memory. */
-            guest_remove_page(d, gpfn);
+            guest_remove_page(d, gfn_x(gpfn));
     }
     /* In the XENMAPSPACE_gmfn case we still hold a ref on the old page. */
-    put_gfn(d, gpfn);
+    put_gfn(d, gfn_x(gpfn));
 
     /* Unmap from old location, if any. */
     old_gpfn = get_gpfn_from_mfn(mfn);
@@ -4872,7 +4871,7 @@ int xenmem_add_to_physmap_one(
         guest_physmap_remove_page(d, _gfn(old_gpfn), _mfn(mfn), PAGE_ORDER_4K);
 
     /* Map at new location. */
-    rc = guest_physmap_add_page(d, _gfn(gpfn), _mfn(mfn), PAGE_ORDER_4K);
+    rc = guest_physmap_add_page(d, gpfn, _mfn(mfn), PAGE_ORDER_4K);
 
     /* In the XENMAPSPACE_gmfn, we took a ref of the gfn at the top */
     if ( space == XENMAPSPACE_gmfn || space == XENMAPSPACE_gmfn_range )
