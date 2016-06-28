@@ -1740,6 +1740,7 @@ int assign_pages(
     unsigned int order,
     unsigned int memflags)
 {
+    int rc = 0;
     unsigned long i;
 
     spin_lock(&d->page_alloc_lock);
@@ -1748,7 +1749,8 @@ int assign_pages(
     {
         gdprintk(XENLOG_INFO, "Cannot assign page to domain%d -- dying.\n",
                 d->domain_id);
-        goto fail;
+        rc = -EINVAL;
+        goto out;
     }
 
     if ( !(memflags & MEMF_no_refcount) )
@@ -1759,7 +1761,8 @@ int assign_pages(
                 gprintk(XENLOG_INFO, "Over-allocation for domain %u: "
                         "%u > %u\n", d->domain_id,
                         d->tot_pages + (1 << order), d->max_pages);
-            goto fail;
+            rc = -E2BIG;
+            goto out;
         }
 
         if ( unlikely(d->tot_pages == 0) )
@@ -1778,12 +1781,9 @@ int assign_pages(
         page_list_add_tail(&pg[i], &d->page_list);
     }
 
+ out:
     spin_unlock(&d->page_alloc_lock);
-    return 0;
-
- fail:
-    spin_unlock(&d->page_alloc_lock);
-    return -1;
+    return rc;
 }
 
 
