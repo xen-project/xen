@@ -35,6 +35,8 @@ extern bool_t iommu_hap_pt_share;
 extern bool_t iommu_debug;
 extern bool_t amd_iommu_perdev_intremap;
 
+extern unsigned int iommu_dev_iotlb_timeout;
+
 #define IOMMU_PAGE_SIZE(sz) (1UL << PAGE_SHIFT_##sz)
 #define IOMMU_PAGE_MASK(sz) (~(u64)0 << PAGE_SHIFT_##sz)
 #define IOMMU_PAGE_ALIGN(sz, addr)  (((addr) + ~PAGE_MASK_##sz) & PAGE_MASK_##sz)

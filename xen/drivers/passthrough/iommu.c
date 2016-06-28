@@ -24,6 +24,9 @@
 static void parse_iommu_param(char *s);
 static void iommu_dump_p2m_table(unsigned char key);
 
+unsigned int __read_mostly iommu_dev_iotlb_timeout = 1000;
+integer_param("iommu_dev_iotlb_timeout", iommu_dev_iotlb_timeout);
+
 /*
  * The 'iommu' parameter enables the IOMMU.  Optional comma separated
  * value may contain:

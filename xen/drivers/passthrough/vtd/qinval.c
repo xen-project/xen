@@ -28,6 +28,8 @@
 #include "vtd.h"
 #include "extern.h"
 
+#define VTD_QI_TIMEOUT	1
+
 static void print_qi_regs(struct iommu *iommu)
 {
     u64 val;
@@ -130,10 +132,10 @@ static void queue_invalidate_iotlb(struct iommu *iommu,
     spin_unlock_irqrestore(&iommu->register_lock, flags);
 }
 
-static int queue_invalidate_wait(struct iommu *iommu,
-    u8 iflag, u8 sw, u8 fn)
+static int __must_check queue_invalidate_wait(struct iommu *iommu,
+                                              u8 iflag, u8 sw, u8 fn,
+                                              bool_t flush_dev_iotlb)
 {
-    s_time_t start_time;
     volatile u32 poll_slot = QINVAL_STAT_INIT;
     unsigned int index;
     unsigned long flags;
@@ -163,14 +165,20 @@ static int queue_invalidate_wait(struct iommu *iommu,
     /* Now we don't support interrupt method */
     if ( sw )
     {
+        s_time_t timeout;
+
         /* In case all wait descriptor writes to same addr with same data */
-        start_time = NOW();
+        timeout = NOW() + MILLISECS(flush_dev_iotlb ?
+                                    iommu_dev_iotlb_timeout : VTD_QI_TIMEOUT);
+
         while ( poll_slot != QINVAL_STAT_DONE )
         {
-            if ( NOW() > (start_time + DMAR_OPERATION_TIMEOUT) )
+            if ( NOW() > timeout )
             {
                 print_qi_regs(iommu);
-                panic("queue invalidate wait descriptor was not executed");
+                printk(XENLOG_WARNING VTDPREFIX
+                       " Queue invalidate wait descriptor timed out\n");
+                return -ETIMEDOUT;
             }
             cpu_relax();
         }
@@ -180,12 +188,14 @@ static int queue_invalidate_wait(struct iommu *iommu,
     return -EOPNOTSUPP;
 }
 
-static int invalidate_sync(struct iommu *iommu)
+static int __must_check invalidate_sync(struct iommu *iommu,
+                                        bool_t flush_dev_iotlb)
 {
     struct qi_ctrl *qi_ctrl = iommu_qi_ctrl(iommu);
 
     if ( qi_ctrl->qinval_maddr )
-        return queue_invalidate_wait(iommu, 0, 1, 1);
+        return queue_invalidate_wait(iommu, 0, 1, 1, flush_dev_iotlb);
+
     return 0;
 }
 
@@ -254,7 +264,7 @@ static int __iommu_flush_iec(struct iommu *iommu, u8 granu, u8 im, u16 iidx)
     int ret;
 
     queue_invalidate_iec(iommu, granu, im, iidx);
-    ret = invalidate_sync(iommu);
+    ret = invalidate_sync(iommu, 0);
     /*
      * reading vt-d architecture register will ensure
      * draining happens in implementation independent way.
@@ -300,7 +310,7 @@ static int __must_check flush_context_qi(void *_iommu, u16 did,
     {
         queue_invalidate_context(iommu, did, sid, fm,
                                  type >> DMA_CCMD_INVL_GRANU_OFFSET);
-        ret = invalidate_sync(iommu);
+        ret = invalidate_sync(iommu, 0);
     }
     return ret;
 }
@@ -344,7 +354,7 @@ static int __must_check flush_iotlb_qi(void *_iommu, u16 did, u64 addr,
                                dw, did, size_order, 0, addr);
         if ( flush_dev_iotlb )
             ret = dev_invalidate_iotlb(iommu, did, addr, size_order, type);
-        rc = invalidate_sync(iommu);
+        rc = invalidate_sync(iommu, flush_dev_iotlb);
         if ( !ret )
             ret = rc;
     }

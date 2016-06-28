@@ -1021,6 +1021,15 @@ debug hypervisor only).
 
 >> Enable IOMMU debugging code (implies `verbose`).
 
+### iommu\_dev\_iotlb\_timeout
+> `= <integer>`
+
+> Default: `1000`
+
+Specify the timeout of the device IOTLB invalidation in milliseconds.
+By default, the timeout is 1000 ms. When you see error 'Queue invalidate
+wait descriptor timed out', try increasing this value.
+
 ### iommu\_inclusive\_mapping (VT-d)
 > `= <boolean>`
 
