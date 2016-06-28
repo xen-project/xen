@@ -20,6 +20,7 @@
 #define __ASM_ARM_MMIO_H__
 
 #include <xen/lib.h>
+#include <xen/rwlock.h>
 #include <asm/processor.h>
 #include <asm/regs.h>
 
@@ -51,7 +52,7 @@ struct mmio_handler {
 
 struct vmmio {
     int num_entries;
-    spinlock_t lock;
+    rwlock_t lock;
     struct mmio_handler handlers[MAX_IO_HANDLER];
 };
 

@@ -70,23 +70,39 @@ static int handle_write(const struct mmio_handler *handler, struct vcpu *v,
                                handler->priv);
 }
 
-int handle_mmio(mmio_info_t *info)
+static const struct mmio_handler *find_mmio_handler(struct domain *d,
+                                                    paddr_t gpa)
 {
-    struct vcpu *v = current;
-    int i;
-    const struct mmio_handler *handler = NULL;
-    const struct vmmio *vmmio = &v->domain->arch.vmmio;
+    const struct mmio_handler *handler;
+    unsigned int i;
+    struct vmmio *vmmio = &d->arch.vmmio;
+
+    read_lock(&vmmio->lock);
 
     for ( i = 0; i < vmmio->num_entries; i++ )
     {
         handler = &vmmio->handlers[i];
 
-        if ( (info->gpa >= handler->addr) &&
-             (info->gpa < (handler->addr + handler->size)) )
+        if ( (gpa >= handler->addr) &&
+             (gpa < (handler->addr + handler->size)) )
             break;
     }
 
     if ( i == vmmio->num_entries )
+        handler = NULL;
+
+    read_unlock(&vmmio->lock);
+
+    return handler;
+}
+
+int handle_mmio(mmio_info_t *info)
+{
+    struct vcpu *v = current;
+    const struct mmio_handler *handler = NULL;
+
+    handler = find_mmio_handler(v->domain, info->gpa);
+    if ( !handler )
         return 0;
 
     if ( info->dabt.write )
@@ -104,7 +120,7 @@ void register_mmio_handler(struct domain *d,
 
     BUG_ON(vmmio->num_entries >= MAX_IO_HANDLER);
 
-    spin_lock(&vmmio->lock);
+    write_lock(&vmmio->lock);
 
     handler = &vmmio->handlers[vmmio->num_entries];
 
@@ -113,24 +129,17 @@ void register_mmio_handler(struct domain *d,
     handler->size = size;
     handler->priv = priv;
 
-    /*
-     * handle_mmio is not using the lock to avoid contention.
-     * Make sure the other processors see the new handler before
-     * updating the number of entries
-     */
-    dsb(ish);
-
     vmmio->num_entries++;
 
-    spin_unlock(&vmmio->lock);
+    write_unlock(&vmmio->lock);
 }
 
 int domain_io_init(struct domain *d)
 {
-   spin_lock_init(&d->arch.vmmio.lock);
-   d->arch.vmmio.num_entries = 0;
+    rwlock_init(&d->arch.vmmio.lock);
+    d->arch.vmmio.num_entries = 0;
 
-   return 0;
+    return 0;
 }
 
 /*
