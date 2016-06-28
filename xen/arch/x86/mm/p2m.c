@@ -76,7 +76,7 @@ static int p2m_initialise(struct domain *d, struct p2m_domain *p2m)
     p2m->np2m_base = P2M_BASE_EADDR;
 
     for ( i = 0; i < ARRAY_SIZE(p2m->pod.mrp.list); ++i )
-        p2m->pod.mrp.list[i] = INVALID_GFN;
+        p2m->pod.mrp.list[i] = gfn_x(INVALID_GFN);
 
     if ( hap_enabled(d) && cpu_has_vmx )
         ret = ept_p2m_init(p2m);
@@ -1863,7 +1863,7 @@ long p2m_set_mem_access(struct domain *d, gfn_t gfn, uint32_t nr,
     }
 
     /* If request to set default access. */
-    if ( gfn_x(gfn) == INVALID_GFN )
+    if ( gfn_eq(gfn, INVALID_GFN) )
     {
         p2m->default_access = a;
         return 0;
@@ -1932,7 +1932,7 @@ int p2m_get_mem_access(struct domain *d, gfn_t gfn, xenmem_access_t *access)
     };
 
     /* If request to get default access. */
-    if ( gfn_x(gfn) == INVALID_GFN )
+    if ( gfn_eq(gfn, INVALID_GFN) )
     {
         *access = memaccess[p2m->default_access];
         return 0;
@@ -2113,8 +2113,8 @@ unsigned long paging_gva_to_gfn(struct vcpu *v,
         mode = paging_get_nestedmode(v);
         l2_gfn = mode->gva_to_gfn(v, p2m, va, pfec);
 
-        if ( l2_gfn == INVALID_GFN )
-            return INVALID_GFN;
+        if ( l2_gfn == gfn_x(INVALID_GFN) )
+            return gfn_x(INVALID_GFN);
 
         /* translate l2 guest gfn into l1 guest gfn */
         rv = nestedhap_walk_L1_p2m(v, l2_gfn, &l1_gfn, &l1_page_order, &l1_p2ma,
@@ -2123,7 +2123,7 @@ unsigned long paging_gva_to_gfn(struct vcpu *v,
                                    !!(*pfec & PFEC_insn_fetch));
 
         if ( rv != NESTEDHVM_PAGEFAULT_DONE )
-            return INVALID_GFN;
+            return gfn_x(INVALID_GFN);
 
         /*
          * Sanity check that l1_gfn can be used properly as a 4K mapping, even
@@ -2415,7 +2415,7 @@ static void p2m_init_altp2m_helper(struct domain *d, unsigned int i)
     struct p2m_domain *p2m = d->arch.altp2m_p2m[i];
     struct ept_data *ept;
 
-    p2m->min_remapped_gfn = INVALID_GFN;
+    p2m->min_remapped_gfn = gfn_x(INVALID_GFN);
     p2m->max_remapped_gfn = 0;
     ept = &p2m->ept;
     ept->asr = pagetable_get_pfn(p2m_get_pagetable(p2m));
@@ -2551,7 +2551,7 @@ int p2m_change_altp2m_gfn(struct domain *d, unsigned int idx,
 
     mfn = ap2m->get_entry(ap2m, gfn_x(old_gfn), &t, &a, 0, NULL, NULL);
 
-    if ( gfn_x(new_gfn) == INVALID_GFN )
+    if ( gfn_eq(new_gfn, INVALID_GFN) )
     {
         if ( mfn_valid(mfn) )
             p2m_remove_page(ap2m, gfn_x(old_gfn), mfn_x(mfn), PAGE_ORDER_4K);
@@ -2613,7 +2613,7 @@ static void p2m_reset_altp2m(struct p2m_domain *p2m)
     /* Uninit and reinit ept to force TLB shootdown */
     ept_p2m_uninit(p2m);
     ept_p2m_init(p2m);
-    p2m->min_remapped_gfn = INVALID_GFN;
+    p2m->min_remapped_gfn = gfn_x(INVALID_GFN);
     p2m->max_remapped_gfn = 0;
 }
 

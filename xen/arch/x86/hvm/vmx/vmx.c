@@ -2059,13 +2059,13 @@ static int vmx_vcpu_emulate_vmfunc(struct cpu_user_regs *regs)
 static bool_t vmx_vcpu_emulate_ve(struct vcpu *v)
 {
     bool_t rc = 0, writable;
-    unsigned long gfn = gfn_x(vcpu_altp2m(v).veinfo_gfn);
+    gfn_t gfn = vcpu_altp2m(v).veinfo_gfn;
     ve_info_t *veinfo;
 
-    if ( gfn == INVALID_GFN )
+    if ( gfn_eq(gfn, INVALID_GFN) )
         return 0;
 
-    veinfo = hvm_map_guest_frame_rw(gfn, 0, &writable);
+    veinfo = hvm_map_guest_frame_rw(gfn_x(gfn), 0, &writable);
     if ( !veinfo )
         return 0;
     if ( !writable || veinfo->semaphore != 0 )

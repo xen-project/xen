@@ -479,7 +479,7 @@ static int __p2m_get_mem_access(struct domain *d, gfn_t gfn,
     }
 
     /* If request to get default access. */
-    if ( gfn_x(gfn) == INVALID_GFN )
+    if ( gfn_eq(gfn, INVALID_GFN) )
     {
         *access = memaccess[p2m->default_access];
         return 0;
@@ -1879,7 +1879,7 @@ long p2m_set_mem_access(struct domain *d, gfn_t gfn, uint32_t nr,
     p2m->mem_access_enabled = true;
 
     /* If request to set default access. */
-    if ( gfn_x(gfn) == INVALID_GFN )
+    if ( gfn_eq(gfn, INVALID_GFN) )
     {
         p2m->default_access = a;
         return 0;

@@ -236,7 +236,7 @@ int nept_translate_l2ga(struct vcpu *v, paddr_t l2ga,
     ept_walk_t gw;
     rwx_acc &= EPTE_RWX_MASK;
 
-    *l1gfn = INVALID_GFN;
+    *l1gfn = gfn_x(INVALID_GFN);
 
     rc = nept_walk_tables(v, l2ga, &gw);
     switch ( rc )

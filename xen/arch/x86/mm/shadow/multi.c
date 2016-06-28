@@ -3660,7 +3660,7 @@ sh_gva_to_gfn(struct vcpu *v, struct p2m_domain *p2m,
          */
         if ( is_hvm_vcpu(v) && !hvm_nx_enabled(v) && !hvm_smep_enabled(v) )
             pfec[0] &= ~PFEC_insn_fetch;
-        return INVALID_GFN;
+        return gfn_x(INVALID_GFN);
     }
     gfn = guest_walk_to_gfn(&gw);
 

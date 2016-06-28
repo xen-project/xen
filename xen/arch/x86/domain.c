@@ -783,7 +783,7 @@ int arch_domain_soft_reset(struct domain *d)
      * gfn == INVALID_GFN indicates that the shared_info page was never mapped
      * to the domain's address space and there is nothing to replace.
      */
-    if ( gfn == INVALID_GFN )
+    if ( gfn == gfn_x(INVALID_GFN) )
         goto exit_put_page;
 
     if ( mfn_x(get_gfn_query(d, gfn, &p2mt)) != mfn )

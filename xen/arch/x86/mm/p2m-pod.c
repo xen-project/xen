@@ -1003,7 +1003,7 @@ static void pod_eager_reclaim(struct p2m_domain *p2m)
         unsigned int idx = (mrp->idx + i++) % ARRAY_SIZE(mrp->list);
         unsigned long gfn = mrp->list[idx];
 
-        if ( gfn != INVALID_GFN )
+        if ( gfn != gfn_x(INVALID_GFN) )
         {
             if ( gfn & POD_LAST_SUPERPAGE )
             {
@@ -1020,7 +1020,7 @@ static void pod_eager_reclaim(struct p2m_domain *p2m)
             else
                 p2m_pod_zero_check(p2m, &gfn, 1);
 
-            mrp->list[idx] = INVALID_GFN;
+            mrp->list[idx] = gfn_x(INVALID_GFN);
         }
 
     } while ( (p2m->pod.count == 0) && (i < ARRAY_SIZE(mrp->list)) );
@@ -1031,7 +1031,7 @@ static void pod_eager_record(struct p2m_domain *p2m,
 {
     struct pod_mrp_list *mrp = &p2m->pod.mrp;
 
-    ASSERT(gfn != INVALID_GFN);
+    ASSERT(gfn != gfn_x(INVALID_GFN));
 
     mrp->list[mrp->idx++] =
         gfn | (order == PAGE_ORDER_2M ? POD_LAST_SUPERPAGE : 0);

@@ -1707,7 +1707,7 @@ static mfn_t emulate_gva_to_mfn(struct vcpu *v, unsigned long vaddr,
 
     /* Translate the VA to a GFN. */
     gfn = paging_get_hostmode(v)->gva_to_gfn(v, NULL, vaddr, &pfec);
-    if ( gfn == INVALID_GFN )
+    if ( gfn == gfn_x(INVALID_GFN) )
     {
         if ( is_hvm_vcpu(v) )
             hvm_inject_page_fault(pfec, vaddr);

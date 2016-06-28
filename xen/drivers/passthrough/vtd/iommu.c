@@ -611,7 +611,7 @@ static int __must_check iommu_flush_iotlb(struct domain *d,
         if ( iommu_domid == -1 )
             continue;
 
-        if ( page_count != 1 || gfn == INVALID_GFN )
+        if ( page_count != 1 || gfn == gfn_x(INVALID_GFN) )
             rc = iommu_flush_iotlb_dsi(iommu, iommu_domid,
                                        0, flush_dev_iotlb);
         else
@@ -640,7 +640,7 @@ static int __must_check iommu_flush_iotlb_pages(struct domain *d,
 
 static int __must_check iommu_flush_iotlb_all(struct domain *d)
 {
-    return iommu_flush_iotlb(d, INVALID_GFN, 0, 0);
+    return iommu_flush_iotlb(d, gfn_x(INVALID_GFN), 0, 0);
 }
 
 /* clear one page's page table */

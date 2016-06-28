@@ -61,7 +61,7 @@ int arch_iommu_populate_page_table(struct domain *d)
             unsigned long mfn = page_to_mfn(page);
             unsigned long gfn = mfn_to_gmfn(d, mfn);
 
-            if ( gfn != INVALID_GFN )
+            if ( gfn != gfn_x(INVALID_GFN) )
             {
                 ASSERT(!(gfn >> DEFAULT_DOMAIN_ADDRESS_WIDTH));
                 BUG_ON(SHARED_M2P(gfn));

@@ -324,7 +324,7 @@ struct p2m_domain {
 #define NR_POD_MRP_ENTRIES 32
 
 /* Encode ORDER_2M superpage in top bit of GFN */
-#define POD_LAST_SUPERPAGE (INVALID_GFN & ~(INVALID_GFN >> 1))
+#define POD_LAST_SUPERPAGE (gfn_x(INVALID_GFN) & ~(gfn_x(INVALID_GFN) >> 1))
 
             unsigned long list[NR_POD_MRP_ENTRIES];
             unsigned int idx;

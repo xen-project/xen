@@ -796,7 +796,7 @@ static inline unsigned long vtlb_lookup(struct vcpu *v,
                                         unsigned long va, uint32_t pfec)
 {
     unsigned long page_number = va >> PAGE_SHIFT;
-    unsigned long frame_number = INVALID_GFN;
+    unsigned long frame_number = gfn_x(INVALID_GFN);
     int i = vtlb_hash(page_number);
 
     spin_lock(&v->arch.paging.vtlb_lock);

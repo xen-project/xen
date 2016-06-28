@@ -26,7 +26,7 @@ altp2m_vcpu_reset(struct vcpu *v)
     struct altp2mvcpu *av = &vcpu_altp2m(v);
 
     av->p2midx = INVALID_ALTP2M;
-    av->veinfo_gfn = _gfn(INVALID_GFN);
+    av->veinfo_gfn = INVALID_GFN;
 }
 
 void

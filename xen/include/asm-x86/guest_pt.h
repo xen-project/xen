@@ -32,7 +32,7 @@
 #error GUEST_PAGING_LEVELS not defined
 #endif
 
-#define VALID_GFN(m) (m != INVALID_GFN)
+#define VALID_GFN(m) (m != gfn_x(INVALID_GFN))
 
 static inline int
 valid_gfn(gfn_t m)
@@ -251,7 +251,7 @@ static inline gfn_t
 guest_walk_to_gfn(walk_t *gw)
 {
     if ( !(guest_l1e_get_flags(gw->l1e) & _PAGE_PRESENT) )
-        return _gfn(INVALID_GFN);
+        return INVALID_GFN;
     return guest_l1e_get_gfn(gw->l1e);
 }
 

@@ -44,8 +44,7 @@ typedef unsigned char dbgbyte_t;
 
 /* Returns: mfn for the given (hvm guest) vaddr */
 static mfn_t
-dbg_hvm_va2mfn(dbgva_t vaddr, struct domain *dp, int toaddr,
-                unsigned long *gfn)
+dbg_hvm_va2mfn(dbgva_t vaddr, struct domain *dp, int toaddr, gfn_t *gfn)
 {
     mfn_t mfn;
     uint32_t pfec = PFEC_page_present;
@@ -53,14 +52,14 @@ dbg_hvm_va2mfn(dbgva_t vaddr, struct domain *dp, int toaddr,
 
     DBGP2("vaddr:%lx domid:%d\n", vaddr, dp->domain_id);
 
-    *gfn = paging_gva_to_gfn(dp->vcpu[0], vaddr, &pfec);
-    if ( *gfn == INVALID_GFN )
+    *gfn = _gfn(paging_gva_to_gfn(dp->vcpu[0], vaddr, &pfec));
+    if ( gfn_eq(*gfn, INVALID_GFN) )
     {
         DBGP2("kdb:bad gfn from gva_to_gfn\n");
         return INVALID_MFN;
     }
 
-    mfn = get_gfn(dp, *gfn, &gfntype);
+    mfn = get_gfn(dp, gfn_x(*gfn), &gfntype);
     if ( p2m_is_readonly(gfntype) && toaddr )
     {
         DBGP2("kdb:p2m_is_readonly: gfntype:%x\n", gfntype);
@@ -72,7 +71,7 @@ dbg_hvm_va2mfn(dbgva_t vaddr, struct domain *dp, int toaddr,
 
     if ( mfn_eq(mfn, INVALID_MFN) )
     {
-        put_gfn(dp, *gfn);
+        put_gfn(dp, gfn_x(*gfn));
         *gfn = INVALID_GFN;
     }
 
@@ -165,7 +164,8 @@ unsigned int dbg_rw_guest_mem(struct domain *dp, void * __user gaddr,
         char *va;
         unsigned long addr = (unsigned long)gaddr;
         mfn_t mfn;
-        unsigned long gfn = INVALID_GFN, pagecnt;
+        gfn_t gfn = INVALID_GFN;
+        unsigned long pagecnt;
 
         pagecnt = min_t(long, PAGE_SIZE - (addr & ~PAGE_MASK), len);
 
@@ -189,8 +189,8 @@ unsigned int dbg_rw_guest_mem(struct domain *dp, void * __user gaddr,
         }
 
         unmap_domain_page(va);
-        if ( gfn != INVALID_GFN )
-            put_gfn(dp, gfn);
+        if ( !gfn_eq(gfn, INVALID_GFN) )
+            put_gfn(dp, gfn_x(gfn));
 
         addr += pagecnt;
         buf += pagecnt;

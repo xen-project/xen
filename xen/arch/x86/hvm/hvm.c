@@ -3037,7 +3037,7 @@ static enum hvm_copy_result __hvm_copy(
         if ( flags & HVMCOPY_virt )
         {
             gfn = paging_gva_to_gfn(curr, addr, &pfec);
-            if ( gfn == INVALID_GFN )
+            if ( gfn == gfn_x(INVALID_GFN) )
             {
                 if ( pfec & PFEC_page_paged )
                     return HVMCOPY_gfn_paged_out;
@@ -3152,7 +3152,7 @@ static enum hvm_copy_result __hvm_clear(paddr_t addr, int size)
         count = min_t(int, PAGE_SIZE - (addr & ~PAGE_MASK), todo);
 
         gfn = paging_gva_to_gfn(curr, addr, &pfec);
-        if ( gfn == INVALID_GFN )
+        if ( gfn == gfn_x(INVALID_GFN) )
         {
             if ( pfec & PFEC_page_paged )
                 return HVMCOPY_gfn_paged_out;
@@ -5296,7 +5296,7 @@ static int do_altp2m_op(
              a.u.enable_notify.vcpu_id != curr->vcpu_id )
             rc = -EINVAL;
 
-        if ( (gfn_x(vcpu_altp2m(curr).veinfo_gfn) != INVALID_GFN) ||
+        if ( !gfn_eq(vcpu_altp2m(curr).veinfo_gfn, INVALID_GFN) ||
              mfn_eq(get_gfn_query_unlocked(curr->domain,
                     a.u.enable_notify.gfn, &p2mt), INVALID_MFN) )
             return -EINVAL;

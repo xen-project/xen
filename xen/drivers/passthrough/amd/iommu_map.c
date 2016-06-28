@@ -555,7 +555,7 @@ static int update_paging_mode(struct domain *d, unsigned long gfn)
     unsigned long old_root_mfn;
     struct domain_iommu *hd = dom_iommu(d);
 
-    if ( gfn == INVALID_GFN )
+    if ( gfn == gfn_x(INVALID_GFN) )
         return -EADDRNOTAVAIL;
     ASSERT(!(gfn >> DEFAULT_DOMAIN_ADDRESS_WIDTH));
 

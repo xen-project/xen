@@ -84,7 +84,7 @@ static inline bool_t mfn_eq(mfn_t x, mfn_t y)
 
 TYPE_SAFE(unsigned long, gfn);
 #define PRI_gfn          "05lx"
-#define INVALID_GFN      (~0UL)
+#define INVALID_GFN      _gfn(~0UL)
 
 #ifndef gfn_t
 #define gfn_t /* Grep fodder: gfn_t, _gfn() and gfn_x() are defined above */

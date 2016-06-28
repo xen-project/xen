@@ -204,7 +204,7 @@ static void hvm_free_ioreq_gmfn(struct domain *d, unsigned long gmfn)
 {
     unsigned int i = gmfn - d->arch.hvm_domain.ioreq_gmfn.base;
 
-    if ( gmfn != INVALID_GFN )
+    if ( gmfn != gfn_x(INVALID_GFN) )
         set_bit(i, &d->arch.hvm_domain.ioreq_gmfn.mask);
 }
 
@@ -420,7 +420,7 @@ static int hvm_ioreq_server_map_pages(struct hvm_ioreq_server *s,
     if ( rc )
         return rc;
 
-    if ( bufioreq_pfn != INVALID_GFN )
+    if ( bufioreq_pfn != gfn_x(INVALID_GFN) )
         rc = hvm_map_ioreq_page(s, 1, bufioreq_pfn);
 
     if ( rc )
@@ -434,8 +434,8 @@ static int hvm_ioreq_server_setup_pages(struct hvm_ioreq_server *s,
                                         bool_t handle_bufioreq)
 {
     struct domain *d = s->domain;
-    unsigned long ioreq_pfn = INVALID_GFN;
-    unsigned long bufioreq_pfn = INVALID_GFN;
+    unsigned long ioreq_pfn = gfn_x(INVALID_GFN);
+    unsigned long bufioreq_pfn = gfn_x(INVALID_GFN);
     int rc;
 
     if ( is_default )
