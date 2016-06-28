@@ -806,7 +806,7 @@ int vm_event_monitor_traps(struct vcpu *v, uint8_t sync,
          * If there was no ring to handle the event, then
          * simply continue executing normally.
          */
-        return 1;
+        return 0;
     default:
         return rc;
     };
@@ -815,6 +815,7 @@ int vm_event_monitor_traps(struct vcpu *v, uint8_t sync,
     {
         req->flags |= VM_EVENT_FLAG_VCPU_PAUSED;
         vm_event_vcpu_pause(v);
+        rc = 1;
     }
 
     if ( altp2m_active(d) )
@@ -826,7 +827,7 @@ int vm_event_monitor_traps(struct vcpu *v, uint8_t sync,
     vm_event_fill_regs(req);
     vm_event_put_request(d, &d->vm_event->monitor, req);
 
-    return 1;
+    return rc;
 }
 
 /*

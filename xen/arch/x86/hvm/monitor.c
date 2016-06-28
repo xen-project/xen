@@ -48,8 +48,8 @@ bool_t hvm_monitor_cr(unsigned int index, unsigned long value, unsigned long old
             .u.write_ctrlreg.old_value = old
         };
 
-        vm_event_monitor_traps(curr, sync, &req);
-        return 1;
+        if ( vm_event_monitor_traps(curr, sync, &req) >= 0 )
+            return 1;
     }
 
     return 0;
