@@ -1292,26 +1292,26 @@ int map_dev_mmio_region(struct domain *d,
 }
 
 int guest_physmap_add_entry(struct domain *d,
-                            unsigned long gpfn,
-                            unsigned long mfn,
+                            gfn_t gfn,
+                            mfn_t mfn,
                             unsigned long page_order,
                             p2m_type_t t)
 {
     return apply_p2m_changes(d, INSERT,
-                             pfn_to_paddr(gpfn),
-                             pfn_to_paddr(gpfn + (1 << page_order)),
-                             pfn_to_paddr(mfn), MATTR_MEM, 0, t,
+                             pfn_to_paddr(gfn_x(gfn)),
+                             pfn_to_paddr(gfn_x(gfn) + (1 << page_order)),
+                             pfn_to_paddr(mfn_x(mfn)), MATTR_MEM, 0, t,
                              d->arch.p2m.default_access);
 }
 
 void guest_physmap_remove_page(struct domain *d,
-                               unsigned long gpfn,
-                               unsigned long mfn, unsigned int page_order)
+                               gfn_t gfn,
+                               mfn_t mfn, unsigned int page_order)
 {
     apply_p2m_changes(d, REMOVE,
-                      pfn_to_paddr(gpfn),
-                      pfn_to_paddr(gpfn + (1<<page_order)),
-                      pfn_to_paddr(mfn), MATTR_MEM, 0, p2m_invalid,
+                      pfn_to_paddr(gfn_x(gfn)),
+                      pfn_to_paddr(gfn_x(gfn) + (1<<page_order)),
+                      pfn_to_paddr(mfn_x(mfn)), MATTR_MEM, 0, p2m_invalid,
                       d->arch.p2m.default_access);
 }
 

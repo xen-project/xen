@@ -675,21 +675,20 @@ p2m_remove_page(struct p2m_domain *p2m, unsigned long gfn, unsigned long mfn,
 }
 
 int
-guest_physmap_remove_page(struct domain *d, unsigned long gfn,
-                          unsigned long mfn, unsigned int page_order)
+guest_physmap_remove_page(struct domain *d, gfn_t gfn,
+                          mfn_t mfn, unsigned int page_order)
 {
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
     int rc;
     gfn_lock(p2m, gfn, page_order);
-    rc = p2m_remove_page(p2m, gfn, mfn, page_order);
+    rc = p2m_remove_page(p2m, gfn_x(gfn), mfn_x(mfn), page_order);
     gfn_unlock(p2m, gfn, page_order);
     return rc;
 }
 
 int
-guest_physmap_add_entry(struct domain *d, unsigned long gfn,
-                        unsigned long mfn, unsigned int page_order, 
-                        p2m_type_t t)
+guest_physmap_add_entry(struct domain *d, gfn_t gfn, mfn_t mfn,
+                        unsigned int page_order, p2m_type_t t)
 {
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
     unsigned long i, ogfn;
@@ -705,13 +704,14 @@ guest_physmap_add_entry(struct domain *d, unsigned long gfn,
         {
             for ( i = 0; i < (1 << page_order); i++ )
             {
-                rc = iommu_map_page(
-                    d, mfn + i, mfn + i, IOMMUF_readable|IOMMUF_writable);
+                rc = iommu_map_page(d, mfn_x(mfn_add(mfn, i)),
+                                    mfn_x(mfn_add(mfn, i)),
+                                    IOMMUF_readable|IOMMUF_writable);
                 if ( rc != 0 )
                 {
                     while ( i-- > 0 )
                         /* If statement to satisfy __must_check. */
-                        if ( iommu_unmap_page(d, mfn + i) )
+                        if ( iommu_unmap_page(d, mfn_x(mfn_add(mfn, i))) )
                             continue;
 
                     return rc;
@@ -727,18 +727,20 @@ guest_physmap_add_entry(struct domain *d, unsigned long gfn,
 
     p2m_lock(p2m);
 
-    P2M_DEBUG("adding gfn=%#lx mfn=%#lx\n", gfn, mfn);
+    P2M_DEBUG("adding gfn=%#lx mfn=%#lx\n", gfn_x(gfn), mfn_x(mfn));
 
     /* First, remove m->p mappings for existing p->m mappings */
     for ( i = 0; i < (1UL << page_order); i++ )
     {
-        omfn = p2m->get_entry(p2m, gfn + i, &ot, &a, 0, NULL, NULL);
+        omfn = p2m->get_entry(p2m, gfn_x(gfn_add(gfn, i)), &ot,
+                              &a, 0, NULL, NULL);
         if ( p2m_is_shared(ot) )
         {
             /* Do an unshare to cleanly take care of all corner 
              * cases. */
             int rc;
-            rc = mem_sharing_unshare_page(p2m->domain, gfn + i, 0);
+            rc = mem_sharing_unshare_page(p2m->domain,
+                                          gfn_x(gfn_add(gfn, i)), 0);
             if ( rc )
             {
                 p2m_unlock(p2m);
@@ -753,10 +755,13 @@ guest_physmap_add_entry(struct domain *d, unsigned long gfn,
                  *
                  * Foreign domains are okay to place an event as they 
                  * won't go to sleep. */
-                (void)mem_sharing_notify_enomem(p2m->domain, gfn + i, 0);
+                (void)mem_sharing_notify_enomem(p2m->domain,
+                                                gfn_x(gfn_add(gfn, i)),
+                                                0);
                 return rc;
             }
-            omfn = p2m->get_entry(p2m, gfn + i, &ot, &a, 0, NULL, NULL);
+            omfn = p2m->get_entry(p2m, gfn_x(gfn_add(gfn, i)),
+                                  &ot, &a, 0, NULL, NULL);
             ASSERT(!p2m_is_shared(ot));
         }
         if ( p2m_is_grant(ot) || p2m_is_foreign(ot) )
@@ -787,39 +792,39 @@ guest_physmap_add_entry(struct domain *d, unsigned long gfn,
     /* Then, look for m->p mappings for this range and deal with them */
     for ( i = 0; i < (1UL << page_order); i++ )
     {
-        if ( page_get_owner(mfn_to_page(_mfn(mfn + i))) == dom_cow )
+        if ( page_get_owner(mfn_to_page(mfn_add(mfn, i))) == dom_cow )
         {
             /* This is no way to add a shared page to your physmap! */
-            gdprintk(XENLOG_ERR, "Adding shared mfn %lx directly to dom %hu "
-                        "physmap not allowed.\n", mfn+i, d->domain_id);
+            gdprintk(XENLOG_ERR, "Adding shared mfn %lx directly to dom%d physmap not allowed.\n",
+                     mfn_x(mfn_add(mfn, i)), d->domain_id);
             p2m_unlock(p2m);
             return -EINVAL;
         }
-        if ( page_get_owner(mfn_to_page(_mfn(mfn + i))) != d )
+        if ( page_get_owner(mfn_to_page(mfn_add(mfn, i))) != d )
             continue;
-        ogfn = mfn_to_gfn(d, _mfn(mfn+i));
-        if ( (ogfn != INVALID_M2P_ENTRY) && (ogfn != gfn + i) )
+        ogfn = mfn_to_gfn(d, mfn_add(mfn, i));
+        if ( (ogfn != INVALID_M2P_ENTRY) && (ogfn != gfn_x(gfn_add(gfn, i))) )
         {
             /* This machine frame is already mapped at another physical
              * address */
             P2M_DEBUG("aliased! mfn=%#lx, old gfn=%#lx, new gfn=%#lx\n",
-                      mfn + i, ogfn, gfn + i);
+                      mfn_x(mfn_add(mfn, i)), ogfn, gfn_x(gfn_add(gfn, i)));
             omfn = p2m->get_entry(p2m, ogfn, &ot, &a, 0, NULL, NULL);
             if ( p2m_is_ram(ot) && !p2m_is_paged(ot) )
             {
                 ASSERT(mfn_valid(omfn));
                 P2M_DEBUG("old gfn=%#lx -> mfn %#lx\n",
                           ogfn , mfn_x(omfn));
-                if ( mfn_x(omfn) == (mfn + i) )
-                    p2m_remove_page(p2m, ogfn, mfn + i, 0);
+                if ( mfn_eq(omfn, mfn_add(mfn, i)) )
+                    p2m_remove_page(p2m, ogfn, mfn_x(mfn_add(mfn, i)), 0);
             }
         }
     }
 
     /* Now, actually do the two-way mapping */
-    if ( mfn_valid(_mfn(mfn)) ) 
+    if ( mfn_valid(mfn) )
     {
-        rc = p2m_set_entry(p2m, gfn, _mfn(mfn), page_order, t,
+        rc = p2m_set_entry(p2m, gfn_x(gfn), mfn, page_order, t,
                            p2m->default_access);
         if ( rc )
             goto out; /* Failed to update p2m, bail without updating m2p. */
@@ -827,14 +832,15 @@ guest_physmap_add_entry(struct domain *d, unsigned long gfn,
         if ( !p2m_is_grant(t) )
         {
             for ( i = 0; i < (1UL << page_order); i++ )
-                set_gpfn_from_mfn(mfn+i, gfn+i);
+                set_gpfn_from_mfn(mfn_x(mfn_add(mfn, i)),
+                                  gfn_x(gfn_add(gfn, i)));
         }
     }
     else
     {
         gdprintk(XENLOG_WARNING, "Adding bad mfn to p2m map (%#lx -> %#lx)\n",
-                 gfn, mfn);
-        rc = p2m_set_entry(p2m, gfn, _mfn(INVALID_MFN), page_order,
+                 gfn_x(gfn), mfn_x(mfn));
+        rc = p2m_set_entry(p2m, gfn_x(gfn), _mfn(INVALID_MFN), page_order,
                            p2m_invalid, p2m->default_access);
         if ( rc == 0 )
         {
@@ -2798,7 +2804,7 @@ int p2m_add_foreign(struct domain *tdom, unsigned long fgfn,
                     unsigned long gpfn, domid_t foreigndom)
 {
     p2m_type_t p2mt, p2mt_prev;
-    unsigned long prev_mfn, mfn;
+    mfn_t prev_mfn, mfn;
     struct page_info *page;
     int rc;
     struct domain *fdom;
@@ -2841,15 +2847,15 @@ int p2m_add_foreign(struct domain *tdom, unsigned long fgfn,
         rc = -EINVAL;
         goto out;
     }
-    mfn = mfn_x(page_to_mfn(page));
+    mfn = page_to_mfn(page);
 
     /* Remove previously mapped page if it is present. */
-    prev_mfn = mfn_x(get_gfn(tdom, gpfn, &p2mt_prev));
-    if ( mfn_valid(_mfn(prev_mfn)) )
+    prev_mfn = get_gfn(tdom, gpfn, &p2mt_prev);
+    if ( mfn_valid(prev_mfn) )
     {
-        if ( is_xen_heap_mfn(prev_mfn) )
+        if ( is_xen_heap_mfn(mfn_x(prev_mfn)) )
             /* Xen heap frames are simply unhooked from this phys slot */
-            guest_physmap_remove_page(tdom, gpfn, prev_mfn, 0);
+            guest_physmap_remove_page(tdom, _gfn(gpfn), prev_mfn, 0);
         else
             /* Normal domain memory is freed, to avoid leaking memory. */
             guest_remove_page(tdom, gpfn);
@@ -2859,11 +2865,11 @@ int p2m_add_foreign(struct domain *tdom, unsigned long fgfn,
      * will update the m2p table which will result in  mfn -> gpfn of dom0
      * and not fgfn of domU.
      */
-    rc = set_foreign_p2m_entry(tdom, gpfn, _mfn(mfn));
+    rc = set_foreign_p2m_entry(tdom, gpfn, mfn);
     if ( rc )
         gdprintk(XENLOG_WARNING, "set_foreign_p2m_entry failed. "
                  "gpfn:%lx mfn:%lx fgfn:%lx td:%d fd:%d\n",
-                 gpfn, mfn, fgfn, tdom->domain_id, fdom->domain_id);
+                 gpfn, mfn_x(mfn), fgfn, tdom->domain_id, fdom->domain_id);
 
     put_page(page);
 

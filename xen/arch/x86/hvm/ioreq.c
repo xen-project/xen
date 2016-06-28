@@ -267,8 +267,8 @@ bool_t is_ioreq_server_page(struct domain *d, const struct page_info *page)
 static void hvm_remove_ioreq_gmfn(
     struct domain *d, struct hvm_ioreq_page *iorp)
 {
-    guest_physmap_remove_page(d, iorp->gmfn,
-                              page_to_mfn(iorp->page), 0);
+    guest_physmap_remove_page(d, _gfn(iorp->gmfn),
+                              _mfn(page_to_mfn(iorp->page)), 0);
     clear_page(iorp->va);
 }
 
@@ -279,8 +279,8 @@ static int hvm_add_ioreq_gmfn(
 
     clear_page(iorp->va);
 
-    rc = guest_physmap_add_page(d, iorp->gmfn,
-                                page_to_mfn(iorp->page), 0);
+    rc = guest_physmap_add_page(d, _gfn(iorp->gmfn),
+                                _mfn(page_to_mfn(iorp->page)), 0);
     if ( rc == 0 )
         paging_mark_dirty(d, page_to_mfn(iorp->page));
 

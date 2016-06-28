@@ -4211,7 +4211,8 @@ static int create_grant_p2m_mapping(uint64_t addr, unsigned long frame,
     else
         p2mt = p2m_grant_map_rw;
     rc = guest_physmap_add_entry(current->domain,
-                                 addr >> PAGE_SHIFT, frame, PAGE_ORDER_4K, p2mt);
+                                 _gfn(addr >> PAGE_SHIFT),
+                                 _mfn(frame), PAGE_ORDER_4K, p2mt);
     if ( rc )
         return GNTST_general_error;
     else
@@ -4268,7 +4269,7 @@ static int replace_grant_p2m_mapping(
                 type, mfn_x(old_mfn), frame);
         return GNTST_general_error;
     }
-    guest_physmap_remove_page(d, gfn, frame, PAGE_ORDER_4K);
+    guest_physmap_remove_page(d, _gfn(gfn), _mfn(frame), PAGE_ORDER_4K);
 
     put_gfn(d, gfn);
     return GNTST_okay;
@@ -4853,7 +4854,8 @@ int xenmem_add_to_physmap_one(
     {
         if ( is_xen_heap_mfn(prev_mfn) )
             /* Xen heap frames are simply unhooked from this phys slot. */
-            guest_physmap_remove_page(d, gpfn, prev_mfn, PAGE_ORDER_4K);
+            guest_physmap_remove_page(d, _gfn(gpfn), _mfn(prev_mfn),
+                                      PAGE_ORDER_4K);
         else
             /* Normal domain memory is freed, to avoid leaking memory. */
             guest_remove_page(d, gpfn);
@@ -4867,10 +4869,10 @@ int xenmem_add_to_physmap_one(
     if ( space == XENMAPSPACE_gmfn || space == XENMAPSPACE_gmfn_range )
         ASSERT( old_gpfn == gfn );
     if ( old_gpfn != INVALID_M2P_ENTRY )
-        guest_physmap_remove_page(d, old_gpfn, mfn, PAGE_ORDER_4K);
+        guest_physmap_remove_page(d, _gfn(old_gpfn), _mfn(mfn), PAGE_ORDER_4K);
 
     /* Map at new location. */
-    rc = guest_physmap_add_page(d, gpfn, mfn, PAGE_ORDER_4K);
+    rc = guest_physmap_add_page(d, _gfn(gpfn), _mfn(mfn), PAGE_ORDER_4K);
 
     /* In the XENMAPSPACE_gmfn, we took a ref of the gfn at the top */
     if ( space == XENMAPSPACE_gmfn || space == XENMAPSPACE_gmfn_range )

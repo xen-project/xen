@@ -117,7 +117,7 @@ static bool_t insert_11_bank(struct domain *d,
         goto fail;
     }
 
-    res = guest_physmap_add_page(d, spfn, spfn, order);
+    res = guest_physmap_add_page(d, _gfn(spfn), _mfn(spfn), order);
     if ( res )
         panic("Failed map pages to DOM0: %d", res);
 

@@ -427,7 +427,7 @@ static __init void pvh_add_mem_mapping(struct domain *d, unsigned long gfn,
         if ( !iomem_access_permitted(d, mfn + i, mfn + i) )
         {
             omfn = get_gfn_query_unlocked(d, gfn + i, &t);
-            guest_physmap_remove_page(d, gfn + i, mfn_x(omfn), PAGE_ORDER_4K);
+            guest_physmap_remove_page(d, _gfn(gfn + i), omfn, PAGE_ORDER_4K);
             continue;
         }
 
@@ -530,7 +530,7 @@ static __init void pvh_map_all_iomem(struct domain *d, unsigned long nr_pages)
             if ( get_gpfn_from_mfn(mfn) != INVALID_M2P_ENTRY )
                 continue;
 
-            rc = guest_physmap_add_page(d, start_pfn, mfn, 0);
+            rc = guest_physmap_add_page(d, _gfn(start_pfn), _mfn(mfn), 0);
             if ( rc != 0 )
                 panic("Unable to add gpfn %#lx mfn %#lx to Dom0 physmap: %d",
                       start_pfn, mfn, rc);
@@ -605,7 +605,7 @@ static __init void dom0_update_physmap(struct domain *d, unsigned long pfn,
 {
     if ( is_pvh_domain(d) )
     {
-        int rc = guest_physmap_add_page(d, pfn, mfn, 0);
+        int rc = guest_physmap_add_page(d, _gfn(pfn), _mfn(mfn), 0);
         BUG_ON(rc);
         return;
     }

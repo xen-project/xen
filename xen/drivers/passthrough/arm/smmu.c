@@ -2774,7 +2774,7 @@ static int __must_check arm_smmu_map_page(struct domain *d, unsigned long gfn,
 	 * The function guest_physmap_add_entry replaces the current mapping
 	 * if there is already one...
 	 */
-	return guest_physmap_add_entry(d, gfn, mfn, 0, t);
+	return guest_physmap_add_entry(d, _gfn(gfn), _mfn(mfn), 0, t);
 }
 
 static int __must_check arm_smmu_unmap_page(struct domain *d, unsigned long gfn)
@@ -2786,7 +2786,7 @@ static int __must_check arm_smmu_unmap_page(struct domain *d, unsigned long gfn)
 	if ( !is_domain_direct_mapped(d) )
 		return -EINVAL;
 
-	guest_physmap_remove_page(d, gfn, gfn, 0);
+	guest_physmap_remove_page(d, _gfn(gfn), _mfn(gfn), 0);
 
 	return 0;
 }

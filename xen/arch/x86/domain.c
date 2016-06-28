@@ -802,9 +802,10 @@ int arch_domain_soft_reset(struct domain *d)
         ret = -ENOMEM;
         goto exit_put_gfn;
     }
-    guest_physmap_remove_page(d, gfn, mfn, PAGE_ORDER_4K);
+    guest_physmap_remove_page(d, _gfn(gfn), _mfn(mfn), PAGE_ORDER_4K);
 
-    ret = guest_physmap_add_page(d, gfn, page_to_mfn(new_page), PAGE_ORDER_4K);
+    ret = guest_physmap_add_page(d, _gfn(gfn), _mfn(page_to_mfn(new_page)),
+                                 PAGE_ORDER_4K);
     if ( ret )
     {
         printk(XENLOG_G_ERR "Failed to add a page to replace"

@@ -1153,7 +1153,7 @@ int xenmem_add_to_physmap_one(
     }
 
     /* Map at new location. */
-    rc = guest_physmap_add_entry(d, gpfn, mfn, 0, t);
+    rc = guest_physmap_add_entry(d, _gfn(gpfn), _mfn(mfn), 0, t);
 
     /* If we fail to add the mapping, we need to drop the reference we
      * took earlier on foreign pages */
@@ -1282,8 +1282,8 @@ int create_grant_host_mapping(unsigned long addr, unsigned long frame,
     if ( flags & GNTMAP_readonly )
         t = p2m_grant_map_ro;
 
-    rc = guest_physmap_add_entry(current->domain, addr >> PAGE_SHIFT,
-                                 frame, 0, t);
+    rc = guest_physmap_add_entry(current->domain, _gfn(addr >> PAGE_SHIFT),
+                                 _mfn(frame), 0, t);
 
     if ( rc )
         return GNTST_general_error;
@@ -1294,13 +1294,13 @@ int create_grant_host_mapping(unsigned long addr, unsigned long frame,
 int replace_grant_host_mapping(unsigned long addr, unsigned long mfn,
         unsigned long new_addr, unsigned int flags)
 {
-    unsigned long gfn = (unsigned long)(addr >> PAGE_SHIFT);
+    gfn_t gfn = _gfn(addr >> PAGE_SHIFT);
     struct domain *d = current->domain;
 
     if ( new_addr != 0 || (flags & GNTMAP_contains_pte) )
         return GNTST_general_error;
 
-    guest_physmap_remove_page(d, gfn, mfn, 0);
+    guest_physmap_remove_page(d, gfn, _mfn(mfn), 0);
 
     return GNTST_okay;
 }

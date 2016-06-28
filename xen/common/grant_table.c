@@ -1818,7 +1818,7 @@ gnttab_transfer(
             goto copyback;
         }
 
-        guest_physmap_remove_page(d, gop.mfn, mfn, 0);
+        guest_physmap_remove_page(d, _gfn(gop.mfn), _mfn(mfn), 0);
         gnttab_flush_tlb(d);
 
         /* Find the target domain. */
@@ -1946,7 +1946,7 @@ gnttab_transfer(
         {
             grant_entry_v1_t *sha = &shared_entry_v1(e->grant_table, gop.ref);
 
-            guest_physmap_add_page(e, sha->frame, mfn, 0);
+            guest_physmap_add_page(e, _gfn(sha->frame), _mfn(mfn), 0);
             if ( !paging_mode_translate(e) )
                 sha->frame = mfn;
         }
@@ -1954,7 +1954,8 @@ gnttab_transfer(
         {
             grant_entry_v2_t *sha = &shared_entry_v2(e->grant_table, gop.ref);
 
-            guest_physmap_add_page(e, sha->full_page.frame, mfn, 0);
+            guest_physmap_add_page(e, _gfn(sha->full_page.frame),
+                                   _mfn(mfn), 0);
             if ( !paging_mode_translate(e) )
                 sha->full_page.frame = mfn;
         }
