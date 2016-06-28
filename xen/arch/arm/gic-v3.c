@@ -1134,14 +1134,6 @@ static const hw_irq_controller gicv3_guest_irq_type = {
     .set_affinity = gicv3_irq_set_affinity,
 };
 
-static int __init cmp_rdist(const void *a, const void *b)
-{
-    const struct rdist_region *l = a, *r = a;
-
-    /* We assume that re-distributor regions can never overlap */
-    return ( l->base < r->base) ? -1 : 0;
-}
-
 static paddr_t __initdata dbase = INVALID_PADDR;
 static paddr_t __initdata vbase = INVALID_PADDR, vsize = 0;
 static paddr_t __initdata cbase = INVALID_PADDR, csize = 0;
@@ -1209,9 +1201,6 @@ static void __init gicv3_dt_init(void)
         rdist_regs[i].base = rdist_base;
         rdist_regs[i].size = rdist_size;
     }
-
-    /* The vGIC code requires the region to be sorted */
-    sort(rdist_regs, gicv3.rdist_count, sizeof(*rdist_regs), cmp_rdist, NULL);
 
     if ( !dt_property_read_u32(node, "redistributor-stride", &gicv3.rdist_stride) )
         gicv3.rdist_stride = 0;
@@ -1454,9 +1443,6 @@ static void __init gicv3_acpi_init(void)
         rdist_regs[i].base = gic_rdist->base_address;
         rdist_regs[i].size = gic_rdist->length;
     }
-
-    /* The vGIC code requires the region to be sorted */
-    sort(rdist_regs, gicv3.rdist_count, sizeof(*rdist_regs), cmp_rdist, NULL);
 
     gicv3.rdist_regions= rdist_regs;
 
