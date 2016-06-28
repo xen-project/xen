@@ -59,8 +59,9 @@ int ats_device(const struct pci_dev *, const struct acpi_drhd_unit *);
 int dev_invalidate_iotlb(struct iommu *iommu, u16 did,
                          u64 addr, unsigned int size_order, u64 type);
 
-int qinval_device_iotlb(struct iommu *iommu,
-                        u32 max_invs_pend, u16 sid, u16 size, u64 addr);
+int __must_check qinval_device_iotlb_sync(struct iommu *iommu,
+                                          u32 max_invs_pend,
+                                          u16 sid, u16 size, u64 addr);
 
 unsigned int get_cache_line_size(void);
 void cacheline_flush(char *);

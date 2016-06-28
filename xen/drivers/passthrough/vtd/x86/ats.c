@@ -134,8 +134,8 @@ int dev_invalidate_iotlb(struct iommu *iommu, u16 did,
             /* invalidate all translations: sbit=1,bit_63=0,bit[62:12]=1 */
             sbit = 1;
             addr = (~0UL << PAGE_SHIFT_4K) & 0x7FFFFFFFFFFFFFFF;
-            rc = qinval_device_iotlb(iommu, pdev->ats_queue_depth,
-                                     sid, sbit, addr);
+            rc = qinval_device_iotlb_sync(iommu, pdev->ats_queue_depth,
+                                          sid, sbit, addr);
             break;
         case DMA_TLB_PSI_FLUSH:
             if ( !device_in_domain(iommu, pdev, did) )
@@ -154,8 +154,8 @@ int dev_invalidate_iotlb(struct iommu *iommu, u16 did,
                 addr |= (((u64)1 << (size_order - 1)) - 1) << PAGE_SHIFT_4K;
             }
 
-            rc = qinval_device_iotlb(iommu, pdev->ats_queue_depth,
-                                     sid, sbit, addr);
+            rc = qinval_device_iotlb_sync(iommu, pdev->ats_queue_depth,
+                                          sid, sbit, addr);
             break;
         default:
             dprintk(XENLOG_WARNING VTDPREFIX, "invalid vt-d flush type\n");
