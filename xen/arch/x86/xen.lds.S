@@ -40,9 +40,20 @@ SECTIONS
 #if !defined(EFI)
   . = __XEN_VIRT_START;
   __image_base__ = .;
+#else
+  . = __image_base__;
 #endif
 
+#if 0
+/*
+ * We don't really use this symbol anywhere, and the way it would get defined
+ * here would result in it having a negative (wrapped to huge positive)
+ * offset relative to the .text section. That, in turn, causes an assembler
+ * truncation warning when including all symbols in the symbol table for Live
+ * Patching code.
+ */
   __2M_text_start = .;         /* Start of 2M superpages, mapped RX. */
+#endif
 
   . = __XEN_VIRT_START + MB(1);
   _start = .;
@@ -189,14 +200,13 @@ SECTIONS
        *(.ctors)
        __ctors_end = .;
   } :text
-  . = ALIGN(PAGE_SIZE);
-  __init_end = .;
 
 #ifdef EFI
   . = ALIGN(MB(2));
 #else
   . = ALIGN(PAGE_SIZE);
 #endif
+  __init_end = .;
   __2M_init_end = .;
 
   __2M_rwdata_start = .;       /* Start of 2M superpages, mapped RW. */
@@ -291,7 +301,6 @@ ASSERT(__image_base__ > XEN_VIRT_START ||
 ASSERT(kexec_reloc_size - kexec_reloc <= PAGE_SIZE, "kexec_reloc is too large")
 #endif
 
-ASSERT(IS_ALIGNED(__2M_text_start,   MB(2)), "__2M_text_start misaligned")
 #ifdef EFI
 ASSERT(IS_ALIGNED(__2M_text_end,     MB(2)), "__2M_text_end misaligned")
 ASSERT(IS_ALIGNED(__2M_rodata_start, MB(2)), "__2M_rodata_start misaligned")

@@ -515,6 +515,7 @@ static inline bool_t using_2M_mapping(void)
 static void noinline init_done(void)
 {
     void *va;
+    unsigned long start, end;
 
     system_state = SYS_STATE_active;
 
@@ -530,18 +531,18 @@ static void noinline init_done(void)
     /* Destroy Xen's mappings, and reuse the pages. */
     if ( using_2M_mapping() )
     {
-        destroy_xen_mappings((unsigned long)&__2M_init_start,
-                             (unsigned long)&__2M_init_end);
-        init_xenheap_pages(__pa(__2M_init_start), __pa(__2M_init_end));
+        start = (unsigned long)&__2M_init_start,
+        end   = (unsigned long)&__2M_init_end;
     }
     else
     {
-        destroy_xen_mappings((unsigned long)&__init_begin,
-                             (unsigned long)&__init_end);
-        init_xenheap_pages(__pa(__init_begin), __pa(__init_end));
+        start = (unsigned long)&__init_begin;
+        end   = (unsigned long)&__init_end;
     }
 
-    printk("Freed %ldkB init memory.\n", (long)(__init_end-__init_begin)>>10);
+    destroy_xen_mappings(start, end);
+    init_xenheap_pages(__pa(start), __pa(end));
+    printk("Freed %lukB init memory\n", (end - start) >> 10);
 
     startup_cpu_idle_loop();
 }
