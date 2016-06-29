@@ -29,7 +29,7 @@
 #define ZIMAGE32_MAGIC 0x016f2818
 
 #define ZIMAGE64_MAGIC_V0 0x14000008
-#define ZIMAGE64_MAGIC 0x644d5241 /* "ARM\x64" */
+#define ZIMAGE64_MAGIC_V1 0x644d5241 /* "ARM\x64" */
 
 struct minimal_dtb_header {
     uint32_t magic;
@@ -335,19 +335,17 @@ static int kernel_zimage64_probe(struct kernel_info *info,
 {
     /* linux/Documentation/arm64/booting.txt */
     struct {
-        union {
-                uint32_t code0;
-                uint32_t magic0; /* Old header magic */
-        };
-        uint32_t code1;
-        uint64_t text_offset;  /* Image load offset, little endian */
-        uint64_t image_size;   /* Effective Image size, little endian */
-        uint64_t flags;
+        uint32_t magic0;
+        uint32_t res0;
+        uint64_t text_offset;  /* Image load offset */
+        uint64_t res1;
         uint64_t res2;
+        /* zImage V1 only from here */
         uint64_t res3;
         uint64_t res4;
-        uint32_t magic;        /* Magic number, little endian, "ARM\x64" */
-        uint32_t res5;
+        uint64_t res5;
+        uint32_t magic1;
+        uint32_t res6;
     } zimage;
     uint64_t start, end;
 
@@ -356,29 +354,20 @@ static int kernel_zimage64_probe(struct kernel_info *info,
 
     copy_from_paddr(&zimage, addr, sizeof(zimage));
 
-    if ( zimage.magic != ZIMAGE64_MAGIC ) {
-        if ( zimage.magic0 == ZIMAGE64_MAGIC_V0 )
-             printk(XENLOG_ERR "No valid magic found in header! Kernel too old\n");
+    if ( zimage.magic0 != ZIMAGE64_MAGIC_V0 &&
+         zimage.magic1 != ZIMAGE64_MAGIC_V1 )
         return -EINVAL;
-    }
 
+    /* Currently there is no length in the header, so just use the size */
     start = 0;
+    end = size;
 
     /*
-     * Where image_size is non-zero image_size is little-endian
-     * and must be respected.
+     * Given the above this check is a bit pointless, but leave it
+     * here in case someone adds a length field in the future.
      */
-    if ( zimage.image_size )
-        end = zimage.image_size;
-    else
-        end = size;
-
-    if ( (end - start) > size ) {
-        printk(XENLOG_ERR "Error: Kernel Image size: %lu bytes > bootmodule size: %lu bytes\n",
-               zimage.image_size, (uint64_t)size);
-        printk(XENLOG_ERR "The field 'size' does not match the size of blob!\n");
+    if ( (end - start) > size )
         return -EINVAL;
-    }
 
     info->zimage.kernel_addr = addr;
     info->zimage.len = end - start;
