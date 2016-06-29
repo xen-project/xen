@@ -155,10 +155,6 @@ SECTIONS
        *(.init.data.rel)
        *(.init.data.rel.*)
 
-       __xsm_init_policy_start = .;
-       *(.init.xsm_policy)
-       __xsm_init_policy_end = .;
-
        . = ALIGN(8);
        __ctors_start = .;
        *(.init_array)

@@ -143,23 +143,6 @@ config FLASK_AVC_STATS
 
 	  If unsure, say Y.
 
-config XSM_POLICY
-	bool "Compile Xen with a built-in security policy"
-	default y
-	depends on XSM
-	---help---
-	  This includes a default XSM policy in the hypervisor so that the
-	  bootloader does not need to load a policy to get sane behavior from an
-	  XSM-enabled hypervisor.  If this is disabled, a policy must be
-	  provided by the bootloader or by Domain 0.  Even if this is enabled, a
-	  policy provided by the bootloader will override it.
-
-	  This requires that the SELinux policy compiler (checkpolicy) be
-	  available when compiling the hypervisor; if this tool is not found, no
-	  policy will be added.
-
-	  If unsure, say Y.
-
 # Enable schedulers
 menu "Schedulers"
 	visible if EXPERT = "y"

@@ -27,23 +27,6 @@ $(FLASK_H_FILES): $(FLASK_H_DEPEND)
 $(AV_H_FILES): $(AV_H_DEPEND)
 	$(CONFIG_SHELL) policy/mkaccess_vector.sh $(AWK) $(AV_H_DEPEND)
 
-ifeq ($(CONFIG_XSM_POLICY),y)
-HAS_CHECKPOLICY := $(shell checkpolicy -h 2>&1 | grep -q xen && echo y || echo n)
-
-obj-$(HAS_CHECKPOLICY) += policy.o
-endif
-
-LDFLAGS += --accept-unknown-input-arch
-
-POLICY_SRC := $(XEN_ROOT)/tools/flask/policy/xenpolicy-$(XEN_FULLVERSION)
-
-policy.bin: FORCE
-	$(MAKE) -C $(XEN_ROOT)/tools/flask/policy
-	cmp -s $(POLICY_SRC) $@ || cp $(POLICY_SRC) $@
-
-policy.o: policy.bin
-	$(OBJCOPY) -S -I binary -O elf64-little --rename-section=.data=.init.xsm_policy $< $@
-
 .PHONY: clean
 clean::
 	rm -f $(ALL_H_FILES) *.o $(DEPS)

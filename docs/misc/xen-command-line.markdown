@@ -712,15 +712,13 @@ enabled by running either:
   with untrusted guests.  If a policy is provided by the bootloader, it will be
   loaded; errors will be reported to the ring buffer but will not prevent
   booting.  The policy can be changed to enforcing mode using "xl setenforce".
-* `enforcing`: This will cause the security server to enter enforcing mode prior
-  to the creation of domain 0.  If an valid policy is not provided by the
-  bootloader and no built-in policy is present, the hypervisor will not continue
-  booting.
-* `late`: This disables loading of the built-in security policy or the policy
-  provided by the bootloader.  FLASK will be enabled but will not enforce access
-  controls until a policy is loaded by a domain using "xl loadpolicy".  Once a
-  policy is loaded, FLASK will run in enforcing mode unless "xl setenforce" has
-  changed that setting.
+* `enforcing`: This requires a security policy to be provided by the bootloader
+  and will enter enforcing mode prior to the creation of domain 0.  If a valid
+  policy is not provided, the hypervisor will not continue booting.
+* `late`: This disables loading of the security policy from the bootloader.
+  FLASK will be enabled but will not enforce access controls until a policy is
+  loaded by a domain using "xl loadpolicy".  Once a policy is loaded, FLASK will
+  run in enforcing mode unless "xl setenforce" has changed that setting.
 * `disabled`: This causes the XSM framework to revert to the dummy module.  The
   dummy module provides the same security policy as is used when compiling the
   hypervisor without support for XSM.  The xsm\_op hypercall can also be used to

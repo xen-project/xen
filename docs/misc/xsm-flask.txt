@@ -141,21 +141,21 @@ only type enforcement is used and the user and role are set to system_u and
 system_r for all domains.
 
 The FLASK security framework is mostly configured using a security policy file.
-It relies on the SELinux compiler "checkpolicy"; if this is available, the
-policy will be compiled as part of the tools build.  If hypervisor support for a
-built-in policy is enabled ("Compile Xen with a built-in security policy"), the
-policy will be built during the hypervisor build.
+This policy file is not normally generated during the Xen build process because
+it relies on the SELinux compiler "checkpolicy"; run
 
-The policy is generated from definition files in tools/flask/policy.  Most
-changes to security policy will involve creating or modifying modules found in
-tools/flask/policy/modules/.  The modules.conf file there defines what modules
-are enabled and has short descriptions of each module.
+	make -C tools/flask/policy
 
-If not using the built-in policy, the XSM policy file needs to be copied to
-/boot and loaded as a module by grub.  The exact position and filename of the
-module does not matter as long as it is after the Xen kernel; it is normally
-placed either just above the dom0 kernel or at the end.  Once dom0 is running,
-the policy can be reloaded using "xl loadpolicy".
+to compile the example policy included with Xen. The policy is generated from
+definition files under this directory. Most changes to security policy will
+involve creating or modifying modules found in tools/flask/policy/modules/.  The
+modules.conf file there defines what modules are enabled and has short
+descriptions of each module.
+
+The XSM policy file needs to be copied to /boot and loaded as a module by grub.
+The exact position of the module does not matter as long as it is after the Xen
+kernel; it is normally placed either just above the dom0 kernel or at the end.
+Once dom0 is running, the policy can be reloaded using "xl loadpolicy".
 
 The example policy included with Xen demonstrates most of the features of FLASK
 that can be used without dom0 disaggregation. The main types for domUs are:
