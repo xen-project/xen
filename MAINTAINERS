@@ -206,7 +206,7 @@ F:	xen/common/event_fifo.c
 F:	xen/include/xen/event_fifo.h
 
 GDBSX DEBUGGER
-M:	Mukesh Rathor <mukesh.rathor@oracle.com>
+M:	Elena Ufimtseva <elena.ufimtseva@oracle.com>
 S:	Supported
 F:	xen/arch/x86/debug.c
 F:	tools/debugger/gdbsx/
