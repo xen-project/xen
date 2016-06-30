@@ -604,14 +604,14 @@ int vmx_cpu_up(void)
         return -EINVAL;
     }
 
-    rdmsr(IA32_FEATURE_CONTROL_MSR, eax, edx);
+    rdmsr(MSR_IA32_FEATURE_CONTROL, eax, edx);
 
-    bios_locked = !!(eax & IA32_FEATURE_CONTROL_MSR_LOCK);
+    bios_locked = !!(eax & IA32_FEATURE_CONTROL_LOCK);
     if ( bios_locked )
     {
         if ( !(eax & (tboot_in_measured_env()
-                      ? IA32_FEATURE_CONTROL_MSR_ENABLE_VMXON_INSIDE_SMX
-                      : IA32_FEATURE_CONTROL_MSR_ENABLE_VMXON_OUTSIDE_SMX)) )
+                      ? IA32_FEATURE_CONTROL_ENABLE_VMXON_INSIDE_SMX
+                      : IA32_FEATURE_CONTROL_ENABLE_VMXON_OUTSIDE_SMX)) )
         {
             printk("CPU%d: VMX disabled by BIOS.\n", cpu);
             return -EINVAL;
@@ -619,11 +619,11 @@ int vmx_cpu_up(void)
     }
     else
     {
-        eax  = IA32_FEATURE_CONTROL_MSR_LOCK;
-        eax |= IA32_FEATURE_CONTROL_MSR_ENABLE_VMXON_OUTSIDE_SMX;
+        eax  = IA32_FEATURE_CONTROL_LOCK;
+        eax |= IA32_FEATURE_CONTROL_ENABLE_VMXON_OUTSIDE_SMX;
         if ( test_bit(X86_FEATURE_SMX, &boot_cpu_data.x86_capability) )
-            eax |= IA32_FEATURE_CONTROL_MSR_ENABLE_VMXON_INSIDE_SMX;
-        wrmsr(IA32_FEATURE_CONTROL_MSR, eax, 0);
+            eax |= IA32_FEATURE_CONTROL_ENABLE_VMXON_INSIDE_SMX;
+        wrmsr(MSR_IA32_FEATURE_CONTROL, eax, 0);
     }
 
     if ( (rc = vmx_init_vmcs_config()) != 0 )
@@ -639,8 +639,8 @@ int vmx_cpu_up(void)
     case -2: /* #UD or #GP */
         if ( bios_locked &&
              test_bit(X86_FEATURE_SMX, &boot_cpu_data.x86_capability) &&
-             (!(eax & IA32_FEATURE_CONTROL_MSR_ENABLE_VMXON_OUTSIDE_SMX) ||
-              !(eax & IA32_FEATURE_CONTROL_MSR_ENABLE_VMXON_INSIDE_SMX)) )
+             (!(eax & IA32_FEATURE_CONTROL_ENABLE_VMXON_OUTSIDE_SMX) ||
+              !(eax & IA32_FEATURE_CONTROL_ENABLE_VMXON_INSIDE_SMX)) )
         {
             printk("CPU%d: VMXON failed: perhaps because of TXT settings "
                    "in your BIOS configuration?\n", cpu);

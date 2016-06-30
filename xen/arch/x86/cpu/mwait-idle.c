@@ -1006,7 +1006,7 @@ static void __init sklh_idle_state_table_update(void)
 		rdmsrl(MSR_IA32_FEATURE_CONTROL, msr);
 
 		/* if SGX is enabled */
-		if (msr & (1 << 18))
+		if (msr & IA32_FEATURE_CONTROL_SGX_ENABLE)
 			return;
 	}
 
