@@ -1637,6 +1637,11 @@ void vmx_vmentry_failure(void)
     __vmread(VM_INSTRUCTION_ERROR, &error);
     gprintk(XENLOG_ERR, "VM%s error: %#lx\n",
             curr->arch.hvm_vmx.launched ? "RESUME" : "LAUNCH", error);
+
+    if ( error == VMX_INSN_INVALID_CONTROL_STATE ||
+         error == VMX_INSN_INVALID_HOST_STATE )
+        vmcs_dump_vcpu(curr);
+
     domain_crash_synchronous();
 }
 
