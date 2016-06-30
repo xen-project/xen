@@ -5928,6 +5928,33 @@ int main_vcpuset(int argc, char **argv)
     return EXIT_SUCCESS;
 }
 
+/* Possibly select a specific piece of `xl info` to print. */
+static const char *info_name;
+static int maybe_printf(const char *fmt, ...) __attribute__((format(printf,1,2)));
+static int maybe_printf(const char *fmt, ...)
+{
+    va_list ap;
+    char *str;
+    int count = 0;
+
+    va_start(ap, fmt);
+    if (vasprintf(&str, fmt, ap) != -1) {
+        if (info_name) {
+            char *s;
+
+            if (!strncmp(str, info_name, strlen(info_name)) &&
+                (s = strchr(str, ':')) && s[1] == ' ')
+                count = fputs(&s[2], stdout);
+        } else
+            count = fputs(str, stdout);
+
+        free(str);
+    }
+    va_end(ap);
+
+    return count;
+}
+
 static void output_xeninfo(void)
 {
     const libxl_version_info *info;
@@ -5946,22 +5973,22 @@ static void output_xeninfo(void)
     }
     sched = rc;
 
-    printf("xen_major              : %d\n", info->xen_version_major);
-    printf("xen_minor              : %d\n", info->xen_version_minor);
-    printf("xen_extra              : %s\n", info->xen_version_extra);
-    printf("xen_version            : %d.%d%s\n", info->xen_version_major,
+    maybe_printf("xen_major              : %d\n", info->xen_version_major);
+    maybe_printf("xen_minor              : %d\n", info->xen_version_minor);
+    maybe_printf("xen_extra              : %s\n", info->xen_version_extra);
+    maybe_printf("xen_version            : %d.%d%s\n", info->xen_version_major,
            info->xen_version_minor, info->xen_version_extra);
-    printf("xen_caps               : %s\n", info->capabilities);
-    printf("xen_scheduler          : %s\n", libxl_scheduler_to_string(sched));
-    printf("xen_pagesize           : %u\n", info->pagesize);
-    printf("platform_params        : virt_start=0x%"PRIx64"\n", info->virt_start);
-    printf("xen_changeset          : %s\n", info->changeset);
-    printf("xen_commandline        : %s\n", info->commandline);
-    printf("cc_compiler            : %s\n", info->compiler);
-    printf("cc_compile_by          : %s\n", info->compile_by);
-    printf("cc_compile_domain      : %s\n", info->compile_domain);
-    printf("cc_compile_date        : %s\n", info->compile_date);
-    printf("build_id               : %s\n", info->build_id);
+    maybe_printf("xen_caps               : %s\n", info->capabilities);
+    maybe_printf("xen_scheduler          : %s\n", libxl_scheduler_to_string(sched));
+    maybe_printf("xen_pagesize           : %u\n", info->pagesize);
+    maybe_printf("platform_params        : virt_start=0x%"PRIx64"\n", info->virt_start);
+    maybe_printf("xen_changeset          : %s\n", info->changeset);
+    maybe_printf("xen_commandline        : %s\n", info->commandline);
+    maybe_printf("cc_compiler            : %s\n", info->compiler);
+    maybe_printf("cc_compile_by          : %s\n", info->compile_by);
+    maybe_printf("cc_compile_domain      : %s\n", info->compile_domain);
+    maybe_printf("cc_compile_date        : %s\n", info->compile_date);
+    maybe_printf("build_id               : %s\n", info->build_id);
 
     return;
 }
@@ -5973,10 +6000,10 @@ static void output_nodeinfo(void)
     if (uname(&utsbuf) < 0)
         return;
 
-    printf("host                   : %s\n", utsbuf.nodename);
-    printf("release                : %s\n", utsbuf.release);
-    printf("version                : %s\n", utsbuf.version);
-    printf("machine                : %s\n", utsbuf.machine);
+    maybe_printf("host                   : %s\n", utsbuf.nodename);
+    maybe_printf("release                : %s\n", utsbuf.release);
+    maybe_printf("version                : %s\n", utsbuf.version);
+    maybe_printf("machine                : %s\n", utsbuf.machine);
 }
 
 static void output_physinfo(void)
@@ -5991,35 +6018,37 @@ static void output_physinfo(void)
         fprintf(stderr, "libxl_physinfo failed.\n");
         return;
     }
-    printf("nr_cpus                : %d\n", info.nr_cpus);
-    printf("max_cpu_id             : %d\n", info.max_cpu_id);
-    printf("nr_nodes               : %d\n", info.nr_nodes);
-    printf("cores_per_socket       : %d\n", info.cores_per_socket);
-    printf("threads_per_core       : %d\n", info.threads_per_core);
-    printf("cpu_mhz                : %d\n", info.cpu_khz / 1000);
-    printf("hw_caps                : ");
-    for (i = 0; i < 8; i++)
-        printf("%08x%c", info.hw_cap[i], i < 7 ? ':' : '\n');
-    printf("virt_caps              :");
-    if (info.cap_hvm)
-        printf(" hvm");
-    if (info.cap_hvm_directio)
-        printf(" hvm_directio");
-    printf("\n");
+    maybe_printf("nr_cpus                : %d\n", info.nr_cpus);
+    maybe_printf("max_cpu_id             : %d\n", info.max_cpu_id);
+    maybe_printf("nr_nodes               : %d\n", info.nr_nodes);
+    maybe_printf("cores_per_socket       : %d\n", info.cores_per_socket);
+    maybe_printf("threads_per_core       : %d\n", info.threads_per_core);
+    maybe_printf("cpu_mhz                : %d\n", info.cpu_khz / 1000);
+
+    maybe_printf("hw_caps                : %08x:%08x:%08x:%08x:%08x:%08x:%08x:%08x\n",
+         info.hw_cap[0], info.hw_cap[1], info.hw_cap[2], info.hw_cap[3],
+         info.hw_cap[4], info.hw_cap[5], info.hw_cap[6], info.hw_cap[7]
+        );
+
+    maybe_printf("virt_caps              :%s%s\n",
+         info.cap_hvm ? " hvm" : "",
+         info.cap_hvm_directio ? " hvm_directio" : ""
+        );
+
     vinfo = libxl_get_version_info(ctx);
     if (vinfo) {
         i = (1 << 20) / vinfo->pagesize;
-        printf("total_memory           : %"PRIu64"\n", info.total_pages / i);
-        printf("free_memory            : %"PRIu64"\n", (info.free_pages - info.outstanding_pages) / i);
-        printf("sharing_freed_memory   : %"PRIu64"\n", info.sharing_freed_pages / i);
-        printf("sharing_used_memory    : %"PRIu64"\n", info.sharing_used_frames / i);
-        printf("outstanding_claims     : %"PRIu64"\n", info.outstanding_pages / i);
+        maybe_printf("total_memory           : %"PRIu64"\n", info.total_pages / i);
+        maybe_printf("free_memory            : %"PRIu64"\n", (info.free_pages - info.outstanding_pages) / i);
+        maybe_printf("sharing_freed_memory   : %"PRIu64"\n", info.sharing_freed_pages / i);
+        maybe_printf("sharing_used_memory    : %"PRIu64"\n", info.sharing_used_frames / i);
+        maybe_printf("outstanding_claims     : %"PRIu64"\n", info.outstanding_pages / i);
     }
     if (!libxl_get_freecpus(ctx, &cpumap)) {
         libxl_for_each_bit(i, cpumap)
             if (libxl_bitmap_test(&cpumap, i))
                 n++;
-        printf("free_cpus              : %d\n", n);
+        maybe_printf("free_cpus              : %d\n", n);
         free(cpumap.map);
     }
     libxl_physinfo_dispose(&info);
@@ -6119,7 +6148,7 @@ static void print_info(int numa)
     }
     output_xeninfo();
 
-    printf("xend_config_format     : 4\n");
+    maybe_printf("xend_config_format     : 4\n");
 
     return;
 }
@@ -6138,6 +6167,13 @@ int main_info(int argc, char **argv)
         numa = 1;
         break;
     }
+
+    /*
+     * If an extra argument is provided, filter out a specific piece of
+     * information.
+     */
+    if (numa == 0 && argc > optind)
+        info_name = argv[optind];
 
     print_info(numa);
     return 0;
