@@ -2497,24 +2497,28 @@ bool_t hvm_virtual_to_linear_addr(
         if ( !reg->attr.fields.p )
             goto out;
 
-        switch ( access_type )
+        /* Read/write restrictions only exist for user segments. */
+        if ( reg->attr.fields.s )
         {
-        case hvm_access_read:
-            if ( (reg->attr.fields.type & 0xa) == 0x8 )
-                goto out; /* execute-only code segment */
-            break;
-        case hvm_access_write:
-            if ( (reg->attr.fields.type & 0xa) != 0x2 )
-                goto out; /* not a writable data segment */
-            break;
-        default:
-            break;
+            switch ( access_type )
+            {
+            case hvm_access_read:
+                if ( (reg->attr.fields.type & 0xa) == 0x8 )
+                    goto out; /* execute-only code segment */
+                break;
+            case hvm_access_write:
+                if ( (reg->attr.fields.type & 0xa) != 0x2 )
+                    goto out; /* not a writable data segment */
+                break;
+            default:
+                break;
+            }
         }
 
         last_byte = (uint32_t)offset + bytes - !!bytes;
 
         /* Is this a grows-down data segment? Special limit check if so. */
-        if ( (reg->attr.fields.type & 0xc) == 0x4 )
+        if ( reg->attr.fields.s && (reg->attr.fields.type & 0xc) == 0x4 )
         {
             /* Is upper limit 0xFFFF or 0xFFFFFFFF? */
             if ( !reg->attr.fields.db )
@@ -2530,10 +2534,18 @@ bool_t hvm_virtual_to_linear_addr(
     else
     {
         /*
-         * LONG MODE: FS and GS add segment base. Addresses must be canonical.
+         * User segments are always treated as present.  System segment may
+         * not be, and also incur limit checks.
          */
+        if ( is_x86_system_segment(seg) &&
+             (!reg->attr.fields.p || (offset + bytes - !!bytes) > reg->limit) )
+            goto out;
 
-        if ( (seg == x86_seg_fs) || (seg == x86_seg_gs) )
+        /*
+         * LONG MODE: FS, GS and system segments: add segment base. All
+         * addresses must be canonical.
+         */
+        if ( seg >= x86_seg_fs )
             addr += reg->base;
 
         last_byte = addr + bytes - !!bytes;

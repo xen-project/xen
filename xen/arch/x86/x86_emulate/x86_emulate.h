@@ -31,7 +31,11 @@
 
 struct x86_emulate_ctxt;
 
-/* Comprehensive enumeration of x86 segment registers. */
+/*
+ * Comprehensive enumeration of x86 segment registers.  Various bits of code
+ * rely on this order (general purpose before system, tr at the beginning of
+ * system).
+ */
 enum x86_segment {
     /* General purpose.  Matches the SReg3 encoding in opcode/ModRM bytes. */
     x86_seg_es,
@@ -40,21 +44,25 @@ enum x86_segment {
     x86_seg_ds,
     x86_seg_fs,
     x86_seg_gs,
-    /* System. */
+    /* System: Valid to use for implicit table references. */
     x86_seg_tr,
     x86_seg_ldtr,
     x86_seg_gdtr,
     x86_seg_idtr,
-    /*
-     * Dummy: used to emulate direct processor accesses to management
-     * structures (TSS, GDT, LDT, IDT, etc.) which use linear addressing
-     * (no segment component) and bypass usual segment- and page-level
-     * protection checks.
-     */
+    /* No Segment: For accesses which are already linear. */
     x86_seg_none
 };
 
-#define is_x86_user_segment(seg) ((unsigned)(seg) <= x86_seg_gs)
+static inline bool is_x86_user_segment(enum x86_segment seg)
+{
+    unsigned int idx = seg;
+
+    return idx <= x86_seg_gs;
+}
+static inline bool is_x86_system_segment(enum x86_segment seg)
+{
+    return seg >= x86_seg_tr && seg < x86_seg_none;
+}
 
 /* Classification of the types of software generated interrupts/exceptions. */
 enum x86_swint_type {

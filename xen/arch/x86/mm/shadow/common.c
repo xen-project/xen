@@ -162,9 +162,15 @@ static int hvm_translate_linear_addr(
 
     if ( !okay )
     {
-        x86_emul_hw_exception(
-            (seg == x86_seg_ss) ? TRAP_stack_error : TRAP_gp_fault,
-            0, &sh_ctxt->ctxt);
+        /*
+         * Leave exception injection to the caller for non-user segments: We
+         * neither know the exact error code to be used, nor can we easily
+         * determine the kind of exception (#GP or #TS) in that case.
+         */
+        if ( is_x86_user_segment(seg) )
+            x86_emul_hw_exception(
+                (seg == x86_seg_ss) ? TRAP_stack_error : TRAP_gp_fault,
+                0, &sh_ctxt->ctxt);
         return X86EMUL_EXCEPTION;
     }
 
