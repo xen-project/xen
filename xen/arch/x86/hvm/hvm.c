@@ -2470,6 +2470,14 @@ bool_t hvm_virtual_to_linear_addr(
     unsigned long addr = offset, last_byte;
     bool_t okay = 0;
 
+    /*
+     * These checks are for a memory access through an active segment.
+     *
+     * It is expected that the access rights of reg are suitable for seg (and
+     * that this is enforced at the point that seg is loaded).
+     */
+    ASSERT(seg < x86_seg_none);
+
     if ( !(current->arch.hvm_vcpu.guest_cr[0] & X86_CR0_PE) )
     {
         /*

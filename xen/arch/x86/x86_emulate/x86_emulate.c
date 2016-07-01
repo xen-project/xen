@@ -1181,20 +1181,36 @@ static int ioport_access_check(
         return rc;
 
     /* Ensure the TSS has an io-bitmap-offset field. */
-    generate_exception_if(tr.attr.fields.type != 0xb ||
-                          tr.limit < 0x67, EXC_GP, 0);
+    generate_exception_if(tr.attr.fields.type != 0xb, EXC_GP, 0);
 
-    if ( (rc = read_ulong(x86_seg_none, tr.base + 0x66,
-                          &iobmp, 2, ctxt, ops)) )
+    switch ( rc = read_ulong(x86_seg_tr, 0x66, &iobmp, 2, ctxt, ops) )
+    {
+    case X86EMUL_OKAY:
+        break;
+
+    case X86EMUL_EXCEPTION:
+        generate_exception_if(!ctxt->event_pending, EXC_GP, 0);
+        /* fallthrough */
+
+    default:
         return rc;
+    }
 
-    /* Ensure TSS includes two bytes including byte containing first port. */
-    iobmp += first_port / 8;
-    generate_exception_if(tr.limit <= iobmp, EXC_GP, 0);
+    /* Read two bytes including byte containing first port. */
+    switch ( rc = read_ulong(x86_seg_tr, iobmp + first_port / 8,
+                             &iobmp, 2, ctxt, ops) )
+    {
+    case X86EMUL_OKAY:
+        break;
 
-    if ( (rc = read_ulong(x86_seg_none, tr.base + iobmp,
-                          &iobmp, 2, ctxt, ops)) )
+    case X86EMUL_EXCEPTION:
+        generate_exception_if(!ctxt->event_pending, EXC_GP, 0);
+        /* fallthrough */
+
+    default:
         return rc;
+    }
+
     generate_exception_if(iobmp & (((1 << bytes) - 1) << (first_port & 7)),
                           EXC_GP, 0);
 
@@ -1317,9 +1333,12 @@ realmode_load_seg(
     struct x86_emulate_ctxt *ctxt,
     const struct x86_emulate_ops *ops)
 {
-    int rc = ops->read_segment(seg, sreg, ctxt);
+    int rc;
 
-    if ( !rc )
+    if ( !ops->read_segment )
+        return X86EMUL_UNHANDLEABLE;
+
+    if ( (rc = ops->read_segment(seg, sreg, ctxt)) == X86EMUL_OKAY )
     {
         sreg->sel  = sel;
         sreg->base = (uint32_t)sel << 4;
@@ -1336,7 +1355,7 @@ protmode_load_seg(
     struct x86_emulate_ctxt *ctxt,
     const struct x86_emulate_ops *ops)
 {
-    struct segment_register desctab;
+    enum x86_segment sel_seg = (sel & 4) ? x86_seg_ldtr : x86_seg_gdtr;
     struct { uint32_t a, b; } desc;
     uint8_t dpl, rpl;
     int cpl = get_cpl(ctxt, ops);
@@ -1369,21 +1388,19 @@ protmode_load_seg(
     if ( !is_x86_user_segment(seg) && (sel & 4) )
         goto raise_exn;
 
-    if ( (rc = ops->read_segment((sel & 4) ? x86_seg_ldtr : x86_seg_gdtr,
-                                 &desctab, ctxt)) )
+    switch ( rc = ops->read(sel_seg, sel & 0xfff8, &desc, sizeof(desc), ctxt) )
+    {
+    case X86EMUL_OKAY:
+        break;
+
+    case X86EMUL_EXCEPTION:
+        if ( !ctxt->event_pending )
+            goto raise_exn;
+        /* fallthrough */
+
+    default:
         return rc;
-
-    /* Segment not valid for use (cooked meaning of .p)? */
-    if ( !desctab.attr.fields.p )
-        goto raise_exn;
-
-    /* Check against descriptor table limit. */
-    if ( ((sel & 0xfff8) + 7) > desctab.limit )
-        goto raise_exn;
-
-    if ( (rc = ops->read(x86_seg_none, desctab.base + (sel & 0xfff8),
-                         &desc, sizeof(desc), ctxt)) )
-        return rc;
+    }
 
     if ( !is_x86_user_segment(seg) )
     {
@@ -1471,9 +1488,20 @@ protmode_load_seg(
     {
         uint32_t new_desc_b = desc.b | a_flag;
 
-        if ( (rc = ops->cmpxchg(x86_seg_none, desctab.base + (sel & 0xfff8) + 4,
-                                &desc.b, &new_desc_b, 4, ctxt)) != 0 )
+        switch ( (rc = ops->cmpxchg(sel_seg, (sel & 0xfff8) + 4, &desc.b,
+                                    &new_desc_b, sizeof(desc.b), ctxt)) )
+        {
+        case X86EMUL_OKAY:
+            break;
+
+        case X86EMUL_EXCEPTION:
+            if ( !ctxt->event_pending )
+                goto raise_exn;
+            /* fallthrough */
+
+        default:
             return rc;
+        }
 
         /* Force the Accessed flag in our local copy. */
         desc.b = new_desc_b;
@@ -1507,8 +1535,7 @@ load_seg(
     struct segment_register reg;
     int rc;
 
-    if ( (ops->read_segment == NULL) ||
-         (ops->write_segment == NULL) )
+    if ( !ops->write_segment )
         return X86EMUL_UNHANDLEABLE;
 
     if ( !sreg )
@@ -1636,8 +1663,7 @@ static int inject_swint(enum x86_swint_type type,
         if ( !in_realmode(ctxt, ops) )
         {
             unsigned int idte_size, idte_offset;
-            struct segment_register idtr;
-            uint32_t idte_ctl;
+            struct { uint32_t a, b, c, d; } idte;
             int lm = in_longmode(ctxt, ops);
 
             if ( lm < 0 )
@@ -1660,24 +1686,30 @@ static int inject_swint(enum x86_swint_type type,
                  ((ctxt->regs->eflags & EFLG_IOPL) != EFLG_IOPL) )
                 goto raise_exn;
 
-            fail_if(ops->read_segment == NULL);
             fail_if(ops->read == NULL);
-            if ( (rc = ops->read_segment(x86_seg_idtr, &idtr, ctxt)) )
-                goto done;
-
-            if ( (idte_offset + idte_size - 1) > idtr.limit )
-                goto raise_exn;
 
             /*
-             * Should strictly speaking read all 8/16 bytes of an entry,
-             * but we currently only care about the dpl and present bits.
+             * Read all 8/16 bytes so the idtr limit check is applied properly
+             * to this entry, even though we only end up looking at the 2nd
+             * word.
              */
-            if ( (rc = ops->read(x86_seg_none, idtr.base + idte_offset + 4,
-                                 &idte_ctl, sizeof(idte_ctl), ctxt)) )
-                goto done;
+            switch ( rc = ops->read(x86_seg_idtr, idte_offset,
+                                    &idte, idte_size, ctxt) )
+            {
+            case X86EMUL_OKAY:
+                break;
+
+            case X86EMUL_EXCEPTION:
+                if ( !ctxt->event_pending )
+                    goto raise_exn;
+                /* fallthrough */
+
+            default:
+                return rc;
+            }
 
             /* Is this entry present? */
-            if ( !(idte_ctl & (1u << 15)) )
+            if ( !(idte.b & (1u << 15)) )
             {
                 fault_type = EXC_NP;
                 goto raise_exn;
@@ -1686,12 +1718,11 @@ static int inject_swint(enum x86_swint_type type,
             /* icebp counts as a hardware event, and bypasses the dpl check. */
             if ( type != x86_swint_icebp )
             {
-                struct segment_register ss;
+                int cpl = get_cpl(ctxt, ops);
 
-                if ( (rc = ops->read_segment(x86_seg_ss, &ss, ctxt)) )
-                    goto done;
+                fail_if(cpl < 0);
 
-                if ( ss.attr.fields.dpl > ((idte_ctl >> 13) & 3) )
+                if ( cpl > ((idte.b >> 13) & 3) )
                     goto raise_exn;
             }
         }
