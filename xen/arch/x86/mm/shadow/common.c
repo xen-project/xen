@@ -123,10 +123,19 @@ __initcall(shadow_audit_key_init);
 /* x86 emulator support for the shadow code
  */
 
-struct segment_register *hvm_get_seg_reg(
+/*
+ * Callers which pass a known in-range x86_segment can rely on the return
+ * pointer being valid.  Other callers must explicitly check for errors.
+ */
+static struct segment_register *hvm_get_seg_reg(
     enum x86_segment seg, struct sh_emulate_ctxt *sh_ctxt)
 {
-    struct segment_register *seg_reg = &sh_ctxt->seg_reg[seg];
+    struct segment_register *seg_reg;
+
+    if ( seg < 0 || seg >= ARRAY_SIZE(sh_ctxt->seg_reg) )
+        return ERR_PTR(-X86EMUL_UNHANDLEABLE);
+
+    seg_reg = &sh_ctxt->seg_reg[seg];
     if ( !__test_and_set_bit(seg, &sh_ctxt->valid_seg_regs) )
         hvm_get_segment_register(current, seg, seg_reg);
     return seg_reg;
@@ -143,14 +152,9 @@ static int hvm_translate_linear_addr(
     const struct segment_register *reg;
     int okay;
 
-    /*
-     * Can arrive here with non-user segments.  However, no such cirucmstance
-     * is part of a legitimate pagetable update, so fail the emulation.
-     */
-    if ( !is_x86_user_segment(seg) )
-        return X86EMUL_UNHANDLEABLE;
-
     reg = hvm_get_seg_reg(seg, sh_ctxt);
+    if ( IS_ERR(reg) )
+        return -PTR_ERR(reg);
 
     okay = hvm_virtual_to_linear_addr(
         seg, reg, offset, bytes, access_type, sh_ctxt->ctxt.addr_size, paddr);
@@ -253,9 +257,6 @@ hvm_emulate_write(enum x86_segment seg,
     unsigned long addr;
     int rc;
 
-    if ( !is_x86_user_segment(seg) )
-        return X86EMUL_UNHANDLEABLE;
-
     /* How many emulations could we save if we unshadowed on stack writes? */
     if ( seg == x86_seg_ss )
         perfc_incr(shadow_fault_emulate_stack);
@@ -283,7 +284,7 @@ hvm_emulate_cmpxchg(enum x86_segment seg,
     unsigned long addr, old, new;
     int rc;
 
-    if ( !is_x86_user_segment(seg) || bytes > sizeof(long) )
+    if ( bytes > sizeof(long) )
         return X86EMUL_UNHANDLEABLE;
 
     rc = hvm_translate_linear_addr(
