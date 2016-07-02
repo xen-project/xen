@@ -68,8 +68,10 @@ extern void debugtrace_dump(void);
 extern void debugtrace_printk(const char *fmt, ...)
     __attribute__ ((format (printf, 1, 2)));
 #else
-#define debugtrace_dump()          ((void)0)
-#define debugtrace_printk(_f, ...) ((void)0)
+static inline void debugtrace_dump(void) {}
+static inline void
+ __attribute__ ((format (printf, 1, 2)))
+debugtrace_printk(const char *fmt, ...) {}
 #endif
 
 /* Allows us to use '%p' as general-purpose machine-word format char. */
