@@ -723,8 +723,7 @@ static void _sh_resync(struct vcpu *v, mfn_t gmfn,
              & ~SHF_L1_ANY));
     ASSERT(!sh_page_has_multiple_shadows(mfn_to_page(gmfn)));
 
-    SHADOW_PRINTK("d=%d, v=%d, gmfn=%05lx\n",
-                  v->domain->domain_id, v->vcpu_id, mfn_x(gmfn));
+    SHADOW_PRINTK("%pv gmfn=%"PRI_mfn"\n", v, mfn_x(gmfn));
 
     /* Need to pull write access so the page *stays* in sync. */
     if ( oos_remove_write_access(v, gmfn, fixup) )
@@ -900,7 +899,7 @@ void sh_resync_all(struct vcpu *v, int skip, int this, int others)
     mfn_t *oos_snapshot = v->arch.paging.shadow.oos_snapshot;
     struct oos_fixup *oos_fixup = v->arch.paging.shadow.oos_fixup;
 
-    SHADOW_PRINTK("d=%d, v=%d\n", v->domain->domain_id, v->vcpu_id);
+    SHADOW_PRINTK("%pv\n", v);
 
     ASSERT(paging_locked_by_me(v->domain));
 
@@ -961,8 +960,7 @@ int sh_unsync(struct vcpu *v, mfn_t gmfn)
 
     ASSERT(paging_locked_by_me(v->domain));
 
-    SHADOW_PRINTK("d=%d, v=%d, gmfn=%05lx\n",
-                  v->domain->domain_id, v->vcpu_id, mfn_x(gmfn));
+    SHADOW_PRINTK("%pv gmfn=%"PRI_mfn"\n", v, mfn_x(gmfn));
 
     pg = mfn_to_page(gmfn);
 
@@ -2792,7 +2790,7 @@ void sh_remove_shadows(struct domain *d, mfn_t gmfn, int fast, int all)
      * can be called via put_page_type when we clear a shadow l1e).*/
     paging_lock_recursive(d);
 
-    SHADOW_PRINTK("d=%d: gmfn=%lx\n", d->domain_id, mfn_x(gmfn));
+    SHADOW_PRINTK("d%d gmfn=%"PRI_mfn"\n", d->domain_id, mfn_x(gmfn));
 
     /* Bail out now if the page is not shadowed */
     if ( (pg->count_info & PGC_page_table) == 0 )
@@ -2847,7 +2845,7 @@ void sh_remove_shadows(struct domain *d, mfn_t gmfn, int fast, int all)
     /* If that didn't catch the shadows, something is wrong */
     if ( !fast && all && (pg->count_info & PGC_page_table) )
     {
-        SHADOW_ERROR("can't find all shadows of mfn %05lx "
+        SHADOW_ERROR("can't find all shadows of mfn %"PRI_mfn" "
                      "(shadow_flags=%08x)\n",
                       mfn_x(gmfn), pg->shadow_flags);
         domain_crash(d);
@@ -3016,9 +3014,9 @@ static void sh_update_paging_modes(struct vcpu *v)
 
         if ( v->arch.paging.mode != old_mode )
         {
-            SHADOW_PRINTK("new paging mode: d=%u v=%u pe=%d gl=%u "
+            SHADOW_PRINTK("new paging mode: %pv pe=%d gl=%u "
                           "sl=%u (was g=%u s=%u)\n",
-                          d->domain_id, v->vcpu_id,
+                          v,
                           is_hvm_domain(d) ? hvm_paging_enabled(v) : 1,
                           v->arch.paging.mode->guest_levels,
                           v->arch.paging.mode->shadow.shadow_levels,
@@ -3033,11 +3031,10 @@ static void sh_update_paging_modes(struct vcpu *v)
 
                 if ( v != current && vcpu_runnable(v) )
                 {
-                    SHADOW_ERROR("Some third party (d=%u v=%u) is changing "
-                                 "this HVM vcpu's (d=%u v=%u) paging mode "
+                    SHADOW_ERROR("Some third party (%pv) is changing "
+                                 "this HVM vcpu's (%pv) paging mode "
                                  "while it is running.\n",
-                                 current->domain->domain_id, current->vcpu_id,
-                                 v->domain->domain_id, v->vcpu_id);
+                                 current, v);
                     /* It's not safe to do that because we can't change
                      * the host CR3 for a running domain */
                     domain_crash(v->domain);
