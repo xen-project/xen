@@ -68,7 +68,28 @@ int libxl__get_hotplug_script_info(libxl__gc *gc, libxl__device *dev,
 
     switch (dev->backend_kind) {
     case LIBXL__DEVICE_KIND_VBD:
+        if (num_exec != 0) {
+            LOG(DEBUG, "num_exec %d, not running hotplug scripts", num_exec);
+            rc = 0;
+            goto out;
+        }
+        rc = libxl__hotplug(gc, dev, args, action);
+        if (!rc) rc = 1;
+        break;
     case LIBXL__DEVICE_KIND_VIF:
+        /*
+         * If domain has a stubdom we don't have to execute hotplug scripts
+         * for emulated interfaces
+         *
+         * NetBSD let QEMU call a script to plug emulated nic, so
+         * only test if num_exec == 0 in that case.
+         */
+        if ((num_exec != 0) ||
+            (libxl_get_stubdom_id(CTX, dev->domid) && num_exec)) {
+            LOG(DEBUG, "num_exec %d, not running hotplug scripts", num_exec);
+            rc = 0;
+            goto out;
+        }
         rc = libxl__hotplug(gc, dev, args, action);
         if (!rc) rc = 1;
         break;
