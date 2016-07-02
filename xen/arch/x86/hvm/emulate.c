@@ -1447,12 +1447,12 @@ static int hvmemul_write_segment(
 {
     struct hvm_emulate_ctxt *hvmemul_ctxt =
         container_of(ctxt, struct hvm_emulate_ctxt, ctxt);
-    struct segment_register *sreg = hvmemul_get_seg_reg(seg, hvmemul_ctxt);
 
-    if ( IS_ERR(sreg) )
-         return -PTR_ERR(sreg);
+    if ( seg < 0 || seg >= ARRAY_SIZE(hvmemul_ctxt->seg_reg) )
+        return X86EMUL_UNHANDLEABLE;
 
-    memcpy(sreg, reg, sizeof(struct segment_register));
+    hvmemul_ctxt->seg_reg[seg] = *reg;
+    __set_bit(seg, &hvmemul_ctxt->seg_reg_accessed);
     __set_bit(seg, &hvmemul_ctxt->seg_reg_dirty);
 
     return X86EMUL_OKAY;
