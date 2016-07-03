@@ -2857,7 +2857,7 @@ static int sh_page_fault(struct vcpu *v,
     const struct x86_emulate_ops *emul_ops;
     int r;
     p2m_type_t p2mt;
-    uint32_t rc;
+    uint32_t rc, error_code;
     int version;
     const struct npfec access = {
          .read_access = 1,
@@ -3011,13 +3011,71 @@ static int sh_page_fault(struct vcpu *v,
 
  rewalk:
 
+    error_code = regs->error_code;
+
+    /*
+     * When CR4.SMAP is enabled, instructions which have a side effect of
+     * accessing the system data structures (e.g. mov to %ds accessing the
+     * LDT/GDT, or int $n accessing the IDT) are known as implicit supervisor
+     * accesses.
+     *
+     * The distinction between implicit and explicit accesses form part of the
+     * determination of access rights, controlling whether the access is
+     * successful, or raises a #PF.
+     *
+     * Unfortunately, the processor throws away the implicit/explicit
+     * distinction and does not provide it to the pagefault handler
+     * (i.e. here.) in the #PF error code.  Therefore, we must try to
+     * reconstruct the lost state so it can be fed back into our pagewalk
+     * through the guest tables.
+     *
+     * User mode accesses are easy to reconstruct:
+     *
+     *   If we observe a cpl3 data fetch which was a supervisor walk, this
+     *   must have been an implicit access to a system table.
+     *
+     * Supervisor mode accesses are not easy:
+     *
+     *   In principle, we could decode the instruction under %rip and have the
+     *   instruction emulator tell us if there is an implicit access.
+     *   However, this is racy with other vcpus updating the pagetable or
+     *   rewriting the instruction stream under our feet.
+     *
+     *   Therefore, we do nothing.  (If anyone has a sensible suggestion for
+     *   how to distinguish these cases, xen-devel@ is all ears...)
+     *
+     * As a result, one specific corner case will fail.  If a guest OS with
+     * SMAP enabled ends up mapping a system table with user mappings, sets
+     * EFLAGS.AC to allow explicit accesses to user mappings, and implicitly
+     * accesses the user mapping, hardware and the shadow code will disagree
+     * on whether a #PF should be raised.
+     *
+     * Hardware raises #PF because implicit supervisor accesses to user
+     * mappings are strictly disallowed.  As we can't reconstruct the correct
+     * input, the pagewalk is performed as if it were an explicit access,
+     * which concludes that the access should have succeeded and the shadow
+     * pagetables need modifying.  The shadow pagetables are modified (to the
+     * same value), and we re-enter the guest to re-execute the instruction,
+     * which causes another #PF, and the vcpu livelocks, unable to make
+     * forward progress.
+     *
+     * In practice, this is tolerable.  No production OS will deliberately
+     * construct this corner case (as doing so would mean that a system table
+     * is directly accessable to userspace, and the OS is trivially rootable.)
+     * If this corner case comes about accidentally, then a security-relevant
+     * bug has been tickled.
+     */
+    if ( !(error_code & (PFEC_insn_fetch|PFEC_user_mode)) &&
+         (is_pv_vcpu(v) ? (regs->ss & 3) : hvm_get_cpl(v)) == 3 )
+        error_code |= PFEC_implicit;
+
     /* The walk is done in a lock-free style, with some sanity check
      * postponed after grabbing paging lock later. Those delayed checks
      * will make sure no inconsistent mapping being translated into
      * shadow page table. */
     version = atomic_read(&d->arch.paging.shadow.gtable_dirty_version);
     rmb();
-    rc = sh_walk_guest_tables(v, va, &gw, regs->error_code);
+    rc = sh_walk_guest_tables(v, va, &gw, error_code);
 
 #if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC)
     regs->error_code &= ~PFEC_page_present;
