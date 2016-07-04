@@ -3402,17 +3402,10 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
             else
                 domain_pause_for_debugger();
             break;
-        case TRAP_int3: 
-        {
+        case TRAP_int3:
             HVMTRACE_1D(TRAP, vector);
-            if ( v->domain->debugger_attached )
+            if ( !v->domain->debugger_attached )
             {
-                update_guest_eip(); /* Safe: INT3 */            
-                v->arch.gdbsx_vcpu_event = TRAP_int3;
-                domain_pause_for_debugger();
-                break;
-            }
-            else {
                 unsigned long insn_len;
                 int rc;
 
@@ -3422,23 +3415,18 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
                                        X86_EVENTTYPE_SW_EXCEPTION,
                                        insn_len);
 
+                if ( rc < 0 )
+                    goto exit_and_crash;
                 if ( !rc )
-                {
-                    struct hvm_trap trap = {
-                        .vector = TRAP_int3,
-                        .type = X86_EVENTTYPE_SW_EXCEPTION,
-                        .error_code = HVM_DELIVER_NO_ERROR_CODE,
-                        .insn_len = insn_len
-                    };
-                    hvm_inject_trap(&trap);
-                    break;
-                }
-                if ( rc > 0 )
-                    break;
+                    vmx_propagate_intr(intr_info);
             }
-
-            goto exit_and_crash;
-        }
+            else
+            {
+                update_guest_eip(); /* Safe: INT3 */
+                v->arch.gdbsx_vcpu_event = TRAP_int3;
+                domain_pause_for_debugger();
+            }
+            break;
         case TRAP_no_device:
             HVMTRACE_1D(TRAP, vector);
             vmx_fpu_dirty_intercept();
