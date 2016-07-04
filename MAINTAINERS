@@ -401,13 +401,17 @@ VM EVENT, MEM ACCESS and MONITOR
 M:	Razvan Cojocaru <rcojocaru@bitdefender.com>
 M:	Tamas K Lengyel <tamas@tklengyel.com>
 S:	Supported
+F:	tools/tests/xen-access
+F:	xen/arch/*/monitor.c
+F:	xen/arch/*/vm_event.c
+F:	xen/arch/x86/hvm/monitor.c
 F:	xen/common/mem_access.c
-F:	xen/*/vm_event.c
-F:	xen/*/monitor.c
+F:	xen/common/monitor.c
+F:	xen/common/vm_event.c
 F:	xen/include/*/mem_access.h
 F:	xen/include/*/monitor.h
 F:	xen/include/*/vm_event.h
-F:	tools/tests/xen-access
+F:	xen/include/asm-x86/hvm/monitor.h
 
 VTPM
 M:	Daniel De Graaf <dgdegra@tycho.nsa.gov>
