@@ -77,6 +77,7 @@
  /*
   * Deny completion of the operation that triggered the event.
   * Currently only useful for MSR, CR0, CR3 and CR4 write events.
+  * Requires the vCPU to be paused already (synchronous events only).
   */
 #define VM_EVENT_FLAG_DENY               (1 << 6)
 /*

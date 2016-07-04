@@ -417,7 +417,8 @@ void vm_event_resume(struct domain *d, struct vm_event_domain *ved)
         if ( rsp.flags & VM_EVENT_FLAG_ALTERNATE_P2M )
             p2m_altp2m_check(v, rsp.altp2m_idx);
 
-        if ( rsp.flags & VM_EVENT_FLAG_VCPU_PAUSED )
+        /* Check flags which apply only when the vCPU is paused */
+        if ( atomic_read(&v->vm_event_pause_count) )
         {
             if ( rsp.flags & VM_EVENT_FLAG_SET_REGISTERS )
                 vm_event_set_registers(v, &rsp);
@@ -425,7 +426,8 @@ void vm_event_resume(struct domain *d, struct vm_event_domain *ved)
             if ( rsp.flags & VM_EVENT_FLAG_TOGGLE_SINGLESTEP )
                 vm_event_toggle_singlestep(d, v);
 
-            vm_event_vcpu_unpause(v);
+            if ( rsp.flags & VM_EVENT_FLAG_VCPU_PAUSED )
+                vm_event_vcpu_unpause(v);
         }
     }
 }

@@ -61,8 +61,10 @@ void vm_event_cleanup_domain(struct domain *d)
 
 void vm_event_toggle_singlestep(struct domain *d, struct vcpu *v)
 {
-    if ( !is_hvm_domain(d) || !atomic_read(&v->vm_event_pause_count) )
+    if ( !is_hvm_domain(d) )
         return;
+
+    ASSERT(atomic_read(&v->vm_event_pause_count));
 
     hvm_toggle_singlestep(v);
 }
@@ -74,6 +76,10 @@ void vm_event_register_write_resume(struct vcpu *v, vm_event_response_t *rsp)
         struct monitor_write_data *w = &v->arch.vm_event->write_data;
 
         ASSERT(w);
+
+        /* deny flag requires the vCPU to be paused */
+        if ( !atomic_read(&v->vm_event_pause_count) )
+            return;
 
         switch ( rsp->reason )
         {
@@ -100,6 +106,8 @@ void vm_event_register_write_resume(struct vcpu *v, vm_event_response_t *rsp)
 
 void vm_event_set_registers(struct vcpu *v, vm_event_response_t *rsp)
 {
+    ASSERT(atomic_read(&v->vm_event_pause_count));
+
     v->arch.user_regs.eax = rsp->data.regs.x86.rax;
     v->arch.user_regs.ebx = rsp->data.regs.x86.rbx;
     v->arch.user_regs.ecx = rsp->data.regs.x86.rcx;
