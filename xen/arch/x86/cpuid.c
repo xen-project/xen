@@ -6,6 +6,7 @@
 #include <asm/hvm/nestedhvm.h>
 #include <asm/hvm/svm/svm.h>
 #include <asm/hvm/vmx/vmcs.h>
+#include <asm/paging.h>
 #include <asm/processor.h>
 #include <asm/xstate.h>
 
@@ -504,7 +505,7 @@ void recalculate_cpuid_policy(struct domain *d)
 
     p->extd.maxphysaddr = min(p->extd.maxphysaddr, max->extd.maxphysaddr);
     p->extd.maxphysaddr = min_t(uint8_t, p->extd.maxphysaddr,
-                                d->arch.paging.gfn_bits + PAGE_SHIFT);
+                                paging_max_paddr_bits(d));
     p->extd.maxphysaddr = max_t(uint8_t, p->extd.maxphysaddr,
                                 (p->basic.pae || p->basic.pse36) ? 36 : 32);
 

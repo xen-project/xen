@@ -1784,7 +1784,7 @@ void *map_domain_gfn(struct p2m_domain *p2m, gfn_t gfn, mfn_t *mfn,
 {
     struct page_info *page;
 
-    if ( gfn_x(gfn) >> p2m->domain->arch.paging.gfn_bits )
+    if ( !gfn_valid(p2m->domain, gfn) )
     {
         *rc = _PAGE_INVALID_BIT;
         return NULL;

@@ -34,12 +34,6 @@
 
 #define VALID_GFN(m) (m != gfn_x(INVALID_GFN))
 
-static inline int
-valid_gfn(gfn_t m)
-{
-    return VALID_GFN(gfn_x(m));
-}
-
 static inline paddr_t
 gfn_to_paddr(gfn_t gfn)
 {

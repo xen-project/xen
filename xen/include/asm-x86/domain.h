@@ -195,9 +195,6 @@ struct paging_domain {
     /* log dirty support */
     struct log_dirty_domain log_dirty;
 
-    /* Number of valid bits in a gfn. */
-    unsigned int gfn_bits;
-
     /* preemption handling */
     struct {
         const struct domain *dom;

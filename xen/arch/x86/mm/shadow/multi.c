@@ -537,7 +537,7 @@ _sh_propagate(struct vcpu *v,
 
     /* Check there's something for the shadows to map to */
     if ( (!p2m_is_valid(p2mt) && !p2m_is_grant(p2mt))
-         || gfn_x(target_gfn) >> d->arch.paging.gfn_bits )
+         || !gfn_valid(d, target_gfn) )
     {
         *sp = shadow_l1e_empty();
         goto done;
