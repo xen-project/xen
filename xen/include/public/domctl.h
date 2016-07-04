@@ -1080,6 +1080,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_domctl_psr_cmt_op_t);
 #define XEN_DOMCTL_MONITOR_EVENT_SINGLESTEP            2
 #define XEN_DOMCTL_MONITOR_EVENT_SOFTWARE_BREAKPOINT   3
 #define XEN_DOMCTL_MONITOR_EVENT_GUEST_REQUEST         4
+#define XEN_DOMCTL_MONITOR_EVENT_DEBUG_EXCEPTION       5
 
 struct xen_domctl_monitor_op {
     uint32_t op; /* XEN_DOMCTL_MONITOR_OP_* */
@@ -1114,6 +1115,11 @@ struct xen_domctl_monitor_op {
             /* Pause vCPU until response */
             uint8_t sync;
         } guest_request;
+
+        struct {
+            /* Pause vCPU until response */
+            uint8_t sync;
+        } debug_exception;
     } u;
 };
 typedef struct xen_domctl_monitor_op xen_domctl_monitor_op_t;

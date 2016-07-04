@@ -23,10 +23,11 @@
 #include <xen/paging.h>
 #include <public/vm_event.h>
 
-enum hvm_monitor_breakpoint_type
+enum hvm_monitor_debug_type
 {
     HVM_MONITOR_SOFTWARE_BREAKPOINT,
     HVM_MONITOR_SINGLESTEP_BREAKPOINT,
+    HVM_MONITOR_DEBUG_EXCEPTION,
 };
 
 /*
@@ -39,8 +40,8 @@ bool_t hvm_monitor_cr(unsigned int index, unsigned long value,
 #define hvm_monitor_crX(cr, new, old) \
                         hvm_monitor_cr(VM_EVENT_X86_##cr, new, old)
 void hvm_monitor_msr(unsigned int msr, uint64_t value);
-int hvm_monitor_breakpoint(unsigned long rip,
-                           enum hvm_monitor_breakpoint_type type);
+int hvm_monitor_debug(unsigned long rip, enum hvm_monitor_debug_type type,
+                      unsigned long trap_type, unsigned long insn_length);
 
 #endif /* __ASM_X86_HVM_MONITOR_H__ */
 

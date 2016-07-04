@@ -403,6 +403,8 @@ struct arch_domain
         unsigned int write_ctrlreg_onchangeonly  : 4;
         unsigned int singlestep_enabled          : 1;
         unsigned int software_breakpoint_enabled : 1;
+        unsigned int debug_exception_enabled     : 1;
+        unsigned int debug_exception_sync        : 1;
         struct monitor_msr_bitmap *msr_bitmap;
     } monitor;
 

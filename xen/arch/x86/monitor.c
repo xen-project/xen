@@ -224,6 +224,22 @@ int arch_monitor_domctl_event(struct domain *d,
         break;
     }
 
+    case XEN_DOMCTL_MONITOR_EVENT_DEBUG_EXCEPTION:
+    {
+        bool_t old_status = ad->monitor.debug_exception_enabled;
+
+        if ( unlikely(old_status == requested_status) )
+            return -EEXIST;
+
+        domain_pause(d);
+        ad->monitor.debug_exception_enabled = requested_status;
+        ad->monitor.debug_exception_sync = requested_status ?
+                                            mop->u.debug_exception.sync :
+                                            0;
+        domain_unpause(d);
+        break;
+    }
+
     default:
         /*
          * Should not be reached unless arch_monitor_get_capabilities() is

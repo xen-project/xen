@@ -87,12 +87,13 @@ static inline unsigned long gfn_of_rip(unsigned long rip)
     return paging_gva_to_gfn(curr, sreg.base + rip, &pfec);
 }
 
-int hvm_monitor_breakpoint(unsigned long rip,
-                           enum hvm_monitor_breakpoint_type type)
+int hvm_monitor_debug(unsigned long rip, enum hvm_monitor_debug_type type,
+                      unsigned long trap_type, unsigned long insn_length)
 {
     struct vcpu *curr = current;
     struct arch_domain *ad = &curr->domain->arch;
     vm_event_request_t req = {};
+    bool_t sync;
 
     switch ( type )
     {
@@ -101,6 +102,9 @@ int hvm_monitor_breakpoint(unsigned long rip,
             return 0;
         req.reason = VM_EVENT_REASON_SOFTWARE_BREAKPOINT;
         req.u.software_breakpoint.gfn = gfn_of_rip(rip);
+        req.u.software_breakpoint.type = trap_type;
+        req.u.software_breakpoint.insn_length = insn_length;
+        sync = 1;
         break;
 
     case HVM_MONITOR_SINGLESTEP_BREAKPOINT:
@@ -108,6 +112,17 @@ int hvm_monitor_breakpoint(unsigned long rip,
             return 0;
         req.reason = VM_EVENT_REASON_SINGLESTEP;
         req.u.singlestep.gfn = gfn_of_rip(rip);
+        sync = 1;
+        break;
+
+    case HVM_MONITOR_DEBUG_EXCEPTION:
+        if ( !ad->monitor.debug_exception_enabled )
+            return 0;
+        req.reason = VM_EVENT_REASON_DEBUG_EXCEPTION;
+        req.u.debug_exception.gfn = gfn_of_rip(rip);
+        req.u.debug_exception.type = trap_type;
+        req.u.debug_exception.insn_length = insn_length;
+        sync = !!ad->monitor.debug_exception_sync;
         break;
 
     default:
@@ -116,7 +131,7 @@ int hvm_monitor_breakpoint(unsigned long rip,
 
     req.vcpu_id = curr->vcpu_id;
 
-    return vm_event_monitor_traps(curr, 1, &req);
+    return vm_event_monitor_traps(curr, sync, &req);
 }
 
 /*
