@@ -1820,16 +1820,32 @@ int nvmx_msr_read_intercept(unsigned int msr, u64 *msr_content)
         return 0;
 
     /*
-     * Those MSRs are available only when bit 55 of
-     * MSR_IA32_VMX_BASIC is set.
+     * These MSRs are only available when flags in other MSRs are set.
+     * These prerequisites are listed in the Intel 64 and IA-32
+     * Architectures Software Developer’s Manual, Vol 3, Appendix A.
      */
     switch ( msr )
     {
+    case MSR_IA32_VMX_PROCBASED_CTLS2:
+        if ( !cpu_has_vmx_secondary_exec_control )
+            return 0;
+        break;
+
+    case MSR_IA32_VMX_EPT_VPID_CAP:
+        if ( !(cpu_has_vmx_ept || cpu_has_vmx_vpid) )
+            return 0;
+        break;
+
     case MSR_IA32_VMX_TRUE_PINBASED_CTLS:
     case MSR_IA32_VMX_TRUE_PROCBASED_CTLS:
     case MSR_IA32_VMX_TRUE_EXIT_CTLS:
     case MSR_IA32_VMX_TRUE_ENTRY_CTLS:
         if ( !(vmx_basic_msr & VMX_BASIC_DEFAULT1_ZERO) )
+            return 0;
+        break;
+
+    case MSR_IA32_VMX_VMFUNC:
+        if ( !cpu_has_vmx_vmfunc )
             return 0;
         break;
     }
