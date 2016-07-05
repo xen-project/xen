@@ -2106,7 +2106,7 @@ x86_emulate(
         generate_exception_if(mode_64bit() && !ext, EXC_UD, -1);
         fail_if(ops->read_segment == NULL);
         if ( (rc = ops->read_segment(src.val, &reg, ctxt)) != 0 )
-            return rc;
+            goto done;
         /* 64-bit mode: PUSH defaults to a 64-bit operand. */
         if ( mode_64bit() && (op_bytes == 4) )
             op_bytes = 8;
@@ -2125,10 +2125,9 @@ x86_emulate(
         if ( mode_64bit() && (op_bytes == 4) )
             op_bytes = 8;
         if ( (rc = read_ulong(x86_seg_ss, sp_post_inc(op_bytes),
-                              &dst.val, op_bytes, ctxt, ops)) != 0 )
+                              &dst.val, op_bytes, ctxt, ops)) != 0 ||
+             (rc = load_seg(src.val, dst.val, 0, NULL, ctxt, ops)) != 0 )
             goto done;
-        if ( (rc = load_seg(src.val, dst.val, 0, NULL, ctxt, ops)) != 0 )
-            return rc;
         break;
 
     case 0x0e: /* push %%cs */
