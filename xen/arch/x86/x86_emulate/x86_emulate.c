@@ -3561,6 +3561,8 @@ x86_emulate(
     case 0xf6 ... 0xf7: /* Grp3 */
         switch ( modrm_reg & 7 )
         {
+            unsigned long u[2], v;
+
         case 0 ... 1: /* test */
             goto test;
         case 2: /* not */
@@ -3599,14 +3601,14 @@ x86_emulate(
                 _regs.edx = (uint32_t)(dst.val >> 32);
                 break;
 #endif
-            default: {
-                unsigned long m[2] = { src.val, dst.val };
-                if ( mul_dbl(m) )
+            default:
+                u[0] = src.val;
+                u[1] = dst.val;
+                if ( mul_dbl(u) )
                     _regs.eflags |= EFLG_OF|EFLG_CF;
-                _regs.edx = m[1];
-                dst.val  = m[0];
+                _regs.edx = u[1];
+                dst.val  = u[0];
                 break;
-            }
             }
             break;
         case 5: /* imul */
@@ -3643,20 +3645,18 @@ x86_emulate(
                     _regs.edx = (uint32_t)(dst.val >> 32);
                 break;
 #endif
-            default: {
-                unsigned long m[2] = { src.val, dst.val };
-                if ( imul_dbl(m) )
+            default:
+                u[0] = src.val;
+                u[1] = dst.val;
+                if ( imul_dbl(u) )
                     _regs.eflags |= EFLG_OF|EFLG_CF;
                 if ( b > 0x6b )
-                    _regs.edx = m[1];
-                dst.val  = m[0];
+                    _regs.edx = u[1];
+                dst.val  = u[0];
                 break;
             }
-            }
             break;
-        case 6: /* div */ {
-            unsigned long u[2], v;
-
+        case 6: /* div */
             dst.type = OP_REG;
             dst.reg  = (unsigned long *)&_regs.eax;
             switch ( dst.bytes = src.bytes )
@@ -3703,10 +3703,7 @@ x86_emulate(
                 break;
             }
             break;
-        }
-        case 7: /* idiv */ {
-            unsigned long u[2], v;
-
+        case 7: /* idiv */
             dst.type = OP_REG;
             dst.reg  = (unsigned long *)&_regs.eax;
             switch ( dst.bytes = src.bytes )
@@ -3753,7 +3750,6 @@ x86_emulate(
                 break;
             }
             break;
-        }
         }
         break;
 
