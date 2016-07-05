@@ -745,6 +745,10 @@ l4e_propagate_from_guest(struct vcpu *v,
                          shadow_l4e_t *sl4e,
                          fetch_type_t ft)
 {
+    if ( !mfn_eq(sl3mfn, INVALID_MFN) &&
+         (guest_l4e_get_flags(gl4e) & _PAGE_PRESENT) )
+        ASSERT(!guest_l4e_rsvd_bits(v, gl4e));
+
     _sh_propagate(v, gl4e.l4, sl3mfn, sl4e, 4, ft, p2m_ram_rw);
 }
 
@@ -755,6 +759,10 @@ l3e_propagate_from_guest(struct vcpu *v,
                          shadow_l3e_t *sl3e,
                          fetch_type_t ft)
 {
+    if ( !mfn_eq(sl2mfn, INVALID_MFN) &&
+         (guest_l3e_get_flags(gl3e) & _PAGE_PRESENT) )
+        ASSERT(!guest_l3e_rsvd_bits(v, gl3e));
+
     _sh_propagate(v, gl3e.l3, sl2mfn, sl3e, 3, ft, p2m_ram_rw);
 }
 #endif // GUEST_PAGING_LEVELS >= 4
@@ -766,6 +774,10 @@ l2e_propagate_from_guest(struct vcpu *v,
                          shadow_l2e_t *sl2e,
                          fetch_type_t ft)
 {
+    if ( !mfn_eq(sl1mfn, INVALID_MFN) &&
+         (guest_l2e_get_flags(gl2e) & _PAGE_PRESENT) )
+        ASSERT(!guest_l2e_rsvd_bits(v, gl2e));
+
     _sh_propagate(v, gl2e.l2, sl1mfn, sl2e, 2, ft, p2m_ram_rw);
 }
 
@@ -777,6 +789,10 @@ l1e_propagate_from_guest(struct vcpu *v,
                          fetch_type_t ft,
                          p2m_type_t p2mt)
 {
+    if ( !mfn_eq(gmfn, INVALID_MFN) &&
+         (guest_l1e_get_flags(gl1e) & _PAGE_PRESENT) )
+        ASSERT(!guest_l1e_rsvd_bits(v, gl1e));
+
     _sh_propagate(v, gl1e.l1, gmfn, sl1e, 1, ft, p2mt);
 }
 
@@ -2157,7 +2173,8 @@ static int validate_gl4e(struct vcpu *v, void *new_ge, mfn_t sl4mfn, void *se)
 
     perfc_incr(shadow_validate_gl4e_calls);
 
-    if ( guest_l4e_get_flags(new_gl4e) & _PAGE_PRESENT )
+    if ( (guest_l4e_get_flags(new_gl4e) & _PAGE_PRESENT) &&
+         !guest_l4e_rsvd_bits(v, new_gl4e) )
     {
         gfn_t gl3gfn = guest_l4e_get_gfn(new_gl4e);
         mfn_t gl3mfn = get_gfn_query_unlocked(d, gfn_x(gl3gfn), &p2mt);
@@ -2215,7 +2232,8 @@ static int validate_gl3e(struct vcpu *v, void *new_ge, mfn_t sl3mfn, void *se)
 
     perfc_incr(shadow_validate_gl3e_calls);
 
-    if ( guest_l3e_get_flags(new_gl3e) & _PAGE_PRESENT )
+    if ( (guest_l3e_get_flags(new_gl3e) & _PAGE_PRESENT) &&
+         !guest_l3e_rsvd_bits(v, new_gl3e) )
     {
         gfn_t gl2gfn = guest_l3e_get_gfn(new_gl3e);
         mfn_t gl2mfn = get_gfn_query_unlocked(d, gfn_x(gl2gfn), &p2mt);
@@ -2248,7 +2266,8 @@ static int validate_gl2e(struct vcpu *v, void *new_ge, mfn_t sl2mfn, void *se)
 
     perfc_incr(shadow_validate_gl2e_calls);
 
-    if ( guest_l2e_get_flags(new_gl2e) & _PAGE_PRESENT )
+    if ( (guest_l2e_get_flags(new_gl2e) & _PAGE_PRESENT) &&
+         !guest_l2e_rsvd_bits(v, new_gl2e) )
     {
         gfn_t gl1gfn = guest_l2e_get_gfn(new_gl2e);
         if ( guest_can_use_l2_superpages(v) &&
@@ -2289,8 +2308,8 @@ static int validate_gl1e(struct vcpu *v, void *new_ge, mfn_t sl1mfn, void *se)
     guest_l1e_t new_gl1e = *(guest_l1e_t *)new_ge;
     shadow_l1e_t *sl1p = se;
     gfn_t gfn;
-    mfn_t gmfn;
-    p2m_type_t p2mt;
+    mfn_t gmfn = INVALID_MFN;
+    p2m_type_t p2mt = p2m_invalid;
     int result = 0;
 #if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC)
     mfn_t gl1mfn;
@@ -2298,8 +2317,12 @@ static int validate_gl1e(struct vcpu *v, void *new_ge, mfn_t sl1mfn, void *se)
 
     perfc_incr(shadow_validate_gl1e_calls);
 
-    gfn = guest_l1e_get_gfn(new_gl1e);
-    gmfn = get_gfn_query_unlocked(d, gfn_x(gfn), &p2mt);
+    if ( (guest_l1e_get_flags(new_gl1e) & _PAGE_PRESENT) &&
+         !guest_l1e_rsvd_bits(v, new_gl1e) )
+    {
+        gfn = guest_l1e_get_gfn(new_gl1e);
+        gmfn = get_gfn_query_unlocked(d, gfn_x(gfn), &p2mt);
+    }
 
     l1e_propagate_from_guest(v, new_gl1e, gmfn, &new_sl1e, ft_prefetch, p2mt);
     result |= shadow_set_l1e(d, sl1p, new_sl1e, p2mt, sl1mfn);
@@ -2355,12 +2378,17 @@ void sh_resync_l1(struct vcpu *v, mfn_t gl1mfn, mfn_t snpmfn)
         if ( memcmp(snpl1p, &gl1e, sizeof(gl1e)) )
         {
             gfn_t gfn;
-            mfn_t gmfn;
-            p2m_type_t p2mt;
+            mfn_t gmfn = INVALID_MFN;
+            p2m_type_t p2mt = p2m_invalid;
             shadow_l1e_t nsl1e;
 
-            gfn = guest_l1e_get_gfn(gl1e);
-            gmfn = get_gfn_query_unlocked(d, gfn_x(gfn), &p2mt);
+            if ( (guest_l1e_get_flags(gl1e) & _PAGE_PRESENT) &&
+                 !guest_l1e_rsvd_bits(v, gl1e) )
+            {
+                gfn = guest_l1e_get_gfn(gl1e);
+                gmfn = get_gfn_query_unlocked(d, gfn_x(gfn), &p2mt);
+            }
+
             l1e_propagate_from_guest(v, gl1e, gmfn, &nsl1e, ft_prefetch, p2mt);
             rc |= shadow_set_l1e(d, sl1p, nsl1e, p2mt, sl1mfn);
             *snpl1p = gl1e;
@@ -2686,8 +2714,17 @@ static void sh_prefetch(struct vcpu *v, walk_t *gw,
         }
 
         /* Look at the gfn that the l1e is pointing at */
-        gfn = guest_l1e_get_gfn(gl1e);
-        gmfn = get_gfn_query_unlocked(d, gfn_x(gfn), &p2mt);
+        if ( (guest_l1e_get_flags(gl1e) & _PAGE_PRESENT) &&
+             !guest_l1e_rsvd_bits(v, gl1e) )
+        {
+            gfn = guest_l1e_get_gfn(gl1e);
+            gmfn = get_gfn_query_unlocked(d, gfn_x(gfn), &p2mt);
+        }
+        else
+        {
+            gmfn = INVALID_MFN;
+            p2mt = p2m_invalid;
+        }
 
         /* Propagate the entry.  */
         l1e_propagate_from_guest(v, gl1e, gmfn, &sl1e, ft_prefetch, p2mt);
