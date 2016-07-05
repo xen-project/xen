@@ -747,10 +747,9 @@ static int copy_partial_fdt(libxl__gc *gc, void *fdt, void *pfdt)
 
 #define FDT_MAX_SIZE (1<<20)
 
-int libxl__arch_domain_init_hw_description(libxl__gc *gc,
-                                           libxl_domain_build_info *info,
-                                           libxl__domain_build_state *state,
-                                           struct xc_dom_image *dom)
+static int libxl__prepare_dtb(libxl__gc *gc, libxl_domain_build_info *info,
+                              libxl__domain_build_state *state,
+                              struct xc_dom_image *dom)
 {
     void *fdt = NULL;
     void *pfdt = NULL;
@@ -763,8 +762,6 @@ int libxl__arch_domain_init_hw_description(libxl__gc *gc,
 
     /* convenience aliases */
     xc_domain_configuration_t *xc_config = &state->config;
-
-    assert(info->type == LIBXL_DOMAIN_TYPE_PV);
 
     vers = libxl_get_version_info(CTX);
     if (vers == NULL) return ERROR_FAIL;
@@ -881,6 +878,15 @@ next_resize:
 
 out:
     return rc;
+}
+
+int libxl__arch_domain_init_hw_description(libxl__gc *gc,
+                                           libxl_domain_build_info *info,
+                                           libxl__domain_build_state *state,
+                                           struct xc_dom_image *dom)
+{
+    assert(info->type == LIBXL_DOMAIN_TYPE_PV);
+    return libxl__prepare_dtb(gc, info, state, dom);
 }
 
 static void finalise_one_memory_node(libxl__gc *gc, void *fdt,
