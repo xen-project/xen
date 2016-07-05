@@ -292,8 +292,10 @@ int hvm_girq_dest_2_vcpu_id(struct domain *d, uint8_t dest, uint8_t dest_mode);
     (hvm_paging_enabled(v) && ((v)->arch.hvm_vcpu.guest_cr[4] & X86_CR4_SMEP))
 #define hvm_smap_enabled(v) \
     (hvm_paging_enabled(v) && ((v)->arch.hvm_vcpu.guest_cr[4] & X86_CR4_SMAP))
+/* HVM guests on Intel hardware leak Xen's NX settings into guest context. */
 #define hvm_nx_enabled(v) \
-    (!!((v)->arch.hvm_vcpu.guest_efer & EFER_NX))
+    ((boot_cpu_data.x86_vendor == X86_VENDOR_INTEL && cpu_has_nx) ||    \
+     ((v)->arch.hvm_vcpu.guest_efer & EFER_NX))
 #define hvm_pku_enabled(v) \
     (hvm_paging_enabled(v) && ((v)->arch.hvm_vcpu.guest_cr[4] & X86_CR4_PKE))
 
