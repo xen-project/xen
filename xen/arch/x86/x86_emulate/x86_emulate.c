@@ -1379,7 +1379,6 @@ decode_segment(uint8_t modrm_reg)
     case 3: return x86_seg_ds;
     case 4: return x86_seg_fs;
     case 5: return x86_seg_gs;
-    default: break;
     }
     return decode_segment_failed;
 }
@@ -1501,6 +1500,19 @@ int x86emul_unhandleable_rw(
     struct x86_emulate_ctxt *ctxt)
 {
     return X86EMUL_UNHANDLEABLE;
+}
+
+static void internal_error(const char *which, uint8_t byte,
+                           const struct cpu_user_regs *regs)
+{
+#ifdef __XEN__
+    static bool_t logged;
+
+    if ( !test_and_set_bool(logged) )
+        gprintk(XENLOG_ERR, "Internal error: %s/%02x [%04x:%08lx]\n",
+                which, byte, regs->cs, regs->eip);
+#endif
+    ASSERT_UNREACHABLE();
 }
 
 int
@@ -2996,8 +3008,6 @@ x86_emulate(
             case 7: /* fdivr */
                 emulate_fpu_insn_memsrc("fdivrs", src.val);
                 break;
-            default:
-                goto cannot_emulate;
             }
         }
         break;
@@ -3128,8 +3138,6 @@ x86_emulate(
             case 7: /* fidivr m32i */
                 emulate_fpu_insn_memsrc("fidivrl", src.val);
                 break;
-            default:
-                goto cannot_emulate;
             }
         }
         break;
@@ -3352,8 +3360,6 @@ x86_emulate(
             case 7: /* fidivr m16i */
                 emulate_fpu_insn_memsrc("fidivrs", src.val);
                 break;
-            default:
-                goto cannot_emulate;
             }
         }
         break;
@@ -3431,8 +3437,6 @@ x86_emulate(
                 dst.type = OP_MEM;
                 emulate_fpu_insn_memdst("fistpll", dst.val);
                 break;
-            default:
-                goto cannot_emulate;
             }
         }
         break;
@@ -3750,8 +3754,6 @@ x86_emulate(
             }
             break;
         }
-        default:
-            goto cannot_emulate;
         }
         break;
 
@@ -3845,10 +3847,12 @@ x86_emulate(
             goto push;
         case 7:
             generate_exception_if(1, EXC_UD, -1);
-        default:
-            goto cannot_emulate;
         }
         break;
+
+    default:
+        internal_error("primary", b, ctxt->regs);
+        goto cannot_emulate;
     }
 
  writeback:
@@ -4815,6 +4819,10 @@ x86_emulate(
             break;
         }
         break;
+
+    default:
+        internal_error("secondary", b, ctxt->regs);
+        goto cannot_emulate;
     }
     goto writeback;
 
