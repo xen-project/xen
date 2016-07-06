@@ -518,8 +518,9 @@ __runq_insert(struct list_head *runq, struct csched2_vcpu *svc)
 }
 
 static void
-runq_insert(const struct scheduler *ops, unsigned int cpu, struct csched2_vcpu *svc)
+runq_insert(const struct scheduler *ops, struct csched2_vcpu *svc)
 {
+    unsigned int cpu = svc->vcpu->processor;
     struct list_head * runq = &RQD(ops, cpu)->runq;
     int pos = 0;
 
@@ -558,17 +559,17 @@ void burn_credits(struct csched2_runqueue_data *rqd, struct csched2_vcpu *, s_ti
 /* Check to see if the item on the runqueue is higher priority than what's
  * currently running; if so, wake up the processor */
 static /*inline*/ void
-runq_tickle(const struct scheduler *ops, unsigned int cpu, struct csched2_vcpu *new, s_time_t now)
+runq_tickle(const struct scheduler *ops, struct csched2_vcpu *new, s_time_t now)
 {
     int i, ipid=-1;
     s_time_t lowest=(1<<30);
+    unsigned int cpu = new->vcpu->processor;
     struct csched2_runqueue_data *rqd = RQD(ops, cpu);
     cpumask_t mask;
     struct csched2_vcpu * cur;
 
     d2printk("rqt %pv curr %pv\n", new->vcpu, current);
 
-    BUG_ON(new->vcpu->processor != cpu);
     BUG_ON(new->rqd != rqd);
 
     /* Look at the cpu it's running on first */
@@ -1071,8 +1072,8 @@ csched2_vcpu_wake(const struct scheduler *ops, struct vcpu *vc)
     update_load(ops, svc->rqd, svc, 1, now);
         
     /* Put the VCPU on the runq */
-    runq_insert(ops, vc->processor, svc);
-    runq_tickle(ops, vc->processor, svc, now);
+    runq_insert(ops, svc);
+    runq_tickle(ops, svc, now);
 
 out:
     d2printk("w-\n");
@@ -1104,8 +1105,8 @@ csched2_context_saved(const struct scheduler *ops, struct vcpu *vc)
     {
         BUG_ON(__vcpu_on_runq(svc));
 
-        runq_insert(ops, vc->processor, svc);
-        runq_tickle(ops, vc->processor, svc, now);
+        runq_insert(ops, svc);
+        runq_tickle(ops, svc, now);
     }
     else if ( !is_idle_vcpu(vc) )
         update_load(ops, svc->rqd, svc, -1, now);
@@ -1313,8 +1314,8 @@ static void migrate(const struct scheduler *ops,
         if ( on_runq )
         {
             update_load(ops, svc->rqd, NULL, 1, now);
-            runq_insert(ops, svc->vcpu->processor, svc);
-            runq_tickle(ops, svc->vcpu->processor, svc, now);
+            runq_insert(ops, svc);
+            runq_tickle(ops, svc, now);
             SCHED_STAT_CRANK(migrate_on_runq);
         }
         else
