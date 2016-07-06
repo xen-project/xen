@@ -738,14 +738,15 @@ static void reset_credit(const struct scheduler *ops, int cpu, s_time_t now,
     /* No need to resort runqueue, as everyone's order should be the same. */
 }
 
-void burn_credits(struct csched2_runqueue_data *rqd, struct csched2_vcpu *svc, s_time_t now)
+void burn_credits(struct csched2_runqueue_data *rqd,
+                  struct csched2_vcpu *svc, s_time_t now)
 {
     s_time_t delta;
 
     /* Assert svc is current */
     ASSERT(svc==CSCHED2_VCPU(curr_on_cpu(svc->vcpu->processor)));
 
-    if ( is_idle_vcpu(svc->vcpu) )
+    if ( unlikely(is_idle_vcpu(svc->vcpu)) )
     {
         BUG_ON(svc->credit != CSCHED2_IDLE_CREDIT);
         return;
@@ -753,13 +754,16 @@ void burn_credits(struct csched2_runqueue_data *rqd, struct csched2_vcpu *svc, s
 
     delta = now - svc->start_time;
 
-    if ( delta > 0 ) {
+    if ( likely(delta > 0) )
+    {
         SCHED_STAT_CRANK(burn_credits_t2c);
         t2c_update(rqd, delta, svc);
         svc->start_time = now;
 
         d2printk("b %pv c%d\n", svc->vcpu, svc->credit);
-    } else {
+    }
+    else if ( delta < 0 )
+    {
         d2printk("%s: Time went backwards? now %"PRI_stime" start %"PRI_stime"\n",
                __func__, now, svc->start_time);
     }
