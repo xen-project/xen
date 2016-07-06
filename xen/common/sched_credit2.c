@@ -1366,6 +1366,7 @@ static void balance_load(const struct scheduler *ops, int cpu, s_time_t now)
     struct csched2_private *prv = CSCHED2_PRIV(ops);
     int i, max_delta_rqi = -1;
     struct list_head *push_iter, *pull_iter;
+    bool_t inner_load_updated = 0;
 
     balance_state_t st = { .best_push_svc = NULL, .best_pull_svc = NULL };
     
@@ -1463,7 +1464,6 @@ retry:
     /* Reuse load delta (as we're trying to minimize it) */
     list_for_each( push_iter, &st.lrqd->svc )
     {
-        int inner_load_updated = 0;
         struct csched2_vcpu * push_svc = list_entry(push_iter, struct csched2_vcpu, rqd_elem);
 
         __update_svc_load(ops, push_svc, 0, now);
@@ -1475,10 +1475,8 @@ retry:
         {
             struct csched2_vcpu * pull_svc = list_entry(pull_iter, struct csched2_vcpu, rqd_elem);
             
-            if ( ! inner_load_updated )
-            {
+            if ( !inner_load_updated )
                 __update_svc_load(ops, pull_svc, 0, now);
-            }
         
             if ( !vcpu_is_migrateable(pull_svc, st.lrqd) )
                 continue;
