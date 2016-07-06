@@ -321,7 +321,7 @@ struct csched2_dom {
 /*
  * When a hard affinity change occurs, we may not be able to check some
  * (any!) of the other runqueues, when looking for the best new processor
- * for svc (as trylock-s in choose_cpu() can fail). If that happens, we
+ * for svc (as trylock-s in csched2_cpu_pick() can fail). If that happens, we
  * pick, in order of decreasing preference:
  *  - svc's current pcpu;
  *  - another pcpu from svc's current runq;
@@ -1116,7 +1116,7 @@ csched2_context_saved(const struct scheduler *ops, struct vcpu *vc)
 
 #define MAX_LOAD (1ULL<<60);
 static int
-choose_cpu(const struct scheduler *ops, struct vcpu *vc)
+csched2_cpu_pick(const struct scheduler *ops, struct vcpu *vc)
 {
     struct csched2_private *prv = CSCHED2_PRIV(ops);
     int i, min_rqi = -1, new_cpu;
@@ -1488,16 +1488,6 @@ out_up:
 
 out:
     return;
-}
-
-static int
-csched2_cpu_pick(const struct scheduler *ops, struct vcpu *vc)
-{
-    int new_cpu;
-
-    new_cpu = choose_cpu(ops, vc);
-
-    return new_cpu;
 }
 
 static void
