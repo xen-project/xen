@@ -742,12 +742,6 @@ static void domcreate_bootloader_done(libxl__egc *egc,
 static void domcreate_launch_dm(libxl__egc *egc, libxl__multidev *aodevs,
                                 int ret);
 
-static void domcreate_attach_vtpms(libxl__egc *egc, libxl__multidev *multidev,
-                                   int ret);
-static void domcreate_attach_usbctrls(libxl__egc *egc,
-                                      libxl__multidev *multidev, int ret);
-static void domcreate_attach_usbdevs(libxl__egc *egc, libxl__multidev *multidev,
-                                     int ret);
 static void domcreate_attach_pci(libxl__egc *egc, libxl__multidev *aodevs,
                                  int ret);
 static void domcreate_attach_dtdev(libxl__egc *egc,
@@ -1407,6 +1401,53 @@ static void domcreate_launch_dm(libxl__egc *egc, libxl__multidev *multidev,
     domcreate_complete(egc, dcs, ret);
 }
 
+static const struct libxl_device_type *device_type_tbl[] = {
+    &libxl__nic_devtype,
+    &libxl__vtpm_devtype,
+    &libxl__usbctrl_devtype,
+    &libxl__usbdev_devtype,
+};
+
+static void domcreate_attach_devices(libxl__egc *egc,
+                                     libxl__multidev *multidev,
+                                     int ret)
+{
+    libxl__domain_create_state *dcs = CONTAINER_OF(multidev, *dcs, multidev);
+    STATE_AO_GC(dcs->ao);
+    int domid = dcs->guest_domid;
+    libxl_domain_config *const d_config = dcs->guest_config;
+    const struct libxl_device_type *dt;
+
+    if (ret) {
+        LOG(ERROR, "unable to add %s devices",
+            device_type_tbl[dcs->device_type_idx]->type);
+        goto error_out;
+    }
+
+    dcs->device_type_idx++;
+    if (dcs->device_type_idx < ARRAY_SIZE(device_type_tbl)) {
+        dt = device_type_tbl[dcs->device_type_idx];
+        if (*(int *)((void *)d_config + dt->num_offset) > 0) {
+            /* Attach devices */
+            libxl__multidev_begin(ao, &dcs->multidev);
+            dcs->multidev.callback = domcreate_attach_devices;
+            dt->add(egc, ao, domid, d_config, &dcs->multidev);
+            libxl__multidev_prepared(egc, &dcs->multidev, 0);
+            return;
+        }
+
+        domcreate_attach_devices(egc, &dcs->multidev, 0);
+        return;
+    }
+
+    domcreate_attach_pci(egc, multidev, 0);
+    return;
+
+error_out:
+    assert(ret);
+    domcreate_complete(egc, dcs, ret);
+}
+
 static void domcreate_devmodel_started(libxl__egc *egc,
                                        libxl__dm_spawn_state *dmss,
                                        int ret)
@@ -1430,113 +1471,8 @@ static void domcreate_devmodel_started(libxl__egc *egc,
         }
     }
 
-    /* Plug nic interfaces */
-    if (d_config->num_nics > 0) {
-        /* Attach nics */
-        libxl__multidev_begin(ao, &dcs->multidev);
-        dcs->multidev.callback = domcreate_attach_vtpms;
-        libxl__add_nics(egc, ao, domid, d_config, &dcs->multidev);
-        libxl__multidev_prepared(egc, &dcs->multidev, 0);
-        return;
-    }
-
-    domcreate_attach_vtpms(egc, &dcs->multidev, 0);
-    return;
-
-error_out:
-    assert(ret);
-    domcreate_complete(egc, dcs, ret);
-}
-
-static void domcreate_attach_vtpms(libxl__egc *egc,
-                                   libxl__multidev *multidev,
-                                   int ret)
-{
-   libxl__domain_create_state *dcs = CONTAINER_OF(multidev, *dcs, multidev);
-   STATE_AO_GC(dcs->ao);
-   int domid = dcs->guest_domid;
-
-   libxl_domain_config* const d_config = dcs->guest_config;
-
-   if(ret) {
-       LOG(ERROR, "unable to add nic devices");
-       goto error_out;
-   }
-
-    /* Plug vtpm devices */
-   if (d_config->num_vtpms > 0) {
-       /* Attach vtpms */
-       libxl__multidev_begin(ao, &dcs->multidev);
-       dcs->multidev.callback = domcreate_attach_usbctrls;
-       libxl__add_vtpms(egc, ao, domid, d_config, &dcs->multidev);
-       libxl__multidev_prepared(egc, &dcs->multidev, 0);
-       return;
-   }
-
-   domcreate_attach_usbctrls(egc, multidev, 0);
-   return;
-
-error_out:
-   assert(ret);
-   domcreate_complete(egc, dcs, ret);
-}
-
-static void domcreate_attach_usbctrls(libxl__egc *egc,
-                                      libxl__multidev *multidev, int ret)
-{
-    libxl__domain_create_state *dcs = CONTAINER_OF(multidev, *dcs, multidev);
-    STATE_AO_GC(dcs->ao);
-    int domid = dcs->guest_domid;
-
-    libxl_domain_config *const d_config = dcs->guest_config;
-
-    if (ret) {
-        LOG(ERROR, "unable to add vtpm devices");
-        goto error_out;
-    }
-
-    if (d_config->num_usbctrls > 0) {
-        /* Attach usbctrls */
-        libxl__multidev_begin(ao, &dcs->multidev);
-        dcs->multidev.callback = domcreate_attach_usbdevs;
-        libxl__add_usbctrls(egc, ao, domid, d_config, &dcs->multidev);
-        libxl__multidev_prepared(egc, &dcs->multidev, 0);
-        return;
-    }
-
-    domcreate_attach_usbdevs(egc, multidev, 0);
-    return;
-
-error_out:
-    assert(ret);
-    domcreate_complete(egc, dcs, ret);
-}
-
-
-static void domcreate_attach_usbdevs(libxl__egc *egc, libxl__multidev *multidev,
-                                int ret)
-{
-    libxl__domain_create_state *dcs = CONTAINER_OF(multidev, *dcs, multidev);
-    STATE_AO_GC(dcs->ao);
-    int domid = dcs->guest_domid;
-
-    libxl_domain_config *const d_config = dcs->guest_config;
-
-    if (ret) {
-        LOG(ERROR, "unable to add usbctrl devices");
-        goto error_out;
-    }
-
-    if (d_config->num_usbdevs > 0) {
-        /* Attach usbctrls */
-        libxl__multidev_begin(ao, &dcs->multidev);
-        dcs->multidev.callback = domcreate_attach_pci;
-        libxl__add_usbdevs(egc, ao, domid, d_config, &dcs->multidev);
-        libxl__multidev_prepared(egc, &dcs->multidev, 0);
-        return;
-    }
-
-    domcreate_attach_pci(egc, multidev, 0);
+    dcs->device_type_idx = -1;
+    domcreate_attach_devices(egc, &dcs->multidev, 0);
     return;
 
 error_out:
@@ -1556,7 +1492,6 @@ static void domcreate_attach_pci(libxl__egc *egc, libxl__multidev *multidev,
     libxl_domain_config *const d_config = dcs->guest_config;
 
     if (ret) {
-        LOG(ERROR, "unable to add usb devices");
         goto error_out;
     }
 

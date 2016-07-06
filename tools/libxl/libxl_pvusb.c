@@ -1667,6 +1667,10 @@ out:
     GC_FREE;
     return rc;
 }
+
+DEFINE_DEVICE_TYPE_STRUCT(usbctrl);
+DEFINE_DEVICE_TYPE_STRUCT(usbdev);
+
 /*
  * Local variables:
  * mode: C

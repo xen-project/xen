@@ -3392,6 +3392,25 @@ _hidden void libxl__bootloader_init(libxl__bootloader_state *bl);
  * If callback is passed rc==0, will have updated st->info appropriately */
 _hidden void libxl__bootloader_run(libxl__egc*, libxl__bootloader_state *st);
 
+/*----- Generic Device Handling -----*/
+struct libxl_device_type {
+    char *type;
+    int num_offset;   /* Offset of # of devices in libxl_domain_config */
+    void (*add)(libxl__egc *, libxl__ao *, uint32_t, libxl_domain_config *,
+                libxl__multidev *);
+};
+
+#define DEFINE_DEVICE_TYPE_STRUCT(name)                                 \
+    const struct libxl_device_type libxl__ ## name ## _devtype = {      \
+        .type       = #name,                                            \
+        .num_offset = offsetof(libxl_domain_config, num_ ## name ## s), \
+        .add        = libxl__add_ ## name ## s,                         \
+    }
+
+extern const struct libxl_device_type libxl__nic_devtype;
+extern const struct libxl_device_type libxl__vtpm_devtype;
+extern const struct libxl_device_type libxl__usbctrl_devtype;
+extern const struct libxl_device_type libxl__usbdev_devtype;
 /*----- Domain destruction -----*/
 
 /* Domain destruction has been split into two functions:
@@ -3568,6 +3587,7 @@ struct libxl__domain_create_state {
     libxl_asyncprogress_how aop_console_how;
     /* private to domain_create */
     int guest_domid;
+    int device_type_idx;
     const char *colo_proxy_script;
     libxl__domain_build_state build_state;
     libxl__colo_restore_state crs;

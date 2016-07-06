@@ -7551,6 +7551,9 @@ out:
     return rc;
 }
 
+DEFINE_DEVICE_TYPE_STRUCT(nic);
+DEFINE_DEVICE_TYPE_STRUCT(vtpm);
+
 /*
  * Local variables:
  * mode: C
