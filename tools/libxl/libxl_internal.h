@@ -3411,6 +3411,7 @@ extern const struct libxl_device_type libxl__nic_devtype;
 extern const struct libxl_device_type libxl__vtpm_devtype;
 extern const struct libxl_device_type libxl__usbctrl_devtype;
 extern const struct libxl_device_type libxl__usbdev_devtype;
+extern const struct libxl_device_type libxl__pcidev_devtype;
 /*----- Domain destruction -----*/
 
 /* Domain destruction has been split into two functions:

@@ -1291,6 +1291,36 @@ out:
     return rc;
 }
 
+static void libxl__add_pcidevs(libxl__egc *egc, libxl__ao *ao, uint32_t domid,
+                               libxl_domain_config *d_config,
+                               libxl__multidev *multidev)
+{
+    AO_GC;
+    libxl__ao_device *aodev = libxl__multidev_prepare(multidev);
+    int i, rc = 0;
+
+    for (i = 0; i < d_config->num_pcidevs; i++) {
+        rc = libxl__device_pci_add(gc, domid, &d_config->pcidevs[i], 1);
+        if (rc < 0) {
+            LOG(ERROR, "libxl_device_pci_add failed: %d", rc);
+            goto out;
+        }
+    }
+
+    if (d_config->num_pcidevs > 0) {
+        rc = libxl__create_pci_backend(gc, domid, d_config->pcidevs,
+            d_config->num_pcidevs);
+        if (rc < 0) {
+            LOG(ERROR, "libxl_create_pci_backend failed: %d", rc);
+            goto out;
+        }
+    }
+
+out:
+    aodev->rc = rc;
+    aodev->callback(egc, aodev);
+}
+
 static int qemu_pci_remove_xenstore(libxl__gc *gc, uint32_t domid,
                                     libxl_device_pci *pcidev, int force)
 {
@@ -1667,6 +1697,8 @@ int libxl__grant_vga_iomem_permission(libxl__gc *gc, const uint32_t domid,
 
     return 0;
 }
+
+DEFINE_DEVICE_TYPE_STRUCT(pcidev);
 
 /*
  * Local variables:

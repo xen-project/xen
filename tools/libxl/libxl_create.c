@@ -742,10 +742,8 @@ static void domcreate_bootloader_done(libxl__egc *egc,
 static void domcreate_launch_dm(libxl__egc *egc, libxl__multidev *aodevs,
                                 int ret);
 
-static void domcreate_attach_pci(libxl__egc *egc, libxl__multidev *aodevs,
-                                 int ret);
-static void domcreate_attach_dtdev(libxl__egc *egc,
-                                   libxl__domain_create_state *dcs);
+static void domcreate_attach_dtdev(libxl__egc *egc, libxl__multidev *multidev,
+                                   int ret);
 
 static void domcreate_console_available(libxl__egc *egc,
                                         libxl__domain_create_state *dcs);
@@ -1406,6 +1404,7 @@ static const struct libxl_device_type *device_type_tbl[] = {
     &libxl__vtpm_devtype,
     &libxl__usbctrl_devtype,
     &libxl__usbdev_devtype,
+    &libxl__pcidev_devtype,
 };
 
 static void domcreate_attach_devices(libxl__egc *egc,
@@ -1440,7 +1439,7 @@ static void domcreate_attach_devices(libxl__egc *egc,
         return;
     }
 
-    domcreate_attach_pci(egc, multidev, 0);
+    domcreate_attach_dtdev(egc, multidev, 0);
     return;
 
 error_out:
@@ -1480,52 +1479,13 @@ error_out:
     domcreate_complete(egc, dcs, ret);
 }
 
-static void domcreate_attach_pci(libxl__egc *egc, libxl__multidev *multidev,
-                                 int ret)
+static void domcreate_attach_dtdev(libxl__egc *egc,
+                                   libxl__multidev *multidev,
+                                   int ret)
 {
     libxl__domain_create_state *dcs = CONTAINER_OF(multidev, *dcs, multidev);
     STATE_AO_GC(dcs->ao);
     int i;
-    int domid = dcs->guest_domid;
-
-    /* convenience aliases */
-    libxl_domain_config *const d_config = dcs->guest_config;
-
-    if (ret) {
-        goto error_out;
-    }
-
-    for (i = 0; i < d_config->num_pcidevs; i++) {
-        ret = libxl__device_pci_add(gc, domid, &d_config->pcidevs[i], 1);
-        if (ret < 0) {
-            LOG(ERROR, "libxl_device_pci_add failed: %d", ret);
-            goto error_out;
-        }
-    }
-
-    if (d_config->num_pcidevs > 0) {
-        ret = libxl__create_pci_backend(gc, domid, d_config->pcidevs,
-            d_config->num_pcidevs);
-        if (ret < 0) {
-            LOG(ERROR, "libxl_create_pci_backend failed: %d", ret);
-            goto error_out;
-        }
-    }
-
-    domcreate_attach_dtdev(egc, dcs);
-    return;
-
-error_out:
-    assert(ret);
-    domcreate_complete(egc, dcs, ret);
-}
-
-static void domcreate_attach_dtdev(libxl__egc *egc,
-                                   libxl__domain_create_state *dcs)
-{
-    STATE_AO_GC(dcs->ao);
-    int i;
-    int ret;
     int domid = dcs->guest_domid;
 
     /* convenience aliases */
