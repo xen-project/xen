@@ -742,9 +742,6 @@ static void domcreate_bootloader_done(libxl__egc *egc,
 static void domcreate_launch_dm(libxl__egc *egc, libxl__multidev *aodevs,
                                 int ret);
 
-static void domcreate_attach_dtdev(libxl__egc *egc, libxl__multidev *multidev,
-                                   int ret);
-
 static void domcreate_console_available(libxl__egc *egc,
                                         libxl__domain_create_state *dcs);
 
@@ -1399,12 +1396,39 @@ static void domcreate_launch_dm(libxl__egc *egc, libxl__multidev *multidev,
     domcreate_complete(egc, dcs, ret);
 }
 
+static void libxl__add_dtdevs(libxl__egc *egc, libxl__ao *ao, uint32_t domid,
+                              libxl_domain_config *d_config,
+                              libxl__multidev *multidev)
+{
+    AO_GC;
+    libxl__ao_device *aodev = libxl__multidev_prepare(multidev);
+    int i, rc = 0;
+
+    for (i = 0; i < d_config->num_dtdevs; i++) {
+        const libxl_device_dtdev *dtdev = &d_config->dtdevs[i];
+
+        LOG(DEBUG, "Assign device \"%s\" to dom%u", dtdev->path, domid);
+        rc = xc_assign_dt_device(CTX->xch, domid, dtdev->path);
+        if (rc < 0) {
+            LOG(ERROR, "xc_assign_dtdevice failed: %d", rc);
+            goto out;
+        }
+    }
+
+out:
+    aodev->rc = rc;
+    aodev->callback(egc, aodev);
+}
+
+static DEFINE_DEVICE_TYPE_STRUCT(dtdev);
+
 static const struct libxl_device_type *device_type_tbl[] = {
     &libxl__nic_devtype,
     &libxl__vtpm_devtype,
     &libxl__usbctrl_devtype,
     &libxl__usbdev_devtype,
     &libxl__pcidev_devtype,
+    &libxl__dtdev_devtype,
 };
 
 static void domcreate_attach_devices(libxl__egc *egc,
@@ -1439,7 +1463,10 @@ static void domcreate_attach_devices(libxl__egc *egc,
         return;
     }
 
-    domcreate_attach_dtdev(egc, multidev, 0);
+    domcreate_console_available(egc, dcs);
+
+    domcreate_complete(egc, dcs, 0);
+
     return;
 
 error_out:
@@ -1472,39 +1499,6 @@ static void domcreate_devmodel_started(libxl__egc *egc,
 
     dcs->device_type_idx = -1;
     domcreate_attach_devices(egc, &dcs->multidev, 0);
-    return;
-
-error_out:
-    assert(ret);
-    domcreate_complete(egc, dcs, ret);
-}
-
-static void domcreate_attach_dtdev(libxl__egc *egc,
-                                   libxl__multidev *multidev,
-                                   int ret)
-{
-    libxl__domain_create_state *dcs = CONTAINER_OF(multidev, *dcs, multidev);
-    STATE_AO_GC(dcs->ao);
-    int i;
-    int domid = dcs->guest_domid;
-
-    /* convenience aliases */
-    libxl_domain_config *const d_config = dcs->guest_config;
-
-    for (i = 0; i < d_config->num_dtdevs; i++) {
-        const libxl_device_dtdev *dtdev = &d_config->dtdevs[i];
-
-        LOG(DEBUG, "Assign device \"%s\" to dom%u", dtdev->path, domid);
-        ret = xc_assign_dt_device(CTX->xch, domid, dtdev->path);
-        if (ret < 0) {
-            LOG(ERROR, "xc_assign_dtdevice failed: %d", ret);
-            goto error_out;
-        }
-    }
-
-    domcreate_console_available(egc, dcs);
-
-    domcreate_complete(egc, dcs, 0);
     return;
 
 error_out:
