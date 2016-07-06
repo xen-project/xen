@@ -589,6 +589,7 @@ runq_tickle(const struct scheduler *ops, unsigned int cpu, struct csched2_vcpu *
     i = cpumask_cycle(cpu, &mask);
     if ( i < nr_cpu_ids )
     {
+        SCHED_STAT_CRANK(tickled_idle_cpu);
         ipid = i;
         goto tickle;
     }
@@ -637,11 +638,12 @@ runq_tickle(const struct scheduler *ops, unsigned int cpu, struct csched2_vcpu *
      * than the migrate resistance */
     if ( ipid == -1 || lowest + CSCHED2_MIGRATE_RESIST > new->credit )
     {
-        SCHED_STAT_CRANK(tickle_idlers_none);
-        goto no_tickle;
+        SCHED_STAT_CRANK(tickled_no_cpu);
+        return;
     }
 
-tickle:
+    SCHED_STAT_CRANK(tickled_busy_cpu);
+ tickle:
     BUG_ON(ipid == -1);
 
     /* TRACE */ {
@@ -654,11 +656,7 @@ tickle:
                   (unsigned char *)&d);
     }
     cpumask_set_cpu(ipid, &rqd->tickled);
-    SCHED_STAT_CRANK(tickle_idlers_some);
     cpu_raise_softirq(ipid, SCHEDULE_SOFTIRQ);
-
-no_tickle:
-    return;
 }
 
 /*

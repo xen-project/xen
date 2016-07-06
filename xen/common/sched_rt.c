@@ -1146,6 +1146,7 @@ runq_tickle(const struct scheduler *ops, struct rt_vcpu *new)
     /* 1) if new's previous cpu is idle, kick it for cache benefit */
     if ( is_idle_vcpu(curr_on_cpu(new->vcpu->processor)) )
     {
+        SCHED_STAT_CRANK(tickled_idle_cpu);
         cpu_to_tickle = new->vcpu->processor;
         goto out;
     }
@@ -1157,6 +1158,7 @@ runq_tickle(const struct scheduler *ops, struct rt_vcpu *new)
         iter_vc = curr_on_cpu(cpu);
         if ( is_idle_vcpu(iter_vc) )
         {
+            SCHED_STAT_CRANK(tickled_idle_cpu);
             cpu_to_tickle = cpu;
             goto out;
         }
@@ -1170,14 +1172,15 @@ runq_tickle(const struct scheduler *ops, struct rt_vcpu *new)
     if ( latest_deadline_vcpu != NULL &&
          new->cur_deadline < latest_deadline_vcpu->cur_deadline )
     {
+        SCHED_STAT_CRANK(tickled_busy_cpu);
         cpu_to_tickle = latest_deadline_vcpu->vcpu->processor;
         goto out;
     }
 
     /* didn't tickle any cpu */
-    SCHED_STAT_CRANK(tickle_idlers_none);
+    SCHED_STAT_CRANK(tickled_no_cpu);
     return;
-out:
+ out:
     /* TRACE */
     {
         struct {
@@ -1191,7 +1194,6 @@ out:
     }
 
     cpumask_set_cpu(cpu_to_tickle, &prv->tickled);
-    SCHED_STAT_CRANK(tickle_idlers_some);
     cpu_raise_softirq(cpu_to_tickle, SCHEDULE_SOFTIRQ);
     return;
 }

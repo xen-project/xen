@@ -27,8 +27,9 @@ PERFCOUNTER(vcpu_wake_running,      "sched: vcpu_wake_running")
 PERFCOUNTER(vcpu_wake_onrunq,       "sched: vcpu_wake_onrunq")
 PERFCOUNTER(vcpu_wake_runnable,     "sched: vcpu_wake_runnable")
 PERFCOUNTER(vcpu_wake_not_runnable, "sched: vcpu_wake_not_runnable")
-PERFCOUNTER(tickle_idlers_none,     "sched: tickle_idlers_none")
-PERFCOUNTER(tickle_idlers_some,     "sched: tickle_idlers_some")
+PERFCOUNTER(tickled_no_cpu,         "sched: tickled_no_cpu")
+PERFCOUNTER(tickled_idle_cpu,       "sched: tickled_idle_cpu")
+PERFCOUNTER(tickled_busy_cpu,       "sched: tickled_busy_cpu")
 PERFCOUNTER(vcpu_check,             "sched: vcpu_check")
 
 /* credit specific counters */

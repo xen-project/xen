@@ -385,7 +385,9 @@ static inline void __runq_tickle(struct csched_vcpu *new)
          || (idlers_empty && new->pri > cur->pri) )
     {
         if ( cur->pri != CSCHED_PRI_IDLE )
-            SCHED_STAT_CRANK(tickle_idlers_none);
+            SCHED_STAT_CRANK(tickled_busy_cpu);
+        else
+            SCHED_STAT_CRANK(tickled_idle_cpu);
         __cpumask_set_cpu(cpu, &mask);
     }
     else if ( !idlers_empty )
@@ -444,13 +446,13 @@ static inline void __runq_tickle(struct csched_vcpu *new)
                     set_bit(_VPF_migrating, &cur->vcpu->pause_flags);
                 }
                 /* Tickle cpu anyway, to let new preempt cur. */
-                SCHED_STAT_CRANK(tickle_idlers_none);
+                SCHED_STAT_CRANK(tickled_busy_cpu);
                 __cpumask_set_cpu(cpu, &mask);
             }
             else if ( !new_idlers_empty )
             {
                 /* Which of the idlers suitable for new shall we wake up? */
-                SCHED_STAT_CRANK(tickle_idlers_some);
+                SCHED_STAT_CRANK(tickled_idle_cpu);
                 if ( opt_tickle_one_idle )
                 {
                     this_cpu(last_tickle_cpu) =
@@ -479,6 +481,8 @@ static inline void __runq_tickle(struct csched_vcpu *new)
         /* Send scheduler interrupts to designated CPUs */
         cpumask_raise_softirq(&mask, SCHEDULE_SOFTIRQ);
     }
+    else
+        SCHED_STAT_CRANK(tickled_no_cpu);
 }
 
 static void
