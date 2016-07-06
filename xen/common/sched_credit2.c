@@ -556,9 +556,23 @@ __runq_remove(struct csched2_vcpu *svc)
 
 void burn_credits(struct csched2_runqueue_data *rqd, struct csched2_vcpu *, s_time_t);
 
-/* Check to see if the item on the runqueue is higher priority than what's
- * currently running; if so, wake up the processor */
-static /*inline*/ void
+/*
+ * Check what processor it is best to 'wake', for picking up a vcpu that has
+ * just been put (back) in the runqueue. Logic is as follows:
+ *  1. if there are idle processors in the runq, wake one of them;
+ *  2. if there aren't idle processor, check the one were the vcpu was
+ *     running before to see if we can preempt what's running there now
+ *     (and hence doing just one migration);
+ *  3. last stand: check all processors and see if the vcpu is in right
+ *     of preempting any of the other vcpus running on them (this requires
+ *     two migrations, and that's indeed why it is left as the last stand).
+ *
+ * Note that when we say 'idle processors' what we really mean is (pretty
+ * much always) both _idle_ and _not_already_tickled_. In fact, if a
+ * processor has been tickled, it will run csched2_schedule() shortly, and
+ * pick up some work, so it would be wrong to consider it idle.
+ */
+static void
 runq_tickle(const struct scheduler *ops, struct csched2_vcpu *new, s_time_t now)
 {
     int i, ipid=-1;
@@ -572,22 +586,14 @@ runq_tickle(const struct scheduler *ops, struct csched2_vcpu *new, s_time_t now)
 
     BUG_ON(new->rqd != rqd);
 
-    /* Look at the cpu it's running on first */
-    cur = CSCHED2_VCPU(curr_on_cpu(cpu));
-    burn_credits(rqd, cur, now);
-
-    if ( cur->credit < new->credit )
-    {
-        ipid = cpu;
-        goto tickle;
-    }
-    
-    /* Get a mask of idle, but not tickled, that new is allowed to run on. */
+    /*
+     * Get a mask of idle, but not tickled, processors that new is
+     * allowed to run on. If that's not empty, choose someone from there
+     * (preferrably, the one were new was running on already).
+     */
     cpumask_andnot(&mask, &rqd->idle, &rqd->tickled);
     cpumask_and(&mask, &mask, new->vcpu->cpu_hard_affinity);
-    
-    /* If it's not empty, choose one */
-    i = cpumask_cycle(cpu, &mask);
+    i = cpumask_test_or_cycle(cpu, &mask);
     if ( i < nr_cpu_ids )
     {
         SCHED_STAT_CRANK(tickled_idle_cpu);
@@ -595,12 +601,26 @@ runq_tickle(const struct scheduler *ops, struct csched2_vcpu *new, s_time_t now)
         goto tickle;
     }
 
-    /* Otherwise, look for the non-idle cpu with the lowest credit,
-     * skipping cpus which have been tickled but not scheduled yet,
-     * that new is allowed to run on. */
+    /*
+     * Otherwise, look for the non-idle (and non-tickled) processors with
+     * the lowest credit, among the ones new is allowed to run on. Again,
+     * the cpu were it was running on would be the best candidate.
+     */
     cpumask_andnot(&mask, &rqd->active, &rqd->idle);
     cpumask_andnot(&mask, &mask, &rqd->tickled);
     cpumask_and(&mask, &mask, new->vcpu->cpu_hard_affinity);
+    if ( cpumask_test_cpu(cpu, &mask) )
+    {
+        cur = CSCHED2_VCPU(curr_on_cpu(cpu));
+        burn_credits(rqd, cur, now);
+
+        if ( cur->credit < new->credit )
+        {
+            SCHED_STAT_CRANK(tickled_busy_cpu);
+            ipid = cpu;
+            goto tickle;
+        }
+    }
 
     for_each_cpu(i, &mask)
     {
@@ -612,7 +632,7 @@ runq_tickle(const struct scheduler *ops, struct csched2_vcpu *new, s_time_t now)
 
         BUG_ON(is_idle_vcpu(cur->vcpu));
 
-        /* Update credits for current to see if we want to preempt */
+        /* Update credits for current to see if we want to preempt. */
         burn_credits(rqd, cur, now);
 
         if ( cur->credit < lowest )
@@ -635,8 +655,10 @@ runq_tickle(const struct scheduler *ops, struct csched2_vcpu *new, s_time_t now)
         }
     }
 
-    /* Only switch to another processor if the credit difference is greater
-     * than the migrate resistance */
+    /*
+     * Only switch to another processor if the credit difference is
+     * greater than the migrate resistance.
+     */
     if ( ipid == -1 || lowest + CSCHED2_MIGRATE_RESIST > new->credit )
     {
         SCHED_STAT_CRANK(tickled_no_cpu);

@@ -266,6 +266,14 @@ static inline int cpumask_cycle(int n, const cpumask_t *srcp)
     return nxt;
 }
 
+static inline int cpumask_test_or_cycle(int n, const cpumask_t *srcp)
+{
+    if ( cpumask_test_cpu(n, srcp) )
+        return n;
+
+    return cpumask_cycle(n, srcp);
+}
+
 static inline unsigned int cpumask_any(const cpumask_t *srcp)
 {
     unsigned int cpu = cpumask_first(srcp);
