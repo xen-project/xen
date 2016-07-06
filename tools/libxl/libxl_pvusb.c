@@ -69,9 +69,9 @@ out:
     return rc;
 }
 
-int libxl__device_from_usbctrl(libxl__gc *gc, uint32_t domid,
-                               libxl_device_usbctrl *usbctrl,
-                               libxl__device *device)
+static int libxl__device_from_usbctrl(libxl__gc *gc, uint32_t domid,
+                                      libxl_device_usbctrl *usbctrl,
+                                      libxl__device *device)
 {
     device->backend_devid   = usbctrl->devid;
     device->backend_domid   = usbctrl->backend_domid;
@@ -218,9 +218,9 @@ static char *pvusb_get_device_type(libxl_usbctrl_type type)
  * Before calling this function, aodev should be properly filled:
  * aodev->ao, aodev->callback, aodev->update_json, ...
  */
-void libxl__device_usbctrl_add(libxl__egc *egc, uint32_t domid,
-                               libxl_device_usbctrl *usbctrl,
-                               libxl__ao_device *aodev)
+static void libxl__device_usbctrl_add(libxl__egc *egc, uint32_t domid,
+                                      libxl_device_usbctrl *usbctrl,
+                                      libxl__ao_device *aodev)
 {
     STATE_AO_GC(aodev->ao);
     libxl__device *device;
@@ -262,6 +262,10 @@ out:
     aodev->callback(egc, aodev);
     return;
 }
+
+LIBXL_DEFINE_DEVICE_ADD(usbctrl)
+static LIBXL_DEFINE_DEVICES_ADD(usbctrl)
+LIBXL_DEFINE_DEVICE_REMOVE_CUSTOM(usbctrl)
 
 static int libxl__device_usbdev_list_for_usbctrl(libxl__gc *gc, uint32_t domid,
                                                  libxl_devid usbctrl,
@@ -1423,9 +1427,9 @@ out:
  * Before calling this function, aodev should be properly filled:
  * aodev->ao, aodev->callback, aodev->update_json, ...
  */
-void libxl__device_usbdev_add(libxl__egc *egc, uint32_t domid,
-                              libxl_device_usbdev *usbdev,
-                              libxl__ao_device *aodev)
+static void libxl__device_usbdev_add(libxl__egc *egc, uint32_t domid,
+                                     libxl_device_usbdev *usbdev,
+                                     libxl__ao_device *aodev)
 {
     STATE_AO_GC(aodev->ao);
     int rc;
@@ -1490,6 +1494,9 @@ out:
     aodev->callback(egc, aodev);
     return;
 }
+
+LIBXL_DEFINE_DEVICE_ADD(usbdev)
+static LIBXL_DEFINE_DEVICES_ADD(usbdev)
 
 static int do_usbdev_remove(libxl__gc *gc, uint32_t domid,
                             libxl_device_usbdev *usbdev)

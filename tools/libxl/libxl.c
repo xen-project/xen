@@ -1980,7 +1980,7 @@ out:
 /******************************************************************************/
 
 /* generic callback for devices that only need to set ao_complete */
-static void device_addrm_aocomplete(libxl__egc *egc, libxl__ao_device *aodev)
+void device_addrm_aocomplete(libxl__egc *egc, libxl__ao_device *aodev)
 {
     STATE_AO_GC(aodev->ao);
 
@@ -2055,9 +2055,9 @@ static int libxl__device_from_vtpm(libxl__gc *gc, uint32_t domid,
    return 0;
 }
 
-void libxl__device_vtpm_add(libxl__egc *egc, uint32_t domid,
-                           libxl_device_vtpm *vtpm,
-                           libxl__ao_device *aodev)
+static void libxl__device_vtpm_add(libxl__egc *egc, uint32_t domid,
+                                   libxl_device_vtpm *vtpm,
+                                   libxl__ao_device *aodev)
 {
     STATE_AO_GC(aodev->ao);
     flexarray_t *front;
@@ -2629,8 +2629,9 @@ out:
     return;
 }
 
-void libxl__device_disk_add(libxl__egc *egc, uint32_t domid,
-                           libxl_device_disk *disk, libxl__ao_device *aodev)
+static void libxl__device_disk_add(libxl__egc *egc, uint32_t domid,
+                                   libxl_device_disk *disk,
+                                   libxl__ao_device *aodev)
 {
     device_disk_add(egc, domid, disk, aodev, NULL, NULL);
 }
@@ -3432,8 +3433,9 @@ static int libxl__device_from_nic(libxl__gc *gc, uint32_t domid,
     return 0;
 }
 
-void libxl__device_nic_add(libxl__egc *egc, uint32_t domid,
-                           libxl_device_nic *nic, libxl__ao_device *aodev)
+static void libxl__device_nic_add(libxl__egc *egc, uint32_t domid,
+                                  libxl_device_nic *nic,
+                                  libxl__ao_device *aodev)
 {
     STATE_AO_GC(aodev->ao);
     flexarray_t *front;
@@ -4298,136 +4300,49 @@ out:
 
 /******************************************************************************/
 
-/* Macro for defining device remove/destroy functions in a compact way */
 /* The following functions are defined:
+ * libxl_device_disk_add
+ * libxl__add_disks
  * libxl_device_disk_remove
  * libxl_device_disk_destroy
+ * libxl_device_nic_add
+ * libxl__add_nics
  * libxl_device_nic_remove
  * libxl_device_nic_destroy
+ * libxl_device_vtpm_add
+ * libxl__add_vtpms
  * libxl_device_vtpm_remove
  * libxl_device_vtpm_destroy
  * libxl_device_vkb_remove
  * libxl_device_vkb_destroy
  * libxl_device_vfb_remove
  * libxl_device_vfb_destroy
- * libxl_device_usbctrl_remove
- * libxl_device_usbctrl_destroy
  */
-#define DEFINE_DEVICE_REMOVE_EXT(type, remtype, removedestroy, f)        \
-    int libxl_device_##type##_##removedestroy(libxl_ctx *ctx,           \
-        uint32_t domid, libxl_device_##type *type,                      \
-        const libxl_asyncop_how *ao_how)                                \
-    {                                                                   \
-        AO_CREATE(ctx, domid, ao_how);                                  \
-        libxl__device *device;                                          \
-        libxl__ao_device *aodev;                                        \
-        int rc;                                                         \
-                                                                        \
-        GCNEW(device);                                                  \
-        rc = libxl__device_from_##type(gc, domid, type, device);        \
-        if (rc != 0) goto out;                                          \
-                                                                        \
-        GCNEW(aodev);                                                   \
-        libxl__prepare_ao_device(ao, aodev);                            \
-        aodev->action = LIBXL__DEVICE_ACTION_REMOVE;                    \
-        aodev->dev = device;                                            \
-        aodev->callback = device_addrm_aocomplete;                      \
-        aodev->force = f;                                               \
-        libxl__initiate_device_##remtype##_remove(egc, aodev);          \
-                                                                        \
-    out:                                                                \
-        if (rc) return AO_CREATE_FAIL(rc);                              \
-        return AO_INPROGRESS;                                           \
-    }
-
-#define DEFINE_DEVICE_REMOVE(type, removedestroy, f) \
-    DEFINE_DEVICE_REMOVE_EXT(type, generic, removedestroy, f)
-
-#define DEFINE_DEVICE_REMOVE_CUSTOM(type, removedestroy, f)  \
-    DEFINE_DEVICE_REMOVE_EXT(type, type, removedestroy, f)
-
-/* Define all remove/destroy functions and undef the macro */
-
-/* disk */
-DEFINE_DEVICE_REMOVE(disk, remove, 0)
-DEFINE_DEVICE_REMOVE(disk, destroy, 1)
-
-/* nic */
-DEFINE_DEVICE_REMOVE(nic, remove, 0)
-DEFINE_DEVICE_REMOVE(nic, destroy, 1)
-
-/* vkb */
-DEFINE_DEVICE_REMOVE(vkb, remove, 0)
-DEFINE_DEVICE_REMOVE(vkb, destroy, 1)
-
-/* vfb */
-
-DEFINE_DEVICE_REMOVE(vfb, remove, 0)
-DEFINE_DEVICE_REMOVE(vfb, destroy, 1)
-
-/* vtpm */
-DEFINE_DEVICE_REMOVE(vtpm, remove, 0)
-DEFINE_DEVICE_REMOVE(vtpm, destroy, 1)
-
-/* usbctrl */
-DEFINE_DEVICE_REMOVE_CUSTOM(usbctrl, remove, 0)
-DEFINE_DEVICE_REMOVE_CUSTOM(usbctrl, destroy, 1)
 
 /* channel/console hotunplug is not implemented. There are 2 possibilities:
  * 1. add support for secondary consoles to xenconsoled
  * 2. dynamically add/remove qemu chardevs via qmp messages. */
 
-#undef DEFINE_DEVICE_REMOVE
-#undef DEFINE_DEVICE_REMOVE_CUSTOM
-#undef DEFINE_DEVICE_REMOVE_EXT
-
-/******************************************************************************/
-
-/* Macro for defining device addition functions in a compact way */
-/* The following functions are defined:
- * libxl_device_disk_add
- * libxl_device_nic_add
- * libxl_device_vtpm_add
- * libxl_device_usbctrl_add
- * libxl_device_usbdev_add
- */
-
-#define DEFINE_DEVICE_ADD(type)                                         \
-    int libxl_device_##type##_add(libxl_ctx *ctx,                       \
-        uint32_t domid, libxl_device_##type *type,                      \
-        const libxl_asyncop_how *ao_how)                                \
-    {                                                                   \
-        AO_CREATE(ctx, domid, ao_how);                                  \
-        libxl__ao_device *aodev;                                        \
-                                                                        \
-        GCNEW(aodev);                                                   \
-        libxl__prepare_ao_device(ao, aodev);                            \
-        aodev->action = LIBXL__DEVICE_ACTION_ADD;                       \
-        aodev->callback = device_addrm_aocomplete;                      \
-        aodev->update_json = true;                                      \
-        libxl__device_##type##_add(egc, domid, type, aodev);            \
-                                                                        \
-        return AO_INPROGRESS;                                           \
-    }
-
-/* Define alladd functions and undef the macro */
-
 /* disk */
-DEFINE_DEVICE_ADD(disk)
+LIBXL_DEFINE_DEVICE_ADD(disk)
+LIBXL_DEFINE_DEVICES_ADD(disk)
+LIBXL_DEFINE_DEVICE_REMOVE(disk)
 
 /* nic */
-DEFINE_DEVICE_ADD(nic)
+LIBXL_DEFINE_DEVICE_ADD(nic)
+LIBXL_DEFINE_DEVICES_ADD(nic)
+LIBXL_DEFINE_DEVICE_REMOVE(nic)
 
 /* vtpm */
-DEFINE_DEVICE_ADD(vtpm)
+LIBXL_DEFINE_DEVICE_ADD(vtpm)
+static LIBXL_DEFINE_DEVICES_ADD(vtpm)
+LIBXL_DEFINE_DEVICE_REMOVE(vtpm)
 
-/* usbctrl */
-DEFINE_DEVICE_ADD(usbctrl)
+/* vkb */
+LIBXL_DEFINE_DEVICE_REMOVE(vkb)
 
-/* usb */
-DEFINE_DEVICE_ADD(usbdev)
-
-#undef DEFINE_DEVICE_ADD
+/* vfb */
+LIBXL_DEFINE_DEVICE_REMOVE(vfb)
 
 /******************************************************************************/
 

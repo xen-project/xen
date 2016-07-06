@@ -2382,6 +2382,9 @@ typedef void libxl__device_callback(libxl__egc*, libxl__ao_device*);
  */
 _hidden void libxl__prepare_ao_device(libxl__ao *ao, libxl__ao_device *aodev);
 
+/* generic callback for devices that only need to set ao_complete */
+_hidden void device_addrm_aocomplete(libxl__egc *egc, libxl__ao_device *aodev);
+
 struct libxl__ao_device {
     /* filled in by user */
     libxl__ao *ao;
@@ -2624,26 +2627,6 @@ struct libxl__multidev {
  * xenstore entry afterwards. We have both JSON and xenstore entry,
  * it's a valid state.
  */
-_hidden void libxl__device_disk_add(libxl__egc *egc, uint32_t domid,
-                                    libxl_device_disk *disk,
-                                    libxl__ao_device *aodev);
-
-/* AO operation to connect a nic device */
-_hidden void libxl__device_nic_add(libxl__egc *egc, uint32_t domid,
-                                   libxl_device_nic *nic,
-                                   libxl__ao_device *aodev);
-
-_hidden void libxl__device_vtpm_add(libxl__egc *egc, uint32_t domid,
-                                   libxl_device_vtpm *vtpm,
-                                   libxl__ao_device *aodev);
-
-_hidden void libxl__device_usbctrl_add(libxl__egc *egc, uint32_t domid,
-                                       libxl_device_usbctrl *usbctrl,
-                                       libxl__ao_device *aodev);
-
-_hidden void libxl__device_usbdev_add(libxl__egc *egc, uint32_t domid,
-                                      libxl_device_usbdev *usbdev,
-                                      libxl__ao_device *aodev);
 
 /* Internal function to connect a vkb device */
 _hidden int libxl__device_vkb_add(libxl__gc *gc, uint32_t domid,
@@ -2676,10 +2659,6 @@ _hidden void libxl__wait_device_connection(libxl__egc*,
  */
 _hidden void libxl__initiate_device_generic_remove(libxl__egc *egc,
                                                    libxl__ao_device *aodev);
-
-_hidden int libxl__device_from_usbctrl(libxl__gc *gc, uint32_t domid,
-                               libxl_device_usbctrl *usbctrl,
-                               libxl__device *device);
 
 _hidden void libxl__initiate_device_usbctrl_remove(libxl__egc *egc,
                                                    libxl__ao_device *aodev);
@@ -3393,6 +3372,73 @@ _hidden void libxl__bootloader_init(libxl__bootloader_state *bl);
 _hidden void libxl__bootloader_run(libxl__egc*, libxl__bootloader_state *st);
 
 /*----- Generic Device Handling -----*/
+#define LIBXL_DEFINE_DEVICE_ADD(type)                                   \
+    int libxl_device_##type##_add(libxl_ctx *ctx,                       \
+        uint32_t domid, libxl_device_##type *type,                      \
+        const libxl_asyncop_how *ao_how)                                \
+    {                                                                   \
+        AO_CREATE(ctx, domid, ao_how);                                  \
+        libxl__ao_device *aodev;                                        \
+                                                                        \
+        GCNEW(aodev);                                                   \
+        libxl__prepare_ao_device(ao, aodev);                            \
+        aodev->action = LIBXL__DEVICE_ACTION_ADD;                       \
+        aodev->callback = device_addrm_aocomplete;                      \
+        aodev->update_json = true;                                      \
+        libxl__device_##type##_add(egc, domid, type, aodev);            \
+                                                                        \
+        return AO_INPROGRESS;                                           \
+    }
+
+#define LIBXL_DEFINE_DEVICES_ADD(type)                                  \
+    void libxl__add_##type##s(libxl__egc *egc, libxl__ao *ao, uint32_t domid, \
+                              libxl_domain_config *d_config,            \
+                              libxl__multidev *multidev)                \
+    {                                                                   \
+        AO_GC;                                                          \
+        int i;                                                          \
+        for (i = 0; i < d_config->num_##type##s; i++) {                 \
+            libxl__ao_device *aodev = libxl__multidev_prepare(multidev);  \
+            libxl__device_##type##_add(egc, domid, &d_config->type##s[i], \
+                                       aodev);                          \
+        }                                                               \
+    }
+
+#define LIBXL_DEFINE_DEVICE_REMOVE_EXT(type, remtype, removedestroy, f) \
+    int libxl_device_##type##_##removedestroy(libxl_ctx *ctx,           \
+        uint32_t domid, libxl_device_##type *type,                      \
+        const libxl_asyncop_how *ao_how)                                \
+    {                                                                   \
+        AO_CREATE(ctx, domid, ao_how);                                  \
+        libxl__device *device;                                          \
+        libxl__ao_device *aodev;                                        \
+        int rc;                                                         \
+                                                                        \
+        GCNEW(device);                                                  \
+        rc = libxl__device_from_##type(gc, domid, type, device);        \
+        if (rc != 0) goto out;                                          \
+                                                                        \
+        GCNEW(aodev);                                                   \
+        libxl__prepare_ao_device(ao, aodev);                            \
+        aodev->action = LIBXL__DEVICE_ACTION_REMOVE;                    \
+        aodev->dev = device;                                            \
+        aodev->callback = device_addrm_aocomplete;                      \
+        aodev->force = f;                                               \
+        libxl__initiate_device_##remtype##_remove(egc, aodev);          \
+                                                                        \
+    out:                                                                \
+        if (rc) return AO_CREATE_FAIL(rc);                              \
+        return AO_INPROGRESS;                                           \
+    }
+
+#define LIBXL_DEFINE_DEVICE_REMOVE(type)                                \
+    LIBXL_DEFINE_DEVICE_REMOVE_EXT(type, generic, remove, 0)            \
+    LIBXL_DEFINE_DEVICE_REMOVE_EXT(type, generic, destroy, 1)
+
+#define LIBXL_DEFINE_DEVICE_REMOVE_CUSTOM(type)                         \
+    LIBXL_DEFINE_DEVICE_REMOVE_EXT(type, type, remove, 0)               \
+    LIBXL_DEFINE_DEVICE_REMOVE_EXT(type, type, destroy, 1)
+
 struct libxl_device_type {
     char *type;
     int num_offset;   /* Offset of # of devices in libxl_domain_config */
@@ -3510,18 +3556,6 @@ _hidden void libxl__add_disks(libxl__egc *egc, libxl__ao *ao, uint32_t domid,
 _hidden void libxl__add_nics(libxl__egc *egc, libxl__ao *ao, uint32_t domid,
                              libxl_domain_config *d_config,
                              libxl__multidev *multidev);
-
-_hidden void libxl__add_vtpms(libxl__egc *egc, libxl__ao *ao, uint32_t domid,
-                             libxl_domain_config *d_config,
-                             libxl__multidev *multidev);
-
-_hidden void libxl__add_usbctrls(libxl__egc *egc, libxl__ao *ao,
-                                 uint32_t domid, libxl_domain_config *d_config,
-                                 libxl__multidev *multidev);
-
-_hidden void libxl__add_usbdevs(libxl__egc *egc, libxl__ao *ao,
-                                uint32_t domid, libxl_domain_config *d_config,
-                                libxl__multidev *multidev);
 
 /*----- device model creation -----*/
 

@@ -677,42 +677,6 @@ void libxl__multidev_prepared(libxl__egc *egc,
 
 /******************************************************************************/
 
-/* Macro for defining the functions that will add a bunch of disks when
- * inside an async op with multidev.
- * This macro is added to prevent repetition of code.
- *
- * The following functions are defined:
- * libxl__add_disks
- * libxl__add_nics
- * libxl__add_vtpms
- * libxl__add_usbctrls
- * libxl__add_usbs
- */
-
-#define DEFINE_DEVICES_ADD(type)                                        \
-    void libxl__add_##type##s(libxl__egc *egc, libxl__ao *ao, uint32_t domid, \
-                              libxl_domain_config *d_config,            \
-                              libxl__multidev *multidev)                \
-    {                                                                   \
-        AO_GC;                                                          \
-        int i;                                                          \
-        for (i = 0; i < d_config->num_##type##s; i++) {                 \
-            libxl__ao_device *aodev = libxl__multidev_prepare(multidev);  \
-            libxl__device_##type##_add(egc, domid, &d_config->type##s[i], \
-                                       aodev);                          \
-        }                                                               \
-    }
-
-DEFINE_DEVICES_ADD(disk)
-DEFINE_DEVICES_ADD(nic)
-DEFINE_DEVICES_ADD(vtpm)
-DEFINE_DEVICES_ADD(usbctrl)
-DEFINE_DEVICES_ADD(usbdev)
-
-#undef DEFINE_DEVICES_ADD
-
-/******************************************************************************/
-
 int libxl__device_destroy(libxl__gc *gc, libxl__device *dev)
 {
     const char *be_path = libxl__device_backend_path(gc, dev);
