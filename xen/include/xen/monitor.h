@@ -3,7 +3,7 @@
  *
  * Common monitor_op domctl handler.
  *
- * Copyright (c) 2015 Tamas K Lengyel (tamas@tklengyel.com)
+ * Copyright (c) 2015-2016 Tamas K Lengyel (tamas@tklengyel.com)
  * Copyright (c) 2016, Bitdefender S.R.L.
  *
  * This program is free software; you can redistribute it and/or
@@ -22,10 +22,14 @@
 #ifndef __XEN_MONITOR_H__
 #define __XEN_MONITOR_H__
 
+#include <public/vm_event.h>
+
 struct domain;
 struct xen_domctl_monitor_op;
 
 int monitor_domctl(struct domain *d, struct xen_domctl_monitor_op *op);
 void monitor_guest_request(void);
+
+int monitor_traps(struct vcpu *v, bool_t sync, vm_event_request_t *req);
 
 #endif /* __XEN_MONITOR_H__ */
