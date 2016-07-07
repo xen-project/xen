@@ -1,0 +1,14 @@
+[Unit]
+Description=Xen driver domain device daemon
+DefaultDependencies=no
+Requires=proc-xen.mount
+After=proc-xen.mount
+ConditionVirtualization=xen
+
+[Service]
+Type=forking
+ExecStart=@sbindir@/xl devd --pidfile=/var/run/xldevd.pid
+PIDFile=/var/run/xldevd.pid
+
+[Install]
+WantedBy=multi-user.target

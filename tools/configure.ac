@@ -436,6 +436,7 @@ AS_IF([test "x$systemd" = "xy"], [
     hotplug/Linux/systemd/xen-watchdog.service
     hotplug/Linux/systemd/xenconsoled.service
     hotplug/Linux/systemd/xendomains.service
+    hotplug/Linux/systemd/xendriverdomain.service
     hotplug/Linux/systemd/xenstored.service
     hotplug/Linux/systemd/xenstored.socket
     hotplug/Linux/systemd/xenstored_ro.socket
