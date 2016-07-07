@@ -393,7 +393,9 @@ void vm_event_resume(struct domain *d, struct vm_event_domain *ved)
          */
         switch ( rsp.reason )
         {
+#ifdef CONFIG_X86
         case VM_EVENT_REASON_MOV_TO_MSR:
+#endif
         case VM_EVENT_REASON_WRITE_CTRLREG:
             vm_event_register_write_resume(v, &rsp);
             break;
