@@ -20,7 +20,6 @@
 #define __ASM_X86_HVM_MONITOR_H__
 
 #include <xen/sched.h>
-#include <xen/paging.h>
 #include <public/vm_event.h>
 
 enum hvm_monitor_debug_type

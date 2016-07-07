@@ -26,6 +26,7 @@
 #include <xen/monitor.h>
 #include <asm/hvm/monitor.h>
 #include <asm/monitor.h>
+#include <asm/paging.h>
 #include <asm/vm_event.h>
 #include <public/vm_event.h>
 
