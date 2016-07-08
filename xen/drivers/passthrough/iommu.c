@@ -318,21 +318,47 @@ int iommu_iotlb_flush(struct domain *d, unsigned long gfn,
                       unsigned int page_count)
 {
     const struct domain_iommu *hd = dom_iommu(d);
+    int rc;
 
     if ( !iommu_enabled || !hd->platform_ops || !hd->platform_ops->iotlb_flush )
         return 0;
 
-    return hd->platform_ops->iotlb_flush(d, gfn, page_count);
+    rc = hd->platform_ops->iotlb_flush(d, gfn, page_count);
+    if ( unlikely(rc) )
+    {
+        if ( !d->is_shutting_down && printk_ratelimit() )
+            printk(XENLOG_ERR
+                   "d%d: IOMMU IOTLB flush failed: %d, gfn %#lx, page count %u\n",
+                   d->domain_id, rc, gfn, page_count);
+
+        if ( !is_hardware_domain(d) )
+            domain_crash(d);
+    }
+
+    return rc;
 }
 
 int iommu_iotlb_flush_all(struct domain *d)
 {
     const struct domain_iommu *hd = dom_iommu(d);
+    int rc;
 
     if ( !iommu_enabled || !hd->platform_ops || !hd->platform_ops->iotlb_flush_all )
         return 0;
 
-    return hd->platform_ops->iotlb_flush_all(d);
+    rc = hd->platform_ops->iotlb_flush_all(d);
+    if ( unlikely(rc) )
+    {
+        if ( !d->is_shutting_down && printk_ratelimit() )
+            printk(XENLOG_ERR
+                   "d%d: IOMMU IOTLB flush all failed: %d\n",
+                   d->domain_id, rc);
+
+        if ( !is_hardware_domain(d) )
+            domain_crash(d);
+    }
+
+    return rc;
 }
 
 int __init iommu_setup(void)

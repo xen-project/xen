@@ -1848,6 +1848,17 @@ int iommu_pte_flush(struct domain *d, u64 gfn, u64 *pte,
         }
     }
 
+    if ( unlikely(rc) )
+    {
+        if ( !d->is_shutting_down && printk_ratelimit() )
+            printk(XENLOG_ERR VTDPREFIX
+                   " d%d: IOMMU pages flush failed: %d\n",
+                   d->domain_id, rc);
+
+        if ( !is_hardware_domain(d) )
+            domain_crash(d);
+    }
+
     return rc;
 }
 
