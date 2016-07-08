@@ -542,6 +542,7 @@ struct iommu {
     u64 root_maddr; /* root entry machine address */
     struct msi_desc msi;
     struct intel_iommu *intel;
+    struct list_head ats_devices;
     unsigned long *domid_bitmap;  /* domain id bitmap */
     u16 *domid_map;               /* domain id mapping array */
 };

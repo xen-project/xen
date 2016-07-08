@@ -78,6 +78,11 @@ struct pci_dev {
     struct pci_dev_info info;
     struct arch_pci_dev arch;
     struct {
+        struct list_head list;
+        unsigned int cap_pos;
+        unsigned int queue_depth;
+    } ats;
+    struct {
         s_time_t time;
         unsigned int count;
 #define PT_FAULT_THRESHOLD 10

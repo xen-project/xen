@@ -1162,6 +1162,7 @@ int __init iommu_alloc(struct acpi_drhd_unit *drhd)
         return -ENOMEM;
 
     iommu->msi.irq = -1; /* No irq assigned yet. */
+    INIT_LIST_HEAD(&iommu->ats_devices);
 
     iommu->intel = alloc_intel_iommu();
     if ( iommu->intel == NULL )
@@ -1461,8 +1462,8 @@ int domain_context_mapping_one(
     return rc;
 }
 
-static int domain_context_mapping(
-    struct domain *domain, u8 devfn, const struct pci_dev *pdev)
+static int domain_context_mapping(struct domain *domain, u8 devfn,
+                                  struct pci_dev *pdev)
 {
     struct acpi_drhd_unit *drhd;
     int ret = 0;
@@ -1498,7 +1499,7 @@ static int domain_context_mapping(
         ret = domain_context_mapping_one(domain, drhd->iommu, bus, devfn,
                                          pdev);
         if ( !ret && devfn == pdev->devfn && ats_device(pdev, drhd) > 0 )
-            enable_ats_device(seg, bus, devfn, drhd->iommu);
+            enable_ats_device(pdev, &drhd->iommu->ats_devices);
 
         break;
 
@@ -1611,8 +1612,8 @@ int domain_context_unmap_one(
     return rc;
 }
 
-static int domain_context_unmap(
-    struct domain *domain, u8 devfn, const struct pci_dev *pdev)
+static int domain_context_unmap(struct domain *domain, u8 devfn,
+                                struct pci_dev *pdev)
 {
     struct acpi_drhd_unit *drhd;
     struct iommu *iommu;
@@ -1648,7 +1649,7 @@ static int domain_context_unmap(
                    PCI_SLOT(devfn), PCI_FUNC(devfn));
         ret = domain_context_unmap_one(domain, iommu, bus, devfn);
         if ( !ret && devfn == pdev->devfn && ats_device(pdev, drhd) > 0 )
-            disable_ats_device(seg, bus, devfn);
+            disable_ats_device(pdev);
 
         break;
 
@@ -1994,7 +1995,7 @@ static int intel_iommu_enable_device(struct pci_dev *pdev)
     if ( ret <= 0 )
         return ret;
 
-    ret = enable_ats_device(pdev->seg, pdev->bus, pdev->devfn, drhd->iommu);
+    ret = enable_ats_device(pdev, &drhd->iommu->ats_devices);
 
     return ret >= 0 ? 0 : ret;
 }

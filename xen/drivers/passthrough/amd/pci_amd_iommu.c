@@ -162,7 +162,7 @@ static void amd_iommu_setup_domain_device(
          !pci_ats_enabled(iommu->seg, bus, pdev->devfn) )
     {
         if ( devfn == pdev->devfn )
-            enable_ats_device(iommu->seg, bus, devfn, iommu);
+            enable_ats_device(pdev, &iommu->ats_devices);
 
         amd_iommu_flush_iotlb(devfn, pdev, INV_IOMMU_ALL_PAGES_ADDRESS, 0);
     }
@@ -356,7 +356,7 @@ void amd_iommu_disable_domain_device(struct domain *domain,
     if ( devfn == pdev->devfn &&
          pci_ats_device(iommu->seg, bus, devfn) &&
          pci_ats_enabled(iommu->seg, bus, devfn) )
-        disable_ats_device(iommu->seg, bus, devfn);
+        disable_ats_device(pdev);
 }
 
 static int reassign_device(struct domain *source, struct domain *target,

@@ -104,6 +104,8 @@ struct amd_iommu {
     uint64_t exclusion_limit;
 
     int enabled;
+
+    struct list_head ats_devices;
 };
 
 struct ivrs_mappings {
