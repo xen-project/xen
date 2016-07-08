@@ -31,7 +31,6 @@
 #include <xen/hypercall.h>
 #include <xen/guest_access.h>
 #include <xen/event.h>
-#include <xen/paging.h>
 #include <xen/cpu.h>
 #include <xen/wait.h>
 #include <xen/mem_access.h>
@@ -63,7 +62,6 @@
 #include <asm/hvm/nestedhvm.h>
 #include <asm/hvm/monitor.h>
 #include <asm/hvm/ioreq.h>
-#include <asm/hvm/vmx/vmx.h>
 #include <asm/altp2m.h>
 #include <asm/mtrr.h>
 #include <asm/apic.h>

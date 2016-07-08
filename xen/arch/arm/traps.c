@@ -439,7 +439,6 @@ static void inject_abt32_exception(struct cpu_user_regs *regs,
         far |= addr << 32;
         WRITE_SYSREG(far, FAR_EL1);
         WRITE_SYSREG(fsr, IFSR32_EL2);
-
 #endif
     }
     else

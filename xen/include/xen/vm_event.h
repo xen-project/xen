@@ -77,7 +77,6 @@ void vm_event_vcpu_unpause(struct vcpu *v);
 
 #endif /* __VM_EVENT_H__ */
 
-
 /*
  * Local variables:
  * mode: C

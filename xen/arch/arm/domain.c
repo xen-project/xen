@@ -294,7 +294,6 @@ static void continue_new_vcpu(struct vcpu *prev)
     else
         /* check_wakeup_from_wait(); */
         reset_stack_and_jump(return_to_new_vcpu64);
-
 }
 
 void context_switch(struct vcpu *prev, struct vcpu *next)

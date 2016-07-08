@@ -23,9 +23,6 @@
 #define __ASM_X86_MONITOR_H__
 
 #include <xen/sched.h>
-#include <public/domctl.h>
-#include <asm/cpufeature.h>
-#include <asm/hvm/hvm.h>
 
 #define monitor_ctrlreg_bitmask(ctrlreg_index) (1U << (ctrlreg_index))
 

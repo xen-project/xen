@@ -24,7 +24,6 @@
 #include <xen/sched.h>
 #include <xen/vm_event.h>
 #include <xsm/xsm.h>
-#include <public/domctl.h>
 #include <asm/altp2m.h>
 #include <asm/monitor.h>
 #include <asm/vm_event.h>

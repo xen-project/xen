@@ -769,8 +769,10 @@ void vm_event_vcpu_unpause(struct vcpu *v)
 {
     int old, new, prev = v->vm_event_pause_count.counter;
 
-    /* All unpause requests as a result of toolstack responses.  Prevent
-     * underflow of the vcpu pause count. */
+    /*
+     * All unpause requests as a result of toolstack responses.
+     * Prevent underflow of the vcpu pause count.
+     */
     do
     {
         old = prev;

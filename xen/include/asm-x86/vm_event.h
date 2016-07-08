@@ -20,7 +20,6 @@
 #define __ASM_X86_VM_EVENT_H__
 
 #include <xen/sched.h>
-#include <xen/vm_event.h>
 
 /*
  * Should we emulate the next matching instruction on VCPU resume

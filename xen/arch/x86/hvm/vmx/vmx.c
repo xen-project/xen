@@ -34,7 +34,6 @@
 #include <asm/guest_access.h>
 #include <asm/debugreg.h>
 #include <asm/msr.h>
-#include <asm/paging.h>
 #include <asm/p2m.h>
 #include <asm/mem_sharing.h>
 #include <asm/hvm/emulate.h>

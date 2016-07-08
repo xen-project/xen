@@ -74,20 +74,20 @@
  * VM_EVENT_FLAG_SET_EMUL_READ_DATA are set, only the latter will be honored).
  */
 #define VM_EVENT_FLAG_SET_EMUL_READ_DATA (1 << 5)
- /*
-  * Deny completion of the operation that triggered the event.
-  * Currently only useful for MSR, CR0, CR3 and CR4 write events.
-  * Requires the vCPU to be paused already (synchronous events only).
-  */
+/*
+ * Deny completion of the operation that triggered the event.
+ * Currently only useful for MSR and control-register write events.
+ * Requires the vCPU to be paused already (synchronous events only).
+ */
 #define VM_EVENT_FLAG_DENY               (1 << 6)
 /*
  * This flag can be set in a request or a response
  *
- * On a request, indicates that the event occurred in the alternate p2m specified by
- * the altp2m_idx request field.
+ * On a request, indicates that the event occurred in the alternate p2m
+ * specified by the altp2m_idx request field.
  *
- * On a response, indicates that the VCPU should resume in the alternate p2m specified
- * by the altp2m_idx response field if possible.
+ * On a response, indicates that the VCPU should resume in the alternate p2m
+ * specified by the altp2m_idx response field if possible.
  */
 #define VM_EVENT_FLAG_ALTERNATE_P2M      (1 << 7)
 /*
@@ -180,16 +180,16 @@ struct vm_event_regs_x86 {
  * FAULT_WITH_GLA: If the violation was triggered by accessing gla
  * FAULT_IN_GPT: If the violation was triggered during translating gla
  */
-#define MEM_ACCESS_R                    (1 << 0)
-#define MEM_ACCESS_W                    (1 << 1)
-#define MEM_ACCESS_X                    (1 << 2)
-#define MEM_ACCESS_RWX                  (MEM_ACCESS_R | MEM_ACCESS_W | MEM_ACCESS_X)
-#define MEM_ACCESS_RW                   (MEM_ACCESS_R | MEM_ACCESS_W)
-#define MEM_ACCESS_RX                   (MEM_ACCESS_R | MEM_ACCESS_X)
-#define MEM_ACCESS_WX                   (MEM_ACCESS_W | MEM_ACCESS_X)
-#define MEM_ACCESS_GLA_VALID            (1 << 3)
-#define MEM_ACCESS_FAULT_WITH_GLA       (1 << 4)
-#define MEM_ACCESS_FAULT_IN_GPT         (1 << 5)
+#define MEM_ACCESS_R                (1 << 0)
+#define MEM_ACCESS_W                (1 << 1)
+#define MEM_ACCESS_X                (1 << 2)
+#define MEM_ACCESS_RWX              (MEM_ACCESS_R | MEM_ACCESS_W | MEM_ACCESS_X)
+#define MEM_ACCESS_RW               (MEM_ACCESS_R | MEM_ACCESS_W)
+#define MEM_ACCESS_RX               (MEM_ACCESS_R | MEM_ACCESS_X)
+#define MEM_ACCESS_WX               (MEM_ACCESS_W | MEM_ACCESS_X)
+#define MEM_ACCESS_GLA_VALID        (1 << 3)
+#define MEM_ACCESS_FAULT_WITH_GLA   (1 << 4)
+#define MEM_ACCESS_FAULT_IN_GPT     (1 << 5)
 
 struct vm_event_mem_access {
     uint64_t gfn;

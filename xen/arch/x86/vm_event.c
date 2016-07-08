@@ -18,9 +18,6 @@
  * License along with this program; If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <xen/sched.h>
-#include <asm/hvm/hvm.h>
-#include <asm/monitor.h>
 #include <asm/vm_event.h>
 
 /* Implicitly serialized by the domctl lock. */
