@@ -73,13 +73,15 @@ void vm_event_register_write_resume(struct vcpu *v, vm_event_response_t *rsp)
 {
     if ( rsp->flags & VM_EVENT_FLAG_DENY )
     {
-        struct monitor_write_data *w = &v->arch.vm_event->write_data;
+        struct monitor_write_data *w;
 
-        ASSERT(w);
+        ASSERT(v->arch.vm_event);
 
         /* deny flag requires the vCPU to be paused */
         if ( !atomic_read(&v->vm_event_pause_count) )
             return;
+
+        w = &v->arch.vm_event->write_data;
 
         switch ( rsp->reason )
         {

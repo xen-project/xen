@@ -477,7 +477,7 @@ void hvm_do_resume(struct vcpu *v)
     {
         struct monitor_write_data *w = &v->arch.vm_event->write_data;
 
-        if ( v->arch.vm_event->emulate_flags )
+        if ( unlikely(v->arch.vm_event->emulate_flags) )
         {
             enum emul_kind kind = EMUL_KIND_NORMAL;
 
