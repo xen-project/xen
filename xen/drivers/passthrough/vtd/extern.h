@@ -25,6 +25,7 @@
 
 #define VTDPREFIX "[VT-D]"
 
+struct pci_ats_dev;
 extern bool_t rwbf_quirk;
 
 void print_iommu_regs(struct acpi_drhd_unit *drhd);
@@ -60,8 +61,8 @@ int dev_invalidate_iotlb(struct iommu *iommu, u16 did,
                          u64 addr, unsigned int size_order, u64 type);
 
 int __must_check qinval_device_iotlb_sync(struct iommu *iommu,
-                                          u32 max_invs_pend,
-                                          u16 sid, u16 size, u64 addr);
+                                          struct pci_dev *pdev,
+                                          u16 did, u16 size, u64 addr);
 
 unsigned int get_cache_line_size(void);
 void cacheline_flush(char *);

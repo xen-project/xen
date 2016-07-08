@@ -207,6 +207,8 @@ int __must_check iommu_iotlb_flush(struct domain *d, unsigned long gfn,
                                    unsigned int page_count);
 int __must_check iommu_iotlb_flush_all(struct domain *d);
 
+void iommu_dev_iotlb_flush_timeout(struct domain *d, struct pci_dev *pdev);
+
 /*
  * The purpose of the iommu_dont_flush_iotlb optional cpu flag is to
  * avoid unecessary iotlb_flush in the low level IOMMU code.
