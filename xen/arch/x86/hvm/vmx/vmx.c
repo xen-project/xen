@@ -1433,8 +1433,10 @@ static void vmx_update_guest_cr(struct vcpu *v, unsigned int cr)
         if ( paging_mode_hap(v->domain) )
         {
             /* Manage GUEST_CR3 when CR0.PE=0. */
+            uint32_t old_ctls = v->arch.hvm_vmx.exec_control;
             uint32_t cr3_ctls = (CPU_BASED_CR3_LOAD_EXITING |
                                  CPU_BASED_CR3_STORE_EXITING);
+
             v->arch.hvm_vmx.exec_control &= ~cr3_ctls;
             if ( !hvm_paging_enabled(v) && !vmx_unrestricted_guest(v) )
                 v->arch.hvm_vmx.exec_control |= cr3_ctls;
@@ -1444,7 +1446,8 @@ static void vmx_update_guest_cr(struct vcpu *v, unsigned int cr)
                  monitor_ctrlreg_bitmask(VM_EVENT_X86_CR3) )
                 v->arch.hvm_vmx.exec_control |= CPU_BASED_CR3_LOAD_EXITING;
 
-            vmx_update_cpu_exec_control(v);
+            if ( old_ctls != v->arch.hvm_vmx.exec_control )
+                vmx_update_cpu_exec_control(v);
         }
 
         if ( !nestedhvm_vcpu_in_guestmode(v) )
