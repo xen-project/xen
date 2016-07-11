@@ -1711,6 +1711,14 @@ static inline int update_intpte(intpte_t *p,
                   _t ## e_get_intpte(_o), _t ## e_get_intpte(_n),   \
                   (_m), (_v), (_ad))
 
+/*
+ * PTE flags that a guest may change without re-validating the PTE.
+ * All other bits affect translation, caching, or Xen's safety.
+ */
+#define FASTPATH_FLAG_WHITELIST                                     \
+    (_PAGE_NX_BIT | _PAGE_AVAIL_HIGH | _PAGE_AVAIL | _PAGE_GLOBAL | \
+     _PAGE_DIRTY | _PAGE_ACCESSED | _PAGE_USER)
+
 /* Update the L1 entry at pl1e to new value nl1e. */
 static int mod_l1_entry(l1_pgentry_t *pl1e, l1_pgentry_t nl1e,
                         unsigned long gl1mfn, int preserve_ad,
@@ -1751,9 +1759,8 @@ static int mod_l1_entry(l1_pgentry_t *pl1e, l1_pgentry_t nl1e,
             return -EINVAL;
         }
 
-        /* Fast path for identical mapping, r/w, presence, and cachability. */
-        if ( !l1e_has_changed(ol1e, nl1e,
-                              PAGE_CACHE_ATTRS | _PAGE_RW | _PAGE_PRESENT) )
+        /* Fast path for sufficiently-similar mappings. */
+        if ( !l1e_has_changed(ol1e, nl1e, ~FASTPATH_FLAG_WHITELIST) )
         {
             adjust_guest_l1e(nl1e, pt_dom);
             if ( UPDATE_ENTRY(l1, pl1e, ol1e, nl1e, gl1mfn, pt_vcpu,
@@ -1835,11 +1842,8 @@ static int mod_l2_entry(l2_pgentry_t *pl2e,
             return -EINVAL;
         }
 
-        /* Fast path for identical mapping and presence. */
-        if ( !l2e_has_changed(ol2e, nl2e,
-                              unlikely(opt_allow_superpage)
-                              ? _PAGE_PSE | _PAGE_RW | _PAGE_PRESENT
-                              : _PAGE_PRESENT) )
+        /* Fast path for sufficiently-similar mappings. */
+        if ( !l2e_has_changed(ol2e, nl2e, ~FASTPATH_FLAG_WHITELIST) )
         {
             adjust_guest_l2e(nl2e, d);
             if ( UPDATE_ENTRY(l2, pl2e, ol2e, nl2e, pfn, vcpu, preserve_ad) )
@@ -1904,8 +1908,8 @@ static int mod_l3_entry(l3_pgentry_t *pl3e,
             return -EINVAL;
         }
 
-        /* Fast path for identical mapping and presence. */
-        if ( !l3e_has_changed(ol3e, nl3e, _PAGE_PRESENT) )
+        /* Fast path for sufficiently-similar mappings. */
+        if ( !l3e_has_changed(ol3e, nl3e, ~FASTPATH_FLAG_WHITELIST) )
         {
             adjust_guest_l3e(nl3e, d);
             rc = UPDATE_ENTRY(l3, pl3e, ol3e, nl3e, pfn, vcpu, preserve_ad);
@@ -1968,8 +1972,8 @@ static int mod_l4_entry(l4_pgentry_t *pl4e,
             return -EINVAL;
         }
 
-        /* Fast path for identical mapping and presence. */
-        if ( !l4e_has_changed(ol4e, nl4e, _PAGE_PRESENT) )
+        /* Fast path for sufficiently-similar mappings. */
+        if ( !l4e_has_changed(ol4e, nl4e, ~FASTPATH_FLAG_WHITELIST) )
         {
             adjust_guest_l4e(nl4e, d);
             rc = UPDATE_ENTRY(l4, pl4e, ol4e, nl4e, pfn, vcpu, preserve_ad);
