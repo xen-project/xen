@@ -23,6 +23,7 @@
 #include <xenctrl.h>
 
 #include "xenstat_priv.h"
+#include "_paths.h"
 
 #ifdef HAVE_YAJL_YAJL_VERSION_H
 #  include <yajl/yajl_version.h>
@@ -418,7 +419,7 @@ void read_attributes_qdisk(xenstat_node * node)
 		free(val);
 
 		/* Connect to this VMs QMP socket */
-		snprintf(path, sizeof(path), "/var/run/xen/qmp-libxenstat-%i", dominfo[i].domain);
+		snprintf(path, sizeof(path), XEN_RUN_DIR "/qmp-libxenstat-%i", dominfo[i].domain);
 		if ((qfd = qmp_connect(path)) < 0) {
 			continue;
 		}
