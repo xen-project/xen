@@ -24,7 +24,7 @@ xendriverdomain_config=@CONFIG_DIR@/@CONFIG_LEAF_DIR@
 
 test -f $xendriverdomain_config/xendriverdomain && . $xendriverdomain_config/xendriverdomain
 
-XLDEVD_PIDFILE=/var/run/xldevd.pid
+XLDEVD_PIDFILE=@XEN_RUN_DIR@/xldevd.pid
 
 # not running in Xen dom0 or domU
 if ! test -d /proc/xen ; then

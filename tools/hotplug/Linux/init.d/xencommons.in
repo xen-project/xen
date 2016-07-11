@@ -27,8 +27,8 @@ xencommons_config=@CONFIG_DIR@/@CONFIG_LEAF_DIR@
 
 test -f $xencommons_config/xencommons && . $xencommons_config/xencommons
 
-XENCONSOLED_PIDFILE=/var/run/xenconsoled.pid
-QEMU_PIDFILE=/var/run/qemu-dom0.pid
+XENCONSOLED_PIDFILE=@XEN_RUN_DIR@/xenconsoled.pid
+QEMU_PIDFILE=@XEN_RUN_DIR@/qemu-dom0.pid
 shopt -s extglob
 
 # not running in Xen dom0 or domU
@@ -70,7 +70,7 @@ do_start () {
 
 		if [ -n "$XENSTORED" ] ; then
 		    echo -n Starting $XENSTORED...
-		    $XENSTORED --pid-file /var/run/xenstored.pid $XENSTORED_ARGS
+		    $XENSTORED --pid-file @XEN_RUN_DIR@/xenstored.pid $XENSTORED_ARGS
 		else
 		    echo "No xenstored found"
 		    exit 1
