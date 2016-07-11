@@ -81,7 +81,7 @@ let config_filename cf =
 	| Some name -> name
 	| None      -> Define.default_config_dir ^ "/oxenstored.conf"
 
-let default_pidfile = "/var/run/xenstored.pid"
+let default_pidfile = Paths.xen_run_dir ^ "/xenstored.pid"
 
 let ring_scan_interval = ref 20
 
