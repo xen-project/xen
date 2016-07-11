@@ -5121,11 +5121,16 @@ int libxl_get_memory_target(libxl_ctx *ctx, uint32_t domid,
     return rc;
 }
 
-int libxl_domain_need_memory(libxl_ctx *ctx, libxl_domain_build_info *b_info,
+int libxl_domain_need_memory(libxl_ctx *ctx,
+                             const libxl_domain_build_info *b_info_in,
                              uint32_t *need_memkb)
 {
     GC_INIT(ctx);
+    libxl_domain_build_info b_info[1];
     int rc;
+
+    libxl_domain_build_info_init(b_info);
+    libxl_domain_build_info_copy(ctx, b_info, b_info_in);
 
     rc = libxl__domain_build_info_setdefault(gc, b_info);
     if (rc) goto out;
@@ -5149,6 +5154,7 @@ int libxl_domain_need_memory(libxl_ctx *ctx, libxl_domain_build_info *b_info,
     rc = 0;
 out:
     GC_FREE;
+    libxl_domain_build_info_dispose(b_info);
     return rc;
 
 }

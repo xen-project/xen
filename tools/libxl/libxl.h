@@ -74,6 +74,13 @@
  */
 #define LIBXL_HAVE_CONST_COPY_AND_LENGTH_FUNCTIONS 1
 
+/* LIBXL_HAVE_DOMAIN_NEED_MEMORY_CONST_B_INFO
+ *
+ * If this is defined, libxl_domain_need_memory no longer modifies
+ * the b_info paseed in.
+ */
+#define LIBXL_HAVE_DOMAIN_NEED_MEMORY_CONST_B_INFO 1
+
 /* LIBXL_HAVE_VNUMA
  *
  * If this is defined the type libxl_vnode_info exists, and a
@@ -1383,7 +1390,8 @@ int libxl_get_memory_target(libxl_ctx *ctx, uint32_t domid, uint32_t *out_target
  * existing programs which use them in roughly the same way as libxl.
  */
 /* how much free memory in the system a domain needs to be built */
-int libxl_domain_need_memory(libxl_ctx *ctx, libxl_domain_build_info *b_info,
+int libxl_domain_need_memory(libxl_ctx *ctx,
+                             const libxl_domain_build_info *b_info_in,
                              uint32_t *need_memkb);
 /* how much free memory is available in the system */
 int libxl_get_free_memory(libxl_ctx *ctx, uint32_t *memkb);
