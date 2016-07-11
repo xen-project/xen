@@ -193,7 +193,7 @@ int main(int argc, char **argv)
 	increase_fd_limit();
 
 	if (!is_interactive) {
-		daemonize(pidfile ? pidfile : "/var/run/xenconsoled.pid");
+		daemonize(pidfile ? pidfile : XEN_RUN_DIR "/xenconsoled.pid");
 	}
 
 	if (!xen_setup())
