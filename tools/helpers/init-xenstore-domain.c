@@ -14,6 +14,7 @@
 #include <xen-xsm/flask/flask.h>
 
 #include "init-dom-json.h"
+#include "_paths.h"
 
 static uint32_t domid = ~0;
 static char *kernel;
@@ -316,10 +317,10 @@ int main(int argc, char** argv)
     do_xs_write_dom(xsh, "memory/static-max", buf);
     xs_close(xsh);
 
-    fd = creat("/var/run/xenstored.pid", 0666);
+    fd = creat(XEN_RUN_DIR "/xenstored.pid", 0666);
     if ( fd < 0 )
     {
-        fprintf(stderr, "Creating /var/run/xenstored.pid failed\n");
+        fprintf(stderr, "Creating " XEN_RUN_DIR "/xenstored.pid failed\n");
         return 3;
     }
     rv = snprintf(buf, 16, "domid:%d\n", domid);
@@ -327,7 +328,8 @@ int main(int argc, char** argv)
     close(fd);
     if ( rv < 0 )
     {
-        fprintf(stderr, "Writing domid to /var/run/xenstored.pid failed\n");
+        fprintf(stderr,
+                "Writing domid to " XEN_RUN_DIR "/xenstored.pid failed\n");
         return 3;
     }
 

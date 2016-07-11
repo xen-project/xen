@@ -28,6 +28,8 @@ all: $(PROGS)
 xen-init-dom0: $(XEN_INIT_DOM0_OBJS)
 	$(CC) $(LDFLAGS) -o $@ $(XEN_INIT_DOM0_OBJS) $(LDLIBS_libxentoollog) $(LDLIBS_libxenstore) $(LDLIBS_libxenlight) $(APPEND_LDFLAGS)
 
+$(INIT_XENSTORE_DOMAIN_OBJS): _paths.h
+
 init-xenstore-domain: $(INIT_XENSTORE_DOMAIN_OBJS)
 	$(CC) $(LDFLAGS) -o $@ $(INIT_XENSTORE_DOMAIN_OBJS) $(LDLIBS_libxentoollog) $(LDLIBS_libxenstore) $(LDLIBS_libxenctrl) $(LDLIBS_libxenguest) $(LDLIBS_libxenlight) $(APPEND_LDFLAGS)
 
@@ -41,6 +43,9 @@ endif
 
 .PHONY: clean
 clean:
-	$(RM) -f *.o $(PROGS) $(DEPS)
+	$(RM) -f *.o $(PROGS) $(DEPS) _paths.h
 
 distclean: clean
+
+genpath-target = $(call buildmakevars2header,_paths.h)
+$(eval $(genpath-target))
