@@ -234,7 +234,7 @@ void libxl_string_list_dispose(libxl_string_list *psl)
 
 void libxl_string_list_copy(libxl_ctx *ctx,
                             libxl_string_list *dst,
-                            libxl_string_list *src)
+                            const libxl_string_list *src)
 {
     GC_INIT(ctx);
     int i, len;
@@ -266,7 +266,7 @@ int libxl_string_list_length(const libxl_string_list *psl)
     return i;
 }
 
-int libxl_key_value_list_length(libxl_key_value_list *pkvl)
+int libxl_key_value_list_length(const libxl_key_value_list *pkvl)
 {
     int i = 0;
     libxl_key_value_list kvl = *pkvl;
@@ -301,7 +301,7 @@ void libxl_key_value_list_dispose(libxl_key_value_list *pkvl)
 
 void libxl_key_value_list_copy(libxl_ctx *ctx,
                                libxl_key_value_list *dst,
-                               libxl_key_value_list *src)
+                               const libxl_key_value_list *src)
 {
     GC_INIT(ctx);
     int i, len;
@@ -7227,7 +7227,7 @@ out_err:
 
 }
 
-void libxl_hwcap_copy(libxl_ctx *ctx,libxl_hwcap *dst, libxl_hwcap *src)
+void libxl_hwcap_copy(libxl_ctx *ctx,libxl_hwcap *dst, const libxl_hwcap *src)
 {
     int i;
 
@@ -7235,7 +7235,7 @@ void libxl_hwcap_copy(libxl_ctx *ctx,libxl_hwcap *dst, libxl_hwcap *src)
         (*dst)[i] = (*src)[i];
 }
 
-void libxl_mac_copy(libxl_ctx *ctx, libxl_mac *dst, libxl_mac *src)
+void libxl_mac_copy(libxl_ctx *ctx, libxl_mac *dst, const libxl_mac *src)
 {
     int i;
 

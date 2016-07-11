@@ -67,6 +67,13 @@
  * the same $(XEN_VERSION) (e.g. throughout a major release).
  */
 
+/* LIBXL_HAVE_CONST_COPY_AND_LENGTH_FUNCTIONS
+ *
+ * If this is defined, the copy functions have constified src parameter and the
+ * length functions accept constified parameter.
+ */
+#define LIBXL_HAVE_CONST_COPY_AND_LENGTH_FUNCTIONS 1
+
 /* LIBXL_HAVE_VNUMA
  *
  * If this is defined the type libxl_vnode_info exists, and a
@@ -839,7 +846,7 @@ typedef uint8_t libxl_mac[6];
 #define LIBXL_MAC_FMT "%02hhx:%02hhx:%02hhx:%02hhx:%02hhx:%02hhx"
 #define LIBXL_MAC_FMTLEN ((2*6)+5) /* 6 hex bytes plus 5 colons */
 #define LIBXL_MAC_BYTES(mac) mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]
-void libxl_mac_copy(libxl_ctx *ctx, libxl_mac *dst, libxl_mac *src);
+void libxl_mac_copy(libxl_ctx *ctx, libxl_mac *dst, const libxl_mac *src);
 
 #if defined(__i386__) || defined(__x86_64__)
 /*
@@ -962,17 +969,17 @@ typedef char **libxl_string_list;
 void libxl_string_list_dispose(libxl_string_list *sl);
 int libxl_string_list_length(const libxl_string_list *sl);
 void libxl_string_list_copy(libxl_ctx *ctx, libxl_string_list *dst,
-                            libxl_string_list *src);
+                            const libxl_string_list *src);
 
 typedef char **libxl_key_value_list;
 void libxl_key_value_list_dispose(libxl_key_value_list *kvl);
-int libxl_key_value_list_length(libxl_key_value_list *kvl);
+int libxl_key_value_list_length(const libxl_key_value_list *kvl);
 void libxl_key_value_list_copy(libxl_ctx *ctx,
                                libxl_key_value_list *dst,
-                               libxl_key_value_list *src);
+                               const libxl_key_value_list *src);
 
 typedef uint32_t libxl_hwcap[8];
-void libxl_hwcap_copy(libxl_ctx *ctx, libxl_hwcap *dst, libxl_hwcap *src);
+void libxl_hwcap_copy(libxl_ctx *ctx, libxl_hwcap *dst, const libxl_hwcap *src);
 
 typedef uint64_t libxl_ev_user;
 
@@ -990,10 +997,10 @@ void libxl_bitmap_dispose(libxl_bitmap *map);
 typedef struct libxl__cpuid_policy libxl_cpuid_policy;
 typedef libxl_cpuid_policy * libxl_cpuid_policy_list;
 void libxl_cpuid_dispose(libxl_cpuid_policy_list *cpuid_list);
-int libxl_cpuid_policy_list_length(libxl_cpuid_policy_list *l);
+int libxl_cpuid_policy_list_length(const libxl_cpuid_policy_list *l);
 void libxl_cpuid_policy_list_copy(libxl_ctx *ctx,
                                   libxl_cpuid_policy_list *dst,
-                                  libxl_cpuid_policy_list *src);
+                                  const libxl_cpuid_policy_list *src);
 
 #define LIBXL_PCI_FUNC_ALL (~0U)
 
@@ -2004,7 +2011,7 @@ int libxl_flask_loadpolicy(libxl_ctx *ctx, void *policy, uint32_t size);
 int libxl_ms_vm_genid_generate(libxl_ctx *ctx, libxl_ms_vm_genid *id);
 bool libxl_ms_vm_genid_is_zero(const libxl_ms_vm_genid *id);
 void libxl_ms_vm_genid_copy(libxl_ctx *ctx, libxl_ms_vm_genid *dst,
-                            libxl_ms_vm_genid *src);
+                            const libxl_ms_vm_genid *src);
 
 #ifdef LIBXL_HAVE_PSR_CMT
 int libxl_psr_cmt_attach(libxl_ctx *ctx, uint32_t domid);

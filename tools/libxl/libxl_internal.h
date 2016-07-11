@@ -4095,7 +4095,7 @@ void libxl__update_domain_configuration(libxl__gc *gc,
                                         const libxl_domain_config *src);
 static inline void libxl__update_config_nic(libxl__gc *gc,
                                             libxl_device_nic *dst,
-                                            libxl_device_nic *src)
+                                            const libxl_device_nic *src)
 {
     dst->devid = src->devid;
     dst->nictype = src->nictype;

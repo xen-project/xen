@@ -544,7 +544,7 @@ if __name__ == '__main__':
         if ty.dispose_fn is not None:
             f.write("%svoid %s(%s);\n" % (ty.hidden(), ty.dispose_fn, ty.make_arg("p")))
         if ty.copy_fn is not None:
-            f.write("%svoid %s(libxl_ctx *ctx, %s, %s);\n" % (ty.hidden(), ty.copy_fn,
+            f.write("%svoid %s(libxl_ctx *ctx, %s, const %s);\n" % (ty.hidden(), ty.copy_fn,
                                               ty.make_arg("dst"), ty.make_arg("src")))
         if ty.init_fn is not None:
             f.write("%svoid %s(%s);\n" % (ty.hidden(), ty.init_fn, ty.make_arg("p")))
@@ -649,7 +649,7 @@ if __name__ == '__main__':
         f.write("\n")
 
     for ty in [t for t in types if t.copy_fn and t.autogenerate_copy_fn]:
-        f.write("void %s(libxl_ctx *ctx, %s, %s)\n" % (ty.copy_fn,
+        f.write("void %s(libxl_ctx *ctx, %s, const %s)\n" % (ty.copy_fn,
                                        ty.make_arg("dst", passby=idl.PASS_BY_REFERENCE),
                                        ty.make_arg("src", passby=idl.PASS_BY_REFERENCE)))
         f.write("{\n")

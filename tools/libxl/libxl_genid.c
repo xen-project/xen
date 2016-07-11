@@ -52,7 +52,7 @@ bool libxl_ms_vm_genid_is_zero(const libxl_ms_vm_genid *id)
 }
 
 void libxl_ms_vm_genid_copy(libxl_ctx *ctx, libxl_ms_vm_genid *dst,
-                            libxl_ms_vm_genid *src)
+                            const libxl_ms_vm_genid *src)
 {
     memcpy(dst, src, LIBXL_MS_VM_GENID_LEN);
 }

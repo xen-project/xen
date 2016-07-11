@@ -1271,7 +1271,7 @@ int libxl_domid_valid_guest(uint32_t domid)
     return domid > 0 && domid < DOMID_FIRST_RESERVED;
 }
 
-void libxl_string_copy(libxl_ctx *ctx, char **dst, char **src)
+void libxl_string_copy(libxl_ctx *ctx, char **dst, char * const*src)
 {
     GC_INIT(ctx);
 
