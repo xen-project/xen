@@ -19,7 +19,7 @@ start_cmd="xendriverdomain_startcmd"
 stop_cmd="xendriverdomain_stop"
 extra_commands=""
 
-XLDEVD_PIDFILE="/var/run/xldevd.pid"
+XLDEVD_PIDFILE="@XEN_RUN_DIR@/xldevd.pid"
 
 xendriverdomain_precmd()
 {
