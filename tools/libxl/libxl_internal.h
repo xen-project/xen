@@ -1288,7 +1288,6 @@ bool libxl__xswait_inuse(const libxl__xswait_state *ss);
 
 int libxl__xswait_start(libxl__gc*, libxl__xswait_state*);
 
-
 /*
  * libxl__ev_devstate - waits a given time for a device to
  * reach a given state.  Follows the libxl_ev_* conventions.
@@ -3678,6 +3677,10 @@ struct libxl__domain_create_state {
     libxl__domain_destroy_state dds;
     libxl__multidev multidev;
 };
+
+_hidden int libxl__device_nic_set_devids(libxl__gc *gc,
+                                         libxl_domain_config *d_config,
+                                         uint32_t domid);
 
 /*----- Domain suspend (save) functions -----*/
 

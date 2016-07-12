@@ -772,7 +772,6 @@ static void initiate_domain_create(libxl__egc *egc,
     libxl_ctx *ctx = libxl__gc_owner(gc);
     uint32_t domid;
     int i, ret;
-    size_t last_devid = -1;
     bool pod_enabled = false;
 
     /* convenience aliases */
@@ -932,25 +931,9 @@ static void initiate_domain_create(libxl__egc *egc,
      * Make two runs over configured NICs in order to avoid duplicate IDs
      * in case the caller partially assigned IDs.
      */
-    for (i = 0; i < d_config->num_nics; i++) {
-        /* We have to init the nic here, because we still haven't
-         * called libxl_device_nic_add when domcreate_launch_dm gets called,
-         * but qemu needs the nic information to be complete.
-         */
-        ret = libxl__device_nic_setdefault(gc, &d_config->nics[i], domid,
-                                           false);
-        if (ret) {
-            LOG(ERROR, "Unable to set nic defaults for nic %d", i);
-            goto error_out;
-        }
-
-        if (d_config->nics[i].devid > last_devid)
-            last_devid = d_config->nics[i].devid;
-    }
-    for (i = 0; i < d_config->num_nics; i++) {
-        if (d_config->nics[i].devid < 0)
-            d_config->nics[i].devid = ++last_devid;
-    }
+    ret = libxl__device_nic_set_devids(gc, d_config, domid);
+    if (ret)
+        goto error_out;
 
     if (restore_fd >= 0 || dcs->domid_soft_reset != INVALID_DOMID) {
         LOG(DEBUG, "restoring, not running bootloader");

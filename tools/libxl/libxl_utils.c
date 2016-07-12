@@ -598,41 +598,6 @@ int libxl_pipe(libxl_ctx *ctx, int pipes[2])
     return ret;
 }
 
-int libxl_mac_to_device_nic(libxl_ctx *ctx, uint32_t domid,
-                            const char *mac, libxl_device_nic *nic)
-{
-    libxl_device_nic *nics;
-    int nb, rc, i;
-    libxl_mac mac_n;
-
-    rc = libxl__parse_mac(mac, mac_n);
-    if (rc)
-        return rc;
-
-    nics = libxl_device_nic_list(ctx, domid, &nb);
-    if (!nics)
-        return ERROR_FAIL;
-
-    memset(nic, 0, sizeof (libxl_device_nic));
-
-    rc = ERROR_INVAL;
-    for (i = 0; i < nb; ++i) {
-        if (!libxl__compare_macs(&mac_n, &nics[i].mac)) {
-            *nic = nics[i];
-            rc = 0;
-            i++; /* Do not dispose this NIC on exit path */
-            break;
-        }
-        libxl_device_nic_dispose(&nics[i]);
-    }
-
-    for (; i<nb; i++)
-        libxl_device_nic_dispose(&nics[i]);
-
-    free(nics);
-    return rc;
-}
-
 int libxl_bitmap_alloc(libxl_ctx *ctx, libxl_bitmap *bitmap, int n_bits)
 {
     GC_INIT(ctx);
