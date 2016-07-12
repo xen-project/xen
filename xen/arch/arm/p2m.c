@@ -1159,27 +1159,27 @@ out:
 }
 
 int map_regions_rw_cache(struct domain *d,
-                         unsigned long start_gfn,
+                         gfn_t gfn,
                          unsigned long nr,
-                         unsigned long mfn)
+                         mfn_t mfn)
 {
     return apply_p2m_changes(d, INSERT,
-                             pfn_to_paddr(start_gfn),
-                             pfn_to_paddr(start_gfn + nr),
-                             pfn_to_paddr(mfn),
+                             pfn_to_paddr(gfn_x(gfn)),
+                             pfn_to_paddr(gfn_x(gfn) + nr),
+                             pfn_to_paddr(mfn_x(mfn)),
                              MATTR_MEM, 0, p2m_mmio_direct,
                              d->arch.p2m.default_access);
 }
 
 int unmap_regions_rw_cache(struct domain *d,
-                           unsigned long start_gfn,
+                           gfn_t gfn,
                            unsigned long nr,
-                           unsigned long mfn)
+                           mfn_t mfn)
 {
     return apply_p2m_changes(d, REMOVE,
-                             pfn_to_paddr(start_gfn),
-                             pfn_to_paddr(start_gfn + nr),
-                             pfn_to_paddr(mfn),
+                             pfn_to_paddr(gfn_x(gfn)),
+                             pfn_to_paddr(gfn_x(gfn) + nr),
+                             pfn_to_paddr(mfn_x(mfn)),
                              MATTR_MEM, 0, p2m_invalid,
                              d->arch.p2m.default_access);
 }

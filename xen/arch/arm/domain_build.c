@@ -1522,9 +1522,9 @@ static void acpi_map_other_tables(struct domain *d)
         addr = acpi_gbl_root_table_list.tables[i].address;
         size = acpi_gbl_root_table_list.tables[i].length;
         res = map_regions_rw_cache(d,
-                                   paddr_to_pfn(addr & PAGE_MASK),
+                                   _gfn(paddr_to_pfn(addr)),
                                    DIV_ROUND_UP(size, PAGE_SIZE),
-                                   paddr_to_pfn(addr & PAGE_MASK));
+                                   _mfn(paddr_to_pfn(addr)));
         if ( res )
         {
              panic(XENLOG_ERR "Unable to map ACPI region 0x%"PRIx64
@@ -1878,9 +1878,9 @@ static int prepare_acpi(struct domain *d, struct kernel_info *kinfo)
 
     /* Map the EFI and ACPI tables to Dom0 */
     rc = map_regions_rw_cache(d,
-                              paddr_to_pfn(d->arch.efi_acpi_gpa),
+                              _gfn(paddr_to_pfn(d->arch.efi_acpi_gpa)),
                               PFN_UP(d->arch.efi_acpi_len),
-                              paddr_to_pfn(virt_to_maddr(d->arch.efi_acpi_table)));
+                              _mfn(paddr_to_pfn(virt_to_maddr(d->arch.efi_acpi_table))));
     if ( rc != 0 )
     {
         printk(XENLOG_ERR "Unable to map EFI/ACPI table 0x%"PRIx64

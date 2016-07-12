@@ -142,14 +142,14 @@ mfn_t p2m_lookup(struct domain *d, gfn_t gfn, p2m_type_t *t);
 int p2m_cache_flush(struct domain *d, gfn_t start, unsigned long nr);
 
 int map_regions_rw_cache(struct domain *d,
-                         unsigned long start_gfn,
-                         unsigned long nr_mfns,
-                         unsigned long mfn);
+                         gfn_t gfn,
+                         unsigned long nr,
+                         mfn_t mfn);
 
 int unmap_regions_rw_cache(struct domain *d,
-                           unsigned long start_gfn,
-                           unsigned long nr_mfns,
-                           unsigned long mfn);
+                           gfn_t gfn,
+                           unsigned long nr,
+                           mfn_t mfn);
 
 int map_dev_mmio_region(struct domain *d,
                         gfn_t gfn,
