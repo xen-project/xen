@@ -1158,17 +1158,40 @@ out:
     return rc;
 }
 
+static inline int p2m_insert_mapping(struct domain *d,
+                                     gfn_t start_gfn,
+                                     unsigned long nr,
+                                     mfn_t mfn,
+                                     int mattr, p2m_type_t t)
+{
+    return apply_p2m_changes(d, INSERT,
+                             pfn_to_paddr(gfn_x(start_gfn)),
+                             pfn_to_paddr(gfn_x(start_gfn) + nr),
+                             pfn_to_paddr(mfn_x(mfn)),
+                             mattr, 0, t, d->arch.p2m.default_access);
+}
+
+static inline int p2m_remove_mapping(struct domain *d,
+                                     gfn_t start_gfn,
+                                     unsigned long nr,
+                                     mfn_t mfn)
+{
+    return apply_p2m_changes(d, REMOVE,
+                             pfn_to_paddr(gfn_x(start_gfn)),
+                             pfn_to_paddr(gfn_x(start_gfn) + nr),
+                             pfn_to_paddr(mfn_x(mfn)),
+                             /* arguments below not used when removing mapping */
+                             MATTR_MEM, 0, p2m_invalid,
+                             d->arch.p2m.default_access);
+}
+
 int map_regions_rw_cache(struct domain *d,
                          gfn_t gfn,
                          unsigned long nr,
                          mfn_t mfn)
 {
-    return apply_p2m_changes(d, INSERT,
-                             pfn_to_paddr(gfn_x(gfn)),
-                             pfn_to_paddr(gfn_x(gfn) + nr),
-                             pfn_to_paddr(mfn_x(mfn)),
-                             MATTR_MEM, 0, p2m_mmio_direct,
-                             d->arch.p2m.default_access);
+    return p2m_insert_mapping(d, gfn, nr, mfn,
+                              MATTR_MEM, p2m_mmio_direct);
 }
 
 int unmap_regions_rw_cache(struct domain *d,
@@ -1176,12 +1199,7 @@ int unmap_regions_rw_cache(struct domain *d,
                            unsigned long nr,
                            mfn_t mfn)
 {
-    return apply_p2m_changes(d, REMOVE,
-                             pfn_to_paddr(gfn_x(gfn)),
-                             pfn_to_paddr(gfn_x(gfn) + nr),
-                             pfn_to_paddr(mfn_x(mfn)),
-                             MATTR_MEM, 0, p2m_invalid,
-                             d->arch.p2m.default_access);
+    return p2m_remove_mapping(d, gfn, nr, mfn);
 }
 
 int map_mmio_regions(struct domain *d,
@@ -1189,12 +1207,8 @@ int map_mmio_regions(struct domain *d,
                      unsigned long nr,
                      mfn_t mfn)
 {
-    return apply_p2m_changes(d, INSERT,
-                             pfn_to_paddr(gfn_x(start_gfn)),
-                             pfn_to_paddr(gfn_x(start_gfn) + nr),
-                             pfn_to_paddr(mfn_x(mfn)),
-                             MATTR_DEV, 0, p2m_mmio_direct,
-                             d->arch.p2m.default_access);
+    return p2m_insert_mapping(d, start_gfn, nr, mfn,
+                              MATTR_DEV, p2m_mmio_direct);
 }
 
 int unmap_mmio_regions(struct domain *d,
@@ -1202,12 +1216,7 @@ int unmap_mmio_regions(struct domain *d,
                        unsigned long nr,
                        mfn_t mfn)
 {
-    return apply_p2m_changes(d, REMOVE,
-                             pfn_to_paddr(gfn_x(start_gfn)),
-                             pfn_to_paddr(gfn_x(start_gfn) + nr),
-                             pfn_to_paddr(mfn_x(mfn)),
-                             MATTR_DEV, 0, p2m_invalid,
-                             d->arch.p2m.default_access);
+    return p2m_remove_mapping(d, start_gfn, nr, mfn);
 }
 
 int map_dev_mmio_region(struct domain *d,
@@ -1237,22 +1246,15 @@ int guest_physmap_add_entry(struct domain *d,
                             unsigned long page_order,
                             p2m_type_t t)
 {
-    return apply_p2m_changes(d, INSERT,
-                             pfn_to_paddr(gfn_x(gfn)),
-                             pfn_to_paddr(gfn_x(gfn) + (1 << page_order)),
-                             pfn_to_paddr(mfn_x(mfn)), MATTR_MEM, 0, t,
-                             d->arch.p2m.default_access);
+    return p2m_insert_mapping(d, gfn, (1 << page_order), mfn,
+                              MATTR_MEM, t);
 }
 
 void guest_physmap_remove_page(struct domain *d,
                                gfn_t gfn,
                                mfn_t mfn, unsigned int page_order)
 {
-    apply_p2m_changes(d, REMOVE,
-                      pfn_to_paddr(gfn_x(gfn)),
-                      pfn_to_paddr(gfn_x(gfn) + (1<<page_order)),
-                      pfn_to_paddr(mfn_x(mfn)), MATTR_MEM, 0, p2m_invalid,
-                      d->arch.p2m.default_access);
+    p2m_remove_mapping(d, gfn, (1 << page_order), mfn);
 }
 
 int p2m_alloc_table(struct domain *d)
