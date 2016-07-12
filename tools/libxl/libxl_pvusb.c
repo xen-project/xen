@@ -1695,6 +1695,24 @@ static int libxl_device_usbdev_compare(libxl_device_usbdev *d1,
     return COMPARE_USB(d1, d2);
 }
 
+void libxl_device_usbctrl_list_free(libxl_device_usbctrl *list, int nr)
+{
+   int i;
+
+   for (i = 0; i < nr; i++)
+       libxl_device_usbctrl_dispose(&list[i]);
+   free(list);
+}
+
+void libxl_device_usbdev_list_free(libxl_device_usbdev *list, int nr)
+{
+   int i;
+
+   for (i = 0; i < nr; i++)
+       libxl_device_usbdev_dispose(&list[i]);
+   free(list);
+}
+
 DEFINE_DEVICE_TYPE_STRUCT(usbctrl,
     .dm_needed = libxl_device_usbctrl_dm_needed
 );

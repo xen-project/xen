@@ -1310,24 +1310,6 @@ int libxl__random_bytes(libxl__gc *gc, uint8_t *buf, size_t len)
     return ret;
 }
 
-void libxl_device_usbctrl_list_free(libxl_device_usbctrl *list, int nr)
-{
-   int i;
-
-   for (i = 0; i < nr; i++)
-       libxl_device_usbctrl_dispose(&list[i]);
-   free(list);
-}
-
-void libxl_device_usbdev_list_free(libxl_device_usbdev *list, int nr)
-{
-   int i;
-
-   for (i = 0; i < nr; i++)
-       libxl_device_usbdev_dispose(&list[i]);
-   free(list);
-}
-
 /*
  * Local variables:
  * mode: C
