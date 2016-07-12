@@ -34,6 +34,14 @@
 /* Maximum we can support with current vLAPIC ID mapping. */
 #define HVM_MAX_VCPUS        128
 
+/*
+ * In some cases SMP HVM guests may require knowledge of Xen's idea of vCPU ids
+ * for their vCPUs. For example, HYPERVISOR_vcpu_op and some EVTCHNOP_*
+ * hypercalls take vcpu id as a parameter. It is valid for HVM guests to assume
+ * that Xen's vCPU id always equals to ACPI (not APIC!) id in MADT table which
+ * is always present for SMP guests.
+ */
+
 struct hvm_info_table {
     char        signature[8]; /* "HVM INFO" */
     uint32_t    length;
