@@ -122,6 +122,8 @@
 #define VM_EVENT_REASON_GUEST_REQUEST           8
 /* A debug exception was caught */
 #define VM_EVENT_REASON_DEBUG_EXCEPTION         9
+/* CPUID executed */
+#define VM_EVENT_REASON_CPUID                   10
 
 /* Supported values for the vm_event_write_ctrlreg index. */
 #define VM_EVENT_X86_CR0    0
@@ -222,6 +224,11 @@ struct vm_event_mov_to_msr {
     uint64_t value;
 };
 
+struct vm_event_cpuid {
+    uint32_t insn_length;
+    uint32_t _pad;
+};
+
 #define MEM_PAGING_DROP_PAGE       (1 << 0)
 #define MEM_PAGING_EVICT_FAIL      (1 << 1)
 
@@ -260,6 +267,7 @@ typedef struct vm_event_st {
         struct vm_event_singlestep            singlestep;
         struct vm_event_debug                 software_breakpoint;
         struct vm_event_debug                 debug_exception;
+        struct vm_event_cpuid                 cpuid;
     } u;
 
     union {

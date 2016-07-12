@@ -136,6 +136,22 @@ int hvm_monitor_debug(unsigned long rip, enum hvm_monitor_debug_type type,
     return monitor_traps(curr, sync, &req);
 }
 
+int hvm_monitor_cpuid(unsigned long insn_length)
+{
+    struct vcpu *curr = current;
+    struct arch_domain *ad = &curr->domain->arch;
+    vm_event_request_t req = {};
+
+    if ( !ad->monitor.cpuid_enabled )
+        return 0;
+
+    req.reason = VM_EVENT_REASON_CPUID;
+    req.vcpu_id = curr->vcpu_id;
+    req.u.cpuid.insn_length = insn_length;
+
+    return monitor_traps(curr, 1, &req);
+}
+
 /*
  * Local variables:
  * mode: C

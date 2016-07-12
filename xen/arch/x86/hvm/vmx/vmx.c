@@ -2399,7 +2399,7 @@ static void vmx_cpuid_intercept(
     HVMTRACE_5D (CPUID, input, *eax, *ebx, *ecx, *edx);
 }
 
-static void vmx_do_cpuid(struct cpu_user_regs *regs)
+static int vmx_do_cpuid(struct cpu_user_regs *regs)
 {
     unsigned int eax, ebx, ecx, edx;
 
@@ -2414,6 +2414,8 @@ static void vmx_do_cpuid(struct cpu_user_regs *regs)
     regs->ebx = ebx;
     regs->ecx = ecx;
     regs->edx = edx;
+
+    return hvm_monitor_cpuid(get_instruction_length());
 }
 
 static void vmx_dr_access(unsigned long exit_qualification,
@@ -3528,9 +3530,28 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
         break;
     }
     case EXIT_REASON_CPUID:
-        is_pvh_vcpu(v) ? pv_cpuid(regs) : vmx_do_cpuid(regs);
-        update_guest_eip(); /* Safe: CPUID */
+    {
+        int rc;
+
+        if ( is_pvh_vcpu(v) )
+        {
+            pv_cpuid(regs);
+            rc = 0;
+        }
+        else
+            rc = vmx_do_cpuid(regs);
+
+        /*
+         * rc < 0 error in monitor/vm_event, crash
+         * !rc    continue normally
+         * rc > 0 paused waiting for response, work here is done
+         */
+        if ( rc < 0 )
+            goto exit_and_crash;
+        if ( !rc )
+            update_guest_eip(); /* Safe: CPUID */
         break;
+    }
     case EXIT_REASON_HLT:
         update_guest_eip(); /* Safe: HLT */
         hvm_hlt(regs->eflags);

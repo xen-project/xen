@@ -405,6 +405,7 @@ struct arch_domain
         unsigned int software_breakpoint_enabled : 1;
         unsigned int debug_exception_enabled     : 1;
         unsigned int debug_exception_sync        : 1;
+        unsigned int cpuid_enabled               : 1;
         struct monitor_msr_bitmap *msr_bitmap;
     } monitor;
 

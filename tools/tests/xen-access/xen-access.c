@@ -337,7 +337,7 @@ void usage(char* progname)
 {
     fprintf(stderr, "Usage: %s [-m] <domain_id> write|exec", progname);
 #if defined(__i386__) || defined(__x86_64__)
-            fprintf(stderr, "|breakpoint|altp2m_write|altp2m_exec|debug");
+            fprintf(stderr, "|breakpoint|altp2m_write|altp2m_exec|debug|cpuid");
 #endif
             fprintf(stderr,
             "\n"
@@ -364,6 +364,7 @@ int main(int argc, char *argv[])
     int shutting_down = 0;
     int altp2m = 0;
     int debug = 0;
+    int cpuid = 0;
     uint16_t altp2m_view_id = 0;
 
     char* progname = argv[0];
@@ -425,6 +426,10 @@ int main(int argc, char *argv[])
     else if ( !strcmp(argv[0], "debug") )
     {
         debug = 1;
+    }
+    else if ( !strcmp(argv[0], "cpuid") )
+    {
+        cpuid = 1;
     }
 #endif
     else
@@ -548,6 +553,16 @@ int main(int argc, char *argv[])
         }
     }
 
+    if ( cpuid )
+    {
+        rc = xc_monitor_cpuid(xch, domain_id, 1);
+        if ( rc < 0 )
+        {
+            ERROR("Error %d setting cpuid listener with vm_event\n", rc);
+            goto exit;
+        }
+    }
+
     /* Wait for access */
     for (;;)
     {
@@ -560,6 +575,8 @@ int main(int argc, char *argv[])
                 rc = xc_monitor_software_breakpoint(xch, domain_id, 0);
             if ( debug )
                 rc = xc_monitor_debug_exceptions(xch, domain_id, 0, 0);
+            if ( cpuid )
+                rc = xc_monitor_cpuid(xch, domain_id, 0);
 
             if ( altp2m )
             {
@@ -715,6 +732,20 @@ int main(int argc, char *argv[])
                     continue;
                 }
 
+                break;
+            case VM_EVENT_REASON_CPUID:
+                printf("CPUID executed: rip=%016"PRIx64", vcpu %d. Insn length: %"PRIu32" " \
+                       "EAX: 0x%"PRIx64" EBX: 0x%"PRIx64" ECX: 0x%"PRIx64" EDX: 0x%"PRIx64"\n",
+                       req.data.regs.x86.rip,
+                       req.vcpu_id,
+                       req.u.cpuid.insn_length,
+                       req.data.regs.x86.rax,
+                       req.data.regs.x86.rbx,
+                       req.data.regs.x86.rcx,
+                       req.data.regs.x86.rdx);
+                rsp.flags |= VM_EVENT_FLAG_SET_REGISTERS;
+                rsp.data = req.data;
+                rsp.data.regs.x86.rip += req.u.cpuid.insn_length;
                 break;
             default:
                 fprintf(stderr, "UNKNOWN REASON CODE %d\n", req.reason);
