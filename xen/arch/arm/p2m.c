@@ -1231,7 +1231,7 @@ int map_regions_rw_cache(struct domain *d,
                              pfn_to_paddr(start_gfn + nr),
                              pfn_to_paddr(mfn),
                              MATTR_MEM, 0, p2m_mmio_direct,
-                             p2m_access_rw);
+                             d->arch.p2m.default_access);
 }
 
 int unmap_regions_rw_cache(struct domain *d,
@@ -1244,7 +1244,7 @@ int unmap_regions_rw_cache(struct domain *d,
                              pfn_to_paddr(start_gfn + nr),
                              pfn_to_paddr(mfn),
                              MATTR_MEM, 0, p2m_invalid,
-                             p2m_access_rw);
+                             d->arch.p2m.default_access);
 }
 
 int map_mmio_regions(struct domain *d,
