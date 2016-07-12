@@ -152,9 +152,9 @@ int unmap_regions_rw_cache(struct domain *d,
                            unsigned long mfn);
 
 int map_dev_mmio_region(struct domain *d,
-                        unsigned long start_gfn,
+                        gfn_t gfn,
                         unsigned long nr,
-                        unsigned long mfn);
+                        mfn_t mfn);
 
 int guest_physmap_add_entry(struct domain *d,
                             gfn_t gfn,

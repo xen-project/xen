@@ -1145,7 +1145,7 @@ int xenmem_add_to_physmap_one(
         if ( extra.res0 )
             return -EOPNOTSUPP;
 
-        rc = map_dev_mmio_region(d, gfn_x(gfn), 1, idx);
+        rc = map_dev_mmio_region(d, gfn, 1, _mfn(idx));
         return rc;
 
     default:

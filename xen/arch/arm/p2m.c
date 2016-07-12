@@ -1211,20 +1211,20 @@ int unmap_mmio_regions(struct domain *d,
 }
 
 int map_dev_mmio_region(struct domain *d,
-                        unsigned long start_gfn,
+                        gfn_t gfn,
                         unsigned long nr,
-                        unsigned long mfn)
+                        mfn_t mfn)
 {
     int res;
 
-    if ( !(nr && iomem_access_permitted(d, mfn, mfn + nr - 1)) )
+    if ( !(nr && iomem_access_permitted(d, mfn_x(mfn), mfn_x(mfn) + nr - 1)) )
         return 0;
 
-    res = map_mmio_regions(d, _gfn(start_gfn), nr, _mfn(mfn));
+    res = map_mmio_regions(d, gfn, nr, mfn);
     if ( res < 0 )
     {
-        printk(XENLOG_G_ERR "Unable to map [%#lx - %#lx] in Dom%d\n",
-               mfn, mfn + nr - 1, d->domain_id);
+        printk(XENLOG_G_ERR "Unable to map MFNs [%#"PRI_mfn" - %#"PRI_mfn" in Dom%d\n",
+               mfn_x(mfn), mfn_x(mfn) + nr - 1, d->domain_id);
         return res;
     }
 
