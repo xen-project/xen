@@ -3147,6 +3147,14 @@ static int libxl__device_from_nic(libxl__gc *gc, uint32_t domid,
     return 0;
 }
 
+static void libxl__update_config_nic(libxl__gc *gc, libxl_device_nic *dst,
+                                     const libxl_device_nic *src)
+{
+    dst->devid = src->devid;
+    dst->nictype = src->nictype;
+    libxl_mac_copy(CTX, &dst->mac, &src->mac);
+}
+
 static void libxl__device_nic_add(libxl__egc *egc, uint32_t domid,
                                   libxl_device_nic *nic,
                                   libxl__ao_device *aodev)
@@ -7230,12 +7238,19 @@ static int libxl_device_nic_compare(libxl_device_nic *d1,
     return COMPARE_DEVID(d1, d2);
 }
 
+static void libxl_device_nic_update_config(libxl__gc *gc, void *d, void *s)
+{
+    libxl__update_config_nic(gc, d, s);
+}
+
 DEFINE_DEVICE_TYPE_STRUCT(disk,
     .merge       = libxl_device_disk_merge,
     .dm_needed   = libxl_device_disk_dm_needed,
     .skip_attach = 1
 );
-DEFINE_DEVICE_TYPE_STRUCT(nic);
+DEFINE_DEVICE_TYPE_STRUCT(nic,
+    .update_config = libxl_device_nic_update_config
+);
 
 /*
  * Local variables:

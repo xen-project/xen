@@ -537,15 +537,22 @@ void libxl__update_domain_configuration(libxl__gc *gc,
                                         libxl_domain_config *dst,
                                         const libxl_domain_config *src)
 {
-    int i;
+    int i, idx, num;
+    const struct libxl_device_type *dt;
 
-    /* update network interface information */
-    for (i = 0; i < src->num_nics; i++)
-        libxl__update_config_nic(gc, &dst->nics[i], &src->nics[i]);
+    for (idx = 0;; idx++) {
+        dt = device_type_tbl[idx];
+        if (!dt)
+            break;
 
-    /* update vtpm information */
-    for (i = 0; i < src->num_vtpms; i++)
-        libxl__update_config_vtpm(gc, &dst->vtpms[i], &src->vtpms[i]);
+        num = *libxl__device_type_get_num(dt, src);
+        if (!dt->update_config || !num)
+            continue;
+
+        for (i = 0; i < num; i++)
+            dt->update_config(gc, libxl__device_type_get_elem(dt, dst, i),
+                                  libxl__device_type_get_elem(dt, src, i));
+    }
 
     /* update guest UUID */
     libxl_uuid_copy(CTX, &dst->c_info.uuid, &src->c_info.uuid);

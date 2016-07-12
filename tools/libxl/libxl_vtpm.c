@@ -41,6 +41,13 @@ static int libxl__device_from_vtpm(libxl__gc *gc, uint32_t domid,
    return 0;
 }
 
+static void libxl__update_config_vtpm(libxl__gc *gc, libxl_device_vtpm *dst,
+                                      libxl_device_vtpm *src)
+{
+    dst->devid = src->devid;
+    libxl_uuid_copy(CTX, &dst->uuid, &src->uuid);
+}
+
 static void libxl__device_vtpm_add(libxl__egc *egc, uint32_t domid,
                                    libxl_device_vtpm *vtpm,
                                    libxl__ao_device *aodev)
@@ -350,11 +357,18 @@ void libxl_device_vtpm_list_free(libxl_device_vtpm* list, int nr)
    free(list);
 }
 
+static void libxl_device_vtpm_update_config(libxl__gc *gc, void *d, void *s)
+{
+    libxl__update_config_vtpm(gc, d, s);
+}
+
 LIBXL_DEFINE_DEVICE_ADD(vtpm)
 static LIBXL_DEFINE_DEVICES_ADD(vtpm)
 LIBXL_DEFINE_DEVICE_REMOVE(vtpm)
 
-DEFINE_DEVICE_TYPE_STRUCT(vtpm);
+DEFINE_DEVICE_TYPE_STRUCT(vtpm,
+    .update_config = libxl_device_vtpm_update_config
+);
 
 /*
  * Local variables:

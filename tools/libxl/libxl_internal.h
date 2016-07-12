@@ -3451,6 +3451,7 @@ struct libxl_device_type {
     int (*compare)(void *, void *);
     void (*merge)(libxl_ctx *, void *, void *);
     int (*dm_needed)(void *, unsigned);
+    void (*update_config)(libxl__gc *, void *, void *);
 };
 
 #define DEFINE_DEVICE_TYPE_STRUCT_X(name, sname, ...)                          \
@@ -4192,22 +4193,6 @@ int libxl__set_domain_configuration(libxl__gc *gc, uint32_t domid,
 void libxl__update_domain_configuration(libxl__gc *gc,
                                         libxl_domain_config *dst,
                                         const libxl_domain_config *src);
-static inline void libxl__update_config_nic(libxl__gc *gc,
-                                            libxl_device_nic *dst,
-                                            const libxl_device_nic *src)
-{
-    dst->devid = src->devid;
-    dst->nictype = src->nictype;
-    libxl_mac_copy(CTX, &dst->mac, &src->mac);
-}
-
-static inline void libxl__update_config_vtpm(libxl__gc *gc,
-                                             libxl_device_vtpm *dst,
-                                             libxl_device_vtpm *src)
-{
-    dst->devid = src->devid;
-    libxl_uuid_copy(CTX, &dst->uuid, &src->uuid);
-}
 
 /* Target memory in xenstore is different from what user has
  * asked for. The difference is video_memkb + (possible) fudge.
