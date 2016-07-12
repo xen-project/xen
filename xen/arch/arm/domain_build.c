@@ -235,7 +235,7 @@ fail:
  * (as described above) we allow higher allocations and continue until
  * that runs out (or we have allocated sufficient dom0 memory).
  */
-static void allocate_memory_11(struct domain *d, struct kernel_info *kinfo)
+static void allocate_memory(struct domain *d, struct kernel_info *kinfo)
 {
     const unsigned int min_low_order =
         get_order_from_bytes(min_t(paddr_t, dom0_mem, MB(128)));
@@ -246,6 +246,12 @@ static void allocate_memory_11(struct domain *d, struct kernel_info *kinfo)
 
     bool_t lowmem = is_32bit_domain(d);
     unsigned int bits;
+
+    /*
+     * TODO: Implement memory bank allocation when DOM0 is not direct
+     * mapped
+     */
+    BUG_ON(!dom0_11_mapping);
 
     printk("Allocating 1:1 mappings totalling %ldMB for dom0:\n",
            /* Don't want format this as PRIpaddr (16 digit hex) */
@@ -340,56 +346,6 @@ static void allocate_memory_11(struct domain *d, struct kernel_info *kinfo)
                kinfo->mem.bank[i].start + kinfo->mem.bank[i].size,
                /* Don't want format this as PRIpaddr (16 digit hex) */
                (unsigned long)(kinfo->mem.bank[i].size >> 20));
-    }
-}
-
-static void allocate_memory(struct domain *d, struct kernel_info *kinfo)
-{
-
-    struct dt_device_node *memory = NULL;
-    const void *reg;
-    u32 reg_len, reg_size;
-    unsigned int bank = 0;
-
-    if ( dom0_11_mapping )
-        return allocate_memory_11(d, kinfo);
-
-    while ( (memory = dt_find_node_by_type(memory, "memory")) )
-    {
-        int l;
-
-        dt_dprintk("memory node\n");
-
-        reg_size = dt_cells_to_size(dt_n_addr_cells(memory) + dt_n_size_cells(memory));
-
-        reg = dt_get_property(memory, "reg", &reg_len);
-        if ( reg == NULL )
-            panic("Memory node has no reg property");
-
-        for ( l = 0;
-              kinfo->unassigned_mem > 0 && l + reg_size <= reg_len
-                  && kinfo->mem.nr_banks < NR_MEM_BANKS;
-              l += reg_size )
-        {
-            paddr_t start, size;
-
-            if ( dt_device_get_address(memory, bank, &start, &size) )
-                panic("Unable to retrieve the bank %u for %s",
-                      bank, dt_node_full_name(memory));
-
-            if ( size > kinfo->unassigned_mem )
-                size = kinfo->unassigned_mem;
-
-            printk("Populate P2M %#"PRIx64"->%#"PRIx64"\n",
-                   start, start + size);
-            if ( p2m_populate_ram(d, start, start + size) < 0 )
-                panic("Failed to populate P2M");
-            kinfo->mem.bank[kinfo->mem.nr_banks].start = start;
-            kinfo->mem.bank[kinfo->mem.nr_banks].size = size;
-            kinfo->mem.nr_banks++;
-
-            kinfo->unassigned_mem -= size;
-        }
     }
 }
 
