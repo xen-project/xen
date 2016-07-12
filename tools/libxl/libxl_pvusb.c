@@ -1681,13 +1681,23 @@ static int libxl_device_usbctrl_compare(libxl_device_usbctrl *d1,
     return COMPARE_USBCTRL(d1, d2);
 }
 
+static int libxl_device_usbctrl_dm_needed(void *e, unsigned domid)
+{
+    libxl_device_usbctrl *elem = e;
+
+    return elem->type == LIBXL_USBCTRL_TYPE_QUSB &&
+           elem->backend_domid == domid;
+}
+
 static int libxl_device_usbdev_compare(libxl_device_usbdev *d1,
                                        libxl_device_usbdev *d2)
 {
     return COMPARE_USB(d1, d2);
 }
 
-DEFINE_DEVICE_TYPE_STRUCT(usbctrl);
+DEFINE_DEVICE_TYPE_STRUCT(usbctrl,
+    .dm_needed = libxl_device_usbctrl_dm_needed
+);
 DEFINE_DEVICE_TYPE_STRUCT(usbdev);
 
 /*

@@ -3441,6 +3441,7 @@ _hidden void libxl__bootloader_run(libxl__egc*, libxl__bootloader_state *st);
 
 struct libxl_device_type {
     char *type;
+    int skip_attach;   /* Skip entry in domcreate_attach_devices() if 1 */
     int ptr_offset;    /* Offset of device array ptr in libxl_domain_config */
     int num_offset;    /* Offset of # of devices in libxl_domain_config */
     int dev_elem_size; /* Size of one device element in array */
@@ -3450,6 +3451,7 @@ struct libxl_device_type {
     void (*dispose)(void *);
     int (*compare)(void *, void *);
     void (*merge)(libxl_ctx *, void *, void *);
+    int (*dm_needed)(void *, unsigned);
 };
 
 #define DEFINE_DEVICE_TYPE_STRUCT_X(name, sname, ...)                          \

@@ -2348,8 +2348,9 @@ int libxl__destroy_device_model(libxl__gc *gc, uint32_t domid)
 /* Return 0 if no dm needed, 1 if needed and <0 if error. */
 int libxl__need_xenpv_qemu(libxl__gc *gc, libxl_domain_config *d_config)
 {
-    int i, ret;
+    int idx, i, ret, num;
     uint32_t domid;
+    const struct libxl_device_type *dt;
 
     ret = libxl__get_domid(gc, &domid);
     if (ret) {
@@ -2362,11 +2363,21 @@ int libxl__need_xenpv_qemu(libxl__gc *gc, libxl_domain_config *d_config)
         goto out;
     }
 
-    for (i = 0; i < d_config->num_disks; i++) {
-        if (d_config->disks[i].backend == LIBXL_DISK_BACKEND_QDISK &&
-            d_config->disks[i].backend_domid == domid) {
-            ret = 1;
-            goto out;
+    for (idx = 0;; idx++) {
+        dt = device_type_tbl[idx];
+        if (!dt)
+            break;
+
+        num = *libxl__device_type_get_num(dt, d_config);
+        if (!dt->dm_needed || !num)
+            continue;
+
+        for (i = 0; i < num; i++) {
+            if (dt->dm_needed(libxl__device_type_get_elem(dt, d_config, i),
+                              domid)) {
+                ret = 1;
+                goto out;
+            }
         }
     }
 
@@ -2375,14 +2386,6 @@ int libxl__need_xenpv_qemu(libxl__gc *gc, libxl_domain_config *d_config)
             /* xenconsoled is limited to the first console only.
                Until this restriction is removed we must use qemu for
                secondary consoles which includes all channels. */
-            ret = 1;
-            goto out;
-        }
-    }
-
-    for (i = 0; i < d_config->num_usbctrls; i++) {
-       if (d_config->usbctrls[i].type == LIBXL_USBCTRL_TYPE_QUSB &&
-           d_config->usbctrls[i].backend_domid == domid) {
             ret = 1;
             goto out;
         }

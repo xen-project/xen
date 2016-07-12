@@ -7511,6 +7511,14 @@ static void libxl_device_disk_merge(libxl_ctx *ctx, void *d1, void *d2)
     }
 }
 
+static int libxl_device_disk_dm_needed(void *e, unsigned domid)
+{
+    libxl_device_disk *elem = e;
+
+    return elem->backend == LIBXL_DISK_BACKEND_QDISK &&
+           elem->backend_domid == domid;
+}
+
 static int libxl_device_nic_compare(libxl_device_nic *d1,
                                     libxl_device_nic *d2)
 {
@@ -7523,7 +7531,11 @@ static int libxl_device_vtpm_compare(libxl_device_vtpm *d1,
     return COMPARE_DEVID(d1, d2);
 }
 
-DEFINE_DEVICE_TYPE_STRUCT(disk, .merge = libxl_device_disk_merge);
+DEFINE_DEVICE_TYPE_STRUCT(disk,
+    .merge       = libxl_device_disk_merge,
+    .dm_needed   = libxl_device_disk_dm_needed,
+    .skip_attach = 1
+);
 DEFINE_DEVICE_TYPE_STRUCT(nic);
 DEFINE_DEVICE_TYPE_STRUCT(vtpm);
 

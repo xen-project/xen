@@ -1454,7 +1454,7 @@ static void domcreate_attach_devices(libxl__egc *egc,
     dcs->device_type_idx++;
     dt = device_type_tbl[dcs->device_type_idx];
     if (dt) {
-        if (*libxl__device_type_get_num(dt, d_config) > 0) {
+        if (*libxl__device_type_get_num(dt, d_config) > 0 && !dt->skip_attach) {
             /* Attach devices */
             libxl__multidev_begin(ao, &dcs->multidev);
             dcs->multidev.callback = domcreate_attach_devices;
@@ -1501,11 +1501,7 @@ static void domcreate_devmodel_started(libxl__egc *egc,
         }
     }
 
-    /*
-     * Setting dcs->device_type_idx to 0 will skip disks, those have been
-     * already added.
-     */
-    dcs->device_type_idx = 0;
+    dcs->device_type_idx = -1;
     domcreate_attach_devices(egc, &dcs->multidev, 0);
     return;
 
