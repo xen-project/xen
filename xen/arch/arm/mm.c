@@ -1004,7 +1004,7 @@ int page_is_ram_type(unsigned long mfn, unsigned long mem_type)
 
 unsigned long domain_get_maximum_gpfn(struct domain *d)
 {
-    return d->arch.p2m.max_mapped_gfn;
+    return gfn_x(d->arch.p2m.max_mapped_gfn);
 }
 
 void share_xen_page_with_guest(struct page_info *page,

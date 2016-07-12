@@ -34,13 +34,13 @@ struct p2m_domain {
     /* Highest guest frame that's ever been mapped in the p2m
      * Only takes into account ram and foreign mapping
      */
-    unsigned long max_mapped_gfn;
+    gfn_t max_mapped_gfn;
 
     /* Lowest mapped gfn in the p2m. When releasing mapped gfn's in a
      * preemptible manner this is update to track recall where to
      * resume the search. Apart from during teardown this can only
      * decrease. */
-    unsigned long lowest_mapped_gfn;
+    gfn_t lowest_mapped_gfn;
 
     /* Gather some statistics for information purposes only */
     struct {

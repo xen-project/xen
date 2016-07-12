@@ -976,7 +976,7 @@ static int apply_p2m_changes(struct domain *d,
                  * This is set in preempt_count_limit.
                  *
                  */
-                p2m->lowest_mapped_gfn = addr >> PAGE_SHIFT;
+                p2m->lowest_mapped_gfn = _gfn(addr >> PAGE_SHIFT);
                 rc = -ERESTART;
                 goto out;
 
@@ -1117,8 +1117,8 @@ static int apply_p2m_changes(struct domain *d,
 
     if ( op == INSERT )
     {
-        p2m->max_mapped_gfn = max(p2m->max_mapped_gfn, egfn);
-        p2m->lowest_mapped_gfn = min(p2m->lowest_mapped_gfn, sgfn);
+        p2m->max_mapped_gfn = gfn_max(p2m->max_mapped_gfn, _gfn(egfn));
+        p2m->lowest_mapped_gfn = gfn_min(p2m->lowest_mapped_gfn, _gfn(sgfn));
     }
 
     rc = 0;
@@ -1383,8 +1383,8 @@ int p2m_init(struct domain *d)
 
     p2m->root = NULL;
 
-    p2m->max_mapped_gfn = 0;
-    p2m->lowest_mapped_gfn = ULONG_MAX;
+    p2m->max_mapped_gfn = _gfn(0);
+    p2m->lowest_mapped_gfn = _gfn(ULONG_MAX);
 
     p2m->default_access = p2m_access_rwx;
     p2m->mem_access_enabled = false;
@@ -1401,8 +1401,8 @@ int relinquish_p2m_mapping(struct domain *d)
     struct p2m_domain *p2m = &d->arch.p2m;
 
     return apply_p2m_changes(d, RELINQUISH,
-                              pfn_to_paddr(p2m->lowest_mapped_gfn),
-                              pfn_to_paddr(p2m->max_mapped_gfn),
+                              pfn_to_paddr(gfn_x(p2m->lowest_mapped_gfn)),
+                              pfn_to_paddr(gfn_x(p2m->max_mapped_gfn)),
                               pfn_to_paddr(mfn_x(INVALID_MFN)),
                               MATTR_MEM, 0, p2m_invalid,
                               d->arch.p2m.default_access);
@@ -1413,8 +1413,8 @@ int p2m_cache_flush(struct domain *d, gfn_t start, unsigned long nr)
     struct p2m_domain *p2m = &d->arch.p2m;
     gfn_t end = gfn_add(start, nr);
 
-    start = gfn_max(start, _gfn(p2m->lowest_mapped_gfn));
-    end = gfn_min(end, _gfn(p2m->max_mapped_gfn));
+    start = gfn_max(start, p2m->lowest_mapped_gfn);
+    end = gfn_min(end, p2m->max_mapped_gfn);
 
     return apply_p2m_changes(d, CACHEFLUSH,
                              pfn_to_paddr(gfn_x(start)),
