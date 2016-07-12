@@ -1420,15 +1420,19 @@ out:
     aodev->callback(egc, aodev);
 }
 
+#define libxl_device_dtdev_list NULL
+#define libxl_device_dtdev_compare NULL
 static DEFINE_DEVICE_TYPE_STRUCT(dtdev);
 
-static const struct libxl_device_type *device_type_tbl[] = {
+const struct libxl_device_type *device_type_tbl[] = {
+    &libxl__disk_devtype,
     &libxl__nic_devtype,
     &libxl__vtpm_devtype,
     &libxl__usbctrl_devtype,
     &libxl__usbdev_devtype,
     &libxl__pcidev_devtype,
     &libxl__dtdev_devtype,
+    NULL
 };
 
 static void domcreate_attach_devices(libxl__egc *egc,
@@ -1448,9 +1452,9 @@ static void domcreate_attach_devices(libxl__egc *egc,
     }
 
     dcs->device_type_idx++;
-    if (dcs->device_type_idx < ARRAY_SIZE(device_type_tbl)) {
-        dt = device_type_tbl[dcs->device_type_idx];
-        if (*(int *)((void *)d_config + dt->num_offset) > 0) {
+    dt = device_type_tbl[dcs->device_type_idx];
+    if (dt) {
+        if (*libxl__device_type_get_num(dt, d_config) > 0) {
             /* Attach devices */
             libxl__multidev_begin(ao, &dcs->multidev);
             dcs->multidev.callback = domcreate_attach_devices;
@@ -1497,7 +1501,11 @@ static void domcreate_devmodel_started(libxl__egc *egc,
         }
     }
 
-    dcs->device_type_idx = -1;
+    /*
+     * Setting dcs->device_type_idx to 0 will skip disks, those have been
+     * already added.
+     */
+    dcs->device_type_idx = 0;
     domcreate_attach_devices(egc, &dcs->multidev, 0);
     return;
 

@@ -7404,93 +7404,68 @@ int libxl_retrieve_domain_configuration(libxl_ctx *ctx, uint32_t domid,
      *    entry retrieved from xenstore while "dst" points to the entry
      *    retrieve from JSON.
      */
-#define MERGE(type, ptr, compare, merge)                                \
-    do {                                                                \
-        libxl_device_##type *p = NULL;                                  \
-        int i, j, num;                                                  \
-                                                                        \
-        p = libxl_device_##type##_list(CTX, domid, &num);               \
-        if (p == NULL) {                                                \
-            LOG(DEBUG,                                                  \
-                "no %s from xenstore for domain %d",                    \
-                #type, domid);                                          \
-        }                                                               \
-                                                                        \
-        for (i = 0; i < d_config->num_##ptr; i++) {                     \
-            libxl_device_##type *q = &d_config->ptr[i];                 \
-            for (j = 0; j < num; j++) {                                 \
-                if (compare(&p[j], q))                                  \
-                    break;                                              \
-            }                                                           \
-                                                                        \
-            if (j < num) {         /* found in xenstore */              \
-                libxl_device_##type *dst, *src;                         \
-                dst = q;                                                \
-                src = &p[j];                                            \
-                merge;                                                  \
-            } else {                /* not found in xenstore */         \
-                LOG(WARN,                                               \
-                "Device present in JSON but not in xenstore, ignored"); \
-                                                                        \
-                libxl_device_##type##_dispose(q);                       \
-                                                                        \
-                for (j = i; j < d_config->num_##ptr - 1; j++)           \
-                    memcpy(&d_config->ptr[j], &d_config->ptr[j+1],      \
-                           sizeof(libxl_device_##type));                \
-                                                                        \
-                d_config->ptr =                                         \
-                    libxl__realloc(NOGC, d_config->ptr,                 \
-                                   sizeof(libxl_device_##type) *        \
-                                   (d_config->num_##ptr - 1));          \
-                                                                        \
-                /* rewind counters */                                   \
-                d_config->num_##ptr--;                                  \
-                i--;                                                    \
-            }                                                           \
-        }                                                               \
-                                                                        \
-        for (i = 0; i < num; i++)                                       \
-            libxl_device_##type##_dispose(&p[i]);                       \
-        free(p);                                                        \
-    } while (0);
+    {
+        const struct libxl_device_type *dt;
+        int idx;
 
-    MERGE(nic, nics, COMPARE_DEVID, {});
+        for (idx = 0;; idx++) {
+            void *p = NULL;
+            void **devs;
+            int i, j, num;
+            int *num_dev;
 
-    MERGE(vtpm, vtpms, COMPARE_DEVID, {});
+            dt = device_type_tbl[idx];
+            if (!dt)
+                break;
 
-    MERGE(pci, pcidevs, COMPARE_PCI, {});
+            if (!dt->list || !dt->compare)
+                continue;
 
-    MERGE(usbctrl, usbctrls, COMPARE_USBCTRL, {});
+            num_dev = libxl__device_type_get_num(dt, d_config);
+            p = dt->list(CTX, domid, &num);
+            if (p == NULL) {
+                LOG(DEBUG, "no %s from xenstore for domain %d",
+                    dt->type, domid);
+            }
+            devs = libxl__device_type_get_ptr(dt, d_config);
 
-    MERGE(usbdev, usbdevs, COMPARE_USB, {});
+            for (i = 0; i < *num_dev; i++) {
+                void *q;
 
-    /* Take care of removable device. We maintain invariant in the
-     * insert / remove operation so that:
-     * 1. if xenstore is "empty" while JSON is not, the result
-     *    is "empty"
-     * 2. if xenstore has a different media than JSON, use the
-     *    one in JSON
-     * 3. if xenstore and JSON have the same media, well, you
-     *    know the answer :-)
-     *
-     * Currently there is only one removable device -- CDROM.
-     * Look for libxl_cdrom_insert for reference.
-     */
-    MERGE(disk, disks, COMPARE_DISK, {
-            if (src->removable) {
-                if (!src->pdev_path || *src->pdev_path == '\0') {
-                    /* 1, no media in drive */
-                    free(dst->pdev_path);
-                    dst->pdev_path = libxl__strdup(NOGC, "");
-                    dst->format = LIBXL_DISK_FORMAT_EMPTY;
-                } else {
-                    /* 2 and 3, use JSON, no need to touch anything */
-                    ;
+                q = libxl__device_type_get_elem(dt, d_config, i);
+                for (j = 0; j < num; j++) {
+                    if (dt->compare(p + dt->dev_elem_size * j, q))
+                        break;
+                }
+
+                if (j < num) {         /* found in xenstore */
+                    if (dt->merge)
+                        dt->merge(ctx, p + dt->dev_elem_size * j, q);
+                } else {                /* not found in xenstore */
+                    LOG(WARN,
+                        "Device present in JSON but not in xenstore, ignored");
+
+                    dt->dispose(q);
+
+                    for (j = i; j < *num_dev - 1; j++)
+                        memcpy(libxl__device_type_get_elem(dt, d_config, j),
+                               libxl__device_type_get_elem(dt, d_config, j+1),
+                               dt->dev_elem_size);
+
+                    /* rewind counters */
+                    (*num_dev)--;
+                    i--;
+
+                    *devs = libxl__realloc(NOGC, *devs,
+                                           dt->dev_elem_size * *num_dev);
                 }
             }
-        });
 
-#undef MERGE
+            for (i = 0; i < num; i++)
+                dt->dispose(p + dt->dev_elem_size * i);
+            free(p);
+        }
+    }
 
 out:
     if (lock) libxl__unlock_domain_userdata(lock);
@@ -7499,6 +7474,56 @@ out:
     return rc;
 }
 
+static int libxl_device_disk_compare(libxl_device_disk *d1,
+                                     libxl_device_disk *d2)
+{
+    return COMPARE_DISK(d1, d2);
+}
+
+/* Take care of removable device. We maintain invariant in the
+ * insert / remove operation so that:
+ * 1. if xenstore is "empty" while JSON is not, the result
+ *    is "empty"
+ * 2. if xenstore has a different media than JSON, use the
+ *    one in JSON
+ * 3. if xenstore and JSON have the same media, well, you
+ *    know the answer :-)
+ *
+ * Currently there is only one removable device -- CDROM.
+ * Look for libxl_cdrom_insert for reference.
+ */
+static void libxl_device_disk_merge(libxl_ctx *ctx, void *d1, void *d2)
+{
+    GC_INIT(ctx);
+    libxl_device_disk *src = d1;
+    libxl_device_disk *dst = d2;
+
+    if (src->removable) {
+        if (!src->pdev_path || *src->pdev_path == '\0') {
+            /* 1, no media in drive */
+            free(dst->pdev_path);
+            dst->pdev_path = libxl__strdup(NOGC, "");
+            dst->format = LIBXL_DISK_FORMAT_EMPTY;
+        } else {
+            /* 2 and 3, use JSON, no need to touch anything */
+            ;
+        }
+    }
+}
+
+static int libxl_device_nic_compare(libxl_device_nic *d1,
+                                    libxl_device_nic *d2)
+{
+    return COMPARE_DEVID(d1, d2);
+}
+
+static int libxl_device_vtpm_compare(libxl_device_vtpm *d1,
+                                     libxl_device_vtpm *d2)
+{
+    return COMPARE_DEVID(d1, d2);
+}
+
+DEFINE_DEVICE_TYPE_STRUCT(disk, .merge = libxl_device_disk_merge);
 DEFINE_DEVICE_TYPE_STRUCT(nic);
 DEFINE_DEVICE_TYPE_STRUCT(vtpm);
 

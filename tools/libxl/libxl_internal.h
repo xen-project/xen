@@ -3441,23 +3441,63 @@ _hidden void libxl__bootloader_run(libxl__egc*, libxl__bootloader_state *st);
 
 struct libxl_device_type {
     char *type;
-    int num_offset;   /* Offset of # of devices in libxl_domain_config */
+    int ptr_offset;    /* Offset of device array ptr in libxl_domain_config */
+    int num_offset;    /* Offset of # of devices in libxl_domain_config */
+    int dev_elem_size; /* Size of one device element in array */
     void (*add)(libxl__egc *, libxl__ao *, uint32_t, libxl_domain_config *,
                 libxl__multidev *);
+    void *(*list)(libxl_ctx *, uint32_t, int *);
+    void (*dispose)(void *);
+    int (*compare)(void *, void *);
+    void (*merge)(libxl_ctx *, void *, void *);
 };
 
-#define DEFINE_DEVICE_TYPE_STRUCT(name)                                 \
-    const struct libxl_device_type libxl__ ## name ## _devtype = {      \
-        .type       = #name,                                            \
-        .num_offset = offsetof(libxl_domain_config, num_ ## name ## s), \
-        .add        = libxl__add_ ## name ## s,                         \
+#define DEFINE_DEVICE_TYPE_STRUCT_X(name, sname, ...)                          \
+    const struct libxl_device_type libxl__ ## name ## _devtype = {             \
+        .type          = #sname,                                               \
+        .ptr_offset    = offsetof(libxl_domain_config, name ## s),             \
+        .num_offset    = offsetof(libxl_domain_config, num_ ## name ## s),     \
+        .dev_elem_size = sizeof(libxl_device_ ## sname),                       \
+        .add           = libxl__add_ ## name ## s,                             \
+        .list          = (void *(*)(libxl_ctx *, uint32_t, int *))             \
+                         libxl_device_ ## sname ## _list,                      \
+        .dispose       = (void (*)(void *))libxl_device_ ## sname ## _dispose, \
+        .compare       = (int (*)(void *, void *))                             \
+                         libxl_device_ ## sname ## _compare,                   \
+        __VA_ARGS__                                                            \
     }
 
+#define DEFINE_DEVICE_TYPE_STRUCT(name, ...)                                   \
+    DEFINE_DEVICE_TYPE_STRUCT_X(name, name, __VA_ARGS__)
+
+static inline void **libxl__device_type_get_ptr(
+    const struct libxl_device_type *dt, const libxl_domain_config *d_config)
+{
+    return (void **)((void *)d_config + dt->ptr_offset);
+}
+
+static inline void *libxl__device_type_get_elem(
+    const struct libxl_device_type *dt, const libxl_domain_config *d_config,
+    int e)
+{
+    return *libxl__device_type_get_ptr(dt, d_config) + dt->dev_elem_size * e;
+}
+
+static inline int *libxl__device_type_get_num(
+    const struct libxl_device_type *dt, const libxl_domain_config *d_config)
+{
+    return (int *)((void *)d_config + dt->num_offset);
+}
+
+extern const struct libxl_device_type libxl__disk_devtype;
 extern const struct libxl_device_type libxl__nic_devtype;
 extern const struct libxl_device_type libxl__vtpm_devtype;
 extern const struct libxl_device_type libxl__usbctrl_devtype;
 extern const struct libxl_device_type libxl__usbdev_devtype;
 extern const struct libxl_device_type libxl__pcidev_devtype;
+
+extern const struct libxl_device_type *device_type_tbl[];
+
 /*----- Domain destruction -----*/
 
 /* Domain destruction has been split into two functions:
