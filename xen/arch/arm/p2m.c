@@ -906,25 +906,26 @@ static void update_reference_mapping(struct page_info *page,
 
 static int apply_p2m_changes(struct domain *d,
                      enum p2m_operation op,
-                     paddr_t start_gpaddr,
-                     paddr_t end_gpaddr,
-                     paddr_t maddr,
+                     gfn_t sgfn,
+                     unsigned long nr,
+                     mfn_t smfn,
                      int mattr,
                      uint32_t mask,
                      p2m_type_t t,
                      p2m_access_t a)
 {
+    paddr_t start_gpaddr = pfn_to_paddr(gfn_x(sgfn));
+    paddr_t end_gpaddr = pfn_to_paddr(gfn_x(sgfn) + nr);
+    paddr_t maddr = pfn_to_paddr(mfn_x(smfn));
     int rc, ret;
     struct p2m_domain *p2m = &d->arch.p2m;
     lpae_t *mappings[4] = { NULL, NULL, NULL, NULL };
     struct page_info *pages[4] = { NULL, NULL, NULL, NULL };
-    paddr_t addr, orig_maddr = maddr;
+    paddr_t addr;
     unsigned int level = 0;
     unsigned int cur_root_table = ~0;
     unsigned int cur_offset[4] = { ~0, ~0, ~0, ~0 };
     unsigned int count = 0;
-    const unsigned long sgfn = paddr_to_pfn(start_gpaddr),
-                        egfn = paddr_to_pfn(end_gpaddr);
     const unsigned int preempt_count_limit = (op == MEMACCESS) ? 1 : 0x2000;
     const bool_t preempt = !is_idle_vcpu(current);
     bool_t flush = false;
@@ -986,9 +987,9 @@ static int apply_p2m_changes(struct domain *d,
                  * Preempt setting mem_access permissions as required by XSA-89,
                  * if it's not the last iteration.
                  */
-                uint32_t progress = paddr_to_pfn(addr) - sgfn + 1;
+                uint32_t progress = paddr_to_pfn(addr) - gfn_x(sgfn) + 1;
 
-                if ( (egfn - sgfn) > progress && !(progress & mask) )
+                if ( nr > progress && !(progress & mask) )
                 {
                     rc = progress;
                     goto out;
@@ -1117,8 +1118,9 @@ static int apply_p2m_changes(struct domain *d,
 
     if ( op == INSERT )
     {
-        p2m->max_mapped_gfn = gfn_max(p2m->max_mapped_gfn, _gfn(egfn));
-        p2m->lowest_mapped_gfn = gfn_min(p2m->lowest_mapped_gfn, _gfn(sgfn));
+        p2m->max_mapped_gfn = gfn_max(p2m->max_mapped_gfn,
+                                      gfn_add(sgfn, nr));
+        p2m->lowest_mapped_gfn = gfn_min(p2m->lowest_mapped_gfn, sgfn);
     }
 
     rc = 0;
@@ -1127,7 +1129,7 @@ out:
     if ( flush )
     {
         flush_tlb_domain(d);
-        ret = iommu_iotlb_flush(d, sgfn, egfn - sgfn);
+        ret = iommu_iotlb_flush(d, gfn_x(sgfn), nr);
         if ( !rc )
             rc = ret;
     }
@@ -1146,12 +1148,14 @@ out:
     if ( rc < 0 && ( op == INSERT ) &&
          addr != start_gpaddr )
     {
+        unsigned long gfn = paddr_to_pfn(addr);
+
         BUG_ON(addr == end_gpaddr);
         /*
          * addr keeps the address of the end of the last successfully-inserted
          * mapping.
          */
-        apply_p2m_changes(d, REMOVE, start_gpaddr, addr, orig_maddr,
+        apply_p2m_changes(d, REMOVE, sgfn, gfn - gfn_x(sgfn), smfn,
                           mattr, 0, p2m_invalid, d->arch.p2m.default_access);
     }
 
@@ -1164,10 +1168,7 @@ static inline int p2m_insert_mapping(struct domain *d,
                                      mfn_t mfn,
                                      int mattr, p2m_type_t t)
 {
-    return apply_p2m_changes(d, INSERT,
-                             pfn_to_paddr(gfn_x(start_gfn)),
-                             pfn_to_paddr(gfn_x(start_gfn) + nr),
-                             pfn_to_paddr(mfn_x(mfn)),
+    return apply_p2m_changes(d, INSERT, start_gfn, nr, mfn,
                              mattr, 0, t, d->arch.p2m.default_access);
 }
 
@@ -1176,10 +1177,7 @@ static inline int p2m_remove_mapping(struct domain *d,
                                      unsigned long nr,
                                      mfn_t mfn)
 {
-    return apply_p2m_changes(d, REMOVE,
-                             pfn_to_paddr(gfn_x(start_gfn)),
-                             pfn_to_paddr(gfn_x(start_gfn) + nr),
-                             pfn_to_paddr(mfn_x(mfn)),
+    return apply_p2m_changes(d, REMOVE, start_gfn, nr, mfn,
                              /* arguments below not used when removing mapping */
                              MATTR_MEM, 0, p2m_invalid,
                              d->arch.p2m.default_access);
@@ -1399,13 +1397,13 @@ err:
 int relinquish_p2m_mapping(struct domain *d)
 {
     struct p2m_domain *p2m = &d->arch.p2m;
+    unsigned long nr;
 
-    return apply_p2m_changes(d, RELINQUISH,
-                              pfn_to_paddr(gfn_x(p2m->lowest_mapped_gfn)),
-                              pfn_to_paddr(gfn_x(p2m->max_mapped_gfn)),
-                              pfn_to_paddr(mfn_x(INVALID_MFN)),
-                              MATTR_MEM, 0, p2m_invalid,
-                              d->arch.p2m.default_access);
+    nr = gfn_x(p2m->max_mapped_gfn) - gfn_x(p2m->lowest_mapped_gfn);
+
+    return apply_p2m_changes(d, RELINQUISH, p2m->lowest_mapped_gfn, nr,
+                             INVALID_MFN, MATTR_MEM, 0, p2m_invalid,
+                             d->arch.p2m.default_access);
 }
 
 int p2m_cache_flush(struct domain *d, gfn_t start, unsigned long nr)
@@ -1416,10 +1414,7 @@ int p2m_cache_flush(struct domain *d, gfn_t start, unsigned long nr)
     start = gfn_max(start, p2m->lowest_mapped_gfn);
     end = gfn_min(end, p2m->max_mapped_gfn);
 
-    return apply_p2m_changes(d, CACHEFLUSH,
-                             pfn_to_paddr(gfn_x(start)),
-                             pfn_to_paddr(gfn_x(end)),
-                             pfn_to_paddr(mfn_x(INVALID_MFN)),
+    return apply_p2m_changes(d, CACHEFLUSH, start, nr, INVALID_MFN,
                              MATTR_MEM, 0, p2m_invalid,
                              d->arch.p2m.default_access);
 }
@@ -1828,10 +1823,9 @@ long p2m_set_mem_access(struct domain *d, gfn_t gfn, uint32_t nr,
         return 0;
     }
 
-    rc = apply_p2m_changes(d, MEMACCESS,
-                           pfn_to_paddr(gfn_x(gfn) + start),
-                           pfn_to_paddr(gfn_x(gfn) + nr),
-                           0, MATTR_MEM, mask, 0, a);
+    rc = apply_p2m_changes(d, MEMACCESS, gfn_add(gfn, start),
+                           (nr - start), INVALID_MFN,
+                           MATTR_MEM, mask, 0, a);
     if ( rc < 0 )
         return rc;
     else if ( rc > 0 )
