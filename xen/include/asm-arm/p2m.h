@@ -141,9 +141,6 @@ mfn_t p2m_lookup(struct domain *d, gfn_t gfn, p2m_type_t *t);
 /* Clean & invalidate caches corresponding to a region of guest address space */
 int p2m_cache_flush(struct domain *d, gfn_t start, unsigned long nr);
 
-/* Setup p2m RAM mapping for domain d from start-end. */
-int p2m_populate_ram(struct domain *d, paddr_t start, paddr_t end);
-
 int map_regions_rw_cache(struct domain *d,
                          unsigned long start_gfn,
                          unsigned long nr_mfns,

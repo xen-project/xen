@@ -547,7 +547,6 @@ static int p2m_mem_access_radix_set(struct p2m_domain *p2m, unsigned long pfn,
 
 enum p2m_operation {
     INSERT,
-    ALLOCATE,
     REMOVE,
     RELINQUISH,
     CACHEFLUSH,
@@ -667,7 +666,6 @@ static int apply_one_level(struct domain *d,
 {
     const paddr_t level_size = level_sizes[level];
     const paddr_t level_mask = level_masks[level];
-    const paddr_t level_shift = level_shifts[level];
 
     struct p2m_domain *p2m = &d->arch.p2m;
     lpae_t pte;
@@ -678,58 +676,6 @@ static int apply_one_level(struct domain *d,
 
     switch ( op )
     {
-    case ALLOCATE:
-        ASSERT(level < 3 || !p2m_valid(orig_pte));
-        ASSERT(*maddr == 0);
-
-        if ( p2m_valid(orig_pte) )
-            return P2M_ONE_DESCEND;
-
-        if ( is_mapping_aligned(*addr, end_gpaddr, 0, level_size) &&
-           /* We only create superpages when mem_access is not in use. */
-             (level == 3 || (level < 3 && !p2m->mem_access_enabled)) )
-        {
-            struct page_info *page;
-
-            page = alloc_domheap_pages(d, level_shift - PAGE_SHIFT, 0);
-            if ( page )
-            {
-                rc = p2m_mem_access_radix_set(p2m, paddr_to_pfn(*addr), a);
-                if ( rc < 0 )
-                {
-                    free_domheap_page(page);
-                    return rc;
-                }
-
-                pte = mfn_to_p2m_entry(page_to_mfn(page), mattr, t, a);
-                if ( level < 3 )
-                    pte.p2m.table = 0;
-                p2m_write_pte(entry, pte, flush_cache);
-                p2m->stats.mappings[level]++;
-
-                *addr += level_size;
-
-                return P2M_ONE_PROGRESS;
-            }
-            else if ( level == 3 )
-                return -ENOMEM;
-        }
-
-        /* L3 is always suitably aligned for mapping (handled, above) */
-        BUG_ON(level == 3);
-
-        /*
-         * If we get here then we failed to allocate a sufficiently
-         * large contiguous region for this level (which can't be
-         * L3) or mem_access is in use. Create a page table and
-         * continue to descend so we try smaller allocations.
-         */
-        rc = p2m_create_table(d, entry, 0, flush_cache);
-        if ( rc < 0 )
-            return rc;
-
-        return P2M_ONE_DESCEND;
-
     case INSERT:
         if ( is_mapping_aligned(*addr, end_gpaddr, *maddr, level_size) &&
            /*
@@ -1169,7 +1115,7 @@ static int apply_p2m_changes(struct domain *d,
         }
     }
 
-    if ( op == ALLOCATE || op == INSERT )
+    if ( op == INSERT )
     {
         p2m->max_mapped_gfn = max(p2m->max_mapped_gfn, egfn);
         p2m->lowest_mapped_gfn = min(p2m->lowest_mapped_gfn, sgfn);
@@ -1197,7 +1143,7 @@ out:
 
     spin_unlock(&p2m->lock);
 
-    if ( rc < 0 && ( op == INSERT || op == ALLOCATE ) &&
+    if ( rc < 0 && ( op == INSERT ) &&
          addr != start_gpaddr )
     {
         BUG_ON(addr == end_gpaddr);
@@ -1210,15 +1156,6 @@ out:
     }
 
     return rc;
-}
-
-int p2m_populate_ram(struct domain *d,
-                     paddr_t start,
-                     paddr_t end)
-{
-    return apply_p2m_changes(d, ALLOCATE, start, end,
-                             0, MATTR_MEM, 0, p2m_ram_rw,
-                             d->arch.p2m.default_access);
 }
 
 int map_regions_rw_cache(struct domain *d,
