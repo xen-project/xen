@@ -58,7 +58,7 @@ int libxl__cpuid_policy_list_parse_json(libxl__gc *gc,
 
 void libxl_cpuid_policy_list_copy(libxl_ctx *ctx,
                                   libxl_cpuid_policy_list *dst,
-                                  libxl_cpuid_policy_list *src)
+                                  const libxl_cpuid_policy_list *src)
 {
 }
 
