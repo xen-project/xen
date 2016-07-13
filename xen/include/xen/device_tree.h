@@ -17,7 +17,6 @@
 #include <xen/init.h>
 #include <xen/string.h>
 #include <xen/types.h>
-#include <xen/stdbool.h>
 #include <xen/list.h>
 
 #define DEVICE_TREE_MAX_DEPTH 16

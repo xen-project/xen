@@ -20,7 +20,6 @@
 
 #include <xen/config.h>
 #include <asm/platform.h>
-#include <xen/stdbool.h>
 #include <xen/vmap.h>
 #include <xen/device_tree.h>
 #include <asm/io.h>

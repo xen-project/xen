@@ -62,10 +62,6 @@ typedef unsigned long size_t;
 #endif
 typedef signed long ssize_t;
 
-typedef char bool_t;
-#define test_and_set_bool(b)   xchg(&(b), 1)
-#define test_and_clear_bool(b) xchg(&(b), 0)
-
 #endif /* __ASSEMBLY__ */
 
 #endif /* __ARM_TYPES_H__ */

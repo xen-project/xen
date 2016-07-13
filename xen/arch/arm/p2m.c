@@ -1,7 +1,6 @@
 #include <xen/config.h>
 #include <xen/sched.h>
 #include <xen/lib.h>
-#include <xen/stdbool.h>
 #include <xen/errno.h>
 #include <xen/domain_page.h>
 #include <xen/bitops.h>

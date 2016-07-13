@@ -56,7 +56,8 @@ custom_param("apic", genapic_apic_force);
 
 void __init generic_apic_probe(void) 
 { 
-	int i, changed;
+	bool changed;
+	int i;
 
 	record_boot_APIC_mode();
 

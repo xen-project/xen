@@ -1,6 +1,8 @@
 #ifndef __TYPES_H__
 #define __TYPES_H__
 
+#include <xen/stdbool.h>
+
 #include <asm/types.h>
 
 #define BITS_TO_LONGS(bits) \
@@ -58,5 +60,9 @@ typedef __u64 __le64;
 typedef __u64 __be64;
 
 typedef unsigned long uintptr_t;
+
+typedef _Bool bool_t;
+#define test_and_set_bool(b)   xchg(&(b), true)
+#define test_and_clear_bool(b) xchg(&(b), false)
 
 #endif /* __TYPES_H__ */

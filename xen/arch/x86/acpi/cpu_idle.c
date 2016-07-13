@@ -480,7 +480,7 @@ void trace_exit_reason(u32 *irq_traced)
  */
 bool_t errata_c6_eoi_workaround(void)
 {
-    static bool_t fix_needed = -1;
+    static int8_t fix_needed = -1;
 
     if ( unlikely(fix_needed == -1) )
     {

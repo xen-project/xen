@@ -17,7 +17,6 @@
  */
 
 #include <xen/config.h>
-#include <xen/stdbool.h>
 #include <xen/init.h>
 #include <xen/string.h>
 #include <xen/version.h>
