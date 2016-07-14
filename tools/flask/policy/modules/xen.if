@@ -83,7 +83,8 @@ define(`create_domain_build_label', `
 define(`manage_domain', `
 	allow $1 $2:domain { getdomaininfo getvcpuinfo getaffinity
 			getaddrsize pause unpause trigger shutdown destroy
-			setaffinity setdomainmaxmem getscheduler resume };
+			setaffinity setdomainmaxmem getscheduler resume
+			setpodtarget getpodtarget };
     allow $1 $2:domain2 set_vnumainfo;
 ')
 
