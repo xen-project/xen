@@ -1353,7 +1353,7 @@ static int security_preserve_bools(struct policydb *p);
  * This function will flush the access vector cache after
  * loading the new policy.
  */
-int security_load_policy(void *data, size_t len)
+int security_load_policy(const void *data, size_t len)
 {
     struct policydb oldpolicydb, newpolicydb;
     struct sidtab oldsidtab, newsidtab;

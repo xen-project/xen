@@ -1815,7 +1815,7 @@ static struct xsm_operations flask_ops = {
     .xen_version = flask_xen_version,
 };
 
-__init void flask_init(void)
+void __init flask_init(const void *policy_buffer, size_t policy_size)
 {
     int ret = -ENOENT;
 

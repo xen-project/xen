@@ -36,7 +36,7 @@ static inline int verify(struct xsm_operations *ops)
     return 0;
 }
 
-static int __init xsm_core_init(void)
+static int __init xsm_core_init(const void *policy_buffer, size_t policy_size)
 {
     if ( verify(&dummy_xsm_ops) )
     {
@@ -46,7 +46,7 @@ static int __init xsm_core_init(void)
     }
 
     xsm_ops = &dummy_xsm_ops;
-    flask_init();
+    flask_init(policy_buffer, policy_size);
 
     return 0;
 }
@@ -57,12 +57,15 @@ int __init xsm_multiboot_init(unsigned long *module_map,
                               void *(*bootstrap_map)(const module_t *))
 {
     int ret = 0;
+    void *policy_buffer = NULL;
+    size_t policy_size = 0;
 
     printk("XSM Framework v" XSM_FRAMEWORK_VERSION " initialized\n");
 
     if ( XSM_MAGIC )
     {
-        ret = xsm_multiboot_policy_init(module_map, mbi, bootstrap_map);
+        ret = xsm_multiboot_policy_init(module_map, mbi, bootstrap_map,
+                                        &policy_buffer, &policy_size);
         if ( ret )
         {
             bootstrap_map(NULL);
@@ -71,7 +74,7 @@ int __init xsm_multiboot_init(unsigned long *module_map,
         }
     }
 
-    ret = xsm_core_init();
+    ret = xsm_core_init(policy_buffer, policy_size);
     bootstrap_map(NULL);
 
     return 0;
@@ -82,12 +85,14 @@ int __init xsm_multiboot_init(unsigned long *module_map,
 int __init xsm_dt_init(void)
 {
     int ret = 0;
+    void *policy_buffer = NULL;
+    size_t policy_size = 0;
 
     printk("XSM Framework v" XSM_FRAMEWORK_VERSION " initialized\n");
 
     if ( XSM_MAGIC )
     {
-        ret = xsm_dt_policy_init();
+        ret = xsm_dt_policy_init(&policy_buffer, &policy_size);
         if ( ret )
         {
             printk("%s: Error initializing policy (rc = %d).\n",
@@ -96,7 +101,7 @@ int __init xsm_dt_init(void)
         }
     }
 
-    ret = xsm_core_init();
+    ret = xsm_core_init(policy_buffer, policy_size);
 
     xfree(policy_buffer);
 

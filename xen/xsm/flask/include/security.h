@@ -52,7 +52,7 @@ enum flask_bootparam_t {
 extern enum flask_bootparam_t flask_bootparam;
 extern int flask_mls_enabled;
 
-int security_load_policy(void * data, size_t len);
+int security_load_policy(const void *data, size_t len);
 
 struct av_decision {
     u32 allowed;

@@ -277,7 +277,7 @@ extern int policydb_read(struct policydb *p, void *fp);
 #define TARGET_XEN_OLD 0
 
 struct policy_file {
-    char *data;
+    const char *data;
     size_t len;
 };
 
