@@ -269,10 +269,16 @@ Building the python tools may fail unless certain options are passed to
 setup.py. Config.mk contains additional info how to use this variable.
 PYTHON_PREFIX_ARG=
 
-The hypervisor may be build with XSM/Flask support, which can be changed
+The hypervisor may be built with XSM/Flask support, which can be changed
 by running:
 make -C xen menuconfig
-and enabling XSM/Flask in the 'Common Features' menu.
+and enabling XSM/Flask in the 'Common Features' menu.  A security policy
+is required to use XSM/Flask; if the SELinux policy compiler is
+available, the policy from tools can be included in the hypervisor.
+This option is enabled by default if XSM is enabled and the compiler
+(checkpolicy) is found.  The location of this executable can be set
+using the environment variable.
+CHECKPOLICY=
 
 Do a build for coverage.
 coverage=y

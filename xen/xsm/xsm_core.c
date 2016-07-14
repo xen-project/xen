@@ -38,6 +38,14 @@ static inline int verify(struct xsm_operations *ops)
 
 static int __init xsm_core_init(const void *policy_buffer, size_t policy_size)
 {
+#ifdef CONFIG_XSM_POLICY
+    if ( policy_size == 0 )
+    {
+        policy_buffer = xsm_init_policy;
+        policy_size = xsm_init_policy_size;
+    }
+#endif
+
     if ( verify(&dummy_xsm_ops) )
     {
         printk("%s could not verify "
