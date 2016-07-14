@@ -1274,6 +1274,14 @@ static int gicv3_iomem_deny_access(const struct domain *d)
 }
 
 #ifdef CONFIG_ACPI
+static void __init gic_acpi_add_rdist_region(paddr_t base, paddr_t size)
+{
+    unsigned int idx = gicv3.rdist_count++;
+
+    gicv3.rdist_regions[idx].base = base;
+    gicv3.rdist_regions[idx].size = size;
+}
+
 static int gicv3_make_hwdom_madt(const struct domain *d, u32 offset)
 {
     struct acpi_subtable_header *header;
@@ -1379,6 +1387,22 @@ gic_acpi_parse_madt_distributor(struct acpi_subtable_header *header,
 
     return 0;
 }
+
+static int __init
+gic_acpi_parse_madt_redistributor(struct acpi_subtable_header *header,
+                                  const unsigned long end)
+{
+    struct acpi_madt_generic_redistributor *rdist;
+
+    rdist = (struct acpi_madt_generic_redistributor *)header;
+    if ( BAD_MADT_ENTRY(rdist, end) )
+        return -EINVAL;
+
+    gic_acpi_add_rdist_region(rdist->base_address, rdist->length);
+
+    return 0;
+}
+
 static int __init
 gic_acpi_get_madt_redistributor_num(struct acpi_subtable_header *header,
                                     const unsigned long end)
@@ -1392,7 +1416,7 @@ gic_acpi_get_madt_redistributor_num(struct acpi_subtable_header *header,
 static void __init gicv3_acpi_init(void)
 {
     struct rdist_region *rdist_regs;
-    int count, i;
+    int count;
 
     /*
      * Find distributor base address. We expect one distributor entry since
@@ -1411,33 +1435,21 @@ static void __init gicv3_acpi_init(void)
     if ( count <= 0 )
         panic("GICv3: No valid GICR entries exists");
 
-    gicv3.rdist_count = count;
-
-    if ( gicv3.rdist_count > MAX_RDIST_COUNT )
+    if ( count > MAX_RDIST_COUNT )
         panic("GICv3: Number of redistributor regions is more than"
               "%d (Increase MAX_RDIST_COUNT!!)\n", MAX_RDIST_COUNT);
 
-    rdist_regs = xzalloc_array(struct rdist_region, gicv3.rdist_count);
+    rdist_regs = xzalloc_array(struct rdist_region, count);
     if ( !rdist_regs )
         panic("GICv3: Failed to allocate memory for rdist regions\n");
 
-    for ( i = 0; i < gicv3.rdist_count; i++ )
-    {
-        struct acpi_subtable_header *header;
-        struct acpi_madt_generic_redistributor *gic_rdist;
+    gicv3.rdist_regions = rdist_regs;
 
-        header = acpi_table_get_entry_madt(ACPI_MADT_TYPE_GENERIC_REDISTRIBUTOR,
-                                           i);
-        if ( !header )
-            panic("GICv3: Can't get GICR entry");
-
-        gic_rdist =
-           container_of(header, struct acpi_madt_generic_redistributor, header);
-        rdist_regs[i].base = gic_rdist->base_address;
-        rdist_regs[i].size = gic_rdist->length;
-    }
-
-    gicv3.rdist_regions= rdist_regs;
+    /* Parse always-on power domain Re-distributor entries */
+    count = acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_REDISTRIBUTOR,
+                                  gic_acpi_parse_madt_redistributor, count);
+    if ( count <= 0 )
+        panic("GICv3: Can't get Redistributor entry");
 
     /* Collect CPU base addresses */
     count = acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_INTERRUPT,
