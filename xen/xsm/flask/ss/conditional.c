@@ -40,7 +40,7 @@ static int cond_evaluate_expr(struct policydb *p, struct cond_expr *expr)
                 if ( sp == (COND_EXPR_MAXDEPTH - 1) )
                     return -1;
                 sp++;
-                s[sp] = p->bool_val_to_struct[cur->bool - 1]->state;
+                s[sp] = p->bool_val_to_struct[cur->bool_val - 1]->state;
             break;
             case COND_NOT:
                 if ( sp < 0 )
@@ -404,7 +404,7 @@ static int expr_isvalid(struct policydb *p, struct cond_expr *expr)
         return 0;
     }
 
-    if ( expr->bool > p->p_bools.nprim )
+    if ( expr->bool_val > p->p_bools.nprim )
     {
         printk("Flask: conditional expressions uses unknown bool.\n");
         return 0;
@@ -444,7 +444,7 @@ static int cond_read_node(struct policydb *p, struct cond_node *node, void *fp)
             goto err;
 
         expr->expr_type = le32_to_cpu(buf[0]);
-        expr->bool = le32_to_cpu(buf[1]);
+        expr->bool_val = le32_to_cpu(buf[1]);
 
         if ( !expr_isvalid(p, expr) )
         {
