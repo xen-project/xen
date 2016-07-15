@@ -638,6 +638,7 @@ __update_runq_load(const struct scheduler *ops,
 
     ASSERT(rqd->avgload <= STIME_MAX && rqd->b_avgload <= STIME_MAX);
 
+    if ( unlikely(tb_init_done) )
     {
         struct {
             uint64_t rq_avgload, b_avgload;
@@ -648,9 +649,9 @@ __update_runq_load(const struct scheduler *ops,
         d.rq_avgload = rqd->avgload;
         d.b_avgload = rqd->b_avgload;
         d.shift = P;
-        trace_var(TRC_CSCHED2_UPDATE_RUNQ_LOAD, 1,
-                  sizeof(d),
-                  (unsigned char *)&d);
+        __trace_var(TRC_CSCHED2_UPDATE_RUNQ_LOAD, 1,
+                    sizeof(d),
+                    (unsigned char *)&d);
     }
 }
 
@@ -693,6 +694,7 @@ __update_svc_load(const struct scheduler *ops,
     }
     svc->load_last_update = now;
 
+    if ( unlikely(tb_init_done) )
     {
         struct {
             uint64_t v_avgload;
@@ -703,9 +705,9 @@ __update_svc_load(const struct scheduler *ops,
         d.vcpu = svc->vcpu->vcpu_id;
         d.v_avgload = svc->avgload;
         d.shift = P;
-        trace_var(TRC_CSCHED2_UPDATE_VCPU_LOAD, 1,
-                  sizeof(d),
-                  (unsigned char *)&d);
+        __trace_var(TRC_CSCHED2_UPDATE_VCPU_LOAD, 1,
+                    sizeof(d),
+                    (unsigned char *)&d);
     }
 }
 
@@ -761,6 +763,7 @@ runq_insert(const struct scheduler *ops, struct csched2_vcpu *svc)
 
     pos = __runq_insert(runq, svc);
 
+    if ( unlikely(tb_init_done) )
     {
         struct {
             unsigned vcpu:16, dom:16;
@@ -769,9 +772,9 @@ runq_insert(const struct scheduler *ops, struct csched2_vcpu *svc)
         d.dom = svc->vcpu->domain->domain_id;
         d.vcpu = svc->vcpu->vcpu_id;
         d.pos = pos;
-        trace_var(TRC_CSCHED2_RUNQ_POS, 1,
-                  sizeof(d),
-                  (unsigned char *)&d);
+        __trace_var(TRC_CSCHED2_RUNQ_POS, 1,
+                    sizeof(d),
+                    (unsigned char *)&d);
     }
 
     return;
@@ -814,7 +817,7 @@ runq_tickle(const struct scheduler *ops, struct csched2_vcpu *new, s_time_t now)
 
     ASSERT(new->rqd == rqd);
 
-    /* TRACE */
+    if ( unlikely(tb_init_done) )
     {
         struct {
             unsigned vcpu:16, dom:16;
@@ -824,9 +827,9 @@ runq_tickle(const struct scheduler *ops, struct csched2_vcpu *new, s_time_t now)
         d.vcpu = new->vcpu->vcpu_id;
         d.processor = new->vcpu->processor;
         d.credit = new->credit;
-        trace_var(TRC_CSCHED2_TICKLE_NEW, 1,
-                  sizeof(d),
-                  (unsigned char *)&d);
+        __trace_var(TRC_CSCHED2_TICKLE_NEW, 1,
+                    sizeof(d),
+                    (unsigned char *)&d);
     }
 
     /*
@@ -884,7 +887,8 @@ runq_tickle(const struct scheduler *ops, struct csched2_vcpu *new, s_time_t now)
             lowest = cur->credit;
         }
 
-        /* TRACE */ {
+        if ( unlikely(tb_init_done) )
+        {
             struct {
                 unsigned vcpu:16, dom:16;
                 unsigned credit;
@@ -892,9 +896,9 @@ runq_tickle(const struct scheduler *ops, struct csched2_vcpu *new, s_time_t now)
             d.dom = cur->vcpu->domain->domain_id;
             d.vcpu = cur->vcpu->vcpu_id;
             d.credit = cur->credit;
-            trace_var(TRC_CSCHED2_TICKLE_CHECK, 1,
-                      sizeof(d),
-                      (unsigned char *)&d);
+            __trace_var(TRC_CSCHED2_TICKLE_CHECK, 1,
+                        sizeof(d),
+                        (unsigned char *)&d);
         }
     }
 
@@ -912,14 +916,15 @@ runq_tickle(const struct scheduler *ops, struct csched2_vcpu *new, s_time_t now)
  tickle:
     BUG_ON(ipid == -1);
 
-    /* TRACE */ {
+    if ( unlikely(tb_init_done) )
+    {
         struct {
             unsigned cpu:16, pad:16;
         } d;
         d.cpu = ipid; d.pad = 0;
-        trace_var(TRC_CSCHED2_TICKLE, 1,
-                  sizeof(d),
-                  (unsigned char *)&d);
+        __trace_var(TRC_CSCHED2_TICKLE, 1,
+                    sizeof(d),
+                    (unsigned char *)&d);
     }
     __cpumask_set_cpu(ipid, &rqd->tickled);
     cpu_raise_softirq(ipid, SCHEDULE_SOFTIRQ);
@@ -981,7 +986,8 @@ static void reset_credit(const struct scheduler *ops, int cpu, s_time_t now,
 
         svc->start_time = now;
 
-        /* TRACE */ {
+        if ( unlikely(tb_init_done) )
+        {
             struct {
                 unsigned vcpu:16, dom:16;
                 unsigned credit_start, credit_end;
@@ -992,9 +998,9 @@ static void reset_credit(const struct scheduler *ops, int cpu, s_time_t now,
             d.credit_start = start_credit;
             d.credit_end = svc->credit;
             d.multiplier = m;
-            trace_var(TRC_CSCHED2_CREDIT_RESET, 1,
-                      sizeof(d),
-                      (unsigned char *)&d);
+            __trace_var(TRC_CSCHED2_CREDIT_RESET, 1,
+                        sizeof(d),
+                        (unsigned char *)&d);
         }
     }
 
@@ -1030,7 +1036,7 @@ void burn_credits(struct csched2_runqueue_data *rqd,
                  __func__, now, svc->start_time);
     }
 
-    /* TRACE */
+    if ( unlikely(tb_init_done) )
     {
         struct {
             unsigned vcpu:16, dom:16;
@@ -1041,9 +1047,9 @@ void burn_credits(struct csched2_runqueue_data *rqd,
         d.vcpu = svc->vcpu->vcpu_id;
         d.credit = svc->credit;
         d.delta = delta;
-        trace_var(TRC_CSCHED2_CREDIT_BURN, 1,
-                  sizeof(d),
-                  (unsigned char *)&d);
+        __trace_var(TRC_CSCHED2_CREDIT_BURN, 1,
+                    sizeof(d),
+                    (unsigned char *)&d);
     }
 }
 
@@ -1079,16 +1085,16 @@ static void update_max_weight(struct csched2_runqueue_data *rqd, int new_weight,
         SCHED_STAT_CRANK(upd_max_weight_full);
     }
 
-    /* TRACE */
+    if ( unlikely(tb_init_done) )
     {
         struct {
             unsigned rqi:16, max_weight:16;
         } d;
         d.rqi = rqd->id;
         d.max_weight = rqd->max_weight;
-        trace_var(TRC_CSCHED2_RUNQ_MAX_WEIGHT, 1,
-                  sizeof(d),
-                  (unsigned char *)&d);
+        __trace_var(TRC_CSCHED2_RUNQ_MAX_WEIGHT, 1,
+                    sizeof(d),
+                    (unsigned char *)&d);
     }
 }
 
@@ -1168,7 +1174,7 @@ __runq_assign(struct csched2_vcpu *svc, struct csched2_runqueue_data *rqd)
     /* Expected new load based on adding this vcpu */
     rqd->b_avgload += svc->avgload;
 
-    /* TRACE */
+    if ( unlikely(tb_init_done) )
     {
         struct {
             unsigned vcpu:16, dom:16;
@@ -1177,9 +1183,9 @@ __runq_assign(struct csched2_vcpu *svc, struct csched2_runqueue_data *rqd)
         d.dom = svc->vcpu->domain->domain_id;
         d.vcpu = svc->vcpu->vcpu_id;
         d.rqi=rqd->id;
-        trace_var(TRC_CSCHED2_RUNQ_ASSIGN, 1,
-                  sizeof(d),
-                  (unsigned char *)&d);
+        __trace_var(TRC_CSCHED2_RUNQ_ASSIGN, 1,
+                    sizeof(d),
+                    (unsigned char *)&d);
     }
 
 }
@@ -1491,7 +1497,7 @@ csched2_cpu_pick(const struct scheduler *ops, struct vcpu *vc)
 out_up:
     spin_unlock(&prv->lock);
 
-    /* TRACE */
+    if ( unlikely(tb_init_done) )
     {
         struct {
             uint64_t b_avgload;
@@ -1503,9 +1509,9 @@ out_up:
         d.vcpu = vc->vcpu_id;
         d.rq_id = c2r(ops, new_cpu);
         d.new_cpu = new_cpu;
-        trace_var(TRC_CSCHED2_PICKED_CPU, 1,
-                  sizeof(d),
-                  (unsigned char *)&d);
+        __trace_var(TRC_CSCHED2_PICKED_CPU, 1,
+                    sizeof(d),
+                    (unsigned char *)&d);
     }
 
     return new_cpu;
@@ -1560,7 +1566,7 @@ static void migrate(const struct scheduler *ops,
                     struct csched2_runqueue_data *trqd, 
                     s_time_t now)
 {
-    /* TRACE */
+    if ( unlikely(tb_init_done) )
     {
         struct {
             unsigned vcpu:16, dom:16;
@@ -1570,9 +1576,9 @@ static void migrate(const struct scheduler *ops,
         d.vcpu = svc->vcpu->vcpu_id;
         d.rqi = svc->rqd->id;
         d.trqi = trqd->id;
-        trace_var(TRC_CSCHED2_MIGRATE, 1,
-                  sizeof(d),
-                  (unsigned char *)&d);
+        __trace_var(TRC_CSCHED2_MIGRATE, 1,
+                    sizeof(d),
+                    (unsigned char *)&d);
     }
 
     if ( svc->flags & CSFLAG_scheduled )
@@ -1698,7 +1704,7 @@ retry:
         if ( i > cpus_max )
             cpus_max = i;
 
-        /* TRACE */
+        if ( unlikely(tb_init_done) )
         {
             struct {
                 unsigned lrq_id:16, orq_id:16;
@@ -1707,9 +1713,9 @@ retry:
             d.lrq_id = st.lrqd->id;
             d.orq_id = st.orqd->id;
             d.load_delta = st.load_delta;
-            trace_var(TRC_CSCHED2_LOAD_CHECK, 1,
-                      sizeof(d),
-                      (unsigned char *)&d);
+            __trace_var(TRC_CSCHED2_LOAD_CHECK, 1,
+                        sizeof(d),
+                        (unsigned char *)&d);
         }
 
         /*
@@ -1740,7 +1746,7 @@ retry:
     if ( unlikely(st.orqd->id < 0) )
         goto out_up;
 
-    /* TRACE */
+    if ( unlikely(tb_init_done) )
     {
         struct {
             uint64_t lb_avgload, ob_avgload;
@@ -1750,9 +1756,9 @@ retry:
         d.lb_avgload = st.lrqd->b_avgload;
         d.orq_id = st.orqd->id;
         d.ob_avgload = st.orqd->b_avgload;
-        trace_var(TRC_CSCHED2_LOAD_BALANCE, 1,
-                  sizeof(d),
-                  (unsigned char *)&d);
+        __trace_var(TRC_CSCHED2_LOAD_BALANCE, 1,
+                    sizeof(d),
+                    (unsigned char *)&d);
     }
 
     /* Look for "swap" which gives the best load average
