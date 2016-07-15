@@ -374,8 +374,7 @@ static void vlapic_accept_irq(struct vcpu *v, uint32_t icr_low)
 
     case APIC_DM_INIT:
     case APIC_DM_STARTUP:
-        /* Handled in vlapic_ipi(). */
-        BUG();
+        BUG(); /* Handled in vlapic_ipi(). */
 
     default:
         gdprintk(XENLOG_ERR, "TODO: unsupported delivery mode in ICR %x\n",
