@@ -23,6 +23,10 @@ atomics: last sync @ v3.16-rc6 (last commit: 8715466b6027)
 
 linux/arch/arm64/include/asm/atomic.h   xen/include/asm-arm/arm64/atomic.h
 
+The following functions were taken from Linux:
+    atomic_add(), atomic_add_return(), atomic_sub(), atomic_sub_return(),
+    atomic_cmpxchg(), __atomic_add_unless()
+
 ---------------------------------------------------------------------
 
 mem*: last sync @ v3.16-rc6 (last commit: d875c9b37240)
@@ -90,6 +94,10 @@ linux/arch/arm/include/asm/cmpxchg.h    xen/include/asm-arm/arm32/cmpxchg.h
 atomics: last sync @ v3.16-rc6 (last commit: 030d0178bdbd)
 
 linux/arch/arm/include/asm/atomic.h     xen/include/asm-arm/arm32/atomic.h
+
+The following functions were taken from Linux:
+    atomic_add(), atomic_add_return(), atomic_sub(), atomic_sub_return(),
+    atomic_cmpxchg(), __atomic_add_unless()
 
 ---------------------------------------------------------------------
 
