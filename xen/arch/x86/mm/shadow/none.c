@@ -42,7 +42,7 @@ static unsigned long _gva_to_gfn(struct vcpu *v, struct p2m_domain *p2m,
                                  unsigned long va, uint32_t *pfec)
 {
     ASSERT_UNREACHABLE();
-    return INVALID_GFN;
+    return gfn_x(INVALID_GFN);
 }
 
 static void _update_cr3(struct vcpu *v, int do_locking)
