@@ -4658,6 +4658,12 @@ int libxl_device_events_handler(libxl_ctx *ctx,
     uint32_t domid;
     libxl__ddomain ddomain;
     char *be_path;
+    char **kinds = NULL, **domains = NULL, **devs = NULL;
+    const char *sstate;
+    char *state_path;
+    int state;
+    unsigned int nkinds, ndomains, ndevs;
+    int i, j, k;
 
     ddomain.ao = ao;
     LIBXL_SLIST_INIT(&ddomain.guests);
@@ -4676,6 +4682,33 @@ int libxl_device_events_handler(libxl_ctx *ctx,
     rc = libxl__ev_xswatch_register(gc, &ddomain.watch, backend_watch_callback,
                                     be_path);
     if (rc) goto out;
+
+    kinds = libxl__xs_directory(gc, XBT_NULL, be_path, &nkinds);
+    if (kinds) {
+        for (i = 0; i < nkinds; i++) {
+            domains = libxl__xs_directory(gc, XBT_NULL,
+                    GCSPRINTF("%s/%s", be_path, kinds[i]), &ndomains);
+            if (!domains)
+                continue;
+            for (j = 0; j < ndomains; j++) {
+                devs = libxl__xs_directory(gc, XBT_NULL,
+                        GCSPRINTF("%s/%s/%s", be_path, kinds[i], domains[j]), &ndevs);
+                if (!devs)
+                    continue;
+                for (k = 0; k < ndevs; k++) {
+                    state_path = GCSPRINTF("%s/%s/%s/%s/state",
+                            be_path, kinds[i], domains[j], devs[k]);
+                    rc = libxl__xs_read_checked(gc, XBT_NULL, state_path, &sstate);
+                    if (rc || !sstate)
+                        continue;
+                    state = atoi(sstate);
+                    if (state == XenbusStateInitWait)
+                        backend_watch_callback(egc, &ddomain.watch,
+                                               be_path, state_path);
+                }
+            }
+        }
+    }
 
     return AO_INPROGRESS;
 
