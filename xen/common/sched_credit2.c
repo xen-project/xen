@@ -2055,9 +2055,16 @@ csched2_vcpu_insert(const struct scheduler *ops, struct vcpu *vc)
     ASSERT(!is_idle_vcpu(vc));
     ASSERT(list_empty(&svc->runq_elem));
 
-    /* Add vcpu to runqueue of initial processor */
+    /* csched2_cpu_pick() expects the pcpu lock to be held */
     lock = vcpu_schedule_lock_irq(vc);
 
+    vc->processor = csched2_cpu_pick(ops, vc);
+
+    spin_unlock_irq(lock);
+
+    lock = vcpu_schedule_lock_irq(vc);
+
+    /* Add vcpu to runqueue of initial processor */
     runq_assign(ops, vc);
 
     vcpu_schedule_unlock_irq(lock, vc);

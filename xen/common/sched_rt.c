@@ -874,6 +874,9 @@ rt_vcpu_insert(const struct scheduler *ops, struct vcpu *vc)
 
     BUG_ON( is_idle_vcpu(vc) );
 
+    /* This is safe because vc isn't yet being scheduled */
+    vc->processor = rt_cpu_pick(ops, vc);
+
     lock = vcpu_schedule_lock_irq(vc);
 
     now = NOW();
