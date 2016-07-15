@@ -456,7 +456,7 @@ ENTRY(compat_hypercall_table)
         .quad compat_update_va_mapping_otherdomain
         .quad compat_iret
         .quad compat_vcpu_op
-        .quad compat_ni_hypercall       /* 25 */
+        .quad do_set_segment_base       /* 25 */
         .quad compat_mmuext_op
         .quad compat_xsm_op
         .quad compat_nmi_op

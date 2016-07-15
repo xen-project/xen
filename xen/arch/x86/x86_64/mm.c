@@ -1031,6 +1031,9 @@ long do_set_segment_base(unsigned int which, unsigned long base)
     struct vcpu *v = current;
     long ret = 0;
 
+    if ( is_pv_32bit_vcpu(v) )
+        return -ENOSYS; /* x86/64 only. */
+
     switch ( which )
     {
     case SEGBASE_FS:
