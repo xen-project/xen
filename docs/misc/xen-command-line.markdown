@@ -485,8 +485,38 @@ the address range the area should fall into.
 ### credit2\_balance\_under
 > `= <integer>`
 
+### credit2\_load\_precision\_shift
+> `= <integer>`
+
+> Default: `18`
+
+Specify the number of bits to use for the fractional part of the
+values involved in Credit2 load tracking and load balancing math.
+
 ### credit2\_load\_window\_shift
 > `= <integer>`
+
+> Default: `30`
+
+Specify the number of bits to use to represent the length of the
+window (in nanoseconds) we use for load tracking inside Credit2.
+This means that, with the default value (30), we use
+2^30 nsec ~= 1 sec long window.
+
+Load tracking is done by means of a variation of exponentially
+weighted moving average (EWMA). The window length defined here
+is what tells for how long we give value to previous history
+of the load itself. In fact, after a full window has passed,
+what happens is that we discard all previous history entirely.
+
+A short window will make the load balancer quick at reacting
+to load changes, but also short-sighted about previous history
+(and hence, e.g., long term load trends). A long window will
+make the load balancer thoughtful of previous history (and
+hence capable of capturing, e.g., long term load trends), but
+also slow in responding to load changes.
+
+The default value of `1 sec` is rather long.
 
 ### credit2\_runqueue
 > `= core | socket | node | all`

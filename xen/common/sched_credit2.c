@@ -173,16 +173,86 @@ integer_param("sched_credit2_migrate_resist", opt_migrate_resist);
 #define RQD(_ops, _cpu)     (&CSCHED2_PRIV(_ops)->rqd[c2r(_ops, _cpu)])
 
 /*
- * Shifts for load average.
- * - granularity: Reduce granularity of time by a factor of 1000, so we can use 32-bit maths
- * - window shift: Given granularity shift, make the window about 1 second
- * - scale shift: Shift up load by this amount rather than using fractions; 128 corresponds 
- *   to a load of 1.
+ * Load tracking and load balancing
+ *
+ * Load history of runqueues and vcpus is accounted for by using an
+ * exponential weighted moving average algorithm. However, instead of using
+ * fractions,we shift everything to left by the number of bits we want to
+ * use for representing the fractional part (Q-format).
+ *
+ * We may also want to reduce the precision of time accounting, to
+ * accommodate 'longer  windows'. So, if that is the case, we just need to
+ * shift all time samples to the right.
+ *
+ * The details of the formulas used for load tracking are explained close to
+ * __update_runq_load(). Let's just say here that, with full nanosecond time
+ * granularity, a 30 bits wide 'decaying window' is ~1 second long.
+ *
+ * We want to consider the following equations:
+ *
+ *  avg[0] = load*P
+ *  avg[i+1] = avg[i] + delta*load*P/W - delta*avg[i]/W,  0 <= delta <= W
+ *
+ * where W is the lenght of the window, P the multiplier for transitiong into
+ * Q-format fixed point arithmetic and load is the instantaneous load of a
+ * runqueue, which basically is the number of runnable vcpus there are on the
+ * runqueue (for the meaning of the other terms, look at the doc comment to
+ *  __update_runq_load()).
+ *
+ *  So, again, with full nanosecond granularity, and 1 second window, we have:
+ *
+ *  W = 2^30
+ *  P = 2^18
+ *
+ * The maximum possible value for the average load, which we want to store in
+ * s_time_t type variables (i.e., we have 63 bits available) is load*P. This
+ * means that, with P 18 bits wide, load can occupy 45 bits. This in turn
+ * means we can have 2^45 vcpus in each runqueue, before overflow occurs!
+ *
+ * However, it can happen that, at step j+1, if:
+ *
+ *  avg[j] = load*P
+ *  delta = W
+ *
+ * then:
+ *
+ *  avg[j+i] = avg[j] + W*load*P/W - W*load*P/W
+ *
+ * So we must be able to deal with W*load*P. This means load can't be higher
+ * than:
+ *
+ *  2^(63 - 30 - 18) = 2^15 = 32768
+ *
+ * So 32768 is the maximum number of vcpus the we can have in a runqueue,
+ * at any given time, and still not have problems with the load tracking
+ * calculations... and this is more than fine.
+ *
+ * As a matter of fact, since we are using microseconds granularity, we have
+ * W=2^20. So, still with 18 fractional bits and a 1 second long window, there
+ * may be 2^25 = 33554432 vcpus in a runq before we have to start thinking
+ * about overflow.
  */
-#define LOADAVG_GRANULARITY_SHIFT (10)
-static unsigned int __read_mostly opt_load_window_shift = 18;
-#define  LOADAVG_WINDOW_SHIFT_MIN 4
+
+/* If >0, decreases the granularity of time samples used for load tracking. */
+#define LOADAVG_GRANULARITY_SHIFT   (10)
+/* Time window during which we still give value to previous load history. */
+#define LOADAVG_WINDOW_SHIFT        (30)
+/* 18 bits by default (and not less than 4) for decimals. */
+#define LOADAVG_PRECISION_SHIFT     (18)
+#define LOADAVG_PRECISION_SHIFT_MIN (4)
+
+/*
+ * Both the lenght of the window and the number of fractional bits can be
+ * decided with boot parameters.
+ *
+ * The length of the window is always expressed in nanoseconds. The actual
+ * value used by default is LOADAVG_WINDOW_SHIFT - LOADAVG_GRANULARITY_SHIFT.
+ */
+static unsigned int __read_mostly opt_load_window_shift = LOADAVG_WINDOW_SHIFT;
 integer_param("credit2_load_window_shift", opt_load_window_shift);
+static unsigned int __read_mostly opt_load_precision_shift = LOADAVG_PRECISION_SHIFT;
+integer_param("credit2_load_precision_shift", opt_load_precision_shift);
+
 static int __read_mostly opt_underload_balance_tolerance = 0;
 integer_param("credit2_balance_under", opt_underload_balance_tolerance);
 static int __read_mostly opt_overload_balance_tolerance = -3;
@@ -279,6 +349,7 @@ struct csched2_private {
     cpumask_t active_queues; /* Queues which may have active cpus */
     struct csched2_runqueue_data rqd[NR_CPUS];
 
+    unsigned int load_precision_shift;
     unsigned int load_window_shift;
 };
 
@@ -387,19 +458,147 @@ __runq_elem(struct list_head *elem)
     return list_entry(elem, struct csched2_vcpu, runq_elem);
 }
 
+/*
+ * Track the runq load by gathering instantaneous load samples, and using
+ * exponentially weighted moving average (EWMA) for the 'decaying'.
+ *
+ * We consider a window of lenght W=2^(prv->load_window_shift) nsecs
+ * (which takes LOADAVG_GRANULARITY_SHIFT into account).
+ *
+ * If load is the instantaneous load, the formula for EWMA looks as follows,
+ * for the i-eth sample:
+ *
+ *  avg[i] = a*load + (1 - a)*avg[i-1]
+ *
+ * where avg[i] is the new value of the average load, avg[i-1] is the value
+ * of the average load calculated so far, and a is a coefficient less or
+ * equal to 1.
+ *
+ * So, for us, it becomes:
+ *
+ *  avgload = a*load + (1 - a)*avgload
+ *
+ * For determining a, we consider _when_ we are doing the load update, wrt
+ * the lenght of the window. We define delta as follows:
+ *
+ *  delta = t - load_last_update
+ *
+ * where t is current time (i.e., time at which we are both sampling and
+ * updating the load average) and load_last_update is the last time we did
+ * that.
+ *
+ * There are two possible situations:
+ *
+ * a) delta <= W
+ *    this means that, during the last window of lenght W, the runeuque load
+ *    was avgload for (W - detla) time, and load for delta time:
+ *
+ *                |----------- W ---------|
+ *                |                       |
+ *                |     load_last_update  t
+ *     -------------------------|---------|---
+ *                |             |         |
+ *                \__W - delta__/\_delta__/
+ *                |             |         |
+ *                |___avgload___|__load___|
+ *
+ *    So, what about using delta/W as our smoothing coefficient a. If we do,
+ *    here's what happens:
+ *
+ *     a = delta / W
+ *     1 - a = 1 - (delta / W) = (W - delta) / W
+ *
+ *    Which matches the above description of what happened in the last
+ *    window of lenght W.
+ *
+ *    Note that this also means that the weight that we assign to both the
+ *    latest load sample, and to previous history, varies at each update.
+ *    The longer the latest load sample has been in efect, within the last
+ *    window, the higher it weights (and the lesser the previous history
+ *    weights).
+ *
+ *    This is some sort of extension of plain EWMA to fit even better to our
+ *    use case.
+ *
+ * b) delta > W
+ *    this means more than a full window has passed since the last update:
+ *
+ *                |----------- W ---------|
+ *                |                       |
+ *       load_last_update                 t
+ *     ----|------------------------------|---
+ *         |                              |
+ *         \_________________delta________/
+ *
+ *    Basically, it means the last load sample has been in effect for more
+ *    than W time, and hence we should just use it, and forget everything
+ *    before that.
+ *
+ *    This can be seen as a 'reset condition', occurring when, for whatever
+ *    reason, load has not been updated for longer than we expected. (It is
+ *    also how avgload is assigned its first value.)
+ *
+ * The formula for avgload then becomes:
+ *
+ *  avgload = (delta/W)*load + (W - delta)*avgload/W
+ *  avgload = delta*load/W + W*avgload/W - delta*avgload/W
+ *  avgload = avgload + delta*load/W - delta*avgload/W
+ *
+ * So, final form is:
+ *
+ *  avgload_0 = load
+ *  avgload = avgload + delta*load/W - delta*avgload/W,  0<=delta<=W
+ *
+ * As a confirmation, let's look at the extremes, when delta is 0 (i.e.,
+ * what happens if we  update the load twice, at the same time instant?):
+ *
+ *  avgload = avgload + 0*load/W - 0*avgload/W
+ *  avgload = avgload
+ *
+ * and when delta is W (i.e., what happens if we update at the last
+ * possible instant before the window 'expires'?):
+ *
+ *  avgload = avgload + W*load/W - W*avgload/W
+ *  avgload = avgload + load - avgload
+ *  avgload = load
+ *
+ * Which, in both cases, is what we expect.
+ */
 static void
 __update_runq_load(const struct scheduler *ops,
                   struct csched2_runqueue_data *rqd, int change, s_time_t now)
 {
     struct csched2_private *prv = CSCHED2_PRIV(ops);
-    s_time_t delta=-1;
+    s_time_t delta, load = rqd->load;
+    unsigned int P, W;
 
+    W = prv->load_window_shift;
+    P = prv->load_precision_shift;
     now >>= LOADAVG_GRANULARITY_SHIFT;
 
-    if ( rqd->load_last_update + (1ULL<<prv->load_window_shift) < now )
+    /*
+     * To avoid using fractions, we shift to left by load_precision_shift,
+     * and use the least last load_precision_shift bits as fractional part.
+     * Looking back at the formula we want to use, we now have:
+     *
+     *  P = 2^(load_precision_shift)
+     *  P*avgload = P*(avgload + delta*load/W - delta*avgload/W)
+     *  P*avgload = P*avgload + delta*load*P/W - delta*P*avgload/W
+     *
+     * And if we are ok storing and using P*avgload, we can rewrite this as:
+     *
+     *  P*avgload = avgload'
+     *  avgload' = avgload' + delta*P*load/W - delta*avgload'/W
+     *
+     * Coupled with, of course:
+     *
+     *  avgload_0' = P*load
+     */
+
+    if ( rqd->load_last_update + (1ULL << W)  < now )
     {
-        rqd->avgload = (unsigned long long)rqd->load << prv->load_window_shift;
-        rqd->b_avgload = (unsigned long long)rqd->load << prv->load_window_shift;
+        rqd->avgload = load << P;
+        rqd->b_avgload = load << P;
     }
     else
     {
@@ -411,16 +610,28 @@ __update_runq_load(const struct scheduler *ops,
             delta = 0;
         }
 
-        rqd->avgload =
-            ( ( delta * ( (unsigned long long)rqd->load << prv->load_window_shift ) )
-              + ( ((1ULL<<prv->load_window_shift) - delta) * rqd->avgload ) ) >> prv->load_window_shift;
-
-        rqd->b_avgload =
-            ( ( delta * ( (unsigned long long)rqd->load << prv->load_window_shift ) )
-              + ( ((1ULL<<prv->load_window_shift) - delta) * rqd->b_avgload ) ) >> prv->load_window_shift;
+        /*
+         * Note that, if we were to enforce (or check) some relationship
+         * between P and W, we may save one shift. E.g., if we are sure
+         * that P < W, we could write:
+         *
+         *  (delta * (load << P)) >> W
+         *
+         * as:
+         *
+         *  (delta * load) >> (W - P)
+         */
+        rqd->avgload = rqd->avgload +
+                       ((delta * (load << P)) >> W) -
+                       ((delta * rqd->avgload) >> W);
+        rqd->b_avgload = rqd->b_avgload +
+                         ((delta * (load << P)) >> W) -
+                         ((delta * rqd->b_avgload) >> W);
     }
     rqd->load += change;
     rqd->load_last_update = now;
+
+    ASSERT(rqd->avgload <= STIME_MAX && rqd->b_avgload <= STIME_MAX);
 
     {
         struct {
@@ -442,8 +653,8 @@ __update_svc_load(const struct scheduler *ops,
                   struct csched2_vcpu *svc, int change, s_time_t now)
 {
     struct csched2_private *prv = CSCHED2_PRIV(ops);
-    s_time_t delta=-1;
-    int vcpu_load;
+    s_time_t delta, vcpu_load;
+    unsigned int P, W;
 
     if ( change == -1 )
         vcpu_load = 1;
@@ -452,11 +663,13 @@ __update_svc_load(const struct scheduler *ops,
     else
         vcpu_load = vcpu_runnable(svc->vcpu);
 
+    W = prv->load_window_shift;
+    P = prv->load_precision_shift;
     now >>= LOADAVG_GRANULARITY_SHIFT;
 
-    if ( svc->load_last_update + (1ULL<<prv->load_window_shift) < now )
+    if ( svc->load_last_update + (1ULL << W) < now )
     {
-        svc->avgload = (unsigned long long)vcpu_load << prv->load_window_shift;
+        svc->avgload = vcpu_load << P;
     }
     else
     {
@@ -468,9 +681,9 @@ __update_svc_load(const struct scheduler *ops,
             delta = 0;
         }
 
-        svc->avgload =
-            ( ( delta * ( (unsigned long long)vcpu_load << prv->load_window_shift ) )
-              + ( ((1ULL<<prv->load_window_shift) - delta) * svc->avgload ) ) >> prv->load_window_shift;
+        svc->avgload = svc->avgload +
+                       ((delta * (vcpu_load << P)) >> W) -
+                       ((delta * svc->avgload) >> W);
     }
     svc->load_last_update = now;
 
@@ -903,7 +1116,7 @@ csched2_alloc_vdata(const struct scheduler *ops, struct vcpu *vc, void *dd)
         svc->credit = CSCHED2_CREDIT_INIT;
         svc->weight = svc->sdom->weight;
         /* Starting load of 50% */
-        svc->avgload = 1ULL << (CSCHED2_PRIV(ops)->load_window_shift - 1);
+        svc->avgload = 1ULL << (CSCHED2_PRIV(ops)->load_precision_shift - 1);
         svc->load_last_update = NOW() >> LOADAVG_GRANULARITY_SHIFT;
     }
     else
@@ -1152,7 +1365,7 @@ csched2_context_saved(const struct scheduler *ops, struct vcpu *vc)
     vcpu_schedule_unlock_irq(lock, vc);
 }
 
-#define MAX_LOAD (1ULL<<60);
+#define MAX_LOAD (STIME_MAX);
 static int
 csched2_cpu_pick(const struct scheduler *ops, struct vcpu *vc)
 {
@@ -1446,15 +1659,19 @@ retry:
         if ( i > cpus_max )
             cpus_max = i;
 
-        /* If we're under 100% capacaty, only shift if load difference
-         * is > 1.  otherwise, shift if under 12.5% */
-        if ( load_max < (1ULL<<(prv->load_window_shift))*cpus_max )
+        /*
+         * If we're under 100% capacaty, only shift if load difference
+         * is > 1.  otherwise, shift if under 12.5%
+         */
+        if ( load_max < (cpus_max << prv->load_precision_shift) )
         {
-            if ( st.load_delta < (1ULL<<(prv->load_window_shift+opt_underload_balance_tolerance) ) )
+            if ( st.load_delta < (1ULL << (prv->load_precision_shift +
+                                           opt_underload_balance_tolerance)) )
                  goto out;
         }
         else
-            if ( st.load_delta < (1ULL<<(prv->load_window_shift+opt_overload_balance_tolerance)) )
+            if ( st.load_delta < (1ULL << (prv->load_precision_shift +
+                                           opt_overload_balance_tolerance)) )
                 goto out;
     }
              
@@ -1962,7 +2179,7 @@ csched2_schedule(
 }
 
 static void
-csched2_dump_vcpu(struct csched2_vcpu *svc)
+csched2_dump_vcpu(struct csched2_private *prv, struct csched2_vcpu *svc)
 {
     printk("[%i.%i] flags=%x cpu=%i",
             svc->vcpu->domain->domain_id,
@@ -1971,6 +2188,9 @@ csched2_dump_vcpu(struct csched2_vcpu *svc)
             svc->vcpu->processor);
 
     printk(" credit=%" PRIi32" [w=%u]", svc->credit, svc->weight);
+
+    printk(" load=%"PRI_stime" (~%"PRI_stime"%%)", svc->avgload,
+           (svc->avgload * 100) >> prv->load_precision_shift);
 
     printk("\n");
 }
@@ -2009,7 +2229,7 @@ csched2_dump_pcpu(const struct scheduler *ops, int cpu)
     if ( svc )
     {
         printk("\trun: ");
-        csched2_dump_vcpu(svc);
+        csched2_dump_vcpu(prv, svc);
     }
 
     loop = 0;
@@ -2019,7 +2239,7 @@ csched2_dump_pcpu(const struct scheduler *ops, int cpu)
         if ( svc )
         {
             printk("\t%3d: ", ++loop);
-            csched2_dump_vcpu(svc);
+            csched2_dump_vcpu(prv, svc);
         }
     }
 
@@ -2048,8 +2268,8 @@ csched2_dump(const struct scheduler *ops)
     for_each_cpu(i, &prv->active_queues)
     {
         s_time_t fraction;
-        
-        fraction = prv->rqd[i].avgload * 100 / (1ULL<<prv->load_window_shift);
+
+        fraction = (prv->rqd[i].avgload * 100) >> prv->load_precision_shift;
 
         cpulist_scnprintf(cpustr, sizeof(cpustr), &prv->rqd[i].active);
         printk("Runqueue %d:\n"
@@ -2057,12 +2277,13 @@ csched2_dump(const struct scheduler *ops)
                "\tcpus               = %s\n"
                "\tmax_weight         = %d\n"
                "\tinstload           = %d\n"
-               "\taveload            = %3"PRI_stime"\n",
+               "\taveload            = %"PRI_stime" (~%"PRI_stime"%%)\n",
                i,
                cpumask_weight(&prv->rqd[i].active),
                cpustr,
                prv->rqd[i].max_weight,
                prv->rqd[i].load,
+               prv->rqd[i].avgload,
                fraction);
 
         cpumask_scnprintf(cpustr, sizeof(cpustr), &prv->rqd[i].idle);
@@ -2093,7 +2314,7 @@ csched2_dump(const struct scheduler *ops)
             lock = vcpu_schedule_lock(svc->vcpu);
 
             printk("\t%3d: ", ++loop);
-            csched2_dump_vcpu(svc);
+            csched2_dump_vcpu(prv, svc);
 
             vcpu_schedule_unlock(lock, svc->vcpu);
         }
@@ -2354,17 +2575,27 @@ csched2_init(struct scheduler *ops)
            " WARNING: This is experimental software in development.\n" \
            " Use at your own risk.\n");
 
+    printk(" load_precision_shift: %d\n", opt_load_precision_shift);
     printk(" load_window_shift: %d\n", opt_load_window_shift);
     printk(" underload_balance_tolerance: %d\n", opt_underload_balance_tolerance);
     printk(" overload_balance_tolerance: %d\n", opt_overload_balance_tolerance);
     printk(" runqueues arrangement: %s\n", opt_runqueue_str[opt_runqueue]);
 
-    if ( opt_load_window_shift < LOADAVG_WINDOW_SHIFT_MIN )
+    if ( opt_load_precision_shift < LOADAVG_PRECISION_SHIFT_MIN )
     {
-        printk("%s: opt_load_window_shift %d below min %d, resetting\n",
-               __func__, opt_load_window_shift, LOADAVG_WINDOW_SHIFT_MIN);
-        opt_load_window_shift = LOADAVG_WINDOW_SHIFT_MIN;
+        printk("WARNING: %s: opt_load_precision_shift %d below min %d, resetting\n",
+               __func__, opt_load_precision_shift, LOADAVG_PRECISION_SHIFT_MIN);
+        opt_load_precision_shift = LOADAVG_PRECISION_SHIFT_MIN;
     }
+
+    if ( opt_load_window_shift <= LOADAVG_GRANULARITY_SHIFT )
+    {
+        printk("WARNING: %s: opt_load_window_shift %d too short, resetting\n",
+               __func__, opt_load_window_shift);
+        opt_load_window_shift = LOADAVG_WINDOW_SHIFT;
+    }
+    printk(XENLOG_INFO "load tracking window lenght %llu ns\n",
+           1ULL << opt_load_window_shift);
 
     /* Basically no CPU information is available at this point; just
      * set up basic structures, and a callback when the CPU info is
@@ -2385,7 +2616,9 @@ csched2_init(struct scheduler *ops)
         prv->rqd[i].id = -1;
     }
 
-    prv->load_window_shift = opt_load_window_shift;
+    prv->load_precision_shift = opt_load_precision_shift;
+    prv->load_window_shift = opt_load_window_shift - LOADAVG_GRANULARITY_SHIFT;
+    ASSERT(opt_load_window_shift > 0);
 
     return 0;
 }
