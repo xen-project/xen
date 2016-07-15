@@ -51,6 +51,9 @@
 #define TRC_CSCHED2_TICKLE_NEW       TRC_SCHED_CLASS_EVT(CSCHED2, 13)
 #define TRC_CSCHED2_RUNQ_MAX_WEIGHT  TRC_SCHED_CLASS_EVT(CSCHED2, 14)
 #define TRC_CSCHED2_MIGRATE          TRC_SCHED_CLASS_EVT(CSCHED2, 15)
+#define TRC_CSCHED2_LOAD_CHECK       TRC_SCHED_CLASS_EVT(CSCHED2, 16)
+#define TRC_CSCHED2_LOAD_BALANCE     TRC_SCHED_CLASS_EVT(CSCHED2, 17)
+#define TRC_CSCHED2_PICKED_CPU       TRC_SCHED_CLASS_EVT(CSCHED2, 19)
 
 /*
  * WARNING: This is still in an experimental phase.  Status and work can be found at the
@@ -711,6 +714,8 @@ update_load(const struct scheduler *ops,
             struct csched2_runqueue_data *rqd,
             struct csched2_vcpu *svc, int change, s_time_t now)
 {
+    trace_var(TRC_CSCHED2_UPDATE_LOAD, 1, 0,  NULL);
+
     __update_runq_load(ops, rqd, change, now);
     if ( svc )
         __update_svc_load(ops, svc, change, now);
@@ -1486,6 +1491,23 @@ csched2_cpu_pick(const struct scheduler *ops, struct vcpu *vc)
 out_up:
     spin_unlock(&prv->lock);
 
+    /* TRACE */
+    {
+        struct {
+            uint64_t b_avgload;
+            unsigned vcpu:16, dom:16;
+            unsigned rq_id:16, new_cpu:16;
+       } d;
+        d.b_avgload = prv->rqd[min_rqi].b_avgload;
+        d.dom = vc->domain->domain_id;
+        d.vcpu = vc->vcpu_id;
+        d.rq_id = c2r(ops, new_cpu);
+        d.new_cpu = new_cpu;
+        trace_var(TRC_CSCHED2_PICKED_CPU, 1,
+                  sizeof(d),
+                  (unsigned char *)&d);
+    }
+
     return new_cpu;
 }
 
@@ -1611,7 +1633,7 @@ static void balance_load(const struct scheduler *ops, int cpu, s_time_t now)
     bool_t inner_load_updated = 0;
 
     balance_state_t st = { .best_push_svc = NULL, .best_pull_svc = NULL };
-    
+
     /*
      * Basic algorithm: Push, pull, or swap.
      * - Find the runqueue with the furthest load distance
@@ -1676,6 +1698,20 @@ retry:
         if ( i > cpus_max )
             cpus_max = i;
 
+        /* TRACE */
+        {
+            struct {
+                unsigned lrq_id:16, orq_id:16;
+                unsigned load_delta;
+            } d;
+            d.lrq_id = st.lrqd->id;
+            d.orq_id = st.orqd->id;
+            d.load_delta = st.load_delta;
+            trace_var(TRC_CSCHED2_LOAD_CHECK, 1,
+                      sizeof(d),
+                      (unsigned char *)&d);
+        }
+
         /*
          * If we're under 100% capacaty, only shift if load difference
          * is > 1.  otherwise, shift if under 12.5%
@@ -1703,6 +1739,21 @@ retry:
     /* Make sure the runqueue hasn't been deactivated since we released prv->lock */
     if ( unlikely(st.orqd->id < 0) )
         goto out_up;
+
+    /* TRACE */
+    {
+        struct {
+            uint64_t lb_avgload, ob_avgload;
+            unsigned lrq_id:16, orq_id:16;
+        } d;
+        d.lrq_id = st.lrqd->id;
+        d.lb_avgload = st.lrqd->b_avgload;
+        d.orq_id = st.orqd->id;
+        d.ob_avgload = st.orqd->b_avgload;
+        trace_var(TRC_CSCHED2_LOAD_BALANCE, 1,
+                  sizeof(d),
+                  (unsigned char *)&d);
+    }
 
     /* Look for "swap" which gives the best load average
      * FIXME: O(n^2)! */
@@ -1753,10 +1804,9 @@ retry:
     if ( st.best_pull_svc )
         migrate(ops, st.best_pull_svc, st.lrqd, now);
 
-out_up:
+ out_up:
     spin_unlock(&st.orqd->lock);
-
-out:
+ out:
     return;
 }
 
