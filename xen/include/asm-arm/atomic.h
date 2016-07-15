@@ -102,7 +102,7 @@ void __bad_atomic_size(void);
  * strex/ldrex monitor on some implementations. The reason we can use it for
  * atomic_set() is the clrex or dummy strex done on every exception return.
  */
-static inline int atomic_read(atomic_t *v)
+static inline int atomic_read(const atomic_t *v)
 {
     return *(volatile int *)&v->counter;
 }

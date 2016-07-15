@@ -80,7 +80,7 @@ void __bad_atomic_size(void);
     }                                                     \
 })
 
-static inline int atomic_read(atomic_t *v)
+static inline int atomic_read(const atomic_t *v)
 {
     return read_atomic(&v->counter);
 }
