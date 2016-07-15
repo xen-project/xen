@@ -1923,8 +1923,16 @@ csched2_schedule(
     }
     else
     {
-        /* Update the idle mask if necessary */
-        if ( !cpumask_test_cpu(cpu, &rqd->idle) )
+        /*
+         * Update the idle mask if necessary. Note that, if we're scheduling
+         * idle in order to carry on some tasklet work, we want to play busy!
+         */
+        if ( tasklet_work_scheduled )
+        {
+            if ( cpumask_test_cpu(cpu, &rqd->idle) )
+                cpumask_clear_cpu(cpu, &rqd->idle);
+        }
+        else if ( !cpumask_test_cpu(cpu, &rqd->idle) )
             cpumask_set_cpu(cpu, &rqd->idle);
         /* Make sure avgload gets updated periodically even
          * if there's no activity */
@@ -2303,8 +2311,6 @@ csched2_deinit_pdata(const struct scheduler *ops, void *pcpu, int cpu)
 
     /* No need to save IRQs here, they're already disabled */
     spin_lock(&rqd->lock);
-
-    BUG_ON(!cpumask_test_cpu(cpu, &rqd->idle));
 
     printk("Removing cpu %d from runqueue %d\n", cpu, rqi);
 

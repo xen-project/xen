@@ -1827,7 +1827,7 @@ csched_schedule(
      * Update idlers mask if necessary. When we're idling, other CPUs
      * will tickle us when they get extra work.
      */
-    if ( snext->pri == CSCHED_PRI_IDLE )
+    if ( !tasklet_work_scheduled && snext->pri == CSCHED_PRI_IDLE )
     {
         if ( !cpumask_test_cpu(cpu, prv->idlers) )
             cpumask_set_cpu(cpu, prv->idlers);
