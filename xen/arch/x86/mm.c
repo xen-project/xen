@@ -271,14 +271,13 @@ void __init arch_init_memory(void)
 {
     unsigned long i, pfn, rstart_pfn, rend_pfn, iostart_pfn, ioend_pfn;
 
-    /* Basic guest-accessible flags: PRESENT, R/W, USER, A/D, AVAIL[0,1,2] */
-    base_disallow_mask = ~(_PAGE_PRESENT|_PAGE_RW|_PAGE_USER|
-                           _PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_AVAIL);
-    /* Allow guest access to the NX flag if hardware supports it. */
-    if ( cpu_has_nx )
-        base_disallow_mask &= ~_PAGE_NX_BIT;
-    /* On x86/64, range [62:52] is available for guest software use. */
-    base_disallow_mask &= ~get_pte_flags((intpte_t)0x7ff << 52);
+    /*
+     * Basic guest-accessible flags:
+     *   PRESENT, R/W, USER, A/D, AVAIL[0,1,2], AVAIL_HIGH, NX (if available).
+     */
+    base_disallow_mask =
+        ~(_PAGE_PRESENT | _PAGE_RW | _PAGE_USER | _PAGE_ACCESSED |
+          _PAGE_DIRTY | _PAGE_AVAIL | _PAGE_AVAIL_HIGH | _PAGE_NX);
 
     /*
      * Initialise our DOMID_XEN domain.
