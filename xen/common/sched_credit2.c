@@ -404,6 +404,12 @@ __update_runq_load(const struct scheduler *ops,
     else
     {
         delta = now - rqd->load_last_update;
+        if ( unlikely(delta < 0) )
+        {
+            d2printk("%s: Time went backwards? now %"PRI_stime" llu %"PRI_stime"\n",
+                     __func__, now, rqd->load_last_update);
+            delta = 0;
+        }
 
         rqd->avgload =
             ( ( delta * ( (unsigned long long)rqd->load << prv->load_window_shift ) )
@@ -455,6 +461,12 @@ __update_svc_load(const struct scheduler *ops,
     else
     {
         delta = now - svc->load_last_update;
+        if ( unlikely(delta < 0) )
+        {
+            d2printk("%s: Time went backwards? now %"PRI_stime" llu %"PRI_stime"\n",
+                     __func__, now, svc->load_last_update);
+            delta = 0;
+        }
 
         svc->avgload =
             ( ( delta * ( (unsigned long long)vcpu_load << prv->load_window_shift ) )
