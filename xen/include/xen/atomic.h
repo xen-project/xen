@@ -111,6 +111,15 @@ static inline int atomic_add_return(int i, atomic_t *v);
 static inline void atomic_sub(int i, atomic_t *v);
 
 /**
+ * atomic_sub_return - sub integer and return
+ * @i: integer value to sub
+ * @v: pointer of type atomic_t
+ *
+ * Atomically subtracts @i from @v and returns @v - @i.
+ */
+static inline int atomic_sub_return(int i, atomic_t *v);
+
+/**
  * atomic_sub_and_test - subtract value from variable and test result
  * @i: integer value to subtract
  * @v: pointer of type atomic_t
@@ -130,6 +139,14 @@ static inline int atomic_sub_and_test(int i, atomic_t *v);
 static inline void atomic_inc(atomic_t *v);
 
 /**
+ * atomic_inc_return - increment atomic variable and return
+ * @v: pointer of type atomic_t
+ *
+ * Atomically increments @v by 1 and returns @v + 1.
+ */
+static inline int atomic_inc_return(atomic_t *v);
+
+/**
  * atomic_inc_and_test - increment and test
  * @v: pointer of type atomic_t
  *
@@ -146,6 +163,14 @@ static inline int atomic_inc_and_test(atomic_t *v);
  * Atomically decrements @v by 1.
  */
 static inline void atomic_dec(atomic_t *v);
+
+/**
+ * atomic_dec_return - decrement atomic variable and return
+ * @v: pointer of type atomic_t
+ *
+ * Atomically decrements @v by 1 and returns @v - 1.
+ */
+static inline int atomic_dec_return(atomic_t *v);
 
 /**
  * atomic_dec_and_test - decrement and test
@@ -167,5 +192,16 @@ static inline int atomic_dec_and_test(atomic_t *v);
  * result is greater than or equal to zero.
  */
 static inline int atomic_add_negative(int i, atomic_t *v);
+
+/**
+ * atomic_add_unless - add to atomic variable unless it has a specified value
+ * @v: pointer of type atomic_t
+ * @a: integer value to add
+ * @u: integer value @v must -not- be for the add to be performed
+ *
+ * If @v != @u, adds @a to @v and returns @v + @a.
+ * Otherwise returns @u (== @v).
+ */
+static inline int atomic_add_unless(atomic_t *v, int a, int u);
 
 #endif /* __XEN_ATOMIC_H__ */

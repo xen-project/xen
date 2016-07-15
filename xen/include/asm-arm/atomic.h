@@ -170,6 +170,11 @@ static inline int atomic_add_negative(int i, atomic_t *v)
     return atomic_add_return(i, v) < 0;
 }
 
+static inline int atomic_add_unless(atomic_t *v, int a, int u)
+{
+    return __atomic_add_unless(v, a, u);
+}
+
 #define atomic_xchg(v, new) (xchg(&((v)->counter), new))
 
 #endif /* __ARCH_ARM_ATOMIC__ */

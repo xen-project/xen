@@ -126,6 +126,11 @@ static inline void atomic_sub(int i, atomic_t *v)
         : "ir" (i), "m" (*(volatile int *)&v->counter) );
 }
 
+static inline int atomic_sub_return(int i, atomic_t *v)
+{
+    return arch_fetch_and_add(&v->counter, -i) - i;
+}
+
 static inline int atomic_sub_and_test(int i, atomic_t *v)
 {
     unsigned char c;
@@ -145,6 +150,11 @@ static inline void atomic_inc(atomic_t *v)
         : "m" (*(volatile int *)&v->counter) );
 }
 
+static inline int atomic_inc_return(atomic_t *v)
+{
+    return atomic_add_return(1, v);
+}
+
 static inline int atomic_inc_and_test(atomic_t *v)
 {
     unsigned char c;
@@ -162,6 +172,11 @@ static inline void atomic_dec(atomic_t *v)
         "lock; decl %0"
         : "=m" (*(volatile int *)&v->counter)
         : "m" (*(volatile int *)&v->counter) );
+}
+
+static inline int atomic_dec_return(atomic_t *v)
+{
+    return atomic_sub_return(1, v);
 }
 
 static inline int atomic_dec_and_test(atomic_t *v)
@@ -185,5 +200,17 @@ static inline int atomic_add_negative(int i, atomic_t *v)
         : "ir" (i), "m" (*(volatile int *)&v->counter) : "memory" );
     return c;
 }
+
+static inline int atomic_add_unless(atomic_t *v, int a, int u)
+{
+    int c, old;
+
+    c = atomic_read(v);
+    while (c != u && (old = atomic_cmpxchg(v, c, c + a)) != c)
+        c = old;
+    return c;
+}
+
+#define atomic_xchg(v, new) (xchg(&((v)->counter), new))
 
 #endif /* __ARCH_X86_ATOMIC__ */
