@@ -110,7 +110,6 @@ static inline int _atomic_read(atomic_t v)
     return v.counter;
 }
 
-
 /**
  * atomic_set - set atomic variable
  * @v: pointer of type atomic_t
@@ -217,6 +216,25 @@ static inline void atomic_inc(atomic_t *v)
 }
 
 /**
+ * atomic_inc_and_test - increment and test
+ * @v: pointer of type atomic_t
+ *
+ * Atomically increments @v by 1
+ * and returns true if the result is zero, or false for all
+ * other cases.
+ */
+static inline int atomic_inc_and_test(atomic_t *v)
+{
+    unsigned char c;
+
+    asm volatile (
+        "lock; incl %0; sete %1"
+        : "=m" (*(volatile int *)&v->counter), "=qm" (c)
+        : "m" (*(volatile int *)&v->counter) : "memory" );
+    return c != 0;
+}
+
+/**
  * atomic_dec - decrement atomic variable
  * @v: pointer of type atomic_t
  * 
@@ -244,25 +262,6 @@ static inline int atomic_dec_and_test(atomic_t *v)
 
     asm volatile (
         "lock; decl %0; sete %1"
-        : "=m" (*(volatile int *)&v->counter), "=qm" (c)
-        : "m" (*(volatile int *)&v->counter) : "memory" );
-    return c != 0;
-}
-
-/**
- * atomic_inc_and_test - increment and test 
- * @v: pointer of type atomic_t
- * 
- * Atomically increments @v by 1
- * and returns true if the result is zero, or false for all
- * other cases.
- */ 
-static inline int atomic_inc_and_test(atomic_t *v)
-{
-    unsigned char c;
-
-    asm volatile (
-        "lock; incl %0; sete %1"
         : "=m" (*(volatile int *)&v->counter), "=qm" (c)
         : "m" (*(volatile int *)&v->counter) : "memory" );
     return c != 0;
