@@ -2,6 +2,7 @@
 #define __ARCH_ARM_ATOMIC__
 
 #include <xen/config.h>
+#include <xen/atomic.h>
 #include <xen/prefetch.h>
 #include <asm/system.h>
 
@@ -95,15 +96,6 @@ void __bad_atomic_size(void);
     default: __bad_atomic_size(); break;                                \
     }                                                                   \
 })
-    
-/*
- * NB. I've pushed the volatile qualifier into the operations. This allows
- * fast accessors such as _atomic_read() and _atomic_set() which don't give
- * the compiler a fit.
- */
-typedef struct { int counter; } atomic_t;
-
-#define ATOMIC_INIT(i) { (i) }
 
 /*
  * On ARM, ordinary assignment (str instruction) doesn't clear the local
@@ -141,12 +133,35 @@ static inline void _atomic_set(atomic_t *v, int i)
 #define atomic_inc_return(v)        (atomic_add_return(1, v))
 #define atomic_dec_return(v)        (atomic_sub_return(1, v))
 
-#define atomic_sub_and_test(i, v)   (atomic_sub_return(i, v) == 0)
-#define atomic_inc(v)               atomic_add(1, v)
-#define atomic_inc_and_test(v)      (atomic_add_return(1, v) == 0)
-#define atomic_dec(v)               atomic_sub(1, v)
-#define atomic_dec_and_test(v)      (atomic_sub_return(1, v) == 0)
-#define atomic_add_negative(i,v)    (atomic_add_return(i, v) < 0)
+static inline int atomic_sub_and_test(int i, atomic_t *v)
+{
+    return atomic_sub_return(i, v) == 0;
+}
+
+static inline void atomic_inc(atomic_t *v)
+{
+    atomic_add(1, v);
+}
+
+static inline int atomic_inc_and_test(atomic_t *v)
+{
+    return atomic_add_return(1, v) == 0;
+}
+
+static inline void atomic_dec(atomic_t *v)
+{
+    atomic_sub(1, v);
+}
+
+static inline int atomic_dec_and_test(atomic_t *v)
+{
+    return atomic_sub_return(1, v) == 0;
+}
+
+static inline int atomic_add_negative(int i, atomic_t *v)
+{
+    return atomic_add_return(i, v) < 0;
+}
 
 #define atomic_xchg(v, new) (xchg(&((v)->counter), new))
 
