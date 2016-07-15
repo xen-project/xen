@@ -55,6 +55,12 @@
 0x0002220a  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  csched2:runq_assign    [ dom:vcpu = 0x%(1)08x, rq_id = %(2)d ]
 0x0002220b  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  csched2:updt_vcpu_load [ dom:vcpu = 0x%(3)08x, vcpuload = 0x%(2)08x%(1)08x, wshift = %(4)d ]
 0x0002220c  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  csched2:updt_runq_load [ rq_load[16]:rq_id[8]:wshift[8] = 0x%(5)08x, rq_avgload = 0x%(2)08x%(1)08x, b_avgload = 0x%(4)08x%(3)08x ]
+0x0002220d  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  csched2:tickle_new     [ dom:vcpu = 0x%(1)08x, processor = %(2)d credit = %(3)d ]
+0x0002220e  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  csched2:runq_max_weight [ rq_id[16]:max_weight[16] = 0x%(1)08x ]
+0x0002220f  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  csched2:migrrate       [ dom:vcpu = 0x%(1)08x, rq_id[16]:trq_id[16] = 0x%(2)08x ]
+0x00022210  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  csched2:load_check     [ lrq_id[16]:orq_id[16] = 0x%(1)08x, delta = %(2)d ]
+0x00022211  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  csched2:load_balance   [ l_bavgload = 0x%(2)08x%(1)08x, o_bavgload = 0x%(4)08x%(3)08x, lrq_id[16]:orq_id[16] = 0x%(5)08x ]
+0x00022212  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  csched2:pick_cpu       [ b_avgload = 0x%(2)08x%(1)08x, dom:vcpu = 0x%(3)08x, rq_id[16]:new_cpu[16] = %(4)d ]
 
 0x00022801  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  rtds:tickle        [ cpu = %(1)d ]
 0x00022802  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  rtds:runq_pick     [ dom:vcpu = 0x%(1)08x, cur_deadline = 0x%(3)08x%(2)08x, cur_budget = 0x%(5)08x%(4)08x ]

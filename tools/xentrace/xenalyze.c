@@ -7725,7 +7725,6 @@ void sched_process(struct pcpu_info *p)
         /* CREDIT 2 (TRC_CSCHED2_xxx) */
         case TRC_SCHED_CLASS_EVT(CSCHED2, 1): /* TICK              */
         case TRC_SCHED_CLASS_EVT(CSCHED2, 4): /* CREDIT_ADD        */
-        case TRC_SCHED_CLASS_EVT(CSCHED2, 9): /* UPDATE_LOAD       */
             break;
         case TRC_SCHED_CLASS_EVT(CSCHED2, 2): /* RUNQ_POS          */
             if(opt.dump_all) {
@@ -7788,11 +7787,15 @@ void sched_process(struct pcpu_info *p)
             if(opt.dump_all)
                 printf(" %s csched2:sched_tasklet\n", ri->dump_header);
             break;
+        case TRC_SCHED_CLASS_EVT(CSCHED2, 9):  /* UPDATE_LOAD      */
+            if(opt.dump_all)
+                printf(" %s csched2:update_load\n", ri->dump_header);
+            break;
         case TRC_SCHED_CLASS_EVT(CSCHED2, 10): /* RUNQ_ASSIGN      */
             if(opt.dump_all) {
                 struct {
                     unsigned int vcpuid:16, domid:16;
-                    unsigned int rqi;
+                    unsigned int rqi:16;
                 } *r = (typeof(r))ri->d;
 
                 printf(" %s csched2:runq_assign d%uv%u on rq# %u\n",
@@ -7832,6 +7835,77 @@ void sched_process(struct pcpu_info *p)
                        "b_avgload = %4.3f%% (%"PRIu64")\n",
                        ri->dump_header, r->rq_id, r->rq_load,
                        avgload, r->rq_avgload, b_avgload, r->b_avgload);
+            }
+            break;
+        case TRC_SCHED_CLASS_EVT(CSCHED2, 13): /* TICKLE_NEW       */
+            if (opt.dump_all) {
+                struct {
+                    unsigned vcpuid:16, domid:16;
+                    unsigned processor, credit;
+                } *r = (typeof(r))ri->d;
+
+                printf(" %s csched2:runq_tickle_new d%uv%u, "
+                       "processor = %u, credit = %u\n",
+                       ri->dump_header, r->domid, r->vcpuid,
+                       r->processor, r->credit);
+            }
+            break;
+        case TRC_SCHED_CLASS_EVT(CSCHED2, 14): /* RUNQ_MAX_WEIGHT  */
+            if (opt.dump_all) {
+                struct {
+                    unsigned rqi:16, max_weight:16;
+                } *r = (typeof(r))ri->d;
+
+                printf(" %s csched2:update_max_weight rq# %u, max_weight = %u\n",
+                       ri->dump_header, r->rqi, r->max_weight);
+            }
+            break;
+        case TRC_SCHED_CLASS_EVT(CSCHED2, 15): /* MIGRATE          */
+            if (opt.dump_all) {
+                struct {
+                    unsigned vcpuid:16, domid:16;
+                    unsigned rqi:16, trqi:16;
+                } *r = (typeof(r))ri->d;
+
+                printf(" %s csched2:migrate d%uv%u rq# %u --> rq# %u\n",
+                       ri->dump_header, r->domid, r->vcpuid, r->rqi, r->trqi);
+            }
+            break;
+        case TRC_SCHED_CLASS_EVT(CSCHED2, 16): /* LOAD_CHECK       */
+            if (opt.dump_all) {
+                struct {
+                    unsigned lrqi:16, orqi:16;
+                    unsigned load_delta;
+                } *r = (typeof(r))ri->d;
+
+                printf(" %s csched2:load_balance_check lrq# %u, orq# %u, "
+                       "delta = %u\n",
+                       ri->dump_header, r->lrqi, r->orqi, r->load_delta);
+            }
+            break;
+        case TRC_SCHED_CLASS_EVT(CSCHED2, 17): /* LOAD_BALANCE     */
+            if (opt.dump_all) {
+                struct {
+                    uint64_t lb_avgload, ob_avgload;
+                    unsigned lrqi:16, orqi:16;
+                } *r = (typeof(r))ri->d;
+
+                printf(" %s csched2:load_balance_begin lrq# %u, "
+                       "avg_load = %"PRIu64" -- orq# %u, avg_load = %"PRIu64"\n",
+                       ri->dump_header, r->lrqi, r->lb_avgload,
+                       r->orqi, r->ob_avgload);
+            }
+            break;
+        case TRC_SCHED_CLASS_EVT(CSCHED2, 19): /* PICKED_CPU       */
+            if (opt.dump_all) {
+                struct {
+                    uint64_t b_avgload;
+                    unsigned vcpuid:16, domid:16;
+                    unsigned rqi:16, cpu:16;
+                } *r = (typeof(r))ri->d;
+
+                printf(" %s csched2:picked_cpu d%uv%u, rq# %u, cpu %u\n",
+                       ri->dump_header, r->domid, r->vcpuid, r->rqi, r->cpu);
             }
             break;
         /* RTDS (TRC_RTDS_xxx) */
