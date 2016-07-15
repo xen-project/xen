@@ -53,8 +53,8 @@
 0x00022208  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  csched2:sched_tasklet
 0x00022209  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  csched2:update_load
 0x0002220a  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  csched2:runq_assign    [ dom:vcpu = 0x%(1)08x, rq_id = %(2)d ]
-0x0002220b  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  csched2:updt_vcpu_load [ dom:vcpu = 0x%(1)08x, avgload = %(2)d ]
-0x0002220c  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  csched2:updt_runq_load [ rq_load[4]:rq_avgload[28] = 0x%(1)08x, rq_id[4]:b_avgload[28] = 0x%(2)08x ]
+0x0002220b  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  csched2:updt_vcpu_load [ dom:vcpu = 0x%(3)08x, vcpuload = 0x%(2)08x%(1)08x, wshift = %(4)d ]
+0x0002220c  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  csched2:updt_runq_load [ rq_load[16]:rq_id[8]:wshift[8] = 0x%(5)08x, rq_avgload = 0x%(2)08x%(1)08x, b_avgload = 0x%(4)08x%(3)08x ]
 
 0x00022801  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  rtds:tickle        [ cpu = %(1)d ]
 0x00022802  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  rtds:runq_pick     [ dom:vcpu = 0x%(1)08x, cur_deadline = 0x%(3)08x%(2)08x, cur_budget = 0x%(5)08x%(4)08x ]

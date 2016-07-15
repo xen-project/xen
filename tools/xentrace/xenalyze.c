@@ -7802,25 +7802,36 @@ void sched_process(struct pcpu_info *p)
         case TRC_SCHED_CLASS_EVT(CSCHED2, 11): /* UPDATE_VCPU_LOAD */
             if(opt.dump_all) {
                 struct {
+                    uint64_t vcpuload;
                     unsigned int vcpuid:16, domid:16;
-                    unsigned int avgload;
+                    unsigned int shift;
                 } *r = (typeof(r))ri->d;
+                double vcpuload;
 
-                printf(" %s csched2:update_vcpu_load d%uv%u, avg_load = %u\n",
-                       ri->dump_header, r->domid, r->vcpuid, r->avgload);
+                vcpuload = (r->vcpuload * 100.0) / (1ULL << r->shift);
+
+                printf(" %s csched2:update_vcpu_load d%uv%u, "
+                       "vcpu_load = %4.3f%% (%"PRIu64")\n",
+                       ri->dump_header, r->domid, r->vcpuid, vcpuload,
+                       r->vcpuload);
             }
             break;
         case TRC_SCHED_CLASS_EVT(CSCHED2, 12): /* UPDATE_RUNQ_LOAD */
             if(opt.dump_all) {
                 struct {
-                    unsigned int rq_load:4, rq_avgload:28;
-                    unsigned int rq_id:4, b_avgload:28;
+                    uint64_t rq_avgload, b_avgload;
+                    unsigned int rq_load:16, rq_id:8, shift:8;
                 } *r = (typeof(r))ri->d;
+                double avgload, b_avgload;
+
+                avgload = (r->rq_avgload * 100.0) / (1ULL << r->shift);
+                b_avgload = (r->b_avgload * 100.0) / (1ULL << r->shift);
 
                 printf(" %s csched2:update_rq_load rq# %u, load = %u, "
-                       "avgload = %u, b_avgload = %u\n",
+                       "avgload = %4.3f%% (%"PRIu64"), "
+                       "b_avgload = %4.3f%% (%"PRIu64")\n",
                        ri->dump_header, r->rq_id, r->rq_load,
-                       r->rq_avgload, r->b_avgload);
+                       avgload, r->rq_avgload, b_avgload, r->b_avgload);
             }
             break;
         /* RTDS (TRC_RTDS_xxx) */

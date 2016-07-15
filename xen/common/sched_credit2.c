@@ -635,13 +635,14 @@ __update_runq_load(const struct scheduler *ops,
 
     {
         struct {
-            unsigned rq_load:4, rq_avgload:28;
-            unsigned rq_id:4, b_avgload:28;
+            uint64_t rq_avgload, b_avgload;
+            unsigned rq_load:16, rq_id:8, shift:8;
         } d;
-        d.rq_id=rqd->id;
+        d.rq_id = rqd->id;
         d.rq_load = rqd->load;
         d.rq_avgload = rqd->avgload;
         d.b_avgload = rqd->b_avgload;
+        d.shift = P;
         trace_var(TRC_CSCHED2_UPDATE_RUNQ_LOAD, 1,
                   sizeof(d),
                   (unsigned char *)&d);
@@ -689,12 +690,14 @@ __update_svc_load(const struct scheduler *ops,
 
     {
         struct {
+            uint64_t v_avgload;
             unsigned vcpu:16, dom:16;
-            unsigned v_avgload:32;
+            unsigned shift;
         } d;
         d.dom = svc->vcpu->domain->domain_id;
         d.vcpu = svc->vcpu->vcpu_id;
         d.v_avgload = svc->avgload;
+        d.shift = P;
         trace_var(TRC_CSCHED2_UPDATE_VCPU_LOAD, 1,
                   sizeof(d),
                   (unsigned char *)&d);
