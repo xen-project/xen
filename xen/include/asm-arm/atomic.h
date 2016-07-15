@@ -130,9 +130,6 @@ static inline void _atomic_set(atomic_t *v, int i)
 # error "unknown ARM variant"
 #endif
 
-#define atomic_inc_return(v)        (atomic_add_return(1, v))
-#define atomic_dec_return(v)        (atomic_sub_return(1, v))
-
 static inline int atomic_sub_and_test(int i, atomic_t *v)
 {
     return atomic_sub_return(i, v) == 0;
@@ -143,6 +140,11 @@ static inline void atomic_inc(atomic_t *v)
     atomic_add(1, v);
 }
 
+static inline int atomic_inc_return(atomic_t *v)
+{
+    return atomic_add_return(1, v);
+}
+
 static inline int atomic_inc_and_test(atomic_t *v)
 {
     return atomic_add_return(1, v) == 0;
@@ -151,6 +153,11 @@ static inline int atomic_inc_and_test(atomic_t *v)
 static inline void atomic_dec(atomic_t *v)
 {
     atomic_sub(1, v);
+}
+
+static inline int atomic_dec_return(atomic_t *v)
+{
+    return atomic_sub_return(1, v);
 }
 
 static inline int atomic_dec_and_test(atomic_t *v)
