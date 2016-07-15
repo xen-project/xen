@@ -215,6 +215,8 @@ void getdomaininfo(struct domain *d, struct xen_domctl_getdomaininfo *info)
     info->cpupool = d->cpupool ? d->cpupool->cpupool_id : CPUPOOLID_NONE;
 
     memcpy(info->handle, d->handle, sizeof(xen_domain_handle_t));
+
+    arch_get_domain_info(d, info);
 }
 
 bool_t domctl_lock_acquire(void)

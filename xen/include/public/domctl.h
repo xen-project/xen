@@ -103,6 +103,9 @@ struct xen_domctl_getdomaininfo {
 /* domain is a xenstore domain */
 #define _XEN_DOMINF_xs_domain 8
 #define XEN_DOMINF_xs_domain  (1U<<_XEN_DOMINF_xs_domain)
+/* domain has hardware assisted paging */
+#define _XEN_DOMINF_hap       9
+#define XEN_DOMINF_hap        (1U<<_XEN_DOMINF_hap)
  /* XEN_DOMINF_shutdown guest-supplied code.  */
 #define XEN_DOMINF_shutdownmask 255
 #define XEN_DOMINF_shutdownshift 16

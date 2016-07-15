@@ -229,6 +229,13 @@ static void update_domain_cpuid_info(struct domain *d,
     }
 }
 
+void arch_get_domain_info(const struct domain *d,
+                          struct xen_domctl_getdomaininfo *info)
+{
+    if ( paging_mode_hap(d) )
+        info->flags |= XEN_DOMINF_hap;
+}
+
 #define MAX_IOPORTS 0x10000
 
 long arch_do_domctl(

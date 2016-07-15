@@ -18,6 +18,8 @@ int vcpu_reset(struct vcpu *);
 
 struct xen_domctl_getdomaininfo;
 void getdomaininfo(struct domain *d, struct xen_domctl_getdomaininfo *info);
+void arch_get_domain_info(const struct domain *d,
+                          struct xen_domctl_getdomaininfo *info);
 
 /*
  * Arch-specifics.
