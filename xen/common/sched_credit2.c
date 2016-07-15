@@ -27,8 +27,10 @@
 #include <xen/cpu.h>
 #include <xen/keyhandler.h>
 
+/* Meant only for helping developers during debugging. */
+/* #define d2printk printk */
 #define d2printk(x...)
-//#define d2printk printk
+
 
 /*
  * Credit2 tracing events ("only" 512 available!). Check
@@ -46,16 +48,16 @@
 #define TRC_CSCHED2_RUNQ_ASSIGN      TRC_SCHED_CLASS_EVT(CSCHED2, 10)
 #define TRC_CSCHED2_UPDATE_VCPU_LOAD TRC_SCHED_CLASS_EVT(CSCHED2, 11)
 #define TRC_CSCHED2_UPDATE_RUNQ_LOAD TRC_SCHED_CLASS_EVT(CSCHED2, 12)
+#define TRC_CSCHED2_TICKLE_NEW       TRC_SCHED_CLASS_EVT(CSCHED2, 13)
+#define TRC_CSCHED2_RUNQ_MAX_WEIGHT  TRC_SCHED_CLASS_EVT(CSCHED2, 14)
+#define TRC_CSCHED2_MIGRATE          TRC_SCHED_CLASS_EVT(CSCHED2, 15)
 
 /*
  * WARNING: This is still in an experimental phase.  Status and work can be found at the
  * credit2 wiki page:
  *  http://wiki.xen.org/wiki/Credit2_Scheduler_Development
+ *
  * TODO:
- * + Multiple sockets
- *  - Simple load balancer / runqueue assignment
- *  - Runqueue load measurement
- *  - Load-based load balancer
  * + Hyperthreading
  *  - Look for non-busy core if possible
  *  - "Discount" time run on a thread with busy siblings
@@ -605,7 +607,7 @@ __update_runq_load(const struct scheduler *ops,
         delta = now - rqd->load_last_update;
         if ( unlikely(delta < 0) )
         {
-            d2printk("%s: Time went backwards? now %"PRI_stime" llu %"PRI_stime"\n",
+            d2printk("WARNING: %s: Time went backwards? now %"PRI_stime" llu %"PRI_stime"\n",
                      __func__, now, rqd->load_last_update);
             delta = 0;
         }
@@ -677,7 +679,7 @@ __update_svc_load(const struct scheduler *ops,
         delta = now - svc->load_last_update;
         if ( unlikely(delta < 0) )
         {
-            d2printk("%s: Time went backwards? now %"PRI_stime" llu %"PRI_stime"\n",
+            d2printk("WARNING: %s: Time went backwards? now %"PRI_stime" llu %"PRI_stime"\n",
                      __func__, now, svc->load_last_update);
             delta = 0;
         }
@@ -720,23 +722,18 @@ __runq_insert(struct list_head *runq, struct csched2_vcpu *svc)
     struct list_head *iter;
     int pos = 0;
 
-    d2printk("rqi %pv\n", svc->vcpu);
-
-    BUG_ON(&svc->rqd->runq != runq);
-    /* Idle vcpus not allowed on the runqueue anymore */
-    BUG_ON(is_idle_vcpu(svc->vcpu));
-    BUG_ON(svc->vcpu->is_running);
-    BUG_ON(svc->flags & CSFLAG_scheduled);
+    ASSERT(&svc->rqd->runq == runq);
+    ASSERT(!is_idle_vcpu(svc->vcpu));
+    ASSERT(!svc->vcpu->is_running);
+    ASSERT(!(svc->flags & CSFLAG_scheduled));
 
     list_for_each( iter, runq )
     {
         struct csched2_vcpu * iter_svc = __runq_elem(iter);
 
         if ( svc->credit > iter_svc->credit )
-        {
-            d2printk(" p%d %pv\n", pos, iter_svc->vcpu);
             break;
-        }
+
         pos++;
     }
 
@@ -752,10 +749,10 @@ runq_insert(const struct scheduler *ops, struct csched2_vcpu *svc)
     struct list_head * runq = &RQD(ops, cpu)->runq;
     int pos = 0;
 
-    ASSERT( spin_is_locked(per_cpu(schedule_data, cpu).schedule_lock) );
+    ASSERT(spin_is_locked(per_cpu(schedule_data, cpu).schedule_lock));
 
-    BUG_ON( __vcpu_on_runq(svc) );
-    BUG_ON( c2r(ops, cpu) != c2r(ops, svc->vcpu->processor) );
+    ASSERT(!__vcpu_on_runq(svc));
+    ASSERT(c2r(ops, cpu) == c2r(ops, svc->vcpu->processor));
 
     pos = __runq_insert(runq, svc);
 
@@ -778,7 +775,7 @@ runq_insert(const struct scheduler *ops, struct csched2_vcpu *svc)
 static inline void
 __runq_remove(struct csched2_vcpu *svc)
 {
-    BUG_ON( !__vcpu_on_runq(svc) );
+    ASSERT(__vcpu_on_runq(svc));
     list_del_init(&svc->runq_elem);
 }
 
@@ -803,16 +800,29 @@ void burn_credits(struct csched2_runqueue_data *rqd, struct csched2_vcpu *, s_ti
 static void
 runq_tickle(const struct scheduler *ops, struct csched2_vcpu *new, s_time_t now)
 {
-    int i, ipid=-1;
-    s_time_t lowest=(1<<30);
+    int i, ipid = -1;
+    s_time_t lowest = (1<<30);
     unsigned int cpu = new->vcpu->processor;
     struct csched2_runqueue_data *rqd = RQD(ops, cpu);
     cpumask_t mask;
     struct csched2_vcpu * cur;
 
-    d2printk("rqt %pv curr %pv\n", new->vcpu, current);
+    ASSERT(new->rqd == rqd);
 
-    BUG_ON(new->rqd != rqd);
+    /* TRACE */
+    {
+        struct {
+            unsigned vcpu:16, dom:16;
+            unsigned processor, credit;
+        } d;
+        d.dom = new->vcpu->domain->domain_id;
+        d.vcpu = new->vcpu->vcpu_id;
+        d.processor = new->vcpu->processor;
+        d.credit = new->credit;
+        trace_var(TRC_CSCHED2_TICKLE_NEW, 1,
+                  sizeof(d),
+                  (unsigned char *)&d);
+    }
 
     /*
      * Get a mask of idle, but not tickled, processors that new is
@@ -858,7 +868,7 @@ runq_tickle(const struct scheduler *ops, struct csched2_vcpu *new, s_time_t now)
 
         cur = CSCHED2_VCPU(curr_on_cpu(i));
 
-        BUG_ON(is_idle_vcpu(cur->vcpu));
+        ASSERT(!is_idle_vcpu(cur->vcpu));
 
         /* Update credits for current to see if we want to preempt. */
         burn_credits(rqd, cur, now);
@@ -948,8 +958,8 @@ static void reset_credit(const struct scheduler *ops, int cpu, s_time_t now,
 
         svc = list_entry(iter, struct csched2_vcpu, rqd_elem);
 
-        BUG_ON( is_idle_vcpu(svc->vcpu) );
-        BUG_ON( svc->rqd != rqd );
+        ASSERT(!is_idle_vcpu(svc->vcpu));
+        ASSERT(svc->rqd == rqd);
 
         start_credit = svc->credit;
 
@@ -993,12 +1003,11 @@ void burn_credits(struct csched2_runqueue_data *rqd,
 {
     s_time_t delta;
 
-    /* Assert svc is current */
-    ASSERT(svc==CSCHED2_VCPU(curr_on_cpu(svc->vcpu->processor)));
+    ASSERT(svc == CSCHED2_VCPU(curr_on_cpu(svc->vcpu->processor)));
 
     if ( unlikely(is_idle_vcpu(svc->vcpu)) )
     {
-        BUG_ON(svc->credit != CSCHED2_IDLE_CREDIT);
+        ASSERT(svc->credit == CSCHED2_IDLE_CREDIT);
         return;
     }
 
@@ -1009,13 +1018,11 @@ void burn_credits(struct csched2_runqueue_data *rqd,
         SCHED_STAT_CRANK(burn_credits_t2c);
         t2c_update(rqd, delta, svc);
         svc->start_time = now;
-
-        d2printk("b %pv c%d\n", svc->vcpu, svc->credit);
     }
     else if ( delta < 0 )
     {
-        d2printk("%s: Time went backwards? now %"PRI_stime" start %"PRI_stime"\n",
-               __func__, now, svc->start_time);
+        d2printk("WARNING: %s: Time went backwards? now %"PRI_stime" start_time %"PRI_stime"\n",
+                 __func__, now, svc->start_time);
     }
 
     /* TRACE */
@@ -1048,7 +1055,6 @@ static void update_max_weight(struct csched2_runqueue_data *rqd, int new_weight,
     if ( new_weight > rqd->max_weight )
     {
         rqd->max_weight = new_weight;
-        d2printk("%s: Runqueue id %d max weight %d\n", __func__, rqd->id, rqd->max_weight);
         SCHED_STAT_CRANK(upd_max_weight_quick);
     }
     else if ( old_weight == rqd->max_weight )
@@ -1065,8 +1071,19 @@ static void update_max_weight(struct csched2_runqueue_data *rqd, int new_weight,
         }
 
         rqd->max_weight = max_weight;
-        d2printk("%s: Runqueue %d max weight %d\n", __func__, rqd->id, rqd->max_weight);
         SCHED_STAT_CRANK(upd_max_weight_full);
+    }
+
+    /* TRACE */
+    {
+        struct {
+            unsigned rqi:16, max_weight:16;
+        } d;
+        d.rqi = rqd->id;
+        d.max_weight = rqd->max_weight;
+        trace_var(TRC_CSCHED2_RUNQ_MAX_WEIGHT, 1,
+                  sizeof(d),
+                  (unsigned char *)&d);
     }
 }
 
@@ -1114,8 +1131,7 @@ csched2_alloc_vdata(const struct scheduler *ops, struct vcpu *vc, void *dd)
 
     if ( ! is_idle_vcpu(vc) )
     {
-        BUG_ON( svc->sdom == NULL );
-
+        ASSERT(svc->sdom != NULL);
         svc->credit = CSCHED2_CREDIT_INIT;
         svc->weight = svc->sdom->weight;
         /* Starting load of 50% */
@@ -1124,7 +1140,7 @@ csched2_alloc_vdata(const struct scheduler *ops, struct vcpu *vc, void *dd)
     }
     else
     {
-        BUG_ON( svc->sdom != NULL );
+        ASSERT(svc->sdom == NULL);
         svc->credit = CSCHED2_IDLE_CREDIT;
         svc->weight = 0;
     }
@@ -1168,7 +1184,7 @@ runq_assign(const struct scheduler *ops, struct vcpu *vc)
 {
     struct csched2_vcpu *svc = vc->sched_priv;
 
-    BUG_ON(svc->rqd != NULL);
+    ASSERT(svc->rqd == NULL);
 
     __runq_assign(svc, RQD(ops, vc->processor));
 }
@@ -1176,8 +1192,8 @@ runq_assign(const struct scheduler *ops, struct vcpu *vc)
 static void
 __runq_deassign(struct csched2_vcpu *svc)
 {
-    BUG_ON(__vcpu_on_runq(svc));
-    BUG_ON(svc->flags & CSFLAG_scheduled);
+    ASSERT(!__vcpu_on_runq(svc));
+    ASSERT(!(svc->flags & CSFLAG_scheduled));
 
     list_del_init(&svc->rqd_elem);
     update_max_weight(svc->rqd, 0, svc->weight);
@@ -1193,7 +1209,7 @@ runq_deassign(const struct scheduler *ops, struct vcpu *vc)
 {
     struct csched2_vcpu *svc = vc->sched_priv;
 
-    BUG_ON(svc->rqd != RQD(ops, vc->processor));
+    ASSERT(svc->rqd == RQD(ops, vc->processor));
 
     __runq_deassign(svc);
 }
@@ -1205,9 +1221,8 @@ csched2_vcpu_insert(const struct scheduler *ops, struct vcpu *vc)
     struct csched2_dom * const sdom = svc->sdom;
     spinlock_t *lock;
 
-    printk("%s: Inserting %pv\n", __func__, vc);
-
-    BUG_ON(is_idle_vcpu(vc));
+    ASSERT(!is_idle_vcpu(vc));
+    ASSERT(list_empty(&svc->runq_elem));
 
     /* Add vcpu to runqueue of initial processor */
     lock = vcpu_schedule_lock_irq(vc);
@@ -1235,26 +1250,21 @@ static void
 csched2_vcpu_remove(const struct scheduler *ops, struct vcpu *vc)
 {
     struct csched2_vcpu * const svc = CSCHED2_VCPU(vc);
-    struct csched2_dom * const sdom = svc->sdom;
+    spinlock_t *lock;
 
-    BUG_ON( sdom == NULL );
-    BUG_ON( !list_empty(&svc->runq_elem) );
+    ASSERT(!is_idle_vcpu(vc));
+    ASSERT(list_empty(&svc->runq_elem));
 
-    if ( ! is_idle_vcpu(vc) )
-    {
-        spinlock_t *lock;
+    SCHED_STAT_CRANK(vcpu_remove);
 
-        SCHED_STAT_CRANK(vcpu_remove);
+    /* Remove from runqueue */
+    lock = vcpu_schedule_lock_irq(vc);
 
-        /* Remove from runqueue */
-        lock = vcpu_schedule_lock_irq(vc);
+    runq_deassign(ops, vc);
 
-        runq_deassign(ops, vc);
+    vcpu_schedule_unlock_irq(lock, vc);
 
-        vcpu_schedule_unlock_irq(lock, vc);
-
-        svc->sdom->nr_vcpus--;
-    }
+    svc->sdom->nr_vcpus--;
 }
 
 static void
@@ -1262,14 +1272,14 @@ csched2_vcpu_sleep(const struct scheduler *ops, struct vcpu *vc)
 {
     struct csched2_vcpu * const svc = CSCHED2_VCPU(vc);
 
-    BUG_ON( is_idle_vcpu(vc) );
+    ASSERT(!is_idle_vcpu(vc));
     SCHED_STAT_CRANK(vcpu_sleep);
 
     if ( curr_on_cpu(vc->processor) == vc )
         cpu_raise_softirq(vc->processor, SCHEDULE_SOFTIRQ);
     else if ( __vcpu_on_runq(svc) )
     {
-        BUG_ON(svc->rqd != RQD(ops, vc->processor));
+        ASSERT(svc->rqd == RQD(ops, vc->processor));
         update_load(ops, svc->rqd, svc, -1, NOW());
         __runq_remove(svc);
     }
@@ -1285,9 +1295,7 @@ csched2_vcpu_wake(const struct scheduler *ops, struct vcpu *vc)
 
     /* Schedule lock should be held at this point. */
 
-    d2printk("w %pv\n", vc);
-
-    BUG_ON( is_idle_vcpu(vc) );
+    ASSERT(!is_idle_vcpu(vc));
 
     if ( unlikely(curr_on_cpu(vc->processor) == vc) )
     {
@@ -1319,7 +1327,7 @@ csched2_vcpu_wake(const struct scheduler *ops, struct vcpu *vc)
     if ( svc->rqd == NULL )
         runq_assign(ops, vc);
     else
-        BUG_ON(RQD(ops, vc->processor) != svc->rqd );
+        ASSERT(RQD(ops, vc->processor) == svc->rqd );
 
     now = NOW();
 
@@ -1330,7 +1338,6 @@ csched2_vcpu_wake(const struct scheduler *ops, struct vcpu *vc)
     runq_tickle(ops, svc, now);
 
 out:
-    d2printk("w-\n");
     return;
 }
 
@@ -1342,6 +1349,7 @@ csched2_context_saved(const struct scheduler *ops, struct vcpu *vc)
     s_time_t now = NOW();
 
     BUG_ON( !is_idle_vcpu(vc) && svc->rqd != RQD(ops, vc->processor));
+    ASSERT(is_idle_vcpu(vc) || svc->rqd == RQD(ops, vc->processor));
 
     /* This vcpu is now eligible to be put on the runqueue again */
     __clear_bit(__CSFLAG_scheduled, &svc->flags);
@@ -1357,7 +1365,7 @@ csched2_context_saved(const struct scheduler *ops, struct vcpu *vc)
     if ( __test_and_clear_bit(__CSFLAG_delayed_runq_add, &svc->flags)
          && likely(vcpu_runnable(vc)) )
     {
-        BUG_ON(__vcpu_on_runq(svc));
+        ASSERT(!__vcpu_on_runq(svc));
 
         runq_insert(ops, svc);
         runq_tickle(ops, svc, now);
@@ -1377,7 +1385,7 @@ csched2_cpu_pick(const struct scheduler *ops, struct vcpu *vc)
     struct csched2_vcpu *svc = CSCHED2_VCPU(vc);
     s_time_t min_avgload;
 
-    BUG_ON(cpumask_empty(&prv->active_queues));
+    ASSERT(!cpumask_empty(&prv->active_queues));
 
     /* Locking:
      * - vc->processor is already locked
@@ -1396,12 +1404,8 @@ csched2_cpu_pick(const struct scheduler *ops, struct vcpu *vc)
 
     if ( !spin_trylock(&prv->lock) )
     {
-        if ( __test_and_clear_bit(__CSFLAG_runq_migrate_request, &svc->flags) )
-        {
-            d2printk("%pv -\n", svc->vcpu);
-            __clear_bit(__CSFLAG_runq_migrate_request, &svc->flags);
-        }
-
+        /* We may be here because someone requested us to migrate. */
+        __clear_bit(__CSFLAG_runq_migrate_request, &svc->flags);
         return get_fallback_cpu(svc);
     }
 
@@ -1411,7 +1415,7 @@ csched2_cpu_pick(const struct scheduler *ops, struct vcpu *vc)
     {
         if ( unlikely(svc->migrate_rqd->id < 0) )
         {
-            printk("%s: Runqueue migrate aborted because target runqueue disappeared!\n",
+            printk(XENLOG_WARNING "%s: target runqueue disappeared!\n",
                    __func__);
         }
         else
@@ -1420,10 +1424,7 @@ csched2_cpu_pick(const struct scheduler *ops, struct vcpu *vc)
                         &svc->migrate_rqd->active);
             new_cpu = cpumask_any(cpumask_scratch);
             if ( new_cpu < nr_cpu_ids )
-            {
-                d2printk("%pv +\n", svc->vcpu);
                 goto out_up;
-            }
         }
         /* Fall-through to normal cpu pick */
     }
@@ -1537,9 +1538,23 @@ static void migrate(const struct scheduler *ops,
                     struct csched2_runqueue_data *trqd, 
                     s_time_t now)
 {
+    /* TRACE */
+    {
+        struct {
+            unsigned vcpu:16, dom:16;
+            unsigned rqi:16, trqi:16;
+        } d;
+        d.dom = svc->vcpu->domain->domain_id;
+        d.vcpu = svc->vcpu->vcpu_id;
+        d.rqi = svc->rqd->id;
+        d.trqi = trqd->id;
+        trace_var(TRC_CSCHED2_MIGRATE, 1,
+                  sizeof(d),
+                  (unsigned char *)&d);
+    }
+
     if ( svc->flags & CSFLAG_scheduled )
     {
-        d2printk("%pv %d-%d a\n", svc->vcpu, svc->rqd->id, trqd->id);
         /* It's running; mark it to migrate. */
         svc->migrate_rqd = trqd;
         __set_bit(_VPF_migrating, &svc->vcpu->pause_flags);
@@ -1548,21 +1563,20 @@ static void migrate(const struct scheduler *ops,
     }
     else
     {
-        int on_runq=0;
+        int on_runq = 0;
         /* It's not running; just move it */
-        d2printk("%pv %d-%d i\n", svc->vcpu, svc->rqd->id, trqd->id);
         if ( __vcpu_on_runq(svc) )
         {
             __runq_remove(svc);
             update_load(ops, svc->rqd, NULL, -1, now);
-            on_runq=1;
+            on_runq = 1;
         }
         __runq_deassign(svc);
 
         cpumask_and(cpumask_scratch, svc->vcpu->cpu_hard_affinity,
                     &trqd->active);
         svc->vcpu->processor = cpumask_any(cpumask_scratch);
-        BUG_ON(svc->vcpu->processor >= nr_cpu_ids);
+        ASSERT(svc->vcpu->processor < nr_cpu_ids);
 
         __runq_assign(svc, trqd);
         if ( on_runq )
@@ -1754,7 +1768,7 @@ csched2_vcpu_migrate(
     struct csched2_runqueue_data *trqd;
 
     /* Check if new_cpu is valid */
-    BUG_ON(!cpumask_test_cpu(new_cpu, &CSCHED2_PRIV(ops)->initialized));
+    ASSERT(cpumask_test_cpu(new_cpu, &CSCHED2_PRIV(ops)->initialized));
     ASSERT(cpumask_test_cpu(new_cpu, vc->cpu_hard_affinity));
 
     trqd = RQD(ops, new_cpu);
@@ -1814,7 +1828,7 @@ csched2_dom_cntl(
                  * been disabled. */
                 spinlock_t *lock = vcpu_schedule_lock(svc->vcpu);
 
-                BUG_ON(svc->rqd != RQD(ops, svc->vcpu->processor));
+                ASSERT(svc->rqd == RQD(ops, svc->vcpu->processor));
 
                 svc->weight = sdom->weight;
                 update_max_weight(svc->rqd, svc->weight, old_weight);
@@ -1863,8 +1877,6 @@ csched2_dom_init(const struct scheduler *ops, struct domain *dom)
 {
     struct csched2_dom *sdom;
 
-    printk("%s: Initializing domain %d\n", __func__, dom->domain_id);
-
     if ( is_idle_domain(dom) )
         return 0;
 
@@ -1895,7 +1907,7 @@ csched2_free_domdata(const struct scheduler *ops, void *data)
 static void
 csched2_dom_destroy(const struct scheduler *ops, struct domain *dom)
 {
-    BUG_ON(CSCHED2_DOM(dom)->nr_vcpus > 0);
+    ASSERT(CSCHED2_DOM(dom)->nr_vcpus == 0);
 
     csched2_free_domdata(ops, CSCHED2_DOM(dom));
 }
@@ -2036,8 +2048,6 @@ csched2_schedule(
     SCHED_STAT_CRANK(schedule);
     CSCHED2_VCPU_CHECK(current);
 
-    d2printk("sc p%d c %pv now %"PRI_stime"\n", cpu, scurr->vcpu, now);
-
     BUG_ON(!cpumask_test_cpu(cpu, &CSCHED2_PRIV(ops)->initialized));
 
     rqd = RQD(ops, cpu);
@@ -2045,30 +2055,6 @@ csched2_schedule(
 
     /* Protected by runqueue lock */        
 
-    /* DEBUG */
-    if ( !is_idle_vcpu(scurr->vcpu) && scurr->rqd != rqd)
-    {
-        int other_rqi = -1, this_rqi = c2r(ops, cpu);
-
-        if ( scurr->rqd )
-        {
-            int rq;
-            other_rqi = -2;
-            for_each_cpu ( rq, &CSCHED2_PRIV(ops)->active_queues )
-            {
-                if ( scurr->rqd == &CSCHED2_PRIV(ops)->rqd[rq] )
-                {
-                    other_rqi = rq;
-                    break;
-                }
-            }
-        }
-        printk("%s: pcpu %d rq %d, but scurr %pv assigned to "
-               "pcpu %d rq %d!\n",
-               __func__,
-               cpu, this_rqi,
-               scurr->vcpu, scurr->vcpu->processor, other_rqi);
-    }
     BUG_ON(!is_idle_vcpu(scurr->vcpu) && scurr->rqd != rqd);
 
     /* Clear "tickled" bit now that we've been scheduled */
@@ -2119,15 +2105,10 @@ csched2_schedule(
         /* If switching, remove this from the runqueue and mark it scheduled */
         if ( snext != scurr )
         {
-            BUG_ON(snext->rqd != rqd);
-    
+            ASSERT(snext->rqd == rqd);
+            ASSERT(!snext->vcpu->is_running);
+
             __runq_remove(snext);
-            if ( snext->vcpu->is_running )
-            {
-                printk("p%d: snext %pv running on p%d! scurr %pv\n",
-                       cpu, snext->vcpu, snext->vcpu->processor, scurr->vcpu);
-                BUG();
-            }
             __set_bit(__CSFLAG_scheduled, &snext->flags);
         }
 
@@ -2433,10 +2414,10 @@ init_pdata(struct csched2_private *prv, unsigned int cpu)
 
     rqd = prv->rqd + rqi;
 
-    printk("Adding cpu %d to runqueue %d\n", cpu, rqi);
+    printk(XENLOG_INFO "Adding cpu %d to runqueue %d\n", cpu, rqi);
     if ( ! cpumask_test_cpu(rqi, &prv->active_queues) )
     {
-        printk(" First cpu on runqueue, activating\n");
+        printk(XENLOG_INFO " First cpu on runqueue, activating\n");
         activate_runqueue(prv, rqi);
     }
     
@@ -2548,14 +2529,14 @@ csched2_deinit_pdata(const struct scheduler *ops, void *pcpu, int cpu)
     /* No need to save IRQs here, they're already disabled */
     spin_lock(&rqd->lock);
 
-    printk("Removing cpu %d from runqueue %d\n", cpu, rqi);
+    printk(XENLOG_INFO "Removing cpu %d from runqueue %d\n", cpu, rqi);
 
     __cpumask_clear_cpu(cpu, &rqd->idle);
     __cpumask_clear_cpu(cpu, &rqd->active);
 
     if ( cpumask_empty(&rqd->active) )
     {
-        printk(" No cpus left on runqueue, disabling\n");
+        printk(XENLOG_INFO " No cpus left on runqueue, disabling\n");
         deactivate_runqueue(prv, rqi);
     }
 
@@ -2574,15 +2555,20 @@ csched2_init(struct scheduler *ops)
     int i;
     struct csched2_private *prv;
 
-    printk("Initializing Credit2 scheduler\n" \
-           " WARNING: This is experimental software in development.\n" \
+    printk("Initializing Credit2 scheduler\n");
+    printk(" WARNING: This is experimental software in development.\n" \
            " Use at your own risk.\n");
 
-    printk(" load_precision_shift: %d\n", opt_load_precision_shift);
-    printk(" load_window_shift: %d\n", opt_load_window_shift);
-    printk(" underload_balance_tolerance: %d\n", opt_underload_balance_tolerance);
-    printk(" overload_balance_tolerance: %d\n", opt_overload_balance_tolerance);
-    printk(" runqueues arrangement: %s\n", opt_runqueue_str[opt_runqueue]);
+    printk(XENLOG_INFO " load_precision_shift: %d\n"
+           XENLOG_INFO " load_window_shift: %d\n"
+           XENLOG_INFO " underload_balance_tolerance: %d\n"
+           XENLOG_INFO " overload_balance_tolerance: %d\n"
+           XENLOG_INFO " runqueues arrangement: %s\n",
+           opt_load_precision_shift,
+           opt_load_window_shift,
+           opt_underload_balance_tolerance,
+           opt_overload_balance_tolerance,
+           opt_runqueue_str[opt_runqueue]);
 
     if ( opt_load_precision_shift < LOADAVG_PRECISION_SHIFT_MIN )
     {
