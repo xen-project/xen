@@ -37,24 +37,8 @@ following machine state:
 All other processor registers and flag bits are unspecified. The OS is in
 charge of setting up it's own stack, GDT and IDT.
 
-The format of the boot start info structure is the following (pointed to
-be %ebx):
-
-    struct hvm_start_info {
-    #define HVM_START_MAGIC_VALUE 0x336ec578
-        uint32_t magic;             /* Contains the magic value 0x336ec578       */
-                                    /* ("xEn3" with the 0x80 bit of the "E" set).*/
-        uint32_t flags;             /* SIF_xxx flags.                            */
-        uint32_t cmdline_paddr;     /* Physical address of the command line.     */
-        uint32_t nr_modules;        /* Number of modules passed to the kernel.   */
-        uint32_t modlist_paddr;     /* Physical address of an array of           */
-                                    /* hvm_modlist_entry.                        */
-    };
-
-    struct hvm_modlist_entry {
-        uint32_t paddr;             /* Physical address of the module.           */
-        uint32_t size;              /* Size of the module in bytes.              */
-    };
+The format of the boot start info structure (pointed to by %ebx) can be found
+in xen/include/public/arch-x86/hvm/start_info.h
 
 Other relevant information needed in order to boot a guest kernel
 (console page address, xenstore event channel...) can be obtained
