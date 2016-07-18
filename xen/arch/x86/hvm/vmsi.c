@@ -166,6 +166,16 @@ struct msixtbl_entry
 
 static DEFINE_RCU_READ_LOCK(msixtbl_rcu_lock);
 
+/*
+ * MSI-X table infrastructure is dynamically initialised when an MSI-X capable
+ * device is passed through to a domain, rather than unconditionally for all
+ * domains.
+ */
+static bool msixtbl_initialised(const struct domain *d)
+{
+    return !!d->arch.hvm_domain.msixtbl_list.next;
+}
+
 static struct msixtbl_entry *msixtbl_find_entry(
     struct vcpu *v, unsigned long addr)
 {
@@ -519,7 +529,7 @@ void msixtbl_pt_unregister(struct domain *d, struct pirq *pirq)
     ASSERT(pcidevs_locked());
     ASSERT(spin_is_locked(&d->event_lock));
 
-    if ( !has_vlapic(d) )
+    if ( !msixtbl_initialised(d) )
         return;
 
     irq_desc = pirq_spin_lock_irq_desc(pirq, NULL);
@@ -552,7 +562,7 @@ void msixtbl_init(struct domain *d)
     struct hvm_io_handler *handler;
 
     if ( !has_hvm_container_domain(d) || !has_vlapic(d) ||
-         d->arch.hvm_domain.msixtbl_list.next )
+         msixtbl_initialised(d) )
         return;
 
     INIT_LIST_HEAD(&d->arch.hvm_domain.msixtbl_list);
@@ -569,7 +579,7 @@ void msixtbl_pt_cleanup(struct domain *d)
 {
     struct msixtbl_entry *entry, *temp;
 
-    if ( !d->arch.hvm_domain.msixtbl_list.next )
+    if ( !msixtbl_initialised(d) )
         return;
 
     spin_lock(&d->event_lock);
