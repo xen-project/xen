@@ -102,6 +102,9 @@ $(TARGET)-syms: prelink.o xen.lds $(BASEDIR)/common/symbols-dummy.o
 	$(MAKE) -f $(BASEDIR)/Rules.mk $(@D)/.$(@F).1.o
 	$(LD) $(LDFLAGS) -T xen.lds -N prelink.o $(build_id_linker) \
 	    $(@D)/.$(@F).1.o -o $@
+	$(NM) -pa --format=sysv $(@D)/$(@F) \
+		| $(BASEDIR)/tools/symbols --xensyms --sysv --sort \
+		>$(@D)/$(@F).map
 	rm -f $(@D)/.$(@F).[0-9]*
 
 asm-offsets.s: $(TARGET_SUBARCH)/asm-offsets.c

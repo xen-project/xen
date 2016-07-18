@@ -52,6 +52,7 @@ static unsigned int table_size, table_cnt;
 static unsigned long long _stext, _etext, _sinittext, _einittext, _sextratext, _eextratext;
 static int all_symbols = 0;
 static int sort_by_name = 0;
+static int map_only = 0;
 static char symbol_prefix_char = '\0';
 static enum { fmt_bsd, fmt_sysv } input_format;
 static int compare_name(const void *p1, const void *p2);
@@ -181,7 +182,7 @@ static int read_symbol(FILE *in, struct sym_entry *s)
 		*sym++ = '#';
 	}
 	strcpy(sym, str);
-	if (sort_by_name) {
+	if (sort_by_name || map_only) {
 		s->orig_symbol = strdup(SYMBOL_NAME(s));
 		s->type = stype; /* As s->sym[0] ends mangled. */
 	}
@@ -307,6 +308,13 @@ static void write_src(void)
 	unsigned int *markers;
 	char buf[KSYM_NAME_LEN+1];
 
+	if (map_only) {
+		for (i = 0; i < table_cnt; i++)
+			printf("%#llx %c %s\n", table[i].addr, table[i].type,
+						table[i].orig_symbol);
+
+		return;
+	}
 	printf("#include <xen/config.h>\n");
 	printf("#include <asm/types.h>\n");
 	printf("#if BITS_PER_LONG == 64 && !defined(SYMBOLS_ORIGIN)\n");
@@ -609,6 +617,8 @@ int main(int argc, char **argv)
 				sort_by_name = 1;
 			else if (strcmp(argv[i], "--warn-dup") == 0)
 				warn_dup = true;
+			else if (strcmp(argv[i], "--xensyms") == 0)
+				map_only = true;
 			else
 				usage();
 		}

@@ -273,6 +273,7 @@ tools/flask/policy/policy.conf
 tools/flask/policy/xenpolicy-*
 xen/xen
 xen/xen-syms
+xen/xen-syms.map
 xen/xen.*
 unmodified_drivers/linux-2.6/.tmp_versions
 unmodified_drivers/linux-2.6/*.cmd

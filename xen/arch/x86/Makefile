@@ -139,6 +139,9 @@ $(TARGET)-syms: prelink.o xen.lds $(BASEDIR)/common/symbols-dummy.o
 	$(MAKE) -f $(BASEDIR)/Rules.mk $(@D)/.$(@F).1.o
 	$(LD) $(LDFLAGS) -T xen.lds -N prelink.o $(build_id_linker) \
 	    $(@D)/.$(@F).1.o -o $@
+	$(NM) -pa --format=sysv $(@D)/$(@F) \
+		| $(BASEDIR)/tools/symbols --xensyms --sysv --sort \
+		>$(@D)/$(@F).map
 	rm -f $(@D)/.$(@F).[0-9]*
 
 note.o: $(TARGET)-syms
@@ -189,7 +192,9 @@ $(TARGET).efi: prelink-efi.o $(note_file) efi.lds efi/relocs-dummy.o $(BASEDIR)/
 	$(guard) $(MAKE) -f $(BASEDIR)/Rules.mk $(@D)/.$(@F).1r.o $(@D)/.$(@F).1s.o
 	$(guard) $(LD) $(call EFI_LDFLAGS,$(VIRT_BASE)) -T efi.lds -N $< \
 	                $(@D)/.$(@F).1r.o $(@D)/.$(@F).1s.o $(note_file) -o $@
-	if $(guard) false; then rm -f $@; echo 'EFI support disabled'; fi
+	if $(guard) false; then rm -f $@; echo 'EFI support disabled'; \
+	else $(NM) -pa --format=sysv $(@D)/$(@F) \
+		| $(BASEDIR)/tools/symbols --xensyms --sysv --sort >$(@D)/$(@F).map; fi
 	rm -f $(@D)/.$(@F).[0-9]*
 
 efi/boot.init.o efi/runtime.o efi/compat.o efi/buildid.o: $(BASEDIR)/arch/x86/efi/built_in.o
