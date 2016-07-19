@@ -407,8 +407,12 @@ bool is_child(const char *child, const char *parent)
 	return child[len] == '/' || child[len] == '\0';
 }
 
-/* If it fails, returns NULL and sets errno. */
-static struct node *read_node(struct connection *conn, const char *name)
+/*
+ * If it fails, returns NULL and sets errno.
+ * Temporary memory allocations will be done with ctx.
+ */
+static struct node *read_node(struct connection *conn, const void *ctx,
+			      const char *name)
 {
 	TDB_DATA key, data;
 	uint32_t *p;
@@ -429,7 +433,7 @@ static struct node *read_node(struct connection *conn, const char *name)
 		return NULL;
 	}
 
-	node = talloc(name, struct node);
+	node = talloc(ctx, struct node);
 	node->name = talloc_strdup(node, name);
 	node->parent = NULL;
 	node->tdb = tdb_context(conn);
@@ -536,7 +540,7 @@ static enum xs_perm_type ask_parents(struct connection *conn, const char *name)
 
 	do {
 		name = get_parent(name, name);
-		node = read_node(conn, name);
+		node = read_node(conn, name, name);
 		if (node)
 			break;
 	} while (!streq(name, "/"));
@@ -577,7 +581,7 @@ struct node *get_node(struct connection *conn,
 		errno = EINVAL;
 		return NULL;
 	}
-	node = read_node(conn, name);
+	node = read_node(conn, name, name);
 	/* If we don't have permission, we don't have node. */
 	if (node) {
 		if ((perm_for_conn(conn, node->perms, node->num_perms) & perm)
@@ -833,7 +837,7 @@ static struct node *construct_node(struct connection *conn, const char *name)
 	char *children, *parentname = get_parent(name, name);
 
 	/* If parent doesn't exist, create it. */
-	parent = read_node(conn, parentname);
+	parent = read_node(conn, parentname, parentname);
 	if (!parent)
 		parent = construct_node(conn, parentname);
 	if (!parent)
@@ -998,7 +1002,7 @@ static void delete_node(struct connection *conn, struct node *node)
 	for (i = 0; i < node->childlen; i += strlen(node->children+i) + 1) {
 		struct node *child;
 
-		child = read_node(conn, 
+		child = read_node(conn, node,
 				  talloc_asprintf(node, "%s/%s", node->name,
 						  node->children + i));
 		if (child) {
@@ -1050,7 +1054,7 @@ static int _rm(struct connection *conn, struct node *node, const char *name)
 	/* Delete from parent first, then if we crash, the worst that can
 	   happen is the child will continue to take up space, but will
 	   otherwise be unreachable. */
-	struct node *parent = read_node(conn, get_parent(name, name));
+	struct node *parent = read_node(conn, name, get_parent(name, name));
 	if (!parent) {
 		send_error(conn, EINVAL);
 		return 0;
@@ -1069,7 +1073,7 @@ static int _rm(struct connection *conn, struct node *node, const char *name)
 static void internal_rm(const char *name)
 {
 	char *tname = talloc_strdup(NULL, name);
-	struct node *node = read_node(NULL, tname);
+	struct node *node = read_node(NULL, tname, tname);
 	if (node)
 		_rm(NULL, node, tname);
 	talloc_free(node);
@@ -1087,7 +1091,7 @@ static void do_rm(struct connection *conn, struct buffered_data *in)
 	if (!node) {
 		/* Didn't exist already?  Fine, if parent exists. */
 		if (errno == ENOENT) {
-			node = read_node(conn, get_parent(in, name));
+			node = read_node(conn, in, get_parent(in, name));
 			if (node) {
 				send_ack(conn, XS_RM);
 				return;
@@ -1618,7 +1622,7 @@ static void remember_string(struct hashtable *hash, const char *str)
  */
 static void check_store_(const char *name, struct hashtable *reachable)
 {
-	struct node *node = read_node(NULL, name);
+	struct node *node = read_node(NULL, name, name);
 
 	if (node) {
 		size_t i = 0;
@@ -1632,7 +1636,8 @@ static void check_store_(const char *name, struct hashtable *reachable)
 			size_t childlen = strlen(node->children + i);
 			char * childname = child_name(node->name,
 						      node->children + i);
-			struct node *childnode = read_node(NULL, childname);
+			struct node *childnode = read_node(NULL, childname,
+							   childname);
 			
 			if (childnode) {
 				if (hashtable_search(children, childname)) {
