@@ -971,7 +971,7 @@ static void do_write(struct connection *conn, struct buffered_data *in)
 	}
 
 	add_change_node(conn->transaction, name, false);
-	fire_watches(conn, name, false);
+	fire_watches(conn, in, name, false);
 	send_ack(conn, XS_WRITE);
 }
 
@@ -996,7 +996,7 @@ static void do_mkdir(struct connection *conn, struct buffered_data *in)
 			return;
 		}
 		add_change_node(conn->transaction, name, false);
-		fire_watches(conn, name, false);
+		fire_watches(conn, in, name, false);
 	}
 	send_ack(conn, XS_MKDIR);
 }
@@ -1122,7 +1122,7 @@ static void do_rm(struct connection *conn, struct buffered_data *in)
 
 	if (_rm(conn, node, name)) {
 		add_change_node(conn->transaction, name, true);
-		fire_watches(conn, name, true);
+		fire_watches(conn, in, name, true);
 		send_ack(conn, XS_RM);
 	}
 }
@@ -1198,7 +1198,7 @@ static void do_set_perms(struct connection *conn, struct buffered_data *in)
 	}
 
 	add_change_node(conn->transaction, name, false);
-	fire_watches(conn, name, false);
+	fire_watches(conn, in, name, false);
 	send_ack(conn, XS_SET_PERMS);
 }
 

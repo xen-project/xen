@@ -227,7 +227,7 @@ void do_transaction_end(struct connection *conn, struct buffered_data *in)
 
 		/* Fire off the watches for everything that changed. */
 		list_for_each_entry(i, &trans->changes, list)
-			fire_watches(conn, i->node, i->recurse);
+			fire_watches(conn, in, i->node, i->recurse);
 		generation++;
 	}
 	send_ack(conn, XS_TRANSACTION_END);

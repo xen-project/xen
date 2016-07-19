@@ -204,7 +204,7 @@ static int destroy_domain(void *_domain)
 			unmap_interface(domain->interface);
 	}
 
-	fire_watches(NULL, "@releaseDomain", false);
+	fire_watches(NULL, domain, "@releaseDomain", false);
 
 	return 0;
 }
@@ -232,7 +232,7 @@ static void domain_cleanup(void)
 	}
 
 	if (notify)
-		fire_watches(NULL, "@releaseDomain", false);
+		fire_watches(NULL, NULL, "@releaseDomain", false);
 }
 
 /* We scan all domains rather than use the information given here. */
@@ -389,7 +389,7 @@ void do_introduce(struct connection *conn, struct buffered_data *in)
 		/* Now domain belongs to its connection. */
 		talloc_steal(domain->conn, domain);
 
-		fire_watches(NULL, "@introduceDomain", false);
+		fire_watches(NULL, in, "@introduceDomain", false);
 	} else if ((domain->mfn == mfn) && (domain->conn != conn)) {
 		/* Use XS_INTRODUCE for recreating the xenbus event-channel. */
 		if (domain->port)

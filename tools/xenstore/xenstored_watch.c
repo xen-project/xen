@@ -47,7 +47,12 @@ struct watch
 	char *node;
 };
 
+/*
+ * Send a watch event.
+ * Temporary memory allocations are done with ctx.
+ */
 static void add_event(struct connection *conn,
+		      void *ctx,
 		      struct watch *watch,
 		      const char *name)
 {
@@ -57,7 +62,7 @@ static void add_event(struct connection *conn,
 
 	if (!check_event_node(name)) {
 		/* Can this conn load node, or see that it doesn't exist? */
-		struct node *node = get_node(conn, name, name, XS_PERM_READ);
+		struct node *node = get_node(conn, ctx, name, XS_PERM_READ);
 		/*
 		 * XXX We allow EACCES here because otherwise a non-dom0
 		 * backend driver cannot watch for disappearance of a frontend
@@ -78,14 +83,19 @@ static void add_event(struct connection *conn,
 	}
 
 	len = strlen(name) + 1 + strlen(watch->token) + 1;
-	data = talloc_array(watch, char, len);
+	data = talloc_array(ctx, char, len);
 	strcpy(data, name);
 	strcpy(data + strlen(name) + 1, watch->token);
 	send_reply(conn, XS_WATCH_EVENT, data, len);
 	talloc_free(data);
 }
 
-void fire_watches(struct connection *conn, const char *name, bool recurse)
+/*
+ * Check whether any watch events are to be sent.
+ * Temporary memory allocations are done with ctx.
+ */
+void fire_watches(struct connection *conn, void *ctx, const char *name,
+		  bool recurse)
 {
 	struct connection *i;
 	struct watch *watch;
@@ -98,9 +108,9 @@ void fire_watches(struct connection *conn, const char *name, bool recurse)
 	list_for_each_entry(i, &connections, list) {
 		list_for_each_entry(watch, &i->watches, list) {
 			if (is_child(name, watch->node))
-				add_event(i, watch, name);
+				add_event(i, ctx, watch, name);
 			else if (recurse && is_child(watch->node, name))
-				add_event(i, watch, watch->node);
+				add_event(i, ctx, watch, watch->node);
 		}
 	}
 }
@@ -169,7 +179,7 @@ void do_watch(struct connection *conn, struct buffered_data *in)
 	send_ack(conn, XS_WATCH);
 
 	/* We fire once up front: simplifies clients and restart. */
-	add_event(conn, watch, watch->node);
+	add_event(conn, in, watch, watch->node);
 }
 
 void do_unwatch(struct connection *conn, struct buffered_data *in)
