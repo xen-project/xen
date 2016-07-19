@@ -443,6 +443,10 @@ Send <config> instead of config file from creation.
 
 Print huge (!) amount of debug during the migration process.
 
+=item B<-p>
+
+Leave the domain on the receive side paused after migration.
+
 =back
 
 =item B<remus> [I<OPTIONS>] I<domain-id> I<host>

@@ -4778,7 +4778,7 @@ static void migrate_domain(uint32_t domid, const char *rune, int debug,
     exit(EXIT_FAILURE);
 }
 
-static void migrate_receive(int debug, int daemonize, int monitor,
+static void migrate_receive(int debug, int daemonize, int monitor, int pause,
                             int send_fd, int recv_fd,
                             libxl_checkpointed_stream checkpointed,
                             char *colo_proxy_script)
@@ -4888,8 +4888,10 @@ static void migrate_receive(int debug, int daemonize, int monitor,
         if (rc) goto perhaps_destroy_notify_rc;
     }
 
-    rc = libxl_domain_unpause(ctx, domid);
-    if (rc) goto perhaps_destroy_notify_rc;
+    if (!pause) {
+        rc = libxl_domain_unpause(ctx, domid);
+        if (rc) goto perhaps_destroy_notify_rc;
+    }
 
     fprintf(stderr, "migration target: Domain started successsfully.\n");
     rc = 0;
@@ -5003,7 +5005,7 @@ int main_restore(int argc, char **argv)
 
 int main_migrate_receive(int argc, char **argv)
 {
-    int debug = 0, daemonize = 1, monitor = 1;
+    int debug = 0, daemonize = 1, monitor = 1, pause = 0;
     libxl_checkpointed_stream checkpointed = LIBXL_CHECKPOINTED_STREAM_NONE;
     int opt;
     char *script = NULL;
@@ -5014,7 +5016,7 @@ int main_migrate_receive(int argc, char **argv)
         COMMON_LONG_OPTS
     };
 
-    SWITCH_FOREACH_OPT(opt, "Fedr", opts, "migrate-receive", 0) {
+    SWITCH_FOREACH_OPT(opt, "Fedrp", opts, "migrate-receive", 0) {
     case 'F':
         daemonize = 0;
         break;
@@ -5034,13 +5036,16 @@ int main_migrate_receive(int argc, char **argv)
     case 0x200:
         script = optarg;
         break;
+    case 'p':
+        pause = 1;
+        break;
     }
 
     if (argc-optind != 0) {
         help("migrate-receive");
         return EXIT_FAILURE;
     }
-    migrate_receive(debug, daemonize, monitor,
+    migrate_receive(debug, daemonize, monitor, pause,
                     STDOUT_FILENO, STDIN_FILENO,
                     checkpointed, script);
 
@@ -5086,14 +5091,14 @@ int main_migrate(int argc, char **argv)
     const char *ssh_command = "ssh";
     char *rune = NULL;
     char *host;
-    int opt, daemonize = 1, monitor = 1, debug = 0;
+    int opt, daemonize = 1, monitor = 1, debug = 0, pause = 0;
     static struct option opts[] = {
         {"debug", 0, 0, 0x100},
         {"live", 0, 0, 0x200},
         COMMON_LONG_OPTS
     };
 
-    SWITCH_FOREACH_OPT(opt, "FC:s:e", opts, "migrate", 2) {
+    SWITCH_FOREACH_OPT(opt, "FC:s:ep", opts, "migrate", 2) {
     case 'C':
         config_filename = optarg;
         break;
@@ -5106,6 +5111,9 @@ int main_migrate(int argc, char **argv)
     case 'e':
         daemonize = 0;
         monitor = 0;
+        break;
+    case 'p':
+        pause = 1;
         break;
     case 0x100: /* --debug */
         debug = 1;
@@ -5134,12 +5142,13 @@ int main_migrate(int argc, char **argv)
         } else {
             verbose_len = (minmsglevel_default - minmsglevel) + 2;
         }
-        xasprintf(&rune, "exec %s %s xl%s%.*s migrate-receive%s%s",
+        xasprintf(&rune, "exec %s %s xl%s%.*s migrate-receive%s%s%s",
                   ssh_command, host,
                   pass_tty_arg ? " -t" : "",
                   verbose_len, verbose_buf,
                   daemonize ? "" : " -e",
-                  debug ? " -d" : "");
+                  debug ? " -d" : "",
+                  pause ? " -p" : "");
     }
 
     migrate_domain(domid, rune, debug, config_filename);
