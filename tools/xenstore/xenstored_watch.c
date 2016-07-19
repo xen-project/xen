@@ -57,7 +57,7 @@ static void add_event(struct connection *conn,
 
 	if (!check_event_node(name)) {
 		/* Can this conn load node, or see that it doesn't exist? */
-		struct node *node = get_node(conn, name, XS_PERM_READ);
+		struct node *node = get_node(conn, name, name, XS_PERM_READ);
 		/*
 		 * XXX We allow EACCES here because otherwise a non-dom0
 		 * backend driver cannot watch for disappearance of a frontend

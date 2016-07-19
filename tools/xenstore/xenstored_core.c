@@ -533,14 +533,18 @@ static char *get_parent(const void *ctx, const char *node)
 	return talloc_asprintf(ctx, "%.*s", (int)(slash - node), node);
 }
 
-/* What do parents say? */
-static enum xs_perm_type ask_parents(struct connection *conn, const char *name)
+/*
+ * What do parents say?
+ * Temporary memory allocations are done with ctx.
+ */
+static enum xs_perm_type ask_parents(struct connection *conn, const void *ctx,
+				     const char *name)
 {
 	struct node *node;
 
 	do {
-		name = get_parent(name, name);
-		node = read_node(conn, name, name);
+		name = get_parent(ctx, name);
+		node = read_node(conn, ctx, name);
 		if (node)
 			break;
 	} while (!streq(name, "/"));
@@ -554,24 +558,32 @@ static enum xs_perm_type ask_parents(struct connection *conn, const char *name)
 	return perm_for_conn(conn, node->perms, node->num_perms);
 }
 
-/* We have a weird permissions system.  You can allow someone into a
+/*
+ * We have a weird permissions system.  You can allow someone into a
  * specific node without allowing it in the parents.  If it's going to
  * fail, however, we don't want the errno to indicate any information
- * about the node. */
-static int errno_from_parents(struct connection *conn, const char *node,
-			      int errnum, enum xs_perm_type perm)
+ * about the node.
+ * Temporary memory allocations are done with ctx.
+ */
+static int errno_from_parents(struct connection *conn, const void *ctx,
+			      const char *node, int errnum,
+			      enum xs_perm_type perm)
 {
 	/* We always tell them about memory failures. */
 	if (errnum == ENOMEM)
 		return errnum;
 
-	if (ask_parents(conn, node) & perm)
+	if (ask_parents(conn, ctx, node) & perm)
 		return errnum;
 	return EACCES;
 }
 
-/* If it fails, returns NULL and sets errno. */
+/*
+ * If it fails, returns NULL and sets errno.
+ * Temporary memory allocations are done with ctx.
+ */
 struct node *get_node(struct connection *conn,
+		      const void *ctx,
 		      const char *name,
 		      enum xs_perm_type perm)
 {
@@ -581,7 +593,7 @@ struct node *get_node(struct connection *conn,
 		errno = EINVAL;
 		return NULL;
 	}
-	node = read_node(conn, name, name);
+	node = read_node(conn, ctx, name);
 	/* If we don't have permission, we don't have node. */
 	if (node) {
 		if ((perm_for_conn(conn, node->perms, node->num_perms) & perm)
@@ -592,7 +604,7 @@ struct node *get_node(struct connection *conn,
 	}
 	/* Clean up errno if they weren't supposed to know. */
 	if (!node) 
-		errno = errno_from_parents(conn, name, errno, perm);
+		errno = errno_from_parents(conn, ctx, name, errno, perm);
 	return node;
 }
 
@@ -785,7 +797,7 @@ static void send_directory(struct connection *conn, struct buffered_data *in)
 	const char *name = onearg(in);
 
 	name = canonicalize(conn, name);
-	node = get_node(conn, name, XS_PERM_READ);
+	node = get_node(conn, in, name, XS_PERM_READ);
 	if (!node) {
 		send_error(conn, errno);
 		return;
@@ -800,7 +812,7 @@ static void do_read(struct connection *conn, struct buffered_data *in)
 	const char *name = onearg(in);
 
 	name = canonicalize(conn, name);
-	node = get_node(conn, name, XS_PERM_READ);
+	node = get_node(conn, in, name, XS_PERM_READ);
 	if (!node) {
 		send_error(conn, errno);
 		return;
@@ -937,7 +949,7 @@ static void do_write(struct connection *conn, struct buffered_data *in)
 	datalen = in->used - offset;
 
 	name = canonicalize(conn, vec[0]);
-	node = get_node(conn, name, XS_PERM_WRITE);
+	node = get_node(conn, in, name, XS_PERM_WRITE);
 	if (!node) {
 		/* No permissions, invalid input? */
 		if (errno != ENOENT) {
@@ -969,7 +981,7 @@ static void do_mkdir(struct connection *conn, struct buffered_data *in)
 	const char *name = onearg(in);
 
 	name = canonicalize(conn, name);
-	node = get_node(conn, name, XS_PERM_WRITE);
+	node = get_node(conn, in, name, XS_PERM_WRITE);
 
 	/* If it already exists, fine. */
 	if (!node) {
@@ -1087,7 +1099,7 @@ static void do_rm(struct connection *conn, struct buffered_data *in)
 	const char *name = onearg(in);
 
 	name = canonicalize(conn, name);
-	node = get_node(conn, name, XS_PERM_WRITE);
+	node = get_node(conn, in, name, XS_PERM_WRITE);
 	if (!node) {
 		/* Didn't exist already?  Fine, if parent exists. */
 		if (errno == ENOENT) {
@@ -1124,7 +1136,7 @@ static void do_get_perms(struct connection *conn, struct buffered_data *in)
 	unsigned int len;
 
 	name = canonicalize(conn, name);
-	node = get_node(conn, name, XS_PERM_READ);
+	node = get_node(conn, in, name, XS_PERM_READ);
 	if (!node) {
 		send_error(conn, errno);
 		return;
@@ -1156,7 +1168,7 @@ static void do_set_perms(struct connection *conn, struct buffered_data *in)
 	num--;
 
 	/* We must own node to do this (tools can do this too). */
-	node = get_node(conn, name, XS_PERM_WRITE|XS_PERM_OWNER);
+	node = get_node(conn, in, name, XS_PERM_WRITE|XS_PERM_OWNER);
 	if (!node) {
 		send_error(conn, errno);
 		return;

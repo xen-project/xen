@@ -149,6 +149,7 @@ bool check_event_node(const char *node);
 
 /* Get this node, checking we have permissions. */
 struct node *get_node(struct connection *conn,
+		      const void *ctx,
 		      const char *name,
 		      enum xs_perm_type perm);
 
