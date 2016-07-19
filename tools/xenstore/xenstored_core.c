@@ -517,12 +517,16 @@ static enum xs_perm_type perm_for_conn(struct connection *conn,
 	return perms[0].perms & mask;
 }
 
-static char *get_parent(const char *node)
+/*
+ * Get name of node parent.
+ * Temporary memory allocations are done with ctx.
+ */
+static char *get_parent(const void *ctx, const char *node)
 {
 	char *slash = strrchr(node + 1, '/');
 	if (!slash)
-		return talloc_strdup(node, "/");
-	return talloc_asprintf(node, "%.*s", (int)(slash - node), node);
+		return talloc_strdup(ctx, "/");
+	return talloc_asprintf(ctx, "%.*s", (int)(slash - node), node);
 }
 
 /* What do parents say? */
@@ -531,7 +535,7 @@ static enum xs_perm_type ask_parents(struct connection *conn, const char *name)
 	struct node *node;
 
 	do {
-		name = get_parent(name);
+		name = get_parent(name, name);
 		node = read_node(conn, name);
 		if (node)
 			break;
@@ -826,7 +830,7 @@ static struct node *construct_node(struct connection *conn, const char *name)
 	const char *base;
 	unsigned int baselen;
 	struct node *parent, *node;
-	char *children, *parentname = get_parent(name);
+	char *children, *parentname = get_parent(name, name);
 
 	/* If parent doesn't exist, create it. */
 	parent = read_node(conn, parentname);
@@ -1046,7 +1050,7 @@ static int _rm(struct connection *conn, struct node *node, const char *name)
 	/* Delete from parent first, then if we crash, the worst that can
 	   happen is the child will continue to take up space, but will
 	   otherwise be unreachable. */
-	struct node *parent = read_node(conn, get_parent(name));
+	struct node *parent = read_node(conn, get_parent(name, name));
 	if (!parent) {
 		send_error(conn, EINVAL);
 		return 0;
@@ -1083,7 +1087,7 @@ static void do_rm(struct connection *conn, struct buffered_data *in)
 	if (!node) {
 		/* Didn't exist already?  Fine, if parent exists. */
 		if (errno == ENOENT) {
-			node = read_node(conn, get_parent(name));
+			node = read_node(conn, get_parent(in, name));
 			if (node) {
 				send_ack(conn, XS_RM);
 				return;
