@@ -184,8 +184,9 @@ void do_transaction_start(struct connection *conn, struct buffered_data *in)
 	send_reply(conn, XS_TRANSACTION_START, id_str, strlen(id_str)+1);
 }
 
-void do_transaction_end(struct connection *conn, const char *arg)
+void do_transaction_end(struct connection *conn, struct buffered_data *in)
 {
+	const char *arg = onearg(in);
 	struct changed_node *i;
 	struct changed_domain *d;
 	struct transaction *trans;

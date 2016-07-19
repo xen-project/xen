@@ -723,7 +723,7 @@ bool is_valid_nodename(const char *node)
 /* We expect one arg in the input: return NULL otherwise.
  * The payload must contain exactly one nul, at the end.
  */
-static const char *onearg(struct buffered_data *in)
+const char *onearg(struct buffered_data *in)
 {
 	if (!in->used || get_string(in, 0) != in->used)
 		return NULL;
@@ -771,9 +771,10 @@ bool check_event_node(const char *node)
 	return true;
 }
 
-static void send_directory(struct connection *conn, const char *name)
+static void send_directory(struct connection *conn, struct buffered_data *in)
 {
 	struct node *node;
+	const char *name = onearg(in);
 
 	name = canonicalize(conn, name);
 	node = get_node(conn, name, XS_PERM_READ);
@@ -785,9 +786,10 @@ static void send_directory(struct connection *conn, const char *name)
 	send_reply(conn, XS_DIRECTORY, node->children, node->childlen);
 }
 
-static void do_read(struct connection *conn, const char *name)
+static void do_read(struct connection *conn, struct buffered_data *in)
 {
 	struct node *node;
+	const char *name = onearg(in);
 
 	name = canonicalize(conn, name);
 	node = get_node(conn, name, XS_PERM_READ);
@@ -953,9 +955,10 @@ static void do_write(struct connection *conn, struct buffered_data *in)
 	send_ack(conn, XS_WRITE);
 }
 
-static void do_mkdir(struct connection *conn, const char *name)
+static void do_mkdir(struct connection *conn, struct buffered_data *in)
 {
 	struct node *node;
+	const char *name = onearg(in);
 
 	name = canonicalize(conn, name);
 	node = get_node(conn, name, XS_PERM_WRITE);
@@ -1070,9 +1073,10 @@ static void internal_rm(const char *name)
 }
 
 
-static void do_rm(struct connection *conn, const char *name)
+static void do_rm(struct connection *conn, struct buffered_data *in)
 {
 	struct node *node;
+	const char *name = onearg(in);
 
 	name = canonicalize(conn, name);
 	node = get_node(conn, name, XS_PERM_WRITE);
@@ -1104,9 +1108,10 @@ static void do_rm(struct connection *conn, const char *name)
 }
 
 
-static void do_get_perms(struct connection *conn, const char *name)
+static void do_get_perms(struct connection *conn, struct buffered_data *in)
 {
 	struct node *node;
+	const char *name = onearg(in);
 	char *strings;
 	unsigned int len;
 
@@ -1220,11 +1225,11 @@ static void process_message(struct connection *conn, struct buffered_data *in)
 
 	switch (in->hdr.msg.type) {
 	case XS_DIRECTORY:
-		send_directory(conn, onearg(in));
+		send_directory(conn, in);
 		break;
 
 	case XS_READ:
-		do_read(conn, onearg(in));
+		do_read(conn, in);
 		break;
 
 	case XS_WRITE:
@@ -1232,15 +1237,15 @@ static void process_message(struct connection *conn, struct buffered_data *in)
 		break;
 
 	case XS_MKDIR:
-		do_mkdir(conn, onearg(in));
+		do_mkdir(conn, in);
 		break;
 
 	case XS_RM:
-		do_rm(conn, onearg(in));
+		do_rm(conn, in);
 		break;
 
 	case XS_GET_PERMS:
-		do_get_perms(conn, onearg(in));
+		do_get_perms(conn, in);
 		break;
 
 	case XS_SET_PERMS:
@@ -1264,7 +1269,7 @@ static void process_message(struct connection *conn, struct buffered_data *in)
 		break;
 
 	case XS_TRANSACTION_END:
-		do_transaction_end(conn, onearg(in));
+		do_transaction_end(conn, in);
 		break;
 
 	case XS_INTRODUCE:
@@ -1272,19 +1277,19 @@ static void process_message(struct connection *conn, struct buffered_data *in)
 		break;
 
 	case XS_IS_DOMAIN_INTRODUCED:
-		do_is_domain_introduced(conn, onearg(in));
+		do_is_domain_introduced(conn, in);
 		break;
 
 	case XS_RELEASE:
-		do_release(conn, onearg(in));
+		do_release(conn, in);
 		break;
 
 	case XS_GET_DOMAIN_PATH:
-		do_get_domain_path(conn, onearg(in));
+		do_get_domain_path(conn, in);
 		break;
 
 	case XS_RESUME:
-		do_resume(conn, onearg(in));
+		do_resume(conn, in);
 		break;
 
 	case XS_SET_TARGET:
@@ -1292,7 +1297,7 @@ static void process_message(struct connection *conn, struct buffered_data *in)
 		break;
 
 	case XS_RESET_WATCHES:
-		do_reset_watches(conn);
+		do_reset_watches(conn, in);
 		break;
 
 	default:

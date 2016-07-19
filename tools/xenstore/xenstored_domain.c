@@ -453,8 +453,9 @@ void do_set_target(struct connection *conn, struct buffered_data *in)
 }
 
 /* domid */
-void do_release(struct connection *conn, const char *domid_str)
+void do_release(struct connection *conn, struct buffered_data *in)
 {
+	const char *domid_str = onearg(in);
 	struct domain *domain;
 	unsigned int domid;
 
@@ -490,10 +491,11 @@ void do_release(struct connection *conn, const char *domid_str)
 	send_ack(conn, XS_RELEASE);
 }
 
-void do_resume(struct connection *conn, const char *domid_str)
+void do_resume(struct connection *conn, struct buffered_data *in)
 {
 	struct domain *domain;
 	unsigned int domid;
+	const char *domid_str = onearg(in);
 
 	if (!domid_str) {
 		send_error(conn, EINVAL);
@@ -527,9 +529,10 @@ void do_resume(struct connection *conn, const char *domid_str)
 	send_ack(conn, XS_RESUME);
 }
 
-void do_get_domain_path(struct connection *conn, const char *domid_str)
+void do_get_domain_path(struct connection *conn, struct buffered_data *in)
 {
 	char *path;
+	const char *domid_str = onearg(in);
 
 	if (!domid_str) {
 		send_error(conn, EINVAL);
@@ -543,10 +546,11 @@ void do_get_domain_path(struct connection *conn, const char *domid_str)
 	talloc_free(path);
 }
 
-void do_is_domain_introduced(struct connection *conn, const char *domid_str)
+void do_is_domain_introduced(struct connection *conn, struct buffered_data *in)
 {
 	int result;
 	unsigned int domid;
+	const char *domid_str = onearg(in);
 
 	if (!domid_str) {
 		send_error(conn, EINVAL);
@@ -563,7 +567,7 @@ void do_is_domain_introduced(struct connection *conn, const char *domid_str)
 }
 
 /* Allow guest to reset all watches */
-void do_reset_watches(struct connection *conn)
+void do_reset_watches(struct connection *conn, struct buffered_data *in)
 {
 	conn_delete_all_watches(conn);
 	conn_delete_all_transactions(conn);

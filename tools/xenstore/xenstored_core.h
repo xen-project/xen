@@ -122,6 +122,9 @@ struct node {
 	char *children;
 };
 
+/* Return the only argument in the input. */
+const char *onearg(struct buffered_data *in);
+
 /* Break input into vectors, return the number, fill in up to num of them. */
 unsigned int get_strings(struct buffered_data *data,
 			 char *vec[], unsigned int num);
