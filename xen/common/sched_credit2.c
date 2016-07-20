@@ -730,7 +730,8 @@ __update_runq_load(const struct scheduler *ops,
     rqd->load += change;
     rqd->load_last_update = now;
 
-    ASSERT(rqd->avgload <= STIME_MAX && rqd->b_avgload <= STIME_MAX);
+    /* Overflow, capable of making the load look negative, must not occur. */
+    ASSERT(rqd->avgload >= 0 && rqd->b_avgload >= 0);
 
     if ( unlikely(tb_init_done) )
     {
@@ -787,6 +788,9 @@ __update_svc_load(const struct scheduler *ops,
                        ((delta * svc->avgload) >> W);
     }
     svc->load_last_update = now;
+
+    /* Overflow, capable of making the load look negative, must not occur. */
+    ASSERT(svc->avgload >= 0);
 
     if ( unlikely(tb_init_done) )
     {
@@ -1841,7 +1845,7 @@ retry:
          * If we're under 100% capacaty, only shift if load difference
          * is > 1.  otherwise, shift if under 12.5%
          */
-        if ( load_max < (cpus_max << prv->load_precision_shift) )
+        if ( load_max < ((s_time_t)cpus_max << prv->load_precision_shift) )
         {
             if ( st.load_delta < (1ULL << (prv->load_precision_shift +
                                            opt_underload_balance_tolerance)) )
