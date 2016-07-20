@@ -917,7 +917,7 @@ static void show_guest_stack(struct vcpu *v, struct cpu_user_regs *regs)
         return;
     }
 
-    page = get_page_from_gva(v->domain, sp, GV2M_READ);
+    page = get_page_from_gva(v, sp, GV2M_READ);
     if ( page == NULL )
     {
         printk("Failed to convert stack to physical address\n");

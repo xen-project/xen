@@ -17,7 +17,7 @@ static unsigned long raw_copy_to_guest_helper(void *to, const void *from,
         unsigned size = min(len, (unsigned)PAGE_SIZE - offset);
         struct page_info *page;
 
-        page = get_page_from_gva(current->domain, (vaddr_t) to, GV2M_WRITE);
+        page = get_page_from_gva(current, (vaddr_t) to, GV2M_WRITE);
         if ( page == NULL )
             return len;
 
@@ -64,7 +64,7 @@ unsigned long raw_clear_guest(void *to, unsigned len)
         unsigned size = min(len, (unsigned)PAGE_SIZE - offset);
         struct page_info *page;
 
-        page = get_page_from_gva(current->domain, (vaddr_t) to, GV2M_WRITE);
+        page = get_page_from_gva(current, (vaddr_t) to, GV2M_WRITE);
         if ( page == NULL )
             return len;
 
@@ -96,7 +96,7 @@ unsigned long raw_copy_from_guest(void *to, const void __user *from, unsigned le
         unsigned size = min(len, (unsigned)(PAGE_SIZE - offset));
         struct page_info *page;
 
-        page = get_page_from_gva(current->domain, (vaddr_t) from, GV2M_READ);
+        page = get_page_from_gva(current, (vaddr_t) from, GV2M_READ);
         if ( page == NULL )
             return len;
 

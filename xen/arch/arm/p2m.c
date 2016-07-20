@@ -1456,9 +1456,10 @@ err:
     return page;
 }
 
-struct page_info *get_page_from_gva(struct domain *d, vaddr_t va,
+struct page_info *get_page_from_gva(struct vcpu *v, vaddr_t va,
                                     unsigned long flags)
 {
+    struct domain *d = v->domain;
     struct p2m_domain *p2m = &d->arch.p2m;
     struct page_info *page = NULL;
     paddr_t maddr = 0;
