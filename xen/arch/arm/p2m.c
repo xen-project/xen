@@ -1530,24 +1530,16 @@ struct page_info *get_page_from_gva(struct vcpu *v, vaddr_t va,
     paddr_t maddr = 0;
     int rc;
 
+    /*
+     * XXX: To support a different vCPU, we would need to load the
+     * VTTBR_EL2, TTBR0_EL1, TTBR1_EL1 and SCTLR_EL1
+     */
+    if ( v != current )
+        return NULL;
+
     spin_lock(&p2m->lock);
 
-    if ( unlikely(d != current->domain) )
-    {
-        unsigned long irq_flags;
-
-        local_irq_save(irq_flags);
-        p2m_load_VTTBR(d);
-
-        rc = gvirt_to_maddr(va, &maddr, flags);
-
-        p2m_load_VTTBR(current->domain);
-        local_irq_restore(irq_flags);
-    }
-    else
-    {
-        rc = gvirt_to_maddr(va, &maddr, flags);
-    }
+    rc = gvirt_to_maddr(va, &maddr, flags);
 
     if ( rc )
         goto err;
