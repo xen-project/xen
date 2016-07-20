@@ -4778,7 +4778,8 @@ static void migrate_domain(uint32_t domid, const char *rune, int debug,
     exit(EXIT_FAILURE);
 }
 
-static void migrate_receive(int debug, int daemonize, int monitor, int pause,
+static void migrate_receive(int debug, int daemonize, int monitor,
+                            int pause_after_migration,
                             int send_fd, int recv_fd,
                             libxl_checkpointed_stream checkpointed,
                             char *colo_proxy_script)
@@ -4888,7 +4889,7 @@ static void migrate_receive(int debug, int daemonize, int monitor, int pause,
         if (rc) goto perhaps_destroy_notify_rc;
     }
 
-    if (!pause) {
+    if (!pause_after_migration) {
         rc = libxl_domain_unpause(ctx, domid);
         if (rc) goto perhaps_destroy_notify_rc;
     }
@@ -5005,7 +5006,7 @@ int main_restore(int argc, char **argv)
 
 int main_migrate_receive(int argc, char **argv)
 {
-    int debug = 0, daemonize = 1, monitor = 1, pause = 0;
+    int debug = 0, daemonize = 1, monitor = 1, pause_after_migration = 0;
     libxl_checkpointed_stream checkpointed = LIBXL_CHECKPOINTED_STREAM_NONE;
     int opt;
     char *script = NULL;
@@ -5037,7 +5038,7 @@ int main_migrate_receive(int argc, char **argv)
         script = optarg;
         break;
     case 'p':
-        pause = 1;
+        pause_after_migration = 1;
         break;
     }
 
@@ -5045,7 +5046,7 @@ int main_migrate_receive(int argc, char **argv)
         help("migrate-receive");
         return EXIT_FAILURE;
     }
-    migrate_receive(debug, daemonize, monitor, pause,
+    migrate_receive(debug, daemonize, monitor, pause_after_migration,
                     STDOUT_FILENO, STDIN_FILENO,
                     checkpointed, script);
 
@@ -5091,7 +5092,7 @@ int main_migrate(int argc, char **argv)
     const char *ssh_command = "ssh";
     char *rune = NULL;
     char *host;
-    int opt, daemonize = 1, monitor = 1, debug = 0, pause = 0;
+    int opt, daemonize = 1, monitor = 1, debug = 0, pause_after_migration = 0;
     static struct option opts[] = {
         {"debug", 0, 0, 0x100},
         {"live", 0, 0, 0x200},
@@ -5113,7 +5114,7 @@ int main_migrate(int argc, char **argv)
         monitor = 0;
         break;
     case 'p':
-        pause = 1;
+        pause_after_migration = 1;
         break;
     case 0x100: /* --debug */
         debug = 1;
@@ -5148,7 +5149,7 @@ int main_migrate(int argc, char **argv)
                   verbose_len, verbose_buf,
                   daemonize ? "" : " -e",
                   debug ? " -d" : "",
-                  pause ? " -p" : "");
+                  pause_after_migration ? " -p" : "");
     }
 
     migrate_domain(domid, rune, debug, config_filename);
