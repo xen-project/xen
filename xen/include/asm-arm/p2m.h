@@ -97,6 +97,17 @@ typedef enum {
     p2m_max_real_type,  /* Types after this won't be store in the p2m */
 } p2m_type_t;
 
+/* We use bitmaps and mask to handle groups of types */
+#define p2m_to_mask(_t) (1UL << (_t))
+
+/* RAM types, which map to real machine frames */
+#define P2M_RAM_TYPES (p2m_to_mask(p2m_ram_rw) |        \
+                       p2m_to_mask(p2m_ram_ro))
+
+/* Useful predicates */
+#define p2m_is_ram(_t) (p2m_to_mask(_t) & P2M_RAM_TYPES)
+#define p2m_is_foreign(_t) (p2m_to_mask(_t) & p2m_to_mask(p2m_map_foreign))
+
 static inline
 void p2m_mem_access_emulate_check(struct vcpu *v,
                                   const vm_event_response_t *rsp)
@@ -109,9 +120,6 @@ void p2m_altp2m_check(struct vcpu *v, uint16_t idx)
 {
     /* Not supported on ARM. */
 }
-
-#define p2m_is_foreign(_t)  ((_t) == p2m_map_foreign)
-#define p2m_is_ram(_t)      ((_t) == p2m_ram_rw || (_t) == p2m_ram_ro)
 
 /* Initialise vmid allocator */
 void p2m_vmid_allocator_init(void);
