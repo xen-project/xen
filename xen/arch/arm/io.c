@@ -20,6 +20,7 @@
 #include <xen/lib.h>
 #include <xen/spinlock.h>
 #include <xen/sched.h>
+#include <xen/sort.h>
 #include <asm/current.h>
 #include <asm/mmio.h>
 
@@ -70,27 +71,31 @@ static int handle_write(const struct mmio_handler *handler, struct vcpu *v,
                                handler->priv);
 }
 
+/* This function assumes that mmio regions are not overlapped */
+static int cmp_mmio_handler(const void *key, const void *elem)
+{
+    const struct mmio_handler *handler0 = key;
+    const struct mmio_handler *handler1 = elem;
+
+    if ( handler0->addr < handler1->addr )
+        return -1;
+
+    if ( handler0->addr > (handler1->addr + handler1->size) )
+        return 1;
+
+    return 0;
+}
+
 static const struct mmio_handler *find_mmio_handler(struct domain *d,
                                                     paddr_t gpa)
 {
-    const struct mmio_handler *handler;
-    unsigned int i;
     struct vmmio *vmmio = &d->arch.vmmio;
+    struct mmio_handler key = {.addr = gpa};
+    const struct mmio_handler *handler;
 
     read_lock(&vmmio->lock);
-
-    for ( i = 0; i < vmmio->num_entries; i++ )
-    {
-        handler = &vmmio->handlers[i];
-
-        if ( (gpa >= handler->addr) &&
-             (gpa < (handler->addr + handler->size)) )
-            break;
-    }
-
-    if ( i == vmmio->num_entries )
-        handler = NULL;
-
+    handler = bsearch(&key, vmmio->handlers, vmmio->num_entries,
+                      sizeof(*handler), cmp_mmio_handler);
     read_unlock(&vmmio->lock);
 
     return handler;
@@ -130,6 +135,10 @@ void register_mmio_handler(struct domain *d,
     handler->priv = priv;
 
     vmmio->num_entries++;
+
+    /* Sort mmio handlers in ascending order based on base address */
+    sort(vmmio->handlers, vmmio->num_entries, sizeof(struct mmio_handler),
+         cmp_mmio_handler, NULL);
 
     write_unlock(&vmmio->lock);
 }
