@@ -43,6 +43,7 @@ obj-y += schedule.o
 obj-y += shutdown.o
 obj-y += softirq.o
 obj-y += sort.o
+obj-y += bsearch.o
 obj-y += smp.o
 obj-y += spinlock.o
 obj-y += stop_machine.o
