@@ -327,7 +327,6 @@ static void p2m_set_permission(lpae_t *e, p2m_type_t t, p2m_access_t a)
 static lpae_t mfn_to_p2m_entry(unsigned long mfn, unsigned int mattr,
                                p2m_type_t t, p2m_access_t a)
 {
-    paddr_t pa = ((paddr_t) mfn) << PAGE_SHIFT;
     /*
      * sh, xn and write bit will be defined in the following switches
      * based on mattr and t.
@@ -359,10 +358,9 @@ static lpae_t mfn_to_p2m_entry(unsigned long mfn, unsigned int mattr,
 
     p2m_set_permission(&e, t, a);
 
-    ASSERT(!(pa & ~PAGE_MASK));
-    ASSERT(!(pa & ~PADDR_MASK));
+    ASSERT(!(pfn_to_paddr(mfn) & ~PADDR_MASK));
 
-    e.bits |= pa;
+    e.p2m.base = mfn;
 
     return e;
 }
