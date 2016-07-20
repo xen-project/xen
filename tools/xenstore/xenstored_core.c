@@ -2135,6 +2135,7 @@ int main(int argc, char *argv[])
 		if (trigger_talloc_report) {
 			FILE *out;
 
+			assert(memfile);
 			trigger_talloc_report = false;
 			out = fopen(memfile, "a");
 			if (out) {
