@@ -981,6 +981,12 @@ static void do_mkdir(struct connection *conn, struct buffered_data *in)
 	struct node *node;
 	const char *name = onearg(in);
 
+	if (!name) {
+		errno = EINVAL;
+		send_error(conn, errno);
+		return;
+	}
+
 	name = canonicalize(conn, name);
 	node = get_node(conn, in, name, XS_PERM_WRITE);
 
