@@ -546,7 +546,7 @@ void vcpu_destroy(struct vcpu *v)
 int arch_domain_create(struct domain *d, unsigned int domcr_flags,
                        struct xen_arch_domainconfig *config)
 {
-    int rc;
+    int rc, count;
 
     d->arch.relmem = RELMEM_not_started;
 
@@ -569,7 +569,8 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags,
     share_xen_page_with_guest(
         virt_to_page(d->shared_info), d, XENSHARE_writable);
 
-    if ( (rc = domain_io_init(d)) != 0 )
+    count = MAX_IO_HANDLER;
+    if ( (rc = domain_io_init(d, count)) != 0 )
         goto fail;
 
     if ( (rc = p2m_alloc_table(d)) != 0 )
@@ -663,6 +664,7 @@ void arch_domain_destroy(struct domain *d)
     free_xenheap_pages(d->arch.efi_acpi_table,
                        get_order_from_bytes(d->arch.efi_acpi_len));
 #endif
+    domain_io_free(d);
 }
 
 void arch_domain_shutdown(struct domain *d)

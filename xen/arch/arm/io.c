@@ -118,7 +118,7 @@ void register_mmio_handler(struct domain *d,
     struct vmmio *vmmio = &d->arch.vmmio;
     struct mmio_handler *handler;
 
-    BUG_ON(vmmio->num_entries >= MAX_IO_HANDLER);
+    BUG_ON(vmmio->num_entries >= vmmio->max_num_entries);
 
     write_lock(&vmmio->lock);
 
@@ -134,12 +134,21 @@ void register_mmio_handler(struct domain *d,
     write_unlock(&vmmio->lock);
 }
 
-int domain_io_init(struct domain *d)
+int domain_io_init(struct domain *d, int max_count)
 {
     rwlock_init(&d->arch.vmmio.lock);
     d->arch.vmmio.num_entries = 0;
+    d->arch.vmmio.max_num_entries = max_count;
+    d->arch.vmmio.handlers = xzalloc_array(struct mmio_handler, max_count);
+    if ( !d->arch.vmmio.handlers )
+        return -ENOMEM;
 
     return 0;
+}
+
+void domain_io_free(struct domain *d)
+{
+    xfree(d->arch.vmmio.handlers);
 }
 
 /*
