@@ -227,7 +227,7 @@ static inline struct page_info *get_page_from_gfn(
      * get_page won't work on foreign mapping because the page doesn't
      * belong to the current domain.
      */
-    if ( p2mt == p2m_map_foreign )
+    if ( p2m_is_foreign(p2mt) )
     {
         struct domain *fdom = page_get_owner_and_reference(page);
         ASSERT(fdom != NULL);
