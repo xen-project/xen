@@ -6,8 +6,7 @@ ConditionVirtualization=xen
 
 [Service]
 Type=forking
-ExecStart=@sbindir@/xl devd --pidfile=/var/run/xldevd.pid
-PIDFile=/var/run/xldevd.pid
+ExecStart=@sbindir@/xl devd
 
 [Install]
 WantedBy=multi-user.target
