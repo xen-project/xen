@@ -33,9 +33,11 @@ static bool_t p2m_valid(lpae_t pte)
 {
     return pte.p2m.valid;
 }
-/* These two can only be used on L0..L2 ptes because L3 mappings set
+/*
+ * These two can only be used on L0..L2 ptes because L3 mappings set
  * the table bit and therefore these would return the opposite to what
- * you would expect. */
+ * you would expect.
+ */
 static bool_t p2m_table(lpae_t pte)
 {
     return p2m_valid(pte) && pte.p2m.table;
@@ -119,7 +121,8 @@ void flush_tlb_domain(struct domain *d)
 {
     unsigned long flags = 0;
 
-    /* Update the VTTBR if necessary with the domain d. In this case,
+    /*
+     * Update the VTTBR if necessary with the domain d. In this case,
      * it's only necessary to flush TLBs on every CPUs with the current VMID
      * (our domain).
      */
@@ -325,8 +328,10 @@ static lpae_t mfn_to_p2m_entry(unsigned long mfn, unsigned int mattr,
                                p2m_type_t t, p2m_access_t a)
 {
     paddr_t pa = ((paddr_t) mfn) << PAGE_SHIFT;
-    /* sh, xn and write bit will be defined in the following switches
-     * based on mattr and t. */
+    /*
+     * sh, xn and write bit will be defined in the following switches
+     * based on mattr and t.
+     */
     lpae_t e = (lpae_t) {
         .p2m.af = 1,
         .p2m.read = 1,
@@ -552,15 +557,17 @@ enum p2m_operation {
     MEMACCESS,
 };
 
-/* Put any references on the single 4K page referenced by pte.  TODO:
- * Handle superpages, for now we only take special references for leaf
+/*
+ * Put any references on the single 4K page referenced by pte.
+ * TODO: Handle superpages, for now we only take special references for leaf
  * pages (specifically foreign ones, which can't be super mapped today).
  */
 static void p2m_put_l3_page(const lpae_t pte)
 {
     ASSERT(p2m_valid(pte));
 
-    /* TODO: Handle other p2m types
+    /*
+     * TODO: Handle other p2m types
      *
      * It's safe to do the put_page here because page_alloc will
      * flush the TLBs if the page is reallocated before the end of
@@ -932,7 +939,8 @@ static int apply_p2m_changes(struct domain *d,
     PAGE_LIST_HEAD(free_pages);
     struct page_info *pg;
 
-    /* Some IOMMU don't support coherent PT walk. When the p2m is
+    /*
+     * Some IOMMU don't support coherent PT walk. When the p2m is
      * shared with the CPU, Xen has to make sure that the PT changes have
      * reached the memory
      */
@@ -1275,7 +1283,8 @@ int p2m_alloc_table(struct domain *d)
     d->arch.vttbr = page_to_maddr(p2m->root)
         | ((uint64_t)p2m->vmid&0xff)<<48;
 
-    /* Make sure that all TLBs corresponding to the new VMID are flushed
+    /*
+     * Make sure that all TLBs corresponding to the new VMID are flushed
      * before using it
      */
     flush_tlb_domain(d);
@@ -1290,8 +1299,10 @@ int p2m_alloc_table(struct domain *d)
 
 static spinlock_t vmid_alloc_lock = SPIN_LOCK_UNLOCKED;
 
-/* VTTBR_EL2 VMID field is 8 bits. Using a bitmap here limits us to
- * 256 concurrent domains. */
+/*
+ * VTTBR_EL2 VMID field is 8 bits. Using a bitmap here limits us to
+ * 256 concurrent domains.
+ */
 static DECLARE_BITMAP(vmid_mask, MAX_VMID);
 
 void p2m_vmid_allocator_init(void)

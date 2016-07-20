@@ -31,12 +31,14 @@ struct p2m_domain {
     /* Current VMID in use */
     uint8_t vmid;
 
-    /* Highest guest frame that's ever been mapped in the p2m
+    /*
+     * Highest guest frame that's ever been mapped in the p2m
      * Only takes into account ram and foreign mapping
      */
     gfn_t max_mapped_gfn;
 
-    /* Lowest mapped gfn in the p2m. When releasing mapped gfn's in a
+    /*
+     * Lowest mapped gfn in the p2m. When releasing mapped gfn's in a
      * preemptible manner this is update to track recall where to
      * resume the search. Apart from during teardown this can only
      * decrease. */
@@ -51,24 +53,31 @@ struct p2m_domain {
         unsigned long shattered[4];
     } stats;
 
-    /* If true, and an access fault comes in and there is no vm_event listener,
-     * pause domain. Otherwise, remove access restrictions. */
+    /*
+     * If true, and an access fault comes in and there is no vm_event listener,
+     * pause domain. Otherwise, remove access restrictions.
+     */
     bool_t access_required;
 
     /* Defines if mem_access is in use for the domain. */
     bool_t mem_access_enabled;
 
-    /* Default P2M access type for each page in the the domain: new pages,
+    /*
+     * Default P2M access type for each page in the the domain: new pages,
      * swapped in pages, cleared pages, and pages that are ambiguously
-     * retyped get this access type. See definition of p2m_access_t. */
+     * retyped get this access type. See definition of p2m_access_t.
+     */
     p2m_access_t default_access;
 
-    /* Radix tree to store the p2m_access_t settings as the pte's don't have
-     * enough available bits to store this information. */
+    /*
+     * Radix tree to store the p2m_access_t settings as the pte's don't have
+     * enough available bits to store this information.
+     */
     struct radix_tree_root mem_access_settings;
 };
 
-/* List of possible type for each page in the p2m entry.
+/*
+ * List of possible type for each page in the p2m entry.
  * The number of available bit per page in the pte for this purpose is 4 bits.
  * So it's possible to only have 16 fields. If we run out of value in the
  * future, it's possible to use higher value for pseudo-type and don't store
@@ -116,13 +125,15 @@ int p2m_init(struct domain *d);
 /* Return all the p2m resources to Xen. */
 void p2m_teardown(struct domain *d);
 
-/* Remove mapping refcount on each mapping page in the p2m
+/*
+ * Remove mapping refcount on each mapping page in the p2m
  *
  * TODO: For the moment only foreign mappings are handled
  */
 int relinquish_p2m_mapping(struct domain *d);
 
-/* Allocate a new p2m table for a domain.
+/*
+ * Allocate a new p2m table for a domain.
  *
  * Returns 0 for success or -errno.
  */
@@ -181,8 +192,10 @@ mfn_t gfn_to_mfn(struct domain *d, gfn_t gfn);
  * Populate-on-demand
  */
 
-/* Call when decreasing memory reservation to handle PoD entries properly.
- * Will return '1' if all entries were handled and nothing more need be done.*/
+/*
+ * Call when decreasing memory reservation to handle PoD entries properly.
+ * Will return '1' if all entries were handled and nothing more need be done.
+ */
 int
 p2m_pod_decrease_reservation(struct domain *d,
                              xen_pfn_t gpfn,
@@ -210,7 +223,8 @@ static inline struct page_info *get_page_from_gfn(
         return NULL;
     page = mfn_to_page(mfn);
 
-    /* get_page won't work on foreign mapping because the page doesn't
+    /*
+     * get_page won't work on foreign mapping because the page doesn't
      * belong to the current domain.
      */
     if ( p2mt == p2m_map_foreign )
@@ -257,8 +271,10 @@ static inline bool_t p2m_vm_event_sanity_check(struct domain *d)
     return 1;
 }
 
-/* Send mem event based on the access. Boolean return value indicates if trap
- * needs to be injected into guest. */
+/*
+ * Send mem event based on the access. Boolean return value indicates if trap
+ * needs to be injected into guest.
+ */
 bool_t p2m_mem_access_check(paddr_t gpa, vaddr_t gla, const struct npfec npfec);
 
 #endif /* _XEN_P2M_H */
