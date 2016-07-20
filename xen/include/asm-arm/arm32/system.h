@@ -24,7 +24,7 @@
     asm volatile (                                               \
             "msr     cpsr_c, %0      @ local_irq_restore\n"      \
             :                                                    \
-            : "r" (flags)                                        \
+            : "r" (x)                                            \
             : "memory", "cc");                                   \
 })
 
