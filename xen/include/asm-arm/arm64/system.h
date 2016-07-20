@@ -40,7 +40,7 @@
     asm volatile (                                               \
         "msr    daif, %0                // local_irq_restore"    \
         :                                                        \
-        : "r" (flags)                                            \
+        : "r" (x)                                                \
         : "memory");                                             \
 })
 
