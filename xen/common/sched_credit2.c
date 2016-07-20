@@ -353,8 +353,9 @@ struct csched2_runqueue_data {
     struct list_head svc;  /* List of all vcpus assigned to this runqueue */
     unsigned int max_weight;
 
-    cpumask_t idle,        /* Currently idle */
-        tickled;           /* Another cpu in the queue is already targeted for this one */
+    cpumask_t idle,        /* Currently idle pcpus */
+        smt_idle,          /* Fully idle-and-untickled cores (see below) */
+        tickled;           /* Have been asked to go through schedule */
     int load;              /* Instantaneous load: Length of queue  + num non-idle threads */
     s_time_t load_last_update;  /* Last time average was updated */
     s_time_t avgload;           /* Decaying queue load */
@@ -413,6 +414,79 @@ struct csched2_dom {
     uint16_t weight;
     uint16_t nr_vcpus;
 };
+
+/*
+ * Hyperthreading (SMT) support.
+ *
+ * We use a special per-runq mask (smt_idle) and update it according to the
+ * following logic:
+ *  - when _all_ the SMT sibling in a core are idle, all their corresponding
+ *    bits are set in the smt_idle mask;
+ *  - when even _just_one_ of the SMT siblings in a core is not idle, all the
+ *    bits correspondings to it and to all its siblings are clear in the
+ *    smt_idle mask.
+ *
+ * Once we have such a mask, it is easy to implement a policy that, either:
+ *  - uses fully idle cores first: it is enough to try to schedule the vcpus
+ *    on pcpus from smt_idle mask first. This is what happens if
+ *    sched_smt_power_savings was not set at boot (default), and it maximizes
+ *    true parallelism, and hence performance;
+ *  - uses already busy cores first: it is enough to try to schedule the vcpus
+ *    on pcpus that are idle, but are not in smt_idle. This is what happens if
+ *    sched_smt_power_savings is set at boot, and it allows as more cores as
+ *    possible to stay in low power states, minimizing power consumption.
+ *
+ * This logic is entirely implemented in runq_tickle(), and that is enough.
+ * In fact, in this scheduler, placement of a vcpu on one of the pcpus of a
+ * runq, _always_ happens by means of tickling:
+ *  - when a vcpu wakes up, it calls csched2_vcpu_wake(), which calls
+ *    runq_tickle();
+ *  - when a migration is initiated in schedule.c, we call csched2_cpu_pick(),
+ *    csched2_vcpu_migrate() (which calls migrate()) and csched2_vcpu_wake().
+ *    csched2_cpu_pick() looks for the least loaded runq and return just any
+ *    of its processors. Then, csched2_vcpu_migrate() just moves the vcpu to
+ *    the chosen runq, and it is again runq_tickle(), called by
+ *    csched2_vcpu_wake() that actually decides what pcpu to use within the
+ *    chosen runq;
+ *  - when a migration is initiated in sched_credit2.c, by calling  migrate()
+ *    directly, that again temporarily use a random pcpu from the new runq,
+ *    and then calls runq_tickle(), by itself.
+ */
+
+/*
+ * If all the siblings of cpu (including cpu itself) are both idle and
+ * untickled, set all their bits in mask.
+ *
+ * NB that rqd->smt_idle is different than rqd->idle.  rqd->idle
+ * records pcpus that at are merely idle (i.e., at the moment do not
+ * have a vcpu running on them).  But you have to manually filter out
+ * which pcpus have been tickled in order to find cores that are not
+ * going to be busy soon.  Filtering out tickled cpus pairwise is a
+ * lot of extra pain; so for rqd->smt_idle, we explicitly make so that
+ * the bits of a pcpu are set only if all the threads on its core are
+ * both idle *and* untickled.
+ *
+ * This means changing the mask when either rqd->idle or rqd->tickled
+ * changes.
+ */
+static inline
+void smt_idle_mask_set(unsigned int cpu, const cpumask_t *idlers,
+                       cpumask_t *mask)
+{
+    const cpumask_t *cpu_siblings = per_cpu(cpu_sibling_mask, cpu);
+
+    if ( cpumask_subset(cpu_siblings, idlers) )
+        cpumask_or(mask, mask, cpu_siblings);
+}
+
+/*
+ * Clear the bits of all the siblings of cpu from mask.
+ */
+static inline
+void smt_idle_mask_clear(unsigned int cpu, cpumask_t *mask)
+{
+    cpumask_andnot(mask, mask, per_cpu(cpu_sibling_mask, cpu));
+}
 
 /*
  * When a hard affinity change occurs, we may not be able to check some
@@ -853,9 +927,30 @@ runq_tickle(const struct scheduler *ops, struct csched2_vcpu *new, s_time_t now)
     }
 
     /*
-     * Get a mask of idle, but not tickled, processors that new is
-     * allowed to run on. If that's not empty, choose someone from there
-     * (preferrably, the one were new was running on already).
+     * First of all, consider idle cpus, checking if we can just
+     * re-use the pcpu where we were running before.
+     *
+     * If there are cores where all the siblings are idle, consider
+     * them first, honoring whatever the spreading-vs-consolidation
+     * SMT policy wants us to do.
+     */
+    if ( unlikely(sched_smt_power_savings) )
+        cpumask_andnot(&mask, &rqd->idle, &rqd->smt_idle);
+    else
+        cpumask_copy(&mask, &rqd->smt_idle);
+    cpumask_and(&mask, &mask, new->vcpu->cpu_hard_affinity);
+    i = cpumask_test_or_cycle(cpu, &mask);
+    if ( i < nr_cpu_ids )
+    {
+        SCHED_STAT_CRANK(tickled_idle_cpu);
+        ipid = i;
+        goto tickle;
+    }
+
+    /*
+     * If there are no fully idle cores, check all idlers, after
+     * having filtered out pcpus that have been tickled but haven't
+     * gone through the scheduler yet.
      */
     cpumask_andnot(&mask, &rqd->idle, &rqd->tickled);
     cpumask_and(&mask, &mask, new->vcpu->cpu_hard_affinity);
@@ -947,6 +1042,7 @@ runq_tickle(const struct scheduler *ops, struct csched2_vcpu *new, s_time_t now)
                     (unsigned char *)&d);
     }
     __cpumask_set_cpu(ipid, &rqd->tickled);
+    smt_idle_mask_clear(ipid, &rqd->smt_idle);
     cpu_raise_softirq(ipid, SCHEDULE_SOFTIRQ);
 }
 
@@ -1442,8 +1538,10 @@ csched2_cpu_pick(const struct scheduler *ops, struct vcpu *vc)
         return get_fallback_cpu(svc);
     }
 
-    /* First check to see if we're here because someone else suggested a place
-     * for us to move. */
+    /*
+     * First check to see if we're here because someone else suggested a place
+     * for us to move.
+     */
     if ( __test_and_clear_bit(__CSFLAG_runq_migrate_request, &svc->flags) )
     {
         if ( unlikely(svc->migrate_rqd->id < 0) )
@@ -1464,7 +1562,7 @@ csched2_cpu_pick(const struct scheduler *ops, struct vcpu *vc)
 
     min_avgload = MAX_LOAD;
 
-    /* Find the runqueue with the lowest instantaneous load */
+    /* Find the runqueue with the lowest average load. */
     for_each_cpu(i, &prv->active_queues)
     {
         struct csched2_runqueue_data *rqd;
@@ -1507,16 +1605,17 @@ csched2_cpu_pick(const struct scheduler *ops, struct vcpu *vc)
 
     /* We didn't find anyone (most likely because of spinlock contention). */
     if ( min_rqi == -1 )
-        new_cpu = get_fallback_cpu(svc);
-    else
     {
-        cpumask_and(cpumask_scratch, vc->cpu_hard_affinity,
-                    &prv->rqd[min_rqi].active);
-        new_cpu = cpumask_any(cpumask_scratch);
-        BUG_ON(new_cpu >= nr_cpu_ids);
+        new_cpu = get_fallback_cpu(svc);
+        goto out_up;
     }
 
-out_up:
+    cpumask_and(cpumask_scratch, vc->cpu_hard_affinity,
+                &prv->rqd[min_rqi].active);
+    new_cpu = cpumask_any(cpumask_scratch);
+    BUG_ON(new_cpu >= nr_cpu_ids);
+
+ out_up:
     read_unlock(&prv->lock);
 
     if ( unlikely(tb_init_done) )
@@ -2140,7 +2239,11 @@ csched2_schedule(
 
     /* Clear "tickled" bit now that we've been scheduled */
     if ( cpumask_test_cpu(cpu, &rqd->tickled) )
+    {
         __cpumask_clear_cpu(cpu, &rqd->tickled);
+        cpumask_andnot(cpumask_scratch, &rqd->idle, &rqd->tickled);
+        smt_idle_mask_set(cpu, cpumask_scratch, &rqd->smt_idle);
+    }
 
     /* Update credits */
     burn_credits(rqd, scurr, now);
@@ -2202,7 +2305,10 @@ csched2_schedule(
 
         /* Clear the idle mask if necessary */
         if ( cpumask_test_cpu(cpu, &rqd->idle) )
+        {
             __cpumask_clear_cpu(cpu, &rqd->idle);
+            smt_idle_mask_clear(cpu, &rqd->smt_idle);
+        }
 
         snext->start_time = now;
 
@@ -2224,10 +2330,17 @@ csched2_schedule(
         if ( tasklet_work_scheduled )
         {
             if ( cpumask_test_cpu(cpu, &rqd->idle) )
+            {
                 __cpumask_clear_cpu(cpu, &rqd->idle);
+                smt_idle_mask_clear(cpu, &rqd->smt_idle);
+            }
         }
         else if ( !cpumask_test_cpu(cpu, &rqd->idle) )
+        {
             __cpumask_set_cpu(cpu, &rqd->idle);
+            cpumask_andnot(cpumask_scratch, &rqd->idle, &rqd->tickled);
+            smt_idle_mask_set(cpu, cpumask_scratch, &rqd->smt_idle);
+        }
         /* Make sure avgload gets updated periodically even
          * if there's no activity */
         update_load(ops, rqd, NULL, 0, now);
@@ -2357,6 +2470,8 @@ csched2_dump(const struct scheduler *ops)
         printk("\tidlers: %s\n", cpustr);
         cpumask_scnprintf(cpustr, sizeof(cpustr), &prv->rqd[i].tickled);
         printk("\ttickled: %s\n", cpustr);
+        cpumask_scnprintf(cpustr, sizeof(cpustr), &prv->rqd[i].smt_idle);
+        printk("\tfully idle cores: %s\n", cpustr);
     }
 
     printk("Domain info:\n");
@@ -2510,6 +2625,7 @@ init_pdata(struct csched2_private *prv, unsigned int cpu)
     __cpumask_set_cpu(cpu, &rqd->idle);
     __cpumask_set_cpu(cpu, &rqd->active);
     __cpumask_set_cpu(cpu, &prv->initialized);
+    __cpumask_set_cpu(cpu, &rqd->smt_idle);
 
     return rqi;
 }
@@ -2615,6 +2731,7 @@ csched2_deinit_pdata(const struct scheduler *ops, void *pcpu, int cpu)
     printk(XENLOG_INFO "Removing cpu %d from runqueue %d\n", cpu, rqi);
 
     __cpumask_clear_cpu(cpu, &rqd->idle);
+    __cpumask_clear_cpu(cpu, &rqd->smt_idle);
     __cpumask_clear_cpu(cpu, &rqd->active);
 
     if ( cpumask_empty(&rqd->active) )
