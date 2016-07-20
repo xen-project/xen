@@ -90,18 +90,18 @@ static void vgic_rank_init(struct vgic_irq_rank *rank, uint8_t index,
         rank->vcpu[i] = vcpu;
 }
 
-static int domain_vgic_register(struct domain *d)
+int domain_vgic_register(struct domain *d, int *mmio_count)
 {
     switch ( d->arch.vgic.version )
     {
 #ifdef CONFIG_HAS_GICV3
     case GIC_V3:
-        if ( vgic_v3_init(d) )
+        if ( vgic_v3_init(d, mmio_count) )
            return -ENODEV;
         break;
 #endif
     case GIC_V2:
-        if ( vgic_v2_init(d) )
+        if ( vgic_v2_init(d, mmio_count) )
             return -ENODEV;
         break;
     default:
@@ -125,10 +125,6 @@ int domain_vgic_init(struct domain *d, unsigned int nr_spis)
         return -EINVAL;
 
     d->arch.vgic.nr_spis = nr_spis;
-
-    ret = domain_vgic_register(d);
-    if ( ret < 0 )
-        return ret;
 
     spin_lock_init(&d->arch.vgic.lock);
 

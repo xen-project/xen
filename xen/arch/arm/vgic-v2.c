@@ -711,7 +711,7 @@ static const struct vgic_ops vgic_v2_ops = {
     .max_vcpus = 8,
 };
 
-int vgic_v2_init(struct domain *d)
+int vgic_v2_init(struct domain *d, int *mmio_count)
 {
     if ( !vgic_v2_hw.enabled )
     {
@@ -721,6 +721,7 @@ int vgic_v2_init(struct domain *d)
         return -ENODEV;
     }
 
+    *mmio_count = 1; /* Only GICD region */
     register_vgic_ops(d, &vgic_v2_ops);
 
     return 0;

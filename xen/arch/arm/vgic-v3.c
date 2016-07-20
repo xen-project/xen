@@ -1499,7 +1499,7 @@ static const struct vgic_ops v3_ops = {
     .max_vcpus = 4096,
 };
 
-int vgic_v3_init(struct domain *d)
+int vgic_v3_init(struct domain *d, int *mmio_count)
 {
     if ( !vgic_v3_hw.enabled )
     {
@@ -1508,6 +1508,9 @@ int vgic_v3_init(struct domain *d)
                d->domain_id);
         return -ENODEV;
     }
+
+    /* GICD region + number of Redistributors */
+    *mmio_count = vgic_v3_rdist_count(d) + 1;
 
     register_vgic_ops(d, &v3_ops);
 
