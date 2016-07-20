@@ -281,7 +281,7 @@ static inline void *page_to_virt(const struct page_info *pg)
     return mfn_to_virt(page_to_mfn(pg));
 }
 
-struct page_info *get_page_from_gva(struct domain *d, vaddr_t va,
+struct page_info *get_page_from_gva(struct vcpu *v, vaddr_t va,
                                     unsigned long flags);
 
 /*
