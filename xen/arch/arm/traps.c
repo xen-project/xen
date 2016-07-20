@@ -2350,7 +2350,7 @@ void dump_guest_s1_walk(struct domain *d, vaddr_t addr)
     printk("1ST[0x%"PRIx32"] (0x%"PRIpaddr") = 0x%08"PRIx32"\n",
            offset, pfn_to_paddr(mfn_x(mfn)), first[offset]);
     if ( !(first[offset] & 0x1) ||
-         !(first[offset] & 0x2) )
+          (first[offset] & 0x2) )
         goto done;
 
     mfn = p2m_lookup(d, _gfn(paddr_to_pfn(first[offset])), NULL);
