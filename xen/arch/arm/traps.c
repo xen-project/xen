@@ -2346,7 +2346,7 @@ void dump_guest_s1_walk(struct domain *d, vaddr_t addr)
     }
     first = map_domain_page(mfn);
 
-    offset = addr >> (12+10);
+    offset = addr >> (12+8);
     printk("1ST[0x%"PRIx32"] (0x%"PRIpaddr") = 0x%08"PRIx32"\n",
            offset, pfn_to_paddr(mfn_x(mfn)), first[offset]);
     if ( !(first[offset] & 0x1) ||
