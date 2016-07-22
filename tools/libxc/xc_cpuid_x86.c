@@ -123,7 +123,8 @@ static void amd_xc_cpuid_policy(
          * ECX[15:12] is ApicIdCoreSize: ECX[7:0] is NumberOfCores (minus one).
          * Update to reflect vLAPIC_ID = vCPU_ID * 2.
          */
-        regs[2] = ((regs[2] & 0xf000u) + 1) | ((regs[2] & 0xffu) << 1) | 1u;
+        regs[2] = ((regs[2] + (1u << 12)) & 0xf000u) |
+                  ((regs[2] & 0xffu) << 1) | 1u;
         break;
 
     case 0x8000000a: {
