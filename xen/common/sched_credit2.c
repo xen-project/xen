@@ -1323,14 +1323,16 @@ runq_assign(const struct scheduler *ops, struct vcpu *vc)
 static void
 __runq_deassign(struct csched2_vcpu *svc)
 {
+    struct csched2_runqueue_data *rqd = svc->rqd;
+
     ASSERT(!__vcpu_on_runq(svc));
     ASSERT(!(svc->flags & CSFLAG_scheduled));
 
     list_del_init(&svc->rqd_elem);
-    update_max_weight(svc->rqd, 0, svc->weight);
+    update_max_weight(rqd, 0, svc->weight);
 
     /* Expected new load based on removing this vcpu */
-    svc->rqd->b_avgload -= svc->avgload;
+    rqd->b_avgload = max_t(s_time_t, rqd->b_avgload - svc->avgload, 0);
 
     svc->rqd = NULL;
 }
@@ -1590,7 +1592,7 @@ csched2_cpu_pick(const struct scheduler *ops, struct vcpu *vc)
         if ( rqd == svc->rqd )
         {
             if ( cpumask_intersects(vc->cpu_hard_affinity, &rqd->active) )
-                rqd_avgload = rqd->b_avgload - svc->avgload;
+                rqd_avgload = max_t(s_time_t, rqd->b_avgload - svc->avgload, 0);
         }
         else if ( spin_trylock(&rqd->lock) )
         {
