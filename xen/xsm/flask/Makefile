@@ -32,7 +32,7 @@ obj-$(CONFIG_XSM_POLICY) += policy.o
 POLICY_SRC := $(XEN_ROOT)/tools/flask/policy/xenpolicy-$(XEN_FULLVERSION)
 
 policy.bin: FORCE
-	$(MAKE) -C $(XEN_ROOT)/tools/flask/policy
+	$(MAKE) -f $(XEN_ROOT)/tools/flask/policy/Makefile.common -C $(XEN_ROOT)/tools/flask/policy
 	cmp -s $(POLICY_SRC) $@ || cp $(POLICY_SRC) $@
 
 policy.c: policy.bin gen-policy.py
