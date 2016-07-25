@@ -1348,59 +1348,6 @@ runq_deassign(const struct scheduler *ops, struct vcpu *vc)
 }
 
 static void
-csched2_vcpu_insert(const struct scheduler *ops, struct vcpu *vc)
-{
-    struct csched2_vcpu *svc = vc->sched_priv;
-    struct csched2_dom * const sdom = svc->sdom;
-    spinlock_t *lock;
-
-    ASSERT(!is_idle_vcpu(vc));
-    ASSERT(list_empty(&svc->runq_elem));
-
-    /* Add vcpu to runqueue of initial processor */
-    lock = vcpu_schedule_lock_irq(vc);
-
-    runq_assign(ops, vc);
-
-    vcpu_schedule_unlock_irq(lock, vc);
-
-    sdom->nr_vcpus++;
-
-    SCHED_STAT_CRANK(vcpu_insert);
-
-    CSCHED2_VCPU_CHECK(vc);
-}
-
-static void
-csched2_free_vdata(const struct scheduler *ops, void *priv)
-{
-    struct csched2_vcpu *svc = priv;
-
-    xfree(svc);
-}
-
-static void
-csched2_vcpu_remove(const struct scheduler *ops, struct vcpu *vc)
-{
-    struct csched2_vcpu * const svc = CSCHED2_VCPU(vc);
-    spinlock_t *lock;
-
-    ASSERT(!is_idle_vcpu(vc));
-    ASSERT(list_empty(&svc->runq_elem));
-
-    SCHED_STAT_CRANK(vcpu_remove);
-
-    /* Remove from runqueue */
-    lock = vcpu_schedule_lock_irq(vc);
-
-    runq_deassign(ops, vc);
-
-    vcpu_schedule_unlock_irq(lock, vc);
-
-    svc->sdom->nr_vcpus--;
-}
-
-static void
 csched2_vcpu_sleep(const struct scheduler *ops, struct vcpu *vc)
 {
     struct csched2_vcpu * const svc = CSCHED2_VCPU(vc);
@@ -2096,6 +2043,59 @@ csched2_dom_destroy(const struct scheduler *ops, struct domain *dom)
     ASSERT(CSCHED2_DOM(dom)->nr_vcpus == 0);
 
     csched2_free_domdata(ops, CSCHED2_DOM(dom));
+}
+
+static void
+csched2_vcpu_insert(const struct scheduler *ops, struct vcpu *vc)
+{
+    struct csched2_vcpu *svc = vc->sched_priv;
+    struct csched2_dom * const sdom = svc->sdom;
+    spinlock_t *lock;
+
+    ASSERT(!is_idle_vcpu(vc));
+    ASSERT(list_empty(&svc->runq_elem));
+
+    /* Add vcpu to runqueue of initial processor */
+    lock = vcpu_schedule_lock_irq(vc);
+
+    runq_assign(ops, vc);
+
+    vcpu_schedule_unlock_irq(lock, vc);
+
+    sdom->nr_vcpus++;
+
+    SCHED_STAT_CRANK(vcpu_insert);
+
+    CSCHED2_VCPU_CHECK(vc);
+}
+
+static void
+csched2_free_vdata(const struct scheduler *ops, void *priv)
+{
+    struct csched2_vcpu *svc = priv;
+
+    xfree(svc);
+}
+
+static void
+csched2_vcpu_remove(const struct scheduler *ops, struct vcpu *vc)
+{
+    struct csched2_vcpu * const svc = CSCHED2_VCPU(vc);
+    spinlock_t *lock;
+
+    ASSERT(!is_idle_vcpu(vc));
+    ASSERT(list_empty(&svc->runq_elem));
+
+    SCHED_STAT_CRANK(vcpu_remove);
+
+    /* Remove from runqueue */
+    lock = vcpu_schedule_lock_irq(vc);
+
+    runq_deassign(ops, vc);
+
+    vcpu_schedule_unlock_irq(lock, vc);
+
+    svc->sdom->nr_vcpus--;
 }
 
 /* How long should we let this vcpu run for? */

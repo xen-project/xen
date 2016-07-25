@@ -582,6 +582,29 @@ replq_reinsert(const struct scheduler *ops, struct rt_vcpu *svc)
 }
 
 /*
+ * Pick a valid CPU for the vcpu vc
+ * Valid CPU of a vcpu is intesection of vcpu's affinity
+ * and available cpus
+ */
+static int
+rt_cpu_pick(const struct scheduler *ops, struct vcpu *vc)
+{
+    cpumask_t cpus;
+    cpumask_t *online;
+    int cpu;
+
+    online = cpupool_domain_cpumask(vc->domain);
+    cpumask_and(&cpus, online, vc->cpu_hard_affinity);
+
+    cpu = cpumask_test_cpu(vc->processor, &cpus)
+            ? vc->processor
+            : cpumask_cycle(vc->processor, &cpus);
+    ASSERT( !cpumask_empty(&cpus) && cpumask_test_cpu(cpu, &cpus) );
+
+    return cpu;
+}
+
+/*
  * Init/Free related code
  */
 static int
@@ -891,29 +914,6 @@ rt_vcpu_remove(const struct scheduler *ops, struct vcpu *vc)
         replq_remove(ops,svc);
 
     vcpu_schedule_unlock_irq(lock, vc);
-}
-
-/*
- * Pick a valid CPU for the vcpu vc
- * Valid CPU of a vcpu is intesection of vcpu's affinity
- * and available cpus
- */
-static int
-rt_cpu_pick(const struct scheduler *ops, struct vcpu *vc)
-{
-    cpumask_t cpus;
-    cpumask_t *online;
-    int cpu;
-
-    online = cpupool_domain_cpumask(vc->domain);
-    cpumask_and(&cpus, online, vc->cpu_hard_affinity);
-
-    cpu = cpumask_test_cpu(vc->processor, &cpus)
-            ? vc->processor
-            : cpumask_cycle(vc->processor, &cpus);
-    ASSERT( !cpumask_empty(&cpus) && cpumask_test_cpu(cpu, &cpus) );
-
-    return cpu;
 }
 
 /*
