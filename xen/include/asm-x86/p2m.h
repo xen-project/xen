@@ -380,9 +380,9 @@ void p2m_unlock_and_tlb_flush(struct p2m_domain *p2m);
  * After calling any of the variants below, caller needs to use
  * put_gfn. ****/
 
-mfn_t __get_gfn_type_access(struct p2m_domain *p2m, unsigned long gfn,
-                    p2m_type_t *t, p2m_access_t *a, p2m_query_t q,
-                    unsigned int *page_order, bool_t locked);
+mfn_t __nonnull(3, 4) __get_gfn_type_access(
+    struct p2m_domain *p2m, unsigned long gfn, p2m_type_t *t,
+    p2m_access_t *a, p2m_query_t q, unsigned int *page_order, bool_t locked);
 
 /* Read a particular P2M table, mapping pages as we go.  Most callers
  * should _not_ call this directly; use the other get_gfn* functions
@@ -391,13 +391,16 @@ mfn_t __get_gfn_type_access(struct p2m_domain *p2m, unsigned long gfn,
  * If the lookup succeeds, the return value is != INVALID_MFN and 
  * *page_order is filled in with the order of the superpage (if any) that
  * the entry was found in.  */
-#define get_gfn_type_access(p, g, t, a, q, o)   \
-        __get_gfn_type_access((p), (g), (t), (a), (q), (o), 1)
+static inline mfn_t __nonnull(3, 4) get_gfn_type_access(
+    struct p2m_domain *p2m, unsigned long gfn, p2m_type_t *t,
+    p2m_access_t *a, p2m_query_t q, unsigned int *page_order)
+{
+    return __get_gfn_type_access(p2m, gfn, t, a, q, page_order, true);
+}
 
 /* General conversion function from gfn to mfn */
-static inline mfn_t get_gfn_type(struct domain *d,
-                                    unsigned long gfn, p2m_type_t *t,
-                                    p2m_query_t q)
+static inline mfn_t __nonnull(3) get_gfn_type(
+    struct domain *d, unsigned long gfn, p2m_type_t *t, p2m_query_t q)
 {
     p2m_access_t a;
     return get_gfn_type_access(p2m_get_hostp2m(d), gfn, t, &a, q, NULL);
