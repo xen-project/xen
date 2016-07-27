@@ -903,11 +903,10 @@ static int make_timer_node(const struct domain *d, void *fdt,
     return res;
 }
 
-static int map_irq_to_domain(const struct dt_device_node *dev,
-                             struct domain *d, unsigned int irq)
+static int map_irq_to_domain(struct domain *d, unsigned int irq,
+                             bool_t need_mapping, const char *devname)
 
 {
-    bool_t need_mapping = !dt_device_for_passthrough(dev);
     int res;
 
     res = irq_permit_access(d, irq);
@@ -927,7 +926,7 @@ static int map_irq_to_domain(const struct dt_device_node *dev,
          */
         vgic_reserve_virq(d, irq);
 
-        res = route_irq_to_guest(d, irq, irq, dt_node_name(dev));
+        res = route_irq_to_guest(d, irq, irq, devname);
         if ( res < 0 )
         {
             printk(XENLOG_ERR "Unable to map IRQ%"PRId32" to dom%d\n",
@@ -947,6 +946,7 @@ static int map_dt_irq_to_domain(const struct dt_device_node *dev,
     struct domain *d = data;
     unsigned int irq = dt_irq->irq;
     int res;
+    bool_t need_mapping = !dt_device_for_passthrough(dev);
 
     if ( irq < NR_LOCAL_IRQS )
     {
@@ -965,7 +965,7 @@ static int map_dt_irq_to_domain(const struct dt_device_node *dev,
         return res;
     }
 
-    res = map_irq_to_domain(dev, d, irq);
+    res = map_irq_to_domain(d, irq, need_mapping, dt_node_name(dev));
 
     return 0;
 }
@@ -1103,7 +1103,7 @@ static int handle_device(struct domain *d, struct dt_device_node *dev)
             return res;
         }
 
-        res = map_irq_to_domain(dev, d, res);
+        res = map_irq_to_domain(d, res, need_mapping, dt_node_name(dev));
         if ( res )
             return res;
     }
@@ -1343,15 +1343,14 @@ static int acpi_iomem_deny_access(struct domain *d)
     return gic_iomem_deny_access(d);
 }
 
-static int acpi_permit_spi_access(struct domain *d)
+static int acpi_route_spis(struct domain *d)
 {
     int i, res;
     struct irq_desc *desc;
 
     /*
-     * Here just permit Dom0 to access the SPIs which Xen doesn't use. Then when
-     * Dom0 configures the interrupt, set the interrupt type and route it to
-     * Dom0.
+     * Route the IRQ to hardware domain and permit the access.
+     * The interrupt type will be set by set by the hardware domain.
      */
     for( i = NR_LOCAL_IRQS; i < vgic_num_irqs(d); i++ )
     {
@@ -1362,13 +1361,10 @@ static int acpi_permit_spi_access(struct domain *d)
         if ( desc->action != NULL)
             continue;
 
-        res = irq_permit_access(d, i);
+        /* XXX: Shall we use a proper devname? */
+        res = map_irq_to_domain(d, i, true, "ACPI");
         if ( res )
-        {
-            printk(XENLOG_ERR "Unable to permit to dom%u access to IRQ %u\n",
-                   d->domain_id, i);
             return res;
-        }
     }
 
     return 0;
@@ -1902,7 +1898,7 @@ static int prepare_acpi(struct domain *d, struct kernel_info *kinfo)
     if ( rc != 0 )
         return rc;
 
-    rc = acpi_permit_spi_access(d);
+    rc = acpi_route_spis(d);
     if ( rc != 0 )
         return rc;
 
