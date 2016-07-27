@@ -1464,7 +1464,7 @@ csched2_cpu_pick(const struct scheduler *ops, struct vcpu *vc)
     struct csched2_private *prv = CSCHED2_PRIV(ops);
     int i, min_rqi = -1, new_cpu;
     struct csched2_vcpu *svc = CSCHED2_VCPU(vc);
-    s_time_t min_avgload;
+    s_time_t min_avgload = MAX_LOAD;
 
     ASSERT(!cpumask_empty(&prv->active_queues));
 
@@ -1488,7 +1488,12 @@ csched2_cpu_pick(const struct scheduler *ops, struct vcpu *vc)
     {
         /* We may be here because someone requested us to migrate. */
         __clear_bit(__CSFLAG_runq_migrate_request, &svc->flags);
-        return get_fallback_cpu(svc);
+        new_cpu = get_fallback_cpu(svc);
+        /*
+         * Tracing of runq and its load won't be accurate, since we could
+         * not get the lock, but at least we will output the chosen pcpu.
+         */
+        goto out;
     }
 
     /*
@@ -1512,8 +1517,6 @@ csched2_cpu_pick(const struct scheduler *ops, struct vcpu *vc)
         }
         /* Fall-through to normal cpu pick */
     }
-
-    min_avgload = MAX_LOAD;
 
     /* Find the runqueue with the lowest average load. */
     for_each_cpu(i, &prv->active_queues)
@@ -1552,7 +1555,7 @@ csched2_cpu_pick(const struct scheduler *ops, struct vcpu *vc)
         if ( rqd_avgload < min_avgload )
         {
             min_avgload = rqd_avgload;
-            min_rqi=i;
+            min_rqi = i;
         }
     }
 
@@ -1560,6 +1563,8 @@ csched2_cpu_pick(const struct scheduler *ops, struct vcpu *vc)
     if ( min_rqi == -1 )
     {
         new_cpu = get_fallback_cpu(svc);
+        min_rqi = c2r(ops, new_cpu);
+        min_avgload = prv->rqd[min_rqi].b_avgload;
         goto out_up;
     }
 
@@ -1570,18 +1575,18 @@ csched2_cpu_pick(const struct scheduler *ops, struct vcpu *vc)
 
  out_up:
     read_unlock(&prv->lock);
-
+ out:
     if ( unlikely(tb_init_done) )
     {
         struct {
             uint64_t b_avgload;
             unsigned vcpu:16, dom:16;
             unsigned rq_id:16, new_cpu:16;
-       } d;
-        d.b_avgload = prv->rqd[min_rqi].b_avgload;
+        } d;
         d.dom = vc->domain->domain_id;
         d.vcpu = vc->vcpu_id;
-        d.rq_id = c2r(ops, new_cpu);
+        d.rq_id = min_rqi;
+        d.b_avgload = min_avgload;
         d.new_cpu = new_cpu;
         __trace_var(TRC_CSCHED2_PICKED_CPU, 1,
                     sizeof(d),
