@@ -34,6 +34,15 @@ static const struct arm_cpu_capabilities arm_errata[] = {
         MIDR_RANGE(MIDR_CORTEX_A53, 0x00, 0x01),
     },
 #endif
+#ifdef CONFIG_ARM64_ERRATUM_832075
+    {
+        /* Cortex-A57 r0p0 - r1p2 */
+        .desc = "ARM erratum 832075",
+        .capability = ARM64_WORKAROUND_DEVICE_LOAD_ACQUIRE,
+        MIDR_RANGE(MIDR_CORTEX_A57, 0x00,
+                   (1 << MIDR_VARIANT_SHIFT) | 2),
+    },
+#endif
     {},
 };
 

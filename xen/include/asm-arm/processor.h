@@ -47,8 +47,10 @@
 #define ARM_CPU_IMP_ARM             0x41
 
 #define ARM_CPU_PART_CORTEX_A53     0xD03
+#define ARM_CPU_PART_CORTEX_A57     0xD07
 
 #define MIDR_CORTEX_A53 MIDR_CPU_MODEL(ARM_CPU_IMP_ARM, ARM_CPU_PART_CORTEX_A53)
+#define MIDR_CORTEX_A57 MIDR_CPU_MODEL(ARM_CPU_IMP_ARM, ARM_CPU_PART_CORTEX_A57)
 
 /* MPIDR Multiprocessor Affinity Register */
 #define _MPIDR_UP           (30)
