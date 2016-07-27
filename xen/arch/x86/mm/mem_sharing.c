@@ -870,6 +870,7 @@ int mem_sharing_nominate_page(struct domain *d,
         unsigned int i;
         struct p2m_domain *ap2m;
         mfn_t amfn;
+        p2m_type_t ap2mt;
         p2m_access_t ap2ma;
 
         altp2m_list_lock(d);
@@ -880,7 +881,7 @@ int mem_sharing_nominate_page(struct domain *d,
             if ( !ap2m )
                 continue;
 
-            amfn = get_gfn_type_access(ap2m, gfn, NULL, &ap2ma, 0, NULL);
+            amfn = get_gfn_type_access(ap2m, gfn, &ap2mt, &ap2ma, 0, NULL);
             if ( mfn_valid(amfn) && (mfn_x(amfn) != mfn_x(mfn) || ap2ma != p2ma) )
             {
                 altp2m_list_unlock(d);
