@@ -44,6 +44,12 @@
         _model == (model) && _rv >= (rv_min) && _rv <= (rv_max);        \
 })
 
+#define ARM_CPU_IMP_ARM             0x41
+
+#define ARM_CPU_PART_CORTEX_A53     0xD03
+
+#define MIDR_CORTEX_A53 MIDR_CPU_MODEL(ARM_CPU_IMP_ARM, ARM_CPU_PART_CORTEX_A53)
+
 /* MPIDR Multiprocessor Affinity Register */
 #define _MPIDR_UP           (30)
 #define MPIDR_UP            (_AC(1,U) << _MPIDR_UP)

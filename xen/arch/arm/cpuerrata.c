@@ -17,6 +17,23 @@ is_affected_midr_range(const struct arm_cpu_capabilities *entry)
 }
 
 static const struct arm_cpu_capabilities arm_errata[] = {
+#if defined(CONFIG_ARM64_ERRATUM_827319) || \
+    defined(CONFIG_ARM64_ERRATUM_824069)
+    {
+        /* Cortex-A53 r0p[012] */
+        .desc = "ARM errata 827319, 824069",
+        .capability = ARM64_WORKAROUND_CLEAN_CACHE,
+        MIDR_RANGE(MIDR_CORTEX_A53, 0x00, 0x02),
+    },
+#endif
+#ifdef CONFIG_ARM64_ERRATUM_819472
+    {
+        /* Cortex-A53 r0[01] */
+        .desc = "ARM erratum 819472",
+        .capability = ARM64_WORKAROUND_CLEAN_CACHE,
+        MIDR_RANGE(MIDR_CORTEX_A53, 0x00, 0x01),
+    },
+#endif
     {},
 };
 

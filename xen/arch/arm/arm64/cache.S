@@ -19,6 +19,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <asm/alternative.h>
+
 /*
  * dcache_line_size - get the minimum D-cache line size from the CTR register.
  */
