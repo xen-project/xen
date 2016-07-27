@@ -395,6 +395,17 @@ bool_t is_assignable_irq(unsigned int irq)
 }
 
 /*
+ * Only the hardware domain is allowed to set the configure the
+ * interrupt type for now.
+ *
+ * XXX: See whether it is possible to let any domain configure the type.
+ */
+bool_t irq_type_set_by_domain(const struct domain *d)
+{
+    return (d == hardware_domain);
+}
+
+/*
  * Route an IRQ to a specific guest.
  * For now only SPIs are assignable to the guest.
  */
@@ -449,7 +460,7 @@ int route_irq_to_guest(struct domain *d, unsigned int virq,
 
     spin_lock_irqsave(&desc->lock, flags);
 
-    if ( desc->arch.type == IRQ_TYPE_INVALID )
+    if ( !irq_type_set_by_domain(d) && desc->arch.type == IRQ_TYPE_INVALID )
     {
         printk(XENLOG_G_ERR "IRQ %u has not been configured\n", irq);
         retval = -EIO;

@@ -222,6 +222,9 @@ enum gic_version {
 
 extern enum gic_version gic_hw_version(void);
 
+/* Program the IRQ type into the GIC */
+void gic_set_irq_type(struct irq_desc *desc, unsigned int type);
+
 /* Program the GIC to route an interrupt */
 extern void gic_route_irq_to_xen(struct irq_desc *desc, unsigned int priority);
 extern int gic_route_irq_to_guest(struct domain *, unsigned int virq,

@@ -97,7 +97,7 @@ void gic_restore_state(struct vcpu *v)
 }
 
 /* desc->irq needs to be disabled before calling this function */
-static void gic_set_irq_type(struct irq_desc *desc, unsigned int type)
+void gic_set_irq_type(struct irq_desc *desc, unsigned int type)
 {
     /*
      * IRQ must be disabled before configuring it (see 4.3.13 in ARM IHI
@@ -160,7 +160,8 @@ int gic_route_irq_to_guest(struct domain *d, unsigned int virq,
     desc->handler = gic_hw_ops->gic_guest_irq_type;
     set_bit(_IRQ_GUEST, &desc->status);
 
-    gic_set_irq_type(desc, desc->arch.type);
+    if ( !irq_type_set_by_domain(d) )
+        gic_set_irq_type(desc, desc->arch.type);
     gic_set_irq_priority(desc, priority);
 
     p->desc = desc;
