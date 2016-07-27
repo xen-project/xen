@@ -472,13 +472,10 @@ static inline uint64_t gicv3_mpidr_to_affinity(int cpu)
 }
 
 static void gicv3_set_irq_properties(struct irq_desc *desc,
-                                     const cpumask_t *cpu_mask,
                                      unsigned int priority)
 {
     uint32_t cfg, actual, edgebit;
-    uint64_t affinity;
     void __iomem *base;
-    unsigned int cpu = gicv3_get_cpu_from_mask(cpu_mask);
     unsigned int irq = desc->irq;
     unsigned int type = desc->arch.type;
 
@@ -515,13 +512,6 @@ static void gicv3_set_irq_properties(struct irq_desc *desc,
             IRQ_TYPE_EDGE_RISING :
             IRQ_TYPE_LEVEL_HIGH;
     }
-
-    affinity = gicv3_mpidr_to_affinity(cpu);
-    /* Make sure we don't broadcast the interrupt */
-    affinity &= ~GICD_IROUTER_SPI_MODE_ANY;
-
-    if ( irq >= NR_GIC_LOCAL_IRQS )
-        writeq_relaxed(affinity, (GICD + GICD_IROUTER + irq * 8));
 
     /* Set priority */
     if ( irq < NR_GIC_LOCAL_IRQS )

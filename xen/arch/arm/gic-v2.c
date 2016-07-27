@@ -236,16 +236,10 @@ static unsigned int gicv2_read_irq(void)
     return (readl_gicc(GICC_IAR) & GICC_IA_IRQ);
 }
 
-/*
- * needs to be called with a valid cpu_mask, ie each cpu in the mask has
- * already called gic_cpu_init
- */
 static void gicv2_set_irq_properties(struct irq_desc *desc,
-                                   const cpumask_t *cpu_mask,
-                                   unsigned int priority)
+                                     unsigned int priority)
 {
     uint32_t cfg, actual, edgebit;
-    unsigned int mask = gicv2_cpu_mask(cpu_mask);
     unsigned int irq = desc->irq;
     unsigned int type = desc->arch.type;
 
@@ -276,8 +270,6 @@ static void gicv2_set_irq_properties(struct irq_desc *desc,
             IRQ_TYPE_LEVEL_HIGH;
     }
 
-    /* Set target CPU mask (RAZ/WI on uniprocessor) */
-    writeb_gicd(mask, GICD_ITARGETSR + irq);
     /* Set priority */
     writeb_gicd(priority, GICD_IPRIORITYR + irq);
 

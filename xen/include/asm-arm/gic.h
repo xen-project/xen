@@ -331,7 +331,6 @@ struct gic_hw_operations {
     unsigned int (*read_irq)(void);
     /* Set IRQ property */
     void (*set_irq_properties)(struct irq_desc *desc,
-                               const cpumask_t *cpu_mask,
                                unsigned int priority);
     /* Send SGI */
     void (*send_SGI)(enum gic_sgi sgi, enum gic_sgi_mode irqmode,

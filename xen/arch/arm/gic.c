@@ -106,7 +106,8 @@ static void gic_set_irq_properties(struct irq_desc *desc,
                                    const cpumask_t *cpu_mask,
                                    unsigned int priority)
 {
-   gic_hw_ops->set_irq_properties(desc, cpu_mask, priority);
+    gic_hw_ops->set_irq_properties(desc, priority);
+    desc->handler->set_affinity(desc, cpu_mask);
 }
 
 /* Program the GIC to route an interrupt to the host (i.e. Xen)
