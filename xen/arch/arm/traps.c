@@ -2412,7 +2412,7 @@ static void do_trap_instr_abort_guest(struct cpu_user_regs *regs,
 
             rc = gva_to_ipa(gva, &gpa, GV2M_READ);
             if ( rc == -EFAULT )
-                goto bad_insn_abort;
+                return; /* Try again */
         }
 
         rc = p2m_mem_access_check(gpa, gva, npfec);
@@ -2424,7 +2424,6 @@ static void do_trap_instr_abort_guest(struct cpu_user_regs *regs,
     break;
     }
 
-bad_insn_abort:
     inject_iabt_exception(regs, gva, hsr.len);
 }
 
@@ -2448,7 +2447,7 @@ static void do_trap_data_abort_guest(struct cpu_user_regs *regs,
     {
         rc = gva_to_ipa(info.gva, &info.gpa, GV2M_READ);
         if ( rc == -EFAULT )
-            goto bad_data_abort;
+            return; /* Try again */
     }
 
     switch ( dabt.dfsc & 0x3f )
