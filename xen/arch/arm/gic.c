@@ -96,8 +96,14 @@ void gic_restore_state(struct vcpu *v)
     gic_restore_pending_irqs(v);
 }
 
+/* desc->irq needs to be disabled before calling this function */
 static void gic_set_irq_type(struct irq_desc *desc, unsigned int type)
 {
+    /*
+     * IRQ must be disabled before configuring it (see 4.3.13 in ARM IHI
+     * 0048B.b). We rely on the caller to do it.
+     */
+    ASSERT(test_bit(_IRQ_DISABLED, &desc->status));
     ASSERT(spin_is_locked(&desc->lock));
     ASSERT(type != IRQ_TYPE_INVALID);
 
