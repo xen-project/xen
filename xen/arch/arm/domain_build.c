@@ -1355,8 +1355,9 @@ static int acpi_route_spis(struct domain *d)
     for( i = NR_LOCAL_IRQS; i < vgic_num_irqs(d); i++ )
     {
         /*
-	 * TODO: Exclude the SPIs SMMU uses which should not be routed to Dom0.
-	 */
+         * TODO: Exclude the SPIs SMMU uses which should not be routed to
+         * the hardware domain.
+         */
         desc = irq_to_desc(i);
         if ( desc->action != NULL)
             continue;
