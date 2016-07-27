@@ -96,12 +96,12 @@ void gic_restore_state(struct vcpu *v)
     gic_restore_pending_irqs(v);
 }
 
-static void gic_set_irq_type(struct irq_desc *desc)
+static void gic_set_irq_type(struct irq_desc *desc, unsigned int type)
 {
     ASSERT(spin_is_locked(&desc->lock));
-    ASSERT(desc->arch.type != IRQ_TYPE_INVALID);
+    ASSERT(type != IRQ_TYPE_INVALID);
 
-    gic_hw_ops->set_irq_type(desc);
+    gic_hw_ops->set_irq_type(desc, type);
 }
 
 static void gic_set_irq_priority(struct irq_desc *desc, unsigned int priority)
@@ -121,7 +121,7 @@ void gic_route_irq_to_xen(struct irq_desc *desc, unsigned int priority)
 
     desc->handler = gic_hw_ops->gic_host_irq_type;
 
-    gic_set_irq_type(desc);
+    gic_set_irq_type(desc, desc->arch.type);
     gic_set_irq_priority(desc, priority);
 }
 
@@ -154,7 +154,7 @@ int gic_route_irq_to_guest(struct domain *d, unsigned int virq,
     desc->handler = gic_hw_ops->gic_guest_irq_type;
     set_bit(_IRQ_GUEST, &desc->status);
 
-    gic_set_irq_type(desc);
+    gic_set_irq_type(desc, desc->arch.type);
     gic_set_irq_priority(desc, priority);
 
     p->desc = desc;

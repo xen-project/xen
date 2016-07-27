@@ -236,11 +236,10 @@ static unsigned int gicv2_read_irq(void)
     return (readl_gicc(GICC_IAR) & GICC_IA_IRQ);
 }
 
-static void gicv2_set_irq_type(struct irq_desc *desc)
+static void gicv2_set_irq_type(struct irq_desc *desc, unsigned int type)
 {
     uint32_t cfg, actual, edgebit;
     unsigned int irq = desc->irq;
-    unsigned int type = desc->arch.type;
 
     spin_lock(&gicv2.lock);
     /* Set edge / level */

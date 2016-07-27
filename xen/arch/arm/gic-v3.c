@@ -471,12 +471,11 @@ static inline uint64_t gicv3_mpidr_to_affinity(int cpu)
              MPIDR_AFFINITY_LEVEL(mpidr, 0));
 }
 
-static void gicv3_set_irq_type(struct irq_desc *desc)
+static void gicv3_set_irq_type(struct irq_desc *desc, unsigned int type)
 {
     uint32_t cfg, actual, edgebit;
     void __iomem *base;
     unsigned int irq = desc->irq;
-    unsigned int type = desc->arch.type;
 
     /* SGI's are always edge-triggered not need to call GICD_ICFGR0 */
     ASSERT(irq >= NR_GIC_SGI);

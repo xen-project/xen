@@ -328,8 +328,8 @@ struct gic_hw_operations {
     void (*deactivate_irq)(struct irq_desc *irqd);
     /* Read IRQ id and Ack */
     unsigned int (*read_irq)(void);
-    /* Set IRQ type - type is taken from desc->arch.type */
-    void (*set_irq_type)(struct irq_desc *desc);
+    /* Set IRQ type */
+    void (*set_irq_type)(struct irq_desc *desc, unsigned int type);
     /* Set IRQ priority */
     void (*set_irq_priority)(struct irq_desc *desc, unsigned int priority);
     /* Send SGI */
