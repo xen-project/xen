@@ -14,6 +14,7 @@ config ARM_64
 	def_bool y
 	depends on 64BIT
 	select HAS_GICV3
+	select ALTERNATIVE
 
 config ARM
 	def_bool y
@@ -44,6 +45,10 @@ config ACPI
 
 # Select HAS_GICV3 if GICv3 is supported
 config HAS_GICV3
+	bool
+
+# Select ALTERNATIVE if the architecture supports runtime patching
+config ALTERNATIVE
 	bool
 
 endmenu

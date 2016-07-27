@@ -38,6 +38,7 @@
 #include <xen/vmap.h>
 #include <xen/libfdt/libfdt.h>
 #include <xen/acpi.h>
+#include <asm/alternative.h>
 #include <asm/page.h>
 #include <asm/current.h>
 #include <asm/setup.h>
@@ -834,6 +835,12 @@ void __init start_xen(unsigned long boot_phys_offset,
     iommu_setup();
 
     do_initcalls();
+
+    /*
+     * It needs to be called after do_initcalls to be able to use
+     * stop_machine (tasklets initialized via an initcall).
+     */
+    apply_alternatives_all();
 
     /* Create initial domain 0. */
     /* The vGIC for DOM0 is exactly emulating the hardware GIC */

@@ -61,6 +61,22 @@ u32 aarch64_insn_encode_immediate(enum aarch64_insn_imm_type type,
 s32 aarch64_get_branch_offset(u32 insn);
 u32 aarch64_set_branch_offset(u32 insn, s32 offset);
 
+/* Wrapper for common code */
+static inline bool insn_is_branch_imm(u32 insn)
+{
+    return aarch64_insn_is_branch_imm(insn);
+}
+
+static inline s32 insn_get_branch_offset(u32 insn)
+{
+    return aarch64_get_branch_offset(insn);
+}
+
+static inline u32 insn_set_branch_offset(u32 insn, s32 offset)
+{
+    return aarch64_set_branch_offset(insn, offset);
+}
+
 #endif /* !__ARCH_ARM_ARM64_INSN */
 /*
  * Local variables:
