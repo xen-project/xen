@@ -66,6 +66,12 @@ struct arm_cpu_capabilities {
     const char *desc;
     u16 capability;
     bool_t (*matches)(const struct arm_cpu_capabilities *);
+    union {
+        struct {    /* To be used for eratum handling only */
+            u32 midr_model;
+            u32 midr_range_min, midr_range_max;
+        };
+    };
 };
 
 void update_cpu_capabilities(const struct arm_cpu_capabilities *caps,
