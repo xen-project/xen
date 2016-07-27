@@ -471,8 +471,7 @@ static inline uint64_t gicv3_mpidr_to_affinity(int cpu)
              MPIDR_AFFINITY_LEVEL(mpidr, 0));
 }
 
-static void gicv3_set_irq_properties(struct irq_desc *desc,
-                                     unsigned int priority)
+static void gicv3_set_irq_type(struct irq_desc *desc)
 {
     uint32_t cfg, actual, edgebit;
     void __iomem *base;
@@ -512,6 +511,15 @@ static void gicv3_set_irq_properties(struct irq_desc *desc,
             IRQ_TYPE_EDGE_RISING :
             IRQ_TYPE_LEVEL_HIGH;
     }
+    spin_unlock(&gicv3.lock);
+}
+
+static void gicv3_set_irq_priority(struct irq_desc *desc,
+                                   unsigned int priority)
+{
+    unsigned int irq = desc->irq;
+
+    spin_lock(&gicv3.lock);
 
     /* Set priority */
     if ( irq < NR_GIC_LOCAL_IRQS )
@@ -1579,7 +1587,8 @@ static const struct gic_hw_operations gicv3_ops = {
     .eoi_irq             = gicv3_eoi_irq,
     .deactivate_irq      = gicv3_dir_irq,
     .read_irq            = gicv3_read_irq,
-    .set_irq_properties  = gicv3_set_irq_properties,
+    .set_irq_type        = gicv3_set_irq_type,
+    .set_irq_priority    = gicv3_set_irq_priority,
     .send_SGI            = gicv3_send_sgi,
     .disable_interface   = gicv3_disable_interface,
     .update_lr           = gicv3_update_lr,

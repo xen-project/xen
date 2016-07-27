@@ -236,15 +236,11 @@ static unsigned int gicv2_read_irq(void)
     return (readl_gicc(GICC_IAR) & GICC_IA_IRQ);
 }
 
-static void gicv2_set_irq_properties(struct irq_desc *desc,
-                                     unsigned int priority)
+static void gicv2_set_irq_type(struct irq_desc *desc)
 {
     uint32_t cfg, actual, edgebit;
     unsigned int irq = desc->irq;
     unsigned int type = desc->arch.type;
-
-    ASSERT(type != IRQ_TYPE_INVALID);
-    ASSERT(spin_is_locked(&desc->lock));
 
     spin_lock(&gicv2.lock);
     /* Set edge / level */
@@ -269,6 +265,16 @@ static void gicv2_set_irq_properties(struct irq_desc *desc,
             IRQ_TYPE_EDGE_RISING :
             IRQ_TYPE_LEVEL_HIGH;
     }
+
+    spin_unlock(&gicv2.lock);
+}
+
+static void gicv2_set_irq_priority(struct irq_desc *desc,
+                                   unsigned int priority)
+{
+    unsigned int irq = desc->irq;
+
+    spin_lock(&gicv2.lock);
 
     /* Set priority */
     writeb_gicd(priority, GICD_IPRIORITYR + irq);
@@ -1217,7 +1223,8 @@ const static struct gic_hw_operations gicv2_ops = {
     .eoi_irq             = gicv2_eoi_irq,
     .deactivate_irq      = gicv2_dir_irq,
     .read_irq            = gicv2_read_irq,
-    .set_irq_properties  = gicv2_set_irq_properties,
+    .set_irq_type        = gicv2_set_irq_type,
+    .set_irq_priority    = gicv2_set_irq_priority,
     .send_SGI            = gicv2_send_SGI,
     .disable_interface   = gicv2_disable_interface,
     .update_lr           = gicv2_update_lr,
