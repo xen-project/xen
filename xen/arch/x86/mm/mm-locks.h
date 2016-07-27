@@ -242,6 +242,21 @@ declare_mm_lock(nestedp2m)
 
 declare_mm_rwlock(p2m);
 
+/* Sharing per page lock
+ *
+ * This is an external lock, not represented by an mm_lock_t. The memory
+ * sharing lock uses it to protect addition and removal of (gfn,domain)
+ * tuples to a shared page. We enforce order here against the p2m lock,
+ * which is taken after the page_lock to change the gfn's p2m entry.
+ *
+ * The lock is recursive because during share we lock two pages. */
+
+declare_mm_order_constraint(per_page_sharing)
+#define page_sharing_mm_pre_lock()   mm_enforce_order_lock_pre_per_page_sharing()
+#define page_sharing_mm_post_lock(l, r) \
+        mm_enforce_order_lock_post_per_page_sharing((l), (r))
+#define page_sharing_mm_unlock(l, r) mm_enforce_order_unlock((l), (r))
+
 /* Alternate P2M list lock (per-domain)
  *
  * A per-domain lock that protects the list of alternate p2m's.
@@ -286,21 +301,6 @@ declare_mm_rwlock(altp2m);
 #define p2m_read_unlock(p)    mm_read_unlock(&(p)->lock)
 #define p2m_locked_by_me(p)   mm_write_locked_by_me(&(p)->lock)
 #define gfn_locked_by_me(p,g) p2m_locked_by_me(p)
-
-/* Sharing per page lock
- *
- * This is an external lock, not represented by an mm_lock_t. The memory
- * sharing lock uses it to protect addition and removal of (gfn,domain)
- * tuples to a shared page. We enforce order here against the p2m lock,
- * which is taken after the page_lock to change the gfn's p2m entry.
- *
- * The lock is recursive because during share we lock two pages. */
-
-declare_mm_order_constraint(per_page_sharing)
-#define page_sharing_mm_pre_lock()   mm_enforce_order_lock_pre_per_page_sharing()
-#define page_sharing_mm_post_lock(l, r) \
-        mm_enforce_order_lock_post_per_page_sharing((l), (r))
-#define page_sharing_mm_unlock(l, r) mm_enforce_order_unlock((l), (r))
 
 /* PoD lock (per-p2m-table)
  * 

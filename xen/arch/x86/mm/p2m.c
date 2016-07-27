@@ -1786,8 +1786,9 @@ int p2m_set_altp2m_mem_access(struct domain *d, struct p2m_domain *hp2m,
     /* Check host p2m if no valid entry in alternate */
     if ( !mfn_valid(mfn) )
     {
-        mfn = hp2m->get_entry(hp2m, gfn_l, &t, &old_a,
-                              P2M_ALLOC | P2M_UNSHARE, &page_order, NULL);
+
+        mfn = get_gfn_type_access(hp2m, gfn_l, &t, &old_a,
+                                  P2M_ALLOC | P2M_UNSHARE, &page_order);
 
         rc = -ESRCH;
         if ( !mfn_valid(mfn) || t != p2m_ram_rw )
@@ -2363,7 +2364,7 @@ bool_t p2m_altp2m_lazy_copy(struct vcpu *v, paddr_t gpa,
         return 0;
 
     mfn = get_gfn_type_access(hp2m, gfn_x(gfn), &p2mt, &p2ma,
-                              P2M_ALLOC | P2M_UNSHARE, &page_order);
+                              P2M_ALLOC, &page_order);
     __put_gfn(hp2m, gfn_x(gfn));
 
     if ( mfn_eq(mfn, INVALID_MFN) )
@@ -2562,8 +2563,8 @@ int p2m_change_altp2m_gfn(struct domain *d, unsigned int idx,
     /* Check host p2m if no valid entry in alternate */
     if ( !mfn_valid(mfn) )
     {
-        mfn = hp2m->get_entry(hp2m, gfn_x(old_gfn), &t, &a,
-                              P2M_ALLOC | P2M_UNSHARE, &page_order, NULL);
+        mfn = get_gfn_type_access(hp2m, gfn_x(old_gfn), &t, &a,
+                                  P2M_ALLOC | P2M_UNSHARE, &page_order);
 
         if ( !mfn_valid(mfn) || t != p2m_ram_rw )
             goto out;
@@ -2588,6 +2589,7 @@ int p2m_change_altp2m_gfn(struct domain *d, unsigned int idx,
     if ( !mfn_valid(mfn) )
         mfn = hp2m->get_entry(hp2m, gfn_x(new_gfn), &t, &a, 0, NULL, NULL);
 
+    /* Note: currently it is not safe to remap to a shared entry */
     if ( !mfn_valid(mfn) || (t != p2m_ram_rw) )
         goto out;
 

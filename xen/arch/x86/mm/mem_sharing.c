@@ -33,6 +33,7 @@
 #include <asm/page.h>
 #include <asm/string.h>
 #include <asm/p2m.h>
+#include <asm/altp2m.h>
 #include <asm/atomic.h>
 #include <asm/event.h>
 #include <xsm/xsm.h>
@@ -828,14 +829,16 @@ int mem_sharing_nominate_page(struct domain *d,
                               int expected_refcnt,
                               shr_handle_t *phandle)
 {
+    struct p2m_domain *hp2m = p2m_get_hostp2m(d);
     p2m_type_t p2mt;
+    p2m_access_t p2ma;
     mfn_t mfn;
     struct page_info *page = NULL; /* gcc... */
     int ret;
 
     *phandle = 0UL;
 
-    mfn = get_gfn(d, gfn, &p2mt);
+    mfn = get_gfn_type_access(hp2m, gfn, &p2mt, &p2ma, 0, NULL);
 
     /* Check if mfn is valid */
     ret = -EINVAL;
@@ -860,6 +863,33 @@ int mem_sharing_nominate_page(struct domain *d,
     /* Check p2m type */
     if ( !p2m_is_sharable(p2mt) )
         goto out;
+
+    /* Check if there are mem_access/remapped altp2m entries for this page */
+    if ( altp2m_active(d) )
+    {
+        unsigned int i;
+        struct p2m_domain *ap2m;
+        mfn_t amfn;
+        p2m_access_t ap2ma;
+
+        altp2m_list_lock(d);
+
+        for ( i = 0; i < MAX_ALTP2M; i++ )
+        {
+            ap2m = d->arch.altp2m_p2m[i];
+            if ( !ap2m )
+                continue;
+
+            amfn = get_gfn_type_access(ap2m, gfn, NULL, &ap2ma, 0, NULL);
+            if ( mfn_valid(amfn) && (mfn_x(amfn) != mfn_x(mfn) || ap2ma != p2ma) )
+            {
+                altp2m_list_unlock(d);
+                goto out;
+            }
+        }
+
+        altp2m_list_unlock(d);
+    }
 
     /* Try to convert the mfn to the sharable type */
     page = mfn_to_page(mfn);
