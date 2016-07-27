@@ -24,6 +24,22 @@
 
 DECLARE_BITMAP(cpu_hwcaps, ARM_NCAPS);
 
+void update_cpu_capabilities(const struct arm_cpu_capabilities *caps,
+                             const char *info)
+{
+    int i;
+
+    for ( i = 0; caps[i].matches; i++ )
+    {
+        if ( !caps[i].matches(&caps[i]) )
+            continue;
+
+        if ( !cpus_have_cap(caps[i].capability) && caps[i].desc )
+            printk(XENLOG_INFO "%s: %s\n", info, caps[i].desc);
+        cpus_set_cap(caps[i].capability);
+    }
+}
+
 /*
  * Local variables:
  * mode: C
