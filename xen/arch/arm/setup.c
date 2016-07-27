@@ -40,6 +40,7 @@
 #include <asm/current.h>
 #include <asm/setup.h>
 #include <asm/gic.h>
+#include <asm/cpuerrata.h>
 #include <asm/cpufeature.h>
 #include <asm/platform.h>
 #include <asm/procinfo.h>
@@ -163,6 +164,8 @@ static void __init processor_id(void)
     }
 
     processor_setup();
+
+    check_local_cpu_errata();
 }
 
 static void dt_unreserved_regions(paddr_t s, paddr_t e,

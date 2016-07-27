@@ -29,6 +29,7 @@
 #include <xen/timer.h>
 #include <xen/irq.h>
 #include <xen/console.h>
+#include <asm/cpuerrata.h>
 #include <asm/gic.h>
 #include <asm/psci.h>
 
@@ -303,6 +304,8 @@ void __cpuinit start_secondary(unsigned long boot_phys_offset,
 
     local_irq_enable();
     local_abort_enable();
+
+    check_local_cpu_errata();
 
     printk(XENLOG_DEBUG "CPU %u booted.\n", smp_processor_id());
 
