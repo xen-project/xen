@@ -92,6 +92,7 @@ static int fd_lock = -1;
 static const char savefileheader_magic[32]=
     "Xen saved domain, xl format\n \0 \r";
 
+#ifndef LIBXL_HAVE_NO_SUSPEND_RESUME
 static const char migrate_receiver_banner[]=
     "xl migration receiver ready, send binary domain data.\n";
 static const char migrate_receiver_ready[]=
@@ -100,6 +101,8 @@ static const char migrate_permission_to_go[]=
     "domain is yours, you are cleared to unpause";
 static const char migrate_report[]=
     "my copy unpause results are as follows";
+#endif
+
   /* followed by one byte:
    *     0: everything went well, domain is running
    *            next thing is we all exit
