@@ -6,6 +6,7 @@ subdir-$(CONFIG_ACPI) += acpi
 
 obj-$(EARLY_PRINTK) += early_printk.o
 obj-y += cpu.o
+obj-y += cpuerrata.o
 obj-y += cpufeature.o
 obj-y += domain.o
 obj-y += psci.o
