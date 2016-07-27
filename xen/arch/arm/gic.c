@@ -97,24 +97,19 @@ void gic_restore_state(struct vcpu *v)
 }
 
 /*
- * needs to be called with a valid cpu_mask, ie each cpu in the mask has
- * already called gic_cpu_init
  * - desc.lock must be held
  * - arch.type must be valid (i.e != IRQ_TYPE_INVALID)
  */
 static void gic_set_irq_properties(struct irq_desc *desc,
-                                   const cpumask_t *cpu_mask,
                                    unsigned int priority)
 {
     gic_hw_ops->set_irq_properties(desc, priority);
-    desc->handler->set_affinity(desc, cpu_mask);
 }
 
 /* Program the GIC to route an interrupt to the host (i.e. Xen)
  * - needs to be called with desc.lock held
  */
-void gic_route_irq_to_xen(struct irq_desc *desc, const cpumask_t *cpu_mask,
-                          unsigned int priority)
+void gic_route_irq_to_xen(struct irq_desc *desc, unsigned int priority)
 {
     ASSERT(priority <= 0xff);     /* Only 8 bits of priority */
     ASSERT(desc->irq < gic_number_lines());/* Can't route interrupts that don't exist */
@@ -123,7 +118,7 @@ void gic_route_irq_to_xen(struct irq_desc *desc, const cpumask_t *cpu_mask,
 
     desc->handler = gic_hw_ops->gic_host_irq_type;
 
-    gic_set_irq_properties(desc, cpu_mask, priority);
+    gic_set_irq_properties(desc, priority);
 }
 
 /* Program the GIC to route an interrupt to a guest
@@ -155,7 +150,7 @@ int gic_route_irq_to_guest(struct domain *d, unsigned int virq,
     desc->handler = gic_hw_ops->gic_guest_irq_type;
     set_bit(_IRQ_GUEST, &desc->status);
 
-    gic_set_irq_properties(desc, cpumask_of(v_target->processor), priority);
+    gic_set_irq_properties(desc, priority);
 
     p->desc = desc;
     res = 0;

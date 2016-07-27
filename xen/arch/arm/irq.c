@@ -370,6 +370,7 @@ int setup_irq(unsigned int irq, unsigned int irqflags, struct irqaction *new)
     /* First time the IRQ is setup */
     if ( disabled )
     {
+        gic_route_irq_to_xen(desc, GIC_PRI_IRQ);
         /* It's fine to use smp_processor_id() because:
          * For PPI: irq_desc is banked
          * For SPI: we don't care for now which CPU will receive the
@@ -377,8 +378,7 @@ int setup_irq(unsigned int irq, unsigned int irqflags, struct irqaction *new)
          * TODO: Handle case where SPI is setup on different CPU than
          * the targeted CPU and the priority.
          */
-        gic_route_irq_to_xen(desc, cpumask_of(smp_processor_id()),
-                             GIC_PRI_IRQ);
+        irq_set_affinity(desc, cpumask_of(smp_processor_id()));
         desc->handler->startup(desc);
     }
 
