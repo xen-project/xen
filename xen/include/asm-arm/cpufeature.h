@@ -62,6 +62,15 @@ static inline void cpus_set_cap(unsigned int num)
         __set_bit(num, cpu_hwcaps);
 }
 
+struct arm_cpu_capabilities {
+    const char *desc;
+    u16 capability;
+    bool_t (*matches)(const struct arm_cpu_capabilities *);
+};
+
+void update_cpu_capabilities(const struct arm_cpu_capabilities *caps,
+                             const char *info);
+
 #endif /* __ASSEMBLY__ */
 
 #endif
