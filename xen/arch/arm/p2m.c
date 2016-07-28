@@ -127,6 +127,9 @@ void p2m_restore_state(struct vcpu *n)
 {
     register_t hcr;
 
+    if ( is_idle_vcpu(n) )
+        return;
+
     hcr = READ_SYSREG(HCR_EL2);
     WRITE_SYSREG(hcr & ~HCR_VM, HCR_EL2);
     isb();
