@@ -415,10 +415,9 @@ static inline void p2m_remove_pte(lpae_t *p, bool_t flush_cache)
  *
  * level_shift is the number of bits at the level we want to create.
  */
-static int p2m_create_table(struct domain *d, lpae_t *entry,
+static int p2m_create_table(struct p2m_domain *p2m, lpae_t *entry,
                             int level_shift, bool_t flush_cache)
 {
-    struct p2m_domain *p2m = &d->arch.p2m;
     struct page_info *page;
     lpae_t *p;
     lpae_t pte;
@@ -652,18 +651,17 @@ static const paddr_t level_masks[] =
 static const paddr_t level_shifts[] =
     { ZEROETH_SHIFT, FIRST_SHIFT, SECOND_SHIFT, THIRD_SHIFT };
 
-static int p2m_shatter_page(struct domain *d,
+static int p2m_shatter_page(struct p2m_domain *p2m,
                             lpae_t *entry,
                             unsigned int level,
                             bool_t flush_cache)
 {
     const paddr_t level_shift = level_shifts[level];
-    int rc = p2m_create_table(d, entry,
+    int rc = p2m_create_table(p2m, entry,
                               level_shift - PAGE_SHIFT, flush_cache);
 
     if ( !rc )
     {
-        struct p2m_domain *p2m = &d->arch.p2m;
         p2m->stats.shattered[level]++;
         p2m->stats.mappings[level]--;
         p2m->stats.mappings[level+1] += LPAE_ENTRIES;
@@ -756,7 +754,7 @@ static int apply_one_level(struct domain *d,
             /* Not present -> create table entry and descend */
             if ( !p2m_valid(orig_pte) )
             {
-                rc = p2m_create_table(d, entry, 0, flush_cache);
+                rc = p2m_create_table(p2m, entry, 0, flush_cache);
                 if ( rc < 0 )
                     return rc;
                 return P2M_ONE_DESCEND;
@@ -766,7 +764,7 @@ static int apply_one_level(struct domain *d,
             if ( p2m_mapping(orig_pte) )
             {
                 *flush = true;
-                rc = p2m_shatter_page(d, entry, level, flush_cache);
+                rc = p2m_shatter_page(p2m, entry, level, flush_cache);
                 if ( rc < 0 )
                     return rc;
             } /* else: an existing table mapping -> descend */
@@ -803,7 +801,7 @@ static int apply_one_level(struct domain *d,
                  * and descend.
                  */
                 *flush = true;
-                rc = p2m_shatter_page(d, entry, level, flush_cache);
+                rc = p2m_shatter_page(p2m, entry, level, flush_cache);
                 if ( rc < 0 )
                     return rc;
 
@@ -888,7 +886,7 @@ static int apply_one_level(struct domain *d,
             /* Shatter large pages as we descend */
             if ( p2m_mapping(orig_pte) )
             {
-                rc = p2m_shatter_page(d, entry, level, flush_cache);
+                rc = p2m_shatter_page(p2m, entry, level, flush_cache);
                 if ( rc < 0 )
                     return rc;
             } /* else: an existing table mapping -> descend */
