@@ -105,19 +105,6 @@ void dump_p2m_lookup(struct domain *d, paddr_t addr)
                  P2M_ROOT_LEVEL, P2M_ROOT_PAGES);
 }
 
-static void p2m_load_VTTBR(struct domain *d)
-{
-    struct p2m_domain *p2m = &d->arch.p2m;
-
-    if ( is_idle_domain(d) )
-        return;
-
-    ASSERT(p2m->vttbr);
-
-    WRITE_SYSREG64(p2m->vttbr, VTTBR_EL2);
-    isb(); /* Ensure update is visible */
-}
-
 void p2m_save_state(struct vcpu *p)
 {
     p->arch.sctlr = READ_SYSREG(SCTLR_EL1);
@@ -126,6 +113,7 @@ void p2m_save_state(struct vcpu *p)
 void p2m_restore_state(struct vcpu *n)
 {
     register_t hcr;
+    struct p2m_domain *p2m = &n->domain->arch.p2m;
 
     if ( is_idle_vcpu(n) )
         return;
@@ -134,7 +122,7 @@ void p2m_restore_state(struct vcpu *n)
     WRITE_SYSREG(hcr & ~HCR_VM, HCR_EL2);
     isb();
 
-    p2m_load_VTTBR(n->domain);
+    WRITE_SYSREG64(p2m->vttbr, VTTBR_EL2);
     isb();
 
     if ( is_32bit_domain(n->domain) )
