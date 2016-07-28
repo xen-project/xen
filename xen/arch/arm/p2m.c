@@ -324,7 +324,7 @@ static void p2m_set_permission(lpae_t *e, p2m_type_t t, p2m_access_t a)
     }
 }
 
-static lpae_t mfn_to_p2m_entry(unsigned long mfn, unsigned int mattr,
+static lpae_t mfn_to_p2m_entry(mfn_t mfn, unsigned int mattr,
                                p2m_type_t t, p2m_access_t a)
 {
     /*
@@ -358,9 +358,9 @@ static lpae_t mfn_to_p2m_entry(unsigned long mfn, unsigned int mattr,
 
     p2m_set_permission(&e, t, a);
 
-    ASSERT(!(pfn_to_paddr(mfn) & ~PADDR_MASK));
+    ASSERT(!(pfn_to_paddr(mfn_x(mfn)) & ~PADDR_MASK));
 
-    e.p2m.base = mfn;
+    e.p2m.base = mfn_x(mfn);
 
     return e;
 }
@@ -411,7 +411,7 @@ static int p2m_create_table(struct domain *d, lpae_t *entry,
     if ( splitting )
     {
         p2m_type_t t = entry->p2m.type;
-        unsigned long base_pfn = entry->p2m.base;
+        mfn_t mfn = _mfn(entry->p2m.base);
         int i;
 
         /*
@@ -420,7 +420,7 @@ static int p2m_create_table(struct domain *d, lpae_t *entry,
          */
          for ( i=0 ; i < LPAE_ENTRIES; i++ )
          {
-             pte = mfn_to_p2m_entry(base_pfn + (i<<(level_shift-LPAE_SHIFT)),
+             pte = mfn_to_p2m_entry(mfn_add(mfn, i << (level_shift - LPAE_SHIFT)),
                                     MATTR_MEM, t, p2m->default_access);
 
              /*
@@ -443,7 +443,7 @@ static int p2m_create_table(struct domain *d, lpae_t *entry,
 
     unmap_domain_page(p);
 
-    pte = mfn_to_p2m_entry(page_to_mfn(page), MATTR_MEM, p2m_invalid,
+    pte = mfn_to_p2m_entry(_mfn(page_to_mfn(page)), MATTR_MEM, p2m_invalid,
                            p2m->default_access);
 
     p2m_write_pte(entry, pte, flush_cache);
@@ -693,7 +693,7 @@ static int apply_one_level(struct domain *d,
                 return rc;
 
             /* New mapping is superpage aligned, make it */
-            pte = mfn_to_p2m_entry(*maddr >> PAGE_SHIFT, mattr, t, a);
+            pte = mfn_to_p2m_entry(_mfn(*maddr >> PAGE_SHIFT), mattr, t, a);
             if ( level < 3 )
                 pte.p2m.table = 0; /* Superpage entry */
 
