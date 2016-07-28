@@ -151,24 +151,28 @@ void p2m_restore_state(struct vcpu *n)
 
 void flush_tlb_domain(struct domain *d)
 {
+    struct p2m_domain *p2m = &d->arch.p2m;
     unsigned long flags = 0;
+    uint64_t ovttbr;
 
     /*
-     * Update the VTTBR if necessary with the domain d. In this case,
-     * it's only necessary to flush TLBs on every CPUs with the current VMID
-     * (our domain).
+     * ARM only provides an instruction to flush TLBs for the current
+     * VMID. So switch to the VTTBR of a given P2M if different.
      */
-    if ( d != current->domain )
+    ovttbr = READ_SYSREG64(VTTBR_EL2);
+    if ( ovttbr != p2m->vttbr )
     {
         local_irq_save(flags);
-        p2m_load_VTTBR(d);
+        WRITE_SYSREG64(p2m->vttbr, VTTBR_EL2);
+        isb();
     }
 
     flush_tlb();
 
-    if ( d != current->domain )
+    if ( ovttbr != READ_SYSREG64(VTTBR_EL2) )
     {
-        p2m_load_VTTBR(current->domain);
+        WRITE_SYSREG64(ovttbr, VTTBR_EL2);
+        isb();
         local_irq_restore(flags);
     }
 }
