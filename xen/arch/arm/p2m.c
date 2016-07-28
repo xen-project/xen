@@ -47,11 +47,36 @@ static bool_t p2m_mapping(lpae_t pte)
     return p2m_valid(pte) && !pte.p2m.table;
 }
 
+static inline void p2m_write_lock(struct p2m_domain *p2m)
+{
+    spin_lock(&p2m->lock);
+}
+
+static inline void p2m_write_unlock(struct p2m_domain *p2m)
+{
+    spin_unlock(&p2m->lock);
+}
+
+static inline void p2m_read_lock(struct p2m_domain *p2m)
+{
+    spin_lock(&p2m->lock);
+}
+
+static inline void p2m_read_unlock(struct p2m_domain *p2m)
+{
+    spin_unlock(&p2m->lock);
+}
+
+static inline int p2m_is_locked(struct p2m_domain *p2m)
+{
+    return spin_is_locked(&p2m->lock);
+}
+
 void p2m_dump_info(struct domain *d)
 {
     struct p2m_domain *p2m = &d->arch.p2m;
 
-    spin_lock(&p2m->lock);
+    p2m_read_lock(p2m);
     printk("p2m mappings for domain %d (vmid %d):\n",
            d->domain_id, p2m->vmid);
     BUG_ON(p2m->stats.mappings[0] || p2m->stats.shattered[0]);
@@ -60,7 +85,7 @@ void p2m_dump_info(struct domain *d)
     printk("  2M mappings: %ld (shattered %ld)\n",
            p2m->stats.mappings[2], p2m->stats.shattered[2]);
     printk("  4K mappings: %ld\n", p2m->stats.mappings[3]);
-    spin_unlock(&p2m->lock);
+    p2m_read_unlock(p2m);
 }
 
 void memory_type_changed(struct domain *d)
@@ -166,7 +191,7 @@ static mfn_t __p2m_lookup(struct domain *d, gfn_t gfn, p2m_type_t *t)
     p2m_type_t _t;
     unsigned int level, root_table;
 
-    ASSERT(spin_is_locked(&p2m->lock));
+    ASSERT(p2m_is_locked(p2m));
     BUILD_BUG_ON(THIRD_MASK != PAGE_MASK);
 
     /* Allow t to be NULL */
@@ -233,9 +258,9 @@ mfn_t p2m_lookup(struct domain *d, gfn_t gfn, p2m_type_t *t)
     mfn_t ret;
     struct p2m_domain *p2m = &d->arch.p2m;
 
-    spin_lock(&p2m->lock);
+    p2m_read_lock(p2m);
     ret = __p2m_lookup(d, gfn, t);
-    spin_unlock(&p2m->lock);
+    p2m_read_unlock(p2m);
 
     return ret;
 }
@@ -475,7 +500,7 @@ static int __p2m_get_mem_access(struct domain *d, gfn_t gfn,
 #undef ACCESS
     };
 
-    ASSERT(spin_is_locked(&p2m->lock));
+    ASSERT(p2m_is_locked(p2m));
 
     /* If no setting was ever set, just return rwx. */
     if ( !p2m->mem_access_enabled )
@@ -944,7 +969,7 @@ static int apply_p2m_changes(struct domain *d,
      */
     flush_pt = iommu_enabled && !iommu_has_feature(d, IOMMU_FEAT_COHERENT_WALK);
 
-    spin_lock(&p2m->lock);
+    p2m_write_lock(p2m);
 
     /* Static mapping. P2M_ROOT_PAGES > 1 are handled below */
     if ( P2M_ROOT_PAGES == 1 )
@@ -1148,7 +1173,7 @@ out:
             unmap_domain_page(mappings[level]);
     }
 
-    spin_unlock(&p2m->lock);
+    p2m_write_unlock(p2m);
 
     if ( rc < 0 && ( op == INSERT ) &&
          addr != start_gpaddr )
@@ -1529,7 +1554,7 @@ struct page_info *get_page_from_gva(struct vcpu *v, vaddr_t va,
     if ( v != current )
         return NULL;
 
-    spin_lock(&p2m->lock);
+    p2m_read_lock(p2m);
 
     rc = gvirt_to_maddr(va, &maddr, flags);
 
@@ -1549,7 +1574,7 @@ err:
     if ( !page && p2m->mem_access_enabled )
         page = p2m_mem_access_check_and_get_page(va, flags);
 
-    spin_unlock(&p2m->lock);
+    p2m_read_unlock(p2m);
 
     return page;
 }
@@ -1823,9 +1848,9 @@ int p2m_get_mem_access(struct domain *d, gfn_t gfn,
     int ret;
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
 
-    spin_lock(&p2m->lock);
+    p2m_read_lock(p2m);
     ret = __p2m_get_mem_access(d, gfn, access);
-    spin_unlock(&p2m->lock);
+    p2m_read_unlock(p2m);
 
     return ret;
 }
