@@ -272,7 +272,8 @@ static void p2m_set_permission(lpae_t *e, p2m_type_t t, p2m_access_t a)
     case p2m_iommu_map_rw:
     case p2m_map_foreign:
     case p2m_grant_map_rw:
-    case p2m_mmio_direct:
+    case p2m_mmio_direct_nc:
+    case p2m_mmio_direct_c:
         e->p2m.xn = 1;
         e->p2m.write = 1;
         break;
@@ -1194,7 +1195,7 @@ int map_regions_rw_cache(struct domain *d,
                          mfn_t mfn)
 {
     return p2m_insert_mapping(d, gfn, nr, mfn,
-                              MATTR_MEM, p2m_mmio_direct);
+                              MATTR_MEM, p2m_mmio_direct_c);
 }
 
 int unmap_regions_rw_cache(struct domain *d,
@@ -1211,7 +1212,7 @@ int map_mmio_regions(struct domain *d,
                      mfn_t mfn)
 {
     return p2m_insert_mapping(d, start_gfn, nr, mfn,
-                              MATTR_DEV, p2m_mmio_direct);
+                              MATTR_DEV, p2m_mmio_direct_nc);
 }
 
 int unmap_mmio_regions(struct domain *d,
