@@ -3228,7 +3228,7 @@ static int libxl__device_channel_from_xenstore(libxl__gc *gc,
                                 GCSPRINTF("%s/name", libxl_path),
                                 (const char **)(&channel->name));
     if (rc) goto out;
-    rc = libxl__xs_read_checked(NOGC, XBT_NULL,
+    rc = libxl__xs_read_checked(gc, XBT_NULL,
                                 GCSPRINTF("%s/connection", libxl_path), &tmp);
     if (rc) goto out;
     if (!strcmp(tmp, "pty")) {

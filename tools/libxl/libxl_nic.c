@@ -321,19 +321,19 @@ static int libxl__device_nic_from_xenstore(libxl__gc *gc,
         memset(nic->mac, 0, sizeof(nic->mac));
     }
 
-    rc = libxl__xs_read_checked(gc, XBT_NULL,
+    rc = libxl__xs_read_checked(NOGC, XBT_NULL,
                                 GCSPRINTF("%s/ip", libxl_path),
                                 (const char **)(&nic->ip));
     if (rc) goto out;
-    rc = libxl__xs_read_checked(gc, XBT_NULL,
+    rc = libxl__xs_read_checked(NOGC, XBT_NULL,
                                 GCSPRINTF("%s/bridge", libxl_path),
                                 (const char **)(&nic->bridge));
     if (rc) goto out;
-    rc = libxl__xs_read_checked(gc, XBT_NULL,
+    rc = libxl__xs_read_checked(NOGC, XBT_NULL,
                                 GCSPRINTF("%s/script", libxl_path),
                                 (const char **)(&nic->script));
     if (rc) goto out;
-    rc = libxl__xs_read_checked(gc, XBT_NULL,
+    rc = libxl__xs_read_checked(NOGC, XBT_NULL,
                                 GCSPRINTF("%s/forwarddev", libxl_path),
                                 (const char **)(&nic->coloft_forwarddev));
     if (rc) goto out;
