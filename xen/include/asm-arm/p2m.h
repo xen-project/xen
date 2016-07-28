@@ -3,6 +3,7 @@
 
 #include <xen/mm.h>
 #include <xen/radix-tree.h>
+#include <xen/rwlock.h>
 #include <public/vm_event.h> /* for vm_event_response_t */
 #include <public/memory.h>
 #include <xen/p2m-common.h>
@@ -20,7 +21,7 @@ extern void memory_type_changed(struct domain *);
 /* Per-p2m-table state */
 struct p2m_domain {
     /* Lock that protects updates to the p2m */
-    spinlock_t lock;
+    rwlock_t lock;
 
     /* Pages used to construct the p2m */
     struct page_list_head pages;

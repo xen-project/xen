@@ -49,27 +49,27 @@ static bool_t p2m_mapping(lpae_t pte)
 
 static inline void p2m_write_lock(struct p2m_domain *p2m)
 {
-    spin_lock(&p2m->lock);
+    write_lock(&p2m->lock);
 }
 
 static inline void p2m_write_unlock(struct p2m_domain *p2m)
 {
-    spin_unlock(&p2m->lock);
+    write_unlock(&p2m->lock);
 }
 
 static inline void p2m_read_lock(struct p2m_domain *p2m)
 {
-    spin_lock(&p2m->lock);
+    read_lock(&p2m->lock);
 }
 
 static inline void p2m_read_unlock(struct p2m_domain *p2m)
 {
-    spin_unlock(&p2m->lock);
+    read_unlock(&p2m->lock);
 }
 
 static inline int p2m_is_locked(struct p2m_domain *p2m)
 {
-    return spin_is_locked(&p2m->lock);
+    return rw_is_locked(&p2m->lock);
 }
 
 void p2m_dump_info(struct domain *d)
@@ -1388,7 +1388,7 @@ int p2m_init(struct domain *d)
     struct p2m_domain *p2m = &d->arch.p2m;
     int rc = 0;
 
-    spin_lock_init(&p2m->lock);
+    rwlock_init(&p2m->lock);
     INIT_PAGE_LIST_HEAD(&p2m->pages);
 
     p2m->vmid = INVALID_VMID;
