@@ -1266,8 +1266,6 @@ int p2m_alloc_table(struct domain *d)
     if ( page == NULL )
         return -ENOMEM;
 
-    spin_lock(&p2m->lock);
-
     /* Clear both first level pages */
     for ( i = 0; i < P2M_ROOT_PAGES; i++ )
         clear_and_clean_page(page + i);
@@ -1282,8 +1280,6 @@ int p2m_alloc_table(struct domain *d)
      * before using it
      */
     flush_tlb_domain(d);
-
-    spin_unlock(&p2m->lock);
 
     return 0;
 }
@@ -1349,8 +1345,6 @@ void p2m_teardown(struct domain *d)
     struct p2m_domain *p2m = &d->arch.p2m;
     struct page_info *pg;
 
-    spin_lock(&p2m->lock);
-
     while ( (pg = page_list_remove_head(&p2m->pages)) )
         free_domheap_page(pg);
 
@@ -1362,8 +1356,6 @@ void p2m_teardown(struct domain *d)
     p2m_free_vmid(d);
 
     radix_tree_destroy(&p2m->mem_access_settings, NULL);
-
-    spin_unlock(&p2m->lock);
 }
 
 int p2m_init(struct domain *d)
@@ -1374,12 +1366,11 @@ int p2m_init(struct domain *d)
     spin_lock_init(&p2m->lock);
     INIT_PAGE_LIST_HEAD(&p2m->pages);
 
-    spin_lock(&p2m->lock);
     p2m->vmid = INVALID_VMID;
 
     rc = p2m_alloc_vmid(d);
     if ( rc != 0 )
-        goto err;
+        return rc;
 
     d->arch.vttbr = 0;
 
@@ -1391,9 +1382,6 @@ int p2m_init(struct domain *d)
     p2m->default_access = p2m_access_rwx;
     p2m->mem_access_enabled = false;
     radix_tree_init(&p2m->mem_access_settings);
-
-err:
-    spin_unlock(&p2m->lock);
 
     return rc;
 }
