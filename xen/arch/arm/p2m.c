@@ -1281,7 +1281,7 @@ void guest_physmap_remove_page(struct domain *d,
     p2m_remove_mapping(d, gfn, (1 << page_order), mfn);
 }
 
-int p2m_alloc_table(struct domain *d)
+static int p2m_alloc_table(struct domain *d)
 {
     struct p2m_domain *p2m = &d->arch.p2m;
     struct page_info *page;
@@ -1397,16 +1397,14 @@ int p2m_init(struct domain *d)
     if ( rc != 0 )
         return rc;
 
-    d->arch.vttbr = 0;
-
-    p2m->root = NULL;
-
     p2m->max_mapped_gfn = _gfn(0);
     p2m->lowest_mapped_gfn = _gfn(ULONG_MAX);
 
     p2m->default_access = p2m_access_rwx;
     p2m->mem_access_enabled = false;
     radix_tree_init(&p2m->mem_access_settings);
+
+    rc = p2m_alloc_table(d);
 
     return rc;
 }

@@ -149,13 +149,6 @@ void p2m_teardown(struct domain *d);
  */
 int relinquish_p2m_mapping(struct domain *d);
 
-/*
- * Allocate a new p2m table for a domain.
- *
- * Returns 0 for success or -errno.
- */
-int p2m_alloc_table(struct domain *d);
-
 /* Context switch */
 void p2m_save_state(struct vcpu *p);
 void p2m_restore_state(struct vcpu *n);
