@@ -137,9 +137,8 @@ void p2m_restore_state(struct vcpu *n)
     isb();
 }
 
-static void flush_tlb_domain(struct domain *d)
+static void p2m_flush_tlb(struct p2m_domain *p2m)
 {
-    struct p2m_domain *p2m = &d->arch.p2m;
     unsigned long flags = 0;
     uint64_t ovttbr;
 
@@ -1157,7 +1156,7 @@ static int apply_p2m_changes(struct domain *d,
 out:
     if ( flush )
     {
-        flush_tlb_domain(d);
+        p2m_flush_tlb(&d->arch.p2m);
         ret = iommu_iotlb_flush(d, gfn_x(sgfn), nr);
         if ( !rc )
             rc = ret;
@@ -1302,7 +1301,7 @@ static int p2m_alloc_table(struct domain *d)
      * Make sure that all TLBs corresponding to the new VMID are flushed
      * before using it
      */
-    flush_tlb_domain(d);
+    p2m_flush_tlb(p2m);
 
     return 0;
 }
