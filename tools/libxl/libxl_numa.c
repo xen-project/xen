@@ -285,7 +285,7 @@ static int count_cpus_per_node(libxl_cputopology *tinfo, int nr_cpus,
  * comparison function.
  */
 int libxl__get_numa_candidate(libxl__gc *gc,
-                              uint32_t min_free_memkb, int min_cpus,
+                              uint64_t min_free_memkb, int min_cpus,
                               int min_nodes, int max_nodes,
                               const libxl_bitmap *suitable_cpumap,
                               libxl__numa_candidate_cmpf numa_cmpf,
@@ -436,7 +436,7 @@ int libxl__get_numa_candidate(libxl__gc *gc,
         for (comb_ok = comb_init(gc, &comb_iter, nr_suit_nodes, min_nodes);
              comb_ok;
              comb_ok = comb_next(comb_iter, nr_suit_nodes, min_nodes)) {
-            uint32_t nodes_free_memkb;
+            uint64_t nodes_free_memkb;
             int nodes_cpus;
 
             /* Get the nodemap for the combination, only considering
@@ -478,7 +478,7 @@ int libxl__get_numa_candidate(libxl__gc *gc,
 
                 LOG(DEBUG, "New best NUMA placement candidate found: "
                            "nr_nodes=%d, nr_cpus=%d, nr_vcpus=%d, "
-                           "free_memkb=%"PRIu32"", new_cndt.nr_nodes,
+                           "free_memkb=%"PRIu64"", new_cndt.nr_nodes,
                            new_cndt.nr_cpus, new_cndt.nr_vcpus,
                            new_cndt.free_memkb / 1024);
 

@@ -972,6 +972,17 @@ void libxl_mac_copy(libxl_ctx *ctx, libxl_mac *dst, const libxl_mac *src);
  */
 #define LIBXL_HAVE_BYTEARRAY_UUID 1
 
+/*
+ * LIBXL_HAVE_MEMKB_64BITS
+ *
+ * If this is defined libxl_set_memory_target(), libxl_domain_setmaxmem()
+ * and libxl_wait_for_free_memory()  will take a 64 bit value for the memory
+ * size parameter.
+ * From Xen 4.8 on libxl_get_memory_target(), libxl_domain_need_memory() and
+ * libxl_get_free_memory() return the memory size in a 64 bit value, too.
+ */
+#define LIBXL_HAVE_MEMKB_64BITS 1
+
 typedef char **libxl_string_list;
 void libxl_string_list_dispose(libxl_string_list *sl);
 int libxl_string_list_length(const libxl_string_list *sl);
@@ -1375,10 +1386,12 @@ int libxl_domain_core_dump(libxl_ctx *ctx, uint32_t domid,
                            const libxl_asyncop_how *ao_how)
                            LIBXL_EXTERNAL_CALLERS_ONLY;
 
-int libxl_domain_setmaxmem(libxl_ctx *ctx, uint32_t domid, uint32_t target_memkb);
-int libxl_set_memory_target(libxl_ctx *ctx, uint32_t domid, int32_t target_memkb, int relative, int enforce);
-int libxl_get_memory_target(libxl_ctx *ctx, uint32_t domid, uint32_t *out_target);
-
+int libxl_domain_setmaxmem(libxl_ctx *ctx, uint32_t domid, uint64_t target_memkb);
+int libxl_set_memory_target(libxl_ctx *ctx, uint32_t domid, int64_t target_memkb, int relative, int enforce);
+int libxl_get_memory_target(libxl_ctx *ctx, uint32_t domid, uint64_t *out_target);
+int libxl_get_memory_target_0x040700(libxl_ctx *ctx, uint32_t domid,
+                                     uint32_t *out_target)
+    LIBXL_EXTERNAL_CALLERS_ONLY;
 
 /*
  * WARNING
@@ -1392,11 +1405,17 @@ int libxl_get_memory_target(libxl_ctx *ctx, uint32_t domid, uint32_t *out_target
 /* how much free memory in the system a domain needs to be built */
 int libxl_domain_need_memory(libxl_ctx *ctx,
                              const libxl_domain_build_info *b_info_in,
-                             uint32_t *need_memkb);
+                             uint64_t *need_memkb);
+int libxl_domain_need_memory_0x040700(libxl_ctx *ctx,
+                                      const libxl_domain_build_info *b_info_in,
+                                      uint32_t *need_memkb)
+    LIBXL_EXTERNAL_CALLERS_ONLY;
 /* how much free memory is available in the system */
-int libxl_get_free_memory(libxl_ctx *ctx, uint32_t *memkb);
+int libxl_get_free_memory(libxl_ctx *ctx, uint64_t *memkb);
+int libxl_get_free_memory_0x040700(libxl_ctx *ctx, uint32_t *memkb)
+    LIBXL_EXTERNAL_CALLERS_ONLY;
 /* wait for a given amount of memory to be free in the system */
-int libxl_wait_for_free_memory(libxl_ctx *ctx, uint32_t domid, uint32_t memory_kb, int wait_secs);
+int libxl_wait_for_free_memory(libxl_ctx *ctx, uint32_t domid, uint64_t memory_kb, int wait_secs);
 /*
  * Wait for the memory target of a domain to be reached. Does not
  * decrement wait_secs if the domain is making progress toward reaching
@@ -1411,6 +1430,12 @@ int libxl_wait_for_free_memory(libxl_ctx *ctx, uint32_t domid, uint32_t memory_k
  * time for the guest to reach its target as an argument.
  */
 int libxl_wait_for_memory_target(libxl_ctx *ctx, uint32_t domid, int wait_secs);
+
+#if defined(LIBXL_API_VERSION) && LIBXL_API_VERSION < 0x040800
+#define libxl_get_memory_target libxl_get_memory_target_0x040700
+#define libxl_domain_need_memory libxl_domain_need_memory_0x040700
+#define libxl_get_free_memory libxl_get_free_memory_0x040700
+#endif
 
 int libxl_vncviewer_exec(libxl_ctx *ctx, uint32_t domid, int autopass);
 int libxl_console_exec(libxl_ctx *ctx, uint32_t domid, int cons_num, libxl_console_type type);

@@ -2691,7 +2691,7 @@ static int preserve_domain(uint32_t *r_domid, libxl_event *event,
 static bool freemem(uint32_t domid, libxl_domain_build_info *b_info)
 {
     int rc, retries = 3;
-    uint32_t need_memkb, free_memkb;
+    uint64_t need_memkb, free_memkb;
 
     if (!autoballoon)
         return true;

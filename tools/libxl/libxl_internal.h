@@ -3937,7 +3937,7 @@ static inline void libxl__ctx_unlock(libxl_ctx *ctx) {
 typedef struct {
     int nr_cpus, nr_nodes;
     int nr_vcpus;
-    uint32_t free_memkb;
+    uint64_t free_memkb;
     libxl_bitmap nodemap;
 } libxl__numa_candidate;
 
@@ -3977,7 +3977,7 @@ typedef int (*libxl__numa_candidate_cmpf)(const libxl__numa_candidate *c1,
  * it.
  */
 _hidden int libxl__get_numa_candidate(libxl__gc *gc,
-                                      uint32_t min_free_memkb, int min_cpus,
+                                      uint64_t min_free_memkb, int min_cpus,
                                       int min_nodes, int max_nodes,
                                       const libxl_bitmap *suitable_cpumap,
                                       libxl__numa_candidate_cmpf numa_cmpf,

@@ -123,7 +123,7 @@ static int numa_place_domain(libxl__gc *gc, uint32_t domid,
     libxl_bitmap cpupool_nodemap;
     libxl_cpupoolinfo cpupool_info;
     int i, cpupool, rc = 0;
-    uint32_t memkb;
+    uint64_t memkb;
 
     libxl__numa_candidate_init(&candidate);
     libxl_bitmap_init(&cpupool_nodemap);
@@ -178,7 +178,7 @@ static int numa_place_domain(libxl__gc *gc, uint32_t domid,
     }
 
     LOG(DETAIL, "NUMA placement candidate with %d nodes, %d cpus and "
-                "%"PRIu32" KB free selected", candidate.nr_nodes,
+                "%"PRIu64" KB free selected", candidate.nr_nodes,
                 candidate.nr_cpus, candidate.free_memkb / 1024);
 
  out:
