@@ -880,7 +880,7 @@ void vcpu_show_registers(const struct vcpu *v)
     ctxt.ifsr32_el2 = v->arch.ifsr;
 #endif
 
-    ctxt.vttbr_el2 = v->domain->arch.vttbr;
+    ctxt.vttbr_el2 = v->domain->arch.p2m.vttbr;
 
     _show_registers(&v->arch.cpu_info->guest_cpu_user_regs, &ctxt, 1, v);
 }

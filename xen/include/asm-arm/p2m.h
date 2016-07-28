@@ -32,6 +32,9 @@ struct p2m_domain {
     /* Current VMID in use */
     uint8_t vmid;
 
+    /* Current Translation Table Base Register for the p2m */
+    uint64_t vttbr;
+
     /*
      * Highest guest frame that's ever been mapped in the p2m
      * Only takes into account ram and foreign mapping

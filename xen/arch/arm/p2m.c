@@ -107,10 +107,14 @@ void dump_p2m_lookup(struct domain *d, paddr_t addr)
 
 static void p2m_load_VTTBR(struct domain *d)
 {
+    struct p2m_domain *p2m = &d->arch.p2m;
+
     if ( is_idle_domain(d) )
         return;
-    BUG_ON(!d->arch.vttbr);
-    WRITE_SYSREG64(d->arch.vttbr, VTTBR_EL2);
+
+    ASSERT(p2m->vttbr);
+
+    WRITE_SYSREG64(p2m->vttbr, VTTBR_EL2);
     isb(); /* Ensure update is visible */
 }
 
@@ -1297,8 +1301,7 @@ static int p2m_alloc_table(struct domain *d)
 
     p2m->root = page;
 
-    d->arch.vttbr = page_to_maddr(p2m->root)
-        | ((uint64_t)p2m->vmid&0xff)<<48;
+    p2m->vttbr = page_to_maddr(p2m->root) | ((uint64_t)p2m->vmid & 0xff) << 48;
 
     /*
      * Make sure that all TLBs corresponding to the new VMID are flushed

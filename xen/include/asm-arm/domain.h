@@ -48,7 +48,6 @@ struct arch_domain
 
     /* Virtual MMU */
     struct p2m_domain p2m;
-    uint64_t vttbr;
 
     struct hvm_domain hvm_domain;
     gfn_t *grant_table_gfn;
