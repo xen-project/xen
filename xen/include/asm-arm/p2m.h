@@ -104,9 +104,16 @@ typedef enum {
 #define P2M_RAM_TYPES (p2m_to_mask(p2m_ram_rw) |        \
                        p2m_to_mask(p2m_ram_ro))
 
+/* Grant mapping types, which map to a real frame in another VM */
+#define P2M_GRANT_TYPES (p2m_to_mask(p2m_grant_map_rw) |  \
+                         p2m_to_mask(p2m_grant_map_ro))
+
 /* Useful predicates */
 #define p2m_is_ram(_t) (p2m_to_mask(_t) & P2M_RAM_TYPES)
 #define p2m_is_foreign(_t) (p2m_to_mask(_t) & p2m_to_mask(p2m_map_foreign))
+#define p2m_is_any_ram(_t) (p2m_to_mask(_t) &                   \
+                            (P2M_RAM_TYPES | P2M_GRANT_TYPES |  \
+                             p2m_to_mask(p2m_map_foreign)))
 
 static inline
 void p2m_mem_access_emulate_check(struct vcpu *v,
@@ -224,7 +231,7 @@ static inline struct page_info *get_page_from_gfn(
     if (t)
         *t = p2mt;
 
-    if ( p2mt == p2m_invalid || p2mt == p2m_mmio_direct )
+    if ( !p2m_is_any_ram(p2mt) )
         return NULL;
 
     if ( !mfn_valid(mfn) )
