@@ -137,7 +137,7 @@ void p2m_restore_state(struct vcpu *n)
     isb();
 }
 
-void flush_tlb_domain(struct domain *d)
+static void flush_tlb_domain(struct domain *d)
 {
     struct p2m_domain *p2m = &d->arch.p2m;
     unsigned long flags = 0;

@@ -25,9 +25,6 @@ do {                                                                    \
 /* Flush specified CPUs' TLBs */
 void flush_tlb_mask(const cpumask_t *mask);
 
-/* Flush CPU's TLBs for the specified domain */
-void flush_tlb_domain(struct domain *d);
-
 #endif /* __ASM_ARM_FLUSHTLB_H__ */
 /*
  * Local variables:
