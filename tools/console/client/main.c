@@ -76,7 +76,7 @@ static void usage(const char *program) {
 	       "\n"
 	       "  -h, --help       display this help and exit\n"
 	       "  -n, --num N      use console number N\n"
-	       "  -t, --type TYPE  console type. must be 'pv' or 'serial'\n"
+	       "  --type TYPE      console type. must be 'pv' or 'serial'\n"
 	       , program);
 }
 
