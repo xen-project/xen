@@ -434,7 +434,6 @@ static int p2m_create_table(struct p2m_domain *p2m, lpae_t *entry,
     p = __map_domain_page(page);
     if ( splitting )
     {
-        p2m_type_t t = entry->p2m.type;
         mfn_t mfn = _mfn(entry->p2m.base);
         int i;
 
@@ -444,15 +443,20 @@ static int p2m_create_table(struct p2m_domain *p2m, lpae_t *entry,
          */
          for ( i=0 ; i < LPAE_ENTRIES; i++ )
          {
-             pte = mfn_to_p2m_entry(mfn_add(mfn, i << (level_shift - LPAE_SHIFT)),
-                                    t, p2m->default_access);
+             /*
+              * Use the content of the superpage entry and override
+              * the necessary fields. So the correct permissions are
+              * kept.
+              */
+             pte = *entry;
+             pte.p2m.base = mfn_x(mfn_add(mfn,
+                                          i << (level_shift - LPAE_SHIFT)));
 
              /*
               * First and second level super pages set p2m.table = 0, but
               * third level entries set table = 1.
               */
-             if ( level_shift - LPAE_SHIFT )
-                 pte.p2m.table = 0;
+             pte.p2m.table = !(level_shift - LPAE_SHIFT);
 
              write_pte(&p[i], pte);
          }
@@ -467,6 +471,10 @@ static int p2m_create_table(struct p2m_domain *p2m, lpae_t *entry,
 
     unmap_domain_page(p);
 
+    /*
+     * The access value does not matter because the hardware will ignore
+     * the permission fields for table entry.
+     */
     pte = mfn_to_p2m_entry(_mfn(page_to_mfn(page)), p2m_invalid,
                            p2m->default_access);
 
