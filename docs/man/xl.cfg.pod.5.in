@@ -561,7 +561,9 @@ The actual display used can be accessed with C<xl vncviewer>.
 
 =item C<vncpasswd="PASSWORD">
 
-Specifies the password for the VNC server.
+Specifies the password for the VNC server. If password is set to an
+empty string, authentication on the VNC server will be disabled
+allowing any user to connect.
 
 =item C<sdl=BOOLEAN>
 
@@ -1689,7 +1691,9 @@ The actual display used can be accessed with C<xl vncviewer>.
 
 =item B<vncpasswd="PASSWORD">
 
-Specifies the password for the VNC server.
+Specifies the password for the VNC server. If password is set to an
+empty string, authentication on the VNC server will be disabled
+allowing any user to connect.
 
 =item B<keymap="LANG">
 
