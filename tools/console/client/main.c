@@ -77,6 +77,7 @@ static void usage(const char *program) {
 	       "  -h, --help       display this help and exit\n"
 	       "  -n, --num N      use console number N\n"
 	       "  --type TYPE      console type. must be 'pv' or 'serial'\n"
+	       "  --start-notify-fd N file descriptor used to notify parent\n"
 	       , program);
 }
 
@@ -327,10 +328,12 @@ int main(int argc, char **argv)
 	int ch;
 	unsigned int num = 0;
 	int opt_ind=0;
+	int start_notify_fd = -1;
 	struct option lopt[] = {
 		{ "type",     1, 0, 't' },
 		{ "num",     1, 0, 'n' },
 		{ "help",    0, 0, 'h' },
+		{ "start-notify-fd", 1, 0, 's' },
 		{ 0 },
 
 	};
@@ -363,6 +366,9 @@ int main(int argc, char **argv)
 				fprintf(stderr, "Console types supported are: serial, pv\n");
 				exit(EINVAL);
 			}
+			break;
+		case 's':
+			start_notify_fd = atoi(optarg);
 			break;
 		default:
 			fprintf(stderr, "Invalid argument\n");
@@ -462,6 +468,22 @@ int main(int argc, char **argv)
 		init_term(STDIN_FILENO, &stdin_old_attr);
 		atexit(restore_term_stdin); /* if this fails, oh dear */
 	}
+
+	if (start_notify_fd != -1) {
+		/* Write 0x00 to notify parent about client's readiness */
+		static const char msg[] = { 0x00 };
+		int r;
+
+		do {
+			r = write(start_notify_fd, msg, 1);
+		} while ((r == -1 && errno == EINTR) || r == 0);
+
+		if (r == -1)
+			err(errno, "Could not notify parent with fd %d",
+			    start_notify_fd);
+		close(start_notify_fd);
+	}
+
 	console_loop(spty, xs, path, interactive);
 
 	free(path);
