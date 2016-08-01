@@ -67,6 +67,14 @@
  * the same $(XEN_VERSION) (e.g. throughout a major release).
  */
 
+/* LIBXL_HAVE_CONSOLE_NOTIFY_FD
+ *
+ * If this is defined, libxl_console_exec and
+ * libxl_primary_console_exe take a notify_fd parameter. That
+ * parameter will be used to notify the caller that the console is connected.
+ */
+#define LIBXL_HAVE_CONSOLE_NOTIFY_FD 1
+
 /* LIBXL_HAVE_CONST_COPY_AND_LENGTH_FUNCTIONS
  *
  * If this is defined, the copy functions have constified src parameter and the
@@ -1438,15 +1446,44 @@ int libxl_wait_for_memory_target(libxl_ctx *ctx, uint32_t domid, int wait_secs);
 #endif
 
 int libxl_vncviewer_exec(libxl_ctx *ctx, uint32_t domid, int autopass);
-int libxl_console_exec(libxl_ctx *ctx, uint32_t domid, int cons_num, libxl_console_type type);
+
+/*
+ * If notify_fd is not -1, xenconsole will write 0x00 to it to nofity
+ * the caller that it has connected to the guest console.
+ */
+int libxl_console_exec(libxl_ctx *ctx, uint32_t domid, int cons_num,
+                       libxl_console_type type, int notify_fd);
 /* libxl_primary_console_exec finds the domid and console number
  * corresponding to the primary console of the given vm, then calls
  * libxl_console_exec with the right arguments (domid might be different
  * if the guest is using stubdoms).
  * This function can be called after creating the device model, in
  * case of HVM guests, and before libxl_run_bootloader in case of PV
- * guests using pygrub. */
-int libxl_primary_console_exec(libxl_ctx *ctx, uint32_t domid_vm);
+ * guests using pygrub.
+ * If notify_fd is not -1, xenconsole will write 0x00 to it to nofity
+ * the caller that it has connected to the guest console.
+ */
+int libxl_primary_console_exec(libxl_ctx *ctx, uint32_t domid_vm,
+                               int notify_fd);
+
+#if defined(LIBXL_API_VERSION) && LIBXL_API_VERSION < 0x040800
+
+static inline int libxl_console_exec_0x040700(libxl_ctx *ctx,
+                                              uint32_t domid, int cons_num,
+                                              libxl_console_type type)
+{
+    return libxl_console_exec(ctx, domid, cons_num, type, -1);
+}
+#define libxl_console_exec libxl_console_exec_0x040700
+
+static inline libxl_primary_console_exec_0x040700(libxl_ctx *ctx,
+                                                  uint32_t domid_vm)
+{
+    return libxl_primary_console_exec(ctx, domid_vm, -1);
+}
+#define libxl_primary_console_exec libxl_primary_console_exec_0x040700
+
+#endif
 
 /* libxl_console_get_tty retrieves the specified domain's console tty path
  * and stores it in path. Caller is responsible for freeing the memory.

@@ -1777,12 +1777,13 @@ out:
 }
 
 int libxl_console_exec(libxl_ctx *ctx, uint32_t domid, int cons_num,
-                       libxl_console_type type)
+                       libxl_console_type type, int notify_fd)
 {
     GC_INIT(ctx);
     char *p = GCSPRINTF("%s/xenconsole", libxl__private_bindir_path());
     char *domid_s = GCSPRINTF("%d", domid);
     char *cons_num_s = GCSPRINTF("%d", cons_num);
+    char *notify_fd_s;
     char *cons_type_s;
 
     switch (type) {
@@ -1796,7 +1797,14 @@ int libxl_console_exec(libxl_ctx *ctx, uint32_t domid, int cons_num,
         goto out;
     }
 
-    execl(p, p, domid_s, "--num", cons_num_s, "--type", cons_type_s, (void *)NULL);
+    if (notify_fd != -1) {
+        notify_fd_s = GCSPRINTF("%d", notify_fd);
+        execl(p, p, domid_s, "--num", cons_num_s, "--type", cons_type_s,
+              "--start-notify-fd", notify_fd_s, (void *)NULL);
+    } else {
+        execl(p, p, domid_s, "--num", cons_num_s, "--type", cons_type_s,
+              (void *)NULL);
+    }
 
 out:
     GC_FREE;
@@ -1868,7 +1876,7 @@ out:
     return rc;
 }
 
-int libxl_primary_console_exec(libxl_ctx *ctx, uint32_t domid_vm)
+int libxl_primary_console_exec(libxl_ctx *ctx, uint32_t domid_vm, int notify_fd)
 {
     uint32_t domid;
     int cons_num;
@@ -1877,7 +1885,7 @@ int libxl_primary_console_exec(libxl_ctx *ctx, uint32_t domid_vm)
 
     rc = libxl__primary_console_find(ctx, domid_vm, &domid, &cons_num, &type);
     if ( rc ) return rc;
-    return libxl_console_exec(ctx, domid, cons_num, type);
+    return libxl_console_exec(ctx, domid, cons_num, type, notify_fd);
 }
 
 int libxl_primary_console_get_tty(libxl_ctx *ctx, uint32_t domid_vm,
