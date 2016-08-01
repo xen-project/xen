@@ -2334,6 +2334,21 @@ int xc_memshr_add_to_physmap(xc_interface *xch,
                     domid_t client_domain,
                     unsigned long client_gfn);
 
+/* Allows to deduplicate a range of memory of a client domain. Using
+ * this function is equivalent of calling xc_memshr_nominate_gfn for each gfn
+ * in the two domains followed by xc_memshr_share_gfns.
+ *
+ * May fail with -EINVAL if the source and client domain have different
+ * memory size or if memory sharing is not enabled on either of the domains.
+ * May also fail with -ENOMEM if there isn't enough memory available to store
+ * the sharing metadata before deduplication can happen.
+ */
+int xc_memshr_range_share(xc_interface *xch,
+                          domid_t source_domain,
+                          domid_t client_domain,
+                          uint64_t first_gfn,
+                          uint64_t last_gfn);
+
 /* Debug calls: return the number of pages referencing the shared frame backing
  * the input argument. Should be one or greater. 
  *

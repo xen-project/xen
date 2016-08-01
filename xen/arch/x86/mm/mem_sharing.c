@@ -1325,6 +1325,58 @@ int relinquish_shared_pages(struct domain *d)
     return rc;
 }
 
+static int range_share(struct domain *d, struct domain *cd,
+                       struct mem_sharing_op_range *range)
+{
+    int rc = 0;
+    shr_handle_t sh, ch;
+    unsigned long start = range->opaque ?: range->first_gfn;
+
+    while ( range->last_gfn >= start )
+    {
+        /*
+         * We only break out if we run out of memory as individual pages may
+         * legitimately be unsharable and we just want to skip over those.
+         */
+        rc = mem_sharing_nominate_page(d, start, 0, &sh);
+        if ( rc == -ENOMEM )
+            break;
+
+        if ( !rc )
+        {
+            rc = mem_sharing_nominate_page(cd, start, 0, &ch);
+            if ( rc == -ENOMEM )
+                break;
+
+            if ( !rc )
+            {
+                /* If we get here this should be guaranteed to succeed. */
+                rc = mem_sharing_share_pages(d, start, sh,
+                                             cd, start, ch);
+                ASSERT(!rc);
+            }
+        }
+
+        /* Check for continuation if it's not the last iteration. */
+        if ( range->last_gfn >= ++start && hypercall_preempt_check() )
+        {
+            rc = 1;
+            break;
+        }
+    }
+
+    range->opaque = start;
+
+    /*
+     * The last page may fail with -EINVAL, and for range sharing we don't
+     * care about that.
+     */
+    if ( range->last_gfn < start && rc == -EINVAL )
+        rc = 0;
+
+    return rc;
+}
+
 int mem_sharing_memop(XEN_GUEST_HANDLE_PARAM(xen_mem_sharing_op_t) arg)
 {
     int rc;
@@ -1496,6 +1548,96 @@ int mem_sharing_memop(XEN_GUEST_HANDLE_PARAM(xen_mem_sharing_op_t) arg)
             rc = mem_sharing_add_to_physmap(d, sgfn, sh, cd, cgfn); 
 
             rcu_unlock_domain(cd);
+        }
+        break;
+
+        case XENMEM_sharing_op_range_share:
+        {
+            unsigned long max_sgfn, max_cgfn;
+            struct domain *cd;
+
+            rc = -EINVAL;
+            if ( mso.u.range._pad[0] || mso.u.range._pad[1] ||
+                 mso.u.range._pad[2] )
+                 goto out;
+
+            /*
+             * We use opaque for the hypercall continuation value.
+             * Ideally the user sets this to 0 in the beginning but
+             * there is no good way of enforcing that here, so we just check
+             * that it's at least in range.
+             */
+            if ( mso.u.range.opaque &&
+                 (mso.u.range.opaque < mso.u.range.first_gfn ||
+                  mso.u.range.opaque > mso.u.range.last_gfn) )
+                goto out;
+
+            if ( !mem_sharing_enabled(d) )
+                goto out;
+
+            rc = rcu_lock_live_remote_domain_by_id(mso.u.range.client_domain,
+                                                   &cd);
+            if ( rc )
+                goto out;
+
+            /*
+             * We reuse XENMEM_sharing_op_share XSM check here as this is
+             * essentially the same concept repeated over multiple pages.
+             */
+            rc = xsm_mem_sharing_op(XSM_DM_PRIV, d, cd,
+                                    XENMEM_sharing_op_share);
+            if ( rc )
+            {
+                rcu_unlock_domain(cd);
+                goto out;
+            }
+
+            if ( !mem_sharing_enabled(cd) )
+            {
+                rcu_unlock_domain(cd);
+                rc = -EINVAL;
+                goto out;
+            }
+
+            /*
+             * Sanity check only, the client should keep the domains paused for
+             * the duration of this op.
+             */
+            if ( !atomic_read(&d->pause_count) ||
+                 !atomic_read(&cd->pause_count) )
+            {
+                rcu_unlock_domain(cd);
+                rc = -EINVAL;
+                goto out;
+            }
+
+            max_sgfn = domain_get_maximum_gpfn(d);
+            max_cgfn = domain_get_maximum_gpfn(cd);
+
+            if ( max_sgfn < mso.u.range.first_gfn ||
+                 max_sgfn < mso.u.range.last_gfn ||
+                 max_cgfn < mso.u.range.first_gfn ||
+                 max_cgfn < mso.u.range.last_gfn )
+            {
+                rcu_unlock_domain(cd);
+                rc = -EINVAL;
+                goto out;
+            }
+
+            rc = range_share(d, cd, &mso.u.range);
+            rcu_unlock_domain(cd);
+
+            if ( rc > 0 )
+            {
+                if ( __copy_to_guest(arg, &mso, 1) )
+                    rc = -EFAULT;
+                else
+                    rc = hypercall_create_continuation(__HYPERVISOR_memory_op,
+                                                       "lh", XENMEM_sharing_op,
+                                                       arg);
+            }
+            else
+                mso.u.range.opaque = 0;
         }
         break;
 

@@ -24,6 +24,8 @@ static int usage(const char* prog)
     printf("  nominate <domid> <gfn>  - Nominate a page for sharing.\n");
     printf("  share <domid> <gfn> <handle> <source> <source-gfn> <source-handle>\n");
     printf("                          - Share two pages.\n");
+    printf("  range <source-domid> <destination-domid> <first-gfn> <last-gfn>\n");
+    printf("                          - Share pages between domains in a range.\n");
     printf("  unshare <domid> <gfn>   - Unshare a page by grabbing a writable map.\n");
     printf("  add-to-physmap <domid> <gfn> <source> <source-gfn> <source-handle>\n");
     printf("                          - Populate a page in a domain with a shared page.\n");
@@ -180,6 +182,26 @@ int main(int argc, const char** argv)
         }
         printf("Audit returned %d errors.\n", rc);
     }
+    else if( !strcasecmp(cmd, "range") )
+    {
+        domid_t sdomid, cdomid;
+        int rc;
+        uint64_t first_gfn, last_gfn;
 
+        if ( argc != 6 )
+            return usage(argv[0]);
+
+        sdomid = strtol(argv[2], NULL, 0);
+        cdomid = strtol(argv[3], NULL, 0);
+        first_gfn = strtoul(argv[4], NULL, 0);
+        last_gfn = strtoul(argv[5], NULL, 0);
+
+        rc = xc_memshr_range_share(xch, sdomid, cdomid, first_gfn, last_gfn);
+        if ( rc < 0 )
+        {
+            printf("error executing xc_memshr_range_share: %s\n", strerror(errno));
+            return rc;
+        }
+    }
     return 0;
 }

@@ -181,6 +181,25 @@ int xc_memshr_add_to_physmap(xc_interface *xch,
     return xc_memshr_memop(xch, source_domain, &mso);
 }
 
+int xc_memshr_range_share(xc_interface *xch,
+                          domid_t source_domain,
+                          domid_t client_domain,
+                          uint64_t first_gfn,
+                          uint64_t last_gfn)
+{
+    xen_mem_sharing_op_t mso;
+
+    memset(&mso, 0, sizeof(mso));
+
+    mso.op = XENMEM_sharing_op_range_share;
+
+    mso.u.range.client_domain = client_domain;
+    mso.u.range.first_gfn = first_gfn;
+    mso.u.range.last_gfn = last_gfn;
+
+    return xc_memshr_memop(xch, source_domain, &mso);
+}
+
 int xc_memshr_domain_resume(xc_interface *xch,
                             domid_t domid)
 {
