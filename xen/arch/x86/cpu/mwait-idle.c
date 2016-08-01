@@ -922,7 +922,10 @@ static unsigned long long __init irtl_2_usec(unsigned long long irtl)
 {
 	unsigned long long ns;
 
-	ns = irtl_ns_units[(irtl >> 10) & 0x3];
+	if (!irtl)
+		return 0;
+
+	ns = irtl_ns_units[(irtl >> 10) & 0x7];
 
 	return (irtl & 0x3FF) * ns / 1000;
 }
@@ -935,43 +938,39 @@ static unsigned long long __init irtl_2_usec(unsigned long long irtl)
 static void __init bxt_idle_state_table_update(void)
 {
 	unsigned long long msr;
+	unsigned int usec;
 
 	rdmsrl(MSR_PKGC6_IRTL, msr);
-	if (msr) {
-		unsigned int usec = irtl_2_usec(msr);
-
+	usec = irtl_2_usec(msr);
+	if (usec) {
 		bxt_cstates[2].exit_latency = usec;
 		bxt_cstates[2].target_residency = usec;
 	}
 
 	rdmsrl(MSR_PKGC7_IRTL, msr);
-	if (msr) {
-		unsigned int usec = irtl_2_usec(msr);
-
+	usec = irtl_2_usec(msr);
+	if (usec) {
 		bxt_cstates[3].exit_latency = usec;
 		bxt_cstates[3].target_residency = usec;
 	}
 
 	rdmsrl(MSR_PKGC8_IRTL, msr);
-	if (msr) {
-		unsigned int usec = irtl_2_usec(msr);
-
+	usec = irtl_2_usec(msr);
+	if (usec) {
 		bxt_cstates[4].exit_latency = usec;
 		bxt_cstates[4].target_residency = usec;
 	}
 
 	rdmsrl(MSR_PKGC9_IRTL, msr);
-	if (msr) {
-		unsigned int usec = irtl_2_usec(msr);
-
+	usec = irtl_2_usec(msr);
+	if (usec) {
 		bxt_cstates[5].exit_latency = usec;
 		bxt_cstates[5].target_residency = usec;
 	}
 
 	rdmsrl(MSR_PKGC10_IRTL, msr);
-	if (msr) {
-		unsigned int usec = irtl_2_usec(msr);
-
+	usec = irtl_2_usec(msr);
+	if (usec) {
 		bxt_cstates[6].exit_latency = usec;
 		bxt_cstates[6].target_residency = usec;
 	}
