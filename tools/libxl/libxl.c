@@ -1742,6 +1742,40 @@ static void domain_destroy_domid_cb(libxl__egc *egc,
     dis->callback(egc, dis, rc);
 }
 
+static int libxl__console_tty_path(libxl__gc *gc, uint32_t domid, int cons_num,
+                                   libxl_console_type type, char **tty_path)
+{
+    int rc;
+    char *dom_path;
+
+    dom_path = libxl__xs_get_dompath(gc, domid);
+    if (!dom_path) {
+        rc = ERROR_FAIL;
+        goto out;
+    }
+
+    switch (type) {
+    case LIBXL_CONSOLE_TYPE_SERIAL:
+        *tty_path = GCSPRINTF("%s/serial/%d/tty", dom_path, cons_num);
+        rc = 0;
+        break;
+    case LIBXL_CONSOLE_TYPE_PV:
+        if (cons_num == 0)
+            *tty_path = GCSPRINTF("%s/console/tty", dom_path);
+        else
+            *tty_path = GCSPRINTF("%s/device/console/%d/tty", dom_path,
+                                  cons_num);
+        rc = 0;
+        break;
+    default:
+        rc = ERROR_INVAL;
+        goto out;
+    }
+
+out:
+    return rc;
+}
+
 int libxl_console_exec(libxl_ctx *ctx, uint32_t domid, int cons_num,
                        libxl_console_type type)
 {
@@ -1773,30 +1807,13 @@ int libxl_console_get_tty(libxl_ctx *ctx, uint32_t domid, int cons_num,
                           libxl_console_type type, char **path)
 {
     GC_INIT(ctx);
-    char *dom_path;
     char *tty_path;
     char *tty;
     int rc;
 
-    dom_path = libxl__xs_get_dompath(gc, domid);
-    if (!dom_path) {
-        rc = ERROR_FAIL;
-        goto out;
-    }
-
-    switch (type) {
-    case LIBXL_CONSOLE_TYPE_SERIAL:
-        tty_path = GCSPRINTF("%s/serial/%d/tty", dom_path, cons_num);
-        break;
-    case LIBXL_CONSOLE_TYPE_PV:
-        if (cons_num == 0)
-            tty_path = GCSPRINTF("%s/console/tty", dom_path);
-        else
-            tty_path = GCSPRINTF("%s/device/console/%d/tty", dom_path,
-                                cons_num);
-        break;
-    default:
-        rc = ERROR_INVAL;
+    rc = libxl__console_tty_path(gc, domid, cons_num, type, &tty_path);
+    if (rc) {
+        LOG(ERROR, "Failed to get tty path for domain %d\n", domid);
         goto out;
     }
 
