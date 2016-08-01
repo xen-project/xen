@@ -124,3 +124,9 @@ can only have one pv console with xenstored as backend (the stubdom
 could provide pv console backends to the hvm guest but then it would
 need another pv console connection for each console backend to export
 the pty to dom0).
+
+The xenconsole program supports a very simple protocol to notify parent about
+its readiness. If xenconsole (the client) is exec'ed and has been given a fd
+(normally the write end of a pipe) via --start-notify-fd option, it will
+write 0x00 to that fd after connecting to the guest but before entering the
+event loop. Parent can read from the read end of the fd to know the status.
