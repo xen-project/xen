@@ -646,6 +646,23 @@ retry_transaction:
                     GCSPRINTF("%s/control/shutdown", dom_path),
                     rwperm, ARRAY_SIZE(rwperm));
     libxl__xs_mknod(gc, t,
+                    GCSPRINTF("%s/control/feature-poweroff", dom_path),
+                    rwperm, ARRAY_SIZE(rwperm));
+    libxl__xs_mknod(gc, t,
+                    GCSPRINTF("%s/control/feature-reboot", dom_path),
+                    rwperm, ARRAY_SIZE(rwperm));
+    libxl__xs_mknod(gc, t,
+                    GCSPRINTF("%s/control/feature-suspend", dom_path),
+                    rwperm, ARRAY_SIZE(rwperm));
+    if (info->type == LIBXL_DOMAIN_TYPE_HVM) {
+        libxl__xs_mknod(gc, t,
+                        GCSPRINTF("%s/control/feature-s3", dom_path),
+                        rwperm, ARRAY_SIZE(rwperm));
+        libxl__xs_mknod(gc, t,
+                        GCSPRINTF("%s/control/feature-s4", dom_path),
+                        rwperm, ARRAY_SIZE(rwperm));
+    }
+    libxl__xs_mknod(gc, t,
                     GCSPRINTF("%s/device/suspend/event-channel", dom_path),
                     rwperm, ARRAY_SIZE(rwperm));
     libxl__xs_mknod(gc, t,
