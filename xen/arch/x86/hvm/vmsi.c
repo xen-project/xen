@@ -459,7 +459,7 @@ int msixtbl_pt_register(struct domain *d, struct pirq *pirq, uint64_t gtable)
     ASSERT(pcidevs_locked());
     ASSERT(spin_is_locked(&d->event_lock));
 
-    if ( !has_vlapic(d) )
+    if ( !msixtbl_initialised(d) )
         return -ENODEV;
 
     /*
