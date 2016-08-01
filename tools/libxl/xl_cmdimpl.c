@@ -2728,6 +2728,7 @@ static void autoconnect_console(libxl_ctx *ctx_ignored,
                                 libxl_event *ev, void *priv)
 {
     uint32_t bldomid = ev->domid;
+    int notify_fd = *(int*)priv; /* write end of the notification pipe */
 
     libxl_event_free(ctx, ev);
 
@@ -2740,7 +2741,7 @@ static void autoconnect_console(libxl_ctx *ctx_ignored,
     postfork();
 
     sleep(1);
-    libxl_primary_console_exec(ctx, bldomid);
+    libxl_primary_console_exec(ctx, bldomid, notify_fd);
     /* Do not return. xl continued in child process */
     perror("xl: unable to exec console client");
     _exit(1);
@@ -2810,6 +2811,7 @@ static int create_domain(struct domain_create *dom_info)
     int restore_fd_to_close = -1;
     int send_back_fd = -1;
     const libxl_asyncprogress_how *autoconnect_console_how;
+    int notify_pipe[2] = { -1, -1 };
     struct save_file_header hdr;
     uint32_t domid_soft_reset = INVALID_DOMID;
 
@@ -2997,7 +2999,12 @@ start:
 
     libxl_asyncprogress_how autoconnect_console_how_buf;
     if ( dom_info->console_autoconnect ) {
+        if (libxl_pipe(ctx, notify_pipe)) {
+            ret = ERROR_FAIL;
+            goto error_out;
+        }
         autoconnect_console_how_buf.callback = autoconnect_console;
+        autoconnect_console_how_buf.for_callback = &notify_pipe[1];
         autoconnect_console_how = &autoconnect_console_how_buf;
     }else{
         autoconnect_console_how = 0;
@@ -3045,6 +3052,33 @@ start:
             fprintf(stderr, "Failed to close restoring file, fd %d, errno %d\n",
                     restore_fd_to_close, errno);
         restore_fd_to_close = -1;
+    }
+
+    if (autoconnect_console_how) {
+        char buf[1];
+        int r;
+
+        /* Try to get notification from xenconsole. Just move on if
+         * error occurs -- it's only minor annoyance if console
+         * doesn't show up.
+         */
+        do {
+            r = read(notify_pipe[0], buf, 1);
+        } while (r == -1 && errno == EINTR);
+
+        if (r == -1)
+            fprintf(stderr,
+                    "Failed to get notification from xenconsole: %s\n",
+                    strerror(errno));
+        else if (r == 0)
+            fprintf(stderr, "Got EOF from xenconsole notification fd\n");
+        else if (r == 1 && buf[0] != 0x00)
+            fprintf(stderr, "Got unexpected response from xenconsole: %#x\n",
+                    buf[0]);
+
+        close(notify_pipe[0]);
+        close(notify_pipe[1]);
+        notify_pipe[0] = notify_pipe[1] = -1;
     }
 
     if (!paused)
@@ -3754,9 +3788,9 @@ int main_console(int argc, char **argv)
 
     domid = find_domain(argv[optind]);
     if (!type)
-        libxl_primary_console_exec(ctx, domid);
+        libxl_primary_console_exec(ctx, domid, -1);
     else
-        libxl_console_exec(ctx, domid, num, type);
+        libxl_console_exec(ctx, domid, num, type, -1);
     fprintf(stderr, "Unable to attach console\n");
     return EXIT_FAILURE;
 }
