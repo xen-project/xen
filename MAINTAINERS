@@ -415,7 +415,7 @@ F:	xen/include/asm-x86/hvm/monitor.h
 
 VTPM
 M:	Daniel De Graaf <dgdegra@tycho.nsa.gov>
-M:	Quan Xu <quan.xu@intel.com>
+M:	Quan Xu <xuquan8@huawei.com>
 S:	Supported
 F:	extras/mini-os/tpm*
 F:	extras/mini-os/include/tpm*
