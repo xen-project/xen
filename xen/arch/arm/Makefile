@@ -43,6 +43,7 @@ obj-y += traps.o
 obj-y += vgic.o
 obj-y += vgic-v2.o
 obj-$(CONFIG_ARM_64) += vgic-v3.o
+obj-y += vm_event.o
 obj-y += vtimer.o
 obj-y += vpsci.o
 obj-y += vuart.o

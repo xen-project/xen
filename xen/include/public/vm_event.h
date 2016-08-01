@@ -132,8 +132,8 @@
 #define VM_EVENT_X86_XCR0   3
 
 /*
- * Using a custom struct (not hvm_hw_cpu) so as to not fill
- * the vm_event ring buffer too quickly.
+ * Using custom vCPU structs (i.e. not hvm_hw_cpu) for both x86 and ARM
+ * so as to not fill the vm_event ring buffer too quickly.
  */
 struct vm_event_regs_x86 {
     uint64_t rax;
@@ -168,6 +168,19 @@ struct vm_event_regs_x86 {
     uint64_t fs_base;
     uint64_t gs_base;
     uint32_t cs_arbytes;
+    uint32_t _pad;
+};
+
+/*
+ * Only the register 'pc' can be set on a vm_event response using the
+ * VM_EVENT_FLAG_SET_REGISTERS flag.
+ */
+struct vm_event_regs_arm {
+    uint64_t ttbr0;
+    uint64_t ttbr1;
+    uint64_t ttbcr;
+    uint64_t pc;
+    uint32_t cpsr;
     uint32_t _pad;
 };
 
@@ -275,6 +288,7 @@ typedef struct vm_event_st {
     union {
         union {
             struct vm_event_regs_x86 x86;
+            struct vm_event_regs_arm arm;
         } regs;
 
         struct vm_event_emul_read_data emul_read_data;
