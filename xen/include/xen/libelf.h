@@ -83,15 +83,7 @@ typedef uintptr_t elf_ptrval;
 #define ELF_HANDLE_DECL(structname)          structname##_handle
   /* Provides a type declaration for a HANDLE. */
 
-#ifdef __XEN__
-# define ELF_PRPTRVAL "lx"
-  /*
-   * PRIxPTR is misdefined in xen/include/xen/inttypes.h, on 32-bit,
-   * to "x", when in fact uintptr_t is an unsigned long.
-   */
-#else
-# define ELF_PRPTRVAL PRIxPTR
-#endif
+#define ELF_PRPTRVAL PRIxPTR
   /* printf format a la PRId... for a PTRVAL */
 
 #define ELF_DEFINE_HANDLE(structname)                                   \
