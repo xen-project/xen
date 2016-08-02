@@ -18,7 +18,6 @@
 # Description:       Starts and stops the daemons neeeded for xl/xend
 ### END INIT INFO
 
-XENSTORED=@XENSTORED@
 BACKEND_MODULES="@LINUX_BACKEND_MODULES@"
 
 . @XEN_SCRIPT_DIR@/hotplugpath.sh
@@ -53,8 +52,6 @@ if test -f /proc/xen/capabilities && \
 fi
 
 do_start () {
-        local time=0
-	local timeout=30
 	local mod
 
 	for mod in $BACKEND_MODULES ; do modprobe "$mod" &>/dev/null ; done
@@ -62,37 +59,10 @@ do_start () {
 	mkdir -p ${XEN_RUN_DIR}
 	mkdir -p ${XEN_LOCK_DIR}
 
-	if ! `${bindir}/xenstore-read -s / >/dev/null 2>&1`
-	then
-		test -z "$XENSTORED_ROOTDIR" && XENSTORED_ROOTDIR="@XEN_LIB_STORED@"
-		rm -f "$XENSTORED_ROOTDIR"/tdb* &>/dev/null
-		test -z "$XENSTORED_TRACE" || XENSTORED_ARGS=" -T @XEN_LOG_DIR@/xenstored-trace.log"
+	@XEN_SCRIPT_DIR@/launch-xenstore || exit 1
 
-		if [ -n "$XENSTORED" ] ; then
-		    echo -n Starting $XENSTORED...
-		    $XENSTORED --pid-file @XEN_RUN_DIR@/xenstored.pid $XENSTORED_ARGS
-		else
-		    echo "No xenstored found"
-		    exit 1
-		fi
-
-		# Wait for xenstored to actually come up, timing out after 30 seconds
-                while [ $time -lt $timeout ] && ! `${bindir}/xenstore-read -s / >/dev/null 2>&1` ; do
-                    echo -n .
-		    time=$(($time+1))
-                    sleep 1
-                done
-		echo
-
-		# Exit if we timed out
-		if ! [ $time -lt $timeout ] ; then
-		    echo Could not start xenstored
-		    exit 1
-		fi
-
-		echo Setting domain 0 name, domid and JSON config...
-		${LIBEXEC_BIN}/xen-init-dom0
-	fi
+	echo Setting domain 0 name, domid and JSON config...
+	${LIBEXEC_BIN}/xen-init-dom0
 
 	echo Starting xenconsoled...
 	test -z "$XENCONSOLED_TRACE" || XENCONSOLED_ARGS=" --log=$XENCONSOLED_TRACE"

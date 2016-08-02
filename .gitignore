@@ -157,6 +157,7 @@ tools/hotplug/Linux/init.d/xen-watchdog
 tools/hotplug/Linux/init.d/xencommons
 tools/hotplug/Linux/init.d/xendomains
 tools/hotplug/Linux/init.d/xendriverdomain
+tools/hotplug/Linux/launch-xenstore
 tools/hotplug/Linux/systemd/*.conf
 tools/hotplug/Linux/systemd/*.mount
 tools/hotplug/Linux/systemd/*.socket

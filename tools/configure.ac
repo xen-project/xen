@@ -15,6 +15,7 @@ hotplug/Linux/init.d/xen-watchdog
 hotplug/Linux/init.d/xencommons
 hotplug/Linux/init.d/xendomains
 hotplug/Linux/init.d/xendriverdomain
+hotplug/Linux/launch-xenstore
 hotplug/Linux/vif-setup
 hotplug/Linux/xen-hotplug-common.sh
 hotplug/Linux/xendomains

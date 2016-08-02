@@ -30,6 +30,7 @@ XEN_SCRIPTS += block-drbd-probe
 XEN_SCRIPTS += block-dummy
 XEN_SCRIPTS += $(XEN_SCRIPTS-y)
 XEN_SCRIPTS += colo-proxy-setup
+XEN_SCRIPTS += launch-xenstore
 
 SUBDIRS-$(CONFIG_SYSTEMD) += systemd
 

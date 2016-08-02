@@ -1,0 +1,55 @@
+#!/bin/bash
+#
+# Copyright (c) 2016 SUSE Linux GmbH
+#
+# This library is free software; you can redistribute it and/or
+# modify it under the terms of version 2.1 of the GNU Lesser General Public
+# License as published by the Free Software Foundation.
+#
+# This library is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# Lesser General Public License for more details.
+#
+# You should have received a copy of the GNU Lesser General Public
+# License along with this library; If not, see <http://www.gnu.org/licenses/>.
+#
+
+XENSTORED=@XENSTORED@
+
+. @XEN_SCRIPT_DIR@/hotplugpath.sh
+test -f @CONFIG_DIR@/@CONFIG_LEAF_DIR@/xencommons && . @CONFIG_DIR@/@CONFIG_LEAF_DIR@/xencommons
+
+time=0
+timeout=30
+
+if ! `${bindir}/xenstore-read -s / >/dev/null 2>&1`
+then
+	test -z "$XENSTORED_ROOTDIR" && XENSTORED_ROOTDIR="@XEN_LIB_STORED@"
+	rm -f "$XENSTORED_ROOTDIR"/tdb* &>/dev/null
+	test -z "$XENSTORED_TRACE" || XENSTORED_ARGS=" -T @XEN_LOG_DIR@/xenstored-trace.log"
+
+	if [ -n "$XENSTORED" ] ; then
+	    echo -n Starting $XENSTORED...
+	    $XENSTORED --pid-file @XEN_RUN_DIR@/xenstored.pid $XENSTORED_ARGS
+	else
+	    echo "No xenstored found"
+	    exit 1
+	fi
+
+	# Wait for xenstored to actually come up, timing out after 30 seconds
+	while [ $time -lt $timeout ] && ! `${bindir}/xenstore-read -s / >/dev/null 2>&1` ; do
+	    echo -n .
+	    time=$(($time+1))
+	    sleep 1
+	done
+	echo
+
+	# Exit if we timed out
+	if ! [ $time -lt $timeout ] ; then
+	    echo Could not start xenstored
+	    exit 1
+	fi
+fi
+
+exit 0
