@@ -96,7 +96,7 @@ case "$1" in
 	do_start
 	;;
   status)
-        ${bindir}/xenstore-read -s /
+        test -f @XEN_RUN_DIR@/xenstored.pid
 	;;
   stop)
 	do_stop

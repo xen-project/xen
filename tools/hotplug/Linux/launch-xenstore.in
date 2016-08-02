@@ -18,38 +18,48 @@
 XENSTORED=@XENSTORED@
 
 . @XEN_SCRIPT_DIR@/hotplugpath.sh
-test -f @CONFIG_DIR@/@CONFIG_LEAF_DIR@/xencommons && . @CONFIG_DIR@/@CONFIG_LEAF_DIR@/xencommons
 
-time=0
-timeout=30
+test_xenstore () {
+	test -f @XEN_RUN_DIR@/xenstored.pid
+	return $?
+}
 
-if ! `${bindir}/xenstore-read -s / >/dev/null 2>&1`
-then
-	test -z "$XENSTORED_ROOTDIR" && XENSTORED_ROOTDIR="@XEN_LIB_STORED@"
-	rm -f "$XENSTORED_ROOTDIR"/tdb* &>/dev/null
-	test -z "$XENSTORED_TRACE" || XENSTORED_ARGS=" -T @XEN_LOG_DIR@/xenstored-trace.log"
+timeout_xenstore () {
+	local time=0
+	local timeout=30
 
-	if [ -n "$XENSTORED" ] ; then
-	    echo -n Starting $XENSTORED...
-	    $XENSTORED --pid-file @XEN_RUN_DIR@/xenstored.pid $XENSTORED_ARGS
-	else
-	    echo "No xenstored found"
-	    exit 1
-	fi
-
-	# Wait for xenstored to actually come up, timing out after 30 seconds
-	while [ $time -lt $timeout ] && ! `${bindir}/xenstore-read -s / >/dev/null 2>&1` ; do
-	    echo -n .
-	    time=$(($time+1))
-	    sleep 1
+	while [ $time -lt $timeout ] && ! test_xenstore ; do
+		echo -n .
+		time=$(($time+1))
+		sleep 1
 	done
 	echo
-
+ 
 	# Exit if we timed out
 	if ! [ $time -lt $timeout ] ; then
-	    echo Could not start xenstored
-	    exit 1
+		echo "Could not start $@"
+		return 1
 	fi
+
+	return 0
+}
+
+test_xenstore && exit 0
+
+test -f @CONFIG_DIR@/@CONFIG_LEAF_DIR@/xencommons && . @CONFIG_DIR@/@CONFIG_LEAF_DIR@/xencommons
+
+test -z "$XENSTORED_ROOTDIR" && XENSTORED_ROOTDIR="@XEN_LIB_STORED@"
+rm -f "$XENSTORED_ROOTDIR"/tdb* &>/dev/null
+test -z "$XENSTORED_TRACE" || XENSTORED_ARGS=" -T @XEN_LOG_DIR@/xenstored-trace.log"
+
+if [ -n "$XENSTORED" ] ; then
+	echo -n Starting $XENSTORED...
+	$XENSTORED --pid-file @XEN_RUN_DIR@/xenstored.pid $XENSTORED_ARGS
+else
+	echo "No xenstored found"
+	exit 1
 fi
+
+timeout_xenstore $XENSTORED || exit 1
 
 exit 0
