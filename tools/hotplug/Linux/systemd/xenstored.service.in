@@ -1,6 +1,6 @@
 [Unit]
 Description=The Xen xenstore
-Requires=xenstored_ro.socket xenstored.socket proc-xen.mount var-lib-xenstored.mount
+Requires=proc-xen.mount var-lib-xenstored.mount
 After=proc-xen.mount var-lib-xenstored.mount
 Before=libvirtd.service libvirt-guests.service
 RefuseManualStop=true
@@ -8,6 +8,8 @@ ConditionPathExists=/proc/xen/capabilities
 
 [Service]
 Type=notify
+NotifyAccess=all
+RemainAfterExit=true
 KillMode=none
 Environment=XENSTORED_ARGS=
 Environment=XENSTORED=@XENSTORED@
@@ -19,6 +21,5 @@ ExecStart=/bin/sh -c "exec $XENSTORED --no-fork $XENSTORED_ARGS"
 
 [Install]
 WantedBy=multi-user.target
-Also=xenstored_ro.socket xenstored.socket
 Also=proc-xen.mount
 Also=var-lib-xenstored.mount

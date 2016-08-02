@@ -1788,84 +1788,6 @@ static int destroy_fd(void *_fd)
 	return 0;
 }
 
-#if defined(XEN_SYSTEMD_ENABLED)
-/* Will work regardless of the order systemd gives them to us */
-static int xs_get_sd_fd(const char *connect_to)
-{
-	int fd = SD_LISTEN_FDS_START;
-	int r;
-
-	while (fd <= SD_LISTEN_FDS_START + 1) {
-		r = sd_is_socket_unix(fd, SOCK_STREAM, 1, connect_to, 0);
-		if (r > 0)
-			return fd;
-		fd++;
-	}
-
-	return -EBADR;
-}
-
-static int xs_validate_active_socket(const char *connect_to)
-{
-	if ((strcmp(xs_daemon_socket_ro(), connect_to) != 0) &&
-	    (strcmp(xs_daemon_socket(), connect_to) != 0)) {
-		sd_notifyf(0, "STATUS=unexpected socket: %s\n"
-			   "ERRNO=%i",
-			   connect_to,
-			   EBADR);
-		return -EBADR;
-	}
-
-	return xs_get_sd_fd(connect_to);
-}
-
-/* Return true if started by systemd and false if not. Exit with
- * error if things go wrong.
- */
-static bool systemd_checkin(int **psock, int **pro_sock)
-{
-	int *sock, *ro_sock;
-	const char *soc_str = xs_daemon_socket();
-	const char *soc_str_ro = xs_daemon_socket_ro();
-	int n;
-
-	n = sd_listen_fds(0);
-
-	if (n == 0)
-		return false;
-
-	if (n < 0) {
-		sd_notifyf(0, "STATUS=Failed to get any active sockets: %s\n"
-			   "ERRNO=%i",
-			   strerror(errno),
-			   errno);
-		barf_perror("sd_listen_fds() failed\n");
-	} else if (n != 2) {
-		fprintf(stderr, SD_ERR "Expected 2 fds but given %d\n", n);
-		sd_notifyf(0, "STATUS=Mismatch on number (2): %s\n"
-			   "ERRNO=%d",
-			   strerror(EBADR),
-			   EBADR);
-		barf_perror("sd_listen_fds() gave too many fds\n");
-	}
-
-	*psock = sock = talloc(talloc_autofree_context(), int);
-	*sock = xs_validate_active_socket(soc_str);
-	if (*sock <= 0)
-		barf_perror("%s", soc_str);
-
-	*pro_sock = ro_sock = talloc(talloc_autofree_context(), int);
-	*ro_sock = xs_validate_active_socket(soc_str_ro);
-	if (*ro_sock <= 0)
-		barf_perror("%s", soc_str_ro);
-
-	talloc_set_destructor(sock, destroy_fd);
-	talloc_set_destructor(ro_sock, destroy_fd);
-
-	return true;
-}
-#endif
-
 static void init_sockets(int **psock, int **pro_sock)
 {
 	struct sockaddr_un addr;
@@ -1984,9 +1906,7 @@ int main(int argc, char *argv[])
 	const char *pidfile = NULL;
 	const char *memfile = NULL;
 	int timeout;
-#if defined(XEN_SYSTEMD_ENABLED)
-	bool systemd;
-#endif
+
 
 	while ((opt = getopt_long(argc, argv, "DE:F:HNPS:t:T:RLVW:M:", options,
 				  NULL)) != -1) {
@@ -2050,16 +1970,6 @@ int main(int argc, char *argv[])
 	if (optind != argc)
 		barf("%s: No arguments desired", argv[0]);
 
-#if defined(XEN_SYSTEMD_ENABLED)
-	systemd = systemd_checkin(&sock, &ro_sock);
-	if (systemd) {
-		dofork = false;
-		if (pidfile)
-			xprintf("%s: PID file not needed on systemd", argv[0]);
-		pidfile = NULL;
-	}
-#endif
-
 	reopen_log();
 
 	/* make sure xenstored directories exist */
@@ -2086,10 +1996,7 @@ int main(int argc, char *argv[])
 		signal(SIGUSR1, do_talloc_report);
 	}
 
-#if defined(XEN_SYSTEMD_ENABLED)
-	if (!systemd)
-#endif
-		init_sockets(&sock, &ro_sock);
+	init_sockets(&sock, &ro_sock);
 
 	init_pipe(reopen_log_pipe);
 
@@ -2122,10 +2029,8 @@ int main(int argc, char *argv[])
 	xenbus_notify_running();
 
 #if defined(XEN_SYSTEMD_ENABLED)
-	if (systemd) {
-		sd_notify(1, "READY=1");
-		fprintf(stderr, SD_NOTICE "xenstored is ready\n");
-	}
+	sd_notify(1, "READY=1");
+	fprintf(stderr, SD_NOTICE "xenstored is ready\n");
 #endif
 
 	/* Main loop. */

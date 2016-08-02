@@ -428,8 +428,7 @@ let _ =
 		process_domains store cons domains
 		in
 
-	if Systemd.launched_by_systemd () then
-		Systemd.sd_notify_ready ();
+	Systemd.sd_notify_ready ();
 	while not !quit
 	do
 		try
