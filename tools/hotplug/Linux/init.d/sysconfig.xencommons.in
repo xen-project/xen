@@ -6,12 +6,24 @@
 #XENCONSOLED_TRACE=[none|guest|hv|all]
 
 ## Type: string
+## Default: daemon
+#
+# Select type of xentore service.
+#
+# This can be either of:
+#  * daemon
+#  * domain
+#
+# Changing this requires a reboot to take effect.
+#
+#XENSTORETYPE=daemon
+
+## Type: string
 ## Default: xenstored
 #
 # Select xenstore implementation, this can be either
-# of these below. If using systemd it's preferred that you
-# just edit the xenstored.service unit file and change
-# the XENSTORED variable there.
+# of these below.
+# Only evaluated if XENSTORETYPE is "daemon".
 #
 # This can be either of:
 #  * @sbindir@/oxenstored
@@ -26,19 +38,43 @@
 # Additional commandline arguments to start xenstored,
 # like "--trace-file @XEN_LOG_DIR@/xenstored-trace.log"
 # See "@sbindir@/xenstored --help" for possible options.
+# Only evaluated if XENSTORETYPE is "daemon".
 XENSTORED_ARGS=
 
 ## Type: string
 ## Default: Not defined, tracing off
 #
 # Log xenstored messages
+# Only evaluated if XENSTORETYPE is "daemon".
 #XENSTORED_TRACE=[yes|on|1]
 
 ## Type: string
 ## Default: "@XEN_LIB_STORED@"
 #
 # Running xenstored on XENSTORED_ROOTDIR
+# Only evaluated if XENSTORETYPE is "daemon".
 #XENSTORED_ROOTDIR=@XEN_LIB_STORED@
+
+## Type: string
+## Default: @LIBEXEC@/boot/xenstore-stubdom.gz
+#
+# xenstore domain kernel.
+# Only evaluated if XENSTORETYPE is "domain".
+#XENSTORE_DOMAIN_KERNEL=@LIBEXEC@/boot/xenstore-stubdom.gz
+
+## Type: integer
+## Default: 8
+#
+# xenstore domain memory size in MiB.
+# Only evaluated if XENSTORETYPE is "domain".
+#XENSTORE_DOMAIN_SIZE=8
+
+## Type: string
+## Default: ""
+#
+# Additional arguments for starting the xenstore domain.
+# Only evaluated if XENSTORETYPE is "domain".
+XENSTORE_DOMAIN_ARGS=
 
 ## Type: string
 ## Default: Not defined, xenbackendd debug mode off

@@ -48,18 +48,40 @@ test_xenstore && exit 0
 
 test -f @CONFIG_DIR@/@CONFIG_LEAF_DIR@/xencommons && . @CONFIG_DIR@/@CONFIG_LEAF_DIR@/xencommons
 
-test -z "$XENSTORED_ROOTDIR" && XENSTORED_ROOTDIR="@XEN_LIB_STORED@"
-rm -f "$XENSTORED_ROOTDIR"/tdb* &>/dev/null
-test -z "$XENSTORED_TRACE" || XENSTORED_ARGS=" -T @XEN_LOG_DIR@/xenstored-trace.log"
+[ "$XENSTORETYPE" = "" ] && XENSTORETYPE=daemon
 
-if [ -n "$XENSTORED" ] ; then
+/bin/mkdir -p @XEN_RUN_DIR@
+
+[ "$XENSTORETYPE" = "daemon" ] && {
+	[ -z "$XENSTORED_ROOTDIR" ] && XENSTORED_ROOTDIR="@XEN_LIB_STORED@"
+	/bin/rm -f $XENSTORED_ROOTDIR/tdb* &>/dev/null
+	[ -z "$XENSTORED_TRACE" ] || XENSTORED_ARGS="$XENSTORED_ARGS -T @XEN_LOG_DIR@/xenstored-trace.log"
+	[ -z "$XENSTORED" ] && XENSTORED=@XENSTORED@
+	[ -x "$XENSTORED" ] || {
+		echo "No xenstored found"
+		exit 1
+	}
+
 	echo -n Starting $XENSTORED...
 	$XENSTORED --pid-file @XEN_RUN_DIR@/xenstored.pid $XENSTORED_ARGS
-else
-	echo "No xenstored found"
-	exit 1
-fi
 
-timeout_xenstore $XENSTORED || exit 1
+	systemd-notify --booted 2>/dev/null || timeout_xenstore $XENSTORED || exit 1
 
-exit 0
+	exit 0
+}
+
+[ "$XENSTORETYPE" = "domain" ] && {
+	[ -z "$XENSTORE_DOMAIN_KERNEL" ] && XENSTORE_DOMAIN_KERNEL=@LIBEXEC@/boot/xenstore-stubdom.gz
+	XENSTORE_DOMAIN_ARGS="$XENSTORE_DOMAIN_ARGS --kernel $XENSTORE_DOMAIN_KERNEL"
+	[ -z "$XENSTORE_DOMAIN_SIZE" ] && XENSTORE_DOMAIN_SIZE=8
+	XENSTORE_DOMAIN_ARGS="$XENSTORE_DOMAIN_ARGS --memory $XENSTORE_DOMAIN_SIZE"
+
+	echo -n Starting $XENSTORE_DOMAIN_KERNEL...
+	${LIBEXEC_BIN}/init-xenstore-domain $XENSTORE_DOMAIN_ARGS || exit 1
+	systemd-notify --ready 2>/dev/null
+
+	exit 0
+}
+
+echo "illegal value $XENSTORETYPE for XENSTORETYPE"
+exit 1

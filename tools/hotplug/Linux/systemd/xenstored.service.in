@@ -10,14 +10,8 @@ ConditionPathExists=/proc/xen/capabilities
 Type=notify
 NotifyAccess=all
 RemainAfterExit=true
-KillMode=none
-Environment=XENSTORED_ARGS=
-Environment=XENSTORED=@XENSTORED@
-EnvironmentFile=-@CONFIG_DIR@/@CONFIG_LEAF_DIR@/xencommons
 ExecStartPre=/bin/grep -q control_d /proc/xen/capabilities
-ExecStartPre=-/bin/rm -f @XEN_LIB_STORED@/tdb*
-ExecStartPre=/bin/mkdir -p @XEN_RUN_DIR@
-ExecStart=/bin/sh -c "exec $XENSTORED --no-fork $XENSTORED_ARGS"
+ExecStart=@XEN_SCRIPT_DIR@/launch-xenstore
 
 [Install]
 WantedBy=multi-user.target
