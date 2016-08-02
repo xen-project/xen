@@ -1130,6 +1130,7 @@ static void device_hotplug(libxl__egc *egc, libxl__ao_device *aodev)
         goto out;
     }
 
+    assert(args != NULL);
     LOG(DEBUG, "calling hotplug script: %s %s", args[0], args[1]);
     LOG(DEBUG, "extra args:");
     {
@@ -1140,7 +1141,7 @@ static void device_hotplug(libxl__egc *egc, libxl__ao_device *aodev)
             LOG(DEBUG, "\t%s", arg);
     }
     LOG(DEBUG, "env:");
-    {
+    if (env != NULL) {
         const char *k, *v;
         unsigned int x;
 
