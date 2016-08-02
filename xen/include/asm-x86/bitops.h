@@ -145,8 +145,14 @@ static inline int test_and_set_bit(int nr, volatile void *addr)
 {
     int oldbit;
 
+#ifdef __GCC_ASM_FLAG_OUTPUTS__
+    asm volatile ( "lock; btsl %2,%1"
+                   : "=@ccc" (oldbit), "+m" (ADDR) : "Ir" (nr) : "memory" );
+#else
     asm volatile ( "lock; btsl %2,%1\n\tsbbl %0,%0"
-                   : "=r" (oldbit), "+m" (ADDR) : "Ir" (nr) : "memory");
+                   : "=r" (oldbit), "+m" (ADDR) : "Ir" (nr) : "memory" );
+#endif
+
     return oldbit;
 }
 #define test_and_set_bit(nr, addr) ({                   \
@@ -167,10 +173,16 @@ static inline int __test_and_set_bit(int nr, void *addr)
 {
     int oldbit;
 
-    asm volatile (
-        "btsl %2,%1\n\tsbbl %0,%0"
-        : "=r" (oldbit), "+m" (*(int *)addr)
-        : "Ir" (nr) : "memory" );
+#ifdef __GCC_ASM_FLAG_OUTPUTS__
+    asm volatile ( "btsl %2,%1"
+                   : "=@ccc" (oldbit), "+m" (*(int *)addr)
+                   : "Ir" (nr) : "memory" );
+#else
+    asm volatile ( "btsl %2,%1\n\tsbbl %0,%0"
+                   : "=r" (oldbit), "+m" (*(int *)addr)
+                   : "Ir" (nr) : "memory" );
+#endif
+
     return oldbit;
 }
 #define __test_and_set_bit(nr, addr) ({                 \
@@ -190,8 +202,14 @@ static inline int test_and_clear_bit(int nr, volatile void *addr)
 {
     int oldbit;
 
+#ifdef __GCC_ASM_FLAG_OUTPUTS__
+    asm volatile ( "lock; btrl %2,%1"
+                   : "=@ccc" (oldbit), "+m" (ADDR) : "Ir" (nr) : "memory" );
+#else
     asm volatile ( "lock; btrl %2,%1\n\tsbbl %0,%0"
-                   : "=r" (oldbit), "+m" (ADDR) : "Ir" (nr) : "memory");
+                   : "=r" (oldbit), "+m" (ADDR) : "Ir" (nr) : "memory" );
+#endif
+
     return oldbit;
 }
 #define test_and_clear_bit(nr, addr) ({                 \
@@ -212,10 +230,16 @@ static inline int __test_and_clear_bit(int nr, void *addr)
 {
     int oldbit;
 
-    asm volatile (
-        "btrl %2,%1\n\tsbbl %0,%0"
-        : "=r" (oldbit), "+m" (*(int *)addr)
-        : "Ir" (nr) : "memory" );
+#ifdef __GCC_ASM_FLAG_OUTPUTS__
+    asm volatile ( "btrl %2,%1"
+                   : "=@ccc" (oldbit), "+m" (*(int *)addr)
+                   : "Ir" (nr) : "memory" );
+#else
+    asm volatile ( "btrl %2,%1\n\tsbbl %0,%0"
+                   : "=r" (oldbit), "+m" (*(int *)addr)
+                   : "Ir" (nr) : "memory" );
+#endif
+
     return oldbit;
 }
 #define __test_and_clear_bit(nr, addr) ({               \
@@ -228,10 +252,16 @@ static inline int __test_and_change_bit(int nr, void *addr)
 {
     int oldbit;
 
-    asm volatile (
-        "btcl %2,%1\n\tsbbl %0,%0"
-        : "=r" (oldbit), "+m" (*(int *)addr)
-        : "Ir" (nr) : "memory" );
+#ifdef __GCC_ASM_FLAG_OUTPUTS__
+    asm volatile ( "btcl %2,%1"
+                   : "=@ccc" (oldbit), "+m" (*(int *)addr)
+                   : "Ir" (nr) : "memory" );
+#else
+    asm volatile ( "btcl %2,%1\n\tsbbl %0,%0"
+                   : "=r" (oldbit), "+m" (*(int *)addr)
+                   : "Ir" (nr) : "memory" );
+#endif
+
     return oldbit;
 }
 #define __test_and_change_bit(nr, addr) ({              \
@@ -251,8 +281,14 @@ static inline int test_and_change_bit(int nr, volatile void *addr)
 {
     int oldbit;
 
+#ifdef __GCC_ASM_FLAG_OUTPUTS__
+    asm volatile ( "lock; btcl %2,%1"
+                   : "=@ccc" (oldbit), "+m" (ADDR) : "Ir" (nr) : "memory" );
+#else
     asm volatile ( "lock; btcl %2,%1\n\tsbbl %0,%0"
-                   : "=r" (oldbit), "+m" (ADDR) : "Ir" (nr) : "memory");
+                   : "=r" (oldbit), "+m" (ADDR) : "Ir" (nr) : "memory" );
+#endif
+
     return oldbit;
 }
 #define test_and_change_bit(nr, addr) ({                \
@@ -270,10 +306,16 @@ static inline int variable_test_bit(int nr, const volatile void *addr)
 {
     int oldbit;
 
-    asm volatile (
-        "btl %2,%1\n\tsbbl %0,%0"
-        : "=r" (oldbit)
-        : "m" (CONST_ADDR), "Ir" (nr) : "memory" );
+#ifdef __GCC_ASM_FLAG_OUTPUTS__
+    asm volatile ( "btl %2,%1"
+                   : "=@ccc" (oldbit)
+                   : "m" (CONST_ADDR), "Ir" (nr) : "memory" );
+#else
+    asm volatile ( "btl %2,%1\n\tsbbl %0,%0"
+                   : "=r" (oldbit)
+                   : "m" (CONST_ADDR), "Ir" (nr) : "memory" );
+#endif
+
     return oldbit;
 }
 

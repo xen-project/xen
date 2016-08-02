@@ -610,7 +610,12 @@ do {                                                    \
  */
 static bool_t even_parity(uint8_t v)
 {
+#ifdef __GCC_ASM_FLAG_OUTPUTS__
+    asm ( "test %1,%1" : "=@ccp" (v) : "q" (v) );
+#else
     asm ( "test %1,%1; setp %0" : "=qm" (v) : "q" (v) );
+#endif
+
     return v;
 }
 
@@ -832,8 +837,14 @@ static int read_ulong(
 static bool_t mul_dbl(unsigned long m[2])
 {
     bool_t rc;
+
+#ifdef __GCC_ASM_FLAG_OUTPUTS__
+    asm ( "mul %1" : "+a" (m[0]), "+d" (m[1]), "=@cco" (rc) );
+#else
     asm ( "mul %1; seto %2"
           : "+a" (m[0]), "+d" (m[1]), "=qm" (rc) );
+#endif
+
     return rc;
 }
 
@@ -845,8 +856,14 @@ static bool_t mul_dbl(unsigned long m[2])
 static bool_t imul_dbl(unsigned long m[2])
 {
     bool_t rc;
+
+#ifdef __GCC_ASM_FLAG_OUTPUTS__
+    asm ( "imul %1" : "+a" (m[0]), "+d" (m[1]), "=@cco" (rc) );
+#else
     asm ( "imul %1; seto %2"
           : "+a" (m[0]), "+d" (m[1]), "=qm" (rc) );
+#endif
+
     return rc;
 }
 
@@ -4650,9 +4667,15 @@ x86_emulate(
     case 0xbc: /* bsf or tzcnt */ {
         bool_t zf;
 
+#ifdef __GCC_ASM_FLAG_OUTPUTS__
+        asm ( "bsf %2,%0"
+              : "=r" (dst.val), "=@ccz" (zf)
+              : "rm" (src.val) );
+#else
         asm ( "bsf %2,%0; setz %1"
               : "=r" (dst.val), "=qm" (zf)
               : "rm" (src.val) );
+#endif
         _regs.eflags &= ~EFLG_ZF;
         if ( (vex.pfx == vex_f3) && vcpu_has_bmi1() )
         {
@@ -4676,9 +4699,15 @@ x86_emulate(
     case 0xbd: /* bsr or lzcnt */ {
         bool_t zf;
 
+#ifdef __GCC_ASM_FLAG_OUTPUTS__
+        asm ( "bsr %2,%0"
+              : "=r" (dst.val), "=@ccz" (zf)
+              : "rm" (src.val) );
+#else
         asm ( "bsr %2,%0; setz %1"
               : "=r" (dst.val), "=qm" (zf)
               : "rm" (src.val) );
+#endif
         _regs.eflags &= ~EFLG_ZF;
         if ( (vex.pfx == vex_f3) && vcpu_has_lzcnt() )
         {
