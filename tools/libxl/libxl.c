@@ -4195,7 +4195,7 @@ retry_transaction:
     videoram = videoram_s ? atoi(videoram_s) : 0;
 
     if (relative) {
-        if (target_memkb < 0 && abs(target_memkb) > current_target_memkb)
+        if (target_memkb < 0 && llabs(target_memkb) > current_target_memkb)
             new_target_memkb = 0;
         else
             new_target_memkb = current_target_memkb + target_memkb;
