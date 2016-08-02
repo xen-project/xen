@@ -27,10 +27,12 @@ size_t strlcat(char *, const char *, size_t);
 
 #ifndef __HAVE_ARCH_STRCMP
 int strcmp(const char *, const char *);
+#define strcmp(s1, s2) __builtin_strcmp(s1, s2)
 #endif
 
 #ifndef __HAVE_ARCH_STRNCMP
 int strncmp(const char *, const char *, size_t);
+#define strncmp(s1, s2, n) __builtin_strncmp(s1, s2, n)
 #endif
 
 #ifndef __HAVE_ARCH_STRNICMP
@@ -39,22 +41,27 @@ int strnicmp(const char *, const char *, size_t);
 
 #ifndef __HAVE_ARCH_STRCASECMP
 int strcasecmp(const char *, const char *);
+#define strcasecmp(s1, s2) __builtin_strcasecmp(s1, s2)
 #endif
 
 #ifndef __HAVE_ARCH_STRCHR
 char *strchr(const char *, int);
+#define strchr(s1, c) __builtin_strchr(s1, c)
 #endif
 
 #ifndef __HAVE_ARCH_STRRCHR
 char *strrchr(const char *, int);
+#define strrchr(s1, c) __builtin_strrchr(s1, c)
 #endif
 
 #ifndef __HAVE_ARCH_STRSTR
 char *strstr(const char *, const char *);
+#define strstr(s1, s2) __builtin_strstr(s1, s2)
 #endif
 
 #ifndef __HAVE_ARCH_STRLEN
 size_t strlen(const char *);
+#define strlen(s1) __builtin_strlen(s1)
 #endif
 
 #ifndef __HAVE_ARCH_STRNLEN
@@ -76,14 +83,17 @@ size_t strspn(const char *, const char *);
 
 #ifndef __HAVE_ARCH_MEMSET
 void *memset(void *, int, size_t);
+#define memset(s, c, n) __builtin_memset(s, c, n)
 #endif
 
 #ifndef __HAVE_ARCH_MEMCPY
 void *memcpy(void *, const void *, size_t);
+#define memcpy(d, s, n) __builtin_memcpy(d, s, n)
 #endif
 
 #ifndef __HAVE_ARCH_MEMMOVE
 void *memmove(void *, const void *, size_t);
+#define memmove(d, s, n) __builtin_memmove(d, s, n)
 #endif
 
 #ifndef __HAVE_ARCH_MEMSCAN
@@ -92,10 +102,12 @@ void *memscan(void *, int, size_t);
 
 #ifndef __HAVE_ARCH_MEMCMP
 int memcmp(const void *, const void *, size_t);
+#define memcmp(s1, s2, n) __builtin_memcmp(s1, s2, n)
 #endif
 
 #ifndef __HAVE_ARCH_MEMCHR
 void *memchr(const void *, int, size_t);
+#define memchr(s, c, n) __builtin_memchr(s, c, n)
 #endif
 
 #define is_char_array(x) __builtin_types_compatible_p(typeof(x), char[])

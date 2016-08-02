@@ -42,7 +42,7 @@ int strnicmp(const char *s1, const char *s2, size_t len)
 #endif
 
 #ifndef __HAVE_ARCH_STRCASECMP
-int strcasecmp(const char *s1, const char *s2)
+int (strcasecmp)(const char *s1, const char *s2)
 {
     int c1, c2;
 
@@ -117,7 +117,7 @@ EXPORT_SYMBOL(strlcat);
  * @cs: One string
  * @ct: Another string
  */
-int strcmp(const char * cs,const char * ct)
+int (strcmp)(const char *cs, const char *ct)
 {
 	register signed char __res;
 
@@ -137,7 +137,7 @@ int strcmp(const char * cs,const char * ct)
  * @ct: Another string
  * @count: The maximum number of bytes to compare
  */
-int strncmp(const char * cs,const char * ct,size_t count)
+int (strncmp)(const char *cs, const char *ct, size_t count)
 {
 	register signed char __res = 0;
 
@@ -157,7 +157,7 @@ int strncmp(const char * cs,const char * ct,size_t count)
  * @s: The string to be searched
  * @c: The character to search for
  */
-char * strchr(const char * s, int c)
+char *(strchr)(const char *s, int c)
 {
 	for(; *s != (char) c; ++s)
 		if (*s == '\0')
@@ -172,7 +172,7 @@ char * strchr(const char * s, int c)
  * @s: The string to be searched
  * @c: The character to search for
  */
-char * strrchr(const char * s, int c)
+char *(strrchr)(const char *s, int c)
 {
        const char *p = s + strlen(s);
        do {
@@ -188,7 +188,7 @@ char * strrchr(const char * s, int c)
  * strlen - Find the length of a string
  * @s: The string to be sized
  */
-size_t strlen(const char * s)
+size_t (strlen)(const char * s)
 {
 	const char *sc;
 
@@ -298,7 +298,7 @@ char * strsep(char **s, const char *ct)
  *
  * Do not use memset() to access IO space, use memset_io() instead.
  */
-void * memset(void * s,int c,size_t count)
+void *(memset)(void *s, int c, size_t count)
 {
 	char *xs = (char *) s;
 
@@ -319,7 +319,7 @@ void * memset(void * s,int c,size_t count)
  * You should not use this function to access IO space, use memcpy_toio()
  * or memcpy_fromio() instead.
  */
-void * memcpy(void * dest,const void *src,size_t count)
+void *(memcpy)(void *dest, const void *src, size_t count)
 {
 	char *tmp = (char *) dest, *s = (char *) src;
 
@@ -339,7 +339,7 @@ void * memcpy(void * dest,const void *src,size_t count)
  *
  * Unlike memcpy(), memmove() copes with overlapping areas.
  */
-void * memmove(void * dest,const void *src,size_t count)
+void *(memmove)(void *dest, const void *src, size_t count)
 {
 	char *tmp, *s;
 
@@ -367,7 +367,7 @@ void * memmove(void * dest,const void *src,size_t count)
  * @ct: Another area of memory
  * @count: The size of the area.
  */
-int memcmp(const void * cs,const void * ct,size_t count)
+int (memcmp)(const void *cs, const void *ct, size_t count)
 {
 	const unsigned char *su1, *su2;
 	int res = 0;
@@ -409,7 +409,7 @@ void * memscan(void * addr, int c, size_t size)
  * @s1: The string to be searched
  * @s2: The string to search for
  */
-char * strstr(const char * s1,const char * s2)
+char *(strstr)(const char *s1, const char *s2)
 {
 	int l1, l2;
 
@@ -437,7 +437,7 @@ char * strstr(const char * s1,const char * s2)
  * returns the address of the first occurrence of @c, or %NULL
  * if @c is not found
  */
-void *memchr(const void *s, int c, size_t n)
+void *(memchr)(const void *s, int c, size_t n)
 {
 	const unsigned char *p = s;
 	while (n-- != 0) {
