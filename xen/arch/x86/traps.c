@@ -625,12 +625,17 @@ void fatal_trap(const struct cpu_user_regs *regs, bool_t show_remote)
           (regs->eflags & X86_EFLAGS_IF) ? "" : ", IN INTERRUPT CONTEXT");
 }
 
-static void do_guest_trap(
-    int trapnr, const struct cpu_user_regs *regs, int use_error_code)
+static void do_guest_trap(unsigned int trapnr,
+                          const struct cpu_user_regs *regs)
 {
     struct vcpu *v = current;
     struct trap_bounce *tb;
     const struct trap_info *ti;
+    bool_t use_error_code;
+
+    ASSERT(trapnr < 32);
+
+    use_error_code = (TRAP_HAVE_EC & (1u << trapnr));
 
     trace_pv_trap(trapnr, regs->eip, use_error_code, regs->error_code);
 
@@ -666,7 +671,7 @@ static void instruction_done(
         current->arch.debugreg[6] |= bpmatch | DR_STATUS_RESERVED_ONE;
         if ( regs->eflags & X86_EFLAGS_TF )
             current->arch.debugreg[6] |= DR_STEP;
-        do_guest_trap(TRAP_debug, regs, 0);
+        do_guest_trap(TRAP_debug, regs);
     }
 }
 
@@ -714,7 +719,7 @@ int set_guest_machinecheck_trapbounce(void)
     struct vcpu *v = current;
     struct trap_bounce *tb = &v->arch.pv_vcpu.trap_bounce;
  
-    do_guest_trap(TRAP_machine_check, guest_cpu_user_regs(), 0);
+    do_guest_trap(TRAP_machine_check, guest_cpu_user_regs());
     tb->flags &= ~TBF_EXCEPTION; /* not needed for MCE delivery path */
     return !null_trap_bounce(v, tb);
 }
@@ -727,7 +732,7 @@ int set_guest_nmi_trapbounce(void)
 {
     struct vcpu *v = current;
     struct trap_bounce *tb = &v->arch.pv_vcpu.trap_bounce;
-    do_guest_trap(TRAP_nmi, guest_cpu_user_regs(), 0);
+    do_guest_trap(TRAP_nmi, guest_cpu_user_regs());
     tb->flags &= ~TBF_EXCEPTION; /* not needed for NMI delivery path */
     return !null_trap_bounce(v, tb);
 }
@@ -743,7 +748,7 @@ void do_reserved_trap(struct cpu_user_regs *regs)
     panic("FATAL RESERVED TRAP %#x: %s", trapnr, trapstr(trapnr));
 }
 
-static void do_trap(struct cpu_user_regs *regs, int use_error_code)
+void do_trap(struct cpu_user_regs *regs)
 {
     struct vcpu *curr = current;
     unsigned int trapnr = regs->entry_vector;
@@ -757,7 +762,7 @@ static void do_trap(struct cpu_user_regs *regs, int use_error_code)
 
     if ( guest_mode(regs) )
     {
-        do_guest_trap(trapnr, regs, use_error_code);
+        do_guest_trap(trapnr, regs);
         return;
     }
 
@@ -788,28 +793,6 @@ static void do_trap(struct cpu_user_regs *regs, int use_error_code)
           "[error_code=%04x]",
           trapnr, trapstr(trapnr), regs->error_code);
 }
-
-#define DO_ERROR_NOCODE(name)                           \
-void do_##name(struct cpu_user_regs *regs)              \
-{                                                       \
-    do_trap(regs, 0);                                   \
-}
-
-#define DO_ERROR(name)                                  \
-void do_##name(struct cpu_user_regs *regs)              \
-{                                                       \
-    do_trap(regs, 1);                                   \
-}
-
-DO_ERROR_NOCODE(divide_error)
-DO_ERROR_NOCODE(overflow)
-DO_ERROR_NOCODE(bounds)
-DO_ERROR(       invalid_TSS)
-DO_ERROR(       segment_not_present)
-DO_ERROR(       stack_segment)
-DO_ERROR_NOCODE(coprocessor_error)
-DO_ERROR(       alignment_check)
-DO_ERROR_NOCODE(simd_coprocessor_error)
 
 /* Returns 0 if not handled, and non-0 for success. */
 int rdmsr_hypervisor_regs(uint32_t idx, uint64_t *val)
@@ -1318,7 +1301,7 @@ void do_invalid_op(struct cpu_user_regs *regs)
     {
         if ( !emulate_invalid_rdtscp(regs) &&
              !emulate_forced_invalid_op(regs) )
-            do_guest_trap(TRAP_invalid_op, regs, 0);
+            do_guest_trap(TRAP_invalid_op, regs);
         return;
     }
 
@@ -1432,7 +1415,7 @@ void do_int3(struct cpu_user_regs *regs)
         return;
     } 
 
-    do_guest_trap(TRAP_int3, regs, 0);
+    do_guest_trap(TRAP_int3, regs);
 }
 
 static void reserved_bit_page_fault(
@@ -2604,7 +2587,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             if ( lock || rep_prefix || opsize_prefix
                  || !(v->arch.pv_vcpu.ctrlreg[4] & X86_CR4_OSXSAVE) )
             {
-                do_guest_trap(TRAP_invalid_op, regs, 0);
+                do_guest_trap(TRAP_invalid_op, regs);
                 goto skip;
             }
 
@@ -3136,12 +3119,12 @@ static void emulate_gate_op(struct cpu_user_regs *regs)
          (((ar >> 13) & 3) < (regs->cs & 3)) ||
          ((ar & _SEGMENT_TYPE) != 0xc00) )
     {
-        do_guest_trap(TRAP_gp_fault, regs, 1);
+        do_guest_trap(TRAP_gp_fault, regs);
         return;
     }
     if ( !(ar & _SEGMENT_P) )
     {
-        do_guest_trap(TRAP_no_segment, regs, 1);
+        do_guest_trap(TRAP_no_segment, regs);
         return;
     }
     dpl = (ar >> 13) & 3;
@@ -3156,7 +3139,7 @@ static void emulate_gate_op(struct cpu_user_regs *regs)
          !(ar & _SEGMENT_P) ||
          !(ar & _SEGMENT_CODE) )
     {
-        do_guest_trap(TRAP_gp_fault, regs, 1);
+        do_guest_trap(TRAP_gp_fault, regs);
         return;
     }
 
@@ -3310,7 +3293,7 @@ static void emulate_gate_op(struct cpu_user_regs *regs)
     if ( jump < 0 )
     {
  fail:
-        do_guest_trap(TRAP_gp_fault, regs, 1);
+        do_guest_trap(TRAP_gp_fault, regs);
  skip:
         return;
     }
@@ -3321,7 +3304,7 @@ static void emulate_gate_op(struct cpu_user_regs *regs)
          !(ar & _SEGMENT_P) ||
          ((ar & _SEGMENT_CODE) && !(ar & _SEGMENT_WR)) )
     {
-        do_guest_trap(TRAP_gp_fault, regs, 1);
+        do_guest_trap(TRAP_gp_fault, regs);
         return;
     }
 
@@ -3332,7 +3315,7 @@ static void emulate_gate_op(struct cpu_user_regs *regs)
     ASSERT((opnd_sel & ~3) == regs->error_code);
     if ( dpl < (opnd_sel & 3) )
     {
-        do_guest_trap(TRAP_gp_fault, regs, 1);
+        do_guest_trap(TRAP_gp_fault, regs);
         return;
     }
 
@@ -3344,19 +3327,19 @@ static void emulate_gate_op(struct cpu_user_regs *regs)
           ((ar >> 13) & 3) != (regs->cs & 3)) )
     {
         regs->error_code = sel;
-        do_guest_trap(TRAP_gp_fault, regs, 1);
+        do_guest_trap(TRAP_gp_fault, regs);
         return;
     }
     if ( !(ar & _SEGMENT_P) )
     {
         regs->error_code = sel;
-        do_guest_trap(TRAP_no_segment, regs, 1);
+        do_guest_trap(TRAP_no_segment, regs);
         return;
     }
     if ( off > limit )
     {
         regs->error_code = 0;
-        do_guest_trap(TRAP_gp_fault, regs, 1);
+        do_guest_trap(TRAP_gp_fault, regs);
         return;
     }
 
@@ -3383,7 +3366,7 @@ static void emulate_gate_op(struct cpu_user_regs *regs)
             /* Inner stack known only for kernel ring. */
             if ( (sel & 3) != GUEST_KERNEL_RPL(v->domain) )
             {
-                do_guest_trap(TRAP_gp_fault, regs, 1);
+                do_guest_trap(TRAP_gp_fault, regs);
                 return;
             }
             esp = v->arch.pv_vcpu.kernel_sp;
@@ -3396,20 +3379,20 @@ static void emulate_gate_op(struct cpu_user_regs *regs)
                  !(ar & _SEGMENT_WR) )
             {
                 regs->error_code = ss & ~3;
-                do_guest_trap(TRAP_invalid_tss, regs, 1);
+                do_guest_trap(TRAP_invalid_tss, regs);
                 return;
             }
             if ( !(ar & _SEGMENT_P) ||
                  !check_stack_limit(ar, limit, esp, (4 + nparm) * 4) )
             {
                 regs->error_code = ss & ~3;
-                do_guest_trap(TRAP_stack_error, regs, 1);
+                do_guest_trap(TRAP_stack_error, regs);
                 return;
             }
             stkp = (unsigned int *)(unsigned long)((unsigned int)base + esp);
             if ( !compat_access_ok(stkp - 4 - nparm, (4 + nparm) * 4) )
             {
-                do_guest_trap(TRAP_gp_fault, regs, 1);
+                do_guest_trap(TRAP_gp_fault, regs);
                 return;
             }
             push(regs->ss);
@@ -3424,11 +3407,11 @@ static void emulate_gate_op(struct cpu_user_regs *regs)
                      (ar & _SEGMENT_CODE) ||
                      !(ar & _SEGMENT_WR) ||
                      !check_stack_limit(ar, limit, esp + nparm * 4, nparm * 4) )
-                    return do_guest_trap(TRAP_gp_fault, regs, 1);
+                    return do_guest_trap(TRAP_gp_fault, regs);
                 ustkp = (unsigned int *)(unsigned long)((unsigned int)base + regs->_esp + nparm * 4);
                 if ( !compat_access_ok(ustkp - nparm, nparm * 4) )
                 {
-                    do_guest_trap(TRAP_gp_fault, regs, 1);
+                    do_guest_trap(TRAP_gp_fault, regs);
                     return;
                 }
                 do
@@ -3454,19 +3437,19 @@ static void emulate_gate_op(struct cpu_user_regs *regs)
             if ( !read_descriptor(ss, v, regs, &base, &limit, &ar, 0) ||
                  ((ar >> 13) & 3) != (sel & 3) )
             {
-                do_guest_trap(TRAP_gp_fault, regs, 1);
+                do_guest_trap(TRAP_gp_fault, regs);
                 return;
             }
             if ( !check_stack_limit(ar, limit, esp, 2 * 4) )
             {
                 regs->error_code = 0;
-                do_guest_trap(TRAP_stack_error, regs, 1);
+                do_guest_trap(TRAP_stack_error, regs);
                 return;
             }
             stkp = (unsigned int *)(unsigned long)((unsigned int)base + esp);
             if ( !compat_access_ok(stkp - 2, 2 * 4) )
             {
-                do_guest_trap(TRAP_gp_fault, regs, 1);
+                do_guest_trap(TRAP_gp_fault, regs);
                 return;
             }
         }
@@ -3527,7 +3510,7 @@ void do_general_protection(struct cpu_user_regs *regs)
         if ( permit_softint(TI_GET_DPL(ti), v, regs) )
         {
             regs->eip += 2;
-            do_guest_trap(vector, regs, 0);
+            do_guest_trap(vector, regs);
             return;
         }
     }
@@ -3546,7 +3529,7 @@ void do_general_protection(struct cpu_user_regs *regs)
     }
 
     /* Pass on GPF as is. */
-    do_guest_trap(TRAP_gp_fault, regs, 1);
+    do_guest_trap(TRAP_gp_fault, regs);
     return;
 
  gp_in_kernel:
@@ -3762,7 +3745,7 @@ void do_device_not_available(struct cpu_user_regs *regs)
 
     if ( curr->arch.pv_vcpu.ctrlreg[0] & X86_CR0_TS )
     {
-        do_guest_trap(TRAP_no_device, regs, 0);
+        do_guest_trap(TRAP_no_device, regs);
         curr->arch.pv_vcpu.ctrlreg[0] &= ~X86_CR0_TS;
     }
     else
@@ -3835,7 +3818,7 @@ void do_debug(struct cpu_user_regs *regs)
     v->arch.debugreg[6] = read_debugreg(6);
 
     ler_enable();
-    do_guest_trap(TRAP_debug, regs, 0);
+    do_guest_trap(TRAP_debug, regs);
     return;
 
  out:

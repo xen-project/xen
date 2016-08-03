@@ -715,26 +715,26 @@ GLOBAL(trap_nop)
 .section .rodata, "a", @progbits
 
 ENTRY(exception_table)
-        .quad do_divide_error
+        .quad do_trap
         .quad do_debug
         .quad do_nmi
         .quad do_int3
-        .quad do_overflow
-        .quad do_bounds
+        .quad do_trap
+        .quad do_trap
         .quad do_invalid_op
         .quad do_device_not_available
         .quad do_reserved_trap /* double_fault - has its own entry. */
         .quad do_reserved_trap /* coproc_seg_overrun - Intel 387 only. */
-        .quad do_invalid_TSS
-        .quad do_segment_not_present
-        .quad do_stack_segment
+        .quad do_trap
+        .quad do_trap
+        .quad do_trap
         .quad do_general_protection
         .quad do_page_fault
         .quad do_reserved_trap /* Default PIC spurious irq - architecturally reserved. */
-        .quad do_coprocessor_error
-        .quad do_alignment_check
+        .quad do_trap
+        .quad do_trap
         .quad do_machine_check
-        .quad do_simd_coprocessor_error
+        .quad do_trap
         .rept TRAP_nr - ((. - exception_table) / 8)
         .quad do_reserved_trap /* Architecturally reserved exceptions. */
         .endr
