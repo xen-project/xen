@@ -658,6 +658,28 @@ static struct cpuidle_state bxt_cstates[] = {
 	{}
 };
 
+static const struct cpuidle_state dnv_cstates[] = {
+	{
+		.name = "C1-DNV",
+		.flags = MWAIT2flg(0x00),
+		.exit_latency = 2,
+		.target_residency = 2,
+	},
+	{
+		.name = "C1E-DNV",
+		.flags = MWAIT2flg(0x01),
+		.exit_latency = 10,
+		.target_residency = 20,
+	},
+	{
+		.name = "C6-DNV",
+		.flags = MWAIT2flg(0x20) | CPUIDLE_FLAG_TLB_FLUSHED,
+		.exit_latency = 50,
+		.target_residency = 500,
+	},
+	{}
+};
+
 static void mwait_idle(void)
 {
 	unsigned int cpu = smp_processor_id();
@@ -844,6 +866,11 @@ static const struct idle_cpu idle_cpu_bxt = {
 	.disable_promotion_to_c1e = 1,
 };
 
+static const struct idle_cpu idle_cpu_dnv = {
+	.state_table = dnv_cstates,
+	.disable_promotion_to_c1e = 1,
+};
+
 #define ICPU(model, cpu) \
     { X86_VENDOR_INTEL, 6, model, X86_FEATURE_MONITOR, \
         &idle_cpu_##cpu}
@@ -881,6 +908,7 @@ static const struct x86_cpu_id intel_idle_ids[] __initconstrel = {
 	ICPU(0x55, skx),
 	ICPU(0x57, knl),
 	ICPU(0x5c, bxt),
+	ICPU(0x5f, dnv),
 	{}
 };
 
