@@ -232,6 +232,9 @@ static int cpupool_move_domain_locked(struct domain *d, struct cpupool *c)
 {
     int ret;
 
+    if ( unlikely(d->cpupool == c) )
+        return 0;
+
     d->cpupool->n_dom--;
     ret = sched_move_domain(d, c);
     if ( ret )
