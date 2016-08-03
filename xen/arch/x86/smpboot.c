@@ -328,11 +328,11 @@ void start_secondary(void *unused)
 
     percpu_traps_init();
 
-    init_percpu_time();
-
     cpu_init();
 
     smp_callin();
+
+    init_percpu_time();
 
     setup_secondary_APIC_clock();
 
@@ -995,6 +995,8 @@ int __cpu_up(unsigned int cpu)
 
     if ( (ret = do_boot_cpu(apicid, cpu)) != 0 )
         return ret;
+
+    time_latch_stamps();
 
     set_cpu_state(CPU_STATE_ONLINE);
     while ( !cpu_online(cpu) )

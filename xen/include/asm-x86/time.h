@@ -40,6 +40,7 @@ int time_suspend(void);
 int time_resume(void);
 
 void init_percpu_time(void);
+void time_latch_stamps(void);
 
 struct ioreq;
 int hwdom_pit_access(struct ioreq *ioreq);

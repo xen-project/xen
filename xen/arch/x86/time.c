@@ -1328,21 +1328,52 @@ static void time_calibration(void *unused)
                      &r, 1);
 }
 
+static struct {
+    s_time_t local_stime, master_stime;
+} ap_bringup_ref;
+
+void time_latch_stamps(void)
+{
+    unsigned long flags;
+    u64 tsc;
+
+    local_irq_save(flags);
+    ap_bringup_ref.master_stime = read_platform_stime();
+    tsc = rdtsc();
+    local_irq_restore(flags);
+
+    ap_bringup_ref.local_stime = get_s_time_fixed(tsc);
+}
+
 void init_percpu_time(void)
 {
     struct cpu_time *t = &this_cpu(cpu_time);
     unsigned long flags;
+    u64 tsc;
     s_time_t now;
 
     /* Initial estimate for TSC rate. */
     t->tsc_scale = per_cpu(cpu_time, 0).tsc_scale;
 
     local_irq_save(flags);
-    t->local_tsc_stamp = rdtsc();
     now = read_platform_stime();
+    tsc = rdtsc();
     local_irq_restore(flags);
 
     t->stime_master_stamp = now;
+    /*
+     * To avoid a discontinuity (TSC and platform clock can't be expected
+     * to be in perfect sync), initialization here needs to match up with
+     * local_time_calibration()'s decision whether to use its fast path.
+     */
+    if ( boot_cpu_has(X86_FEATURE_CONSTANT_TSC) )
+    {
+        if ( system_state < SYS_STATE_smp_boot )
+            now = get_s_time_fixed(tsc);
+        else
+            now += ap_bringup_ref.local_stime - ap_bringup_ref.master_stime;
+    }
+    t->local_tsc_stamp    = tsc;
     t->stime_local_stamp  = now;
 }
 
