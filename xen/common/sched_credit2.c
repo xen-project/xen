@@ -377,6 +377,7 @@ struct csched2_private {
 
     unsigned int load_precision_shift;
     unsigned int load_window_shift;
+    unsigned ratelimit_us; /* each cpupool can have its own ratelimit */
 };
 
 /*
@@ -1983,6 +1984,34 @@ csched2_dom_cntl(
     return rc;
 }
 
+static int csched2_sys_cntl(const struct scheduler *ops,
+                            struct xen_sysctl_scheduler_op *sc)
+{
+    int rc = -EINVAL;
+    xen_sysctl_credit_schedule_t *params = &sc->u.sched_credit;
+    struct csched2_private *prv = CSCHED2_PRIV(ops);
+    unsigned long flags;
+
+    switch (sc->cmd )
+    {
+        case XEN_SYSCTL_SCHEDOP_putinfo:
+            if ( params->ratelimit_us &&
+                ( params->ratelimit_us > XEN_SYSCTL_SCHED_RATELIMIT_MAX ||
+                  params->ratelimit_us < XEN_SYSCTL_SCHED_RATELIMIT_MIN ))
+                return rc;
+            write_lock_irqsave(&prv->lock, flags);
+            prv->ratelimit_us = params->ratelimit_us;
+            write_unlock_irqrestore(&prv->lock, flags);
+            break;
+
+        case XEN_SYSCTL_SCHEDOP_getinfo:
+            params->ratelimit_us = prv->ratelimit_us;
+            rc = 0;
+            break;
+    }
+    return rc;
+}
+
 static void *
 csched2_alloc_domdata(const struct scheduler *ops, struct domain *dom)
 {
@@ -2112,12 +2141,14 @@ csched2_vcpu_remove(const struct scheduler *ops, struct vcpu *vc)
 
 /* How long should we let this vcpu run for? */
 static s_time_t
-csched2_runtime(const struct scheduler *ops, int cpu, struct csched2_vcpu *snext)
+csched2_runtime(const struct scheduler *ops, int cpu,
+                struct csched2_vcpu *snext, s_time_t now)
 {
-    s_time_t time; 
+    s_time_t time, min_time;
     int rt_credit; /* Proposed runtime measured in credits */
     struct csched2_runqueue_data *rqd = RQD(ops, cpu);
     struct list_head *runq = &rqd->runq;
+    struct csched2_private *prv = CSCHED2_PRIV(ops);
 
     /*
      * If we're idle, just stay so. Others (or external events)
@@ -2130,8 +2161,21 @@ csched2_runtime(const struct scheduler *ops, int cpu, struct csched2_vcpu *snext
      * 1) Run until snext's credit will be 0
      * 2) But if someone is waiting, run until snext's credit is equal
      * to his
-     * 3) But never run longer than MAX_TIMER or shorter than MIN_TIMER.
+     * 3) But never run longer than MAX_TIMER or shorter than MIN_TIMER or
+     * the ratelimit time.
      */
+
+    /* Calculate mintime */
+    min_time = CSCHED2_MIN_TIMER;
+    if ( prv->ratelimit_us )
+    {
+        s_time_t ratelimit_min = MICROSECS(prv->ratelimit_us);
+        if ( snext->vcpu->is_running )
+            ratelimit_min = snext->vcpu->runstate.state_entry_time +
+                            MICROSECS(prv->ratelimit_us) - now;
+        if ( ratelimit_min > min_time )
+            min_time = ratelimit_min;
+    }
 
     /* 1) Basic time: Run until credit is 0. */
     rt_credit = snext->credit;
@@ -2149,32 +2193,32 @@ csched2_runtime(const struct scheduler *ops, int cpu, struct csched2_vcpu *snext
         }
     }
 
-    /* The next guy may actually have a higher credit, if we've tried to
-     * avoid migrating him from a different cpu.  DTRT.  */
-    if ( rt_credit <= 0 )
+    /*
+     * The next guy on the runqueue may actually have a higher credit,
+     * if we've tried to avoid migrating him from a different cpu.
+     * Setting time=0 will ensure the minimum timeslice is chosen.
+     *
+     * FIXME: See if we can eliminate this conversion if we know time
+     * will be outside (MIN,MAX).  Probably requires pre-calculating
+     * credit values of MIN,MAX per vcpu, since each vcpu burns credit
+     * at a different rate.
+     */
+    if (rt_credit > 0)
+        time = c2t(rqd, rt_credit, snext);
+    else
+        time = 0;
+
+    /* 3) But never run longer than MAX_TIMER or less than MIN_TIMER or
+     * the rate_limit time. */
+    if ( time < min_time)
     {
-        time = CSCHED2_MIN_TIMER;
+        time = min_time;
         SCHED_STAT_CRANK(runtime_min_timer);
     }
-    else
+    else if (time > CSCHED2_MAX_TIMER)
     {
-        /* FIXME: See if we can eliminate this conversion if we know time
-         * will be outside (MIN,MAX).  Probably requires pre-calculating
-         * credit values of MIN,MAX per vcpu, since each vcpu burns credit
-         * at a different rate. */
-        time = c2t(rqd, rt_credit, snext);
-
-        /* Check limits */
-        if ( time < CSCHED2_MIN_TIMER )
-        {
-            time = CSCHED2_MIN_TIMER;
-            SCHED_STAT_CRANK(runtime_min_timer);
-        }
-        else if ( time > CSCHED2_MAX_TIMER )
-        {
-            time = CSCHED2_MAX_TIMER;
-            SCHED_STAT_CRANK(runtime_max_timer);
-        }
+        time = CSCHED2_MAX_TIMER;
+        SCHED_STAT_CRANK(runtime_max_timer);
     }
 
     return time;
@@ -2192,12 +2236,24 @@ runq_candidate(struct csched2_runqueue_data *rqd,
 {
     struct list_head *iter;
     struct csched2_vcpu *snext = NULL;
+    struct csched2_private *prv = CSCHED2_PRIV(per_cpu(scheduler, cpu));
 
     /* Default to current if runnable, idle otherwise */
     if ( vcpu_runnable(scurr->vcpu) )
         snext = scurr;
     else
         snext = CSCHED2_VCPU(idle_vcpu[cpu]);
+
+    /*
+     * Return the current vcpu if it has executed for less than ratelimit.
+     * Adjuststment for the selected vcpu's credit and decision
+     * for how long it will run will be taken in csched2_runtime.
+     */
+    if ( prv->ratelimit_us && !is_idle_vcpu(scurr->vcpu) &&
+         vcpu_runnable(scurr->vcpu) &&
+         (now - scurr->vcpu->runstate.state_entry_time) <
+          MICROSECS(prv->ratelimit_us) )
+        return scurr;
 
     list_for_each( iter, &rqd->runq )
     {
@@ -2367,7 +2423,7 @@ csched2_schedule(
     /*
      * Return task to run next...
      */
-    ret.time = csched2_runtime(ops, cpu, snext);
+    ret.time = csched2_runtime(ops, cpu, snext, now);
     ret.task = snext->vcpu;
 
     CSCHED2_VCPU_CHECK(ret.task);
@@ -2822,6 +2878,8 @@ csched2_init(struct scheduler *ops)
         prv->runq_map[i] = -1;
         prv->rqd[i].id = -1;
     }
+    /* initialize ratelimit */
+    prv->ratelimit_us = sched_ratelimit_us;
 
     prv->load_precision_shift = opt_load_precision_shift;
     prv->load_window_shift = opt_load_window_shift - LOADAVG_GRANULARITY_SHIFT;
@@ -2856,6 +2914,7 @@ static const struct scheduler sched_credit2_def = {
     .wake           = csched2_vcpu_wake,
 
     .adjust         = csched2_dom_cntl,
+    .adjust_global  = csched2_sys_cntl,
 
     .pick_cpu       = csched2_cpu_pick,
     .migrate        = csched2_vcpu_migrate,
