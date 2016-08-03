@@ -637,7 +637,7 @@ void noreturn asm_domain_crash_synchronous(unsigned long addr);
 void scheduler_init(void);
 int  sched_init_vcpu(struct vcpu *v, unsigned int processor);
 void sched_destroy_vcpu(struct vcpu *v);
-int  sched_init_domain(struct domain *d);
+int  sched_init_domain(struct domain *d, int poolid);
 void sched_destroy_domain(struct domain *d);
 int sched_move_domain(struct domain *d, struct cpupool *c);
 long sched_adjust(struct domain *, struct xen_domctl_scheduler_op *);
