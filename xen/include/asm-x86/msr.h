@@ -80,6 +80,22 @@ static inline uint64_t rdtsc(void)
     return ((uint64_t)high << 32) | low;
 }
 
+static inline uint64_t rdtsc_ordered(void)
+{
+	/*
+	 * The RDTSC instruction is not ordered relative to memory access.
+	 * The Intel SDM and the AMD APM are both vague on this point, but
+	 * empirically an RDTSC instruction can be speculatively executed
+	 * before prior loads.  An RDTSC immediately after an appropriate
+	 * barrier appears to be ordered as a normal load, that is, it
+	 * provides the same ordering guarantees as reading from a global
+	 * memory location that some other imaginary CPU is updating
+	 * continuously with a time stamp.
+	 */
+	alternative("lfence", "mfence", X86_FEATURE_MFENCE_RDTSC);
+	return rdtsc();
+}
+
 #define __write_tsc(val) wrmsrl(MSR_IA32_TSC, val)
 #define write_tsc(val) ({                                       \
     /* Reliable TSCs are in lockstep across all CPUs. We should \

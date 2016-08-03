@@ -1137,7 +1137,7 @@ static int __init calibrate_APIC_clock(void)
     /*
      * We wrapped around just now. Let's start:
      */
-    t1 = rdtsc();
+    t1 = rdtsc_ordered();
     tt1 = apic_read(APIC_TMCCT);
 
     /*
@@ -1147,7 +1147,7 @@ static int __init calibrate_APIC_clock(void)
         wait_8254_wraparound();
 
     tt2 = apic_read(APIC_TMCCT);
-    t2 = rdtsc();
+    t2 = rdtsc_ordered();
 
     /*
      * The APIC bus clock counter is 32 bits only, it
