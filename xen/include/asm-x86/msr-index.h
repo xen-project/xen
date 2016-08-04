@@ -460,17 +460,25 @@
 #define MSR_P4_LASTBRANCH_0_TO_LIP	0x000006c0
 #define NUM_MSR_P4_LASTBRANCH_FROM_TO	16
 
-/* Pentium M (and Core) last-branch recording */
-#define MSR_PM_LASTBRANCH_TOS		0x000001c9
-#define MSR_PM_LASTBRANCH_0		0x00000040
-#define NUM_MSR_PM_LASTBRANCH		8
-
 /* Core 2 and Atom last-branch recording */
 #define MSR_C2_LASTBRANCH_TOS		0x000001c9
 #define MSR_C2_LASTBRANCH_0_FROM_IP	0x00000040
 #define MSR_C2_LASTBRANCH_0_TO_IP	0x00000060
 #define NUM_MSR_C2_LASTBRANCH_FROM_TO	4
 #define NUM_MSR_ATOM_LASTBRANCH_FROM_TO	8
+
+/* Skylake (and newer) last-branch recording */
+#define MSR_SKL_LASTBRANCH_TOS		0x000001c9
+#define MSR_SKL_LASTBRANCH_0_FROM_IP	0x00000680
+#define MSR_SKL_LASTBRANCH_0_TO_IP	0x000006c0
+#define MSR_SKL_LASTBRANCH_0_INFO	0x00000dc0
+#define NUM_MSR_SKL_LASTBRANCH		32
+
+/* Goldmont last-branch recording */
+#define MSR_GM_LASTBRANCH_TOS		0x000001c9
+#define MSR_GM_LASTBRANCH_0_FROM_IP	0x00000680
+#define MSR_GM_LASTBRANCH_0_TO_IP	0x000006c0
+#define NUM_MSR_GM_LASTBRANCH_FROM_TO	32
 
 /* Intel Core-based CPU performance counters */
 #define MSR_CORE_PERF_FIXED_CTR0	0x00000309

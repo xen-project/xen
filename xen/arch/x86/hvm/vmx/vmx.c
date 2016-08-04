@@ -2529,12 +2529,27 @@ static const struct lbr_info {
     { MSR_P4_LASTBRANCH_0_FROM_LIP, NUM_MSR_P4_LASTBRANCH_FROM_TO },
     { MSR_P4_LASTBRANCH_0_TO_LIP,   NUM_MSR_P4_LASTBRANCH_FROM_TO },
     { 0, 0 }
+}, sk_lbr[] = {
+    { MSR_IA32_LASTINTFROMIP,       1 },
+    { MSR_IA32_LASTINTTOIP,         1 },
+    { MSR_SKL_LASTBRANCH_TOS,       1 },
+    { MSR_SKL_LASTBRANCH_0_FROM_IP, NUM_MSR_SKL_LASTBRANCH },
+    { MSR_SKL_LASTBRANCH_0_TO_IP,   NUM_MSR_SKL_LASTBRANCH },
+    { MSR_SKL_LASTBRANCH_0_INFO,    NUM_MSR_SKL_LASTBRANCH },
+    { 0, 0 }
 }, at_lbr[] = {
     { MSR_IA32_LASTINTFROMIP,       1 },
     { MSR_IA32_LASTINTTOIP,         1 },
     { MSR_C2_LASTBRANCH_TOS,        1 },
     { MSR_C2_LASTBRANCH_0_FROM_IP,  NUM_MSR_ATOM_LASTBRANCH_FROM_TO },
     { MSR_C2_LASTBRANCH_0_TO_IP,    NUM_MSR_ATOM_LASTBRANCH_FROM_TO },
+    { 0, 0 }
+}, gm_lbr[] = {
+    { MSR_IA32_LASTINTFROMIP,       1 },
+    { MSR_IA32_LASTINTTOIP,         1 },
+    { MSR_GM_LASTBRANCH_TOS,        1 },
+    { MSR_GM_LASTBRANCH_0_FROM_IP,  NUM_MSR_GM_LASTBRANCH_FROM_TO },
+    { MSR_GM_LASTBRANCH_0_TO_IP,    NUM_MSR_GM_LASTBRANCH_FROM_TO },
     { 0, 0 }
 };
 
@@ -2550,7 +2565,6 @@ static const struct lbr_info *last_branch_msr_get(void)
         /* Enhanced Core */
         case 23:
             return c2_lbr;
-            break;
         /* Nehalem */
         case 26: case 30: case 31: case 46:
         /* Westmere */
@@ -2562,11 +2576,13 @@ static const struct lbr_info *last_branch_msr_get(void)
         /* Haswell */
         case 60: case 63: case 69: case 70:
         /* Broadwell */
-        case 61: case 79: case 86:
-        /* future */
-        case 78:
+        case 61: case 71: case 79: case 86:
             return nh_lbr;
-            break;
+        /* Skylake */
+        case 78: case 94:
+        /* future */
+        case 142: case 158:
+            return sk_lbr;
         /* Atom */
         case 28: case 38: case 39: case 53: case 54:
         /* Silvermont */
@@ -2576,7 +2592,9 @@ static const struct lbr_info *last_branch_msr_get(void)
         /* Airmont */
         case 76:
             return at_lbr;
-            break;
+        /* Goldmont */
+        case 92: case 95:
+            return gm_lbr;
         }
         break;
 
@@ -2586,7 +2604,6 @@ static const struct lbr_info *last_branch_msr_get(void)
         /* Pentium4/Xeon with em64t */
         case 3: case 4: case 6:
             return p4_lbr;
-            break;
         }
         break;
     }
