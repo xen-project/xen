@@ -111,8 +111,6 @@ struct cpu_user_regs
 #define READ_SYSREG(name)     READ_SYSREG64(name)
 #define WRITE_SYSREG(v, name) WRITE_SYSREG64(v, name)
 
-#define cpu_has_erratum_766422() 0
-
 #endif /* __ASSEMBLY__ */
 
 #endif /* __ASM_ARM_ARM64_PROCESSOR_H */

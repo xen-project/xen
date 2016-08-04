@@ -46,6 +46,7 @@
 #include "vtimer.h"
 #include <asm/gic.h>
 #include <asm/vgic.h>
+#include <asm/cpuerrata.h>
 
 /* The base of the stack must always be double-word aligned, which means
  * that both the kernel half of struct cpu_user_regs (which is pushed in
@@ -2481,7 +2482,7 @@ static void do_trap_data_abort_guest(struct cpu_user_regs *regs,
      * Erratum 766422: Thumb store translation fault to Hypervisor may
      * not have correct HSR Rt value.
      */
-    if ( cpu_has_erratum_766422() && (regs->cpsr & PSR_THUMB) && dabt.write )
+    if ( check_workaround_766422() && (regs->cpsr & PSR_THUMB) && dabt.write )
     {
         rc = decode_instruction(regs, &info.dabt);
         if ( rc )

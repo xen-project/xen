@@ -40,6 +40,8 @@ static inline bool_t check_workaround_##erratum(void)           \
 
 #endif
 
+CHECK_WORKAROUND_HELPER(766422, ARM32_WORKAROUND_766422, CONFIG_ARM_32)
+
 #undef CHECK_WORKAROUND_HELPER
 
 #endif /* __ARM_CPUERRATA_H__ */

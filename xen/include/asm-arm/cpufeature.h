@@ -37,8 +37,9 @@
 
 #define ARM64_WORKAROUND_CLEAN_CACHE    0
 #define ARM64_WORKAROUND_DEVICE_LOAD_ACQUIRE    1
+#define ARM32_WORKAROUND_766422 2
 
-#define ARM_NCAPS           2
+#define ARM_NCAPS           3
 
 #ifndef __ASSEMBLY__
 

@@ -17,6 +17,12 @@ is_affected_midr_range(const struct arm_cpu_capabilities *entry)
 }
 
 static const struct arm_cpu_capabilities arm_errata[] = {
+    {
+        /* Cortex-A15 r0p4 */
+        .desc = "ARM erratum 766422",
+        .capability = ARM32_WORKAROUND_766422,
+        MIDR_RANGE(MIDR_CORTEX_A15, 0x04, 0x04),
+    },
 #if defined(CONFIG_ARM64_ERRATUM_827319) || \
     defined(CONFIG_ARM64_ERRATUM_824069)
     {
