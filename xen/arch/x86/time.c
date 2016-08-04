@@ -59,7 +59,7 @@ struct platform_timesource {
     char *name;
     u64 frequency;
     u64 (*read_counter)(void);
-    int (*init)(struct platform_timesource *);
+    s64 (*init)(struct platform_timesource *);
     void (*resume)(struct platform_timesource *);
     int counter_bits;
 };
@@ -224,49 +224,18 @@ static struct irqaction __read_mostly irq0 = {
     timer_interrupt, "timer", NULL
 };
 
-/* ------ Calibrate the TSC ------- 
- * Return processor ticks per second / CALIBRATE_FRAC.
- */
-
 #define CLOCK_TICK_RATE 1193182 /* system crystal frequency (Hz) */
 #define CALIBRATE_FRAC  20      /* calibrate over 50ms */
-#define CALIBRATE_LATCH ((CLOCK_TICK_RATE+(CALIBRATE_FRAC/2))/CALIBRATE_FRAC)
+#define CALIBRATE_VALUE(freq) (((freq) + CALIBRATE_FRAC / 2) / CALIBRATE_FRAC)
 
-static u64 init_pit_and_calibrate_tsc(void)
+static void preinit_pit(void)
 {
-    u64 start, end;
-    unsigned long count;
-
     /* Set PIT channel 0 to HZ Hz. */
 #define LATCH (((CLOCK_TICK_RATE)+(HZ/2))/HZ)
     outb_p(0x34, PIT_MODE);        /* binary, mode 2, LSB/MSB, ch 0 */
     outb_p(LATCH & 0xff, PIT_CH0); /* LSB */
     outb(LATCH >> 8, PIT_CH0);     /* MSB */
-
-    /* Set the Gate high, disable speaker */
-    outb((inb(0x61) & ~0x02) | 0x01, 0x61);
-
-    /*
-     * Now let's take care of CTC channel 2
-     *
-     * Set the Gate high, program CTC channel 2 for mode 0, (interrupt on
-     * terminal count mode), binary count, load 5 * LATCH count, (LSB and MSB)
-     * to begin countdown.
-     */
-    outb(0xb0, PIT_MODE);           /* binary, mode 0, LSB/MSB, Ch 2 */
-    outb(CALIBRATE_LATCH & 0xff, PIT_CH2); /* LSB of count */
-    outb(CALIBRATE_LATCH >> 8, PIT_CH2);   /* MSB of count */
-
-    start = rdtsc_ordered();
-    for ( count = 0; (inb(0x61) & 0x20) == 0; count++ )
-        continue;
-    end = rdtsc_ordered();
-
-    /* Error if the CTC doesn't behave itself. */
-    if ( count == 0 )
-        return 0;
-
-    return ((end - start) * (u64)CALIBRATE_FRAC);
+#undef LATCH
 }
 
 void set_time_scale(struct time_scale *ts, u64 ticks_per_sec)
@@ -327,10 +296,49 @@ static u64 read_pit_count(void)
     return count32;
 }
 
-static int __init init_pit(struct platform_timesource *pts)
+static s64 __init init_pit(struct platform_timesource *pts)
 {
+    u8 portb = inb(0x61);
+    u64 start, end;
+    unsigned long count;
+
     using_pit = 1;
-    return 1;
+
+    /* Set the Gate high, disable speaker. */
+    outb((portb & ~0x02) | 0x01, 0x61);
+
+    /*
+     * Now let's take care of CTC channel 2: mode 0, (interrupt on
+     * terminal count mode), binary count, load CALIBRATE_LATCH count,
+     * (LSB and MSB) to begin countdown.
+     */
+#define CALIBRATE_LATCH CALIBRATE_VALUE(CLOCK_TICK_RATE)
+    outb(0xb0, PIT_MODE);                  /* binary, mode 0, LSB/MSB, Ch 2 */
+    outb(CALIBRATE_LATCH & 0xff, PIT_CH2); /* LSB of count */
+    outb(CALIBRATE_LATCH >> 8, PIT_CH2);   /* MSB of count */
+#undef CALIBRATE_LATCH
+
+    start = rdtsc_ordered();
+    for ( count = 0; !(inb(0x61) & 0x20); ++count )
+        continue;
+    end = rdtsc_ordered();
+
+    /* Set the Gate low, disable speaker. */
+    outb(portb & ~0x03, 0x61);
+
+    /* Error if the CTC doesn't behave itself. */
+    if ( count == 0 )
+        return 0;
+
+    return (end - start) * CALIBRATE_FRAC;
+}
+
+static void resume_pit(struct platform_timesource *pts)
+{
+    /* Set CTC channel 2 to mode 0 again; initial value does not matter. */
+    outb(0xb0, PIT_MODE); /* binary, mode 0, LSB/MSB, Ch 2 */
+    outb(0, PIT_CH2);     /* LSB of count */
+    outb(0, PIT_CH2);     /* MSB of count */
 }
 
 static struct platform_timesource __initdata plt_pit =
@@ -340,7 +348,8 @@ static struct platform_timesource __initdata plt_pit =
     .frequency = CLOCK_TICK_RATE,
     .read_counter = read_pit_count,
     .counter_bits = 32,
-    .init = init_pit
+    .init = init_pit,
+    .resume = resume_pit,
 };
 
 /************************************************************
@@ -352,15 +361,26 @@ static u64 read_hpet_count(void)
     return hpet_read32(HPET_COUNTER);
 }
 
-static int __init init_hpet(struct platform_timesource *pts)
+static s64 __init init_hpet(struct platform_timesource *pts)
 {
-    u64 hpet_rate = hpet_setup();
+    u64 hpet_rate = hpet_setup(), start;
+    u32 count, target;
 
     if ( hpet_rate == 0 )
         return 0;
 
     pts->frequency = hpet_rate;
-    return 1;
+
+    count = hpet_read32(HPET_COUNTER);
+    start = rdtsc_ordered();
+    target = count + CALIBRATE_VALUE(hpet_rate);
+    if ( target < count )
+        while ( hpet_read32(HPET_COUNTER) >= count )
+            continue;
+    while ( hpet_read32(HPET_COUNTER) < target )
+        continue;
+
+    return (rdtsc_ordered() - start) * CALIBRATE_FRAC;
 }
 
 static void resume_hpet(struct platform_timesource *pts)
@@ -392,12 +412,24 @@ static u64 read_pmtimer_count(void)
     return inl(pmtmr_ioport);
 }
 
-static int __init init_pmtimer(struct platform_timesource *pts)
+static s64 __init init_pmtimer(struct platform_timesource *pts)
 {
+    u64 start;
+    u32 count, target, mask = 0xffffff;
+
     if ( pmtmr_ioport == 0 )
         return 0;
 
-    return 1;
+    count = inl(pmtmr_ioport) & mask;
+    start = rdtsc_ordered();
+    target = count + CALIBRATE_VALUE(ACPI_PM_FREQUENCY);
+    if ( target < count )
+        while ( (inl(pmtmr_ioport) & mask) >= count )
+            continue;
+    while ( (inl(pmtmr_ioport) & mask) < target )
+        continue;
+
+    return (rdtsc_ordered() - start) * CALIBRATE_FRAC;
 }
 
 static struct platform_timesource __initdata plt_pmtimer =
@@ -533,14 +565,15 @@ static void resume_platform_timer(void)
     plt_stamp = plt_src.read_counter();
 }
 
-static void __init init_platform_timer(void)
+static u64 __init init_platform_timer(void)
 {
     static struct platform_timesource * __initdata plt_timers[] = {
         &plt_hpet, &plt_pmtimer, &plt_pit
     };
 
     struct platform_timesource *pts = NULL;
-    int i, rc = -1;
+    unsigned int i;
+    s64 rc = -1;
 
     if ( opt_clocksource[0] != '\0' )
     {
@@ -578,15 +611,12 @@ static void __init init_platform_timer(void)
 
     plt_overflow_period = scale_delta(
         1ull << (pts->counter_bits-1), &plt_scale);
-    init_timer(&plt_overflow_timer, plt_overflow, NULL, 0);
     plt_src = *pts;
-    plt_overflow(NULL);
-
-    platform_timer_stamp = plt_stamp64;
-    stime_platform_stamp = NOW();
 
     printk("Platform timer is %s %s\n",
            freq_string(pts->frequency), pts->name);
+
+    return rc;
 }
 
 u64 stime2tsc(s_time_t stime)
@@ -1479,7 +1509,11 @@ int __init init_xen_time(void)
     /* NB. get_cmos_time() can take over one second to execute. */
     do_settime(get_cmos_time(), 0, NOW());
 
-    init_platform_timer();
+    /* Finish platform timer initialization. */
+    init_timer(&plt_overflow_timer, plt_overflow, NULL, 0);
+    plt_overflow(NULL);
+    platform_timer_stamp = plt_stamp64;
+    stime_platform_stamp = NOW();
 
     init_percpu_time();
 
@@ -1494,7 +1528,10 @@ int __init init_xen_time(void)
 void __init early_time_init(void)
 {
     struct cpu_time *t = &this_cpu(cpu_time);
-    u64 tmp = init_pit_and_calibrate_tsc();
+    u64 tmp;
+
+    preinit_pit();
+    tmp = init_platform_timer();
 
     set_time_scale(&t->tsc_scale, tmp);
     t->local_tsc_stamp = boot_tsc_stamp;
@@ -1603,7 +1640,7 @@ int time_suspend(void)
 
 int time_resume(void)
 {
-    init_pit_and_calibrate_tsc();
+    preinit_pit();
 
     resume_platform_timer();
 
