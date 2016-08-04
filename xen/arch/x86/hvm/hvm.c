@@ -1863,7 +1863,7 @@ int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
      */
     if ( (p2mt == p2m_mmio_dm) || 
          (npfec.write_access &&
-          (p2m_is_discard_write(p2mt) || (p2mt == p2m_mmio_write_dm))) )
+          (p2m_is_discard_write(p2mt) || (p2mt == p2m_ioreq_server))) )
     {
         __put_gfn(p2m, gfn);
         if ( ap2m_active )
@@ -5563,6 +5563,8 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
             get_gfn_query_unlocked(d, a.pfn, &t);
             if ( p2m_is_mmio(t) )
                 a.mem_type =  HVMMEM_mmio_dm;
+            else if ( t == p2m_ioreq_server )
+                a.mem_type = HVMMEM_ioreq_server;
             else if ( p2m_is_readonly(t) )
                 a.mem_type =  HVMMEM_ram_ro;
             else if ( p2m_is_ram(t) )
@@ -5593,7 +5595,8 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
             [HVMMEM_ram_rw]  = p2m_ram_rw,
             [HVMMEM_ram_ro]  = p2m_ram_ro,
             [HVMMEM_mmio_dm] = p2m_mmio_dm,
-            [HVMMEM_unused] = p2m_invalid
+            [HVMMEM_unused] = p2m_invalid,
+            [HVMMEM_ioreq_server] = p2m_ioreq_server
         };
 
         if ( copy_from_guest(&a, arg, 1) )
@@ -5642,7 +5645,7 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
             }
             if ( !p2m_is_ram(t) &&
                  (!p2m_is_hole(t) || a.hvmmem_type != HVMMEM_mmio_dm) &&
-                 (t != p2m_mmio_write_dm || a.hvmmem_type != HVMMEM_ram_rw) )
+                 (t != p2m_ioreq_server || a.hvmmem_type != HVMMEM_ram_rw) )
             {
                 put_gfn(d, pfn);
                 goto setmemtype_fail;
