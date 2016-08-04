@@ -2382,13 +2382,28 @@ static inline paddr_t get_faulting_ipa(vaddr_t gva)
     return ipa;
 }
 
+static inline bool hpfar_is_valid(bool s1ptw, uint8_t fsc)
+{
+    /*
+     * HPFAR is valid if one of the following cases are true:
+     *  1. the stage 2 fault happen during a stage 1 page table walk
+     *  (the bit ESR_EL2.S1PTW is set)
+     *  2. the fault was due to a translation fault
+     *
+     * Note that technically HPFAR is valid for other cases, but they
+     * are currently not supported by Xen.
+     */
+    return s1ptw || (fsc == FSC_FLT_TRANS);
+}
+
 static void do_trap_instr_abort_guest(struct cpu_user_regs *regs,
                                       const union hsr hsr)
 {
     int rc;
     register_t gva = READ_SYSREG(FAR_EL2);
+    uint8_t fsc = hsr.iabt.ifsc & ~FSC_LL_MASK;
 
-    switch ( hsr.iabt.ifsc & ~FSC_LL_MASK )
+    switch ( fsc )
     {
     case FSC_FLT_PERM:
     {
@@ -2399,7 +2414,7 @@ static void do_trap_instr_abort_guest(struct cpu_user_regs *regs,
             .kind = hsr.iabt.s1ptw ? npfec_kind_in_gpt : npfec_kind_with_gla
         };
 
-        if ( hsr.iabt.s1ptw )
+        if ( hpfar_is_valid(hsr.iabt.s1ptw, fsc) )
             gpa = get_faulting_ipa(gva);
         else
         {
@@ -2434,6 +2449,7 @@ static void do_trap_data_abort_guest(struct cpu_user_regs *regs,
     const struct hsr_dabt dabt = hsr.dabt;
     int rc;
     mmio_info_t info;
+    uint8_t fsc = hsr.dabt.dfsc & ~FSC_LL_MASK;
 
     info.dabt = dabt;
 #ifdef CONFIG_ARM_32
@@ -2442,7 +2458,7 @@ static void do_trap_data_abort_guest(struct cpu_user_regs *regs,
     info.gva = READ_SYSREG64(FAR_EL2);
 #endif
 
-    if ( dabt.s1ptw )
+    if ( hpfar_is_valid(dabt.s1ptw, fsc) )
         info.gpa = get_faulting_ipa(info.gva);
     else
     {
@@ -2451,7 +2467,7 @@ static void do_trap_data_abort_guest(struct cpu_user_regs *regs,
             return; /* Try again */
     }
 
-    switch ( dabt.dfsc & ~FSC_LL_MASK )
+    switch ( fsc )
     {
     case FSC_FLT_PERM:
     {
