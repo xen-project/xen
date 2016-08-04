@@ -7629,7 +7629,8 @@ void sched_process(struct pcpu_info *p)
             }
             break;
         case TRC_SCHED_SWITCH:
-            dump_sched_switch(ri);
+            if(opt.dump_all)
+                dump_sched_switch(ri);
             break;
         case TRC_SCHED_SWITCH_INFPREV:
             if(opt.dump_all) {
