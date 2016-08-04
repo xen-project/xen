@@ -403,6 +403,7 @@ static struct platform_timesource __initdata plt_hpet =
  */
 
 u32 __read_mostly pmtmr_ioport;
+unsigned int __initdata pmtmr_width;
 
 /* ACPI PM timer ticks at 3.579545 MHz. */
 #define ACPI_PM_FREQUENCY 3579545
@@ -417,8 +418,14 @@ static s64 __init init_pmtimer(struct platform_timesource *pts)
     u64 start;
     u32 count, target, mask = 0xffffff;
 
-    if ( pmtmr_ioport == 0 )
+    if ( !pmtmr_ioport || !pmtmr_width )
         return 0;
+
+    if ( pmtmr_width == 32 )
+    {
+        pts->counter_bits = 32;
+        mask = 0xffffffff;
+    }
 
     count = inl(pmtmr_ioport) & mask;
     start = rdtsc_ordered();

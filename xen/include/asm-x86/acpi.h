@@ -146,6 +146,7 @@ extern u32 x86_acpiid_to_apicid[];
 #define INVALID_ACPIID		(-1U)
 
 extern u32 pmtmr_ioport;
+extern unsigned int pmtmr_width;
 
 int acpi_dmar_init(void);
 void acpi_mmcfg_init(void);

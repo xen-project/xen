@@ -481,22 +481,23 @@ static int __init acpi_parse_fadt(struct acpi_table_header *table)
 	if (fadt->header.revision >= FADT2_REVISION_ID) {
 		/* FADT rev. 2 */
 		if (fadt->xpm_timer_block.space_id ==
-		    ACPI_ADR_SPACE_SYSTEM_IO)
+		    ACPI_ADR_SPACE_SYSTEM_IO) {
 			pmtmr_ioport = fadt->xpm_timer_block.address;
-		/*
-		 * "X" fields are optional extensions to the original V1.0
-		 * fields, so we must selectively expand V1.0 fields if the
-		 * corresponding X field is zero.
-	 	 */
-		if (!pmtmr_ioport)
-			pmtmr_ioport = fadt->pm_timer_block;
-	} else {
-		/* FADT rev. 1 */
+			pmtmr_width = fadt->xpm_timer_block.bit_width;
+		}
+	}
+	/*
+	 * "X" fields are optional extensions to the original V1.0
+	 * fields, so we must selectively expand V1.0 fields if the
+	 * corresponding X field is zero.
+ 	 */
+	if (!pmtmr_ioport) {
 		pmtmr_ioport = fadt->pm_timer_block;
+		pmtmr_width = fadt->pm_timer_length == 4 ? 24 : 0;
 	}
 	if (pmtmr_ioport)
-		printk(KERN_INFO PREFIX "PM-Timer IO Port: %#x\n",
-		       pmtmr_ioport);
+		printk(KERN_INFO PREFIX "PM-Timer IO Port: %#x (%u bits)\n",
+		       pmtmr_ioport, pmtmr_width);
 #endif
 
 	acpi_smi_cmd       = fadt->smi_command;
