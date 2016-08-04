@@ -5343,6 +5343,61 @@ static int do_altp2m_op(
     return rc;
 }
 
+static int hvmop_get_mem_type(
+    XEN_GUEST_HANDLE_PARAM(xen_hvm_get_mem_type_t) arg)
+{
+    struct xen_hvm_get_mem_type a;
+    struct domain *d;
+    p2m_type_t t;
+    int rc;
+
+    if ( copy_from_guest(&a, arg, 1) )
+        return -EFAULT;
+
+    d = rcu_lock_domain_by_any_id(a.domid);
+    if ( d == NULL )
+        return -ESRCH;
+
+    rc = xsm_hvm_param(XSM_TARGET, d, HVMOP_get_mem_type);
+    if ( rc )
+        goto out;
+
+    rc = -EINVAL;
+    if ( !is_hvm_domain(d) )
+        goto out;
+
+    /*
+     * Use get_gfn query as we are interested in the current
+     * type, not in allocating or unsharing. That'll happen
+     * on access.
+     */
+    get_gfn_query_unlocked(d, a.pfn, &t);
+    if ( p2m_is_mmio(t) )
+        a.mem_type =  HVMMEM_mmio_dm;
+    else if ( t == p2m_ioreq_server )
+        a.mem_type = HVMMEM_ioreq_server;
+    else if ( p2m_is_readonly(t) )
+        a.mem_type =  HVMMEM_ram_ro;
+    else if ( p2m_is_ram(t) )
+        a.mem_type =  HVMMEM_ram_rw;
+    else if ( p2m_is_pod(t) )
+        a.mem_type =  HVMMEM_ram_rw;
+    else if ( p2m_is_grant(t) )
+        a.mem_type =  HVMMEM_ram_rw;
+    else
+        a.mem_type =  HVMMEM_mmio_dm;
+
+    rc = -EFAULT;
+    if ( __copy_to_guest(arg, &a, 1) )
+        goto out;
+    rc = 0;
+
+ out:
+    rcu_unlock_domain(d);
+
+    return rc;
+}
+
 /*
  * Note that this value is effectively part of the ABI, even if we don't need
  * to make it a formal part of it: A guest suspended for migration in the
@@ -5350,6 +5405,107 @@ static int do_altp2m_op(
  * using a different value.
  */
 #define HVMOP_op_mask 0xff
+
+static bool_t hvm_allow_p2m_type_change(p2m_type_t old, p2m_type_t new)
+{
+    if ( p2m_is_ram(old) ||
+         (p2m_is_hole(old) && new == p2m_mmio_dm) ||
+         (old == p2m_ioreq_server && new == p2m_ram_rw) )
+        return 1;
+
+    return 0;
+}
+
+static int hvmop_set_mem_type(
+    XEN_GUEST_HANDLE_PARAM(xen_hvm_set_mem_type_t) arg,
+    unsigned long *iter)
+{
+    unsigned long start_iter = *iter;
+    struct xen_hvm_set_mem_type a;
+    struct domain *d;
+    int rc;
+
+    /* Interface types to internal p2m types */
+    static const p2m_type_t memtype[] = {
+        [HVMMEM_ram_rw]  = p2m_ram_rw,
+        [HVMMEM_ram_ro]  = p2m_ram_ro,
+        [HVMMEM_mmio_dm] = p2m_mmio_dm,
+        [HVMMEM_unused] = p2m_invalid,
+        [HVMMEM_ioreq_server] = p2m_ioreq_server
+    };
+
+    if ( copy_from_guest(&a, arg, 1) )
+        return -EFAULT;
+
+    rc = rcu_lock_remote_domain_by_id(a.domid, &d);
+    if ( rc != 0 )
+        return rc;
+
+    rc = -EINVAL;
+    if ( !is_hvm_domain(d) )
+        goto out;
+
+    rc = xsm_hvm_control(XSM_DM_PRIV, d, HVMOP_set_mem_type);
+    if ( rc )
+        goto out;
+
+    rc = -EINVAL;
+    if ( a.nr < start_iter ||
+         ((a.first_pfn + a.nr - 1) < a.first_pfn) ||
+         ((a.first_pfn + a.nr - 1) > domain_get_maximum_gpfn(d)) )
+        goto out;
+
+    if ( a.hvmmem_type >= ARRAY_SIZE(memtype) ||
+         unlikely(a.hvmmem_type == HVMMEM_unused) )
+        goto out;
+
+    while ( a.nr > start_iter )
+    {
+        unsigned long pfn = a.first_pfn + start_iter;
+        p2m_type_t t;
+
+        get_gfn_unshare(d, pfn, &t);
+        if ( p2m_is_paging(t) )
+        {
+            put_gfn(d, pfn);
+            p2m_mem_paging_populate(d, pfn);
+            rc = -EAGAIN;
+            goto out;
+        }
+        if ( p2m_is_shared(t) )
+        {
+            put_gfn(d, pfn);
+            rc = -EAGAIN;
+            goto out;
+        }
+        if ( !hvm_allow_p2m_type_change(t, memtype[a.hvmmem_type]) )
+        {
+            put_gfn(d, pfn);
+            goto out;
+        }
+
+        rc = p2m_change_type_one(d, pfn, t, memtype[a.hvmmem_type]);
+        put_gfn(d, pfn);
+
+        if ( rc )
+            goto out;
+
+        /* Check for continuation if it's not the last interation */
+        if ( a.nr > ++start_iter && !(start_iter & HVMOP_op_mask) &&
+             hypercall_preempt_check() )
+        {
+            rc = -ERESTART;
+            goto out;
+        }
+    }
+    rc = 0;
+
+ out:
+    rcu_unlock_domain(d);
+    *iter = start_iter;
+
+    return rc;
+}
 
 long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
 {
@@ -5540,137 +5696,15 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
     }
 
     case HVMOP_get_mem_type:
-    {
-        struct xen_hvm_get_mem_type a;
-        struct domain *d;
-        p2m_type_t t;
-
-        if ( copy_from_guest(&a, arg, 1) )
-            return -EFAULT;
-
-        d = rcu_lock_domain_by_any_id(a.domid);
-        if ( d == NULL )
-            return -ESRCH;
-
-        rc = xsm_hvm_param(XSM_TARGET, d, op);
-        if ( unlikely(rc) )
-            /* nothing */;
-        else if ( likely(is_hvm_domain(d)) )
-        {
-            /* Use get_gfn query as we are interested in the current 
-             * type, not in allocating or unsharing. That'll happen 
-             * on access. */
-            get_gfn_query_unlocked(d, a.pfn, &t);
-            if ( p2m_is_mmio(t) )
-                a.mem_type =  HVMMEM_mmio_dm;
-            else if ( t == p2m_ioreq_server )
-                a.mem_type = HVMMEM_ioreq_server;
-            else if ( p2m_is_readonly(t) )
-                a.mem_type =  HVMMEM_ram_ro;
-            else if ( p2m_is_ram(t) )
-                a.mem_type =  HVMMEM_ram_rw;
-            else if ( p2m_is_pod(t) )
-                a.mem_type =  HVMMEM_ram_rw;
-            else if ( p2m_is_grant(t) )
-                a.mem_type =  HVMMEM_ram_rw;
-            else
-                a.mem_type =  HVMMEM_mmio_dm;
-            if ( __copy_to_guest(arg, &a, 1) )
-                rc = -EFAULT;
-        }
-        else
-            rc = -EINVAL;
-
-        rcu_unlock_domain(d);
+        rc = hvmop_get_mem_type(
+            guest_handle_cast(arg, xen_hvm_get_mem_type_t));
         break;
-    }
 
     case HVMOP_set_mem_type:
-    {
-        struct xen_hvm_set_mem_type a;
-        struct domain *d;
-        
-        /* Interface types to internal p2m types */
-        static const p2m_type_t memtype[] = {
-            [HVMMEM_ram_rw]  = p2m_ram_rw,
-            [HVMMEM_ram_ro]  = p2m_ram_ro,
-            [HVMMEM_mmio_dm] = p2m_mmio_dm,
-            [HVMMEM_unused] = p2m_invalid,
-            [HVMMEM_ioreq_server] = p2m_ioreq_server
-        };
-
-        if ( copy_from_guest(&a, arg, 1) )
-            return -EFAULT;
-
-        rc = rcu_lock_remote_domain_by_id(a.domid, &d);
-        if ( rc != 0 )
-            return rc;
-
-        rc = -EINVAL;
-        if ( !is_hvm_domain(d) )
-            goto setmemtype_fail;
-
-        rc = xsm_hvm_control(XSM_DM_PRIV, d, op);
-        if ( rc )
-            goto setmemtype_fail;
-
-        rc = -EINVAL;
-        if ( a.nr < start_iter ||
-             ((a.first_pfn + a.nr - 1) < a.first_pfn) ||
-             ((a.first_pfn + a.nr - 1) > domain_get_maximum_gpfn(d)) )
-            goto setmemtype_fail;
-            
-        if ( a.hvmmem_type >= ARRAY_SIZE(memtype) ||
-             unlikely(a.hvmmem_type == HVMMEM_unused) )
-            goto setmemtype_fail;
-
-        while ( a.nr > start_iter )
-        {
-            unsigned long pfn = a.first_pfn + start_iter;
-            p2m_type_t t;
-
-            get_gfn_unshare(d, pfn, &t);
-            if ( p2m_is_paging(t) )
-            {
-                put_gfn(d, pfn);
-                p2m_mem_paging_populate(d, pfn);
-                rc = -EAGAIN;
-                goto setmemtype_fail;
-            }
-            if ( p2m_is_shared(t) )
-            {
-                put_gfn(d, pfn);
-                rc = -EAGAIN;
-                goto setmemtype_fail;
-            }
-            if ( !p2m_is_ram(t) &&
-                 (!p2m_is_hole(t) || a.hvmmem_type != HVMMEM_mmio_dm) &&
-                 (t != p2m_ioreq_server || a.hvmmem_type != HVMMEM_ram_rw) )
-            {
-                put_gfn(d, pfn);
-                goto setmemtype_fail;
-            }
-
-            rc = p2m_change_type_one(d, pfn, t, memtype[a.hvmmem_type]);
-            put_gfn(d, pfn);
-            if ( rc )
-                goto setmemtype_fail;
-
-            /* Check for continuation if it's not the last interation */
-            if ( a.nr > ++start_iter && !(start_iter & HVMOP_op_mask) &&
-                 hypercall_preempt_check() )
-            {
-                rc = -ERESTART;
-                goto setmemtype_fail;
-            }
-        }
-
-        rc = 0;
-
-    setmemtype_fail:
-        rcu_unlock_domain(d);
+        rc = hvmop_set_mem_type(
+            guest_handle_cast(arg, xen_hvm_set_mem_type_t),
+            &start_iter);
         break;
-    }
 
     case HVMOP_pagetable_dying:
     {
