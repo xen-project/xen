@@ -47,10 +47,14 @@ unsigned long __read_mostly cpu_khz;  /* CPU clock frequency in kHz. */
 DEFINE_SPINLOCK(rtc_lock);
 unsigned long pit0_ticks;
 
+struct cpu_time_stamp {
+    u64 local_tsc;
+    s_time_t local_stime;
+    s_time_t master_stime;
+};
+
 struct cpu_time {
-    u64 local_tsc_stamp;
-    s_time_t stime_local_stamp;
-    s_time_t stime_master_stamp;
+    struct cpu_time_stamp stamp;
     struct time_scale tsc_scale;
 };
 
@@ -118,7 +122,7 @@ static inline u32 mul_frac(u32 multiplicand, u32 multiplier)
  * Scale a 64-bit delta by scaling and multiplying by a 32-bit fraction,
  * yielding a 64-bit result.
  */
-u64 scale_delta(u64 delta, struct time_scale *scale)
+u64 scale_delta(u64 delta, const struct time_scale *scale)
 {
     u64 product;
 
@@ -635,11 +639,11 @@ u64 stime2tsc(s_time_t stime)
     t = &this_cpu(cpu_time);
     sys_to_tsc = scale_reciprocal(t->tsc_scale);
 
-    stime_delta = stime - t->stime_local_stamp;
+    stime_delta = stime - t->stamp.local_stime;
     if ( stime_delta < 0 )
         stime_delta = 0;
 
-    return t->local_tsc_stamp + scale_delta(stime_delta, &sys_to_tsc);
+    return t->stamp.local_tsc + scale_delta(stime_delta, &sys_to_tsc);
 }
 
 void cstate_restore_tsc(void)
@@ -790,7 +794,7 @@ static unsigned long get_cmos_time(void)
 
 s_time_t get_s_time_fixed(u64 at_tsc)
 {
-    struct cpu_time *t = &this_cpu(cpu_time);
+    const struct cpu_time *t = &this_cpu(cpu_time);
     u64 tsc, delta;
     s_time_t now;
 
@@ -798,8 +802,8 @@ s_time_t get_s_time_fixed(u64 at_tsc)
         tsc = at_tsc;
     else
         tsc = rdtsc_ordered();
-    delta = tsc - t->local_tsc_stamp;
-    now = t->stime_local_stamp + scale_delta(delta, &t->tsc_scale);
+    delta = tsc - t->stamp.local_tsc;
+    now = t->stamp.local_stime + scale_delta(delta, &t->tsc_scale);
 
     return now;
 }
@@ -818,7 +822,7 @@ uint64_t tsc_ticks2ns(uint64_t ticks)
 
 static void __update_vcpu_system_time(struct vcpu *v, int force)
 {
-    struct cpu_time       *t;
+    const struct cpu_time *t;
     struct vcpu_time_info *u, _u = {};
     struct domain *d = v->domain;
     s_time_t tsc_stamp;
@@ -831,7 +835,7 @@ static void __update_vcpu_system_time(struct vcpu *v, int force)
 
     if ( d->arch.vtsc )
     {
-        s_time_t stime = t->stime_local_stamp;
+        s_time_t stime = t->stamp.local_stime;
 
         if ( is_hvm_domain(d) )
         {
@@ -853,20 +857,20 @@ static void __update_vcpu_system_time(struct vcpu *v, int force)
     {
         if ( has_hvm_container_domain(d) && hvm_tsc_scaling_supported )
         {
-            tsc_stamp            = hvm_scale_tsc(d, t->local_tsc_stamp);
+            tsc_stamp            = hvm_scale_tsc(d, t->stamp.local_tsc);
             _u.tsc_to_system_mul = d->arch.vtsc_to_ns.mul_frac;
             _u.tsc_shift         = d->arch.vtsc_to_ns.shift;
         }
         else
         {
-            tsc_stamp            = t->local_tsc_stamp;
+            tsc_stamp            = t->stamp.local_tsc;
             _u.tsc_to_system_mul = t->tsc_scale.mul_frac;
             _u.tsc_shift         = t->tsc_scale.shift;
         }
     }
 
     _u.tsc_timestamp = tsc_stamp;
-    _u.system_time   = t->stime_local_stamp;
+    _u.system_time   = t->stamp.local_stime;
 
     if ( is_hvm_domain(d) )
         _u.tsc_timestamp += v->arch.hvm_vcpu.cache_tsc_offset;
@@ -966,12 +970,12 @@ int cpu_frequency_change(u64 freq)
 
     local_irq_disable();
     /* Platform time /first/, as we may be delayed by platform_timer_lock. */
-    t->stime_master_stamp = read_platform_stime();
-    /* TSC-extrapolated time may be bogus after frequency change. */
-    /*t->stime_local_stamp = get_s_time();*/
-    t->stime_local_stamp = t->stime_master_stamp;
+    t->stamp.master_stime = read_platform_stime();
     curr_tsc = rdtsc_ordered();
-    t->local_tsc_stamp = curr_tsc;
+    /* TSC-extrapolated time may be bogus after frequency change. */
+    /*t->stamp.local_stime = get_s_time_fixed(curr_tsc);*/
+    t->stamp.local_stime = t->stamp.master_stime;
+    t->stamp.local_tsc = curr_tsc;
     set_time_scale(&t->tsc_scale, freq);
     local_irq_enable();
 
@@ -988,28 +992,19 @@ int cpu_frequency_change(u64 freq)
 }
 
 /* Per-CPU communication between rendezvous IRQ and softirq handler. */
-struct cpu_calibration {
-    u64 local_tsc_stamp;
-    s_time_t stime_local_stamp;
-    s_time_t stime_master_stamp;
-};
-static DEFINE_PER_CPU(struct cpu_calibration, cpu_calibration);
+static DEFINE_PER_CPU(struct cpu_time_stamp, cpu_calibration);
 
 /* Softirq handler for per-CPU time calibration. */
 static void local_time_calibration(void)
 {
     struct cpu_time *t = &this_cpu(cpu_time);
-    struct cpu_calibration *c = &this_cpu(cpu_calibration);
+    const struct cpu_time_stamp *c = &this_cpu(cpu_calibration);
 
     /*
-     * System timestamps, extrapolated from local and master oscillators,
-     * taken during this calibration and the previous calibration.
+     * System (extrapolated from local and master oscillators) and TSC
+     * timestamps, taken during this calibration and the previous one.
      */
-    s_time_t prev_local_stime, curr_local_stime;
-    s_time_t prev_master_stime, curr_master_stime;
-
-    /* TSC timestamps taken during this calibration and prev calibration. */
-    u64 prev_tsc, curr_tsc;
+    struct cpu_time_stamp prev, curr;
 
     /*
      * System time and TSC ticks elapsed during the previous calibration
@@ -1017,9 +1012,6 @@ static void local_time_calibration(void)
      */
     u64 stime_elapsed64, tsc_elapsed64;
     u32 stime_elapsed32, tsc_elapsed32;
-
-    /* The accumulated error in the local estimate. */
-    u64 local_stime_err;
 
     /* Error correction to slow down a fast local clock. */
     u32 error_factor = 0;
@@ -1034,40 +1026,34 @@ static void local_time_calibration(void)
     {
         /* Atomically read cpu_calibration struct and write cpu_time struct. */
         local_irq_disable();
-        t->local_tsc_stamp    = c->local_tsc_stamp;
-        t->stime_local_stamp  = c->stime_local_stamp;
-        t->stime_master_stamp = c->stime_master_stamp;
+        t->stamp = *c;
         local_irq_enable();
         update_vcpu_system_time(current);
         goto out;
     }
 
-    prev_tsc          = t->local_tsc_stamp;
-    prev_local_stime  = t->stime_local_stamp;
-    prev_master_stime = t->stime_master_stamp;
+    prev = t->stamp;
 
     /* Disabling IRQs ensures we atomically read cpu_calibration struct. */
     local_irq_disable();
-    curr_tsc          = c->local_tsc_stamp;
-    curr_local_stime  = c->stime_local_stamp;
-    curr_master_stime = c->stime_master_stamp;
+    curr = *c;
     local_irq_enable();
 
 #if 0
     printk("PRE%d: tsc=%"PRIu64" stime=%"PRIu64" master=%"PRIu64"\n",
-           smp_processor_id(), prev_tsc, prev_local_stime, prev_master_stime);
+           smp_processor_id(), prev.local_tsc, prev.local_stime, prev.master_stime);
     printk("CUR%d: tsc=%"PRIu64" stime=%"PRIu64" master=%"PRIu64
            " -> %"PRId64"\n",
-           smp_processor_id(), curr_tsc, curr_local_stime, curr_master_stime,
-           curr_master_stime - curr_local_stime);
+           smp_processor_id(), curr.local_tsc, curr.local_stime, curr.master_stime,
+           curr.master_stime - curr.local_stime);
 #endif
 
     /* Local time warps forward if it lags behind master time. */
-    if ( curr_local_stime < curr_master_stime )
-        curr_local_stime = curr_master_stime;
+    if ( curr.local_stime < curr.master_stime )
+        curr.local_stime = curr.master_stime;
 
-    stime_elapsed64 = curr_master_stime - prev_master_stime;
-    tsc_elapsed64   = curr_tsc - prev_tsc;
+    stime_elapsed64 = curr.master_stime - prev.master_stime;
+    tsc_elapsed64   = curr.local_tsc - prev.local_tsc;
 
     /*
      * Weirdness can happen if we lose sync with the platform timer.
@@ -1081,9 +1067,10 @@ static void local_time_calibration(void)
      * clock (slow clocks are warped forwards). The scale factor is clamped
      * to >= 0.5.
      */
-    if ( curr_local_stime != curr_master_stime )
+    if ( curr.local_stime != curr.master_stime )
     {
-        local_stime_err = curr_local_stime - curr_master_stime;
+        u64 local_stime_err = curr.local_stime - curr.master_stime;
+
         if ( local_stime_err > EPOCH )
             local_stime_err = EPOCH;
         error_factor = div_frac(EPOCH, EPOCH + (u32)local_stime_err);
@@ -1136,9 +1123,7 @@ static void local_time_calibration(void)
     local_irq_disable();
     t->tsc_scale.mul_frac = calibration_mul_frac;
     t->tsc_scale.shift    = tsc_shift;
-    t->local_tsc_stamp    = curr_tsc;
-    t->stime_local_stamp  = curr_local_stime;
-    t->stime_master_stamp = curr_master_stime;
+    t->stamp              = curr;
     local_irq_enable();
 
     update_vcpu_system_time(current);
@@ -1266,11 +1251,11 @@ struct calibration_rendezvous {
 static void
 time_calibration_rendezvous_tail(const struct calibration_rendezvous *r)
 {
-    struct cpu_calibration *c = &this_cpu(cpu_calibration);
+    struct cpu_time_stamp *c = &this_cpu(cpu_calibration);
 
-    c->local_tsc_stamp = rdtsc_ordered();
-    c->stime_local_stamp = get_s_time_fixed(c->local_tsc_stamp);
-    c->stime_master_stamp = r->master_stime;
+    c->local_tsc    = rdtsc_ordered();
+    c->local_stime  = get_s_time_fixed(c->local_tsc);
+    c->master_stime = r->master_stime;
 
     raise_softirq(TIME_CALIBRATE_SOFTIRQ);
 }
@@ -1367,21 +1352,18 @@ static void time_calibration(void *unused)
                      &r, 1);
 }
 
-static struct {
-    s_time_t local_stime, master_stime;
-} ap_bringup_ref;
+static struct cpu_time_stamp ap_bringup_ref;
 
 void time_latch_stamps(void)
 {
     unsigned long flags;
-    u64 tsc;
 
     local_irq_save(flags);
     ap_bringup_ref.master_stime = read_platform_stime();
-    tsc = rdtsc_ordered();
+    ap_bringup_ref.local_tsc = rdtsc_ordered();
     local_irq_restore(flags);
 
-    ap_bringup_ref.local_stime = get_s_time_fixed(tsc);
+    ap_bringup_ref.local_stime = get_s_time_fixed(ap_bringup_ref.local_tsc);
 }
 
 void init_percpu_time(void)
@@ -1399,7 +1381,7 @@ void init_percpu_time(void)
     tsc = rdtsc_ordered();
     local_irq_restore(flags);
 
-    t->stime_master_stamp = now;
+    t->stamp.master_stime = now;
     /*
      * To avoid a discontinuity (TSC and platform clock can't be expected
      * to be in perfect sync), initialization here needs to match up with
@@ -1412,8 +1394,8 @@ void init_percpu_time(void)
         else
             now += ap_bringup_ref.local_stime - ap_bringup_ref.master_stime;
     }
-    t->local_tsc_stamp    = tsc;
-    t->stime_local_stamp  = now;
+    t->stamp.local_tsc   = tsc;
+    t->stamp.local_stime = now;
 }
 
 /*
@@ -1543,7 +1525,7 @@ void __init early_time_init(void)
     tmp = init_platform_timer();
 
     set_time_scale(&t->tsc_scale, tmp);
-    t->local_tsc_stamp = boot_tsc_stamp;
+    t->stamp.local_tsc = boot_tsc_stamp;
 
     do_div(tmp, 1000);
     cpu_khz = (unsigned long)tmp;
