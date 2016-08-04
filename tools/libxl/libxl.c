@@ -1813,7 +1813,7 @@ int libxl_console_get_tty(libxl_ctx *ctx, uint32_t domid, int cons_num,
 
     switch (type) {
     case LIBXL_CONSOLE_TYPE_SERIAL:
-        tty_path = GCSPRINTF("%s/serial/0/tty", dom_path);
+        tty_path = GCSPRINTF("%s/serial/%d/tty", dom_path, cons_num);
         break;
     case LIBXL_CONSOLE_TYPE_PV:
         if (cons_num == 0)
