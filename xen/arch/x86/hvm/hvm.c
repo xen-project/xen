@@ -4279,11 +4279,13 @@ int hvm_do_hypercall(struct cpu_user_regs *regs)
     struct domain *currd = curr->domain;
     struct segment_register sreg;
     int mode = hvm_guest_x86_mode(curr);
-    uint32_t eax = regs->eax;
+    unsigned long eax = regs->_eax;
 
     switch ( mode )
     {
-    case 8:        
+    case 8:
+        eax = regs->rax;
+        /* Fallthrough to permission check. */
     case 4:
     case 2:
         hvm_get_segment_register(curr, x86_seg_ss, &sreg);
@@ -4321,7 +4323,7 @@ int hvm_do_hypercall(struct cpu_user_regs *regs)
         unsigned long r8 = regs->r8;
         unsigned long r9 = regs->r9;
 
-        HVM_DBG_LOG(DBG_LEVEL_HCALL, "hcall%u(%lx, %lx, %lx, %lx, %lx, %lx)",
+        HVM_DBG_LOG(DBG_LEVEL_HCALL, "hcall%lu(%lx, %lx, %lx, %lx, %lx, %lx)",
                     eax, rdi, rsi, rdx, r10, r8, r9);
 
 #ifndef NDEBUG
@@ -4368,7 +4370,7 @@ int hvm_do_hypercall(struct cpu_user_regs *regs)
         unsigned int edi = regs->_edi;
         unsigned int ebp = regs->_ebp;
 
-        HVM_DBG_LOG(DBG_LEVEL_HCALL, "hcall%u(%x, %x, %x, %x, %x, %x)", eax,
+        HVM_DBG_LOG(DBG_LEVEL_HCALL, "hcall%lu(%x, %x, %x, %x, %x, %x)", eax,
                     ebx, ecx, edx, esi, edi, ebp);
 
 #ifndef NDEBUG
@@ -4404,7 +4406,7 @@ int hvm_do_hypercall(struct cpu_user_regs *regs)
 #endif
     }
 
-    HVM_DBG_LOG(DBG_LEVEL_HCALL, "hcall%u -> %lx",
+    HVM_DBG_LOG(DBG_LEVEL_HCALL, "hcall%lu -> %lx",
                 eax, (unsigned long)regs->eax);
 
     if ( curr->arch.hvm_vcpu.hcall_preempted )
