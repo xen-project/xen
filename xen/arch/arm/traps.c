@@ -2467,35 +2467,40 @@ static void do_trap_data_abort_guest(struct cpu_user_regs *regs,
         /* Trap was triggered by mem_access, work here is done */
         if ( !rc )
             return;
+        break;
     }
-    break;
-    }
-
-    if ( dabt.s1ptw )
-        goto bad_data_abort;
-
-    /* XXX: Decode the instruction if ISS is not valid */
-    if ( !dabt.valid )
-        goto bad_data_abort;
-
-    /*
-     * Erratum 766422: Thumb store translation fault to Hypervisor may
-     * not have correct HSR Rt value.
-     */
-    if ( check_workaround_766422() && (regs->cpsr & PSR_THUMB) && dabt.write )
-    {
-        rc = decode_instruction(regs, &info.dabt);
-        if ( rc )
-        {
-            gprintk(XENLOG_DEBUG, "Unable to decode instruction\n");
+    case FSC_FLT_TRANS:
+        if ( dabt.s1ptw )
             goto bad_data_abort;
-        }
-    }
 
-    if (handle_mmio(&info))
-    {
-        advance_pc(regs, hsr);
-        return;
+        /* XXX: Decode the instruction if ISS is not valid */
+        if ( !dabt.valid )
+            goto bad_data_abort;
+
+        /*
+         * Erratum 766422: Thumb store translation fault to Hypervisor may
+         * not have correct HSR Rt value.
+         */
+        if ( check_workaround_766422() && (regs->cpsr & PSR_THUMB) &&
+             dabt.write )
+        {
+            rc = decode_instruction(regs, &info.dabt);
+            if ( rc )
+            {
+                gprintk(XENLOG_DEBUG, "Unable to decode instruction\n");
+                goto bad_data_abort;
+            }
+        }
+
+        if ( handle_mmio(&info) )
+        {
+            advance_pc(regs, hsr);
+            return;
+        }
+        break;
+    default:
+        gprintk(XENLOG_WARNING, "Unsupported DFSC: HSR=%#x DFSC=%#x\n",
+                hsr.bits, dabt.dfsc);
     }
 
 bad_data_abort:
