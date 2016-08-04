@@ -2387,9 +2387,9 @@ static void do_trap_instr_abort_guest(struct cpu_user_regs *regs,
     int rc;
     register_t gva = READ_SYSREG(FAR_EL2);
 
-    switch ( hsr.iabt.ifsc & 0x3f )
+    switch ( hsr.iabt.ifsc & ~FSC_LL_MASK )
     {
-    case FSC_FLT_PERM ... FSC_FLT_PERM + 3:
+    case FSC_FLT_PERM:
     {
         paddr_t gpa;
         const struct npfec npfec = {
@@ -2450,9 +2450,9 @@ static void do_trap_data_abort_guest(struct cpu_user_regs *regs,
             return; /* Try again */
     }
 
-    switch ( dabt.dfsc & 0x3f )
+    switch ( dabt.dfsc & ~FSC_LL_MASK )
     {
-    case FSC_FLT_PERM ... FSC_FLT_PERM + 3:
+    case FSC_FLT_PERM:
     {
         const struct npfec npfec = {
             .read_access = !dabt.write,
