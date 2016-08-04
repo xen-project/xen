@@ -490,14 +490,14 @@ void *scratch_alloc(uint32_t size, uint32_t align)
 
 uint32_t ioapic_read(uint32_t reg)
 {
-    *(volatile uint32_t *)(IOAPIC_BASE_ADDRESS + 0x00) = reg;
-    return *(volatile uint32_t *)(IOAPIC_BASE_ADDRESS + 0x10);
+    *(volatile uint32_t *)(ioapic_base_address + 0x00) = reg;
+    return *(volatile uint32_t *)(ioapic_base_address + 0x10);
 }
 
 void ioapic_write(uint32_t reg, uint32_t val)
 {
-    *(volatile uint32_t *)(IOAPIC_BASE_ADDRESS + 0x00) = reg;
-    *(volatile uint32_t *)(IOAPIC_BASE_ADDRESS + 0x10) = val;
+    *(volatile uint32_t *)(ioapic_base_address + 0x00) = reg;
+    *(volatile uint32_t *)(ioapic_base_address + 0x10) = val;
 }
 
 uint32_t lapic_read(uint32_t reg)

@@ -137,7 +137,7 @@ static struct acpi_20_madt *construct_madt(struct acpi_info *info)
     io_apic->type        = ACPI_IO_APIC;
     io_apic->length      = sizeof(*io_apic);
     io_apic->ioapic_id   = IOAPIC_ID;
-    io_apic->ioapic_addr = IOAPIC_BASE_ADDRESS;
+    io_apic->ioapic_addr = ioapic_base_address;
 
     lapic = (struct acpi_20_madt_lapic *)(io_apic + 1);
     info->nr_cpus = hvm_info->nr_vcpus;

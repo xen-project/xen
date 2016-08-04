@@ -227,9 +227,9 @@ static void fill_mp_ioapic_entry(struct mp_ioapic_entry *mpie)
 {
     mpie->type = ENTRY_TYPE_IOAPIC;
     mpie->ioapic_id = IOAPIC_ID;
-    mpie->ioapic_version = IOAPIC_VERSION;
+    mpie->ioapic_version = ioapic_version;
     mpie->ioapic_flags = 1; /* enabled */
-    mpie->ioapic_addr = IOAPIC_BASE_ADDRESS;
+    mpie->ioapic_addr = ioapic_base_address;
 }
 
 

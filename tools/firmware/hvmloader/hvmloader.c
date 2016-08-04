@@ -108,6 +108,9 @@ asm (
 
 unsigned long scratch_start = SCRATCH_PHYSICAL_ADDRESS;
 
+uint32_t ioapic_base_address = 0xfec00000;
+uint8_t ioapic_version;
+
 static void init_hypercalls(void)
 {
     uint32_t eax, ebx, ecx, edx;
@@ -185,6 +188,15 @@ static void init_vm86_tss(void)
 
 static void apic_setup(void)
 {
+    /*
+     * This would the The Right Thing To Do (tm), if only qemu negotiated
+     * with Xen where the IO-APIC actually sits (which is currently hard
+     * coded in Xen and can't be controlled externally). Uncomment this code
+     * once that changed.
+    ioapic_base_address |= (pci_readb(PCI_ISA_DEVFN, 0x80) & 0x3f) << 10;
+     */
+    ioapic_version = ioapic_read(0x01) & 0xff;
+
     /* Set the IOAPIC ID to the static value used in the MP/ACPI tables. */
     ioapic_write(0x00, IOAPIC_ID);
 
