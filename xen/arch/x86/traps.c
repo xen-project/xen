@@ -736,7 +736,9 @@ void do_reserved_trap(struct cpu_user_regs *regs)
 {
     unsigned int trapnr = regs->entry_vector;
 
-    DEBUGGER_trap_fatal(trapnr, regs);
+    if ( debugger_trap_fatal(trapnr, regs) )
+        return;
+
     show_execution_state(regs);
     panic("FATAL RESERVED TRAP %#x: %s", trapnr, trapstr(trapnr));
 }
@@ -750,7 +752,8 @@ static void do_trap(struct cpu_user_regs *regs, int use_error_code)
     if ( regs->error_code & X86_XEC_EXT )
         goto hardware_trap;
 
-    DEBUGGER_trap_entry(trapnr, regs);
+    if ( debugger_trap_entry(trapnr, regs) )
+        return;
 
     if ( guest_mode(regs) )
     {
@@ -777,7 +780,8 @@ static void do_trap(struct cpu_user_regs *regs, int use_error_code)
     }
 
  hardware_trap:
-    DEBUGGER_trap_fatal(trapnr, regs);
+    if ( debugger_trap_fatal(trapnr, regs) )
+        return;
 
     show_execution_state(regs);
     panic("FATAL TRAP: vector = %d (%s)\n"
@@ -1307,7 +1311,8 @@ void do_invalid_op(struct cpu_user_regs *regs)
     int id = -1, lineno;
     const struct virtual_region *region;
 
-    DEBUGGER_trap_entry(TRAP_invalid_op, regs);
+    if ( debugger_trap_entry(TRAP_invalid_op, regs) )
+        return;
 
     if ( likely(guest_mode(regs)) )
     {
@@ -1377,7 +1382,10 @@ void do_invalid_op(struct cpu_user_regs *regs)
 
     case BUGFRAME_bug:
         printk("Xen BUG at %s%s:%d\n", prefix, filename, lineno);
-        DEBUGGER_trap_fatal(TRAP_invalid_op, regs);
+
+        if ( debugger_trap_fatal(TRAP_invalid_op, regs) )
+            return;
+
         show_execution_state(regs);
         panic("Xen BUG at %s%s:%d", prefix, filename, lineno);
 
@@ -1389,7 +1397,10 @@ void do_invalid_op(struct cpu_user_regs *regs)
 
         printk("Assertion '%s' failed at %s%s:%d\n",
                predicate, prefix, filename, lineno);
-        DEBUGGER_trap_fatal(TRAP_invalid_op, regs);
+
+        if ( debugger_trap_fatal(TRAP_invalid_op, regs) )
+            return;
+
         show_execution_state(regs);
         panic("Assertion '%s' failed at %s%s:%d",
               predicate, prefix, filename, lineno);
@@ -1402,14 +1413,18 @@ void do_invalid_op(struct cpu_user_regs *regs)
         regs->eip = fixup;
         return;
     }
-    DEBUGGER_trap_fatal(TRAP_invalid_op, regs);
+
+    if ( debugger_trap_fatal(TRAP_invalid_op, regs) )
+        return;
+
     show_execution_state(regs);
     panic("FATAL TRAP: vector = %d (invalid opcode)", TRAP_invalid_op);
 }
 
 void do_int3(struct cpu_user_regs *regs)
 {
-    DEBUGGER_trap_entry(TRAP_int3, regs);
+    if ( debugger_trap_entry(TRAP_int3, regs) )
+        return;
 
     if ( !guest_mode(regs) )
     {
@@ -1744,7 +1759,8 @@ void do_page_fault(struct cpu_user_regs *regs)
     /* fixup_page_fault() might change regs->error_code, so cache it here. */
     error_code = regs->error_code;
 
-    DEBUGGER_trap_entry(TRAP_page_fault, regs);
+    if ( debugger_trap_entry(TRAP_page_fault, regs) )
+        return;
 
     perfc_incr(page_faults);
 
@@ -1774,7 +1790,8 @@ void do_page_fault(struct cpu_user_regs *regs)
             return;
         }
 
-        DEBUGGER_trap_fatal(TRAP_page_fault, regs);
+        if ( debugger_trap_fatal(TRAP_page_fault, regs) )
+            return;
 
         show_execution_state(regs);
         show_page_walk(addr);
@@ -3471,7 +3488,8 @@ void do_general_protection(struct cpu_user_regs *regs)
     struct vcpu *v = current;
     unsigned long fixup;
 
-    DEBUGGER_trap_entry(TRAP_gp_fault, regs);
+    if ( debugger_trap_entry(TRAP_gp_fault, regs) )
+        return;
 
     if ( regs->error_code & X86_XEC_EXT )
         goto hardware_gp;
@@ -3543,7 +3561,8 @@ void do_general_protection(struct cpu_user_regs *regs)
     }
 
  hardware_gp:
-    DEBUGGER_trap_fatal(TRAP_gp_fault, regs);
+    if ( debugger_trap_fatal(TRAP_gp_fault, regs) )
+        return;
 
     show_execution_state(regs);
     panic("GENERAL PROTECTION FAULT\n[error_code=%04x]", regs->error_code);
@@ -3778,7 +3797,8 @@ void do_debug(struct cpu_user_regs *regs)
 {
     struct vcpu *v = current;
 
-    DEBUGGER_trap_entry(TRAP_debug, regs);
+    if ( debugger_trap_entry(TRAP_debug, regs) )
+        return;
 
     if ( !guest_mode(regs) )
     {

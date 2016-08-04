@@ -33,17 +33,11 @@
 #include <asm/regs.h>
 #include <asm/processor.h>
 
-/* The main trap handlers use these helper macros which include early bail. */
-#define DEBUGGER_trap_entry(_v, _r) \
-    if ( debugger_trap_entry(_v, _r) ) return;
-#define DEBUGGER_trap_fatal(_v, _r) \
-    if ( debugger_trap_fatal(_v, _r) ) return;
-
 #ifdef CONFIG_CRASH_DEBUG
 
 #include <xen/gdbstub.h>
 
-static inline int debugger_trap_fatal(
+static inline bool debugger_trap_fatal(
     unsigned int vector, struct cpu_user_regs *regs)
 {
     int rc = __trap_to_gdb(regs, vector);
@@ -55,31 +49,39 @@ static inline int debugger_trap_fatal(
 
 #else
 
-static inline int debugger_trap_fatal(
+static inline bool debugger_trap_fatal(
     unsigned int vector, struct cpu_user_regs *regs)
 {
-    return 0;
+    return false;
 }
 
 #define debugger_trap_immediate() ((void)0)
 
 #endif
 
-static inline int debugger_trap_entry(
+static inline bool debugger_trap_entry(
     unsigned int vector, struct cpu_user_regs *regs)
 {
+    /*
+     * This function is called before any checks are made.  Amongst other
+     * things, be aware that during early boot, current is not a safe pointer
+     * to follow.
+     */
     struct vcpu *v = current;
 
-    if ( guest_kernel_mode(v, regs) && v->domain->debugger_attached &&
-         ((vector == TRAP_int3) || (vector == TRAP_debug)) )
+    if ( vector != TRAP_int3 && vector != TRAP_debug )
+        return false;
+
+    if ( guest_mode(regs) && guest_kernel_mode(v, regs) &&
+         v->domain->debugger_attached  )
     {
         if ( vector != TRAP_debug ) /* domain pause is good enough */
             current->arch.gdbsx_vcpu_event = vector;
         domain_pause_for_debugger();
-        return 1;
+        return true;
     }
 
-    return 0;
+    return false;
 }
 
 unsigned int dbg_rw_mem(void * __user addr, void * __user buf,
