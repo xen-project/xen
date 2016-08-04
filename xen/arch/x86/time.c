@@ -1263,6 +1263,18 @@ struct calibration_rendezvous {
     u64 master_tsc_stamp;
 };
 
+static void
+time_calibration_rendezvous_tail(const struct calibration_rendezvous *r)
+{
+    struct cpu_calibration *c = &this_cpu(cpu_calibration);
+
+    c->local_tsc_stamp = rdtsc_ordered();
+    c->stime_local_stamp = get_s_time_fixed(c->local_tsc_stamp);
+    c->stime_master_stamp = r->master_stime;
+
+    raise_softirq(TIME_CALIBRATE_SOFTIRQ);
+}
+
 /*
  * Keep TSCs in sync when they run at the same rate, but may stop in
  * deep-sleep C states.
@@ -1270,7 +1282,6 @@ struct calibration_rendezvous {
 static void time_calibration_tsc_rendezvous(void *_r)
 {
     int i;
-    struct cpu_calibration *c = &this_cpu(cpu_calibration);
     struct calibration_rendezvous *r = _r;
     unsigned int total_cpus = cpumask_weight(&r->cpu_calibration_map);
 
@@ -1311,17 +1322,12 @@ static void time_calibration_tsc_rendezvous(void *_r)
         }
     }
 
-    c->local_tsc_stamp = rdtsc_ordered();
-    c->stime_local_stamp = get_s_time_fixed(c->local_tsc_stamp);
-    c->stime_master_stamp = r->master_stime;
-
-    raise_softirq(TIME_CALIBRATE_SOFTIRQ);
+    time_calibration_rendezvous_tail(r);
 }
 
 /* Ordinary rendezvous function which does not modify TSC values. */
 static void time_calibration_std_rendezvous(void *_r)
 {
-    struct cpu_calibration *c = &this_cpu(cpu_calibration);
     struct calibration_rendezvous *r = _r;
     unsigned int total_cpus = cpumask_weight(&r->cpu_calibration_map);
 
@@ -1341,11 +1347,7 @@ static void time_calibration_std_rendezvous(void *_r)
         mb(); /* receive signal /then/ read r->master_stime */
     }
 
-    c->local_tsc_stamp = rdtsc_ordered();
-    c->stime_local_stamp = get_s_time_fixed(c->local_tsc_stamp);
-    c->stime_master_stamp = r->master_stime;
-
-    raise_softirq(TIME_CALIBRATE_SOFTIRQ);
+    time_calibration_rendezvous_tail(r);
 }
 
 static void (*time_calibration_rendezvous_fn)(void *) =
