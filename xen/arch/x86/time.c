@@ -1211,7 +1211,7 @@ static void tsc_check_slave(void *unused)
     unsigned int cpu = smp_processor_id();
     local_irq_disable();
     while ( !cpumask_test_cpu(cpu, &tsc_check_cpumask) )
-        mb();
+        cpu_relax();
     check_tsc_warp(cpu_khz, &tsc_max_warp);
     cpumask_clear_cpu(cpu, &tsc_check_cpumask);
     local_irq_enable();
@@ -1276,7 +1276,7 @@ static void time_calibration_tsc_rendezvous(void *_r)
         if ( smp_processor_id() == 0 )
         {
             while ( atomic_read(&r->semaphore) != (total_cpus - 1) )
-                mb();
+                cpu_relax();
 
             if ( r->master_stime == 0 )
             {
@@ -1289,21 +1289,21 @@ static void time_calibration_tsc_rendezvous(void *_r)
                 write_tsc(r->master_tsc_stamp);
 
             while ( atomic_read(&r->semaphore) != (2*total_cpus - 1) )
-                mb();
+                cpu_relax();
             atomic_set(&r->semaphore, 0);
         }
         else
         {
             atomic_inc(&r->semaphore);
             while ( atomic_read(&r->semaphore) < total_cpus )
-                mb();
+                cpu_relax();
 
             if ( i == 0 )
                 write_tsc(r->master_tsc_stamp);
 
             atomic_inc(&r->semaphore);
             while ( atomic_read(&r->semaphore) > total_cpus )
-                mb();
+                cpu_relax();
         }
     }
 
@@ -1321,7 +1321,7 @@ static void time_calibration_std_rendezvous(void *_r)
         while ( atomic_read(&r->semaphore) != (total_cpus - 1) )
             cpu_relax();
         r->master_stime = read_platform_stime();
-        mb(); /* write r->master_stime /then/ signal */
+        smp_wmb(); /* write r->master_stime /then/ signal */
         atomic_inc(&r->semaphore);
     }
     else
@@ -1329,7 +1329,7 @@ static void time_calibration_std_rendezvous(void *_r)
         atomic_inc(&r->semaphore);
         while ( atomic_read(&r->semaphore) != total_cpus )
             cpu_relax();
-        mb(); /* receive signal /then/ read r->master_stime */
+        smp_rmb(); /* receive signal /then/ read r->master_stime */
     }
 
     time_calibration_rendezvous_tail(r);
