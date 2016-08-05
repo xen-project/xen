@@ -476,7 +476,7 @@ void detect_extended_topology(struct cpuinfo_x86 *c)
 		sub_index++;
 	} while ( LEAFB_SUBTYPE(ecx) != INVALID_TYPE );
 
-	core_select_mask = (~(-1 << core_plus_mask_width)) >> ht_mask_width;
+	core_select_mask = (~(~0u << core_plus_mask_width)) >> ht_mask_width;
 
 	c->cpu_core_id = phys_pkg_id(initial_apicid, ht_mask_width)
 		& core_select_mask;

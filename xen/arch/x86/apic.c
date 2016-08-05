@@ -571,7 +571,7 @@ void setup_local_APIC(void)
     for (i = APIC_ISR_NR - 1; i >= 0; i--) {
         value = apic_read(APIC_ISR + i*0x10);
         for (j = 31; j >= 0; j--) {
-            if (value & (1<<j))
+            if (value & (1u << j))
                 ack_APIC_irq();
         }
     }

@@ -30,7 +30,7 @@
 #define			APIC_EIO_ACK		0x0		/* Write this to the EOI register */
 #define		APIC_RRR	0xC0
 #define		APIC_LDR	0xD0
-#define			APIC_LDR_MASK		(0xFF<<24)
+#define			APIC_LDR_MASK		(0xFFu<<24)
 #define			GET_xAPIC_LOGICAL_ID(x)	(((x)>>24)&0xFF)
 #define			SET_xAPIC_LOGICAL_ID(x)	(((x)<<24))
 #define			APIC_ALL_CPUS		0xFF
