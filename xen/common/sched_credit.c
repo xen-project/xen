@@ -892,9 +892,6 @@ csched_vcpu_insert(const struct scheduler *ops, struct vcpu *vc)
     spinlock_t *lock;
     unsigned long flags;
 
-    /* This is safe because vc isn't yet being scheduled */
-    vc->processor = csched_cpu_pick(ops, vc);
-
     lock = vcpu_schedule_lock_irqsave(vc, &flags);
 
     if ( !__vcpu_on_runq(svc) && vcpu_runnable(vc) && !vc->is_running )
