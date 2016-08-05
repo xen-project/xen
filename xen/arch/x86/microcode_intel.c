@@ -143,7 +143,8 @@ static int microcode_sanity_check(void *mc)
     struct extended_sigtable *ext_header = NULL;
     struct extended_signature *ext_sig;
     unsigned long total_size, data_size, ext_table_size;
-    int sum, orig_sum, ext_sigcount = 0, i;
+    unsigned int ext_sigcount = 0, i;
+    uint32_t sum, orig_sum;
 
     total_size = get_totalsize(mc_header);
     data_size = get_datasize(mc_header);
@@ -183,8 +184,8 @@ static int microcode_sanity_check(void *mc)
     /* check extended table checksum */
     if ( ext_table_size )
     {
-        int ext_table_sum = 0;
-        int *ext_tablep = (int *)ext_header;
+        uint32_t ext_table_sum = 0;
+        uint32_t *ext_tablep = (uint32_t *)ext_header;
 
         i = ext_table_size / DWSIZE;
         while ( i-- )
@@ -201,7 +202,7 @@ static int microcode_sanity_check(void *mc)
     orig_sum = 0;
     i = (MC_HEADER_SIZE + data_size) / DWSIZE;
     while ( i-- )
-        orig_sum += ((int *)mc)[i];
+        orig_sum += ((uint32_t *)mc)[i];
     if ( orig_sum )
     {
         printk(KERN_ERR "microcode: aborting, bad checksum\n");
