@@ -404,6 +404,8 @@ static elf_errorstatus elf_xen_note_check(struct elf_binary *elf,
 static elf_errorstatus elf_xen_addr_calc_check(struct elf_binary *elf,
                                    struct elf_dom_parms *parms)
 {
+    uint64_t virt_offset;
+
     if ( (parms->elf_paddr_offset != UNSET_ADDR) &&
          (parms->virt_base == UNSET_ADDR) )
     {
@@ -439,9 +441,9 @@ static elf_errorstatus elf_xen_addr_calc_check(struct elf_binary *elf,
                 __FUNCTION__, parms->elf_paddr_offset);
     }
 
-    parms->virt_offset = parms->virt_base - parms->elf_paddr_offset;
-    parms->virt_kstart = elf->pstart + parms->virt_offset;
-    parms->virt_kend   = elf->pend   + parms->virt_offset;
+    virt_offset = parms->virt_base - parms->elf_paddr_offset;
+    parms->virt_kstart = elf->pstart + virt_offset;
+    parms->virt_kend   = elf->pend   + virt_offset;
 
     if ( parms->virt_entry == UNSET_ADDR )
         parms->virt_entry = elf_uval(elf, elf->ehdr, e_entry);
@@ -450,13 +452,13 @@ static elf_errorstatus elf_xen_addr_calc_check(struct elf_binary *elf,
     {
         elf_parse_bsdsyms(elf, elf->pend);
         if ( elf->bsd_symtab_pend )
-            parms->virt_kend = elf->bsd_symtab_pend + parms->virt_offset;
+            parms->virt_kend = elf->bsd_symtab_pend + virt_offset;
     }
 
     elf_msg(elf, "%s: addresses:\n", __FUNCTION__);
     elf_msg(elf, "    virt_base        = 0x%" PRIx64 "\n", parms->virt_base);
     elf_msg(elf, "    elf_paddr_offset = 0x%" PRIx64 "\n", parms->elf_paddr_offset);
-    elf_msg(elf, "    virt_offset      = 0x%" PRIx64 "\n", parms->virt_offset);
+    elf_msg(elf, "    virt_offset      = 0x%" PRIx64 "\n", virt_offset);
     elf_msg(elf, "    virt_kstart      = 0x%" PRIx64 "\n", parms->virt_kstart);
     elf_msg(elf, "    virt_kend        = 0x%" PRIx64 "\n", parms->virt_kend);
     elf_msg(elf, "    virt_entry       = 0x%" PRIx64 "\n", parms->virt_entry);

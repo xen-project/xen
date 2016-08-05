@@ -428,7 +428,6 @@ struct elf_dom_parms {
     uint32_t phys_entry;
 
     /* calculated */
-    uint64_t virt_offset;
     uint64_t virt_kstart;
     uint64_t virt_kend;
 };
