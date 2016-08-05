@@ -217,54 +217,6 @@ void getdomaininfo(struct domain *d, struct xen_domctl_getdomaininfo *info)
     memcpy(info->handle, d->handle, sizeof(xen_domain_handle_t));
 }
 
-static unsigned int default_vcpu0_location(cpumask_t *online)
-{
-    struct domain *d;
-    struct vcpu   *v;
-    unsigned int   i, cpu, nr_cpus, *cnt;
-    cpumask_t      cpu_exclude_map;
-
-    /* Do an initial CPU placement. Pick the least-populated CPU. */
-    nr_cpus = cpumask_last(&cpu_online_map) + 1;
-    cnt = xzalloc_array(unsigned int, nr_cpus);
-    if ( cnt )
-    {
-        rcu_read_lock(&domlist_read_lock);
-        for_each_domain ( d )
-            for_each_vcpu ( d, v )
-                if ( !(v->pause_flags & VPF_down)
-                     && ((cpu = v->processor) < nr_cpus) )
-                    cnt[cpu]++;
-        rcu_read_unlock(&domlist_read_lock);
-    }
-
-    /*
-     * If we're on a HT system, we only auto-allocate to a non-primary HT. We
-     * favour high numbered CPUs in the event of a tie.
-     */
-    cpumask_copy(&cpu_exclude_map, per_cpu(cpu_sibling_mask, 0));
-    cpu = cpumask_first(&cpu_exclude_map);
-    i = cpumask_next(cpu, &cpu_exclude_map);
-    if ( i < nr_cpu_ids )
-        cpu = i;
-    for_each_cpu(i, online)
-    {
-        if ( cpumask_test_cpu(i, &cpu_exclude_map) )
-            continue;
-        if ( (i == cpumask_first(per_cpu(cpu_sibling_mask, i))) &&
-             (cpumask_next(i, per_cpu(cpu_sibling_mask, i)) < nr_cpu_ids) )
-            continue;
-        cpumask_or(&cpu_exclude_map, &cpu_exclude_map,
-                   per_cpu(cpu_sibling_mask, i));
-        if ( !cnt || cnt[i] <= cnt[cpu] )
-            cpu = i;
-    }
-
-    xfree(cnt);
-
-    return cpu;
-}
-
 bool_t domctl_lock_acquire(void)
 {
     /*
@@ -691,7 +643,7 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
                 continue;
 
             cpu = (i == 0) ?
-                default_vcpu0_location(online) :
+                cpumask_any(online) :
                 cpumask_cycle(d->vcpu[i-1]->processor, online);
 
             if ( alloc_vcpu(d, i, cpu) == NULL )
