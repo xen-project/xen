@@ -2305,7 +2305,7 @@ static int vmx_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
         __vmread(GUEST_IA32_DEBUGCTL, msr_content);
         break;
     case IA32_FEATURE_CONTROL_MSR:
-    case MSR_IA32_VMX_BASIC...MSR_IA32_VMX_TRUE_ENTRY_CTLS:
+    case MSR_IA32_VMX_BASIC...MSR_IA32_VMX_VMFUNC:
         if ( !nvmx_msr_read_intercept(msr, msr_content) )
             goto gp_fault;
         break;
