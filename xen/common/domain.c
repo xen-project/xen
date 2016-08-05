@@ -293,7 +293,7 @@ struct domain *domain_create(domid_t domid, unsigned int domcr_flags,
     d->auto_node_affinity = 1;
 
     spin_lock_init(&d->shutdown_lock);
-    d->shutdown_code = -1;
+    d->shutdown_code = SHUTDOWN_CODE_INVALID;
 
     spin_lock_init(&d->pbuf_lock);
 
@@ -695,7 +695,7 @@ void domain_shutdown(struct domain *d, u8 reason)
 
     spin_lock(&d->shutdown_lock);
 
-    if ( d->shutdown_code == -1 )
+    if ( d->shutdown_code == SHUTDOWN_CODE_INVALID )
         d->shutdown_code = reason;
     reason = d->shutdown_code;
 
@@ -742,7 +742,7 @@ void domain_resume(struct domain *d)
     spin_lock(&d->shutdown_lock);
 
     d->is_shutting_down = d->is_shut_down = 0;
-    d->shutdown_code = -1;
+    d->shutdown_code = SHUTDOWN_CODE_INVALID;
 
     for_each_vcpu ( d, v )
     {

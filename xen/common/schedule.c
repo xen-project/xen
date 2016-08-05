@@ -1120,7 +1120,7 @@ ret_t do_sched_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
                  d->domain_id, current->vcpu_id, sched_shutdown.reason);
 
         spin_lock(&d->shutdown_lock);
-        if ( d->shutdown_code == -1 )
+        if ( d->shutdown_code == SHUTDOWN_CODE_INVALID )
             d->shutdown_code = (u8)sched_shutdown.reason;
         spin_unlock(&d->shutdown_lock);
 

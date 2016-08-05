@@ -404,7 +404,8 @@ struct domain
     spinlock_t       shutdown_lock;
     bool_t           is_shutting_down; /* in process of shutting down? */
     bool_t           is_shut_down;     /* fully shut down? */
-    int              shutdown_code;
+#define SHUTDOWN_CODE_INVALID ~0u
+    unsigned int     shutdown_code;
 
     /* If this is not 0, send suspend notification here instead of
      * raising DOM_EXC */
@@ -483,7 +484,7 @@ extern struct vcpu *idle_vcpu[NR_CPUS];
 #define is_idle_domain(d) ((d)->domain_id == DOMID_IDLE)
 #define is_idle_vcpu(v)   (is_idle_domain((v)->domain))
 
-#define DOMAIN_DESTROYED (1<<31) /* assumes atomic_t is >= 32 bits */
+#define DOMAIN_DESTROYED (1u << 31) /* assumes atomic_t is >= 32 bits */
 #define put_domain(_d) \
   if ( atomic_dec_and_test(&(_d)->refcnt) ) domain_destroy(_d)
 
