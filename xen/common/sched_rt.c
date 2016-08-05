@@ -187,6 +187,8 @@ struct rt_dom {
     struct domain *dom;         /* pointer to upper domain */
 };
 
+static int rt_cpu_pick(const struct scheduler *ops, struct vcpu *vc);
+
 /*
  * Useful inline functions
  */
@@ -627,6 +629,9 @@ rt_vcpu_insert(const struct scheduler *ops, struct vcpu *vc)
     /* not addlocate idle vcpu to dom vcpu list */
     if ( is_idle_vcpu(vc) )
         return;
+
+    /* This is safe because vc isn't yet being scheduled */
+    vc->processor = rt_cpu_pick(ops, vc);
 
     lock = vcpu_schedule_lock_irq(vc);
 

@@ -268,6 +268,7 @@ struct csched2_dom {
     uint16_t nr_vcpus;
 };
 
+static int csched2_cpu_pick(const struct scheduler *ops, struct vcpu *vc);
 
 /*
  * Time-to-credit, credit-to-time.
@@ -883,9 +884,16 @@ csched2_vcpu_insert(const struct scheduler *ops, struct vcpu *vc)
         /* FIXME: Do we need the private lock here? */
         list_add_tail(&svc->sdom_elem, &svc->sdom->vcpu);
 
-        /* Add vcpu to runqueue of initial processor */
+        /* csched2_cpu_pick() expects the pcpu lock to be held */
         lock = vcpu_schedule_lock_irq(vc);
 
+        vc->processor = csched2_cpu_pick(ops, vc);
+
+        spin_unlock_irq(lock);
+
+        lock = vcpu_schedule_lock_irq(vc);
+
+        /* Add vcpu to runqueue of initial processor */
         runq_assign(ops, vc);
 
         vcpu_schedule_unlock_irq(lock, vc);
