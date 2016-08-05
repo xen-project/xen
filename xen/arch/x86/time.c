@@ -1146,16 +1146,13 @@ static void local_time_calibration(void)
  */
 static void check_tsc_warp(unsigned long tsc_khz, unsigned long *max_warp)
 {
-#define rdtsc_barrier() mb()
     static DEFINE_SPINLOCK(sync_lock);
     static cycles_t last_tsc;
 
     cycles_t start, now, prev, end;
     int i;
 
-    rdtsc_barrier();
-    start = get_cycles();
-    rdtsc_barrier();
+    start = rdtsc_ordered();
 
     /* The measurement runs for 20 msecs: */
     end = start + tsc_khz * 20ULL;
@@ -1170,9 +1167,7 @@ static void check_tsc_warp(unsigned long tsc_khz, unsigned long *max_warp)
          */
         spin_lock(&sync_lock);
         prev = last_tsc;
-        rdtsc_barrier();
-        now = get_cycles();
-        rdtsc_barrier();
+        now = rdtsc_ordered();
         last_tsc = now;
         spin_unlock(&sync_lock);
 
