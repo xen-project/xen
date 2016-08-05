@@ -318,6 +318,8 @@ struct csched2_dom {
     uint16_t nr_vcpus;
 };
 
+static int csched2_cpu_pick(const struct scheduler *ops, struct vcpu *vc);
+
 /*
  * When a hard affinity change occurs, we may not be able to check some
  * (any!) of the other runqueues, when looking for the best new processor
@@ -956,9 +958,16 @@ csched2_vcpu_insert(const struct scheduler *ops, struct vcpu *vc)
 
     BUG_ON(is_idle_vcpu(vc));
 
-    /* Add vcpu to runqueue of initial processor */
+    /* csched2_cpu_pick() expects the pcpu lock to be held */
     lock = vcpu_schedule_lock_irq(vc);
 
+    vc->processor = csched2_cpu_pick(ops, vc);
+
+    spin_unlock_irq(lock);
+
+    lock = vcpu_schedule_lock_irq(vc);
+
+    /* Add vcpu to runqueue of initial processor */
     runq_assign(ops, vc);
 
     vcpu_schedule_unlock_irq(lock, vc);
