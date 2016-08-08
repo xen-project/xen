@@ -50,7 +50,7 @@ xentrace_setsize: setsize.o
 	$(CC) $(LDFLAGS) -o $@ $< $(LDLIBS) $(APPEND_LDFLAGS)
 
 xenalyze: xenalyze.o mread.o
-	$(CC) $(LDFLAGS) -o $@ $^ $(LDLIBS) $(APPEND_LDFLAGS)
+	$(CC) $(LDFLAGS) -o $@ $^ $(APPEND_LDFLAGS)
 
 -include $(DEPS)
 
