@@ -294,8 +294,10 @@ Libxenlight coding style is super simple.  Avoid tricky expressions.
 
 5. Block structure
 
-Every indented statement is braced, except blocks that contain just
-one statement.
+Every indented statement is braced, but blocks that contain just one
+statement may have the braces omitted.  To avoid confusion, either all
+the blocks in an if...else chain have braces, or none of them do.
+
 The opening brace is on the line that contains the control flow
 statement that introduces the new block; the closing brace is on the
 same line as the else keyword, or on a line by itself if there is no
