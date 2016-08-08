@@ -1476,8 +1476,8 @@ static inline int libxl_console_exec_0x040700(libxl_ctx *ctx,
 }
 #define libxl_console_exec libxl_console_exec_0x040700
 
-static inline libxl_primary_console_exec_0x040700(libxl_ctx *ctx,
-                                                  uint32_t domid_vm)
+static inline int libxl_primary_console_exec_0x040700(libxl_ctx *ctx,
+                                                      uint32_t domid_vm)
 {
     return libxl_primary_console_exec(ctx, domid_vm, -1);
 }
