@@ -147,7 +147,6 @@ int verbosity = 5;
 struct {
     unsigned
         scatterplot_interrupt_eip:1,
-        scatterplot_cpi:1,
         scatterplot_unpin_promote:1,
         scatterplot_cr3_switch:1,
         scatterplot_wake_to_halt:1,
@@ -223,7 +222,6 @@ struct {
     } interval;
 } opt = {
     .scatterplot_interrupt_eip=0,
-    .scatterplot_cpi=0,
     .scatterplot_unpin_promote=0,
     .scatterplot_cr3_switch=0,
     .scatterplot_wake_to_halt=0,
@@ -287,15 +285,6 @@ struct cycle_summary {
     int count;
     unsigned long long cycles;
     long long *sample;
-    struct interval_element interval;
-};
-
-struct weighted_cpi_summary {
-    int count;
-    unsigned long long instructions;
-    unsigned long long cycles;
-    float *cpi;
-    unsigned long long *cpi_weight;
     struct interval_element interval;
 };
 
@@ -1672,7 +1661,6 @@ struct vcpu_data {
     struct cycle_framework f;
     struct cycle_summary runstates[RUNSTATE_MAX];
     struct cycle_summary runnable_states[RUNNABLE_STATE_MAX];
-    struct weighted_cpi_summary cpi;
     struct cycle_summary cpu_affinity_all,
         cpu_affinity_pcpu[MAX_CPUS];
     enum {
@@ -2297,54 +2285,6 @@ static inline void clear_interval_cycles(struct interval_element *e) {
     e->instructions = 0;
 }
 
-#if 0
-static inline void update_cpi(struct weighted_cpi_summary *s,
-                              unsigned long long i,
-                              unsigned long long c) {
-/* We don't know ahead of time how many samples there are, and working
- * with dynamic stuff is a pain, and unnecessary.  This algorithm will
- * generate a sample set that approximates an even sample.  We can
- * then take the percentiles on this, and get an approximate value. */
-    int lap, index;
-
-    if ( opt.sample_size ) {
-        lap = (s->count/opt.sample_size)+1;
-        index =s->count % opt.sample_size;
-
-        if((index - (lap/3))%lap == 0) {
-            if(!s->cpi) {
-                assert(!s->cpi_weight);
-
-                s->cpi = malloc(sizeof(*s->cpi) * opt.sample_size);
-                s->cpi_weight = malloc(sizeof(*s->cpi_weight) * opt.sample_size);
-                if(!s->cpi || !s->cpi_weight) {
-                    fprintf(stderr, "%s: malloc failed!\n", __func__);
-                    error(ERR_SYSTEM, NULL);
-                }
-            }
-            assert(s->cpi_weight);
-
-            s->cpi[index] = (float) c / i;
-            s->cpi_weight[index]=c;
-        }
-    }
-
-    s->instructions += i;
-    s->cycles += c;
-    s->count++;
-
-    s->interval.instructions += i;
-    s->interval.cycles += c;
-    s->interval.count++;
-}
-
-static inline void clear_interval_cpi(struct weighted_cpi_summary *s) {
-    s->interval.cycles = 0;
-    s->interval.count = 0;
-    s->interval.instructions = 0;
-}
-#endif
-
 static inline void print_cpu_affinity(struct cycle_summary *s, char *p) {
     if(s->count) {
         long long avg;
@@ -2366,31 +2306,6 @@ static inline void print_cpu_affinity(struct cycle_summary *s, char *p) {
         } else {
             printf("%s: %7d %6lld\n",
                    p, s->count, avg);
-        }
-    }
-}
-
-static inline void print_cpi_summary(struct weighted_cpi_summary *s) {
-    if(s->count) {
-        float avg;
-
-        avg = (float)s->cycles / s->instructions;
-
-        if ( opt.sample_size ) {
-            float p5, p50, p95;
-            int data_size = s->count;
-
-            if(data_size > opt.sample_size)
-                data_size = opt.sample_size;
-
-            p50 = weighted_percentile(s->cpi, s->cpi_weight, data_size, 50);
-            p5 = weighted_percentile(s->cpi, s->cpi_weight, data_size, 5);
-            p95 = weighted_percentile(s->cpi, s->cpi_weight, data_size, 95);
-
-            printf("  CPI summary: %2.2f {%2.2f|%2.2f|%2.2f}\n",
-                   avg, p5, p50, p95);
-        } else {
-            printf("  CPI summary: %2.2f\n", avg);
         }
     }
 }
@@ -7324,31 +7239,6 @@ update:
     else if ( sevt.old_runstate == RUNSTATE_RUNNING
               || v->runstate.state == RUNSTATE_RUNNING )
     {
-#if 0
-        /* A lot of traces include cpi that shouldn't... */
-        if(perfctrs && v->runstate.tsc) {
-            unsigned long long run_cycles, run_instr;
-            double cpi;
-
-            //run_cycles = r->p1 - v->runstate_p1_start;
-            run_cycles = ri->tsc - v->runstate.tsc;
-            run_instr  = r->p2 - v->runstate.p2_start;
-
-            cpi = ((double)run_cycles) / run_instr;
-
-            if(opt.dump_all) {
-                printf("   cpi: %2.2lf ( %lld / %lld )\n",
-                       cpi, run_cycles, run_instr);
-            }
-
-            if(opt.scatterplot_cpi && v->d->did == 1)
-                printf("%lld,%2.2lf\n",
-                       ri->tsc, cpi);
-
-            if(opt.summary_info)
-                update_cpi(&v->cpi, run_instr, run_cycles);
-        }
-#endif
         /*
          * Cases:
          * old running, v running:
@@ -7520,7 +7410,6 @@ void sched_summary_vcpu(struct vcpu_data *v)
             }
         }
     }
-    print_cpi_summary(&v->cpi);
     print_cpu_affinity(&v->cpu_affinity_all, " cpu affinity");
     for ( i = 0; i < MAX_CPUS ; i++)
     {
@@ -9932,7 +9821,6 @@ enum {
     OPT_WITH_MMIO_ENUMERATION,
     OPT_WITH_INTERRUPT_EIP_ENUMERATION,
     OPT_SCATTERPLOT_INTERRUPT_EIP,
-    OPT_SCATTERPLOT_CPI,
     OPT_SCATTERPLOT_UNPIN_PROMOTE,
     OPT_SCATTERPLOT_CR3_SWITCH,
     OPT_SCATTERPLOT_WAKE_TO_HALT,
@@ -10168,10 +10056,6 @@ error_t cmd_parser(int key, char *arg, struct argp_state *state)
             argp_usage(state);
     }
     break;
-    case OPT_SCATTERPLOT_CPI:
-        G.output_defined = 1;
-        opt.scatterplot_cpi=1;
-        break;
     case OPT_SCATTERPLOT_UNPIN_PROMOTE:
         G.output_defined = 1;
         opt.scatterplot_unpin_promote=1;
@@ -10550,11 +10434,6 @@ const struct argp_option cmd_opts[] =  {
       .arg = "vector",
       .group = OPT_GROUP_EXTRA,
       .doc = "Output a scatterplot of vmexit cycles for external interrupts of the given vector as a funciton of time.", },
-
-    { .name = "scatterplot-cpi",
-      .key = OPT_SCATTERPLOT_CPI,
-      .group = OPT_GROUP_EXTRA,
-      .doc = "Output scatterplot of cpi.", },
 
     { .name = "scatterplot-unpin-promote",
       .key = OPT_SCATTERPLOT_UNPIN_PROMOTE,
