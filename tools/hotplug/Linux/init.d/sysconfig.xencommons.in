@@ -70,6 +70,17 @@ XENSTORED_ARGS=
 #XENSTORE_DOMAIN_SIZE=8
 
 ## Type: string
+## Default: not set, no autoballooning of xenstore domain
+#
+# Maximum xenstore domain memory size. Can be specified as:
+# - plain integer value for max size in MiB
+# - fraction of host memory, e.g. 1/100
+# - combination of both in form of <val>:<frac> (e.g. 8:1/100), resulting
+#   value will be the higher of both specifications
+# Only evaluated if XENSTORETYPE is "domain".
+#XENSTORE_MAX_DOMAIN_SIZE=
+
+## Type: string
 ## Default: ""
 #
 # Additional arguments for starting the xenstore domain.
