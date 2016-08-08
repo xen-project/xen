@@ -274,15 +274,8 @@ struct interval_element {
     long long instructions;
 };
 
-struct event_cycle_summary {
-    int count, cycles_count;
-    long long cycles;
-    long long *cycles_sample;
-    struct interval_element interval;
-};
-
 struct cycle_summary {
-    int count;
+    int event_count, count;
     unsigned long long cycles;
     long long *sample;
     struct interval_element interval;
@@ -397,7 +390,7 @@ enum {
 struct eip_list_struct {
     struct eip_list_struct *next;
     unsigned long long eip;
-    struct event_cycle_summary summary;
+    struct cycle_summary summary;
     int type;
     void * extra;
 };
@@ -1314,21 +1307,21 @@ struct hvm_data {
 
     /* Information about particular exit reasons */
     struct {
-        struct event_cycle_summary exit_reason[HVM_EXIT_REASON_MAX];
+        struct cycle_summary exit_reason[HVM_EXIT_REASON_MAX];
         int extint[EXTERNAL_INTERRUPT_MAX+1];
         int *extint_histogram;
-        struct event_cycle_summary trap[HVM_TRAP_MAX];
-        struct event_cycle_summary pf_xen[PF_XEN_MAX];
-        struct event_cycle_summary pf_xen_emul[PF_XEN_EMUL_MAX];
-        struct event_cycle_summary pf_xen_emul_early_unshadow[5];
-        struct event_cycle_summary pf_xen_non_emul[PF_XEN_NON_EMUL_MAX];
-        struct event_cycle_summary pf_xen_fixup[PF_XEN_FIXUP_MAX];
-        struct event_cycle_summary pf_xen_fixup_unsync_resync[PF_XEN_FIXUP_UNSYNC_RESYNC_MAX+1];
-        struct event_cycle_summary cr_write[CR_MAX];
-        struct event_cycle_summary cr3_write_resyncs[RESYNCS_MAX+1];
-        struct event_cycle_summary vmcall[HYPERCALL_MAX+1];
-        struct event_cycle_summary generic[HVM_EVENT_HANDLER_MAX];
-        struct event_cycle_summary mmio[NONPF_MMIO_MAX];
+        struct cycle_summary trap[HVM_TRAP_MAX];
+        struct cycle_summary pf_xen[PF_XEN_MAX];
+        struct cycle_summary pf_xen_emul[PF_XEN_EMUL_MAX];
+        struct cycle_summary pf_xen_emul_early_unshadow[5];
+        struct cycle_summary pf_xen_non_emul[PF_XEN_NON_EMUL_MAX];
+        struct cycle_summary pf_xen_fixup[PF_XEN_FIXUP_MAX];
+        struct cycle_summary pf_xen_fixup_unsync_resync[PF_XEN_FIXUP_UNSYNC_RESYNC_MAX+1];
+        struct cycle_summary cr_write[CR_MAX];
+        struct cycle_summary cr3_write_resyncs[RESYNCS_MAX+1];
+        struct cycle_summary vmcall[HYPERCALL_MAX+1];
+        struct cycle_summary generic[HVM_EVENT_HANDLER_MAX];
+        struct cycle_summary mmio[NONPF_MMIO_MAX];
         struct hvm_gi_struct {
             int count;
             struct cycle_summary runtime[GUEST_INTERRUPT_CASE_MAX];
@@ -1337,7 +1330,7 @@ struct hvm_data {
             tsc_t start_tsc;
         } guest_interrupt[GUEST_INTERRUPT_MAX + 1];
         /* IPI Latency */
-        struct event_cycle_summary ipi_latency;
+        struct cycle_summary ipi_latency;
         int ipi_count[256];
         struct {
             struct io_address *mmio, *pio;
@@ -2200,42 +2193,13 @@ static inline double __cycles_percent(long long cycles, long long total) {
     return (double)(cycles*100) / total;
 }
 
-static inline double __summary_percent(struct event_cycle_summary *s,
+static inline double __summary_percent(struct cycle_summary *s,
                                        struct cycle_framework *f) {
     return __cycles_percent(s->cycles, f->total_cycles);
 }
 
-static inline double summary_percent_global(struct event_cycle_summary *s) {
+static inline double summary_percent_global(struct cycle_summary *s) {
     return __summary_percent(s, &P.f);
-}
-
-static inline void update_summary(struct event_cycle_summary *s, long long c) {
-/* We don't know ahead of time how many samples there are, and working
- * with dynamic stuff is a pain, and unnecessary.  This algorithm will
- * generate a sample set that approximates an even sample.  We can
- * then take the percentiles on this, and get an approximate value. */
-    if(c) {
-        if(opt.sample_size) {
-            int lap = (s->cycles_count/opt.sample_size)+1,
-                index =s->cycles_count % opt.sample_size;
-            if((index - (lap/3))%lap == 0) {
-                if(!s->cycles_sample) {
-                    s->cycles_sample = malloc(sizeof(*s->cycles_sample) * opt.sample_size);
-                    if(!s->cycles_sample) {
-                        fprintf(stderr, "%s: malloc failed!\n", __func__);
-                        error(ERR_SYSTEM, NULL);
-                    }
-                }
-                s->cycles_sample[index]=c;
-            }
-        }
-        s->cycles_count++;
-        s->cycles += c;
-
-        s->interval.count++;
-        s->interval.cycles += c;
-    }
-    s->count++;
 }
 
 static inline void update_cycles(struct cycle_summary *s, long long c) {
@@ -2243,19 +2207,14 @@ static inline void update_cycles(struct cycle_summary *s, long long c) {
  * with dynamic stuff is a pain, and unnecessary.  This algorithm will
  * generate a sample set that approximates an even sample.  We can
  * then take the percentiles on this, and get an approximate value. */
-    int lap, index;
+    s->event_count++;
 
-    if ( c == 0 )
-    {
-        fprintf(warn, "%s: cycles 0! Not updating...\n",
-                __func__);
+    if (!c)
         return;
-    }
-
-    if ( opt.sample_size ) {
-        lap = (s->count/opt.sample_size)+1;
-        index =s->count % opt.sample_size;
-
+            
+    if(opt.sample_size) {
+        int lap = (s->count/opt.sample_size)+1,
+            index =s->count % opt.sample_size;
         if((index - (lap/3))%lap == 0) {
             if(!s->sample) {
                 s->sample = malloc(sizeof(*s->sample) * opt.sample_size);
@@ -2264,19 +2223,14 @@ static inline void update_cycles(struct cycle_summary *s, long long c) {
                     error(ERR_SYSTEM, NULL);
                 }
             }
-            s->sample[index] = c;
+            s->sample[index]=c;
         }
     }
-
-    if(c > 0) {
-        s->cycles += c;
-        s->interval.cycles += c;
-    } else {
-        s->cycles += -c;
-        s->interval.cycles += -c;
-    }
     s->count++;
+    s->cycles += c;
+    
     s->interval.count++;
+    s->interval.cycles += c;
 }
 
 static inline void clear_interval_cycles(struct interval_element *e) {
@@ -2377,29 +2331,29 @@ static inline void print_cycle_summary(struct cycle_summary *s, char *p) {
 
 #define PRINT_SUMMARY(_s, _p...)                                        \
     do {                                                                \
-        if((_s).count) {                                                \
+        if((_s).event_count) {                                          \
             if ( opt.sample_size ) {                                    \
                 unsigned long long p5, p50, p95;                        \
-                int data_size=(_s).cycles_count;                        \
+                int data_size=(_s).count;                               \
                 if(data_size > opt.sample_size)                         \
                     data_size=opt.sample_size;                          \
-                p50=percentile((_s).cycles_sample, data_size, 50);      \
-                p5=percentile((_s).cycles_sample, data_size, 5);        \
-                p95=percentile((_s).cycles_sample, data_size, 95);      \
+                p50=percentile((_s).sample, data_size, 50);      \
+                p5=percentile((_s).sample, data_size, 5);        \
+                p95=percentile((_s).sample, data_size, 95);      \
                 printf(_p);                                             \
                 printf(" %7d %5.2lfs %5.2lf%% %5lld cyc {%5lld|%5lld|%5lld}\n", \
-                       (_s).count,                                      \
+                       (_s).event_count,                                \
                        ((double)(_s).cycles)/opt.cpu_hz,                \
                        summary_percent_global(&(_s)),                   \
-                       (_s).cycles_count ? (_s).cycles / (_s).cycles_count:0, \
+                       (_s).count ? (_s).cycles / (_s).count:0,         \
                        p5, p50, p95);                                   \
             } else {                                                    \
                 printf(_p);                                             \
                 printf(" %7d %5.2lfs %5.2lf%% %5lld cyc\n",             \
-                       (_s).count,                                      \
+                       (_s).event_count,                                \
                        ((double)(_s).cycles)/opt.cpu_hz,                \
                        summary_percent_global(&(_s)),                   \
-                       (_s).cycles_count ? (_s).cycles / (_s).cycles_count:0); \
+                       (_s).count ? (_s).cycles / (_s).count:0);        \
             }                                                           \
         }                                                               \
     } while(0)
@@ -2855,7 +2809,7 @@ void update_eip(struct eip_list_struct **head, unsigned long long eip,
         eip_list_type[type].update(p, extra);
     }
 
-    update_summary(&p->summary, cycles);
+    update_cycles(&p->summary, cycles);
 }
 
 int eip_compare(const void *_a, const void *_b) {
@@ -3306,7 +3260,7 @@ void hvm_pf_xen_postprocess(struct hvm_data *h) {
 
     if(opt.summary_info) {
         if(e->pf_case)
-            update_summary(&h->summary.pf_xen[e->pf_case],
+            update_cycles(&h->summary.pf_xen[e->pf_case],
                            h->arc_cycles);
         else
             fprintf(warn, "Strange, pf_case 0!\n");
@@ -3320,17 +3274,17 @@ void hvm_pf_xen_postprocess(struct hvm_data *h) {
             break;
         case PF_XEN_NON_EMULATE:
             if(is_kernel(h->v->guest_paging_levels, h->rip))
-                update_summary(&h->summary.pf_xen_non_emul[PF_XEN_NON_EMUL_EIP_KERNEL],
+                update_cycles(&h->summary.pf_xen_non_emul[PF_XEN_NON_EMUL_EIP_KERNEL],
                                h->arc_cycles);
             else
-                update_summary(&h->summary.pf_xen_non_emul[PF_XEN_NON_EMUL_EIP_USER],
+                update_cycles(&h->summary.pf_xen_non_emul[PF_XEN_NON_EMUL_EIP_USER],
                                h->arc_cycles);
             if(is_kernel(h->v->guest_paging_levels, e->va))
-                update_summary(&h->summary.pf_xen_non_emul[PF_XEN_NON_EMUL_VA_KERNEL],
+                update_cycles(&h->summary.pf_xen_non_emul[PF_XEN_NON_EMUL_VA_KERNEL],
                                h->arc_cycles);
 
             else
-                update_summary(&h->summary.pf_xen_non_emul[PF_XEN_NON_EMUL_VA_USER],
+                update_cycles(&h->summary.pf_xen_non_emul[PF_XEN_NON_EMUL_VA_USER],
                                h->arc_cycles);
         }
 
@@ -3411,7 +3365,7 @@ void hvm_vlapic_vmentry_cleanup(struct vcpu_data *v, tsc_t tsc)
         /* FIXME: make general somehow */
         if(opt.summary_info)
         {
-            update_summary(&h->summary.ipi_latency, lat);
+            update_cycles(&h->summary.ipi_latency, lat);
             h->summary.ipi_count[vla->outstanding_ipis]++;
         }
 #endif
@@ -3651,7 +3605,7 @@ void hvm_mmio_assist_postprocess(struct hvm_data *h)
 
     if(opt.summary_info)
     {
-        update_summary(&h->summary.mmio[reason],
+        update_cycles(&h->summary.mmio[reason],
                        h->arc_cycles);
     }
 
@@ -3787,7 +3741,7 @@ struct io_address {
     struct io_address *next;
     unsigned int pa;
     unsigned int va;
-    struct event_cycle_summary summary[2];
+    struct cycle_summary summary[2];
 };
 
 void update_io_address(struct io_address ** list, unsigned int pa, int dir,
@@ -3819,7 +3773,7 @@ void update_io_address(struct io_address ** list, unsigned int pa, int dir,
             *list = p;
         }
     }
-    update_summary(&p->summary[dir], arc_cycles);
+    update_cycles(&p->summary[dir], arc_cycles);
 }
 
 void hvm_io_address_summary(struct io_address *list, char * s) {
@@ -4139,10 +4093,10 @@ void hvm_cr_write_postprocess(struct hvm_data *h)
             if(resyncs > RESYNCS_MAX)
                 resyncs = RESYNCS_MAX;
 
-            update_summary(&h->summary.cr3_write_resyncs[resyncs],
+            update_cycles(&h->summary.cr3_write_resyncs[resyncs],
                            h->arc_cycles);
 
-            update_summary(&h->summary.cr_write[3],
+            update_cycles(&h->summary.cr_write[3],
                            h->arc_cycles);
 
             hvm_update_short_summary(h, HVM_SHORT_SUMMARY_CR3);
@@ -4154,7 +4108,7 @@ void hvm_cr_write_postprocess(struct hvm_data *h)
         if(opt.summary_info)
         {
             if(h->inflight.cr_write.cr < CR_MAX)
-                update_summary(&h->summary.cr_write[h->inflight.cr_write.cr],
+                update_cycles(&h->summary.cr_write[h->inflight.cr_write.cr],
                                h->arc_cycles);
 
         }
@@ -4339,10 +4293,10 @@ void hvm_vmcall_postprocess(struct hvm_data *h)
     if(opt.summary)
     {
         if ( eax < HYPERCALL_MAX )
-            update_summary(&h->summary.vmcall[eax],
+            update_cycles(&h->summary.vmcall[eax],
                        h->arc_cycles);
         else
-            update_summary(&h->summary.vmcall[HYPERCALL_MAX],
+            update_cycles(&h->summary.vmcall[HYPERCALL_MAX],
                        h->arc_cycles);
         hvm_set_summary_handler(h, hvm_vmcall_summary, NULL);
     }
@@ -4683,7 +4637,7 @@ void hvm_generic_postprocess(struct hvm_data *h)
     }
 
     if(opt.summary_info) {
-        update_summary(&h->summary.generic[evt],
+        update_cycles(&h->summary.generic[evt],
                        h->arc_cycles);
 
         /* NB that h->exit_reason may be 0, so we offset by 1 */
@@ -5170,7 +5124,7 @@ void hvm_close_vmexit(struct hvm_data *h, tsc_t tsc) {
             h->arc_cycles = tsc - h->exit_tsc;
 
             if(opt.summary_info) {
-                update_summary(&h->summary.exit_reason[h->exit_reason],
+                update_cycles(&h->summary.exit_reason[h->exit_reason],
                                h->arc_cycles);
                 h->summary_info = 1;
             }
@@ -5445,26 +5399,26 @@ void shadow_emulate_postprocess(struct hvm_data *h)
                    h->rip,
                    h->arc_cycles,
                    0, NULL);
-        update_summary(&h->summary.pf_xen[PF_XEN_EMULATE], h->arc_cycles);
-        update_summary(&h->summary.pf_xen_emul[e->pt_level], h->arc_cycles);
+        update_cycles(&h->summary.pf_xen[PF_XEN_EMULATE], h->arc_cycles);
+        update_cycles(&h->summary.pf_xen_emul[e->pt_level], h->arc_cycles);
         if(h->prealloc_unpin)
-            update_summary(&h->summary.pf_xen_emul[PF_XEN_EMUL_PREALLOC_UNPIN], h->arc_cycles);
+            update_cycles(&h->summary.pf_xen_emul[PF_XEN_EMUL_PREALLOC_UNPIN], h->arc_cycles);
         if(e->flag_prealloc_unhook)
-            update_summary(&h->summary.pf_xen_emul[PF_XEN_EMUL_PREALLOC_UNHOOK], h->arc_cycles);
+            update_cycles(&h->summary.pf_xen_emul[PF_XEN_EMUL_PREALLOC_UNHOOK], h->arc_cycles);
         if(e->flag_early_unshadow)
-            update_summary(&h->summary.pf_xen_emul[PF_XEN_EMUL_EARLY_UNSHADOW], h->arc_cycles);
+            update_cycles(&h->summary.pf_xen_emul[PF_XEN_EMUL_EARLY_UNSHADOW], h->arc_cycles);
         if(e->flag_set_changed)
-            update_summary(&h->summary.pf_xen_emul[PF_XEN_EMUL_SET_CHANGED], h->arc_cycles);
+            update_cycles(&h->summary.pf_xen_emul[PF_XEN_EMUL_SET_CHANGED], h->arc_cycles);
         else
-            update_summary(&h->summary.pf_xen_emul[PF_XEN_EMUL_SET_UNCHANGED], h->arc_cycles);
+            update_cycles(&h->summary.pf_xen_emul[PF_XEN_EMUL_SET_UNCHANGED], h->arc_cycles);
         if(e->flag_set_flush)
-            update_summary(&h->summary.pf_xen_emul[PF_XEN_EMUL_SET_FLUSH], h->arc_cycles);
+            update_cycles(&h->summary.pf_xen_emul[PF_XEN_EMUL_SET_FLUSH], h->arc_cycles);
         if(e->flag_set_error)
-            update_summary(&h->summary.pf_xen_emul[PF_XEN_EMUL_SET_ERROR], h->arc_cycles);
+            update_cycles(&h->summary.pf_xen_emul[PF_XEN_EMUL_SET_ERROR], h->arc_cycles);
         if(e->flag_promote)
-            update_summary(&h->summary.pf_xen_emul[PF_XEN_EMUL_PROMOTE], h->arc_cycles);
+            update_cycles(&h->summary.pf_xen_emul[PF_XEN_EMUL_PROMOTE], h->arc_cycles);
         if(e->flag_demote)
-            update_summary(&h->summary.pf_xen_emul[PF_XEN_EMUL_DEMOTE], h->arc_cycles);
+            update_cycles(&h->summary.pf_xen_emul[PF_XEN_EMUL_DEMOTE], h->arc_cycles);
         /* more summary info */
 
         hvm_update_short_summary(h, HVM_SHORT_SUMMARY_EMULATE);
@@ -5677,10 +5631,10 @@ void shadow_unsync_postprocess(struct hvm_data *h)
                 h->resyncs);
 
     if(opt.summary_info) {
-        update_summary(&h->summary.pf_xen[PF_XEN_EMULATE_UNSYNC],
+        update_cycles(&h->summary.pf_xen[PF_XEN_EMULATE_UNSYNC],
                        h->arc_cycles);
         if(h->resyncs <= 1)
-            update_summary(&h->summary.pf_xen_unsync[h->resyncs],
+            update_cycles(&h->summary.pf_xen_unsync[h->resyncs],
                            h->arc_cycles);
     }
 }
@@ -5744,36 +5698,36 @@ void shadow_fixup_postprocess(struct hvm_data *h)
 
     if ( opt.summary_info )
     {
-        update_summary(&h->summary.pf_xen[PF_XEN_FIXUP], h->arc_cycles);
+        update_cycles(&h->summary.pf_xen[PF_XEN_FIXUP], h->arc_cycles);
         if(h->prealloc_unpin) {
-            update_summary(&h->summary.pf_xen_fixup[PF_XEN_FIXUP_PREALLOC_UNPIN], h->arc_cycles);
+            update_cycles(&h->summary.pf_xen_fixup[PF_XEN_FIXUP_PREALLOC_UNPIN], h->arc_cycles);
         }
         if(e->flag_unsync) {
-            update_summary(&h->summary.pf_xen_fixup[PF_XEN_FIXUP_UNSYNC], h->arc_cycles);
+            update_cycles(&h->summary.pf_xen_fixup[PF_XEN_FIXUP_UNSYNC], h->arc_cycles);
             if(h->resyncs < PF_XEN_FIXUP_UNSYNC_RESYNC_MAX)
-                update_summary(&h->summary.pf_xen_fixup_unsync_resync[h->resyncs],
+                update_cycles(&h->summary.pf_xen_fixup_unsync_resync[h->resyncs],
                                h->arc_cycles);
             else
-                update_summary(&h->summary.pf_xen_fixup_unsync_resync[PF_XEN_FIXUP_UNSYNC_RESYNC_MAX],
+                update_cycles(&h->summary.pf_xen_fixup_unsync_resync[PF_XEN_FIXUP_UNSYNC_RESYNC_MAX],
                                h->arc_cycles);
         }
         if(e->flag_oos_fixup_add)
-            update_summary(&h->summary.pf_xen_fixup[PF_XEN_FIXUP_OOS_ADD], h->arc_cycles);
+            update_cycles(&h->summary.pf_xen_fixup[PF_XEN_FIXUP_OOS_ADD], h->arc_cycles);
         if(e->flag_oos_fixup_evict)
-            update_summary(&h->summary.pf_xen_fixup[PF_XEN_FIXUP_OOS_EVICT], h->arc_cycles);
+            update_cycles(&h->summary.pf_xen_fixup[PF_XEN_FIXUP_OOS_EVICT], h->arc_cycles);
         if(e->flag_promote)
-            update_summary(&h->summary.pf_xen_fixup[PF_XEN_FIXUP_PROMOTE], h->arc_cycles);
+            update_cycles(&h->summary.pf_xen_fixup[PF_XEN_FIXUP_PROMOTE], h->arc_cycles);
         if(e->flag_wrmap) {
-            update_summary(&h->summary.pf_xen_fixup[PF_XEN_FIXUP_WRMAP], h->arc_cycles);
+            update_cycles(&h->summary.pf_xen_fixup[PF_XEN_FIXUP_WRMAP], h->arc_cycles);
             if(e->flag_wrmap_brute_force || h->wrmap_bf)
-                update_summary(&h->summary.pf_xen_fixup[PF_XEN_FIXUP_BRUTE_FORCE], h->arc_cycles);
+                update_cycles(&h->summary.pf_xen_fixup[PF_XEN_FIXUP_BRUTE_FORCE], h->arc_cycles);
         } else if(e->flag_wrmap_brute_force || h->wrmap_bf) {
             fprintf(warn, "Strange: wrmap_bf but not wrmap!\n");
         }
 
 
         if(!(e->flag_promote || h->prealloc_unpin || e->flag_unsync))
-            update_summary(&h->summary.pf_xen_fixup[PF_XEN_FIXUP_UPDATE_ONLY], h->arc_cycles);
+            update_cycles(&h->summary.pf_xen_fixup[PF_XEN_FIXUP_UPDATE_ONLY], h->arc_cycles);
         /* more summary info */
 
         if(e->flag_unsync)
@@ -5894,7 +5848,7 @@ void shadow_mmio_postprocess(struct hvm_data *h)
     if ( opt.summary_info )
     {
         if(e->pf_case)
-            update_summary(&h->summary.pf_xen[e->pf_case],
+            update_cycles(&h->summary.pf_xen[e->pf_case],
                            h->arc_cycles);
         else
             fprintf(warn, "Strange, pf_case 0!\n");
@@ -5974,7 +5928,7 @@ void shadow_propagate_postprocess(struct hvm_data *h)
     if ( opt.summary_info )
     {
         if(e->pf_case)
-            update_summary(&h->summary.pf_xen[e->pf_case],
+            update_cycles(&h->summary.pf_xen[e->pf_case],
                            h->arc_cycles);
         else
             fprintf(warn, "Strange, pf_case 0!\n");
@@ -6106,7 +6060,7 @@ void shadow_fault_generic_postprocess(struct hvm_data *h)
     }
 
     if(opt.summary_info) {
-        update_summary(&h->summary.pf_xen[e->pf_case],
+        update_cycles(&h->summary.pf_xen[e->pf_case],
                            h->arc_cycles);
 
         hvm_update_short_summary(h, HVM_SHORT_SUMMARY_PROPAGATE);
