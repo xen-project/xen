@@ -93,7 +93,9 @@ Comments
 
 Only C style /* ... */ comments are to be used.  C++ style // comments
 should not be used.  Multi-word comments should begin with a capital
-letter and end with a full stop.
+letter.  Comments containing a single sentence may end with a full
+stop; comments containing several sentences must have a full stop
+after each sentence.
 
 Multi-line comment blocks should start and end with comment markers on
 separate lines and each line should begin with a leading '*'.
