@@ -44,7 +44,8 @@ struct mread_ctrl;
 #define QHZ_FROM_HZ(_hz) (((_hz) << 10)/ 1000000000)
 
 #define ADDR_SPACE_BITS 48
-#define DEFAULT_SAMPLE_SIZE 10240
+#define DEFAULT_SAMPLE_SIZE 1024
+#define DEFAULT_SAMPLE_MAX  1024*1024*32
 #define DEFAULT_INTERVAL_LENGTH 1000
 
 struct array_struct {
@@ -187,7 +188,7 @@ struct {
     unsigned long long histogram_interrupt_increment;
     int interrupt_eip_enumeration_vector;
     int default_guest_paging_levels;
-    int sample_size;
+    int sample_size, sample_max;
     enum error_level tolerance; /* Tolerate up to this level of error */
     struct {
         tsc_t cycles;
@@ -257,6 +258,7 @@ struct {
     .cpu_qhz = QHZ_FROM_HZ(DEFAULT_CPU_HZ),
     .default_guest_paging_levels = 2,
     .sample_size = DEFAULT_SAMPLE_SIZE,
+    .sample_max = DEFAULT_SAMPLE_MAX,
     .tolerance = ERR_SANITY,
     .interval = { .msec = DEFAULT_INTERVAL_LENGTH },
 };
@@ -275,7 +277,7 @@ struct interval_element {
 };
 
 struct cycle_summary {
-    int event_count, count;
+    int event_count, count, sample_size;
     unsigned long long cycles;
     long long *sample;
     struct interval_element interval;
@@ -2203,28 +2205,49 @@ static inline double summary_percent_global(struct cycle_summary *s) {
 }
 
 static inline void update_cycles(struct cycle_summary *s, long long c) {
-/* We don't know ahead of time how many samples there are, and working
- * with dynamic stuff is a pain, and unnecessary.  This algorithm will
- * generate a sample set that approximates an even sample.  We can
- * then take the percentiles on this, and get an approximate value. */
     s->event_count++;
 
     if (!c)
         return;
             
     if(opt.sample_size) {
-        int lap = (s->count/opt.sample_size)+1,
-            index =s->count % opt.sample_size;
-        if((index - (lap/3))%lap == 0) {
-            if(!s->sample) {
-                s->sample = malloc(sizeof(*s->sample) * opt.sample_size);
-                if(!s->sample) {
-                    fprintf(stderr, "%s: malloc failed!\n", __func__);
-                    error(ERR_SYSTEM, NULL);
-                }
+        if (s->count >= s->sample_size
+            && (s->count == 0
+                || opt.sample_max == 0
+                || s->sample_size < opt.sample_max)) {
+            int new_size;
+            void * new_sample = NULL;
+
+            new_size = s->sample_size << 1;
+
+            if (new_size == 0)
+                new_size = opt.sample_size;
+
+            if (opt.sample_max != 0 && new_size > opt.sample_max)
+                new_size = opt.sample_max;
+
+            new_sample = realloc(s->sample, sizeof(*s->sample) * new_size);
+            
+            if (new_sample) {
+                s->sample = new_sample;
+                s->sample_size = new_size;
             }
-            s->sample[index]=c;
         }
+        
+        if (s->count < s->sample_size) {
+            s->sample[s->count]=c;
+        } else {
+            /* 
+             * If we run out of space for samples, start taking only a
+             * subset of samples.
+             */
+            int lap, index;
+            lap = (s->count/s->sample_size)+1;
+            index =s->count % s->sample_size;
+            if((index - (lap/3))%lap == 0) {
+                s->sample[index]=c;
+             }
+         }
     }
     s->count++;
     s->cycles += c;
@@ -2248,8 +2271,8 @@ static inline void print_cpu_affinity(struct cycle_summary *s, char *p) {
         if ( opt.sample_size ) {
             long long  p5, p50, p95;
             int data_size = s->count;
-           if(data_size > opt.sample_size)
-                data_size = opt.sample_size;
+           if(data_size > s->sample_size)
+               data_size = s->sample_size;
 
             p50 = percentile(s->sample, data_size, 50);
             p5 = percentile(s->sample, data_size, 5);
@@ -2280,8 +2303,8 @@ static inline void print_cycle_percent_summary(struct cycle_summary *s,
             long long p5, p50, p95;
             int data_size = s->count;
 
-            if(data_size > opt.sample_size)
-                data_size = opt.sample_size;
+            if(data_size > s->sample_size)
+                data_size = s->sample_size;
 
             p50 = self_weighted_percentile(s->sample, data_size, 50);
             p5 = self_weighted_percentile(s->sample, data_size, 5);
@@ -2312,8 +2335,8 @@ static inline void print_cycle_summary(struct cycle_summary *s, char *p) {
             long long p5, p50, p95;
             int data_size = s->count;
 
-            if(data_size > opt.sample_size)
-                data_size = opt.sample_size;
+            if(data_size > s->sample_size)
+                data_size = s->sample_size;
 
             p50 = self_weighted_percentile(s->sample, data_size, 50);
             p5 = self_weighted_percentile(s->sample, data_size, 5);
@@ -2335,8 +2358,8 @@ static inline void print_cycle_summary(struct cycle_summary *s, char *p) {
             if ( opt.sample_size ) {                                    \
                 unsigned long long p5, p50, p95;                        \
                 int data_size=(_s).count;                               \
-                if(data_size > opt.sample_size)                         \
-                    data_size=opt.sample_size;                          \
+                if(data_size > (_s).sample_size)                         \
+                    data_size=(_s).sample_size;                          \
                 p50=percentile((_s).sample, data_size, 50);      \
                 p5=percentile((_s).sample, data_size, 5);        \
                 p95=percentile((_s).sample, data_size, 95);      \
@@ -9801,6 +9824,7 @@ enum {
     OPT_SHOW_DEFAULT_DOMAIN_SUMMARY,
     OPT_MMIO_ENUMERATION_SKIP_VGA,
     OPT_SAMPLE_SIZE,
+    OPT_SAMPLE_MAX,
     OPT_REPORT_PCPU,
     /* Guest info */
     OPT_DEFAULT_GUEST_PAGING_LEVELS,
@@ -9979,6 +10003,14 @@ error_t cmd_parser(int key, char *arg, struct argp_state *state)
     {
         char * inval;
         opt.sample_size = (int)strtol(arg, &inval, 0);
+        if( inval == arg )
+            argp_usage(state);
+        break;
+    }
+    case OPT_SAMPLE_MAX:
+    {
+        char * inval;
+        opt.sample_max = (int)strtol(arg, &inval, 0);
         if( inval == arg )
             argp_usage(state);
         break;
@@ -10520,8 +10552,15 @@ const struct argp_option cmd_opts[] =  {
       .key = OPT_SAMPLE_SIZE,
       .arg = "size",
       .group = OPT_GROUP_SUMMARY,
-      .doc = "Keep [size] samples for percentile purposes.  Enter 0 to " \
-      "disable.  Default 10240.", },
+      .doc = "Start with [size] samples for percentile purposes.  Enter 0 to" \
+      "disable.  Default 1024.", },
+
+    { .name = "sample-max",
+      .key = OPT_SAMPLE_MAX,
+      .arg = "size",
+      .group = OPT_GROUP_SUMMARY,
+      .doc = "Do not allow sample to grow beyond [size] samples for percentile"\
+      " purposes.  Enter 0 for no limit.", },
 
     { .name = "summary",
       .key = OPT_SUMMARY,
