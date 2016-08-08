@@ -23,6 +23,7 @@ static char *flask;
 static char *param;
 static char *name = "Xenstore";
 static int memory;
+static int maxmem;
 
 static struct option options[] = {
     { "kernel", 1, NULL, 'k' },
@@ -31,6 +32,7 @@ static struct option options[] = {
     { "ramdisk", 1, NULL, 'r' },
     { "param", 1, NULL, 'p' },
     { "name", 1, NULL, 'n' },
+    { "maxmem", 1, NULL, 'M' },
     { NULL, 0, NULL, 0 }
 };
 
@@ -48,7 +50,11 @@ static void usage(void)
 "  --flask <flask-label>      optional flask label of the domain\n"
 "  --ramdisk <ramdisk-file>   optional ramdisk file for the domain\n"
 "  --param <cmdline>          optional additional parameters for the domain\n"
-"  --name <name>              name of the domain (default: Xenstore)\n");
+"  --name <name>              name of the domain (default: Xenstore)\n"
+"  --maxmem <max size>        maximum memory size in the format:\n"
+"                             <MB val>|<a>/<b>|<MB val>:<a>/<b>\n"
+"                             (an absolute value in MB, a fraction a/b of\n"
+"                             the host memory, or the maximum of both)\n");
 }
 
 static int build(xc_interface *xch)
@@ -58,7 +64,7 @@ static int build(xc_interface *xch)
     xen_domain_handle_t handle = { 0 };
     int rv, xs_fd;
     struct xc_dom_image *dom = NULL;
-    int limit_kb = (memory + 1) * 1024;
+    int limit_kb = (maxmem ? : (memory + 1)) * 1024;
 
     xs_fd = open("/dev/xen/xenbus_backend", O_RDWR);
     if ( xs_fd == -1 )
@@ -223,6 +229,63 @@ static int check_domain(xc_interface *xch)
     return 0;
 }
 
+static int parse_maxmem(xc_interface *xch, char *str)
+{
+    xc_physinfo_t info;
+    int rv;
+    unsigned long mb = 0, a = 0, b = 0;
+    unsigned long val;
+    unsigned long *res;
+    char buf[16];
+    char *p;
+    char *s = str;
+
+    rv = xc_physinfo(xch, &info);
+    if ( rv )
+    {
+        fprintf(stderr, "xc_physinfo failed\n");
+        return -1;
+    }
+
+    res = &mb;
+    for (p = s; *p; s = p + 1)
+    {
+        val = strtoul(s, &p, 10);
+        if ( val == 0 || val >= INT_MAX / 1024 )
+            goto err;
+        if ( *p == '/' )
+        {
+            if ( res != &mb || a != 0 )
+                goto err;
+            a = val;
+            res = &b;
+            continue;
+        }
+        if ( *res != 0 )
+            goto err;
+        *res = val;
+        if ( *p != 0 && *p != ':' )
+            goto err;
+        res = &mb;
+    }
+    if ( a && !b )
+        goto err;
+
+    val = a ? info.total_pages * a / (b * 1024 * 1024 / XC_PAGE_SIZE) : 0;
+    if ( val >= INT_MAX / 1024 )
+        goto err;
+
+    maxmem = mb < val ? val : mb;
+    if ( maxmem < memory )
+        maxmem = 0;
+
+    return maxmem;
+
+err:
+    fprintf(stderr, "illegal value for maxmem: %s\n", str);
+    return -1;
+}
+
 static void do_xs_write(struct xs_handle *xsh, char *path, char *val)
 {
     if ( !xs_write(xsh, XBT_NULL, path, val, strlen(val)) )
@@ -244,6 +307,7 @@ int main(int argc, char** argv)
     struct xs_handle *xsh;
     char buf[16];
     int rv, fd;
+    char *maxmem_str = NULL;
 
     while ( (opt = getopt_long(argc, argv, "", options, NULL)) != -1 )
     {
@@ -267,6 +331,9 @@ int main(int argc, char** argv)
         case 'n':
             name = optarg;
             break;
+        case 'M':
+            maxmem_str = optarg;
+            break;
         default:
             usage();
             return 2;
@@ -284,6 +351,16 @@ int main(int argc, char** argv)
     {
         fprintf(stderr, "xc_interface_open() failed\n");
         return 1;
+    }
+
+    if ( maxmem_str )
+    {
+        maxmem = parse_maxmem(xch, maxmem_str);
+        if ( maxmem < 0 )
+        {
+            xc_interface_close(xch);
+            return 1;
+        }
     }
 
     rv = check_domain(xch);
@@ -314,6 +391,8 @@ int main(int argc, char** argv)
     do_xs_write_dom(xsh, "name", name);
     snprintf(buf, 16, "%d", memory * 1024);
     do_xs_write_dom(xsh, "memory/target", buf);
+    if (maxmem)
+        snprintf(buf, 16, "%d", maxmem * 1024);
     do_xs_write_dom(xsh, "memory/static-max", buf);
     xs_close(xsh);
 
