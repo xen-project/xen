@@ -37,6 +37,9 @@ struct acpi_config {
 
     uint32_t table_flags;
 
+    uint64_t vm_gid[2];
+    unsigned long vm_gid_addr; /* OUT parameter */
+
     /*
      * Address where acpi_info should be placed.
      * This must match the OperationRegion(BIOS, SystemMemory, ....)

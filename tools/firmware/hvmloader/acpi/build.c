@@ -464,32 +464,26 @@ static int construct_secondary_tables(unsigned long *table_ptrs,
  *
  * Return 0 if memory failure, != 0 if success
  */
-static int new_vm_gid(struct acpi_info *acpi_info)
+static int new_vm_gid(struct acpi_config *config,
+                      struct acpi_info *info)
 {
-    uint64_t vm_gid[2], *buf;
-    const char * s;
-    char *end;
+    uint64_t *buf;
 
-    acpi_info->vm_gid_addr = 0;
+    info->vm_gid_addr = 0;
 
-    /* read ID and check for 0 */
-    s = xenstore_read("platform/generation-id", "0:0");
-    vm_gid[0] = strtoll(s, &end, 0);
-    vm_gid[1] = 0;
-    if ( end && end[0] == ':' )
-        vm_gid[1] = strtoll(end+1, NULL, 0);
-    if ( !vm_gid[0] && !vm_gid[1] )
+    /* check for 0 ID*/
+    if ( !config->vm_gid[0] && !config->vm_gid[1] )
         return 1;
 
     /* copy to allocate BIOS memory */
-    buf = (uint64_t *) mem_alloc(sizeof(vm_gid), 8);
+    buf = mem_alloc(sizeof(config->vm_gid), 8);
     if ( !buf )
         return 0;
-    memcpy(buf, vm_gid, sizeof(vm_gid));
+    memcpy(buf, config->vm_gid, sizeof(config->vm_gid));
 
-    /* set into ACPI table and HVM param the address */
-    acpi_info->vm_gid_addr = virt_to_phys(buf);
-    hvm_param_set(HVM_PARAM_VM_GENERATION_ID_ADDR, acpi_info->vm_gid_addr);
+    /* set the address into ACPI table and also pass it back to the caller */
+    info->vm_gid_addr = virt_to_phys(buf);
+    config->vm_gid_addr = info->vm_gid_addr;
 
     return 1;
 }
@@ -625,7 +619,7 @@ void acpi_build_tables(const struct acpi_config *config)
                  offsetof(struct acpi_20_rsdp, extended_checksum),
                  sizeof(struct acpi_20_rsdp));
 
-    if ( !new_vm_gid(acpi_info) )
+    if ( !new_vm_gid(config, acpi_info) )
         goto oom;
 
     return;

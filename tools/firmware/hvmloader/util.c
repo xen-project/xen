@@ -27,6 +27,7 @@
 #include <xen/xen.h>
 #include <xen/memory.h>
 #include <xen/sched.h>
+#include <xen/hvm/params.h>
 
 /*
  * Check whether there exists overlap in the specified memory range.
@@ -861,6 +862,8 @@ int hpet_exists(unsigned long hpet_base)
 void hvmloader_acpi_build_tables(struct acpi_config *config,
                                  unsigned int physical)
 {
+    const char *s;
+
     /* Allocate and initialise the acpi info area. */
     mem_hole_populate_ram(ACPI_INFO_PHYSICAL_ADDRESS >> PAGE_SHIFT, 1);
 
@@ -881,10 +884,23 @@ void hvmloader_acpi_build_tables(struct acpi_config *config,
         config->pci_hi_len = pci_hi_mem_end - pci_hi_mem_start;
     }
 
+    s = xenstore_read("platform/generation-id", "0:0");
+    if ( s )
+    {
+        char *end;
+
+        config->vm_gid[0] = strtoll(s, &end, 0);
+        config->vm_gid[1] = 0;
+        if ( end && end[0] == ':' )
+            config->vm_gid[1] = strtoll(end+1, NULL, 0);
+    }
+
     config->rsdp = physical;
     config->infop = ACPI_INFO_PHYSICAL_ADDRESS;
 
     acpi_build_tables(config);
+
+    hvm_param_set(HVM_PARAM_VM_GENERATION_ID_ADDR, config->vm_gid_addr);
 }
 
 /*
