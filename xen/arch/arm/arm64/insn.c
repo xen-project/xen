@@ -157,6 +157,67 @@ u32 __kprobes aarch64_insn_encode_immediate(enum aarch64_insn_imm_type type,
 	return insn;
 }
 
+static inline long branch_imm_common(unsigned long pc, unsigned long addr,
+				     long range)
+{
+	long offset;
+
+	if ((pc & 0x3) || (addr & 0x3)) {
+		pr_err("%s: A64 instructions must be word aligned\n", __func__);
+		return range;
+	}
+
+	offset = ((long)addr - (long)pc);
+
+	if (offset < -range || offset >= range) {
+		pr_err("%s: offset out of range\n", __func__);
+		return range;
+	}
+
+	return offset;
+}
+
+u32 __kprobes aarch64_insn_gen_branch_imm(unsigned long pc, unsigned long addr,
+					  enum aarch64_insn_branch_type type)
+{
+	u32 insn;
+	long offset;
+
+	/*
+	 * B/BL support [-128M, 128M) offset
+	 * ARM64 virtual address arrangement guarantees all kernel and module
+	 * texts are within +/-128M.
+	 */
+	offset = branch_imm_common(pc, addr, SZ_128M);
+	if (offset >= SZ_128M)
+		return AARCH64_BREAK_FAULT;
+
+	switch (type) {
+	case AARCH64_INSN_BRANCH_LINK:
+		insn = aarch64_insn_get_bl_value();
+		break;
+	case AARCH64_INSN_BRANCH_NOLINK:
+		insn = aarch64_insn_get_b_value();
+		break;
+	default:
+		pr_err("%s: unknown branch encoding %d\n", __func__, type);
+		return AARCH64_BREAK_FAULT;
+	}
+
+	return aarch64_insn_encode_immediate(AARCH64_INSN_IMM_26, insn,
+					     offset >> 2);
+}
+
+u32 __kprobes aarch64_insn_gen_hint(enum aarch64_insn_hint_op op)
+{
+	return aarch64_insn_get_hint_value() | op;
+}
+
+u32 __kprobes aarch64_insn_gen_nop(void)
+{
+	return aarch64_insn_gen_hint(AARCH64_INSN_HINT_NOP);
+}
+
 /*
  * Decode the imm field of a branch, and return the byte offset as a
  * signed value (so it can be used when computing a new branch

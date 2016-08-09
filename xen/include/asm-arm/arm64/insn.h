@@ -23,6 +23,15 @@
 #include <xen/types.h>
 #include <xen/stdbool.h>
 
+enum aarch64_insn_hint_op {
+	AARCH64_INSN_HINT_NOP	= 0x0 << 5,
+	AARCH64_INSN_HINT_YIELD	= 0x1 << 5,
+	AARCH64_INSN_HINT_WFE	= 0x2 << 5,
+	AARCH64_INSN_HINT_WFI	= 0x3 << 5,
+	AARCH64_INSN_HINT_SEV	= 0x4 << 5,
+	AARCH64_INSN_HINT_SEVL	= 0x5 << 5,
+};
+
 enum aarch64_insn_imm_type {
 	AARCH64_INSN_IMM_ADR,
 	AARCH64_INSN_IMM_26,
@@ -38,6 +47,14 @@ enum aarch64_insn_imm_type {
 	AARCH64_INSN_IMM_MAX
 };
 
+enum aarch64_insn_branch_type {
+	AARCH64_INSN_BRANCH_NOLINK,
+	AARCH64_INSN_BRANCH_LINK,
+	AARCH64_INSN_BRANCH_RETURN,
+	AARCH64_INSN_BRANCH_COMP_ZERO,
+	AARCH64_INSN_BRANCH_COMP_NONZERO,
+};
+
 #define	__AARCH64_INSN_FUNCS(abbr, mask, val)	\
 static always_inline bool_t aarch64_insn_is_##abbr(u32 code) \
 { return (code & (mask)) == (val); } \
@@ -51,6 +68,7 @@ __AARCH64_INSN_FUNCS(cbnz,	0x7F000000, 0x35000000)
 __AARCH64_INSN_FUNCS(tbz,	0x7F000000, 0x36000000)
 __AARCH64_INSN_FUNCS(tbnz,	0x7F000000, 0x37000000)
 __AARCH64_INSN_FUNCS(bcond,	0xFF000010, 0x54000000)
+__AARCH64_INSN_FUNCS(hint,	0xFFFFF01F, 0xD503201F)
 
 bool aarch64_insn_is_branch_imm(u32 insn);
 
@@ -60,6 +78,11 @@ u32 aarch64_insn_encode_immediate(enum aarch64_insn_imm_type type,
 
 s32 aarch64_get_branch_offset(u32 insn);
 u32 aarch64_set_branch_offset(u32 insn, s32 offset);
+
+u32 aarch64_insn_gen_branch_imm(unsigned long pc, unsigned long addr,
+				enum aarch64_insn_branch_type type);
+u32 aarch64_insn_gen_hint(enum aarch64_insn_hint_op op);
+u32 aarch64_insn_gen_nop(void);
 
 /* Wrapper for common code */
 static inline bool insn_is_branch_imm(u32 insn)
