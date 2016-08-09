@@ -287,37 +287,27 @@ static struct acpi_20_slit *construct_slit(void)
 }
 
 static int construct_passthrough_tables(unsigned long *table_ptrs,
-                                        int nr_tables)
+                                        int nr_tables,
+                                        struct acpi_config *config)
 {
-    const char *s;
-    uint8_t *acpi_pt_addr;
-    uint32_t acpi_pt_length;
+    unsigned long pt_addr;
     struct acpi_header *header;
     int nr_added;
     int nr_max = (ACPI_MAX_SECONDARY_TABLES - nr_tables - 1);
     uint32_t total = 0;
     uint8_t *buffer;
 
-    s = xenstore_read(HVM_XS_ACPI_PT_ADDRESS, NULL);
-    if ( s == NULL )
-        return 0;    
-
-    acpi_pt_addr = (uint8_t*)(uint32_t)strtoll(s, NULL, 0);
-    if ( acpi_pt_addr == NULL )
+    if ( config->pt.addr == 0 )
         return 0;
 
-    s = xenstore_read(HVM_XS_ACPI_PT_LENGTH, NULL);
-    if ( s == NULL )
-        return 0;
-
-    acpi_pt_length = (uint32_t)strtoll(s, NULL, 0);
+    pt_addr = config->pt.addr;
 
     for ( nr_added = 0; nr_added < nr_max; nr_added++ )
     {        
-        if ( (acpi_pt_length - total) < sizeof(struct acpi_header) )
+        if ( (config->pt.length - total) < sizeof(struct acpi_header) )
             break;
 
-        header = (struct acpi_header*)acpi_pt_addr;
+        header = (struct acpi_header*)pt_addr;
 
         buffer = mem_alloc(header->length, 16);
         if ( buffer == NULL )
@@ -326,7 +316,7 @@ static int construct_passthrough_tables(unsigned long *table_ptrs,
 
         table_ptrs[nr_tables++] = (unsigned long)buffer;
         total += header->length;
-        acpi_pt_addr += header->length;
+        pt_addr += header->length;
     }
 
     return nr_added;
@@ -447,7 +437,7 @@ static int construct_secondary_tables(unsigned long *table_ptrs,
     }
 
     /* Load any additional tables passed through. */
-    nr_tables += construct_passthrough_tables(table_ptrs, nr_tables);
+    nr_tables += construct_passthrough_tables(table_ptrs, nr_tables, config);
 
     table_ptrs[nr_tables] = 0;
     return nr_tables;

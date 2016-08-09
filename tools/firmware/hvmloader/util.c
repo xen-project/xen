@@ -27,6 +27,7 @@
 #include <xen/xen.h>
 #include <xen/memory.h>
 #include <xen/sched.h>
+#include <xen/hvm/hvm_xs_strings.h>
 #include <xen/hvm/params.h>
 
 /*
@@ -898,6 +899,16 @@ void hvmloader_acpi_build_tables(struct acpi_config *config,
         config->vm_gid[1] = 0;
         if ( end && end[0] == ':' )
             config->vm_gid[1] = strtoll(end+1, NULL, 0);
+    }
+
+    s = xenstore_read(HVM_XS_ACPI_PT_ADDRESS, NULL);
+    if ( s )
+    {
+        config->pt.addr = strtoll(s, NULL, 0);
+
+        s = xenstore_read(HVM_XS_ACPI_PT_LENGTH, NULL);
+        if ( s )
+            config->pt.length = strtoll(s, NULL, 0);
     }
 
     if ( battery_port_exists() )
