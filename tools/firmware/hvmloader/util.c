@@ -859,6 +859,11 @@ int hpet_exists(unsigned long hpet_base)
     return ((hpet_id >> 16) == 0x8086);
 }
 
+static uint8_t battery_port_exists(void)
+{
+    return (inb(0x88) == 0x1F);
+}
+
 void hvmloader_acpi_build_tables(struct acpi_config *config,
                                  unsigned int physical)
 {
@@ -894,6 +899,13 @@ void hvmloader_acpi_build_tables(struct acpi_config *config,
         if ( end && end[0] == ':' )
             config->vm_gid[1] = strtoll(end+1, NULL, 0);
     }
+
+    if ( battery_port_exists() )
+        config->table_flags |= ACPI_HAS_SSDT_PM;
+    if ( !strncmp(xenstore_read("platform/acpi_s3", "1"), "1", 1)  )
+        config->table_flags |= ACPI_HAS_SSDT_S3;
+    if ( !strncmp(xenstore_read("platform/acpi_s4", "1"), "1", 1)  )
+        config->table_flags |= ACPI_HAS_SSDT_S4;
 
     config->rsdp = physical;
     config->infop = ACPI_INFO_PHYSICAL_ADDRESS;

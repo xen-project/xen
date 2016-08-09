@@ -24,6 +24,10 @@
 #define ACPI_HAS_COM2        (1<<1)
 #define ACPI_HAS_LPT1        (1<<2)
 #define ACPI_HAS_HPET        (1<<3)
+#define ACPI_HAS_SSDT_PM     (1<<4)
+#define ACPI_HAS_SSDT_S3     (1<<5)
+#define ACPI_HAS_SSDT_S4     (1<<6)
+
 
 struct acpi_config {
     const unsigned char *dsdt_anycpu;
