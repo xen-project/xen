@@ -22,6 +22,7 @@
 #include "hypercall.h"
 #include "ctype.h"
 #include "acpi/acpi2_0.h"
+#include "acpi/libacpi.h"
 #include <stdint.h>
 #include <xen/xen.h>
 #include <xen/memory.h>
@@ -860,7 +861,30 @@ int hpet_exists(unsigned long hpet_base)
 void hvmloader_acpi_build_tables(struct acpi_config *config,
                                  unsigned int physical)
 {
-    acpi_build_tables(config, physical);
+    /* Allocate and initialise the acpi info area. */
+    mem_hole_populate_ram(ACPI_INFO_PHYSICAL_ADDRESS >> PAGE_SHIFT, 1);
+
+    if ( uart_exists(0x3f8)  )
+        config->table_flags |= ACPI_HAS_COM1;
+    if (  uart_exists(0x2f8) )
+        config->table_flags |= ACPI_HAS_COM2;
+    if ( lpt_exists(0x378) )
+        config->table_flags |= ACPI_HAS_LPT1;
+    if (  hpet_exists(ACPI_HPET_ADDRESS) )
+        config->table_flags |= ACPI_HAS_HPET;
+
+    config->pci_start = pci_mem_start;
+    config->pci_len = pci_mem_end - pci_mem_start;
+    if ( pci_hi_mem_end > pci_hi_mem_start )
+    {
+        config->pci_hi_start = pci_hi_mem_start;
+        config->pci_hi_len = pci_hi_mem_end - pci_hi_mem_start;
+    }
+
+    config->rsdp = physical;
+    config->infop = ACPI_INFO_PHYSICAL_ADDRESS;
+
+    acpi_build_tables(config);
 }
 
 /*

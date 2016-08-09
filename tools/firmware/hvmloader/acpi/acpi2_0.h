@@ -451,15 +451,6 @@ struct acpi_20_slit {
 
 #pragma pack ()
 
-struct acpi_config {
-    unsigned char *dsdt_anycpu;
-    int dsdt_anycpu_len;
-    unsigned char *dsdt_15cpu;
-    int dsdt_15cpu_len;
-};
-
-void acpi_build_tables(struct acpi_config *config, unsigned int physical);
-
 #endif /* _ACPI_2_0_H_ */
 
 /*

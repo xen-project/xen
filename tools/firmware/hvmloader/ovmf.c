@@ -23,7 +23,7 @@
 
 #include "config.h"
 #include "smbios_types.h"
-#include "acpi/acpi2_0.h"
+#include "acpi/libacpi.h"
 #include "apic_regs.h"
 #include "../rombios/config.h"
 #include "util.h"

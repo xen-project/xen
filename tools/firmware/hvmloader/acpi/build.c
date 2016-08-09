@@ -16,6 +16,7 @@
  */
 
 #include "acpi2_0.h"
+#include "libacpi.h"
 #include "ssdt_s3.h"
 #include "ssdt_s4.h"
 #include "ssdt_tpm.h"
@@ -358,7 +359,7 @@ static int construct_secondary_tables(unsigned long *table_ptrs,
     }
 
     /* HPET. */
-    if ( hpet_exists(ACPI_HPET_ADDRESS) )
+    if ( info->hpet_present )
     {
         hpet = construct_hpet();
         if (!hpet) return -1;
@@ -493,7 +494,7 @@ static int new_vm_gid(struct acpi_info *acpi_info)
     return 1;
 }
 
-void acpi_build_tables(struct acpi_config *config, unsigned int physical)
+void acpi_build_tables(const struct acpi_config *config)
 {
     struct acpi_info *acpi_info;
     struct acpi_20_rsdp *rsdp;
@@ -506,10 +507,19 @@ void acpi_build_tables(struct acpi_config *config, unsigned int physical)
     unsigned long        secondary_tables[ACPI_MAX_SECONDARY_TABLES];
     int                  nr_secondaries, i;
 
-    /* Allocate and initialise the acpi info area. */
-    mem_hole_populate_ram(ACPI_INFO_PHYSICAL_ADDRESS >> PAGE_SHIFT, 1);
-    acpi_info = (struct acpi_info *)ACPI_INFO_PHYSICAL_ADDRESS;
+    acpi_info = (struct acpi_info *)config->infop;
     memset(acpi_info, 0, sizeof(*acpi_info));
+    acpi_info->com1_present = !!(config->table_flags & ACPI_HAS_COM1);
+    acpi_info->com2_present = !!(config->table_flags & ACPI_HAS_COM2);
+    acpi_info->lpt1_present = !!(config->table_flags & ACPI_HAS_LPT1);
+    acpi_info->hpet_present = !!(config->table_flags & ACPI_HAS_HPET);
+    acpi_info->pci_min = config->pci_start;
+    acpi_info->pci_len = config->pci_len;
+    if ( config->pci_hi_len )
+    {
+        acpi_info->pci_hi_min = config->pci_hi_start;
+        acpi_info->pci_hi_len = config->pci_hi_len;
+    }
 
     /*
      * Fill in high-memory data structures, starting at @buf.
@@ -603,7 +613,7 @@ void acpi_build_tables(struct acpi_config *config, unsigned int physical)
     /*
      * Fill in low-memory data structures: acpi_info and RSDP.
      */
-    rsdp = (struct acpi_20_rsdp *)physical;
+    rsdp = (struct acpi_20_rsdp *)config->rsdp;
 
     memcpy(rsdp, &Rsdp, sizeof(struct acpi_20_rsdp));
     rsdp->rsdt_address = (unsigned long)rsdt;
@@ -617,18 +627,6 @@ void acpi_build_tables(struct acpi_config *config, unsigned int physical)
 
     if ( !new_vm_gid(acpi_info) )
         goto oom;
-
-    acpi_info->com1_present = uart_exists(0x3f8);
-    acpi_info->com2_present = uart_exists(0x2f8);
-    acpi_info->lpt1_present = lpt_exists(0x378);
-    acpi_info->hpet_present = hpet_exists(ACPI_HPET_ADDRESS);
-    acpi_info->pci_min = pci_mem_start;
-    acpi_info->pci_len = pci_mem_end - pci_mem_start;
-    if ( pci_hi_mem_end > pci_hi_mem_start )
-    {
-        acpi_info->pci_hi_min = pci_hi_mem_start;
-        acpi_info->pci_hi_len = pci_hi_mem_end - pci_hi_mem_start;
-    }
 
     return;
 
