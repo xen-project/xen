@@ -1,6 +1,9 @@
 #ifndef __XEN_VERSION_H__
 #define __XEN_VERSION_H__
 
+#include <xen/types.h>
+#include <xen/elfstructs.h>
+
 const char *xen_compile_date(void);
 const char *xen_compile_time(void);
 const char *xen_compile_by(void);
@@ -14,5 +17,10 @@ const char *xen_changeset(void);
 const char *xen_banner(void);
 const char *xen_deny(void);
 int xen_build_id(const void **p, unsigned int *len);
+
+#ifdef BUILD_ID
+int xen_build_id_check(const Elf_Note *n, unsigned int n_sz,
+                       const void **p, unsigned int *len);
+#endif
 
 #endif /* __XEN_VERSION_H__ */
