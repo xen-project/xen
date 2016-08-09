@@ -273,6 +273,10 @@ extern struct e820map memory_map;
 bool check_overlap(uint64_t start, uint64_t size,
                    uint64_t reserved_start, uint64_t reserved_size);
 
+struct acpi_config;
+void hvmloader_acpi_build_tables(struct acpi_config *config,
+                                 unsigned int physical);
+
 #endif /* __HVMLOADER_UTIL_H__ */
 
 /*

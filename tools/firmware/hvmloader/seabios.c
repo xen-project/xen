@@ -100,7 +100,7 @@ static void seabios_acpi_build_tables(void)
         .dsdt_15cpu_len = 0,
     };
 
-    acpi_build_tables(&config, rsdp);
+    hvmloader_acpi_build_tables(&config, rsdp);
     add_table(rsdp);
 }
 

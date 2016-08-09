@@ -21,6 +21,7 @@
 #include "config.h"
 #include "hypercall.h"
 #include "ctype.h"
+#include "acpi/acpi2_0.h"
 #include <stdint.h>
 #include <xen/xen.h>
 #include <xen/memory.h>
@@ -854,6 +855,12 @@ int hpet_exists(unsigned long hpet_base)
 {
     uint32_t hpet_id = *(uint32_t *)hpet_base;
     return ((hpet_id >> 16) == 0x8086);
+}
+
+void hvmloader_acpi_build_tables(struct acpi_config *config,
+                                 unsigned int physical)
+{
+    acpi_build_tables(config, physical);
 }
 
 /*

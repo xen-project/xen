@@ -125,7 +125,7 @@ static void ovmf_acpi_build_tables(void)
         .dsdt_15cpu_len = 0
     };
 
-    acpi_build_tables(&config, ACPI_PHYSICAL_ADDRESS);
+    hvmloader_acpi_build_tables(&config, ACPI_PHYSICAL_ADDRESS);
 }
 
 static void ovmf_create_smbios_tables(void)

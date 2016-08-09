@@ -180,7 +180,7 @@ static void rombios_acpi_build_tables(void)
         .dsdt_15cpu_len = dsdt_15cpu_len,
     };
 
-    acpi_build_tables(&config, ACPI_PHYSICAL_ADDRESS);
+    hvmloader_acpi_build_tables(&config, ACPI_PHYSICAL_ADDRESS);
 }
 
 static void rombios_create_mp_tables(void)
