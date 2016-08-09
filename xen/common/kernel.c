@@ -22,8 +22,6 @@
 
 enum system_state system_state = SYS_STATE_early_boot;
 
-int tainted;
-
 xen_commandline_t saved_cmdline;
 
 static void __init assign_integer_param(
@@ -168,14 +166,15 @@ int __init parse_bool(const char *s)
     return -1;
 }
 
+unsigned int tainted;
+
 /**
  *      print_tainted - return a string to represent the kernel taint state.
  *
- *  'S' - SMP with CPUs not designed for SMP.
- *  'M' - Machine had a machine check experience.
- *  'B' - System has hit bad_page.
  *  'C' - Console output is synchronous.
+ *  'E' - An error (e.g. a machine check exceptions) has been injected.
  *  'H' - HVM forced emulation prefix is permitted.
+ *  'M' - Machine had a machine check experience.
  *
  *      The string is overwritten by the next call to print_taint().
  */
@@ -183,11 +182,10 @@ char *print_tainted(char *str)
 {
     if ( tainted )
     {
-        snprintf(str, TAINT_STRING_MAX_LEN, "Tainted: %c%c%c%c%c",
-                 tainted & TAINT_UNSAFE_SMP ? 'S' : ' ',
+        snprintf(str, TAINT_STRING_MAX_LEN, "Tainted: %c%c%c%c",
                  tainted & TAINT_MACHINE_CHECK ? 'M' : ' ',
-                 tainted & TAINT_BAD_PAGE ? 'B' : ' ',
                  tainted & TAINT_SYNC_CONSOLE ? 'C' : ' ',
+                 tainted & TAINT_ERROR_INJECT ? 'E' : ' ',
                  tainted & TAINT_HVM_FEP ? 'H' : ' ');
     }
     else
@@ -198,7 +196,7 @@ char *print_tainted(char *str)
     return str;
 }
 
-void add_taint(unsigned flag)
+void add_taint(unsigned int flag)
 {
     tainted |= flag;
 }

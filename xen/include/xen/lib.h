@@ -137,16 +137,14 @@ unsigned long long parse_size_and_unit(const char *s, const char **ps);
 
 uint64_t muldiv64(uint64_t a, uint32_t b, uint32_t c);
 
-#define TAINT_UNSAFE_SMP                (1<<0)
-#define TAINT_MACHINE_CHECK             (1<<1)
-#define TAINT_BAD_PAGE                  (1<<2)
-#define TAINT_SYNC_CONSOLE              (1<<3)
-#define TAINT_ERROR_INJECT              (1<<4)
-#define TAINT_HVM_FEP                   (1<<5)
-extern int tainted;
+#define TAINT_SYNC_CONSOLE              (1u << 0)
+#define TAINT_MACHINE_CHECK             (1u << 1)
+#define TAINT_ERROR_INJECT              (1u << 2)
+#define TAINT_HVM_FEP                   (1u << 3)
+extern unsigned int tainted;
 #define TAINT_STRING_MAX_LEN            20
 extern char *print_tainted(char *str);
-extern void add_taint(unsigned);
+extern void add_taint(unsigned int taint);
 
 struct cpu_user_regs;
 void dump_execstate(struct cpu_user_regs *);
