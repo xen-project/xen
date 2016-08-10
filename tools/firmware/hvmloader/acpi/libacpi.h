@@ -60,7 +60,7 @@ struct acpi_config {
     unsigned int rsdp;
 };
 
-void acpi_build_tables(const struct acpi_config *config);
+void acpi_build_tables(struct acpi_config *config);
 
 #endif /* __LIBACPI_H__ */
 

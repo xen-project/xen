@@ -474,7 +474,7 @@ static int new_vm_gid(struct acpi_config *config,
     return 1;
 }
 
-void acpi_build_tables(const struct acpi_config *config)
+void acpi_build_tables(struct acpi_config *config)
 {
     struct acpi_info *acpi_info;
     struct acpi_20_rsdp *rsdp;
