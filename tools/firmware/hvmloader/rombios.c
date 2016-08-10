@@ -24,7 +24,7 @@
 #include "../rombios/config.h"
 
 #include "smbios_types.h"
-#include "acpi/acpi2_0.h"
+#include "acpi/libacpi.h"
 #include "pci_regs.h"
 #include "util.h"
 #include "hypercall.h"
