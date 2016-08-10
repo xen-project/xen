@@ -230,6 +230,30 @@ static const char *livepatch_symbols_lookup(unsigned long addr,
     return n;
 }
 
+/* Lookup function's old address if not already resolved. */
+static int resolve_old_address(struct livepatch_func *f,
+                               const struct livepatch_elf *elf)
+{
+    if ( f->old_addr )
+        return 0;
+
+    f->old_addr = (void *)symbols_lookup_by_name(f->name);
+    if ( !f->old_addr )
+    {
+        f->old_addr = (void *)livepatch_symbols_lookup_by_name(f->name);
+        if ( !f->old_addr )
+        {
+            dprintk(XENLOG_ERR, LIVEPATCH "%s: Could not resolve old address of %s\n",
+                    elf->name, f->name);
+            return -ENOENT;
+        }
+    }
+    dprintk(XENLOG_DEBUG, LIVEPATCH "%s: Resolved old address %s => %p\n",
+            elf->name, f->name, f->old_addr);
+
+    return 0;
+}
+
 static struct payload *find_payload(const char *name)
 {
     struct payload *data, *found = NULL;
@@ -497,23 +521,9 @@ static int prepare_payload(struct payload *payload,
         if ( rc )
             return rc;
 
-        /* Lookup function's old address if not already resolved. */
-        if ( !f->old_addr )
-        {
-            f->old_addr = (void *)symbols_lookup_by_name(f->name);
-            if ( !f->old_addr )
-            {
-                f->old_addr = (void *)livepatch_symbols_lookup_by_name(f->name);
-                if ( !f->old_addr )
-                {
-                    dprintk(XENLOG_ERR, LIVEPATCH "%s: Could not resolve old address of %s\n",
-                            elf->name, f->name);
-                    return -ENOENT;
-                }
-            }
-            dprintk(XENLOG_DEBUG, LIVEPATCH "%s: Resolved old address %s => %p\n",
-                    elf->name, f->name, f->old_addr);
-        }
+        rc = resolve_old_address(f, elf);
+        if ( rc )
+            return rc;
     }
 
     sec = livepatch_elf_sec_by_name(elf, ELF_BUILD_ID_NOTE);
