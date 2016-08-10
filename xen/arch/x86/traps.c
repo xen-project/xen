@@ -631,11 +631,8 @@ static void do_guest_trap(unsigned int trapnr,
     struct vcpu *v = current;
     struct trap_bounce *tb;
     const struct trap_info *ti;
-    bool_t use_error_code;
-
-    ASSERT(trapnr < 32);
-
-    use_error_code = (TRAP_HAVE_EC & (1u << trapnr));
+    const bool use_error_code =
+        ((trapnr < 32) && (TRAP_HAVE_EC & (1u << trapnr)));
 
     trace_pv_trap(trapnr, regs->eip, use_error_code, regs->error_code);
 
