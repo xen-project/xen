@@ -1386,21 +1386,21 @@ int memory_add(unsigned long spfn, unsigned long epfn, unsigned int pxm)
             goto destroy_directmap;
     }
 
-    old_node_start = NODE_DATA(node)->node_start_pfn;
-    old_node_span = NODE_DATA(node)->node_spanned_pages;
+    old_node_start = node_start_pfn(node);
+    old_node_span = node_spanned_pages(node);
     orig_online = node_online(node);
 
     if ( !orig_online )
     {
         dprintk(XENLOG_WARNING, "node %x pxm %x is not online\n",node, pxm);
-        NODE_DATA(node)->node_id = node;
         NODE_DATA(node)->node_start_pfn = spfn;
         NODE_DATA(node)->node_spanned_pages =
                 epfn - node_start_pfn(node);
         node_set_online(node);
-    }else
+    }
+    else
     {
-        if (NODE_DATA(node)->node_start_pfn > spfn)
+        if (node_start_pfn(node) > spfn)
             NODE_DATA(node)->node_start_pfn = spfn;
         if (node_end_pfn(node) < epfn)
             NODE_DATA(node)->node_spanned_pages = epfn - node_start_pfn(node);

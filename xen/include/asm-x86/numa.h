@@ -40,7 +40,6 @@ extern void srat_detect_node(int cpu);
 
 extern void setup_node_bootmem(nodeid_t nodeid, u64 start, u64 end);
 extern nodeid_t apicid_to_node[];
-#ifdef CONFIG_NUMA
 extern void init_cpu_to_node(void);
 
 static inline void clear_node_cpumask(int cpu)
@@ -56,7 +55,6 @@ extern u8 *memnodemap;
 struct node_data {
     unsigned long node_start_pfn;
     unsigned long node_spanned_pages;
-    nodeid_t      node_id;
 };
 
 extern struct node_data node_data[];
@@ -78,11 +76,6 @@ static inline __attribute__((pure)) nodeid_t phys_to_nid(paddr_t addr)
 				 NODE_DATA(nid)->node_spanned_pages)
 
 extern int valid_numa_range(u64 start, u64 end, nodeid_t node);
-#else
-#define init_cpu_to_node() do {} while (0)
-#define clear_node_cpumask(cpu) do {} while (0)
-#define valid_numa_range(start, end, node) 1
-#endif
 
 void srat_parse_regions(u64 addr);
 extern u8 __node_distance(nodeid_t a, nodeid_t b);

@@ -179,7 +179,6 @@ void __init setup_node_bootmem(nodeid_t nodeid, u64 start, u64 end)
     start_pfn = start >> PAGE_SHIFT;
     end_pfn = end >> PAGE_SHIFT;
 
-    NODE_DATA(nodeid)->node_id = nodeid;
     NODE_DATA(nodeid)->node_start_pfn = start_pfn;
     NODE_DATA(nodeid)->node_spanned_pages = end_pfn - start_pfn;
 
@@ -390,16 +389,15 @@ static void dump_numa(unsigned char key)
 
     for_each_online_node ( i )
     {
-        paddr_t pa = (paddr_t)(NODE_DATA(i)->node_start_pfn + 1)<< PAGE_SHIFT;
-        printk("idx%d -> NODE%d start->%lu size->%lu free->%lu\n",
-               i, NODE_DATA(i)->node_id,
-               NODE_DATA(i)->node_start_pfn,
-               NODE_DATA(i)->node_spanned_pages,
+        paddr_t pa = pfn_to_paddr(node_start_pfn(i) + 1);
+
+        printk("NODE%u start->%lu size->%lu free->%lu\n",
+               i, node_start_pfn(i), node_spanned_pages(i),
                avail_node_heap_pages(i));
         /* sanity check phys_to_nid() */
-        printk("phys_to_nid(%"PRIpaddr") -> %d should be %d\n", pa,
-               phys_to_nid(pa),
-               NODE_DATA(i)->node_id);
+        if ( phys_to_nid(pa) != i )
+            printk("phys_to_nid(%"PRIpaddr") -> %d should be %u\n",
+                   pa, phys_to_nid(pa), i);
     }
 
     j = cpumask_first(&cpu_online_map);
