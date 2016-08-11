@@ -1114,7 +1114,14 @@ static int __vlapic_accept_pic_intr(struct vcpu *v)
     struct domain *d = v->domain;
     struct vlapic *vlapic = vcpu_vlapic(v);
     uint32_t lvt0 = vlapic_get_reg(vlapic, APIC_LVT0);
-    union vioapic_redir_entry redir0 = domain_vioapic(d)->redirtbl[0];
+    union vioapic_redir_entry redir0;
+
+    ASSERT(has_vpic(d));
+
+    if ( !has_vioapic(d) )
+        return 0;
+
+    redir0 = domain_vioapic(d)->redirtbl[0];
 
     /* We deliver 8259 interrupts to the appropriate CPU as follows. */
     return ((/* IOAPIC pin0 is unmasked and routing to this LAPIC? */
@@ -1130,7 +1137,7 @@ static int __vlapic_accept_pic_intr(struct vcpu *v)
 
 int vlapic_accept_pic_intr(struct vcpu *v)
 {
-    if ( vlapic_hw_disabled(vcpu_vlapic(v)) )
+    if ( vlapic_hw_disabled(vcpu_vlapic(v)) || !has_vpic(v->domain) )
         return 0;
 
     TRACE_2D(TRC_HVM_EMUL_LAPIC_PIC_INTR,
@@ -1144,6 +1151,9 @@ int vlapic_accept_pic_intr(struct vcpu *v)
 void vlapic_adjust_i8259_target(struct domain *d)
 {
     struct vcpu *v;
+
+    if ( !has_vpic(d) )
+        return;
 
     for_each_vcpu ( d, v )
         if ( __vlapic_accept_pic_intr(v) )

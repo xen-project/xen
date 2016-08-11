@@ -496,7 +496,7 @@ void pt_adjust_global_vcpu_target(struct vcpu *v)
     struct pl_time *pl_time;
     int i;
 
-    if ( v == NULL )
+    if ( !v || !has_vpit(v->domain) )
         return;
 
     vpit = &v->domain->arch.vpit;
