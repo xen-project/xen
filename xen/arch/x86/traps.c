@@ -2900,6 +2900,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             {
                 vpmu_msr = 1;
         case MSR_AMD_FAM15H_EVNTSEL0...MSR_AMD_FAM15H_PERFCTR5:
+        case MSR_K7_EVNTSEL0...MSR_K7_PERFCTR3:
                 if ( vpmu_msr || (boot_cpu_data.x86_vendor == X86_VENDOR_AMD) )
                 {
                     if ( (vpmu_mode & XENPMU_MODE_ALL) &&
@@ -3027,6 +3028,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             {
                 vpmu_msr = 1;
         case MSR_AMD_FAM15H_EVNTSEL0...MSR_AMD_FAM15H_PERFCTR5:
+        case MSR_K7_EVNTSEL0...MSR_K7_PERFCTR3:
                 if ( vpmu_msr || (boot_cpu_data.x86_vendor == X86_VENDOR_AMD) )
                 {
 
