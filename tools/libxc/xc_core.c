@@ -859,7 +859,7 @@ copy_done:
         /* When live dump-mode (-L option) is specified,
          * guest domain may reduce memory. pad with zero pages.
          */
-        IPRINTF("j (%ld) != nr_pages (%ld)", j, nr_pages);
+        DPRINTF("j (%ld) != nr_pages (%ld)", j, nr_pages);
         memset(dump_mem_start, 0, PAGE_SIZE);
         for (; j < nr_pages; j++) {
             sts = dump_rtn(xch, args, dump_mem_start, PAGE_SIZE);
