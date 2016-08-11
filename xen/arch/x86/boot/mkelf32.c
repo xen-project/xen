@@ -260,7 +260,7 @@ int main(int argc, char **argv)
     u32        loadbase, dat_siz, mem_siz, note_base, note_sz, offset;
     char      *inimage, *outimage;
     int        infd, outfd;
-    char       buffer[1024];
+    char       buffer[1024] = {};
     int        bytes, todo, i = 1;
     int        num_phdrs = 1;
 

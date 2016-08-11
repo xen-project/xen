@@ -121,7 +121,7 @@ _distclean: clean
 	rm -f tags TAGS cscope.files cscope.in.out cscope.out cscope.po.out GTAGS GPATH GRTAGS GSYMS .config
 
 $(TARGET).gz: $(TARGET)
-	gzip -f -9 < $< > $@.new
+	gzip -n -f -9 < $< > $@.new
 	mv $@.new $@
 
 $(TARGET): delete-unfresh-files
