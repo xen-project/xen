@@ -386,16 +386,17 @@ static int move_payload(struct payload *payload, struct livepatch_elf *elf)
 
 static int secure_payload(struct payload *payload, struct livepatch_elf *elf)
 {
-    int rc;
+    int rc = 0;
     unsigned int text_pages, rw_pages, ro_pages;
 
     text_pages = PFN_UP(payload->text_size);
-    ASSERT(text_pages);
 
-    rc = arch_livepatch_secure(payload->text_addr, text_pages, LIVEPATCH_VA_RX);
-    if ( rc )
-        return rc;
-
+    if ( text_pages )
+    {
+        rc = arch_livepatch_secure(payload->text_addr, text_pages, LIVEPATCH_VA_RX);
+        if ( rc )
+            return rc;
+    }
     rw_pages = PFN_UP(payload->rw_size);
     if ( rw_pages )
     {
