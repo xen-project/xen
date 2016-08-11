@@ -355,11 +355,25 @@ void __init init_cpu_to_node(void)
     }
 }
 
-EXPORT_SYMBOL(cpu_to_node);
-EXPORT_SYMBOL(node_to_cpumask);
-EXPORT_SYMBOL(memnode_shift);
-EXPORT_SYMBOL(memnodemap);
-EXPORT_SYMBOL(node_data);
+unsigned int __init arch_get_dma_bitsize(void)
+{
+    unsigned int node;
+
+    for_each_online_node(node)
+        if ( node_spanned_pages(node) &&
+             !(node_start_pfn(node) >> (32 - PAGE_SHIFT)) )
+            break;
+    if ( node >= MAX_NUMNODES )
+        panic("No node with memory below 4Gb");
+
+    /*
+     * Try to not reserve the whole node's memory for DMA, but dividing
+     * its spanned pages by (arbitrarily chosen) 4.
+     */
+    return min_t(unsigned int,
+                 flsl(node_start_pfn(node) + node_spanned_pages(node) / 4 - 1)
+                 + PAGE_SHIFT, 32);
+}
 
 static void dump_numa(unsigned char key)
 {
