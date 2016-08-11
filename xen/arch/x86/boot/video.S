@@ -994,6 +994,7 @@ force_size:     .word   0       # Use this size instead of the one in BIOS vars
 vesa_size:      .word   0,0,0   # width x depth x height
 
 /* If we don't run at all, assume basic video mode 3 at 80x25. */
+        .align  2
 GLOBAL(boot_vid_mode)
         .word   VIDEO_80x25
 GLOBAL(boot_vid_info)
