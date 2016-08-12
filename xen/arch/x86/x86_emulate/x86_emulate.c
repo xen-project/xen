@@ -94,8 +94,8 @@ static uint8_t opcode_table[256] = {
     ImplicitOps, ImplicitOps, DstReg|SrcMem|ModRM, DstReg|SrcNone|ModRM|Mov,
     0, 0, 0, 0,
     /* 0x68 - 0x6F */
-    ImplicitOps|Mov, DstReg|SrcImm|ModRM|Mov,
-    ImplicitOps|Mov, DstReg|SrcImmByte|ModRM|Mov,
+    DstImplicit|SrcImm|Mov, DstReg|SrcImm|ModRM|Mov,
+    DstImplicit|SrcImmByte|Mov, DstReg|SrcImmByte|ModRM|Mov,
     ImplicitOps|Mov, ImplicitOps|Mov, ImplicitOps|Mov, ImplicitOps|Mov,
     /* 0x70 - 0x77 */
     ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
@@ -2334,10 +2334,15 @@ x86_emulate(
         break;
 
     case 0x68: /* push imm{16,32,64} */
-        src.val = ((op_bytes == 2)
-                   ? (int32_t)insn_fetch_type(int16_t)
-                   : insn_fetch_type(int32_t));
-        goto push;
+    case 0x6a: /* push imm8 */
+    push:
+        d |= Mov; /* force writeback */
+        dst.type  = OP_MEM;
+        dst.bytes = mode_64bit() && (op_bytes == 4) ? 8 : op_bytes;
+        dst.val = src.val;
+        dst.mem.seg = x86_seg_ss;
+        dst.mem.off = sp_pre_dec(dst.bytes);
+        break;
 
     case 0x69: /* imul imm16/32 */
     case 0x6b: /* imul imm8 */
@@ -2347,19 +2352,6 @@ x86_emulate(
                                    &dst.val, op_bytes, ctxt, ops)) )
             goto done;
         goto imul;
-
-    case 0x6a: /* push imm8 */
-        src.val = insn_fetch_type(int8_t);
-    push:
-        d |= Mov; /* force writeback */
-        dst.type  = OP_MEM;
-        dst.bytes = op_bytes;
-        if ( mode_64bit() && (dst.bytes == 4) )
-            dst.bytes = 8;
-        dst.val = src.val;
-        dst.mem.seg = x86_seg_ss;
-        dst.mem.off = sp_pre_dec(dst.bytes);
-        break;
 
     case 0x6c ... 0x6d: /* ins %dx,%es:%edi */ {
         unsigned long nr_reps = get_rep_prefix();

@@ -11,21 +11,21 @@ all: $(TARGET)
 run: $(TARGET)
 	./$(TARGET)
 
-.PHONY: blowfish.h
-blowfish.h:
-	rm -f blowfish.bin
-	XEN_TARGET_ARCH=x86_32 make -f blowfish.mk all
-	(echo "static unsigned int blowfish32_code[] = {"; \
-	od -v -t x blowfish.bin | sed 's/^[0-9]* /0x/' | sed 's/ /, 0x/g' | sed 's/$$/,/';\
-	echo "};") >$@
-	rm -f blowfish.bin
-ifeq ($(XEN_COMPILE_ARCH),x86_64)
-	XEN_TARGET_ARCH=x86_64 make -f blowfish.mk all
-	(echo "static unsigned int blowfish64_code[] = {"; \
-	od -v -t x blowfish.bin | sed 's/^[0-9]* /0x/' | sed 's/ /, 0x/g' | sed 's/$$/,/';\
-	echo "};") >>$@
-	rm -f blowfish.bin
-endif
+cflags-x86_32 := "-mno-accumulate-outgoing-args -Dstatic="
+
+blowfish.h: blowfish.c blowfish.mk Makefile
+	rm -f $@.new blowfish.bin
+	$(foreach arch,$(filter-out $(XEN_COMPILE_ARCH),x86_32) $(XEN_COMPILE_ARCH), \
+	    for cflags in "" $(cflags-$(arch)); do \
+		$(MAKE) -f blowfish.mk XEN_TARGET_ARCH=$(arch) BLOWFISH_CFLAGS="$$cflags" all; \
+		flavor=$$(echo $${cflags} | sed -e 's, .*,,' -e 'y,-=,__,') ; \
+		(echo "static unsigned int blowfish_$(arch)$${flavor}[] = {"; \
+		 od -v -t x blowfish.bin | sed -e 's/^[0-9]* /0x/' -e 's/ /, 0x/g' -e 's/$$/,/'; \
+		 echo "};") >>$@.new; \
+		rm -f blowfish.bin; \
+	    done; \
+	)
+	mv $@.new $@
 
 $(TARGET): x86_emulate.o test_x86_emulator.o
 	$(HOSTCC) -o $@ $^

@@ -1,4 +1,5 @@
 #include <errno.h>
+#include <limits.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -11,6 +12,21 @@
 
 #include "x86_emulate/x86_emulate.h"
 #include "blowfish.h"
+
+static const struct {
+    const void *code;
+    size_t size;
+    unsigned int bitness;
+    const char*name;
+} blobs[] = {
+    { blowfish_x86_32, sizeof(blowfish_x86_32), 32, "blowfish" },
+    { blowfish_x86_32_mno_accumulate_outgoing_args,
+      sizeof(blowfish_x86_32_mno_accumulate_outgoing_args),
+      32, "blowfish (push)" },
+#ifdef __x86_64__
+    { blowfish_x86_64, sizeof(blowfish_x86_64), 64, "blowfish" },
+#endif
+};
 
 #define MMAP_SZ 16384
 
@@ -943,25 +959,19 @@ int main(int argc, char **argv)
     else
         printf("skipped\n");
 
-    for ( j = 1; j <= 2; j++ )
+    for ( j = 0; j < sizeof(blobs) / sizeof(*blobs); j++ )
     {
-#if defined(__i386__)
-        if ( j == 2 ) break;
-        memcpy(res, blowfish32_code, sizeof(blowfish32_code));
-#else
-        ctxt.addr_size = 16 << j;
-        ctxt.sp_size   = 16 << j;
-        memcpy(res, (j == 1) ? blowfish32_code : blowfish64_code,
-               (j == 1) ? sizeof(blowfish32_code) : sizeof(blowfish64_code));
-#endif
-        printf("Testing blowfish %u-bit code sequence", j*32);
+        memcpy(res, blobs[j].code, blobs[j].size);
+        ctxt.addr_size = ctxt.sp_size = blobs[j].bitness;
+
+        printf("Testing %s %u-bit code sequence",
+               blobs[j].name, ctxt.addr_size);
         regs.eax = 2;
         regs.edx = 1;
         regs.eip = (unsigned long)res;
         regs.esp = (unsigned long)res + MMAP_SZ - 4;
-        if ( j == 2 )
+        if ( ctxt.addr_size == 64 )
         {
-            ctxt.addr_size = ctxt.sp_size = 64;
             *(uint32_t *)(unsigned long)regs.esp = 0;
             regs.esp -= 4;
         }
@@ -983,20 +993,27 @@ int main(int argc, char **argv)
              (regs.eax != 2) || (regs.edx != 1) )
             goto fail;
         printf("okay\n");
-    }
 
-    printf("%-40s", "Testing blowfish native execution...");    
-    asm volatile (
+        if ( ctxt.addr_size != sizeof(void *) * CHAR_BIT )
+            continue;
+
+        i = printf("Testing %s native execution...", blobs[j].name);
+        asm volatile (
 #if defined(__i386__)
-        "movl $0x100000,%%ecx; call *%%ecx"
+            "movl $0x100000,%%ecx; call *%%ecx"
 #else
-        "movl $0x100000,%%ecx; call *%%rcx"
+            "movl $0x100000,%%ecx; call *%%rcx"
 #endif
-        : "=a" (regs.eax), "=d" (regs.edx)
-        : "0" (2), "1" (1) : "ecx" );
-    if ( (regs.eax != 2) || (regs.edx != 1) )
-        goto fail;
-    printf("okay\n");
+            : "=a" (regs.eax), "=d" (regs.edx)
+            : "0" (2), "1" (1) : "ecx"
+#ifdef __x86_64__
+              , "rsi", "rdi", "r8", "r9", "r10", "r11"
+#endif
+        );
+        if ( (regs.eax != 2) || (regs.edx != 1) )
+            goto fail;
+        printf("%*sokay\n", i < 40 ? 40 - i : 0, "");
+    }
 
     return 0;
 

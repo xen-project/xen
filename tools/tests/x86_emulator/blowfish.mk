@@ -5,7 +5,7 @@ include $(XEN_ROOT)/tools/Rules.mk
 
 $(call cc-options-add,CFLAGS,CC,$(EMBEDDED_EXTRA_CFLAGS))
 
-CFLAGS += -fno-builtin -msoft-float
+CFLAGS += -fno-builtin -msoft-float $(BLOWFISH_CFLAGS)
 
 .PHONY: all
 all: blowfish.bin
