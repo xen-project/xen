@@ -3,6 +3,13 @@ About
 This documents the upstream sources for the different slew of different
 m4 sources we have picked up or developed.
 
+ax_compare_version.m4
+=====================
+This file was fetched from
+http://git.savannah.gnu.org/gitweb/?p=autoconf-archive.git;a=blob_plain;f=m4/ax_compare_version.m4
+
+Also see http://www.gnu.org/software/autoconf-archive/ax_compare_version.html
+
 pkg.m4
 ======
 The pkg-config m4 macro library comes from the upstream pkg-config
@@ -13,7 +20,7 @@ on how to use this read the pkg-config(1) man page.
 Do not modify this file yourself, if you want to evolve it send
 patches upstream and then synch back here.
 
-Tree: git://anongit.freedesktop.org/pkg-config
+[0]: git://anongit.freedesktop.org/pkg-config
 
 The last synch was from commit:
 
