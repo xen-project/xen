@@ -272,6 +272,7 @@ F:  xen/arch/*/livepatch*
 F:  xen/common/livepatch*
 F:  xen/include/asm-*/livepatch.h
 F:  xen/include/xen/livepatch*
+F:  xen/test/livepatch/*
 
 MACHINE CHECK (MCA) & RAS
 M:	Christoph Egger <chegger@amazon.de>

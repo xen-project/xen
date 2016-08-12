@@ -80,7 +80,7 @@ _install: $(TARGET)$(CONFIG_XEN_INSTALL_SUFFIX)
 
 .PHONY: _tests
 _tests:
-	$(MAKE) -f $(BASEDIR)/Rules.mk -C arch/$(TARGET_ARCH) tests
+	$(MAKE) -f $(BASEDIR)/Rules.mk -C test tests
 
 .PHONY: _uninstall
 _uninstall: D=$(DESTDIR)
@@ -114,6 +114,7 @@ _clean: delete-unfresh-files
 	$(MAKE) -f $(BASEDIR)/Rules.mk -C xsm clean
 	$(MAKE) -f $(BASEDIR)/Rules.mk -C crypto clean
 	$(MAKE) -f $(BASEDIR)/Rules.mk -C arch/$(TARGET_ARCH) clean
+	$(MAKE) -f $(BASEDIR)/Rules.mk -C test clean
 	$(MAKE) -f $(BASEDIR)/tools/kconfig/Makefile.kconfig ARCH=$(ARCH) SRCARCH=$(SRCARCH) clean
 	find . \( -name "*.o" -o -name ".*.d" \) -exec rm -f {} \;
 	rm -f include/asm $(TARGET) $(TARGET).gz $(TARGET).efi $(TARGET).efi.map $(TARGET)-syms $(TARGET)-syms.map *~ core
@@ -189,7 +190,7 @@ include/asm-$(TARGET_ARCH)/asm-offsets.h: arch/$(TARGET_ARCH)/asm-offsets.s
 	  echo ""; \
 	  echo "#endif") <$< >$@
 
-SUBDIRS = xsm arch/$(TARGET_ARCH) common drivers
+SUBDIRS = xsm arch/$(TARGET_ARCH) common drivers test
 define all_sources
     ( find include/asm-$(TARGET_ARCH) -name '*.h' -print; \
       find include -name 'asm-*' -prune -o -name '*.h' -print; \
