@@ -32,10 +32,6 @@
 #include <asm/insn.h>
 #include <asm/page.h>
 
-#define __ALT_PTR(a,f)      (u32 *)((void *)&(a)->f + (a)->f)
-#define ALT_ORIG_PTR(a)     __ALT_PTR(a, orig_offset)
-#define ALT_REPL_PTR(a)     __ALT_PTR(a, alt_offset)
-
 extern const struct alt_instr __alt_instructions[], __alt_instructions_end[];
 
 struct alt_region {

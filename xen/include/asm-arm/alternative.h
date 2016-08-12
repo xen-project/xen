@@ -21,6 +21,11 @@ struct alt_instr {
 	u8  alt_len;		/* size of new instruction(s), <= orig_len */
 };
 
+/* Xen: helpers used by common code. */
+#define __ALT_PTR(a,f)		((u32 *)((void *)&(a)->f + (a)->f))
+#define ALT_ORIG_PTR(a)		__ALT_PTR(a, orig_offset)
+#define ALT_REPL_PTR(a)		__ALT_PTR(a, alt_offset)
+
 void __init apply_alternatives_all(void);
 int apply_alternatives(void *start, size_t length);
 

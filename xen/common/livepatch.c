@@ -621,8 +621,8 @@ static int prepare_payload(struct payload *payload,
 
         for ( a = start; a < end; a++ )
         {
-            const void *instr = &a->instr_offset + a->instr_offset;
-            const void *replacement = &a->repl_offset + a->repl_offset;
+            const void *instr = ALT_ORIG_PTR(a);
+            const void *replacement = ALT_REPL_PTR(a);
 
             if ( (instr < region->start && instr >= region->end) ||
                  (replacement < region->start && replacement >= region->end) )

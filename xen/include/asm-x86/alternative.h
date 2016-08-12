@@ -23,6 +23,10 @@ struct alt_instr {
     u8  replacementlen;     /* length of new instruction, <= instrlen */
 };
 
+#define __ALT_PTR(a,f)      ((u8 *)((void *)&(a)->f + (a)->f))
+#define ALT_ORIG_PTR(a)     __ALT_PTR(a, instr_offset)
+#define ALT_REPL_PTR(a)     __ALT_PTR(a, repl_offset)
+
 /* Similar to apply_alternatives except it can be run with IRQs enabled. */
 extern void apply_alternatives_nocheck(struct alt_instr *start,
                                        struct alt_instr *end);
