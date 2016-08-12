@@ -3981,15 +3981,8 @@ void hvm_ud_intercept(struct cpu_user_regs *regs)
         unsigned long addr;
         char sig[5]; /* ud2; .ascii "xen" */
 
-        /*
-         * Note that in the call below we pass 1 more than the signature
-         * size, to guard against the overall code sequence wrapping between
-         * "prefix" and actual instruction. There's necessarily at least one
-         * actual instruction byte required, so this won't cause failure on
-         * legitimate uses.
-         */
         if ( hvm_virtual_to_linear_addr(x86_seg_cs, cs, regs->eip,
-                                        sizeof(sig) + 1, hvm_access_insn_fetch,
+                                        sizeof(sig), hvm_access_insn_fetch,
                                         (hvm_long_mode_enabled(cur) &&
                                          cs->attr.fields.l) ? 64 :
                                         cs->attr.fields.db ? 32 : 16, &addr) &&
@@ -3999,6 +3992,11 @@ void hvm_ud_intercept(struct cpu_user_regs *regs)
         {
             regs->eip += sizeof(sig);
             regs->eflags &= ~X86_EFLAGS_RF;
+
+            /* Zero the upper 32 bits of %rip if not in 64bit mode. */
+            if ( !(hvm_long_mode_enabled(cur) && cs->attr.fields.l) )
+                regs->eip = regs->_eip;
+
             add_taint(TAINT_HVM_FEP);
         }
     }
