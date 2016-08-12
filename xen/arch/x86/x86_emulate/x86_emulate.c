@@ -98,11 +98,15 @@ static uint8_t opcode_table[256] = {
     DstImplicit|SrcImmByte|Mov, DstReg|SrcImmByte|ModRM|Mov,
     ImplicitOps|Mov, ImplicitOps|Mov, ImplicitOps|Mov, ImplicitOps|Mov,
     /* 0x70 - 0x77 */
-    ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
-    ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
+    DstImplicit|SrcImmByte, DstImplicit|SrcImmByte,
+    DstImplicit|SrcImmByte, DstImplicit|SrcImmByte,
+    DstImplicit|SrcImmByte, DstImplicit|SrcImmByte,
+    DstImplicit|SrcImmByte, DstImplicit|SrcImmByte,
     /* 0x78 - 0x7F */
-    ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
-    ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
+    DstImplicit|SrcImmByte, DstImplicit|SrcImmByte,
+    DstImplicit|SrcImmByte, DstImplicit|SrcImmByte,
+    DstImplicit|SrcImmByte, DstImplicit|SrcImmByte,
+    DstImplicit|SrcImmByte, DstImplicit|SrcImmByte,
     /* 0x80 - 0x87 */
     ByteOp|DstMem|SrcImm|ModRM, DstMem|SrcImm|ModRM,
     ByteOp|DstMem|SrcImm|ModRM, DstMem|SrcImmByte|ModRM,
@@ -155,10 +159,12 @@ static uint8_t opcode_table[256] = {
     ImplicitOps|ModRM|Mov, ImplicitOps|ModRM|Mov,
     ImplicitOps|ModRM|Mov, ImplicitOps|ModRM|Mov,
     /* 0xE0 - 0xE7 */
-    ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
+    DstImplicit|SrcImmByte, DstImplicit|SrcImmByte,
+    DstImplicit|SrcImmByte, DstImplicit|SrcImmByte,
     ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
     /* 0xE8 - 0xEF */
-    ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
+    DstImplicit|SrcImm|Mov, DstImplicit|SrcImm,
+    ImplicitOps, DstImplicit|SrcImmByte,
     ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
     /* 0xF0 - 0xF7 */
     0, ImplicitOps, 0, 0,
@@ -206,11 +212,15 @@ static uint8_t twobyte_table[256] = {
     /* 0x70 - 0x7F */
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, ImplicitOps|ModRM,
     /* 0x80 - 0x87 */
-    ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
-    ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
+    DstImplicit|SrcImm, DstImplicit|SrcImm,
+    DstImplicit|SrcImm, DstImplicit|SrcImm,
+    DstImplicit|SrcImm, DstImplicit|SrcImm,
+    DstImplicit|SrcImm, DstImplicit|SrcImm,
     /* 0x88 - 0x8F */
-    ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
-    ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
+    DstImplicit|SrcImm, DstImplicit|SrcImm,
+    DstImplicit|SrcImm, DstImplicit|SrcImm,
+    DstImplicit|SrcImm, DstImplicit|SrcImm,
+    DstImplicit|SrcImm, DstImplicit|SrcImm,
     /* 0x90 - 0x97 */
     ByteOp|DstMem|SrcNone|ModRM|Mov, ByteOp|DstMem|SrcNone|ModRM|Mov,
     ByteOp|DstMem|SrcNone|ModRM|Mov, ByteOp|DstMem|SrcNone|ModRM|Mov,
@@ -2414,12 +2424,10 @@ x86_emulate(
         break;
     }
 
-    case 0x70 ... 0x7f: /* jcc (short) */ {
-        int rel = insn_fetch_type(int8_t);
+    case 0x70 ... 0x7f: /* jcc (short) */
         if ( test_cc(b, _regs.eflags) )
-            jmp_rel(rel);
+            jmp_rel((int32_t)src.val);
         break;
-    }
 
     case 0x82: /* Grp1 (x86/32 only) */
         generate_exception_if(mode_64bit(), EXC_UD, -1);
@@ -3451,8 +3459,8 @@ x86_emulate(
         break;
 
     case 0xe0 ... 0xe2: /* loop{,z,nz} */ {
-        int rel = insn_fetch_type(int8_t);
         int do_jmp = !(_regs.eflags & EFLG_ZF); /* loopnz */
+
         if ( b == 0xe1 )
             do_jmp = !do_jmp; /* loopz */
         else if ( b == 0xe2 )
@@ -3471,17 +3479,15 @@ x86_emulate(
             break;
         }
         if ( do_jmp )
-            jmp_rel(rel);
+            jmp_rel((int32_t)src.val);
         break;
     }
 
-    case 0xe3: /* jcxz/jecxz (short) */ {
-        int rel = insn_fetch_type(int8_t);
+    case 0xe3: /* jcxz/jecxz (short) */
         if ( (ad_bytes == 2) ? !(uint16_t)_regs.ecx :
              (ad_bytes == 4) ? !(uint32_t)_regs.ecx : !_regs.ecx )
-            jmp_rel(rel);
+            jmp_rel((int32_t)src.val);
         break;
-    }
 
     case 0xe4: /* in imm8,%al */
     case 0xe5: /* in imm8,%eax */
@@ -3518,22 +3524,18 @@ x86_emulate(
     }
 
     case 0xe8: /* call (near) */ {
-        int rel = ((op_bytes == 2)
-                   ? (int32_t)insn_fetch_type(int16_t)
-                   : insn_fetch_type(int32_t));
+        int32_t rel = src.val;
+
         op_bytes = ((op_bytes == 4) && mode_64bit()) ? 8 : op_bytes;
         src.val = _regs.eip;
         jmp_rel(rel);
         goto push;
     }
 
-    case 0xe9: /* jmp (near) */ {
-        int rel = ((op_bytes == 2)
-                   ? (int32_t)insn_fetch_type(int16_t)
-                   : insn_fetch_type(int32_t));
-        jmp_rel(rel);
+    case 0xe9: /* jmp (near) */
+    case 0xeb: /* jmp (short) */
+        jmp_rel((int32_t)src.val);
         break;
-    }
 
     case 0xea: /* jmp (far, absolute) */ {
         uint16_t sel;
@@ -3544,12 +3546,6 @@ x86_emulate(
         if ( (rc = load_seg(x86_seg_cs, sel, 0, &cs, ctxt, ops)) ||
              (rc = commit_far_branch(&cs, eip)) )
             goto done;
-        break;
-    }
-
-    case 0xeb: /* jmp (short) */ {
-        int rel = insn_fetch_type(int8_t);
-        jmp_rel(rel);
         break;
     }
 
@@ -4493,14 +4489,10 @@ x86_emulate(
         break;
     }
 
-    case 0x80 ... 0x8f: /* jcc (near) */ {
-        int rel = ((op_bytes == 2)
-                   ? (int32_t)insn_fetch_type(int16_t)
-                   : insn_fetch_type(int32_t));
+    case 0x80 ... 0x8f: /* jcc (near) */
         if ( test_cc(b, _regs.eflags) )
-            jmp_rel(rel);
+            jmp_rel((int32_t)src.val);
         break;
-    }
 
     case 0x90 ... 0x9f: /* setcc */
         dst.val = test_cc(b, _regs.eflags);
