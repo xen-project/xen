@@ -255,7 +255,7 @@ static inline void vm_event_release_slot(struct domain *d,
 
 /*
  * vm_event_mark_and_pause() tags vcpu and put it to sleep.
- * The vcpu will resume execution in vm_event_wake_waiters().
+ * The vcpu will resume execution in vm_event_wake_blocked().
  */
 void vm_event_mark_and_pause(struct vcpu *v, struct vm_event_domain *ved)
 {
