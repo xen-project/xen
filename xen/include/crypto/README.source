@@ -1,0 +1,17 @@
+About
+=====
+This documents the upstream sources for files in this directory.
+
+rijndael.h
+==========
+This file comes from 
+http://cvsweb.openbsd.org/cgi-bin/cvsweb/src/sys/crypto/
+
+vmac.h
+======
+This file was developed by Ted Krovetz and Wei Dai (more details 
+are in the files). 
+
+See
+- https://en.wikipedia.org/wiki/VMAC
+- http://www.fastcrypto.org/vmac/vmac.h
