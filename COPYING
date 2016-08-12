@@ -10,30 +10,66 @@ version of the license (i.e., *only* v2, not v2.2 or v3.x or
 whatever), unless explicitly otherwise stated.
 
 Some code fragments in the hypervisor and associated subsystems
-include the 2- or 3-clause BSD license stanzas (also known as Modified
-BSD licenses). When these code sections are compiled as part of a
+include other license stanzas: the most common ones are listed in
+the *License Exceptions* section of this file.
+
+When these code sections are compiled as part of a
 GPLv2-licensed program, such as Xen, the result is licensed under
 GPLv2. See the FSF's definition of GPL compatibility:
  http://www.gnu.org/licenses/gpl-faq.html#WhatDoesCompatMean
 And how this applies to a range of open source licenses:
  http://www.gnu.org/licenses/license-list.html
 
-Licensing Exceptions (the relaxed BSD-style license)
-----------------------------------------------------
+A number of files will also specify GPL exceptions, such as
+ - Autoconf exception
+ - Bison exception
+ - GCC exception
+
+In addition the xen directory also contains a XEN NOTICE clarifying
+what constitutes a derived work, which applies to the xen directory
+and its subdirectories (see xen/COPYING).
+
+Licensing Exceptions
+--------------------
 
 For the convenience of users and those who are porting OSes to run as
 Xen guests, certain files in this repository are not subject to the
 GPL when distributed separately or included in software packages
-outside this repository. Instead we specify a much more relaxed
-BSD-style license. Affected files include the Xen interface headers
-(xen/include/public/COPYING), MiniOS (extras/mini-os) and various
-drivers, support functions and header files within Xen-aware Linux
-source trees.  In all such cases, license terms are stated at the top
-of the file or in a COPYING file in the same directory. Note that
-_any_ file that is modified and then distributed within a Linux kernel
-is still subject to the GNU GPL.
+outside this repository.
 
- -- Keir Fraser (on behalf of the Xen team)
+Instead we specify more relaxed licenses, depending on need, such as
+  - BSD style license (BSD Original, BSD Modified, Intel BSD)
+  - MIT license
+  - LGPL 2.1
+
+Affected files include the Xen interface headers (xen/include/public),
+various drivers, support functions and header files within Xen-aware
+Linux source trees. In all such cases, license terms are stated at the
+top of the file or in a COPYING file in the same directory.
+
+In some cases, compatible 3rd party code has been imported into the
+Xen tree, retaining the original license, such as
+  - AES-128 3.0
+  - FSF Unlimited License
+  - Laurikari License
+  - Public Domain
+  - ZLIB License
+  - ZPL 2.0
+
+Significant code imports are highlighted in a README.source file
+in the directory into which the file or code snippet was imported.
+
+Note that *any* file that is modified and then distributed within a
+Linux kernel is still subject to the GNU GPL.
+
+Contributions
+-------------
+
+Contributions are governed by the license that applies to the relevant
+specific file or by the license specified in the COPYING file, that
+governs the license of its containing directory and its subdirectories.
+
+For more information, see the CONTRIBUTING file.
 
 =====================================================================
 

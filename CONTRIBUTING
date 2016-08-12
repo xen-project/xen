@@ -1,0 +1,211 @@
+
+CONTRIBUTING
+============
+
+INBOUND LICENSE
+---------------
+
+Contributions are governed by the license that applies to relevant
+specific file or by the license specified in the COPYING file, that
+governs the license of its containing directory and its subdirectories.
+
+Most of the Xen Project code is licensed under GPLv2, but a number of
+directories are primarily licensed under different licenses.
+
+Most notably:
+ - tools/blktap2      : BSD-Modified
+ - tools/libxc        : LGPL v2.1
+ - tools/libxl        : LGPL v2.1
+ - xen/include/public : MIT license
+
+When creating new components and directories that contain a
+significant amount of files that are licensed under licenses other
+than GPLv2 or the license specified in the COPYING file, please
+create a new COPYING file in that directory containing a copy of the
+license text and a rationale for using a different license. This helps
+ensure that the license of this new component/directory is maintained
+consistently with the original intention.
+
+When importing code from other upstream projects into this repository,
+please create a README.source file in the directory the code is imported
+to, listing the original source of the code. An example can be found at
+m4/README.source
+
+The COMMON COPYRIGHT NOTICES section of this document contains
+sample copyright notices for the most common licenses used within
+this repository.
+
+Developer's Certificate of Origin
+---------------------------------
+
+All patches to the Xen Project code base must include the line
+"Signed-off-by: your_name <your_email>" at the end of the change
+description. This is required and indicates that you certify the patch
+under the "Developer's Certificate of Origin" which states:
+
+  Developer's Certificate of Origin 1.1
+
+  By making a contribution to this project, I certify that:
+
+  (a) The contribution was created in whole or in part by me and I
+      have the right to submit it under the open source license
+      indicated in the file; or
+
+  (b) The contribution is based upon previous work that, to the best
+      of my knowledge, is covered under an appropriate open source
+      license and I have the right under that license to submit that
+      work with modifications, whether created in whole or in part
+      by me, under the same open source license (unless I am
+      permitted to submit under a different license), as indicated
+      in the file; or
+
+  (c) The contribution was provided directly to me by some other
+      person who certified (a), (b) or (c) and I have not modified
+      it.
+
+  (d) I understand and agree that this project and the contribution
+      are public and that a record of the contribution (including all
+      personal information I submit with it, including my sign-off) is
+      maintained indefinitely and may be redistributed consistent with
+      this project or the open source license(s) involved.
+
+GOVERNANCE AND WORKFLOW
+-----------------------
+
+The following documents provide a general overview of governance and
+contribution guidelines for the Xen Project:
+ - https://xenproject.org/governance.html
+ - https://xenproject.org/help/contribution-guidelines.html
+
+For more information on contributing to this repository, see
+ - CODING_STYLE file in this directory
+ - https://wiki.xenproject.org/wiki/Submitting_Xen_Project_Patches
+ - https://wiki.xenproject.org/wiki/Submitting_Xen_Patches_with_Git
+ - https://wiki.xenproject.org/wiki/Asking_Developer_Questions
+ - https://wiki.xenproject.org/wiki/Category:Developers
+
+
+COMMON COPYRIGHT NOTICES
+========================
+
+The following section contains sample copyright notice for the most
+common licenses used within the Xen Project that is consistent with the
+projects coding standards.
+
+GPL v2 License
+--------------
+
+/*
+ * <File name>
+ *
+ * <One line description of the file and what it does>
+ *
+ * Copyright (C) <year>  <name of author and/or company>
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms and conditions of the GNU General Public
+ * License, version 2, as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public
+ * License along with this program; If not, see <http://www.gnu.org/licenses/>.
+ */
+
+
+LGPL v2.1 License
+-----------------
+
+/*
+ * <File name>
+ *
+ * <One line description of the file and what it does>
+ *
+ * Copyright (C) <year>  <name of author and/or company>
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License, version 2.1, as published by the Free Software Foundation.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; If not, see <http://www.gnu.org/licenses/>.
+ */
+
+BSD-Modified License (also known as BSD-3-Clause)
+-------------------------------------------------
+
+/*
+ * <File name>
+ *
+ * <One line description of the file and what it does>
+ *
+ * Copyright (C) <year>  <name of author and/or company>
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ *
+ *   1. Redistributions of source code must retain the above copyright
+ *      notice, this list of conditions and the following disclaimer.
+ *   2. Redistributions in binary form must reproduce the above
+ *      copyright notice, this list of conditions and the following
+ *      disclaimer in the documentation and/or other materials provided
+ *      with the distribution.
+ *   3. Neither the name of the copyright holder nor the names of its
+ *      contributors may be used to endorse or promote products derived
+ *      from this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
+ * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
+ * OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
+
+MIT License
+-----------
+
+/*
+ * <File name>
+ *
+ * <One line description of the file and what it does>
+ *
+ * Copyright (C) <year>  <name of author and/or company>
+ *
+ * Permission is hereby granted, free of charge, to any person
+ * obtaining a copy of this software and associated documentation
+ * files (the "Software"), to deal in the Software without restriction,
+ * including without limitation the rights to use, copy, modify, merge,
+ * publish, distribute, sublicense, and/or sell copies of the Software,
+ * and to permit persons to whom the Software is furnished to do so,
+ * subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be
+ * included in all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+ * IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+ * CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+ * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+ * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ */
+
