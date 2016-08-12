@@ -122,7 +122,7 @@ static uint8_t opcode_table[256] = {
     ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
     /* 0x98 - 0x9F */
     ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
-    ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
+    ImplicitOps|Mov, ImplicitOps|Mov, ImplicitOps, ImplicitOps,
     /* 0xA0 - 0xA7 */
     ByteOp|ImplicitOps|Mov, ImplicitOps|Mov,
     ByteOp|ImplicitOps|Mov, ImplicitOps|Mov,
@@ -1902,7 +1902,7 @@ x86_emulate(
                 /* fall through */
             case 3: /* call (far, absolute indirect) */
             case 5: /* jmp (far, absolute indirect) */
-                d = DstNone|SrcMem|ModRM;
+                d = DstNone | SrcMem | ModRM | Mov;
                 break;
             }
             break;
@@ -2346,7 +2346,7 @@ x86_emulate(
     case 0x68: /* push imm{16,32,64} */
     case 0x6a: /* push imm8 */
     push:
-        d |= Mov; /* force writeback */
+        ASSERT(d & Mov); /* writeback needed */
         dst.type  = OP_MEM;
         dst.bytes = mode_64bit() && (op_bytes == 4) ? 8 : op_bytes;
         dst.val = src.val;
