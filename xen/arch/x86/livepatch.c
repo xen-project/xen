@@ -122,18 +122,6 @@ int arch_livepatch_perform_rela(struct livepatch_elf *elf,
     uint64_t val;
     uint8_t *dest;
 
-    /* Nothing to do. */
-    if ( !rela->sec->sh_size )
-        return 0;
-
-    if ( rela->sec->sh_entsize < sizeof(Elf_RelA) ||
-         rela->sec->sh_size % rela->sec->sh_entsize )
-    {
-        dprintk(XENLOG_ERR, LIVEPATCH "%s: Section relative header is corrupted!\n",
-                elf->name);
-        return -EINVAL;
-    }
-
     for ( i = 0; i < (rela->sec->sh_size / rela->sec->sh_entsize); i++ )
     {
         r = rela->data + i * rela->sec->sh_entsize;

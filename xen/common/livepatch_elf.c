@@ -335,6 +335,7 @@ int livepatch_elf_perform_relocs(struct livepatch_elf *elf)
     struct livepatch_elf_sec *r, *base;
     unsigned int i;
     int rc = 0;
+    size_t sz;
 
     ASSERT(elf->sym);
 
@@ -360,6 +361,22 @@ int livepatch_elf_perform_relocs(struct livepatch_elf *elf)
         {
             dprintk(XENLOG_ERR, LIVEPATCH "%s: Relative link of %s is incorrect (%d, expected=%d)\n",
                     elf->name, r->name, r->sec->sh_link, elf->symtab_idx);
+            rc = -EINVAL;
+            break;
+        }
+
+        if ( r->sec->sh_type == SHT_RELA )
+            sz = sizeof(Elf_RelA);
+        else
+            sz = sizeof(Elf_Rel);
+
+        if ( !r->sec->sh_size )
+            continue;
+
+        if ( r->sec->sh_entsize < sz || r->sec->sh_size % r->sec->sh_entsize )
+        {
+            dprintk(XENLOG_ERR, LIVEPATCH "%s: Section relative header is corrupted!\n",
+                    elf->name);
             rc = -EINVAL;
             break;
         }
