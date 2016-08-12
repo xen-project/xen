@@ -148,11 +148,11 @@ static uint8_t opcode_table[256] = {
     ByteOp|DstMem|SrcImm|ModRM|Mov, DstMem|SrcImm|ModRM|Mov,
     /* 0xC8 - 0xCF */
     ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
-    ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
+    ImplicitOps, DstImplicit|SrcImmByte, ImplicitOps, ImplicitOps,
     /* 0xD0 - 0xD7 */
     ByteOp|DstMem|SrcImplicit|ModRM, DstMem|SrcImplicit|ModRM,
     ByteOp|DstMem|SrcImplicit|ModRM, DstMem|SrcImplicit|ModRM,
-    ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
+    DstImplicit|SrcImmByte, DstImplicit|SrcImmByte, ImplicitOps, ImplicitOps,
     /* 0xD8 - 0xDF */
     ImplicitOps|ModRM|Mov, ImplicitOps|ModRM|Mov,
     ImplicitOps|ModRM|Mov, ImplicitOps|ModRM|Mov,
@@ -161,7 +161,8 @@ static uint8_t opcode_table[256] = {
     /* 0xE0 - 0xE7 */
     DstImplicit|SrcImmByte, DstImplicit|SrcImmByte,
     DstImplicit|SrcImmByte, DstImplicit|SrcImmByte,
-    ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
+    DstImplicit|SrcImmByte, DstImplicit|SrcImmByte,
+    DstImplicit|SrcImmByte, DstImplicit|SrcImmByte,
     /* 0xE8 - 0xEF */
     DstImplicit|SrcImm|Mov, DstImplicit|SrcImm,
     ImplicitOps, DstImplicit|SrcImmByte,
@@ -233,10 +234,10 @@ static uint8_t twobyte_table[256] = {
     ByteOp|DstMem|SrcNone|ModRM|Mov, ByteOp|DstMem|SrcNone|ModRM|Mov,
     /* 0xA0 - 0xA7 */
     ImplicitOps, ImplicitOps, ImplicitOps, DstBitBase|SrcReg|ModRM,
-    DstMem|SrcReg|ModRM, DstMem|SrcReg|ModRM, 0, 0,
+    DstMem|SrcImmByte|ModRM, DstMem|SrcReg|ModRM, 0, 0,
     /* 0xA8 - 0xAF */
     ImplicitOps, ImplicitOps, 0, DstBitBase|SrcReg|ModRM,
-    DstMem|SrcReg|ModRM, DstMem|SrcReg|ModRM,
+    DstMem|SrcImmByte|ModRM, DstMem|SrcReg|ModRM,
     ImplicitOps|ModRM, DstReg|SrcMem|ModRM,
     /* 0xB0 - 0xB7 */
     ByteOp|DstMem|SrcReg|ModRM, DstMem|SrcReg|ModRM,
@@ -2893,10 +2894,9 @@ x86_emulate(
         goto swint;
 
     case 0xcd: /* int imm8 */
-        src.val = insn_fetch_type(uint8_t);
         swint_type = x86_swint_int;
     swint:
-        rc = inject_swint(swint_type, src.val,
+        rc = inject_swint(swint_type, (uint8_t)src.val,
                           _regs.eip - ctxt->regs->eip,
                           ctxt, ops) ? : X86EMUL_EXCEPTION;
         goto done;
@@ -2942,7 +2942,7 @@ x86_emulate(
 
     case 0xd4: /* aam */
     case 0xd5: /* aad */ {
-        unsigned int base = insn_fetch_type(uint8_t);
+        unsigned int base = (uint8_t)src.val;
 
         generate_exception_if(mode_64bit(), EXC_UD, -1);
         if ( b & 0x01 )
@@ -3497,9 +3497,9 @@ x86_emulate(
     case 0xed: /* in %dx,%eax */
     case 0xee: /* out %al,%dx */
     case 0xef: /* out %eax,%dx */ {
-        unsigned int port = ((b < 0xe8)
-                             ? insn_fetch_type(uint8_t)
-                             : (uint16_t)_regs.edx);
+        unsigned int port = ((b < 0xe8) ? (uint8_t)src.val
+                                        : (uint16_t)_regs.edx);
+
         op_bytes = !(b & 1) ? 1 : (op_bytes == 8) ? 4 : op_bytes;
         if ( (rc = ioport_access_check(port, op_bytes, ctxt, ops)) != 0 )
             goto done;
@@ -4554,7 +4554,15 @@ x86_emulate(
     case 0xac: /* shrd imm8,r,r/m */
     case 0xad: /* shrd %%cl,r,r/m */ {
         uint8_t shift, width = dst.bytes << 3;
-        shift = (b & 1) ? (uint8_t)_regs.ecx : insn_fetch_type(uint8_t);
+
+        if ( b & 1 )
+            shift = _regs.ecx;
+        else
+        {
+            shift = src.val;
+            src.reg = decode_register(modrm_reg, &_regs, 0);
+            src.val = truncate_word(*src.reg, dst.bytes);
+        }
         if ( (shift &= width - 1) == 0 )
             break;
         dst.orig_val = truncate_word(dst.val, dst.bytes);
