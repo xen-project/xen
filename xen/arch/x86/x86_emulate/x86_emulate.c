@@ -124,7 +124,7 @@ static uint8_t opcode_table[256] = {
     ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
     ImplicitOps|Mov, ImplicitOps|Mov, ImplicitOps, ImplicitOps,
     /* 0xA0 - 0xA7 */
-    ByteOp|ImplicitOps|Mov, ImplicitOps|Mov,
+    ByteOp|DstEax|SrcImplicit|Mov, DstEax|SrcImplicit|Mov,
     ByteOp|ImplicitOps|Mov, ImplicitOps|Mov,
     ByteOp|ImplicitOps|Mov, ImplicitOps|Mov,
     ByteOp|ImplicitOps, ImplicitOps,
@@ -161,12 +161,12 @@ static uint8_t opcode_table[256] = {
     /* 0xE0 - 0xE7 */
     DstImplicit|SrcImmByte, DstImplicit|SrcImmByte,
     DstImplicit|SrcImmByte, DstImplicit|SrcImmByte,
-    DstImplicit|SrcImmByte, DstImplicit|SrcImmByte,
+    DstEax|SrcImmByte, DstEax|SrcImmByte,
     DstImplicit|SrcImmByte, DstImplicit|SrcImmByte,
     /* 0xE8 - 0xEF */
     DstImplicit|SrcImm|Mov, DstImplicit|SrcImm,
     ImplicitOps, DstImplicit|SrcImmByte,
-    ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
+    DstEax|SrcImplicit, DstEax|SrcImplicit, ImplicitOps, ImplicitOps,
     /* 0xF0 - 0xF7 */
     0, ImplicitOps, 0, 0,
     ImplicitOps, ImplicitOps,
@@ -2617,8 +2617,6 @@ x86_emulate(
 
     case 0xa0 ... 0xa1: /* mov mem.offs,{%al,%ax,%eax,%rax} */
         /* Source EA is not encoded via ModRM. */
-        dst.type  = OP_REG;
-        dst.reg   = (unsigned long *)&_regs.eax;
         dst.bytes = (d & ByteOp) ? 1 : op_bytes;
         if ( (rc = read_ulong(ea.mem.seg, insn_fetch_bytes(ad_bytes),
                               &dst.val, dst.bytes, ctxt, ops)) != 0 )
@@ -3512,9 +3510,7 @@ x86_emulate(
         else
         {
             /* in */
-            dst.type  = OP_REG;
             dst.bytes = op_bytes;
-            dst.reg   = (unsigned long *)&_regs.eax;
             fail_if(ops->read_io == NULL);
             rc = ops->read_io(port, dst.bytes, &dst.val, ctxt);
         }
