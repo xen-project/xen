@@ -388,6 +388,13 @@ void vm_event_resume(struct domain *d, struct vm_event_domain *ved)
         v = d->vcpu[rsp.vcpu_id];
 
         /*
+         * Make sure the vCPU state has been synchronized for the custom
+         * handlers.
+         */
+        if ( atomic_read(&v->vm_event_pause_count) )
+            sync_vcpu_execstate(v);
+
+        /*
          * In some cases the response type needs extra handling, so here
          * we call the appropriate handlers.
          */
