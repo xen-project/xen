@@ -103,7 +103,7 @@ _uninstall:
 
 .PHONY: _debug
 _debug:
-	objdump -D -S $(TARGET)-syms > $(TARGET).s
+	$(OBJDUMP) -D -S $(TARGET)-syms > $(TARGET).s
 
 .PHONY: _clean
 _clean: delete-unfresh-files
