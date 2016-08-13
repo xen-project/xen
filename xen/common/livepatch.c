@@ -747,7 +747,7 @@ static bool_t is_payload_symbol(const struct livepatch_elf *elf,
          !strncmp(sym->name, ".L", 2) )
         return 0;
 
-    return 1;
+    return arch_livepatch_symbol_ok(elf, sym);
 }
 
 static int build_symbol_table(struct payload *payload,

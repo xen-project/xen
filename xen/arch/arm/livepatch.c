@@ -84,6 +84,39 @@ void arch_livepatch_unmask(void)
     local_abort_enable();
 }
 
+bool arch_livepatch_symbol_ok(const struct livepatch_elf *elf,
+                              const struct livepatch_elf_sym *sym)
+{
+    /*
+     * - Mapping symbols - denote the "start of a sequence of bytes of the
+     *   appropriate type" to mark certain features - such as start of region
+     *   containing data ($d); ARM ($a), or A64 ($x) instructions.
+     *   We ignore Thumb instructions ($t) as we shouldn't have them.
+     *
+     * The format is either short: '$x' or long: '$x.<any>'. We do not
+     * need this and more importantly - each payload will contain this
+     * resulting in symbol collisions.
+     */
+    if ( sym->name[0] == '$' && sym->name[1] != '\0' )
+    {
+        char p = sym->name[1];
+        size_t len = strlen(sym->name);
+
+        if ( (len >= 3 && (sym->name[2] == '.' )) || (len == 2) )
+        {
+            if ( p == 'd' ||
+#ifdef CONFIG_ARM_32
+                 p == 'a'
+#else
+                 p == 'x'
+#endif
+               )
+                return false;
+        }
+    }
+    return true;
+}
+
 int arch_livepatch_perform_rel(struct livepatch_elf *elf,
                                const struct livepatch_elf_sec *base,
                                const struct livepatch_elf_sec *rela)
