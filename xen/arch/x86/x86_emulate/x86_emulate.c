@@ -1979,9 +1979,14 @@ x86_emulate(
             goto done;
         break;
     case SrcImm:
+        if ( !(d & ByteOp) )
+            src.bytes = op_bytes != 8 ? op_bytes : 4;
+        else
+        {
+    case SrcImmByte:
+            src.bytes = 1;
+        }
         src.type  = OP_IMM;
-        src.bytes = (d & ByteOp) ? 1 : op_bytes;
-        if ( src.bytes == 8 ) src.bytes = 4;
         /* NB. Immediates are sign-extended as necessary. */
         switch ( src.bytes )
         {
@@ -1989,11 +1994,6 @@ x86_emulate(
         case 2: src.val = insn_fetch_type(int16_t); break;
         case 4: src.val = insn_fetch_type(int32_t); break;
         }
-        break;
-    case SrcImmByte:
-        src.type  = OP_IMM;
-        src.bytes = 1;
-        src.val   = insn_fetch_type(int8_t);
         break;
     }
 
