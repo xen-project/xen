@@ -193,8 +193,6 @@ tools/misc/xen-livepatch
 tools/misc/xenperf
 tools/misc/xenpm
 tools/misc/xen-hvmctx
-tools/misc/gtraceview
-tools/misc/gtracestat
 tools/misc/xenlockprof
 tools/misc/lowmemd
 tools/misc/xencov

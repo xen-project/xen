@@ -17,8 +17,6 @@ INSTALL_BIN                    += xencov_split
 INSTALL_BIN += $(INSTALL_BIN-y)
 
 # Everything to be installed in regular sbin/
-INSTALL_SBIN                   += gtracestat
-INSTALL_SBIN                   += gtraceview
 INSTALL_SBIN                   += xen-bugtool
 INSTALL_SBIN-$(CONFIG_MIGRATE) += xen-hptool
 INSTALL_SBIN-$(CONFIG_X86)     += xen-hvmcrash
@@ -85,9 +83,6 @@ xenperf: xenperf.o
 xenpm: xenpm.o
 	$(CC) $(LDFLAGS) -o $@ $< $(LDLIBS_libxenctrl) $(APPEND_LDFLAGS)
 
-gtracestat: gtracestat.o
-	$(CC) $(LDFLAGS) -o $@ $< $(APPEND_LDFLAGS)
-
 xenlockprof: xenlockprof.o
 	$(CC) $(LDFLAGS) -o $@ $< $(LDLIBS_libxenctrl) $(APPEND_LDFLAGS)
 
@@ -109,9 +104,6 @@ xen-livepatch: xen-livepatch.o
 
 xen-lowmemd: xen-lowmemd.o
 	$(CC) $(LDFLAGS) -o $@ $< $(LDLIBS_libxenevtchn) $(LDLIBS_libxenctrl) $(LDLIBS_libxenstore) $(APPEND_LDFLAGS)
-
-gtraceview: gtraceview.o
-	$(CC) $(LDFLAGS) -o $@ $< $(CURSES_LIBS) $(TINFO_LIBS) $(APPEND_LDFLAGS)
 
 xencov: xencov.o
 	$(CC) $(LDFLAGS) -o $@ $< $(LDLIBS_libxenctrl) $(APPEND_LDFLAGS)

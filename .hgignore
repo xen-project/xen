@@ -205,8 +205,6 @@
 ^tools/misc/xenpm$
 ^tools/misc/xen-hvmctx$
 ^tools/misc/xen-lowmemd$
-^tools/misc/gtraceview$
-^tools/misc/gtracestat$
 ^tools/misc/xenlockprof$
 ^tools/misc/xencov$
 ^tools/pygrub/build/.*$
