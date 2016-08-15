@@ -1,6 +1,7 @@
 #include <xen/compile.h>
 #include <xen/init.h>
 #include <xen/errno.h>
+#include <xen/lib.h>
 #include <xen/string.h>
 #include <xen/types.h>
 #include <xen/elf.h>
@@ -90,11 +91,10 @@ int xen_build_id_check(const Elf_Note *n, unsigned int n_sz,
                        const void **p, unsigned int *len)
 {
     /* Check if we really have a build-id. */
+    ASSERT(n_sz > sizeof(*n));
+
     if ( NT_GNU_BUILD_ID != n->type )
         return -ENODATA;
-
-    if ( n_sz <= sizeof(*n) )
-        return -EINVAL;
 
     if ( n->namesz + n->descsz < n->namesz )
         return -EINVAL;
@@ -127,8 +127,8 @@ static int __init xen_build_init(void)
         return -ENODATA;
 
     /* Check for full Note header. */
-    if ( &n[1] > __note_gnu_build_id_end )
-        return -ENODATA;;
+    if ( &n[1] >= __note_gnu_build_id_end )
+        return -ENODATA;
 
     sz = (void *)__note_gnu_build_id_end - (void *)n;
 
