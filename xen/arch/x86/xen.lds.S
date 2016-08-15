@@ -222,7 +222,6 @@ SECTIONS
   } :text
 
   .data : {                    /* Data */
-       . = ALIGN(PAGE_SIZE);
        *(.data.page_aligned)
        *(.data)
        *(.data.rel)
@@ -231,10 +230,8 @@ SECTIONS
   } :text
 
   .bss : {                     /* BSS */
-       . = ALIGN(STACK_SIZE);
        __bss_start = .;
        *(.bss.stack_aligned)
-       . = ALIGN(PAGE_SIZE);
        *(.bss.page_aligned*)
        *(.bss)
        . = ALIGN(SMP_CACHE_BYTES);

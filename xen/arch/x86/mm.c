@@ -125,7 +125,8 @@
 #include <asm/pci.h>
 
 /* Mapping of the fixmap space needed early. */
-l1_pgentry_t __section(".bss.page_aligned") l1_fixmap[L1_PAGETABLE_ENTRIES];
+l1_pgentry_t __section(".bss.page_aligned") __aligned(PAGE_SIZE)
+    l1_fixmap[L1_PAGETABLE_ENTRIES];
 
 #define MEM_LOG(_f, _a...) gdprintk(XENLOG_WARNING , _f "\n" , ## _a)
 
@@ -588,7 +589,8 @@ static inline void guest_get_eff_kern_l1e(struct vcpu *v, unsigned long addr,
     TOGGLE_MODE();
 }
 
-const char __section(".bss.page_aligned.const") zero_page[PAGE_SIZE];
+const char __section(".bss.page_aligned.const") __aligned(PAGE_SIZE)
+    zero_page[PAGE_SIZE];
 
 static void invalidate_shadow_ldt(struct vcpu *v, int flush)
 {

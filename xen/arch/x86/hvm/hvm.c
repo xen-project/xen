@@ -88,7 +88,7 @@ struct hvm_function_table hvm_funcs __read_mostly;
  * the hardware domain which needs a more permissive one.
  */
 #define HVM_IOBITMAP_SIZE (3 * PAGE_SIZE)
-unsigned long __section(".bss.page_aligned")
+unsigned long __section(".bss.page_aligned") __aligned(PAGE_SIZE)
     hvm_io_bitmap[HVM_IOBITMAP_SIZE / BYTES_PER_LONG];
 
 /* Xen command-line option to enable HAP */
