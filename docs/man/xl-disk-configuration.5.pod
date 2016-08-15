@@ -232,7 +232,7 @@ Specifies the backend implementation to use
 
 =item Supported values
 
-phy, tap, qdisk
+phy, qdisk
 
 =item Mandatory
 

@@ -25,7 +25,6 @@ XEN_XENLIGHT       = $(XEN_ROOT)/tools/libxl
 XEN_XLUTIL         = $(XEN_XENLIGHT)
 XEN_XENSTORE       = $(XEN_ROOT)/tools/xenstore
 XEN_LIBXENSTAT     = $(XEN_ROOT)/tools/xenstat/libxenstat/src
-XEN_BLKTAP2        = $(XEN_ROOT)/tools/blktap2
 XEN_LIBVCHAN       = $(XEN_ROOT)/tools/libvchan
 
 CFLAGS_xeninclude = -I$(XEN_INCLUDE)
@@ -174,21 +173,8 @@ else
 CFLAGS += -O2 -fomit-frame-pointer
 endif
 
-ifeq ($(CONFIG_BLKTAP2),y)
-CFLAGS_libblktapctl = -I$(XEN_BLKTAP2)/control -I$(XEN_BLKTAP2)/include $(CFLAGS_xeninclude)
-SHDEPS_libblktapctl =
-LDLIBS_libblktapctl = $(SHDEPS_libblktapctl) $(XEN_BLKTAP2)/control/libblktapctl$(libextension)
-SHLIB_libblktapctl  = $(SHDEPS_libblktapctl) -Wl,-rpath-link=$(XEN_BLKTAP2)/control
-else
-CFLAGS_libblktapctl =
-SHDEPS_libblktapctl =
-LDLIBS_libblktapctl =
-SHLIB_libblktapctl  =
-PKG_CONFIG_REMOVE += xenblktapctl
-endif
-
 CFLAGS_libxenlight = -I$(XEN_XENLIGHT) $(CFLAGS_libxenctrl) $(CFLAGS_xeninclude)
-SHDEPS_libxenlight = $(SHLIB_libxenctrl) $(SHLIB_libxenstore) $(SHLIB_libblktapctl)
+SHDEPS_libxenlight = $(SHLIB_libxenctrl) $(SHLIB_libxenstore)
 LDLIBS_libxenlight = $(SHDEPS_libxenlight) $(XEN_XENLIGHT)/libxenlight$(libextension)
 SHLIB_libxenlight  = $(SHDEPS_libxenlight) -Wl,-rpath-link=$(XEN_XENLIGHT)
 

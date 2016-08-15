@@ -53,7 +53,6 @@ CONFIG_SEABIOS      := @seabios@
 CONFIG_IPXE         := @ipxe@
 CONFIG_QEMU_TRAD    := @qemu_traditional@
 CONFIG_QEMU_XEN     := @qemu_xen@
-CONFIG_BLKTAP2      := @blktap2@
 CONFIG_QEMUU_EXTRA_ARGS:= @EXTRA_QEMUU_CONFIGURE_ARGS@
 CONFIG_LIBNL        := @libnl@
 

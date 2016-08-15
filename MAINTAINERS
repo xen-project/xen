@@ -192,10 +192,6 @@ F:	xen/include/asm-arm/
 F:	xen/include/public/arch-arm/
 F:	xen/include/public/arch-arm.h
 
-BLKTAP2
-S:	Orphaned
-F:	tools/blktap2/
-
 Continuous Integration (CI)
 M:	Doug Goldstein <cardoe@cardoe.com>
 W:	https://gitlab.com/xen-project/xen

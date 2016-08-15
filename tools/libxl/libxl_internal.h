@@ -1892,32 +1892,6 @@ struct libxl__cpuid_policy {
     char *policy[4];
 };
 
-/*
- * blktap2 support
- */
-
-/* libxl__blktap_enabled:
- *    return true if blktap/blktap2 support is available.
- */
-_hidden int libxl__blktap_enabled(libxl__gc *gc);
-
-/* libxl__blktap_devpath:
- *    Argument: path and disk image as specified in config file.
- *      The type specifies whether this is aio, qcow, qcow2, etc.
- *    returns device path xenstore wants to have. returns NULL
- *      if no device corresponds to the disk.
- */
-_hidden char *libxl__blktap_devpath(libxl__gc *gc,
-                                    const char *disk,
-                                    libxl_disk_format format);
-
-/* libxl__device_destroy_tapdisk:
- *   Destroys any tapdisk process associated with the backend represented
- *   by be_path.
- *   Always logs on failure.
- */
-_hidden int libxl__device_destroy_tapdisk(libxl__gc *gc, const char *params);
-
 /* Calls poll() again - useful to check whether a signaled condition
  * is still true.  Cannot fail.  Returns currently-true revents. */
 _hidden short libxl__fd_poll_recheck(libxl__egc *egc, int fd, short events);
