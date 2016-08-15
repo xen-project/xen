@@ -39,6 +39,7 @@
 #define SrcMem16    (4<<3) /* Memory operand (16-bit). */
 #define SrcImm      (5<<3) /* Immediate operand. */
 #define SrcImmByte  (6<<3) /* 8-bit sign-extended immediate operand. */
+#define SrcImm16    (7<<3) /* 16-bit zero-extended immediate operand. */
 #define SrcMask     (7<<3)
 /* Generic ModRM decode. */
 #define ModRM       (1<<6)
@@ -143,11 +144,11 @@ static uint8_t opcode_table[256] = {
     DstReg|SrcImm|Mov, DstReg|SrcImm|Mov, DstReg|SrcImm|Mov, DstReg|SrcImm|Mov,
     /* 0xC0 - 0xC7 */
     ByteOp|DstMem|SrcImm|ModRM, DstMem|SrcImmByte|ModRM,
-    ImplicitOps, ImplicitOps,
+    DstImplicit|SrcImm16, ImplicitOps,
     DstReg|SrcMem|ModRM|Mov, DstReg|SrcMem|ModRM|Mov,
     ByteOp|DstMem|SrcImm|ModRM|Mov, DstMem|SrcImm|ModRM|Mov,
     /* 0xC8 - 0xCF */
-    ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
+    DstImplicit|SrcImm16, ImplicitOps, DstImplicit|SrcImm16, ImplicitOps,
     ImplicitOps, DstImplicit|SrcImmByte, ImplicitOps, ImplicitOps,
     /* 0xD0 - 0xD7 */
     ByteOp|DstMem|SrcImplicit|ModRM, DstMem|SrcImplicit|ModRM,
@@ -1995,6 +1996,11 @@ x86_emulate(
         case 4: src.val = insn_fetch_type(int32_t); break;
         }
         break;
+    case SrcImm16:
+        src.type  = OP_IMM;
+        src.bytes = 2;
+        src.val   = insn_fetch_type(uint16_t);
+        break;
     }
 
     /* Decode and fetch the destination operand: register or memory. */
@@ -2786,16 +2792,14 @@ x86_emulate(
         break;
 
     case 0xc2: /* ret imm16 (near) */
-    case 0xc3: /* ret (near) */ {
-        int offset = (b == 0xc2) ? insn_fetch_type(uint16_t) : 0;
+    case 0xc3: /* ret (near) */
         op_bytes = ((op_bytes == 4) && mode_64bit()) ? 8 : op_bytes;
-        if ( (rc = read_ulong(x86_seg_ss, sp_post_inc(op_bytes + offset),
+        if ( (rc = read_ulong(x86_seg_ss, sp_post_inc(op_bytes + src.val),
                               &dst.val, op_bytes, ctxt, ops)) != 0 ||
              (rc = ops->insn_fetch(x86_seg_cs, dst.val, NULL, 0, ctxt)) )
             goto done;
         _regs.eip = dst.val;
         break;
-    }
 
     case 0xc4: /* les */ {
         unsigned long sel;
@@ -2817,7 +2821,6 @@ x86_emulate(
         goto les;
 
     case 0xc8: /* enter imm16,imm8 */ {
-        uint16_t size = insn_fetch_type(uint16_t);
         uint8_t depth = insn_fetch_type(uint8_t) & 31;
         int i;
 
@@ -2846,7 +2849,7 @@ x86_emulate(
                 goto done;
         }
 
-        sp_pre_dec(size);
+        sp_pre_dec(src.val);
         break;
     }
 
@@ -2874,17 +2877,15 @@ x86_emulate(
         break;
 
     case 0xca: /* ret imm16 (far) */
-    case 0xcb: /* ret (far) */ {
-        int offset = (b == 0xca) ? insn_fetch_type(uint16_t) : 0;
+    case 0xcb: /* ret (far) */
         if ( (rc = read_ulong(x86_seg_ss, sp_post_inc(op_bytes),
                               &dst.val, op_bytes, ctxt, ops)) ||
-             (rc = read_ulong(x86_seg_ss, sp_post_inc(op_bytes + offset),
+             (rc = read_ulong(x86_seg_ss, sp_post_inc(op_bytes + src.val),
                               &src.val, op_bytes, ctxt, ops)) ||
              (rc = load_seg(x86_seg_cs, src.val, 1, &cs, ctxt, ops)) ||
              (rc = commit_far_branch(&cs, dst.val)) )
             goto done;
         break;
-    }
 
     case 0xcc: /* int3 */
         src.val = EXC_BP;
