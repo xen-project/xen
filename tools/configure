@@ -703,7 +703,6 @@ BCC
 LD86
 AS86
 qemu_traditional
-blktap2
 LINUX_BACKEND_MODULES
 seabios
 ovmf
@@ -802,7 +801,6 @@ enable_xsmpolicy
 enable_ovmf
 enable_seabios
 with_linux_backend_modules
-enable_blktap2
 enable_qemu_traditional
 enable_rombios
 with_system_qemu
@@ -1475,8 +1473,6 @@ Optional Features:
   --disable-xsmpolicy     Disable XSM policy compilation (default is ENABLED)
   --enable-ovmf           Enable OVMF (default is DISABLED)
   --disable-seabios       Disable SeaBIOS (default is ENABLED)
-  --enable-blktap2        Enable blktap2, (DEFAULT is on for Linux, otherwise
-                          off)
   --enable-qemu-traditional
                           Enable qemu traditional device model, (DEFAULT is on
                           for Linux or NetBSD x86, otherwise off)
@@ -4159,7 +4155,6 @@ xen-scsibk
 usbbk
 pciback
 xen-acpi-processor
-blktap2
 "
 ;;
 *)
@@ -4169,33 +4164,6 @@ esac
 fi
 
 LINUX_BACKEND_MODULES="`eval echo $LINUX_BACKEND_MODULES`"
-
-
-# Check whether --enable-blktap2 was given.
-if test "${enable_blktap2+set}" = set; then :
-  enableval=$enable_blktap2;
-else
-
-    case "$host_os" in
-        linux*)
-           enable_blktap2="yes";;
-        *) enable_blktap2="no";;
-    esac
-
-fi
-
-if test "x$enable_blktap2" = "xyes"; then :
-
-
-$as_echo "#define HAVE_BLKTAP2 1" >>confdefs.h
-
-    blktap2=y
-else
-
-    blktap2=n
-
-fi
-
 
 
 # Check whether --enable-qemu-traditional was given.
@@ -8308,57 +8276,6 @@ fi
 
 
 
-if test "x$enable_blktap2" = "xyes"; then :
-
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for io_setup in -laio" >&5
-$as_echo_n "checking for io_setup in -laio... " >&6; }
-if ${ac_cv_lib_aio_io_setup+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  ac_check_lib_save_LIBS=$LIBS
-LIBS="-laio  $LIBS"
-cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-/* Override any GCC internal prototype to avoid an error.
-   Use char because int might match the return type of a GCC
-   builtin and then its argument prototype would still apply.  */
-#ifdef __cplusplus
-extern "C"
-#endif
-char io_setup ();
-int
-main ()
-{
-return io_setup ();
-  ;
-  return 0;
-}
-_ACEOF
-if ac_fn_c_try_link "$LINENO"; then :
-  ac_cv_lib_aio_io_setup=yes
-else
-  ac_cv_lib_aio_io_setup=no
-fi
-rm -f core conftest.err conftest.$ac_objext \
-    conftest$ac_exeext conftest.$ac_ext
-LIBS=$ac_check_lib_save_LIBS
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_aio_io_setup" >&5
-$as_echo "$ac_cv_lib_aio_io_setup" >&6; }
-if test "x$ac_cv_lib_aio_io_setup" = xyes; then :
-  cat >>confdefs.h <<_ACEOF
-#define HAVE_LIBAIO 1
-_ACEOF
-
-  LIBS="-laio $LIBS"
-
-else
-  as_fn_error $? "Could not find libaio" "$LINENO" 5
-fi
-
-
-fi
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for MD5 in -lcrypto" >&5
 $as_echo_n "checking for MD5 in -lcrypto... " >&6; }

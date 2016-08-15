@@ -271,26 +271,9 @@ static int disk_try_backend(disk_try_backend_args *a,
         return 0;
 
     case LIBXL_DISK_BACKEND_TAP:
-        if (a->disk->script) goto bad_script;
-
-        if (libxl_defbool_val(a->disk->colo_enable))
-            goto bad_colo;
-
-        if (a->disk->is_cdrom) {
-            LOG(DEBUG, "Disk vdev=%s, backend tap unsuitable for cdroms",
-                       a->disk->vdev);
-            return 0;
-        }
-        if (!libxl__blktap_enabled(a->gc)) {
-            LOG(DEBUG, "Disk vdev=%s, backend tap unsuitable because blktap "
-                       "not available", a->disk->vdev);
-            return 0;
-        }
-        if (!(a->disk->format == LIBXL_DISK_FORMAT_RAW ||
-              a->disk->format == LIBXL_DISK_FORMAT_VHD)) {
-            goto bad_format;
-        }
-        return backend;
+        LOG(DEBUG, "Disk vdev=%s, backend tap unsuitable because blktap "
+                   "not supported", a->disk->vdev);
+        return 0;
 
     case LIBXL_DISK_BACKEND_QDISK:
         if (a->disk->script) goto bad_script;
@@ -682,8 +665,6 @@ int libxl__device_destroy(libxl__gc *gc, libxl__device *dev)
     const char *be_path = libxl__device_backend_path(gc, dev);
     const char *fe_path = libxl__device_frontend_path(gc, dev);
     const char *libxl_path = libxl__device_libxl_path(gc, dev);
-    const char *tapdisk_path = GCSPRINTF("%s/%s", be_path, "tapdisk-params");
-    const char *tapdisk_params;
     xs_transaction_t t = 0;
     int rc;
     uint32_t domid;
@@ -693,10 +674,6 @@ int libxl__device_destroy(libxl__gc *gc, libxl__device *dev)
 
     for (;;) {
         rc = libxl__xs_transaction_start(gc, &t);
-        if (rc) goto out;
-
-        /* May not exist if this is not a tap device */
-        rc = libxl__xs_read_checked(gc, t, tapdisk_path, &tapdisk_params);
         if (rc) goto out;
 
         if (domid == LIBXL_TOOLSTACK_DOMID) {
@@ -719,9 +696,6 @@ int libxl__device_destroy(libxl__gc *gc, libxl__device *dev)
         if (!rc) break;
         if (rc < 0) goto out;
     }
-
-    if (tapdisk_params)
-        rc = libxl__device_destroy_tapdisk(gc, tapdisk_params);
 
 out:
     libxl__xs_transaction_abort(gc, &t);

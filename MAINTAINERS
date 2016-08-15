@@ -322,8 +322,6 @@ M:	Shriram Rajagopalan <rshriram@cs.ubc.ca>
 M:	Yang Hongyang <imhy.yang@gmail.com>
 S:	Maintained
 F:	docs/README.remus
-F:	tools/blktap2/drivers/block-remus.c
-F:	tools/blktap2/drivers/hashtable*
 F:	tools/libxl/libxl_remus_*
 F:	tools/libxl/libxl_netbuffer.c
 F:	tools/libxl/libxl_nonetbuffer.c

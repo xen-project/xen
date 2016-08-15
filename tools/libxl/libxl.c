@@ -2218,7 +2218,6 @@ static void device_disk_add(libxl__egc *egc, uint32_t domid,
             case LIBXL_DISK_BACKEND_PHY:
                 dev = disk->pdev_path;
 
-        do_backend_phy:
                 flexarray_append(back, "params");
                 flexarray_append(back, dev);
 
@@ -2230,27 +2229,9 @@ static void device_disk_add(libxl__egc *egc, uint32_t domid,
                 break;
 
             case LIBXL_DISK_BACKEND_TAP:
-                if (dev == NULL) {
-                    dev = libxl__blktap_devpath(gc, disk->pdev_path,
-                                                disk->format);
-                    if (!dev) {
-                        LOG(ERROR, "failed to get blktap devpath for %p",
-                            disk->pdev_path);
-                        rc = ERROR_FAIL;
-                        goto out;
-                    }
-                }
-                flexarray_append(back, "tapdisk-params");
-                flexarray_append(back, GCSPRINTF("%s:%s",
-                    libxl__device_disk_string_of_format(disk->format),
-                    disk->pdev_path));
-
-                /* tap backends with scripts are rejected by
-                 * libxl__device_disk_set_backend */
-                assert(!disk->script);
-
-                /* now create a phy device to export the device to the guest */
-                goto do_backend_phy;
+                LOG(ERROR, "blktap is not supported");
+                rc = ERROR_FAIL;
+                goto out;
             case LIBXL_DISK_BACKEND_QDISK:
                 flexarray_append(back, "params");
                 flexarray_append(back, GCSPRINTF("%s:%s",

@@ -155,7 +155,7 @@ backendtype=<backend-type>
 --------------------------
 
 Description:           Specifies the backend implementation to use
-Supported values:      phy, tap, qdisk
+Supported values:      phy, qdisk
 Mandatory:             No
 Default value:         Automatically determine which backend to use.
 
