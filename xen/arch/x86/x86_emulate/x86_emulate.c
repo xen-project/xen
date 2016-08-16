@@ -31,15 +31,14 @@
 #define DstMem      (3<<1) /* Memory operand. */
 #define DstMask     (3<<1)
 /* Source operand type. */
-#define SrcInvalid  (0<<3) /* Unimplemented opcode. */
-#define SrcNone     (1<<3) /* No source operand. */
-#define SrcImplicit (1<<3) /* Source operand is implicit in the opcode. */
-#define SrcReg      (2<<3) /* Register operand. */
-#define SrcMem      (3<<3) /* Memory operand. */
-#define SrcMem16    (4<<3) /* Memory operand (16-bit). */
-#define SrcImm      (5<<3) /* Immediate operand. */
-#define SrcImmByte  (6<<3) /* 8-bit sign-extended immediate operand. */
-#define SrcImm16    (7<<3) /* 16-bit zero-extended immediate operand. */
+#define SrcNone     (0<<3) /* No source operand. */
+#define SrcImplicit (0<<3) /* Source operand is implicit in the opcode. */
+#define SrcReg      (1<<3) /* Register operand. */
+#define SrcMem      (2<<3) /* Memory operand. */
+#define SrcMem16    (3<<3) /* Memory operand (16-bit). */
+#define SrcImm      (4<<3) /* Immediate operand. */
+#define SrcImmByte  (5<<3) /* 8-bit sign-extended immediate operand. */
+#define SrcImm16    (6<<3) /* 16-bit zero-extended immediate operand. */
 #define SrcMask     (7<<3)
 /* Generic ModRM decode. */
 #define ModRM       (1<<6)
@@ -1531,19 +1530,6 @@ int x86emul_unhandleable_rw(
     return X86EMUL_UNHANDLEABLE;
 }
 
-static void internal_error(const char *which, uint8_t byte,
-                           const struct cpu_user_regs *regs)
-{
-#ifdef __XEN__
-    static bool_t logged;
-
-    if ( !test_and_set_bool(logged) )
-        gprintk(XENLOG_ERR, "Internal error: %s/%02x [%04x:%08lx]\n",
-                which, byte, regs->cs, regs->eip);
-#endif
-    ASSERT_UNREACHABLE();
-}
-
 int
 x86_emulate(
     struct x86_emulate_ctxt *ctxt,
@@ -1663,10 +1649,6 @@ x86_emulate(
                 break;
             }
         }
-
-        /* Unrecognised? */
-        if ( d == 0 )
-            goto cannot_emulate;
     }
 
     /* Lock prefix is allowed only on RMW instructions. */
@@ -1727,10 +1709,6 @@ x86_emulate(
                 ext = ext_0f;
                 b = insn_fetch_type(uint8_t);
                 d = twobyte_table[b];
-
-                /* Unrecognised? */
-                if ( d == 0 || b == 0x38 )
-                    goto cannot_emulate;
 
                 modrm = insn_fetch_type(uint8_t);
                 modrm_mod = (modrm & 0xc0) >> 6;
@@ -3841,7 +3819,6 @@ x86_emulate(
         break;
 
     default:
-        internal_error("primary", b, ctxt->regs);
         goto cannot_emulate;
     }
 
@@ -4827,7 +4804,6 @@ x86_emulate(
         break;
 
     default:
-        internal_error("secondary", b, ctxt->regs);
         goto cannot_emulate;
     }
     goto writeback;
