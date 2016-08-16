@@ -1741,6 +1741,66 @@ x86_emulate(
         modrm_reg = ((rex_prefix & 4) << 1) | ((modrm & 0x38) >> 3);
         modrm_rm  = modrm & 0x07;
 
+        /* Early operand adjustments. */
+        switch ( ext )
+        {
+        case ext_none:
+            switch ( b )
+            {
+            case 0xf6 ... 0xf7: /* Grp3 */
+                switch ( modrm_reg & 7 )
+                {
+                case 0 ... 1: /* test */
+                    d = (d & ~SrcMask) | SrcImm;
+                    break;
+                case 4: /* mul */
+                case 5: /* imul */
+                case 6: /* div */
+                case 7: /* idiv */
+                    d = (d & (ByteOp | ModRM)) | DstImplicit | SrcMem;
+                    break;
+                }
+                break;
+            case 0xff: /* Grp5 */
+                switch ( modrm_reg & 7 )
+                {
+                case 2: /* call (near) */
+                case 4: /* jmp (near) */
+                case 6: /* push */
+                    if ( mode_64bit() && op_bytes == 4 )
+                        op_bytes = 8;
+                    /* fall through */
+                case 3: /* call (far, absolute indirect) */
+                case 5: /* jmp (far, absolute indirect) */
+                    d = DstNone | SrcMem | ModRM | Mov;
+                    break;
+                }
+                break;
+            }
+            break;
+
+        case ext_0f:
+            break;
+
+        case ext_0f38:
+            switch ( b )
+            {
+            case 0xf0: /* movbe / crc32 */
+                d |= repne_prefix() ? ByteOp : Mov;
+                break;
+            case 0xf1: /* movbe / crc32 */
+                if ( !repne_prefix() )
+                    d = (d & ~(DstMask | SrcMask)) | DstMem | SrcReg | Mov;
+                break;
+            default: /* Until it is worth making this table based ... */
+                goto cannot_emulate;
+            }
+            break;
+
+        default:
+            ASSERT_UNREACHABLE();
+        }
+
         if ( modrm_mod == 3 )
         {
             modrm_rm |= (rex_prefix & 1) << 3;
@@ -1850,11 +1910,6 @@ x86_emulate(
                         ((op_bytes == 8) ? 4 : op_bytes);
                 else if ( (d & SrcMask) == SrcImmByte )
                     ea.mem.off += 1;
-                else if ( !ext && ((b & 0xfe) == 0xf6) &&
-                          ((modrm_reg & 7) <= 1) )
-                    /* Special case in Grp3: test has immediate operand. */
-                    ea.mem.off += (d & ByteOp) ? 1
-                        : ((op_bytes == 8) ? 4 : op_bytes);
                 break;
             case 1:
                 ea.mem.off += insn_fetch_type(int8_t);
@@ -1869,66 +1924,6 @@ x86_emulate(
 
     if ( override_seg != -1 && ea.type == OP_MEM )
         ea.mem.seg = override_seg;
-
-    /* Early operand adjustments. */
-    switch ( ext )
-    {
-    case ext_none:
-        switch ( b )
-        {
-        case 0xf6 ... 0xf7: /* Grp3 */
-            switch ( modrm_reg & 7 )
-            {
-            case 0 ... 1: /* test */
-                d = (d & ~SrcMask) | SrcImm;
-                break;
-            case 4: /* mul */
-            case 5: /* imul */
-            case 6: /* div */
-            case 7: /* idiv */
-                d = (d & (ByteOp | ModRM)) | DstImplicit | SrcMem;
-                break;
-            }
-            break;
-        case 0xff: /* Grp5 */
-            switch ( modrm_reg & 7 )
-            {
-            case 2: /* call (near) */
-            case 4: /* jmp (near) */
-            case 6: /* push */
-                if ( mode_64bit() && op_bytes == 4 )
-                    op_bytes = 8;
-                /* fall through */
-            case 3: /* call (far, absolute indirect) */
-            case 5: /* jmp (far, absolute indirect) */
-                d = DstNone | SrcMem | ModRM | Mov;
-                break;
-            }
-            break;
-        }
-        break;
-
-    case ext_0f:
-        break;
-
-    case ext_0f38:
-        switch ( b )
-        {
-        case 0xf0: /* movbe / crc32 */
-            d |= repne_prefix() ? ByteOp : Mov;
-            break;
-        case 0xf1: /* movbe / crc32 */
-            if ( !repne_prefix() )
-                d = (d & ~(DstMask | SrcMask)) | DstMem | SrcReg | Mov;
-            break;
-        default: /* Until it is worth making this table based ... */
-            goto cannot_emulate;
-        }
-        break;
-
-    default:
-        ASSERT_UNREACHABLE();
-    }
 
     /* Decode and fetch the source operand: register, memory or immediate. */
     switch ( d & SrcMask )
