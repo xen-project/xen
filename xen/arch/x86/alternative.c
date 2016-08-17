@@ -144,9 +144,10 @@ static void *init_or_livepatch text_poke(void *addr, const void *opcode, size_t 
  * APs have less capabilities than the boot processor are not handled.
  * Tough. Make sure you disable such features by hand.
  */
-void init_or_livepatch apply_alternatives_nocheck(struct alt_instr *start, struct alt_instr *end)
+void init_or_livepatch apply_alternatives(const struct alt_instr *start,
+                                          const struct alt_instr *end)
 {
-    struct alt_instr *a;
+    const struct alt_instr *a;
     u8 *instr, *replacement;
     u8 insnbuf[MAX_PATCH_LEN];
 
@@ -187,24 +188,10 @@ void init_or_livepatch apply_alternatives_nocheck(struct alt_instr *start, struc
  * This routine is called with local interrupt disabled and used during
  * bootup.
  */
-void __init apply_alternatives(struct alt_instr *start, struct alt_instr *end)
-{
-    unsigned long cr0 = read_cr0();
-
-    ASSERT(!local_irq_is_enabled());
-
-    /* Disable WP to allow application of alternatives to read-only pages. */
-    write_cr0(cr0 & ~X86_CR0_WP);
-
-    apply_alternatives_nocheck(start, end);
-
-    /* Reinstate WP. */
-    write_cr0(cr0);
-}
-
 void __init alternative_instructions(void)
 {
     nmi_callback_t *saved_nmi_callback;
+    unsigned long cr0 = read_cr0();
 
     arch_init_ideal_nops();
 
@@ -225,7 +212,15 @@ void __init alternative_instructions(void)
      * expect a machine check to cause undue problems during to code
      * patching.
      */
+    ASSERT(!local_irq_is_enabled());
+
+    /* Disable WP to allow application of alternatives to read-only pages. */
+    write_cr0(cr0 & ~X86_CR0_WP);
+
     apply_alternatives(__alt_instructions, __alt_instructions_end);
+
+    /* Reinstate WP. */
+    write_cr0(cr0);
 
     set_nmi_callback(saved_nmi_callback);
 }

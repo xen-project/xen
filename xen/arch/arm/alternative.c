@@ -209,11 +209,11 @@ void __init apply_alternatives_all(void)
     BUG_ON(ret);
 }
 
-int apply_alternatives(void *start, size_t length)
+int apply_alternatives(const struct alt_instr *start, const struct alt_instr *end)
 {
     const struct alt_region region = {
         .begin = start,
-        .end = start + length,
+        .end = end,
     };
 
     return __apply_alternatives(&region);

@@ -27,7 +27,7 @@ struct alt_instr {
 #define ALT_REPL_PTR(a)		__ALT_PTR(a, alt_offset)
 
 void __init apply_alternatives_all(void);
-int apply_alternatives(void *start, size_t length);
+int apply_alternatives(const struct alt_instr *start, const struct alt_instr *end);
 
 #define ALTINSTR_ENTRY(feature)						      \
 	" .word 661b - .\n"				/* label           */ \

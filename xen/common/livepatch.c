@@ -632,7 +632,7 @@ static int prepare_payload(struct payload *payload,
                 return -EINVAL;
             }
         }
-        apply_alternatives_nocheck(start, end);
+        apply_alternatives(start, end);
     }
 
     sec = livepatch_elf_sec_by_name(elf, ".ex_table");
