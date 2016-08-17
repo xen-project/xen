@@ -1735,7 +1735,11 @@ x86_emulate(
                 case 5: /* imul */
                 case 6: /* div */
                 case 7: /* idiv */
-                    d = (d & (ByteOp | ModRM)) | DstImplicit | SrcMem;
+                    /*
+                     * DstEax isn't really precise for all cases; updates to
+                     * rDX get handled in an open coded manner.
+                     */
+                    d = (d & (ByteOp | ModRM)) | DstEax | SrcMem;
                     break;
                 }
                 break;
@@ -3544,11 +3548,8 @@ x86_emulate(
             emulate_1op("neg", dst, _regs.eflags);
             break;
         case 4: /* mul */
-            dst.type = OP_REG;
-            dst.reg  = (unsigned long *)&_regs.eax;
-            dst.val  = *dst.reg;
             _regs.eflags &= ~(EFLG_OF|EFLG_CF);
-            switch ( dst.bytes = src.bytes )
+            switch ( dst.bytes )
             {
             case 1:
                 dst.val = (uint8_t)dst.val;
@@ -3584,10 +3585,6 @@ x86_emulate(
             }
             break;
         case 5: /* imul */
-            dst.type = OP_REG;
-            dst.reg  = (unsigned long *)&_regs.eax;
-            dst.val  = *dst.reg;
-            dst.bytes = src.bytes;
         imul:
             _regs.eflags &= ~(EFLG_OF|EFLG_CF);
             switch ( dst.bytes )
@@ -3629,9 +3626,7 @@ x86_emulate(
             }
             break;
         case 6: /* div */
-            dst.type = OP_REG;
-            dst.reg  = (unsigned long *)&_regs.eax;
-            switch ( dst.bytes = src.bytes )
+            switch ( src.bytes )
             {
             case 1:
                 u[0] = (uint16_t)_regs.eax;
@@ -3676,9 +3671,7 @@ x86_emulate(
             }
             break;
         case 7: /* idiv */
-            dst.type = OP_REG;
-            dst.reg  = (unsigned long *)&_regs.eax;
-            switch ( dst.bytes = src.bytes )
+            switch ( src.bytes )
             {
             case 1:
                 u[0] = (int16_t)_regs.eax;
