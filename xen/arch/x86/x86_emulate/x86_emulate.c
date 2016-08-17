@@ -111,7 +111,7 @@ static uint8_t opcode_table[256] = {
     /* 0x80 - 0x87 */
     ByteOp|DstMem|SrcImm|ModRM, DstMem|SrcImm|ModRM,
     ByteOp|DstMem|SrcImm|ModRM, DstMem|SrcImmByte|ModRM,
-    ByteOp|DstMem|SrcReg|ModRM, DstMem|SrcReg|ModRM,
+    ByteOp|DstReg|SrcMem|ModRM, DstReg|SrcMem|ModRM,
     ByteOp|DstMem|SrcReg|ModRM, DstMem|SrcReg|ModRM,
     /* 0x88 - 0x8F */
     ByteOp|DstMem|SrcReg|ModRM|Mov, DstMem|SrcReg|ModRM|Mov,
@@ -172,8 +172,7 @@ static uint8_t opcode_table[256] = {
     DstEax|SrcImplicit, DstEax|SrcImplicit, ImplicitOps, ImplicitOps,
     /* 0xF0 - 0xF7 */
     0, ImplicitOps, 0, 0,
-    ImplicitOps, ImplicitOps,
-    ByteOp|DstMem|SrcNone|ModRM, DstMem|SrcNone|ModRM,
+    ImplicitOps, ImplicitOps, ByteOp|ModRM, ModRM,
     /* 0xF8 - 0xFF */
     ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
     ImplicitOps, ImplicitOps, ByteOp|DstMem|SrcNone|ModRM, DstMem|SrcNone|ModRM
@@ -1660,9 +1659,6 @@ x86_emulate(
         }
     }
 
-    /* Lock prefix is allowed only on RMW instructions. */
-    generate_exception_if((d & Mov) && lock_prefix, EXC_UD, -1);
-
     /* ModRM and SIB bytes. */
     if ( d & ModRM )
     {
@@ -1738,7 +1734,11 @@ x86_emulate(
                 switch ( modrm_reg & 7 )
                 {
                 case 0 ... 1: /* test */
-                    d = (d & ~SrcMask) | SrcImm;
+                    d |= DstMem | SrcImm;
+                    break;
+                case 2: /* not */
+                case 3: /* neg */
+                    d |= DstMem;
                     break;
                 case 4: /* mul */
                 case 5: /* imul */
@@ -1748,7 +1748,7 @@ x86_emulate(
                      * DstEax isn't really precise for all cases; updates to
                      * rDX get handled in an open coded manner.
                      */
-                    d = (d & (ByteOp | ModRM)) | DstEax | SrcMem;
+                    d |= DstEax | SrcMem;
                     break;
                 }
                 break;
@@ -1996,8 +1996,9 @@ x86_emulate(
          */
         generate_exception_if(
             lock_prefix &&
-            ((b < 0x20) || (b > 0x23)) && /* MOV CRn/DRn */
-            (b != 0xc7),                  /* CMPXCHG{8,16}B */
+            (ext != ext_0f ||
+             (((b < 0x20) || (b > 0x23)) && /* MOV CRn/DRn */
+              (b != 0xc7))),                /* CMPXCHG{8,16}B */
             EXC_UD, -1);
         dst.type = OP_NONE;
         break;
@@ -2075,6 +2076,8 @@ x86_emulate(
                 goto done;
             dst.orig_val = dst.val;
         }
+        else /* Lock prefix is allowed only on RMW instructions. */
+            generate_exception_if(lock_prefix, EXC_UD, -1);
         break;
     }
 
@@ -2124,6 +2127,7 @@ x86_emulate(
         break;
 
     case 0x38 ... 0x3d: cmp: /* cmp */
+        generate_exception_if(lock_prefix, EXC_UD, -1);
         emulate_2op_SrcV("cmp", src, dst, _regs.eflags);
         dst.type = OP_NONE;
         break;
@@ -3548,6 +3552,7 @@ x86_emulate(
             unsigned long u[2], v;
 
         case 0 ... 1: /* test */
+            generate_exception_if(lock_prefix, EXC_UD, -1);
             goto test;
         case 2: /* not */
             dst.val = ~dst.val;
@@ -4495,6 +4500,7 @@ x86_emulate(
     case 0xad: /* shrd %%cl,r,r/m */ {
         uint8_t shift, width = dst.bytes << 3;
 
+        generate_exception_if(lock_prefix, EXC_UD, -1);
         if ( b & 1 )
             shift = _regs.ecx;
         else
