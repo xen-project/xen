@@ -4482,33 +4482,6 @@ x86_emulate(
         break;
     }
 
-    case 0xa8: /* push %%gs */
-        src.val = x86_seg_gs;
-        goto push_seg;
-
-    case 0xa9: /* pop %%gs */
-        src.val = x86_seg_gs;
-        goto pop_seg;
-
-    case 0xb0 ... 0xb1: /* cmpxchg */
-        /* Save real source value, then compare EAX against destination. */
-        src.orig_val = src.val;
-        src.val = _regs.eax;
-        /* cmp: %%eax - dst ==> dst and src swapped for macro invocation */
-        emulate_2op_SrcV("cmp", dst, src, _regs.eflags);
-        if ( _regs.eflags & EFLG_ZF )
-        {
-            /* Success: write back to memory. */
-            dst.val = src.orig_val;
-        }
-        else
-        {
-            /* Failure: write the value we saw to EAX. */
-            dst.type = OP_REG;
-            dst.reg  = (unsigned long *)&_regs.eax;
-        }
-        break;
-
     case 0xa3: bt: /* bt */
         emulate_2op_SrcV_nobyte("bt", src, dst, _regs.eflags);
         dst.type = OP_NONE;
@@ -4551,9 +4524,13 @@ x86_emulate(
         break;
     }
 
-    case 0xb3: btr: /* btr */
-        emulate_2op_SrcV_nobyte("btr", src, dst, _regs.eflags);
-        break;
+    case 0xa8: /* push %%gs */
+        src.val = x86_seg_gs;
+        goto push_seg;
+
+    case 0xa9: /* pop %%gs */
+        src.val = x86_seg_gs;
+        goto pop_seg;
 
     case 0xab: bts: /* bts */
         emulate_2op_SrcV_nobyte("bts", src, dst, _regs.eflags);
@@ -4578,9 +4555,32 @@ x86_emulate(
         emulate_2op_SrcV_srcmem("imul", src, dst, _regs.eflags);
         break;
 
+    case 0xb0 ... 0xb1: /* cmpxchg */
+        /* Save real source value, then compare EAX against destination. */
+        src.orig_val = src.val;
+        src.val = _regs.eax;
+        /* cmp: %%eax - dst ==> dst and src swapped for macro invocation */
+        emulate_2op_SrcV("cmp", dst, src, _regs.eflags);
+        if ( _regs.eflags & EFLG_ZF )
+        {
+            /* Success: write back to memory. */
+            dst.val = src.orig_val;
+        }
+        else
+        {
+            /* Failure: write the value we saw to EAX. */
+            dst.type = OP_REG;
+            dst.reg  = (unsigned long *)&_regs.eax;
+        }
+        break;
+
     case 0xb2: /* lss */
         dst.val = x86_seg_ss;
         goto les;
+
+    case 0xb3: btr: /* btr */
+        emulate_2op_SrcV_nobyte("btr", src, dst, _regs.eflags);
+        break;
 
     case 0xb4: /* lfs */
         dst.val = x86_seg_fs;
@@ -4595,6 +4595,25 @@ x86_emulate(
         dst.reg   = decode_register(modrm_reg, &_regs, 0);
         dst.bytes = op_bytes;
         dst.val   = (uint8_t)src.val;
+        break;
+
+    case 0xb7: /* movzx rm16,r{16,32,64} */
+        dst.val = (uint16_t)src.val;
+        break;
+
+    case 0xba: /* Grp8 */
+        switch ( modrm_reg & 7 )
+        {
+        case 4: goto bt;
+        case 5: goto bts;
+        case 6: goto btr;
+        case 7: goto btc;
+        default: generate_exception_if(1, EXC_UD, -1);
+        }
+        break;
+
+    case 0xbb: btc: /* btc */
+        emulate_2op_SrcV_nobyte("btc", src, dst, _regs.eflags);
         break;
 
     case 0xbc: /* bsf or tzcnt */ {
@@ -4664,25 +4683,6 @@ x86_emulate(
         }
         break;
     }
-
-    case 0xb7: /* movzx rm16,r{16,32,64} */
-        dst.val = (uint16_t)src.val;
-        break;
-
-    case 0xbb: btc: /* btc */
-        emulate_2op_SrcV_nobyte("btc", src, dst, _regs.eflags);
-        break;
-
-    case 0xba: /* Grp8 */
-        switch ( modrm_reg & 7 )
-        {
-        case 4: goto bt;
-        case 5: goto bts;
-        case 6: goto btr;
-        case 7: goto btc;
-        default: generate_exception_if(1, EXC_UD, -1);
-        }
-        break;
 
     case 0xbe: /* movsx rm8,r{16,32,64} */
         /* Recompute DstReg as we may have decoded AH/BH/CH/DH. */
