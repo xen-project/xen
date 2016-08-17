@@ -34,6 +34,7 @@
 #define SrcNone     (0<<3) /* No source operand. */
 #define SrcImplicit (0<<3) /* Source operand is implicit in the opcode. */
 #define SrcReg      (1<<3) /* Register operand. */
+#define SrcEax      SrcReg /* Register EAX (aka SrcReg with no ModRM) */
 #define SrcMem      (2<<3) /* Memory operand. */
 #define SrcMem16    (3<<3) /* Memory operand (16-bit). */
 #define SrcImm      (4<<3) /* Immediate operand. */
@@ -118,8 +119,10 @@ static uint8_t opcode_table[256] = {
     DstMem|SrcReg|ModRM|Mov, DstReg|SrcNone|ModRM,
     DstReg|SrcMem16|ModRM|Mov, DstMem|SrcNone|ModRM|Mov,
     /* 0x90 - 0x97 */
-    ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
-    ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
+    DstImplicit|SrcEax, DstImplicit|SrcEax,
+    DstImplicit|SrcEax, DstImplicit|SrcEax,
+    DstImplicit|SrcEax, DstImplicit|SrcEax,
+    DstImplicit|SrcEax, DstImplicit|SrcEax,
     /* 0x98 - 0x9F */
     ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
     ImplicitOps|Mov, ImplicitOps|Mov, ImplicitOps, ImplicitOps,
@@ -2501,12 +2504,11 @@ x86_emulate(
     case 0x90: /* nop / xchg %%r8,%%rax */
         if ( !(rex_prefix & 1) )
             break; /* nop */
+        /* fall through */
 
     case 0x91 ... 0x97: /* xchg reg,%%rax */
-        src.type = dst.type = OP_REG;
-        src.bytes = dst.bytes = op_bytes;
-        src.reg  = (unsigned long *)&_regs.eax;
-        src.val  = *src.reg;
+        dst.type = OP_REG;
+        dst.bytes = op_bytes;
         dst.reg  = decode_register(
             (b & 7) | ((rex_prefix & 1) << 3), &_regs, 0);
         dst.val  = *dst.reg;
