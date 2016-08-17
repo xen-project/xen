@@ -61,7 +61,12 @@ static always_inline int xsm_default_action(
         return 0;
     case XSM_TARGET:
         if ( src == target )
+        {
             return 0;
+    case XSM_XS_PRIV:
+            if ( src->is_xenstore )
+                return 0;
+        }
         /* fall through */
     case XSM_DM_PRIV:
         if ( target && src->target == target )
@@ -69,10 +74,6 @@ static always_inline int xsm_default_action(
         /* fall through */
     case XSM_PRIV:
         if ( src->is_privileged )
-            return 0;
-        return -EPERM;
-    case XSM_XS_PRIV:
-        if ( src->is_xenstore || src->is_privileged )
             return 0;
         return -EPERM;
     default:

@@ -396,14 +396,13 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
     switch ( op->cmd )
     {
     case XEN_DOMCTL_createdomain:
-    case XEN_DOMCTL_getdomaininfo:
     case XEN_DOMCTL_test_assign_device:
     case XEN_DOMCTL_gdbsx_guestmemio:
         d = NULL;
         break;
     default:
         d = rcu_lock_domain_by_id(op->domain);
-        if ( d == NULL )
+        if ( !d && op->cmd != XEN_DOMCTL_getdomaininfo )
             return -ESRCH;
     }
 
@@ -817,13 +816,21 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
 
     case XEN_DOMCTL_getdomaininfo:
     {
-        domid_t dom = op->domain;
+        domid_t dom = DOMID_INVALID;
 
-        rcu_read_lock(&domlist_read_lock);
-
-        for_each_domain ( d )
-            if ( d->domain_id >= dom )
+        if ( !d )
+        {
+            ret = -EINVAL;
+            if ( op->domain >= DOMID_FIRST_RESERVED )
                 break;
+
+            rcu_read_lock(&domlist_read_lock);
+
+            dom = op->domain;
+            for_each_domain ( d )
+                if ( d->domain_id >= dom )
+                    break;
+        }
 
         ret = -ESRCH;
         if ( d == NULL )
@@ -839,6 +846,10 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
         copyback = 1;
 
     getdomaininfo_out:
+        /* When d was non-NULL upon entry, no cleanup is needed. */
+        if ( dom == DOMID_INVALID )
+            break;
+
         rcu_read_unlock(&domlist_read_lock);
         d = NULL;
         break;
