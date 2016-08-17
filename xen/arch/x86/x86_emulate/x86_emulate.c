@@ -465,28 +465,29 @@ typedef union {
 "orl  %"_LO32 _tmp",%"_LO32 _sav"; "
 
 /* Raw emulation: instruction has two explicit operands. */
-#define __emulate_2op_nobyte(_op,_src,_dst,_eflags,_wx,_wy,_lx,_ly,_qx,_qy)\
+#define __emulate_2op_nobyte(_op,_src,_dst,_eflags, wsx,wsy,wdx,wdy,       \
+                             lsx,lsy,ldx,ldy, qsx,qsy,qdx,qdy)             \
 do{ unsigned long _tmp;                                                    \
     switch ( (_dst).bytes )                                                \
     {                                                                      \
     case 2:                                                                \
         asm volatile (                                                     \
             _PRE_EFLAGS("0","4","2")                                       \
-            _op"w %"_wx"3,%1; "                                            \
+            _op"w %"wsx"3,%"wdx"1; "                                       \
             _POST_EFLAGS("0","4","2")                                      \
-            : "+g" (_eflags), "+m" ((_dst).val), "=&r" (_tmp)              \
-            : _wy ((_src).val), "i" (EFLAGS_MASK) );                       \
+            : "+g" (_eflags), "+" wdy ((_dst).val), "=&r" (_tmp)           \
+            : wsy ((_src).val), "i" (EFLAGS_MASK) );                       \
         break;                                                             \
     case 4:                                                                \
         asm volatile (                                                     \
             _PRE_EFLAGS("0","4","2")                                       \
-            _op"l %"_lx"3,%1; "                                            \
+            _op"l %"lsx"3,%"ldx"1; "                                       \
             _POST_EFLAGS("0","4","2")                                      \
-            : "+g" (_eflags), "+m" ((_dst).val), "=&r" (_tmp)              \
-            : _ly ((_src).val), "i" (EFLAGS_MASK) );                       \
+            : "+g" (_eflags), "+" ldy ((_dst).val), "=&r" (_tmp)           \
+            : lsy ((_src).val), "i" (EFLAGS_MASK) );                       \
         break;                                                             \
     case 8:                                                                \
-        __emulate_2op_8byte(_op, _src, _dst, _eflags, _qx, _qy);           \
+        __emulate_2op_8byte(_op, _src, _dst, _eflags, qsx, qsy, qdx, qdy); \
         break;                                                             \
     }                                                                      \
 } while (0)
@@ -503,7 +504,8 @@ do{ unsigned long _tmp;                                                    \
             : _by ((_src).val), "i" (EFLAGS_MASK) );                       \
         break;                                                             \
     default:                                                               \
-        __emulate_2op_nobyte(_op,_src,_dst,_eflags,_wx,_wy,_lx,_ly,_qx,_qy);\
+        __emulate_2op_nobyte(_op,_src,_dst,_eflags, _wx,_wy,"","m",        \
+                             _lx,_ly,"","m", _qx,_qy,"","m");              \
         break;                                                             \
     }                                                                      \
 } while (0)
@@ -517,8 +519,12 @@ do{ unsigned long _tmp;                                                    \
                   "b", "q", "w", "r", _LO32, "r", "", "r")
 /* Source operand is word, long or quad sized. */
 #define emulate_2op_SrcV_nobyte(_op, _src, _dst, _eflags)                  \
-    __emulate_2op_nobyte(_op, _src, _dst, _eflags,                         \
-                  "w", "r", _LO32, "r", "", "r")
+    __emulate_2op_nobyte(_op, _src, _dst, _eflags, "w", "r", "", "m",      \
+                         _LO32, "r", "", "m", "", "r", "", "m")
+/* Operands are word, long or quad sized and source may be in memory. */
+#define emulate_2op_SrcV_srcmem(_op, _src, _dst, _eflags)                  \
+    __emulate_2op_nobyte(_op, _src, _dst, _eflags, "", "m", "w", "r",      \
+                         "", "m", _LO32, "r", "", "m", "", "r")
 
 /* Instruction has only one explicit operand (no source operand). */
 #define emulate_1op(_op,_dst,_eflags)                                      \
@@ -557,13 +563,13 @@ do{ unsigned long _tmp;                                                    \
 
 /* Emulate an instruction with quadword operands (x86/64 only). */
 #if defined(__x86_64__)
-#define __emulate_2op_8byte(_op, _src, _dst, _eflags, _qx, _qy)         \
+#define __emulate_2op_8byte(_op, _src, _dst, _eflags, qsx, qsy, qdx, qdy) \
 do{ asm volatile (                                                      \
         _PRE_EFLAGS("0","4","2")                                        \
-        _op"q %"_qx"3,%1; "                                             \
+        _op"q %"qsx"3,%"qdx"1; "                                        \
         _POST_EFLAGS("0","4","2")                                       \
-        : "+g" (_eflags), "+m" ((_dst).val), "=&r" (_tmp)               \
-        : _qy ((_src).val), "i" (EFLAGS_MASK) );                        \
+        : "+g" (_eflags), "+" qdy ((_dst).val), "=&r" (_tmp)            \
+        : qsy ((_src).val), "i" (EFLAGS_MASK) );                        \
 } while (0)
 #define __emulate_1op_8byte(_op, _dst, _eflags)                         \
 do{ asm volatile (                                                      \
@@ -574,7 +580,7 @@ do{ asm volatile (                                                      \
         : "i" (EFLAGS_MASK) );                                          \
 } while (0)
 #elif defined(__i386__)
-#define __emulate_2op_8byte(_op, _src, _dst, _eflags, _qx, _qy)
+#define __emulate_2op_8byte(_op, _src, _dst, _eflags, qsx, qsy, qdx, qdy)
 #define __emulate_1op_8byte(_op, _dst, _eflags)
 #endif /* __i386__ */
 
@@ -4569,31 +4575,7 @@ x86_emulate(
         break;
 
     case 0xaf: /* imul */
-        _regs.eflags &= ~(EFLG_OF|EFLG_CF);
-        switch ( dst.bytes )
-        {
-        case 2:
-            dst.val = ((uint32_t)(int16_t)src.val *
-                       (uint32_t)(int16_t)dst.val);
-            if ( (int16_t)dst.val != (uint32_t)dst.val )
-                _regs.eflags |= EFLG_OF|EFLG_CF;
-            break;
-#ifdef __x86_64__
-        case 4:
-            dst.val = ((uint64_t)(int32_t)src.val *
-                       (uint64_t)(int32_t)dst.val);
-            if ( (int32_t)dst.val != dst.val )
-                _regs.eflags |= EFLG_OF|EFLG_CF;
-            break;
-#endif
-        default: {
-            unsigned long m[2] = { src.val, dst.val };
-            if ( imul_dbl(m) )
-                _regs.eflags |= EFLG_OF|EFLG_CF;
-            dst.val = m[0];
-            break;
-        }
-        }
+        emulate_2op_SrcV_srcmem("imul", src, dst, _regs.eflags);
         break;
 
     case 0xb2: /* lss */
