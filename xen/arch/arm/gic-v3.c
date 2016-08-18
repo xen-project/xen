@@ -1172,8 +1172,10 @@ static int gicv3_make_hwdom_dt_node(const struct domain *d,
 
     res = fdt_property(fdt, "reg", new_cells, len);
     xfree(new_cells);
+    if ( res )
+        return res;
 
-    return res;
+    return gicv3_its_make_hwdom_dt_nodes(d, gic, fdt);
 }
 
 static const hw_irq_controller gicv3_host_irq_type = {

@@ -158,6 +158,11 @@ int gicv3_its_setup_collection(unsigned int cpu);
 int vgic_v3_its_init_domain(struct domain *d);
 void vgic_v3_its_free_domain(struct domain *d);
 
+/* Create the appropriate DT nodes for a hardware domain. */
+int gicv3_its_make_hwdom_dt_nodes(const struct domain *d,
+                                  const struct dt_device_node *gic,
+                                  void *fdt);
+
 /*
  * Map a device on the host by allocating an ITT on the host (ITS).
  * "nr_event" specifies how many events (interrupts) this device will need.
@@ -240,6 +245,13 @@ static inline int vgic_v3_its_init_domain(struct domain *d)
 
 static inline void vgic_v3_its_free_domain(struct domain *d)
 {
+}
+
+static inline int gicv3_its_make_hwdom_dt_nodes(const struct domain *d,
+                                                const struct dt_device_node *gic,
+                                                void *fdt)
+{
+    return 0;
 }
 
 #endif /* CONFIG_HAS_ITS */
