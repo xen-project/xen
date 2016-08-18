@@ -54,26 +54,6 @@ config KEXEC
 
 	  If unsure, say Y.
 
-config LATE_HWDOM
-	bool "dedicated hardware domain"
-	default n
-	depends on XSM && X86
-	---help---
-	  Allows the creation of a dedicated hardware domain distinct from
-	  domain 0 that manages devices without needing access to other
-	  privileged functionality such as the ability to manage domains.
-	  This requires that the actual domain 0 be a stub domain that
-	  constructs the actual hardware domain instead of initializing the
-	  hardware itself.  Because the hardware domain needs access to
-	  hypercalls not available to unprivileged guests, an XSM policy
-	  is required to properly define the privilege of these domains.
-
-	  This feature does nothing if the "hardware_dom" boot parameter is
-	  not present.  If this feature is being used for security, it should
-	  be combined with an IOMMU in strict mode.
-
-	  If unsure, say N.
-
 config TMEM
 	def_bool y
 	prompt "Transcendent Memory Support" if EXPERT = "y"
@@ -151,6 +131,26 @@ config XSM_POLICY
 
 	  If unsure, say Y.
 
+config LATE_HWDOM
+	bool "Dedicated hardware domain"
+	default n
+	depends on XSM && X86
+	---help---
+	  Allows the creation of a dedicated hardware domain distinct from
+	  domain 0 that manages devices without needing access to other
+	  privileged functionality such as the ability to manage domains.
+	  This requires that the actual domain 0 be a stub domain that
+	  constructs the actual hardware domain instead of initializing the
+	  hardware itself.  Because the hardware domain needs access to
+	  hypercalls not available to unprivileged guests, an XSM policy
+	  is required to properly define the privilege of these domains.
+
+	  This feature does nothing if the "hardware_dom" boot parameter is
+	  not present.  If this feature is being used for security, it should
+	  be combined with an IOMMU in strict mode.
+
+	  If unsure, say N.
+
 menu "Schedulers"
 	visible if EXPERT = "y"
 
@@ -183,7 +183,7 @@ config SCHED_ARINC653
 
 choice
 	prompt "Default Scheduler?"
-	default SCHED_CREDIT_DEFAULT 
+	default SCHED_CREDIT_DEFAULT
 
 	config SCHED_CREDIT_DEFAULT
 		bool "Credit Scheduler" if SCHED_CREDIT
