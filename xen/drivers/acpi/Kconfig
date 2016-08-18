@@ -1,5 +1,4 @@
 
-# Select ACPI if ACPI is supported
 config ACPI
 	bool
 

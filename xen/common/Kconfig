@@ -11,31 +11,24 @@ config COMPAT
 config CORE_PARKING
 	bool
 
-# Select HAS_DEVICE_TREE if device tree is supported
 config HAS_DEVICE_TREE
 	bool
 
-# Select HAS_MEM_ACCESS if mem access is supported
 config HAS_MEM_ACCESS
 	bool
 
-# Select HAS_MEM_PAGING if mem paging is supported
 config HAS_MEM_PAGING
 	bool
 
-# Select HAS_MEM_SHARING if mem sharing is supported
 config HAS_MEM_SHARING
 	bool
 
-# Select HAS_PDX if PDX is supported
 config HAS_PDX
 	bool
 
-# Select HAS_KEXEC if kexec is supported
 config HAS_KEXEC
 	bool
 
-# Select HAS_GDBSX if GDBSX is supported
 config HAS_GDBSX
 	bool
 
@@ -50,7 +43,6 @@ config HAS_CHECKPOLICY
 	string
 	option env="XEN_HAS_CHECKPOLICY"
 
-# Enable/Disable kexec support
 config KEXEC
 	bool "kexec support"
 	default y
@@ -62,7 +54,6 @@ config KEXEC
 
 	  If unsure, say Y.
 
-# Allows "late" initialization of the hardware domain
 config LATE_HWDOM
 	bool "dedicated hardware domain"
 	default n
@@ -83,7 +74,6 @@ config LATE_HWDOM
 
 	  If unsure, say N.
 
-# Enables transcendent memory support
 config TMEM
 	def_bool y
 	prompt "Transcendent Memory Support" if EXPERT = "y"
@@ -97,7 +87,6 @@ config TMEM
 
 	  If unsure, say Y.
 
-# Adds support for Xenoprof
 config XENOPROF
 	def_bool y
 	prompt "Xen Oprofile Support" if EXPERT = "y"
@@ -110,7 +99,6 @@ config XENOPROF
 
 	  If unsure, say Y.
 
-# Enable/Disable XSM support
 config XSM
 	bool "Xen Security Modules support"
 	default n
@@ -163,7 +151,6 @@ config XSM_POLICY
 
 	  If unsure, say Y.
 
-# Enable schedulers
 menu "Schedulers"
 	visible if EXPERT = "y"
 
@@ -221,7 +208,6 @@ endmenu
 config CRYPTO
 	bool
 
-# Enable/Disable live patching support
 config LIVEPATCH
 	bool "Live patching support (TECH PREVIEW)"
 	default n

@@ -1,4 +1,3 @@
 
-# Select HAS_PASSTHROUGH if device pass through is supported
 config HAS_PASSTHROUGH
 	bool
