@@ -864,7 +864,7 @@ static long xatp_permission_check(struct domain *d, unsigned int space)
 
 long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 {
-    struct domain *d;
+    struct domain *d, *curr_d = current->domain;
     long rc;
     struct xen_memory_reservation reservation;
     struct memop_args args;
@@ -905,7 +905,7 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
              && (reservation.mem_flags & XENMEMF_populate_on_demand) )
             args.memflags |= MEMF_populate_on_demand;
 
-        if ( xsm_memory_adjust_reservation(XSM_TARGET, current->domain, d) )
+        if ( xsm_memory_adjust_reservation(XSM_TARGET, curr_d, d) )
         {
             rcu_unlock_domain(d);
             return start_extent;
@@ -962,7 +962,7 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( d == NULL )
             return -ESRCH;
 
-        rc = xsm_memory_stat_reservation(XSM_TARGET, current->domain, d);
+        rc = xsm_memory_stat_reservation(XSM_TARGET, curr_d, d);
         if ( rc )
         {
             rcu_unlock_domain(d);
@@ -1086,7 +1086,7 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( d == NULL )
             return -ESRCH;
 
-        rc = xsm_remove_from_physmap(XSM_TARGET, current->domain, d);
+        rc = xsm_remove_from_physmap(XSM_TARGET, curr_d, d);
         if ( rc )
         {
             rcu_unlock_domain(d);
