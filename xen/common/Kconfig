@@ -218,6 +218,9 @@ config SCHED_DEFAULT
 
 endmenu
 
+config CRYPTO
+	bool
+
 # Enable/Disable live patching support
 config LIVEPATCH
 	bool "Live patching support (TECH PREVIEW)"
