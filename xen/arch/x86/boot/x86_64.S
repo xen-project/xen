@@ -88,7 +88,7 @@ GLOBAL(__page_tables_start)
  * of physical memory. In any case the VGA hole should be mapped with type UC.
  * Uses 1x 4k page.
  */
-GLOBAL(l1_identmap)
+l1_identmap:
         pfn = 0
         .rept L1_PAGETABLE_ENTRIES
         /* VGA hole (0xa0000-0xc0000) should be mapped UC. */
@@ -143,7 +143,7 @@ l2_fixmap:
         .size l2_fixmap, . - l2_fixmap
 
 /* Identity map, covering the 4 l2_identmap tables.  Uses 1x 4k page. */
-GLOBAL(l3_identmap)
+l3_identmap:
         idx = 0
         .rept 4
         .quad sym_phys(l2_identmap) + (idx << PAGE_SHIFT) + __PAGE_HYPERVISOR
