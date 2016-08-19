@@ -228,7 +228,7 @@ static void __init efi_arch_pre_exit_boot(void)
 
 static void __init noreturn efi_arch_post_exit_boot(void)
 {
-    u64 efer;
+    u64 cr4 = XEN_MINIMAL_CR4 & ~X86_CR4_PGE, efer;
 
     efi_arch_relocate_image(__XEN_VIRT_START - xen_phys_start);
     memcpy((void *)trampoline_phys, trampoline_start, cfg.size);
@@ -244,6 +244,10 @@ static void __init noreturn efi_arch_post_exit_boot(void)
               X86_CR0_AM | X86_CR0_PG);
     asm volatile ( "mov    %[cr4], %%cr4\n\t"
                    "mov    %[cr3], %%cr3\n\t"
+#if XEN_MINIMAL_CR4 & X86_CR4_PGE
+                   "or     $"__stringify(X86_CR4_PGE)", %[cr4]\n\t"
+                   "mov    %[cr4], %%cr4\n\t"
+#endif
                    "movabs $__start_xen, %[rip]\n\t"
                    "lgdt   gdt_descr(%%rip)\n\t"
                    "mov    stack_start(%%rip), %%rsp\n\t"
@@ -255,9 +259,9 @@ static void __init noreturn efi_arch_post_exit_boot(void)
                    "movl   %[cs], 8(%%rsp)\n\t"
                    "mov    %[rip], (%%rsp)\n\t"
                    "lretq  %[stkoff]-16"
-                   : [rip] "=&r" (efer/* any dead 64-bit variable */)
+                   : [rip] "=&r" (efer/* any dead 64-bit variable */),
+                     [cr4] "+&r" (cr4)
                    : [cr3] "r" (idle_pg_table),
-                     [cr4] "r" (mmu_cr4_features),
                      [cs] "ir" (__HYPERVISOR_CS),
                      [ds] "r" (__HYPERVISOR_DS),
                      [stkoff] "i" (STACK_SIZE - sizeof(struct cpu_info)),
