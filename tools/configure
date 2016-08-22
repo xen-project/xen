@@ -4449,11 +4449,15 @@ if test "${with_system_seabios+set}" = set; then :
 
 fi
 
+if test "x$seabios" = "xy"; then :
+
 
 cat >>confdefs.h <<_ACEOF
 #define SEABIOS_PATH "${seabios_path:-$XENFIRMWAREDIR/bios.bin}"
 _ACEOF
 
+
+fi
 
 
 # Check whether --with-system-ovmf was given.
@@ -4468,11 +4472,15 @@ if test "${with_system_ovmf+set}" = set; then :
 
 fi
 
+if test "x$ovmf" = "xy"; then :
+
 
 cat >>confdefs.h <<_ACEOF
 #define OVMF_PATH "${ovmf_path:-$XENFIRMWAREDIR/ovmf.bin}"
 _ACEOF
 
+
+fi
 
 
 # Check whether --with-extra-qemuu-configure-args was given.
