@@ -272,8 +272,8 @@ const struct hvm_modlist_entry *get_module_entry(
 
     if ( !modlist ||
          info->modlist_paddr > UINTPTR_MAX ||
-         (info->modlist_paddr + info->nr_modules * sizeof(*modlist) - 1)
-            > UINTPTR_MAX )
+         (UINTPTR_MAX - (uintptr_t)info->modlist_paddr) / sizeof(*modlist)
+         < info->nr_modules )
         return NULL;
 
     for ( i = 0; i < info->nr_modules; i++ )
