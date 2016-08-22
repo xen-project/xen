@@ -37,12 +37,20 @@ const char *libxl__run_dir_path(void)
 
 const char *libxl__seabios_path(void)
 {
+#ifdef SEABIOS_PATH
     return SEABIOS_PATH;
+#else
+    return NULL;
+#endif
 }
 
 const char *libxl__ovmf_path(void)
 {
+#ifdef OVMF_PATH
     return OVMF_PATH;
+#else
+    return NULL;
+#endif
 }
 
 /*
