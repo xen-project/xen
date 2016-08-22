@@ -82,7 +82,7 @@
  *   8M -  10M   Early relocation address (used when relocating Xen)
  *
  * ARM32 layout:
- *   0  -   8M   <COMMON>
+ *   0  -  10M   <COMMON>
  *
  *  32M - 128M   Frametable: 24 bytes per page for 16GB of RAM
  * 256M -   1G   VMAP: ioremap and early_ioremap use this virtual address
@@ -93,7 +93,7 @@
  *
  * ARM64 layout:
  * 0x0000000000000000 - 0x0000007fffffffff (512GB, L0 slot [0])
- *   0  -   8M   <COMMON>
+ *   0  -  10M   <COMMON>
  *
  *   1G -   2G   VMAP: ioremap and early_ioremap
  *
