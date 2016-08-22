@@ -233,12 +233,29 @@ static int __vgic_v3_rdistr_rd_mmio_read(struct vcpu *v, mmio_info_t *info,
         goto read_reserved;
 
     case VREG64(GICR_PROPBASER):
-        /* LPI's not implemented */
-        goto read_as_zero_64;
+        if ( !v->domain->arch.vgic.has_its )
+            goto read_as_zero_64;
+        if ( !vgic_reg64_check_access(dabt) ) goto bad_width;
+
+        vgic_lock(v);
+        *r = vgic_reg64_extract(v->domain->arch.vgic.rdist_propbase, info);
+        vgic_unlock(v);
+        return 1;
 
     case VREG64(GICR_PENDBASER):
-        /* LPI's not implemented */
-        goto read_as_zero_64;
+    {
+        unsigned long flags;
+
+        if ( !v->domain->arch.vgic.has_its )
+            goto read_as_zero_64;
+        if ( !vgic_reg64_check_access(dabt) ) goto bad_width;
+
+        spin_lock_irqsave(&v->arch.vgic.lock, flags);
+        *r = vgic_reg64_extract(v->arch.vgic.rdist_pendbase, info);
+        *r &= ~GICR_PENDBASER_PTZ;       /* WO, reads as 0 */
+        spin_unlock_irqrestore(&v->arch.vgic.lock, flags);
+        return 1;
+    }
 
     case 0x0080:
         goto read_reserved;
@@ -335,11 +352,95 @@ read_unknown:
     return 1;
 }
 
+static uint64_t vgic_sanitise_field(uint64_t reg, uint64_t field_mask,
+                                    int field_shift,
+                                    uint64_t (*sanitise_fn)(uint64_t))
+{
+    uint64_t field = (reg & field_mask) >> field_shift;
+
+    field = sanitise_fn(field) << field_shift;
+
+    return (reg & ~field_mask) | field;
+}
+
+/* We want to avoid outer shareable. */
+static uint64_t vgic_sanitise_shareability(uint64_t field)
+{
+    switch ( field )
+    {
+    case GIC_BASER_OuterShareable:
+        return GIC_BASER_InnerShareable;
+    default:
+        return field;
+    }
+}
+
+/* Avoid any inner non-cacheable mapping. */
+static uint64_t vgic_sanitise_inner_cacheability(uint64_t field)
+{
+    switch ( field )
+    {
+    case GIC_BASER_CACHE_nCnB:
+    case GIC_BASER_CACHE_nC:
+        return GIC_BASER_CACHE_RaWb;
+    default:
+        return field;
+    }
+}
+
+/* Non-cacheable or same-as-inner are OK. */
+static uint64_t vgic_sanitise_outer_cacheability(uint64_t field)
+{
+    switch ( field )
+    {
+    case GIC_BASER_CACHE_SameAsInner:
+    case GIC_BASER_CACHE_nC:
+        return field;
+    default:
+        return GIC_BASER_CACHE_nC;
+    }
+}
+
+static uint64_t sanitize_propbaser(uint64_t reg)
+{
+    reg = vgic_sanitise_field(reg, GICR_PROPBASER_SHAREABILITY_MASK,
+                              GICR_PROPBASER_SHAREABILITY_SHIFT,
+                              vgic_sanitise_shareability);
+    reg = vgic_sanitise_field(reg, GICR_PROPBASER_INNER_CACHEABILITY_MASK,
+                              GICR_PROPBASER_INNER_CACHEABILITY_SHIFT,
+                              vgic_sanitise_inner_cacheability);
+    reg = vgic_sanitise_field(reg, GICR_PROPBASER_OUTER_CACHEABILITY_MASK,
+                              GICR_PROPBASER_OUTER_CACHEABILITY_SHIFT,
+                              vgic_sanitise_outer_cacheability);
+
+    reg &= ~GICR_PROPBASER_RES0_MASK;
+
+    return reg;
+}
+
+static uint64_t sanitize_pendbaser(uint64_t reg)
+{
+    reg = vgic_sanitise_field(reg, GICR_PENDBASER_SHAREABILITY_MASK,
+                              GICR_PENDBASER_SHAREABILITY_SHIFT,
+                              vgic_sanitise_shareability);
+    reg = vgic_sanitise_field(reg, GICR_PENDBASER_INNER_CACHEABILITY_MASK,
+                              GICR_PENDBASER_INNER_CACHEABILITY_SHIFT,
+                              vgic_sanitise_inner_cacheability);
+    reg = vgic_sanitise_field(reg, GICR_PENDBASER_OUTER_CACHEABILITY_MASK,
+                              GICR_PENDBASER_OUTER_CACHEABILITY_SHIFT,
+                              vgic_sanitise_outer_cacheability);
+
+    reg &= ~GICR_PENDBASER_RES0_MASK;
+
+    return reg;
+}
+
 static int __vgic_v3_rdistr_rd_mmio_write(struct vcpu *v, mmio_info_t *info,
                                           uint32_t gicr_reg,
                                           register_t r)
 {
     struct hsr_dabt dabt = info->dabt;
+    uint64_t reg;
 
     switch ( gicr_reg )
     {
@@ -370,36 +471,75 @@ static int __vgic_v3_rdistr_rd_mmio_write(struct vcpu *v, mmio_info_t *info,
         goto write_impl_defined;
 
     case VREG64(GICR_SETLPIR):
-        /* LPI is not implemented */
+        /* LPIs without an ITS are not implemented */
         goto write_ignore_64;
 
     case VREG64(GICR_CLRLPIR):
-        /* LPI is not implemented */
+        /* LPIs without an ITS are not implemented */
         goto write_ignore_64;
 
     case 0x0050:
         goto write_reserved;
 
     case VREG64(GICR_PROPBASER):
-        /* LPI is not implemented */
-        goto write_ignore_64;
+        if ( !v->domain->arch.vgic.has_its )
+            goto write_ignore_64;
+        if ( !vgic_reg64_check_access(dabt) ) goto bad_width;
+
+        vgic_lock(v);
+
+        /*
+         * Writing PROPBASER with any redistributor having LPIs enabled
+         * is UNPREDICTABLE.
+         */
+        if ( !(v->domain->arch.vgic.rdists_enabled) )
+        {
+            reg = v->domain->arch.vgic.rdist_propbase;
+            vgic_reg64_update(&reg, r, info);
+            reg = sanitize_propbaser(reg);
+            v->domain->arch.vgic.rdist_propbase = reg;
+        }
+
+        vgic_unlock(v);
+
+        return 1;
 
     case VREG64(GICR_PENDBASER):
-        /* LPI is not implemented */
-        goto write_ignore_64;
+    {
+        unsigned long flags;
+
+        if ( !v->domain->arch.vgic.has_its )
+            goto write_ignore_64;
+        if ( !vgic_reg64_check_access(dabt) ) goto bad_width;
+
+        spin_lock_irqsave(&v->arch.vgic.lock, flags);
+
+        /* Writing PENDBASER with LPIs enabled is UNPREDICTABLE. */
+        if ( !(v->arch.vgic.flags & VGIC_V3_LPIS_ENABLED) )
+        {
+            reg = v->arch.vgic.rdist_pendbase;
+            vgic_reg64_update(&reg, r, info);
+            reg = sanitize_pendbaser(reg);
+            v->arch.vgic.rdist_pendbase = reg;
+        }
+
+        spin_unlock_irqrestore(&v->arch.vgic.lock, false);
+
+        return 1;
+    }
 
     case 0x0080:
         goto write_reserved;
 
     case VREG64(GICR_INVLPIR):
-        /* LPI is not implemented */
+        /* LPIs without an ITS are not implemented */
         goto write_ignore_64;
 
     case 0x00A8:
         goto write_reserved;
 
     case VREG64(GICR_INVALLR):
-        /* LPI is not implemented */
+        /* LPIs without an ITS are not implemented */
         goto write_ignore_64;
 
     case 0x00B8:
