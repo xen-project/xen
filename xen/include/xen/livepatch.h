@@ -71,7 +71,7 @@ int arch_livepatch_verify_func(const struct livepatch_func *func);
  * These functions are called around the critical region patching live code,
  * for an architecture to take make appropratie global state adjustments.
  */
-void arch_livepatch_quiesce(void);
+int arch_livepatch_quiesce(void);
 void arch_livepatch_revive(void);
 
 void arch_livepatch_apply_jmp(struct livepatch_func *func);

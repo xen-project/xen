@@ -7,8 +7,9 @@
 #include <xen/livepatch_elf.h>
 #include <xen/livepatch.h>
 
-void arch_livepatch_quiesce(void)
+int arch_livepatch_quiesce(void)
 {
+    return -ENOSYS;
 }
 
 void arch_livepatch_revive(void)
