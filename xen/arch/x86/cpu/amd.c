@@ -211,6 +211,24 @@ static void amd_ctxt_switch_levelling(const struct vcpu *next)
 		(nextd && is_pv_domain(nextd) && nextd->arch.pv_domain.cpuidmasks)
 		? nextd->arch.pv_domain.cpuidmasks : &cpuidmask_defaults;
 
+	if ((levelling_caps & LCAP_1cd) == LCAP_1cd) {
+		uint64_t val = masks->_1cd;
+
+		/*
+		 * OSXSAVE defaults to 1, which causes fast-forwarding of
+		 * Xen's real setting.  Clobber it if disabled by the guest
+		 * kernel.
+		 */
+		if (next && is_pv_vcpu(next) && !is_idle_vcpu(next) &&
+		    !(next->arch.pv_vcpu.ctrlreg[4] & X86_CR4_OSXSAVE))
+			val &= ~((uint64_t)cpufeat_mask(X86_FEATURE_OSXSAVE) << 32);
+
+		if (unlikely(these_masks->_1cd != val)) {
+			wrmsr_amd(MSR_K8_FEATURE_MASK, val);
+			these_masks->_1cd = val;
+		}
+	}
+
 #define LAZY(cap, msr, field)						\
 	({								\
 		if (unlikely(these_masks->field != masks->field) &&	\
@@ -221,7 +239,6 @@ static void amd_ctxt_switch_levelling(const struct vcpu *next)
 		}							\
 	})
 
-	LAZY(LCAP_1cd,  MSR_K8_FEATURE_MASK,       _1cd);
 	LAZY(LCAP_e1cd, MSR_K8_EXT_FEATURE_MASK,   e1cd);
 	LAZY(LCAP_7ab0, MSR_AMD_L7S0_FEATURE_MASK, _7ab0);
 	LAZY(LCAP_6c,   MSR_AMD_THRM_FEATURE_MASK, _6c);

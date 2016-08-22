@@ -2737,6 +2737,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         case 4: /* Write CR4 */
             v->arch.pv_vcpu.ctrlreg[4] = pv_guest_cr4_fixup(v, *reg);
             write_cr4(pv_guest_cr4_to_real_cr4(v));
+            ctxt_switch_levelling(v);
             break;
 
         default:
