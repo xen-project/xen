@@ -68,10 +68,10 @@ static void ovmf_setup_bios_info(void)
 {
     struct ovmf_info *info = (void *)OVMF_INFO_PHYSICAL_ADDRESS;
 
-    memset(info, 0, sizeof(*info));
-
-    memcpy(info->signature, "XenHVMOVMF", sizeof(info->signature));
-    info->length = sizeof(*info);
+    *info = (struct ovmf_info) {
+        .signature = "XenHVMOVMF",
+        .length = sizeof(*info)
+    };
 }
 
 static void ovmf_finish_bios_info(void)

@@ -56,10 +56,10 @@ static void seabios_setup_bios_info(void)
 {
     struct seabios_info *info = (void *)BIOS_INFO_PHYSICAL_ADDRESS;
 
-    memset(info, 0, sizeof(*info));
-
-    memcpy(info->signature, "XenHVMSeaBIOS", sizeof(info->signature));
-    info->length = sizeof(*info);
+    *info = (struct seabios_info) {
+        .signature = "XenHVMSeaBIOS",
+        .length = sizeof(*info)
+    };
 
     info->tables = (uint32_t)scratch_alloc(MAX_TABLES*sizeof(uint32_t), 0);
 }
