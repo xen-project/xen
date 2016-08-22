@@ -30,6 +30,22 @@ static inline void write_pte(lpae_t *p, lpae_t pte)
 #define __clean_and_invalidate_dcache_one(R) STORE_CP32(R, DCCIMVAC)
 
 /*
+ * Invalidate all instruction caches in Inner Shareable domain to PoU.
+ * We also need to flush the branch predictor for ARMv7 as it may be
+ * architecturally visible to the software (see B2.2.4 in ARM DDI 0406C.b).
+ */
+static inline void invalidate_icache(void)
+{
+    asm volatile (
+        CMD_CP32(ICIALLUIS)     /* Flush I-cache. */
+        CMD_CP32(BPIALLIS)      /* Flush branch predictor. */
+        : : : "memory");
+
+    dsb(ish);                   /* Ensure completion of the flush I-cache */
+    isb();                      /* Synchronize fetched instruction stream. */
+}
+
+/*
  * Flush all hypervisor mappings from the TLB and branch predictor of
  * the local processor.
  *
