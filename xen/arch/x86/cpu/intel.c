@@ -151,9 +151,10 @@ static void __init probe_masking_msrs(void)
  * used to context switch to the default host state (by the cpu bringup-code,
  * crash path, etc).
  */
-static void intel_ctxt_switch_levelling(const struct domain *nextd)
+static void intel_ctxt_switch_levelling(const struct vcpu *next)
 {
 	struct cpuidmasks *these_masks = &this_cpu(cpuidmasks);
+	const struct domain *nextd = next ? next->domain : NULL;
 	const struct cpuidmasks *masks;
 
 	if (cpu_has_cpuid_faulting) {
