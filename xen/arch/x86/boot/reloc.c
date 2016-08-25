@@ -15,39 +15,33 @@ asm (
     "    .text                         \n"
     "    .globl _start                 \n"
     "_start:                           \n"
-    "    call 1f                       \n"
-    "1:  pop  %ebx                     \n"
-    "    mov  %eax,alloc-1b(%ebx)      \n"
-    "    jmp  reloc                    \n"
-    );
-
-/*
- * This is our data. Because the code must be relocatable, no BSS is
- * allowed. All data is accessed PC-relative with inline assembly.
- */
-asm (
-    "alloc:                            \n"
-    "    .long 0                       \n"
+    "    push %eax                     \n"
+    "    push 0x8(%esp)                \n"
+    "    call reloc                    \n"
+    "    ret  $0x4                     \n"
     );
 
 typedef unsigned int u32;
 #include "../../../include/xen/multiboot.h"
 
+#define __stdcall	__attribute__((__stdcall__))
+
+#define ALIGN_UP(arg, align) \
+                (((arg) + (align) - 1) & ~((typeof(arg))(align) - 1))
+
+static u32 alloc;
+
 static void *reloc_mbi_struct(void *old, unsigned int bytes)
 {
     void *new;
-    asm(
-    "    call 1f                      \n"
-    "1:  pop  %%edx                   \n"
-    "    mov  alloc-1b(%%edx),%0      \n"
-    "    sub  %1,%0                   \n"
-    "    and  $~15,%0                 \n"
-    "    mov  %0,alloc-1b(%%edx)      \n"
-    "    mov  %0,%%edi                \n"
-    "    rep  movsb                   \n"
-       : "=&r" (new), "+c" (bytes), "+S" (old)
-	: : "edx", "edi", "memory");
-    return new;
+
+    alloc -= ALIGN_UP(bytes, 16);
+    new = (void *)alloc;
+
+    while ( bytes-- )
+        *(char *)new++ = *(char *)old++;
+
+    return (void *)alloc;
 }
 
 static char *reloc_mbi_string(char *old)
@@ -58,10 +52,14 @@ static char *reloc_mbi_string(char *old)
     return reloc_mbi_struct(old, p - old + 1);
 }
 
-multiboot_info_t *reloc(multiboot_info_t *mbi_old)
+multiboot_info_t __stdcall *reloc(multiboot_info_t *mbi_old, u32 trampoline)
 {
-    multiboot_info_t *mbi = reloc_mbi_struct(mbi_old, sizeof(*mbi));
+    multiboot_info_t *mbi;
     int i;
+
+    alloc = trampoline;
+
+    mbi = reloc_mbi_struct(mbi_old, sizeof(*mbi));
 
     if ( mbi->flags & MBI_CMDLINE )
         mbi->cmdline = (u32)reloc_mbi_string((char *)mbi->cmdline);
