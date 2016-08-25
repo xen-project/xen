@@ -129,11 +129,12 @@ static int context_get_domain_id(struct context_entry *context,
 
         dom_index = context_domain_id(*context);
 
-        if ( dom_index < nr_dom && iommu->domid_map)
+        if ( dom_index < nr_dom && iommu->domid_map )
             domid = iommu->domid_map[dom_index];
         else
-            dprintk(XENLOG_DEBUG VTDPREFIX, "%s: dom_index %lu exceeds nr_dom %lu or iommu has no domid_map\n",
-                    __func__, dom_index, nr_dom);
+            dprintk(XENLOG_DEBUG VTDPREFIX,
+                    "dom_index %lu exceeds nr_dom %lu or iommu has no domid_map\n",
+                    dom_index, nr_dom);
     }
     return domid;
 }

@@ -242,8 +242,8 @@ static int remap_entry_to_ioapic_rte(
     if ( index < 0 || index > IREMAP_ENTRY_NR - 1 )
     {
         dprintk(XENLOG_ERR VTDPREFIX,
-                "%s: index (%d) for remap table is invalid !\n",
-                __func__, index);
+                "IO-APIC index (%d) for remap table is invalid\n",
+                index);
         return -EFAULT;
     }
 
@@ -255,8 +255,8 @@ static int remap_entry_to_ioapic_rte(
     if ( iremap_entry->val == 0 )
     {
         dprintk(XENLOG_ERR VTDPREFIX,
-                "%s: index (%d) get an empty entry!\n",
-                __func__, index);
+                "IO-APIC index (%d) has an empty entry\n",
+                index);
         unmap_vtd_domain_page(iremap_entries);
         spin_unlock_irqrestore(&ir_ctrl->iremap_lock, flags);
         return -EFAULT;
@@ -301,9 +301,8 @@ static int ioapic_rte_to_remap_entry(struct iommu *iommu,
     if ( index > IREMAP_ENTRY_NR - 1 )
     {
         dprintk(XENLOG_ERR VTDPREFIX,
-                "%s: intremap index (%d) is larger than"
-                " the maximum index (%d)!\n",
-                __func__, index, IREMAP_ENTRY_NR - 1);
+                "IO-APIC intremap index (%d) larger than maximum index (%d)\n",
+                index, IREMAP_ENTRY_NR - 1);
         spin_unlock_irqrestore(&ir_ctrl->iremap_lock, flags);
         return -EFAULT;
     }
@@ -500,8 +499,8 @@ static int remap_entry_to_msi_msg(
     if ( index >= IREMAP_ENTRY_NR )
     {
         dprintk(XENLOG_ERR VTDPREFIX,
-                "%s: index (%d) for remap table is invalid !\n",
-                __func__, index);
+                "MSI index (%d) for remap table is invalid\n",
+                index);
         return -EFAULT;
     }
 
@@ -513,8 +512,8 @@ static int remap_entry_to_msi_msg(
     if ( iremap_entry->val == 0 )
     {
         dprintk(XENLOG_ERR VTDPREFIX,
-                "%s: index (%d) get an empty entry!\n",
-                __func__, index);
+                "MSI index (%d) has an empty entry\n",
+                index);
         unmap_vtd_domain_page(iremap_entries);
         spin_unlock_irqrestore(&ir_ctrl->iremap_lock, flags);
         return -EFAULT;
@@ -585,9 +584,8 @@ static int msi_msg_to_remap_entry(
     if ( index > IREMAP_ENTRY_NR - 1 )
     {
         dprintk(XENLOG_ERR VTDPREFIX,
-                "%s: intremap index (%d) is larger than"
-                " the maximum index (%d)!\n",
-                __func__, index, IREMAP_ENTRY_NR - 1);
+                "MSI intremap index (%d) larger than maximum index (%d)!\n",
+                index, IREMAP_ENTRY_NR - 1);
         for ( i = 0; i < nr; ++i )
             msi_desc[i].remap_index = -1;
         spin_unlock_irqrestore(&ir_ctrl->iremap_lock, flags);
@@ -689,9 +687,8 @@ int __init intel_setup_hpet_msi(struct msi_desc *msi_desc)
     if ( msi_desc->remap_index >= IREMAP_ENTRY_NR )
     {
         dprintk(XENLOG_ERR VTDPREFIX,
-                "%s: intremap index (%d) is larger than"
-                " the maximum index (%d)!\n",
-                __func__, msi_desc->remap_index, IREMAP_ENTRY_NR - 1);
+                "HPET intremap index (%d) larger than maximum index (%d)!\n",
+                msi_desc->remap_index, IREMAP_ENTRY_NR - 1);
         msi_desc->remap_index = -1;
         rc = -ENXIO;
     }
