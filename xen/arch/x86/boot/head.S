@@ -119,7 +119,8 @@ __start:
 
         /* Save the Multiboot info struct (after relocation) for later use. */
         mov     $sym_phys(cpu0_stack)+1024,%esp
-        push    %ebx
+        push    %eax                /* Boot trampoline address. */
+        push    %ebx                /* Multiboot information address. */
         call    reloc
         mov     %eax,sym_phys(multiboot_ptr)
 

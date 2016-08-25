@@ -10,15 +10,16 @@
  *    Keir Fraser <keir@xen.org>
  */
 
-/* entered with %eax = BOOT_TRAMPOLINE */
+/*
+ * This entry point is entered from xen/arch/x86/boot/head.S with:
+ *   - 0x4(%esp) = MULTIBOOT_INFORMATION_ADDRESS,
+ *   - 0x8(%esp) = BOOT_TRAMPOLINE_ADDRESS.
+ */
 asm (
     "    .text                         \n"
     "    .globl _start                 \n"
     "_start:                           \n"
-    "    push %eax                     \n"
-    "    push 0x8(%esp)                \n"
-    "    call reloc                    \n"
-    "    ret  $0x4                     \n"
+    "    jmp  reloc                    \n"
     );
 
 typedef unsigned int u32;
