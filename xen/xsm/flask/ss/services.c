@@ -1995,7 +1995,7 @@ int security_ocontext_add( u32 ocon, unsigned long low, unsigned long high
             {
                 if ( c->sid == sid )
                     break;
-                printk("%s: Duplicate pirq %d\n", __FUNCTION__, add->u.pirq);
+                printk("flask: Duplicate pirq %d\n", add->u.pirq);
                 ret = -EEXIST;
                 break;
             }
@@ -2027,9 +2027,8 @@ int security_ocontext_add( u32 ocon, unsigned long low, unsigned long high
                 c->u.ioport.high_ioport == high && c->sid == sid)
                 break;
 
-            printk("%s: IO Port overlap with entry %#x - %#x\n",
-                   __FUNCTION__, c->u.ioport.low_ioport,
-                   c->u.ioport.high_ioport);
+            printk("flask: IO Port overlap with entry %#x - %#x\n",
+                   c->u.ioport.low_ioport, c->u.ioport.high_ioport);
             ret = -EEXIST;
             break;
         }
@@ -2061,8 +2060,8 @@ int security_ocontext_add( u32 ocon, unsigned long low, unsigned long high
                 c->u.iomem.high_iomem == high && c->sid == sid)
                 break;
 
-            printk("%s: IO Memory overlap with entry %#"PRIx64" - %#"PRIx64"\n",
-                   __FUNCTION__, c->u.iomem.low_iomem, c->u.iomem.high_iomem);
+            printk("flask: IO Memory overlap with entry %#"PRIx64" - %#"PRIx64"\n",
+                   c->u.iomem.low_iomem, c->u.iomem.high_iomem);
             ret = -EEXIST;
             break;
         }
@@ -2092,8 +2091,7 @@ int security_ocontext_add( u32 ocon, unsigned long low, unsigned long high
                 if ( c->sid == sid )
                     break;
 
-                printk("%s: Duplicate PCI Device %#x\n", __FUNCTION__,
-                        add->u.device);
+                printk("flask: Duplicate PCI Device %#x\n", add->u.device);
                 ret = -EEXIST;
                 break;
             }
@@ -2146,7 +2144,7 @@ int security_ocontext_del( u32 ocon, unsigned long low, unsigned long high )
             }
         }
 
-        printk("%s: ocontext not found: pirq %ld\n", __FUNCTION__, low);
+        printk("flask: ocontext not found: pirq %ld\n", low);
         ret = -ENOENT;
         break;
 
@@ -2172,8 +2170,7 @@ int security_ocontext_del( u32 ocon, unsigned long low, unsigned long high )
             }
         }
 
-        printk("%s: ocontext not found: ioport %#lx - %#lx\n",
-                __FUNCTION__, low, high);
+        printk("flask: ocontext not found: ioport %#lx - %#lx\n", low, high);
         ret = -ENOENT;
         break;
 
@@ -2199,8 +2196,7 @@ int security_ocontext_del( u32 ocon, unsigned long low, unsigned long high )
             }
         }
 
-        printk("%s: ocontext not found: iomem %#lx - %#lx\n",
-                __FUNCTION__, low, high);
+        printk("flask: ocontext not found: iomem %#lx - %#lx\n", low, high);
         ret = -ENOENT;
         break;
 
@@ -2225,7 +2221,7 @@ int security_ocontext_del( u32 ocon, unsigned long low, unsigned long high )
             }
         }
 
-        printk("%s: ocontext not found: pcidevice %#lx\n", __FUNCTION__, low);
+        printk("flask: ocontext not found: pcidevice %#lx\n", low);
         ret = -ENOENT;
         break;
 

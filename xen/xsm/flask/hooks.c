@@ -241,8 +241,8 @@ static int flask_evtchn_interdomain(struct domain *d1, struct evtchn *chn1,
     rc = security_transition_sid(sid1, sid2, SECCLASS_EVENT, &newsid);
     if ( rc )
     {
-        printk("%s: security_transition_sid failed, rc=%d (domain=%d)\n",
-               __FUNCTION__, -rc, d2->domain_id);
+        printk("security_transition_sid failed, rc=%d, Dom%d\n",
+               -rc, d2->domain_id);
         return rc;
     }
 

@@ -48,8 +48,7 @@ static int __init xsm_core_init(const void *policy_buffer, size_t policy_size)
 
     if ( verify(&dummy_xsm_ops) )
     {
-        printk("%s could not verify "
-               "dummy_xsm_ops structure.\n", __FUNCTION__);
+        printk(XENLOG_ERR "Could not verify dummy_xsm_ops structure\n");
         return -EIO;
     }
 
@@ -77,7 +76,7 @@ int __init xsm_multiboot_init(unsigned long *module_map,
         if ( ret )
         {
             bootstrap_map(NULL);
-            printk("%s: Error initializing policy.\n", __FUNCTION__);
+            printk(XENLOG_ERR "Error %d initializing XSM policy\n", ret);
             return -EINVAL;
         }
     }
@@ -103,8 +102,7 @@ int __init xsm_dt_init(void)
         ret = xsm_dt_policy_init(&policy_buffer, &policy_size);
         if ( ret )
         {
-            printk("%s: Error initializing policy (rc = %d).\n",
-                   __FUNCTION__, ret);
+            printk(XENLOG_ERR "Error %d initializing XSM policy\n", ret);
             return -EINVAL;
         }
     }
@@ -144,8 +142,7 @@ int __init register_xsm(struct xsm_operations *ops)
 {
     if ( verify(ops) )
     {
-        printk("%s could not verify "
-               "security_operations structure.\n", __FUNCTION__);
+        printk(XENLOG_ERR "Could not verify xsm_operations structure\n");
         return -EINVAL;
     }
 
