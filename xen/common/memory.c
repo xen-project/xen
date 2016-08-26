@@ -140,14 +140,14 @@ static void populate_physmap(struct memop_args *a)
     struct page_info *page;
     unsigned long i, j;
     xen_pfn_t gpfn, mfn;
-    struct domain *d = a->domain;
+    struct domain *d = a->domain, *curr_d = current->domain;
 
     if ( !guest_handle_subrange_okay(a->extent_list, a->nr_done,
                                      a->nr_extents-1) )
         return;
 
     if ( a->extent_order > (a->memflags & MEMF_populate_on_demand ? MAX_ORDER :
-                            max_order(current->domain)) )
+                            max_order(curr_d)) )
         return;
 
     for ( i = a->nr_done; i < a->nr_extents; i++ )
@@ -163,6 +163,10 @@ static void populate_physmap(struct memop_args *a)
 
         if ( a->memflags & MEMF_populate_on_demand )
         {
+            /* Disallow populating PoD pages on oneself. */
+            if ( d == curr_d )
+                goto out;
+
             if ( guest_physmap_mark_populate_on_demand(d, gpfn,
                                                        a->extent_order) < 0 )
                 goto out;
