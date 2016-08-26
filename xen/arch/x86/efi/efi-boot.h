@@ -47,11 +47,23 @@ static void __init efi_arch_relocate_image(unsigned long delta)
 
     for ( base_relocs = __base_relocs_start; base_relocs < __base_relocs_end; )
     {
-        unsigned int i, n;
+        unsigned int i = 0, n;
 
         n = (base_relocs->size - sizeof(*base_relocs)) /
             sizeof(*base_relocs->entries);
-        for ( i = 0; i < n; ++i )
+
+        /*
+         * Relevant l{2,3}_bootmap entries get initialized explicitly in
+         * efi_arch_memory_setup(), so we must not apply relocations there.
+         * l2_identmap's first slot, otoh, should be handled normally, as
+         * efi_arch_memory_setup() won't touch it (xen_phys_start should
+         * never be zero).
+         */
+        if ( xen_phys_start + base_relocs->rva == (unsigned long)l3_bootmap ||
+             xen_phys_start + base_relocs->rva == (unsigned long)l2_bootmap )
+            i = n;
+
+        for ( ; i < n; ++i )
         {
             unsigned long addr = xen_phys_start + base_relocs->rva +
                                  (base_relocs->entries[i] & 0xfff);
