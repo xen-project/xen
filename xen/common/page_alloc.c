@@ -1267,16 +1267,7 @@ void __init end_boot_allocator(void)
     init_heap_pages(virt_to_page(bootmem_region_list), 1);
 
     if ( !dma_bitsize && (num_online_nodes() > 1) )
-    {
-#ifdef CONFIG_X86
-        dma_bitsize = min_t(unsigned int,
-                            fls(NODE_DATA(0)->node_spanned_pages) - 1
-                            + PAGE_SHIFT - 2,
-                            32);
-#else
-        dma_bitsize = 32;
-#endif
-    }
+        dma_bitsize = arch_get_dma_bitsize();
 
     printk("Domain heap initialised");
     if ( dma_bitsize )

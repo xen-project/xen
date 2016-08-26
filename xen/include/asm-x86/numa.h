@@ -84,5 +84,6 @@ extern int valid_numa_range(u64 start, u64 end, int node);
 
 void srat_parse_regions(u64 addr);
 extern int __node_distance(int a, int b);
+unsigned int arch_get_dma_bitsize(void);
 
 #endif
