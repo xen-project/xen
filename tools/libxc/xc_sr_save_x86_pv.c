@@ -430,6 +430,8 @@ static int map_p2m_list(struct xc_sr_context *ctx, uint64_t p2m_cr3)
 
         if ( level == 2 )
         {
+            if ( saved_idx == idx_end )
+                saved_idx++;
             max_pfn = ((xen_pfn_t)saved_idx << 9) * fpp - 1;
             if ( max_pfn < ctx->x86_pv.max_pfn )
             {
