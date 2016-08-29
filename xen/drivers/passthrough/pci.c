@@ -379,8 +379,8 @@ static struct pci_dev *alloc_pdev(struct pci_seg *pseg, u8 bus, u8 devfn)
             break;
 
         default:
-            printk(XENLOG_WARNING "%s: unknown type: %04x:%02x:%02x.%u\n",
-                   __func__, pseg->nr, bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
+            printk(XENLOG_WARNING "%04x:%02x:%02x.%u: unknown type %d\n",
+                   pseg->nr, bus, PCI_SLOT(devfn), PCI_FUNC(devfn), pdev->type);
             break;
     }
 
@@ -991,7 +991,8 @@ static int __init _scan_pci_devices(struct pci_seg *pseg, void *arg)
                 pdev = alloc_pdev(pseg, bus, PCI_DEVFN(dev, func));
                 if ( !pdev )
                 {
-                    printk("%s: alloc_pdev failed.\n", __func__);
+                    printk(XENLOG_WARNING "%04x:%02x:%02x.%u: alloc_pdev failed\n",
+                           pseg->nr, bus, dev, func);
                     return -ENOMEM;
                 }
 
