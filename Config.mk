@@ -277,9 +277,9 @@ MINIOS_UPSTREAM_URL ?= git://xenbits.xen.org/mini-os.git
 endif
 OVMF_UPSTREAM_REVISION ?= 52a99493cce88a9d4ec8a02d7f1bd1a1001ce60d
 QEMU_UPSTREAM_REVISION ?= master
-MINIOS_UPSTREAM_REVISION ?= f27fa61a0c206bf372753f2020bbe5dc6028864c
-# Fri, 12 Aug 2016 11:32:57 +0100 (11:32 +0100)
-# x86/arch_mm.h: move p2m_chk_pfn to x86/mm.c
+MINIOS_UPSTREAM_REVISION ?= 0f6582dd71454dffba4bbb21258fea25becfdd00
+# Tue Aug 30 13:51:23 2016 +0200
+# mini-os: support "make config" for out-of-tree users
 
 SEABIOS_UPSTREAM_REVISION ?= rel-1.9.2
 # Tue, 1 Mar 2016 15:06:45 +0100 (16:06 +0200)

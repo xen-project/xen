@@ -425,13 +425,16 @@ libxc-$(XEN_TARGET_ARCH)/libxenctrl.a: mk-headers-$(XEN_TARGET_ARCH) libxentooll
 # ioemu
 #######
 
+ioemu-minios-config.mk: $(CURDIR)/ioemu-minios.cfg
+	MINIOS_CONFIG="$<" CONFIG_FILE="$(CURDIR)/$@" $(MAKE) DESTDIR= -C $(MINI_OS) config
+
 .PHONY: ioemu
-ioemu: cross-zlib cross-libpci libxc
+ioemu: cross-zlib cross-libpci libxc ioemu-minios-config.mk
 	[ -f ioemu/config-host.mak ] || \
 	  ( $(buildmakevars2shellvars); \
 	    cd ioemu ; \
 	    LWIPDIR=$(CURDIR)/lwip-$(XEN_TARGET_ARCH) \
-	    TARGET_CPPFLAGS="$(TARGET_CPPFLAGS)" \
+	    TARGET_CPPFLAGS="$(TARGET_CPPFLAGS) $(shell cat ioemu-minios-config.mk)" \
 	    TARGET_CFLAGS="$(TARGET_CFLAGS)" \
 	    TARGET_LDFLAGS="$(TARGET_LDFLAGS)" \
 	    $(QEMU_ROOT)/xen-setup-stubdom )
@@ -441,33 +444,45 @@ ioemu: cross-zlib cross-libpci libxc
 # caml
 ######
 
+caml-minios-config.mk: $(CURDIR)/caml/minios.cfg
+	MINIOS_CONFIG="$<" CONFIG_FILE="$(CURDIR)/$@" $(MAKE) DESTDIR= -C $(MINI_OS) config
+
 .PHONY: caml
 caml: $(CROSS_ROOT)
-	CPPFLAGS="$(TARGET_CPPFLAGS)" CFLAGS="$(TARGET_CFLAGS)" $(MAKE) DESTDIR= -C $@ LWIPDIR=$(CURDIR)/lwip-$(XEN_TARGET_ARCH) OCAMLC_CROSS_PREFIX=$(CROSS_PREFIX)/$(GNU_TARGET_ARCH)-xen-elf/bin/
+	CPPFLAGS="$(TARGET_CPPFLAGS) $(shell cat caml-minios-config.mk)" CFLAGS="$(TARGET_CFLAGS)" $(MAKE) DESTDIR= -C $@ LWIPDIR=$(CURDIR)/lwip-$(XEN_TARGET_ARCH) OCAMLC_CROSS_PREFIX=$(CROSS_PREFIX)/$(GNU_TARGET_ARCH)-xen-elf/bin/
 
 ###
 # C
 ###
 
+c-minios-config.mk: $(CURDIR)/c/minios.cfg
+	MINIOS_CONFIG="$<" CONFIG_FILE="$(CURDIR)/$@" $(MAKE) DESTDIR= -C $(MINI_OS) config
+
 .PHONY: c
-c: $(CROSS_ROOT)
-	CPPFLAGS="$(TARGET_CPPFLAGS)" CFLAGS="$(TARGET_CFLAGS)" $(MAKE) DESTDIR= -C $@ LWIPDIR=$(CURDIR)/lwip-$(XEN_TARGET_ARCH) 
+c: $(CROSS_ROOT) c-minios-config.mk
+	CPPFLAGS="$(TARGET_CPPFLAGS) $(shell cat c-minios-config.mk)" CFLAGS="$(TARGET_CFLAGS)" $(MAKE) DESTDIR= -C $@ LWIPDIR=$(CURDIR)/lwip-$(XEN_TARGET_ARCH) 
 
 ######
 # VTPM
 ######
 
+vtpm-minios-config.mk: $(CURDIR)/vtpm/minios.cfg
+	MINIOS_CONFIG="$<" CONFIG_FILE="$(CURDIR)/$@" $(MAKE) DESTDIR= -C $(MINI_OS) config
+
 .PHONY: vtpm
-vtpm: cross-polarssl cross-tpmemu
-	XEN_TARGET_ARCH="$(XEN_TARGET_ARCH)" CPPFLAGS="$(TARGET_CPPFLAGS)" CFLAGS="$(TARGET_CFLAGS)" $(MAKE) -C $@
+vtpm: cross-polarssl cross-tpmemu vtpm-minios-config.mk
+	XEN_TARGET_ARCH="$(XEN_TARGET_ARCH)" CPPFLAGS="$(TARGET_CPPFLAGS) $(shell cat vtpm-minios-config.mk)" CFLAGS="$(TARGET_CFLAGS)" $(MAKE) -C $@
 
 ######
 # VTPMMGR
 ######
 
+vtpmmgr-minios-config.mk: $(CURDIR)/vtpmmgr/minios.cfg
+	MINIOS_CONFIG="$<" CONFIG_FILE="$(CURDIR)/$@" $(MAKE) DESTDIR= -C $(MINI_OS) config
+
 .PHONY: vtpmmgr
-vtpmmgr: cross-polarssl
-	XEN_TARGET_ARCH="$(XEN_TARGET_ARCH)" CPPFLAGS="$(TARGET_CPPFLAGS)" CFLAGS="$(TARGET_CFLAGS)" $(MAKE) -C $@
+vtpmmgr: cross-polarssl vtpmmgr-minios-config.mk
+	XEN_TARGET_ARCH="$(XEN_TARGET_ARCH)" CPPFLAGS="$(TARGET_CPPFLAGS) $(shell cat vtpmmgr-minios-config.mk)" CFLAGS="$(TARGET_CFLAGS)" $(MAKE) -C $@
 
 ######
 # Grub
@@ -483,18 +498,24 @@ grub-upstream: grub-$(GRUB_VERSION).tar.gz
 		patch -d $@ -p1 < $$i || exit 1; \
 	done
 
+grub-$(XEN_TARGET_ARCH)-minios-config.mk: $(CURDIR)/grub/minios.cfg
+	MINIOS_CONFIG="$<" CONFIG_FILE="$(CURDIR)/$@" $(MAKE) DESTDIR= -C $(MINI_OS) config
+
 .PHONY: grub
-grub: cross-polarssl grub-upstream $(CROSS_ROOT)
+grub: cross-polarssl grub-upstream $(CROSS_ROOT) grub-$(XEN_TARGET_ARCH)-minios-config.mk
 	mkdir -p grub-$(XEN_TARGET_ARCH)
-	CPPFLAGS="$(TARGET_CPPFLAGS)" CFLAGS="$(TARGET_CFLAGS)" $(MAKE) DESTDIR= -C $@ OBJ_DIR=$(CURDIR)/grub-$(XEN_TARGET_ARCH)
+	CPPFLAGS="$(TARGET_CPPFLAGS) $(shell cat grub-$(XEN_TARGET_ARCH)-minios-config.mk)" CFLAGS="$(TARGET_CFLAGS)" $(MAKE) DESTDIR= -C $@ OBJ_DIR=$(CURDIR)/grub-$(XEN_TARGET_ARCH)
 
 ##########
 # xenstore
 ##########
 
+xenstore-minios-config.mk: $(CURDIR)/xenstore-minios.cfg
+	MINIOS_CONFIG="$<" CONFIG_FILE="$(CURDIR)/$@" $(MAKE) DESTDIR= -C $(MINI_OS) config
+
 .PHONY: xenstore
-xenstore: $(CROSS_ROOT)
-	CPPFLAGS="$(TARGET_CPPFLAGS)" CFLAGS="$(TARGET_CFLAGS)" $(MAKE) DESTDIR= -C $@ xenstored.a CONFIG_STUBDOM=y
+xenstore: $(CROSS_ROOT) xenstore-minios-config.mk
+	CPPFLAGS="$(TARGET_CPPFLAGS) $(shell cat xenstore-minios-config.mk)" CFLAGS="$(TARGET_CFLAGS)" $(MAKE) DESTDIR= -C $@ xenstored.a CONFIG_STUBDOM=y
 
 ########
 # minios
@@ -586,6 +607,7 @@ clean:
 	$(MAKE) -C vtpmmgr clean
 	rm -fr grub-$(XEN_TARGET_ARCH)
 	rm -f $(STUBDOMPATH)
+	rm -f *-minios-config.mk
 	[ ! -e libs-$(XEN_TARGET_ARCH)/toollog/Makefile ] || $(MAKE) DESTDIR= -C libs-$(XEN_TARGET_ARCH)/toollog clean
 	[ ! -e libs-$(XEN_TARGET_ARCH)/evtchn/Makefile ] || $(MAKE) DESTDIR= -C libs-$(XEN_TARGET_ARCH)/evtchn clean
 	[ ! -e libs-$(XEN_TARGET_ARCH)/gnttab/Makefile ] || $(MAKE) DESTDIR= -C libs-$(XEN_TARGET_ARCH)/gnttab clean
