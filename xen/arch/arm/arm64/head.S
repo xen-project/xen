@@ -599,7 +599,9 @@ launch:
         mov   x0, x20                /* Marshal args: - phys_offset */
         mov   x1, x21                /*               - FDT */
         mov   x2, x24                /*               - CPU ID */
-        cbz   x22, start_xen         /* and disappear into the land of C */
+        cbnz  x22, 1f
+        b     start_xen              /* and disappear into the land of C */
+1:
         b     start_secondary        /* (to the appropriate entry point) */
 
 /* Fail-stop */
