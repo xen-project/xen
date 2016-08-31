@@ -75,7 +75,7 @@ obj-$(CONFIG_TMEM) += $(tmem-y)
 
 subdir-$(CONFIG_X86) += hvm
 
-subdir-$(coverage) += gcov
+subdir-$(CONFIG_GCOV) += gcov
 
 subdir-y += libelf
 subdir-$(CONFIG_HAS_DEVICE_TREE) += libfdt

@@ -28,6 +28,11 @@ config FRAME_POINTER
 	  maybe slower, but it gives very useful debugging information
 	  in case of any Xen bugs.
 
+config GCOV
+       bool "Gcov Support"
+       ---help---
+         Enable gcov (a test coverage program in GCC) support.
+
 config LOCK_PROFILE
 	bool "Lock Profiling"
 	---help---
