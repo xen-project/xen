@@ -1851,7 +1851,6 @@ long do_fpu_taskswitch(int set)
 
 static int read_descriptor(unsigned int sel,
                            const struct vcpu *v,
-                           const struct cpu_user_regs * regs,
                            unsigned long *base,
                            unsigned long *limit,
                            unsigned int *ar,
@@ -2267,8 +2266,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
     uint64_t val;
     bool_t vpmu_msr;
 
-    if ( !read_descriptor(regs->cs, v, regs,
-                          &code_base, &code_limit, &ar, 1) )
+    if ( !read_descriptor(regs->cs, v, &code_base, &code_limit, &ar, 1) )
         goto fail;
     op_default = op_bytes = (ar & (_SEGMENT_L|_SEGMENT_DB)) ? 4 : 2;
     ad_default = ad_bytes = (ar & _SEGMENT_L) ? 8 : op_default;
@@ -2359,8 +2357,8 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
 
         if ( !(ar & _SEGMENT_L) )
         {
-            if ( !read_descriptor(data_sel, v, regs,
-                                  &data_base, &data_limit, &ar, 0) )
+            if ( !read_descriptor(data_sel, v, &data_base, &data_limit,
+                                  &ar, 0) )
                 goto fail;
             if ( !(ar & _SEGMENT_S) ||
                  !(ar & _SEGMENT_P) ||
@@ -3133,7 +3131,7 @@ static void emulate_gate_op(struct cpu_user_regs *regs)
      * Decode instruction (and perhaps operand) to determine RPL,
      * whether this is a jump or a call, and the call return offset.
      */
-    if ( !read_descriptor(regs->cs, v, regs, &base, &limit, &ar, 0) ||
+    if ( !read_descriptor(regs->cs, v, &base, &limit, &ar, 0) ||
          !(ar & _SEGMENT_S) ||
          !(ar & _SEGMENT_P) ||
          !(ar & _SEGMENT_CODE) )
@@ -3298,7 +3296,7 @@ static void emulate_gate_op(struct cpu_user_regs *regs)
     }
 
     if ( (opnd_sel != regs->cs &&
-          !read_descriptor(opnd_sel, v, regs, &base, &limit, &ar, 0)) ||
+          !read_descriptor(opnd_sel, v, &base, &limit, &ar, 0)) ||
          !(ar & _SEGMENT_S) ||
          !(ar & _SEGMENT_P) ||
          ((ar & _SEGMENT_CODE) && !(ar & _SEGMENT_WR)) )
@@ -3318,7 +3316,7 @@ static void emulate_gate_op(struct cpu_user_regs *regs)
         return;
     }
 
-    if ( !read_descriptor(sel, v, regs, &base, &limit, &ar, 0) ||
+    if ( !read_descriptor(sel, v, &base, &limit, &ar, 0) ||
          !(ar & _SEGMENT_S) ||
          !(ar & _SEGMENT_CODE) ||
          (!jump || (ar & _SEGMENT_EC) ?
@@ -3371,7 +3369,7 @@ static void emulate_gate_op(struct cpu_user_regs *regs)
             esp = v->arch.pv_vcpu.kernel_sp;
             ss = v->arch.pv_vcpu.kernel_ss;
             if ( (ss & 3) != (sel & 3) ||
-                 !read_descriptor(ss, v, regs, &base, &limit, &ar, 0) ||
+                 !read_descriptor(ss, v, &base, &limit, &ar, 0) ||
                  ((ar >> 13) & 3) != (sel & 3) ||
                  !(ar & _SEGMENT_S) ||
                  (ar & _SEGMENT_CODE) ||
@@ -3400,7 +3398,7 @@ static void emulate_gate_op(struct cpu_user_regs *regs)
             {
                 const unsigned int *ustkp;
 
-                if ( !read_descriptor(regs->ss, v, regs, &base, &limit, &ar, 0) ||
+                if ( !read_descriptor(regs->ss, v, &base, &limit, &ar, 0) ||
                      ((ar >> 13) & 3) != (regs->cs & 3) ||
                      !(ar & _SEGMENT_S) ||
                      (ar & _SEGMENT_CODE) ||
@@ -3433,7 +3431,7 @@ static void emulate_gate_op(struct cpu_user_regs *regs)
             sel |= (regs->cs & 3);
             esp = regs->esp;
             ss = regs->ss;
-            if ( !read_descriptor(ss, v, regs, &base, &limit, &ar, 0) ||
+            if ( !read_descriptor(ss, v, &base, &limit, &ar, 0) ||
                  ((ar >> 13) & 3) != (sel & 3) )
             {
                 do_guest_trap(TRAP_gp_fault, regs);
