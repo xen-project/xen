@@ -12,3 +12,4 @@ efi := $(if $(efi),$(shell rm disabled)y,$(shell $(call create,boot.init.o); $(c
 extra-$(efi) += boot.init.o relocs-dummy.o runtime.o compat.o
 
 stub.o: $(extra-y)
+nogcov-$(efi) += stub.o

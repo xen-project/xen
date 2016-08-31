@@ -115,7 +115,9 @@ subdir-all := $(subdir-y) $(subdir-n)
 
 $(filter %.init.o,$(obj-y) $(obj-bin-y) $(extra-y)): CFLAGS += -DINIT_SECTIONS_ONLY
 
-$(obj-$(coverage)): CFLAGS += -fprofile-arcs -ftest-coverage -DTEST_COVERAGE
+ifeq ($(coverage),y)
+$(filter-out %.init.o $(nogcov-y),$(obj-y) $(obj-bin-y) $(extra-y)): CFLAGS += -fprofile-arcs -ftest-coverage -DTEST_COVERAGE
+endif
 
 ifeq ($(lto),y)
 # Would like to handle all object files as bitcode, but objects made from
