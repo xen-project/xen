@@ -37,7 +37,7 @@
 #include <asm/setup.h>
 
 /* Processors with enabled flag and sane MPIDR */
-static unsigned int enabled_cpus = 1;
+static unsigned int __initdata enabled_cpus = 1;
 static bool __initdata bootcpu_valid;
 
 /* total number of cpus in this system */
