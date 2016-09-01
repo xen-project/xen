@@ -2206,10 +2206,8 @@ void guest_io_write(unsigned int port, unsigned int bytes, uint32_t data,
 }
 
 /* I/O emulation support. Helper routines for, and type of, the stack stub.*/
-void host_to_guest_gpr_switch(struct cpu_user_regs *)
-    __attribute__((__regparm__(1)));
-unsigned long guest_to_host_gpr_switch(unsigned long)
-    __attribute__((__regparm__(1)));
+void host_to_guest_gpr_switch(struct cpu_user_regs *);
+unsigned long guest_to_host_gpr_switch(unsigned long);
 
 void (*pv_post_outb_hook)(unsigned int port, u8 value);
 
@@ -2268,7 +2266,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
                            : (*(u16 *)&regs->reg = (val)))
     unsigned long code_base, code_limit;
     char *io_emul_stub = NULL;
-    void (*io_emul)(struct cpu_user_regs *) __attribute__((__regparm__(1)));
+    void (*io_emul)(struct cpu_user_regs *);
     uint64_t val;
     bool_t vpmu_msr;
 
