@@ -164,10 +164,7 @@ void msi_compose_msg(unsigned vector, const cpumask_t *cpu_mask, struct msi_msg 
 
     memset(msg, 0, sizeof(*msg));
     if ( !cpumask_intersects(cpu_mask, &cpu_online_map) )
-    {
-        dprintk(XENLOG_ERR,"%s, compose msi message error!!\n", __func__);
         return;
-    }
 
     if ( vector )
     {

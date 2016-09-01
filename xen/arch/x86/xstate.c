@@ -574,8 +574,8 @@ void xstate_init(struct cpuinfo_x86 *c)
          * We know FP/SSE and YMM about eax, and nothing about edx at present.
          */
         xsave_cntxt_size = _xstate_ctxt_size(feature_mask);
-        printk("%s: using cntxt_size: %#x and states: %#"PRIx64"\n",
-            __func__, xsave_cntxt_size, xfeature_mask);
+        printk("xstate: size: %#x and states: %#"PRIx64"\n",
+               xsave_cntxt_size, xfeature_mask);
 
         asm ( "fxsave %0" : "=m" (ctxt) );
         if ( ctxt.mxcsr_mask )

@@ -1467,8 +1467,7 @@ static int __init verify_tsc_reliability(void)
         tsc_check_reliability();
         if ( tsc_max_warp )
         {
-            printk("%s: TSC warp detected, disabling TSC_RELIABLE\n",
-                   __func__);
+            printk("TSC warp detected, disabling TSC_RELIABLE\n");
             setup_clear_cpu_cap(X86_FEATURE_TSC_RELIABLE);
         }
     }

@@ -404,10 +404,8 @@ static vmask_t *irq_get_used_vector_mask(int irq)
         ret = &global_used_vector_map;
 
         if ( desc->arch.used_vectors )
-        {
-            printk(XENLOG_INFO "%s: Strange, unassigned irq %d already has used_vectors!\n",
-                   __func__, irq);
-        }
+            printk(XENLOG_INFO "Unassigned IRQ %d already has used_vectors\n",
+                   irq);
         else
         {
             int vector;
@@ -415,8 +413,8 @@ static vmask_t *irq_get_used_vector_mask(int irq)
             vector = irq_to_vector(irq);
             if ( vector > 0 )
             {
-                printk(XENLOG_INFO "%s: Strange, irq %d already assigned vector %d!\n",
-                       __func__, irq, vector);
+                printk(XENLOG_INFO "IRQ %d already assigned vector %d\n",
+                       irq, vector);
                 
                 ASSERT(!test_bit(vector, ret));
 
