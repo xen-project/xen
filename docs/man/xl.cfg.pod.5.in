@@ -32,7 +32,7 @@ A string, surrounded by either single or double quotes.
 =item B<NUMBER>
 
 A number, in either decimal, octal (using a C<0> prefix) or
-hexadecimal (using an C<0x> prefix).
+hexadecimal (using a C<0x> prefix).
 
 =item B<BOOLEAN>
 
@@ -480,7 +480,7 @@ devices which the guest will contain.
 
 Specifies the disks (both emulated disks and Xen virtual block
 devices) which are to be provided to the guest, and what objects on
-the they should map to.  See F<docs/misc/xl-disk-configuration.txt>.
+the host they should map to.  See F<docs/misc/xl-disk-configuration.txt>.
 
 =item B<vif=[ "NET_SPEC_STRING", "NET_SPEC_STRING", ...]>
 
@@ -501,7 +501,7 @@ settings, from the following list:
 
 =item C<backend=DOMAIN>
 
-Specify the backend domain name of id. This value is required!
+Specify the backend domain name or id. This value is required!
 If this domain is a guest, the backend should be set to the
 vtpm domain name. If this domain is a vtpm, the
 backend should be set to the vtpm manager domain name.
@@ -607,7 +607,7 @@ configuration after boot and signalling to in-guest agents. Please see
 F<docs/misc/channels.txt> for more details.
 
 Each B<CHANNEL_SPEC_STRING> is a comma-separated list of C<KEY=VALUE>
-seettings. Leading and trailing whitespace is ignored in both KEY and
+settings. Leading and trailing whitespace is ignored in both KEY and
 VALUE. Neither KEY nor VALUE may contain ',', '=' or '"'. Defined values
 are:
 
@@ -630,7 +630,7 @@ names unique by including domain name and version number in the string
 
 =item C<connection=CONNECTION>
 
-Specify how the backend will be implemented. This following options are
+Specify how the backend will be implemented. The following options are
 available:
 
 =over 4
@@ -715,7 +715,7 @@ When that conflict is unsolved,
 attached in the case of hotplug.
 
 "relaxed" allows VM to be created but may cause VM to crash if
-pass-through device accesses RDM. For exampl,e Windows IGD GFX driver
+pass-through device accesses RDM. For example Windows IGD GFX driver
 always accessed RDM regions so it leads to VM crash.
 
 Note this may be overridden by rdm_policy option in PCI device configuration.
@@ -759,7 +759,7 @@ Specifies the usb controller version.  Possible values include
 Specifies the total ports of the usb controller. The maximum
 number is 31. Default is 8.
 
-USB controler ids start from 0.  In line with the USB spec, however,
+USB controller ids start from 0.  In line with the USB spec, however,
 ports on a controller start from 1.
 
 E.g.
@@ -847,7 +847,7 @@ Possible B<KEY>s are:
 
 By default pciback only allows PV guests to write "known safe" values
 into PCI config space, likewise QEMU (both qemu-xen and
-qemu-traditional) imposes the same contraint on HVM guests. However
+qemu-traditional) imposes the same constraint on HVM guests. However
 many devices require writes to other areas of config space in order to
 operate properly.  This option tells the backend (pciback or QEMU) to
 allow all writes to PCI config space of this device by this domain.
@@ -929,7 +929,7 @@ any kind of sharing of the GPU, so you can only assign the GPU to one
 single VM at a time.
 
 gfx_passthru also enables various legacy VGA memory ranges, BARs, MMIOs,
-and ioports to be passed thru to the VM, since those are required
+and ioports to be passed through to the VM, since those are required
 for correct operation of things like VGA BIOS, text mode, VBE, etc.
 
 Enabling gfx_passthru option also copies the physical graphics card
@@ -988,7 +988,7 @@ wiki page.
 Number of megabytes to set a boundary for checking rdm conflict.
 
 When RDM conflicts with RAM, RDM probably scatter the whole RAM space.
-Especially multiple RDM entries would worsen this to lead a complicated
+Especially multiple RDM entries would worsen this to lead to a complicated
 memory layout. So here we're trying to figure out a simple solution to
 avoid breaking existing layout. So when a conflict occurs,
 
@@ -1172,7 +1172,7 @@ Number of megabytes to set aside for shadowing guest pagetable pages
 state. By default this is 1MB per guest vcpu plus 8KB per MB of guest
 RAM. You should not normally need to adjust this value. However if you
 are not using hardware assisted paging (i.e. you are using shadow
-mode) and your guest workload consists of a a very large number of
+mode) and your guest workload consists of a very large number of
 similar processes then increasing this value may improve performance.
 
 =back
@@ -1374,7 +1374,7 @@ preceded by a 32b integer indicating the size of the next structure.
 
 Provide a VM generation ID to the guest.
 
-The VM generation ID as a 128-bit random number that a guest may use
+The VM generation ID is a 128-bit random number that a guest may use
 to determine if the guest has been restored from an earlier snapshot
 or cloned.
 
@@ -1820,7 +1820,7 @@ B<-serial> option in the L<qemu(1)> manpage for details of the valid
 B<DEVICE> options. Default is B<vc> when in graphical mode and
 B<stdio> if B<nographics=1> is used.
 
-The form serial=DEVICE is also accepted for backwards compatibilty.
+The form serial=DEVICE is also accepted for backwards compatibility.
 
 =item B<soundhw=DEVICE>
 
