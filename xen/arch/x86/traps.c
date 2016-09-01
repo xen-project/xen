@@ -3219,7 +3219,7 @@ static void emulate_gate_op(struct cpu_user_regs *regs)
                             sib = insn_fetch(u8, base, eip, limit);
 
                             modrm = (modrm & ~7) | (sib & 7);
-                            if ( (sib >>= 3) != 4 )
+                            if ( ((sib >>= 3) & 7) != 4 )
                                 opnd_off = *(unsigned long *)
                                     decode_register(sib & 7, regs, 0);
                             opnd_off <<= sib >> 3;
@@ -3279,7 +3279,10 @@ static void emulate_gate_op(struct cpu_user_regs *regs)
                         opnd_off += insn_fetch(s8, base, eip, limit);
                         break;
                     case 0x80:
-                        opnd_off += insn_fetch(s32, base, eip, limit);
+                        if ( ad_bytes > 2 )
+                            opnd_off += insn_fetch(s32, base, eip, limit);
+                        else
+                            opnd_off += insn_fetch(s16, base, eip, limit);
                         break;
                     }
                     if ( ad_bytes == 4 )
@@ -3316,8 +3319,7 @@ static void emulate_gate_op(struct cpu_user_regs *regs)
 #define ad_default ad_bytes
     opnd_sel = insn_fetch(u16, base, opnd_off, limit);
 #undef ad_default
-    ASSERT((opnd_sel & ~3) == regs->error_code);
-    if ( dpl < (opnd_sel & 3) )
+    if ( (opnd_sel & ~3) != regs->error_code || dpl < (opnd_sel & 3) )
     {
         do_guest_trap(TRAP_gp_fault, regs);
         return;
