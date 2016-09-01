@@ -627,6 +627,8 @@ enum get_cpu_vendor {
 };
 
 int get_cpu_vendor(const char vendor_id[], enum get_cpu_vendor);
+uint8_t get_cpu_family(uint32_t raw, uint8_t *model, uint8_t *stepping);
+
 void pv_cpuid(struct cpu_user_regs *regs);
 
 #endif /* !__ASSEMBLY__ */

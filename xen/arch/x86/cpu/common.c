@@ -183,6 +183,25 @@ int get_cpu_vendor(const char v[], enum get_cpu_vendor mode)
 	return X86_VENDOR_UNKNOWN;
 }
 
+uint8_t get_cpu_family(uint32_t raw, uint8_t *model, uint8_t *stepping)
+{
+	uint8_t fam, mod;
+
+	fam = (raw >> 8) & 0xf;
+	if (fam == 0xf)
+		fam += (raw >> 20) & 0xff;
+
+	mod = (raw >> 4) & 0xf;
+	if (fam >= 0x6)
+		mod |= (raw >> 12) & 0xf0;
+
+	if (model)
+		*model = mod;
+	if (stepping)
+		*stepping = raw & 0xf;
+	return fam;
+}
+
 static inline u32 _phys_pkg_id(u32 cpuid_apic, int index_msb)
 {
 	return cpuid_apic >> index_msb;
@@ -222,13 +241,8 @@ static void __init early_cpu_detect(void)
 	c->x86_vendor = get_cpu_vendor(c->x86_vendor_id, gcv_host);
 
 	cpuid(0x00000001, &eax, &ebx, &ecx, &edx);
-	c->x86 = (eax >> 8) & 15;
-	c->x86_model = (eax >> 4) & 15;
-	if (c->x86 == 0xf)
-		c->x86 += (eax >> 20) & 0xff;
-	if (c->x86 >= 0x6)
-		c->x86_model += ((eax >> 16) & 0xF) << 4;
-	c->x86_mask = eax & 15;
+	c->x86 = get_cpu_family(eax, &c->x86_model, &c->x86_mask);
+
 	edx &= ~cleared_caps[cpufeat_word(X86_FEATURE_FPU)];
 	ecx &= ~cleared_caps[cpufeat_word(X86_FEATURE_SSE3)];
 	if (edx & cpufeat_mask(X86_FEATURE_CLFLUSH))
@@ -273,13 +287,7 @@ static void generic_identify(struct cpuinfo_x86 *c)
 
 	/* Model and family information. */
 	cpuid(0x00000001, &eax, &ebx, &ecx, &edx);
-	c->x86 = (eax >> 8) & 15;
-	c->x86_model = (eax >> 4) & 15;
-	if (c->x86 == 0xf)
-		c->x86 += (eax >> 20) & 0xff;
-	if (c->x86 >= 0x6)
-		c->x86_model += ((eax >> 16) & 0xF) << 4;
-	c->x86_mask = eax & 15;
+	c->x86 = get_cpu_family(eax, &c->x86_model, &c->x86_mask);
 	c->apicid = phys_pkg_id((ebx >> 24) & 0xFF, 0);
 	c->phys_proc_id = c->apicid;
 

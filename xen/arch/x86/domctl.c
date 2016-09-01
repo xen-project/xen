@@ -82,12 +82,7 @@ static void update_domain_cpuid_info(struct domain *d,
     }
 
     case 1:
-        d->arch.x86 = (ctl->eax >> 8) & 0xf;
-        if ( d->arch.x86 == 0xf )
-            d->arch.x86 += (ctl->eax >> 20) & 0xff;
-        d->arch.x86_model = (ctl->eax >> 4) & 0xf;
-        if ( d->arch.x86 >= 0x6 )
-            d->arch.x86_model |= (ctl->eax >> 12) & 0xf0;
+        d->arch.x86 = get_cpu_family(ctl->eax, &d->arch.x86_model, NULL);
 
         if ( is_pv_domain(d) && ((levelling_caps & LCAP_1cd) == LCAP_1cd) )
         {
