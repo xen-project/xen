@@ -1572,11 +1572,6 @@ static void svm_cpuid_intercept(
     hvm_cpuid(input, eax, ebx, ecx, edx);
 
     switch (input) {
-    case 0x80000001:
-        /* Fix up VLAPIC details. */
-        if ( vlapic_hw_disabled(vcpu_vlapic(v)) )
-            __clear_bit(X86_FEATURE_APIC & 31, edx);
-        break;
     case 0x8000001c: 
     {
         /* LWP capability CPUID */
