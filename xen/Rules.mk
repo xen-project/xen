@@ -116,7 +116,7 @@ subdir-all := $(subdir-y) $(subdir-n)
 $(filter %.init.o,$(obj-y) $(obj-bin-y) $(extra-y)): CFLAGS += -DINIT_SECTIONS_ONLY
 
 ifeq ($(CONFIG_GCOV),y)
-$(filter-out %.init.o $(nogcov-y),$(obj-y) $(obj-bin-y) $(extra-y)): CFLAGS += -fprofile-arcs -ftest-coverage -DTEST_COVERAGE
+$(filter-out %.init.o $(nogcov-y),$(obj-y) $(obj-bin-y) $(extra-y)): CFLAGS += -fprofile-arcs -ftest-coverage
 endif
 
 ifeq ($(lto),y)

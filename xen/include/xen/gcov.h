@@ -86,7 +86,7 @@ struct gcov_info
 /**
  * Sysctl operations for coverage
  */
-#ifdef TEST_COVERAGE
+#ifdef CONFIG_GCOV
 int sysctl_coverage_op(xen_sysctl_coverage_op_t *op);
 #endif
 
