@@ -949,9 +949,14 @@ static int normalise_pagetable(struct xc_sr_context *ctx, const uint64_t *src,
 #ifdef __i386__
             if ( mfn == INVALID_MFN )
             {
-                ERROR("PTE truncation detected.  L%lu[%u] = %016"PRIx64,
-                      type >> XEN_DOMCTL_PFINFO_LTAB_SHIFT, i, pte);
-                errno = E2BIG;
+                if ( !ctx->dominfo.paused )
+                    errno = EAGAIN;
+                else
+                {
+                    ERROR("PTE truncation detected.  L%lu[%u] = %016"PRIx64,
+                          type >> XEN_DOMCTL_PFINFO_LTAB_SHIFT, i, pte);
+                    errno = E2BIG;
+                }
                 return -1;
             }
 #endif
