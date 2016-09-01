@@ -4,6 +4,7 @@
 #include <xen/lib.h>
 #include <xen/string.h>
 #include <xen/types.h>
+#include <xen/efi.h>
 #include <xen/elf.h>
 #include <xen/version.h>
 
@@ -117,10 +118,33 @@ int xen_build_id_check(const Elf_Note *n, unsigned int n_sz,
     return 0;
 }
 
+struct pe_external_debug_directory
+{
+    uint32_t characteristics;
+    uint32_t time_stamp;
+    uint16_t major_version;
+    uint16_t minor_version;
+#define PE_IMAGE_DEBUG_TYPE_CODEVIEW 2
+    uint32_t type;
+    uint32_t size;
+    uint32_t rva_of_data;
+    uint32_t filepos_of_data;
+};
+
+struct cv_info_pdb70
+{
+#define CVINFO_PDB70_CVSIGNATURE 0x53445352 /* "RSDS" */
+    uint32_t cv_signature;
+    unsigned char signature[16];
+    uint32_t age;
+    char pdb_filename[];
+};
+
 static int __init xen_build_init(void)
 {
     const Elf_Note *n = __note_gnu_build_id_start;
     unsigned int sz;
+    int rc;
 
     /* --build-id invoked with wrong parameters. */
     if ( __note_gnu_build_id_end <= &n[0] )
@@ -132,7 +156,38 @@ static int __init xen_build_init(void)
 
     sz = (void *)__note_gnu_build_id_end - (void *)n;
 
-    return xen_build_id_check(n, sz, &build_id_p, &build_id_len);
+    rc = xen_build_id_check(n, sz, &build_id_p, &build_id_len);
+
+#ifdef CONFIG_X86
+    /* Alternatively we may have a CodeView record from an EFI build. */
+    if ( rc && efi_enabled )
+    {
+        const struct pe_external_debug_directory *dir = (const void *)n;
+
+        /*
+         * Validate that the full-note-header check above won't prevent
+         * fall-through to the CodeView case here.
+         */
+        BUILD_BUG_ON(sizeof(*n) > sizeof(*dir));
+
+        if ( sz > sizeof(*dir) + sizeof(struct cv_info_pdb70) &&
+             dir->type == PE_IMAGE_DEBUG_TYPE_CODEVIEW &&
+             dir->size > sizeof(struct cv_info_pdb70) &&
+             XEN_VIRT_START + dir->rva_of_data == (unsigned long)(dir + 1) )
+        {
+            const struct cv_info_pdb70 *info = (const void *)(dir + 1);
+
+            if ( info->cv_signature == CVINFO_PDB70_CVSIGNATURE )
+            {
+                build_id_p = info->signature;
+                build_id_len = sizeof(info->signature);
+                rc = 0;
+            }
+        }
+    }
+#endif
+
+    return rc;
 }
 __initcall(xen_build_init);
 #endif

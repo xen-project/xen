@@ -158,24 +158,30 @@ $(TARGET).efi: VIRT_BASE = 0x$(shell $(NM) efi/relocs-dummy.o | sed -n 's, A VIR
 $(TARGET).efi: ALT_BASE = 0x$(shell $(NM) efi/relocs-dummy.o | sed -n 's, A ALT_START$$,,p')
 # Don't use $(wildcard ...) here - at least make 3.80 expands this too early!
 $(TARGET).efi: guard = $(if $(shell echo efi/dis* | grep disabled),:)
+
 ifneq ($(build_id_linker),)
-$(TARGET).efi: note.o
+ifeq ($(call ld-ver-build-id,$(LD) $(filter -m%,$(EFI_LDFLAGS))),y)
+CFLAGS += -DBUILD_ID_EFI
+EFI_LDFLAGS += $(build_id_linker)
+note_file := efi/buildid.o
+else
 note_file := note.o
+endif
 else
 note_file :=
 endif
 
-$(TARGET).efi: prelink-efi.o efi.lds efi/relocs-dummy.o $(BASEDIR)/common/symbols-dummy.o efi/mkreloc
+$(TARGET).efi: prelink-efi.o $(note_file) efi.lds efi/relocs-dummy.o $(BASEDIR)/common/symbols-dummy.o efi/mkreloc
 	$(foreach base, $(VIRT_BASE) $(ALT_BASE), \
 	          $(guard) $(LD) $(call EFI_LDFLAGS,$(base)) -T efi.lds -N $< efi/relocs-dummy.o \
-	                $(BASEDIR)/common/symbols-dummy.o -o $(@D)/.$(@F).$(base).0 &&) :
+	                $(BASEDIR)/common/symbols-dummy.o $(note_file) -o $(@D)/.$(@F).$(base).0 &&) :
 	$(guard) efi/mkreloc $(foreach base,$(VIRT_BASE) $(ALT_BASE),$(@D)/.$(@F).$(base).0) >$(@D)/.$(@F).0r.S
 	$(guard) $(NM) -pa --format=sysv $(@D)/.$(@F).$(VIRT_BASE).0 \
 		| $(guard) $(BASEDIR)/tools/symbols $(all_symbols) --sysv --sort >$(@D)/.$(@F).0s.S
 	$(guard) $(MAKE) -f $(BASEDIR)/Rules.mk $(@D)/.$(@F).0r.o $(@D)/.$(@F).0s.o
 	$(foreach base, $(VIRT_BASE) $(ALT_BASE), \
 	          $(guard) $(LD) $(call EFI_LDFLAGS,$(base)) -T efi.lds -N $< \
-	                $(@D)/.$(@F).0r.o $(@D)/.$(@F).0s.o -o $(@D)/.$(@F).$(base).1 &&) :
+	                $(@D)/.$(@F).0r.o $(@D)/.$(@F).0s.o $(note_file) -o $(@D)/.$(@F).$(base).1 &&) :
 	$(guard) efi/mkreloc $(foreach base,$(VIRT_BASE) $(ALT_BASE),$(@D)/.$(@F).$(base).1) >$(@D)/.$(@F).1r.S
 	$(guard) $(NM) -pa --format=sysv $(@D)/.$(@F).$(VIRT_BASE).1 \
 		| $(guard) $(BASEDIR)/tools/symbols $(all_symbols) --sysv --sort >$(@D)/.$(@F).1s.S
@@ -185,8 +191,8 @@ $(TARGET).efi: prelink-efi.o efi.lds efi/relocs-dummy.o $(BASEDIR)/common/symbol
 	if $(guard) false; then rm -f $@; echo 'EFI support disabled'; fi
 	rm -f $(@D)/.$(@F).[0-9]*
 
-efi/boot.init.o efi/runtime.o efi/compat.o: $(BASEDIR)/arch/x86/efi/built_in.o
-efi/boot.init.o efi/runtime.o efi/compat.o: ;
+efi/boot.init.o efi/runtime.o efi/compat.o efi/buildid.o: $(BASEDIR)/arch/x86/efi/built_in.o
+efi/boot.init.o efi/runtime.o efi/compat.o efi/buildid.o: ;
 
 asm-offsets.s: $(TARGET_SUBARCH)/asm-offsets.c
 	$(CC) $(filter-out -flto,$(CFLAGS)) -S -o $@ $<

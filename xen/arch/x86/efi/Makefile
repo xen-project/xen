@@ -9,7 +9,10 @@ efi := $(if $(efi),$(shell $(CC) $(filter-out $(CFLAGS-y) .%.d,$(CFLAGS)) -c che
 efi := $(if $(efi),$(shell $(LD) -mi386pep --subsystem=10 -o check.efi check.o 2>disabled && echo y))
 efi := $(if $(efi),$(shell rm disabled)y,$(shell $(call create,boot.init.o); $(call create,runtime.o)))
 
-extra-$(efi) += boot.init.o relocs-dummy.o runtime.o compat.o
+extra-$(efi) += boot.init.o relocs-dummy.o runtime.o compat.o buildid.o
+
+%.o: %.ihex
+	$(OBJCOPY) -I ihex -O binary $< $@
 
 stub.o: $(extra-y)
 nogcov-$(efi) += stub.o
