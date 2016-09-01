@@ -166,7 +166,9 @@ SECTIONS
 
        . = ALIGN(8);
        __ctors_start = .;
+       *(.ctors)
        *(.init_array)
+       *(SORT(.init_array.*))
        __ctors_end = .;
   } :text
   __init_end_efi = .;
