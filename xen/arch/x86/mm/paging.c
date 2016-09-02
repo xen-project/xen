@@ -469,8 +469,9 @@ static int paging_log_dirty_op(struct domain *d,
         peek = 0;
 
     if ( unlikely(d->arch.paging.log_dirty.failed_allocs) ) {
-        printk("%s: %d failed page allocs while logging dirty pages\n",
-               __FUNCTION__, d->arch.paging.log_dirty.failed_allocs);
+        printk(XENLOG_WARNING
+               "%u failed page allocs while logging dirty pages of d%d\n",
+               d->arch.paging.log_dirty.failed_allocs, d->domain_id);
         rv = -ENOMEM;
         goto out;
     }
