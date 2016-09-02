@@ -1419,6 +1419,25 @@ decode_segment(uint8_t modrm_reg)
     return decode_segment_failed;
 }
 
+static bool is_aligned(enum x86_segment seg, unsigned long offs,
+                       unsigned int size, struct x86_emulate_ctxt *ctxt,
+                       const struct x86_emulate_ops *ops)
+{
+    struct segment_register reg;
+
+    /* Expecting powers of two only. */
+    ASSERT(!(size & (size - 1)));
+
+    /* No alignment checking when we have no way to read segment data. */
+    if ( !ops->read_segment )
+        return true;
+
+    if ( ops->read_segment(seg, &reg, ctxt) != X86EMUL_OKAY )
+        return false;
+
+    return !((reg.base + offs) & (size - 1));
+}
+
 /* Inject a software interrupt/exception, emulating if needed. */
 static int inject_swint(enum x86_swint_type type,
                         uint8_t vector, uint8_t insn_len,
@@ -4178,10 +4197,10 @@ x86_emulate(
             ea.bytes = vex.pfx & VEX_PREFIX_DOUBLE_MASK ? 8 : 4;
         if ( ea.type == OP_MEM )
         {
-            /* XXX enable once there is ops->ea() or equivalent
             generate_exception_if((b >= 0x28) &&
-                                  (ops->ea(ea.mem.seg, ea.mem.off)
-                                   & (ea.bytes - 1)), EXC_GP, 0); */
+                                  !is_aligned(ea.mem.seg, ea.mem.off, ea.bytes,
+                                              ctxt, ops),
+                                  EXC_GP, 0);
             if ( !(b & 1) )
                 rc = ops->read(ea.mem.seg, ea.mem.off+0, mmvalp,
                                ea.bytes, ctxt);
@@ -4432,10 +4451,10 @@ x86_emulate(
         }
         if ( ea.type == OP_MEM )
         {
-            /* XXX enable once there is ops->ea() or equivalent
             generate_exception_if((vex.pfx == vex_66) &&
-                                  (ops->ea(ea.mem.seg, ea.mem.off)
-                                   & (ea.bytes - 1)), EXC_GP, 0); */
+                                  !is_aligned(ea.mem.seg, ea.mem.off, ea.bytes,
+                                              ctxt, ops),
+                                  EXC_GP, 0);
             if ( b == 0x6f )
                 rc = ops->read(ea.mem.seg, ea.mem.off+0, mmvalp,
                                ea.bytes, ctxt);
