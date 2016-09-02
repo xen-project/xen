@@ -192,7 +192,7 @@ static void intel_ctxt_switch_levelling(const struct vcpu *next)
 		 */
 		if (next && is_pv_vcpu(next) && !is_idle_vcpu(next) &&
 		    !(next->arch.pv_vcpu.ctrlreg[4] & X86_CR4_OSXSAVE))
-			val &= ~cpufeat_mask(X86_FEATURE_OSXSAVE);
+			val &= ~(uint64_t)cpufeat_mask(X86_FEATURE_OSXSAVE);
 
 		if (unlikely(these_masks->_1cd != val)) {
 			wrmsrl(msr_basic, val);
