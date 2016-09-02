@@ -732,7 +732,7 @@ libxl_device_usbdev_list(libxl_ctx *ctx, uint32_t domid, int *num)
     *num = 0;
 
     libxl_vusbs_path = GCSPRINTF("%s/device/vusb",
-                                 libxl__xs_libxl_path(gc, !domid));
+                                 libxl__xs_libxl_path(gc, domid));
     usbctrls = libxl__xs_directory(gc, XBT_NULL, libxl_vusbs_path, &nc);
 
     for (i = 0; i < nc; i++) {
