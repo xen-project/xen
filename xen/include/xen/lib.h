@@ -26,6 +26,12 @@
 #define BUILD_BUG_ON(cond) ((void)BUILD_BUG_ON_ZERO(cond))
 #endif
 
+#ifdef CONFIG_GCOV
+#define gcov_string "gcov=y"
+#else
+#define gcov_string ""
+#endif
+
 #ifndef NDEBUG
 #define ASSERT(p) \
     do { if ( unlikely(!(p)) ) assert_failed(#p); } while (0)
