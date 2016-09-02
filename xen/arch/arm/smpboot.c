@@ -288,7 +288,6 @@ void start_secondary(unsigned long boot_phys_offset,
 
     set_processor_id(cpuid);
 
-    current_cpu_data = boot_cpu_data;
     identify_cpu(&current_cpu_data);
 
     init_traps();
