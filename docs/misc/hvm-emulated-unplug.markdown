@@ -70,3 +70,27 @@ xen/include/public/hvm/pvdrivers.h.
 NOTE: The IO ports implementing the unplug protocol are implemented
 as part of the Xen Platform PCI Device, so if that device is not
 present in the system then this protocol will not work.
+
+
+Unplug protocol for old SUSE PVonHVM
+
+During xen-3.0.4 timeframe an unofficial unplug protocol was added to
+the xen-platform-pci kernel module. The value 0x1 was written to offset
+0x4 in the memory region of the Xen Platform PCI Device. This was done
+unconditionally. The corresponding code in qemu-xen-traditional did an
+unplug of all NIC, IDE and SCSI devices. This was used in all SUSE
+releases up to openSUSE 12.3, SLES11SP3. Starting with openSUSE 13.1 and
+SLES11SP4/SLE12 the official protocol was used.
+
+Unplug protocol for old Novell VMDP
+
+During Xen-3.0 timeframe an unofficial unplug protocol was used in
+Novells VMDP. Depending on how VMDP was configured it would control all
+devices, or either NIC or storage. To control all devices the value 0x1
+was written to offset 0x4 in the memory region of the Xen Platform PCI
+Device. This was supposed to unplug NIC, IDE and SCSI devices. If VMDP
+was configured to control just NIC devices it would write the value 0x1
+to offset 0x8. If VMDP was configured to control just storage devices it
+would write the value 0x2 to offset 0x8. Starting with VMDP version 1.7
+(released 2011) the official protocol was used.
+
