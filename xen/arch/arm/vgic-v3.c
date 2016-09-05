@@ -170,8 +170,19 @@ static int __vgic_v3_rdistr_rd_mmio_read(struct vcpu *v, mmio_info_t *info,
     switch ( gicr_reg )
     {
     case VREG32(GICR_CTLR):
-        /* We have not implemented LPI's, read zero */
-        goto read_as_zero_32;
+    {
+        unsigned long flags;
+
+        if ( !v->domain->arch.vgic.has_its )
+            goto read_as_zero_32;
+        if ( dabt.size != DABT_WORD ) goto bad_width;
+
+        spin_lock_irqsave(&v->arch.vgic.lock, flags);
+        *r = vgic_reg32_extract(!!(v->arch.vgic.flags & VGIC_V3_LPIS_ENABLED),
+                                info);
+        spin_unlock_irqrestore(&v->arch.vgic.lock, flags);
+        return 1;
+    }
 
     case VREG32(GICR_IIDR):
         if ( dabt.size != DABT_WORD ) goto bad_width;
@@ -183,15 +194,19 @@ static int __vgic_v3_rdistr_rd_mmio_read(struct vcpu *v, mmio_info_t *info,
         uint64_t typer, aff;
 
         if ( !vgic_reg64_check_access(dabt) ) goto bad_width;
-        /* TBD: Update processor id in [23:8] when ITS support is added */
         aff = (MPIDR_AFFINITY_LEVEL(v->arch.vmpidr, 3) << 56 |
                MPIDR_AFFINITY_LEVEL(v->arch.vmpidr, 2) << 48 |
                MPIDR_AFFINITY_LEVEL(v->arch.vmpidr, 1) << 40 |
                MPIDR_AFFINITY_LEVEL(v->arch.vmpidr, 0) << 32);
         typer = aff;
+        /* We use the VCPU ID as the redistributor ID in bits[23:8] */
+        typer |= v->vcpu_id << GICR_TYPER_PROC_NUM_SHIFT;
 
         if ( v->arch.vgic.flags & VGIC_V3_RDIST_LAST )
             typer |= GICR_TYPER_LAST;
+
+        if ( v->domain->arch.vgic.has_its )
+            typer |= GICR_TYPER_PLPIS;
 
         *r = vgic_reg64_extract(typer, info);
 
@@ -426,6 +441,40 @@ static uint64_t sanitize_pendbaser(uint64_t reg)
     return reg;
 }
 
+static void vgic_vcpu_enable_lpis(struct vcpu *v)
+{
+    uint64_t reg = v->domain->arch.vgic.rdist_propbase;
+    unsigned int nr_lpis = BIT((reg & 0x1f) + 1);
+
+    /* rdists_enabled is protected by the domain lock. */
+    ASSERT(spin_is_locked(&v->domain->arch.vgic.lock));
+
+    if ( nr_lpis < LPI_OFFSET )
+        nr_lpis = 0;
+    else
+        nr_lpis -= LPI_OFFSET;
+
+    if ( !v->domain->arch.vgic.rdists_enabled )
+    {
+        v->domain->arch.vgic.nr_lpis = nr_lpis;
+        /*
+         * Make sure nr_lpis is visible before rdists_enabled.
+         * We read nr_lpis (and rdist_propbase) outside of the lock in
+         * other functions, but guard those accesses by rdists_enabled, so
+         * make sure these are consistent.
+         */
+        smp_mb();
+        v->domain->arch.vgic.rdists_enabled = true;
+        /*
+         * Make sure the per-domain rdists_enabled flag has been set before
+         * enabling this particular redistributor.
+         */
+        smp_mb();
+    }
+
+    v->arch.vgic.flags |= VGIC_V3_LPIS_ENABLED;
+}
+
 static int __vgic_v3_rdistr_rd_mmio_write(struct vcpu *v, mmio_info_t *info,
                                           uint32_t gicr_reg,
                                           register_t r)
@@ -436,8 +485,26 @@ static int __vgic_v3_rdistr_rd_mmio_write(struct vcpu *v, mmio_info_t *info,
     switch ( gicr_reg )
     {
     case VREG32(GICR_CTLR):
-        /* LPI's not implemented */
-        goto write_ignore_32;
+    {
+        unsigned long flags;
+
+        if ( !v->domain->arch.vgic.has_its )
+            goto write_ignore_32;
+        if ( dabt.size != DABT_WORD ) goto bad_width;
+
+        vgic_lock(v);                   /* protects rdists_enabled */
+        spin_lock_irqsave(&v->arch.vgic.lock, flags);
+
+        /* LPIs can only be enabled once, but never disabled again. */
+        if ( (r & GICR_CTLR_ENABLE_LPIS) &&
+             !(v->arch.vgic.flags & VGIC_V3_LPIS_ENABLED) )
+            vgic_vcpu_enable_lpis(v);
+
+        spin_unlock_irqrestore(&v->arch.vgic.lock, flags);
+        vgic_unlock(v);
+
+        return 1;
+    }
 
     case VREG32(GICR_IIDR):
         /* RO */
@@ -1048,7 +1115,6 @@ static int vgic_v3_distr_mmio_read(struct vcpu *v, mmio_info_t *info,
          * Number of interrupt identifier bits supported by the GIC
          * Stream Protocol Interface
          */
-        unsigned int irq_bits = get_count_order(vgic_num_irqs(v->domain));
         /*
          * Number of processors that may be used as interrupt targets when ARE
          * bit is zero. The maximum is 8.
@@ -1061,7 +1127,10 @@ static int vgic_v3_distr_mmio_read(struct vcpu *v, mmio_info_t *info,
         typer = ((ncpus - 1) << GICD_TYPE_CPUS_SHIFT |
                  DIV_ROUND_UP(v->domain->arch.vgic.nr_spis, 32));
 
-        typer |= (irq_bits - 1) << GICD_TYPE_ID_BITS_SHIFT;
+        if ( v->domain->arch.vgic.has_its )
+            typer |= GICD_TYPE_LPIS;
+
+        typer |= (v->domain->arch.vgic.intid_bits - 1) << GICD_TYPE_ID_BITS_SHIFT;
 
         *r = vgic_reg32_extract(typer, info);
 
