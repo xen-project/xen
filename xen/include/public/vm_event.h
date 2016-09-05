@@ -226,6 +226,8 @@ struct vm_event_mov_to_msr {
 
 struct vm_event_cpuid {
     uint32_t insn_length;
+    uint32_t leaf;
+    uint32_t subleaf;
     uint32_t _pad;
 };
 

@@ -136,7 +136,8 @@ int hvm_monitor_debug(unsigned long rip, enum hvm_monitor_debug_type type,
     return monitor_traps(curr, sync, &req);
 }
 
-int hvm_monitor_cpuid(unsigned long insn_length)
+int hvm_monitor_cpuid(unsigned long insn_length, unsigned int leaf,
+                      unsigned int subleaf)
 {
     struct vcpu *curr = current;
     struct arch_domain *ad = &curr->domain->arch;
@@ -148,6 +149,8 @@ int hvm_monitor_cpuid(unsigned long insn_length)
     req.reason = VM_EVENT_REASON_CPUID;
     req.vcpu_id = curr->vcpu_id;
     req.u.cpuid.insn_length = insn_length;
+    req.u.cpuid.leaf = leaf;
+    req.u.cpuid.subleaf = subleaf;
 
     return monitor_traps(curr, 1, &req);
 }

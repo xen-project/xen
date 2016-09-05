@@ -2402,11 +2402,15 @@ static void vmx_cpuid_intercept(
 static int vmx_do_cpuid(struct cpu_user_regs *regs)
 {
     unsigned int eax, ebx, ecx, edx;
+    unsigned int leaf, subleaf;
 
     eax = regs->eax;
     ebx = regs->ebx;
     ecx = regs->ecx;
     edx = regs->edx;
+
+    leaf = regs->eax;
+    subleaf = regs->ecx;
 
     vmx_cpuid_intercept(&eax, &ebx, &ecx, &edx);
 
@@ -2415,7 +2419,7 @@ static int vmx_do_cpuid(struct cpu_user_regs *regs)
     regs->ecx = ecx;
     regs->edx = edx;
 
-    return hvm_monitor_cpuid(get_instruction_length());
+    return hvm_monitor_cpuid(get_instruction_length(), leaf, subleaf);
 }
 
 static void vmx_dr_access(unsigned long exit_qualification,

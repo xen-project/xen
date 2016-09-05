@@ -735,10 +735,12 @@ int main(int argc, char *argv[])
                 break;
             case VM_EVENT_REASON_CPUID:
                 printf("CPUID executed: rip=%016"PRIx64", vcpu %d. Insn length: %"PRIu32" " \
-                       "EAX: 0x%"PRIx64" EBX: 0x%"PRIx64" ECX: 0x%"PRIx64" EDX: 0x%"PRIx64"\n",
+                       "0x%"PRIx32" 0x%"PRIx32": EAX=0x%"PRIx64" EBX=0x%"PRIx64" ECX=0x%"PRIx64" EDX=0x%"PRIx64"\n",
                        req.data.regs.x86.rip,
                        req.vcpu_id,
                        req.u.cpuid.insn_length,
+                       req.u.cpuid.leaf,
+                       req.u.cpuid.subleaf,
                        req.data.regs.x86.rax,
                        req.data.regs.x86.rbx,
                        req.data.regs.x86.rcx,
