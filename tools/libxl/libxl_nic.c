@@ -309,6 +309,18 @@ static int libxl__device_nic_from_xenstore(libxl__gc *gc,
     else
         nic->devid = 0;
 
+    rc = libxl__xs_read_checked(gc, XBT_NULL,
+                                GCSPRINTF("%s/backend", libxl_path), &tmp);
+    if (rc) goto out;
+
+    if (!tmp) {
+        LOG(ERROR, "nic %s does not exist (no backend path)", libxl_path);
+        rc = ERROR_FAIL;
+        goto out;
+    }
+    rc = libxl__backendpath_parse_domid(gc, tmp, &nic->backend_domid);
+    if (rc) goto out;
+
     /* nic->mtu = */
 
     rc = libxl__xs_read_checked(gc, XBT_NULL,
