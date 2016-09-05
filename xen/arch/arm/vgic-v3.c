@@ -1577,12 +1577,23 @@ static struct pending_irq *vgic_v3_lpi_to_pending(struct domain *d,
     return pirq;
 }
 
+/* Retrieve the priority of an LPI from its struct pending_irq. */
+static int vgic_v3_lpi_get_priority(struct domain *d, uint32_t vlpi)
+{
+    struct pending_irq *p = vgic_v3_lpi_to_pending(d, vlpi);
+
+    ASSERT(p);
+
+    return p->lpi_priority;
+}
+
 static const struct vgic_ops v3_ops = {
     .vcpu_init   = vgic_v3_vcpu_init,
     .domain_init = vgic_v3_domain_init,
     .domain_free = vgic_v3_domain_free,
     .emulate_reg  = vgic_v3_emulate_reg,
     .lpi_to_pending = vgic_v3_lpi_to_pending,
+    .lpi_get_priority = vgic_v3_lpi_get_priority,
     /*
      * We use both AFF1 and AFF0 in (v)MPIDR. Thus, the max number of CPU
      * that can be supported is up to 4096(==256*16) in theory.

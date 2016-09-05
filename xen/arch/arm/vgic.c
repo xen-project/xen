@@ -227,8 +227,13 @@ struct vcpu *vgic_get_target_vcpu(struct vcpu *v, unsigned int virq)
 
 static int vgic_get_virq_priority(struct vcpu *v, unsigned int virq)
 {
-    struct vgic_irq_rank *rank = vgic_rank_irq(v, virq);
+    struct vgic_irq_rank *rank;
 
+    /* LPIs don't have a rank, also store their priority separately. */
+    if ( is_lpi(virq) )
+        return v->domain->arch.vgic.handler->lpi_get_priority(v->domain, virq);
+
+    rank = vgic_rank_irq(v, virq);
     return ACCESS_ONCE(rank->priority[virq & INTERRUPT_RANK_MASK]);
 }
 
@@ -503,8 +508,6 @@ void vgic_vcpu_inject_irq(struct vcpu *v, unsigned int virq)
     unsigned long flags;
     bool running;
 
-    priority = vgic_get_virq_priority(v, virq);
-
     spin_lock_irqsave(&v->arch.vgic.lock, flags);
 
     n = irq_to_pending(v, virq);
@@ -530,6 +533,7 @@ void vgic_vcpu_inject_irq(struct vcpu *v, unsigned int virq)
         goto out;
     }
 
+    priority = vgic_get_virq_priority(v, virq);
     n->priority = priority;
 
     /* the irq is enabled */
