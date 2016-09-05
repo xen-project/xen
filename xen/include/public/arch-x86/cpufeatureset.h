@@ -206,15 +206,24 @@ XEN_CPUFEATURE(PQM,           5*32+12) /*   Platform QoS Monitoring */
 XEN_CPUFEATURE(NO_FPU_SEL,    5*32+13) /*!  FPU CS/DS stored as zero */
 XEN_CPUFEATURE(MPX,           5*32+14) /*S  Memory Protection Extensions */
 XEN_CPUFEATURE(PQE,           5*32+15) /*   Platform QoS Enforcement */
+XEN_CPUFEATURE(AVX512F,       5*32+16) /*A  AVX-512 Foundation Instructions */
+XEN_CPUFEATURE(AVX512DQ,      5*32+17) /*A  AVX-512 Doubleword & Quadword Instrs */
 XEN_CPUFEATURE(RDSEED,        5*32+18) /*A  RDSEED instruction */
 XEN_CPUFEATURE(ADX,           5*32+19) /*A  ADCX, ADOX instructions */
 XEN_CPUFEATURE(SMAP,          5*32+20) /*S  Supervisor Mode Access Prevention */
+XEN_CPUFEATURE(AVX512IFMA,    5*32+21) /*A  AVX-512 Integer Fused Multiply Add */
 XEN_CPUFEATURE(CLFLUSHOPT,    5*32+23) /*A  CLFLUSHOPT instruction */
 XEN_CPUFEATURE(CLWB,          5*32+24) /*A  CLWB instruction */
+XEN_CPUFEATURE(AVX512PF,      5*32+26) /*A  AVX-512 Prefetch Instructions */
+XEN_CPUFEATURE(AVX512ER,      5*32+27) /*A  AVX-512 Exponent & Reciprocal Instrs */
+XEN_CPUFEATURE(AVX512CD,      5*32+28) /*A  AVX-512 Conflict Detection Instrs */
 XEN_CPUFEATURE(SHA,           5*32+29) /*A  SHA1 & SHA256 instructions */
+XEN_CPUFEATURE(AVX512BW,      5*32+30) /*A  AVX-512 Byte and Word Instructions */
+XEN_CPUFEATURE(AVX512VL,      5*32+31) /*A  AVX-512 Vector Length Extensions */
 
 /* Intel-defined CPU features, CPUID level 0x00000007:0.ecx, word 6 */
 XEN_CPUFEATURE(PREFETCHWT1,   6*32+ 0) /*A  PREFETCHWT1 instruction */
+XEN_CPUFEATURE(AVX512VBMI,    6*32+ 1) /*A  AVX-512 Vector Byte Manipulation Instrs */
 XEN_CPUFEATURE(PKU,           6*32+ 3) /*H  Protection Keys for Userspace */
 XEN_CPUFEATURE(OSPKE,         6*32+ 4) /*!  OS Protection Keys Enable */
 

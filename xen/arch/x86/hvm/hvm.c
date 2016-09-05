@@ -3472,6 +3472,20 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
                                   xstate_sizes[_XSTATE_BNDCSR]);
             }
 
+            if ( _ebx & cpufeat_mask(X86_FEATURE_AVX512F) )
+            {
+                xfeature_mask |= XSTATE_OPMASK | XSTATE_ZMM | XSTATE_HI_ZMM;
+                xstate_size = max(xstate_size,
+                                  xstate_offsets[_XSTATE_OPMASK] +
+                                  xstate_sizes[_XSTATE_OPMASK]);
+                xstate_size = max(xstate_size,
+                                  xstate_offsets[_XSTATE_ZMM] +
+                                  xstate_sizes[_XSTATE_ZMM]);
+                xstate_size = max(xstate_size,
+                                  xstate_offsets[_XSTATE_HI_ZMM] +
+                                  xstate_sizes[_XSTATE_HI_ZMM]);
+            }
+
             if ( _ecx & cpufeat_mask(X86_FEATURE_PKU) )
             {
                 xfeature_mask |= XSTATE_PKRU;

@@ -959,7 +959,7 @@ void pv_cpuid(struct cpu_user_regs *regs)
 
     switch ( leaf )
     {
-        uint32_t tmp, _ecx;
+        uint32_t tmp, _ecx, _ebx;
 
     case 0x00000001:
         c &= pv_featureset[FEATURESET_1c];
@@ -1145,6 +1145,26 @@ void pv_cpuid(struct cpu_user_regs *regs)
                 xfeature_mask |= XSTATE_YMM;
                 xstate_size = (xstate_offsets[_XSTATE_YMM] +
                                xstate_sizes[_XSTATE_YMM]);
+            }
+
+            if ( !is_control_domain(currd) && !is_hardware_domain(currd) )
+                domain_cpuid(currd, 7, 0, &tmp, &_ebx, &tmp, &tmp);
+            else
+                cpuid_count(7, 0, &tmp, &_ebx, &tmp, &tmp);
+            _ebx &= pv_featureset[FEATURESET_7b0];
+
+            if ( _ebx & cpufeat_mask(X86_FEATURE_AVX512F) )
+            {
+                xfeature_mask |= XSTATE_OPMASK | XSTATE_ZMM | XSTATE_HI_ZMM;
+                xstate_size = max(xstate_size,
+                                  xstate_offsets[_XSTATE_OPMASK] +
+                                  xstate_sizes[_XSTATE_OPMASK]);
+                xstate_size = max(xstate_size,
+                                  xstate_offsets[_XSTATE_ZMM] +
+                                  xstate_sizes[_XSTATE_ZMM]);
+                xstate_size = max(xstate_size,
+                                  xstate_offsets[_XSTATE_HI_ZMM] +
+                                  xstate_sizes[_XSTATE_HI_ZMM]);
             }
 
             a = (uint32_t)xfeature_mask;
