@@ -224,7 +224,7 @@ AC_ARG_WITH([system-seabios],
 ],[])
 AS_IF([test "x$seabios" = "xy"], [
     AC_DEFINE_UNQUOTED([SEABIOS_PATH],
-                       ["${seabios_path:-$XENFIRMWAREDIR/bios.bin}"],
+                       ["${seabios_path:-$XENFIRMWAREDIR/seabios.bin}"],
                        [SeaBIOS path])
 ])
 

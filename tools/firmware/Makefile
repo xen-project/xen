@@ -42,7 +42,7 @@ install: all
 	[ -d $(INST_DIR) ] || $(INSTALL_DIR) $(INST_DIR)
 	[ ! -e $(TARGET) ] || $(INSTALL_DATA) $(TARGET) $(INST_DIR)
 ifeq ($(CONFIG_SEABIOS),y)
-	$(INSTALL_DATA) seabios-dir/out/bios.bin $(INST_DIR)/bios.bin
+	$(INSTALL_DATA) seabios-dir/out/bios.bin $(INST_DIR)/seabios.bin
 endif
 ifeq ($(CONFIG_OVMF),y)
 	$(INSTALL_DATA) ovmf-dir/ovmf.bin $(INST_DIR)/ovmf.bin
