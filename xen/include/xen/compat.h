@@ -15,11 +15,14 @@
     typedef struct { \
         compat_ptr_t c; \
         type *_[0] __packed; \
-    } __compat_handle_ ## name
+    } __compat_handle_ ## name; \
+    typedef struct { \
+        compat_ptr_t c; \
+        const type *_[0] __packed; \
+    } __compat_handle_const_ ## name
 
 #define DEFINE_COMPAT_HANDLE(name) \
-    __DEFINE_COMPAT_HANDLE(name, name); \
-    __DEFINE_COMPAT_HANDLE(const_ ## name, const name)
+    __DEFINE_COMPAT_HANDLE(name, name)
 #define COMPAT_HANDLE(name)          __compat_handle_ ## name
 
 /* NB: it is assumed that if an arch uses the compat layer it does not
