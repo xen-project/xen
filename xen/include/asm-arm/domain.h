@@ -260,7 +260,8 @@ struct arch_vcpu
 
         /* GICv3: redistributor base and flags for this vCPU */
         paddr_t rdist_base;
-#define VGIC_V3_RDIST_LAST  (1 << 0)        /* last vCPU of the rdist */
+#define VGIC_V3_RDIST_LAST      (1 << 0)        /* last vCPU of the rdist */
+#define VGIC_V3_LPIS_ENABLED    (1 << 1)
         uint8_t flags;
     } vgic;
 

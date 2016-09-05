@@ -1217,6 +1217,12 @@ static int __init gicv2_init(void)
     return 0;
 }
 
+static void gicv2_do_LPI(unsigned int lpi)
+{
+    /* No LPIs in a GICv2 */
+    BUG();
+}
+
 const static struct gic_hw_operations gicv2_ops = {
     .info                = &gicv2_info,
     .init                = gicv2_init,
@@ -1244,6 +1250,7 @@ const static struct gic_hw_operations gicv2_ops = {
     .make_hwdom_madt     = gicv2_make_hwdom_madt,
     .map_hwdom_extra_mappings = gicv2_map_hwdown_extra_mappings,
     .iomem_deny_access   = gicv2_iomem_deny_access,
+    .do_LPI              = gicv2_do_LPI,
 };
 
 /* Set up the GIC */

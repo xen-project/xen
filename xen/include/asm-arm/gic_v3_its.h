@@ -134,6 +134,8 @@ void gicv3_its_dt_init(const struct dt_device_node *node);
 
 bool gicv3_its_host_has_its(void);
 
+void gicv3_do_LPI(unsigned int lpi);
+
 int gicv3_lpi_init_rdist(void __iomem * rdist_base);
 
 /* Initialize the host structures for LPIs and the host ITSes. */
@@ -164,6 +166,8 @@ int gicv3_its_map_guest_device(struct domain *d,
 int gicv3_allocate_host_lpi_block(struct domain *d, uint32_t *first_lpi);
 void gicv3_free_host_lpi_block(uint32_t first_lpi);
 
+void vgic_vcpu_inject_lpi(struct domain *d, unsigned int virq);
+
 #else
 
 static inline void gicv3_its_dt_init(const struct dt_device_node *node)
@@ -173,6 +177,12 @@ static inline void gicv3_its_dt_init(const struct dt_device_node *node)
 static inline bool gicv3_its_host_has_its(void)
 {
     return false;
+}
+
+static inline void gicv3_do_LPI(unsigned int lpi)
+{
+    /* We don't enable LPIs without an ITS. */
+    BUG();
 }
 
 static inline int gicv3_lpi_init_rdist(void __iomem * rdist_base)

@@ -1692,6 +1692,7 @@ static const struct gic_hw_operations gicv3_ops = {
     .make_hwdom_dt_node  = gicv3_make_hwdom_dt_node,
     .make_hwdom_madt     = gicv3_make_hwdom_madt,
     .iomem_deny_access   = gicv3_iomem_deny_access,
+    .do_LPI              = gicv3_do_LPI,
 };
 
 static int __init gicv3_dt_preinit(struct dt_device_node *node, const void *data)

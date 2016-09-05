@@ -732,7 +732,13 @@ void gic_interrupt(struct cpu_user_regs *regs, int is_fiq)
             do_IRQ(regs, irq, is_fiq);
             local_irq_disable();
         }
-        else if (unlikely(irq < 16))
+        else if ( is_lpi(irq) )
+        {
+            local_irq_enable();
+            gic_hw_ops->do_LPI(irq);
+            local_irq_disable();
+        }
+        else if ( unlikely(irq < 16) )
         {
             do_sgi(regs, irq);
         }

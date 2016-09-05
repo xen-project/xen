@@ -136,6 +136,85 @@ uint64_t gicv3_get_redist_address(unsigned int cpu, bool use_pta)
         return per_cpu(lpi_redist, cpu).redist_id << 16;
 }
 
+void vgic_vcpu_inject_lpi(struct domain *d, unsigned int virq)
+{
+    /*
+     * TODO: this assumes that the struct pending_irq stays valid all of
+     * the time. We cannot properly protect this with the current locking
+     * scheme, but the future per-IRQ lock will solve this problem.
+     */
+    struct pending_irq *p = irq_to_pending(d->vcpu[0], virq);
+    unsigned int vcpu_id;
+
+    if ( !p )
+        return;
+
+    vcpu_id = ACCESS_ONCE(p->lpi_vcpu_id);
+    if ( vcpu_id >= d->max_vcpus )
+          return;
+
+    vgic_vcpu_inject_irq(d->vcpu[vcpu_id], virq);
+}
+
+/*
+ * Handle incoming LPIs, which are a bit special, because they are potentially
+ * numerous and also only get injected into guests. Treat them specially here,
+ * by just looking up their target vCPU and virtual LPI number and hand it
+ * over to the injection function.
+ * Please note that LPIs are edge-triggered only, also have no active state,
+ * so spurious interrupts on the host side are no issue (we can just ignore
+ * them).
+ * Also a guest cannot expect that firing interrupts that haven't been
+ * fully configured yet will reach the CPU, so we don't need to care about
+ * this special case.
+ */
+void gicv3_do_LPI(unsigned int lpi)
+{
+    struct domain *d;
+    union host_lpi *hlpip, hlpi;
+
+    irq_enter();
+
+    /* EOI the LPI already. */
+    WRITE_SYSREG32(lpi, ICC_EOIR1_EL1);
+
+    /* Find out if a guest mapped something to this physical LPI. */
+    hlpip = gic_get_host_lpi(lpi);
+    if ( !hlpip )
+        goto out;
+
+    hlpi.data = read_u64_atomic(&hlpip->data);
+
+    /*
+     * Unmapped events are marked with an invalid LPI ID. We can safely
+     * ignore them, as they have no further state and no-one can expect
+     * to see them if they have not been mapped.
+     */
+    if ( hlpi.virt_lpi == INVALID_LPI )
+        goto out;
+
+    d = rcu_lock_domain_by_id(hlpi.dom_id);
+    if ( !d )
+        goto out;
+
+    /*
+     * TODO: Investigate what to do here for potential interrupt storms.
+     * As we keep all host LPIs enabled, for disabling LPIs we would need
+     * to queue a ITS host command, which we avoid so far during a guest's
+     * runtime. Also re-enabling would trigger a host command upon the
+     * guest sending a command, which could be an attack vector for
+     * hogging the host command queue.
+     * See the thread around here for some background:
+     * https://lists.xen.org/archives/html/xen-devel/2016-12/msg00003.html
+     */
+    vgic_vcpu_inject_lpi(d, hlpi.virt_lpi);
+
+    rcu_unlock_domain(d);
+
+out:
+    irq_exit();
+}
+
 static int gicv3_lpi_allocate_pendtable(uint64_t *reg)
 {
     uint64_t val;

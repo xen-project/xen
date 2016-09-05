@@ -367,6 +367,8 @@ struct gic_hw_operations {
     int (*map_hwdom_extra_mappings)(struct domain *d);
     /* Deny access to GIC regions */
     int (*iomem_deny_access)(const struct domain *d);
+    /* Handle LPIs, which require special handling */
+    void (*do_LPI)(unsigned int lpi);
 };
 
 void register_gic_ops(const struct gic_hw_operations *ops);
