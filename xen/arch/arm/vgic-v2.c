@@ -705,10 +705,18 @@ static void vgic_v2_domain_free(struct domain *d)
     /* Nothing to be cleanup for this driver */
 }
 
+static struct pending_irq *vgic_v2_lpi_to_pending(struct domain *d,
+                                                  unsigned int vlpi)
+{
+    /* Dummy function, no LPIs on a VGICv2. */
+    BUG();
+}
+
 static const struct vgic_ops vgic_v2_ops = {
     .vcpu_init   = vgic_v2_vcpu_init,
     .domain_init = vgic_v2_domain_init,
     .domain_free = vgic_v2_domain_free,
+    .lpi_to_pending = vgic_v2_lpi_to_pending,
     .max_vcpus = 8,
 };
 

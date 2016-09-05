@@ -1457,6 +1457,9 @@ static int vgic_v3_domain_init(struct domain *d)
     d->arch.vgic.nr_regions = rdist_count;
     d->arch.vgic.rdist_regions = rdist_regions;
 
+    rwlock_init(&d->arch.vgic.pend_lpi_tree_lock);
+    radix_tree_init(&d->arch.vgic.pend_lpi_tree);
+
     /*
      * Domain 0 gets the hardware address.
      * Guests get the virtual platform layout.
@@ -1545,7 +1548,33 @@ static int vgic_v3_domain_init(struct domain *d)
 static void vgic_v3_domain_free(struct domain *d)
 {
     vgic_v3_its_free_domain(d);
+    /*
+     * It is expected that at this point all actual ITS devices have been
+     * cleaned up already. The struct pending_irq's, for which the pointers
+     * have been stored in the radix tree, are allocated and freed by device.
+     * On device unmapping all the entries are removed from the tree and
+     * the backing memory is freed.
+     */
+    radix_tree_destroy(&d->arch.vgic.pend_lpi_tree, NULL);
     xfree(d->arch.vgic.rdist_regions);
+}
+
+/*
+ * Looks up a virtual LPI number in our tree of mapped LPIs. This will return
+ * the corresponding struct pending_irq, which we also use to store the
+ * enabled and pending bit plus the priority.
+ * Returns NULL if an LPI cannot be found (or no LPIs are supported).
+ */
+static struct pending_irq *vgic_v3_lpi_to_pending(struct domain *d,
+                                                  unsigned int lpi)
+{
+    struct pending_irq *pirq;
+
+    read_lock(&d->arch.vgic.pend_lpi_tree_lock);
+    pirq = radix_tree_lookup(&d->arch.vgic.pend_lpi_tree, lpi);
+    read_unlock(&d->arch.vgic.pend_lpi_tree_lock);
+
+    return pirq;
 }
 
 static const struct vgic_ops v3_ops = {
@@ -1553,6 +1582,7 @@ static const struct vgic_ops v3_ops = {
     .domain_init = vgic_v3_domain_init,
     .domain_free = vgic_v3_domain_free,
     .emulate_reg  = vgic_v3_emulate_reg,
+    .lpi_to_pending = vgic_v3_lpi_to_pending,
     /*
      * We use both AFF1 and AFF0 in (v)MPIDR. Thus, the max number of CPU
      * that can be supported is up to 4096(==256*16) in theory.

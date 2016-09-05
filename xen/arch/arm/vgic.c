@@ -469,6 +469,8 @@ struct pending_irq *irq_to_pending(struct vcpu *v, unsigned int irq)
      * are used for SPIs; the rests are used for per cpu irqs */
     if ( irq < 32 )
         n = &v->arch.vgic.pending_irqs[irq];
+    else if ( is_lpi(irq) )
+        n = v->domain->arch.vgic.handler->lpi_to_pending(v->domain, irq);
     else
         n = &v->domain->arch.vgic.pending_irqs[irq - 32];
     return n;

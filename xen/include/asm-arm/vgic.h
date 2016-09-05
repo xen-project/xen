@@ -134,6 +134,8 @@ struct vgic_ops {
     void (*domain_free)(struct domain *d);
     /* vGIC sysreg/cpregs emulate */
     bool (*emulate_reg)(struct cpu_user_regs *regs, union hsr hsr);
+    /* lookup the struct pending_irq for a given LPI interrupt */
+    struct pending_irq *(*lpi_to_pending)(struct domain *d, unsigned int vlpi);
     /* Maximum number of vCPU supported */
     const unsigned int max_vcpus;
 };
