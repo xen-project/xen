@@ -61,6 +61,14 @@ boolean_param("nosmp", opt_nosmp);
 static unsigned int __initdata max_cpus;
 integer_param("maxcpus", max_cpus);
 
+/* smep: Enable/disable Supervisor Mode Execution Protection (default on). */
+static bool_t __initdata opt_smep = 1;
+boolean_param("smep", opt_smep);
+
+/* smap: Enable/disable Supervisor Mode Access Prevention (default on). */
+static bool_t __initdata opt_smap = 1;
+boolean_param("smap", opt_smap);
+
 unsigned long __read_mostly cr4_pv32_mask;
 
 /* Boot dom0 in pvh mode */
@@ -103,58 +111,6 @@ char __section(".bss.stack_aligned") __aligned(STACK_SIZE)
 struct cpuinfo_x86 __read_mostly boot_cpu_data = { 0, 0, 0, 0, -1 };
 
 unsigned long __read_mostly mmu_cr4_features = XEN_MINIMAL_CR4;
-
-/* smep: Enable/disable Supervisor Mode Execution Protection (default on). */
-#define SMEP_HVM_ONLY (-1)
-static s8 __initdata opt_smep = 1;
-static void __init parse_smep_param(char *s)
-{
-    if ( !*s )
-    {
-        opt_smep = 1;
-        return;
-    }
-
-    switch ( parse_bool(s) )
-    {
-    case 0:
-        opt_smep = 0;
-        return;
-    case 1:
-        opt_smep = 1;
-        return;
-    }
-
-    if ( !strcmp(s, "hvm") )
-        opt_smep = SMEP_HVM_ONLY;
-}
-custom_param("smep", parse_smep_param);
-
-/* smap: Enable/disable Supervisor Mode Access Prevention (default on). */
-#define SMAP_HVM_ONLY (-1)
-static s8 __initdata opt_smap = 1;
-static void __init parse_smap_param(char *s)
-{
-    if ( !*s )
-    {
-        opt_smap = 1;
-        return;
-    }
-
-    switch ( parse_bool(s) )
-    {
-    case 0:
-        opt_smap = 0;
-        return;
-    case 1:
-        opt_smap = 1;
-        return;
-    }
-
-    if ( !strcmp(s, "hvm") )
-        opt_smap = SMAP_HVM_ONLY;
-}
-custom_param("smap", parse_smap_param);
 
 bool_t __read_mostly acpi_disabled;
 bool_t __initdata acpi_force;
@@ -1448,16 +1404,12 @@ void __init noreturn __start_xen(unsigned long mbi_p)
 
     if ( !opt_smep )
         setup_clear_cpu_cap(X86_FEATURE_SMEP);
-    else if ( opt_smep == 1 )
-        __set_bit(X86_FEATURE_XEN_SMEP, boot_cpu_data.x86_capability);
-    if ( boot_cpu_has(X86_FEATURE_XEN_SMEP) )
+    if ( cpu_has_smep )
         set_in_cr4(X86_CR4_SMEP);
 
     if ( !opt_smap )
         setup_clear_cpu_cap(X86_FEATURE_SMAP);
-    else if ( opt_smap == 1 )
-        __set_bit(X86_FEATURE_XEN_SMAP, boot_cpu_data.x86_capability);
-    if ( boot_cpu_has(X86_FEATURE_XEN_SMAP) )
+    if ( cpu_has_smap )
         set_in_cr4(X86_CR4_SMAP);
 
     cr4_pv32_mask = mmu_cr4_features & XEN_CR4_PV32_BITS;
@@ -1599,7 +1551,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
      * This saves a large number of corner cases interactions with
      * copy_from_user().
      */
-    if ( boot_cpu_has(X86_FEATURE_XEN_SMAP) )
+    if ( cpu_has_smap )
     {
         cr4_pv32_mask &= ~X86_CR4_SMAP;
         write_cr4(read_cr4() & ~X86_CR4_SMAP);
@@ -1619,7 +1571,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
                         bootstrap_map, cmdline) != 0)
         panic("Could not set up DOM0 guest OS");
 
-    if ( boot_cpu_has(X86_FEATURE_XEN_SMAP) )
+    if ( cpu_has_smap )
     {
         write_cr4(read_cr4() | X86_CR4_SMAP);
         cr4_pv32_mask |= X86_CR4_SMAP;

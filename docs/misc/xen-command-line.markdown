@@ -1427,21 +1427,19 @@ enabling more sockets and cores to go into deeper sleep states.
 
 Set the serial transmit buffer size.
 
-### smap
-> `= <boolean> | hvm`
-
-> Default: `true`
-
-Flag to enable Supervisor Mode Access Prevention
-Use `smap=hvm` to allow SMAP use by HVM guests only.
-
 ### smep
-> `= <boolean> | hvm`
+> `= <boolean>`
 
 > Default: `true`
 
 Flag to enable Supervisor Mode Execution Protection
-Use `smep=hvm` to allow SMEP use by HVM guests only.
+
+### smap
+> `= <boolean>`
+
+> Default: `true`
+
+Flag to enable Supervisor Mode Access Prevention
 
 ### snb\_igd\_quirk
 > `= <boolean> | cap | <integer>`
