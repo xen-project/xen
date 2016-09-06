@@ -78,9 +78,6 @@
 #define CSCHED_VCPU(_vcpu)  ((struct csched_vcpu *) (_vcpu)->sched_priv)
 #define CSCHED_DOM(_dom)    ((struct csched_dom *) (_dom)->sched_priv)
 #define RUNQ(_cpu)          (&(CSCHED_PCPU(_cpu)->runq))
-/* Is the first element of _cpu's runq its idle vcpu? */
-#define IS_RUNQ_IDLE(_cpu)  (list_empty(RUNQ(_cpu)) || \
-                             is_idle_vcpu(__runq_elem(RUNQ(_cpu)->next)->vcpu))
 
 
 /*
@@ -249,6 +246,18 @@ static inline struct csched_vcpu *
 __runq_elem(struct list_head *elem)
 {
     return list_entry(elem, struct csched_vcpu, runq_elem);
+}
+
+/* Is the first element of cpu's runq (if any) cpu's idle vcpu? */
+static inline bool_t is_runq_idle(unsigned int cpu)
+{
+    /*
+     * We're peeking at cpu's runq, we must hold the proper lock.
+     */
+    ASSERT(spin_is_locked(per_cpu(schedule_data, cpu).schedule_lock));
+
+    return list_empty(RUNQ(cpu)) ||
+           is_idle_vcpu(__runq_elem(RUNQ(cpu)->next)->vcpu);
 }
 
 static inline void
@@ -696,7 +705,7 @@ _csched_cpu_pick(const struct scheduler *ops, struct vcpu *vc, bool_t commit)
          * runnable vcpu on cpu, we add cpu to the idlers.
          */
         cpumask_and(&idlers, &cpu_online_map, CSCHED_PRIV(ops)->idlers);
-        if ( vc->processor == cpu && IS_RUNQ_IDLE(cpu) )
+        if ( vc->processor == cpu && is_runq_idle(cpu) )
             __cpumask_set_cpu(cpu, &idlers);
         cpumask_and(&cpus, &cpus, &idlers);
 
@@ -862,21 +871,33 @@ csched_vcpu_acct(struct csched_private *prv, unsigned int cpu)
     /*
      * Put this VCPU and domain back on the active list if it was
      * idling.
-     *
-     * If it's been active a while, check if we'd be better off
-     * migrating it to run elsewhere (see multi-core and multi-thread
-     * support in csched_cpu_pick()).
      */
     if ( list_empty(&svc->active_vcpu_elem) )
     {
         __csched_vcpu_acct_start(prv, svc);
     }
-    else if ( _csched_cpu_pick(ops, current, 0) != cpu )
+    else
     {
-        SCHED_VCPU_STAT_CRANK(svc, migrate_r);
-        SCHED_STAT_CRANK(migrate_running);
-        set_bit(_VPF_migrating, &current->pause_flags);
-        cpu_raise_softirq(cpu, SCHEDULE_SOFTIRQ);
+        unsigned int new_cpu;
+        unsigned long flags;
+        spinlock_t *lock = vcpu_schedule_lock_irqsave(current, &flags);
+
+        /*
+         * If it's been active a while, check if we'd be better off
+         * migrating it to run elsewhere (see multi-core and multi-thread
+         * support in csched_cpu_pick()).
+         */
+        new_cpu = _csched_cpu_pick(ops, current, 0);
+
+        vcpu_schedule_unlock_irqrestore(lock, flags, current);
+
+        if ( new_cpu != cpu )
+        {
+            SCHED_VCPU_STAT_CRANK(svc, migrate_r);
+            SCHED_STAT_CRANK(migrate_running);
+            set_bit(_VPF_migrating, &current->pause_flags);
+            cpu_raise_softirq(cpu, SCHEDULE_SOFTIRQ);
+        }
     }
 }
 
@@ -909,8 +930,12 @@ csched_vcpu_insert(const struct scheduler *ops, struct vcpu *vc)
 
     BUG_ON( is_idle_vcpu(vc) );
 
-    /* This is safe because vc isn't yet being scheduled */
+    /* csched_cpu_pick() looks in vc->processor's runq, so we need the lock. */
+    lock = vcpu_schedule_lock_irq(vc);
+
     vc->processor = csched_cpu_pick(ops, vc);
+
+    spin_unlock_irq(lock);
 
     lock = vcpu_schedule_lock_irq(vc);
 
