@@ -30,6 +30,8 @@ struct xen_sysctl_livepatch_op;
 #define ELF_LIVEPATCH_FUNC    ".livepatch.funcs"
 #define ELF_LIVEPATCH_DEPENDS ".livepatch.depends"
 #define ELF_BUILD_ID_NOTE      ".note.gnu.build-id"
+/* Arbitrary limit for payload size and .bss section size. */
+#define LIVEPATCH_MAX_SIZE     MB(2)
 
 struct livepatch_symbol {
     const char *name;

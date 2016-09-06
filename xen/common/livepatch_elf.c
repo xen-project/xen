@@ -86,6 +86,10 @@ static int elf_resolve_sections(struct livepatch_elf *elf, const void *data)
                     delta < sizeof(Elf_Ehdr) ? "at ELF header" : "is past end");
             return -EINVAL;
         }
+        else if ( (sec[i].sec->sh_flags & (SHF_WRITE | SHF_ALLOC)) &&
+                  sec[i].sec->sh_type == SHT_NOBITS &&
+                  sec[i].sec->sh_size > LIVEPATCH_MAX_SIZE )
+            return -EINVAL;
 
         sec[i].data = data + delta;
         /* Name is populated in elf_resolve_section_names. */

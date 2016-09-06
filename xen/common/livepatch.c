@@ -123,7 +123,7 @@ static int verify_payload(const xen_sysctl_livepatch_upload_t *upload, char *n)
     if ( !upload->size )
         return -EINVAL;
 
-    if ( upload->size > MB(2) )
+    if ( upload->size > LIVEPATCH_MAX_SIZE )
         return -EINVAL;
 
     if ( !guest_handle_okay(upload->payload, upload->size) )
