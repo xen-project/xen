@@ -2664,8 +2664,8 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
 
                     if ( vpmu_do_wrmsr(regs->ecx, msr_content, 0) )
                         goto fail;
+                    break;
                 }
-                break;
             }
             /*FALLTHROUGH*/
 
@@ -2799,8 +2799,8 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
 
                     regs->eax = (uint32_t)val;
                     regs->edx = (uint32_t)(val >> 32);
+                    break;
                 }
-                break;
             }
             /*FALLTHROUGH*/
 
