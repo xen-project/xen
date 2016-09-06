@@ -243,7 +243,7 @@ static struct vcpu *vector_hashing_dest(const struct domain *d,
         for ( i = 0; i <= mod; i++ )
         {
             idx = find_next_bit(dest_vcpu_bitmap, d->max_vcpus, idx) + 1;
-            BUG_ON(idx >= d->max_vcpus);
+            BUG_ON(idx > d->max_vcpus);
         }
 
         dest = d->vcpu[idx - 1];
