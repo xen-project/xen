@@ -641,10 +641,10 @@ static int prepare_payload(struct payload *payload,
                                   sizeof(*region->frame[i].bugs);
     }
 
-#ifdef CONFIG_HAS_ALTERNATIVE
     sec = livepatch_elf_sec_by_name(elf, ".altinstructions");
     if ( sec )
     {
+#ifdef CONFIG_HAS_ALTERNATIVE
         struct alt_instr *a, *start, *end;
 
         if ( sec->sec->sh_size % sizeof(*a) )
@@ -671,13 +671,17 @@ static int prepare_payload(struct payload *payload,
             }
         }
         apply_alternatives(start, end);
-    }
+#else
+        dprintk(XENLOG_ERR, LIVEPATCH "%s: We don't support alternative patching!\n",
+                elf->name);
+        return -EOPNOTSUPP;
 #endif
+    }
 
-#ifdef CONFIG_HAS_EX_TABLE
     sec = livepatch_elf_sec_by_name(elf, ".ex_table");
     if ( sec )
     {
+#ifdef CONFIG_HAS_EX_TABLE
         struct exception_table_entry *s, *e;
 
         if ( !sec->sec->sh_size ||
@@ -696,8 +700,12 @@ static int prepare_payload(struct payload *payload,
 
         region->ex = s;
         region->ex_end = e;
-    }
+#else
+        dprintk(XENLOG_ERR, LIVEPATCH "%s: We don't support .ex_table!\n",
+                elf->name);
+        return -EOPNOTSUPP;
 #endif
+    }
 
     return 0;
 }
