@@ -550,9 +550,7 @@ rt_vcpu_insert(const struct scheduler *ops, struct vcpu *vc)
     s_time_t now;
     spinlock_t *lock;
 
-    /* not addlocate idle vcpu to dom vcpu list */
-    if ( is_idle_vcpu(vc) )
-        return;
+    BUG_ON( is_idle_vcpu(vc) );
 
     lock = vcpu_schedule_lock_irq(vc);
 

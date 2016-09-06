@@ -209,20 +209,22 @@ int sched_init_vcpu(struct vcpu *v, unsigned int processor)
     init_timer(&v->poll_timer, poll_timer_fn,
                v, v->processor);
 
-    /* Idle VCPUs are scheduled immediately. */
+    v->sched_priv = SCHED_OP(DOM2OP(d), alloc_vdata, v, d->sched_priv);
+    if ( v->sched_priv == NULL )
+        return 1;
+
+    TRACE_2D(TRC_SCHED_DOM_ADD, v->domain->domain_id, v->vcpu_id);
+
+    /* Idle VCPUs are scheduled immediately, so don't put them in runqueue. */
     if ( is_idle_domain(d) )
     {
         per_cpu(schedule_data, v->processor).curr = v;
         v->is_running = 1;
     }
-
-    TRACE_2D(TRC_SCHED_DOM_ADD, v->domain->domain_id, v->vcpu_id);
-
-    v->sched_priv = SCHED_OP(DOM2OP(d), alloc_vdata, v, d->sched_priv);
-    if ( v->sched_priv == NULL )
-        return 1;
-
-    SCHED_OP(DOM2OP(d), insert_vcpu, v);
+    else
+    {
+        SCHED_OP(DOM2OP(d), insert_vcpu, v);
+    }
 
     return 0;
 }
