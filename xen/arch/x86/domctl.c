@@ -110,10 +110,18 @@ static void update_domain_cpuid_info(struct domain *d,
             case X86_VENDOR_INTEL:
                 /*
                  * Intel masking MSRs are documented as AND masks.
-                 * Experimentally, they are applied before OSXSAVE and APIC
+                 * Experimentally, they are applied after OSXSAVE and APIC
                  * are fast-forwarded from real hardware state.
                  */
                 mask &= ((uint64_t)edx << 32) | ecx;
+
+                if ( ecx & cpufeat_mask(X86_FEATURE_XSAVE) )
+                    ecx = cpufeat_mask(X86_FEATURE_OSXSAVE);
+                else
+                    ecx = 0;
+                edx = cpufeat_mask(X86_FEATURE_APIC);
+
+                mask |= ((uint64_t)edx << 32) | ecx;
                 break;
 
             case X86_VENDOR_AMD:
