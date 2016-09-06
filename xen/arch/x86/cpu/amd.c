@@ -203,9 +203,10 @@ static void __init noinline probe_masking_msrs(void)
  * used to context switch to the default host state (by the cpu bringup-code,
  * crash path, etc).
  */
-static void amd_ctxt_switch_levelling(const struct domain *nextd)
+static void amd_ctxt_switch_levelling(const struct vcpu *next)
 {
 	struct cpuidmasks *these_masks = &this_cpu(cpuidmasks);
+	const struct domain *nextd = next ? next->domain : NULL;
 	const struct cpuidmasks *masks =
 		(nextd && is_pv_domain(nextd) && nextd->arch.pv_domain.cpuidmasks)
 		? nextd->arch.pv_domain.cpuidmasks : &cpuidmask_defaults;

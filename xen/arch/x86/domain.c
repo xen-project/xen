@@ -2107,7 +2107,7 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
             load_segments(next);
         }
 
-        ctxt_switch_levelling(nextd);
+        ctxt_switch_levelling(next);
     }
 
     context_saved(prev);
