@@ -281,9 +281,9 @@ MINIOS_UPSTREAM_REVISION ?= 0f6582dd71454dffba4bbb21258fea25becfdd00
 # Tue Aug 30 13:51:23 2016 +0200
 # mini-os: support "make config" for out-of-tree users
 
-SEABIOS_UPSTREAM_REVISION ?= rel-1.9.2
-# Tue, 1 Mar 2016 15:06:45 +0100 (16:06 +0200)
-# fw/pci: add Q35 S3 support
+SEABIOS_UPSTREAM_REVISION ?= rel-1.9.3
+# Wed Jun 22 14:53:24 2016 +0800
+# fw/msr_feature_control: add support to set MSR_IA32_FEATURE_CONTROL
 
 ETHERBOOT_NICS ?= rtl8139 8086100e
 
