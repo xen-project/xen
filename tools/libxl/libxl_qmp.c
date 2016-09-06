@@ -1119,14 +1119,54 @@ int libxl__qmp_x_blockdev_change(libxl__gc *gc, int domid, const char *parent,
     return qmp_run_command(gc, domid, "x-blockdev-change", args, NULL, NULL);
 }
 
-int libxl__qmp_hmp(libxl__gc *gc, int domid, const char *command_line)
+static int hmp_callback(libxl__qmp_handler *qmp,
+                        const libxl__json_object *response,
+                        void *opaque)
+{
+    char **output = opaque;
+    GC_INIT(qmp->ctx);
+    int rc;
+
+    rc = 0;
+    if (!output)
+        goto out;
+
+    *output = NULL;
+
+    if (libxl__json_object_is_string(response)) {
+        *output = libxl__strdup(NOGC, libxl__json_object_get_string(response));
+        goto out;
+    }
+
+    LOG(ERROR, "Response has unexpected format");
+    rc = ERROR_FAIL;
+
+out:
+    GC_FREE;
+    return rc;
+}
+
+int libxl__qmp_hmp(libxl__gc *gc, int domid, const char *command_line,
+                   char **output)
 {
     libxl__json_object *args = NULL;
 
     qmp_parameters_add_string(gc, &args, "command-line", command_line);
 
     return qmp_run_command(gc, domid, "human-monitor-command", args,
-                           NULL, NULL);
+                           hmp_callback, output);
+}
+
+int libxl_qemu_monitor_command(libxl_ctx *ctx, uint32_t domid,
+                               const char *command_line, char **output)
+{
+    GC_INIT(ctx);
+    int rc;
+
+    rc = libxl__qmp_hmp(gc, domid, command_line, output);
+
+    GC_FREE;
+    return rc;
 }
 
 int libxl__qmp_initializations(libxl__gc *gc, uint32_t domid,

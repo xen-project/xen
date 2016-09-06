@@ -1821,7 +1821,8 @@ _hidden int libxl__qmp_x_blockdev_change(libxl__gc *gc, int domid,
                                          const char *parant,
                                          const char *child, const char *node);
 /* run a hmp command in qmp mode */
-_hidden int libxl__qmp_hmp(libxl__gc *gc, int domid, const char *command_line);
+_hidden int libxl__qmp_hmp(libxl__gc *gc, int domid, const char *command_line,
+                           char **out);
 /* close and free the QMP handler */
 _hidden void libxl__qmp_close(libxl__qmp_handler *qmp);
 /* remove the socket file, if the file has already been removed,

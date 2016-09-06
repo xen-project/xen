@@ -9536,6 +9536,35 @@ int main_psr_hwinfo(int argc, char **argv)
 
 #endif
 
+int main_qemu_monitor_command(int argc, char **argv)
+{
+    int opt;
+    uint32_t domid;
+    char *cmd;
+    char *output;
+    int ret;
+
+    SWITCH_FOREACH_OPT(opt, "", NULL, "qemu-monitor-command", 2) {
+        /* No options */
+    }
+
+    domid = find_domain(argv[optind]);
+    cmd = argv[optind + 1];
+
+    if (argc - optind > 2) {
+        fprintf(stderr, "Invalid arguments.\n");
+        return EXIT_FAILURE;
+    }
+
+    ret = libxl_qemu_monitor_command(ctx, domid, cmd, &output);
+    if (!ret && output) {
+        printf("%s\n", output);
+        free(output);
+    }
+
+    return ret ? EXIT_FAILURE : EXIT_SUCCESS;
+}
+
 /*
  * Local variables:
  * mode: C

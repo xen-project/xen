@@ -173,7 +173,7 @@ static void colo_qdisk_save_preresume(libxl__egc *egc,
                     "file.driver=nbd,file.host=%s,file.port=%d,"
                     "file.export=%s,node-name=%s,if=none",
                     host, port, export_name, node);
-    ret = libxl__qmp_hmp(gc, domid, cmd);
+    ret = libxl__qmp_hmp(gc, domid, cmd, NULL);
     if (ret)
         rc = ERROR_FAIL;
 

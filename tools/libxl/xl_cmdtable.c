@@ -584,6 +584,11 @@ struct cmd_spec cmd_table[] = {
       "List information about all USB controllers and devices for a domain",
       "<Domain>",
     },
+    { "qemu-monitor-command",
+      &main_qemu_monitor_command, 0, 1,
+      "Issue a qemu monitor command to the device model of a domain",
+      "<Domain> <Command>",
+    },
 };
 
 int cmdtable_len = sizeof(cmd_table)/sizeof(struct cmd_spec);

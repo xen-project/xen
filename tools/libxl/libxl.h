@@ -275,6 +275,12 @@
 #define LIBXL_HAVE_BUILD_ID 1
 
 /*
+ * LIBXL_HAVE_QEMU_MONITOR_COMMAND indiactes the availability of the
+ * libxl_qemu_monitor_command() function.
+ */
+#define LIBXL_HAVE_QEMU_MONITOR_COMMAND 1
+
+/*
  * libxl ABI compatibility
  *
  * The only guarantee which libxl makes regarding ABI compatibility
@@ -2151,6 +2157,14 @@ void libxl_psr_cat_info_list_free(libxl_psr_cat_info *list, int nr);
  * return ERROR_FAIL, but also leave errno valid. */
 int libxl_fd_set_cloexec(libxl_ctx *ctx, int fd, int cloexec);
 int libxl_fd_set_nonblock(libxl_ctx *ctx, int fd, int nonblock);
+
+/*
+ * Issue a qmp monitor command to the device model of the specified domain.
+ * The function returns the output of the command in a new allocated buffer
+ * via output.
+ */
+int libxl_qemu_monitor_command(libxl_ctx *ctx, uint32_t domid,
+                               const char *command_line, char **output);
 
 #include <libxl_event.h>
 

@@ -1516,6 +1516,42 @@ List pass-through usb devices for a domain.
 
 =back
 
+=head1 DEVICE-MODEL CONTROL
+
+=over 4
+
+=item B<qemu-monitor-command> I<domain-id> I<command>
+
+Issue a monitor command to the device model of the domain specified by
+I<domain-id>. I<command> can be any valid command qemu understands. This
+can be e.g. used to add non-standard devices or devices with non-standard
+parameters to a domain. The output of the command is printed to stdout.
+
+B<Warning:> This qemu monitor access is provided for convenience when
+debugging, troubleshooting, and experimenting.  Its use is not
+supported by the Xen Project.
+
+Specifically, not all information printed by the qemu monitor will
+necessarily be accurate or complete, because in a Xen system qemu
+does not have a complete view of the guest.
+
+Furthermore, modifying the guest's setup via the qemu monitor may
+conflict with the Xen toolstack's assumptions.  Resulting problems
+may include, but are not limited to: guest crashes; toolstack error
+messages; inability to migrate the guest; and security
+vulnerabilities which are not covered by the Xen Project security
+response policy.
+
+B<EXAMPLE>
+
+Obtain information of USB devices connected as such via the device model
+(only!) to a domain:
+
+ xl qemu-monitor-command vm1 'info usb'
+  Device 0.2, Port 5, Speed 480 Mb/s, Product Mass Storage
+
+=back
+
 =head1 TMEM
 
 =over 4
