@@ -1547,12 +1547,6 @@ static void livepatch_printall(unsigned char key)
 
 static int __init livepatch_init(void)
 {
-    const void *binary_id;
-    unsigned int len;
-
-    if ( !xen_build_id(&binary_id, &len) )
-        printk(XENLOG_INFO LIVEPATCH ": build-id: %*phN\n", len, binary_id);
-
     register_keyhandler('x', livepatch_printall, "print livepatch info", 1);
 
     arch_livepatch_init();
