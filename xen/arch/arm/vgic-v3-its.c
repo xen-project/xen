@@ -428,6 +428,82 @@ static int update_lpi_property(struct domain *d, struct pending_irq *p)
     return 0;
 }
 
+/*
+ * Checks whether an LPI that got enabled or disabled needs to change
+ * something in the VGIC (added or removed from the LR or queues).
+ * We don't disable the underlying physical LPI, because this requires
+ * queueing a host LPI command, which we can't afford to do on behalf
+ * of a guest.
+ * Must be called with the VCPU VGIC lock held.
+ */
+static void update_lpi_vgic_status(struct vcpu *v, struct pending_irq *p)
+{
+    ASSERT(spin_is_locked(&v->arch.vgic.lock));
+
+    if ( test_bit(GIC_IRQ_GUEST_ENABLED, &p->status) )
+    {
+        if ( !list_empty(&p->inflight) &&
+             !test_bit(GIC_IRQ_GUEST_VISIBLE, &p->status) )
+            gic_raise_guest_irq(v, p->irq, p->lpi_priority);
+    }
+    else
+        gic_remove_from_lr_pending(v, p);
+}
+
+static int its_handle_inv(struct virt_its *its, uint64_t *cmdptr)
+{
+    struct domain *d = its->d;
+    uint32_t devid = its_cmd_get_deviceid(cmdptr);
+    uint32_t eventid = its_cmd_get_id(cmdptr);
+    struct pending_irq *p;
+    unsigned long flags;
+    struct vcpu *vcpu;
+    uint32_t vlpi;
+    int ret = -1;
+
+    /*
+     * If no redistributor has its LPIs enabled yet, we can't access the
+     * property table, so there is no point in executing this command.
+     * The control flow dependency here and a barrier instruction on the
+     * write side make sure we can access these without taking a lock.
+     */
+    if ( !d->arch.vgic.rdists_enabled )
+        return 0;
+
+    spin_lock(&its->its_lock);
+
+    /* Translate the event into a vCPU/vLPI pair. */
+    if ( !read_itte(its, devid, eventid, &vcpu, &vlpi) )
+        goto out_unlock_its;
+
+    if ( vlpi == INVALID_LPI )
+        goto out_unlock_its;
+
+    p = gicv3_its_get_event_pending_irq(d, its->doorbell_address,
+                                        devid, eventid);
+    if ( unlikely(!p) )
+        goto out_unlock_its;
+
+    spin_lock_irqsave(&vcpu->arch.vgic.lock, flags);
+
+    /* Read the property table and update our cached status. */
+    if ( update_lpi_property(d, p) )
+        goto out_unlock;
+
+    /* Check whether the LPI needs to go on a VCPU. */
+    update_lpi_vgic_status(vcpu, p);
+
+    ret = 0;
+
+out_unlock:
+    spin_unlock_irqrestore(&vcpu->arch.vgic.lock, flags);
+
+out_unlock_its:
+    spin_unlock(&its->its_lock);
+
+    return ret;
+}
+
 /* Must be called with the ITS lock held. */
 static int its_discard_event(struct virt_its *its,
                              uint32_t vdevid, uint32_t vevid)
@@ -781,6 +857,9 @@ static int vgic_its_handle_cmds(struct domain *d, struct virt_its *its)
             break;
         case GITS_CMD_INT:
             ret = its_handle_int(its, command);
+            break;
+        case GITS_CMD_INV:
+            ret = its_handle_inv(its, command);
             break;
         case GITS_CMD_MAPC:
             ret = its_handle_mapc(its, command);
