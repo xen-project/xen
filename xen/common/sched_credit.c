@@ -906,14 +906,15 @@ csched_vcpu_insert(const struct scheduler *ops, struct vcpu *vc)
 {
     struct csched_vcpu *svc = vc->sched_priv;
     spinlock_t *lock;
-    unsigned long flags;
 
-    lock = vcpu_schedule_lock_irqsave(vc, &flags);
+    BUG_ON( is_idle_vcpu(vc) );
+
+    lock = vcpu_schedule_lock_irq(vc);
 
     if ( !__vcpu_on_runq(svc) && vcpu_runnable(vc) && !vc->is_running )
         __runq_insert(vc->processor, svc);
 
-    vcpu_schedule_unlock_irqrestore(lock, flags, vc);
+    vcpu_schedule_unlock_irq(lock, vc);
 }
 
 static void

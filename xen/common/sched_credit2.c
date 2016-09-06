@@ -870,28 +870,23 @@ csched2_vcpu_insert(const struct scheduler *ops, struct vcpu *vc)
 {
     struct csched2_vcpu *svc = vc->sched_priv;
     struct csched2_dom * const sdom = svc->sdom;
+    spinlock_t *lock;
 
     printk("%s: Inserting %pv\n", __func__, vc);
 
-    /* NB: On boot, idle vcpus are inserted before alloc_pdata() has
-     * been called for that cpu.
-     */
-    if ( ! is_idle_vcpu(vc) )
-    {
-        spinlock_t *lock;
+    BUG_ON(is_idle_vcpu(vc));
 
-        /* FIXME: Do we need the private lock here? */
-        list_add_tail(&svc->sdom_elem, &svc->sdom->vcpu);
+    /* FIXME: Do we need the private lock here? */
+    list_add_tail(&svc->sdom_elem, &svc->sdom->vcpu);
 
-        /* Add vcpu to runqueue of initial processor */
-        lock = vcpu_schedule_lock_irq(vc);
+    /* Add vcpu to runqueue of initial processor */
+    lock = vcpu_schedule_lock_irq(vc);
 
-        runq_assign(ops, vc);
+    runq_assign(ops, vc);
 
-        vcpu_schedule_unlock_irq(lock, vc);
+    vcpu_schedule_unlock_irq(lock, vc);
 
-        sdom->nr_vcpus++;
-    }
+    sdom->nr_vcpus++;
 
     CSCHED2_VCPU_CHECK(vc);
 }
