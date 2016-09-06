@@ -972,6 +972,8 @@ void pv_cpuid(struct cpu_user_regs *regs)
              *
              * Therefore, the leaking of Xen's OSXSAVE setting has become a
              * defacto part of the PV ABI and can't reasonably be corrected.
+             * It can however be restricted to only the enlightened CPUID
+             * view, as seen by the guest kernel.
              *
              * The following situations and logic now applies:
              *
@@ -985,14 +987,18 @@ void pv_cpuid(struct cpu_user_regs *regs)
              *
              * - Enlightened CPUID or CPUID faulting available:
              *    Xen can fully control what is seen here.  Guest kernels need
-             *    to see the leaked OSXSAVE, but guest userspace is given
-             *    architectural behaviour, to reflect the guest kernels
-             *    intentions.
+             *    to see the leaked OSXSAVE via the enlightened path, but
+             *    guest userspace and the native is given architectural
+             *    behaviour.
+             *
+             *    Emulated vs Faulted CPUID is distinguised based on whether a
+             *    #UD or #GP is currently being serviced.
              */
             /* OSXSAVE cleared by pv_featureset.  Fast-forward CR4 back in. */
-            if ( (guest_kernel_mode(curr, regs) &&
-                  (read_cr4() & X86_CR4_OSXSAVE)) ||
-                 (curr->arch.pv_vcpu.ctrlreg[4] & X86_CR4_OSXSAVE) )
+            if ( (curr->arch.pv_vcpu.ctrlreg[4] & X86_CR4_OSXSAVE) ||
+                 (regs->entry_vector == TRAP_invalid_op &&
+                  guest_kernel_mode(curr, regs) &&
+                  (read_cr4() & X86_CR4_OSXSAVE)) )
                 c |= cpufeat_mask(X86_FEATURE_OSXSAVE);
 
             /*
