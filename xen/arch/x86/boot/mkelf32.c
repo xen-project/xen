@@ -394,7 +394,7 @@ int main(int argc, char **argv)
         note_phdr.p_paddr   = note_base;
         note_phdr.p_filesz  = note_sz;
         note_phdr.p_memsz   = note_sz;
-        note_phdr.p_offset  = offset;
+        note_phdr.p_offset  = RAW_OFFSET + offset;
 
         /* Tack on the .note\0 */
         out_shdr[2].sh_size += sizeof(out_shstrtab_extra);
