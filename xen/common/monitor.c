@@ -107,6 +107,8 @@ int monitor_traps(struct vcpu *v, bool_t sync, vm_event_request_t *req)
         return rc;
     };
 
+    req->vcpu_id = v->vcpu_id;
+
     if ( sync )
     {
         req->flags |= VM_EVENT_FLAG_VCPU_PAUSED;

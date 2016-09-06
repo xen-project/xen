@@ -5,7 +5,7 @@
 #include <xen/domain_page.h>
 #include <xen/bitops.h>
 #include <xen/vm_event.h>
-#include <xen/mem_access.h>
+#include <xen/monitor.h>
 #include <xen/iocap.h>
 #include <public/vm_event.h>
 #include <asm/flushtlb.h>
@@ -1748,10 +1748,6 @@ bool_t p2m_mem_access_check(paddr_t gpa, vaddr_t gla, const struct npfec npfec)
     {
         req->reason = VM_EVENT_REASON_MEM_ACCESS;
 
-        /* Pause the current VCPU */
-        if ( xma != XENMEM_access_n2rwx )
-            req->flags |= VM_EVENT_FLAG_VCPU_PAUSED;
-
         /* Send request to mem access subscriber */
         req->u.mem_access.gfn = gpa >> PAGE_SHIFT;
         req->u.mem_access.offset =  gpa & ((1 << PAGE_SHIFT) - 1);
@@ -1768,15 +1764,12 @@ bool_t p2m_mem_access_check(paddr_t gpa, vaddr_t gla, const struct npfec npfec)
         req->u.mem_access.flags |= npfec.read_access    ? MEM_ACCESS_R : 0;
         req->u.mem_access.flags |= npfec.write_access   ? MEM_ACCESS_W : 0;
         req->u.mem_access.flags |= npfec.insn_fetch     ? MEM_ACCESS_X : 0;
-        req->vcpu_id = v->vcpu_id;
 
-        mem_access_send_req(v->domain, req);
+        if ( monitor_traps(v, (xma != XENMEM_access_n2rwx), req) < 0 )
+            domain_crash(v->domain);
+
         xfree(req);
     }
-
-    /* Pause the current VCPU */
-    if ( xma != XENMEM_access_n2rwx )
-        vm_event_vcpu_pause(v);
 
     return false;
 }

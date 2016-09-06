@@ -44,7 +44,6 @@ bool_t hvm_monitor_cr(unsigned int index, unsigned long value, unsigned long old
 
         vm_event_request_t req = {
             .reason = VM_EVENT_REASON_WRITE_CTRLREG,
-            .vcpu_id = curr->vcpu_id,
             .u.write_ctrlreg.index = index,
             .u.write_ctrlreg.new_value = value,
             .u.write_ctrlreg.old_value = old
@@ -65,7 +64,6 @@ void hvm_monitor_msr(unsigned int msr, uint64_t value)
     {
         vm_event_request_t req = {
             .reason = VM_EVENT_REASON_MOV_TO_MSR,
-            .vcpu_id = curr->vcpu_id,
             .u.mov_to_msr.msr = msr,
             .u.mov_to_msr.value = value,
         };
@@ -131,8 +129,6 @@ int hvm_monitor_debug(unsigned long rip, enum hvm_monitor_debug_type type,
         return -EOPNOTSUPP;
     }
 
-    req.vcpu_id = curr->vcpu_id;
-
     return monitor_traps(curr, sync, &req);
 }
 
@@ -147,7 +143,6 @@ int hvm_monitor_cpuid(unsigned long insn_length, unsigned int leaf,
         return 0;
 
     req.reason = VM_EVENT_REASON_CPUID;
-    req.vcpu_id = curr->vcpu_id;
     req.u.cpuid.insn_length = insn_length;
     req.u.cpuid.leaf = leaf;
     req.u.cpuid.subleaf = subleaf;

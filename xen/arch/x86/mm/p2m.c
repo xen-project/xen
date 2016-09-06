@@ -1728,13 +1728,8 @@ bool_t p2m_mem_access_check(paddr_t gpa, unsigned long gla,
     if ( req )
     {
         *req_ptr = req;
+
         req->reason = VM_EVENT_REASON_MEM_ACCESS;
-
-        /* Pause the current VCPU */
-        if ( p2ma != p2m_access_n2rwx )
-            req->flags |= VM_EVENT_FLAG_VCPU_PAUSED;
-
-        /* Send request to mem event */
         req->u.mem_access.gfn = gfn;
         req->u.mem_access.offset = gpa & ((1 << PAGE_SHIFT) - 1);
         if ( npfec.gla_valid )
@@ -1750,23 +1745,10 @@ bool_t p2m_mem_access_check(paddr_t gpa, unsigned long gla,
         req->u.mem_access.flags |= npfec.read_access    ? MEM_ACCESS_R : 0;
         req->u.mem_access.flags |= npfec.write_access   ? MEM_ACCESS_W : 0;
         req->u.mem_access.flags |= npfec.insn_fetch     ? MEM_ACCESS_X : 0;
-        req->vcpu_id = v->vcpu_id;
-
-        vm_event_fill_regs(req);
-
-        if ( altp2m_active(v->domain) )
-        {
-            req->flags |= VM_EVENT_FLAG_ALTERNATE_P2M;
-            req->altp2m_idx = vcpu_altp2m(v).p2midx;
-        }
     }
 
-    /* Pause the current VCPU */
-    if ( p2ma != p2m_access_n2rwx )
-        vm_event_vcpu_pause(v);
-
-    /* VCPU may be paused, return whether we promoted automatically */
-    return (p2ma == p2m_access_n2rwx);
+    /* Return whether vCPU pause is required (aka. sync event) */
+    return (p2ma != p2m_access_n2rwx);
 }
 
 static inline

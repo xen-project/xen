@@ -1707,7 +1707,7 @@ int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
     int rc, fall_through = 0, paged = 0;
     int sharing_enomem = 0;
     vm_event_request_t *req_ptr = NULL;
-    bool_t ap2m_active;
+    bool_t ap2m_active, sync = 0;
 
     /* On Nested Virtualization, walk the guest page table.
      * If this succeeds, all is fine.
@@ -1846,11 +1846,13 @@ int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
                 }
             }
 
-            if ( p2m_mem_access_check(gpa, gla, npfec, &req_ptr) )
-            {
+            sync = p2m_mem_access_check(gpa, gla, npfec, &req_ptr);
+
+            if ( !sync )
                 fall_through = 1;
-            } else {
-                /* Rights not promoted, vcpu paused, work here is done */
+            else
+            {
+                /* Rights not promoted (aka. sync event), work here is done */
                 rc = 1;
                 goto out_put_gfn;
             }
@@ -1956,7 +1958,9 @@ out:
     }
     if ( req_ptr )
     {
-        mem_access_send_req(currd, req_ptr);
+        if ( monitor_traps(curr, sync, req_ptr) < 0 )
+            rc = 0;
+
         xfree(req_ptr);
     }
     return rc;

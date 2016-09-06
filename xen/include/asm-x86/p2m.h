@@ -663,11 +663,14 @@ int p2m_mem_paging_prep(struct domain *d, unsigned long gfn, uint64_t buffer);
 /* Resume normal operation (in case a domain was paused) */
 void p2m_mem_paging_resume(struct domain *d, vm_event_response_t *rsp);
 
-/* Send mem event based on the access (gla is -1ull if not available).  Handles
- * the rw2rx conversion. Boolean return value indicates if access rights have 
- * been promoted with no underlying vcpu pause. If the req_ptr has been populated, 
- * then the caller must put the event in the ring (once having released get_gfn*
- * locks -- caller must also xfree the request. */
+/*
+ * Setup vm_event request based on the access (gla is -1ull if not available).
+ * Handles the rw2rx conversion. Boolean return value indicates if event type
+ * is syncronous (aka. requires vCPU pause). If the req_ptr has been populated,
+ * then the caller should use monitor_traps to send the event on the MONITOR
+ * ring. Once having released get_gfn* locks caller must also xfree the
+ * request.
+ */
 bool_t p2m_mem_access_check(paddr_t gpa, unsigned long gla,
                             struct npfec npfec,
                             vm_event_request_t **req_ptr);

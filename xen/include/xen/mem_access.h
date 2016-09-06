@@ -29,7 +29,6 @@
 
 int mem_access_memop(unsigned long cmd,
                      XEN_GUEST_HANDLE_PARAM(xen_mem_access_op_t) arg);
-int mem_access_send_req(struct domain *d, vm_event_request_t *req);
 
 static inline
 void mem_access_resume(struct vcpu *v, vm_event_response_t *rsp)
@@ -42,12 +41,6 @@ void mem_access_resume(struct vcpu *v, vm_event_response_t *rsp)
 static inline
 int mem_access_memop(unsigned long cmd,
                      XEN_GUEST_HANDLE_PARAM(xen_mem_access_op_t) arg)
-{
-    return -ENOSYS;
-}
-
-static inline
-int mem_access_send_req(struct domain *d, vm_event_request_t *req)
 {
     return -ENOSYS;
 }

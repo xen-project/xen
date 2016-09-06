@@ -108,17 +108,6 @@ int mem_access_memop(unsigned long cmd,
     return rc;
 }
 
-int mem_access_send_req(struct domain *d, vm_event_request_t *req)
-{
-    int rc = vm_event_claim_slot(d, &d->vm_event->monitor);
-    if ( rc < 0 )
-        return rc;
-
-    vm_event_put_request(d, &d->vm_event->monitor, req);
-
-    return 0;
-}
-
 /*
  * Local variables:
  * mode: C
