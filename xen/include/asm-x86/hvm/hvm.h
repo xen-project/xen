@@ -611,7 +611,7 @@ unsigned long hvm_cr4_guest_reserved_bits(const struct vcpu *v, bool_t restore);
     struct vcpu *v_ = (v);                                      \
     struct domain *d_ = v_->domain;                             \
     if ( has_hvm_container_domain(d_) &&                        \
-         d_->arch.hvm_domain.vmx.vcpu_block )                   \
+         (cpu_has_vmx && d_->arch.hvm_domain.vmx.vcpu_block) )  \
         d_->arch.hvm_domain.vmx.vcpu_block(v_);                 \
 })
 
