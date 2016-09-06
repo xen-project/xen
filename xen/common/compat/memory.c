@@ -312,6 +312,11 @@ int compat_memory_op(unsigned int cmd, XEN_GUEST_HANDLE_PARAM(void) compat)
             break;
         }
 
+        case XENMEM_access_op:
+            return mem_access_memop(cmd,
+                                    guest_handle_cast(compat,
+                                                      xen_mem_access_op_t));
+
         case XENMEM_get_vnumainfo:
         {
             enum XLAT_vnuma_topology_info_vdistance vdistance =
@@ -486,10 +491,6 @@ int compat_memory_op(unsigned int cmd, XEN_GUEST_HANDLE_PARAM(void) compat)
             }
             break;
         }
-
-        case XENMEM_access_op:
-            rc = mem_access_memop(cmd, guest_handle_cast(compat, xen_mem_access_op_t));
-            break;
 
         case XENMEM_add_to_physmap_batch:
             start_extent = end_extent;
