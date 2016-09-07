@@ -41,6 +41,44 @@ int xc_set_mem_access(xc_interface *xch,
     return do_memory_op(xch, XENMEM_access_op, &mao, sizeof(mao));
 }
 
+int xc_set_mem_access_multi(xc_interface *xch,
+                            domid_t domain_id,
+                            uint8_t *access,
+                            uint64_t *pages,
+                            uint32_t nr)
+{
+    DECLARE_HYPERCALL_BOUNCE(access, nr, XC_HYPERCALL_BUFFER_BOUNCE_IN);
+    DECLARE_HYPERCALL_BOUNCE(pages, nr * sizeof(uint64_t),
+                             XC_HYPERCALL_BUFFER_BOUNCE_IN);
+    int rc;
+
+    xen_mem_access_op_t mao =
+    {
+        .op       = XENMEM_access_op_set_access_multi,
+        .domid    = domain_id,
+        .access   = XENMEM_access_default + 1, /* Invalid value */
+        .pfn      = ~0UL, /* Invalid GFN */
+        .nr       = nr,
+    };
+
+    if ( xc_hypercall_bounce_pre(xch, pages) ||
+         xc_hypercall_bounce_pre(xch, access) )
+    {
+        PERROR("Could not bounce memory for XENMEM_access_op_set_access_multi");
+        return -1;
+    }
+
+    set_xen_guest_handle(mao.pfn_list, pages);
+    set_xen_guest_handle(mao.access_list, access);
+
+    rc = do_memory_op(xch, XENMEM_access_op, &mao, sizeof(mao));
+
+    xc_hypercall_bounce_post(xch, access);
+    xc_hypercall_bounce_post(xch, pages);
+
+    return rc;
+}
+
 int xc_get_mem_access(xc_interface *xch,
                       domid_t domain_id,
                       uint64_t pfn,

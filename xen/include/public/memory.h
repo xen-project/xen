@@ -410,6 +410,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_mem_paging_op_t);
  * #define XENMEM_access_op_enable_emulate     2
  * #define XENMEM_access_op_disable_emulate    3
  */
+#define XENMEM_access_op_set_access_multi   4
 
 typedef enum {
     XENMEM_access_n,
@@ -442,7 +443,8 @@ struct xen_mem_access_op {
     uint8_t access;
     domid_t domid;
     /*
-     * Number of pages for set op
+     * Number of pages for set op (or size of pfn_list for
+     * XENMEM_access_op_set_access_multi)
      * Ignored on setting default access and other ops
      */
     uint32_t nr;
@@ -452,6 +454,16 @@ struct xen_mem_access_op {
      * ~0ull is used to set and get the default access for pages
      */
     uint64_aligned_t pfn;
+    /*
+     * List of pfns to set access for
+     * Used only with XENMEM_access_op_set_access_multi
+     */
+    XEN_GUEST_HANDLE(const_uint64) pfn_list;
+    /*
+     * Corresponding list of access settings for pfn_list
+     * Used only with XENMEM_access_op_set_access_multi
+     */
+    XEN_GUEST_HANDLE(const_uint8) access_list;
 };
 typedef struct xen_mem_access_op xen_mem_access_op_t;
 DEFINE_XEN_GUEST_HANDLE(xen_mem_access_op_t);

@@ -2126,6 +2126,15 @@ int xc_set_mem_access(xc_interface *xch, domid_t domain_id,
                       uint32_t nr);
 
 /*
+ * Set an array of pages to their respective access in the access array.
+ * The nr parameter specifies the size of the pages and access arrays.
+ * The same allowed access types as for xc_set_mem_access() apply.
+ */
+int xc_set_mem_access_multi(xc_interface *xch, domid_t domain_id,
+                            uint8_t *access, uint64_t *pages,
+                            uint32_t nr);
+
+/*
  * Gets the mem access for the given page (returned in access on success)
  */
 int xc_get_mem_access(xc_interface *xch, domid_t domain_id,

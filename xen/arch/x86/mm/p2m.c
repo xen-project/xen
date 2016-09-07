@@ -23,6 +23,7 @@
  * along with this program; If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <xen/guest_access.h> /* copy_from_guest() */
 #include <xen/iommu.h>
 #include <xen/vm_event.h>
 #include <xen/event.h>
@@ -1786,21 +1787,37 @@ int p2m_set_altp2m_mem_access(struct domain *d, struct p2m_domain *hp2m,
                          (current->domain != d));
 }
 
-/*
- * Set access type for a region of gfns.
- * If gfn == INVALID_GFN, sets the default access type.
- */
-long p2m_set_mem_access(struct domain *d, gfn_t gfn, uint32_t nr,
-                        uint32_t start, uint32_t mask, xenmem_access_t access,
-                        unsigned int altp2m_idx)
+static int set_mem_access(struct domain *d, struct p2m_domain *p2m,
+                          struct p2m_domain *ap2m, p2m_access_t a,
+                          gfn_t gfn)
 {
-    struct p2m_domain *p2m = p2m_get_hostp2m(d), *ap2m = NULL;
-    p2m_access_t a, _a;
-    p2m_type_t t;
-    mfn_t mfn;
-    unsigned long gfn_l;
-    long rc = 0;
+    int rc = 0;
 
+    if ( ap2m )
+    {
+        rc = p2m_set_altp2m_mem_access(d, p2m, ap2m, a, gfn);
+        /* If the corresponding mfn is invalid we will want to just skip it */
+        if ( rc == -ESRCH )
+            rc = 0;
+    }
+    else
+    {
+        mfn_t mfn;
+        p2m_access_t _a;
+        p2m_type_t t;
+        unsigned long gfn_l = gfn_x(gfn);
+
+        mfn = p2m->get_entry(p2m, gfn_l, &t, &_a, 0, NULL, NULL);
+        rc = p2m->set_entry(p2m, gfn_l, mfn, PAGE_ORDER_4K, t, a, -1);
+    }
+
+    return rc;
+}
+
+static bool xenmem_access_to_p2m_access(struct p2m_domain *p2m,
+                                        xenmem_access_t xaccess,
+                                        p2m_access_t *paccess)
+{
     static const p2m_access_t memaccess[] = {
 #define ACCESS(ac) [XENMEM_access_##ac] = p2m_access_##ac
         ACCESS(n),
@@ -1816,6 +1833,34 @@ long p2m_set_mem_access(struct domain *d, gfn_t gfn, uint32_t nr,
 #undef ACCESS
     };
 
+    switch ( xaccess )
+    {
+    case 0 ... ARRAY_SIZE(memaccess) - 1:
+        *paccess = memaccess[xaccess];
+        break;
+    case XENMEM_access_default:
+        *paccess = p2m->default_access;
+        break;
+    default:
+        return false;
+    }
+
+    return true;
+}
+
+/*
+ * Set access type for a region of gfns.
+ * If gfn == INVALID_GFN, sets the default access type.
+ */
+long p2m_set_mem_access(struct domain *d, gfn_t gfn, uint32_t nr,
+                        uint32_t start, uint32_t mask, xenmem_access_t access,
+                        unsigned int altp2m_idx)
+{
+    struct p2m_domain *p2m = p2m_get_hostp2m(d), *ap2m = NULL;
+    p2m_access_t a;
+    unsigned long gfn_l;
+    long rc = 0;
+
     /* altp2m view 0 is treated as the hostp2m */
     if ( altp2m_idx )
     {
@@ -1826,17 +1871,8 @@ long p2m_set_mem_access(struct domain *d, gfn_t gfn, uint32_t nr,
         ap2m = d->arch.altp2m_p2m[altp2m_idx];
     }
 
-    switch ( access )
-    {
-    case 0 ... ARRAY_SIZE(memaccess) - 1:
-        a = memaccess[access];
-        break;
-    case XENMEM_access_default:
-        a = p2m->default_access;
-        break;
-    default:
+    if ( !xenmem_access_to_p2m_access(p2m, access, &a) )
         return -EINVAL;
-    }
 
     /* If request to set default access. */
     if ( gfn_eq(gfn, INVALID_GFN) )
@@ -1851,20 +1887,68 @@ long p2m_set_mem_access(struct domain *d, gfn_t gfn, uint32_t nr,
 
     for ( gfn_l = gfn_x(gfn) + start; nr > start; ++gfn_l )
     {
-        if ( ap2m )
+        rc = set_mem_access(d, p2m, ap2m, a, _gfn(gfn_l));
+
+        if ( rc )
+            break;
+
+        /* Check for continuation if it's not the last iteration. */
+        if ( nr > ++start && !(start & mask) && hypercall_preempt_check() )
         {
-            rc = p2m_set_altp2m_mem_access(d, p2m, ap2m, a, _gfn(gfn_l));
-            /* If the corresponding mfn is invalid we will just skip it */
-            if ( rc && rc != -ESRCH )
-                break;
+            rc = start;
+            break;
         }
-        else
+    }
+
+    if ( ap2m )
+        p2m_unlock(ap2m);
+    p2m_unlock(p2m);
+
+    return rc;
+}
+
+long p2m_set_mem_access_multi(struct domain *d,
+                              const XEN_GUEST_HANDLE(const_uint64) pfn_list,
+                              const XEN_GUEST_HANDLE(const_uint8) access_list,
+                              uint32_t nr, uint32_t start, uint32_t mask,
+                              unsigned int altp2m_idx)
+{
+    struct p2m_domain *p2m = p2m_get_hostp2m(d), *ap2m = NULL;
+    long rc = 0;
+
+    /* altp2m view 0 is treated as the hostp2m */
+    if ( altp2m_idx )
+    {
+        if ( altp2m_idx >= MAX_ALTP2M ||
+             d->arch.altp2m_eptp[altp2m_idx] == mfn_x(INVALID_MFN) )
+            return -EINVAL;
+
+        ap2m = d->arch.altp2m_p2m[altp2m_idx];
+    }
+
+    p2m_lock(p2m);
+    if ( ap2m )
+        p2m_lock(ap2m);
+
+    while ( start < nr )
+    {
+        p2m_access_t a;
+        uint8_t access;
+        uint64_t gfn_l;
+
+        copy_from_guest_offset(&gfn_l, pfn_list, start, 1);
+        copy_from_guest_offset(&access, access_list, start, 1);
+
+        if ( !xenmem_access_to_p2m_access(p2m, access, &a) )
         {
-            mfn = p2m->get_entry(p2m, gfn_l, &t, &_a, 0, NULL, NULL);
-            rc = p2m->set_entry(p2m, gfn_l, mfn, PAGE_ORDER_4K, t, a, -1);
-            if ( rc )
-                break;
+            rc = -EINVAL;
+            break;
         }
+
+        rc = set_mem_access(d, p2m, ap2m, a, _gfn(gfn_l));
+
+        if ( rc )
+            break;
 
         /* Check for continuation if it's not the last iteration. */
         if ( nr > ++start && !(start & mask) && hypercall_preempt_check() )

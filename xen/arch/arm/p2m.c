@@ -1836,6 +1836,16 @@ long p2m_set_mem_access(struct domain *d, gfn_t gfn, uint32_t nr,
     return 0;
 }
 
+long p2m_set_mem_access_multi(struct domain *d,
+                              const XEN_GUEST_HANDLE(const_uint64) pfn_list,
+                              const XEN_GUEST_HANDLE(const_uint8) access_list,
+                              uint32_t nr, uint32_t start, uint32_t mask,
+                              unsigned int altp2m_idx)
+{
+    /* Not yet implemented on ARM. */
+    return -EOPNOTSUPP;
+}
+
 int p2m_get_mem_access(struct domain *d, gfn_t gfn,
                        xenmem_access_t *access)
 {
