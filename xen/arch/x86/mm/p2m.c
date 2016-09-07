@@ -1769,8 +1769,8 @@ int p2m_set_altp2m_mem_access(struct domain *d, struct p2m_domain *hp2m,
     if ( !mfn_valid(mfn) )
     {
 
-        mfn = get_gfn_type_access(hp2m, gfn_l, &t, &old_a,
-                                  P2M_ALLOC | P2M_UNSHARE, &page_order);
+        mfn = __get_gfn_type_access(hp2m, gfn_l, &t, &old_a,
+                                    P2M_ALLOC | P2M_UNSHARE, &page_order, 0);
 
         rc = -ESRCH;
         if ( !mfn_valid(mfn) || t != p2m_ram_rw )
@@ -2530,6 +2530,7 @@ int p2m_change_altp2m_gfn(struct domain *d, unsigned int idx,
     hp2m = p2m_get_hostp2m(d);
     ap2m = d->arch.altp2m_p2m[idx];
 
+    p2m_lock(hp2m);
     p2m_lock(ap2m);
 
     mfn = ap2m->get_entry(ap2m, gfn_x(old_gfn), &t, &a, 0, NULL, NULL);
@@ -2545,8 +2546,8 @@ int p2m_change_altp2m_gfn(struct domain *d, unsigned int idx,
     /* Check host p2m if no valid entry in alternate */
     if ( !mfn_valid(mfn) )
     {
-        mfn = get_gfn_type_access(hp2m, gfn_x(old_gfn), &t, &a,
-                                  P2M_ALLOC | P2M_UNSHARE, &page_order);
+        mfn = __get_gfn_type_access(hp2m, gfn_x(old_gfn), &t, &a,
+                                    P2M_ALLOC | P2M_UNSHARE, &page_order, 0);
 
         if ( !mfn_valid(mfn) || t != p2m_ram_rw )
             goto out;
@@ -2588,6 +2589,7 @@ int p2m_change_altp2m_gfn(struct domain *d, unsigned int idx,
 
  out:
     p2m_unlock(ap2m);
+    p2m_unlock(hp2m);
     return rc;
 }
 
