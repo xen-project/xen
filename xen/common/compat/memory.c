@@ -358,7 +358,7 @@ int compat_memory_op(unsigned int cmd, XEN_GUEST_HANDLE_PARAM(void) compat)
             struct get_reserved_device_memory grdm;
 
             if ( unlikely(start_extent) )
-                return -ENOSYS;
+                return -EINVAL;
 
             if ( copy_from_guest(&grdm.map, compat, 1) ||
                  !compat_handle_okay(grdm.map.buffer, grdm.map.nr_entries) )

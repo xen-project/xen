@@ -3567,7 +3567,7 @@ long do_mmuext_op(
             if ( !opt_allow_superpage )
             {
                 MEM_LOG("Superpages disallowed");
-                rc = -ENOSYS;
+                rc = -EOPNOTSUPP;
             }
             else if ( unlikely(d != pg_owner) )
                 rc = -EPERM;

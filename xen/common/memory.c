@@ -941,14 +941,14 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 
     case XENMEM_exchange:
         if ( unlikely(start_extent) )
-            return -ENOSYS;
+            return -EINVAL;
 
         rc = memory_exchange(guest_handle_cast(arg, xen_memory_exchange_t));
         break;
 
     case XENMEM_maximum_ram_page:
         if ( unlikely(start_extent) )
-            return -ENOSYS;
+            return -EINVAL;
 
         rc = max_page;
         break;
@@ -957,7 +957,7 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
     case XENMEM_maximum_reservation:
     case XENMEM_maximum_gpfn:
         if ( unlikely(start_extent) )
-            return -ENOSYS;
+            return -EINVAL;
 
         if ( copy_from_guest(&domid, arg, 1) )
             return -EFAULT;
@@ -1081,7 +1081,7 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         struct page_info *page;
 
         if ( unlikely(start_extent) )
-            return -ENOSYS;
+            return -EINVAL;
 
         if ( copy_from_guest(&xrfp, arg, 1) )
             return -EFAULT;
@@ -1118,7 +1118,7 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 
     case XENMEM_claim_pages:
         if ( unlikely(start_extent) )
-            return -ENOSYS;
+            return -EINVAL;
 
         if ( copy_from_guest(&reservation, arg, 1) )
             return -EFAULT;
@@ -1152,7 +1152,7 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         struct vnuma_info tmp;
 
         if ( unlikely(start_extent) )
-            return -ENOSYS;
+            return -EINVAL;
 
         /*
          * Guest passes nr_vnodes, number of regions and nr_vcpus thus
@@ -1284,7 +1284,7 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         struct get_reserved_device_memory grdm;
 
         if ( unlikely(start_extent) )
-            return -ENOSYS;
+            return -EINVAL;
 
         if ( copy_from_guest(&grdm.map, arg, 1) ||
              !guest_handle_okay(grdm.map.buffer, grdm.map.nr_entries) )

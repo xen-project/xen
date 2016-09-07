@@ -440,7 +440,7 @@ int unmmap_broken_page(struct domain *d, mfn_t mfn, unsigned long gfn)
         return -EINVAL;
 
     if ( !has_hvm_container_domain(d) || !paging_mode_hap(d) )
-        return -ENOSYS;
+        return -EOPNOTSUPP;
 
     rc = -1;
     r_mfn = get_gfn_query(d, gfn, &pt);

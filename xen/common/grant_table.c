@@ -3025,7 +3025,7 @@ do_grant_table_op(
         return -EINVAL;
 
     if ( (cmd &= GNTTABOP_CMD_MASK) != GNTTABOP_cache_flush && opaque_in )
-        return -ENOSYS;
+        return -EINVAL;
     
     rc = -EFAULT;
     switch ( cmd )

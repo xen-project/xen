@@ -621,7 +621,7 @@ int evtchn_fifo_expand_array(const struct evtchn_expand_array *expand_array)
     int rc;
 
     if ( !d->evtchn_fifo )
-        return -ENOSYS;
+        return -EOPNOTSUPP;
 
     spin_lock(&d->event_lock);
     rc = add_page_to_event_array(d, expand_array->array_gfn);

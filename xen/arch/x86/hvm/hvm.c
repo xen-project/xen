@@ -5628,7 +5628,7 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
         break;
 
     case HVMOP_flush_tlbs:
-        rc = guest_handle_is_null(arg) ? hvmop_flush_tlb_all() : -ENOSYS;
+        rc = guest_handle_is_null(arg) ? hvmop_flush_tlb_all() : -EINVAL;
         break;
 
     case HVMOP_track_dirty_vram:
@@ -5868,7 +5868,7 @@ int hvm_debug_op(struct vcpu *v, int32_t op)
     {
         case XEN_DOMCTL_DEBUG_OP_SINGLE_STEP_ON:
         case XEN_DOMCTL_DEBUG_OP_SINGLE_STEP_OFF:
-            rc = -ENOSYS;
+            rc = -EOPNOTSUPP;
             if ( !cpu_has_monitor_trap_flag )
                 break;
             rc = 0;

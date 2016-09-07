@@ -332,7 +332,7 @@ int mtrr_add_page(unsigned long base, unsigned long size,
 	if ((type == MTRR_TYPE_WRCOMB) && !have_wrcomb()) {
 		printk(KERN_WARNING
 		       "mtrr: your processor doesn't support write-combining\n");
-		return -ENOSYS;
+		return -EOPNOTSUPP;
 	}
 
 	if (!size) {
