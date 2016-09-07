@@ -859,6 +859,23 @@ struct pending_irq *gicv3_its_get_event_pending_irq(struct domain *d,
     return get_event_pending_irq(d, vdoorbell_address, vdevid, eventid, NULL);
 }
 
+int gicv3_remove_guest_event(struct domain *d, paddr_t vdoorbell_address,
+                             uint32_t vdevid, uint32_t eventid)
+{
+    uint32_t host_lpi = INVALID_LPI;
+
+    if ( !get_event_pending_irq(d, vdoorbell_address, vdevid, eventid,
+                                &host_lpi) )
+        return -EINVAL;
+
+    if ( host_lpi == INVALID_LPI )
+        return -EINVAL;
+
+    gicv3_lpi_update_host_entry(host_lpi, d->domain_id, INVALID_LPI);
+
+    return 0;
+}
+
 /* Scan the DT for any ITS nodes and create a list of host ITSes out of it. */
 void gicv3_its_dt_init(const struct dt_device_node *node)
 {

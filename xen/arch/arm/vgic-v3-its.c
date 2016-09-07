@@ -159,6 +159,21 @@ static struct vcpu *get_vcpu_from_collection(struct virt_its *its,
     return its->d->vcpu[vcpu_id];
 }
 
+/* Set the address of an ITT for a given device ID. */
+static int its_set_itt_address(struct virt_its *its, uint32_t devid,
+                               paddr_t itt_address, uint32_t nr_bits)
+{
+    paddr_t addr = get_baser_phys_addr(its->baser_dev);
+    dev_table_entry_t itt_entry = DEV_TABLE_ENTRY(itt_address, nr_bits);
+
+    if ( devid >= its->max_devices )
+        return -ENOENT;
+
+    return vgic_access_guest_memory(its->d,
+                                    addr + devid * sizeof(dev_table_entry_t),
+                                    &itt_entry, sizeof(itt_entry), true);
+}
+
 /*
  * Lookup the address of the Interrupt Translation Table associated with
  * that device ID.
@@ -375,6 +390,130 @@ out_unlock:
     return ret;
 }
 
+/* Must be called with the ITS lock held. */
+static int its_discard_event(struct virt_its *its,
+                             uint32_t vdevid, uint32_t vevid)
+{
+    struct pending_irq *p;
+    unsigned long flags;
+    struct vcpu *vcpu;
+    uint32_t vlpi;
+
+    ASSERT(spin_is_locked(&its->its_lock));
+
+    if ( !read_itte(its, vdevid, vevid, &vcpu, &vlpi) )
+        return -ENOENT;
+
+    if ( vlpi == INVALID_LPI )
+        return -ENOENT;
+
+    /*
+     * TODO: This relies on the VCPU being correct in the ITS tables.
+     * This can be fixed by either using a per-IRQ lock or by using
+     * the VCPU ID from the pending_irq instead.
+     */
+    spin_lock_irqsave(&vcpu->arch.vgic.lock, flags);
+
+    /* Remove the pending_irq from the tree. */
+    write_lock(&its->d->arch.vgic.pend_lpi_tree_lock);
+    p = radix_tree_delete(&its->d->arch.vgic.pend_lpi_tree, vlpi);
+    write_unlock(&its->d->arch.vgic.pend_lpi_tree_lock);
+
+    if ( !p )
+    {
+        spin_unlock_irqrestore(&vcpu->arch.vgic.lock, flags);
+
+        return -ENOENT;
+    }
+
+    /* Cleanup the pending_irq and disconnect it from the LPI. */
+    gic_remove_irq_from_queues(vcpu, p);
+    vgic_init_pending_irq(p, INVALID_LPI);
+
+    spin_unlock_irqrestore(&vcpu->arch.vgic.lock, flags);
+
+    /* Remove the corresponding host LPI entry */
+    return gicv3_remove_guest_event(its->d, its->doorbell_address,
+                                    vdevid, vevid);
+}
+
+static void its_unmap_device(struct virt_its *its, uint32_t devid)
+{
+    dev_table_entry_t itt;
+    uint64_t evid;
+
+    spin_lock(&its->its_lock);
+
+    if ( its_get_itt(its, devid, &itt) )
+        goto out;
+
+    /*
+     * For DomUs we need to check that the number of events per device
+     * is really limited, otherwise looping over all events can take too
+     * long for a guest. This ASSERT can then be removed if that is
+     * covered.
+     */
+    ASSERT(is_hardware_domain(its->d));
+
+    for ( evid = 0; evid < DEV_TABLE_ITT_SIZE(itt); evid++ )
+        /* Don't care about errors here, clean up as much as possible. */
+        its_discard_event(its, devid, evid);
+
+out:
+    spin_unlock(&its->its_lock);
+}
+
+static int its_handle_mapd(struct virt_its *its, uint64_t *cmdptr)
+{
+    /* size and devid get validated by the functions called below. */
+    uint32_t devid = its_cmd_get_deviceid(cmdptr);
+    unsigned int size = its_cmd_get_size(cmdptr) + 1;
+    bool valid = its_cmd_get_validbit(cmdptr);
+    paddr_t itt_addr = its_cmd_get_ittaddr(cmdptr);
+    int ret;
+
+    /* Sanitize the number of events. */
+    if ( valid && (size > its->evid_bits) )
+        return -1;
+
+    if ( !valid )
+        /* Discard all events and remove pending LPIs. */
+        its_unmap_device(its, devid);
+
+    /*
+     * There is no easy and clean way for Xen to know the ITS device ID of a
+     * particular (PCI) device, so we have to rely on the guest telling
+     * us about it. For *now* we are just using the device ID *Dom0* uses,
+     * because the driver there has the actual knowledge.
+     * Eventually this will be replaced with a dedicated hypercall to
+     * announce pass-through of devices.
+     */
+    if ( is_hardware_domain(its->d) )
+    {
+
+        /*
+         * Dom0's ITSes are mapped 1:1, so both addresses are the same.
+         * Also the device IDs are equal.
+         */
+        ret = gicv3_its_map_guest_device(its->d, its->doorbell_address, devid,
+                                         its->doorbell_address, devid,
+                                         BIT(size), valid);
+        if ( ret && valid )
+            return ret;
+    }
+
+    spin_lock(&its->its_lock);
+
+    if ( valid )
+        ret = its_set_itt_address(its, devid, itt_addr, size);
+    else
+        ret = its_set_itt_address(its, devid, INVALID_PADDR, 1);
+
+    spin_unlock(&its->its_lock);
+
+    return ret;
+}
+
 #define ITS_CMD_BUFFER_SIZE(baser)      ((((baser) & 0xff) + 1) << 12)
 #define ITS_CMD_OFFSET(reg)             ((reg) & GENMASK(19, 5))
 
@@ -419,6 +558,9 @@ static int vgic_its_handle_cmds(struct domain *d, struct virt_its *its)
             break;
         case GITS_CMD_MAPC:
             ret = its_handle_mapc(its, command);
+            break;
+        case GITS_CMD_MAPD:
+            ret = its_handle_mapd(its, command);
             break;
         case GITS_CMD_SYNC:
             /* We handle ITS commands synchronously, so we ignore SYNC. */
