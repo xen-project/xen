@@ -651,6 +651,69 @@ out_remove_mapping:
     return ret;
 }
 
+static int its_handle_movi(struct virt_its *its, uint64_t *cmdptr)
+{
+    uint32_t devid = its_cmd_get_deviceid(cmdptr);
+    uint32_t eventid = its_cmd_get_id(cmdptr);
+    uint16_t collid = its_cmd_get_collection(cmdptr);
+    unsigned long flags;
+    struct pending_irq *p;
+    struct vcpu *ovcpu, *nvcpu;
+    uint32_t vlpi;
+    int ret = -1;
+
+    spin_lock(&its->its_lock);
+    /* Check for a mapped LPI and get the LPI number. */
+    if ( !read_itte(its, devid, eventid, &ovcpu, &vlpi) )
+        goto out_unlock;
+
+    if ( vlpi == INVALID_LPI )
+        goto out_unlock;
+
+    /* Check the new collection ID and get the new VCPU pointer */
+    nvcpu = get_vcpu_from_collection(its, collid);
+    if ( !nvcpu )
+        goto out_unlock;
+
+    p = gicv3_its_get_event_pending_irq(its->d, its->doorbell_address,
+                                        devid, eventid);
+    if ( unlikely(!p) )
+        goto out_unlock;
+
+    /*
+     * TODO: This relies on the VCPU being correct in the ITS tables.
+     * This can be fixed by either using a per-IRQ lock or by using
+     * the VCPU ID from the pending_irq instead.
+     */
+    spin_lock_irqsave(&ovcpu->arch.vgic.lock, flags);
+
+    /* Update our cached vcpu_id in the pending_irq. */
+    p->lpi_vcpu_id = nvcpu->vcpu_id;
+
+    spin_unlock_irqrestore(&ovcpu->arch.vgic.lock, flags);
+
+    /*
+     * TODO: Investigate if and how to migrate an already pending LPI. This
+     * is not really critical, as these benign races happen in hardware too
+     * (an affinity change may come too late for a just fired IRQ), but may
+     * simplify the code if we can keep the IRQ's associated VCPU in sync,
+     * so that we don't have to deal with special cases anymore.
+     * Migrating those LPIs is not easy to do at the moment anyway, but should
+     * become easier with the introduction of a per-IRQ lock.
+     */
+
+    /* Now store the new collection in the translation table. */
+    if ( !write_itte(its, devid, eventid, collid, vlpi) )
+        goto out_unlock;
+
+    ret = 0;
+
+out_unlock:
+    spin_unlock(&its->its_lock);
+
+    return ret;
+}
+
 #define ITS_CMD_BUFFER_SIZE(baser)      ((((baser) & 0xff) + 1) << 12)
 #define ITS_CMD_OFFSET(reg)             ((reg) & GENMASK(19, 5))
 
@@ -702,6 +765,12 @@ static int vgic_its_handle_cmds(struct domain *d, struct virt_its *its)
         case GITS_CMD_MAPI:
         case GITS_CMD_MAPTI:
             ret = its_handle_mapti(its, command);
+            break;
+        case GITS_CMD_MOVALL:
+            gdprintk(XENLOG_G_INFO, "vGITS: ignoring MOVALL command\n");
+            break;
+        case GITS_CMD_MOVI:
+            ret = its_handle_movi(its, command);
             break;
         case GITS_CMD_SYNC:
             /* We handle ITS commands synchronously, so we ignore SYNC. */
