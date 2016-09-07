@@ -186,8 +186,8 @@ static paddr_t its_get_itte_address(struct virt_its *its,
  * address and puts the result in vcpu_ptr and vlpi_ptr.
  * Must be called with the ITS lock held.
  */
-bool read_itte(struct virt_its *its, uint32_t devid, uint32_t evid,
-               struct vcpu **vcpu_ptr, uint32_t *vlpi_ptr)
+static bool read_itte(struct virt_its *its, uint32_t devid, uint32_t evid,
+                      struct vcpu **vcpu_ptr, uint32_t *vlpi_ptr)
 {
     paddr_t addr;
     struct vits_itte itte;
@@ -259,6 +259,28 @@ static uint64_t its_cmd_mask_field(uint64_t *its_cmd, unsigned int word,
 #define its_cmd_get_validbit(cmd)       its_cmd_mask_field(cmd, 2, 63,  1)
 #define its_cmd_get_ittaddr(cmd)        (its_cmd_mask_field(cmd, 2, 8, 44) << 8)
 
+static int its_handle_int(struct virt_its *its, uint64_t *cmdptr)
+{
+    uint32_t devid = its_cmd_get_deviceid(cmdptr);
+    uint32_t eventid = its_cmd_get_id(cmdptr);
+    struct vcpu *vcpu;
+    uint32_t vlpi;
+    bool ret;
+
+    spin_lock(&its->its_lock);
+    ret = read_itte(its, devid, eventid, &vcpu, &vlpi);
+    spin_unlock(&its->its_lock);
+    if ( !ret )
+        return -1;
+
+    if ( vlpi == INVALID_LPI )
+        return -1;
+
+    vgic_vcpu_inject_lpi(its->d, vlpi);
+
+    return 0;
+}
+
 #define ITS_CMD_BUFFER_SIZE(baser)      ((((baser) & 0xff) + 1) << 12)
 #define ITS_CMD_OFFSET(reg)             ((reg) & GENMASK(19, 5))
 
@@ -295,6 +317,9 @@ static int vgic_its_handle_cmds(struct domain *d, struct virt_its *its)
 
         switch ( its_cmd_get_command(command) )
         {
+        case GITS_CMD_INT:
+            ret = its_handle_int(its, command);
+            break;
         case GITS_CMD_SYNC:
             /* We handle ITS commands synchronously, so we ignore SYNC. */
             break;
