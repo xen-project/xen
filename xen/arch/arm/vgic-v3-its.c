@@ -52,6 +52,7 @@
  */
 struct virt_its {
     struct domain *d;
+    struct list_head vits_list;
     paddr_t doorbell_address;
     unsigned int devid_bits;
     unsigned int evid_bits;
@@ -1454,6 +1455,46 @@ static const struct mmio_handler_ops vgic_its_mmio_handler = {
     .write = vgic_v3_its_mmio_write,
 };
 
+static int vgic_v3_its_init_virtual(struct domain *d, paddr_t guest_addr,
+                                    unsigned int devid_bits,
+                                    unsigned int evid_bits)
+{
+    struct virt_its *its;
+    uint64_t base_attr;
+
+    its = xzalloc(struct virt_its);
+    if ( !its )
+        return -ENOMEM;
+
+    base_attr  = GIC_BASER_InnerShareable << GITS_BASER_SHAREABILITY_SHIFT;
+    base_attr |= GIC_BASER_CACHE_SameAsInner << GITS_BASER_OUTER_CACHEABILITY_SHIFT;
+    base_attr |= GIC_BASER_CACHE_RaWaWb << GITS_BASER_INNER_CACHEABILITY_SHIFT;
+
+    its->cbaser  = base_attr;
+    base_attr |= 0ULL << GITS_BASER_PAGE_SIZE_SHIFT;    /* 4K pages */
+    its->baser_dev = GITS_BASER_TYPE_DEVICE << GITS_BASER_TYPE_SHIFT;
+    its->baser_dev |= (sizeof(dev_table_entry_t) - 1) <<
+                      GITS_BASER_ENTRY_SIZE_SHIFT;
+    its->baser_dev |= base_attr;
+    its->baser_coll  = GITS_BASER_TYPE_COLLECTION << GITS_BASER_TYPE_SHIFT;
+    its->baser_coll |= (sizeof(coll_table_entry_t) - 1) <<
+                       GITS_BASER_ENTRY_SIZE_SHIFT;
+    its->baser_coll |= base_attr;
+    its->d = d;
+    its->doorbell_address = guest_addr + ITS_DOORBELL_OFFSET;
+    its->devid_bits = devid_bits;
+    its->evid_bits = evid_bits;
+    spin_lock_init(&its->vcmd_lock);
+    spin_lock_init(&its->its_lock);
+
+    register_mmio_handler(d, &vgic_its_mmio_handler, guest_addr, SZ_64K, its);
+
+    /* Register the virtual ITS to be able to clean it up later. */
+    list_add_tail(&its->vits_list, &d->arch.vgic.vits_list);
+
+    return 0;
+}
+
 unsigned int vgic_v3_its_count(const struct domain *d)
 {
     struct host_its *hw_its;
@@ -1469,16 +1510,52 @@ unsigned int vgic_v3_its_count(const struct domain *d)
     return ret;
 }
 
+/*
+ * For a hardware domain, this will iterate over the host ITSes
+ * and map one virtual ITS per host ITS at the same address.
+ */
 int vgic_v3_its_init_domain(struct domain *d)
 {
+    int ret;
+
+    INIT_LIST_HEAD(&d->arch.vgic.vits_list);
     spin_lock_init(&d->arch.vgic.its_devices_lock);
     d->arch.vgic.its_devices = RB_ROOT;
+
+    if ( is_hardware_domain(d) )
+    {
+        struct host_its *hw_its;
+
+        list_for_each_entry(hw_its, &host_its_list, entry)
+        {
+            /*
+             * For each host ITS create a virtual ITS using the same
+             * base and thus doorbell address.
+             * Use the same number of device ID and event ID bits as the host.
+             */
+            ret = vgic_v3_its_init_virtual(d, hw_its->addr,
+                                           hw_its->devid_bits,
+                                           hw_its->evid_bits);
+            if ( ret )
+                return ret;
+            else
+                d->arch.vgic.has_its = true;
+        }
+    }
 
     return 0;
 }
 
 void vgic_v3_its_free_domain(struct domain *d)
 {
+    struct virt_its *pos, *temp;
+
+    list_for_each_entry_safe( pos, temp, &d->arch.vgic.vits_list, vits_list )
+    {
+        list_del(&pos->vits_list);
+        xfree(pos);
+    }
+
     ASSERT(RB_EMPTY_ROOT(&d->arch.vgic.its_devices));
 }
 
