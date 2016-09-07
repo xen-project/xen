@@ -1224,6 +1224,28 @@ static int vmx_get_guest_pat(struct vcpu *v, u64 *gpat)
     return 1;
 }
 
+static bool vmx_set_guest_bndcfgs(struct vcpu *v, u64 val)
+{
+    ASSERT(cpu_has_mpx && cpu_has_vmx_mpx);
+
+    vmx_vmcs_enter(v);
+    __vmwrite(GUEST_BNDCFGS, val);
+    vmx_vmcs_exit(v);
+
+    return true;
+}
+
+static bool vmx_get_guest_bndcfgs(struct vcpu *v, u64 *val)
+{
+    ASSERT(cpu_has_mpx && cpu_has_vmx_mpx);
+
+    vmx_vmcs_enter(v);
+    __vmread(GUEST_BNDCFGS, val);
+    vmx_vmcs_exit(v);
+
+    return true;
+}
+
 static void vmx_handle_cd(struct vcpu *v, unsigned long value)
 {
     if ( !paging_mode_hap(v->domain) )
@@ -2323,6 +2345,12 @@ const struct hvm_function_table * __init start_vmx(void)
     if ( cpu_has_vmx_tsc_scaling )
         vmx_function_table.tsc_scaling.ratio_frac_bits = 48;
 
+    if ( cpu_has_mpx && cpu_has_vmx_mpx )
+    {
+        vmx_function_table.set_guest_bndcfgs = vmx_set_guest_bndcfgs;
+        vmx_function_table.get_guest_bndcfgs = vmx_get_guest_bndcfgs;
+    }
+
     setup_vmcs_dump();
 
     return &vmx_function_table;
@@ -2650,11 +2678,6 @@ static int vmx_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
     case MSR_IA32_DEBUGCTLMSR:
         __vmread(GUEST_IA32_DEBUGCTL, msr_content);
         break;
-    case MSR_IA32_BNDCFGS:
-        if ( !cpu_has_mpx || !cpu_has_vmx_mpx )
-            goto gp_fault;
-        __vmread(GUEST_BNDCFGS, msr_content);
-        break;
     case MSR_IA32_FEATURE_CONTROL:
     case MSR_IA32_VMX_BASIC...MSR_IA32_VMX_VMFUNC:
         if ( !nvmx_msr_read_intercept(msr, msr_content) )
@@ -2881,13 +2904,6 @@ static int vmx_msr_write_intercept(unsigned int msr, uint64_t msr_content)
 
         break;
     }
-    case MSR_IA32_BNDCFGS:
-        if ( !cpu_has_mpx || !cpu_has_vmx_mpx ||
-             !is_canonical_address(msr_content) ||
-             (msr_content & IA32_BNDCFGS_RESERVED) )
-            goto gp_fault;
-        __vmwrite(GUEST_BNDCFGS, msr_content);
-        break;
     case MSR_IA32_FEATURE_CONTROL:
     case MSR_IA32_VMX_BASIC...MSR_IA32_VMX_TRUE_ENTRY_CTLS:
         if ( !nvmx_msr_write_intercept(msr, msr_content) )

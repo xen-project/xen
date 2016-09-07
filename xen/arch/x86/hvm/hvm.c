@@ -309,6 +309,14 @@ int hvm_set_guest_pat(struct vcpu *v, u64 guest_pat)
     return 1;
 }
 
+bool hvm_set_guest_bndcfgs(struct vcpu *v, u64 val)
+{
+    return hvm_funcs.set_guest_bndcfgs &&
+           is_canonical_address(val) &&
+           !(val & IA32_BNDCFGS_RESERVED) &&
+           hvm_funcs.set_guest_bndcfgs(v, val);
+}
+
 /*
  * Get the ratio to scale host TSC frequency to gtsc_khz. zero will be
  * returned if TSC scaling is unavailable or ratio cannot be handled
@@ -3667,26 +3675,28 @@ int hvm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
 {
     struct vcpu *v = current;
     uint64_t *var_range_base, *fixed_range_base;
-    bool_t mtrr;
-    unsigned int edx, index;
+    bool mtrr = false;
     int ret = X86EMUL_OKAY;
 
     var_range_base = (uint64_t *)v->arch.hvm_vcpu.mtrr.var_ranges;
     fixed_range_base = (uint64_t *)v->arch.hvm_vcpu.mtrr.fixed_ranges;
 
-    hvm_cpuid(1, NULL, NULL, NULL, &edx);
-    mtrr = !!(edx & cpufeat_mask(X86_FEATURE_MTRR));
+    if ( msr == MSR_MTRRcap ||
+         (msr >= MSR_IA32_MTRR_PHYSBASE(0) && msr <= MSR_MTRRdefType) )
+    {
+        unsigned int edx;
+
+        hvm_cpuid(1, NULL, NULL, NULL, &edx);
+        if ( edx & cpufeat_mask(X86_FEATURE_MTRR) )
+            mtrr = true;
+    }
 
     switch ( msr )
     {
+        unsigned int eax, ebx, ecx, index;
+
     case MSR_EFER:
         *msr_content = v->arch.hvm_vcpu.guest_efer;
-        break;
-
-    case MSR_IA32_XSS:
-        if ( !cpu_has_xsaves )
-            goto gp_fault;
-        *msr_content = v->arch.hvm_vcpu.msr_xss;
         break;
 
     case MSR_IA32_TSC:
@@ -3754,6 +3764,22 @@ int hvm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
         *msr_content = var_range_base[index];
         break;
 
+    case MSR_IA32_XSS:
+        ecx = 1;
+        hvm_cpuid(XSTATE_CPUID, &eax, NULL, &ecx, NULL);
+        if ( !(eax & cpufeat_mask(X86_FEATURE_XSAVES)) )
+            goto gp_fault;
+        *msr_content = v->arch.hvm_vcpu.msr_xss;
+        break;
+
+    case MSR_IA32_BNDCFGS:
+        ecx = 0;
+        hvm_cpuid(7, NULL, &ebx, &ecx, NULL);
+        if ( !(ebx & cpufeat_mask(X86_FEATURE_MPX)) ||
+             !hvm_get_guest_bndcfgs(v, msr_content) )
+            goto gp_fault;
+        break;
+
     case MSR_K8_ENABLE_C1E:
     case MSR_AMD64_NB_CFG:
          /*
@@ -3790,15 +3816,20 @@ int hvm_msr_write_intercept(unsigned int msr, uint64_t msr_content,
                             bool_t may_defer)
 {
     struct vcpu *v = current;
-    bool_t mtrr;
-    unsigned int edx, index;
+    bool mtrr = false;
     int ret = X86EMUL_OKAY;
 
     HVMTRACE_3D(MSR_WRITE, msr,
                (uint32_t)msr_content, (uint32_t)(msr_content >> 32));
 
-    hvm_cpuid(1, NULL, NULL, NULL, &edx);
-    mtrr = !!(edx & cpufeat_mask(X86_FEATURE_MTRR));
+    if ( msr >= MSR_IA32_MTRR_PHYSBASE(0) && msr <= MSR_MTRRdefType )
+    {
+        unsigned int edx;
+
+        hvm_cpuid(1, NULL, NULL, NULL, &edx);
+        if ( edx & cpufeat_mask(X86_FEATURE_MTRR) )
+            mtrr = true;
+    }
 
     if ( may_defer && unlikely(monitored_msr(v->domain, msr)) )
     {
@@ -3815,16 +3846,11 @@ int hvm_msr_write_intercept(unsigned int msr, uint64_t msr_content,
 
     switch ( msr )
     {
+        unsigned int eax, ebx, ecx, index;
+
     case MSR_EFER:
         if ( hvm_set_efer(msr_content) )
            return X86EMUL_EXCEPTION;
-        break;
-
-    case MSR_IA32_XSS:
-        /* No XSS features currently supported for guests. */
-        if ( !cpu_has_xsaves || msr_content != 0 )
-            goto gp_fault;
-        v->arch.hvm_vcpu.msr_xss = msr_content;
         break;
 
     case MSR_IA32_TSC:
@@ -3863,9 +3889,8 @@ int hvm_msr_write_intercept(unsigned int msr, uint64_t msr_content,
         break;
 
     case MSR_MTRRcap:
-        if ( !mtrr )
-            goto gp_fault;
         goto gp_fault;
+
     case MSR_MTRRdefType:
         if ( !mtrr )
             goto gp_fault;
@@ -3902,6 +3927,23 @@ int hvm_msr_write_intercept(unsigned int msr, uint64_t msr_content,
             goto gp_fault;
         if ( !mtrr_var_range_msr_set(v->domain, &v->arch.hvm_vcpu.mtrr,
                                      msr, msr_content) )
+            goto gp_fault;
+        break;
+
+    case MSR_IA32_XSS:
+        ecx = 1;
+        hvm_cpuid(XSTATE_CPUID, &eax, NULL, &ecx, NULL);
+        /* No XSS features currently supported for guests. */
+        if ( !(eax & cpufeat_mask(X86_FEATURE_XSAVES)) || msr_content != 0 )
+            goto gp_fault;
+        v->arch.hvm_vcpu.msr_xss = msr_content;
+        break;
+
+    case MSR_IA32_BNDCFGS:
+        ecx = 0;
+        hvm_cpuid(7, NULL, &ebx, &ecx, NULL);
+        if ( !(ebx & cpufeat_mask(X86_FEATURE_MPX)) ||
+             !hvm_set_guest_bndcfgs(v, msr_content) )
             goto gp_fault;
         break;
 
