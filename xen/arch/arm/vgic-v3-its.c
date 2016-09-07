@@ -714,6 +714,29 @@ out_unlock:
     return ret;
 }
 
+static int its_handle_discard(struct virt_its *its, uint64_t *cmdptr)
+{
+    uint32_t devid = its_cmd_get_deviceid(cmdptr);
+    uint32_t eventid = its_cmd_get_id(cmdptr);
+    int ret;
+
+    spin_lock(&its->its_lock);
+
+    /* Remove from the radix tree and remove the host entry. */
+    ret = its_discard_event(its, devid, eventid);
+    if ( ret )
+        goto out_unlock;
+
+    /* Remove from the guest's ITTE. */
+    if ( !write_itte(its, devid, eventid, UNMAPPED_COLLECTION, INVALID_LPI) )
+        ret = -1;
+
+out_unlock:
+    spin_unlock(&its->its_lock);
+
+    return ret;
+}
+
 #define ITS_CMD_BUFFER_SIZE(baser)      ((((baser) & 0xff) + 1) << 12)
 #define ITS_CMD_OFFSET(reg)             ((reg) & GENMASK(19, 5))
 
@@ -752,6 +775,9 @@ static int vgic_its_handle_cmds(struct domain *d, struct virt_its *its)
         {
         case GITS_CMD_CLEAR:
             ret = its_handle_clear(its, command);
+            break;
+        case GITS_CMD_DISCARD:
+            ret = its_handle_discard(its, command);
             break;
         case GITS_CMD_INT:
             ret = its_handle_int(its, command);
