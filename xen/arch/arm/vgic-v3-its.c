@@ -115,6 +115,25 @@ static paddr_t get_baser_phys_addr(uint64_t reg)
 }
 
 /* Must be called with the ITS lock held. */
+static int its_set_collection(struct virt_its *its, uint16_t collid,
+                              coll_table_entry_t vcpu_id)
+{
+    paddr_t addr = get_baser_phys_addr(its->baser_coll);
+
+    /* The collection table entry must be able to store a VCPU ID. */
+    BUILD_BUG_ON(BIT(sizeof(coll_table_entry_t) * 8) < MAX_VIRT_CPUS);
+
+    ASSERT(spin_is_locked(&its->its_lock));
+
+    if ( collid >= its->max_collections )
+        return -ENOENT;
+
+    return vgic_access_guest_memory(its->d,
+                                    addr + collid * sizeof(coll_table_entry_t),
+                                    &vcpu_id, sizeof(vcpu_id), true);
+}
+
+/* Must be called with the ITS lock held. */
 static struct vcpu *get_vcpu_from_collection(struct virt_its *its,
                                              uint16_t collid)
 {
@@ -281,6 +300,29 @@ static int its_handle_int(struct virt_its *its, uint64_t *cmdptr)
     return 0;
 }
 
+static int its_handle_mapc(struct virt_its *its, uint64_t *cmdptr)
+{
+    uint32_t collid = its_cmd_get_collection(cmdptr);
+    uint64_t rdbase = its_cmd_mask_field(cmdptr, 2, 16, 44);
+
+    if ( collid >= its->max_collections )
+        return -1;
+
+    if ( rdbase >= its->d->max_vcpus )
+        return -1;
+
+    spin_lock(&its->its_lock);
+
+    if ( its_cmd_get_validbit(cmdptr) )
+        its_set_collection(its, collid, rdbase);
+    else
+        its_set_collection(its, collid, UNMAPPED_COLLECTION);
+
+    spin_unlock(&its->its_lock);
+
+    return 0;
+}
+
 #define ITS_CMD_BUFFER_SIZE(baser)      ((((baser) & 0xff) + 1) << 12)
 #define ITS_CMD_OFFSET(reg)             ((reg) & GENMASK(19, 5))
 
@@ -319,6 +361,9 @@ static int vgic_its_handle_cmds(struct domain *d, struct virt_its *its)
         {
         case GITS_CMD_INT:
             ret = its_handle_int(its, command);
+            break;
+        case GITS_CMD_MAPC:
+            ret = its_handle_mapc(its, command);
             break;
         case GITS_CMD_SYNC:
             /* We handle ITS commands synchronously, so we ignore SYNC. */
