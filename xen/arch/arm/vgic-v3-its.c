@@ -52,6 +52,7 @@
  */
 struct virt_its {
     struct domain *d;
+    paddr_t doorbell_address;
     unsigned int devid_bits;
     unsigned int evid_bits;
     spinlock_t vcmd_lock;       /* Protects the virtual command buffer, which */
@@ -323,6 +324,57 @@ static int its_handle_mapc(struct virt_its *its, uint64_t *cmdptr)
     return 0;
 }
 
+/*
+ * CLEAR removes the pending state from an LPI. */
+static int its_handle_clear(struct virt_its *its, uint64_t *cmdptr)
+{
+    uint32_t devid = its_cmd_get_deviceid(cmdptr);
+    uint32_t eventid = its_cmd_get_id(cmdptr);
+    struct pending_irq *p;
+    struct vcpu *vcpu;
+    uint32_t vlpi;
+    unsigned long flags;
+    int ret = -1;
+
+    spin_lock(&its->its_lock);
+
+    /* Translate the DevID/EvID pair into a vCPU/vLPI pair. */
+    if ( !read_itte(its, devid, eventid, &vcpu, &vlpi) )
+        goto out_unlock;
+
+    p = gicv3_its_get_event_pending_irq(its->d, its->doorbell_address,
+                                        devid, eventid);
+    /* Protect against an invalid LPI number. */
+    if ( unlikely(!p) )
+        goto out_unlock;
+
+    /*
+     * TODO: This relies on the VCPU being correct in the ITS tables.
+     * This can be fixed by either using a per-IRQ lock or by using
+     * the VCPU ID from the pending_irq instead.
+     */
+    spin_lock_irqsave(&vcpu->arch.vgic.lock, flags);
+
+    /*
+     * If the LPI is already visible on the guest, it is too late to
+     * clear the pending state. However this is a benign race that can
+     * happen on real hardware, too: If the LPI has already been forwarded
+     * to a CPU interface, a CLEAR request reaching the redistributor has
+     * no effect on that LPI anymore. Since LPIs are edge triggered and
+     * have no active state, we don't need to care about this here.
+     */
+    if ( !test_bit(GIC_IRQ_GUEST_VISIBLE, &p->status) )
+        gic_remove_irq_from_queues(vcpu, p);
+
+    spin_unlock_irqrestore(&vcpu->arch.vgic.lock, flags);
+    ret = 0;
+
+out_unlock:
+    spin_unlock(&its->its_lock);
+
+    return ret;
+}
+
 #define ITS_CMD_BUFFER_SIZE(baser)      ((((baser) & 0xff) + 1) << 12)
 #define ITS_CMD_OFFSET(reg)             ((reg) & GENMASK(19, 5))
 
@@ -359,6 +411,9 @@ static int vgic_its_handle_cmds(struct domain *d, struct virt_its *its)
 
         switch ( its_cmd_get_command(command) )
         {
+        case GITS_CMD_CLEAR:
+            ret = its_handle_clear(its, command);
+            break;
         case GITS_CMD_INT:
             ret = its_handle_int(its, command);
             break;
