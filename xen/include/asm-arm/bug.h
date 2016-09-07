@@ -52,6 +52,7 @@ struct bug_frame {
          ".popsection\n"                                                    \
          ".pushsection .bug_frames." __stringify(type) ", \"a\", %progbits\n"\
          "4:\n"                                                             \
+         ".p2align 2\n"                                                     \
          ".long (1b - 4b)\n"                                                \
          ".long (2b - 4b)\n"                                                \
          ".long (3b - 4b)\n"                                                \

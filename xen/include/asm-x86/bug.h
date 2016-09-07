@@ -98,6 +98,7 @@ extern const struct bug_frame __start_bug_frames[],
     .popsection
 
     .pushsection .bug_frames.\type, "a", @progbits
+        .p2align 2
         .L\@bf:
         .long (.L\@ud - .L\@bf) + \
                ((\line >> BUG_LINE_LO_WIDTH) << BUG_DISP_WIDTH)

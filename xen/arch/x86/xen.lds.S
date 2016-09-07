@@ -79,7 +79,6 @@ SECTIONS
   .rodata : {
        _srodata = .;
        /* Bug frames table */
-       . = ALIGN(4);
        __start_bug_frames = .;
        *(.bug_frames.0)
        __stop_bug_frames_0 = .;
