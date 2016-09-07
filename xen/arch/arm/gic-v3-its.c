@@ -876,6 +876,33 @@ int gicv3_remove_guest_event(struct domain *d, paddr_t vdoorbell_address,
     return 0;
 }
 
+/*
+ * Connects the event ID for an already assigned device to the given VCPU/vLPI
+ * pair. The corresponding physical LPI is already mapped on the host side
+ * (when assigning the physical device to the guest), so we just connect the
+ * target VCPU/vLPI pair to that interrupt to inject it properly if it fires.
+ * Returns a pointer to the already allocated struct pending_irq that is
+ * meant to be used by that event.
+ */
+struct pending_irq *gicv3_assign_guest_event(struct domain *d,
+                                             paddr_t vdoorbell_address,
+                                             uint32_t vdevid, uint32_t eventid,
+                                             uint32_t virt_lpi)
+{
+    struct pending_irq *pirq;
+    uint32_t host_lpi = INVALID_LPI;
+
+    pirq = get_event_pending_irq(d, vdoorbell_address, vdevid, eventid,
+                                 &host_lpi);
+
+    if ( !pirq )
+        return NULL;
+
+    gicv3_lpi_update_host_entry(host_lpi, d->domain_id, virt_lpi);
+
+    return pirq;
+}
+
 /* Scan the DT for any ITS nodes and create a list of host ITSes out of it. */
 void gicv3_its_dt_init(const struct dt_device_node *node)
 {

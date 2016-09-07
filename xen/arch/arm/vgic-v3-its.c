@@ -253,8 +253,8 @@ static bool read_itte(struct virt_its *its, uint32_t devid, uint32_t evid,
  * If vcpu_ptr is provided, returns the VCPU belonging to that collection.
  * Must be called with the ITS lock held.
  */
-bool write_itte(struct virt_its *its, uint32_t devid,
-                uint32_t evid, uint32_t collid, uint32_t vlpi)
+static bool write_itte(struct virt_its *its, uint32_t devid,
+                       uint32_t evid, uint32_t collid, uint32_t vlpi)
 {
     paddr_t addr;
     struct vits_itte itte;
@@ -390,6 +390,44 @@ out_unlock:
     return ret;
 }
 
+/*
+ * For a given virtual LPI read the enabled bit and priority from the virtual
+ * property table and update the virtual IRQ's state in the given pending_irq.
+ * Must be called with the respective VGIC VCPU lock held.
+ */
+static int update_lpi_property(struct domain *d, struct pending_irq *p)
+{
+    paddr_t addr;
+    uint8_t property;
+    int ret;
+
+    /*
+     * If no redistributor has its LPIs enabled yet, we can't access the
+     * property table. In this case we just can't update the properties,
+     * but this should not be an error from an ITS point of view.
+     * The control flow dependency here and a barrier instruction on the
+     * write side make sure we can access these without taking a lock.
+     */
+    if ( !d->arch.vgic.rdists_enabled )
+        return 0;
+
+    addr = d->arch.vgic.rdist_propbase & GENMASK(51, 12);
+
+    ret = vgic_access_guest_memory(d, addr + p->irq - LPI_OFFSET,
+                                   &property, sizeof(property), false);
+    if ( ret )
+        return ret;
+
+    write_atomic(&p->lpi_priority, property & LPI_PROP_PRIO_MASK);
+
+    if ( property & LPI_PROP_ENABLED )
+        set_bit(GIC_IRQ_GUEST_ENABLED, &p->status);
+    else
+        clear_bit(GIC_IRQ_GUEST_ENABLED, &p->status);
+
+    return 0;
+}
+
 /* Must be called with the ITS lock held. */
 static int its_discard_event(struct virt_its *its,
                              uint32_t vdevid, uint32_t vevid)
@@ -514,6 +552,105 @@ static int its_handle_mapd(struct virt_its *its, uint64_t *cmdptr)
     return ret;
 }
 
+static int its_handle_mapti(struct virt_its *its, uint64_t *cmdptr)
+{
+    uint32_t devid = its_cmd_get_deviceid(cmdptr);
+    uint32_t eventid = its_cmd_get_id(cmdptr);
+    uint32_t intid = its_cmd_get_physical_id(cmdptr), _intid;
+    uint16_t collid = its_cmd_get_collection(cmdptr);
+    struct pending_irq *pirq;
+    struct vcpu *vcpu = NULL;
+    int ret = -1;
+
+    if ( its_cmd_get_command(cmdptr) == GITS_CMD_MAPI )
+        intid = eventid;
+
+    spin_lock(&its->its_lock);
+    /*
+     * Check whether there is a valid existing mapping. If yes, behavior is
+     * unpredictable, we choose to ignore this command here.
+     * This makes sure we start with a pristine pending_irq below.
+     */
+    if ( read_itte(its, devid, eventid, &vcpu, &_intid) &&
+         _intid != INVALID_LPI )
+    {
+        spin_unlock(&its->its_lock);
+        return -1;
+    }
+
+    /* Sanitize collection ID and interrupt ID */
+    vcpu = get_vcpu_from_collection(its, collid);
+    if ( !vcpu || intid >= its->d->arch.vgic.nr_lpis )
+    {
+        spin_unlock(&its->its_lock);
+        return -1;
+    }
+
+    /* Enter the mapping in our virtual ITS tables. */
+    if ( !write_itte(its, devid, eventid, collid, intid) )
+    {
+        spin_unlock(&its->its_lock);
+        return -1;
+    }
+
+    spin_unlock(&its->its_lock);
+
+    /*
+     * Connect this virtual LPI to the corresponding host LPI, which is
+     * determined by the same device ID and event ID on the host side.
+     * This returns us the corresponding, still unused pending_irq.
+     */
+    pirq = gicv3_assign_guest_event(its->d, its->doorbell_address,
+                                    devid, eventid, intid);
+    if ( !pirq )
+        goto out_remove_mapping;
+
+    vgic_init_pending_irq(pirq, intid);
+
+    /*
+     * Now read the guest's property table to initialize our cached state.
+     * We don't need the VGIC VCPU lock here, because the pending_irq isn't
+     * in the radix tree yet.
+     */
+    ret = update_lpi_property(its->d, pirq);
+    if ( ret )
+        goto out_remove_host_entry;
+
+    pirq->lpi_vcpu_id = vcpu->vcpu_id;
+    /*
+     * Mark this LPI as new, so any older (now unmapped) LPI in any LR
+     * can be easily recognised as such.
+     */
+    set_bit(GIC_IRQ_GUEST_PRISTINE_LPI, &pirq->status);
+
+    /*
+     * Now insert the pending_irq into the domain's LPI tree, so that
+     * it becomes live.
+     */
+    write_lock(&its->d->arch.vgic.pend_lpi_tree_lock);
+    ret = radix_tree_insert(&its->d->arch.vgic.pend_lpi_tree, intid, pirq);
+    write_unlock(&its->d->arch.vgic.pend_lpi_tree_lock);
+
+    if ( !ret )
+        return 0;
+
+    /*
+     * radix_tree_insert() returns an error either due to an internal
+     * condition (like memory allocation failure) or because the LPI already
+     * existed in the tree. We don't support the latter case, so we always
+     * cleanup and return an error here in any case.
+     */
+out_remove_host_entry:
+    gicv3_remove_guest_event(its->d, its->doorbell_address, devid, eventid);
+
+out_remove_mapping:
+    spin_lock(&its->its_lock);
+    write_itte(its, devid, eventid, UNMAPPED_COLLECTION, INVALID_LPI);
+    spin_unlock(&its->its_lock);
+
+    return ret;
+}
+
 #define ITS_CMD_BUFFER_SIZE(baser)      ((((baser) & 0xff) + 1) << 12)
 #define ITS_CMD_OFFSET(reg)             ((reg) & GENMASK(19, 5))
 
@@ -561,6 +698,10 @@ static int vgic_its_handle_cmds(struct domain *d, struct virt_its *its)
             break;
         case GITS_CMD_MAPD:
             ret = its_handle_mapd(its, command);
+            break;
+        case GITS_CMD_MAPI:
+        case GITS_CMD_MAPTI:
+            ret = its_handle_mapti(its, command);
             break;
         case GITS_CMD_SYNC:
             /* We handle ITS commands synchronously, so we ignore SYNC. */
