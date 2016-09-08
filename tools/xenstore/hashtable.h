@@ -1,5 +1,10 @@
 /* Copyright (C) 2002 Christopher Clark <firstname.lastname@cl.cam.ac.uk> */
 
+/*
+ * There are duplicates of this code in:
+ *  - tools/blktap2/drivers/hashtable.h
+ */
+
 #ifndef __HASHTABLE_CWC22_H__
 #define __HASHTABLE_CWC22_H__
 

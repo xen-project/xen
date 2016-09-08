@@ -98,6 +98,19 @@ tools/libs/evtchn/headers.chk
 tools/libs/gnttab/headers.chk
 tools/libs/call/headers.chk
 tools/libs/foreignmemory/headers.chk
+tools/blktap2/daemon/blktapctrl
+tools/blktap2/drivers/img2qcow
+tools/blktap2/drivers/lock-util
+tools/blktap2/drivers/qcow-create
+tools/blktap2/drivers/qcow2raw
+tools/blktap2/drivers/tapdisk
+tools/blktap2/drivers/tapdisk-client
+tools/blktap2/drivers/tapdisk-diff
+tools/blktap2/drivers/tapdisk-stream
+tools/blktap2/drivers/tapdisk2
+tools/blktap2/drivers/td-util
+tools/blktap2/vhd/vhd-update
+tools/blktap2/vhd/vhd-util
 tools/console/xenconsole
 tools/console/xenconsoled
 tools/console/client/_paths.h
@@ -314,6 +327,7 @@ tools/libxl/*.pyc
 tools/libxl/libxl-save-helper
 tools/libxl/test_timedereg
 tools/libxl/test_fdderegrace
+tools/blktap2/control/tap-ctl
 tools/firmware/etherboot/eb-roms.h
 tools/firmware/etherboot/gpxe-git-snapshot.tar.gz
 tools/misc/xenwatchdogd

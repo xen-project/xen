@@ -144,6 +144,10 @@ this detection and the sysv runlevel scripts have to be used.
   --with-systemd=DIR
   --with-systemd-modules-load=DIR
 
+The old backend drivers are disabled because qdisk is now the default.
+This option can be used to build them anyway.
+  --enable-blktap2
+
 Build various stubom components, some are only example code. Its usually
 enough to specify just --enable-stubdom and leave these options alone.
   --enable-ioemu-stubdom

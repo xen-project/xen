@@ -19,6 +19,7 @@ XEN_LIBXC          = $(XEN_ROOT)/tools/libxc
 XEN_XENLIGHT       = $(XEN_ROOT)/tools/libxl
 XEN_XENSTORE       = $(XEN_ROOT)/tools/xenstore
 XEN_LIBXENSTAT     = $(XEN_ROOT)/tools/xenstat/libxenstat/src
+XEN_BLKTAP2        = $(XEN_ROOT)/tools/blktap2
 XEN_LIBVCHAN       = $(XEN_ROOT)/tools/libvchan
 
 CFLAGS_xeninclude = -I$(XEN_INCLUDE)
@@ -142,8 +143,22 @@ CFLAGS += -O0 -g3
 PY_CFLAGS += $(PY_NOOPT_CFLAGS)
 endif
 
+LIBXL_BLKTAP ?= $(CONFIG_BLKTAP2)
+
+ifeq ($(LIBXL_BLKTAP),y)
+CFLAGS_libblktapctl = -I$(XEN_BLKTAP2)/control -I$(XEN_BLKTAP2)/include $(CFLAGS_xeninclude)
+SHDEPS_libblktapctl =
+LDLIBS_libblktapctl = $(SHDEPS_libblktapctl) $(XEN_BLKTAP2)/control/libblktapctl$(libextension)
+SHLIB_libblktapctl  = $(SHDEPS_libblktapctl) -Wl,-rpath-link=$(XEN_BLKTAP2)/control
+else
+CFLAGS_libblktapctl =
+SHDEPS_libblktapctl =
+LDLIBS_libblktapctl =
+SHLIB_libblktapctl  =
+endif
+
 CFLAGS_libxenlight = -I$(XEN_XENLIGHT) $(CFLAGS_libxenctrl) $(CFLAGS_xeninclude)
-SHDEPS_libxenlight = $(SHLIB_libxenctrl) $(SHLIB_libxenstore)
+SHDEPS_libxenlight = $(SHLIB_libxenctrl) $(SHLIB_libxenstore) $(SHLIB_libblktapctl)
 LDLIBS_libxenlight = $(SHDEPS_libxenlight) $(XEN_XENLIGHT)/libxenlight$(libextension)
 SHLIB_libxenlight  = $(SHDEPS_libxenlight) -Wl,-rpath-link=$(XEN_XENLIGHT)
 

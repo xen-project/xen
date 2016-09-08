@@ -1362,9 +1362,20 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
                     continue;
                 }
 
-                assert(disks[i].backend != LIBXL_DISK_BACKEND_TAP);
-                target_path = libxl__device_disk_find_local_path(gc,
-                                    guest_domid, &disks[i], true);
+                /* 
+                 * We can't call libxl__blktap_devpath from
+                 * libxl__device_disk_find_local_path for now because
+                 * the bootloader is called before the disks are set
+                 * up, so this function would set up a blktap node,
+                 * but there's no TAP tear-down on error conditions in
+                 * the bootloader path.
+                 */
+                if (disks[i].backend == LIBXL_DISK_BACKEND_TAP)
+                    target_path = libxl__blktap_devpath(gc, disks[i].pdev_path,
+                                                        disks[i].format);
+                else
+                    target_path = libxl__device_disk_find_local_path(gc,
+                                                 guest_domid, &disks[i], true);
 
                 if (!target_path) {
                     LOG(WARN, "No way to get local access disk to image: %s\n"

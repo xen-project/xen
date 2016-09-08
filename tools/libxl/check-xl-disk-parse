@@ -3,7 +3,7 @@
 set -e
 
 if [ -x ./xl ] ; then
-    export LD_LIBRARY_PATH=.:../libxc:../xenstore
+    export LD_LIBRARY_PATH=.:../libxc:../xenstore:../blktap2/control
     XL=./xl
 else
     XL=xl

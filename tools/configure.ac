@@ -108,6 +108,7 @@ xen-scsibk
 usbbk
 pciback
 xen-acpi-processor
+blktap2
 "
 ;;
 *)
@@ -116,6 +117,24 @@ LINUX_BACKEND_MODULES=
 esac])
 LINUX_BACKEND_MODULES="`eval echo $LINUX_BACKEND_MODULES`"
 AC_SUBST(LINUX_BACKEND_MODULES)
+
+dnl Enable blktap2 on Linux only.
+AC_ARG_ENABLE([blktap2],
+    AS_HELP_STRING([--enable-blktap2],
+                   [Enable blktap2, (DEFAULT is on for Linux, otherwise off)]),,[
+    case "$host_os" in
+        linux*)
+           enable_blktap2="yes";;
+        *) enable_blktap2="no";;
+    esac
+])
+AS_IF([test "x$enable_blktap2" = "xyes"], [
+AC_DEFINE([HAVE_BLKTAP2], [1], [Blktap2 enabled])
+    blktap2=y],[
+    blktap2=n
+])
+AC_SUBST(blktap2)
+
 
 AC_ARG_ENABLE([qemu-traditional],
     AS_HELP_STRING([--enable-qemu-traditional],
@@ -350,6 +369,9 @@ AC_CHECK_HEADER([lzo/lzo1x.h], [
 AC_CHECK_LIB([lzo2], [lzo1x_decompress], [zlib="$zlib -DHAVE_LZO1X -llzo2"])
 ])
 AC_SUBST(zlib)
+AS_IF([test "x$enable_blktap2" = "xyes"], [
+AC_CHECK_LIB([aio], [io_setup], [], [AC_MSG_ERROR([Could not find libaio])])
+])
 AC_SUBST(system_aio)
 AC_CHECK_LIB([crypto], [MD5], [], [AC_MSG_ERROR([Could not find libcrypto])])
 AX_CHECK_EXTFS
