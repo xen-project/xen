@@ -141,10 +141,8 @@ static void libxl__device_vtpm_add(libxl__egc *egc, uint32_t domid,
         }
 
         libxl__device_generic_add(gc, t, device,
-                                  libxl__xs_kvs_of_flexarray(gc, back,
-                                                             back->count),
-                                  libxl__xs_kvs_of_flexarray(gc, front,
-                                                             front->count),
+                                  libxl__xs_kvs_of_flexarray(gc, back),
+                                  libxl__xs_kvs_of_flexarray(gc, front),
                                   NULL);
 
         rc = libxl__xs_transaction_commit(gc, &t);

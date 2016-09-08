@@ -177,9 +177,9 @@ static int libxl__device_usbctrl_add_xenstore(libxl__gc *gc, uint32_t domid,
         }
 
         libxl__device_generic_add(gc, t, device,
-                          libxl__xs_kvs_of_flexarray(gc, back, back->count),
-                          libxl__xs_kvs_of_flexarray(gc, front, front->count),
-                          NULL);
+                                  libxl__xs_kvs_of_flexarray(gc, back),
+                                  libxl__xs_kvs_of_flexarray(gc, front),
+                                  NULL);
 
         rc = libxl__xs_transaction_commit(gc, &t);
         if (!rc) break;

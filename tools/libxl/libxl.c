@@ -2334,8 +2334,8 @@ static void device_disk_add(libxl__egc *egc, uint32_t domid,
         }
 
         libxl__device_generic_add(gc, t, device,
-                                  libxl__xs_kvs_of_flexarray(gc, back, back->count),
-                                  libxl__xs_kvs_of_flexarray(gc, front, front->count),
+                                  libxl__xs_kvs_of_flexarray(gc, back),
+                                  libxl__xs_kvs_of_flexarray(gc, front),
                                   NULL);
 
         rc = libxl__xs_transaction_commit(gc, &t);
@@ -2754,7 +2754,7 @@ int libxl_cdrom_insert(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk,
             goto out;
         }
 
-        char **kvs = libxl__xs_kvs_of_flexarray(gc, empty, empty->count);
+        char **kvs = libxl__xs_kvs_of_flexarray(gc, empty);
 
         rc = libxl__xs_writev(gc, t, be_path, kvs);
         if (rc) goto out;
@@ -2796,7 +2796,7 @@ int libxl_cdrom_insert(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk,
         rc = libxl__set_domain_configuration(gc, domid, &d_config);
         if (rc) goto out;
 
-        char **kvs = libxl__xs_kvs_of_flexarray(gc, insert, insert->count);
+        char **kvs = libxl__xs_kvs_of_flexarray(gc, insert);
 
         rc = libxl__xs_writev(gc, t, be_path, kvs);
         if (rc) goto out;
@@ -3166,9 +3166,9 @@ int libxl__device_console_add(libxl__gc *gc, uint32_t domid,
         flexarray_append(front, LIBXL_XENCONSOLE_PROTOCOL);
     }
     libxl__device_generic_add(gc, XBT_NULL, device,
-                              libxl__xs_kvs_of_flexarray(gc, back, back->count),
-                              libxl__xs_kvs_of_flexarray(gc, front, front->count),
-                              libxl__xs_kvs_of_flexarray(gc, ro_front, ro_front->count));
+                              libxl__xs_kvs_of_flexarray(gc, back),
+                              libxl__xs_kvs_of_flexarray(gc, front),
+                              libxl__xs_kvs_of_flexarray(gc, ro_front));
     rc = 0;
 out:
     return rc;
@@ -3495,8 +3495,8 @@ int libxl__device_vkb_add(libxl__gc *gc, uint32_t domid,
     flexarray_append(front, GCSPRINTF("%d", XenbusStateInitialising));
 
     libxl__device_generic_add(gc, XBT_NULL, &device,
-                              libxl__xs_kvs_of_flexarray(gc, back, back->count),
-                              libxl__xs_kvs_of_flexarray(gc, front, front->count),
+                              libxl__xs_kvs_of_flexarray(gc, back),
+                              libxl__xs_kvs_of_flexarray(gc, front),
                               NULL);
     rc = 0;
 out:
@@ -3608,8 +3608,8 @@ int libxl__device_vfb_add(libxl__gc *gc, uint32_t domid, libxl_device_vfb *vfb)
     flexarray_append_pair(front, "state", GCSPRINTF("%d", XenbusStateInitialising));
 
     libxl__device_generic_add(gc, XBT_NULL, &device,
-                              libxl__xs_kvs_of_flexarray(gc, back, back->count),
-                              libxl__xs_kvs_of_flexarray(gc, front, front->count),
+                              libxl__xs_kvs_of_flexarray(gc, back),
+                              libxl__xs_kvs_of_flexarray(gc, front),
                               NULL);
     rc = 0;
 out:

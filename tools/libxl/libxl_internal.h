@@ -676,7 +676,7 @@ _hidden int libxl__remove_directory(libxl__gc *gc, const char *path);
 _hidden int libxl__remove_file_or_directory(libxl__gc *gc, const char *path);
 
 
-_hidden char **libxl__xs_kvs_of_flexarray(libxl__gc *gc, flexarray_t *array, int length);
+_hidden char **libxl__xs_kvs_of_flexarray(libxl__gc *gc, flexarray_t *array);
 
 /* treats kvs as pairs of keys and values and writes each to dir. */
 _hidden int libxl__xs_writev(libxl__gc *gc, xs_transaction_t t,

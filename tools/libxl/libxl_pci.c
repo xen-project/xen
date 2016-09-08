@@ -104,8 +104,8 @@ int libxl__create_pci_backend(libxl__gc *gc, uint32_t domid,
     flexarray_append_pair(front, "state", GCSPRINTF("%d", XenbusStateInitialising));
 
     return libxl__device_generic_add(gc, XBT_NULL, &device,
-                                     libxl__xs_kvs_of_flexarray(gc, back, back->count),
-                                     libxl__xs_kvs_of_flexarray(gc, front, front->count),
+                                     libxl__xs_kvs_of_flexarray(gc, back),
+                                     libxl__xs_kvs_of_flexarray(gc, front),
                                      NULL);
 }
 
@@ -172,8 +172,7 @@ static int libxl__device_pci_add_xenstore(libxl__gc *gc, uint32_t domid, libxl_d
         rc = libxl__set_domain_configuration(gc, domid, &d_config);
         if (rc) goto out;
 
-        libxl__xs_writev(gc, t, be_path,
-                         libxl__xs_kvs_of_flexarray(gc, back, back->count));
+        libxl__xs_writev(gc, t, be_path, libxl__xs_kvs_of_flexarray(gc, back));
 
         rc = libxl__xs_transaction_commit(gc, &t);
         if (!rc) break;
