@@ -142,8 +142,17 @@ static int hvm_translate_linear_addr(
     struct sh_emulate_ctxt *sh_ctxt,
     unsigned long *paddr)
 {
-    struct segment_register *reg = hvm_get_seg_reg(seg, sh_ctxt);
+    struct segment_register *reg;
     int okay;
+
+    /*
+     * Can arrive here with non-user segments.  However, no such cirucmstance
+     * is part of a legitimate pagetable update, so fail the emulation.
+     */
+    if ( !is_x86_user_segment(seg) )
+        return X86EMUL_UNHANDLEABLE;
+
+    reg = hvm_get_seg_reg(seg, sh_ctxt);
 
     okay = hvm_virtual_to_linear_addr(
         seg, reg, offset, bytes, access_type, sh_ctxt->ctxt.addr_size, paddr);
