@@ -10,7 +10,7 @@
 
 #include <public/sysctl.h>
 
-static char xen_replace_world_name[] = "xen_extra_version";
+static const char xen_replace_world_name[] = "xen_extra_version";
 extern const char *xen_replace_world(void);
 
 struct livepatch_func __section(".livepatch.funcs") livepatch_xen_replace_world = {

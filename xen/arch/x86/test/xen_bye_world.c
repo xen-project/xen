@@ -11,7 +11,7 @@
 
 #include <public/sysctl.h>
 
-static char bye_world_patch_this_fnc[] = "xen_extra_version";
+static const char bye_world_patch_this_fnc[] = "xen_extra_version";
 extern const char *xen_bye_world(void);
 
 struct livepatch_func __section(".livepatch.funcs") livepatch_xen_bye_world = {
