@@ -130,14 +130,15 @@ __initcall(shadow_audit_key_init);
 static struct segment_register *hvm_get_seg_reg(
     enum x86_segment seg, struct sh_emulate_ctxt *sh_ctxt)
 {
+    unsigned int idx = seg;
     struct segment_register *seg_reg;
 
-    if ( seg < 0 || seg >= ARRAY_SIZE(sh_ctxt->seg_reg) )
+    if ( idx >= ARRAY_SIZE(sh_ctxt->seg_reg) )
         return ERR_PTR(-X86EMUL_UNHANDLEABLE);
 
-    seg_reg = &sh_ctxt->seg_reg[seg];
-    if ( !__test_and_set_bit(seg, &sh_ctxt->valid_seg_regs) )
-        hvm_get_segment_register(current, seg, seg_reg);
+    seg_reg = &sh_ctxt->seg_reg[idx];
+    if ( !__test_and_set_bit(idx, &sh_ctxt->valid_seg_regs) )
+        hvm_get_segment_register(current, idx, seg_reg);
     return seg_reg;
 }
 

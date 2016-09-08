@@ -1447,13 +1447,14 @@ static int hvmemul_write_segment(
 {
     struct hvm_emulate_ctxt *hvmemul_ctxt =
         container_of(ctxt, struct hvm_emulate_ctxt, ctxt);
+    unsigned int idx = seg;
 
-    if ( seg < 0 || seg >= ARRAY_SIZE(hvmemul_ctxt->seg_reg) )
+    if ( idx >= ARRAY_SIZE(hvmemul_ctxt->seg_reg) )
         return X86EMUL_UNHANDLEABLE;
 
-    hvmemul_ctxt->seg_reg[seg] = *reg;
-    __set_bit(seg, &hvmemul_ctxt->seg_reg_accessed);
-    __set_bit(seg, &hvmemul_ctxt->seg_reg_dirty);
+    hvmemul_ctxt->seg_reg[idx] = *reg;
+    __set_bit(idx, &hvmemul_ctxt->seg_reg_accessed);
+    __set_bit(idx, &hvmemul_ctxt->seg_reg_dirty);
 
     return X86EMUL_OKAY;
 }
@@ -2012,12 +2013,14 @@ struct segment_register *hvmemul_get_seg_reg(
     enum x86_segment seg,
     struct hvm_emulate_ctxt *hvmemul_ctxt)
 {
-    if ( seg < 0 || seg >= ARRAY_SIZE(hvmemul_ctxt->seg_reg) )
+    unsigned int idx = seg;
+
+    if ( idx >= ARRAY_SIZE(hvmemul_ctxt->seg_reg) )
         return ERR_PTR(-X86EMUL_UNHANDLEABLE);
 
-    if ( !__test_and_set_bit(seg, &hvmemul_ctxt->seg_reg_accessed) )
-        hvm_get_segment_register(current, seg, &hvmemul_ctxt->seg_reg[seg]);
-    return &hvmemul_ctxt->seg_reg[seg];
+    if ( !__test_and_set_bit(idx, &hvmemul_ctxt->seg_reg_accessed) )
+        hvm_get_segment_register(current, idx, &hvmemul_ctxt->seg_reg[idx]);
+    return &hvmemul_ctxt->seg_reg[idx];
 }
 
 static const char *guest_x86_mode_to_str(int mode)
