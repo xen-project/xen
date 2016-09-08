@@ -1011,7 +1011,9 @@ get_page_from_l3e(
 
     rc = get_page_and_type_from_pagenr(
         l3e_get_pfn(l3e), PGT_l2_page_table, d, partial, 1);
-    if ( unlikely(rc == -EINVAL) && get_l3_linear_pagetable(l3e, pfn, d) )
+    if ( unlikely(rc == -EINVAL) &&
+         !is_pv_32bit_domain(d) &&
+         get_l3_linear_pagetable(l3e, pfn, d) )
         rc = 0;
 
     return rc;
