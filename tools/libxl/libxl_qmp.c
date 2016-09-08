@@ -827,6 +827,22 @@ static int qmp_run_command(libxl__gc *gc, int domid,
     return rc;
 }
 
+int libxl__qmp_run_command_flexarray(libxl__gc *gc, int domid,
+                                     const char *cmd, flexarray_t *array)
+{
+    libxl__json_object *args = NULL;
+    int i;
+    void *name, *value;
+
+    for (i = 0; i < array->count; i += 2) {
+        flexarray_get(array, i, &name);
+        flexarray_get(array, i + 1, &value);
+        qmp_parameters_add_string(gc, &args, (char *)name, (char *)value);
+    }
+
+    return qmp_run_command(gc, domid, cmd, args, NULL, NULL);
+}
+
 int libxl__qmp_pci_add(libxl__gc *gc, int domid, libxl_device_pci *pcidev)
 {
     libxl__qmp_handler *qmp = NULL;
