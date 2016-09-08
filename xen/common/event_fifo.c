@@ -482,6 +482,7 @@ static void cleanup_event_array(struct domain *d)
     for ( i = 0; i < EVTCHN_FIFO_MAX_EVENT_ARRAY_PAGES; i++ )
         unmap_guest_page(d->evtchn_fifo->event_array[i]);
     xfree(d->evtchn_fifo);
+    d->evtchn_fifo = NULL;
 }
 
 static void setup_ports(struct domain *d)
