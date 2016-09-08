@@ -33,7 +33,7 @@ elf_errorstatus elf_init(struct elf_binary *elf, const char *image_input, size_t
 
     if ( !elf_is_elfbinary(image_input, size) )
     {
-        elf_err(elf, "%s: not an ELF binary\n", __FUNCTION__);
+        elf_err(elf, "ELF: not an ELF binary\n");
         return -1;
     }
 
@@ -51,8 +51,8 @@ elf_errorstatus elf_init(struct elf_binary *elf, const char *image_input, size_t
         elf_uval(elf, elf->ehdr, e_phentsize) * elf_phdr_count(elf);
     if ( offset > elf->size )
     {
-        elf_err(elf, "%s: phdr overflow (off %" PRIx64 " > size %lx)\n",
-                __FUNCTION__, offset, (unsigned long)elf->size);
+        elf_err(elf, "ELF: phdr overflow (off %" PRIx64 " > size %lx)\n",
+                offset, (unsigned long)elf->size);
         return -1;
     }
 
@@ -61,8 +61,8 @@ elf_errorstatus elf_init(struct elf_binary *elf, const char *image_input, size_t
         elf_uval(elf, elf->ehdr, e_shentsize) * elf_shdr_count(elf);
     if ( offset > elf->size )
     {
-        elf_err(elf, "%s: shdr overflow (off %" PRIx64 " > size %lx)\n",
-                __FUNCTION__, offset, (unsigned long)elf->size);
+        elf_err(elf, "ELF: shdr overflow (off %" PRIx64 " > size %lx)\n",
+                offset, (unsigned long)elf->size);
         return -1;
     }
 
@@ -430,8 +430,8 @@ void elf_parse_binary(struct elf_binary *elf)
             continue;
         paddr = elf_uval(elf, phdr, p_paddr);
         memsz = elf_uval(elf, phdr, p_memsz);
-        elf_msg(elf, "%s: phdr: paddr=0x%" PRIx64
-                " memsz=0x%" PRIx64 "\n", __FUNCTION__, paddr, memsz);
+        elf_msg(elf, "ELF: phdr: paddr=%#" PRIx64 " memsz=%#" PRIx64 "\n",
+                paddr, memsz);
         if ( low > paddr )
             low = paddr;
         if ( high < paddr + memsz )
@@ -439,8 +439,8 @@ void elf_parse_binary(struct elf_binary *elf)
     }
     elf->pstart = low;
     elf->pend = high;
-    elf_msg(elf, "%s: memory: 0x%" PRIx64 " -> 0x%" PRIx64 "\n",
-            __FUNCTION__, elf->pstart, elf->pend);
+    elf_msg(elf, "ELF: memory: %#" PRIx64 " -> %#" PRIx64 "\n",
+            elf->pstart, elf->pend);
 }
 
 elf_errorstatus elf_load_binary(struct elf_binary *elf)
@@ -483,8 +483,9 @@ elf_errorstatus elf_load_binary(struct elf_binary *elf)
         }
         remain_allow_copy -= memsz;
 
-        elf_msg(elf, "%s: phdr %" PRIu64 " at 0x%"ELF_PRPTRVAL" -> 0x%"ELF_PRPTRVAL"\n",
-                __func__, i, dest, (elf_ptrval)(dest + filesz));
+        elf_msg(elf,
+                "ELF: phdr %" PRIu64 " at %#"ELF_PRPTRVAL" -> %#"ELF_PRPTRVAL"\n",
+                i, dest, (elf_ptrval)(dest + filesz));
         if ( elf_load_image(elf, dest, ELF_IMAGE_BASE(elf) + offset, filesz, memsz) != 0 )
             return -1;
     }
