@@ -94,28 +94,18 @@ static u32 get_alt_insn(const struct alt_instr *alt,
     return insn;
 }
 
+/*
+ * The region patched should be read-write to allow __apply_alternatives
+ * to replacing the instructions when necessary.
+ */
 static int __apply_alternatives(const struct alt_region *region)
 {
     const struct alt_instr *alt;
-    const u32 *origptr, *replptr;
-    u32 *writeptr, *writemap;
-    mfn_t xen_mfn = _mfn(virt_to_mfn(_start));
-    unsigned int xen_order = get_order_from_bytes(_end - _start);
+    const u32 *replptr;
+    u32 *origptr;
 
-    printk(XENLOG_INFO "alternatives: Patching kernel code\n");
-
-    /*
-     * The text and inittext section are read-only. So re-map Xen to be
-     * able to patch the code.
-     */
-    writemap = __vmap(&xen_mfn, 1U << xen_order, 1, 1, PAGE_HYPERVISOR,
-                      VMAP_DEFAULT);
-    if ( !writemap )
-    {
-        printk(XENLOG_ERR "alternatives: Unable to map the text section (size %u)\n",
-               1 << xen_order);
-        return -ENOMEM;
-    }
+    printk(XENLOG_INFO "alternatives: Patching with alt table %p -> %p\n",
+           region->begin, region->end);
 
     for ( alt = region->begin; alt < region->end; alt++ )
     {
@@ -128,7 +118,6 @@ static int __apply_alternatives(const struct alt_region *region)
         BUG_ON(alt->alt_len != alt->orig_len);
 
         origptr = ALT_ORIG_PTR(alt);
-        writeptr = origptr - (u32 *)_start + writemap;
         replptr = ALT_REPL_PTR(alt);
 
         nr_inst = alt->alt_len / sizeof(insn);
@@ -136,18 +125,16 @@ static int __apply_alternatives(const struct alt_region *region)
         for ( i = 0; i < nr_inst; i++ )
         {
             insn = get_alt_insn(alt, origptr + i, replptr + i);
-            *(writeptr + i) = cpu_to_le32(insn);
+            *(origptr + i) = cpu_to_le32(insn);
         }
 
         /* Ensure the new instructions reached the memory and nuke */
-        clean_and_invalidate_dcache_va_range(writeptr,
-                                             (sizeof (*writeptr) * nr_inst));
+        clean_and_invalidate_dcache_va_range(origptr,
+                                             (sizeof (*origptr) * nr_inst));
     }
 
     /* Nuke the instruction cache */
     invalidate_icache();
-
-    vunmap(writemap);
 
     return 0;
 }
@@ -159,10 +146,6 @@ static int __apply_alternatives(const struct alt_region *region)
 static int __apply_alternatives_multi_stop(void *unused)
 {
     static int patched = 0;
-    const struct alt_region region = {
-        .begin = __alt_instructions,
-        .end = __alt_instructions_end,
-    };
 
     /* We always have a CPU 0 at this point (__init) */
     if ( smp_processor_id() )
@@ -174,11 +157,37 @@ static int __apply_alternatives_multi_stop(void *unused)
     else
     {
         int ret;
+        struct alt_region region;
+        mfn_t xen_mfn = _mfn(virt_to_mfn(_start));
+        unsigned int xen_order = get_order_from_bytes(_end - _start);
+        void *xenmap;
 
         BUG_ON(patched);
+
+        /*
+         * The text and inittext section are read-only. So re-map Xen to
+         * be able to patch the code.
+         */
+        xenmap = __vmap(&xen_mfn, 1U << xen_order, 1, 1, PAGE_HYPERVISOR,
+                        VMAP_DEFAULT);
+        /* Re-mapping Xen is not expected to fail during boot. */
+        BUG_ON(!xenmap);
+
+        /*
+         * Find the virtual address of the alternative region in the new
+         * mapping.
+         * alt_instr contains relative offset, so the function
+         * __apply_alternatives will patch in the re-mapped version of
+         * Xen.
+         */
+        region.begin = (void *)__alt_instructions - (void *)_start + xenmap;
+        region.end = (void *)__alt_instructions_end - (void *)_start + xenmap;
+
         ret = __apply_alternatives(&region);
         /* The patching is not expected to fail during boot. */
         BUG_ON(ret != 0);
+
+        vunmap(xenmap);
 
         /* Barriers provided by the cache flushing */
         write_atomic(&patched, 1);
