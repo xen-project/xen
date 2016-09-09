@@ -221,3 +221,9 @@ SECTIONS
  * code running on the boot time identity map cannot cross a section boundary.
  */
 ASSERT( _end_boot - start <= PAGE_SIZE, "Boot code is larger than 4K")
+/*
+ * __init_[begin|end] MUST be at word size boundary otherwise we cannot
+ * write fault instructions in the space properly.
+ */
+ASSERT(IS_ALIGNED(__init_begin,     4), "__init_begin is misaligned")
+ASSERT(IS_ALIGNED(__init_end,       4), "__init_end is misaligned")

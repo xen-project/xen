@@ -994,8 +994,21 @@ void free_init_memory(void)
 {
     paddr_t pa = virt_to_maddr(__init_begin);
     unsigned long len = __init_end - __init_begin;
+    uint32_t insn;
+    unsigned int i, nr = len / sizeof(insn);
+    uint32_t *p;
+
     set_pte_flags_on_range(__init_begin, len, mg_rw);
-    memset(__init_begin, 0xcc, len);
+#ifdef CONFIG_ARM_32
+    /* udf instruction i.e (see A8.8.247 in ARM DDI 0406C.c) */
+    insn = 0xe7f000f0;
+#else
+    insn = AARCH64_BREAK_FAULT;
+#endif
+    p = (uint32_t *)__init_begin;
+    for ( i = 0; i < nr; i++ )
+        *(p + i) = insn;
+
     set_pte_flags_on_range(__init_begin, len, mg_clear);
     init_domheap_pages(pa, pa + len);
     printk("Freed %ldkB init memory.\n", (long)(__init_end-__init_begin)>>10);
