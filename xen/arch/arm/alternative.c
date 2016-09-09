@@ -99,21 +99,21 @@ static int __apply_alternatives(const struct alt_region *region)
     const struct alt_instr *alt;
     const u32 *origptr, *replptr;
     u32 *writeptr, *writemap;
-    mfn_t text_mfn = _mfn(virt_to_mfn(_stext));
-    unsigned int text_order = get_order_from_bytes(_end - _start);
+    mfn_t xen_mfn = _mfn(virt_to_mfn(_start));
+    unsigned int xen_order = get_order_from_bytes(_end - _start);
 
     printk(XENLOG_INFO "alternatives: Patching kernel code\n");
 
     /*
-     * The text section is read-only. So re-map Xen to be able to patch
-     * the code.
+     * The text and inittext section are read-only. So re-map Xen to be
+     * able to patch the code.
      */
-    writemap = __vmap(&text_mfn, 1 << text_order, 1, 1, PAGE_HYPERVISOR,
+    writemap = __vmap(&xen_mfn, 1U << xen_order, 1, 1, PAGE_HYPERVISOR,
                       VMAP_DEFAULT);
     if ( !writemap )
     {
         printk(XENLOG_ERR "alternatives: Unable to map the text section (size %u)\n",
-               1 << text_order);
+               1 << xen_order);
         return -ENOMEM;
     }
 
