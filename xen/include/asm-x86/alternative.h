@@ -27,6 +27,7 @@ struct alt_instr {
 #define ALT_ORIG_PTR(a)     __ALT_PTR(a, instr_offset)
 #define ALT_REPL_PTR(a)     __ALT_PTR(a, repl_offset)
 
+extern void add_nops(void *insns, unsigned int len);
 /* Similar to alternative_instructions except it can be run with IRQs enabled. */
 extern void apply_alternatives(const struct alt_instr *start,
                                const struct alt_instr *end);

@@ -318,12 +318,23 @@ The size of the structure is 64 bytes on 64-bit hypervisors. It will be
   payload generation time if hypervisor function address is known. If unknown,
   the value *MUST* be zero and the hypervisor will attempt to resolve the address.
 
-* `new_addr` is the address of the function that is replacing the old
-  function. The address is filled in during relocation. The value **MUST** be
-  the address of the new function in the file.
+* `new_addr` can either have a non-zero value or be zero.
+  * If there is a non-zero value, then it is the address of the function that is
+    replacing the old function and the address is recomputed during relocation.
+    The value **MUST** be the address of the new function in the payload file.
 
-* `old_size` and `new_size` contain the sizes of the respective functions in bytes.
+  * If the value is zero, then we NOPing out at the `old_addr` location
+    `new_size` bytes.
+
+* `old_size` contains the sizes of the respective `old_addr` function in bytes.
    The value of `old_size` **MUST** not be zero.
+
+* `new_size` depends on what `new_addr` contains:
+  * If `new_addr` contains an non-zero value, then `new_size` has the size of
+    the new function (which will replace the one at `old_addr`)  in bytes.
+  * If the value of `new_addr` is zero then `new_size` determines how many
+    instruction bytes to NOP (up to opaque size modulo smallest platform
+    instruction - 1 byte x86 and 4 bytes on ARM).
 
 * `version` is to be one.
 
@@ -1087,7 +1098,8 @@ limit that calls the next trampoline.
 Please note there is a small limitation for trampolines in
 function entries: The target function (+ trailing padding) must be able
 to accomodate the trampoline. On x86 with +-2 GB relative jumps,
-this means 5 bytes are required.
+this means 5 bytes are required which means that `old_size` **MUST** be
+at least five bytes if patching in trampoline.
 
 Depending on compiler settings, there are several functions in Xen that
 are smaller (without inter-function padding).

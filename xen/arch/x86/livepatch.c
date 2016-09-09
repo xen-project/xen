@@ -12,8 +12,7 @@
 #include <xen/livepatch.h>
 
 #include <asm/nmi.h>
-
-#define PATCH_INSN_SIZE 5
+#include <asm/livepatch.h>
 
 int arch_livepatch_quiesce(void)
 {
@@ -31,11 +30,17 @@ void arch_livepatch_revive(void)
 
 int arch_livepatch_verify_func(const struct livepatch_func *func)
 {
-    /* No NOP patching yet. */
-    if ( !func->new_size )
-        return -EOPNOTSUPP;
+    /* If NOPing.. */
+    if ( !func->new_addr )
+    {
+        /* Only do up to maximum amount we can put in the ->opaque. */
+        if ( func->new_size > sizeof(func->opaque) )
+            return -EOPNOTSUPP;
 
-    if ( func->old_size < PATCH_INSN_SIZE )
+        if ( func->old_size < func->new_size )
+            return -EINVAL;
+    }
+    else if ( func->old_size < ARCH_PATCH_INSN_SIZE )
         return -EINVAL;
 
     return 0;
@@ -43,23 +48,36 @@ int arch_livepatch_verify_func(const struct livepatch_func *func)
 
 void arch_livepatch_apply_jmp(struct livepatch_func *func)
 {
-    int32_t val;
     uint8_t *old_ptr;
-
-    BUILD_BUG_ON(PATCH_INSN_SIZE > sizeof(func->opaque));
-    BUILD_BUG_ON(PATCH_INSN_SIZE != (1 + sizeof(val)));
+    uint8_t insn[sizeof(func->opaque)];
+    unsigned int len;
 
     old_ptr = func->old_addr;
-    memcpy(func->opaque, old_ptr, PATCH_INSN_SIZE);
+    len = livepatch_insn_len(func);
+    if ( !len )
+        return;
 
-    *old_ptr++ = 0xe9; /* Relative jump */
-    val = func->new_addr - func->old_addr - PATCH_INSN_SIZE;
-    memcpy(old_ptr, &val, sizeof(val));
+    memcpy(func->opaque, old_ptr, len);
+    if ( func->new_addr )
+    {
+        int32_t val;
+
+        BUILD_BUG_ON(ARCH_PATCH_INSN_SIZE != (1 + sizeof(val)));
+
+        insn[0] = 0xe9; /* Relative jump. */
+        val = func->new_addr - func->old_addr - ARCH_PATCH_INSN_SIZE;
+
+        memcpy(&insn[1], &val, sizeof(val));
+    }
+    else
+        add_nops(insn, len);
+
+    memcpy(old_ptr, insn, len);
 }
 
 void arch_livepatch_revert_jmp(const struct livepatch_func *func)
 {
-    memcpy(func->old_addr, func->opaque, PATCH_INSN_SIZE);
+    memcpy(func->old_addr, func->opaque, livepatch_insn_len(func));
 }
 
 /* Serialise the CPU pipeline. */

@@ -270,6 +270,7 @@ F:  docs/misc/livepatch.markdown
 F:  tools/misc/xen-livepatch.c
 F:  xen/arch/*/livepatch*
 F:  xen/common/livepatch*
+F:  xen/include/asm-*/livepatch.h
 F:  xen/include/xen/livepatch*
 
 MACHINE CHECK (MCA) & RAS

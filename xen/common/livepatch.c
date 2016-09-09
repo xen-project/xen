@@ -523,7 +523,8 @@ static int prepare_payload(struct payload *payload,
             return -EOPNOTSUPP;
         }
 
-        if ( !f->new_addr || !f->new_size )
+        /* 'old_addr', 'new_addr', 'new_size' can all be zero. */
+        if ( !f->old_size )
         {
             dprintk(XENLOG_ERR, LIVEPATCH "%s: Address or size fields are zero!\n",
                     elf->name);

@@ -101,7 +101,7 @@ static void __init arch_init_ideal_nops(void)
 }
 
 /* Use this to add nops to a buffer, then text_poke the whole buffer. */
-static void init_or_livepatch add_nops(void *insns, unsigned int len)
+void init_or_livepatch add_nops(void *insns, unsigned int len)
 {
     while ( len > 0 )
     {

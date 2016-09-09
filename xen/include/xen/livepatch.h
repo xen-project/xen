@@ -68,7 +68,17 @@ int arch_livepatch_secure(const void *va, unsigned int pages, enum va_type types
 void arch_livepatch_init(void);
 
 #include <public/sysctl.h> /* For struct livepatch_func. */
+#include <asm/livepatch.h>
 int arch_livepatch_verify_func(const struct livepatch_func *func);
+
+static inline
+unsigned int livepatch_insn_len(const struct livepatch_func *func)
+{
+    if ( !func->new_addr )
+        return func->new_size;
+
+    return ARCH_PATCH_INSN_SIZE;
+}
 /*
  * These functions are called around the critical region patching live code,
  * for an architecture to take make appropratie global state adjustments.
