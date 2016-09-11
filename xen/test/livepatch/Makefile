@@ -18,6 +18,7 @@ CODE_SZ=$(shell nm --defined -S $(1) | grep $(2) | awk '{ print "0x"$$2}')
 LIVEPATCH := xen_hello_world.livepatch
 LIVEPATCH_BYE := xen_bye_world.livepatch
 LIVEPATCH_REPLACE := xen_replace_world.livepatch
+LIVEPATCH_NOP := xen_nop.livepatch
 
 default: livepatch
 
@@ -25,10 +26,12 @@ install: livepatch
 	$(INSTALL_DATA) $(LIVEPATCH) $(DESTDIR)$(DEBUG_DIR)/$(LIVEPATCH)
 	$(INSTALL_DATA) $(LIVEPATCH_BYE) $(DESTDIR)$(DEBUG_DIR)/$(LIVEPATCH_BYE)
 	$(INSTALL_DATA) $(LIVEPATCH_REPLACE) $(DESTDIR)$(DEBUG_DIR)/$(LIVEPATCH_REPLACE)
+	$(INSTALL_DATA) $(LIVEPATCH_NOP) $(DESTDIR)$(DEBUG_DIR)/$(LIVEPATCH_NOP)
 uninstall:
 	rm -f $(DESTDIR)$(DEBUG_DIR)/$(LIVEPATCH)
 	rm -f $(DESTDIR)$(DEBUG_DIR)/$(LIVEPATCH_BYE)
 	rm -f $(DESTDIR)$(DEBUG_DIR)/$(LIVEPATCH_REPLACE)
+	rm -f $(DESTDIR)$(DEBUG_DIR)/$(LIVEPATCH_NOP)
 
 .PHONY: clean
 clean::
@@ -41,9 +44,13 @@ clean::
 .PHONY: config.h
 config.h: OLD_CODE_SZ=$(call CODE_SZ,$(BASEDIR)/xen-syms,xen_extra_version)
 config.h: NEW_CODE_SZ=$(call CODE_SZ,$<,xen_hello_world)
+config.h: MINOR_VERSION_SZ=$(call CODE_SZ,$(BASEDIR)/xen-syms,xen_minor_version)
+config.h: MINOR_VERSION_ADDR=$(call CODE_ADDR,$(BASEDIR)/xen-syms,xen_minor_version)
 config.h: xen_hello_world_func.o
 	(set -e; \
 	 echo "#define NEW_CODE_SZ $(NEW_CODE_SZ)"; \
+	 echo "#define MINOR_VERSION_SZ $(MINOR_VERSION_SZ)"; \
+	 echo "#define MINOR_VERSION_ADDR $(MINOR_VERSION_ADDR)"; \
 	 echo "#define OLD_CODE_SZ $(OLD_CODE_SZ)") > $@
 
 xen_hello_world.o: config.h
@@ -91,5 +98,11 @@ xen_replace_world.o: config.h
 $(LIVEPATCH_REPLACE): xen_replace_world_func.o xen_replace_world.o note.o
 	$(LD) $(LDFLAGS) $(build_id_linker) -r -o $(LIVEPATCH_REPLACE) $^
 
+xen_nop.o: config.h
+
+.PHONY: $(LIVEPATCH_NOP)
+$(LIVEPATCH_NOP): xen_nop.o note.o
+	$(LD) $(LDFLAGS) $(build_id_linker) -r -o $(LIVEPATCH_NOP) $^
+
 .PHONY: livepatch
-livepatch: $(LIVEPATCH) $(LIVEPATCH_BYE) $(LIVEPATCH_REPLACE)
+livepatch: $(LIVEPATCH) $(LIVEPATCH_BYE) $(LIVEPATCH_REPLACE) $(LIVEPATCH_NOP)
