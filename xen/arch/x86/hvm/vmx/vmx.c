@@ -628,14 +628,14 @@ static int vmx_load_vmcs_ctxt(struct vcpu *v, struct hvm_hw_cpu *ctxt)
 
 static unsigned int __init vmx_init_msr(void)
 {
-    return !!cpu_has_mpx;
+    return cpu_has_mpx && cpu_has_vmx_mpx;
 }
 
 static void vmx_save_msr(struct vcpu *v, struct hvm_msr *ctxt)
 {
     vmx_vmcs_enter(v);
 
-    if ( cpu_has_mpx )
+    if ( cpu_has_mpx && cpu_has_vmx_mpx )
     {
         __vmread(GUEST_BNDCFGS, &ctxt->msr[ctxt->count].val);
         if ( ctxt->msr[ctxt->count].val )
@@ -657,7 +657,9 @@ static int vmx_load_msr(struct vcpu *v, struct hvm_msr *ctxt)
         switch ( ctxt->msr[i].index )
         {
         case MSR_IA32_BNDCFGS:
-            if ( cpu_has_mpx )
+            if ( cpu_has_mpx && cpu_has_vmx_mpx &&
+                 is_canonical_address(ctxt->msr[i].val) &&
+                 !(ctxt->msr[i].val & IA32_BNDCFGS_RESERVED) )
                 __vmwrite(GUEST_BNDCFGS, ctxt->msr[i].val);
             else
                 err = -ENXIO;
@@ -2304,6 +2306,11 @@ static int vmx_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
     case MSR_IA32_DEBUGCTLMSR:
         __vmread(GUEST_IA32_DEBUGCTL, msr_content);
         break;
+    case MSR_IA32_BNDCFGS:
+        if ( !cpu_has_mpx || !cpu_has_vmx_mpx )
+            goto gp_fault;
+        __vmread(GUEST_BNDCFGS, msr_content);
+        break;
     case IA32_FEATURE_CONTROL_MSR:
     case MSR_IA32_VMX_BASIC...MSR_IA32_VMX_VMFUNC:
         if ( !nvmx_msr_read_intercept(msr, msr_content) )
@@ -2524,6 +2531,13 @@ static int vmx_msr_write_intercept(unsigned int msr, uint64_t msr_content)
 
         break;
     }
+    case MSR_IA32_BNDCFGS:
+        if ( !cpu_has_mpx || !cpu_has_vmx_mpx ||
+             !is_canonical_address(msr_content) ||
+             (msr_content & IA32_BNDCFGS_RESERVED) )
+            goto gp_fault;
+        __vmwrite(GUEST_BNDCFGS, msr_content);
+        break;
     case IA32_FEATURE_CONTROL_MSR:
     case MSR_IA32_VMX_BASIC...MSR_IA32_VMX_TRUE_ENTRY_CTLS:
         if ( !nvmx_msr_write_intercept(msr, msr_content) )

@@ -291,6 +291,9 @@ extern u32 vmx_secondary_exec_control;
     (vmx_secondary_exec_control & SECONDARY_EXEC_ENABLE_VIRT_EXCEPTIONS)
 #define cpu_has_vmx_pml \
     (vmx_secondary_exec_control & SECONDARY_EXEC_ENABLE_PML)
+#define cpu_has_vmx_mpx \
+    ((vmx_vmexit_control & VM_EXIT_CLEAR_BNDCFGS) && \
+     (vmx_vmentry_control & VM_ENTRY_LOAD_BNDCFGS))
 
 #define VMCS_RID_TYPE_MASK              0x80000000
 

@@ -4543,9 +4543,7 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
             *ebx &= ~cpufeat_mask(X86_FEATURE_SMAP);
 
         /* Don't expose MPX to hvm when VMX support is not available */
-        if ( (count == 0) &&
-             (!(vmx_vmexit_control & VM_EXIT_CLEAR_BNDCFGS) ||
-              !(vmx_vmentry_control & VM_ENTRY_LOAD_BNDCFGS)) )
+        if ( (count == 0) && !cpu_has_vmx_mpx )
             *ebx &= ~cpufeat_mask(X86_FEATURE_MPX);
 
         /* Don't expose INVPCID to non-hap hvm. */

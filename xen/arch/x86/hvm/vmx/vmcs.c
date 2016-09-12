@@ -1249,6 +1249,8 @@ static int construct_vmcs(struct vcpu *v)
         __vmwrite(HOST_PAT, host_pat);
         __vmwrite(GUEST_PAT, guest_pat);
     }
+    if ( cpu_has_vmx_mpx )
+        __vmwrite(GUEST_BNDCFGS, 0);
 
     vmx_vmcs_exit(v);
 
