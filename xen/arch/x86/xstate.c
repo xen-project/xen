@@ -86,12 +86,6 @@ uint64_t get_msr_xss(void)
     return this_cpu(xss);
 }
 
-static bool_t xsave_area_compressed(const struct xsave_struct *xsave_area)
-{
-     return xsave_area && (xsave_area->xsave_hdr.xcomp_bv
-                           & XSTATE_COMPACTION_ENABLED);
-}
-
 static int setup_xstate_features(bool_t bsp)
 {
     unsigned int leaf, eax, ebx, ecx, edx;

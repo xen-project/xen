@@ -1158,7 +1158,15 @@ long arch_do_domctl(
                 goto vcpuextstate_out;
             }
 
-            if ( evc->size <= PV_XSAVE_SIZE(_xcr0_accum) )
+            if ( evc->size == PV_XSAVE_HDR_SIZE )
+                ; /* Nothing to restore. */
+            else if ( evc->size < PV_XSAVE_HDR_SIZE + XSTATE_AREA_MIN_SIZE )
+                ret = -EINVAL; /* Can't be legitimate data. */
+            else if ( xsave_area_compressed(_xsave_area) )
+                ret = -EOPNOTSUPP; /* Don't support compressed data. */
+            else if ( evc->size != PV_XSAVE_SIZE(_xcr0_accum) )
+                ret = -EINVAL; /* Not legitimate data. */
+            else
             {
                 vcpu_pause(v);
                 v->arch.xcr0 = _xcr0;
@@ -1169,8 +1177,6 @@ long arch_do_domctl(
                                       evc->size - PV_XSAVE_HDR_SIZE);
                 vcpu_unpause(v);
             }
-            else
-                ret = -EINVAL;
 
             xfree(receive_buf);
         }

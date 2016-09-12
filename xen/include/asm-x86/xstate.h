@@ -131,4 +131,10 @@ static inline bool_t xstate_all(const struct vcpu *v)
            (v->arch.xcr0_accum & XSTATE_LAZY & ~XSTATE_FP_SSE);
 }
 
+static inline bool __nonnull(1)
+xsave_area_compressed(const struct xsave_struct *xsave_area)
+{
+    return xsave_area->xsave_hdr.xcomp_bv & XSTATE_COMPACTION_ENABLED;
+}
+
 #endif /* __ASM_XSTATE_H */
