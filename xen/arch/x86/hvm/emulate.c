@@ -526,6 +526,8 @@ static int hvmemul_virtual_to_linear(
                            ? 1 : 4096);
 
     reg = hvmemul_get_seg_reg(seg, hvmemul_ctxt);
+    if ( IS_ERR(reg) )
+        return -PTR_ERR(reg);
 
     if ( (hvmemul_ctxt->ctxt.regs->eflags & X86_EFLAGS_DF) && (*reps > 1) )
     {
@@ -1360,6 +1362,10 @@ static int hvmemul_read_segment(
     struct hvm_emulate_ctxt *hvmemul_ctxt =
         container_of(ctxt, struct hvm_emulate_ctxt, ctxt);
     struct segment_register *sreg = hvmemul_get_seg_reg(seg, hvmemul_ctxt);
+
+    if ( IS_ERR(sreg) )
+         return -PTR_ERR(sreg);
+
     memcpy(reg, sreg, sizeof(struct segment_register));
     return X86EMUL_OKAY;
 }
@@ -1372,6 +1378,9 @@ static int hvmemul_write_segment(
     struct hvm_emulate_ctxt *hvmemul_ctxt =
         container_of(ctxt, struct hvm_emulate_ctxt, ctxt);
     struct segment_register *sreg = hvmemul_get_seg_reg(seg, hvmemul_ctxt);
+
+    if ( IS_ERR(sreg) )
+         return -PTR_ERR(sreg);
 
     memcpy(sreg, reg, sizeof(struct segment_register));
     __set_bit(seg, &hvmemul_ctxt->seg_reg_dirty);
@@ -1911,13 +1920,22 @@ void hvm_emulate_writeback(
     }
 }
 
+/*
+ * Callers which pass a known in-range x86_segment can rely on the return
+ * pointer being valid.  Other callers must explicitly check for errors.
+ */
 struct segment_register *hvmemul_get_seg_reg(
     enum x86_segment seg,
     struct hvm_emulate_ctxt *hvmemul_ctxt)
 {
-    if ( !__test_and_set_bit(seg, &hvmemul_ctxt->seg_reg_accessed) )
-        hvm_get_segment_register(current, seg, &hvmemul_ctxt->seg_reg[seg]);
-    return &hvmemul_ctxt->seg_reg[seg];
+    unsigned int idx = seg;
+
+    if ( idx >= ARRAY_SIZE(hvmemul_ctxt->seg_reg) )
+        return ERR_PTR(-X86EMUL_UNHANDLEABLE);
+
+    if ( !__test_and_set_bit(idx, &hvmemul_ctxt->seg_reg_accessed) )
+        hvm_get_segment_register(current, idx, &hvmemul_ctxt->seg_reg[idx]);
+    return &hvmemul_ctxt->seg_reg[idx];
 }
 
 static const char *guest_x86_mode_to_str(int mode)
