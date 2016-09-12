@@ -1087,11 +1087,13 @@ long arch_do_domctl(
                 ret = -EFAULT;
 
             offset += sizeof(v->arch.xcr0_accum);
-            if ( !ret )
-            {
-                void *xsave_area;
 
-                xsave_area = xmalloc_bytes(size);
+            /* Serialise xsave state, if there is any. */
+            if ( !ret && size > PV_XSAVE_HDR_SIZE )
+            {
+                unsigned int xsave_size = size - PV_XSAVE_HDR_SIZE;
+                void *xsave_area = xmalloc_bytes(xsave_size);
+
                 if ( !xsave_area )
                 {
                     ret = -ENOMEM;
@@ -1099,11 +1101,10 @@ long arch_do_domctl(
                     goto vcpuextstate_out;
                 }
 
-                expand_xsave_states(v, xsave_area,
-                                    size - PV_XSAVE_HDR_SIZE);
+                expand_xsave_states(v, xsave_area, xsave_size);
 
                 if ( copy_to_guest_offset(evc->buffer, offset, xsave_area,
-                                          size - PV_XSAVE_HDR_SIZE) )
+                                          xsave_size) )
                      ret = -EFAULT;
                 xfree(xsave_area);
            }
