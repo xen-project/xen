@@ -154,15 +154,6 @@ static void setup_xstate_comp(uint16_t *comp_offsets,
     ASSERT(offset <= xsave_cntxt_size);
 }
 
-static void *get_xsave_addr(struct xsave_struct *xsave,
-                            const uint16_t *comp_offsets,
-                            unsigned int xfeature_idx)
-{
-    ASSERT(xsave_area_compressed(xsave));
-    return (1ul << xfeature_idx) & xsave->xsave_hdr.xstate_bv ?
-           (void *)xsave + comp_offsets[xfeature_idx] : NULL;
-}
-
 /*
  * Serialise a vcpus xsave state into a representation suitable for the
  * toolstack.
@@ -229,14 +220,28 @@ void expand_xsave_states(struct vcpu *v, void *dest, unsigned int size)
     }
 }
 
+/*
+ * Deserialise a toolstack's xsave state representation suitably for a vcpu.
+ *
+ * Internally a vcpus xsave state may be compressed or uncompressed, depending
+ * on the features in use, but the ABI with the toolstack is strictly
+ * uncompressed.
+ *
+ * It is the callers responsibility to ensure that the source buffer contains
+ * xsave state, is uncompressed, and is exactly the right size.
+ */
 void compress_xsave_states(struct vcpu *v, const void *src, unsigned int size)
 {
     struct xsave_struct *xsave = v->arch.xsave_area;
+    void *dest;
     uint16_t comp_offsets[sizeof(xfeature_mask)*8];
-    u64 xstate_bv = ((const struct xsave_struct *)src)->xsave_hdr.xstate_bv;
-    u64 valid;
+    u64 xstate_bv, valid;
 
+    BUG_ON(!v->arch.xcr0_accum);
+    BUG_ON(size != xstate_ctxt_size(v->arch.xcr0_accum));
     ASSERT(!xsave_area_compressed(src));
+
+    xstate_bv = ((const struct xsave_struct *)src)->xsave_hdr.xstate_bv;
 
     if ( !(v->arch.xcr0_accum & XSTATE_XSAVES_ONLY) )
     {
@@ -260,18 +265,22 @@ void compress_xsave_states(struct vcpu *v, const void *src, unsigned int size)
      * Copy each region from the non-compacted offset to the
      * possibly compacted offset.
      */
+    dest = xsave;
     valid = xstate_bv & ~XSTATE_FP_SSE;
     while ( valid )
     {
         u64 feature = valid & -valid;
         unsigned int index = fls(feature) - 1;
-        void *dest = get_xsave_addr(xsave, comp_offsets, index);
 
-        if ( dest )
-        {
-            ASSERT((xstate_offsets[index] + xstate_sizes[index]) <= size);
-            memcpy(dest, src + xstate_offsets[index], xstate_sizes[index]);
-        }
+        /*
+         * We previously verified xstate_bv.  If we don't have valid
+         * comp_offset[] information, something is very broken.
+         */
+        BUG_ON(!comp_offsets[index]);
+        BUG_ON((xstate_offsets[index] + xstate_sizes[index]) > size);
+
+        memcpy(dest + comp_offsets[index], src + xstate_offsets[index],
+               xstate_sizes[index]);
 
         valid &= ~feature;
     }
