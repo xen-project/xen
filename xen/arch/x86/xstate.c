@@ -169,12 +169,29 @@ static void *get_xsave_addr(struct xsave_struct *xsave,
            (void *)xsave + comp_offsets[xfeature_idx] : NULL;
 }
 
+/*
+ * Serialise a vcpus xsave state into a representation suitable for the
+ * toolstack.
+ *
+ * Internally a vcpus xsave state may be compressed or uncompressed, depending
+ * on the features in use, but the ABI with the toolstack is strictly
+ * uncompressed.
+ *
+ * It is the callers responsibility to ensure that there is xsave state to
+ * serialise, and that the provided buffer is exactly the right size.
+ */
 void expand_xsave_states(struct vcpu *v, void *dest, unsigned int size)
 {
-    struct xsave_struct *xsave = v->arch.xsave_area;
+    const struct xsave_struct *xsave = v->arch.xsave_area;
+    const void *src;
     uint16_t comp_offsets[sizeof(xfeature_mask)*8];
     u64 xstate_bv = xsave->xsave_hdr.xstate_bv;
     u64 valid;
+
+    /* Check there is state to serialise (i.e. at least an XSAVE_HDR) */
+    BUG_ON(!v->arch.xcr0_accum);
+    /* Check there is the correct room to decompress into. */
+    BUG_ON(size != xstate_ctxt_size(v->arch.xcr0_accum));
 
     if ( !(xsave->xsave_hdr.xcomp_bv & XSTATE_COMPACTION_ENABLED) )
     {
@@ -189,6 +206,7 @@ void expand_xsave_states(struct vcpu *v, void *dest, unsigned int size)
      * Copy legacy XSAVE area and XSAVE hdr area.
      */
     memcpy(dest, xsave, XSTATE_AREA_MIN_SIZE);
+    memset(dest + XSTATE_AREA_MIN_SIZE, 0, size - XSTATE_AREA_MIN_SIZE);
 
     ((struct xsave_struct *)dest)->xsave_hdr.xcomp_bv =  0;
 
@@ -196,20 +214,22 @@ void expand_xsave_states(struct vcpu *v, void *dest, unsigned int size)
      * Copy each region from the possibly compacted offset to the
      * non-compacted offset.
      */
+    src = xsave;
     valid = xstate_bv & ~XSTATE_FP_SSE;
     while ( valid )
     {
         u64 feature = valid & -valid;
         unsigned int index = fls(feature) - 1;
-        const void *src = get_xsave_addr(xsave, comp_offsets, index);
 
-        if ( src )
-        {
-            ASSERT((xstate_offsets[index] + xstate_sizes[index]) <= size);
-            memcpy(dest + xstate_offsets[index], src, xstate_sizes[index]);
-        }
-        else
-            memset(dest + xstate_offsets[index], 0, xstate_sizes[index]);
+        /*
+         * We previously verified xstate_bv.  If there isn't valid
+         * comp_offsets[] information, something is very broken.
+         */
+        BUG_ON(!comp_offsets[index]);
+        BUG_ON((xstate_offsets[index] + xstate_sizes[index]) > size);
+
+        memcpy(dest + xstate_offsets[index], src + comp_offsets[index],
+               xstate_sizes[index]);
 
         valid &= ~feature;
     }
