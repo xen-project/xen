@@ -238,8 +238,9 @@ static void __init early_cpu_detect(void)
 	c->x86_capability[cpufeat_word(X86_FEATURE_SSE3)] = ecx;
 
 	printk(XENLOG_INFO
-	       "CPU Vendor: %s, Family %u, Model %u, Stepping %u (raw %08x)\n",
-	       this_cpu->c_vendor, c->x86, c->x86_model, c->x86_mask, eax);
+	       "CPU Vendor: %s, Family %u (%#x), Model %u (%#x), Stepping %u (raw %08x)\n",
+	       this_cpu->c_vendor, c->x86, c->x86,
+	       c->x86_model, c->x86_model, c->x86_mask, eax);
 
 	eax = cpuid_eax(0x80000000);
 	if ((eax >> 16) == 0x8000 && eax >= 0x80000008) {
