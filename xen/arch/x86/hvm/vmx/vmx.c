@@ -2771,6 +2771,10 @@ static void vmx_vmexit_ud_intercept(struct cpu_user_regs *regs)
         {
             regs->eip += sizeof(sig);
             regs->eflags &= ~X86_EFLAGS_RF;
+
+            /* Zero the upper 32 bits of %rip if not in long mode. */
+            if ( vmx_guest_x86_mode(current) != 8 )
+                regs->eip = regs->_eip;
         }
     }
 
