@@ -1054,19 +1054,25 @@ long arch_do_domctl(
             unsigned int size;
 
             ret = 0;
-            vcpu_pause(v);
 
-            size = PV_XSAVE_SIZE(v->arch.xcr0_accum);
             if ( (!evc->size && !evc->xfeature_mask) ||
                  guest_handle_is_null(evc->buffer) )
             {
+                /*
+                 * A query for the size of buffer to use.  Must return the
+                 * maximum size we ever might hand back to userspace, bearing
+                 * in mind that the vcpu might increase its xcr0_accum between
+                 * this query for size, and the following query for data.
+                 */
                 evc->xfeature_mask = xfeature_mask;
-                evc->size = size;
-                vcpu_unpause(v);
+                evc->size = PV_XSAVE_SIZE(xfeature_mask);
                 goto vcpuextstate_out;
             }
 
-            if ( evc->size != size || evc->xfeature_mask != xfeature_mask )
+            vcpu_pause(v);
+            size = PV_XSAVE_SIZE(v->arch.xcr0_accum);
+
+            if ( evc->size < size || evc->xfeature_mask != xfeature_mask )
                 ret = -EINVAL;
 
             if ( !ret && copy_to_guest_offset(evc->buffer, offset,
@@ -1103,6 +1109,10 @@ long arch_do_domctl(
            }
 
             vcpu_unpause(v);
+
+            /* Specify how much data we actually wrote into the buffer. */
+            if ( !ret )
+                evc->size = size;
         }
         else
         {
