@@ -2131,10 +2131,12 @@ static void svm_vmexit_ud_intercept(struct cpu_user_regs *regs)
 
     if ( opt_hvm_fep )
     {
+        uint32_t walk = (ctxt.seg_reg[x86_seg_ss].attr.fields.dpl == 3)
+            ? PFEC_user_mode : 0;
         char sig[5]; /* ud2; .ascii "xen" */
 
         if ( (hvm_fetch_from_guest_virt_nofault(
-                  sig, regs->eip, sizeof(sig), 0) == HVMCOPY_okay) &&
+                  sig, regs->eip, sizeof(sig), walk) == HVMCOPY_okay) &&
              (memcmp(sig, "\xf\xbxen", sizeof(sig)) == 0) )
         {
             regs->eip += sizeof(sig);
