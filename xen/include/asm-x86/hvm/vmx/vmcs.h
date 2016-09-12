@@ -273,6 +273,9 @@ extern u32 vmx_secondary_exec_control;
     (vmx_pin_based_exec_control & PIN_BASED_POSTED_INTERRUPT)
 #define cpu_has_vmx_vmcs_shadowing \
     (vmx_secondary_exec_control & SECONDARY_EXEC_ENABLE_VMCS_SHADOWING)
+#define cpu_has_vmx_mpx \
+    ((vmx_vmexit_control & VM_EXIT_CLEAR_BNDCFGS) && \
+     (vmx_vmentry_control & VM_ENTRY_LOAD_BNDCFGS))
 
 #define VMCS_RID_TYPE_MASK              0x80000000
 
