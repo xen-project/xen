@@ -1037,7 +1037,8 @@ long arch_do_domctl(
         struct vcpu *v;
         uint32_t offset = 0;
 
-#define PV_XSAVE_SIZE(xcr0) (2 * sizeof(uint64_t) + xstate_ctxt_size(xcr0))
+#define PV_XSAVE_HDR_SIZE (2 * sizeof(uint64_t))
+#define PV_XSAVE_SIZE(xcr0) (PV_XSAVE_HDR_SIZE + xstate_ctxt_size(xcr0))
 
         ret = -ESRCH;
         if ( (evc->vcpu >= d->max_vcpus) ||
@@ -1093,10 +1094,10 @@ long arch_do_domctl(
                 }
 
                 expand_xsave_states(v, xsave_area,
-                                    size - 2 * sizeof(uint64_t));
+                                    size - PV_XSAVE_HDR_SIZE);
 
                 if ( copy_to_guest_offset(evc->buffer, offset, xsave_area,
-                                          size - 2 * sizeof(uint64_t)) )
+                                          size - PV_XSAVE_HDR_SIZE) )
                      ret = -EFAULT;
                 xfree(xsave_area);
            }
@@ -1110,9 +1111,8 @@ long arch_do_domctl(
             const struct xsave_struct *_xsave_area;
 
             ret = -EINVAL;
-            if ( evc->size < 2 * sizeof(uint64_t) ||
-                 evc->size > 2 * sizeof(uint64_t) +
-                             xstate_ctxt_size(xfeature_mask) )
+            if ( evc->size < PV_XSAVE_HDR_SIZE ||
+                 evc->size > PV_XSAVE_SIZE(xfeature_mask) )
                 goto vcpuextstate_out;
 
             receive_buf = xmalloc_bytes(evc->size);
@@ -1131,11 +1131,11 @@ long arch_do_domctl(
 
             _xcr0 = *(uint64_t *)receive_buf;
             _xcr0_accum = *(uint64_t *)(receive_buf + sizeof(uint64_t));
-            _xsave_area = receive_buf + 2 * sizeof(uint64_t);
+            _xsave_area = receive_buf + PV_XSAVE_HDR_SIZE;
 
             if ( _xcr0_accum )
             {
-                if ( evc->size >= 2 * sizeof(uint64_t) + XSTATE_AREA_MIN_SIZE )
+                if ( evc->size >= PV_XSAVE_HDR_SIZE + XSTATE_AREA_MIN_SIZE )
                     ret = validate_xstate(_xcr0, _xcr0_accum,
                                           &_xsave_area->xsave_hdr);
             }
@@ -1155,7 +1155,7 @@ long arch_do_domctl(
                 if ( _xcr0_accum & XSTATE_NONLAZY )
                     v->arch.nonlazy_xstate_used = 1;
                 compress_xsave_states(v, _xsave_area,
-                                      evc->size - 2 * sizeof(uint64_t));
+                                      evc->size - PV_XSAVE_HDR_SIZE);
                 vcpu_unpause(v);
             }
             else
@@ -1163,6 +1163,9 @@ long arch_do_domctl(
 
             xfree(receive_buf);
         }
+
+#undef PV_XSAVE_HDR_SIZE
+#undef PV_XSAVE_SIZE
 
     vcpuextstate_out:
         if ( domctl->cmd == XEN_DOMCTL_getvcpuextstate )
