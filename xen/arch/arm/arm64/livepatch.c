@@ -90,6 +90,13 @@ int arch_livepatch_verify_elf(const struct livepatch_elf *elf)
     return 0;
 }
 
+bool arch_livepatch_symbol_deny(const struct livepatch_elf *elf,
+                                const struct livepatch_elf_sym *sym)
+{
+    /* No special checks on ARM 64. */
+    return false;
+}
+
 enum aarch64_reloc_op {
     RELOC_OP_NONE,
     RELOC_OP_ABS,

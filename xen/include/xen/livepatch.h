@@ -50,6 +50,8 @@ bool_t is_patch(const void *addr);
 int arch_livepatch_verify_elf(const struct livepatch_elf *elf);
 bool arch_livepatch_symbol_ok(const struct livepatch_elf *elf,
                               const struct livepatch_elf_sym *sym);
+bool arch_livepatch_symbol_deny(const struct livepatch_elf *elf,
+                                const struct livepatch_elf_sym *sym);
 int arch_livepatch_perform_rel(struct livepatch_elf *elf,
                                const struct livepatch_elf_sec *base,
                                const struct livepatch_elf_sec *rela);

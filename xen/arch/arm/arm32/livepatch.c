@@ -20,6 +20,19 @@ int arch_livepatch_verify_elf(const struct livepatch_elf *elf)
     return -EOPNOTSUPP;
 }
 
+bool arch_livepatch_symbol_deny(const struct livepatch_elf *elf,
+                                const struct livepatch_elf_sym *sym)
+{
+    /*
+     * Xen does not use Thumb instructions - and we should not see any of
+     * them. If we do, abort.
+     */
+    if ( sym->name && sym->name[0] == '$' && sym->name[1] == 't' )
+        return ( !sym->name[2] || sym->name[2] == '.' );
+
+    return false;
+}
+
 int arch_livepatch_perform_rela(struct livepatch_elf *elf,
                                 const struct livepatch_elf_sec *base,
                                 const struct livepatch_elf_sec *rela)

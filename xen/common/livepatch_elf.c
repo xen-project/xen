@@ -251,6 +251,12 @@ static int elf_get_sym(struct livepatch_elf *elf, const void *data)
 
         sym[i].sym = s;
         sym[i].name = strtab_sec->data + delta;
+        if ( arch_livepatch_symbol_deny(elf, &sym[i]) )
+        {
+            dprintk(XENLOG_ERR, LIVEPATCH "%s: Symbol '%s' should not be in payload!\n",
+                    elf->name, sym[i].name);
+            return -EINVAL;
+        }
     }
     elf->nsym = nsym;
 

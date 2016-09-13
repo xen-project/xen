@@ -131,6 +131,13 @@ bool arch_livepatch_symbol_ok(const struct livepatch_elf *elf,
     return true;
 }
 
+bool arch_livepatch_symbol_deny(const struct livepatch_elf *elf,
+                                const struct livepatch_elf_sym *sym)
+{
+    /* No special checks on x86. */
+    return false;
+}
+
 int arch_livepatch_perform_rel(struct livepatch_elf *elf,
                                const struct livepatch_elf_sec *base,
                                const struct livepatch_elf_sec *rela)
