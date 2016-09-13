@@ -12,8 +12,8 @@ config ARM_32
 config ARM_64
 	def_bool y
 	depends on 64BIT
+	select HAS_ALTERNATIVE
 	select HAS_GICV3
-	select ALTERNATIVE
 
 config ARM
 	def_bool y
@@ -45,13 +45,13 @@ config ACPI
 config HAS_GICV3
 	bool
 
-config ALTERNATIVE
+config HAS_ALTERNATIVE
 	bool
 
 endmenu
 
 menu "ARM errata workaround via the alternative framework"
-	depends on ALTERNATIVE
+	depends on HAS_ALTERNATIVE
 
 config ARM64_ERRATUM_827319
 	bool "Cortex-A53: 827319: Data cache clean instructions might cause overlapping transactions to the interconnect"

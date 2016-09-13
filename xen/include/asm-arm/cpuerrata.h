@@ -7,7 +7,7 @@
 
 void check_local_cpu_errata(void);
 
-#ifdef CONFIG_ALTERNATIVE
+#ifdef CONFIG_HAS_ALTERNATIVE
 
 #define CHECK_WORKAROUND_HELPER(erratum, feature, arch)         \
 static inline bool_t check_workaround_##erratum(void)           \
@@ -27,7 +27,7 @@ static inline bool_t check_workaround_##erratum(void)           \
     }                                                           \
 }
 
-#else /* CONFIG_ALTERNATIVE */
+#else /* CONFIG_HAS_ALTERNATIVE */
 
 #define CHECK_WORKAROUND_HELPER(erratum, feature, arch)         \
 static inline bool_t check_workaround_##erratum(void)           \

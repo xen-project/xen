@@ -5,7 +5,7 @@
 #include <xen/config.h>
 #include <xen/kconfig.h>
 
-#ifdef CONFIG_ALTERNATIVE
+#ifdef CONFIG_HAS_ALTERNATIVE
 
 #ifndef __ASSEMBLY__
 
@@ -154,7 +154,7 @@ int apply_alternatives(const struct alt_instr *start, const struct alt_instr *en
 #define ALTERNATIVE(oldinstr, newinstr, ...)   \
 	_ALTERNATIVE_CFG(oldinstr, newinstr, __VA_ARGS__, 1)
 
-#else /* !CONFIG_ALTERNATIVE */
+#else /* !CONFIG_HAS_ALTERNATIVE */
 
 static inline void apply_alternatives_all(void)
 {

@@ -151,7 +151,7 @@ SECTIONS
        *(.initcall1.init)
        __initcall_end = .;
 
-#ifdef CONFIG_ALTERNATIVE
+#ifdef CONFIG_HAS_ALTERNATIVE
        . = ALIGN(4);
        __alt_instructions = .;
        *(.altinstructions)
