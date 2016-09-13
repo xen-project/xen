@@ -55,7 +55,7 @@ $(LIVEPATCH): xen_hello_world_func.o xen_hello_world.o note.o
 note.o:
 	$(OBJCOPY) -O binary --only-section=.note.gnu.build-id $(BASEDIR)/xen-syms $@.bin
 	$(OBJCOPY) -I binary -O elf64-x86-64 -B i386:x86-64 \
-		   --rename-section=.data=.livepatch.depends -S $@.bin $@
+		   --rename-section=.data=.livepatch.depends,alloc,load,readonly,data,contents -S $@.bin $@
 	rm -f $@.bin
 
 #
@@ -66,7 +66,7 @@ note.o:
 hello_world_note.o: $(LIVEPATCH)
 	$(OBJCOPY) -O binary --only-section=.note.gnu.build-id $(LIVEPATCH) $@.bin
 	$(OBJCOPY)  -I binary -O elf64-x86-64 -B i386:x86-64 \
-		   --rename-section=.data=.livepatch.depends -S $@.bin $@
+		   --rename-section=.data=.livepatch.depends,alloc,load,readonly,data,contents -S $@.bin $@
 	rm -f $@.bin
 
 xen_bye_world.o: config.h
