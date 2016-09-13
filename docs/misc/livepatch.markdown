@@ -1061,6 +1061,13 @@ depending on the current state of data. As such it should not be attempted.
 That said we should provide hook functions so that the existing data
 can be changed during payload application.
 
+To guarantee safety we disallow re-applying an payload after it has been
+reverted. This is because we cannot guarantee that the state of .bss
+and .data to be exactly as it was during loading. Hence the administrator
+MUST unload the payload and upload it again to apply it.
+
+There is an exception to this: if the payload only has .livepatch.funcs;
+and the .data or .bss sections are of zero length.
 
 ### Inline patching
 
