@@ -620,6 +620,21 @@ static int gicv3_enable_redist(void)
     return 0;
 }
 
+/* Enable LPIs on this redistributor (only useful when the host has an ITS). */
+static bool gicv3_enable_lpis(void)
+{
+    uint32_t val;
+
+    val = readl_relaxed(GICD_RDIST_BASE + GICR_TYPER);
+    if ( !(val & GICR_TYPER_PLPIS) )
+        return false;
+
+    val = readl_relaxed(GICD_RDIST_BASE + GICR_CTLR);
+    writel_relaxed(val | GICR_CTLR_ENABLE_LPIS, GICD_RDIST_BASE + GICR_CTLR);
+
+    return true;
+}
+
 static int __init gicv3_populate_rdist(void)
 {
     int i;
@@ -731,11 +746,14 @@ static int gicv3_cpu_init(void)
     if ( gicv3_enable_redist() )
         return -ENODEV;
 
+    /* If the host has any ITSes, enable LPIs now. */
     if ( gicv3_its_host_has_its() )
     {
         ret = gicv3_its_setup_collection(smp_processor_id());
         if ( ret )
             return ret;
+        if ( !gicv3_enable_lpis() )
+            return -EBUSY;
     }
 
     /* Set priority on PPI and SGI interrupts */
