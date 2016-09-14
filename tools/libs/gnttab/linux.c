@@ -23,12 +23,15 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
+#include <stddef.h>
 
 #include <sys/ioctl.h>
 #include <sys/mman.h>
 
 #include <xen/sys/gntdev.h>
 #include <xen/sys/gntalloc.h>
+
+#include <xen-tools/libs.h>
 
 #include "private.h"
 
@@ -233,6 +236,82 @@ int osdep_gnttab_unmap(xengnttab_handle *xgt,
         return rc;
 
     return 0;
+}
+
+int osdep_gnttab_grant_copy(xengnttab_handle *xgt,
+                            uint32_t count,
+                            xengnttab_grant_copy_segment_t *segs)
+{
+    int rc;
+    int fd = xgt->fd;
+    struct ioctl_gntdev_grant_copy copy;
+
+    BUILD_BUG_ON(sizeof(struct ioctl_gntdev_grant_copy_segment) !=
+                 sizeof(xengnttab_grant_copy_segment_t));
+
+    BUILD_BUG_ON(__alignof__(struct ioctl_gntdev_grant_copy_segment) !=
+                 __alignof__(xengnttab_grant_copy_segment_t));
+
+    BUILD_BUG_ON(offsetof(struct ioctl_gntdev_grant_copy_segment,
+                          source.virt) !=
+                 offsetof(xengnttab_grant_copy_segment_t,
+                          source.virt));
+    BUILD_BUG_ON(offsetof(struct ioctl_gntdev_grant_copy_segment,
+                          source.foreign) !=
+                 offsetof(xengnttab_grant_copy_segment_t,
+                          source.foreign));
+    BUILD_BUG_ON(offsetof(struct ioctl_gntdev_grant_copy_segment,
+                          source.foreign.ref) !=
+                 offsetof(xengnttab_grant_copy_segment_t,
+                          source.foreign));
+    BUILD_BUG_ON(offsetof(struct ioctl_gntdev_grant_copy_segment,
+                          source.foreign.offset) !=
+                 offsetof(xengnttab_grant_copy_segment_t,
+                          source.foreign.offset));
+    BUILD_BUG_ON(offsetof(struct ioctl_gntdev_grant_copy_segment,
+                          source.foreign.domid) !=
+                 offsetof(xengnttab_grant_copy_segment_t,
+                          source.foreign.domid));
+
+    BUILD_BUG_ON(offsetof(struct ioctl_gntdev_grant_copy_segment,
+                          dest.virt) !=
+                 offsetof(xengnttab_grant_copy_segment_t,
+                          dest.virt));
+    BUILD_BUG_ON(offsetof(struct ioctl_gntdev_grant_copy_segment,
+                          dest.foreign) !=
+                 offsetof(xengnttab_grant_copy_segment_t,
+                          dest.foreign));
+    BUILD_BUG_ON(offsetof(struct ioctl_gntdev_grant_copy_segment,
+                          dest.foreign.ref) !=
+                 offsetof(xengnttab_grant_copy_segment_t,
+                          dest.foreign));
+    BUILD_BUG_ON(offsetof(struct ioctl_gntdev_grant_copy_segment,
+                          dest.foreign.offset) !=
+                 offsetof(xengnttab_grant_copy_segment_t,
+                          dest.foreign.offset));
+    BUILD_BUG_ON(offsetof(struct ioctl_gntdev_grant_copy_segment,
+                          dest.foreign.domid) !=
+                 offsetof(xengnttab_grant_copy_segment_t,
+                          dest.foreign.domid));
+
+    BUILD_BUG_ON(offsetof(struct ioctl_gntdev_grant_copy_segment,
+                          len) !=
+                 offsetof(xengnttab_grant_copy_segment_t, len));
+    BUILD_BUG_ON(offsetof(struct ioctl_gntdev_grant_copy_segment,
+                          flags) !=
+                 offsetof(xengnttab_grant_copy_segment_t, flags));
+    BUILD_BUG_ON(offsetof(struct ioctl_gntdev_grant_copy_segment,
+                          status) !=
+                 offsetof(xengnttab_grant_copy_segment_t, status));
+
+    copy.segments = (struct ioctl_gntdev_grant_copy_segment *)segs;
+    copy.count = count;
+
+    rc = ioctl(fd, IOCTL_GNTDEV_GRANT_COPY, &copy);
+    if (rc)
+        GTERROR(xgt->logger, "ioctl GRANT COPY failed %d ", errno);
+
+    return rc;
 }
 
 int osdep_gntshr_open(xengntshr_handle *xgs)

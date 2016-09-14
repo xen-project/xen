@@ -113,6 +113,12 @@ int xengnttab_unmap(xengnttab_handle *xgt, void *start_address, uint32_t count)
     return osdep_gnttab_unmap(xgt, start_address, count);
 }
 
+int xengnttab_grant_copy(xengnttab_handle *xgt,
+                         uint32_t count,
+                         xengnttab_grant_copy_segment_t *segs)
+{
+    return osdep_gnttab_grant_copy(xgt, count, segs);
+}
 /*
  * Local variables:
  * mode: C

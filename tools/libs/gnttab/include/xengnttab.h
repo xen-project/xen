@@ -258,6 +258,34 @@ int xengnttab_unmap(xengnttab_handle *xgt, void *start_address, uint32_t count);
 int xengnttab_set_max_grants(xengnttab_handle *xgt,
                              uint32_t nr_grants);
 
+struct xengnttab_grant_copy_segment {
+    union xengnttab_copy_ptr {
+        void *virt;
+        struct {
+            uint32_t ref;
+            uint16_t offset;
+            uint16_t domid;
+        } foreign;
+    } source, dest;
+    uint16_t len;
+    uint16_t flags;
+    int16_t status;
+};
+
+typedef struct xengnttab_grant_copy_segment xengnttab_grant_copy_segment_t;
+
+/**
+ * Copy memory from or to grant references. The information of each operations
+ * are contained in 'xengnttab_grant_copy_segment_t'. The @flag value indicate
+ * the direction of an operation (GNTCOPY_source_gref\GNTCOPY_dest_gref).
+ *
+ * For each segment, @virt may cross a page boundary but @offset + @len
+ * must not exceed XEN_PAGE_SIZE.
+ */
+int xengnttab_grant_copy(xengnttab_handle *xgt,
+                         uint32_t count,
+                         xengnttab_grant_copy_segment_t *segs);
+
 /*
  * Grant Sharing Interface (allocating and granting pages to others)
  */

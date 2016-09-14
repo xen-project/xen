@@ -147,4 +147,25 @@ struct ioctl_gntdev_unmap_notify {
 /* Send an interrupt on the indicated event channel */
 #define UNMAP_NOTIFY_SEND_EVENT 0x2
 
+struct ioctl_gntdev_grant_copy_segment {
+    union {
+        void *virt;
+        struct {
+            uint32_t ref;
+            uint16_t offset;
+            uint16_t domid;
+        } foreign;
+    } source, dest;
+    uint16_t len;
+    uint16_t flags;
+    int16_t status;
+};
+
+#define IOCTL_GNTDEV_GRANT_COPY \
+_IOC(_IOC_NONE, 'G', 8, sizeof(struct ioctl_gntdev_grant_copy))
+struct ioctl_gntdev_grant_copy {
+    unsigned int count;
+    struct ioctl_gntdev_grant_copy_segment *segments;
+};
+
 #endif /* __LINUX_PUBLIC_GNTDEV_H__ */

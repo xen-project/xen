@@ -106,6 +106,12 @@ int osdep_gnttab_set_max_grants(xengnttab_handle *xgt, uint32_t count)
     return ret;
 }
 
+int osdep_gnttab_grant_copy(xengnttab_handle *xgt,
+                            uint32_t count,
+                            xengnttab_grant_copy_segment_t *segs)
+{
+    return -1;
+}
 /*
  * Local variables:
  * mode: C

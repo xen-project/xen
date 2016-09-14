@@ -23,6 +23,10 @@ void *osdep_gnttab_grant_map(xengnttab_handle *xgt,
 int osdep_gnttab_unmap(xengnttab_handle *xgt,
                        void *start_address,
                        uint32_t count);
+int osdep_gnttab_grant_copy(xengnttab_handle *xgt,
+                            uint32_t count,
+                            xengnttab_grant_copy_segment_t *segs);
+
 int osdep_gntshr_open(xengntshr_handle *xgs);
 int osdep_gntshr_close(xengntshr_handle *xgs);
 

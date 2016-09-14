@@ -21,3 +21,8 @@ VERS_1.0 {
 		xengntshr_unshare;
 	local: *; /* Do not expose anything by default */
 };
+
+VERS_1.1 {
+    global:
+        xengnttab_grant_copy;
+} VERS_1.0;
