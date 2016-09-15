@@ -1391,6 +1391,7 @@ int p2m_init(struct domain *d)
     if ( rc != 0 )
         return rc;
 
+    p2m->domain = d;
     p2m->max_mapped_gfn = _gfn(0);
     p2m->lowest_mapped_gfn = _gfn(ULONG_MAX);
 

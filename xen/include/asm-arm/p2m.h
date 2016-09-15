@@ -81,6 +81,9 @@ struct p2m_domain {
      * enough available bits to store this information.
      */
     struct radix_tree_root mem_access_settings;
+
+    /* back pointer to domain */
+    struct domain *domain;
 };
 
 /*
