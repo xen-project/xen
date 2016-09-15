@@ -57,6 +57,11 @@ static inline bool_t p2m_mapping(lpae_t pte)
     return p2m_valid(pte) && !pte.p2m.table;
 }
 
+static inline bool p2m_is_superpage(lpae_t pte, unsigned int level)
+{
+    return (level < 3) && p2m_mapping(pte);
+}
+
 static inline void p2m_write_lock(struct p2m_domain *p2m)
 {
     write_lock(&p2m->lock);
