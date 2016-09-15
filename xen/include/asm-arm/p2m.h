@@ -188,6 +188,17 @@ mfn_t p2m_get_entry(struct p2m_domain *p2m, gfn_t gfn,
                     p2m_type_t *t, p2m_access_t *a,
                     unsigned int *page_order);
 
+/*
+ * Direct set a p2m entry: only for use by the P2M code.
+ * The P2M write lock should be taken.
+ */
+int p2m_set_entry(struct p2m_domain *p2m,
+                  gfn_t sgfn,
+                  unsigned long nr,
+                  mfn_t smfn,
+                  p2m_type_t t,
+                  p2m_access_t a);
+
 /* Clean & invalidate caches corresponding to a region of guest address space */
 int p2m_cache_flush(struct domain *d, gfn_t start, unsigned long nr);
 

@@ -783,6 +783,380 @@ static void p2m_put_l3_page(const lpae_t pte)
     }
 }
 
+/* Free lpae sub-tree behind an entry */
+static void p2m_free_entry(struct p2m_domain *p2m,
+                           lpae_t entry, unsigned int level)
+{
+    unsigned int i;
+    lpae_t *table;
+    mfn_t mfn;
+
+    /* Nothing to do if the entry is invalid. */
+    if ( !p2m_valid(entry) )
+        return;
+
+    /* Nothing to do but updating the stats if the entry is a super-page. */
+    if ( p2m_is_superpage(entry, level) )
+    {
+        p2m->stats.mappings[level]--;
+        return;
+    }
+
+    if ( level == 3 )
+    {
+        p2m->stats.mappings[level]--;
+        p2m_put_l3_page(entry);
+        return;
+    }
+
+    table = map_domain_page(_mfn(entry.p2m.base));
+    for ( i = 0; i < LPAE_ENTRIES; i++ )
+        p2m_free_entry(p2m, *(table + i), level + 1);
+
+    unmap_domain_page(table);
+
+    /*
+     * Make sure all the references in the TLB have been removed before
+     * freing the intermediate page table.
+     * XXX: Should we defer the free of the page table to avoid the
+     * flush?
+     */
+    if ( p2m->need_flush )
+        p2m_flush_tlb_sync(p2m);
+
+    mfn = _mfn(entry.p2m.base);
+    ASSERT(mfn_valid(mfn_x(mfn)));
+
+    free_domheap_page(mfn_to_page(mfn_x(mfn)));
+}
+
+static bool p2m_split_superpage(struct p2m_domain *p2m, lpae_t *entry,
+                                unsigned int level, unsigned int target,
+                                const unsigned int *offsets)
+{
+    struct page_info *page;
+    unsigned int i;
+    lpae_t pte, *table;
+    bool rv = true;
+
+    /* Convenience aliases */
+    mfn_t mfn = _mfn(entry->p2m.base);
+    unsigned int next_level = level + 1;
+    unsigned int level_order = level_orders[next_level];
+
+    /*
+     * This should only be called with target != level and the entry is
+     * a superpage.
+     */
+    ASSERT(level < target);
+    ASSERT(p2m_is_superpage(*entry, level));
+
+    page = alloc_domheap_page(NULL, 0);
+    if ( !page )
+        return false;
+
+    page_list_add(page, &p2m->pages);
+    table = __map_domain_page(page);
+
+    /*
+     * We are either splitting a first level 1G page into 512 second level
+     * 2M pages, or a second level 2M page into 512 third level 4K pages.
+     */
+    for ( i = 0; i < LPAE_ENTRIES; i++ )
+    {
+        lpae_t *new_entry = table + i;
+
+        /*
+         * Use the content of the superpage entry and override
+         * the necessary fields. So the correct permission are kept.
+         */
+        pte = *entry;
+        pte.p2m.base = mfn_x(mfn_add(mfn, i << level_order));
+
+        /*
+         * First and second level pages set p2m.table = 0, but third
+         * level entries set p2m.table = 1.
+         */
+        pte.p2m.table = (next_level == 3);
+
+        write_pte(new_entry, pte);
+    }
+
+    /* Update stats */
+    p2m->stats.shattered[level]++;
+    p2m->stats.mappings[level]--;
+    p2m->stats.mappings[next_level] += LPAE_ENTRIES;
+
+    /*
+     * Shatter superpage in the page to the level we want to make the
+     * changes.
+     * This is done outside the loop to avoid checking the offset to
+     * know whether the entry should be shattered for every entry.
+     */
+    if ( next_level != target )
+        rv = p2m_split_superpage(p2m, table + offsets[next_level],
+                                 level + 1, target, offsets);
+
+    if ( p2m->clean_pte )
+        clean_dcache_va_range(table, PAGE_SIZE);
+
+    unmap_domain_page(table);
+
+    pte = mfn_to_p2m_entry(_mfn(page_to_mfn(page)), p2m_invalid,
+                           p2m->default_access);
+
+    /*
+     * Even if we failed, we should install the newly allocated LPAE
+     * entry. The caller will be in charge to free the sub-tree.
+     */
+    p2m_write_pte(entry, pte, p2m->clean_pte);
+
+    return rv;
+}
+
+/*
+ * Insert an entry in the p2m. This should be called with a mapping
+ * equal to a page/superpage (4K, 2M, 1G).
+ */
+static int __p2m_set_entry(struct p2m_domain *p2m,
+                           gfn_t sgfn,
+                           unsigned int page_order,
+                           mfn_t smfn,
+                           p2m_type_t t,
+                           p2m_access_t a)
+{
+    paddr_t addr = pfn_to_paddr(gfn_x(sgfn));
+    unsigned int level = 0;
+    unsigned int target = 3 - (page_order / LPAE_SHIFT);
+    lpae_t *entry, *table, orig_pte;
+    int rc;
+
+    /* Convenience aliases */
+    const unsigned int offsets[4] = {
+        zeroeth_table_offset(addr),
+        first_table_offset(addr),
+        second_table_offset(addr),
+        third_table_offset(addr)
+    };
+
+    ASSERT(p2m_is_write_locked(p2m));
+
+    /*
+     * Check if the level target is valid: we only support
+     * 4K - 2M - 1G mapping.
+     */
+    ASSERT(target > 0 && target <= 3);
+
+    table = p2m_get_root_pointer(p2m, sgfn);
+    if ( !table )
+        return -EINVAL;
+
+    for ( level = P2M_ROOT_LEVEL; level < target; level++ )
+    {
+        /*
+         * Don't try to allocate intermediate page table if the mapping
+         * is about to be removed (i.e mfn == INVALID_MFN).
+         */
+        rc = p2m_next_level(p2m, mfn_eq(smfn, INVALID_MFN),
+                            &table, offsets[level]);
+        if ( rc == GUEST_TABLE_MAP_FAILED )
+        {
+            /*
+             * We are here because p2m_next_level has failed to map
+             * the intermediate page table (e.g the table does not exist
+             * and they p2m tree is read-only). It is a valid case
+             * when removing a mapping as it may not exist in the
+             * page table. In this case, just ignore it.
+             */
+            rc = mfn_eq(smfn, INVALID_MFN) ? 0 : -ENOENT;
+            goto out;
+        }
+        else if ( rc != GUEST_TABLE_NORMAL_PAGE )
+            break;
+    }
+
+    entry = table + offsets[level];
+
+    /*
+     * If we are here with level < target, we must be at a leaf node,
+     * and we need to break up the superpage.
+     */
+    if ( level < target )
+    {
+        /* We need to split the original page. */
+        lpae_t split_pte = *entry;
+
+        ASSERT(p2m_is_superpage(*entry, level));
+
+        if ( !p2m_split_superpage(p2m, &split_pte, level, target, offsets) )
+        {
+            /*
+             * The current super-page is still in-place, so re-increment
+             * the stats.
+             */
+            p2m->stats.mappings[level]++;
+
+            /* Free the allocated sub-tree */
+            p2m_free_entry(p2m, split_pte, level);
+
+            rc = -ENOMEM;
+            goto out;
+        }
+
+        /*
+         * Follow the break-before-sequence to update the entry.
+         * For more details see (D4.7.1 in ARM DDI 0487A.j).
+         */
+        p2m_remove_pte(entry, p2m->clean_pte);
+        p2m_flush_tlb_sync(p2m);
+
+        p2m_write_pte(entry, split_pte, p2m->clean_pte);
+
+        /* then move to the level we want to make real changes */
+        for ( ; level < target; level++ )
+        {
+            rc = p2m_next_level(p2m, true, &table, offsets[level]);
+
+            /*
+             * The entry should be found and either be a table
+             * or a superpage if level 3 is not targeted
+             */
+            ASSERT(rc == GUEST_TABLE_NORMAL_PAGE ||
+                   (rc == GUEST_TABLE_SUPER_PAGE && target < 3));
+        }
+
+        entry = table + offsets[level];
+    }
+
+    /*
+     * We should always be there with the correct level because
+     * all the intermediate tables have been installed if necessary.
+     */
+    ASSERT(level == target);
+
+    orig_pte = *entry;
+
+    /*
+     * The radix-tree can only work on 4KB. This is only used when
+     * memaccess is enabled.
+     */
+    ASSERT(!p2m->mem_access_enabled || page_order == 0);
+    /*
+     * The access type should always be p2m_access_rwx when the mapping
+     * is removed.
+     */
+    ASSERT(!mfn_eq(INVALID_MFN, smfn) || (a == p2m_access_rwx));
+    /*
+     * Update the mem access permission before update the P2M. So we
+     * don't have to revert the mapping if it has failed.
+     */
+    rc = p2m_mem_access_radix_set(p2m, sgfn, a);
+    if ( rc )
+        goto out;
+
+    /*
+     * Always remove the entry in order to follow the break-before-make
+     * sequence when updating the translation table (D4.7.1 in ARM DDI
+     * 0487A.j).
+     */
+    if ( p2m_valid(orig_pte) )
+        p2m_remove_pte(entry, p2m->clean_pte);
+
+    if ( mfn_eq(smfn, INVALID_MFN) )
+        /* Flush can be deferred if the entry is removed */
+        p2m->need_flush |= !!p2m_valid(orig_pte);
+    else
+    {
+        lpae_t pte = mfn_to_p2m_entry(smfn, t, a);
+
+        if ( level < 3 )
+            pte.p2m.table = 0; /* Superpage entry */
+
+        /*
+         * It is necessary to flush the TLB before writing the new entry
+         * to keep coherency when the previous entry was valid.
+         *
+         * Although, it could be defered when only the permissions are
+         * changed (e.g in case of memaccess).
+         */
+        if ( p2m_valid(orig_pte) )
+        {
+            if ( likely(!p2m->mem_access_enabled) ||
+                 P2M_CLEAR_PERM(pte) != P2M_CLEAR_PERM(orig_pte) )
+                p2m_flush_tlb_sync(p2m);
+            else
+                p2m->need_flush = true;
+        }
+        else /* new mapping */
+            p2m->stats.mappings[level]++;
+
+        p2m_write_pte(entry, pte, p2m->clean_pte);
+
+        p2m->max_mapped_gfn = gfn_max(p2m->max_mapped_gfn,
+                                      gfn_add(sgfn, 1 << page_order));
+        p2m->lowest_mapped_gfn = gfn_min(p2m->lowest_mapped_gfn, sgfn);
+    }
+
+    /*
+     * Free the entry only if the original pte was valid and the base
+     * is different (to avoid freeing when permission is changed).
+     */
+    if ( p2m_valid(orig_pte) && entry->p2m.base != orig_pte.p2m.base )
+        p2m_free_entry(p2m, orig_pte, level);
+
+    if ( need_iommu(p2m->domain) && (p2m_valid(orig_pte) || p2m_valid(*entry)) )
+        rc = iommu_iotlb_flush(p2m->domain, gfn_x(sgfn), 1UL << page_order);
+    else
+        rc = 0;
+
+out:
+    unmap_domain_page(table);
+
+    return rc;
+}
+
+int p2m_set_entry(struct p2m_domain *p2m,
+                  gfn_t sgfn,
+                  unsigned long nr,
+                  mfn_t smfn,
+                  p2m_type_t t,
+                  p2m_access_t a)
+{
+    int rc = 0;
+
+    while ( nr )
+    {
+        /*
+         * XXX: Support superpage mappings if nr is not aligned to a
+         * superpage size.
+         */
+        unsigned long mask = gfn_x(sgfn) | mfn_x(smfn) | nr;
+        unsigned long order;
+
+        /* Always map 4k by 4k when memaccess is enabled */
+        if ( unlikely(p2m->mem_access_enabled) )
+            order = THIRD_ORDER;
+        else if ( !(mask & ((1UL << FIRST_ORDER) - 1)) )
+            order = FIRST_ORDER;
+        else if ( !(mask & ((1UL << SECOND_ORDER) - 1)) )
+            order = SECOND_ORDER;
+        else
+            order = THIRD_ORDER;
+
+        rc = __p2m_set_entry(p2m, sgfn, order, smfn, t, a);
+        if ( rc )
+            break;
+
+        sgfn = gfn_add(sgfn, (1 << order));
+        if ( !mfn_eq(smfn, INVALID_MFN) )
+           smfn = mfn_add(smfn, (1 << order));
+
+        nr -= (1 << order);
+    }
+
+    return rc;
+}
+
 /*
  * Returns true if start_gpaddr..end_gpaddr contains at least one
  * suitably aligned level_size mappping of maddr.

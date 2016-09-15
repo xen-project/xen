@@ -177,6 +177,10 @@ typedef struct __packed {
     unsigned long sbz1:5;
 } lpae_p2m_t;
 
+/* Permission mask: xn, write, read */
+#define P2M_PERM_MASK (0x00400000000000C0ULL)
+#define P2M_CLEAR_PERM(pte) ((pte).bits & ~P2M_PERM_MASK)
+
 /*
  * Walk is the common bits of p2m and pt entries which are needed to
  * simply walk the table (e.g. for debug).
