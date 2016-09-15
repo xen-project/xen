@@ -39,7 +39,7 @@ static const uint8_t level_shifts[] =
 static const uint8_t level_orders[] =
     { ZEROETH_ORDER, FIRST_ORDER, SECOND_ORDER, THIRD_ORDER };
 
-static bool_t p2m_valid(lpae_t pte)
+static inline bool_t p2m_valid(lpae_t pte)
 {
     return pte.p2m.valid;
 }
@@ -48,11 +48,11 @@ static bool_t p2m_valid(lpae_t pte)
  * the table bit and therefore these would return the opposite to what
  * you would expect.
  */
-static bool_t p2m_table(lpae_t pte)
+static inline bool_t p2m_table(lpae_t pte)
 {
     return p2m_valid(pte) && pte.p2m.table;
 }
-static bool_t p2m_mapping(lpae_t pte)
+static inline bool_t p2m_mapping(lpae_t pte)
 {
     return p2m_valid(pte) && !pte.p2m.table;
 }
