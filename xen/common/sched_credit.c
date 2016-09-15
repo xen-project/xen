@@ -433,9 +433,9 @@ static inline void __runq_tickle(struct csched_vcpu *new)
             /*
              * If there are no suitable idlers for new, and it's higher
              * priority than cur, check whether we can migrate cur away.
-             * (We have to do it indirectly, via _VPF_migrating, instead
+             * We have to do it indirectly, via _VPF_migrating (instead
              * of just tickling any idler suitable for cur) because cur
-             * is running.)
+             * is running.
              *
              * If there are suitable idlers for new, no matter priorities,
              * leave cur alone (as it is running and is, likely, cache-hot)
@@ -444,9 +444,7 @@ static inline void __runq_tickle(struct csched_vcpu *new)
              */
             if ( new_idlers_empty && new->pri > cur->pri )
             {
-                csched_balance_cpumask(cur->vcpu, balance_step,
-                                       cpumask_scratch_cpu(cpu));
-                if ( cpumask_intersects(cpumask_scratch_cpu(cpu),
+                if ( cpumask_intersects(cur->vcpu->cpu_hard_affinity,
                                         &idle_mask) )
                 {
                     SCHED_VCPU_STAT_CRANK(cur, kicked_away);
