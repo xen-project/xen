@@ -753,7 +753,6 @@ static int p2m_mem_access_radix_set(struct p2m_domain *p2m, gfn_t gfn,
 
 enum p2m_operation {
     INSERT,
-    REMOVE,
     MEMACCESS,
 };
 
@@ -1232,7 +1231,6 @@ static int apply_one_level(struct domain *d,
                            p2m_access_t a)
 {
     const paddr_t level_size = level_sizes[level];
-    const paddr_t level_mask = level_masks[level];
 
     struct p2m_domain *p2m = &d->arch.p2m;
     lpae_t pte;
@@ -1316,74 +1314,6 @@ static int apply_one_level(struct domain *d,
         }
 
         break;
-
-    case REMOVE:
-        if ( !p2m_valid(orig_pte) )
-        {
-            /* Progress up to next boundary */
-            *addr = (*addr + level_size) & level_mask;
-            *maddr = (*maddr + level_size) & level_mask;
-            return P2M_ONE_PROGRESS_NOP;
-        }
-
-        if ( level < 3 )
-        {
-            if ( p2m_table(orig_pte) )
-                return P2M_ONE_DESCEND;
-
-            if ( op == REMOVE &&
-                 !is_mapping_aligned(*addr, end_gpaddr,
-                                     0, /* maddr doesn't matter for remove */
-                                     level_size) )
-            {
-                /*
-                 * Removing a mapping from the middle of a superpage. Shatter
-                 * and descend.
-                 */
-                *flush = true;
-                rc = p2m_shatter_page(p2m, entry, level);
-                if ( rc < 0 )
-                    return rc;
-
-                return P2M_ONE_DESCEND;
-            }
-        }
-
-        /*
-         * Ensure that the guest address addr currently being
-         * handled (that is in the range given as argument to
-         * this function) is actually mapped to the corresponding
-         * machine address in the specified range. maddr here is
-         * the machine address given to the function, while
-         * orig_pte.p2m.base is the machine frame number actually
-         * mapped to the guest address: check if the two correspond.
-         */
-         if ( op == REMOVE &&
-              pfn_to_paddr(orig_pte.p2m.base) != *maddr )
-             printk(XENLOG_G_WARNING
-                    "p2m_remove dom%d: mapping at %"PRIpaddr" is of maddr %"PRIpaddr" not %"PRIpaddr" as expected\n",
-                    d->domain_id, *addr, pfn_to_paddr(orig_pte.p2m.base),
-                    *maddr);
-
-        *flush = true;
-
-        p2m_remove_pte(entry, p2m->clean_pte);
-        p2m_mem_access_radix_set(p2m, _gfn(paddr_to_pfn(*addr)),
-                                 p2m_access_rwx);
-
-        *addr += level_size;
-        *maddr += level_size;
-
-        p2m->stats.mappings[level]--;
-
-        if ( level == 3 )
-            p2m_put_l3_page(orig_pte);
-
-        /*
-         * This is still a single pte write, no matter the level, so no need to
-         * scale.
-         */
-        return P2M_ONE_PROGRESS;
 
     case MEMACCESS:
         if ( level < 3 )
@@ -1596,43 +1526,6 @@ static int apply_p2m_changes(struct domain *d,
         }
 
         BUG_ON(level > 3);
-
-        if ( op == REMOVE )
-        {
-            for ( ; level > P2M_ROOT_LEVEL; level-- )
-            {
-                lpae_t old_entry;
-                lpae_t *entry;
-                unsigned int offset;
-
-                pg = pages[level];
-
-                /*
-                 * No need to try the previous level if the current one
-                 * still contains some mappings.
-                 */
-                if ( pg->u.inuse.p2m_refcount )
-                    break;
-
-                offset = offsets[level - 1];
-                entry = &mappings[level - 1][offset];
-                old_entry = *entry;
-
-                page_list_del(pg, &p2m->pages);
-
-                p2m_remove_pte(entry, p2m->clean_pte);
-
-                p2m->stats.mappings[level - 1]--;
-                update_reference_mapping(pages[level - 1], old_entry, *entry);
-
-                /*
-                 * We can't free the page now because it may be present
-                 * in the guest TLB. Queue it and free it after the TLB
-                 * has been flushed.
-                 */
-                page_list_add(pg, &free_pages);
-            }
-        }
     }
 
     if ( op == INSERT )
@@ -1674,8 +1567,10 @@ out:
          * addr keeps the address of the end of the last successfully-inserted
          * mapping.
          */
-        apply_p2m_changes(d, REMOVE, sgfn, gfn - gfn_x(sgfn), smfn,
-                          0, p2m_invalid, d->arch.p2m.default_access);
+        p2m_write_lock(p2m);
+        p2m_set_entry(p2m, sgfn, gfn - gfn_x(sgfn), INVALID_MFN,
+                      p2m_invalid, p2m_access_rwx);
+        p2m_write_unlock(p2m);
     }
 
     return rc;
@@ -1696,9 +1591,15 @@ static inline int p2m_remove_mapping(struct domain *d,
                                      unsigned long nr,
                                      mfn_t mfn)
 {
-    return apply_p2m_changes(d, REMOVE, start_gfn, nr, mfn,
-                             /* arguments below not used when removing mapping */
-                             0, p2m_invalid, d->arch.p2m.default_access);
+    struct p2m_domain *p2m = &d->arch.p2m;
+    int rc;
+
+    p2m_write_lock(p2m);
+    rc = p2m_set_entry(p2m, start_gfn, nr, INVALID_MFN,
+                       p2m_invalid, p2m_access_rwx);
+    p2m_write_unlock(p2m);
+
+    return rc;
 }
 
 int map_regions_rw_cache(struct domain *d,
