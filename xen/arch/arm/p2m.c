@@ -687,14 +687,14 @@ static const paddr_t level_sizes[] =
     { ZEROETH_SIZE, FIRST_SIZE, SECOND_SIZE, THIRD_SIZE };
 static const paddr_t level_masks[] =
     { ZEROETH_MASK, FIRST_MASK, SECOND_MASK, THIRD_MASK };
-static const paddr_t level_shifts[] =
+static const uint8_t level_shifts[] =
     { ZEROETH_SHIFT, FIRST_SHIFT, SECOND_SHIFT, THIRD_SHIFT };
 
 static int p2m_shatter_page(struct p2m_domain *p2m,
                             lpae_t *entry,
                             unsigned int level)
 {
-    const paddr_t level_shift = level_shifts[level];
+    const uint8_t level_shift = level_shifts[level];
     int rc = p2m_create_table(p2m, entry, level_shift - PAGE_SHIFT);
 
     if ( !rc )
