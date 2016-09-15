@@ -555,6 +555,11 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags,
         return 0;
 
     ASSERT(config != NULL);
+
+    /* p2m_init relies on some value initialized by the IOMMU subsystem */
+    if ( (rc = iommu_domain_init(d)) != 0 )
+        goto fail;
+
     if ( (rc = p2m_init(d)) != 0 )
         goto fail;
 
@@ -635,9 +640,6 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags,
      * support multi-platform.
      */
     if ( is_hardware_domain(d) && (rc = domain_vuart_init(d)) )
-        goto fail;
-
-    if ( (rc = iommu_domain_init(d)) != 0 )
         goto fail;
 
     return 0;

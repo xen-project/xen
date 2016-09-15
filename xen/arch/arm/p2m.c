@@ -416,7 +416,7 @@ static inline void p2m_remove_pte(lpae_t *p, bool_t flush_cache)
  * level_shift is the number of bits at the level we want to create.
  */
 static int p2m_create_table(struct p2m_domain *p2m, lpae_t *entry,
-                            int level_shift, bool_t flush_cache)
+                            int level_shift)
 {
     struct page_info *page;
     lpae_t *p;
@@ -466,7 +466,7 @@ static int p2m_create_table(struct p2m_domain *p2m, lpae_t *entry,
     else
         clear_page(p);
 
-    if ( flush_cache )
+    if ( p2m->clean_pte )
         clean_dcache_va_range(p, PAGE_SIZE);
 
     unmap_domain_page(p);
@@ -478,7 +478,7 @@ static int p2m_create_table(struct p2m_domain *p2m, lpae_t *entry,
     pte = mfn_to_p2m_entry(_mfn(page_to_mfn(page)), p2m_invalid,
                            p2m->default_access);
 
-    p2m_write_pte(entry, pte, flush_cache);
+    p2m_write_pte(entry, pte, p2m->clean_pte);
 
     return 0;
 }
@@ -661,12 +661,10 @@ static const paddr_t level_shifts[] =
 
 static int p2m_shatter_page(struct p2m_domain *p2m,
                             lpae_t *entry,
-                            unsigned int level,
-                            bool_t flush_cache)
+                            unsigned int level)
 {
     const paddr_t level_shift = level_shifts[level];
-    int rc = p2m_create_table(p2m, entry,
-                              level_shift - PAGE_SHIFT, flush_cache);
+    int rc = p2m_create_table(p2m, entry, level_shift - PAGE_SHIFT);
 
     if ( !rc )
     {
@@ -688,7 +686,6 @@ static int p2m_shatter_page(struct p2m_domain *p2m,
 static int apply_one_level(struct domain *d,
                            lpae_t *entry,
                            unsigned int level,
-                           bool_t flush_cache,
                            enum p2m_operation op,
                            paddr_t start_gpaddr,
                            paddr_t end_gpaddr,
@@ -727,7 +724,7 @@ static int apply_one_level(struct domain *d,
             if ( level < 3 )
                 pte.p2m.table = 0; /* Superpage entry */
 
-            p2m_write_pte(entry, pte, flush_cache);
+            p2m_write_pte(entry, pte, p2m->clean_pte);
 
             *flush |= p2m_valid(orig_pte);
 
@@ -762,7 +759,7 @@ static int apply_one_level(struct domain *d,
             /* Not present -> create table entry and descend */
             if ( !p2m_valid(orig_pte) )
             {
-                rc = p2m_create_table(p2m, entry, 0, flush_cache);
+                rc = p2m_create_table(p2m, entry, 0);
                 if ( rc < 0 )
                     return rc;
                 return P2M_ONE_DESCEND;
@@ -772,7 +769,7 @@ static int apply_one_level(struct domain *d,
             if ( p2m_mapping(orig_pte) )
             {
                 *flush = true;
-                rc = p2m_shatter_page(p2m, entry, level, flush_cache);
+                rc = p2m_shatter_page(p2m, entry, level);
                 if ( rc < 0 )
                     return rc;
             } /* else: an existing table mapping -> descend */
@@ -809,7 +806,7 @@ static int apply_one_level(struct domain *d,
                  * and descend.
                  */
                 *flush = true;
-                rc = p2m_shatter_page(p2m, entry, level, flush_cache);
+                rc = p2m_shatter_page(p2m, entry, level);
                 if ( rc < 0 )
                     return rc;
 
@@ -835,7 +832,7 @@ static int apply_one_level(struct domain *d,
 
         *flush = true;
 
-        p2m_remove_pte(entry, flush_cache);
+        p2m_remove_pte(entry, p2m->clean_pte);
         p2m_mem_access_radix_set(p2m, paddr_to_pfn(*addr), p2m_access_rwx);
 
         *addr += level_size;
@@ -894,7 +891,7 @@ static int apply_one_level(struct domain *d,
             /* Shatter large pages as we descend */
             if ( p2m_mapping(orig_pte) )
             {
-                rc = p2m_shatter_page(p2m, entry, level, flush_cache);
+                rc = p2m_shatter_page(p2m, entry, level);
                 if ( rc < 0 )
                     return rc;
             } /* else: an existing table mapping -> descend */
@@ -912,7 +909,7 @@ static int apply_one_level(struct domain *d,
                     return rc;
 
                 p2m_set_permission(&pte, pte.p2m.type, a);
-                p2m_write_pte(entry, pte, flush_cache);
+                p2m_write_pte(entry, pte, p2m->clean_pte);
             }
 
             *addr += level_size;
@@ -962,16 +959,8 @@ static int apply_p2m_changes(struct domain *d,
     const unsigned int preempt_count_limit = (op == MEMACCESS) ? 1 : 0x2000;
     const bool_t preempt = !is_idle_vcpu(current);
     bool_t flush = false;
-    bool_t flush_pt;
     PAGE_LIST_HEAD(free_pages);
     struct page_info *pg;
-
-    /*
-     * Some IOMMU don't support coherent PT walk. When the p2m is
-     * shared with the CPU, Xen has to make sure that the PT changes have
-     * reached the memory
-     */
-    flush_pt = iommu_enabled && !iommu_has_feature(d, IOMMU_FEAT_COHERENT_WALK);
 
     p2m_write_lock(p2m);
 
@@ -1078,7 +1067,7 @@ static int apply_p2m_changes(struct domain *d,
             lpae_t old_entry = *entry;
 
             ret = apply_one_level(d, entry,
-                                  level, flush_pt, op,
+                                  level, op,
                                   start_gpaddr, end_gpaddr,
                                   &addr, &maddr, &flush,
                                   t, a);
@@ -1135,7 +1124,7 @@ static int apply_p2m_changes(struct domain *d,
 
                 page_list_del(pg, &p2m->pages);
 
-                p2m_remove_pte(entry, flush_pt);
+                p2m_remove_pte(entry, p2m->clean_pte);
 
                 p2m->stats.mappings[level - 1]--;
                 update_reference_mapping(pages[level - 1], old_entry, *entry);
@@ -1406,6 +1395,14 @@ int p2m_init(struct domain *d)
     p2m->default_access = p2m_access_rwx;
     p2m->mem_access_enabled = false;
     radix_tree_init(&p2m->mem_access_settings);
+
+    /*
+     * Some IOMMUs don't support coherent PT walk. When the p2m is
+     * shared with the CPU, Xen has to make sure that the PT changes have
+     * reached the memory
+     */
+    p2m->clean_pte = iommu_enabled &&
+        !iommu_has_feature(d, IOMMU_FEAT_COHERENT_WALK);
 
     rc = p2m_alloc_table(d);
 

@@ -48,6 +48,9 @@ struct p2m_domain {
      * decrease. */
     gfn_t lowest_mapped_gfn;
 
+    /* Indicate if it is required to clean the cache when writing an entry */
+    bool clean_pte;
+
     /* Gather some statistics for information purposes only */
     struct {
         /* Number of mappings at each p2m tree level */
