@@ -2445,6 +2445,38 @@ static void do_trap_instr_abort_guest(struct cpu_user_regs *regs,
     inject_iabt_exception(regs, gva, hsr.len);
 }
 
+static bool try_handle_mmio(struct cpu_user_regs *regs,
+                            mmio_info_t *info)
+{
+    const struct hsr_dabt dabt = info->dabt;
+    int rc;
+
+    /* stage-1 page table should never live in an emulated MMIO region */
+    if ( dabt.s1ptw )
+        return false;
+
+    /* All the instructions used on emulated MMIO region should be valid */
+    if ( !dabt.valid )
+        return false;
+
+    /*
+     * Erratum 766422: Thumb store translation fault to Hypervisor may
+     * not have correct HSR Rt value.
+     */
+    if ( check_workaround_766422() && (regs->cpsr & PSR_THUMB) &&
+         dabt.write )
+    {
+        rc = decode_instruction(regs, &info->dabt);
+        if ( rc )
+        {
+            gprintk(XENLOG_DEBUG, "Unable to decode instruction\n");
+            return false;
+        }
+    }
+
+    return !!handle_mmio(info);
+}
+
 static void do_trap_data_abort_guest(struct cpu_user_regs *regs,
                                      const union hsr hsr)
 {
@@ -2488,29 +2520,7 @@ static void do_trap_data_abort_guest(struct cpu_user_regs *regs,
         break;
     }
     case FSC_FLT_TRANS:
-        if ( dabt.s1ptw )
-            goto bad_data_abort;
-
-        /* XXX: Decode the instruction if ISS is not valid */
-        if ( !dabt.valid )
-            goto bad_data_abort;
-
-        /*
-         * Erratum 766422: Thumb store translation fault to Hypervisor may
-         * not have correct HSR Rt value.
-         */
-        if ( check_workaround_766422() && (regs->cpsr & PSR_THUMB) &&
-             dabt.write )
-        {
-            rc = decode_instruction(regs, &info.dabt);
-            if ( rc )
-            {
-                gprintk(XENLOG_DEBUG, "Unable to decode instruction\n");
-                goto bad_data_abort;
-            }
-        }
-
-        if ( handle_mmio(&info) )
+        if ( try_handle_mmio(regs, &info) )
         {
             advance_pc(regs, hsr);
             return;
@@ -2521,7 +2531,6 @@ static void do_trap_data_abort_guest(struct cpu_user_regs *regs,
                 hsr.bits, dabt.dfsc);
     }
 
-bad_data_abort:
     gdprintk(XENLOG_DEBUG, "HSR=0x%x pc=%#"PRIregister" gva=%#"PRIvaddr
              " gpa=%#"PRIpaddr"\n", hsr.bits, regs->pc, info.gva, info.gpa);
     inject_dabt_exception(regs, info.gva, hsr.len);
