@@ -7501,28 +7501,29 @@ void sched_process(struct pcpu_info *p)
         case TRC_SCHED_SWITCH_INFPREV:
             if(opt.dump_all) {
                 struct {
-                    unsigned int domid, runtime;
+                    unsigned int domid, vcpuid, runtime;
                 } *r = (typeof(r))ri->d;
 
-                printf(" %s sched_switch prev d%u, run for %u.%uus\n",
-                       ri->dump_header, r->domid, r->runtime / 1000,
-                       r->runtime % 1000);
+                printf(" %s sched_switch prev d%uv%d, run for %u.%uus\n",
+                       ri->dump_header, r->domid, r->vcpuid,
+                       r->runtime / 1000, r->runtime % 1000);
             }
             break;
         case TRC_SCHED_SWITCH_INFNEXT:
             if(opt.dump_all)
             {
                 struct {
-                    unsigned int domid, rsince;
+                    unsigned int domid, vcpuid, rsince;
                     int slice;
                 } *r = (typeof(r))ri->d;
 
-                printf(" %s sched_switch next d%u", ri->dump_header, r->domid);
+                printf(" %s sched_switch next d%uv%u", ri->dump_header,
+                       r->domid, r->vcpuid);
                 if ( r->rsince != 0 )
-                    printf(", was runnable for %u.%uus, ", r->rsince / 1000,
+                    printf(", was runnable for %u.%uus", r->rsince / 1000,
                            r->rsince % 1000);
                 if ( r->slice > 0 )
-                    printf("next slice %u.%uus", r->slice / 1000,
+                    printf(", next slice %u.%uus", r->slice / 1000,
                            r->slice % 1000);
                 printf("\n");
             }

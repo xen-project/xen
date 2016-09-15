@@ -1388,11 +1388,11 @@ static void schedule(void)
         return continue_running(prev);
     }
 
-    TRACE_2D(TRC_SCHED_SWITCH_INFPREV,
-             prev->domain->domain_id,
+    TRACE_3D(TRC_SCHED_SWITCH_INFPREV,
+             prev->domain->domain_id, prev->vcpu_id,
              now - prev->runstate.state_entry_time);
-    TRACE_3D(TRC_SCHED_SWITCH_INFNEXT,
-             next->domain->domain_id,
+    TRACE_4D(TRC_SCHED_SWITCH_INFNEXT,
+             next->domain->domain_id, next->vcpu_id,
              (next->runstate.state == RUNSTATE_runnable) ?
              (now - next->runstate.state_entry_time) : 0,
              next_slice.time);
