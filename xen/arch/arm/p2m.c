@@ -752,7 +752,6 @@ static int p2m_mem_access_radix_set(struct p2m_domain *p2m, gfn_t gfn,
 }
 
 enum p2m_operation {
-    INSERT,
     MEMACCESS,
 };
 
@@ -1155,41 +1154,6 @@ int p2m_set_entry(struct p2m_domain *p2m,
     return rc;
 }
 
-/*
- * Returns true if start_gpaddr..end_gpaddr contains at least one
- * suitably aligned level_size mappping of maddr.
- *
- * So long as the range is large enough the end_gpaddr need not be
- * aligned (callers should create one superpage mapping based on this
- * result and then call this again on the new range, eventually the
- * slop at the end will cause this function to return false).
- */
-static bool_t is_mapping_aligned(const paddr_t start_gpaddr,
-                                 const paddr_t end_gpaddr,
-                                 const paddr_t maddr,
-                                 const paddr_t level_size)
-{
-    const paddr_t level_mask = level_size - 1;
-
-    /* No hardware superpages at level 0 */
-    if ( level_size == ZEROETH_SIZE )
-        return false;
-
-    /*
-     * A range smaller than the size of a superpage at this level
-     * cannot be superpage aligned.
-     */
-    if ( ( end_gpaddr - start_gpaddr ) < level_size - 1 )
-        return false;
-
-    /* Both the gpaddr and maddr must be aligned */
-    if ( start_gpaddr & level_mask )
-        return false;
-    if ( maddr & level_mask )
-        return false;
-    return true;
-}
-
 #define P2M_ONE_DESCEND        0
 #define P2M_ONE_PROGRESS_NOP   0x1
 #define P2M_ONE_PROGRESS       0x10
@@ -1241,80 +1205,6 @@ static int apply_one_level(struct domain *d,
 
     switch ( op )
     {
-    case INSERT:
-        if ( is_mapping_aligned(*addr, end_gpaddr, *maddr, level_size) &&
-           /*
-            * We do not handle replacing an existing table with a superpage
-            * or when mem_access is in use.
-            */
-             (level == 3 || (!p2m_table(orig_pte) && !p2m->mem_access_enabled)) )
-        {
-            rc = p2m_mem_access_radix_set(p2m, _gfn(paddr_to_pfn(*addr)), a);
-            if ( rc < 0 )
-                return rc;
-
-            /* New mapping is superpage aligned, make it */
-            pte = mfn_to_p2m_entry(_mfn(*maddr >> PAGE_SHIFT), t, a);
-            if ( level < 3 )
-                pte.p2m.table = 0; /* Superpage entry */
-
-            p2m_write_pte(entry, pte, p2m->clean_pte);
-
-            *flush |= p2m_valid(orig_pte);
-
-            *addr += level_size;
-            *maddr += level_size;
-
-            if ( p2m_valid(orig_pte) )
-            {
-                /*
-                 * We can't currently get here for an existing table
-                 * mapping, since we don't handle replacing an
-                 * existing table with a superpage. If we did we would
-                 * need to handle freeing (and accounting) for the bit
-                 * of the p2m tree which we would be about to lop off.
-                 */
-                BUG_ON(level < 3 && p2m_table(orig_pte));
-                if ( level == 3 )
-                    p2m_put_l3_page(orig_pte);
-            }
-            else /* New mapping */
-                p2m->stats.mappings[level]++;
-
-            return P2M_ONE_PROGRESS;
-        }
-        else
-        {
-            /* New mapping is not superpage aligned, create a new table entry */
-
-            /* L3 is always suitably aligned for mapping (handled, above) */
-            BUG_ON(level == 3);
-
-            /* Not present -> create table entry and descend */
-            if ( !p2m_valid(orig_pte) )
-            {
-                rc = p2m_create_table(p2m, entry, 0);
-                if ( rc < 0 )
-                    return rc;
-                return P2M_ONE_DESCEND;
-            }
-
-            /* Existing superpage mapping -> shatter and descend */
-            if ( p2m_mapping(orig_pte) )
-            {
-                *flush = true;
-                rc = p2m_shatter_page(p2m, entry, level);
-                if ( rc < 0 )
-                    return rc;
-            } /* else: an existing table mapping -> descend */
-
-            BUG_ON(!p2m_table(*entry));
-
-            return P2M_ONE_DESCEND;
-        }
-
-        break;
-
     case MEMACCESS:
         if ( level < 3 )
         {
@@ -1528,13 +1418,6 @@ static int apply_p2m_changes(struct domain *d,
         BUG_ON(level > 3);
     }
 
-    if ( op == INSERT )
-    {
-        p2m->max_mapped_gfn = gfn_max(p2m->max_mapped_gfn,
-                                      gfn_add(sgfn, nr));
-        p2m->lowest_mapped_gfn = gfn_min(p2m->lowest_mapped_gfn, sgfn);
-    }
-
     rc = 0;
 
 out:
@@ -1557,22 +1440,6 @@ out:
 
     p2m_write_unlock(p2m);
 
-    if ( rc < 0 && ( op == INSERT ) &&
-         addr != start_gpaddr )
-    {
-        unsigned long gfn = paddr_to_pfn(addr);
-
-        BUG_ON(addr == end_gpaddr);
-        /*
-         * addr keeps the address of the end of the last successfully-inserted
-         * mapping.
-         */
-        p2m_write_lock(p2m);
-        p2m_set_entry(p2m, sgfn, gfn - gfn_x(sgfn), INVALID_MFN,
-                      p2m_invalid, p2m_access_rwx);
-        p2m_write_unlock(p2m);
-    }
-
     return rc;
 }
 
@@ -1582,8 +1449,14 @@ static inline int p2m_insert_mapping(struct domain *d,
                                      mfn_t mfn,
                                      p2m_type_t t)
 {
-    return apply_p2m_changes(d, INSERT, start_gfn, nr, mfn,
-                             0, t, d->arch.p2m.default_access);
+    struct p2m_domain *p2m = &d->arch.p2m;
+    int rc;
+
+    p2m_write_lock(p2m);
+    rc = p2m_set_entry(p2m, start_gfn, nr, mfn, t, p2m->default_access);
+    p2m_write_unlock(p2m);
+
+    return rc;
 }
 
 static inline int p2m_remove_mapping(struct domain *d,
