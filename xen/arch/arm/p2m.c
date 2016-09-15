@@ -36,6 +36,8 @@ static const paddr_t level_masks[] =
     { ZEROETH_MASK, FIRST_MASK, SECOND_MASK, THIRD_MASK };
 static const uint8_t level_shifts[] =
     { ZEROETH_SHIFT, FIRST_SHIFT, SECOND_SHIFT, THIRD_SHIFT };
+static const uint8_t level_orders[] =
+    { ZEROETH_ORDER, FIRST_ORDER, SECOND_ORDER, THIRD_ORDER };
 
 static bool_t p2m_valid(lpae_t pte)
 {
@@ -204,6 +206,37 @@ static void p2m_flush_tlb_sync(struct p2m_domain *p2m)
 }
 
 /*
+ * Find and map the root page table. The caller is responsible for
+ * unmapping the table.
+ *
+ * The function will return NULL if the offset of the root table is
+ * invalid.
+ */
+static lpae_t *p2m_get_root_pointer(struct p2m_domain *p2m,
+                                    gfn_t gfn)
+{
+    unsigned int root_table;
+
+    if ( P2M_ROOT_PAGES == 1 )
+        return __map_domain_page(p2m->root);
+
+    /*
+     * Concatenated root-level tables. The table number will be the
+     * offset at the previous level. It is not possible to
+     * concatenate a level-0 root.
+     */
+    ASSERT(P2M_ROOT_LEVEL > 0);
+
+    root_table = gfn_x(gfn) >> (level_orders[P2M_ROOT_LEVEL - 1]);
+    root_table &= LPAE_ENTRY_MASK;
+
+    if ( root_table >= P2M_ROOT_PAGES )
+        return NULL;
+
+    return __map_domain_page(p2m->root + root_table);
+}
+
+/*
  * Lookup the MFN corresponding to a domain's GFN.
  *
  * There are no processor functions to do a stage 2 only lookup therefore we
@@ -226,7 +259,7 @@ static mfn_t __p2m_lookup(struct domain *d, gfn_t gfn, p2m_type_t *t)
     mfn_t mfn = INVALID_MFN;
     paddr_t mask = 0;
     p2m_type_t _t;
-    unsigned int level, root_table;
+    unsigned int level;
 
     ASSERT(p2m_is_locked(p2m));
     BUILD_BUG_ON(THIRD_MASK != PAGE_MASK);
@@ -236,22 +269,9 @@ static mfn_t __p2m_lookup(struct domain *d, gfn_t gfn, p2m_type_t *t)
 
     *t = p2m_invalid;
 
-    if ( P2M_ROOT_PAGES > 1 )
-    {
-        /*
-         * Concatenated root-level tables. The table number will be
-         * the offset at the previous level. It is not possible to
-         * concatenate a level-0 root.
-         */
-        ASSERT(P2M_ROOT_LEVEL > 0);
-        root_table = offsets[P2M_ROOT_LEVEL - 1];
-        if ( root_table >= P2M_ROOT_PAGES )
-            goto err;
-    }
-    else
-        root_table = 0;
-
-    map = __map_domain_page(p2m->root + root_table);
+    map = p2m_get_root_pointer(p2m, gfn);
+    if ( !map )
+        return INVALID_MFN;
 
     ASSERT(P2M_ROOT_LEVEL < 4);
 
@@ -286,7 +306,6 @@ static mfn_t __p2m_lookup(struct domain *d, gfn_t gfn, p2m_type_t *t)
         *t = pte.p2m.type;
     }
 
-err:
     return mfn;
 }
 
