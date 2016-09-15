@@ -2405,6 +2405,7 @@ static void do_trap_instr_abort_guest(struct cpu_user_regs *regs,
     register_t gva = READ_SYSREG(FAR_EL2);
     uint8_t fsc = hsr.iabt.ifsc & ~FSC_LL_MASK;
     paddr_t gpa;
+    mfn_t mfn;
 
     if ( hpfar_is_valid(hsr.iabt.s1ptw, fsc) )
         gpa = get_faulting_ipa(gva);
@@ -2418,6 +2419,11 @@ static void do_trap_instr_abort_guest(struct cpu_user_regs *regs,
          */
         flush_tlb_local();
 
+        /*
+         * We may not be able to translate because someone is
+         * playing with the Stage-2 page table of the domain.
+         * Return to the guest.
+         */
         rc = gva_to_ipa(gva, &gpa, GV2M_READ);
         if ( rc == -EFAULT )
             return; /* Try again */
@@ -2438,8 +2444,17 @@ static void do_trap_instr_abort_guest(struct cpu_user_regs *regs,
         /* Trap was triggered by mem_access, work here is done */
         if ( !rc )
             return;
+        break;
     }
-    break;
+    case FSC_FLT_TRANS:
+        /*
+         * The PT walk may have failed because someone was playing
+         * with the Stage-2 page table. Walk the Stage-2 PT to check
+         * if the entry exists. If it's the case, return to the guest
+         */
+        mfn = p2m_lookup(current->domain, _gfn(paddr_to_pfn(gpa)), NULL);
+        if ( !mfn_eq(mfn, INVALID_MFN) )
+            return;
     }
 
     inject_iabt_exception(regs, gva, hsr.len);
@@ -2484,6 +2499,7 @@ static void do_trap_data_abort_guest(struct cpu_user_regs *regs,
     int rc;
     mmio_info_t info;
     uint8_t fsc = hsr.dabt.dfsc & ~FSC_LL_MASK;
+    mfn_t mfn;
 
     info.dabt = dabt;
 #ifdef CONFIG_ARM_32
@@ -2497,6 +2513,11 @@ static void do_trap_data_abort_guest(struct cpu_user_regs *regs,
     else
     {
         rc = gva_to_ipa(info.gva, &info.gpa, GV2M_READ);
+        /*
+         * We may not be able to translate because someone is
+         * playing with the Stage-2 page table of the domain.
+         * Return to the guest.
+         */
         if ( rc == -EFAULT )
             return; /* Try again */
     }
@@ -2520,11 +2541,25 @@ static void do_trap_data_abort_guest(struct cpu_user_regs *regs,
         break;
     }
     case FSC_FLT_TRANS:
+        /*
+         * Attempt first to emulate the MMIO as the data abort will
+         * likely happen in an emulated region.
+         */
         if ( try_handle_mmio(regs, &info) )
         {
             advance_pc(regs, hsr);
             return;
         }
+
+        /*
+         * The PT walk may have failed because someone was playing
+         * with the Stage-2 page table. Walk the Stage-2 PT to check
+         * if the entry exists. If it's the case, return to the guest
+         */
+        mfn = p2m_lookup(current->domain, _gfn(paddr_to_pfn(info.gpa)), NULL);
+        if ( !mfn_eq(mfn, INVALID_MFN) )
+            return;
+
         break;
     default:
         gprintk(XENLOG_WARNING, "Unsupported DFSC: HSR=%#x DFSC=%#x\n",
