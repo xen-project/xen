@@ -278,8 +278,7 @@ static p2m_access_t p2m_mem_access_radix_get(struct p2m_domain *p2m, gfn_t gfn)
 #define GUEST_TABLE_SUPER_PAGE 1
 #define GUEST_TABLE_NORMAL_PAGE 2
 
-static int p2m_create_table(struct p2m_domain *p2m, lpae_t *entry,
-                            int level_shift);
+static int p2m_create_table(struct p2m_domain *p2m, lpae_t *entry);
 
 /*
  * Take the currently mapped table, find the corresponding GFN entry,
@@ -310,7 +309,7 @@ static int p2m_next_level(struct p2m_domain *p2m, bool read_only,
         if ( read_only )
             return GUEST_TABLE_MAP_FAILED;
 
-        ret = p2m_create_table(p2m, entry, /* not used */ ~0);
+        ret = p2m_create_table(p2m, entry);
         if ( ret )
             return GUEST_TABLE_MAP_FAILED;
     }
@@ -575,25 +574,14 @@ static inline void p2m_remove_pte(lpae_t *p, bool clean_pte)
     p2m_write_pte(p, pte, clean_pte);
 }
 
-/*
- * Allocate a new page table page and hook it in via the given entry.
- * apply_one_level relies on this returning 0 on success
- * and -ve on failure.
- *
- * If the existing entry is present then it must be a mapping and not
- * a table and it will be shattered into the next level down.
- *
- * level_shift is the number of bits at the level we want to create.
- */
-static int p2m_create_table(struct p2m_domain *p2m, lpae_t *entry,
-                            int level_shift)
+/* Allocate a new page table page and hook it in via the given entry. */
+static int p2m_create_table(struct p2m_domain *p2m, lpae_t *entry)
 {
     struct page_info *page;
     lpae_t *p;
     lpae_t pte;
-    int splitting = p2m_valid(*entry);
 
-    BUG_ON(p2m_table(*entry));
+    ASSERT(!p2m_valid(*entry));
 
     page = alloc_domheap_page(NULL, 0);
     if ( page == NULL )
@@ -602,39 +590,7 @@ static int p2m_create_table(struct p2m_domain *p2m, lpae_t *entry,
     page_list_add(page, &p2m->pages);
 
     p = __map_domain_page(page);
-    if ( splitting )
-    {
-        mfn_t mfn = _mfn(entry->p2m.base);
-        int i;
-
-        /*
-         * We are either splitting a first level 1G page into 512 second level
-         * 2M pages, or a second level 2M page into 512 third level 4K pages.
-         */
-         for ( i=0 ; i < LPAE_ENTRIES; i++ )
-         {
-             /*
-              * Use the content of the superpage entry and override
-              * the necessary fields. So the correct permissions are
-              * kept.
-              */
-             pte = *entry;
-             pte.p2m.base = mfn_x(mfn_add(mfn,
-                                          i << (level_shift - LPAE_SHIFT)));
-
-             /*
-              * First and second level super pages set p2m.table = 0, but
-              * third level entries set table = 1.
-              */
-             pte.p2m.table = !(level_shift - LPAE_SHIFT);
-
-             write_pte(&p[i], pte);
-         }
-
-         page->u.inuse.p2m_refcount = LPAE_ENTRIES;
-    }
-    else
-        clear_page(p);
+    clear_page(p);
 
     if ( p2m->clean_pte )
         clean_dcache_va_range(p, PAGE_SIZE);
