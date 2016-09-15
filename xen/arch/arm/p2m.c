@@ -62,6 +62,22 @@ static inline void p2m_write_lock(struct p2m_domain *p2m)
     write_lock(&p2m->lock);
 }
 
+/*
+ * Return the start of the next mapping based on the order of the
+ * current one.
+ */
+static inline gfn_t gfn_next_boundary(gfn_t gfn, unsigned int order)
+{
+    /*
+     * The order corresponds to the order of the mapping (or invalid
+     * range) in the page table. So we need to align the GFN before
+     * incrementing.
+     */
+    gfn = _gfn(gfn_x(gfn) & ~((1UL << order) - 1));
+
+    return gfn_add(gfn, 1UL << order);
+}
+
 static void p2m_flush_tlb(struct p2m_domain *p2m);
 
 static inline void p2m_write_unlock(struct p2m_domain *p2m)
@@ -734,7 +750,6 @@ enum p2m_operation {
     INSERT,
     REMOVE,
     RELINQUISH,
-    CACHEFLUSH,
     MEMACCESS,
 };
 
@@ -992,36 +1007,6 @@ static int apply_one_level(struct domain *d,
          * scale.
          */
         return P2M_ONE_PROGRESS;
-
-    case CACHEFLUSH:
-        if ( !p2m_valid(orig_pte) )
-        {
-            *addr = (*addr + level_size) & level_mask;
-            return P2M_ONE_PROGRESS_NOP;
-        }
-
-        if ( level < 3 && p2m_table(orig_pte) )
-            return P2M_ONE_DESCEND;
-
-        /*
-         * could flush up to the next superpage boundary, but would
-         * need to be careful about preemption, so just do one 4K page
-         * now and return P2M_ONE_PROGRESS{,_NOP} so that the caller will
-         * continue to loop over the rest of the range.
-         */
-        if ( p2m_is_ram(orig_pte.p2m.type) )
-        {
-            unsigned long offset = paddr_to_pfn(*addr & ~level_mask);
-            flush_page_to_ram(orig_pte.p2m.base + offset);
-
-            *addr += PAGE_SIZE;
-            return P2M_ONE_PROGRESS;
-        }
-        else
-        {
-            *addr += PAGE_SIZE;
-            return P2M_ONE_PROGRESS_NOP;
-        }
 
     case MEMACCESS:
         if ( level < 3 )
@@ -1571,12 +1556,44 @@ int p2m_cache_flush(struct domain *d, gfn_t start, unsigned long nr)
 {
     struct p2m_domain *p2m = &d->arch.p2m;
     gfn_t end = gfn_add(start, nr);
+    gfn_t next_gfn;
+    p2m_type_t t;
+    unsigned int order;
 
     start = gfn_max(start, p2m->lowest_mapped_gfn);
     end = gfn_min(end, p2m->max_mapped_gfn);
 
-    return apply_p2m_changes(d, CACHEFLUSH, start, nr, INVALID_MFN,
-                             0, p2m_invalid, d->arch.p2m.default_access);
+    /*
+     * The operation cache flush will invalidate the RAM assigned to the
+     * guest in a given range. It will not modify the page table and
+     * flushing the cache whilst the page is used by another CPU is
+     * fine. So using read-lock is fine here.
+     */
+    p2m_read_lock(p2m);
+
+    for ( ; gfn_x(start) < gfn_x(end); start = next_gfn )
+    {
+        mfn_t mfn = p2m_get_entry(p2m, start, &t, NULL, &order);
+
+        next_gfn = gfn_next_boundary(start, order);
+
+        /* Skip hole and non-RAM page */
+        if ( mfn_eq(mfn, INVALID_MFN) || !p2m_is_ram(t) )
+            continue;
+
+        /* XXX: Implement preemption */
+        while ( gfn_x(start) < gfn_x(next_gfn) )
+        {
+            flush_page_to_ram(mfn_x(mfn));
+
+            start = gfn_add(start, 1);
+            mfn = mfn_add(mfn, 1);
+        }
+    }
+
+    p2m_read_unlock(p2m);
+
+    return 0;
 }
 
 mfn_t gfn_to_mfn(struct domain *d, gfn_t gfn)
