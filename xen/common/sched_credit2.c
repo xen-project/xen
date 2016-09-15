@@ -149,7 +149,7 @@
 /* Reset: Value below which credit will be reset. */
 #define CSCHED2_CREDIT_RESET         0
 /* Max timer: Maximum time a guest can be run for. */
-#define CSCHED2_MAX_TIMER            MILLISECS(2)
+#define CSCHED2_MAX_TIMER            CSCHED2_CREDIT_INIT
 
 
 #define CSCHED2_IDLE_CREDIT                 (-(1<<30))
