@@ -402,24 +402,13 @@ out:
     return mfn;
 }
 
-/*
- * Lookup the MFN corresponding to a domain's GFN.
- *
- * There are no processor functions to do a stage 2 only lookup therefore we
- * do a a software walk.
- */
-static mfn_t __p2m_lookup(struct domain *d, gfn_t gfn, p2m_type_t *t)
-{
-    return p2m_get_entry(&d->arch.p2m, gfn, t, NULL, NULL);
-}
-
 mfn_t p2m_lookup(struct domain *d, gfn_t gfn, p2m_type_t *t)
 {
     mfn_t ret;
     struct p2m_domain *p2m = &d->arch.p2m;
 
     p2m_read_lock(p2m);
-    ret = __p2m_lookup(d, gfn, t);
+    ret = p2m_get_entry(p2m, gfn, t, NULL, NULL);
     p2m_read_unlock(p2m);
 
     return ret;
@@ -691,7 +680,7 @@ static int __p2m_get_mem_access(struct domain *d, gfn_t gfn,
          * No setting was found in the Radix tree. Check if the
          * entry exists in the page-tables.
          */
-        mfn_t mfn = __p2m_lookup(d, gfn, NULL);
+        mfn_t mfn = p2m_get_entry(p2m, gfn, NULL, NULL, NULL);
 
         if ( mfn_eq(mfn, INVALID_MFN) )
             return -ESRCH;
@@ -1611,6 +1600,7 @@ p2m_mem_access_check_and_get_page(vaddr_t gva, unsigned long flag)
     xenmem_access_t xma;
     p2m_type_t t;
     struct page_info *page = NULL;
+    struct p2m_domain *p2m = &current->domain->arch.p2m;
 
     rc = gva_to_ipa(gva, &ipa, flag);
     if ( rc < 0 )
@@ -1671,7 +1661,7 @@ p2m_mem_access_check_and_get_page(vaddr_t gva, unsigned long flag)
      * We had a mem_access permission limiting the access, but the page type
      * could also be limiting, so we need to check that as well.
      */
-    mfn = __p2m_lookup(current->domain, gfn, &t);
+    mfn = p2m_get_entry(p2m, gfn, &t, NULL, NULL);
     if ( mfn_eq(mfn, INVALID_MFN) )
         goto err;
 
