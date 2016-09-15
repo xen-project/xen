@@ -51,6 +51,17 @@ struct p2m_domain {
     /* Indicate if it is required to clean the cache when writing an entry */
     bool clean_pte;
 
+    /*
+     * P2M updates may required TLBs to be flushed (invalidated).
+     *
+     * Flushes may be deferred by setting 'need_flush' and then flushing
+     * when the p2m write lock is released.
+     *
+     * If an immediate flush is required (e.g, if a super page is
+     * shattered), call p2m_tlb_flush_sync().
+     */
+    bool need_flush;
+
     /* Gather some statistics for information purposes only */
     struct {
         /* Number of mappings at each p2m tree level */

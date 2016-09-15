@@ -52,8 +52,21 @@ static inline void p2m_write_lock(struct p2m_domain *p2m)
     write_lock(&p2m->lock);
 }
 
+static void p2m_flush_tlb(struct p2m_domain *p2m);
+
 static inline void p2m_write_unlock(struct p2m_domain *p2m)
 {
+    if ( p2m->need_flush )
+    {
+        p2m->need_flush = false;
+        /*
+         * The final flush is done with the P2M write lock taken to
+         * to avoid someone else modify the P2M before the TLB
+         * invalidation has completed.
+         */
+        p2m_flush_tlb(p2m);
+    }
+
     write_unlock(&p2m->lock);
 }
 
@@ -70,6 +83,11 @@ static inline void p2m_read_unlock(struct p2m_domain *p2m)
 static inline int p2m_is_locked(struct p2m_domain *p2m)
 {
     return rw_is_locked(&p2m->lock);
+}
+
+static inline int p2m_is_write_locked(struct p2m_domain *p2m)
+{
+    return rw_is_write_locked(&p2m->lock);
 }
 
 void p2m_dump_info(struct domain *d)
@@ -162,6 +180,19 @@ static void p2m_flush_tlb(struct p2m_domain *p2m)
         isb();
         local_irq_restore(flags);
     }
+}
+
+/*
+ * Force a synchronous P2M TLB flush.
+ *
+ * Must be called with the p2m lock held.
+ */
+static void p2m_flush_tlb_sync(struct p2m_domain *p2m)
+{
+    ASSERT(p2m_is_write_locked(p2m));
+
+    p2m_flush_tlb(p2m);
+    p2m->need_flush = false;
 }
 
 /*
@@ -1153,7 +1184,7 @@ static int apply_p2m_changes(struct domain *d,
 out:
     if ( flush )
     {
-        p2m_flush_tlb(&d->arch.p2m);
+        p2m_flush_tlb_sync(&d->arch.p2m);
         ret = iommu_iotlb_flush(d, gfn_x(sgfn), nr);
         if ( !rc )
             rc = ret;
