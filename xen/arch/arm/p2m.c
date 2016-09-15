@@ -29,6 +29,14 @@ static unsigned int __read_mostly p2m_root_level;
 
 unsigned int __read_mostly p2m_ipa_bits;
 
+/* Helpers to lookup the properties of each level */
+static const paddr_t level_sizes[] =
+    { ZEROETH_SIZE, FIRST_SIZE, SECOND_SIZE, THIRD_SIZE };
+static const paddr_t level_masks[] =
+    { ZEROETH_MASK, FIRST_MASK, SECOND_MASK, THIRD_MASK };
+static const uint8_t level_shifts[] =
+    { ZEROETH_SHIFT, FIRST_SHIFT, SECOND_SHIFT, THIRD_SHIFT };
+
 static bool_t p2m_valid(lpae_t pte)
 {
     return pte.p2m.valid;
@@ -681,14 +689,6 @@ static bool_t is_mapping_aligned(const paddr_t start_gpaddr,
 #define P2M_ONE_DESCEND        0
 #define P2M_ONE_PROGRESS_NOP   0x1
 #define P2M_ONE_PROGRESS       0x10
-
-/* Helpers to lookup the properties of each level */
-static const paddr_t level_sizes[] =
-    { ZEROETH_SIZE, FIRST_SIZE, SECOND_SIZE, THIRD_SIZE };
-static const paddr_t level_masks[] =
-    { ZEROETH_MASK, FIRST_MASK, SECOND_MASK, THIRD_MASK };
-static const uint8_t level_shifts[] =
-    { ZEROETH_SHIFT, FIRST_SHIFT, SECOND_SHIFT, THIRD_SHIFT };
 
 static int p2m_shatter_page(struct p2m_domain *p2m,
                             lpae_t *entry,
