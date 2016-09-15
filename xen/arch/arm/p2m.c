@@ -238,28 +238,104 @@ static lpae_t *p2m_get_root_pointer(struct p2m_domain *p2m,
 
 /*
  * Lookup the MFN corresponding to a domain's GFN.
- *
- * There are no processor functions to do a stage 2 only lookup therefore we
- * do a a software walk.
+ * Lookup mem access in the ratrix tree.
+ * The entries associated to the GFN is considered valid.
  */
-static mfn_t __p2m_lookup(struct domain *d, gfn_t gfn, p2m_type_t *t)
+static p2m_access_t p2m_mem_access_radix_get(struct p2m_domain *p2m, gfn_t gfn)
 {
-    struct p2m_domain *p2m = &d->arch.p2m;
-    const paddr_t paddr = pfn_to_paddr(gfn_x(gfn));
-    const unsigned int offsets[4] = {
-        zeroeth_table_offset(paddr),
-        first_table_offset(paddr),
-        second_table_offset(paddr),
-        third_table_offset(paddr)
-    };
-    const paddr_t masks[4] = {
-        ZEROETH_MASK, FIRST_MASK, SECOND_MASK, THIRD_MASK
-    };
-    lpae_t pte, *map;
+    void *ptr;
+
+    if ( !p2m->mem_access_enabled )
+        return p2m->default_access;
+
+    ptr = radix_tree_lookup(&p2m->mem_access_settings, gfn_x(gfn));
+    if ( !ptr )
+        return p2m_access_rwx;
+    else
+        return radix_tree_ptr_to_int(ptr);
+}
+
+#define GUEST_TABLE_MAP_FAILED 0
+#define GUEST_TABLE_SUPER_PAGE 1
+#define GUEST_TABLE_NORMAL_PAGE 2
+
+static int p2m_create_table(struct p2m_domain *p2m, lpae_t *entry,
+                            int level_shift);
+
+/*
+ * Take the currently mapped table, find the corresponding GFN entry,
+ * and map the next table, if available. The previous table will be
+ * unmapped if the next level was mapped (e.g GUEST_TABLE_NORMAL_PAGE
+ * returned).
+ *
+ * The read_only parameters indicates whether intermediate tables should
+ * be allocated when not present.
+ *
+ * Return values:
+ *  GUEST_TABLE_MAP_FAILED: Either read_only was set and the entry
+ *  was empty, or allocating a new page failed.
+ *  GUEST_TABLE_NORMAL_PAGE: next level mapped normally
+ *  GUEST_TABLE_SUPER_PAGE: The next entry points to a superpage.
+ */
+static int p2m_next_level(struct p2m_domain *p2m, bool read_only,
+                          lpae_t **table, unsigned int offset)
+{
+    lpae_t *entry;
+    int ret;
+    mfn_t mfn;
+
+    entry = *table + offset;
+
+    if ( !p2m_valid(*entry) )
+    {
+        if ( read_only )
+            return GUEST_TABLE_MAP_FAILED;
+
+        ret = p2m_create_table(p2m, entry, /* not used */ ~0);
+        if ( ret )
+            return GUEST_TABLE_MAP_FAILED;
+    }
+
+    /* The function p2m_next_level is never called at the 3rd level */
+    if ( p2m_mapping(*entry) )
+        return GUEST_TABLE_SUPER_PAGE;
+
+    mfn = _mfn(entry->p2m.base);
+
+    unmap_domain_page(*table);
+    *table = map_domain_page(mfn);
+
+    return GUEST_TABLE_NORMAL_PAGE;
+}
+
+/*
+ * Get the details of a given gfn.
+ *
+ * If the entry is present, the associated MFN will be returned and the
+ * access and type filled up. The page_order will correspond to the
+ * order of the mapping in the page table (i.e it could be a superpage).
+ *
+ * If the entry is not present, INVALID_MFN will be returned and the
+ * page_order will be set according to the order of the invalid range.
+ */
+mfn_t p2m_get_entry(struct p2m_domain *p2m, gfn_t gfn,
+                    p2m_type_t *t, p2m_access_t *a,
+                    unsigned int *page_order)
+{
+    paddr_t addr = pfn_to_paddr(gfn_x(gfn));
+    unsigned int level = 0;
+    lpae_t entry, *table;
+    int rc;
     mfn_t mfn = INVALID_MFN;
-    paddr_t mask = 0;
     p2m_type_t _t;
-    unsigned int level;
+
+    /* Convenience aliases */
+    const unsigned int offsets[4] = {
+        zeroeth_table_offset(addr),
+        first_table_offset(addr),
+        second_table_offset(addr),
+        third_table_offset(addr)
+    };
 
     ASSERT(p2m_is_locked(p2m));
     BUILD_BUG_ON(THIRD_MASK != PAGE_MASK);
@@ -269,44 +345,72 @@ static mfn_t __p2m_lookup(struct domain *d, gfn_t gfn, p2m_type_t *t)
 
     *t = p2m_invalid;
 
-    map = p2m_get_root_pointer(p2m, gfn);
-    if ( !map )
-        return INVALID_MFN;
+    /* XXX: Check if the mapping is lower than the mapped gfn */
 
-    ASSERT(P2M_ROOT_LEVEL < 4);
-
-    for ( level = P2M_ROOT_LEVEL ; level < 4 ; level++ )
+    /* This gfn is higher than the highest the p2m map currently holds */
+    if ( gfn_x(gfn) > gfn_x(p2m->max_mapped_gfn) )
     {
-        mask = masks[level];
+        for ( level = P2M_ROOT_LEVEL; level < 3; level++ )
+            if ( (gfn_x(gfn) & (level_masks[level] >> PAGE_SHIFT)) >
+                 gfn_x(p2m->max_mapped_gfn) )
+                break;
 
-        pte = map[offsets[level]];
+        goto out;
+    }
 
-        if ( level == 3 && !p2m_table(pte) )
-            /* Invalid, clobber the pte */
-            pte.bits = 0;
-        if ( level == 3 || !p2m_table(pte) )
-            /* Done */
+    table = p2m_get_root_pointer(p2m, gfn);
+
+    /*
+     * the table should always be non-NULL because the gfn is below
+     * p2m->max_mapped_gfn and the root table pages are always present.
+     */
+    BUG_ON(table == NULL);
+
+    for ( level = P2M_ROOT_LEVEL; level < 3; level++ )
+    {
+        rc = p2m_next_level(p2m, true, &table, offsets[level]);
+        if ( rc == GUEST_TABLE_MAP_FAILED )
+            goto out_unmap;
+        else if ( rc != GUEST_TABLE_NORMAL_PAGE )
             break;
-
-        ASSERT(level < 3);
-
-        /* Map for next level */
-        unmap_domain_page(map);
-        map = map_domain_page(_mfn(pte.p2m.base));
     }
 
-    unmap_domain_page(map);
+    entry = table[offsets[level]];
 
-    if ( p2m_valid(pte) )
+    if ( p2m_valid(entry) )
     {
-        ASSERT(mask);
-        ASSERT(pte.p2m.type != p2m_invalid);
-        mfn = _mfn(paddr_to_pfn((pte.bits & PADDR_MASK & mask) |
-                                (paddr & ~mask)));
-        *t = pte.p2m.type;
+        *t = entry.p2m.type;
+
+        if ( a )
+            *a = p2m_mem_access_radix_get(p2m, gfn);
+
+        mfn = _mfn(entry.p2m.base);
+        /*
+         * The entry may point to a superpage. Find the MFN associated
+         * to the GFN.
+         */
+        mfn = mfn_add(mfn, gfn_x(gfn) & ((1UL << level_orders[level]) - 1));
     }
+
+out_unmap:
+    unmap_domain_page(table);
+
+out:
+    if ( page_order )
+        *page_order = level_orders[level];
 
     return mfn;
+}
+
+/*
+ * Lookup the MFN corresponding to a domain's GFN.
+ *
+ * There are no processor functions to do a stage 2 only lookup therefore we
+ * do a a software walk.
+ */
+static mfn_t __p2m_lookup(struct domain *d, gfn_t gfn, p2m_type_t *t)
+{
+    return p2m_get_entry(&d->arch.p2m, gfn, t, NULL, NULL);
 }
 
 mfn_t p2m_lookup(struct domain *d, gfn_t gfn, p2m_type_t *t)
