@@ -390,19 +390,19 @@ static lpae_t mfn_to_p2m_entry(mfn_t mfn, p2m_type_t t, p2m_access_t a)
     return e;
 }
 
-static inline void p2m_write_pte(lpae_t *p, lpae_t pte, bool_t flush_cache)
+static inline void p2m_write_pte(lpae_t *p, lpae_t pte, bool clean_pte)
 {
     write_pte(p, pte);
-    if ( flush_cache )
+    if ( clean_pte )
         clean_dcache(*p);
 }
 
-static inline void p2m_remove_pte(lpae_t *p, bool_t flush_cache)
+static inline void p2m_remove_pte(lpae_t *p, bool clean_pte)
 {
     lpae_t pte;
 
     memset(&pte, 0x00, sizeof(pte));
-    p2m_write_pte(p, pte, flush_cache);
+    p2m_write_pte(p, pte, clean_pte);
 }
 
 /*
