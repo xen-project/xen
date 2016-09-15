@@ -1745,22 +1745,22 @@ static void load_segments(struct vcpu *n)
             (unsigned long *)pv->kernel_sp;
         unsigned long cs_and_mask, rflags;
 
+        /* Fold upcall mask and architectural IOPL into RFLAGS.IF. */
+        rflags  = regs->rflags & ~(X86_EFLAGS_IF|X86_EFLAGS_IOPL);
+        rflags |= !vcpu_info(n, evtchn_upcall_mask) << 9;
+        if ( VM_ASSIST(n->domain, architectural_iopl) )
+            rflags |= n->arch.pv_vcpu.iopl;
+
         if ( is_pv_32bit_vcpu(n) )
         {
             unsigned int *esp = ring_1(regs) ?
                                 (unsigned int *)regs->rsp :
                                 (unsigned int *)pv->kernel_sp;
-            unsigned int cs_and_mask, eflags;
             int ret = 0;
 
             /* CS longword also contains full evtchn_upcall_mask. */
             cs_and_mask = (unsigned short)regs->cs |
                 ((unsigned int)vcpu_info(n, evtchn_upcall_mask) << 16);
-            /* Fold upcall mask into RFLAGS.IF. */
-            eflags  = regs->_eflags & ~(X86_EFLAGS_IF|X86_EFLAGS_IOPL);
-            eflags |= !vcpu_info(n, evtchn_upcall_mask) << 9;
-            if ( VM_ASSIST(n->domain, architectural_iopl) )
-                eflags |= n->arch.pv_vcpu.iopl;
 
             if ( !ring_1(regs) )
             {
@@ -1770,7 +1770,7 @@ static void load_segments(struct vcpu *n)
             }
 
             if ( ret |
-                 put_user(eflags,              esp-1) |
+                 put_user(rflags,              esp-1) |
                  put_user(cs_and_mask,         esp-2) |
                  put_user(regs->_eip,          esp-3) |
                  put_user(uregs->gs,           esp-4) |
@@ -1804,12 +1804,6 @@ static void load_segments(struct vcpu *n)
         /* CS longword also contains full evtchn_upcall_mask. */
         cs_and_mask = (unsigned long)regs->cs |
             ((unsigned long)vcpu_info(n, evtchn_upcall_mask) << 32);
-
-        /* Fold upcall mask into RFLAGS.IF. */
-        rflags  = regs->rflags & ~(X86_EFLAGS_IF|X86_EFLAGS_IOPL);
-        rflags |= !vcpu_info(n, evtchn_upcall_mask) << 9;
-        if ( VM_ASSIST(n->domain, architectural_iopl) )
-            rflags |= n->arch.pv_vcpu.iopl;
 
         if ( put_user(regs->ss,            rsp- 1) |
              put_user(regs->rsp,           rsp- 2) |
