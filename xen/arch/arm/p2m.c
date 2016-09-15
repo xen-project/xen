@@ -550,7 +550,7 @@ static int __p2m_get_mem_access(struct domain *d, gfn_t gfn,
     return 0;
 }
 
-static int p2m_mem_access_radix_set(struct p2m_domain *p2m, unsigned long pfn,
+static int p2m_mem_access_radix_set(struct p2m_domain *p2m, gfn_t gfn,
                                     p2m_access_t a)
 {
     int rc;
@@ -560,18 +560,18 @@ static int p2m_mem_access_radix_set(struct p2m_domain *p2m, unsigned long pfn,
 
     if ( p2m_access_rwx == a )
     {
-        radix_tree_delete(&p2m->mem_access_settings, pfn);
+        radix_tree_delete(&p2m->mem_access_settings, gfn_x(gfn));
         return 0;
     }
 
-    rc = radix_tree_insert(&p2m->mem_access_settings, pfn,
+    rc = radix_tree_insert(&p2m->mem_access_settings, gfn_x(gfn),
                            radix_tree_int_to_ptr(a));
     if ( rc == -EEXIST )
     {
         /* If a setting already exists, change it to the new one */
         radix_tree_replace_slot(
             radix_tree_lookup_slot(
-                &p2m->mem_access_settings, pfn),
+                &p2m->mem_access_settings, gfn_x(gfn)),
             radix_tree_int_to_ptr(a));
         rc = 0;
     }
@@ -715,7 +715,7 @@ static int apply_one_level(struct domain *d,
             */
              (level == 3 || (!p2m_table(orig_pte) && !p2m->mem_access_enabled)) )
         {
-            rc = p2m_mem_access_radix_set(p2m, paddr_to_pfn(*addr), a);
+            rc = p2m_mem_access_radix_set(p2m, _gfn(paddr_to_pfn(*addr)), a);
             if ( rc < 0 )
                 return rc;
 
@@ -833,7 +833,8 @@ static int apply_one_level(struct domain *d,
         *flush = true;
 
         p2m_remove_pte(entry, p2m->clean_pte);
-        p2m_mem_access_radix_set(p2m, paddr_to_pfn(*addr), p2m_access_rwx);
+        p2m_mem_access_radix_set(p2m, _gfn(paddr_to_pfn(*addr)),
+                                 p2m_access_rwx);
 
         *addr += level_size;
         *maddr += level_size;
@@ -904,7 +905,8 @@ static int apply_one_level(struct domain *d,
 
             if ( p2m_valid(pte) )
             {
-                rc = p2m_mem_access_radix_set(p2m, paddr_to_pfn(*addr), a);
+                rc = p2m_mem_access_radix_set(p2m, _gfn(paddr_to_pfn(*addr)),
+                                              a);
                 if ( rc < 0 )
                     return rc;
 
