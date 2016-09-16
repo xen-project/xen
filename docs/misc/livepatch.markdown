@@ -351,6 +351,13 @@ When reverting a patch, the hypervisor iterates over each `livepatch_func`
 and the core code copies the data from the undo buffer (private internal copy)
 to `old_addr`.
 
+It optionally may contain the address of functions to be called right before
+being applied and after being reverted:
+
+ * `.livepatch.hooks.load` - an array of function pointers.
+ * `.livepatch.hooks.unload` - an array of function pointers.
+
+
 ### Example of .livepatch.funcs
 
 A simple example of what a payload file can be:
@@ -387,6 +394,22 @@ struct livepatch_func livepatch_hello_world = {
 </pre>
 
 Code must be compiled with -fPIC.
+
+### .livepatch.hooks.load and .livepatch.hooks.unload
+
+This section contains an array of function pointers to be executed
+before payload is being applied (.livepatch.funcs) or after reverting
+the payload. This is useful to prepare data structures that need to
+be modified patching.
+
+Each entry in this array is eight bytes.
+
+The type definition of the function are as follow:
+
+<pre>
+typedef void (*livepatch_loadcall_t)(void);  
+typedef void (*livepatch_unloadcall_t)(void);   
+</pre>
 
 ### .livepatch.depends and .note.gnu.build-id
 
