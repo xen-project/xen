@@ -65,46 +65,46 @@ static u32 copy_string(u32 src)
     return copy_mem(src, p - src + 1);
 }
 
-multiboot_info_t __stdcall *reloc(u32 mbi_old, u32 trampoline)
+multiboot_info_t __stdcall *reloc(u32 mbi_in, u32 trampoline)
 {
-    multiboot_info_t *mbi;
     int i;
+    multiboot_info_t *mbi_out;
 
     alloc = trampoline;
 
-    mbi = _p(copy_mem(mbi_old, sizeof(*mbi)));
+    mbi_out = _p(copy_mem(mbi_in, sizeof(*mbi_out)));
 
-    if ( mbi->flags & MBI_CMDLINE )
-        mbi->cmdline = copy_string(mbi->cmdline);
+    if ( mbi_out->flags & MBI_CMDLINE )
+        mbi_out->cmdline = copy_string(mbi_out->cmdline);
 
-    if ( mbi->flags & MBI_MODULES )
+    if ( mbi_out->flags & MBI_MODULES )
     {
         module_t *mods;
 
-        mbi->mods_addr = copy_mem(mbi->mods_addr,
-                                  mbi->mods_count * sizeof(module_t));
+        mbi_out->mods_addr = copy_mem(mbi_out->mods_addr,
+                                      mbi_out->mods_count * sizeof(module_t));
 
-        mods = _p(mbi->mods_addr);
+        mods = _p(mbi_out->mods_addr);
 
-        for ( i = 0; i < mbi->mods_count; i++ )
+        for ( i = 0; i < mbi_out->mods_count; i++ )
         {
             if ( mods[i].string )
                 mods[i].string = copy_string(mods[i].string);
         }
     }
 
-    if ( mbi->flags & MBI_MEMMAP )
-        mbi->mmap_addr = copy_mem(mbi->mmap_addr, mbi->mmap_length);
+    if ( mbi_out->flags & MBI_MEMMAP )
+        mbi_out->mmap_addr = copy_mem(mbi_out->mmap_addr, mbi_out->mmap_length);
 
-    if ( mbi->flags & MBI_LOADERNAME )
-        mbi->boot_loader_name = copy_string(mbi->boot_loader_name);
+    if ( mbi_out->flags & MBI_LOADERNAME )
+        mbi_out->boot_loader_name = copy_string(mbi_out->boot_loader_name);
 
     /* Mask features we don't understand or don't relocate. */
-    mbi->flags &= (MBI_MEMLIMITS |
-                   MBI_CMDLINE |
-                   MBI_MODULES |
-                   MBI_MEMMAP |
-                   MBI_LOADERNAME);
+    mbi_out->flags &= (MBI_MEMLIMITS |
+                       MBI_CMDLINE |
+                       MBI_MODULES |
+                       MBI_MEMMAP |
+                       MBI_LOADERNAME);
 
-    return mbi;
+    return mbi_out;
 }
