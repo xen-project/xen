@@ -89,8 +89,8 @@ Novells VMDP. Depending on how VMDP was configured it would control all
 devices, or either NIC or storage. To control all devices the value 0x1
 was written to offset 0x4 in the memory region of the Xen Platform PCI
 Device. This was supposed to unplug NIC, IDE and SCSI devices. If VMDP
-was configured to control just NIC devices it would write the value 0x1
+was configured to control just NIC devices it would write the value 0x2
 to offset 0x8. If VMDP was configured to control just storage devices it
-would write the value 0x2 to offset 0x8. Starting with VMDP version 1.7
+would write the value 0x1 to offset 0x8. Starting with VMDP version 1.7
 (released 2011) the official protocol was used.
 
