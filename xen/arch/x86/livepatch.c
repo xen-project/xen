@@ -46,7 +46,7 @@ int arch_livepatch_verify_func(const struct livepatch_func *func)
     return 0;
 }
 
-void arch_livepatch_apply_jmp(struct livepatch_func *func)
+void arch_livepatch_apply(struct livepatch_func *func)
 {
     uint8_t *old_ptr;
     uint8_t insn[sizeof(func->opaque)];
@@ -75,7 +75,7 @@ void arch_livepatch_apply_jmp(struct livepatch_func *func)
     memcpy(old_ptr, insn, len);
 }
 
-void arch_livepatch_revert_jmp(const struct livepatch_func *func)
+void arch_livepatch_revert(const struct livepatch_func *func)
 {
     memcpy(func->old_addr, func->opaque, livepatch_insn_len(func));
 }

@@ -21,11 +21,11 @@ int arch_livepatch_verify_func(const struct livepatch_func *func)
     return -ENOSYS;
 }
 
-void arch_livepatch_apply_jmp(struct livepatch_func *func)
+void arch_livepatch_apply(struct livepatch_func *func)
 {
 }
 
-void arch_livepatch_revert_jmp(const struct livepatch_func *func)
+void arch_livepatch_revert(const struct livepatch_func *func)
 {
 }
 

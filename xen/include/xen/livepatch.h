@@ -86,8 +86,8 @@ unsigned int livepatch_insn_len(const struct livepatch_func *func)
 int arch_livepatch_quiesce(void);
 void arch_livepatch_revive(void);
 
-void arch_livepatch_apply_jmp(struct livepatch_func *func);
-void arch_livepatch_revert_jmp(const struct livepatch_func *func);
+void arch_livepatch_apply(struct livepatch_func *func);
+void arch_livepatch_revert(const struct livepatch_func *func);
 void arch_livepatch_post_action(void);
 
 void arch_livepatch_mask(void);

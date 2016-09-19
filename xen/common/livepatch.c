@@ -1031,7 +1031,7 @@ static int apply_payload(struct payload *data)
     }
 
     for ( i = 0; i < data->nfuncs; i++ )
-        arch_livepatch_apply_jmp(&data->funcs[i]);
+        arch_livepatch_apply(&data->funcs[i]);
 
     arch_livepatch_revive();
 
@@ -1060,7 +1060,7 @@ static int revert_payload(struct payload *data)
     }
 
     for ( i = 0; i < data->nfuncs; i++ )
-        arch_livepatch_revert_jmp(&data->funcs[i]);
+        arch_livepatch_revert(&data->funcs[i]);
 
     arch_livepatch_revive();
 
