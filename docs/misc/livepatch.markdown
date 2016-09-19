@@ -1151,6 +1151,9 @@ with proper offset is used for an unconditional branch to the new code.
 This means that that `old_size` **MUST** be at least four bytes if patching
 in trampoline.
 
+The instruction offset is limited on ARM32 to +/- 32MB to displacement
+and on ARM64 to +/- 128MB displacement.
+
 The new code is placed in the 8M - 10M virtual address space while the
 Xen code is in 2M - 4M. That gives us enough space.
 

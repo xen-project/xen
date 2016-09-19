@@ -6,7 +6,10 @@
 #ifndef __XEN_X86_LIVEPATCH_H__
 #define __XEN_X86_LIVEPATCH_H__
 
+#include <xen/sizes.h> /* For SZ_* macros. */
+
 #define ARCH_PATCH_INSN_SIZE 5
+#define ARCH_LIVEPATCH_RANGE SZ_2G
 
 #endif /* __XEN_X86_LIVEPATCH_H__ */
 

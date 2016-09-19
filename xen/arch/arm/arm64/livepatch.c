@@ -40,6 +40,7 @@ void arch_livepatch_apply(struct livepatch_func *func)
     else
         insn = aarch64_insn_gen_nop();
 
+    /* Verified in livepatch_verify_distance. */
     ASSERT(insn != AARCH64_BREAK_FAULT);
 
     new_ptr = func->old_addr - (void *)_start + vmap_of_xen_text;
