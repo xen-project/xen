@@ -11,7 +11,13 @@ config COMPAT
 config CORE_PARKING
 	bool
 
+config HAS_ALTERNATIVE
+	bool
+
 config HAS_DEVICE_TREE
+	bool
+
+config HAS_EX_TABLE
 	bool
 
 config HAS_MEM_ACCESS
