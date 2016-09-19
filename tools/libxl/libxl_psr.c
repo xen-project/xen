@@ -16,6 +16,7 @@
 #include "libxl_osdeps.h" /* must come before any other headers */
 #include "libxl_internal.h"
 
+#include <xen-tools/libs.h>
 
 #define IA32_QM_CTR_ERROR_MASK         (0x3ul << 62)
 

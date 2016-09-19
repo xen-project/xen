@@ -2,6 +2,8 @@
 
 #include "xc_sr_common.h"
 
+#include <xen-tools/libs.h>
+
 static const char *dhdr_types[] =
 {
     [DHDR_TYPE_X86_PV]  = "x86 PV",
@@ -140,17 +142,17 @@ int read_record(struct xc_sr_context *ctx, int fd, struct xc_sr_record *rec)
 
 static void __attribute__((unused)) build_assertions(void)
 {
-    XC_BUILD_BUG_ON(sizeof(struct xc_sr_ihdr) != 24);
-    XC_BUILD_BUG_ON(sizeof(struct xc_sr_dhdr) != 16);
-    XC_BUILD_BUG_ON(sizeof(struct xc_sr_rhdr) != 8);
+    BUILD_BUG_ON(sizeof(struct xc_sr_ihdr) != 24);
+    BUILD_BUG_ON(sizeof(struct xc_sr_dhdr) != 16);
+    BUILD_BUG_ON(sizeof(struct xc_sr_rhdr) != 8);
 
-    XC_BUILD_BUG_ON(sizeof(struct xc_sr_rec_page_data_header)  != 8);
-    XC_BUILD_BUG_ON(sizeof(struct xc_sr_rec_x86_pv_info)       != 8);
-    XC_BUILD_BUG_ON(sizeof(struct xc_sr_rec_x86_pv_p2m_frames) != 8);
-    XC_BUILD_BUG_ON(sizeof(struct xc_sr_rec_x86_pv_vcpu_hdr)   != 8);
-    XC_BUILD_BUG_ON(sizeof(struct xc_sr_rec_tsc_info)          != 24);
-    XC_BUILD_BUG_ON(sizeof(struct xc_sr_rec_hvm_params_entry)  != 16);
-    XC_BUILD_BUG_ON(sizeof(struct xc_sr_rec_hvm_params)        != 8);
+    BUILD_BUG_ON(sizeof(struct xc_sr_rec_page_data_header)  != 8);
+    BUILD_BUG_ON(sizeof(struct xc_sr_rec_x86_pv_info)       != 8);
+    BUILD_BUG_ON(sizeof(struct xc_sr_rec_x86_pv_p2m_frames) != 8);
+    BUILD_BUG_ON(sizeof(struct xc_sr_rec_x86_pv_vcpu_hdr)   != 8);
+    BUILD_BUG_ON(sizeof(struct xc_sr_rec_tsc_info)          != 24);
+    BUILD_BUG_ON(sizeof(struct xc_sr_rec_hvm_params_entry)  != 16);
+    BUILD_BUG_ON(sizeof(struct xc_sr_rec_hvm_params)        != 8);
 }
 
 /*

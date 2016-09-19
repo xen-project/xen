@@ -21,6 +21,8 @@
 #include <stdbool.h>
 #include "xc_private.h"
 
+#include <xen-tools/libs.h>
+
 /*
  * Get PM statistic info
  */
@@ -274,8 +276,8 @@ int xc_get_cpufreq_para(xc_interface *xch, int cpuid,
                 sys_para->scaling_governor, CPUFREQ_NAME_LEN);
 
         /* copy to user_para no matter what cpufreq governor */
-        XC_BUILD_BUG_ON(sizeof(((struct xc_get_cpufreq_para *)0)->u) !=
-                        sizeof(((struct xen_get_cpufreq_para *)0)->u));
+        BUILD_BUG_ON(sizeof(((struct xc_get_cpufreq_para *)0)->u) !=
+		     sizeof(((struct xen_get_cpufreq_para *)0)->u));
 
         memcpy(&user_para->u, &sys_para->u, sizeof(sys_para->u));
     }

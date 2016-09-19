@@ -19,6 +19,8 @@
 #include "xg_private.h"
 #include "xc_core.h"
 
+#include <xen-tools/libs.h>
+
 int
 xc_core_arch_gpfn_may_present(struct xc_core_arch_context *arch_ctxt,
                               unsigned long pfn)
@@ -101,7 +103,7 @@ xc_core_arch_get_scratch_gpfn(xc_interface *xch, domid_t domid,
      * The Grant Table region space is not used until the guest is
      * booting. Use the first page for the scratch pfn.
      */
-    XC_BUILD_BUG_ON(GUEST_GNTTAB_SIZE < XC_PAGE_SIZE);
+    BUILD_BUG_ON(GUEST_GNTTAB_SIZE < XC_PAGE_SIZE);
 
     *gpfn = GUEST_GNTTAB_BASE >> XC_PAGE_SHIFT;
 

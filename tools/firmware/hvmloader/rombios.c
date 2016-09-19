@@ -31,6 +31,7 @@
 #include "option_rom.h"
 
 #include <xen/hvm/params.h>
+#include <xen-tools/libs.h>
 
 #define ROM_INCLUDE_ROMBIOS
 #define ROM_INCLUDE_VGABIOS

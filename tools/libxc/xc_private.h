@@ -72,13 +72,6 @@ struct iovec {
 #define PAGE_SIZE               XC_PAGE_SIZE
 #define PAGE_MASK               XC_PAGE_MASK
 
-/* Force a compilation error if condition is true */
-#if __GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 6)
-#define XC_BUILD_BUG_ON(p) ({ _Static_assert(!(p), "!(" #p ")"); })
-#else
-#define XC_BUILD_BUG_ON(p) ((void)sizeof(struct { int:-!!(p); }))
-#endif
-
 #ifndef ARRAY_SIZE /* MiniOS leaks ARRAY_SIZE into our namespace as part of a
                     * stubdom build.  It shouldn't... */
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof(a[0]))

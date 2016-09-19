@@ -21,6 +21,7 @@
 
 #include <xen/xen.h>
 #include <xen/io/protocols.h>
+#include <xen-tools/libs.h>
 
 #include "xg_private.h"
 #include "xc_dom.h"
@@ -69,7 +70,7 @@ static int alloc_magic_pages(struct xc_dom_image *dom)
     const xen_pfn_t base = GUEST_MAGIC_BASE >> XC_PAGE_SHIFT;
     xen_pfn_t p2m[NR_MAGIC_PAGES];
 
-    XC_BUILD_BUG_ON(NR_MAGIC_PAGES > GUEST_MAGIC_SIZE >> XC_PAGE_SHIFT);
+    BUILD_BUG_ON(NR_MAGIC_PAGES > GUEST_MAGIC_SIZE >> XC_PAGE_SHIFT);
 
     DOMPRINTF_CALLED(dom->xch);
 
