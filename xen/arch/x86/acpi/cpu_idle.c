@@ -66,9 +66,9 @@
 #define GET_PC3_RES(val)  GET_HW_RES_IN_NS(0x3F8, val)
 #define GET_PC6_RES(val)  GET_HW_RES_IN_NS(0x3F9, val)
 #define GET_PC7_RES(val)  GET_HW_RES_IN_NS(0x3FA, val)
-#define GET_PC8_RES(val)  GET_HW_RES_IN_NS(0x630, val)
-#define GET_PC9_RES(val)  GET_HW_RES_IN_NS(0x631, val)
-#define GET_PC10_RES(val) GET_HW_RES_IN_NS(0x632, val)
+#define GET_PC8_RES(val)  GET_HW_RES_IN_NS(0x630, val) /* some Haswells only */
+#define GET_PC9_RES(val)  GET_HW_RES_IN_NS(0x631, val) /* some Haswells only */
+#define GET_PC10_RES(val) GET_HW_RES_IN_NS(0x632, val) /* some Haswells only */
 #define GET_CC1_RES(val)  GET_HW_RES_IN_NS(0x660, val) /* Silvermont only */
 #define GET_CC3_RES(val)  GET_HW_RES_IN_NS(0x3FC, val)
 #define GET_CC6_RES(val)  GET_HW_RES_IN_NS(0x3FD, val)
@@ -142,8 +142,6 @@ static void do_get_hw_residencies(void *arg)
     {
     /* 4th generation Intel Core (Haswell) */
     case 0x45:
-    /* Xeon E5/E7 v4 (Broadwell) */
-    case 0x4F:
         GET_PC8_RES(hw_res->pc8);
         GET_PC9_RES(hw_res->pc9);
         GET_PC10_RES(hw_res->pc10);
@@ -161,6 +159,7 @@ static void do_get_hw_residencies(void *arg)
     /* Broadwell */
     case 0x3D:
     case 0x47:
+    case 0x4F:
     case 0x56:
     /* Skylake */
     case 0x4E:
