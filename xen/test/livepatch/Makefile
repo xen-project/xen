@@ -1,5 +1,12 @@
 include $(XEN_ROOT)/Config.mk
 
+ifeq ($(XEN_TARGET_ARCH),x86_64)
+OBJCOPY_MAGIC := -I binary -O elf64-x86-64 -B i386:x86-64
+endif
+ifeq ($(XEN_TARGET_ARCH),arm64)
+OBJCOPY_MAGIC := -I binary -O elf64-littleaarch64 -B aarch64
+endif
+
 CODE_ADDR=$(shell nm --defined $(1) | grep $(2) | awk '{print "0x"$$1}')
 CODE_SZ=$(shell nm --defined -S $(1) | grep $(2) | awk '{ print "0x"$$2}')
 
@@ -54,7 +61,7 @@ $(LIVEPATCH): xen_hello_world_func.o xen_hello_world.o note.o
 .PHONY: note.o
 note.o:
 	$(OBJCOPY) -O binary --only-section=.note.gnu.build-id $(BASEDIR)/xen-syms $@.bin
-	$(OBJCOPY) -I binary -O elf64-x86-64 -B i386:x86-64 \
+	$(OBJCOPY) $(OBJCOPY_MAGIC) \
 		   --rename-section=.data=.livepatch.depends,alloc,load,readonly,data,contents -S $@.bin $@
 	rm -f $@.bin
 
@@ -65,7 +72,7 @@ note.o:
 .PHONY: hello_world_note.o
 hello_world_note.o: $(LIVEPATCH)
 	$(OBJCOPY) -O binary --only-section=.note.gnu.build-id $(LIVEPATCH) $@.bin
-	$(OBJCOPY)  -I binary -O elf64-x86-64 -B i386:x86-64 \
+	$(OBJCOPY) $(OBJCOPY_MAGIC) \
 		   --rename-section=.data=.livepatch.depends,alloc,load,readonly,data,contents -S $@.bin $@
 	rm -f $@.bin
 

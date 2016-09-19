@@ -1,6 +1,6 @@
 .PHONY: tests
 tests:
-ifeq ($(XEN_TARGET_ARCH),x86_64)
+ifneq $(XEN_TARGET_ARCH),arm32)
 	$(MAKE) -f $(BASEDIR)/Rules.mk -C livepatch livepatch
 endif
 

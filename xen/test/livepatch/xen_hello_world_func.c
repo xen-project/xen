@@ -7,14 +7,17 @@
 
 #include <asm/alternative.h>
 #include <asm/livepatch.h>
+#ifdef CONFIG_X86
 #include <asm/nops.h>
 #include <asm/uaccess.h>
 
 static unsigned long *non_canonical_addr = (unsigned long *)0xdead000000000000ULL;
+#endif
 
 /* Our replacement function for xen_extra_version. */
 const char *xen_hello_world(void)
 {
+#ifdef CONFIG_X86
     unsigned long tmp;
     int rc;
 
@@ -25,6 +28,10 @@ const char *xen_hello_world(void)
      */
     rc = __get_user(tmp, non_canonical_addr);
     BUG_ON(rc != -EFAULT);
+#endif
+#if defined(CONFIG_ARM) && defined(CONFIG_HAS_ALTERNATIVE)
+    asm(ALTERNATIVE("nop", "nop", LIVEPATCH_FEATURE));
+#endif
 
     return "Hello World";
 }
