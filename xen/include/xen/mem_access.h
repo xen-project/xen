@@ -30,12 +30,6 @@
 int mem_access_memop(unsigned long cmd,
                      XEN_GUEST_HANDLE_PARAM(xen_mem_access_op_t) arg);
 
-static inline
-void mem_access_resume(struct vcpu *v, vm_event_response_t *rsp)
-{
-    p2m_mem_access_emulate_check(v, rsp);
-}
-
 #else
 
 static inline
@@ -43,12 +37,6 @@ int mem_access_memop(unsigned long cmd,
                      XEN_GUEST_HANDLE_PARAM(xen_mem_access_op_t) arg)
 {
     return -ENOSYS;
-}
-
-static inline
-void mem_access_resume(struct vcpu *vcpu, vm_event_response_t *rsp)
-{
-    /* Nothing to do. */
 }
 
 #endif /* HAS_MEM_ACCESS */

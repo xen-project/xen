@@ -677,7 +677,7 @@ bool_t p2m_mem_access_check(paddr_t gpa, unsigned long gla,
 
 /* Check for emulation and mark vcpu for skipping one instruction
  * upon rescheduling if required. */
-void p2m_mem_access_emulate_check(struct vcpu *v,
+bool p2m_mem_access_emulate_check(struct vcpu *v,
                                   const vm_event_response_t *rsp);
 
 /* Sanity check for mem_access hardware support */

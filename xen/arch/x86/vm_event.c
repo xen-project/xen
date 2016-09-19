@@ -18,6 +18,7 @@
  * License along with this program; If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <asm/p2m.h>
 #include <asm/vm_event.h>
 
 /* Implicitly serialized by the domctl lock. */
@@ -56,8 +57,12 @@ void vm_event_cleanup_domain(struct domain *d)
     d->arch.mem_access_emulate_each_rep = 0;
 }
 
-void vm_event_toggle_singlestep(struct domain *d, struct vcpu *v)
+void vm_event_toggle_singlestep(struct domain *d, struct vcpu *v,
+                                vm_event_response_t *rsp)
 {
+    if ( !(rsp->flags & VM_EVENT_FLAG_TOGGLE_SINGLESTEP) )
+        return;
+
     if ( !is_hvm_domain(d) )
         return;
 
@@ -184,6 +189,34 @@ void vm_event_fill_regs(vm_event_request_t *req)
 
     hvm_get_segment_register(curr, x86_seg_cs, &seg);
     req->data.regs.x86.cs_arbytes = seg.attr.bytes;
+}
+
+void vm_event_emulate_check(struct vcpu *v, vm_event_response_t *rsp)
+{
+    if ( !(rsp->flags & VM_EVENT_FLAG_EMULATE) )
+    {
+        v->arch.vm_event->emulate_flags = 0;
+        return;
+    }
+
+    switch ( rsp->reason )
+    {
+    case VM_EVENT_REASON_MEM_ACCESS:
+        /*
+         * Emulate iff this is a response to a mem_access violation and there
+         * are still conflicting mem_access permissions in-place.
+         */
+        if ( p2m_mem_access_emulate_check(v, rsp) )
+        {
+            if ( rsp->flags & VM_EVENT_FLAG_SET_EMUL_READ_DATA )
+                v->arch.vm_event->emul_read_data = rsp->data.emul_read_data;
+
+            v->arch.vm_event->emulate_flags = rsp->flags;
+        }
+        break;
+    default:
+        break;
+    };
 }
 
 /*

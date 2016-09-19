@@ -121,10 +121,11 @@ typedef enum {
                              p2m_to_mask(p2m_map_foreign)))
 
 static inline
-void p2m_mem_access_emulate_check(struct vcpu *v,
+bool p2m_mem_access_emulate_check(struct vcpu *v,
                                   const vm_event_response_t *rsp)
 {
     /* Not supported on ARM. */
+    return 0;
 }
 
 static inline

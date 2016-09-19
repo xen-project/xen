@@ -1588,62 +1588,55 @@ void p2m_mem_paging_resume(struct domain *d, vm_event_response_t *rsp)
     }
 }
 
-void p2m_mem_access_emulate_check(struct vcpu *v,
+bool p2m_mem_access_emulate_check(struct vcpu *v,
                                   const vm_event_response_t *rsp)
 {
-    /* Mark vcpu for skipping one instruction upon rescheduling. */
-    if ( rsp->flags & VM_EVENT_FLAG_EMULATE )
+    xenmem_access_t access;
+    bool violation = 1;
+    const struct vm_event_mem_access *data = &rsp->u.mem_access;
+
+    if ( p2m_get_mem_access(v->domain, _gfn(data->gfn), &access) == 0 )
     {
-        xenmem_access_t access;
-        bool_t violation = 1;
-        const struct vm_event_mem_access *data = &rsp->u.mem_access;
-
-        if ( p2m_get_mem_access(v->domain, _gfn(data->gfn), &access) == 0 )
+        switch ( access )
         {
-            switch ( access )
-            {
-            case XENMEM_access_n:
-            case XENMEM_access_n2rwx:
-            default:
-                violation = data->flags & MEM_ACCESS_RWX;
-                break;
+        case XENMEM_access_n:
+        case XENMEM_access_n2rwx:
+        default:
+            violation = data->flags & MEM_ACCESS_RWX;
+            break;
 
-            case XENMEM_access_r:
-                violation = data->flags & MEM_ACCESS_WX;
-                break;
+        case XENMEM_access_r:
+            violation = data->flags & MEM_ACCESS_WX;
+            break;
 
-            case XENMEM_access_w:
-                violation = data->flags & MEM_ACCESS_RX;
-                break;
+        case XENMEM_access_w:
+            violation = data->flags & MEM_ACCESS_RX;
+            break;
 
-            case XENMEM_access_x:
-                violation = data->flags & MEM_ACCESS_RW;
-                break;
+        case XENMEM_access_x:
+            violation = data->flags & MEM_ACCESS_RW;
+            break;
 
-            case XENMEM_access_rx:
-            case XENMEM_access_rx2rw:
-                violation = data->flags & MEM_ACCESS_W;
-                break;
+        case XENMEM_access_rx:
+        case XENMEM_access_rx2rw:
+            violation = data->flags & MEM_ACCESS_W;
+            break;
 
-            case XENMEM_access_wx:
-                violation = data->flags & MEM_ACCESS_R;
-                break;
+        case XENMEM_access_wx:
+            violation = data->flags & MEM_ACCESS_R;
+            break;
 
-            case XENMEM_access_rw:
-                violation = data->flags & MEM_ACCESS_X;
-                break;
+        case XENMEM_access_rw:
+            violation = data->flags & MEM_ACCESS_X;
+            break;
 
-            case XENMEM_access_rwx:
-                violation = 0;
-                break;
-            }
+        case XENMEM_access_rwx:
+            violation = 0;
+            break;
         }
-
-        v->arch.vm_event->emulate_flags = violation ? rsp->flags : 0;
-
-        if ( (rsp->flags & VM_EVENT_FLAG_SET_EMUL_READ_DATA) )
-            v->arch.vm_event->emul_read_data = rsp->data.emul_read_data;
     }
+
+    return violation;
 }
 
 void p2m_altp2m_check(struct vcpu *v, uint16_t idx)

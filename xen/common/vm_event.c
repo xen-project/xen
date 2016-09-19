@@ -398,41 +398,40 @@ void vm_event_resume(struct domain *d, struct vm_event_domain *ved)
          * In some cases the response type needs extra handling, so here
          * we call the appropriate handlers.
          */
-        switch ( rsp.reason )
-        {
-#ifdef CONFIG_X86
-        case VM_EVENT_REASON_MOV_TO_MSR:
-#endif
-        case VM_EVENT_REASON_WRITE_CTRLREG:
-            vm_event_register_write_resume(v, &rsp);
-            break;
-
-#ifdef CONFIG_HAS_MEM_ACCESS
-        case VM_EVENT_REASON_MEM_ACCESS:
-            mem_access_resume(v, &rsp);
-            break;
-#endif
-
-#ifdef CONFIG_HAS_MEM_PAGING
-        case VM_EVENT_REASON_MEM_PAGING:
-            p2m_mem_paging_resume(d, &rsp);
-            break;
-#endif
-
-        };
-
-        /* Check for altp2m switch */
-        if ( rsp.flags & VM_EVENT_FLAG_ALTERNATE_P2M )
-            p2m_altp2m_check(v, rsp.altp2m_idx);
 
         /* Check flags which apply only when the vCPU is paused */
         if ( atomic_read(&v->vm_event_pause_count) )
         {
+#ifdef CONFIG_HAS_MEM_PAGING
+            if ( rsp.reason == VM_EVENT_REASON_MEM_PAGING )
+                p2m_mem_paging_resume(d, &rsp);
+#endif
+
+            /*
+             * Check emulation flags in the arch-specific handler only, as it
+             * has to set arch-specific flags when supported, and to avoid
+             * bitmask overhead when it isn't supported.
+             */
+            vm_event_emulate_check(v, &rsp);
+
+            /*
+             * Check in arch-specific handler to avoid bitmask overhead when
+             * not supported.
+             */
+            vm_event_register_write_resume(v, &rsp);
+
+            /*
+             * Check in arch-specific handler to avoid bitmask overhead when
+             * not supported.
+             */
+            vm_event_toggle_singlestep(d, v, &rsp);
+
+            /* Check for altp2m switch */
+            if ( rsp.flags & VM_EVENT_FLAG_ALTERNATE_P2M )
+                p2m_altp2m_check(v, rsp.altp2m_idx);
+
             if ( rsp.flags & VM_EVENT_FLAG_SET_REGISTERS )
                 vm_event_set_registers(v, &rsp);
-
-            if ( rsp.flags & VM_EVENT_FLAG_TOGGLE_SINGLESTEP )
-                vm_event_toggle_singlestep(d, v);
 
             if ( rsp.flags & VM_EVENT_FLAG_VCPU_PAUSED )
                 vm_event_vcpu_unpause(v);
