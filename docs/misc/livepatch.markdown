@@ -1108,7 +1108,7 @@ and the .data or .bss sections are of zero length.
 The hypervisor should verify that the in-place patching would fit within
 the code or data.
 
-### Trampoline (e9 opcode)
+### Trampoline (e9 opcode), x86
 
 The e9 opcode used for jmpq uses a 32-bit signed displacement. That means
 we are limited to up to 2GB of virtual address to place the new code
@@ -1143,3 +1143,15 @@ that in the hypervisor is advised.
 The tool for generating payloads currently does perform a compile-time
 check to ensure that the function to be replaced is large enough.
 
+#### Trampoline, ARM
+
+The unconditional branch instruction (for the encoding see the
+DDI 0406C.c and DDI 0487A.j Architecture Reference Manual's).
+with proper offset is used for an unconditional branch to the new code.
+This means that that `old_size` **MUST** be at least four bytes if patching
+in trampoline.
+
+The new code is placed in the 8M - 10M virtual address space while the
+Xen code is in 2M - 4M. That gives us enough space.
+
+The hypervisor also checks the displacement during loading of the payload.

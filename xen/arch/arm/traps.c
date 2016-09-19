@@ -24,6 +24,7 @@
 #include <xen/symbols.h>
 #include <xen/irq.h>
 #include <xen/lib.h>
+#include <xen/livepatch.h>
 #include <xen/mm.h>
 #include <xen/errno.h>
 #include <xen/hypercall.h>
@@ -2733,6 +2734,11 @@ asmlinkage void leave_hypervisor_tail(void)
         }
         local_irq_enable();
         do_softirq();
+        /*
+         * Must be the last one - as the IPI will trigger us to come here
+         * and we want to patch the hypervisor with almost no stack.
+         */
+        check_for_livepatch_work();
     }
 }
 

@@ -14,6 +14,15 @@
 #define NULL ((void*)0)
 #endif
 
+#define INT16_MIN       (-32767-1)
+#define INT32_MIN       (-2147483647-1)
+
+#define INT16_MAX       (32767)
+#define INT32_MAX       (2147483647)
+
+#define UINT16_MAX      (65535)
+#define UINT32_MAX      (4294967295U)
+
 #define INT_MAX         ((int)(~0U>>1))
 #define INT_MIN         (-INT_MAX - 1)
 #define UINT_MAX        (~0U)

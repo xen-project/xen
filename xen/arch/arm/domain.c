@@ -13,6 +13,7 @@
 #include <xen/hypercall.h>
 #include <xen/init.h>
 #include <xen/lib.h>
+#include <xen/livepatch.h>
 #include <xen/sched.h>
 #include <xen/softirq.h>
 #include <xen/wait.h>
@@ -55,6 +56,11 @@ void idle_loop(void)
 
         do_tasklet();
         do_softirq();
+        /*
+         * We MUST be last (or before dsb, wfi). Otherwise after we get the
+         * softirq we would execute dsb,wfi (and sleep) and not patch.
+         */
+        check_for_livepatch_work();
     }
 }
 
