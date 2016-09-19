@@ -26,7 +26,6 @@
 #include "util.h"
 #include "hypercall.h"
 #include <xen/hvm/hvm_xs_strings.h>
-#include <xen-tools/libs.h>
 
 /* SBMIOS handle base values */
 #define SMBIOS_HANDLE_TYPE0   0x0000

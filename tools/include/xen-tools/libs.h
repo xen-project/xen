@@ -1,4 +1,5 @@
 #ifndef __XEN_TOOLS_LIBS__
+#define __XEN_TOOLS_LIBS__
 
 #ifndef BUILD_BUG_ON
 #if __GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 6)
