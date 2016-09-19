@@ -8,6 +8,7 @@
 #include <xen/livepatch.h>
 #include <xen/vmap.h>
 
+#include <asm/cpufeature.h>
 #include <asm/livepatch.h>
 #include <asm/mm.h>
 
@@ -161,6 +162,8 @@ void __init arch_livepatch_init(void)
     end = (void *)LIVEPATCH_VMAP_END;
 
     vm_init_type(VMAP_XEN, start, end);
+
+    cpus_set_cap(LIVEPATCH_FEATURE);
 }
 
 /*

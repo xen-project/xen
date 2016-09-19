@@ -6,6 +6,7 @@
 #include <xen/types.h>
 
 #include <asm/alternative.h>
+#include <asm/livepatch.h>
 #include <asm/nops.h>
 #include <asm/uaccess.h>
 
@@ -17,7 +18,7 @@ const char *xen_hello_world(void)
     unsigned long tmp;
     int rc;
 
-    alternative(ASM_NOP8, ASM_NOP1, X86_FEATURE_LM);
+    alternative(ASM_NOP8, ASM_NOP1, LIVEPATCH_FEATURE);
     /*
      * Any BUG, or WARN_ON will contain symbol and payload name. Furthermore
      * exceptions will be caught and processed properly.
