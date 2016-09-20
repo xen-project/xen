@@ -114,15 +114,21 @@ int libxl__device_generic_add(libxl__gc *gc, xs_transaction_t t,
         libxl__device *device, char **bents, char **fents, char **ro_fents)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
-    char *frontend_path, *backend_path, *libxl_path;
+    char *frontend_path = NULL, *backend_path = NULL, *libxl_path;
     struct xs_permissions frontend_perms[2];
     struct xs_permissions ro_frontend_perms[2];
     struct xs_permissions backend_perms[2];
     int create_transaction = t == XBT_NULL;
+    int libxl_only = device->backend_kind == LIBXL__DEVICE_KIND_NONE;
     int rc;
 
-    frontend_path = libxl__device_frontend_path(gc, device);
-    backend_path = libxl__device_backend_path(gc, device);
+    if (libxl_only) {
+        /* bents should be set as this is used to setup libxl_path content. */
+        assert(!fents && !ro_fents);
+    } else {
+        frontend_path = libxl__device_frontend_path(gc, device);
+        backend_path = libxl__device_backend_path(gc, device);
+    }
     libxl_path = libxl__device_libxl_path(gc, device);
 
     frontend_perms[0].id = device->domid;
@@ -144,13 +150,15 @@ retry_transaction:
     rc = libxl__xs_rm_checked(gc, t, libxl_path);
     if (rc) goto out;
 
-    rc = libxl__xs_write_checked(gc, t, GCSPRINTF("%s/frontend",libxl_path),
-                                 frontend_path);
-    if (rc) goto out;
+    if (!libxl_only) {
+        rc = libxl__xs_write_checked(gc, t, GCSPRINTF("%s/frontend",libxl_path),
+                                     frontend_path);
+        if (rc) goto out;
 
-    rc = libxl__xs_write_checked(gc, t, GCSPRINTF("%s/backend",libxl_path),
-                                 backend_path);
-    if (rc) goto out;
+        rc = libxl__xs_write_checked(gc, t, GCSPRINTF("%s/backend",libxl_path),
+                                     backend_path);
+        if (rc) goto out;
+    }
 
     /* xxx much of this function lacks error checks! */
 
@@ -179,12 +187,15 @@ retry_transaction:
     }
 
     if (bents) {
-        xs_rm(ctx->xsh, t, backend_path);
-        xs_mkdir(ctx->xsh, t, backend_path);
-        xs_set_permissions(ctx->xsh, t, backend_path, backend_perms, ARRAY_SIZE(backend_perms));
-        xs_write(ctx->xsh, t, GCSPRINTF("%s/frontend", backend_path),
-                 frontend_path, strlen(frontend_path));
-        libxl__xs_writev(gc, t, backend_path, bents);
+        if (!libxl_only) {
+            xs_rm(ctx->xsh, t, backend_path);
+            xs_mkdir(ctx->xsh, t, backend_path);
+            xs_set_permissions(ctx->xsh, t, backend_path, backend_perms,
+                               ARRAY_SIZE(backend_perms));
+            xs_write(ctx->xsh, t, GCSPRINTF("%s/frontend", backend_path),
+                     frontend_path, strlen(frontend_path));
+            libxl__xs_writev(gc, t, backend_path, bents);
+        }
 
         /*
          * We make a copy of everything for the backend in the libxl
@@ -193,6 +204,9 @@ retry_transaction:
          * would use the information from the json configuration
          * instead.  But there are still places in libxl that try to
          * reconstruct a config from xenstore.
+         *
+         * For devices without PV backend (e.g. USB devices emulated via qemu)
+         * only the libxl path is written.
          *
          * This duplication will typically produces duplicate keys
          * which will go out of date, but that's OK because nothing
@@ -679,14 +693,21 @@ void libxl__multidev_prepared(libxl__egc *egc,
 
 int libxl__device_destroy(libxl__gc *gc, libxl__device *dev)
 {
-    const char *be_path = libxl__device_backend_path(gc, dev);
-    const char *fe_path = libxl__device_frontend_path(gc, dev);
+    const char *be_path = NULL;
+    const char *fe_path = NULL;
     const char *libxl_path = libxl__device_libxl_path(gc, dev);
-    const char *tapdisk_path = GCSPRINTF("%s/%s", be_path, "tapdisk-params");
-    const char *tapdisk_params;
+    const char *tapdisk_path = NULL;
+    const char *tapdisk_params = NULL;
     xs_transaction_t t = 0;
     int rc;
     uint32_t domid;
+    int libxl_only = dev->backend_kind == LIBXL__DEVICE_KIND_NONE;
+
+    if (!libxl_only) {
+        be_path = libxl__device_backend_path(gc, dev);
+        fe_path = libxl__device_frontend_path(gc, dev);
+        tapdisk_path = GCSPRINTF("%s/%s", be_path, "tapdisk-params");
+    }
 
     rc = libxl__get_domid(gc, &domid);
     if (rc) goto out;
@@ -696,18 +717,21 @@ int libxl__device_destroy(libxl__gc *gc, libxl__device *dev)
         if (rc) goto out;
 
         /* May not exist if this is not a tap device */
-        rc = libxl__xs_read_checked(gc, t, tapdisk_path, &tapdisk_params);
-        if (rc) goto out;
+        if (tapdisk_path) {
+            rc = libxl__xs_read_checked(gc, t, tapdisk_path, &tapdisk_params);
+            if (rc) goto out;
+        }
 
         if (domid == LIBXL_TOOLSTACK_DOMID) {
             /*
              * The toolstack domain is in charge of removing the
              * frontend and libxl paths.
              */
-            libxl__xs_path_cleanup(gc, t, fe_path);
+            if (!libxl_only)
+                libxl__xs_path_cleanup(gc, t, fe_path);
             libxl__xs_path_cleanup(gc, t, libxl_path);
         }
-        if (dev->backend_domid == domid) {
+        if (dev->backend_domid == domid && !libxl_only) {
             /*
              * The driver domain is in charge of removing what it can
              * from the backend path.

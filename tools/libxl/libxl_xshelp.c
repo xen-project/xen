@@ -20,8 +20,12 @@
 char **libxl__xs_kvs_of_flexarray(libxl__gc *gc, flexarray_t *array)
 {
     char **kvs;
-    int i, length = array->count;
+    int i, length;
 
+    if (!array)
+        return NULL;
+
+    length = array->count;
     if (!length)
         return NULL;
 
