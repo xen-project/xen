@@ -268,9 +268,9 @@ SEABIOS_UPSTREAM_REVISION ?= rel-1.8.2
 ETHERBOOT_NICS ?= rtl8139 8086100e
 
 
-QEMU_TRADITIONAL_REVISION ?= xen-4.6.3
-# Thu May 19 19:38:35 2016 +0100
-# main loop: Big hammer to fix logfile disk DoS in Xen setups
+QEMU_TRADITIONAL_REVISION ?= cff044b5c8bf51d9c9f3f9439671ed378857928a
+# Tue Jul 26 15:31:59 2016 +0100
+# virtio: error out if guest exceeds virtqueue size
 
 # Specify which qemu-dm to use. This may be `ioemu' to use the old
 # Mercurial in-tree version, or a local directory, or a git URL.
