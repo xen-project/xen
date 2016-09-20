@@ -3728,14 +3728,14 @@ int main_usblist(int argc, char **argv)
     }
 
     for (i = 0; i < numctrl; ++i) {
-        printf("%-6s %-6s %-3s %-5s %-7s %-5s\n",
+        printf("%-6s %-12s %-3s %-5s %-7s %-5s\n",
                 "Devid", "Type", "BE", "state", "usb-ver", "ports");
 
         libxl_usbctrlinfo_init(&usbctrlinfo);
 
         if (!libxl_device_usbctrl_getinfo(ctx, domid,
                                 &usbctrls[i], &usbctrlinfo)) {
-            printf("%-6d %-6s %-3d %-5d %-7d %-5d\n",
+            printf("%-6d %-12s %-3d %-5d %-7d %-5d\n",
                     usbctrlinfo.devid,
                     libxl_usbctrl_type_to_string(usbctrlinfo.type),
                     usbctrlinfo.backend_id, usbctrlinfo.state,
