@@ -252,7 +252,7 @@ QEMU_TRADITIONAL_URL ?= git://xenbits.xen.org/qemu-xen-traditional.git
 SEABIOS_UPSTREAM_URL ?= git://xenbits.xen.org/seabios.git
 endif
 OVMF_UPSTREAM_REVISION ?= 52a99493cce88a9d4ec8a02d7f1bd1a1001ce60d
-QEMU_UPSTREAM_REVISION ?= qemu-xen-4.5.4
+QEMU_UPSTREAM_REVISION ?= qemu-xen-4.5.5
 # Wed Sep 16 17:38:44 2015 +0200
 # trace: remove malloc tracing
 SEABIOS_UPSTREAM_REVISION ?= rel-1.7.5
@@ -262,7 +262,7 @@ SEABIOS_UPSTREAM_REVISION ?= rel-1.7.5
 ETHERBOOT_NICS ?= rtl8139 8086100e
 
 
-QEMU_TRADITIONAL_REVISION ?= xen-4.5.4
+QEMU_TRADITIONAL_REVISION ?= xen-4.5.5
 # Thu May 19 19:38:35 2016 +0100
 # main loop: Big hammer to fix logfile disk DoS in Xen setups
 
