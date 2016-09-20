@@ -827,14 +827,7 @@ static struct page_info *alloc_heap_pages(
         BUG_ON(pg[i].count_info != PGC_state_free);
         pg[i].count_info = PGC_state_inuse;
 
-        if ( pg[i].u.free.need_tlbflush &&
-             (pg[i].tlbflush_timestamp <= tlbflush_current_time()) &&
-             (!need_tlbflush ||
-              (pg[i].tlbflush_timestamp > tlbflush_timestamp)) )
-        {
-            need_tlbflush = 1;
-            tlbflush_timestamp = pg[i].tlbflush_timestamp;
-        }
+        accumulate_tlbflush(&need_tlbflush, &pg[i], &tlbflush_timestamp);
 
         /* Initialise fields which have other uses for free pages. */
         pg[i].u.inuse.type_info = 0;
@@ -849,15 +842,7 @@ static struct page_info *alloc_heap_pages(
     spin_unlock(&heap_lock);
 
     if ( need_tlbflush )
-    {
-        cpumask_t mask = cpu_online_map;
-        tlbflush_filter(mask, tlbflush_timestamp);
-        if ( !cpumask_empty(&mask) )
-        {
-            perfc_incr(need_flush_tlb_flush);
-            flush_tlb_mask(&mask);
-        }
-    }
+        filtered_flush_tlb_mask(tlbflush_timestamp);
 
     return pg;
 }
