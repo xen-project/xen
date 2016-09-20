@@ -194,6 +194,47 @@ out:
     return rc;
 }
 
+static const char *vusb_be_from_xs_libxl(libxl__gc *gc, const char *libxl_path)
+{
+    const char *be_path;
+    int r;
+
+    r = libxl__xs_read_checked(gc, XBT_NULL,
+                               GCSPRINTF("%s/backend", libxl_path),
+                               &be_path);
+    if (r || !be_path) return NULL;
+
+    return be_path;
+}
+
+static void libxl__device_usbctrl_del_xenstore(libxl__gc *gc, uint32_t domid,
+                                               libxl_device_usbctrl *usbctrl)
+{
+    const char *libxl_path, *be_path;
+    xs_transaction_t t = XBT_NULL;
+    int rc;
+
+    libxl_path = GCSPRINTF("%s/device/vusb/%d",
+                           libxl__xs_libxl_path(gc, domid), usbctrl->devid);
+    be_path = vusb_be_from_xs_libxl(gc, libxl_path);
+
+    for (;;) {
+        rc = libxl__xs_transaction_start(gc, &t);
+        if (rc) goto out;
+
+        libxl__xs_path_cleanup(gc, t, be_path);
+
+        rc = libxl__xs_transaction_commit(gc, &t);
+        if (!rc) break;
+        if (rc < 0) goto out;
+    }
+
+    return;
+
+out:
+    libxl__xs_transaction_abort(gc, &t);
+}
+
 static char *pvusb_get_device_type(libxl_usbctrl_type type)
 {
     switch (type) {
@@ -250,13 +291,15 @@ static void libxl__device_usbctrl_add(libxl__egc *egc, uint32_t domid,
 
     GCNEW(device);
     rc = libxl__device_from_usbctrl(gc, domid, usbctrl, device);
-    if (rc) goto out;
+    if (rc) goto outrm;
 
     aodev->dev = device;
     aodev->action = LIBXL__DEVICE_ACTION_ADD;
     libxl__wait_device_connection(egc, aodev);
     return;
 
+outrm:
+    libxl__device_usbctrl_del_xenstore(gc, domid, usbctrl);
 out:
     aodev->rc = rc;
     aodev->callback(egc, aodev);
@@ -338,19 +381,6 @@ out:
     aodev->rc = rc;
     aodev->callback(egc, aodev);
     return;
-}
-
-static const char *vusb_be_from_xs_libxl(libxl__gc *gc, const char *libxl_path)
-{
-    const char *be_path;
-    int r;
-
-    r = libxl__xs_read_checked(gc, XBT_NULL,
-                               GCSPRINTF("%s/backend", libxl_path),
-                               &be_path);
-    if (r || !be_path) return NULL;
-
-    return be_path;
 }
 
 libxl_device_usbctrl *
