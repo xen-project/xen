@@ -745,19 +745,29 @@ Specifies the usb controller type.
 
 "qusb" specifies a qemu base backend for pvusb.
 
+"devicemodel" specifies a USB controller emulated by qemu.
+It will show up as a PCI-device in the guest.
+
 "auto" (the default) determines whether a kernel based backend is installed.
 If this is the case, "pv" is selected, "qusb" will be selected if no kernel
 backend is currently available.
+For HVM domains "devicemodel" will be selected.
 
 =item B<version=VERSION>
 
 Specifies the usb controller version.  Possible values include
-1 (USB1.1) and 2 (USB2.0). Default is 2 (USB2.0).
+1 (USB1.1), 2 (USB2.0) and 3 (USB3.0).
+Default is 2 (USB2.0).
+3 (USB3.0) is available for the type "devicemodel" only.
 
 =item B<ports=PORTS>
 
 Specifies the total ports of the usb controller. The maximum
 number is 31. Default is 8.
+With the type "devicemodel" the number of ports is more limited:
+a USB1.1 controller always has 2 ports,
+a USB2.0 controller always has 6 ports
+and a USB3.0 controller can have up to 15 ports.
 
 USB controller ids start from 0.  In line with the USB spec, however,
 ports on a controller start from 1.
