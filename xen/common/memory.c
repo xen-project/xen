@@ -141,6 +141,8 @@ static void populate_physmap(struct memop_args *a)
     unsigned int i, j;
     xen_pfn_t gpfn, mfn;
     struct domain *d = a->domain, *curr_d = current->domain;
+    bool need_tlbflush = false;
+    uint32_t tlbflush_timestamp = 0;
 
     if ( !guest_handle_subrange_okay(a->extent_list, a->nr_done,
                                      a->nr_extents-1) )
@@ -149,6 +151,17 @@ static void populate_physmap(struct memop_args *a)
     if ( a->extent_order > (a->memflags & MEMF_populate_on_demand ? MAX_ORDER :
                             max_order(curr_d)) )
         return;
+
+    /*
+     * With MEMF_no_tlbflush set, alloc_heap_pages() will ignore
+     * TLB-flushes. After VM creation, this is a security issue (it can
+     * make pages accessible to guest B, when guest A may still have a
+     * cached mapping to them). So we do this only during domain creation,
+     * when the domain itself has not yet been unpaused for the first
+     * time.
+     */
+    if ( unlikely(!d->creation_finished) )
+        a->memflags |= MEMF_no_tlbflush;
 
     for ( i = a->nr_done; i < a->nr_extents; i++ )
     {
@@ -214,6 +227,13 @@ static void populate_physmap(struct memop_args *a)
                     goto out;
                 }
 
+                if ( unlikely(a->memflags & MEMF_no_tlbflush) )
+                {
+                    for ( j = 0; j < (1U << a->extent_order); j++ )
+                        accumulate_tlbflush(&need_tlbflush, &page[j],
+                                            &tlbflush_timestamp);
+                }
+
                 mfn = page_to_mfn(page);
             }
 
@@ -232,6 +252,8 @@ static void populate_physmap(struct memop_args *a)
     }
 
 out:
+    if ( need_tlbflush )
+        filtered_flush_tlb_mask(tlbflush_timestamp);
     a->nr_done = i;
 }
 

@@ -1004,6 +1004,13 @@ int domain_unpause_by_systemcontroller(struct domain *d)
 {
     int old, new, prev = d->controller_pause_count;
 
+    /*
+     * We record this information here for populate_physmap to figure out
+     * that the domain has finished being created. In fact, we're only
+     * allowed to set the MEMF_no_tlbflush flag during VM creation.
+     */
+    d->creation_finished = true;
+
     do
     {
         old = prev;

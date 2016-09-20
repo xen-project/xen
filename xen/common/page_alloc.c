@@ -827,7 +827,9 @@ static struct page_info *alloc_heap_pages(
         BUG_ON(pg[i].count_info != PGC_state_free);
         pg[i].count_info = PGC_state_inuse;
 
-        accumulate_tlbflush(&need_tlbflush, &pg[i], &tlbflush_timestamp);
+        if ( !(memflags & MEMF_no_tlbflush) )
+            accumulate_tlbflush(&need_tlbflush, &pg[i],
+                                &tlbflush_timestamp);
 
         /* Initialise fields which have other uses for free pages. */
         pg[i].u.inuse.type_info = 0;
