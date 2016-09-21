@@ -20,7 +20,7 @@ static xc_interface *xch;
 void show_help(void)
 {
     fprintf(stderr,
-            "xen-livepatch: live patching test tool\n"
+            "xen-livepatch: live patching tool\n"
             "Usage: xen-livepatch <command> [args]\n"
             " <name> An unique name of payload. Up to %d characters.\n"
             "Commands:\n"
