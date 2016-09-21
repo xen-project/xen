@@ -31,7 +31,7 @@ Xen relies on some settings the firmware has to configure in EL3 before starting
 
 * Xen must be entered in NS EL2 mode
 
-* The bit SCR_EL3.HCR (resp. SCR.HCE for 32-bit ARM) must be set to 1.
+* The bit SCR_EL3.HCE (resp. SCR.HCE for 32-bit ARM) must be set to 1.
 
 
 [1] linux/Documentation/arm/Booting
