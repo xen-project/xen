@@ -33,6 +33,8 @@ static inline void write_pte(lpae_t *p, lpae_t pte)
 static inline void invalidate_icache(void)
 {
     asm volatile ("ic ialluis");
+    dsb(ish);               /* Ensure completion of the flush I-cache */
+    isb();
 }
 
 /*
