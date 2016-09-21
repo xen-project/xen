@@ -91,8 +91,6 @@ static int list_func(int argc, char *argv[])
         return rc;
     }
 
-    fprintf(stdout," ID                                     | status\n"
-                   "----------------------------------------+------------\n");
     do {
         done = 0;
         /* The memset is done to catch errors. */
@@ -106,6 +104,10 @@ static int list_func(int argc, char *argv[])
                     idx, left, errno, strerror(errno));
             break;
         }
+        if ( !idx )
+            fprintf(stdout," ID                                     | status\n"
+                           "----------------------------------------+------------\n");
+
         for ( i = 0; i < done; i++ )
         {
             unsigned int j;
