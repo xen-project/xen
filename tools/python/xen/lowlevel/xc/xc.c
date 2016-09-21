@@ -1641,7 +1641,6 @@ static PyObject *pyxc_tmem_control(XcObject *self,
         case XEN_SYSCTL_TMEM_OP_FREEZE:
         case XEN_SYSCTL_TMEM_OP_DESTROY:
         case XEN_SYSCTL_TMEM_OP_SET_WEIGHT:
-        case XEN_SYSCTL_TMEM_OP_SET_CAP:
         case XEN_SYSCTL_TMEM_OP_SET_COMPRESS:
         default:
             break;

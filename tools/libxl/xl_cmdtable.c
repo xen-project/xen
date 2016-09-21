@@ -407,7 +407,6 @@ struct cmd_spec cmd_table[] = {
       "[<Domain>|-a] [-w[=WEIGHT]|-c[=CAP]|-p[=COMPRESS]]",
       "  -a                             Operate on all tmem\n"
       "  -w WEIGHT                      Weight (int)\n"
-      "  -c CAP                         Cap (int)\n"
       "  -p COMPRESS                    Compress (int)",
     },
     { "tmem-shared-auth",

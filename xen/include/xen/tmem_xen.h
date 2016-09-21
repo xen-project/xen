@@ -409,7 +409,6 @@ struct client {
     long eph_count, eph_count_max;
     domid_t cli_id;
     uint32_t weight;
-    uint32_t cap;
     bool_t compress;
     bool_t frozen;
     bool_t shared_auth_required;

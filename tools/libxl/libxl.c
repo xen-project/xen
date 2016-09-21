@@ -6156,8 +6156,6 @@ static int32_t tmem_setop_from_string(char *set_name)
 {
     if (!strcmp(set_name, "weight"))
         return XEN_SYSCTL_TMEM_OP_SET_WEIGHT;
-    else if (!strcmp(set_name, "cap"))
-        return XEN_SYSCTL_TMEM_OP_SET_CAP;
     else if (!strcmp(set_name, "compress"))
         return XEN_SYSCTL_TMEM_OP_SET_COMPRESS;
     else
@@ -6171,7 +6169,7 @@ int libxl_tmem_set(libxl_ctx *ctx, uint32_t domid, char* name, uint32_t set)
     GC_INIT(ctx);
 
     if (subop == -1) {
-        LOGEV(ERROR, -1, "Invalid set, valid sets are <weight|cap|compress>");
+        LOGEV(ERROR, -1, "Invalid set, valid sets are <weight|compress>");
         rc = ERROR_INVAL;
         goto out;
     }

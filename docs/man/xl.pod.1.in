@@ -1589,10 +1589,6 @@ B<OPTIONS>
 
 Weight (int)
 
-=item B<-c> I<CAP>
-
-Cap (int)
-
 =item B<-p> I<COMPRESS>
 
 Compress (int)

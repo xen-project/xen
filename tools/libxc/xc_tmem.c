@@ -212,7 +212,7 @@ int xc_tmem_save(xc_interface *xch,
     int marker = field_marker;
     int i, j;
     uint32_t max_pools, version;
-    uint32_t weight, cap, flags;
+    uint32_t weight, flags;
     uint32_t pool_id;
     uint32_t minusone = -1;
     struct tmem_handle *h;
@@ -238,10 +238,7 @@ int xc_tmem_save(xc_interface *xch,
     weight = xc_tmem_control(xch,0,XEN_SYSCTL_TMEM_OP_SAVE_GET_CLIENT_WEIGHT,dom,0,0,NULL);
     if ( write_exact(io_fd, &weight, sizeof(weight)) )
         return -1;
-    cap = xc_tmem_control(xch,0,XEN_SYSCTL_TMEM_OP_SAVE_GET_CLIENT_CAP,dom,0,0,NULL);
-    if ( write_exact(io_fd, &cap, sizeof(cap)) )
-        return -1;
-    if ( flags == -1 || weight == -1 || cap == -1 )
+    if ( flags == -1 || weight == -1 )
         return -1;
     if ( write_exact(io_fd, &minusone, sizeof(minusone)) )
         return -1;
@@ -384,7 +381,7 @@ int xc_tmem_restore(xc_interface *xch, int dom, int io_fd)
     uint32_t this_max_pools, this_version;
     uint32_t pool_id;
     uint32_t minusone;
-    uint32_t weight, cap, flags;
+    uint32_t weight, flags;
     int checksum = 0;
 
     if ( read_exact(io_fd, &this_version, sizeof(this_version)) )
@@ -409,10 +406,6 @@ int xc_tmem_restore(xc_interface *xch, int dom, int io_fd)
     if ( read_exact(io_fd, &weight, sizeof(weight)) )
         return -1;
     if ( xc_tmem_control(xch,0,XEN_SYSCTL_TMEM_OP_SET_WEIGHT,dom,0,0,NULL) < 0 )
-        return -1;
-    if ( read_exact(io_fd, &cap, sizeof(cap)) )
-        return -1;
-    if ( xc_tmem_control(xch,0,XEN_SYSCTL_TMEM_OP_SET_CAP,dom,0,0,NULL) < 0 )
         return -1;
     if ( read_exact(io_fd, &minusone, sizeof(minusone)) )
         return -1;

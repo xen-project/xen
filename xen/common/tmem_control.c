@@ -103,9 +103,9 @@ static int tmemc_list_client(struct client *c, tmem_cli_va_param_t buf,
     struct tmem_pool *p;
     bool_t s;
 
-    n = scnprintf(info,BSIZE,"C=CI:%d,ww:%d,ca:%d,co:%d,fr:%d,"
+    n = scnprintf(info,BSIZE,"C=CI:%d,ww:%d,co:%d,fr:%d,"
         "Tc:%"PRIu64",Ge:%ld,Pp:%ld,Gp:%ld%c",
-        c->cli_id, c->weight, c->cap, c->compress, c->frozen,
+        c->cli_id, c->weight, c->compress, c->frozen,
         c->total_cycles, c->succ_eph_gets, c->succ_pers_puts, c->succ_pers_gets,
         use_long ? ',' : '\n');
     if (use_long)
@@ -273,11 +273,6 @@ static int __tmemc_set_var(struct client *client, uint32_t subop, uint32_t arg1)
         atomic_sub(old_weight,&tmem_global.client_weight_total);
         atomic_add(client->weight,&tmem_global.client_weight_total);
         break;
-    case XEN_SYSCTL_TMEM_OP_SET_CAP:
-        client->cap = arg1;
-        tmem_client_info("tmem: cap set to %d for %s=%d\n",
-                        arg1, tmem_cli_id_str, cli_id);
-        break;
     case XEN_SYSCTL_TMEM_OP_SET_COMPRESS:
         if ( tmem_dedup_enabled() )
         {
@@ -341,11 +336,6 @@ static int tmemc_save_subop(int cli_id, uint32_t pool_id,
             break;
         rc = client->weight == -1 ? -2 : client->weight;
         break;
-    case XEN_SYSCTL_TMEM_OP_SAVE_GET_CLIENT_CAP:
-        if ( client == NULL )
-            break;
-        rc = client->cap == -1 ? -2 : client->cap;
-        break;
     case XEN_SYSCTL_TMEM_OP_SAVE_GET_CLIENT_FLAGS:
         if ( client == NULL )
             break;
@@ -404,7 +394,6 @@ int tmem_control(struct xen_sysctl_tmem_op *op)
                          guest_handle_cast(op->buf, char), op->arg1, op->arg2);
         break;
     case XEN_SYSCTL_TMEM_OP_SET_WEIGHT:
-    case XEN_SYSCTL_TMEM_OP_SET_CAP:
     case XEN_SYSCTL_TMEM_OP_SET_COMPRESS:
         ret = tmemc_set_var(op->cli_id, cmd, op->arg1);
         break;
@@ -414,7 +403,6 @@ int tmem_control(struct xen_sysctl_tmem_op *op)
     case XEN_SYSCTL_TMEM_OP_SAVE_GET_VERSION:
     case XEN_SYSCTL_TMEM_OP_SAVE_GET_MAXPOOLS:
     case XEN_SYSCTL_TMEM_OP_SAVE_GET_CLIENT_WEIGHT:
-    case XEN_SYSCTL_TMEM_OP_SAVE_GET_CLIENT_CAP:
     case XEN_SYSCTL_TMEM_OP_SAVE_GET_CLIENT_FLAGS:
     case XEN_SYSCTL_TMEM_OP_SAVE_GET_POOL_FLAGS:
     case XEN_SYSCTL_TMEM_OP_SAVE_GET_POOL_NPAGES:
