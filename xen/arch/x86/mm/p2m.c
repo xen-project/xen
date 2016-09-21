@@ -1936,8 +1936,12 @@ long p2m_set_mem_access_multi(struct domain *d,
         uint8_t access;
         uint64_t gfn_l;
 
-        copy_from_guest_offset(&gfn_l, pfn_list, start, 1);
-        copy_from_guest_offset(&access, access_list, start, 1);
+        if ( copy_from_guest_offset(&gfn_l, pfn_list, start, 1) ||
+             copy_from_guest_offset(&access, access_list, start, 1) )
+        {
+            rc = -EFAULT;
+            break;
+        }
 
         if ( !xenmem_access_to_p2m_access(p2m, access, &a) )
         {
