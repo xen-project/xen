@@ -84,6 +84,7 @@
  *
  */
 #define MATTR_DEV     0x1
+#define MATTR_MEM_NC  0x5
 #define MATTR_MEM     0xf
 
 /* Flags for get_page_from_gva, gvirt_to_maddr etc */

@@ -441,6 +441,7 @@ static void p2m_set_permission(lpae_t *e, p2m_type_t t, p2m_access_t a)
     case p2m_map_foreign:
     case p2m_grant_map_rw:
     case p2m_mmio_direct_dev:
+    case p2m_mmio_direct_nc:
     case p2m_mmio_direct_c:
         e->p2m.xn = 1;
         e->p2m.write = 1;
@@ -518,6 +519,24 @@ static lpae_t mfn_to_p2m_entry(mfn_t mfn, p2m_type_t t, p2m_access_t a)
 
     case p2m_mmio_direct_c:
         e.p2m.mattr = MATTR_MEM;
+        e.p2m.sh = LPAE_SH_OUTER;
+        break;
+
+    /*
+     * ARM ARM: Overlaying the shareability attribute (DDI
+     * 0406C.b B3-1376 to 1377)
+     *
+     * A memory region with a resultant memory type attribute of Normal,
+     * and a resultant cacheability attribute of Inner Non-cacheable,
+     * Outer Non-cacheable, must have a resultant shareability attribute
+     * of Outer Shareable, otherwise shareability is UNPREDICTABLE.
+     *
+     * On ARMv8 shareability is ignored and explicitly treated as Outer
+     * Shareable for Normal Inner Non_cacheable, Outer Non-cacheable.
+     * See the note for table D4-40, in page 1788 of the ARM DDI 0487A.j.
+     */
+    case p2m_mmio_direct_nc:
+        e.p2m.mattr = MATTR_MEM_NC;
         e.p2m.sh = LPAE_SH_OUTER;
         break;
 
