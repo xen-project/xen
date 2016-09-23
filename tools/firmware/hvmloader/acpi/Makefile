@@ -22,6 +22,9 @@ OBJS  = $(patsubst %.c,%.o,$(C_SRC))
 
 CFLAGS += $(CFLAGS_xeninclude)
 
+# Suffix for temporary files.
+TMP_SUFFIX	= tmp
+
 vpath iasl $(PATH)
 all: acpi.a
 
@@ -34,18 +37,21 @@ mk_dsdt: mk_dsdt.c
 	$(HOSTCC) $(HOSTCFLAGS) $(CFLAGS_xeninclude) -o $@ mk_dsdt.c
 
 dsdt_anycpu_qemu_xen.asl: dsdt.asl mk_dsdt
-	awk 'NR > 1 {print s} {s=$$0}' $< > $@
-	./mk_dsdt --debug=$(debug) --dm-version qemu-xen >> $@
+	awk 'NR > 1 {print s} {s=$$0}' $< > $@.$(TMP_SUFFIX)
+	./mk_dsdt --debug=$(debug) --dm-version qemu-xen >> $@.$(TMP_SUFFIX)
+	mv -f $@.$(TMP_SUFFIX) $@
 
 # NB. awk invocation is a portable alternative to 'head -n -1'
 dsdt_%cpu.asl: dsdt.asl mk_dsdt
-	awk 'NR > 1 {print s} {s=$$0}' $< > $@
-	./mk_dsdt --debug=$(debug) --maxcpu $*  >> $@
+	awk 'NR > 1 {print s} {s=$$0}' $< > $@.$(TMP_SUFFIX)
+	./mk_dsdt --debug=$(debug) --maxcpu $*  >> $@.$(TMP_SUFFIX)
+	mv -f $@.$(TMP_SUFFIX) $@
 
 $(filter dsdt_%.c,$(C_SRC)): %.c: iasl %.asl
 	iasl -vs -p $* -tc $*.asl
-	sed -e 's/AmlCode/$*/g' $*.hex >$@
-	echo "int $*_len=sizeof($*);" >>$@
+	sed -e 's/AmlCode/$*/g' $*.hex >$@.$(TMP_SUFFIX)
+	echo "int $*_len=sizeof($*);" >>$@.$(TMP_SUFFIX)
+	mv -f $@.$(TMP_SUFFIX) $@
 	rm -f $*.aml $*.hex
 
 iasl:
@@ -63,7 +69,7 @@ acpi.a: $(OBJS)
 
 clean:
 	rm -rf *.a *.o $(IASL_VER) $(IASL_VER).tar.gz $(DEPS)
-	rm -rf ssdt_*.h dsdt*.c *~ *.aml *.hex mk_dsdt dsdt_*.asl
+	rm -rf ssdt_*.h dsdt*.c *~ *.aml *.hex mk_dsdt dsdt_*.asl *.$(TMP_SUFFIX)
 
 distclean: clean
 
