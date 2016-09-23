@@ -537,17 +537,21 @@ static void plt_overflow(void *unused)
     set_timer(&plt_overflow_timer, NOW() + plt_overflow_period);
 }
 
-static s_time_t read_platform_stime(void)
+static s_time_t read_platform_stime(u64 *stamp)
 {
-    u64 count;
+    u64 plt_counter, count;
     s_time_t stime;
 
     ASSERT(!local_irq_is_enabled());
 
     spin_lock(&platform_timer_lock);
-    count = plt_stamp64 + ((plt_src.read_counter() - plt_stamp) & plt_mask);
+    plt_counter = plt_src.read_counter();
+    count = plt_stamp64 + ((plt_counter - plt_stamp) & plt_mask);
     stime = __read_platform_stime(count);
     spin_unlock(&platform_timer_lock);
+
+    if ( unlikely(stamp) )
+        *stamp = plt_counter;
 
     return stime;
 }
@@ -661,7 +665,7 @@ void cstate_restore_tsc(void)
     if ( boot_cpu_has(X86_FEATURE_NONSTOP_TSC) )
         return;
 
-    write_tsc(stime2tsc(read_platform_stime()));
+    write_tsc(stime2tsc(read_platform_stime(NULL)));
 }
 
 /***************************************************************************
@@ -980,7 +984,7 @@ int cpu_frequency_change(u64 freq)
 
     local_irq_disable();
     /* Platform time /first/, as we may be delayed by platform_timer_lock. */
-    t->stamp.master_stime = read_platform_stime();
+    t->stamp.master_stime = read_platform_stime(NULL);
     curr_tsc = rdtsc_ordered();
     /* TSC-extrapolated time may be bogus after frequency change. */
     /*t->stamp.local_stime = get_s_time_fixed(curr_tsc);*/
@@ -1285,7 +1289,7 @@ static void time_calibration_tsc_rendezvous(void *_r)
 
             if ( r->master_stime == 0 )
             {
-                r->master_stime = read_platform_stime();
+                r->master_stime = read_platform_stime(NULL);
                 r->master_tsc_stamp = rdtsc_ordered();
             }
             atomic_inc(&r->semaphore);
@@ -1325,7 +1329,7 @@ static void time_calibration_std_rendezvous(void *_r)
     {
         while ( atomic_read(&r->semaphore) != (total_cpus - 1) )
             cpu_relax();
-        r->master_stime = read_platform_stime();
+        r->master_stime = read_platform_stime(NULL);
         smp_wmb(); /* write r->master_stime /then/ signal */
         atomic_inc(&r->semaphore);
     }
@@ -1364,7 +1368,7 @@ void time_latch_stamps(void)
     unsigned long flags;
 
     local_irq_save(flags);
-    ap_bringup_ref.master_stime = read_platform_stime();
+    ap_bringup_ref.master_stime = read_platform_stime(NULL);
     ap_bringup_ref.local_tsc = rdtsc_ordered();
     local_irq_restore(flags);
 
@@ -1382,7 +1386,7 @@ void init_percpu_time(void)
     t->tsc_scale = per_cpu(cpu_time, 0).tsc_scale;
 
     local_irq_save(flags);
-    now = read_platform_stime();
+    now = read_platform_stime(NULL);
     tsc = rdtsc_ordered();
     local_irq_restore(flags);
 
