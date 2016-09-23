@@ -42,6 +42,12 @@ static void __init parse_dom0_mem(const char *s)
 }
 custom_param("dom0_mem", parse_dom0_mem);
 
+struct map_range_data
+{
+    struct domain *d;
+    p2m_type_t p2mt;
+};
+
 //#define DEBUG_11_ALLOCATION
 #ifdef DEBUG_11_ALLOCATION
 # define D11PRINT(fmt, args...) printk(XENLOG_DEBUG fmt, ##args)
@@ -974,7 +980,8 @@ static int map_range_to_domain(const struct dt_device_node *dev,
                                u64 addr, u64 len,
                                void *data)
 {
-    struct domain *d = data;
+    struct map_range_data *mr_data = data;
+    struct domain *d = mr_data->d;
     bool_t need_mapping = !dt_device_for_passthrough(dev);
     int res;
 
@@ -991,10 +998,12 @@ static int map_range_to_domain(const struct dt_device_node *dev,
 
     if ( need_mapping )
     {
-        res = map_mmio_regions(d,
+        res = map_regions_p2mt(d,
                                _gfn(paddr_to_pfn(addr)),
                                DIV_ROUND_UP(len, PAGE_SIZE),
-                               _mfn(paddr_to_pfn(addr)));
+                               _mfn(paddr_to_pfn(addr)),
+                               mr_data->p2mt);
+
         if ( res < 0 )
         {
             printk(XENLOG_ERR "Unable to map 0x%"PRIx64
@@ -1005,7 +1014,8 @@ static int map_range_to_domain(const struct dt_device_node *dev,
         }
     }
 
-    dt_dprintk("  - MMIO: %010"PRIx64" - %010"PRIx64"\n", addr, addr + len);
+    dt_dprintk("  - MMIO: %010"PRIx64" - %010"PRIx64" P2MType=%x\n",
+               addr, addr + len, mr_data->p2mt);
 
     return 0;
 }
@@ -1016,8 +1026,10 @@ static int map_range_to_domain(const struct dt_device_node *dev,
  * the child resources available to domain 0.
  */
 static int map_device_children(struct domain *d,
-                               const struct dt_device_node *dev)
+                               const struct dt_device_node *dev,
+                               p2m_type_t p2mt)
 {
+    struct map_range_data mr_data = { .d = d, .p2mt = p2mt };
     int ret;
 
     if ( dt_device_type_is_equal(dev, "pci") )
@@ -1029,7 +1041,7 @@ static int map_device_children(struct domain *d,
         if ( ret < 0 )
             return ret;
 
-        ret = dt_for_each_range(dev, &map_range_to_domain, d);
+        ret = dt_for_each_range(dev, &map_range_to_domain, &mr_data);
         if ( ret < 0 )
             return ret;
     }
@@ -1045,7 +1057,8 @@ static int map_device_children(struct domain *d,
  *  - Assign the device to the guest if it's protected by an IOMMU
  *  - Map the IRQs and iomem regions to DOM0
  */
-static int handle_device(struct domain *d, struct dt_device_node *dev)
+static int handle_device(struct domain *d, struct dt_device_node *dev,
+                         p2m_type_t p2mt)
 {
     unsigned int nirq;
     unsigned int naddr;
@@ -1111,6 +1124,7 @@ static int handle_device(struct domain *d, struct dt_device_node *dev)
     /* Give permission and map MMIOs */
     for ( i = 0; i < naddr; i++ )
     {
+        struct map_range_data mr_data = { .d = d, .p2mt = p2mt };
         res = dt_device_get_address(dev, i, &addr, &size);
         if ( res )
         {
@@ -1119,12 +1133,12 @@ static int handle_device(struct domain *d, struct dt_device_node *dev)
             return res;
         }
 
-        res = map_range_to_domain(dev, addr, size, d);
+        res = map_range_to_domain(dev, addr, size, &mr_data);
         if ( res )
             return res;
     }
 
-    res = map_device_children(d, dev);
+    res = map_device_children(d, dev, p2mt);
     if ( res )
         return res;
 
@@ -1132,7 +1146,8 @@ static int handle_device(struct domain *d, struct dt_device_node *dev)
 }
 
 static int handle_node(struct domain *d, struct kernel_info *kinfo,
-                       struct dt_device_node *node)
+                       struct dt_device_node *node,
+                       p2m_type_t p2mt)
 {
     static const struct dt_device_match skip_matches[] __initconst =
     {
@@ -1219,7 +1234,7 @@ static int handle_node(struct domain *d, struct kernel_info *kinfo,
                "WARNING: Path %s is reserved, skip the node as we may re-use the path.\n",
                path);
 
-    res = handle_device(d, node);
+    res = handle_device(d, node, p2mt);
     if ( res)
         return res;
 
@@ -1241,7 +1256,7 @@ static int handle_node(struct domain *d, struct kernel_info *kinfo,
 
     for ( child = node->child; child != NULL; child = child->sibling )
     {
-        res = handle_node(d, kinfo, child);
+        res = handle_node(d, kinfo, child, p2mt);
         if ( res )
             return res;
     }
@@ -1273,6 +1288,7 @@ static int handle_node(struct domain *d, struct kernel_info *kinfo,
 
 static int prepare_dtb(struct domain *d, struct kernel_info *kinfo)
 {
+    const p2m_type_t default_p2mt = p2m_mmio_direct_dev;
     const void *fdt;
     int new_size;
     int ret;
@@ -1292,7 +1308,7 @@ static int prepare_dtb(struct domain *d, struct kernel_info *kinfo)
 
     fdt_finish_reservemap(kinfo->fdt);
 
-    ret = handle_node(d, kinfo, dt_host);
+    ret = handle_node(d, kinfo, dt_host, default_p2mt);
     if ( ret )
         goto err;
 
