@@ -576,6 +576,24 @@ static void resume_platform_timer(void)
     plt_stamp = plt_src.read_counter();
 }
 
+static s64 __init try_platform_timer(struct platform_timesource *pts)
+{
+    s64 rc = pts->init(pts);
+
+    if ( rc <= 0 )
+        return rc;
+
+    plt_mask = (u64)~0ull >> (64 - pts->counter_bits);
+
+    set_time_scale(&plt_scale, pts->frequency);
+
+    plt_overflow_period = scale_delta(
+        1ull << (pts->counter_bits - 1), &plt_scale);
+    plt_src = *pts;
+
+    return rc;
+}
+
 static u64 __init init_platform_timer(void)
 {
     static struct platform_timesource * __initdata plt_timers[] = {
@@ -593,7 +611,7 @@ static u64 __init init_platform_timer(void)
             pts = plt_timers[i];
             if ( !strcmp(opt_clocksource, pts->id) )
             {
-                rc = pts->init(pts);
+                rc = try_platform_timer(pts);
                 break;
             }
         }
@@ -609,20 +627,12 @@ static u64 __init init_platform_timer(void)
         for ( i = 0; i < ARRAY_SIZE(plt_timers); i++ )
         {
             pts = plt_timers[i];
-            if ( (rc = pts->init(pts)) > 0 )
+            if ( (rc = try_platform_timer(pts)) > 0 )
                 break;
         }
     }
 
     BUG_ON(rc <= 0);
-
-    plt_mask = (u64)~0ull >> (64 - pts->counter_bits);
-
-    set_time_scale(&plt_scale, pts->frequency);
-
-    plt_overflow_period = scale_delta(
-        1ull << (pts->counter_bits-1), &plt_scale);
-    plt_src = *pts;
 
     printk("Platform timer is %s %s\n",
            freq_string(pts->frequency), pts->name);
