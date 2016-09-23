@@ -108,7 +108,7 @@ typedef enum {
     p2m_invalid = 0,    /* Nothing mapped here */
     p2m_ram_rw,         /* Normal read/write guest RAM */
     p2m_ram_ro,         /* Read-only; writes are silently dropped */
-    p2m_mmio_direct_nc, /* Read/write mapping of genuine MMIO area non-cacheable */
+    p2m_mmio_direct_dev,/* Read/write mapping of genuine Device MMIO area */
     p2m_mmio_direct_c,  /* Read/write mapping of genuine MMIO area cacheable */
     p2m_map_foreign,    /* Ram pages from foreign domain */
     p2m_grant_map_rw,   /* Read/write grant mapping */
