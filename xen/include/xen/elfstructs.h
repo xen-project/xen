@@ -103,6 +103,15 @@ typedef uint64_t	Elf64_Xword;
                       (ehdr).e_ident[EI_MAG2] == ELFMAG2 && \
                       (ehdr).e_ident[EI_MAG3] == ELFMAG3)
 
+/* e_flags */
+#define EF_ARM_EABI_MASK	0xff000000
+#define EF_ARM_EABI_UNKNOWN	0x00000000
+#define EF_ARM_EABI_VER1	0x01000000
+#define EF_ARM_EABI_VER2	0x02000000
+#define EF_ARM_EABI_VER3	0x03000000
+#define EF_ARM_EABI_VER4	0x04000000
+#define EF_ARM_EABI_VER5	0x05000000
+
 /* ELF Header */
 typedef struct elfhdr {
 	unsigned char	e_ident[EI_NIDENT]; /* ELF Identification */
@@ -364,9 +373,22 @@ typedef struct {
 #define R_X86_64_PLT32		4	/* 32 bit PLT address */
 
 /*
+ * ARM32 relocation types. See
+ * http://infocenter.arm.com/help/topic/com.arm.doc.ihi0044f/IHI0044F_aaelf.pdf
  * S - address of symbol.
- * A - addend for relocation (r_addend)
+ * A - addend for relocation (r_addend or need to extract from insn)
  * P - address of the dest being relocated (derieved from r_offset)
+ */
+#define R_ARM_NONE              0
+#define R_ARM_ABS32             2	/* Direct 32-bit. S+A */
+#define R_ARM_REL32             3	/* PC relative. S+A */
+#define R_ARM_CALL              28	/* SignExtend([23:0]) << 2. S+A-P */
+#define R_ARM_JUMP24            29	/* Same as R_ARM_CALL */
+#define R_ARM_MOVW_ABS_NC       43	/* SignExtend([19:16],[11:0])&0xFFFF, S+A */
+#define R_ARM_MOVT_ABS          44	/* SignExtend([19:16],[11:0))&0xFFFF0000 */
+					/*  >> 16, S+A. */
+
+/*
  * NC -  No check for overflow.
  *
  * The defines also use _PREL for PC-relative address, and _NC is No Check.

@@ -241,6 +241,13 @@ static int reloc_insn_imm(enum aarch64_reloc_op op, void *dest, u64 val,
     return 0;
 }
 
+int arch_livepatch_perform_rel(struct livepatch_elf *elf,
+                               const struct livepatch_elf_sec *base,
+                               const struct livepatch_elf_sec *rela)
+{
+    return -ENOSYS;
+}
+
 int arch_livepatch_perform_rela(struct livepatch_elf *elf,
                                 const struct livepatch_elf_sec *base,
                                 const struct livepatch_elf_sec *rela)

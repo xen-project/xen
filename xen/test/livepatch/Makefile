@@ -6,6 +6,9 @@ endif
 ifeq ($(XEN_TARGET_ARCH),arm64)
 OBJCOPY_MAGIC := -I binary -O elf64-littleaarch64 -B aarch64
 endif
+ifeq ($(XEN_TARGET_ARCH),arm32)
+OBJCOPY_MAGIC := -I binary -O elf32-littlearm -B arm
+endif
 
 CODE_ADDR=$(shell nm --defined $(1) | grep $(2) | awk '{print "0x"$$1}')
 CODE_SZ=$(shell nm --defined -S $(1) | grep $(2) | awk '{ print "0x"$$2}')
