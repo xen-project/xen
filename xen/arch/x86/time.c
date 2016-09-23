@@ -475,6 +475,55 @@ uint64_t ns_to_acpi_pm_tick(uint64_t ns)
 }
 
 /************************************************************
+ * PLATFORM TIMER 4: TSC
+ */
+
+/*
+ * Called in verify_tsc_reliability() under reliable TSC conditions
+ * thus reusing all the checks already performed there.
+ */
+static s64 __init init_tsc(struct platform_timesource *pts)
+{
+    u64 ret = pts->frequency;
+
+    if ( nr_cpu_ids != num_present_cpus() )
+    {
+        printk(XENLOG_WARNING "TSC: CPU Hotplug intended\n");
+        ret = 0;
+    }
+
+    if ( nr_sockets > 1 )
+    {
+        printk(XENLOG_WARNING "TSC: Not invariant across sockets\n");
+        ret = 0;
+    }
+
+    if ( !ret )
+        printk(XENLOG_DEBUG "TSC: Not setting it as clocksource\n");
+
+    return ret;
+}
+
+static u64 read_tsc(void)
+{
+    return rdtsc_ordered();
+}
+
+static struct platform_timesource __initdata plt_tsc =
+{
+    .id = "tsc",
+    .name = "TSC",
+    .read_counter = read_tsc,
+    /*
+     * Calculations for platform timer overflow assume u64 boundary.
+     * Hence we set to less than 64, such that the TSC wraparound is
+     * correctly checked and handled.
+     */
+    .counter_bits = 63,
+    .init = init_tsc,
+};
+
+/************************************************************
  * GENERIC PLATFORM TIMER INFRASTRUCTURE
  */
 
@@ -580,12 +629,31 @@ static void resume_platform_timer(void)
     plt_stamp = plt_src.read_counter();
 }
 
+static void __init reset_platform_timer(void)
+{
+    /* Deactivate any timers running */
+    kill_timer(&plt_overflow_timer);
+    kill_timer(&calibration_timer);
+
+    /* Reset counters and stamps */
+    spin_lock_irq(&platform_timer_lock);
+    plt_stamp = 0;
+    plt_stamp64 = 0;
+    platform_timer_stamp = 0;
+    stime_platform_stamp = 0;
+    spin_unlock_irq(&platform_timer_lock);
+}
+
 static s64 __init try_platform_timer(struct platform_timesource *pts)
 {
     s64 rc = pts->init(pts);
 
     if ( rc <= 0 )
         return rc;
+
+    /* We have a platform timesource already so reset it */
+    if ( plt_src.counter_bits != 0 )
+        reset_platform_timer();
 
     plt_mask = (u64)~0ull >> (64 - pts->counter_bits);
 
@@ -608,7 +676,8 @@ static u64 __init init_platform_timer(void)
     unsigned int i;
     s64 rc = -1;
 
-    if ( opt_clocksource[0] != '\0' )
+    /* clocksource=tsc is initialized via __initcalls (when CPUs are up). */
+    if ( (opt_clocksource[0] != '\0') && strcmp(opt_clocksource, "tsc") )
     {
         for ( i = 0; i < ARRAY_SIZE(plt_timers); i++ )
         {
@@ -1344,6 +1413,22 @@ static void time_calibration_std_rendezvous(void *_r)
     time_calibration_rendezvous_tail(r);
 }
 
+/*
+ * Rendezvous function used when clocksource is TSC and
+ * no CPU hotplug will be performed.
+ */
+static void time_calibration_nop_rendezvous(void *rv)
+{
+    const struct calibration_rendezvous *r = rv;
+    struct cpu_time_stamp *c = &this_cpu(cpu_calibration);
+
+    c->local_tsc    = r->master_tsc_stamp;
+    c->local_stime  = r->master_stime;
+    c->master_stime = r->master_stime;
+
+    raise_softirq(TIME_CALIBRATE_SOFTIRQ);
+}
+
 static void (*time_calibration_rendezvous_fn)(void *) =
     time_calibration_std_rendezvous;
 
@@ -1352,6 +1437,13 @@ static void time_calibration(void *unused)
     struct calibration_rendezvous r = {
         .semaphore = ATOMIC_INIT(0)
     };
+
+    if ( clocksource_is_tsc() )
+    {
+        local_irq_disable();
+        r.master_stime = read_platform_stime(&r.master_tsc_stamp);
+        local_irq_enable();
+    }
 
     cpumask_copy(&r.cpu_calibration_map, &cpu_online_map);
 
@@ -1467,6 +1559,31 @@ static void __init tsc_check_writability(void)
     disable_tsc_sync = 1;
 }
 
+static void __init reset_percpu_time(void *unused)
+{
+    struct cpu_time *t = &this_cpu(cpu_time);
+
+    t->stamp.local_tsc = boot_tsc_stamp;
+    t->stamp.local_stime = 0;
+    t->stamp.local_stime = get_s_time_fixed(boot_tsc_stamp);
+    t->stamp.master_stime = t->stamp.local_stime;
+}
+
+static void __init try_platform_timer_tail(bool late)
+{
+    init_timer(&plt_overflow_timer, plt_overflow, NULL, 0);
+    plt_overflow(NULL);
+
+    platform_timer_stamp = plt_stamp64;
+    stime_platform_stamp = NOW();
+
+    if ( !late )
+        init_percpu_time();
+
+    init_timer(&calibration_timer, time_calibration, NULL, 0);
+    set_timer(&calibration_timer, NOW() + EPOCH);
+}
+
 /* Late init function, after all cpus have booted */
 static int __init verify_tsc_reliability(void)
 {
@@ -1483,6 +1600,32 @@ static int __init verify_tsc_reliability(void)
         {
             printk("TSC warp detected, disabling TSC_RELIABLE\n");
             setup_clear_cpu_cap(X86_FEATURE_TSC_RELIABLE);
+        }
+        else if ( !strcmp(opt_clocksource, "tsc") &&
+                  (try_platform_timer(&plt_tsc) > 0) )
+        {
+            /*
+             * Platform timer has changed and CPU time will only be updated
+             * after we set again the calibration timer, which means we need to
+             * seed again each local CPU time. At this stage TSC is known to be
+             * reliable i.e. monotonically increasing across all CPUs so this
+             * lets us remove the skew between platform timer and TSC, since
+             * these are now effectively the same.
+             */
+            on_selected_cpus(&cpu_online_map, reset_percpu_time, NULL, 1);
+
+            /*
+             * We won't do CPU Hotplug and TSC clocksource is being used which
+             * means we have a reliable TSC, plus we don't sync with any other
+             * clocksource so no need for rendezvous.
+             */
+            time_calibration_rendezvous_fn = time_calibration_nop_rendezvous;
+
+            /* Finish platform timer switch. */
+            try_platform_timer_tail(true);
+
+            printk("Switched to Platform timer %s TSC\n",
+                   freq_string(plt_src.frequency));
         }
     }
 
@@ -1509,15 +1652,7 @@ int __init init_xen_time(void)
     do_settime(get_cmos_time(), 0, NOW());
 
     /* Finish platform timer initialization. */
-    init_timer(&plt_overflow_timer, plt_overflow, NULL, 0);
-    plt_overflow(NULL);
-    platform_timer_stamp = plt_stamp64;
-    stime_platform_stamp = NOW();
-
-    init_percpu_time();
-
-    init_timer(&calibration_timer, time_calibration, NULL, 0);
-    set_timer(&calibration_timer, NOW() + EPOCH);
+    try_platform_timer_tail(false);
 
     return 0;
 }
@@ -1531,6 +1666,7 @@ void __init early_time_init(void)
 
     preinit_pit();
     tmp = init_platform_timer();
+    plt_tsc.frequency = tmp;
 
     set_time_scale(&t->tsc_scale, tmp);
     t->stamp.local_tsc = boot_tsc_stamp;
@@ -1777,6 +1913,11 @@ void pv_soft_rdtsc(struct vcpu *v, struct cpu_user_regs *regs, int rdtscp)
     if ( rdtscp )
          regs->ecx =
              (d->arch.tsc_mode == TSC_MODE_PVRDTSCP) ? d->arch.incarnation : 0;
+}
+
+bool clocksource_is_tsc(void)
+{
+    return plt_src.read_counter == read_tsc;
 }
 
 int host_tsc_is_safe(void)

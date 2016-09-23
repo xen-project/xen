@@ -631,7 +631,8 @@ ret_t do_platform_op(XEN_GUEST_HANDLE_PARAM(xen_platform_op_t) u_xenpf_op)
         if ( ret )
             break;
 
-        if ( cpu >= nr_cpu_ids || !cpu_present(cpu) )
+        if ( cpu >= nr_cpu_ids || !cpu_present(cpu) ||
+             clocksource_is_tsc() )
         {
             ret = -EINVAL;
             break;

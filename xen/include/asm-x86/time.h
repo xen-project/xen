@@ -69,6 +69,7 @@ void tsc_get_info(struct domain *d, uint32_t *tsc_mode, uint64_t *elapsed_nsec,
 
 void force_update_vcpu_system_time(struct vcpu *v);
 
+bool clocksource_is_tsc(void);
 int host_tsc_is_safe(void);
 void cpuid_time_leaf(uint32_t sub_idx, uint32_t *eax, uint32_t *ebx,
                      uint32_t *ecx, uint32_t *edx);

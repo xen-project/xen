@@ -264,9 +264,13 @@ minimum of 32M, subject to a suitably aligned and sized contiguous
 region of memory being available.
 
 ### clocksource
-> `= pit | hpet | acpi`
+> `= pit | hpet | acpi | tsc`
 
 If set, override Xen's default choice for the platform timer.
+Having TSC as platform timer requires being explicitly set. This is because
+TSC can only be safely used if CPU hotplug isn't performed on the system. On
+some platforms, the "maxcpus" option may need to be used to further adjust
+the number of allowed CPUs.
 
 ### cmci-threshold
 > `= <integer>`
