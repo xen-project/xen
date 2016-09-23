@@ -955,6 +955,14 @@ static void __update_vcpu_system_time(struct vcpu *v, int force)
     _u.tsc_timestamp = tsc_stamp;
     _u.system_time   = t->stamp.local_stime;
 
+    /*
+     * It's expected that domains cope with this bit changing on every
+     * pvclock read to check whether they can resort solely on this tuple
+     * or if it further requires monotonicity checks with other vcpus.
+     */
+    if ( clocksource_is_tsc() )
+        _u.flags |= XEN_PVCLOCK_TSC_STABLE_BIT;
+
     if ( is_hvm_domain(d) )
         _u.tsc_timestamp += v->arch.hvm_vcpu.cache_tsc_offset;
 
