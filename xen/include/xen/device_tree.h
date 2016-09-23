@@ -32,10 +32,15 @@ struct dt_device_match {
     const void *data;
 };
 
-#define DT_MATCH_PATH(p)                { .path = p }
-#define DT_MATCH_TYPE(typ)              { .type = typ }
-#define DT_MATCH_COMPATIBLE(compat)     { .compatible = compat }
-#define DT_MATCH_NOT_AVAILABLE()        { .not_available = 1 }
+#define __DT_MATCH_PATH(p)              .path = p
+#define __DT_MATCH_TYPE(typ)            .type = typ
+#define __DT_MATCH_COMPATIBLE(compat)   .compatible = compat
+#define __DT_MATCH_NOT_AVAILABLE()      .not_available = 1
+
+#define DT_MATCH_PATH(p)                { __DT_MATCH_PATH(p) }
+#define DT_MATCH_TYPE(typ)              { __DT_MATCH_TYPE(typ) }
+#define DT_MATCH_COMPATIBLE(compat)     { __DT_MATCH_COMPATIBLE(compat) }
+#define DT_MATCH_NOT_AVAILABLE()        { __DT_MATCH_NOT_AVAILABLE() }
 
 typedef u32 dt_phandle;
 
