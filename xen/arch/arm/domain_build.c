@@ -215,9 +215,9 @@ fail:
  *    bank. Partly this is just easier for us to deal with, but also
  *    the ramdisk and DTB must be placed within a certain proximity of
  *    the kernel within RAM.
- * 3. For 32-bit dom0 we want to place as much of the RAM as we
- *    reasonably can below 4GB, so that it can be used by non-LPAE
- *    enabled kernels.
+ * 3. For dom0 we want to place as much of the RAM as we reasonably can
+ *    below 4GB, so that it can be used by non-LPAE enabled kernels (32-bit)
+ *    or when a device assigned to dom0 can only do 32-bit DMA access.
  * 4. For 32-bit dom0 the kernel must be located below 4GB.
  * 5. We want to have a few largers banks rather than many smaller ones.
  *
@@ -250,7 +250,8 @@ fail:
  * we give up.
  *
  * For 32-bit domain we require that the initial allocation for the
- * first bank is under 4G. Then for the subsequent allocations we
+ * first bank is under 4G. For 64-bit domain, the first bank is preferred
+ * to be allocated under 4G. Then for the subsequent allocations we
  * initially allocate memory only from below 4GB. Once that runs out
  * (as described above) we allow higher allocations and continue until
  * that runs out (or we have allocated sufficient dom0 memory).
@@ -264,7 +265,7 @@ static void allocate_memory(struct domain *d, struct kernel_info *kinfo)
     unsigned int order = get_11_allocation_size(kinfo->unassigned_mem);
     int i;
 
-    bool_t lowmem = is_32bit_domain(d);
+    bool_t lowmem = true;
     unsigned int bits;
 
     /*
@@ -289,20 +290,30 @@ static void allocate_memory(struct domain *d, struct kernel_info *kinfo)
         {
             pg = alloc_domheap_pages(d, order, MEMF_bits(bits));
             if ( pg != NULL )
+            {
+                if ( !insert_11_bank(d, kinfo, pg, order) )
+                    BUG(); /* Cannot fail for first bank */
+
                 goto got_bank0;
+            }
         }
         order--;
     }
 
-    panic("Unable to allocate first memory bank");
+    /* Failed to allocate bank0 under 4GB */
+    if ( is_32bit_domain(d) )
+        panic("Unable to allocate first memory bank.");
+
+    /* Try to allocate memory from above 4GB */
+    printk(XENLOG_INFO "No bank has been allocated below 4GB.\n");
+    lowmem = false;
 
  got_bank0:
 
-    if ( !insert_11_bank(d, kinfo, pg, order) )
-        BUG(); /* Cannot fail for first bank */
-
-    /* Now allocate more memory and fill in additional banks */
-
+    /*
+     * If we failed to allocate bank0 under 4GB, continue allocating
+     * memory from above 4GB and fill in banks.
+     */
     order = get_11_allocation_size(kinfo->unassigned_mem);
     while ( kinfo->unassigned_mem && kinfo->mem.nr_banks < NR_MEM_BANKS )
     {
