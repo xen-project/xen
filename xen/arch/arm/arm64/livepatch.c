@@ -62,18 +62,7 @@ void arch_livepatch_apply(struct livepatch_func *func)
     clean_and_invalidate_dcache_va_range(new_ptr, sizeof (*new_ptr) * len);
 }
 
-void arch_livepatch_revert(const struct livepatch_func *func)
-{
-    uint32_t *new_ptr;
-    unsigned int len;
-
-    new_ptr = func->old_addr - (void *)_start + vmap_of_xen_text;
-
-    len = livepatch_insn_len(func);
-    memcpy(new_ptr, func->opaque, len);
-
-    clean_and_invalidate_dcache_va_range(new_ptr, len);
-}
+/* arch_livepatch_revert shared with ARM 32/ARM 64. */
 
 int arch_livepatch_verify_elf(const struct livepatch_elf *elf)
 {
