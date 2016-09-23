@@ -319,7 +319,7 @@ dt_match_node(const struct dt_device_match *matches,
         return NULL;
 
     while ( matches->path || matches->type ||
-            matches->compatible || matches->not_available )
+            matches->compatible || matches->not_available || matches->prop)
     {
         bool_t match = 1;
 
@@ -334,6 +334,9 @@ dt_match_node(const struct dt_device_match *matches,
 
         if ( matches->not_available )
             match &= !dt_device_is_available(node);
+
+        if ( matches->prop )
+            match &= dt_find_property(node, matches->prop, NULL) != NULL;
 
         if ( match )
             return matches;
