@@ -3842,56 +3842,7 @@ x86_emulate(
     default:
         goto cannot_emulate;
     }
-
- writeback:
-    switch ( dst.type )
-    {
-    case OP_REG:
-        /* The 4-byte case *is* correct: in 64-bit mode we zero-extend. */
-        switch ( dst.bytes )
-        {
-        case 1: *(uint8_t  *)dst.reg = (uint8_t)dst.val; break;
-        case 2: *(uint16_t *)dst.reg = (uint16_t)dst.val; break;
-        case 4: *dst.reg = (uint32_t)dst.val; break; /* 64b: zero-ext */
-        case 8: *dst.reg = dst.val; break;
-        }
-        break;
-    case OP_MEM:
-        if ( !(d & Mov) && (dst.orig_val == dst.val) &&
-             !ctxt->force_writeback )
-            /* nothing to do */;
-        else if ( lock_prefix )
-            rc = ops->cmpxchg(
-                dst.mem.seg, dst.mem.off, &dst.orig_val,
-                &dst.val, dst.bytes, ctxt);
-        else
-            rc = ops->write(
-                dst.mem.seg, dst.mem.off, &dst.val, dst.bytes, ctxt);
-        if ( rc != 0 )
-            goto done;
-    default:
-        break;
-    }
-
- no_writeback:
-    /* Inject #DB if single-step tracing was enabled at instruction start. */
-    if ( (ctxt->regs->eflags & EFLG_TF) && (rc == X86EMUL_OKAY) &&
-         (ops->inject_hw_exception != NULL) )
-        rc = ops->inject_hw_exception(EXC_DB, -1, ctxt) ? : X86EMUL_EXCEPTION;
-
-    /* Commit shadow register state. */
-    _regs.eflags &= ~EFLG_RF;
-
-    /* Zero the upper 32 bits of %rip if not in long mode. */
-    if ( def_ad_bytes < sizeof(_regs.eip) )
-        _regs.eip = (uint32_t)_regs.eip;
-
-    *ctxt->regs = _regs;
-
- done:
-    _put_fpu();
-    put_stub(stub);
-    return rc;
+    goto writeback;
 
  ext_0f_insn:
     switch ( b )
@@ -4860,7 +4811,56 @@ x86_emulate(
     default:
         goto cannot_emulate;
     }
-    goto writeback;
+
+ writeback:
+    switch ( dst.type )
+    {
+    case OP_REG:
+        /* The 4-byte case *is* correct: in 64-bit mode we zero-extend. */
+        switch ( dst.bytes )
+        {
+        case 1: *(uint8_t  *)dst.reg = (uint8_t)dst.val; break;
+        case 2: *(uint16_t *)dst.reg = (uint16_t)dst.val; break;
+        case 4: *dst.reg = (uint32_t)dst.val; break; /* 64b: zero-ext */
+        case 8: *dst.reg = dst.val; break;
+        }
+        break;
+    case OP_MEM:
+        if ( !(d & Mov) && (dst.orig_val == dst.val) &&
+             !ctxt->force_writeback )
+            /* nothing to do */;
+        else if ( lock_prefix )
+            rc = ops->cmpxchg(
+                dst.mem.seg, dst.mem.off, &dst.orig_val,
+                &dst.val, dst.bytes, ctxt);
+        else
+            rc = ops->write(
+                dst.mem.seg, dst.mem.off, &dst.val, dst.bytes, ctxt);
+        if ( rc != 0 )
+            goto done;
+    default:
+        break;
+    }
+
+ no_writeback:
+    /* Inject #DB if single-step tracing was enabled at instruction start. */
+    if ( (ctxt->regs->eflags & EFLG_TF) && (rc == X86EMUL_OKAY) &&
+         (ops->inject_hw_exception != NULL) )
+        rc = ops->inject_hw_exception(EXC_DB, -1, ctxt) ? : X86EMUL_EXCEPTION;
+
+    /* Commit shadow register state. */
+    _regs.eflags &= ~EFLG_RF;
+
+    /* Zero the upper 32 bits of %rip if not in long mode. */
+    if ( def_ad_bytes < sizeof(_regs.eip) )
+        _regs.eip = (uint32_t)_regs.eip;
+
+    *ctxt->regs = _regs;
+
+ done:
+    _put_fpu();
+    put_stub(stub);
+    return rc;
 
  cannot_emulate:
     _put_fpu();
