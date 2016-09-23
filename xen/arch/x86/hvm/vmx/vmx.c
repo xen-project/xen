@@ -969,41 +969,11 @@ void vmx_get_segment_register(struct vcpu *v, enum x86_segment seg,
 
     switch ( seg )
     {
-    case x86_seg_cs:
-        __vmread(GUEST_CS_SELECTOR, &sel);
-        __vmread(GUEST_CS_LIMIT,    &limit);
-        __vmread(GUEST_CS_BASE,     &reg->base);
-        __vmread(GUEST_CS_AR_BYTES, &attr);
-        break;
-    case x86_seg_ds:
-        __vmread(GUEST_DS_SELECTOR, &sel);
-        __vmread(GUEST_DS_LIMIT,    &limit);
-        __vmread(GUEST_DS_BASE,     &reg->base);
-        __vmread(GUEST_DS_AR_BYTES, &attr);
-        break;
-    case x86_seg_es:
-        __vmread(GUEST_ES_SELECTOR, &sel);
-        __vmread(GUEST_ES_LIMIT,    &limit);
-        __vmread(GUEST_ES_BASE,     &reg->base);
-        __vmread(GUEST_ES_AR_BYTES, &attr);
-        break;
-    case x86_seg_fs:
-        __vmread(GUEST_FS_SELECTOR, &sel);
-        __vmread(GUEST_FS_LIMIT,    &limit);
-        __vmread(GUEST_FS_BASE,     &reg->base);
-        __vmread(GUEST_FS_AR_BYTES, &attr);
-        break;
-    case x86_seg_gs:
-        __vmread(GUEST_GS_SELECTOR, &sel);
-        __vmread(GUEST_GS_LIMIT,    &limit);
-        __vmread(GUEST_GS_BASE,     &reg->base);
-        __vmread(GUEST_GS_AR_BYTES, &attr);
-        break;
-    case x86_seg_ss:
-        __vmread(GUEST_SS_SELECTOR, &sel);
-        __vmread(GUEST_SS_LIMIT,    &limit);
-        __vmread(GUEST_SS_BASE,     &reg->base);
-        __vmread(GUEST_SS_AR_BYTES, &attr);
+    case x86_seg_es ... x86_seg_gs:
+        __vmread(GUEST_SEG_SELECTOR(seg), &sel);
+        __vmread(GUEST_SEG_LIMIT(seg),    &limit);
+        __vmread(GUEST_SEG_BASE(seg),     &reg->base);
+        __vmread(GUEST_SEG_AR_BYTES(seg), &attr);
         break;
     case x86_seg_tr:
         __vmread(GUEST_TR_SELECTOR, &sel);
@@ -1133,41 +1103,11 @@ static void vmx_set_segment_register(struct vcpu *v, enum x86_segment seg,
 
     switch ( seg )
     {
-    case x86_seg_cs:
-        __vmwrite(GUEST_CS_SELECTOR, sel);
-        __vmwrite(GUEST_CS_LIMIT, limit);
-        __vmwrite(GUEST_CS_BASE, base);
-        __vmwrite(GUEST_CS_AR_BYTES, attr);
-        break;
-    case x86_seg_ds:
-        __vmwrite(GUEST_DS_SELECTOR, sel);
-        __vmwrite(GUEST_DS_LIMIT, limit);
-        __vmwrite(GUEST_DS_BASE, base);
-        __vmwrite(GUEST_DS_AR_BYTES, attr);
-        break;
-    case x86_seg_es:
-        __vmwrite(GUEST_ES_SELECTOR, sel);
-        __vmwrite(GUEST_ES_LIMIT, limit);
-        __vmwrite(GUEST_ES_BASE, base);
-        __vmwrite(GUEST_ES_AR_BYTES, attr);
-        break;
-    case x86_seg_fs:
-        __vmwrite(GUEST_FS_SELECTOR, sel);
-        __vmwrite(GUEST_FS_LIMIT, limit);
-        __vmwrite(GUEST_FS_BASE, base);
-        __vmwrite(GUEST_FS_AR_BYTES, attr);
-        break;
-    case x86_seg_gs:
-        __vmwrite(GUEST_GS_SELECTOR, sel);
-        __vmwrite(GUEST_GS_LIMIT, limit);
-        __vmwrite(GUEST_GS_BASE, base);
-        __vmwrite(GUEST_GS_AR_BYTES, attr);
-        break;
-    case x86_seg_ss:
-        __vmwrite(GUEST_SS_SELECTOR, sel);
-        __vmwrite(GUEST_SS_LIMIT, limit);
-        __vmwrite(GUEST_SS_BASE, base);
-        __vmwrite(GUEST_SS_AR_BYTES, attr);
+    case x86_seg_es ... x86_seg_gs:
+        __vmwrite(GUEST_SEG_SELECTOR(seg), sel);
+        __vmwrite(GUEST_SEG_LIMIT(seg),    limit);
+        __vmwrite(GUEST_SEG_BASE(seg),     base);
+        __vmwrite(GUEST_SEG_AR_BYTES(seg), attr);
         break;
     case x86_seg_tr:
         __vmwrite(GUEST_TR_SELECTOR, sel);

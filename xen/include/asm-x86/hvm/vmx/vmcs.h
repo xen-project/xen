@@ -420,6 +420,7 @@ enum vmcs_field {
     VIRTUAL_PROCESSOR_ID            = 0x00000000,
     POSTED_INTR_NOTIFICATION_VECTOR = 0x00000002,
     EPTP_INDEX                      = 0x00000004,
+#define GUEST_SEG_SELECTOR(sel) (GUEST_ES_SELECTOR + (sel) * 2) /* ES ... GS */
     GUEST_ES_SELECTOR               = 0x00000800,
     GUEST_CS_SELECTOR               = 0x00000802,
     GUEST_SS_SELECTOR               = 0x00000804,
@@ -496,6 +497,7 @@ enum vmcs_field {
     IDT_VECTORING_ERROR_CODE        = 0x0000440a,
     VM_EXIT_INSTRUCTION_LEN         = 0x0000440c,
     VMX_INSTRUCTION_INFO            = 0x0000440e,
+#define GUEST_SEG_LIMIT(sel) (GUEST_ES_LIMIT + (sel) * 2) /* ES ... GS */
     GUEST_ES_LIMIT                  = 0x00004800,
     GUEST_CS_LIMIT                  = 0x00004802,
     GUEST_SS_LIMIT                  = 0x00004804,
@@ -506,6 +508,7 @@ enum vmcs_field {
     GUEST_TR_LIMIT                  = 0x0000480e,
     GUEST_GDTR_LIMIT                = 0x00004810,
     GUEST_IDTR_LIMIT                = 0x00004812,
+#define GUEST_SEG_AR_BYTES(sel) (GUEST_ES_AR_BYTES + (sel) * 2) /* ES ... GS */
     GUEST_ES_AR_BYTES               = 0x00004814,
     GUEST_CS_AR_BYTES               = 0x00004816,
     GUEST_SS_AR_BYTES               = 0x00004818,
@@ -531,6 +534,7 @@ enum vmcs_field {
     GUEST_CR0                       = 0x00006800,
     GUEST_CR3                       = 0x00006802,
     GUEST_CR4                       = 0x00006804,
+#define GUEST_SEG_BASE(sel) (GUEST_ES_BASE + (sel) * 2) /* ES ... GS */
     GUEST_ES_BASE                   = 0x00006806,
     GUEST_CS_BASE                   = 0x00006808,
     GUEST_SS_BASE                   = 0x0000680a,
