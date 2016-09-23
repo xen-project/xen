@@ -477,6 +477,10 @@ uint64_t ns_to_acpi_pm_tick(uint64_t ns)
 /************************************************************
  * PLATFORM TIMER 4: TSC
  */
+static unsigned int __initdata tsc_flags;
+
+/* TSC is reliable across sockets */
+#define TSC_RELIABLE_SOCKET (1 << 0)
 
 /*
  * Called in verify_tsc_reliability() under reliable TSC conditions
@@ -492,7 +496,7 @@ static s64 __init init_tsc(struct platform_timesource *pts)
         ret = 0;
     }
 
-    if ( nr_sockets > 1 )
+    if ( nr_sockets > 1 && !(tsc_flags & TSC_RELIABLE_SOCKET) )
     {
         printk(XENLOG_WARNING "TSC: Not invariant across sockets\n");
         ret = 0;
@@ -1855,6 +1859,7 @@ int hwdom_pit_access(struct ioreq *ioreq)
 /*
  * tsc=unstable: Override all tests; assume TSC is unreliable.
  * tsc=skewed: Assume TSCs are individually reliable, but skewed across CPUs.
+ * tsc=stable:socket: Assume TSCs are reliable across sockets.
  */
 static void __init tsc_parse(const char *s)
 {
@@ -1865,9 +1870,9 @@ static void __init tsc_parse(const char *s)
         setup_clear_cpu_cap(X86_FEATURE_TSC_RELIABLE);
     }
     else if ( !strcmp(s, "skewed") )
-    {
         setup_clear_cpu_cap(X86_FEATURE_TSC_RELIABLE);
-    }
+    else if ( !strcmp(s, "stable:socket") )
+        tsc_flags |= TSC_RELIABLE_SOCKET;
 }
 custom_param("tsc", tsc_parse);
 

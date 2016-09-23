@@ -270,7 +270,9 @@ If set, override Xen's default choice for the platform timer.
 Having TSC as platform timer requires being explicitly set. This is because
 TSC can only be safely used if CPU hotplug isn't performed on the system. On
 some platforms, the "maxcpus" option may need to be used to further adjust
-the number of allowed CPUs.
+the number of allowed CPUs.  When running on platforms that can guarantee a
+monotonic TSC across sockets you may want to adjust the "tsc" command line
+parameter to "stable:socket".
 
 ### cmci-threshold
 > `= <integer>`
@@ -1508,7 +1510,7 @@ pages) must also be specified via the tbuf\_size parameter.
 > `= <integer>`
 
 ### tsc
-> `= unstable | skewed`
+> `= unstable | skewed | stable:socket`
 
 ### ucode
 > `= [<integer> | scan]`
