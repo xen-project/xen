@@ -661,6 +661,18 @@ static void init_amd(struct cpuinfo_x86 *c)
 				       smp_processor_id());
 			wrmsrl(MSR_AMD64_LS_CFG, value | (1 << 15));
 		}
+	} else if (c->x86 == 0x12) {
+		rdmsrl(MSR_AMD64_DE_CFG, value);
+		if (!(value & (1U << 31))) {
+			static bool warned;
+
+			if (c == &boot_cpu_data || opt_cpu_info ||
+			    !test_and_set_bool(warned))
+				printk(KERN_WARNING
+				       "CPU%u: Applying workaround for erratum 665\n",
+				       smp_processor_id());
+			wrmsrl(MSR_AMD64_DE_CFG, value | (1U << 31));
+		}
 	}
 
 	/* AMD CPUs do not support SYSENTER outside of legacy mode. */
