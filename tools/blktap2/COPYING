@@ -1,0 +1,72 @@
+Most files in this directory are covered by a BSD-3-Clause
+license as stated in the text below, unless explicitly otherwise
+stated.
+
+New contributions to existing files in this directory are
+governed by the license that applies to the relevant specific
+file. New contributions to the files listed in [1] are to be
+taken under a BSD-3-Clause license. We believe that most
+(if not all) of the existing copyright holders intended
+to make their contribution under BSD-3 even for the files
+with no copyright headers. But this has not been verified.
+
+New files are to be taken under BSD-3-Clause, unless otherwise
+explicitly stated in the copyright header.
+
+If you want to deal in this code you may do so under GPLv2,
+at least.
+
+Files without (c) headers
+=========================
+The following source files did not have a (c) notice at the
+time this COPYING notice was added to the source tree:
+
+[1]
+./drivers/aes.h
+./drivers/blk_linux.c
+./drivers/blk_netbsd.c
+./drivers/block-remus.c
+./drivers/bswap.h
+./drivers/check_gcrypt
+./drivers/md5.h
+./drivers/xmsnap
+./include/list.h
+
+QCOW files
+==========
+The following files are dually licensed under an MIT and GPLv2
+license
+
+[2]
+./drivers/img2qcow.c
+./drivers/qcow2raw.c
+./drivers/qcow-create.c
+
+=====================================================================
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions
+are met:
+
+1. Redistributions of source code must retain the above copyright
+   notice, this list of conditions and the following disclaimer.
+
+2. Redistributions in binary form must reproduce the above copyright
+   notice, this list of conditions and the following disclaimer in the
+   documentation and/or other materials provided with the distribution.
+
+3. Neither the name of the copyright holder Inc. nor the names of its
+   contributors may be used to endorse or promote products derived
+   from this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
