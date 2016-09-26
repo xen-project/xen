@@ -1,0 +1,31 @@
+Most files in this directory are covered by version 2 of the
+GNU General Public License except where explicitly stated.
+See the main COPYING file in xen.git for more information.
+
+Notable exceptions are in the following directories
+
+vtpm
+====
+Exclusively contains code licensed under a MIT license
+Also see vtpm/COPYING
+
+vtpmmgr
+=======
+Contains a significant portion of files which are licensed
+under a BSD-3-Clause license. These files were imported from
+elsewhere and are copyrighted as follows:
+
+Copyright (c) 2005, Intel Corp.
+All rights reserved.
+
+See README.source for a complete list of files
+
+Otherwise, this directory contains several files licensed under
+GPLv2+, or without copyright headers.
+
+*.patch and *.diff files
+========================
+This directory contains a number of *.patch and *.diff files.
+These files describe changes to source files and are thus
+licensed under the license from which the *.patch and *.diff
+were generated.

@@ -1,0 +1,27 @@
+About
+=====
+This documents the upstream sources for files in this directory.
+
+According to the header files, the following files are based off
+the original tools/vtpm_manager code base in xen.git. This directory
+has since been (commit b918dce5bb2a665a34ff893a9df5392fb8ea429d)
+
+init.c
+log.c
+log.h
+marshal.h
+tcg.h
+tpm.c
+tpm.h
+tpm2.c
+tpm2.h
+tpm2_marshal.h
+vtpm_cmd_handler.c
+vtpm_manager.h
+vtpmmgr.c
+vtpmmgr.h
+
+uuid.h - This file does not appear to be part of the original
+tools/vtpm_manager code. It's origin is unclear, but it is
+trivial and likely not copyrightable under "fair use"
+provisions.
