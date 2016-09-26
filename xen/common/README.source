@@ -1,0 +1,50 @@
+About
+=====
+This file documents the upstream sources for files and directories
+in this part of the Xen source tree. Note that the list may not
+be complete: in particular for code that has been imported from
+the Linux Kernel underr a GPLv2 license.
+
+bunzip2.c
+---------
+Originally from https://www.landley.net/code/bunzip-4.1.c
+The file is licensed under LGPLv2 (or later)
+
+unizma.c
+--------
+This file was originally imported from the Linux tree
+at kernel/git/torvalds/linux.git, path: lib/decompress_unlzma.c
+The file is licensed under LGPLv2.1 (or later)
+
+xmalloc_tlsf.c
+--------------
+This file was originally imported from the compcache project at
+https://code.google.com/archive/p/compcache/source, path
+compcache/sub-projects/allocators/tlsf-kmod
+The file is dually licensed under GPLv2.0 and LGPLv2.1
+
+libelf
+------
+This directory was opriginally imported from the libelf
+project at http://www.mr511.de/software/english.html
+This directory is licensed under LGPLv2.1 (see COPYING file)
+
+libfdt
+------
+This directory was originally imported from the Device Tree
+Compiler at https://github.com/dgibson/dtc/tree/master/libfdt
+This directory is dually licensed as GPLv2.0 or later
+and a BSD 2-clause license
+
+lz4/decompress.c
+-----------------
+This file was originally imported from the LZ4 project
+( http://www.lz4.org). The source is available from
+https://github.com/Cyan4973/lz4
+The file is licensed under a BSD 2-clause license
+
+xz
+--
+This directory was imported from the XZ Utils project
+and is available under http://tukaani.org/xz/
+The imported code is in the public domain

@@ -1,0 +1,9 @@
+About
+=====
+This file documents the upstream sources for files and directories
+in this part of the Xen source tree.
+
+xen/tools/kconfig
+-----------------
+The kconfig directory was originally imported from the linux kernel
+git tree at kernel/git/torvalds/linux.git, path: scripts/kconfig

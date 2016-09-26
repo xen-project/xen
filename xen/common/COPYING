@@ -1,0 +1,16 @@
+Most files in this directory are covered by version 2 of the
+GNU General Public License except where explicitly stated.
+See the main COPYING file in xen.git for more information.
+
+The following files and directories are notable exceptions
+and cover code which has been imported into the Xen codebase.
+For more information on the origin of these files and their
+licenses, see README.source
+
+bunzip2.c
+unizma.c
+xmalloc_tlsf.c
+libelf/*
+libfdt/*
+lz4/decompress.c
+xz/*
