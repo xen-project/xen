@@ -1656,30 +1656,31 @@ static int tmemc_save_subop(int cli_id, uint32_t pool_id,
     struct client *client = tmem_client_from_cli_id(cli_id);
     uint32_t p;
     struct tmem_page_descriptor *pgp, *pgp2;
-    int rc = -1;
+    int rc = -ENOENT;
 
     switch(subop)
     {
     case XEN_SYSCTL_TMEM_OP_SAVE_BEGIN:
         if ( client == NULL )
-            return 0;
+            break;
         for (p = 0; p < MAX_POOLS_PER_DOMAIN; p++)
             if ( client->pools[p] != NULL )
                 break;
+
         if ( p == MAX_POOLS_PER_DOMAIN )
-        {
-            rc = 0;
             break;
-        }
+
         client->was_frozen = client->info.flags.u.frozen;
         client->info.flags.u.frozen = 1;
         if ( arg1 != 0 )
             client->info.flags.u.migrating = 1;
-        rc = 1;
+        rc = 0;
         break;
     case XEN_SYSCTL_TMEM_OP_RESTORE_BEGIN:
-        if ( client == NULL && (client = client_create(cli_id)) != NULL )
-            return 1;
+        if ( client == NULL )
+            rc = client_create(cli_id) ? 0 : -ENOMEM;
+        else
+            rc = -EEXIST;
         break;
     case XEN_SYSCTL_TMEM_OP_SAVE_END:
         if ( client == NULL )

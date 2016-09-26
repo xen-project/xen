@@ -214,15 +214,23 @@ int xc_tmem_save(xc_interface *xch,
                  int dom, int io_fd, int live, int field_marker)
 {
     int marker = field_marker;
-    int i, j;
+    int i, j, rc;
     uint32_t flags;
     uint32_t minusone = -1;
     uint32_t pool_id;
     struct tmem_handle *h;
     xen_tmem_client_t info;
 
-    if ( xc_tmem_control(xch,0,XEN_SYSCTL_TMEM_OP_SAVE_BEGIN,dom,live,0,NULL) <= 0 )
-        return 0;
+    rc = xc_tmem_control(xch, 0, XEN_SYSCTL_TMEM_OP_SAVE_BEGIN,
+                         dom, live, 0, NULL);
+    if ( rc )
+    {
+        /* Nothing to save - no tmem enabled. */
+        if ( errno == ENOENT )
+            return 0;
+
+        return rc;
+    }
 
     if ( write_exact(io_fd, &marker, sizeof(marker)) )
         return -1;
