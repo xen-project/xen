@@ -358,19 +358,10 @@ static inline void hvm_flush_guest_tlbs(void)
 void hvm_hypercall_page_initialise(struct domain *d,
                                    void *hypercall_page);
 
-static inline void
-hvm_get_segment_register(struct vcpu *v, enum x86_segment seg,
-                         struct segment_register *reg)
-{
-    hvm_funcs.get_segment_register(v, seg, reg);
-}
-
-static inline void
-hvm_set_segment_register(struct vcpu *v, enum x86_segment seg,
-                         struct segment_register *reg)
-{
-    hvm_funcs.set_segment_register(v, seg, reg);
-}
+void hvm_get_segment_register(struct vcpu *v, enum x86_segment seg,
+                              struct segment_register *reg);
+void hvm_set_segment_register(struct vcpu *v, enum x86_segment seg,
+                              struct segment_register *reg);
 
 static inline unsigned long hvm_get_shadow_gs_base(struct vcpu *v)
 {

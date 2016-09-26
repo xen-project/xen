@@ -89,7 +89,13 @@
 #ifndef __ASSEMBLY__
 
 /* System Descriptor types for GDT and IDT entries. */
+#define SYS_DESC_tss16_avail  1
 #define SYS_DESC_ldt          2
+#define SYS_DESC_tss16_busy   3
+#define SYS_DESC_call_gate16  4
+#define SYS_DESC_task_gate    5
+#define SYS_DESC_irq_gate16   6
+#define SYS_DESC_trap_gate16  7
 #define SYS_DESC_tss_avail    9
 #define SYS_DESC_tss_busy     11
 #define SYS_DESC_call_gate    12

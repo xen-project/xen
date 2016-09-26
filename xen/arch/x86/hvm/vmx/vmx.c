@@ -1096,9 +1096,6 @@ static void vmx_set_segment_register(struct vcpu *v, enum x86_segment seg,
      */
     attr = (!(attr & (1u << 7)) << 16) | ((attr & 0xf00) << 4) | (attr & 0xff);
 
-    /* VMX has strict consistency requirement for flag G. */
-    attr |= !!(limit >> 20) << 15;
-
     vmx_vmcs_enter(v);
 
     switch ( seg )
@@ -1113,8 +1110,7 @@ static void vmx_set_segment_register(struct vcpu *v, enum x86_segment seg,
         __vmwrite(GUEST_TR_SELECTOR, sel);
         __vmwrite(GUEST_TR_LIMIT, limit);
         __vmwrite(GUEST_TR_BASE, base);
-        /* VMX checks that the the busy flag (bit 1) is set. */
-        __vmwrite(GUEST_TR_AR_BYTES, attr | 2);
+        __vmwrite(GUEST_TR_AR_BYTES, attr);
         break;
     case x86_seg_gdtr:
         __vmwrite(GUEST_GDTR_LIMIT, limit);

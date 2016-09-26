@@ -627,50 +627,34 @@ static void svm_get_segment_register(struct vcpu *v, enum x86_segment seg,
     {
     case x86_seg_cs:
         memcpy(reg, &vmcb->cs, sizeof(*reg));
-        reg->attr.fields.p = 1;
-        reg->attr.fields.g = reg->limit > 0xFFFFF;
         break;
     case x86_seg_ds:
         memcpy(reg, &vmcb->ds, sizeof(*reg));
-        if ( reg->attr.fields.type != 0 )
-            reg->attr.fields.type |= 0x1;
         break;
     case x86_seg_es:
         memcpy(reg, &vmcb->es, sizeof(*reg));
-        if ( reg->attr.fields.type != 0 )
-            reg->attr.fields.type |= 0x1;
         break;
     case x86_seg_fs:
         svm_sync_vmcb(v);
         memcpy(reg, &vmcb->fs, sizeof(*reg));
-        if ( reg->attr.fields.type != 0 )
-            reg->attr.fields.type |= 0x1;
         break;
     case x86_seg_gs:
         svm_sync_vmcb(v);
         memcpy(reg, &vmcb->gs, sizeof(*reg));
-        if ( reg->attr.fields.type != 0 )
-            reg->attr.fields.type |= 0x1;
         break;
     case x86_seg_ss:
         memcpy(reg, &vmcb->ss, sizeof(*reg));
         reg->attr.fields.dpl = vmcb->_cpl;
-        if ( reg->attr.fields.type == 0 )
-            reg->attr.fields.db = 0;
         break;
     case x86_seg_tr:
         svm_sync_vmcb(v);
         memcpy(reg, &vmcb->tr, sizeof(*reg));
-        reg->attr.fields.p = 1;
-        reg->attr.fields.type |= 0x2;
         break;
     case x86_seg_gdtr:
         memcpy(reg, &vmcb->gdtr, sizeof(*reg));
-        reg->attr.bytes = 0x80;
         break;
     case x86_seg_idtr:
         memcpy(reg, &vmcb->idtr, sizeof(*reg));
-        reg->attr.bytes = 0x80;
         break;
     case x86_seg_ldtr:
         svm_sync_vmcb(v);
@@ -740,11 +724,11 @@ static void svm_set_segment_register(struct vcpu *v, enum x86_segment seg,
         break;
     case x86_seg_gdtr:
         vmcb->gdtr.base = reg->base;
-        vmcb->gdtr.limit = (uint16_t)reg->limit;
+        vmcb->gdtr.limit = reg->limit;
         break;
     case x86_seg_idtr:
         vmcb->idtr.base = reg->base;
-        vmcb->idtr.limit = (uint16_t)reg->limit;
+        vmcb->idtr.limit = reg->limit;
         break;
     case x86_seg_ldtr:
         memcpy(&vmcb->ldtr, reg, sizeof(*reg));

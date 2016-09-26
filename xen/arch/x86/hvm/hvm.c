@@ -6052,6 +6052,160 @@ void hvm_domain_soft_reset(struct domain *d)
 }
 
 /*
+ * Segment caches in VMCB/VMCS are inconsistent about which bits are checked,
+ * important, and preserved across vmentry/exit.  Cook the values to make them
+ * closer to what is architecturally expected from entries in the segment
+ * cache.
+ */
+void hvm_get_segment_register(struct vcpu *v, enum x86_segment seg,
+                              struct segment_register *reg)
+{
+    hvm_funcs.get_segment_register(v, seg, reg);
+
+    switch ( seg )
+    {
+    case x86_seg_ss:
+        /* SVM may retain %ss.DB when %ss is loaded with a NULL selector. */
+        if ( !reg->attr.fields.p )
+            reg->attr.fields.db = 0;
+        break;
+
+    case x86_seg_tr:
+        /*
+         * SVM doesn't track %tr.B. Architecturally, a loaded TSS segment will
+         * always be busy.
+         */
+        reg->attr.fields.type |= 0x2;
+
+        /*
+         * %cs and %tr are unconditionally present.  SVM ignores these present
+         * bits and will happily run without them set.
+         */
+    case x86_seg_cs:
+        reg->attr.fields.p = 1;
+        break;
+
+    case x86_seg_gdtr:
+    case x86_seg_idtr:
+        /*
+         * Treat GDTR/IDTR as being present system segments.  This avoids them
+         * needing special casing for segmentation checks.
+         */
+        reg->attr.bytes = 0x80;
+        break;
+
+    default: /* Avoid triggering -Werror=switch */
+        break;
+    }
+
+    if ( reg->attr.fields.p )
+    {
+        /*
+         * For segments which are present/usable, cook the system flag.  SVM
+         * ignores the S bit on all segments and will happily run with them in
+         * any state.
+         */
+        reg->attr.fields.s = is_x86_user_segment(seg);
+
+        /*
+         * SVM discards %cs.G on #VMEXIT.  Other user segments do have .G
+         * tracked, but Linux commit 80112c89ed87 "KVM: Synthesize G bit for
+         * all segments." indicates that this isn't necessarily the case when
+         * nested under ESXi.
+         *
+         * Unconditionally recalculate G.
+         */
+        reg->attr.fields.g = !!(reg->limit >> 20);
+
+        /*
+         * SVM doesn't track the Accessed flag.  It will always be set for
+         * usable user segments loaded into the descriptor cache.
+         */
+        if ( is_x86_user_segment(seg) )
+            reg->attr.fields.type |= 0x1;
+    }
+}
+
+void hvm_set_segment_register(struct vcpu *v, enum x86_segment seg,
+                              struct segment_register *reg)
+{
+    /* Set G to match the limit field.  VT-x cares, while SVM doesn't. */
+    if ( reg->attr.fields.p )
+        reg->attr.fields.g = !!(reg->limit >> 20);
+
+    switch ( seg )
+    {
+    case x86_seg_cs:
+        ASSERT(reg->attr.fields.p);                  /* Usable. */
+        ASSERT(reg->attr.fields.s);                  /* User segment. */
+        ASSERT((reg->base >> 32) == 0);              /* Upper bits clear. */
+        break;
+
+    case x86_seg_ss:
+        if ( reg->attr.fields.p )
+        {
+            ASSERT(reg->attr.fields.s);              /* User segment. */
+            ASSERT(!(reg->attr.fields.type & 0x8));  /* Data segment. */
+            ASSERT(reg->attr.fields.type & 0x2);     /* Writeable. */
+            ASSERT((reg->base >> 32) == 0);          /* Upper bits clear. */
+        }
+        break;
+
+    case x86_seg_ds:
+    case x86_seg_es:
+    case x86_seg_fs:
+    case x86_seg_gs:
+        if ( reg->attr.fields.p )
+        {
+            ASSERT(reg->attr.fields.s);              /* User segment. */
+
+            if ( reg->attr.fields.type & 0x8 )
+                ASSERT(reg->attr.fields.type & 0x2); /* Readable. */
+
+            if ( seg == x86_seg_fs || seg == x86_seg_gs )
+                ASSERT(is_canonical_address(reg->base));
+            else
+                ASSERT((reg->base >> 32) == 0);      /* Upper bits clear. */
+        }
+        break;
+
+    case x86_seg_tr:
+        ASSERT(reg->attr.fields.p);                  /* Usable. */
+        ASSERT(!reg->attr.fields.s);                 /* System segment. */
+        ASSERT(!(reg->sel & 0x4));                   /* !TI. */
+        if ( reg->attr.fields.type == SYS_DESC_tss_busy )
+            ASSERT(is_canonical_address(reg->base));
+        else if ( reg->attr.fields.type == SYS_DESC_tss16_busy )
+            ASSERT((reg->base >> 32) == 0);
+        else
+            ASSERT(!"%tr typecheck failure");
+        break;
+
+    case x86_seg_ldtr:
+        if ( reg->attr.fields.p )
+        {
+            ASSERT(!reg->attr.fields.s);             /* System segment. */
+            ASSERT(!(reg->sel & 0x4));               /* !TI. */
+            ASSERT(reg->attr.fields.type == SYS_DESC_ldt);
+            ASSERT(is_canonical_address(reg->base));
+        }
+        break;
+
+    case x86_seg_gdtr:
+    case x86_seg_idtr:
+        ASSERT(is_canonical_address(reg->base));
+        ASSERT((reg->limit >> 16) == 0);             /* Upper bits clear. */
+        break;
+
+    default:
+        ASSERT_UNREACHABLE();
+        return;
+    }
+
+    hvm_funcs.set_segment_register(v, seg, reg);
+}
+
+/*
  * Local variables:
  * mode: C
  * c-file-style: "BSD"
