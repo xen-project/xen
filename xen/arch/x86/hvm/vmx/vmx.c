@@ -2062,9 +2062,7 @@ static void vmx_vcpu_update_vmfunc_ve(struct vcpu *v)
     else
         v->arch.hvm_vmx.secondary_exec_control &= ~mask;
 
-    __vmwrite(SECONDARY_VM_EXEC_CONTROL,
-              v->arch.hvm_vmx.secondary_exec_control);
-
+    vmx_update_secondary_exec_control(v);
     vmx_vmcs_exit(v);
 }
 
