@@ -69,9 +69,6 @@ u32 svm_feature_flags;
 /* Indicates whether guests may use EFER.LMSLE. */
 bool_t cpu_has_lmsl;
 
-#define set_segment_register(name, value)  \
-    asm volatile ( "movw %%ax ,%%" STR(name) "" : : "a" (value) )
-
 static void svm_update_guest_efer(struct vcpu *);
 
 static struct hvm_function_table svm_function_table;
@@ -1023,15 +1020,12 @@ static void svm_ctxt_switch_to(struct vcpu *v)
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
     int cpu = smp_processor_id();
 
-    /* 
-     * This is required, because VMRUN does consistency check
-     * and some of the DOM0 selectors are pointing to 
-     * invalid GDT locations, and cause AMD processors
-     * to shutdown.
+    /*
+     * This is required, because VMRUN does consistency check and some of the
+     * DOM0 selectors are pointing to invalid GDT locations, and cause AMD
+     * processors to shutdown.
      */
-    set_segment_register(ds, 0);
-    set_segment_register(es, 0);
-    set_segment_register(ss, 0);
+    asm volatile ("mov %0, %%ds; mov %0, %%es; mov %0, %%ss;" :: "r" (0));
 
     /*
      * Cannot use ISTs for NMI/#MC/#DF while we are running with the guest TR.
