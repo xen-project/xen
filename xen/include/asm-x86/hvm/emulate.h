@@ -40,14 +40,15 @@ struct hvm_emulate_ctxt {
 enum emul_kind {
     EMUL_KIND_NORMAL,
     EMUL_KIND_NOWRITE,
-    EMUL_KIND_SET_CONTEXT
+    EMUL_KIND_SET_CONTEXT_DATA,
+    EMUL_KIND_SET_CONTEXT_INSN
 };
 
 int hvm_emulate_one(
     struct hvm_emulate_ctxt *hvmemul_ctxt);
 int hvm_emulate_one_no_write(
     struct hvm_emulate_ctxt *hvmemul_ctxt);
-void hvm_mem_access_emulate_one(enum emul_kind kind,
+void hvm_emulate_one_vm_event(enum emul_kind kind,
     unsigned int trapnr,
     unsigned int errcode);
 void hvm_emulate_prepare(

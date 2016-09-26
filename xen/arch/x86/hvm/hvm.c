@@ -487,15 +487,22 @@ void hvm_do_resume(struct vcpu *v)
         {
             enum emul_kind kind = EMUL_KIND_NORMAL;
 
+            /*
+             * Please observ the order here to match the flag descriptions
+             * provided in public/vm_event.h
+             */
             if ( v->arch.vm_event->emulate_flags &
                  VM_EVENT_FLAG_SET_EMUL_READ_DATA )
-                kind = EMUL_KIND_SET_CONTEXT;
+                kind = EMUL_KIND_SET_CONTEXT_DATA;
             else if ( v->arch.vm_event->emulate_flags &
                       VM_EVENT_FLAG_EMULATE_NOWRITE )
                 kind = EMUL_KIND_NOWRITE;
+            else if ( v->arch.vm_event->emulate_flags &
+                      VM_EVENT_FLAG_SET_EMUL_INSN_DATA )
+                kind = EMUL_KIND_SET_CONTEXT_INSN;
 
-            hvm_mem_access_emulate_one(kind, TRAP_invalid_op,
-                                       HVM_DELIVER_NO_ERROR_CODE);
+            hvm_emulate_one_vm_event(kind, TRAP_invalid_op,
+                                     HVM_DELIVER_NO_ERROR_CODE);
 
             v->arch.vm_event->emulate_flags = 0;
         }

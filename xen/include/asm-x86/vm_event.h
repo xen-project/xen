@@ -27,7 +27,10 @@
  */
 struct arch_vm_event {
     uint32_t emulate_flags;
-    struct vm_event_emul_read_data emul_read_data;
+    union {
+        struct vm_event_emul_read_data read;
+        struct vm_event_emul_insn_data insn;
+    } emul;
     struct monitor_write_data write_data;
 };
 

@@ -76,9 +76,9 @@ static int set_context_data(void *buffer, unsigned int size)
     if ( curr->arch.vm_event )
     {
         unsigned int safe_size =
-            min(size, curr->arch.vm_event->emul_read_data.size);
+            min(size, curr->arch.vm_event->emul.read.size);
 
-        memcpy(buffer, curr->arch.vm_event->emul_read_data.data, safe_size);
+        memcpy(buffer, curr->arch.vm_event->emul.read.data, safe_size);
         memset(buffer + safe_size, 0, size - safe_size);
         return X86EMUL_OKAY;
     }
@@ -1931,7 +1931,7 @@ int hvm_emulate_one_mmio(unsigned long mfn, unsigned long gla)
     return rc;
 }
 
-void hvm_mem_access_emulate_one(enum emul_kind kind, unsigned int trapnr,
+void hvm_emulate_one_vm_event(enum emul_kind kind, unsigned int trapnr,
     unsigned int errcode)
 {
     struct hvm_emulate_ctxt ctx = {{ 0 }};
@@ -1944,10 +1944,25 @@ void hvm_mem_access_emulate_one(enum emul_kind kind, unsigned int trapnr,
     case EMUL_KIND_NOWRITE:
         rc = hvm_emulate_one_no_write(&ctx);
         break;
-    case EMUL_KIND_SET_CONTEXT:
-        ctx.set_context = 1;
-        /* Intentional fall-through. */
+    case EMUL_KIND_SET_CONTEXT_INSN: {
+        struct vcpu *curr = current;
+        struct hvm_vcpu_io *vio = &curr->arch.hvm_vcpu.hvm_io;
+
+        BUILD_BUG_ON(sizeof(vio->mmio_insn) !=
+                     sizeof(curr->arch.vm_event->emul.insn.data));
+        ASSERT(!vio->mmio_insn_bytes);
+
+        /*
+         * Stash insn buffer into mmio buffer here instead of ctx
+         * to avoid having to add more logic to hvm_emulate_one.
+         */
+        vio->mmio_insn_bytes = sizeof(vio->mmio_insn);
+        memcpy(vio->mmio_insn, curr->arch.vm_event->emul.insn.data,
+               vio->mmio_insn_bytes);
+    }
+    /* Fall-through */
     default:
+        ctx.set_context = (kind == EMUL_KIND_SET_CONTEXT_DATA);
         rc = hvm_emulate_one(&ctx);
     }
 

@@ -209,11 +209,20 @@ void vm_event_emulate_check(struct vcpu *v, vm_event_response_t *rsp)
         if ( p2m_mem_access_emulate_check(v, rsp) )
         {
             if ( rsp->flags & VM_EVENT_FLAG_SET_EMUL_READ_DATA )
-                v->arch.vm_event->emul_read_data = rsp->data.emul_read_data;
+                v->arch.vm_event->emul.read = rsp->data.emul.read;
 
             v->arch.vm_event->emulate_flags = rsp->flags;
         }
         break;
+
+    case VM_EVENT_REASON_SOFTWARE_BREAKPOINT:
+        if ( rsp->flags & VM_EVENT_FLAG_SET_EMUL_INSN_DATA )
+        {
+            v->arch.vm_event->emul.insn = rsp->data.emul.insn;
+            v->arch.vm_event->emulate_flags = rsp->flags;
+        }
+        break;
+
     default:
         break;
     };

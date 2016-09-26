@@ -97,6 +97,14 @@
  * Requires the vCPU to be paused already (synchronous events only).
  */
 #define VM_EVENT_FLAG_SET_REGISTERS      (1 << 8)
+/*
+ * Instruction cache is being sent back to the hypervisor in the event response
+ * to be used by the emulator. This flag is only useful when combined with
+ * VM_EVENT_FLAG_EMULATE and does not take presedence if combined with
+ * VM_EVENT_FLAG_EMULATE_NOWRITE or VM_EVENT_FLAG_SET_EMUL_READ_DATA, (i.e.
+ * if any of those flags are set, only those will be honored).
+ */
+#define VM_EVENT_FLAG_SET_EMUL_INSN_DATA (1 << 9)
 
 /*
  * Reasons for the vm event request
@@ -265,6 +273,10 @@ struct vm_event_emul_read_data {
     uint8_t  data[sizeof(struct vm_event_regs_x86) - sizeof(uint32_t)];
 };
 
+struct vm_event_emul_insn_data {
+    uint8_t data[16]; /* Has to be completely filled */
+};
+
 typedef struct vm_event_st {
     uint32_t version;   /* VM_EVENT_INTERFACE_VERSION */
     uint32_t flags;     /* VM_EVENT_FLAG_* */
@@ -291,7 +303,10 @@ typedef struct vm_event_st {
             struct vm_event_regs_arm arm;
         } regs;
 
-        struct vm_event_emul_read_data emul_read_data;
+        union {
+            struct vm_event_emul_read_data read;
+            struct vm_event_emul_insn_data insn;
+        } emul;
     } data;
 } vm_event_request_t, vm_event_response_t;
 
