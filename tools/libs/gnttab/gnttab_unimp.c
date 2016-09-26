@@ -78,9 +78,9 @@ int xengnttab_unmap(xengnttab_handle *xgt, void *start_address, uint32_t count)
     abort();
 }
 
-int xengnttab_copy_grant(xengnttab_handle *xgt,
+int xengnttab_grant_copy(xengnttab_handle *xgt,
                          uint32_t count,
-                         xengnttab_copy_grant_segment_t *segs)
+                         xengnttab_grant_copy_segment_t *segs)
 {
     abort();
 }
