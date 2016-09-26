@@ -2723,6 +2723,7 @@ static int hvm_load_segment_selector(
         if ( (seg == x86_seg_cs) || (seg == x86_seg_ss) )
             goto fail;
         memset(&segr, 0, sizeof(segr));
+        segr.sel = sel;
         hvm_set_segment_register(v, seg, &segr);
         return 0;
     }
@@ -2749,7 +2750,8 @@ static int hvm_load_segment_selector(
         /* Segment present in memory? */
         if ( !(desc.b & _SEGMENT_P) )
         {
-            fault_type = TRAP_no_segment;
+            fault_type = (seg != x86_seg_ss) ? TRAP_no_segment
+                                             : TRAP_stack_error;
             goto unmap_and_fail;
         }
 
