@@ -4449,7 +4449,7 @@ if test "${with_system_seabios+set}" = set; then :
 
 fi
 
-if test "x$seabios" = "xy"; then :
+if test "x$seabios" = "xy" -o -n "$seabios_path" ; then :
 
 
 cat >>confdefs.h <<_ACEOF
@@ -4472,7 +4472,7 @@ if test "${with_system_ovmf+set}" = set; then :
 
 fi
 
-if test "x$ovmf" = "xy"; then :
+if test "x$ovmf" = "xy" -o -n "$ovmf_path" ; then :
 
 
 cat >>confdefs.h <<_ACEOF

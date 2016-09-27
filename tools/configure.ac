@@ -222,7 +222,7 @@ AC_ARG_WITH([system-seabios],
         *)  seabios_path=$withval ;;
     esac
 ],[])
-AS_IF([test "x$seabios" = "xy"], [
+AS_IF([test "x$seabios" = "xy" -o -n "$seabios_path" ], [
     AC_DEFINE_UNQUOTED([SEABIOS_PATH],
                        ["${seabios_path:-$XENFIRMWAREDIR/seabios.bin}"],
                        [SeaBIOS path])
@@ -239,7 +239,7 @@ AC_ARG_WITH([system-ovmf],
         *)  ovmf_path=$withval ;;
     esac
 ],[])
-AS_IF([test "x$ovmf" = "xy"], [
+AS_IF([test "x$ovmf" = "xy" -o -n "$ovmf_path" ], [
     AC_DEFINE_UNQUOTED([OVMF_PATH],
                        ["${ovmf_path:-$XENFIRMWAREDIR/ovmf.bin}"],
                        [OVMF path])
