@@ -274,13 +274,6 @@ static int __tmemc_set_var(struct client *client, uint32_t subop, uint32_t arg1)
         atomic_add(client->weight,&tmem_global.client_weight_total);
         break;
     case XEN_SYSCTL_TMEM_OP_SET_COMPRESS:
-        if ( tmem_dedup_enabled() )
-        {
-            tmem_client_warn("tmem: compression %s for all %ss, cannot be changed when tmem_dedup is enabled\n",
-                            tmem_compression_enabled() ? "enabled" : "disabled",
-                            tmem_client_str);
-            return -1;
-        }
         client->compress = arg1 ? 1 : 0;
         tmem_client_info("tmem: compression %s for %s=%d\n",
             arg1 ? "enabled" : "disabled",tmem_cli_id_str,cli_id);

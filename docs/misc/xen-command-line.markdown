@@ -1500,14 +1500,8 @@ pages) must also be specified via the tbuf\_size parameter.
 ### tmem\_compress
 > `= <boolean>`
 
-### tmem\_dedup
-> `= <boolean>`
-
 ### tmem\_shared\_auth
 > `= <boolean>`
-
-### tmem\_tze
-> `= <integer>`
 
 ### tsc
 > `= unstable | skewed | stable:socket`
