@@ -940,8 +940,8 @@ static void vmx_ctxt_switch_to(struct vcpu *v)
         .fields = { .type = 0xb, .s = 0, .dpl = 0, .p = 1, .avl = 0,    \
                     .l = 0, .db = 0, .g = 0, .pad = 0 } }).bytes)
 
-void vmx_get_segment_register(struct vcpu *v, enum x86_segment seg,
-                              struct segment_register *reg)
+static void vmx_get_segment_register(struct vcpu *v, enum x86_segment seg,
+                                     struct segment_register *reg)
 {
     unsigned long attr = 0, sel = 0, limit;
 
@@ -1444,19 +1444,19 @@ static void vmx_update_guest_cr(struct vcpu *v, unsigned int cr)
              * Need to read them all either way, as realmode reads can update
              * the saved values we'll use when returning to prot mode. */
             for ( s = 0; s < ARRAY_SIZE(reg); s++ )
-                vmx_get_segment_register(v, s, &reg[s]);
+                hvm_get_segment_register(v, s, &reg[s]);
             v->arch.hvm_vmx.vmx_realmode = realmode;
             
             if ( realmode )
             {
                 for ( s = 0; s < ARRAY_SIZE(reg); s++ )
-                    vmx_set_segment_register(v, s, &reg[s]);
+                    hvm_set_segment_register(v, s, &reg[s]);
             }
             else 
             {
                 for ( s = 0; s < ARRAY_SIZE(reg); s++ )
                     if ( !(v->arch.hvm_vmx.vm86_segment_mask & (1<<s)) )
-                        vmx_set_segment_register(
+                        hvm_set_segment_register(
                             v, s, &v->arch.hvm_vmx.vm86_saved_seg[s]);
             }
 
@@ -3847,7 +3847,7 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
             gdprintk(XENLOG_WARNING, "Bad vmexit (reason %#lx)\n",
                      exit_reason);
 
-            vmx_get_segment_register(v, x86_seg_ss, &ss);
+            hvm_get_segment_register(v, x86_seg_ss, &ss);
             if ( ss.attr.fields.dpl )
                 hvm_inject_hw_exception(TRAP_invalid_op,
                                         X86_EVENT_NO_EC);
@@ -3879,7 +3879,7 @@ out:
 
         gprintk(XENLOG_WARNING, "Bad rIP %lx for mode %u\n", regs->rip, mode);
 
-        vmx_get_segment_register(v, x86_seg_ss, &ss);
+        hvm_get_segment_register(v, x86_seg_ss, &ss);
         if ( ss.attr.fields.dpl )
         {
             __vmread(VM_ENTRY_INTR_INFO, &intr_info);

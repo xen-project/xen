@@ -550,8 +550,6 @@ static inline int __vmxon(u64 addr)
     return rc;
 }
 
-void vmx_get_segment_register(struct vcpu *, enum x86_segment,
-                              struct segment_register *);
 void vmx_inject_extint(int trap, uint8_t source);
 void vmx_inject_nmi(void);
 
