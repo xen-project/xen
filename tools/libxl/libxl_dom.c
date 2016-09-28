@@ -818,7 +818,8 @@ static int hvm_build_set_params(xc_interface *handle, uint32_t domid,
 
 static int hvm_build_set_xs_values(libxl__gc *gc,
                                    uint32_t domid,
-                                   struct xc_dom_image *dom)
+                                   struct xc_dom_image *dom,
+                                   const libxl_domain_build_info *info)
 {
     char *path = NULL;
     int ret = 0;
@@ -839,18 +840,20 @@ static int hvm_build_set_xs_values(libxl__gc *gc,
             goto err;
     }
 
-    if (dom->acpi_module.guest_addr_out) {
+    /* Only one module can be passed. PVHv2 guests do not support this. */
+    if (dom->acpi_modules[0].guest_addr_out && 
+        info->device_model_version !=LIBXL_DEVICE_MODEL_VERSION_NONE) {
         path = GCSPRINTF("/local/domain/%d/"HVM_XS_ACPI_PT_ADDRESS, domid);
 
         ret = libxl__xs_printf(gc, XBT_NULL, path, "0x%"PRIx64,
-                               dom->acpi_module.guest_addr_out);
+                               dom->acpi_modules[0].guest_addr_out);
         if (ret)
             goto err;
 
         path = GCSPRINTF("/local/domain/%d/"HVM_XS_ACPI_PT_LENGTH, domid);
 
         ret = libxl__xs_printf(gc, XBT_NULL, path, "0x%x",
-                               dom->acpi_module.length);
+                               dom->acpi_modules[0].length);
         if (ret)
             goto err;
     }
@@ -994,6 +997,13 @@ static int libxl__domain_firmware(libxl__gc *gc,
     }
 
     if (info->u.hvm.acpi_firmware) {
+
+        if (info->device_model_version == LIBXL_DEVICE_MODEL_VERSION_NONE) {
+            LOGE(ERROR, "PVH guests do not allow loading ACPI modules");
+            rc = ERROR_FAIL;
+            goto out;
+        }
+
         data = NULL;
         e = libxl_read_file_contents(ctx, info->u.hvm.acpi_firmware,
                                      &data, &datalen);
@@ -1005,9 +1015,9 @@ static int libxl__domain_firmware(libxl__gc *gc,
         }
         libxl__ptr_add(gc, data);
         if (datalen) {
-            /* Only accept non-empty files */
-            dom->acpi_module.data = data;
-            dom->acpi_module.length = (uint32_t)datalen;
+            /* Only accept a non-empty file */
+            dom->acpi_modules[0].data = data;
+            dom->acpi_modules[0].length = (uint32_t)datalen;
         }
     }
 
@@ -1143,7 +1153,7 @@ int libxl__build_hvm(libxl__gc *gc, uint32_t domid,
         goto out;
     }
 
-    rc = hvm_build_set_xs_values(gc, domid, dom);
+    rc = hvm_build_set_xs_values(gc, domid, dom, info);
     if (rc != 0) {
         LOG(ERROR, "hvm build set xenstore values failed");
         goto out;

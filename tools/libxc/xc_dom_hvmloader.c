@@ -172,7 +172,8 @@ static int modules_init(struct xc_dom_image *dom)
     rc = module_init_one(dom, &dom->system_firmware_module,
                          "System Firmware module");
     if ( rc ) goto err;
-    rc = module_init_one(dom, &dom->acpi_module, "ACPI module");
+    /* Only one module can be added */
+    rc = module_init_one(dom, &dom->acpi_modules[0], "ACPI module");
     if ( rc ) goto err;
     rc = module_init_one(dom, &dom->smbios_module, "SMBIOS module");
     if ( rc ) goto err;
