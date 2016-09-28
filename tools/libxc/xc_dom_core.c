@@ -1048,7 +1048,7 @@ static int populate_acpi_pages(struct xc_dom_image *dom,
     xc_interface *xch = dom->xch;
     uint32_t domid = dom->guest_domid;
     unsigned long idx;
-    unsigned int first_high_idx = (4 << 30) >> PAGE_SHIFT; /* 4GB */
+    unsigned long first_high_idx = 4UL << (30 - PAGE_SHIFT); /* 4GB */
 
     for ( ; num_pages; num_pages--, extents++ )
     {
