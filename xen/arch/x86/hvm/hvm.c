@@ -1251,8 +1251,8 @@ static int hvm_load_cpu_xsave_states(struct domain *d, hvm_domain_context_t *h)
     int err;
     struct vcpu *v;
     struct hvm_hw_cpu_xsave *ctxt;
-    struct hvm_save_descriptor *desc;
-    unsigned int i, desc_start;
+    const struct hvm_save_descriptor *desc;
+    unsigned int i, desc_start, desc_length;
 
     /* Which vcpu is this? */
     vcpuid = hvm_load_instance(h);
@@ -1311,7 +1311,8 @@ static int hvm_load_cpu_xsave_states(struct domain *d, hvm_domain_context_t *h)
         return err;
     }
     size = HVM_CPU_XSAVE_SIZE(ctxt->xcr0_accum);
-    if ( desc->length > size )
+    desc_length = desc->length;
+    if ( desc_length > size )
     {
         /*
          * Xen 4.3.0, 4.2.3 and older used to send longer-than-needed
@@ -1331,6 +1332,23 @@ static int hvm_load_cpu_xsave_states(struct domain *d, hvm_domain_context_t *h)
         printk(XENLOG_G_WARNING
                "HVM%d.%u restore mismatch: xsave length %#x > %#x\n",
                d->domain_id, vcpuid, desc->length, size);
+        /* Rewind desc_length to ignore the extraneous zeros. */
+        desc_length = size;
+    }
+
+    if ( xsave_area_compressed((const void *)&ctxt->save_area) )
+    {
+        printk(XENLOG_G_WARNING
+               "HVM%d.%u restore: compressed xsave state not supported\n",
+               d->domain_id, vcpuid);
+        return -EOPNOTSUPP;
+    }
+    else if ( desc_length != size )
+    {
+        printk(XENLOG_G_WARNING
+               "HVM%d.%u restore mismatch: xsave length %#x != %#x\n",
+               d->domain_id, vcpuid, desc_length, size);
+        return -EINVAL;
     }
     /* Checking finished */
 
@@ -1339,8 +1357,7 @@ static int hvm_load_cpu_xsave_states(struct domain *d, hvm_domain_context_t *h)
     if ( ctxt->xcr0_accum & XSTATE_NONLAZY )
         v->arch.nonlazy_xstate_used = 1;
     compress_xsave_states(v, &ctxt->save_area,
-                          min(desc->length, size) -
-                          offsetof(struct hvm_hw_cpu_xsave,save_area));
+                          size - offsetof(struct hvm_hw_cpu_xsave, save_area));
 
     return 0;
 }
