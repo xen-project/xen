@@ -100,43 +100,49 @@ static struct acpi_20_madt *construct_madt(const struct acpi_config *config,
     madt->lapic_addr = LAPIC_BASE_ADDRESS;
     madt->flags      = ACPI_PCAT_COMPAT;
 
-    intsrcovr = (struct acpi_20_madt_intsrcovr *)(madt + 1);
-    for ( i = 0; i < 16; i++ )
-    {
-        memset(intsrcovr, 0, sizeof(*intsrcovr));
-        intsrcovr->type   = ACPI_INTERRUPT_SOURCE_OVERRIDE;
-        intsrcovr->length = sizeof(*intsrcovr);
-        intsrcovr->source = i;
+    if ( config->table_flags & ACPI_HAS_IOAPIC )
+    {     
+        intsrcovr = (struct acpi_20_madt_intsrcovr *)(madt + 1);
+        for ( i = 0; i < 16; i++ )
+        {
+            memset(intsrcovr, 0, sizeof(*intsrcovr));
+            intsrcovr->type   = ACPI_INTERRUPT_SOURCE_OVERRIDE;
+            intsrcovr->length = sizeof(*intsrcovr);
+            intsrcovr->source = i;
 
-        if ( i == 0 )
-        {
-            /* ISA IRQ0 routed to IOAPIC GSI 2. */
-            intsrcovr->gsi    = 2;
-            intsrcovr->flags  = 0x0;
-        }
-        else if ( PCI_ISA_IRQ_MASK & (1U << i) )
-        {
-            /* PCI: active-low level-triggered. */
-            intsrcovr->gsi    = i;
-            intsrcovr->flags  = 0xf;
-        }
-        else
-        {
-            /* No need for a INT source override structure. */
-            continue;
+            if ( i == 0 )
+            {
+                /* ISA IRQ0 routed to IOAPIC GSI 2. */
+                intsrcovr->gsi    = 2;
+                intsrcovr->flags  = 0x0;
+            }
+            else if ( PCI_ISA_IRQ_MASK & (1U << i) )
+            {
+                /* PCI: active-low level-triggered. */
+                intsrcovr->gsi    = i;
+                intsrcovr->flags  = 0xf;
+            }
+            else
+            {
+                /* No need for a INT source override structure. */
+                continue;
+            }
+
+            intsrcovr++;
         }
 
-        intsrcovr++;
+        io_apic = (struct acpi_20_madt_ioapic *)intsrcovr;
+        memset(io_apic, 0, sizeof(*io_apic));
+        io_apic->type        = ACPI_IO_APIC;
+        io_apic->length      = sizeof(*io_apic);
+        io_apic->ioapic_id   = IOAPIC_ID;
+        io_apic->ioapic_addr = ioapic_base_address;
+
+        lapic = (struct acpi_20_madt_lapic *)(io_apic + 1);
     }
+    else
+        lapic = (struct acpi_20_madt_lapic *)(madt + 1);
 
-    io_apic = (struct acpi_20_madt_ioapic *)intsrcovr;
-    memset(io_apic, 0, sizeof(*io_apic));
-    io_apic->type        = ACPI_IO_APIC;
-    io_apic->length      = sizeof(*io_apic);
-    io_apic->ioapic_id   = IOAPIC_ID;
-    io_apic->ioapic_addr = ioapic_base_address;
-
-    lapic = (struct acpi_20_madt_lapic *)(io_apic + 1);
     info->nr_cpus = hvminfo->nr_vcpus;
     info->madt_lapic0_addr = (uint32_t)lapic;
     for ( i = 0; i < hvminfo->nr_vcpus; i++ )
