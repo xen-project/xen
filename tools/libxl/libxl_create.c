@@ -899,17 +899,6 @@ static void initiate_domain_create(libxl__egc *egc,
         goto error_out;
     }
 
-    ret = libxl__domain_make(gc, d_config, &domid, &state->config);
-    if (ret) {
-        LOG(ERROR, "cannot make domain: %d", ret);
-        dcs->guest_domid = domid;
-        ret = ERROR_FAIL;
-        goto error_out;
-    }
-
-    dcs->guest_domid = domid;
-    dcs->sdss.dm.guest_domid = 0; /* means we haven't spawned */
-
     ret = libxl__domain_build_info_setdefault(gc, &d_config->b_info);
     if (ret) {
         LOG(ERROR, "Unable to set domain build info defaults");
@@ -922,6 +911,17 @@ static void initiate_domain_create(libxl__egc *egc,
         LOG(ERROR, "nestedhvm and altp2mhvm cannot be used together");
         goto error_out;
     }
+
+    ret = libxl__domain_make(gc, d_config, &domid, &state->config);
+    if (ret) {
+        LOG(ERROR, "cannot make domain: %d", ret);
+        dcs->guest_domid = domid;
+        ret = ERROR_FAIL;
+        goto error_out;
+    }
+
+    dcs->guest_domid = domid;
+    dcs->sdss.dm.guest_domid = 0; /* means we haven't spawned */
 
     /*
      * Set the dm version quite early so that libxl doesn't have to pass the
