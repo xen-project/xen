@@ -545,25 +545,31 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags,
     }
     else
     {
-        if ( (config->emulation_flags & ~XEN_X86_EMU_ALL) != 0 )
-        {
-            printk(XENLOG_G_ERR "d%d: Invalid emulation bitmap: %#x\n",
-                   d->domain_id, config->emulation_flags);
-            return -EINVAL;
-        }
+        uint32_t emflags;
+
         if ( is_hardware_domain(d) )
             config->emulation_flags |= XEN_X86_EMU_PIT;
-        if ( config->emulation_flags != 0 &&
-             (config->emulation_flags !=
-              (is_hvm_domain(d) ? XEN_X86_EMU_ALL : XEN_X86_EMU_PIT)) )
+
+        emflags = config->emulation_flags;
+        if ( emflags & ~XEN_X86_EMU_ALL )
+        {
+            printk(XENLOG_G_ERR "d%d: Invalid emulation bitmap: %#x\n",
+                   d->domain_id, emflags);
+            return -EINVAL;
+        }
+
+        /* PVHv2 guests can request emulated APIC. */
+        if ( emflags &&
+            (is_hvm_domain(d) ? ((emflags != XEN_X86_EMU_ALL) &&
+                                 (emflags != XEN_X86_EMU_LAPIC)) :
+                                (emflags != XEN_X86_EMU_PIT)) )
         {
             printk(XENLOG_G_ERR "d%d: Xen does not allow %s domain creation "
                    "with the current selection of emulators: %#x\n",
-                   d->domain_id, is_hvm_domain(d) ? "HVM" : "PV",
-                   config->emulation_flags);
+                   d->domain_id, is_hvm_domain(d) ? "HVM" : "PV", emflags);
             return -EOPNOTSUPP;
         }
-        d->arch.emulation_flags = config->emulation_flags;
+        d->arch.emulation_flags = emflags;
     }
 
     if ( has_hvm_container_domain(d) )
