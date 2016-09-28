@@ -2332,6 +2332,13 @@ static int vmx_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
         if ( vpmu_do_rdmsr(msr, msr_content) )
             goto gp_fault;
         break;
+
+    case MSR_INTEL_PLATFORM_INFO:
+        if ( rdmsr_safe(MSR_INTEL_PLATFORM_INFO, *msr_content) )
+            goto gp_fault;
+        *msr_content = 0;
+        break;
+
     default:
         if ( passive_domain_do_rdmsr(msr, msr_content) )
             goto done;
@@ -2552,6 +2559,13 @@ static int vmx_msr_write_intercept(unsigned int msr, uint64_t msr_content)
          if ( vpmu_do_wrmsr(msr, msr_content, 0) )
             goto gp_fault;
         break;
+
+    case MSR_INTEL_PLATFORM_INFO:
+        if ( msr_content ||
+             rdmsr_safe(MSR_INTEL_PLATFORM_INFO, msr_content) )
+            goto gp_fault;
+        break;
+
     default:
         if ( passive_domain_do_wrmsr(msr, msr_content) )
             return X86EMUL_OKAY;
