@@ -62,4 +62,10 @@ int libxl__arch_domain_construct_memmap(libxl__gc *gc,
                                         uint32_t domid,
                                         struct xc_dom_image *dom);
 
+#if defined(__i386__) || defined(__x86_64__)
+
+#define LAPIC_BASE_ADDRESS  0xfee00000
+
+#endif
+
 #endif

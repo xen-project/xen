@@ -1077,10 +1077,21 @@ int libxl__build_hvm(libxl__gc *gc, uint32_t domid,
         dom->target_pages = mem_size >> XC_PAGE_SHIFT;
     if (dom->mmio_size == 0 && device_model)
         dom->mmio_size = HVM_BELOW_4G_MMIO_LENGTH;
-    else if (dom->mmio_size == 0 && !device_model)
-        dom->mmio_size = GB(4) -
-                    ((X86_HVM_END_SPECIAL_REGION - X86_HVM_NR_SPECIAL_PAGES)
-                    << XC_PAGE_SHIFT);
+    else if (dom->mmio_size == 0 && !device_model) {
+#if defined(__i386__) || defined(__x86_64__)
+        if (libxl_defbool_val(info->u.hvm.apic)) {
+            /* Make sure LAPIC_BASE_ADDRESS is below special pages */
+            assert(((((X86_HVM_END_SPECIAL_REGION - X86_HVM_NR_SPECIAL_PAGES)
+                      << XC_PAGE_SHIFT) - LAPIC_BASE_ADDRESS)) >= XC_PAGE_SIZE);
+            dom->mmio_size = GB(4) - LAPIC_BASE_ADDRESS;
+        } else
+            dom->mmio_size = GB(4) -
+                ((X86_HVM_END_SPECIAL_REGION - X86_HVM_NR_SPECIAL_PAGES)
+                 << XC_PAGE_SHIFT);
+#else
+        assert(1);
+#endif
+    }
     lowmem_end = mem_size;
     highmem_end = 0;
     mmio_start = (1ull << 32) - dom->mmio_size;

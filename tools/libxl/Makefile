@@ -166,6 +166,8 @@ $(XL_OBJS) $(TEST_PROG_OBJS) _libxl.api-for-check: \
 $(XL_OBJS): CFLAGS += $(CFLAGS_XL)
 $(XL_OBJS): CFLAGS += -include $(XEN_ROOT)/tools/config.h # libxl_json.h needs it.
 
+libxl_dom.o: CFLAGS += -I$(XEN_ROOT)/tools  # include libacpi/x86.h
+
 SAVE_HELPER_OBJS = libxl_save_helper.o _libxl_save_msgs_helper.o
 $(SAVE_HELPER_OBJS): CFLAGS += $(CFLAGS_libxenctrl) $(CFLAGS_libxenevtchn)
 
