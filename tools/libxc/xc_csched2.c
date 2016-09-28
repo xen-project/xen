@@ -37,7 +37,10 @@ xc_sched_credit2_domain_set(
     domctl.u.scheduler_op.cmd = XEN_DOMCTL_SCHEDOP_putinfo;
     domctl.u.scheduler_op.u.credit2 = *sdom;
 
-    return do_domctl(xch, &domctl);
+    if ( do_domctl(xch, &domctl) )
+        return -1;
+
+    return 0;
 }
 
 int
@@ -47,18 +50,18 @@ xc_sched_credit2_domain_get(
     struct xen_domctl_sched_credit2 *sdom)
 {
     DECLARE_DOMCTL;
-    int err;
 
     domctl.cmd = XEN_DOMCTL_scheduler_op;
     domctl.domain = (domid_t) domid;
     domctl.u.scheduler_op.sched_id = XEN_SCHEDULER_CREDIT2;
     domctl.u.scheduler_op.cmd = XEN_DOMCTL_SCHEDOP_getinfo;
 
-    err = do_domctl(xch, &domctl);
-    if ( err == 0 )
-        *sdom = domctl.u.scheduler_op.u.credit2;
+    if ( do_domctl(xch, &domctl) )
+        return -1;
 
-    return err;
+    *sdom = domctl.u.scheduler_op.u.credit2;
+
+    return 0;
 }
 
 int

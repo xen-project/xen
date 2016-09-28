@@ -37,7 +37,10 @@ xc_sched_credit_domain_set(
     domctl.u.scheduler_op.cmd = XEN_DOMCTL_SCHEDOP_putinfo;
     domctl.u.scheduler_op.u.credit = *sdom;
 
-    return do_domctl(xch, &domctl);
+    if ( do_domctl(xch, &domctl) )
+        return -1;
+
+    return 0;
 }
 
 int
@@ -47,18 +50,18 @@ xc_sched_credit_domain_get(
     struct xen_domctl_sched_credit *sdom)
 {
     DECLARE_DOMCTL;
-    int err;
 
     domctl.cmd = XEN_DOMCTL_scheduler_op;
     domctl.domain = (domid_t) domid;
     domctl.u.scheduler_op.sched_id = XEN_SCHEDULER_CREDIT;
     domctl.u.scheduler_op.cmd = XEN_DOMCTL_SCHEDOP_getinfo;
 
-    err = do_domctl(xch, &domctl);
-    if ( err == 0 )
-        *sdom = domctl.u.scheduler_op.u.credit;
+    if ( do_domctl(xch, &domctl) )
+        return -1;
 
-    return err;
+    *sdom = domctl.u.scheduler_op.u.credit;
+
+    return 0;
 }
 
 int
@@ -67,7 +70,6 @@ xc_sched_credit_params_set(
     uint32_t cpupool_id,
     struct xen_sysctl_credit_schedule *schedule)
 {
-    int rc;
     DECLARE_SYSCTL;
 
     sysctl.cmd = XEN_SYSCTL_scheduler_op;
@@ -77,11 +79,12 @@ xc_sched_credit_params_set(
 
     sysctl.u.scheduler_op.u.sched_credit = *schedule;
 
-    rc = do_sysctl(xch, &sysctl);
+    if ( do_sysctl(xch, &sysctl) )
+        return -1;
 
     *schedule = sysctl.u.scheduler_op.u.sched_credit;
 
-    return rc;
+    return 0;
 }
 
 int
@@ -90,7 +93,6 @@ xc_sched_credit_params_get(
     uint32_t cpupool_id,
     struct xen_sysctl_credit_schedule *schedule)
 {
-    int rc;
     DECLARE_SYSCTL;
 
     sysctl.cmd = XEN_SYSCTL_scheduler_op;
@@ -98,9 +100,10 @@ xc_sched_credit_params_get(
     sysctl.u.scheduler_op.sched_id = XEN_SCHEDULER_CREDIT;
     sysctl.u.scheduler_op.cmd = XEN_SYSCTL_SCHEDOP_getinfo;
 
-    rc = do_sysctl(xch, &sysctl);
+    if ( do_sysctl(xch, &sysctl) )
+        return -1;
 
     *schedule = sysctl.u.scheduler_op.u.sched_credit;
 
-    return rc;
+    return 0;
 }
