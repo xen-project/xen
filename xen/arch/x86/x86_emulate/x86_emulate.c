@@ -588,7 +588,7 @@ do{ asm volatile (                                                      \
 })
 #define truncate_ea(ea) truncate_word((ea), ad_bytes)
 
-#define mode_64bit() (def_ad_bytes == 8)
+#define mode_64bit() (ctxt->addr_size == 64)
 
 #define fail_if(p)                                      \
 do {                                                    \
@@ -1156,18 +1156,25 @@ protmode_load_seg(
     struct x86_emulate_ctxt *ctxt,
     const struct x86_emulate_ops *ops)
 {
-    struct segment_register desctab, ss;
+    struct segment_register desctab;
     struct { uint32_t a, b; } desc;
-    uint8_t dpl, rpl, cpl;
+    uint8_t dpl, rpl;
+    int cpl = get_cpl(ctxt, ops);
     uint32_t new_desc_b, a_flag = 0x100;
     int rc, fault_type = EXC_GP;
+
+    if ( cpl < 0 )
+        return X86EMUL_UNHANDLEABLE;
 
     /* NULL selector? */
     if ( (sel & 0xfffc) == 0 )
     {
-        if ( (seg == x86_seg_cs) || (seg == x86_seg_ss) )
+        if ( (seg == x86_seg_cs) ||
+             ((seg == x86_seg_ss) &&
+              (!mode_64bit() || (cpl == 3) || (cpl != sel))) )
             goto raise_exn;
         memset(sreg, 0, sizeof(*sreg));
+        sreg->sel = sel;
         return X86EMUL_OKAY;
     }
 
@@ -1175,8 +1182,7 @@ protmode_load_seg(
     if ( !is_x86_user_segment(seg) && (sel & 4) )
         goto raise_exn;
 
-    if ( (rc = ops->read_segment(x86_seg_ss, &ss, ctxt)) ||
-         (rc = ops->read_segment((sel & 4) ? x86_seg_ldtr : x86_seg_gdtr,
+    if ( (rc = ops->read_segment((sel & 4) ? x86_seg_ldtr : x86_seg_gdtr,
                                  &desctab, ctxt)) )
         return rc;
 
@@ -1191,7 +1197,7 @@ protmode_load_seg(
     /* Segment present in memory? */
     if ( !(desc.b & (1u<<15)) )
     {
-        fault_type = EXC_NP;
+        fault_type = seg != x86_seg_ss ? EXC_NP : EXC_SS;
         goto raise_exn;
     }
 
@@ -1210,7 +1216,6 @@ protmode_load_seg(
 
     dpl = (desc.b >> 13) & 3;
     rpl = sel & 3;
-    cpl = ss.attr.fields.dpl;
 
     switch ( seg )
     {
