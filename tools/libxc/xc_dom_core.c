@@ -1040,6 +1040,97 @@ static int xc_dom_build_ramdisk(struct xc_dom_image *dom)
     return -1;
 }
 
+static int populate_acpi_pages(struct xc_dom_image *dom,
+                               xen_pfn_t *extents,
+                               unsigned int num_pages)
+{
+    int rc;
+    xc_interface *xch = dom->xch;
+    uint32_t domid = dom->guest_domid;
+    unsigned long idx;
+    unsigned int first_high_idx = (4 << 30) >> PAGE_SHIFT; /* 4GB */
+
+    for ( ; num_pages; num_pages--, extents++ )
+    {
+
+        if ( xc_domain_populate_physmap(xch, domid, 1, 0, 0, extents) == 1 )
+            continue;
+
+        if ( dom->highmem_end )
+        {
+            idx = --dom->highmem_end;
+            if ( idx == first_high_idx )
+                dom->highmem_end = 0;
+        }
+        else
+        {
+            idx = --dom->lowmem_end;
+        }
+
+        rc = xc_domain_add_to_physmap(xch, domid,
+                                      XENMAPSPACE_gmfn,
+                                      idx, *extents);
+        if ( rc )
+            return rc;
+    }
+
+    return 0;
+}
+
+static int xc_dom_load_acpi(struct xc_dom_image *dom)
+{
+    int j, i = 0;
+    unsigned num_pages;
+    xen_pfn_t *extents, base;
+    void *ptr;
+
+    while ( (i < MAX_ACPI_MODULES) && dom->acpi_modules[i].length )
+    {
+        DOMPRINTF("%s: %d bytes at address %" PRIx64 "\n", __FUNCTION__,
+                  dom->acpi_modules[i].length,
+                  dom->acpi_modules[i].guest_addr_out);
+
+        num_pages = (dom->acpi_modules[i].length + (XC_PAGE_SIZE - 1)) >>
+                       XC_PAGE_SHIFT;
+        extents = malloc(num_pages * sizeof(*extents));
+        if ( !extents )
+        {
+            DOMPRINTF("%s: Out of memory", __FUNCTION__);
+            goto err;
+        }
+
+        base = dom->acpi_modules[i].guest_addr_out >> XC_PAGE_SHIFT;
+        for ( j = 0; j < num_pages; j++ )
+            extents[j] = base + j;
+        if ( populate_acpi_pages(dom, extents, num_pages) )
+        {
+            DOMPRINTF("%s: Can populate ACPI pages", __FUNCTION__);
+            goto err;
+        }
+
+        ptr = xc_map_foreign_range(dom->xch, dom->guest_domid,
+                                   XC_PAGE_SIZE * num_pages,
+                                   PROT_READ | PROT_WRITE, base);
+        if ( !ptr )
+        {
+            DOMPRINTF("%s: Can't map %d pages at 0x%lx",
+                      __FUNCTION__, num_pages, base);
+            goto err;
+        }
+
+        memcpy(ptr, dom->acpi_modules[i].data, dom->acpi_modules[i].length);
+
+        free(extents);
+        i++;
+    }
+
+    return 0;
+
+err:
+    free(extents);
+    return -1;
+}
+
 int xc_dom_build_image(struct xc_dom_image *dom)
 {
     unsigned int page_size;
@@ -1096,6 +1187,10 @@ int xc_dom_build_image(struct xc_dom_image *dom)
         }
         memcpy(devicetreemap, dom->devicetree_blob, dom->devicetree_size);
     }
+
+    /* load ACPI tables */
+    if ( xc_dom_load_acpi(dom) != 0 )
+        goto err;
 
     /* allocate other pages */
     if ( !dom->arch_hooks->p2m_base_supported ||
