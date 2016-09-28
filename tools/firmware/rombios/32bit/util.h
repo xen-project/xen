@@ -1,7 +1,7 @@
 #ifndef UTIL_H
 #define UTIL_H
 
-#include "../hvmloader/acpi/acpi2_0.h"
+#include <acpi2_0.h>
 
 void outb(uint16_t addr, uint8_t val);
 void outw(uint16_t addr, uint16_t val);

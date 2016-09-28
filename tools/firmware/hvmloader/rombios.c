@@ -24,12 +24,12 @@
 #include "../rombios/config.h"
 
 #include "smbios_types.h"
-#include "acpi/libacpi.h"
 #include "pci_regs.h"
 #include "util.h"
 #include "hypercall.h"
 #include "option_rom.h"
 
+#include <libacpi.h>
 #include <xen/hvm/params.h>
 
 #define ROM_INCLUDE_ROMBIOS

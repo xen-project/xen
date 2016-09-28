@@ -25,8 +25,9 @@
 #include "util.h"
 
 #include "smbios_types.h"
-#include "acpi/acpi2_0.h"
-#include "acpi/libacpi.h"
+
+#include <acpi2_0.h>
+#include <libacpi.h>
 
 extern unsigned char dsdt_anycpu_qemu_xen[];
 extern int dsdt_anycpu_qemu_xen_len;

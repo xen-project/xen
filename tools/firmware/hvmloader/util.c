@@ -22,8 +22,8 @@
 #include "hypercall.h"
 #include "ctype.h"
 #include "vnuma.h"
-#include "acpi/acpi2_0.h"
-#include "acpi/libacpi.h"
+#include <acpi2_0.h>
+#include <libacpi.h>
 #include <stdint.h>
 #include <xen/xen.h>
 #include <xen/memory.h>
@@ -883,6 +883,11 @@ static void acpi_mem_free(struct acpi_ctxt *ctxt,
     /* ACPI builder currently doesn't free memory so this is just a stub */
 }
 
+static uint8_t acpi_lapic_id(unsigned cpu)
+{
+    return LAPIC_ID(cpu);
+}
+
 void hvmloader_acpi_build_tables(struct acpi_config *config,
                                  unsigned int physical)
 {
@@ -891,6 +896,12 @@ void hvmloader_acpi_build_tables(struct acpi_config *config,
 
     /* Allocate and initialise the acpi info area. */
     mem_hole_populate_ram(ACPI_INFO_PHYSICAL_ADDRESS >> PAGE_SHIFT, 1);
+
+    config->lapic_base_address = LAPIC_BASE_ADDRESS;
+    config->lapic_id = acpi_lapic_id;
+    config->ioapic_base_address = ioapic_base_address;
+    config->ioapic_id = IOAPIC_ID;
+    config->pci_isa_irq_mask = PCI_ISA_IRQ_MASK; 
 
     if ( uart_exists(0x3f8)  )
         config->table_flags |= ACPI_HAS_COM1;

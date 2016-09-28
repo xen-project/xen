@@ -82,6 +82,13 @@ struct acpi_config {
 
     /* RSDP address */
     unsigned int rsdp;
+
+    /* x86-specific parameters */
+    uint8_t (*lapic_id)(unsigned cpu);
+    uint32_t lapic_base_address;
+    uint32_t ioapic_base_address;
+    uint16_t pci_isa_irq_mask;
+    uint8_t ioapic_id;
 };
 
 void acpi_build_tables(struct acpi_ctxt *ctxt, struct acpi_config *config);

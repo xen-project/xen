@@ -79,7 +79,8 @@ smbios.o: CFLAGS += -D__SMBIOS_DATE__="\"$(SMBIOS_REL_DATE)\""
 ACPI_PATH = acpi
 ACPI_FILES = dsdt_anycpu.c dsdt_15cpu.c dsdt_anycpu_qemu_xen.c
 ACPI_OBJS = $(patsubst %.c,%.o,$(ACPI_FILES)) build.o static_tables.o
-$(ACPI_OBJS): CFLAGS += -I$(ACPI_PATH) -I.
+$(ACPI_OBJS): CFLAGS += -I. -DLIBACPI_STDUTILS=\"../util.h\"
+CFLAGS += -I$(ACPI_PATH)
 vpath build.c $(ACPI_PATH)
 vpath static_tables.c $(ACPI_PATH)
 OBJS += $(ACPI_OBJS)

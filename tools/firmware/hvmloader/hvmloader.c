@@ -24,8 +24,8 @@
 #include "config.h"
 #include "pci_regs.h"
 #include "apic_regs.h"
-#include "acpi/acpi2_0.h"
 #include "vnuma.h"
+#include <acpi2_0.h>
 #include <xen/version.h>
 #include <xen/hvm/params.h>
 #include <xen/arch-x86/hvm/start_info.h>

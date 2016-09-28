@@ -1,11 +1,19 @@
-ACPI Table for domain firmware
+ACPI builder for domain firmware
 
 
-INSTALL
+BUILDING ACPI
 -----------------
-Simply make is OK.
-# make 
+Users of ACPI builder are expected to provide an include file that makes available
+the following:
+* strncpy
+* printf
+* NULL
+* test_bit
+* offsetof
 
+When compiling build.c, the name of this include file should be given to
+compiler as -DLIBACPI_STDUTILS=\"<filename>\". See tools/firmware/hvmloader/Makefile
+for an example.
 
 Note on DSDT Table
 ------------------

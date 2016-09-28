@@ -13,15 +13,14 @@
  * GNU Lesser General Public License for more details.
  */
 
+#include LIBACPI_STDUTILS
 #include "acpi2_0.h"
 #include "libacpi.h"
 #include "ssdt_s3.h"
 #include "ssdt_s4.h"
 #include "ssdt_tpm.h"
 #include "ssdt_pm.h"
-#include "../config.h"
-#include "../util.h"
-#include "../vnuma.h"
+#include <xen/hvm/hvm_info_table.h>
 #include <xen/hvm/hvm_xs_strings.h>
 #include <xen/hvm/params.h>
 #include <xen/memory.h>
@@ -82,6 +81,9 @@ static struct acpi_20_madt *construct_madt(struct acpi_ctxt *ctxt,
     const struct hvm_info_table   *hvminfo = config->hvminfo;
     int i, sz;
 
+    if ( config->lapic_id == NULL )
+        return NULL;
+
     sz  = sizeof(struct acpi_20_madt);
     sz += sizeof(struct acpi_20_madt_intsrcovr) * 16;
     sz += sizeof(struct acpi_20_madt_ioapic);
@@ -98,7 +100,7 @@ static struct acpi_20_madt *construct_madt(struct acpi_ctxt *ctxt,
     madt->header.oem_revision = ACPI_OEM_REVISION;
     madt->header.creator_id   = ACPI_CREATOR_ID;
     madt->header.creator_revision = ACPI_CREATOR_REVISION;
-    madt->lapic_addr = LAPIC_BASE_ADDRESS;
+    madt->lapic_addr = config->lapic_base_address;
     madt->flags      = ACPI_PCAT_COMPAT;
 
     if ( config->table_flags & ACPI_HAS_IOAPIC )
@@ -117,7 +119,7 @@ static struct acpi_20_madt *construct_madt(struct acpi_ctxt *ctxt,
                 intsrcovr->gsi    = 2;
                 intsrcovr->flags  = 0x0;
             }
-            else if ( PCI_ISA_IRQ_MASK & (1U << i) )
+            else if ( config->pci_isa_irq_mask & (1U << i) )
             {
                 /* PCI: active-low level-triggered. */
                 intsrcovr->gsi    = i;
@@ -136,8 +138,8 @@ static struct acpi_20_madt *construct_madt(struct acpi_ctxt *ctxt,
         memset(io_apic, 0, sizeof(*io_apic));
         io_apic->type        = ACPI_IO_APIC;
         io_apic->length      = sizeof(*io_apic);
-        io_apic->ioapic_id   = IOAPIC_ID;
-        io_apic->ioapic_addr = ioapic_base_address;
+        io_apic->ioapic_id   = config->ioapic_id;
+        io_apic->ioapic_addr = config->ioapic_base_address;
 
         lapic = (struct acpi_20_madt_lapic *)(io_apic + 1);
     }
@@ -153,7 +155,7 @@ static struct acpi_20_madt *construct_madt(struct acpi_ctxt *ctxt,
         lapic->length  = sizeof(*lapic);
         /* Processor ID must match processor-object IDs in the DSDT. */
         lapic->acpi_processor_id = i;
-        lapic->apic_id = LAPIC_ID(i);
+        lapic->apic_id = config->lapic_id(i);
         lapic->flags = (test_bit(i, hvminfo->vcpu_online)
                         ? ACPI_LOCAL_APIC_ENABLED : 0);
         lapic++;
@@ -241,7 +243,7 @@ static struct acpi_20_srat *construct_srat(struct acpi_ctxt *ctxt,
         processor->type     = ACPI_PROCESSOR_AFFINITY;
         processor->length   = sizeof(*processor);
         processor->domain   = config->numa.vcpu_to_vnode[i];
-        processor->apic_id  = LAPIC_ID(i);
+        processor->apic_id  = config->lapic_id(i);
         processor->flags    = ACPI_LOCAL_APIC_AFFIN_ENABLED;
         processor++;
     }
