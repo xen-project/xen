@@ -1134,15 +1134,15 @@ int libxl__build_hvm(libxl__gc *gc, uint32_t domid,
             dom->vnode_to_pnode[i] = info->vnuma_nodes[i].pnode;
     }
 
+    rc = libxl__build_dom(gc, domid, info, state, dom);
+    if (rc != 0)
+        goto out;
+
     rc = libxl__arch_domain_construct_memmap(gc, d_config, domid, dom);
     if (rc != 0) {
         LOG(ERROR, "setting domain memory map failed");
         goto out;
     }
-
-    rc = libxl__build_dom(gc, domid, info, state, dom);
-    if (rc != 0)
-        goto out;
 
     rc = hvm_build_set_params(ctx->xch, domid, info, state->store_port,
                                &state->store_mfn, state->console_port,

@@ -492,6 +492,7 @@ int libxl__arch_domain_construct_memmap(libxl__gc *gc,
     uint64_t highmem_size =
                     dom->highmem_end ? dom->highmem_end - (1ull << 32) : 0;
     uint32_t lowmem_start = dom->device_model ? GUEST_LOW_MEM_START_DEFAULT : 0;
+    unsigned page_size = XC_DOM_PAGE_SIZE(dom);
 
     /* Add all rdm entries. */
     for (i = 0; i < d_config->num_rdms; i++)
@@ -502,6 +503,10 @@ int libxl__arch_domain_construct_memmap(libxl__gc *gc,
     /* If we should have a highmem range. */
     if (highmem_size)
         e820_entries++;
+
+    for (i = 0; i < MAX_ACPI_MODULES; i++)
+        if (dom->acpi_modules[i].length)
+            e820_entries++;
 
     if (e820_entries >= E820MAX) {
         LOG(ERROR, "Ooops! Too many entries in the memory map!");
@@ -526,6 +531,16 @@ int libxl__arch_domain_construct_memmap(libxl__gc *gc,
         e820[nr].size = d_config->rdms[i].size;
         e820[nr].type = E820_RESERVED;
         nr++;
+    }
+
+    for (i = 0; i < MAX_ACPI_MODULES; i++) {
+        if (dom->acpi_modules[i].length) {
+            e820[nr].addr = dom->acpi_modules[i].guest_addr_out & ~(page_size - 1);
+            e820[nr].size = dom->acpi_modules[i].length +
+                (dom->acpi_modules[i].guest_addr_out & (page_size - 1));
+            e820[nr].type = E820_ACPI;
+            nr++;
+        }
     }
 
     /* High memory */
