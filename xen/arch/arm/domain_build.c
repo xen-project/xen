@@ -1518,10 +1518,11 @@ static void acpi_map_other_tables(struct domain *d)
     {
         addr = acpi_gbl_root_table_list.tables[i].address;
         size = acpi_gbl_root_table_list.tables[i].length;
-        res = map_regions_rw_cache(d,
-                                   _gfn(paddr_to_pfn(addr)),
-                                   DIV_ROUND_UP(size, PAGE_SIZE),
-                                   _mfn(paddr_to_pfn(addr)));
+        res = map_regions_p2mt(d,
+                               _gfn(paddr_to_pfn(addr)),
+                               DIV_ROUND_UP(size, PAGE_SIZE),
+                               _mfn(paddr_to_pfn(addr)),
+                               p2m_mmio_direct_c);
         if ( res )
         {
              panic(XENLOG_ERR "Unable to map ACPI region 0x%"PRIx64
@@ -1874,10 +1875,11 @@ static int prepare_acpi(struct domain *d, struct kernel_info *kinfo)
     acpi_create_efi_mmap_table(d, &kinfo->mem, tbl_add);
 
     /* Map the EFI and ACPI tables to Dom0 */
-    rc = map_regions_rw_cache(d,
-                              _gfn(paddr_to_pfn(d->arch.efi_acpi_gpa)),
-                              PFN_UP(d->arch.efi_acpi_len),
-                              _mfn(paddr_to_pfn(virt_to_maddr(d->arch.efi_acpi_table))));
+    rc = map_regions_p2mt(d,
+                          _gfn(paddr_to_pfn(d->arch.efi_acpi_gpa)),
+                          PFN_UP(d->arch.efi_acpi_len),
+                          _mfn(paddr_to_pfn(virt_to_maddr(d->arch.efi_acpi_table))),
+                          p2m_mmio_direct_c);
     if ( rc != 0 )
     {
         printk(XENLOG_ERR "Unable to map EFI/ACPI table 0x%"PRIx64

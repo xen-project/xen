@@ -1135,18 +1135,19 @@ static inline int p2m_remove_mapping(struct domain *d,
     return rc;
 }
 
-int map_regions_rw_cache(struct domain *d,
-                         gfn_t gfn,
-                         unsigned long nr,
-                         mfn_t mfn)
+int map_regions_p2mt(struct domain *d,
+                     gfn_t gfn,
+                     unsigned long nr,
+                     mfn_t mfn,
+                     p2m_type_t p2mt)
 {
-    return p2m_insert_mapping(d, gfn, nr, mfn, p2m_mmio_direct_c);
+    return p2m_insert_mapping(d, gfn, nr, mfn, p2mt);
 }
 
-int unmap_regions_rw_cache(struct domain *d,
-                           gfn_t gfn,
-                           unsigned long nr,
-                           mfn_t mfn)
+int unmap_regions_p2mt(struct domain *d,
+                       gfn_t gfn,
+                       unsigned long nr,
+                       mfn_t mfn)
 {
     return p2m_remove_mapping(d, gfn, nr, mfn);
 }

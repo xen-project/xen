@@ -230,15 +230,20 @@ int p2m_set_entry(struct p2m_domain *p2m,
 /* Clean & invalidate caches corresponding to a region of guest address space */
 int p2m_cache_flush(struct domain *d, gfn_t start, unsigned long nr);
 
-int map_regions_rw_cache(struct domain *d,
-                         gfn_t gfn,
-                         unsigned long nr,
-                         mfn_t mfn);
+/*
+ * Map a region in the guest p2m with a specific p2m type.
+ * The memory attributes will be derived from the p2m type.
+ */
+int map_regions_p2mt(struct domain *d,
+                     gfn_t gfn,
+                     unsigned long nr,
+                     mfn_t mfn,
+                     p2m_type_t p2mt);
 
-int unmap_regions_rw_cache(struct domain *d,
-                           gfn_t gfn,
-                           unsigned long nr,
-                           mfn_t mfn);
+int unmap_regions_p2mt(struct domain *d,
+                       gfn_t gfn,
+                       unsigned long nr,
+                       mfn_t mfn);
 
 int map_dev_mmio_region(struct domain *d,
                         gfn_t gfn,
