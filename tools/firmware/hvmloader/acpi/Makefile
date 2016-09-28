@@ -17,7 +17,8 @@
 XEN_ROOT = $(CURDIR)/../../../..
 include $(XEN_ROOT)/tools/firmware/Rules.mk
 
-C_SRC = build.c dsdt_anycpu.c dsdt_15cpu.c static_tables.c dsdt_anycpu_qemu_xen.c
+C_SRC-$(GPL) = build.c dsdt_anycpu.c dsdt_15cpu.c dsdt_anycpu_qemu_xen.c
+C_SRC = build.c static_tables.c $(C_SRC-y)
 OBJS  = $(patsubst %.c,%.o,$(C_SRC))
 
 CFLAGS += $(CFLAGS_xeninclude)
@@ -36,18 +37,25 @@ ssdt_s3.h ssdt_s4.h ssdt_pm.h ssdt_tpm.h: %.h: %.asl iasl
 mk_dsdt: mk_dsdt.c
 	$(HOSTCC) $(HOSTCFLAGS) $(CFLAGS_xeninclude) -o $@ mk_dsdt.c
 
-dsdt_anycpu_qemu_xen.asl: dsdt.asl dsdt_acpi_info.asl mk_dsdt
+ifeq ($(GPL),y)
+dsdt_anycpu_qemu_xen.asl: dsdt.asl dsdt_acpi_info.asl gpl/mk_dsdt_gpl.sh mk_dsdt
 	awk 'NR > 1 {print s} {s=$$0}' $< > $@.$(TMP_SUFFIX)
+	# Strip license comment
+	sed -i '1,/\*\//{/\/\*/,/\*\//d}' $@.$(TMP_SUFFIX)
+	$(SHELL) gpl/mk_dsdt_gpl.sh >> $@.$(TMP_SUFFIX)
 	cat dsdt_acpi_info.asl >> $@.$(TMP_SUFFIX)
 	./mk_dsdt --debug=$(debug) --dm-version qemu-xen >> $@.$(TMP_SUFFIX)
 	mv -f $@.$(TMP_SUFFIX) $@
 
 # NB. awk invocation is a portable alternative to 'head -n -1'
-dsdt_%cpu.asl: dsdt.asl dsdt_acpi_info.asl mk_dsdt
+dsdt_%cpu.asl: dsdt.asl dsdt_acpi_info.asl gpl/mk_dsdt_gpl.sh mk_dsdt
 	awk 'NR > 1 {print s} {s=$$0}' $< > $@.$(TMP_SUFFIX)
+	sed -i '1,/\*\//{/\/\*/,/\*\//d}' $@.$(TMP_SUFFIX)
+	$(SHELL) gpl/mk_dsdt_gpl.sh >> $@.$(TMP_SUFFIX)
 	cat dsdt_acpi_info.asl >> $@.$(TMP_SUFFIX)
 	./mk_dsdt --debug=$(debug) --maxcpu $*  >> $@.$(TMP_SUFFIX)
 	mv -f $@.$(TMP_SUFFIX) $@
+endif
 
 $(filter dsdt_%.c,$(C_SRC)): %.c: iasl %.asl
 	iasl -vs -p $* -tc $*.asl
