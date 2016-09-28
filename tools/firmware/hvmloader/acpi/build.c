@@ -360,9 +360,13 @@ static int construct_secondary_tables(unsigned long *table_ptrs,
     }
 
     /* WAET. */
-    waet = construct_waet();
-    if (!waet) return -1;
-    table_ptrs[nr_tables++] = (unsigned long)waet;
+    if ( config->table_flags & ACPI_HAS_WAET )
+    {
+        waet = construct_waet();
+        if ( !waet )
+            return -1;
+        table_ptrs[nr_tables++] = (unsigned long)waet;
+    }
 
     if ( config->table_flags & ACPI_HAS_SSDT_PM )
     {

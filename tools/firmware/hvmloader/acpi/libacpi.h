@@ -29,6 +29,7 @@
 #define ACPI_HAS_SSDT_S4     (1<<6)
 #define ACPI_HAS_TCPA        (1<<7)
 #define ACPI_HAS_IOAPIC      (1<<8)
+#define ACPI_HAS_WAET        (1<<9)
 
 struct xen_vmemrange;
 struct acpi_numa {

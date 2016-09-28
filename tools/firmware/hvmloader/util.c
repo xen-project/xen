@@ -919,7 +919,7 @@ void hvmloader_acpi_build_tables(struct acpi_config *config,
     if ( !strncmp(xenstore_read("platform/acpi_s4", "1"), "1", 1)  )
         config->table_flags |= ACPI_HAS_SSDT_S4;
 
-    config->table_flags |= (ACPI_HAS_TCPA | ACPI_HAS_IOAPIC);
+    config->table_flags |= (ACPI_HAS_TCPA | ACPI_HAS_IOAPIC | ACPI_HAS_WAET);
 
     config->tis_hdr = (uint16_t *)ACPI_TIS_HDR_ADDRESS;
 
