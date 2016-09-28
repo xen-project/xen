@@ -23,6 +23,7 @@ static unsigned int indent_level;
 static bool debug = false;
 
 typedef enum dm_version {
+    QEMU_NONE,
     QEMU_XEN_TRADITIONAL,
     QEMU_XEN,
 } dm_version;
@@ -135,6 +136,8 @@ int main(int argc, char **argv)
                 dm_version = QEMU_XEN;
             } else if (strcmp(optarg, "qemu-xen-traditional") == 0) {
                 dm_version = QEMU_XEN_TRADITIONAL;
+            } else if (strcmp(optarg, "none") == 0) {
+                dm_version = QEMU_NONE;
             } else {
                 fprintf(stderr, "Unknown device model version `%s'.\n", optarg);
                 return -1;
@@ -251,6 +254,11 @@ int main(int argc, char **argv)
     pop_block();
 
     pop_block();
+
+    if (dm_version == QEMU_NONE) {
+        pop_block();
+        return 0;
+    }
 
     /* Define GPE control method. */
     push_block("Scope", "\\_GPE");

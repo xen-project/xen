@@ -18,7 +18,7 @@ include $(XEN_ROOT)/tools/firmware/Rules.mk
 MK_DSDT = $(ACPI_BUILD_DIR)/mk_dsdt
 
 C_SRC-$(GPL) = dsdt_anycpu.c dsdt_15cpu.c dsdt_anycpu_qemu_xen.c
-C_SRC = $(addprefix $(ACPI_BUILD_DIR)/, $(C_SRC-y))
+C_SRC = $(addprefix $(ACPI_BUILD_DIR)/, dsdt_pvh.c $(C_SRC-y))
 H_SRC = $(addprefix $(ACPI_BUILD_DIR)/, ssdt_s3.h ssdt_s4.h ssdt_pm.h ssdt_tpm.h)
 
 # Suffix for temporary files.
@@ -59,6 +59,11 @@ $(ACPI_BUILD_DIR)/dsdt_%cpu.asl: dsdt.asl dsdt_acpi_info.asl gpl/mk_dsdt_gpl.sh 
 	$(MK_DSDT) --debug=$(debug) --maxcpu $*  >> $@.$(TMP_SUFFIX)
 	mv -f $@.$(TMP_SUFFIX) $@
 endif
+
+$(ACPI_BUILD_DIR)/dsdt_pvh.asl: dsdt_acpi_info.asl $(MK_DSDT)
+	printf "DefinitionBlock (\"DSDT.aml\", \"DSDT\", 5, \"Xen\", \"HVM\", 0)\n{" > $@
+	cat dsdt_acpi_info.asl >> $@
+	$(MK_DSDT) --debug=$(debug) --maxcpu any --dm-version none >> $@
 
 $(C_SRC): $(ACPI_BUILD_DIR)/%.c: iasl $(ACPI_BUILD_DIR)/%.asl
 	iasl -vs -p $(ACPI_BUILD_DIR)/$*.$(TMP_SUFFIX) -tc $(ACPI_BUILD_DIR)/$*.asl
