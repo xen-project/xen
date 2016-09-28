@@ -1169,10 +1169,17 @@ protmode_load_seg(
     /* NULL selector? */
     if ( (sel & 0xfffc) == 0 )
     {
-        if ( (seg == x86_seg_cs) ||
-             ((seg == x86_seg_ss) &&
-              (!mode_64bit() || (cpl == 3) || (cpl != sel))) )
+        switch ( seg )
+        {
+        case x86_seg_ss:
+            if ( mode_64bit() && (cpl != 3) && (cpl == sel) )
+        default:
+                break;
+            /* fall through */
+        case x86_seg_cs:
+        case x86_seg_tr:
             goto raise_exn;
+        }
         memset(sreg, 0, sizeof(*sreg));
         sreg->sel = sel;
         return X86EMUL_OKAY;
