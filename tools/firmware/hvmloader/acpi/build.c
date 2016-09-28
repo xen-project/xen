@@ -145,7 +145,7 @@ static struct acpi_20_madt *construct_madt(struct acpi_ctxt *ctxt,
         lapic = (struct acpi_20_madt_lapic *)(madt + 1);
 
     info->nr_cpus = hvminfo->nr_vcpus;
-    info->madt_lapic0_addr = (uint32_t)lapic;
+    info->madt_lapic0_addr = ctxt->mem_ops.v2p(ctxt, lapic);
     for ( i = 0; i < hvminfo->nr_vcpus; i++ )
     {
         memset(lapic, 0, sizeof(*lapic));
@@ -162,7 +162,8 @@ static struct acpi_20_madt *construct_madt(struct acpi_ctxt *ctxt,
     madt->header.length = (unsigned char *)lapic - (unsigned char *)madt;
     set_checksum(madt, offsetof(struct acpi_header, checksum),
                  madt->header.length);
-    info->madt_csum_addr = (uint32_t)&madt->header.checksum;
+    info->madt_csum_addr =
+        ctxt->mem_ops.v2p(ctxt, &madt->header.checksum);
 
     return madt;
 }
@@ -328,7 +329,7 @@ static int construct_passthrough_tables(struct acpi_ctxt *ctxt,
             break;
         memcpy(buffer, header, header->length);
 
-        table_ptrs[nr_tables++] = (unsigned long)buffer;
+        table_ptrs[nr_tables++] = ctxt->mem_ops.v2p(ctxt, buffer);
         total += header->length;
         pt_addr += header->length;
     }
@@ -355,7 +356,7 @@ static int construct_secondary_tables(struct acpi_ctxt *ctxt,
     {
         madt = construct_madt(ctxt, config, info);
         if (!madt) return -1;
-        table_ptrs[nr_tables++] = (unsigned long)madt;
+        table_ptrs[nr_tables++] = ctxt->mem_ops.v2p(ctxt, madt);
     }
 
     /* HPET. */
@@ -363,7 +364,7 @@ static int construct_secondary_tables(struct acpi_ctxt *ctxt,
     {
         hpet = construct_hpet(ctxt, config);
         if (!hpet) return -1;
-        table_ptrs[nr_tables++] = (unsigned long)hpet;
+        table_ptrs[nr_tables++] = ctxt->mem_ops.v2p(ctxt, hpet);
     }
 
     /* WAET. */
@@ -372,7 +373,7 @@ static int construct_secondary_tables(struct acpi_ctxt *ctxt,
         waet = construct_waet(ctxt, config);
         if ( !waet )
             return -1;
-        table_ptrs[nr_tables++] = (unsigned long)waet;
+        table_ptrs[nr_tables++] = ctxt->mem_ops.v2p(ctxt, waet);
     }
 
     if ( config->table_flags & ACPI_HAS_SSDT_PM )
@@ -380,7 +381,7 @@ static int construct_secondary_tables(struct acpi_ctxt *ctxt,
         ssdt = ctxt->mem_ops.alloc(ctxt, sizeof(ssdt_pm), 16);
         if (!ssdt) return -1;
         memcpy(ssdt, ssdt_pm, sizeof(ssdt_pm));
-        table_ptrs[nr_tables++] = (unsigned long)ssdt;
+        table_ptrs[nr_tables++] = ctxt->mem_ops.v2p(ctxt, ssdt);
     }
 
     if ( config->table_flags & ACPI_HAS_SSDT_S3 )
@@ -388,7 +389,7 @@ static int construct_secondary_tables(struct acpi_ctxt *ctxt,
         ssdt = ctxt->mem_ops.alloc(ctxt, sizeof(ssdt_s3), 16);
         if (!ssdt) return -1;
         memcpy(ssdt, ssdt_s3, sizeof(ssdt_s3));
-        table_ptrs[nr_tables++] = (unsigned long)ssdt;
+        table_ptrs[nr_tables++] = ctxt->mem_ops.v2p(ctxt, ssdt);
     } else {
         printf("S3 disabled\n");
     }
@@ -398,7 +399,7 @@ static int construct_secondary_tables(struct acpi_ctxt *ctxt,
         ssdt = ctxt->mem_ops.alloc(ctxt, sizeof(ssdt_s4), 16);
         if (!ssdt) return -1;
         memcpy(ssdt, ssdt_s4, sizeof(ssdt_s4));
-        table_ptrs[nr_tables++] = (unsigned long)ssdt;
+        table_ptrs[nr_tables++] = ctxt->mem_ops.v2p(ctxt, ssdt);
     } else {
         printf("S4 disabled\n");
     }
@@ -412,12 +413,12 @@ static int construct_secondary_tables(struct acpi_ctxt *ctxt,
         ssdt = ctxt->mem_ops.alloc(ctxt, sizeof(ssdt_tpm), 16);
         if (!ssdt) return -1;
         memcpy(ssdt, ssdt_tpm, sizeof(ssdt_tpm));
-        table_ptrs[nr_tables++] = (unsigned long)ssdt;
+        table_ptrs[nr_tables++] = ctxt->mem_ops.v2p(ctxt, ssdt);
 
         tcpa = ctxt->mem_ops.alloc(ctxt, sizeof(struct acpi_20_tcpa), 16);
         if (!tcpa) return -1;
         memset(tcpa, 0, sizeof(*tcpa));
-        table_ptrs[nr_tables++] = (unsigned long)tcpa;
+        table_ptrs[nr_tables++] = ctxt->mem_ops.v2p(ctxt, tcpa);
 
         tcpa->header.signature = ACPI_2_0_TCPA_SIGNATURE;
         tcpa->header.length    = sizeof(*tcpa);
@@ -445,11 +446,11 @@ static int construct_secondary_tables(struct acpi_ctxt *ctxt,
         struct acpi_20_slit *slit = construct_slit(ctxt, config);
 
         if ( srat )
-            table_ptrs[nr_tables++] = (unsigned long)srat;
+            table_ptrs[nr_tables++] = ctxt->mem_ops.v2p(ctxt, srat);
         else
             printf("Failed to build SRAT, skipping...\n");
         if ( slit )
-            table_ptrs[nr_tables++] = (unsigned long)slit;
+            table_ptrs[nr_tables++] = ctxt->mem_ops.v2p(ctxt, slit);
         else
             printf("Failed to build SLIT, skipping...\n");
     }
@@ -563,8 +564,8 @@ void acpi_build_tables(struct acpi_ctxt *ctxt, struct acpi_config *config)
     memcpy(fadt_10, &Fadt, sizeof(struct acpi_10_fadt));
     fadt_10->header.length = sizeof(struct acpi_10_fadt);
     fadt_10->header.revision = ACPI_1_0_FADT_REVISION;
-    fadt_10->dsdt          = (unsigned long)dsdt;
-    fadt_10->firmware_ctrl = (unsigned long)facs;
+    fadt_10->dsdt          = ctxt->mem_ops.v2p(ctxt, dsdt);
+    fadt_10->firmware_ctrl = ctxt->mem_ops.v2p(ctxt, facs);
     set_checksum(fadt_10,
                  offsetof(struct acpi_header, checksum),
                  sizeof(struct acpi_10_fadt));
@@ -572,10 +573,10 @@ void acpi_build_tables(struct acpi_ctxt *ctxt, struct acpi_config *config)
     fadt = ctxt->mem_ops.alloc(ctxt, sizeof(struct acpi_20_fadt), 16);
     if (!fadt) goto oom;
     memcpy(fadt, &Fadt, sizeof(struct acpi_20_fadt));
-    fadt->dsdt   = (unsigned long)dsdt;
-    fadt->x_dsdt = (unsigned long)dsdt;
-    fadt->firmware_ctrl   = (unsigned long)facs;
-    fadt->x_firmware_ctrl = (unsigned long)facs;
+    fadt->dsdt   = ctxt->mem_ops.v2p(ctxt, dsdt);
+    fadt->x_dsdt = ctxt->mem_ops.v2p(ctxt, dsdt);
+    fadt->firmware_ctrl   = ctxt->mem_ops.v2p(ctxt, facs);
+    fadt->x_firmware_ctrl = ctxt->mem_ops.v2p(ctxt, facs);
     set_checksum(fadt,
                  offsetof(struct acpi_header, checksum),
                  sizeof(struct acpi_20_fadt));
@@ -590,7 +591,7 @@ void acpi_build_tables(struct acpi_ctxt *ctxt, struct acpi_config *config)
                                16);
     if (!xsdt) goto oom;
     memcpy(xsdt, &Xsdt, sizeof(struct acpi_header));
-    xsdt->entry[0] = (unsigned long)fadt;
+    xsdt->entry[0] = ctxt->mem_ops.v2p(ctxt, fadt);
     for ( i = 0; secondary_tables[i]; i++ )
         xsdt->entry[i+1] = secondary_tables[i];
     xsdt->header.length = sizeof(struct acpi_header) + (i+1)*sizeof(uint64_t);
@@ -603,7 +604,7 @@ void acpi_build_tables(struct acpi_ctxt *ctxt, struct acpi_config *config)
                                16);
     if (!rsdt) goto oom;
     memcpy(rsdt, &Rsdt, sizeof(struct acpi_header));
-    rsdt->entry[0] = (unsigned long)fadt_10;
+    rsdt->entry[0] = ctxt->mem_ops.v2p(ctxt, fadt_10);
     for ( i = 0; secondary_tables[i]; i++ )
         rsdt->entry[i+1] = secondary_tables[i];
     rsdt->header.length = sizeof(struct acpi_header) + (i+1)*sizeof(uint32_t);
@@ -617,8 +618,8 @@ void acpi_build_tables(struct acpi_ctxt *ctxt, struct acpi_config *config)
     rsdp = (struct acpi_20_rsdp *)config->rsdp;
 
     memcpy(rsdp, &Rsdp, sizeof(struct acpi_20_rsdp));
-    rsdp->rsdt_address = (unsigned long)rsdt;
-    rsdp->xsdt_address = (unsigned long)xsdt;
+    rsdp->rsdt_address = ctxt->mem_ops.v2p(ctxt, rsdt);
+    rsdp->xsdt_address = ctxt->mem_ops.v2p(ctxt, xsdt);
     set_checksum(rsdp,
                  offsetof(struct acpi_10_rsdp, checksum),
                  sizeof(struct acpi_10_rsdp));
