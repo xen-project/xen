@@ -15,52 +15,57 @@
 XEN_ROOT = $(CURDIR)/../../../..
 include $(XEN_ROOT)/tools/firmware/Rules.mk
 
-C_SRC-$(GPL) = build.c dsdt_anycpu.c dsdt_15cpu.c dsdt_anycpu_qemu_xen.c
-C_SRC = build.c static_tables.c $(C_SRC-y)
-OBJS  = $(patsubst %.c,%.o,$(C_SRC))
+MK_DSDT = $(ACPI_BUILD_DIR)/mk_dsdt
 
-CFLAGS += $(CFLAGS_xeninclude)
+C_SRC-$(GPL) = dsdt_anycpu.c dsdt_15cpu.c dsdt_anycpu_qemu_xen.c
+C_SRC = $(addprefix $(ACPI_BUILD_DIR)/, $(C_SRC-y))
+H_SRC = $(addprefix $(ACPI_BUILD_DIR)/, ssdt_s3.h ssdt_s4.h ssdt_pm.h ssdt_tpm.h)
 
 # Suffix for temporary files.
+#
+# We will also use this suffix to workaround a bug in older iasl
+# versions where the tool will ignore everything after last '.' in the
+# path ('-p' argument). By adding ".<suffix>" we force iasl to use
+# complete $(ACPI_BUILD_DIR) as path, even if it has '.' symbols.
 TMP_SUFFIX	= tmp
 
 vpath iasl $(PATH)
-all: acpi.a
+all: $(C_SRC) $(H_SRC)
 
-ssdt_s3.h ssdt_s4.h ssdt_pm.h ssdt_tpm.h: %.h: %.asl iasl
-	iasl -vs -p $* -tc $<
-	sed -e 's/AmlCode/$*/g' $*.hex >$@
-	rm -f $*.hex $*.aml
-
-mk_dsdt: mk_dsdt.c
+$(H_SRC): $(ACPI_BUILD_DIR)/%.h: %.asl iasl
+	iasl -vs -p $(ACPI_BUILD_DIR)/$*.$(TMP_SUFFIX) -tc $<
+	sed -e 's/AmlCode/$*/g' $(ACPI_BUILD_DIR)/$*.hex >$@
+	rm -f $(addprefix $(ACPI_BUILD_DIR)/, $*.aml $*.hex)
+ 
+$(MK_DSDT): mk_dsdt.c
 	$(HOSTCC) $(HOSTCFLAGS) $(CFLAGS_xeninclude) -o $@ mk_dsdt.c
 
 ifeq ($(GPL),y)
-dsdt_anycpu_qemu_xen.asl: dsdt.asl dsdt_acpi_info.asl gpl/mk_dsdt_gpl.sh mk_dsdt
+$(ACPI_BUILD_DIR)/dsdt_anycpu_qemu_xen.asl: dsdt.asl dsdt_acpi_info.asl gpl/mk_dsdt_gpl.sh $(MK_DSDT)
 	awk 'NR > 1 {print s} {s=$$0}' $< > $@.$(TMP_SUFFIX)
 	# Strip license comment
 	sed -i '1,/\*\//{/\/\*/,/\*\//d}' $@.$(TMP_SUFFIX)
 	$(SHELL) gpl/mk_dsdt_gpl.sh >> $@.$(TMP_SUFFIX)
 	cat dsdt_acpi_info.asl >> $@.$(TMP_SUFFIX)
-	./mk_dsdt --debug=$(debug) --dm-version qemu-xen >> $@.$(TMP_SUFFIX)
+	$(MK_DSDT) --debug=$(debug) --dm-version qemu-xen >> $@.$(TMP_SUFFIX)
 	mv -f $@.$(TMP_SUFFIX) $@
 
 # NB. awk invocation is a portable alternative to 'head -n -1'
-dsdt_%cpu.asl: dsdt.asl dsdt_acpi_info.asl gpl/mk_dsdt_gpl.sh mk_dsdt
+$(ACPI_BUILD_DIR)/dsdt_%cpu.asl: dsdt.asl dsdt_acpi_info.asl gpl/mk_dsdt_gpl.sh $(MK_DSDT)
 	awk 'NR > 1 {print s} {s=$$0}' $< > $@.$(TMP_SUFFIX)
 	sed -i '1,/\*\//{/\/\*/,/\*\//d}' $@.$(TMP_SUFFIX)
 	$(SHELL) gpl/mk_dsdt_gpl.sh >> $@.$(TMP_SUFFIX)
 	cat dsdt_acpi_info.asl >> $@.$(TMP_SUFFIX)
-	./mk_dsdt --debug=$(debug) --maxcpu $*  >> $@.$(TMP_SUFFIX)
+	$(MK_DSDT) --debug=$(debug) --maxcpu $*  >> $@.$(TMP_SUFFIX)
 	mv -f $@.$(TMP_SUFFIX) $@
 endif
 
-$(filter dsdt_%.c,$(C_SRC)): %.c: iasl %.asl
-	iasl -vs -p $* -tc $*.asl
-	sed -e 's/AmlCode/$*/g' $*.hex >$@.$(TMP_SUFFIX)
-	echo "int $*_len=sizeof($*);" >>$@.$(TMP_SUFFIX)
+$(C_SRC): $(ACPI_BUILD_DIR)/%.c: iasl $(ACPI_BUILD_DIR)/%.asl
+	iasl -vs -p $(ACPI_BUILD_DIR)/$*.$(TMP_SUFFIX) -tc $(ACPI_BUILD_DIR)/$*.asl
+	sed -e 's/AmlCode/$*/g' $(ACPI_BUILD_DIR)/$*.hex > $@.$(TMP_SUFFIX)
+	echo "int $*_len=sizeof($*);" >> $@.$(TMP_SUFFIX)
 	mv -f $@.$(TMP_SUFFIX) $@
-	rm -f $*.aml $*.hex
+	rm -f $(addprefix $(ACPI_BUILD_DIR)/, $*.aml $*.hex)
 
 iasl:
 	@echo
@@ -76,8 +81,8 @@ acpi.a: $(OBJS)
 	$(AR) rc $@ $(OBJS)
 
 clean:
-	rm -rf *.a *.o $(IASL_VER) $(IASL_VER).tar.gz $(DEPS)
-	rm -rf ssdt_*.h dsdt*.c *~ *.aml *.hex mk_dsdt dsdt_*cpu*.asl *.$(TMP_SUFFIX)
+	rm -f $(C_SRC) $(H_SRC) $(MK_DSDT) $(C_SRC:=.$(TMP_SUFFIX))
+	rm -f $(patsubst %.c,%.hex,$(C_SRC)) $(patsubst %.c,%.aml,$(C_SRC)) $(patsubst %.c,%.asl,$(C_SRC))
 
 distclean: clean
 

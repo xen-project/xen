@@ -127,13 +127,12 @@ tools/firmware/*bios/*bios*.txt
 tools/firmware/etherboot/gpxe/*
 tools/firmware/extboot/extboot.img
 tools/firmware/extboot/signrom
-tools/firmware/hvmloader/acpi/mk_dsdt
-tools/firmware/hvmloader/acpi/dsdt*.c
-tools/firmware/hvmloader/acpi/dsdt_*cpu*.asl
-tools/firmware/hvmloader/acpi/ssdt_*.h
+tools/firmware/hvmloader/dsdt*
 tools/firmware/hvmloader/hvmloader
+tools/firmware/hvmloader/mk_dsdt
 tools/firmware/hvmloader/roms.h
 tools/firmware/hvmloader/roms.inc
+tools/firmware/hvmloader/ssdt*
 tools/firmware/rombios/BIOS-bochs-[^/]*
 tools/firmware/rombios/_rombios[^/]*_.c
 tools/firmware/rombios/rombios[^/]*.s

@@ -20,6 +20,7 @@
 XEN_ROOT = $(CURDIR)/../../..
 include $(XEN_ROOT)/tools/firmware/Rules.mk
 
+export ACPI_BUILD_DIR=$(CURDIR)
 SUBDIRS := acpi
 
 # The HVM loader is started in 32-bit mode at the address below:
@@ -75,7 +76,15 @@ all: subdirs-all
 rombios.o: roms.inc
 smbios.o: CFLAGS += -D__SMBIOS_DATE__="\"$(SMBIOS_REL_DATE)\""
 
-hvmloader: $(OBJS) acpi/acpi.a
+ACPI_PATH = acpi
+ACPI_FILES = dsdt_anycpu.c dsdt_15cpu.c dsdt_anycpu_qemu_xen.c
+ACPI_OBJS = $(patsubst %.c,%.o,$(ACPI_FILES)) build.o static_tables.o
+$(ACPI_OBJS): CFLAGS += -I$(ACPI_PATH) -I.
+vpath build.c $(ACPI_PATH)
+vpath static_tables.c $(ACPI_PATH)
+OBJS += $(ACPI_OBJS)
+
+hvmloader: $(OBJS)
 	$(LD) $(LDFLAGS_DIRECT) -N -Ttext $(LOADADDR) -o hvmloader.tmp $^
 	$(OBJCOPY) hvmloader.tmp hvmloader
 	rm -f hvmloader.tmp
