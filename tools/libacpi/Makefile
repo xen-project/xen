@@ -12,7 +12,7 @@
 # NU Lesser General Public License for more details.
 #
 
-XEN_ROOT = $(CURDIR)/../../../..
+XEN_ROOT = $(CURDIR)/../..
 include $(XEN_ROOT)/tools/firmware/Rules.mk
 
 MK_DSDT = $(ACPI_BUILD_DIR)/mk_dsdt

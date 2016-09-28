@@ -3,7 +3,7 @@ include $(XEN_ROOT)/tools/firmware/Rules.mk
 
 TARGET  = tcgbiosext.o
 
-CFLAGS += $(CFLAGS_xeninclude) -I.. -I../.. -I../../../hvmloader/acpi
+CFLAGS += $(CFLAGS_xeninclude) -I.. -I../.. -I../../../../libacpi
 
 .PHONY: all
 all: $(TARGET)

@@ -20,10 +20,7 @@
 XEN_ROOT = $(CURDIR)/../../..
 include $(XEN_ROOT)/tools/firmware/Rules.mk
 
-export ACPI_BUILD_DIR=$(CURDIR)
-SUBDIRS := acpi
 
-# The HVM loader is started in 32-bit mode at the address below:
 LOADADDR = 0x100000
 
 # SMBIOS spec requires format mm/dd/yyyy
@@ -70,16 +67,20 @@ endif
 export GPL := y
 
 .PHONY: all
-all: subdirs-all
+all: acpi subdirs-all
 	$(MAKE) hvmloader
+
+.PHONY: acpi
+acpi:
+	$(MAKE) -C $(ACPI_PATH)  ACPI_BUILD_DIR=$(CURDIR)
 
 rombios.o: roms.inc
 smbios.o: CFLAGS += -D__SMBIOS_DATE__="\"$(SMBIOS_REL_DATE)\""
 
-ACPI_PATH = acpi
+ACPI_PATH = ../../libacpi
 ACPI_FILES = dsdt_anycpu.c dsdt_15cpu.c dsdt_anycpu_qemu_xen.c
 ACPI_OBJS = $(patsubst %.c,%.o,$(ACPI_FILES)) build.o static_tables.o
-$(ACPI_OBJS): CFLAGS += -I. -DLIBACPI_STDUTILS=\"../util.h\"
+$(ACPI_OBJS): CFLAGS += -I. -DLIBACPI_STDUTILS=\"$(CURDIR)/util.h\"
 CFLAGS += -I$(ACPI_PATH)
 vpath build.c $(ACPI_PATH)
 vpath static_tables.c $(ACPI_PATH)
@@ -121,6 +122,7 @@ endif
 clean: subdirs-clean
 	rm -f roms.inc roms.inc.new acpi.h
 	rm -f hvmloader hvmloader.tmp *.o $(DEPS)
+	$(MAKE) -C $(ACPI_PATH)  ACPI_BUILD_DIR=$(CURDIR) clean
 
 .PHONY: distclean
 distclean: clean

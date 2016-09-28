@@ -138,6 +138,7 @@ S:	Supported
 F:	xen/arch/x86/acpi/
 F:	xen/drivers/acpi/
 F:	xen/include/acpi/
+F:	tools/libacpi/
 
 AMD IOMMU
 M:	Suravee Suthikulpanit <suravee.suthikulpanit@amd.com>
