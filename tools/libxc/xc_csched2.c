@@ -60,3 +60,47 @@ xc_sched_credit2_domain_get(
 
     return err;
 }
+
+int
+xc_sched_credit2_params_set(
+    xc_interface *xch,
+    uint32_t cpupool_id,
+    struct xen_sysctl_credit2_schedule *schedule)
+{
+    DECLARE_SYSCTL;
+
+    sysctl.cmd = XEN_SYSCTL_scheduler_op;
+    sysctl.u.scheduler_op.cpupool_id = cpupool_id;
+    sysctl.u.scheduler_op.sched_id = XEN_SCHEDULER_CREDIT2;
+    sysctl.u.scheduler_op.cmd = XEN_SYSCTL_SCHEDOP_putinfo;
+
+    sysctl.u.scheduler_op.u.sched_credit2 = *schedule;
+
+    if ( do_sysctl(xch, &sysctl) )
+        return -1;
+
+    *schedule = sysctl.u.scheduler_op.u.sched_credit2;
+
+    return 0;
+}
+
+int
+xc_sched_credit2_params_get(
+    xc_interface *xch,
+    uint32_t cpupool_id,
+    struct xen_sysctl_credit2_schedule *schedule)
+{
+    DECLARE_SYSCTL;
+
+    sysctl.cmd = XEN_SYSCTL_scheduler_op;
+    sysctl.u.scheduler_op.cpupool_id = cpupool_id;
+    sysctl.u.scheduler_op.sched_id = XEN_SCHEDULER_CREDIT2;
+    sysctl.u.scheduler_op.cmd = XEN_SYSCTL_SCHEDOP_getinfo;
+
+    if ( do_sysctl(xch, &sysctl) )
+        return -1;
+
+    *schedule = sysctl.u.scheduler_op.u.sched_credit2;
+
+    return 0;
+}

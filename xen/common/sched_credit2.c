@@ -1988,29 +1988,33 @@ csched2_dom_cntl(
 static int csched2_sys_cntl(const struct scheduler *ops,
                             struct xen_sysctl_scheduler_op *sc)
 {
-    int rc = -EINVAL;
-    xen_sysctl_credit_schedule_t *params = &sc->u.sched_credit;
+    xen_sysctl_credit2_schedule_t *params = &sc->u.sched_credit2;
     struct csched2_private *prv = CSCHED2_PRIV(ops);
     unsigned long flags;
 
     switch (sc->cmd )
     {
-        case XEN_SYSCTL_SCHEDOP_putinfo:
-            if ( params->ratelimit_us &&
-                ( params->ratelimit_us > XEN_SYSCTL_SCHED_RATELIMIT_MAX ||
-                  params->ratelimit_us < XEN_SYSCTL_SCHED_RATELIMIT_MIN ))
-                return rc;
-            write_lock_irqsave(&prv->lock, flags);
-            prv->ratelimit_us = params->ratelimit_us;
-            write_unlock_irqrestore(&prv->lock, flags);
-            break;
+    case XEN_SYSCTL_SCHEDOP_putinfo:
+        if ( params->ratelimit_us &&
+             (params->ratelimit_us > XEN_SYSCTL_SCHED_RATELIMIT_MAX ||
+              params->ratelimit_us < XEN_SYSCTL_SCHED_RATELIMIT_MIN ))
+            return -EINVAL;
 
-        case XEN_SYSCTL_SCHEDOP_getinfo:
-            params->ratelimit_us = prv->ratelimit_us;
-            rc = 0;
-            break;
+        write_lock_irqsave(&prv->lock, flags);
+        if ( !prv->ratelimit_us && params->ratelimit_us )
+            printk(XENLOG_INFO "Enabling context switch rate limiting\n");
+        else if ( prv->ratelimit_us && !params->ratelimit_us )
+            printk(XENLOG_INFO "Disabling context switch rate limiting\n");
+        prv->ratelimit_us = params->ratelimit_us;
+        write_unlock_irqrestore(&prv->lock, flags);
+
+    /* FALLTHRU */
+    case XEN_SYSCTL_SCHEDOP_getinfo:
+        params->ratelimit_us = prv->ratelimit_us;
+        break;
     }
-    return rc;
+
+    return 0;
 }
 
 static void *

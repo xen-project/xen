@@ -910,25 +910,31 @@ int xc_sched_credit_domain_get(xc_interface *xch,
                                uint32_t domid,
                                struct xen_domctl_sched_credit *sdom);
 int xc_sched_credit_params_set(xc_interface *xch,
-                              uint32_t cpupool_id,
-                              struct xen_sysctl_credit_schedule *schedule);
+                               uint32_t cpupool_id,
+                               struct xen_sysctl_credit_schedule *schedule);
 int xc_sched_credit_params_get(xc_interface *xch,
-                              uint32_t cpupool_id,
-                              struct xen_sysctl_credit_schedule *schedule);
-int xc_sched_credit2_domain_set(xc_interface *xch,
-                               uint32_t domid,
-                               struct xen_domctl_sched_credit2 *sdom);
+                               uint32_t cpupool_id,
+                               struct xen_sysctl_credit_schedule *schedule);
 
+int xc_sched_credit2_params_set(xc_interface *xch,
+                                uint32_t cpupool_id,
+                                struct xen_sysctl_credit2_schedule *schedule);
+int xc_sched_credit2_params_get(xc_interface *xch,
+                                uint32_t cpupool_id,
+                                struct xen_sysctl_credit2_schedule *schedule);
+int xc_sched_credit2_domain_set(xc_interface *xch,
+                                uint32_t domid,
+                                struct xen_domctl_sched_credit2 *sdom);
 int xc_sched_credit2_domain_get(xc_interface *xch,
-                               uint32_t domid,
-                               struct xen_domctl_sched_credit2 *sdom);
+                                uint32_t domid,
+                                struct xen_domctl_sched_credit2 *sdom);
 
 int xc_sched_rtds_domain_set(xc_interface *xch,
-                            uint32_t domid,
-                            struct xen_domctl_sched_rtds *sdom);
+                             uint32_t domid,
+                             struct xen_domctl_sched_rtds *sdom);
 int xc_sched_rtds_domain_get(xc_interface *xch,
-                            uint32_t domid,
-                            struct xen_domctl_sched_rtds *sdom);
+                             uint32_t domid,
+                             struct xen_domctl_sched_rtds *sdom);
 int xc_sched_rtds_vcpu_set(xc_interface *xch,
                            uint32_t domid,
                            struct xen_domctl_schedparam_vcpu *vcpus,

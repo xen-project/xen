@@ -1226,16 +1226,20 @@ csched_sys_cntl(const struct scheduler *ops,
     switch ( sc->cmd )
     {
     case XEN_SYSCTL_SCHEDOP_putinfo:
-        if (params->tslice_ms > XEN_SYSCTL_CSCHED_TSLICE_MAX
-            || params->tslice_ms < XEN_SYSCTL_CSCHED_TSLICE_MIN 
-            || (params->ratelimit_us
-                && (params->ratelimit_us > XEN_SYSCTL_SCHED_RATELIMIT_MAX
-                    || params->ratelimit_us < XEN_SYSCTL_SCHED_RATELIMIT_MIN))
-            || MICROSECS(params->ratelimit_us) > MILLISECS(params->tslice_ms) )
+        if ( params->tslice_ms > XEN_SYSCTL_CSCHED_TSLICE_MAX
+             || params->tslice_ms < XEN_SYSCTL_CSCHED_TSLICE_MIN
+             || (params->ratelimit_us
+                 && (params->ratelimit_us > XEN_SYSCTL_SCHED_RATELIMIT_MAX
+                     || params->ratelimit_us < XEN_SYSCTL_SCHED_RATELIMIT_MIN))
+             || MICROSECS(params->ratelimit_us) > MILLISECS(params->tslice_ms) )
                 goto out;
 
         spin_lock_irqsave(&prv->lock, flags);
         __csched_set_tslice(prv, params->tslice_ms);
+        if ( !prv->ratelimit_us && params->ratelimit_us )
+            printk(XENLOG_INFO "Enabling context switch rate limiting\n");
+        else if ( prv->ratelimit_us && !params->ratelimit_us )
+            printk(XENLOG_INFO "Disabling context switch rate limiting\n");
         prv->ratelimit_us = params->ratelimit_us;
         spin_unlock_irqrestore(&prv->lock, flags);
 
