@@ -34,8 +34,6 @@ static const paddr_t level_sizes[] =
     { ZEROETH_SIZE, FIRST_SIZE, SECOND_SIZE, THIRD_SIZE };
 static const paddr_t level_masks[] =
     { ZEROETH_MASK, FIRST_MASK, SECOND_MASK, THIRD_MASK };
-static const uint8_t level_shifts[] =
-    { ZEROETH_SHIFT, FIRST_SHIFT, SECOND_SHIFT, THIRD_SHIFT };
 static const uint8_t level_orders[] =
     { ZEROETH_ORDER, FIRST_ORDER, SECOND_ORDER, THIRD_ORDER };
 
@@ -1154,295 +1152,6 @@ int p2m_set_entry(struct p2m_domain *p2m,
     return rc;
 }
 
-#define P2M_ONE_DESCEND        0
-#define P2M_ONE_PROGRESS_NOP   0x1
-#define P2M_ONE_PROGRESS       0x10
-
-static int p2m_shatter_page(struct p2m_domain *p2m,
-                            lpae_t *entry,
-                            unsigned int level)
-{
-    const uint8_t level_shift = level_shifts[level];
-    int rc = p2m_create_table(p2m, entry, level_shift - PAGE_SHIFT);
-
-    if ( !rc )
-    {
-        p2m->stats.shattered[level]++;
-        p2m->stats.mappings[level]--;
-        p2m->stats.mappings[level+1] += LPAE_ENTRIES;
-    }
-
-    return rc;
-}
-
-/*
- * 0   == (P2M_ONE_DESCEND) continue to descend the tree
- * +ve == (P2M_ONE_PROGRESS_*) handled at this level, continue, flush,
- *        entry, addr and maddr updated.  Return value is an
- *        indication of the amount of work done (for preemption).
- * -ve == (-Exxx) error.
- */
-static int apply_one_level(struct domain *d,
-                           lpae_t *entry,
-                           unsigned int level,
-                           enum p2m_operation op,
-                           paddr_t start_gpaddr,
-                           paddr_t end_gpaddr,
-                           paddr_t *addr,
-                           paddr_t *maddr,
-                           bool_t *flush,
-                           p2m_type_t t,
-                           p2m_access_t a)
-{
-    const paddr_t level_size = level_sizes[level];
-
-    struct p2m_domain *p2m = &d->arch.p2m;
-    lpae_t pte;
-    const lpae_t orig_pte = *entry;
-    int rc;
-
-    BUG_ON(level > 3);
-
-    switch ( op )
-    {
-    case MEMACCESS:
-        if ( level < 3 )
-        {
-            if ( !p2m_valid(orig_pte) )
-            {
-                *addr += level_size;
-                return P2M_ONE_PROGRESS_NOP;
-            }
-
-            /* Shatter large pages as we descend */
-            if ( p2m_mapping(orig_pte) )
-            {
-                rc = p2m_shatter_page(p2m, entry, level);
-                if ( rc < 0 )
-                    return rc;
-            } /* else: an existing table mapping -> descend */
-
-            return P2M_ONE_DESCEND;
-        }
-        else
-        {
-            pte = orig_pte;
-
-            if ( p2m_valid(pte) )
-            {
-                rc = p2m_mem_access_radix_set(p2m, _gfn(paddr_to_pfn(*addr)),
-                                              a);
-                if ( rc < 0 )
-                    return rc;
-
-                p2m_set_permission(&pte, pte.p2m.type, a);
-                p2m_write_pte(entry, pte, p2m->clean_pte);
-            }
-
-            *addr += level_size;
-            *flush = true;
-            return P2M_ONE_PROGRESS;
-        }
-    }
-
-    BUG(); /* Should never get here */
-}
-
-/*
- * The page is only used by the P2M code which is protected by the p2m->lock.
- * So we can avoid to use atomic helpers.
- */
-static void update_reference_mapping(struct page_info *page,
-                                     lpae_t old_entry,
-                                     lpae_t new_entry)
-{
-    if ( p2m_valid(old_entry) && !p2m_valid(new_entry) )
-        page->u.inuse.p2m_refcount--;
-    else if ( !p2m_valid(old_entry) && p2m_valid(new_entry) )
-        page->u.inuse.p2m_refcount++;
-}
-
-static int apply_p2m_changes(struct domain *d,
-                     enum p2m_operation op,
-                     gfn_t sgfn,
-                     unsigned long nr,
-                     mfn_t smfn,
-                     uint32_t mask,
-                     p2m_type_t t,
-                     p2m_access_t a)
-{
-    paddr_t start_gpaddr = pfn_to_paddr(gfn_x(sgfn));
-    paddr_t end_gpaddr = pfn_to_paddr(gfn_x(sgfn) + nr);
-    paddr_t maddr = pfn_to_paddr(mfn_x(smfn));
-    int rc, ret;
-    struct p2m_domain *p2m = &d->arch.p2m;
-    lpae_t *mappings[4] = { NULL, NULL, NULL, NULL };
-    struct page_info *pages[4] = { NULL, NULL, NULL, NULL };
-    paddr_t addr;
-    unsigned int level = 0;
-    unsigned int cur_root_table = ~0;
-    unsigned int cur_offset[4] = { ~0, ~0, ~0, ~0 };
-    unsigned int count = 0;
-    const unsigned int preempt_count_limit = (op == MEMACCESS) ? 1 : 0x2000;
-    const bool_t preempt = !is_idle_vcpu(current);
-    bool_t flush = false;
-    PAGE_LIST_HEAD(free_pages);
-    struct page_info *pg;
-
-    p2m_write_lock(p2m);
-
-    /* Static mapping. P2M_ROOT_PAGES > 1 are handled below */
-    if ( P2M_ROOT_PAGES == 1 )
-    {
-        mappings[P2M_ROOT_LEVEL] = __map_domain_page(p2m->root);
-        pages[P2M_ROOT_LEVEL] = p2m->root;
-    }
-
-    addr = start_gpaddr;
-    while ( addr < end_gpaddr )
-    {
-        int root_table;
-        const unsigned int offsets[4] = {
-            zeroeth_table_offset(addr),
-            first_table_offset(addr),
-            second_table_offset(addr),
-            third_table_offset(addr)
-        };
-
-        /*
-         * Check if current iteration should be possibly preempted.
-         * Since count is initialised to 0 above we are guaranteed to
-         * always make at least one pass as long as preempt_count_limit is
-         * initialized with a value >= 1.
-         */
-        if ( preempt && count >= preempt_count_limit
-             && hypercall_preempt_check() )
-        {
-            switch ( op )
-            {
-            case MEMACCESS:
-            {
-                /*
-                 * Preempt setting mem_access permissions as required by XSA-89,
-                 * if it's not the last iteration.
-                 */
-                uint32_t progress = paddr_to_pfn(addr) - gfn_x(sgfn) + 1;
-
-                if ( nr > progress && !(progress & mask) )
-                {
-                    rc = progress;
-                    goto out;
-                }
-                break;
-            }
-
-            default:
-                break;
-            };
-
-            /*
-             * Reset current iteration counter.
-             */
-            count = 0;
-        }
-
-        if ( P2M_ROOT_PAGES > 1 )
-        {
-            int i;
-            /*
-             * Concatenated root-level tables. The table number will be the
-             * offset at the previous level. It is not possible to concatenate
-             * a level-0 root.
-             */
-            ASSERT(P2M_ROOT_LEVEL > 0);
-            root_table = offsets[P2M_ROOT_LEVEL - 1];
-            if ( root_table >= P2M_ROOT_PAGES )
-            {
-                rc = -EINVAL;
-                goto out;
-            }
-
-            if ( cur_root_table != root_table )
-            {
-                if ( mappings[P2M_ROOT_LEVEL] )
-                    unmap_domain_page(mappings[P2M_ROOT_LEVEL]);
-                mappings[P2M_ROOT_LEVEL] =
-                    __map_domain_page(p2m->root + root_table);
-                pages[P2M_ROOT_LEVEL] = p2m->root + root_table;
-                cur_root_table = root_table;
-                /* Any mapping further down is now invalid */
-                for ( i = P2M_ROOT_LEVEL; i < 4; i++ )
-                    cur_offset[i] = ~0;
-            }
-        }
-
-        for ( level = P2M_ROOT_LEVEL; level < 4; level++ )
-        {
-            unsigned offset = offsets[level];
-            lpae_t *entry = &mappings[level][offset];
-            lpae_t old_entry = *entry;
-
-            ret = apply_one_level(d, entry,
-                                  level, op,
-                                  start_gpaddr, end_gpaddr,
-                                  &addr, &maddr, &flush,
-                                  t, a);
-            if ( ret < 0 ) { rc = ret ; goto out; }
-            count += ret;
-
-            if ( ret != P2M_ONE_PROGRESS_NOP )
-                update_reference_mapping(pages[level], old_entry, *entry);
-
-            /* L3 had better have done something! We cannot descend any further */
-            BUG_ON(level == 3 && ret == P2M_ONE_DESCEND);
-            if ( ret != P2M_ONE_DESCEND ) break;
-
-            BUG_ON(!p2m_valid(*entry));
-
-            if ( cur_offset[level] != offset )
-            {
-                /* Update mapping for next level */
-                int i;
-                if ( mappings[level+1] )
-                    unmap_domain_page(mappings[level+1]);
-                mappings[level+1] = map_domain_page(_mfn(entry->p2m.base));
-                pages[level+1] = mfn_to_page(entry->p2m.base);
-                cur_offset[level] = offset;
-                /* Any mapping further down is now invalid */
-                for ( i = level+1; i < 4; i++ )
-                    cur_offset[i] = ~0;
-            }
-            /* else: next level already valid */
-        }
-
-        BUG_ON(level > 3);
-    }
-
-    rc = 0;
-
-out:
-    if ( flush )
-    {
-        p2m_flush_tlb_sync(&d->arch.p2m);
-        ret = iommu_iotlb_flush(d, gfn_x(sgfn), nr);
-        if ( !rc )
-            rc = ret;
-    }
-
-    while ( (pg = page_list_remove_head(&free_pages)) )
-        free_domheap_page(pg);
-
-    for ( level = P2M_ROOT_LEVEL; level < 4; level ++ )
-    {
-        if ( mappings[level] )
-            unmap_domain_page(mappings[level]);
-    }
-
-    p2m_write_unlock(p2m);
-
-    return rc;
-}
-
 static inline int p2m_insert_mapping(struct domain *d,
                                      gfn_t start_gfn,
                                      unsigned long nr,
@@ -2139,6 +1848,7 @@ long p2m_set_mem_access(struct domain *d, gfn_t gfn, uint32_t nr,
 {
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
     p2m_access_t a;
+    unsigned int order;
     long rc = 0;
 
     static const p2m_access_t memaccess[] = {
@@ -2181,14 +1891,35 @@ long p2m_set_mem_access(struct domain *d, gfn_t gfn, uint32_t nr,
         return 0;
     }
 
-    rc = apply_p2m_changes(d, MEMACCESS, gfn_add(gfn, start),
-                           (nr - start), INVALID_MFN, mask, 0, a);
-    if ( rc < 0 )
-        return rc;
-    else if ( rc > 0 )
-        return start + rc;
+    p2m_write_lock(p2m);
 
-    return 0;
+    for ( gfn = gfn_add(gfn, start); nr > start;
+          gfn = gfn_next_boundary(gfn, order) )
+    {
+        p2m_type_t t;
+        mfn_t mfn = p2m_get_entry(p2m, gfn, &t, NULL, &order);
+
+
+        if ( !mfn_eq(mfn, INVALID_MFN) )
+        {
+            order = 0;
+            rc = __p2m_set_entry(p2m, gfn, 0, mfn, t, a);
+            if ( rc )
+                break;
+        }
+
+        start += gfn_x(gfn_next_boundary(gfn, order)) - gfn_x(gfn);
+        /* Check for continuation if it is not the last iteration */
+        if ( nr > start && !(start & mask) && hypercall_preempt_check() )
+        {
+            rc = start;
+            break;
+        }
+    }
+
+    p2m_write_unlock(p2m);
+
+    return rc;
 }
 
 long p2m_set_mem_access_multi(struct domain *d,
