@@ -2440,12 +2440,12 @@ static void do_trap_instr_abort_guest(struct cpu_user_regs *regs,
             .kind = hsr.iabt.s1ptw ? npfec_kind_in_gpt : npfec_kind_with_gla
         };
 
-        rc = p2m_mem_access_check(gpa, gva, npfec);
-
-        /* Trap was triggered by mem_access, work here is done */
-        if ( !rc )
-            return;
-        break;
+        p2m_mem_access_check(gpa, gva, npfec);
+        /*
+         * The only way to get here right now is because of mem_access,
+         * thus reinjecting the exception to the guest is never required.
+         */
+        return;
     }
     case FSC_FLT_TRANS:
         /*
@@ -2534,12 +2534,12 @@ static void do_trap_data_abort_guest(struct cpu_user_regs *regs,
             .kind = dabt.s1ptw ? npfec_kind_in_gpt : npfec_kind_with_gla
         };
 
-        rc = p2m_mem_access_check(info.gpa, info.gva, npfec);
-
-        /* Trap was triggered by mem_access, work here is done */
-        if ( !rc )
-            return;
-        break;
+        p2m_mem_access_check(info.gpa, info.gva, npfec);
+        /*
+         * The only way to get here right now is because of mem_access,
+         * thus reinjecting the exception to the guest is never required.
+         */
+        return;
     }
     case FSC_FLT_TRANS:
         /*
