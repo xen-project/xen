@@ -463,11 +463,12 @@ static inline void __runq_tickle(struct csched_vcpu *new)
                 if ( opt_tickle_one_idle )
                 {
                     this_cpu(last_tickle_cpu) =
-                        cpumask_cycle(this_cpu(last_tickle_cpu), &idle_mask);
+                        cpumask_cycle(this_cpu(last_tickle_cpu),
+                                      cpumask_scratch_cpu(cpu));
                     __cpumask_set_cpu(this_cpu(last_tickle_cpu), &mask);
                 }
                 else
-                    cpumask_or(&mask, &mask, &idle_mask);
+                    cpumask_or(&mask, &mask, cpumask_scratch_cpu(cpu));
             }
 
             /* Did we find anyone? */
