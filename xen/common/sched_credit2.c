@@ -1212,6 +1212,7 @@ static void migrate(const struct scheduler *ops,
         svc->migrate_rqd = trqd;
         set_bit(_VPF_migrating, &svc->vcpu->pause_flags);
         set_bit(__CSFLAG_runq_migrate_request, &svc->flags);
+        cpu_raise_softirq(svc->vcpu->processor, SCHEDULE_SOFTIRQ);
         SCHED_STAT_CRANK(migrate_requested);
     }
     else
