@@ -27,6 +27,7 @@
 #define ACPI_HAS_SSDT_PM     (1<<4)
 #define ACPI_HAS_SSDT_S3     (1<<5)
 #define ACPI_HAS_SSDT_S4     (1<<6)
+#define ACPI_HAS_TCPA        (1<<7)
 
 struct xen_vmemrange;
 struct acpi_numa {
@@ -59,6 +60,8 @@ struct acpi_config {
 
     struct acpi_numa numa;
     const struct hvm_info_table *hvminfo;
+
+    const uint16_t *tis_hdr;
 
     /*
      * Address where acpi_info should be placed.

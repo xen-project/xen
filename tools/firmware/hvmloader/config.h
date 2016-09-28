@@ -56,6 +56,8 @@ extern uint8_t ioapic_version;
 /* MMIO hole: Hardcoded defaults, which can be dynamically expanded. */
 #define PCI_MEM_END         0xfc000000
 
+#define ACPI_TIS_HDR_ADDRESS 0xFED40F00UL
+
 extern unsigned long pci_mem_start, pci_mem_end;
 extern uint64_t pci_hi_mem_start, pci_hi_mem_end;
 

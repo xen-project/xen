@@ -335,7 +335,6 @@ static int construct_secondary_tables(unsigned long *table_ptrs,
     struct acpi_20_tcpa *tcpa;
     unsigned char *ssdt;
     static const uint16_t tis_signature[] = {0x0001, 0x0001, 0x0001};
-    uint16_t *tis_hdr;
     void *lasa;
 
     /* MADT. */
@@ -388,10 +387,10 @@ static int construct_secondary_tables(unsigned long *table_ptrs,
     }
 
     /* TPM TCPA and SSDT. */
-    tis_hdr = (uint16_t *)0xFED40F00;
-    if ( (tis_hdr[0] == tis_signature[0]) &&
-         (tis_hdr[1] == tis_signature[1]) &&
-         (tis_hdr[2] == tis_signature[2]) )
+    if ( (config->table_flags & ACPI_HAS_TCPA) &&
+         (config->tis_hdr[0] == tis_signature[0]) &&
+         (config->tis_hdr[1] == tis_signature[1]) &&
+         (config->tis_hdr[2] == tis_signature[2]) )
     {
         ssdt = mem_alloc(sizeof(ssdt_tpm), 16);
         if (!ssdt) return -1;

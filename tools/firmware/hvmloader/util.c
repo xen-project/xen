@@ -919,6 +919,10 @@ void hvmloader_acpi_build_tables(struct acpi_config *config,
     if ( !strncmp(xenstore_read("platform/acpi_s4", "1"), "1", 1)  )
         config->table_flags |= ACPI_HAS_SSDT_S4;
 
+    config->table_flags |= ACPI_HAS_TCPA;
+
+    config->tis_hdr = (uint16_t *)ACPI_TIS_HDR_ADDRESS;
+
     config->numa.nr_vmemranges = nr_vmemranges;
     config->numa.nr_vnodes = nr_vnodes;
     config->numa.vcpu_to_vnode = vcpu_to_vnode;
