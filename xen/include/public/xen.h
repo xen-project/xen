@@ -53,17 +53,22 @@ DEFINE_XEN_GUEST_HANDLE(uint64_t);
 DEFINE_XEN_GUEST_HANDLE(xen_pfn_t);
 DEFINE_XEN_GUEST_HANDLE(xen_ulong_t);
 
-/* Turn a plain number into a C unsigned (long) constant. */
+/* Turn a plain number into a C unsigned (long (long)) constant. */
 #define __xen_mk_uint(x)  x ## U
 #define __xen_mk_ulong(x) x ## UL
+#ifndef __xen_mk_ullong
+# define __xen_mk_ullong(x) x ## ULL
+#endif
 #define xen_mk_uint(x)    __xen_mk_uint(x)
 #define xen_mk_ulong(x)   __xen_mk_ulong(x)
+#define xen_mk_ullong(x)  __xen_mk_ullong(x)
 
 #else
 
 /* In assembly code we cannot use C numeric constant suffixes. */
-#define xen_mk_uint(x)  x
-#define xen_mk_ulong(x) x
+#define xen_mk_uint(x)   x
+#define xen_mk_ulong(x)  x
+#define xen_mk_ullong(x) x
 
 #endif
 

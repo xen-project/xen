@@ -16,7 +16,6 @@
  * this program; If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <public/hvm/e820.h>
 #include <xen/domain_page.h>
 #include <asm/e820.h>
 #include <asm/iocap.h>
@@ -25,6 +24,7 @@
 #include <asm/mtrr.h>
 #include <asm/hvm/support.h>
 #include <asm/hvm/cacheattr.h>
+#include <public/hvm/e820.h>
 
 /* Get page attribute fields (PAn) from PAT MSR. */
 #define pat_cr_2_paf(pat_cr,n)  ((((uint64_t)pat_cr) >> ((n)<<3)) & 0xff)

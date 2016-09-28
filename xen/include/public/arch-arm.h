@@ -391,38 +391,38 @@ typedef uint64_t xen_callback_t;
  */
 
 /* vGIC v2 mappings */
-#define GUEST_GICD_BASE   0x03001000ULL
-#define GUEST_GICD_SIZE   0x00001000ULL
-#define GUEST_GICC_BASE   0x03002000ULL
-#define GUEST_GICC_SIZE   0x00002000ULL
+#define GUEST_GICD_BASE   xen_mk_ullong(0x03001000)
+#define GUEST_GICD_SIZE   xen_mk_ullong(0x00001000)
+#define GUEST_GICC_BASE   xen_mk_ullong(0x03002000)
+#define GUEST_GICC_SIZE   xen_mk_ullong(0x00002000)
 
 /* vGIC v3 mappings */
-#define GUEST_GICV3_GICD_BASE      0x03001000ULL
-#define GUEST_GICV3_GICD_SIZE      0x00010000ULL
+#define GUEST_GICV3_GICD_BASE      xen_mk_ullong(0x03001000)
+#define GUEST_GICV3_GICD_SIZE      xen_mk_ullong(0x00010000)
 
-#define GUEST_GICV3_RDIST_STRIDE   0x20000ULL
+#define GUEST_GICV3_RDIST_STRIDE   xen_mk_ullong(0x00020000)
 #define GUEST_GICV3_RDIST_REGIONS  1
 
-#define GUEST_GICV3_GICR0_BASE     0x03020000ULL    /* vCPU0 - vCPU127 */
-#define GUEST_GICV3_GICR0_SIZE     0x01000000ULL
+#define GUEST_GICV3_GICR0_BASE     xen_mk_ullong(0x03020000) /* vCPU0..127 */
+#define GUEST_GICV3_GICR0_SIZE     xen_mk_ullong(0x01000000)
 
 /*
  * 16MB == 4096 pages reserved for guest to use as a region to map its
  * grant table in.
  */
-#define GUEST_GNTTAB_BASE 0x38000000ULL
-#define GUEST_GNTTAB_SIZE 0x01000000ULL
+#define GUEST_GNTTAB_BASE xen_mk_ullong(0x38000000)
+#define GUEST_GNTTAB_SIZE xen_mk_ullong(0x01000000)
 
-#define GUEST_MAGIC_BASE  0x39000000ULL
-#define GUEST_MAGIC_SIZE  0x01000000ULL
+#define GUEST_MAGIC_BASE  xen_mk_ullong(0x39000000)
+#define GUEST_MAGIC_SIZE  xen_mk_ullong(0x01000000)
 
 #define GUEST_RAM_BANKS   2
 
-#define GUEST_RAM0_BASE   0x40000000ULL /* 3GB of low RAM @ 1GB */
-#define GUEST_RAM0_SIZE   0xc0000000ULL
+#define GUEST_RAM0_BASE   xen_mk_ullong(0x40000000) /* 3GB of low RAM @ 1GB */
+#define GUEST_RAM0_SIZE   xen_mk_ullong(0xc0000000)
 
-#define GUEST_RAM1_BASE   0x0200000000ULL /* 1016GB of RAM @ 8GB */
-#define GUEST_RAM1_SIZE   0xfe00000000ULL
+#define GUEST_RAM1_BASE   xen_mk_ullong(0x0200000000) /* 1016GB of RAM @ 8GB */
+#define GUEST_RAM1_SIZE   xen_mk_ullong(0xfe00000000)
 
 #define GUEST_RAM_BASE    GUEST_RAM0_BASE /* Lowest RAM address */
 /* Largest amount of actual RAM, not including holes */

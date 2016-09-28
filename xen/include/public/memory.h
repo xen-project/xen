@@ -486,7 +486,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_mem_access_op_t);
  * for sharing utilities sitting as "filters" in IO backends
  * (e.g. memshr + blktap(2)). The IO backend is only exposed 
  * to grant references, and this allows sharing of the grefs */
-#define XENMEM_SHARING_OP_FIELD_IS_GREF_FLAG   (1ULL << 62)
+#define XENMEM_SHARING_OP_FIELD_IS_GREF_FLAG   (xen_mk_ullong(1) << 62)
 
 #define XENMEM_SHARING_OP_FIELD_MAKE_GREF(field, val)  \
     (field) = (XENMEM_SHARING_OP_FIELD_IS_GREF_FLAG | val)
