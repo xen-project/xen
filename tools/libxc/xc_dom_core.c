@@ -1113,7 +1113,7 @@ static int xc_dom_load_acpi(struct xc_dom_image *dom)
                                    PROT_READ | PROT_WRITE, base);
         if ( !ptr )
         {
-            DOMPRINTF("%s: Can't map %d pages at 0x%lx",
+            DOMPRINTF("%s: Can't map %d pages at 0x%"PRI_xen_pfn,
                       __FUNCTION__, num_pages, base);
             goto err;
         }
