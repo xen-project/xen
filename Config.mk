@@ -277,9 +277,9 @@ MINIOS_UPSTREAM_URL ?= git://xenbits.xen.org/mini-os.git
 endif
 OVMF_UPSTREAM_REVISION ?= bc54e50e0fe03c570014f363b547426913e92449
 QEMU_UPSTREAM_REVISION ?= master
-MINIOS_UPSTREAM_REVISION ?= 0f6582dd71454dffba4bbb21258fea25becfdd00
-# Tue Aug 30 13:51:23 2016 +0200
-# mini-os: support "make config" for out-of-tree users
+MINIOS_UPSTREAM_REVISION ?= e20998fbec0af4d783abb1a0695ab4614064c520
+# Wed Sep 28 11:50:04 2016 +0200
+# minios: fix build issue with xen_*mb defines
 
 SEABIOS_UPSTREAM_REVISION ?= rel-1.9.3
 # Wed Jun 22 14:53:24 2016 +0800
