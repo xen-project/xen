@@ -40,6 +40,14 @@ struct acpi_numa {
     const struct xen_vmemrange *vmemrange;
 };
 
+struct acpi_ctxt {
+    struct acpi_mem_ops {
+        void *(*alloc)(struct acpi_ctxt *ctxt, uint32_t size, uint32_t align);
+        void (*free)(struct acpi_ctxt *ctxt, void *v, uint32_t size);
+        unsigned long (*v2p)(struct acpi_ctxt *ctxt, void *v);
+    } mem_ops;
+};
+
 struct acpi_config {
     const unsigned char *dsdt_anycpu;
     unsigned int dsdt_anycpu_len;
@@ -76,7 +84,7 @@ struct acpi_config {
     unsigned int rsdp;
 };
 
-void acpi_build_tables(struct acpi_config *config);
+void acpi_build_tables(struct acpi_ctxt *ctxt, struct acpi_config *config);
 
 #endif /* __LIBACPI_H__ */
 

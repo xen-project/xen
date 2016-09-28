@@ -866,10 +866,28 @@ static uint8_t battery_port_exists(void)
     return (inb(0x88) == 0x1F);
 }
 
+static unsigned long acpi_v2p(struct acpi_ctxt *ctxt, void *v)
+{
+    return virt_to_phys(v);
+}
+
+static void *acpi_mem_alloc(struct acpi_ctxt *ctxt,
+                            uint32_t size, uint32_t align)
+{
+    return mem_alloc(size, align);
+}
+
+static void acpi_mem_free(struct acpi_ctxt *ctxt,
+                          void *v, uint32_t size)
+{
+    /* ACPI builder currently doesn't free memory so this is just a stub */
+}
+
 void hvmloader_acpi_build_tables(struct acpi_config *config,
                                  unsigned int physical)
 {
     const char *s;
+    struct acpi_ctxt ctxt;
 
     /* Allocate and initialise the acpi info area. */
     mem_hole_populate_ram(ACPI_INFO_PHYSICAL_ADDRESS >> PAGE_SHIFT, 1);
@@ -934,7 +952,11 @@ void hvmloader_acpi_build_tables(struct acpi_config *config,
     config->rsdp = physical;
     config->infop = ACPI_INFO_PHYSICAL_ADDRESS;
 
-    acpi_build_tables(config);
+    ctxt.mem_ops.alloc = acpi_mem_alloc;
+    ctxt.mem_ops.free = acpi_mem_free;
+    ctxt.mem_ops.v2p = acpi_v2p;
+
+    acpi_build_tables(&ctxt, config);
 
     hvm_param_set(HVM_PARAM_VM_GENERATION_ID_ADDR, config->vm_gid_addr);
 }
