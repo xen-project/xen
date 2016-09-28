@@ -36,14 +36,16 @@ ssdt_s3.h ssdt_s4.h ssdt_pm.h ssdt_tpm.h: %.h: %.asl iasl
 mk_dsdt: mk_dsdt.c
 	$(HOSTCC) $(HOSTCFLAGS) $(CFLAGS_xeninclude) -o $@ mk_dsdt.c
 
-dsdt_anycpu_qemu_xen.asl: dsdt.asl mk_dsdt
+dsdt_anycpu_qemu_xen.asl: dsdt.asl dsdt_acpi_info.asl mk_dsdt
 	awk 'NR > 1 {print s} {s=$$0}' $< > $@.$(TMP_SUFFIX)
+	cat dsdt_acpi_info.asl >> $@.$(TMP_SUFFIX)
 	./mk_dsdt --debug=$(debug) --dm-version qemu-xen >> $@.$(TMP_SUFFIX)
 	mv -f $@.$(TMP_SUFFIX) $@
 
 # NB. awk invocation is a portable alternative to 'head -n -1'
-dsdt_%cpu.asl: dsdt.asl mk_dsdt
+dsdt_%cpu.asl: dsdt.asl dsdt_acpi_info.asl mk_dsdt
 	awk 'NR > 1 {print s} {s=$$0}' $< > $@.$(TMP_SUFFIX)
+	cat dsdt_acpi_info.asl >> $@.$(TMP_SUFFIX)
 	./mk_dsdt --debug=$(debug) --maxcpu $*  >> $@.$(TMP_SUFFIX)
 	mv -f $@.$(TMP_SUFFIX) $@
 
@@ -69,7 +71,7 @@ acpi.a: $(OBJS)
 
 clean:
 	rm -rf *.a *.o $(IASL_VER) $(IASL_VER).tar.gz $(DEPS)
-	rm -rf ssdt_*.h dsdt*.c *~ *.aml *.hex mk_dsdt dsdt_*.asl *.$(TMP_SUFFIX)
+	rm -rf ssdt_*.h dsdt*.c *~ *.aml *.hex mk_dsdt dsdt_*cpu*.asl *.$(TMP_SUFFIX)
 
 distclean: clean
 
