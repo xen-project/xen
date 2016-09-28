@@ -8,13 +8,18 @@ int libxl__arch_domain_prepare_config(libxl__gc *gc,
                                       xc_domain_configuration_t *xc_config)
 {
 
-    if (d_config->c_info.type == LIBXL_DOMAIN_TYPE_HVM &&
-        d_config->b_info.device_model_version !=
-        LIBXL_DEVICE_MODEL_VERSION_NONE) {
-        /* HVM domains with a device model. */
-        xc_config->emulation_flags = XEN_X86_EMU_ALL;
+    if (d_config->c_info.type == LIBXL_DOMAIN_TYPE_HVM) {
+        if (d_config->b_info.device_model_version !=
+            LIBXL_DEVICE_MODEL_VERSION_NONE) {
+            xc_config->emulation_flags = XEN_X86_EMU_ALL;
+        } else if (libxl_defbool_val(d_config->b_info.u.hvm.apic)) {
+            /*
+             * HVM guests without device model may want
+             * to have LAPIC emulation.
+             */
+            xc_config->emulation_flags = XEN_X86_EMU_LAPIC;
+        }
     } else {
-        /* PV or HVM domains without a device model. */
         xc_config->emulation_flags = 0;
     }
 
@@ -366,7 +371,16 @@ int libxl__arch_domain_finalise_hw_description(libxl__gc *gc,
                                                libxl_domain_build_info *info,
                                                struct xc_dom_image *dom)
 {
-    return 0;
+    int rc = 0;
+
+    if ((info->type == LIBXL_DOMAIN_TYPE_HVM) &&
+        (info->device_model_version == LIBXL_DEVICE_MODEL_VERSION_NONE)) {
+        rc = libxl__dom_load_acpi(gc, info, dom);
+        if (rc != 0)
+            LOGE(ERROR, "libxl_dom_load_acpi failed");
+    }
+
+    return rc;
 }
 
 /* Return 0 on success, ERROR_* on failure. */

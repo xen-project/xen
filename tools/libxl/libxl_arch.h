@@ -66,6 +66,9 @@ int libxl__arch_domain_construct_memmap(libxl__gc *gc,
 
 #define LAPIC_BASE_ADDRESS  0xfee00000
 
+int libxl__dom_load_acpi(libxl__gc *gc,
+                         const libxl_domain_build_info *b_info,
+                         struct xc_dom_image *dom);
 #endif
 
 #endif

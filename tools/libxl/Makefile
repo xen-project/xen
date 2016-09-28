@@ -75,7 +75,20 @@ else
 LIBXL_OBJS-y += libxl_no_colo.o
 endif
 
-LIBXL_OBJS-$(CONFIG_X86) += libxl_cpuid.o libxl_x86.o libxl_psr.o
+ACPI_PATH  = $(XEN_ROOT)/tools/libacpi
+ACPI_FILES = dsdt_pvh.c
+ACPI_OBJS  = $(patsubst %.c,%.o,$(ACPI_FILES)) build.o static_tables.o
+$(ACPI_FILES): acpi
+$(ACPI_OBJS): CFLAGS += -I. -DLIBACPI_STDUTILS=\"$(CURDIR)/libxl_x86_acpi.h\"
+vpath build.c $(ACPI_PATH)/
+vpath static_tables.c $(ACPI_PATH)/
+LIBXL_OBJS-$(CONFIG_X86) += $(ACPI_OBJS)
+
+.PHONY: acpi
+acpi:
+	$(MAKE) -C $(ACPI_PATH) ACPI_BUILD_DIR=$(CURDIR)
+
+LIBXL_OBJS-$(CONFIG_X86) += libxl_cpuid.o libxl_x86.o libxl_psr.o libxl_x86_acpi.o
 LIBXL_OBJS-$(CONFIG_ARM) += libxl_nocpuid.o libxl_arm.o libxl_libfdt_compat.o
 
 ifeq ($(CONFIG_NetBSD),y)
@@ -167,6 +180,7 @@ $(XL_OBJS): CFLAGS += $(CFLAGS_XL)
 $(XL_OBJS): CFLAGS += -include $(XEN_ROOT)/tools/config.h # libxl_json.h needs it.
 
 libxl_dom.o: CFLAGS += -I$(XEN_ROOT)/tools  # include libacpi/x86.h
+libxl_x86_acpi.o: CFLAGS += -I$(XEN_ROOT)/tools
 
 SAVE_HELPER_OBJS = libxl_save_helper.o _libxl_save_msgs_helper.o
 $(SAVE_HELPER_OBJS): CFLAGS += $(CFLAGS_libxenctrl) $(CFLAGS_libxenevtchn)
@@ -309,6 +323,7 @@ clean:
 	$(RM) -f testidl.c.new testidl.c *.api-ok
 	$(RM) -f xenlight.pc
 	$(RM) -f xlutil.pc
+	$(MAKE) -C $(ACPI_PATH) ACPI_BUILD_DIR=$(CURDIR) clean
 
 distclean: clean
 	$(RM) -f xenlight.pc.in xlutil.pc.in

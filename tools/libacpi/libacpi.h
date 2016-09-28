@@ -78,10 +78,10 @@ struct acpi_config {
      * This must match the OperationRegion(BIOS, SystemMemory, ....)
      * definition in the DSDT
      */
-    unsigned int infop;
+    unsigned long infop;
 
     /* RSDP address */
-    unsigned int rsdp;
+    unsigned long rsdp;
 
     /* x86-specific parameters */
     uint8_t (*lapic_id)(unsigned cpu);
@@ -91,7 +91,7 @@ struct acpi_config {
     uint8_t ioapic_id;
 };
 
-void acpi_build_tables(struct acpi_ctxt *ctxt, struct acpi_config *config);
+int acpi_build_tables(struct acpi_ctxt *ctxt, struct acpi_config *config);
 
 #endif /* __LIBACPI_H__ */
 

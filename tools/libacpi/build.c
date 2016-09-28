@@ -497,7 +497,7 @@ static int new_vm_gid(struct acpi_ctxt *ctxt,
     return 1;
 }
 
-void acpi_build_tables(struct acpi_ctxt *ctxt, struct acpi_config *config)
+int acpi_build_tables(struct acpi_ctxt *ctxt, struct acpi_config *config)
 {
     struct acpi_info *acpi_info;
     struct acpi_20_rsdp *rsdp;
@@ -632,11 +632,11 @@ void acpi_build_tables(struct acpi_ctxt *ctxt, struct acpi_config *config)
     if ( !new_vm_gid(ctxt, config, acpi_info) )
         goto oom;
 
-    return;
+    return 0;
 
 oom:
     printf("unable to build ACPI tables: out of memory\n");
-
+    return -1;
 }
 
 /*
