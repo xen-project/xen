@@ -246,26 +246,26 @@ void kexec(void *kernel, long kernel_size, void *module, long module_size, char 
     tpm_hash2pcr(dom, cmdline);
 
     if ( (rc = xc_dom_boot_xen_init(dom, xc_handle, domid)) != 0 ) {
-        grub_printf("xc_dom_boot_xen_init returned %d\n", rc);
+        printk("xc_dom_boot_xen_init returned %d\n", rc);
         errnum = ERR_BOOT_FAILURE;
         goto out;
     }
     if ( (rc = xc_dom_parse_image(dom)) != 0 ) {
-        grub_printf("xc_dom_parse_image returned %d\n", rc);
+        printk("xc_dom_parse_image returned %d\n", rc);
         errnum = ERR_BOOT_FAILURE;
         goto out;
     }
 
 #ifdef __i386__
     if (strcmp(dom->guest_type, "xen-3.0-x86_32p")) {
-        grub_printf("can only boot x86 32 PAE kernels, not %s\n", dom->guest_type);
+        printk("can only boot x86 32 PAE kernels, not %s\n", dom->guest_type);
         errnum = ERR_EXEC_FORMAT;
         goto out;
     }
 #endif
 #ifdef __x86_64__
     if (strcmp(dom->guest_type, "xen-3.0-x86_64")) {
-        grub_printf("can only boot x86 64 kernels, not %s\n", dom->guest_type);
+        printk("can only boot x86 64 kernels, not %s\n", dom->guest_type);
         errnum = ERR_EXEC_FORMAT;
         goto out;
     }
@@ -273,7 +273,7 @@ void kexec(void *kernel, long kernel_size, void *module, long module_size, char 
 
     /* equivalent of xc_dom_mem_init */
     if (xc_dom_set_arch_hooks(dom)) {
-        grub_printf("xc_dom_set_arch_hooks failed\n");
+        printk("xc_dom_set_arch_hooks failed\n");
         errnum = ERR_EXEC_FORMAT;
         goto out;
     }
@@ -290,7 +290,7 @@ void kexec(void *kernel, long kernel_size, void *module, long module_size, char 
         dom->p2m_host[i] = pfn_to_mfn(i);
 
     if ( (rc = xc_dom_build_image(dom)) != 0 ) {
-        grub_printf("xc_dom_build_image returned %d\n", rc);
+        printk("xc_dom_build_image returned %d\n", rc);
         errnum = ERR_BOOT_FAILURE;
         goto out;
     }
@@ -306,7 +306,7 @@ void kexec(void *kernel, long kernel_size, void *module, long module_size, char 
     dom->shared_info_mfn = PHYS_PFN(start_info.shared_info);
 
     if (!xc_dom_compat_check(dom)) {
-        grub_printf("xc_dom_compat_check failed\n");
+        printk("xc_dom_compat_check failed\n");
         errnum = ERR_EXEC_FORMAT;
         goto out;
     }
@@ -324,14 +324,14 @@ void kexec(void *kernel, long kernel_size, void *module, long module_size, char 
     /* Make sure the bootstrap page table does not RW-map any of our current
      * page table frames */
     if ( (rc = xc_dom_update_guest_p2m(dom))) {
-        grub_printf("xc_dom_update_guest_p2m returned %d\n", rc);
+        printk("xc_dom_update_guest_p2m returned %d\n", rc);
         errnum = ERR_BOOT_FAILURE;
         goto out;
     }
 
     if ( dom->arch_hooks->setup_pgtables )
         if ( (rc = dom->arch_hooks->setup_pgtables(dom))) {
-            grub_printf("setup_pgtables returned %d\n", rc);
+            printk("setup_pgtables returned %d\n", rc);
             errnum = ERR_BOOT_FAILURE;
             goto out;
         }
@@ -364,8 +364,8 @@ void kexec(void *kernel, long kernel_size, void *module, long module_size, char 
 #endif
                 xc_dom_p2m(dom, dom->pgtables_seg.pfn),
                 dom->guest_domid)) != 0 ) {
-        grub_printf("pin_table(%lx) returned %d\n", xc_dom_p2m(dom,
-                    dom->pgtables_seg.pfn), rc);
+        printk("pin_table(%lx) returned %d\n", xc_dom_p2m(dom,
+               dom->pgtables_seg.pfn), rc);
         errnum = ERR_BOOT_FAILURE;
         goto out_remap;
     }
