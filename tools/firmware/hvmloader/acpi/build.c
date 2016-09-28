@@ -24,6 +24,7 @@
 #include "../vnuma.h"
 #include <xen/hvm/hvm_xs_strings.h>
 #include <xen/hvm/params.h>
+#include <xen/memory.h>
 
 #define ACPI_MAX_SECONDARY_TABLES 16
 
@@ -70,18 +71,20 @@ static void set_checksum(
     p[checksum_offset] = -sum;
 }
 
-static struct acpi_20_madt *construct_madt(struct acpi_info *info)
+static struct acpi_20_madt *construct_madt(const struct acpi_config *config,
+                                           struct acpi_info *info)
 {
     struct acpi_20_madt           *madt;
     struct acpi_20_madt_intsrcovr *intsrcovr;
     struct acpi_20_madt_ioapic    *io_apic;
     struct acpi_20_madt_lapic     *lapic;
+    const struct hvm_info_table   *hvminfo = config->hvminfo;
     int i, sz;
 
     sz  = sizeof(struct acpi_20_madt);
     sz += sizeof(struct acpi_20_madt_intsrcovr) * 16;
     sz += sizeof(struct acpi_20_madt_ioapic);
-    sz += sizeof(struct acpi_20_madt_lapic) * hvm_info->nr_vcpus;
+    sz += sizeof(struct acpi_20_madt_lapic) * hvminfo->nr_vcpus;
 
     madt = mem_alloc(sz, 16);
     if (!madt) return NULL;
@@ -134,9 +137,9 @@ static struct acpi_20_madt *construct_madt(struct acpi_info *info)
     io_apic->ioapic_addr = ioapic_base_address;
 
     lapic = (struct acpi_20_madt_lapic *)(io_apic + 1);
-    info->nr_cpus = hvm_info->nr_vcpus;
+    info->nr_cpus = hvminfo->nr_vcpus;
     info->madt_lapic0_addr = (uint32_t)lapic;
-    for ( i = 0; i < hvm_info->nr_vcpus; i++ )
+    for ( i = 0; i < hvminfo->nr_vcpus; i++ )
     {
         memset(lapic, 0, sizeof(*lapic));
         lapic->type    = ACPI_PROCESSOR_LOCAL_APIC;
@@ -144,7 +147,7 @@ static struct acpi_20_madt *construct_madt(struct acpi_info *info)
         /* Processor ID must match processor-object IDs in the DSDT. */
         lapic->acpi_processor_id = i;
         lapic->apic_id = LAPIC_ID(i);
-        lapic->flags = (test_bit(i, hvm_info->vcpu_online)
+        lapic->flags = (test_bit(i, hvminfo->vcpu_online)
                         ? ACPI_LOCAL_APIC_ENABLED : 0);
         lapic++;
     }
@@ -195,7 +198,7 @@ static struct acpi_20_waet *construct_waet(void)
     return waet;
 }
 
-static struct acpi_20_srat *construct_srat(void)
+static struct acpi_20_srat *construct_srat(const struct acpi_config *config)
 {
     struct acpi_20_srat *srat;
     struct acpi_20_srat_processor *processor;
@@ -204,8 +207,8 @@ static struct acpi_20_srat *construct_srat(void)
     void *p;
     unsigned int i;
 
-    size = sizeof(*srat) + sizeof(*processor) * hvm_info->nr_vcpus +
-           sizeof(*memory) * nr_vmemranges;
+    size = sizeof(*srat) + sizeof(*processor) * config->hvminfo->nr_vcpus +
+           sizeof(*memory) * config->numa.nr_vmemranges;
 
     p = mem_alloc(size, 16);
     if ( !p )
@@ -222,25 +225,26 @@ static struct acpi_20_srat *construct_srat(void)
     srat->table_revision      = ACPI_SRAT_TABLE_REVISION;
 
     processor = (struct acpi_20_srat_processor *)(srat + 1);
-    for ( i = 0; i < hvm_info->nr_vcpus; i++ )
+    for ( i = 0; i < config->hvminfo->nr_vcpus; i++ )
     {
         processor->type     = ACPI_PROCESSOR_AFFINITY;
         processor->length   = sizeof(*processor);
-        processor->domain   = vcpu_to_vnode[i];
+        processor->domain   = config->numa.vcpu_to_vnode[i];
         processor->apic_id  = LAPIC_ID(i);
         processor->flags    = ACPI_LOCAL_APIC_AFFIN_ENABLED;
         processor++;
     }
 
     memory = (struct acpi_20_srat_memory *)processor;
-    for ( i = 0; i < nr_vmemranges; i++ )
+    for ( i = 0; i < config->numa.nr_vmemranges; i++ )
     {
         memory->type          = ACPI_MEMORY_AFFINITY;
         memory->length        = sizeof(*memory);
-        memory->domain        = vmemrange[i].nid;
+        memory->domain        = config->numa.vmemrange[i].nid;
         memory->flags         = ACPI_MEM_AFFIN_ENABLED;
-        memory->base_address  = vmemrange[i].start;
-        memory->mem_length    = vmemrange[i].end - vmemrange[i].start;
+        memory->base_address  = config->numa.vmemrange[i].start;
+        memory->mem_length    = config->numa.vmemrange[i].end -
+                                config->numa.vmemrange[i].start;
         memory++;
     }
 
@@ -252,12 +256,12 @@ static struct acpi_20_srat *construct_srat(void)
     return srat;
 }
 
-static struct acpi_20_slit *construct_slit(void)
+static struct acpi_20_slit *construct_slit(const struct acpi_config *config)
 {
     struct acpi_20_slit *slit;
     unsigned int i, num, size;
 
-    num = nr_vnodes * nr_vnodes;
+    num = config->numa.nr_vnodes * config->numa.nr_vnodes;
     size = sizeof(*slit) + num * sizeof(uint8_t);
 
     slit = mem_alloc(size, 16);
@@ -274,9 +278,9 @@ static struct acpi_20_slit *construct_slit(void)
     slit->header.creator_revision = ACPI_CREATOR_REVISION;
 
     for ( i = 0; i < num; i++ )
-        slit->entry[i] = vdistance[i];
+        slit->entry[i] = config->numa.vdistance[i];
 
-    slit->localities = nr_vnodes;
+    slit->localities = config->numa.nr_vnodes;
 
     slit->header.length = size;
     set_checksum(slit, offsetof(struct acpi_header, checksum), size);
@@ -335,9 +339,9 @@ static int construct_secondary_tables(unsigned long *table_ptrs,
     void *lasa;
 
     /* MADT. */
-    if ( (hvm_info->nr_vcpus > 1) || hvm_info->apic_mode )
+    if ( (config->hvminfo->nr_vcpus > 1) || config->hvminfo->apic_mode )
     {
-        madt = construct_madt(info);
+        madt = construct_madt(config, info);
         if (!madt) return -1;
         table_ptrs[nr_tables++] = (unsigned long)madt;
     }
@@ -419,10 +423,10 @@ static int construct_secondary_tables(unsigned long *table_ptrs,
     }
 
     /* SRAT and SLIT */
-    if ( nr_vnodes > 0 )
+    if ( config->numa.nr_vnodes > 0 )
     {
-        struct acpi_20_srat *srat = construct_srat();
-        struct acpi_20_slit *slit = construct_slit();
+        struct acpi_20_srat *srat = construct_srat(config);
+        struct acpi_20_slit *slit = construct_slit(config);
 
         if ( srat )
             table_ptrs[nr_tables++] = (unsigned long)srat;
@@ -515,7 +519,7 @@ void acpi_build_tables(struct acpi_config *config)
      * The latter is required for Windows 2000, which experiences a BSOD of
      * KMODE_EXCEPTION_NOT_HANDLED if it sees more than 15 processor objects.
      */
-    if ( hvm_info->nr_vcpus <= 15 && config->dsdt_15cpu)
+    if ( config->hvminfo->nr_vcpus <= 15 && config->dsdt_15cpu)
     {
         dsdt = mem_alloc(config->dsdt_15cpu_len, 16);
         if (!dsdt) goto oom;

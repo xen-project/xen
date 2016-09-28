@@ -21,6 +21,7 @@
 #include "config.h"
 #include "hypercall.h"
 #include "ctype.h"
+#include "vnuma.h"
 #include "acpi/acpi2_0.h"
 #include "acpi/libacpi.h"
 #include <stdint.h>
@@ -917,6 +918,14 @@ void hvmloader_acpi_build_tables(struct acpi_config *config,
         config->table_flags |= ACPI_HAS_SSDT_S3;
     if ( !strncmp(xenstore_read("platform/acpi_s4", "1"), "1", 1)  )
         config->table_flags |= ACPI_HAS_SSDT_S4;
+
+    config->numa.nr_vmemranges = nr_vmemranges;
+    config->numa.nr_vnodes = nr_vnodes;
+    config->numa.vcpu_to_vnode = vcpu_to_vnode;
+    config->numa.vdistance = vdistance;
+    config->numa.vmemrange = vmemrange;
+
+    config->hvminfo = hvm_info;
 
     config->rsdp = physical;
     config->infop = ACPI_INFO_PHYSICAL_ADDRESS;

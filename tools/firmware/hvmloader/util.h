@@ -48,9 +48,9 @@ void __bug(char *file, int line) __attribute__((noreturn));
 #define max_t(type,x,y) \
         ({ type __x = (x); type __y = (y); __x > __y ? __x: __y; })
 
-static inline int test_bit(unsigned int b, void *p)
+static inline int test_bit(unsigned int b, const void *p)
 {
-    return !!(((uint8_t *)p)[b>>3] & (1u<<(b&7)));
+    return !!(((const uint8_t *)p)[b>>3] & (1u<<(b&7)));
 }
 
 static inline int test_and_clear_bit(int nr, volatile void *addr)

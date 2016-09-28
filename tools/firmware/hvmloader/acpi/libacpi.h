@@ -28,6 +28,14 @@
 #define ACPI_HAS_SSDT_S3     (1<<5)
 #define ACPI_HAS_SSDT_S4     (1<<6)
 
+struct xen_vmemrange;
+struct acpi_numa {
+    uint32_t nr_vmemranges;
+    uint32_t nr_vnodes;
+    const unsigned int *vcpu_to_vnode;
+    const unsigned int *vdistance;
+    const struct xen_vmemrange *vmemrange;
+};
 
 struct acpi_config {
     const unsigned char *dsdt_anycpu;
@@ -48,6 +56,9 @@ struct acpi_config {
         uint32_t addr;
         uint32_t length;
     } pt;
+
+    struct acpi_numa numa;
+    const struct hvm_info_table *hvminfo;
 
     /*
      * Address where acpi_info should be placed.
