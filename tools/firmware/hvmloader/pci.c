@@ -59,7 +59,7 @@ static int find_next_rmrr(uint32_t base)
 {
     unsigned int i;
     int next_rmrr = -1;
-    uint64_t end, min_end = 1ULL << 32;
+    uint64_t end, min_end = GB(4);
 
     for ( i = 0; i < memory_map.nr_map ; i++ )
     {
@@ -297,7 +297,7 @@ void pci_setup(void)
 
     if ( mmio_hole_size )
     {
-        uint64_t max_ram_below_4g = (1ULL << 32) - mmio_hole_size;
+        uint64_t max_ram_below_4g = GB(4) - mmio_hole_size;
 
         if ( max_ram_below_4g > HVM_BELOW_4G_MMIO_START )
         {
@@ -385,13 +385,13 @@ void pci_setup(void)
     adjust_memory_map();
 
     high_mem_resource.base = ((uint64_t)hvm_info->high_mem_pgend) << PAGE_SHIFT;
-    if ( high_mem_resource.base < 1ull << 32 )
+    if ( high_mem_resource.base < GB(4) )
     {
         if ( hvm_info->high_mem_pgend != 0 )
             printf("WARNING: hvm_info->high_mem_pgend %x"
                    " does not point into high memory!",
                    hvm_info->high_mem_pgend);
-        high_mem_resource.base = 1ull << 32;
+        high_mem_resource.base = GB(4);
     }
     printf("%sRAM in high memory; setting high_mem resource base to "PRIllx"\n",
            hvm_info->high_mem_pgend?"":"No ",

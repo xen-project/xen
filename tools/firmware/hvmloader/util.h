@@ -48,6 +48,9 @@ void __bug(char *file, int line) __attribute__((noreturn));
 #define max_t(type,x,y) \
         ({ type __x = (x); type __y = (y); __x > __y ? __x: __y; })
 
+#define MB(mb) (mb##ULL << 20)
+#define GB(gb) (gb##ULL << 30)
+
 static inline int test_bit(unsigned int b, const void *p)
 {
     return !!(((const uint8_t *)p)[b>>3] & (1u<<(b&7)));

@@ -82,7 +82,7 @@ void adjust_memory_map(void)
 
         /* Modify the existing highmem region if it exists. */
         if ( memory_map.map[i].type == E820_RAM &&
-             high_mem_end && map_start == ((uint64_t)1 << 32) )
+             high_mem_end && map_start == GB(4) )
         {
             if ( high_mem_end != map_end )
                 memory_map.map[i].size = high_mem_end - map_start;
@@ -94,7 +94,7 @@ void adjust_memory_map(void)
     /* If there was no highmem region, just create one. */
     if ( high_mem_end )
     {
-        memory_map.map[i].addr = ((uint64_t)1 << 32);
+        memory_map.map[i].addr = GB(4);
         memory_map.map[i].size =
                 ((uint64_t)hvm_info->high_mem_pgend << PAGE_SHIFT) -
                     memory_map.map[i].addr;
@@ -234,7 +234,7 @@ int build_e820_table(struct e820entry *e820,
     }
 
     /* Low RAM goes here. Reserve space for special pages. */
-    BUG_ON(low_mem_end < (2u << 20));
+    BUG_ON(low_mem_end < MB(2));
 
     /*
      * Construct E820 table according to recorded memory map.

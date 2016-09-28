@@ -239,15 +239,14 @@ get_memsize(void)
 
     sz = (uint64_t)hvm_info->low_mem_pgend << PAGE_SHIFT;
     if ( hvm_info->high_mem_pgend )
-        sz += (((uint64_t)hvm_info->high_mem_pgend << PAGE_SHIFT)
-               - (1ull << 32));
+        sz += (((uint64_t)hvm_info->high_mem_pgend << PAGE_SHIFT) - GB(4));
 
     /*
      * Round up to the nearest MB.  The user specifies domU pseudo-physical 
      * memory in megabytes, so not doing this could easily lead to reporting 
      * one less MB than the user specified.
      */
-    return (sz + (1ul << 20) - 1) >> 20;
+    return (sz + MB(1) - 1) >> 20;
 }
 
 void
