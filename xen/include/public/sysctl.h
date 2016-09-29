@@ -36,7 +36,7 @@
 #include "physdev.h"
 #include "tmem.h"
 
-#define XEN_SYSCTL_INTERFACE_VERSION 0x0000000E
+#define XEN_SYSCTL_INTERFACE_VERSION 0x0000000F
 
 /*
  * Read console content from Xen buffer ring.
@@ -665,6 +665,40 @@ struct xen_sysctl_scheduler_op {
 typedef struct xen_sysctl_scheduler_op xen_sysctl_scheduler_op_t;
 DEFINE_XEN_GUEST_HANDLE(xen_sysctl_scheduler_op_t);
 
+/*
+ * Output format of gcov data:
+ *
+ * XEN_GCOV_FORMAT_MAGIC XEN_GCOV_RECORD ... XEN_GCOV_RECORD
+ *
+ * That is, one magic number followed by 0 or more record.
+ *
+ * The magic number is stored as an uint32_t field.
+ *
+ * The record is packed and variable in length. It has the form:
+ *
+ *  filename: a NULL terminated path name extracted from gcov, used to
+ *            create the name of gcda file.
+ *  size:     a uint32_t field indicating the size of the payload, the
+ *            unit is byte.
+ *  payload:  the actual payload, length is `size' bytes.
+ *
+ * Userspace tool will split the record to different files.
+ */
+
+#define XEN_GCOV_FORMAT_MAGIC    0x58434f56 /* XCOV */
+
+#define XEN_SYSCTL_GCOV_get_size 0 /* Get total size of output data */
+#define XEN_SYSCTL_GCOV_read     1 /* Read output data */
+#define XEN_SYSCTL_GCOV_reset    2 /* Reset all counters */
+
+struct xen_sysctl_gcov_op {
+    uint32_t cmd;
+    uint32_t size; /* IN/OUT: size of the buffer  */
+    XEN_GUEST_HANDLE_64(char) buffer; /* OUT */
+};
+typedef struct xen_sysctl_gcov_op xen_sysctl_gcov_op_t;
+DEFINE_XEN_GUEST_HANDLE(xen_sysctl_gcov_op_t);
+
 #define XEN_SYSCTL_PSR_CMT_get_total_rmid            0
 #define XEN_SYSCTL_PSR_CMT_get_l3_upscaling_factor   1
 /* The L3 cache size is returned in KB unit */
@@ -1073,7 +1107,7 @@ struct xen_sysctl {
 #define XEN_SYSCTL_numainfo                      17
 #define XEN_SYSCTL_cpupool_op                    18
 #define XEN_SYSCTL_scheduler_op                  19
-/* #define XEN_SYSCTL_coverage_op                   20 */
+#define XEN_SYSCTL_gcov_op                       20
 #define XEN_SYSCTL_psr_cmt_op                    21
 #define XEN_SYSCTL_pcitopoinfo                   22
 #define XEN_SYSCTL_psr_cat_op                    23
@@ -1102,6 +1136,7 @@ struct xen_sysctl {
         struct xen_sysctl_lockprof_op       lockprof_op;
         struct xen_sysctl_cpupool_op        cpupool_op;
         struct xen_sysctl_scheduler_op      scheduler_op;
+        struct xen_sysctl_gcov_op           gcov_op;
         struct xen_sysctl_psr_cmt_op        psr_cmt_op;
         struct xen_sysctl_psr_cat_op        psr_cat_op;
         struct xen_sysctl_tmem_op           tmem_op;
