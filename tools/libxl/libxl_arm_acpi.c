@@ -161,6 +161,35 @@ static void make_acpi_rsdp(libxl__gc *gc, struct xc_dom_image *dom,
                        acpitables[RSDP].size);
 }
 
+static void make_acpi_header(struct acpi_table_header *h, const char *sig,
+                             size_t len, uint8_t rev)
+{
+    memcpy(h->signature, sig, 4);
+    h->length = len;
+    h->revision = rev;
+    memcpy(h->oem_id, ACPI_OEM_ID, sizeof(h->oem_id));
+    memcpy(h->oem_table_id, ACPI_OEM_TABLE_ID, sizeof(h->oem_table_id));
+    h->oem_revision = 0;
+    memcpy(h->asl_compiler_id, ACPI_ASL_COMPILER_ID,
+           sizeof(h->asl_compiler_id));
+    h->asl_compiler_revision = 0;
+    h->checksum = 0;
+}
+
+static void make_acpi_xsdt(libxl__gc *gc, struct xc_dom_image *dom,
+                           struct acpitable acpitables[])
+{
+    uint64_t offset = acpitables[XSDT].addr - GUEST_ACPI_BASE;
+    struct acpi_table_xsdt *xsdt = (void *)dom->acpi_modules[0].data + offset;
+
+    xsdt->table_offset_entry[0] = acpitables[MADT].addr;
+    xsdt->table_offset_entry[1] = acpitables[GTDT].addr;
+    xsdt->table_offset_entry[2] = acpitables[FADT].addr;
+    make_acpi_header(&xsdt->header, "XSDT", acpitables[XSDT].size, 1);
+    calculate_checksum(xsdt, offsetof(struct acpi_table_header, checksum),
+                       acpitables[XSDT].size);
+}
+
 int libxl__prepare_acpi(libxl__gc *gc, libxl_domain_build_info *info,
                         struct xc_dom_image *dom)
 {
@@ -186,6 +215,7 @@ int libxl__prepare_acpi(libxl__gc *gc, libxl_domain_build_info *info,
         goto out;
 
     make_acpi_rsdp(gc, dom, acpitables);
+    make_acpi_xsdt(gc, dom, acpitables);
 
 out:
     return rc;
