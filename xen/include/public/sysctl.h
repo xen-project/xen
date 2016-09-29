@@ -665,41 +665,6 @@ struct xen_sysctl_scheduler_op {
 typedef struct xen_sysctl_scheduler_op xen_sysctl_scheduler_op_t;
 DEFINE_XEN_GUEST_HANDLE(xen_sysctl_scheduler_op_t);
 
-/* XEN_SYSCTL_coverage_op */
-/*
- * Get total size of information, to help allocate
- * the buffer. The pointer points to a 32 bit value.
- */
-#define XEN_SYSCTL_COVERAGE_get_total_size 0
-
-/*
- * Read coverage information in a single run
- * You must use a tool to split them.
- */
-#define XEN_SYSCTL_COVERAGE_read           1
-
-/*
- * Reset all the coverage counters to 0
- * No parameters.
- */
-#define XEN_SYSCTL_COVERAGE_reset          2
-
-/*
- * Like XEN_SYSCTL_COVERAGE_read but reset also
- * counters to 0 in a single call.
- */
-#define XEN_SYSCTL_COVERAGE_read_and_reset 3
-
-struct xen_sysctl_coverage_op {
-    uint32_t cmd;        /* XEN_SYSCTL_COVERAGE_* */
-    union {
-        uint32_t total_size; /* OUT */
-        XEN_GUEST_HANDLE_64(uint8)  raw_info;   /* OUT */
-    } u;
-};
-typedef struct xen_sysctl_coverage_op xen_sysctl_coverage_op_t;
-DEFINE_XEN_GUEST_HANDLE(xen_sysctl_coverage_op_t);
-
 #define XEN_SYSCTL_PSR_CMT_get_total_rmid            0
 #define XEN_SYSCTL_PSR_CMT_get_l3_upscaling_factor   1
 /* The L3 cache size is returned in KB unit */
@@ -1108,7 +1073,7 @@ struct xen_sysctl {
 #define XEN_SYSCTL_numainfo                      17
 #define XEN_SYSCTL_cpupool_op                    18
 #define XEN_SYSCTL_scheduler_op                  19
-#define XEN_SYSCTL_coverage_op                   20
+/* #define XEN_SYSCTL_coverage_op                   20 */
 #define XEN_SYSCTL_psr_cmt_op                    21
 #define XEN_SYSCTL_pcitopoinfo                   22
 #define XEN_SYSCTL_psr_cat_op                    23
@@ -1137,7 +1102,6 @@ struct xen_sysctl {
         struct xen_sysctl_lockprof_op       lockprof_op;
         struct xen_sysctl_cpupool_op        cpupool_op;
         struct xen_sysctl_scheduler_op      scheduler_op;
-        struct xen_sysctl_coverage_op       coverage_op;
         struct xen_sysctl_psr_cmt_op        psr_cmt_op;
         struct xen_sysctl_psr_cat_op        psr_cat_op;
         struct xen_sysctl_tmem_op           tmem_op;

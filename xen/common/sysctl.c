@@ -27,7 +27,6 @@
 #include <xen/nodemask.h>
 #include <xsm/xsm.h>
 #include <xen/pmstat.h>
-#include <xen/gcov.h>
 #include <xen/livepatch.h>
 
 long do_sysctl(XEN_GUEST_HANDLE_PARAM(xen_sysctl_t) u_sysctl)
@@ -395,12 +394,6 @@ long do_sysctl(XEN_GUEST_HANDLE_PARAM(xen_sysctl_t) u_sysctl)
         }
     }
     break;
-
-#ifdef CONFIG_GCOV
-    case XEN_SYSCTL_coverage_op:
-        ret = sysctl_coverage_op(&op->u.coverage_op);
-        break;
-#endif
 
 #ifdef CONFIG_HAS_PCI
     case XEN_SYSCTL_pcitopoinfo:

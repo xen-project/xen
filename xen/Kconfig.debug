@@ -30,6 +30,7 @@ config FRAME_POINTER
 
 config GCOV
 	bool "Gcov Support"
+	depends on BROKEN
 	---help---
 	  Enable gcov (a test coverage program in GCC) support.
 
