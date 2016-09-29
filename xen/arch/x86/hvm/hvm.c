@@ -1966,11 +1966,11 @@ int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
      * Otherwise, this is an error condition. */
     rc = fall_through;
 
-out_put_gfn:
+ out_put_gfn:
     __put_gfn(p2m, gfn);
     if ( ap2m_active )
         __put_gfn(hostp2m, gfn);
-out:
+ out:
     /* All of these are delayed until we exit, since we might 
      * sleep on event ring wait queues, and we must not hold
      * locks in such circumstance */
@@ -5317,12 +5317,25 @@ static int do_altp2m_op(
         return -EFAULT;
 
     if ( a.pad1 || a.pad2 ||
-         (a.version != HVMOP_ALTP2M_INTERFACE_VERSION) ||
-         (a.cmd < HVMOP_altp2m_get_domain_state) ||
-         (a.cmd > HVMOP_altp2m_change_gfn) )
+         (a.version != HVMOP_ALTP2M_INTERFACE_VERSION) )
         return -EINVAL;
 
-    d = (a.cmd != HVMOP_altp2m_vcpu_enable_notify) ?
+    switch ( a.cmd )
+    {
+    case HVMOP_altp2m_get_domain_state:
+    case HVMOP_altp2m_set_domain_state:
+    case HVMOP_altp2m_vcpu_enable_notify:
+    case HVMOP_altp2m_create_p2m:
+    case HVMOP_altp2m_destroy_p2m:
+    case HVMOP_altp2m_switch_p2m:
+    case HVMOP_altp2m_set_mem_access:
+    case HVMOP_altp2m_change_gfn:
+        break;
+    default:
+        return -EOPNOTSUPP;
+    }
+
+    d = ( a.cmd != HVMOP_altp2m_vcpu_enable_notify ) ?
         rcu_lock_domain_by_any_id(a.domain) : rcu_lock_current_domain();
 
     if ( d == NULL )
@@ -5439,6 +5452,9 @@ static int do_altp2m_op(
             rc = p2m_change_altp2m_gfn(d, a.u.change_gfn.view,
                     _gfn(a.u.change_gfn.old_gfn),
                     _gfn(a.u.change_gfn.new_gfn));
+        break;
+    default:
+        ASSERT_UNREACHABLE();
     }
 
  out:
@@ -5961,25 +5977,6 @@ void hvm_toggle_singlestep(struct vcpu *v)
         return;
 
     v->arch.hvm_vcpu.single_step = !v->arch.hvm_vcpu.single_step;
-}
-
-void altp2m_vcpu_update_p2m(struct vcpu *v)
-{
-    if ( hvm_funcs.altp2m_vcpu_update_p2m )
-        hvm_funcs.altp2m_vcpu_update_p2m(v);
-}
-
-void altp2m_vcpu_update_vmfunc_ve(struct vcpu *v)
-{
-    if ( hvm_funcs.altp2m_vcpu_update_vmfunc_ve )
-        hvm_funcs.altp2m_vcpu_update_vmfunc_ve(v);
-}
-
-bool_t altp2m_vcpu_emulate_ve(struct vcpu *v)
-{
-    if ( hvm_funcs.altp2m_vcpu_emulate_ve )
-        return hvm_funcs.altp2m_vcpu_emulate_ve(v);
-    return 0;
 }
 
 int hvm_set_mode(struct vcpu *v, int mode)

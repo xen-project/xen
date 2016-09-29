@@ -100,7 +100,7 @@ struct hvm_function_table {
     bool_t pvh_supported;
 
     /* Necessary hardware support for alternate p2m's? */
-    bool_t altp2m_supported;
+    bool altp2m_supported;
 
     /* Indicate HAP capabilities. */
     unsigned int hap_capabilities;
@@ -593,19 +593,35 @@ static inline bool_t hvm_is_singlestep_supported(void)
 }
 
 /* returns true if hardware supports alternate p2m's */
-static inline bool_t hvm_altp2m_supported(void)
+static inline bool hvm_altp2m_supported(void)
 {
     return hvm_funcs.altp2m_supported;
 }
 
 /* updates the current hardware p2m */
-void altp2m_vcpu_update_p2m(struct vcpu *v);
+static inline void altp2m_vcpu_update_p2m(struct vcpu *v)
+{
+    if ( hvm_funcs.altp2m_vcpu_update_p2m )
+        hvm_funcs.altp2m_vcpu_update_p2m(v);
+}
 
 /* updates VMCS fields related to VMFUNC and #VE */
-void altp2m_vcpu_update_vmfunc_ve(struct vcpu *v);
+static inline void altp2m_vcpu_update_vmfunc_ve(struct vcpu *v)
+{
+    if ( hvm_funcs.altp2m_vcpu_update_vmfunc_ve )
+        hvm_funcs.altp2m_vcpu_update_vmfunc_ve(v);
+}
 
 /* emulates #VE */
-bool_t altp2m_vcpu_emulate_ve(struct vcpu *v);
+static inline bool altp2m_vcpu_emulate_ve(struct vcpu *v)
+{
+    if ( hvm_funcs.altp2m_vcpu_emulate_ve )
+    {
+        hvm_funcs.altp2m_vcpu_emulate_ve(v);
+        return true;
+    }
+    return false;
+}
 
 /* Check CR4/EFER values */
 const char *hvm_efer_valid(const struct vcpu *v, uint64_t value,
