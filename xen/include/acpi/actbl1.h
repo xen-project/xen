@@ -786,6 +786,8 @@ struct acpi_madt_generic_interrupt {
 	u8 reserved2[3];
 };
 
+#define ACPI_MADT_GICC_SIZE_v5          76
+
 /* Masks for Flags field above */
 
 /* ACPI_MADT_ENABLED                    (1)      Processor is usable if set */
