@@ -309,13 +309,7 @@ static int make_cpus_node(libxl__gc *gc, void *fdt, int nr_cpus,
     for (i = 0; i < nr_cpus; i++) {
         const char *name;
 
-        /*
-         * According to ARM CPUs bindings, the reg field should match
-         * the MPIDR's affinity bits. We will use AFF0 and AFF1 when
-         * constructing the reg value of the guest at the moment, for it
-         * is enough for the current max vcpu number.
-         */
-        mpidr_aff = (i & 0x0f) | (((i >> 4) & 0xff) << 8);
+        mpidr_aff = libxl__compute_mpdir(i);
         name = GCSPRINTF("cpu@%"PRIx64, mpidr_aff);
 
         res = fdt_begin_node(fdt, name);

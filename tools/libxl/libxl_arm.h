@@ -23,6 +23,17 @@ _hidden
 int libxl__prepare_acpi(libxl__gc *gc, libxl_domain_build_info *info,
                         struct xc_dom_image *dom);
 
+static inline uint64_t libxl__compute_mpdir(unsigned int cpuid)
+{
+    /*
+     * According to ARM CPUs bindings, the reg field should match
+     * the MPIDR's affinity bits. We will use AFF0 and AFF1 when
+     * constructing the reg value of the guest at the moment, for it
+     * is enough for the current max vcpu number.
+     */
+    return (cpuid & 0x0f) | (((cpuid >> 4) & 0xff) << 8);
+}
+
 /*
  * Local variables:
  * mode: C
