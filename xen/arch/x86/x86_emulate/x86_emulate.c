@@ -182,11 +182,14 @@ static const opcode_desc_t opcode_table[256] = {
 
 static const opcode_desc_t twobyte_table[256] = {
     /* 0x00 - 0x07 */
-    SrcMem16|ModRM, ImplicitOps|ModRM, 0, 0, 0, ImplicitOps, ImplicitOps, 0,
+    SrcMem16|ModRM, ImplicitOps|ModRM, ModRM, ModRM,
+    0, ImplicitOps, ImplicitOps, ImplicitOps,
     /* 0x08 - 0x0F */
-    ImplicitOps, ImplicitOps, 0, 0, 0, ImplicitOps|ModRM, 0, 0,
+    ImplicitOps, ImplicitOps, 0, ImplicitOps,
+    0, ImplicitOps|ModRM, ImplicitOps, ModRM|SrcImmByte,
     /* 0x10 - 0x17 */
-    ImplicitOps|ModRM, ImplicitOps|ModRM, 0, 0, 0, 0, 0, 0,
+    ImplicitOps|ModRM, ImplicitOps|ModRM, ImplicitOps|ModRM, ImplicitOps|ModRM,
+    ImplicitOps|ModRM, ImplicitOps|ModRM, ImplicitOps|ModRM, ImplicitOps|ModRM,
     /* 0x18 - 0x1F */
     ImplicitOps|ModRM, ImplicitOps|ModRM, ImplicitOps|ModRM, ImplicitOps|ModRM,
     ImplicitOps|ModRM, ImplicitOps|ModRM, ImplicitOps|ModRM, ImplicitOps|ModRM,
@@ -194,12 +197,13 @@ static const opcode_desc_t twobyte_table[256] = {
     ImplicitOps|ModRM, ImplicitOps|ModRM, ImplicitOps|ModRM, ImplicitOps|ModRM,
     0, 0, 0, 0,
     /* 0x28 - 0x2F */
-    ImplicitOps|ModRM, ImplicitOps|ModRM, 0, ImplicitOps|ModRM, 0, 0, 0, 0,
+    ImplicitOps|ModRM, ImplicitOps|ModRM, ImplicitOps|ModRM, ImplicitOps|ModRM,
+    ImplicitOps|ModRM, ImplicitOps|ModRM, ImplicitOps|ModRM, ImplicitOps|ModRM,
     /* 0x30 - 0x37 */
-    ImplicitOps, ImplicitOps, ImplicitOps, 0,
-    ImplicitOps, ImplicitOps, 0, 0,
+    ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
+    ImplicitOps, ImplicitOps, 0, ImplicitOps,
     /* 0x38 - 0x3F */
-    DstReg|SrcMem|ModRM, 0, 0, 0, 0, 0, 0, 0,
+    DstReg|SrcMem|ModRM, 0, DstReg|SrcImmByte|ModRM, 0, 0, 0, 0, 0,
     /* 0x40 - 0x47 */
     DstReg|SrcMem|ModRM|Mov, DstReg|SrcMem|ModRM|Mov,
     DstReg|SrcMem|ModRM|Mov, DstReg|SrcMem|ModRM|Mov,
@@ -211,11 +215,15 @@ static const opcode_desc_t twobyte_table[256] = {
     DstReg|SrcMem|ModRM|Mov, DstReg|SrcMem|ModRM|Mov,
     DstReg|SrcMem|ModRM|Mov, DstReg|SrcMem|ModRM|Mov,
     /* 0x50 - 0x5F */
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    ModRM, ModRM, ModRM, ModRM, ModRM, ModRM, ModRM, ModRM,
+    ModRM, ModRM, ModRM, ModRM, ModRM, ModRM, ModRM, ModRM,
     /* 0x60 - 0x6F */
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, ImplicitOps|ModRM,
+    ModRM, ModRM, ModRM, ModRM, ModRM, ModRM, ModRM, ModRM,
+    ModRM, ModRM, ModRM, ModRM, ModRM, ModRM, ModRM, ImplicitOps|ModRM,
     /* 0x70 - 0x7F */
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, ImplicitOps|ModRM,
+    SrcImmByte|ModRM, SrcImmByte|ModRM, SrcImmByte|ModRM, SrcImmByte|ModRM,
+    ModRM, ModRM, ModRM, ImplicitOps,
+    ModRM, ModRM, 0, 0, ModRM, ModRM, ModRM, ImplicitOps|ModRM,
     /* 0x80 - 0x87 */
     DstImplicit|SrcImm, DstImplicit|SrcImm,
     DstImplicit|SrcImm, DstImplicit|SrcImm,
@@ -238,9 +246,9 @@ static const opcode_desc_t twobyte_table[256] = {
     ByteOp|DstMem|SrcNone|ModRM|Mov, ByteOp|DstMem|SrcNone|ModRM|Mov,
     /* 0xA0 - 0xA7 */
     ImplicitOps, ImplicitOps, ImplicitOps, DstBitBase|SrcReg|ModRM,
-    DstMem|SrcImmByte|ModRM, DstMem|SrcReg|ModRM, 0, 0,
+    DstMem|SrcImmByte|ModRM, DstMem|SrcReg|ModRM, ModRM, ModRM,
     /* 0xA8 - 0xAF */
-    ImplicitOps, ImplicitOps, 0, DstBitBase|SrcReg|ModRM,
+    ImplicitOps, ImplicitOps, ImplicitOps, DstBitBase|SrcReg|ModRM,
     DstMem|SrcImmByte|ModRM, DstMem|SrcReg|ModRM,
     ImplicitOps|ModRM, DstReg|SrcMem|ModRM,
     /* 0xB0 - 0xB7 */
@@ -249,22 +257,26 @@ static const opcode_desc_t twobyte_table[256] = {
     DstReg|SrcMem|ModRM|Mov, DstReg|SrcMem|ModRM|Mov,
     ByteOp|DstReg|SrcMem|ModRM|Mov, DstReg|SrcMem16|ModRM|Mov,
     /* 0xB8 - 0xBF */
-    0, 0, DstBitBase|SrcImmByte|ModRM, DstBitBase|SrcReg|ModRM,
+    DstReg|SrcMem|ModRM, ModRM,
+    DstBitBase|SrcImmByte|ModRM, DstBitBase|SrcReg|ModRM,
     DstReg|SrcMem|ModRM, DstReg|SrcMem|ModRM,
     ByteOp|DstReg|SrcMem|ModRM|Mov, DstReg|SrcMem16|ModRM|Mov,
     /* 0xC0 - 0xC7 */
     ByteOp|DstMem|SrcReg|ModRM, DstMem|SrcReg|ModRM,
-    0, DstMem|SrcReg|ModRM|Mov,
-    0, 0, 0, ImplicitOps|ModRM,
+    SrcImmByte|ModRM, DstMem|SrcReg|ModRM|Mov,
+    SrcImmByte|ModRM, SrcImmByte|ModRM, SrcImmByte|ModRM, ImplicitOps|ModRM,
     /* 0xC8 - 0xCF */
     ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
     ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
     /* 0xD0 - 0xDF */
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    ModRM, ModRM, ModRM, ModRM, ModRM, ModRM, ModRM, ModRM,
+    ModRM, ModRM, ModRM, ModRM, ModRM, ModRM, ModRM, ModRM,
     /* 0xE0 - 0xEF */
-    0, 0, 0, 0, 0, 0, 0, ImplicitOps|ModRM, 0, 0, 0, 0, 0, 0, 0, 0,
+    ModRM, ModRM, ModRM, ModRM, ModRM, ModRM, ModRM, ImplicitOps|ModRM,
+    ModRM, ModRM, ModRM, ModRM, ModRM, ModRM, ModRM, ModRM,
     /* 0xF0 - 0xFF */
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+    ModRM, ModRM, ModRM, ModRM, ModRM, ModRM, ModRM, ModRM,
+    ModRM, ModRM, ModRM, ModRM, ModRM, ModRM, ModRM, ModRM
 };
 
 #define REX_PREFIX 0x40
@@ -1574,7 +1586,12 @@ int x86emul_unhandleable_rw(
 struct x86_emulate_state {
     unsigned int op_bytes, ad_bytes;
 
-    enum { ext_none, ext_0f, ext_0f38 } ext;
+    enum {
+        ext_none = vex_none,
+        ext_0f   = vex_0f,
+        ext_0f38 = vex_0f38,
+        ext_0f3a = vex_0f3a,
+    } ext;
     uint8_t opcode;
     uint8_t modrm, modrm_mod, modrm_reg, modrm_rm;
     uint8_t rex_prefix;
@@ -1643,6 +1660,34 @@ x86_decode_onebyte(
 
     case 0xc8: /* enter imm16,imm8 */
         imm2 = insn_fetch_type(uint8_t);
+        break;
+    }
+
+ done:
+    return rc;
+}
+
+static int
+x86_decode_twobyte(
+    struct x86_emulate_state *state,
+    struct x86_emulate_ctxt *ctxt,
+    const struct x86_emulate_ops *ops)
+{
+    int rc = X86EMUL_OKAY;
+
+    switch ( state->opcode )
+    {
+    case 0x78:
+        if ( vex.opcx )
+            break;
+        switch ( vex.pfx )
+        {
+        case vex_66: /* extrq $imm8, $imm8, xmm */
+        case vex_f2: /* insertq $imm8, $imm8, xmm, xmm */
+            imm1 = insn_fetch_type(uint8_t);
+            imm2 = insn_fetch_type(uint8_t);
+            break;
+        }
         break;
     }
 
@@ -1754,6 +1799,10 @@ x86_decode(
                 b = insn_fetch_type(uint8_t);
                 ext = ext_0f38;
                 break;
+            case 0x3a:
+                b = insn_fetch_type(uint8_t);
+                ext = ext_0f3a;
+                break;
             }
         }
     }
@@ -1809,10 +1858,22 @@ x86_decode(
                 if ( mode_64bit() && !vex.r )
                     rex_prefix |= REX_R;
 
-                fail_if(vex.opcx != vex_0f);
-                ext = ext_0f;
                 b = insn_fetch_type(uint8_t);
-                d = twobyte_table[b];
+                switch ( ext = vex.opcx )
+                {
+                case vex_0f:
+                    d = twobyte_table[b];
+                    break;
+                case vex_0f38:
+                    d = twobyte_table[0x38];
+                    break;
+                case vex_0f3a:
+                    d = twobyte_table[0x3a];
+                    break;
+                default:
+                    rc = X86EMUL_UNHANDLEABLE;
+                    goto done;
+                }
 
                 modrm = insn_fetch_type(uint8_t);
                 modrm_mod = (modrm & 0xc0) >> 6;
@@ -1870,9 +1931,12 @@ x86_decode(
             break;
 
         case ext_0f:
+        case ext_0f3a:
             break;
 
         case ext_0f38:
+            if ( vex.opcx )
+                break;
             switch ( b )
             {
             case 0xf0: /* movbe / crc32 */
@@ -2052,7 +2116,11 @@ x86_decode(
         break;
 
     case ext_0f:
+        rc = x86_decode_twobyte(state, ctxt, ops);
+        break;
+
     case ext_0f38:
+    case ext_0f3a:
         break;
 
     default:
@@ -2268,6 +2336,7 @@ x86_emulate(
         goto ext_0f38_insn;
     default:
         ASSERT_UNREACHABLE();
+    case ext_0f3a:
         goto cannot_emulate;
     }
 
@@ -4210,6 +4279,11 @@ x86_emulate(
         if ( (rc = ops->wbinvd(ctxt)) != 0 )
             goto done;
         break;
+
+    case 0x0b: /* ud2 */
+    case 0xb9: /* ud1 */
+    case 0xff: /* ud0 */
+        generate_exception_if(1, EXC_UD, -1);
 
     case 0x0d: /* GrpP (prefetch) */
     case 0x18: /* Grp16 (prefetch/nop) */
