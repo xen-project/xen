@@ -285,6 +285,25 @@ static int make_chosen_node(libxl__gc *gc, void *fdt, bool ramdisk,
         if (res) return res;
     }
 
+    if (libxl_defbool_val(info->acpi)) {
+        const uint64_t acpi_base = GUEST_ACPI_BASE;
+        const char *name = GCSPRINTF("module@%"PRIx64, acpi_base);
+
+        res = fdt_begin_node(fdt, name);
+        if (res) return res;
+
+        res = fdt_property_compat(gc, fdt, 2, "xen,guest-acpi",
+                                  "multiboot,module");
+        if (res) return res;
+
+        res = fdt_property_regs(gc, fdt, ROOT_ADDRESS_CELLS, ROOT_SIZE_CELLS,
+                                1, 0, 0);
+        if (res) return res;
+
+        res = fdt_end_node(fdt);
+        if (res) return res;
+    }
+
     res = fdt_end_node(fdt);
     if (res) return res;
 
@@ -973,6 +992,11 @@ int libxl__arch_domain_finalise_hw_description(libxl__gc *gc,
         const uint64_t size = (uint64_t)dom->rambank_size[i] << XC_PAGE_SHIFT;
 
         finalise_one_node(gc, fdt, "/memory", bankbase[i], size);
+    }
+
+    if (dom->acpi_modules[0].data) {
+        finalise_one_node(gc, fdt, "/chosen/module", GUEST_ACPI_BASE,
+                          dom->acpi_modules[0].length);
     }
 
     debug_dump_fdt(gc, fdt);
