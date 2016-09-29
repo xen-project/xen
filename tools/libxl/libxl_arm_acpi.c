@@ -25,9 +25,23 @@ typedef uint8_t u8;
 typedef uint16_t u16;
 typedef uint32_t u32;
 typedef uint64_t u64;
+typedef int64_t s64;
 
 #include <acpi/acconfig.h>
 #include <acpi/actbl.h>
+
+#ifndef BITS_PER_LONG
+#ifdef _LP64
+#define BITS_PER_LONG 64
+#else
+#define BITS_PER_LONG 32
+#endif
+#endif
+#define ACPI_MACHINE_WIDTH __BITS_PER_LONG
+#define COMPILER_DEPENDENT_INT64 int64_t
+#define COMPILER_DEPENDENT_UINT64 uint64_t
+
+#include <acpi/actypes.h>
 
 _hidden
 extern const unsigned char dsdt_anycpu_arm[];
@@ -190,6 +204,29 @@ static void make_acpi_xsdt(libxl__gc *gc, struct xc_dom_image *dom,
                        acpitables[XSDT].size);
 }
 
+static void make_acpi_gtdt(libxl__gc *gc, struct xc_dom_image *dom,
+                           struct acpitable acpitables[])
+{
+    uint64_t offset = acpitables[GTDT].addr - GUEST_ACPI_BASE;
+    struct acpi_table_gtdt *gtdt = (void *)dom->acpi_modules[0].data + offset;
+
+    gtdt->non_secure_el1_interrupt = GUEST_TIMER_PHYS_NS_PPI;
+    gtdt->non_secure_el1_flags =
+                             (ACPI_LEVEL_SENSITIVE << ACPI_GTDT_INTERRUPT_MODE)
+                             |(ACPI_ACTIVE_LOW << ACPI_GTDT_INTERRUPT_POLARITY);
+    gtdt->virtual_timer_interrupt = GUEST_TIMER_VIRT_PPI;
+    gtdt->virtual_timer_flags =
+                             (ACPI_LEVEL_SENSITIVE << ACPI_GTDT_INTERRUPT_MODE)
+                             |(ACPI_ACTIVE_LOW << ACPI_GTDT_INTERRUPT_POLARITY);
+
+    gtdt->counter_block_addresss = ~((uint64_t)0);
+    gtdt->counter_read_block_address = ~((uint64_t)0);
+
+    make_acpi_header(&gtdt->header, "GTDT", acpitables[GTDT].size, 2);
+    calculate_checksum(gtdt, offsetof(struct acpi_table_header, checksum),
+                       acpitables[GTDT].size);
+}
+
 int libxl__prepare_acpi(libxl__gc *gc, libxl_domain_build_info *info,
                         struct xc_dom_image *dom)
 {
@@ -216,6 +253,7 @@ int libxl__prepare_acpi(libxl__gc *gc, libxl_domain_build_info *info,
 
     make_acpi_rsdp(gc, dom, acpitables);
     make_acpi_xsdt(gc, dom, acpitables);
+    make_acpi_gtdt(gc, dom, acpitables);
 
 out:
     return rc;
