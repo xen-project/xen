@@ -279,6 +279,12 @@ static const opcode_desc_t twobyte_table[256] = {
     ModRM, ModRM, ModRM, ModRM, ModRM, ModRM, ModRM, ModRM
 };
 
+static const opcode_desc_t xop_table[] = {
+    DstReg|SrcImmByte|ModRM,
+    DstReg|SrcMem|ModRM,
+    DstReg|SrcImm|ModRM,
+};
+
 #define REX_PREFIX 0x40
 #define REX_B 0x01
 #define REX_X 0x02
@@ -1591,6 +1597,13 @@ struct x86_emulate_state {
         ext_0f   = vex_0f,
         ext_0f38 = vex_0f38,
         ext_0f3a = vex_0f3a,
+        /*
+         * For XOP use values such that the respective instruction field
+         * can be used without adjustment.
+         */
+        ext_8f08 = 8,
+        ext_8f09,
+        ext_8f0a,
     } ext;
     uint8_t opcode;
     uint8_t modrm, modrm_mod, modrm_reg, modrm_rm;
@@ -1813,7 +1826,7 @@ x86_decode(
         modrm = insn_fetch_type(uint8_t);
         modrm_mod = (modrm & 0xc0) >> 6;
 
-        if ( !ext && ((b & ~1) == 0xc4) )
+        if ( !ext && ((b & ~1) == 0xc4 || (b == 0x8f && (modrm & 0x18))) )
             switch ( def_ad_bytes )
             {
             default:
@@ -1827,11 +1840,11 @@ x86_decode(
                     break;
                 /* fall through */
             case 8:
-                /* VEX */
+                /* VEX / XOP */
                 generate_exception_if(rex_prefix || vex.pfx, EXC_UD, -1);
 
                 vex.raw[0] = modrm;
-                if ( b & 1 )
+                if ( b == 0xc5 )
                 {
                     vex.raw[1] = modrm;
                     vex.opcx = vex_0f;
@@ -1859,18 +1872,30 @@ x86_decode(
                     rex_prefix |= REX_R;
 
                 b = insn_fetch_type(uint8_t);
-                switch ( ext = vex.opcx )
+                ext = vex.opcx;
+                if ( b != 0x8f )
                 {
-                case vex_0f:
-                    d = twobyte_table[b];
-                    break;
-                case vex_0f38:
-                    d = twobyte_table[0x38];
-                    break;
-                case vex_0f3a:
-                    d = twobyte_table[0x3a];
-                    break;
-                default:
+                    switch ( ext )
+                    {
+                    case vex_0f:
+                        d = twobyte_table[b];
+                        break;
+                    case vex_0f38:
+                        d = twobyte_table[0x38];
+                        break;
+                    case vex_0f3a:
+                        d = twobyte_table[0x3a];
+                        break;
+                    default:
+                        rc = X86EMUL_UNHANDLEABLE;
+                        goto done;
+                    }
+                }
+                else if ( ext < ext_8f08 +
+                                sizeof(xop_table) / sizeof(*xop_table) )
+                    d = xop_table[ext - ext_8f08];
+                else
+                {
                     rc = X86EMUL_UNHANDLEABLE;
                     goto done;
                 }
@@ -1932,6 +1957,9 @@ x86_decode(
 
         case ext_0f:
         case ext_0f3a:
+        case ext_8f08:
+        case ext_8f09:
+        case ext_8f0a:
             break;
 
         case ext_0f38:
@@ -2121,6 +2149,9 @@ x86_decode(
 
     case ext_0f38:
     case ext_0f3a:
+    case ext_8f08:
+    case ext_8f09:
+    case ext_8f0a:
         break;
 
     default:
@@ -2337,6 +2368,9 @@ x86_emulate(
     default:
         ASSERT_UNREACHABLE();
     case ext_0f3a:
+    case ext_8f08:
+    case ext_8f09:
+    case ext_8f0a:
         goto cannot_emulate;
     }
 
