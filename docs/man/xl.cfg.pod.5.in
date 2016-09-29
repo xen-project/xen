@@ -1249,6 +1249,7 @@ the virtual firmware to the guest Operating System. ACPI is required
 by most modern guest Operating Systems. This option is enabled by
 default and usually you should omit it. However it may be necessary to
 disable ACPI for compatibility with some guest Operating Systems.
+This option is true for x86 while it's false for ARM by default.
 
 =item B<acpi_s3=BOOLEAN>
 

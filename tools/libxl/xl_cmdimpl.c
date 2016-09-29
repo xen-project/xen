@@ -1550,6 +1550,7 @@ static void parse_config_data(const char *config_source,
     b_info->cmdline = parse_cmdline(config);
 
     xlu_cfg_get_defbool(config, "driver_domain", &c_info->driver_domain, 0);
+    xlu_cfg_get_defbool(config, "acpi", &b_info->acpi, 0);
 
     switch(b_info->type) {
     case LIBXL_DOMAIN_TYPE_HVM:
@@ -1579,7 +1580,6 @@ static void parse_config_data(const char *config_source,
 
         xlu_cfg_get_defbool(config, "pae", &b_info->u.hvm.pae, 0);
         xlu_cfg_get_defbool(config, "apic", &b_info->u.hvm.apic, 0);
-        xlu_cfg_get_defbool(config, "acpi", &b_info->u.hvm.acpi, 0);
         xlu_cfg_get_defbool(config, "acpi_s3", &b_info->u.hvm.acpi_s3, 0);
         xlu_cfg_get_defbool(config, "acpi_s4", &b_info->u.hvm.acpi_s4, 0);
         xlu_cfg_get_defbool(config, "nx", &b_info->u.hvm.nx, 0);

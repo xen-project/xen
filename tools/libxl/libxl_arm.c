@@ -985,6 +985,12 @@ int libxl__arch_domain_construct_memmap(libxl__gc *gc,
     return 0;
 }
 
+void libxl__arch_domain_build_info_acpi_setdefault(
+                                        libxl_domain_build_info *b_info)
+{
+    libxl_defbool_setdefault(&b_info->acpi, false);
+}
+
 /*
  * Local variables:
  * mode: C

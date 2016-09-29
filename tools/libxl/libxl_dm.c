@@ -583,7 +583,7 @@ static int libxl__build_device_model_args_old(libxl__gc *gc,
         if (b_info->u.hvm.soundhw) {
             flexarray_vappend(dm_args, "-soundhw", b_info->u.hvm.soundhw, NULL);
         }
-        if (libxl_defbool_val(b_info->u.hvm.acpi)) {
+        if (libxl__acpi_defbool_val(b_info)) {
             flexarray_append(dm_args, "-acpi");
         }
         if (b_info->max_vcpus > 1) {
@@ -1204,7 +1204,7 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
         if (b_info->u.hvm.soundhw) {
             flexarray_vappend(dm_args, "-soundhw", b_info->u.hvm.soundhw, NULL);
         }
-        if (!libxl_defbool_val(b_info->u.hvm.acpi)) {
+        if (!libxl__acpi_defbool_val(b_info)) {
             flexarray_append(dm_args, "-no-acpi");
         }
         if (b_info->max_vcpus > 1) {

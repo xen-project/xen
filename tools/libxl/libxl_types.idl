@@ -494,11 +494,15 @@ libxl_domain_build_info = Struct("domain_build_info",[
     # Note that the partial device tree should avoid to use the phandle
     # 65000 which is reserved by the toolstack.
     ("device_tree",      string),
+    ("acpi",             libxl_defbool),
     ("u", KeyedUnion(None, libxl_domain_type, "type",
                 [("hvm", Struct(None, [("firmware",         string),
                                        ("bios",             libxl_bios_type),
                                        ("pae",              libxl_defbool),
                                        ("apic",             libxl_defbool),
+                                       # The following acpi field is deprecated.
+                                       # Please use the unified acpi field above
+                                       # which works for both x86 and ARM.
                                        ("acpi",             libxl_defbool),
                                        ("acpi_s3",          libxl_defbool),
                                        ("acpi_s4",          libxl_defbool),

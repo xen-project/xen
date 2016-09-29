@@ -215,6 +215,8 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
     if (!b_info->event_channels)
         b_info->event_channels = 1023;
 
+    libxl__arch_domain_build_info_acpi_setdefault(b_info);
+
     switch (b_info->type) {
     case LIBXL_DOMAIN_TYPE_HVM:
         if (b_info->shadow_memkb == LIBXL_MEMKB_DEFAULT)
@@ -454,7 +456,7 @@ int libxl__domain_build(libxl__gc *gc,
         localents = libxl__calloc(gc, 9, sizeof(char *));
         i = 0;
         localents[i++] = "platform/acpi";
-        localents[i++] = libxl_defbool_val(info->u.hvm.acpi) ? "1" : "0";
+        localents[i++] = libxl__acpi_defbool_val(info) ? "1" : "0";
         localents[i++] = "platform/acpi_s3";
         localents[i++] = libxl_defbool_val(info->u.hvm.acpi_s3) ? "1" : "0";
         localents[i++] = "platform/acpi_s4";

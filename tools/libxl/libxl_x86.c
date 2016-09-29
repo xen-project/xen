@@ -573,6 +573,12 @@ out:
     return rc;
 }
 
+void libxl__arch_domain_build_info_acpi_setdefault(
+                                        libxl_domain_build_info *b_info)
+{
+    libxl_defbool_setdefault(&b_info->acpi, true);
+}
+
 /*
  * Local variables:
  * mode: C
