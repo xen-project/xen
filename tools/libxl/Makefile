@@ -90,6 +90,13 @@ acpi:
 
 LIBXL_OBJS-$(CONFIG_X86) += libxl_cpuid.o libxl_x86.o libxl_psr.o libxl_x86_acpi.o
 LIBXL_OBJS-$(CONFIG_ARM) += libxl_nocpuid.o libxl_arm.o libxl_libfdt_compat.o
+ifeq ($(CONFIG_ARM_64),y)
+LIBXL_OBJS-y += libxl_arm_acpi.o
+libxl_arm_acpi.o: libxl_arm_acpi.c
+	$(CC) -c $(CFLAGS) -I../../xen/include/ -o $@ libxl_arm_acpi.c
+else
+LIBXL_OBJS-$(CONFIG_ARM) += libxl_arm_no_acpi.o
+endif
 
 ifeq ($(CONFIG_NetBSD),y)
 LIBXL_OBJS-y += libxl_netbsd.o

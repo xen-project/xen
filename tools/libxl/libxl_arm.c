@@ -1,6 +1,7 @@
 #include "libxl_internal.h"
 #include "libxl_arch.h"
 #include "libxl_libfdt_compat.h"
+#include "libxl_arm.h"
 
 #include <xc_dom.h>
 #include <stdbool.h>
@@ -885,8 +886,29 @@ int libxl__arch_domain_init_hw_description(libxl__gc *gc,
                                            libxl__domain_build_state *state,
                                            struct xc_dom_image *dom)
 {
+    int rc;
+
     assert(info->type == LIBXL_DOMAIN_TYPE_PV);
-    return libxl__prepare_dtb(gc, info, state, dom);
+    rc = libxl__prepare_dtb(gc, info, state, dom);
+    if (rc) goto out;
+
+    if (!libxl_defbool_val(info->acpi)) {
+        LOG(DEBUG, "Generating ACPI tables is disabled by user.");
+        rc = 0;
+        goto out;
+    }
+
+    if (strcmp(dom->guest_type, "xen-3.0-aarch64")) {
+        /* ACPI is only supported for 64-bit guest currently. */
+        LOG(ERROR, "Can not enable libxl option 'acpi' for %s", dom->guest_type);
+        rc = ERROR_FAIL;
+        goto out;
+    }
+
+    rc = libxl__prepare_acpi(gc, info, dom);
+
+out:
+    return rc;
 }
 
 static void finalise_one_memory_node(libxl__gc *gc, void *fdt,
