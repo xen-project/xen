@@ -126,6 +126,11 @@ struct arch_domain
     paddr_t efi_acpi_gpa;
     paddr_t efi_acpi_len;
 #endif
+
+    /* Monitor options */
+    struct {
+        uint8_t privileged_call_enabled : 1;
+    } monitor;
 }  __cacheline_aligned;
 
 struct arch_vcpu

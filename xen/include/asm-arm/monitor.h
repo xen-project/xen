@@ -32,19 +32,8 @@ int arch_monitor_domctl_op(struct domain *d, struct xen_domctl_monitor_op *mop)
     return -EOPNOTSUPP;
 }
 
-static inline
 int arch_monitor_domctl_event(struct domain *d,
-                              struct xen_domctl_monitor_op *mop)
-{
-    /*
-     * No arch-specific monitor vm-events on ARM.
-     *
-     * Should not be reached unless arch_monitor_get_capabilities() is not
-     * properly implemented.
-     */
-    ASSERT_UNREACHABLE();
-    return -EOPNOTSUPP;
-}
+                              struct xen_domctl_monitor_op *mop);
 
 static inline
 int arch_monitor_init_domain(struct domain *d)
@@ -63,9 +52,12 @@ static inline uint32_t arch_monitor_get_capabilities(struct domain *d)
 {
     uint32_t capabilities = 0;
 
-    capabilities = (1U << XEN_DOMCTL_MONITOR_EVENT_GUEST_REQUEST);
+    capabilities = (1U << XEN_DOMCTL_MONITOR_EVENT_GUEST_REQUEST |
+                    1U << XEN_DOMCTL_MONITOR_EVENT_PRIVILEGED_CALL);
 
     return capabilities;
 }
+
+int monitor_smc(void);
 
 #endif /* __ASM_ARM_MONITOR_H__ */

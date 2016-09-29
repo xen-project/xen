@@ -338,6 +338,8 @@ void usage(char* progname)
     fprintf(stderr, "Usage: %s [-m] <domain_id> write|exec", progname);
 #if defined(__i386__) || defined(__x86_64__)
             fprintf(stderr, "|breakpoint|altp2m_write|altp2m_exec|debug|cpuid");
+#elif defined(__arm__) || defined(__aarch64__)
+            fprintf(stderr, "|privcall");
 #endif
             fprintf(stderr,
             "\n"
@@ -362,6 +364,7 @@ int main(int argc, char *argv[])
     int required = 0;
     int breakpoint = 0;
     int shutting_down = 0;
+    int privcall = 0;
     int altp2m = 0;
     int debug = 0;
     int cpuid = 0;
@@ -430,6 +433,11 @@ int main(int argc, char *argv[])
     else if ( !strcmp(argv[0], "cpuid") )
     {
         cpuid = 1;
+    }
+#elif defined(__arm__) || defined(__aarch64__)
+    else if ( !strcmp(argv[0], "privcall") )
+    {
+        privcall = 1;
     }
 #endif
     else
@@ -563,6 +571,16 @@ int main(int argc, char *argv[])
         }
     }
 
+    if ( privcall )
+    {
+        rc = xc_monitor_privileged_call(xch, domain_id, 1);
+        if ( rc < 0 )
+        {
+            ERROR("Error %d setting privileged call trapping with vm_event\n", rc);
+            goto exit;
+        }
+    }
+
     /* Wait for access */
     for (;;)
     {
@@ -577,6 +595,9 @@ int main(int argc, char *argv[])
                 rc = xc_monitor_debug_exceptions(xch, domain_id, 0, 0);
             if ( cpuid )
                 rc = xc_monitor_cpuid(xch, domain_id, 0);
+
+            if ( privcall )
+                rc = xc_monitor_privileged_call(xch, domain_id, 0);
 
             if ( altp2m )
             {
@@ -694,6 +715,15 @@ int main(int argc, char *argv[])
                     interrupted = -1;
                     continue;
                 }
+                break;
+            case VM_EVENT_REASON_PRIVILEGED_CALL:
+                printf("Privileged call: pc=%"PRIx64" (vcpu %d)\n",
+                       req.data.regs.arm.pc,
+                       req.vcpu_id);
+
+                rsp.data.regs.arm = req.data.regs.arm;
+                rsp.data.regs.arm.pc += 4;
+                rsp.flags |= VM_EVENT_FLAG_SET_REGISTERS;
                 break;
             case VM_EVENT_REASON_SINGLESTEP:
                 printf("Singlestep: rip=%016"PRIx64", vcpu %d, altp2m %u\n",

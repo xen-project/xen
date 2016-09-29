@@ -132,6 +132,13 @@
 #define VM_EVENT_REASON_DEBUG_EXCEPTION         9
 /* CPUID executed */
 #define VM_EVENT_REASON_CPUID                   10
+/*
+ * Privileged call executed (e.g. SMC).
+ * Note: event may be generated even if SMC condition check fails on some CPUs.
+ *       As this behavior is CPU-specific, users are advised to not rely on it.
+ *       These kinds of events will be filtered out in future versions.
+ */
+#define VM_EVENT_REASON_PRIVILEGED_CALL         11
 
 /* Supported values for the vm_event_write_ctrlreg index. */
 #define VM_EVENT_X86_CR0    0
