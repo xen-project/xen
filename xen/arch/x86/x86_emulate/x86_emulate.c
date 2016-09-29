@@ -48,7 +48,9 @@
 /* All operands are implicit in the opcode. */
 #define ImplicitOps (DstImplicit|SrcImplicit)
 
-static uint8_t opcode_table[256] = {
+typedef uint8_t opcode_desc_t;
+
+static const opcode_desc_t opcode_table[256] = {
     /* 0x00 - 0x07 */
     ByteOp|DstMem|SrcReg|ModRM, DstMem|SrcReg|ModRM,
     ByteOp|DstReg|SrcMem|ModRM, DstReg|SrcMem|ModRM,
@@ -178,7 +180,7 @@ static uint8_t opcode_table[256] = {
     ImplicitOps, ImplicitOps, ByteOp|DstMem|SrcNone|ModRM, DstMem|SrcNone|ModRM
 };
 
-static uint8_t twobyte_table[256] = {
+static const opcode_desc_t twobyte_table[256] = {
     /* 0x00 - 0x07 */
     SrcMem16|ModRM, ImplicitOps|ModRM, 0, 0, 0, ImplicitOps, ImplicitOps, 0,
     /* 0x08 - 0x0F */
@@ -1569,32 +1571,63 @@ int x86emul_unhandleable_rw(
     return X86EMUL_UNHANDLEABLE;
 }
 
-int
-x86_emulate(
-    struct x86_emulate_ctxt *ctxt,
-    const struct x86_emulate_ops  *ops)
-{
-    /* Shadow copy of register state. Committed on successful emulation. */
-    struct cpu_user_regs _regs = *ctxt->regs;
+struct x86_emulate_state {
+    unsigned int op_bytes, ad_bytes;
 
-    uint8_t b, d, sib, sib_index, sib_base, rex_prefix = 0;
-    uint8_t modrm = 0, modrm_mod = 0, modrm_reg = 0, modrm_rm = 0;
-    enum { ext_none, ext_0f, ext_0f38 } ext = ext_none;
-    union vex vex = {};
-    unsigned int op_bytes, def_op_bytes, ad_bytes, def_ad_bytes;
-    bool_t lock_prefix = 0;
-    int override_seg = -1, rc = X86EMUL_OKAY;
-    struct operand src = { .reg = REG_POISON };
-    struct operand dst = { .reg = REG_POISON };
-    enum x86_swint_type swint_type;
-    struct x86_emulate_stub stub = {};
-    DECLARE_ALIGNED(mmval_t, mmval);
+    enum { ext_none, ext_0f, ext_0f38 } ext;
+    uint8_t opcode;
+    uint8_t modrm, modrm_mod, modrm_reg, modrm_rm;
+    uint8_t rex_prefix;
+    bool lock_prefix;
+    opcode_desc_t desc;
+    union vex vex;
+    int override_seg;
+
     /*
      * Data operand effective address (usually computed from ModRM).
      * Default is a memory operand relative to segment DS.
      */
-    struct operand ea = { .type = OP_MEM, .reg = REG_POISON };
-    ea.mem.seg = x86_seg_ds; /* gcc may reject anon union initializer */
+    struct operand ea;
+
+    /* Immediate operand values, if any. Use otherwise unused fields. */
+#define imm1 ea.val
+#define imm2 ea.orig_val
+
+    /* Shadow copy of register state. Committed on successful emulation. */
+    struct cpu_user_regs regs;
+};
+
+/* Helper definitions. */
+#define op_bytes (state->op_bytes)
+#define ad_bytes (state->ad_bytes)
+#define ext (state->ext)
+#define modrm (state->modrm)
+#define modrm_mod (state->modrm_mod)
+#define modrm_reg (state->modrm_reg)
+#define modrm_rm (state->modrm_rm)
+#define rex_prefix (state->rex_prefix)
+#define lock_prefix (state->lock_prefix)
+#define vex (state->vex)
+#define override_seg (state->override_seg)
+#define ea (state->ea)
+#define _regs (state->regs)
+
+static int
+x86_decode(
+    struct x86_emulate_state *state,
+    struct x86_emulate_ctxt *ctxt,
+    const struct x86_emulate_ops  *ops)
+{
+    uint8_t b, d, sib, sib_index, sib_base;
+    unsigned int def_op_bytes, def_ad_bytes;
+    int rc = X86EMUL_OKAY;
+
+    memset(state, 0, sizeof(*state));
+    override_seg = -1;
+    ea.type = OP_MEM;
+    ea.mem.seg = x86_seg_ds;
+    ea.reg = REG_POISON;
+    _regs = *ctxt->regs;
 
     ctxt->retire.byte = 0;
 
@@ -1811,7 +1844,7 @@ x86_emulate(
                     d = (d & ~(DstMask | SrcMask)) | DstMem | SrcReg | Mov;
                 break;
             default: /* Until it is worth making this table based ... */
-                goto cannot_emulate;
+                return X86EMUL_UNHANDLEABLE;
             }
             break;
 
@@ -1943,6 +1976,61 @@ x86_emulate(
     if ( override_seg != -1 && ea.type == OP_MEM )
         ea.mem.seg = override_seg;
 
+    /* Fetch the immediate operand, if present. */
+    switch ( d & SrcMask )
+    {
+        unsigned int bytes;
+
+    case SrcImm:
+        if ( !(d & ByteOp) )
+            bytes = op_bytes != 8 ? op_bytes : 4;
+        else
+        {
+    case SrcImmByte:
+            bytes = 1;
+        }
+        /* NB. Immediates are sign-extended as necessary. */
+        switch ( bytes )
+        {
+        case 1: imm1 = insn_fetch_type(int8_t);  break;
+        case 2: imm1 = insn_fetch_type(int16_t); break;
+        case 4: imm1 = insn_fetch_type(int32_t); break;
+        }
+        break;
+    case SrcImm16:
+        imm1 = insn_fetch_type(uint16_t);
+        break;
+    }
+
+    state->opcode = b;
+    state->desc = d;
+
+ done:
+    return rc;
+}
+
+int
+x86_emulate(
+    struct x86_emulate_ctxt *ctxt,
+    const struct x86_emulate_ops *ops)
+{
+    struct x86_emulate_state state;
+    int rc;
+    uint8_t b, d;
+    struct operand src = { .reg = REG_POISON };
+    struct operand dst = { .reg = REG_POISON };
+    enum x86_swint_type swint_type;
+    struct x86_emulate_stub stub = {};
+    DECLARE_ALIGNED(mmval_t, mmval);
+
+    rc = x86_decode(&state, ctxt, ops);
+    if ( rc != X86EMUL_OKAY )
+        return rc;
+
+    b = state.opcode;
+    d = state.desc;
+#define state (&state)
+
     /* Decode and fetch the source operand: register, memory or immediate. */
     switch ( d & SrcMask )
     {
@@ -1998,18 +2086,12 @@ x86_emulate(
             src.bytes = 1;
         }
         src.type  = OP_IMM;
-        /* NB. Immediates are sign-extended as necessary. */
-        switch ( src.bytes )
-        {
-        case 1: src.val = insn_fetch_type(int8_t);  break;
-        case 2: src.val = insn_fetch_type(int16_t); break;
-        case 4: src.val = insn_fetch_type(int32_t); break;
-        }
+        src.val   = imm1;
         break;
     case SrcImm16:
         src.type  = OP_IMM;
         src.bytes = 2;
-        src.val   = insn_fetch_type(uint16_t);
+        src.val   = imm1;
         break;
     }
 
@@ -4863,8 +4945,8 @@ x86_emulate(
     /* Commit shadow register state. */
     _regs.eflags &= ~EFLG_RF;
 
-    /* Zero the upper 32 bits of %rip if not in long mode. */
-    if ( def_ad_bytes < sizeof(_regs.eip) )
+    /* Zero the upper 32 bits of %rip if not in 64-bit mode. */
+    if ( !mode_64bit() )
         _regs.eip = (uint32_t)_regs.eip;
 
     *ctxt->regs = _regs;
@@ -4878,4 +4960,19 @@ x86_emulate(
     _put_fpu();
     put_stub(stub);
     return X86EMUL_UNHANDLEABLE;
+#undef state
 }
+
+#undef op_bytes
+#undef ad_bytes
+#undef ext
+#undef modrm
+#undef modrm_mod
+#undef modrm_reg
+#undef modrm_rm
+#undef rex_prefix
+#undef lock_prefix
+#undef vex
+#undef override_seg
+#undef ea
+#undef _regs
