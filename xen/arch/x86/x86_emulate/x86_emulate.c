@@ -590,9 +590,9 @@ do{ asm volatile (                                                      \
 
 /* Fetch next part of the instruction being emulated. */
 #define insn_fetch_bytes(_size)                                         \
-({ unsigned long _x = 0, _eip = _regs.eip;                              \
-   _regs.eip += (_size); /* real hardware doesn't truncate */           \
-   generate_exception_if((uint8_t)(_regs.eip -                          \
+({ unsigned long _x = 0, _eip = state->eip;                             \
+   state->eip += (_size); /* real hardware doesn't truncate */          \
+   generate_exception_if((uint8_t)(state->eip -                         \
                                    ctxt->regs->eip) > MAX_INST_LEN,     \
                          EXC_GP, 0);                                    \
    rc = ops->insn_fetch(x86_seg_cs, _eip, &_x, (_size), ctxt);          \
@@ -1593,8 +1593,8 @@ struct x86_emulate_state {
 #define imm1 ea.val
 #define imm2 ea.orig_val
 
-    /* Shadow copy of register state. Committed on successful emulation. */
-    struct cpu_user_regs regs;
+    unsigned long eip;
+    struct cpu_user_regs *regs;
 };
 
 /* Helper definitions. */
@@ -1610,7 +1610,6 @@ struct x86_emulate_state {
 #define vex (state->vex)
 #define override_seg (state->override_seg)
 #define ea (state->ea)
-#define _regs (state->regs)
 
 static int
 x86_decode_onebyte(
@@ -1666,7 +1665,8 @@ x86_decode(
     ea.type = OP_MEM;
     ea.mem.seg = x86_seg_ds;
     ea.reg = REG_POISON;
-    _regs = *ctxt->regs;
+    state->regs = ctxt->regs;
+    state->eip = ctxt->regs->eip;
 
     ctxt->retire.byte = 0;
 
@@ -1770,7 +1770,7 @@ x86_decode(
             default:
                 BUG();
             case 2:
-                if ( in_realmode(ctxt, ops) || (_regs.eflags & EFLG_VM) )
+                if ( in_realmode(ctxt, ops) || (state->regs->eflags & EFLG_VM) )
                     break;
                 /* fall through */
             case 4:
@@ -1895,8 +1895,6 @@ x86_decode(
         {
             modrm_rm |= (rex_prefix & 1) << 3;
             ea.type = OP_REG;
-            ea.reg  = decode_register(
-                modrm_rm, &_regs, (d & ByteOp) && (rex_prefix == 0));
         }
         else if ( ad_bytes == 2 )
         {
@@ -1904,33 +1902,33 @@ x86_decode(
             switch ( modrm_rm )
             {
             case 0:
-                ea.mem.off = _regs.ebx + _regs.esi;
+                ea.mem.off = state->regs->ebx + state->regs->esi;
                 break;
             case 1:
-                ea.mem.off = _regs.ebx + _regs.edi;
+                ea.mem.off = state->regs->ebx + state->regs->edi;
                 break;
             case 2:
                 ea.mem.seg = x86_seg_ss;
-                ea.mem.off = _regs.ebp + _regs.esi;
+                ea.mem.off = state->regs->ebp + state->regs->esi;
                 break;
             case 3:
                 ea.mem.seg = x86_seg_ss;
-                ea.mem.off = _regs.ebp + _regs.edi;
+                ea.mem.off = state->regs->ebp + state->regs->edi;
                 break;
             case 4:
-                ea.mem.off = _regs.esi;
+                ea.mem.off = state->regs->esi;
                 break;
             case 5:
-                ea.mem.off = _regs.edi;
+                ea.mem.off = state->regs->edi;
                 break;
             case 6:
                 if ( modrm_mod == 0 )
                     break;
                 ea.mem.seg = x86_seg_ss;
-                ea.mem.off = _regs.ebp;
+                ea.mem.off = state->regs->ebp;
                 break;
             case 7:
-                ea.mem.off = _regs.ebx;
+                ea.mem.off = state->regs->ebx;
                 break;
             }
             switch ( modrm_mod )
@@ -1957,14 +1955,15 @@ x86_decode(
                 sib_index = ((sib >> 3) & 7) | ((rex_prefix << 2) & 8);
                 sib_base  = (sib & 7) | ((rex_prefix << 3) & 8);
                 if ( sib_index != 4 )
-                    ea.mem.off = *(long*)decode_register(sib_index, &_regs, 0);
+                    ea.mem.off = *(long *)decode_register(sib_index,
+                                                          state->regs, 0);
                 ea.mem.off <<= (sib >> 6) & 3;
                 if ( (modrm_mod == 0) && ((sib_base & 7) == 5) )
                     ea.mem.off += insn_fetch_type(int32_t);
                 else if ( sib_base == 4 )
                 {
                     ea.mem.seg  = x86_seg_ss;
-                    ea.mem.off += _regs.esp;
+                    ea.mem.off += state->regs->esp;
                     if ( !ext && (b == 0x8f) )
                         /* POP <rm> computes its EA post increment. */
                         ea.mem.off += ((mode_64bit() && (op_bytes == 4))
@@ -1973,15 +1972,17 @@ x86_decode(
                 else if ( sib_base == 5 )
                 {
                     ea.mem.seg  = x86_seg_ss;
-                    ea.mem.off += _regs.ebp;
+                    ea.mem.off += state->regs->ebp;
                 }
                 else
-                    ea.mem.off += *(long*)decode_register(sib_base, &_regs, 0);
+                    ea.mem.off += *(long *)decode_register(sib_base,
+                                                           state->regs, 0);
             }
             else
             {
                 modrm_rm |= (rex_prefix & 1) << 3;
-                ea.mem.off = *(long *)decode_register(modrm_rm, &_regs, 0);
+                ea.mem.off = *(long *)decode_register(modrm_rm,
+                                                      state->regs, 0);
                 if ( (modrm_rm == 5) && (modrm_mod != 0) )
                     ea.mem.seg = x86_seg_ss;
             }
@@ -1994,7 +1995,7 @@ x86_decode(
                 if ( !mode_64bit() )
                     break;
                 /* Relative to RIP of next instruction. Argh! */
-                ea.mem.off += _regs.eip;
+                ea.mem.off += state->eip;
                 if ( (d & SrcMask) == SrcImm )
                     ea.mem.off += (d & ByteOp) ? 1 :
                         ((op_bytes == 8) ? 4 : op_bytes);
@@ -2072,6 +2073,8 @@ x86_emulate(
     struct x86_emulate_ctxt *ctxt,
     const struct x86_emulate_ops *ops)
 {
+    /* Shadow copy of register state. Committed on successful emulation. */
+    struct cpu_user_regs _regs = *ctxt->regs;
     struct x86_emulate_state state;
     int rc;
     uint8_t b, d;
@@ -2085,9 +2088,16 @@ x86_emulate(
     if ( rc != X86EMUL_OKAY )
         return rc;
 
+    /* Sync rIP to post decode value. */
+    _regs.eip = state.eip;
+
     b = state.opcode;
     d = state.desc;
 #define state (&state)
+
+    if ( ea.type == OP_REG )
+        ea.reg = decode_register(modrm_rm, &_regs,
+                                 (d & ByteOp) && !rex_prefix);
 
     /* Decode and fetch the source operand: register, memory or immediate. */
     switch ( d & SrcMask )
@@ -5005,4 +5015,3 @@ x86_emulate(
 #undef vex
 #undef override_seg
 #undef ea
-#undef _regs
