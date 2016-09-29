@@ -905,11 +905,11 @@ out:
     return rc;
 }
 
-static void finalise_one_memory_node(libxl__gc *gc, void *fdt,
-                                     uint64_t base, uint64_t size)
+static void finalise_one_node(libxl__gc *gc, void *fdt, const char *uname,
+                              uint64_t base, uint64_t size)
 {
     int node, res;
-    const char *name = GCSPRINTF("/memory@%"PRIx64, base);
+    const char *name = GCSPRINTF("%s@%"PRIx64, uname, base);
 
     node = fdt_path_offset(fdt, name);
     assert(node > 0);
@@ -972,7 +972,7 @@ int libxl__arch_domain_finalise_hw_description(libxl__gc *gc,
     for (i = 0; i < GUEST_RAM_BANKS; i++) {
         const uint64_t size = (uint64_t)dom->rambank_size[i] << XC_PAGE_SHIFT;
 
-        finalise_one_memory_node(gc, fdt, bankbase[i], size);
+        finalise_one_node(gc, fdt, "/memory", bankbase[i], size);
     }
 
     debug_dump_fdt(gc, fdt);
