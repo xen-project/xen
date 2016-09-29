@@ -128,6 +128,9 @@
 #define ROUNDUP(_val, _order)                                           \
     (((unsigned long)(_val)+(1UL<<(_order))-1) & ~((1UL<<(_order))-1))
 
+#define MASK_EXTR(v, m) (((v) & (m)) / ((m) & -(m)))
+#define MASK_INSR(v, m) (((v) * ((m) & -(m))) & (m))
+
 #define min(X, Y) ({                             \
             const typeof (X) _x = (X);           \
             const typeof (Y) _y = (Y);           \

@@ -900,8 +900,22 @@ int libxl__arch_domain_init_hw_description(libxl__gc *gc,
                                            struct xc_dom_image *dom)
 {
     int rc;
+    uint64_t val;
 
     assert(info->type == LIBXL_DOMAIN_TYPE_PV);
+
+    /* Set the value of domain param HVM_PARAM_CALLBACK_IRQ. */
+    val = MASK_INSR(HVM_PARAM_CALLBACK_TYPE_PPI,
+                    HVM_PARAM_CALLBACK_IRQ_TYPE_MASK);
+    /* Active-low level-sensitive  */
+    val |= MASK_INSR(HVM_PARAM_CALLBACK_TYPE_PPI_FLAG_LOW_LEVEL,
+                     HVM_PARAM_CALLBACK_TYPE_PPI_FLAG_MASK);
+    val |= GUEST_EVTCHN_PPI;
+    rc = xc_hvm_param_set(dom->xch, dom->guest_domid, HVM_PARAM_CALLBACK_IRQ,
+                          val);
+    if (rc)
+        return rc;
+
     rc = libxl__prepare_dtb(gc, info, state, dom);
     if (rc) goto out;
 
