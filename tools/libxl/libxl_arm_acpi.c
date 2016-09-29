@@ -227,6 +227,89 @@ static void make_acpi_gtdt(libxl__gc *gc, struct xc_dom_image *dom,
                        acpitables[GTDT].size);
 }
 
+static void make_acpi_madt_gicc(void *table, int nr_cpus, uint64_t gicc_base)
+{
+    int i;
+    struct acpi_madt_generic_interrupt *gicc = table;
+
+    for (i = 0; i < nr_cpus; i++) {
+        gicc->header.type = ACPI_MADT_TYPE_GENERIC_INTERRUPT;
+        gicc->header.length = ACPI_MADT_GICC_SIZE_v5;
+        gicc->base_address = gicc_base;
+        gicc->cpu_interface_number = i;
+        gicc->arm_mpidr = libxl__compute_mpdir(i);
+        gicc->uid = i;
+        gicc->flags = ACPI_MADT_ENABLED;
+        gicc = table + ACPI_MADT_GICC_SIZE_v5;
+    }
+}
+
+static void make_acpi_madt_gicd(void *table, uint64_t gicd_base,
+                                uint8_t gic_version)
+{
+    struct acpi_madt_generic_distributor *gicd = table;
+
+    gicd->header.type = ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR;
+    gicd->header.length = sizeof(*gicd);
+    gicd->base_address = gicd_base;
+    /* This version field has no meaning before ACPI 5.1 errata. */
+    gicd->version = gic_version;
+}
+
+static void make_acpi_madt_gicr(void *table, uint64_t gicr_base,
+                                uint64_t gicr_size)
+{
+    struct acpi_madt_generic_redistributor *gicr = table;
+
+    gicr->header.type = ACPI_MADT_TYPE_GENERIC_REDISTRIBUTOR;
+    gicr->header.length = sizeof(*gicr);
+    gicr->base_address = gicr_base;
+    gicr->length = gicr_size;
+}
+
+static int make_acpi_madt(libxl__gc *gc, struct xc_dom_image *dom,
+                          libxl_domain_build_info *info,
+                          struct acpitable acpitables[])
+{
+    uint64_t offset = acpitables[MADT].addr - GUEST_ACPI_BASE;
+    void *table = dom->acpi_modules[0].data + offset;
+    struct acpi_table_madt *madt = table;
+    int rc = 0;
+
+    switch (info->arch_arm.gic_version) {
+    case LIBXL_GIC_VERSION_V2:
+        table += sizeof(struct acpi_table_madt);
+        make_acpi_madt_gicc(table, info->max_vcpus, GUEST_GICC_BASE);
+
+        table += ACPI_MADT_GICC_SIZE_v5 * info->max_vcpus;
+        make_acpi_madt_gicd(table, GUEST_GICD_BASE, ACPI_MADT_GIC_VERSION_V2);
+        break;
+    case LIBXL_GIC_VERSION_V3:
+        table += sizeof(struct acpi_table_madt);
+        make_acpi_madt_gicc(table, info->max_vcpus, 0);
+
+        table += ACPI_MADT_GICC_SIZE_v5 * info->max_vcpus;
+        make_acpi_madt_gicd(table, GUEST_GICV3_GICD_BASE,
+                            ACPI_MADT_GIC_VERSION_V3);
+
+        table += sizeof(struct acpi_madt_generic_distributor);
+        make_acpi_madt_gicr(table, GUEST_GICV3_GICR0_BASE,
+                            GUEST_GICV3_GICR0_SIZE);
+        break;
+    default:
+        LOG(ERROR, "Unknown GIC version");
+        rc = ERROR_FAIL;
+        goto out;
+    }
+
+    make_acpi_header(&madt->header, "APIC", acpitables[MADT].size, 3);
+    calculate_checksum(madt, offsetof(struct acpi_table_header, checksum),
+                       acpitables[MADT].size);
+
+out:
+    return rc;
+}
+
 int libxl__prepare_acpi(libxl__gc *gc, libxl_domain_build_info *info,
                         struct xc_dom_image *dom)
 {
@@ -254,6 +337,7 @@ int libxl__prepare_acpi(libxl__gc *gc, libxl_domain_build_info *info,
     make_acpi_rsdp(gc, dom, acpitables);
     make_acpi_xsdt(gc, dom, acpitables);
     make_acpi_gtdt(gc, dom, acpitables);
+    rc = make_acpi_madt(gc, dom, info, acpitables);
 
 out:
     return rc;
