@@ -325,7 +325,7 @@ void hvm_set_callback_via(struct domain *d, uint64_t via)
     unsigned int gsi=0, pdev=0, pintx=0;
     uint8_t via_type;
 
-    via_type = (uint8_t)(via >> 56) + 1;
+    via_type = (uint8_t)MASK_EXTR(via, HVM_PARAM_CALLBACK_IRQ_TYPE_MASK) + 1;
     if ( ((via_type == HVMIRQ_callback_gsi) && (via == 0)) ||
          (via_type > HVMIRQ_callback_vector) )
         via_type = HVMIRQ_callback_none;

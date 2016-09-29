@@ -30,6 +30,7 @@
  */
 
 #define HVM_PARAM_CALLBACK_IRQ 0
+#define HVM_PARAM_CALLBACK_IRQ_TYPE_MASK xen_mk_ullong(0xFF00000000000000)
 /*
  * How should CPU0 event-channel notifications be delivered?
  *
@@ -66,6 +67,8 @@
  * This is only used by ARM/ARM64 and masking/eoi the interrupt associated to
  * the notification is handled by the interrupt controller.
  */
+#define HVM_PARAM_CALLBACK_TYPE_PPI_FLAG_MASK      0xFF00
+#define HVM_PARAM_CALLBACK_TYPE_PPI_FLAG_LOW_LEVEL 2
 #endif
 
 /*

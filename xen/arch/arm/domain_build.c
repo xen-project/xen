@@ -2064,9 +2064,12 @@ static void evtchn_fixup(struct domain *d, struct kernel_info *kinfo)
            d->arch.evtchn_irq);
 
     /* Set the value of domain param HVM_PARAM_CALLBACK_IRQ */
-    val = (u64)HVM_PARAM_CALLBACK_TYPE_PPI << 56;
-    val |= (2 << 8); /* Active-low level-sensitive  */
-    val |= d->arch.evtchn_irq & 0xff;
+    val = MASK_INSR(HVM_PARAM_CALLBACK_TYPE_PPI,
+                    HVM_PARAM_CALLBACK_IRQ_TYPE_MASK);
+    /* Active-low level-sensitive  */
+    val |= MASK_INSR(HVM_PARAM_CALLBACK_TYPE_PPI_FLAG_LOW_LEVEL,
+                     HVM_PARAM_CALLBACK_TYPE_PPI_FLAG_MASK);
+    val |= d->arch.evtchn_irq;
     d->arch.hvm_domain.params[HVM_PARAM_CALLBACK_IRQ] = val;
 
     /*
