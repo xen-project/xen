@@ -302,6 +302,7 @@ int libxl__build_pre(libxl__gc *gc, uint32_t domid,
     libxl_ctx *ctx = libxl__gc_owner(gc);
     char *xs_domid, *con_domid;
     int rc;
+    uint64_t size;
 
     if (xc_domain_max_vcpus(ctx->xch, domid, info->max_vcpus) != 0) {
         LOG(ERROR, "Couldn't set max vcpu count");
@@ -408,8 +409,14 @@ int libxl__build_pre(libxl__gc *gc, uint32_t domid,
         }
     }
 
-    if (xc_domain_setmaxmem(ctx->xch, domid, info->target_memkb +
-        LIBXL_MAXMEM_CONSTANT) < 0) {
+
+    rc = libxl__arch_extra_memory(gc, info, &size);
+    if (rc < 0) {
+        LOGE(ERROR, "Couldn't get arch extra constant memory size");
+        return ERROR_FAIL;
+    }
+
+    if (xc_domain_setmaxmem(ctx->xch, domid, info->target_memkb + size) < 0) {
         LOGE(ERROR, "Couldn't set max memory");
         return ERROR_FAIL;
     }

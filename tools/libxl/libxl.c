@@ -17,6 +17,7 @@
 #include "libxl_osdeps.h"
 
 #include "libxl_internal.h"
+#include "libxl_arch.h"
 
 #define PAGE_TO_MEMKB(pages) ((pages) * 4)
 #define BACKEND_STRING_SIZE 5
@@ -4022,10 +4023,11 @@ int libxl_domain_setmaxmem(libxl_ctx *ctx, uint32_t domid, uint64_t max_memkb)
 {
     GC_INIT(ctx);
     char *mem, *endptr;
-    uint64_t memorykb;
+    uint64_t memorykb, size;
     char *dompath = libxl__xs_get_dompath(gc, domid);
     int rc = 1;
     libxl__domain_userdata_lock *lock = NULL;
+    libxl_domain_config d_config;
 
     CTX_LOCK;
 
@@ -4051,11 +4053,24 @@ int libxl_domain_setmaxmem(libxl_ctx *ctx, uint32_t domid, uint64_t max_memkb)
              "memory_static_max must be greater than or or equal to memory_dynamic_max");
         goto out;
     }
-    rc = xc_domain_setmaxmem(ctx->xch, domid, max_memkb + LIBXL_MAXMEM_CONSTANT);
+
+    rc = libxl_retrieve_domain_configuration(ctx, domid, &d_config);
+    if (rc < 0) {
+        LOGE(ERROR, "unable to retrieve domain configuration");
+        goto out;
+    }
+
+    rc = libxl__arch_extra_memory(gc, &d_config.b_info, &size);
+    if (rc < 0) {
+        LOGE(ERROR, "Couldn't get arch extra constant memory size");
+        goto out;
+    }
+
+    rc = xc_domain_setmaxmem(ctx->xch, domid, max_memkb + size);
     if (rc != 0) {
         LOGE(ERROR,
              "xc_domain_setmaxmem domid=%d memkb=%"PRIu64" failed ""rc=%d\n",
-             domid, max_memkb + LIBXL_MAXMEM_CONSTANT, rc);
+             domid, max_memkb + size, rc);
         goto out;
     }
 
@@ -4149,7 +4164,7 @@ int libxl_set_memory_target(libxl_ctx *ctx, uint32_t domid,
 {
     GC_INIT(ctx);
     int rc, r, lrc, abort_transaction = 0;
-    uint64_t memorykb;
+    uint64_t memorykb, size;
     uint64_t videoram = 0;
     uint64_t current_target_memkb = 0, new_target_memkb = 0;
     uint64_t current_max_memkb = 0;
@@ -4160,12 +4175,25 @@ int libxl_set_memory_target(libxl_ctx *ctx, uint32_t domid,
     char *uuid;
     xs_transaction_t t;
     libxl__domain_userdata_lock *lock;
+    libxl_domain_config d_config;
 
     CTX_LOCK;
 
     lock = libxl__lock_domain_userdata(gc, domid);
     if (!lock) {
         rc = ERROR_LOCK_FAIL;
+        goto out_no_transaction;
+    }
+
+    rc = libxl_retrieve_domain_configuration(ctx, domid, &d_config);
+    if (rc < 0) {
+        LOGE(ERROR, "unable to retrieve domain configuration");
+        goto out_no_transaction;
+    }
+
+    rc = libxl__arch_extra_memory(gc, &d_config.b_info, &size);
+    if (rc < 0) {
+        LOGE(ERROR, "Couldn't get arch extra constant memory size");
         goto out_no_transaction;
     }
 
@@ -4246,13 +4274,12 @@ retry_transaction:
 
     if (enforce) {
         memorykb = new_target_memkb + videoram;
-        r = xc_domain_setmaxmem(ctx->xch, domid, memorykb +
-                LIBXL_MAXMEM_CONSTANT);
+        r = xc_domain_setmaxmem(ctx->xch, domid, memorykb + size);
         if (r != 0) {
             LOGE(ERROR,
                  "xc_domain_setmaxmem domid=%u memkb=%"PRIu64" failed ""rc=%d\n",
                  domid,
-                 memorykb + LIBXL_MAXMEM_CONSTANT,
+                 memorykb + size,
                  r);
             abort_transaction = 1;
             rc = ERROR_FAIL;
@@ -4261,12 +4288,12 @@ retry_transaction:
     }
 
     r = xc_domain_set_pod_target(ctx->xch, domid,
-            (new_target_memkb + LIBXL_MAXMEM_CONSTANT) / 4, NULL, NULL, NULL);
+            (new_target_memkb + size) / 4, NULL, NULL, NULL);
     if (r != 0) {
         LOGE(ERROR,
              "xc_domain_set_pod_target domid=%d, memkb=%"PRIu64" failed rc=%d\n",
              domid,
-             new_target_memkb / 4,
+             (new_target_memkb + size) / 4,
              r);
         abort_transaction = 1;
         rc = ERROR_FAIL;

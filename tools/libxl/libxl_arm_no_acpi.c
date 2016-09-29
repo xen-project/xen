@@ -24,6 +24,13 @@ int libxl__prepare_acpi(libxl__gc *gc, libxl_domain_build_info *info,
     return ERROR_FAIL;
 }
 
+int libxl__get_acpi_size(libxl__gc *gc,
+                         const libxl_domain_build_info *info,
+                         uint64_t *out)
+{
+    return ERROR_FAIL;
+}
+
 /*
  * Local variables:
  * mode: C

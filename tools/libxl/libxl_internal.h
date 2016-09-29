@@ -128,6 +128,8 @@
 #define ROUNDUP(_val, _order)                                           \
     (((unsigned long)(_val)+(1UL<<(_order))-1) & ~((1UL<<(_order))-1))
 
+#define DIV_ROUNDUP(n, d) (((n) + (d) - 1) / (d))
+
 #define MASK_EXTR(v, m) (((v) & (m)) / ((m) & -(m)))
 #define MASK_INSR(v, m) (((v) * ((m) & -(m))) & (m))
 

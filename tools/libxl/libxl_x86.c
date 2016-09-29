@@ -359,6 +359,15 @@ out:
     return ret;
 }
 
+int libxl__arch_extra_memory(libxl__gc *gc,
+                             const libxl_domain_build_info *info,
+                             uint64_t *out)
+{
+    *out = LIBXL_MAXMEM_CONSTANT;
+
+    return 0;
+}
+
 int libxl__arch_domain_init_hw_description(libxl__gc *gc,
                                            libxl_domain_build_info *info,
                                            libxl__domain_build_state *state,

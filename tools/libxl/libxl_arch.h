@@ -66,6 +66,11 @@ _hidden
 void libxl__arch_domain_build_info_acpi_setdefault(
                                         libxl_domain_build_info *b_info);
 
+_hidden
+int libxl__arch_extra_memory(libxl__gc *gc,
+                             const libxl_domain_build_info *info,
+                             uint64_t *out);
+
 #if defined(__i386__) || defined(__x86_64__)
 
 #define LAPIC_BASE_ADDRESS  0xfee00000

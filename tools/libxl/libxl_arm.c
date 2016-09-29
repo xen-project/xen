@@ -106,6 +106,26 @@ int libxl__arch_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
     return 0;
 }
 
+int libxl__arch_extra_memory(libxl__gc *gc,
+                             const libxl_domain_build_info *info,
+                             uint64_t *out)
+{
+    int rc = 0;
+    uint64_t size = 0;
+
+    if (libxl_defbool_val(info->acpi)) {
+        rc = libxl__get_acpi_size(gc, info, &size);
+        if (rc < 0) {
+            rc = ERROR_FAIL;
+            goto out;
+        }
+    }
+
+    *out = LIBXL_MAXMEM_CONSTANT + DIV_ROUNDUP(size, 1024);
+out:
+    return rc;
+}
+
 static struct arch_info {
     const char *guest_type;
     const char *timer_compat;

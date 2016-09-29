@@ -23,6 +23,11 @@ _hidden
 int libxl__prepare_acpi(libxl__gc *gc, libxl_domain_build_info *info,
                         struct xc_dom_image *dom);
 
+_hidden
+int libxl__get_acpi_size(libxl__gc *gc,
+                         const libxl_domain_build_info *info,
+                         uint64_t *out);
+
 static inline uint64_t libxl__compute_mpdir(unsigned int cpuid)
 {
     /*

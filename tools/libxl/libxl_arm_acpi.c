@@ -94,6 +94,29 @@ static int libxl__estimate_madt_size(libxl__gc *gc,
     return rc;
 }
 
+int libxl__get_acpi_size(libxl__gc *gc,
+                         const libxl_domain_build_info *info,
+                         uint64_t *out)
+{
+    uint64_t size;
+    int rc = 0;
+
+
+    rc = libxl__estimate_madt_size(gc, info, &size);
+    if (rc < 0)
+        goto out;
+
+    *out = ROUNDUP(size, 3) +
+           ROUNDUP(sizeof(struct acpi_table_rsdp), 3) +
+           ROUNDUP(sizeof(struct acpi_table_xsdt), 3) +
+           ROUNDUP(sizeof(struct acpi_table_gtdt), 3) +
+           ROUNDUP(sizeof(struct acpi_table_fadt), 3) +
+           ROUNDUP(sizeof(dsdt_anycpu_arm_len), 3);
+
+out:
+    return rc;
+}
+
 static int libxl__allocate_acpi_tables(libxl__gc *gc,
                                        libxl_domain_build_info *info,
                                        struct xc_dom_image *dom,
