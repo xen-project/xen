@@ -310,6 +310,25 @@ out:
     return rc;
 }
 
+static void make_acpi_fadt(libxl__gc *gc, struct xc_dom_image *dom,
+                           struct acpitable acpitables[])
+{
+    uint64_t offset = acpitables[FADT].addr - GUEST_ACPI_BASE;
+    struct acpi_table_fadt *fadt = (void *)dom->acpi_modules[0].data + offset;
+
+    /* Hardware Reduced = 1 and use PSCI 0.2+ and with HVC */
+    fadt->flags = ACPI_FADT_HW_REDUCED;
+    fadt->arm_boot_flags = ACPI_FADT_PSCI_COMPLIANT | ACPI_FADT_PSCI_USE_HVC;
+
+    /* ACPI v5.1 (fadt->revision.fadt->minor_revision) */
+    fadt->minor_revision = 0x1;
+    fadt->dsdt = acpitables[DSDT].addr;
+
+    make_acpi_header(&fadt->header, "FACP", acpitables[FADT].size, 5);
+    calculate_checksum(fadt, offsetof(struct acpi_table_header, checksum),
+                       acpitables[FADT].size);
+}
+
 int libxl__prepare_acpi(libxl__gc *gc, libxl_domain_build_info *info,
                         struct xc_dom_image *dom)
 {
@@ -338,6 +357,10 @@ int libxl__prepare_acpi(libxl__gc *gc, libxl_domain_build_info *info,
     make_acpi_xsdt(gc, dom, acpitables);
     make_acpi_gtdt(gc, dom, acpitables);
     rc = make_acpi_madt(gc, dom, info, acpitables);
+    if (rc)
+        goto out;
+
+    make_acpi_fadt(gc, dom, acpitables);
 
 out:
     return rc;
