@@ -329,6 +329,15 @@ static void make_acpi_fadt(libxl__gc *gc, struct xc_dom_image *dom,
                        acpitables[FADT].size);
 }
 
+static void make_acpi_dsdt(libxl__gc *gc, struct xc_dom_image *dom,
+                           struct acpitable acpitables[])
+{
+    uint64_t offset = acpitables[DSDT].addr - GUEST_ACPI_BASE;
+    void *dsdt = dom->acpi_modules[0].data + offset;
+
+    memcpy(dsdt, dsdt_anycpu_arm, dsdt_anycpu_arm_len);
+}
+
 int libxl__prepare_acpi(libxl__gc *gc, libxl_domain_build_info *info,
                         struct xc_dom_image *dom)
 {
@@ -361,6 +370,7 @@ int libxl__prepare_acpi(libxl__gc *gc, libxl_domain_build_info *info,
         goto out;
 
     make_acpi_fadt(gc, dom, acpitables);
+    make_acpi_dsdt(gc, dom, acpitables);
 
 out:
     return rc;
