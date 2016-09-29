@@ -129,8 +129,8 @@ static const opcode_desc_t opcode_table[256] = {
     ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
     ImplicitOps|Mov, ImplicitOps|Mov, ImplicitOps, ImplicitOps,
     /* 0xA0 - 0xA7 */
-    ByteOp|DstEax|SrcImplicit|Mov, DstEax|SrcImplicit|Mov,
-    ByteOp|ImplicitOps|Mov, ImplicitOps|Mov,
+    ByteOp|DstEax|SrcMem|Mov, DstEax|SrcMem|Mov,
+    ByteOp|DstMem|SrcEax|Mov, DstMem|SrcEax|Mov,
     ByteOp|ImplicitOps|Mov, ImplicitOps|Mov,
     ByteOp|ImplicitOps, ImplicitOps,
     /* 0xA8 - 0xAF */
@@ -1613,6 +1613,45 @@ struct x86_emulate_state {
 #define _regs (state->regs)
 
 static int
+x86_decode_onebyte(
+    struct x86_emulate_state *state,
+    struct x86_emulate_ctxt *ctxt,
+    const struct x86_emulate_ops *ops)
+{
+    int rc = X86EMUL_OKAY;
+
+    switch ( state->opcode )
+    {
+    case 0x9a: /* call (far, absolute) */
+    case 0xea: /* jmp (far, absolute) */
+        generate_exception_if(mode_64bit(), EXC_UD, -1);
+
+        imm1 = insn_fetch_bytes(op_bytes);
+        imm2 = insn_fetch_type(uint16_t);
+        break;
+
+    case 0xa0: case 0xa1: /* mov mem.offs,{%al,%ax,%eax,%rax} */
+    case 0xa2: case 0xa3: /* mov {%al,%ax,%eax,%rax},mem.offs */
+        /* Source EA is not encoded via ModRM. */
+        ea.mem.off = insn_fetch_bytes(ad_bytes);
+        break;
+
+    case 0xb8 ... 0xbf: /* mov imm{16,32,64},r{16,32,64} */
+        if ( op_bytes == 8 ) /* Fetch more bytes to obtain imm64. */
+            imm1 = ((uint32_t)imm1 |
+                    ((uint64_t)insn_fetch_type(uint32_t) << 32));
+        break;
+
+    case 0xc8: /* enter imm16,imm8 */
+        imm2 = insn_fetch_type(uint8_t);
+        break;
+    }
+
+ done:
+    return rc;
+}
+
+static int
 x86_decode(
     struct x86_emulate_state *state,
     struct x86_emulate_ctxt *ctxt,
@@ -2005,9 +2044,28 @@ x86_decode(
     state->opcode = b;
     state->desc = d;
 
+    switch ( ext )
+    {
+    case ext_none:
+        rc = x86_decode_onebyte(state, ctxt, ops);
+        break;
+
+    case ext_0f:
+    case ext_0f38:
+        break;
+
+    default:
+        ASSERT_UNREACHABLE();
+        return X86EMUL_UNHANDLEABLE;
+    }
+
  done:
     return rc;
 }
+
+/* No insn fetching past this point. */
+#undef insn_fetch_bytes
+#undef insn_fetch_type
 
 int
 x86_emulate(
@@ -2571,6 +2629,8 @@ x86_emulate(
     case 0xc6 ... 0xc7: /* mov (sole member of Grp11) */
         generate_exception_if((modrm_reg & 7) != 0, EXC_UD, -1);
     case 0x88 ... 0x8b: /* mov */
+    case 0xa0 ... 0xa1: /* mov mem.offs,{%al,%ax,%eax,%rax} */
+    case 0xa2 ... 0xa3: /* mov {%al,%ax,%eax,%rax},mem.offs */
         dst.val = src.val;
         break;
 
@@ -2655,18 +2715,13 @@ x86_emulate(
 
     case 0x9a: /* call (far, absolute) */ {
         struct segment_register reg;
-        uint16_t sel;
-        uint32_t eip;
 
-        generate_exception_if(mode_64bit(), EXC_UD, -1);
+        ASSERT(!mode_64bit());
         fail_if(ops->read_segment == NULL);
 
-        eip = insn_fetch_bytes(op_bytes);
-        sel = insn_fetch_type(uint16_t);
-
         if ( (rc = ops->read_segment(x86_seg_cs, &reg, ctxt)) ||
-             (rc = load_seg(x86_seg_cs, sel, 0, &cs, ctxt, ops)) ||
-             (validate_far_branch(&cs, eip),
+             (rc = load_seg(x86_seg_cs, imm2, 0, &cs, ctxt, ops)) ||
+             (validate_far_branch(&cs, imm1),
               rc = ops->write(x86_seg_ss, sp_pre_dec(op_bytes),
                               &reg.sel, op_bytes, ctxt)) ||
              (rc = ops->write(x86_seg_ss, sp_pre_dec(op_bytes),
@@ -2674,7 +2729,7 @@ x86_emulate(
              (rc = ops->write_segment(x86_seg_cs, &cs, ctxt)) )
             goto done;
 
-        _regs.eip = eip;
+        _regs.eip = imm1;
         break;
     }
 
@@ -2714,23 +2769,6 @@ x86_emulate(
 
     case 0x9f: /* lahf */
         ((uint8_t *)&_regs.eax)[1] = (_regs.eflags & 0xd7) | 0x02;
-        break;
-
-    case 0xa0 ... 0xa1: /* mov mem.offs,{%al,%ax,%eax,%rax} */
-        /* Source EA is not encoded via ModRM. */
-        dst.bytes = (d & ByteOp) ? 1 : op_bytes;
-        if ( (rc = read_ulong(ea.mem.seg, insn_fetch_bytes(ad_bytes),
-                              &dst.val, dst.bytes, ctxt, ops)) != 0 )
-            goto done;
-        break;
-
-    case 0xa2 ... 0xa3: /* mov {%al,%ax,%eax,%rax},mem.offs */
-        /* Destination EA is not encoded via ModRM. */
-        dst.type  = OP_MEM;
-        dst.mem.seg = ea.mem.seg;
-        dst.mem.off = insn_fetch_bytes(ad_bytes);
-        dst.bytes = (d & ByteOp) ? 1 : op_bytes;
-        dst.val   = (unsigned long)_regs.eax;
         break;
 
     case 0xa4 ... 0xa5: /* movs */ {
@@ -2850,9 +2888,6 @@ x86_emulate(
         break;
 
     case 0xb8 ... 0xbf: /* mov imm{16,32,64},r{16,32,64} */
-        if ( dst.bytes == 8 ) /* Fetch more bytes to obtain imm64 */
-            src.val = ((uint32_t)src.val |
-                       ((uint64_t)insn_fetch_type(uint32_t) << 32));
         dst.reg = decode_register(
             (b & 7) | ((rex_prefix & 1) << 3), &_regs, 0);
         dst.val = src.val;
@@ -2916,7 +2951,7 @@ x86_emulate(
         goto les;
 
     case 0xc8: /* enter imm16,imm8 */ {
-        uint8_t depth = insn_fetch_type(uint8_t) & 31;
+        uint8_t depth = imm2 & 31;
         int i;
 
         dst.type = OP_REG;
@@ -3629,17 +3664,12 @@ x86_emulate(
         jmp_rel((int32_t)src.val);
         break;
 
-    case 0xea: /* jmp (far, absolute) */ {
-        uint16_t sel;
-        uint32_t eip;
-        generate_exception_if(mode_64bit(), EXC_UD, -1);
-        eip = insn_fetch_bytes(op_bytes);
-        sel = insn_fetch_type(uint16_t);
-        if ( (rc = load_seg(x86_seg_cs, sel, 0, &cs, ctxt, ops)) ||
-             (rc = commit_far_branch(&cs, eip)) )
+    case 0xea: /* jmp (far, absolute) */
+        ASSERT(!mode_64bit());
+        if ( (rc = load_seg(x86_seg_cs, imm2, 0, &cs, ctxt, ops)) ||
+             (rc = commit_far_branch(&cs, imm1)) )
             goto done;
         break;
-    }
 
     case 0xf1: /* int1 (icebp) */
         src.val = EXC_DB;
