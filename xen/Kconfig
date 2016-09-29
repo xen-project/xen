@@ -12,6 +12,9 @@ config ARCH
 	string
 	option env="ARCH"
 
+config BROKEN
+	bool
+
 source "arch/$SRCARCH/Kconfig"
 
 config XEN_FULLVERSION
