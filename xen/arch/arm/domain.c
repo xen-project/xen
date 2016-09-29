@@ -554,6 +554,7 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags,
 {
     int rc, count = 0;
 
+    BUILD_BUG_ON(GUEST_MAX_VCPUS < MAX_VIRT_CPUS);
     d->arch.relmem = RELMEM_not_started;
 
     /* Idle domains do not need this setup */

@@ -29,6 +29,11 @@ typedef uint64_t u64;
 #include <acpi/acconfig.h>
 #include <acpi/actbl.h>
 
+_hidden
+extern const unsigned char dsdt_anycpu_arm[];
+_hidden
+extern const int dsdt_anycpu_arm_len;
+
 int libxl__prepare_acpi(libxl__gc *gc, libxl_domain_build_info *info,
                         struct xc_dom_image *dom)
 {

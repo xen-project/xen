@@ -340,7 +340,7 @@ dnl "host" here means the platform on which the hypervisor and tools is
 dnl going to run, not the platform on which we are building (known as
 dnl "build" in gnu speak).
 case "$host_cpu" in
-i[[3456]]86|x86_64)
+i[[3456]]86|x86_64|aarch64)
     AX_PATH_PROG_OR_FAIL([IASL], [iasl])
     ;;
 esac

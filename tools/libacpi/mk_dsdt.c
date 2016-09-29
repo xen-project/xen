@@ -17,7 +17,11 @@
 #include <getopt.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#if defined(__i386__) || defined(__x86_64__)
 #include <xen/hvm/hvm_info_table.h>
+#elif defined(__aarch64__)
+#include <xen/arch-arm.h>
+#endif
 
 static unsigned int indent_level;
 static bool debug = false;
@@ -104,8 +108,14 @@ static struct option options[] = {
 
 int main(int argc, char **argv)
 {
-    unsigned int slot, cpu, max_cpus = HVM_MAX_VCPUS;
+    unsigned int slot, cpu, max_cpus;
     dm_version dm_version = QEMU_XEN_TRADITIONAL;
+
+#if defined(__i386__) || defined(__x86_64__)
+    max_cpus = HVM_MAX_VCPUS;
+#elif defined(__aarch64__)
+    max_cpus = GUEST_MAX_VCPUS;
+#endif
 
     for ( ; ; )
     {
@@ -159,6 +169,7 @@ int main(int argc, char **argv)
     /**** Processor start ****/
     push_block("Scope", "\\_SB");
 
+#if defined(__i386__) || defined(__x86_64__)
     /* MADT checksum */
     stmt("OperationRegion", "MSUM, SystemMemory, \\_SB.MSUA, 1");
     push_block("Field", "MSUM, ByteAcc, NoLock, Preserve");
@@ -172,6 +183,7 @@ int main(int argc, char **argv)
     pop_block();
     stmt("Return", "Buffer() {0, 8, 0xff, 0xff, 0, 0, 0, 0}");
     pop_block();
+#endif
 
     /* Define processor objects and control methods. */
     for ( cpu = 0; cpu < max_cpus; cpu++)
@@ -180,6 +192,11 @@ int main(int argc, char **argv)
 
         stmt("Name", "_HID, \"ACPI0007\"");
 
+        stmt("Name", "_UID, %d", cpu);
+#if defined(__aarch64__)
+        pop_block();
+        continue;
+#endif
         /* Name this processor's MADT LAPIC descriptor. */
         stmt("OperationRegion", 
              "MATR, SystemMemory, Add(\\_SB.MAPA, %d), 8", cpu*8);
@@ -217,6 +234,14 @@ int main(int argc, char **argv)
 
         pop_block();
     }
+
+#if defined(__aarch64__)
+    pop_block();
+    /**** Processor end ****/
+    pop_block();
+    /**** DSDT DefinitionBlock end ****/
+    return 0;
+#endif
 
     /* Operation Region 'PRST': bitmask of online CPUs. */
     stmt("OperationRegion", "PRST, SystemIO, 0xaf00, 32");

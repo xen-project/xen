@@ -91,7 +91,10 @@ acpi:
 LIBXL_OBJS-$(CONFIG_X86) += libxl_cpuid.o libxl_x86.o libxl_psr.o libxl_x86_acpi.o
 LIBXL_OBJS-$(CONFIG_ARM) += libxl_nocpuid.o libxl_arm.o libxl_libfdt_compat.o
 ifeq ($(CONFIG_ARM_64),y)
-LIBXL_OBJS-y += libxl_arm_acpi.o
+LIBXL_OBJS-y += libxl_arm_acpi.o dsdt_anycpu_arm.o
+dsdt_anycpu_arm.c:
+	$(MAKE) -C $(ACPI_PATH) ACPI_BUILD_DIR=$(CURDIR)
+
 libxl_arm_acpi.o: libxl_arm_acpi.c
 	$(CC) -c $(CFLAGS) -I../../xen/include/ -o $@ libxl_arm_acpi.c
 else

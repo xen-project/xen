@@ -7476,7 +7476,7 @@ then
     as_fn_error $? "Unable to find xgettext, please install xgettext" "$LINENO" 5
 fi
 case "$host_cpu" in
-i[3456]86|x86_64)
+i[3456]86|x86_64|aarch64)
     # Extract the first word of "iasl", so it can be a program name with args.
 set dummy iasl; ac_word=$2
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5

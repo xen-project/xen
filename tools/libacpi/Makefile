@@ -18,6 +18,7 @@ include $(XEN_ROOT)/tools/firmware/Rules.mk
 MK_DSDT = $(ACPI_BUILD_DIR)/mk_dsdt
 
 C_SRC-$(GPL) = dsdt_anycpu.c dsdt_15cpu.c dsdt_anycpu_qemu_xen.c
+C_SRC-$(CONFIG_ARM) = $(ACPI_BUILD_DIR)/dsdt_anycpu_arm.c
 C_SRC = $(addprefix $(ACPI_BUILD_DIR)/, dsdt_pvh.c $(C_SRC-y))
 H_SRC = $(addprefix $(ACPI_BUILD_DIR)/, ssdt_s3.h ssdt_s4.h ssdt_pm.h ssdt_tpm.h)
 
@@ -38,7 +39,7 @@ $(H_SRC): $(ACPI_BUILD_DIR)/%.h: %.asl iasl
 	rm -f $(addprefix $(ACPI_BUILD_DIR)/, $*.aml $*.hex)
  
 $(MK_DSDT): mk_dsdt.c
-	$(HOSTCC) $(HOSTCFLAGS) $(CFLAGS_xeninclude) -o $@ mk_dsdt.c
+	$(HOSTCC) $(HOSTCFLAGS) $(CFLAGS_xeninclude) -D__XEN_TOOLS__ -o $@ mk_dsdt.c
 
 ifeq ($(GPL),y)
 $(ACPI_BUILD_DIR)/dsdt_anycpu_qemu_xen.asl: dsdt.asl dsdt_acpi_info.asl gpl/mk_dsdt_gpl.sh $(MK_DSDT)
@@ -64,6 +65,11 @@ $(ACPI_BUILD_DIR)/dsdt_pvh.asl: dsdt_acpi_info.asl $(MK_DSDT)
 	printf "DefinitionBlock (\"DSDT.aml\", \"DSDT\", 5, \"Xen\", \"HVM\", 0)\n{" > $@
 	cat dsdt_acpi_info.asl >> $@
 	$(MK_DSDT) --debug=$(debug) --maxcpu any --dm-version none >> $@
+
+$(ACPI_BUILD_DIR)/dsdt_anycpu_arm.asl: $(MK_DSDT)
+	printf "DefinitionBlock (\"DSDT.aml\", \"DSDT\", 3, \"Xen\", \"ARM\", 1)\n{" > $@.$(TMP_SUFFIX)
+	$(MK_DSDT) --debug=$(debug) >> $@.$(TMP_SUFFIX)
+	mv -f $@.$(TMP_SUFFIX) $@
 
 $(C_SRC): $(ACPI_BUILD_DIR)/%.c: iasl $(ACPI_BUILD_DIR)/%.asl
 	iasl -vs -p $(ACPI_BUILD_DIR)/$*.$(TMP_SUFFIX) -tc $(ACPI_BUILD_DIR)/$*.asl
