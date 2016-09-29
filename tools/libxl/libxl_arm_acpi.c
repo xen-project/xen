@@ -34,6 +34,10 @@ extern const unsigned char dsdt_anycpu_arm[];
 _hidden
 extern const int dsdt_anycpu_arm_len;
 
+#define ACPI_OEM_ID "Xen"
+#define ACPI_OEM_TABLE_ID "ARM"
+#define ACPI_ASL_COMPILER_ID "XL"
+
 enum {
     RSDP,
     XSDT,
@@ -126,6 +130,37 @@ out:
     return rc;
 }
 
+static void calculate_checksum(void *table, uint32_t checksum_offset,
+                               uint32_t length)
+{
+    uint8_t *p, sum = 0;
+
+    p = table;
+    p[checksum_offset] = 0;
+
+    while (length--)
+        sum = sum + *p++;
+
+    p = table;
+    p[checksum_offset] = -sum;
+}
+
+static void make_acpi_rsdp(libxl__gc *gc, struct xc_dom_image *dom,
+                           struct acpitable acpitables[])
+{
+    uint64_t offset = acpitables[RSDP].addr - GUEST_ACPI_BASE;
+    struct acpi_table_rsdp *rsdp = (void *)dom->acpi_modules[0].data + offset;
+
+    memcpy(rsdp->signature, "RSD PTR ", sizeof(rsdp->signature));
+    memcpy(rsdp->oem_id, ACPI_OEM_ID, sizeof(rsdp->oem_id));
+    rsdp->length = acpitables[RSDP].size;
+    rsdp->revision = 0x02;
+    rsdp->xsdt_physical_address = acpitables[XSDT].addr;
+    calculate_checksum(rsdp,
+                       offsetof(struct acpi_table_rsdp, extended_checksum),
+                       acpitables[RSDP].size);
+}
+
 int libxl__prepare_acpi(libxl__gc *gc, libxl_domain_build_info *info,
                         struct xc_dom_image *dom)
 {
@@ -147,6 +182,10 @@ int libxl__prepare_acpi(libxl__gc *gc, libxl_domain_build_info *info,
     dom->acpi_modules[0].guest_addr_out = GUEST_ACPI_BASE;
 
     rc = libxl__allocate_acpi_tables(gc, info, dom, acpitables);
+    if (rc)
+        goto out;
+
+    make_acpi_rsdp(gc, dom, acpitables);
 
 out:
     return rc;
