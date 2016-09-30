@@ -36,7 +36,7 @@
 #include "physdev.h"
 #include "tmem.h"
 
-#define XEN_SYSCTL_INTERFACE_VERSION 0x0000000D
+#define XEN_SYSCTL_INTERFACE_VERSION 0x0000000E
 
 /*
  * Read console content from Xen buffer ring.
@@ -767,14 +767,10 @@ DEFINE_XEN_GUEST_HANDLE(xen_sysctl_psr_cat_op_t);
 #define XEN_SYSCTL_TMEM_OP_FLUSH                  2
 #define XEN_SYSCTL_TMEM_OP_DESTROY                3
 #define XEN_SYSCTL_TMEM_OP_LIST                   4
-#define XEN_SYSCTL_TMEM_OP_SET_WEIGHT             5
-#define XEN_SYSCTL_TMEM_OP_SET_COMPRESS           7
+#define XEN_SYSCTL_TMEM_OP_GET_CLIENT_INFO        5
+#define XEN_SYSCTL_TMEM_OP_SET_CLIENT_INFO        6
 #define XEN_SYSCTL_TMEM_OP_QUERY_FREEABLE_MB      8
 #define XEN_SYSCTL_TMEM_OP_SAVE_BEGIN             10
-#define XEN_SYSCTL_TMEM_OP_SAVE_GET_VERSION       11
-#define XEN_SYSCTL_TMEM_OP_SAVE_GET_MAXPOOLS      12
-#define XEN_SYSCTL_TMEM_OP_SAVE_GET_CLIENT_WEIGHT 13
-#define XEN_SYSCTL_TMEM_OP_SAVE_GET_CLIENT_FLAGS  15
 #define XEN_SYSCTL_TMEM_OP_SAVE_GET_POOL_FLAGS    16
 #define XEN_SYSCTL_TMEM_OP_SAVE_GET_POOL_NPAGES   17
 #define XEN_SYSCTL_TMEM_OP_SAVE_GET_POOL_UUID     18
@@ -796,7 +792,14 @@ struct tmem_handle {
     xen_tmem_oid_t oid;
 };
 
+/*
+ * XEN_SYSCTL_TMEM_OP_[GET,SAVE]_CLIENT uses the 'client' in
+ * xen_tmem_op with this structure, which is mostly used during migration.
+ */
 struct xen_tmem_client {
+    uint32_t version;   /* If mismatched we will get XEN_EOPNOTSUPP. */
+    uint32_t maxpools;  /* If greater than what hypervisor supports, will get
+                           XEN_ERANGE. */
     union {             /* See TMEM_CLIENT_[COMPRESS,FROZEN] */
         uint32_t raw;
         struct {
@@ -807,6 +810,8 @@ struct xen_tmem_client {
     } flags;
     uint32_t weight;
 };
+typedef struct xen_tmem_client xen_tmem_client_t;
+DEFINE_XEN_GUEST_HANDLE(xen_tmem_client_t);
 
 struct xen_sysctl_tmem_op {
     uint32_t cmd;       /* IN: XEN_SYSCTL_TMEM_OP_* . */
@@ -819,7 +824,9 @@ struct xen_sysctl_tmem_op {
     uint32_t pad;       /* Padding so structure is the same under 32 and 64. */
     xen_tmem_oid_t oid; /* IN: If not applicable to command use 0s. */
     union {
-        XEN_GUEST_HANDLE_64(char) buf; /* IN/OUT: Buffer to save and restore ops. */
+        XEN_GUEST_HANDLE_64(char) buf; /* IN/OUT: Buffer to save/restore */
+        XEN_GUEST_HANDLE_64(xen_tmem_client_t) client; /* IN/OUT for */
+                        /*  XEN_SYSCTL_TMEM_OP_[GET,SAVE]_CLIENT. */
     } u;
 };
 typedef struct xen_sysctl_tmem_op xen_sysctl_tmem_op_t;

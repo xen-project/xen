@@ -293,7 +293,7 @@ struct client {
     struct list_head ephemeral_page_list;
     long eph_count, eph_count_max;
     domid_t cli_id;
-    struct xen_tmem_client info;
+    xen_tmem_client_t info;
     bool_t shared_auth_required;
     /* For save/restore/migration. */
     bool_t was_frozen;

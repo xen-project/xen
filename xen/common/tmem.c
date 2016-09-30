@@ -843,6 +843,8 @@ static struct client *client_create(domid_t cli_id)
     rcu_unlock_domain(d);
 
     client->cli_id = cli_id;
+    client->info.version = TMEM_SPEC_VERSION;
+    client->info.maxpools = MAX_POOLS_PER_DOMAIN;
     client->info.flags.u.compress = tmem_compression_enabled();
     client->shared_auth_required = tmem_shared_auth();
     for ( i = 0; i < MAX_GLOBAL_SHARED_POOLS; i++)

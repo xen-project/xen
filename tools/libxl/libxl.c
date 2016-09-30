@@ -6152,28 +6152,42 @@ out:
     return rc;
 }
 
-static int32_t tmem_setop_from_string(char *set_name)
+static int32_t tmem_setop_from_string(char *set_name, uint32_t val,
+                                      xen_tmem_client_t *info)
 {
     if (!strcmp(set_name, "weight"))
-        return XEN_SYSCTL_TMEM_OP_SET_WEIGHT;
+        info->weight = val;
     else if (!strcmp(set_name, "compress"))
-        return XEN_SYSCTL_TMEM_OP_SET_COMPRESS;
+        info->flags.u.compress = val;
     else
         return -1;
+
+    return 0;
 }
 
 int libxl_tmem_set(libxl_ctx *ctx, uint32_t domid, char* name, uint32_t set)
 {
     int r, rc;
-    int32_t subop = tmem_setop_from_string(name);
+    xen_tmem_client_t info;
     GC_INIT(ctx);
 
-    if (subop == -1) {
+    r = xc_tmem_control(ctx->xch, -1 /* pool_id */,
+                        XEN_SYSCTL_TMEM_OP_GET_CLIENT_INFO,
+                        domid, sizeof(info), 0 /* arg2 */, &info);
+    if (r < 0) {
+        LOGE(ERROR, "Can not get tmem data!");
+        rc = ERROR_FAIL;
+        goto out;
+    }
+    rc = tmem_setop_from_string(name, set, &info);
+    if (rc == -1) {
         LOGEV(ERROR, -1, "Invalid set, valid sets are <weight|compress>");
         rc = ERROR_INVAL;
         goto out;
     }
-    r = xc_tmem_control(ctx->xch, -1, subop, domid, set, 0, NULL);
+    r = xc_tmem_control(ctx->xch, -1 /* pool_id */,
+                        XEN_SYSCTL_TMEM_OP_SET_CLIENT_INFO,
+                        domid, sizeof(info), 0 /* arg2 */, &info);
     if (r < 0) {
         LOGE(ERROR, "Can not set tmem %s", name);
         rc = ERROR_FAIL;
