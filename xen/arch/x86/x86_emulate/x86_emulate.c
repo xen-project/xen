@@ -4187,6 +4187,14 @@ x86_emulate(
         }
 #endif
 
+        case 0xd4: /* vmfunc */
+            generate_exception_if(lock_prefix | rep_prefix() | (vex.pfx == vex_66),
+                                  EXC_UD, -1);
+            fail_if(!ops->vmfunc);
+            if ( (rc = ops->vmfunc(ctxt) != X86EMUL_OKAY) )
+                goto done;
+            goto no_writeback;
+
         case 0xdf: /* invlpga */
             generate_exception_if(!in_protmode(ctxt, ops), EXC_UD, -1);
             generate_exception_if(!mode_ring0(), EXC_GP, 0);
@@ -4195,7 +4203,9 @@ x86_emulate(
                                    ctxt)) )
                 goto done;
             goto no_writeback;
-        case 0xf9: /* rdtscp */ {
+
+        case 0xf9: /* rdtscp */
+        {
             uint64_t tsc_aux;
             fail_if(ops->read_msr == NULL);
             if ( (rc = ops->read_msr(MSR_TSC_AUX, &tsc_aux, ctxt)) != 0 )
@@ -4203,14 +4213,9 @@ x86_emulate(
             _regs.ecx = (uint32_t)tsc_aux;
             goto rdtsc;
         }
-        case 0xd4: /* vmfunc */
-            generate_exception_if(lock_prefix | rep_prefix() | (vex.pfx == vex_66),
-                                  EXC_UD, -1);
-            fail_if(ops->vmfunc == NULL);
-            if ( (rc = ops->vmfunc(ctxt) != X86EMUL_OKAY) )
-                goto done;
-            goto no_writeback;
-	case 0xfc: /* clzero */ {
+
+        case 0xfc: /* clzero */
+        {
             unsigned int eax = 1, ebx = 0, dummy = 0;
             unsigned long zero = 0;
 
