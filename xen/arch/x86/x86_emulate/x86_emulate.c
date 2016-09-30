@@ -382,9 +382,9 @@ struct operand {
     } mem;
 };
 #ifdef __x86_64__
-#define REG_POISON ((unsigned long *) 0x8086000000008086UL) /* non-canonical */
+#define PTR_POISON ((void *)0x8086000000008086UL) /* non-canonical */
 #else
-#define REG_POISON NULL /* 32-bit builds are for user-space, so NULL is OK. */
+#define PTR_POISON NULL /* 32-bit builds are for user-space, so NULL is OK. */
 #endif
 
 typedef union {
@@ -1658,6 +1658,14 @@ struct x86_emulate_state {
 
     unsigned long eip;
     struct cpu_user_regs *regs;
+
+#ifndef NDEBUG
+    /*
+     * Track caller of x86_decode_insn() to spot missing as well as
+     * premature calls to x86_emulate_free_state().
+     */
+    void *caller;
+#endif
 };
 
 /* Helper definitions. */
@@ -1685,6 +1693,11 @@ x86_decode_onebyte(
 
     switch ( ctxt->opcode )
     {
+    case 0x90: /* nop / pause */
+        if ( repe_prefix() )
+            ctxt->opcode |= X86EMUL_OPC_F3(0, 0);
+        break;
+
     case 0x9a: /* call (far, absolute) */
     case 0xea: /* jmp (far, absolute) */
         generate_exception_if(mode_64bit(), EXC_UD, -1);
@@ -1792,7 +1805,7 @@ x86_decode(
     override_seg = -1;
     ea.type = OP_MEM;
     ea.mem.seg = x86_seg_ds;
-    ea.reg = REG_POISON;
+    ea.reg = PTR_POISON;
     state->regs = ctxt->regs;
     state->eip = ctxt->regs->eip;
 
@@ -2304,8 +2317,8 @@ x86_emulate(
     int rc;
     uint8_t b, d;
     bool tf = ctxt->regs->eflags & EFLG_TF;
-    struct operand src = { .reg = REG_POISON };
-    struct operand dst = { .reg = REG_POISON };
+    struct operand src = { .reg = PTR_POISON };
+    struct operand dst = { .reg = PTR_POISON };
     enum x86_swint_type swint_type;
     struct x86_emulate_stub stub = {};
     DECLARE_ALIGNED(mmval_t, mmval);
@@ -2910,8 +2923,9 @@ x86_emulate(
         break;
 
     case 0x90: /* nop / xchg %%r8,%%rax */
+    case X86EMUL_OPC_F3(0, 0x90): /* pause / xchg %%r8,%%rax */
         if ( !(rex_prefix & 1) )
-            break; /* nop */
+            break; /* nop / pause */
         /* fall through */
 
     case 0x91 ... 0x97: /* xchg reg,%%rax */
@@ -5312,3 +5326,89 @@ x86_emulate(
 #undef vex
 #undef override_seg
 #undef ea
+
+#ifdef __XEN__
+
+#include <xen/err.h>
+
+struct x86_emulate_state *
+x86_decode_insn(
+    struct x86_emulate_ctxt *ctxt,
+    int (*insn_fetch)(
+        enum x86_segment seg, unsigned long offset,
+        void *p_data, unsigned int bytes,
+        struct x86_emulate_ctxt *ctxt))
+{
+    static DEFINE_PER_CPU(struct x86_emulate_state, state);
+    struct x86_emulate_state *state = &this_cpu(state);
+    const struct x86_emulate_ops ops = {
+        .insn_fetch = insn_fetch,
+        .read       = x86emul_unhandleable_rw,
+        .write      = PTR_POISON,
+        .cmpxchg    = PTR_POISON,
+    };
+    int rc = x86_decode(state, ctxt, &ops);
+
+    if ( unlikely(rc != X86EMUL_OKAY) )
+        return ERR_PTR(-rc);
+
+#ifndef NDEBUG
+    /*
+     * While we avoid memory allocation (by use of per-CPU data) above,
+     * nevertheless make sure callers properly release the state structure
+     * for forward compatibility.
+     */
+    if ( state->caller )
+    {
+        printk(XENLOG_ERR "Unreleased emulation state acquired by %ps\n",
+               state->caller);
+        dump_execution_state();
+    }
+    state->caller = __builtin_return_address(0);
+#endif
+
+    return state;
+}
+
+static inline void check_state(const struct x86_emulate_state *state)
+{
+#ifndef NDEBUG
+    ASSERT(state->caller);
+#endif
+}
+
+#ifndef NDEBUG
+void x86_emulate_free_state(struct x86_emulate_state *state)
+{
+    check_state(state);
+    state->caller = NULL;
+}
+#endif
+
+int
+x86_insn_modrm(const struct x86_emulate_state *state,
+               unsigned int *rm, unsigned int *reg)
+{
+    check_state(state);
+
+    if ( !(state->desc & ModRM) )
+        return -EINVAL;
+
+    if ( rm )
+        *rm = state->modrm_rm;
+    if ( reg )
+        *reg = state->modrm_reg;
+
+    return state->modrm_mod;
+}
+
+unsigned int
+x86_insn_length(const struct x86_emulate_state *state,
+                const struct x86_emulate_ctxt *ctxt)
+{
+    check_state(state);
+
+    return state->eip - ctxt->regs->eip;
+}
+
+#endif

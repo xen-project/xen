@@ -835,7 +835,7 @@ static int hvmemul_read(
         container_of(ctxt, struct hvm_emulate_ctxt, ctxt));
 }
 
-static int hvmemul_insn_fetch(
+int hvmemul_insn_fetch(
     enum x86_segment seg,
     unsigned long offset,
     void *p_data,
@@ -1766,15 +1766,14 @@ static const struct x86_emulate_ops hvm_emulate_ops_no_write = {
     .vmfunc        = hvmemul_vmfunc,
 };
 
-static int _hvm_emulate_one(struct hvm_emulate_ctxt *hvmemul_ctxt,
-    const struct x86_emulate_ops *ops)
+void hvm_emulate_init(
+    struct hvm_emulate_ctxt *hvmemul_ctxt,
+    const unsigned char *insn_buf,
+    unsigned int insn_bytes)
 {
-    struct cpu_user_regs *regs = hvmemul_ctxt->ctxt.regs;
     struct vcpu *curr = current;
-    uint32_t new_intr_shadow, pfec = PFEC_page_present;
-    struct hvm_vcpu_io *vio = &curr->arch.hvm_vcpu.hvm_io;
+    unsigned int pfec = PFEC_page_present;
     unsigned long addr;
-    int rc;
 
     if ( hvm_long_mode_enabled(curr) &&
          hvmemul_ctxt->seg_reg[x86_seg_cs].attr.fields.l )
@@ -1792,14 +1791,14 @@ static int _hvm_emulate_one(struct hvm_emulate_ctxt *hvmemul_ctxt,
     if ( hvmemul_ctxt->seg_reg[x86_seg_ss].attr.fields.dpl == 3 )
         pfec |= PFEC_user_mode;
 
-    hvmemul_ctxt->insn_buf_eip = regs->eip;
-    if ( !vio->mmio_insn_bytes )
+    hvmemul_ctxt->insn_buf_eip = hvmemul_ctxt->ctxt.regs->eip;
+    if ( !insn_bytes )
     {
         hvmemul_ctxt->insn_buf_bytes =
             hvm_get_insn_bytes(curr, hvmemul_ctxt->insn_buf) ?:
             (hvm_virtual_to_linear_addr(x86_seg_cs,
                                         &hvmemul_ctxt->seg_reg[x86_seg_cs],
-                                        regs->eip,
+                                        hvmemul_ctxt->insn_buf_eip,
                                         sizeof(hvmemul_ctxt->insn_buf),
                                         hvm_access_insn_fetch,
                                         hvmemul_ctxt->ctxt.addr_size,
@@ -1811,11 +1810,24 @@ static int _hvm_emulate_one(struct hvm_emulate_ctxt *hvmemul_ctxt,
     }
     else
     {
-        hvmemul_ctxt->insn_buf_bytes = vio->mmio_insn_bytes;
-        memcpy(hvmemul_ctxt->insn_buf, vio->mmio_insn, vio->mmio_insn_bytes);
+        hvmemul_ctxt->insn_buf_bytes = insn_bytes;
+        memcpy(hvmemul_ctxt->insn_buf, insn_buf, insn_bytes);
     }
 
     hvmemul_ctxt->exn_pending = 0;
+}
+
+static int _hvm_emulate_one(struct hvm_emulate_ctxt *hvmemul_ctxt,
+    const struct x86_emulate_ops *ops)
+{
+    const struct cpu_user_regs *regs = hvmemul_ctxt->ctxt.regs;
+    struct vcpu *curr = current;
+    uint32_t new_intr_shadow;
+    struct hvm_vcpu_io *vio = &curr->arch.hvm_vcpu.hvm_io;
+    int rc;
+
+    hvm_emulate_init(hvmemul_ctxt, vio->mmio_insn, vio->mmio_insn_bytes);
+
     vio->mmio_retry = 0;
 
     if ( cpu_has_vmx )

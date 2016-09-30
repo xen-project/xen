@@ -532,4 +532,29 @@ x86emul_unhandleable_rw(
     unsigned int bytes,
     struct x86_emulate_ctxt *ctxt);
 
+#ifdef __XEN__
+
+struct x86_emulate_state *
+x86_decode_insn(
+    struct x86_emulate_ctxt *ctxt,
+    int (*insn_fetch)(
+        enum x86_segment seg, unsigned long offset,
+        void *p_data, unsigned int bytes,
+        struct x86_emulate_ctxt *ctxt));
+
+int
+x86_insn_modrm(const struct x86_emulate_state *state,
+               unsigned int *rm, unsigned int *reg);
+unsigned int
+x86_insn_length(const struct x86_emulate_state *state,
+                const struct x86_emulate_ctxt *ctxt);
+
+#ifdef NDEBUG
+static inline void x86_emulate_free_state(struct x86_emulate_state *state) {}
+#else
+void x86_emulate_free_state(struct x86_emulate_state *state);
+#endif
+
+#endif
+
 #endif /* __X86_EMULATE_H__ */

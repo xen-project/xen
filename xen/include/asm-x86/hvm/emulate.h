@@ -54,6 +54,10 @@ void hvm_emulate_one_vm_event(enum emul_kind kind,
 void hvm_emulate_prepare(
     struct hvm_emulate_ctxt *hvmemul_ctxt,
     struct cpu_user_regs *regs);
+void hvm_emulate_init(
+    struct hvm_emulate_ctxt *hvmemul_ctxt,
+    const unsigned char *insn_buf,
+    unsigned int insn_bytes);
 void hvm_emulate_writeback(
     struct hvm_emulate_ctxt *hvmemul_ctxt);
 struct segment_register *hvmemul_get_seg_reg(
@@ -61,6 +65,11 @@ struct segment_register *hvmemul_get_seg_reg(
     struct hvm_emulate_ctxt *hvmemul_ctxt);
 int hvm_emulate_one_mmio(unsigned long mfn, unsigned long gla);
 
+int hvmemul_insn_fetch(enum x86_segment seg,
+                       unsigned long offset,
+                       void *p_data,
+                       unsigned int bytes,
+                       struct x86_emulate_ctxt *ctxt);
 int hvmemul_do_pio_buffer(uint16_t port,
                           unsigned int size,
                           uint8_t dir,
