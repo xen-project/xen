@@ -13,6 +13,7 @@
 #include <asm/x86_emulate.h>
 #include <asm/asm_defns.h> /* mark_regs_dirty() */
 #include <asm/processor.h> /* current_cpu_info */
+#include <asm/xstate.h>
 #include <asm/amd.h> /* cpu_has_amd_erratum() */
 
 /* Avoid namespace pollution. */

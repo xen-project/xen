@@ -410,8 +410,6 @@ typedef union {
 #define MSR_SYSENTER_ESP 0x00000175
 #define MSR_SYSENTER_EIP 0x00000176
 #define MSR_EFER         0xc0000080
-#define EFER_SCE         (1u<<0)
-#define EFER_LMA         (1u<<10)
 #define MSR_STAR         0xc0000081
 #define MSR_LSTAR        0xc0000082
 #define MSR_CSTAR        0xc0000083
@@ -4163,6 +4161,23 @@ x86_emulate(
 
         switch( modrm )
         {
+#ifdef __XEN__
+        case 0xd1: /* xsetbv */
+        {
+            unsigned long cr4;
+
+            generate_exception_if(vex.pfx, EXC_UD, -1);
+            if ( !ops->read_cr || ops->read_cr(4, &cr4, ctxt) != X86EMUL_OKAY )
+                cr4 = 0;
+            generate_exception_if(!(cr4 & X86_CR4_OSXSAVE), EXC_UD, -1);
+            generate_exception_if(!mode_ring0() ||
+                                  handle_xsetbv(_regs._ecx,
+                                                _regs._eax | (_regs.rdx << 32)),
+                                  EXC_GP, 0);
+            goto no_writeback;
+        }
+#endif
+
         case 0xdf: /* invlpga */
             generate_exception_if(!in_protmode(ctxt, ops), EXC_UD, -1);
             generate_exception_if(!mode_ring0(), EXC_GP, 0);
