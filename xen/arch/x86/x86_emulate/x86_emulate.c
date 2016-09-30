@@ -2484,7 +2484,8 @@ x86_emulate(
 
     switch ( ctxt->opcode )
     {
-        struct segment_register cs;
+        enum x86_segment seg;
+        struct segment_register cs, sreg;
 
     case 0x00 ... 0x05: add: /* add */
         emulate_2op_SrcV("add", src, dst, _regs.eflags);
@@ -2520,22 +2521,20 @@ x86_emulate(
         dst.type = OP_NONE;
         break;
 
-    case 0x06: /* push %%es */ {
-        struct segment_register reg;
+    case 0x06: /* push %%es */
         src.val = x86_seg_es;
     push_seg:
         generate_exception_if(mode_64bit() && !ext, EXC_UD, -1);
         fail_if(ops->read_segment == NULL);
-        if ( (rc = ops->read_segment(src.val, &reg, ctxt)) != 0 )
+        if ( (rc = ops->read_segment(src.val, &sreg, ctxt)) != 0 )
             goto done;
         /* 64-bit mode: PUSH defaults to a 64-bit operand. */
         if ( mode_64bit() && (op_bytes == 4) )
             op_bytes = 8;
         if ( (rc = ops->write(x86_seg_ss, sp_pre_dec(op_bytes),
-                              &reg.sel, op_bytes, ctxt)) != 0 )
+                              &sreg.sel, op_bytes, ctxt)) != 0 )
             goto done;
         break;
-    }
 
     case 0x07: /* pop %%es */
         src.val = x86_seg_es;
@@ -2855,21 +2854,20 @@ x86_emulate(
         dst.val = src.val;
         break;
 
-    case 0x8c: /* mov Sreg,r/m */ {
-        struct segment_register reg;
-        enum x86_segment seg = decode_segment(modrm_reg);
+    case 0x8c: /* mov Sreg,r/m */
+        seg = decode_segment(modrm_reg);
         generate_exception_if(seg == decode_segment_failed, EXC_UD, -1);
+    store_selector:
         fail_if(ops->read_segment == NULL);
-        if ( (rc = ops->read_segment(seg, &reg, ctxt)) != 0 )
+        if ( (rc = ops->read_segment(seg, &sreg, ctxt)) != 0 )
             goto done;
-        dst.val = reg.sel;
+        dst.val = sreg.sel;
         if ( dst.type == OP_MEM )
             dst.bytes = 2;
         break;
-    }
 
-    case 0x8e: /* mov r/m,Sreg */ {
-        enum x86_segment seg = decode_segment(modrm_reg);
+    case 0x8e: /* mov r/m,Sreg */
+        seg = decode_segment(modrm_reg);
         generate_exception_if(seg == decode_segment_failed, EXC_UD, -1);
         generate_exception_if(seg == x86_seg_cs, EXC_UD, -1);
         if ( (rc = load_seg(seg, src.val, 0, NULL, ctxt, ops)) != 0 )
@@ -2878,7 +2876,6 @@ x86_emulate(
             ctxt->retire.flags.mov_ss = 1;
         dst.type = OP_NONE;
         break;
-    }
 
     case 0x8d: /* lea */
         generate_exception_if(ea.type != OP_MEM, EXC_UD, -1);
@@ -2934,17 +2931,15 @@ x86_emulate(
         }
         break;
 
-    case 0x9a: /* call (far, absolute) */ {
-        struct segment_register reg;
-
+    case 0x9a: /* call (far, absolute) */
         ASSERT(!mode_64bit());
         fail_if(ops->read_segment == NULL);
 
-        if ( (rc = ops->read_segment(x86_seg_cs, &reg, ctxt)) ||
+        if ( (rc = ops->read_segment(x86_seg_cs, &sreg, ctxt)) ||
              (rc = load_seg(x86_seg_cs, imm2, 0, &cs, ctxt, ops)) ||
              (validate_far_branch(&cs, imm1),
               rc = ops->write(x86_seg_ss, sp_pre_dec(op_bytes),
-                              &reg.sel, op_bytes, ctxt)) ||
+                              &sreg.sel, op_bytes, ctxt)) ||
              (rc = ops->write(x86_seg_ss, sp_pre_dec(op_bytes),
                               &_regs.eip, op_bytes, ctxt)) ||
              (rc = ops->write_segment(x86_seg_cs, &cs, ctxt)) )
@@ -2952,7 +2947,6 @@ x86_emulate(
 
         _regs.eip = imm1;
         break;
-    }
 
     case 0x9b:  /* wait/fwait */
         emulate_fpu_insn("fwait");
@@ -4156,13 +4150,12 @@ x86_emulate(
 
             if ( (modrm_reg & 7) == 3 ) /* call */
             {
-                struct segment_register reg;
                 fail_if(ops->read_segment == NULL);
-                if ( (rc = ops->read_segment(x86_seg_cs, &reg, ctxt)) ||
+                if ( (rc = ops->read_segment(x86_seg_cs, &sreg, ctxt)) ||
                      (rc = load_seg(x86_seg_cs, sel, 0, &cs, ctxt, ops)) ||
                      (validate_far_branch(&cs, src.val),
                       rc = ops->write(x86_seg_ss, sp_pre_dec(op_bytes),
-                                      &reg.sel, op_bytes, ctxt)) ||
+                                      &sreg.sel, op_bytes, ctxt)) ||
                      (rc = ops->write(x86_seg_ss, sp_pre_dec(op_bytes),
                                       &_regs.eip, op_bytes, ctxt)) ||
                      (rc = ops->write_segment(x86_seg_cs, &cs, ctxt)) )
@@ -4184,23 +4177,13 @@ x86_emulate(
         break;
 
     case X86EMUL_OPC(0x0f, 0x00): /* Grp6 */
-    {
-        enum x86_segment seg = (modrm_reg & 1) ? x86_seg_tr : x86_seg_ldtr;
-
+        seg = (modrm_reg & 1) ? x86_seg_tr : x86_seg_ldtr;
         generate_exception_if(!in_protmode(ctxt, ops), EXC_UD, -1);
         switch ( modrm_reg & 6 )
         {
-            struct segment_register sreg;
-
         case 0: /* sldt / str */
             generate_exception_if(umip_active(ctxt, ops), EXC_GP, 0);
-            fail_if(!ops->read_segment);
-            if ( (rc = ops->read_segment(seg, &sreg, ctxt)) != 0 )
-                goto done;
-            dst.val = sreg.sel;
-            if ( dst.type == OP_MEM )
-                dst.bytes = 2;
-            break;
+            goto store_selector;
         case 2: /* lldt / ltr */
             generate_exception_if(!mode_ring0(), EXC_GP, 0);
             if ( (rc = load_seg(seg, src.val, 0, NULL, ctxt, ops)) != 0 )
@@ -4211,10 +4194,8 @@ x86_emulate(
             break;
         }
         break;
-    }
 
     case X86EMUL_OPC(0x0f, 0x01): /* Grp7 */ {
-        struct segment_register reg;
         unsigned long base, limit, cr0, cr0w;
 
         switch( modrm )
@@ -4305,6 +4286,8 @@ x86_emulate(
         }
         }
 
+        seg = (modrm_reg & 1) ? x86_seg_idtr : x86_seg_gdtr;
+
         switch ( modrm_reg & 7 )
         {
         case 0: /* sgdt */
@@ -4312,16 +4295,14 @@ x86_emulate(
             generate_exception_if(ea.type != OP_MEM, EXC_UD, -1);
             generate_exception_if(umip_active(ctxt, ops), EXC_GP, 0);
             fail_if(ops->read_segment == NULL);
-            if ( (rc = ops->read_segment((modrm_reg & 1) ?
-                                         x86_seg_idtr : x86_seg_gdtr,
-                                         &reg, ctxt)) )
+            if ( (rc = ops->read_segment(seg, &sreg, ctxt)) )
                 goto done;
             if ( op_bytes == 2 )
-                reg.base &= 0xffffff;
+                sreg.base &= 0xffffff;
             if ( (rc = ops->write(ea.mem.seg, ea.mem.off+0,
-                                  &reg.limit, 2, ctxt)) ||
+                                  &sreg.limit, 2, ctxt)) ||
                  (rc = ops->write(ea.mem.seg, ea.mem.off+2,
-                                  &reg.base, mode_64bit() ? 8 : 4, ctxt)) )
+                                  &sreg.base, mode_64bit() ? 8 : 4, ctxt)) )
                 goto done;
             break;
         case 2: /* lgdt */
@@ -4329,19 +4310,17 @@ x86_emulate(
             generate_exception_if(!mode_ring0(), EXC_GP, 0);
             generate_exception_if(ea.type != OP_MEM, EXC_UD, -1);
             fail_if(ops->write_segment == NULL);
-            memset(&reg, 0, sizeof(reg));
+            memset(&sreg, 0, sizeof(sreg));
             if ( (rc = read_ulong(ea.mem.seg, ea.mem.off+0,
                                   &limit, 2, ctxt, ops)) ||
                  (rc = read_ulong(ea.mem.seg, ea.mem.off+2,
                                   &base, mode_64bit() ? 8 : 4, ctxt, ops)) )
                 goto done;
-            reg.base = base;
-            reg.limit = limit;
+            sreg.base = base;
+            sreg.limit = limit;
             if ( op_bytes == 2 )
-                reg.base &= 0xffffff;
-            if ( (rc = ops->write_segment((modrm_reg & 1) ?
-                                          x86_seg_idtr : x86_seg_gdtr,
-                                          &reg, ctxt)) )
+                sreg.base &= 0xffffff;
+            if ( (rc = ops->write_segment(seg, &sreg, ctxt)) )
                 goto done;
             break;
         case 4: /* smsw */
@@ -4384,7 +4363,6 @@ x86_emulate(
 
     case X86EMUL_OPC(0x0f, 0x05): /* syscall */ {
         uint64_t msr_content;
-        struct segment_register cs, ss;
 
         generate_exception_if(!in_protmode(ctxt, ops), EXC_UD, -1);
 
@@ -4398,11 +4376,11 @@ x86_emulate(
             goto done;
 
         cs.sel = (msr_content >> 32) & ~3; /* SELECTOR_RPL_MASK */
-        ss.sel = cs.sel + 8;
+        sreg.sel = cs.sel + 8;
 
-        cs.base = ss.base = 0; /* flat segment */
-        cs.limit = ss.limit = ~0u;  /* 4GB limit */
-        ss.attr.bytes = 0xc93; /* G+DB+P+S+Data */
+        cs.base = sreg.base = 0; /* flat segment */
+        cs.limit = sreg.limit = ~0u;  /* 4GB limit */
+        sreg.attr.bytes = 0xc93; /* G+DB+P+S+Data */
 
 #ifdef __x86_64__
         rc = in_longmode(ctxt, ops);
@@ -4436,7 +4414,7 @@ x86_emulate(
 
         fail_if(ops->write_segment == NULL);
         if ( (rc = ops->write_segment(x86_seg_cs, &cs, ctxt)) ||
-             (rc = ops->write_segment(x86_seg_ss, &ss, ctxt)) )
+             (rc = ops->write_segment(x86_seg_ss, &sreg, ctxt)) )
             goto done;
 
         break;
@@ -4655,7 +4633,6 @@ x86_emulate(
 
     case X86EMUL_OPC(0x0f, 0x34): /* sysenter */ {
         uint64_t msr_content;
-        struct segment_register cs, ss;
         int lm;
 
         generate_exception_if(mode_ring0(), EXC_GP, 0);
@@ -4680,14 +4657,14 @@ x86_emulate(
         cs.attr.bytes = lm ? 0xa9b  /* L+DB+P+S+Code */
                            : 0xc9b; /* G+DB+P+S+Code */
 
-        ss.sel = cs.sel + 8;
-        ss.base = 0;   /* flat segment */
-        ss.limit = ~0u;  /* 4GB limit */
-        ss.attr.bytes = 0xc93; /* G+DB+P+S+Data */
+        sreg.sel = cs.sel + 8;
+        sreg.base = 0;   /* flat segment */
+        sreg.limit = ~0u;  /* 4GB limit */
+        sreg.attr.bytes = 0xc93; /* G+DB+P+S+Data */
 
         fail_if(ops->write_segment == NULL);
         if ( (rc = ops->write_segment(x86_seg_cs, &cs, ctxt)) != 0 ||
-             (rc = ops->write_segment(x86_seg_ss, &ss, ctxt)) != 0 )
+             (rc = ops->write_segment(x86_seg_ss, &sreg, ctxt)) != 0 )
             goto done;
 
         if ( (rc = ops->read_msr(MSR_SYSENTER_EIP, &msr_content, ctxt)) != 0 )
@@ -4703,7 +4680,6 @@ x86_emulate(
 
     case X86EMUL_OPC(0x0f, 0x35): /* sysexit */ {
         uint64_t msr_content;
-        struct segment_register cs, ss;
         bool_t user64 = !!(rex_prefix & REX_W);
 
         generate_exception_if(!mode_ring0(), EXC_GP, 0);
@@ -4725,14 +4701,14 @@ x86_emulate(
         cs.attr.bytes = user64 ? 0xafb  /* L+DB+P+DPL3+S+Code */
                                : 0xcfb; /* G+DB+P+DPL3+S+Code */
 
-        ss.sel = cs.sel + 8;
-        ss.base = 0;   /* flat segment */
-        ss.limit = ~0u;  /* 4GB limit */
-        ss.attr.bytes = 0xcf3; /* G+DB+P+DPL3+S+Data */
+        sreg.sel = cs.sel + 8;
+        sreg.base = 0;   /* flat segment */
+        sreg.limit = ~0u;  /* 4GB limit */
+        sreg.attr.bytes = 0xcf3; /* G+DB+P+DPL3+S+Data */
 
         fail_if(ops->write_segment == NULL);
         if ( (rc = ops->write_segment(x86_seg_cs, &cs, ctxt)) != 0 ||
-             (rc = ops->write_segment(x86_seg_ss, &ss, ctxt)) != 0 )
+             (rc = ops->write_segment(x86_seg_ss, &sreg, ctxt)) != 0 )
             goto done;
 
         _regs.eip = user64 ? _regs.edx : (uint32_t)_regs.edx;
