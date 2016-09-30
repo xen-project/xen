@@ -51,6 +51,8 @@
 /* Default timeslice: 30ms */
 #define CSCHED_DEFAULT_TSLICE_MS    30
 #define CSCHED_CREDITS_PER_MSEC     10
+/* Never set a timer shorter than this value. */
+#define CSCHED_MIN_TIMER            XEN_SYSCTL_SCHED_RATELIMIT_MIN
 
 
 /*
@@ -1811,7 +1813,15 @@ csched_schedule(
         snext = scurr;
         snext->start_time += now;
         perfc_incr(delay_ms);
-        tslice = MICROSECS(prv->ratelimit_us);
+        /*
+         * Next timeslice must last just until we'll have executed for
+         * ratelimit_us. However, to avoid setting a really short timer, which
+         * will most likely be inaccurate and counterproductive, we never go
+         * below CSCHED_MIN_TIMER.
+         */
+        tslice = MICROSECS(prv->ratelimit_us) - runtime;
+        if ( unlikely(runtime < CSCHED_MIN_TIMER) )
+            tslice = CSCHED_MIN_TIMER;
         ret.migrated = 0;
         goto out;
     }
