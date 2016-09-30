@@ -796,6 +796,18 @@ struct tmem_handle {
     xen_tmem_oid_t oid;
 };
 
+struct xen_tmem_client {
+    union {             /* See TMEM_CLIENT_[COMPRESS,FROZEN] */
+        uint32_t raw;
+        struct {
+            uint8_t frozen:1,
+                    compress:1,
+                    migrating:1;
+        } u;
+    } flags;
+    uint32_t weight;
+};
+
 struct xen_sysctl_tmem_op {
     uint32_t cmd;       /* IN: XEN_SYSCTL_TMEM_OP_* . */
     int32_t pool_id;    /* IN: 0 by default unless _SAVE_*, RESTORE_* .*/

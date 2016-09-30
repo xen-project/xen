@@ -27,14 +27,14 @@ static int tmemc_freeze_pools(domid_t cli_id, int arg)
     if ( cli_id == TMEM_CLI_ID_NULL )
     {
         list_for_each_entry(client,&tmem_global.client_list,client_list)
-            client->frozen = freeze;
+            client->info.flags.u.frozen = freeze;
         tmem_client_info("tmem: all pools %s for all %ss\n", s, tmem_client_str);
     }
     else
     {
         if ( (client = tmem_client_from_cli_id(cli_id)) == NULL)
             return -1;
-        client->frozen = freeze;
+        client->info.flags.u.frozen = freeze;
         tmem_client_info("tmem: all pools %s for %s=%d\n",
                          s, tmem_cli_id_str, cli_id);
     }
@@ -105,7 +105,7 @@ static int tmemc_list_client(struct client *c, tmem_cli_va_param_t buf,
 
     n = scnprintf(info,BSIZE,"C=CI:%d,ww:%d,co:%d,fr:%d,"
         "Tc:%"PRIu64",Ge:%ld,Pp:%ld,Gp:%ld%c",
-        c->cli_id, c->weight, c->compress, c->frozen,
+        c->cli_id, c->info.weight, c->info.flags.u.compress, c->info.flags.u.frozen,
         c->total_cycles, c->succ_eph_gets, c->succ_pers_puts, c->succ_pers_gets,
         use_long ? ',' : '\n');
     if (use_long)
@@ -266,15 +266,15 @@ static int __tmemc_set_var(struct client *client, uint32_t subop, uint32_t arg1)
     switch (subop)
     {
     case XEN_SYSCTL_TMEM_OP_SET_WEIGHT:
-        old_weight = client->weight;
-        client->weight = arg1;
+        old_weight = client->info.weight;
+        client->info.weight = arg1;
         tmem_client_info("tmem: weight set to %d for %s=%d\n",
                         arg1, tmem_cli_id_str, cli_id);
         atomic_sub(old_weight,&tmem_global.client_weight_total);
-        atomic_add(client->weight,&tmem_global.client_weight_total);
+        atomic_add(client->info.weight,&tmem_global.client_weight_total);
         break;
     case XEN_SYSCTL_TMEM_OP_SET_COMPRESS:
-        client->compress = arg1 ? 1 : 0;
+        client->info.flags.u.compress = arg1 ? 1 : 0;
         tmem_client_info("tmem: compression %s for %s=%d\n",
             arg1 ? "enabled" : "disabled",tmem_cli_id_str,cli_id);
         break;
@@ -327,12 +327,12 @@ static int tmemc_save_subop(int cli_id, uint32_t pool_id,
     case XEN_SYSCTL_TMEM_OP_SAVE_GET_CLIENT_WEIGHT:
         if ( client == NULL )
             break;
-        rc = client->weight == -1 ? -2 : client->weight;
+        rc = client->info.weight == -1 ? -2 : client->info.weight;
         break;
     case XEN_SYSCTL_TMEM_OP_SAVE_GET_CLIENT_FLAGS:
         if ( client == NULL )
             break;
-        rc = (client->compress ? TMEM_CLIENT_COMPRESS : 0 ) |
+        rc = (client->info.flags.u.compress ? TMEM_CLIENT_COMPRESS : 0 ) |
              (client->was_frozen ? TMEM_CLIENT_FROZEN : 0 );
         break;
     case XEN_SYSCTL_TMEM_OP_SAVE_GET_POOL_FLAGS:

@@ -293,12 +293,9 @@ struct client {
     struct list_head ephemeral_page_list;
     long eph_count, eph_count_max;
     domid_t cli_id;
-    uint32_t weight;
-    bool_t compress;
-    bool_t frozen;
+    struct xen_tmem_client info;
     bool_t shared_auth_required;
     /* For save/restore/migration. */
-    bool_t live_migrating;
     bool_t was_frozen;
     struct list_head persistent_invalidated_list;
     struct tmem_page_descriptor *cur_pgp;
