@@ -384,7 +384,7 @@ int tmem_control(struct xen_sysctl_tmem_op *op)
         break;
     case XEN_SYSCTL_TMEM_OP_LIST:
         ret = tmemc_list(op->cli_id,
-                         guest_handle_cast(op->buf, char), op->arg1, op->arg2);
+                         guest_handle_cast(op->u.buf, char), op->arg1, op->arg2);
         break;
     case XEN_SYSCTL_TMEM_OP_SET_WEIGHT:
     case XEN_SYSCTL_TMEM_OP_SET_COMPRESS:
@@ -401,7 +401,7 @@ int tmem_control(struct xen_sysctl_tmem_op *op)
     case XEN_SYSCTL_TMEM_OP_SAVE_GET_POOL_NPAGES:
     case XEN_SYSCTL_TMEM_OP_SAVE_GET_POOL_UUID:
         ret = tmemc_save_subop(op->cli_id, pool_id, cmd,
-                               guest_handle_cast(op->buf, char), op->arg1);
+                               guest_handle_cast(op->u.buf, char), op->arg1);
         break;
     default:
         ret = do_tmem_control(op);

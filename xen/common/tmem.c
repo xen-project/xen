@@ -1841,19 +1841,19 @@ int do_tmem_control(struct xen_sysctl_tmem_op *op)
     case XEN_SYSCTL_TMEM_OP_RESTORE_BEGIN:
     case XEN_SYSCTL_TMEM_OP_SAVE_END:
         ret = tmemc_save_subop(op->cli_id, pool_id, cmd,
-                               guest_handle_cast(op->buf, char), op->arg1);
+                               guest_handle_cast(op->u.buf, char), op->arg1);
         break;
     case XEN_SYSCTL_TMEM_OP_SAVE_GET_NEXT_PAGE:
         ret = tmemc_save_get_next_page(op->cli_id, pool_id,
-                                       guest_handle_cast(op->buf, char), op->arg1);
+                                       guest_handle_cast(op->u.buf, char), op->arg1);
         break;
     case XEN_SYSCTL_TMEM_OP_SAVE_GET_NEXT_INV:
         ret = tmemc_save_get_next_inv(op->cli_id,
-                                      guest_handle_cast(op->buf, char), op->arg1);
+                                      guest_handle_cast(op->u.buf, char), op->arg1);
         break;
     case XEN_SYSCTL_TMEM_OP_RESTORE_PUT_PAGE:
         ret = tmemc_restore_put_page(op->cli_id, pool_id, oidp, op->arg2,
-                                     guest_handle_cast(op->buf, char), op->arg1);
+                                     guest_handle_cast(op->u.buf, char), op->arg1);
         break;
     case XEN_SYSCTL_TMEM_OP_RESTORE_FLUSH_PAGE:
         ret = tmemc_restore_flush_page(op->cli_id, pool_id, oidp, op->arg2);

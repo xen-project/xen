@@ -81,7 +81,7 @@ int xc_tmem_control(xc_interface *xch,
         }
     }
 
-    set_xen_guest_handle(sysctl.u.tmem_op.buf, buf);
+    set_xen_guest_handle(sysctl.u.tmem_op.u.buf, buf);
 
     rc = do_sysctl(xch, &sysctl);
 
@@ -127,7 +127,7 @@ int xc_tmem_control_oid(xc_interface *xch,
         }
     }
 
-    set_xen_guest_handle(sysctl.u.tmem_op.buf, buf);
+    set_xen_guest_handle(sysctl.u.tmem_op.u.buf, buf);
 
     rc = do_sysctl(xch, &sysctl);
 
