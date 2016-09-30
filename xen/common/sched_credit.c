@@ -133,6 +133,8 @@
 #define TRC_CSCHED_TICKLE        TRC_SCHED_CLASS_EVT(CSCHED, 6)
 #define TRC_CSCHED_BOOST_START   TRC_SCHED_CLASS_EVT(CSCHED, 7)
 #define TRC_CSCHED_BOOST_END     TRC_SCHED_CLASS_EVT(CSCHED, 8)
+#define TRC_CSCHED_SCHEDULE      TRC_SCHED_CLASS_EVT(CSCHED, 9)
+#define TRC_CSCHED_RATELIMIT     TRC_SCHED_CLASS_EVT(CSCHED, 10)
 
 
 /*
@@ -1774,6 +1776,23 @@ csched_schedule(
     SCHED_STAT_CRANK(schedule);
     CSCHED_VCPU_CHECK(current);
 
+    /*
+     * Here in Credit1 code, we usually just call TRACE_nD() helpers, and
+     * don't care about packing. But scheduling happens very often, so it
+     * actually is important that the record is as small as possible.
+     */
+    if ( unlikely(tb_init_done) )
+    {
+        struct {
+            unsigned cpu:16, tasklet:8, idle:8;
+        } d;
+        d.cpu = cpu;
+        d.tasklet = tasklet_work_scheduled;
+        d.idle = is_idle_vcpu(current);
+        __trace_var(TRC_CSCHED_SCHEDULE, 1, sizeof(d),
+                    (unsigned char *)&d);
+    }
+
     runtime = now - current->runstate.state_entry_time;
     if ( runtime < 0 ) /* Does this ever happen? */
         runtime = 0;
@@ -1829,6 +1848,19 @@ csched_schedule(
         tslice = MICROSECS(prv->ratelimit_us) - runtime;
         if ( unlikely(runtime < CSCHED_MIN_TIMER) )
             tslice = CSCHED_MIN_TIMER;
+        if ( unlikely(tb_init_done) )
+        {
+            struct {
+                unsigned vcpu:16, dom:16;
+                unsigned runtime;
+            } d;
+            d.dom = scurr->vcpu->domain->domain_id;
+            d.vcpu = scurr->vcpu->vcpu_id;
+            d.runtime = runtime;
+            __trace_var(TRC_CSCHED_RATELIMIT, 1, sizeof(d),
+                        (unsigned char *)&d);
+        }
+
         ret.migrated = 0;
         goto out;
     }

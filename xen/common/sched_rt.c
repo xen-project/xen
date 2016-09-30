@@ -160,6 +160,7 @@
 #define TRC_RTDS_BUDGET_BURN      TRC_SCHED_CLASS_EVT(RTDS, 3)
 #define TRC_RTDS_BUDGET_REPLENISH TRC_SCHED_CLASS_EVT(RTDS, 4)
 #define TRC_RTDS_SCHED_TASKLET    TRC_SCHED_CLASS_EVT(RTDS, 5)
+#define TRC_RTDS_SCHEDULE         TRC_SCHED_CLASS_EVT(RTDS, 6)
 
 static void repl_timer_handler(void *data);
 
@@ -1034,6 +1035,20 @@ rt_schedule(const struct scheduler *ops, s_time_t now, bool_t tasklet_work_sched
     struct rt_vcpu *const scurr = rt_vcpu(current);
     struct rt_vcpu *snext = NULL;
     struct task_slice ret = { .migrated = 0 };
+
+    /* TRACE */
+    {
+        struct __packed {
+            unsigned cpu:16, tasklet:8, tickled:4, idle:4;
+        } d;
+        d.cpu = cpu;
+        d.tasklet = tasklet_work_scheduled;
+        d.tickled = cpumask_test_cpu(cpu, &prv->tickled);
+        d.idle = is_idle_vcpu(current);
+        trace_var(TRC_RTDS_SCHEDULE, 1,
+                  sizeof(d),
+                  (unsigned char *)&d);
+    }
 
     /* clear ticked bit now that we've been scheduled */
     cpumask_clear_cpu(cpu, &prv->tickled);

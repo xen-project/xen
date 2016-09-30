@@ -55,6 +55,8 @@
 #define TRC_CSCHED2_LOAD_BALANCE     TRC_SCHED_CLASS_EVT(CSCHED2, 17)
 #define TRC_CSCHED2_PICKED_CPU       TRC_SCHED_CLASS_EVT(CSCHED2, 19)
 #define TRC_CSCHED2_RUNQ_CANDIDATE   TRC_SCHED_CLASS_EVT(CSCHED2, 20)
+#define TRC_CSCHED2_SCHEDULE         TRC_SCHED_CLASS_EVT(CSCHED2, 21)
+#define TRC_CSCHED2_RATELIMIT        TRC_SCHED_CLASS_EVT(CSCHED2, 22)
 
 /*
  * WARNING: This is still in an experimental phase.  Status and work can be found at the
@@ -2281,7 +2283,22 @@ runq_candidate(struct csched2_runqueue_data *rqd,
          vcpu_runnable(scurr->vcpu) &&
          (now - scurr->vcpu->runstate.state_entry_time) <
           MICROSECS(prv->ratelimit_us) )
+    {
+        if ( unlikely(tb_init_done) )
+        {
+            struct {
+                unsigned vcpu:16, dom:16;
+                unsigned runtime;
+            } d;
+            d.dom = scurr->vcpu->domain->domain_id;
+            d.vcpu = scurr->vcpu->vcpu_id;
+            d.runtime = now - scurr->vcpu->runstate.state_entry_time;
+            __trace_var(TRC_CSCHED2_RATELIMIT, 1,
+                        sizeof(d),
+                        (unsigned char *)&d);
+        }
         return scurr;
+    }
 
     /* Default to current if runnable, idle otherwise */
     if ( vcpu_runnable(scurr->vcpu) )
@@ -2371,6 +2388,7 @@ csched2_schedule(
     struct csched2_vcpu *snext = NULL;
     unsigned int skipped_vcpus = 0;
     struct task_slice ret;
+    bool_t tickled;
 
     SCHED_STAT_CRANK(schedule);
     CSCHED2_VCPU_CHECK(current);
@@ -2385,11 +2403,29 @@ csched2_schedule(
     BUG_ON(!is_idle_vcpu(scurr->vcpu) && scurr->rqd != rqd);
 
     /* Clear "tickled" bit now that we've been scheduled */
-    if ( cpumask_test_cpu(cpu, &rqd->tickled) )
+    tickled = cpumask_test_cpu(cpu, &rqd->tickled);
+    if ( tickled )
     {
         __cpumask_clear_cpu(cpu, &rqd->tickled);
         cpumask_andnot(cpumask_scratch, &rqd->idle, &rqd->tickled);
         smt_idle_mask_set(cpu, cpumask_scratch, &rqd->smt_idle);
+    }
+
+    if ( unlikely(tb_init_done) )
+    {
+        struct {
+            unsigned cpu:16, rq_id:16;
+            unsigned tasklet:8, idle:8, smt_idle:8, tickled:8;
+        } d;
+        d.cpu = cpu;
+        d.rq_id = c2r(ops, cpu);
+        d.tasklet = tasklet_work_scheduled;
+        d.idle = is_idle_vcpu(current);
+        d.smt_idle = cpumask_test_cpu(cpu, &rqd->smt_idle);
+        d.tickled = tickled;
+        __trace_var(TRC_CSCHED2_SCHEDULE, 1,
+                    sizeof(d),
+                    (unsigned char *)&d);
     }
 
     /* Update credits */
