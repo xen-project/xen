@@ -819,8 +819,8 @@ struct xen_sysctl_tmem_op {
     uint32_t cli_id;    /* IN: client id, 0 for XEN_SYSCTL_TMEM_QUERY_FREEABLE_MB
                            for all others can be the domain id or
                            XEN_SYSCTL_TMEM_OP_ALL_CLIENTS for all. */
-    uint32_t arg1;      /* IN: If not applicable to command use 0. */
-    uint32_t arg2;      /* IN: If not applicable to command use 0. */
+    uint32_t len;       /* IN: length of 'buf'. If not applicable to use 0. */
+    uint32_t arg;       /* IN: If not applicable to command use 0. */
     uint32_t pad;       /* Padding so structure is the same under 32 and 64. */
     xen_tmem_oid_t oid; /* IN: If not applicable to command use 0s. */
     union {

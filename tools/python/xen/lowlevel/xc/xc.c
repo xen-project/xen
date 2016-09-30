@@ -1612,8 +1612,8 @@ static PyObject *pyxc_tmem_control(XcObject *self,
     int32_t pool_id;
     uint32_t subop;
     uint32_t cli_id;
-    uint32_t arg1;
-    uint32_t arg2;
+    uint32_t len;
+    uint32_t arg;
     char *buf;
     char _buffer[32768], *buffer = _buffer;
     int rc;
@@ -1621,13 +1621,13 @@ static PyObject *pyxc_tmem_control(XcObject *self,
     static char *kwd_list[] = { "pool_id", "subop", "cli_id", "arg1", "arg2", "buf", NULL };
 
     if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iiiiis", kwd_list,
-                        &pool_id, &subop, &cli_id, &arg1, &arg2, &buf) )
+                        &pool_id, &subop, &cli_id, &len, &arg, &buf) )
         return NULL;
 
-    if ( (subop == XEN_SYSCTL_TMEM_OP_LIST) && (arg1 > 32768) )
-        arg1 = 32768;
+    if ( (subop == XEN_SYSCTL_TMEM_OP_LIST) && (len > 32768) )
+        len = 32768;
 
-    if ( (rc = xc_tmem_control(self->xc_handle, pool_id, subop, cli_id, arg1, arg2, buffer)) < 0 )
+    if ( (rc = xc_tmem_control(self->xc_handle, pool_id, subop, cli_id, len, arg, buffer)) < 0 )
         return Py_BuildValue("i", rc);
 
     switch (subop) {
@@ -2506,8 +2506,8 @@ static PyMethodDef pyxc_methods[] = {
       " pool_id [int]: Identifier of the tmem pool (-1 == all).\n"
       " subop [int]: Supplementary Operation.\n"
       " cli_id [int]: Client identifier (-1 == all).\n"
-      " arg1 [int]: Argument.\n"
-      " arg2 [int]: Argument.\n"
+      " len [int]: Length of 'buf'.\n"
+      " arg [int]: Argument.\n"
       " buf [str]: Buffer.\n\n"
       "Returns: [int] 0 or [str] tmem info on success; exception on error.\n" },
 

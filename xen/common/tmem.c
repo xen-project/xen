@@ -1651,7 +1651,7 @@ static int tmemc_shared_pool_auth(domid_t cli_id, uint64_t uuid_lo,
 }
 
 static int tmemc_save_subop(int cli_id, uint32_t pool_id,
-                        uint32_t subop, tmem_cli_va_param_t buf, uint32_t arg1)
+                        uint32_t subop, tmem_cli_va_param_t buf, uint32_t arg)
 {
     struct client *client = tmem_client_from_cli_id(cli_id);
     uint32_t p;
@@ -1672,7 +1672,7 @@ static int tmemc_save_subop(int cli_id, uint32_t pool_id,
 
         client->was_frozen = client->info.flags.u.frozen;
         client->info.flags.u.frozen = 1;
-        if ( arg1 != 0 )
+        if ( arg != 0 )
             client->info.flags.u.migrating = 1;
         rc = 0;
         break;
@@ -1844,22 +1844,22 @@ int do_tmem_control(struct xen_sysctl_tmem_op *op)
     case XEN_SYSCTL_TMEM_OP_RESTORE_BEGIN:
     case XEN_SYSCTL_TMEM_OP_SAVE_END:
         ret = tmemc_save_subop(op->cli_id, pool_id, cmd,
-                               guest_handle_cast(op->u.buf, char), op->arg1);
+                               guest_handle_cast(op->u.buf, char), op->arg);
         break;
     case XEN_SYSCTL_TMEM_OP_SAVE_GET_NEXT_PAGE:
         ret = tmemc_save_get_next_page(op->cli_id, pool_id,
-                                       guest_handle_cast(op->u.buf, char), op->arg1);
+                                       guest_handle_cast(op->u.buf, char), op->len);
         break;
     case XEN_SYSCTL_TMEM_OP_SAVE_GET_NEXT_INV:
         ret = tmemc_save_get_next_inv(op->cli_id,
-                                      guest_handle_cast(op->u.buf, char), op->arg1);
+                                      guest_handle_cast(op->u.buf, char), op->len);
         break;
     case XEN_SYSCTL_TMEM_OP_RESTORE_PUT_PAGE:
-        ret = tmemc_restore_put_page(op->cli_id, pool_id, oidp, op->arg2,
-                                     guest_handle_cast(op->u.buf, char), op->arg1);
+        ret = tmemc_restore_put_page(op->cli_id, pool_id, oidp, op->arg,
+                                     guest_handle_cast(op->u.buf, char), op->len);
         break;
     case XEN_SYSCTL_TMEM_OP_RESTORE_FLUSH_PAGE:
-        ret = tmemc_restore_flush_page(op->cli_id, pool_id, oidp, op->arg2);
+        ret = tmemc_restore_flush_page(op->cli_id, pool_id, oidp, op->arg);
         break;
     default:
         ret = -1;

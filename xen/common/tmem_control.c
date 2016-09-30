@@ -347,7 +347,7 @@ static int tmemc_get_client_info(int cli_id,
 }
 
 static int tmemc_save_subop(int cli_id, uint32_t pool_id, uint32_t subop,
-                            XEN_GUEST_HANDLE_PARAM(char) buf, uint32_t arg1)
+                            XEN_GUEST_HANDLE_PARAM(char) buf, uint32_t arg)
 {
     struct client *client = tmem_client_from_cli_id(cli_id);
     struct tmem_pool *pool = (client == NULL || pool_id >= MAX_POOLS_PER_DOMAIN)
@@ -401,11 +401,11 @@ int tmem_control(struct xen_sysctl_tmem_op *op)
         ret = tmemc_freeze_pools(op->cli_id, cmd);
         break;
     case XEN_SYSCTL_TMEM_OP_FLUSH:
-        ret = tmemc_flush_mem(op->cli_id,op->arg1);
+        ret = tmemc_flush_mem(op->cli_id, op->arg);
         break;
     case XEN_SYSCTL_TMEM_OP_LIST:
         ret = tmemc_list(op->cli_id,
-                         guest_handle_cast(op->u.buf, char), op->arg1, op->arg2);
+                         guest_handle_cast(op->u.buf, char), op->len, op->arg);
         break;
     case XEN_SYSCTL_TMEM_OP_SET_CLIENT_INFO:
         ret = tmemc_set_client_info(op->cli_id, op->u.client);
@@ -420,7 +420,7 @@ int tmem_control(struct xen_sysctl_tmem_op *op)
     case XEN_SYSCTL_TMEM_OP_SAVE_GET_POOL_NPAGES:
     case XEN_SYSCTL_TMEM_OP_SAVE_GET_POOL_UUID:
         ret = tmemc_save_subop(op->cli_id, pool_id, cmd,
-                               guest_handle_cast(op->u.buf, char), op->arg1);
+                               guest_handle_cast(op->u.buf, char), op->arg);
         break;
     default:
         ret = do_tmem_control(op);

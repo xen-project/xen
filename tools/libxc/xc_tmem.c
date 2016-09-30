@@ -49,20 +49,20 @@ int xc_tmem_control(xc_interface *xch,
                     int32_t pool_id,
                     uint32_t cmd,
                     uint32_t cli_id,
-                    uint32_t arg1,
-                    uint32_t arg2,
+                    uint32_t len,
+                    uint32_t arg,
                     void *buf)
 {
     DECLARE_SYSCTL;
-    DECLARE_HYPERCALL_BOUNCE(buf, arg1, XC_HYPERCALL_BUFFER_BOUNCE_OUT);
+    DECLARE_HYPERCALL_BOUNCE(buf, len, XC_HYPERCALL_BUFFER_BOUNCE_OUT);
     int rc;
 
     sysctl.cmd = XEN_SYSCTL_tmem_op;
     sysctl.u.tmem_op.pool_id = pool_id;
     sysctl.u.tmem_op.cmd = cmd;
     sysctl.u.tmem_op.cli_id = cli_id;
-    sysctl.u.tmem_op.arg1 = arg1;
-    sysctl.u.tmem_op.arg2 = arg2;
+    sysctl.u.tmem_op.len = len;
+    sysctl.u.tmem_op.arg = arg;
     sysctl.u.tmem_op.pad = 0;
     sysctl.u.tmem_op.oid.oid[0] = 0;
     sysctl.u.tmem_op.oid.oid[1] = 0;
@@ -70,8 +70,7 @@ int xc_tmem_control(xc_interface *xch,
 
     if ( cmd == XEN_SYSCTL_TMEM_OP_SET_CLIENT_INFO )
         HYPERCALL_BOUNCE_SET_DIR(buf, XC_HYPERCALL_BUFFER_BOUNCE_IN);
-
-    if ( arg1 )
+    if ( len )
     {
         if ( buf == NULL )
         {
@@ -89,7 +88,7 @@ int xc_tmem_control(xc_interface *xch,
 
     rc = do_sysctl(xch, &sysctl);
 
-    if ( arg1 )
+    if ( len )
         xc_hypercall_bounce_post(xch, buf);
 
     return rc;
@@ -99,25 +98,25 @@ int xc_tmem_control_oid(xc_interface *xch,
                         int32_t pool_id,
                         uint32_t cmd,
                         uint32_t cli_id,
-                        uint32_t arg1,
-                        uint32_t arg2,
+                        uint32_t len,
+                        uint32_t arg,
                         struct xen_tmem_oid oid,
                         void *buf)
 {
     DECLARE_SYSCTL;
-    DECLARE_HYPERCALL_BOUNCE(buf, arg1, XC_HYPERCALL_BUFFER_BOUNCE_OUT);
+    DECLARE_HYPERCALL_BOUNCE(buf, len, XC_HYPERCALL_BUFFER_BOUNCE_OUT);
     int rc;
 
     sysctl.cmd = XEN_SYSCTL_tmem_op;
     sysctl.u.tmem_op.pool_id = pool_id;
     sysctl.u.tmem_op.cmd = cmd;
     sysctl.u.tmem_op.cli_id = cli_id;
-    sysctl.u.tmem_op.arg1 = arg1;
-    sysctl.u.tmem_op.arg2 = arg2;
+    sysctl.u.tmem_op.len = len;
+    sysctl.u.tmem_op.arg = arg;
     sysctl.u.tmem_op.pad = 0;
     sysctl.u.tmem_op.oid = oid;
 
-    if ( cmd == XEN_SYSCTL_TMEM_OP_LIST && arg1 != 0 )
+    if ( len  )
     {
         if ( buf == NULL )
         {
@@ -135,8 +134,8 @@ int xc_tmem_control_oid(xc_interface *xch,
 
     rc = do_sysctl(xch, &sysctl);
 
-    if ( cmd == XEN_SYSCTL_TMEM_OP_LIST && arg1 != 0 )
-            xc_hypercall_bounce_post(xch, buf);
+    if ( len )
+        xc_hypercall_bounce_post(xch, buf);
 
     return rc;
 }
@@ -222,7 +221,7 @@ int xc_tmem_save(xc_interface *xch,
     xen_tmem_client_t info;
 
     rc = xc_tmem_control(xch, 0, XEN_SYSCTL_TMEM_OP_SAVE_BEGIN,
-                         dom, live, 0, NULL);
+                         dom, 0 /* len*/ , live, NULL);
     if ( rc )
     {
         /* Nothing to save - no tmem enabled. */
@@ -237,7 +236,7 @@ int xc_tmem_save(xc_interface *xch,
 
     if ( xc_tmem_control(xch, 0 /* pool_id */,
                          XEN_SYSCTL_TMEM_OP_GET_CLIENT_INFO,
-                         dom /* cli_id */, sizeof(info) /* arg1 */, 0 /* arg2 */,
+                         dom /* cli_id */, sizeof(info), 0 /* arg */,
                          &info) < 0 )
         return -1;
 
@@ -394,7 +393,7 @@ int xc_tmem_restore(xc_interface *xch, int dom, int io_fd)
 
     if ( xc_tmem_control(xch, 0 /* pool_id */,
                          XEN_SYSCTL_TMEM_OP_SET_CLIENT_INFO,
-                         dom /* cli_id */, sizeof(info) /* arg1 */, 0 /* arg2 */,
+                         dom /* cli_id */, sizeof(info), 0 /* arg */,
                          &info) < 0 )
         return -1;
 

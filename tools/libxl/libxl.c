@@ -6173,7 +6173,7 @@ int libxl_tmem_set(libxl_ctx *ctx, uint32_t domid, char* name, uint32_t set)
 
     r = xc_tmem_control(ctx->xch, -1 /* pool_id */,
                         XEN_SYSCTL_TMEM_OP_GET_CLIENT_INFO,
-                        domid, sizeof(info), 0 /* arg2 */, &info);
+                        domid, sizeof(info), 0 /* arg */, &info);
     if (r < 0) {
         LOGE(ERROR, "Can not get tmem data!");
         rc = ERROR_FAIL;
@@ -6187,7 +6187,7 @@ int libxl_tmem_set(libxl_ctx *ctx, uint32_t domid, char* name, uint32_t set)
     }
     r = xc_tmem_control(ctx->xch, -1 /* pool_id */,
                         XEN_SYSCTL_TMEM_OP_SET_CLIENT_INFO,
-                        domid, sizeof(info), 0 /* arg2 */, &info);
+                        domid, sizeof(info), 0 /* arg */, &info);
     if (r < 0) {
         LOGE(ERROR, "Can not set tmem %s", name);
         rc = ERROR_FAIL;

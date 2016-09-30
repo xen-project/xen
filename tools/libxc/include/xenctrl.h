@@ -2067,11 +2067,11 @@ int xc_disable_turbo(xc_interface *xch, int cpuid);
  */
 
 int xc_tmem_control_oid(xc_interface *xch, int32_t pool_id, uint32_t subop,
-                        uint32_t cli_id, uint32_t arg1, uint32_t arg2,
+                        uint32_t cli_id, uint32_t len, uint32_t arg,
                         struct xen_tmem_oid oid, void *buf);
 int xc_tmem_control(xc_interface *xch,
                     int32_t pool_id, uint32_t subop, uint32_t cli_id,
-                    uint32_t arg1, uint32_t arg2, void *buf);
+                    uint32_t len, uint32_t arg, void *buf);
 int xc_tmem_auth(xc_interface *xch, int cli_id, char *uuid_str, int arg1);
 int xc_tmem_save(xc_interface *xch, int dom, int live, int fd, int field_marker);
 int xc_tmem_save_extra(xc_interface *xch, int dom, int fd, int field_marker);
