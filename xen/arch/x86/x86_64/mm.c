@@ -1088,7 +1088,7 @@ int check_descriptor(const struct domain *dom, struct desc_struct *d)
 
     /* A not-present descriptor will always fault, so is safe. */
     if ( !(b & _SEGMENT_P) ) 
-        goto good;
+        return 1;
 
     /* Check and fix up the DPL. */
     dpl = (b >> 13) & 3;
@@ -1130,7 +1130,7 @@ int check_descriptor(const struct domain *dom, struct desc_struct *d)
 
     /* Invalid type 0 is harmless. It is used for 2nd half of a call gate. */
     if ( (b & _SEGMENT_TYPE) == 0x000 )
-        goto good;
+        return 1;
 
     /* Everything but a call gate is discarded here. */
     if ( (b & _SEGMENT_TYPE) != 0xc00 )
