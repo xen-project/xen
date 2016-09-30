@@ -713,6 +713,54 @@ int main(int argc, char **argv)
     else
         printf("skipped\n");
 
+    printf("%-40s", "Testing movq %%xmm0,32(%%ecx)...");
+    if ( stack_exec && cpu_has_sse2 )
+    {
+        decl_insn(movq_to_mem2);
+
+        asm volatile ( "pcmpgtb %%xmm0, %%xmm0\n"
+                       put_insn(movq_to_mem2, "movq %%xmm0, 32(%0)")
+                       :: "c" (NULL) );
+
+        memset(res, 0xbd, 64);
+        set_insn(movq_to_mem2);
+        regs.ecx = (unsigned long)res;
+        regs.edx = 0;
+        rc = x86_emulate(&ctxt, &emulops);
+        if ( rc != X86EMUL_OKAY || !check_eip(movq_to_mem2) ||
+             *((uint64_t *)res + 4) ||
+             memcmp(res, res + 10, 24) ||
+             memcmp(res, res + 6, 8) )
+            goto fail;
+        printf("okay\n");
+    }
+    else
+        printf("skipped\n");
+
+    printf("%-40s", "Testing vmovq %%xmm1,32(%%edx)...");
+    if ( stack_exec && cpu_has_avx )
+    {
+        decl_insn(vmovq_to_mem);
+
+        asm volatile ( "pcmpgtb %%xmm1, %%xmm1\n"
+                       put_insn(vmovq_to_mem, "vmovq %%xmm1, 32(%0)")
+                       :: "d" (NULL) );
+
+        memset(res, 0xdb, 64);
+        set_insn(vmovq_to_mem);
+        regs.ecx = 0;
+        regs.edx = (unsigned long)res;
+        rc = x86_emulate(&ctxt, &emulops);
+        if ( rc != X86EMUL_OKAY || !check_eip(vmovq_to_mem) ||
+             *((uint64_t *)res + 4) ||
+             memcmp(res, res + 10, 24) ||
+             memcmp(res, res + 6, 8) )
+            goto fail;
+        printf("okay\n");
+    }
+    else
+        printf("skipped\n");
+
     printf("%-40s", "Testing movdqu %xmm2,(%ecx)...");
     if ( stack_exec && cpu_has_sse2 )
     {
