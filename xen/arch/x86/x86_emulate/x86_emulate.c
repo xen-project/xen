@@ -223,7 +223,7 @@ static const opcode_desc_t twobyte_table[256] = {
     /* 0x70 - 0x7F */
     SrcImmByte|ModRM, SrcImmByte|ModRM, SrcImmByte|ModRM, SrcImmByte|ModRM,
     ModRM, ModRM, ModRM, ImplicitOps,
-    ModRM, ModRM, 0, 0, ModRM, ModRM, ModRM, ImplicitOps|ModRM,
+    ModRM, ModRM, 0, 0, ModRM, ModRM, ImplicitOps|ModRM, ImplicitOps|ModRM,
     /* 0x80 - 0x87 */
     DstImplicit|SrcImm, DstImplicit|SrcImm,
     DstImplicit|SrcImm, DstImplicit|SrcImm,
@@ -2246,6 +2246,14 @@ x86_decode(
         ASSERT_UNREACHABLE();
         return X86EMUL_UNHANDLEABLE;
     }
+
+    /*
+     * Undo the operand-size override effect of prefix 66 when it was
+     * determined to have another meaning.
+     */
+    if ( op_bytes == 2 &&
+         (ctxt->opcode & X86EMUL_OPC_PFX_MASK) == X86EMUL_OPC_66(0, 0) )
+        op_bytes = 4;
 
  done:
     return rc;
@@ -4689,6 +4697,12 @@ x86_emulate(
                                          /* vmovdqa ymm/m256,ymm */
     case X86EMUL_OPC_VEX_F3(0x0f, 0x6f): /* vmovdqu xmm/m128,xmm */
                                          /* vmovdqu ymm/m256,ymm */
+    case X86EMUL_OPC(0x0f, 0x7e):        /* movd mm,r/m32 */
+                                         /* movq mm,r/m64 */
+    case X86EMUL_OPC_66(0x0f, 0x7e):     /* movd xmm,r/m32 */
+                                         /* movq xmm,r/m64 */
+    case X86EMUL_OPC_VEX_66(0x0f, 0x7e): /* vmovd xmm,r/m32 */
+                                         /* vmovq xmm,r/m64 */
     case X86EMUL_OPC(0x0f, 0x7f):        /* movq mm,mm/m64 */
     case X86EMUL_OPC_66(0x0f, 0x7f):     /* movdqa xmm,xmm/m128 */
     case X86EMUL_OPC_VEX_66(0x0f, 0x7f): /* vmovdqa xmm,xmm/m128 */
@@ -4739,10 +4753,16 @@ x86_emulate(
             get_fpu(X86EMUL_FPU_ymm, &fic);
             ea.bytes = 16 << vex.l;
         }
-        if ( b == 0xd6 )
+        switch ( b )
         {
+        case 0x7e:
+            generate_exception_if(vex.l, EXC_UD, -1);
+            ea.bytes = op_bytes;
+            break;
+        case 0xd6:
             generate_exception_if(vex.l, EXC_UD, -1);
             ea.bytes = 8;
+            break;
         }
         if ( ea.type == OP_MEM )
         {
@@ -4753,15 +4773,22 @@ x86_emulate(
             if ( b == 0x6f )
                 rc = ops->read(ea.mem.seg, ea.mem.off+0, mmvalp,
                                ea.bytes, ctxt);
-            /* convert memory operand to (%rAX) */
+        }
+        if ( ea.type == OP_MEM || b == 0x7e )
+        {
+            /* Convert memory operand or GPR destination to (%rAX) */
             rex_prefix &= ~REX_B;
             vex.b = 1;
             buf[4] &= 0x38;
+            if ( ea.type == OP_MEM )
+                ea.reg = (void *)mmvalp;
+            else /* Ensure zero-extension of a 32-bit result. */
+                *ea.reg = 0;
         }
         if ( !rc )
         {
            copy_REX_VEX(buf, rex_prefix, vex);
-           asm volatile ( "call *%0" : : "r" (stub.func), "a" (mmvalp)
+           asm volatile ( "call *%0" : : "r" (stub.func), "a" (ea.reg)
                                      : "memory" );
         }
         put_fpu(&fic);
