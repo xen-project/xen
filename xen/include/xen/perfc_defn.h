@@ -66,6 +66,9 @@ PERFCOUNTER(runtime_max_timer,      "csched2: runtime_max_timer")
 PERFCOUNTER(migrated,               "csched2: migrated")
 PERFCOUNTER(migrate_resisted,       "csched2: migrate_resisted")
 PERFCOUNTER(credit_reset,           "csched2: credit_reset")
+PERFCOUNTER(deferred_to_tickled_cpu,"csched2: deferred_to_tickled_cpu")
+PERFCOUNTER(tickled_cpu_overwritten,"csched2: tickled_cpu_overwritten")
+PERFCOUNTER(tickled_cpu_overridden, "csched2: tickled_cpu_overridden")
 
 PERFCOUNTER(need_flush_tlb_flush,   "PG_need_flush tlb flushes")
 

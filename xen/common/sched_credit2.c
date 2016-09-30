@@ -54,6 +54,7 @@
 #define TRC_CSCHED2_LOAD_CHECK       TRC_SCHED_CLASS_EVT(CSCHED2, 16)
 #define TRC_CSCHED2_LOAD_BALANCE     TRC_SCHED_CLASS_EVT(CSCHED2, 17)
 #define TRC_CSCHED2_PICKED_CPU       TRC_SCHED_CLASS_EVT(CSCHED2, 19)
+#define TRC_CSCHED2_RUNQ_CANDIDATE   TRC_SCHED_CLASS_EVT(CSCHED2, 20)
 
 /*
  * WARNING: This is still in an experimental phase.  Status and work can be found at the
@@ -398,6 +399,7 @@ struct csched2_vcpu {
     int credit;
     s_time_t start_time; /* When we were scheduled (used for credit) */
     unsigned flags;      /* 16 bits doesn't seem to play well with clear_bit() */
+    int tickled_cpu;     /* cpu tickled for picking us up (-1 if none) */
 
     /* Individual contribution to load */
     s_time_t load_last_update;  /* Last time average was updated */
@@ -1049,6 +1051,10 @@ runq_tickle(const struct scheduler *ops, struct csched2_vcpu *new, s_time_t now)
     __cpumask_set_cpu(ipid, &rqd->tickled);
     smt_idle_mask_clear(ipid, &rqd->smt_idle);
     cpu_raise_softirq(ipid, SCHEDULE_SOFTIRQ);
+
+    if ( unlikely(new->tickled_cpu != -1) )
+        SCHED_STAT_CRANK(tickled_cpu_overwritten);
+    new->tickled_cpu = ipid;
 }
 
 /*
@@ -1276,6 +1282,7 @@ csched2_alloc_vdata(const struct scheduler *ops, struct vcpu *vc, void *dd)
         svc->credit = CSCHED2_IDLE_CREDIT;
         svc->weight = 0;
     }
+    svc->tickled_cpu = -1;
 
     SCHED_STAT_CRANK(vcpu_alloc);
 
@@ -2268,6 +2275,17 @@ runq_candidate(struct csched2_runqueue_data *rqd,
         if ( !cpumask_test_cpu(cpu, svc->vcpu->cpu_hard_affinity) )
             continue;
 
+        /*
+         * If a vcpu is meant to be picked up by another processor, and such
+         * processor has not scheduled yet, leave it in the runqueue for him.
+         */
+        if ( svc->tickled_cpu != -1 && svc->tickled_cpu != cpu &&
+             cpumask_test_cpu(svc->tickled_cpu, &rqd->tickled) )
+        {
+            SCHED_STAT_CRANK(deferred_to_tickled_cpu);
+            continue;
+        }
+
         /* If this is on a different processor, don't pull it unless
          * its credit is at least CSCHED2_MIGRATE_RESIST higher. */
         if ( svc->vcpu->processor != cpu
@@ -2284,8 +2302,24 @@ runq_candidate(struct csched2_runqueue_data *rqd,
 
         /* In any case, if we got this far, break. */
         break;
-
     }
+
+    if ( unlikely(tb_init_done) )
+    {
+        struct {
+            unsigned vcpu:16, dom:16;
+            unsigned tickled_cpu;
+        } d;
+        d.dom = snext->vcpu->domain->domain_id;
+        d.vcpu = snext->vcpu->vcpu_id;
+        d.tickled_cpu = snext->tickled_cpu;
+        __trace_var(TRC_CSCHED2_RUNQ_CANDIDATE, 1,
+                    sizeof(d),
+                    (unsigned char *)&d);
+    }
+
+    if ( unlikely(snext->tickled_cpu != -1 && snext->tickled_cpu != cpu) )
+        SCHED_STAT_CRANK(tickled_cpu_overridden);
 
     return snext;
 }
@@ -2351,7 +2385,7 @@ csched2_schedule(
         snext = CSCHED2_VCPU(idle_vcpu[cpu]);
     }
     else
-        snext=runq_candidate(rqd, scurr, cpu, now);
+        snext = runq_candidate(rqd, scurr, cpu, now);
 
     /* If switching from a non-idle runnable vcpu, put it
      * back on the runqueue. */
@@ -2390,6 +2424,7 @@ csched2_schedule(
         }
 
         snext->start_time = now;
+        snext->tickled_cpu = -1;
 
         /* Safe because lock for old processor is held */
         if ( snext->vcpu->processor != cpu )
