@@ -1119,6 +1119,7 @@ static int xc_dom_load_acpi(struct xc_dom_image *dom)
         }
 
         memcpy(ptr, dom->acpi_modules[i].data, dom->acpi_modules[i].length);
+        munmap(ptr, XC_PAGE_SIZE * num_pages);
 
         free(extents);
         i++;
