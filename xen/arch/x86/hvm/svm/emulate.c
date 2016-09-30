@@ -62,7 +62,7 @@ static const struct {
         unsigned int mod:2;
 #define MODRM(mod, reg, rm) { rm, reg, mod }
     } modrm;
-} const opc_tab[INSTR_MAX_COUNT] = {
+} opc_tab[INSTR_MAX_COUNT] = {
     [INSTR_PAUSE]   = { X86EMUL_OPC_F3(0, 0x90) },
     [INSTR_INT3]    = { X86EMUL_OPC(   0, 0xcc) },
     [INSTR_HLT]     = { X86EMUL_OPC(   0, 0xf4) },
