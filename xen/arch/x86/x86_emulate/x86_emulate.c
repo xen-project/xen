@@ -1891,7 +1891,7 @@ x86_decode(
             switch ( def_ad_bytes )
             {
             default:
-                BUG();
+                BUG(); /* Shouldn't be possible. */
             case 2:
                 if ( in_realmode(ctxt, ops) || (state->regs->eflags & EFLG_VM) )
                     break;
