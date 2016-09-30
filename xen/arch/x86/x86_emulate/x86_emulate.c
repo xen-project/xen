@@ -182,7 +182,7 @@ static const opcode_desc_t opcode_table[256] = {
 
 static const opcode_desc_t twobyte_table[256] = {
     /* 0x00 - 0x07 */
-    SrcMem16|ModRM, ImplicitOps|ModRM, ModRM, ModRM,
+    ModRM, ImplicitOps|ModRM, ModRM, ModRM,
     0, ImplicitOps, ImplicitOps, ImplicitOps,
     /* 0x08 - 0x0F */
     ImplicitOps, ImplicitOps, 0, ImplicitOps,
@@ -419,6 +419,7 @@ typedef union {
 /* Control register flags. */
 #define CR0_PE    (1<<0)
 #define CR4_TSD   (1<<2)
+#define CR4_UMIP  (1<<11)
 
 /* EFLAGS bit definitions. */
 #define EFLG_VIP  (1<<20)
@@ -1489,6 +1490,17 @@ static bool is_aligned(enum x86_segment seg, unsigned long offs,
     return !((reg.base + offs) & (size - 1));
 }
 
+static bool umip_active(struct x86_emulate_ctxt *ctxt,
+                        const struct x86_emulate_ops *ops)
+{
+    unsigned long cr4;
+
+    /* Intentionally not using mode_ring0() here to avoid its fail_if(). */
+    return get_cpl(ctxt, ops) > 0 &&
+           ops->read_cr && ops->read_cr(4, &cr4, ctxt) == X86EMUL_OKAY &&
+           (cr4 & CR4_UMIP);
+}
+
 /* Inject a software interrupt/exception, emulating if needed. */
 static int inject_swint(enum x86_swint_type type,
                         uint8_t vector, uint8_t insn_len,
@@ -2041,10 +2053,20 @@ x86_decode(
             break;
 
         case ext_0f:
-        case ext_0f3a:
-        case ext_8f08:
-        case ext_8f09:
-        case ext_8f0a:
+            switch ( b )
+            {
+            case 0x00: /* Grp6 */
+                switch ( modrm_reg & 6 )
+                {
+                case 0:
+                    d |= DstMem | SrcImplicit | Mov;
+                    break;
+                case 2: case 4:
+                    d |= SrcMem16;
+                    break;
+                }
+                break;
+            }
             break;
 
         case ext_0f38:
@@ -2058,6 +2080,12 @@ x86_decode(
                     d = (d & ~(DstMask | SrcMask)) | DstMem | SrcReg | Mov;
                 break;
             }
+            break;
+
+        case ext_0f3a:
+        case ext_8f08:
+        case ext_8f09:
+        case ext_8f0a:
             break;
 
         default:
@@ -4156,13 +4184,34 @@ x86_emulate(
         break;
 
     case X86EMUL_OPC(0x0f, 0x00): /* Grp6 */
-        fail_if((modrm_reg & 6) != 2);
+    {
+        enum x86_segment seg = (modrm_reg & 1) ? x86_seg_tr : x86_seg_ldtr;
+
         generate_exception_if(!in_protmode(ctxt, ops), EXC_UD, -1);
-        generate_exception_if(!mode_ring0(), EXC_GP, 0);
-        if ( (rc = load_seg((modrm_reg & 1) ? x86_seg_tr : x86_seg_ldtr,
-                            src.val, 0, NULL, ctxt, ops)) != 0 )
-            goto done;
+        switch ( modrm_reg & 6 )
+        {
+            struct segment_register sreg;
+
+        case 0: /* sldt / str */
+            generate_exception_if(umip_active(ctxt, ops), EXC_GP, 0);
+            fail_if(!ops->read_segment);
+            if ( (rc = ops->read_segment(seg, &sreg, ctxt)) != 0 )
+                goto done;
+            dst.val = sreg.sel;
+            if ( dst.type == OP_MEM )
+                dst.bytes = 2;
+            break;
+        case 2: /* lldt / ltr */
+            generate_exception_if(!mode_ring0(), EXC_GP, 0);
+            if ( (rc = load_seg(seg, src.val, 0, NULL, ctxt, ops)) != 0 )
+                goto done;
+            break;
+        default:
+            generate_exception_if(true, EXC_UD, -1);
+            break;
+        }
         break;
+    }
 
     case X86EMUL_OPC(0x0f, 0x01): /* Grp7 */ {
         struct segment_register reg;
@@ -4261,6 +4310,7 @@ x86_emulate(
         case 0: /* sgdt */
         case 1: /* sidt */
             generate_exception_if(ea.type != OP_MEM, EXC_UD, -1);
+            generate_exception_if(umip_active(ctxt, ops), EXC_GP, 0);
             fail_if(ops->read_segment == NULL);
             if ( (rc = ops->read_segment((modrm_reg & 1) ?
                                          x86_seg_idtr : x86_seg_gdtr,
@@ -4295,6 +4345,7 @@ x86_emulate(
                 goto done;
             break;
         case 4: /* smsw */
+            generate_exception_if(umip_active(ctxt, ops), EXC_GP, 0);
             ea.bytes = (ea.type == OP_MEM) ? 2 : op_bytes;
             dst = ea;
             fail_if(ops->read_cr == NULL);
