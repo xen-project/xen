@@ -1089,6 +1089,15 @@ to 65535 and the default is 256.
 
 Restrict output to domains in the specified cpupool.
 
+=item B<-s>, B<--schedparam>
+
+Specify to list or set pool-wide scheduler parameters.
+
+=item B<-r RLIMIT>, B<--ratelimit_us=RLIMIT>
+
+Attempts to limit the rate of context switching. It is basically the same
+as B<--ratelimit_us> in B<sched-credit>
+
 =back
 
 =item B<sched-rtds> [I<OPTIONS>]

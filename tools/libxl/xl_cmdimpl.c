@@ -6457,8 +6457,29 @@ static int sched_credit_pool_output(uint32_t poolid)
     return 0;
 }
 
-static int sched_credit2_domain_output(
-    int domid)
+static int sched_credit2_params_set(int poolid,
+                                    libxl_sched_credit2_params *scinfo)
+{
+    if (libxl_sched_credit2_params_set(ctx, poolid, scinfo)) {
+        fprintf(stderr, "libxl_sched_credit2_params_set failed.\n");
+        return 1;
+    }
+
+    return 0;
+}
+
+static int sched_credit2_params_get(int poolid,
+                                    libxl_sched_credit2_params *scinfo)
+{
+    if (libxl_sched_credit2_params_get(ctx, poolid, scinfo)) {
+        fprintf(stderr, "libxl_sched_credit2_params_get failed.\n");
+        return 1;
+    }
+
+    return 0;
+}
+
+static int sched_credit2_domain_output(int domid)
 {
     char *domname;
     libxl_domain_sched_params scinfo;
@@ -6480,6 +6501,22 @@ static int sched_credit2_domain_output(
         scinfo.weight);
     free(domname);
     libxl_domain_sched_params_dispose(&scinfo);
+    return 0;
+}
+
+static int sched_credit2_pool_output(uint32_t poolid)
+{
+    libxl_sched_credit2_params scparam;
+    char *poolname = libxl_cpupoolid_to_name(ctx, poolid);
+
+    if (sched_credit2_params_get(poolid, &scparam))
+        printf("Cpupool %s: [sched params unavailable]\n", poolname);
+    else
+        printf("Cpupool %s: ratelimit=%dus\n",
+               poolname, scparam.ratelimit_us);
+
+    free(poolname);
+
     return 0;
 }
 
@@ -6578,17 +6615,6 @@ static int sched_rtds_pool_output(uint32_t poolid)
     poolname = libxl_cpupoolid_to_name(ctx, poolid);
     printf("Cpupool %s: sched=RTDS\n", poolname);
 
-    free(poolname);
-    return 0;
-}
-
-static int sched_default_pool_output(uint32_t poolid)
-{
-    char *poolname;
-
-    poolname = libxl_cpupoolid_to_name(ctx, poolid);
-    printf("Cpupool %s:\n",
-           poolname);
     free(poolname);
     return 0;
 }
@@ -6838,23 +6864,35 @@ int main_sched_credit2(int argc, char **argv)
 {
     const char *dom = NULL;
     const char *cpupool = NULL;
+    int ratelimit = 0;
     int weight = 256;
+    bool opt_s = false;
+    bool opt_r = false;
     bool opt_w = false;
     int opt, rc;
     static struct option opts[] = {
         {"domain", 1, 0, 'd'},
         {"weight", 1, 0, 'w'},
+        {"schedparam", 0, 0, 's'},
+        {"ratelimit_us", 1, 0, 'r'},
         {"cpupool", 1, 0, 'p'},
         COMMON_LONG_OPTS
     };
 
-    SWITCH_FOREACH_OPT(opt, "d:w:p:", opts, "sched-credit2", 0) {
+    SWITCH_FOREACH_OPT(opt, "d:w:p:r:s", opts, "sched-credit2", 0) {
     case 'd':
         dom = optarg;
         break;
     case 'w':
         weight = strtol(optarg, NULL, 10);
         opt_w = true;
+        break;
+    case 's':
+        opt_s = true;
+        break;
+    case 'r':
+        ratelimit = strtol(optarg, NULL, 10);
+        opt_r = true;
         break;
     case 'p':
         cpupool = optarg;
@@ -6871,10 +6909,31 @@ int main_sched_credit2(int argc, char **argv)
         return EXIT_FAILURE;
     }
 
-    if (!dom) { /* list all domain's credit scheduler info */
+    if (opt_s) {
+        libxl_sched_credit2_params scparam;
+        uint32_t poolid = 0;
+
+        if (cpupool) {
+            if (libxl_cpupool_qualifier_to_cpupoolid(ctx, cpupool,
+                                                     &poolid, NULL) ||
+                !libxl_cpupoolid_is_valid(ctx, poolid)) {
+                fprintf(stderr, "unknown cpupool \'%s\'\n", cpupool);
+                return EXIT_FAILURE;
+            }
+        }
+
+        if (!opt_r) { /* Output scheduling parameters */
+            if (sched_credit2_pool_output(poolid))
+                return EXIT_FAILURE;
+        } else {      /* Set scheduling parameters (so far, just ratelimit) */
+            scparam.ratelimit_us = ratelimit;
+            if (sched_credit2_params_set(poolid, &scparam))
+                return EXIT_FAILURE;
+        }
+    } else if (!dom) { /* list all domain's credit scheduler info */
         if (sched_domain_output(LIBXL_SCHEDULER_CREDIT2,
                                 sched_credit2_domain_output,
-                                sched_default_pool_output,
+                                sched_credit2_pool_output,
                                 cpupool))
             return EXIT_FAILURE;
     } else {
