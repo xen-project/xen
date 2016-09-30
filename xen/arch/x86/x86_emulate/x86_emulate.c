@@ -3171,21 +3171,16 @@ x86_emulate(
 
     case 0xc9: /* leave */
         /* First writeback, to %%esp. */
-        dst.type = OP_REG;
         dst.bytes = (mode_64bit() && (op_bytes == 4)) ? 8 : op_bytes;
-        dst.reg = (unsigned long *)&_regs.esp;
-        dst.val = _regs.ebp;
-
-        /* Flush first writeback, since there is a second. */
         switch ( dst.bytes )
         {
-        case 1: *(uint8_t  *)dst.reg = (uint8_t)dst.val; break;
-        case 2: *(uint16_t *)dst.reg = (uint16_t)dst.val; break;
-        case 4: *dst.reg = (uint32_t)dst.val; break; /* 64b: zero-ext */
-        case 8: *dst.reg = dst.val; break;
+        case 2: *(uint16_t *)&_regs.esp = (uint16_t)_regs.ebp; break;
+        case 4: _regs.esp = (uint32_t)_regs.ebp; break; /* 64b: zero-ext */
+        case 8: _regs.esp = _regs.ebp; break;
         }
 
         /* Second writeback, to %%ebp. */
+        dst.type = OP_REG;
         dst.reg = (unsigned long *)&_regs.ebp;
         if ( (rc = read_ulong(x86_seg_ss, sp_post_inc(dst.bytes),
                               &dst.val, dst.bytes, ctxt, ops)) )
