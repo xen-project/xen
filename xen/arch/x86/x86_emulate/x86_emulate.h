@@ -415,11 +415,14 @@ struct x86_emulate_ctxt
     /* Stack pointer width in bits (16, 32 or 64). */
     unsigned int sp_size;
 
-    /* Set this if writes may have side effects. */
-    uint8_t force_writeback;
+    /* Canonical opcode (see below). */
+    unsigned int opcode;
 
     /* Software event injection support. */
     enum x86_swint_emulation swint_emulate;
+
+    /* Set this if writes may have side effects. */
+    uint8_t force_writeback;
 
     /* Retirement state, set by the emulator (valid only on X86EMUL_OKAY). */
     union {
@@ -434,6 +437,60 @@ struct x86_emulate_ctxt
     /* Caller data that can be used by x86_emulate_ops' routines. */
     void *data;
 };
+
+/*
+ * Encode opcode extensions in the following way:
+ *     0x0xxxx for one byte opcodes
+ *    0x0fxxxx for 0f-prefixed opcodes (or their VEX/EVEX equivalents)
+ *  0x0f38xxxx for 0f38-prefixed opcodes (or their VEX/EVEX equivalents)
+ *  0x0f3axxxx for 0f3a-prefixed opcodes (or their VEX/EVEX equivalents)
+ *  0x8f08xxxx for 8f/8-prefixed XOP opcodes
+ *  0x8f09xxxx for 8f/9-prefixed XOP opcodes
+ *  0x8f0axxxx for 8f/a-prefixed XOP opcodes
+ * The low byte represents the base opcode withing the resepctive space,
+ * and some of bits 8..15 are used for encoding further information (see
+ * below).
+ * Hence no separate #define-s get added.
+ */
+#define X86EMUL_OPC_EXT_MASK         0xffff0000
+#define X86EMUL_OPC(ext, byte)       ((uint8_t)(byte) | \
+                                      MASK_INSR((ext), X86EMUL_OPC_EXT_MASK))
+/*
+ * This includes the 66, F3, and F2 prefixes (see also below)
+ * as well as VEX/EVEX:
+ */
+#define X86EMUL_OPC_MASK             (0x000000ff | X86EMUL_OPC_PFX_MASK | \
+                                     X86EMUL_OPC_ENCODING_MASK)
+
+/*
+ * Note that prefixes 66, F2, and F3 get encoded only when semantically
+ * meaningful, to reduce the complexity of interpreting this representation.
+ */
+#define X86EMUL_OPC_PFX_MASK         0x00000300
+# define X86EMUL_OPC_66(ext, byte)   (X86EMUL_OPC(ext, byte) | 0x00000100)
+# define X86EMUL_OPC_F3(ext, byte)   (X86EMUL_OPC(ext, byte) | 0x00000200)
+# define X86EMUL_OPC_F2(ext, byte)   (X86EMUL_OPC(ext, byte) | 0x00000300)
+
+#define X86EMUL_OPC_ENCODING_MASK    0x00003000
+#define X86EMUL_OPC_LEGACY_          0x00000000
+#define X86EMUL_OPC_VEX_             0x00001000
+# define X86EMUL_OPC_VEX(ext, byte) \
+    (X86EMUL_OPC(ext, byte) | X86EMUL_OPC_VEX_)
+# define X86EMUL_OPC_VEX_66(ext, byte) \
+    (X86EMUL_OPC_66(ext, byte) | X86EMUL_OPC_VEX_)
+# define X86EMUL_OPC_VEX_F3(ext, byte) \
+    (X86EMUL_OPC_F3(ext, byte) | X86EMUL_OPC_VEX_)
+# define X86EMUL_OPC_VEX_F2(ext, byte) \
+    (X86EMUL_OPC_F2(ext, byte) | X86EMUL_OPC_VEX_)
+#define X86EMUL_OPC_EVEX_            0x00002000
+# define X86EMUL_OPC_EVEX(ext, byte) \
+    (X86EMUL_OPC(ext, byte) | X86EMUL_OPC_EVEX_)
+# define X86EMUL_OPC_EVEX_66(ext, byte) \
+    (X86EMUL_OPC_66(ext, byte) | X86EMUL_OPC_EVEX_)
+# define X86EMUL_OPC_EVEX_F3(ext, byte) \
+    (X86EMUL_OPC_F3(ext, byte) | X86EMUL_OPC_EVEX_)
+# define X86EMUL_OPC_EVEX_F2(ext, byte) \
+    (X86EMUL_OPC_F2(ext, byte) | X86EMUL_OPC_EVEX_)
 
 struct x86_emulate_stub {
     union {
