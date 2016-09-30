@@ -2355,6 +2355,26 @@ static int priv_op_write_cr(unsigned int reg, unsigned long val,
     return X86EMUL_UNHANDLEABLE;
 }
 
+static int priv_op_read_dr(unsigned int reg, unsigned long *val,
+                           struct x86_emulate_ctxt *ctxt)
+{
+    unsigned long res = do_get_debugreg(reg);
+
+    if ( IS_ERR_VALUE(res) )
+        return X86EMUL_UNHANDLEABLE;
+
+    *val = res;
+
+    return X86EMUL_OKAY;
+}
+
+static int priv_op_write_dr(unsigned int reg, unsigned long val,
+                            struct x86_emulate_ctxt *ctxt)
+{
+    return do_set_debugreg(reg, val) == 0
+           ? X86EMUL_OKAY : X86EMUL_UNHANDLEABLE;
+}
+
 static inline uint64_t guest_misc_enable(uint64_t val)
 {
     val &= ~(MSR_IA32_MISC_ENABLE_PERF_AVAIL |
@@ -2773,16 +2793,14 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         break;
 
     case 0x21: /* MOV DR?,<reg> */ {
-        unsigned long res;
         opcode = insn_fetch(u8, code_base, eip, code_limit);
         if ( opcode < 0xc0 )
             goto fail;
         modrm_reg += ((opcode >> 3) & 7) + (lock << 3);
         modrm_rm  |= (opcode >> 0) & 7;
-        reg = decode_register(modrm_rm, regs, 0);
-        if ( (res = do_get_debugreg(modrm_reg)) > (unsigned long)-256 )
+        if ( priv_op_read_dr(modrm_reg, decode_register(modrm_rm, regs, 0),
+                             NULL) != X86EMUL_OKAY )
             goto fail;
-        *reg = res;
         break;
     }
 
@@ -2811,7 +2829,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         modrm_reg += ((opcode >> 3) & 7) + (lock << 3);
         modrm_rm  |= (opcode >> 0) & 7;
         reg = decode_register(modrm_rm, regs, 0);
-        if ( do_set_debugreg(modrm_reg, *reg) != 0 )
+        if ( priv_op_write_dr(modrm_reg, *reg, NULL) != X86EMUL_OKAY )
             goto fail;
         break;
 
