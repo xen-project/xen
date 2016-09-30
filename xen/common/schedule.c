@@ -947,6 +947,8 @@ long vcpu_yield(void)
     SCHED_OP(VCPU2OP(v), yield, v);
     vcpu_schedule_unlock_irq(lock, v);
 
+    SCHED_STAT_CRANK(vcpu_yield);
+
     TRACE_2D(TRC_SCHED_YIELD, current->domain->domain_id, current->vcpu_id);
     raise_softirq(SCHEDULE_SOFTIRQ);
     return 0;
