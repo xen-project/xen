@@ -2254,6 +2254,107 @@ unsigned long guest_to_host_gpr_switch(unsigned long);
 
 void (*pv_post_outb_hook)(unsigned int port, u8 value);
 
+static int priv_op_read_cr(unsigned int reg, unsigned long *val,
+                           struct x86_emulate_ctxt *ctxt)
+{
+    const struct vcpu *curr = current;
+
+    switch ( reg )
+    {
+    case 0: /* Read CR0 */
+        *val = (read_cr0() & ~X86_CR0_TS) | curr->arch.pv_vcpu.ctrlreg[0];
+        return X86EMUL_OKAY;
+
+    case 2: /* Read CR2 */
+    case 4: /* Read CR4 */
+        *val = curr->arch.pv_vcpu.ctrlreg[reg];
+        return X86EMUL_OKAY;
+
+    case 3: /* Read CR3 */
+    {
+        const struct domain *currd = curr->domain;
+        unsigned long mfn;
+
+        if ( !is_pv_32bit_domain(currd) )
+        {
+            mfn = pagetable_get_pfn(curr->arch.guest_table);
+            *val = xen_pfn_to_cr3(mfn_to_gmfn(currd, mfn));
+        }
+        else
+        {
+            l4_pgentry_t *pl4e =
+                map_domain_page(_mfn(pagetable_get_pfn(curr->arch.guest_table)));
+
+            mfn = l4e_get_pfn(*pl4e);
+            unmap_domain_page(pl4e);
+            *val = compat_pfn_to_cr3(mfn_to_gmfn(currd, mfn));
+        }
+        /* PTs should not be shared */
+        BUG_ON(page_get_owner(mfn_to_page(mfn)) == dom_cow);
+        return X86EMUL_OKAY;
+    }
+    }
+
+    return X86EMUL_UNHANDLEABLE;
+}
+
+static int priv_op_write_cr(unsigned int reg, unsigned long val,
+                            struct x86_emulate_ctxt *ctxt)
+{
+    struct vcpu *curr = current;
+
+    switch ( reg )
+    {
+    case 0: /* Write CR0 */
+        if ( (val ^ read_cr0()) & ~X86_CR0_TS )
+        {
+            gdprintk(XENLOG_WARNING,
+                    "Attempt to change unmodifiable CR0 flags\n");
+            break;
+        }
+        do_fpu_taskswitch(!!(val & X86_CR0_TS));
+        return X86EMUL_OKAY;
+
+    case 2: /* Write CR2 */
+        curr->arch.pv_vcpu.ctrlreg[2] = val;
+        arch_set_cr2(curr, val);
+        return X86EMUL_OKAY;
+
+    case 3: /* Write CR3 */
+    {
+        struct domain *currd = curr->domain;
+        unsigned long gfn;
+        struct page_info *page;
+        int rc;
+
+        gfn = !is_pv_32bit_domain(currd)
+              ? xen_cr3_to_pfn(val) : compat_cr3_to_pfn(val);
+        page = get_page_from_gfn(currd, gfn, NULL, P2M_ALLOC);
+        if ( !page )
+            break;
+        rc = new_guest_cr3(page_to_mfn(page));
+        put_page(page);
+
+        switch ( rc )
+        {
+        case 0:
+            return X86EMUL_OKAY;
+        case -ERESTART: /* retry after preemption */
+            return X86EMUL_RETRY;
+        }
+        break;
+    }
+
+    case 4: /* Write CR4 */
+        curr->arch.pv_vcpu.ctrlreg[4] = pv_guest_cr4_fixup(curr, val);
+        write_cr4(pv_guest_cr4_to_real_cr4(curr));
+        ctxt_switch_levelling(curr);
+        return X86EMUL_OKAY;
+    }
+
+    return X86EMUL_UNHANDLEABLE;
+}
+
 static inline uint64_t guest_misc_enable(uint64_t val)
 {
     val &= ~(MSR_IA32_MISC_ENABLE_PERF_AVAIL |
@@ -2666,48 +2767,9 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             goto fail;
         modrm_reg += ((opcode >> 3) & 7) + (lock << 3);
         modrm_rm  |= (opcode >> 0) & 7;
-        reg = decode_register(modrm_rm, regs, 0);
-        switch ( modrm_reg )
-        {
-        case 0: /* Read CR0 */
-            *reg = (read_cr0() & ~X86_CR0_TS) |
-                v->arch.pv_vcpu.ctrlreg[0];
-            break;
-
-        case 2: /* Read CR2 */
-            *reg = v->arch.pv_vcpu.ctrlreg[2];
-            break;
-            
-        case 3: /* Read CR3 */
-        {
-            unsigned long mfn;
-            
-            if ( !is_pv_32bit_domain(currd) )
-            {
-                mfn = pagetable_get_pfn(v->arch.guest_table);
-                *reg = xen_pfn_to_cr3(mfn_to_gmfn(currd, mfn));
-            }
-            else
-            {
-                l4_pgentry_t *pl4e =
-                    map_domain_page(_mfn(pagetable_get_pfn(v->arch.guest_table)));
-
-                mfn = l4e_get_pfn(*pl4e);
-                unmap_domain_page(pl4e);
-                *reg = compat_pfn_to_cr3(mfn_to_gmfn(currd, mfn));
-            }
-            /* PTs should not be shared */
-            BUG_ON(page_get_owner(mfn_to_page(mfn)) == dom_cow);
-        }
-        break;
-
-        case 4: /* Read CR4 */
-            *reg = v->arch.pv_vcpu.ctrlreg[4];
-            break;
-
-        default:
+        if ( priv_op_read_cr(modrm_reg, decode_register(modrm_rm, regs, 0),
+                             NULL) != X86EMUL_OKAY )
             goto fail;
-        }
         break;
 
     case 0x21: /* MOV DR?,<reg> */ {
@@ -2731,56 +2793,12 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         modrm_reg += ((opcode >> 3) & 7) + (lock << 3);
         modrm_rm  |= (opcode >> 0) & 7;
         reg = decode_register(modrm_rm, regs, 0);
-        switch ( modrm_reg )
+        switch ( priv_op_write_cr(modrm_reg, *reg, NULL) )
         {
-        case 0: /* Write CR0 */
-            if ( (*reg ^ read_cr0()) & ~X86_CR0_TS )
-            {
-                gdprintk(XENLOG_WARNING,
-                        "Attempt to change unmodifiable CR0 flags.\n");
-                goto fail;
-            }
-            (void)do_fpu_taskswitch(!!(*reg & X86_CR0_TS));
+        case X86EMUL_OKAY:
             break;
-
-        case 2: /* Write CR2 */
-            v->arch.pv_vcpu.ctrlreg[2] = *reg;
-            arch_set_cr2(v, *reg);
-            break;
-
-        case 3: {/* Write CR3 */
-            unsigned long gfn;
-            struct page_info *page;
-
-            gfn = !is_pv_32bit_domain(currd)
-                ? xen_cr3_to_pfn(*reg) : compat_cr3_to_pfn(*reg);
-            page = get_page_from_gfn(currd, gfn, NULL, P2M_ALLOC);
-            if ( page )
-            {
-                rc = new_guest_cr3(page_to_mfn(page));
-                put_page(page);
-            }
-            else
-                rc = -EINVAL;
-
-            switch ( rc )
-            {
-            case 0:
-                break;
-            case -ERESTART: /* retry after preemption */
-                goto skip;
-            default:      /* not okay */
-                goto fail;
-            }
-            break;
-        }
-
-        case 4: /* Write CR4 */
-            v->arch.pv_vcpu.ctrlreg[4] = pv_guest_cr4_fixup(v, *reg);
-            write_cr4(pv_guest_cr4_to_real_cr4(v));
-            ctxt_switch_levelling(v);
-            break;
-
+        case X86EMUL_RETRY: /* retry after preemption */
+            goto skip;
         default:
             goto fail;
         }
