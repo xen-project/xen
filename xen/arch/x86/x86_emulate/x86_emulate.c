@@ -1166,6 +1166,8 @@ static bool_t vcpu_has(
 #define vcpu_has_clflush() vcpu_has(       1, EDX, 19, ctxt, ops)
 #define vcpu_has_lzcnt() vcpu_has(0x80000001, ECX,  5, ctxt, ops)
 #define vcpu_has_bmi1()  vcpu_has(0x00000007, EBX,  3, ctxt, ops)
+#define vcpu_has_hle()   vcpu_has(0x00000007, EBX,  4, ctxt, ops)
+#define vcpu_has_rtm()   vcpu_has(0x00000007, EBX, 11, ctxt, ops)
 
 #define vcpu_must_have(leaf, reg, bit) \
     generate_exception_if(!vcpu_has(leaf, reg, bit, ctxt, ops), EXC_UD, -1)
@@ -2846,7 +2848,22 @@ x86_emulate(
         lock_prefix = 1;
         break;
 
-    case 0xc6 ... 0xc7: /* mov (sole member of Grp11) */
+    case 0xc6: /* Grp11: mov / xabort */
+    case 0xc7: /* Grp11: mov / xbegin */
+        if ( modrm == 0xf8 && vcpu_has_rtm() )
+        {
+            /*
+             * xbegin unconditionally aborts, xabort is unconditionally
+             * a nop.
+             */
+            if ( b & 1 )
+            {
+                jmp_rel((int32_t)src.val);
+                _regs.eax = 0;
+            }
+            dst.type = OP_NONE;
+            break;
+        }
         generate_exception_if((modrm_reg & 7) != 0, EXC_UD, -1);
     case 0x88 ... 0x8b: /* mov */
     case 0xa0 ... 0xa1: /* mov mem.offs,{%al,%ax,%eax,%rax} */
@@ -4223,6 +4240,20 @@ x86_emulate(
             fail_if(!ops->vmfunc);
             if ( (rc = ops->vmfunc(ctxt) != X86EMUL_OKAY) )
                 goto done;
+            goto no_writeback;
+
+        case 0xd5: /* xend */
+            generate_exception_if(vex.pfx, EXC_UD, -1);
+            generate_exception_if(!vcpu_has_rtm(), EXC_UD, -1);
+            generate_exception_if(vcpu_has_rtm(), EXC_GP, 0);
+            break;
+
+        case 0xd6: /* xtest */
+            generate_exception_if(vex.pfx, EXC_UD, -1);
+            generate_exception_if(!vcpu_has_rtm() && !vcpu_has_hle(),
+                                  EXC_UD, -1);
+            /* Neither HLE nor RTM can be active when we get here. */
+            _regs.eflags |= EFLG_ZF;
             goto no_writeback;
 
         case 0xdf: /* invlpga */
