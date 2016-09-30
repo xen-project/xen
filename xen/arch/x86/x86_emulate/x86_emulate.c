@@ -2265,6 +2265,7 @@ x86_emulate(
     struct x86_emulate_state state;
     int rc;
     uint8_t b, d;
+    bool tf = ctxt->regs->eflags & EFLG_TF;
     struct operand src = { .reg = REG_POISON };
     struct operand dst = { .reg = REG_POISON };
     enum x86_swint_type swint_type;
@@ -5176,11 +5177,6 @@ x86_emulate(
     }
 
  no_writeback:
-    /* Inject #DB if single-step tracing was enabled at instruction start. */
-    if ( (ctxt->regs->eflags & EFLG_TF) && (rc == X86EMUL_OKAY) &&
-         (ops->inject_hw_exception != NULL) )
-        rc = ops->inject_hw_exception(EXC_DB, -1, ctxt) ? : X86EMUL_EXCEPTION;
-
     /* Commit shadow register state. */
     _regs.eflags &= ~EFLG_RF;
 
@@ -5189,6 +5185,10 @@ x86_emulate(
         _regs.eip = (uint32_t)_regs.eip;
 
     *ctxt->regs = _regs;
+
+    /* Inject #DB if single-step tracing was enabled at instruction start. */
+    if ( tf && (rc == X86EMUL_OKAY) && ops->inject_hw_exception )
+        rc = ops->inject_hw_exception(EXC_DB, -1, ctxt) ? : X86EMUL_EXCEPTION;
 
  done:
     _put_fpu();
