@@ -3845,18 +3845,19 @@ x86_emulate(
             emulate_1op("neg", dst, _regs.eflags);
             break;
         case 4: /* mul */
+            dst.reg = (unsigned long *)&_regs.eax;
             _regs.eflags &= ~(EFLG_OF|EFLG_CF);
             switch ( dst.bytes )
             {
             case 1:
-                dst.val = (uint8_t)dst.val;
+                dst.val = (uint8_t)_regs.eax;
                 dst.val *= src.val;
                 if ( (uint8_t)dst.val != (uint16_t)dst.val )
                     _regs.eflags |= EFLG_OF|EFLG_CF;
                 dst.bytes = 2;
                 break;
             case 2:
-                dst.val = (uint16_t)dst.val;
+                dst.val = (uint16_t)_regs.eax;
                 dst.val *= src.val;
                 if ( (uint16_t)dst.val != (uint32_t)dst.val )
                     _regs.eflags |= EFLG_OF|EFLG_CF;
@@ -3864,7 +3865,7 @@ x86_emulate(
                 break;
 #ifdef __x86_64__
             case 4:
-                dst.val = (uint32_t)dst.val;
+                dst.val = _regs._eax;
                 dst.val *= src.val;
                 if ( (uint32_t)dst.val != dst.val )
                     _regs.eflags |= EFLG_OF|EFLG_CF;
@@ -3873,7 +3874,7 @@ x86_emulate(
 #endif
             default:
                 u[0] = src.val;
-                u[1] = dst.val;
+                u[1] = _regs.eax;
                 if ( mul_dbl(u) )
                     _regs.eflags |= EFLG_OF|EFLG_CF;
                 _regs.edx = u[1];
@@ -3882,12 +3883,13 @@ x86_emulate(
             }
             break;
         case 5: /* imul */
+            dst.reg = (unsigned long *)&_regs.eax;
         imul:
             _regs.eflags &= ~(EFLG_OF|EFLG_CF);
             switch ( dst.bytes )
             {
             case 1:
-                dst.val = (int8_t)src.val * (int8_t)dst.val;
+                dst.val = (int8_t)src.val * (int8_t)_regs.eax;
                 if ( (int8_t)dst.val != (int16_t)dst.val )
                     _regs.eflags |= EFLG_OF|EFLG_CF;
                 ASSERT(b > 0x6b);
@@ -3895,7 +3897,7 @@ x86_emulate(
                 break;
             case 2:
                 dst.val = ((uint32_t)(int16_t)src.val *
-                           (uint32_t)(int16_t)dst.val);
+                           (uint32_t)(int16_t)_regs.eax);
                 if ( (int16_t)dst.val != (int32_t)dst.val )
                     _regs.eflags |= EFLG_OF|EFLG_CF;
                 if ( b > 0x6b )
@@ -3904,7 +3906,7 @@ x86_emulate(
 #ifdef __x86_64__
             case 4:
                 dst.val = ((uint64_t)(int32_t)src.val *
-                           (uint64_t)(int32_t)dst.val);
+                           (uint64_t)(int32_t)_regs.eax);
                 if ( (int32_t)dst.val != dst.val )
                     _regs.eflags |= EFLG_OF|EFLG_CF;
                 if ( b > 0x6b )
@@ -3913,7 +3915,7 @@ x86_emulate(
 #endif
             default:
                 u[0] = src.val;
-                u[1] = dst.val;
+                u[1] = _regs.eax;
                 if ( imul_dbl(u) )
                     _regs.eflags |= EFLG_OF|EFLG_CF;
                 if ( b > 0x6b )
@@ -3923,6 +3925,7 @@ x86_emulate(
             }
             break;
         case 6: /* div */
+            dst.reg = (unsigned long *)&_regs.eax;
             switch ( src.bytes )
             {
             case 1:
@@ -3968,6 +3971,7 @@ x86_emulate(
             }
             break;
         case 7: /* idiv */
+            dst.reg = (unsigned long *)&_regs.eax;
             switch ( src.bytes )
             {
             case 1:
