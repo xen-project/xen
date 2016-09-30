@@ -5260,65 +5260,69 @@ int libxl_sched_credit_params_get(libxl_ctx *ctx, uint32_t poolid,
                                   libxl_sched_credit_params *scinfo)
 {
     struct xen_sysctl_credit_schedule sparam;
-    int rc;
+    int r, rc;
     GC_INIT(ctx);
 
-    rc = xc_sched_credit_params_get(ctx->xch, poolid, &sparam);
-    if (rc != 0) {
-        LOGE(ERROR, "getting sched credit param");
-        GC_FREE;
-        return ERROR_FAIL;
+    r = xc_sched_credit_params_get(ctx->xch, poolid, &sparam);
+    if (r < 0) {
+        LOGE(ERROR, "getting Credit scheduler parameters");
+        rc = ERROR_FAIL;
+        goto out;
     }
 
     scinfo->tslice_ms = sparam.tslice_ms;
     scinfo->ratelimit_us = sparam.ratelimit_us;
 
+    rc = 0;
+ out:
     GC_FREE;
-    return 0;
+    return rc;
 }
 
 int libxl_sched_credit_params_set(libxl_ctx *ctx, uint32_t poolid,
                                   libxl_sched_credit_params *scinfo)
 {
     struct xen_sysctl_credit_schedule sparam;
-    int rc=0;
+    int r, rc;
     GC_INIT(ctx);
 
     if (scinfo->tslice_ms <  XEN_SYSCTL_CSCHED_TSLICE_MIN
         || scinfo->tslice_ms > XEN_SYSCTL_CSCHED_TSLICE_MAX) {
         LOG(ERROR, "Time slice out of range, valid range is from %d to %d",
             XEN_SYSCTL_CSCHED_TSLICE_MIN, XEN_SYSCTL_CSCHED_TSLICE_MAX);
-        GC_FREE;
-        return ERROR_INVAL;
+        rc = ERROR_INVAL;
+        goto out;
     }
     if (scinfo->ratelimit_us <  XEN_SYSCTL_SCHED_RATELIMIT_MIN
         || scinfo->ratelimit_us > XEN_SYSCTL_SCHED_RATELIMIT_MAX) {
         LOG(ERROR, "Ratelimit out of range, valid range is from %d to %d",
             XEN_SYSCTL_SCHED_RATELIMIT_MIN, XEN_SYSCTL_SCHED_RATELIMIT_MAX);
-        GC_FREE;
-        return ERROR_INVAL;
+        rc = ERROR_INVAL;
+        goto out;
     }
     if (scinfo->ratelimit_us > scinfo->tslice_ms*1000) {
         LOG(ERROR, "Ratelimit cannot be greater than timeslice");
-        GC_FREE;
-        return ERROR_INVAL;
+        rc = ERROR_INVAL;
+        goto out;
     }
 
     sparam.tslice_ms = scinfo->tslice_ms;
     sparam.ratelimit_us = scinfo->ratelimit_us;
 
-    rc = xc_sched_credit_params_set(ctx->xch, poolid, &sparam);
-    if ( rc < 0 ) {
-        LOGE(ERROR, "setting sched credit param");
-        GC_FREE;
-        return ERROR_FAIL;
+    r = xc_sched_credit_params_set(ctx->xch, poolid, &sparam);
+    if ( r < 0 ) {
+        LOGE(ERROR, "Setting Credit scheduler parameters");
+        rc = ERROR_FAIL;
+        goto out;
     }
 
     scinfo->tslice_ms = sparam.tslice_ms;
     scinfo->ratelimit_us = sparam.ratelimit_us;
 
+    rc = 0;
+ out:
     GC_FREE;
-    return 0;
+    return rc;
 }
 
 static int sched_credit2_domain_get(libxl__gc *gc, uint32_t domid,
