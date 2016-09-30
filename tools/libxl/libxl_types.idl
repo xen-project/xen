@@ -838,6 +838,10 @@ libxl_sched_credit_params = Struct("sched_credit_params", [
     ("ratelimit_us", integer),
     ], dispose_fn=None)
 
+libxl_sched_credit2_params = Struct("sched_credit2_params", [
+    ("ratelimit_us", integer),
+    ], dispose_fn=None)
+
 libxl_domain_remus_info = Struct("domain_remus_info",[
     ("interval",     integer),
     ("allow_unsafe", libxl_defbool),

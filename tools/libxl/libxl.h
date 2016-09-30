@@ -281,6 +281,13 @@
 #define LIBXL_HAVE_QEMU_MONITOR_COMMAND 1
 
 /*
+ * LIBXL_HAVE_SCHED_CREDIT2_PARAMS indicates the existance of a
+ * libxl_sched_credit2_params structure, containing Credit2 scheduler
+ * wide parameters (i.e., the ratelimiting value).
+ */
+#define LIBXL_HAVE_SCHED_CREDIT2_PARAMS 1
+
+/*
  * libxl ABI compatibility
  *
  * The only guarantee which libxl makes regarding ABI compatibility
@@ -1992,6 +1999,10 @@ int libxl_sched_credit_params_get(libxl_ctx *ctx, uint32_t poolid,
                                   libxl_sched_credit_params *scinfo);
 int libxl_sched_credit_params_set(libxl_ctx *ctx, uint32_t poolid,
                                   libxl_sched_credit_params *scinfo);
+int libxl_sched_credit2_params_get(libxl_ctx *ctx, uint32_t poolid,
+                                   libxl_sched_credit2_params *scinfo);
+int libxl_sched_credit2_params_set(libxl_ctx *ctx, uint32_t poolid,
+                                   libxl_sched_credit2_params *scinfo);
 
 /* Scheduler Per-domain parameters */
 

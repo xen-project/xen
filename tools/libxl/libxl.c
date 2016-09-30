@@ -5256,6 +5256,19 @@ static int sched_credit_domain_set(libxl__gc *gc, uint32_t domid,
     return 0;
 }
 
+static int sched_ratelimit_check(libxl__gc *gc, int ratelimit)
+{
+    if (ratelimit != 0 &&
+        (ratelimit <  XEN_SYSCTL_SCHED_RATELIMIT_MIN ||
+         ratelimit > XEN_SYSCTL_SCHED_RATELIMIT_MAX)) {
+        LOG(ERROR, "Ratelimit out of range, valid range is from %d to %d",
+            XEN_SYSCTL_SCHED_RATELIMIT_MIN, XEN_SYSCTL_SCHED_RATELIMIT_MAX);
+        return ERROR_INVAL;
+    }
+
+    return 0;
+}
+
 int libxl_sched_credit_params_get(libxl_ctx *ctx, uint32_t poolid,
                                   libxl_sched_credit_params *scinfo)
 {
@@ -5293,11 +5306,8 @@ int libxl_sched_credit_params_set(libxl_ctx *ctx, uint32_t poolid,
         rc = ERROR_INVAL;
         goto out;
     }
-    if (scinfo->ratelimit_us <  XEN_SYSCTL_SCHED_RATELIMIT_MIN
-        || scinfo->ratelimit_us > XEN_SYSCTL_SCHED_RATELIMIT_MAX) {
-        LOG(ERROR, "Ratelimit out of range, valid range is from %d to %d",
-            XEN_SYSCTL_SCHED_RATELIMIT_MIN, XEN_SYSCTL_SCHED_RATELIMIT_MAX);
-        rc = ERROR_INVAL;
+    rc = sched_ratelimit_check(gc, scinfo->ratelimit_us);
+    if (rc) {
         goto out;
     }
     if (scinfo->ratelimit_us > scinfo->tslice_ms*1000) {
@@ -5317,6 +5327,56 @@ int libxl_sched_credit_params_set(libxl_ctx *ctx, uint32_t poolid,
     }
 
     scinfo->tslice_ms = sparam.tslice_ms;
+    scinfo->ratelimit_us = sparam.ratelimit_us;
+
+    rc = 0;
+ out:
+    GC_FREE;
+    return rc;
+}
+
+int libxl_sched_credit2_params_get(libxl_ctx *ctx, uint32_t poolid,
+                                   libxl_sched_credit2_params *scinfo)
+{
+    struct xen_sysctl_credit2_schedule sparam;
+    int r, rc;
+    GC_INIT(ctx);
+
+    r = xc_sched_credit2_params_get(ctx->xch, poolid, &sparam);
+    if (r < 0) {
+        LOGE(ERROR, "getting Credit2 scheduler parameters");
+        rc = ERROR_FAIL;
+        goto out;
+    }
+
+    scinfo->ratelimit_us = sparam.ratelimit_us;
+
+    rc = 0;
+ out:
+    GC_FREE;
+    return rc;
+}
+
+
+int libxl_sched_credit2_params_set(libxl_ctx *ctx, uint32_t poolid,
+                                   libxl_sched_credit2_params *scinfo)
+{
+    struct xen_sysctl_credit2_schedule sparam;
+    int r, rc;
+    GC_INIT(ctx);
+
+    rc = sched_ratelimit_check(gc, scinfo->ratelimit_us);
+    if (rc) goto out;
+
+    sparam.ratelimit_us = scinfo->ratelimit_us;
+
+    r = xc_sched_credit2_params_set(ctx->xch, poolid, &sparam);
+    if (r < 0) {
+        LOGE(ERROR, "Setting Credit2 scheduler parameters");
+        rc = ERROR_FAIL;
+        goto out;
+    }
+
     scinfo->ratelimit_us = sparam.ratelimit_us;
 
     rc = 0;
