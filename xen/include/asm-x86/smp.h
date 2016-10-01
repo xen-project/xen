@@ -23,8 +23,6 @@
 /*
  * Private routines/data
  */
- 
-extern void smp_alloc_memory(void);
 DECLARE_PER_CPU(cpumask_var_t, cpu_sibling_mask);
 DECLARE_PER_CPU(cpumask_var_t, cpu_core_mask);
 

@@ -1541,11 +1541,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
     if ( opt_dom0pvh )
         domcr_flags |= DOMCRF_pvh | DOMCRF_hap;
 
-    /*
-     * Create initial domain 0.
-     * x86 doesn't support arch-configuration. So it's fine to pass
-     * NULL.
-     */
+    /* Create initial domain 0. */
     dom0 = domain_create(0, domcr_flags, 0, &config);
     if ( IS_ERR(dom0) || (alloc_dom0_vcpu0(dom0) == NULL) )
         panic("Error creating domain 0");
