@@ -1565,41 +1565,6 @@ static void svm_fpu_dirty_intercept(void)
         vmcb_set_cr0(vmcb, vmcb_get_cr0(vmcb) & ~X86_CR0_TS);
 }
 
-static void svm_cpuid_intercept(
-    unsigned int *eax, unsigned int *ebx,
-    unsigned int *ecx, unsigned int *edx)
-{
-    unsigned int input = *eax;
-    struct vcpu *v = current;
-
-    hvm_cpuid(input, eax, ebx, ecx, edx);
-
-    switch (input) {
-    case 0x8000001c: 
-    {
-        /* LWP capability CPUID */
-        uint64_t lwp_cfg = v->arch.hvm_svm.guest_lwp_cfg;
-
-        if ( cpu_has_lwp )
-        {
-            if ( !(v->arch.xcr0 & XSTATE_LWP) )
-           {
-                *eax = 0x0;
-                break;
-            }
-
-            /* turn on available bit and other features specified in lwp_cfg */
-            *eax = (*edx & lwp_cfg) | 0x00000001;
-        }
-        break;
-    }
-    default:
-        break;
-    }
-
-    HVMTRACE_5D (CPUID, input, *eax, *ebx, *ecx, *edx);
-}
-
 static void svm_vmexit_do_cpuid(struct cpu_user_regs *regs)
 {
     unsigned int eax, ebx, ecx, edx, inst_len;
@@ -1612,7 +1577,8 @@ static void svm_vmexit_do_cpuid(struct cpu_user_regs *regs)
     ecx = regs->ecx;
     edx = regs->edx;
 
-    svm_cpuid_intercept(&eax, &ebx, &ecx, &edx);
+    hvm_cpuid(regs->_eax, &eax, &ebx, &ecx, &edx);
+    HVMTRACE_5D(CPUID, regs->_eax, eax, ebx, ecx, edx);
 
     regs->eax = eax;
     regs->ebx = ebx;
@@ -2244,7 +2210,6 @@ static struct hvm_function_table __initdata svm_function_table = {
     .init_hypercall_page  = svm_init_hypercall_page,
     .event_pending        = svm_event_pending,
     .invlpg               = svm_invlpg,
-    .cpuid_intercept      = svm_cpuid_intercept,
     .wbinvd_intercept     = svm_wbinvd_intercept,
     .fpu_dirty_intercept  = svm_fpu_dirty_intercept,
     .msr_read_intercept   = svm_msr_read_intercept,

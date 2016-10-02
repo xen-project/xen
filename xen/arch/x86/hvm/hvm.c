@@ -906,12 +906,7 @@ const char *hvm_efer_valid(const struct vcpu *v, uint64_t value,
         ASSERT(v->domain == current->domain);
         hvm_cpuid(0x80000000, &level, NULL, NULL, NULL);
         if ( (level >> 16) == 0x8000 && level > 0x80000000 )
-        {
-            unsigned int dummy;
-
-            level = 0x80000001;
-            hvm_funcs.cpuid_intercept(&level, &dummy, &ext1_ecx, &ext1_edx);
-        }
+            hvm_cpuid(0x80000001, NULL, NULL, &ext1_ecx, &ext1_edx);
     }
     else
     {
@@ -3618,6 +3613,12 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
             if ( !(hvm_pae_enabled(v) || hvm_long_mode_enabled(v)) )
                 *edx &= ~cpufeat_mask(X86_FEATURE_PSE36);
         }
+
+        /* SYSCALL is hidden outside of long mode on Intel. */
+        if ( d->arch.x86_vendor == X86_VENDOR_INTEL &&
+             !hvm_long_mode_enabled(v))
+            *edx &= ~cpufeat_mask(X86_FEATURE_SYSCALL);
+
         break;
 
     case 0x80000007:
@@ -3641,6 +3642,20 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
         *eax |= (_edx & cpufeat_mask(X86_FEATURE_LM) ? vaddr_bits : 32) << 8;
 
         *ebx &= hvm_featureset[FEATURESET_e8b];
+        break;
+
+    case 0x8000001c:
+        if ( !cpu_has_svm )
+        {
+            *eax = *ebx = *ecx = *edx = 0;
+            break;
+        }
+
+        if ( cpu_has_lwp && (v->arch.xcr0 & XSTATE_LWP) )
+            /* Turn on available bit and other features specified in lwp_cfg. */
+            *eax = (*edx & v->arch.hvm_svm.guest_lwp_cfg) | 1;
+        else
+            *eax = 0;
         break;
     }
 }

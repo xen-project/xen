@@ -1566,7 +1566,7 @@ int hvmemul_cpuid(
          hvm_check_cpuid_faulting(current) )
         return X86EMUL_EXCEPTION;
 
-    hvm_funcs.cpuid_intercept(eax, ebx, ecx, edx);
+    hvm_cpuid(*eax, eax, ebx, ecx, edx);
     return X86EMUL_OKAY;
 }
 

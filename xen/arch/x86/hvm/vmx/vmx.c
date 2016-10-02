@@ -73,9 +73,6 @@ static void vmx_install_vlapic_mapping(struct vcpu *v);
 static void vmx_update_guest_cr(struct vcpu *v, unsigned int cr);
 static void vmx_update_guest_efer(struct vcpu *v);
 static void vmx_update_guest_vendor(struct vcpu *v);
-static void vmx_cpuid_intercept(
-    unsigned int *eax, unsigned int *ebx,
-    unsigned int *ecx, unsigned int *edx);
 static void vmx_wbinvd_intercept(void);
 static void vmx_fpu_dirty_intercept(void);
 static int vmx_msr_read_intercept(unsigned int msr, uint64_t *msr_content);
@@ -2105,7 +2102,6 @@ static struct hvm_function_table __initdata vmx_function_table = {
     .invlpg               = vmx_invlpg,
     .cpu_up               = vmx_cpu_up,
     .cpu_down             = vmx_cpu_down,
-    .cpuid_intercept      = vmx_cpuid_intercept,
     .wbinvd_intercept     = vmx_wbinvd_intercept,
     .fpu_dirty_intercept  = vmx_fpu_dirty_intercept,
     .msr_read_intercept   = vmx_msr_read_intercept,
@@ -2341,30 +2337,6 @@ static void vmx_fpu_dirty_intercept(void)
     }
 }
 
-static void vmx_cpuid_intercept(
-    unsigned int *eax, unsigned int *ebx,
-    unsigned int *ecx, unsigned int *edx)
-{
-    unsigned int input = *eax;
-    struct vcpu *v = current;
-
-    hvm_cpuid(input, eax, ebx, ecx, edx);
-
-    switch ( input )
-    {
-        case 0x80000001:
-            /* SYSCALL is visible iff running in long mode. */
-            if ( hvm_long_mode_enabled(v) )
-                *edx |= cpufeat_mask(X86_FEATURE_SYSCALL);
-            else
-                *edx &= ~(cpufeat_mask(X86_FEATURE_SYSCALL));
-
-            break;
-    }
-
-    HVMTRACE_5D (CPUID, input, *eax, *ebx, *ecx, *edx);
-}
-
 static int vmx_do_cpuid(struct cpu_user_regs *regs)
 {
     unsigned int eax, ebx, ecx, edx;
@@ -2384,7 +2356,8 @@ static int vmx_do_cpuid(struct cpu_user_regs *regs)
     leaf = regs->eax;
     subleaf = regs->ecx;
 
-    vmx_cpuid_intercept(&eax, &ebx, &ecx, &edx);
+    hvm_cpuid(leaf, &eax, &ebx, &ecx, &edx);
+    HVMTRACE_5D(CPUID, leaf, eax, ebx, ecx, edx);
 
     regs->eax = eax;
     regs->ebx = ebx;
