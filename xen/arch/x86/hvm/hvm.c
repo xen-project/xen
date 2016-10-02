@@ -3317,28 +3317,6 @@ unsigned long copy_from_user_hvm(void *to, const void *from, unsigned len)
     return rc ? len : 0; /* fake a copy_from_user() return code */
 }
 
-void hvm_hypervisor_cpuid_leaf(uint32_t sub_idx,
-                               uint32_t *eax, uint32_t *ebx,
-                               uint32_t *ecx, uint32_t *edx)
-{
-    *eax = *ebx = *ecx = *edx = 0;
-    if ( hvm_funcs.hypervisor_cpuid_leaf )
-        hvm_funcs.hypervisor_cpuid_leaf(sub_idx, eax, ebx, ecx, edx);
-
-    if ( sub_idx == 0 )
-    {
-        /*
-         * Indicate that memory mapped from other domains (either grants or
-         * foreign pages) has valid IOMMU entries.
-         */
-        *eax |= XEN_HVM_CPUID_IOMMU_MAPPINGS;
-
-        /* Indicate presence of vcpu id and set it in ebx */
-        *eax |= XEN_HVM_CPUID_VCPU_ID_PRESENT;
-        *ebx = current->vcpu_id;
-    }
-}
-
 void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
                                    unsigned int *ecx, unsigned int *edx)
 {

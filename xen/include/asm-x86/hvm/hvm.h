@@ -198,10 +198,6 @@ struct hvm_function_table {
                                 uint8_t *p2m_acc, bool_t access_r,
                                 bool_t access_w, bool_t access_x);
 
-    void (*hypervisor_cpuid_leaf)(uint32_t sub_idx,
-                                  uint32_t *eax, uint32_t *ebx,
-                                  uint32_t *ecx, uint32_t *edx);
-
     void (*enable_msr_interception)(struct domain *d, uint32_t msr);
     bool_t (*is_singlestep_supported)(void);
     int (*set_mode)(struct vcpu *v, int mode);
@@ -388,9 +384,6 @@ bool hvm_set_guest_bndcfgs(struct vcpu *v, u64 val);
 #define has_viridian_apic_assist(d) \
     (is_viridian_domain(d) && (viridian_feature_mask(d) & HVMPV_apic_assist))
 
-void hvm_hypervisor_cpuid_leaf(uint32_t sub_idx,
-                               uint32_t *eax, uint32_t *ebx,
-                               uint32_t *ecx, uint32_t *edx);
 void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
                                    unsigned int *ecx, unsigned int *edx);
 bool hvm_check_cpuid_faulting(struct vcpu *v);

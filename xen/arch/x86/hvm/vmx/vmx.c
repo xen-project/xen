@@ -1908,24 +1908,6 @@ static void vmx_handle_eoi(u8 vector)
     __vmwrite(GUEST_INTR_STATUS, status);
 }
 
-void vmx_hypervisor_cpuid_leaf(uint32_t sub_idx,
-                               uint32_t *eax, uint32_t *ebx,
-                               uint32_t *ecx, uint32_t *edx)
-{
-    if ( sub_idx != 0 )
-        return;
-    if ( cpu_has_vmx_apic_reg_virt )
-        *eax |= XEN_HVM_CPUID_APIC_ACCESS_VIRT;
-    /*
-     * We want to claim that x2APIC is virtualized if APIC MSR accesses are
-     * not intercepted. When all three of these are true both rdmsr and wrmsr
-     * in the guest will run without VMEXITs (see vmx_vlapic_msr_changed()).
-     */
-    if ( cpu_has_vmx_virtualize_x2apic_mode && cpu_has_vmx_apic_reg_virt &&
-         cpu_has_vmx_virtual_intr_delivery )
-        *eax |= XEN_HVM_CPUID_X2APIC_VIRT;
-}
-
 static void vmx_enable_msr_interception(struct domain *d, uint32_t msr)
 {
     struct vcpu *v;
@@ -2126,7 +2108,6 @@ static struct hvm_function_table __initdata vmx_function_table = {
     .sync_pir_to_irr      = vmx_sync_pir_to_irr,
     .handle_eoi           = vmx_handle_eoi,
     .nhvm_hap_walk_L1_p2m = nvmx_hap_walk_L1_p2m,
-    .hypervisor_cpuid_leaf = vmx_hypervisor_cpuid_leaf,
     .enable_msr_interception = vmx_enable_msr_interception,
     .is_singlestep_supported = vmx_is_singlestep_supported,
     .set_mode = vmx_set_mode,

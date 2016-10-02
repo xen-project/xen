@@ -907,7 +907,8 @@ int wrmsr_hypervisor_regs(uint32_t idx, uint64_t val)
 int cpuid_hypervisor_leaves( uint32_t idx, uint32_t sub_idx,
                uint32_t *eax, uint32_t *ebx, uint32_t *ecx, uint32_t *edx)
 {
-    struct domain *currd = current->domain;
+    struct vcpu *curr = current;
+    struct domain *currd = curr->domain;
     /* Optionally shift out of the way of Viridian architectural leaves. */
     uint32_t base = is_viridian_domain(currd) ? 0x40000100 : 0x40000000;
     uint32_t limit, dummy;
@@ -999,13 +1000,35 @@ int cpuid_hypervisor_leaves( uint32_t idx, uint32_t sub_idx,
         }
         break;
 
-    case 4:
-        if ( !has_hvm_container_domain(currd) )
-        {
-            *eax = *ebx = *ecx = *edx = 0;
+    case 4: /* HVM hypervisor leaf. */
+        *eax = *ebx = *ecx = *edx = 0;
+
+        if ( !has_hvm_container_domain(currd) || sub_idx != 0 )
             break;
-        }
-        hvm_hypervisor_cpuid_leaf(sub_idx, eax, ebx, ecx, edx);
+
+        if ( cpu_has_vmx_apic_reg_virt )
+            *eax |= XEN_HVM_CPUID_APIC_ACCESS_VIRT;
+
+        /*
+         * We want to claim that x2APIC is virtualized if APIC MSR accesses
+         * are not intercepted. When all three of these are true both rdmsr
+         * and wrmsr in the guest will run without VMEXITs (see
+         * vmx_vlapic_msr_changed()).
+         */
+        if ( cpu_has_vmx_virtualize_x2apic_mode &&
+             cpu_has_vmx_apic_reg_virt &&
+             cpu_has_vmx_virtual_intr_delivery )
+            *eax |= XEN_HVM_CPUID_X2APIC_VIRT;
+
+        /*
+         * Indicate that memory mapped from other domains (either grants or
+         * foreign pages) has valid IOMMU entries.
+         */
+        *eax |= XEN_HVM_CPUID_IOMMU_MAPPINGS;
+
+        /* Indicate presence of vcpu id and set it in ebx */
+        *eax |= XEN_HVM_CPUID_VCPU_ID_PRESENT;
+        *ebx = curr->vcpu_id;
         break;
 
     default:
