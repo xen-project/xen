@@ -960,9 +960,43 @@ int cpuid_hypervisor_leaves( uint32_t idx, uint32_t sub_idx,
             *ecx |= XEN_CPUID_FEAT1_MMU_PT_UPDATE_PRESERVE_AD;
         break;
 
-    case 3:
-        *eax = *ebx = *ecx = *edx = 0;
-        cpuid_time_leaf( sub_idx, eax, ebx, ecx, edx );
+    case 3: /* Time leaf. */
+        switch ( sub_idx )
+        {
+        case 0: /* features */
+            *eax = ((!!currd->arch.vtsc << 0) |
+                    (!!host_tsc_is_safe() << 1) |
+                    (!!boot_cpu_has(X86_FEATURE_RDTSCP) << 2));
+            *ebx = currd->arch.tsc_mode;
+            *ecx = currd->arch.tsc_khz;
+            *edx = currd->arch.incarnation;
+            break;
+
+        case 1: /* scale and offset */
+        {
+            uint64_t offset;
+
+            if ( !currd->arch.vtsc )
+                offset = currd->arch.vtsc_offset;
+            else
+                /* offset already applied to value returned by virtual rdtscp */
+                offset = 0;
+            *eax = (uint32_t)offset;
+            *ebx = (uint32_t)(offset >> 32);
+            *ecx = currd->arch.vtsc_to_ns.mul_frac;
+            *edx = (s8)currd->arch.vtsc_to_ns.shift;
+            break;
+        }
+
+        case 2: /* physical cpu_khz */
+            *eax = cpu_khz;
+            *ebx = *ecx = *edx = 0;
+            break;
+
+        default:
+            *eax = *ebx = *ecx = *edx = 0;
+            break;
+        }
         break;
 
     case 4:
