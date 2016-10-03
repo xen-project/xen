@@ -1,0 +1,97 @@
+#!/usr/bin/python
+
+import sys, os, os.path as path, struct, errno
+from optparse import OptionParser
+
+def xencov_split(opts):
+    """Split input into multiple gcda files"""
+
+    # Check native byte order and explicitly specify it.  The "native"
+    # byte order in struct module takes into account padding while the
+    # data is always packed.
+    if sys.byteorder == 'little':
+        bo_prefix = '<'
+    else:
+        bo_prefix = '>'
+
+    input_file = opts.args[0]
+
+    f = open(input_file)
+
+    # Magic number
+    s = f.read(4)
+    magic, = struct.unpack(bo_prefix + "I", s)
+    # See public/sysctl.h for magic number -- "XCOV"
+    if magic != 0x58434f56:
+        raise Exception("Invalid magic number")
+
+    # The rest is zero or more records
+    content = f.read()
+
+    f.close()
+
+    while content:
+        off = content.find('\x00')
+        fmt = bo_prefix + str(off) + 's'
+        fn, = struct.unpack_from(fmt, content)
+        content = content[off+1:]
+
+        fmt = bo_prefix + 'I'
+        sz, = struct.unpack_from(fmt, content)
+        content = content[struct.calcsize(fmt):]
+
+        fmt = bo_prefix + str(sz) + 's'
+        payload, = struct.unpack_from(fmt, content)
+        content = content[sz:]
+
+        # Create and store files
+        if opts.output_dir == '.':
+            opts.output_dir = os.getcwd()
+
+        dir = opts.output_dir + path.dirname(fn)
+        try:
+            os.makedirs(dir)
+        except OSError, e:
+            if e.errno == errno.EEXIST and os.path.isdir(dir):
+                pass
+            else:
+                raise
+
+        full_path = dir + '/' + path.basename(fn)
+        f = open(full_path, "w")
+        f.write(payload)
+        f.close()
+
+def main():
+    """ Main entrypoint """
+
+    # Change stdout to be line-buffered.
+    sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', 1)
+
+    parser = OptionParser(
+        usage = "%prog [OPTIONS] <INPUT>",
+        description = "Utility to split xencov data file",
+        )
+
+    parser.add_option("--output-dir", action = "store",
+                      dest = "output_dir", default = ".",
+                      type = "string",
+                      help = ('Specify the directory to place output files, '
+                              'defaults to current directory'),
+                      )
+
+    opts, args = parser.parse_args()
+    opts.args = args
+
+    xencov_split(opts)
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except Exception, e:
+        print >>sys.stderr, "Error:", e
+        sys.exit(1)
+    except KeyboardInterrupt:
+        sys.exit(1)
+

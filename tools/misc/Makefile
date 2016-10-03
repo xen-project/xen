@@ -13,6 +13,7 @@ CFLAGS += $(CFLAGS_libxenstore)
 INSTALL_BIN-$(CONFIG_X86)      += xen-cpuid
 INSTALL_BIN-$(CONFIG_X86)      += xen-detect
 INSTALL_BIN                    += xencons
+INSTALL_BIN                    += xencov_split
 INSTALL_BIN += $(INSTALL_BIN-y)
 
 # Everything to be installed in regular sbin/
@@ -24,6 +25,7 @@ INSTALL_SBIN-$(CONFIG_X86)     += xen-lowmemd
 INSTALL_SBIN-$(CONFIG_X86)     += xen-mfndump
 INSTALL_SBIN                   += xen-ringwatch
 INSTALL_SBIN                   += xen-tmem-list-parse
+INSTALL_SBIN                   += xencov
 INSTALL_SBIN                   += xenlockprof
 INSTALL_SBIN                   += xenperf
 INSTALL_SBIN                   += xenpm
@@ -41,6 +43,7 @@ TARGETS_ALL := $(INSTALL_BIN) $(INSTALL_SBIN) $(INSTALL_PRIVBIN)
 TARGETS_COPY += xen-bugtool
 TARGETS_COPY += xen-ringwatch
 TARGETS_COPY += xencons
+TARGETS_COPY += xencov_split
 TARGETS_COPY += xenpvnetboot
 
 # Everything which needs to be built
@@ -101,5 +104,8 @@ xen-livepatch: xen-livepatch.o
 
 xen-lowmemd: xen-lowmemd.o
 	$(CC) $(LDFLAGS) -o $@ $< $(LDLIBS_libxenevtchn) $(LDLIBS_libxenctrl) $(LDLIBS_libxenstore) $(APPEND_LDFLAGS)
+
+xencov: xencov.o
+	$(CC) $(LDFLAGS) -o $@ $< $(LDLIBS_libxenctrl) $(APPEND_LDFLAGS)
 
 -include $(DEPS)
