@@ -4029,6 +4029,8 @@ int libxl_domain_setmaxmem(libxl_ctx *ctx, uint32_t domid, uint64_t max_memkb)
     libxl__domain_userdata_lock *lock = NULL;
     libxl_domain_config d_config;
 
+    libxl_domain_config_init(&d_config);
+
     CTX_LOCK;
 
     lock = libxl__lock_domain_userdata(gc, domid);
@@ -4054,7 +4056,7 @@ int libxl_domain_setmaxmem(libxl_ctx *ctx, uint32_t domid, uint64_t max_memkb)
         goto out;
     }
 
-    rc = libxl_retrieve_domain_configuration(ctx, domid, &d_config);
+    rc = libxl__get_domain_configuration(gc, domid, &d_config);
     if (rc < 0) {
         LOGE(ERROR, "unable to retrieve domain configuration");
         goto out;
@@ -4076,6 +4078,7 @@ int libxl_domain_setmaxmem(libxl_ctx *ctx, uint32_t domid, uint64_t max_memkb)
 
     rc = 0;
 out:
+    libxl_domain_config_dispose(&d_config);
     if (lock) libxl__unlock_domain_userdata(lock);
     CTX_UNLOCK;
     GC_FREE;
@@ -4177,6 +4180,8 @@ int libxl_set_memory_target(libxl_ctx *ctx, uint32_t domid,
     libxl__domain_userdata_lock *lock;
     libxl_domain_config d_config;
 
+    libxl_domain_config_init(&d_config);
+
     CTX_LOCK;
 
     lock = libxl__lock_domain_userdata(gc, domid);
@@ -4185,7 +4190,7 @@ int libxl_set_memory_target(libxl_ctx *ctx, uint32_t domid,
         goto out_no_transaction;
     }
 
-    rc = libxl_retrieve_domain_configuration(ctx, domid, &d_config);
+    rc = libxl__get_domain_configuration(gc, domid, &d_config);
     if (rc < 0) {
         LOGE(ERROR, "unable to retrieve domain configuration");
         goto out_no_transaction;
@@ -4318,6 +4323,7 @@ out:
             goto retry_transaction;
 
 out_no_transaction:
+    libxl_domain_config_dispose(&d_config);
     if (lock) libxl__unlock_domain_userdata(lock);
     CTX_UNLOCK;
     GC_FREE;
