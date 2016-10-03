@@ -276,8 +276,8 @@ SEABIOS_UPSTREAM_URL ?= git://xenbits.xen.org/seabios.git
 MINIOS_UPSTREAM_URL ?= git://xenbits.xen.org/mini-os.git
 endif
 OVMF_UPSTREAM_REVISION ?= bc54e50e0fe03c570014f363b547426913e92449
-QEMU_UPSTREAM_REVISION ?= master
-MINIOS_UPSTREAM_REVISION ?= e20998fbec0af4d783abb1a0695ab4614064c520
+QEMU_UPSTREAM_REVISION ?= qemu-xen-4.8.0-rc1
+MINIOS_UPSTREAM_REVISION ?= xen-4.8.0-rc1
 # Wed Sep 28 11:50:04 2016 +0200
 # minios: fix build issue with xen_*mb defines
 
@@ -288,7 +288,7 @@ SEABIOS_UPSTREAM_REVISION ?= rel-1.9.3
 ETHERBOOT_NICS ?= rtl8139 8086100e
 
 
-QEMU_TRADITIONAL_REVISION ?= c4e0d84d3c92923fdbc7fa922638d54e5e834753
+QEMU_TRADITIONAL_REVISION ?= xen-4.8.0-rc1
 # Tue Jul 26 15:31:59 2016 +0100
 # virtio: error out if guest exceeds virtqueue size
 
