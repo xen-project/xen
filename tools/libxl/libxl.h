@@ -1352,7 +1352,8 @@ void libxl_domain_config_dispose(libxl_domain_config *d_config);
  * works with DomU.
  */
 int libxl_retrieve_domain_configuration(libxl_ctx *ctx, uint32_t domid,
-                                        libxl_domain_config *d_config);
+                                        libxl_domain_config *d_config)
+                                        LIBXL_EXTERNAL_CALLERS_ONLY;
 
 int libxl_domain_suspend(libxl_ctx *ctx, uint32_t domid, int fd,
                          int flags, /* LIBXL_SUSPEND_* */
@@ -1945,12 +1946,14 @@ void libxl_cpuid_set(libxl_ctx *ctx, uint32_t domid,
  */
 int libxl_userdata_store(libxl_ctx *ctx, uint32_t domid,
                               const char *userdata_userid,
-                              const uint8_t *data, int datalen);
+                              const uint8_t *data, int datalen)
+                              LIBXL_EXTERNAL_CALLERS_ONLY;
   /* If datalen==0, data is not used and the user data for
    * that domain and userdata_userid is deleted. */
 int libxl_userdata_retrieve(libxl_ctx *ctx, uint32_t domid,
                                  const char *userdata_userid,
-                                 uint8_t **data_r, int *datalen_r);
+                                 uint8_t **data_r, int *datalen_r)
+                                 LIBXL_EXTERNAL_CALLERS_ONLY;
   /* On successful return, *data_r is from malloc.
    * If there is no data for that domain and userdata_userid,
    * *data_r and *datalen_r will be set to 0.
