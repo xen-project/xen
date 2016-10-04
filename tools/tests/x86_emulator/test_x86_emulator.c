@@ -127,6 +127,22 @@ static inline uint64_t xgetbv(uint32_t xcr)
     (ebx & (1U << 5)) != 0; \
 })
 
+static int read_cr(
+    unsigned int reg,
+    unsigned long *val,
+    struct x86_emulate_ctxt *ctxt)
+{
+    /* Fake just enough state for the emulator's _get_fpu() to be happy. */
+    switch ( reg )
+    {
+    case 0:
+        *val = 0x00000001; /* PE */
+        return X86EMUL_OKAY;
+    }
+
+    return X86EMUL_UNHANDLEABLE;
+}
+
 int get_fpu(
     void (*exception_callback)(void *, struct cpu_user_regs *),
     void *exception_callback_arg,
@@ -158,6 +174,7 @@ static struct x86_emulate_ops emulops = {
     .write      = write,
     .cmpxchg    = cmpxchg,
     .cpuid      = cpuid,
+    .read_cr    = read_cr,
     .get_fpu    = get_fpu,
 };
 

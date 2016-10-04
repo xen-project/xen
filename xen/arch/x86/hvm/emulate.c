@@ -1070,6 +1070,7 @@ static int hvmemul_get_fpu(
     switch ( type )
     {
     case X86EMUL_FPU_fpu:
+    case X86EMUL_FPU_wait:
         break;
     case X86EMUL_FPU_mmx:
         if ( !cpu_has_mmx )
@@ -1077,7 +1078,6 @@ static int hvmemul_get_fpu(
         break;
     case X86EMUL_FPU_xmm:
         if ( !cpu_has_xmm ||
-             (curr->arch.hvm_vcpu.guest_cr[0] & X86_CR0_EM) ||
              !(curr->arch.hvm_vcpu.guest_cr[4] & X86_CR4_OSFXSR) )
             return X86EMUL_UNHANDLEABLE;
         break;
