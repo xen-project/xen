@@ -373,6 +373,9 @@ typedef union {
 
 /* Control register flags. */
 #define CR0_PE    (1<<0)
+#define CR0_MP    (1<<1)
+#define CR0_EM    (1<<2)
+#define CR0_TS    (1<<3)
 #define CR4_TSD   (1<<2)
 
 /* EFLAGS bit definitions. */
@@ -400,6 +403,7 @@ typedef union {
 #define EXC_OF  4
 #define EXC_BR  5
 #define EXC_UD  6
+#define EXC_NM  7
 #define EXC_TS 10
 #define EXC_NP 11
 #define EXC_SS 12
@@ -684,10 +688,45 @@ static void fpu_handle_exception(void *_fic, struct cpu_user_regs *regs)
     regs->eip += fic->insn_bytes;
 }
 
+static int _get_fpu(
+    enum x86_emulate_fpu_type type,
+    struct fpu_insn_ctxt *fic,
+    struct x86_emulate_ctxt *ctxt,
+    const struct x86_emulate_ops *ops)
+{
+    int rc;
+
+    fic->exn_raised = 0;
+
+    fail_if(!ops->get_fpu);
+    rc = ops->get_fpu(fpu_handle_exception, fic, type, ctxt);
+
+    if ( rc == X86EMUL_OKAY )
+    {
+        unsigned long cr0;
+
+        fail_if(!ops->read_cr);
+        rc = ops->read_cr(0, &cr0, ctxt);
+        if ( rc != X86EMUL_OKAY )
+            return rc;
+        if ( cr0 & CR0_EM )
+        {
+            generate_exception_if(type == X86EMUL_FPU_fpu, EXC_NM, -1);
+            generate_exception_if(type == X86EMUL_FPU_mmx, EXC_UD, -1);
+            generate_exception_if(type == X86EMUL_FPU_xmm, EXC_UD, -1);
+        }
+        generate_exception_if((cr0 & CR0_TS) &&
+                              (type != X86EMUL_FPU_wait || (cr0 & CR0_MP)),
+                              EXC_NM, -1);
+    }
+
+ done:
+    return rc;
+}
+
 #define get_fpu(_type, _fic)                                    \
-do{ (_fic)->exn_raised = 0;                                     \
-    fail_if(ops->get_fpu == NULL);                              \
-    rc = ops->get_fpu(fpu_handle_exception, _fic, _type, ctxt); \
+do {                                                            \
+    rc = _get_fpu(_type, _fic, ctxt, ops);                      \
     if ( rc ) goto done;                                        \
 } while (0)
 #define put_fpu(_fic)                                           \
@@ -2491,8 +2530,14 @@ x86_emulate(
     }
 
     case 0x9b:  /* wait/fwait */
-        emulate_fpu_insn("fwait");
+    {
+        struct fpu_insn_ctxt fic = { .insn_bytes = 1 };
+
+        get_fpu(X86EMUL_FPU_wait, &fic);
+        asm volatile ( "fwait" ::: "memory" );
+        put_fpu(&fic);
         break;
+    }
 
     case 0x9c: /* pushf */
         src.val = _regs.eflags;
