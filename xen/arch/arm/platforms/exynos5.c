@@ -175,10 +175,10 @@ static int exynos5_cpu_power_up(void __iomem *power, int cpu)
         /* wait max 10 ms until cpu is on */
         while ( exynos_cpu_power_state(power, cpu) != S5P_CORE_LOCAL_PWR_EN )
         {
-            if ( timeout-- == 0 )
-                break;
-
             mdelay(1);
+
+            if ( --timeout == 0 )
+                break;
         }
 
         if ( timeout == 0 )
