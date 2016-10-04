@@ -30,8 +30,6 @@ static unsigned int __read_mostly p2m_root_level;
 unsigned int __read_mostly p2m_ipa_bits;
 
 /* Helpers to lookup the properties of each level */
-static const paddr_t level_sizes[] =
-    { ZEROETH_SIZE, FIRST_SIZE, SECOND_SIZE, THIRD_SIZE };
 static const paddr_t level_masks[] =
     { ZEROETH_MASK, FIRST_MASK, SECOND_MASK, THIRD_MASK };
 static const uint8_t level_orders[] =
