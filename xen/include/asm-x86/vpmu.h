@@ -25,6 +25,7 @@
 
 #define vcpu_vpmu(vcpu)   (&(vcpu)->arch.vpmu)
 #define vpmu_vcpu(vpmu)   container_of((vpmu), struct vcpu, arch.vpmu)
+#define vpmu_enabled(vcpu) vpmu_is_set(vcpu_vpmu(vcpu), VPMU_CONTEXT_ALLOCATED)
 
 #define MSR_TYPE_COUNTER            0
 #define MSR_TYPE_CTRL               1
@@ -42,9 +43,6 @@ struct arch_vpmu_ops {
                     uint64_t supported);
     int (*do_rdmsr)(unsigned int msr, uint64_t *msr_content);
     int (*do_interrupt)(struct cpu_user_regs *regs);
-    void (*do_cpuid)(unsigned int input,
-                     unsigned int *eax, unsigned int *ebx,
-                     unsigned int *ecx, unsigned int *edx);
     void (*arch_vpmu_destroy)(struct vcpu *v);
     int (*arch_vpmu_save)(struct vcpu *v, bool_t to_guest);
     int (*arch_vpmu_load)(struct vcpu *v, bool_t from_guest);
@@ -77,6 +75,10 @@ struct vpmu_struct {
 /* PV(H) guests: VPMU registers are accessed by guest from shared page */
 #define VPMU_CACHED                         0x40
 
+/* Intel-specific VPMU features */
+#define VPMU_CPU_HAS_DS                     0x100 /* Has Debug Store */
+#define VPMU_CPU_HAS_BTS                    0x200 /* Has Branch Trace Store */
+
 static inline void vpmu_set(struct vpmu_struct *vpmu, const u32 mask)
 {
     vpmu->flags |= mask;
@@ -103,8 +105,6 @@ void vpmu_lvtpc_update(uint32_t val);
 int vpmu_do_msr(unsigned int msr, uint64_t *msr_content,
                 uint64_t supported, bool_t is_write);
 void vpmu_do_interrupt(struct cpu_user_regs *regs);
-void vpmu_do_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
-                                       unsigned int *ecx, unsigned int *edx);
 void vpmu_initialise(struct vcpu *v);
 void vpmu_destroy(struct vcpu *v);
 void vpmu_save(struct vcpu *v);

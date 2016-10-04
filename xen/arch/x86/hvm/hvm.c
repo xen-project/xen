@@ -3432,6 +3432,17 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
             if ( !(hvm_pae_enabled(v) || hvm_long_mode_enabled(v)) )
                 *edx &= ~cpufeat_mask(X86_FEATURE_PSE36);
         }
+
+        if ( vpmu_enabled(v) &&
+             vpmu_is_set(vcpu_vpmu(v), VPMU_CPU_HAS_DS) )
+        {
+            *edx |= cpufeat_mask(X86_FEATURE_DS);
+            if ( cpu_has(&current_cpu_data, X86_FEATURE_DTES64) )
+                *ecx |= cpufeat_mask(X86_FEATURE_DTES64);
+            if ( cpu_has(&current_cpu_data, X86_FEATURE_DSCPL) )
+                *ecx |= cpufeat_mask(X86_FEATURE_DSCPL);
+        }
+
         break;
 
     case 0x7:
@@ -3560,6 +3571,18 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
             *ecx = *edx = 0;
             break;
         }
+        break;
+
+    case 0x0000000a: /* Architectural Performance Monitor Features (Intel) */
+        if ( boot_cpu_data.x86_vendor != X86_VENDOR_INTEL || !vpmu_enabled(v) )
+        {
+            *eax = *ebx = *ecx = *edx = 0;
+            break;
+        }
+
+        /* Report at most version 3 since that's all we currently emulate */
+        if ( (*eax & 0xff) > 3 )
+            *eax = (*eax & ~0xff) | 3;
         break;
 
     case 0x80000001:

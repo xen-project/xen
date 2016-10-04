@@ -2362,8 +2362,6 @@ static void vmx_cpuid_intercept(
             break;
     }
 
-    vpmu_do_cpuid(input, eax, ebx, ecx, edx);
-
     HVMTRACE_5D (CPUID, input, *eax, *ebx, *ecx, *edx);
 }
 

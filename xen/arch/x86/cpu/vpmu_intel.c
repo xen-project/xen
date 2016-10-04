@@ -68,10 +68,6 @@
 #define MSR_PMC_ALIAS_MASK       (~(MSR_IA32_PERFCTR0 ^ MSR_IA32_A_PERFCTR0))
 static bool_t __read_mostly full_width_write;
 
-/* Intel-specific VPMU features */
-#define VPMU_CPU_HAS_DS                     0x100 /* Has Debug Store */
-#define VPMU_CPU_HAS_BTS                    0x200 /* Has Branch Trace Store */
-
 /*
  * MSR_CORE_PERF_FIXED_CTR_CTRL contains the configuration of all fixed
  * counters. 4 bits for every counter.
@@ -782,33 +778,6 @@ static int core2_vpmu_do_rdmsr(unsigned int msr, uint64_t *msr_content)
     return 0;
 }
 
-static void core2_vpmu_do_cpuid(unsigned int input,
-                                unsigned int *eax, unsigned int *ebx,
-                                unsigned int *ecx, unsigned int *edx)
-{
-    switch ( input )
-    {
-    case 0x1:
-
-        if ( vpmu_is_set(vcpu_vpmu(current), VPMU_CPU_HAS_DS) )
-        {
-            /* Switch on the 'Debug Store' feature in CPUID.EAX[1]:EDX[21] */
-            *edx |= cpufeat_mask(X86_FEATURE_DS);
-            if ( cpu_has(&current_cpu_data, X86_FEATURE_DTES64) )
-                *ecx |= cpufeat_mask(X86_FEATURE_DTES64);
-            if ( cpu_has(&current_cpu_data, X86_FEATURE_DSCPL) )
-                *ecx |= cpufeat_mask(X86_FEATURE_DSCPL);
-        }
-        break;
-
-    case 0xa:
-        /* Report at most version 3 since that's all we currently emulate */
-        if ( MASK_EXTR(*eax, PMU_VERSION_MASK) > 3 )
-            *eax = (*eax & ~PMU_VERSION_MASK) | MASK_INSR(3, PMU_VERSION_MASK);
-        break;
-    }
-}
-
 /* Dump vpmu info on console, called in the context of keyhandler 'q'. */
 static void core2_vpmu_dump(const struct vcpu *v)
 {
@@ -900,31 +869,11 @@ struct arch_vpmu_ops core2_vpmu_ops = {
     .do_wrmsr = core2_vpmu_do_wrmsr,
     .do_rdmsr = core2_vpmu_do_rdmsr,
     .do_interrupt = core2_vpmu_do_interrupt,
-    .do_cpuid = core2_vpmu_do_cpuid,
     .arch_vpmu_destroy = core2_vpmu_destroy,
     .arch_vpmu_save = core2_vpmu_save,
     .arch_vpmu_load = core2_vpmu_load,
     .arch_vpmu_dump = core2_vpmu_dump
 };
-
-static void core2_no_vpmu_do_cpuid(unsigned int input,
-                                unsigned int *eax, unsigned int *ebx,
-                                unsigned int *ecx, unsigned int *edx)
-{
-    /*
-     * As in this case the vpmu is not enabled reset some bits in the
-     * architectural performance monitoring related part.
-     */
-    if ( input == 0xa )
-    {
-        *eax &= ~PMU_VERSION_MASK;
-        *eax &= ~PMU_GENERAL_NR_MASK;
-        *eax &= ~PMU_GENERAL_WIDTH_MASK;
-
-        *edx &= ~PMU_FIXED_NR_MASK;
-        *edx &= ~PMU_FIXED_WIDTH_MASK;
-    }
-}
 
 /*
  * If its a vpmu msr set it to 0.
@@ -943,7 +892,6 @@ static int core2_no_vpmu_do_rdmsr(unsigned int msr, uint64_t *msr_content)
  */
 struct arch_vpmu_ops core2_no_vpmu_ops = {
     .do_rdmsr = core2_no_vpmu_do_rdmsr,
-    .do_cpuid = core2_no_vpmu_do_cpuid,
 };
 
 int vmx_vpmu_initialise(struct vcpu *v)

@@ -1192,6 +1192,16 @@ void pv_cpuid(struct cpu_user_regs *regs)
             }
         }
 
+        if ( vpmu_enabled(curr) &&
+             vpmu_is_set(vcpu_vpmu(curr), VPMU_CPU_HAS_DS) )
+        {
+            d |= cpufeat_mask(X86_FEATURE_DS);
+            if ( cpu_has(&current_cpu_data, X86_FEATURE_DTES64) )
+                c |= cpufeat_mask(X86_FEATURE_DTES64);
+            if ( cpu_has(&current_cpu_data, X86_FEATURE_DSCPL) )
+                c |= cpufeat_mask(X86_FEATURE_DSCPL);
+        }
+
         c |= cpufeat_mask(X86_FEATURE_HYPERVISOR);
         break;
 
@@ -1222,6 +1232,16 @@ void pv_cpuid(struct cpu_user_regs *regs)
         else
             b = c = d = 0;
         a = 0;
+        break;
+
+    case 0x0000000a: /* Architectural Performance Monitor Features (Intel) */
+        if ( boot_cpu_data.x86_vendor != X86_VENDOR_INTEL ||
+             !vpmu_enabled(curr) )
+            goto unsupported;
+
+        /* Report at most version 3 since that's all we currently emulate. */
+        if ( (a & 0xff) > 3 )
+            a = (a & ~0xff) | 3;
         break;
 
     case XSTATE_CPUID:
@@ -1329,9 +1349,6 @@ void pv_cpuid(struct cpu_user_regs *regs)
         b &= pv_featureset[FEATURESET_e8b];
         break;
 
-    case 0x0000000a: /* Architectural Performance Monitor Features (Intel) */
-        break;
-
     case 0x00000005: /* MONITOR/MWAIT */
     case 0x0000000b: /* Extended Topology Enumeration */
     case 0x8000000a: /* SVM revision and features */
@@ -1344,9 +1361,6 @@ void pv_cpuid(struct cpu_user_regs *regs)
     }
 
  out:
-    /* VPMU may decide to modify some of the leaves */
-    vpmu_do_cpuid(leaf, &a, &b, &c, &d);
-
     regs->eax = a;
     regs->ebx = b;
     regs->ecx = c;
