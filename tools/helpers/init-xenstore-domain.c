@@ -236,7 +236,6 @@ static int parse_maxmem(xc_interface *xch, char *str)
     unsigned long mb = 0, a = 0, b = 0;
     unsigned long val;
     unsigned long *res;
-    char buf[16];
     char *p;
     char *s = str;
 
