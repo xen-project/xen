@@ -865,7 +865,7 @@ static void core2_vpmu_destroy(struct vcpu *v)
     vpmu_clear(vpmu);
 }
 
-struct arch_vpmu_ops core2_vpmu_ops = {
+static const struct arch_vpmu_ops core2_vpmu_ops = {
     .do_wrmsr = core2_vpmu_do_wrmsr,
     .do_rdmsr = core2_vpmu_do_rdmsr,
     .do_interrupt = core2_vpmu_do_interrupt,
@@ -875,32 +875,12 @@ struct arch_vpmu_ops core2_vpmu_ops = {
     .arch_vpmu_dump = core2_vpmu_dump
 };
 
-/*
- * If its a vpmu msr set it to 0.
- */
-static int core2_no_vpmu_do_rdmsr(unsigned int msr, uint64_t *msr_content)
-{
-    int type = -1, index = -1;
-    if ( !is_core2_vpmu_msr(msr, &type, &index) )
-        return -EINVAL;
-    *msr_content = 0;
-    return 0;
-}
-
-/*
- * These functions are used in case vpmu is not enabled.
- */
-struct arch_vpmu_ops core2_no_vpmu_ops = {
-    .do_rdmsr = core2_no_vpmu_do_rdmsr,
-};
-
 int vmx_vpmu_initialise(struct vcpu *v)
 {
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
     u64 msr_content;
     static bool_t ds_warned;
 
-    vpmu->arch_vpmu_ops = &core2_no_vpmu_ops;
     if ( vpmu_mode == XENPMU_MODE_OFF )
         return 0;
 

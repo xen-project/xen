@@ -488,7 +488,7 @@ static void amd_vpmu_dump(const struct vcpu *v)
     }
 }
 
-struct arch_vpmu_ops amd_vpmu_ops = {
+static const struct arch_vpmu_ops amd_vpmu_ops = {
     .do_wrmsr = amd_vpmu_do_wrmsr,
     .do_rdmsr = amd_vpmu_do_rdmsr,
     .do_interrupt = amd_vpmu_do_interrupt,

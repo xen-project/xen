@@ -60,7 +60,7 @@ struct vpmu_struct {
     u32 hw_lapic_lvtpc;
     void *context;      /* May be shared with PV guest */
     void *priv_context; /* hypervisor-only */
-    struct arch_vpmu_ops *arch_vpmu_ops;
+    const struct arch_vpmu_ops *arch_vpmu_ops;
     struct xen_pmu_data *xenpmu_data;
     spinlock_t vpmu_lock;
 };

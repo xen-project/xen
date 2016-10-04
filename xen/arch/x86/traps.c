@@ -2566,11 +2566,7 @@ static int priv_op_read_msr(unsigned int reg, uint64_t *val,
     case MSR_K7_EVNTSEL0...MSR_K7_PERFCTR3:
             if ( vpmu_msr || (boot_cpu_data.x86_vendor == X86_VENDOR_AMD) )
             {
-                /* Don't leak PMU MSRs to unprivileged domains. */
-                if ( (vpmu_mode & XENPMU_MODE_ALL) &&
-                     !is_hardware_domain(currd) )
-                    *val = 0;
-                else if ( vpmu_do_rdmsr(reg, val) )
+                if ( vpmu_do_rdmsr(reg, val) )
                     break;
                 return X86EMUL_OKAY;
             }

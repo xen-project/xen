@@ -136,9 +136,13 @@ int vpmu_do_msr(unsigned int msr, uint64_t *msr_content,
     const struct arch_vpmu_ops *ops;
     int ret = 0;
 
+    /*
+     * Hide the PMU MSRs if vpmu is not configured, or the hardware domain is
+     * profiling the whole system.
+     */
     if ( likely(vpmu_mode == XENPMU_MODE_OFF) ||
          ((vpmu_mode & XENPMU_MODE_ALL) &&
-          !is_hardware_domain(current->domain)) )
+          !is_hardware_domain(curr->domain)) )
          goto nop;
 
     vpmu = vcpu_vpmu(curr);
