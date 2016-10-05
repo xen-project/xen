@@ -39,9 +39,16 @@ config GCOV
 choice
 	prompt "Specify Gcov format"
 	depends on GCOV
-	default GCOV_FORMAT_5
+	default GCOV_FORMAT_AUTODETECT
 	---help---
 	  The gcov format is determined by gcc version.
+
+	  If unsure, choose "Autodetect".
+
+config GCOV_FORMAT_AUTODETECT
+	bool "Autodetect"
+	---help---
+	  Automatically select gcov format based on gcc version.
 
 config GCOV_FORMAT_5
 	bool "GCC 5 format"
