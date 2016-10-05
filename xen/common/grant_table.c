@@ -993,7 +993,7 @@ __gnttab_map_grant_ref(
     mt = &maptrack_entry(lgt, handle);
     mt->domid = op->dom;
     mt->ref   = op->ref;
-    wmb();
+    smp_wmb();
     write_atomic(&mt->flags, op->flags);
 
     if ( need_iommu )

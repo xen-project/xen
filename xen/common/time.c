@@ -103,7 +103,7 @@ void update_domain_wallclock_time(struct domain *d)
 
     wc_version = &shared_info(d, wc_version);
     *wc_version = version_update_begin(*wc_version);
-    wmb();
+    smp_wmb();
 
     sec = wc_sec + d->time_offset_seconds;
     shared_info(d, wc_sec)    = sec;
@@ -117,7 +117,7 @@ void update_domain_wallclock_time(struct domain *d)
     shared_info(d, wc_sec_hi) = sec >> 32;
 #endif
 
-    wmb();
+    smp_wmb();
     *wc_version = version_update_end(*wc_version);
 
     spin_unlock(&wc_lock);

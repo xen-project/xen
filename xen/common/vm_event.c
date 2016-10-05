@@ -31,9 +31,9 @@
 #include <xsm/xsm.h>
 
 /* for public/io/ring.h macros */
-#define xen_mb()   mb()
-#define xen_rmb()  rmb()
-#define xen_wmb()  wmb()
+#define xen_mb()   smp_mb()
+#define xen_rmb()  smp_rmb()
+#define xen_wmb()  smp_wmb()
 
 #define vm_event_ring_lock_init(_ved)  spin_lock_init(&(_ved)->ring_lock)
 #define vm_event_ring_lock(_ved)       spin_lock(&(_ved)->ring_lock)
