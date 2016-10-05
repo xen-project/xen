@@ -501,9 +501,9 @@ static void mctelem_append_processing(mctelem_class_t which)
 		ltep->mcte_prev = *procltp;
 		*procltp = dangling[target];
 	}
-	wmb();
+	smp_wmb();
 	dangling[target] = NULL;
-	wmb();
+	smp_wmb();
 }
 
 mctelem_cookie_t mctelem_consume_oldest_begin(mctelem_class_t which)

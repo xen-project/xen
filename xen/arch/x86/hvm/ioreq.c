@@ -91,7 +91,7 @@ static bool hvm_wait_for_io(struct hvm_ioreq_vcpu *sv, ioreq_t *p)
     {
         unsigned int state = p->state;
 
-        rmb();
+        smp_rmb();
         switch ( state )
         {
         case STATE_IOREQ_NONE:
@@ -1329,7 +1329,7 @@ static int hvm_send_buffered_ioreq(struct hvm_ioreq_server *s, ioreq_t *p)
     }
 
     /* Make the ioreq_t visible /before/ write_pointer. */
-    wmb();
+    smp_wmb();
     pg->ptrs.write_pointer += qw ? 2 : 1;
 
     /* Canonicalize read/write pointers to prevent their overflow. */

@@ -85,7 +85,7 @@ static enum cpu_state {
     CPU_STATE_CALLIN,   /* slave -> master: Completed phase 2 */
     CPU_STATE_ONLINE    /* master -> slave: Go fully online now. */
 } cpu_state;
-#define set_cpu_state(state) do { mb(); cpu_state = (state); } while (0)
+#define set_cpu_state(state) do { smp_mb(); cpu_state = (state); } while (0)
 
 void *stack_base[NR_CPUS];
 
@@ -132,7 +132,7 @@ static void synchronize_tsc_master(unsigned int slave)
     for ( i = 1; i <= 5; i++ )
     {
         tsc_value = rdtsc_ordered();
-        wmb();
+        smp_wmb();
         atomic_inc(&tsc_count);
         while ( atomic_read(&tsc_count) != (i<<1) )
             cpu_relax();
@@ -157,7 +157,7 @@ static void synchronize_tsc_slave(unsigned int slave)
     {
         while ( atomic_read(&tsc_count) != ((i<<1)-1) )
             cpu_relax();
-        rmb();
+        smp_rmb();
         /*
          * If a CPU has been physically hotplugged, we may as well write
          * to its TSC in spite of X86_FEATURE_TSC_RELIABLE. The platform does
@@ -561,13 +561,13 @@ static int do_boot_cpu(int apicid, int cpu)
         }
         else if ( cpu_state == CPU_STATE_DEAD )
         {
-            rmb();
+            smp_rmb();
             rc = cpu_error;
         }
         else
         {
             boot_error = 1;
-            mb();
+            smp_mb();
             if ( bootsym(trampoline_cpu_started) == 0xA5 )
                 /* trampoline started but...? */
                 printk("Stuck ??\n");
@@ -585,7 +585,7 @@ static int do_boot_cpu(int apicid, int cpu)
 
     /* mark "stuck" area as not stuck */
     bootsym(trampoline_cpu_started) = 0;
-    mb();
+    smp_mb();
 
     smpboot_restore_warm_reset_vector();
 

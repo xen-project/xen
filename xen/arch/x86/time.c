@@ -976,10 +976,10 @@ static void __update_vcpu_system_time(struct vcpu *v, int force)
 
     /* 1. Update guest kernel version. */
     _u.version = u->version = version_update_begin(u->version);
-    wmb();
+    smp_wmb();
     /* 2. Update all other guest kernel fields. */
     *u = _u;
-    wmb();
+    smp_wmb();
     /* 3. Update guest kernel version. */
     u->version = version_update_end(u->version);
 
@@ -1006,10 +1006,10 @@ bool update_secondary_system_time(struct vcpu *v,
         update_guest_memory_policy(v, &policy);
         return false;
     }
-    wmb();
+    smp_wmb();
     /* 2. Update all other userspace fields. */
     __copy_to_guest(user_u, u, 1);
-    wmb();
+    smp_wmb();
     /* 3. Update userspace version. */
     u->version = version_update_end(u->version);
     __copy_field_to_guest(user_u, u, version);

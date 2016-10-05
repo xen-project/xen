@@ -764,9 +764,9 @@ void irq_set_affinity(struct irq_desc *desc, const cpumask_t *mask)
     
     ASSERT(spin_is_locked(&desc->lock));
     desc->status &= ~IRQ_MOVE_PENDING;
-    wmb();
+    smp_wmb();
     cpumask_copy(desc->arch.pending_mask, mask);
-    wmb();
+    smp_wmb();
     desc->status |= IRQ_MOVE_PENDING;
 }
 

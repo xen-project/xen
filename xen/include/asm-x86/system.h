@@ -183,7 +183,7 @@ static always_inline unsigned long __xadd(
 #define smp_wmb()       wmb()
 
 #define set_mb(var, value) do { xchg(&var, value); } while (0)
-#define set_wmb(var, value) do { var = value; wmb(); } while (0)
+#define set_wmb(var, value) do { var = value; smp_wmb(); } while (0)
 
 #define local_irq_disable()     asm volatile ( "cli" : : : "memory" )
 #define local_irq_enable()      asm volatile ( "sti" : : : "memory" )
