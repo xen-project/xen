@@ -1241,6 +1241,7 @@ static bool_t vcpu_has(
 
 #define vcpu_must_have(leaf, reg, bit) \
     generate_exception_if(!vcpu_has(leaf, reg, bit, ctxt, ops), EXC_UD, -1)
+#define vcpu_must_have_fpu()  vcpu_must_have(0x00000001, EDX, 0)
 #define vcpu_must_have_mmx()  vcpu_must_have(0x00000001, EDX, 23)
 #define vcpu_must_have_sse()  vcpu_must_have(0x00000001, EDX, 25)
 #define vcpu_must_have_sse2() vcpu_must_have(0x00000001, EDX, 26)
@@ -3053,6 +3054,7 @@ x86_emulate(
     {
         struct fpu_insn_ctxt fic = { .insn_bytes = 1 };
 
+        host_and_vcpu_must_have(fpu);
         get_fpu(X86EMUL_FPU_wait, &fic);
         asm volatile ( "fwait" ::: "memory" );
         put_fpu(&fic);
@@ -3426,6 +3428,7 @@ x86_emulate(
     }
 
     case 0xd8: /* FPU 0xd8 */
+        host_and_vcpu_must_have(fpu);
         switch ( modrm )
         {
         case 0xc0 ... 0xc7: /* fadd %stN,%stN */
@@ -3476,6 +3479,7 @@ x86_emulate(
         break;
 
     case 0xd9: /* FPU 0xd9 */
+        host_and_vcpu_must_have(fpu);
         switch ( modrm )
         {
         case 0xfb: /* fsincos */
@@ -3559,6 +3563,7 @@ x86_emulate(
         break;
 
     case 0xda: /* FPU 0xda */
+        host_and_vcpu_must_have(fpu);
         switch ( modrm )
         {
         case 0xc0 ... 0xc7: /* fcmovb %stN */
@@ -3606,6 +3611,7 @@ x86_emulate(
         break;
 
     case 0xdb: /* FPU 0xdb */
+        host_and_vcpu_must_have(fpu);
         switch ( modrm )
         {
         case 0xc0 ... 0xc7: /* fcmovnb %stN */
@@ -3678,6 +3684,7 @@ x86_emulate(
         break;
 
     case 0xdc: /* FPU 0xdc */
+        host_and_vcpu_must_have(fpu);
         switch ( modrm )
         {
         case 0xc0 ... 0xc7: /* fadd %stN */
@@ -3726,6 +3733,7 @@ x86_emulate(
         break;
 
     case 0xdd: /* FPU 0xdd */
+        host_and_vcpu_must_have(fpu);
         switch ( modrm )
         {
         case 0xc0 ... 0xc7: /* ffree %stN */
@@ -3779,6 +3787,7 @@ x86_emulate(
         break;
 
     case 0xde: /* FPU 0xde */
+        host_and_vcpu_must_have(fpu);
         switch ( modrm )
         {
         case 0xc0 ... 0xc7: /* faddp %stN */
@@ -3828,6 +3837,7 @@ x86_emulate(
         break;
 
     case 0xdf: /* FPU 0xdf */
+        host_and_vcpu_must_have(fpu);
         switch ( modrm )
         {
         case 0xe0:

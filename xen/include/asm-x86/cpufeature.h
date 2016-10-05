@@ -48,6 +48,7 @@ XEN_CPUFEATURE(MFENCE_RDTSC,    (FSCAPINTS+0)*32+ 9) /* MFENCE synchronizes RDTS
 #define CPUID_PM_LEAF                    6
 #define CPUID6_ECX_APERFMPERF_CAPABILITY 0x1
 
+#define cpu_has_fpu		1
 #define cpu_has_de		1
 #define cpu_has_pse		1
 #define cpu_has_pge		1
