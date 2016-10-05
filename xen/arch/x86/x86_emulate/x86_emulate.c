@@ -421,8 +421,11 @@ typedef union {
 #define CR0_MP    (1<<1)
 #define CR0_EM    (1<<2)
 #define CR0_TS    (1<<3)
-#define CR4_TSD   (1<<2)
-#define CR4_UMIP  (1<<11)
+
+#define CR4_TSD        (1<<2)
+#define CR4_OSFXSR     (1<<9)
+#define CR4_UMIP       (1<<11)
+#define CR4_OSXSAVE    (1<<18)
 
 /* EFLAGS bit definitions. */
 #define EFLG_VIP  (1<<20)
@@ -767,9 +770,26 @@ static int _get_fpu(
         unsigned long cr0;
 
         fail_if(!ops->read_cr);
+        if ( type >= X86EMUL_FPU_xmm )
+        {
+            unsigned long cr4;
+
+            rc = ops->read_cr(4, &cr4, ctxt);
+            if ( rc != X86EMUL_OKAY )
+                return rc;
+            generate_exception_if(!(cr4 & ((type == X86EMUL_FPU_xmm)
+                                           ? CR4_OSFXSR : CR4_OSXSAVE)),
+                                  EXC_UD, -1);
+        }
+
         rc = ops->read_cr(0, &cr0, ctxt);
         if ( rc != X86EMUL_OKAY )
             return rc;
+        if ( type >= X86EMUL_FPU_ymm )
+        {
+            /* Should be unreachable if VEX decoding is working correctly. */
+            ASSERT((cr0 & CR0_PE) && !(ctxt->regs->eflags & EFLG_VM));
+        }
         if ( cr0 & CR0_EM )
         {
             generate_exception_if(type == X86EMUL_FPU_fpu, EXC_NM, -1);

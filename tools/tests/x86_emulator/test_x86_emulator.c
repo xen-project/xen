@@ -129,6 +129,13 @@ static int cpuid(
     (edx & (1U << 26)) != 0; \
 })
 
+#define cpu_has_xsave ({ \
+    unsigned int eax = 1, ecx = 0; \
+    cpuid(&eax, &eax, &ecx, &eax, NULL); \
+    /* Intentionally checking OSXSAVE here. */ \
+    (ecx & (1U << 27)) != 0; \
+})
+
 static inline uint64_t xgetbv(uint32_t xcr)
 {
     uint32_t lo, hi;
@@ -168,6 +175,11 @@ static int read_cr(
     {
     case 0:
         *val = 0x00000001; /* PE */
+        return X86EMUL_OKAY;
+
+    case 4:
+        /* OSFXSR, OSXMMEXCPT, and maybe OSXSAVE */
+        *val = 0x00000600 | (cpu_has_xsave ? 0x00040000 : 0);
         return X86EMUL_OKAY;
     }
 
