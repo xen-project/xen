@@ -424,6 +424,7 @@ typedef union {
 
 #define CR4_TSD        (1<<2)
 #define CR4_OSFXSR     (1<<9)
+#define CR4_OSXMMEXCPT (1<<10)
 #define CR4_UMIP       (1<<11)
 #define CR4_OSXSAVE    (1<<18)
 
@@ -459,6 +460,7 @@ typedef union {
 #define EXC_GP 13
 #define EXC_PF 14
 #define EXC_MF 16
+#define EXC_XM 19
 
 /* Segment selector error code bits. */
 #define ECODE_EXT (1 << 0)
@@ -742,13 +744,14 @@ do {                                                                    \
 
 struct fpu_insn_ctxt {
     uint8_t insn_bytes;
-    uint8_t exn_raised;
+    int8_t exn_raised;
 };
 
 static void fpu_handle_exception(void *_fic, struct cpu_user_regs *regs)
 {
     struct fpu_insn_ctxt *fic = _fic;
-    fic->exn_raised = 1;
+    ASSERT(regs->entry_vector < 0x20);
+    fic->exn_raised = regs->entry_vector;
     regs->eip += fic->insn_bytes;
 }
 
@@ -760,7 +763,7 @@ static int _get_fpu(
 {
     int rc;
 
-    fic->exn_raised = 0;
+    fic->exn_raised = -1;
 
     fail_if(!ops->get_fpu);
     rc = ops->get_fpu(fpu_handle_exception, fic, type, ctxt);
@@ -818,7 +821,15 @@ do {                                                            \
 #define put_fpu(_fic)                                           \
 do {                                                            \
     _put_fpu();                                                 \
-    generate_exception_if((_fic)->exn_raised, EXC_MF, -1);      \
+    if( (_fic)->exn_raised == EXC_XM && ops->read_cr )          \
+    {                                                           \
+        unsigned long cr4;                                      \
+        if ( (ops->read_cr(4, &cr4, ctxt) == X86EMUL_OKAY) &&   \
+             !(cr4 & CR4_OSXMMEXCPT) )                          \
+            (_fic)->exn_raised = EXC_UD;                        \
+    }                                                           \
+    generate_exception_if((_fic)->exn_raised >= 0,              \
+                          (_fic)->exn_raised, -1);              \
 } while (0)
 
 #define emulate_fpu_insn(_op)                           \
