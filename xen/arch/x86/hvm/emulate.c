@@ -1026,17 +1026,6 @@ static int hvmemul_cmpxchg(
     unsigned int bytes,
     struct x86_emulate_ctxt *ctxt)
 {
-    struct hvm_emulate_ctxt *hvmemul_ctxt =
-        container_of(ctxt, struct hvm_emulate_ctxt, ctxt);
-
-    if ( unlikely(hvmemul_ctxt->set_context) )
-    {
-        int rc = set_context_data(p_new, bytes);
-
-        if ( rc != X86EMUL_OKAY )
-            return rc;
-    }
-
     /* Fix this in case the guest is really relying on r-m-w atomicity. */
     return hvmemul_write(seg, offset, p_new, bytes, ctxt);
 }
