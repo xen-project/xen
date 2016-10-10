@@ -2754,14 +2754,6 @@ static int hvm_load_segment_selector(
     do {
         desc = *pdesc;
 
-        /* Segment present in memory? */
-        if ( !(desc.b & _SEGMENT_P) )
-        {
-            fault_type = (seg != x86_seg_ss) ? TRAP_no_segment
-                                             : TRAP_stack_error;
-            goto unmap_and_fail;
-        }
-
         /* LDT descriptor is a system segment. All others are code/data. */
         if ( (desc.b & (1u<<12)) == ((seg == x86_seg_ldtr) << 12) )
             goto unmap_and_fail;
@@ -2805,6 +2797,14 @@ static int hvm_load_segment_selector(
                  && ((dpl < cpl) || (dpl < rpl)) )
                 goto unmap_and_fail;
             break;
+        }
+
+        /* Segment present in memory? */
+        if ( !(desc.b & _SEGMENT_P) )
+        {
+            fault_type = (seg != x86_seg_ss) ? TRAP_no_segment
+                                             : TRAP_stack_error;
+            goto unmap_and_fail;
         }
     } while ( !(desc.b & 0x100) && /* Ensure Accessed flag is set */
               writable && /* except if we are to discard writes */
@@ -2892,17 +2892,17 @@ void hvm_task_switch(
     if ( tr.attr.fields.g )
         tr.limit = (tr.limit << 12) | 0xfffu;
 
-    if ( !tr.attr.fields.p )
-    {
-        hvm_inject_hw_exception(TRAP_no_segment, tss_sel & 0xfff8);
-        goto out;
-    }
-
     if ( tr.attr.fields.type != ((taskswitch_reason == TSW_iret) ? 0xb : 0x9) )
     {
         hvm_inject_hw_exception(
             (taskswitch_reason == TSW_iret) ? TRAP_invalid_tss : TRAP_gp_fault,
             tss_sel & 0xfff8);
+        goto out;
+    }
+
+    if ( !tr.attr.fields.p )
+    {
+        hvm_inject_hw_exception(TRAP_no_segment, tss_sel & 0xfff8);
         goto out;
     }
 
