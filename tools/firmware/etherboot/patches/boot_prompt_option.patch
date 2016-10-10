@@ -1,24 +1,22 @@
-diff --git a/src/arch/i386/prefix/romprefix.S b/src/arch/i386/prefix/romprefix.S
-index 0f92415..cce7505 100644
---- a/src/arch/i386/prefix/romprefix.S
-+++ b/src/arch/i386/prefix/romprefix.S
-@@ -391,6 +391,7 @@ no_pmm:
- 	xorw	%di, %di
- 	cs rep	movsb
- 
+--- a/src/arch/x86/prefix/romprefix.S	2016-10-10 13:09:18.126031400 +0100
++++ b/src/arch/x86/prefix/romprefix.S	2016-10-10 13:11:22.930680278 +0100
+@@ -468,6 +468,7 @@
+ 	testb	$PCI_FUNC_MASK, init_pci_busdevfn
+ 	jnz	no_shell
+ .endif
 +#ifndef NO_POST_PROMPT
  	/* Prompt for POST-time shell */
  	movw	$init_message_prompt, %si
  	xorw	%di, %di
-@@ -418,6 +419,7 @@ no_pmm:
+@@ -495,6 +496,7 @@
  	pushw	%cs
  	call	exec
- 2:
 +#endif
- 	/* Restore registers */
- 	popw	%gs
- 	popw	%fs
-@@ -546,6 +548,7 @@ init_message_pmm:
+ no_shell:
+ 	movb	$( '\n' ), %al
+ 	xorw	%di, %di
+ 	call	print_character
+@@ -636,6 +638,7 @@
  init_message_int19:
  	.asciz	" INT19"
  	.size	init_message_int19, . - init_message_int19
@@ -26,7 +24,7 @@ index 0f92415..cce7505 100644
  init_message_prompt:
  	.asciz	"\nPress Ctrl-B to configure "
  	.size	init_message_prompt, . - init_message_prompt
-@@ -555,6 +558,7 @@ init_message_dots:
+@@ -645,6 +648,7 @@
  init_message_done:
  	.asciz	"\n\n"
  	.size	init_message_done, . - init_message_done

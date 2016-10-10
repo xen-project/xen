@@ -10,7 +10,7 @@ else
 IPXE_GIT_URL ?= git://git.ipxe.org/ipxe.git
 endif
 
-IPXE_GIT_TAG := 9a93db3f0947484e30e753bbd61a10b17336e20e
+IPXE_GIT_TAG := 827dd1bfee67daa683935ce65316f7e0f057fe1c
 
 IPXE_TARBALL_URL ?= $(XEN_EXTFILES_URL)/ipxe-git-$(IPXE_GIT_TAG).tar.gz
 
