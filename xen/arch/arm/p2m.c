@@ -98,8 +98,6 @@ void p2m_restore_state(struct vcpu *n)
     register_t hcr;
 
     hcr = READ_SYSREG(HCR_EL2);
-    WRITE_SYSREG(hcr & ~HCR_VM, HCR_EL2);
-    isb();
 
     p2m_load_VTTBR(n->domain);
     isb();
