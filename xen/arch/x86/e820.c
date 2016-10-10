@@ -419,8 +419,6 @@ static void __init clip_to_limit(uint64_t limit, char *warnmsg)
 }
 
 /* Conservative estimate of top-of-RAM by looking for MTRR WB regions. */
-#define MSR_MTRRphysBase(reg) (0x200 + 2 * (reg))
-#define MSR_MTRRphysMask(reg) (0x200 + 2 * (reg) + 1)
 static uint64_t __init mtrr_top_of_ram(void)
 {
     uint32_t eax, ebx, ecx, edx;
@@ -477,8 +475,8 @@ static uint64_t __init mtrr_top_of_ram(void)
     top = 0;
     for ( i = 0; i < (uint8_t)mtrr_cap; i++ )
     {
-        rdmsrl(MSR_MTRRphysBase(i), base);
-        rdmsrl(MSR_MTRRphysMask(i), mask);
+        rdmsrl(MSR_IA32_MTRR_PHYSBASE(i), base);
+        rdmsrl(MSR_IA32_MTRR_PHYSMASK(i), mask);
 
         if ( e820_verbose )
             printk(" MTRR[%d]: base %"PRIx64" mask %"PRIx64"\n",
