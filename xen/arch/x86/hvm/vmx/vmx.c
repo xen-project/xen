@@ -3096,19 +3096,20 @@ static void vmx_failed_vmentry(unsigned int exit_reason,
     unsigned long exit_qualification;
     struct vcpu *curr = current;
 
-    printk("Failed vm entry (exit reason %#x) ", exit_reason);
+    printk("%pv vmentry failure (reason %#x): ", curr, exit_reason);
     __vmread(EXIT_QUALIFICATION, &exit_qualification);
     switch ( failed_vmentry_reason )
     {
     case EXIT_REASON_INVALID_GUEST_STATE:
-        printk("caused by invalid guest state (%ld).\n", exit_qualification);
+        printk("Invalid guest state (%lu)\n", exit_qualification);
         break;
+
     case EXIT_REASON_MSR_LOADING:
     {
         unsigned long idx = exit_qualification - 1;
         const struct vmx_msr_entry *msr;
 
-        printk("caused by MSR loading (entry %lu).\n", idx);
+        printk("MSR loading (entry %lu)\n", idx);
 
         if ( idx >= (PAGE_SIZE / sizeof(*msr)) )
             printk("  Entry out of range\n");
@@ -3121,13 +3122,15 @@ static void vmx_failed_vmentry(unsigned int exit_reason,
         }
         break;
     }
+
     case EXIT_REASON_MCE_DURING_VMENTRY:
-        printk("caused by machine check.\n");
+        printk("MCE\n");
         HVMTRACE_0D(MCE);
         /* Already handled. */
         break;
+
     default:
-        printk("reason not known yet!");
+        printk("Unknown\n");
         break;
     }
 
