@@ -879,6 +879,24 @@ do {                                                                    \
     put_stub(stub);                                                     \
 } while (0)
 
+#define emulate_fpu_insn_stub_eflags(bytes...)                          \
+do {                                                                    \
+    unsigned int nr_ = sizeof((uint8_t[]){ bytes });                    \
+    struct fpu_insn_ctxt fic_ = { .insn_bytes = nr_ };                  \
+    unsigned long tmp_;                                                 \
+    memcpy(get_stub(stub), ((uint8_t[]){ bytes, 0xc3 }), nr_ + 1);      \
+    get_fpu(X86EMUL_FPU_fpu, &fic_);                                    \
+    asm volatile ( _PRE_EFLAGS("[eflags]", "[mask]", "[tmp]")           \
+                   "call *%[func];"                                     \
+                   _POST_EFLAGS("[eflags]", "[mask]", "[tmp]")          \
+                   : [eflags] "+g" (_regs.eflags),                      \
+                     [tmp] "=&r" (tmp_)                                 \
+                   : [func] "rm" (stub.func),                           \
+                     [mask] "i" (EFLG_ZF|EFLG_PF|EFLG_CF) );            \
+    put_fpu(&fic_);                                                     \
+    put_stub(stub);                                                     \
+} while (0)
+
 static unsigned long _get_rep_prefix(
     const struct cpu_user_regs *int_regs,
     int ad_bytes)
@@ -1242,6 +1260,7 @@ static bool_t vcpu_has(
 #define vcpu_must_have(leaf, reg, bit) \
     generate_exception_if(!vcpu_has(leaf, reg, bit, ctxt, ops), EXC_UD, -1)
 #define vcpu_must_have_fpu()  vcpu_must_have(0x00000001, EDX, 0)
+#define vcpu_must_have_cmov() vcpu_must_have(0x00000001, EDX, 15)
 #define vcpu_must_have_mmx()  vcpu_must_have(0x00000001, EDX, 23)
 #define vcpu_must_have_sse()  vcpu_must_have(0x00000001, EDX, 25)
 #define vcpu_must_have_sse2() vcpu_must_have(0x00000001, EDX, 26)
@@ -3573,6 +3592,9 @@ x86_emulate(
         case 0xc8 ... 0xcf: /* fcmove %stN */
         case 0xd0 ... 0xd7: /* fcmovbe %stN */
         case 0xd8 ... 0xdf: /* fcmovu %stN */
+            vcpu_must_have_cmov();
+            emulate_fpu_insn_stub_eflags(0xda, modrm);
+            break;
         case 0xe9:          /* fucompp */
             emulate_fpu_insn_stub(0xda, modrm);
             break;
@@ -3621,7 +3643,10 @@ x86_emulate(
         case 0xc8 ... 0xcf: /* fcmovne %stN */
         case 0xd0 ... 0xd7: /* fcmovnbe %stN */
         case 0xd8 ... 0xdf: /* fcmovnu %stN */
-            emulate_fpu_insn_stub(0xdb, modrm);
+        case 0xe8 ... 0xef: /* fucomi %stN */
+        case 0xf0 ... 0xf7: /* fcomi %stN */
+            vcpu_must_have_cmov();
+            emulate_fpu_insn_stub_eflags(0xdb, modrm);
             break;
         case 0xe2: /* fnclex */
             emulate_fpu_insn("fnclex");
@@ -3630,10 +3655,6 @@ x86_emulate(
             emulate_fpu_insn("fninit");
             break;
         case 0xe4: /* fsetpm - 287 only, ignored by 387 */
-            break;
-        case 0xe8 ... 0xef: /* fucomi %stN */
-        case 0xf0 ... 0xf7: /* fcomi %stN */
-            emulate_fpu_insn_stub(0xdb, modrm);
             break;
         default:
             fail_if(modrm >= 0xc0);
@@ -3852,7 +3873,8 @@ x86_emulate(
             break;
         case 0xe8 ... 0xef: /* fucomip %stN */
         case 0xf0 ... 0xf7: /* fcomip %stN */
-            emulate_fpu_insn_stub(0xdf, modrm);
+            vcpu_must_have_cmov();
+            emulate_fpu_insn_stub_eflags(0xdf, modrm);
             break;
         default:
             fail_if(modrm >= 0xc0);
@@ -4760,6 +4782,7 @@ x86_emulate(
     }
 
     case X86EMUL_OPC(0x0f, 0x40) ... X86EMUL_OPC(0x0f, 0x4f): /* cmovcc */
+        vcpu_must_have_cmov();
         dst.val = src.val;
         if ( !test_cc(b, _regs.eflags) )
             dst.type = OP_NONE;
