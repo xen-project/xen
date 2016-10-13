@@ -822,6 +822,9 @@ static int flask_sysctl(int cmd)
     case XEN_SYSCTL_livepatch_op:
         return avc_current_has_perm(SECINITSID_XEN, SECCLASS_XEN2,
                                     XEN2__LIVEPATCH_OP, NULL);
+    case XEN_SYSCTL_gcov_op:
+        return avc_current_has_perm(SECINITSID_XEN, SECCLASS_XEN2,
+                                    XEN2__GCOV_OP, NULL);
 
     default:
         return avc_unknown_permission("sysctl", cmd);

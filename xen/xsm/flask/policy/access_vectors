@@ -99,6 +99,8 @@ class xen2
     get_cpu_featureset
 # XEN_SYSCTL_livepatch_op
     livepatch_op
+# XEN_SYSCTL_gcov_op
+    gcov_op
 }
 
 # Classes domain and domain2 consist of operations that a domain performs on
