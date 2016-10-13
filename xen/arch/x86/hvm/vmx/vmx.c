@@ -3104,8 +3104,23 @@ static void vmx_failed_vmentry(unsigned int exit_reason,
         printk("caused by invalid guest state (%ld).\n", exit_qualification);
         break;
     case EXIT_REASON_MSR_LOADING:
-        printk("caused by MSR entry %ld loading.\n", exit_qualification);
+    {
+        unsigned long idx = exit_qualification - 1;
+        const struct vmx_msr_entry *msr;
+
+        printk("caused by MSR loading (entry %lu).\n", idx);
+
+        if ( idx >= (PAGE_SIZE / sizeof(*msr)) )
+            printk("  Entry out of range\n");
+        else
+        {
+            msr = &curr->arch.hvm_vmx.msr_area[idx];
+
+            printk("  msr %08x val %016"PRIx64" (mbz %#x)\n",
+                   msr->index, msr->data, msr->mbz);
+        }
         break;
+    }
     case EXIT_REASON_MCE_DURING_VMENTRY:
         printk("caused by machine check.\n");
         HVMTRACE_0D(MCE);
