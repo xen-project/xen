@@ -2037,6 +2037,30 @@ int hvm_set_efer(uint64_t value)
         return X86EMUL_EXCEPTION;
     }
 
+    if ( (value & EFER_LME) && !(v->arch.hvm_vcpu.guest_efer & EFER_LME) )
+    {
+        struct segment_register cs;
+
+        hvm_get_segment_register(v, x86_seg_cs, &cs);
+
+        /*
+         * %cs may be loaded with both .D and .L set in legacy mode, and both
+         * are captured in the VMCS/VMCB.
+         *
+         * If a guest does this and then tries to transition into long mode,
+         * the vmentry from setting LME fails due to invalid guest state,
+         * because %cr0.PG is still clear.
+         *
+         * When LME becomes set, clobber %cs.L to keep the guest firmly in
+         * compatibility mode until it reloads %cs itself.
+         */
+        if ( cs.attr.fields.l )
+        {
+            cs.attr.fields.l = 0;
+            hvm_set_segment_register(v, x86_seg_cs, &cs);
+        }
+    }
+
     if ( nestedhvm_enabled(v->domain) && cpu_has_svm &&
        ((value & EFER_SVME) == 0 ) &&
        ((value ^ v->arch.hvm_vcpu.guest_efer) & EFER_SVME) )
