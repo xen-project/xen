@@ -1405,6 +1405,14 @@ protmode_load_seg(
                /* Non-conforming segment: check RPL and DPL against CPL. */
                : rpl > cpl || dpl != cpl )
             goto raise_exn;
+        /*
+         * 64-bit code segments (L bit set) must have D bit clear.
+         * Experimentally in long mode, the L and D bits are checked before
+         * the Present bit.
+         */
+        if ( in_longmode(ctxt, ops) &&
+             (desc.b & (1 << 21)) && (desc.b & (1 << 22)) )
+            goto raise_exn;
         sel = (sel ^ rpl) | cpl;
         break;
     case x86_seg_ss:
@@ -1443,11 +1451,6 @@ protmode_load_seg(
         fault_type = seg != x86_seg_ss ? EXC_NP : EXC_SS;
         goto raise_exn;
     }
-
-    /* 64-bit code segments (L bit set) must have D bit clear. */
-    if ( seg == x86_seg_cs && in_longmode(ctxt, ops) &&
-         (desc.b & (1 << 21)) && (desc.b & (1 << 22)) )
-        goto raise_exn;
 
     /* Ensure Accessed flag is set. */
     if ( a_flag && !(desc.b & a_flag) )
