@@ -36,6 +36,9 @@
 /* Define to 1 if you have the `fdt' library (-lfdt). */
 #undef HAVE_LIBFDT
 
+/* Define to 1 if you have the `lzma' library (-llzma). */
+#undef HAVE_LIBLZMA
+
 /* Define to 1 if you have the `yajl' library (-lyajl). */
 #undef HAVE_LIBYAJL
 
