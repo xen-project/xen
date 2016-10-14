@@ -2628,7 +2628,7 @@ int p2m_change_altp2m_gfn(struct domain *d, unsigned int idx,
     if ( !mfn_valid(mfn) )
     {
         mfn = __get_gfn_type_access(hp2m, gfn_x(old_gfn), &t, &a,
-                                    P2M_ALLOC | P2M_UNSHARE, &page_order, 0);
+                                    P2M_ALLOC, &page_order, 0);
 
         if ( !mfn_valid(mfn) || t != p2m_ram_rw )
             goto out;
