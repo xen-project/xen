@@ -2643,13 +2643,8 @@ x86_emulate(
         fail_if(ops->read_segment == NULL);
         if ( (rc = ops->read_segment(src.val, &sreg, ctxt)) != 0 )
             goto done;
-        /* 64-bit mode: PUSH defaults to a 64-bit operand. */
-        if ( mode_64bit() && (op_bytes == 4) )
-            op_bytes = 8;
-        if ( (rc = ops->write(x86_seg_ss, sp_pre_dec(op_bytes),
-                              &sreg.sel, op_bytes, ctxt)) != 0 )
-            goto done;
-        break;
+        src.val = sreg.sel;
+        goto push;
 
     case 0x07: /* pop %%es */
         src.val = x86_seg_es;
@@ -3064,13 +3059,15 @@ x86_emulate(
 
     case 0x9a: /* call (far, absolute) */
         ASSERT(!mode_64bit());
+    far_call:
         fail_if(ops->read_segment == NULL);
 
         if ( (rc = ops->read_segment(x86_seg_cs, &sreg, ctxt)) ||
              (rc = load_seg(x86_seg_cs, imm2, 0, &cs, ctxt, ops)) ||
              (validate_far_branch(&cs, imm1),
+              src.val = sreg.sel,
               rc = ops->write(x86_seg_ss, sp_pre_dec(op_bytes),
-                              &sreg.sel, op_bytes, ctxt)) ||
+                              &src.val, op_bytes, ctxt)) ||
              (rc = ops->write(x86_seg_ss, sp_pre_dec(op_bytes),
                               &_regs.eip, op_bytes, ctxt)) ||
              (rc = ops->write_segment(x86_seg_cs, &cs, ctxt)) )
@@ -4025,6 +4022,7 @@ x86_emulate(
 
     case 0xea: /* jmp (far, absolute) */
         ASSERT(!mode_64bit());
+    far_jmp:
         if ( (rc = load_seg(x86_seg_cs, imm2, 0, &cs, ctxt, ops)) ||
              (rc = commit_far_branch(&cs, imm1)) )
             goto done;
@@ -4288,36 +4286,16 @@ x86_emulate(
             dst.type = OP_NONE;
             break;
         case 3: /* call (far, absolute indirect) */
-        case 5: /* jmp (far, absolute indirect) */ {
-            unsigned long sel;
-
+        case 5: /* jmp (far, absolute indirect) */
             generate_exception_if(src.type != OP_MEM, EXC_UD, -1);
 
             if ( (rc = read_ulong(src.mem.seg, src.mem.off + op_bytes,
-                                  &sel, 2, ctxt, ops)) )
+                                  &imm2, 2, ctxt, ops)) )
                 goto done;
-
-            if ( (modrm_reg & 7) == 3 ) /* call */
-            {
-                fail_if(ops->read_segment == NULL);
-                if ( (rc = ops->read_segment(x86_seg_cs, &sreg, ctxt)) ||
-                     (rc = load_seg(x86_seg_cs, sel, 0, &cs, ctxt, ops)) ||
-                     (validate_far_branch(&cs, src.val),
-                      rc = ops->write(x86_seg_ss, sp_pre_dec(op_bytes),
-                                      &sreg.sel, op_bytes, ctxt)) ||
-                     (rc = ops->write(x86_seg_ss, sp_pre_dec(op_bytes),
-                                      &_regs.eip, op_bytes, ctxt)) ||
-                     (rc = ops->write_segment(x86_seg_cs, &cs, ctxt)) )
-                    goto done;
-                _regs.eip = src.val;
-            }
-            else if ( (rc = load_seg(x86_seg_cs, sel, 0, &cs, ctxt, ops)) ||
-                      (rc = commit_far_branch(&cs, src.val)) )
-                goto done;
-
-            dst.type = OP_NONE;
-            break;
-        }
+            imm1 = src.val;
+            if ( !(modrm_reg & 4) )
+                goto far_call;
+            goto far_jmp;
         case 6: /* push */
             goto push;
         case 7:
