@@ -1,0 +1,97 @@
+% Credit Scheduler
+% Revision 1
+
+\clearpage
+
+# Basics
+---------------- ----------------------------------------------------
+         Status: **Supported**
+
+      Component: Hypervisor
+---------------- ----------------------------------------------------
+
+# Overview
+
+Credit (also known as Credit1) is the default virtual CPU (vCPU) scheduler
+of the Xen hypervisor.
+
+It is a general purpose, weighted fair-share scheduler.
+
+# User details
+
+Xen supports multiple schedulers. As said, Credit is the default, so it
+is used automatically, unless the `sched=$SCHED` (with `$SCHED` different
+than `credit`) parameter is passed to Xen via the bootloader.
+
+Once the system is live, for creating a cpupool with Credit as its
+scheduler, either compile a cpupool configuration file, as described
+in `docs/man/xlcpupool.cfg.pod.5` (and as exemplified in
+`tools/examples/cpupool`), or use just `xl` directly:
+
+    xl cpupool-create name=\"pool1\" sched=\"credit\" cpus=[4,8]
+
+Two kind of interactions with the scheduler are possible:
+
+* checking or changing the global parameters, via, e.g.:
+    * `xl sched-credit -s`
+    * `xl sched-credit -s -p pool1`
+    * `xl sched-credit -s -t 20`
+* checking or changing a VM's scheduling parameters, via, e.g.:
+    * `xl sched-credit -d vm1`
+    * `xl sched-credit -d vm1 -w 512`
+
+# Technical details
+
+Implementation entirely lives in the hypervisor. Xen has a pluggable,
+hook based, architecture for schedulers. Thanks to this, Credit code
+is all contained in `xen/common/sched_credit.c`.
+
+# Limitations
+
+In Credit, a vCPU has a priority, a status (i.e., active or inactive),
+a weight and some credits... and all these things interact in a rather
+involved way. Also, with years of use, things have gotten even more
+complex (due to, e.g., the introduction of boosting, caps and vCPU
+soft-affinity).
+
+Dealing with such complexity is starting to be an issue. Odd behavior
+or subtle scheduling anomalies, that is not always possible to act upon,
+have been identified already. [1][2][3]
+
+A certain lack of scalability and difficulties and weakness in dealing
+with mixed workloads and VMs with low latency requirements are other
+known problems. [4] For all these reasons, effort is ongoing to have
+Credit2 become the new default scheduler.
+
+# Testing
+
+Any change to Credit code must to be tested by doing at least the following:
+
+* create a few virtual machine and verify that they boot and can
+  run some basic workload (e.g., login into them and run simple commands),
+* shutdown/reboot the virtual machines,
+* shutdown the system.
+
+Ideally, all the above steps should **also** be performed in a configuration
+that includes cpupools, better if with pools using different schedulers, and
+by also doing the following:
+
+* move the virtual machines between cpupools.
+
+# References
+
+* [potential non-ideal behavior on hyperthreaded systems](https://lists.xenproject.org/archives/html/xen-devel/2014-07/msg01848.html) [1]
+* [long standing BOOST vs. migration bug](https://lists.xen.org/archives/html/xen-devel/2015-10/msg02851.html) [2]
+* [priority handling issues](https://lists.xenproject.org/archives/html/xen-devel/2016-05/msg01362.html) [3]
+* "Scheduler development update", XenSummit Asia 2009 [whitepaper](http://www-archive.xenproject.org/files/xensummit_intel09/George_Dunlap.pdf) [4]
+* "Scheduling in Xen" [XPDS15 Presentation](http://events.linuxfoundation.org/sites/events/files/slides/Faggioli_XenSummit.pdf)
+* "The Credit Scheduler" [on the Xen-Project wiki](https://wiki.xenproject.org/wiki/Credit_Scheduler)
+* "Xen Project Schedulers" [on the Xen-Project wiki](https://wiki.xenproject.org/wiki/Xen_Project_Schedulers)
+
+# History
+
+------------------------------------------------------------------------
+Date       Revision Version  Notes
+---------- -------- -------- -------------------------------------------
+2016-10-14 1        Xen 4.8  Document written
+---------- -------- -------- -------------------------------------------
