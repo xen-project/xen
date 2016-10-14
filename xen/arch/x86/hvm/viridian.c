@@ -667,9 +667,9 @@ int viridian_hypercall(struct cpu_user_regs *regs)
         output_params_gpa = regs->r8;
         break;
     case 4:
-        input.raw = ((uint64_t)regs->edx << 32) | regs->eax;
-        input_params_gpa = ((uint64_t)regs->ebx << 32) | regs->ecx;
-        output_params_gpa = ((uint64_t)regs->edi << 32) | regs->esi;
+        input.raw = (regs->rdx << 32) | regs->_eax;
+        input_params_gpa = (regs->rbx << 32) | regs->_ecx;
+        output_params_gpa = (regs->rdi << 32) | regs->_esi;
         break;
     default:
         goto out;
@@ -770,8 +770,8 @@ out:
         regs->rax = output.raw;
         break;
     default:
-        regs->edx = output.raw >> 32;
-        regs->eax = output.raw;
+        regs->rdx = output.raw >> 32;
+        regs->rax = (uint32_t)output.raw;
         break;
     }
 
