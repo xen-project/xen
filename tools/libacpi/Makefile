@@ -13,12 +13,12 @@
 #
 
 XEN_ROOT = $(CURDIR)/../..
-include $(XEN_ROOT)/tools/firmware/Rules.mk
+include $(XEN_ROOT)/tools/Rules.mk
 
 MK_DSDT = $(ACPI_BUILD_DIR)/mk_dsdt
 
 C_SRC-$(GPL) = dsdt_anycpu.c dsdt_15cpu.c dsdt_anycpu_qemu_xen.c
-C_SRC-$(CONFIG_ARM) = $(ACPI_BUILD_DIR)/dsdt_anycpu_arm.c
+C_SRC-$(CONFIG_ARM_64) = dsdt_anycpu_arm.c
 C_SRC = $(addprefix $(ACPI_BUILD_DIR)/, dsdt_pvh.c $(C_SRC-y))
 H_SRC = $(addprefix $(ACPI_BUILD_DIR)/, ssdt_s3.h ssdt_s4.h ssdt_pm.h ssdt_tpm.h)
 
