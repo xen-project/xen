@@ -446,6 +446,9 @@ typedef union {
 #define EFLG_PF   (1<<2)
 #define EFLG_CF   (1<<0)
 
+/* MXCSR bit definitions. */
+#define MXCSR_MM  (1U << 17)
+
 /* Exception definitions. */
 #define EXC_DE  0
 #define EXC_DB  1
@@ -1253,6 +1256,7 @@ static bool_t vcpu_has(
 
 #define vcpu_has_clflush() vcpu_has(       1, EDX, 19, ctxt, ops)
 #define vcpu_has_lzcnt() vcpu_has(0x80000001, ECX,  5, ctxt, ops)
+#define vcpu_has_misalignsse() vcpu_has(0x80000001, ECX, 7, ctxt, ops)
 #define vcpu_has_bmi1()  vcpu_has(0x00000007, EBX,  3, ctxt, ops)
 #define vcpu_has_hle()   vcpu_has(0x00000007, EBX,  4, ctxt, ops)
 #define vcpu_has_rtm()   vcpu_has(0x00000007, EBX, 11, ctxt, ops)
@@ -4678,7 +4682,13 @@ x86_emulate(
             ea.bytes = vex.pfx & VEX_PREFIX_DOUBLE_MASK ? 8 : 4;
         if ( ea.type == OP_MEM )
         {
-            generate_exception_if((b >= 0x28) &&
+            uint32_t mxcsr = 0;
+
+            if ( b < 0x28 )
+                mxcsr = MXCSR_MM;
+            else if ( vcpu_has_misalignsse() )
+                asm ( "stmxcsr %0" : "=m" (mxcsr) );
+            generate_exception_if(!(mxcsr & MXCSR_MM) &&
                                   !is_aligned(ea.mem.seg, ea.mem.off, ea.bytes,
                                               ctxt, ops),
                                   EXC_GP, 0);
@@ -4958,7 +4968,13 @@ x86_emulate(
         }
         if ( ea.type == OP_MEM )
         {
-            generate_exception_if((vex.pfx == vex_66) &&
+            uint32_t mxcsr = 0;
+
+            if ( vex.pfx != vex_66 )
+                mxcsr = MXCSR_MM;
+            else if ( vcpu_has_misalignsse() )
+                asm ( "stmxcsr %0" : "=m" (mxcsr) );
+            generate_exception_if(!(mxcsr & MXCSR_MM) &&
                                   !is_aligned(ea.mem.seg, ea.mem.off, ea.bytes,
                                               ctxt, ops),
                                   EXC_GP, 0);
