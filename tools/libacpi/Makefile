@@ -15,6 +15,10 @@
 XEN_ROOT = $(CURDIR)/../..
 include $(XEN_ROOT)/tools/Rules.mk
 
+ifeq ($(ACPI_BUILD_DIR),)
+$(error ACPI_BUILD_DIR not set)
+endif
+
 MK_DSDT = $(ACPI_BUILD_DIR)/mk_dsdt
 
 C_SRC-$(GPL) = dsdt_anycpu.c dsdt_15cpu.c dsdt_anycpu_qemu_xen.c
