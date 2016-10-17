@@ -2674,7 +2674,7 @@ static int preserve_domain(uint32_t *r_domid, libxl_event *event,
 
     libxl_uuid_generate(&new_uuid);
 
-    LOG("Preserving domain %d %s with suffix%s",
+    LOG("Preserving domain %u %s with suffix%s",
         *r_domid, d_config->c_info.name, strtime);
     rc = libxl_domain_preserve(ctx, *r_domid, &d_config->c_info,
                                strtime, new_uuid);
@@ -2758,7 +2758,7 @@ static int domain_wait_event(uint32_t domid, libxl_event **event_r)
     for (;;) {
         ret = libxl_event_wait(ctx, event_r, LIBXL_EVENTMASK_ALL, 0,0);
         if (ret) {
-            LOG("Domain %d, failed to get event, quitting (rc=%d)", domid, ret);
+            LOG("Domain %u, failed to get event, quitting (rc=%d)", domid, ret);
             return ret;
         }
         if ((*event_r)->domid != domid) {
@@ -3108,7 +3108,7 @@ start:
         }
         need_daemon = 0;
     }
-    LOG("Waiting for domain %s (domid %d) to die [pid %ld]",
+    LOG("Waiting for domain %s (domid %u) to die [pid %ld]",
         d_config.c_info.name, domid, (long)getpid());
 
     ret = libxl_evenable_domain_death(ctx, domid, 0, &deathw);
@@ -3134,7 +3134,7 @@ start:
         switch (event->type) {
 
         case LIBXL_EVENT_TYPE_DOMAIN_SHUTDOWN:
-            LOG("Domain %d has shut down, reason code %d 0x%x", domid,
+            LOG("Domain %u has shut down, reason code %d 0x%x", domid,
                 event->u.domain_shutdown.shutdown_reason,
                 event->u.domain_shutdown.shutdown_reason);
             switch (handle_domain_death(&domid, event, &d_config)) {
@@ -3198,7 +3198,7 @@ start:
             }
 
         case LIBXL_EVENT_TYPE_DOMAIN_DEATH:
-            LOG("Domain %d has been destroyed.", domid);
+            LOG("Domain %u has been destroyed.", domid);
             libxl_event_free(ctx, event);
             ret = 0;
             goto out;
@@ -3442,7 +3442,7 @@ static int set_memory_max(uint32_t domid, const char *mem)
     }
 
     if (libxl_domain_setmaxmem(ctx, domid, memorykb)) {
-        fprintf(stderr, "cannot set domid %d static max memory to : %s\n", domid, mem);
+        fprintf(stderr, "cannot set domid %u static max memory to : %s\n", domid, mem);
         return EXIT_FAILURE;
     }
 
@@ -3476,7 +3476,7 @@ static int set_memory_target(uint32_t domid, const char *mem)
     }
 
     if (libxl_set_memory_target(ctx, domid, memorykb, 0, /* enforce */ 1)) {
-        fprintf(stderr, "cannot set domid %d dynamic max memory to : %s\n", domid, mem);
+        fprintf(stderr, "cannot set domid %u dynamic max memory to : %s\n", domid, mem);
         return EXIT_FAILURE;
     }
 
@@ -4133,7 +4133,7 @@ static void shutdown_domain(uint32_t domid,
 {
     int rc;
 
-    fprintf(stderr, "Shutting down domain %d\n", domid);
+    fprintf(stderr, "Shutting down domain %u\n", domid);
     rc=libxl_domain_shutdown(ctx, domid);
     if (rc == ERROR_NOPARAVIRT) {
         if (fallback_trigger) {
@@ -4165,7 +4165,7 @@ static void reboot_domain(uint32_t domid, libxl_evgen_domain_death **deathw,
 {
     int rc;
 
-    fprintf(stderr, "Rebooting domain %d\n", domid);
+    fprintf(stderr, "Rebooting domain %u\n", domid);
     rc=libxl_domain_reboot(ctx, domid);
     if (rc == ERROR_NOPARAVIRT) {
         if (fallback_trigger) {
@@ -5625,7 +5625,7 @@ int main_config_update(int argc, char **argv)
         printf_info(default_output_format, -1, &d_config, stdout);
 
     if (!dryrun_only) {
-        fprintf(stderr, "setting dom%d configuration\n", domid);
+        fprintf(stderr, "setting dom%u configuration\n", domid);
         rc = libxl_userdata_store(ctx, domid, "xl",
                                    config_data, config_len);
         if (rc) {
@@ -5951,7 +5951,7 @@ static int vcpuset(uint32_t domid, const char* nr_vcpus, int check_host)
     if (rc == ERROR_DOMAIN_NOTFOUND)
         fprintf(stderr, "Domain %u does not exist.\n", domid);
     else if (rc)
-        fprintf(stderr, "libxl_set_vcpuonline failed domid=%d max_vcpus=%d," \
+        fprintf(stderr, "libxl_set_vcpuonline failed domid=%u max_vcpus=%d," \
                 " rc: %d\n", domid, max_vcpus, rc);
 
     libxl_bitmap_dispose(&cpumap);
@@ -7172,7 +7172,7 @@ int main_domid(int argc, char **argv)
         return EXIT_FAILURE;
     }
 
-    printf("%d\n", domid);
+    printf("%u\n", domid);
 
     return EXIT_SUCCESS;
 }
@@ -7197,7 +7197,7 @@ int main_domname(int argc, char **argv)
 
     domname = libxl_domid_to_name(ctx, domid);
     if (!domname) {
-        fprintf(stderr, "Can't get domain name of domain id '%d', maybe this domain does not exist.\n", domid);
+        fprintf(stderr, "Can't get domain name of domain id '%u', maybe this domain does not exist.\n", domid);
         return EXIT_FAILURE;
     }
 
