@@ -94,9 +94,6 @@ ifeq ($(CONFIG_ARM_64),y)
 LIBXL_OBJS-y += libxl_arm_acpi.o dsdt_anycpu_arm.o
 dsdt_anycpu_arm.c:
 	$(MAKE) -C $(ACPI_PATH) ACPI_BUILD_DIR=$(CURDIR)
-
-libxl_arm_acpi.o: libxl_arm_acpi.c
-	$(CC) -c $(CFLAGS) -o $@ libxl_arm_acpi.c
 else
 LIBXL_OBJS-$(CONFIG_ARM) += libxl_arm_no_acpi.o
 endif
