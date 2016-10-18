@@ -1295,6 +1295,7 @@ static bool vcpu_has(
 #define vcpu_has_bmi1()        vcpu_has(         7, EBX,  3, ctxt, ops)
 #define vcpu_has_hle()         vcpu_has(         7, EBX,  4, ctxt, ops)
 #define vcpu_has_rtm()         vcpu_has(         7, EBX, 11, ctxt, ops)
+#define vcpu_has_smap()        vcpu_has(         7, EBX, 20, ctxt, ops)
 
 #define vcpu_must_have(feat) \
     generate_exception_if(!vcpu_has_##feat(), EXC_UD)
@@ -4354,6 +4355,17 @@ x86_emulate(
 
         switch( modrm )
         {
+        case 0xca: /* clac */
+        case 0xcb: /* stac */
+            vcpu_must_have(smap);
+            generate_exception_if(lock_prefix || vex.pfx || !mode_ring0(),
+                                  EXC_UD);
+
+            _regs.eflags &= ~EFLG_AC;
+            if ( modrm == 0xcb )
+                _regs.eflags |= EFLG_AC;
+            goto no_writeback;
+
 #ifdef __XEN__
         case 0xd1: /* xsetbv */
         {
