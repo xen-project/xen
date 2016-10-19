@@ -54,19 +54,19 @@ static const opcode_desc_t opcode_table[256] = {
     /* 0x00 - 0x07 */
     ByteOp|DstMem|SrcReg|ModRM, DstMem|SrcReg|ModRM,
     ByteOp|DstReg|SrcMem|ModRM, DstReg|SrcMem|ModRM,
-    ByteOp|DstEax|SrcImm, DstEax|SrcImm, ImplicitOps, ImplicitOps,
+    ByteOp|DstEax|SrcImm, DstEax|SrcImm, ImplicitOps|Mov, ImplicitOps|Mov,
     /* 0x08 - 0x0F */
     ByteOp|DstMem|SrcReg|ModRM, DstMem|SrcReg|ModRM,
     ByteOp|DstReg|SrcMem|ModRM, DstReg|SrcMem|ModRM,
-    ByteOp|DstEax|SrcImm, DstEax|SrcImm, ImplicitOps, 0,
+    ByteOp|DstEax|SrcImm, DstEax|SrcImm, ImplicitOps|Mov, 0,
     /* 0x10 - 0x17 */
     ByteOp|DstMem|SrcReg|ModRM, DstMem|SrcReg|ModRM,
     ByteOp|DstReg|SrcMem|ModRM, DstReg|SrcMem|ModRM,
-    ByteOp|DstEax|SrcImm, DstEax|SrcImm, ImplicitOps, ImplicitOps,
+    ByteOp|DstEax|SrcImm, DstEax|SrcImm, ImplicitOps|Mov, ImplicitOps|Mov,
     /* 0x18 - 0x1F */
     ByteOp|DstMem|SrcReg|ModRM, DstMem|SrcReg|ModRM,
     ByteOp|DstReg|SrcMem|ModRM, DstReg|SrcMem|ModRM,
-    ByteOp|DstEax|SrcImm, DstEax|SrcImm, ImplicitOps, ImplicitOps,
+    ByteOp|DstEax|SrcImm, DstEax|SrcImm, ImplicitOps|Mov, ImplicitOps|Mov,
     /* 0x20 - 0x27 */
     ByteOp|DstMem|SrcReg|ModRM, DstMem|SrcReg|ModRM,
     ByteOp|DstReg|SrcMem|ModRM, DstReg|SrcMem|ModRM,
@@ -245,10 +245,10 @@ static const opcode_desc_t twobyte_table[256] = {
     ByteOp|DstMem|SrcNone|ModRM|Mov, ByteOp|DstMem|SrcNone|ModRM|Mov,
     ByteOp|DstMem|SrcNone|ModRM|Mov, ByteOp|DstMem|SrcNone|ModRM|Mov,
     /* 0xA0 - 0xA7 */
-    ImplicitOps, ImplicitOps, ImplicitOps, DstBitBase|SrcReg|ModRM,
+    ImplicitOps|Mov, ImplicitOps|Mov, ImplicitOps, DstBitBase|SrcReg|ModRM,
     DstMem|SrcImmByte|ModRM, DstMem|SrcReg|ModRM, ModRM, ModRM,
     /* 0xA8 - 0xAF */
-    ImplicitOps, ImplicitOps, ImplicitOps, DstBitBase|SrcReg|ModRM,
+    ImplicitOps|Mov, ImplicitOps|Mov, ImplicitOps, DstBitBase|SrcReg|ModRM,
     DstMem|SrcImmByte|ModRM, DstMem|SrcReg|ModRM,
     ImplicitOps|ModRM, DstReg|SrcMem|ModRM,
     /* 0xB0 - 0xB7 */
