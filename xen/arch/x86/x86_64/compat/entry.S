@@ -137,10 +137,10 @@ ENTRY(compat_restore_all_guest)
         .section .altinstructions, "a"
         altinstruction_entry .Lcr4_orig, .Lcr4_orig, X86_FEATURE_ALWAYS, \
                              (.Lcr4_orig_end - .Lcr4_orig), 0
-        altinstruction_entry .Lcr4_orig, .Lcr4_alt, X86_FEATURE_SMEP, \
+        altinstruction_entry .Lcr4_orig, .Lcr4_alt, X86_FEATURE_XEN_SMEP, \
                              (.Lcr4_orig_end - .Lcr4_orig), \
                              (.Lcr4_alt_end - .Lcr4_alt)
-        altinstruction_entry .Lcr4_orig, .Lcr4_alt, X86_FEATURE_SMAP, \
+        altinstruction_entry .Lcr4_orig, .Lcr4_alt, X86_FEATURE_XEN_SMAP, \
                              (.Lcr4_orig_end - .Lcr4_orig), \
                              (.Lcr4_alt_end - .Lcr4_alt)
         .popsection

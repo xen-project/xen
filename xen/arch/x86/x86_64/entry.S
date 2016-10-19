@@ -417,11 +417,11 @@ handle_exception_saved:
 .Lcr4_pv32_alt_end:
         .section .altinstructions, "a"
         altinstruction_entry .Lcr4_pv32_orig, .Lcr4_pv32_alt, \
-                             X86_FEATURE_SMEP, \
+                             X86_FEATURE_XEN_SMEP, \
                              (.Lcr4_pv32_alt_end - .Lcr4_pv32_alt), \
                              (.Lcr4_pv32_alt_end - .Lcr4_pv32_alt)
         altinstruction_entry .Lcr4_pv32_orig, .Lcr4_pv32_alt, \
-                             X86_FEATURE_SMAP, \
+                             X86_FEATURE_XEN_SMAP, \
                              (.Lcr4_pv32_alt_end - .Lcr4_pv32_alt), \
                              (.Lcr4_pv32_alt_end - .Lcr4_pv32_alt)
         .popsection

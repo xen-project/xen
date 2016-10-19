@@ -205,7 +205,7 @@ void ret_from_intr(void);
         .popsection;                                                   \
         .pushsection .altinstructions, "a";                            \
         altinstruction_entry 661b, 661b, X86_FEATURE_ALWAYS, 3, 0;     \
-        altinstruction_entry 661b, 662b, X86_FEATURE_SMAP, 3, 3;       \
+        altinstruction_entry 661b, 662b, X86_FEATURE_XEN_SMAP, 3, 3;       \
         .popsection
 
 #define ASM_STAC ASM_AC(STAC)
@@ -217,21 +217,21 @@ void ret_from_intr(void);
         668: call cr4_pv32_restore;                                \
         .section .altinstructions, "a";                            \
         altinstruction_entry 667b, 667b, X86_FEATURE_ALWAYS, 5, 0; \
-        altinstruction_entry 667b, 668b, X86_FEATURE_SMEP, 5, 5;   \
-        altinstruction_entry 667b, 668b, X86_FEATURE_SMAP, 5, 5;   \
+        altinstruction_entry 667b, 668b, X86_FEATURE_XEN_SMEP, 5, 5;   \
+        altinstruction_entry 667b, 668b, X86_FEATURE_XEN_SMAP, 5, 5;   \
         .popsection
 
 #else
 static always_inline void clac(void)
 {
     /* Note: a barrier is implicit in alternative() */
-    alternative(ASM_NOP3, __stringify(__ASM_CLAC), X86_FEATURE_SMAP);
+    alternative(ASM_NOP3, __stringify(__ASM_CLAC), X86_FEATURE_XEN_SMAP);
 }
 
 static always_inline void stac(void)
 {
     /* Note: a barrier is implicit in alternative() */
-    alternative(ASM_NOP3, __stringify(__ASM_STAC), X86_FEATURE_SMAP);
+    alternative(ASM_NOP3, __stringify(__ASM_STAC), X86_FEATURE_XEN_SMAP);
 }
 #endif
 
