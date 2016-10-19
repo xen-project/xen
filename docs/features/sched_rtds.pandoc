@@ -15,7 +15,7 @@
 RTDS is one of the virtual CPU (vCPU) scheduler available in the Xen
 hypervisor.
 
-RTDS is a real--time scheduler, so its purpose is enabling
+RTDS is a real-time scheduler, so its purpose is enabling
 **deterministic** scheduling of the virtual machine's vCPUs. It has
 been originally developed in the context of the RT-Xen project.
 
@@ -35,8 +35,8 @@ in `docs/man/xlcpupool.cfg.pod.5` (and as exemplified in
 
 For checking or changing a VM's scheduling parameters from xl, do
 as follows:
-    * `xl sched-rtds -d vm-rt`
-    * `xl sched-rtds -d vm-rt -t 10000 -b 25000`
+    * `xl sched-rtds -d vm-rt -v all`
+    * `xl sched-rtds -d vm-rt -v all -p 10000 -b 2500`
 
 It is possible, for a multiple vCPUs VM, to change the parameters of
 each vCPU individually:
@@ -88,7 +88,7 @@ at a macroscopic level), the following should be done:
 
 * create a VM with 1 vCPU and put it in the RTDS cpupool,
 * set the scheduling parameters such as it has a 50% reservation, with
-  `xl sched-rtds -d vm -t 100000 -b 50000`,
+  `xl sched-rtds -d vm -v all -p 100000 -b 50000`,
 * run a CPU-burning process inside the VM (e.g., `yes`),
 * check with `xentop` (in Domain0) that the VM is getting no more than
   50% pCPU time.
