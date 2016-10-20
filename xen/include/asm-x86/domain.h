@@ -557,6 +557,9 @@ struct arch_vcpu
      * and thus should be saved/restored. */
     bool_t nonlazy_xstate_used;
 
+    /* Has the guest enabled CPUID faulting? */
+    bool cpuid_faulting;
+
     /*
      * The SMAP check policy when updating runstate_guest(v) and the
      * secondary system time.

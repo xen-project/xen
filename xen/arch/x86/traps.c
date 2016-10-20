@@ -1320,6 +1320,15 @@ static int emulate_forced_invalid_op(struct cpu_user_regs *regs)
     }
     if ( memcmp(instr, "\xf\xa2", sizeof(instr)) )
         return 0;
+
+    /* If cpuid faulting is enabled and CPL>0 inject a #GP in place of #UD. */
+    if ( current->arch.cpuid_faulting && !guest_kernel_mode(current, regs) )
+    {
+        regs->eip = eip;
+        do_guest_trap(TRAP_gp_fault, regs);
+        return EXCRET_fault_fixed;
+    }
+
     eip += sizeof(instr);
 
     pv_cpuid(regs);
@@ -2479,6 +2488,17 @@ static int priv_op_read_msr(unsigned int reg, uint64_t *val,
              rdmsr_safe(MSR_INTEL_PLATFORM_INFO, *val) )
             break;
         *val = 0;
+        if ( this_cpu(cpuid_faulting_enabled) )
+            *val |= MSR_PLATFORM_INFO_CPUID_FAULTING;
+        return X86EMUL_OKAY;
+
+    case MSR_INTEL_MISC_FEATURES_ENABLES:
+        if ( boot_cpu_data.x86_vendor != X86_VENDOR_INTEL ||
+             rdmsr_safe(MSR_INTEL_MISC_FEATURES_ENABLES, *val) )
+            break;
+        *val = 0;
+        if ( curr->arch.cpuid_faulting )
+            *val |= MSR_MISC_FEATURES_CPUID_FAULTING;
         return X86EMUL_OKAY;
 
     case MSR_P6_PERFCTR(0)...MSR_P6_PERFCTR(7):
@@ -2680,6 +2700,17 @@ static int priv_op_write_msr(unsigned int reg, uint64_t val,
         if ( boot_cpu_data.x86_vendor != X86_VENDOR_INTEL ||
              val || rdmsr_safe(MSR_INTEL_PLATFORM_INFO, val) )
             break;
+        return X86EMUL_OKAY;
+
+    case MSR_INTEL_MISC_FEATURES_ENABLES:
+        if ( boot_cpu_data.x86_vendor != X86_VENDOR_INTEL ||
+             (val & ~MSR_MISC_FEATURES_CPUID_FAULTING) ||
+             rdmsr_safe(MSR_INTEL_MISC_FEATURES_ENABLES, temp) )
+            break;
+        if ( (val & MSR_MISC_FEATURES_CPUID_FAULTING) &&
+             !this_cpu(cpuid_faulting_enabled) )
+            break;
+        curr->arch.cpuid_faulting = !!(val & MSR_MISC_FEATURES_CPUID_FAULTING);
         return X86EMUL_OKAY;
 
     case MSR_P6_PERFCTR(0)...MSR_P6_PERFCTR(7):
@@ -3191,6 +3222,10 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         break;
 
     case 0xa2: /* CPUID */
+        /* If cpuid faulting is enabled and CPL>0 leave the #GP untouched. */
+        if ( v->arch.cpuid_faulting && !guest_kernel_mode(v, regs) )
+            goto fail;
+
         pv_cpuid(regs);
         break;
 

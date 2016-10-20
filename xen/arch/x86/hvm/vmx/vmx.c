@@ -2433,6 +2433,12 @@ static int vmx_do_cpuid(struct cpu_user_regs *regs)
     unsigned int eax, ebx, ecx, edx;
     unsigned int leaf, subleaf;
 
+    if ( hvm_check_cpuid_faulting(current) )
+    {
+        hvm_inject_hw_exception(TRAP_gp_fault, 0);
+        return 1;  /* Don't advance the guest IP! */
+    }
+
     eax = regs->eax;
     ebx = regs->ebx;
     ecx = regs->ecx;
@@ -2699,9 +2705,13 @@ static int vmx_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
         break;
 
     case MSR_INTEL_PLATFORM_INFO:
-        if ( rdmsr_safe(MSR_INTEL_PLATFORM_INFO, *msr_content) )
-            goto gp_fault;
+        *msr_content = MSR_PLATFORM_INFO_CPUID_FAULTING;
+        break;
+
+    case MSR_INTEL_MISC_FEATURES_ENABLES:
         *msr_content = 0;
+        if ( current->arch.cpuid_faulting )
+            *msr_content |= MSR_MISC_FEATURES_CPUID_FAULTING;
         break;
 
     default:
@@ -2928,6 +2938,13 @@ static int vmx_msr_write_intercept(unsigned int msr, uint64_t msr_content)
         if ( msr_content ||
              rdmsr_safe(MSR_INTEL_PLATFORM_INFO, msr_content) )
             goto gp_fault;
+        break;
+
+    case MSR_INTEL_MISC_FEATURES_ENABLES:
+        if ( msr_content & ~MSR_MISC_FEATURES_CPUID_FAULTING )
+            goto gp_fault;
+        v->arch.cpuid_faulting =
+            !!(msr_content & MSR_MISC_FEATURES_CPUID_FAULTING);
         break;
 
     default:

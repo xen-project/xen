@@ -3680,6 +3680,20 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
     }
 }
 
+bool hvm_check_cpuid_faulting(struct vcpu *v)
+{
+    struct segment_register sreg;
+
+    if ( !v->arch.cpuid_faulting )
+        return false;
+
+    hvm_get_segment_register(v, x86_seg_ss, &sreg);
+    if ( sreg.attr.fields.dpl == 0 )
+        return false;
+
+    return true;
+}
+
 static uint64_t _hvm_rdtsc_intercept(void)
 {
     struct vcpu *curr = current;

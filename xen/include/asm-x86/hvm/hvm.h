@@ -414,6 +414,7 @@ void hvm_hypervisor_cpuid_leaf(uint32_t sub_idx,
                                uint32_t *ecx, uint32_t *edx);
 void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
                                    unsigned int *ecx, unsigned int *edx);
+bool hvm_check_cpuid_faulting(struct vcpu *v);
 void hvm_migrate_timers(struct vcpu *v);
 void hvm_do_resume(struct vcpu *v);
 void hvm_migrate_pirqs(struct vcpu *v);
