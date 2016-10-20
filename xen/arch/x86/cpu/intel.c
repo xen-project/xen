@@ -18,7 +18,7 @@
 
 #define select_idle_routine(x) ((void)0)
 
-static bool_t __init probe_intel_cpuid_faulting(void)
+static bool __init probe_intel_cpuid_faulting(void)
 {
 	uint64_t x;
 
@@ -32,10 +32,11 @@ static bool_t __init probe_intel_cpuid_faulting(void)
 	return 1;
 }
 
-static void set_cpuid_faulting(bool_t enable)
+DEFINE_PER_CPU(bool, cpuid_faulting_enabled);
+
+static void set_cpuid_faulting(bool enable)
 {
-	static DEFINE_PER_CPU(bool_t, cpuid_faulting_enabled);
-	bool_t *this_enabled = &this_cpu(cpuid_faulting_enabled);
+	bool *this_enabled = &this_cpu(cpuid_faulting_enabled);
 	uint32_t hi, lo;
 
 	ASSERT(cpu_has_cpuid_faulting);
