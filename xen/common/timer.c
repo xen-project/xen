@@ -530,7 +530,6 @@ static void dump_timerq(unsigned char key)
     {
         ts = &per_cpu(timers, i);
 
-        process_pending_softirqs();
         printk("CPU%02d:\n", i);
         spin_lock_irqsave(&ts->lock, flags);
         for ( j = 1; j <= GET_HEAP_SIZE(ts->heap); j++ )
