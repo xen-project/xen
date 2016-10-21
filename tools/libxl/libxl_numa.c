@@ -205,12 +205,21 @@ static int nr_vcpus_on_nodes(libxl__gc *gc, libxl_cputopology *tinfo,
     }
 
     for (i = 0; i < nr_doms; i++) {
-        libxl_vcpuinfo *vinfo;
-        int nr_dom_vcpus;
+        libxl_vcpuinfo *vinfo = NULL;
+        libxl_cpupoolinfo cpupool_info;
+        int cpupool, nr_dom_vcpus;
+
+        libxl_cpupoolinfo_init(&cpupool_info);
+
+        cpupool = libxl__domain_cpupool(gc, dinfo[i].domid);
+        if (cpupool < 0)
+            goto next;
+        if (libxl_cpupool_info(CTX, &cpupool_info, cpupool))
+            goto next;
 
         vinfo = libxl_list_vcpu(CTX, dinfo[i].domid, &nr_dom_vcpus, &nr_cpus);
         if (vinfo == NULL)
-            continue;
+            goto next;
 
         /* Retrieve the domain's node-affinity map */
         libxl_domain_get_nodeaffinity(CTX, dinfo[i].domid, &dom_nodemap);
@@ -220,6 +229,12 @@ static int nr_vcpus_on_nodes(libxl__gc *gc, libxl_cputopology *tinfo,
              * For each vcpu of each domain, it must have both vcpu-affinity
              * and node-affinity to (a pcpu belonging to) a certain node to
              * cause an increment in the corresponding element of the array.
+             *
+             * Note that we also need to check whether the cpu actually
+             * belongs to the domain's cpupool (the cpupool of the domain
+             * being checked). In fact, it could be that the vcpu has affinity
+             * with cpus in suitable_cpumask, but that are not in its own
+             * cpupool, and we don't want to consider those!
              */
             libxl_bitmap_set_none(&nodes_counted);
             libxl_for_each_set_bit(k, vinfo[j].cpumap) {
@@ -228,6 +243,7 @@ static int nr_vcpus_on_nodes(libxl__gc *gc, libxl_cputopology *tinfo,
                 int node = tinfo[k].node;
 
                 if (libxl_bitmap_test(suitable_cpumap, k) &&
+                    libxl_bitmap_test(&cpupool_info.cpumap, k) &&
                     libxl_bitmap_test(&dom_nodemap, node) &&
                     !libxl_bitmap_test(&nodes_counted, node)) {
                     libxl_bitmap_set(&nodes_counted, node);
@@ -236,6 +252,8 @@ static int nr_vcpus_on_nodes(libxl__gc *gc, libxl_cputopology *tinfo,
             }
         }
 
+ next:
+        libxl_cpupoolinfo_dispose(&cpupool_info);
         libxl_vcpuinfo_list_free(vinfo, nr_dom_vcpus);
     }
 
