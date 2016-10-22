@@ -1480,8 +1480,8 @@ static void repl_timer_handler(void *data){
             if ( svc->cur_deadline > next_on_runq->cur_deadline )
                 runq_tickle(ops, next_on_runq);
         }
-        else if ( vcpu_on_q(svc) &&
-                  __test_and_clear_bit(__RTDS_depleted, &svc->flags) )
+        else if ( __test_and_clear_bit(__RTDS_depleted, &svc->flags) &&
+                  vcpu_on_q(svc) )
             runq_tickle(ops, svc);
 
         list_del(&svc->replq_elem);
