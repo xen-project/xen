@@ -196,8 +196,9 @@ def crunch_numbers(state):
 
         # SSE is taken to mean support for the %XMM registers as well as the
         # instructions.  Several futher instruction sets are built on core
-        # %XMM support, without specific inter-dependencies.
-        SSE: [SSE2, SSE3, SSSE3, SSE4A,
+        # %XMM support, without specific inter-dependencies.  Additionally
+        # AMD has a special mis-alignment sub-mode.
+        SSE: [SSE2, SSE3, SSSE3, SSE4A, MISALIGNSSE,
               AESNI, SHA],
 
         # SSE2 was re-specified as core instructions for 64bit.
