@@ -206,8 +206,9 @@ static int nr_vcpus_on_nodes(libxl__gc *gc, libxl_cputopology *tinfo,
 
     for (i = 0; i < nr_doms; i++) {
         libxl_vcpuinfo *vinfo = NULL;
+        int nr_dom_vcpus = 0;
         libxl_cpupoolinfo cpupool_info;
-        int cpupool, nr_dom_vcpus;
+        int cpupool;
 
         libxl_cpupoolinfo_init(&cpupool_info);
 
