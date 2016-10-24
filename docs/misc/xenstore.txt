@@ -229,8 +229,6 @@ TRANSACTION_START	|			<transid>|
 	tx_id request header field.  When transaction is started whole
 	db is copied; reads and writes happen on the copy.
 	It is not legal to send non-0 tx_id in TRANSACTION_START.
-	Currently xenstored has the bug that after 2^32 transactions
-	it will allocate the transid 0 for an actual transaction.
 
 TRANSACTION_END		T|
 TRANSACTION_END		F|
