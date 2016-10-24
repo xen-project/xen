@@ -2075,11 +2075,10 @@ x86_decode(
                 if ( mode_64bit() && !vex.r )
                     rex_prefix |= REX_R;
 
-                b = insn_fetch_type(uint8_t);
-                opcode |= b | MASK_INSR(vex.pfx, X86EMUL_OPC_PFX_MASK);
                 ext = vex.opcx;
                 if ( b != 0x8f )
                 {
+                    b = insn_fetch_type(uint8_t);
                     switch ( ext )
                     {
                     case vex_0f:
@@ -2102,6 +2101,7 @@ x86_decode(
                 else if ( ext < ext_8f08 +
                                 sizeof(xop_table) / sizeof(*xop_table) )
                 {
+                    b = insn_fetch_type(uint8_t);
                     opcode |= MASK_INSR(0x8f08 + ext - ext_8f08,
                                         X86EMUL_OPC_EXT_MASK);
                     d = xop_table[ext - ext_8f08];
@@ -2111,6 +2111,8 @@ x86_decode(
                     rc = X86EMUL_UNHANDLEABLE;
                     goto done;
                 }
+
+                opcode |= b | MASK_INSR(vex.pfx, X86EMUL_OPC_PFX_MASK);
 
                 modrm = insn_fetch_type(uint8_t);
                 modrm_mod = (modrm & 0xc0) >> 6;
