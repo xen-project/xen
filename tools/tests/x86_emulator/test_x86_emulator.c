@@ -12,6 +12,8 @@
 #include "x86_emulate/x86_emulate.h"
 #include "blowfish.h"
 
+#define verbose false /* Switch to true for far more logging. */
+
 static const struct {
     const void *code;
     size_t size;
@@ -47,6 +49,9 @@ static int read(
     unsigned int bytes,
     struct x86_emulate_ctxt *ctxt)
 {
+    if ( verbose )
+        printf("** %s(%u, %p,, %u,)\n", __func__, seg, (void *)offset, bytes);
+
     bytes_read += bytes;
     memcpy(p_data, (void *)offset, bytes);
     return X86EMUL_OKAY;
@@ -59,6 +64,9 @@ static int fetch(
     unsigned int bytes,
     struct x86_emulate_ctxt *ctxt)
 {
+    if ( verbose )
+        printf("** %s(%u, %p,, %u,)\n", __func__, seg, (void *)offset, bytes);
+
     memcpy(p_data, (void *)offset, bytes);
     return X86EMUL_OKAY;
 }
@@ -70,6 +78,9 @@ static int write(
     unsigned int bytes,
     struct x86_emulate_ctxt *ctxt)
 {
+    if ( verbose )
+        printf("** %s(%u, %p,, %u,)\n", __func__, seg, (void *)offset, bytes);
+
     memcpy((void *)offset, p_data, bytes);
     return X86EMUL_OKAY;
 }
@@ -82,6 +93,9 @@ static int cmpxchg(
     unsigned int bytes,
     struct x86_emulate_ctxt *ctxt)
 {
+    if ( verbose )
+        printf("** %s(%u, %p,, %u,)\n", __func__, seg, (void *)offset, bytes);
+
     memcpy((void *)offset, new, bytes);
     return X86EMUL_OKAY;
 }
@@ -232,6 +246,9 @@ int main(int argc, char **argv)
 #ifndef __x86_64__
     unsigned int bcdres_native, bcdres_emul;
 #endif
+
+    /* Disable output buffering. */
+    setbuf(stdout, NULL);
 
     ctxt.regs = &regs;
     ctxt.force_writeback = 0;
