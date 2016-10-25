@@ -179,6 +179,7 @@
  */
 #define VSCSIIF_MAX_COMMAND_SIZE         16
 #define VSCSIIF_SENSE_BUFFERSIZE         96
+#define VSCSIIF_PAGE_SIZE              4096
 
 struct scsiif_request_segment {
     grant_ref_t gref;
@@ -187,7 +188,7 @@ struct scsiif_request_segment {
 };
 typedef struct scsiif_request_segment vscsiif_segment_t;
 
-#define VSCSIIF_SG_PER_PAGE (PAGE_SIZE / sizeof(struct scsiif_request_segment))
+#define VSCSIIF_SG_PER_PAGE (VSCSIIF_PAGE_SIZE / sizeof(struct scsiif_request_segment))
 
 /* Size of one request is 252 bytes */
 struct vscsiif_request {
