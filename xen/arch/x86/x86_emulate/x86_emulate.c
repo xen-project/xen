@@ -2090,13 +2090,8 @@ x86_emulate(
         fail_if(ops->read_segment == NULL);
         if ( (rc = ops->read_segment(src.val, &reg, ctxt)) != 0 )
             return rc;
-        /* 64-bit mode: PUSH defaults to a 64-bit operand. */
-        if ( mode_64bit() && (op_bytes == 4) )
-            op_bytes = 8;
-        if ( (rc = ops->write(x86_seg_ss, sp_pre_dec(op_bytes),
-                              &reg.sel, op_bytes, ctxt)) != 0 )
-            goto done;
-        break;
+        src.val = reg.sel;
+        goto push;
     }
 
     case 0x07: /* pop %%es */
@@ -2541,8 +2536,9 @@ x86_emulate(
         if ( (rc = ops->read_segment(x86_seg_cs, &reg, ctxt)) ||
              (rc = load_seg(x86_seg_cs, sel, 0, &cs, ctxt, ops)) ||
              (validate_far_branch(&cs, eip),
+              src.val = reg.sel,
               rc = ops->write(x86_seg_ss, sp_pre_dec(op_bytes),
-                              &reg.sel, op_bytes, ctxt)) ||
+                              &src.val, op_bytes, ctxt)) ||
              (rc = ops->write(x86_seg_ss, sp_pre_dec(op_bytes),
                               &_regs.eip, op_bytes, ctxt)) ||
              (rc = ops->write_segment(x86_seg_cs, &cs, ctxt)) )
@@ -3841,8 +3837,9 @@ x86_emulate(
                 if ( (rc = ops->read_segment(x86_seg_cs, &reg, ctxt)) ||
                      (rc = load_seg(x86_seg_cs, sel, 0, &cs, ctxt, ops)) ||
                      (validate_far_branch(&cs, src.val),
+                      dst.val = reg.sel,
                       rc = ops->write(x86_seg_ss, sp_pre_dec(op_bytes),
-                                      &reg.sel, op_bytes, ctxt)) ||
+                                      &dst.val, op_bytes, ctxt)) ||
                      (rc = ops->write(x86_seg_ss, sp_pre_dec(op_bytes),
                                       &_regs.eip, op_bytes, ctxt)) ||
                      (rc = ops->write_segment(x86_seg_cs, &cs, ctxt)) )
