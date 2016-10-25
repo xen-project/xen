@@ -1176,7 +1176,7 @@ protmode_load_seg(
     struct { uint32_t a, b; } desc;
     uint8_t dpl, rpl;
     int cpl = get_cpl(ctxt, ops);
-    uint32_t new_desc_b, a_flag = 0x100;
+    uint32_t a_flag = 0x100;
     int rc, fault_type = EXC_GP;
 
     if ( cpl < 0 )
@@ -1217,13 +1217,6 @@ protmode_load_seg(
                          &desc, sizeof(desc), ctxt)) )
         return rc;
 
-    /* Segment present in memory? */
-    if ( !(desc.b & (1u<<15)) )
-    {
-        fault_type = seg != x86_seg_ss ? EXC_NP : EXC_SS;
-        goto raise_exn;
-    }
-
     if ( !is_x86_user_segment(seg) )
     {
         /* System segments must have S flag == 0. */
@@ -1258,7 +1251,11 @@ protmode_load_seg(
                /* Non-conforming segment: check RPL and DPL against CPL. */
                : rpl > cpl || dpl != cpl )
             goto raise_exn;
-        /* 64-bit code segments (L bit set) must have D bit clear. */
+        /*
+         * 64-bit code segments (L bit set) must have D bit clear.
+         * Experimentally in long mode, the L and D bits are checked before
+         * the Present bit.
+         */
         if ( in_longmode(ctxt, ops) &&
              (desc.b & (1 << 21)) && (desc.b & (1 << 22)) )
             goto raise_exn;
@@ -1275,7 +1272,8 @@ protmode_load_seg(
         /* LDT system segment? */
         if ( (desc.b & (15u<<8)) != (2u<<8) )
             goto raise_exn;
-        goto skip_accessed_flag;
+        a_flag = 0;
+        break;
     case x86_seg_tr:
         /* Available TSS system segment? */
         if ( (desc.b & (15u<<8)) != (9u<<8) )
@@ -1293,18 +1291,26 @@ protmode_load_seg(
         break;
     }
 
+    /* Segment present in memory? */
+    if ( !(desc.b & (1 << 15)) )
+    {
+        fault_type = seg != x86_seg_ss ? EXC_NP : EXC_SS;
+        goto raise_exn;
+    }
+
     /* Ensure Accessed flag is set. */
-    new_desc_b = desc.b | a_flag;
-    if ( !(desc.b & a_flag) &&
-         ((rc = ops->cmpxchg(
-             x86_seg_none, desctab.base + (sel & 0xfff8) + 4,
-             &desc.b, &new_desc_b, 4, ctxt)) != 0) )
-        return rc;
+    if ( a_flag && !(desc.b & a_flag) )
+    {
+        uint32_t new_desc_b = desc.b | a_flag;
 
-    /* Force the Accessed flag in our local copy. */
-    desc.b |= a_flag;
+        if ( (rc = ops->cmpxchg(x86_seg_none, desctab.base + (sel & 0xfff8) + 4,
+                                &desc.b, &new_desc_b, 4, ctxt)) != 0 )
+            return rc;
 
- skip_accessed_flag:
+        /* Force the Accessed flag in our local copy. */
+        desc.b = new_desc_b;
+    }
+
     sreg->base = (((desc.b <<  0) & 0xff000000u) |
                   ((desc.b << 16) & 0x00ff0000u) |
                   ((desc.a >> 16) & 0x0000ffffu));
