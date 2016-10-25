@@ -148,8 +148,12 @@ static int calculate_tbuf_size(unsigned int pages, uint16_t t_info_first_offset)
         pages = max_pages;
     }
 
-    t_info_words = num_online_cpus() * pages * sizeof(uint32_t);
-    t_info_pages = PFN_UP(t_info_first_offset + t_info_words);
+    /* 
+     * NB this calculation is correct, because t_info_first_offset is
+     * in words, not bytes, not bytes
+     */
+    t_info_words = num_online_cpus() * pages + t_info_first_offset;
+    t_info_pages = PFN_UP(t_info_words * sizeof(uint32_t));
     printk(XENLOG_INFO "xentrace: requesting %u t_info pages "
            "for %u trace pages on %u cpus\n",
            t_info_pages, pages, num_online_cpus());
