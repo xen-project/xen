@@ -6,6 +6,8 @@
 #include <string.h>
 #include <xen/xen.h>
 
+#include "x86_emulate/x86_emulate.h"
+
 typedef bool bool_t;
 
 #define is_canonical_address(x) (((int64_t)(x) >> 47) == ((int64_t)(x) >> 63))
@@ -23,8 +25,6 @@ typedef bool bool_t;
 #define cpu_has_amd_erratum(nr) 0
 #define mark_regs_dirty(r) ((void)(r))
 
-#define __packed __attribute__((packed))
-
 /* For generic assembly code: use macros to define operation/operand sizes. */
 #ifdef __i386__
 # define __OS          "l"  /* Operation Suffix */
@@ -33,8 +33,6 @@ typedef bool bool_t;
 # define __OS          "q"  /* Operation Suffix */
 # define __OP          "r"  /* Operand Prefix */
 #endif
-
-#include "x86_emulate/x86_emulate.h"
 
 #define get_stub(stb) ((void *)((stb).addr = (uintptr_t)(stb).buf))
 #define put_stub(stb)

@@ -8,8 +8,6 @@
 #include <xen/xen.h>
 #include <sys/mman.h>
 
-#define __packed __attribute__((packed))
-
 #include "x86_emulate/x86_emulate.h"
 #include "blowfish.h"
 
