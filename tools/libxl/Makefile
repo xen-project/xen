@@ -320,8 +320,8 @@ install: all
 	$(INSTALL_DATA) libxlutil.a $(DESTDIR)$(libdir)
 	$(INSTALL_DATA) libxl.h libxl_event.h libxl_json.h _libxl_types.h _libxl_types_json.h _libxl_list.h libxl_utils.h libxl_uuid.h libxlutil.h $(DESTDIR)$(includedir)
 	$(INSTALL_DATA) bash-completion $(DESTDIR)$(BASH_COMPLETION_DIR)/xl.sh
-	$(INSTALL_DATA) xenlight.pc $(DESTDIR)$(SHAREDIR)/pkgconfig/
-	$(INSTALL_DATA) xlutil.pc $(DESTDIR)$(SHAREDIR)/pkgconfig/
+	$(INSTALL_DATA) xenlight.pc $(DESTDIR)$(PKG_INSTALLDIR)
+	$(INSTALL_DATA) xlutil.pc $(DESTDIR)$(PKG_INSTALLDIR)
 
 .PHONY: clean
 clean:

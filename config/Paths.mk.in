@@ -56,3 +56,5 @@ XENFIRMWAREDIR           := @XENFIRMWAREDIR@
 
 XEN_CONFIG_DIR           := @XEN_CONFIG_DIR@
 XEN_SCRIPT_DIR           := @XEN_SCRIPT_DIR@
+
+PKG_INSTALLDIR           := ${SHAREDIR}/pkgconfig
