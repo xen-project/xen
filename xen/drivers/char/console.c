@@ -347,7 +347,7 @@ static void switch_serial_input(void)
 static void __serial_rx(char c, struct cpu_user_regs *regs)
 {
     if ( xen_rx )
-        return handle_keypress(c, regs, !in_irq());
+        return handle_keypress(c, regs);
 
     /* Deliver input to guest buffer, unless it is already full. */
     if ( (serial_rx_prod-serial_rx_cons) != SERIAL_RX_SIZE )

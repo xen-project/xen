@@ -75,22 +75,19 @@ static struct keyhandler {
 
 static void keypress_action(unsigned long unused)
 {
-    console_start_log_everything();
-    key_table[keypress_key].fn(keypress_key);
-    console_end_log_everything();
+    handle_keypress(keypress_key, NULL);
 }
 
 static DECLARE_TASKLET(keypress_tasklet, keypress_action, 0);
 
-void handle_keypress(unsigned char key, struct cpu_user_regs *regs,
-                     bool force_tasklet)
+void handle_keypress(unsigned char key, struct cpu_user_regs *regs)
 {
     struct keyhandler *h;
 
     if ( key >= ARRAY_SIZE(key_table) || !(h = &key_table[key])->fn )
         return;
 
-    if ( h->irq_callback || !force_tasklet )
+    if ( !in_irq() || h->irq_callback )
     {
         console_start_log_everything();
         h->irq_callback ? h->irq_fn(key, regs) : h->fn(key);

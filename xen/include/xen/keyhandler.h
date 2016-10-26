@@ -46,8 +46,7 @@ void register_irq_keyhandler(unsigned char key,
                              bool_t diagnostic);
 
 /* Inject a keypress into the key-handling subsystem. */
-extern void handle_keypress(unsigned char key, struct cpu_user_regs *regs,
-                            bool force_tasklet);
+extern void handle_keypress(unsigned char key, struct cpu_user_regs *regs);
 
 /* Scratch space is available for use of any keyhandler. */
 extern char keyhandler_scratch[1024];
