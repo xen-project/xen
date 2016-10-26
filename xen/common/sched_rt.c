@@ -407,6 +407,12 @@ rt_update_deadline(s_time_t now, struct rt_vcpu *svc)
         svc->cur_deadline += count * svc->period;
     }
 
+    /*
+     * svc may be scheduled to run immediately after it misses deadline
+     * Then rt_update_deadline is called before rt_schedule, which
+     * should only deduct the time spent in current period from the budget
+     */
+    svc->last_start = now;
     svc->cur_budget = svc->budget;
 
     /* TRACE */
