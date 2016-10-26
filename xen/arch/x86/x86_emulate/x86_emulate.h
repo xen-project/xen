@@ -352,7 +352,12 @@ struct x86_emulate_ops
     int (*wbinvd)(
         struct x86_emulate_ctxt *ctxt);
 
-    /* cpuid: Emulate CPUID via given set of EAX-EDX inputs/outputs. */
+    /*
+     * cpuid: Emulate CPUID via given set of EAX-EDX inputs/outputs.
+     *
+     * May return X86EMUL_EXCEPTION, which causes the emulator to inject
+     * #GP[0].  Used to implement CPUID faulting.
+     */
     int (*cpuid)(
         unsigned int *eax,
         unsigned int *ebx,

@@ -1556,18 +1556,7 @@ static int hvmemul_cpuid(
      */
     if ( ctxt->opcode == X86EMUL_OPC(0x0f, 0xa2) &&
          hvm_check_cpuid_faulting(current) )
-    {
-        struct hvm_emulate_ctxt *hvmemul_ctxt =
-            container_of(ctxt, struct hvm_emulate_ctxt, ctxt);
-
-        hvmemul_ctxt->exn_pending = 1;
-        hvmemul_ctxt->trap.vector = TRAP_gp_fault;
-        hvmemul_ctxt->trap.type = X86_EVENTTYPE_HW_EXCEPTION;
-        hvmemul_ctxt->trap.error_code = 0;
-        hvmemul_ctxt->trap.insn_len = 0;
-
         return X86EMUL_EXCEPTION;
-    }
 
     hvm_funcs.cpuid_intercept(eax, ebx, ecx, edx);
     return X86EMUL_OKAY;

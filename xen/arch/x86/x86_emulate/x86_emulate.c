@@ -4995,7 +4995,10 @@ x86_emulate(
         unsigned int eax = _regs.eax, ebx = _regs.ebx;
         unsigned int ecx = _regs.ecx, edx = _regs.edx;
         fail_if(ops->cpuid == NULL);
-        if ( (rc = ops->cpuid(&eax, &ebx, &ecx, &edx, ctxt)) != 0 )
+        rc = ops->cpuid(&eax, &ebx, &ecx, &edx, ctxt);
+        generate_exception_if(rc == X86EMUL_EXCEPTION,
+                              EXC_GP, 0); /* CPUID Faulting? */
+        if ( rc != X86EMUL_OKAY )
             goto done;
         _regs.eax = eax; _regs.ebx = ebx;
         _regs.ecx = ecx; _regs.edx = edx;
