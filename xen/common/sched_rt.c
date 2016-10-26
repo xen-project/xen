@@ -953,6 +953,7 @@ burn_budget(const struct scheduler *ops, struct rt_vcpu *svc, s_time_t now)
     }
 
     svc->cur_budget -= delta;
+    svc->last_start = now;
 
     if ( svc->cur_budget <= 0 )
     {
