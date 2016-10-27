@@ -20,11 +20,10 @@
 #include <asm/msr-index.h>
 #include <asm/hvm/svm/svmdebug.h>
 
-static void svm_dump_sel(const char *name, svm_segment_register_t *s)
+static void svm_dump_sel(const char *name, const svm_segment_register_t *s)
 {
-    printk("%s: sel=0x%04x, attr=0x%04x, limit=0x%08x, base=0x%016llx\n", 
-           name, s->sel, s->attr.bytes, s->limit,
-           (unsigned long long)s->base);
+    printk("%s: %04x %04x %08x %016"PRIx64"\n",
+           name, s->sel, s->attr.bytes, s->limit, s->base);
 }
 
 /* This function can directly access fields which are covered by clean bits. */
@@ -83,16 +82,17 @@ void svm_vmcb_dump(const char *from, struct vmcb_struct *vmcb)
            (unsigned long long)vmcb->_h_cr3, vmcb->cleanbits.bytes);
 
     /* print out all the selectors */
-    svm_dump_sel("CS", &vmcb->cs);
-    svm_dump_sel("DS", &vmcb->ds);
-    svm_dump_sel("SS", &vmcb->ss);
-    svm_dump_sel("ES", &vmcb->es);
-    svm_dump_sel("FS", &vmcb->fs);
-    svm_dump_sel("GS", &vmcb->gs);
+    printk("       sel attr  limit   base\n");
+    svm_dump_sel("  CS", &vmcb->cs);
+    svm_dump_sel("  DS", &vmcb->ds);
+    svm_dump_sel("  SS", &vmcb->ss);
+    svm_dump_sel("  ES", &vmcb->es);
+    svm_dump_sel("  FS", &vmcb->fs);
+    svm_dump_sel("  GS", &vmcb->gs);
     svm_dump_sel("GDTR", &vmcb->gdtr);
     svm_dump_sel("LDTR", &vmcb->ldtr);
     svm_dump_sel("IDTR", &vmcb->idtr);
-    svm_dump_sel("TR", &vmcb->tr);
+    svm_dump_sel("  TR", &vmcb->tr);
 }
 
 bool_t
