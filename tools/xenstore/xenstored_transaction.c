@@ -102,9 +102,13 @@ void add_change_node(struct transaction *trans, const char *node, bool recurse)
 		return;
 	}
 
-	list_for_each_entry(i, &trans->changes, list)
-		if (streq(i->node, node))
+	list_for_each_entry(i, &trans->changes, list) {
+		if (streq(i->node, node)) {
+			if (recurse)
+				i->recurse = recurse;
 			return;
+		}
+	}
 
 	i = talloc(trans, struct changed_node);
 	i->node = talloc_strdup(i, node);
