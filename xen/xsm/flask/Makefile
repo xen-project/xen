@@ -29,10 +29,11 @@ $(AV_H_FILES): $(AV_H_DEPEND)
 
 obj-$(CONFIG_XSM_POLICY) += policy.o
 
-POLICY_SRC := $(XEN_ROOT)/tools/flask/policy/xenpolicy-$(XEN_FULLVERSION)
+FLASK_BUILD_DIR := $(CURDIR)
+POLICY_SRC := $(FLASK_BUILD_DIR)/xenpolicy-$(XEN_FULLVERSION)
 
 policy.bin: FORCE
-	$(MAKE) -f $(XEN_ROOT)/tools/flask/policy/Makefile.common -C $(XEN_ROOT)/tools/flask/policy
+	$(MAKE) -f $(XEN_ROOT)/tools/flask/policy/Makefile.common -C $(XEN_ROOT)/tools/flask/policy FLASK_BUILD_DIR=$(FLASK_BUILD_DIR)
 	cmp -s $(POLICY_SRC) $@ || cp $(POLICY_SRC) $@
 
 policy.c: policy.bin gen-policy.py
@@ -40,4 +41,4 @@ policy.c: policy.bin gen-policy.py
 
 .PHONY: clean
 clean::
-	rm -f $(ALL_H_FILES) *.o $(DEPS) policy.c policy.bin
+	rm -f $(ALL_H_FILES) *.o $(DEPS) policy.* $(POLICY_SRC)

@@ -3,6 +3,10 @@
 
 XEN_ROOT=$(CURDIR)/../../..
 
+ifeq ($(FLASK_BUILD_DIR),)
+$(error FLASK_BUILD_DIR not set)
+endif
+
 ########################################
 #
 # Configurable portions of the Makefile
@@ -31,7 +35,7 @@ OUTPUT_POLICY ?= $(BEST_POLICY_VER)
 #
 ########################################
 
-POLICY_FILENAME = xenpolicy-$(shell $(MAKE) -C $(XEN_ROOT)/xen xenversion --no-print-directory)
+POLICY_FILENAME = $(FLASK_BUILD_DIR)/xenpolicy-$(shell $(MAKE) -C $(XEN_ROOT)/xen xenversion --no-print-directory)
 POLICY_LOADPATH = /boot
 
 # List of policy versions supported by the hypervisor
@@ -114,14 +118,14 @@ install: $(POLICY_FILENAME)
 	$(INSTALL_DIR) $(DESTDIR)/$(POLICY_LOADPATH)
 	$(INSTALL_DATA) $^ $(DESTDIR)/$(POLICY_LOADPATH)
 
-$(POLICY_FILENAME): policy.conf
+$(POLICY_FILENAME): $(FLASK_BUILD_DIR)/policy.conf
 	$(CHECKPOLICY) $(CHECKPOLICY_PARAM) $^ -o $@
 
-policy.conf: $(POLICY_SECTIONS) $(MOD_CONF)
+$(FLASK_BUILD_DIR)/policy.conf: $(POLICY_SECTIONS) $(MOD_CONF)
 	$(M4) $(M4PARAM) $(POLICY_SECTIONS) > $@
 
 clean:
-	$(RM) tmp policy.conf $(POLICY_FILENAME)
+	$(RM) $(FLASK_BUILD_DIR)/policy.conf $(POLICY_FILENAME)
 
 distclean: clean
 
