@@ -649,7 +649,7 @@ patchclean: crossclean
 downloadclean: patchclean
 	rm -f newlib-$(NEWLIB_VERSION).tar.gz
 	rm -f zlib-$(ZLIB_VERSION).tar.gz
-	rm -f gmp-$(GMP_VERSION).tar.gz
+	rm -f gmp-$(GMP_VERSION).tar.bz2
 	rm -f tpm_emulator-$(TPMEMU_VERSION).tar.gz
 	rm -f pciutils-$(LIBPCI_VERSION).tar.bz2
 	rm -f grub-$(GRUB_VERSION).tar.gz
