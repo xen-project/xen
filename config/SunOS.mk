@@ -31,12 +31,5 @@ UTIL_LIBS =
 SONAME_LDFLAG = -h
 SHLIB_LDFLAGS = -R $(SunOS_LIBDIR) -shared
 
-ifneq ($(debug),y)
-CFLAGS += -O2 -fno-omit-frame-pointer
-else
-# Less than -O1 produces bad code and large stack frames
-CFLAGS += -O1 -fno-omit-frame-pointer
-endif
-
 CFLAGS += -Wa,--divide -D_POSIX_C_SOURCE=200112L -D__EXTENSIONS__
 

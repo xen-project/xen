@@ -35,14 +35,6 @@ UTIL_LIBS = -lutil
 SONAME_LDFLAG = -soname
 SHLIB_LDFLAGS = -shared
 
-ifneq ($(debug),y)
-CFLAGS += -O2 -fomit-frame-pointer
-else
-# Less than -O1 produces bad code and large stack frames
-CFLAGS += -O1 -fno-omit-frame-pointer
-CFLAGS-$(gcc) += -fno-optimize-sibling-calls
-endif
-
 ifeq ($(lto),y)
 CFLAGS += -flto
 LDFLAGS-$(clang) += -plugin LLVMgold.so

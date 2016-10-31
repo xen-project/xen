@@ -46,6 +46,12 @@ ALL_OBJS-y               += $(BASEDIR)/xsm/built_in.o
 ALL_OBJS-y               += $(BASEDIR)/arch/$(TARGET_ARCH)/built_in.o
 ALL_OBJS-$(CONFIG_CRYPTO)   += $(BASEDIR)/crypto/built_in.o
 
+ifeq ($(CONFIG_DEBUG),y)
+CFLAGS += -O1
+else
+CFLAGS += -O2 -fomit-frame-pointer
+endif
+
 CFLAGS += -nostdinc -fno-builtin -fno-common
 CFLAGS += -Werror -Wredundant-decls -Wno-pointer-arith
 CFLAGS += -pipe -g -D__XEN__ -include $(BASEDIR)/include/xen/config.h

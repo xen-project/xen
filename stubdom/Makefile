@@ -6,6 +6,8 @@ export XEN_OS=MiniOS
 
 export stubdom=y
 export debug=y
+# Moved from config/StdGNU.mk
+CFLAGS += -O1 -fno-omit-frame-pointer
 
 ifeq (,$(findstring clean,$(MAKECMDGOALS)))
   ifeq ($(wildcard $(MINI_OS)/Config.mk),)

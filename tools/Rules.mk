@@ -138,9 +138,11 @@ SHLIB_libxenvchan  = $(SHDEPS_libxenvchan) -Wl,-rpath-link=$(XEN_LIBVCHAN)
 
 ifeq ($(debug),y)
 # Disable optimizations and enable debugging information for macros
-CFLAGS += -O0 -g3
+CFLAGS += -O0 -g3 -fno-omit-frame-pointer
 # But allow an override to -O0 in case Python enforces -D_FORTIFY_SOURCE=<n>.
 PY_CFLAGS += $(PY_NOOPT_CFLAGS)
+else
+CFLAGS += -O2 -fomit-frame-pointer
 endif
 
 LIBXL_BLKTAP ?= $(CONFIG_BLKTAP2)
