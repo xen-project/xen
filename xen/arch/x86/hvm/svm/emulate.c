@@ -30,18 +30,18 @@ static unsigned long svm_nextrip_insn_length(struct vcpu *v)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
 
-    if ( !cpu_has_svm_nrips || (vmcb->nextrip <= vmcb->rip) )
+    if ( !cpu_has_svm_nrips )
         return 0;
 
 #ifndef NDEBUG
     switch ( vmcb->exitcode )
     {
-    case VMEXIT_CR0_READ... VMEXIT_DR15_WRITE:
+    case VMEXIT_CR0_READ ... VMEXIT_DR15_WRITE:
         /* faults due to instruction intercepts */
         /* (exitcodes 84-95) are reserved */
     case VMEXIT_IDTR_READ ... VMEXIT_TR_WRITE:
     case VMEXIT_RDTSC ... VMEXIT_MSR:
-    case VMEXIT_VMRUN ...  VMEXIT_XSETBV:
+    case VMEXIT_VMRUN ... VMEXIT_XSETBV:
         /* ...and the rest of the #VMEXITs */
     case VMEXIT_CR0_SEL_WRITE:
     case VMEXIT_EXCEPTION_BP:
@@ -88,7 +88,8 @@ int __get_instruction_length_from_list(struct vcpu *v,
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
     struct hvm_emulate_ctxt ctxt;
     struct x86_emulate_state *state;
-    unsigned int inst_len, j, modrm_rm, modrm_reg;
+    unsigned long inst_len, j;
+    unsigned int modrm_rm, modrm_reg;
     int modrm_mod;
 
     /*
@@ -96,7 +97,9 @@ int __get_instruction_length_from_list(struct vcpu *v,
      * hardware.
      */
 #ifdef NDEBUG
-    if ( (inst_len = svm_nextrip_insn_length(v)) != 0 )
+    if ( (inst_len = svm_nextrip_insn_length(v)) > MAX_INST_LEN )
+        gprintk(XENLOG_WARNING, "NRip reported insn_len %lu\n", insn_len);
+    else if ( insn_len != 0 )
         return inst_len;
 
     if ( vmcb->exitcode == VMEXIT_IOIO )
@@ -120,7 +123,7 @@ int __get_instruction_length_from_list(struct vcpu *v,
         j = svm_nextrip_insn_length(v);
     if ( j && j != inst_len )
     {
-        gprintk(XENLOG_WARNING, "insn-len[%02x]=%u (exp %u)\n",
+        gprintk(XENLOG_WARNING, "insn-len[%02x]=%lu (exp %lu)\n",
                 ctxt.ctxt.opcode, inst_len, j);
         return j;
     }
