@@ -16,7 +16,8 @@ or       = $(if $(strip $(1)),$(1),$(if $(strip $(2)),$(2),$(if $(strip $(3)),$(
 
 -include $(XEN_ROOT)/.config
 
-# A debug build of Xen and tools?
+# A debug build of tools?
+# Hypervisor debug build is controlled by Kconfig.
 debug ?= n
 debug_symbols ?= $(debug)
 
