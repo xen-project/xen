@@ -218,8 +218,16 @@ let fire_watch watch path =
 
 (* Search for a valid unused transaction id. *)
 let rec valid_transaction_id con proposed_id =
-	(* Clip proposed_id to the range [1, 0x7ffffffe] *)
-	let id = if proposed_id <= 0 || proposed_id >= 0x7fffffff then 1 else proposed_id in
+	(*
+	 * Clip proposed_id to the range [1, 0x3ffffffe]
+	 *
+	 * The chosen id must not trucate when written into the uint32_t tx_id
+	 * field, and needs to fit within the positive range of a 31 bit ocaml
+	 * integer to function when compiled as 32bit.
+	 *
+	 * Oxenstored therefore supports only 1 billion open transactions.
+	 *)
+	let id = if proposed_id <= 0 || proposed_id >= 0x3fffffff then 1 else proposed_id in
 
 	if Hashtbl.mem con.transactions id then (
 		(* Outstanding transaction with this id.  Try the next. *)
