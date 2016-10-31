@@ -1496,21 +1496,23 @@ static void vmx_update_guest_cr(struct vcpu *v, unsigned int cr)
             enum x86_segment s; 
             struct segment_register reg[x86_seg_tr + 1];
 
+            BUILD_BUG_ON(x86_seg_tr != x86_seg_gs + 1);
+
             /* Entering or leaving real mode: adjust the segment registers.
              * Need to read them all either way, as realmode reads can update
              * the saved values we'll use when returning to prot mode. */
-            for ( s = x86_seg_cs ; s <= x86_seg_tr ; s++ )
+            for ( s = 0; s < ARRAY_SIZE(reg); s++ )
                 vmx_get_segment_register(v, s, &reg[s]);
             v->arch.hvm_vmx.vmx_realmode = realmode;
             
             if ( realmode )
             {
-                for ( s = x86_seg_cs ; s <= x86_seg_tr ; s++ )
+                for ( s = 0; s < ARRAY_SIZE(reg); s++ )
                     vmx_set_segment_register(v, s, &reg[s]);
             }
             else 
             {
-                for ( s = x86_seg_cs ; s <= x86_seg_tr ; s++ ) 
+                for ( s = 0; s < ARRAY_SIZE(reg); s++ )
                     if ( !(v->arch.hvm_vmx.vm86_segment_mask & (1<<s)) )
                         vmx_set_segment_register(
                             v, s, &v->arch.hvm_vmx.vm86_saved_seg[s]);
