@@ -47,9 +47,11 @@ $(MK_DSDT): mk_dsdt.c
 
 ifeq ($(GPL),y)
 $(ACPI_BUILD_DIR)/dsdt_anycpu_qemu_xen.asl: dsdt.asl dsdt_acpi_info.asl gpl/mk_dsdt_gpl.sh $(MK_DSDT)
-	awk 'NR > 1 {print s} {s=$$0}' $< > $@.$(TMP_SUFFIX)
+	# Remove last bracket
+	awk 'NR > 1 {print s} {s=$$0}' $< > $@.1.$(TMP_SUFFIX)
 	# Strip license comment
-	sed -i '1,/\*\//{/\/\*/,/\*\//d}' $@.$(TMP_SUFFIX)
+	sed '1,/\*\//d' $@.1.$(TMP_SUFFIX) > $@.$(TMP_SUFFIX)
+	rm -f $@.1.$(TMP_SUFFIX)
 	$(SHELL) gpl/mk_dsdt_gpl.sh >> $@.$(TMP_SUFFIX)
 	cat dsdt_acpi_info.asl >> $@.$(TMP_SUFFIX)
 	$(MK_DSDT) --debug=$(debug) --dm-version qemu-xen >> $@.$(TMP_SUFFIX)
@@ -57,8 +59,11 @@ $(ACPI_BUILD_DIR)/dsdt_anycpu_qemu_xen.asl: dsdt.asl dsdt_acpi_info.asl gpl/mk_d
 
 # NB. awk invocation is a portable alternative to 'head -n -1'
 $(ACPI_BUILD_DIR)/dsdt_%cpu.asl: dsdt.asl dsdt_acpi_info.asl gpl/mk_dsdt_gpl.sh $(MK_DSDT)
-	awk 'NR > 1 {print s} {s=$$0}' $< > $@.$(TMP_SUFFIX)
-	sed -i '1,/\*\//{/\/\*/,/\*\//d}' $@.$(TMP_SUFFIX)
+	# Remove last bracket
+	awk 'NR > 1 {print s} {s=$$0}' $< > $@.1.$(TMP_SUFFIX)
+	# Strip license comment
+	sed '1,/\*\//d' $@.1.$(TMP_SUFFIX) > $@.$(TMP_SUFFIX)
+	rm -f $@.1.$(TMP_SUFFIX)
 	$(SHELL) gpl/mk_dsdt_gpl.sh >> $@.$(TMP_SUFFIX)
 	cat dsdt_acpi_info.asl >> $@.$(TMP_SUFFIX)
 	$(MK_DSDT) --debug=$(debug) --maxcpu $*  >> $@.$(TMP_SUFFIX)
