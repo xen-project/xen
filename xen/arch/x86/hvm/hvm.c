@@ -2859,6 +2859,7 @@ void hvm_task_switch(
     struct desc_struct *optss_desc = NULL, *nptss_desc = NULL, tss_desc;
     bool_t otd_writable, ntd_writable;
     unsigned long eflags;
+    pagefault_info_t pfinfo;
     int exn_raised, rc;
     struct {
         u16 back_link,__blh;
@@ -2925,7 +2926,7 @@ void hvm_task_switch(
     }
 
     rc = hvm_copy_from_guest_virt(
-        &tss, prev_tr.base, sizeof(tss), PFEC_page_present);
+        &tss, prev_tr.base, sizeof(tss), PFEC_page_present, &pfinfo);
     if ( rc != HVMCOPY_okay )
         goto out;
 
@@ -2963,12 +2964,12 @@ void hvm_task_switch(
                                 &tss.eip,
                                 offsetof(typeof(tss), trace) -
                                 offsetof(typeof(tss), eip),
-                                PFEC_page_present);
+                                PFEC_page_present, &pfinfo);
     if ( rc != HVMCOPY_okay )
         goto out;
 
     rc = hvm_copy_from_guest_virt(
-        &tss, tr.base, sizeof(tss), PFEC_page_present);
+        &tss, tr.base, sizeof(tss), PFEC_page_present, &pfinfo);
     /*
      * Note: The HVMCOPY_gfn_shared case could be optimised, if the callee
      * functions knew we want RO access.
@@ -3008,7 +3009,8 @@ void hvm_task_switch(
         tss.back_link = prev_tr.sel;
 
         rc = hvm_copy_to_guest_virt(tr.base + offsetof(typeof(tss), back_link),
-                                    &tss.back_link, sizeof(tss.back_link), 0);
+                                    &tss.back_link, sizeof(tss.back_link), 0,
+                                    &pfinfo);
         if ( rc == HVMCOPY_bad_gva_to_gfn )
             exn_raised = 1;
         else if ( rc != HVMCOPY_okay )
@@ -3045,7 +3047,8 @@ void hvm_task_switch(
                                         16 << segr.attr.fields.db,
                                         &linear_addr) )
         {
-            rc = hvm_copy_to_guest_virt(linear_addr, &errcode, opsz, 0);
+            rc = hvm_copy_to_guest_virt(linear_addr, &errcode, opsz, 0,
+                                        &pfinfo);
             if ( rc == HVMCOPY_bad_gva_to_gfn )
                 exn_raised = 1;
             else if ( rc != HVMCOPY_okay )
@@ -3068,7 +3071,8 @@ void hvm_task_switch(
 #define HVMCOPY_phys       (0u<<2)
 #define HVMCOPY_virt       (1u<<2)
 static enum hvm_copy_result __hvm_copy(
-    void *buf, paddr_t addr, int size, unsigned int flags, uint32_t pfec)
+    void *buf, paddr_t addr, int size, unsigned int flags, uint32_t pfec,
+    pagefault_info_t *pfinfo)
 {
     struct vcpu *curr = current;
     unsigned long gfn;
@@ -3109,7 +3113,15 @@ static enum hvm_copy_result __hvm_copy(
                 if ( pfec & PFEC_page_shared )
                     return HVMCOPY_gfn_shared;
                 if ( flags & HVMCOPY_fault )
+                {
+                    if ( pfinfo )
+                    {
+                        pfinfo->linear = addr;
+                        pfinfo->ec = pfec;
+                    }
+
                     hvm_inject_page_fault(pfec, addr);
+                }
                 return HVMCOPY_bad_gva_to_gfn;
             }
             gpa |= (paddr_t)gfn << PAGE_SHIFT;
@@ -3279,7 +3291,7 @@ enum hvm_copy_result hvm_copy_to_guest_phys(
 {
     return __hvm_copy(buf, paddr, size,
                       HVMCOPY_to_guest | HVMCOPY_fault | HVMCOPY_phys,
-                      0);
+                      0, NULL);
 }
 
 enum hvm_copy_result hvm_copy_from_guest_phys(
@@ -3287,31 +3299,34 @@ enum hvm_copy_result hvm_copy_from_guest_phys(
 {
     return __hvm_copy(buf, paddr, size,
                       HVMCOPY_from_guest | HVMCOPY_fault | HVMCOPY_phys,
-                      0);
+                      0, NULL);
 }
 
 enum hvm_copy_result hvm_copy_to_guest_virt(
-    unsigned long vaddr, void *buf, int size, uint32_t pfec)
+    unsigned long vaddr, void *buf, int size, uint32_t pfec,
+    pagefault_info_t *pfinfo)
 {
     return __hvm_copy(buf, vaddr, size,
                       HVMCOPY_to_guest | HVMCOPY_fault | HVMCOPY_virt,
-                      PFEC_page_present | PFEC_write_access | pfec);
+                      PFEC_page_present | PFEC_write_access | pfec, pfinfo);
 }
 
 enum hvm_copy_result hvm_copy_from_guest_virt(
-    void *buf, unsigned long vaddr, int size, uint32_t pfec)
+    void *buf, unsigned long vaddr, int size, uint32_t pfec,
+    pagefault_info_t *pfinfo)
 {
     return __hvm_copy(buf, vaddr, size,
                       HVMCOPY_from_guest | HVMCOPY_fault | HVMCOPY_virt,
-                      PFEC_page_present | pfec);
+                      PFEC_page_present | pfec, pfinfo);
 }
 
 enum hvm_copy_result hvm_fetch_from_guest_virt(
-    void *buf, unsigned long vaddr, int size, uint32_t pfec)
+    void *buf, unsigned long vaddr, int size, uint32_t pfec,
+    pagefault_info_t *pfinfo)
 {
     return __hvm_copy(buf, vaddr, size,
                       HVMCOPY_from_guest | HVMCOPY_fault | HVMCOPY_virt,
-                      PFEC_page_present | PFEC_insn_fetch | pfec);
+                      PFEC_page_present | PFEC_insn_fetch | pfec, pfinfo);
 }
 
 enum hvm_copy_result hvm_copy_to_guest_virt_nofault(
@@ -3319,7 +3334,7 @@ enum hvm_copy_result hvm_copy_to_guest_virt_nofault(
 {
     return __hvm_copy(buf, vaddr, size,
                       HVMCOPY_to_guest | HVMCOPY_no_fault | HVMCOPY_virt,
-                      PFEC_page_present | PFEC_write_access | pfec);
+                      PFEC_page_present | PFEC_write_access | pfec, NULL);
 }
 
 enum hvm_copy_result hvm_copy_from_guest_virt_nofault(
@@ -3327,7 +3342,7 @@ enum hvm_copy_result hvm_copy_from_guest_virt_nofault(
 {
     return __hvm_copy(buf, vaddr, size,
                       HVMCOPY_from_guest | HVMCOPY_no_fault | HVMCOPY_virt,
-                      PFEC_page_present | pfec);
+                      PFEC_page_present | pfec, NULL);
 }
 
 enum hvm_copy_result hvm_fetch_from_guest_virt_nofault(
@@ -3335,7 +3350,7 @@ enum hvm_copy_result hvm_fetch_from_guest_virt_nofault(
 {
     return __hvm_copy(buf, vaddr, size,
                       HVMCOPY_from_guest | HVMCOPY_no_fault | HVMCOPY_virt,
-                      PFEC_page_present | PFEC_insn_fetch | pfec);
+                      PFEC_page_present | PFEC_insn_fetch | pfec, NULL);
 }
 
 unsigned long copy_to_user_hvm(void *to, const void *from, unsigned int len)

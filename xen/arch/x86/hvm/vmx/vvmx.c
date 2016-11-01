@@ -396,6 +396,7 @@ static int decode_vmx_inst(struct cpu_user_regs *regs,
     struct vcpu *v = current;
     union vmx_inst_info info;
     struct segment_register seg;
+    pagefault_info_t pfinfo;
     unsigned long base, index, seg_base, disp, offset;
     int scale, size;
 
@@ -451,7 +452,7 @@ static int decode_vmx_inst(struct cpu_user_regs *regs,
             goto gp_fault;
 
         if ( poperandS != NULL &&
-             hvm_copy_from_guest_virt(poperandS, base, size, 0)
+             hvm_copy_from_guest_virt(poperandS, base, size, 0, &pfinfo)
                   != HVMCOPY_okay )
             return X86EMUL_EXCEPTION;
         decode->mem = base;
@@ -1611,6 +1612,7 @@ int nvmx_handle_vmptrst(struct cpu_user_regs *regs)
     struct vcpu *v = current;
     struct vmx_inst_decoded decode;
     struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
+    pagefault_info_t pfinfo;
     unsigned long gpa = 0;
     int rc;
 
@@ -1620,7 +1622,7 @@ int nvmx_handle_vmptrst(struct cpu_user_regs *regs)
 
     gpa = nvcpu->nv_vvmcxaddr;
 
-    rc = hvm_copy_to_guest_virt(decode.mem, &gpa, decode.len, 0);
+    rc = hvm_copy_to_guest_virt(decode.mem, &gpa, decode.len, 0, &pfinfo);
     if ( rc != HVMCOPY_okay )
         return X86EMUL_EXCEPTION;
 
@@ -1679,6 +1681,7 @@ int nvmx_handle_vmread(struct cpu_user_regs *regs)
 {
     struct vcpu *v = current;
     struct vmx_inst_decoded decode;
+    pagefault_info_t pfinfo;
     u64 value = 0;
     int rc;
 
@@ -1690,7 +1693,7 @@ int nvmx_handle_vmread(struct cpu_user_regs *regs)
 
     switch ( decode.type ) {
     case VMX_INST_MEMREG_TYPE_MEMORY:
-        rc = hvm_copy_to_guest_virt(decode.mem, &value, decode.len, 0);
+        rc = hvm_copy_to_guest_virt(decode.mem, &value, decode.len, 0, &pfinfo);
         if ( rc != HVMCOPY_okay )
             return X86EMUL_EXCEPTION;
         break;

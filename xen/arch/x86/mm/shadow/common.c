@@ -179,6 +179,7 @@ hvm_read(enum x86_segment seg,
          enum hvm_access_type access_type,
          struct sh_emulate_ctxt *sh_ctxt)
 {
+    pagefault_info_t pfinfo;
     unsigned long addr;
     int rc;
 
@@ -188,9 +189,9 @@ hvm_read(enum x86_segment seg,
         return rc;
 
     if ( access_type == hvm_access_insn_fetch )
-        rc = hvm_fetch_from_guest_virt(p_data, addr, bytes, 0);
+        rc = hvm_fetch_from_guest_virt(p_data, addr, bytes, 0, &pfinfo);
     else
-        rc = hvm_copy_from_guest_virt(p_data, addr, bytes, 0);
+        rc = hvm_copy_from_guest_virt(p_data, addr, bytes, 0, &pfinfo);
 
     switch ( rc )
     {

@@ -770,6 +770,7 @@ static int __hvmemul_read(
     struct hvm_emulate_ctxt *hvmemul_ctxt)
 {
     struct vcpu *curr = current;
+    pagefault_info_t pfinfo;
     unsigned long addr, reps = 1;
     uint32_t pfec = PFEC_page_present;
     struct hvm_vcpu_io *vio = &curr->arch.hvm_vcpu.hvm_io;
@@ -790,8 +791,8 @@ static int __hvmemul_read(
         pfec |= PFEC_user_mode;
 
     rc = ((access_type == hvm_access_insn_fetch) ?
-          hvm_fetch_from_guest_virt(p_data, addr, bytes, pfec) :
-          hvm_copy_from_guest_virt(p_data, addr, bytes, pfec));
+          hvm_fetch_from_guest_virt(p_data, addr, bytes, pfec, &pfinfo) :
+          hvm_copy_from_guest_virt(p_data, addr, bytes, pfec, &pfinfo));
 
     switch ( rc )
     {
@@ -878,6 +879,7 @@ static int hvmemul_write(
     struct hvm_emulate_ctxt *hvmemul_ctxt =
         container_of(ctxt, struct hvm_emulate_ctxt, ctxt);
     struct vcpu *curr = current;
+    pagefault_info_t pfinfo;
     unsigned long addr, reps = 1;
     uint32_t pfec = PFEC_page_present | PFEC_write_access;
     struct hvm_vcpu_io *vio = &curr->arch.hvm_vcpu.hvm_io;
@@ -896,7 +898,7 @@ static int hvmemul_write(
          (hvmemul_ctxt->seg_reg[x86_seg_ss].attr.fields.dpl == 3) )
         pfec |= PFEC_user_mode;
 
-    rc = hvm_copy_to_guest_virt(addr, p_data, bytes, pfec);
+    rc = hvm_copy_to_guest_virt(addr, p_data, bytes, pfec, &pfinfo);
 
     switch ( rc )
     {

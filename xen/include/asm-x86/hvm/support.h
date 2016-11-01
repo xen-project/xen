@@ -83,16 +83,27 @@ enum hvm_copy_result hvm_copy_from_guest_phys(
  *  HVMCOPY_bad_gfn_to_mfn: Some guest physical address did not map to
  *                          ordinary machine memory.
  *  HVMCOPY_bad_gva_to_gfn: Some guest virtual address did not have a valid
- *                          mapping to a guest physical address. In this case
- *                          a page fault exception is automatically queued
- *                          for injection into the current HVM VCPU.
+ *                          mapping to a guest physical address.  The
+ *                          pagefault_info_t structure will be filled in if
+ *                          provided, and a page fault exception is
+ *                          automatically queued for injection into the
+ *                          current HVM VCPU.
  */
+typedef struct pagefault_info
+{
+    unsigned long linear;
+    int ec;
+} pagefault_info_t;
+
 enum hvm_copy_result hvm_copy_to_guest_virt(
-    unsigned long vaddr, void *buf, int size, uint32_t pfec);
+    unsigned long vaddr, void *buf, int size, uint32_t pfec,
+    pagefault_info_t *pfinfo);
 enum hvm_copy_result hvm_copy_from_guest_virt(
-    void *buf, unsigned long vaddr, int size, uint32_t pfec);
+    void *buf, unsigned long vaddr, int size, uint32_t pfec,
+    pagefault_info_t *pfinfo);
 enum hvm_copy_result hvm_fetch_from_guest_virt(
-    void *buf, unsigned long vaddr, int size, uint32_t pfec);
+    void *buf, unsigned long vaddr, int size, uint32_t pfec,
+    pagefault_info_t *pfinfo);
 
 /*
  * As above (copy to/from a guest virtual address), but no fault is generated
