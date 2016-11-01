@@ -648,6 +648,19 @@ static inline void x86_emul_hw_exception(
     ctxt->event_pending = true;
 }
 
+static inline void x86_emul_pagefault(
+    int error_code, unsigned long cr2, struct x86_emulate_ctxt *ctxt)
+{
+    ASSERT(!ctxt->event_pending);
+
+    ctxt->event.vector = 14; /* TRAP_page_fault */
+    ctxt->event.type = X86_EVENTTYPE_HW_EXCEPTION;
+    ctxt->event.error_code = error_code;
+    ctxt->event.cr2 = cr2;
+
+    ctxt->event_pending = true;
+}
+
 static inline void x86_emul_software_event(
     enum x86_swint_type type, uint8_t vector, uint8_t insn_len,
     struct x86_emulate_ctxt *ctxt)

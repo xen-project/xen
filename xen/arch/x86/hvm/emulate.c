@@ -459,7 +459,7 @@ static int hvmemul_linear_to_phys(
     {
         if ( pfec & (PFEC_page_paged | PFEC_page_shared) )
             return X86EMUL_RETRY;
-        hvm_inject_page_fault(pfec, addr);
+        x86_emul_pagefault(pfec, addr, &hvmemul_ctxt->ctxt);
         return X86EMUL_EXCEPTION;
     }
 
@@ -483,7 +483,7 @@ static int hvmemul_linear_to_phys(
                 ASSERT(!reverse);
                 if ( npfn != gfn_x(INVALID_GFN) )
                     return X86EMUL_UNHANDLEABLE;
-                hvm_inject_page_fault(pfec, addr & PAGE_MASK);
+                x86_emul_pagefault(pfec, addr & PAGE_MASK, &hvmemul_ctxt->ctxt);
                 return X86EMUL_EXCEPTION;
             }
             *reps = done;
