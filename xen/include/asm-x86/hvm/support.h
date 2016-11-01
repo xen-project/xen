@@ -85,9 +85,7 @@ enum hvm_copy_result hvm_copy_from_guest_phys(
  *  HVMCOPY_bad_gva_to_gfn: Some guest virtual address did not have a valid
  *                          mapping to a guest physical address.  The
  *                          pagefault_info_t structure will be filled in if
- *                          provided, and a page fault exception is
- *                          automatically queued for injection into the
- *                          current HVM VCPU.
+ *                          provided.
  */
 typedef struct pagefault_info
 {

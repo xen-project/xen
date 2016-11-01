@@ -2927,6 +2927,8 @@ void hvm_task_switch(
 
     rc = hvm_copy_from_guest_linear(
         &tss, prev_tr.base, sizeof(tss), PFEC_page_present, &pfinfo);
+    if ( rc == HVMCOPY_bad_gva_to_gfn )
+        hvm_inject_page_fault(pfinfo.ec, pfinfo.linear);
     if ( rc != HVMCOPY_okay )
         goto out;
 
@@ -2965,11 +2967,15 @@ void hvm_task_switch(
                                   offsetof(typeof(tss), trace) -
                                   offsetof(typeof(tss), eip),
                                   PFEC_page_present, &pfinfo);
+    if ( rc == HVMCOPY_bad_gva_to_gfn )
+        hvm_inject_page_fault(pfinfo.ec, pfinfo.linear);
     if ( rc != HVMCOPY_okay )
         goto out;
 
     rc = hvm_copy_from_guest_linear(
         &tss, tr.base, sizeof(tss), PFEC_page_present, &pfinfo);
+    if ( rc == HVMCOPY_bad_gva_to_gfn )
+        hvm_inject_page_fault(pfinfo.ec, pfinfo.linear);
     /*
      * Note: The HVMCOPY_gfn_shared case could be optimised, if the callee
      * functions knew we want RO access.
@@ -3012,7 +3018,10 @@ void hvm_task_switch(
                                       &tss.back_link, sizeof(tss.back_link), 0,
                                       &pfinfo);
         if ( rc == HVMCOPY_bad_gva_to_gfn )
+        {
+            hvm_inject_page_fault(pfinfo.ec, pfinfo.linear);
             exn_raised = 1;
+        }
         else if ( rc != HVMCOPY_okay )
             goto out;
     }
@@ -3050,7 +3059,10 @@ void hvm_task_switch(
             rc = hvm_copy_to_guest_linear(linear_addr, &errcode, opsz, 0,
                                           &pfinfo);
             if ( rc == HVMCOPY_bad_gva_to_gfn )
+            {
+                hvm_inject_page_fault(pfinfo.ec, pfinfo.linear);
                 exn_raised = 1;
+            }
             else if ( rc != HVMCOPY_okay )
                 goto out;
         }
@@ -3114,8 +3126,6 @@ static enum hvm_copy_result __hvm_copy(
                 {
                     pfinfo->linear = addr;
                     pfinfo->ec = pfec;
-
-                    hvm_inject_page_fault(pfec, addr);
                 }
                 return HVMCOPY_bad_gva_to_gfn;
             }

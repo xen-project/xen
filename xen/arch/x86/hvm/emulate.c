@@ -799,6 +799,7 @@ static int __hvmemul_read(
     case HVMCOPY_okay:
         break;
     case HVMCOPY_bad_gva_to_gfn:
+        x86_emul_pagefault(pfinfo.ec, pfinfo.linear, &hvmemul_ctxt->ctxt);
         return X86EMUL_EXCEPTION;
     case HVMCOPY_bad_gfn_to_mfn:
         if ( access_type == hvm_access_insn_fetch )
@@ -905,6 +906,7 @@ static int hvmemul_write(
     case HVMCOPY_okay:
         break;
     case HVMCOPY_bad_gva_to_gfn:
+        x86_emul_pagefault(pfinfo.ec, pfinfo.linear, &hvmemul_ctxt->ctxt);
         return X86EMUL_EXCEPTION;
     case HVMCOPY_bad_gfn_to_mfn:
         return hvmemul_linear_mmio_write(addr, bytes, p_data, pfec, hvmemul_ctxt, 0);
