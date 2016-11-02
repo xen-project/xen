@@ -2841,6 +2841,7 @@ x86_emulate(
         struct segment_register cs, sreg;
         unsigned long cr4;
         struct cpuid_leaf cpuid_leaf;
+        uint64_t msr_val;
 
     case 0x00 ... 0x05: add: /* add */
         emulate_2op_SrcV("add", src, dst, _regs._eflags);
@@ -4691,14 +4692,12 @@ x86_emulate(
             goto complete_insn;
 
         case 0xf9: /* rdtscp */
-        {
-            uint64_t tsc_aux;
             fail_if(ops->read_msr == NULL);
-            if ( (rc = ops->read_msr(MSR_TSC_AUX, &tsc_aux, ctxt)) != 0 )
+            if ( (rc = ops->read_msr(MSR_TSC_AUX,
+                                     &msr_val, ctxt)) != X86EMUL_OKAY )
                 goto done;
-            _regs.r(cx) = (uint32_t)tsc_aux;
+            _regs.r(cx) = (uint32_t)msr_val;
             goto rdtsc;
-        }
 
         case 0xfc: /* clzero */
         {
@@ -4919,21 +4918,19 @@ x86_emulate(
             dst.type = OP_NONE;
         break;
 
-    case X86EMUL_OPC(0x0f, 0x05): /* syscall */ {
-        uint64_t msr_content;
-
+    case X86EMUL_OPC(0x0f, 0x05): /* syscall */
         generate_exception_if(!in_protmode(ctxt, ops), EXC_UD);
 
         /* Inject #UD if syscall/sysret are disabled. */
         fail_if(ops->read_msr == NULL);
-        if ( (rc = ops->read_msr(MSR_EFER, &msr_content, ctxt)) != 0 )
+        if ( (rc = ops->read_msr(MSR_EFER, &msr_val, ctxt)) != X86EMUL_OKAY )
             goto done;
-        generate_exception_if((msr_content & EFER_SCE) == 0, EXC_UD);
+        generate_exception_if((msr_val & EFER_SCE) == 0, EXC_UD);
 
-        if ( (rc = ops->read_msr(MSR_STAR, &msr_content, ctxt)) != 0 )
+        if ( (rc = ops->read_msr(MSR_STAR, &msr_val, ctxt)) != X86EMUL_OKAY )
             goto done;
 
-        cs.sel = (msr_content >> 32) & ~3; /* SELECTOR_RPL_MASK */
+        cs.sel = (msr_val >> 32) & ~3; /* SELECTOR_RPL_MASK */
         sreg.sel = cs.sel + 8;
 
         cs.base = sreg.base = 0; /* flat segment */
@@ -4952,13 +4949,14 @@ x86_emulate(
             _regs.r11 = _regs._eflags & ~X86_EFLAGS_RF;
 
             if ( (rc = ops->read_msr(mode_64bit() ? MSR_LSTAR : MSR_CSTAR,
-                                     &msr_content, ctxt)) != 0 )
+                                     &msr_val, ctxt)) != X86EMUL_OKAY )
                 goto done;
-            _regs.rip = msr_content;
+            _regs.rip = msr_val;
 
-            if ( (rc = ops->read_msr(MSR_SYSCALL_MASK, &msr_content, ctxt)) != 0 )
+            if ( (rc = ops->read_msr(MSR_SYSCALL_MASK,
+                                     &msr_val, ctxt)) != X86EMUL_OKAY )
                 goto done;
-            _regs._eflags &= ~(msr_content | X86_EFLAGS_RF);
+            _regs._eflags &= ~(msr_val | X86_EFLAGS_RF);
         }
         else
 #endif
@@ -4966,7 +4964,7 @@ x86_emulate(
             cs.attr.bytes = 0xc9b; /* G+DB+P+S+Code */
 
             _regs.r(cx) = _regs._eip;
-            _regs._eip = msr_content;
+            _regs._eip = msr_val;
             _regs._eflags &= ~(X86_EFLAGS_VM | X86_EFLAGS_IF | X86_EFLAGS_RF);
         }
 
@@ -4991,9 +4989,7 @@ x86_emulate(
          * #DB (or to not use enable EFER.SCE to start with).
          */
         singlestep = _regs._eflags & X86_EFLAGS_TF;
-
         break;
-    }
 
     case X86EMUL_OPC(0x0f, 0x06): /* clts */
         generate_exception_if(!mode_ring0(), EXC_GP, 0);
@@ -5169,9 +5165,7 @@ x86_emulate(
             goto done;
         break;
 
-    case X86EMUL_OPC(0x0f, 0x31): rdtsc: /* rdtsc */ {
-        uint64_t val;
-
+    case X86EMUL_OPC(0x0f, 0x31): rdtsc: /* rdtsc */
         if ( !mode_ring0() )
         {
             fail_if(ops->read_cr == NULL);
@@ -5180,23 +5174,21 @@ x86_emulate(
             generate_exception_if(cr4 & X86_CR4_TSD, EXC_GP, 0);
         }
         fail_if(ops->read_msr == NULL);
-        if ( (rc = ops->read_msr(MSR_IA32_TSC, &val, ctxt)) != 0 )
+        if ( (rc = ops->read_msr(MSR_IA32_TSC,
+                                 &msr_val, ctxt)) != X86EMUL_OKAY )
             goto done;
-        _regs.r(dx) = val >> 32;
-        _regs.r(ax) = (uint32_t)val;
+        _regs.r(dx) = msr_val >> 32;
+        _regs.r(ax) = (uint32_t)msr_val;
         break;
-    }
 
-    case X86EMUL_OPC(0x0f, 0x32): /* rdmsr */ {
-        uint64_t val;
+    case X86EMUL_OPC(0x0f, 0x32): /* rdmsr */
         generate_exception_if(!mode_ring0(), EXC_GP, 0);
         fail_if(ops->read_msr == NULL);
-        if ( (rc = ops->read_msr(_regs._ecx, &val, ctxt)) != 0 )
+        if ( (rc = ops->read_msr(_regs._ecx, &msr_val, ctxt)) != X86EMUL_OKAY )
             goto done;
-        _regs.r(dx) = val >> 32;
-        _regs.r(ax) = (uint32_t)val;
+        _regs.r(dx) = msr_val >> 32;
+        _regs.r(ax) = (uint32_t)msr_val;
         break;
-    }
 
     case X86EMUL_OPC(0x0f, 0x40) ... X86EMUL_OPC(0x0f, 0x4f): /* cmovcc */
         vcpu_must_have(cmov);
@@ -5205,7 +5197,6 @@ x86_emulate(
         break;
 
     case X86EMUL_OPC(0x0f, 0x34): /* sysenter */ {
-        uint64_t msr_content;
         int lm;
 
         vcpu_must_have(sep);
@@ -5213,18 +5204,18 @@ x86_emulate(
         generate_exception_if(!in_protmode(ctxt, ops), EXC_GP, 0);
 
         fail_if(ops->read_msr == NULL);
-        if ( (rc = ops->read_msr(MSR_IA32_SYSENTER_CS, &msr_content, ctxt))
-             != 0 )
+        if ( (rc = ops->read_msr(MSR_IA32_SYSENTER_CS,
+                                 &msr_val, ctxt)) != X86EMUL_OKAY )
             goto done;
 
-        generate_exception_if(!(msr_content & 0xfffc), EXC_GP, 0);
+        generate_exception_if(!(msr_val & 0xfffc), EXC_GP, 0);
         lm = in_longmode(ctxt, ops);
         if ( lm < 0 )
             goto cannot_emulate;
 
         _regs._eflags &= ~(X86_EFLAGS_VM | X86_EFLAGS_IF | X86_EFLAGS_RF);
 
-        cs.sel = msr_content & ~3; /* SELECTOR_RPL_MASK */
+        cs.sel = msr_val & ~3; /* SELECTOR_RPL_MASK */
         cs.base = 0;   /* flat segment */
         cs.limit = ~0u;  /* 4GB limit */
         cs.attr.bytes = lm ? 0xa9b  /* G+L+P+S+Code */
@@ -5240,40 +5231,37 @@ x86_emulate(
              (rc = ops->write_segment(x86_seg_ss, &sreg, ctxt)) != 0 )
             goto done;
 
-        if ( (rc = ops->read_msr(MSR_IA32_SYSENTER_EIP, &msr_content, ctxt))
-             != 0 )
+        if ( (rc = ops->read_msr(MSR_IA32_SYSENTER_EIP,
+                                 &msr_val, ctxt)) != X86EMUL_OKAY )
             goto done;
-        _regs.r(ip) = lm ? msr_content : (uint32_t)msr_content;
+        _regs.r(ip) = lm ? msr_val : (uint32_t)msr_val;
 
-        if ( (rc = ops->read_msr(MSR_IA32_SYSENTER_ESP, &msr_content, ctxt))
-             != 0 )
+        if ( (rc = ops->read_msr(MSR_IA32_SYSENTER_ESP,
+                                 &msr_val, ctxt)) != X86EMUL_OKAY )
             goto done;
-        _regs.r(sp) = lm ? msr_content : (uint32_t)msr_content;
+        _regs.r(sp) = lm ? msr_val : (uint32_t)msr_val;
 
         singlestep = _regs._eflags & X86_EFLAGS_TF;
         break;
     }
 
     case X86EMUL_OPC(0x0f, 0x35): /* sysexit */
-    {
-        uint64_t msr_content;
-
         vcpu_must_have(sep);
         generate_exception_if(!mode_ring0(), EXC_GP, 0);
         generate_exception_if(!in_protmode(ctxt, ops), EXC_GP, 0);
 
         fail_if(ops->read_msr == NULL);
-        if ( (rc = ops->read_msr(MSR_IA32_SYSENTER_CS, &msr_content, ctxt))
-             != 0 )
+        if ( (rc = ops->read_msr(MSR_IA32_SYSENTER_CS,
+                                 &msr_val, ctxt)) != X86EMUL_OKAY )
             goto done;
 
-        generate_exception_if(!(msr_content & 0xfffc), EXC_GP, 0);
+        generate_exception_if(!(msr_val & 0xfffc), EXC_GP, 0);
         generate_exception_if(op_bytes == 8 &&
                               (!is_canonical_address(_regs.r(dx)) ||
                                !is_canonical_address(_regs.r(cx))),
                               EXC_GP, 0);
 
-        cs.sel = (msr_content | 3) + /* SELECTOR_RPL_MASK */
+        cs.sel = (msr_val | 3) + /* SELECTOR_RPL_MASK */
                  (op_bytes == 8 ? 32 : 16);
         cs.base = 0;   /* flat segment */
         cs.limit = ~0u;  /* 4GB limit */
@@ -5295,7 +5283,6 @@ x86_emulate(
 
         singlestep = _regs._eflags & X86_EFLAGS_TF;
         break;
-    }
 
     case X86EMUL_OPC(0x0f, 0xe7):        /* movntq mm,m64 */
     case X86EMUL_OPC_66(0x0f, 0xe7):     /* movntdq xmm,m128 */
@@ -5780,16 +5767,14 @@ x86_emulate(
             case 7: /* rdseed / rdpid */
                 if ( repe_prefix() ) /* rdpid */
                 {
-                    uint64_t tsc_aux;
-
                     generate_exception_if(ea.type != OP_REG, EXC_UD);
                     vcpu_must_have(rdpid);
                     fail_if(!ops->read_msr);
-                    if ( (rc = ops->read_msr(MSR_TSC_AUX, &tsc_aux,
+                    if ( (rc = ops->read_msr(MSR_TSC_AUX, &msr_val,
                                              ctxt)) != X86EMUL_OKAY )
                         goto done;
                     dst = ea;
-                    dst.val = tsc_aux;
+                    dst.val = msr_val;
                     dst.bytes = 4;
                     break;
                 }
