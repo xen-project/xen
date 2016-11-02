@@ -1744,7 +1744,6 @@ static int svm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
     return X86EMUL_OKAY;
 
  gpf:
-    hvm_inject_hw_exception(TRAP_gp_fault, 0);
     return X86EMUL_EXCEPTION;
 }
 
@@ -1897,7 +1896,6 @@ static int svm_msr_write_intercept(unsigned int msr, uint64_t msr_content)
     return result;
 
  gpf:
-    hvm_inject_hw_exception(TRAP_gp_fault, 0);
     return X86EMUL_EXCEPTION;
 }
 
@@ -1924,6 +1922,8 @@ static void svm_do_msr_access(struct cpu_user_regs *regs)
 
     if ( rc == X86EMUL_OKAY )
         __update_guest_eip(regs, inst_len);
+    else if ( rc == X86EMUL_EXCEPTION )
+        hvm_inject_hw_exception(TRAP_gp_fault, 0);
 }
 
 static void svm_vmexit_do_hlt(struct vmcb_struct *vmcb,

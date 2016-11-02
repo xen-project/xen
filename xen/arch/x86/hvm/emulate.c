@@ -1544,7 +1544,12 @@ static int hvmemul_read_msr(
     uint64_t *val,
     struct x86_emulate_ctxt *ctxt)
 {
-    return hvm_msr_read_intercept(reg, val);
+    int rc = hvm_msr_read_intercept(reg, val);
+
+    if ( rc == X86EMUL_EXCEPTION )
+        x86_emul_hw_exception(TRAP_gp_fault, 0, ctxt);
+
+    return rc;
 }
 
 static int hvmemul_write_msr(
@@ -1552,7 +1557,12 @@ static int hvmemul_write_msr(
     uint64_t val,
     struct x86_emulate_ctxt *ctxt)
 {
-    return hvm_msr_write_intercept(reg, val, 1);
+    int rc = hvm_msr_write_intercept(reg, val, 1);
+
+    if ( rc == X86EMUL_EXCEPTION )
+        x86_emul_hw_exception(TRAP_gp_fault, 0, ctxt);
+
+    return rc;
 }
 
 static int hvmemul_wbinvd(

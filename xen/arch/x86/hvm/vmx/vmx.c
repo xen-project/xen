@@ -2673,7 +2673,6 @@ done:
     return X86EMUL_OKAY;
 
 gp_fault:
-    hvm_inject_hw_exception(TRAP_gp_fault, 0);
     return X86EMUL_EXCEPTION;
 }
 
@@ -2910,7 +2909,6 @@ static int vmx_msr_write_intercept(unsigned int msr, uint64_t msr_content)
     return X86EMUL_OKAY;
 
 gp_fault:
-    hvm_inject_hw_exception(TRAP_gp_fault, 0);
     return X86EMUL_EXCEPTION;
 }
 
@@ -3603,18 +3601,33 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
         break;
     case EXIT_REASON_MSR_READ:
     {
-        uint64_t msr_content;
-        if ( hvm_msr_read_intercept(regs->_ecx, &msr_content) == X86EMUL_OKAY )
+        uint64_t msr_content = 0;
+
+        switch ( hvm_msr_read_intercept(regs->_ecx, &msr_content) )
         {
+        case X86EMUL_OKAY:
             msr_split(regs, msr_content);
             update_guest_eip(); /* Safe: RDMSR */
+            break;
+
+        case X86EMUL_EXCEPTION:
+            hvm_inject_hw_exception(TRAP_gp_fault, 0);
+            break;
         }
         break;
     }
 
     case EXIT_REASON_MSR_WRITE:
-        if ( hvm_msr_write_intercept(regs->_ecx, msr_fold(regs), 1) == X86EMUL_OKAY )
+        switch ( hvm_msr_write_intercept(regs->_ecx, msr_fold(regs), 1) )
+        {
+        case X86EMUL_OKAY:
             update_guest_eip(); /* Safe: WRMSR */
+            break;
+
+        case X86EMUL_EXCEPTION:
+            hvm_inject_hw_exception(TRAP_gp_fault, 0);
+            break;
+        }
         break;
 
     case EXIT_REASON_VMXOFF:

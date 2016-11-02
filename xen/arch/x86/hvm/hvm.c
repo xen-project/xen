@@ -518,7 +518,10 @@ void hvm_do_resume(struct vcpu *v)
 
         if ( w->do_write.msr )
         {
-            hvm_msr_write_intercept(w->msr, w->value, 0);
+            if ( hvm_msr_write_intercept(w->msr, w->value, 0) ==
+                 X86EMUL_EXCEPTION )
+                hvm_inject_hw_exception(TRAP_gp_fault, 0);
+
             w->do_write.msr = 0;
         }
 
@@ -3455,7 +3458,6 @@ int hvm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
     return ret;
 
  gp_fault:
-    hvm_inject_hw_exception(TRAP_gp_fault, 0);
     ret = X86EMUL_EXCEPTION;
     *msr_content = -1ull;
     goto out;
@@ -3600,7 +3602,6 @@ int hvm_msr_write_intercept(unsigned int msr, uint64_t msr_content,
     return ret;
 
 gp_fault:
-    hvm_inject_hw_exception(TRAP_gp_fault, 0);
     return X86EMUL_EXCEPTION;
 }
 

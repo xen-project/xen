@@ -1032,6 +1032,7 @@ static void load_shadow_guest_state(struct vcpu *v)
     struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
     u32 control;
     u64 cr_gh_mask, cr_read_shadow;
+    int rc;
 
     static const u16 vmentry_fields[] = {
         VM_ENTRY_INTR_INFO,
@@ -1053,8 +1054,12 @@ static void load_shadow_guest_state(struct vcpu *v)
     if ( control & VM_ENTRY_LOAD_GUEST_PAT )
         hvm_set_guest_pat(v, get_vvmcs(v, GUEST_PAT));
     if ( control & VM_ENTRY_LOAD_PERF_GLOBAL_CTRL )
-        hvm_msr_write_intercept(MSR_CORE_PERF_GLOBAL_CTRL,
-                                get_vvmcs(v, GUEST_PERF_GLOBAL_CTRL), 0);
+    {
+        rc = hvm_msr_write_intercept(MSR_CORE_PERF_GLOBAL_CTRL,
+                                     get_vvmcs(v, GUEST_PERF_GLOBAL_CTRL), 0);
+        if ( rc == X86EMUL_EXCEPTION )
+            hvm_inject_hw_exception(TRAP_gp_fault, 0);
+    }
 
     hvm_funcs.set_tsc_offset(v, v->arch.hvm_vcpu.cache_tsc_offset, 0);
 
@@ -1222,7 +1227,7 @@ static void sync_vvmcs_ro(struct vcpu *v)
 
 static void load_vvmcs_host_state(struct vcpu *v)
 {
-    int i;
+    int i, rc;
     u64 r;
     u32 control;
 
@@ -1240,8 +1245,12 @@ static void load_vvmcs_host_state(struct vcpu *v)
     if ( control & VM_EXIT_LOAD_HOST_PAT )
         hvm_set_guest_pat(v, get_vvmcs(v, HOST_PAT));
     if ( control & VM_EXIT_LOAD_PERF_GLOBAL_CTRL )
-        hvm_msr_write_intercept(MSR_CORE_PERF_GLOBAL_CTRL,
-                                get_vvmcs(v, HOST_PERF_GLOBAL_CTRL), 1);
+    {
+        rc = hvm_msr_write_intercept(MSR_CORE_PERF_GLOBAL_CTRL,
+                                     get_vvmcs(v, HOST_PERF_GLOBAL_CTRL), 1);
+        if ( rc == X86EMUL_EXCEPTION )
+            hvm_inject_hw_exception(TRAP_gp_fault, 0);
+    }
 
     hvm_funcs.set_tsc_offset(v, v->arch.hvm_vcpu.cache_tsc_offset, 0);
 

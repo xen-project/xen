@@ -121,12 +121,18 @@ int hvm_set_efer(uint64_t value);
 int hvm_set_cr0(unsigned long value, bool_t may_defer);
 int hvm_set_cr3(unsigned long value, bool_t may_defer);
 int hvm_set_cr4(unsigned long value, bool_t may_defer);
-int hvm_msr_read_intercept(unsigned int msr, uint64_t *msr_content);
-int hvm_msr_write_intercept(
-    unsigned int msr, uint64_t msr_content, bool_t may_defer);
 int hvm_mov_to_cr(unsigned int cr, unsigned int gpr);
 int hvm_mov_from_cr(unsigned int cr, unsigned int gpr);
 void hvm_ud_intercept(struct cpu_user_regs *);
+
+/*
+ * May return X86EMUL_EXCEPTION, at which point the caller is responsible for
+ * injecting a #GP fault.  Used to support speculative reads.
+ */
+int __must_check hvm_msr_read_intercept(
+    unsigned int msr, uint64_t *msr_content);
+int __must_check hvm_msr_write_intercept(
+    unsigned int msr, uint64_t msr_content, bool_t may_defer);
 
 #endif /* __ASM_X86_HVM_SUPPORT_H__ */
 
