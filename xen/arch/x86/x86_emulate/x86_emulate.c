@@ -4443,6 +4443,7 @@ x86_emulate(
                  (rc = read_ulong(ea.mem.seg, ea.mem.off+2,
                                   &base, mode_64bit() ? 8 : 4, ctxt, ops)) )
                 goto done;
+            generate_exception_if(!is_canonical_address(base), EXC_GP, 0);
             sreg.base = base;
             sreg.limit = limit;
             if ( op_bytes == 2 )
