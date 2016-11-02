@@ -1937,9 +1937,9 @@ void hvm_emulate_init_per_insn(
                                         hvm_access_insn_fetch,
                                         hvmemul_ctxt->ctxt.addr_size,
                                         &addr) &&
-             hvm_fetch_from_guest_virt_nofault(hvmemul_ctxt->insn_buf, addr,
-                                               sizeof(hvmemul_ctxt->insn_buf),
-                                               pfec) == HVMCOPY_okay) ?
+             hvm_fetch_from_guest_virt(hvmemul_ctxt->insn_buf, addr,
+                                       sizeof(hvmemul_ctxt->insn_buf),
+                                       pfec, NULL) == HVMCOPY_okay) ?
             sizeof(hvmemul_ctxt->insn_buf) : 0;
     }
     else

@@ -105,17 +105,6 @@ enum hvm_copy_result hvm_fetch_from_guest_virt(
     void *buf, unsigned long vaddr, int size, uint32_t pfec,
     pagefault_info_t *pfinfo);
 
-/*
- * As above (copy to/from a guest virtual address), but no fault is generated
- * when HVMCOPY_bad_gva_to_gfn is returned.
- */
-enum hvm_copy_result hvm_copy_to_guest_virt_nofault(
-    unsigned long vaddr, void *buf, int size, uint32_t pfec);
-enum hvm_copy_result hvm_copy_from_guest_virt_nofault(
-    void *buf, unsigned long vaddr, int size, uint32_t pfec);
-enum hvm_copy_result hvm_fetch_from_guest_virt_nofault(
-    void *buf, unsigned long vaddr, int size, uint32_t pfec);
-
 #define HVM_HCALL_completed  0 /* hypercall completed - no further action */
 #define HVM_HCALL_preempted  1 /* hypercall preempted - re-execute VMCALL */
 #define HVM_HCALL_invalidate 2 /* invalidate ioemu-dm memory cache        */

@@ -3066,8 +3066,6 @@ void hvm_task_switch(
 
 #define HVMCOPY_from_guest (0u<<0)
 #define HVMCOPY_to_guest   (1u<<0)
-#define HVMCOPY_no_fault   (0u<<1)
-#define HVMCOPY_fault      (1u<<1)
 #define HVMCOPY_phys       (0u<<2)
 #define HVMCOPY_virt       (1u<<2)
 static enum hvm_copy_result __hvm_copy(
@@ -3112,13 +3110,10 @@ static enum hvm_copy_result __hvm_copy(
                     return HVMCOPY_gfn_paged_out;
                 if ( pfec & PFEC_page_shared )
                     return HVMCOPY_gfn_shared;
-                if ( flags & HVMCOPY_fault )
+                if ( pfinfo )
                 {
-                    if ( pfinfo )
-                    {
-                        pfinfo->linear = addr;
-                        pfinfo->ec = pfec;
-                    }
+                    pfinfo->linear = addr;
+                    pfinfo->ec = pfec;
 
                     hvm_inject_page_fault(pfec, addr);
                 }
@@ -3290,16 +3285,14 @@ enum hvm_copy_result hvm_copy_to_guest_phys(
     paddr_t paddr, void *buf, int size)
 {
     return __hvm_copy(buf, paddr, size,
-                      HVMCOPY_to_guest | HVMCOPY_fault | HVMCOPY_phys,
-                      0, NULL);
+                      HVMCOPY_to_guest | HVMCOPY_phys, 0, NULL);
 }
 
 enum hvm_copy_result hvm_copy_from_guest_phys(
     void *buf, paddr_t paddr, int size)
 {
     return __hvm_copy(buf, paddr, size,
-                      HVMCOPY_from_guest | HVMCOPY_fault | HVMCOPY_phys,
-                      0, NULL);
+                      HVMCOPY_from_guest | HVMCOPY_phys, 0, NULL);
 }
 
 enum hvm_copy_result hvm_copy_to_guest_virt(
@@ -3307,7 +3300,7 @@ enum hvm_copy_result hvm_copy_to_guest_virt(
     pagefault_info_t *pfinfo)
 {
     return __hvm_copy(buf, vaddr, size,
-                      HVMCOPY_to_guest | HVMCOPY_fault | HVMCOPY_virt,
+                      HVMCOPY_to_guest | HVMCOPY_virt,
                       PFEC_page_present | PFEC_write_access | pfec, pfinfo);
 }
 
@@ -3316,7 +3309,7 @@ enum hvm_copy_result hvm_copy_from_guest_virt(
     pagefault_info_t *pfinfo)
 {
     return __hvm_copy(buf, vaddr, size,
-                      HVMCOPY_from_guest | HVMCOPY_fault | HVMCOPY_virt,
+                      HVMCOPY_from_guest | HVMCOPY_virt,
                       PFEC_page_present | pfec, pfinfo);
 }
 
@@ -3325,32 +3318,8 @@ enum hvm_copy_result hvm_fetch_from_guest_virt(
     pagefault_info_t *pfinfo)
 {
     return __hvm_copy(buf, vaddr, size,
-                      HVMCOPY_from_guest | HVMCOPY_fault | HVMCOPY_virt,
+                      HVMCOPY_from_guest | HVMCOPY_virt,
                       PFEC_page_present | PFEC_insn_fetch | pfec, pfinfo);
-}
-
-enum hvm_copy_result hvm_copy_to_guest_virt_nofault(
-    unsigned long vaddr, void *buf, int size, uint32_t pfec)
-{
-    return __hvm_copy(buf, vaddr, size,
-                      HVMCOPY_to_guest | HVMCOPY_no_fault | HVMCOPY_virt,
-                      PFEC_page_present | PFEC_write_access | pfec, NULL);
-}
-
-enum hvm_copy_result hvm_copy_from_guest_virt_nofault(
-    void *buf, unsigned long vaddr, int size, uint32_t pfec)
-{
-    return __hvm_copy(buf, vaddr, size,
-                      HVMCOPY_from_guest | HVMCOPY_no_fault | HVMCOPY_virt,
-                      PFEC_page_present | pfec, NULL);
-}
-
-enum hvm_copy_result hvm_fetch_from_guest_virt_nofault(
-    void *buf, unsigned long vaddr, int size, uint32_t pfec)
-{
-    return __hvm_copy(buf, vaddr, size,
-                      HVMCOPY_from_guest | HVMCOPY_no_fault | HVMCOPY_virt,
-                      PFEC_page_present | PFEC_insn_fetch | pfec, NULL);
 }
 
 unsigned long copy_to_user_hvm(void *to, const void *from, unsigned int len)
@@ -3364,8 +3333,7 @@ unsigned long copy_to_user_hvm(void *to, const void *from, unsigned int len)
         return 0;
     }
 
-    rc = hvm_copy_to_guest_virt_nofault((unsigned long)to, (void *)from,
-                                        len, 0);
+    rc = hvm_copy_to_guest_virt((unsigned long)to, (void *)from, len, 0, NULL);
     return rc ? len : 0; /* fake a copy_to_user() return code */
 }
 
@@ -3395,7 +3363,7 @@ unsigned long copy_from_user_hvm(void *to, const void *from, unsigned len)
         return 0;
     }
 
-    rc = hvm_copy_from_guest_virt_nofault(to, (unsigned long)from, len, 0);
+    rc = hvm_copy_from_guest_virt(to, (unsigned long)from, len, 0, NULL);
     return rc ? len : 0; /* fake a copy_from_user() return code */
 }
 
@@ -4071,8 +4039,8 @@ void hvm_ud_intercept(struct cpu_user_regs *regs)
                                         (hvm_long_mode_enabled(cur) &&
                                          cs->attr.fields.l) ? 64 :
                                         cs->attr.fields.db ? 32 : 16, &addr) &&
-             (hvm_fetch_from_guest_virt_nofault(sig, addr, sizeof(sig),
-                                                walk) == HVMCOPY_okay) &&
+             (hvm_fetch_from_guest_virt(sig, addr, sizeof(sig),
+                                        walk, NULL) == HVMCOPY_okay) &&
              (memcmp(sig, "\xf\xbxen", sizeof(sig)) == 0) )
         {
             regs->eip += sizeof(sig);
