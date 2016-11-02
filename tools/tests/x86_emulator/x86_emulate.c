@@ -8,8 +8,6 @@
 
 #include "x86_emulate/x86_emulate.h"
 
-typedef bool bool_t;
-
 #define is_canonical_address(x) (((int64_t)(x) >> 47) == ((int64_t)(x) >> 63))
 
 #define EFER_SCE       (1 << 0)

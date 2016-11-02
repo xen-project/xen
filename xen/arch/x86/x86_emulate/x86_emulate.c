@@ -692,7 +692,7 @@ static inline int mkec(uint8_t e, int32_t ec, ...)
  * Given byte has even parity (even number of 1s)? SDM Vol. 1 Sec. 3.4.3.1,
  * "Status Flags": EFLAGS.PF reflects parity of least-sig. byte of result only.
  */
-static bool_t even_parity(uint8_t v)
+static bool even_parity(uint8_t v)
 {
 #ifdef __GCC_ASM_FLAG_OUTPUTS__
     asm ( "test %1,%1" : "=@ccp" (v) : "q" (v) );
@@ -997,9 +997,9 @@ static int read_ulong(
  * IN:  Multiplicand=m[0], Multiplier=m[1]
  * OUT: Return CF/OF (overflow status); Result=m[1]:m[0]
  */
-static bool_t mul_dbl(unsigned long m[2])
+static bool mul_dbl(unsigned long m[2])
 {
-    bool_t rc;
+    bool rc;
 
 #ifdef __GCC_ASM_FLAG_OUTPUTS__
     asm ( "mul %1" : "+a" (m[0]), "+d" (m[1]), "=@cco" (rc) );
@@ -1016,9 +1016,9 @@ static bool_t mul_dbl(unsigned long m[2])
  * IN:  Multiplicand=m[0], Multiplier=m[1]
  * OUT: Return CF/OF (overflow status); Result=m[1]:m[0]
  */
-static bool_t imul_dbl(unsigned long m[2])
+static bool imul_dbl(unsigned long m[2])
 {
-    bool_t rc;
+    bool rc;
 
 #ifdef __GCC_ASM_FLAG_OUTPUTS__
     asm ( "imul %1" : "+a" (m[0]), "+d" (m[1]), "=@cco" (rc) );
@@ -1036,7 +1036,7 @@ static bool_t imul_dbl(unsigned long m[2])
  * OUT: Return 1: #DE
  *      Return 0: Quotient=u[0], Remainder=u[1]
  */
-static bool_t div_dbl(unsigned long u[2], unsigned long v)
+static bool div_dbl(unsigned long u[2], unsigned long v)
 {
     if ( (v == 0) || (u[1] >= v) )
         return 1;
@@ -1052,9 +1052,9 @@ static bool_t div_dbl(unsigned long u[2], unsigned long v)
  * NB. We don't use idiv directly as it's moderately hard to work out
  *     ahead of time whether it will #DE, which we cannot allow to happen.
  */
-static bool_t idiv_dbl(unsigned long u[2], long v)
+static bool idiv_dbl(unsigned long u[2], long v)
 {
-    bool_t negu = (long)u[1] < 0, negv = v < 0;
+    bool negu = (long)u[1] < 0, negv = v < 0;
 
     /* u = abs(u) */
     if ( negu )
@@ -1086,7 +1086,7 @@ static bool_t idiv_dbl(unsigned long u[2], long v)
     return 0;
 }
 
-static bool_t
+static bool
 test_cc(
     unsigned int condition, unsigned int flags)
 {
@@ -1218,7 +1218,7 @@ static int ioport_access_check(
     return rc;
 }
 
-static bool_t
+static bool
 in_realmode(
     struct x86_emulate_ctxt *ctxt,
     const struct x86_emulate_ops  *ops)
@@ -1233,7 +1233,7 @@ in_realmode(
     return (!rc && !(cr0 & CR0_PE));
 }
 
-static bool_t
+static bool
 in_protmode(
     struct x86_emulate_ctxt *ctxt,
     const struct x86_emulate_ops  *ops)
@@ -1246,7 +1246,7 @@ in_protmode(
 #define EDX 2
 #define EBX 3
 
-static bool_t vcpu_has(
+static bool vcpu_has(
     unsigned int eax,
     unsigned int reg,
     unsigned int bit,
@@ -1350,7 +1350,7 @@ realmode_load_seg(
 static int
 protmode_load_seg(
     enum x86_segment seg,
-    uint16_t sel, bool_t is_ret,
+    uint16_t sel, bool is_ret,
     struct segment_register *sreg,
     struct x86_emulate_ctxt *ctxt,
     const struct x86_emulate_ops *ops)
@@ -1527,7 +1527,7 @@ protmode_load_seg(
 static int
 load_seg(
     enum x86_segment seg,
-    uint16_t sel, bool_t is_ret,
+    uint16_t sel, bool is_ret,
     struct segment_register *sreg,
     struct x86_emulate_ctxt *ctxt,
     const struct x86_emulate_ops *ops)
@@ -4864,9 +4864,10 @@ x86_emulate(
         break;
     }
 
-    case X86EMUL_OPC(0x0f, 0x35): /* sysexit */ {
+    case X86EMUL_OPC(0x0f, 0x35): /* sysexit */
+    {
         uint64_t msr_content;
-        bool_t user64 = !!(rex_prefix & REX_W);
+        bool user64 = rex_prefix & REX_W;
 
         generate_exception_if(!mode_ring0(), EXC_GP, 0);
         generate_exception_if(!in_protmode(ctxt, ops), EXC_GP, 0);
@@ -5191,8 +5192,9 @@ x86_emulate(
         emulate_2op_SrcV_nobyte("btc", src, dst, _regs.eflags);
         break;
 
-    case X86EMUL_OPC(0x0f, 0xbc): /* bsf or tzcnt */ {
-        bool_t zf;
+    case X86EMUL_OPC(0x0f, 0xbc): /* bsf or tzcnt */
+    {
+        bool zf;
 
 #ifdef __GCC_ASM_FLAG_OUTPUTS__
         asm ( "bsf %2,%0"
@@ -5223,8 +5225,9 @@ x86_emulate(
         break;
     }
 
-    case X86EMUL_OPC(0x0f, 0xbd): /* bsr or lzcnt */ {
-        bool_t zf;
+    case X86EMUL_OPC(0x0f, 0xbd): /* bsr or lzcnt */
+    {
+        bool zf;
 
 #ifdef __GCC_ASM_FLAG_OUTPUTS__
         asm ( "bsr %2,%0"
