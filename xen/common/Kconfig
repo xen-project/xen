@@ -166,7 +166,7 @@ config SCHED_CREDIT
 	  The traditional credit scheduler is a general purpose scheduler.
 
 config SCHED_CREDIT2
-	bool "Credit2 scheduler support (EXPERIMENTAL)"
+	bool "Credit2 scheduler support"
 	default y
 	---help---
 	  The credit2 scheduler is a general purpose scheduler that is

@@ -2954,8 +2954,6 @@ csched2_init(struct scheduler *ops)
     struct csched2_private *prv;
 
     printk("Initializing Credit2 scheduler\n");
-    printk(" WARNING: This is experimental software in development.\n" \
-           " Use at your own risk.\n");
 
     printk(XENLOG_INFO " load_precision_shift: %d\n"
            XENLOG_INFO " load_window_shift: %d\n"
