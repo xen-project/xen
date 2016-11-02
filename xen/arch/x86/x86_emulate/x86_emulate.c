@@ -5424,10 +5424,25 @@ x86_emulate(
         break;
 
     case X86EMUL_OPC(0x0f, 0xa2): /* cpuid */
+        msr_val = 0;
         fail_if(ops->cpuid == NULL);
+
+        /* Speculatively read MSR_INTEL_MISC_FEATURES_ENABLES. */
+        if ( ops->read_msr && !mode_ring0() &&
+             (rc = ops->read_msr(MSR_INTEL_MISC_FEATURES_ENABLES,
+                                 &msr_val, ctxt)) == X86EMUL_EXCEPTION )
+        {
+            /* Not implemented.  Squash the exception and proceed normally. */
+            x86_emul_reset_event(ctxt);
+            rc = X86EMUL_OKAY;
+        }
+        if ( rc != X86EMUL_OKAY )
+            goto done;
+
+        generate_exception_if((msr_val & MSR_MISC_FEATURES_CPUID_FAULTING),
+                              EXC_GP, 0); /* Faulting active? (Inc. CPL test) */
+
         rc = ops->cpuid(_regs._eax, _regs._ecx, &cpuid_leaf, ctxt);
-        generate_exception_if(rc == X86EMUL_EXCEPTION,
-                              EXC_GP, 0); /* CPUID Faulting? */
         if ( rc != X86EMUL_OKAY )
             goto done;
         _regs.r(ax) = cpuid_leaf.a;

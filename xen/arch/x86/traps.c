@@ -2884,23 +2884,7 @@ static int priv_op_wbinvd(struct x86_emulate_ctxt *ctxt)
 int pv_emul_cpuid(uint32_t leaf, uint32_t subleaf,
                   struct cpuid_leaf *res, struct x86_emulate_ctxt *ctxt)
 {
-    const struct vcpu *curr = current;
-
-    /*
-     * x86_emulate uses this function to query CPU features for its own
-     * internal use. Make sure we're actually emulating CPUID before checking
-     * for emulated CPUID faulting.
-     */
-    if ( ctxt->opcode == X86EMUL_OPC(0x0f, 0xa2) )
-    {
-
-        /* If cpuid faulting is enabled and CPL>0 leave the #GP untouched. */
-        if ( curr->arch.cpuid_faulting &&
-             !guest_kernel_mode(curr, ctxt->regs) )
-            return X86EMUL_EXCEPTION;
-    }
-
-    guest_cpuid(curr, leaf, subleaf, res);
+    guest_cpuid(current, leaf, subleaf, res);
 
     return X86EMUL_OKAY;
 }

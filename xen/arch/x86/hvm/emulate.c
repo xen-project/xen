@@ -1575,15 +1575,6 @@ static int hvmemul_wbinvd(
 int hvmemul_cpuid(uint32_t leaf, uint32_t subleaf,
                   struct cpuid_leaf *res, struct x86_emulate_ctxt *ctxt)
 {
-    /*
-     * x86_emulate uses this function to query CPU features for its own internal
-     * use. Make sure we're actually emulating CPUID before emulating CPUID
-     * faulting.
-     */
-    if ( ctxt->opcode == X86EMUL_OPC(0x0f, 0xa2) &&
-         hvm_check_cpuid_faulting(current) )
-        return X86EMUL_EXCEPTION;
-
     guest_cpuid(current, leaf, subleaf, res);
     return X86EMUL_OKAY;
 }
