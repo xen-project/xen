@@ -885,6 +885,13 @@ static void initiate_domain_create(libxl__egc *egc,
         goto error_out;
     }
 
+    if (d_config->c_info.type == LIBXL_DOMAIN_TYPE_HVM &&
+        libxl_defbool_val(d_config->b_info.u.hvm.altp2m) &&
+        pod_enabled) {
+        LOG(ERROR, "Cannot enable PoD and ALTP2M at the same time");
+        goto error_out;
+    }
+
     /* PV vNUMA is not yet supported because there is an issue with
      * cpuid handling.
      */
