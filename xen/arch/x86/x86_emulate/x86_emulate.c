@@ -457,13 +457,19 @@ typedef union {
 #define EXC_BR  5
 #define EXC_UD  6
 #define EXC_NM  7
+#define EXC_DF  8
 #define EXC_TS 10
 #define EXC_NP 11
 #define EXC_SS 12
 #define EXC_GP 13
 #define EXC_PF 14
 #define EXC_MF 16
+#define EXC_AC 17
 #define EXC_XM 19
+
+#define EXC_HAS_EC                                                      \
+    ((1u << EXC_DF) | (1u << EXC_TS) | (1u << EXC_NP) |                 \
+     (1u << EXC_SS) | (1u << EXC_GP) | (1u << EXC_PF) | (1u << EXC_AC))
 
 /* Segment selector error code bits. */
 #define ECODE_EXT (1 << 0)
@@ -667,13 +673,21 @@ do {                                                    \
     if ( rc ) goto done;                                \
 } while (0)
 
-#define generate_exception_if(p, e, ec)                                   \
+static inline int mkec(uint8_t e, int32_t ec, ...)
+{
+    return (e < 32 && ((1u << e) & EXC_HAS_EC)) ? ec : X86_EVENT_NO_EC;
+}
+
+#define generate_exception_if(p, e, ec...)                                \
 ({  if ( (p) ) {                                                          \
         fail_if(ops->inject_hw_exception == NULL);                        \
-        rc = ops->inject_hw_exception(e, ec, ctxt) ? : X86EMUL_EXCEPTION; \
+        rc = ops->inject_hw_exception(e, mkec(e, ##ec, 0), ctxt)          \
+            ? : X86EMUL_EXCEPTION;                                        \
         goto done;                                                        \
     }                                                                     \
 })
+
+#define generate_exception(e, ec...) generate_exception_if(true, e, ##ec)
 
 /*
  * Given byte has even parity (even number of 1s)? SDM Vol. 1 Sec. 3.4.3.1,
@@ -785,7 +799,7 @@ static int _get_fpu(
                 return rc;
             generate_exception_if(!(cr4 & ((type == X86EMUL_FPU_xmm)
                                            ? CR4_OSFXSR : CR4_OSXSAVE)),
-                                  EXC_UD, -1);
+                                  EXC_UD);
         }
 
         rc = ops->read_cr(0, &cr0, ctxt);
@@ -798,13 +812,13 @@ static int _get_fpu(
         }
         if ( cr0 & CR0_EM )
         {
-            generate_exception_if(type == X86EMUL_FPU_fpu, EXC_NM, -1);
-            generate_exception_if(type == X86EMUL_FPU_mmx, EXC_UD, -1);
-            generate_exception_if(type == X86EMUL_FPU_xmm, EXC_UD, -1);
+            generate_exception_if(type == X86EMUL_FPU_fpu, EXC_NM);
+            generate_exception_if(type == X86EMUL_FPU_mmx, EXC_UD);
+            generate_exception_if(type == X86EMUL_FPU_xmm, EXC_UD);
         }
         generate_exception_if((cr0 & CR0_TS) &&
                               (type != X86EMUL_FPU_wait || (cr0 & CR0_MP)),
-                              EXC_NM, -1);
+                              EXC_NM);
     }
 
  done:
@@ -832,7 +846,7 @@ do {                                                            \
             (_fic)->exn_raised = EXC_UD;                        \
     }                                                           \
     generate_exception_if((_fic)->exn_raised >= 0,              \
-                          (_fic)->exn_raised, -1);              \
+                          (_fic)->exn_raised);                  \
 } while (0)
 
 #define emulate_fpu_insn(_op)                           \
@@ -1167,11 +1181,9 @@ static int ioport_access_check(
     if ( (rc = ops->read_segment(x86_seg_tr, &tr, ctxt)) != 0 )
         return rc;
 
-    /* Ensure that the TSS is valid and has an io-bitmap-offset field. */
-    if ( !tr.attr.fields.p ||
-         ((tr.attr.fields.type & 0xd) != 0x9) ||
-         (tr.limit < 0x67) )
-        goto raise_exception;
+    /* Ensure the TSS has an io-bitmap-offset field. */
+    generate_exception_if(tr.attr.fields.type != 0xb ||
+                          tr.limit < 0x67, EXC_GP, 0);
 
     if ( (rc = read_ulong(x86_seg_none, tr.base + 0x66,
                           &iobmp, 2, ctxt, ops)) )
@@ -1179,21 +1191,16 @@ static int ioport_access_check(
 
     /* Ensure TSS includes two bytes including byte containing first port. */
     iobmp += first_port / 8;
-    if ( tr.limit <= iobmp )
-        goto raise_exception;
+    generate_exception_if(tr.limit <= iobmp, EXC_GP, 0);
 
     if ( (rc = read_ulong(x86_seg_none, tr.base + iobmp,
                           &iobmp, 2, ctxt, ops)) )
         return rc;
-    if ( (iobmp & (((1<<bytes)-1) << (first_port&7))) != 0 )
-        goto raise_exception;
+    generate_exception_if(iobmp & (((1 << bytes) - 1) << (first_port & 7)),
+                          EXC_GP, 0);
 
  done:
     return rc;
-
- raise_exception:
-    fail_if(ops->inject_hw_exception == NULL);
-    return ops->inject_hw_exception(EXC_GP, 0, ctxt) ? : X86EMUL_EXCEPTION;
 }
 
 static bool_t
@@ -1262,7 +1269,7 @@ static bool_t vcpu_has(
 #define vcpu_has_rtm()   vcpu_has(0x00000007, EBX, 11, ctxt, ops)
 
 #define vcpu_must_have(leaf, reg, bit) \
-    generate_exception_if(!vcpu_has(leaf, reg, bit, ctxt, ops), EXC_UD, -1)
+    generate_exception_if(!vcpu_has(leaf, reg, bit, ctxt, ops), EXC_UD)
 #define vcpu_must_have_fpu()  vcpu_must_have(0x00000001, EDX, 0)
 #define vcpu_must_have_cmov() vcpu_must_have(0x00000001, EDX, 15)
 #define vcpu_must_have_mmx()  vcpu_must_have(0x00000001, EDX, 23)
@@ -1282,7 +1289,7 @@ static bool_t vcpu_has(
  * the actual operation.
  */
 #define host_and_vcpu_must_have(feat) ({ \
-    generate_exception_if(!cpu_has_##feat, EXC_UD, -1); \
+    generate_exception_if(!cpu_has_##feat, EXC_UD); \
     vcpu_must_have_##feat(); \
 })
 #else
@@ -1485,11 +1492,9 @@ protmode_load_seg(
     return X86EMUL_OKAY;
 
  raise_exn:
-    if ( ops->inject_hw_exception == NULL )
-        return X86EMUL_UNHANDLEABLE;
-    if ( (rc = ops->inject_hw_exception(fault_type, sel & 0xfffc, ctxt)) )
-        return rc;
-    return X86EMUL_EXCEPTION;
+    generate_exception(fault_type, sel & 0xfffc);
+ done:
+    return rc;
 }
 
 static int
@@ -1702,7 +1707,7 @@ static int inject_swint(enum x86_swint_type type,
     return rc;
 
  raise_exn:
-    return ops->inject_hw_exception(fault_type, error_code, ctxt);
+    generate_exception(fault_type, error_code);
 }
 
 int x86emul_unhandleable_rw(
@@ -1793,7 +1798,7 @@ x86_decode_onebyte(
 
     case 0x9a: /* call (far, absolute) */
     case 0xea: /* jmp (far, absolute) */
-        generate_exception_if(mode_64bit(), EXC_UD, -1);
+        generate_exception_if(mode_64bit(), EXC_UD);
 
         imm1 = insn_fetch_bytes(op_bytes);
         imm2 = insn_fetch_type(uint16_t);
@@ -2021,7 +2026,7 @@ x86_decode(
                 /* fall through */
             case 8:
                 /* VEX / XOP / EVEX */
-                generate_exception_if(rex_prefix || vex.pfx, EXC_UD, -1);
+                generate_exception_if(rex_prefix || vex.pfx, EXC_UD);
 
                 vex.raw[0] = modrm;
                 if ( b == 0xc5 )
@@ -2513,12 +2518,12 @@ x86_emulate(
             (ext != ext_0f ||
              (((b < 0x20) || (b > 0x23)) && /* MOV CRn/DRn */
               (b != 0xc7))),                /* CMPXCHG{8,16}B */
-            EXC_UD, -1);
+            EXC_UD);
         dst.type = OP_NONE;
         break;
 
     case DstReg:
-        generate_exception_if(lock_prefix, EXC_UD, -1);
+        generate_exception_if(lock_prefix, EXC_UD);
         dst.type = OP_REG;
         if ( d & ByteOp )
         {
@@ -2574,7 +2579,7 @@ x86_emulate(
         dst = ea;
         if ( dst.type == OP_REG )
         {
-            generate_exception_if(lock_prefix, EXC_UD, -1);
+            generate_exception_if(lock_prefix, EXC_UD);
             switch ( dst.bytes )
             {
             case 1: dst.val = *(uint8_t  *)dst.reg; break;
@@ -2591,7 +2596,7 @@ x86_emulate(
             dst.orig_val = dst.val;
         }
         else /* Lock prefix is allowed only on RMW instructions. */
-            generate_exception_if(lock_prefix, EXC_UD, -1);
+            generate_exception_if(lock_prefix, EXC_UD);
         break;
     }
 
@@ -2629,7 +2634,7 @@ x86_emulate(
         break;
 
     case 0x38 ... 0x3d: cmp: /* cmp */
-        generate_exception_if(lock_prefix, EXC_UD, -1);
+        generate_exception_if(lock_prefix, EXC_UD);
         emulate_2op_SrcV("cmp", src, dst, _regs.eflags);
         dst.type = OP_NONE;
         break;
@@ -2637,7 +2642,7 @@ x86_emulate(
     case 0x06: /* push %%es */
         src.val = x86_seg_es;
     push_seg:
-        generate_exception_if(mode_64bit() && !ext, EXC_UD, -1);
+        generate_exception_if(mode_64bit() && !ext, EXC_UD);
         fail_if(ops->read_segment == NULL);
         if ( (rc = ops->read_segment(src.val, &sreg, ctxt)) != 0 )
             goto done;
@@ -2647,7 +2652,7 @@ x86_emulate(
     case 0x07: /* pop %%es */
         src.val = x86_seg_es;
     pop_seg:
-        generate_exception_if(mode_64bit() && !ext, EXC_UD, -1);
+        generate_exception_if(mode_64bit() && !ext, EXC_UD);
         fail_if(ops->write_segment == NULL);
         /* 64-bit mode: POP defaults to a 64-bit operand. */
         if ( mode_64bit() && (op_bytes == 4) )
@@ -2685,7 +2690,7 @@ x86_emulate(
         uint8_t al = _regs.eax;
         unsigned long eflags = _regs.eflags;
 
-        generate_exception_if(mode_64bit(), EXC_UD, -1);
+        generate_exception_if(mode_64bit(), EXC_UD);
         _regs.eflags &= ~(EFLG_CF|EFLG_AF|EFLG_SF|EFLG_ZF|EFLG_PF);
         if ( ((al & 0x0f) > 9) || (eflags & EFLG_AF) )
         {
@@ -2707,7 +2712,7 @@ x86_emulate(
 
     case 0x37: /* aaa */
     case 0x3f: /* aas */
-        generate_exception_if(mode_64bit(), EXC_UD, -1);
+        generate_exception_if(mode_64bit(), EXC_UD);
         _regs.eflags &= ~EFLG_CF;
         if ( ((uint8_t)_regs.eax > 9) || (_regs.eflags & EFLG_AF) )
         {
@@ -2751,7 +2756,7 @@ x86_emulate(
         unsigned long regs[] = {
             _regs.eax, _regs.ecx, _regs.edx, _regs.ebx,
             _regs.esp, _regs.ebp, _regs.esi, _regs.edi };
-        generate_exception_if(mode_64bit(), EXC_UD, -1);
+        generate_exception_if(mode_64bit(), EXC_UD);
         for ( i = 0; i < 8; i++ )
             if ( (rc = ops->write(x86_seg_ss, sp_pre_dec(op_bytes),
                                   &regs[i], op_bytes, ctxt)) != 0 )
@@ -2766,7 +2771,7 @@ x86_emulate(
             (unsigned long *)&_regs.ebp, (unsigned long *)&dummy_esp,
             (unsigned long *)&_regs.ebx, (unsigned long *)&_regs.edx,
             (unsigned long *)&_regs.ecx, (unsigned long *)&_regs.eax };
-        generate_exception_if(mode_64bit(), EXC_UD, -1);
+        generate_exception_if(mode_64bit(), EXC_UD);
         for ( i = 0; i < 8; i++ )
         {
             if ( (rc = read_ulong(x86_seg_ss, sp_post_inc(op_bytes),
@@ -2784,14 +2789,14 @@ x86_emulate(
         unsigned long src_val2;
         int lb, ub, idx;
         generate_exception_if(mode_64bit() || (src.type != OP_MEM),
-                              EXC_UD, -1);
+                              EXC_UD);
         if ( (rc = read_ulong(src.mem.seg, src.mem.off + op_bytes,
                               &src_val2, op_bytes, ctxt, ops)) )
             goto done;
         ub  = (op_bytes == 2) ? (int16_t)src_val2 : (int32_t)src_val2;
         lb  = (op_bytes == 2) ? (int16_t)src.val  : (int32_t)src.val;
         idx = (op_bytes == 2) ? (int16_t)dst.val  : (int32_t)dst.val;
-        generate_exception_if((idx < lb) || (idx > ub), EXC_BR, -1);
+        generate_exception_if((idx < lb) || (idx > ub), EXC_BR);
         dst.type = OP_NONE;
         break;
     }
@@ -2829,7 +2834,7 @@ x86_emulate(
                 _regs.eflags &= ~EFLG_ZF;
                 dst.type = OP_NONE;
             }
-            generate_exception_if(!in_protmode(ctxt, ops), EXC_UD, -1);
+            generate_exception_if(!in_protmode(ctxt, ops), EXC_UD);
         }
         break;
 
@@ -2920,7 +2925,7 @@ x86_emulate(
         break;
 
     case 0x82: /* Grp1 (x86/32 only) */
-        generate_exception_if(mode_64bit(), EXC_UD, -1);
+        generate_exception_if(mode_64bit(), EXC_UD);
     case 0x80: case 0x81: case 0x83: /* Grp1 */
         switch ( modrm_reg & 7 )
         {
@@ -2971,7 +2976,7 @@ x86_emulate(
             dst.type = OP_NONE;
             break;
         }
-        generate_exception_if((modrm_reg & 7) != 0, EXC_UD, -1);
+        generate_exception_if((modrm_reg & 7) != 0, EXC_UD);
     case 0x88 ... 0x8b: /* mov */
     case 0xa0 ... 0xa1: /* mov mem.offs,{%al,%ax,%eax,%rax} */
     case 0xa2 ... 0xa3: /* mov {%al,%ax,%eax,%rax},mem.offs */
@@ -2980,7 +2985,7 @@ x86_emulate(
 
     case 0x8c: /* mov Sreg,r/m */
         seg = modrm_reg & 7; /* REX.R is ignored. */
-        generate_exception_if(!is_x86_user_segment(seg), EXC_UD, -1);
+        generate_exception_if(!is_x86_user_segment(seg), EXC_UD);
     store_selector:
         fail_if(ops->read_segment == NULL);
         if ( (rc = ops->read_segment(seg, &sreg, ctxt)) != 0 )
@@ -2993,7 +2998,7 @@ x86_emulate(
     case 0x8e: /* mov r/m,Sreg */
         seg = modrm_reg & 7; /* REX.R is ignored. */
         generate_exception_if(!is_x86_user_segment(seg) ||
-                              seg == x86_seg_cs, EXC_UD, -1);
+                              seg == x86_seg_cs, EXC_UD);
         if ( (rc = load_seg(seg, src.val, 0, NULL, ctxt, ops)) != 0 )
             goto done;
         if ( seg == x86_seg_ss )
@@ -3002,12 +3007,12 @@ x86_emulate(
         break;
 
     case 0x8d: /* lea */
-        generate_exception_if(ea.type != OP_MEM, EXC_UD, -1);
+        generate_exception_if(ea.type != OP_MEM, EXC_UD);
         dst.val = ea.mem.off;
         break;
 
     case 0x8f: /* pop (sole member of Grp1a) */
-        generate_exception_if((modrm_reg & 7) != 0, EXC_UD, -1);
+        generate_exception_if((modrm_reg & 7) != 0, EXC_UD);
         /* 64-bit mode: POP defaults to a 64-bit operand. */
         if ( mode_64bit() && (dst.bytes == 4) )
             dst.bytes = 8;
@@ -3284,8 +3289,8 @@ x86_emulate(
         unsigned long sel;
         dst.val = x86_seg_es;
     les: /* dst.val identifies the segment */
-        generate_exception_if(mode_64bit() && !ext, EXC_UD, -1);
-        generate_exception_if(src.type != OP_MEM, EXC_UD, -1);
+        generate_exception_if(mode_64bit() && !ext, EXC_UD);
+        generate_exception_if(src.type != OP_MEM, EXC_UD);
         if ( (rc = read_ulong(src.mem.seg, src.mem.off + src.bytes,
                               &sel, 2, ctxt, ops)) != 0 )
             goto done;
@@ -3375,7 +3380,7 @@ x86_emulate(
         goto done;
 
     case 0xce: /* into */
-        generate_exception_if(mode_64bit(), EXC_UD, -1);
+        generate_exception_if(mode_64bit(), EXC_UD);
         if ( !(_regs.eflags & EFLG_OF) )
             break;
         src.val = EXC_OF;
@@ -3417,7 +3422,7 @@ x86_emulate(
     case 0xd5: /* aad */ {
         unsigned int base = (uint8_t)src.val;
 
-        generate_exception_if(mode_64bit(), EXC_UD, -1);
+        generate_exception_if(mode_64bit(), EXC_UD);
         if ( b & 0x01 )
         {
             uint16_t ax = _regs.eax;
@@ -3428,7 +3433,7 @@ x86_emulate(
         {
             uint8_t al = _regs.eax;
 
-            generate_exception_if(!base, EXC_DE, -1);
+            generate_exception_if(!base, EXC_DE);
             *(uint16_t *)&_regs.eax = ((al / base) << 8) | (al % base);
         }
         _regs.eflags &= ~(EFLG_SF|EFLG_ZF|EFLG_PF);
@@ -3439,7 +3444,7 @@ x86_emulate(
     }
 
     case 0xd6: /* salc */
-        generate_exception_if(mode_64bit(), EXC_UD, -1);
+        generate_exception_if(mode_64bit(), EXC_UD);
         *(uint8_t *)&_regs.eax = (_regs.eflags & EFLG_CF) ? 0xff : 0x00;
         break;
 
@@ -4047,7 +4052,7 @@ x86_emulate(
             unsigned long u[2], v;
 
         case 0 ... 1: /* test */
-            generate_exception_if(lock_prefix, EXC_UD, -1);
+            generate_exception_if(lock_prefix, EXC_UD);
             goto test;
         case 2: /* not */
             dst.val = ~dst.val;
@@ -4145,7 +4150,7 @@ x86_emulate(
                 v    = (uint8_t)src.val;
                 generate_exception_if(
                     div_dbl(u, v) || ((uint8_t)u[0] != (uint16_t)u[0]),
-                    EXC_DE, -1);
+                    EXC_DE);
                 dst.val = (uint8_t)u[0];
                 ((uint8_t *)&_regs.eax)[1] = u[1];
                 break;
@@ -4155,7 +4160,7 @@ x86_emulate(
                 v    = (uint16_t)src.val;
                 generate_exception_if(
                     div_dbl(u, v) || ((uint16_t)u[0] != (uint32_t)u[0]),
-                    EXC_DE, -1);
+                    EXC_DE);
                 dst.val = (uint16_t)u[0];
                 *(uint16_t *)&_regs.edx = u[1];
                 break;
@@ -4166,7 +4171,7 @@ x86_emulate(
                 v    = (uint32_t)src.val;
                 generate_exception_if(
                     div_dbl(u, v) || ((uint32_t)u[0] != u[0]),
-                    EXC_DE, -1);
+                    EXC_DE);
                 dst.val   = (uint32_t)u[0];
                 _regs.edx = (uint32_t)u[1];
                 break;
@@ -4175,7 +4180,7 @@ x86_emulate(
                 u[0] = _regs.eax;
                 u[1] = _regs.edx;
                 v    = src.val;
-                generate_exception_if(div_dbl(u, v), EXC_DE, -1);
+                generate_exception_if(div_dbl(u, v), EXC_DE);
                 dst.val   = u[0];
                 _regs.edx = u[1];
                 break;
@@ -4191,7 +4196,7 @@ x86_emulate(
                 v    = (int8_t)src.val;
                 generate_exception_if(
                     idiv_dbl(u, v) || ((int8_t)u[0] != (int16_t)u[0]),
-                    EXC_DE, -1);
+                    EXC_DE);
                 dst.val = (int8_t)u[0];
                 ((int8_t *)&_regs.eax)[1] = u[1];
                 break;
@@ -4201,7 +4206,7 @@ x86_emulate(
                 v    = (int16_t)src.val;
                 generate_exception_if(
                     idiv_dbl(u, v) || ((int16_t)u[0] != (int32_t)u[0]),
-                    EXC_DE, -1);
+                    EXC_DE);
                 dst.val = (int16_t)u[0];
                 *(int16_t *)&_regs.edx = u[1];
                 break;
@@ -4212,7 +4217,7 @@ x86_emulate(
                 v    = (int32_t)src.val;
                 generate_exception_if(
                     idiv_dbl(u, v) || ((int32_t)u[0] != u[0]),
-                    EXC_DE, -1);
+                    EXC_DE);
                 dst.val   = (int32_t)u[0];
                 _regs.edx = (uint32_t)u[1];
                 break;
@@ -4221,7 +4226,7 @@ x86_emulate(
                 u[0] = _regs.eax;
                 u[1] = _regs.edx;
                 v    = src.val;
-                generate_exception_if(idiv_dbl(u, v), EXC_DE, -1);
+                generate_exception_if(idiv_dbl(u, v), EXC_DE);
                 dst.val   = u[0];
                 _regs.edx = u[1];
                 break;
@@ -4261,7 +4266,7 @@ x86_emulate(
         break;
 
     case 0xfe: /* Grp4 */
-        generate_exception_if((modrm_reg & 7) >= 2, EXC_UD, -1);
+        generate_exception_if((modrm_reg & 7) >= 2, EXC_UD);
     case 0xff: /* Grp5 */
         switch ( modrm_reg & 7 )
         {
@@ -4286,7 +4291,7 @@ x86_emulate(
             break;
         case 3: /* call (far, absolute indirect) */
         case 5: /* jmp (far, absolute indirect) */
-            generate_exception_if(src.type != OP_MEM, EXC_UD, -1);
+            generate_exception_if(src.type != OP_MEM, EXC_UD);
 
             if ( (rc = read_ulong(src.mem.seg, src.mem.off + op_bytes,
                                   &imm2, 2, ctxt, ops)) )
@@ -4298,13 +4303,13 @@ x86_emulate(
         case 6: /* push */
             goto push;
         case 7:
-            generate_exception_if(1, EXC_UD, -1);
+            generate_exception(EXC_UD);
         }
         break;
 
     case X86EMUL_OPC(0x0f, 0x00): /* Grp6 */
         seg = (modrm_reg & 1) ? x86_seg_tr : x86_seg_ldtr;
-        generate_exception_if(!in_protmode(ctxt, ops), EXC_UD, -1);
+        generate_exception_if(!in_protmode(ctxt, ops), EXC_UD);
         switch ( modrm_reg & 6 )
         {
         case 0: /* sldt / str */
@@ -4316,7 +4321,7 @@ x86_emulate(
                 goto done;
             break;
         default:
-            generate_exception_if(true, EXC_UD, -1);
+            generate_exception_if(true, EXC_UD);
             break;
         }
         break;
@@ -4331,10 +4336,10 @@ x86_emulate(
         {
             unsigned long cr4;
 
-            generate_exception_if(vex.pfx, EXC_UD, -1);
+            generate_exception_if(vex.pfx, EXC_UD);
             if ( !ops->read_cr || ops->read_cr(4, &cr4, ctxt) != X86EMUL_OKAY )
                 cr4 = 0;
-            generate_exception_if(!(cr4 & X86_CR4_OSXSAVE), EXC_UD, -1);
+            generate_exception_if(!(cr4 & X86_CR4_OSXSAVE), EXC_UD);
             generate_exception_if(!mode_ring0() ||
                                   handle_xsetbv(_regs._ecx,
                                                 _regs._eax | (_regs.rdx << 32)),
@@ -4345,28 +4350,28 @@ x86_emulate(
 
         case 0xd4: /* vmfunc */
             generate_exception_if(lock_prefix | rep_prefix() | (vex.pfx == vex_66),
-                                  EXC_UD, -1);
+                                  EXC_UD);
             fail_if(!ops->vmfunc);
             if ( (rc = ops->vmfunc(ctxt) != X86EMUL_OKAY) )
                 goto done;
             goto no_writeback;
 
         case 0xd5: /* xend */
-            generate_exception_if(vex.pfx, EXC_UD, -1);
-            generate_exception_if(!vcpu_has_rtm(), EXC_UD, -1);
+            generate_exception_if(vex.pfx, EXC_UD);
+            generate_exception_if(!vcpu_has_rtm(), EXC_UD);
             generate_exception_if(vcpu_has_rtm(), EXC_GP, 0);
             break;
 
         case 0xd6: /* xtest */
-            generate_exception_if(vex.pfx, EXC_UD, -1);
+            generate_exception_if(vex.pfx, EXC_UD);
             generate_exception_if(!vcpu_has_rtm() && !vcpu_has_hle(),
-                                  EXC_UD, -1);
+                                  EXC_UD);
             /* Neither HLE nor RTM can be active when we get here. */
             _regs.eflags |= EFLG_ZF;
             goto no_writeback;
 
         case 0xdf: /* invlpga */
-            generate_exception_if(!in_protmode(ctxt, ops), EXC_UD, -1);
+            generate_exception_if(!in_protmode(ctxt, ops), EXC_UD);
             generate_exception_if(!mode_ring0(), EXC_GP, 0);
             fail_if(ops->invlpg == NULL);
             if ( (rc = ops->invlpg(x86_seg_none, truncate_ea(_regs.eax),
@@ -4396,7 +4401,7 @@ x86_emulate(
                  ops->cpuid(&eax, &ebx, &dummy, &dummy, ctxt) == X86EMUL_OKAY )
                 limit = ((ebx >> 8) & 0xff) * 8;
             generate_exception_if(limit < sizeof(long) ||
-                                  (limit & (limit - 1)), EXC_UD, -1);
+                                  (limit & (limit - 1)), EXC_UD);
             base &= ~(limit - 1);
             if ( override_seg == -1 )
                 override_seg = x86_seg_ds;
@@ -4432,7 +4437,7 @@ x86_emulate(
         {
         case 0: /* sgdt */
         case 1: /* sidt */
-            generate_exception_if(ea.type != OP_MEM, EXC_UD, -1);
+            generate_exception_if(ea.type != OP_MEM, EXC_UD);
             generate_exception_if(umip_active(ctxt, ops), EXC_GP, 0);
             fail_if(ops->read_segment == NULL);
             if ( (rc = ops->read_segment(seg, &sreg, ctxt)) )
@@ -4453,7 +4458,7 @@ x86_emulate(
         case 2: /* lgdt */
         case 3: /* lidt */
             generate_exception_if(!mode_ring0(), EXC_GP, 0);
-            generate_exception_if(ea.type != OP_MEM, EXC_UD, -1);
+            generate_exception_if(ea.type != OP_MEM, EXC_UD);
             fail_if(ops->write_segment == NULL);
             memset(&sreg, 0, sizeof(sreg));
             if ( (rc = read_ulong(ea.mem.seg, ea.mem.off+0,
@@ -4496,7 +4501,7 @@ x86_emulate(
             break;
         case 7: /* invlpg */
             generate_exception_if(!mode_ring0(), EXC_GP, 0);
-            generate_exception_if(ea.type != OP_MEM, EXC_UD, -1);
+            generate_exception_if(ea.type != OP_MEM, EXC_UD);
             fail_if(ops->invlpg == NULL);
             if ( (rc = ops->invlpg(ea.mem.seg, ea.mem.off, ctxt)) )
                 goto done;
@@ -4510,13 +4515,13 @@ x86_emulate(
     case X86EMUL_OPC(0x0f, 0x05): /* syscall */ {
         uint64_t msr_content;
 
-        generate_exception_if(!in_protmode(ctxt, ops), EXC_UD, -1);
+        generate_exception_if(!in_protmode(ctxt, ops), EXC_UD);
 
         /* Inject #UD if syscall/sysret are disabled. */
         fail_if(ops->read_msr == NULL);
         if ( (rc = ops->read_msr(MSR_EFER, &msr_content, ctxt)) != 0 )
             goto done;
-        generate_exception_if((msr_content & EFER_SCE) == 0, EXC_UD, -1);
+        generate_exception_if((msr_content & EFER_SCE) == 0, EXC_UD);
 
         if ( (rc = ops->read_msr(MSR_STAR, &msr_content, ctxt)) != 0 )
             goto done;
@@ -4585,7 +4590,7 @@ x86_emulate(
     case X86EMUL_OPC(0x0f, 0x0b): /* ud2 */
     case X86EMUL_OPC(0x0f, 0xb9): /* ud1 */
     case X86EMUL_OPC(0x0f, 0xff): /* ud0 */
-        generate_exception_if(1, EXC_UD, -1);
+        generate_exception(EXC_UD);
 
     case X86EMUL_OPC(0x0f, 0x0d): /* GrpP (prefetch) */
     case X86EMUL_OPC(0x0f, 0x18): /* Grp16 (prefetch/nop) */
@@ -4704,7 +4709,7 @@ x86_emulate(
     case X86EMUL_OPC(0x0f, 0x21): /* mov dr,reg */
     case X86EMUL_OPC(0x0f, 0x22): /* mov reg,cr */
     case X86EMUL_OPC(0x0f, 0x23): /* mov reg,dr */
-        generate_exception_if(ea.type != OP_REG, EXC_UD, -1);
+        generate_exception_if(ea.type != OP_REG, EXC_UD);
         generate_exception_if(!mode_ring0(), EXC_GP, 0);
         modrm_reg |= lock_prefix << 3;
         if ( b & 2 )
@@ -4940,11 +4945,11 @@ x86_emulate(
         switch ( b )
         {
         case 0x7e:
-            generate_exception_if(vex.l, EXC_UD, -1);
+            generate_exception_if(vex.l, EXC_UD);
             ea.bytes = op_bytes;
             break;
         case 0xd6:
-            generate_exception_if(vex.l, EXC_UD, -1);
+            generate_exception_if(vex.l, EXC_UD);
             ea.bytes = 8;
             break;
         }
@@ -5034,7 +5039,7 @@ x86_emulate(
     case X86EMUL_OPC(0x0f, 0xad): /* shrd %%cl,r,r/m */ {
         uint8_t shift, width = dst.bytes << 3;
 
-        generate_exception_if(lock_prefix, EXC_UD, -1);
+        generate_exception_if(lock_prefix, EXC_UD);
         if ( b & 1 )
             shift = _regs.ecx;
         else
@@ -5149,7 +5154,7 @@ x86_emulate(
         case 5: goto bts;
         case 6: goto btr;
         case 7: goto btc;
-        default: generate_exception_if(1, EXC_UD, -1);
+        default: generate_exception(EXC_UD);
         }
         break;
 
@@ -5250,15 +5255,15 @@ x86_emulate(
     case X86EMUL_OPC(0x0f, 0xc3): /* movnti */
         /* Ignore the non-temporal hint for now. */
         vcpu_must_have_sse2();
-        generate_exception_if(dst.bytes <= 2, EXC_UD, -1);
+        generate_exception_if(dst.bytes <= 2, EXC_UD);
         dst.val = src.val;
         break;
 
     case X86EMUL_OPC(0x0f, 0xc7): /* Grp9 (cmpxchg8b/cmpxchg16b) */ {
         unsigned long old[2], exp[2], new[2];
 
-        generate_exception_if((modrm_reg & 7) != 1, EXC_UD, -1);
-        generate_exception_if(ea.type != OP_MEM, EXC_UD, -1);
+        generate_exception_if((modrm_reg & 7) != 1, EXC_UD);
+        generate_exception_if(ea.type != OP_MEM, EXC_UD);
         if ( op_bytes == 8 )
             host_and_vcpu_must_have(cx16);
         op_bytes *= 2;
