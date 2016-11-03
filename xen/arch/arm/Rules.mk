@@ -24,7 +24,7 @@ endif
 
 EARLY_PRINTK := n
 
-ifeq ($(debug),y)
+ifeq ($(CONFIG_DEBUG),y)
 
 # See docs/misc/arm/early-printk.txt for syntax
 
@@ -77,7 +77,7 @@ CFLAGS-$(EARLY_PRINTK) += -DEARLY_PRINTK_BAUD=$(EARLY_PRINTK_BAUD)
 CFLAGS-$(EARLY_PRINTK) += -DEARLY_UART_BASE_ADDRESS=$(EARLY_UART_BASE_ADDRESS)
 CFLAGS-$(EARLY_PRINTK) += -DEARLY_UART_REG_SHIFT=$(EARLY_UART_REG_SHIFT)
 
-else # !debug
+else # !CONFIG_DEBUG
 
 ifneq ($(CONFIG_EARLY_PRINTK),)
 # Early printk is dependant on a debug build.
