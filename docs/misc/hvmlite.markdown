@@ -64,3 +64,14 @@ The following VCPU hypercalls can be used in order to bring up secondary vCPUs:
  * `VCPUOP_down` is used to bring down a vCPU.
 
  * `VCPUOP_is_up` is used to scan the number of available vCPUs.
+
+## Hardware description ##
+
+PVHv2 guests that have access to hardware (either emulated or real) will also
+have ACPI tables with the description of the hardware that's available to the
+guest. This applies to both privileged and unprivileged guests. A hint of
+the position of the RSDP in memory (if present) can be fetched from the start
+info structure that's passed at boot time (field rsdp_paddr).
+
+Description of paravirtualized devices will come from XenStore, just as it's
+done for HVM guests.
