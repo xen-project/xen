@@ -69,7 +69,7 @@ The following VCPU hypercalls can be used in order to bring up secondary vCPUs:
 
 PVHv2 guests that have access to hardware (either emulated or real) will also
 have ACPI tables with the description of the hardware that's available to the
-guest. This applies to both privileged and unprivileged guests. A hint of
+guest. This applies to both privileged and unprivileged guests. A pointer to
 the position of the RSDP in memory (if present) can be fetched from the start
 info structure that's passed at boot time (field rsdp_paddr).
 
