@@ -49,8 +49,8 @@ as HVM guests, using the hypervisor cpuid leaves and msr ranges.
 
 ## AP startup ##
 
-AP startup is performed using hypercalls. The following VCPU operations
-are used in order to bring up secondary vCPUs:
+AP startup can be performed using hypercalls or the local APIC if present.
+The following VCPU hypercalls can be used in order to bring up secondary vCPUs:
 
  * `VCPUOP_initialise` is used to set the initial state of the vCPU. The
    argument passed to the hypercall must be of the type vcpu_hvm_context.
