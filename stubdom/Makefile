@@ -305,7 +305,41 @@ ioemu/linkfarm.stamp:
 	touch ioemu/linkfarm.stamp
 endif
 
-mk-headers-$(XEN_TARGET_ARCH): $(IOEMU_LINKFARM_TARGET)
+define do_links
+  mkdir -p $(dir $@)include
+  cd $(dir $@); \
+  ln -sf $(dir $<)include/*.h include/; \
+  ln -sf $(dir $<)*.[ch] .; \
+  ln -sf $(dir $<)Makefile .
+  touch $@
+endef
+
+libs-$(XEN_TARGET_ARCH)/toollog/stamp: $(XEN_ROOT)/tools/libs/toollog/Makefile
+	$(do_links)
+
+libs-$(XEN_TARGET_ARCH)/evtchn/stamp: $(XEN_ROOT)/tools/libs/evtchn/Makefile
+	$(do_links)
+
+libs-$(XEN_TARGET_ARCH)/gnttab/stamp: $(XEN_ROOT)/tools/libs/gnttab/Makefile
+	$(do_links)
+
+libs-$(XEN_TARGET_ARCH)/call/stamp: $(XEN_ROOT)/tools/libs/call/Makefile
+	$(do_links)
+
+libs-$(XEN_TARGET_ARCH)/foreignmemory/stamp: $(XEN_ROOT)/tools/libs/foreignmemory/Makefile
+	$(do_links)
+
+libxc-$(XEN_TARGET_ARCH)/stamp: $(XEN_ROOT)/tools/libxc/Makefile
+	$(do_links)
+
+xenstore/stamp: $(XEN_ROOT)/tools/xenstore/Makefile
+	$(do_links)
+
+LINK_LIBS_DIRS := toollog evtchn gnttab call foreignmemory
+LINK_DIRS := libxc-$(XEN_TARGET_ARCH) xenstore $(foreach dir,$(LINK_LIBS_DIRS),libs-$(XEN_TARGET_ARCH)/$(dir))
+LINK_STAMPS := $(foreach dir,$(LINK_DIRS),$(dir)/stamp)
+
+mk-headers-$(XEN_TARGET_ARCH): $(IOEMU_LINKFARM_TARGET) $(LINK_STAMPS)
 	$(MAKE) -C $(XEN_ROOT)/tools/include
 	mkdir -p include/xen && \
           ln -sf $(wildcard $(XEN_ROOT)/xen/include/public/*.h) include/xen && \
@@ -316,47 +350,6 @@ mk-headers-$(XEN_TARGET_ARCH): $(IOEMU_LINKFARM_TARGET)
 	  ln -sf $(wildcard $(XEN_ROOT)/tools/include/xen-foreign/*) include/xen-foreign/ && \
 	  $(MAKE) DESTDIR= -C include/xen-foreign/ && \
 	  ( [ -h include/xen/foreign ] || ln -sf ../xen-foreign include/xen/foreign )
-	mkdir -p libs-$(XEN_TARGET_ARCH)/toollog/include
-	[ -h libs-$(XEN_TARGET_ARCH)/toollog/Makefile ] || ( cd libs-$(XEN_TARGET_ARCH)/toollog && \
-	  ln -sf $(XEN_ROOT)/tools/libs/toollog/include/*.h include/ && \
-	  ln -sf $(XEN_ROOT)/tools/libs/toollog/*.c . && \
-	  ln -sf $(XEN_ROOT)/tools/libs/toollog/Makefile . )
-	mkdir -p libs-$(XEN_TARGET_ARCH)/evtchn/include
-	[ -h libs-$(XEN_TARGET_ARCH)/evtchn/Makefile ] || ( cd libs-$(XEN_TARGET_ARCH)/evtchn && \
-	  ln -sf $(XEN_ROOT)/tools/libs/evtchn/*.h . && \
-	  ln -sf $(XEN_ROOT)/tools/libs/evtchn/include/*.h include/ && \
-	  ln -sf $(XEN_ROOT)/tools/libs/evtchn/*.c . && \
-	  ln -sf $(XEN_ROOT)/tools/libs/evtchn/Makefile . )
-	mkdir -p libs-$(XEN_TARGET_ARCH)/gnttab/include
-	[ -h libs-$(XEN_TARGET_ARCH)/gnttab/Makefile ] || ( cd libs-$(XEN_TARGET_ARCH)/gnttab && \
-	  ln -sf $(XEN_ROOT)/tools/libs/gnttab/*.h . && \
-	  ln -sf $(XEN_ROOT)/tools/libs/gnttab/include/*.h include/ && \
-	  ln -sf $(XEN_ROOT)/tools/libs/gnttab/*.c . && \
-	  ln -sf $(XEN_ROOT)/tools/libs/gnttab/Makefile . )
-	mkdir -p libs-$(XEN_TARGET_ARCH)/call/include
-	[ -h libs-$(XEN_TARGET_ARCH)/call/Makefile ] || ( cd libs-$(XEN_TARGET_ARCH)/call && \
-	  ln -sf $(XEN_ROOT)/tools/libs/call/*.h . && \
-	  ln -sf $(XEN_ROOT)/tools/libs/call/include/*.h include/ && \
-	  ln -sf $(XEN_ROOT)/tools/libs/call/*.c . && \
-	  ln -sf $(XEN_ROOT)/tools/libs/call/Makefile . )
-	mkdir -p libs-$(XEN_TARGET_ARCH)/foreignmemory/include
-	[ -h libs-$(XEN_TARGET_ARCH)/foreignmemory/Makefile ] || ( cd libs-$(XEN_TARGET_ARCH)/foreignmemory && \
-	  ln -sf $(XEN_ROOT)/tools/libs/foreignmemory/*.h . && \
-	  ln -sf $(XEN_ROOT)/tools/libs/foreignmemory/include/*.h include/ && \
-	  ln -sf $(XEN_ROOT)/tools/libs/foreignmemory/*.c . && \
-	  ln -sf $(XEN_ROOT)/tools/libs/foreignmemory/Makefile . )
-	mkdir -p libxc-$(XEN_TARGET_ARCH)/include
-	[ -h libxc-$(XEN_TARGET_ARCH)/Makefile ] || ( cd libxc-$(XEN_TARGET_ARCH) && \
-	  ln -sf $(XEN_ROOT)/tools/libxc/*.h . && \
-	  ln -sf $(XEN_ROOT)/tools/libxc/include/*.h include/ && \
-	  ln -sf $(XEN_ROOT)/tools/libxc/*.c . && \
-	  ln -sf $(XEN_ROOT)/tools/libxc/Makefile . )
-	mkdir -p xenstore/include
-	[ -h xenstore/Makefile ] || ( cd xenstore && \
-	  ln -sf $(XEN_ROOT)/tools/xenstore/*.c . && \
-	  ln -sf $(XEN_ROOT)/tools/xenstore/*.h . && \
-	  ln -sf $(XEN_ROOT)/tools/xenstore/include/*.h include/ && \
-	  ln -sf $(XEN_ROOT)/tools/xenstore/Makefile . )
 	$(MAKE) DESTDIR= -C $(MINI_OS) links
 	touch mk-headers-$(XEN_TARGET_ARCH)
 
