@@ -49,6 +49,10 @@ type ioport_t, resource_type;
 type iomem_t, resource_type;
 type device_t, resource_type;
 
+# Domain destruction can result in some access checks for actions performed by
+# the hypervisor.  These should always be allowed.
+allow xen_t resource_type : resource { remove_irq remove_ioport remove_iomem };
+
 ################################################################################
 #
 # Policy constraints
