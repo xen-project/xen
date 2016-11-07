@@ -80,12 +80,13 @@ enum x86_event_type {
     X86_EVENTTYPE_PRI_SW_EXCEPTION, /* ICEBP (F1) */
     X86_EVENTTYPE_SW_EXCEPTION,     /* INT3 (CC), INTO (CE) */
 };
+#define X86_EVENT_NO_EC (-1)        /* No error code. */
 
 struct x86_event {
     int16_t       vector;
     uint8_t       type;         /* X86_EVENTTYPE_* */
     uint8_t       insn_len;     /* Instruction length */
-    uint32_t      error_code;   /* HVM_DELIVER_NO_ERROR_CODE if n/a */
+    int32_t       error_code;   /* X86_EVENT_NO_EC if n/a */
     unsigned long cr2;          /* Only for TRAP_page_fault h/w exception */
 };
 

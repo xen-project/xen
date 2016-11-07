@@ -1609,7 +1609,7 @@ static int hvmemul_inject_sw_interrupt(
 
     hvmemul_ctxt->exn_pending = 1;
     hvmemul_ctxt->trap.vector = vector;
-    hvmemul_ctxt->trap.error_code = HVM_DELIVER_NO_ERROR_CODE;
+    hvmemul_ctxt->trap.error_code = X86_EVENT_NO_EC;
     hvmemul_ctxt->trap.insn_len = insn_len;
 
     return X86EMUL_OKAY;
@@ -1696,8 +1696,7 @@ static int hvmemul_vmfunc(
 
     rc = hvm_funcs.altp2m_vcpu_emulate_vmfunc(ctxt->regs);
     if ( rc != X86EMUL_OKAY )
-        hvmemul_inject_hw_exception(TRAP_invalid_op, HVM_DELIVER_NO_ERROR_CODE,
-                                    ctxt);
+        hvmemul_inject_hw_exception(TRAP_invalid_op, X86_EVENT_NO_EC, ctxt);
 
     return rc;
 }

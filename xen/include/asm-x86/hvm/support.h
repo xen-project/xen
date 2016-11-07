@@ -25,8 +25,6 @@
 #include <xen/hvm/save.h>
 #include <asm/processor.h>
 
-#define HVM_DELIVER_NO_ERROR_CODE  (~0U)
-
 #ifndef NDEBUG
 #define DBG_LEVEL_0                 (1 << 0)
 #define DBG_LEVEL_1                 (1 << 1)

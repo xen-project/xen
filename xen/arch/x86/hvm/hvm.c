@@ -502,7 +502,7 @@ void hvm_do_resume(struct vcpu *v)
                 kind = EMUL_KIND_SET_CONTEXT_INSN;
 
             hvm_emulate_one_vm_event(kind, TRAP_invalid_op,
-                                     HVM_DELIVER_NO_ERROR_CODE);
+                                     X86_EVENT_NO_EC);
 
             v->arch.vm_event->emulate_flags = 0;
         }
@@ -3054,7 +3054,7 @@ void hvm_task_switch(
     }
 
     if ( (tss.trace & 1) && !exn_raised )
-        hvm_inject_hw_exception(TRAP_debug, HVM_DELIVER_NO_ERROR_CODE);
+        hvm_inject_hw_exception(TRAP_debug, X86_EVENT_NO_EC);
 
  out:
     hvm_unmap_entry(optss_desc);
@@ -4074,7 +4074,7 @@ void hvm_ud_intercept(struct cpu_user_regs *regs)
     switch ( hvm_emulate_one(&ctxt) )
     {
     case X86EMUL_UNHANDLEABLE:
-        hvm_inject_hw_exception(TRAP_invalid_op, HVM_DELIVER_NO_ERROR_CODE);
+        hvm_inject_hw_exception(TRAP_invalid_op, X86_EVENT_NO_EC);
         break;
     case X86EMUL_EXCEPTION:
         if ( ctxt.exn_pending )

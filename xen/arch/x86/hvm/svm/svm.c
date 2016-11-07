@@ -89,7 +89,7 @@ static DEFINE_SPINLOCK(osvw_lock);
 static void svm_crash_or_fault(struct vcpu *v)
 {
     if ( vmcb_get_cpl(v->arch.hvm_svm.vmcb) )
-        hvm_inject_hw_exception(TRAP_invalid_op, HVM_DELIVER_NO_ERROR_CODE);
+        hvm_inject_hw_exception(TRAP_invalid_op, X86_EVENT_NO_EC);
     else
         domain_crash(v->domain);
 }
@@ -116,7 +116,7 @@ void __update_guest_eip(struct cpu_user_regs *regs, unsigned int inst_len)
     curr->arch.hvm_svm.vmcb->interrupt_shadow = 0;
 
     if ( regs->eflags & X86_EFLAGS_TF )
-        hvm_inject_hw_exception(TRAP_debug, HVM_DELIVER_NO_ERROR_CODE);
+        hvm_inject_hw_exception(TRAP_debug, X86_EVENT_NO_EC);
 }
 
 static void svm_cpu_down(void)
@@ -1285,7 +1285,7 @@ static void svm_inject_event(const struct x86_event *event)
 
     default:
         eventinj.fields.type = X86_EVENTTYPE_HW_EXCEPTION;
-        eventinj.fields.ev = (_event.error_code != HVM_DELIVER_NO_ERROR_CODE);
+        eventinj.fields.ev = (_event.error_code != X86_EVENT_NO_EC);
         eventinj.fields.errorcode = _event.error_code;
         break;
     }
@@ -1553,7 +1553,7 @@ static void svm_fpu_dirty_intercept(void)
     {
        /* Check if l1 guest must make FPU ready for the l2 guest */
        if ( v->arch.hvm_vcpu.guest_cr[0] & X86_CR0_TS )
-           hvm_inject_hw_exception(TRAP_no_device, HVM_DELIVER_NO_ERROR_CODE);
+           hvm_inject_hw_exception(TRAP_no_device, X86_EVENT_NO_EC);
        else
            vmcb_set_cr0(n1vmcb, vmcb_get_cr0(n1vmcb) & ~X86_CR0_TS);
        return;
@@ -2022,7 +2022,7 @@ svm_vmexit_do_vmrun(struct cpu_user_regs *regs,
     if ( !nsvm_efer_svm_enabled(v) )
     {
         gdprintk(XENLOG_ERR, "VMRUN: nestedhvm disabled, injecting #UD\n");
-        hvm_inject_hw_exception(TRAP_invalid_op, HVM_DELIVER_NO_ERROR_CODE);
+        hvm_inject_hw_exception(TRAP_invalid_op, X86_EVENT_NO_EC);
         return;
     }
 
@@ -2077,7 +2077,7 @@ svm_vmexit_do_vmload(struct vmcb_struct *vmcb,
     if ( !nsvm_efer_svm_enabled(v) ) 
     {
         gdprintk(XENLOG_ERR, "VMLOAD: nestedhvm disabled, injecting #UD\n");
-        hvm_inject_hw_exception(TRAP_invalid_op, HVM_DELIVER_NO_ERROR_CODE);
+        hvm_inject_hw_exception(TRAP_invalid_op, X86_EVENT_NO_EC);
         return;
     }
 
@@ -2113,7 +2113,7 @@ svm_vmexit_do_vmsave(struct vmcb_struct *vmcb,
     if ( !nsvm_efer_svm_enabled(v) ) 
     {
         gdprintk(XENLOG_ERR, "VMSAVE: nestedhvm disabled, injecting #UD\n");
-        hvm_inject_hw_exception(TRAP_invalid_op, HVM_DELIVER_NO_ERROR_CODE);
+        hvm_inject_hw_exception(TRAP_invalid_op, X86_EVENT_NO_EC);
         return;
     }
 
@@ -2416,7 +2416,7 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
 
     case VMEXIT_EXCEPTION_DB:
         if ( !v->domain->debugger_attached )
-            hvm_inject_hw_exception(TRAP_debug, HVM_DELIVER_NO_ERROR_CODE);
+            hvm_inject_hw_exception(TRAP_debug, X86_EVENT_NO_EC);
         else
             domain_pause_for_debugger();
         break;
@@ -2604,7 +2604,7 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
 
     case VMEXIT_MONITOR:
     case VMEXIT_MWAIT:
-        hvm_inject_hw_exception(TRAP_invalid_op, HVM_DELIVER_NO_ERROR_CODE);
+        hvm_inject_hw_exception(TRAP_invalid_op, X86_EVENT_NO_EC);
         break;
 
     case VMEXIT_VMRUN:
@@ -2623,7 +2623,7 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
         svm_vmexit_do_clgi(regs, v);
         break;
     case VMEXIT_SKINIT:
-        hvm_inject_hw_exception(TRAP_invalid_op, HVM_DELIVER_NO_ERROR_CODE);
+        hvm_inject_hw_exception(TRAP_invalid_op, X86_EVENT_NO_EC);
         break;
 
     case VMEXIT_XSETBV:

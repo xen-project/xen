@@ -380,7 +380,7 @@ vmexit:
     
 invalid_op:
     gdprintk(XENLOG_ERR, "vmx_inst_check_privilege: invalid_op\n");
-    hvm_inject_hw_exception(TRAP_invalid_op, HVM_DELIVER_NO_ERROR_CODE);
+    hvm_inject_hw_exception(TRAP_invalid_op, X86_EVENT_NO_EC);
     return X86EMUL_EXCEPTION;
 
 gp_fault:

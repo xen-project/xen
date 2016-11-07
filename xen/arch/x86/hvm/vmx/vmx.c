@@ -1586,7 +1586,8 @@ static void __vmx_inject_exception(int trap, int type, int error_code)
     intr_fields = INTR_INFO_VALID_MASK |
                   MASK_INSR(type, INTR_INFO_INTR_TYPE_MASK) |
                   MASK_INSR(trap, INTR_INFO_VECTOR_MASK);
-    if ( error_code != HVM_DELIVER_NO_ERROR_CODE ) {
+    if ( error_code != X86_EVENT_NO_EC )
+    {
         __vmwrite(VM_ENTRY_EXCEPTION_ERROR_CODE, error_code);
         intr_fields |= INTR_INFO_DELIVER_CODE_MASK;
     }
@@ -1611,12 +1612,12 @@ void vmx_inject_extint(int trap, uint8_t source)
                INTR_INFO_VALID_MASK |
                MASK_INSR(X86_EVENTTYPE_EXT_INTR, INTR_INFO_INTR_TYPE_MASK) |
                MASK_INSR(trap, INTR_INFO_VECTOR_MASK),
-               HVM_DELIVER_NO_ERROR_CODE, source);
+               X86_EVENT_NO_EC, source);
             return;
         }
     }
     __vmx_inject_exception(trap, X86_EVENTTYPE_EXT_INTR,
-                           HVM_DELIVER_NO_ERROR_CODE);
+                           X86_EVENT_NO_EC);
 }
 
 void vmx_inject_nmi(void)
@@ -1631,12 +1632,12 @@ void vmx_inject_nmi(void)
                INTR_INFO_VALID_MASK |
                MASK_INSR(X86_EVENTTYPE_NMI, INTR_INFO_INTR_TYPE_MASK) |
                MASK_INSR(TRAP_nmi, INTR_INFO_VECTOR_MASK),
-               HVM_DELIVER_NO_ERROR_CODE, hvm_intsrc_nmi);
+               X86_EVENT_NO_EC, hvm_intsrc_nmi);
             return;
         }
     }
     __vmx_inject_exception(2, X86_EVENTTYPE_NMI,
-                           HVM_DELIVER_NO_ERROR_CODE);
+                           X86_EVENT_NO_EC);
 }
 
 /*
@@ -2051,7 +2052,7 @@ static bool_t vmx_vcpu_emulate_ve(struct vcpu *v)
     vmx_vmcs_exit(v);
 
     hvm_inject_hw_exception(TRAP_virtualisation,
-                            HVM_DELIVER_NO_ERROR_CODE);
+                            X86_EVENT_NO_EC);
 
  out:
     hvm_unmap_guest_frame(veinfo, 0);
@@ -2327,7 +2328,7 @@ void update_guest_eip(void)
     }
 
     if ( regs->eflags & X86_EFLAGS_TF )
-        hvm_inject_hw_exception(TRAP_debug, HVM_DELIVER_NO_ERROR_CODE);
+        hvm_inject_hw_exception(TRAP_debug, X86_EVENT_NO_EC);
 }
 
 static void vmx_fpu_dirty_intercept(void)
@@ -2855,7 +2856,7 @@ static int vmx_msr_write_intercept(unsigned int msr, uint64_t msr_content)
 
         if ( (rc < 0) ||
              (msr_content && (vmx_add_host_load_msr(msr) < 0)) )
-            hvm_inject_hw_exception(TRAP_machine_check, HVM_DELIVER_NO_ERROR_CODE);
+            hvm_inject_hw_exception(TRAP_machine_check, X86_EVENT_NO_EC);
         else
             __vmwrite(GUEST_IA32_DEBUGCTL, msr_content);
 
@@ -3153,7 +3154,7 @@ static void vmx_propagate_intr(unsigned long intr)
         event.error_code = tmp;
     }
     else
-        event.error_code = HVM_DELIVER_NO_ERROR_CODE;
+        event.error_code = X86_EVENT_NO_EC;
 
     if ( event.type >= X86_EVENTTYPE_SW_INTERRUPT )
     {
@@ -3710,7 +3711,7 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
 
     case EXIT_REASON_VMFUNC:
         if ( vmx_vmfunc_intercept(regs) != X86EMUL_OKAY )
-            hvm_inject_hw_exception(TRAP_invalid_op, HVM_DELIVER_NO_ERROR_CODE);
+            hvm_inject_hw_exception(TRAP_invalid_op, X86_EVENT_NO_EC);
         else
             update_guest_eip();
         break;
@@ -3724,7 +3725,7 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
          * as far as vmexit.
          */
         WARN_ON(exit_reason == EXIT_REASON_GETSEC);
-        hvm_inject_hw_exception(TRAP_invalid_op, HVM_DELIVER_NO_ERROR_CODE);
+        hvm_inject_hw_exception(TRAP_invalid_op, X86_EVENT_NO_EC);
         break;
 
     case EXIT_REASON_TPR_BELOW_THRESHOLD:
@@ -3849,7 +3850,7 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
             vmx_get_segment_register(v, x86_seg_ss, &ss);
             if ( ss.attr.fields.dpl )
                 hvm_inject_hw_exception(TRAP_invalid_op,
-                                        HVM_DELIVER_NO_ERROR_CODE);
+                                        X86_EVENT_NO_EC);
             else
                 domain_crash(v->domain);
         }

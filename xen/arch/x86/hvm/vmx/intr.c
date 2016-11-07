@@ -302,7 +302,7 @@ void vmx_intr_assist(void)
     }
     else if ( intack.source == hvm_intsrc_mce )
     {
-        hvm_inject_hw_exception(TRAP_machine_check, HVM_DELIVER_NO_ERROR_CODE);
+        hvm_inject_hw_exception(TRAP_machine_check, X86_EVENT_NO_EC);
     }
     else if ( cpu_has_vmx_virtual_intr_delivery &&
               intack.source != hvm_intsrc_pic &&

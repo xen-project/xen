@@ -17,7 +17,7 @@
  */
 
 #include <asm/msr.h>
-#include <asm/hvm/support.h>	/* for HVM_DELIVER_NO_ERROR_CODE */
+#include <asm/hvm/support.h>
 #include <asm/hvm/hvm.h>
 #include <asm/p2m.h>    /* for struct p2m_domain */
 #include <asm/hvm/nestedhvm.h>
