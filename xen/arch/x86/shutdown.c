@@ -541,6 +541,7 @@ void machine_restart(unsigned int delay_millisecs)
         {
         case BOOT_INVALID:
             ASSERT_UNREACHABLE();
+            /* fall through */
         case BOOT_KBD:
             /* Pulse the keyboard reset line. */
             for ( i = 0; i < 100; i++ )
