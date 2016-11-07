@@ -1797,6 +1797,9 @@ static int bootlate_hvm(struct xc_dom_image *dom)
             modlist[0].size = dom->ramdisk_seg.vend - dom->ramdisk_seg.vstart;
             start_info->nr_modules = 1;
         }
+
+        /* ACPI module 0 is the RSDP */
+        start_info->rsdp_paddr = dom->acpi_modules[0].guest_addr_out ? : 0;
     }
     else
     {
