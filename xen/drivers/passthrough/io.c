@@ -168,6 +168,7 @@ static void pt_irq_time_out(void *data)
     if ( unlikely(!dpci) )
     {
         ASSERT_UNREACHABLE();
+        spin_unlock(&irq_map->dom->event_lock);
         return;
     }
     list_for_each_entry ( digl, &irq_map->digl_list, list )
