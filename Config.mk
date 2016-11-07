@@ -282,7 +282,7 @@ MINIOS_UPSTREAM_REVISION ?= xen-4.8.0-rc1
 # Wed Sep 28 11:50:04 2016 +0200
 # minios: fix build issue with xen_*mb defines
 
-SEABIOS_UPSTREAM_REVISION ?= rel-1.9.3
+SEABIOS_UPSTREAM_REVISION ?= rel-1.10.0
 # Wed Jun 22 14:53:24 2016 +0800
 # fw/msr_feature_control: add support to set MSR_IA32_FEATURE_CONTROL
 
