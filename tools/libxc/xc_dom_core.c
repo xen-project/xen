@@ -1090,8 +1090,9 @@ static int xc_dom_load_acpi(struct xc_dom_image *dom)
                   dom->acpi_modules[i].length,
                   dom->acpi_modules[i].guest_addr_out);
 
-        num_pages = (dom->acpi_modules[i].length + (XC_PAGE_SIZE - 1)) >>
-                       XC_PAGE_SHIFT;
+        num_pages = (dom->acpi_modules[i].length +
+                     (dom->acpi_modules[i].guest_addr_out & ~XC_PAGE_MASK) +
+                     (XC_PAGE_SIZE - 1)) >> XC_PAGE_SHIFT;
         extents = malloc(num_pages * sizeof(*extents));
         if ( !extents )
         {
@@ -1117,6 +1118,9 @@ static int xc_dom_load_acpi(struct xc_dom_image *dom)
                       __FUNCTION__, num_pages, base);
             goto err;
         }
+
+        ptr = (uint8_t *)ptr +
+              (dom->acpi_modules[i].guest_addr_out & ~XC_PAGE_MASK);
 
         memcpy(ptr, dom->acpi_modules[i].data, dom->acpi_modules[i].length);
         munmap(ptr, XC_PAGE_SIZE * num_pages);
