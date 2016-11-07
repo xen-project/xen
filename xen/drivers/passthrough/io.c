@@ -165,7 +165,11 @@ static void pt_irq_time_out(void *data)
     spin_lock(&irq_map->dom->event_lock);
 
     dpci = domain_get_irq_dpci(irq_map->dom);
-    ASSERT(dpci);
+    if ( unlikely(!dpci) )
+    {
+        ASSERT_UNREACHABLE();
+        return;
+    }
     list_for_each_entry ( digl, &irq_map->digl_list, list )
     {
         unsigned int guest_gsi = hvm_pci_intx_gsi(digl->device, digl->intx);
@@ -793,7 +797,11 @@ void hvm_dpci_msi_eoi(struct domain *d, int vector)
 
 static void hvm_dirq_assist(struct domain *d, struct hvm_pirq_dpci *pirq_dpci)
 {
-    ASSERT(d->arch.hvm_domain.irq.dpci);
+    if ( unlikely(!d->arch.hvm_domain.irq.dpci) )
+    {
+        ASSERT_UNREACHABLE();
+        return;
+    }
 
     spin_lock(&d->event_lock);
     if ( test_and_clear_bool(pirq_dpci->masked) )
