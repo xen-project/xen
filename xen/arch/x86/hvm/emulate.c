@@ -568,12 +568,9 @@ static int hvmemul_virtual_to_linear(
         return X86EMUL_UNHANDLEABLE;
 
     /* This is a singleton operation: fail it with an exception. */
-    hvmemul_ctxt->exn_pending = 1;
-    hvmemul_ctxt->trap.vector =
-        (seg == x86_seg_ss) ? TRAP_stack_error : TRAP_gp_fault;
-    hvmemul_ctxt->trap.type = X86_EVENTTYPE_HW_EXCEPTION;
-    hvmemul_ctxt->trap.error_code = 0;
-    hvmemul_ctxt->trap.insn_len = 0;
+    x86_emul_hw_exception((seg == x86_seg_ss)
+                          ? TRAP_stack_error
+                          : TRAP_gp_fault, 0, &hvmemul_ctxt->ctxt);
     return X86EMUL_EXCEPTION;
 }
 
@@ -1562,59 +1559,6 @@ int hvmemul_cpuid(
     return X86EMUL_OKAY;
 }
 
-static int hvmemul_inject_hw_exception(
-    uint8_t vector,
-    int32_t error_code,
-    struct x86_emulate_ctxt *ctxt)
-{
-    struct hvm_emulate_ctxt *hvmemul_ctxt =
-        container_of(ctxt, struct hvm_emulate_ctxt, ctxt);
-
-    hvmemul_ctxt->exn_pending = 1;
-    hvmemul_ctxt->trap.vector = vector;
-    hvmemul_ctxt->trap.type = X86_EVENTTYPE_HW_EXCEPTION;
-    hvmemul_ctxt->trap.error_code = error_code;
-    hvmemul_ctxt->trap.insn_len = 0;
-
-    return X86EMUL_OKAY;
-}
-
-static int hvmemul_inject_sw_interrupt(
-    enum x86_swint_type type,
-    uint8_t vector,
-    uint8_t insn_len,
-    struct x86_emulate_ctxt *ctxt)
-{
-    struct hvm_emulate_ctxt *hvmemul_ctxt =
-        container_of(ctxt, struct hvm_emulate_ctxt, ctxt);
-
-    switch ( type )
-    {
-    case x86_swint_icebp:
-        hvmemul_ctxt->trap.type = X86_EVENTTYPE_PRI_SW_EXCEPTION;
-        break;
-
-    case x86_swint_int3:
-    case x86_swint_into:
-        hvmemul_ctxt->trap.type = X86_EVENTTYPE_SW_EXCEPTION;
-        break;
-
-    case x86_swint_int:
-        hvmemul_ctxt->trap.type = X86_EVENTTYPE_SW_INTERRUPT;
-        break;
-
-    default:
-        return X86EMUL_UNHANDLEABLE;
-    }
-
-    hvmemul_ctxt->exn_pending = 1;
-    hvmemul_ctxt->trap.vector = vector;
-    hvmemul_ctxt->trap.error_code = X86_EVENT_NO_EC;
-    hvmemul_ctxt->trap.insn_len = insn_len;
-
-    return X86EMUL_OKAY;
-}
-
 static int hvmemul_get_fpu(
     void (*exception_callback)(void *, struct cpu_user_regs *),
     void *exception_callback_arg,
@@ -1678,8 +1622,7 @@ static int hvmemul_invlpg(
          * hvmemul_virtual_to_linear() raises exceptions for type/limit
          * violations, so squash them.
          */
-        hvmemul_ctxt->exn_pending = 0;
-        hvmemul_ctxt->trap = (struct x86_event){};
+        x86_emul_reset_event(ctxt);
         rc = X86EMUL_OKAY;
     }
 
@@ -1696,7 +1639,7 @@ static int hvmemul_vmfunc(
 
     rc = hvm_funcs.altp2m_vcpu_emulate_vmfunc(ctxt->regs);
     if ( rc != X86EMUL_OKAY )
-        hvmemul_inject_hw_exception(TRAP_invalid_op, X86_EVENT_NO_EC, ctxt);
+        x86_emul_hw_exception(TRAP_invalid_op, X86_EVENT_NO_EC, ctxt);
 
     return rc;
 }
@@ -1720,8 +1663,6 @@ static const struct x86_emulate_ops hvm_emulate_ops = {
     .write_msr     = hvmemul_write_msr,
     .wbinvd        = hvmemul_wbinvd,
     .cpuid         = hvmemul_cpuid,
-    .inject_hw_exception = hvmemul_inject_hw_exception,
-    .inject_sw_interrupt = hvmemul_inject_sw_interrupt,
     .get_fpu       = hvmemul_get_fpu,
     .put_fpu       = hvmemul_put_fpu,
     .invlpg        = hvmemul_invlpg,
@@ -1747,8 +1688,6 @@ static const struct x86_emulate_ops hvm_emulate_ops_no_write = {
     .write_msr     = hvmemul_write_msr_discard,
     .wbinvd        = hvmemul_wbinvd_discard,
     .cpuid         = hvmemul_cpuid,
-    .inject_hw_exception = hvmemul_inject_hw_exception,
-    .inject_sw_interrupt = hvmemul_inject_sw_interrupt,
     .get_fpu       = hvmemul_get_fpu,
     .put_fpu       = hvmemul_put_fpu,
     .invlpg        = hvmemul_invlpg,
@@ -1870,8 +1809,8 @@ int hvm_emulate_one_mmio(unsigned long mfn, unsigned long gla)
         hvm_dump_emulation_state(XENLOG_G_WARNING "MMCFG", &ctxt);
         break;
     case X86EMUL_EXCEPTION:
-        if ( ctxt.exn_pending )
-            hvm_inject_event(&ctxt.trap);
+        if ( ctxt.ctxt.event_pending )
+            hvm_inject_event(&ctxt.ctxt.event);
         /* fallthrough */
     default:
         hvm_emulate_writeback(&ctxt);
@@ -1930,8 +1869,8 @@ void hvm_emulate_one_vm_event(enum emul_kind kind, unsigned int trapnr,
         hvm_inject_hw_exception(trapnr, errcode);
         break;
     case X86EMUL_EXCEPTION:
-        if ( ctx.exn_pending )
-            hvm_inject_event(&ctx.trap);
+        if ( ctx.ctxt.event_pending )
+            hvm_inject_event(&ctx.ctxt.event);
         break;
     }
 
@@ -2006,8 +1945,6 @@ void hvm_emulate_init_per_insn(
         hvmemul_ctxt->insn_buf_bytes = insn_bytes;
         memcpy(hvmemul_ctxt->insn_buf, insn_buf, insn_bytes);
     }
-
-    hvmemul_ctxt->exn_pending = 0;
 }
 
 void hvm_emulate_writeback(

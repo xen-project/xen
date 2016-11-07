@@ -5379,6 +5379,19 @@ int ptwr_do_page_fault(struct vcpu *v, unsigned long addr,
     page_unlock(page);
     put_page(page);
 
+    /*
+     * The previous lack of inject_{sw,hw}*() hooks caused exceptions raised
+     * by the emulator itself to become X86EMUL_UNHANDLEABLE.  Such exceptions
+     * now set event_pending instead.  Exceptions raised behind the back of
+     * the emulator don't yet set event_pending.
+     *
+     * For now, cause such cases to return to the X86EMUL_UNHANDLEABLE path,
+     * for no functional change from before.  Future patches will fix this
+     * properly.
+     */
+    if ( rc == X86EMUL_EXCEPTION && ptwr_ctxt.ctxt.event_pending )
+        rc = X86EMUL_UNHANDLEABLE;
+
     if ( rc == X86EMUL_UNHANDLEABLE )
         goto bail;
 
@@ -5505,6 +5518,19 @@ int mmio_ro_do_page_fault(struct vcpu *v, unsigned long addr,
         rc = x86_emulate(&ctxt, &mmcfg_intercept_ops);
     else
         rc = x86_emulate(&ctxt, &mmio_ro_emulate_ops);
+
+    /*
+     * The previous lack of inject_{sw,hw}*() hooks caused exceptions raised
+     * by the emulator itself to become X86EMUL_UNHANDLEABLE.  Such exceptions
+     * now set event_pending instead.  Exceptions raised behind the back of
+     * the emulator don't yet set event_pending.
+     *
+     * For now, cause such cases to return to the X86EMUL_UNHANDLEABLE path,
+     * for no functional change from before.  Future patches will fix this
+     * properly.
+     */
+    if ( rc == X86EMUL_EXCEPTION && ctxt.event_pending )
+        rc = X86EMUL_UNHANDLEABLE;
 
     if ( rc == X86EMUL_UNHANDLEABLE )
         return 0;

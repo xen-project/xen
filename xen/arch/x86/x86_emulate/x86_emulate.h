@@ -396,19 +396,6 @@ struct x86_emulate_ops
         unsigned int *edx,
         struct x86_emulate_ctxt *ctxt);
 
-    /* inject_hw_exception */
-    int (*inject_hw_exception)(
-        uint8_t vector,
-        int32_t error_code,
-        struct x86_emulate_ctxt *ctxt);
-
-    /* inject_sw_interrupt */
-    int (*inject_sw_interrupt)(
-        enum x86_swint_type type,
-        uint8_t vector,
-        uint8_t insn_len,
-        struct x86_emulate_ctxt *ctxt);
-
     /*
      * get_fpu: Load emulated environment's FPU state onto processor.
      *  @exn_callback: On any FPU or SIMD exception, pass control to
@@ -486,6 +473,9 @@ struct x86_emulate_ctxt
             bool singlestep:1;   /* Singlestepping was active. */
         };
     } retire;
+
+    bool event_pending;
+    struct x86_event event;
 };
 
 /*
@@ -584,6 +574,19 @@ static inline int x86_emulate_wrapper(
     if ( rc == X86EMUL_EXCEPTION )
         ASSERT(ctxt->regs->eip == orig_eip);
 
+    /*
+     * TODO: Make this true:
+     *
+    ASSERT(ctxt->event_pending == (rc == X86EMUL_EXCEPTION));
+     *
+     * Some codepaths still raise exceptions behind the back of the
+     * emulator. (i.e. return X86EMUL_EXCEPTION but without
+     * event_pending being set).  In the meantime, use a slightly
+     * relaxed check...
+     */
+    if ( ctxt->event_pending )
+        ASSERT(rc == X86EMUL_EXCEPTION);
+
     return rc;
 }
 
@@ -632,5 +635,52 @@ void x86_emulate_free_state(struct x86_emulate_state *state);
 #endif
 
 #endif
+
+static inline void x86_emul_hw_exception(
+    unsigned int vector, int error_code, struct x86_emulate_ctxt *ctxt)
+{
+    ASSERT(!ctxt->event_pending);
+
+    ctxt->event.vector = vector;
+    ctxt->event.type = X86_EVENTTYPE_HW_EXCEPTION;
+    ctxt->event.error_code = error_code;
+
+    ctxt->event_pending = true;
+}
+
+static inline void x86_emul_software_event(
+    enum x86_swint_type type, uint8_t vector, uint8_t insn_len,
+    struct x86_emulate_ctxt *ctxt)
+{
+    ASSERT(!ctxt->event_pending);
+
+    switch ( type )
+    {
+    case x86_swint_icebp:
+        ctxt->event.type = X86_EVENTTYPE_PRI_SW_EXCEPTION;
+        break;
+
+    case x86_swint_int3:
+    case x86_swint_into:
+        ctxt->event.type = X86_EVENTTYPE_SW_EXCEPTION;
+        break;
+
+    case x86_swint_int:
+        ctxt->event.type = X86_EVENTTYPE_SW_INTERRUPT;
+        break;
+    }
+
+    ctxt->event.vector = vector;
+    ctxt->event.error_code = X86_EVENT_NO_EC;
+    ctxt->event.insn_len = insn_len;
+
+    ctxt->event_pending = true;
+}
+
+static inline void x86_emul_reset_event(struct x86_emulate_ctxt *ctxt)
+{
+    ctxt->event_pending = false;
+    ctxt->event = (struct x86_event){};
+}
 
 #endif /* __X86_EMULATE_H__ */

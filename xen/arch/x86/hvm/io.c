@@ -102,8 +102,8 @@ int handle_mmio(void)
         hvm_dump_emulation_state(XENLOG_G_WARNING "MMIO", &ctxt);
         return 0;
     case X86EMUL_EXCEPTION:
-        if ( ctxt.exn_pending )
-            hvm_inject_event(&ctxt.trap);
+        if ( ctxt.ctxt.event_pending )
+            hvm_inject_event(&ctxt.ctxt.event);
         break;
     default:
         break;

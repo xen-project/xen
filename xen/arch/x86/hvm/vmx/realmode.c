@@ -122,7 +122,7 @@ void vmx_realmode_emulate_one(struct hvm_emulate_ctxt *hvmemul_ctxt)
 
     if ( rc == X86EMUL_EXCEPTION )
     {
-        if ( !hvmemul_ctxt->exn_pending )
+        if ( !hvmemul_ctxt->ctxt.event_pending )
         {
             unsigned long intr_info;
 
@@ -133,27 +133,27 @@ void vmx_realmode_emulate_one(struct hvm_emulate_ctxt *hvmemul_ctxt)
                 gdprintk(XENLOG_ERR, "Exception pending but no info.\n");
                 goto fail;
             }
-            hvmemul_ctxt->trap.vector = (uint8_t)intr_info;
-            hvmemul_ctxt->trap.insn_len = 0;
+            hvmemul_ctxt->ctxt.event.vector = (uint8_t)intr_info;
+            hvmemul_ctxt->ctxt.event.insn_len = 0;
         }
 
         if ( unlikely(curr->domain->debugger_attached) &&
-             ((hvmemul_ctxt->trap.vector == TRAP_debug) ||
-              (hvmemul_ctxt->trap.vector == TRAP_int3)) )
+             ((hvmemul_ctxt->ctxt.event.vector == TRAP_debug) ||
+              (hvmemul_ctxt->ctxt.event.vector == TRAP_int3)) )
         {
             domain_pause_for_debugger();
         }
         else if ( curr->arch.hvm_vcpu.guest_cr[0] & X86_CR0_PE )
         {
             gdprintk(XENLOG_ERR, "Exception %02x in protected mode.\n",
-                     hvmemul_ctxt->trap.vector);
+                     hvmemul_ctxt->ctxt.event.vector);
             goto fail;
         }
         else
         {
             realmode_deliver_exception(
-                hvmemul_ctxt->trap.vector,
-                hvmemul_ctxt->trap.insn_len,
+                hvmemul_ctxt->ctxt.event.vector,
+                hvmemul_ctxt->ctxt.event.insn_len,
                 hvmemul_ctxt);
         }
     }

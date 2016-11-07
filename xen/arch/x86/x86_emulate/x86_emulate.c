@@ -680,9 +680,8 @@ static inline int mkec(uint8_t e, int32_t ec, ...)
 
 #define generate_exception_if(p, e, ec...)                                \
 ({  if ( (p) ) {                                                          \
-        fail_if(ops->inject_hw_exception == NULL);                        \
-        rc = ops->inject_hw_exception(e, mkec(e, ##ec, 0), ctxt)          \
-            ? : X86EMUL_EXCEPTION;                                        \
+        x86_emul_hw_exception(e, mkec(e, ##ec, 0), ctxt);                 \
+        rc = X86EMUL_EXCEPTION;                                           \
         goto done;                                                        \
     }                                                                     \
 })
@@ -1604,9 +1603,6 @@ static int inject_swint(enum x86_swint_type type,
 {
     int rc, error_code, fault_type = EXC_GP;
 
-    fail_if(ops->inject_sw_interrupt == NULL);
-    fail_if(ops->inject_hw_exception == NULL);
-
     /*
      * Without hardware support, injecting software interrupts/exceptions is
      * problematic.
@@ -1701,7 +1697,8 @@ static int inject_swint(enum x86_swint_type type,
         }
     }
 
-    rc = ops->inject_sw_interrupt(type, vector, insn_len, ctxt);
+    x86_emul_software_event(type, vector, insn_len, ctxt);
+    rc = X86EMUL_OKAY;
 
  done:
     return rc;
@@ -1909,6 +1906,7 @@ x86_decode(
 
     /* Initialise output state in x86_emulate_ctxt */
     ctxt->retire.raw = 0;
+    x86_emul_reset_event(ctxt);
 
     op_bytes = def_op_bytes = ad_bytes = def_ad_bytes = ctxt->addr_size/8;
     if ( op_bytes == 8 )

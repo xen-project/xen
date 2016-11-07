@@ -3374,6 +3374,19 @@ static int sh_page_fault(struct vcpu *v,
     r = x86_emulate(&emul_ctxt.ctxt, emul_ops);
 
     /*
+     * The previous lack of inject_{sw,hw}*() hooks caused exceptions raised
+     * by the emulator itself to become X86EMUL_UNHANDLEABLE.  Such exceptions
+     * now set event_pending instead.  Exceptions raised behind the back of
+     * the emulator don't yet set event_pending.
+     *
+     * For now, cause such cases to return to the X86EMUL_UNHANDLEABLE path,
+     * for no functional change from before.  Future patches will fix this
+     * properly.
+     */
+    if ( r == X86EMUL_EXCEPTION && emul_ctxt.ctxt.event_pending )
+        r = X86EMUL_UNHANDLEABLE;
+
+    /*
      * NB. We do not unshadow on X86EMUL_EXCEPTION. It's not clear that it
      * would be a good unshadow hint. If we *do* decide to unshadow-on-fault
      * then it must be 'failable': we cannot require the unshadow to succeed.
@@ -3445,6 +3458,9 @@ static int sh_page_fault(struct vcpu *v,
             shadow_continue_emulation(&emul_ctxt, regs);
             v->arch.paging.last_write_was_pt = 0;
             r = x86_emulate(&emul_ctxt.ctxt, emul_ops);
+
+            if ( r == X86EMUL_EXCEPTION && emul_ctxt.ctxt.event_pending )
+                r = X86EMUL_UNHANDLEABLE;
 
             /*
              * Only continue the search for the second half if there are no
