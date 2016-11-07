@@ -821,7 +821,7 @@ nsvm_vcpu_vmexit_inject(struct vcpu *v, struct cpu_user_regs *regs,
 }
 
 int
-nsvm_vcpu_vmexit_trap(struct vcpu *v, const struct hvm_trap *trap)
+nsvm_vcpu_vmexit_event(struct vcpu *v, const struct x86_event *trap)
 {
     ASSERT(vcpu_nestedhvm(v).nv_vvmcx != NULL);
 
@@ -994,10 +994,11 @@ nsvm_vmcb_guest_intercepts_exitcode(struct vcpu *v,
 }
 
 bool_t
-nsvm_vmcb_guest_intercepts_trap(struct vcpu *v, unsigned int trapnr, int errcode)
+nsvm_vmcb_guest_intercepts_event(
+    struct vcpu *v, unsigned int vector, int errcode)
 {
     return nsvm_vmcb_guest_intercepts_exitcode(v,
-        guest_cpu_user_regs(), VMEXIT_EXCEPTION_DE + trapnr);
+        guest_cpu_user_regs(), VMEXIT_EXCEPTION_DE + vector);
 }
 
 static int

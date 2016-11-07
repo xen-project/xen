@@ -30,7 +30,7 @@ struct hvm_emulate_ctxt {
     unsigned long seg_reg_dirty;
 
     bool_t exn_pending;
-    struct hvm_trap trap;
+    struct x86_event trap;
 
     uint32_t intr_shadow;
 

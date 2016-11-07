@@ -1203,15 +1203,15 @@ static void svm_vcpu_destroy(struct vcpu *v)
     passive_domain_destroy(v);
 }
 
-static void svm_inject_trap(const struct hvm_trap *trap)
+static void svm_inject_event(const struct x86_event *event)
 {
     struct vcpu *curr = current;
     struct vmcb_struct *vmcb = curr->arch.hvm_svm.vmcb;
-    eventinj_t event = vmcb->eventinj;
-    struct hvm_trap _trap = *trap;
+    eventinj_t eventinj = vmcb->eventinj;
+    struct x86_event _event = *event;
     const struct cpu_user_regs *regs = guest_cpu_user_regs();
 
-    switch ( _trap.vector )
+    switch ( _event.vector )
     {
     case TRAP_debug:
         if ( regs->eflags & X86_EFLAGS_TF )
@@ -1229,21 +1229,21 @@ static void svm_inject_trap(const struct hvm_trap *trap)
         }
     }
 
-    if ( unlikely(event.fields.v) &&
-         (event.fields.type == X86_EVENTTYPE_HW_EXCEPTION) )
+    if ( unlikely(eventinj.fields.v) &&
+         (eventinj.fields.type == X86_EVENTTYPE_HW_EXCEPTION) )
     {
-        _trap.vector = hvm_combine_hw_exceptions(
-            event.fields.vector, _trap.vector);
-        if ( _trap.vector == TRAP_double_fault )
-            _trap.error_code = 0;
+        _event.vector = hvm_combine_hw_exceptions(
+            eventinj.fields.vector, _event.vector);
+        if ( _event.vector == TRAP_double_fault )
+            _event.error_code = 0;
     }
 
-    event.bytes = 0;
-    event.fields.v = 1;
-    event.fields.vector = _trap.vector;
+    eventinj.bytes = 0;
+    eventinj.fields.v = 1;
+    eventinj.fields.vector = _event.vector;
 
     /* Refer to AMD Vol 2: System Programming, 15.20 Event Injection. */
-    switch ( _trap.type )
+    switch ( _event.type )
     {
     case X86_EVENTTYPE_SW_INTERRUPT: /* int $n */
         /*
@@ -1253,8 +1253,8 @@ static void svm_inject_trap(const struct hvm_trap *trap)
          * moved eip forward if appropriate.
          */
         if ( cpu_has_svm_nrips )
-            vmcb->nextrip = regs->eip + _trap.insn_len;
-        event.fields.type = X86_EVENTTYPE_SW_INTERRUPT;
+            vmcb->nextrip = regs->eip + _event.insn_len;
+        eventinj.fields.type = X86_EVENTTYPE_SW_INTERRUPT;
         break;
 
     case X86_EVENTTYPE_PRI_SW_EXCEPTION: /* icebp */
@@ -1265,7 +1265,7 @@ static void svm_inject_trap(const struct hvm_trap *trap)
          */
         if ( cpu_has_svm_nrips )
             vmcb->nextrip = regs->eip;
-        event.fields.type = X86_EVENTTYPE_HW_EXCEPTION;
+        eventinj.fields.type = X86_EVENTTYPE_HW_EXCEPTION;
         break;
 
     case X86_EVENTTYPE_SW_EXCEPTION: /* int3, into */
@@ -1279,28 +1279,28 @@ static void svm_inject_trap(const struct hvm_trap *trap)
          * the correct faulting eip should a fault occur.
          */
         if ( cpu_has_svm_nrips )
-            vmcb->nextrip = regs->eip + _trap.insn_len;
-        event.fields.type = X86_EVENTTYPE_HW_EXCEPTION;
+            vmcb->nextrip = regs->eip + _event.insn_len;
+        eventinj.fields.type = X86_EVENTTYPE_HW_EXCEPTION;
         break;
 
     default:
-        event.fields.type = X86_EVENTTYPE_HW_EXCEPTION;
-        event.fields.ev = (_trap.error_code != HVM_DELIVER_NO_ERROR_CODE);
-        event.fields.errorcode = _trap.error_code;
+        eventinj.fields.type = X86_EVENTTYPE_HW_EXCEPTION;
+        eventinj.fields.ev = (_event.error_code != HVM_DELIVER_NO_ERROR_CODE);
+        eventinj.fields.errorcode = _event.error_code;
         break;
     }
 
-    vmcb->eventinj = event;
+    vmcb->eventinj = eventinj;
 
-    if ( _trap.vector == TRAP_page_fault )
+    if ( _event.vector == TRAP_page_fault )
     {
-        curr->arch.hvm_vcpu.guest_cr[2] = _trap.cr2;
-        vmcb_set_cr2(vmcb, _trap.cr2);
-        HVMTRACE_LONG_2D(PF_INJECT, _trap.error_code, TRC_PAR_LONG(_trap.cr2));
+        curr->arch.hvm_vcpu.guest_cr[2] = _event.cr2;
+        vmcb_set_cr2(vmcb, _event.cr2);
+        HVMTRACE_LONG_2D(PF_INJECT, _event.error_code, TRC_PAR_LONG(_event.cr2));
     }
     else
     {
-        HVMTRACE_2D(INJ_EXC, _trap.vector, _trap.error_code);
+        HVMTRACE_2D(INJ_EXC, _event.vector, _event.error_code);
     }
 }
 
@@ -2238,7 +2238,7 @@ static struct hvm_function_table __initdata svm_function_table = {
     .set_guest_pat        = svm_set_guest_pat,
     .get_guest_pat        = svm_get_guest_pat,
     .set_tsc_offset       = svm_set_tsc_offset,
-    .inject_trap          = svm_inject_trap,
+    .inject_event         = svm_inject_event,
     .init_hypercall_page  = svm_init_hypercall_page,
     .event_pending        = svm_event_pending,
     .invlpg               = svm_invlpg,
@@ -2253,9 +2253,9 @@ static struct hvm_function_table __initdata svm_function_table = {
     .nhvm_vcpu_initialise = nsvm_vcpu_initialise,
     .nhvm_vcpu_destroy = nsvm_vcpu_destroy,
     .nhvm_vcpu_reset = nsvm_vcpu_reset,
-    .nhvm_vcpu_vmexit_trap = nsvm_vcpu_vmexit_trap,
+    .nhvm_vcpu_vmexit_event = nsvm_vcpu_vmexit_event,
     .nhvm_vcpu_p2m_base = nsvm_vcpu_hostcr3,
-    .nhvm_vmcx_guest_intercepts_trap = nsvm_vmcb_guest_intercepts_trap,
+    .nhvm_vmcx_guest_intercepts_event = nsvm_vmcb_guest_intercepts_event,
     .nhvm_vmcx_hap_enabled = nsvm_vmcb_hap_enabled,
     .nhvm_intr_blocked = nsvm_intr_blocked,
     .nhvm_hap_walk_L1_p2m = nsvm_hap_walk_L1_p2m,

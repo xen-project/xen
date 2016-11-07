@@ -5451,6 +5451,17 @@ static void __init __maybe_unused build_assertions(void)
     BUILD_BUG_ON(x86_seg_ds != 3);
     BUILD_BUG_ON(x86_seg_fs != 4);
     BUILD_BUG_ON(x86_seg_gs != 5);
+
+    /*
+     * Check X86_EVENTTYPE_* against VMCB EVENTINJ and VMCS INTR_INFO type
+     * fields.
+     */
+    BUILD_BUG_ON(X86_EVENTTYPE_EXT_INTR != 0);
+    BUILD_BUG_ON(X86_EVENTTYPE_NMI != 2);
+    BUILD_BUG_ON(X86_EVENTTYPE_HW_EXCEPTION != 3);
+    BUILD_BUG_ON(X86_EVENTTYPE_SW_INTERRUPT != 4);
+    BUILD_BUG_ON(X86_EVENTTYPE_PRI_SW_EXCEPTION != 5);
+    BUILD_BUG_ON(X86_EVENTTYPE_SW_EXCEPTION != 6);
 }
 
 #ifdef __XEN__

@@ -77,14 +77,6 @@ enum hvm_intblk {
 #define HVM_HAP_SUPERPAGE_2MB   0x00000001
 #define HVM_HAP_SUPERPAGE_1GB   0x00000002
 
-struct hvm_trap {
-    int16_t       vector;
-    uint8_t       type;         /* X86_EVENTTYPE_* */
-    uint8_t       insn_len;     /* Instruction length */
-    uint32_t      error_code;   /* HVM_DELIVER_NO_ERROR_CODE if n/a */
-    unsigned long cr2;          /* Only for TRAP_page_fault h/w exception */
-};
-
 /*
  * The hardware virtual machine (HVM) interface abstracts away from the
  * x86/x86_64 CPU virtualization assist specifics. Currently this interface
@@ -152,7 +144,7 @@ struct hvm_function_table {
 
     void (*set_tsc_offset)(struct vcpu *v, u64 offset, u64 at_tsc);
 
-    void (*inject_trap)(const struct hvm_trap *trap);
+    void (*inject_event)(const struct x86_event *event);
 
     void (*init_hypercall_page)(struct domain *d, void *hypercall_page);
 
@@ -185,11 +177,10 @@ struct hvm_function_table {
     int (*nhvm_vcpu_initialise)(struct vcpu *v);
     void (*nhvm_vcpu_destroy)(struct vcpu *v);
     int (*nhvm_vcpu_reset)(struct vcpu *v);
-    int (*nhvm_vcpu_vmexit_trap)(struct vcpu *v, const struct hvm_trap *trap);
+    int (*nhvm_vcpu_vmexit_event)(struct vcpu *v, const struct x86_event *event);
     uint64_t (*nhvm_vcpu_p2m_base)(struct vcpu *v);
-    bool_t (*nhvm_vmcx_guest_intercepts_trap)(struct vcpu *v,
-                                              unsigned int trapnr,
-                                              int errcode);
+    bool_t (*nhvm_vmcx_guest_intercepts_event)(
+        struct vcpu *v, unsigned int vector, int errcode);
 
     bool_t (*nhvm_vmcx_hap_enabled)(struct vcpu *v);
 
@@ -419,9 +410,30 @@ void hvm_migrate_timers(struct vcpu *v);
 void hvm_do_resume(struct vcpu *v);
 void hvm_migrate_pirqs(struct vcpu *v);
 
-void hvm_inject_trap(const struct hvm_trap *trap);
-void hvm_inject_hw_exception(unsigned int trapnr, int errcode);
-void hvm_inject_page_fault(int errcode, unsigned long cr2);
+void hvm_inject_event(const struct x86_event *event);
+
+static inline void hvm_inject_hw_exception(unsigned int vector, int errcode)
+{
+    struct x86_event event = {
+        .vector = vector,
+        .type = X86_EVENTTYPE_HW_EXCEPTION,
+        .error_code = errcode,
+    };
+
+    hvm_inject_event(&event);
+}
+
+static inline void hvm_inject_page_fault(int errcode, unsigned long cr2)
+{
+    struct x86_event event = {
+        .vector = TRAP_page_fault,
+        .type = X86_EVENTTYPE_HW_EXCEPTION,
+        .error_code = errcode,
+        .cr2 = cr2,
+    };
+
+    hvm_inject_event(&event);
+}
 
 static inline int hvm_event_pending(struct vcpu *v)
 {
@@ -436,18 +448,6 @@ static inline int hvm_event_pending(struct vcpu *v)
 #define HVM_TRAP_MASK ((1U << TRAP_debug)           | \
                        (1U << TRAP_alignment_check) | \
                        (1U << TRAP_machine_check))
-
-/*
- * x86 event types. This enumeration is valid for:
- *  Intel VMX: {VM_ENTRY,VM_EXIT,IDT_VECTORING}_INTR_INFO[10:8]
- *  AMD SVM: eventinj[10:8] and exitintinfo[10:8] (types 0-4 only)
- */
-#define X86_EVENTTYPE_EXT_INTR         0 /* external interrupt */
-#define X86_EVENTTYPE_NMI              2 /* NMI */
-#define X86_EVENTTYPE_HW_EXCEPTION     3 /* hardware exception */
-#define X86_EVENTTYPE_SW_INTERRUPT     4 /* software interrupt (CD nn) */
-#define X86_EVENTTYPE_PRI_SW_EXCEPTION 5 /* ICEBP (F1) */
-#define X86_EVENTTYPE_SW_EXCEPTION     6 /* INT3 (CC), INTO (CE) */
 
 int hvm_event_needs_reinjection(uint8_t type, uint8_t vector);
 
@@ -542,10 +542,10 @@ int hvm_x2apic_msr_write(struct vcpu *v, unsigned int msr, uint64_t msr_content)
 /* inject vmexit into l1 guest. l1 guest will see a VMEXIT due to
  * 'trapnr' exception.
  */ 
-static inline int nhvm_vcpu_vmexit_trap(struct vcpu *v,
-                                        const struct hvm_trap *trap)
+static inline int nhvm_vcpu_vmexit_event(
+    struct vcpu *v, const struct x86_event *event)
 {
-    return hvm_funcs.nhvm_vcpu_vmexit_trap(v, trap);
+    return hvm_funcs.nhvm_vcpu_vmexit_event(v, event);
 }
 
 /* returns l1 guest's cr3 that points to the page table used to
@@ -557,11 +557,10 @@ static inline uint64_t nhvm_vcpu_p2m_base(struct vcpu *v)
 }
 
 /* returns true, when l1 guest intercepts the specified trap */
-static inline bool_t nhvm_vmcx_guest_intercepts_trap(struct vcpu *v,
-                                                     unsigned int trap,
-                                                     int errcode)
+static inline bool_t nhvm_vmcx_guest_intercepts_event(
+    struct vcpu *v, unsigned int vector, int errcode)
 {
-    return hvm_funcs.nhvm_vmcx_guest_intercepts_trap(v, trap, errcode);
+    return hvm_funcs.nhvm_vmcx_guest_intercepts_event(v, vector, errcode);
 }
 
 /* returns true when l1 guest wants to use hap to run l2 guest */

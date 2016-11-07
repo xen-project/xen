@@ -535,7 +535,7 @@ void hvm_do_resume(struct vcpu *v)
     /* Inject pending hw/sw trap */
     if ( v->arch.hvm_vcpu.inject_trap.vector != -1 )
     {
-        hvm_inject_trap(&v->arch.hvm_vcpu.inject_trap);
+        hvm_inject_event(&v->arch.hvm_vcpu.inject_trap);
         v->arch.hvm_vcpu.inject_trap.vector = -1;
     }
 }
@@ -1676,19 +1676,19 @@ void hvm_triple_fault(void)
     domain_shutdown(d, reason);
 }
 
-void hvm_inject_trap(const struct hvm_trap *trap)
+void hvm_inject_event(const struct x86_event *event)
 {
     struct vcpu *curr = current;
 
     if ( nestedhvm_enabled(curr->domain) &&
          !nestedhvm_vmswitch_in_progress(curr) &&
          nestedhvm_vcpu_in_guestmode(curr) &&
-         nhvm_vmcx_guest_intercepts_trap(
-             curr, trap->vector, trap->error_code) )
+         nhvm_vmcx_guest_intercepts_event(
+             curr, event->vector, event->error_code) )
     {
         enum nestedhvm_vmexits nsret;
 
-        nsret = nhvm_vcpu_vmexit_trap(curr, trap);
+        nsret = nhvm_vcpu_vmexit_event(curr, event);
 
         switch ( nsret )
         {
@@ -1704,26 +1704,7 @@ void hvm_inject_trap(const struct hvm_trap *trap)
         }
     }
 
-    hvm_funcs.inject_trap(trap);
-}
-
-void hvm_inject_hw_exception(unsigned int trapnr, int errcode)
-{
-    struct hvm_trap trap = {
-        .vector = trapnr,
-        .type = X86_EVENTTYPE_HW_EXCEPTION,
-        .error_code = errcode };
-    hvm_inject_trap(&trap);
-}
-
-void hvm_inject_page_fault(int errcode, unsigned long cr2)
-{
-    struct hvm_trap trap = {
-        .vector = TRAP_page_fault,
-        .type = X86_EVENTTYPE_HW_EXCEPTION,
-        .error_code = errcode,
-        .cr2 = cr2 };
-    hvm_inject_trap(&trap);
+    hvm_funcs.inject_event(event);
 }
 
 int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
@@ -4097,7 +4078,7 @@ void hvm_ud_intercept(struct cpu_user_regs *regs)
         break;
     case X86EMUL_EXCEPTION:
         if ( ctxt.exn_pending )
-            hvm_inject_trap(&ctxt.trap);
+            hvm_inject_event(&ctxt.trap);
         /* fall through */
     default:
         hvm_emulate_writeback(&ctxt);

@@ -491,18 +491,19 @@ static void vmreturn(struct cpu_user_regs *regs, enum vmx_ops_result ops_res)
     regs->eflags = eflags;
 }
 
-bool_t nvmx_intercepts_exception(struct vcpu *v, unsigned int trap,
-                                 int error_code)
+bool_t nvmx_intercepts_exception(
+    struct vcpu *v, unsigned int vector, int error_code)
 {
     u32 exception_bitmap, pfec_match=0, pfec_mask=0;
     int r;
 
-    ASSERT ( trap < 32 );
+    ASSERT(vector < 32);
 
     exception_bitmap = get_vvmcs(v, EXCEPTION_BITMAP);
-    r = exception_bitmap & (1 << trap) ? 1: 0;
+    r = exception_bitmap & (1 << vector) ? 1: 0;
 
-    if ( trap == TRAP_page_fault ) {
+    if ( vector == TRAP_page_fault )
+    {
         pfec_match = get_vvmcs(v, PAGE_FAULT_ERROR_CODE_MATCH);
         pfec_mask  = get_vvmcs(v, PAGE_FAULT_ERROR_CODE_MASK);
         if ( (error_code & pfec_mask) != pfec_match )

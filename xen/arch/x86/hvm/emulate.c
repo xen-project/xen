@@ -1679,7 +1679,7 @@ static int hvmemul_invlpg(
          * violations, so squash them.
          */
         hvmemul_ctxt->exn_pending = 0;
-        hvmemul_ctxt->trap = (struct hvm_trap){};
+        hvmemul_ctxt->trap = (struct x86_event){};
         rc = X86EMUL_OKAY;
     }
 
@@ -1869,7 +1869,7 @@ int hvm_emulate_one_mmio(unsigned long mfn, unsigned long gla)
         break;
     case X86EMUL_EXCEPTION:
         if ( ctxt.exn_pending )
-            hvm_inject_trap(&ctxt.trap);
+            hvm_inject_event(&ctxt.trap);
         /* fallthrough */
     default:
         hvm_emulate_writeback(&ctxt);
@@ -1929,7 +1929,7 @@ void hvm_emulate_one_vm_event(enum emul_kind kind, unsigned int trapnr,
         break;
     case X86EMUL_EXCEPTION:
         if ( ctx.exn_pending )
-            hvm_inject_trap(&ctx.trap);
+            hvm_inject_event(&ctx.trap);
         break;
     }
 

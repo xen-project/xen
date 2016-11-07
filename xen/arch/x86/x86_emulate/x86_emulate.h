@@ -67,6 +67,28 @@ enum x86_swint_emulation {
     x86_swint_emulate_all,  /* Help needed with all software events */
 };
 
+/*
+ * x86 event types. This enumeration is valid for:
+ *  Intel VMX: {VM_ENTRY,VM_EXIT,IDT_VECTORING}_INTR_INFO[10:8]
+ *  AMD SVM: eventinj[10:8] and exitintinfo[10:8] (types 0-4 only)
+ */
+enum x86_event_type {
+    X86_EVENTTYPE_EXT_INTR,         /* External interrupt */
+    X86_EVENTTYPE_NMI = 2,          /* NMI */
+    X86_EVENTTYPE_HW_EXCEPTION,     /* Hardware exception */
+    X86_EVENTTYPE_SW_INTERRUPT,     /* Software interrupt (CD nn) */
+    X86_EVENTTYPE_PRI_SW_EXCEPTION, /* ICEBP (F1) */
+    X86_EVENTTYPE_SW_EXCEPTION,     /* INT3 (CC), INTO (CE) */
+};
+
+struct x86_event {
+    int16_t       vector;
+    uint8_t       type;         /* X86_EVENTTYPE_* */
+    uint8_t       insn_len;     /* Instruction length */
+    uint32_t      error_code;   /* HVM_DELIVER_NO_ERROR_CODE if n/a */
+    unsigned long cr2;          /* Only for TRAP_page_fault h/w exception */
+};
+
 /* 
  * Attribute for segment selector. This is a copy of bit 40:47 & 52:55 of the
  * segment descriptor. It happens to match the format of an AMD SVM VMCB.

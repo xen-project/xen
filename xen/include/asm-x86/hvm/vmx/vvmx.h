@@ -112,8 +112,8 @@ void nvmx_vcpu_destroy(struct vcpu *v);
 int nvmx_vcpu_reset(struct vcpu *v);
 uint64_t nvmx_vcpu_eptp_base(struct vcpu *v);
 enum hvm_intblk nvmx_intr_blocked(struct vcpu *v);
-bool_t nvmx_intercepts_exception(struct vcpu *v, unsigned int trap,
-                                 int error_code);
+bool_t nvmx_intercepts_exception(
+    struct vcpu *v, unsigned int vector, int error_code);
 void nvmx_domain_relinquish_resources(struct domain *d);
 
 bool_t nvmx_ept_enabled(struct vcpu *v);

@@ -110,10 +110,10 @@ void nsvm_vcpu_destroy(struct vcpu *v);
 int nsvm_vcpu_initialise(struct vcpu *v);
 int nsvm_vcpu_reset(struct vcpu *v);
 int nsvm_vcpu_vmrun(struct vcpu *v, struct cpu_user_regs *regs);
-int nsvm_vcpu_vmexit_trap(struct vcpu *v, const struct hvm_trap *trap);
+int nsvm_vcpu_vmexit_event(struct vcpu *v, const struct x86_event *event);
 uint64_t nsvm_vcpu_hostcr3(struct vcpu *v);
-bool_t nsvm_vmcb_guest_intercepts_trap(struct vcpu *v, unsigned int trapnr,
-                                       int errcode);
+bool_t nsvm_vmcb_guest_intercepts_event(
+    struct vcpu *v, unsigned int vector, int errcode);
 bool_t nsvm_vmcb_hap_enabled(struct vcpu *v);
 enum hvm_intblk nsvm_intr_blocked(struct vcpu *v);
 
