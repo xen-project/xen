@@ -3764,7 +3764,11 @@ void async_exception_cleanup(struct vcpu *curr)
             if ( (curr->async_exception_mask ^
                   curr->async_exception_state(trap).old_mask) == (1 << trap) )
                 break;
-    ASSERT(trap <= VCPU_TRAP_LAST);
+    if ( unlikely(trap > VCPU_TRAP_LAST) )
+    {
+        ASSERT_UNREACHABLE();
+        return;
+    }
 
     /* Restore previous asynchronous exception mask. */
     curr->async_exception_mask = curr->async_exception_state(trap).old_mask;
