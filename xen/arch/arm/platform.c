@@ -127,6 +127,16 @@ void platform_poweroff(void)
         platform->poweroff();
 }
 
+bool_t platform_has_quirk(uint32_t quirk)
+{
+    uint32_t quirks = 0;
+
+    if ( platform && platform->quirks )
+        quirks = platform->quirks();
+
+    return !!(quirks & quirk);
+}
+
 bool_t platform_device_is_blacklisted(const struct dt_device_node *node)
 {
     const struct dt_device_match *blacklist = NULL;
