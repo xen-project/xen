@@ -39,6 +39,13 @@ struct platform_desc {
     const struct dt_device_match *blacklist_dev;
 };
 
+/*
+ * Quirk for platforms where device tree incorrectly reports 4K GICC
+ * size, but actually the two GICC register ranges are placed at 64K
+ * stride.
+ */
+#define PLATFORM_QUIRK_GIC_64K_STRIDE (1 << 0)
+
 void __init platform_init(void);
 int __init platform_init_time(void);
 int __init platform_specific_mapping(struct domain *d);
