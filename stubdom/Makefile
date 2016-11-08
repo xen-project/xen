@@ -4,6 +4,10 @@ MINI_OS = $(XEN_ROOT)/extras/mini-os
 export XEN_ROOT
 export XEN_OS=MiniOS
 
+# Remove flags which are meant for tools, e.g. "-m64"
+export EXTRA_CFLAGS_XEN_TOOLS=
+export EXTRA_CFLAGS_QEMU_TRADITIONAL=
+
 export stubdom=y
 export debug=y
 # Moved from config/StdGNU.mk
