@@ -101,7 +101,7 @@ install-tools:
 	$(MAKE) -C tools install
 
 .PHONY: install-stubdom
-install-stubdom: install-tools mini-os-dir
+install-stubdom: mini-os-dir
 	$(MAKE) -C stubdom install
 ifeq (x86_64,$(XEN_TARGET_ARCH))
 	XEN_TARGET_ARCH=x86_32 $(MAKE) -C stubdom install-grub
