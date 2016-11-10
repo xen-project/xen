@@ -3683,7 +3683,7 @@ x86_emulate(
                 if ( (rc = ops->read(src.mem.seg, src.mem.off,
                                      &src.val, src.bytes, ctxt)) != 0 )
                     goto done;
-                emulate_fpu_insn_memdst("fldt", src.val);
+                emulate_fpu_insn_memsrc("fldt", src.val);
                 break;
             case 7: /* fstp m80fp */
                 ea.bytes = 10;
@@ -3780,7 +3780,7 @@ x86_emulate(
                 ea.bytes = 8;
                 dst = ea;
                 dst.type = OP_MEM;
-                emulate_fpu_insn_memsrc("fstl", dst.val);
+                emulate_fpu_insn_memdst("fstl", dst.val);
                 break;
             case 3: /* fstp m64fp */
                 ea.bytes = 8;
