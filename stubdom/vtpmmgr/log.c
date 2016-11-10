@@ -147,5 +147,5 @@ const char* tpm_get_error_name (TPM_RESULT code) {
     if (code == error_msgs[i].code)
       return error_msgs[i].code_name;
 
-    return("Unknown Error Code");
+  return("Unknown Error Code");
 }
