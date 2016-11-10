@@ -4940,7 +4940,7 @@ x86_emulate(
         {
             uint32_t mxcsr = 0;
 
-            if ( vex.pfx != vex_66 )
+            if ( ea.bytes < 16 || vex.pfx == vex_f3 )
                 mxcsr = MXCSR_MM;
             else if ( vcpu_has_misalignsse() )
                 asm ( "stmxcsr %0" : "=m" (mxcsr) );
