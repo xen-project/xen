@@ -1329,6 +1329,45 @@ void setup_ept_dump(void)
     register_keyhandler('D', ept_dump_p2m_table, "dump VT-x EPT tables", 0);
 }
 
+void p2m_init_altp2m_ept(struct domain *d, unsigned int i)
+{
+    struct p2m_domain *p2m = d->arch.altp2m_p2m[i];
+    struct ept_data *ept;
+
+    p2m->min_remapped_gfn = gfn_x(INVALID_GFN);
+    p2m->max_remapped_gfn = 0;
+    ept = &p2m->ept;
+    ept->asr = pagetable_get_pfn(p2m_get_pagetable(p2m));
+    d->arch.altp2m_eptp[i] = ept_get_eptp(ept);
+}
+
+unsigned int p2m_find_altp2m_by_eptp(struct domain *d, uint64_t eptp)
+{
+    struct p2m_domain *p2m;
+    struct ept_data *ept;
+    unsigned int i;
+
+    altp2m_list_lock(d);
+
+    for ( i = 0; i < MAX_ALTP2M; i++ )
+    {
+        if ( d->arch.altp2m_eptp[i] == mfn_x(INVALID_MFN) )
+            continue;
+
+        p2m = d->arch.altp2m_p2m[i];
+        ept = &p2m->ept;
+
+        if ( eptp == ept_get_eptp(ept) )
+            goto out;
+    }
+
+    i = INVALID_ALTP2M;
+
+ out:
+    altp2m_list_unlock(d);
+    return i;
+}
+
 /*
  * Local variables:
  * mode: C

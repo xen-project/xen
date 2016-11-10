@@ -2342,33 +2342,6 @@ int unmap_mmio_regions(struct domain *d,
     return i == nr ? 0 : i ?: ret;
 }
 
-unsigned int p2m_find_altp2m_by_eptp(struct domain *d, uint64_t eptp)
-{
-    struct p2m_domain *p2m;
-    struct ept_data *ept;
-    unsigned int i;
-
-    altp2m_list_lock(d);
-
-    for ( i = 0; i < MAX_ALTP2M; i++ )
-    {
-        if ( d->arch.altp2m_eptp[i] == mfn_x(INVALID_MFN) )
-            continue;
-
-        p2m = d->arch.altp2m_p2m[i];
-        ept = &p2m->ept;
-
-        if ( eptp == ept_get_eptp(ept) )
-            goto out;
-    }
-
-    i = INVALID_ALTP2M;
-
- out:
-    altp2m_list_unlock(d);
-    return i;
-}
-
 bool_t p2m_switch_vcpu_altp2m_by_id(struct vcpu *v, unsigned int idx)
 {
     struct domain *d = v->domain;
@@ -2474,18 +2447,6 @@ void p2m_flush_altp2m(struct domain *d)
     altp2m_list_unlock(d);
 }
 
-static void p2m_init_altp2m_helper(struct domain *d, unsigned int i)
-{
-    struct p2m_domain *p2m = d->arch.altp2m_p2m[i];
-    struct ept_data *ept;
-
-    p2m->min_remapped_gfn = gfn_x(INVALID_GFN);
-    p2m->max_remapped_gfn = 0;
-    ept = &p2m->ept;
-    ept->asr = pagetable_get_pfn(p2m_get_pagetable(p2m));
-    d->arch.altp2m_eptp[i] = ept_get_eptp(ept);
-}
-
 int p2m_init_altp2m_by_id(struct domain *d, unsigned int idx)
 {
     int rc = -EINVAL;
@@ -2497,7 +2458,7 @@ int p2m_init_altp2m_by_id(struct domain *d, unsigned int idx)
 
     if ( d->arch.altp2m_eptp[idx] == mfn_x(INVALID_MFN) )
     {
-        p2m_init_altp2m_helper(d, idx);
+        p2m_init_altp2m_ept(d, idx);
         rc = 0;
     }
 
@@ -2517,7 +2478,7 @@ int p2m_init_next_altp2m(struct domain *d, uint16_t *idx)
         if ( d->arch.altp2m_eptp[i] != mfn_x(INVALID_MFN) )
             continue;
 
-        p2m_init_altp2m_helper(d, i);
+        p2m_init_altp2m_ept(d, i);
         *idx = i;
         rc = 0;
 

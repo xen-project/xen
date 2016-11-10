@@ -23,8 +23,8 @@
  * along with this program; If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef _XEN_P2M_H
-#define _XEN_P2M_H
+#ifndef _XEN_ASM_X86_P2M_H
+#define _XEN_ASM_X86_P2M_H
 
 #include <xen/config.h>
 #include <xen/paging.h>
@@ -784,9 +784,6 @@ static inline struct p2m_domain *p2m_get_altp2m(struct vcpu *v)
     return v->domain->arch.altp2m_p2m[index];
 }
 
-/* Locate an alternate p2m by its EPTP */
-unsigned int p2m_find_altp2m_by_eptp(struct domain *d, uint64_t eptp);
-
 /* Switch alternate p2m for a single vcpu */
 bool_t p2m_switch_vcpu_altp2m_by_id(struct vcpu *v, unsigned int idx);
 
@@ -848,7 +845,7 @@ static inline unsigned int p2m_get_iommu_flags(p2m_type_t p2mt)
     return flags;
 }
 
-#endif /* _XEN_P2M_H */
+#endif /* _XEN_ASM_X86_P2M_H */
 
 /*
  * Local variables:
