@@ -14,5 +14,10 @@ extra-$(efi) += boot.init.o relocs-dummy.o runtime.o compat.o buildid.o
 %.o: %.ihex
 	$(OBJCOPY) -I ihex -O binary $< $@
 
+cc-runtime.o := $(CC) -mno-sse
+$(call cc-option-add,cflags-runtime.o,cc-runtime.o,-mpreferred-stack-boundary=3)
+$(call cc-option-add,cflags-runtime.o,cc-runtime.o,-mincoming-stack-boundary=3)
+runtime.o: CFLAGS += $(cflags-runtime.o)
+
 stub.o: $(extra-y)
 nogcov-$(efi) += stub.o
