@@ -123,10 +123,10 @@ static int parse_root_key(struct mem_tpm_mgr *dst, struct disk_seal_entry *src)
 	struct disk_root_sealed_data sealed;
 
     /*TPM 2.0 unbind | TPM 1.x unseal*/
-    if (hw_is_tpm2())
-        rc = TPM2_disk_unbind(&sealed, &olen, src);
-    else
-        rc = TPM_disk_unseal(&sealed, sizeof(sealed), src);
+	if (hw_is_tpm2())
+		rc = TPM2_disk_unbind(&sealed, &olen, src);
+	else
+		rc = TPM_disk_unseal(&sealed, sizeof(sealed), src);
 
 	if (rc)
 		return rc;
