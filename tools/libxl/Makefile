@@ -251,12 +251,13 @@ $(LIBXL_OBJS) $(LIBXL_TEST_OBJS) $(LIBXLU_OBJS) \
 $(LIBXL_OBJS) $(LIBXL_TEST_OBJS): libxl_internal.h
 
 _libxl_type%.h _libxl_type%_json.h _libxl_type%_private.h _libxl_type%.c: libxl_type%.idl gentypes.py idl.py
-	$(PYTHON) gentypes.py libxl_type$*.idl __libxl_type$*.h __libxl_type$*_private.h \
-		__libxl_type$*_json.h  __libxl_type$*.c
-	$(call move-if-changed,__libxl_type$*.h,_libxl_type$*.h)
-	$(call move-if-changed,__libxl_type$*_private.h,_libxl_type$*_private.h)
-	$(call move-if-changed,__libxl_type$*_json.h,_libxl_type$*_json.h)
-	$(call move-if-changed,__libxl_type$*.c,_libxl_type$*.c)
+	$(eval stem = $(notdir $*))
+	$(PYTHON) gentypes.py libxl_type$(stem).idl __libxl_type$(stem).h __libxl_type$(stem)_private.h \
+		__libxl_type$(stem)_json.h  __libxl_type$(stem).c
+	$(call move-if-changed,__libxl_type$(stem).h,_libxl_type$(stem).h)
+	$(call move-if-changed,__libxl_type$(stem)_private.h,_libxl_type$(stem)_private.h)
+	$(call move-if-changed,__libxl_type$(stem)_json.h,_libxl_type$(stem)_json.h)
+	$(call move-if-changed,__libxl_type$(stem).c,_libxl_type$(stem).c)
 
 libxenlight.so: libxenlight.so.$(MAJOR)
 	$(SYMLINK_SHLIB) $< $@
