@@ -618,6 +618,12 @@ static void xc_cpuid_pv_policy(xc_interface *xch,
         /* Host topology exposed to PV guest.  Provide host value. */
         bool host_htt = regs[3] & bitmaskof(X86_FEATURE_HTT);
 
+        /*
+         * Don't pick host's Initial APIC ID which can change from run
+         * to run.
+         */
+        regs[1] &= 0x00ffffffu;
+
         regs[2] = info->featureset[featureword_of(X86_FEATURE_SSE3)];
         regs[3] = (info->featureset[featureword_of(X86_FEATURE_FPU)] &
                    ~bitmaskof(X86_FEATURE_HTT));
