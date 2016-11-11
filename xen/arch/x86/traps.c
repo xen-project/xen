@@ -2755,6 +2755,24 @@ static int priv_op_write_msr(unsigned int reg, uint64_t val,
     return X86EMUL_UNHANDLEABLE;
 }
 
+int pv_emul_cpuid(unsigned int *eax, unsigned int *ebx, unsigned int *ecx,
+                  unsigned int *edx, struct x86_emulate_ctxt *ctxt)
+{
+    struct cpu_user_regs regs = *ctxt->regs;
+
+    regs._eax = *eax;
+    regs._ecx = *ecx;
+
+    pv_cpuid(&regs);
+
+    *eax = regs._eax;
+    *ebx = regs._ebx;
+    *ecx = regs._ecx;
+    *edx = regs._edx;
+
+    return X86EMUL_OKAY;
+}
+
 /* Instruction fetch with error handling. */
 #define insn_fetch(type, base, eip, limit)                                  \
 ({  unsigned long _rc, _ptr = (base) + (eip);                               \

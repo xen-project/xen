@@ -1542,7 +1542,7 @@ static int hvmemul_wbinvd(
     return X86EMUL_OKAY;
 }
 
-static int hvmemul_cpuid(
+int hvmemul_cpuid(
     unsigned int *eax,
     unsigned int *ebx,
     unsigned int *ecx,
@@ -1892,11 +1892,13 @@ int hvm_emulate_one_mmio(unsigned long mfn, unsigned long gla)
         .read       = x86emul_unhandleable_rw,
         .insn_fetch = hvmemul_insn_fetch,
         .write      = mmcfg_intercept_write,
+        .cpuid      = hvmemul_cpuid,
     };
     static const struct x86_emulate_ops hvm_ro_emulate_ops_mmio = {
         .read       = x86emul_unhandleable_rw,
         .insn_fetch = hvmemul_insn_fetch,
-        .write      = mmio_ro_emulated_write
+        .write      = mmio_ro_emulated_write,
+        .cpuid      = hvmemul_cpuid,
     };
     struct mmio_ro_emulate_ctxt mmio_ro_ctxt = { .cr2 = gla };
     struct hvm_emulate_ctxt ctxt;
