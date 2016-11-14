@@ -928,6 +928,11 @@ int cpuid_hypervisor_leaves( uint32_t idx, uint32_t sub_idx,
         break;
 
     case 4:
+        if ( !has_hvm_container_domain(currd) )
+        {
+            *eax = *ebx = *ecx = *edx = 0;
+            break;
+        }
         hvm_hypervisor_cpuid_leaf(sub_idx, eax, ebx, ecx, edx);
         break;
 
