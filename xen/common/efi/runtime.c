@@ -59,26 +59,12 @@ unsigned long efi_rs_enter(void)
     static const u16 fcw = FCW_DEFAULT;
     static const u32 mxcsr = MXCSR_DEFAULT;
     unsigned long cr3 = read_cr3();
-#if __GNUC__ < 5 || (__GNUC__ == 5 && __GNUC_MINOR__ < 3)
-/*
- * -mpreferred-stack-boundary=3 is can be used only from gcc 4.8 onwards,
- * and -mincoming-stack-boundary=3 only from 5.3 onwards. Therefore higher
- * than necessary alignment is being forced here in that case.
- */
-# define FORCE_ALIGN 32
-#else
-# define FORCE_ALIGN 16
-#endif
-    unsigned long __aligned(FORCE_ALIGN) placeholder[0];
-#undef FORCE_ALIGN
-
-    asm volatile("" : "+m" (placeholder));
 
     if ( !efi_l4_pgtable )
         return 0;
 
     save_fpu_enable();
-    asm volatile ( "fnclex; fldcw %0" :: "m" (fcw) );
+    asm volatile ( "fldcw %0" :: "m" (fcw) );
     asm volatile ( "ldmxcsr %0" :: "m" (mxcsr) );
 
     spin_lock(&efi_rs_lock);
