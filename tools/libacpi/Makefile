@@ -21,9 +21,10 @@ endif
 
 MK_DSDT = $(ACPI_BUILD_DIR)/mk_dsdt
 
-C_SRC-$(CONFIG_X86) = dsdt_anycpu.c dsdt_15cpu.c dsdt_anycpu_qemu_xen.c
+C_SRC-$(CONFIG_X86) = dsdt_anycpu.c dsdt_15cpu.c dsdt_anycpu_qemu_xen.c dsdt_pvh.c
 C_SRC-$(CONFIG_ARM_64) = dsdt_anycpu_arm.c
-C_SRC = $(addprefix $(ACPI_BUILD_DIR)/, dsdt_pvh.c $(C_SRC-y))
+DSDT_FILES ?= $(C_SRC-y)
+C_SRC = $(addprefix $(ACPI_BUILD_DIR)/, $(DSDT_FILES))
 H_SRC = $(addprefix $(ACPI_BUILD_DIR)/, ssdt_s3.h ssdt_s4.h ssdt_pm.h ssdt_tpm.h)
 
 # Suffix for temporary files.

@@ -76,9 +76,9 @@ LIBXL_OBJS-y += libxl_no_colo.o
 endif
 
 ACPI_PATH  = $(XEN_ROOT)/tools/libacpi
-ACPI_FILES = dsdt_pvh.c
-ACPI_OBJS  = $(patsubst %.c,%.o,$(ACPI_FILES)) build.o static_tables.o
-$(ACPI_FILES): acpi
+DSDT_FILES-$(CONFIG_X86) = dsdt_pvh.c
+ACPI_OBJS  = $(patsubst %.c,%.o,$(DSDT_FILES-y)) build.o static_tables.o
+$(DSDT_FILES-y): acpi
 $(ACPI_OBJS): CFLAGS += -I. -DLIBACPI_STDUTILS=\"$(CURDIR)/libxl_x86_acpi.h\"
 vpath build.c $(ACPI_PATH)/
 vpath static_tables.c $(ACPI_PATH)/
@@ -86,14 +86,15 @@ LIBXL_OBJS-$(CONFIG_X86) += $(ACPI_OBJS)
 
 .PHONY: acpi
 acpi:
-	$(MAKE) -C $(ACPI_PATH) ACPI_BUILD_DIR=$(CURDIR)
+	$(MAKE) -C $(ACPI_PATH) ACPI_BUILD_DIR=$(CURDIR) DSDT_FILES="$(DSDT_FILES-y)"
 
 LIBXL_OBJS-$(CONFIG_X86) += libxl_cpuid.o libxl_x86.o libxl_psr.o libxl_x86_acpi.o
 LIBXL_OBJS-$(CONFIG_ARM) += libxl_nocpuid.o libxl_arm.o libxl_libfdt_compat.o
 ifeq ($(CONFIG_ARM_64),y)
-LIBXL_OBJS-y += libxl_arm_acpi.o dsdt_anycpu_arm.o
+DSDT_FILES-y = dsdt_anycpu_arm.c
+LIBXL_OBJS-y += libxl_arm_acpi.o $(patsubst %.c,%.o,$(DSDT_FILES-y))
 dsdt_anycpu_arm.c:
-	$(MAKE) -C $(ACPI_PATH) ACPI_BUILD_DIR=$(CURDIR)
+	$(MAKE) -C $(ACPI_PATH) ACPI_BUILD_DIR=$(CURDIR) DSDT_FILES="$(DSDT_FILES-y)"
 else
 LIBXL_OBJS-$(CONFIG_ARM) += libxl_arm_no_acpi.o
 endif
