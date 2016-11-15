@@ -8,18 +8,6 @@ Where clause 3 is invoked in order to relicense under the GPL then
 this shall be considered to be GPL v2 only for files which have
 specified LGPL v2.1 only.
 
-gpl sub-directory
-=================
-This directory contains a gpl sub-directory which contains code
-licensed under the GPL v2, because we have not yet been able to get
-the permission to relicense the relevant code to LGPL v2.1. See
-gpl/COPYING for more information.
-
-The makefile in this component allows to build a GPL and LGPL only
-variant of this library, the latter omits all GPL source code.
-
-
-
                   GNU LESSER GENERAL PUBLIC LICENSE
                        Version 2.1, February 1999
 

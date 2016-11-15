@@ -21,7 +21,7 @@ endif
 
 MK_DSDT = $(ACPI_BUILD_DIR)/mk_dsdt
 
-C_SRC-$(GPL) = dsdt_anycpu.c dsdt_15cpu.c dsdt_anycpu_qemu_xen.c
+C_SRC-$(CONFIG_X86) = dsdt_anycpu.c dsdt_15cpu.c dsdt_anycpu_qemu_xen.c
 C_SRC-$(CONFIG_ARM_64) = dsdt_anycpu_arm.c
 C_SRC = $(addprefix $(ACPI_BUILD_DIR)/, dsdt_pvh.c $(C_SRC-y))
 H_SRC = $(addprefix $(ACPI_BUILD_DIR)/, ssdt_s3.h ssdt_s4.h ssdt_pm.h ssdt_tpm.h)
@@ -45,30 +45,20 @@ $(H_SRC): $(ACPI_BUILD_DIR)/%.h: %.asl iasl
 $(MK_DSDT): mk_dsdt.c
 	$(HOSTCC) $(HOSTCFLAGS) $(CFLAGS_xeninclude) -D__XEN_TOOLS__ -o $@ mk_dsdt.c
 
-ifeq ($(GPL),y)
-$(ACPI_BUILD_DIR)/dsdt_anycpu_qemu_xen.asl: dsdt.asl dsdt_acpi_info.asl gpl/mk_dsdt_gpl.sh $(MK_DSDT)
+$(ACPI_BUILD_DIR)/dsdt_anycpu_qemu_xen.asl: dsdt.asl dsdt_acpi_info.asl $(MK_DSDT)
 	# Remove last bracket
-	awk 'NR > 1 {print s} {s=$$0}' $< > $@.1.$(TMP_SUFFIX)
-	# Strip license comment
-	sed '1,/\*\//d' $@.1.$(TMP_SUFFIX) > $@.$(TMP_SUFFIX)
-	rm -f $@.1.$(TMP_SUFFIX)
-	$(SHELL) gpl/mk_dsdt_gpl.sh >> $@.$(TMP_SUFFIX)
+	awk 'NR > 1 {print s} {s=$$0}' $< > $@.$(TMP_SUFFIX)
 	cat dsdt_acpi_info.asl >> $@.$(TMP_SUFFIX)
 	$(MK_DSDT) --debug=$(debug) --dm-version qemu-xen >> $@.$(TMP_SUFFIX)
 	mv -f $@.$(TMP_SUFFIX) $@
 
 # NB. awk invocation is a portable alternative to 'head -n -1'
-$(ACPI_BUILD_DIR)/dsdt_%cpu.asl: dsdt.asl dsdt_acpi_info.asl gpl/mk_dsdt_gpl.sh $(MK_DSDT)
+$(ACPI_BUILD_DIR)/dsdt_%cpu.asl: dsdt.asl dsdt_acpi_info.asl  $(MK_DSDT)
 	# Remove last bracket
-	awk 'NR > 1 {print s} {s=$$0}' $< > $@.1.$(TMP_SUFFIX)
-	# Strip license comment
-	sed '1,/\*\//d' $@.1.$(TMP_SUFFIX) > $@.$(TMP_SUFFIX)
-	rm -f $@.1.$(TMP_SUFFIX)
-	$(SHELL) gpl/mk_dsdt_gpl.sh >> $@.$(TMP_SUFFIX)
+	awk 'NR > 1 {print s} {s=$$0}' $< > $@.$(TMP_SUFFIX)
 	cat dsdt_acpi_info.asl >> $@.$(TMP_SUFFIX)
 	$(MK_DSDT) --debug=$(debug) --maxcpu $*  >> $@.$(TMP_SUFFIX)
 	mv -f $@.$(TMP_SUFFIX) $@
-endif
 
 $(ACPI_BUILD_DIR)/dsdt_pvh.asl: dsdt_acpi_info.asl $(MK_DSDT)
 	printf "DefinitionBlock (\"DSDT.aml\", \"DSDT\", 5, \"Xen\", \"HVM\", 0)\n{" > $@

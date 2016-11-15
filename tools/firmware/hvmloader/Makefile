@@ -63,9 +63,6 @@ ROMBIOS_ROM := $(ROMBIOS_DIR)/BIOS-bochs-latest
 ROMS += $(ROMBIOS_ROM) $(STDVGA_ROM) $(CIRRUSVGA_ROM) $(ETHERBOOT_ROMS)
 endif
 
-# Certain parts of ACPI builder are GPL-only
-export GPL := y
-
 .PHONY: all
 all: acpi subdirs-all
 	$(MAKE) hvmloader

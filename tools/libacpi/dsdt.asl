@@ -442,4 +442,15 @@ DefinitionBlock ("DSDT.aml", "DSDT", 2, "Xen", "HVM", 0)
             }
         }
     }
+    /* _S3 and _S4 are in separate SSDTs */
+    Name (\_S5, Package (0x04) {
+        0x00,  /* PM1a_CNT.SLP_TYP */
+        0x00,  /* PM1b_CNT.SLP_TYP */
+        0x00,  /* reserved */
+        0x00   /* reserved */
+    })
+    Name(PICD, 0)
+    Method(_PIC, 1) {
+        Store(Arg0, PICD)
+    }
 }
