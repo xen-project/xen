@@ -200,12 +200,6 @@ F:     xen/include/efi/
 F:     xen/include/asm-x86/efi*.h
 F:     xen/include/asm-x86/x86_*/efi*.h
 
-EVENT CHANNELS (FIFO-BASED ABI)
-M:	David Vrabel <david.vrabel@citrix.com>
-S:	Supported
-F:	xen/common/event_fifo.c
-F:	xen/include/xen/event_fifo.h
-
 GDBSX DEBUGGER
 M:	Elena Ufimtseva <elena.ufimtseva@oracle.com>
 S:	Supported
@@ -256,7 +250,7 @@ S:	Odd Fixes
 F:	tools/debugger/kdd/
 
 KEXEC
-M:      David Vrabel <david.vrabel@citrix.com>
+M:      Andrew Cooper <andrew.cooper3@citrix.com>
 S:      Supported
 F:      xen/common/{kexec,kimage}.c
 F:      xen/include/{kexec,kimage}.h
