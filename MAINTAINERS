@@ -304,6 +304,11 @@ X:	xen/arch/x86/acpi/lib.c
 F:	xen/drivers/cpufreq/
 F:	xen/include/acpi/cpufreq/
 
+PUBLIC I/O INTERFACES AND PV DRIVERS DESIGNS
+M:  Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+S:  Supported
+F:  xen/include/public/io/
+
 QEMU-DM
 M:	Ian Jackson <ian.jackson@eu.citrix.com>
 S:	Supported
