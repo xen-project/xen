@@ -98,8 +98,8 @@ int __get_instruction_length_from_list(struct vcpu *v,
      */
 #ifdef NDEBUG
     if ( (inst_len = svm_nextrip_insn_length(v)) > MAX_INST_LEN )
-        gprintk(XENLOG_WARNING, "NRip reported insn_len %lu\n", insn_len);
-    else if ( insn_len != 0 )
+        gprintk(XENLOG_WARNING, "NRip reported inst_len %lu\n", inst_len);
+    else if ( inst_len != 0 )
         return inst_len;
 
     if ( vmcb->exitcode == VMEXIT_IOIO )
