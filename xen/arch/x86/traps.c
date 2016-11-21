@@ -1133,6 +1133,7 @@ void pv_cpuid(struct cpu_user_regs *regs)
                   special_features[FEATURESET_7b0]);
 
             c &= pv_featureset[FEATURESET_7c0];
+            d &= pv_featureset[FEATURESET_7d0];
 
             if ( !is_pvh_domain(currd) )
             {
@@ -1147,8 +1148,8 @@ void pv_cpuid(struct cpu_user_regs *regs)
             }
         }
         else
-            b = c = 0;
-        a = d = 0;
+            b = c = d = 0;
+        a = 0;
         break;
 
     case XSTATE_CPUID:

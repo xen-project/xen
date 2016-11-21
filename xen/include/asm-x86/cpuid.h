@@ -17,6 +17,7 @@
 #define FEATURESET_7c0    6 /* 0x00000007:0.ecx    */
 #define FEATURESET_e7d    7 /* 0x80000007.edx      */
 #define FEATURESET_e8b    8 /* 0x80000008.ebx      */
+#define FEATURESET_7d0    9 /* 0x00000007:0.edx    */
 
 #ifndef __ASSEMBLY__
 #include <xen/types.h>

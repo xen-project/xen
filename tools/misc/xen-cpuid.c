@@ -143,6 +143,15 @@ static const char *str_e8b[32] =
     [1 ... 31] = "REZ",
 };
 
+static const char *str_7d0[32] =
+{
+    [0 ... 1] = "REZ",
+
+    [ 2] = "avx512_4vnniw", [ 3] = "avx512_4fmaps",
+
+    [4 ... 31] = "REZ",
+};
+
 static struct {
     const char *name;
     const char *abbr;
@@ -158,6 +167,7 @@ static struct {
     { "0x00000007:0.ecx", "7c0", str_7c0 },
     { "0x80000007.edx",   "e7d", str_e7d },
     { "0x80000008.ebx",   "e8b", str_e8b },
+    { "0x00000007:0.edx", "7d0", str_7d0 },
 };
 
 #define COL_ALIGN "18"

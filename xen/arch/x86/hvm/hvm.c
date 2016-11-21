@@ -3525,6 +3525,7 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
                      special_features[FEATURESET_7b0]);
 
             *ecx &= hvm_featureset[FEATURESET_7c0];
+            *edx &= hvm_featureset[FEATURESET_7d0];
 
             /* Don't expose HAP-only features to non-hap guests. */
             if ( !hap_enabled(d) )

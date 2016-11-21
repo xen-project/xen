@@ -78,7 +78,7 @@ static void __init calculate_raw_featureset(void)
         cpuid_count(0x7, 0, &tmp,
                     &raw_featureset[FEATURESET_7b0],
                     &raw_featureset[FEATURESET_7c0],
-                    &tmp);
+                    &raw_featureset[FEATURESET_7d0]);
     if ( max >= 0xd )
         cpuid_count(0xd, 1,
                     &raw_featureset[FEATURESET_Da1],

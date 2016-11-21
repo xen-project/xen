@@ -325,7 +325,7 @@ static void generic_identify(struct cpuinfo_x86 *c)
 		cpuid_count(0x00000007, 0, &tmp,
 			    &c->x86_capability[cpufeat_word(X86_FEATURE_FSGSBASE)],
 			    &c->x86_capability[cpufeat_word(X86_FEATURE_PKU)],
-			    &tmp);
+			    &c->x86_capability[cpufeat_word(X86_FEATURE_AVX512_4VNNIW)]);
 }
 
 /*
