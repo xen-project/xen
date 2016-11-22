@@ -1975,6 +1975,12 @@ x86_emulate(
         else
         {
             /*
+             * Instructions such as bt can reference an arbitrary offset from
+             * their memory operand, but the instruction doing the actual
+             * emulation needs the appropriate op_bytes read from memory.
+             * Adjust both the source register and memory operand to make an
+             * equivalent instruction.
+             *
              * EA       += BitOffset DIV op_bytes*8
              * BitOffset = BitOffset MOD op_bytes*8
              * DIV truncates towards negative infinity.
@@ -1986,14 +1992,15 @@ x86_emulate(
                 src.val = (int32_t)src.val;
             if ( (long)src.val < 0 )
             {
-                unsigned long byte_offset;
-                byte_offset = op_bytes + (((-src.val-1) >> 3) & ~(op_bytes-1));
+                unsigned long byte_offset =
+                    op_bytes + (((-src.val - 1) >> 3) & ~(op_bytes - 1L));
+
                 ea.mem.off -= byte_offset;
                 src.val = (byte_offset << 3) + src.val;
             }
             else
             {
-                ea.mem.off += (src.val >> 3) & ~(op_bytes - 1);
+                ea.mem.off += (src.val >> 3) & ~(op_bytes - 1L);
                 src.val &= (op_bytes << 3) - 1;
             }
         }
