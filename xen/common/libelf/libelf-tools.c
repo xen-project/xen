@@ -59,8 +59,7 @@ bool elf_access_ok(struct elf_binary * elf,
         return 1;
     if ( elf_ptrval_in_range(ptrval, size, elf->dest_base, elf->dest_size) )
         return 1;
-    if ( elf_ptrval_in_range(ptrval, size,
-                             elf->caller_xdest_base, elf->caller_xdest_size) )
+    if ( elf_ptrval_in_range(ptrval, size, elf->xdest_base, elf->xdest_size) )
         return 1;
     elf_mark_broken(elf, "out of range access");
     return 0;
@@ -371,6 +370,14 @@ bool elf_phdr_is_loadable(struct elf_binary *elf, ELF_HANDLE_DECL(elf_phdr) phdr
     uint64_t p_flags = elf_uval(elf, phdr, p_flags);
 
     return ((p_type == PT_LOAD) && (p_flags & (PF_R | PF_W | PF_X)) != 0);
+}
+
+void elf_set_xdest(struct elf_binary *elf, void *addr, uint64_t size)
+{
+    elf->xdest_base = addr;
+    elf->xdest_size = size;
+    if ( addr != NULL )
+        elf_memset_safe(elf, ELF_REALPTR2PTRVAL(addr), 0, size);
 }
 
 /*

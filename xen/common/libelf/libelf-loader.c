@@ -43,8 +43,6 @@ elf_errorstatus elf_init(struct elf_binary *elf, const char *image_input, size_t
     elf->ehdr = ELF_MAKE_HANDLE(elf_ehdr, (elf_ptrval)image_input);
     elf->class = elf_uval_3264(elf, elf->ehdr, e32.e_ident[EI_CLASS]);
     elf->data = elf_uval_3264(elf, elf->ehdr, e32.e_ident[EI_DATA]);
-    elf->caller_xdest_base = NULL;
-    elf->caller_xdest_size = 0;
 
     /* Sanity check phdr. */
     offset = elf_uval(elf, elf->ehdr, e_phoff) +
@@ -284,9 +282,8 @@ do {                                                                \
 #define SYMTAB_INDEX    1
 #define STRTAB_INDEX    2
 
-    /* Allow elf_memcpy_safe to write to symbol_header. */
-    elf->caller_xdest_base = &header;
-    elf->caller_xdest_size = sizeof(header);
+    /* Allow elf_memcpy_safe to write to header. */
+    elf_set_xdest(elf, &header, sizeof(header));
 
     /*
      * Calculate the position of the various elements in GUEST MEMORY SPACE.
@@ -319,11 +316,7 @@ do {                                                                \
     elf_store_field_bitness(elf, header_handle, e_phentsize, 0);
     elf_store_field_bitness(elf, header_handle, e_phnum, 0);
 
-    /* Zero the undefined section. */
-    section_handle = ELF_MAKE_HANDLE(elf_shdr,
-                     ELF_REALPTR2PTRVAL(&header.elf_header.section[SHN_UNDEF]));
     shdr_size = elf_uval(elf, elf->ehdr, e_shentsize);
-    elf_memset_safe(elf, ELF_HANDLE_PTRVAL(section_handle), 0, shdr_size);
 
     /*
      * The symtab section header is going to reside in section[SYMTAB_INDEX],
@@ -404,8 +397,7 @@ do {                                                                \
     }
 
     /* Remove permissions from elf_memcpy_safe. */
-    elf->caller_xdest_base = NULL;
-    elf->caller_xdest_size = 0;
+    elf_set_xdest(elf, NULL, 0);
 
 #undef SYMTAB_INDEX
 #undef STRTAB_INDEX

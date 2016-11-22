@@ -202,13 +202,11 @@ struct elf_binary {
     uint64_t bsd_symtab_pend;
 
     /*
-     * caller's other acceptable destination
-     *
-     * Again, these are trusted and must be valid (or 0) so long
-     * as the struct elf_binary is in use.
+     * caller's other acceptable destination.
+     * Set by elf_set_xdest.  Do not set these directly.
      */
-    void *caller_xdest_base;
-    uint64_t caller_xdest_size;
+    void *xdest_base;
+    uint64_t xdest_size;
 
 #ifndef __XEN__
     /* misc */
@@ -485,5 +483,10 @@ static inline void ELF_ADVANCE_DEST(struct elf_binary *elf, uint64_t amount)
     }
 }
 
+/* Specify a (single) additional destination, to which the image may
+ * cause writes.  As with dest_base and dest_size, the values provided
+ * are trusted and must be valid so long as the struct elf_binary
+ * is in use or until elf_set_xdest(,0,0) is called. */
+void elf_set_xdest(struct elf_binary *elf, void *addr, uint64_t size);
 
 #endif /* __XEN_LIBELF_H__ */
