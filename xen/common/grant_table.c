@@ -3438,6 +3438,53 @@ void grant_table_init_vcpu(struct vcpu *v)
     v->maptrack_tail = MAPTRACK_TAIL;
 }
 
+#ifdef CONFIG_HAS_MEM_SHARING
+int mem_sharing_gref_to_gfn(struct grant_table *gt, grant_ref_t ref,
+                            gfn_t *gfn, uint16_t *status)
+{
+    int rc = 0;
+    uint16_t flags = 0;
+
+    grant_read_lock(gt);
+
+    if ( gt->gt_version < 1 )
+        rc = -EINVAL;
+    else if ( ref >= nr_grant_entries(gt) )
+        rc = -ENOENT;
+    else if ( gt->gt_version == 1 )
+    {
+        const grant_entry_v1_t *sha1 = &shared_entry_v1(gt, ref);
+
+        flags = sha1->flags;
+        *gfn = _gfn(sha1->frame);
+    }
+    else
+    {
+        const grant_entry_v2_t *sha2 = &shared_entry_v2(gt, ref);
+
+        flags = sha2->hdr.flags;
+        if ( flags & GTF_sub_page )
+           *gfn = _gfn(sha2->sub_page.frame);
+        else
+           *gfn = _gfn(sha2->full_page.frame);
+    }
+
+    if ( !rc && (flags & GTF_type_mask) != GTF_permit_access )
+        rc = -ENXIO;
+    else if ( !rc && status )
+    {
+        if ( gt->gt_version == 1 )
+            *status = flags;
+        else
+            *status = status_entry(gt, ref);
+    }
+
+    grant_read_unlock(gt);
+
+    return rc;
+}
+#endif
+
 static void gnttab_usage_print(struct domain *rd)
 {
     int first = 1;

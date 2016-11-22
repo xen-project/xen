@@ -149,4 +149,7 @@ static inline unsigned int grant_to_status_frames(int grant_frames)
         GRANT_STATUS_PER_PAGE;
 }
 
+int mem_sharing_gref_to_gfn(struct grant_table *gt, grant_ref_t ref,
+                            gfn_t *gfn, uint16_t *status);
+
 #endif /* __XEN_GRANT_TABLE_H__ */

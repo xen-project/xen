@@ -753,75 +753,25 @@ int mem_sharing_debug_gfn(struct domain *d, unsigned long gfn)
     return num_refs;
 }
 
-#define SHGNT_PER_PAGE_V1 (PAGE_SIZE / sizeof(grant_entry_v1_t))
-#define shared_entry_v1(t, e) \
-    ((t)->shared_v1[(e)/SHGNT_PER_PAGE_V1][(e)%SHGNT_PER_PAGE_V1])
-#define SHGNT_PER_PAGE_V2 (PAGE_SIZE / sizeof(grant_entry_v2_t))
-#define shared_entry_v2(t, e) \
-    ((t)->shared_v2[(e)/SHGNT_PER_PAGE_V2][(e)%SHGNT_PER_PAGE_V2])
-#define STGNT_PER_PAGE (PAGE_SIZE / sizeof(grant_status_t))
-#define status_entry(t, e) \
-    ((t)->status[(e)/STGNT_PER_PAGE][(e)%STGNT_PER_PAGE])
-
-static grant_entry_header_t *
-shared_entry_header(struct grant_table *t, grant_ref_t ref)
-{
-    ASSERT (t->gt_version != 0);
-    if ( t->gt_version == 1 )
-        return (grant_entry_header_t*)&shared_entry_v1(t, ref);
-    else
-        return &shared_entry_v2(t, ref).hdr;
-}
-
-static int mem_sharing_gref_to_gfn(struct domain *d, 
-                                   grant_ref_t ref, 
-                                   unsigned long *gfn)
-{
-    if ( d->grant_table->gt_version < 1 )
-        return -1;
-
-    if ( d->grant_table->gt_version == 1 ) 
-    {
-        grant_entry_v1_t *sha1;
-        sha1 = &shared_entry_v1(d->grant_table, ref);
-        *gfn = sha1->frame;
-    } 
-    else 
-    {
-        grant_entry_v2_t *sha2;
-        sha2 = &shared_entry_v2(d->grant_table, ref);
-        *gfn = sha2->full_page.frame;
-    }
- 
-    return 0;
-}
-
-
 int mem_sharing_debug_gref(struct domain *d, grant_ref_t ref)
 {
-    grant_entry_header_t *shah;
+    int rc;
     uint16_t status;
-    unsigned long gfn;
+    gfn_t gfn;
 
-    if ( d->grant_table->gt_version < 1 )
+    rc = mem_sharing_gref_to_gfn(d->grant_table, ref, &gfn, &status);
+    if ( rc )
     {
-        MEM_SHARING_DEBUG( 
-                "Asked to debug [dom=%d,gref=%d], but not yet inited.\n",
-                d->domain_id, ref);
-        return -EINVAL;
+        MEM_SHARING_DEBUG("Asked to debug [dom=%d,gref=%u]: error %d.\n",
+                          d->domain_id, ref, rc);
+        return rc;
     }
-    (void)mem_sharing_gref_to_gfn(d, ref, &gfn); 
-    shah = shared_entry_header(d->grant_table, ref);
-    if ( d->grant_table->gt_version == 1 ) 
-        status = shah->flags;
-    else 
-        status = status_entry(d->grant_table, ref);
     
     MEM_SHARING_DEBUG(
             "==> Grant [dom=%d,ref=%d], status=%x. ", 
             d->domain_id, ref, status);
 
-    return mem_sharing_debug_gfn(d, gfn); 
+    return mem_sharing_debug_gfn(d, gfn_x(gfn));
 }
 
 int mem_sharing_nominate_page(struct domain *d,
@@ -1422,23 +1372,24 @@ int mem_sharing_memop(XEN_GUEST_HANDLE_PARAM(xen_mem_sharing_op_t) arg)
         case XENMEM_sharing_op_nominate_gref:
         {
             grant_ref_t gref = mso.u.nominate.u.grant_ref;
-            unsigned long gfn;
+            gfn_t gfn;
             shr_handle_t handle;
 
             rc = -EINVAL;
             if ( !mem_sharing_enabled(d) )
                 goto out;
-            if ( mem_sharing_gref_to_gfn(d, gref, &gfn) < 0 )
+            rc = mem_sharing_gref_to_gfn(d->grant_table, gref, &gfn, NULL);
+            if ( rc < 0 )
                 goto out;
 
-            rc = mem_sharing_nominate_page(d, gfn, 3, &handle);
+            rc = mem_sharing_nominate_page(d, gfn_x(gfn), 3, &handle);
             mso.u.nominate.handle = handle;
         }
         break;
 
         case XENMEM_sharing_op_share:
         {
-            unsigned long sgfn, cgfn;
+            gfn_t sgfn, cgfn;
             struct domain *cd;
             shr_handle_t sh, ch;
 
@@ -1470,35 +1421,38 @@ int mem_sharing_memop(XEN_GUEST_HANDLE_PARAM(xen_mem_sharing_op_t) arg)
                 grant_ref_t gref = (grant_ref_t) 
                                     (XENMEM_SHARING_OP_FIELD_GET_GREF(
                                         mso.u.share.source_gfn));
-                if ( mem_sharing_gref_to_gfn(d, gref, &sgfn) < 0 )
+                rc = mem_sharing_gref_to_gfn(d->grant_table, gref, &sgfn,
+                                             NULL);
+                if ( rc < 0 )
                 {
                     rcu_unlock_domain(cd);
-                    rc = -EINVAL;
                     goto out;
                 }
-            } else {
-                sgfn  = mso.u.share.source_gfn;
             }
+            else
+                sgfn = _gfn(mso.u.share.source_gfn);
 
             if ( XENMEM_SHARING_OP_FIELD_IS_GREF(mso.u.share.client_gfn) )
             {
                 grant_ref_t gref = (grant_ref_t) 
                                     (XENMEM_SHARING_OP_FIELD_GET_GREF(
                                         mso.u.share.client_gfn));
-                if ( mem_sharing_gref_to_gfn(cd, gref, &cgfn) < 0 )
+                rc = mem_sharing_gref_to_gfn(cd->grant_table, gref, &cgfn,
+                                             NULL);
+                if ( rc < 0 )
                 {
                     rcu_unlock_domain(cd);
-                    rc = -EINVAL;
                     goto out;
                 }
-            } else {
-                cgfn  = mso.u.share.client_gfn;
             }
+            else
+                cgfn = _gfn(mso.u.share.client_gfn);
 
             sh = mso.u.share.source_handle;
             ch = mso.u.share.client_handle;
 
-            rc = mem_sharing_share_pages(d, sgfn, sh, cd, cgfn, ch); 
+            rc = mem_sharing_share_pages(d, gfn_x(sgfn), sh,
+                                         cd, gfn_x(cgfn), ch);
 
             rcu_unlock_domain(cd);
         }
