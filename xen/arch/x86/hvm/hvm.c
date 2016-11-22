@@ -2512,6 +2512,10 @@ bool_t hvm_virtual_to_linear_addr(
          */
         addr = (uint32_t)(addr + reg->base);
 
+        /* Segment not valid for use (cooked meaning of .p)? */
+        if ( !reg->attr.fields.p )
+            goto out;
+
         switch ( access_type )
         {
         case hvm_access_read:
@@ -2766,6 +2770,10 @@ static int hvm_load_segment_selector(
     hvm_get_segment_register(v, x86_seg_cs, &cs);
     hvm_get_segment_register(
         v, (sel & 4) ? x86_seg_ldtr : x86_seg_gdtr, &desctab);
+
+    /* Segment not valid for use (cooked meaning of .p)? */
+    if ( !desctab.attr.fields.p )
+        goto fail;
 
     /* Check against descriptor table limit. */
     if ( ((sel & 0xfff8) + 7) > desctab.limit )
