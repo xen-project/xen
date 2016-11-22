@@ -1006,7 +1006,12 @@ runq_tickle(const struct scheduler *ops, struct csched2_vcpu *new, s_time_t now)
 
         cur = CSCHED2_VCPU(curr_on_cpu(i));
 
-        ASSERT(!is_idle_vcpu(cur->vcpu));
+        /*
+         * Even if the cpu is not in rqd->idle, it may be running the
+         * idle vcpu, if it's doing tasklet work. Just skip it.
+         */
+        if ( is_idle_vcpu(cur->vcpu) )
+            continue;
 
         /* Update credits for current to see if we want to preempt. */
         burn_credits(rqd, cur, now);
@@ -1042,6 +1047,7 @@ runq_tickle(const struct scheduler *ops, struct csched2_vcpu *new, s_time_t now)
         return;
     }
 
+    ASSERT(!is_idle_vcpu(curr_on_cpu(ipid)));
     SCHED_STAT_CRANK(tickled_busy_cpu);
  tickle:
     BUG_ON(ipid == -1);
