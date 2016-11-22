@@ -48,6 +48,10 @@ void svm_vmcb_dump(const char *from, struct vmcb_struct *vmcb)
            vmcb->tlb_control,
            (unsigned long long)vmcb->_vintr.bytes,
            (unsigned long long)vmcb->interrupt_shadow);
+    printk("eventinj %016"PRIx64", valid? %d, ec? %d, type %u, vector %#x\n",
+           vmcb->eventinj.bytes, vmcb->eventinj.fields.v,
+           vmcb->eventinj.fields.ev, vmcb->eventinj.fields.type,
+           vmcb->eventinj.fields.vector);
     printk("exitcode = %#Lx exitintinfo = %#Lx\n",
            (unsigned long long)vmcb->exitcode,
            (unsigned long long)vmcb->exitintinfo.bytes);
