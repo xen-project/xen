@@ -1229,17 +1229,14 @@ static void svm_inject_trap(struct hvm_trap *trap)
     {
     case X86_EVENTTYPE_SW_INTERRUPT: /* int $n */
         /*
-         * Injection type 4 (software interrupt) is only supported with
-         * NextRIP support.  Without NextRIP, the emulator will have performed
-         * DPL and presence checks for us.
+         * Software interrupts (type 4) cannot be properly injected if the
+         * processor doesn't support NextRIP.  Without NextRIP, the emulator
+         * will have performed DPL and presence checks for us, and will have
+         * moved eip forward if appropriate.
          */
         if ( cpu_has_svm_nrips )
-        {
             vmcb->nextrip = regs->eip + _trap.insn_len;
-            event.fields.type = X86_EVENTTYPE_SW_INTERRUPT;
-        }
-        else
-            event.fields.type = X86_EVENTTYPE_HW_EXCEPTION;
+        event.fields.type = X86_EVENTTYPE_SW_INTERRUPT;
         break;
 
     case X86_EVENTTYPE_PRI_SW_EXCEPTION: /* icebp */
