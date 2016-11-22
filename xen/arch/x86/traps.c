@@ -2439,19 +2439,19 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         switch ( (u32)regs->ecx )
         {
         case MSR_FS_BASE:
-            if ( is_pv_32on64_vcpu(v) )
+            if ( is_pv_32on64_vcpu(v) || !is_canonical_address(msr_content) )
                 goto fail;
             wrfsbase(msr_content);
             v->arch.pv_vcpu.fs_base = msr_content;
             break;
         case MSR_GS_BASE:
-            if ( is_pv_32on64_vcpu(v) )
+            if ( is_pv_32on64_vcpu(v) || !is_canonical_address(msr_content) )
                 goto fail;
             wrgsbase(msr_content);
             v->arch.pv_vcpu.gs_base_kernel = msr_content;
             break;
         case MSR_SHADOW_GS_BASE:
-            if ( is_pv_32on64_vcpu(v) )
+            if ( is_pv_32on64_vcpu(v) || !is_canonical_address(msr_content) )
                 goto fail;
             if ( wrmsr_safe(MSR_SHADOW_GS_BASE, msr_content) )
                 goto fail;
