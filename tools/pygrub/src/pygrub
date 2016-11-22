@@ -721,14 +721,17 @@ def sniff_netware(fs, cfg):
     return cfg
 
 def format_sxp(kernel, ramdisk, args):
-    s = "linux (kernel %s)" % kernel
+    s = "linux (kernel %s)" % repr(kernel)
     if ramdisk:
-        s += "(ramdisk %s)" % ramdisk
+        s += "(ramdisk %s)" % repr(ramdisk)
     if args:
-        s += "(args \"%s\")" % args
+        s += "(args %s)" % repr(args)
     return s
                 
 def format_simple(kernel, ramdisk, args, sep):
+    for check in (kernel, ramdisk, args):
+        if check is not None and sep in check:
+            raise RuntimeError, "simple format cannot represent delimiter-containing value"
     s = ("kernel %s" % kernel) + sep
     if ramdisk:
         s += ("ramdisk %s" % ramdisk) + sep
