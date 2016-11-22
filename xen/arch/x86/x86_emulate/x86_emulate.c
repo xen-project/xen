@@ -1486,10 +1486,16 @@ static int inject_swint(enum x86_swint_type type,
     {
         if ( !in_realmode(ctxt, ops) )
         {
-            unsigned int idte_size = (ctxt->addr_size == 64) ? 16 : 8;
-            unsigned int idte_offset = vector * idte_size;
+            unsigned int idte_size, idte_offset;
             struct segment_register idtr;
             uint32_t idte_ctl;
+            int lm = in_longmode(ctxt, ops);
+
+            if ( lm < 0 )
+                return X86EMUL_UNHANDLEABLE;
+
+            idte_size = lm ? 16 : 8;
+            idte_offset = vector * idte_size;
 
             /* icebp sets the External Event bit despite being an instruction. */
             error_code = (vector << 3) | ECODE_IDT |
@@ -1517,8 +1523,9 @@ static int inject_swint(enum x86_swint_type type,
              * Should strictly speaking read all 8/16 bytes of an entry,
              * but we currently only care about the dpl and present bits.
              */
-            ops->read(x86_seg_none, idtr.base + idte_offset + 4,
-                      &idte_ctl, sizeof(idte_ctl), ctxt);
+            if ( (rc = ops->read(x86_seg_none, idtr.base + idte_offset + 4,
+                                 &idte_ctl, sizeof(idte_ctl), ctxt)) )
+                goto done;
 
             /* Is this entry present? */
             if ( !(idte_ctl & (1u << 15)) )
