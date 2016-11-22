@@ -897,7 +897,13 @@ int arch_set_info_guest(
     {
         if ( !compat )
         {
-            if ( !is_canonical_address(c.nat->user_regs.eip) ||
+            if ( !is_canonical_address(c.nat->user_regs.rip) ||
+                 !is_canonical_address(c.nat->user_regs.rsp) ||
+                 !is_canonical_address(c.nat->kernel_sp) ||
+                 (c.nat->ldt_ents && !is_canonical_address(c.nat->ldt_base)) ||
+                 !is_canonical_address(c.nat->fs_base) ||
+                 !is_canonical_address(c.nat->gs_base_kernel) ||
+                 !is_canonical_address(c.nat->gs_base_user) ||
                  !is_canonical_address(c.nat->event_callback_eip) ||
                  !is_canonical_address(c.nat->syscall_callback_eip) ||
                  !is_canonical_address(c.nat->failsafe_callback_eip) )
