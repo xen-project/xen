@@ -770,10 +770,12 @@ void vmx_get_segment_register(struct vcpu *v, enum x86_segment seg,
     reg->sel = sel;
     reg->limit = limit;
 
-    reg->attr.bytes = (attr & 0xff) | ((attr >> 4) & 0xf00);
-    /* Unusable flag is folded into Present flag. */
-    if ( attr & (1u<<16) )
-        reg->attr.fields.p = 0;
+    /*
+     * Fold VT-x representation into Xen's representation.  The Present bit is
+     * unconditionally set to the inverse of unusable.
+     */
+    reg->attr.bytes =
+        (!(attr & (1u << 16)) << 7) | (attr & 0x7f) | ((attr >> 4) & 0xf00);
 
     /* Adjust for virtual 8086 mode */
     if ( v->arch.hvm_vmx.vmx_realmode && seg <= x86_seg_tr 
@@ -853,11 +855,11 @@ static void vmx_set_segment_register(struct vcpu *v, enum x86_segment seg,
         }
     }
 
-    attr = ((attr & 0xf00) << 4) | (attr & 0xff);
-
-    /* Not-present must mean unusable. */
-    if ( !reg->attr.fields.p )
-        attr |= (1u << 16);
+    /*
+     * Unfold Xen representation into VT-x representation.  The unusable bit
+     * is unconditionally set to the inverse of present.
+     */
+    attr = (!(attr & (1u << 7)) << 16) | ((attr & 0xf00) << 4) | (attr & 0xff);
 
     /* VMX has strict consistency requirement for flag G. */
     attr |= !!(limit >> 20) << 15;

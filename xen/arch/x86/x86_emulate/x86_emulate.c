@@ -1185,6 +1185,10 @@ protmode_load_seg(
                                  &desctab, ctxt)) )
         return rc;
 
+    /* Segment not valid for use (cooked meaning of .p)? */
+    if ( !desctab.attr.fields.p )
+        goto raise_exn;
+
     /* Check against descriptor table limit. */
     if ( ((sel & 0xfff8) + 7) > desctab.limit )
         goto raise_exn;

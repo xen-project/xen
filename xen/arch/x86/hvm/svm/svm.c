@@ -522,6 +522,7 @@ static void svm_get_segment_register(struct vcpu *v, enum x86_segment seg,
     {
     case x86_seg_cs:
         memcpy(reg, &vmcb->cs, sizeof(*reg));
+        reg->attr.fields.p = 1;
         reg->attr.fields.g = reg->limit > 0xFFFFF;
         break;
     case x86_seg_ds:
@@ -555,13 +556,16 @@ static void svm_get_segment_register(struct vcpu *v, enum x86_segment seg,
     case x86_seg_tr:
         svm_sync_vmcb(v);
         memcpy(reg, &vmcb->tr, sizeof(*reg));
+        reg->attr.fields.p = 1;
         reg->attr.fields.type |= 0x2;
         break;
     case x86_seg_gdtr:
         memcpy(reg, &vmcb->gdtr, sizeof(*reg));
+        reg->attr.bytes = 0x80;
         break;
     case x86_seg_idtr:
         memcpy(reg, &vmcb->idtr, sizeof(*reg));
+        reg->attr.bytes = 0x80;
         break;
     case x86_seg_ldtr:
         svm_sync_vmcb(v);
