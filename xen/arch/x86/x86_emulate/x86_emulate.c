@@ -1296,10 +1296,10 @@ in_longmode(
 {
     uint64_t efer;
 
-    if (ops->read_msr == NULL)
+    if ( !ops->read_msr ||
+         unlikely(ops->read_msr(MSR_EFER, &efer, ctxt) != X86EMUL_OKAY) )
         return -1;
 
-    ops->read_msr(MSR_EFER, &efer, ctxt);
     return !!(efer & EFER_LMA);
 }
 
