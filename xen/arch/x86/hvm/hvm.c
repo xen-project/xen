@@ -2952,7 +2952,6 @@ void hvm_task_switch(
     if ( taskswitch_reason == TSW_iret )
         eflags &= ~X86_EFLAGS_NT;
 
-    tss.cr3    = v->arch.hvm_vcpu.guest_cr[3];
     tss.eip    = regs->eip;
     tss.eflags = eflags;
     tss.eax    = regs->eax;
@@ -2979,8 +2978,11 @@ void hvm_task_switch(
     hvm_get_segment_register(v, x86_seg_ldtr, &segr);
     tss.ldt = segr.sel;
 
-    rc = hvm_copy_to_guest_virt(
-        prev_tr.base, &tss, sizeof(tss), PFEC_page_present);
+    rc = hvm_copy_to_guest_virt(prev_tr.base + offsetof(typeof(tss), eip),
+                                &tss.eip,
+                                offsetof(typeof(tss), trace) -
+                                offsetof(typeof(tss), eip),
+                                PFEC_page_present);
     if ( rc != HVMCOPY_okay )
         goto out;
 
