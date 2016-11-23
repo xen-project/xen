@@ -410,6 +410,23 @@ struct cpu_user_regs;
 
 struct x86_emulate_ctxt
 {
+    /*
+     * Input-only state:
+     */
+
+    /* Software event injection support. */
+    enum x86_swint_emulation swint_emulate;
+
+    /* Set this if writes may have side effects. */
+    bool force_writeback;
+
+    /* Caller data that can be used by x86_emulate_ops' routines. */
+    void *data;
+
+    /*
+     * Input/output state:
+     */
+
     /* Register state before/after emulation. */
     struct cpu_user_regs *regs;
 
@@ -419,14 +436,12 @@ struct x86_emulate_ctxt
     /* Stack pointer width in bits (16, 32 or 64). */
     unsigned int sp_size;
 
-    /* Canonical opcode (see below). */
+    /*
+     * Output-only state:
+     */
+
+    /* Canonical opcode (see below) (valid only on X86EMUL_OKAY). */
     unsigned int opcode;
-
-    /* Software event injection support. */
-    enum x86_swint_emulation swint_emulate;
-
-    /* Set this if writes may have side effects. */
-    uint8_t force_writeback;
 
     /* Retirement state, set by the emulator (valid only on X86EMUL_OKAY). */
     union {
@@ -437,9 +452,6 @@ struct x86_emulate_ctxt
         } flags;
         uint8_t byte;
     } retire;
-
-    /* Caller data that can be used by x86_emulate_ops' routines. */
-    void *data;
 };
 
 /*

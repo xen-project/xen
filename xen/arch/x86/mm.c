@@ -5337,7 +5337,14 @@ int ptwr_do_page_fault(struct vcpu *v, unsigned long addr,
     struct domain *d = v->domain;
     struct page_info *page;
     l1_pgentry_t      pte;
-    struct ptwr_emulate_ctxt ptwr_ctxt;
+    struct ptwr_emulate_ctxt ptwr_ctxt = {
+        .ctxt = {
+            .regs = regs,
+            .addr_size = is_pv_32bit_domain(d) ? 32 : BITS_PER_LONG,
+            .sp_size   = is_pv_32bit_domain(d) ? 32 : BITS_PER_LONG,
+            .swint_emulate = x86_swint_emulate_none,
+        },
+    };
     int rc;
 
     /* Attempt to read the PTE that maps the VA being accessed. */
@@ -5363,11 +5370,6 @@ int ptwr_do_page_fault(struct vcpu *v, unsigned long addr,
         goto bail;
     }
 
-    ptwr_ctxt.ctxt.regs = regs;
-    ptwr_ctxt.ctxt.force_writeback = 0;
-    ptwr_ctxt.ctxt.addr_size = ptwr_ctxt.ctxt.sp_size =
-        is_pv_32bit_domain(d) ? 32 : BITS_PER_LONG;
-    ptwr_ctxt.ctxt.swint_emulate = x86_swint_emulate_none;
     ptwr_ctxt.cr2 = addr;
     ptwr_ctxt.pte = pte;
 

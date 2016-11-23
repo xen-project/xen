@@ -1904,6 +1904,7 @@ x86_decode(
     state->regs = ctxt->regs;
     state->eip = ctxt->regs->eip;
 
+    /* Initialise output state in x86_emulate_ctxt */
     ctxt->retire.byte = 0;
 
     op_bytes = def_op_bytes = ad_bytes = def_ad_bytes = ctxt->addr_size/8;

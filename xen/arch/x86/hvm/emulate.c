@@ -1770,13 +1770,6 @@ static int _hvm_emulate_one(struct hvm_emulate_ctxt *hvmemul_ctxt,
 
     vio->mmio_retry = 0;
 
-    if ( cpu_has_vmx )
-        hvmemul_ctxt->ctxt.swint_emulate = x86_swint_emulate_none;
-    else if ( cpu_has_svm_nrips )
-        hvmemul_ctxt->ctxt.swint_emulate = x86_swint_emulate_icebp;
-    else
-        hvmemul_ctxt->ctxt.swint_emulate = x86_swint_emulate_all;
-
     rc = x86_emulate(&hvmemul_ctxt->ctxt, ops);
 
     if ( rc == X86EMUL_OKAY && vio->mmio_retry )
@@ -1947,14 +1940,23 @@ void hvm_emulate_init_once(
     struct hvm_emulate_ctxt *hvmemul_ctxt,
     struct cpu_user_regs *regs)
 {
-    hvmemul_ctxt->intr_shadow = hvm_funcs.get_interrupt_shadow(current);
-    hvmemul_ctxt->ctxt.regs = regs;
-    hvmemul_ctxt->ctxt.force_writeback = 1;
-    hvmemul_ctxt->seg_reg_accessed = 0;
-    hvmemul_ctxt->seg_reg_dirty = 0;
-    hvmemul_ctxt->set_context = 0;
+    struct vcpu *curr = current;
+
+    memset(hvmemul_ctxt, 0, sizeof(*hvmemul_ctxt));
+
+    hvmemul_ctxt->intr_shadow = hvm_funcs.get_interrupt_shadow(curr);
     hvmemul_get_seg_reg(x86_seg_cs, hvmemul_ctxt);
     hvmemul_get_seg_reg(x86_seg_ss, hvmemul_ctxt);
+
+    hvmemul_ctxt->ctxt.regs = regs;
+    hvmemul_ctxt->ctxt.force_writeback = true;
+
+    if ( cpu_has_vmx )
+        hvmemul_ctxt->ctxt.swint_emulate = x86_swint_emulate_none;
+    else if ( cpu_has_svm_nrips )
+        hvmemul_ctxt->ctxt.swint_emulate = x86_swint_emulate_icebp;
+    else
+        hvmemul_ctxt->ctxt.swint_emulate = x86_swint_emulate_all;
 }
 
 void hvm_emulate_init_per_insn(

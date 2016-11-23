@@ -385,8 +385,9 @@ const struct x86_emulate_ops *shadow_init_emulation(
     struct vcpu *v = current;
     unsigned long addr;
 
+    memset(sh_ctxt, 0, sizeof(*sh_ctxt));
+
     sh_ctxt->ctxt.regs = regs;
-    sh_ctxt->ctxt.force_writeback = 0;
     sh_ctxt->ctxt.swint_emulate = x86_swint_emulate_none;
 
     if ( is_pv_vcpu(v) )
@@ -396,7 +397,6 @@ const struct x86_emulate_ops *shadow_init_emulation(
     }
 
     /* Segment cache initialisation. Primed with CS. */
-    sh_ctxt->valid_seg_regs = 0;
     creg = hvm_get_seg_reg(x86_seg_cs, sh_ctxt);
 
     /* Work out the emulation mode. */
