@@ -107,8 +107,8 @@ int __get_instruction_length_from_list(struct vcpu *v,
 #endif
 
     ASSERT(v == current);
-    hvm_emulate_prepare(&ctxt, guest_cpu_user_regs());
-    hvm_emulate_init(&ctxt, NULL, 0);
+    hvm_emulate_init_once(&ctxt, guest_cpu_user_regs());
+    hvm_emulate_init_per_insn(&ctxt, NULL, 0);
     state = x86_decode_insn(&ctxt.ctxt, hvmemul_insn_fetch);
     if ( IS_ERR_OR_NULL(state) )
         return 0;

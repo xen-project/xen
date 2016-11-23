@@ -167,7 +167,7 @@ bool_t handle_hvm_io_completion(struct vcpu *v)
     {
         struct hvm_emulate_ctxt ctxt;
 
-        hvm_emulate_prepare(&ctxt, guest_cpu_user_regs());
+        hvm_emulate_init_once(&ctxt, guest_cpu_user_regs());
         vmx_realmode_emulate_one(&ctxt);
         hvm_emulate_writeback(&ctxt);
 

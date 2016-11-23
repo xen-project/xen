@@ -179,7 +179,7 @@ void vmx_realmode(struct cpu_user_regs *regs)
     if ( intr_info & INTR_INFO_VALID_MASK )
         __vmwrite(VM_ENTRY_INTR_INFO, 0);
 
-    hvm_emulate_prepare(&hvmemul_ctxt, regs);
+    hvm_emulate_init_once(&hvmemul_ctxt, regs);
 
     /* Only deliver interrupts into emulated real mode. */
     if ( !(curr->arch.hvm_vcpu.guest_cr[0] & X86_CR0_PE) &&

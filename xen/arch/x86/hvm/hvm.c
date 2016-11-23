@@ -4058,7 +4058,7 @@ void hvm_ud_intercept(struct cpu_user_regs *regs)
 {
     struct hvm_emulate_ctxt ctxt;
 
-    hvm_emulate_prepare(&ctxt, regs);
+    hvm_emulate_init_once(&ctxt, regs);
 
     if ( opt_hvm_fep )
     {

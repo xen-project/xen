@@ -1755,57 +1755,6 @@ static const struct x86_emulate_ops hvm_emulate_ops_no_write = {
     .vmfunc        = hvmemul_vmfunc,
 };
 
-void hvm_emulate_init(
-    struct hvm_emulate_ctxt *hvmemul_ctxt,
-    const unsigned char *insn_buf,
-    unsigned int insn_bytes)
-{
-    struct vcpu *curr = current;
-    unsigned int pfec = PFEC_page_present;
-    unsigned long addr;
-
-    if ( hvm_long_mode_enabled(curr) &&
-         hvmemul_ctxt->seg_reg[x86_seg_cs].attr.fields.l )
-    {
-        hvmemul_ctxt->ctxt.addr_size = hvmemul_ctxt->ctxt.sp_size = 64;
-    }
-    else
-    {
-        hvmemul_ctxt->ctxt.addr_size =
-            hvmemul_ctxt->seg_reg[x86_seg_cs].attr.fields.db ? 32 : 16;
-        hvmemul_ctxt->ctxt.sp_size =
-            hvmemul_ctxt->seg_reg[x86_seg_ss].attr.fields.db ? 32 : 16;
-    }
-
-    if ( hvmemul_ctxt->seg_reg[x86_seg_ss].attr.fields.dpl == 3 )
-        pfec |= PFEC_user_mode;
-
-    hvmemul_ctxt->insn_buf_eip = hvmemul_ctxt->ctxt.regs->eip;
-    if ( !insn_bytes )
-    {
-        hvmemul_ctxt->insn_buf_bytes =
-            hvm_get_insn_bytes(curr, hvmemul_ctxt->insn_buf) ?:
-            (hvm_virtual_to_linear_addr(x86_seg_cs,
-                                        &hvmemul_ctxt->seg_reg[x86_seg_cs],
-                                        hvmemul_ctxt->insn_buf_eip,
-                                        sizeof(hvmemul_ctxt->insn_buf),
-                                        hvm_access_insn_fetch,
-                                        hvmemul_ctxt->ctxt.addr_size,
-                                        &addr) &&
-             hvm_fetch_from_guest_virt_nofault(hvmemul_ctxt->insn_buf, addr,
-                                               sizeof(hvmemul_ctxt->insn_buf),
-                                               pfec) == HVMCOPY_okay) ?
-            sizeof(hvmemul_ctxt->insn_buf) : 0;
-    }
-    else
-    {
-        hvmemul_ctxt->insn_buf_bytes = insn_bytes;
-        memcpy(hvmemul_ctxt->insn_buf, insn_buf, insn_bytes);
-    }
-
-    hvmemul_ctxt->exn_pending = 0;
-}
-
 static int _hvm_emulate_one(struct hvm_emulate_ctxt *hvmemul_ctxt,
     const struct x86_emulate_ops *ops)
 {
@@ -1815,7 +1764,8 @@ static int _hvm_emulate_one(struct hvm_emulate_ctxt *hvmemul_ctxt,
     struct hvm_vcpu_io *vio = &curr->arch.hvm_vcpu.hvm_io;
     int rc;
 
-    hvm_emulate_init(hvmemul_ctxt, vio->mmio_insn, vio->mmio_insn_bytes);
+    hvm_emulate_init_per_insn(hvmemul_ctxt, vio->mmio_insn,
+                              vio->mmio_insn_bytes);
 
     vio->mmio_retry = 0;
 
@@ -1915,7 +1865,7 @@ int hvm_emulate_one_mmio(unsigned long mfn, unsigned long gla)
     else
         ops = &hvm_ro_emulate_ops_mmio;
 
-    hvm_emulate_prepare(&ctxt, guest_cpu_user_regs());
+    hvm_emulate_init_once(&ctxt, guest_cpu_user_regs());
     ctxt.ctxt.data = &mmio_ro_ctxt;
     rc = _hvm_emulate_one(&ctxt, ops);
     switch ( rc )
@@ -1940,7 +1890,7 @@ void hvm_emulate_one_vm_event(enum emul_kind kind, unsigned int trapnr,
     struct hvm_emulate_ctxt ctx = {{ 0 }};
     int rc;
 
-    hvm_emulate_prepare(&ctx, guest_cpu_user_regs());
+    hvm_emulate_init_once(&ctx, guest_cpu_user_regs());
 
     switch ( kind )
     {
@@ -1992,7 +1942,7 @@ void hvm_emulate_one_vm_event(enum emul_kind kind, unsigned int trapnr,
     hvm_emulate_writeback(&ctx);
 }
 
-void hvm_emulate_prepare(
+void hvm_emulate_init_once(
     struct hvm_emulate_ctxt *hvmemul_ctxt,
     struct cpu_user_regs *regs)
 {
@@ -2004,6 +1954,55 @@ void hvm_emulate_prepare(
     hvmemul_ctxt->set_context = 0;
     hvmemul_get_seg_reg(x86_seg_cs, hvmemul_ctxt);
     hvmemul_get_seg_reg(x86_seg_ss, hvmemul_ctxt);
+}
+
+void hvm_emulate_init_per_insn(
+    struct hvm_emulate_ctxt *hvmemul_ctxt,
+    const unsigned char *insn_buf,
+    unsigned int insn_bytes)
+{
+    struct vcpu *curr = current;
+    unsigned int pfec = PFEC_page_present;
+    unsigned long addr;
+
+    if ( hvm_long_mode_enabled(curr) &&
+         hvmemul_ctxt->seg_reg[x86_seg_cs].attr.fields.l )
+        hvmemul_ctxt->ctxt.addr_size = hvmemul_ctxt->ctxt.sp_size = 64;
+    else
+    {
+        hvmemul_ctxt->ctxt.addr_size =
+            hvmemul_ctxt->seg_reg[x86_seg_cs].attr.fields.db ? 32 : 16;
+        hvmemul_ctxt->ctxt.sp_size =
+            hvmemul_ctxt->seg_reg[x86_seg_ss].attr.fields.db ? 32 : 16;
+    }
+
+    if ( hvmemul_ctxt->seg_reg[x86_seg_ss].attr.fields.dpl == 3 )
+        pfec |= PFEC_user_mode;
+
+    hvmemul_ctxt->insn_buf_eip = hvmemul_ctxt->ctxt.regs->eip;
+    if ( !insn_bytes )
+    {
+        hvmemul_ctxt->insn_buf_bytes =
+            hvm_get_insn_bytes(curr, hvmemul_ctxt->insn_buf) ?:
+            (hvm_virtual_to_linear_addr(x86_seg_cs,
+                                        &hvmemul_ctxt->seg_reg[x86_seg_cs],
+                                        hvmemul_ctxt->insn_buf_eip,
+                                        sizeof(hvmemul_ctxt->insn_buf),
+                                        hvm_access_insn_fetch,
+                                        hvmemul_ctxt->ctxt.addr_size,
+                                        &addr) &&
+             hvm_fetch_from_guest_virt_nofault(hvmemul_ctxt->insn_buf, addr,
+                                               sizeof(hvmemul_ctxt->insn_buf),
+                                               pfec) == HVMCOPY_okay) ?
+            sizeof(hvmemul_ctxt->insn_buf) : 0;
+    }
+    else
+    {
+        hvmemul_ctxt->insn_buf_bytes = insn_bytes;
+        memcpy(hvmemul_ctxt->insn_buf, insn_buf, insn_bytes);
+    }
+
+    hvmemul_ctxt->exn_pending = 0;
 }
 
 void hvm_emulate_writeback(

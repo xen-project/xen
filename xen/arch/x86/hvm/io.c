@@ -87,7 +87,7 @@ int handle_mmio(void)
 
     ASSERT(!is_pvh_vcpu(curr));
 
-    hvm_emulate_prepare(&ctxt, guest_cpu_user_regs());
+    hvm_emulate_init_once(&ctxt, guest_cpu_user_regs());
 
     rc = hvm_emulate_one(&ctxt);
 
