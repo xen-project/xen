@@ -431,6 +431,22 @@ int main(int argc, char **argv)
         goto fail;
     printf("okay\n");
 
+#ifdef __x86_64__
+    printf("%-40s", "Testing btcq %r8,(%r11)...");
+    instr[0] = 0x4d; instr[1] = 0x0f; instr[2] = 0xbb; instr[3] = 0x03;
+    regs.eflags = 0x200;
+    regs.rip    = (unsigned long)&instr[0];
+    regs.r8     = (-1L << 40) + 1;
+    regs.r11    = (unsigned long)(res + (1L << 35));
+    rc = x86_emulate(&ctxt, &emulops);
+    if ( (rc != X86EMUL_OKAY) ||
+         (*res != 0x2233445C) ||
+         (regs.eflags != 0x201) ||
+         (regs.rip != (unsigned long)&instr[4]) )
+        goto fail;
+    printf("okay\n");
+#endif
+
     res[0] = 0x12345678;
     res[1] = 0x87654321;
 

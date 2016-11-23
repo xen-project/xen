@@ -2560,18 +2560,11 @@ x86_emulate(
             else if ( op_bytes == 4 )
                 src.val = (int32_t)src.val;
             if ( (long)src.val < 0 )
-            {
-                unsigned long byte_offset =
+                ea.mem.off -=
                     op_bytes + (((-src.val - 1) >> 3) & ~(op_bytes - 1L));
-
-                ea.mem.off -= byte_offset;
-                src.val = (byte_offset << 3) + src.val;
-            }
             else
-            {
                 ea.mem.off += (src.val >> 3) & ~(op_bytes - 1L);
-                src.val &= (op_bytes << 3) - 1;
-            }
+            src.val &= (op_bytes << 3) - 1;
         }
         /* Becomes a normal DstMem operation from here on. */
         d = (d & ~DstMask) | DstMem;
