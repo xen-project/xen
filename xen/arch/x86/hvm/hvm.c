@@ -2890,7 +2890,7 @@ void hvm_task_switch(
         u32 cr3, eip, eflags, eax, ecx, edx, ebx, esp, ebp, esi, edi;
         u16 es, _3, cs, _4, ss, _5, ds, _6, fs, _7, gs, _8, ldt, _9;
         u16 trace, iomap;
-    } tss = { 0 };
+    } tss;
 
     hvm_get_segment_register(v, x86_seg_gdtr, &gdt);
     hvm_get_segment_register(v, x86_seg_tr, &prev_tr);
@@ -3010,12 +3010,6 @@ void hvm_task_switch(
     regs->esi    = tss.esi;
     regs->edi    = tss.edi;
 
-    if ( (taskswitch_reason == TSW_call_or_int) )
-    {
-        regs->eflags |= X86_EFLAGS_NT;
-        tss.back_link = prev_tr.sel;
-    }
-
     exn_raised = 0;
     if ( hvm_load_segment_selector(x86_seg_es, tss.es, tss.eflags) ||
          hvm_load_segment_selector(x86_seg_cs, tss.cs, tss.eflags) ||
@@ -3025,12 +3019,18 @@ void hvm_task_switch(
          hvm_load_segment_selector(x86_seg_gs, tss.gs, tss.eflags) )
         exn_raised = 1;
 
-    rc = hvm_copy_to_guest_virt(
-        tr.base, &tss, sizeof(tss), PFEC_page_present);
-    if ( rc == HVMCOPY_bad_gva_to_gfn )
-        exn_raised = 1;
-    else if ( rc != HVMCOPY_okay )
-        goto out;
+    if ( taskswitch_reason == TSW_call_or_int )
+    {
+        regs->eflags |= X86_EFLAGS_NT;
+        tss.back_link = prev_tr.sel;
+
+        rc = hvm_copy_to_guest_virt(tr.base + offsetof(typeof(tss), back_link),
+                                    &tss.back_link, sizeof(tss.back_link), 0);
+        if ( rc == HVMCOPY_bad_gva_to_gfn )
+            exn_raised = 1;
+        else if ( rc != HVMCOPY_okay )
+            goto out;
+    }
 
     if ( (tss.trace & 1) && !exn_raised )
         hvm_inject_hw_exception(TRAP_debug, HVM_DELIVER_NO_ERROR_CODE);
