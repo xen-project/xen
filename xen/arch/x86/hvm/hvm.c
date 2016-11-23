@@ -3034,9 +3034,6 @@ void hvm_task_switch(
             goto out;
     }
 
-    if ( (tss.trace & 1) && !exn_raised )
-        hvm_inject_hw_exception(TRAP_debug, HVM_DELIVER_NO_ERROR_CODE);
-
     tr.attr.fields.type = 0xb; /* busy 32-bit tss */
     hvm_set_segment_register(v, x86_seg_tr, &tr);
 
@@ -3052,16 +3049,31 @@ void hvm_task_switch(
 
     if ( errcode >= 0 )
     {
-        struct segment_register reg;
         unsigned long linear_addr;
-        regs->esp -= 4;
-        hvm_get_segment_register(current, x86_seg_ss, &reg);
-        /* Todo: do not ignore access faults here. */
-        if ( hvm_virtual_to_linear_addr(x86_seg_ss, &reg, regs->esp,
-                                        4, hvm_access_write, 32,
+        unsigned int opsz, sp;
+
+        hvm_get_segment_register(v, x86_seg_cs, &segr);
+        opsz = segr.attr.fields.db ? 4 : 2;
+        hvm_get_segment_register(v, x86_seg_ss, &segr);
+        if ( segr.attr.fields.db )
+            sp = regs->_esp -= opsz;
+        else
+            sp = *(uint16_t *)&regs->esp -= opsz;
+        if ( hvm_virtual_to_linear_addr(x86_seg_ss, &segr, sp, opsz,
+                                        hvm_access_write,
+                                        16 << segr.attr.fields.db,
                                         &linear_addr) )
-            hvm_copy_to_guest_virt_nofault(linear_addr, &errcode, 4, 0);
+        {
+            rc = hvm_copy_to_guest_virt(linear_addr, &errcode, opsz, 0);
+            if ( rc == HVMCOPY_bad_gva_to_gfn )
+                exn_raised = 1;
+            else if ( rc != HVMCOPY_okay )
+                goto out;
+        }
     }
+
+    if ( (tss.trace & 1) && !exn_raised )
+        hvm_inject_hw_exception(TRAP_debug, HVM_DELIVER_NO_ERROR_CODE);
 
  out:
     hvm_unmap_entry(optss_desc);
