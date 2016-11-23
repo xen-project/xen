@@ -791,8 +791,8 @@ static int __hvmemul_read(
         pfec |= PFEC_user_mode;
 
     rc = ((access_type == hvm_access_insn_fetch) ?
-          hvm_fetch_from_guest_virt(p_data, addr, bytes, pfec, &pfinfo) :
-          hvm_copy_from_guest_virt(p_data, addr, bytes, pfec, &pfinfo));
+          hvm_fetch_from_guest_linear(p_data, addr, bytes, pfec, &pfinfo) :
+          hvm_copy_from_guest_linear(p_data, addr, bytes, pfec, &pfinfo));
 
     switch ( rc )
     {
@@ -898,7 +898,7 @@ static int hvmemul_write(
          (hvmemul_ctxt->seg_reg[x86_seg_ss].attr.fields.dpl == 3) )
         pfec |= PFEC_user_mode;
 
-    rc = hvm_copy_to_guest_virt(addr, p_data, bytes, pfec, &pfinfo);
+    rc = hvm_copy_to_guest_linear(addr, p_data, bytes, pfec, &pfinfo);
 
     switch ( rc )
     {
@@ -1937,9 +1937,9 @@ void hvm_emulate_init_per_insn(
                                         hvm_access_insn_fetch,
                                         hvmemul_ctxt->ctxt.addr_size,
                                         &addr) &&
-             hvm_fetch_from_guest_virt(hvmemul_ctxt->insn_buf, addr,
-                                       sizeof(hvmemul_ctxt->insn_buf),
-                                       pfec, NULL) == HVMCOPY_okay) ?
+             hvm_fetch_from_guest_linear(hvmemul_ctxt->insn_buf, addr,
+                                         sizeof(hvmemul_ctxt->insn_buf),
+                                         pfec, NULL) == HVMCOPY_okay) ?
             sizeof(hvmemul_ctxt->insn_buf) : 0;
     }
     else

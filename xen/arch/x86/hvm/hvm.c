@@ -2925,7 +2925,7 @@ void hvm_task_switch(
         goto out;
     }
 
-    rc = hvm_copy_from_guest_virt(
+    rc = hvm_copy_from_guest_linear(
         &tss, prev_tr.base, sizeof(tss), PFEC_page_present, &pfinfo);
     if ( rc != HVMCOPY_okay )
         goto out;
@@ -2960,15 +2960,15 @@ void hvm_task_switch(
     hvm_get_segment_register(v, x86_seg_ldtr, &segr);
     tss.ldt = segr.sel;
 
-    rc = hvm_copy_to_guest_virt(prev_tr.base + offsetof(typeof(tss), eip),
-                                &tss.eip,
-                                offsetof(typeof(tss), trace) -
-                                offsetof(typeof(tss), eip),
-                                PFEC_page_present, &pfinfo);
+    rc = hvm_copy_to_guest_linear(prev_tr.base + offsetof(typeof(tss), eip),
+                                  &tss.eip,
+                                  offsetof(typeof(tss), trace) -
+                                  offsetof(typeof(tss), eip),
+                                  PFEC_page_present, &pfinfo);
     if ( rc != HVMCOPY_okay )
         goto out;
 
-    rc = hvm_copy_from_guest_virt(
+    rc = hvm_copy_from_guest_linear(
         &tss, tr.base, sizeof(tss), PFEC_page_present, &pfinfo);
     /*
      * Note: The HVMCOPY_gfn_shared case could be optimised, if the callee
@@ -3008,9 +3008,9 @@ void hvm_task_switch(
         regs->eflags |= X86_EFLAGS_NT;
         tss.back_link = prev_tr.sel;
 
-        rc = hvm_copy_to_guest_virt(tr.base + offsetof(typeof(tss), back_link),
-                                    &tss.back_link, sizeof(tss.back_link), 0,
-                                    &pfinfo);
+        rc = hvm_copy_to_guest_linear(tr.base + offsetof(typeof(tss), back_link),
+                                      &tss.back_link, sizeof(tss.back_link), 0,
+                                      &pfinfo);
         if ( rc == HVMCOPY_bad_gva_to_gfn )
             exn_raised = 1;
         else if ( rc != HVMCOPY_okay )
@@ -3047,8 +3047,8 @@ void hvm_task_switch(
                                         16 << segr.attr.fields.db,
                                         &linear_addr) )
         {
-            rc = hvm_copy_to_guest_virt(linear_addr, &errcode, opsz, 0,
-                                        &pfinfo);
+            rc = hvm_copy_to_guest_linear(linear_addr, &errcode, opsz, 0,
+                                          &pfinfo);
             if ( rc == HVMCOPY_bad_gva_to_gfn )
                 exn_raised = 1;
             else if ( rc != HVMCOPY_okay )
@@ -3067,7 +3067,7 @@ void hvm_task_switch(
 #define HVMCOPY_from_guest (0u<<0)
 #define HVMCOPY_to_guest   (1u<<0)
 #define HVMCOPY_phys       (0u<<2)
-#define HVMCOPY_virt       (1u<<2)
+#define HVMCOPY_linear     (1u<<2)
 static enum hvm_copy_result __hvm_copy(
     void *buf, paddr_t addr, int size, unsigned int flags, uint32_t pfec,
     pagefault_info_t *pfinfo)
@@ -3101,7 +3101,7 @@ static enum hvm_copy_result __hvm_copy(
 
         count = min_t(int, PAGE_SIZE - gpa, todo);
 
-        if ( flags & HVMCOPY_virt )
+        if ( flags & HVMCOPY_linear )
         {
             gfn = paging_gva_to_gfn(curr, addr, &pfec);
             if ( gfn == gfn_x(INVALID_GFN) )
@@ -3295,30 +3295,30 @@ enum hvm_copy_result hvm_copy_from_guest_phys(
                       HVMCOPY_from_guest | HVMCOPY_phys, 0, NULL);
 }
 
-enum hvm_copy_result hvm_copy_to_guest_virt(
-    unsigned long vaddr, void *buf, int size, uint32_t pfec,
+enum hvm_copy_result hvm_copy_to_guest_linear(
+    unsigned long addr, void *buf, int size, uint32_t pfec,
     pagefault_info_t *pfinfo)
 {
-    return __hvm_copy(buf, vaddr, size,
-                      HVMCOPY_to_guest | HVMCOPY_virt,
+    return __hvm_copy(buf, addr, size,
+                      HVMCOPY_to_guest | HVMCOPY_linear,
                       PFEC_page_present | PFEC_write_access | pfec, pfinfo);
 }
 
-enum hvm_copy_result hvm_copy_from_guest_virt(
-    void *buf, unsigned long vaddr, int size, uint32_t pfec,
+enum hvm_copy_result hvm_copy_from_guest_linear(
+    void *buf, unsigned long addr, int size, uint32_t pfec,
     pagefault_info_t *pfinfo)
 {
-    return __hvm_copy(buf, vaddr, size,
-                      HVMCOPY_from_guest | HVMCOPY_virt,
+    return __hvm_copy(buf, addr, size,
+                      HVMCOPY_from_guest | HVMCOPY_linear,
                       PFEC_page_present | pfec, pfinfo);
 }
 
-enum hvm_copy_result hvm_fetch_from_guest_virt(
-    void *buf, unsigned long vaddr, int size, uint32_t pfec,
+enum hvm_copy_result hvm_fetch_from_guest_linear(
+    void *buf, unsigned long addr, int size, uint32_t pfec,
     pagefault_info_t *pfinfo)
 {
-    return __hvm_copy(buf, vaddr, size,
-                      HVMCOPY_from_guest | HVMCOPY_virt,
+    return __hvm_copy(buf, addr, size,
+                      HVMCOPY_from_guest | HVMCOPY_linear,
                       PFEC_page_present | PFEC_insn_fetch | pfec, pfinfo);
 }
 
@@ -3333,7 +3333,7 @@ unsigned long copy_to_user_hvm(void *to, const void *from, unsigned int len)
         return 0;
     }
 
-    rc = hvm_copy_to_guest_virt((unsigned long)to, (void *)from, len, 0, NULL);
+    rc = hvm_copy_to_guest_linear((unsigned long)to, (void *)from, len, 0, NULL);
     return rc ? len : 0; /* fake a copy_to_user() return code */
 }
 
@@ -3363,7 +3363,7 @@ unsigned long copy_from_user_hvm(void *to, const void *from, unsigned len)
         return 0;
     }
 
-    rc = hvm_copy_from_guest_virt(to, (unsigned long)from, len, 0, NULL);
+    rc = hvm_copy_from_guest_linear(to, (unsigned long)from, len, 0, NULL);
     return rc ? len : 0; /* fake a copy_from_user() return code */
 }
 
@@ -4039,8 +4039,8 @@ void hvm_ud_intercept(struct cpu_user_regs *regs)
                                         (hvm_long_mode_enabled(cur) &&
                                          cs->attr.fields.l) ? 64 :
                                         cs->attr.fields.db ? 32 : 16, &addr) &&
-             (hvm_fetch_from_guest_virt(sig, addr, sizeof(sig),
-                                        walk, NULL) == HVMCOPY_okay) &&
+             (hvm_fetch_from_guest_linear(sig, addr, sizeof(sig),
+                                          walk, NULL) == HVMCOPY_okay) &&
              (memcmp(sig, "\xf\xbxen", sizeof(sig)) == 0) )
         {
             regs->eip += sizeof(sig);

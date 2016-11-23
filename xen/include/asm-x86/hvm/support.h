@@ -73,7 +73,7 @@ enum hvm_copy_result hvm_copy_from_guest_phys(
     void *buf, paddr_t paddr, int size);
 
 /*
- * Copy to/from a guest virtual address. @pfec should include PFEC_user_mode
+ * Copy to/from a guest linear address. @pfec should include PFEC_user_mode
  * if emulating a user-mode access (CPL=3). All other flags in @pfec are
  * managed by the called function: it is therefore optional for the caller
  * to set them.
@@ -95,14 +95,14 @@ typedef struct pagefault_info
     int ec;
 } pagefault_info_t;
 
-enum hvm_copy_result hvm_copy_to_guest_virt(
-    unsigned long vaddr, void *buf, int size, uint32_t pfec,
+enum hvm_copy_result hvm_copy_to_guest_linear(
+    unsigned long addr, void *buf, int size, uint32_t pfec,
     pagefault_info_t *pfinfo);
-enum hvm_copy_result hvm_copy_from_guest_virt(
-    void *buf, unsigned long vaddr, int size, uint32_t pfec,
+enum hvm_copy_result hvm_copy_from_guest_linear(
+    void *buf, unsigned long addr, int size, uint32_t pfec,
     pagefault_info_t *pfinfo);
-enum hvm_copy_result hvm_fetch_from_guest_virt(
-    void *buf, unsigned long vaddr, int size, uint32_t pfec,
+enum hvm_copy_result hvm_fetch_from_guest_linear(
+    void *buf, unsigned long addr, int size, uint32_t pfec,
     pagefault_info_t *pfinfo);
 
 #define HVM_HCALL_completed  0 /* hypercall completed - no further action */
