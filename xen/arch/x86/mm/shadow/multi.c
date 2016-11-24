@@ -4694,7 +4694,7 @@ sh_x86_emulate_cmpxchg(struct vcpu *v, unsigned long vaddr,
     }
 
     if ( prev != old )
-        rv = X86EMUL_CMPXCHG_FAILED;
+        rv = X86EMUL_RETRY;
 
     SHADOW_DEBUG(EMULATE, "va %#lx was %#lx expected %#lx"
                   " wanted %#lx now %#lx bytes %u\n",

@@ -109,8 +109,6 @@ struct __attribute__((__packed__)) segment_register {
 #define X86EMUL_EXCEPTION      2
  /* Retry the emulation for some reason. No state modified. */
 #define X86EMUL_RETRY          3
- /* (cmpxchg accessor): CMPXCHG failed. Maps to X86EMUL_RETRY in caller. */
-#define X86EMUL_CMPXCHG_FAILED 3
 
 /* FPU sub-types which may be requested via ->get_fpu(). */
 enum x86_emulate_fpu_type {

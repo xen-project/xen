@@ -5254,7 +5254,7 @@ static int ptwr_emulated_update(
         {
             unmap_domain_page(pl1e);
             put_page_from_l1e(nl1e, d);
-            return X86EMUL_CMPXCHG_FAILED;
+            return X86EMUL_RETRY;
         }
     }
     else
