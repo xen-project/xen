@@ -5136,7 +5136,7 @@ static int ptwr_emulated_read(
     if ( !__addr_ok(addr) ||
          (rc = __copy_from_user(p_data, (void *)addr, bytes)) )
     {
-        pv_inject_page_fault(0, addr + bytes - rc); /* Read fault. */
+        x86_emul_pagefault(0, addr + bytes - rc, ctxt);  /* Read fault. */
         return X86EMUL_EXCEPTION;
     }
 
@@ -5177,8 +5177,9 @@ static int ptwr_emulated_update(
         addr &= ~(sizeof(paddr_t)-1);
         if ( (rc = copy_from_user(&full, (void *)addr, sizeof(paddr_t))) != 0 )
         {
-            pv_inject_page_fault(0, /* Read fault. */
-                                 addr + sizeof(paddr_t) - rc);
+            x86_emul_pagefault(0, /* Read fault. */
+                               addr + sizeof(paddr_t) - rc,
+                               &ptwr_ctxt->ctxt);
             return X86EMUL_EXCEPTION;
         }
         /* Mask out bits provided by caller. */
@@ -5379,27 +5380,38 @@ int ptwr_do_page_fault(struct vcpu *v, unsigned long addr,
     page_unlock(page);
     put_page(page);
 
-    /*
-     * The previous lack of inject_{sw,hw}*() hooks caused exceptions raised
-     * by the emulator itself to become X86EMUL_UNHANDLEABLE.  Such exceptions
-     * now set event_pending instead.  Exceptions raised behind the back of
-     * the emulator don't yet set event_pending.
-     *
-     * For now, cause such cases to return to the X86EMUL_UNHANDLEABLE path,
-     * for no functional change from before.  Future patches will fix this
-     * properly.
-     */
-    if ( rc == X86EMUL_EXCEPTION && ptwr_ctxt.ctxt.event_pending )
-        rc = X86EMUL_UNHANDLEABLE;
+    /* More strict than x86_emulate_wrapper(), as this is now true for PV. */
+    ASSERT(ptwr_ctxt.ctxt.event_pending == (rc == X86EMUL_EXCEPTION));
 
-    if ( rc == X86EMUL_UNHANDLEABLE )
-        goto bail;
+    switch ( rc )
+    {
+    case X86EMUL_EXCEPTION:
+        /*
+         * This emulation only covers writes to pagetables which are marked
+         * read-only by Xen.  We tolerate #PF (in case a concurrent pagetable
+         * update has succeeded on a different vcpu).  Anything else is an
+         * emulation bug, or a guest playing with the instruction stream under
+         * Xen's feet.
+         */
+        if ( ptwr_ctxt.ctxt.event.type == X86_EVENTTYPE_HW_EXCEPTION &&
+             ptwr_ctxt.ctxt.event.vector == TRAP_page_fault )
+            pv_inject_event(&ptwr_ctxt.ctxt.event);
+        else
+            gdprintk(XENLOG_WARNING,
+                     "Unexpected event (type %u, vector %#x) from emulation\n",
+                     ptwr_ctxt.ctxt.event.type, ptwr_ctxt.ctxt.event.vector);
 
-    if ( ptwr_ctxt.ctxt.retire.singlestep )
-        pv_inject_hw_exception(TRAP_debug, X86_EVENT_NO_EC);
+        /* Fallthrough */
+    case X86EMUL_OKAY:
 
-    perfc_incr(ptwr_emulations);
-    return EXCRET_fault_fixed;
+        if ( ptwr_ctxt.ctxt.retire.singlestep )
+            pv_inject_hw_exception(TRAP_debug, X86_EVENT_NO_EC);
+
+        /* Fallthrough */
+    case X86EMUL_RETRY:
+        perfc_incr(ptwr_emulations);
+        return EXCRET_fault_fixed;
+    }
 
  bail:
     return 0;
@@ -5519,26 +5531,39 @@ int mmio_ro_do_page_fault(struct vcpu *v, unsigned long addr,
     else
         rc = x86_emulate(&ctxt, &mmio_ro_emulate_ops);
 
-    /*
-     * The previous lack of inject_{sw,hw}*() hooks caused exceptions raised
-     * by the emulator itself to become X86EMUL_UNHANDLEABLE.  Such exceptions
-     * now set event_pending instead.  Exceptions raised behind the back of
-     * the emulator don't yet set event_pending.
-     *
-     * For now, cause such cases to return to the X86EMUL_UNHANDLEABLE path,
-     * for no functional change from before.  Future patches will fix this
-     * properly.
-     */
-    if ( rc == X86EMUL_EXCEPTION && ctxt.event_pending )
-        rc = X86EMUL_UNHANDLEABLE;
+    /* More strict than x86_emulate_wrapper(), as this is now true for PV. */
+    ASSERT(ctxt.event_pending == (rc == X86EMUL_EXCEPTION));
 
-    if ( rc == X86EMUL_UNHANDLEABLE )
-        return 0;
+    switch ( rc )
+    {
+    case X86EMUL_EXCEPTION:
+        /*
+         * This emulation only covers writes to MMCFG space or read-only MFNs.
+         * We tolerate #PF (from hitting an adjacent page or a successful
+         * concurrent pagetable update).  Anything else is an emulation bug,
+         * or a guest playing with the instruction stream under Xen's feet.
+         */
+        if ( ctxt.event.type == X86_EVENTTYPE_HW_EXCEPTION &&
+             ctxt.event.vector == TRAP_page_fault )
+            pv_inject_event(&ctxt.event);
+        else
+            gdprintk(XENLOG_WARNING,
+                     "Unexpected event (type %u, vector %#x) from emulation\n",
+                     ctxt.event.type, ctxt.event.vector);
 
-    if ( ctxt.retire.singlestep )
-        pv_inject_hw_exception(TRAP_debug, X86_EVENT_NO_EC);
+        /* Fallthrough */
+    case X86EMUL_OKAY:
 
-    return EXCRET_fault_fixed;
+        if ( ctxt.retire.singlestep )
+            pv_inject_hw_exception(TRAP_debug, X86_EVENT_NO_EC);
+
+        /* Fallthrough */
+    case X86EMUL_RETRY:
+        perfc_incr(ptwr_emulations);
+        return EXCRET_fault_fixed;
+    }
+
+    return 0;
 }
 
 void *alloc_xen_pagetable(void)
