@@ -625,37 +625,75 @@ void fatal_trap(const struct cpu_user_regs *regs, bool_t show_remote)
           (regs->eflags & X86_EFLAGS_IF) ? "" : ", IN INTERRUPT CONTEXT");
 }
 
-static void do_guest_trap(unsigned int trapnr,
-                          const struct cpu_user_regs *regs)
+void pv_inject_event(const struct x86_event *event)
 {
     struct vcpu *v = current;
+    struct cpu_user_regs *regs = guest_cpu_user_regs();
     struct trap_bounce *tb;
     const struct trap_info *ti;
+    const uint8_t vector = event->vector;
     const bool use_error_code =
-        ((trapnr < 32) && (TRAP_HAVE_EC & (1u << trapnr)));
+        ((vector < 32) && (TRAP_HAVE_EC & (1u << vector)));
+    unsigned int error_code = event->error_code;
 
-    trace_pv_trap(trapnr, regs->eip, use_error_code, regs->error_code);
+    ASSERT(vector == event->vector); /* Confirm no truncation. */
+    if ( use_error_code )
+        ASSERT(error_code != X86_EVENT_NO_EC);
+    else
+        ASSERT(error_code == X86_EVENT_NO_EC);
 
     tb = &v->arch.pv_vcpu.trap_bounce;
-    ti = &v->arch.pv_vcpu.trap_ctxt[trapnr];
+    ti = &v->arch.pv_vcpu.trap_ctxt[vector];
 
     tb->flags = TBF_EXCEPTION;
     tb->cs    = ti->cs;
     tb->eip   = ti->address;
 
+    if ( vector == TRAP_page_fault )
+    {
+        v->arch.pv_vcpu.ctrlreg[2] = event->cr2;
+        arch_set_cr2(v, event->cr2);
+
+        /* Re-set error_code.user flag appropriately for the guest. */
+        error_code &= ~PFEC_user_mode;
+        if ( !guest_kernel_mode(v, regs) )
+            error_code |= PFEC_user_mode;
+
+        trace_pv_page_fault(event->cr2, error_code);
+    }
+    else
+        trace_pv_trap(vector, regs->eip, use_error_code, error_code);
+
     if ( use_error_code )
     {
         tb->flags |= TBF_EXCEPTION_ERRCODE;
-        tb->error_code = regs->error_code;
+        tb->error_code = error_code;
     }
 
     if ( TI_GET_IF(ti) )
         tb->flags |= TBF_INTERRUPT;
 
     if ( unlikely(null_trap_bounce(v, tb)) )
+    {
         gprintk(XENLOG_WARNING,
                 "Unhandled %s fault/trap [#%d, ec=%04x]\n",
-                trapstr(trapnr), trapnr, regs->error_code);
+                trapstr(vector), vector, error_code);
+
+        if ( vector == TRAP_page_fault )
+            show_page_walk(event->cr2);
+    }
+}
+
+static inline void do_guest_trap(unsigned int trapnr,
+                                 const struct cpu_user_regs *regs)
+{
+    const struct x86_event event = {
+        .vector = trapnr,
+        .error_code = (((trapnr < 32) && (TRAP_HAVE_EC & (1u << trapnr)))
+                       ? regs->error_code : X86_EVENT_NO_EC),
+    };
+
+    pv_inject_event(&event);
 }
 
 static void instruction_done(
@@ -1290,7 +1328,7 @@ static int emulate_invalid_rdtscp(struct cpu_user_regs *regs)
     eip = regs->eip;
     if ( (rc = copy_from_user(opcode, (char *)eip, sizeof(opcode))) != 0 )
     {
-        propagate_page_fault(eip + sizeof(opcode) - rc, 0);
+        pv_inject_page_fault(0, eip + sizeof(opcode) - rc);
         return EXCRET_fault_fixed;
     }
     if ( memcmp(opcode, "\xf\x1\xf9", sizeof(opcode)) )
@@ -1311,7 +1349,7 @@ static int emulate_forced_invalid_op(struct cpu_user_regs *regs)
     /* Check for forced emulation signature: ud2 ; .ascii "xen". */
     if ( (rc = copy_from_user(sig, (char *)eip, sizeof(sig))) != 0 )
     {
-        propagate_page_fault(eip + sizeof(sig) - rc, 0);
+        pv_inject_page_fault(0, eip + sizeof(sig) - rc);
         return EXCRET_fault_fixed;
     }
     if ( memcmp(sig, "\xf\xbxen", sizeof(sig)) )
@@ -1321,7 +1359,7 @@ static int emulate_forced_invalid_op(struct cpu_user_regs *regs)
     /* We only emulate CPUID. */
     if ( ( rc = copy_from_user(instr, (char *)eip, sizeof(instr))) != 0 )
     {
-        propagate_page_fault(eip + sizeof(instr) - rc, 0);
+        pv_inject_page_fault(0, eip + sizeof(instr) - rc);
         return EXCRET_fault_fixed;
     }
     if ( memcmp(instr, "\xf\xa2", sizeof(instr)) )
@@ -1488,53 +1526,6 @@ static void reserved_bit_page_fault(
     show_execution_state(regs);
 }
 
-struct trap_bounce *propagate_page_fault(unsigned long addr, u16 error_code)
-{
-    struct trap_info *ti;
-    struct vcpu *v = current;
-    struct trap_bounce *tb = &v->arch.pv_vcpu.trap_bounce;
-
-    if ( unlikely(!is_canonical_address(addr)) )
-    {
-        ti = &v->arch.pv_vcpu.trap_ctxt[TRAP_gp_fault];
-        tb->flags      = TBF_EXCEPTION | TBF_EXCEPTION_ERRCODE;
-        tb->error_code = 0;
-        tb->cs         = ti->cs;
-        tb->eip        = ti->address;
-        if ( TI_GET_IF(ti) )
-            tb->flags |= TBF_INTERRUPT;
-        return tb;
-    }
-
-    v->arch.pv_vcpu.ctrlreg[2] = addr;
-    arch_set_cr2(v, addr);
-
-    /* Re-set error_code.user flag appropriately for the guest. */
-    error_code &= ~PFEC_user_mode;
-    if ( !guest_kernel_mode(v, guest_cpu_user_regs()) )
-        error_code |= PFEC_user_mode;
-
-    trace_pv_page_fault(addr, error_code);
-
-    ti = &v->arch.pv_vcpu.trap_ctxt[TRAP_page_fault];
-    tb->flags = TBF_EXCEPTION | TBF_EXCEPTION_ERRCODE;
-    tb->error_code = error_code;
-    tb->cs         = ti->cs;
-    tb->eip        = ti->address;
-    if ( TI_GET_IF(ti) )
-        tb->flags |= TBF_INTERRUPT;
-    if ( unlikely(null_trap_bounce(v, tb)) )
-    {
-        printk("%pv: unhandled page fault (ec=%04X)\n", v, error_code);
-        show_page_walk(addr);
-    }
-
-    if ( unlikely(error_code & PFEC_reserved_bit) )
-        reserved_bit_page_fault(addr, guest_cpu_user_regs());
-
-    return NULL;
-}
-
 static int handle_gdt_ldt_mapping_fault(
     unsigned long offset, struct cpu_user_regs *regs)
 {
@@ -1566,17 +1557,22 @@ static int handle_gdt_ldt_mapping_fault(
         }
         else
         {
-            struct trap_bounce *tb;
-
             /* In hypervisor mode? Leave it to the #PF handler to fix up. */
             if ( !guest_mode(regs) )
                 return 0;
-            /* In guest mode? Propagate fault to guest, with adjusted %cr2. */
-            tb = propagate_page_fault(curr->arch.pv_vcpu.ldt_base + offset,
-                                      regs->error_code);
-            if ( tb )
-                tb->error_code = (offset & ~(X86_XEC_EXT | X86_XEC_IDT)) |
-                                 X86_XEC_TI;
+
+            /* Access would have become non-canonical? Pass #GP[sel] back. */
+            if ( unlikely(!is_canonical_address(
+                              curr->arch.pv_vcpu.ldt_base + offset)) )
+            {
+                uint16_t ec = (offset & ~(X86_XEC_EXT | X86_XEC_IDT)) | X86_XEC_TI;
+
+                pv_inject_hw_exception(TRAP_gp_fault, ec);
+            }
+            else
+                /* else pass the #PF back, with adjusted %cr2. */
+                pv_inject_page_fault(regs->error_code,
+                                     curr->arch.pv_vcpu.ldt_base + offset);
         }
     }
     else
@@ -1859,7 +1855,10 @@ void do_page_fault(struct cpu_user_regs *regs)
             return;
     }
 
-    propagate_page_fault(addr, regs->error_code);
+    if ( unlikely(regs->error_code & PFEC_reserved_bit) )
+        reserved_bit_page_fault(addr, regs);
+
+    pv_inject_page_fault(regs->error_code, addr);
 }
 
 /*
@@ -2789,7 +2788,7 @@ int pv_emul_cpuid(unsigned int *eax, unsigned int *ebx, unsigned int *ecx,
         goto fail;                                                          \
     if ( (_rc = copy_from_user(&_x, (type *)_ptr, sizeof(_x))) != 0 )       \
     {                                                                       \
-        propagate_page_fault(_ptr + sizeof(_x) - _rc, 0);                   \
+        pv_inject_page_fault(0, _ptr + sizeof(_x) - _rc);                   \
         goto skip;                                                          \
     }                                                                       \
     (eip) += sizeof(_x); _x; })
@@ -2954,8 +2953,8 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             if ( (rc = copy_to_user((void *)data_base + rd_ad(edi),
                                     &data, op_bytes)) != 0 )
             {
-                propagate_page_fault(data_base + rd_ad(edi) + op_bytes - rc,
-                                     PFEC_write_access);
+                pv_inject_page_fault(PFEC_write_access,
+                                     data_base + rd_ad(edi) + op_bytes - rc);
                 return EXCRET_fault_fixed;
             }
             wr_ad(edi, regs->edi + (int)((regs->eflags & X86_EFLAGS_DF)
@@ -2972,8 +2971,8 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             if ( (rc = copy_from_user(&data, (void *)data_base + rd_ad(esi),
                                       op_bytes)) != 0 )
             {
-                propagate_page_fault(data_base + rd_ad(esi)
-                                     + op_bytes - rc, 0);
+                pv_inject_page_fault(0, data_base + rd_ad(esi)
+                                     + op_bytes - rc);
                 return EXCRET_fault_fixed;
             }
             guest_io_write(port, op_bytes, data, currd);
@@ -3530,8 +3529,8 @@ static void emulate_gate_op(struct cpu_user_regs *regs)
             rc = __put_user(item, stkp); \
             if ( rc ) \
             { \
-                propagate_page_fault((unsigned long)(stkp + 1) - rc, \
-                                     PFEC_write_access); \
+                pv_inject_page_fault(PFEC_write_access, \
+                                     (unsigned long)(stkp + 1) - rc); \
                 return; \
             } \
         } while ( 0 )
@@ -3598,7 +3597,7 @@ static void emulate_gate_op(struct cpu_user_regs *regs)
                     rc = __get_user(parm, ustkp);
                     if ( rc )
                     {
-                        propagate_page_fault((unsigned long)(ustkp + 1) - rc, 0);
+                        pv_inject_page_fault(0, (unsigned long)(ustkp + 1) - rc);
                         return;
                     }
                     push(parm);

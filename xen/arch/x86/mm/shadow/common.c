@@ -323,7 +323,7 @@ pv_emulate_read(enum x86_segment seg,
 
     if ( (rc = copy_from_user(p_data, (void *)offset, bytes)) != 0 )
     {
-        propagate_page_fault(offset + bytes - rc, 0); /* read fault */
+        pv_inject_page_fault(0, offset + bytes - rc); /* Read fault. */
         return X86EMUL_EXCEPTION;
     }
 
@@ -1717,7 +1717,7 @@ static mfn_t emulate_gva_to_mfn(struct vcpu *v, unsigned long vaddr,
         if ( is_hvm_vcpu(v) )
             hvm_inject_page_fault(pfec, vaddr);
         else
-            propagate_page_fault(vaddr, pfec);
+            pv_inject_page_fault(pfec, vaddr);
         return _mfn(BAD_GVA_TO_GFN);
     }
 

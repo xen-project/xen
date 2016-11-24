@@ -8,6 +8,7 @@
 #include <asm/hvm/domain.h>
 #include <asm/e820.h>
 #include <asm/mce.h>
+#include <asm/x86_emulate.h>
 #include <public/vcpu.h>
 #include <public/hvm/hvm_info_table.h>
 
@@ -631,6 +632,31 @@ static inline void free_vcpu_guest_context(struct vcpu_guest_context *vgc)
 
 struct vcpu_hvm_context;
 int arch_set_info_hvm_guest(struct vcpu *v, const struct vcpu_hvm_context *ctx);
+
+void pv_inject_event(const struct x86_event *event);
+
+static inline void pv_inject_hw_exception(unsigned int vector, int errcode)
+{
+    const struct x86_event event = {
+        .vector = vector,
+        .type = X86_EVENTTYPE_HW_EXCEPTION,
+        .error_code = errcode,
+    };
+
+    pv_inject_event(&event);
+}
+
+static inline void pv_inject_page_fault(int errcode, unsigned long cr2)
+{
+    const struct x86_event event = {
+        .vector = TRAP_page_fault,
+        .type = X86_EVENTTYPE_HW_EXCEPTION,
+        .error_code = errcode,
+        .cr2 = cr2,
+    };
+
+    pv_inject_event(&event);
+}
 
 #endif /* __ASM_DOMAIN_H__ */
 

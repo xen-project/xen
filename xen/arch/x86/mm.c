@@ -5136,7 +5136,7 @@ static int ptwr_emulated_read(
     if ( !__addr_ok(addr) ||
          (rc = __copy_from_user(p_data, (void *)addr, bytes)) )
     {
-        propagate_page_fault(addr + bytes - rc, 0); /* read fault */
+        pv_inject_page_fault(0, addr + bytes - rc); /* Read fault. */
         return X86EMUL_EXCEPTION;
     }
 
@@ -5177,7 +5177,8 @@ static int ptwr_emulated_update(
         addr &= ~(sizeof(paddr_t)-1);
         if ( (rc = copy_from_user(&full, (void *)addr, sizeof(paddr_t))) != 0 )
         {
-            propagate_page_fault(addr+sizeof(paddr_t)-rc, 0); /* read fault */
+            pv_inject_page_fault(0, /* Read fault. */
+                                 addr + sizeof(paddr_t) - rc);
             return X86EMUL_EXCEPTION;
         }
         /* Mask out bits provided by caller. */
