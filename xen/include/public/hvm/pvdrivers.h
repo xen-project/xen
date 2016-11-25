@@ -28,7 +28,7 @@
  * This is the master registry of product numbers for
  * PV drivers. 
  * If you need a new product number allocating, please
- * post to xen-devel@lists.xensource.com.  You should NOT use
+ * post to xen-devel@lists.xenproject.org.  You should NOT use
  * a product number without allocating one.
  * If you maintain a separate versioning and distribution path
  * for PV drivers you should have a separate product number so
