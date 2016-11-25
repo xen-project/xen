@@ -162,8 +162,9 @@ static int hvm_translate_linear_addr(
 
     if ( !okay )
     {
-        hvm_inject_hw_exception(
-            (seg == x86_seg_ss) ? TRAP_stack_error : TRAP_gp_fault, 0);
+        x86_emul_hw_exception(
+            (seg == x86_seg_ss) ? TRAP_stack_error : TRAP_gp_fault,
+            0, &sh_ctxt->ctxt);
         return X86EMUL_EXCEPTION;
     }
 
@@ -323,7 +324,7 @@ pv_emulate_read(enum x86_segment seg,
 
     if ( (rc = copy_from_user(p_data, (void *)offset, bytes)) != 0 )
     {
-        pv_inject_page_fault(0, offset + bytes - rc); /* Read fault. */
+        x86_emul_pagefault(0, offset + bytes - rc, ctxt); /* Read fault. */
         return X86EMUL_EXCEPTION;
     }
 
@@ -1714,10 +1715,8 @@ static mfn_t emulate_gva_to_mfn(struct vcpu *v, unsigned long vaddr,
     gfn = paging_get_hostmode(v)->gva_to_gfn(v, NULL, vaddr, &pfec);
     if ( gfn == gfn_x(INVALID_GFN) )
     {
-        if ( is_hvm_vcpu(v) )
-            hvm_inject_page_fault(pfec, vaddr);
-        else
-            pv_inject_page_fault(pfec, vaddr);
+        x86_emul_pagefault(pfec, vaddr, &sh_ctxt->ctxt);
+
         return _mfn(BAD_GVA_TO_GFN);
     }
 

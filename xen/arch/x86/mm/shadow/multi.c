@@ -3373,18 +3373,34 @@ static int sh_page_fault(struct vcpu *v,
 
     r = x86_emulate(&emul_ctxt.ctxt, emul_ops);
 
-    /*
-     * The previous lack of inject_{sw,hw}*() hooks caused exceptions raised
-     * by the emulator itself to become X86EMUL_UNHANDLEABLE.  Such exceptions
-     * now set event_pending instead.  Exceptions raised behind the back of
-     * the emulator don't yet set event_pending.
-     *
-     * For now, cause such cases to return to the X86EMUL_UNHANDLEABLE path,
-     * for no functional change from before.  Future patches will fix this
-     * properly.
-     */
     if ( r == X86EMUL_EXCEPTION && emul_ctxt.ctxt.event_pending )
-        r = X86EMUL_UNHANDLEABLE;
+    {
+        /*
+         * This emulation covers writes to shadow pagetables.  We tolerate #PF
+         * (from accesses spanning pages, concurrent paging updated from
+         * vcpus, etc) and #GP[0]/#SS[0] (from segmentation errors).  Anything
+         * else is an emulation bug, or a guest playing with the instruction
+         * stream under Xen's feet.
+         */
+        if ( emul_ctxt.ctxt.event.type == X86_EVENTTYPE_HW_EXCEPTION &&
+             ((emul_ctxt.ctxt.event.vector == TRAP_page_fault) ||
+              (((emul_ctxt.ctxt.event.vector == TRAP_gp_fault) ||
+                (emul_ctxt.ctxt.event.vector == TRAP_stack_error)) &&
+               emul_ctxt.ctxt.event.error_code == 0)) )
+        {
+            if ( has_hvm_container_domain(d) )
+                hvm_inject_event(&emul_ctxt.ctxt.event);
+            else
+                pv_inject_event(&emul_ctxt.ctxt.event);
+        }
+        else
+        {
+            SHADOW_PRINTK(
+                "Unexpected event (type %u, vector %#x) from emulation\n",
+                emul_ctxt.ctxt.event.type, emul_ctxt.ctxt.event.vector);
+            r = X86EMUL_UNHANDLEABLE;
+        }
+    }
 
     /*
      * NB. We do not unshadow on X86EMUL_EXCEPTION. It's not clear that it
