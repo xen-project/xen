@@ -1802,7 +1802,8 @@ void *sh_emulate_map_dest(struct vcpu *v, unsigned long vaddr,
     else
     {
         /* This write crosses a page boundary. Translate the second page. */
-        sh_ctxt->mfn[1] = emulate_gva_to_mfn(v, vaddr + bytes - 1, sh_ctxt);
+        sh_ctxt->mfn[1] = emulate_gva_to_mfn(
+            v, (vaddr + bytes - 1) & PAGE_MASK, sh_ctxt);
         if ( !mfn_valid(sh_ctxt->mfn[1]) )
             return ((mfn_x(sh_ctxt->mfn[1]) == BAD_GVA_TO_GFN) ?
                     MAPPING_EXCEPTION :
