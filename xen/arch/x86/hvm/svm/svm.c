@@ -2029,7 +2029,7 @@ svm_vmexit_do_vmrun(struct cpu_user_regs *regs,
     if ( !nestedsvm_vmcb_map(v, vmcbaddr) )
     {
         gdprintk(XENLOG_ERR, "VMRUN: mapping vmcb failed, injecting #GP\n");
-        hvm_inject_hw_exception(TRAP_gp_fault, HVM_DELIVER_NO_ERROR_CODE);
+        hvm_inject_hw_exception(TRAP_gp_fault, 0);
         return;
     }
 
@@ -2068,7 +2068,6 @@ svm_vmexit_do_vmload(struct vmcb_struct *vmcb,
                      struct cpu_user_regs *regs,
                      struct vcpu *v, uint64_t vmcbaddr)
 {
-    int ret;
     unsigned int inst_len;
     struct page_info *page;
 
@@ -2078,8 +2077,8 @@ svm_vmexit_do_vmload(struct vmcb_struct *vmcb,
     if ( !nsvm_efer_svm_enabled(v) ) 
     {
         gdprintk(XENLOG_ERR, "VMLOAD: nestedhvm disabled, injecting #UD\n");
-        ret = TRAP_invalid_op;
-        goto inject;
+        hvm_inject_hw_exception(TRAP_invalid_op, HVM_DELIVER_NO_ERROR_CODE);
+        return;
     }
 
     page = nsvm_get_nvmcb_page(v, vmcbaddr);
@@ -2087,8 +2086,8 @@ svm_vmexit_do_vmload(struct vmcb_struct *vmcb,
     {
         gdprintk(XENLOG_ERR,
             "VMLOAD: mapping failed, injecting #GP\n");
-        ret = TRAP_gp_fault;
-        goto inject;
+        hvm_inject_hw_exception(TRAP_gp_fault, 0);
+        return;
     }
 
     svm_vmload_pa(page_to_maddr(page));
@@ -2098,11 +2097,6 @@ svm_vmexit_do_vmload(struct vmcb_struct *vmcb,
     v->arch.hvm_svm.vmcb_in_sync = 0;
 
     __update_guest_eip(regs, inst_len);
-    return;
-
- inject:
-    hvm_inject_hw_exception(ret, HVM_DELIVER_NO_ERROR_CODE);
-    return;
 }
 
 static void
@@ -2110,7 +2104,6 @@ svm_vmexit_do_vmsave(struct vmcb_struct *vmcb,
                      struct cpu_user_regs *regs,
                      struct vcpu *v, uint64_t vmcbaddr)
 {
-    int ret;
     unsigned int inst_len;
     struct page_info *page;
 
@@ -2120,8 +2113,8 @@ svm_vmexit_do_vmsave(struct vmcb_struct *vmcb,
     if ( !nsvm_efer_svm_enabled(v) ) 
     {
         gdprintk(XENLOG_ERR, "VMSAVE: nestedhvm disabled, injecting #UD\n");
-        ret = TRAP_invalid_op;
-        goto inject;
+        hvm_inject_hw_exception(TRAP_invalid_op, HVM_DELIVER_NO_ERROR_CODE);
+        return;
     }
 
     page = nsvm_get_nvmcb_page(v, vmcbaddr);
@@ -2129,18 +2122,13 @@ svm_vmexit_do_vmsave(struct vmcb_struct *vmcb,
     {
         gdprintk(XENLOG_ERR,
             "VMSAVE: mapping vmcb failed, injecting #GP\n");
-        ret = TRAP_gp_fault;
-        goto inject;
+        hvm_inject_hw_exception(TRAP_gp_fault, 0);
+        return;
     }
 
     svm_vmsave_pa(page_to_maddr(page));
     put_page(page);
     __update_guest_eip(regs, inst_len);
-    return;
-
- inject:
-    hvm_inject_hw_exception(ret, HVM_DELIVER_NO_ERROR_CODE);
-    return;
 }
 
 static int svm_is_erratum_383(struct cpu_user_regs *regs)
