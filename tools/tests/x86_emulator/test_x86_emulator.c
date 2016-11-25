@@ -669,6 +669,21 @@ int main(int argc, char **argv)
     printf("okay\n");
 #else
     printf("skipped\n");
+
+    printf("%-40s", "Testing cmovz %ecx,%eax...");
+    instr[0] = 0x0f; instr[1] = 0x44; instr[2] = 0xc1;
+    regs.eflags = 0x200;
+    regs.eip    = (unsigned long)&instr[0];
+    regs.rax    = 0x1111111122222222;
+    regs.rcx    = 0x3333333344444444;
+    rc = x86_emulate(&ctxt, &emulops);
+    if ( (rc != X86EMUL_OKAY) ||
+         (regs.rax != 0x0000000022222222) ||
+         (regs.rcx != 0x3333333344444444) ||
+         (regs.eflags != 0x200) ||
+         (regs.eip != (unsigned long)&instr[3]) )
+        goto fail;
+    printf("okay\n");
 #endif
 
     printf("%-40s", "Testing movbe (%%ecx),%%eax...");

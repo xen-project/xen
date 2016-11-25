@@ -4777,9 +4777,8 @@ x86_emulate(
 
     case X86EMUL_OPC(0x0f, 0x40) ... X86EMUL_OPC(0x0f, 0x4f): /* cmovcc */
         vcpu_must_have_cmov();
-        dst.val = src.val;
-        if ( !test_cc(b, _regs.eflags) )
-            dst.type = OP_NONE;
+        if ( test_cc(b, _regs.eflags) )
+            dst.val = src.val;
         break;
 
     case X86EMUL_OPC(0x0f, 0x34): /* sysenter */ {
