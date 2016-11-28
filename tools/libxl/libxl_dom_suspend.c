@@ -456,12 +456,6 @@ int libxl__domain_resume(libxl__gc *gc, uint32_t domid, int suspend_cancel)
 {
     int rc = 0;
 
-    if (xc_domain_resume(CTX->xch, domid, suspend_cancel)) {
-        LOGED(ERROR, domid, "xc_domain_resume failed");
-        rc = ERROR_FAIL;
-        goto out;
-    }
-
     libxl_domain_type type = libxl__domain_type(gc, domid);
     if (type == LIBXL_DOMAIN_TYPE_INVALID) {
         rc = ERROR_FAIL;
@@ -474,6 +468,12 @@ int libxl__domain_resume(libxl__gc *gc, uint32_t domid, int suspend_cancel)
             LOGD(ERROR, domid, "failed to resume device model:%d", rc);
             goto out;
         }
+    }
+
+    if (xc_domain_resume(CTX->xch, domid, suspend_cancel)) {
+        LOGED(ERROR, domid, "xc_domain_resume failed");
+        rc = ERROR_FAIL;
+        goto out;
     }
 
     if (!xs_resume_domain(CTX->xsh, domid)) {
