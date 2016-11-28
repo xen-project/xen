@@ -385,16 +385,18 @@ static int xc_tmem_restore_new_pool(
                     uint64_t uuid_lo,
                     uint64_t uuid_hi)
 {
-    tmem_op_t op;
+    xen_tmem_pool_info_t pool = {
+        .flags.raw = flags,
+        .id = pool_id,
+        .n_pages = 0,
+        .uuid[0] = uuid_lo,
+        .uuid[1] = uuid_hi,
+    };
 
-    op.cmd = TMEM_RESTORE_NEW;
-    op.pool_id = pool_id;
-    op.u.creat.arg1 = cli_id;
-    op.u.creat.flags = flags;
-    op.u.creat.uuid[0] = uuid_lo;
-    op.u.creat.uuid[1] = uuid_hi;
-
-    return do_tmem_op(xch, &op);
+    return xc_tmem_control(xch, pool_id,
+                           XEN_SYSCTL_TMEM_OP_SET_POOLS,
+                           cli_id, sizeof(pool),
+                           0 /* arg */, &pool);
 }
 
 int xc_tmem_restore(xc_interface *xch, int dom, int io_fd)

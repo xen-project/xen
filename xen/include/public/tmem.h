@@ -53,7 +53,8 @@
 
 /* Privileged commands to HYPERVISOR_tmem_op() */
 #define TMEM_AUTH                 101
-#define TMEM_RESTORE_NEW          102
+#define TMEM_RESTORE_NEW          102 /* Now called via XEN_SYSCTL_tmem_op as
+                                         XEN_SYSCTL_TMEM_OP_SET_POOL. */
 
 /* Bits for HYPERVISOR_tmem_op(TMEM_NEW_POOL) */
 #define TMEM_POOL_PERSIST          1
@@ -92,7 +93,7 @@ struct tmem_op {
             uint64_t uuid[2];
             uint32_t flags;
             uint32_t arg1;
-        } creat; /* for cmd == TMEM_NEW_POOL, TMEM_AUTH, TMEM_RESTORE_NEW */
+        } creat; /* for cmd == TMEM_NEW_POOL, TMEM_AUTH */
         struct {
 #if __XEN_INTERFACE_VERSION__ < 0x00040600
             uint64_t oid[3];

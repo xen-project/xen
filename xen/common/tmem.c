@@ -804,7 +804,7 @@ static void pool_flush(struct tmem_pool *pool, domid_t cli_id)
 
 /************ CLIENT MANIPULATION OPERATIONS **************************/
 
-static struct client *client_create(domid_t cli_id)
+struct client *client_create(domid_t cli_id)
 {
     struct client *client = xzalloc(struct client);
     int i, shift;
@@ -1435,9 +1435,9 @@ static int do_tmem_destroy_pool(uint32_t pool_id)
     return 1;
 }
 
-static int do_tmem_new_pool(domid_t this_cli_id,
-                                     uint32_t d_poolid, uint32_t flags,
-                                     uint64_t uuid_lo, uint64_t uuid_hi)
+int do_tmem_new_pool(domid_t this_cli_id,
+                     uint32_t d_poolid, uint32_t flags,
+                     uint64_t uuid_lo, uint64_t uuid_hi)
 {
     struct client *client;
     domid_t cli_id;
@@ -1908,21 +1908,19 @@ long do_tmem_op(tmem_cli_op_t uops)
     /* Acquire write lock for all commands at first. */
     write_lock(&tmem_rwlock);
 
-    if ( op.cmd == TMEM_CONTROL )
+    switch ( op.cmd )
     {
+    case TMEM_CONTROL:
+    case TMEM_RESTORE_NEW:
         rc = -EOPNOTSUPP;
-    }
-    else if ( op.cmd == TMEM_AUTH )
-    {
+        break;
+
+    case TMEM_AUTH:
         rc = tmemc_shared_pool_auth(op.u.creat.arg1,op.u.creat.uuid[0],
                          op.u.creat.uuid[1],op.u.creat.flags);
-    }
-    else if ( op.cmd == TMEM_RESTORE_NEW )
-    {
-        rc = do_tmem_new_pool(op.u.creat.arg1, op.pool_id, op.u.creat.flags,
-                         op.u.creat.uuid[0], op.u.creat.uuid[1]);
-    }
-    else {
+        break;
+
+    default:
     /*
 	 * For other commands, create per-client tmem structure dynamically on
 	 * first use by client.
@@ -1999,6 +1997,8 @@ long do_tmem_op(tmem_cli_op_t uops)
                 tmem_stats.errored_tmem_ops++;
             return rc;
         }
+        break;
+
     }
 out:
     write_unlock(&tmem_rwlock);
