@@ -643,11 +643,6 @@ void load_system_tables(void)
 		.limit = (IDT_ENTRIES * sizeof(idt_entry_t)) - 1,
 	};
 
-	/* Bottom-of-stack must be 16-byte aligned! */
-	BUILD_BUG_ON((sizeof(struct cpu_info) -
-		      offsetof(struct cpu_info, guest_cpu_user_regs.es)) & 0xf);
-	BUG_ON(system_state != SYS_STATE_early_boot && (stack_bottom & 0xf));
-
 	/* Main stack for interrupts/exceptions. */
 	tss->rsp0 = stack_bottom;
 	tss->bitmap = IOBMP_INVALID_OFFSET;
@@ -672,6 +667,15 @@ void load_system_tables(void)
 	asm volatile ("lidt %0"  : : "m"  (idtr) );
 	asm volatile ("ltr  %w0" : : "rm" (TSS_ENTRY << 3) );
 	asm volatile ("lldt %w0" : : "rm" (0) );
+
+	/*
+	 * Bottom-of-stack must be 16-byte aligned!
+	 *
+	 * Defer checks until exception support is sufficiently set up.
+	 */
+	BUILD_BUG_ON((sizeof(struct cpu_info) -
+		      offsetof(struct cpu_info, guest_cpu_user_regs.es)) & 0xf);
+	BUG_ON(system_state != SYS_STATE_early_boot && (stack_bottom & 0xf));
 }
 
 /*
