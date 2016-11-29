@@ -5382,6 +5382,9 @@ int ptwr_do_page_fault(struct vcpu *v, unsigned long addr,
     if ( rc == X86EMUL_UNHANDLEABLE )
         goto bail;
 
+    if ( ptwr_ctxt.ctxt.retire.singlestep )
+        pv_inject_hw_exception(TRAP_debug, X86_EVENT_NO_EC);
+
     perfc_incr(ptwr_emulations);
     return EXCRET_fault_fixed;
 
@@ -5503,7 +5506,13 @@ int mmio_ro_do_page_fault(struct vcpu *v, unsigned long addr,
     else
         rc = x86_emulate(&ctxt, &mmio_ro_emulate_ops);
 
-    return rc != X86EMUL_UNHANDLEABLE ? EXCRET_fault_fixed : 0;
+    if ( rc == X86EMUL_UNHANDLEABLE )
+        return 0;
+
+    if ( ctxt.retire.singlestep )
+        pv_inject_hw_exception(TRAP_debug, X86_EVENT_NO_EC);
+
+    return EXCRET_fault_fixed;
 }
 
 void *alloc_xen_pagetable(void)

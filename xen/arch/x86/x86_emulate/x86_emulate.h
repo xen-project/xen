@@ -483,6 +483,7 @@ struct x86_emulate_ctxt
             bool hlt:1;          /* Instruction HLTed. */
             bool mov_ss:1;       /* Instruction sets MOV-SS irq shadow. */
             bool sti:1;          /* Instruction sets STI irq shadow. */
+            bool singlestep:1;   /* Singlestepping was active. */
         };
     } retire;
 };
@@ -572,11 +573,16 @@ static inline int x86_emulate_wrapper(
     struct x86_emulate_ctxt *ctxt,
     const struct x86_emulate_ops *ops)
 {
+    unsigned long orig_eip = ctxt->regs->eip;
     int rc = x86_emulate(ctxt, ops);
 
     /* Retire flags should only be set for successful instruction emulation. */
     if ( rc != X86EMUL_OKAY )
         ASSERT(ctxt->retire.raw == 0);
+
+    /* All cases returning X86EMUL_EXCEPTION should have fault semantics. */
+    if ( rc == X86EMUL_EXCEPTION )
+        ASSERT(ctxt->regs->eip == orig_eip);
 
     return rc;
 }

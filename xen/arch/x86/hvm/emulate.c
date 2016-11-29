@@ -1788,6 +1788,9 @@ static int _hvm_emulate_one(struct hvm_emulate_ctxt *hvmemul_ctxt,
     if ( rc != X86EMUL_OKAY )
         return rc;
 
+    if ( hvmemul_ctxt->ctxt.retire.singlestep )
+        hvm_inject_hw_exception(TRAP_debug, X86_EVENT_NO_EC);
+
     new_intr_shadow = hvmemul_ctxt->intr_shadow;
 
     /* MOV-SS instruction toggles MOV-SS shadow, else we just clear it. */

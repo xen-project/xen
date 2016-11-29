@@ -3422,18 +3422,36 @@ static int sh_page_fault(struct vcpu *v,
         v->arch.paging.last_write_emul_ok = 0;
 #endif
 
+    if ( emul_ctxt.ctxt.retire.singlestep )
+    {
+        if ( has_hvm_container_domain(d) )
+            hvm_inject_hw_exception(TRAP_debug, X86_EVENT_NO_EC);
+        else
+            pv_inject_hw_exception(TRAP_debug, X86_EVENT_NO_EC);
+    }
+
 #if GUEST_PAGING_LEVELS == 3 /* PAE guest */
-    if ( r == X86EMUL_OKAY ) {
+    /*
+     * If there are no pending actions, emulate up to four extra instructions
+     * in the hope of catching the "second half" of a 64-bit pagetable write.
+     */
+    if ( r == X86EMUL_OKAY && !emul_ctxt.ctxt.retire.raw )
+    {
         int i, emulation_count=0;
         this_cpu(trace_emulate_initial_va) = va;
-        /* Emulate up to four extra instructions in the hope of catching
-         * the "second half" of a 64-bit pagetable write. */
+
         for ( i = 0 ; i < 4 ; i++ )
         {
             shadow_continue_emulation(&emul_ctxt, regs);
             v->arch.paging.last_write_was_pt = 0;
             r = x86_emulate(&emul_ctxt.ctxt, emul_ops);
-            if ( r == X86EMUL_OKAY )
+
+            /*
+             * Only continue the search for the second half if there are no
+             * exceptions or pending actions.  Otherwise, give up and re-enter
+             * the guest.
+             */
+            if ( r == X86EMUL_OKAY && !emul_ctxt.ctxt.retire.raw )
             {
                 emulation_count++;
                 if ( v->arch.paging.last_write_was_pt )
@@ -3449,6 +3467,15 @@ static int sh_page_fault(struct vcpu *v,
             {
                 perfc_incr(shadow_em_ex_fail);
                 TRACE_SHADOW_PATH_FLAG(TRCE_SFLAG_EMULATION_LAST_FAILED);
+
+                if ( emul_ctxt.ctxt.retire.singlestep )
+                {
+                    if ( has_hvm_container_domain(d) )
+                        hvm_inject_hw_exception(TRAP_debug, X86_EVENT_NO_EC);
+                    else
+                        pv_inject_hw_exception(TRAP_debug, X86_EVENT_NO_EC);
+                }
+
                 break; /* Don't emulate again if we failed! */
             }
         }

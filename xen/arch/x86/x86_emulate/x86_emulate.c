@@ -2415,7 +2415,6 @@ x86_emulate(
     struct x86_emulate_state state;
     int rc;
     uint8_t b, d;
-    bool tf = ctxt->regs->eflags & EFLG_TF;
     struct operand src = { .reg = PTR_POISON };
     struct operand dst = { .reg = PTR_POISON };
     enum x86_swint_type swint_type;
@@ -5413,11 +5412,11 @@ x86_emulate(
     if ( !mode_64bit() )
         _regs.eip = (uint32_t)_regs.eip;
 
-    *ctxt->regs = _regs;
+    /* Was singestepping active at the start of this instruction? */
+    if ( (rc == X86EMUL_OKAY) && (ctxt->regs->eflags & EFLG_TF) )
+        ctxt->retire.singlestep = true;
 
-    /* Inject #DB if single-step tracing was enabled at instruction start. */
-    if ( tf && (rc == X86EMUL_OKAY) && ops->inject_hw_exception )
-        rc = ops->inject_hw_exception(EXC_DB, -1, ctxt) ? : X86EMUL_EXCEPTION;
+    *ctxt->regs = _regs;
 
  done:
     _put_fpu();
