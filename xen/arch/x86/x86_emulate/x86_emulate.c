@@ -1905,7 +1905,7 @@ x86_decode(
     state->eip = ctxt->regs->eip;
 
     /* Initialise output state in x86_emulate_ctxt */
-    ctxt->retire.byte = 0;
+    ctxt->retire.raw = 0;
 
     op_bytes = def_op_bytes = ad_bytes = def_ad_bytes = ctxt->addr_size/8;
     if ( op_bytes == 8 )
@@ -2668,7 +2668,7 @@ x86_emulate(
 
     case 0x17: /* pop %%ss */
         src.val = x86_seg_ss;
-        ctxt->retire.flags.mov_ss = 1;
+        ctxt->retire.mov_ss = true;
         goto pop_seg;
 
     case 0x1e: /* push %%ds */
@@ -2996,7 +2996,7 @@ x86_emulate(
         if ( (rc = load_seg(seg, src.val, 0, NULL, ctxt, ops)) != 0 )
             goto done;
         if ( seg == x86_seg_ss )
-            ctxt->retire.flags.mov_ss = 1;
+            ctxt->retire.mov_ss = true;
         dst.type = OP_NONE;
         break;
 
@@ -4033,7 +4033,7 @@ x86_emulate(
 
     case 0xf4: /* hlt */
         generate_exception_if(!mode_ring0(), EXC_GP, 0);
-        ctxt->retire.flags.hlt = 1;
+        ctxt->retire.hlt = true;
         break;
 
     case 0xf5: /* cmc */
@@ -4247,7 +4247,7 @@ x86_emulate(
         if ( !(_regs.eflags & EFLG_IF) )
         {
             _regs.eflags |= EFLG_IF;
-            ctxt->retire.flags.sti = 1;
+            ctxt->retire.sti = true;
         }
         break;
 

@@ -468,12 +468,12 @@ struct x86_emulate_ctxt
 
     /* Retirement state, set by the emulator (valid only on X86EMUL_OKAY). */
     union {
+        uint8_t raw;
         struct {
-            uint8_t hlt:1;          /* Instruction HLTed. */
-            uint8_t mov_ss:1;       /* Instruction sets MOV-SS irq shadow. */
-            uint8_t sti:1;          /* Instruction sets STI irq shadow. */
-        } flags;
-        uint8_t byte;
+            bool hlt:1;          /* Instruction HLTed. */
+            bool mov_ss:1;       /* Instruction sets MOV-SS irq shadow. */
+            bool sti:1;          /* Instruction sets STI irq shadow. */
+        };
     } retire;
 };
 

@@ -1791,13 +1791,13 @@ static int _hvm_emulate_one(struct hvm_emulate_ctxt *hvmemul_ctxt,
     new_intr_shadow = hvmemul_ctxt->intr_shadow;
 
     /* MOV-SS instruction toggles MOV-SS shadow, else we just clear it. */
-    if ( hvmemul_ctxt->ctxt.retire.flags.mov_ss )
+    if ( hvmemul_ctxt->ctxt.retire.mov_ss )
         new_intr_shadow ^= HVM_INTR_SHADOW_MOV_SS;
     else
         new_intr_shadow &= ~HVM_INTR_SHADOW_MOV_SS;
 
     /* STI instruction toggles STI shadow, else we just clear it. */
-    if ( hvmemul_ctxt->ctxt.retire.flags.sti )
+    if ( hvmemul_ctxt->ctxt.retire.sti )
         new_intr_shadow ^= HVM_INTR_SHADOW_STI;
     else
         new_intr_shadow &= ~HVM_INTR_SHADOW_STI;
@@ -1808,7 +1808,7 @@ static int _hvm_emulate_one(struct hvm_emulate_ctxt *hvmemul_ctxt,
         hvm_funcs.set_interrupt_shadow(curr, new_intr_shadow);
     }
 
-    if ( hvmemul_ctxt->ctxt.retire.flags.hlt &&
+    if ( hvmemul_ctxt->ctxt.retire.hlt &&
          !hvm_local_events_need_delivery(curr) )
     {
         hvm_hlt(regs->eflags);
