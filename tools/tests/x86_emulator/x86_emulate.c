@@ -16,7 +16,6 @@ typedef bool bool_t;
 #define EFER_LMA       (1 << 10)
 
 #define BUG() abort()
-#define ASSERT assert
 #define ASSERT_UNREACHABLE() assert(!__LINE__)
 
 #if __GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 6)
@@ -49,5 +48,8 @@ typedef bool bool_t;
 
 #define __init
 #define __maybe_unused __attribute__((__unused__))
+
+#define likely(x)     __builtin_expect(!!(x), true)
+#define unlikely(x)   __builtin_expect(!!(x), false)
 
 #include "x86_emulate/x86_emulate.c"

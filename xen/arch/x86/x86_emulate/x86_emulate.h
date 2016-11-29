@@ -23,6 +23,10 @@
 #ifndef __X86_EMULATE_H__
 #define __X86_EMULATE_H__
 
+#if !defined(__XEN__) && !defined(ASSERT)
+#define ASSERT assert
+#endif
+
 #define MAX_INST_LEN 15
 
 struct x86_emulate_ctxt;
@@ -546,12 +550,33 @@ struct x86_emulate_stub {
 
 /*
  * x86_emulate: Emulate an instruction.
- * Returns -1 on failure, 0 on success.
+ * Returns X86EMUL_* constants.
  */
 int
 x86_emulate(
     struct x86_emulate_ctxt *ctxt,
     const struct x86_emulate_ops *ops);
+
+#ifndef NDEBUG
+/*
+ * In debug builds, wrap x86_emulate() with some assertions about its expected
+ * behaviour.
+ */
+static inline int x86_emulate_wrapper(
+    struct x86_emulate_ctxt *ctxt,
+    const struct x86_emulate_ops *ops)
+{
+    int rc = x86_emulate(ctxt, ops);
+
+    /* Retire flags should only be set for successful instruction emulation. */
+    if ( rc != X86EMUL_OKAY )
+        ASSERT(ctxt->retire.raw == 0);
+
+    return rc;
+}
+
+#define x86_emulate x86_emulate_wrapper
+#endif
 
 /*
  * Given the 'reg' portion of a ModRM byte, and a register block, return a

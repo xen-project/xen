@@ -2404,6 +2404,9 @@ x86_decode(
 #undef insn_fetch_bytes
 #undef insn_fetch_type
 
+/* Undo DEBUG wrapper. */
+#undef x86_emulate
+
 int
 x86_emulate(
     struct x86_emulate_ctxt *ctxt,
