@@ -55,6 +55,17 @@ struct cpu_user_regs
 
     uint32_t pad1; /* Doubleword-align the user half of the frame */
 };
+
+/* Functions for pending virtual abort checking window. */
+void abort_guest_exit_start(void);
+void abort_guest_exit_end(void);
+
+#define VABORT_GEN_BY_GUEST(r)  \
+( \
+    ( (unsigned long)abort_guest_exit_start == (r)->pc ) || \
+    ( (unsigned long)abort_guest_exit_end == (r)->pc ) \
+)
+
 #endif
 
 /* Layout as used in assembly, with src/dest registers mixed in */

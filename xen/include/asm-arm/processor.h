@@ -690,6 +690,8 @@ void vcpu_regs_user_to_hyp(struct vcpu *vcpu,
 int call_smc(register_t function_id, register_t arg0, register_t arg1,
              register_t arg2);
 
+void do_trap_guest_error(struct cpu_user_regs *regs);
+
 #endif /* __ASSEMBLY__ */
 #endif /* __ASM_ARM_PROCESSOR_H */
 /*
