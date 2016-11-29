@@ -42,6 +42,61 @@ save_guest_regs:
         SAVE_BANKED(fiq)
         SAVE_ONE_BANKED(R8_fiq); SAVE_ONE_BANKED(R9_fiq); SAVE_ONE_BANKED(R10_fiq)
         SAVE_ONE_BANKED(R11_fiq); SAVE_ONE_BANKED(R12_fiq);
+        /*
+         * Start to check pending virtual abort in the gap of Guest -> HYP
+         * world switch.
+         *
+         * Save ELR_hyp to check whether the pending virtual abort exception
+         * takes place while we are doing this trap exception.
+         */
+        mrs r1, ELR_hyp
+
+        /*
+         * Force loads and stores to complete before unmasking asynchronous
+         * aborts and forcing the delivery of the exception.
+         */
+        dsb sy
+
+        /*
+         * Unmask asynchronous abort bit. If there is a pending asynchronous
+         * abort, the data_abort exception will happen after A bit is cleared.
+         */
+        cpsie a
+
+        /*
+         * This is our single instruction exception window. A pending
+         * asynchronous abort is guaranteed to occur at the earliest when we
+         * unmask it, and at the latest just after the ISB.
+         *
+         * If a pending abort occurs, the program will jump to data_abort
+         * exception handler, and the ELR_hyp will be set to
+         * abort_guest_exit_start or abort_guest_exit_end.
+         */
+        .global abort_guest_exit_start
+abort_guest_exit_start:
+
+        isb
+
+        .global abort_guest_exit_end
+abort_guest_exit_end:
+        /* Mask CPSR asynchronous abort bit, close the checking window. */
+        cpsid a
+
+        /*
+         * Compare ELR_hyp and the saved value to check whether we are
+         * returning from a valid exception caused by pending virtual
+         * abort.
+         */
+        mrs r2, ELR_hyp
+        cmp r1, r2
+
+        /*
+         * Not equal, the pending virtual abort exception took place, the
+         * initial exception does not have any significance to be handled.
+         * Exit ASAP.
+         */
+        bne return_from_trap
+
         mov pc, lr
 
 #define DEFINE_TRAP_ENTRY(trap)                                         \

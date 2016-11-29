@@ -173,6 +173,43 @@ hyp_error_invalid:
         entry   hyp=1
         invalid BAD_ERROR
 
+hyp_error:
+        /*
+         * Only two possibilities:
+         * 1) Either we come from the exit path, having just unmasked
+         *    PSTATE.A: change the return code to an EL2 fault, and
+         *    carry on, as we're already in a sane state to handle it.
+         * 2) Or we come from anywhere else, and that's a bug: we panic.
+         */
+        entry   hyp=1
+        msr     daifclr, #2
+
+        /*
+         * The ELR_EL2 may be modified by an interrupt, so we have to use the
+         * saved value in cpu_user_regs to check whether we come from 1) or
+         * not.
+         */
+        ldr     x0, [sp, #UREGS_PC]
+        adr     x1, abort_guest_exit_start
+        cmp     x0, x1
+        adr     x1, abort_guest_exit_end
+        ccmp    x0, x1, #4, ne
+        mov     x0, sp
+        mov     x1, #BAD_ERROR
+
+        /*
+         * Not equal, the exception come from 2). It's a bug, we have to
+         * panic the hypervisor.
+         */
+        b.ne    do_bad_mode
+
+        /*
+         * Otherwise, the exception come from 1). It happened because of
+         * the guest. Crash this guest.
+         */
+        bl      do_trap_guest_error
+        exit    hyp=1
+
 /* Traps taken in Current EL with SP_ELx */
 hyp_sync:
         entry   hyp=1
@@ -189,45 +226,79 @@ hyp_irq:
 
 guest_sync:
         entry   hyp=0, compat=0
+        bl      check_pending_vserror
+        /*
+         * If x0 is Non-zero, a vSError took place, the initial exception
+         * doesn't have any significance to be handled. Exit ASAP
+         */
+        cbnz    x0, 1f
         msr     daifclr, #2
         mov     x0, sp
         bl      do_trap_hypervisor
+1:
         exit    hyp=0, compat=0
 
 guest_irq:
         entry   hyp=0, compat=0
+        bl      check_pending_vserror
+        /*
+         * If x0 is Non-zero, a vSError took place, the initial exception
+         * doesn't have any significance to be handled. Exit ASAP
+         */
+        cbnz    x0, 1f
         mov     x0, sp
         bl      do_trap_irq
+1:
         exit    hyp=0, compat=0
 
 guest_fiq_invalid:
         entry   hyp=0, compat=0
         invalid BAD_FIQ
 
-guest_error_invalid:
+guest_error:
         entry   hyp=0, compat=0
-        invalid BAD_ERROR
+        msr     daifclr, #2
+        mov     x0, sp
+        bl      do_trap_guest_error
+        exit    hyp=0, compat=0
 
 guest_sync_compat:
         entry   hyp=0, compat=1
+        bl      check_pending_vserror
+        /*
+         * If x0 is Non-zero, a vSError took place, the initial exception
+         * doesn't have any significance to be handled. Exit ASAP
+         */
+        cbnz    x0, 1f
         msr     daifclr, #2
         mov     x0, sp
         bl      do_trap_hypervisor
+1:
         exit    hyp=0, compat=1
 
 guest_irq_compat:
         entry   hyp=0, compat=1
+        bl      check_pending_vserror
+        /*
+         * If x0 is Non-zero, a vSError took place, the initial exception
+         * doesn't have any significance to be handled. Exit ASAP
+         */
+        cbnz    x0, 1f
         mov     x0, sp
         bl      do_trap_irq
+1:
         exit    hyp=0, compat=1
 
 guest_fiq_invalid_compat:
         entry   hyp=0, compat=1
         invalid BAD_FIQ
 
-guest_error_invalid_compat:
+guest_error_compat:
         entry   hyp=0, compat=1
-        invalid BAD_ERROR
+        msr     daifclr, #2
+        mov     x0, sp
+        bl      do_trap_guest_error
+        exit    hyp=0, compat=1
 
 ENTRY(return_to_new_vcpu32)
         exit    hyp=0, compat=1
@@ -264,6 +335,62 @@ return_from_trap:
         eret
 
 /*
+ * This function is used to check pending virtual SError in the gap of
+ * EL1 -> EL2 world switch.
+ * The x0 register will be used to indicate the results of detection.
+ * x0 -- Non-zero indicates a pending virtual SError took place.
+ * x0 -- Zero indicates no pending virtual SError took place.
+ */
+check_pending_vserror:
+        /*
+         * Save elr_el2 to check whether the pending SError exception takes
+         * place while we are doing this sync exception.
+         */
+        mrs     x0, elr_el2
+
+        /* Synchronize against in-flight ld/st */
+        dsb     sy
+
+        /*
+         * Unmask PSTATE asynchronous abort bit. If there is a pending
+         * SError, the EL2 error exception will happen after PSTATE.A
+         * is cleared.
+         */
+        msr     daifclr, #4
+
+        /*
+         * This is our single instruction exception window. A pending
+         * SError is guaranteed to occur at the earliest when we unmask
+         * it, and at the latest just after the ISB.
+         *
+         * If a pending SError occurs, the program will jump to EL2 error
+         * exception handler, and the elr_el2 will be set to
+         * abort_guest_exit_start or abort_guest_exit_end.
+         */
+abort_guest_exit_start:
+
+        isb
+
+abort_guest_exit_end:
+        /* Mask PSTATE asynchronous abort bit, close the checking window. */
+        msr     daifset, #4
+
+        /*
+         * Compare elr_el2 and the saved value to check whether we are
+         * returning from a valid exception caused by pending SError.
+         */
+        mrs     x1, elr_el2
+        cmp     x0, x1
+
+        /*
+         * Not equal, the pending SError exception took place, set
+         * x0 to non-zero.
+         */
+        cset    x0, ne
+
+        ret
+
+/*
  * Exception vectors.
  */
         .macro  ventry  label
@@ -281,17 +408,17 @@ ENTRY(hyp_traps_vector)
         ventry  hyp_sync                        // Synchronous EL2h
         ventry  hyp_irq                         // IRQ EL2h
         ventry  hyp_fiq_invalid                 // FIQ EL2h
-        ventry  hyp_error_invalid               // Error EL2h
+        ventry  hyp_error                       // Error EL2h
 
         ventry  guest_sync                      // Synchronous 64-bit EL0/EL1
         ventry  guest_irq                       // IRQ 64-bit EL0/EL1
         ventry  guest_fiq_invalid               // FIQ 64-bit EL0/EL1
-        ventry  guest_error_invalid             // Error 64-bit EL0/EL1
+        ventry  guest_error                     // Error 64-bit EL0/EL1
 
         ventry  guest_sync_compat               // Synchronous 32-bit EL0/EL1
         ventry  guest_irq_compat                // IRQ 32-bit EL0/EL1
         ventry  guest_fiq_invalid_compat        // FIQ 32-bit EL0/EL1
-        ventry  guest_error_invalid_compat      // Error 32-bit EL0/EL1
+        ventry  guest_error_compat              // Error 32-bit EL0/EL1
 
 /*
  * struct vcpu *__context_switch(struct vcpu *prev, struct vcpu *next)

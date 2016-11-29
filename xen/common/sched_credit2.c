@@ -330,7 +330,7 @@ static const char *const opt_runqueue_str[] = {
     [OPT_RUNQUEUE_NODE] = "node",
     [OPT_RUNQUEUE_ALL] = "all"
 };
-static int __read_mostly opt_runqueue = OPT_RUNQUEUE_CORE;
+static int __read_mostly opt_runqueue = OPT_RUNQUEUE_SOCKET;
 
 static void parse_credit2_runqueue(const char *s)
 {

@@ -27,6 +27,9 @@ DSDT_FILES ?= $(C_SRC-y)
 C_SRC = $(addprefix $(ACPI_BUILD_DIR)/, $(DSDT_FILES))
 H_SRC = $(addprefix $(ACPI_BUILD_DIR)/, ssdt_s3.h ssdt_s4.h ssdt_pm.h ssdt_tpm.h)
 
+MKDSDT_CFLAGS-$(CONFIG_ARM_64) = -DCONFIG_ARM_64
+MKDSDT_CFLAGS-$(CONFIG_X86) = -DCONFIG_X86
+
 # Suffix for temporary files.
 #
 # We will also use this suffix to workaround a bug in older iasl
@@ -44,7 +47,7 @@ $(H_SRC): $(ACPI_BUILD_DIR)/%.h: %.asl iasl
 	rm -f $(addprefix $(ACPI_BUILD_DIR)/, $*.aml $*.hex)
  
 $(MK_DSDT): mk_dsdt.c
-	$(HOSTCC) $(HOSTCFLAGS) $(CFLAGS_xeninclude) -D__XEN_TOOLS__ -o $@ mk_dsdt.c
+	$(HOSTCC) $(HOSTCFLAGS) $(MKDSDT_CFLAGS-y) $(CFLAGS_xeninclude) -D__XEN_TOOLS__ -o $@ mk_dsdt.c
 
 $(ACPI_BUILD_DIR)/dsdt_anycpu_qemu_xen.asl: dsdt.asl dsdt_acpi_info.asl $(MK_DSDT)
 	# Remove last bracket
