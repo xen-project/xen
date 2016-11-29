@@ -268,9 +268,9 @@ SEABIOS_UPSTREAM_REVISION ?= rel-1.8.2
 ETHERBOOT_NICS ?= rtl8139 8086100e
 
 
-QEMU_TRADITIONAL_REVISION ?= xen-4.6.4
-# Tue Jul 26 15:31:59 2016 +0100
-# virtio: error out if guest exceeds virtqueue size
+QEMU_TRADITIONAL_REVISION ?= 470c00e3b6982cef06a491f7991f2021c7be00c7
+# Tue Nov 29 16:36:38 2016 +0000
+# xen: fix ioreq handling
 
 # Specify which qemu-dm to use. This may be `ioemu' to use the old
 # Mercurial in-tree version, or a local directory, or a git URL.
