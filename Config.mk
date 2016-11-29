@@ -290,8 +290,6 @@ ETHERBOOT_NICS ?= rtl8139 8086100e
 
 
 QEMU_TRADITIONAL_REVISION ?= xen-4.8.0-rc7
-# Tue Jul 26 15:31:59 2016 +0100
-# virtio: error out if guest exceeds virtqueue size
 
 # Specify which qemu-dm to use. This may be `ioemu' to use the old
 # Mercurial in-tree version, or a local directory, or a git URL.
