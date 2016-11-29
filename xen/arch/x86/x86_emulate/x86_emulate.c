@@ -2656,6 +2656,8 @@ x86_emulate(
                               &dst.val, op_bytes, ctxt, ops)) != 0 ||
              (rc = load_seg(src.val, dst.val, 0, NULL, ctxt, ops)) != 0 )
             goto done;
+        if ( src.val == x86_seg_ss )
+            ctxt->retire.mov_ss = true;
         break;
 
     case 0x0e: /* push %%cs */
@@ -2668,7 +2670,6 @@ x86_emulate(
 
     case 0x17: /* pop %%ss */
         src.val = x86_seg_ss;
-        ctxt->retire.mov_ss = true;
         goto pop_seg;
 
     case 0x1e: /* push %%ds */
