@@ -17,9 +17,9 @@
 #include <getopt.h>
 #include <stdlib.h>
 #include <stdbool.h>
-#if defined(__i386__) || defined(__x86_64__)
+#if defined(CONFIG_X86)
 #include <xen/hvm/hvm_info_table.h>
-#elif defined(__aarch64__)
+#elif defined(CONFIG_ARM_64)
 #include <xen/arch-arm.h>
 #endif
 
@@ -111,9 +111,9 @@ int main(int argc, char **argv)
     unsigned int slot, dev, intx, link, cpu, max_cpus;
     dm_version dm_version = QEMU_XEN_TRADITIONAL;
 
-#if defined(__i386__) || defined(__x86_64__)
+#if defined(CONFIG_X86)
     max_cpus = HVM_MAX_VCPUS;
-#elif defined(__aarch64__)
+#elif defined(CONFIG_ARM_64)
     max_cpus = GUEST_MAX_VCPUS;
 #endif
 
@@ -169,7 +169,7 @@ int main(int argc, char **argv)
     /**** Processor start ****/
     push_block("Scope", "\\_SB");
 
-#if defined(__i386__) || defined(__x86_64__)
+#ifdef CONFIG_X86
     /* MADT checksum */
     stmt("OperationRegion", "MSUM, SystemMemory, \\_SB.MSUA, 1");
     push_block("Field", "MSUM, ByteAcc, NoLock, Preserve");
@@ -193,7 +193,7 @@ int main(int argc, char **argv)
         stmt("Name", "_HID, \"ACPI0007\"");
 
         stmt("Name", "_UID, %d", cpu);
-#if defined(__aarch64__)
+#ifdef CONFIG_ARM_64
         pop_block();
         continue;
 #endif
@@ -235,7 +235,7 @@ int main(int argc, char **argv)
         pop_block();
     }
 
-#if defined(__aarch64__)
+#ifdef CONFIG_ARM_64
     pop_block();
     /**** Processor end ****/
     pop_block();
