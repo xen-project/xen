@@ -248,9 +248,9 @@ ETHERBOOT_NICS ?= rtl8139 8086100e
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= 564f935e958bd102df822c978bd021673365dc78
-# Thu May 19 19:38:35 2016 +0100
-# main loop: Big hammer to fix logfile disk DoS in Xen setups
+QEMU_TAG ?= 851b5ee8ae2a841373d605ae6f755cb33a3626f9
+# Tue Nov 29 18:38:24 2016 +0000
+# xen: fix ioreq handling
 
 # Short answer -- do not enable this unless you know what you are
 # doing and are prepared for some pain.
