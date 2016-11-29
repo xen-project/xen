@@ -63,7 +63,10 @@ asmlinkage void do_trap_prefetch_abort(struct cpu_user_regs *regs)
 
 asmlinkage void do_trap_data_abort(struct cpu_user_regs *regs)
 {
-    do_unexpected_trap("Data Abort", regs);
+    if ( VABORT_GEN_BY_GUEST(regs) )
+        do_trap_guest_error(regs);
+    else
+        do_unexpected_trap("Data Abort", regs);
 }
 
 /*
