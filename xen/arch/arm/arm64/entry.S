@@ -204,9 +204,12 @@ guest_fiq_invalid:
         entry   hyp=0, compat=0
         invalid BAD_FIQ
 
-guest_error_invalid:
+guest_error:
         entry   hyp=0, compat=0
-        invalid BAD_ERROR
+        msr     daifclr, #2
+        mov     x0, sp
+        bl      do_trap_guest_error
+        exit    hyp=0, compat=0
 
 guest_sync_compat:
         entry   hyp=0, compat=1
@@ -225,9 +228,12 @@ guest_fiq_invalid_compat:
         entry   hyp=0, compat=1
         invalid BAD_FIQ
 
-guest_error_invalid_compat:
+guest_error_compat:
         entry   hyp=0, compat=1
-        invalid BAD_ERROR
+        msr     daifclr, #2
+        mov     x0, sp
+        bl      do_trap_guest_error
+        exit    hyp=0, compat=1
 
 ENTRY(return_to_new_vcpu32)
         exit    hyp=0, compat=1
@@ -286,12 +292,12 @@ ENTRY(hyp_traps_vector)
         ventry  guest_sync                      // Synchronous 64-bit EL0/EL1
         ventry  guest_irq                       // IRQ 64-bit EL0/EL1
         ventry  guest_fiq_invalid               // FIQ 64-bit EL0/EL1
-        ventry  guest_error_invalid             // Error 64-bit EL0/EL1
+        ventry  guest_error                     // Error 64-bit EL0/EL1
 
         ventry  guest_sync_compat               // Synchronous 32-bit EL0/EL1
         ventry  guest_irq_compat                // IRQ 32-bit EL0/EL1
         ventry  guest_fiq_invalid_compat        // FIQ 32-bit EL0/EL1
-        ventry  guest_error_invalid_compat      // Error 32-bit EL0/EL1
+        ventry  guest_error_compat              // Error 32-bit EL0/EL1
 
 /*
  * struct vcpu *__context_switch(struct vcpu *prev, struct vcpu *next)
