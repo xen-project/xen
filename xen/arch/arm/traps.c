@@ -2383,6 +2383,15 @@ static void do_trap_instr_abort_guest(struct cpu_user_regs *regs,
     int rc;
     register_t gva = READ_SYSREG(FAR_EL2);
 
+    /*
+     * If this bit has been set, it means that this instruction abort is caused
+     * by a guest external abort. Currently we crash the guest to protect the
+     * hypervisor. In future one can better handle this by injecting a virtual
+     * abort to the guest.
+     */
+    if ( hsr.iabt.eat )
+        domain_crash_synchronous();
+
     switch ( hsr.iabt.ifsc & 0x3f )
     {
     case FSC_FLT_PERM ... FSC_FLT_PERM + 3:
@@ -2436,6 +2445,15 @@ static void do_trap_data_abort_guest(struct cpu_user_regs *regs,
         advance_pc(regs, hsr);
         return;
     }
+
+    /*
+     * If this bit has been set, it means that this data abort is caused
+     * by a guest external abort. Currently we crash the guest to protect the
+     * hypervisor. In future one can better handle this by injecting a virtual
+     * abort to the guest.
+     */
+    if ( dabt.eat )
+        domain_crash_synchronous();
 
     info.dabt = dabt;
 #ifdef CONFIG_ARM_32
