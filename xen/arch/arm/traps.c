@@ -2723,6 +2723,21 @@ asmlinkage void do_trap_hypervisor(struct cpu_user_regs *regs)
     }
 }
 
+asmlinkage void do_trap_guest_error(struct cpu_user_regs *regs)
+{
+    enter_hypervisor_head(regs);
+
+    /*
+     * Currently, to ensure hypervisor safety, when we received a
+     * guest-generated vSerror/vAbort, we just crash the guest to protect
+     * the hypervisor. In future we can better handle this by injecting
+     * a vSerror/vAbort to the guest.
+     */
+    gdprintk(XENLOG_WARNING, "Guest(Dom-%u) will be crashed by vSError\n",
+             current->domain->domain_id);
+    domain_crash_synchronous();
+}
+
 asmlinkage void do_trap_irq(struct cpu_user_regs *regs)
 {
     enter_hypervisor_head(regs);
