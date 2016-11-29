@@ -282,7 +282,9 @@ SEABIOS_UPSTREAM_REVISION ?= rel-1.9.2
 ETHERBOOT_NICS ?= rtl8139 8086100e
 
 
-QEMU_TRADITIONAL_REVISION ?= xen-4.7.1
+QEMU_TRADITIONAL_REVISION ?= 02a1797276642b9ba4f43c919da49767428877e7
+# Tue Nov 29 16:36:38 2016 +0000
+# xen: fix ioreq handling
 
 # Specify which qemu-dm to use. This may be `ioemu' to use the old
 # Mercurial in-tree version, or a local directory, or a git URL.
