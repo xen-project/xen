@@ -1694,8 +1694,6 @@ static int inject_swint(enum x86_swint_type type,
                     goto raise_exn;
             }
         }
-
-        ctxt->regs->eip += insn_len;
     }
 
     rc = ops->inject_sw_interrupt(type, vector, insn_len, ctxt);

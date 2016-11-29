@@ -64,7 +64,13 @@ enum x86_swint_type {
     x86_swint_int,   /* 0xcd $n */
 };
 
-/* How much help is required with software event injection? */
+/*
+ * How much help is required with software event injection?
+ *
+ * All software events return from x86_emulate() with X86EMUL_EXCEPTION and
+ * fault-like semantics.  This just controls whether the emulator performs
+ * presence/dpl/etc checks and possibly raises exceptions instead.
+ */
 enum x86_swint_emulation {
     x86_swint_emulate_none, /* Hardware supports all software injection properly */
     x86_swint_emulate_icebp,/* Help needed with `icebp` (0xf1) */

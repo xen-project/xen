@@ -1209,7 +1209,7 @@ static void svm_inject_event(const struct x86_event *event)
     struct vmcb_struct *vmcb = curr->arch.hvm_svm.vmcb;
     eventinj_t eventinj = vmcb->eventinj;
     struct x86_event _event = *event;
-    const struct cpu_user_regs *regs = guest_cpu_user_regs();
+    struct cpu_user_regs *regs = guest_cpu_user_regs();
 
     switch ( _event.vector )
     {
@@ -1242,44 +1242,52 @@ static void svm_inject_event(const struct x86_event *event)
     eventinj.fields.v = 1;
     eventinj.fields.vector = _event.vector;
 
-    /* Refer to AMD Vol 2: System Programming, 15.20 Event Injection. */
+    /*
+     * Refer to AMD Vol 2: System Programming, 15.20 Event Injection.
+     *
+     * On hardware lacking NextRIP support, and all hardware in the case of
+     * icebp, software events with trap semantics need emulating, so %rip in
+     * the trap frame points after the instruction.
+     *
+     * The x86 emulator (if requested by the x86_swint_emulate_* choice) will
+     * have performed checks such as presence/dpl/etc and believes that the
+     * event injection will succeed without faulting.
+     *
+     * The x86 emulator will always provide fault semantics for software
+     * events, with _trap.insn_len set appropriately.  If the injection
+     * requires emulation, move %rip forwards at this point.
+     */
     switch ( _event.type )
     {
     case X86_EVENTTYPE_SW_INTERRUPT: /* int $n */
-        /*
-         * Software interrupts (type 4) cannot be properly injected if the
-         * processor doesn't support NextRIP.  Without NextRIP, the emulator
-         * will have performed DPL and presence checks for us, and will have
-         * moved eip forward if appropriate.
-         */
         if ( cpu_has_svm_nrips )
-            vmcb->nextrip = regs->eip + _event.insn_len;
+            vmcb->nextrip = regs->rip + _event.insn_len;
+        else
+            regs->rip += _event.insn_len;
         eventinj.fields.type = X86_EVENTTYPE_SW_INTERRUPT;
         break;
 
     case X86_EVENTTYPE_PRI_SW_EXCEPTION: /* icebp */
         /*
-         * icebp's injection must always be emulated.  Software injection help
-         * in x86_emulate has moved eip forward, but NextRIP (if used) still
-         * needs setting or execution will resume from 0.
+         * icebp's injection must always be emulated, as hardware does not
+         * special case HW_EXCEPTION with vector 1 (#DB) as having trap
+         * semantics.
          */
+        regs->rip += _event.insn_len;
         if ( cpu_has_svm_nrips )
-            vmcb->nextrip = regs->eip;
+            vmcb->nextrip = regs->rip;
         eventinj.fields.type = X86_EVENTTYPE_HW_EXCEPTION;
         break;
 
     case X86_EVENTTYPE_SW_EXCEPTION: /* int3, into */
         /*
-         * The AMD manual states that .type=3 (HW exception), .vector=3 or 4,
-         * will perform DPL checks.  Experimentally, DPL and presence checks
-         * are indeed performed, even without NextRIP support.
-         *
-         * However without NextRIP support, the event injection still needs
-         * fully emulating to get the correct eip in the trap frame, yet get
-         * the correct faulting eip should a fault occur.
+         * Hardware special cases HW_EXCEPTION with vectors 3 and 4 as having
+         * trap semantics, and will perform DPL checks.
          */
         if ( cpu_has_svm_nrips )
-            vmcb->nextrip = regs->eip + _event.insn_len;
+            vmcb->nextrip = regs->rip + _event.insn_len;
+        else
+            regs->rip += _event.insn_len;
         eventinj.fields.type = X86_EVENTTYPE_HW_EXCEPTION;
         break;
 
@@ -1288,6 +1296,16 @@ static void svm_inject_event(const struct x86_event *event)
         eventinj.fields.ev = (_event.error_code != X86_EVENT_NO_EC);
         eventinj.fields.errorcode = _event.error_code;
         break;
+    }
+
+    /*
+     * If injecting an event outside of 64bit mode, zero the upper bits of the
+     * %eip and nextrip after the adjustments above.
+     */
+    if ( !((vmcb->_efer & EFER_LMA) && vmcb->cs.attr.fields.l) )
+    {
+        regs->rip = regs->_eip;
+        vmcb->nextrip = (uint32_t)vmcb->nextrip;
     }
 
     vmcb->eventinj = eventinj;
