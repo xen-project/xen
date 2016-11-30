@@ -826,8 +826,10 @@ static char *qemu_disk_scsi_drive_string(libxl__gc *gc, const char *target_path,
          *  file.backing.backing=exportname,
          */
         drive = GCSPRINTF(
-            "if=scsi,bus=0,unit=%d,cache=writeback,driver=replication,"
+            "if=scsi,id=top-colo,bus=0,unit=%d,cache=writeback,"
+            "driver=replication,"
             "mode=secondary,"
+            "top-id=top-colo,"
             "file.driver=qcow2,"
             "file.file.filename=%s,"
             "file.backing.driver=qcow2,"
@@ -889,8 +891,10 @@ static char *qemu_disk_ide_drive_string(libxl__gc *gc, const char *target_path,
          *  file.backing.backing=exportname,
          */
         drive = GCSPRINTF(
-            "if=ide,index=%d,media=disk,cache=writeback,driver=replication,"
+            "if=ide,index=%d,id=top-colo,media=disk,cache=writeback,"
+            "driver=replication,"
             "mode=secondary,"
+            "top-id=top-colo,"
             "file.driver=qcow2,"
             "file.file.filename=%s,"
             "file.backing.driver=qcow2,"
