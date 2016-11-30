@@ -147,7 +147,7 @@ int __init psci_init_0_2(void)
     psci_ver = call_smc(PSCI_0_2_FN_PSCI_VERSION, 0, 0, 0);
 
     /* For the moment, we only support PSCI 0.2 and PSCI 1.x */
-    if ( psci_ver != PSCI_VERSION(0, 2) && PSCI_VERSION_MAJOR(psci_ver != 1) )
+    if ( psci_ver != PSCI_VERSION(0, 2) && PSCI_VERSION_MAJOR(psci_ver) != 1 )
     {
         printk("Error: Unrecognized PSCI version %u.%u\n",
                PSCI_VERSION_MAJOR(psci_ver), PSCI_VERSION_MINOR(psci_ver));
