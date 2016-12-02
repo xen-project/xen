@@ -164,23 +164,27 @@ static always_inline unsigned long __xadd(
     ((typeof(*(ptr)))__xadd(ptr, (typeof(*(ptr)))(v), sizeof(*(ptr))))
 
 /*
+ * Mandatory barriers, for enforced ordering of reads and writes, e.g. for use
+ * with MMIO devices mapped with reduced cacheability.
+ */
+#define mb()            asm volatile ( "mfence" ::: "memory" )
+#define rmb()           asm volatile ( "lfence" ::: "memory" )
+#define wmb()           asm volatile ( "sfence" ::: "memory" )
+
+/*
+ * SMP barriers, for ordering of reads and writes between CPUs, most commonly
+ * used with shared memory.
+ *
  * Both Intel and AMD agree that, from a programmer's viewpoint:
  *  Loads cannot be reordered relative to other loads.
  *  Stores cannot be reordered relative to other stores.
- * 
- * Intel64 Architecture Memory Ordering White Paper
- * <http://developer.intel.com/products/processor/manuals/318147.pdf>
- * 
- * AMD64 Architecture Programmer's Manual, Volume 2: System Programming
- * <http://www.amd.com/us-en/assets/content_type/\
- *  white_papers_and_tech_docs/24593.pdf>
+ *  Loads may be reordered ahead of a unaliasing stores.
+ *
+ * Refer to the vendor system programming manuals for further details.
  */
-#define rmb()           barrier()
-#define wmb()           barrier()
-
 #define smp_mb()        mb()
-#define smp_rmb()       rmb()
-#define smp_wmb()       wmb()
+#define smp_rmb()       barrier()
+#define smp_wmb()       barrier()
 
 #define set_mb(var, value) do { xchg(&var, value); } while (0)
 #define set_wmb(var, value) do { var = value; smp_wmb(); } while (0)
