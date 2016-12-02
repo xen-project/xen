@@ -428,19 +428,16 @@ int libxl__domain_rename(libxl__gc *gc, uint32_t domid,
     if (old_name) {
         got_old_name = xs_read(ctx->xsh, trans, name_path, &got_old_len);
         if (!got_old_name) {
-            LOGEV(ERROR, errno,
-                  "check old name for domain %"PRIu32" allegedly named `%s'",
-                  domid,
-                  old_name);
+            LOGEVD(ERROR, errno, domid,
+                   "Check old name for domain allegedly named `%s'",
+                   old_name);
             goto x_fail;
         }
         if (strcmp(old_name, got_old_name)) {
-            LOG(ERROR,
-                "domain %"PRIu32" allegedly named "
-                "`%s' is actually named `%s' - racing ?",
-                domid,
-                old_name,
-                got_old_name);
+            LOGD(ERROR, domid,
+                 "Allegedly named `%s' is actually named `%s' - racing ?",
+                 old_name,
+                 got_old_name);
             free(got_old_name);
             goto x_fail;
         }
@@ -448,12 +445,11 @@ int libxl__domain_rename(libxl__gc *gc, uint32_t domid,
     }
     if (!xs_write(ctx->xsh, trans, name_path,
                   new_name, strlen(new_name))) {
-        LOG(ERROR,
-            "failed to write new name `%s'"
-            " for domain %"PRIu32" previously named `%s'",
-            new_name,
-            domid,
-            old_name);
+        LOGD(ERROR, domid,
+             "Failed to write new name `%s'"
+             " for domain previously named `%s'",
+             new_name,
+             old_name);
         goto x_fail;
     }
 
@@ -482,20 +478,18 @@ int libxl__domain_rename(libxl__gc *gc, uint32_t domid,
         if (!xs_transaction_end(ctx->xsh, our_trans, 0)) {
             trans = our_trans = 0;
             if (errno != EAGAIN) {
-                LOG(ERROR,
-                    "failed to commit new name `%s'"
-                    " for domain %"PRIu32" previously named `%s'",
-                    new_name,
-                    domid,
-                    old_name);
+                LOGD(ERROR, domid,
+                     "Failed to commit new name `%s'"
+                     " for domain previously named `%s'",
+                     new_name,
+                     old_name);
                 goto x_fail;
             }
-            LOG(DEBUG,
-                "need to retry rename transaction"
-                " for domain %"PRIu32" (name_path=\"%s\", new_name=\"%s\")",
-                domid,
-                name_path,
-                new_name);
+            LOGD(DEBUG, domid,
+                 "Need to retry rename transaction"
+                 " for domain (name_path=\"%s\", new_name=\"%s\")",
+                 name_path,
+                 new_name);
             goto retry_transaction;
         }
         our_trans = 0;
@@ -987,7 +981,7 @@ int libxl_domain_core_dump(libxl_ctx *ctx, uint32_t domid,
 
     ret = xc_domain_dumpcore(ctx->xch, domid, filename);
     if (ret<0) {
-        LOGE(ERROR, "core dumping domain %d to %s", domid, filename);
+        LOGED(ERROR, domid, "Core dumping domain to %s", filename);
         rc = ERROR_FAIL;
         goto out;
     }
@@ -1016,15 +1010,15 @@ int libxl_domain_unpause(libxl_ctx *ctx, uint32_t domid)
             LIBXL_DEVICE_MODEL_VERSION_NONE) {
             rc = libxl__domain_resume_device_model(gc, domid);
             if (rc < 0) {
-                LOG(ERROR, "failed to unpause device model for domain %u:%d",
-                    domid, rc);
+                LOGD(ERROR, domid, "Failed to unpause device model for domain:%d",
+                     rc);
                 goto out;
             }
         }
     }
     ret = xc_domain_unpause(ctx->xch, domid);
     if (ret<0) {
-        LOGE(ERROR, "unpausing domain %d", domid);
+        LOGED(ERROR, domid, "Unpausing domain");
         rc = ERROR_FAIL;
     }
  out:
@@ -1573,7 +1567,7 @@ void libxl__destroy_domid(libxl__egc *egc, libxl__destroy_domid_state *dis)
     case 0:
         break;
     case ERROR_DOMAIN_NOTFOUND:
-        LOG(ERROR, "non-existant domain %d", domid);
+        LOGD(ERROR, domid, "Non-existant domain");
     default:
         goto out;
     }
@@ -1602,14 +1596,14 @@ void libxl__destroy_domid(libxl__egc *egc, libxl__destroy_domid_state *dis)
     }
 
     if (libxl__device_pci_destroy_all(gc, domid) < 0)
-        LOG(ERROR, "pci shutdown failed for domid %d", domid);
+        LOGD(ERROR, domid, "Pci shutdown failed");
     rc = xc_domain_pause(ctx->xch, domid);
     if (rc < 0) {
-        LOGEV(ERROR, rc, "xc_domain_pause failed for %d", domid);
+        LOGEVD(ERROR, rc, domid, "xc_domain_pause failed");
     }
     if (dm_present) {
         if (libxl__destroy_device_model(gc, domid) < 0)
-            LOG(ERROR, "libxl__destroy_device_model failed for %d", domid);
+            LOGD(ERROR, domid, "libxl__destroy_device_model failed");
 
         libxl__qmp_cleanup(gc, domid);
     }
@@ -1645,7 +1639,7 @@ static void devices_destroy_cb(libxl__egc *egc,
     }
 
     if (rc < 0)
-        LOG(ERROR, "libxl__devices_destroy failed for %d", domid);
+        LOGD(ERROR, domid, "libxl__devices_destroy failed");
 
     vm_path = libxl__xs_read(gc, XBT_NULL, GCSPRINTF("%s/vm", dom_path));
     if (vm_path)
@@ -1704,13 +1698,13 @@ static void devices_destroy_cb(libxl__egc *egc,
         if (errno > 0  && errno < 126) {
             _exit(errno);
         } else {
-            LOGE(ERROR,
- "xc_domain_destroy failed for %d (with difficult errno value %d)",
-                 domid, errno);
+            LOGED(ERROR, domid,
+ "xc_domain_destroy failed (with difficult errno value %d)",
+                  errno);
             _exit(-1);
         }
     }
-    LOG(DEBUG, "forked pid %ld for destroy of domain %d", (long)rc, domid);
+    LOGD(DEBUG, domid, "Forked pid %ld for destroy of domain", (long)rc);
 
     return;
 
@@ -1823,7 +1817,7 @@ int libxl_console_get_tty(libxl_ctx *ctx, uint32_t domid, int cons_num,
 
     rc = libxl__console_tty_path(gc, domid, cons_num, type, &tty_path);
     if (rc) {
-        LOG(ERROR, "Failed to get tty path for domain %d\n", domid);
+        LOGD(ERROR, domid, "Failed to get tty path\n");
         goto out;
     }
 
@@ -1921,7 +1915,7 @@ int libxl_vncviewer_exec(libxl_ctx *ctx, uint32_t domid, int autopass)
                             GCSPRINTF(
                             "/local/domain/%d/console/vnc-port", domid));
     if (!vnc_port) {
-        LOG(ERROR, "Cannot get vnc-port of domain %d", domid);
+        LOGD(ERROR, domid, "Cannot get vnc-port");
         goto x_fail;
     }
 
@@ -4286,11 +4280,10 @@ retry_transaction:
         memorykb = new_target_memkb + videoram;
         r = xc_domain_setmaxmem(ctx->xch, domid, memorykb + size);
         if (r != 0) {
-            LOGE(ERROR,
-                 "xc_domain_setmaxmem domid=%u memkb=%"PRIu64" failed ""rc=%d\n",
-                 domid,
-                 memorykb + size,
-                 r);
+            LOGED(ERROR, domid,
+                  "xc_domain_setmaxmem memkb=%"PRIu64" failed ""rc=%d\n",
+                  memorykb + size,
+                  r);
             abort_transaction = 1;
             rc = ERROR_FAIL;
             goto out;
@@ -4300,11 +4293,10 @@ retry_transaction:
     r = xc_domain_set_pod_target(ctx->xch, domid,
             (new_target_memkb + size) / 4, NULL, NULL, NULL);
     if (r != 0) {
-        LOGE(ERROR,
-             "xc_domain_set_pod_target domid=%d, memkb=%"PRIu64" failed rc=%d\n",
-             domid,
-             (new_target_memkb + size) / 4,
-             r);
+        LOGED(ERROR, domid,
+              "xc_domain_set_pod_target memkb=%"PRIu64" failed rc=%d\n",
+              (new_target_memkb + size) / 4,
+              r);
         abort_transaction = 1;
         rc = ERROR_FAIL;
         goto out;
@@ -5113,7 +5105,7 @@ static int libxl__set_vcpuonline_qmp(libxl__gc *gc, uint32_t domid,
     libxl_for_each_set_bit(i, final_map) {
         rc = libxl__qmp_cpu_add(gc, domid, i);
         if (rc) {
-            LOG(ERROR, "failed to add cpu %d to domain %d", i, domid);
+            LOGD(ERROR, domid, "Failed to add cpu %d", i);
             goto out;
         }
     }
@@ -6097,7 +6089,7 @@ uint32_t libxl_vm_get_start_time(libxl_ctx *ctx, uint32_t domid)
     start_time = libxl__xs_read(
         gc, XBT_NULL, GCSPRINTF("%s/start_time", vm_path));
     if (start_time == NULL) {
-        LOGEV(ERROR, -1, "Can't get start time of domain '%d'", domid);
+        LOGEVD(ERROR, -1, domid, "Can't get start time of domain");
         ret = -1;
     }else{
         ret = strtoul(start_time, NULL, 10);
@@ -6691,7 +6683,7 @@ static int libxl__update_avail_vcpus_qmp(libxl__gc *gc, uint32_t domid,
 
     rc = libxl__qmp_query_cpus(gc, domid, map);
     if (rc) {
-        LOG(ERROR, "fail to get number of cpus for domain %d", domid);
+        LOGD(ERROR, domid, "Fail to get number of cpus");
         goto out;
     }
 
@@ -6745,7 +6737,7 @@ int libxl_retrieve_domain_configuration(libxl_ctx *ctx, uint32_t domid,
 
     rc = libxl__get_domain_configuration(gc, domid, d_config);
     if (rc) {
-        LOG(ERROR, "fail to get domain configuration for domain %d", domid);
+        LOGD(ERROR, domid, "Fail to get domain configuration");
         rc = ERROR_FAIL;
         goto out;
     }
@@ -6755,7 +6747,7 @@ int libxl_retrieve_domain_configuration(libxl_ctx *ctx, uint32_t domid,
         char *domname;
         domname = libxl_domid_to_name(ctx, domid);
         if (!domname) {
-            LOG(ERROR, "fail to get domain name for domain %d", domid);
+            LOGD(ERROR, domid, "Fail to get domain name");
             goto out;
         }
         free(d_config->c_info.name);
@@ -6768,7 +6760,7 @@ int libxl_retrieve_domain_configuration(libxl_ctx *ctx, uint32_t domid,
         libxl_dominfo_init(&info);
         rc = libxl_domain_info(ctx, &info, domid);
         if (rc) {
-            LOG(ERROR, "fail to get domain info for domain %d", domid);
+            LOGD(ERROR, domid, "Fail to get domain info");
             libxl_dominfo_dispose(&info);
             goto out;
         }
@@ -6814,7 +6806,7 @@ int libxl_retrieve_domain_configuration(libxl_ctx *ctx, uint32_t domid,
         }
 
         if (rc) {
-            LOG(ERROR, "fail to update available cpu map for domain %d", domid);
+            LOGD(ERROR, domid, "Fail to update available cpu map");
             goto out;
         }
     }
@@ -6836,7 +6828,7 @@ int libxl_retrieve_domain_configuration(libxl_ctx *ctx, uint32_t domid,
         /* "target" */
         rc = libxl__get_memory_target(gc, domid, &target_memkb, &max_memkb);
         if (rc) {
-            LOG(ERROR, "fail to get memory target for domain %d", domid);
+            LOGD(ERROR, domid, "Fail to get memory target");
             goto out;
         }
 
@@ -6887,8 +6879,8 @@ int libxl_retrieve_domain_configuration(libxl_ctx *ctx, uint32_t domid,
             num_dev = libxl__device_type_get_num(dt, d_config);
             p = dt->list(CTX, domid, &num);
             if (p == NULL) {
-                LOG(DEBUG, "no %s from xenstore for domain %d",
-                    dt->type, domid);
+                LOGD(DEBUG, domid, "No %s from xenstore",
+                     dt->type);
             }
             devs = libxl__device_type_get_ptr(dt, d_config);
 
