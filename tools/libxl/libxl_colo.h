@@ -27,7 +27,7 @@
                                                                         \
     pid = libxl__ev_child_fork(gc, child, callback);                    \
     if (pid == -1) {                                                    \
-        LOG(ERROR, "unable to fork");                                   \
+        LOGD(ERROR, ao->domid, "unable to fork");                       \
         goto out;                                                       \
     }                                                                   \
                                                                         \
