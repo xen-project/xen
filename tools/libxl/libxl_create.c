@@ -539,7 +539,7 @@ int libxl__domain_make(libxl__gc *gc, libxl_domain_config *d_config,
     } else if (libxl_defbool_val(info->pvh)) {
         flags |= XEN_DOMCTL_CDF_pvh_guest;
         if (!libxl_defbool_val(info->hap)) {
-            LOG(ERROR, "HAP must be on for PVH");
+            LOGD(ERROR, *domid, "HAP must be on for PVH");
             rc = ERROR_INVAL;
             goto out;
         }
@@ -551,7 +551,7 @@ int libxl__domain_make(libxl__gc *gc, libxl_domain_config *d_config,
 
     ret = libxl__arch_domain_prepare_config(gc, d_config, xc_config);
     if (ret < 0) {
-        LOGE(ERROR, "fail to get domain config");
+        LOGED(ERROR, *domid, "fail to get domain config");
         rc = ERROR_FAIL;
         goto out;
     }
@@ -561,7 +561,7 @@ int libxl__domain_make(libxl__gc *gc, libxl_domain_config *d_config,
         ret = xc_domain_create(ctx->xch, info->ssidref, handle, flags, domid,
                                xc_config);
         if (ret < 0) {
-            LOGE(ERROR, "domain creation fail");
+            LOGED(ERROR, *domid, "domain creation fail");
             rc = ERROR_FAIL;
             goto out;
         }
@@ -573,7 +573,7 @@ int libxl__domain_make(libxl__gc *gc, libxl_domain_config *d_config,
 
     ret = xc_cpupool_movedomain(ctx->xch, info->poolid, *domid);
     if (ret < 0) {
-        LOGE(ERROR, "domain move fail");
+        LOGED(ERROR, *domid, "domain move fail");
         rc = ERROR_FAIL;
         goto out;
     }
@@ -586,7 +586,7 @@ int libxl__domain_make(libxl__gc *gc, libxl_domain_config *d_config,
 
     vm_path = GCSPRINTF("/vm/%s", uuid_string);
     if (!vm_path) {
-        LOG(ERROR, "cannot allocate create paths");
+        LOGD(ERROR, *domid, "cannot allocate create paths");
         rc = ERROR_FAIL;
         goto out;
     }
@@ -697,7 +697,7 @@ retry_transaction:
 
     vm_list = libxl_list_vm(ctx, &nb_vm);
     if (!vm_list) {
-        LOG(ERROR, "cannot get number of running guests");
+        LOGD(ERROR, *domid, "cannot get number of running guests");
         rc = ERROR_FAIL;
         goto out;
     }
@@ -716,7 +716,7 @@ retry_transaction:
             t = 0;
             goto retry_transaction;
         }
-        LOGE(ERROR, "domain creation ""xenstore transaction commit failed");
+        LOGED(ERROR, *domid, "domain creation ""xenstore transaction commit failed");
         rc = ERROR_FAIL;
         goto out;
     }
@@ -806,10 +806,10 @@ static void initiate_domain_create(libxl__egc *egc,
                                          &d_config->c_info.ssidref);
         if (ret) {
             if (errno == ENOSYS) {
-                LOG(WARN, "XSM Disabled: init_seclabel not supported");
+                LOGD(WARN, domid, "XSM Disabled: init_seclabel not supported");
                 ret = 0;
             } else {
-                LOG(ERROR, "Invalid init_seclabel: %s", s);
+                LOGD(ERROR, domid, "Invalid init_seclabel: %s", s);
                 goto error_out;
             }
         }
@@ -821,10 +821,10 @@ static void initiate_domain_create(libxl__egc *egc,
                                          &d_config->b_info.exec_ssidref);
         if (ret) {
             if (errno == ENOSYS) {
-                LOG(WARN, "XSM Disabled: seclabel not supported");
+                LOGD(WARN, domid, "XSM Disabled: seclabel not supported");
                 ret = 0;
             } else {
-                LOG(ERROR, "Invalid seclabel: %s", s);
+                LOGD(ERROR, domid, "Invalid seclabel: %s", s);
                 goto error_out;
             }
         }
@@ -836,10 +836,11 @@ static void initiate_domain_create(libxl__egc *egc,
                                          &d_config->b_info.device_model_ssidref);
         if (ret) {
             if (errno == ENOSYS) {
-                LOG(WARN,"XSM Disabled: device_model_stubdomain_seclabel not supported");
+                LOGD(WARN, domid,
+                     "XSM Disabled: device_model_stubdomain_seclabel not supported");
                 ret = 0;
             } else {
-                LOG(ERROR, "Invalid device_model_stubdomain_seclabel: %s", s);
+                LOGD(ERROR, domid, "Invalid device_model_stubdomain_seclabel: %s", s);
                 goto error_out;
             }
         }
@@ -852,7 +853,8 @@ static void initiate_domain_create(libxl__egc *egc,
                                              NULL);
     }
     if (!libxl_cpupoolid_is_valid(ctx, d_config->c_info.poolid)) {
-        LOG(ERROR, "Illegal pool specified: %s", d_config->c_info.pool_name);
+        LOGD(ERROR, domid, "Illegal pool specified: %s",
+             d_config->c_info.pool_name);
         ret = ERROR_INVAL;
         goto error_out;
     }
@@ -872,7 +874,8 @@ static void initiate_domain_create(libxl__egc *egc,
     if (d_config->c_info.type == LIBXL_DOMAIN_TYPE_HVM &&
         d_config->num_pcidevs && pod_enabled) {
         ret = ERROR_INVAL;
-        LOG(ERROR, "PCI device assignment for HVM guest failed due to PoD enabled");
+        LOGD(ERROR, domid,
+             "PCI device assignment for HVM guest failed due to PoD enabled");
         goto error_out;
     }
 
@@ -881,7 +884,7 @@ static void initiate_domain_create(libxl__egc *egc,
      */
     if (pod_enabled && d_config->b_info.num_vnuma_nodes) {
         ret = ERROR_INVAL;
-        LOG(ERROR, "Cannot enable PoD and vNUMA at the same time");
+        LOGD(ERROR, domid, "Cannot enable PoD and vNUMA at the same time");
         goto error_out;
     }
 
@@ -891,19 +894,19 @@ static void initiate_domain_create(libxl__egc *egc,
     if (d_config->c_info.type == LIBXL_DOMAIN_TYPE_PV &&
         d_config->b_info.num_vnuma_nodes) {
         ret = ERROR_INVAL;
-        LOG(ERROR, "PV vNUMA is not yet supported");
+        LOGD(ERROR, domid, "PV vNUMA is not yet supported");
         goto error_out;
     }
 
     ret = libxl__domain_create_info_setdefault(gc, &d_config->c_info);
     if (ret) {
-        LOG(ERROR, "Unable to set domain create info defaults");
+        LOGD(ERROR, domid, "Unable to set domain create info defaults");
         goto error_out;
     }
 
     ret = libxl__domain_build_info_setdefault(gc, &d_config->b_info);
     if (ret) {
-        LOG(ERROR, "Unable to set domain build info defaults");
+        LOGD(ERROR, domid, "Unable to set domain build info defaults");
         goto error_out;
     }
 
@@ -911,7 +914,7 @@ static void initiate_domain_create(libxl__egc *egc,
         (libxl_defbool_val(d_config->b_info.u.hvm.nested_hvm) &&
          libxl_defbool_val(d_config->b_info.u.hvm.altp2m))) {
         ret = ERROR_INVAL;
-        LOG(ERROR, "nestedhvm and altp2mhvm cannot be used together");
+        LOGD(ERROR, domid, "nestedhvm and altp2mhvm cannot be used together");
         goto error_out;
     }
 
@@ -919,13 +922,13 @@ static void initiate_domain_create(libxl__egc *egc,
         libxl_defbool_val(d_config->b_info.u.hvm.altp2m) &&
         pod_enabled) {
         ret = ERROR_INVAL;
-        LOG(ERROR, "Cannot enable PoD and ALTP2M at the same time");
+        LOGD(ERROR, domid, "Cannot enable PoD and ALTP2M at the same time");
         goto error_out;
     }
 
     ret = libxl__domain_make(gc, d_config, &domid, &state->config);
     if (ret) {
-        LOG(ERROR, "cannot make domain: %d", ret);
+        LOGD(ERROR, domid, "cannot make domain: %d", ret);
         dcs->guest_domid = domid;
         ret = ERROR_FAIL;
         goto error_out;
@@ -943,7 +946,7 @@ static void initiate_domain_create(libxl__egc *egc,
     for (i = 0; i < d_config->num_disks; i++) {
         ret = libxl__device_disk_setdefault(gc, &d_config->disks[i], domid);
         if (ret) {
-            LOG(ERROR, "Unable to set disk defaults for disk %d", i);
+            LOGD(ERROR, domid, "Unable to set disk defaults for disk %d", i);
             goto error_out;
         }
     }
@@ -964,10 +967,10 @@ static void initiate_domain_create(libxl__egc *egc,
         goto error_out;
 
     if (restore_fd >= 0 || dcs->domid_soft_reset != INVALID_DOMID) {
-        LOG(DEBUG, "restoring, not running bootloader");
+        LOGD(DEBUG, domid, "restoring, not running bootloader");
         domcreate_bootloader_done(egc, &dcs->bl, 0);
     } else  {
-        LOG(DEBUG, "running bootloader");
+        LOGD(DEBUG, domid, "running bootloader");
         dcs->bl.callback = domcreate_bootloader_done;
         dcs->bl.console_available = domcreate_bootloader_console_available;
         dcs->bl.info = &d_config->b_info;
@@ -1011,7 +1014,7 @@ static void libxl__colo_restore_setup_done(libxl__egc *egc,
     EGC_GC;
 
     if (rc) {
-        LOG(ERROR, "colo restore setup fails: %d", rc);
+        LOGD(ERROR, dcs->guest_domid, "colo restore setup fails: %d", rc);
         domcreate_stream_done(egc, &dcs->srs, rc);
         return;
     }
@@ -1075,8 +1078,7 @@ static void domcreate_bootloader_done(libxl__egc *egc,
      */
     if (info->type != LIBXL_DOMAIN_TYPE_HVM &&
         checkpointed_stream == LIBXL_CHECKPOINTED_STREAM_COLO) {
-        LOG(ERROR, "COLO only supports HVM, unable to restore domain %d",
-            domid);
+        LOGD(ERROR, domid, "COLO only supports HVM, unable to restore domain");
         rc = ERROR_FAIL;
         goto out;
     }
@@ -1220,7 +1222,7 @@ static void domcreate_rebuild_done(libxl__egc *egc,
     libxl_domain_config *const d_config = dcs->guest_config;
 
     if (ret) {
-        LOG(ERROR, "cannot (re-)build domain: %d", ret);
+        LOGD(ERROR, domid, "cannot (re-)build domain: %d", ret);
         ret = ERROR_FAIL;
         goto error_out;
     }
@@ -1252,22 +1254,22 @@ static void domcreate_launch_dm(libxl__egc *egc, libxl__multidev *multidev,
     libxl__domain_build_state *const state = &dcs->build_state;
 
     if (ret) {
-        LOG(ERROR, "unable to add disk devices");
+        LOGD(ERROR, domid, "unable to add disk devices");
         goto error_out;
     }
 
     for (i = 0; i < d_config->b_info.num_ioports; i++) {
         libxl_ioport_range *io = &d_config->b_info.ioports[i];
 
-        LOG(DEBUG, "dom%d ioports %"PRIx32"-%"PRIx32,
-            domid, io->first, io->first + io->number - 1);
+        LOGD(DEBUG, domid, "ioports %"PRIx32"-%"PRIx32,
+             io->first, io->first + io->number - 1);
 
         ret = xc_domain_ioport_permission(CTX->xch, domid,
                                           io->first, io->number, 1);
         if (ret < 0) {
-            LOGE(ERROR,
-                 "failed give dom%d access to ioports %"PRIx32"-%"PRIx32,
-                 domid, io->first, io->first + io->number - 1);
+            LOGED(ERROR, domid,
+                  "failed give domain access to ioports %"PRIx32"-%"PRIx32,
+                  io->first, io->first + io->number - 1);
             ret = ERROR_FAIL;
             goto error_out;
         }
@@ -1276,12 +1278,12 @@ static void domcreate_launch_dm(libxl__egc *egc, libxl__multidev *multidev,
     for (i = 0; i < d_config->b_info.num_irqs; i++) {
         int irq = d_config->b_info.irqs[i];
 
-        LOG(DEBUG, "dom%d irq %d", domid, irq);
+        LOGD(DEBUG, domid, "irq %d", irq);
 
         ret = irq >= 0 ? libxl__arch_domain_map_irq(gc, domid, irq)
                        : -EOVERFLOW;
         if (ret) {
-            LOGE(ERROR, "failed give dom%d access to irq %d", domid, irq);
+            LOGED(ERROR, domid, "failed give domain access to irq %d", irq);
             ret = ERROR_FAIL;
             goto error_out;
         }
@@ -1290,15 +1292,15 @@ static void domcreate_launch_dm(libxl__egc *egc, libxl__multidev *multidev,
     for (i = 0; i < d_config->b_info.num_iomem; i++) {
         libxl_iomem_range *io = &d_config->b_info.iomem[i];
 
-        LOG(DEBUG, "dom%d iomem %"PRIx64"-%"PRIx64,
-            domid, io->start, io->start + io->number - 1);
+        LOGD(DEBUG, domid, "iomem %"PRIx64"-%"PRIx64,
+             io->start, io->start + io->number - 1);
 
         ret = xc_domain_iomem_permission(CTX->xch, domid,
                                           io->start, io->number, 1);
         if (ret < 0) {
-            LOGE(ERROR,
-                 "failed give dom%d access to iomem range %"PRIx64"-%"PRIx64,
-                 domid, io->start, io->start + io->number - 1);
+            LOGED(ERROR, domid,
+                  "failed give domain access to iomem range %"PRIx64"-%"PRIx64,
+                  io->start, io->start + io->number - 1);
             ret = ERROR_FAIL;
             goto error_out;
         }
@@ -1306,10 +1308,10 @@ static void domcreate_launch_dm(libxl__egc *egc, libxl__multidev *multidev,
                                        io->gfn, io->start,
                                        io->number, 1);
         if (ret < 0) {
-            LOGE(ERROR,
-                 "failed to map to dom%d iomem range %"PRIx64"-%"PRIx64
-                 " to guest address %"PRIx64,
-                 domid, io->start, io->start + io->number - 1, io->gfn);
+            LOGED(ERROR, domid,
+                  "failed to map to domain iomem range %"PRIx64"-%"PRIx64
+                  " to guest address %"PRIx64,
+                  io->start, io->start + io->number - 1, io->gfn);
             ret = ERROR_FAIL;
             goto error_out;
         }
@@ -1418,10 +1420,10 @@ static void libxl__add_dtdevs(libxl__egc *egc, libxl__ao *ao, uint32_t domid,
     for (i = 0; i < d_config->num_dtdevs; i++) {
         const libxl_device_dtdev *dtdev = &d_config->dtdevs[i];
 
-        LOG(DEBUG, "Assign device \"%s\" to dom%u", dtdev->path, domid);
+        LOGD(DEBUG, domid, "Assign device \"%s\" to domain", dtdev->path);
         rc = xc_assign_dt_device(CTX->xch, domid, dtdev->path);
         if (rc < 0) {
-            LOG(ERROR, "xc_assign_dtdevice failed: %d", rc);
+            LOGD(ERROR, domid, "xc_assign_dtdevice failed: %d", rc);
             goto out;
         }
     }
@@ -1457,8 +1459,8 @@ static void domcreate_attach_devices(libxl__egc *egc,
     const struct libxl_device_type *dt;
 
     if (ret) {
-        LOG(ERROR, "unable to add %s devices",
-            device_type_tbl[dcs->device_type_idx]->type);
+        LOGD(ERROR, domid, "unable to add %s devices",
+             device_type_tbl[dcs->device_type_idx]->type);
         goto error_out;
     }
 
@@ -1501,7 +1503,7 @@ static void domcreate_devmodel_started(libxl__egc *egc,
     libxl_domain_config *const d_config = dcs->guest_config;
 
     if (ret) {
-        LOG(ERROR, "device model did not start: %d", ret);
+        LOGD(ERROR, domid, "device model did not start: %d", ret);
         goto error_out;
     }
 
@@ -1579,8 +1581,7 @@ static void domcreate_destruction_cb(libxl__egc *egc,
     libxl__domain_create_state *dcs = CONTAINER_OF(dds, *dcs, dds);
 
     if (rc)
-        LOG(ERROR, "unable to destroy domain %u following failed creation",
-                   dds->domid);
+        LOGD(ERROR, dds->domid, "unable to destroy domain following failed creation");
 
     dcs->callback(egc, dcs, ERROR_FAIL, dcs->guest_domid);
 }
@@ -1654,7 +1655,7 @@ static void domain_soft_reset_cb(libxl__egc *egc,
     char *savefile, *restorefile;
 
     if (rc) {
-        LOG(ERROR, "destruction of domain %u failed.", dds->domid);
+        LOGD(ERROR, dds->domid, "destruction of domain failed.");
         goto error;
     }
 
@@ -1662,7 +1663,7 @@ static void domain_soft_reset_cb(libxl__egc *egc,
     rc = libxl__restore_emulator_xenstore_data(&cdcs->dcs, srs->toolstack_buf,
                                                srs->toolstack_len);
     if (rc) {
-        LOG(ERROR, "failed to restore toolstack record.");
+        LOGD(ERROR, dds->domid, "failed to restore toolstack record.");
         goto error;
     }
 
@@ -1670,7 +1671,7 @@ static void domain_soft_reset_cb(libxl__egc *egc,
     restorefile = GCSPRINTF(LIBXL_DEVICE_MODEL_RESTORE_FILE".%d", dds->domid);
     rc = rename(savefile, restorefile);
     if (rc) {
-        LOG(ERROR, "failed to rename dm save file.");
+        LOGD(ERROR, dds->domid, "failed to rename dm save file.");
         goto error;
     }
 
@@ -1718,7 +1719,7 @@ static int do_domain_soft_reset(libxl_ctx *ctx,
 
     dom_path = libxl__xs_get_dompath(gc, domid_soft_reset);
     if (!dom_path) {
-        LOG(ERROR, "failed to read domain path");
+        LOGD(ERROR, domid_soft_reset, "failed to read domain path");
         rc = ERROR_FAIL;
         goto out;
     }
@@ -1743,13 +1744,13 @@ static int do_domain_soft_reset(libxl_ctx *ctx,
     rc = libxl__save_emulator_xenstore_data(dss, &srs->toolstack_buf,
                                             &srs->toolstack_len);
     if (rc) {
-        LOG(ERROR, "failed to save toolstack record.");
+        LOGD(ERROR, domid_soft_reset, "failed to save toolstack record.");
         goto out;
     }
 
     rc = libxl__domain_suspend_device_model(gc, &dss->dsps);
     if (rc) {
-        LOG(ERROR, "failed to suspend device model.");
+        LOGD(ERROR, domid_soft_reset, "failed to suspend device model.");
         goto out;
     }
 
