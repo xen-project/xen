@@ -574,6 +574,11 @@ int acpi_build_tables(struct acpi_ctxt *ctxt, struct acpi_config *config)
 
     fadt = ctxt->mem_ops.alloc(ctxt, sizeof(struct acpi_20_fadt), 16);
     if (!fadt) goto oom;
+    if ( !(config->table_flags & ACPI_HAS_PMTIMER) )
+    {
+        Fadt.pm_tmr_blk = Fadt.pm_tmr_len = 0;
+        memset(&Fadt.x_pm_tmr_blk, 0, sizeof(Fadt.x_pm_tmr_blk));
+    }
     memcpy(fadt, &Fadt, sizeof(struct acpi_20_fadt));
     fadt->dsdt   = ctxt->mem_ops.v2p(ctxt, dsdt);
     fadt->x_dsdt = ctxt->mem_ops.v2p(ctxt, dsdt);
