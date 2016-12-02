@@ -22,7 +22,7 @@ void libxl__colo_restore_setup(libxl__egc *egc,
 {
     STATE_AO_GC(crs->ao);
 
-    LOG(ERROR, "COLO is not supported");
+    LOGD(ERROR, crs->domid, "COLO is not supported");
 
     crs->callback(egc, crs, ERROR_FAIL);
 }
@@ -39,7 +39,7 @@ void libxl__colo_save_setup(libxl__egc *egc, libxl__colo_save_state *css)
     libxl__domain_save_state *dss = CONTAINER_OF(css, *dss, css);
     STATE_AO_GC(dss->ao);
 
-    LOG(ERROR, "COLO is not supported");
+    LOGD(ERROR, dss->domid, "COLO is not supported");
 
     dss->callback(egc, dss, ERROR_FAIL);
 }
