@@ -267,7 +267,7 @@ void libxl__stream_write_start(libxl__egc *egc,
 
         default:
             rc = ERROR_FAIL;
-            LOG(ERROR, "Unknown emulator for HVM domain");
+            LOGD(ERROR, dss->domid, "Unknown emulator for HVM domain");
             goto err;
         }
         stream->emu_sub_hdr.index = 0;
@@ -349,7 +349,7 @@ void libxl__xc_domain_save_done(libxl__egc *egc, void *dss_void,
         goto err;
 
     if (retval) {
-        LOGEV(ERROR, errnoval, "saving domain: %s",
+        LOGEVD(ERROR, errnoval, dss->domid, "saving domain: %s",
               dss->dsps.guest_responded ?
               "domain responded to suspend request" :
               "domain did not respond to suspend request");
@@ -464,19 +464,19 @@ static void write_emulator_context_record(libxl__egc *egc,
     stream->emu_carefd = libxl__carefd_opened(CTX, readfd);
     if (readfd == -1) {
         rc = ERROR_FAIL;
-        LOGE(ERROR, "unable to open %s", filename);
+        LOGED(ERROR, dss->domid, "unable to open %s", filename);
         goto err;
     }
 
     if (fstat(readfd, &st)) {
         rc = ERROR_FAIL;
-        LOGE(ERROR, "unable to fstat %s", filename);
+        LOGED(ERROR, dss->domid, "unable to fstat %s", filename);
         goto err;
     }
 
     if (!S_ISREG(st.st_mode)) {
         rc = ERROR_FAIL;
-        LOG(ERROR, "%s is not a plain file!", filename);
+        LOGD(ERROR, dss->domid, "%s is not a plain file!", filename);
         goto err;
     }
 
