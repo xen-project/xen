@@ -241,15 +241,15 @@ int libxl_psr_cmt_get_sample(libxl_ctx *ctx,
 
     rc = xc_psr_cmt_get_domain_rmid(ctx->xch, domid, &rmid);
     if (rc < 0 || rmid == 0) {
-        LOGE(ERROR, "fail to get the domain rmid, "
-            "or domain is not attached with platform QoS monitoring service");
+        LOGED(ERROR, domid, "fail to get the domain rmid, "
+              "or domain is not attached with platform QoS monitoring service");
         rc = ERROR_FAIL;
         goto out;
     }
 
     cpu = libxl__pick_socket_cpu(gc, scope);
     if (cpu < 0) {
-        LOGE(ERROR, "failed to get socket cpu");
+        LOGED(ERROR, domid, "failed to get socket cpu");
         rc = ERROR_FAIL;
         goto out;
     }
@@ -257,14 +257,14 @@ int libxl_psr_cmt_get_sample(libxl_ctx *ctx,
     rc = xc_psr_cmt_get_data(ctx->xch, rmid, cpu, type - 1,
                              &monitor_data, tsc_r);
     if (rc < 0) {
-        LOGE(ERROR, "failed to get monitoring data");
+        LOGED(ERROR, domid, "failed to get monitoring data");
         rc = ERROR_FAIL;
         goto out;
     }
 
     rc = xc_psr_cmt_get_l3_upscaling_factor(ctx->xch, &upscaling_factor);
     if (rc < 0) {
-        LOGE(ERROR, "failed to get L3 upscaling factor");
+        LOGED(ERROR, domid, "failed to get L3 upscaling factor");
         rc = ERROR_FAIL;
         goto out;
     }
@@ -311,7 +311,7 @@ int libxl_psr_cat_set_cbm(libxl_ctx *ctx, uint32_t domid,
 
     rc = libxl__count_physical_sockets(gc, &nr_sockets);
     if (rc) {
-        LOGE(ERROR, "failed to get system socket count");
+        LOGED(ERROR, domid, "failed to get system socket count");
         goto out;
     }
 
