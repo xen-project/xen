@@ -294,8 +294,8 @@ static void helper_stdout_readable(libxl__egc *egc, libxl__ev_fd *ev,
     int rc, errnoval;
 
     if (revents & (POLLERR|POLLPRI)) {
-        LOG(ERROR, "%s signaled POLLERR|POLLPRI (%#x)",
-            shs->stdout_what, revents);
+        LOGD(ERROR, shs->domid, "%s signaled POLLERR|POLLPRI (%#x)",
+             shs->stdout_what, revents);
         rc = ERROR_FAIL;
  out:
         /* this is here because otherwise we bypass the decl of msg[] */
@@ -339,14 +339,14 @@ static void helper_exited(libxl__egc *egc, libxl__ev_child *ch,
 
     if (shs->need_results) {
         if (!shs->rc) {
-            LOG(ERROR,"%s exited without providing results",what);
+            LOGD(ERROR,shs->domid,"%s exited without providing results",what);
             shs->rc = ERROR_FAIL;
         }
     }
 
     if (!shs->completed) {
         if (!shs->rc) {
-            LOG(ERROR,"%s exited without signaling completion",what);
+            LOGD(ERROR,shs->domid,"%s exited without signaling completion",what);
             shs->rc = ERROR_FAIL;
         }
     }
