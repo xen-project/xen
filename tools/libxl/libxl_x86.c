@@ -327,7 +327,7 @@ int libxl__arch_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
         tm = localtime_r(&t, &result);
 
         if (!tm) {
-            LOGE(ERROR, "Failed to call localtime_r");
+            LOGED(ERROR, domid, "Failed to call localtime_r");
             ret = ERROR_FAIL;
             goto out;
         }
@@ -350,7 +350,7 @@ int libxl__arch_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
             libxl_defbool_val(d_config->b_info.u.pv.e820_host)) {
         ret = libxl__e820_alloc(gc, domid, d_config);
         if (ret) {
-            LOGE(ERROR, "Failed while collecting E820 with: %d (errno:%d)\n",
+            LOGED(ERROR, domid, "Failed while collecting E820 with: %d (errno:%d)\n",
                  ret, errno);
         }
     }
@@ -532,7 +532,7 @@ int libxl__arch_domain_construct_memmap(libxl__gc *gc,
             e820_entries++;
 
     if (e820_entries >= E820MAX) {
-        LOG(ERROR, "Ooops! Too many entries in the memory map!");
+        LOGD(ERROR, domid, "Ooops! Too many entries in the memory map!");
         rc = ERROR_INVAL;
         goto out;
     }
