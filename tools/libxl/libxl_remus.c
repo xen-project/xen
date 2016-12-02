@@ -84,7 +84,8 @@ void libxl__remus_setup(libxl__egc *egc, libxl__remus_state *rs)
 
     if (libxl_defbool_val(info->netbuf)) {
         if (!libxl__netbuffer_enabled(gc)) {
-            LOG(ERROR, "Remus: No support for network buffering");
+            LOGD(ERROR, dss->domid,
+                 "Remus: No support for network buffering");
             goto out;
         }
         cds->device_kind_flags |= (1 << LIBXL__DEVICE_KIND_VIF);
@@ -101,8 +102,8 @@ void libxl__remus_setup(libxl__egc *egc, libxl__remus_state *rs)
     rs->interval = info->interval;
 
     if (init_device_subkind(cds)) {
-        LOG(ERROR, "Remus: failed to init device subkind for guest %u",
-            dss->domid);
+        LOGD(ERROR, dss->domid,
+             "Remus: failed to init device subkind");
         goto out;
     }
 
@@ -130,8 +131,7 @@ static void remus_setup_done(libxl__egc *egc,
         return;
     }
 
-    LOG(ERROR, "Remus: failed to setup device for guest with domid %u, rc %d",
-        dss->domid, rc);
+    LOGD(ERROR, dss->domid, "Remus: failed to setup device, rc %d", rc);
     cds->callback = remus_setup_failed;
     libxl__checkpoint_devices_teardown(egc, cds);
 }
@@ -143,8 +143,8 @@ static void remus_setup_failed(libxl__egc *egc,
     STATE_AO_GC(dss->ao);
 
     if (rc)
-        LOG(ERROR, "Remus: failed to teardown device after setup failed"
-            " for guest with domid %u, rc %d", dss->domid, rc);
+        LOGD(ERROR, dss->domid,
+             "Remus: failed to teardown device after setup failed, rc %d", rc);
 
     cleanup_device_subkind(cds);
 
@@ -165,8 +165,8 @@ void libxl__remus_teardown(libxl__egc *egc,
 
     EGC_GC;
 
-    LOG(WARN, "Remus: Domain suspend terminated with rc %d,"
-        " teardown Remus devices...", rc);
+    LOGD(WARN, dss->domid, "Remus: Domain suspend terminated with rc %d,"
+         " teardown Remus devices...", rc);
     cds->callback = remus_teardown_done;
     libxl__checkpoint_devices_teardown(egc, cds);
 }
@@ -179,8 +179,8 @@ static void remus_teardown_done(libxl__egc *egc,
     STATE_AO_GC(dss->ao);
 
     if (rc)
-        LOG(ERROR, "Remus: failed to teardown device for guest with domid %u,"
-            " rc %d", dss->domid, rc);
+        LOGD(ERROR, dss->domid, "Remus: failed to teardown device,"
+            " rc %d", rc);
 
     cleanup_device_subkind(cds);
 
@@ -309,7 +309,8 @@ static void remus_checkpoint_stream_written(
     STATE_AO_GC(dss->ao);
 
     if (rc) {
-        LOG(ERROR, "Failed to save device model. Terminating Remus..");
+        LOGD(ERROR, dss->domid, "Failed to save device model."
+             " Terminating Remus..");
         goto out;
     }
 
@@ -331,7 +332,7 @@ static void remus_devices_commit_cb(libxl__egc *egc,
     STATE_AO_GC(dss->ao);
 
     if (rc) {
-        LOG(ERROR, "Failed to do device commit op."
+        LOGD(ERROR, dss->domid, "Failed to do device commit op."
             " Terminating Remus..");
         goto out;
     }
