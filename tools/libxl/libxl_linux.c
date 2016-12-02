@@ -61,7 +61,7 @@ static char **get_hotplug_env(libxl__gc *gc,
         env[nr++] = gatewaydev ? : "";
 
         if (libxl__nic_type(gc, dev, &nictype)) {
-            LOG(ERROR, "unable to get nictype");
+            LOGD(ERROR, dev->domid, "unable to get nictype");
             return NULL;
         }
         switch (nictype) {
@@ -107,14 +107,15 @@ static int libxl__hotplug_nic(libxl__gc *gc, libxl__device *dev,
     script = libxl__xs_read(gc, XBT_NULL, GCSPRINTF("%s/%s", be_path,
                                                              "script"));
     if (!script) {
-        LOGE(ERROR, "unable to read script from %s", be_path);
+        LOGED(ERROR, dev->domid,
+              "unable to read script from %s", be_path);
         rc = ERROR_FAIL;
         goto out;
     }
 
     rc = libxl__nic_type(gc, dev, &nictype);
     if (rc) {
-        LOG(ERROR, "error when fetching nic type");
+        LOGD(ERROR, dev->domid, "error when fetching nic type");
         rc = ERROR_FAIL;
         goto out;
     }
@@ -161,14 +162,15 @@ static int libxl__hotplug_disk(libxl__gc *gc, libxl__device *dev,
     script = libxl__xs_read(gc, XBT_NULL,
                             GCSPRINTF("%s/%s", be_path, "script"));
     if (!script) {
-        LOGEV(ERROR, errno, "unable to read script from %s", be_path);
+        LOGEVD(ERROR, errno, dev->domid,
+               "unable to read script from %s", be_path);
         rc = ERROR_FAIL;
         goto error;
     }
 
     *env = get_hotplug_env(gc, script, dev);
     if (!*env) {
-        LOG(ERROR, "Failed to get hotplug environment");
+        LOGD(ERROR, dev->domid, "Failed to get hotplug environment");
         rc = ERROR_FAIL;
         goto error;
     }
@@ -180,7 +182,7 @@ static int libxl__hotplug_disk(libxl__gc *gc, libxl__device *dev,
     (*args)[nr++] = NULL;
     assert(nr == arraysize);
 
-    LOG(DEBUG, "Args and environment ready");
+    LOGD(DEBUG, dev->domid, "Args and environment ready");
     rc = 1;
 
 error:
@@ -197,7 +199,8 @@ int libxl__get_hotplug_script_info(libxl__gc *gc, libxl__device *dev,
     switch (dev->backend_kind) {
     case LIBXL__DEVICE_KIND_VBD:
         if (num_exec != 0) {
-            LOG(DEBUG, "num_exec %d, not running hotplug scripts", num_exec);
+            LOGD(DEBUG, dev->domid,
+                 "num_exec %d, not running hotplug scripts", num_exec);
             rc = 0;
             goto out;
         }
@@ -210,7 +213,8 @@ int libxl__get_hotplug_script_info(libxl__gc *gc, libxl__device *dev,
          */
         if ((num_exec > 1) ||
             (libxl_get_stubdom_id(CTX, dev->domid) && num_exec)) {
-            LOG(DEBUG, "num_exec %d, not running hotplug scripts", num_exec);
+            LOGD(DEBUG, dev->domid,
+                 "num_exec %d, not running hotplug scripts", num_exec);
             rc = 0;
             goto out;
         }
@@ -218,7 +222,8 @@ int libxl__get_hotplug_script_info(libxl__gc *gc, libxl__device *dev,
         break;
     default:
         /* No need to execute any hotplug scripts */
-        LOG(DEBUG, "backend_kind %d, no need to execute scripts", dev->backend_kind);
+        LOGD(DEBUG, dev->domid,
+             "backend_kind %d, no need to execute scripts", dev->backend_kind);
         rc = 0;
         break;
     }
