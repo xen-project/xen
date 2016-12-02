@@ -18,7 +18,7 @@ or       = $(if $(strip $(1)),$(1),$(if $(strip $(2)),$(2),$(if $(strip $(3)),$(
 
 # A debug build of tools?
 # Hypervisor debug build is controlled by Kconfig.
-debug ?= n
+debug ?= y
 debug_symbols ?= $(debug)
 
 XEN_COMPILE_ARCH    ?= $(shell uname -m | sed -e s/i.86/x86_32/ \
@@ -277,8 +277,8 @@ SEABIOS_UPSTREAM_URL ?= git://xenbits.xen.org/seabios.git
 MINIOS_UPSTREAM_URL ?= git://xenbits.xen.org/mini-os.git
 endif
 OVMF_UPSTREAM_REVISION ?= bc54e50e0fe03c570014f363b547426913e92449
-QEMU_UPSTREAM_REVISION ?= qemu-xen-4.8.0-rc7
-MINIOS_UPSTREAM_REVISION ?= xen-4.8.0-rc1
+QEMU_UPSTREAM_REVISION ?= master
+MINIOS_UPSTREAM_REVISION ?= e20998fbec0af4d783abb1a0695ab4614064c520
 # Wed Sep 28 11:50:04 2016 +0200
 # minios: fix build issue with xen_*mb defines
 
@@ -289,7 +289,9 @@ SEABIOS_UPSTREAM_REVISION ?= rel-1.10.0
 ETHERBOOT_NICS ?= rtl8139 8086100e
 
 
-QEMU_TRADITIONAL_REVISION ?= xen-4.8.0-rc7
+QEMU_TRADITIONAL_REVISION ?= 89c4cbe8d234049b0145e4dc5e5d19d626250b57
+# Tue Nov 29 16:36:38 2016 +0000
+# xen: fix ioreq handling
 
 # Specify which qemu-dm to use. This may be `ioemu' to use the old
 # Mercurial in-tree version, or a local directory, or a git URL.
