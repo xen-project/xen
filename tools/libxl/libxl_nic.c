@@ -101,7 +101,8 @@ int libxl__device_nic_setdefault(libxl__gc *gc, libxl_device_nic *nic,
         break;
     case LIBXL_DOMAIN_TYPE_PV:
         if (nic->nictype == LIBXL_NIC_TYPE_VIF_IOEMU) {
-            LOG(ERROR, "trying to create PV guest with an emulated interface");
+            LOGD(ERROR, domid,
+                 "trying to create PV guest with an emulated interface");
             return ERROR_INVAL;
         }
         nic->nictype = LIBXL_NIC_TYPE_VIF;
@@ -254,7 +255,7 @@ static void libxl__device_nic_add(libxl__egc *egc, uint32_t domid,
         rc = libxl__device_exists(gc, t, device);
         if (rc < 0) goto out;
         if (rc == 1) {              /* already exists in xenstore */
-            LOG(ERROR, "device already exists in xenstore");
+            LOGD(ERROR, domid, "device already exists in xenstore");
             aodev->action = LIBXL__DEVICE_ACTION_ADD; /* for error message */
             rc = ERROR_DEVICE_EXISTS;
             goto out;
@@ -440,7 +441,7 @@ libxl_device_nic *libxl_device_nic_list(libxl_ctx *ctx, uint32_t domid, int *num
     return nics;
 
 out_err:
-    LOG(ERROR, "Unable to list nics");
+    LOGD(ERROR, domid, "Unable to list nics");
     while (*num) {
         (*num)--;
         libxl_device_nic_dispose(&nics[*num]);
@@ -531,7 +532,7 @@ int libxl__device_nic_set_devids(libxl__gc *gc, libxl_domain_config *d_config,
         ret = libxl__device_nic_setdefault(gc, &d_config->nics[i], domid,
                                            false);
         if (ret) {
-            LOG(ERROR, "Unable to set nic defaults for nic %d", i);
+            LOGD(ERROR, domid, "Unable to set nic defaults for nic %d", i);
             goto out;
         }
 
