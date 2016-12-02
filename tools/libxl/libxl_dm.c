@@ -455,7 +455,7 @@ static int libxl__build_device_model_args_old(libxl__gc *gc,
         if (vnc->listen) {
             if (strchr(vnc->listen, ':') != NULL) {
                 if (vnc->display) {
-                    LOG(ERROR, "vncdisplay set, vnclisten contains display");
+                    LOGD(ERROR, domid, "vncdisplay set, vnclisten contains display");
                     return ERROR_INVAL;
                 }
                 vncarg = vnc->listen;
@@ -502,15 +502,15 @@ static int libxl__build_device_model_args_old(libxl__gc *gc,
         char *s;
 
         if (b_info->kernel) {
-            LOG(ERROR, "HVM direct kernel boot is not supported by "
-                "qemu-xen-traditional");
+            LOGD(ERROR, domid, "HVM direct kernel boot is not supported by "
+                 "qemu-xen-traditional");
             return ERROR_INVAL;
         }
 
         if (b_info->u.hvm.serial || b_info->u.hvm.serial_list) {
             if ( b_info->u.hvm.serial && b_info->u.hvm.serial_list )
             {
-                LOG(ERROR, "Both serial and serial_list set");
+                LOGD(ERROR, domid, "Both serial and serial_list set");
                 return ERROR_INVAL;
             }
             if (b_info->u.hvm.serial) {
@@ -550,7 +550,7 @@ static int libxl__build_device_model_args_old(libxl__gc *gc,
         case LIBXL_VGA_INTERFACE_TYPE_QXL:
             break;
         default:
-            LOG(ERROR, "Invalid emulated video card specified");
+            LOGD(ERROR, domid, "Invalid emulated video card specified");
             return ERROR_INVAL;
         }
 
@@ -562,7 +562,7 @@ static int libxl__build_device_model_args_old(libxl__gc *gc,
             || b_info->u.hvm.usbdevice_list) {
             if ( b_info->u.hvm.usbdevice && b_info->u.hvm.usbdevice_list )
             {
-                LOG(ERROR, "Both usbdevice and usbdevice_list set");
+                LOGD(ERROR, domid, "Both usbdevice and usbdevice_list set");
                 return ERROR_INVAL;
             }
             flexarray_append(dm_args, "-usb");
@@ -632,7 +632,7 @@ static int libxl__build_device_model_args_old(libxl__gc *gc,
                 flexarray_append(dm_args, "-gfx_passthru");
                 break;
             default:
-                LOG(ERROR, "unsupported gfx_passthru_kind.");
+                LOGD(ERROR, domid, "unsupported gfx_passthru_kind.");
                 return ERROR_INVAL;
             }
         }
@@ -970,7 +970,7 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
                 break;
             default:
                 /* We've forgotten to add the clause */
-                LOG(ERROR, "%s: unknown channel connection %d",
+                LOGD(ERROR, guest_domid, "%s: unknown channel connection %d",
                     __func__, connection);
                 return ERROR_INVAL;
         }
@@ -1014,7 +1014,8 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
         if (vnc->listen) {
             if (strchr(vnc->listen, ':') != NULL) {
                 if (vnc->display) {
-                    LOG(ERROR, "vncdisplay set, vnclisten contains display");
+                    LOGD(ERROR, guest_domid,
+                         "vncdisplay set, vnclisten contains display");
                     return ERROR_INVAL;
                 }
                 vncarg = vnc->listen;
@@ -1075,7 +1076,7 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
         if (b_info->u.hvm.serial || b_info->u.hvm.serial_list) {
             if ( b_info->u.hvm.serial && b_info->u.hvm.serial_list )
             {
-                LOG(ERROR, "Both serial and serial_list set");
+                LOGD(ERROR, guest_domid, "Both serial and serial_list set");
                 return ERROR_INVAL;
             }
             if (b_info->u.hvm.serial) {
@@ -1133,7 +1134,7 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
                 (b_info->video_memkb/2/1024), (b_info->video_memkb/2/1024) ) );
             break;
         default:
-            LOG(ERROR, "Invalid emulated video card specified");
+            LOGD(ERROR, guest_domid, "Invalid emulated video card specified");
             return ERROR_INVAL;
         }
 
@@ -1146,7 +1147,7 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
             || b_info->u.hvm.usbdevice_list) {
             if ( b_info->u.hvm.usbdevice && b_info->u.hvm.usbdevice_list )
             {
-                LOG(ERROR, "Both usbdevice and usbdevice_list set");
+                LOGD(ERROR, guest_domid, "Both usbdevice and usbdevice_list set");
                 return ERROR_INVAL;
             }
             flexarray_append(dm_args, "-usb");
@@ -1183,7 +1184,7 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
                     "-device", "nec-usb-xhci,id=usb", NULL);
                 break;
             default:
-                LOG(ERROR, "usbversion parameter is invalid, "
+                LOGD(ERROR, guest_domid, "usbversion parameter is invalid, "
                     "must be between 1 and 3");
                 return ERROR_INVAL;
             }
@@ -1196,7 +1197,7 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
                         GCSPRINTF("usb-redir,chardev=usbrc%d,"
                         "id=usbrc%d", i, i), NULL);
             } else {
-                LOG(ERROR, "usbredirection parameter is invalid, "
+                LOGD(ERROR, guest_domid, "usbredirection parameter is invalid, "
                     "it must be between 1 and 4");
                 return ERROR_INVAL;
             }
@@ -1282,8 +1283,8 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
                 (b_info->u.hvm.mmio_hole_memkb << 10);
 
             if (max_ram_below_4g > HVM_BELOW_4G_MMIO_START) {
-                LOG(WARN, "mmio_hole_memkb=%"PRIu64
-                    " invalid ignored.\n",
+                LOGD(WARN, guest_domid, "mmio_hole_memkb=%"PRIu64
+                     " invalid ignored.\n",
                     b_info->u.hvm.mmio_hole_memkb);
             } else {
                 machinearg = GCSPRINTF("%s,max-ram-below-4g=%"PRIu64,
@@ -1299,10 +1300,10 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
                 machinearg = GCSPRINTF("%s,igd-passthru=on", machinearg);
                 break;
             case LIBXL_GFX_PASSTHRU_KIND_DEFAULT:
-                LOG(ERROR, "unable to detect required gfx_passthru_kind");
+                LOGD(ERROR, guest_domid, "unable to detect required gfx_passthru_kind");
                 return ERROR_FAIL;
             default:
-                LOG(ERROR, "invalid value for gfx_passthru_kind");
+                LOGD(ERROR, guest_domid, "invalid value for gfx_passthru_kind");
                 return ERROR_INVAL;
             }
         }
@@ -1332,8 +1333,8 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
             int colo_mode;
 
             if (dev_number == -1) {
-                LOG(WARN, "unable to determine"" disk number for %s",
-                    disks[i].vdev);
+                LOGD(WARN, guest_domid, "unable to determine"" disk number for %s",
+                     disks[i].vdev);
                 continue;
             }
 
@@ -1348,17 +1349,17 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
 
             if (disks[i].format == LIBXL_DISK_FORMAT_EMPTY) {
                 if (!disks[i].is_cdrom) {
-                    LOG(WARN, "Cannot support empty disk format for %s",
-                        disks[i].vdev);
+                    LOGD(WARN, guest_domid, "Cannot support empty disk format for %s",
+                         disks[i].vdev);
                     continue;
                 }
             } else {
                 if (format == NULL) {
-                    LOG(WARN,
-                        "Unable to determine disk image format: %s\n"
-                        "Disk will be available via PV drivers but not as an"
-                        "emulated disk.",
-                        disks[i].vdev);
+                    LOGD(WARN, guest_domid,
+                         "Unable to determine disk image format: %s\n"
+                         "Disk will be available via PV drivers but not as an"
+                         "emulated disk.",
+                         disks[i].vdev);
                     continue;
                 }
 
@@ -1378,10 +1379,10 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
                                                  guest_domid, &disks[i], true);
 
                 if (!target_path) {
-                    LOG(WARN, "No way to get local access disk to image: %s\n"
-                        "Disk will be available via PV drivers but not as an"
-                        "emulated disk.",
-                        disks[i].vdev);
+                    LOGD(WARN, guest_domid, "No way to get local access disk to image: %s\n"
+                         "Disk will be available via PV drivers but not as an"
+                         "emulated disk.",
+                         disks[i].vdev);
                     continue;
                 }
             }
@@ -1426,7 +1427,8 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
                                                         colo_mode);
                 } else if (disk < 6 && b_info->u.hvm.hdtype == LIBXL_HDTYPE_AHCI) {
                     if (!disks[i].readwrite) {
-                        LOG(ERROR, "qemu-xen doesn't support read-only AHCI disk drivers");
+                        LOGD(ERROR, guest_domid,
+                             "qemu-xen doesn't support read-only AHCI disk drivers");
                         return ERROR_INVAL;
                     }
                     flexarray_vappend(dm_args, "-drive",
@@ -1437,7 +1439,8 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
                     continue;
                 } else if (disk < 4) {
                     if (!disks[i].readwrite) {
-                        LOG(ERROR, "qemu-xen doesn't support read-only IDE disk drivers");
+                        LOGD(ERROR, guest_domid,
+                             "qemu-xen doesn't support read-only IDE disk drivers");
                         return ERROR_INVAL;
                     }
                     if (colo_mode == LIBXL__COLO_SECONDARY) {
@@ -1490,14 +1493,14 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
         if (ret < 0)
             return ret;
         if (ret > 0) {
-            LOG(WARN, "Could not find user %s%d, falling back to %s",
+            LOGD(WARN, guest_domid, "Could not find user %s%d, falling back to %s",
                     LIBXL_QEMU_USER_BASE, guest_domid, LIBXL_QEMU_USER_SHARED);
             goto end_search;
         }
 
         user = NULL;
-        LOG(DEBUG, "Could not find user %s, starting QEMU as root",
-            LIBXL_QEMU_USER_SHARED);
+        LOGD(DEBUG, guest_domid, "Could not find user %s, starting QEMU as root",
+             LIBXL_QEMU_USER_SHARED);
 
 end_search:
         if (user != NULL && strcmp(user, "root")) {
@@ -1536,8 +1539,8 @@ static int libxl__build_device_model_args(libxl__gc *gc,
                                                   args, envs,
                                                   state, dm_state_fd);
     default:
-        LOGE(ERROR, "unknown device model version %d",
-             guest_config->b_info.device_model_version);
+        LOGED(ERROR, guest_domid, "unknown device model version %d",
+              guest_config->b_info.device_model_version);
         return ERROR_INVAL;
     }
 }
@@ -1764,7 +1767,8 @@ void libxl__spawn_stub_dm(libxl__egc *egc, libxl__stub_dm_spawn_state *sdss)
                      "%d", guest_domid);
     ret = xc_domain_set_target(ctx->xch, dm_domid, guest_domid);
     if (ret<0) {
-        LOGE(ERROR, "setting target domain %d -> %d", dm_domid, guest_domid);
+        LOGED(ERROR, guest_domid, "setting target domain %d -> %d",
+              dm_domid, guest_domid);
         ret = ERROR_FAIL;
         goto out;
     }
@@ -1814,7 +1818,7 @@ static void spawn_stub_launch_dm(libxl__egc *egc,
     uint32_t dm_domid = sdss->pvqemu.guest_domid;
 
     if (ret) {
-        LOG(ERROR, "error connecting disk devices");
+        LOGD(ERROR, guest_domid, "error connecting disk devices");
         goto out;
      }
 
@@ -1929,7 +1933,8 @@ static void stubdom_pvqemu_cb(libxl__egc *egc,
     libxl__xswait_init(&sdss->xswait);
 
     if (rc) {
-        LOGE(ERROR, "error connecting nics devices");
+        LOGED(ERROR, sdss->dm.guest_domid,
+              "error connecting nics devices");
         goto out;
     }
 
@@ -1960,7 +1965,8 @@ static void stubdom_xswait_cb(libxl__egc *egc, libxl__xswait_state *xswait,
 
     if (rc) {
         if (rc == ERROR_TIMEDOUT)
-            LOG(ERROR, "%s: startup timed out", xswait->what);
+            LOGD(ERROR, sdss->dm.guest_domid,
+                 "%s: startup timed out", xswait->what);
         goto out;
     }
 
@@ -2021,7 +2027,7 @@ void libxl__spawn_local_dm(libxl__egc *egc, libxl__dm_spawn_state *dmss)
         goto out;
     }
     if (access(dm, X_OK) < 0) {
-        LOGE(ERROR, "device model %s is not executable", dm);
+        LOGED(ERROR, domid, "device model %s is not executable", dm);
         rc = ERROR_FAIL;
         goto out;
     }
@@ -2064,7 +2070,7 @@ void libxl__spawn_local_dm(libxl__egc *egc, libxl__dm_spawn_state *dmss)
     }
     null = open("/dev/null", O_RDONLY);
     if (null < 0) {
-        LOGE(ERROR, "unable to open /dev/null");
+        LOGED(ERROR, domid, "unable to open /dev/null");
         rc = ERROR_FAIL;
         goto out_close;
     }
@@ -2091,13 +2097,13 @@ retry_transaction:
         }
     }
 
-    LOG(DEBUG, "Spawning device-model %s with arguments:", dm);
+    LOGD(DEBUG, domid, "Spawning device-model %s with arguments:", dm);
     for (arg = args; *arg; arg++)
-        LOG(DEBUG, "  %s", *arg);
+        LOGD(DEBUG, domid, "  %s", *arg);
     if (*envs) {
-        LOG(DEBUG, "Spawning device-model %s with additional environment:", dm);
+        LOGD(DEBUG, domid, "Spawning device-model %s with additional environment:", dm);
         for (arg = envs; *arg; arg += 2)
-            LOG(DEBUG, "  %s=%s", arg[0], arg[1]);
+            LOGD(DEBUG, domid, "  %s=%s", arg[0], arg[1]);
     }
 
     spawn->what = GCSPRINTF("domain %d device model", domid);
@@ -2186,14 +2192,15 @@ static void device_model_spawn_outcome(libxl__egc *egc,
     int ret2;
 
     if (rc)
-        LOG(ERROR, "%s: spawn failed (rc=%d)", dmss->spawn.what, rc);
+        LOGD(ERROR, dmss->guest_domid,
+             "%s: spawn failed (rc=%d)", dmss->spawn.what, rc);
 
     libxl__domain_build_state *state = dmss->build_state;
 
     if (state->saved_state) {
         ret2 = unlink(state->saved_state);
         if (ret2) {
-            LOGE(ERROR, "%s: failed to remove device-model state %s",
+            LOGED(ERROR, dmss->guest_domid, "%s: failed to remove device-model state %s",
                  dmss->spawn.what, state->saved_state);
             rc = ERROR_FAIL;
             goto out;
@@ -2339,7 +2346,7 @@ int libxl__destroy_device_model(libxl__gc *gc, uint32_t domid)
 {
     char *path = DEVICE_MODEL_XS_PATH(gc, LIBXL_TOOLSTACK_DOMID, domid, "");
     if (!xs_rm(CTX->xsh, XBT_NULL, path))
-        LOG(ERROR, "xs_rm failed for %s", path);
+        LOGD(ERROR, domid, "xs_rm failed for %s", path);
     /* We should try to destroy the device model anyway. */
     return kill_device_model(gc,
                 GCSPRINTF("/local/domain/%d/image/device-model-pid", domid));
@@ -2420,7 +2427,7 @@ int libxl__dm_check_start(libxl__gc *gc, libxl_domain_config *d_config,
     if (!rc)
         return 0;
 
-    LOG(ERROR, "device model required but not running");
+    LOGD(ERROR, domid, "device model required but not running");
     rc = ERROR_FAIL;
 
 out:
