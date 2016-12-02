@@ -869,6 +869,88 @@ static __init void setup_pv_physmap(struct domain *d, unsigned long pgtbl_pfn,
     unmap_domain_page(l4start);
 }
 
+static int __init setup_permissions(struct domain *d)
+{
+    unsigned long mfn;
+    unsigned int i;
+    int rc;
+
+    /* The hardware domain is initially permitted full I/O capabilities. */
+    rc = ioports_permit_access(d, 0, 0xFFFF);
+    rc |= iomem_permit_access(d, 0UL, (1UL << (paddr_bits - PAGE_SHIFT)) - 1);
+    rc |= irqs_permit_access(d, 1, nr_irqs_gsi - 1);
+
+    /* Modify I/O port access permissions. */
+
+    /* Master Interrupt Controller (PIC). */
+    rc |= ioports_deny_access(d, 0x20, 0x21);
+    /* Slave Interrupt Controller (PIC). */
+    rc |= ioports_deny_access(d, 0xA0, 0xA1);
+    /* Interval Timer (PIT). */
+    rc |= ioports_deny_access(d, 0x40, 0x43);
+    /* PIT Channel 2 / PC Speaker Control. */
+    rc |= ioports_deny_access(d, 0x61, 0x61);
+    /* ACPI PM Timer. */
+    if ( pmtmr_ioport )
+        rc |= ioports_deny_access(d, pmtmr_ioport, pmtmr_ioport + 3);
+    /* PCI configuration space (NB. 0xcf8 has special treatment). */
+    rc |= ioports_deny_access(d, 0xcfc, 0xcff);
+    /* Command-line I/O ranges. */
+    process_dom0_ioports_disable(d);
+
+    /* Modify I/O memory access permissions. */
+
+    /* Local APIC. */
+    if ( mp_lapic_addr != 0 )
+    {
+        mfn = paddr_to_pfn(mp_lapic_addr);
+        rc |= iomem_deny_access(d, mfn, mfn);
+    }
+    /* I/O APICs. */
+    for ( i = 0; i < nr_ioapics; i++ )
+    {
+        mfn = paddr_to_pfn(mp_ioapics[i].mpc_apicaddr);
+        if ( !rangeset_contains_singleton(mmio_ro_ranges, mfn) )
+            rc |= iomem_deny_access(d, mfn, mfn);
+    }
+    /* MSI range. */
+    rc |= iomem_deny_access(d, paddr_to_pfn(MSI_ADDR_BASE_LO),
+                            paddr_to_pfn(MSI_ADDR_BASE_LO +
+                                         MSI_ADDR_DEST_ID_MASK));
+    /* HyperTransport range. */
+    if ( boot_cpu_data.x86_vendor == X86_VENDOR_AMD )
+        rc |= iomem_deny_access(d, paddr_to_pfn(0xfdULL << 32),
+                                paddr_to_pfn((1ULL << 40) - 1));
+
+    /* Remove access to E820_UNUSABLE I/O regions above 1MB. */
+    for ( i = 0; i < e820.nr_map; i++ )
+    {
+        unsigned long sfn, efn;
+        sfn = max_t(unsigned long, paddr_to_pfn(e820.map[i].addr), 0x100ul);
+        efn = paddr_to_pfn(e820.map[i].addr + e820.map[i].size - 1);
+        if ( (e820.map[i].type == E820_UNUSABLE) &&
+             (e820.map[i].size != 0) &&
+             (sfn <= efn) )
+            rc |= iomem_deny_access(d, sfn, efn);
+    }
+
+    /* Prevent access to HPET */
+    if ( hpet_address )
+    {
+        u8 prot_flags = hpet_flags & ACPI_HPET_PAGE_PROTECT_MASK;
+
+        mfn = paddr_to_pfn(hpet_address);
+        if ( prot_flags == ACPI_HPET_PAGE_PROTECT4 )
+            rc |= iomem_deny_access(d, mfn, mfn);
+        else if ( prot_flags == ACPI_HPET_PAGE_PROTECT64 )
+            rc |= iomem_deny_access(d, mfn, mfn + 15);
+        else if ( ro_hpet )
+            rc |= rangeset_add_singleton(mmio_ro_ranges, mfn);
+    }
+
+    return rc;
+}
+
 int __init construct_dom0(
     struct domain *d,
     const module_t *image, unsigned long image_headroom,
@@ -1539,83 +1621,7 @@ int __init construct_dom0(
     if ( test_bit(XENFEAT_supervisor_mode_kernel, parms.f_required) )
         panic("Dom0 requires supervisor-mode execution");
 
-    rc = 0;
-
-    /* The hardware domain is initially permitted full I/O capabilities. */
-    rc |= ioports_permit_access(d, 0, 0xFFFF);
-    rc |= iomem_permit_access(d, 0UL, (1UL << (paddr_bits - PAGE_SHIFT)) - 1);
-    rc |= irqs_permit_access(d, 1, nr_irqs_gsi - 1);
-
-    /*
-     * Modify I/O port access permissions.
-     */
-    /* Master Interrupt Controller (PIC). */
-    rc |= ioports_deny_access(d, 0x20, 0x21);
-    /* Slave Interrupt Controller (PIC). */
-    rc |= ioports_deny_access(d, 0xA0, 0xA1);
-    /* Interval Timer (PIT). */
-    rc |= ioports_deny_access(d, 0x40, 0x43);
-    /* PIT Channel 2 / PC Speaker Control. */
-    rc |= ioports_deny_access(d, 0x61, 0x61);
-    /* ACPI PM Timer. */
-    if ( pmtmr_ioport )
-        rc |= ioports_deny_access(d, pmtmr_ioport, pmtmr_ioport + 3);
-    /* PCI configuration space (NB. 0xcf8 has special treatment). */
-    rc |= ioports_deny_access(d, 0xcfc, 0xcff);
-    /* Command-line I/O ranges. */
-    process_dom0_ioports_disable(d);
-
-    /*
-     * Modify I/O memory access permissions.
-     */
-    /* Local APIC. */
-    if ( mp_lapic_addr != 0 )
-    {
-        mfn = paddr_to_pfn(mp_lapic_addr);
-        rc |= iomem_deny_access(d, mfn, mfn);
-    }
-    /* I/O APICs. */
-    for ( i = 0; i < nr_ioapics; i++ )
-    {
-        mfn = paddr_to_pfn(mp_ioapics[i].mpc_apicaddr);
-        if ( !rangeset_contains_singleton(mmio_ro_ranges, mfn) )
-            rc |= iomem_deny_access(d, mfn, mfn);
-    }
-    /* MSI range. */
-    rc |= iomem_deny_access(d, paddr_to_pfn(MSI_ADDR_BASE_LO),
-                            paddr_to_pfn(MSI_ADDR_BASE_LO +
-                                         MSI_ADDR_DEST_ID_MASK));
-    /* HyperTransport range. */
-    if ( boot_cpu_data.x86_vendor == X86_VENDOR_AMD )
-        rc |= iomem_deny_access(d, paddr_to_pfn(0xfdULL << 32),
-                                paddr_to_pfn((1ULL << 40) - 1));
-
-    /* Remove access to E820_UNUSABLE I/O regions above 1MB. */
-    for ( i = 0; i < e820.nr_map; i++ )
-    {
-        unsigned long sfn, efn;
-        sfn = max_t(unsigned long, paddr_to_pfn(e820.map[i].addr), 0x100ul);
-        efn = paddr_to_pfn(e820.map[i].addr + e820.map[i].size - 1);
-        if ( (e820.map[i].type == E820_UNUSABLE) &&
-             (e820.map[i].size != 0) &&
-             (sfn <= efn) )
-            rc |= iomem_deny_access(d, sfn, efn);
-    }
-
-    /* Prevent access to HPET */
-    if ( hpet_address )
-    {
-        u8 prot_flags = hpet_flags & ACPI_HPET_PAGE_PROTECT_MASK;
-
-        mfn = paddr_to_pfn(hpet_address);
-        if ( prot_flags == ACPI_HPET_PAGE_PROTECT4 )
-            rc |= iomem_deny_access(d, mfn, mfn);
-        else if ( prot_flags == ACPI_HPET_PAGE_PROTECT64 )
-            rc |= iomem_deny_access(d, mfn, mfn + 15);
-        else if ( ro_hpet )
-            rc |= rangeset_add_singleton(mmio_ro_ranges, mfn);
-    }
-
+    rc = setup_permissions(d);
     BUG_ON(rc != 0);
 
     if ( elf_check_broken(&elf) )
