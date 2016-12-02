@@ -84,7 +84,7 @@ static void colo_qdisk_setup(libxl__egc *egc, libxl__checkpoint_device *dev,
             crs->port = port;
         } else {
             if (strcmp(crs->host, host) || strcmp(crs->port, port)) {
-                LOG(ERROR, "The host and port of all disks must be the same");
+                LOGD(ERROR, domid, "The host and port of all disks must be the same");
                 rc = ERROR_FAIL;
                 goto out;
             }
