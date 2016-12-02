@@ -3475,9 +3475,6 @@ static int sh_page_fault(struct vcpu *v,
             v->arch.paging.last_write_was_pt = 0;
             r = x86_emulate(&emul_ctxt.ctxt, emul_ops);
 
-            if ( r == X86EMUL_EXCEPTION && emul_ctxt.ctxt.event_pending )
-                r = X86EMUL_UNHANDLEABLE;
-
             /*
              * Only continue the search for the second half if there are no
              * exceptions or pending actions.  Otherwise, give up and re-enter
