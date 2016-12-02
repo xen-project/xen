@@ -99,7 +99,7 @@ static int setup_xenconsoled_pty(libxl__egc *egc, libxl__bootloader_state *bl,
 
     r = ttyname_r(slave, slave_path, slave_path_len);
     if (r == -1) {
-        LOGE(ERROR,"ttyname_r failed");
+        LOGED(ERROR, bl->domid, "ttyname_r failed");
         rc = ERROR_FAIL;
         goto out;
     }
@@ -125,7 +125,7 @@ static int setup_xenconsoled_pty(libxl__egc *egc, libxl__bootloader_state *bl,
 }
 
 static const char *bootloader_result_command(libxl__gc *gc, const char *buf,
-                         const char *prefix, size_t prefixlen) {
+                         const char *prefix, size_t prefixlen, uint32_t domid) {
     if (strncmp(buf, prefix, prefixlen))
         return 0;
 
@@ -136,7 +136,7 @@ static const char *bootloader_result_command(libxl__gc *gc, const char *buf,
     while (CTYPE(isspace,*rhs))
         rhs++;
 
-    LOG(DEBUG,"bootloader output contained %s %s", prefix, rhs);
+    LOGD(DEBUG, domid, "bootloader output contained %s %s", prefix, rhs);
 
     return rhs;
 }
@@ -151,7 +151,8 @@ static int parse_bootloader_result(libxl__egc *egc,
 
     f = fopen(bl->outputpath, "r");
     if (!f) {
-        LOGE(ERROR,"open bootloader output file %s", bl->outputpath);
+        LOGED(ERROR, bl->domid, "open bootloader output file %s",
+              bl->outputpath);
         goto out;
     }
 
@@ -166,21 +167,22 @@ static int parse_bootloader_result(libxl__egc *egc,
         }
         if (c == EOF) {
             if (ferror(f)) {
-                LOGE(ERROR,"read bootloader output file %s", bl->outputpath);
+                LOGED(ERROR, bl->domid, "read bootloader output file %s",
+                      bl->outputpath);
                 goto out;
             }
             if (!l)
                 break;
         }
         if (l >= sizeof(buf)) {
-            LOG(WARN,"bootloader output contained"
-                " overly long item `%.150s...'", buf);
+            LOGD(WARN, bl->domid, "bootloader output contained"
+                 " overly long item `%.150s...'", buf);
             continue;
         }
         buf[l] = 0;
 
         const char *rhs;
-#define COMMAND(s) ((rhs = bootloader_result_command(gc, buf, s, sizeof(s)-1)))
+#define COMMAND(s) ((rhs = bootloader_result_command(gc, buf, s, sizeof(s)-1, bl->domid)))
 
         if (COMMAND("kernel")) {
             bl->kernel->path = libxl__strdup(gc, rhs);
@@ -193,7 +195,8 @@ static int parse_bootloader_result(libxl__egc *egc,
         } else if (COMMAND("args")) {
             bl->cmdline = libxl__strdup(gc, rhs);
         } else if (l) {
-            LOG(WARN, "unexpected output from bootloader: `%s'", buf);
+            LOGD(WARN, bl->domid,
+                 "unexpected output from bootloader: `%s'", buf);
         }
     }
     rc = 0;
@@ -276,7 +279,8 @@ static void bootloader_local_detached_cb(libxl__egc *egc,
     libxl__bootloader_state *bl = CONTAINER_OF(dls, *bl, dls);
 
     if (rc) {
-        LOG(ERROR, "unable to detach locally attached disk");
+        LOGD(ERROR, bl->domid,
+             "unable to detach locally attached disk");
         if (!bl->rc)
             bl->rc = rc;
     }
@@ -295,8 +299,8 @@ static void bootloader_stop(libxl__egc *egc,
     libxl__datacopier_kill(&bl->display);
     if (libxl__ev_child_inuse(&bl->child)) {
         r = kill(bl->child.pid, SIGTERM);
-        if (r) LOGE(WARN, "%sfailed to kill bootloader [%lu]",
-                    rc ? "after failure, " : "", (unsigned long)bl->child.pid);
+        if (r) LOGED(WARN, bl->domid, "%sfailed to kill bootloader [%lu]",
+                     rc ? "after failure, " : "", (unsigned long)bl->child.pid);
     }
     if (!bl->rc)
         bl->rc = rc;
@@ -321,13 +325,14 @@ void libxl__bootloader_run(libxl__egc *egc, libxl__bootloader_state *bl)
     libxl__bootloader_init(bl);
 
     if (info->type != LIBXL_DOMAIN_TYPE_PV) {
-        LOG(DEBUG, "not a PV domain, skipping bootloader");
+        LOGD(DEBUG, domid, "not a PV domain, skipping bootloader");
         rc = 0;
         goto out_ok;
     }
 
     if (!info->u.pv.bootloader) {
-        LOG(DEBUG, "no bootloader configured, using user supplied kernel");
+        LOGD(DEBUG, domid,
+             "no bootloader configured, using user supplied kernel");
         bl->kernel->path = bl->info->kernel;
         bl->ramdisk->path = bl->info->ramdisk;
         bl->cmdline = bl->info->cmdline;
@@ -336,7 +341,7 @@ void libxl__bootloader_run(libxl__egc *egc, libxl__bootloader_state *bl)
     }
 
     if (!bl->disk) {
-        LOG(ERROR, "cannot run bootloader with no boot disk");
+        LOGD(ERROR, domid, "cannot run bootloader with no boot disk");
         rc = ERROR_FAIL;
         goto out;
     }
@@ -354,7 +359,8 @@ void libxl__bootloader_run(libxl__egc *egc, libxl__bootloader_state *bl)
 
     bl->display.log = fopen(bl->logfile, "a");
     if (!bl->display.log) {
-        LOGE(ERROR, "failed to create bootloader logfile %s", bl->logfile);
+        LOGED(ERROR, domid,
+              "failed to create bootloader logfile %s", bl->logfile);
         rc = ERROR_FAIL;
         goto out;
     }
@@ -364,7 +370,8 @@ void libxl__bootloader_run(libxl__egc *egc, libxl__bootloader_state *bl)
         if (!r) break;
         if (errno == EINTR) continue;
         if (errno == EEXIST) break;
-        LOGE(ERROR, "failed to create bootloader dir %s", bl->outputdir);
+        LOGED(ERROR, domid,
+              "failed to create bootloader dir %s", bl->outputdir);
         rc = ERROR_FAIL;
         goto out;
     }
@@ -373,7 +380,8 @@ void libxl__bootloader_run(libxl__egc *egc, libxl__bootloader_state *bl)
         r = open(bl->outputpath, O_WRONLY|O_CREAT|O_TRUNC, 0600);
         if (r>=0) { close(r); break; }
         if (errno == EINTR) continue;
-        LOGE(ERROR, "failed to precreate bootloader output %s", bl->outputpath);
+        LOGED(ERROR, domid,
+              "failed to precreate bootloader output %s", bl->outputpath);
         rc = ERROR_FAIL;
         goto out;
     }
@@ -405,15 +413,18 @@ static void bootloader_disk_attached_cb(libxl__egc *egc,
     const char *bootloader;
 
     if (rc) {
-        LOG(ERROR, "failed to attach local disk for bootloader execution");
+        LOGD(ERROR, bl->domid,
+             "failed to attach local disk for bootloader execution");
         goto out;
     }
 
-    LOG(DEBUG, "Config bootloader value: %s", info->u.pv.bootloader);
+    LOGD(DEBUG, bl->domid,
+         "Config bootloader value: %s", info->u.pv.bootloader);
 
     if ( !strcmp(info->u.pv.bootloader, "/usr/bin/pygrub") )
-        LOG(WARN, "bootloader='/usr/bin/pygrub' is deprecated; use " \
-            "bootloader='pygrub' instead");
+        LOGD(WARN, bl->domid,
+             "bootloader='/usr/bin/pygrub' is deprecated; use " \
+             "bootloader='pygrub' instead");
 
     bootloader = info->u.pv.bootloader;
 
@@ -425,11 +436,13 @@ static void bootloader_disk_attached_cb(libxl__egc *egc,
         bltmp = libxl__abs_path(gc, bootloader, libxl__private_bindir_path());
         /* Check to see if the file exists in this location; if not,
          * fall back to checking the path */
-        LOG(DEBUG, "Checking for bootloader in libexec path: %s", bltmp);
+        LOGD(DEBUG, bl->domid,
+             "Checking for bootloader in libexec path: %s", bltmp);
 
         if ( lstat(bltmp, &st) )
-            LOG(DEBUG, "%s doesn't exist, falling back to config path",
-                bltmp);
+            LOGD(DEBUG, bl->domid,
+                 "%s doesn't exist, falling back to config path",
+                 bltmp);
         else
             bootloader = bltmp;
     }
@@ -488,7 +501,7 @@ static void bootloader_gotptys(libxl__egc *egc, libxl__openpty_state *op)
     rc = libxl__xs_printf(gc, XBT_NULL, dom_console_xs_path, "%s",
                           dom_console_slave_tty_path);
     if (rc) {
-        LOGE(ERROR,"xs write console path %s := %s failed",
+        LOGED(ERROR, bl->domid, "xs write console path %s := %s failed",
              dom_console_xs_path, dom_console_slave_tty_path);
         rc = ERROR_FAIL;
         goto out;
@@ -537,11 +550,11 @@ static void bootloader_gotptys(libxl__egc *egc, libxl__openpty_state *op)
     rc = libxl__datacopier_start(&bl->display);
     if (rc) goto out;
 
-    LOG(DEBUG, "executing bootloader: %s", bl->args[0]);
+    LOGD(DEBUG, bl->domid, "executing bootloader: %s", bl->args[0]);
     for (const char **blarg = bl->args;
          *blarg;
          blarg++)
-        LOG(DEBUG, "  bootloader arg: %s", *blarg);
+        LOGD(DEBUG, bl->domid, "  bootloader arg: %s", *blarg);
 
     struct termios termattr;
 
@@ -554,7 +567,7 @@ static void bootloader_gotptys(libxl__egc *egc, libxl__openpty_state *op)
     if (!pid) {
         /* child */
         r = login_tty(libxl__carefd_fd(bl->ptys[0].slave));
-        if (r) { LOGE(ERROR, "login_tty failed"); exit(-1); }
+        if (r) { LOGED(ERROR, bl->domid, "login_tty failed"); exit(-1); }
         libxl__exec(gc, -1, -1, -1, bl->args[0], (char **) bl->args, env);
     }
 
@@ -589,10 +602,10 @@ static void bootloader_copyfail(libxl__egc *egc, const char *which,
             rc = 0;
             bl->got_pollhup = 1;
         } else {
-            LOG(ERROR, "unexpected POLLHUP on %s", which);
+            LOGD(ERROR, bl->domid, "unexpected POLLHUP on %s", which);
         }
     } else if (!rc) {
-        LOG(ERROR, "unexpected eof copying %s", which);
+        LOGD(ERROR, bl->domid, "unexpected eof copying %s", which);
         rc = ERROR_FAIL;
     }
 
@@ -631,14 +644,15 @@ static void bootloader_finished(libxl__egc *egc, libxl__ev_child *child,
 
     if (status) {
         if (bl->got_pollhup && WIFSIGNALED(status) && WTERMSIG(status)==SIGTERM)
-            LOG(ERROR, "got POLLHUP, sent SIGTERM");
-        LOG(ERROR, "bootloader failed - consult logfile %s", bl->logfile);
+            LOGD(ERROR, bl->domid, "got POLLHUP, sent SIGTERM");
+        LOGD(ERROR, bl->domid,
+             "bootloader failed - consult logfile %s", bl->logfile);
         libxl_report_child_exitstatus(CTX, XTL_ERROR, "bootloader",
                                       pid, status);
         rc = ERROR_FAIL;
         goto out;
     } else {
-        LOG(DEBUG, "bootloader completed");
+        LOGD(DEBUG, bl->domid, "bootloader completed");
     }
 
     if (bl->rc) {
@@ -651,7 +665,7 @@ static void bootloader_finished(libxl__egc *egc, libxl__ev_child *child,
     if (rc) goto out;
 
     rc = 0;
-    LOG(DEBUG, "bootloader execution successful");
+    LOGD(DEBUG, bl->domid, "bootloader execution successful");
 
  out:
     bootloader_callback(egc, bl, rc);
