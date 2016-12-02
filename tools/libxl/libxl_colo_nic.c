@@ -213,7 +213,7 @@ static void colo_save_setup_script_cb(libxl__egc *egc,
         goto out;
 
     if (hotplug_error) {
-        LOG(ERROR, "colo_proxy script %s setup failed for vif %s: %s",
+        LOGD(ERROR, domid, "colo_proxy script %s setup failed for vif %s: %s",
             aes->args[0], vif, hotplug_error);
         rc = ERROR_FAIL;
         goto out;
