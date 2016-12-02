@@ -1615,9 +1615,9 @@ shadow_free_p2m_page(struct domain *d, struct page_info *pg)
  * Input will be rounded up to at least shadow_min_acceptable_pages(),
  * plus space for the p2m table.
  * Returns 0 for success, non-zero for failure. */
-static unsigned int sh_set_allocation(struct domain *d,
-                                      unsigned int pages,
-                                      int *preempted)
+static int sh_set_allocation(struct domain *d,
+                             unsigned int pages,
+                             int *preempted)
 {
     struct page_info *sp;
     unsigned int lower_bound;
@@ -3153,13 +3153,11 @@ int shadow_enable(struct domain *d, u32 mode)
     old_pages = d->arch.paging.shadow.total_pages;
     if ( old_pages == 0 )
     {
-        unsigned int r;
         paging_lock(d);
-        r = sh_set_allocation(d, 1024, NULL); /* Use at least 4MB */
-        if ( r != 0 )
+        rv = sh_set_allocation(d, 1024, NULL); /* Use at least 4MB */
+        if ( rv != 0 )
         {
             sh_set_allocation(d, 0, NULL);
-            rv = -ENOMEM;
             goto out_locked;
         }
         paging_unlock(d);
