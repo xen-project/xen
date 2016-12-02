@@ -94,13 +94,13 @@ int libxl__nic_type(libxl__gc *gc, libxl__device *dev, libxl_nic_type *nictype)
     snictype = libxl__xs_read(gc, XBT_NULL,
                               GCSPRINTF("%s/%s", be_path, "type"));
     if (!snictype) {
-        LOGE(ERROR, "unable to read nictype from %s", be_path);
+        LOGED(ERROR, dev->domid, "unable to read nictype from %s", be_path);
         rc = ERROR_FAIL;
         goto out;
     }
     rc = libxl_nic_type_from_string(snictype, nictype);
     if (rc) {
-        LOGE(ERROR, "unable to parse nictype from %s", be_path);
+        LOGED(ERROR, dev->domid, "unable to parse nictype from %s", be_path);
         goto out;
     }
 
@@ -231,7 +231,7 @@ retry_transaction:
         if (errno == EAGAIN)
             goto retry_transaction;
         else {
-            LOGE(ERROR, "xs transaction failed");
+            LOGED(ERROR, device->domid, "xs transaction failed");
             return ERROR_FAIL;
         }
     }
@@ -885,7 +885,7 @@ void libxl__wait_device_connection(libxl__egc *egc, libxl__ao_device *aodev)
                                  state_path, XenbusStateInitWait,
                                  LIBXL_INIT_TIMEOUT * 1000);
     if (rc) {
-        LOG(ERROR, "unable to initialize device %s", be_path);
+        LOGD(ERROR, aodev->dev->domid, "unable to initialize device %s", be_path);
         goto out;
     }
 
@@ -914,14 +914,14 @@ void libxl__initiate_device_generic_remove(libxl__egc *egc,
 
     rc = libxl__get_domid(gc, &my_domid);
     if (rc) {
-        LOG(ERROR, "unable to get my domid");
+        LOGD(ERROR, domid, "unable to get my domid");
         goto out;
     }
 
     if (my_domid == LIBXL_TOOLSTACK_DOMID) {
         rc = libxl_domain_info(CTX, &info, domid);
         if (rc) {
-            LOG(ERROR, "unable to get info for domain %d", domid);
+            LOGD(ERROR, domid, "unable to get info for domain %d", domid);
             goto out;
         }
         if (QEMU_BACKEND(aodev->dev) &&
@@ -934,8 +934,8 @@ void libxl__initiate_device_generic_remove(libxl__egc *egc,
                                              device_qemu_timeout,
                                              LIBXL_QEMU_BODGE_TIMEOUT * 1000);
             if (rc) {
-                LOG(ERROR, "unable to register timeout for Qemu device %s",
-                           be_path);
+                LOGD(ERROR, domid, "unable to register timeout for Qemu device %s",
+                            be_path);
                 goto out;
             }
             goto out_success;
@@ -945,7 +945,7 @@ void libxl__initiate_device_generic_remove(libxl__egc *egc,
     for (;;) {
         rc = libxl__xs_transaction_start(gc, &t);
         if (rc) {
-            LOG(ERROR, "unable to start transaction");
+            LOGD(ERROR, domid, "unable to start transaction");
             goto out;
         }
 
@@ -955,7 +955,7 @@ void libxl__initiate_device_generic_remove(libxl__egc *egc,
 
         rc = libxl__xs_read_checked(gc, t, state_path, &state);
         if (rc) {
-            LOG(ERROR, "unable to read device state from path %s", state_path);
+            LOGD(ERROR, domid, "unable to read device state from path %s", state_path);
             goto out;
         }
 
@@ -970,7 +970,7 @@ void libxl__initiate_device_generic_remove(libxl__egc *egc,
          if (state && atoi(state) != XenbusStateClosed) {
             rc = libxl__xs_write_checked(gc, t, state_path, GCSPRINTF("%d", XenbusStateClosing));
             if (rc) {
-                LOG(ERROR, "unable to write to xenstore path %s", state_path);
+                LOGD(ERROR, domid, "unable to write to xenstore path %s", state_path);
                 goto out;
             }
         }
@@ -985,7 +985,7 @@ void libxl__initiate_device_generic_remove(libxl__egc *egc,
                                  state_path, XenbusStateClosed,
                                  LIBXL_DESTROY_TIMEOUT * 1000);
     if (rc) {
-        LOG(ERROR, "unable to remove device %s", be_path);
+        LOGD(ERROR, domid, "unable to remove device %s", be_path);
         goto out;
     }
 
@@ -1019,7 +1019,7 @@ static void device_qemu_timeout(libxl__egc *egc, libxl__ev_time *ev,
     for (;;) {
         rc = libxl__xs_transaction_start(gc, &t);
         if (rc) {
-            LOG(ERROR, "unable to start transaction");
+            LOGD(ERROR, aodev->dev->domid, "unable to start transaction");
             goto out;
         }
 
@@ -1056,22 +1056,22 @@ static void device_backend_callback(libxl__egc *egc, libxl__ev_devstate *ds,
     libxl__ao_device *aodev = CONTAINER_OF(ds, *aodev, backend_ds);
     STATE_AO_GC(aodev->ao);
 
-    LOG(DEBUG, "calling device_backend_cleanup");
+    LOGD(DEBUG, aodev->dev->domid, "calling device_backend_cleanup");
     device_backend_cleanup(gc, aodev);
 
     if (rc == ERROR_TIMEDOUT &&
         aodev->action == LIBXL__DEVICE_ACTION_REMOVE &&
         !aodev->force) {
-        LOG(DEBUG, "Timeout reached, initiating forced remove");
+        LOGD(DEBUG, aodev->dev->domid, "Timeout reached, initiating forced remove");
         aodev->force = 1;
         libxl__initiate_device_generic_remove(egc, aodev);
         return;
     }
 
     if (rc) {
-        LOG(ERROR, "unable to %s device with path %s",
-                   libxl__device_action_to_string(aodev->action),
-                   libxl__device_backend_path(gc, aodev->dev));
+        LOGD(ERROR, aodev->dev->domid, "unable to %s device with path %s",
+                    libxl__device_action_to_string(aodev->action),
+                    libxl__device_backend_path(gc, aodev->dev));
         goto out;
     }
 
@@ -1106,12 +1106,13 @@ static void device_hotplug(libxl__egc *egc, libxl__ao_device *aodev)
      */
     rc = libxl__get_domid(gc, &domid);
     if (rc) {
-        LOG(ERROR, "Failed to get domid");
+        LOGD(ERROR, aodev->dev->domid, "Failed to get domid");
         goto out;
     }
     if (aodev->dev->backend_domid != domid) {
-        LOG(DEBUG, "Backend domid %d, domid %d, assuming driver domains",
-            aodev->dev->backend_domid, domid);
+        LOGD(DEBUG, aodev->dev->domid,
+             "Backend domid %d, domid %d, assuming driver domains",
+             aodev->dev->backend_domid, domid);
 
         if (aodev->action != LIBXL__DEVICE_ACTION_REMOVE) {
             LOG(DEBUG, "Not a remove, not executing hotplug scripts");
@@ -1125,7 +1126,8 @@ static void device_hotplug(libxl__egc *egc, libxl__ao_device *aodev)
         aodev->xswait.callback = device_destroy_be_watch_cb;
         rc = libxl__xswait_start(gc, &aodev->xswait);
         if (rc) {
-            LOG(ERROR, "Setup of backend removal watch failed (path %s)", be_path);
+            LOGD(ERROR, aodev->dev->domid,
+                 "Setup of backend removal watch failed (path %s)", be_path);
             goto out;
         }
 
@@ -1140,43 +1142,44 @@ static void device_hotplug(libxl__egc *egc, libxl__ao_device *aodev)
     switch (hotplug) {
     case 0:
         /* no hotplug script to execute */
-        LOG(DEBUG, "No hotplug script to execute");
+        LOGD(DEBUG, aodev->dev->domid, "No hotplug script to execute");
         goto out;
     case 1:
         /* execute hotplug script */
         break;
     default:
         /* everything else is an error */
-        LOG(ERROR, "unable to get args/env to execute hotplug script for "
-                   "device %s", libxl__device_backend_path(gc, aodev->dev));
+        LOGD(ERROR, aodev->dev->domid,
+                    "unable to get args/env to execute hotplug script for "
+                    "device %s", libxl__device_backend_path(gc, aodev->dev));
         rc = hotplug;
         goto out;
     }
 
     assert(args != NULL);
-    LOG(DEBUG, "calling hotplug script: %s %s", args[0], args[1]);
-    LOG(DEBUG, "extra args:");
+    LOGD(DEBUG, aodev->dev->domid, "calling hotplug script: %s %s", args[0], args[1]);
+    LOGD(DEBUG, aodev->dev->domid, "extra args:");
     {
         const char *arg;
         unsigned int x;
 
         for (x = 2; (arg = args[x]); x++)
-            LOG(DEBUG, "\t%s", arg);
+            LOGD(DEBUG, aodev->dev->domid, "\t%s", arg);
     }
-    LOG(DEBUG, "env:");
+    LOGD(DEBUG, aodev->dev->domid, "env:");
     if (env != NULL) {
         const char *k, *v;
         unsigned int x;
 
         for (x = 0; (k = env[x]); x += 2) {
             v = env[x+1];
-            LOG(DEBUG, "\t%s: %s", k, v);
+            LOGD(DEBUG, aodev->dev->domid, "\t%s: %s", k, v);
         }
     }
 
     nullfd = open("/dev/null", O_RDONLY);
     if (nullfd < 0) {
-        LOG(ERROR, "unable to open /dev/null for hotplug script");
+        LOGD(ERROR, aodev->dev->domid, "unable to open /dev/null for hotplug script");
         rc = ERROR_FAIL;
         goto out;
     }
@@ -1260,8 +1263,9 @@ static void device_destroy_be_watch_cb(libxl__egc *egc,
 
     if (rc) {
         if (rc == ERROR_TIMEDOUT)
-            LOG(ERROR, "timed out while waiting for %s to be removed",
-                xswait->path);
+            LOGD(ERROR, aodev->dev->domid,
+                 "timed out while waiting for %s to be removed",
+                 xswait->path);
         aodev->rc = rc;
         goto out;
     }
