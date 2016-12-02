@@ -361,7 +361,6 @@ void start_secondary(void *unused)
     spin_debug_enable();
     set_cpu_sibling_map(cpu);
     notify_cpu_starting(cpu);
-    wmb();
 
     /*
      * We need to hold vector_lock so there the set of online cpus
@@ -377,7 +376,6 @@ void start_secondary(void *unused)
     local_irq_enable();
     mtrr_ap_init();
 
-    wmb();
     startup_cpu_idle_loop();
 }
 

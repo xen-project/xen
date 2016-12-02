@@ -1341,8 +1341,6 @@ void cpuidle_disable_deep_cstate(void)
             max_cstate = 1;
     }
 
-    mb();
-
     hpet_disable_legacy_broadcast();
 }
 

@@ -86,7 +86,6 @@ static x86_mce_vector_t _machine_check_vector = unexpected_machine_check;
 void x86_mce_vector_register(x86_mce_vector_t hdlr)
 {
     _machine_check_vector = hdlr;
-    wmb();
 }
 
 /* Call the installed machine check handler for this CPU setup. */
@@ -385,8 +384,6 @@ mcheck_mca_logout(enum mca_source who, struct mca_banks *bankmask,
             mcabank_clear(i);
         else if ( who == MCA_MCE_SCAN && need_clear )
             mcabanks_set(i, clear_bank);
-
-        wmb();
     }
 
     if ( mig && errcnt > 0 )
