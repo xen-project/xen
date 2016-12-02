@@ -1362,7 +1362,7 @@ void libxl__event_disaster(libxl__egc *egc, const char *msg, int errnoval,
 {
     EGC_GC;
 
-    libxl__log(CTX, XTL_CRITICAL, errnoval, file, line, func,
+    libxl__log(CTX, XTL_CRITICAL, errnoval, file, line, func, INVALID_DOMID,
                "DISASTER in event loop: %s%s%s%s",
                msg,
                type ? " (relates to event type " : "",
@@ -1943,7 +1943,7 @@ libxl__ao *libxl__ao_create(libxl_ctx *ctx, uint32_t domid,
         ao->poller = libxl__poller_get(&ao->gc);
         if (!ao->poller) goto out;
     }
-    libxl__log(ctx,XTL_DEBUG,-1,file,line,func,
+    libxl__log(ctx,XTL_DEBUG,-1,file,line,func,domid,
                "ao %p: create: how=%p callback=%p poller=%p",
                ao, how, ao->how.callback, ao->poller);
 
@@ -1962,13 +1962,17 @@ int libxl__ao_inprogress(libxl__ao *ao,
 {
     AO_GC;
     int rc;
+    uint32_t domid = ao->domid;
 
     assert(ao->magic == LIBXL__AO_MAGIC);
     assert(ao->constructing);
     assert(ao->in_initiator);
     ao->constructing = 0;
 
-    libxl__log(CTX,XTL_DEBUG,-1,file,line,func,
+    if (ao->nested_root)
+        domid = ao->nested_root->domid;
+
+    libxl__log(CTX,XTL_DEBUG,-1,file,line,func,domid,
                "ao %p: inprogress: poller=%p, flags=%s%s%s%s",
                ao, ao->poller,
                ao->constructing ? "o" : "",

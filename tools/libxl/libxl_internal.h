@@ -152,13 +152,22 @@
 #define LIBXL__LOGGING_ENABLED
 
 #ifdef LIBXL__LOGGING_ENABLED
-#define LIBXL__LOG(ctx, loglevel, _f, _a...)   libxl__log(ctx, loglevel, -1, __FILE__, __LINE__, __func__, _f, ##_a)
-#define LIBXL__LOG_ERRNO(ctx, loglevel, _f, _a...)   libxl__log(ctx, loglevel, errno, __FILE__, __LINE__, __func__, _f, ##_a)
-#define LIBXL__LOG_ERRNOVAL(ctx, loglevel, errnoval, _f, _a...)   libxl__log(ctx, loglevel, errnoval, __FILE__, __LINE__, __func__, _f, ##_a)
+#define LIBXL__LOG(ctx, loglevel, _f, _a...)   libxl__log(ctx, loglevel, -1, __FILE__, __LINE__, __func__, INVALID_DOMID, _f, ##_a)
+#define LIBXL__LOG_ERRNO(ctx, loglevel, _f, _a...)   libxl__log(ctx, loglevel, errno, __FILE__, __LINE__, __func__, INVALID_DOMID, _f, ##_a)
+#define LIBXL__LOG_ERRNOVAL(ctx, loglevel, errnoval, _f, _a...)   libxl__log(ctx, loglevel, errnoval, __FILE__, __LINE__, __func__, INVALID_DOMID, _f, ##_a)
+
+/* Same log functions as above, but with _d being a domain id. */
+#define LIBXL__LOGD(ctx, loglevel, _d, _f, _a...)   libxl__log(ctx, loglevel, -1, __FILE__, __LINE__, __func__, _d, _f, ##_a)
+#define LIBXL__LOGD_ERRNO(ctx, loglevel, _d, _f, _a...)   libxl__log(ctx, loglevel, errno, __FILE__, __LINE__, __func__, _d, _f, ##_a)
+#define LIBXL__LOGD_ERRNOVAL(ctx, loglevel, errnoval, _d, _f, _a...)   libxl__log(ctx, loglevel, errnoval, __FILE__, __LINE__, __func__, _d, _f, ##_a)
 #else
 #define LIBXL__LOG(ctx, loglevel, _f, _a...)
 #define LIBXL__LOG_ERRNO(ctx, loglevel, _f, _a...)
 #define LIBXL__LOG_ERRNOVAL(ctx, loglevel, errnoval, _f, _a...)
+
+#define LIBXLD__LOG(ctx, loglevel, _d, _f, _a...)
+#define LIBXLD__LOG_ERRNO(ctx, loglevel, _d, _f, _a...)
+#define LIBXLD__LOG_ERRNOVAL(ctx, loglevel, errnoval, _d, _f, _a...)
 #endif
   /* all of these macros preserve errno (saving and restoring) */
 
@@ -169,14 +178,16 @@
 _hidden void libxl__logv(libxl_ctx *ctx, xentoollog_level msglevel, int errnoval,
              const char *file /* may be 0 */, int line /* ignored if !file */,
              const char *func /* may be 0 */,
+             uint32_t domid /* may be INVALID_DOMID */,
              const char *fmt, va_list al)
-     __attribute__((format(printf,7,0)));
+     __attribute__((format(printf,8,0)));
 
 _hidden void libxl__log(libxl_ctx *ctx, xentoollog_level msglevel, int errnoval,
             const char *file /* may be 0 */, int line /* ignored if !file */,
             const char *func /* may be 0 */,
+            uint32_t domid /* may be INVALID_DOMID */,
             const char *fmt, ...)
-     __attribute__((format(printf,7,8)));
+     __attribute__((format(printf,8,9)));
 
      /* these functions preserve errno (saving and restoring) */
 
@@ -3875,21 +3886,34 @@ _hidden void libxl__remus_restore_setup(libxl__egc *egc,
  *    void LOG(<xtl_level_suffix>, const char *fmt, ...);
  *    void LOGE(<xtl_level_suffix>, const char *fmt, ...);
  *    void LOGEV(<xtl_level_suffix>, int errnoval, const char *fmt, ...);
+ *
+ *    void LOGD(<xtl_level_suffix>, uint32_t domid, const char *fmt, ...);
+ *    void LOGED(<xtl_level_suffix>, uint32_t domid, const char *fmt, ...);
+ *    void LOGEVD(<xtl_level_suffix>, int errnoval, uint32_t domid, const char *fmt, ...);
  * Use
  *    libxl__gc *gc;
  *
- * Trivial convenience wrappers for LIBXL__LOG, LIBXL__LOG_ERRNO and
- * LIBXL__LOG_ERRNOVAL, respectively (and thus for libxl__log).
+ * Trivial convenience wrappers for LIBXL__LOG, LIBXL__LOG_ERRNO,
+ * LIBXL__LOG_ERRNOVAL, LIBXL__LOGD, LIBXL__LOGD_ERRNO and
+ * LIBXL__LOGD_ERRNOVAL respectively (and thus for libxl__log).
  *
  * XTL_<xtl_level_suffix> should exist and be an xentoollog.h log level
  * So <xtl_level_suffix> should be one of
  *   DEBUG VERBOSE DETAIL PROGRESS INFO NOTICE WARN ERROR ERROR CRITICAL
  * Of these, most of libxl uses
  *   DEBUG INFO WARN ERROR
+ *
+ * The LOG*D family will preprend the log message with a string formatted
+ * as follows: 'Domain %PRIu32:'. This should help better automatic sorting
+ * of log messages per domain.
  */
 #define LOG(l,f, ...)     LIBXL__LOG(CTX,XTL_##l,(f),##__VA_ARGS__)
 #define LOGE(l,f, ...)    LIBXL__LOG_ERRNO(CTX,XTL_##l,(f),##__VA_ARGS__)
 #define LOGEV(l,e,f, ...) LIBXL__LOG_ERRNOVAL(CTX,XTL_##l,(e),(f),##__VA_ARGS__)
+
+#define LOGD(l,d,f, ...)     LIBXL__LOGD(CTX,XTL_##l,(d),(f),##__VA_ARGS__)
+#define LOGED(l,d,f, ...)    LIBXL__LOGD_ERRNO(CTX,XTL_##l,(d),(f),##__VA_ARGS__)
+#define LOGEVD(l,e,d,f, ...) LIBXL__LOGD_ERRNOVAL(CTX,XTL_##l,(e),(d),(f),##__VA_ARGS__)
 
 
 /* Locking functions.  See comment for "lock" member of libxl__ctx. */

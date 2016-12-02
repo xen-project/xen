@@ -22,7 +22,7 @@ void libxl__alloc_failed(libxl_ctx *ctx, const char *func,
 #define M "libxl: FATAL ERROR: memory allocation failure"
 #define L (size ? M " (%s, %lu x %lu)\n" : M " (%s)\n"), \
           func, (unsigned long)nmemb, (unsigned long)size
-    libxl__log(ctx, XTL_CRITICAL, ENOMEM, 0,0, func, L);
+    libxl__log(ctx, XTL_CRITICAL, ENOMEM, 0,0, func, INVALID_DOMID, L);
     fprintf(stderr, L);
     fflush(stderr);
     _exit(-1);
@@ -202,7 +202,7 @@ char *libxl__dirname(libxl__gc *gc, const char *s)
 
 void libxl__logv(libxl_ctx *ctx, xentoollog_level msglevel, int errnoval,
              const char *file, int line, const char *func,
-             const char *fmt, va_list ap)
+             uint32_t domid, const char *fmt, va_list ap)
 {
     /* WARNING this function may not call any libxl-provided
      * memory allocation function, as those may
@@ -211,6 +211,7 @@ void libxl__logv(libxl_ctx *ctx, xentoollog_level msglevel, int errnoval,
     char *base = NULL;
     int rc, esave;
     char fileline[256];
+    char domain[256];
 
     esave = errno;
 
@@ -221,22 +222,25 @@ void libxl__logv(libxl_ctx *ctx, xentoollog_level msglevel, int errnoval,
     if (file) snprintf(fileline, sizeof(fileline), "%s:%d",file,line);
     fileline[sizeof(fileline)-1] = 0;
 
+    domain[0] = 0;
+    if (domid != INVALID_DOMID)
+        snprintf(domain, sizeof(domain), "Domain %"PRIu32":", domid);
  x:
     xtl_log(ctx->lg, msglevel, errnoval, "libxl",
-            "%s%s%s%s" "%s",
+            "%s%s%s%s%s" "%s",
             fileline, func&&file?":":"", func?func:"", func||file?": ":"",
-            base);
+            domain, base);
     if (base != enomem) free(base);
     errno = esave;
 }
 
 void libxl__log(libxl_ctx *ctx, xentoollog_level msglevel, int errnoval,
             const char *file, int line, const char *func,
-            const char *fmt, ...)
+            uint32_t domid, const char *fmt, ...)
 {
     va_list ap;
     va_start(ap, fmt);
-    libxl__logv(ctx, msglevel, errnoval, file, line, func, fmt, ap);
+    libxl__logv(ctx, msglevel, errnoval, file, line, func, domid, fmt, ap);
     va_end(ap);
 }
 
