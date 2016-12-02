@@ -1125,7 +1125,7 @@ static void domain_death_occurred(libxl__egc *egc,
     EGC_GC;
     libxl_evgen_domain_death *const evg = *evg_upd;
 
-    LOG(DEBUG, "%s", why);
+    LOGD(DEBUG, evg->domid, "%s", why);
 
     libxl_evgen_domain_death *evg_next = LIBXL_TAILQ_NEXT(evg, entry);
     *evg_upd = evg_next;
@@ -1165,10 +1165,10 @@ static void domain_death_xswatch_callback(libxl__egc *egc, libxl__ev_xswatch *w,
         }
         gotend = &domaininfos[rc];
 
-        LOG(DEBUG, "[evg=%p:%"PRIu32"] nentries=%d rc=%d %ld..%ld",
-            evg, evg->domid, nentries, rc,
-            rc>0 ? (long)domaininfos[0].domain : 0,
-            rc>0 ? (long)domaininfos[rc-1].domain : 0);
+        LOGD(DEBUG, evg->domid, "[evg=%p] nentries=%d rc=%d %ld..%ld",
+             evg, nentries, rc,
+             rc>0 ? (long)domaininfos[0].domain : 0,
+             rc>0 ? (long)domaininfos[rc-1].domain : 0);
 
         for (;;) {
             if (!evg) {
@@ -1176,10 +1176,10 @@ static void domain_death_xswatch_callback(libxl__egc *egc, libxl__ev_xswatch *w,
                 goto all_reported;
             }
 
-            LOG(DEBUG, "[evg=%p:%"PRIu32"]"
-                "   got=domaininfos[%d] got->domain=%ld",
-                evg, evg->domid, (int)(got - domaininfos),
-                got < gotend ? (long)got->domain : -1L);
+            LOGD(DEBUG, evg->domid, "[evg=%p]"
+                 "   got=domaininfos[%d] got->domain=%ld",
+                 evg, (int)(got - domaininfos),
+                 got < gotend ? (long)got->domain : -1L);
 
             if (!rc) {
                 domain_death_occurred(egc, &evg, "empty list");
@@ -1204,8 +1204,8 @@ static void domain_death_xswatch_callback(libxl__egc *egc, libxl__ev_xswatch *w,
             }
 
             assert(evg->domid == got->domain);
-            LOG(DEBUG, " exists shutdown_reported=%d"" dominf.flags=%x",
-                evg->shutdown_reported, got->flags);
+            LOGD(DEBUG, evg->domid, "Exists shutdown_reported=%d"" dominf.flags=%x",
+                 evg->shutdown_reported, got->flags);
 
             if (got->flags & XEN_DOMINF_dying) {
                 domain_death_occurred(egc, &evg, "dying");
@@ -1455,7 +1455,7 @@ static void domain_destroy_cb(libxl__egc *egc, libxl__domain_destroy_state *dds,
     STATE_AO_GC(dds->ao);
 
     if (rc)
-        LOG(ERROR, "destruction of domain %u failed", dds->domid);
+        LOGD(ERROR, dds->domid, "Destruction of domain failed");
 
     libxl__ao_complete(egc, ao, rc);
 }
@@ -1504,7 +1504,8 @@ static void stubdom_destroy_callback(libxl__egc *egc,
     const char *savefile;
 
     if (rc) {
-        LOG(ERROR, "unable to destroy stubdom with domid %u", dis->domid);
+        LOGD(ERROR, dds->domain.domid, "Unable to destroy stubdom with domid %u",
+             dis->domid);
         dds->rc = rc;
     }
 
@@ -1512,7 +1513,8 @@ static void stubdom_destroy_callback(libxl__egc *egc,
     savefile = libxl__device_model_savefile(gc, dis->domid);
     rc = libxl__remove_file(gc, savefile);
     if (rc) {
-        LOG(ERROR, "failed to remove device-model savefile %s", savefile);
+        LOGD(ERROR, dds->domain.domid, "Failed to remove device-model savefile %s",
+             savefile);
     }
 
     destroy_finish_check(egc, dds);
@@ -1526,7 +1528,7 @@ static void domain_destroy_callback(libxl__egc *egc,
     libxl__domain_destroy_state *dds = CONTAINER_OF(dis, *dds, domain);
 
     if (rc) {
-        LOG(ERROR, "unable to destroy guest with domid %u", dis->domid);
+        LOGD(ERROR, dis->domid, "Unable to destroy guest");
         dds->rc = rc;
     }
 
@@ -1723,8 +1725,8 @@ static void domain_destroy_domid_cb(libxl__egc *egc,
 
     if (status) {
         if (WIFEXITED(status) && WEXITSTATUS(status)<126) {
-            LOGEV(ERROR, WEXITSTATUS(status),
-                  "xc_domain_destroy failed for %"PRIu32"", dis->domid);
+            LOGEVD(ERROR, WEXITSTATUS(status), dis->domid,
+                   "xc_domain_destroy failed");
         } else {
             libxl_report_child_exitstatus(CTX, XTL_ERROR,
                                           "async domain destroy", pid, status);
@@ -1999,7 +2001,7 @@ void device_addrm_aocomplete(libxl__egc *egc, libxl__ao_device *aodev)
 
     if (aodev->rc) {
         if (aodev->dev) {
-            LOG(ERROR, "unable to %s %s with id %u",
+            LOGD(ERROR, aodev->dev->domid, "Unable to %s %s with id %u",
                         libxl__device_action_to_string(aodev->action),
                         libxl__device_kind_to_string(aodev->dev->kind),
                         aodev->dev->devid);
@@ -2905,9 +2907,9 @@ char *libxl__device_disk_find_local_path(libxl__gc *gc,
         char *be_path, *pdpath;
         int rc;
 
-        LOG(DEBUG,
-            "Run from a script; checking for physical-device-path (vdev %s)",
-            disk->vdev);
+        LOGD(DEBUG, guest_domid,
+             "Run from a script; checking for physical-device-path (vdev %s)",
+             disk->vdev);
 
         rc = libxl__device_from_disk(gc, guest_domid, disk, &device);
         if (rc < 0)
@@ -2917,13 +2919,13 @@ char *libxl__device_disk_find_local_path(libxl__gc *gc,
 
         pdpath = libxl__sprintf(gc, "%s/physical-device-path", be_path);
 
-        LOG(DEBUG, "Attempting to read node %s", pdpath);
+        LOGD(DEBUG, guest_domid, "Attempting to read node %s", pdpath);
         path = libxl__xs_read(gc, XBT_NULL, pdpath);
 
         if (path)
-            LOG(DEBUG, "Accessing cooked block device %s", path);
+            LOGD(DEBUG, guest_domid, "Accessing cooked block device %s", path);
         else
-            LOG(DEBUG, "No physical-device-path, can't access locally.");
+            LOGD(DEBUG, guest_domid, "No physical-device-path, can't access locally.");
 
         goto out;
     }
@@ -3064,10 +3066,10 @@ static void local_device_detach_cb(libxl__egc *egc, libxl__ao_device *aodev)
     int rc;
 
     if (aodev->rc) {
-        LOGE(ERROR, "unable to %s %s with id %u",
-                    libxl__device_action_to_string(aodev->action),
-                    libxl__device_kind_to_string(aodev->dev->kind),
-                    aodev->dev->devid);
+        LOGED(ERROR, aodev->dev->domid, "Unable to %s %s with id %u",
+                     libxl__device_action_to_string(aodev->action),
+                     libxl__device_kind_to_string(aodev->dev->kind),
+                     aodev->dev->devid);
         goto out;
     }
 
@@ -3728,8 +3730,8 @@ static void qdisk_spawn_outcome(libxl__egc *egc, libxl__dm_spawn_state *dmss,
 {
     STATE_AO_GC(dmss->spawn.ao);
 
-    LOG(DEBUG, "qdisk backend spawn for domain %u %s", dmss->guest_domid,
-               rc ? "failed" : "succeed");
+    LOGD(DEBUG, dmss->guest_domid, "qdisk backend spawn %s",
+                rc ? "failed" : "succeed");
 
     libxl__nested_ao_free(dmss->spawn.ao);
 }
@@ -3882,8 +3884,7 @@ static void backend_watch_callback(libxl__egc *egc, libxl__ev_xswatch *watch,
         dguest->domid = dev->domid;
         LIBXL_SLIST_INIT(&dguest->devices);
         LIBXL_SLIST_INSERT_HEAD(&ddomain->guests, dguest, next);
-        LOG(DEBUG, "added domain %u to the list of active guests",
-                   dguest->domid);
+        LOGD(DEBUG, dguest->domid, "Added domain to the list of active guests");
     }
     ddev = search_for_device(dguest, dev);
     if (ddev == NULL && state == XenbusStateClosed) {
@@ -3900,7 +3901,8 @@ static void backend_watch_callback(libxl__egc *egc, libxl__ev_xswatch *watch,
         ddev = libxl__zalloc(NOGC, sizeof(*ddev));
         ddev->dev = dev;
         LIBXL_SLIST_INSERT_HEAD(&dguest->devices, ddev, next);
-        LOG(DEBUG, "added device %s to the list of active devices", path);
+        LOGD(DEBUG, dev->domid, "Added device %s to the list of active devices",
+             path);
         rc = add_device(egc, nested_ao, dguest, ddev);
         if (rc > 0)
             free_ao = true;
@@ -3914,7 +3916,8 @@ static void backend_watch_callback(libxl__egc *egc, libxl__ev_xswatch *watch,
          */
         LIBXL_SLIST_REMOVE(&dguest->devices, ddev, libxl__ddomain_device,
                            next);
-        LOG(DEBUG, "removed device %s from the list of active devices", path);
+        LOGD(DEBUG, dev->domid, "Removed device %s from the list of active devices",
+             path);
         rc = remove_device(egc, nested_ao, dguest, ddev);
         if (rc > 0)
             free_ao = true;
@@ -3925,8 +3928,7 @@ static void backend_watch_callback(libxl__egc *egc, libxl__ev_xswatch *watch,
         if (num_devs == 0) {
             LIBXL_SLIST_REMOVE(&ddomain->guests, dguest, libxl__ddomain_guest,
                                next);
-            LOG(DEBUG, "removed domain %u from the list of active guests",
-                       dguest->domid);
+            LOGD(DEBUG, dguest->domid, "Removed domain from the list of active guests");
             /* Clear any leftovers in libxl/<domid> */
             libxl__xs_rm_checked(gc, XBT_NULL,
                                  GCSPRINTF("libxl/%u", dguest->domid));
@@ -4111,7 +4113,7 @@ retry_transaction:
     if (target) {
         *target_memkb = strtoull(target, &endptr, 10);
         if (*endptr != '\0') {
-            LOGE(ERROR, "invalid memory target %s from %s\n", target,
+            LOGED(ERROR, 0, "Invalid memory target %s from %s\n", target,
                  target_path);
             rc = ERROR_FAIL;
             goto out;
@@ -4121,7 +4123,8 @@ retry_transaction:
     if (staticmax) {
         *max_memkb = strtoull(staticmax, &endptr, 10);
         if (*endptr != '\0') {
-            LOGE(ERROR, "invalid memory static-max %s from %s\n", staticmax,
+            LOGED(ERROR, 0, "Invalid memory static-max %s from %s\n",
+                 staticmax,
                  max_path);
             rc = ERROR_FAIL;
             goto out;
