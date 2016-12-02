@@ -69,7 +69,7 @@ static int colo_proxy_send(libxl__colo_proxy_state *cps, uint8_t *buff,
 
     ret = sendmsg(cps->sock_fd, &mh, 0);
     if (ret <= 0) {
-        LOG(ERROR, "can't send msg to kernel by netlink: %s",
+        LOGD(ERROR, ao->domid, "can't send msg to kernel by netlink: %s",
             strerror(errno));
     }
 
@@ -108,7 +108,7 @@ next:
     ret = recvmsg(cps->sock_fd, &mh, 0);
     if (ret <= 0) {
         if (errno != EAGAIN && errno != EWOULDBLOCK)
-            LOGE(ERROR, "can't recv msg from kernel by netlink");
+            LOGED(ERROR, ao->domid, "can't recv msg from kernel by netlink");
         goto err;
     }
 
@@ -154,7 +154,7 @@ int colo_proxy_setup(libxl__colo_proxy_state *cps)
 
     skfd = socket(PF_NETLINK, SOCK_RAW, NETLINK_COLO);
     if (skfd < 0) {
-        LOG(ERROR, "can not create a netlink socket: %s", strerror(errno));
+        LOGD(ERROR, ao->domid, "can not create a netlink socket: %s", strerror(errno));
         goto out;
     }
     cps->sock_fd = skfd;
@@ -165,16 +165,16 @@ retry:
     sa.nl_pid = i++;
 
     if (i > 10) {
-        LOG(ERROR, "netlink bind error");
+        LOGD(ERROR, ao->domid, "netlink bind error");
         goto out;
     }
 
     ret = bind(skfd, (struct sockaddr *)&sa, sizeof(sa));
     if (ret < 0 && errno == EADDRINUSE) {
-        LOG(ERROR, "colo index %d has already in used", sa.nl_pid);
+        LOGD(ERROR, ao->domid, "colo index %d has already in used", sa.nl_pid);
         goto retry;
     } else if (ret < 0) {
-        LOG(ERROR, "netlink bind error");
+        LOGD(ERROR, ao->domid, "netlink bind error");
         goto out;
     }
 
@@ -186,8 +186,8 @@ retry:
     /* receive ack */
     size = colo_proxy_recv(cps, &buff, 500000);
     if (size < 0) {
-        LOG(ERROR, "Can't recv msg from kernel by netlink: %s",
-            strerror(errno));
+        LOGD(ERROR, ao->domid, "Can't recv msg from kernel by netlink: %s",
+             strerror(errno));
         goto out;
     }
 
@@ -198,12 +198,12 @@ retry:
             struct nlmsgerr *err = (struct nlmsgerr *)NLMSG_DATA(h);
 
             if (size - sizeof(*h) < sizeof(*err)) {
-                LOG(ERROR, "NLMSG_LENGTH is too short");
+                LOGD(ERROR, ao->domid, "NLMSG_LENGTH is too short");
                 goto out;
             }
 
             if (err->error) {
-                LOG(ERROR, "NLMSG_ERROR contains error %d", err->error);
+                LOGD(ERROR, ao->domid, "NLMSG_ERROR contains error %d", err->error);
                 goto out;
             }
         }
@@ -271,12 +271,12 @@ int colo_proxy_checkpoint(libxl__colo_proxy_state *cps,
     h = (struct nlmsghdr *) buff;
 
     if (h->nlmsg_type == NLMSG_ERROR) {
-        LOG(ERROR, "receive NLMSG_ERROR");
+        LOGD(ERROR, ao->domid, "receive NLMSG_ERROR");
         goto out;
     }
 
     if (h->nlmsg_len < NLMSG_LENGTH(sizeof(*m))) {
-        LOG(ERROR, "NLMSG_LENGTH is too short");
+        LOGD(ERROR, ao->domid, "NLMSG_LENGTH is too short");
         goto out;
     }
 
