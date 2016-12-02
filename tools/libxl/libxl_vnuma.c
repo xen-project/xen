@@ -283,7 +283,7 @@ int libxl__vnuma_build_vmemrange_hvm(libxl__gc *gc,
         /* Consider video ram belongs to vnode 0 */
         if (nid == 0) {
             if (p->memkb < b_info->video_memkb) {
-                LOG(ERROR, "vnode 0 too small to contain video ram");
+                LOGD(ERROR, domid, "vnode 0 too small to contain video ram");
                 rc = ERROR_INVAL;
                 goto out;
             }
