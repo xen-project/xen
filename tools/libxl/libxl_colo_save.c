@@ -90,7 +90,7 @@ void libxl__colo_save_setup(libxl__egc *egc, libxl__colo_save_state *css)
     STATE_AO_GC(dss->ao);
 
     if (dss->type != LIBXL_DOMAIN_TYPE_HVM) {
-        LOG(ERROR, "COLO only supports hvm now");
+        LOGD(ERROR, dss->domid, "COLO only supports hvm now");
         goto out;
     }
 
@@ -122,8 +122,7 @@ void libxl__colo_save_setup(libxl__egc *egc, libxl__colo_save_state *css)
     libxl__stream_read_start(egc, &css->srs);
     css->cps.ao = ao;
     if (colo_proxy_setup(&css->cps)) {
-        LOG(ERROR, "COLO: failed to setup colo proxy for guest with domid %u",
-            cds->domid);
+        LOGD(ERROR, cds->domid, "COLO: failed to setup colo proxy for guest");
         goto out;
     }
 
@@ -156,8 +155,7 @@ static void colo_save_setup_done(libxl__egc *egc,
         return;
     }
 
-    LOG(ERROR, "COLO: failed to setup device for guest with domid %u",
-        dss->domid);
+    LOGD(ERROR, dss->domid, "COLO: failed to setup device for guest");
     cds->callback = colo_save_setup_failed;
     libxl__checkpoint_devices_teardown(egc, cds);
 }
@@ -171,8 +169,9 @@ static void colo_save_setup_failed(libxl__egc *egc,
     STATE_AO_GC(cds->ao);
 
     if (rc)
-        LOG(ERROR, "COLO: failed to teardown device after setup failed"
-            " for guest with domid %u, rc %d", cds->domid, rc);
+        LOGD(ERROR, cds->domid,
+             "COLO: failed to teardown device after setup failed"
+             " for guest, rc %d", rc);
 
     cleanup_device_subkind(cds);
     dss->callback(egc, dss, rc);
@@ -192,8 +191,9 @@ void libxl__colo_save_teardown(libxl__egc *egc,
 
     EGC_GC;
 
-    LOG(WARN, "COLO: Domain suspend terminated with rc %d,"
-        " teardown COLO devices...", rc);
+    LOGD(WARN, dss->domid,
+         "COLO: Domain suspend terminated with rc %d,"
+         " teardown COLO devices...", rc);
 
     libxl__stream_read_abort(egc, &css->srs, 1);
 
@@ -268,7 +268,7 @@ static void colo_suspend_primary_vm_done(libxl__egc *egc,
     EGC_GC;
 
     if (rc) {
-        LOG(ERROR, "cannot suspend primary vm");
+        LOGD(ERROR, dss->domid, "cannot suspend primary vm");
         goto out;
     }
 
@@ -294,7 +294,7 @@ static void colo_postsuspend_cb(libxl__egc *egc,
     EGC_GC;
 
     if (rc) {
-        LOG(ERROR, "postsuspend fails");
+        LOGD(ERROR, dss->domid, "postsuspend fails");
         goto out;
     }
 
@@ -326,13 +326,14 @@ static void colo_read_svm_suspended_done(libxl__egc *egc,
     EGC_GC;
 
     if (id != CHECKPOINT_SVM_SUSPENDED) {
-        LOG(ERROR, "invalid section: %d, expected: %d", id,
+        LOGD(ERROR, dss->domid, "invalid section: %d, expected: %d", id,
             CHECKPOINT_SVM_SUSPENDED);
         goto out;
     }
 
     if (!css->paused && libxl__qmp_get_replication_error(gc, dss->domid)) {
-        LOG(ERROR, "replication error occurs when primary vm is running");
+        LOGD(ERROR, dss->domid,
+             "replication error occurs when primary vm is running");
         goto out;
     }
 
@@ -405,7 +406,7 @@ static void colo_read_svm_ready_done(libxl__egc *egc,
     EGC_GC;
 
     if (id != CHECKPOINT_SVM_READY) {
-        LOG(ERROR, "invalid section: %d, expected: %d", id,
+        LOGD(ERROR, dss->domid, "invalid section: %d, expected: %d", id,
             CHECKPOINT_SVM_READY);
         goto out;
     }
@@ -432,13 +433,13 @@ static void colo_preresume_cb(libxl__egc *egc,
     EGC_GC;
 
     if (rc) {
-        LOG(ERROR, "preresume fails");
+        LOGD(ERROR, dss->domid, "preresume fails");
         goto out;
     }
 
     if (css->qdisk_used && !css->qdisk_setuped) {
         if (libxl__qmp_start_replication(gc, dss->domid, true)) {
-            LOG(ERROR, "starting replication fails");
+            LOGD(ERROR, dss->domid, "starting replication fails");
             goto out;
         }
         css->qdisk_setuped = true;
@@ -446,14 +447,14 @@ static void colo_preresume_cb(libxl__egc *egc,
 
     if (!css->paused) {
         if (libxl__qmp_do_checkpoint(gc, dss->domid)) {
-            LOG(ERROR, "doing checkpoint fails");
+            LOGD(ERROR, dss->domid, "doing checkpoint fails");
             goto out;
         }
     }
 
     /* Resumes the domain and the device model */
     if (libxl__domain_resume(gc, dss->domid, /* Fast Suspend */1)) {
-        LOG(ERROR, "cannot resume primary vm");
+        LOGD(ERROR, dss->domid, "cannot resume primary vm");
         goto out;
     }
 
@@ -464,7 +465,7 @@ static void colo_preresume_cb(libxl__egc *egc,
     if (css->paused) {
         rc = libxl_domain_unpause(CTX, dss->domid);
         if (rc) {
-            LOG(ERROR, "cannot unpause primary vm");
+            LOGD(ERROR, dss->domid, "cannot unpause primary vm");
             goto out;
         }
         css->paused = false;
@@ -491,7 +492,7 @@ static void colo_read_svm_resumed_done(libxl__egc *egc,
     EGC_GC;
 
     if (id != CHECKPOINT_SVM_RESUMED) {
-        LOG(ERROR, "invalid section: %d, expected: %d", id,
+        LOGD(ERROR, dss->domid, "invalid section: %d, expected: %d", id,
             CHECKPOINT_SVM_RESUMED);
         goto out;
     }
@@ -553,7 +554,7 @@ static void colo_proxy_async_call_done(libxl__egc *egc,
     EGC_GC;
 
     if (status) {
-        LOG(ERROR, "failed to wait for new checkpoint");
+        LOGD(ERROR, dss->domid, "failed to wait for new checkpoint");
         colo_start_new_checkpoint(egc, &dss->cds, ERROR_FAIL);
         return;
     }
@@ -595,7 +596,7 @@ static void colo_device_commit_cb(libxl__egc *egc,
     EGC_GC;
 
     if (rc) {
-        LOG(ERROR, "commit fails");
+        LOGD(ERROR, dss->domid, "commit fails");
         goto out;
     }
 
@@ -644,7 +645,7 @@ static void colo_common_write_stream_done(libxl__egc *egc,
 
     if (rc < 0) {
         /* TODO: it may be a internal error, but we don't know */
-        LOG(ERROR, "sending data fails");
+        LOGD(ERROR, dss->domid, "sending data fails");
         ok = 0;
         goto out;
     }
@@ -675,7 +676,7 @@ static void colo_common_read_stream_done(libxl__egc *egc,
 
     if (rc < 0) {
         /* TODO: it may be a internal error, but we don't know */
-        LOG(ERROR, "reading data fails");
+        LOGD(ERROR, dss->domid, "reading data fails");
         ok = 0;
         goto out;
     }
