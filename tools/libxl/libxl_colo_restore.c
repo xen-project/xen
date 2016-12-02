@@ -63,7 +63,7 @@ static void colo_enable_logdirty(libxl__colo_restore_state *crs, libxl__egc *egc
     if (xc_shadow_control(CTX->xch, domid,
                           XEN_DOMCTL_SHADOW_OP_ENABLE_LOGDIRTY,
                           NULL, 0, NULL, 0, NULL) < 0) {
-        LOG(ERROR, "cannot enable secondary vm's logdirty");
+        LOGD(ERROR, domid, "cannot enable secondary vm's logdirty");
         lds->callback(egc, lds, ERROR_FAIL);
         return;
     }
@@ -91,7 +91,7 @@ static void colo_disable_logdirty(libxl__colo_restore_state *crs,
     /* we need to know which pages are dirty to restore the guest */
     if (xc_shadow_control(CTX->xch, domid, XEN_DOMCTL_SHADOW_OP_OFF,
                           NULL, 0, NULL, 0, NULL) < 0)
-        LOG(WARN, "cannot disable secondary vm's logdirty");
+        LOGD(WARN, domid, "cannot disable secondary vm's logdirty");
 
     if (crs->hvm) {
         libxl__domain_common_switch_qemu_logdirty(egc, domid, 0, lds);
@@ -118,14 +118,15 @@ static void colo_resume_vm(libxl__egc *egc,
         if (restore_device_model) {
             rc = libxl__qmp_restore(gc, crs->domid, crcs->state_file);
             if (rc) {
-                LOG(ERROR, "cannot restore device model for secondary vm");
+                LOGD(ERROR, crs->domid,
+                     "cannot restore device model for secondary vm");
                 crcs->callback(egc, crcs, rc);
                 return;
             }
         }
         rc = libxl__domain_resume(gc, crs->domid, 0);
         if (rc)
-            LOG(ERROR, "cannot resume secondary vm");
+            LOGD(ERROR, crs->domid, "cannot resume secondary vm");
 
         crcs->callback(egc, crcs, rc);
         return;
@@ -317,7 +318,7 @@ void libxl__colo_restore_teardown(libxl__egc *egc, void *dcs_void,
     if (ret == 0 && retval == 0)
         rc = 0;
 
-    LOG(INFO, "%s", rc ? "colo fails" : "failover");
+    LOGD(INFO, crs->domid, "%s", rc ? "colo fails" : "failover");
 
     libxl__stream_write_abort(egc, &crcs->sws, 1);
     if (crs->saved_cb) {
@@ -351,8 +352,8 @@ static void colo_restore_teardown_devices_done(libxl__egc *egc,
     EGC_GC;
 
     if (rc)
-        LOG(ERROR, "COLO: failed to teardown device for guest with domid %u,"
-            " rc %d", cds->domid, rc);
+        LOGD(ERROR, cds->domid, "COLO: failed to teardown device for guest,"
+            " rc %d", rc);
 
     if (crcs->teardown_devices)
         cleanup_device_subkind(cds);
@@ -387,7 +388,7 @@ static void do_failover(libxl__egc *egc, libxl__colo_restore_state *crs)
          * is not called. In this case, the migration is not finished,
          * so we cannot do failover.
          */
-        LOG(ERROR, "migration fails");
+        LOGD(ERROR, crs->domid, "migration fails");
         crcs->callback(egc, crcs, ERROR_FAIL);
         return;
     case LIBXL_COLO_SUSPENDED:
@@ -397,7 +398,7 @@ static void do_failover(libxl__egc *egc, libxl__colo_restore_state *crs)
         colo_disable_logdirty(crs, egc);
         return;
     default:
-        LOG(ERROR, "invalid status: %d", status);
+        LOGD(ERROR, crs->domid, "invalid status: %d", status);
         crcs->callback(egc, crcs, ERROR_FAIL);
     }
 }
@@ -414,7 +415,7 @@ static void do_failover_done(libxl__egc *egc,
     EGC_GC;
 
     if (rc)
-        LOG(ERROR, "cannot do failover");
+        LOGD(ERROR, crs->domid, "cannot do failover");
 
     libxl__colo_restore_teardown_done(egc, crs, rc);
 }
@@ -428,7 +429,7 @@ static void colo_disable_logdirty_done(libxl__egc *egc,
     EGC_GC;
 
     if (rc)
-        LOG(WARN, "cannot disable logdirty");
+        LOGD(WARN, crcs->crs->domid, "cannot disable logdirty");
 
     if (crcs->status == LIBXL_COLO_SUSPENDED) {
         /*
@@ -601,13 +602,13 @@ static void colo_restore_preresume_cb(libxl__egc *egc,
     EGC_GC;
 
     if (rc) {
-        LOG(ERROR, "preresume fails");
+        LOGD(ERROR, crs->domid, "preresume fails");
         goto out;
     }
 
     if (crs->qdisk_setuped) {
         if (libxl__qmp_do_checkpoint(gc, crs->domid)) {
-            LOG(ERROR, "doing checkpoint fails");
+            LOGD(ERROR, crs->domid, "doing checkpoint fails");
             goto out;
         }
     }
@@ -644,7 +645,7 @@ static void colo_resume_vm_done(libxl__egc *egc,
     EGC_GC;
 
     if (rc) {
-        LOG(ERROR, "cannot resume secondary vm");
+        LOGD(ERROR, crs->domid, "cannot resume secondary vm");
         goto out;
     }
 
@@ -719,7 +720,7 @@ static void colo_reenable_logdirty(libxl__egc *egc,
     EGC_GC;
 
     if (rc) {
-        LOG(ERROR, "cannot enable logdirty");
+        LOGD(ERROR, crs->domid, "cannot enable logdirty");
         goto out;
     }
 
@@ -745,7 +746,7 @@ static void colo_reenable_logdirty_done(libxl__egc *egc,
     EGC_GC;
 
     if (rc) {
-        LOG(ERROR, "cannot enable logdirty");
+        LOGD(ERROR, crcs->crs->domid, "cannot enable logdirty");
         goto out;
     }
 
@@ -782,8 +783,7 @@ static void colo_setup_checkpoint_devices(libxl__egc *egc,
 
     crs->cps.ao = ao;
     if (colo_proxy_setup(&crs->cps)) {
-        LOG(ERROR, "COLO: failed to setup colo proxy for guest with domid %u",
-            cds->domid);
+        LOGD(ERROR, cds->domid, "COLO: failed to setup colo proxy for guest");
         goto out;
     }
 
@@ -813,14 +813,13 @@ static void colo_restore_setup_cds_done(libxl__egc *egc,
     EGC_GC;
 
     if (rc) {
-        LOG(ERROR, "COLO: failed to setup device for guest with domid %u",
-            cds->domid);
+        LOGD(ERROR, cds->domid, "COLO: failed to setup device for guest");
         goto out;
     }
 
     if (crs->qdisk_used && !crs->qdisk_setuped) {
         if (libxl__qmp_start_replication(gc, crs->domid, false)) {
-            LOG(ERROR, "starting replication fails");
+            LOGD(ERROR, cds->domid, "starting replication fails");
             goto out;
         }
         crs->qdisk_setuped = true;
@@ -849,7 +848,7 @@ static void colo_unpause_svm(libxl__egc *egc,
     /* We have enabled secondary vm's logdirty, so we can unpause it now */
     rc = libxl_domain_unpause(CTX, domid);
     if (rc) {
-        LOG(ERROR, "cannot unpause secondary vm");
+        LOGD(ERROR, domid, "cannot unpause secondary vm");
         goto out;
     }
 
@@ -894,7 +893,7 @@ static void colo_restore_commit_cb(libxl__egc *egc,
     EGC_GC;
 
     if (rc) {
-        LOG(ERROR, "commit fails");
+        LOGD(ERROR, crs->domid, "commit fails");
         goto out;
     }
 
@@ -918,7 +917,7 @@ static void colo_stream_read_done(libxl__egc *egc,
     EGC_GC;
 
     if (id != CHECKPOINT_NEW) {
-        LOG(ERROR, "invalid section: %d", id);
+        LOGD(ERROR, crcs->crs->domid, "invalid section: %d", id);
         goto out;
     }
 
@@ -974,14 +973,14 @@ static void colo_suspend_vm_done(libxl__egc *egc,
     EGC_GC;
 
     if (rc) {
-        LOG(ERROR, "cannot suspend secondary vm");
+        LOGD(ERROR, crs->domid, "cannot suspend secondary vm");
         goto out;
     }
 
     crcs->status = LIBXL_COLO_SUSPENDED;
 
     if (libxl__qmp_get_replication_error(gc, crs->domid)) {
-        LOG(ERROR, "replication error occurs when secondary vm is running");
+        LOGD(ERROR, crs->domid, "replication error occurs when secondary vm is running");
         goto out;
     }
 
@@ -1006,7 +1005,7 @@ static void colo_restore_postsuspend_cb(libxl__egc *egc,
     EGC_GC;
 
     if (rc) {
-        LOG(ERROR, "postsuspend fails");
+        LOGD(ERROR, crs->domid, "postsuspend fails");
         goto out;
     }
 
@@ -1035,7 +1034,7 @@ static void colo_common_write_stream_done(libxl__egc *egc,
 
     if (rc < 0) {
         /* TODO: it may be a internal error, but we don't know */
-        LOG(ERROR, "sending data fails");
+        LOGD(ERROR, crcs->crs->domid, "sending data fails");
         ok = 2;
         goto out;
     }
@@ -1066,7 +1065,7 @@ static void colo_common_read_stream_done(libxl__egc *egc,
 
     if (rc < 0) {
         /* TODO: it may be a internal error, but we don't know */
-        LOG(ERROR, "reading data fails");
+        LOGD(ERROR, crcs->crs->domid, "reading data fails");
         ok = 2;
         goto out;
     }
