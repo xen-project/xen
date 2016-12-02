@@ -347,6 +347,13 @@ void pagetable_dying(struct domain *d, paddr_t gpa);
 void paging_dump_domain_info(struct domain *d);
 void paging_dump_vcpu_info(struct vcpu *v);
 
+/* Set the pool of shadow pages to the required number of pages.
+ * Input might be rounded up to at minimum amount of pages, plus
+ * space for the p2m table.
+ * Returns 0 for success, non-zero for failure. */
+int paging_set_allocation(struct domain *d, unsigned int pages,
+                          bool *preempted);
+
 #endif /* XEN_PAGING_H */
 
 /*

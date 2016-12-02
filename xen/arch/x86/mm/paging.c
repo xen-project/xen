@@ -809,7 +809,8 @@ long paging_domctl_continuation(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
 /* Call when destroying a domain */
 int paging_teardown(struct domain *d)
 {
-    int rc, preempted = 0;
+    int rc;
+    bool preempted = false;
 
     if ( hap_enabled(d) )
         hap_teardown(d, &preempted);
@@ -952,6 +953,22 @@ void paging_write_p2m_entry(struct p2m_domain *p2m, unsigned long gfn,
         paging_get_hostmode(v)->write_p2m_entry(d, gfn, p, new, level);
     else
         safe_write_pte(p, new);
+}
+
+int paging_set_allocation(struct domain *d, unsigned int pages, bool *preempted)
+{
+    int rc;
+
+    ASSERT(paging_mode_enabled(d));
+
+    paging_lock(d);
+    if ( hap_enabled(d) )
+        rc = hap_set_allocation(d, pages, preempted);
+    else
+        rc = shadow_set_allocation(d, pages, preempted);
+    paging_unlock(d);
+
+    return rc;
 }
 
 /*

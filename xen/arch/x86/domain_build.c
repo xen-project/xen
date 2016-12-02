@@ -35,7 +35,6 @@
 #include <asm/setup.h>
 #include <asm/bzimage.h> /* for bzimage_parse */
 #include <asm/io_apic.h>
-#include <asm/hap.h>
 #include <asm/hpet.h>
 
 #include <public/version.h>
@@ -1383,14 +1382,24 @@ int __init construct_dom0(
                          nr_pages);
     }
 
-    if ( is_pvh_domain(d) )
-        hap_set_alloc_for_pvh_dom0(d, dom0_paging_pages(d, nr_pages));
-
     /*
-     * We enable paging mode again so guest_physmap_add_page will do the
-     * right thing for us.
+     * We enable paging mode again so guest_physmap_add_page and
+     * paging_set_allocation will do the right thing for us.
      */
     d->arch.paging.mode = save_pvh_pg_mode;
+
+    if ( is_pvh_domain(d) )
+    {
+        bool preempted;
+
+        do {
+            preempted = false;
+            paging_set_allocation(d, dom0_paging_pages(d, nr_pages),
+                                  &preempted);
+            process_pending_softirqs();
+        } while ( preempted );
+    }
+
 
     /* Write the phys->machine and machine->phys table entries. */
     for ( pfn = 0; pfn < count; pfn++ )

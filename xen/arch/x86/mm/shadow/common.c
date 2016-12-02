@@ -1611,13 +1611,7 @@ shadow_free_p2m_page(struct domain *d, struct page_info *pg)
     paging_unlock(d);
 }
 
-/* Set the pool of shadow pages to the required number of pages.
- * Input will be rounded up to at least shadow_min_acceptable_pages(),
- * plus space for the p2m table.
- * Returns 0 for success, non-zero for failure. */
-static int sh_set_allocation(struct domain *d,
-                             unsigned int pages,
-                             int *preempted)
+int shadow_set_allocation(struct domain *d, unsigned int pages, bool *preempted)
 {
     struct page_info *sp;
     unsigned int lower_bound;
@@ -1683,7 +1677,7 @@ static int sh_set_allocation(struct domain *d,
         /* Check to see if we need to yield and try again */
         if ( preempted && general_preempt_check() )
         {
-            *preempted = 1;
+            *preempted = true;
             return 0;
         }
     }
@@ -3154,10 +3148,10 @@ int shadow_enable(struct domain *d, u32 mode)
     if ( old_pages == 0 )
     {
         paging_lock(d);
-        rv = sh_set_allocation(d, 1024, NULL); /* Use at least 4MB */
+        rv = shadow_set_allocation(d, 1024, NULL); /* Use at least 4MB */
         if ( rv != 0 )
         {
-            sh_set_allocation(d, 0, NULL);
+            shadow_set_allocation(d, 0, NULL);
             goto out_locked;
         }
         paging_unlock(d);
@@ -3239,7 +3233,7 @@ int shadow_enable(struct domain *d, u32 mode)
     return rv;
 }
 
-void shadow_teardown(struct domain *d, int *preempted)
+void shadow_teardown(struct domain *d, bool *preempted)
 /* Destroy the shadow pagetables of this domain and free its shadow memory.
  * Should only be called for dying domains. */
 {
@@ -3301,7 +3295,7 @@ void shadow_teardown(struct domain *d, int *preempted)
     if ( d->arch.paging.shadow.total_pages != 0 )
     {
         /* Destroy all the shadows and release memory to domheap */
-        sh_set_allocation(d, 0, preempted);
+        shadow_set_allocation(d, 0, preempted);
 
         if ( preempted && *preempted )
             goto out;
@@ -3366,7 +3360,7 @@ void shadow_final_teardown(struct domain *d)
     p2m_teardown(p2m_get_hostp2m(d));
     /* Free any shadow memory that the p2m teardown released */
     paging_lock(d);
-    sh_set_allocation(d, 0, NULL);
+    shadow_set_allocation(d, 0, NULL);
     SHADOW_PRINTK("dom %u final teardown done."
                    "  Shadow pages total = %u, free = %u, p2m=%u\n",
                    d->domain_id,
@@ -3392,9 +3386,9 @@ static int shadow_one_bit_enable(struct domain *d, u32 mode)
     if ( d->arch.paging.shadow.total_pages == 0 )
     {
         /* Init the shadow memory allocation if the user hasn't done so */
-        if ( sh_set_allocation(d, 1, NULL) != 0 )
+        if ( shadow_set_allocation(d, 1, NULL) != 0 )
         {
-            sh_set_allocation(d, 0, NULL);
+            shadow_set_allocation(d, 0, NULL);
             return -ENOMEM;
         }
     }
@@ -3463,7 +3457,7 @@ static int shadow_one_bit_disable(struct domain *d, u32 mode)
         }
 
         /* Pull down the memory allocation */
-        if ( sh_set_allocation(d, 0, NULL) != 0 )
+        if ( shadow_set_allocation(d, 0, NULL) != 0 )
             BUG(); /* In fact, we will have BUG()ed already */
         shadow_hash_teardown(d);
         SHADOW_PRINTK("un-shadowing of domain %u done."
@@ -3876,7 +3870,8 @@ int shadow_domctl(struct domain *d,
                   xen_domctl_shadow_op_t *sc,
                   XEN_GUEST_HANDLE_PARAM(void) u_domctl)
 {
-    int rc, preempted = 0;
+    int rc;
+    bool preempted = false;
 
     switch ( sc->op )
     {
@@ -3907,7 +3902,7 @@ int shadow_domctl(struct domain *d,
             paging_unlock(d);
             return -EINVAL;
         }
-        rc = sh_set_allocation(d, sc->mb << (20 - PAGE_SHIFT), &preempted);
+        rc = shadow_set_allocation(d, sc->mb << (20 - PAGE_SHIFT), &preempted);
         paging_unlock(d);
         if ( preempted )
             /* Not finished.  Set up to re-run the call. */
