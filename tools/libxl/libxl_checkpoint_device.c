@@ -132,7 +132,7 @@ static void device_setup_iterate(libxl__egc *egc, libxl__ao_device *aodev)
         if (!dev->ops) {
             libxl_device_nic * nic = NULL;
             libxl_device_disk * disk = NULL;
-            uint32_t domid;
+            uint32_t domid = INVALID_DOMID;
             int devid;
             if (dev->kind == LIBXL__DEVICE_KIND_VIF) {
                 nic = (libxl_device_nic *)dev->backend_dev;
@@ -143,15 +143,15 @@ static void device_setup_iterate(libxl__egc *egc, libxl__ao_device *aodev)
                 domid = disk->backend_domid;
                 devid = libxl__device_disk_dev_number(disk->vdev, NULL, NULL);
             } else {
-                LOG(ERROR,"device kind not handled by checkpoint: %s",
-                    libxl__device_kind_to_string(dev->kind));
+                LOGD(ERROR, domid, "device kind not handled by checkpoint: %s",
+                     libxl__device_kind_to_string(dev->kind));
                 aodev->rc = ERROR_FAIL;
                 goto out;
             }
-            LOG(ERROR,"device not handled by checkpoint"
-                " (device=%s:%"PRId32"/%"PRId32")",
-                libxl__device_kind_to_string(dev->kind),
-                domid, devid);
+            LOGD(ERROR, domid, "device not handled by checkpoint"
+                 " (device=%s:%"PRId32"/%"PRId32")",
+                 libxl__device_kind_to_string(dev->kind),
+                 domid, devid);
             aodev->rc = ERROR_CHECKPOINT_DEVICE_NOT_SUPPORTED;
             goto out;
         }
