@@ -1679,6 +1679,15 @@ void hvm_triple_fault(void)
 void hvm_inject_event(const struct x86_event *event)
 {
     struct vcpu *curr = current;
+    const uint8_t vector = event->vector;
+    const bool has_ec = ((event->type == X86_EVENTTYPE_HW_EXCEPTION) &&
+                         (vector < 32) && ((TRAP_HAVE_EC & (1u << vector))));
+
+    ASSERT(vector == event->vector); /* Confirm no truncation. */
+    if ( has_ec )
+        ASSERT(event->error_code != X86_EVENT_NO_EC);
+    else
+        ASSERT(event->error_code == X86_EVENT_NO_EC);
 
     if ( nestedhvm_enabled(curr->domain) &&
          !nestedhvm_vmswitch_in_progress(curr) &&
