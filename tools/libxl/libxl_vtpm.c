@@ -129,7 +129,7 @@ static void libxl__device_vtpm_add(libxl__egc *egc, uint32_t domid,
         rc = libxl__device_exists(gc, t, device);
         if (rc < 0) goto out;
         if (rc == 1) {              /* already exists in xenstore */
-            LOG(ERROR, "device already exists in xenstore");
+            LOGD(ERROR, domid, "device already exists in xenstore");
             aodev->action = LIBXL__DEVICE_ACTION_ADD; /* for error message */
             rc = ERROR_DEVICE_EXISTS;
             goto out;
@@ -200,7 +200,7 @@ libxl_device_vtpm *libxl_device_vtpm_list(libxl_ctx *ctx, uint32_t domid, int *n
           tmp = libxl__xs_read(gc, XBT_NULL, GCSPRINTF("%s/uuid", libxl_path));
           if (tmp) {
               if(libxl_uuid_from_string(&(vtpm->uuid), tmp)) {
-                  LOG(ERROR, "%s/uuid is a malformed uuid?? (%s) Probably a bug!!\n", be_path, tmp);
+                  LOGD(ERROR, domid, "%s/uuid is a malformed uuid?? (%s) Probably a bug!!\n", be_path, tmp);
                   free(vtpms);
                   return NULL;
               }
@@ -259,11 +259,11 @@ int libxl_device_vtpm_getinfo(libxl_ctx *ctx,
     val = libxl__xs_read(gc, XBT_NULL,
           GCSPRINTF("%s/uuid", libxl_path));
     if(val == NULL) {
-       LOG(ERROR, "%s/uuid does not exist!", vtpminfo->backend);
+       LOGD(ERROR, domid, "%s/uuid does not exist!", vtpminfo->backend);
        goto err;
     }
     if(libxl_uuid_from_string(&(vtpminfo->uuid), val)) {
-       LOG(ERROR,
+       LOGD(ERROR, domid,
              "%s/uuid is a malformed uuid?? (%s) Probably a bug!\n",
              vtpminfo->backend, val);
        goto err;
