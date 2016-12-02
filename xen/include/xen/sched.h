@@ -708,9 +708,24 @@ unsigned long hypercall_create_continuation(
     unsigned int op, const char *format, ...);
 void hypercall_cancel_continuation(void);
 
+/*
+ * For long-running operations that must be in hypercall context, check
+ * if there is background work to be done that should interrupt this
+ * operation.
+ */
 #define hypercall_preempt_check() (unlikely(    \
         softirq_pending(smp_processor_id()) |   \
         local_events_need_delivery()            \
+    ))
+
+/*
+ * For long-running operations that may be in hypercall context or on
+ * the idle vcpu (e.g. during dom0 construction), check if there is
+ * background work to be done that should interrupt this operation.
+ */
+#define general_preempt_check() (unlikely(                          \
+        softirq_pending(smp_processor_id()) ||                      \
+        (!is_idle_vcpu(current) && local_events_need_delivery())    \
     ))
 
 extern struct domain *domain_list;

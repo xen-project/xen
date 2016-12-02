@@ -379,7 +379,7 @@ hap_set_allocation(struct domain *d, unsigned int pages, int *preempted)
             break;
 
         /* Check to see if we need to yield and try again */
-        if ( preempted && hypercall_preempt_check() )
+        if ( preempted && general_preempt_check() )
         {
             *preempted = 1;
             return 0;

@@ -1681,7 +1681,7 @@ static int sh_set_allocation(struct domain *d,
             break;
 
         /* Check to see if we need to yield and try again */
-        if ( preempted && hypercall_preempt_check() )
+        if ( preempted && general_preempt_check() )
         {
             *preempted = 1;
             return 0;
