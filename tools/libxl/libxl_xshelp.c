@@ -146,7 +146,7 @@ char *libxl__xs_get_dompath(libxl__gc *gc, uint32_t domid)
     libxl_ctx *ctx = libxl__gc_owner(gc);
     char *s = xs_get_domain_path(ctx->xsh, domid);
     if (!s) {
-        LOGE(ERROR, "failed to get dompath for %"PRIu32, domid);
+        LOGED(ERROR, domid, "Failed to get dompath");
         return NULL;
     }
     libxl__ptr_add(gc, s);
@@ -189,7 +189,7 @@ char *libxl__xs_libxl_path(libxl__gc *gc, uint32_t domid)
 {
     char *s = GCSPRINTF("/libxl/%i", domid);
     if (!s)
-        LOG(ERROR, "cannot allocate create paths");
+        LOGD(ERROR, domid, "cannot allocate create paths");
     return s;
 }
 
