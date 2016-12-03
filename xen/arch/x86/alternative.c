@@ -128,13 +128,14 @@ void init_or_livepatch add_nops(void *insns, unsigned int len)
  *
  * You should run this with interrupts disabled or on code that is not
  * executing.
+ *
+ * "noinline" to cause control flow change and thus invalidate I$ and
+ * cause refetch after modification.
  */
-static void *init_or_livepatch text_poke(void *addr, const void *opcode, size_t len)
+static void *init_or_livepatch noinline
+text_poke(void *addr, const void *opcode, size_t len)
 {
-    memcpy(addr, opcode, len);
-    sync_core();
-
-    return addr;
+    return memcpy(addr, opcode, len);
 }
 
 /*

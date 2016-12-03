@@ -46,7 +46,11 @@ int arch_livepatch_verify_func(const struct livepatch_func *func)
     return 0;
 }
 
-void arch_livepatch_apply(struct livepatch_func *func)
+/*
+ * "noinline" to cause control flow change and thus invalidate I$ and
+ * cause refetch after modification.
+ */
+void noinline arch_livepatch_apply(struct livepatch_func *func)
 {
     uint8_t *old_ptr;
     uint8_t insn[sizeof(func->opaque)];
@@ -75,15 +79,21 @@ void arch_livepatch_apply(struct livepatch_func *func)
     memcpy(old_ptr, insn, len);
 }
 
-void arch_livepatch_revert(const struct livepatch_func *func)
+/*
+ * "noinline" to cause control flow change and thus invalidate I$ and
+ * cause refetch after modification.
+ */
+void noinline arch_livepatch_revert(const struct livepatch_func *func)
 {
     memcpy(func->old_addr, func->opaque, livepatch_insn_len(func));
 }
 
-/* Serialise the CPU pipeline. */
-void arch_livepatch_post_action(void)
+/*
+ * "noinline" to cause control flow change and thus invalidate I$ and
+ * cause refetch after modification.
+ */
+void noinline arch_livepatch_post_action(void)
 {
-    cpuid_eax(0);
 }
 
 static nmi_callback_t *saved_nmi_callback;
