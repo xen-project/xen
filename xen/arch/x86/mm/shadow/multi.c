@@ -3378,12 +3378,7 @@ static int sh_page_fault(struct vcpu *v,
               (((emul_ctxt.ctxt.event.vector == TRAP_gp_fault) ||
                 (emul_ctxt.ctxt.event.vector == TRAP_stack_error)) &&
                emul_ctxt.ctxt.event.error_code == 0)) )
-        {
-            if ( has_hvm_container_domain(d) )
-                hvm_inject_event(&emul_ctxt.ctxt.event);
-            else
-                pv_inject_event(&emul_ctxt.ctxt.event);
-        }
+            hvm_inject_event(&emul_ctxt.ctxt.event);
         else
         {
             SHADOW_PRINTK(
@@ -3443,12 +3438,7 @@ static int sh_page_fault(struct vcpu *v,
 #endif
 
     if ( emul_ctxt.ctxt.retire.singlestep )
-    {
-        if ( has_hvm_container_domain(d) )
-            hvm_inject_hw_exception(TRAP_debug, X86_EVENT_NO_EC);
-        else
-            pv_inject_hw_exception(TRAP_debug, X86_EVENT_NO_EC);
-    }
+        hvm_inject_hw_exception(TRAP_debug, X86_EVENT_NO_EC);
 
 #if GUEST_PAGING_LEVELS == 3 /* PAE guest */
     /*
@@ -3489,12 +3479,7 @@ static int sh_page_fault(struct vcpu *v,
                 TRACE_SHADOW_PATH_FLAG(TRCE_SFLAG_EMULATION_LAST_FAILED);
 
                 if ( emul_ctxt.ctxt.retire.singlestep )
-                {
-                    if ( has_hvm_container_domain(d) )
-                        hvm_inject_hw_exception(TRAP_debug, X86_EVENT_NO_EC);
-                    else
-                        pv_inject_hw_exception(TRAP_debug, X86_EVENT_NO_EC);
-                }
+                    hvm_inject_hw_exception(TRAP_debug, X86_EVENT_NO_EC);
 
                 break; /* Don't emulate again if we failed! */
             }

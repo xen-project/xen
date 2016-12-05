@@ -318,75 +318,6 @@ static const struct x86_emulate_ops hvm_shadow_emulator_ops = {
     .cpuid      = hvmemul_cpuid,
 };
 
-static int
-pv_emulate_read(enum x86_segment seg,
-                unsigned long offset,
-                void *p_data,
-                unsigned int bytes,
-                struct x86_emulate_ctxt *ctxt)
-{
-    unsigned int rc;
-
-    if ( !is_x86_user_segment(seg) )
-        return X86EMUL_UNHANDLEABLE;
-
-    if ( (rc = copy_from_user(p_data, (void *)offset, bytes)) != 0 )
-    {
-        x86_emul_pagefault(0, offset + bytes - rc, ctxt); /* Read fault. */
-        return X86EMUL_EXCEPTION;
-    }
-
-    return X86EMUL_OKAY;
-}
-
-static int
-pv_emulate_write(enum x86_segment seg,
-                 unsigned long offset,
-                 void *p_data,
-                 unsigned int bytes,
-                 struct x86_emulate_ctxt *ctxt)
-{
-    struct sh_emulate_ctxt *sh_ctxt =
-        container_of(ctxt, struct sh_emulate_ctxt, ctxt);
-    struct vcpu *v = current;
-    if ( !is_x86_user_segment(seg) )
-        return X86EMUL_UNHANDLEABLE;
-    return v->arch.paging.mode->shadow.x86_emulate_write(
-        v, offset, p_data, bytes, sh_ctxt);
-}
-
-static int
-pv_emulate_cmpxchg(enum x86_segment seg,
-                   unsigned long offset,
-                   void *p_old,
-                   void *p_new,
-                   unsigned int bytes,
-                   struct x86_emulate_ctxt *ctxt)
-{
-    struct sh_emulate_ctxt *sh_ctxt =
-        container_of(ctxt, struct sh_emulate_ctxt, ctxt);
-    unsigned long old, new;
-    struct vcpu *v = current;
-
-    if ( !is_x86_user_segment(seg) || bytes > sizeof(long) )
-        return X86EMUL_UNHANDLEABLE;
-
-    old = new = 0;
-    memcpy(&old, p_old, bytes);
-    memcpy(&new, p_new, bytes);
-
-    return v->arch.paging.mode->shadow.x86_emulate_cmpxchg(
-               v, offset, old, new, bytes, sh_ctxt);
-}
-
-static const struct x86_emulate_ops pv_shadow_emulator_ops = {
-    .read       = pv_emulate_read,
-    .insn_fetch = pv_emulate_read,
-    .write      = pv_emulate_write,
-    .cmpxchg    = pv_emulate_cmpxchg,
-    .cpuid      = pv_emul_cpuid,
-};
-
 const struct x86_emulate_ops *shadow_init_emulation(
     struct sh_emulate_ctxt *sh_ctxt, struct cpu_user_regs *regs)
 {
@@ -394,16 +325,12 @@ const struct x86_emulate_ops *shadow_init_emulation(
     struct vcpu *v = current;
     unsigned long addr;
 
+    ASSERT(has_hvm_container_vcpu(v));
+
     memset(sh_ctxt, 0, sizeof(*sh_ctxt));
 
     sh_ctxt->ctxt.regs = regs;
     sh_ctxt->ctxt.swint_emulate = x86_swint_emulate_none;
-
-    if ( is_pv_vcpu(v) )
-    {
-        sh_ctxt->ctxt.addr_size = sh_ctxt->ctxt.sp_size = BITS_PER_LONG;
-        return &pv_shadow_emulator_ops;
-    }
 
     /* Segment cache initialisation. Primed with CS. */
     creg = hvm_get_seg_reg(x86_seg_cs, sh_ctxt);
@@ -441,24 +368,24 @@ void shadow_continue_emulation(struct sh_emulate_ctxt *sh_ctxt,
     struct vcpu *v = current;
     unsigned long addr, diff;
 
-    /* We don't refetch the segment bases, because we don't emulate
-     * writes to segment registers */
+    ASSERT(has_hvm_container_vcpu(v));
 
-    if ( is_hvm_vcpu(v) )
+    /*
+     * We don't refetch the segment bases, because we don't emulate
+     * writes to segment registers
+     */
+    diff = regs->eip - sh_ctxt->insn_buf_eip;
+    if ( diff > sh_ctxt->insn_buf_bytes )
     {
-        diff = regs->eip - sh_ctxt->insn_buf_eip;
-        if ( diff > sh_ctxt->insn_buf_bytes )
-        {
-            /* Prefetch more bytes. */
-            sh_ctxt->insn_buf_bytes =
-                (!hvm_translate_linear_addr(
-                    x86_seg_cs, regs->eip, sizeof(sh_ctxt->insn_buf),
-                    hvm_access_insn_fetch, sh_ctxt, &addr) &&
-                 !hvm_fetch_from_guest_linear(
-                     sh_ctxt->insn_buf, addr, sizeof(sh_ctxt->insn_buf), 0, NULL))
-                ? sizeof(sh_ctxt->insn_buf) : 0;
-            sh_ctxt->insn_buf_eip = regs->eip;
-        }
+        /* Prefetch more bytes. */
+        sh_ctxt->insn_buf_bytes =
+            (!hvm_translate_linear_addr(
+                x86_seg_cs, regs->eip, sizeof(sh_ctxt->insn_buf),
+                hvm_access_insn_fetch, sh_ctxt, &addr) &&
+             !hvm_fetch_from_guest_linear(
+                 sh_ctxt->insn_buf, addr, sizeof(sh_ctxt->insn_buf), 0, NULL))
+            ? sizeof(sh_ctxt->insn_buf) : 0;
+        sh_ctxt->insn_buf_eip = regs->eip;
     }
 }
 
