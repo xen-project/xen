@@ -81,7 +81,7 @@ $(TARGET).axf: $(TARGET)-syms
 	$(OBJCOPY) --change-addresses +0x80000000 $< $@
 	$(STRIP) $@
 
-ifeq ($(lto),y)
+ifeq ($(CONFIG_LTO),y)
 # Gather all LTO objects together
 prelink_lto.o: $(ALL_OBJS)
 	$(LD_LTO) -r -o $@ $^

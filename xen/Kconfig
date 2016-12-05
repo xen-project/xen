@@ -30,4 +30,12 @@ config EXPERT
 	string
 	option env="XEN_CONFIG_EXPERT"
 
+config LTO
+	bool "Link Time Optimisation"
+	depends on BROKEN
+	---help---
+	  Enable Link Time Optimisation.
+
+	  If unsure, say N.
+
 source "Kconfig.debug"
