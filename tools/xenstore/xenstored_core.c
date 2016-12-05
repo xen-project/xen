@@ -456,7 +456,7 @@ static struct node *read_node(struct connection *conn, const void *ctx,
 	return node;
 }
 
-static bool write_node(struct connection *conn, const struct node *node)
+static bool write_node(struct connection *conn, struct node *node)
 {
 	/*
 	 * conn will be null when this is called from manual_node.
@@ -475,6 +475,8 @@ static bool write_node(struct connection *conn, const struct node *node)
 
 	if (domain_is_unprivileged(conn) && data.dsize >= quota_max_entry_size)
 		goto error;
+
+	add_change_node(conn, node, false);
 
 	data.dptr = talloc_size(node, data.dsize);
 	((uint32_t *)data.dptr)[0] = node->num_perms;
@@ -976,7 +978,6 @@ static void do_write(struct connection *conn, struct buffered_data *in)
 		}
 	}
 
-	add_change_node(conn, node, false);
 	fire_watches(conn, in, name, false);
 	send_ack(conn, XS_WRITE);
 }
@@ -1007,7 +1008,6 @@ static void do_mkdir(struct connection *conn, struct buffered_data *in)
 			send_error(conn, errno);
 			return;
 		}
-		add_change_node(conn, node, false);
 		fire_watches(conn, in, name, false);
 	}
 	send_ack(conn, XS_MKDIR);
@@ -1209,7 +1209,6 @@ static void do_set_perms(struct connection *conn, struct buffered_data *in)
 		return;
 	}
 
-	add_change_node(conn, node, false);
 	fire_watches(conn, in, name, false);
 	send_ack(conn, XS_SET_PERMS);
 }
