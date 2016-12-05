@@ -149,21 +149,17 @@ struct transaction *transaction_lookup(struct connection *conn, uint32_t id)
 	return ERR_PTR(-ENOENT);
 }
 
-void do_transaction_start(struct connection *conn, struct buffered_data *in)
+int do_transaction_start(struct connection *conn, struct buffered_data *in)
 {
 	struct transaction *trans, *exists;
 	char id_str[20];
 
 	/* We don't support nested transactions. */
-	if (conn->transaction) {
-		send_error(conn, EBUSY);
-		return;
-	}
+	if (conn->transaction)
+		return EBUSY;
 
-	if (conn->id && conn->transaction_started > quota_max_transaction) {
-		send_error(conn, ENOSPC);
-		return;
-	}
+	if (conn->id && conn->transaction_started > quota_max_transaction)
+		return ENOSPC;
 
 	/* Attach transaction to input for autofree until it's complete */
 	trans = talloc_zero(in, struct transaction);
@@ -173,10 +169,8 @@ void do_transaction_start(struct connection *conn, struct buffered_data *in)
 	trans->tdb_name = talloc_asprintf(trans, "%s.%p",
 					  xs_daemon_tdb(), trans);
 	trans->tdb = tdb_copy(tdb_context(conn), trans->tdb_name);
-	if (!trans->tdb) {
-		send_error(conn, errno);
-		return;
-	}
+	if (!trans->tdb)
+		return errno;
 	/* Make it close if we go away. */
 	talloc_steal(trans, trans->tdb);
 
@@ -194,24 +188,22 @@ void do_transaction_start(struct connection *conn, struct buffered_data *in)
 
 	snprintf(id_str, sizeof(id_str), "%u", trans->id);
 	send_reply(conn, XS_TRANSACTION_START, id_str, strlen(id_str)+1);
+
+	return 0;
 }
 
-void do_transaction_end(struct connection *conn, struct buffered_data *in)
+int do_transaction_end(struct connection *conn, struct buffered_data *in)
 {
 	const char *arg = onearg(in);
 	struct changed_node *i;
 	struct changed_domain *d;
 	struct transaction *trans;
 
-	if (!arg || (!streq(arg, "T") && !streq(arg, "F"))) {
-		send_error(conn, EINVAL);
-		return;
-	}
+	if (!arg || (!streq(arg, "T") && !streq(arg, "F")))
+		return EINVAL;
 
-	if ((trans = conn->transaction) == NULL) {
-		send_error(conn, ENOENT);
-		return;
-	}
+	if ((trans = conn->transaction) == NULL)
+		return ENOENT;
 
 	conn->transaction = NULL;
 	list_del(&trans->list);
@@ -222,14 +214,10 @@ void do_transaction_end(struct connection *conn, struct buffered_data *in)
 
 	if (streq(arg, "T")) {
 		/* FIXME: Merge, rather failing on any change. */
-		if (trans->generation != generation) {
-			send_error(conn, EAGAIN);
-			return;
-		}
-		if (!replace_tdb(trans->tdb_name, trans->tdb)) {
-			send_error(conn, errno);
-			return;
-		}
+		if (trans->generation != generation)
+			return EAGAIN;
+		if (!replace_tdb(trans->tdb_name, trans->tdb))
+			return errno;
 		/* Don't close this: we won! */
 		trans->tdb = NULL;
 
@@ -243,6 +231,8 @@ void do_transaction_end(struct connection *conn, struct buffered_data *in)
 		generation += trans->trans_gen;
 	}
 	send_ack(conn, XS_TRANSACTION_END);
+
+	return 0;
 }
 
 void transaction_entry_inc(struct transaction *trans, unsigned int domid)

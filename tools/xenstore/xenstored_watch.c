@@ -121,46 +121,36 @@ static int destroy_watch(void *_watch)
 	return 0;
 }
 
-void do_watch(struct connection *conn, struct buffered_data *in)
+int do_watch(struct connection *conn, struct buffered_data *in)
 {
 	struct watch *watch;
 	char *vec[2];
 	bool relative;
 
-	if (get_strings(in, vec, ARRAY_SIZE(vec)) != ARRAY_SIZE(vec)) {
-		send_error(conn, EINVAL);
-		return;
-	}
+	if (get_strings(in, vec, ARRAY_SIZE(vec)) != ARRAY_SIZE(vec))
+		return EINVAL;
 
 	if (strstarts(vec[0], "@")) {
 		relative = false;
-		if (strlen(vec[0]) > XENSTORE_REL_PATH_MAX) {
-			send_error(conn, EINVAL);
-			return;
-		}
+		if (strlen(vec[0]) > XENSTORE_REL_PATH_MAX)
+			return EINVAL;
 		/* check if valid event */
 	} else {
 		relative = !strstarts(vec[0], "/");
 		vec[0] = canonicalize(conn, vec[0]);
-		if (!is_valid_nodename(vec[0])) {
-			send_error(conn, EINVAL);
-			return;
-		}
+		if (!is_valid_nodename(vec[0]))
+			return EINVAL;
 	}
 
 	/* Check for duplicates. */
 	list_for_each_entry(watch, &conn->watches, list) {
 		if (streq(watch->node, vec[0]) &&
-		    streq(watch->token, vec[1])) {
-			send_error(conn, EEXIST);
-			return;
-		}
+		    streq(watch->token, vec[1]))
+			return EEXIST;
 	}
 
-	if (domain_watch(conn) > quota_nb_watch_per_domain) {
-		send_error(conn, E2BIG);
-		return;
-	}
+	if (domain_watch(conn) > quota_nb_watch_per_domain)
+		return E2BIG;
 
 	watch = talloc(conn, struct watch);
 	watch->node = talloc_strdup(watch, vec[0]);
@@ -180,17 +170,17 @@ void do_watch(struct connection *conn, struct buffered_data *in)
 
 	/* We fire once up front: simplifies clients and restart. */
 	add_event(conn, in, watch, watch->node);
+
+	return 0;
 }
 
-void do_unwatch(struct connection *conn, struct buffered_data *in)
+int do_unwatch(struct connection *conn, struct buffered_data *in)
 {
 	struct watch *watch;
 	char *node, *vec[2];
 
-	if (get_strings(in, vec, ARRAY_SIZE(vec)) != ARRAY_SIZE(vec)) {
-		send_error(conn, EINVAL);
-		return;
-	}
+	if (get_strings(in, vec, ARRAY_SIZE(vec)) != ARRAY_SIZE(vec))
+		return EINVAL;
 
 	node = canonicalize(conn, vec[0]);
 	list_for_each_entry(watch, &conn->watches, list) {
@@ -199,10 +189,10 @@ void do_unwatch(struct connection *conn, struct buffered_data *in)
 			talloc_free(watch);
 			domain_watch_dec(conn);
 			send_ack(conn, XS_UNWATCH);
-			return;
+			return 0;
 		}
 	}
-	send_error(conn, ENOENT);
+	return ENOENT;
 }
 
 void conn_delete_all_watches(struct connection *conn)

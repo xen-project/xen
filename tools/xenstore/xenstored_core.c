@@ -770,33 +770,31 @@ bool check_event_node(const char *node)
 	return true;
 }
 
-static void send_directory(struct connection *conn, struct buffered_data *in)
+static int send_directory(struct connection *conn, struct buffered_data *in)
 {
 	struct node *node;
 	const char *name = onearg(in);
 
 	name = canonicalize(conn, name);
 	node = get_node(conn, in, name, XS_PERM_READ);
-	if (!node) {
-		send_error(conn, errno);
-		return;
-	}
+	if (!node)
+		return errno;
 
 	send_reply(conn, XS_DIRECTORY, node->children, node->childlen);
+
+	return 0;
 }
 
-static void send_directory_part(struct connection *conn,
-				struct buffered_data *in)
+static int send_directory_part(struct connection *conn,
+			       struct buffered_data *in)
 {
 	unsigned int off, len, maxlen, genlen;
 	char *name, *child, *data;
 	struct node *node;
 	char gen[24];
 
-	if (xs_count_strings(in->buffer, in->used) != 2) {
-		send_error(conn, EINVAL);
-		return;
-	}
+	if (xs_count_strings(in->buffer, in->used) != 2)
+		return EINVAL;
 
 	/* First arg is node name. */
 	name = canonicalize(conn, in->buffer);
@@ -805,10 +803,8 @@ static void send_directory_part(struct connection *conn,
 	off = atoi(in->buffer + strlen(in->buffer) + 1);
 
 	node = get_node(conn, in, name, XS_PERM_READ);
-	if (!node) {
-		send_error(conn, errno);
-		return;
-	}
+	if (!node)
+		return errno;
 
 	genlen = snprintf(gen, sizeof(gen), "%"PRIu64, node->generation) + 1;
 
@@ -816,7 +812,7 @@ static void send_directory_part(struct connection *conn,
 	if (off >= node->childlen) {
 		gen[genlen] = 0;
 		send_reply(conn, XS_DIRECTORY_PART, gen, genlen + 1);
-		return;
+		return 0;
 	}
 
 	len = 0;
@@ -831,10 +827,8 @@ static void send_directory_part(struct connection *conn,
 	}
 
 	data = talloc_array(in, char, genlen + len + 1);
-	if (!data) {
-		send_error(conn, ENOMEM);
-		return;
-	}
+	if (!data)
+		return ENOMEM;
 
 	memcpy(data, gen, genlen);
 	memcpy(data + genlen, node->children + off, len);
@@ -844,21 +838,23 @@ static void send_directory_part(struct connection *conn,
 	}
 
 	send_reply(conn, XS_DIRECTORY_PART, data, genlen + len);
+
+	return 0;
 }
 
-static void do_read(struct connection *conn, struct buffered_data *in)
+static int do_read(struct connection *conn, struct buffered_data *in)
 {
 	struct node *node;
 	const char *name = onearg(in);
 
 	name = canonicalize(conn, name);
 	node = get_node(conn, in, name, XS_PERM_READ);
-	if (!node) {
-		send_error(conn, errno);
-		return;
-	}
+	if (!node)
+		return errno;
 
 	send_reply(conn, XS_READ, node->data, node->datalen);
+
+	return 0;
 }
 
 static void delete_node_single(struct connection *conn, struct node *node,
@@ -977,7 +973,7 @@ static struct node *create_node(struct connection *conn,
 }
 
 /* path, data... */
-static void do_write(struct connection *conn, struct buffered_data *in)
+static int do_write(struct connection *conn, struct buffered_data *in)
 {
 	unsigned int offset, datalen;
 	struct node *node;
@@ -985,10 +981,8 @@ static void do_write(struct connection *conn, struct buffered_data *in)
 	char *name;
 
 	/* Extra "strings" can be created by binary data. */
-	if (get_strings(in, vec, ARRAY_SIZE(vec)) < ARRAY_SIZE(vec)) {
-		send_error(conn, EINVAL);
-		return;
-	}
+	if (get_strings(in, vec, ARRAY_SIZE(vec)) < ARRAY_SIZE(vec))
+		return EINVAL;
 
 	offset = strlen(vec[0]) + 1;
 	datalen = in->used - offset;
@@ -997,38 +991,31 @@ static void do_write(struct connection *conn, struct buffered_data *in)
 	node = get_node(conn, in, name, XS_PERM_WRITE);
 	if (!node) {
 		/* No permissions, invalid input? */
-		if (errno != ENOENT) {
-			send_error(conn, errno);
-			return;
-		}
+		if (errno != ENOENT)
+			return errno;
 		node = create_node(conn, name, in->buffer + offset, datalen);
-		if (!node) {
-			send_error(conn, errno);
-			return;
-		}
+		if (!node)
+			return errno;
 	} else {
 		node->data = in->buffer + offset;
 		node->datalen = datalen;
-		if (!write_node(conn, node)){
-			send_error(conn, errno);
-			return;
-		}
+		if (!write_node(conn, node))
+			return errno;
 	}
 
 	fire_watches(conn, in, name, false);
 	send_ack(conn, XS_WRITE);
+
+	return 0;
 }
 
-static void do_mkdir(struct connection *conn, struct buffered_data *in)
+static int do_mkdir(struct connection *conn, struct buffered_data *in)
 {
 	struct node *node;
 	const char *name = onearg(in);
 
-	if (!name) {
-		errno = EINVAL;
-		send_error(conn, errno);
-		return;
-	}
+	if (!name)
+		return EINVAL;
 
 	name = canonicalize(conn, name);
 	node = get_node(conn, in, name, XS_PERM_WRITE);
@@ -1036,18 +1023,16 @@ static void do_mkdir(struct connection *conn, struct buffered_data *in)
 	/* If it already exists, fine. */
 	if (!node) {
 		/* No permissions? */
-		if (errno != ENOENT) {
-			send_error(conn, errno);
-			return;
-		}
+		if (errno != ENOENT)
+			return errno;
 		node = create_node(conn, name, NULL, 0);
-		if (!node) {
-			send_error(conn, errno);
-			return;
-		}
+		if (!node)
+			return errno;
 		fire_watches(conn, in, name, false);
 	}
 	send_ack(conn, XS_MKDIR);
+
+	return 0;
 }
 
 static void delete_node(struct connection *conn, struct node *node,
@@ -1117,18 +1102,14 @@ static int _rm(struct connection *conn, struct node *node, const char *name)
 	   happen is the child will continue to take up space, but will
 	   otherwise be unreachable. */
 	struct node *parent = read_node(conn, name, get_parent(name, name));
-	if (!parent) {
-		send_error(conn, EINVAL);
-		return 0;
-	}
+	if (!parent)
+		return EINVAL;
 
-	if (!delete_child(conn, parent, basename(name))) {
-		send_error(conn, EINVAL);
-		return 0;
-	}
+	if (!delete_child(conn, parent, basename(name)))
+		return EINVAL;
 
 	delete_node(conn, node, true);
-	return 1;
+	return 0;
 }
 
 
@@ -1143,9 +1124,10 @@ static void internal_rm(const char *name)
 }
 
 
-static void do_rm(struct connection *conn, struct buffered_data *in)
+static int do_rm(struct connection *conn, struct buffered_data *in)
 {
 	struct node *node;
+	int ret;
 	const char *name = onearg(in);
 
 	name = canonicalize(conn, name);
@@ -1156,28 +1138,29 @@ static void do_rm(struct connection *conn, struct buffered_data *in)
 			node = read_node(conn, in, get_parent(in, name));
 			if (node) {
 				send_ack(conn, XS_RM);
-				return;
+				return 0;
 			}
 			/* Restore errno, just in case. */
 			errno = ENOENT;
 		}
-		send_error(conn, errno);
-		return;
+		return errno;
 	}
 
-	if (streq(name, "/")) {
-		send_error(conn, EINVAL);
-		return;
-	}
+	if (streq(name, "/"))
+		return EINVAL;
 
-	if (_rm(conn, node, name)) {
-		fire_watches(conn, in, name, true);
-		send_ack(conn, XS_RM);
-	}
+	ret = _rm(conn, node, name);
+	if (ret)
+		return ret;
+
+	fire_watches(conn, in, name, true);
+	send_ack(conn, XS_RM);
+
+	return 0;
 }
 
 
-static void do_get_perms(struct connection *conn, struct buffered_data *in)
+static int do_get_perms(struct connection *conn, struct buffered_data *in)
 {
 	struct node *node;
 	const char *name = onearg(in);
@@ -1186,19 +1169,19 @@ static void do_get_perms(struct connection *conn, struct buffered_data *in)
 
 	name = canonicalize(conn, name);
 	node = get_node(conn, in, name, XS_PERM_READ);
-	if (!node) {
-		send_error(conn, errno);
-		return;
-	}
+	if (!node)
+		return errno;
 
 	strings = perms_to_strings(node, node->perms, node->num_perms, &len);
 	if (!strings)
-		send_error(conn, errno);
-	else
-		send_reply(conn, XS_GET_PERMS, strings, len);
+		return errno;
+
+	send_reply(conn, XS_GET_PERMS, strings, len);
+
+	return 0;
 }
 
-static void do_set_perms(struct connection *conn, struct buffered_data *in)
+static int do_set_perms(struct connection *conn, struct buffered_data *in)
 {
 	unsigned int num;
 	struct xs_permissions *perms;
@@ -1206,10 +1189,8 @@ static void do_set_perms(struct connection *conn, struct buffered_data *in)
 	struct node *node;
 
 	num = xs_count_strings(in->buffer, in->used);
-	if (num < 2) {
-		send_error(conn, EINVAL);
-		return;
-	}
+	if (num < 2)
+		return EINVAL;
 
 	/* First arg is node name. */
 	name = canonicalize(conn, in->buffer);
@@ -1218,54 +1199,43 @@ static void do_set_perms(struct connection *conn, struct buffered_data *in)
 
 	/* We must own node to do this (tools can do this too). */
 	node = get_node(conn, in, name, XS_PERM_WRITE|XS_PERM_OWNER);
-	if (!node) {
-		send_error(conn, errno);
-		return;
-	}
+	if (!node)
+		return errno;
 
 	perms = talloc_array(node, struct xs_permissions, num);
-	if (!xs_strings_to_perms(perms, num, permstr)) {
-		send_error(conn, errno);
-		return;
-	}
+	if (!xs_strings_to_perms(perms, num, permstr))
+		return errno;
 
 	/* Unprivileged domains may not change the owner. */
-	if (domain_is_unprivileged(conn) &&
-	    perms[0].id != node->perms[0].id) {
-		send_error(conn, EPERM);
-		return;
-	}
+	if (domain_is_unprivileged(conn) && perms[0].id != node->perms[0].id)
+		return EPERM;
 
 	domain_entry_dec(conn, node);
 	node->perms = perms;
 	node->num_perms = num;
 	domain_entry_inc(conn, node);
 
-	if (!write_node(conn, node)) {
-		send_error(conn, errno);
-		return;
-	}
+	if (!write_node(conn, node))
+		return errno;
 
 	fire_watches(conn, in, name, false);
 	send_ack(conn, XS_SET_PERMS);
+
+	return 0;
 }
 
-static void do_debug(struct connection *conn, struct buffered_data *in)
+static int do_debug(struct connection *conn, struct buffered_data *in)
 {
 	int num;
 
-	if (conn->id != 0) {
-		send_error(conn, EACCES);
-		return;
-	}
+	if (conn->id != 0)
+		return EACCES;
 
 	num = xs_count_strings(in->buffer, in->used);
 
 	if (streq(in->buffer, "print")) {
-		if (num < 2) {
-			send_error(conn, EINVAL);
-			return;
-		}
+		if (num < 2)
+			return EINVAL;
 		xprintf("debug: %s", in->buffer + get_string(in, 0));
 	}
 
@@ -1273,11 +1243,13 @@ static void do_debug(struct connection *conn, struct buffered_data *in)
 		check_store();
 
 	send_ack(conn, XS_DEBUG);
+
+	return 0;
 }
 
 static struct {
 	const char *str;
-	void (*func)(struct connection *conn, struct buffered_data *in);
+	int (*func)(struct connection *conn, struct buffered_data *in);
 } const wire_funcs[XS_TYPE_COUNT] = {
 	[XS_DEBUG]             = { "DEBUG",             do_debug },
 	[XS_DIRECTORY]         = { "DIRECTORY",         send_directory },
@@ -1320,6 +1292,7 @@ static void process_message(struct connection *conn, struct buffered_data *in)
 {
 	struct transaction *trans;
 	enum xsd_sockmsg_type type = in->hdr.msg.type;
+	int ret;
 
 	trans = transaction_lookup(conn, in->hdr.msg.tx_id);
 	if (IS_ERR(trans)) {
@@ -1331,11 +1304,13 @@ static void process_message(struct connection *conn, struct buffered_data *in)
 	conn->transaction = trans;
 
 	if ((unsigned)type < XS_TYPE_COUNT && wire_funcs[type].func)
-		wire_funcs[type].func(conn, in);
+		ret = wire_funcs[type].func(conn, in);
 	else {
 		eprintf("Client unknown operation %i", type);
-		send_error(conn, ENOSYS);
+		ret = ENOSYS;
 	}
+	if (ret)
+		send_error(conn, ret);
 
 	conn->transaction = NULL;
 }

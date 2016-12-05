@@ -21,8 +21,8 @@
 
 struct transaction;
 
-void do_transaction_start(struct connection *conn, struct buffered_data *node);
-void do_transaction_end(struct connection *conn, struct buffered_data *in);
+int do_transaction_start(struct connection *conn, struct buffered_data *node);
+int do_transaction_end(struct connection *conn, struct buffered_data *in);
 
 struct transaction *transaction_lookup(struct connection *conn, uint32_t id);
 
