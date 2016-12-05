@@ -50,6 +50,7 @@ enum xsd_sockmsg_type
     XS_SET_TARGET,
     XS_RESTRICT,
     XS_RESET_WATCHES,
+    XS_DIRECTORY_PART,
 
     XS_INVALID = 0xffff /* Guaranteed to remain an invalid type */
 };

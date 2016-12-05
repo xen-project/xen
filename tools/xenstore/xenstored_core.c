@@ -16,6 +16,7 @@
     along with this program; If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include <inttypes.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <poll.h>
@@ -147,6 +148,7 @@ static char *sockmsg_string(enum xsd_sockmsg_type type)
 	case XS_RESUME: return "RESUME";
 	case XS_SET_TARGET: return "SET_TARGET";
 	case XS_RESET_WATCHES: return "RESET_WATCHES";
+	case XS_DIRECTORY_PART: return "DIRECTORY_PART";
 	default:
 		return "**UNKNOWN**";
 	}
@@ -812,6 +814,67 @@ static void send_directory(struct connection *conn, struct buffered_data *in)
 	send_reply(conn, XS_DIRECTORY, node->children, node->childlen);
 }
 
+static void send_directory_part(struct connection *conn,
+				struct buffered_data *in)
+{
+	unsigned int off, len, maxlen, genlen;
+	char *name, *child, *data;
+	struct node *node;
+	char gen[24];
+
+	if (xs_count_strings(in->buffer, in->used) != 2) {
+		send_error(conn, EINVAL);
+		return;
+	}
+
+	/* First arg is node name. */
+	name = canonicalize(conn, in->buffer);
+
+	/* Second arg is childlist offset. */
+	off = atoi(in->buffer + strlen(in->buffer) + 1);
+
+	node = get_node(conn, in, name, XS_PERM_READ);
+	if (!node) {
+		send_error(conn, errno);
+		return;
+	}
+
+	genlen = snprintf(gen, sizeof(gen), "%"PRIu64, node->generation) + 1;
+
+	/* Offset behind list: just return a list with an empty string. */
+	if (off >= node->childlen) {
+		gen[genlen] = 0;
+		send_reply(conn, XS_DIRECTORY_PART, gen, genlen + 1);
+		return;
+	}
+
+	len = 0;
+	maxlen = XENSTORE_PAYLOAD_MAX - genlen - 1;
+	child = node->children + off;
+
+	while (len + strlen(child) < maxlen) {
+		len += strlen(child) + 1;
+		child += strlen(child) + 1;
+		if (off + len == node->childlen)
+			break;
+	}
+
+	data = talloc_array(in, char, genlen + len + 1);
+	if (!data) {
+		send_error(conn, ENOMEM);
+		return;
+	}
+
+	memcpy(data, gen, genlen);
+	memcpy(data + genlen, node->children + off, len);
+	if (off + len == node->childlen) {
+		data[genlen + len] = 0;
+		len++;
+	}
+
+	send_reply(conn, XS_DIRECTORY_PART, data, genlen + len);
+}
+
 static void do_read(struct connection *conn, struct buffered_data *in)
 {
 	struct node *node;
@@ -1332,6 +1395,10 @@ static void process_message(struct connection *conn, struct buffered_data *in)
 
 	case XS_RESET_WATCHES:
 		do_reset_watches(conn, in);
+		break;
+
+	case XS_DIRECTORY_PART:
+		send_directory_part(conn, in);
 		break;
 
 	default:
