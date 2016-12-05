@@ -822,7 +822,8 @@ static void do_read(struct connection *conn, struct buffered_data *in)
 	send_reply(conn, XS_READ, node->data, node->datalen);
 }
 
-static void delete_node_single(struct connection *conn, struct node *node)
+static void delete_node_single(struct connection *conn, struct node *node,
+			       bool changed)
 {
 	TDB_DATA key;
 
@@ -833,6 +834,10 @@ static void delete_node_single(struct connection *conn, struct node *node)
 		corrupt(conn, "Could not delete '%s'", node->name);
 		return;
 	}
+
+	if (changed)
+		add_change_node(conn, node, true);
+
 	domain_entry_dec(conn, node);
 }
 
@@ -971,7 +976,7 @@ static void do_write(struct connection *conn, struct buffered_data *in)
 		}
 	}
 
-	add_change_node(conn->transaction, name, false);
+	add_change_node(conn, node, false);
 	fire_watches(conn, in, name, false);
 	send_ack(conn, XS_WRITE);
 }
@@ -1002,20 +1007,21 @@ static void do_mkdir(struct connection *conn, struct buffered_data *in)
 			send_error(conn, errno);
 			return;
 		}
-		add_change_node(conn->transaction, name, false);
+		add_change_node(conn, node, false);
 		fire_watches(conn, in, name, false);
 	}
 	send_ack(conn, XS_MKDIR);
 }
 
-static void delete_node(struct connection *conn, struct node *node)
+static void delete_node(struct connection *conn, struct node *node,
+			bool changed)
 {
 	unsigned int i;
 
 	/* Delete self, then delete children.  If we crash, then the worst
 	   that can happen is the children will continue to take up space, but
 	   will otherwise be unreachable. */
-	delete_node_single(conn, node);
+	delete_node_single(conn, node, changed);
 
 	/* Delete children, too. */
 	for (i = 0; i < node->childlen; i += strlen(node->children+i) + 1) {
@@ -1025,7 +1031,7 @@ static void delete_node(struct connection *conn, struct node *node)
 				  talloc_asprintf(node, "%s/%s", node->name,
 						  node->children + i));
 		if (child) {
-			delete_node(conn, child);
+			delete_node(conn, child, false);
 		}
 		else {
 			trace("delete_node: No child '%s/%s' found!\n",
@@ -1084,7 +1090,7 @@ static int _rm(struct connection *conn, struct node *node, const char *name)
 		return 0;
 	}
 
-	delete_node(conn, node);
+	delete_node(conn, node, true);
 	return 1;
 }
 
@@ -1128,7 +1134,6 @@ static void do_rm(struct connection *conn, struct buffered_data *in)
 	}
 
 	if (_rm(conn, node, name)) {
-		add_change_node(conn->transaction, name, true);
 		fire_watches(conn, in, name, true);
 		send_ack(conn, XS_RM);
 	}
@@ -1204,7 +1209,7 @@ static void do_set_perms(struct connection *conn, struct buffered_data *in)
 		return;
 	}
 
-	add_change_node(conn->transaction, name, false);
+	add_change_node(conn, node, false);
 	fire_watches(conn, in, name, false);
 	send_ack(conn, XS_SET_PERMS);
 }

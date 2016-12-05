@@ -92,18 +92,21 @@ TDB_CONTEXT *tdb_transaction_context(struct transaction *trans)
 
 /* Callers get a change node (which can fail) and only commit after they've
  * finished.  This way they don't have to unwind eg. a write. */
-void add_change_node(struct transaction *trans, const char *node, bool recurse)
+void add_change_node(struct connection *conn, struct node *node, bool recurse)
 {
 	struct changed_node *i;
+	struct transaction *trans;
 
-	if (!trans) {
+	if (!conn || !conn->transaction) {
 		/* They're changing the global database. */
 		generation++;
 		return;
 	}
 
+	trans = conn->transaction;
+
 	list_for_each_entry(i, &trans->changes, list) {
-		if (streq(i->node, node)) {
+		if (streq(i->node, node->name)) {
 			if (recurse)
 				i->recurse = recurse;
 			return;
@@ -111,7 +114,7 @@ void add_change_node(struct transaction *trans, const char *node, bool recurse)
 	}
 
 	i = talloc(trans, struct changed_node);
-	i->node = talloc_strdup(i, node);
+	i->node = talloc_strdup(i, node->name);
 	i->recurse = recurse;
 	list_add_tail(&i->list, &trans->changes);
 }
