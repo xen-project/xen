@@ -11,14 +11,7 @@
 #include "talloc.h"
 #include "utils.h"
 
-struct record_hdr {
-	uint32_t num_perms;
-	uint32_t datalen;
-	uint32_t childlen;
-	struct xs_permissions perms[0];
-};
-
-static uint32_t total_size(struct record_hdr *hdr)
+static uint32_t total_size(struct xs_tdb_record_hdr *hdr)
 {
 	return sizeof(*hdr) + hdr->num_perms * sizeof(struct xs_permissions) 
 		+ hdr->datalen + hdr->childlen;
@@ -58,7 +51,7 @@ int main(int argc, char *argv[])
 	key = tdb_firstkey(tdb);
 	while (key.dptr) {
 		TDB_DATA data;
-		struct record_hdr *hdr;
+		struct xs_tdb_record_hdr *hdr;
 
 		data = tdb_fetch(tdb, key);
 		hdr = (void *)data.dptr;

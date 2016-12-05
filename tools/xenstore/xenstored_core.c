@@ -416,7 +416,7 @@ static struct node *read_node(struct connection *conn, const void *ctx,
 			      const char *name)
 {
 	TDB_DATA key, data;
-	uint32_t *p;
+	struct xs_tdb_record_hdr *hdr;
 	struct node *node;
 	TDB_CONTEXT * context = tdb_context(conn);
 
@@ -441,13 +441,13 @@ static struct node *read_node(struct connection *conn, const void *ctx,
 	talloc_steal(node, data.dptr);
 
 	/* Datalen, childlen, number of permissions */
-	p = (uint32_t *)data.dptr;
-	node->num_perms = p[0];
-	node->datalen = p[1];
-	node->childlen = p[2];
+	hdr = (void *)data.dptr;
+	node->num_perms = hdr->num_perms;
+	node->datalen = hdr->datalen;
+	node->childlen = hdr->childlen;
 
 	/* Permissions are struct xs_permissions. */
-	node->perms = (void *)&p[3];
+	node->perms = hdr->perms;
 	/* Data is binary blob (usually ascii, no nul). */
 	node->data = node->perms + node->num_perms;
 	/* Children is strings, nul separated. */
@@ -465,11 +465,12 @@ static bool write_node(struct connection *conn, struct node *node)
 
 	TDB_DATA key, data;
 	void *p;
+	struct xs_tdb_record_hdr *hdr;
 
 	key.dptr = (void *)node->name;
 	key.dsize = strlen(node->name);
 
-	data.dsize = 3*sizeof(uint32_t)
+	data.dsize = sizeof(*hdr)
 		+ node->num_perms*sizeof(node->perms[0])
 		+ node->datalen + node->childlen;
 
@@ -479,13 +480,13 @@ static bool write_node(struct connection *conn, struct node *node)
 	add_change_node(conn, node, false);
 
 	data.dptr = talloc_size(node, data.dsize);
-	((uint32_t *)data.dptr)[0] = node->num_perms;
-	((uint32_t *)data.dptr)[1] = node->datalen;
-	((uint32_t *)data.dptr)[2] = node->childlen;
-	p = data.dptr + 3 * sizeof(uint32_t);
+	hdr = (void *)data.dptr;
+	hdr->num_perms = node->num_perms;
+	hdr->datalen = node->datalen;
+	hdr->childlen = node->childlen;
 
-	memcpy(p, node->perms, node->num_perms*sizeof(node->perms[0]));
-	p += node->num_perms*sizeof(node->perms[0]);
+	memcpy(hdr->perms, node->perms, node->num_perms*sizeof(node->perms[0]));
+	p = hdr->perms + node->num_perms;
 	memcpy(p, node->data, node->datalen);
 	p += node->datalen;
 	memcpy(p, node->children, node->childlen);

@@ -42,6 +42,14 @@ struct xs_permissions
 	enum xs_perm_type perms;
 };
 
+/* Header of the node record in tdb. */
+struct xs_tdb_record_hdr {
+	uint32_t num_perms;
+	uint32_t datalen;
+	uint32_t childlen;
+	struct xs_permissions perms[0];
+};
+
 /* Each 10 bits takes ~ 3 digits, plus one, plus one for nul terminator. */
 #define MAX_STRLEN(x) ((sizeof(x) * CHAR_BIT + CHAR_BIT-1) / 10 * 3 + 2)
 
