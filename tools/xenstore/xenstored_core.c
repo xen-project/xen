@@ -745,13 +745,25 @@ char *canonicalize(struct connection *conn, const char *node)
 	return (char *)node;
 }
 
+static struct node *get_node_canonicalized(struct connection *conn,
+					   const void *ctx,
+					   const char *name,
+					   char **canonical_name,
+					   enum xs_perm_type perm)
+{
+	char *tmp_name;
+
+	if (!canonical_name)
+		canonical_name = &tmp_name;
+	*canonical_name = canonicalize(conn, name);
+	return get_node(conn, ctx, *canonical_name, perm);
+}
+
 static int send_directory(struct connection *conn, struct buffered_data *in)
 {
 	struct node *node;
-	const char *name = onearg(in);
 
-	name = canonicalize(conn, name);
-	node = get_node(conn, in, name, XS_PERM_READ);
+	node = get_node_canonicalized(conn, in, onearg(in), NULL, XS_PERM_READ);
 	if (!node)
 		return errno;
 
@@ -764,7 +776,7 @@ static int send_directory_part(struct connection *conn,
 			       struct buffered_data *in)
 {
 	unsigned int off, len, maxlen, genlen;
-	char *name, *child, *data;
+	char *child, *data;
 	struct node *node;
 	char gen[24];
 
@@ -772,14 +784,12 @@ static int send_directory_part(struct connection *conn,
 		return EINVAL;
 
 	/* First arg is node name. */
-	name = canonicalize(conn, in->buffer);
+	node = get_node_canonicalized(conn, in, in->buffer, NULL, XS_PERM_READ);
+	if (!node)
+		return errno;
 
 	/* Second arg is childlist offset. */
 	off = atoi(in->buffer + strlen(in->buffer) + 1);
-
-	node = get_node(conn, in, name, XS_PERM_READ);
-	if (!node)
-		return errno;
 
 	genlen = snprintf(gen, sizeof(gen), "%"PRIu64, node->generation) + 1;
 
@@ -820,10 +830,8 @@ static int send_directory_part(struct connection *conn,
 static int do_read(struct connection *conn, struct buffered_data *in)
 {
 	struct node *node;
-	const char *name = onearg(in);
 
-	name = canonicalize(conn, name);
-	node = get_node(conn, in, name, XS_PERM_READ);
+	node = get_node_canonicalized(conn, in, onearg(in), NULL, XS_PERM_READ);
 	if (!node)
 		return errno;
 
@@ -962,8 +970,7 @@ static int do_write(struct connection *conn, struct buffered_data *in)
 	offset = strlen(vec[0]) + 1;
 	datalen = in->used - offset;
 
-	name = canonicalize(conn, vec[0]);
-	node = get_node(conn, in, name, XS_PERM_WRITE);
+	node = get_node_canonicalized(conn, in, vec[0], &name, XS_PERM_WRITE);
 	if (!node) {
 		/* No permissions, invalid input? */
 		if (errno != ENOENT)
@@ -987,13 +994,10 @@ static int do_write(struct connection *conn, struct buffered_data *in)
 static int do_mkdir(struct connection *conn, struct buffered_data *in)
 {
 	struct node *node;
-	const char *name = onearg(in);
+	char *name;
 
-	if (!name)
-		return EINVAL;
-
-	name = canonicalize(conn, name);
-	node = get_node(conn, in, name, XS_PERM_WRITE);
+	node = get_node_canonicalized(conn, in, onearg(in), &name,
+				      XS_PERM_WRITE);
 
 	/* If it already exists, fine. */
 	if (!node) {
@@ -1103,10 +1107,10 @@ static int do_rm(struct connection *conn, struct buffered_data *in)
 {
 	struct node *node;
 	int ret;
-	const char *name = onearg(in);
+	char *name;
 
-	name = canonicalize(conn, name);
-	node = get_node(conn, in, name, XS_PERM_WRITE);
+	node = get_node_canonicalized(conn, in, onearg(in), &name,
+				      XS_PERM_WRITE);
 	if (!node) {
 		/* Didn't exist already?  Fine, if parent exists. */
 		if (errno == ENOENT) {
@@ -1138,12 +1142,10 @@ static int do_rm(struct connection *conn, struct buffered_data *in)
 static int do_get_perms(struct connection *conn, struct buffered_data *in)
 {
 	struct node *node;
-	const char *name = onearg(in);
 	char *strings;
 	unsigned int len;
 
-	name = canonicalize(conn, name);
-	node = get_node(conn, in, name, XS_PERM_READ);
+	node = get_node_canonicalized(conn, in, onearg(in), NULL, XS_PERM_READ);
 	if (!node)
 		return errno;
 
@@ -1168,14 +1170,14 @@ static int do_set_perms(struct connection *conn, struct buffered_data *in)
 		return EINVAL;
 
 	/* First arg is node name. */
-	name = canonicalize(conn, in->buffer);
-	permstr = in->buffer + strlen(in->buffer) + 1;
-	num--;
-
 	/* We must own node to do this (tools can do this too). */
-	node = get_node(conn, in, name, XS_PERM_WRITE|XS_PERM_OWNER);
+	node = get_node_canonicalized(conn, in, in->buffer, &name,
+				      XS_PERM_WRITE | XS_PERM_OWNER);
 	if (!node)
 		return errno;
+
+	permstr = in->buffer + strlen(in->buffer) + 1;
+	num--;
 
 	perms = talloc_array(node, struct xs_permissions, num);
 	if (!xs_strings_to_perms(perms, num, permstr))

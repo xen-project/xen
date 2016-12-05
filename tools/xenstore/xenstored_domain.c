@@ -399,6 +399,18 @@ int do_introduce(struct connection *conn, struct buffered_data *in)
 	return 0;
 }
 
+static struct domain *find_connected_domain(unsigned int domid)
+{
+	struct domain *domain;
+
+	domain = find_domain_by_domid(domid);
+	if (!domain)
+		return ERR_PTR(-ENOENT);
+	if (!domain->conn)
+		return ERR_PTR(-EINVAL);
+	return domain;
+}
+
 int do_set_target(struct connection *conn, struct buffered_data *in)
 {
 	char *vec[2];
@@ -413,18 +425,13 @@ int do_set_target(struct connection *conn, struct buffered_data *in)
 	domid = atoi(vec[0]);
 	tdomid = atoi(vec[1]);
 
-        domain = find_domain_by_domid(domid);
-	if (!domain)
-		return ENOENT;
-        if (!domain->conn)
-		return EINVAL;
+        domain = find_connected_domain(domid);
+	if (IS_ERR(domain))
+		return -PTR_ERR(domain);
 
-        tdomain = find_domain_by_domid(tdomid);
-	if (!tdomain)
-		return ENOENT;
-
-        if (!tdomain->conn)
-		return EINVAL;
+        tdomain = find_connected_domain(tdomid);
+	if (IS_ERR(tdomain))
+		return -PTR_ERR(tdomain);
 
         talloc_reference(domain->conn, tdomain->conn);
         domain->conn->target = tdomain->conn;
@@ -434,29 +441,33 @@ int do_set_target(struct connection *conn, struct buffered_data *in)
 	return 0;
 }
 
-/* domid */
-int do_release(struct connection *conn, struct buffered_data *in)
+static struct domain *onearg_domain(struct connection *conn,
+				    struct buffered_data *in)
 {
 	const char *domid_str = onearg(in);
-	struct domain *domain;
 	unsigned int domid;
 
 	if (!domid_str)
-		return EINVAL;
+		return ERR_PTR(-EINVAL);
 
 	domid = atoi(domid_str);
 	if (!domid)
-		return EINVAL;
+		return ERR_PTR(-EINVAL);
 
 	if (domain_is_unprivileged(conn))
-		return EACCES;
+		return ERR_PTR(-EACCES);
 
-	domain = find_domain_by_domid(domid);
-	if (!domain)
-		return ENOENT;
+	return find_connected_domain(domid);
+}
 
-	if (!domain->conn)
-		return EINVAL;
+/* domid */
+int do_release(struct connection *conn, struct buffered_data *in)
+{
+	struct domain *domain;
+
+	domain = onearg_domain(conn, in);
+	if (IS_ERR(domain))
+		return -PTR_ERR(domain);
 
 	talloc_free(domain->conn);
 
@@ -468,25 +479,10 @@ int do_release(struct connection *conn, struct buffered_data *in)
 int do_resume(struct connection *conn, struct buffered_data *in)
 {
 	struct domain *domain;
-	unsigned int domid;
-	const char *domid_str = onearg(in);
 
-	if (!domid_str)
-		return EINVAL;
-
-	domid = atoi(domid_str);
-	if (!domid)
-		return EINVAL;
-
-	if (domain_is_unprivileged(conn))
-		return EACCES;
-
-	domain = find_domain_by_domid(domid);
-	if (!domain)
-		return ENOENT;
-
-	if (!domain->conn)
-		return EINVAL;
+	domain = onearg_domain(conn, in);
+	if (IS_ERR(domain))
+		return -PTR_ERR(domain);
 
 	domain->shutdown = 0;
 	
