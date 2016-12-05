@@ -1,0 +1,331 @@
+DO NOT EDIT
+
+BEING INCORPORATED INTO GIT
+
+
+
+v=4.1
+ov=4.0
+
+##* tag branchpoint
+##        hg tag $v.0-branched
+##        hg sign -k 'Xen tree' 4.1.0-branched
+
+* make branch in qemu-iwj.git
+        git-branch $v-testing master
+
+#* make branches in /usr/groups/xencore/HG (xen.hg and qemu.git)
+#        cd /usr/groups/xencore/HG
+#        really rsync -aH xen-unstable.hg/. xen-$v-testing.hg &
+#        really rsync -aH qemu-xen-unstable.git/. qemu-xen-$v-testing.git &
+#
+#        ed xen-$v-testing.hg/.hg/hgrc
+#        /unsta
+#        s/unstable/###4.1###-testing
+#        w
+#        q
+
+# make branches in xenbits.xen.org qemus
+        ssh xen@xenbits.xen.org
+	cd ~/git/qemu-xen.git
+	git branch staging-$v staging
+	git branch stable-$v master
+	cd ~/git/qemu-xen-traditional.git
+	git branch stable-$v master
+#        cd ~/git
+#        rsync -aH qemu-xen-unstable.git/. qemu-xen-$v-testing.git &
+#        rsync -aH qemu-upstream-unstable.git/. qemu-upstream-$v-testing.git &
+#        cd staging
+#        rsync -aH qemu-xen-unstable.git/. qemu-xen-$v-testing.git &
+#        rsync -aH qemu-upstream-unstable.git/. qemu-upstream-$v-testing.git &
+#        cd /var/xenbits-www/html/git-http
+#        ln -sf /home/xen/git/qemu-xen-$v-testing.git .
+#        ln -sf /home/xen/git/staging/qemu-xen-$v-testing.git staging/.
+#        ln -sf /home/xen/git/qemu-upstream-$v-testing.git .
+#        ln -sf /home/xen/git/staging/qemu-upstream-$v-testing.git staging/.
+
+# make branch in libvirt
+        ssh xen@xenbits.xen.org
+        cd ~/git/libvirt.git/
+	git branch osstest/frozen/xen-$v-testing   xen-tested-master
+
+# make branches in xenbits.xen.org xen.git
+        ssh xen@xenbits.xen.org
+        cd ~/git/xen.git
+	git branch staging-$v staging
+	git branch stable-$v master
+
+## make hg mirror branch(es)
+#	ssh root@xenbits.xen.org
+#	cd ~xen/HG
+#	mkdir {staging/,}xen-$v-testing.hg
+#	chown git2hg:git2hg {staging/,}xen-$v-testing.hg
+# # edit list of repos to mirror - Anthony Perard, or:
+#	ed ~git2hg/update-hg-mirror.sh
+#		/all_xen_version
+
+# update xendocs@xenbits docs generator to generate new stable branch
+#  docs too. commit to git.
+* make 13:37 <ijc> http://xenbits.xen.org/docs/4.2-testing/ is now live true
+#14:17 <ijc> HOWTO: login to xenbits. become "xendocs" . cd cronjobs . edit
+#            xenbits-docs-all.sh in the obvious way. git commit
+	ssh root@xenbits.xen.org
+	su - xendocs
+	cd cronjobs
+	ed xenbits-docs-all.sh
+	/for branch
+	s/$/ 4.6-testing
+	# ^ OR SIMILAR
+	w
+	q
+        git add -p
+	git commit -m "Branch for $v"
+
+### * make symlink on mariner for qemu
+###        cd /var/www/git/
+###        ln -s /usr/groups/xencore/HG/qemu-xen-$v-testing.git .
+
+* make branches etc. in osstest
+        ssh osstest@osstest.test-lab
+	cd testing.git
+	OSSTEST_CONFIG=production-config ./mg-branch-setup xen-$v-testing bisect
+	OSSTEST_CONFIG=production-config ./mg-branch-setup qemu-upstream-$v-testing bisect
+
+* add branch to osstest
+        ie add both eg qemu-upstream-4.2-testing and xen-4.2-testing to BRANCHES in cr-for-branches
+
+* add to patchbot
+        on xenbits
+        cd ~/HG/patchbot/
+
+	cp xen--master.patchbot-reported-heads xen--stable-$v.patchbot-reported-heads
+	cp xen--staging.patchbot-reported-heads xen--staging-$v.patchbot-reported-heads
+        cp qemu-xen--master.patchbot-reported-heads  qemu-xen--stable-$v.patchbot-reported-heads
+        cp qemu-xen--staging.patchbot-reported-heads  qemu-xen--staging-$v.patchbot-reported-heads
+        cp qemu-xen-traditional--master.patchbot-reported-heads qemu-xen-traditional--stable-$v.patchbot-reported-heads
+#        cd staging/
+##      cp xen-unstable.last xen-$v-testing.last
+##      cp xen-unstable.last xen-$v-testing.last
+#        cd ..
+
+        #emacs versions
+	perl -i~ -pe 'next unless m/\b\Q'$ov'\E\b/; $x=$_; $x=~ s/\b\Q'$ov'\E\b/'$v'/g; print $x;' versions
+        git diff
+	git add versions
+	git commit -m "Branch for $v"
+
+#* update xenbits web page
+        ssh root@xenbits.xen.org
+        cd /var/xenbits-www/html
+        emacs index.html
+	# - search for previous version number, and update in each place found
+	# - in general, drop one old release in favour of the new one
+
+Ensure references to qemu trees in xen.git's Config.mk are updated.
+Check this with
+        grep unstable Config.mk 
+which should produce no output.  Replace as necessary.
+
+Update new stable tree's MAINTAINERS to contain correct info for this stable branch
+
+##* update wiki page
+##        http://wiki.xen.org/xenwiki/XenRepositories
+
+###* fix new trees' vcs descriptions
+#* make old trees' descriptions "historical"
+#	cd ~/git
+#	perl -i~ -pe "s/unstable/4.6-testing/" qemu-upstream-$v-testing.git/description
+
+----
+
+* check, even for point releases
+*  http://logs.test-lab.xenproject.org/osstest/results/all-branch-statuses.txt
+
+* check, even for point releases, advisory patch application status (Lars)
+
+* make tag in qemu-iwj.git
+
+##* push qemu tag in /usr/groups/xencore/HG		git-update-server-info
+##* push qemu tag in /usr/groups/xencore/patchman		git-update-server-info
+* push qemu tag in xenbits.xen.org		git-update-server-info
+* push qemu tag in xenbits.xen.org staging	git-update-server-info
+
+s=master
+#b=unstable
+v=$v-rc1
+
+OR
+
+x=4.1
+m=1
+rc=-rc2
+
+r=$x.$m
+s=$x-testing
+#b=$x-testing
+v=$r$rc
+
+t=$r$rc
+OR
+t=RELEASE-$r
+
+# FIRSTLY
+#  - check all XSAs have been applied
+
+# QEMU
+
+  git-checkout $s
+  git-tag -u 'Xen.org Xen tree code signing' -m "Xen $v" xen-$v $s
+
+#  git-push ianj@docr-01:/usr/groups/xencore/HG/qemu-xen-$b.git $s:master xen-$v   # 4.1 and earlier only
+#  git-push latara:/usr/groups/xencore/patchman/qemu-xen-$b.git $s:master xen-$v
+  git-push xenbits.xen.org:/home/xen/git/qemu-xen-traditional.git $s:stable-$x xen-$v
+#  git-push xen@xenbits.xen.org:/home/xen/git/qemu-xen-$b.git $s:master xen-$v
+#  git-push xen@xenbits.xen.org:/home/xen/git/staging/qemu-xen-$b.git $s:master xen-$v
+#  ssh xen@xenbits.xen.org cd /home/xen/git/qemu-xen-$b.git '&&' git update-server-info
+#  ssh xen@xenbits.xen.org cd /home/xen/git/staging/qemu-xen-$b.git '&&' git update-server-info
+
+# consider making tag in minios, and updating xen.git Config.mk
+  git-tag -u 'xen tree' -s -m "Xen $r$rc" xen-$t
+  git push xen@xenbits.xen.org:/home/xen/git/mini-os.git xen-$t
+
+* Also tag upstream qemu tree (Stefano)
+    git tag -u 'xen tree' -s -m "Xen $r$rc" qemu-xen-$r SOMETHING
+    git push osstest@xenbits.xen.org:/home/xen/git/qemu-xen.git qemu-xen-$r
+#    git push xen@xenbits.xen.org:/home/xen/git/qemu-upstream-$b.git qemu-xen-$r
+#    git push xen@xenbits.xen.org:/home/xen/git/staging/qemu-upstream-$b.git qemu-xen-$r
+
+* consider bumping sonames of shlibs
+
+* change xen-unstable README (should say "Xen 4.5" in releases and on stable branches, "Xen 4.5-unstable" on unstable)
+* change xen-unstable Config.mk (QEMU_UPSTREAM_REVISION, QEMU_TRADITIONAL_REVISION, MINIOS_UPSTREAM_REVISION)
+* change xen-unstable xen/Makefile XEN_EXTRAVERSION
+# if main version number has changed (eg 4.7 -> 4.8) rerun ./autogen.sh
+* rerun ./autogen.sh to update version number in configure
+#    - XEN_EXTRAVERSION should be `.0-rc$(XEN_VENDORVERSION)'
+#    - debug ?= n on stable branches
+#    - Kconfig.debug default n on stable branches
+* tag xen-unstable
+
+# In xen.git
+  git-fetch origin
+  git-checkout staging-$x
+  git-pull
+  git-show # should show commit updating version to right version
+  git-tag -u 'xen tree' -s -m "Xen $r$rc" $t
+  git-push origin $t
+##  hg tag <tag_name> ; hg sign -k "Xen tree" <tag_name>
+
+
+
+HANDLING TAG GENERATED BY RELEASE MANAGER
+
+   fetch the tag into my tree
+   make the tarball (RELEASE TARBALL, below)
+   test build (see below)
+   website (see below)
+   merge tag into staging and push to staging
+   maybe force push into master
+   definitely push tag to xenbits
+        git-push origin $t
+
+
+
+RELEASE TARBALL
+
+   for 4.5 and later, use tarball target
+       git checkout $t
+       git clean -xdff
+       # export http_proxy=http://localhost:3128/
+       ./configure
+       make src-tarball-release   # must be used for actual releases
+       make src-tarball           # uses git-describe (best for RCs)
+        # ^find some way to add git-cache-proxy to this (done in ~iwj/.gitconfig)
+       mkdir /volatile/iwj/website-thing/xen.org/oss-xen/release/$v
+       mv dist/xen-$v.tar.gz /volatile/iwj/website-thing/xen.org/oss-xen/release/$v/.
+
+#hg archive -t files /volatile/iwj/d/xen-$v
+
+cd /u/iwj/work/xen.git
+mkdir /volatile/iwj/d/xen-$v
+git archive --format=tar RELEASE-$v |tar Cxf /volatile/iwj/d/xen-$v -
+[OR FOR RCs
+git archive --format=tar $v |tar Cxf /volatile/iwj/d/xen-$v -
+]
+
+cd /volatile/iwj/d/xen-$v/tools/
+mkdir ioemu-qemu-xen   # 4.0, 4.1
+mkdir qemu-xen qemu-xen-traditional  # 4.2+
+
+    cd /u/iwj/work/1/qemu-iwj.git
+    git-archive --format=tar xen-$v |tar Cxf /volatile/iwj/d/xen-$v/tools/ioemu-qemu-xen -   # 4.0, 4.1
+    git-archive --format=tar xen-$v |tar Cxf /volatile/iwj/d/xen-$v/tools/qemu-xen-traditional -   # 4.2+
+
+#    cd /u/iwj/work/1/qemu-upstream-4.2-testing.git # perhaps
+#    cd /u/iwj/work/1/qemu-upstream-4.3-testing.git # perhaps
+#    cd /u/iwj/work/1/qemu-upstream-4.4-testing.git # perhaps
+#    cd /u/iwj/work/1/qemu-upstream-unstable.git # alternatively
+    cd /u/iwj/work/1/qemu-upstream.git # now we have a merged tree
+    git-pull
+    git-archive --format=tar qemu-xen-$v |tar Cxf /volatile/iwj/d/xen-$v/tools/qemu-xen -   # 4.2+
+
+cd ..
+# ONE OF:
+ssh xenbits.xen.org cat /home/xen/release-checklist.patch-4.2 | patch Config.mk
+ssh xenbits.xen.org cat /home/xen/release-checklist.patch-4.1 | patch -p1 Config.mk
+ssh xenbits.xen.org cat /home/xen/release-checklist.patch-4.0 | patch -p1 Config.mk
+
+        # website-thing is cvs -d hg.uk.xensource.com:/usr/groups/sources/cvs/akamai co xen.org
+	cd /volatile/iwj/website-thing/xen.org
+	mkdir oss-xen/release/$v
+
+cd ..
+GZIP=-9v tar zcf /volatile/iwj/website-thing/xen.org/oss-xen/release/$v/xen-$v.tar.gz xen-$v
+
+# test build
+                cd /volatile/iwj/d
+                mkdir build
+                cd build
+                tar zxf /volatile/iwj/website-thing/xen.org/oss-xen/release/$v/xen-$v.tar.gz
+#                rsync -a --delete xen-$v build/
+                cd xen-$v
+                export http_proxy=http://localhost:3128/
+                (make -j4 KERNELS='' && echo ok.) 2>&1 | tee ../log.$v                      # pre 4.2
+                (./configure && make -j4 KERNELS='' && echo ok.) 2>&1 | tee ../log.$v       # post 4.2
+
+# [[ test build amd64 ]]
+
+### check that tarball's .hgtags has the release tag put there by Keir
+##tar zvvxOf /volatile/iwj/website-thing/xen.org/oss-xen/release/$v/xen-$v.tar.gz xen-$v/.hgtags |less
+
+	cvs add -kb oss-xen/release/$v/
+
+        cd oss-xen/release/$v
+        gpg --detach-sign -u 'xen tree' xen-$v.tar.gz
+	cvs add -kb xen-$v.tar.gz
+        cvs add -kb xen-$v.tar.gz.sig
+        cd ../../..
+
+	cvs ci -m $v
+	./upload.sh
+
+        AND (can be done in parallel with ./upload.sh)
+           ssh downloads-cvs@mail.xenproject.org
+	   cd /data/downloads.xenproject.org/xen.org
+	   cvs -q up -d
+	   # should show something like
+	   #   U oss-xen/release/4.8.0-rc2/xen-4.8.0-rc2.tar.gz
+	   #   U oss-xen/release/4.8.0-rc2/xen-4.8.0-rc2.tar.gz.sig
+
+#    cd /volatile/iwj/akamai-xen.org/
+#    cvs -q up
+#    U oss-xen/release/$v/xen-$v.tar.gz
+#    U oss-xen/release/$v/xen-$v.tar.gz.sig
+#    ./upload.sh.~1.3.~
+
+
+update xenbits front page to change references to old stable branch
+ into references to new stable branch
+
+Edit website
+
