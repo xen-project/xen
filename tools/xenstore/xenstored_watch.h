@@ -28,8 +28,6 @@ int do_unwatch(struct connection *conn, struct buffered_data *in);
 void fire_watches(struct connection *conn, void *tmp, const char *name,
 		  bool recurse);
 
-void dump_watches(struct connection *conn);
-
 void conn_delete_all_watches(struct connection *conn);
 
 #endif /* _XENSTORED_WATCH_H */

@@ -365,22 +365,6 @@ static void initialize_fds(int sock, int *p_sock_pollfd_idx,
 	}
 }
 
-/* Is child a subnode of parent, or equal? */
-bool is_child(const char *child, const char *parent)
-{
-	unsigned int len = strlen(parent);
-
-	/* / should really be "" for this algorithm to work, but that's a
-	 * usability nightmare. */
-	if (streq(parent, "/"))
-		return true;
-
-	if (strncmp(child, parent, len) != 0)
-		return false;
-
-	return child[len] == '/' || child[len] == '\0';
-}
-
 /*
  * If it fails, returns NULL and sets errno.
  * Temporary memory allocations will be done with ctx.
@@ -638,6 +622,21 @@ unsigned int get_strings(struct buffered_data *data,
 	return i;
 }
 
+static void send_error(struct connection *conn, int error)
+{
+	unsigned int i;
+
+	for (i = 0; error != xsd_errors[i].errnum; i++) {
+		if (i == ARRAY_SIZE(xsd_errors) - 1) {
+			eprintf("xenstored: error %i untranslatable", error);
+			i = 0; /* EINVAL */
+			break;
+		}
+	}
+	send_reply(conn, XS_ERROR, xsd_errors[i].errstring,
+			  strlen(xsd_errors[i].errstring) + 1);
+}
+
 void send_reply(struct connection *conn, enum xsd_sockmsg_type type,
 		const void *data, unsigned int len)
 {
@@ -673,21 +672,6 @@ void send_reply(struct connection *conn, enum xsd_sockmsg_type type,
 void send_ack(struct connection *conn, enum xsd_sockmsg_type type)
 {
 	send_reply(conn, type, "OK", sizeof("OK"));
-}
-
-void send_error(struct connection *conn, int error)
-{
-	unsigned int i;
-
-	for (i = 0; error != xsd_errors[i].errnum; i++) {
-		if (i == ARRAY_SIZE(xsd_errors) - 1) {
-			eprintf("xenstored: error %i untranslatable", error);
-			i = 0; 	/* EINVAL */
-			break;
-		}
-	}
-	send_reply(conn, XS_ERROR, xsd_errors[i].errstring,
-			  strlen(xsd_errors[i].errstring) + 1);
 }
 
 static bool valid_chars(const char *node)
@@ -759,15 +743,6 @@ char *canonicalize(struct connection *conn, const char *node)
 	if (prefix)
 		return talloc_asprintf(node, "%s/%s", prefix, node);
 	return (char *)node;
-}
-
-bool check_event_node(const char *node)
-{
-	if (!node || !strstarts(node, "@")) {
-		errno = EINVAL;
-		return false;
-	}
-	return true;
 }
 
 static int send_directory(struct connection *conn, struct buffered_data *in)

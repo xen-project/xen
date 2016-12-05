@@ -47,6 +47,33 @@ struct watch
 	char *node;
 };
 
+static bool check_event_node(const char *node)
+{
+	if (!node || !strstarts(node, "@")) {
+		errno = EINVAL;
+		return false;
+	}
+	return true;
+}
+
+/* Is child a subnode of parent, or equal? */
+static bool is_child(const char *child, const char *parent)
+{
+	unsigned int len = strlen(parent);
+
+	/*
+	 * / should really be "" for this algorithm to work, but that's a
+	 * usability nightmare.
+	 */
+	if (streq(parent, "/"))
+		return true;
+
+	if (strncmp(child, parent, len) != 0)
+		return false;
+
+	return child[len] == '/' || child[len] == '\0';
+}
+
 /*
  * Send a watch event.
  * Temporary memory allocations are done with ctx.
