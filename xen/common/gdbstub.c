@@ -44,7 +44,6 @@
 #include <xen/console.h>
 #include <xen/errno.h>
 #include <xen/delay.h>
-#include <xen/init.h>
 #include <asm/byteorder.h>
 
 /* Printk isn't particularly safe just after we've trapped to the
