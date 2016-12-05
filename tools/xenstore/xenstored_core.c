@@ -647,17 +647,20 @@ void send_reply(struct connection *conn, enum xsd_sockmsg_type type,
 		return;
 	}
 
-	/* Message is a child of the connection context for auto-cleanup. */
-	bdata = new_buffer(conn);
-	bdata->buffer = talloc_array(bdata, char, len);
-
-	/* Echo request header in reply unless this is an async watch event. */
+	/* Replies reuse the request buffer, events need a new one. */
 	if (type != XS_WATCH_EVENT) {
-		memcpy(&bdata->hdr.msg, &conn->in->hdr.msg,
-		       sizeof(struct xsd_sockmsg));
+		bdata = conn->in;
+		bdata->inhdr = true;
+		bdata->used = 0;
+		conn->in = NULL;
 	} else {
-		memset(&bdata->hdr.msg, 0, sizeof(struct xsd_sockmsg));
+		/* Message is a child of the connection for auto-cleanup. */
+		bdata = new_buffer(conn);
 	}
+	if (len <= DEFAULT_BUFFER_SIZE)
+		bdata->buffer = bdata->default_buffer;
+	else
+		bdata->buffer = talloc_array(bdata, char, len);
 
 	/* Update relevant header fields and fill in the message body. */
 	bdata->hdr.msg.type = type;
@@ -733,7 +736,7 @@ static char *perms_to_strings(const void *ctx,
 	return strings;
 }
 
-char *canonicalize(struct connection *conn, const char *node)
+char *canonicalize(struct connection *conn, const void *ctx, const char *node)
 {
 	const char *prefix;
 
@@ -741,7 +744,7 @@ char *canonicalize(struct connection *conn, const char *node)
 		return (char *)node;
 	prefix = get_implicit_path(conn);
 	if (prefix)
-		return talloc_asprintf(node, "%s/%s", prefix, node);
+		return talloc_asprintf(ctx, "%s/%s", prefix, node);
 	return (char *)node;
 }
 
@@ -755,7 +758,7 @@ static struct node *get_node_canonicalized(struct connection *conn,
 
 	if (!canonical_name)
 		canonical_name = &tmp_name;
-	*canonical_name = canonicalize(conn, name);
+	*canonical_name = canonicalize(conn, ctx, name);
 	return get_node(conn, ctx, *canonical_name, perm);
 }
 
@@ -865,17 +868,18 @@ static char *basename(const char *name)
 	return strrchr(name, '/') + 1;
 }
 
-static struct node *construct_node(struct connection *conn, const char *name)
+static struct node *construct_node(struct connection *conn, const void *ctx,
+				   const char *name)
 {
 	const char *base;
 	unsigned int baselen;
 	struct node *parent, *node;
-	char *children, *parentname = get_parent(name, name);
+	char *children, *parentname = get_parent(ctx, name);
 
 	/* If parent doesn't exist, create it. */
 	parent = read_node(conn, parentname, parentname);
 	if (!parent)
-		parent = construct_node(conn, parentname);
+		parent = construct_node(conn, ctx, parentname);
 	if (!parent)
 		return NULL;
 
@@ -885,14 +889,14 @@ static struct node *construct_node(struct connection *conn, const char *name)
 	/* Add child to parent. */
 	base = basename(name);
 	baselen = strlen(base) + 1;
-	children = talloc_array(name, char, parent->childlen + baselen);
+	children = talloc_array(ctx, char, parent->childlen + baselen);
 	memcpy(children, parent->children, parent->childlen);
 	memcpy(children + parent->childlen, base, baselen);
 	parent->children = children;
 	parent->childlen += baselen;
 
 	/* Allocate node */
-	node = talloc(name, struct node);
+	node = talloc(ctx, struct node);
 	node->tdb = tdb_context(conn);
 	node->name = talloc_strdup(node, name);
 
@@ -926,13 +930,13 @@ static int destroy_node(void *_node)
 	return 0;
 }
 
-static struct node *create_node(struct connection *conn, 
+static struct node *create_node(struct connection *conn, const void *ctx,
 				const char *name,
 				void *data, unsigned int datalen)
 {
 	struct node *node, *i;
 
-	node = construct_node(conn, name);
+	node = construct_node(conn, ctx, name);
 	if (!node)
 		return NULL;
 
@@ -975,7 +979,8 @@ static int do_write(struct connection *conn, struct buffered_data *in)
 		/* No permissions, invalid input? */
 		if (errno != ENOENT)
 			return errno;
-		node = create_node(conn, name, in->buffer + offset, datalen);
+		node = create_node(conn, in, name, in->buffer + offset,
+				   datalen);
 		if (!node)
 			return errno;
 	} else {
@@ -1004,7 +1009,7 @@ static int do_mkdir(struct connection *conn, struct buffered_data *in)
 		/* No permissions? */
 		if (errno != ENOENT)
 			return errno;
-		node = create_node(conn, name, NULL, 0);
+		node = create_node(conn, in, name, NULL, 0);
 		if (!node)
 			return errno;
 		fire_watches(conn, in, name, false);
@@ -1075,12 +1080,13 @@ static bool delete_child(struct connection *conn,
 }
 
 
-static int _rm(struct connection *conn, struct node *node, const char *name)
+static int _rm(struct connection *conn, const void *ctx, struct node *node,
+	       const char *name)
 {
 	/* Delete from parent first, then if we crash, the worst that can
 	   happen is the child will continue to take up space, but will
 	   otherwise be unreachable. */
-	struct node *parent = read_node(conn, name, get_parent(name, name));
+	struct node *parent = read_node(conn, ctx, get_parent(ctx, name));
 	if (!parent)
 		return EINVAL;
 
@@ -1097,7 +1103,7 @@ static void internal_rm(const char *name)
 	char *tname = talloc_strdup(NULL, name);
 	struct node *node = read_node(NULL, tname, tname);
 	if (node)
-		_rm(NULL, node, tname);
+		_rm(NULL, tname, node, tname);
 	talloc_free(node);
 	talloc_free(tname);
 }
@@ -1128,7 +1134,7 @@ static int do_rm(struct connection *conn, struct buffered_data *in)
 	if (streq(name, "/"))
 		return EINVAL;
 
-	ret = _rm(conn, node, name);
+	ret = _rm(conn, in, node, name);
 	if (ret)
 		return ret;
 
@@ -1301,8 +1307,7 @@ static void consider_message(struct connection *conn)
 
 	process_message(conn, conn->in);
 
-	talloc_free(conn->in);
-	conn->in = new_buffer(conn);
+	assert(conn->in == NULL);
 }
 
 /* Errors in reading or allocating here mean we get out of sync, so we
@@ -1310,7 +1315,15 @@ static void consider_message(struct connection *conn)
 static void handle_input(struct connection *conn)
 {
 	int bytes;
-	struct buffered_data *in = conn->in;
+	struct buffered_data *in;
+
+	if (!conn->in) {
+		conn->in = new_buffer(conn);
+		/* In case of no memory just try it next time again. */
+		if (!conn->in)
+			return;
+	}
+	in = conn->in;
 
 	/* Not finished header yet? */
 	if (in->inhdr) {
@@ -1328,7 +1341,10 @@ static void handle_input(struct connection *conn)
 			goto bad_client;
 		}
 
-		in->buffer = talloc_array(in, char, in->hdr.msg.len);
+		if (in->hdr.msg.len <= DEFAULT_BUFFER_SIZE)
+			in->buffer = in->default_buffer;
+		else
+			in->buffer = talloc_array(in, char, in->hdr.msg.len);
 		if (!in->buffer)
 			goto bad_client;
 		in->used = 0;
@@ -1376,12 +1392,6 @@ struct connection *new_connection(connwritefn_t *write, connreadfn_t *read)
 	INIT_LIST_HEAD(&new->out_list);
 	INIT_LIST_HEAD(&new->watches);
 	INIT_LIST_HEAD(&new->transaction_list);
-
-	new->in = new_buffer(new);
-	if (new->in == NULL) {
-		talloc_free(new);
-		return NULL;
-	}
 
 	list_add_tail(&new->list, &connections);
 	talloc_set_destructor(new, destroy_conn);
@@ -1522,7 +1532,7 @@ static void setup_structure(void)
 
 		if (remove_local) {
 			internal_rm("/local");
-			create_node(NULL, tlocal, NULL, 0);
+			create_node(NULL, NULL, tlocal, NULL, 0);
 
 			check_store();
 		}

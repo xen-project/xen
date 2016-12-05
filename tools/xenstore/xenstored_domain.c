@@ -329,9 +329,7 @@ static void domain_conn_reset(struct domain *domain)
 		talloc_free(out);
 	}
 
-	talloc_free(conn->in->buffer);
-	memset(conn->in, 0, sizeof(*conn->in));
-	conn->in->inhdr = true;
+	talloc_free(conn->in);
 
 	domain->interface->req_cons = domain->interface->req_prod = 0;
 	domain->interface->rsp_cons = domain->interface->rsp_prod = 0;

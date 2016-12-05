@@ -209,8 +209,8 @@ int do_transaction_end(struct connection *conn, struct buffered_data *in)
 	list_del(&trans->list);
 	conn->transaction_started--;
 
-	/* Attach transaction to arg for auto-cleanup */
-	talloc_steal(arg, trans);
+	/* Attach transaction to in for auto-cleanup */
+	talloc_steal(in, trans);
 
 	if (streq(arg, "T")) {
 		/* FIXME: Merge, rather failing on any change. */

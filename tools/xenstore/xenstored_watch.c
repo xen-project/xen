@@ -164,7 +164,7 @@ int do_watch(struct connection *conn, struct buffered_data *in)
 		/* check if valid event */
 	} else {
 		relative = !strstarts(vec[0], "/");
-		vec[0] = canonicalize(conn, vec[0]);
+		vec[0] = canonicalize(conn, in, vec[0]);
 		if (!is_valid_nodename(vec[0]))
 			return EINVAL;
 	}
@@ -209,7 +209,7 @@ int do_unwatch(struct connection *conn, struct buffered_data *in)
 	if (get_strings(in, vec, ARRAY_SIZE(vec)) != ARRAY_SIZE(vec))
 		return EINVAL;
 
-	node = canonicalize(conn, vec[0]);
+	node = canonicalize(conn, in, vec[0]);
 	list_for_each_entry(watch, &conn->watches, list) {
 		if (streq(watch->node, node) && streq(watch->token, vec[1])) {
 			list_del(&watch->list);

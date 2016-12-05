@@ -33,6 +33,9 @@
 #include "list.h"
 #include "tdb.h"
 
+/* DEFAULT_BUFFER_SIZE should be large enough for each errno string. */
+#define DEFAULT_BUFFER_SIZE 16
+
 struct buffered_data
 {
 	struct list_head list;
@@ -50,6 +53,7 @@ struct buffered_data
 
 	/* The actual data. */
 	char *buffer;
+	char default_buffer[DEFAULT_BUFFER_SIZE];
 };
 
 struct connection;
@@ -139,7 +143,7 @@ void send_reply(struct connection *conn, enum xsd_sockmsg_type type,
 void send_ack(struct connection *conn, enum xsd_sockmsg_type type);
 
 /* Canonicalize this path if possible. */
-char *canonicalize(struct connection *conn, const char *node);
+char *canonicalize(struct connection *conn, const void *ctx, const char *node);
 
 /* Get this node, checking we have permissions. */
 struct node *get_node(struct connection *conn,
