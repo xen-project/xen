@@ -1799,14 +1799,9 @@ static int fixup_page_fault(unsigned long addr, struct cpu_user_regs *regs)
     if ( in_irq() || !(regs->eflags & X86_EFLAGS_IF) )
         return 0;
 
-    /* Faults from external-mode guests are handled by shadow/hap */
-    if ( paging_mode_external(d) && guest_mode(regs) )
-    {
-        int ret = paging_fault(addr, regs);
-        if ( ret == EXCRET_fault_fixed )
-            trace_trap_two_addr(TRC_PV_PAGING_FIXUP, regs->eip, addr);
-        return ret;
-    }
+    /* Logdirty mode is the only expected paging mode for PV guests. */
+    if ( paging_mode_enabled(d) )
+        ASSERT(paging_mode_only_log_dirty(d));
 
     if ( !(regs->error_code & PFEC_page_present) &&
           (pagefault_by_memadd(addr, regs)) )
@@ -1838,9 +1833,8 @@ static int fixup_page_fault(unsigned long addr, struct cpu_user_regs *regs)
             return EXCRET_fault_fixed;
     }
 
-    /* For non-external shadowed guests, we fix up both their own 
-     * pagefaults and Xen's, since they share the pagetables. */
-    if ( paging_mode_enabled(d) && !paging_mode_external(d) )
+    /* Logdirty guests call back into the paging code to update shadows. */
+    if ( paging_mode_log_dirty(d) )
     {
         int ret = paging_fault(addr, regs);
         if ( ret == EXCRET_fault_fixed )
