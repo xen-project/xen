@@ -558,15 +558,10 @@ static bool xs_bool(char *reply)
 	return true;
 }
 
-char **xs_directory(struct xs_handle *h, xs_transaction_t t,
-		    const char *path, unsigned int *num)
+static char **xs_directory_common(char *strings, unsigned int len,
+				  unsigned int *num)
 {
-	char *strings, *p, **ret;
-	unsigned int len;
-
-	strings = xs_single(h, t, XS_DIRECTORY, path, &len);
-	if (!strings)
-		return NULL;
+	char *p, **ret;
 
 	/* Count the strings. */
 	*num = xs_count_strings(strings, len);
@@ -584,6 +579,75 @@ char **xs_directory(struct xs_handle *h, xs_transaction_t t,
 	for (p = strings, *num = 0; p < strings + len; p += strlen(p) + 1)
 		ret[(*num)++] = p;
 	return ret;
+}
+
+static char **xs_directory_part(struct xs_handle *h, xs_transaction_t t,
+				const char *path, unsigned int *num)
+{
+	unsigned int off, result_len;
+	char gen[24], offstr[8];
+	struct iovec iovec[2];
+	char *result = NULL, *strings = NULL;
+
+	gen[0] = 0;
+	iovec[0].iov_base = (void *)path;
+	iovec[0].iov_len = strlen(path) + 1;
+
+	for (off = 0;;) {
+		snprintf(offstr, sizeof(offstr), "%u", off);
+		iovec[1].iov_base = (void *)offstr;
+		iovec[1].iov_len = strlen(offstr) + 1;
+		result = xs_talkv(h, t, XS_DIRECTORY_PART, iovec, 2,
+				  &result_len);
+
+		/* If XS_DIRECTORY_PART isn't supported return E2BIG. */
+		if (!result) {
+			if (errno == ENOSYS)
+				errno = E2BIG;
+			return NULL;
+		}
+
+		if (off) {
+			if (strcmp(gen, result)) {
+				free(result);
+				free(strings);
+				strings = NULL;
+				off = 0;
+				continue;
+			}
+		} else
+			strncpy(gen, result, sizeof(gen));
+
+		result_len -= strlen(result) + 1;
+		strings = realloc(strings, off + result_len);
+		memcpy(strings + off, result + strlen(result) + 1, result_len);
+		free(result);
+		off += result_len;
+
+		if (off <= 1 || strings[off - 2] == 0)
+			break;
+	}
+
+	if (off > 1)
+		off--;
+
+	return xs_directory_common(strings, off, num);
+}
+
+char **xs_directory(struct xs_handle *h, xs_transaction_t t,
+		    const char *path, unsigned int *num)
+{
+	char *strings;
+	unsigned int len;
+
+	strings = xs_single(h, t, XS_DIRECTORY, path, &len);
+	if (!strings) {
+		if (errno != E2BIG)
+			return NULL;
+		return xs_directory_part(h, t, path, num);
+	}
+
+	return xs_directory_common(strings, len, num);
 }
 
 /* Get the value of a single file, nul terminated.
