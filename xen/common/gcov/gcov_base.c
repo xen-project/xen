@@ -15,6 +15,8 @@
 
 #include "gcov.h"
 
+#include <xen/init.h>
+
 /*
  * __gcov_init is called by gcc-generated constructor code for each object
  * file compiled with -fprofile-arcs.
