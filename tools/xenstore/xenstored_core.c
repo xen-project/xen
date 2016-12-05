@@ -149,8 +149,10 @@ void trace(const char *fmt, ...)
 	va_start(arglist, fmt);
 	str = talloc_vasprintf(NULL, fmt, arglist);
 	va_end(arglist);
-	dummy = write(tracefd, str, strlen(str));
-	talloc_free(str);
+	if (str) {
+		dummy = write(tracefd, str, strlen(str));
+		talloc_free(str);
+	}
 }
 
 static void trace_io(const struct connection *conn,
@@ -392,7 +394,16 @@ static struct node *read_node(struct connection *conn, const void *ctx,
 	}
 
 	node = talloc(ctx, struct node);
+	if (!node) {
+		errno = ENOMEM;
+		return NULL;
+	}
 	node->name = talloc_strdup(node, name);
+	if (!node->name) {
+		talloc_free(node);
+		errno = ENOMEM;
+		return NULL;
+	}
 	node->parent = NULL;
 	node->tdb = tdb_context(conn);
 	talloc_steal(node, data.dptr);
@@ -490,35 +501,46 @@ static enum xs_perm_type perm_for_conn(struct connection *conn,
  */
 static char *get_parent(const void *ctx, const char *node)
 {
+	char *parent;
 	char *slash = strrchr(node + 1, '/');
-	if (!slash)
-		return talloc_strdup(ctx, "/");
-	return talloc_asprintf(ctx, "%.*s", (int)(slash - node), node);
+
+	parent = slash ? talloc_asprintf(ctx, "%.*s", (int)(slash - node), node)
+		       : talloc_strdup(ctx, "/");
+	if (!parent)
+		errno = ENOMEM;
+
+	return parent;
 }
 
 /*
  * What do parents say?
  * Temporary memory allocations are done with ctx.
  */
-static enum xs_perm_type ask_parents(struct connection *conn, const void *ctx,
-				     const char *name)
+static int ask_parents(struct connection *conn, const void *ctx,
+		       const char *name, enum xs_perm_type *perm)
 {
 	struct node *node;
 
 	do {
 		name = get_parent(ctx, name);
+		if (!name)
+			return errno;
 		node = read_node(conn, ctx, name);
 		if (node)
 			break;
+		if (errno == ENOMEM)
+			return errno;
 	} while (!streq(name, "/"));
 
 	/* No permission at root?  We're in trouble. */
 	if (!node) {
 		corrupt(conn, "No permissions file at root");
-		return XS_PERM_NONE;
+		*perm = XS_PERM_NONE;
+		return 0;
 	}
 
-	return perm_for_conn(conn, node->perms, node->num_perms);
+	*perm = perm_for_conn(conn, node->perms, node->num_perms);
+	return 0;
 }
 
 /*
@@ -532,11 +554,15 @@ static int errno_from_parents(struct connection *conn, const void *ctx,
 			      const char *node, int errnum,
 			      enum xs_perm_type perm)
 {
+	enum xs_perm_type parent_perm = XS_PERM_NONE;
+
 	/* We always tell them about memory failures. */
 	if (errnum == ENOMEM)
 		return errnum;
 
-	if (ask_parents(conn, ctx, node) & perm)
+	if (ask_parents(conn, ctx, node, &parent_perm))
+		return errno;
+	if (parent_perm & perm)
 		return errnum;
 	return EACCES;
 }
@@ -566,7 +592,7 @@ struct node *get_node(struct connection *conn,
 		}
 	}
 	/* Clean up errno if they weren't supposed to know. */
-	if (!node) 
+	if (!node && errno != ENOMEM)
 		errno = errno_from_parents(conn, ctx, name, errno, perm);
 	return node;
 }
@@ -656,11 +682,29 @@ void send_reply(struct connection *conn, enum xsd_sockmsg_type type,
 	} else {
 		/* Message is a child of the connection for auto-cleanup. */
 		bdata = new_buffer(conn);
+
+		/*
+		 * Allocation failure here is unfortunate: we have no way to
+		 * tell anybody about it.
+		 */
+		if (!bdata)
+			return;
 	}
 	if (len <= DEFAULT_BUFFER_SIZE)
 		bdata->buffer = bdata->default_buffer;
 	else
 		bdata->buffer = talloc_array(bdata, char, len);
+	if (!bdata->buffer) {
+		if (type == XS_WATCH_EVENT) {
+			/* Same as above: no way to tell someone. */
+			talloc_free(bdata);
+			return;
+		}
+		/* re-establish request buffer for sending ENOMEM. */
+		conn->in = bdata;
+		send_error(conn, ENOMEM);
+		return;
+	}
 
 	/* Update relevant header fields and fill in the message body. */
 	bdata->hdr.msg.type = type;
@@ -669,6 +713,8 @@ void send_reply(struct connection *conn, enum xsd_sockmsg_type type,
 
 	/* Queue for later transmission. */
 	list_add_tail(&bdata->list, &conn->out_list);
+
+	return;
 }
 
 /* Some routines (write, mkdir, etc) just need a non-error return */
@@ -730,6 +776,8 @@ static char *perms_to_strings(const void *ctx,
 
 		strings = talloc_realloc(ctx, strings, char,
 					 *len + strlen(buffer) + 1);
+		if (!strings)
+			return NULL;
 		strcpy(strings + *len, buffer);
 		*len += strlen(buffer) + 1;
 	}
@@ -875,6 +923,9 @@ static struct node *construct_node(struct connection *conn, const void *ctx,
 	unsigned int baselen;
 	struct node *parent, *node;
 	char *children, *parentname = get_parent(ctx, name);
+
+	if (!parentname)
+		return NULL;
 
 	/* If parent doesn't exist, create it. */
 	parent = read_node(conn, parentname, parentname);
@@ -1023,6 +1074,7 @@ static void delete_node(struct connection *conn, struct node *node,
 			bool changed)
 {
 	unsigned int i;
+	char *name;
 
 	/* Delete self, then delete children.  If we crash, then the worst
 	   that can happen is the children will continue to take up space, but
@@ -1033,17 +1085,18 @@ static void delete_node(struct connection *conn, struct node *node,
 	for (i = 0; i < node->childlen; i += strlen(node->children+i) + 1) {
 		struct node *child;
 
-		child = read_node(conn, node,
-				  talloc_asprintf(node, "%s/%s", node->name,
-						  node->children + i));
+		name = talloc_asprintf(node, "%s/%s", node->name,
+				       node->children + i);
+		child = name ? read_node(conn, node, name) : NULL;
 		if (child) {
 			delete_node(conn, child, false);
 		}
 		else {
-			trace("delete_node: No child '%s/%s' found!\n",
+			trace("delete_node: Error deleting child '%s/%s'!\n",
 			      node->name, node->children + i);
 			/* Skip it, we've already deleted the parent. */
 		}
+		talloc_free(name);
 	}
 }
 
@@ -1086,9 +1139,15 @@ static int _rm(struct connection *conn, const void *ctx, struct node *node,
 	/* Delete from parent first, then if we crash, the worst that can
 	   happen is the child will continue to take up space, but will
 	   otherwise be unreachable. */
-	struct node *parent = read_node(conn, ctx, get_parent(ctx, name));
+	struct node *parent;
+	char *parentname = get_parent(ctx, name);
+
+	if (!parentname)
+		return errno;
+
+	parent = read_node(conn, ctx, parentname);
 	if (!parent)
-		return EINVAL;
+		return (errno == ENOMEM) ? ENOMEM : EINVAL;
 
 	if (!delete_child(conn, parent, basename(name)))
 		return EINVAL;
@@ -1114,19 +1173,24 @@ static int do_rm(struct connection *conn, struct buffered_data *in)
 	struct node *node;
 	int ret;
 	char *name;
+	char *parentname;
 
 	node = get_node_canonicalized(conn, in, onearg(in), &name,
 				      XS_PERM_WRITE);
 	if (!node) {
 		/* Didn't exist already?  Fine, if parent exists. */
 		if (errno == ENOENT) {
-			node = read_node(conn, in, get_parent(in, name));
+			parentname = get_parent(in, name);
+			if (!parentname)
+				return errno;
+			node = read_node(conn, in, parentname);
 			if (node) {
 				send_ack(conn, XS_RM);
 				return 0;
 			}
 			/* Restore errno, just in case. */
-			errno = ENOENT;
+			if (errno != ENOMEM)
+				errno = ENOENT;
 		}
 		return errno;
 	}
@@ -1186,6 +1250,8 @@ static int do_set_perms(struct connection *conn, struct buffered_data *in)
 	num--;
 
 	perms = talloc_array(node, struct xs_permissions, num);
+	if (!perms)
+		return ENOMEM;
 	if (!xs_strings_to_perms(perms, num, permstr))
 		return errno;
 
@@ -1319,7 +1385,7 @@ static void handle_input(struct connection *conn)
 
 	if (!conn->in) {
 		conn->in = new_buffer(conn);
-		/* In case of no memory just try it next time again. */
+		/* In case of no memory just try it again next time. */
 		if (!conn->in)
 			return;
 	}
@@ -1327,26 +1393,29 @@ static void handle_input(struct connection *conn)
 
 	/* Not finished header yet? */
 	if (in->inhdr) {
-		bytes = conn->read(conn, in->hdr.raw + in->used,
-				   sizeof(in->hdr) - in->used);
-		if (bytes < 0)
-			goto bad_client;
-		in->used += bytes;
-		if (in->used != sizeof(in->hdr))
-			return;
+		if (in->used != sizeof(in->hdr)) {
+			bytes = conn->read(conn, in->hdr.raw + in->used,
+					   sizeof(in->hdr) - in->used);
+			if (bytes < 0)
+				goto bad_client;
+			in->used += bytes;
+			if (in->used != sizeof(in->hdr))
+				return;
 
-		if (in->hdr.msg.len > XENSTORE_PAYLOAD_MAX) {
-			syslog(LOG_ERR, "Client tried to feed us %i",
-			       in->hdr.msg.len);
-			goto bad_client;
+			if (in->hdr.msg.len > XENSTORE_PAYLOAD_MAX) {
+				syslog(LOG_ERR, "Client tried to feed us %i",
+				       in->hdr.msg.len);
+				goto bad_client;
+			}
 		}
 
 		if (in->hdr.msg.len <= DEFAULT_BUFFER_SIZE)
 			in->buffer = in->default_buffer;
 		else
 			in->buffer = talloc_array(in, char, in->hdr.msg.len);
+		/* In case of no memory just try it again next time. */
 		if (!in->buffer)
-			goto bad_client;
+			return;
 		in->used = 0;
 		in->inhdr = false;
 	}
@@ -1469,6 +1538,9 @@ static void manual_node(const char *name, const char *child)
 	struct xs_permissions perms = { .id = 0, .perms = XS_PERM_NONE };
 
 	node = talloc_zero(NULL, struct node);
+	if (!node)
+		barf_perror("Could not allocate initial node %s", name);
+
 	node->name = name;
 	node->perms = &perms;
 	node->num_perms = 1;
@@ -1506,6 +1578,8 @@ static void setup_structure(void)
 {
 	char *tdbname;
 	tdbname = talloc_strdup(talloc_autofree_context(), xs_daemon_tdb());
+	if (!tdbname)
+		barf_perror("Could not create tdbname");
 
 	if (!(tdb_flags & TDB_INTERNAL))
 		tdb_ctx = tdb_open_ex(tdbname, 0, tdb_flags, O_RDWR, 0,
@@ -1584,11 +1658,14 @@ static char *child_name(const char *s1, const char *s2)
 }
 
 
-static void remember_string(struct hashtable *hash, const char *str)
+static int remember_string(struct hashtable *hash, const char *str)
 {
 	char *k = malloc(strlen(str) + 1);
+
+	if (!k)
+		return 0;
 	strcpy(k, str);
-	hashtable_insert(hash, k, (void *)1);
+	return hashtable_insert(hash, k, (void *)1);
 }
 
 
@@ -1605,9 +1682,10 @@ static void remember_string(struct hashtable *hash, const char *str)
  * As we go, we record each node in the given reachable hashtable.  These
  * entries will be used later in clean_store.
  */
-static void check_store_(const char *name, struct hashtable *reachable)
+static int check_store_(const char *name, struct hashtable *reachable)
 {
 	struct node *node = read_node(NULL, name, name);
+	int ret = 0;
 
 	if (node) {
 		size_t i = 0;
@@ -1615,14 +1693,24 @@ static void check_store_(const char *name, struct hashtable *reachable)
 		struct hashtable * children =
 			create_hashtable(16, hash_from_key_fn, keys_equal_fn);
 
-		remember_string(reachable, name);
+		if (!remember_string(reachable, name)) {
+			hashtable_destroy(children, 0);
+			log("check_store: ENOMEM");
+			return ENOMEM;
+		}
 
-		while (i < node->childlen) {
+		while (i < node->childlen && !ret) {
+			struct node *childnode;
 			size_t childlen = strlen(node->children + i);
 			char * childname = child_name(node->name,
 						      node->children + i);
-			struct node *childnode = read_node(NULL, childname,
-							   childname);
+
+			if (!childname) {
+				log("check_store: ENOMEM");
+				ret = ENOMEM;
+				break;
+			}
+			childnode = read_node(NULL, childname, childname);
 			
 			if (childnode) {
 				if (hashtable_search(children, childname)) {
@@ -1636,11 +1724,18 @@ static void check_store_(const char *name, struct hashtable *reachable)
 					}
 				}
 				else {
-					remember_string(children, childname);
-					check_store_(childname, reachable);
+					if (!remember_string(children,
+							     childname)) {
+						log("check_store: ENOMEM");
+						talloc_free(childnode);
+						talloc_free(childname);
+						ret = ENOMEM;
+						break;
+					}
+					ret = check_store_(childname,
+							   reachable);
 				}
-			}
-			else {
+			} else if (errno != ENOMEM) {
 				log("check_store: No child '%s' found!\n",
 				    childname);
 
@@ -1648,6 +1743,9 @@ static void check_store_(const char *name, struct hashtable *reachable)
 					remove_child_entry(NULL, node, i);
 					i -= childlen + 1;
 				}
+			} else {
+				log("check_store: ENOMEM");
+				ret = ENOMEM;
 			}
 
 			talloc_free(childnode);
@@ -1658,14 +1756,18 @@ static void check_store_(const char *name, struct hashtable *reachable)
 		hashtable_destroy(children, 0 /* Don't free values (they are
 						 all (void *)1) */);
 		talloc_free(node);
-	}
-	else {
+	} else if (errno != ENOMEM) {
 		/* Impossible, because no database should ever be without the
 		   root, and otherwise, we've just checked in our caller
 		   (which made a recursive call to get here). */
 		   
 		log("check_store: No child '%s' found: impossible!", name);
+	} else {
+		log("check_store: ENOMEM");
+		ret = ENOMEM;
 	}
+
+	return ret;
 }
 
 
@@ -1677,6 +1779,11 @@ static int clean_store_(TDB_CONTEXT *tdb, TDB_DATA key, TDB_DATA val,
 {
 	struct hashtable *reachable = private;
 	char * name = talloc_strndup(NULL, key.dptr, key.dsize);
+
+	if (!name) {
+		log("clean_store: ENOMEM");
+		return 1;
+	}
 
 	if (!hashtable_search(reachable, name)) {
 		log("clean_store: '%s' is orphaned!", name);
@@ -1707,9 +1814,14 @@ static void check_store(void)
 	struct hashtable * reachable =
 		create_hashtable(16, hash_from_key_fn, keys_equal_fn);
  
+	if (!reachable) {
+		log("check_store: ENOMEM");
+		return;
+	}
+
 	log("Checking store ...");
-	check_store_(root, reachable);
-	clean_store(reachable);
+	if (!check_store_(root, reachable))
+		clean_store(reachable);
 	log("Checking store complete.");
 
 	hashtable_destroy(reachable, 0 /* Don't free values (they are all
@@ -1763,10 +1875,14 @@ static void init_sockets(int **psock, int **pro_sock)
 
 	/* Create sockets for them to listen to. */
 	*psock = sock = talloc(talloc_autofree_context(), int);
+	if (!sock)
+		barf_perror("No memory when creating sockets");
 	*sock = socket(PF_UNIX, SOCK_STREAM, 0);
 	if (*sock < 0)
 		barf_perror("Could not create socket");
 	*pro_sock = ro_sock = talloc(talloc_autofree_context(), int);
+	if (!ro_sock)
+		barf_perror("No memory when creating sockets");
 	*ro_sock = socket(PF_UNIX, SOCK_STREAM, 0);
 	if (*ro_sock < 0)
 		barf_perror("Could not create socket");

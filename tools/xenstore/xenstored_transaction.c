@@ -119,7 +119,18 @@ void add_change_node(struct connection *conn, struct node *node, bool recurse)
 	}
 
 	i = talloc(trans, struct changed_node);
+	if (!i) {
+		/* All we can do is let the transaction fail. */
+		generation++;
+		return;
+	}
 	i->node = talloc_strdup(i, node->name);
+	if (!i->node) {
+		/* All we can do is let the transaction fail. */
+		generation++;
+		talloc_free(i);
+		return;
+	}
 	i->recurse = recurse;
 	list_add_tail(&i->list, &trans->changes);
 }
@@ -163,11 +174,16 @@ int do_transaction_start(struct connection *conn, struct buffered_data *in)
 
 	/* Attach transaction to input for autofree until it's complete */
 	trans = talloc_zero(in, struct transaction);
+	if (!trans)
+		return ENOMEM;
+
 	INIT_LIST_HEAD(&trans->changes);
 	INIT_LIST_HEAD(&trans->changed_domains);
 	trans->generation = generation;
 	trans->tdb_name = talloc_asprintf(trans, "%s.%p",
 					  xs_daemon_tdb(), trans);
+	if (!trans->tdb_name)
+		return ENOMEM;
 	trans->tdb = tdb_copy(tdb_context(conn), trans->tdb_name);
 	if (!trans->tdb)
 		return errno;
@@ -246,6 +262,11 @@ void transaction_entry_inc(struct transaction *trans, unsigned int domid)
 		}
 
 	d = talloc(trans, struct changed_domain);
+	if (!d) {
+		/* Let the transaction fail. */
+		generation++;
+		return;
+	}
 	d->domid = domid;
 	d->nbentry = 1;
 	list_add_tail(&d->list, &trans->changed_domains);
@@ -262,6 +283,11 @@ void transaction_entry_dec(struct transaction *trans, unsigned int domid)
 		}
 
 	d = talloc(trans, struct changed_domain);
+	if (!d) {
+		/* Let the transaction fail. */
+		generation++;
+		return;
+	}
 	d->domid = domid;
 	d->nbentry = -1;
 	list_add_tail(&d->list, &trans->changed_domains);

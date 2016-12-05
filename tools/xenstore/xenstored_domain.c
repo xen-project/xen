@@ -279,10 +279,15 @@ static struct domain *new_domain(void *context, unsigned int domid,
 	int rc;
 
 	domain = talloc(context, struct domain);
+	if (!domain)
+		return NULL;
+
 	domain->port = 0;
 	domain->shutdown = 0;
 	domain->domid = domid;
 	domain->path = talloc_domain_path(domain, domid);
+	if (!domain->path)
+		return NULL;
 
 	list_add(&domain->list, &domains);
 	talloc_set_destructor(domain, destroy_domain);
@@ -294,6 +299,9 @@ static struct domain *new_domain(void *context, unsigned int domid,
 	domain->port = rc;
 
 	domain->conn = new_connection(writechn, readchn);
+	if (!domain->conn)
+		return NULL;
+
 	domain->conn->domain = domain;
 	domain->conn->id = domid;
 
@@ -498,6 +506,8 @@ int do_get_domain_path(struct connection *conn, struct buffered_data *in)
 		return EINVAL;
 
 	path = talloc_domain_path(conn, atoi(domid_str));
+	if (!path)
+		return errno;
 
 	send_reply(conn, XS_GET_DOMAIN_PATH, path, strlen(path) + 1);
 

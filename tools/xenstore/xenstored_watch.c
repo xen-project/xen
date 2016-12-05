@@ -111,6 +111,8 @@ static void add_event(struct connection *conn,
 
 	len = strlen(name) + 1 + strlen(watch->token) + 1;
 	data = talloc_array(ctx, char, len);
+	if (!data)
+		return;
 	strcpy(data, name);
 	strcpy(data + strlen(name) + 1, watch->token);
 	send_reply(conn, XS_WATCH_EVENT, data, len);
@@ -165,6 +167,8 @@ int do_watch(struct connection *conn, struct buffered_data *in)
 	} else {
 		relative = !strstarts(vec[0], "/");
 		vec[0] = canonicalize(conn, in, vec[0]);
+		if (!vec[0])
+			return ENOMEM;
 		if (!is_valid_nodename(vec[0]))
 			return EINVAL;
 	}
@@ -180,8 +184,14 @@ int do_watch(struct connection *conn, struct buffered_data *in)
 		return E2BIG;
 
 	watch = talloc(conn, struct watch);
+	if (!watch)
+		return ENOMEM;
 	watch->node = talloc_strdup(watch, vec[0]);
 	watch->token = talloc_strdup(watch, vec[1]);
+	if (!watch->node || !watch->token) {
+		talloc_free(watch);
+		return ENOMEM;
+	}
 	if (relative)
 		watch->relative_path = get_implicit_path(conn);
 	else
@@ -210,6 +220,8 @@ int do_unwatch(struct connection *conn, struct buffered_data *in)
 		return EINVAL;
 
 	node = canonicalize(conn, in, vec[0]);
+	if (!node)
+		return ENOMEM;
 	list_for_each_entry(watch, &conn->watches, list) {
 		if (streq(watch->node, node) && streq(watch->token, vec[1])) {
 			list_del(&watch->list);
