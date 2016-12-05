@@ -4,7 +4,7 @@ $CC --version
 
 # random config or default config
 if [[ "${RANDCONFIG}" == "y" ]]; then
-    make -C xen randconfig
+    make -C xen KCONFIG_ALLCONFIG=tools/kconfig/allrandom.config randconfig
 else
     make -C xen defconfig
 fi
