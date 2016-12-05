@@ -68,7 +68,10 @@ struct transaction
 	uint32_t id;
 
 	/* Generation when transaction started. */
-	unsigned int generation;
+	uint64_t generation;
+
+	/* Transaction internal generation. */
+	uint64_t trans_gen;
 
 	/* TDB to work on, and filename */
 	TDB_CONTEXT *tdb;
@@ -82,7 +85,7 @@ struct transaction
 };
 
 extern int quota_max_transaction;
-static unsigned int generation;
+static uint64_t generation;
 
 /* Return tdb context to use for this connection. */
 TDB_CONTEXT *tdb_transaction_context(struct transaction *trans)
@@ -99,11 +102,13 @@ void add_change_node(struct connection *conn, struct node *node, bool recurse)
 
 	if (!conn || !conn->transaction) {
 		/* They're changing the global database. */
-		generation++;
+		node->generation = generation++;
 		return;
 	}
 
 	trans = conn->transaction;
+
+	node->generation = generation + trans->trans_gen++;
 
 	list_for_each_entry(i, &trans->changes, list) {
 		if (streq(i->node, node->name)) {
@@ -161,7 +166,7 @@ void do_transaction_start(struct connection *conn, struct buffered_data *in)
 	}
 
 	/* Attach transaction to input for autofree until it's complete */
-	trans = talloc(in, struct transaction);
+	trans = talloc_zero(in, struct transaction);
 	INIT_LIST_HEAD(&trans->changes);
 	INIT_LIST_HEAD(&trans->changed_domains);
 	trans->generation = generation;
@@ -235,7 +240,7 @@ void do_transaction_end(struct connection *conn, struct buffered_data *in)
 		/* Fire off the watches for everything that changed. */
 		list_for_each_entry(i, &trans->changes, list)
 			fire_watches(conn, in, i->node, i->recurse);
-		generation++;
+		generation += trans->trans_gen;
 	}
 	send_ack(conn, XS_TRANSACTION_END);
 }

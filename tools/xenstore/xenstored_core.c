@@ -442,6 +442,7 @@ static struct node *read_node(struct connection *conn, const void *ctx,
 
 	/* Datalen, childlen, number of permissions */
 	hdr = (void *)data.dptr;
+	node->generation = hdr->generation;
 	node->num_perms = hdr->num_perms;
 	node->datalen = hdr->datalen;
 	node->childlen = hdr->childlen;
@@ -481,6 +482,7 @@ static bool write_node(struct connection *conn, struct node *node)
 
 	data.dptr = talloc_size(node, data.dsize);
 	hdr = (void *)data.dptr;
+	hdr->generation = node->generation;
 	hdr->num_perms = node->num_perms;
 	hdr->datalen = node->datalen;
 	hdr->childlen = node->childlen;

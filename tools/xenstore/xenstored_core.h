@@ -109,6 +109,9 @@ struct node {
 	/* Parent (optional) */
 	struct node *parent;
 
+	/* Generation count. */
+	uint64_t generation;
+
 	/* Permissions. */
 	unsigned int num_perms;
 	struct xs_permissions *perms;
