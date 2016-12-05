@@ -52,6 +52,8 @@ enum xsd_sockmsg_type
     XS_RESET_WATCHES,
     XS_DIRECTORY_PART,
 
+    XS_TYPE_COUNT,      /* Number of valid types. */
+
     XS_INVALID = 0xffff /* Guaranteed to remain an invalid type */
 };
 

@@ -86,6 +86,7 @@ static bool trigger_talloc_report = false;
 
 static void corrupt(struct connection *conn, const char *fmt, ...);
 static void check_store(void);
+static const char *sockmsg_string(enum xsd_sockmsg_type type);
 
 #define log(...)							\
 	do {								\
@@ -122,36 +123,6 @@ bool replace_tdb(const char *newname, TDB_CONTEXT *newtdb)
 	tdb_close(tdb_ctx);
 	tdb_ctx = talloc_steal(talloc_autofree_context(), newtdb);
 	return true;
-}
-
-static char *sockmsg_string(enum xsd_sockmsg_type type)
-{
-	switch (type) {
-	case XS_DEBUG: return "DEBUG";
-	case XS_DIRECTORY: return "DIRECTORY";
-	case XS_READ: return "READ";
-	case XS_GET_PERMS: return "GET_PERMS";
-	case XS_WATCH: return "WATCH";
-	case XS_UNWATCH: return "UNWATCH";
-	case XS_TRANSACTION_START: return "TRANSACTION_START";
-	case XS_TRANSACTION_END: return "TRANSACTION_END";
-	case XS_INTRODUCE: return "INTRODUCE";
-	case XS_RELEASE: return "RELEASE";
-	case XS_GET_DOMAIN_PATH: return "GET_DOMAIN_PATH";
-	case XS_WRITE: return "WRITE";
-	case XS_MKDIR: return "MKDIR";
-	case XS_RM: return "RM";
-	case XS_SET_PERMS: return "SET_PERMS";
-	case XS_WATCH_EVENT: return "WATCH_EVENT";
-	case XS_ERROR: return "ERROR";
-	case XS_IS_DOMAIN_INTRODUCED: return "XS_IS_DOMAIN_INTRODUCED";
-	case XS_RESUME: return "RESUME";
-	case XS_SET_TARGET: return "SET_TARGET";
-	case XS_RESET_WATCHES: return "RESET_WATCHES";
-	case XS_DIRECTORY_PART: return "DIRECTORY_PART";
-	default:
-		return "**UNKNOWN**";
-	}
 }
 
 void trace(const char *fmt, ...)
@@ -1304,12 +1275,51 @@ static void do_debug(struct connection *conn, struct buffered_data *in)
 	send_ack(conn, XS_DEBUG);
 }
 
+static struct {
+	const char *str;
+	void (*func)(struct connection *conn, struct buffered_data *in);
+} const wire_funcs[XS_TYPE_COUNT] = {
+	[XS_DEBUG]             = { "DEBUG",             do_debug },
+	[XS_DIRECTORY]         = { "DIRECTORY",         send_directory },
+	[XS_READ]              = { "READ",              do_read },
+	[XS_GET_PERMS]         = { "GET_PERMS",         do_get_perms },
+	[XS_WATCH]             = { "WATCH",             do_watch },
+	[XS_UNWATCH]           = { "UNWATCH",           do_unwatch },
+	[XS_TRANSACTION_START] = { "TRANSACTION_START", do_transaction_start },
+	[XS_TRANSACTION_END]   = { "TRANSACTION_END",   do_transaction_end },
+	[XS_INTRODUCE]         = { "INTRODUCE",         do_introduce },
+	[XS_RELEASE]           = { "RELEASE",           do_release },
+	[XS_GET_DOMAIN_PATH]   = { "GET_DOMAIN_PATH",   do_get_domain_path },
+	[XS_WRITE]             = { "WRITE",             do_write },
+	[XS_MKDIR]             = { "MKDIR",             do_mkdir },
+	[XS_RM]                = { "RM",                do_rm },
+	[XS_SET_PERMS]         = { "SET_PERMS",         do_set_perms },
+	[XS_WATCH_EVENT]       = { "WATCH_EVENT",       NULL },
+	[XS_ERROR]             = { "ERROR",             NULL },
+	[XS_IS_DOMAIN_INTRODUCED] =
+			{ "IS_DOMAIN_INTRODUCED", do_is_domain_introduced },
+	[XS_RESUME]            = { "RESUME",            do_resume },
+	[XS_SET_TARGET]        = { "SET_TARGET",        do_set_target },
+	[XS_RESTRICT]          = { "RESTRICT",          NULL },
+	[XS_RESET_WATCHES]     = { "RESET_WATCHES",     do_reset_watches },
+	[XS_DIRECTORY_PART]    = { "DIRECTORY_PART",    send_directory_part },
+};
+
+static const char *sockmsg_string(enum xsd_sockmsg_type type)
+{
+	if ((unsigned)type < XS_TYPE_COUNT && wire_funcs[type].str)
+		return wire_funcs[type].str;
+
+	return "**UNKNOWN**";
+}
+
 /* Process "in" for conn: "in" will vanish after this conversation, so
  * we can talloc off it for temporary variables.  May free "conn".
  */
 static void process_message(struct connection *conn, struct buffered_data *in)
 {
 	struct transaction *trans;
+	enum xsd_sockmsg_type type = in->hdr.msg.type;
 
 	trans = transaction_lookup(conn, in->hdr.msg.tx_id);
 	if (IS_ERR(trans)) {
@@ -1320,91 +1330,11 @@ static void process_message(struct connection *conn, struct buffered_data *in)
 	assert(conn->transaction == NULL);
 	conn->transaction = trans;
 
-	switch (in->hdr.msg.type) {
-	case XS_DIRECTORY:
-		send_directory(conn, in);
-		break;
-
-	case XS_READ:
-		do_read(conn, in);
-		break;
-
-	case XS_WRITE:
-		do_write(conn, in);
-		break;
-
-	case XS_MKDIR:
-		do_mkdir(conn, in);
-		break;
-
-	case XS_RM:
-		do_rm(conn, in);
-		break;
-
-	case XS_GET_PERMS:
-		do_get_perms(conn, in);
-		break;
-
-	case XS_SET_PERMS:
-		do_set_perms(conn, in);
-		break;
-
-	case XS_DEBUG:
-		do_debug(conn, in);
-		break;
-
-	case XS_WATCH:
-		do_watch(conn, in);
-		break;
-
-	case XS_UNWATCH:
-		do_unwatch(conn, in);
-		break;
-
-	case XS_TRANSACTION_START:
-		do_transaction_start(conn, in);
-		break;
-
-	case XS_TRANSACTION_END:
-		do_transaction_end(conn, in);
-		break;
-
-	case XS_INTRODUCE:
-		do_introduce(conn, in);
-		break;
-
-	case XS_IS_DOMAIN_INTRODUCED:
-		do_is_domain_introduced(conn, in);
-		break;
-
-	case XS_RELEASE:
-		do_release(conn, in);
-		break;
-
-	case XS_GET_DOMAIN_PATH:
-		do_get_domain_path(conn, in);
-		break;
-
-	case XS_RESUME:
-		do_resume(conn, in);
-		break;
-
-	case XS_SET_TARGET:
-		do_set_target(conn, in);
-		break;
-
-	case XS_RESET_WATCHES:
-		do_reset_watches(conn, in);
-		break;
-
-	case XS_DIRECTORY_PART:
-		send_directory_part(conn, in);
-		break;
-
-	default:
-		eprintf("Client unknown operation %i", in->hdr.msg.type);
+	if ((unsigned)type < XS_TYPE_COUNT && wire_funcs[type].func)
+		wire_funcs[type].func(conn, in);
+	else {
+		eprintf("Client unknown operation %i", type);
 		send_error(conn, ENOSYS);
-		break;
 	}
 
 	conn->transaction = NULL;
