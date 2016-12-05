@@ -321,11 +321,11 @@ gw_remove_write_accesses(struct vcpu *v, unsigned long va, walk_t *gw)
     return rc;
 }
 
-#if SHADOW_AUDIT & SHADOW_AUDIT_ENTRIES
 /* Lightweight audit: pass all the shadows associated with this guest walk
  * through the audit mechanisms */
-static void sh_audit_gw(struct vcpu *v, walk_t *gw)
+static void sh_audit_gw(struct vcpu *v, const walk_t *gw)
 {
+#if SHADOW_AUDIT & SHADOW_AUDIT_ENTRIES
     struct domain *d = v->domain;
     mfn_t smfn;
 
@@ -362,12 +362,8 @@ static void sh_audit_gw(struct vcpu *v, walk_t *gw)
               && mfn_valid(
               (smfn = get_fl1_shadow_status(d, guest_l2e_get_gfn(gw->l2e)))) )
         (void) sh_audit_fl1_table(v, smfn, INVALID_MFN);
+#endif /* SHADOW_AUDIT & SHADOW_AUDIT_ENTRIES */
 }
-
-#else
-#define sh_audit_gw(_v, _gw) do {} while(0)
-#endif /* audit code */
-
 
 /*
  * Write a new value into the guest pagetable, and update the shadows
@@ -3309,7 +3305,7 @@ static int sh_page_fault(struct vcpu *v,
                 }
             }
 #else /* 32 or 64 */
-            used = (mfn_x(pagetable_get_mfn(tmp->arch.guest_table)) == mfn_x(gmfn));
+            used = mfn_eq(pagetable_get_mfn(tmp->arch.guest_table), gmfn);
 #endif
             if ( used )
                 break;
