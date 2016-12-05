@@ -2293,6 +2293,20 @@ static void do_sysreg(struct cpu_user_regs *regs,
         return inject_undef64_exception(regs, hsr.len);
 
     /*
+     *  ICC_SRE_EL2.Enable = 0
+     *
+     *  GIC Architecture Specification (IHI 0069C): Section 8.1.9
+     */
+    case HSR_SYSREG_ICC_SRE_EL1:
+        /*
+         * Trapped when the guest is using GICv2 whilst the platform
+         * interrupt controller is GICv3. In this case, the register
+         * should be emulate as RAZ/WI to tell the guest to use the GIC
+         * memory mapped interface (i.e GICv2 compatibility).
+         */
+        return handle_raz_wi(regs, regidx, hsr.sysreg.read, hsr, 1);
+
+    /*
      * HCR_EL2.TIDCP
      *
      * ARMv8 (DDI 0487A.d): D1-1501 Table D1-43
