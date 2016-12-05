@@ -846,19 +846,24 @@ void paging_final_teardown(struct domain *d)
  * creation. */
 int paging_enable(struct domain *d, u32 mode)
 {
-    switch ( mode & (PG_external | PG_translate) )
+    /* Unrecognised paging mode? */
+    if ( mode & ~PG_MASK )
+        return -EINVAL;
+
+    /* All of external|translate|refcounts, or none. */
+    switch ( mode & (PG_external | PG_translate | PG_refcounts) )
     {
     case 0:
-    case PG_external | PG_translate:
+    case PG_external | PG_translate | PG_refcounts:
         break;
     default:
         return -EINVAL;
     }
 
     if ( hap_enabled(d) )
-        return hap_enable(d, mode | PG_HAP_enable);
+        return hap_enable(d, mode);
     else
-        return shadow_enable(d, mode | PG_SH_enable);
+        return shadow_enable(d, mode);
 }
 
 /* Called from the guest to indicate that a process is being torn down

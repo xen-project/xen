@@ -3144,8 +3144,7 @@ int shadow_enable(struct domain *d, u32 mode)
     domain_pause(d);
 
     /* Sanity check the arguments */
-    if ( shadow_mode_enabled(d) ||
-         ((mode & PG_translate) && !(mode & PG_refcounts)) )
+    if ( shadow_mode_enabled(d) )
     {
         rv = -EINVAL;
         goto out_unlocked;

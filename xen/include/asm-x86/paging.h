@@ -57,6 +57,9 @@
  * requires VT or similar mechanisms */
 #define PG_external    (XEN_DOMCTL_SHADOW_ENABLE_EXTERNAL << PG_mode_shift)
 
+/* All paging modes. */
+#define PG_MASK (PG_refcounts | PG_log_dirty | PG_translate | PG_external)
+
 #define paging_mode_enabled(_d)   (!!(_d)->arch.paging.mode)
 #define paging_mode_shadow(_d)    (!!((_d)->arch.paging.mode & PG_SH_enable))
 #define paging_mode_hap(_d)       (!!((_d)->arch.paging.mode & PG_HAP_enable))
