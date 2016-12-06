@@ -481,20 +481,17 @@ int route_irq_to_guest(struct domain *d, unsigned int virq,
         {
             struct domain *ad = irq_get_domain(desc);
 
-            if ( d == ad )
-            {
-                if ( irq_get_guest_info(desc)->virq != virq )
-                {
-                    printk(XENLOG_G_ERR
-                           "d%u: IRQ %u is already assigned to vIRQ %u\n",
-                           d->domain_id, irq, irq_get_guest_info(desc)->virq);
-                    retval = -EBUSY;
-                }
-            }
-            else
+            if ( d != ad )
             {
                 printk(XENLOG_G_ERR "IRQ %u is already used by domain %u\n",
                        irq, ad->domain_id);
+                retval = -EBUSY;
+            }
+            else if ( irq_get_guest_info(desc)->virq != virq )
+            {
+                printk(XENLOG_G_ERR
+                       "d%u: IRQ %u is already assigned to vIRQ %u\n",
+                       d->domain_id, irq, irq_get_guest_info(desc)->virq);
                 retval = -EBUSY;
             }
         }
