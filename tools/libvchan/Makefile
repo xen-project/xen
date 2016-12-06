@@ -14,7 +14,7 @@ LIBVCHAN_LIBS = $(LDLIBS_libxenstore) $(LDLIBS_libxengnttab) $(LDLIBS_libxengnts
 $(LIBVCHAN_OBJS) $(LIBVCHAN_PIC_OBJS): CFLAGS += $(CFLAGS_libxenstore) $(CFLAGS_libxengnttab) $(CFLAGS_libxengntshr) $(CFLAGS_libxenevtchn)
 $(NODE_OBJS) $(NODE2_OBJS): CFLAGS += $(CFLAGS_libxengnttab) $(CFLAGS_libxengntshr) $(CFLAGS_libxenevtchn)
 
-MAJOR = 4.8
+MAJOR = 4.9
 MINOR = 0
 
 CFLAGS += -I../include -I.
