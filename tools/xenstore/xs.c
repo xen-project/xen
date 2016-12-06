@@ -589,7 +589,7 @@ static char **xs_directory_part(struct xs_handle *h, xs_transaction_t t,
 	struct iovec iovec[2];
 	char *result = NULL, *strings = NULL;
 
-	gen[0] = 0;
+	memset(gen, 0, sizeof(gen));
 	iovec[0].iov_base = (void *)path;
 	iovec[0].iov_len = strlen(path) + 1;
 
@@ -616,7 +616,7 @@ static char **xs_directory_part(struct xs_handle *h, xs_transaction_t t,
 				continue;
 			}
 		} else
-			strncpy(gen, result, sizeof(gen));
+			strncpy(gen, result, sizeof(gen) - 1);
 
 		result_len -= strlen(result) + 1;
 		strings = realloc(strings, off + result_len);
