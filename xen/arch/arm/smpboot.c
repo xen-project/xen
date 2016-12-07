@@ -307,11 +307,14 @@ void start_secondary(unsigned long boot_phys_offset,
 
     /* Run local notifiers */
     notify_cpu_starting(cpuid);
+    /*
+     * Ensure that previous writes are visible before marking the cpu as
+     * online.
+     */
     smp_wmb();
 
     /* Now report this CPU is up */
     cpumask_set_cpu(cpuid, &cpu_online_map);
-    smp_wmb();
 
     local_irq_enable();
     local_abort_enable();
@@ -408,6 +411,11 @@ int __cpu_up(unsigned int cpu)
         cpu_relax();
         process_pending_softirqs();
     }
+    /*
+     * Ensure that other cpus' initializations are visible before
+     * proceeding. Corresponds to smp_wmb() in start_secondary.
+     */
+    smp_rmb();
 
     /*
      * Nuke start of day info before checking one last time if the CPU
