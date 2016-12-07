@@ -80,6 +80,9 @@ static void __init set_reboot_type(char *str)
             break;
         str++;
     }
+
+    if ( reboot_type == BOOT_EFI && !efi_enabled(EFI_RS) )
+        reboot_type = BOOT_INVALID;
 }
 custom_param("reboot", set_reboot_type);
 
