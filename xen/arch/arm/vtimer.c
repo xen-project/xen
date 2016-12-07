@@ -252,49 +252,28 @@ static bool vtimer_cntp_cval(struct cpu_user_regs *regs, uint64_t *r,
 static bool vtimer_emulate_cp32(struct cpu_user_regs *regs, union hsr hsr)
 {
     struct hsr_cp32 cp32 = hsr.cp32;
-    /*
-     * Initialize to zero to avoid leaking data if there is an
-     * implementation error in the emulation (such as not correctly
-     * setting r).
-     */
-    uint32_t r = 0;
-    bool res;
-
 
     if ( cp32.read )
         perfc_incr(vtimer_cp32_reads);
     else
         perfc_incr(vtimer_cp32_writes);
 
-    if ( !cp32.read )
-        r = get_user_reg(regs, cp32.reg);
-
     switch ( hsr.bits & HSR_CP32_REGS_MASK )
     {
     case HSR_CPREG32(CNTP_CTL):
-        res = vtimer_cntp_ctl(regs, &r, cp32.read);
-        break;
+        return vreg_emulate_cp32(regs, hsr, vtimer_cntp_ctl);
 
     case HSR_CPREG32(CNTP_TVAL):
-        res = vtimer_cntp_tval(regs, &r, cp32.read);
-        break;
+        return vreg_emulate_cp32(regs, hsr, vtimer_cntp_tval);
 
     default:
         return false;
     }
-
-    if ( res && cp32.read )
-        set_user_reg(regs, cp32.reg, r);
-
-    return res;
 }
 
 static bool vtimer_emulate_cp64(struct cpu_user_regs *regs, union hsr hsr)
 {
     struct hsr_cp64 cp64 = hsr.cp64;
-    uint32_t r1 = get_user_reg(regs, cp64.reg1);
-    uint32_t r2 = get_user_reg(regs, cp64.reg2);
-    uint64_t x = (uint64_t)r1 | ((uint64_t)r2 << 32);
 
     if ( cp64.read )
         perfc_incr(vtimer_cp64_reads);
@@ -304,21 +283,11 @@ static bool vtimer_emulate_cp64(struct cpu_user_regs *regs, union hsr hsr)
     switch ( hsr.bits & HSR_CP64_REGS_MASK )
     {
     case HSR_CPREG64(CNTP_CVAL):
-        if ( !vtimer_cntp_cval(regs, &x, cp64.read) )
-            return false;
-        break;
+        return vreg_emulate_cp64(regs, hsr, vtimer_cntp_cval);
 
     default:
         return false;
     }
-
-    if ( cp64.read )
-    {
-        set_user_reg(regs, cp64.reg1, x & 0xffffffff);
-        set_user_reg(regs, cp64.reg2, x >> 32);
-    }
-
-    return true;
 }
 
 #ifdef CONFIG_ARM_64
