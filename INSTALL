@@ -280,9 +280,6 @@ This option is enabled by default if XSM is enabled and the compiler
 using the environment variable.
 CHECKPOLICY=
 
-Do a build for coverage.
-coverage=y
-
 Use clang instead of GCC.
 clang=y
 
