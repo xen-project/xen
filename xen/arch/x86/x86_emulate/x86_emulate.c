@@ -1770,7 +1770,6 @@ struct x86_emulate_state {
     opcode_desc_t desc;
     union vex vex;
     union evex evex;
-    int override_seg;
 
     /*
      * Data operand effective address (usually computed from ModRM).
@@ -1806,7 +1805,6 @@ struct x86_emulate_state {
 #define lock_prefix (state->lock_prefix)
 #define vex (state->vex)
 #define evex (state->evex)
-#define override_seg (state->override_seg)
 #define ea (state->ea)
 
 static int
@@ -1835,6 +1833,7 @@ x86_decode_onebyte(
     case 0xa0: case 0xa1: /* mov mem.offs,{%al,%ax,%eax,%rax} */
     case 0xa2: case 0xa3: /* mov {%al,%ax,%eax,%rax},mem.offs */
         /* Source EA is not encoded via ModRM. */
+        ea.type = OP_MEM;
         ea.mem.off = insn_fetch_bytes(ad_bytes);
         break;
 
@@ -1925,11 +1924,11 @@ x86_decode(
 {
     uint8_t b, d, sib, sib_index, sib_base;
     unsigned int def_op_bytes, def_ad_bytes, opcode;
+    enum x86_segment override_seg = x86_seg_none;
     int rc = X86EMUL_OKAY;
 
     memset(state, 0, sizeof(*state));
-    override_seg = -1;
-    ea.type = OP_MEM;
+    ea.type = OP_NONE;
     ea.mem.seg = x86_seg_ds;
     ea.reg = PTR_POISON;
     state->regs = ctxt->regs;
@@ -2245,6 +2244,7 @@ x86_decode(
         else if ( ad_bytes == 2 )
         {
             /* 16-bit ModR/M decode. */
+            ea.type = OP_MEM;
             switch ( modrm_rm )
             {
             case 0:
@@ -2295,6 +2295,7 @@ x86_decode(
         else
         {
             /* 32/64-bit ModR/M decode. */
+            ea.type = OP_MEM;
             if ( modrm_rm == 4 )
             {
                 sib = insn_fetch_type(uint8_t);
@@ -2359,7 +2360,7 @@ x86_decode(
         }
     }
 
-    if ( override_seg != -1 && ea.type == OP_MEM )
+    if ( override_seg != x86_seg_none )
         ea.mem.seg = override_seg;
 
     /* Fetch the immediate operand, if present. */
@@ -4439,13 +4440,11 @@ x86_emulate(
             generate_exception_if(limit < sizeof(long) ||
                                   (limit & (limit - 1)), EXC_UD);
             base &= ~(limit - 1);
-            if ( override_seg == -1 )
-                override_seg = x86_seg_ds;
             if ( ops->rep_stos )
             {
                 unsigned long nr_reps = limit / sizeof(zero);
 
-                rc = ops->rep_stos(&zero, override_seg, base, sizeof(zero),
+                rc = ops->rep_stos(&zero, ea.mem.seg, base, sizeof(zero),
                                    &nr_reps, ctxt);
                 if ( rc == X86EMUL_OKAY )
                 {
@@ -4457,7 +4456,7 @@ x86_emulate(
             }
             while ( limit )
             {
-                rc = ops->write(override_seg, base, &zero, sizeof(zero), ctxt);
+                rc = ops->write(ea.mem.seg, base, &zero, sizeof(zero), ctxt);
                 if ( rc != X86EMUL_OKAY )
                     goto done;
                 base += sizeof(zero);
@@ -5484,7 +5483,6 @@ x86_emulate(
 #undef rex_prefix
 #undef lock_prefix
 #undef vex
-#undef override_seg
 #undef ea
 
 static void __init __maybe_unused build_assertions(void)
