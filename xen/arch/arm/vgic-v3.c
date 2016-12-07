@@ -31,6 +31,7 @@
 #include <asm/gic_v3_defs.h>
 #include <asm/vgic.h>
 #include <asm/vgic-emul.h>
+#include <asm/vreg.h>
 
 /*
  * PIDR2: Only bits[7:4] are not implementation defined. We are
@@ -1300,9 +1301,21 @@ static bool vgic_v3_to_sgi(struct vcpu *v, register_t sgir)
     return vgic_to_sgi(v, sgir, sgi_mode, virq, &target);
 }
 
+static bool vgic_v3_emulate_sgi1r(struct cpu_user_regs *regs, uint64_t *r,
+                                  bool read)
+{
+    /* WO */
+    if ( !read )
+        return vgic_v3_to_sgi(current, *r);
+    else
+    {
+        gdprintk(XENLOG_WARNING, "Reading SGI1R_EL1 - WO register\n");
+        return false;
+    }
+}
+
 static bool vgic_v3_emulate_sysreg(struct cpu_user_regs *regs, union hsr hsr)
 {
-    struct vcpu *v = current;
     struct hsr_sysreg sysreg = hsr.sysreg;
 
     ASSERT (hsr.ec == HSR_EC_SYSREG);
@@ -1315,14 +1328,8 @@ static bool vgic_v3_emulate_sysreg(struct cpu_user_regs *regs, union hsr hsr)
     switch ( hsr.bits & HSR_SYSREG_REGS_MASK )
     {
     case HSR_SYSREG_ICC_SGI1R_EL1:
-        /* WO */
-        if ( !sysreg.read )
-            return vgic_v3_to_sgi(v, get_user_reg(regs, sysreg.reg));
-        else
-        {
-            gprintk(XENLOG_WARNING, "Reading SGI1R_EL1 - WO register\n");
-            return false;
-        }
+        return vreg_emulate_sysreg64(regs, hsr, vgic_v3_emulate_sgi1r);
+
     default:
         return false;
     }
