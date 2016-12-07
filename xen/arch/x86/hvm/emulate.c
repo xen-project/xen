@@ -1432,7 +1432,8 @@ static int hvmemul_read_segment(
     if ( IS_ERR(sreg) )
          return -PTR_ERR(sreg);
 
-    memcpy(reg, sreg, sizeof(struct segment_register));
+    *reg = *sreg;
+
     return X86EMUL_OKAY;
 }
 

@@ -626,39 +626,39 @@ static void svm_get_segment_register(struct vcpu *v, enum x86_segment seg,
     switch ( seg )
     {
     case x86_seg_cs:
-        memcpy(reg, &vmcb->cs, sizeof(*reg));
+        *reg = vmcb->cs;
         break;
     case x86_seg_ds:
-        memcpy(reg, &vmcb->ds, sizeof(*reg));
+        *reg = vmcb->ds;
         break;
     case x86_seg_es:
-        memcpy(reg, &vmcb->es, sizeof(*reg));
+        *reg = vmcb->es;
         break;
     case x86_seg_fs:
         svm_sync_vmcb(v);
-        memcpy(reg, &vmcb->fs, sizeof(*reg));
+        *reg = vmcb->fs;
         break;
     case x86_seg_gs:
         svm_sync_vmcb(v);
-        memcpy(reg, &vmcb->gs, sizeof(*reg));
+        *reg = vmcb->gs;
         break;
     case x86_seg_ss:
-        memcpy(reg, &vmcb->ss, sizeof(*reg));
+        *reg = vmcb->ss;
         reg->attr.fields.dpl = vmcb->_cpl;
         break;
     case x86_seg_tr:
         svm_sync_vmcb(v);
-        memcpy(reg, &vmcb->tr, sizeof(*reg));
+        *reg = vmcb->tr;
         break;
     case x86_seg_gdtr:
-        memcpy(reg, &vmcb->gdtr, sizeof(*reg));
+        *reg = vmcb->gdtr;
         break;
     case x86_seg_idtr:
-        memcpy(reg, &vmcb->idtr, sizeof(*reg));
+        *reg = vmcb->idtr;
         break;
     case x86_seg_ldtr:
         svm_sync_vmcb(v);
-        memcpy(reg, &vmcb->ldtr, sizeof(*reg));
+        *reg = vmcb->ldtr;
         break;
     default:
         BUG();
@@ -701,26 +701,26 @@ static void svm_set_segment_register(struct vcpu *v, enum x86_segment seg,
     switch ( seg )
     {
     case x86_seg_cs:
-        memcpy(&vmcb->cs, reg, sizeof(*reg));
+        vmcb->cs = *reg;
         break;
     case x86_seg_ds:
-        memcpy(&vmcb->ds, reg, sizeof(*reg));
+        vmcb->ds = *reg;
         break;
     case x86_seg_es:
-        memcpy(&vmcb->es, reg, sizeof(*reg));
+        vmcb->es = *reg;
         break;
     case x86_seg_fs:
-        memcpy(&vmcb->fs, reg, sizeof(*reg));
+        vmcb->fs = *reg;
         break;
     case x86_seg_gs:
-        memcpy(&vmcb->gs, reg, sizeof(*reg));
+        vmcb->gs = *reg;
         break;
     case x86_seg_ss:
-        memcpy(&vmcb->ss, reg, sizeof(*reg));
+        vmcb->ss = *reg;
         vmcb->_cpl = vmcb->ss.attr.fields.dpl;
         break;
     case x86_seg_tr:
-        memcpy(&vmcb->tr, reg, sizeof(*reg));
+        vmcb->tr = *reg;
         break;
     case x86_seg_gdtr:
         vmcb->gdtr.base = reg->base;
@@ -731,7 +731,7 @@ static void svm_set_segment_register(struct vcpu *v, enum x86_segment seg,
         vmcb->idtr.limit = reg->limit;
         break;
     case x86_seg_ldtr:
-        memcpy(&vmcb->ldtr, reg, sizeof(*reg));
+        vmcb->ldtr = *reg;
         break;
     default:
         BUG();
