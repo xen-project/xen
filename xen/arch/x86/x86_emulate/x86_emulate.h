@@ -23,10 +23,6 @@
 #ifndef __X86_EMULATE_H__
 #define __X86_EMULATE_H__
 
-#if !defined(__XEN__) && !defined(ASSERT)
-#define ASSERT assert
-#endif
-
 #define MAX_INST_LEN 15
 
 struct x86_emulate_ctxt;

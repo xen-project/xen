@@ -1,15 +1,9 @@
-#include <assert.h>
 #include <errno.h>
 #include <limits.h>
-#include <stdbool.h>
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <stdint.h>
-#include <xen/xen.h>
 #include <sys/mman.h>
 
-#include "x86_emulate/x86_emulate.h"
+#include "x86_emulate.h"
 #include "blowfish.h"
 
 #define verbose false /* Switch to true for far more logging. */
@@ -1373,7 +1367,7 @@ int main(int argc, char **argv)
     else
         printf("skipped\n");
 
-    for ( j = 0; j < sizeof(blobs) / sizeof(*blobs); j++ )
+    for ( j = 0; j < ARRAY_SIZE(blobs); j++ )
     {
         memcpy(res, blobs[j].code, blobs[j].size);
         ctxt.addr_size = ctxt.sp_size = blobs[j].bitness;
