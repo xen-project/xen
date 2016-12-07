@@ -2261,23 +2261,15 @@ static void do_sysreg(struct cpu_user_regs *regs,
     /*
      * HCR_EL2.FMO or HCR_EL2.IMO
      *
-     * ARMv8: GIC Architecture Specification (PRD03-GENC-010745 24.0)
-     *        Section 4.6.8.
+     * GIC Architecture Specification (IHI 0069C): Section 4.6.3
      */
     case HSR_SYSREG_ICC_SGI1R_EL1:
-        if ( !vgic_emulate(regs, hsr) )
-        {
-            dprintk(XENLOG_WARNING,
-                    "failed emulation of sysreg ICC_SGI1R_EL1 access\n");
-            return inject_undef64_exception(regs, hsr.len);
-        }
-        break;
-    case HSR_SYSREG_ICC_SGI0R_EL1:
     case HSR_SYSREG_ICC_ASGI1R_EL1:
-        /* TBD: Implement to support secure grp0/1 SGI forwarding */
-        dprintk(XENLOG_WARNING,
-                "Emulation of sysreg ICC_SGI0R_EL1/ASGI1R_EL1 not supported\n");
-        return inject_undef64_exception(regs, hsr.len);
+    case HSR_SYSREG_ICC_SGI0R_EL1:
+
+        if ( !vgic_emulate(regs, hsr) )
+            return inject_undef64_exception(regs, hsr.len);
+        break;
 
     /*
      *  ICC_SRE_EL2.Enable = 0
