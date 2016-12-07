@@ -52,24 +52,45 @@ elf_errorstatus elf_init(struct elf_binary *elf, const char *image_input, size_t
     elf->class = elf_uval_3264(elf, elf->ehdr, e32.e_ident[EI_CLASS]);
     elf->data = elf_uval_3264(elf, elf->ehdr, e32.e_ident[EI_DATA]);
 
-    /* Sanity check phdr. */
-    offset = elf_uval(elf, elf->ehdr, e_phoff) +
-        elf_uval(elf, elf->ehdr, e_phentsize) * elf_phdr_count(elf);
-    if ( offset > elf->size )
+    /* Sanity check phdr if present. */
+    count = elf_phdr_count(elf);
+    if ( count )
     {
-        elf_err(elf, "ELF: phdr overflow (off %" PRIx64 " > size %lx)\n",
-                offset, (unsigned long)elf->size);
-        return -1;
+        if ( elf_uval(elf, elf->ehdr, e_phentsize) <
+             elf_size(elf, ELF_HANDLE_DECL(elf_phdr)) )
+        {
+            elf_err(elf, "ELF: phdr too small (%" PRIu64 ")\n",
+                    elf_uval(elf, elf->ehdr, e_phentsize));
+            return -1;
+        }
+        offset = elf_uval(elf, elf->ehdr, e_phoff) +
+            elf_uval(elf, elf->ehdr, e_phentsize) * count;
+        if ( offset > elf->size )
+        {
+            elf_err(elf, "ELF: phdr overflow (off %" PRIx64 " > size %lx)\n",
+                    offset, (unsigned long)elf->size);
+            return -1;
+        }
     }
 
-    /* Sanity check shdr. */
-    offset = elf_uval(elf, elf->ehdr, e_shoff) +
-        elf_uval(elf, elf->ehdr, e_shentsize) * elf_shdr_count(elf);
-    if ( offset > elf->size )
+    /* Sanity check shdr if present. */
+    count = elf_shdr_count(elf);
+    if ( count )
     {
-        elf_err(elf, "ELF: shdr overflow (off %" PRIx64 " > size %lx)\n",
-                offset, (unsigned long)elf->size);
-        return -1;
+        if ( elf_uval(elf, elf->ehdr, e_shentsize) < elf_size(elf, shdr) )
+        {
+            elf_err(elf, "ELF: shdr too small (%" PRIu64 ")\n",
+                    elf_uval(elf, elf->ehdr, e_shentsize));
+            return -1;
+        }
+        offset = elf_uval(elf, elf->ehdr, e_shoff) +
+            elf_uval(elf, elf->ehdr, e_shentsize) * count;
+        if ( offset > elf->size )
+        {
+            elf_err(elf, "ELF: shdr overflow (off %" PRIx64 " > size %lx)\n",
+                    offset, (unsigned long)elf->size);
+            return -1;
+        }
     }
 
     /* Find section string table. */
@@ -79,7 +100,6 @@ elf_errorstatus elf_init(struct elf_binary *elf, const char *image_input, size_t
         elf->sec_strtab = elf_section_start(elf, shdr);
 
     /* Find symbol table and symbol string table. */
-    count = elf_shdr_count(elf);
     for ( i = 1; i < count; i++ )
     {
         shdr = elf_shdr_by_index(elf, i);

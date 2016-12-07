@@ -130,8 +130,11 @@ uint64_t elf_round_up(struct elf_binary *elf, uint64_t addr)
 unsigned elf_shdr_count(struct elf_binary *elf)
 {
     unsigned count = elf_uval(elf, elf->ehdr, e_shnum);
-    uint64_t max = elf->size / sizeof(Elf32_Shdr);
+    uint64_t max;
 
+    if ( !count )
+        return 0;
+    max = elf->size / elf_uval(elf, elf->ehdr, e_shentsize);
     if ( max > UINT_MAX )
         max = UINT_MAX;
     if ( count > max )
@@ -144,7 +147,20 @@ unsigned elf_shdr_count(struct elf_binary *elf)
 
 unsigned elf_phdr_count(struct elf_binary *elf)
 {
-    return elf_uval(elf, elf->ehdr, e_phnum);
+    unsigned count = elf_uval(elf, elf->ehdr, e_phnum);
+    uint64_t max;
+
+    if ( !count )
+        return 0;
+    max = elf->size / elf_uval(elf, elf->ehdr, e_phentsize);
+    if ( max > UINT_MAX )
+        max = UINT_MAX;
+    if ( count > max )
+    {
+        elf_mark_broken(elf, "far too many program headers");
+        count = max;
+    }
+    return count;
 }
 
 ELF_HANDLE_DECL(elf_shdr) elf_shdr_by_name(struct elf_binary *elf, const char *name)
