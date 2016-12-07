@@ -63,7 +63,7 @@ struct acpi_20_fadt Fadt = {
 
     .p_lvl2_lat = 0x0fff, /* >100,  means we do not support C2 state */
     .p_lvl3_lat = 0x0fff, /* >1000, means we do not support C3 state */
-    .iapc_boot_arch = ACPI_8042,
+    .iapc_boot_arch = ACPI_FADT_8042,
     .flags = (ACPI_PROC_C1 |
               ACPI_WBINVD |
               ACPI_FIX_RTC | ACPI_TMR_VAL_EXT |
