@@ -1876,6 +1876,18 @@ static void do_cp15_64(struct cpu_user_regs *regs,
         break;
 
     /*
+     * HCR_EL2.FMO or HCR_EL2.IMO
+     *
+     * GIC Architecture Specification (IHI 0069C): Section 4.6.3
+     */
+    case HSR_CPREG64(ICC_SGI1R):
+    case HSR_CPREG64(ICC_ASGI1R):
+    case HSR_CPREG64(ICC_SGI0R):
+        if ( !vgic_emulate(regs, hsr) )
+            return inject_undef_exception(regs, hsr);
+        break;
+
+    /*
      * CPTR_EL2.T{0..9,12..13}
      *
      * ARMv7 (DDI 0406C.b): B1.14.12

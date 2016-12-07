@@ -1335,12 +1335,32 @@ static bool vgic_v3_emulate_sysreg(struct cpu_user_regs *regs, union hsr hsr)
     }
 }
 
+static bool vgic_v3_emulate_cp64(struct cpu_user_regs *regs, union hsr hsr)
+{
+    struct hsr_cp64 cp64 = hsr.cp64;
+
+    if ( cp64.read )
+        perfc_incr(vgic_cp64_reads);
+    else
+        perfc_incr(vgic_cp64_writes);
+
+    switch ( hsr.bits & HSR_CP64_REGS_MASK )
+    {
+    case HSR_CPREG64(ICC_SGI1R):
+        return vreg_emulate_cp64(regs, hsr, vgic_v3_emulate_sgi1r);
+    default:
+        return false;
+    }
+}
+
 static bool vgic_v3_emulate_reg(struct cpu_user_regs *regs, union hsr hsr)
 {
     switch (hsr.ec)
     {
     case HSR_EC_SYSREG:
         return vgic_v3_emulate_sysreg(regs, hsr);
+    case HSR_EC_CP15_64:
+        return vgic_v3_emulate_cp64(regs, hsr);
     default:
         return false;
     }
