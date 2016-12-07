@@ -5,9 +5,12 @@
 #include <xen/types.h>
 #endif
 
-extern const bool_t efi_enabled;
-
 #define EFI_INVALID_TABLE_ADDR (~0UL)
+
+extern unsigned int efi_flags;
+#define EFI_BOOT	0	/* Were we booted from EFI? */
+#define EFI_LOADER	1	/* Were we booted directly from EFI loader? */
+#define EFI_RS		2	/* Can we use runtime services? */
 
 /* Add fields here only if they need to be referenced from non-EFI code. */
 struct efi {
@@ -28,6 +31,7 @@ union compat_pf_efi_info;
 struct xenpf_efi_runtime_call;
 struct compat_pf_efi_runtime_call;
 
+bool efi_enabled(unsigned int feature);
 void efi_init_memory(void);
 bool_t efi_rs_using_pgtables(void);
 unsigned long efi_get_time(void);

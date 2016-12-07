@@ -29,12 +29,6 @@ void efi_rs_leave(struct efi_rs_state *);
 
 #ifndef COMPAT
 
-/*
- * Currently runtime services are not implemented on ARM. To boot Xen with ACPI,
- * set efi_enabled to 1, so that Xen can get the ACPI root pointer from EFI.
- */
-const bool_t efi_enabled = 1;
-
 #ifndef CONFIG_ARM
 # include <asm/i387.h>
 # include <asm/xstate.h>
@@ -62,6 +56,9 @@ UINT64 __read_mostly efi_boot_max_var_store_size;
 UINT64 __read_mostly efi_boot_remain_var_store_size;
 UINT64 __read_mostly efi_boot_max_var_size;
 
+/* Bit field representing available EFI features/properties. */
+unsigned int efi_flags;
+
 struct efi __read_mostly efi = {
 	.acpi   = EFI_INVALID_TABLE_ADDR,
 	.acpi20 = EFI_INVALID_TABLE_ADDR,
@@ -71,6 +68,11 @@ struct efi __read_mostly efi = {
 };
 
 const struct efi_pci_rom *__read_mostly efi_pci_roms;
+
+bool efi_enabled(unsigned int feature)
+{
+    return test_bit(feature, &efi_flags);
+}
 
 #ifndef CONFIG_ARM /* TODO - disabled until implemented on ARM */
 

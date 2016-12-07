@@ -36,7 +36,7 @@ static inline struct vcpu *mapcache_current_vcpu(void)
      * domain's page tables but current may point at another domain's VCPU.
      * Return NULL as though current is not properly set up yet.
      */
-    if ( efi_enabled && efi_rs_using_pgtables() )
+    if ( efi_rs_using_pgtables() )
         return NULL;
 
     /*

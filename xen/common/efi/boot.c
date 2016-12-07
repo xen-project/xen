@@ -934,6 +934,13 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
     char *option_str;
     bool_t use_cfg_file;
 
+    __set_bit(EFI_BOOT, &efi_flags);
+    __set_bit(EFI_LOADER, &efi_flags);
+
+#ifndef CONFIG_ARM /* Disabled until runtime services implemented. */
+    __set_bit(EFI_RS, &efi_flags);
+#endif
+
     efi_init(ImageHandle, SystemTable);
 
     use_cfg_file = efi_arch_use_config_file(SystemTable);
@@ -1153,7 +1160,6 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
 
 #ifndef CONFIG_ARM /* TODO - runtime service support */
 
-static bool_t __initdata efi_rs_enable = 1;
 static bool_t __initdata efi_map_uc;
 
 static void __init parse_efi_param(char *s)
@@ -1171,7 +1177,12 @@ static void __init parse_efi_param(char *s)
             *ss = '\0';
 
         if ( !strcmp(s, "rs") )
-            efi_rs_enable = val;
+        {
+            if ( val )
+                __set_bit(EFI_RS, &efi_flags);
+            else
+                __clear_bit(EFI_RS, &efi_flags);
+        }
         else if ( !strcmp(s, "attr=uc") )
             efi_map_uc = val;
 
@@ -1254,7 +1265,7 @@ void __init efi_init_memory(void)
                desc->PhysicalStart, desc->PhysicalStart + len - 1,
                desc->Type, desc->Attribute);
 
-        if ( !efi_rs_enable ||
+        if ( !efi_enabled(EFI_RS) ||
              (!(desc->Attribute & EFI_MEMORY_RUNTIME) &&
               (!map_bs ||
                (desc->Type != EfiBootServicesCode &&
@@ -1328,7 +1339,7 @@ void __init efi_init_memory(void)
         }
     }
 
-    if ( !efi_rs_enable )
+    if ( !efi_enabled(EFI_RS) )
     {
         efi_fw_vendor = NULL;
         return;

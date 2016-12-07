@@ -814,7 +814,7 @@ static unsigned long get_cmos_time(void)
     static bool_t __read_mostly cmos_rtc_probe;
     boolean_param("cmos-rtc-probe", cmos_rtc_probe);
 
-    if ( efi_enabled )
+    if ( efi_enabled(EFI_RS) )
     {
         res = efi_get_time();
         if ( res )

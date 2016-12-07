@@ -483,8 +483,8 @@ static void __init parse_video_info(void)
 {
     struct boot_video_info *bvi = &bootsym(boot_vid_info);
 
-    /* The EFI loader fills vga_console_info directly. */
-    if ( efi_enabled )
+    /* vga_console_info is filled directly on EFI platform. */
+    if ( efi_enabled(EFI_BOOT) )
         return;
 
     if ( (bvi->orig_video_isVGA == 1) && (bvi->orig_video_mode == 3) )
@@ -770,7 +770,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
     if ( !(mbi->flags & MBI_MODULES) || (mbi->mods_count == 0) )
         panic("dom0 kernel not specified. Check bootloader configuration.");
 
-    if ( efi_enabled )
+    if ( efi_enabled(EFI_LOADER) )
     {
         set_pdx_range(xen_phys_start >> PAGE_SHIFT,
                       (xen_phys_start + BOOTSTRAP_MAP_BASE) >> PAGE_SHIFT);
@@ -785,6 +785,8 @@ void __init noreturn __start_xen(unsigned long mbi_p)
 
         memmap_type = loader;
     }
+    else if ( efi_enabled(EFI_BOOT) )
+        memmap_type = "EFI";
     else if ( e820_raw_nr != 0 )
     {
         memmap_type = "Xen-e820";
@@ -881,7 +883,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
      * we can relocate the dom0 kernel and other multiboot modules. Also, on
      * x86/64, we relocate Xen to higher memory.
      */
-    for ( i = 0; !efi_enabled && i < mbi->mods_count; i++ )
+    for ( i = 0; !efi_enabled(EFI_LOADER) && i < mbi->mods_count; i++ )
     {
         if ( mod[i].mod_start & (PAGE_SIZE - 1) )
             panic("Bootloader didn't honor module alignment request.");
@@ -1122,7 +1124,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
 
     if ( !xen_phys_start )
         panic("Not enough memory to relocate Xen.");
-    reserve_e820_ram(&boot_e820, efi_enabled ? mbi->mem_upper : __pa(&_start),
+    reserve_e820_ram(&boot_e820, efi_enabled(EFI_LOADER) ? mbi->mem_upper : __pa(&_start),
                      __pa(&_end));
 
     /* Late kexec reservation (dynamic start address). */

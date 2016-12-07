@@ -238,7 +238,7 @@ const char *__init dmi_get_table(paddr_t *base, u32 *len)
 {
 	static unsigned int __initdata instance;
 
-	if (efi_enabled) {
+	if (efi_enabled(EFI_BOOT)) {
 		if (efi_smbios3_size && !(instance & 1)) {
 			*base = efi_smbios3_address;
 			*len = efi_smbios3_size;
@@ -696,7 +696,7 @@ static void __init dmi_decode(struct dmi_header *dm)
 
 void __init dmi_scan_machine(void)
 {
-	if ((!efi_enabled ? dmi_iterate(dmi_decode) :
+	if ((!efi_enabled(EFI_BOOT) ? dmi_iterate(dmi_decode) :
 	                    dmi_efi_iterate(dmi_decode)) == 0)
  		dmi_check_system(dmi_blacklist);
 	else

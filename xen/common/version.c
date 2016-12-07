@@ -160,7 +160,7 @@ static int __init xen_build_init(void)
 
 #ifdef CONFIG_X86
     /* Alternatively we may have a CodeView record from an EFI build. */
-    if ( rc && efi_enabled )
+    if ( rc && efi_enabled(EFI_LOADER) )
     {
         const struct pe_external_debug_directory *dir = (const void *)n;
 

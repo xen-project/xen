@@ -564,7 +564,7 @@ static inline void __init construct_default_ISA_mptable(int mpc_default_type)
 
 static __init void efi_unmap_mpf(void)
 {
-	if (efi_enabled)
+	if (efi_enabled(EFI_BOOT))
 		clear_fixmap(FIX_EFI_MPF);
 }
 
@@ -722,7 +722,7 @@ void __init find_smp_config (void)
 {
 	unsigned int address;
 
-	if (efi_enabled) {
+	if (efi_enabled(EFI_BOOT)) {
 		efi_check_config();
 		return;
 	}

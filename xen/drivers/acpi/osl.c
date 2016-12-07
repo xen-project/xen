@@ -66,7 +66,7 @@ void __init acpi_os_vprintf(const char *fmt, va_list args)
 
 acpi_physical_address __init acpi_os_get_root_pointer(void)
 {
-	if (efi_enabled) {
+	if (efi_enabled(EFI_BOOT)) {
 		if (efi.acpi20 != EFI_INVALID_TABLE_ADDR)
 			return efi.acpi20;
 		else if (efi.acpi != EFI_INVALID_TABLE_ADDR)
