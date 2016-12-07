@@ -309,9 +309,9 @@ int vgic_v3_init(struct domain *d, int *mmio_count);
 
 extern int domain_vgic_register(struct domain *d, int *mmio_count);
 extern int vcpu_vgic_free(struct vcpu *v);
-extern int vgic_to_sgi(struct vcpu *v, register_t sgir,
-                       enum gic_sgi_mode irqmode, int virq,
-                       const struct sgi_target *target);
+extern bool vgic_to_sgi(struct vcpu *v, register_t sgir,
+                        enum gic_sgi_mode irqmode, int virq,
+                        const struct sgi_target *target);
 extern void vgic_migrate_irq(struct vcpu *old, struct vcpu *new, unsigned int irq);
 
 /* Reserve a specific guest vIRQ */

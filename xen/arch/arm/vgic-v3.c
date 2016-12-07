@@ -1269,7 +1269,7 @@ write_reserved:
     return 1;
 }
 
-static int vgic_v3_to_sgi(struct vcpu *v, register_t sgir)
+static bool vgic_v3_to_sgi(struct vcpu *v, register_t sgir)
 {
     int virq;
     int irqmode;
@@ -1294,7 +1294,7 @@ static int vgic_v3_to_sgi(struct vcpu *v, register_t sgir)
         break;
     default:
         gprintk(XENLOG_WARNING, "Wrong irq mode in SGI1R_EL1 register\n");
-        return 0;
+        return false;
     }
 
     return vgic_to_sgi(v, sgir, sgi_mode, virq, &target);

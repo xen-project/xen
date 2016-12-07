@@ -374,7 +374,7 @@ read_reserved:
     return 1;
 }
 
-static int vgic_v2_to_sgi(struct vcpu *v, register_t sgir)
+static bool vgic_v2_to_sgi(struct vcpu *v, register_t sgir)
 {
 
     int virq;
@@ -403,7 +403,7 @@ static int vgic_v2_to_sgi(struct vcpu *v, register_t sgir)
         printk(XENLOG_G_DEBUG
                "%pv: vGICD: unhandled GICD_SGIR write %"PRIregister" with wrong mode\n",
                v, sgir);
-        return 0;
+        return false;
     }
 
     return vgic_to_sgi(v, sgir, sgi_mode, virq, &target);

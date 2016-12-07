@@ -393,8 +393,8 @@ void vgic_enable_irqs(struct vcpu *v, uint32_t r, int n)
     }
 }
 
-int vgic_to_sgi(struct vcpu *v, register_t sgir, enum gic_sgi_mode irqmode, int virq,
-                const struct sgi_target *target)
+bool vgic_to_sgi(struct vcpu *v, register_t sgir, enum gic_sgi_mode irqmode,
+                 int virq, const struct sgi_target *target)
 {
     struct domain *d = v->domain;
     int vcpuid;
@@ -440,10 +440,10 @@ int vgic_to_sgi(struct vcpu *v, register_t sgir, enum gic_sgi_mode irqmode, int 
         gprintk(XENLOG_WARNING,
                 "vGICD:unhandled GICD_SGIR write %"PRIregister" \
                  with wrong mode\n", sgir);
-        return 0;
+        return false;
     }
 
-    return 1;
+    return true;
 }
 
 struct pending_irq *irq_to_pending(struct vcpu *v, unsigned int irq)
