@@ -56,10 +56,6 @@ struct page_sharing_info
 
 unsigned int mem_sharing_get_nr_saved_mfns(void);
 unsigned int mem_sharing_get_nr_shared_mfns(void);
-int mem_sharing_nominate_page(struct domain *d, 
-                              unsigned long gfn,
-                              int expected_refcnt,
-                              shr_handle_t *phandle);
 
 #define MEM_SHARING_DESTROY_GFN       (1<<1)
 /* Only fails with -ENOMEM. Enforce it with a BUG_ON wrapper. */
@@ -92,7 +88,6 @@ int mem_sharing_notify_enomem(struct domain *d, unsigned long gfn,
 int mem_sharing_memop(XEN_GUEST_HANDLE_PARAM(xen_mem_sharing_op_t) arg);
 int mem_sharing_domctl(struct domain *d, 
                        xen_domctl_mem_sharing_op_t *mec);
-int mem_sharing_audit(void);
 void mem_sharing_init(void);
 
 /* Scans the p2m and relinquishes any shared pages, destroying 
