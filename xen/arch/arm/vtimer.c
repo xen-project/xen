@@ -164,12 +164,12 @@ int virt_timer_restore(struct vcpu *v)
     return 0;
 }
 
-static int vtimer_cntp_ctl(struct cpu_user_regs *regs, uint32_t *r, int read)
+static bool vtimer_cntp_ctl(struct cpu_user_regs *regs, uint32_t *r, int read)
 {
     struct vcpu *v = current;
 
     if ( !ACCESS_ALLOWED(regs, EL0PTEN) )
-        return 0;
+        return false;
 
     if ( read )
     {
@@ -190,16 +190,16 @@ static int vtimer_cntp_ctl(struct cpu_user_regs *regs, uint32_t *r, int read)
         else
             stop_timer(&v->arch.phys_timer.timer);
     }
-    return 1;
+    return true;
 }
 
-static int vtimer_cntp_tval(struct cpu_user_regs *regs, uint32_t *r, int read)
+static bool vtimer_cntp_tval(struct cpu_user_regs *regs, uint32_t *r, int read)
 {
     struct vcpu *v = current;
     s_time_t now;
 
     if ( !ACCESS_ALLOWED(regs, EL0PTEN) )
-        return 0;
+        return false;
 
     now = NOW() - v->domain->arch.phys_timer_base.offset;
 
@@ -218,15 +218,15 @@ static int vtimer_cntp_tval(struct cpu_user_regs *regs, uint32_t *r, int read)
                       v->domain->arch.phys_timer_base.offset);
         }
     }
-    return 1;
+    return true;
 }
 
-static int vtimer_cntp_cval(struct cpu_user_regs *regs, uint64_t *r, int read)
+static bool vtimer_cntp_cval(struct cpu_user_regs *regs, uint64_t *r, int read)
 {
     struct vcpu *v = current;
 
     if ( !ACCESS_ALLOWED(regs, EL0PTEN) )
-        return 0;
+        return false;
 
     if ( read )
     {
@@ -243,10 +243,10 @@ static int vtimer_cntp_cval(struct cpu_user_regs *regs, uint64_t *r, int read)
                       v->domain->arch.phys_timer_base.offset);
         }
     }
-    return 1;
+    return true;
 }
 
-static int vtimer_emulate_cp32(struct cpu_user_regs *regs, union hsr hsr)
+static bool vtimer_emulate_cp32(struct cpu_user_regs *regs, union hsr hsr)
 {
     struct hsr_cp32 cp32 = hsr.cp32;
     /*
@@ -255,7 +255,7 @@ static int vtimer_emulate_cp32(struct cpu_user_regs *regs, union hsr hsr)
      * setting r).
      */
     uint32_t r = 0;
-    int res;
+    bool res;
 
 
     if ( cp32.read )
@@ -277,7 +277,7 @@ static int vtimer_emulate_cp32(struct cpu_user_regs *regs, union hsr hsr)
         break;
 
     default:
-        return 0;
+        return false;
     }
 
     if ( res && cp32.read )
@@ -286,7 +286,7 @@ static int vtimer_emulate_cp32(struct cpu_user_regs *regs, union hsr hsr)
     return res;
 }
 
-static int vtimer_emulate_cp64(struct cpu_user_regs *regs, union hsr hsr)
+static bool vtimer_emulate_cp64(struct cpu_user_regs *regs, union hsr hsr)
 {
     struct hsr_cp64 cp64 = hsr.cp64;
     uint32_t r1 = get_user_reg(regs, cp64.reg1);
@@ -302,11 +302,11 @@ static int vtimer_emulate_cp64(struct cpu_user_regs *regs, union hsr hsr)
     {
     case HSR_CPREG64(CNTP_CVAL):
         if ( !vtimer_cntp_cval(regs, &x, cp64.read) )
-            return 0;
+            return false;
         break;
 
     default:
-        return 0;
+        return false;
     }
 
     if ( cp64.read )
@@ -315,21 +315,21 @@ static int vtimer_emulate_cp64(struct cpu_user_regs *regs, union hsr hsr)
         set_user_reg(regs, cp64.reg2, x >> 32);
     }
 
-    return 1;
+    return true;
 }
 
 #ifdef CONFIG_ARM_64
-typedef int (*vtimer_sysreg32_fn_t)(struct cpu_user_regs *regs, uint32_t *r,
-                                    int read);
-typedef int (*vtimer_sysreg64_fn_t)(struct cpu_user_regs *regs, uint64_t *r,
-                                    int read);
+typedef bool (*vtimer_sysreg32_fn_t)(struct cpu_user_regs *regs, uint32_t *r,
+                                     int read);
+typedef bool (*vtimer_sysreg64_fn_t)(struct cpu_user_regs *regs, uint64_t *r,
+                                     int read);
 
-static int vtimer_emulate_sysreg32(struct cpu_user_regs *regs, union hsr hsr,
-                                   vtimer_sysreg32_fn_t fn)
+static bool vtimer_emulate_sysreg32(struct cpu_user_regs *regs, union hsr hsr,
+                                    vtimer_sysreg32_fn_t fn)
 {
     struct hsr_sysreg sysreg = hsr.sysreg;
     uint32_t r = 0;
-    int ret;
+    bool ret;
 
     if ( !sysreg.read )
         r = get_user_reg(regs, sysreg.reg);
@@ -342,8 +342,8 @@ static int vtimer_emulate_sysreg32(struct cpu_user_regs *regs, union hsr hsr,
     return ret;
 }
 
-static int vtimer_emulate_sysreg64(struct cpu_user_regs *regs, union hsr hsr,
-                                   vtimer_sysreg64_fn_t fn)
+static bool vtimer_emulate_sysreg64(struct cpu_user_regs *regs, union hsr hsr,
+                                    vtimer_sysreg64_fn_t fn)
 {
     struct hsr_sysreg sysreg = hsr.sysreg;
     /*
@@ -352,7 +352,7 @@ static int vtimer_emulate_sysreg64(struct cpu_user_regs *regs, union hsr hsr,
      * setting x).
      */
     uint64_t x = 0;
-    int ret;
+    bool ret;
 
     if ( !sysreg.read )
         x = get_user_reg(regs, sysreg.reg);
@@ -365,7 +365,7 @@ static int vtimer_emulate_sysreg64(struct cpu_user_regs *regs, union hsr hsr,
     return ret;
 }
 
-static int vtimer_emulate_sysreg(struct cpu_user_regs *regs, union hsr hsr)
+static bool vtimer_emulate_sysreg(struct cpu_user_regs *regs, union hsr hsr)
 {
     struct hsr_sysreg sysreg = hsr.sysreg;
 
@@ -384,13 +384,13 @@ static int vtimer_emulate_sysreg(struct cpu_user_regs *regs, union hsr hsr)
         return vtimer_emulate_sysreg64(regs, hsr, vtimer_cntp_cval);
 
     default:
-        return 0;
+        return false;
     }
 
 }
 #endif
 
-int vtimer_emulate(struct cpu_user_regs *regs, union hsr hsr)
+bool vtimer_emulate(struct cpu_user_regs *regs, union hsr hsr)
 {
 
     switch (hsr.ec) {
@@ -403,7 +403,7 @@ int vtimer_emulate(struct cpu_user_regs *regs, union hsr hsr)
         return vtimer_emulate_sysreg(regs, hsr);
 #endif
     default:
-        return 0;
+        return false;
     }
 }
 
