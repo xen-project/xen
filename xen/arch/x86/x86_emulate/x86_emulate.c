@@ -3121,13 +3121,20 @@ x86_emulate(
     }
 
     case 0x9c: /* pushf */
-        src.val = _regs.eflags;
+        generate_exception_if((_regs.eflags & EFLG_VM) &&
+                              MASK_EXTR(_regs.eflags, EFLG_IOPL) != 3,
+                              EXC_GP, 0);
+        src.val = _regs.eflags & ~(EFLG_VM | EFLG_RF);
         goto push;
 
     case 0x9d: /* popf */ {
         uint32_t mask = EFLG_VIP | EFLG_VIF | EFLG_VM;
+
         if ( !mode_ring0() )
         {
+            generate_exception_if((_regs.eflags & EFLG_VM) &&
+                                  MASK_EXTR(_regs.eflags, EFLG_IOPL) != 3,
+                                  EXC_GP, 0);
             mask |= EFLG_IOPL;
             if ( !mode_iopl() )
                 mask |= EFLG_IF;
