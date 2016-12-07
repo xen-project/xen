@@ -164,7 +164,7 @@ int virt_timer_restore(struct vcpu *v)
     return 0;
 }
 
-static bool vtimer_cntp_ctl(struct cpu_user_regs *regs, uint32_t *r, int read)
+static bool vtimer_cntp_ctl(struct cpu_user_regs *regs, uint32_t *r, bool read)
 {
     struct vcpu *v = current;
 
@@ -193,7 +193,8 @@ static bool vtimer_cntp_ctl(struct cpu_user_regs *regs, uint32_t *r, int read)
     return true;
 }
 
-static bool vtimer_cntp_tval(struct cpu_user_regs *regs, uint32_t *r, int read)
+static bool vtimer_cntp_tval(struct cpu_user_regs *regs, uint32_t *r,
+                             bool read)
 {
     struct vcpu *v = current;
     s_time_t now;
@@ -221,7 +222,8 @@ static bool vtimer_cntp_tval(struct cpu_user_regs *regs, uint32_t *r, int read)
     return true;
 }
 
-static bool vtimer_cntp_cval(struct cpu_user_regs *regs, uint64_t *r, int read)
+static bool vtimer_cntp_cval(struct cpu_user_regs *regs, uint64_t *r,
+                             bool read)
 {
     struct vcpu *v = current;
 
@@ -320,9 +322,9 @@ static bool vtimer_emulate_cp64(struct cpu_user_regs *regs, union hsr hsr)
 
 #ifdef CONFIG_ARM_64
 typedef bool (*vtimer_sysreg32_fn_t)(struct cpu_user_regs *regs, uint32_t *r,
-                                     int read);
+                                     bool read);
 typedef bool (*vtimer_sysreg64_fn_t)(struct cpu_user_regs *regs, uint64_t *r,
-                                     int read);
+                                     bool read);
 
 static bool vtimer_emulate_sysreg32(struct cpu_user_regs *regs, union hsr hsr,
                                     vtimer_sysreg32_fn_t fn)
