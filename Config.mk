@@ -289,7 +289,9 @@ SEABIOS_UPSTREAM_REVISION ?= rel-1.10.0
 ETHERBOOT_NICS ?= rtl8139 8086100e
 
 
-QEMU_TRADITIONAL_REVISION ?= xen-4.8.0
+QEMU_TRADITIONAL_REVISION ?= 095261a9ad5c31b9ed431f8382e8aa223089c85b
+# Mon Nov 14 17:19:46 2016 +0000
+# qemu: ioport_read, ioport_write: be defensive about 32-bit addresses
 
 # Specify which qemu-dm to use. This may be `ioemu' to use the old
 # Mercurial in-tree version, or a local directory, or a git URL.
