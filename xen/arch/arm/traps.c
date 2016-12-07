@@ -154,13 +154,13 @@ static void print_xen_info(void)
 }
 
 #ifdef CONFIG_ARM_32
-static inline bool_t is_zero_register(int reg)
+static inline bool is_zero_register(int reg)
 {
     /* There is no zero register for ARM32 */
-    return 0;
+    return false;
 }
 #else
-static inline bool_t is_zero_register(int reg)
+static inline bool is_zero_register(int reg)
 {
     /*
      * For store/load and sysreg instruction, the encoding 31 always
@@ -1500,7 +1500,7 @@ static void do_trap_hypercall(struct cpu_user_regs *regs, register_t *nr,
 #endif
 }
 
-static bool_t check_multicall_32bit_clean(struct multicall_entry *multi)
+static bool check_multicall_32bit_clean(struct multicall_entry *multi)
 {
     int i;
 
@@ -1661,7 +1661,7 @@ static void advance_pc(struct cpu_user_regs *regs, const union hsr hsr)
 /* Read as zero and write ignore */
 static void handle_raz_wi(struct cpu_user_regs *regs,
                           int regidx,
-                          bool_t read,
+                          bool read,
                           const union hsr hsr,
                           int min_el)
 {
@@ -1680,7 +1680,7 @@ static void handle_raz_wi(struct cpu_user_regs *regs,
 /* Write only as write ignore */
 static void handle_wo_wi(struct cpu_user_regs *regs,
                          int regidx,
-                         bool_t read,
+                         bool read,
                          const union hsr hsr,
                          int min_el)
 {
@@ -1699,7 +1699,7 @@ static void handle_wo_wi(struct cpu_user_regs *regs,
 /* Read only as read as zero */
 static void handle_ro_raz(struct cpu_user_regs *regs,
                           int regidx,
-                          bool_t read,
+                          bool read,
                           const union hsr hsr,
                           int min_el)
 {
