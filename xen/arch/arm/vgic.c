@@ -482,7 +482,7 @@ void vgic_vcpu_inject_irq(struct vcpu *v, unsigned int virq)
     uint8_t priority;
     struct pending_irq *iter, *n = irq_to_pending(v, virq);
     unsigned long flags;
-    bool_t running;
+    bool running;
 
     priority = vgic_get_virq_priority(v, virq);
 
@@ -555,15 +555,15 @@ int vgic_emulate(struct cpu_user_regs *regs, union hsr hsr)
     return v->domain->arch.vgic.handler->emulate_sysreg(regs, hsr);
 }
 
-bool_t vgic_reserve_virq(struct domain *d, unsigned int virq)
+bool vgic_reserve_virq(struct domain *d, unsigned int virq)
 {
     if ( virq >= vgic_num_irqs(d) )
-        return 0;
+        return false;
 
     return !test_and_set_bit(virq, d->arch.vgic.allocated_irqs);
 }
 
-int vgic_allocate_virq(struct domain *d, bool_t spi)
+int vgic_allocate_virq(struct domain *d, bool spi)
 {
     int first, end;
     unsigned int virq;
