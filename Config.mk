@@ -248,9 +248,9 @@ ETHERBOOT_NICS ?= rtl8139 8086100e
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= 851b5ee8ae2a841373d605ae6f755cb33a3626f9
-# Tue Nov 29 18:38:24 2016 +0000
-# xen: fix ioreq handling
+QEMU_TAG ?= eb200a6a9aca6ea6c03bea986d4b64c090672ed1
+# Mon Nov 14 17:19:46 2016 +0000
+# qemu: ioport_read, ioport_write: be defensive about 32-bit addresses
 
 # Short answer -- do not enable this unless you know what you are
 # doing and are prepared for some pain.
