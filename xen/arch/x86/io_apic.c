@@ -1485,8 +1485,7 @@ static int __init timer_irq_works(void)
 {
     unsigned long t1, flags;
 
-    t1 = pit0_ticks;
-    mb();
+    t1 = ACCESS_ONCE(pit0_ticks);
 
     local_save_flags(flags);
     local_irq_enable();
@@ -1501,8 +1500,7 @@ static int __init timer_irq_works(void)
      * might have cached one ExtINT interrupt.  Finally, at
      * least one tick may be lost due to delays.
      */
-    mb();
-    if (pit0_ticks - t1 > 4)
+    if ( (ACCESS_ONCE(pit0_ticks) - t1) > 4 )
         return 1;
 
     return 0;

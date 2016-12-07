@@ -197,7 +197,7 @@ static void timer_interrupt(int irq, void *dev_id, struct cpu_user_regs *regs)
         return;
 
     /* Only for start-of-day interruopt tests in io_apic.c. */
-    (*(volatile unsigned long *)&pit0_ticks)++;
+    pit0_ticks++;
 
     /* Rough hack to allow accurate timers to sort-of-work with no APIC. */
     if ( !cpu_has_apic )
