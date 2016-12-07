@@ -1037,24 +1037,33 @@ long do_set_segment_base(unsigned int which, unsigned long base)
     switch ( which )
     {
     case SEGBASE_FS:
-        if ( wrmsr_safe(MSR_FS_BASE, base) )
-            ret = -EFAULT;
-        else
+        if ( is_canonical_address(base) )
+        {
+            wrfsbase(base);
             v->arch.pv_vcpu.fs_base = base;
+        }
+        else
+            ret = -EINVAL;
         break;
 
     case SEGBASE_GS_USER:
-        if ( wrmsr_safe(MSR_SHADOW_GS_BASE, base) )
-            ret = -EFAULT;
-        else
+        if ( is_canonical_address(base) )
+        {
+            wrmsrl(MSR_SHADOW_GS_BASE, base);
             v->arch.pv_vcpu.gs_base_user = base;
+        }
+        else
+            ret = -EINVAL;
         break;
 
     case SEGBASE_GS_KERNEL:
-        if ( wrmsr_safe(MSR_GS_BASE, base) )
-            ret = -EFAULT;
-        else
+        if ( is_canonical_address(base) )
+        {
+            wrgsbase(base);
             v->arch.pv_vcpu.gs_base_kernel = base;
+        }
+        else
+            ret = -EINVAL;
         break;
 
     case SEGBASE_GS_USER_SEL:

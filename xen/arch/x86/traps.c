@@ -2613,9 +2613,9 @@ static int priv_op_write_msr(unsigned int reg, uint64_t val,
         return X86EMUL_OKAY;
 
     case MSR_SHADOW_GS_BASE:
-        if ( is_pv_32bit_domain(currd) || !is_canonical_address(val) ||
-             wrmsr_safe(MSR_SHADOW_GS_BASE, val) )
+        if ( is_pv_32bit_domain(currd) || !is_canonical_address(val) )
             break;
+        wrmsrl(MSR_SHADOW_GS_BASE, val);
         curr->arch.pv_vcpu.gs_base_user = val;
         return X86EMUL_OKAY;
 
