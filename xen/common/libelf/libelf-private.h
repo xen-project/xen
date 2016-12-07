@@ -43,6 +43,7 @@
 #include <string.h>
 #include <stddef.h>
 #include <inttypes.h>
+#include <limits.h>
 #ifdef __sun__
 #include <sys/byteorder.h>
 #define bswap_16(x) BSWAP_16(x)

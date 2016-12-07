@@ -131,9 +131,10 @@ unsigned elf_shdr_count(struct elf_binary *elf)
 {
     unsigned count = elf_uval(elf, elf->ehdr, e_shnum);
     uint64_t max = elf->size / sizeof(Elf32_Shdr);
-    if (max > ~(unsigned)0)
-        max = ~(unsigned)0; /* Xen doesn't have limits.h :-/ */
-    if (count > max)
+
+    if ( max > UINT_MAX )
+        max = UINT_MAX;
+    if ( count > max )
     {
         elf_mark_broken(elf, "far too many section headers");
         count = max;
