@@ -514,18 +514,13 @@ long arch_do_domctl(
         break;
 
     case XEN_DOMCTL_set_address_size:
-        switch ( domctl->u.address_size.size )
-        {
-        case 32:
+        if ( ((domctl->u.address_size.size == 64) && !d->arch.is_32bit_pv) ||
+             ((domctl->u.address_size.size == 32) && d->arch.is_32bit_pv) )
+            ret = 0;
+        else if ( domctl->u.address_size.size == 32 )
             ret = switch_compat(d);
-            break;
-        case 64:
-            ret = switch_native(d);
-            break;
-        default:
-            ret = (domctl->u.address_size.size == BITS_PER_LONG) ? 0 : -EINVAL;
-            break;
-        }
+        else
+            ret = -EINVAL;
         break;
 
     case XEN_DOMCTL_get_address_size:

@@ -322,43 +322,12 @@ static void release_compat_l4(struct vcpu *v)
     v->arch.guest_table_user = pagetable_null();
 }
 
-static inline int may_switch_mode(struct domain *d)
-{
-    return (!is_hvm_domain(d) && (d->tot_pages == 0));
-}
-
-int switch_native(struct domain *d)
-{
-    struct vcpu *v;
-
-    if ( !may_switch_mode(d) )
-        return -EACCES;
-    if ( !is_pv_32bit_domain(d) && !is_pvh_32bit_domain(d) )
-        return 0;
-
-    d->arch.is_32bit_pv = d->arch.has_32bit_shinfo = 0;
-
-    for_each_vcpu( d, v )
-    {
-        free_compat_arg_xlat(v);
-
-        if ( !is_pvh_domain(d) )
-            release_compat_l4(v);
-        else
-            hvm_set_mode(v, 8);
-    }
-
-    d->arch.x87_fip_width = cpu_has_fpu_sel ? 0 : 8;
-
-    return 0;
-}
-
 int switch_compat(struct domain *d)
 {
     struct vcpu *v;
     int rc;
 
-    if ( !may_switch_mode(d) )
+    if ( is_hvm_domain(d) || d->tot_pages != 0 )
         return -EACCES;
     if ( is_pv_32bit_domain(d) || is_pvh_32bit_domain(d) )
         return 0;
