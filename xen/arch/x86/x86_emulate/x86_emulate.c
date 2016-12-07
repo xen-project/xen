@@ -1663,7 +1663,7 @@ static int inject_swint(enum x86_swint_type type,
         if ( !in_realmode(ctxt, ops) )
         {
             unsigned int idte_size, idte_offset;
-            struct { uint32_t a, b, c, d; } idte;
+            struct { uint32_t a, b, c, d; } idte = {};
             int lm = in_longmode(ctxt, ops);
 
             if ( lm < 0 )
@@ -1708,12 +1708,27 @@ static int inject_swint(enum x86_swint_type type,
                 return rc;
             }
 
-            /* Is this entry present? */
-            if ( !(idte.b & (1u << 15)) )
+            /* This must be an interrupt, trap, or task gate. */
+#ifdef __XEN__
+            switch ( (idte.b >> 8) & 0x1f )
             {
-                fault_type = EXC_NP;
+            case SYS_DESC_irq_gate:
+            case SYS_DESC_trap_gate:
+                break;
+            case SYS_DESC_irq_gate16:
+            case SYS_DESC_trap_gate16:
+            case SYS_DESC_task_gate:
+                if ( !lm )
+                    break;
+                /* fall through */
+            default:
                 goto raise_exn;
             }
+#endif
+
+            /* The 64-bit high half's type must be zero. */
+            if ( idte.d & 0x1f00 )
+                goto raise_exn;
 
             /* icebp counts as a hardware event, and bypasses the dpl check. */
             if ( type != x86_swint_icebp )
@@ -1724,6 +1739,13 @@ static int inject_swint(enum x86_swint_type type,
 
                 if ( cpl > ((idte.b >> 13) & 3) )
                     goto raise_exn;
+            }
+
+            /* Is this entry present? */
+            if ( !(idte.b & (1u << 15)) )
+            {
+                fault_type = EXC_NP;
+                goto raise_exn;
             }
         }
     }
