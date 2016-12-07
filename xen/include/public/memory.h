@@ -339,6 +339,8 @@ DEFINE_XEN_GUEST_HANDLE(xen_memory_map_t);
 /*
  * Returns the real physical memory map. Passes the same structure as
  * XENMEM_memory_map.
+ * Specifying buffer as NULL will return the number of entries required
+ * to store the complete memory map.
  * arg == addr of xen_memory_map_t.
  */
 #define XENMEM_machine_memory_map   10

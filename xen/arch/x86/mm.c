@@ -4736,15 +4736,18 @@ static int _handle_iomem_range(unsigned long s, unsigned long e,
         XEN_GUEST_HANDLE_PARAM(e820entry_t) buffer_param;
         XEN_GUEST_HANDLE(e820entry_t) buffer;
 
-        if ( ctxt->n + 1 >= ctxt->map.nr_entries )
-            return -EINVAL;
-        ent.addr = (uint64_t)ctxt->s << PAGE_SHIFT;
-        ent.size = (uint64_t)(s - ctxt->s) << PAGE_SHIFT;
-        ent.type = E820_RESERVED;
-        buffer_param = guest_handle_cast(ctxt->map.buffer, e820entry_t);
-        buffer = guest_handle_from_param(buffer_param, e820entry_t);
-        if ( __copy_to_guest_offset(buffer, ctxt->n, &ent, 1) )
-            return -EFAULT;
+        if ( !guest_handle_is_null(ctxt->map.buffer) )
+        {
+            if ( ctxt->n + 1 >= ctxt->map.nr_entries )
+                return -EINVAL;
+            ent.addr = (uint64_t)ctxt->s << PAGE_SHIFT;
+            ent.size = (uint64_t)(s - ctxt->s) << PAGE_SHIFT;
+            ent.type = E820_RESERVED;
+            buffer_param = guest_handle_cast(ctxt->map.buffer, e820entry_t);
+            buffer = guest_handle_from_param(buffer_param, e820entry_t);
+            if ( __copy_to_guest_offset(buffer, ctxt->n, &ent, 1) )
+                return -EFAULT;
+        }
         ctxt->n++;
     }
     ctxt->s = e + 1;
@@ -4978,6 +4981,7 @@ long arch_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         XEN_GUEST_HANDLE(e820entry_t) buffer;
         XEN_GUEST_HANDLE_PARAM(e820entry_t) buffer_param;
         unsigned int i;
+        bool store;
 
         rc = xsm_machine_memory_map(XSM_PRIV);
         if ( rc )
@@ -4985,12 +4989,15 @@ long arch_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 
         if ( copy_from_guest(&ctxt.map, arg, 1) )
             return -EFAULT;
-        if ( ctxt.map.nr_entries < e820.nr_map + 1 )
+
+        store = !guest_handle_is_null(ctxt.map.buffer);
+
+        if ( store && ctxt.map.nr_entries < e820.nr_map + 1 )
             return -EINVAL;
 
         buffer_param = guest_handle_cast(ctxt.map.buffer, e820entry_t);
         buffer = guest_handle_from_param(buffer_param, e820entry_t);
-        if ( !guest_handle_okay(buffer, ctxt.map.nr_entries) )
+        if ( store && !guest_handle_okay(buffer, ctxt.map.nr_entries) )
             return -EFAULT;
 
         for ( i = 0, ctxt.n = 0, ctxt.s = 0; i < e820.nr_map; ++i, ++ctxt.n )
@@ -5007,10 +5014,13 @@ long arch_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
                 if ( rc )
                     return rc;
             }
-            if ( ctxt.map.nr_entries <= ctxt.n + (e820.nr_map - i) )
-                return -EINVAL;
-            if ( __copy_to_guest_offset(buffer, ctxt.n, e820.map + i, 1) )
-                return -EFAULT;
+            if ( store )
+            {
+                if ( ctxt.map.nr_entries <= ctxt.n + (e820.nr_map - i) )
+                    return -EINVAL;
+                if ( __copy_to_guest_offset(buffer, ctxt.n, e820.map + i, 1) )
+                    return -EFAULT;
+            }
             ctxt.s = PFN_UP(e820.map[i].addr + e820.map[i].size);
         }
 
