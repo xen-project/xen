@@ -546,7 +546,7 @@ void arch_evtchn_inject(struct vcpu *v)
     vgic_vcpu_inject_irq(v, v->domain->arch.evtchn_irq);
 }
 
-int vgic_emulate(struct cpu_user_regs *regs, union hsr hsr)
+bool vgic_emulate(struct cpu_user_regs *regs, union hsr hsr)
 {
     struct vcpu *v = current;
 

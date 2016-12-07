@@ -131,7 +131,7 @@ struct vgic_ops {
     /* Release resources that were allocated by domain_init */
     void (*domain_free)(struct domain *d);
     /* vGIC sysreg emulation */
-    int (*emulate_sysreg)(struct cpu_user_regs *regs, union hsr hsr);
+    bool (*emulate_sysreg)(struct cpu_user_regs *regs, union hsr hsr);
     /* Maximum number of vCPU supported */
     const unsigned int max_vcpus;
 };
@@ -300,7 +300,7 @@ extern struct pending_irq *irq_to_pending(struct vcpu *v, unsigned int irq);
 extern struct pending_irq *spi_to_pending(struct domain *d, unsigned int irq);
 extern struct vgic_irq_rank *vgic_rank_offset(struct vcpu *v, int b, int n, int s);
 extern struct vgic_irq_rank *vgic_rank_irq(struct vcpu *v, unsigned int irq);
-extern int vgic_emulate(struct cpu_user_regs *regs, union hsr hsr);
+extern bool vgic_emulate(struct cpu_user_regs *regs, union hsr hsr);
 extern void vgic_disable_irqs(struct vcpu *v, uint32_t r, int n);
 extern void vgic_enable_irqs(struct vcpu *v, uint32_t r, int n);
 extern void register_vgic_ops(struct domain *d, const struct vgic_ops *ops);

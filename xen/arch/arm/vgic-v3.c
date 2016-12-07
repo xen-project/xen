@@ -1300,7 +1300,7 @@ static bool vgic_v3_to_sgi(struct vcpu *v, register_t sgir)
     return vgic_to_sgi(v, sgir, sgi_mode, virq, &target);
 }
 
-static int vgic_v3_emulate_sysreg(struct cpu_user_regs *regs, union hsr hsr)
+static bool vgic_v3_emulate_sysreg(struct cpu_user_regs *regs, union hsr hsr)
 {
     struct vcpu *v = current;
     struct hsr_sysreg sysreg = hsr.sysreg;
@@ -1321,10 +1321,10 @@ static int vgic_v3_emulate_sysreg(struct cpu_user_regs *regs, union hsr hsr)
         else
         {
             gprintk(XENLOG_WARNING, "Reading SGI1R_EL1 - WO register\n");
-            return 0;
+            return false;
         }
     default:
-        return 0;
+        return false;
     }
 }
 
