@@ -1776,12 +1776,6 @@ int hvm_emulate_one(
     return _hvm_emulate_one(hvmemul_ctxt, &hvm_emulate_ops);
 }
 
-int hvm_emulate_one_no_write(
-    struct hvm_emulate_ctxt *hvmemul_ctxt)
-{
-    return _hvm_emulate_one(hvmemul_ctxt, &hvm_emulate_ops_no_write);
-}
-
 int hvm_emulate_one_mmio(unsigned long mfn, unsigned long gla)
 {
     static const struct x86_emulate_ops hvm_intercept_ops_mmcfg = {
@@ -1841,7 +1835,7 @@ void hvm_emulate_one_vm_event(enum emul_kind kind, unsigned int trapnr,
     switch ( kind )
     {
     case EMUL_KIND_NOWRITE:
-        rc = hvm_emulate_one_no_write(&ctx);
+        rc = _hvm_emulate_one(&ctx, &hvm_emulate_ops_no_write);
         break;
     case EMUL_KIND_SET_CONTEXT_INSN: {
         struct vcpu *curr = current;
