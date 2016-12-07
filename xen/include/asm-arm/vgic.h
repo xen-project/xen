@@ -130,8 +130,8 @@ struct vgic_ops {
     int (*domain_init)(struct domain *d);
     /* Release resources that were allocated by domain_init */
     void (*domain_free)(struct domain *d);
-    /* vGIC sysreg emulation */
-    bool (*emulate_sysreg)(struct cpu_user_regs *regs, union hsr hsr);
+    /* vGIC sysreg/cpregs emulate */
+    bool (*emulate_reg)(struct cpu_user_regs *regs, union hsr hsr);
     /* Maximum number of vCPU supported */
     const unsigned int max_vcpus;
 };

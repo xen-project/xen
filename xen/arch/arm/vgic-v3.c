@@ -1328,6 +1328,17 @@ static bool vgic_v3_emulate_sysreg(struct cpu_user_regs *regs, union hsr hsr)
     }
 }
 
+static bool vgic_v3_emulate_reg(struct cpu_user_regs *regs, union hsr hsr)
+{
+    switch (hsr.ec)
+    {
+    case HSR_EC_SYSREG:
+        return vgic_v3_emulate_sysreg(regs, hsr);
+    default:
+        return false;
+    }
+}
+
 static const struct mmio_handler_ops vgic_rdistr_mmio_handler = {
     .read  = vgic_v3_rdistr_mmio_read,
     .write = vgic_v3_rdistr_mmio_write,
@@ -1491,7 +1502,7 @@ static const struct vgic_ops v3_ops = {
     .vcpu_init   = vgic_v3_vcpu_init,
     .domain_init = vgic_v3_domain_init,
     .domain_free = vgic_v3_domain_free,
-    .emulate_sysreg  = vgic_v3_emulate_sysreg,
+    .emulate_reg  = vgic_v3_emulate_reg,
     /*
      * We use both AFF1 and AFF0 in (v)MPIDR. Thus, the max number of CPU
      * that can be supported is up to 4096(==256*16) in theory.

@@ -550,9 +550,9 @@ bool vgic_emulate(struct cpu_user_regs *regs, union hsr hsr)
 {
     struct vcpu *v = current;
 
-    ASSERT(v->domain->arch.vgic.handler->emulate_sysreg != NULL);
+    ASSERT(v->domain->arch.vgic.handler->emulate_reg != NULL);
 
-    return v->domain->arch.vgic.handler->emulate_sysreg(regs, hsr);
+    return v->domain->arch.vgic.handler->emulate_reg(regs, hsr);
 }
 
 bool vgic_reserve_virq(struct domain *d, unsigned int virq)
