@@ -36,7 +36,8 @@ struct elf_sym_header {
 elf_errorstatus elf_init(struct elf_binary *elf, const char *image_input, size_t size)
 {
     ELF_HANDLE_DECL(elf_shdr) shdr;
-    uint64_t i, count, section, offset, link;
+    unsigned i, count, section, link;
+    uint64_t offset;
 
     if ( !elf_is_elfbinary(image_input, size) )
     {
@@ -89,7 +90,7 @@ elf_errorstatus elf_init(struct elf_binary *elf, const char *image_input, size_t
             continue;
 
         link = elf_uval(elf, shdr, sh_link);
-        if ( link == SHN_UNDEF || link >= elf_shdr_count(elf) )
+        if ( link == SHN_UNDEF || link >= count )
             /* out-of-bounds link value. */
             break;
 
@@ -443,11 +444,10 @@ do {                                                                \
 void elf_parse_binary(struct elf_binary *elf)
 {
     ELF_HANDLE_DECL(elf_phdr) phdr;
-    uint64_t low = -1;
-    uint64_t high = 0;
-    uint64_t i, count, paddr, memsz;
+    uint64_t low = -1, high = 0, paddr, memsz;
+    unsigned i, count;
 
-    count = elf_uval(elf, elf->ehdr, e_phnum);
+    count = elf_phdr_count(elf);
     for ( i = 0; i < count; i++ )
     {
         phdr = elf_phdr_by_index(elf, i);
@@ -474,7 +474,8 @@ void elf_parse_binary(struct elf_binary *elf)
 elf_errorstatus elf_load_binary(struct elf_binary *elf)
 {
     ELF_HANDLE_DECL(elf_phdr) phdr;
-    uint64_t i, count, paddr, offset, filesz, memsz;
+    uint64_t paddr, offset, filesz, memsz;
+    unsigned i, count;
     elf_ptrval dest;
     /*
      * Let bizarre ELFs write the output image up to twice; this
@@ -483,7 +484,7 @@ elf_errorstatus elf_load_binary(struct elf_binary *elf)
      */
     uint64_t remain_allow_copy = (uint64_t)elf->dest_size * 2;
 
-    count = elf_uval(elf, elf->ehdr, e_phnum);
+    count = elf_phdr_count(elf);
     for ( i = 0; i < count; i++ )
     {
         phdr = elf_phdr_by_index(elf, i);
@@ -512,7 +513,7 @@ elf_errorstatus elf_load_binary(struct elf_binary *elf)
         remain_allow_copy -= memsz;
 
         elf_msg(elf,
-                "ELF: phdr %" PRIu64 " at %#"ELF_PRPTRVAL" -> %#"ELF_PRPTRVAL"\n",
+                "ELF: phdr %u at %#"ELF_PRPTRVAL" -> %#"ELF_PRPTRVAL"\n",
                 i, dest, (elf_ptrval)(dest + filesz));
         if ( elf_load_image(elf, dest, ELF_IMAGE_BASE(elf) + offset, filesz, memsz) != 0 )
             return -1;

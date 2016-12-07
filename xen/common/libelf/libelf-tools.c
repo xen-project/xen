@@ -149,10 +149,9 @@ unsigned elf_phdr_count(struct elf_binary *elf)
 
 ELF_HANDLE_DECL(elf_shdr) elf_shdr_by_name(struct elf_binary *elf, const char *name)
 {
-    uint64_t count = elf_shdr_count(elf);
+    unsigned i, count = elf_shdr_count(elf);
     ELF_HANDLE_DECL(elf_shdr) shdr;
     const char *sname;
-    unsigned i;
 
     for ( i = 1; i < count; i++ )
     {
@@ -169,7 +168,7 @@ ELF_HANDLE_DECL(elf_shdr) elf_shdr_by_name(struct elf_binary *elf, const char *n
 
 ELF_HANDLE_DECL(elf_shdr) elf_shdr_by_index(struct elf_binary *elf, unsigned index)
 {
-    uint64_t count = elf_shdr_count(elf);
+    unsigned count = elf_shdr_count(elf);
     elf_ptrval ptr;
 
     if ( index >= count )
@@ -183,7 +182,7 @@ ELF_HANDLE_DECL(elf_shdr) elf_shdr_by_index(struct elf_binary *elf, unsigned ind
 
 ELF_HANDLE_DECL(elf_phdr) elf_phdr_by_index(struct elf_binary *elf, unsigned index)
 {
-    uint64_t count = elf_uval(elf, elf->ehdr, e_phnum);
+    unsigned count = elf_phdr_count(elf);
     elf_ptrval ptr;
 
     if ( index >= count )
