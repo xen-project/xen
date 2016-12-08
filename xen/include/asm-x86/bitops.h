@@ -6,8 +6,7 @@
  */
 
 #include <asm/alternative.h>
-#define X86_FEATURES_ONLY
-#include <asm/cpufeature.h>
+#include <asm/cpufeatureset.h>
 
 /*
  * We specify the memory operand as both input and output because the memory

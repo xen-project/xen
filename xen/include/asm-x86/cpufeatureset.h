@@ -8,20 +8,20 @@
 #define XEN_CPUFEATURE(name, value) X86_FEATURE_##name = value,
 enum {
 #include <public/arch-x86/cpufeatureset.h>
-#include <asm/cpufeature.h>
+#include <asm/cpufeatures.h>
 };
 #undef XEN_CPUFEATURE
 
 #define XEN_CPUFEATURE(name, value) asm (".equ X86_FEATURE_" #name ", " \
                                          __stringify(value));
 #include <public/arch-x86/cpufeatureset.h>
-#include <asm/cpufeature.h>
+#include <asm/cpufeatures.h>
 
 #else /* !__ASSEMBLY__ */
 
 #define XEN_CPUFEATURE(name, value) .equ X86_FEATURE_##name, value
 #include <public/arch-x86/cpufeatureset.h>
-#include <asm/cpufeature.h>
+#include <asm/cpufeatures.h>
 
 #endif /* __ASSEMBLY__ */
 

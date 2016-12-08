@@ -3,29 +3,8 @@
  *
  * Defines x86 CPU feature bits
  */
-#if defined(XEN_CPUFEATURE)
-
-/* Other features, Xen-defined mapping. */
-/* This range is used for feature bits which conflict or are synthesized */
-XEN_CPUFEATURE(CONSTANT_TSC,    (FSCAPINTS+0)*32+ 0) /* TSC ticks at a constant rate */
-XEN_CPUFEATURE(NONSTOP_TSC,     (FSCAPINTS+0)*32+ 1) /* TSC does not stop in C states */
-XEN_CPUFEATURE(ARAT,            (FSCAPINTS+0)*32+ 2) /* Always running APIC timer */
-XEN_CPUFEATURE(ARCH_PERFMON,    (FSCAPINTS+0)*32+ 3) /* Intel Architectural PerfMon */
-XEN_CPUFEATURE(TSC_RELIABLE,    (FSCAPINTS+0)*32+ 4) /* TSC is known to be reliable */
-XEN_CPUFEATURE(XTOPOLOGY,       (FSCAPINTS+0)*32+ 5) /* cpu topology enum extensions */
-XEN_CPUFEATURE(CPUID_FAULTING,  (FSCAPINTS+0)*32+ 6) /* cpuid faulting */
-XEN_CPUFEATURE(CLFLUSH_MONITOR, (FSCAPINTS+0)*32+ 7) /* clflush reqd with monitor */
-XEN_CPUFEATURE(APERFMPERF,      (FSCAPINTS+0)*32+ 8) /* APERFMPERF */
-XEN_CPUFEATURE(MFENCE_RDTSC,    (FSCAPINTS+0)*32+ 9) /* MFENCE synchronizes RDTSC */
-XEN_CPUFEATURE(XEN_SMEP,        (FSCAPINTS+0)*32+ 10) /* SMEP gets used by Xen itself */
-XEN_CPUFEATURE(XEN_SMAP,        (FSCAPINTS+0)*32+ 11) /* SMAP gets used by Xen itself */
-
-#define NCAPINTS (FSCAPINTS + 1) /* N 32-bit words worth of info */
-
-#elif !defined(__ASM_I386_CPUFEATURE_H)
-#ifndef X86_FEATURES_ONLY
+#ifndef __ASM_I386_CPUFEATURE_H
 #define __ASM_I386_CPUFEATURE_H
-#endif
 
 #include <xen/const.h>
 #include <asm/cpuid.h>
@@ -37,7 +16,7 @@ XEN_CPUFEATURE(XEN_SMAP,        (FSCAPINTS+0)*32+ 11) /* SMAP gets used by Xen i
 /* An alias of a feature we know is always going to be present. */
 #define X86_FEATURE_ALWAYS      X86_FEATURE_LM
 
-#if !defined(__ASSEMBLY__) && !defined(X86_FEATURES_ONLY)
+#ifndef __ASSEMBLY__
 #include <xen/bitops.h>
 
 #define cpu_has(c, bit)		test_bit(bit, (c)->x86_capability)
@@ -139,9 +118,7 @@ struct cpuid4_info {
 };
 
 int cpuid4_cache_lookup(int index, struct cpuid4_info *this_leaf);
-#endif
-
-#undef X86_FEATURES_ONLY
+#endif /* !__ASSEMBLY__ */
 
 #endif /* __ASM_I386_CPUFEATURE_H */
 
