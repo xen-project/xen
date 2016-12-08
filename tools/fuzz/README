@@ -1,0 +1,39 @@
+# OVERVIEW
+
+This directory provides fuzzing targets to be run inside Google
+oss-fuzz infrastructure.
+
+See also https://github.com/google/oss-fuzz.
+
+# HOW IT WORKS
+
+We need to provide the source code and the rune to produce objects or
+archives (artefacts) from source code. These items ideally should live
+inside xen.git so that they can be kept up to date.
+
+The artefacts contain all the code we wish to fuzz and a function
+called LLVMFuzzerTestOneInput. LLVMFuzzerTestOneInput is the entry
+point to the code we wish to fuzz. Note that we don't produce
+executable programs because we don't have libFuzzEngine
+locally. libFuzzEngine is maintained by oss-fuzz.
+
+We also provide build script to oss-fuzz. The build script will
+inherit the correct compiler settings and be run in a pre-setup
+environment, which has libFuzzEngine installed. The build script is
+responsible for calling the correct Xen build rune to produce the
+artefacts, then link them against libFuzzEngine to produce
+executables, which will run in oss-fuzz infrastructure.
+
+Please refer to official oss-fuzz documents for the most up-to-date
+descriptions for all moving parts.
+
+# HOW TO IMPROVE THE FUZZING TARGETS
+
+Feel free to modify each fuzzing targets at will. Make sure they build
+by invoking make as you would build tools.
+
+To actually test the new code, you would need to run the target in
+standalone mode, please refer to oss-fuzz documents on how to do that.
+
+It is highly recommended that you run the new target for a while to
+weed out error in plumbing code to avoid false positives.
