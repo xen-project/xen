@@ -4104,6 +4104,8 @@ x86_emulate(
         break;
 
     case 0xf6 ... 0xf7: /* Grp3 */
+        if ( (d & DstMask) == DstEax )
+            dst.reg = (unsigned long *)&_regs.eax;
         switch ( modrm_reg & 7 )
         {
             unsigned long u[2], v;
@@ -4118,7 +4120,6 @@ x86_emulate(
             emulate_1op("neg", dst, _regs.eflags);
             break;
         case 4: /* mul */
-            dst.reg = (unsigned long *)&_regs.eax;
             _regs.eflags &= ~(EFLG_OF|EFLG_CF);
             switch ( dst.bytes )
             {
@@ -4156,7 +4157,6 @@ x86_emulate(
             }
             break;
         case 5: /* imul */
-            dst.reg = (unsigned long *)&_regs.eax;
         imul:
             _regs.eflags &= ~(EFLG_OF|EFLG_CF);
             switch ( dst.bytes )
@@ -4198,7 +4198,6 @@ x86_emulate(
             }
             break;
         case 6: /* div */
-            dst.reg = (unsigned long *)&_regs.eax;
             switch ( src.bytes )
             {
             case 1:
@@ -4244,7 +4243,6 @@ x86_emulate(
             }
             break;
         case 7: /* idiv */
-            dst.reg = (unsigned long *)&_regs.eax;
             switch ( src.bytes )
             {
             case 1:
