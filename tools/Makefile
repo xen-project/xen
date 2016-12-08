@@ -6,6 +6,7 @@ SUBDIRS-y += include
 SUBDIRS-y += libs
 SUBDIRS-y += libxc
 SUBDIRS-y += flask
+SUBDIRS-y += fuzz
 SUBDIRS-y += xenstore
 SUBDIRS-y += misc
 SUBDIRS-y += examples
