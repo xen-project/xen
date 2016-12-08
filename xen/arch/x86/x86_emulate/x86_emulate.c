@@ -4863,12 +4863,10 @@ x86_emulate(
 
         _regs.eflags &= ~(EFLG_VM | EFLG_IF | EFLG_RF);
 
-        fail_if(ops->read_segment == NULL);
-        ops->read_segment(x86_seg_cs, &cs, ctxt);
         cs.sel = msr_content & ~3; /* SELECTOR_RPL_MASK */
         cs.base = 0;   /* flat segment */
         cs.limit = ~0u;  /* 4GB limit */
-        cs.attr.bytes = lm ? 0xa9b  /* L+DB+P+S+Code */
+        cs.attr.bytes = lm ? 0xa9b  /* G+L+P+S+Code */
                            : 0xc9b; /* G+DB+P+S+Code */
 
         sreg.sel = cs.sel + 8;
