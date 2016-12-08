@@ -1686,8 +1686,6 @@ static int inject_swint(enum x86_swint_type type,
                  ((ctxt->regs->eflags & EFLG_IOPL) != EFLG_IOPL) )
                 goto raise_exn;
 
-            fail_if(ops->read == NULL);
-
             /*
              * Read all 8/16 bytes so the idtr limit check is applied properly
              * to this entry, even though we only end up looking at the 2nd
