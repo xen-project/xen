@@ -897,19 +897,30 @@ do {                                                                    \
     put_stub(stub);                                                     \
 } while (0)
 
-static unsigned long _get_rep_prefix(
-    const struct cpu_user_regs *int_regs,
+static inline unsigned long get_loop_count(
+    const struct cpu_user_regs *regs,
     int ad_bytes)
 {
-    return (ad_bytes == 2) ? (uint16_t)int_regs->ecx :
-           (ad_bytes == 4) ? (uint32_t)int_regs->ecx :
-           int_regs->ecx;
+    return (ad_bytes == 2) ? (uint16_t)regs->ecx :
+           (ad_bytes == 4) ? (uint32_t)regs->ecx :
+           regs->ecx;
+}
+
+static inline void put_loop_count(
+    struct cpu_user_regs *regs,
+    int ad_bytes,
+    unsigned long count)
+{
+    if ( ad_bytes == 2 )
+        *(uint16_t *)&regs->ecx = count;
+    else
+        regs->ecx = ad_bytes == 4 ? (uint32_t)count : count;
 }
 
 #define get_rep_prefix() ({                                             \
     unsigned long max_reps = 1;                                         \
     if ( rep_prefix() )                                                 \
-        max_reps = _get_rep_prefix(&_regs, ad_bytes);                   \
+        max_reps = get_loop_count(&_regs, ad_bytes);                    \
     if ( max_reps == 0 )                                                \
     {                                                                   \
         /* Skip the instruction if no repetitions are required. */      \
@@ -925,21 +936,14 @@ static void __put_rep_prefix(
     int ad_bytes,
     unsigned long reps_completed)
 {
-    unsigned long ecx = ((ad_bytes == 2) ? (uint16_t)int_regs->ecx :
-                         (ad_bytes == 4) ? (uint32_t)int_regs->ecx :
-                         int_regs->ecx);
+    unsigned long ecx = get_loop_count(int_regs, ad_bytes);
 
     /* Reduce counter appropriately, and repeat instruction if non-zero. */
     ecx -= reps_completed;
     if ( ecx != 0 )
         int_regs->eip = ext_regs->eip;
 
-    if ( ad_bytes == 2 )
-        *(uint16_t *)&int_regs->ecx = ecx;
-    else if ( ad_bytes == 4 )
-        int_regs->ecx = (uint32_t)ecx;
-    else
-        int_regs->ecx = ecx;
+    put_loop_count(int_regs, ad_bytes, ecx);
 }
 
 #define put_rep_prefix(reps_completed) ({                               \
@@ -3993,33 +3997,21 @@ x86_emulate(
         break;
 
     case 0xe0 ... 0xe2: /* loop{,z,nz} */ {
+        unsigned long count = get_loop_count(&_regs, ad_bytes);
         int do_jmp = !(_regs.eflags & EFLG_ZF); /* loopnz */
 
         if ( b == 0xe1 )
             do_jmp = !do_jmp; /* loopz */
         else if ( b == 0xe2 )
             do_jmp = 1; /* loop */
-        switch ( ad_bytes )
-        {
-        case 2:
-            do_jmp &= --(*(uint16_t *)&_regs.ecx) != 0;
-            break;
-        case 4:
-            do_jmp &= --(*(uint32_t *)&_regs.ecx) != 0;
-            _regs.ecx = (uint32_t)_regs.ecx; /* zero extend in x86/64 mode */
-            break;
-        default: /* case 8: */
-            do_jmp &= --_regs.ecx != 0;
-            break;
-        }
-        if ( do_jmp )
+        if ( count != 1 && do_jmp )
             jmp_rel((int32_t)src.val);
+        put_loop_count(&_regs, ad_bytes, count - 1);
         break;
     }
 
     case 0xe3: /* jcxz/jecxz (short) */
-        if ( (ad_bytes == 2) ? !(uint16_t)_regs.ecx :
-             (ad_bytes == 4) ? !(uint32_t)_regs.ecx : !_regs.ecx )
+        if ( !get_loop_count(&_regs, ad_bytes) )
             jmp_rel((int32_t)src.val);
         break;
 
