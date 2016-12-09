@@ -1463,7 +1463,7 @@ determined in the similar way to that of B<default> TSC mode.
 
 =back
 
-Please see F<docs/misc/tscmode.txt> for more information on this option.
+Please see L<xen-tscmode(7)> for more information on this option.
 
 =item B<localtime=BOOLEAN>
 
@@ -2033,7 +2033,7 @@ natively or via hardware backwards compatibility support.
 
 =item L<xl-network-configuration(5)>
 
-=item F<docs/misc/tscmode.txt>
+=item L<xen-tscmode(7)>
 
 =back
 

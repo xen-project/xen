@@ -1,7 +1,4 @@
-TSC_MODE HOW-TO
-by: Dan Magenheimer <dan.magenheimer@oracle.com>
-
-OVERVIEW
+=head1 OVERVIEW
 
 As of Xen 4.0, a new config option called tsc_mode may be specified
 for each domain.  The default for tsc_mode handles the vast majority
@@ -16,16 +13,29 @@ equally to both the OS and ALL apps that are running on this
 domain, now or in the future.
 
 Key questions to be answered for the OS and/or each application are:
-- Does the OS/app use the rdtsc instruction at all?  (We will explain below
-  how to determine this.)
-- At what frequency is the rdtsc instruction executed by either the OS
-  or any running apps?  If the sum exceeds about 10,000 rdtsc instructions
-  per second per processor, we call this a "high-TSC-frequency"
-  OS/app/environment.  (This is relatively rare, and developers of OS's
-  and apps that are high-TSC-frequency are usually aware of it.)
-- If the OS/app does use rdtsc, will it behave incorrectly if "time goes
-  backwards" or if the frequency of the TSC suddenly changes?  If so,
-  we call this a "TSC-sensitive" app or OS; otherwise it is "TSC-resilient".
+
+=over 4
+
+=item *
+
+Does the OS/app use the rdtsc instruction at all?
+(We will explain below how to determine this.)
+
+=item *
+
+At what frequency is the rdtsc instruction executed by either the OS
+or any running apps?  If the sum exceeds about 10,000 rdtsc instructions
+per second per processor, we call this a "high-TSC-frequency"
+OS/app/environment.  (This is relatively rare, and developers of OS's
+and apps that are high-TSC-frequency are usually aware of it.)
+
+=item *
+
+If the OS/app does use rdtsc, will it behave incorrectly if "time goes
+backwards" or if the frequency of the TSC suddenly changes?  If so,
+we call this a "TSC-sensitive" app or OS; otherwise it is "TSC-resilient".
+
+=back
 
 This last is the US$64,000 question as it may be very difficult
 (or, for legacy apps, even impossible) to predict all possible
@@ -46,38 +56,63 @@ an intelligent default but allows system administrator's to adjust
 how rdtsc instructions are executed differently for different domains.
 
 The non-default choices for tsc_mode are:
-- tsc_mode=1 (always emulate). All rdtsc instructions are emulated;
-   this is the best choice when TSC-sensitive apps are running and
-   it is necessary to understand worst-case performance degradation
-   for a specific hardware environment.
-- tsc_mode=2 (never emulate).  This is the same as prior to Xen 4.0
-   and is the best choice if it is certain that all apps running in
-   this VM are TSC-resilient and highest performance is required.
-- tsc_mode=3 (PVRDTSCP).  High-TSC-frequency apps may be paravirtualized
-   (modified) to obtain both correctness and highest performance; any
-   unmodified apps must be TSC-resilient.
 
-If tsc_mode is left unspecified (or set to tsc_mode=0), a hybrid
+=over 4
+
+=item * B<tsc_mode=1> (always emulate).
+
+All rdtsc instructions are emulated; this is the best choice when
+TSC-sensitive apps are running and it is necessary to understand
+worst-case performance degradation for a specific hardware environment.
+
+=item * B<tsc_mode=2> (never emulate).
+
+This is the same as prior to Xen 4.0 and is the best choice if it
+is certain that all apps running in this VM are TSC-resilient and
+highest performance is required.
+
+=item * B<tsc_mode=3> (PVRDTSCP).
+
+High-TSC-frequency apps may be paravirtualized (modified) to
+obtain both correctness and highest performance; any unmodified
+apps must be TSC-resilient.
+
+=back
+
+If tsc_mode is left unspecified (or set to B<tsc_mode=0>), a hybrid
 algorithm is utilized to ensure correctness while providing the
 best performance possible given:
-- the requirement of correctness,
-- the underlying hardware, and
-- whether or not the VM has been saved/restored/migrated
+
+=over 4
+
+=item *
+
+the requirement of correctness,
+
+=item *
+
+the underlying hardware, and
+
+=item *
+
+whether or not the VM has been saved/restored/migrated
 To understand this in more detail, the rest of this document must
 be read.
 
-DETERMINING RDTSC FREQUENCY
+=back
+
+=head1 DETERMINING RDTSC FREQUENCY
 
 To determine the frequency of rdtsc instructions that are emulated,
 an "xm" command can be used by a privileged user of domain0.  The
 command:
 
-# xm debug-key s; xm dmesg | tail
+    # xm debug-key s; xm dmesg | tail
 
 provides information about TSC usage in each domain where TSC
 emulation is currently enabled.
 
-TSC HISTORY
+=head1 TSC HISTORY
 
 To understand tsc_mode completely, some background on TSC is required:
 
@@ -214,7 +249,7 @@ then restored 30 seconds later, TSC is only guaranteed to be greater
 than or equal to 1001, not precisely 1030.  This has some OS implications
 as will be seen in the next section.
 
-TSC INVARIANT BIT and NO_MIGRATE
+=head1 TSC INVARIANT BIT and NO_MIGRATE
 
 Related to TSC emulation, the "TSC Invariant" bit is architecturally defined
 in a cpuid bit on the most recent x86 processors.  If set, TSC invariance
@@ -251,7 +286,7 @@ decisions based on that bit.  This is still an unsolved problem, though
 a workaround exists as part of the PVRDTSCP tsc_mode for apps that
 can be modified.
 
-MORE ON PVRDTSCP
+=head1 MORE ON PVRDTSCP
 
 Paravirtualized OS's use the "pvclock" algorithm to manage the passing
 of time.  This sophisticated algorithm obtains information from a memory
@@ -298,7 +333,7 @@ While pvrtscp is too complex for most apps, certain enterprise
 TSC-sensitive high-TSC-frequency apps may find it useful to
 obtain a significant performance gain.
 
-Hardware TSC Scaling
+=head1 HARDWARE TSC SCALING
 
 Intel VMX TSC scaling and AMD SVM TSC ratio allow the guest TSC read
 by guest rdtsc/p increasing in a different frequency than the host
@@ -318,3 +353,7 @@ executed natively before and after migration.
 For above HVM container in PVRDTSCP mode (tsc_mode=3), if the
 destination host does not support rdtscp, the guest rdtscp instruction
 will be emulated with the guest TSC frequency.
+
+=head1 AUTHORS
+
+Dan Magenheimer <dan.magenheimer@oracle.com>

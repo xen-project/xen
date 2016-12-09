@@ -12,7 +12,6 @@ misc/xen-command-line		Xen Hypervisor Command Line Options
 misc/crashdb			Xen crash debugger notes
 misc/grant-tables		A Rough Introduction to Using Grant Tables
 misc/kexec_and_kdump		Kexec and Kdump for Xen
-misc/tscmode			TSC Mode HOWTO
 misc/xenstore			Xenstore protocol specification
 misc/xenstore-paths		Xenstore path documentation
 misc/distro_mapping		Distro Directory Layouts
