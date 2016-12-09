@@ -4463,7 +4463,7 @@ x86_emulate(
             generate_exception_if(lock_prefix | rep_prefix() | (vex.pfx == vex_66),
                                   EXC_UD);
             fail_if(!ops->vmfunc);
-            if ( (rc = ops->vmfunc(ctxt) != X86EMUL_OKAY) )
+            if ( (rc = ops->vmfunc(ctxt)) != X86EMUL_OKAY )
                 goto done;
             goto no_writeback;
 
