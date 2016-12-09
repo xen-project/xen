@@ -2572,7 +2572,8 @@ static int priv_op_read_msr(unsigned int reg, uint64_t *val,
         {
             if ( wrmsr_safe(MSR_IA32_UCODE_REV, 0) )
                 break;
-            sync_core();
+            /* As documented in the SDM: Do a CPUID 1 here */
+            cpuid_eax(1);
         }
         goto normal;
 

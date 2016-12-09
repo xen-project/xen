@@ -115,8 +115,9 @@ static int collect_cpu_info(unsigned int cpu_num, struct cpu_signature *csig)
     }
 
     wrmsrl(MSR_IA32_UCODE_REV, 0x0ULL);
-    /* see notes above for revision 1.07.  Apparent chip bug */
-    sync_core();
+    /* As documented in the SDM: Do a CPUID 1 here */
+    cpuid_eax(1);
+
     /* get the current revision from MSR 0x8B */
     rdmsrl(MSR_IA32_UCODE_REV, msr_content);
     csig->rev = (uint32_t)(msr_content >> 32);
@@ -297,8 +298,8 @@ static int apply_microcode(unsigned int cpu)
     wrmsrl(MSR_IA32_UCODE_WRITE, (unsigned long)uci->mc.mc_intel->bits);
     wrmsrl(MSR_IA32_UCODE_REV, 0x0ULL);
 
-    /* see notes above for revision 1.07.  Apparent chip bug */
-    sync_core();
+    /* As documented in the SDM: Do a CPUID 1 here */
+    cpuid_eax(1);
 
     /* get the current revision from MSR 0x8B */
     rdmsrl(MSR_IA32_UCODE_REV, msr_content);
