@@ -205,7 +205,10 @@ int gic_remove_irq_from_guest(struct domain *d, unsigned int virq,
          */
         if ( test_bit(_IRQ_INPROGRESS, &desc->status) ||
              !test_bit(_IRQ_DISABLED, &desc->status) )
+        {
+            vgic_unlock_rank(v_target, rank, flags);
             return -EBUSY;
+        }
     }
 
     clear_bit(_IRQ_GUEST, &desc->status);
