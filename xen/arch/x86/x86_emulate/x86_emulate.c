@@ -1929,6 +1929,7 @@ x86_decode(
     uint8_t b, d, sib, sib_index, sib_base;
     unsigned int def_op_bytes, def_ad_bytes, opcode;
     enum x86_segment override_seg = x86_seg_none;
+    bool pc_rel = false;
     int rc = X86EMUL_OKAY;
 
     memset(state, 0, sizeof(*state));
@@ -2294,7 +2295,6 @@ x86_decode(
                 ea.mem.off += insn_fetch_type(int16_t);
                 break;
             }
-            ea.mem.off = truncate_ea(ea.mem.off);
         }
         else
         {
@@ -2343,15 +2343,7 @@ x86_decode(
                 if ( (modrm_rm & 7) != 5 )
                     break;
                 ea.mem.off = insn_fetch_type(int32_t);
-                if ( !mode_64bit() )
-                    break;
-                /* Relative to RIP of next instruction. Argh! */
-                ea.mem.off += state->eip;
-                if ( (d & SrcMask) == SrcImm )
-                    ea.mem.off += (d & ByteOp) ? 1 :
-                        ((op_bytes == 8) ? 4 : op_bytes);
-                else if ( (d & SrcMask) == SrcImmByte )
-                    ea.mem.off += 1;
+                pc_rel = mode_64bit();
                 break;
             case 1:
                 ea.mem.off += insn_fetch_type(int8_t);
@@ -2360,7 +2352,6 @@ x86_decode(
                 ea.mem.off += insn_fetch_type(int32_t);
                 break;
             }
-            ea.mem.off = truncate_ea(ea.mem.off);
         }
     }
 
@@ -2423,6 +2414,14 @@ x86_decode(
     default:
         ASSERT_UNREACHABLE();
         return X86EMUL_UNHANDLEABLE;
+    }
+
+    if ( ea.type == OP_MEM )
+    {
+        if ( pc_rel )
+            ea.mem.off += state->eip;
+
+        ea.mem.off = truncate_ea(ea.mem.off);
     }
 
     /*
