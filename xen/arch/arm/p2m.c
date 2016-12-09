@@ -1479,7 +1479,8 @@ mfn_t gfn_to_mfn(struct domain *d, gfn_t gfn)
  * we indeed found a conflicting mem_access setting.
  */
 static struct page_info*
-p2m_mem_access_check_and_get_page(vaddr_t gva, unsigned long flag)
+p2m_mem_access_check_and_get_page(vaddr_t gva, unsigned long flag,
+                                  const struct vcpu *v)
 {
     long rc;
     paddr_t ipa;
@@ -1488,7 +1489,7 @@ p2m_mem_access_check_and_get_page(vaddr_t gva, unsigned long flag)
     xenmem_access_t xma;
     p2m_type_t t;
     struct page_info *page = NULL;
-    struct p2m_domain *p2m = &current->domain->arch.p2m;
+    struct p2m_domain *p2m = &v->domain->arch.p2m;
 
     rc = gva_to_ipa(gva, &ipa, flag);
     if ( rc < 0 )
@@ -1500,7 +1501,7 @@ p2m_mem_access_check_and_get_page(vaddr_t gva, unsigned long flag)
      * We do this first as this is faster in the default case when no
      * permission is set on the page.
      */
-    rc = __p2m_get_mem_access(current->domain, gfn, &xma);
+    rc = __p2m_get_mem_access(v->domain, gfn, &xma);
     if ( rc < 0 )
         goto err;
 
@@ -1564,7 +1565,7 @@ p2m_mem_access_check_and_get_page(vaddr_t gva, unsigned long flag)
 
     page = mfn_to_page(mfn_x(mfn));
 
-    if ( unlikely(!get_page(page, current->domain)) )
+    if ( unlikely(!get_page(page, v->domain)) )
         page = NULL;
 
 err:
@@ -1605,7 +1606,7 @@ struct page_info *get_page_from_gva(struct vcpu *v, vaddr_t va,
 
 err:
     if ( !page && p2m->mem_access_enabled )
-        page = p2m_mem_access_check_and_get_page(va, flags);
+        page = p2m_mem_access_check_and_get_page(va, flags, v);
 
     p2m_read_unlock(p2m);
 
