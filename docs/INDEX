@@ -18,7 +18,6 @@ misc/xenstore-paths		Xenstore path documentation
 misc/distro_mapping		Distro Directory Layouts
 misc/dump-core-format		Xen Core Dump Format
 misc/vtd			VT-d HOWTO
-misc/vtpm			Virtual TPM
 misc/xen-error-handling		Xen Error Handling
 misc/xenpaging			Xen Paging
 misc/xsm-flask			XSM/FLASK Configuration

@@ -491,8 +491,7 @@ L<xl-network-configuration(5)>.
 =item B<vtpm=[ "VTPM_SPEC_STRING", "VTPM_SPEC_STRING", ...]>
 
 Specifies the virtual trusted platform module to be
-provided to the guest. Please see F<docs/misc/vtpm.txt>
-for more details.
+provided to the guest. Please see L<xen-vtpm(7)> for more details.
 
 Each B<VTPM_SPEC_STRING> is a comma-separated list of C<KEY=VALUE>
 settings, from the following list:
