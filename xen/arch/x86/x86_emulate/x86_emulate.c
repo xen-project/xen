@@ -849,59 +849,44 @@ do {                                                            \
 } while (0)
 
 #define emulate_fpu_insn(_op)                           \
-do{ struct fpu_insn_ctxt fic;                           \
-    get_fpu(X86EMUL_FPU_fpu, &fic);                     \
     asm volatile (                                      \
         "movb $2f-1f,%0 \n"                             \
         "1: " _op "     \n"                             \
         "2:             \n"                             \
-        : "=m" (fic.insn_bytes) : : "memory" );         \
-    put_fpu(&fic);                                      \
-} while (0)
+        : "=m" (fic.insn_bytes) : : "memory" )
 
 #define emulate_fpu_insn_memdst(_op, _arg)              \
-do{ struct fpu_insn_ctxt fic;                           \
-    get_fpu(X86EMUL_FPU_fpu, &fic);                     \
     asm volatile (                                      \
         "movb $2f-1f,%0 \n"                             \
         "1: " _op " %1  \n"                             \
         "2:             \n"                             \
         : "=m" (fic.insn_bytes), "=m" (_arg)            \
-        : : "memory" );                                 \
-    put_fpu(&fic);                                      \
-} while (0)
+        : : "memory" )
 
 #define emulate_fpu_insn_memsrc(_op, _arg)              \
-do{ struct fpu_insn_ctxt fic;                           \
-    get_fpu(X86EMUL_FPU_fpu, &fic);                     \
     asm volatile (                                      \
         "movb $2f-1f,%0 \n"                             \
         "1: " _op " %1  \n"                             \
         "2:             \n"                             \
         : "=m" (fic.insn_bytes)                         \
-        : "m" (_arg) : "memory" );                      \
-    put_fpu(&fic);                                      \
-} while (0)
+        : "m" (_arg) : "memory" )
 
 #define emulate_fpu_insn_stub(_bytes...)                                \
 do {                                                                    \
     uint8_t *buf = get_stub(stub);                                      \
     unsigned int _nr = sizeof((uint8_t[]){ _bytes });                   \
-    struct fpu_insn_ctxt fic = { .insn_bytes = _nr };                   \
+    fic.insn_bytes = _nr;                                               \
     memcpy(buf, ((uint8_t[]){ _bytes, 0xc3 }), _nr + 1);                \
-    get_fpu(X86EMUL_FPU_fpu, &fic);                                     \
     stub.func();                                                        \
-    put_fpu(&fic);                                                      \
     put_stub(stub);                                                     \
 } while (0)
 
 #define emulate_fpu_insn_stub_eflags(bytes...)                          \
 do {                                                                    \
     unsigned int nr_ = sizeof((uint8_t[]){ bytes });                    \
-    struct fpu_insn_ctxt fic_ = { .insn_bytes = nr_ };                  \
     unsigned long tmp_;                                                 \
+    fic.insn_bytes = nr_;                                               \
     memcpy(get_stub(stub), ((uint8_t[]){ bytes, 0xc3 }), nr_ + 1);      \
-    get_fpu(X86EMUL_FPU_fpu, &fic_);                                    \
     asm volatile ( _PRE_EFLAGS("[eflags]", "[mask]", "[tmp]")           \
                    "call *%[func];"                                     \
                    _POST_EFLAGS("[eflags]", "[mask]", "[tmp]")          \
@@ -909,7 +894,6 @@ do {                                                                    \
                      [tmp] "=&r" (tmp_)                                 \
                    : [func] "rm" (stub.func),                           \
                      [mask] "i" (EFLG_ZF|EFLG_PF|EFLG_CF) );            \
-    put_fpu(&fic_);                                                     \
     put_stub(stub);                                                     \
 } while (0)
 
@@ -2473,6 +2457,7 @@ x86_emulate(
     struct operand src = { .reg = PTR_POISON };
     struct operand dst = { .reg = PTR_POISON };
     enum x86_swint_type swint_type;
+    struct fpu_insn_ctxt fic;
     struct x86_emulate_stub stub = {};
     DECLARE_ALIGNED(mmval_t, mmval);
 
@@ -3131,15 +3116,12 @@ x86_emulate(
         break;
 
     case 0x9b:  /* wait/fwait */
-    {
-        struct fpu_insn_ctxt fic = { .insn_bytes = 1 };
-
+        fic.insn_bytes = 1;
         host_and_vcpu_must_have(fpu);
         get_fpu(X86EMUL_FPU_wait, &fic);
         asm volatile ( "fwait" ::: "memory" );
         put_fpu(&fic);
         break;
-    }
 
     case 0x9c: /* pushf */
         generate_exception_if((_regs.eflags & EFLG_VM) &&
@@ -3516,6 +3498,7 @@ x86_emulate(
 
     case 0xd8: /* FPU 0xd8 */
         host_and_vcpu_must_have(fpu);
+        get_fpu(X86EMUL_FPU_fpu, &fic);
         switch ( modrm )
         {
         case 0xc0 ... 0xc7: /* fadd %stN,%st */
@@ -3561,10 +3544,12 @@ x86_emulate(
                 break;
             }
         }
+        put_fpu(&fic);
         break;
 
     case 0xd9: /* FPU 0xd9 */
         host_and_vcpu_must_have(fpu);
+        get_fpu(X86EMUL_FPU_fpu, &fic);
         switch ( modrm )
         {
         case 0xfb: /* fsincos */
@@ -3641,10 +3626,12 @@ x86_emulate(
                 generate_exception(EXC_UD);
             }
         }
+        put_fpu(&fic);
         break;
 
     case 0xda: /* FPU 0xda */
         host_and_vcpu_must_have(fpu);
+        get_fpu(X86EMUL_FPU_fpu, &fic);
         switch ( modrm )
         {
         case 0xc0 ... 0xc7: /* fcmovb %stN */
@@ -3690,10 +3677,12 @@ x86_emulate(
                 break;
             }
         }
+        put_fpu(&fic);
         break;
 
     case 0xdb: /* FPU 0xdb */
         host_and_vcpu_must_have(fpu);
+        get_fpu(X86EMUL_FPU_fpu, &fic);
         switch ( modrm )
         {
         case 0xc0 ... 0xc7: /* fcmovnb %stN */
@@ -3753,10 +3742,12 @@ x86_emulate(
                 generate_exception(EXC_UD);
             }
         }
+        put_fpu(&fic);
         break;
 
     case 0xdc: /* FPU 0xdc */
         host_and_vcpu_must_have(fpu);
+        get_fpu(X86EMUL_FPU_fpu, &fic);
         switch ( modrm )
         {
         case 0xc0 ... 0xc7: /* fadd %st,%stN */
@@ -3802,10 +3793,12 @@ x86_emulate(
                 break;
             }
         }
+        put_fpu(&fic);
         break;
 
     case 0xdd: /* FPU 0xdd */
         host_and_vcpu_must_have(fpu);
+        get_fpu(X86EMUL_FPU_fpu, &fic);
         switch ( modrm )
         {
         case 0xc0 ... 0xc7: /* ffree %stN */
@@ -3852,10 +3845,12 @@ x86_emulate(
                 generate_exception(EXC_UD);
             }
         }
+        put_fpu(&fic);
         break;
 
     case 0xde: /* FPU 0xde */
         host_and_vcpu_must_have(fpu);
+        get_fpu(X86EMUL_FPU_fpu, &fic);
         switch ( modrm )
         {
         case 0xc0 ... 0xc7: /* faddp %stN */
@@ -3898,10 +3893,12 @@ x86_emulate(
                 break;
             }
         }
+        put_fpu(&fic);
         break;
 
     case 0xdf: /* FPU 0xdf */
         host_and_vcpu_must_have(fpu);
+        get_fpu(X86EMUL_FPU_fpu, &fic);
         switch ( modrm )
         {
         case 0xe0:
@@ -3971,6 +3968,7 @@ x86_emulate(
                 break;
             }
         }
+        put_fpu(&fic);
         break;
 
     case 0xe0 ... 0xe2: /* loop{,z,nz} */ {
@@ -4661,8 +4659,8 @@ x86_emulate(
     case X86EMUL_OPC_VEX_F2(0x0f, 0x11): /* vmovsd xmm,xmm/m64 */
     {
         uint8_t *buf = get_stub(stub);
-        struct fpu_insn_ctxt fic = { .insn_bytes = 5 };
 
+        fic.insn_bytes = 5;
         buf[0] = 0x3e;
         buf[1] = 0x3e;
         buf[2] = 0x0f;
@@ -4924,8 +4922,8 @@ x86_emulate(
     case X86EMUL_OPC_VEX_66(0x0f, 0xd6): /* vmovq xmm,xmm/m64 */
     {
         uint8_t *buf = get_stub(stub);
-        struct fpu_insn_ctxt fic = { .insn_bytes = 5 };
 
+        fic.insn_bytes = 5;
         buf[0] = 0x3e;
         buf[1] = 0x3e;
         buf[2] = 0x0f;
