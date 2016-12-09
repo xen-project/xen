@@ -684,10 +684,10 @@ static UINTN __init efi_find_gop_mode(EFI_GRAPHICS_OUTPUT_PROTOCOL *gop,
             break;
         }
         if ( !cols && !rows &&
-             mode_info->HorizontalResolution *
+             (UINTN)mode_info->HorizontalResolution *
              mode_info->VerticalResolution > size )
         {
-            size = mode_info->HorizontalResolution *
+            size = (UINTN)mode_info->HorizontalResolution *
                    mode_info->VerticalResolution;
             gop_mode = i;
         }
