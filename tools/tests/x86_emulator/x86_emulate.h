@@ -33,4 +33,7 @@
 
 #define is_canonical_address(x) (((int64_t)(x) >> 47) == ((int64_t)(x) >> 63))
 
+#define MMAP_SZ 16384
+bool emul_test_make_stack_executable(void);
+
 #include "x86_emulate/x86_emulate.h"

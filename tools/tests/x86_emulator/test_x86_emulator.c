@@ -23,8 +23,6 @@ static const struct {
 #endif
 };
 
-#define MMAP_SZ 16384
-
 /* EFLAGS bit definitions. */
 #define EFLG_OF (1<<11)
 #define EFLG_DF (1<<10)
@@ -234,7 +232,6 @@ int main(int argc, char **argv)
     struct cpu_user_regs regs;
     char *instr;
     unsigned int *res, i, j;
-    unsigned long sp;
     bool stack_exec;
     int rc;
 #ifndef __x86_64__
@@ -258,13 +255,8 @@ int main(int argc, char **argv)
     }
     instr = (char *)res + 0x100;
 
-#ifdef __x86_64__
-    asm ("movq %%rsp, %0" : "=g" (sp));
-#else
-    asm ("movl %%esp, %0" : "=g" (sp));
-#endif
-    stack_exec = mprotect((void *)(sp & -0x1000L) - (MMAP_SZ - 0x1000),
-                          MMAP_SZ, PROT_READ|PROT_WRITE|PROT_EXEC) == 0;
+    stack_exec = emul_test_make_stack_executable();
+
     if ( !stack_exec )
         printf("Warning: Stack could not be made executable (%d).\n", errno);
 
