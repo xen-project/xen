@@ -37,3 +37,75 @@
 bool emul_test_make_stack_executable(void);
 
 #include "x86_emulate/x86_emulate.h"
+
+static inline uint64_t xgetbv(uint32_t xcr)
+{
+    uint32_t lo, hi;
+
+    asm ( ".byte 0x0f, 0x01, 0xd0" : "=a" (lo), "=d" (hi) : "c" (xcr) );
+
+    return ((uint64_t)hi << 32) | lo;
+}
+
+#define cache_line_size() ({		     \
+    unsigned int eax = 1, ebx, ecx = 0, edx; \
+    emul_test_cpuid(&eax, &ebx, &ecx, &edx, NULL); \
+    edx & (1U << 19) ? (ebx >> 5) & 0x7f8 : 0; \
+})
+
+#define cpu_has_mmx ({ \
+    unsigned int eax = 1, ecx = 0, edx; \
+    emul_test_cpuid(&eax, &ecx, &ecx, &edx, NULL); \
+    (edx & (1U << 23)) != 0; \
+})
+
+#define cpu_has_sse ({ \
+    unsigned int eax = 1, ecx = 0, edx; \
+    emul_test_cpuid(&eax, &ecx, &ecx, &edx, NULL); \
+    (edx & (1U << 25)) != 0; \
+})
+
+#define cpu_has_sse2 ({ \
+    unsigned int eax = 1, ecx = 0, edx; \
+    emul_test_cpuid(&eax, &ecx, &ecx, &edx, NULL); \
+    (edx & (1U << 26)) != 0; \
+})
+
+#define cpu_has_xsave ({ \
+    unsigned int eax = 1, ecx = 0; \
+    emul_test_cpuid(&eax, &eax, &ecx, &eax, NULL); \
+    /* Intentionally checking OSXSAVE here. */ \
+    (ecx & (1U << 27)) != 0; \
+})
+
+#define cpu_has_avx ({ \
+    unsigned int eax = 1, ecx = 0; \
+    emul_test_cpuid(&eax, &eax, &ecx, &eax, NULL); \
+    if ( !(ecx & (1U << 27)) || ((xgetbv(0) & 6) != 6) ) \
+        ecx = 0; \
+    (ecx & (1U << 28)) != 0; \
+})
+
+#define cpu_has_avx2 ({ \
+    unsigned int eax = 1, ebx, ecx = 0; \
+    emul_test_cpuid(&eax, &ebx, &ecx, &eax, NULL); \
+    if ( !(ecx & (1U << 27)) || ((xgetbv(0) & 6) != 6) ) \
+        ebx = 0; \
+    else { \
+        eax = 7, ecx = 0; \
+        emul_test_cpuid(&eax, &ebx, &ecx, &eax, NULL); \
+    } \
+    (ebx & (1U << 5)) != 0; \
+})
+
+int emul_test_cpuid(
+    unsigned int *eax,
+    unsigned int *ebx,
+    unsigned int *ecx,
+    unsigned int *edx,
+    struct x86_emulate_ctxt *ctxt);
+
+int emul_test_read_cr(
+    unsigned int reg,
+    unsigned long *val,
+    struct x86_emulate_ctxt *ctxt);

@@ -92,105 +92,6 @@ static int cmpxchg(
     return X86EMUL_OKAY;
 }
 
-static int cpuid(
-    unsigned int *eax,
-    unsigned int *ebx,
-    unsigned int *ecx,
-    unsigned int *edx,
-    struct x86_emulate_ctxt *ctxt)
-{
-    unsigned int leaf = *eax;
-
-    asm ("cpuid" : "+a" (*eax), "+c" (*ecx), "=d" (*edx), "=b" (*ebx));
-
-    /* The emulator doesn't itself use MOVBE, so we can always run the test. */
-    if ( leaf == 1 )
-        *ecx |= 1U << 22;
-
-    return X86EMUL_OKAY;
-}
-
-#define cache_line_size() ({ \
-    unsigned int eax = 1, ebx, ecx = 0, edx; \
-    cpuid(&eax, &ebx, &ecx, &edx, NULL); \
-    edx & (1U << 19) ? (ebx >> 5) & 0x7f8 : 0; \
-})
-
-#define cpu_has_mmx ({ \
-    unsigned int eax = 1, ecx = 0, edx; \
-    cpuid(&eax, &ecx, &ecx, &edx, NULL); \
-    (edx & (1U << 23)) != 0; \
-})
-
-#define cpu_has_sse ({ \
-    unsigned int eax = 1, ecx = 0, edx; \
-    cpuid(&eax, &ecx, &ecx, &edx, NULL); \
-    (edx & (1U << 25)) != 0; \
-})
-
-#define cpu_has_sse2 ({ \
-    unsigned int eax = 1, ecx = 0, edx; \
-    cpuid(&eax, &ecx, &ecx, &edx, NULL); \
-    (edx & (1U << 26)) != 0; \
-})
-
-#define cpu_has_xsave ({ \
-    unsigned int eax = 1, ecx = 0; \
-    cpuid(&eax, &eax, &ecx, &eax, NULL); \
-    /* Intentionally checking OSXSAVE here. */ \
-    (ecx & (1U << 27)) != 0; \
-})
-
-static inline uint64_t xgetbv(uint32_t xcr)
-{
-    uint32_t lo, hi;
-
-    asm ( ".byte 0x0f, 0x01, 0xd0" : "=a" (lo), "=d" (hi) : "c" (xcr) );
-
-    return ((uint64_t)hi << 32) | lo;
-}
-
-#define cpu_has_avx ({ \
-    unsigned int eax = 1, ecx = 0; \
-    cpuid(&eax, &eax, &ecx, &eax, NULL); \
-    if ( !(ecx & (1U << 27)) || ((xgetbv(0) & 6) != 6) ) \
-        ecx = 0; \
-    (ecx & (1U << 28)) != 0; \
-})
-
-#define cpu_has_avx2 ({ \
-    unsigned int eax = 1, ebx, ecx = 0; \
-    cpuid(&eax, &ebx, &ecx, &eax, NULL); \
-    if ( !(ecx & (1U << 27)) || ((xgetbv(0) & 6) != 6) ) \
-        ebx = 0; \
-    else { \
-        eax = 7, ecx = 0; \
-        cpuid(&eax, &ebx, &ecx, &eax, NULL); \
-    } \
-    (ebx & (1U << 5)) != 0; \
-})
-
-static int read_cr(
-    unsigned int reg,
-    unsigned long *val,
-    struct x86_emulate_ctxt *ctxt)
-{
-    /* Fake just enough state for the emulator's _get_fpu() to be happy. */
-    switch ( reg )
-    {
-    case 0:
-        *val = 0x00000001; /* PE */
-        return X86EMUL_OKAY;
-
-    case 4:
-        /* OSFXSR, OSXMMEXCPT, and maybe OSXSAVE */
-        *val = 0x00000600 | (cpu_has_xsave ? 0x00040000 : 0);
-        return X86EMUL_OKAY;
-    }
-
-    return X86EMUL_UNHANDLEABLE;
-}
-
 int get_fpu(
     void (*exception_callback)(void *, struct cpu_user_regs *),
     void *exception_callback_arg,
@@ -221,8 +122,8 @@ static struct x86_emulate_ops emulops = {
     .insn_fetch = fetch,
     .write      = write,
     .cmpxchg    = cmpxchg,
-    .cpuid      = cpuid,
-    .read_cr    = read_cr,
+    .cpuid      = emul_test_cpuid,
+    .read_cr    = emul_test_read_cr,
     .get_fpu    = get_fpu,
 };
 

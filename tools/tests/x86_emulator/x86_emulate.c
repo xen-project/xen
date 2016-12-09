@@ -38,4 +38,46 @@ bool emul_test_make_stack_executable(void)
                     MMAP_SZ, PROT_READ|PROT_WRITE|PROT_EXEC) == 0;
 }
 
+int emul_test_cpuid(
+    unsigned int *eax,
+    unsigned int *ebx,
+    unsigned int *ecx,
+    unsigned int *edx,
+    struct x86_emulate_ctxt *ctxt)
+{
+    unsigned int leaf = *eax;
+
+    asm ("cpuid" : "+a" (*eax), "+c" (*ecx), "=d" (*edx), "=b" (*ebx));
+
+    /*
+     * The emulator doesn't itself use MOVBE, so we can always run the
+     * respective tests.
+     */
+    if ( leaf == 1 )
+        *ecx |= 1U << 22;
+
+    return X86EMUL_OKAY;
+}
+
+int emul_test_read_cr(
+    unsigned int reg,
+    unsigned long *val,
+    struct x86_emulate_ctxt *ctxt)
+{
+    /* Fake just enough state for the emulator's _get_fpu() to be happy. */
+    switch ( reg )
+    {
+    case 0:
+        *val = 0x00000001; /* PE */
+        return X86EMUL_OKAY;
+
+    case 4:
+        /* OSFXSR, OSXMMEXCPT, and maybe OSXSAVE */
+        *val = 0x00000600 | (cpu_has_xsave ? 0x00040000 : 0);
+        return X86EMUL_OKAY;
+    }
+
+    return X86EMUL_UNHANDLEABLE;
+}
+
 #include "x86_emulate/x86_emulate.c"
