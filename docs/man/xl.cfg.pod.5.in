@@ -603,7 +603,7 @@ Specifies the virtual channels to be provided to the guest. A
 channel is a low-bandwidth, bidirectional byte stream, which resembles
 a serial link. Typical uses for channels include transmitting VM
 configuration after boot and signalling to in-guest agents. Please see
-F<docs/misc/channels.txt> for more details.
+L<xen-pv-channel(7)> for more details.
 
 Each B<CHANNEL_SPEC_STRING> is a comma-separated list of C<KEY=VALUE>
 settings. Leading and trailing whitespace is ignored in both KEY and
