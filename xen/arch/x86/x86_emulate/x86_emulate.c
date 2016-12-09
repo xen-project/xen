@@ -3518,18 +3518,18 @@ x86_emulate(
         host_and_vcpu_must_have(fpu);
         switch ( modrm )
         {
-        case 0xc0 ... 0xc7: /* fadd %stN,%stN */
-        case 0xc8 ... 0xcf: /* fmul %stN,%stN */
-        case 0xd0 ... 0xd7: /* fcom %stN,%stN */
-        case 0xd8 ... 0xdf: /* fcomp %stN,%stN */
-        case 0xe0 ... 0xe7: /* fsub %stN,%stN */
-        case 0xe8 ... 0xef: /* fsubr %stN,%stN */
-        case 0xf0 ... 0xf7: /* fdiv %stN,%stN */
-        case 0xf8 ... 0xff: /* fdivr %stN,%stN */
+        case 0xc0 ... 0xc7: /* fadd %stN,%st */
+        case 0xc8 ... 0xcf: /* fmul %stN,%st */
+        case 0xd0 ... 0xd7: /* fcom %stN,%st */
+        case 0xd8 ... 0xdf: /* fcomp %stN,%st */
+        case 0xe0 ... 0xe7: /* fsub %stN,%st */
+        case 0xe8 ... 0xef: /* fsubr %stN,%st */
+        case 0xf0 ... 0xf7: /* fdiv %stN,%st */
+        case 0xf8 ... 0xff: /* fdivr %stN,%st */
             emulate_fpu_insn_stub(0xd8, modrm);
             break;
         default:
-            fail_if(modrm >= 0xc0);
+            ASSERT(ea.type == OP_MEM);
             ea.bytes = 4;
             src = ea;
             if ( (rc = ops->read(src.mem.seg, src.mem.off, &src.val,
@@ -3575,6 +3575,7 @@ x86_emulate(
         case 0xc0 ... 0xc7: /* fld %stN */
         case 0xc8 ... 0xcf: /* fxch %stN */
         case 0xd0: /* fnop */
+        case 0xd8 ... 0xdf: /* fstp %stN (alternative encoding) */
         case 0xe0: /* fchs */
         case 0xe1: /* fabs */
         case 0xe4: /* ftst */
@@ -3604,7 +3605,7 @@ x86_emulate(
             emulate_fpu_insn_stub(0xd9, modrm);
             break;
         default:
-            fail_if(modrm >= 0xc0);
+            generate_exception_if(ea.type != OP_MEM, EXC_UD);
             switch ( modrm_reg & 7 )
             {
             case 0: /* fld m32fp */
@@ -3627,7 +3628,8 @@ x86_emulate(
                 dst.type = OP_MEM;
                 emulate_fpu_insn_memdst("fstps", dst.val);
                 break;
-                /* case 4: fldenv - TODO */
+            case 4: /* fldenv - TODO */
+                goto cannot_emulate;
             case 5: /* fldcw m2byte */
                 ea.bytes = 2;
                 src = ea;
@@ -3636,7 +3638,8 @@ x86_emulate(
                     goto done;
                 emulate_fpu_insn_memsrc("fldcw", src.val);
                 break;
-                /* case 6: fstenv - TODO */
+            case 6: /* fnstenv - TODO */
+                goto cannot_emulate;
             case 7: /* fnstcw m2byte */
                 ea.bytes = 2;
                 dst = ea;
@@ -3644,7 +3647,7 @@ x86_emulate(
                 emulate_fpu_insn_memdst("fnstcw", dst.val);
                 break;
             default:
-                goto cannot_emulate;
+                generate_exception(EXC_UD);
             }
         }
         break;
@@ -3664,7 +3667,7 @@ x86_emulate(
             emulate_fpu_insn_stub(0xda, modrm);
             break;
         default:
-            fail_if(modrm >= 0xc0);
+            generate_exception_if(ea.type != OP_MEM, EXC_UD);
             ea.bytes = 4;
             src = ea;
             if ( (rc = ops->read(src.mem.seg, src.mem.off, &src.val,
@@ -3713,16 +3716,16 @@ x86_emulate(
             vcpu_must_have_cmov();
             emulate_fpu_insn_stub_eflags(0xdb, modrm);
             break;
+        case 0xe0: /* fneni - 8087 only, ignored by 287 */
+        case 0xe1: /* fndisi - 8087 only, ignored by 287 */
         case 0xe2: /* fnclex */
-            emulate_fpu_insn("fnclex");
-            break;
         case 0xe3: /* fninit */
-            emulate_fpu_insn("fninit");
-            break;
-        case 0xe4: /* fsetpm - 287 only, ignored by 387 */
+        case 0xe4: /* fnsetpm - 287 only, ignored by 387 */
+        /* case 0xe5: frstpm - 287 only, #UD on 387 */
+            emulate_fpu_insn_stub(0xdb, modrm);
             break;
         default:
-            fail_if(modrm >= 0xc0);
+            generate_exception_if(ea.type != OP_MEM, EXC_UD);
             switch ( modrm_reg & 7 )
             {
             case 0: /* fild m32i */
@@ -3767,7 +3770,7 @@ x86_emulate(
                 emulate_fpu_insn_memdst("fstpt", dst.val);
                 break;
             default:
-                goto cannot_emulate;
+                generate_exception(EXC_UD);
             }
         }
         break;
@@ -3776,16 +3779,18 @@ x86_emulate(
         host_and_vcpu_must_have(fpu);
         switch ( modrm )
         {
-        case 0xc0 ... 0xc7: /* fadd %stN */
-        case 0xc8 ... 0xcf: /* fmul %stN */
-        case 0xe0 ... 0xe7: /* fsubr %stN */
-        case 0xe8 ... 0xef: /* fsub %stN */
-        case 0xf0 ... 0xf7: /* fdivr %stN */
-        case 0xf8 ... 0xff: /* fdiv %stN */
+        case 0xc0 ... 0xc7: /* fadd %st,%stN */
+        case 0xc8 ... 0xcf: /* fmul %st,%stN */
+        case 0xd0 ... 0xd7: /* fcom %stN,%st (alternative encoding) */
+        case 0xd8 ... 0xdf: /* fcomp %stN,%st (alternative encoding) */
+        case 0xe0 ... 0xe7: /* fsubr %st,%stN */
+        case 0xe8 ... 0xef: /* fsub %st,%stN */
+        case 0xf0 ... 0xf7: /* fdivr %st,%stN */
+        case 0xf8 ... 0xff: /* fdiv %st,%stN */
             emulate_fpu_insn_stub(0xdc, modrm);
             break;
         default:
-            fail_if(modrm >= 0xc0);
+            ASSERT(ea.type == OP_MEM);
             ea.bytes = 8;
             src = ea;
             if ( (rc = ops->read(src.mem.seg, src.mem.off, &src.val,
@@ -3826,6 +3831,7 @@ x86_emulate(
         switch ( modrm )
         {
         case 0xc0 ... 0xc7: /* ffree %stN */
+        case 0xc8 ... 0xcf: /* fxch %stN (alternative encoding) */
         case 0xd0 ... 0xd7: /* fst %stN */
         case 0xd8 ... 0xdf: /* fstp %stN */
         case 0xe0 ... 0xe7: /* fucom %stN */
@@ -3833,7 +3839,7 @@ x86_emulate(
             emulate_fpu_insn_stub(0xdd, modrm);
             break;
         default:
-            fail_if(modrm >= 0xc0);
+            generate_exception_if(ea.type != OP_MEM, EXC_UD);
             switch ( modrm_reg & 7 )
             {
             case 0: /* fld m64fp */;
@@ -3863,6 +3869,9 @@ x86_emulate(
                 dst.type = OP_MEM;
                 emulate_fpu_insn_memdst("fstpl", dst.val);
                 break;
+            case 4: /* frstor - TODO */
+            case 6: /* fnsave - TODO */
+                goto cannot_emulate;
             case 7: /* fnstsw m2byte */
                 ea.bytes = 2;
                 dst = ea;
@@ -3870,7 +3879,7 @@ x86_emulate(
                 emulate_fpu_insn_memdst("fnstsw", dst.val);
                 break;
             default:
-                goto cannot_emulate;
+                generate_exception(EXC_UD);
             }
         }
         break;
@@ -3881,6 +3890,7 @@ x86_emulate(
         {
         case 0xc0 ... 0xc7: /* faddp %stN */
         case 0xc8 ... 0xcf: /* fmulp %stN */
+        case 0xd0 ... 0xd7: /* fcomp %stN (alternative encoding) */
         case 0xd9: /* fcompp */
         case 0xe0 ... 0xe7: /* fsubrp %stN */
         case 0xe8 ... 0xef: /* fsubp %stN */
@@ -3889,7 +3899,7 @@ x86_emulate(
             emulate_fpu_insn_stub(0xde, modrm);
             break;
         default:
-            fail_if(modrm >= 0xc0);
+            generate_exception_if(ea.type != OP_MEM, EXC_UD);
             ea.bytes = 2;
             src = ea;
             if ( (rc = ops->read(src.mem.seg, src.mem.off, &src.val,
@@ -3941,8 +3951,14 @@ x86_emulate(
             vcpu_must_have_cmov();
             emulate_fpu_insn_stub_eflags(0xdf, modrm);
             break;
+        case 0xc0 ... 0xc7: /* ffreep %stN */
+        case 0xc8 ... 0xcf: /* fxch %stN (alternative encoding) */
+        case 0xd0 ... 0xd7: /* fstp %stN (alternative encoding) */
+        case 0xd8 ... 0xdf: /* fstp %stN (alternative encoding) */
+            emulate_fpu_insn_stub(0xdf, modrm);
+            break;
         default:
-            fail_if(modrm >= 0xc0);
+            generate_exception_if(ea.type != OP_MEM, EXC_UD);
             switch ( modrm_reg & 7 )
             {
             case 0: /* fild m16i */
