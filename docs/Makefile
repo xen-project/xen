@@ -3,13 +3,14 @@ include $(XEN_ROOT)/Config.mk
 -include $(XEN_ROOT)/config/Docs.mk
 
 VERSION		:= $(shell $(MAKE) -C $(XEN_ROOT)/xen --no-print-directory xenversion)
+DATE		:= $(shell date +%Y-%m-%d)
 
 DOC_ARCHES      := arm x86_32 x86_64
 
 # Documentation sources to build
-MAN1SRC-y := $(sort $(shell find man/ -name '*.pod.1' -print))
-MAN5SRC-y := $(sort $(shell find man/ -name '*.pod.5' -print))
-MAN8SRC-y := $(sort $(shell find man/ -name '*.pod.8' -print))
+MAN1SRC-y := $(sort $(shell find man/ -regex '.*\.\(pod\|markdown\)\.1' -print))
+MAN5SRC-y := $(sort $(shell find man/ -regex '.*\.\(pod\|markdown\)\.5' -print))
+MAN8SRC-y := $(sort $(shell find man/ -regex '.*\.\(pod\|markdown\)\.8' -print))
 
 MARKDOWNSRC-y := $(sort $(shell find misc -name '*.markdown' -print))
 
@@ -18,11 +19,17 @@ TXTSRC-y := $(sort $(shell find misc -name '*.txt' -print))
 PANDOCSRC-y := $(sort $(shell find features/ misc/ specs/ -name '*.pandoc' -print))
 
 # Documentation targets
-DOC_MAN1 := $(patsubst man/%.pod.1,man1/%.1,$(MAN1SRC-y))
-DOC_MAN5 := $(patsubst man/%.pod.5,man5/%.5,$(MAN5SRC-y))
-DOC_MAN8 := $(patsubst man/%.pod.8,man8/%.8,$(MAN8SRC-y))
+DOC_MAN1 := $(patsubst man/%.pod.1,man1/%.1,$(MAN1SRC-y)) \
+	        $(patsubst man/%.markdown.1,man1/%.1,$(MAN1SRC-y))
+DOC_MAN5 := $(patsubst man/%.pod.5,man5/%.5,$(MAN5SRC-y)) \
+	        $(patsubst man/%.markdown.5,man5/%.5,$(MAN5SRC-y))
+DOC_MAN8 := $(patsubst man/%.pod.8,man8/%.8,$(MAN8SRC-y)) \
+	        $(patsubst man/%.markdown.8,man8/%.8,$(MAN8SRC-y))
 DOC_HTML := $(patsubst %.markdown,html/%.html,$(MARKDOWNSRC-y)) \
             $(patsubst %.pandoc,html/%.html,$(PANDOCSRC-y)) \
+            $(patsubst man/%.markdown.1,html/man/%.1.html,$(MAN1SRC-y)) \
+            $(patsubst man/%.markdown.5,html/man/%.5.html,$(MAN5SRC-y)) \
+            $(patsubst man/%.markdown.8,html/man/%.8.html,$(MAN8SRC-y)) \
             $(patsubst man/%.pod.1,html/man/%.1.html,$(MAN1SRC-y)) \
             $(patsubst man/%.pod.5,html/man/%.5.html,$(MAN5SRC-y)) \
             $(patsubst man/%.pod.8,html/man/%.8.html,$(MAN8SRC-y)) \
@@ -31,6 +38,9 @@ DOC_HTML := $(patsubst %.markdown,html/%.html,$(MARKDOWNSRC-y)) \
 DOC_TXT  := $(patsubst %.txt,txt/%.txt,$(TXTSRC-y)) \
             $(patsubst %.markdown,txt/%.txt,$(MARKDOWNSRC-y)) \
             $(patsubst %.pandoc,txt/%.txt,$(PANDOCSRC-y)) \
+            $(patsubst man/%.markdown.1,txt/man/%.1.txt,$(MAN1SRC-y)) \
+            $(patsubst man/%.markdown.5,txt/man/%.5.txt,$(MAN5SRC-y)) \
+            $(patsubst man/%.markdown.8,txt/man/%.8.txt,$(MAN8SRC-y)) \
             $(patsubst man/%.pod.1,txt/man/%.1.txt,$(MAN1SRC-y)) \
             $(patsubst man/%.pod.5,txt/man/%.5.txt,$(MAN5SRC-y)) \
             $(patsubst man/%.pod.8,txt/man/%.8.txt,$(MAN8SRC-y))
@@ -89,6 +99,16 @@ else
 	@echo "pod2man not installed; skipping $$@"
 endif
 
+man$(1)/%.$(1): man/%.markdown.$(1) Makefile
+ifneq ($(PANDOC),)
+	@$(INSTALL_DIR) $$(@D)
+	$(PANDOC) --standalone -V title=$$* -V section=$(1) \
+		      -V date="$(DATE)" -V footer="$(VERSION)" \
+			  -V header=Xen $$< -t man --output $$@
+else
+	@echo "pandoc not installed; skipping $$@"
+endif
+
 # HTML manpages
 html/man/%.$(1).html: man/%.pod.$(1) Makefile
 ifneq ($(POD2HTML),)
@@ -98,6 +118,14 @@ else
 	@echo "pod2html not installed; skipping $$@"
 endif
 
+html/man/%.$(1).html: man/%.markdown.$(1) Makefile
+ifneq ($(PANDOC),)
+	@$(INSTALL_DIR) $$(@D)
+	$(PANDOC) --standalone $$< -t html --toc --output $$@
+else
+	@echo "pandoc not installed; skipping $$@"
+endif
+
 # Text manpages
 txt/man/%.$(1).txt: man/%.pod.$(1) Makefile
 ifneq ($(POD2TEXT),)
@@ -105,6 +133,14 @@ ifneq ($(POD2TEXT),)
 	$(POD2TEXT) $$< $$@
 else
 	@echo "pod2text not installed; skipping $$@"
+endif
+
+txt/man/%.$(1).txt: man/%.markdown.$(1) Makefile
+ifneq ($(PANDOC),)
+	@$(INSTALL_DIR) $$(@D)
+	$(PANDOC) --standalone $$< -t plain --output $$@
+else
+	@echo "pandoc not installed; skipping $$@"
 endif
 
 # Build
