@@ -1894,7 +1894,7 @@ specified, enabling the use of XenServer PV drivers in the guest.
 =back
 
 This parameter only takes effect when device_model_version=qemu-xen.
-See F<docs/misc/pci-device-reservations.txt> for more information.
+See L<xen-pci-device-reservations(7)> for more information.
 
 =back
 
