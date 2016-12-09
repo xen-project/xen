@@ -2674,50 +2674,39 @@ x86_emulate(
         break;
 
     case 0x06: /* push %%es */
-        src.val = x86_seg_es;
-    push_seg:
-        generate_exception_if(mode_64bit() && !ext, EXC_UD);
+    case 0x0e: /* push %%cs */
+    case 0x16: /* push %%ss */
+    case 0x1e: /* push %%ds */
+        generate_exception_if(mode_64bit(), EXC_UD);
+        /* fall through */
+    case X86EMUL_OPC(0x0f, 0xa0): /* push %%fs */
+    case X86EMUL_OPC(0x0f, 0xa8): /* push %%gs */
         fail_if(ops->read_segment == NULL);
-        if ( (rc = ops->read_segment(src.val, &sreg, ctxt)) != 0 )
+        if ( (rc = ops->read_segment((b >> 3) & 7, &sreg,
+                                     ctxt)) != X86EMUL_OKAY )
             goto done;
         src.val = sreg.sel;
         goto push;
 
     case 0x07: /* pop %%es */
-        src.val = x86_seg_es;
-    pop_seg:
-        generate_exception_if(mode_64bit() && !ext, EXC_UD);
+    case 0x17: /* pop %%ss */
+    case 0x1f: /* pop %%ds */
+        generate_exception_if(mode_64bit(), EXC_UD);
+        /* fall through */
+    case X86EMUL_OPC(0x0f, 0xa1): /* pop %%fs */
+    case X86EMUL_OPC(0x0f, 0xa9): /* pop %%gs */
         fail_if(ops->write_segment == NULL);
         /* 64-bit mode: POP defaults to a 64-bit operand. */
         if ( mode_64bit() && (op_bytes == 4) )
             op_bytes = 8;
-        if ( (rc = read_ulong(x86_seg_ss, sp_post_inc(op_bytes),
-                              &dst.val, op_bytes, ctxt, ops)) != 0 ||
-             (rc = load_seg(src.val, dst.val, 0, NULL, ctxt, ops)) != 0 )
+        seg = (b >> 3) & 7;
+        if ( (rc = read_ulong(x86_seg_ss, sp_post_inc(op_bytes), &dst.val,
+                              op_bytes, ctxt, ops)) != X86EMUL_OKAY ||
+             (rc = load_seg(seg, dst.val, 0, NULL, ctxt, ops)) != X86EMUL_OKAY )
             goto done;
-        if ( src.val == x86_seg_ss )
+        if ( seg == x86_seg_ss )
             ctxt->retire.mov_ss = true;
         break;
-
-    case 0x0e: /* push %%cs */
-        src.val = x86_seg_cs;
-        goto push_seg;
-
-    case 0x16: /* push %%ss */
-        src.val = x86_seg_ss;
-        goto push_seg;
-
-    case 0x17: /* pop %%ss */
-        src.val = x86_seg_ss;
-        goto pop_seg;
-
-    case 0x1e: /* push %%ds */
-        src.val = x86_seg_ds;
-        goto push_seg;
-
-    case 0x1f: /* pop %%ds */
-        src.val = x86_seg_ds;
-        goto pop_seg;
 
     case 0x27: /* daa */
     case 0x2f: /* das */ {
@@ -5032,14 +5021,6 @@ x86_emulate(
         dst.val = test_cc(b, _regs.eflags);
         break;
 
-    case X86EMUL_OPC(0x0f, 0xa0): /* push %%fs */
-        src.val = x86_seg_fs;
-        goto push_seg;
-
-    case X86EMUL_OPC(0x0f, 0xa1): /* pop %%fs */
-        src.val = x86_seg_fs;
-        goto pop_seg;
-
     case X86EMUL_OPC(0x0f, 0xa2): /* cpuid */ {
         unsigned int eax = _regs.eax, ebx = _regs.ebx;
         unsigned int ecx = _regs.ecx, edx = _regs.edx;
@@ -5096,14 +5077,6 @@ x86_emulate(
         _regs.eflags |= even_parity(dst.val) ? EFLG_PF : 0;
         break;
     }
-
-    case X86EMUL_OPC(0x0f, 0xa8): /* push %%gs */
-        src.val = x86_seg_gs;
-        goto push_seg;
-
-    case X86EMUL_OPC(0x0f, 0xa9): /* pop %%gs */
-        src.val = x86_seg_gs;
-        goto pop_seg;
 
     case X86EMUL_OPC(0x0f, 0xab): bts: /* bts */
         emulate_2op_SrcV_nobyte("bts", src, dst, _regs.eflags);
