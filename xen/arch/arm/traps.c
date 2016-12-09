@@ -656,7 +656,7 @@ static const char *mode_string(uint32_t cpsr)
     };
     mode = cpsr & PSR_MODE_MASK;
 
-    if ( mode > ARRAY_SIZE(mode_strings) )
+    if ( mode >= ARRAY_SIZE(mode_strings) )
         return "Unknown";
     return mode_strings[mode] ? : "Unknown";
 }
