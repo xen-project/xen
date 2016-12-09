@@ -92,31 +92,6 @@ static int cmpxchg(
     return X86EMUL_OKAY;
 }
 
-int get_fpu(
-    void (*exception_callback)(void *, struct cpu_user_regs *),
-    void *exception_callback_arg,
-    enum x86_emulate_fpu_type type,
-    struct x86_emulate_ctxt *ctxt)
-{
-    switch ( type )
-    {
-    case X86EMUL_FPU_fpu:
-        break;
-    case X86EMUL_FPU_mmx:
-        if ( cpu_has_mmx )
-            break;
-    case X86EMUL_FPU_xmm:
-        if ( cpu_has_sse )
-            break;
-    case X86EMUL_FPU_ymm:
-        if ( cpu_has_avx )
-            break;
-    default:
-        return X86EMUL_UNHANDLEABLE;
-    }
-    return X86EMUL_OKAY;
-}
-
 static struct x86_emulate_ops emulops = {
     .read       = read,
     .insn_fetch = fetch,
@@ -124,7 +99,7 @@ static struct x86_emulate_ops emulops = {
     .cmpxchg    = cmpxchg,
     .cpuid      = emul_test_cpuid,
     .read_cr    = emul_test_read_cr,
-    .get_fpu    = get_fpu,
+    .get_fpu    = emul_test_get_fpu,
 };
 
 int main(int argc, char **argv)
