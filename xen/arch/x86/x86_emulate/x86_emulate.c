@@ -1340,7 +1340,7 @@ protmode_load_seg(
     const struct x86_emulate_ops *ops)
 {
     enum x86_segment sel_seg = (sel & 4) ? x86_seg_ldtr : x86_seg_gdtr;
-    struct { uint32_t a, b; } desc;
+    struct { uint32_t a, b; } desc, desc_hi = {};
     uint8_t dpl, rpl;
     int cpl = get_cpl(ctxt, ops);
     uint32_t a_flag = 0x100;
@@ -1391,9 +1391,6 @@ protmode_load_seg(
         /* System segments must have S flag == 0. */
         if ( desc.b & (1u << 12) )
             goto raise_exn;
-        /* We do not support 64-bit descriptor types. */
-        if ( in_longmode(ctxt, ops) )
-            return X86EMUL_UNHANDLEABLE;
     }
     /* User segments must have S flag == 1. */
     else if ( !(desc.b & (1u << 12)) )
@@ -1467,6 +1464,33 @@ protmode_load_seg(
         goto raise_exn;
     }
 
+    if ( !is_x86_user_segment(seg) )
+    {
+        int lm = in_longmode(ctxt, ops);
+
+        if ( lm < 0 )
+            return X86EMUL_UNHANDLEABLE;
+        if ( lm )
+        {
+            switch ( rc = ops->read(sel_seg, (sel & 0xfff8) + 8,
+                                    &desc_hi, sizeof(desc_hi), ctxt) )
+            {
+            case X86EMUL_OKAY:
+                break;
+
+            case X86EMUL_EXCEPTION:
+                if ( !ctxt->event_pending )
+                    goto raise_exn;
+                /* fall through */
+            default:
+                return rc;
+            }
+            if ( (desc_hi.b & 0x00001f00) ||
+                 !is_canonical_address((uint64_t)desc_hi.a << 32) )
+                goto raise_exn;
+        }
+    }
+
     /* Ensure Accessed flag is set. */
     if ( a_flag && !(desc.b & a_flag) )
     {
@@ -1491,7 +1515,8 @@ protmode_load_seg(
         desc.b = new_desc_b;
     }
 
-    sreg->base = (((desc.b <<  0) & 0xff000000u) |
+    sreg->base = (((uint64_t)desc_hi.a << 32) |
+                  ((desc.b <<  0) & 0xff000000u) |
                   ((desc.b << 16) & 0x00ff0000u) |
                   ((desc.a >> 16) & 0x0000ffffu));
     sreg->attr.bytes = (((desc.b >>  8) & 0x00ffu) |
