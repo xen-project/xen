@@ -917,15 +917,24 @@ static inline void put_loop_count(
         regs->ecx = ad_bytes == 4 ? (uint32_t)count : count;
 }
 
-#define get_rep_prefix() ({                                             \
+#define get_rep_prefix(using_si, using_di) ({                           \
     unsigned long max_reps = 1;                                         \
     if ( rep_prefix() )                                                 \
         max_reps = get_loop_count(&_regs, ad_bytes);                    \
     if ( max_reps == 0 )                                                \
     {                                                                   \
-        /* Skip the instruction if no repetitions are required. */      \
-        dst.type = OP_NONE;                                             \
-        goto writeback;                                                 \
+        /*                                                              \
+         * Skip the instruction if no repetitions are required, but     \
+         * zero extend involved registers first when using 32-bit       \
+         * addressing in 64-bit mode.                                   \
+         */                                                             \
+        if ( mode_64bit() && ad_bytes == 4 )                            \
+        {                                                               \
+            _regs.ecx = 0;                                              \
+            if ( using_si ) _regs.esi = (uint32_t)_regs.esi;            \
+            if ( using_di ) _regs.edi = (uint32_t)_regs.edi;            \
+        }                                                               \
+        goto no_writeback;                                              \
     }                                                                   \
     max_reps;                                                           \
 })
@@ -2911,7 +2920,7 @@ x86_emulate(
         goto imul;
 
     case 0x6c ... 0x6d: /* ins %dx,%es:%edi */ {
-        unsigned long nr_reps = get_rep_prefix();
+        unsigned long nr_reps = get_rep_prefix(false, true);
         unsigned int port = (uint16_t)_regs.edx;
         dst.bytes = !(b & 1) ? 1 : (op_bytes == 8) ? 4 : op_bytes;
         dst.mem.seg = x86_seg_es;
@@ -2941,7 +2950,7 @@ x86_emulate(
     }
 
     case 0x6e ... 0x6f: /* outs %esi,%dx */ {
-        unsigned long nr_reps = get_rep_prefix();
+        unsigned long nr_reps = get_rep_prefix(true, false);
         unsigned int port = (uint16_t)_regs.edx;
         dst.bytes = !(b & 1) ? 1 : (op_bytes == 8) ? 4 : op_bytes;
         ea.mem.off = truncate_ea_and_reps(_regs.esi, nr_reps, dst.bytes);
@@ -3182,7 +3191,8 @@ x86_emulate(
         break;
 
     case 0xa4 ... 0xa5: /* movs */ {
-        unsigned long nr_reps = get_rep_prefix();
+        unsigned long nr_reps = get_rep_prefix(true, true);
+
         dst.bytes = (d & ByteOp) ? 1 : op_bytes;
         dst.mem.seg = x86_seg_es;
         dst.mem.off = truncate_ea_and_reps(_regs.edi, nr_reps, dst.bytes);
@@ -3215,7 +3225,8 @@ x86_emulate(
 
     case 0xa6 ... 0xa7: /* cmps */ {
         unsigned long next_eip = _regs.eip;
-        get_rep_prefix();
+
+        get_rep_prefix(true, true);
         src.bytes = dst.bytes = (d & ByteOp) ? 1 : op_bytes;
         if ( (rc = read_ulong(ea.mem.seg, truncate_ea(_regs.esi),
                               &dst.val, dst.bytes, ctxt, ops)) ||
@@ -3236,7 +3247,8 @@ x86_emulate(
     }
 
     case 0xaa ... 0xab: /* stos */ {
-        unsigned long nr_reps = get_rep_prefix();
+        unsigned long nr_reps = get_rep_prefix(false, true);
+
         dst.bytes = (d & ByteOp) ? 1 : op_bytes;
         dst.mem.seg = x86_seg_es;
         dst.mem.off = truncate_ea(_regs.edi);
@@ -3258,8 +3270,8 @@ x86_emulate(
         break;
     }
 
-    case 0xac ... 0xad: /* lods */ {
-        /* unsigned long max_reps = */get_rep_prefix();
+    case 0xac ... 0xad: /* lods */
+        get_rep_prefix(true, false);
         dst.type  = OP_REG;
         dst.bytes = (d & ByteOp) ? 1 : op_bytes;
         dst.reg   = (unsigned long *)&_regs.eax;
@@ -3270,11 +3282,11 @@ x86_emulate(
             _regs.esi, (_regs.eflags & EFLG_DF) ? -dst.bytes : dst.bytes);
         put_rep_prefix(1);
         break;
-    }
 
     case 0xae ... 0xaf: /* scas */ {
         unsigned long next_eip = _regs.eip;
-        get_rep_prefix();
+
+        get_rep_prefix(false, true);
         src.bytes = dst.bytes = (d & ByteOp) ? 1 : op_bytes;
         dst.val = _regs.eax;
         if ( (rc = read_ulong(x86_seg_es, truncate_ea(_regs.edi),
@@ -5397,7 +5409,6 @@ x86_emulate(
         goto cannot_emulate;
     }
 
- writeback:
     switch ( dst.type )
     {
     case OP_REG:
