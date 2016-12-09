@@ -18,7 +18,8 @@
  * License along with this program; If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <asm/p2m.h>
+#include <xen/sched.h>
+#include <xen/mem_access.h>
 #include <asm/vm_event.h>
 
 /* Implicitly serialized by the domctl lock. */

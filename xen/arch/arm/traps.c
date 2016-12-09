@@ -32,6 +32,7 @@
 #include <xen/domain_page.h>
 #include <xen/perfc.h>
 #include <xen/virtual_region.h>
+#include <xen/mem_access.h>
 #include <public/sched.h>
 #include <public/xen.h>
 #include <asm/debugger.h>

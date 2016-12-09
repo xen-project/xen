@@ -24,6 +24,7 @@ obj-y += io.o
 obj-y += irq.o
 obj-y += kernel.o
 obj-$(CONFIG_LIVEPATCH) += livepatch.o
+obj-y += mem_access.o
 obj-y += mm.o
 obj-y += monitor.o
 obj-y += p2m.o

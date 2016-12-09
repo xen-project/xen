@@ -402,6 +402,8 @@ S:	Supported
 F:	tools/tests/xen-access
 F:	xen/arch/*/monitor.c
 F:	xen/arch/*/vm_event.c
+F:	xen/arch/arm/mem_access.c
+F:	xen/arch/x86/mm/mem_access.c
 F:	xen/arch/x86/hvm/monitor.c
 F:	xen/common/mem_access.c
 F:	xen/common/monitor.c
