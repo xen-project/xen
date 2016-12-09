@@ -3728,15 +3728,19 @@ x86_emulate(
                 dst.bytes = 4;
                 break;
             case 5: /* fld m80fp */
-                if ( (rc = ops->read(ea.mem.seg, ea.mem.off, &src.val,
+                if ( (rc = ops->read(ea.mem.seg, ea.mem.off, mmvalp,
                                      10, ctxt)) != X86EMUL_OKAY )
                     goto done;
-                emulate_fpu_insn_memsrc("fldt", src.val);
+                emulate_fpu_insn_memsrc("fldt", *mmvalp);
                 dst.type = OP_NONE;
                 break;
             case 7: /* fstp m80fp */
-                emulate_fpu_insn_memdst("fstpt", dst.val);
-                dst.bytes = 10;
+                fail_if(!ops->write);
+                emulate_fpu_insn_memdst("fstpt", *mmvalp);
+                if ( (rc = ops->write(ea.mem.seg, ea.mem.off, mmvalp,
+                                      10, ctxt)) != X86EMUL_OKAY )
+                    goto done;
+                dst.type = OP_NONE;
                 break;
             default:
                 generate_exception(EXC_UD);
@@ -3945,10 +3949,10 @@ x86_emulate(
                 dst.bytes = 2;
                 break;
             case 4: /* fbld m80dec */
-                if ( (rc = ops->read(ea.mem.seg, ea.mem.off, &src.val,
+                if ( (rc = ops->read(ea.mem.seg, ea.mem.off, mmvalp,
                                      10, ctxt)) != X86EMUL_OKAY )
                     goto done;
-                emulate_fpu_insn_memsrc("fbld", src.val);
+                emulate_fpu_insn_memsrc("fbld", *mmvalp);
                 dst.type = OP_NONE;
                 break;
             case 5: /* fild m64i */
@@ -3959,8 +3963,12 @@ x86_emulate(
                 dst.type = OP_NONE;
                 break;
             case 6: /* fbstp packed bcd */
-                emulate_fpu_insn_memdst("fbstp", dst.val);
-                dst.bytes = 10;
+                fail_if(!ops->write);
+                emulate_fpu_insn_memdst("fbstp", *mmvalp);
+                if ( (rc = ops->write(ea.mem.seg, ea.mem.off, mmvalp,
+                                      10, ctxt)) != X86EMUL_OKAY )
+                    goto done;
+                dst.type = OP_NONE;
                 break;
             case 7: /* fistp m64i */
                 emulate_fpu_insn_memdst("fistpll", dst.val);
