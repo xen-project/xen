@@ -1383,7 +1383,7 @@ How the device should be presented to the guest domain; for example "hdc".
 Creates a new network device in the domain specified by I<domain-id>.
 I<network-device> describes the device to attach, using the same format as the
 B<vif> string in the domain config file. See L<xl.cfg> and
-L<http://xenbits.xen.org/docs/unstable/misc/xl-network-configuration.html>
+L<xl-network-configuration(5)>
 for more informations.
 
 Note that only attaching PV network interface is supported.
@@ -1797,10 +1797,10 @@ Transcendent Memory.
 The following man pages:
 
 L<xl.cfg>(5), L<xlcpupool.cfg>(5), B<xentop>(1)
+L<xl-network-configuration(5)>
 
 And the following documents on the xen.org website:
 
-L<http://xenbits.xen.org/docs/unstable/misc/xl-network-configuration.html>
 L<http://xenbits.xen.org/docs/unstable/misc/xl-disk-configuration.txt>
 L<http://xenbits.xen.org/docs/unstable/misc/xsm-flask.txt>
 L<http://xenbits.xen.org/docs/unstable/misc/xl-psr.html>

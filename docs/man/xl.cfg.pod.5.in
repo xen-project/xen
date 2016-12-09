@@ -486,7 +486,7 @@ the host they should map to.  See F<docs/misc/xl-disk-configuration.txt>.
 
 Specifies the networking provision (both emulated network adapters,
 and Xen virtual interfaces) to provided to the guest.  See
-F<docs/misc/xl-network-configuration.markdown>.
+L<xl-network-configuration(5)>.
 
 =item B<vtpm=[ "VTPM_SPEC_STRING", "VTPM_SPEC_STRING", ...]>
 
@@ -2032,7 +2032,7 @@ natively or via hardware backwards compatibility support.
 
 =item F<xl-disk-configuration>
 
-=item F<xl-network-configuration>
+=item L<xl-network-configuration(5)>
 
 =item F<docs/misc/tscmode.txt>
 
