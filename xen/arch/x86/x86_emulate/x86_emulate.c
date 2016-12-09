@@ -159,10 +159,10 @@ static const opcode_desc_t opcode_table[256] = {
     ByteOp|DstMem|SrcImplicit|ModRM, DstMem|SrcImplicit|ModRM,
     DstImplicit|SrcImmByte, DstImplicit|SrcImmByte, ImplicitOps, ImplicitOps,
     /* 0xD8 - 0xDF */
-    ImplicitOps|ModRM|Mov, ImplicitOps|ModRM|Mov,
-    ImplicitOps|ModRM|Mov, ImplicitOps|ModRM|Mov,
-    ImplicitOps|ModRM|Mov, ImplicitOps|ModRM|Mov,
-    ImplicitOps|ModRM|Mov, ImplicitOps|ModRM|Mov,
+    ImplicitOps|ModRM, ImplicitOps|ModRM|Mov,
+    ImplicitOps|ModRM, ImplicitOps|ModRM|Mov,
+    ImplicitOps|ModRM, ImplicitOps|ModRM|Mov,
+    DstImplicit|SrcMem16|ModRM, ImplicitOps|ModRM|Mov,
     /* 0xE0 - 0xE7 */
     DstImplicit|SrcImmByte, DstImplicit|SrcImmByte,
     DstImplicit|SrcImmByte, DstImplicit|SrcImmByte,
@@ -3530,10 +3530,8 @@ x86_emulate(
             break;
         default:
             ASSERT(ea.type == OP_MEM);
-            ea.bytes = 4;
-            src = ea;
-            if ( (rc = ops->read(src.mem.seg, src.mem.off, &src.val,
-                                 src.bytes, ctxt)) != 0 )
+            if ( (rc = ops->read(ea.mem.seg, ea.mem.off, &src.val,
+                                 4, ctxt)) != X86EMUL_OKAY )
                 goto done;
             switch ( modrm_reg & 7 )
             {
@@ -3609,10 +3607,8 @@ x86_emulate(
             switch ( modrm_reg & 7 )
             {
             case 0: /* fld m32fp */
-                ea.bytes = 4;
-                src = ea;
                 if ( (rc = ops->read(ea.mem.seg, ea.mem.off, &src.val,
-                                     src.bytes, ctxt)) != 0 )
+                                     4, ctxt)) != X86EMUL_OKAY )
                     goto done;
                 emulate_fpu_insn_memsrc("flds", src.val);
                 break;
@@ -3631,10 +3627,8 @@ x86_emulate(
             case 4: /* fldenv - TODO */
                 goto cannot_emulate;
             case 5: /* fldcw m2byte */
-                ea.bytes = 2;
-                src = ea;
-                if ( (rc = ops->read(src.mem.seg, src.mem.off, &src.val,
-                                     src.bytes, ctxt)) != 0 )
+                if ( (rc = ops->read(ea.mem.seg, ea.mem.off, &src.val,
+                                     2, ctxt)) != X86EMUL_OKAY )
                     goto done;
                 emulate_fpu_insn_memsrc("fldcw", src.val);
                 break;
@@ -3668,10 +3662,8 @@ x86_emulate(
             break;
         default:
             generate_exception_if(ea.type != OP_MEM, EXC_UD);
-            ea.bytes = 4;
-            src = ea;
-            if ( (rc = ops->read(src.mem.seg, src.mem.off, &src.val,
-                                 src.bytes, ctxt)) != 0 )
+            if ( (rc = ops->read(ea.mem.seg, ea.mem.off, &src.val,
+                                 4, ctxt)) != X86EMUL_OKAY )
                 goto done;
             switch ( modrm_reg & 7 )
             {
@@ -3729,10 +3721,8 @@ x86_emulate(
             switch ( modrm_reg & 7 )
             {
             case 0: /* fild m32i */
-                ea.bytes = 4;
-                src = ea;
-                if ( (rc = ops->read(src.mem.seg, src.mem.off, &src.val,
-                                     src.bytes, ctxt)) != 0 )
+                if ( (rc = ops->read(ea.mem.seg, ea.mem.off, &src.val,
+                                     4, ctxt)) != X86EMUL_OKAY )
                     goto done;
                 emulate_fpu_insn_memsrc("fildl", src.val);
                 break;
@@ -3756,10 +3746,8 @@ x86_emulate(
                 emulate_fpu_insn_memdst("fistpl", dst.val);
                 break;
             case 5: /* fld m80fp */
-                ea.bytes = 10;
-                src = ea;
-                if ( (rc = ops->read(src.mem.seg, src.mem.off,
-                                     &src.val, src.bytes, ctxt)) != 0 )
+                if ( (rc = ops->read(ea.mem.seg, ea.mem.off, &src.val,
+                                     10, ctxt)) != X86EMUL_OKAY )
                     goto done;
                 emulate_fpu_insn_memsrc("fldt", src.val);
                 break;
@@ -3791,10 +3779,8 @@ x86_emulate(
             break;
         default:
             ASSERT(ea.type == OP_MEM);
-            ea.bytes = 8;
-            src = ea;
-            if ( (rc = ops->read(src.mem.seg, src.mem.off, &src.val,
-                                 src.bytes, ctxt)) != 0 )
+            if ( (rc = ops->read(ea.mem.seg, ea.mem.off, &src.val,
+                                 8, ctxt)) != X86EMUL_OKAY )
                 goto done;
             switch ( modrm_reg & 7 )
             {
@@ -3843,10 +3829,8 @@ x86_emulate(
             switch ( modrm_reg & 7 )
             {
             case 0: /* fld m64fp */;
-                ea.bytes = 8;
-                src = ea;
-                if ( (rc = ops->read(src.mem.seg, src.mem.off, &src.val,
-                                     src.bytes, ctxt)) != 0 )
+                if ( (rc = ops->read(ea.mem.seg, ea.mem.off, &src.val,
+                                     8, ctxt)) != X86EMUL_OKAY )
                     goto done;
                 emulate_fpu_insn_memsrc("fldl", src.val);
                 break;
@@ -3900,11 +3884,6 @@ x86_emulate(
             break;
         default:
             generate_exception_if(ea.type != OP_MEM, EXC_UD);
-            ea.bytes = 2;
-            src = ea;
-            if ( (rc = ops->read(src.mem.seg, src.mem.off, &src.val,
-                                 src.bytes, ctxt)) != 0 )
-                goto done;
             switch ( modrm_reg & 7 )
             {
             case 0: /* fiadd m16i */
@@ -3962,10 +3941,8 @@ x86_emulate(
             switch ( modrm_reg & 7 )
             {
             case 0: /* fild m16i */
-                ea.bytes = 2;
-                src = ea;
-                if ( (rc = ops->read(src.mem.seg, src.mem.off, &src.val,
-                                     src.bytes, ctxt)) != 0 )
+                if ( (rc = ops->read(ea.mem.seg, ea.mem.off, &src.val,
+                                     2, ctxt)) != X86EMUL_OKAY )
                     goto done;
                 emulate_fpu_insn_memsrc("filds", src.val);
                 break;
@@ -3989,18 +3966,14 @@ x86_emulate(
                 emulate_fpu_insn_memdst("fistps", dst.val);
                 break;
             case 4: /* fbld m80dec */
-                ea.bytes = 10;
-                src = ea;
-                if ( (rc = ops->read(src.mem.seg, src.mem.off,
-                                     &src.val, src.bytes, ctxt)) != 0 )
+                if ( (rc = ops->read(ea.mem.seg, ea.mem.off, &src.val,
+                                     10, ctxt)) != X86EMUL_OKAY )
                     goto done;
                 emulate_fpu_insn_memsrc("fbld", src.val);
                 break;
             case 5: /* fild m64i */
-                ea.bytes = 8;
-                src = ea;
-                if ( (rc = ops->read(src.mem.seg, src.mem.off, &src.val,
-                                     src.bytes, ctxt)) != 0 )
+                if ( (rc = ops->read(ea.mem.seg, ea.mem.off, &src.val,
+                                     8, ctxt)) != X86EMUL_OKAY )
                     goto done;
                 emulate_fpu_insn_memsrc("fildll", src.val);
                 break;
