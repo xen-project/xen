@@ -3604,6 +3604,7 @@ x86_emulate(
             break;
         default:
             generate_exception_if(ea.type != OP_MEM, EXC_UD);
+            dst = ea;
             switch ( modrm_reg & 7 )
             {
             case 0: /* fld m32fp */
@@ -3611,18 +3612,15 @@ x86_emulate(
                                      4, ctxt)) != X86EMUL_OKAY )
                     goto done;
                 emulate_fpu_insn_memsrc("flds", src.val);
+                dst.type = OP_NONE;
                 break;
             case 2: /* fstp m32fp */
-                ea.bytes = 4;
-                dst = ea;
-                dst.type = OP_MEM;
                 emulate_fpu_insn_memdst("fsts", dst.val);
+                dst.bytes = 4;
                 break;
             case 3: /* fstp m32fp */
-                ea.bytes = 4;
-                dst = ea;
-                dst.type = OP_MEM;
                 emulate_fpu_insn_memdst("fstps", dst.val);
+                dst.bytes = 4;
                 break;
             case 4: /* fldenv - TODO */
                 goto cannot_emulate;
@@ -3631,14 +3629,13 @@ x86_emulate(
                                      2, ctxt)) != X86EMUL_OKAY )
                     goto done;
                 emulate_fpu_insn_memsrc("fldcw", src.val);
+                dst.type = OP_NONE;
                 break;
             case 6: /* fnstenv - TODO */
                 goto cannot_emulate;
             case 7: /* fnstcw m2byte */
-                ea.bytes = 2;
-                dst = ea;
-                dst.type = OP_MEM;
                 emulate_fpu_insn_memdst("fnstcw", dst.val);
+                dst.bytes = 2;
                 break;
             default:
                 generate_exception(EXC_UD);
@@ -3718,6 +3715,7 @@ x86_emulate(
             break;
         default:
             generate_exception_if(ea.type != OP_MEM, EXC_UD);
+            dst = ea;
             switch ( modrm_reg & 7 )
             {
             case 0: /* fild m32i */
@@ -3725,37 +3723,31 @@ x86_emulate(
                                      4, ctxt)) != X86EMUL_OKAY )
                     goto done;
                 emulate_fpu_insn_memsrc("fildl", src.val);
+                dst.type = OP_NONE;
                 break;
             case 1: /* fisttp m32i */
                 host_and_vcpu_must_have(sse3);
-                ea.bytes = 4;
-                dst = ea;
-                dst.type = OP_MEM;
                 emulate_fpu_insn_memdst("fisttpl", dst.val);
+                dst.bytes = 4;
                 break;
             case 2: /* fist m32i */
-                ea.bytes = 4;
-                dst = ea;
-                dst.type = OP_MEM;
                 emulate_fpu_insn_memdst("fistl", dst.val);
+                dst.bytes = 4;
                 break;
             case 3: /* fistp m32i */
-                ea.bytes = 4;
-                dst = ea;
-                dst.type = OP_MEM;
                 emulate_fpu_insn_memdst("fistpl", dst.val);
+                dst.bytes = 4;
                 break;
             case 5: /* fld m80fp */
                 if ( (rc = ops->read(ea.mem.seg, ea.mem.off, &src.val,
                                      10, ctxt)) != X86EMUL_OKAY )
                     goto done;
                 emulate_fpu_insn_memsrc("fldt", src.val);
+                dst.type = OP_NONE;
                 break;
             case 7: /* fstp m80fp */
-                ea.bytes = 10;
-                dst.type = OP_MEM;
-                dst = ea;
                 emulate_fpu_insn_memdst("fstpt", dst.val);
+                dst.bytes = 10;
                 break;
             default:
                 generate_exception(EXC_UD);
@@ -3826,6 +3818,7 @@ x86_emulate(
             break;
         default:
             generate_exception_if(ea.type != OP_MEM, EXC_UD);
+            dst = ea;
             switch ( modrm_reg & 7 )
             {
             case 0: /* fld m64fp */;
@@ -3833,34 +3826,27 @@ x86_emulate(
                                      8, ctxt)) != X86EMUL_OKAY )
                     goto done;
                 emulate_fpu_insn_memsrc("fldl", src.val);
+                dst.type = OP_NONE;
                 break;
             case 1: /* fisttp m64i */
                 host_and_vcpu_must_have(sse3);
-                ea.bytes = 8;
-                dst = ea;
-                dst.type = OP_MEM;
                 emulate_fpu_insn_memdst("fisttpll", dst.val);
+                dst.bytes = 8;
                 break;
             case 2: /* fst m64fp */
-                ea.bytes = 8;
-                dst = ea;
-                dst.type = OP_MEM;
                 emulate_fpu_insn_memdst("fstl", dst.val);
+                dst.bytes = 8;
                 break;
             case 3: /* fstp m64fp */
-                ea.bytes = 8;
-                dst = ea;
-                dst.type = OP_MEM;
                 emulate_fpu_insn_memdst("fstpl", dst.val);
+                dst.bytes = 8;
                 break;
             case 4: /* frstor - TODO */
             case 6: /* fnsave - TODO */
                 goto cannot_emulate;
             case 7: /* fnstsw m2byte */
-                ea.bytes = 2;
-                dst = ea;
-                dst.type = OP_MEM;
                 emulate_fpu_insn_memdst("fnstsw", dst.val);
+                dst.bytes = 2;
                 break;
             default:
                 generate_exception(EXC_UD);
@@ -3938,6 +3924,7 @@ x86_emulate(
             break;
         default:
             generate_exception_if(ea.type != OP_MEM, EXC_UD);
+            dst = ea;
             switch ( modrm_reg & 7 )
             {
             case 0: /* fild m16i */
@@ -3945,49 +3932,42 @@ x86_emulate(
                                      2, ctxt)) != X86EMUL_OKAY )
                     goto done;
                 emulate_fpu_insn_memsrc("filds", src.val);
+                dst.type = OP_NONE;
                 break;
             case 1: /* fisttp m16i */
                 host_and_vcpu_must_have(sse3);
-                ea.bytes = 2;
-                dst = ea;
-                dst.type = OP_MEM;
                 emulate_fpu_insn_memdst("fisttps", dst.val);
+                dst.bytes = 2;
                 break;
             case 2: /* fist m16i */
-                ea.bytes = 2;
-                dst = ea;
-                dst.type = OP_MEM;
                 emulate_fpu_insn_memdst("fists", dst.val);
+                dst.bytes = 2;
                 break;
             case 3: /* fistp m16i */
-                ea.bytes = 2;
-                dst = ea;
-                dst.type = OP_MEM;
                 emulate_fpu_insn_memdst("fistps", dst.val);
+                dst.bytes = 2;
                 break;
             case 4: /* fbld m80dec */
                 if ( (rc = ops->read(ea.mem.seg, ea.mem.off, &src.val,
                                      10, ctxt)) != X86EMUL_OKAY )
                     goto done;
                 emulate_fpu_insn_memsrc("fbld", src.val);
+                dst.type = OP_NONE;
                 break;
             case 5: /* fild m64i */
                 if ( (rc = ops->read(ea.mem.seg, ea.mem.off, &src.val,
                                      8, ctxt)) != X86EMUL_OKAY )
                     goto done;
                 emulate_fpu_insn_memsrc("fildll", src.val);
+                dst.type = OP_NONE;
                 break;
             case 6: /* fbstp packed bcd */
-                ea.bytes = 10;
-                dst = ea;
-                dst.type = OP_MEM;
                 emulate_fpu_insn_memdst("fbstp", dst.val);
+                dst.bytes = 10;
                 break;
             case 7: /* fistp m64i */
-                ea.bytes = 8;
-                dst = ea;
-                dst.type = OP_MEM;
                 emulate_fpu_insn_memdst("fistpll", dst.val);
+                dst.bytes = 8;
                 break;
             }
         }
