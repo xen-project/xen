@@ -1315,7 +1315,7 @@ The domain id of the guest domain that the device will be attached to.
 
 A disc specification in the same format used for the B<disk> variable in
 the domain config file. See
-L<http://xenbits.xen.org/docs/unstable/misc/xl-disk-configuration.txt>.
+L<xl-disk-configuration(5)>.
 
 =back
 
@@ -1354,7 +1354,7 @@ How the device should be presented to the guest domain; for example "hdc".
 
 the target path in the backend domain (usually domain 0) to be
 exported; Can be a block device or a file etc. See B<target> in
-F<docs/misc/xl-disk-configuration.txt>.
+L<xl-disk-configuration(5)>.
 
 =back
 
@@ -1796,12 +1796,11 @@ Transcendent Memory.
 
 The following man pages:
 
-L<xl.cfg>(5), L<xlcpupool.cfg>(5), B<xentop>(1)
+L<xl.cfg>(5), L<xlcpupool.cfg>(5), L<xentop>(1), L<xl-disk-configuration(5)>
 L<xl-network-configuration(5)>
 
 And the following documents on the xen.org website:
 
-L<http://xenbits.xen.org/docs/unstable/misc/xl-disk-configuration.txt>
 L<http://xenbits.xen.org/docs/unstable/misc/xsm-flask.txt>
 L<http://xenbits.xen.org/docs/unstable/misc/xl-psr.html>
 

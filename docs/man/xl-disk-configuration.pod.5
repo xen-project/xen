@@ -1,0 +1,529 @@
+=head1 NAME
+
+xl-disk-configuration - XL Disk Configuration Syntax
+
+=head1 SYNTAX
+
+This document specifies the xl config file format disk configuration
+option.  It has the following form:
+
+   disk = [ 'DISKSPEC', 'DISKSPEC', ... ]
+
+where each C<DISKSPEC> is in this form:
+
+   [<key>=<value>|<flag>,]*,
+     [<target>, [<format>, [<vdev>, [<access>]]]],
+     [<key>=<value>|<flag>,]*
+     [target=<target>]
+
+For example, these strings are equivalent:
+
+    /dev/vg/guest-volume,,hda
+    /dev/vg/guest-volume,raw,hda,rw
+    format=raw, vdev=hda, access=rw, target=/dev/vg/guest-volume
+    raw:/dev/vg/guest-volume,hda,w  (deprecated, see below)
+
+As are these:
+
+    /root/image.iso,,hdc,cdrom
+    /root/image.iso,,hdc,,cdrom
+    /root/image.iso,raw,hdc,devtype=cdrom
+    format=raw, vdev=hdc, access=ro, devtype=cdrom, target=/root/image.iso
+    raw:/root/image.iso,hdc:cdrom,ro   (deprecated, see below)
+
+These might be specified in the domain config file like this:
+
+    disk = [ '/dev/vg/guest-volume,,hda', '/root/image.iso,,hdc,cdrom' ]
+
+
+More formally, the string is a series of comma-separated keyword/value
+pairs, flags and positional parameters.  Parameters which are not bare
+keywords and which do not contain "=" symbols are assigned to the
+so-far-unspecified positional parameters, in the order below.  The
+positional parameters may also be specified explicitly by name.
+
+Each parameter may be specified at most once, either as a positional
+parameter or a named parameter.  Default values apply if the parameter
+is not specified, or if it is specified with an empty value (whether
+positionally or explicitly).
+
+Whitespace may appear before each parameter and will be ignored.
+
+=head1 Positional Parameters
+
+=over 4
+
+=item B<target>
+
+=over 4
+
+=item Description
+
+Block device or image file path.  When this is used as a path, F</dev>
+will be prepended if the path doesn't start with a '/'.
+
+=item Supported values
+
+N/A
+
+=item Deprecated values
+
+N/A
+
+=item Default value
+
+None.  While a path is provided in most cases there is an exception:
+for a cdrom device, lack of this attribute would imply an empty cdrom
+drive.
+
+=item Special syntax
+
+When this parameter is specified by name, ie with the C<target=>
+syntax in the configuration file, it consumes the whole rest of the
+C<DISKSPEC> including trailing whitespaces.  Therefore in that case
+it must come last.  This is permissible even if an empty value for
+the target was already specified as a positional parameter.  This
+is the only way to specify a target string containing metacharacters
+such as commas and (in some cases) colons, which would otherwise be
+misinterpreted.
+
+Future parameter and flag names will start with an ascii letter and
+contain only ascii alphanumerics, hyphens and underscores, and will
+not be legal as vdevs.  Targets which might match that syntax
+should not be specified as positional parameters.
+
+=back
+
+=item B<format>
+
+=over 4
+
+=item Description
+
+Specifies the format of image file.
+
+=item Supported values
+
+raw, qcow, qcow2, vhd, qed
+
+=item Deprecated values
+
+None
+
+=item Default value
+
+raw
+
+=back
+
+=item B<vdev>
+
+=over 4
+
+=item Description
+
+Virtual device as seen by the guest (also referred to as guest drive
+designation in some specifications).  L<vbd-interface(7)>
+
+=item Supported values
+
+hd[x], xvd[x], sd[x] etc.  Please refer to the above specification for
+further details.
+
+=item Deprecated values
+
+None
+
+=item Default Value
+
+None, this parameter is mandatory.
+
+=back
+
+=item B<access>
+
+=over 4
+
+=item Description
+
+Specified access control information.  Whether or not the block device is
+provided to the guest in read-only or read-write mode depends on this
+attribute.
+
+=item Supported values
+
+C<ro>, C<r>   (specifies read-only)
+
+C<rw>, C<w>   (specifies read/write)
+
+=item Deprecated values
+
+None
+
+=item Default value
+
+C<rw> unless devtype=cdrom, in which case C<r>
+
+=back
+
+=back
+
+=head1 Other Parameters And Flags
+
+=over 4
+
+=item B<devtype>=I<DEVTYPE>
+
+=over 4
+
+=item Description
+
+Qualifies virtual device type.
+
+=item Supported values
+
+cdrom
+
+=item Deprecated values
+
+None
+
+=item Mandatory
+
+No
+
+=back
+
+=item B<cdrom>
+
+Convenience alias for "devtype=cdrom".
+
+
+=item B<backend>=I<DOMAIN-NAME>
+
+=over 4
+
+=item Description
+
+Designates a backend domain for the device
+
+=item Supported values
+
+Valid domain names
+
+=item Mandatory
+
+No
+
+=back
+
+Specifies the backend domain which this device should attach to. This
+defaults to domain 0. Specifying another domain requires setting up a
+driver domain which is outside the scope of this document.
+
+
+=item B<backendtype>=I<TYPE>
+
+=over 4
+
+=item Description
+
+Specifies the backend implementation to use
+
+=item Supported values
+
+phy, tap, qdisk
+
+=item Mandatory
+
+No
+
+=item Default value
+
+Automatically determine which backend to use.
+
+=back
+
+This does not affect the guest's view of the device.  It controls
+which software implementation of the Xen backend driver is used.
+
+Not all backend drivers support all combinations of other options.
+For example, "phy" does not support formats other than "raw".
+Normally this option should not be specified, in which case libxl will
+automatically determine the most suitable backend.
+
+
+=item B<script>=I<SCRIPT>
+
+Specifies that B<target> is not a normal host path, but rather
+information to be interpreted by the executable program I<SCRIPT>,
+(looked for in F</etc/xen/scripts>, if it doesn't contain a slash).
+
+These scripts are normally called "block-I<SCRIPT>".
+
+
+=item B<direct-io-safe>
+
+=over 4
+
+=item Description
+
+Disables non-O_DIRECT workaround
+
+=item Supported values
+
+absent, present
+
+=item Mandatory
+
+No
+
+=item Default value
+
+absent (workaround may be enabled)
+
+=back
+
+There is a memory lifetime bug in some driver domain (dom0) kernels
+which can cause crashes when using O_DIRECT.  The bug occurs due to a
+mismatch between the backend-visible lifetime of pages used for the
+Xen PV network protocol and that expected by the backend kernel's
+networking subsystem.  This can cause crashes when using certain
+backends with certain underlying storage.
+
+See:
+ L<http://lists.xen.org/archives/html/xen-devel/2012-12/msg01154.html>
+
+For this reason, (this version of) the Xen libxl toolstack disables
+O_DIRECT when using the qemu-based Xen PV backend (C<qdisk>).
+
+However, this workaround has performance and scaling implications, and
+it is only necessary if the underlying device is a network filesystem.
+If the underlying device is not, then it is good to disable it; that
+is what this option is for.
+
+This option simply requests that the workaround be disabled.  (However,
+not all backends versions which use the workaround understand this
+option, so this is on a best effort basis.)
+
+It's important to note that if you are storing the VM disk on a
+network filesystem or a network block device (NFS or ISCSI) it might
+not be safe to use this option.  Otherwise specifying it is safe and
+can give better performances.
+
+If in the future the bug is fixed properly this option will then be
+silently ignored.
+
+
+=item B<discard> / B<no-discard>
+
+=over 4
+
+=item Description
+
+Request that backend advertise discard support to frontend
+
+=item Supported values
+
+discard, no-discard
+
+=item Mandatory
+
+No
+
+=item Default value
+
+discard
+
+=back
+
+An advisory setting for the backend driver, specifying whether to
+advertise discard support (TRIM, UNMAP) to the frontend.  The real
+benefit of this option is to be able to force it off rather than on.  It
+can be used to disable "hole punching" for file based backends which
+were intentionally created non-sparse to avoid fragmentation of the
+file.
+
+=back
+
+
+=head1 COLO Parameters
+
+=over 4
+
+=item B<colo>
+
+Enable COLO HA for disk. For better understanding block replication on
+QEMU, please refer to: L<http://wiki.qemu.org/Features/BlockReplication>
+Note that the COLO configuration settings should be considered unstable.
+They may change incompatibly in future versions of Xen.
+
+
+=item B<colo-host>
+
+=over 4
+
+=item Description
+
+Secondary host's address
+
+=item Mandatory
+
+Yes when COLO enabled
+
+=back
+
+=item B<colo-port>
+
+=over 4
+
+=item Description
+
+Secondary port.  We will run a nbd server on secondary host,
+and the nbd server will listen this port.
+
+=item Mandatory
+
+Yes when COLO enabled
+
+=back
+
+=item B<colo-export>
+
+=over 4
+
+=item Description
+
+We will run a nbd server on secondary host, exportname is
+the nbd server's disk export name.
+
+=item Mandatory
+
+Yes when COLO enabled
+
+=back
+
+=item B<active-disk>
+
+=over 4
+
+=item Description
+
+This is used by secondary. Secondary guest's write will be buffered in this
+disk.
+
+=item Mandatory
+
+Yes when COLO enabled
+
+=back
+
+=item B<hidden-disk>
+
+=over 4
+
+=item Description
+
+This is used by secondary. It buffers the original content that is modified
+by the primary VM.
+
+=item Mandatory
+
+Yes when COLO enabled
+
+=back
+
+=back
+
+
+=head1 Deprecated Parameters, Prefixes And Syntaxes
+
+Deprecated forms are acceptable and are intended work compatibly with
+xend and xl from xen 4.1.  In future they may print a warning.
+Support for deprecated parameters and syntaxes are likely to be
+dropped in future versions of xl.
+
+There is support for a deprecated old syntax for C<DISKSPEC>:
+
+  [<format>:][<target>],<vdev>[:<devtype>],<access>   (deprecated)
+
+This syntax also supports deprecated prefixes, described below.  These
+are found prepended to the format parameter - eg C<tap:aio:qcow:>.
+
+=over 4
+
+=item B<format>
+
+=over 4
+
+=item Description
+
+Specifies the format (deprecated)
+
+=item Supported values
+
+raw:  qcow2:  vhd:
+
+=back
+
+In xend and old versions of libxl it was necessary to specify the
+format with a prefix.  For compatibility, these three prefixes are
+recognised as specifying the corresponding format.  They are
+equivalent to C<format=FORMAT> or the specification of B<format>
+(without a colon) as a positional parameter.
+
+
+=item B<script>
+
+=over 4
+
+=item Description
+
+Specifies the script (deprecated)
+
+=item Supported values
+
+iscsi:  nbd:  enbd:  drbd:
+
+=back
+
+In xend and old versions of libxl it was necessary to specify the
+"script" (see above) with a prefix.  For compatibility, these four
+prefixes are recognised as specifying the corresponding script.  They
+are equivalent to C<script=block-SCRIPT>.
+
+
+=item B<deprecated-prefix>
+
+=over 4
+
+=item Description
+
+Deprecated prefix, ignored
+
+=item Supported values
+
+tapdisk:  tap2:  aio:  ioemu:  file:  phy:
+
+=back
+
+Various prefixes were required by xend and older versions of libxl to
+make the block devices work.  In some cases these options would
+override the backend type, but in other cases they would be ignored in
+favour of "making it work"; in yet other cases it would be necessary
+to specify several of these, for example:
+
+  tap:aio:/some/path...
+
+All of these prefixes are now stripped and ignored.
+
+=back
+
+=head2 Missing format and empty target
+
+The following syntax is also supported:
+
+  ,<vdev>:<devtype>,<access>   (deprecated)
+
+This is solely for compatibility with xend's syntax for empty cdroms,
+which is (for example) C<,hdc:cdrom,r>.

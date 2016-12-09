@@ -480,7 +480,7 @@ devices which the guest will contain.
 
 Specifies the disks (both emulated disks and Xen virtual block
 devices) which are to be provided to the guest, and what objects on
-the host they should map to.  See F<docs/misc/xl-disk-configuration.txt>.
+the host they should map to.  See L<xl-disk-configuration(5)>.
 
 =item B<vif=[ "NET_SPEC_STRING", "NET_SPEC_STRING", ...]>
 
@@ -2030,7 +2030,7 @@ natively or via hardware backwards compatibility support.
 
 =item L<xlcpupool.cfg(5)>
 
-=item F<xl-disk-configuration>
+=item L<xl-disk-configuration(5)>
 
 =item L<xl-network-configuration(5)>
 
