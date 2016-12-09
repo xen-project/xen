@@ -613,8 +613,8 @@ int main(int argc, char **argv)
         goto fail;
     printf("okay\n");
 
-    printf("%-40s", "Testing daa/das (all inputs)...");
 #ifndef __x86_64__
+    printf("%-40s", "Testing daa/das (all inputs)...");
     /* Bits 0-7: AL; Bit 8: EFLG_AF; Bit 9: EFLG_CF; Bit 10: DAA vs. DAS. */
     for ( i = 0; i < 0x800; i++ )
     {
@@ -679,9 +679,7 @@ int main(int argc, char **argv)
         }
     }
     printf("okay\n");
-#else
-    printf("skipped\n");
-
+#else /* x86-64 */
     printf("%-40s", "Testing cmovz %ecx,%eax...");
     instr[0] = 0x0f; instr[1] = 0x44; instr[2] = 0xc1;
     regs.eflags = 0x200;
