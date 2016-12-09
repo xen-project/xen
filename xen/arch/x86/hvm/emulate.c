@@ -1439,7 +1439,7 @@ static int hvmemul_read_segment(
 
 static int hvmemul_write_segment(
     enum x86_segment seg,
-    struct segment_register *reg,
+    const struct segment_register *reg,
     struct x86_emulate_ctxt *ctxt)
 {
     struct hvm_emulate_ctxt *hvmemul_ctxt =

@@ -200,7 +200,10 @@ struct x86_emulate_ops
 
     /*
      * insn_fetch: Emulate fetch from instruction byte stream.
-     *  Parameters are same as for 'read'. @seg is always x86_seg_cs.
+     *  Except for @bytes, all parameters are the same as for 'read'.
+     *  @bytes: Access length (0 <= @bytes < 16, with zero meaning
+     *  "validate address only").
+     *  @seg is always x86_seg_cs.
      */
     int (*insn_fetch)(
         enum x86_segment seg,
@@ -306,7 +309,7 @@ struct x86_emulate_ops
      */
     int (*write_segment)(
         enum x86_segment seg,
-        struct segment_register *reg,
+        const struct segment_register *reg,
         struct x86_emulate_ctxt *ctxt);
 
     /*
