@@ -185,7 +185,7 @@ host cpus and memory. In that case, the soft affinity of all the vcpus
 of the domain will be set to the pcpus belonging to the NUMA nodes
 chosen during placement.
 
-For more details, see F<docs/misc/xl-numa-placement.markdown>.
+For more details, see L<xl-numa-placement(7)>.
 
 =back
 
