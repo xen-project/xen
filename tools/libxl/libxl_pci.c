@@ -1001,7 +1001,7 @@ static int do_pci_add(libxl__gc *gc, uint32_t domid, libxl_device_pci *pcidev, i
     int irq, i, rc, hvm = 0;
     uint32_t flag = XEN_DOMCTL_DEV_RDM_RELAXED;
     uint32_t domainid = domid;
-    bool isstubdom = !libxl_is_stubdom(ctx, domid, &domainid);
+    bool isstubdom = libxl_is_stubdom(ctx, domid, &domainid);
 
     if (type == LIBXL_DOMAIN_TYPE_INVALID)
         return ERROR_FAIL;
