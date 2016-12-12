@@ -85,6 +85,8 @@ const char *xs_domain_dev(void)
 	return "/proc/xen/xenbus";
 #elif defined(__NetBSD__)
 	return "/kern/xen/xenbus";
+#elif defined(__FreeBSD__)
+	return "/dev/xen/xenstore";
 #else
 	return "/dev/xen/xenbus";
 #endif
