@@ -49,7 +49,7 @@ define(`create_domain_common', `
 	allow $1 $2:domain { create max_vcpus setdomainmaxmem setaddrsize
 			getdomaininfo hypercall setvcpucontext getscheduler
 			getvcpuinfo getaddrsize getaffinity setaffinity
-			settime setdomainhandle getvcpucontext };
+			settime setdomainhandle getvcpucontext set_misc_info };
 	allow $1 $2:domain2 { set_cpuid settsc setscheduler setclaim
 			set_max_evtchn set_vnumainfo get_vnumainfo cacheflush
 			psr_cmt_op psr_cat_op soft_reset };
@@ -58,7 +58,7 @@ define(`create_domain_common', `
 	allow $1 $2:mmu { map_read map_write adjust memorymap physmap pinpage mmuext_op updatemp };
 	allow $1 $2:grant setup;
 	allow $1 $2:hvm { cacheattr getparam hvmctl irqlevel pciroute sethvmc
-			setparam pcilevel trackdirtyvram nested altp2mhvm altp2mhvm_op };
+			setparam pcilevel trackdirtyvram nested altp2mhvm altp2mhvm_op send_irq };
 ')
 
 # create_domain(priv, target)
