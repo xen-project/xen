@@ -1883,6 +1883,22 @@ x86_decode_onebyte(
     case 0xc8: /* enter imm16,imm8 */
         imm2 = insn_fetch_type(uint8_t);
         break;
+
+    case 0xff: /* Grp5 */
+        switch ( modrm_reg & 7 )
+        {
+        case 2: /* call (near) */
+        case 4: /* jmp (near) */
+        case 6: /* push */
+            if ( mode_64bit() && op_bytes == 4 )
+                op_bytes = 8;
+            /* fall through */
+        case 3: /* call (far, absolute indirect) */
+        case 5: /* jmp (far, absolute indirect) */
+            state->desc = DstNone | SrcMem | ModRM | Mov;
+            break;
+        }
+        break;
     }
 
  done:
@@ -1899,6 +1915,18 @@ x86_decode_twobyte(
 
     switch ( ctxt->opcode & X86EMUL_OPC_MASK )
     {
+    case 0x00: /* Grp6 */
+        switch ( modrm_reg & 6 )
+        {
+        case 0:
+            state->desc |= DstMem | SrcImplicit | Mov;
+            break;
+        case 2: case 4:
+            state->desc |= SrcMem16;
+            break;
+        }
+        break;
+
     case 0x78:
         switch ( vex.pfx )
         {
@@ -1944,7 +1972,15 @@ x86_decode_0f38(
         ctxt->opcode |= MASK_INSR(vex.pfx, X86EMUL_OPC_PFX_MASK);
         break;
 
-    case 0xf0: case 0xf1: /* movbe / crc32 */
+    case 0xf0: /* movbe / crc32 */
+        state->desc |= repne_prefix() ? ByteOp : Mov;
+        if ( rep_prefix() )
+            ctxt->opcode |= MASK_INSR(vex.pfx, X86EMUL_OPC_PFX_MASK);
+        break;
+
+    case 0xf1: /* movbe / crc32 */
+        if ( !repne_prefix() )
+            state->desc = (state->desc & ~(DstMask | SrcMask)) | DstMem | SrcReg | Mov;
         if ( rep_prefix() )
             ctxt->opcode |= MASK_INSR(vex.pfx, X86EMUL_OPC_PFX_MASK);
         break;
@@ -2188,10 +2224,14 @@ x86_decode(
         modrm_reg = ((rex_prefix & 4) << 1) | ((modrm & 0x38) >> 3);
         modrm_rm  = modrm & 0x07;
 
-        /* Early operand adjustments. */
-        switch ( ext )
+        /*
+         * Early operand adjustments. Only ones affecting further processing
+         * prior to the x86_decode_*() calls really belong here. That would
+         * normally be only addition/removal of SrcImm/SrcImm16, so their
+         * fetching can be taken care of by the common code below.
+         */
+        if ( ext == ext_none )
         {
-        case ext_none:
             switch ( b )
             {
             case 0xf6 ... 0xf7: /* Grp3 */
@@ -2216,62 +2256,7 @@ x86_decode(
                     break;
                 }
                 break;
-            case 0xff: /* Grp5 */
-                switch ( modrm_reg & 7 )
-                {
-                case 2: /* call (near) */
-                case 4: /* jmp (near) */
-                case 6: /* push */
-                    if ( mode_64bit() && op_bytes == 4 )
-                        op_bytes = 8;
-                    /* fall through */
-                case 3: /* call (far, absolute indirect) */
-                case 5: /* jmp (far, absolute indirect) */
-                    d = DstNone | SrcMem | ModRM | Mov;
-                    break;
-                }
-                break;
             }
-            break;
-
-        case ext_0f:
-            switch ( b )
-            {
-            case 0x00: /* Grp6 */
-                switch ( modrm_reg & 6 )
-                {
-                case 0:
-                    d |= DstMem | SrcImplicit | Mov;
-                    break;
-                case 2: case 4:
-                    d |= SrcMem16;
-                    break;
-                }
-                break;
-            }
-            break;
-
-        case ext_0f38:
-            switch ( opcode & X86EMUL_OPC_MASK )
-            {
-            case 0xf0: /* movbe / crc32 */
-                d |= repne_prefix() ? ByteOp : Mov;
-                break;
-            case 0xf1: /* movbe / crc32 */
-                if ( !repne_prefix() )
-                    d = (d & ~(DstMask | SrcMask)) | DstMem | SrcReg | Mov;
-                break;
-            }
-            break;
-
-        case ext_0f3a:
-        case ext_8f08:
-        case ext_8f09:
-        case ext_8f0a:
-            break;
-
-        default:
-            ASSERT_UNREACHABLE();
         }
 
         if ( modrm_mod == 3 )
