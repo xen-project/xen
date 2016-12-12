@@ -728,8 +728,10 @@ do {                                                                    \
         (reg) = ((reg) & ~((1UL << (_width << 3)) - 1)) |               \
                 (((reg) + _inc) & ((1UL << (_width << 3)) - 1));        \
 } while (0)
-#define register_address_increment(reg, inc) \
-    _register_address_increment((reg), (inc), ad_bytes)
+#define register_address_adjust(reg, adj)                               \
+    _register_address_increment(reg,                                    \
+                                _regs.eflags & EFLG_DF ? -(adj) : (adj), \
+                                ad_bytes)
 
 #define sp_pre_dec(dec) ({                                              \
     _register_address_increment(_regs.esp, -(dec), ctxt->sp_size/8);    \
@@ -2931,9 +2933,7 @@ x86_emulate(
             dst.type = OP_MEM;
             nr_reps = 1;
         }
-        register_address_increment(
-            _regs.edi,
-            nr_reps * ((_regs.eflags & EFLG_DF) ? -dst.bytes : dst.bytes));
+        register_address_adjust(_regs.edi, nr_reps * dst.bytes);
         put_rep_prefix(nr_reps);
         break;
     }
@@ -2962,9 +2962,7 @@ x86_emulate(
                 goto done;
             nr_reps = 1;
         }
-        register_address_increment(
-            _regs.esi,
-            nr_reps * ((_regs.eflags & EFLG_DF) ? -dst.bytes : dst.bytes));
+        register_address_adjust(_regs.esi, nr_reps * dst.bytes);
         put_rep_prefix(nr_reps);
         break;
     }
@@ -3203,12 +3201,8 @@ x86_emulate(
             dst.type = OP_MEM;
             nr_reps = 1;
         }
-        register_address_increment(
-            _regs.esi,
-            nr_reps * ((_regs.eflags & EFLG_DF) ? -dst.bytes : dst.bytes));
-        register_address_increment(
-            _regs.edi,
-            nr_reps * ((_regs.eflags & EFLG_DF) ? -dst.bytes : dst.bytes));
+        register_address_adjust(_regs.esi, nr_reps * dst.bytes);
+        register_address_adjust(_regs.edi, nr_reps * dst.bytes);
         put_rep_prefix(nr_reps);
         break;
     }
@@ -3223,10 +3217,8 @@ x86_emulate(
              (rc = read_ulong(x86_seg_es, truncate_ea(_regs.edi),
                               &src.val, src.bytes, ctxt, ops)) )
             goto done;
-        register_address_increment(
-            _regs.esi, (_regs.eflags & EFLG_DF) ? -dst.bytes : dst.bytes);
-        register_address_increment(
-            _regs.edi, (_regs.eflags & EFLG_DF) ? -src.bytes : src.bytes);
+        register_address_adjust(_regs.esi, dst.bytes);
+        register_address_adjust(_regs.edi, src.bytes);
         put_rep_prefix(1);
         /* cmp: dst - src ==> src=*%%edi,dst=*%%esi ==> *%%esi - *%%edi */
         emulate_2op_SrcV("cmp", src, dst, _regs.eflags);
@@ -3253,9 +3245,7 @@ x86_emulate(
         }
         else if ( rc != X86EMUL_OKAY )
             goto done;
-        register_address_increment(
-            _regs.edi,
-            nr_reps * ((_regs.eflags & EFLG_DF) ? -dst.bytes : dst.bytes));
+        register_address_adjust(_regs.edi, nr_reps * dst.bytes);
         put_rep_prefix(nr_reps);
         break;
     }
@@ -3265,8 +3255,7 @@ x86_emulate(
         if ( (rc = read_ulong(ea.mem.seg, truncate_ea(_regs.esi),
                               &dst.val, dst.bytes, ctxt, ops)) != 0 )
             goto done;
-        register_address_increment(
-            _regs.esi, (_regs.eflags & EFLG_DF) ? -dst.bytes : dst.bytes);
+        register_address_adjust(_regs.esi, dst.bytes);
         put_rep_prefix(1);
         break;
 
@@ -3277,8 +3266,7 @@ x86_emulate(
         if ( (rc = read_ulong(x86_seg_es, truncate_ea(_regs.edi),
                               &dst.val, src.bytes, ctxt, ops)) != 0 )
             goto done;
-        register_address_increment(
-            _regs.edi, (_regs.eflags & EFLG_DF) ? -src.bytes : src.bytes);
+        register_address_adjust(_regs.edi, src.bytes);
         put_rep_prefix(1);
         /* cmp: %%eax - *%%edi ==> src=%%eax,dst=*%%edi ==> src - dst */
         dst.bytes = src.bytes;
