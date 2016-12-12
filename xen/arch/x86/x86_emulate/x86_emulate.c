@@ -1273,39 +1273,39 @@ static bool vcpu_has(
     return rc == X86EMUL_OKAY;
 }
 
-#define vcpu_has_clflush() vcpu_has(       1, EDX, 19, ctxt, ops)
-#define vcpu_has_lzcnt() vcpu_has(0x80000001, ECX,  5, ctxt, ops)
-#define vcpu_has_misalignsse() vcpu_has(0x80000001, ECX, 7, ctxt, ops)
-#define vcpu_has_bmi1()  vcpu_has(0x00000007, EBX,  3, ctxt, ops)
-#define vcpu_has_hle()   vcpu_has(0x00000007, EBX,  4, ctxt, ops)
-#define vcpu_has_rtm()   vcpu_has(0x00000007, EBX, 11, ctxt, ops)
+#define vcpu_has_fpu()         vcpu_has(         1, EDX,  0, ctxt, ops)
+#define vcpu_has_cmov()        vcpu_has(         1, EDX, 15, ctxt, ops)
+#define vcpu_has_clflush()     vcpu_has(         1, EDX, 19, ctxt, ops)
+#define vcpu_has_mmx()         vcpu_has(         1, EDX, 23, ctxt, ops)
+#define vcpu_has_sse()         vcpu_has(         1, EDX, 25, ctxt, ops)
+#define vcpu_has_sse2()        vcpu_has(         1, EDX, 26, ctxt, ops)
+#define vcpu_has_sse3()        vcpu_has(         1, ECX,  0, ctxt, ops)
+#define vcpu_has_cx16()        vcpu_has(         1, ECX, 13, ctxt, ops)
+#define vcpu_has_sse4_2()      vcpu_has(         1, ECX, 20, ctxt, ops)
+#define vcpu_has_movbe()       vcpu_has(         1, ECX, 22, ctxt, ops)
+#define vcpu_has_avx()         vcpu_has(         1, ECX, 28, ctxt, ops)
+#define vcpu_has_lzcnt()       vcpu_has(0x80000001, ECX,  5, ctxt, ops)
+#define vcpu_has_misalignsse() vcpu_has(0x80000001, ECX,  7, ctxt, ops)
+#define vcpu_has_bmi1()        vcpu_has(         7, EBX,  3, ctxt, ops)
+#define vcpu_has_hle()         vcpu_has(         7, EBX,  4, ctxt, ops)
+#define vcpu_has_rtm()         vcpu_has(         7, EBX, 11, ctxt, ops)
 
-#define vcpu_must_have(leaf, reg, bit) \
-    generate_exception_if(!vcpu_has(leaf, reg, bit, ctxt, ops), EXC_UD)
-#define vcpu_must_have_fpu()  vcpu_must_have(0x00000001, EDX, 0)
-#define vcpu_must_have_cmov() vcpu_must_have(0x00000001, EDX, 15)
-#define vcpu_must_have_mmx()  vcpu_must_have(0x00000001, EDX, 23)
-#define vcpu_must_have_sse()  vcpu_must_have(0x00000001, EDX, 25)
-#define vcpu_must_have_sse2() vcpu_must_have(0x00000001, EDX, 26)
-#define vcpu_must_have_sse3() vcpu_must_have(0x00000001, ECX,  0)
-#define vcpu_must_have_cx16() vcpu_must_have(0x00000001, ECX, 13)
-#define vcpu_must_have_sse4_2() vcpu_must_have(0x00000001, ECX, 20)
-#define vcpu_must_have_movbe() vcpu_must_have(0x00000001, ECX, 22)
-#define vcpu_must_have_avx()  vcpu_must_have(0x00000001, ECX, 28)
+#define vcpu_must_have(feat) \
+    generate_exception_if(!vcpu_has_##feat(), EXC_UD)
 
 #ifdef __XEN__
 /*
- * Note the difference between vcpu_must_have_<feature>() and
+ * Note the difference between vcpu_must_have(<feature>) and
  * host_and_vcpu_must_have(<feature>): The latter needs to be used when
  * emulation code is using the same instruction class for carrying out
  * the actual operation.
  */
 #define host_and_vcpu_must_have(feat) ({ \
     generate_exception_if(!cpu_has_##feat, EXC_UD); \
-    vcpu_must_have_##feat(); \
+    vcpu_must_have(feat); \
 })
 #else
-#define host_and_vcpu_must_have(feat) vcpu_must_have_##feat()
+#define host_and_vcpu_must_have(feat) vcpu_must_have(feat)
 #endif
 
 static int
@@ -3667,7 +3667,7 @@ x86_emulate(
         case 0xc8 ... 0xcf: /* fcmove %stN */
         case 0xd0 ... 0xd7: /* fcmovbe %stN */
         case 0xd8 ... 0xdf: /* fcmovu %stN */
-            vcpu_must_have_cmov();
+            vcpu_must_have(cmov);
             emulate_fpu_insn_stub_eflags(0xda, modrm);
             break;
         case 0xe9:          /* fucompp */
@@ -3720,7 +3720,7 @@ x86_emulate(
         case 0xd8 ... 0xdf: /* fcmovnu %stN */
         case 0xe8 ... 0xef: /* fucomi %stN */
         case 0xf0 ... 0xf7: /* fcomi %stN */
-            vcpu_must_have_cmov();
+            vcpu_must_have(cmov);
             emulate_fpu_insn_stub_eflags(0xdb, modrm);
             break;
         case 0xe0: /* fneni - 8087 only, ignored by 287 */
@@ -3943,7 +3943,7 @@ x86_emulate(
             break;
         case 0xe8 ... 0xef: /* fucomip %stN */
         case 0xf0 ... 0xf7: /* fcomip %stN */
-            vcpu_must_have_cmov();
+            vcpu_must_have(cmov);
             emulate_fpu_insn_stub_eflags(0xdf, modrm);
             break;
         case 0xc0 ... 0xc7: /* ffreep %stN */
@@ -4828,7 +4828,7 @@ x86_emulate(
     }
 
     case X86EMUL_OPC(0x0f, 0x40) ... X86EMUL_OPC(0x0f, 0x4f): /* cmovcc */
-        vcpu_must_have_cmov();
+        vcpu_must_have(cmov);
         if ( test_cc(b, _regs.eflags) )
             dst.val = src.val;
         break;
@@ -5284,7 +5284,7 @@ x86_emulate(
 
     case X86EMUL_OPC(0x0f, 0xc3): /* movnti */
         /* Ignore the non-temporal hint for now. */
-        vcpu_must_have_sse2();
+        vcpu_must_have(sse2);
         generate_exception_if(dst.bytes <= 2, EXC_UD);
         dst.val = src.val;
         break;
@@ -5356,7 +5356,7 @@ x86_emulate(
 
     case X86EMUL_OPC(0x0f38, 0xf0): /* movbe m,r */
     case X86EMUL_OPC(0x0f38, 0xf1): /* movbe r,m */
-        vcpu_must_have_movbe();
+        vcpu_must_have(movbe);
         switch ( op_bytes )
         {
         case 2:
