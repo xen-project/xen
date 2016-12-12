@@ -181,9 +181,11 @@ def crunch_numbers(state):
         # bit is only representable in the 64bit PTE format offered by PAE.
         PAE: [LM, NX],
 
+        TSC: [TSC_DEADLINE, RDTSCP, TSC_ADJUST, ITSC],
+
         # APIC is special, but X2APIC does depend on APIC being available in
         # the first place.
-        APIC: [X2APIC],
+        APIC: [X2APIC, TSC_DEADLINE, EXTAPIC],
 
         # AMD built MMXExtentions and 3DNow as extentions to MMX.
         MMX: [MMXEXT, _3DNOW],
