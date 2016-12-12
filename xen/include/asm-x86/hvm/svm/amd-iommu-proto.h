@@ -103,8 +103,14 @@ int amd_setup_hpet_msi(struct msi_desc *msi_desc);
 
 extern struct ioapic_sbdf {
     u16 bdf, seg;
+    u8 id;
+    bool cmdline;
     u16 *pin_2_idx;
 } ioapic_sbdf[MAX_IO_APICS];
+
+extern unsigned int nr_ioapic_sbdf;
+unsigned int ioapic_id_to_index(unsigned int apic_id);
+unsigned int get_next_ioapic_sbdf_index(void);
 
 extern struct hpet_sbdf {
     u16 bdf, seg, id;

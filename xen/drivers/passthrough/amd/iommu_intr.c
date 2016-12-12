@@ -32,8 +32,31 @@ struct hpet_sbdf hpet_sbdf;
 void *shared_intremap_table;
 unsigned long *shared_intremap_inuse;
 static DEFINE_SPINLOCK(shared_intremap_lock);
+unsigned int nr_ioapic_sbdf;
 
 static void dump_intremap_tables(unsigned char key);
+
+unsigned int ioapic_id_to_index(unsigned int apic_id)
+{
+    unsigned int idx;
+
+    for ( idx = 0 ; idx < nr_ioapic_sbdf; idx++ )
+        if ( ioapic_sbdf[idx].id == apic_id )
+            break;
+
+    if ( idx == nr_ioapic_sbdf )
+        return MAX_IO_APICS;
+
+    return idx;
+}
+
+unsigned int __init get_next_ioapic_sbdf_index(void)
+{
+    if ( nr_ioapic_sbdf < MAX_IO_APICS )
+        return nr_ioapic_sbdf++;
+
+    return MAX_IO_APICS;
+}
 
 static spinlock_t* get_intremap_lock(int seg, int req_id)
 {
@@ -218,13 +241,19 @@ int __init amd_iommu_setup_ioapic_remapping(void)
     {
         for ( pin = 0; pin < nr_ioapic_entries[apic]; pin++ )
         {
+            unsigned int idx;
+
             rte = __ioapic_read_entry(apic, pin, 1);
             if ( rte.mask == 1 )
                 continue;
 
             /* get device id of ioapic devices */
-            bdf = ioapic_sbdf[IO_APIC_ID(apic)].bdf;
-            seg = ioapic_sbdf[IO_APIC_ID(apic)].seg;
+            idx = ioapic_id_to_index(IO_APIC_ID(apic));
+            if ( idx == MAX_IO_APICS )
+                return -EINVAL;
+
+            bdf = ioapic_sbdf[idx].bdf;
+            seg = ioapic_sbdf[idx].seg;
             iommu = find_iommu_for_device(seg, bdf);
             if ( !iommu )
             {
@@ -250,7 +279,7 @@ int __init amd_iommu_setup_ioapic_remapping(void)
             spin_unlock_irqrestore(lock, flags);
 
             set_rte_index(&rte, offset);
-            ioapic_sbdf[IO_APIC_ID(apic)].pin_2_idx[pin] = offset;
+            ioapic_sbdf[idx].pin_2_idx[pin] = offset;
             __ioapic_write_entry(apic, pin, 1, rte);
 
             if ( iommu->enabled )
@@ -277,6 +306,7 @@ void amd_iommu_ioapic_update_ire(
     unsigned int pin = (reg - 0x10) / 2;
     int saved_mask, seg, bdf, rc;
     struct amd_iommu *iommu;
+    unsigned int idx;
 
     if ( !iommu_intremap )
     {
@@ -284,9 +314,13 @@ void amd_iommu_ioapic_update_ire(
         return;
     }
 
+    idx = ioapic_id_to_index(IO_APIC_ID(apic));
+    if ( idx == MAX_IO_APICS )
+        return;
+
     /* get device id of ioapic devices */
-    bdf = ioapic_sbdf[IO_APIC_ID(apic)].bdf;
-    seg = ioapic_sbdf[IO_APIC_ID(apic)].seg;
+    bdf = ioapic_sbdf[idx].bdf;
+    seg = ioapic_sbdf[idx].seg;
     iommu = find_iommu_for_device(seg, bdf);
     if ( !iommu )
     {
@@ -313,7 +347,7 @@ void amd_iommu_ioapic_update_ire(
     }
 
     if ( new_rte.mask &&
-         ioapic_sbdf[IO_APIC_ID(apic)].pin_2_idx[pin] >= INTREMAP_ENTRIES )
+         ioapic_sbdf[idx].pin_2_idx[pin] >= INTREMAP_ENTRIES )
     {
         ASSERT(saved_mask);
         __io_apic_write(apic, reg, value);
@@ -330,7 +364,7 @@ void amd_iommu_ioapic_update_ire(
     /* Update interrupt remapping entry */
     rc = update_intremap_entry_from_ioapic(
              bdf, iommu, &new_rte, reg == rte_lo,
-             &ioapic_sbdf[IO_APIC_ID(apic)].pin_2_idx[pin]);
+             &ioapic_sbdf[idx].pin_2_idx[pin]);
 
     __io_apic_write(apic, reg, ((u32 *)&new_rte)[reg != rte_lo]);
 
@@ -357,14 +391,21 @@ void amd_iommu_ioapic_update_ire(
 unsigned int amd_iommu_read_ioapic_from_ire(
     unsigned int apic, unsigned int reg)
 {
+    unsigned int idx;
+    unsigned int offset;
     unsigned int val = __io_apic_read(apic, reg);
     unsigned int pin = (reg - 0x10) / 2;
-    unsigned int offset = ioapic_sbdf[IO_APIC_ID(apic)].pin_2_idx[pin];
+
+    idx = ioapic_id_to_index(IO_APIC_ID(apic));
+    if ( idx == MAX_IO_APICS )
+        return -EINVAL;
+
+    offset = ioapic_sbdf[idx].pin_2_idx[pin];
 
     if ( !(reg & 1) && offset < INTREMAP_ENTRIES )
     {
-        u16 bdf = ioapic_sbdf[IO_APIC_ID(apic)].bdf;
-        u16 seg = ioapic_sbdf[IO_APIC_ID(apic)].seg;
+        u16 bdf = ioapic_sbdf[idx].bdf;
+        u16 seg = ioapic_sbdf[idx].seg;
         u16 req_id = get_intremap_requestor_id(seg, bdf);
         const u32 *entry = get_intremap_entry(seg, req_id, offset);
 
