@@ -1471,7 +1471,7 @@ mfn_t shadow_alloc(struct domain *d,
         /* Before we overwrite the old contents of this page,
          * we need to be sure that no TLB holds a pointer to it. */
         cpumask_copy(&mask, d->domain_dirty_cpumask);
-        tlbflush_filter(mask, sp->tlbflush_timestamp);
+        tlbflush_filter(&mask, sp->tlbflush_timestamp);
         if ( unlikely(!cpumask_empty(&mask)) )
         {
             perfc_incr(shadow_alloc_tlbflush);

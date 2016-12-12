@@ -2514,7 +2514,7 @@ static int __get_page_type(struct page_info *page, unsigned long type,
                 cpumask_copy(&mask, d->domain_dirty_cpumask);
 
                 /* Don't flush if the timestamp is old enough */
-                tlbflush_filter(mask, page->tlbflush_timestamp);
+                tlbflush_filter(&mask, page->tlbflush_timestamp);
 
                 if ( unlikely(!cpumask_empty(&mask)) &&
                      /* Shadow mode: track only writable pages. */

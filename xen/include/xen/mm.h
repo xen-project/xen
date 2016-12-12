@@ -588,9 +588,10 @@ static inline void accumulate_tlbflush(bool *need_tlbflush,
 
 static inline void filtered_flush_tlb_mask(uint32_t tlbflush_timestamp)
 {
-    cpumask_t mask = cpu_online_map;
+    cpumask_t mask;
 
-    tlbflush_filter(mask, tlbflush_timestamp);
+    cpumask_copy(&mask, &cpu_online_map);
+    tlbflush_filter(&mask, tlbflush_timestamp);
     if ( !cpumask_empty(&mask) )
     {
         perfc_incr(need_flush_tlb_flush);

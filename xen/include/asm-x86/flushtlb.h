@@ -50,13 +50,14 @@ static inline int NEED_FLUSH(u32 cpu_stamp, u32 lastuse_stamp)
  * Filter the given set of CPUs, removing those that definitely flushed their
  * TLB since @page_timestamp.
  */
-#define tlbflush_filter(mask, page_timestamp)                           \
-do {                                                                    \
-    unsigned int cpu;                                                   \
-    for_each_cpu ( cpu, &(mask) )                                       \
-        if ( !NEED_FLUSH(per_cpu(tlbflush_time, cpu), page_timestamp) ) \
-            cpumask_clear_cpu(cpu, &(mask));                            \
-} while ( 0 )
+static inline void tlbflush_filter(cpumask_t *mask, uint32_t page_timestamp)
+{
+    unsigned int cpu;
+
+    for_each_cpu ( cpu, mask )
+        if ( !NEED_FLUSH(per_cpu(tlbflush_time, cpu), page_timestamp) )
+            cpumask_clear_cpu(cpu, mask);
+}
 
 void new_tlbflush_clock_period(void);
 
