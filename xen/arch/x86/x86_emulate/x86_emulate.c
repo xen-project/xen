@@ -435,6 +435,7 @@ typedef union {
 #define CR4_OSXSAVE    (1<<18)
 
 /* EFLAGS bit definitions. */
+#define EFLG_ID   (1<<21)
 #define EFLG_VIP  (1<<20)
 #define EFLG_VIF  (1<<19)
 #define EFLG_AC   (1<<18)
@@ -450,6 +451,7 @@ typedef union {
 #define EFLG_ZF   (1<<6)
 #define EFLG_AF   (1<<4)
 #define EFLG_PF   (1<<2)
+#define EFLG_MBS  (1<<1)
 #define EFLG_CF   (1<<0)
 
 /* MXCSR bit definitions. */
@@ -504,6 +506,13 @@ typedef union {
  * any changes are written back to the saved value after emulation.
  */
 #define EFLAGS_MASK (EFLG_OF|EFLG_SF|EFLG_ZF|EFLG_AF|EFLG_PF|EFLG_CF)
+
+/*
+ * These EFLAGS bits are modifiable (by POPF and IRET), possibly subject
+ * to further CPL and IOPL constraints.
+ */
+#define EFLAGS_MODIFIABLE (EFLG_ID|EFLG_AC|EFLG_RF|EFLG_NT|EFLG_IOPL| \
+                           EFLG_DF|EFLG_IF|EFLG_TF|EFLAGS_MASK)
 
 /* Before executing instruction: restore necessary bits in EFLAGS. */
 #define _PRE_EFLAGS(_sav, _msk, _tmp)                           \
@@ -3156,18 +3165,19 @@ x86_emulate(
             goto done;
         if ( op_bytes == 2 )
             dst.val = (uint16_t)dst.val | (_regs.eflags & 0xffff0000u);
-        dst.val &= 0x257fd5;
+        dst.val &= EFLAGS_MODIFIABLE;
         _regs.eflags &= mask;
-        _regs.eflags |= (uint32_t)(dst.val & ~mask) | 0x02;
+        _regs.eflags |= (uint32_t)(dst.val & ~mask) | EFLG_MBS;
         break;
     }
 
     case 0x9e: /* sahf */
-        *(uint8_t *)&_regs.eflags = (((uint8_t *)&_regs.eax)[1] & 0xd7) | 0x02;
+        *(uint8_t *)&_regs.eflags = (((uint8_t *)&_regs.eax)[1] &
+                                     EFLAGS_MASK) | EFLG_MBS;
         break;
 
     case 0x9f: /* lahf */
-        ((uint8_t *)&_regs.eax)[1] = (_regs.eflags & 0xd7) | 0x02;
+        ((uint8_t *)&_regs.eax)[1] = (_regs.eflags & EFLAGS_MASK) | EFLG_MBS;
         break;
 
     case 0xa4 ... 0xa5: /* movs */ {
@@ -3449,9 +3459,9 @@ x86_emulate(
             goto done;
         if ( op_bytes == 2 )
             eflags = (uint16_t)eflags | (_regs.eflags & 0xffff0000u);
-        eflags &= 0x257fd5;
+        eflags &= EFLAGS_MODIFIABLE;
         _regs.eflags &= mask;
-        _regs.eflags |= (eflags & ~mask) | 0x02;
+        _regs.eflags |= (eflags & ~mask) | EFLG_MBS;
         if ( (rc = load_seg(x86_seg_cs, sel, 1, &cs, ctxt, ops)) ||
              (rc = commit_far_branch(&cs, (uint32_t)eip)) )
             goto done;
