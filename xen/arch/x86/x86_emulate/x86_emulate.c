@@ -2635,8 +2635,8 @@ x86_emulate(
                 ea.mem.off += (src.val >> 3) & ~(op_bytes - 1L);
             src.val &= (op_bytes << 3) - 1;
         }
-        /* Becomes a normal DstMem operation from here on. */
         d = (d & ~DstMask) | DstMem;
+        /* Becomes a normal DstMem operation from here on. */
     case DstMem:
         ea.bytes = (d & ByteOp) ? 1 : op_bytes;
         dst = ea;
@@ -2974,6 +2974,7 @@ x86_emulate(
 
     case 0x82: /* Grp1 (x86/32 only) */
         generate_exception_if(mode_64bit(), EXC_UD);
+        /* Fallthrough. */
     case 0x80: case 0x81: case 0x83: /* Grp1 */
         switch ( modrm_reg & 7 )
         {
@@ -4288,6 +4289,7 @@ x86_emulate(
 
     case 0xfe: /* Grp4 */
         generate_exception_if((modrm_reg & 7) >= 2, EXC_UD);
+        /* Fallthrough. */
     case 0xff: /* Grp5 */
         switch ( modrm_reg & 7 )
         {
