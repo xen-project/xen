@@ -404,6 +404,12 @@ typedef union {
         (void *)((long)(__##var + __alignof(type) - __alignof(long)) \
                  & -__alignof(type))
 
+#ifdef __GCC_ASM_FLAG_OUTPUTS__
+# define ASM_FLAG_OUT(yes, no) yes
+#else
+# define ASM_FLAG_OUT(yes, no) no
+#endif
+
 /* MSRs. */
 #define MSR_TSC          0x00000010
 #define MSR_SYSENTER_CS  0x00000174
@@ -694,11 +700,8 @@ static inline int mkec(uint8_t e, int32_t ec, ...)
  */
 static bool even_parity(uint8_t v)
 {
-#ifdef __GCC_ASM_FLAG_OUTPUTS__
-    asm ( "test %1,%1" : "=@ccp" (v) : "q" (v) );
-#else
-    asm ( "test %1,%1; setp %0" : "=qm" (v) : "q" (v) );
-#endif
+    asm ( "test %1,%1" ASM_FLAG_OUT(, "; setp %0")
+          : ASM_FLAG_OUT("=@ccp", "=qm") (v) : "q" (v) );
 
     return v;
 }
@@ -998,12 +1001,8 @@ static bool mul_dbl(unsigned long m[2])
 {
     bool rc;
 
-#ifdef __GCC_ASM_FLAG_OUTPUTS__
-    asm ( "mul %1" : "+a" (m[0]), "+d" (m[1]), "=@cco" (rc) );
-#else
-    asm ( "mul %1; seto %2"
-          : "+a" (m[0]), "+d" (m[1]), "=qm" (rc) );
-#endif
+    asm ( "mul %1" ASM_FLAG_OUT(, "; seto %2")
+          : "+a" (m[0]), "+d" (m[1]), ASM_FLAG_OUT("=@cco", "=qm") (rc) );
 
     return rc;
 }
@@ -1017,12 +1016,8 @@ static bool imul_dbl(unsigned long m[2])
 {
     bool rc;
 
-#ifdef __GCC_ASM_FLAG_OUTPUTS__
-    asm ( "imul %1" : "+a" (m[0]), "+d" (m[1]), "=@cco" (rc) );
-#else
-    asm ( "imul %1; seto %2"
-          : "+a" (m[0]), "+d" (m[1]), "=qm" (rc) );
-#endif
+    asm ( "imul %1" ASM_FLAG_OUT(, "; seto %2")
+          : "+a" (m[0]), "+d" (m[1]), ASM_FLAG_OUT("=@cco", "=qm") (rc) );
 
     return rc;
 }
@@ -5194,15 +5189,9 @@ x86_emulate(
     {
         bool zf;
 
-#ifdef __GCC_ASM_FLAG_OUTPUTS__
-        asm ( "bsf %2,%0"
-              : "=r" (dst.val), "=@ccz" (zf)
+        asm ( "bsf %2,%0" ASM_FLAG_OUT(, "; setz %1")
+              : "=r" (dst.val), ASM_FLAG_OUT("=@ccz", "=qm") (zf)
               : "rm" (src.val) );
-#else
-        asm ( "bsf %2,%0; setz %1"
-              : "=r" (dst.val), "=qm" (zf)
-              : "rm" (src.val) );
-#endif
         _regs.eflags &= ~EFLG_ZF;
         if ( (vex.pfx == vex_f3) && vcpu_has_bmi1() )
         {
@@ -5227,15 +5216,9 @@ x86_emulate(
     {
         bool zf;
 
-#ifdef __GCC_ASM_FLAG_OUTPUTS__
-        asm ( "bsr %2,%0"
-              : "=r" (dst.val), "=@ccz" (zf)
+        asm ( "bsr %2,%0" ASM_FLAG_OUT(, "; setz %1")
+              : "=r" (dst.val), ASM_FLAG_OUT("=@ccz", "=qm") (zf)
               : "rm" (src.val) );
-#else
-        asm ( "bsr %2,%0; setz %1"
-              : "=r" (dst.val), "=qm" (zf)
-              : "rm" (src.val) );
-#endif
         _regs.eflags &= ~EFLG_ZF;
         if ( (vex.pfx == vex_f3) && vcpu_has_lzcnt() )
         {
