@@ -509,6 +509,27 @@ void vcpu_destroy(struct vcpu *v)
         xfree(v->arch.pv_vcpu.trap_ctxt);
 }
 
+static bool emulation_flags_ok(const struct domain *d, uint32_t emflags)
+{
+
+    if ( is_hvm_domain(d) )
+    {
+        if ( is_hardware_domain(d) &&
+             emflags != (XEN_X86_EMU_LAPIC|XEN_X86_EMU_IOAPIC) )
+            return false;
+        if ( !is_hardware_domain(d) && emflags &&
+             emflags != XEN_X86_EMU_ALL && emflags != XEN_X86_EMU_LAPIC )
+            return false;
+    }
+    else if ( emflags != 0 && emflags != XEN_X86_EMU_PIT )
+    {
+        /* PV or classic PVH. */
+        return false;
+    }
+
+    return true;
+}
+
 int arch_domain_create(struct domain *d, unsigned int domcr_flags,
                        struct xen_arch_domainconfig *config)
 {
@@ -547,7 +568,7 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags,
     {
         uint32_t emflags;
 
-        if ( is_hardware_domain(d) )
+        if ( is_hardware_domain(d) && is_pv_domain(d) )
             config->emulation_flags |= XEN_X86_EMU_PIT;
 
         emflags = config->emulation_flags;
@@ -558,11 +579,7 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags,
             return -EINVAL;
         }
 
-        /* PVHv2 guests can request emulated APIC. */
-        if ( emflags &&
-            (is_hvm_domain(d) ? ((emflags != XEN_X86_EMU_ALL) &&
-                                 (emflags != XEN_X86_EMU_LAPIC)) :
-                                (emflags != XEN_X86_EMU_PIT)) )
+        if ( !emulation_flags_ok(d, emflags) )
         {
             printk(XENLOG_G_ERR "d%d: Xen does not allow %s domain creation "
                    "with the current selection of emulators: %#x\n",
