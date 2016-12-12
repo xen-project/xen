@@ -175,7 +175,7 @@ static void __init parse_guest_loglvl(char *s)
     _parse_loglvl(s, &xenlog_guest_lower_thresh, &xenlog_guest_upper_thresh);
 }
 
-static char * __init loglvl_str(int lvl)
+static char *loglvl_str(int lvl)
 {
     switch ( lvl )
     {
@@ -186,6 +186,50 @@ static char * __init loglvl_str(int lvl)
     case 4: return "All";
     }
     return "???";
+}
+
+static int *__read_mostly upper_thresh_adj = &xenlog_upper_thresh;
+static int *__read_mostly lower_thresh_adj = &xenlog_lower_thresh;
+static const char *__read_mostly thresh_adj = "standard";
+
+static void do_toggle_guest(unsigned char key, struct cpu_user_regs *regs)
+{
+    if ( upper_thresh_adj == &xenlog_upper_thresh )
+    {
+        upper_thresh_adj = &xenlog_guest_upper_thresh;
+        lower_thresh_adj = &xenlog_guest_lower_thresh;
+        thresh_adj = "guest";
+    }
+    else
+    {
+        upper_thresh_adj = &xenlog_upper_thresh;
+        lower_thresh_adj = &xenlog_lower_thresh;
+        thresh_adj = "standard";
+    }
+    printk("'%c' pressed -> %s log level adjustments enabled\n",
+           key, thresh_adj);
+}
+
+static void do_adj_thresh(unsigned char key)
+{
+    if ( *upper_thresh_adj < *lower_thresh_adj )
+        *upper_thresh_adj = *lower_thresh_adj;
+    printk("'%c' pressed -> %s log level: %s (rate limited %s)\n",
+           key, thresh_adj, loglvl_str(*lower_thresh_adj),
+           loglvl_str(*upper_thresh_adj));
+}
+
+static void do_inc_thresh(unsigned char key, struct cpu_user_regs *regs)
+{
+    ++*lower_thresh_adj;
+    do_adj_thresh(key);
+}
+
+static void do_dec_thresh(unsigned char key, struct cpu_user_regs *regs)
+{
+    if ( *lower_thresh_adj )
+        --*lower_thresh_adj;
+    do_adj_thresh(key);
 }
 
 /*
@@ -816,6 +860,12 @@ void __init console_endboot(void)
 
     register_keyhandler('w', dump_console_ring_key,
                         "synchronously dump console ring buffer (dmesg)", 0);
+    register_irq_keyhandler('+', &do_inc_thresh,
+                            "increase log level threshold", 0);
+    register_irq_keyhandler('-', &do_dec_thresh,
+                            "decrease log level threshold", 0);
+    register_irq_keyhandler('G', &do_toggle_guest,
+                            "toggle host/guest log level adjustment", 0);
 
     /* Serial input is directed to DOM0 by default. */
     switch_serial_input();
