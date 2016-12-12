@@ -2145,12 +2145,11 @@ static void dump_softtsc(unsigned char key)
         if ( d->arch.incarnation )
             printk(",inc=%"PRIu32, d->arch.incarnation);
 #if !defined(NDEBUG) || defined(CONFIG_PERF_COUNTERS)
-        if ( !(d->arch.vtsc_kerncount | d->arch.vtsc_usercount) )
-            printk("\n");
-        else
-            printk(",vtsc count: %"PRIu64" kernel, %"PRIu64" user\n",
+        if ( d->arch.vtsc_kerncount | d->arch.vtsc_usercount )
+            printk(",vtsc count: %"PRIu64" kernel,%"PRIu64" user",
                    d->arch.vtsc_kerncount, d->arch.vtsc_usercount);
 #endif
+        printk("\n");
         domcnt++;
     }
 
