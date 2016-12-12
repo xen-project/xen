@@ -135,9 +135,9 @@ static const opcode_desc_t opcode_table[256] = {
     ByteOp|ImplicitOps, ImplicitOps,
     /* 0xA8 - 0xAF */
     ByteOp|DstEax|SrcImm, DstEax|SrcImm,
-    ByteOp|ImplicitOps|Mov, ImplicitOps|Mov,
-    ByteOp|ImplicitOps|Mov, ImplicitOps|Mov,
-    ByteOp|ImplicitOps, ImplicitOps,
+    ByteOp|DstImplicit|SrcEax|Mov, DstImplicit|SrcEax|Mov,
+    ByteOp|DstEax|SrcImplicit|Mov, DstEax|SrcImplicit|Mov,
+    ByteOp|DstImplicit|SrcEax, DstImplicit|SrcEax,
     /* 0xB0 - 0xB7 */
     ByteOp|DstReg|SrcImm|Mov, ByteOp|DstReg|SrcImm|Mov,
     ByteOp|DstReg|SrcImm|Mov, ByteOp|DstReg|SrcImm|Mov,
@@ -3239,15 +3239,15 @@ x86_emulate(
     case 0xaa ... 0xab: /* stos */ {
         unsigned long nr_reps = get_rep_prefix(false, true);
 
-        dst.bytes = (d & ByteOp) ? 1 : op_bytes;
+        dst.bytes = src.bytes;
         dst.mem.seg = x86_seg_es;
         dst.mem.off = truncate_ea(_regs.edi);
         if ( (nr_reps == 1) || !ops->rep_stos ||
-             ((rc = ops->rep_stos(&_regs.eax,
+             ((rc = ops->rep_stos(&src.val,
                                   dst.mem.seg, dst.mem.off, dst.bytes,
                                   &nr_reps, ctxt)) == X86EMUL_UNHANDLEABLE) )
         {
-            dst.val = _regs.eax;
+            dst.val = src.val;
             dst.type = OP_MEM;
             nr_reps = 1;
         }
@@ -3262,9 +3262,6 @@ x86_emulate(
 
     case 0xac ... 0xad: /* lods */
         get_rep_prefix(true, false);
-        dst.type  = OP_REG;
-        dst.bytes = (d & ByteOp) ? 1 : op_bytes;
-        dst.reg   = (unsigned long *)&_regs.eax;
         if ( (rc = read_ulong(ea.mem.seg, truncate_ea(_regs.esi),
                               &dst.val, dst.bytes, ctxt, ops)) != 0 )
             goto done;
@@ -3277,16 +3274,15 @@ x86_emulate(
         unsigned long next_eip = _regs.eip;
 
         get_rep_prefix(false, true);
-        src.bytes = dst.bytes = (d & ByteOp) ? 1 : op_bytes;
-        dst.val = _regs.eax;
         if ( (rc = read_ulong(x86_seg_es, truncate_ea(_regs.edi),
-                              &src.val, src.bytes, ctxt, ops)) != 0 )
+                              &dst.val, src.bytes, ctxt, ops)) != 0 )
             goto done;
         register_address_increment(
             _regs.edi, (_regs.eflags & EFLG_DF) ? -src.bytes : src.bytes);
         put_rep_prefix(1);
-        /* cmp: dst - src ==> src=*%%edi,dst=%%eax ==> %%eax - *%%edi */
-        emulate_2op_SrcV("cmp", src, dst, _regs.eflags);
+        /* cmp: %%eax - *%%edi ==> src=%%eax,dst=*%%edi ==> src - dst */
+        dst.bytes = src.bytes;
+        emulate_2op_SrcV("cmp", dst, src, _regs.eflags);
         if ( (repe_prefix() && !(_regs.eflags & EFLG_ZF)) ||
              (repne_prefix() && (_regs.eflags & EFLG_ZF)) )
             _regs.eip = next_eip;
