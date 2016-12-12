@@ -1639,7 +1639,7 @@ void __init setup_virt_paging(void)
     }
 
     /* pa_range is 4 bits, but the defined encodings are only 3 bits */
-    if ( pa_range&0x8 || !pa_range_info[pa_range].pabits )
+    if ( pa_range >= ARRAY_SIZE(pa_range_info) || !pa_range_info[pa_range].pabits )
         panic("Unknown encoding of ID_AA64MMFR0_EL1.PARange %x\n", pa_range);
 
     val |= VTCR_PS(pa_range);
