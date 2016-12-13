@@ -317,6 +317,8 @@ int libxl_string_to_backend(libxl_ctx *ctx, char *s, libxl_disk_backend *backend
             *backend = LIBXL_DISK_BACKEND_QDISK;
         } else if (!strcmp(p, "qcow2")) {
             *backend = LIBXL_DISK_BACKEND_QDISK;
+        } else if (!strcmp(p, "qed")) {
+            *backend = LIBXL_DISK_BACKEND_QDISK;
         }
     }
 out:

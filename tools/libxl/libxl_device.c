@@ -411,6 +411,7 @@ char *libxl__device_disk_string_of_format(libxl_disk_format format)
         case LIBXL_DISK_FORMAT_VHD: return "vhd";
         case LIBXL_DISK_FORMAT_RAW:
         case LIBXL_DISK_FORMAT_EMPTY: return "aio";
+        case LIBXL_DISK_FORMAT_QED: return "qed";
         default: return NULL;
     }
 }

@@ -677,6 +677,7 @@ static const char *qemu_disk_format_string(libxl_disk_format format)
     case LIBXL_DISK_FORMAT_VHD: return "vpc";
     case LIBXL_DISK_FORMAT_RAW: return "raw";
     case LIBXL_DISK_FORMAT_EMPTY: return NULL;
+    case LIBXL_DISK_FORMAT_QED: return "qed";
     default: return NULL;
     }
 }

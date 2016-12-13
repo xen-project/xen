@@ -87,7 +87,7 @@ format
 ------
 
 Description:           Specifies the format of image file.
-Supported values:      raw, qcow, qcow2, vhd
+Supported values:      raw, qcow, qcow2, vhd, qed
 Deprecated values:     None
 Default value:         raw
 

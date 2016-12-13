@@ -4,6 +4,7 @@ a subset of all the possible QEMU emulators. Specifically:
 
 - network: e1000, rtl8139, virtio-net
 - storage: piix3 ide, ahci, xen_disk
+- backing storage image format: raw, qcow, qcow2, vhd
 - graphics: cirris-vga, stdvga and xenfb
 - audio: sb16, es1370, ac97
 - input: Xen PV keyboard and mouse (part of xenfb), USB and PS/2

@@ -953,6 +953,7 @@ static void setformat(DiskParseContext *dpc, const char *str) {
     else if (!strcmp(str,"qcow2"))  DSET(dpc,format,FORMAT,str,QCOW2);
     else if (!strcmp(str,"vhd"))    DSET(dpc,format,FORMAT,str,VHD);
     else if (!strcmp(str,"empty"))  DSET(dpc,format,FORMAT,str,EMPTY);
+    else if (!strcmp(str,"qed"))    DSET(dpc,format,FORMAT,str,QED);
     else xlu__disk_err(dpc,str,"unknown value for format");
 }
 
@@ -1001,7 +1002,7 @@ static int vdev_and_devtype(DiskParseContext *dpc, char *str) {
 #define DPC ((DiskParseContext*)yyextra)
 
 
-#line 1005 "libxlu_disk_l.c"
+#line 1006 "libxlu_disk_l.c"
 
 #define INITIAL 0
 #define LEXERR 1
@@ -1274,12 +1275,12 @@ YY_DECL
 		}
 
 	{
-#line 165 "libxlu_disk_l.l"
+#line 166 "libxlu_disk_l.l"
 
 
  /*----- the scanner rules which do the parsing -----*/
 
-#line 1283 "libxlu_disk_l.c"
+#line 1284 "libxlu_disk_l.c"
 
 	while ( 1 )		/* loops until end-of-file is reached */
 		{
@@ -1368,135 +1369,135 @@ do_action:	/* This label is used only to access EOF actions. */
 case 1:
 /* rule 1 can match eol */
 YY_RULE_SETUP
-#line 169 "libxlu_disk_l.l"
+#line 170 "libxlu_disk_l.l"
 { /* ignore whitespace before parameters */ }
 	YY_BREAK
 /* ordinary parameters setting enums or strings */
 case 2:
 /* rule 2 can match eol */
 YY_RULE_SETUP
-#line 173 "libxlu_disk_l.l"
+#line 174 "libxlu_disk_l.l"
 { STRIP(','); setformat(DPC, FROMEQUALS); }
 	YY_BREAK
 case 3:
 YY_RULE_SETUP
-#line 175 "libxlu_disk_l.l"
+#line 176 "libxlu_disk_l.l"
 { DPC->disk->is_cdrom = 1; }
 	YY_BREAK
 case 4:
 YY_RULE_SETUP
-#line 176 "libxlu_disk_l.l"
+#line 177 "libxlu_disk_l.l"
 { DPC->disk->is_cdrom = 1; }
 	YY_BREAK
 case 5:
 YY_RULE_SETUP
-#line 177 "libxlu_disk_l.l"
+#line 178 "libxlu_disk_l.l"
 { DPC->disk->is_cdrom = 0; }
 	YY_BREAK
 case 6:
 /* rule 6 can match eol */
 YY_RULE_SETUP
-#line 178 "libxlu_disk_l.l"
+#line 179 "libxlu_disk_l.l"
 { xlu__disk_err(DPC,yytext,"unknown value for type"); }
 	YY_BREAK
 case 7:
 /* rule 7 can match eol */
 YY_RULE_SETUP
-#line 180 "libxlu_disk_l.l"
+#line 181 "libxlu_disk_l.l"
 { STRIP(','); setaccess(DPC, FROMEQUALS); }
 	YY_BREAK
 case 8:
 /* rule 8 can match eol */
 YY_RULE_SETUP
-#line 181 "libxlu_disk_l.l"
+#line 182 "libxlu_disk_l.l"
 { STRIP(','); SAVESTRING("backend", backend_domname, FROMEQUALS); }
 	YY_BREAK
 case 9:
 /* rule 9 can match eol */
 YY_RULE_SETUP
-#line 182 "libxlu_disk_l.l"
+#line 183 "libxlu_disk_l.l"
 { STRIP(','); setbackendtype(DPC,FROMEQUALS); }
 	YY_BREAK
 case 10:
 /* rule 10 can match eol */
 YY_RULE_SETUP
-#line 184 "libxlu_disk_l.l"
+#line 185 "libxlu_disk_l.l"
 { STRIP(','); SAVESTRING("vdev", vdev, FROMEQUALS); }
 	YY_BREAK
 case 11:
 /* rule 11 can match eol */
 YY_RULE_SETUP
-#line 185 "libxlu_disk_l.l"
+#line 186 "libxlu_disk_l.l"
 { STRIP(','); SAVESTRING("script", script, FROMEQUALS); }
 	YY_BREAK
 case 12:
 YY_RULE_SETUP
-#line 186 "libxlu_disk_l.l"
+#line 187 "libxlu_disk_l.l"
 { DPC->disk->direct_io_safe = 1; }
 	YY_BREAK
 case 13:
 YY_RULE_SETUP
-#line 187 "libxlu_disk_l.l"
+#line 188 "libxlu_disk_l.l"
 { libxl_defbool_set(&DPC->disk->discard_enable, true); }
 	YY_BREAK
 case 14:
 YY_RULE_SETUP
-#line 188 "libxlu_disk_l.l"
+#line 189 "libxlu_disk_l.l"
 { libxl_defbool_set(&DPC->disk->discard_enable, false); }
 	YY_BREAK
 /* Note that the COLO configuration settings should be considered unstable.
   * They may change incompatibly in future versions of Xen. */
 case 15:
 YY_RULE_SETUP
-#line 191 "libxlu_disk_l.l"
+#line 192 "libxlu_disk_l.l"
 { libxl_defbool_set(&DPC->disk->colo_enable, true); }
 	YY_BREAK
 case 16:
 YY_RULE_SETUP
-#line 192 "libxlu_disk_l.l"
+#line 193 "libxlu_disk_l.l"
 { libxl_defbool_set(&DPC->disk->colo_enable, false); }
 	YY_BREAK
 case 17:
 /* rule 17 can match eol */
 YY_RULE_SETUP
-#line 193 "libxlu_disk_l.l"
+#line 194 "libxlu_disk_l.l"
 { STRIP(','); SAVESTRING("colo-host", colo_host, FROMEQUALS); }
 	YY_BREAK
 case 18:
 /* rule 18 can match eol */
 YY_RULE_SETUP
-#line 194 "libxlu_disk_l.l"
+#line 195 "libxlu_disk_l.l"
 { STRIP(','); setcoloport(DPC, FROMEQUALS); }
 	YY_BREAK
 case 19:
 /* rule 19 can match eol */
 YY_RULE_SETUP
-#line 195 "libxlu_disk_l.l"
+#line 196 "libxlu_disk_l.l"
 { STRIP(','); SAVESTRING("colo-export", colo_export, FROMEQUALS); }
 	YY_BREAK
 case 20:
 /* rule 20 can match eol */
 YY_RULE_SETUP
-#line 196 "libxlu_disk_l.l"
+#line 197 "libxlu_disk_l.l"
 { STRIP(','); SAVESTRING("active-disk", active_disk, FROMEQUALS); }
 	YY_BREAK
 case 21:
 /* rule 21 can match eol */
 YY_RULE_SETUP
-#line 197 "libxlu_disk_l.l"
+#line 198 "libxlu_disk_l.l"
 { STRIP(','); SAVESTRING("hidden-disk", hidden_disk, FROMEQUALS); }
 	YY_BREAK
 /* the target magic parameter, eats the rest of the string */
 case 22:
 YY_RULE_SETUP
-#line 201 "libxlu_disk_l.l"
+#line 202 "libxlu_disk_l.l"
 { STRIP(','); SAVESTRING("target", pdev_path, FROMEQUALS); }
 	YY_BREAK
 /* unknown parameters */
 case 23:
 /* rule 23 can match eol */
 YY_RULE_SETUP
-#line 205 "libxlu_disk_l.l"
+#line 206 "libxlu_disk_l.l"
 { xlu__disk_err(DPC,yytext,"unknown parameter"); }
 	YY_BREAK
 /* deprecated prefixes */
@@ -1504,7 +1505,7 @@ YY_RULE_SETUP
    * matched the whole string, so these patterns take precedence */
 case 24:
 YY_RULE_SETUP
-#line 212 "libxlu_disk_l.l"
+#line 213 "libxlu_disk_l.l"
 {
                     STRIP(':');
                     DPC->had_depr_prefix=1; DEPRECATE("use `[format=]...,'");
@@ -1513,7 +1514,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 25:
 YY_RULE_SETUP
-#line 218 "libxlu_disk_l.l"
+#line 219 "libxlu_disk_l.l"
 {
                     char *newscript;
                     STRIP(':');
@@ -1532,12 +1533,12 @@ case 26:
 yyg->yy_c_buf_p = yy_cp = yy_bp + 8;
 YY_DO_BEFORE_ACTION; /* set up yytext again */
 YY_RULE_SETUP
-#line 231 "libxlu_disk_l.l"
+#line 232 "libxlu_disk_l.l"
 { DPC->had_depr_prefix=1; DEPRECATE(0); }
 	YY_BREAK
 case 27:
 YY_RULE_SETUP
-#line 232 "libxlu_disk_l.l"
+#line 233 "libxlu_disk_l.l"
 { DPC->had_depr_prefix=1; DEPRECATE(0); }
 	YY_BREAK
 case 28:
@@ -1545,7 +1546,7 @@ case 28:
 yyg->yy_c_buf_p = yy_cp = yy_bp + 4;
 YY_DO_BEFORE_ACTION; /* set up yytext again */
 YY_RULE_SETUP
-#line 233 "libxlu_disk_l.l"
+#line 234 "libxlu_disk_l.l"
 { DPC->had_depr_prefix=1; DEPRECATE(0); }
 	YY_BREAK
 case 29:
@@ -1553,7 +1554,7 @@ case 29:
 yyg->yy_c_buf_p = yy_cp = yy_bp + 6;
 YY_DO_BEFORE_ACTION; /* set up yytext again */
 YY_RULE_SETUP
-#line 234 "libxlu_disk_l.l"
+#line 235 "libxlu_disk_l.l"
 { DPC->had_depr_prefix=1; DEPRECATE(0); }
 	YY_BREAK
 case 30:
@@ -1561,7 +1562,7 @@ case 30:
 yyg->yy_c_buf_p = yy_cp = yy_bp + 5;
 YY_DO_BEFORE_ACTION; /* set up yytext again */
 YY_RULE_SETUP
-#line 235 "libxlu_disk_l.l"
+#line 236 "libxlu_disk_l.l"
 { DPC->had_depr_prefix=1; DEPRECATE(0); }
 	YY_BREAK
 case 31:
@@ -1569,13 +1570,13 @@ case 31:
 yyg->yy_c_buf_p = yy_cp = yy_bp + 4;
 YY_DO_BEFORE_ACTION; /* set up yytext again */
 YY_RULE_SETUP
-#line 236 "libxlu_disk_l.l"
+#line 237 "libxlu_disk_l.l"
 { DPC->had_depr_prefix=1; DEPRECATE(0); }
 	YY_BREAK
 case 32:
 /* rule 32 can match eol */
 YY_RULE_SETUP
-#line 238 "libxlu_disk_l.l"
+#line 239 "libxlu_disk_l.l"
 {
 		  xlu__disk_err(DPC,yytext,"unknown deprecated disk prefix");
 		  return 0;
@@ -1585,7 +1586,7 @@ YY_RULE_SETUP
 case 33:
 /* rule 33 can match eol */
 YY_RULE_SETUP
-#line 245 "libxlu_disk_l.l"
+#line 246 "libxlu_disk_l.l"
 {
     STRIP(',');
 
@@ -1614,7 +1615,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 34:
 YY_RULE_SETUP
-#line 271 "libxlu_disk_l.l"
+#line 272 "libxlu_disk_l.l"
 {
     BEGIN(LEXERR);
     yymore();
@@ -1622,17 +1623,17 @@ YY_RULE_SETUP
 	YY_BREAK
 case 35:
 YY_RULE_SETUP
-#line 275 "libxlu_disk_l.l"
+#line 276 "libxlu_disk_l.l"
 {
     xlu__disk_err(DPC,yytext,"bad disk syntax"); return 0;
 }
 	YY_BREAK
 case 36:
 YY_RULE_SETUP
-#line 278 "libxlu_disk_l.l"
+#line 279 "libxlu_disk_l.l"
 YY_FATAL_ERROR( "flex scanner jammed" );
 	YY_BREAK
-#line 1636 "libxlu_disk_l.c"
+#line 1637 "libxlu_disk_l.c"
 			case YY_STATE_EOF(INITIAL):
 			case YY_STATE_EOF(LEXERR):
 				yyterminate();
@@ -2722,4 +2723,4 @@ void xlu__disk_yyfree (void * ptr , yyscan_t yyscanner)
 
 #define YYTABLES_NAME "yytables"
 
-#line 277 "libxlu_disk_l.l"
+#line 278 "libxlu_disk_l.l"
