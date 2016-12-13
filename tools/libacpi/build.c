@@ -613,6 +613,15 @@ int acpi_build_tables(struct acpi_ctxt *ctxt, struct acpi_config *config)
         fadt->iapc_boot_arch |= ACPI_FADT_NO_VGA;
     if ( config->table_flags & ACPI_HAS_8042 )
         fadt->iapc_boot_arch |= ACPI_FADT_8042;
+    if ( !(config->table_flags & ACPI_HAS_CMOS_RTC) )
+    {
+        if ( fadt->header.revision < 5 )
+        {
+            printf("ACPI_FADT_NO_CMOS_RTC requires FADT revision 5\n");
+            return -1;
+        }
+        fadt->iapc_boot_arch |= ACPI_FADT_NO_CMOS_RTC;
+    }
     set_checksum(fadt, offsetof(struct acpi_header, checksum), fadt_size);
 
     nr_secondaries = construct_secondary_tables(ctxt, secondary_tables,
