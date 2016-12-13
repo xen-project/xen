@@ -298,9 +298,13 @@ ioemu/linkfarm.stamp: $(XEN_ROOT)/tools/qemu-xen-traditional-dir
 	(cd $$src && find *	! -type l  -type f  $(addprefix ! -name ,	\
 			'*.[oda1]' 'config-*' config.mak qemu-dm qemu-img-xen	\
 			'*.html' '*.pod'					\
-			)) |							\
-	    while read f; do rm -f "$$f"; ln -s "$$src/$$f" "$$f"; done
-	touch ioemu/linkfarm.stamp
+			)) >linkfarm.stamp.tmp;				\
+	cmp -s linkfarm.stamp.tmp linkfarm.stamp &&			\
+		rm linkfarm.stamp.tmp || {				\
+		mv linkfarm.stamp.tmp linkfarm.stamp;			\
+		cat linkfarm.stamp | while read f;			\
+			do rm -f "$$f"; ln -s "$$src/$$f" "$$f"; done;	\
+	}
 else
 export QEMU_ROOT
 
