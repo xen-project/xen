@@ -41,7 +41,7 @@ static int decode_thumb2(register_t pc, struct hsr_dabt *dabt, uint16_t hw1)
     if ( raw_copy_from_guest(&hw2, (void *__user)(pc + 2), sizeof (hw2)) )
         return -EFAULT;
 
-    rt = (hw2 >> 12) & 0x7;
+    rt = (hw2 >> 12) & 0xf;
 
     switch ( (hw1 >> 9) & 0xf )
     {
