@@ -347,6 +347,8 @@ void kexec(void *kernel, long kernel_size, void *module, long module_size, char 
     /* Unmap libxc's projection of the boot page table */
     seg = xc_dom_seg_to_ptr(dom, &dom->pgtables_seg);
     munmap(seg, dom->pgtables_seg.vend - dom->pgtables_seg.vstart);
+    seg = xc_dom_seg_to_ptr(dom, &dom->p2m_seg);
+    munmap(seg, dom->p2m_seg.vend - dom->p2m_seg.vstart);
 
     /* Unmap day0 pages to avoid having a r/w mapping of the future page table */
     for (pfn = 0; pfn < allocated; pfn++)
