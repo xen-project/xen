@@ -427,6 +427,24 @@ int main(int argc, char **argv)
         goto fail;
     printf("okay\n");
 
+    printf("%-40s", "Testing cmpxchg8b (%edi) [opsize]...");
+    instr[0] = 0x66; instr[1] = 0x0f; instr[2] = 0xc7; instr[3] = 0x0f;
+    res[0]      = 0x12345678;
+    res[1]      = 0x87654321;
+    regs.eflags = 0x200;
+    regs.eip    = (unsigned long)&instr[0];
+    regs.edi    = (unsigned long)res;
+    rc = x86_emulate(&ctxt, &emulops);
+    if ( (rc != X86EMUL_OKAY) ||
+         (res[0] != 0x12345678) ||
+         (res[1] != 0x87654321) ||
+         (regs.eax != 0x12345678) ||
+         (regs.edx != 0x87654321) ||
+         ((regs.eflags&0x240) != 0x200) ||
+         (regs.eip != (unsigned long)&instr[4]) )
+        goto fail;
+    printf("okay\n");
+
     printf("%-40s", "Testing movsxbd (%%eax),%%ecx...");
     instr[0] = 0x0f; instr[1] = 0xbe; instr[2] = 0x08;
     regs.eflags = 0x200;
