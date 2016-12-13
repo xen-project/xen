@@ -169,7 +169,7 @@ struct acpi_10_fadt {
 /*
  * Fixed ACPI Description Table Structure (FADT).
  */
-struct acpi_20_fadt {
+struct acpi_fadt {
     struct acpi_header header;
     uint32_t firmware_ctrl;
     uint32_t dsdt;
@@ -222,6 +222,9 @@ struct acpi_20_fadt {
     struct acpi_20_generic_address x_pm_tmr_blk;
     struct acpi_20_generic_address x_gpe0_blk;
     struct acpi_20_generic_address x_gpe1_blk;
+    /* Only available starting from FADT revision 5. */
+    struct acpi_20_generic_address sleep_control;
+    struct acpi_20_generic_address sleep_status;
 };
 
 /*
@@ -422,7 +425,7 @@ struct acpi_20_slit {
  */
 #define ACPI_2_0_RSDP_SIGNATURE ASCII64('R','S','D',' ','P','T','R',' ')
 #define ACPI_2_0_FACS_SIGNATURE ASCII32('F','A','C','S')
-#define ACPI_2_0_FADT_SIGNATURE ASCII32('F','A','C','P')
+#define ACPI_FADT_SIGNATURE     ASCII32('F','A','C','P')
 #define ACPI_2_0_MADT_SIGNATURE ASCII32('A','P','I','C')
 #define ACPI_2_0_RSDT_SIGNATURE ASCII32('R','S','D','T')
 #define ACPI_2_0_XSDT_SIGNATURE ASCII32('X','S','D','T')
@@ -436,7 +439,6 @@ struct acpi_20_slit {
  * Table revision numbers.
  */
 #define ACPI_2_0_RSDP_REVISION 0x02
-#define ACPI_2_0_FADT_REVISION 0x04
 #define ACPI_2_0_MADT_REVISION 0x02
 #define ACPI_2_0_RSDT_REVISION 0x01
 #define ACPI_2_0_XSDT_REVISION 0x01

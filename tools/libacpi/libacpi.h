@@ -63,6 +63,7 @@ struct acpi_config {
     uint64_t pci_hi_start, pci_hi_len;
 
     uint32_t table_flags;
+    uint8_t acpi_revision;
 
     uint64_t vm_gid[2];
     unsigned long vm_gid_addr; /* OUT parameter */
