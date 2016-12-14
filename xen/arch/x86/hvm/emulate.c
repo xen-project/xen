@@ -459,6 +459,7 @@ static int hvmemul_linear_to_phys(
     {
         if ( pfec & (PFEC_page_paged | PFEC_page_shared) )
             return X86EMUL_RETRY;
+        *reps = 0;
         x86_emul_pagefault(pfec, addr, &hvmemul_ctxt->ctxt);
         return X86EMUL_EXCEPTION;
     }
@@ -478,6 +479,7 @@ static int hvmemul_linear_to_phys(
             if ( pfec & (PFEC_page_paged | PFEC_page_shared) )
                 return X86EMUL_RETRY;
             done /= bytes_per_rep;
+            *reps = done;
             if ( done == 0 )
             {
                 ASSERT(!reverse);
@@ -486,7 +488,6 @@ static int hvmemul_linear_to_phys(
                 x86_emul_pagefault(pfec, addr & PAGE_MASK, &hvmemul_ctxt->ctxt);
                 return X86EMUL_EXCEPTION;
             }
-            *reps = done;
             break;
         }
 
@@ -572,6 +573,7 @@ static int hvmemul_virtual_to_linear(
      * neither know the exact error code to be used, nor can we easily
      * determine the kind of exception (#GP or #TS) in that case.
      */
+    *reps = 0;
     if ( is_x86_user_segment(seg) )
         x86_emul_hw_exception((seg == x86_seg_ss)
                               ? TRAP_stack_error

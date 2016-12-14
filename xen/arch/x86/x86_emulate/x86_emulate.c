@@ -971,7 +971,11 @@ static void __put_rep_prefix(
 
 #define put_rep_prefix(reps_completed) ({                               \
     if ( rep_prefix() )                                                 \
+    {                                                                   \
         __put_rep_prefix(&_regs, ctxt->regs, ad_bytes, reps_completed); \
+        if ( unlikely(rc == X86EMUL_EXCEPTION) )                        \
+            goto no_writeback;                                          \
+    }                                                                   \
 })
 
 /* Clip maximum repetitions so that the index register at most just wraps. */
@@ -2919,14 +2923,9 @@ x86_emulate(
         dst.mem.off = truncate_ea_and_reps(_regs.edi, nr_reps, dst.bytes);
         if ( (rc = ioport_access_check(port, dst.bytes, ctxt, ops)) != 0 )
             goto done;
-        if ( (nr_reps > 1) && (ops->rep_ins != NULL) &&
+        if ( (nr_reps == 1) || !ops->rep_ins ||
              ((rc = ops->rep_ins(port, dst.mem.seg, dst.mem.off, dst.bytes,
-                                 &nr_reps, ctxt)) != X86EMUL_UNHANDLEABLE) )
-        {
-            if ( rc != 0 )
-                goto done;
-        }
-        else
+                                 &nr_reps, ctxt)) == X86EMUL_UNHANDLEABLE) )
         {
             fail_if(ops->read_io == NULL);
             if ( (rc = ops->read_io(port, dst.bytes, &dst.val, ctxt)) != 0 )
@@ -2936,6 +2935,8 @@ x86_emulate(
         }
         register_address_adjust(_regs.edi, nr_reps * dst.bytes);
         put_rep_prefix(nr_reps);
+        if ( rc != X86EMUL_OKAY )
+            goto done;
         break;
     }
 
@@ -2946,14 +2947,9 @@ x86_emulate(
         ea.mem.off = truncate_ea_and_reps(_regs.esi, nr_reps, dst.bytes);
         if ( (rc = ioport_access_check(port, dst.bytes, ctxt, ops)) != 0 )
             goto done;
-        if ( (nr_reps > 1) && (ops->rep_outs != NULL) &&
+        if ( (nr_reps == 1) || !ops->rep_outs ||
              ((rc = ops->rep_outs(ea.mem.seg, ea.mem.off, port, dst.bytes,
-                                  &nr_reps, ctxt)) != X86EMUL_UNHANDLEABLE) )
-        {
-            if ( rc != 0 )
-                goto done;
-        }
-        else
+                                  &nr_reps, ctxt)) == X86EMUL_UNHANDLEABLE) )
         {
             if ( (rc = read_ulong(ea.mem.seg, truncate_ea(_regs.esi),
                                   &dst.val, dst.bytes, ctxt, ops)) != 0 )
@@ -2965,6 +2961,8 @@ x86_emulate(
         }
         register_address_adjust(_regs.esi, nr_reps * dst.bytes);
         put_rep_prefix(nr_reps);
+        if ( rc != X86EMUL_OKAY )
+            goto done;
         break;
     }
 
@@ -3187,15 +3185,10 @@ x86_emulate(
         dst.mem.seg = x86_seg_es;
         dst.mem.off = truncate_ea_and_reps(_regs.edi, nr_reps, dst.bytes);
         src.mem.off = truncate_ea_and_reps(_regs.esi, nr_reps, dst.bytes);
-        if ( (nr_reps > 1) && (ops->rep_movs != NULL) &&
+        if ( (nr_reps == 1) || !ops->rep_movs ||
              ((rc = ops->rep_movs(ea.mem.seg, src.mem.off,
                                   dst.mem.seg, dst.mem.off, dst.bytes,
-                                  &nr_reps, ctxt)) != X86EMUL_UNHANDLEABLE) )
-        {
-            if ( rc != 0 )
-                goto done;
-        }
-        else
+                                  &nr_reps, ctxt)) == X86EMUL_UNHANDLEABLE) )
         {
             if ( (rc = read_ulong(ea.mem.seg, src.mem.off,
                                   &dst.val, dst.bytes, ctxt, ops)) != 0 )
@@ -3206,6 +3199,8 @@ x86_emulate(
         register_address_adjust(_regs.esi, nr_reps * dst.bytes);
         register_address_adjust(_regs.edi, nr_reps * dst.bytes);
         put_rep_prefix(nr_reps);
+        if ( rc != X86EMUL_OKAY )
+            goto done;
         break;
     }
 
@@ -3244,11 +3239,12 @@ x86_emulate(
             dst.val = src.val;
             dst.type = OP_MEM;
             nr_reps = 1;
+            rc = X86EMUL_OKAY;
         }
-        else if ( rc != X86EMUL_OKAY )
-            goto done;
         register_address_adjust(_regs.edi, nr_reps * dst.bytes);
         put_rep_prefix(nr_reps);
+        if ( rc != X86EMUL_OKAY )
+            goto done;
         break;
     }
 
