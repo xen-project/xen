@@ -330,7 +330,6 @@ int action_func(int argc, char *argv[], unsigned int idx)
         }
 
         printf(".");
-        fflush(stdout);
         usleep(DELAY);
     } while ( ++retry < RETRIES );
 
@@ -415,6 +414,12 @@ struct {
 int main(int argc, char *argv[])
 {
     int i, j = 0, ret;
+
+    /*
+     * Set stdout to be unbuffered to avoid having to fflush when
+     * printing without a newline.
+     */
+    setvbuf(stdout, NULL, _IONBF, 0);
 
     if ( argc  <= 1 )
     {
