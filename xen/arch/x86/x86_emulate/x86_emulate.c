@@ -1184,8 +1184,12 @@ static int ioport_access_check(
         return X86EMUL_OKAY;
 
     fail_if(ops->read_segment == NULL);
+    /*
+     * X86EMUL_DONE coming back here may be used to defer the port
+     * permission check to the respective ioport hook.
+     */
     if ( (rc = ops->read_segment(x86_seg_tr, &tr, ctxt)) != 0 )
-        return rc;
+        return rc == X86EMUL_DONE ? X86EMUL_OKAY : rc;
 
     /* Ensure the TSS has an io-bitmap-offset field. */
     generate_exception_if(tr.attr.fields.type != 0xb, EXC_GP, 0);
@@ -2506,6 +2510,21 @@ x86_emulate(
     /* Sync rIP to post decode value. */
     _regs.eip = state.eip;
 
+    if ( ops->validate )
+    {
+#ifndef NDEBUG
+        state.caller = __builtin_return_address(0);
+#endif
+        rc = ops->validate(&state, ctxt);
+#ifndef NDEBUG
+        state.caller = NULL;
+#endif
+        if ( rc == X86EMUL_DONE )
+            goto no_writeback;
+        if ( rc != X86EMUL_OKAY )
+            return rc;
+    }
+
     b = ctxt->opcode;
     d = state.desc;
 #define state (&state)
@@ -2935,13 +2954,28 @@ x86_emulate(
         dst.mem.off = truncate_ea_and_reps(_regs.edi, nr_reps, dst.bytes);
         if ( (rc = ioport_access_check(port, dst.bytes, ctxt, ops)) != 0 )
             goto done;
-        if ( (nr_reps == 1) || !ops->rep_ins ||
-             ((rc = ops->rep_ins(port, dst.mem.seg, dst.mem.off, dst.bytes,
-                                 &nr_reps, ctxt)) == X86EMUL_UNHANDLEABLE) )
+        /* Try the presumably most efficient approach first. */
+        if ( !ops->rep_ins )
+            nr_reps = 1;
+        rc = X86EMUL_UNHANDLEABLE;
+        if ( nr_reps == 1 && ops->read_io && ops->write )
         {
-            fail_if(ops->read_io == NULL);
+            rc = ops->read_io(port, dst.bytes, &dst.val, ctxt);
+            if ( rc == X86EMUL_OKAY )
+                nr_reps = 0;
+        }
+        if ( (nr_reps > 1 || rc == X86EMUL_UNHANDLEABLE) && ops->rep_ins )
+            rc = ops->rep_ins(port, dst.mem.seg, dst.mem.off, dst.bytes,
+                              &nr_reps, ctxt);
+        if ( nr_reps >= 1 && rc == X86EMUL_UNHANDLEABLE )
+        {
+            fail_if(!ops->read_io || !ops->write);
             if ( (rc = ops->read_io(port, dst.bytes, &dst.val, ctxt)) != 0 )
                 goto done;
+            nr_reps = 0;
+        }
+        if ( !nr_reps && rc == X86EMUL_OKAY )
+        {
             dst.type = OP_MEM;
             nr_reps = 1;
         }
@@ -2959,14 +2993,30 @@ x86_emulate(
         ea.mem.off = truncate_ea_and_reps(_regs.esi, nr_reps, dst.bytes);
         if ( (rc = ioport_access_check(port, dst.bytes, ctxt, ops)) != 0 )
             goto done;
-        if ( (nr_reps == 1) || !ops->rep_outs ||
-             ((rc = ops->rep_outs(ea.mem.seg, ea.mem.off, port, dst.bytes,
-                                  &nr_reps, ctxt)) == X86EMUL_UNHANDLEABLE) )
+        /* Try the presumably most efficient approach first. */
+        if ( !ops->rep_outs )
+            nr_reps = 1;
+        rc = X86EMUL_UNHANDLEABLE;
+        if ( nr_reps == 1 && ops->write_io )
         {
-            if ( (rc = read_ulong(ea.mem.seg, truncate_ea(_regs.esi),
-                                  &dst.val, dst.bytes, ctxt, ops)) != 0 )
+            rc = read_ulong(ea.mem.seg, ea.mem.off, &dst.val, dst.bytes,
+                            ctxt, ops);
+            if ( rc == X86EMUL_OKAY )
+                nr_reps = 0;
+        }
+        if ( (nr_reps > 1 || rc == X86EMUL_UNHANDLEABLE) && ops->rep_outs )
+            rc = ops->rep_outs(ea.mem.seg, ea.mem.off, port, dst.bytes,
+                               &nr_reps, ctxt);
+        if ( nr_reps >= 1 && rc == X86EMUL_UNHANDLEABLE )
+        {
+            if ( (rc = read_ulong(ea.mem.seg, ea.mem.off, &dst.val,
+                                  dst.bytes, ctxt, ops)) != X86EMUL_OKAY )
                 goto done;
             fail_if(ops->write_io == NULL);
+            nr_reps = 0;
+        }
+        if ( !nr_reps && rc == X86EMUL_OKAY )
+        {
             if ( (rc = ops->write_io(port, dst.bytes, dst.val, ctxt)) != 0 )
                 goto done;
             nr_reps = 1;
@@ -4040,7 +4090,11 @@ x86_emulate(
             rc = ops->read_io(port, dst.bytes, &dst.val, ctxt);
         }
         if ( rc != 0 )
+        {
+            if ( rc == X86EMUL_DONE )
+                goto no_writeback;
             goto done;
+        }
         break;
     }
 
@@ -5447,9 +5501,7 @@ x86_emulate(
         break;
     }
 
- no_writeback:
-    /* Commit shadow register state. */
-    _regs.eflags &= ~EFLG_RF;
+ no_writeback: /* Commit shadow register state. */
 
     /* Zero the upper 32 bits of %rip if not in 64-bit mode. */
     if ( !mode_64bit() )
@@ -5459,7 +5511,15 @@ x86_emulate(
     if ( (rc == X86EMUL_OKAY) && (ctxt->regs->eflags & EFLG_TF) )
         ctxt->retire.singlestep = true;
 
-    *ctxt->regs = _regs;
+    if ( rc != X86EMUL_DONE )
+        *ctxt->regs = _regs;
+    else
+    {
+        ctxt->regs->eip = _regs.eip;
+        rc = X86EMUL_OKAY;
+    }
+
+    ctxt->regs->eflags &= ~EFLG_RF;
 
  done:
     _put_fpu();

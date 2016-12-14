@@ -146,6 +146,14 @@ struct __attribute__((__packed__)) segment_register {
 #define X86EMUL_EXCEPTION      2
  /* Retry the emulation for some reason. No state modified. */
 #define X86EMUL_RETRY          3
+ /*
+  * Operation fully done by one of the hooks:
+  * - validate(): operation completed (except common insn retire logic)
+  * - read_segment(x86_seg_tr, ...): bypass I/O bitmap access
+  * - read_io() / write_io(): bypass GPR update (non-string insns only)
+  * Undefined behavior when used anywhere else.
+  */
+#define X86EMUL_DONE           4
 
 /* FPU sub-types which may be requested via ->get_fpu(). */
 enum x86_emulate_fpu_type {
@@ -155,6 +163,8 @@ enum x86_emulate_fpu_type {
     X86EMUL_FPU_xmm, /* SSE instruction set (%xmm0-%xmm7/15) */
     X86EMUL_FPU_ymm  /* AVX/XOP instruction set (%ymm0-%ymm7/15) */
 };
+
+struct x86_emulate_state;
 
 /*
  * These operations represent the instruction emulator's interface to memory,
@@ -235,6 +245,14 @@ struct x86_emulate_ops
         void *p_old,
         void *p_new,
         unsigned int bytes,
+        struct x86_emulate_ctxt *ctxt);
+
+    /*
+     * validate: Post-decode, pre-emulate hook to allow caller controlled
+     * filtering.
+     */
+    int (*validate)(
+        const struct x86_emulate_state *state,
         struct x86_emulate_ctxt *ctxt);
 
     /*
