@@ -9,6 +9,7 @@
 #include <string.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
+#include <time.h>
 #include <unistd.h>
 #include <xenctrl.h>
 #include <xenstore.h>
@@ -265,17 +266,31 @@ struct {
     },
 };
 
-/* Go around 300 * 0.1 seconds = 30 seconds. */
-#define RETRIES 300
-/* aka 0.1 second */
-#define DELAY 100000
+/* The hypervisor timeout for the live patching operation is 30 msec,
+ * but it could take some time for the operation to start, so wait twice
+ * that period. */
+#define HYPERVISOR_TIMEOUT_NS 30000000
+#define DELAY (2 * HYPERVISOR_TIMEOUT_NS)
+
+static void nanosleep_retry(long ns)
+{
+    struct timespec req, rem;
+    int rc;
+
+    rem.tv_sec = 0;
+    rem.tv_nsec = ns;
+
+    do {
+        req = rem;
+        rc = nanosleep(&req, &rem);
+    } while ( rc == -1 && errno == EINTR );
+}
 
 int action_func(int argc, char *argv[], unsigned int idx)
 {
     char name[XEN_LIVEPATCH_NAME_SIZE];
-    int rc, original_state;
+    int rc;
     xen_livepatch_status_t status;
-    unsigned int retry = 0;
 
     if ( argc != 1 )
     {
@@ -315,11 +330,11 @@ int action_func(int argc, char *argv[], unsigned int idx)
     /* Perform action. */
     if ( action_options[idx].allow & status.state )
     {
-        printf("%s %s:", action_options[idx].verb, name);
-        rc = action_options[idx].function(xch, name, 0);
+        printf("%s %s... ", action_options[idx].verb, name);
+        rc = action_options[idx].function(xch, name, HYPERVISOR_TIMEOUT_NS);
         if ( rc )
         {
-            printf(" failed\n");
+            printf("failed\n");
             fprintf(stderr, "Error %d: %s\n", errno, strerror(errno));
             return -1;
         }
@@ -334,56 +349,41 @@ int action_func(int argc, char *argv[], unsigned int idx)
         return -1;
     }
 
-    original_state = status.state;
-    do {
-        rc = xc_livepatch_get(xch, name, &status);
-        if ( rc )
-        {
-            rc = -errno;
-            break;
-        }
+    nanosleep_retry(DELAY);
+    rc = xc_livepatch_get(xch, name, &status);
 
-        if ( status.state != original_state )
-            break;
-        if ( status.rc && status.rc != -XEN_EAGAIN )
-        {
-            rc = status.rc;
-            break;
-        }
+    if ( rc )
+        rc = -errno;
+    else if ( status.rc )
+        rc = status.rc;
 
-        printf(".");
-        usleep(DELAY);
-    } while ( ++retry < RETRIES );
-
-    if ( retry >= RETRIES )
+    if ( rc == -XEN_EAGAIN )
     {
-        printf(" failed\n");
-        fprintf(stderr, "Operation didn't complete after 30 seconds.\n");
+        printf("failed\n");
+        fprintf(stderr, "Operation didn't complete.\n");
+        return -1;
+    }
+
+    if ( rc == 0 )
+        rc = status.state;
+
+    if ( action_options[idx].expected == rc )
+        printf("completed\n");
+    else if ( rc < 0 )
+    {
+        printf("failed\n");
+        fprintf(stderr, "Error %d: %s\n", -rc, strerror(-rc));
         return -1;
     }
     else
     {
-        if ( rc == 0 )
-            rc = status.state;
-
-        if ( action_options[idx].expected == rc )
-            printf(" completed\n");
-        else if ( rc < 0 )
-        {
-            printf(" failed\n");
-            fprintf(stderr, "Error %d: %s\n", -rc, strerror(-rc));
-            return -1;
-        }
-        else
-        {
-            printf(" failed\n");
-            fprintf(stderr, "%s is in the wrong state.\n"
-                            "Current state: %s\n"
-                            "Expected state: %s\n",
-                    name, state2str(rc),
-                    state2str(action_options[idx].expected));
-            return -1;
-        }
+        printf("failed\n");
+        fprintf(stderr, "%s is in the wrong state.\n"
+                        "Current state: %s\n"
+                        "Expected state: %s\n",
+                name, state2str(rc),
+                state2str(action_options[idx].expected));
+        return -1;
     }
 
     return 0;
