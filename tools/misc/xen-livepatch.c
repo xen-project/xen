@@ -15,6 +15,7 @@
 #include <xenstore.h>
 
 #include <xen/errno.h>
+#include <xen-tools/libs.h>
 
 static xc_interface *xch;
 
@@ -309,17 +310,18 @@ int action_func(int argc, char *argv[], unsigned int idx)
     rc = xc_livepatch_get(xch, name, &status);
     if ( rc )
     {
+        int saved_errno = errno;
         fprintf(stderr, "Failed to get status of %s.\n"
                         "Error %d: %s\n",
-                name, errno, strerror(errno));
-        return -1;
+                name, saved_errno, strerror(saved_errno));
+        return saved_errno;
     }
     if ( status.rc == -XEN_EAGAIN )
     {
         fprintf(stderr,
                 "Cannot execute %s.\n"
                 "Operation already in progress.\n", action_options[idx].name);
-        return -1;
+        return EAGAIN;
     }
 
     if ( status.state == action_options[idx].expected )
@@ -339,7 +341,7 @@ int action_func(int argc, char *argv[], unsigned int idx)
             printf("failed\n");
             fprintf(stderr, "Error %d: %s\n",
                     saved_errno, strerror(saved_errno));
-            return -1;
+            return saved_errno;
         }
     }
     else
@@ -364,7 +366,7 @@ int action_func(int argc, char *argv[], unsigned int idx)
     {
         printf("failed\n");
         fprintf(stderr, "Operation didn't complete.\n");
-        return -1;
+        return EAGAIN;
     }
 
     if ( rc == 0 )
@@ -376,7 +378,7 @@ int action_func(int argc, char *argv[], unsigned int idx)
     {
         printf("failed\n");
         fprintf(stderr, "Error %d: %s\n", -rc, strerror(-rc));
-        return -1;
+        return -rc;
     }
     else
     {
@@ -488,7 +490,28 @@ int main(int argc, char *argv[])
 
     xc_interface_close(xch);
 
-    return !!ret;
+    /*
+     * Exitcode 0 for success.
+     * Exitcode 1 for an error.
+     * Exitcode 2 if the operation should be retried for any reason (e.g. a
+     * timeout or because another operation was in progress).
+     */
+#define EXIT_TIMEOUT (EXIT_FAILURE + 1)
+
+    BUILD_BUG_ON(EXIT_SUCCESS != 0);
+    BUILD_BUG_ON(EXIT_FAILURE != 1);
+    BUILD_BUG_ON(EXIT_TIMEOUT != 2);
+
+    switch ( ret )
+    {
+    case 0:
+        return EXIT_SUCCESS;
+    case EAGAIN:
+    case EBUSY:
+        return EXIT_TIMEOUT;
+    default:
+        return EXIT_FAILURE;
+    }
 }
 
 /*
