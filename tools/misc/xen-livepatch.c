@@ -101,9 +101,10 @@ static int list_func(int argc, char *argv[])
         rc = xc_livepatch_list(xch, MAX_LEN, idx, info, name, len, &done, &left);
         if ( rc )
         {
+            rc = errno;
             fprintf(stderr, "Failed to list %d/%d.\n"
                             "Error %d: %s\n",
-                    idx, left, errno, strerror(errno));
+                    idx, left, rc, strerror(rc));
             break;
         }
         if ( !idx )
@@ -175,37 +176,40 @@ static int upload_func(int argc, char *argv[])
     fd = open(filename, O_RDONLY);
     if ( fd < 0 )
     {
+        int saved_errno = errno;
         fprintf(stderr, "Could not open %s.\n"
                         "Error %d: %s\n",
-                filename, errno, strerror(errno));
-        return errno;
+                filename, saved_errno, strerror(saved_errno));
+        return saved_errno;
     }
     if ( stat(filename, &buf) != 0 )
     {
+        int saved_errno = errno;
         fprintf(stderr, "Could not get size of %s.\n"
                         "Error %d: %s\n",
-                filename, errno, strerror(errno));
+                filename, saved_errno, strerror(saved_errno));
         close(fd);
-        return errno;
+        return saved_errno;
     }
 
     len = buf.st_size;
     fbuf = mmap(0, len, PROT_READ, MAP_PRIVATE, fd, 0);
     if ( fbuf == MAP_FAILED )
     {
+        int saved_errno = errno;
         fprintf(stderr, "Could not map %s.\n"
                         "Error %d: %s\n",
-                filename, errno, strerror(errno));
+                filename, saved_errno, strerror(saved_errno));
         close (fd);
-        return errno;
+        return saved_errno;
     }
     printf("Uploading %s... ", filename);
     rc = xc_livepatch_upload(xch, name, fbuf, len);
     if ( rc )
     {
+        rc = errno;
         printf("failed\n");
-        fprintf(stderr, "Error %d: %s\n",
-                errno, strerror(errno));
+        fprintf(stderr, "Error %d: %s\n", rc, strerror(rc));
     }
     else
         printf("completed\n");
@@ -216,8 +220,6 @@ static int upload_func(int argc, char *argv[])
         fprintf(stderr, "Could not unmap %s.\n"
                         "Error %d: %s\n",
                 filename, errno, strerror(errno));
-        if ( !rc )
-            rc = errno;
     }
     close(fd);
 
@@ -333,8 +335,10 @@ int action_func(int argc, char *argv[], unsigned int idx)
         rc = action_options[idx].function(xch, name, HYPERVISOR_TIMEOUT_NS);
         if ( rc )
         {
+            int saved_errno = errno;
             printf("failed\n");
-            fprintf(stderr, "Error %d: %s\n", errno, strerror(errno));
+            fprintf(stderr, "Error %d: %s\n",
+                    saved_errno, strerror(saved_errno));
             return -1;
         }
     }
