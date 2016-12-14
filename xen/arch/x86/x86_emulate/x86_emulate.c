@@ -1305,6 +1305,7 @@ static bool vcpu_has(
 #define vcpu_has_hle()         vcpu_has(         7, EBX,  4, ctxt, ops)
 #define vcpu_has_rtm()         vcpu_has(         7, EBX, 11, ctxt, ops)
 #define vcpu_has_smap()        vcpu_has(         7, EBX, 20, ctxt, ops)
+#define vcpu_has_clflushopt()  vcpu_has(         7, EBX, 23, ctxt, ops)
 
 #define vcpu_must_have(feat) \
     generate_exception_if(!vcpu_has_##feat(), EXC_UD)
@@ -5187,6 +5188,10 @@ x86_emulate(
         {
         case 7: /* clflush{,opt} */
             fail_if(modrm_mod == 3);
+            if ( !vex.pfx )
+                vcpu_must_have(clflush);
+            else
+                vcpu_must_have(clflushopt);
             fail_if(ops->wbinvd == NULL);
             if ( (rc = ops->wbinvd(ctxt)) != 0 )
                 goto done;
