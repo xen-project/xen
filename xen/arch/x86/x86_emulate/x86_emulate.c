@@ -1520,6 +1520,7 @@ protmode_load_seg(
     {
         uint32_t new_desc_b = desc.b | a_flag;
 
+        fail_if(!ops->cmpxchg);
         switch ( (rc = ops->cmpxchg(sel_seg, (sel & 0xfff8) + 4, &desc.b,
                                     &new_desc_b, sizeof(desc.b), ctxt)) )
         {
@@ -2017,6 +2018,8 @@ x86_decode(
     bool pc_rel = false;
     int rc = X86EMUL_OKAY;
 
+    ASSERT(ops->insn_fetch);
+
     memset(state, 0, sizeof(*state));
     ea.type = OP_NONE;
     ea.mem.seg = x86_seg_ds;
@@ -2494,6 +2497,8 @@ x86_emulate(
     struct x86_emulate_stub stub = {};
     DECLARE_ALIGNED(mmval_t, mmval);
 
+    ASSERT(ops->read);
+
     rc = x86_decode(&state, ctxt, ops);
     if ( rc != X86EMUL_OKAY )
         return rc;
@@ -2658,13 +2663,18 @@ x86_emulate(
         }
         else if ( !(d & Mov) ) /* optimisation - avoid slow emulated read */
         {
+            fail_if(lock_prefix ? !ops->cmpxchg : !ops->write);
             if ( (rc = read_ulong(dst.mem.seg, dst.mem.off,
                                   &dst.val, dst.bytes, ctxt, ops)) )
                 goto done;
             dst.orig_val = dst.val;
         }
-        else /* Lock prefix is allowed only on RMW instructions. */
+        else
+        {
+            /* Lock prefix is allowed only on RMW instructions. */
             generate_exception_if(lock_prefix, EXC_UD);
+            fail_if(!ops->write);
+        }
         break;
     }
 
@@ -2813,7 +2823,9 @@ x86_emulate(
         unsigned long regs[] = {
             _regs.eax, _regs.ecx, _regs.edx, _regs.ebx,
             _regs.esp, _regs.ebp, _regs.esi, _regs.edi };
+
         generate_exception_if(mode_64bit(), EXC_UD);
+        fail_if(!ops->write);
         for ( i = 0; i < 8; i++ )
             if ( (rc = ops->write(x86_seg_ss, sp_pre_dec(op_bytes),
                                   &regs[i], op_bytes, ctxt)) != 0 )
@@ -3112,7 +3124,7 @@ x86_emulate(
     case 0x9a: /* call (far, absolute) */
         ASSERT(!mode_64bit());
     far_call:
-        fail_if(ops->read_segment == NULL);
+        fail_if(!ops->read_segment || !ops->write);
 
         if ( (rc = ops->read_segment(x86_seg_cs, &sreg, ctxt)) ||
              (rc = load_seg(x86_seg_cs, imm2, 0, &cs, ctxt, ops)) ||
@@ -3351,6 +3363,7 @@ x86_emulate(
         dst.type = OP_REG;
         dst.bytes = (mode_64bit() && (op_bytes == 4)) ? 8 : op_bytes;
         dst.reg = (unsigned long *)&_regs.ebp;
+        fail_if(!ops->write);
         if ( (rc = ops->write(x86_seg_ss, sp_pre_dec(dst.bytes),
                               &_regs.ebp, dst.bytes, ctxt)) )
             goto done;
@@ -4448,6 +4461,7 @@ x86_emulate(
                 else if ( rc != X86EMUL_UNHANDLEABLE )
                     goto done;
             }
+            fail_if(limit && !ops->write);
             while ( limit )
             {
                 rc = ops->write(ea.mem.seg, base, &zero, sizeof(zero), ctxt);
@@ -4468,7 +4482,7 @@ x86_emulate(
         case 1: /* sidt */
             generate_exception_if(ea.type != OP_MEM, EXC_UD);
             generate_exception_if(umip_active(ctxt, ops), EXC_GP, 0);
-            fail_if(ops->read_segment == NULL);
+            fail_if(!ops->read_segment || !ops->write);
             if ( (rc = ops->read_segment(seg, &sreg, ctxt)) )
                 goto done;
             if ( mode_64bit() )
@@ -4505,12 +4519,18 @@ x86_emulate(
             break;
         case 4: /* smsw */
             generate_exception_if(umip_active(ctxt, ops), EXC_GP, 0);
-            ea.bytes = (ea.type == OP_MEM) ? 2 : op_bytes;
+            if ( ea.type == OP_MEM )
+            {
+                fail_if(!ops->write);
+                d |= Mov; /* force writeback */
+                ea.bytes = 2;
+            }
+            else
+                ea.bytes = op_bytes;
             dst = ea;
             fail_if(ops->read_cr == NULL);
             if ( (rc = ops->read_cr(0, &dst.val, ctxt)) )
                 goto done;
-            d |= Mov; /* force writeback */
             break;
         case 6: /* lmsw */
             fail_if(ops->read_cr == NULL);
@@ -4712,6 +4732,8 @@ x86_emulate(
             if ( !(b & 1) )
                 rc = ops->read(ea.mem.seg, ea.mem.off+0, mmvalp,
                                ea.bytes, ctxt);
+            else
+                fail_if(!ops->write); /* Check before running the stub. */
             /* convert memory operand to (%rAX) */
             rex_prefix &= ~REX_B;
             vex.b = 1;
@@ -4726,8 +4748,11 @@ x86_emulate(
         put_fpu(&fic);
         put_stub(stub);
         if ( !rc && (b & 1) && (ea.type == OP_MEM) )
+        {
+            ASSERT(ops->write); /* See the fail_if() above. */
             rc = ops->write(ea.mem.seg, ea.mem.off, mmvalp,
                             ea.bytes, ctxt);
+        }
         if ( rc )
             goto done;
         dst.type = OP_NONE;
@@ -4996,6 +5021,8 @@ x86_emulate(
             if ( b == 0x6f )
                 rc = ops->read(ea.mem.seg, ea.mem.off+0, mmvalp,
                                ea.bytes, ctxt);
+            else
+                fail_if(!ops->write); /* Check before running the stub. */
         }
         if ( ea.type == OP_MEM || b == 0x7e )
         {
@@ -5017,8 +5044,11 @@ x86_emulate(
         put_fpu(&fic);
         put_stub(stub);
         if ( !rc && (b != 0x6f) && (ea.type == OP_MEM) )
+        {
+            ASSERT(ops->write); /* See the fail_if() above. */
             rc = ops->write(ea.mem.seg, ea.mem.off, mmvalp,
                             ea.bytes, ctxt);
+        }
         if ( rc )
             goto done;
         dst.type = OP_NONE;
@@ -5266,6 +5296,7 @@ x86_emulate(
 
         generate_exception_if((modrm_reg & 7) != 1, EXC_UD);
         generate_exception_if(ea.type != OP_MEM, EXC_UD);
+        fail_if(!ops->cmpxchg);
         if ( op_bytes == 8 )
             host_and_vcpu_must_have(cx16);
         op_bytes *= 2;
@@ -5398,12 +5429,18 @@ x86_emulate(
              !ctxt->force_writeback )
             /* nothing to do */;
         else if ( lock_prefix )
+        {
+            fail_if(!ops->cmpxchg);
             rc = ops->cmpxchg(
                 dst.mem.seg, dst.mem.off, &dst.orig_val,
                 &dst.val, dst.bytes, ctxt);
+        }
         else
+        {
+            fail_if(!ops->write);
             rc = ops->write(
                 dst.mem.seg, dst.mem.off, &dst.val, dst.bytes, ctxt);
+        }
         if ( rc != 0 )
             goto done;
     default:
@@ -5487,8 +5524,6 @@ x86_decode_insn(
     const struct x86_emulate_ops ops = {
         .insn_fetch = insn_fetch,
         .read       = x86emul_unhandleable_rw,
-        .write      = PTR_POISON,
-        .cmpxchg    = PTR_POISON,
     };
     int rc = x86_decode(state, ctxt, &ops);
 
