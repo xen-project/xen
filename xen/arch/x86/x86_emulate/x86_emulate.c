@@ -1299,6 +1299,7 @@ static bool vcpu_has(
 #define vcpu_has_sse4_2()      vcpu_has(         1, ECX, 20, ctxt, ops)
 #define vcpu_has_movbe()       vcpu_has(         1, ECX, 22, ctxt, ops)
 #define vcpu_has_avx()         vcpu_has(         1, ECX, 28, ctxt, ops)
+#define vcpu_has_lahf_lm()     vcpu_has(0x80000001, ECX,  0, ctxt, ops)
 #define vcpu_has_lzcnt()       vcpu_has(0x80000001, ECX,  5, ctxt, ops)
 #define vcpu_has_misalignsse() vcpu_has(0x80000001, ECX,  7, ctxt, ops)
 #define vcpu_has_bmi1()        vcpu_has(         7, EBX,  3, ctxt, ops)
@@ -3234,11 +3235,15 @@ x86_emulate(
     }
 
     case 0x9e: /* sahf */
+        if ( mode_64bit() )
+            vcpu_must_have(lahf_lm);
         *(uint8_t *)&_regs.eflags = (((uint8_t *)&_regs.eax)[1] &
                                      EFLAGS_MASK) | EFLG_MBS;
         break;
 
     case 0x9f: /* lahf */
+        if ( mode_64bit() )
+            vcpu_must_have(lahf_lm);
         ((uint8_t *)&_regs.eax)[1] = (_regs.eflags & EFLAGS_MASK) | EFLG_MBS;
         break;
 
