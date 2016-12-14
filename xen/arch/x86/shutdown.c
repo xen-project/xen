@@ -128,11 +128,15 @@ static int __init override_reboot(struct dmi_system_id *d)
 {
     enum reboot_type type = (long)d->driver_data;
 
+    if ( type == BOOT_ACPI && acpi_disabled )
+        type = BOOT_KBD;
+
     if ( reboot_type != type )
     {
         static const char *__initdata msg[] =
         {
             [BOOT_KBD]  = "keyboard controller",
+            [BOOT_ACPI] = "ACPI",
             [BOOT_CF9]  = "PCI",
         };
 
@@ -436,6 +440,15 @@ static struct dmi_system_id __initdata reboot_dmi_table[] = {
         .matches = {
             DMI_MATCH(DMI_SYS_VENDOR, "Dell Inc."),
             DMI_MATCH(DMI_PRODUCT_NAME, "OptiPlex 390"),
+        },
+    },
+    {    /* Handle problems with rebooting on Dell OptiPlex 9020. */
+        .callback = override_reboot,
+        .driver_data = (void *)(long)BOOT_ACPI,
+        .ident = "Dell OptiPlex 9020",
+        .matches = {
+            DMI_MATCH(DMI_SYS_VENDOR, "Dell Inc."),
+            DMI_MATCH(DMI_PRODUCT_NAME, "OptiPlex 9020"),
         },
     },
     {    /* Handle problems with rebooting on the Latitude E6320. */
