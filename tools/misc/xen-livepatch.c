@@ -238,7 +238,6 @@ struct {
     const char *name;
     const char *verb;
     int (*function)(xc_interface *xch, char *name, uint32_t timeout);
-    unsigned int executed; /* Has the function been called?. */
 } action_options[] = {
     {   .allow = LIVEPATCH_STATE_CHECKED,
         .expected = LIVEPATCH_STATE_APPLIED,
