@@ -282,7 +282,7 @@ static int hvm_add_ioreq_gmfn(
     rc = guest_physmap_add_page(d, _gfn(iorp->gmfn),
                                 _mfn(page_to_mfn(iorp->page)), 0);
     if ( rc == 0 )
-        paging_mark_dirty(d, page_to_mfn(iorp->page));
+        paging_mark_dirty(d, _mfn(page_to_mfn(iorp->page)));
 
     return rc;
 }

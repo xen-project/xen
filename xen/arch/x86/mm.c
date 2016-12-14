@@ -2251,7 +2251,7 @@ static int alloc_page_type(struct page_info *page, unsigned long type,
 
     /* A page table is dirtied when its type count becomes non-zero. */
     if ( likely(owner != NULL) )
-        paging_mark_dirty(owner, page_to_mfn(page));
+        paging_mark_dirty(owner, _mfn(page_to_mfn(page)));
 
     switch ( type & PGT_type_mask )
     {
@@ -2325,7 +2325,7 @@ int free_page_type(struct page_info *page, unsigned long type,
     if ( likely(owner != NULL) && unlikely(paging_mode_enabled(owner)) )
     {
         /* A page table is dirtied when its type count becomes zero. */
-        paging_mark_dirty(owner, page_to_mfn(page));
+        paging_mark_dirty(owner, _mfn(page_to_mfn(page)));
 
         if ( shadow_mode_refcounts(owner) )
             return 0;
@@ -3247,7 +3247,7 @@ long do_mmuext_op(
                 goto pin_drop;
 
             /* A page is dirtied when its pin status is set. */
-            paging_mark_dirty(pg_owner, page_to_mfn(page));
+            paging_mark_dirty(pg_owner, _mfn(page_to_mfn(page)));
 
             /* We can race domain destruction (domain_relinquish_resources). */
             if ( unlikely(pg_owner != d) )
@@ -3307,7 +3307,7 @@ long do_mmuext_op(
             put_page(page);
 
             /* A page is dirtied when its pin status is cleared. */
-            paging_mark_dirty(pg_owner, page_to_mfn(page));
+            paging_mark_dirty(pg_owner, _mfn(page_to_mfn(page)));
 
             break;
         }
@@ -3516,7 +3516,7 @@ long do_mmuext_op(
             }
 
             /* A page is dirtied when it's being cleared. */
-            paging_mark_dirty(pg_owner, page_to_mfn(page));
+            paging_mark_dirty(pg_owner, _mfn(page_to_mfn(page)));
 
             clear_domain_page(_mfn(page_to_mfn(page)));
 
@@ -3551,7 +3551,7 @@ long do_mmuext_op(
             }
 
             /* A page is dirtied when it's being copied to. */
-            paging_mark_dirty(pg_owner, page_to_mfn(dst_page));
+            paging_mark_dirty(pg_owner, _mfn(page_to_mfn(dst_page)));
 
             copy_domain_page(_mfn(page_to_mfn(dst_page)),
                              _mfn(page_to_mfn(src_page)));
@@ -3894,7 +3894,7 @@ long do_mmu_update(
 
             set_gpfn_from_mfn(mfn, gpfn);
 
-            paging_mark_dirty(pg_owner, mfn);
+            paging_mark_dirty(pg_owner, _mfn(mfn));
 
             put_page(mfn_to_page(mfn));
             break;
@@ -4700,7 +4700,7 @@ long do_update_descriptor(u64 pa, u64 desc)
         break;
     }
 
-    paging_mark_dirty(dom, mfn);
+    paging_mark_dirty(dom, _mfn(mfn));
 
     /* All is good so make the update. */
     gdt_pent = map_domain_page(_mfn(mfn));

@@ -80,7 +80,7 @@ static inline void cli_put_page(void *cli_va, struct page_info *cli_pfp,
     if ( mark_dirty )
     {
         put_page_and_type(cli_pfp);
-        paging_mark_dirty(current->domain,cli_mfn);
+        paging_mark_dirty(current->domain, _mfn(cli_mfn));
     }
     else
         put_page(cli_pfp);

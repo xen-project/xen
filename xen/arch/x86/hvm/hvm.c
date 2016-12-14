@@ -1943,7 +1943,7 @@ int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
          */
         if ( npfec.write_access )
         {
-            paging_mark_dirty(currd, mfn_x(mfn));
+            paging_mark_dirty(currd, mfn);
             /*
              * If p2m is really an altp2m, unlock here to avoid lock ordering
              * violation when the change below is propagated from host p2m.
@@ -2633,7 +2633,7 @@ static void *_hvm_map_guest_frame(unsigned long gfn, bool_t permanent,
         if ( unlikely(p2m_is_discard_write(p2mt)) )
             *writable = 0;
         else if ( !permanent )
-            paging_mark_dirty(d, page_to_mfn(page));
+            paging_mark_dirty(d, _mfn(page_to_mfn(page)));
     }
 
     if ( !permanent )
@@ -2696,7 +2696,7 @@ void hvm_unmap_guest_frame(void *p, bool_t permanent)
         list_for_each_entry(track, &d->arch.hvm_domain.write_map.list, list)
             if ( track->page == page )
             {
-                paging_mark_dirty(d, mfn);
+                paging_mark_dirty(d, _mfn(mfn));
                 list_del(&track->list);
                 xfree(track);
                 break;
@@ -2713,7 +2713,7 @@ void hvm_mapped_guest_frames_mark_dirty(struct domain *d)
 
     spin_lock(&d->arch.hvm_domain.write_map.lock);
     list_for_each_entry(track, &d->arch.hvm_domain.write_map.list, list)
-        paging_mark_dirty(d, page_to_mfn(track->page));
+        paging_mark_dirty(d, _mfn(page_to_mfn(track->page)));
     spin_unlock(&d->arch.hvm_domain.write_map.lock);
 }
 
@@ -3230,7 +3230,7 @@ static enum hvm_copy_result __hvm_copy(
                     memcpy(p, buf, count);
                 else
                     memset(p, 0, count);
-                paging_mark_dirty(curr->domain, page_to_mfn(page));
+                paging_mark_dirty(curr->domain, _mfn(page_to_mfn(page)));
             }
         }
         else
@@ -5807,7 +5807,7 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
             page = get_page_from_gfn(d, pfn, NULL, P2M_UNSHARE);
             if ( page )
             {
-                paging_mark_dirty(d, page_to_mfn(page));
+                paging_mark_dirty(d, _mfn(page_to_mfn(page)));
                 /* These are most probably not page tables any more */
                 /* don't take a long time and don't die either */
                 sh_remove_shadows(d, _mfn(page_to_mfn(page)), 1, 0);

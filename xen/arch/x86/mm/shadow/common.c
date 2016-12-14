@@ -999,7 +999,7 @@ sh_validate_guest_entry(struct vcpu *v, mfn_t gmfn, void *entry, u32 size)
     int result = 0;
     struct page_info *page = mfn_to_page(gmfn);
 
-    paging_mark_dirty(v->domain, mfn_x(gmfn));
+    paging_mark_dirty(v->domain, gmfn);
 
     // Determine which types of shadows are affected, and update each.
     //
@@ -1818,11 +1818,11 @@ void sh_emulate_unmap_dest(struct vcpu *v, void *addr, unsigned int bytes,
             sh_validate_guest_pt_write(v, sh_ctxt->mfn[1], addr + b1, b2);
     }
 
-    paging_mark_dirty(v->domain, mfn_x(sh_ctxt->mfn[0]));
+    paging_mark_dirty(v->domain, sh_ctxt->mfn[0]);
 
     if ( unlikely(mfn_valid(sh_ctxt->mfn[1])) )
     {
-        paging_mark_dirty(v->domain, mfn_x(sh_ctxt->mfn[1]));
+        paging_mark_dirty(v->domain, sh_ctxt->mfn[1]);
         vunmap((void *)((unsigned long)addr & PAGE_MASK));
     }
     else

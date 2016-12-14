@@ -46,7 +46,7 @@ int replace_grant_host_mapping(
 #define gnttab_status_gmfn(d, t, i)                     \
     (mfn_to_gmfn(d, gnttab_status_mfn(t, i)))
 
-#define gnttab_mark_dirty(d, f) paging_mark_dirty((d), (f))
+#define gnttab_mark_dirty(d, f) paging_mark_dirty((d), _mfn(f))
 
 static inline void gnttab_clear_flag(unsigned int nr, uint16_t *st)
 {

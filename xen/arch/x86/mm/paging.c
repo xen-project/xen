@@ -343,12 +343,9 @@ out:
 }
 
 /* Mark a page as dirty */
-void paging_mark_dirty(struct domain *d, unsigned long guest_mfn)
+void paging_mark_dirty(struct domain *d, mfn_t gmfn)
 {
     unsigned long pfn;
-    mfn_t gmfn;
-
-    gmfn = _mfn(guest_mfn);
 
     if ( !paging_mode_log_dirty(d) || !mfn_valid(gmfn) ||
          page_get_owner(mfn_to_page(gmfn)) != d )

@@ -1210,7 +1210,7 @@ private_page_found:
 
     /* Now that the gfn<->mfn map is properly established,
      * marking dirty is feasible */
-    paging_mark_dirty(d, mfn_x(page_to_mfn(page)));
+    paging_mark_dirty(d, page_to_mfn(page));
     /* We do not need to unlock a private page */
     put_gfn(d, gfn);
     return 0;

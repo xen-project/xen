@@ -181,7 +181,7 @@ unsigned int dbg_rw_guest_mem(struct domain *dp, void * __user gaddr,
         if ( toaddr )
         {
             copy_from_user(va, buf, pagecnt);    /* va = buf */
-            paging_mark_dirty(dp, mfn_x(mfn));
+            paging_mark_dirty(dp, mfn);
         }
         else
         {
