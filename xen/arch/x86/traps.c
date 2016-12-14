@@ -3629,20 +3629,17 @@ static void emulate_gate_op(struct cpu_user_regs *regs)
           ((ar >> 13) & 3) > (regs->cs & 3) :
           ((ar >> 13) & 3) != (regs->cs & 3)) )
     {
-        regs->error_code = sel;
-        do_guest_trap(TRAP_gp_fault, regs);
+        pv_inject_hw_exception(TRAP_gp_fault, sel);
         return;
     }
     if ( !(ar & _SEGMENT_P) )
     {
-        regs->error_code = sel;
-        do_guest_trap(TRAP_no_segment, regs);
+        pv_inject_hw_exception(TRAP_no_segment, sel);
         return;
     }
     if ( off > limit )
     {
-        regs->error_code = 0;
-        do_guest_trap(TRAP_gp_fault, regs);
+        pv_inject_hw_exception(TRAP_gp_fault, 0);
         return;
     }
 
@@ -3681,15 +3678,13 @@ static void emulate_gate_op(struct cpu_user_regs *regs)
                  (ar & _SEGMENT_CODE) ||
                  !(ar & _SEGMENT_WR) )
             {
-                regs->error_code = ss & ~3;
-                do_guest_trap(TRAP_invalid_tss, regs);
+                pv_inject_hw_exception(TRAP_invalid_tss, ss & ~3);
                 return;
             }
             if ( !(ar & _SEGMENT_P) ||
                  !check_stack_limit(ar, limit, esp, (4 + nparm) * 4) )
             {
-                regs->error_code = ss & ~3;
-                do_guest_trap(TRAP_stack_error, regs);
+                pv_inject_hw_exception(TRAP_stack_error, ss & ~3);
                 return;
             }
             stkp = (unsigned int *)(unsigned long)((unsigned int)base + esp);
@@ -3745,8 +3740,7 @@ static void emulate_gate_op(struct cpu_user_regs *regs)
             }
             if ( !check_stack_limit(ar, limit, esp, 2 * 4) )
             {
-                regs->error_code = 0;
-                do_guest_trap(TRAP_stack_error, regs);
+                pv_inject_hw_exception(TRAP_stack_error, 0);
                 return;
             }
             stkp = (unsigned int *)(unsigned long)((unsigned int)base + esp);
