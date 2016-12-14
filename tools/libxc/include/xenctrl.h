@@ -2703,7 +2703,7 @@ int xc_livepatch_list(xc_interface *xch, unsigned int max, unsigned int start,
  * The operations are asynchronous and the hypervisor may take a while
  * to complete them. The `timeout` offers an option to expire the
  * operation if it could not be completed within the specified time
- * (in ms). Value of 0 means let hypervisor decide the best timeout.
+ * (in ns). Value of 0 means let hypervisor decide the best timeout.
  */
 int xc_livepatch_apply(xc_interface *xch, char *name, uint32_t timeout);
 int xc_livepatch_revert(xc_interface *xch, char *name, uint32_t timeout);

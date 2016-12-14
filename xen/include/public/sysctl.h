@@ -1067,8 +1067,9 @@ struct xen_sysctl_livepatch_action {
 #define LIVEPATCH_ACTION_APPLY        3
 #define LIVEPATCH_ACTION_REPLACE      4
     uint32_t cmd;                           /* IN: LIVEPATCH_ACTION_*. */
-    uint32_t timeout;                       /* IN: Zero if no timeout. */
-                                            /* Or upper bound of time (ms) */
+    uint32_t timeout;                       /* IN: If zero then uses */
+                                            /* hypervisor default. */
+                                            /* Or upper bound of time (ns) */
                                             /* for operation to take. */
 };
 typedef struct xen_sysctl_livepatch_action xen_sysctl_livepatch_action_t;

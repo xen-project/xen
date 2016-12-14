@@ -689,9 +689,9 @@ The caller provides:
   payload. If the operation takes more time than the upper bound of time
   the `rc` in `xen_livepatch_status' retrieved via **XEN_SYSCTL_LIVEPATCH_GET**
   will be -XEN_EBUSY.
- * `time` the upper bound of time (ms) the cmd should take. Zero means infinite.
-   If within the time the operation does not succeed the operation would go in
-   error state.
+ * `time` the upper bound of time (ns) the cmd should take. Zero means to use
+   the hypervisor default. If within the time the operation does not succeed
+   the operation would go in error state.
  * `pad` - *MUST* be zero.
 
 The return value will be zero unless the provided fields are incorrect.
@@ -706,9 +706,10 @@ The structure is as follow:
 struct xen_sysctl_livepatch_action {  
     xen_livepatch_name_t name;              /* IN, name of the patch. */  
     uint32_t cmd;                           /* IN: LIVEPATCH_ACTION_* */  
-    uint32_t time;                          /* IN: Zero if no timeout. */   
-                                            /* Or upper bound of time (ms) */   
-                                            /* for operation to take. */  
+    uint32_t time;                          /* IN: If zero then uses */
+                                            /* hypervisor default. */
+                                            /* Or upper bound of time (ns) */
+                                            /* for operation to take. */
 };  
 
 </pre>

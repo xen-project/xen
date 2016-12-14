@@ -1227,8 +1227,8 @@ static int schedule_work(struct payload *data, uint32_t cmd, uint32_t timeout)
     livepatch_work.data = data;
     livepatch_work.timeout = timeout ?: MILLISECS(30);
 
-    dprintk(XENLOG_DEBUG, LIVEPATCH "%s: timeout is %"PRI_stime"ms\n",
-            data->name, livepatch_work.timeout / MILLISECS(1));
+    dprintk(XENLOG_DEBUG, LIVEPATCH "%s: timeout is %"PRIu32"ns\n",
+            data->name, livepatch_work.timeout);
 
     atomic_set(&livepatch_work.semaphore, -1);
 
