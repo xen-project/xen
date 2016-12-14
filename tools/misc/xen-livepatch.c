@@ -100,7 +100,8 @@ static int list_func(int argc, char *argv[])
         rc = xc_livepatch_list(xch, MAX_LEN, idx, info, name, len, &done, &left);
         if ( rc )
         {
-            fprintf(stderr, "Failed to list %d/%d: %d(%s)!\n",
+            fprintf(stderr, "Failed to list %d/%d.\n"
+                            "Error %d: %s\n",
                     idx, left, errno, strerror(errno));
             break;
         }
@@ -140,7 +141,8 @@ static int get_name(int argc, char *argv[], char *name)
     ssize_t len = strlen(argv[0]);
     if ( len > XEN_LIVEPATCH_NAME_SIZE )
     {
-        fprintf(stderr, "ID MUST be %d characters!\n", XEN_LIVEPATCH_NAME_SIZE);
+        fprintf(stderr, "ID must be no more than %d characters.\n",
+                XEN_LIVEPATCH_NAME_SIZE);
         errno = EINVAL;
         return errno;
     }
@@ -172,13 +174,15 @@ static int upload_func(int argc, char *argv[])
     fd = open(filename, O_RDONLY);
     if ( fd < 0 )
     {
-        fprintf(stderr, "Could not open %s, error: %d(%s)\n",
+        fprintf(stderr, "Could not open %s.\n"
+                        "Error %d: %s\n",
                 filename, errno, strerror(errno));
         return errno;
     }
     if ( stat(filename, &buf) != 0 )
     {
-        fprintf(stderr, "Could not get right size %s, error: %d(%s)\n",
+        fprintf(stderr, "Could not get size of %s.\n"
+                        "Error %d: %s\n",
                 filename, errno, strerror(errno));
         close(fd);
         return errno;
@@ -188,21 +192,29 @@ static int upload_func(int argc, char *argv[])
     fbuf = mmap(0, len, PROT_READ, MAP_PRIVATE, fd, 0);
     if ( fbuf == MAP_FAILED )
     {
-        fprintf(stderr,"Could not map: %s, error: %d(%s)\n",
+        fprintf(stderr, "Could not map %s.\n"
+                        "Error %d: %s\n",
                 filename, errno, strerror(errno));
         close (fd);
         return errno;
     }
-    printf("Uploading %s (%zu bytes)\n", filename, len);
+    printf("Uploading %s... ", filename);
     rc = xc_livepatch_upload(xch, name, fbuf, len);
     if ( rc )
-        fprintf(stderr, "Upload failed: %s, error: %d(%s)!\n",
-                filename, errno, strerror(errno));
+    {
+        printf("failed\n");
+        fprintf(stderr, "Error %d: %s\n",
+                errno, strerror(errno));
+    }
+    else
+        printf("completed\n");
+
 
     if ( munmap( fbuf, len) )
     {
-        fprintf(stderr, "Could not unmap!? error: %d(%s)!\n",
-                errno, strerror(errno));
+        fprintf(stderr, "Could not unmap %s.\n"
+                        "Error %d: %s\n",
+                filename, errno, strerror(errno));
         if ( !rc )
             rc = errno;
     }
@@ -223,27 +235,32 @@ struct {
     int allow; /* State it must be in to call function. */
     int expected; /* The state to be in after the function. */
     const char *name;
+    const char *verb;
     int (*function)(xc_interface *xch, char *name, uint32_t timeout);
     unsigned int executed; /* Has the function been called?. */
 } action_options[] = {
     {   .allow = LIVEPATCH_STATE_CHECKED,
         .expected = LIVEPATCH_STATE_APPLIED,
         .name = "apply",
+        .verb = "Applying",
         .function = xc_livepatch_apply,
     },
     {   .allow = LIVEPATCH_STATE_APPLIED,
         .expected = LIVEPATCH_STATE_CHECKED,
         .name = "revert",
+        .verb = "Reverting",
         .function = xc_livepatch_revert,
     },
     {   .allow = LIVEPATCH_STATE_CHECKED,
         .expected = -XEN_ENOENT,
         .name = "unload",
+        .verb = "Unloading",
         .function = xc_livepatch_unload,
     },
     {   .allow = LIVEPATCH_STATE_CHECKED,
         .expected = LIVEPATCH_STATE_APPLIED,
         .name = "replace",
+        .verb = "Replacing all live patches with",
         .function = xc_livepatch_replace,
     },
 };
@@ -276,39 +293,44 @@ int action_func(int argc, char *argv[], unsigned int idx)
     rc = xc_livepatch_get(xch, name, &status);
     if ( rc )
     {
-        fprintf(stderr, "%s failed to get status %d(%s)!\n",
+        fprintf(stderr, "Failed to get status of %s.\n"
+                        "Error %d: %s\n",
                 name, errno, strerror(errno));
         return -1;
     }
     if ( status.rc == -XEN_EAGAIN )
     {
-        fprintf(stderr, "%s failed. Operation already in progress\n", name);
+        fprintf(stderr,
+                "Cannot execute %s.\n"
+                "Operation already in progress.\n", action_options[idx].name);
         return -1;
     }
 
     if ( status.state == action_options[idx].expected )
     {
-        printf("No action needed\n");
+        printf("No action needed.\n");
         return 0;
     }
 
     /* Perform action. */
     if ( action_options[idx].allow & status.state )
     {
-        printf("Performing %s:", action_options[idx].name);
+        printf("%s %s:", action_options[idx].verb, name);
         rc = action_options[idx].function(xch, name, 0);
         if ( rc )
         {
-            fprintf(stderr, "%s failed with %d(%s)\n", name, errno,
-                    strerror(errno));
+            printf(" failed\n");
+            fprintf(stderr, "Error %d: %s\n", errno, strerror(errno));
             return -1;
         }
     }
     else
     {
-        printf("%s: in wrong state (%s), expected (%s)\n",
-               name, state2str(status.state),
-               state2str(action_options[idx].allow));
+        fprintf(stderr, "%s is in the wrong state.\n"
+                        "Current state: %s\n"
+                        "Expected state: %s\n",
+                name, state2str(status.state),
+                state2str(action_options[idx].allow));
         return -1;
     }
 
@@ -335,7 +357,8 @@ int action_func(int argc, char *argv[], unsigned int idx)
 
     if ( retry >= RETRIES )
     {
-        fprintf(stderr, "%s: Operation didn't complete after 30 seconds.\n", name);
+        printf(" failed\n");
+        fprintf(stderr, "Operation didn't complete after 30 seconds.\n");
         return -1;
     }
     else
@@ -347,14 +370,18 @@ int action_func(int argc, char *argv[], unsigned int idx)
             printf(" completed\n");
         else if ( rc < 0 )
         {
-            fprintf(stderr, "%s failed with %d(%s)\n", name, -rc, strerror(-rc));
+            printf(" failed\n");
+            fprintf(stderr, "Error %d: %s\n", -rc, strerror(-rc));
             return -1;
         }
         else
         {
-            fprintf(stderr, "%s: in wrong state (%s), expected (%s)\n",
-               name, state2str(rc),
-               state2str(action_options[idx].expected));
+            printf(" failed\n");
+            fprintf(stderr, "%s is in the wrong state.\n"
+                            "Current state: %s\n"
+                            "Expected state: %s\n",
+                    name, state2str(rc),
+                    state2str(action_options[idx].expected));
             return -1;
         }
     }
