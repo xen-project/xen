@@ -3398,24 +3398,20 @@ x86_emulate(
         _regs.eip = dst.val;
         break;
 
-    case 0xc4: /* les */ {
-        unsigned long sel;
-        dst.val = x86_seg_es;
-    les: /* dst.val identifies the segment */
-        generate_exception_if(mode_64bit() && !ext, EXC_UD);
+    case 0xc4: /* les */
+    case 0xc5: /* lds */
+        generate_exception_if(mode_64bit(), EXC_UD);
+        seg = (b & 1) * 3; /* es = 0, ds = 3 */
+    les:
         generate_exception_if(src.type != OP_MEM, EXC_UD);
         if ( (rc = read_ulong(src.mem.seg, src.mem.off + src.bytes,
-                              &sel, 2, ctxt, ops)) != 0 )
+                              &dst.val, 2, ctxt, ops)) != X86EMUL_OKAY )
             goto done;
-        if ( (rc = load_seg(dst.val, sel, 0, NULL, ctxt, ops)) != 0 )
+        ASSERT(is_x86_user_segment(seg));
+        if ( (rc = load_seg(seg, dst.val, 0, NULL, ctxt, ops)) != X86EMUL_OKAY )
             goto done;
         dst.val = src.val;
         break;
-    }
-
-    case 0xc5: /* lds */
-        dst.val = x86_seg_ds;
-        goto les;
 
     case 0xc8: /* enter imm16,imm8 */ {
         uint8_t depth = imm2 & 31;
@@ -5274,20 +5270,14 @@ x86_emulate(
         break;
 
     case X86EMUL_OPC(0x0f, 0xb2): /* lss */
-        dst.val = x86_seg_ss;
+    case X86EMUL_OPC(0x0f, 0xb4): /* lfs */
+    case X86EMUL_OPC(0x0f, 0xb5): /* lgs */
+        seg = b & 7;
         goto les;
 
     case X86EMUL_OPC(0x0f, 0xb3): btr: /* btr */
         emulate_2op_SrcV_nobyte("btr", src, dst, _regs.eflags);
         break;
-
-    case X86EMUL_OPC(0x0f, 0xb4): /* lfs */
-        dst.val = x86_seg_fs;
-        goto les;
-
-    case X86EMUL_OPC(0x0f, 0xb5): /* lgs */
-        dst.val = x86_seg_gs;
-        goto les;
 
     case X86EMUL_OPC(0x0f, 0xb6): /* movzx rm8,r{16,32,64} */
         /* Recompute DstReg as we may have decoded AH/BH/CH/DH. */
