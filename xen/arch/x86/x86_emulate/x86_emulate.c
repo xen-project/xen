@@ -2637,11 +2637,7 @@ x86_emulate(
         }
         break;
     case DstBitBase:
-        if ( ((d & SrcMask) == SrcImmByte) || (ea.type == OP_REG) )
-        {
-            src.val &= (op_bytes << 3) - 1;
-        }
-        else
+        if ( ea.type == OP_MEM )
         {
             /*
              * Instructions such as bt can reference an arbitrary offset from
@@ -2664,8 +2660,11 @@ x86_emulate(
                     op_bytes + (((-src.val - 1) >> 3) & ~(op_bytes - 1L));
             else
                 ea.mem.off += (src.val >> 3) & ~(op_bytes - 1L);
-            src.val &= (op_bytes << 3) - 1;
         }
+
+        /* Bit index always truncated to within range. */
+        src.val &= (op_bytes << 3) - 1;
+
         d = (d & ~DstMask) | DstMem;
         /* Becomes a normal DstMem operation from here on. */
     case DstMem:
