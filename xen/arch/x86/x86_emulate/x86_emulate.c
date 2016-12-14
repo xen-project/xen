@@ -5532,6 +5532,14 @@ void x86_emulate_free_state(struct x86_emulate_state *state)
 }
 #endif
 
+unsigned int
+x86_insn_opsize(const struct x86_emulate_state *state)
+{
+    check_state(state);
+
+    return state->op_bytes << 3;
+}
+
 int
 x86_insn_modrm(const struct x86_emulate_state *state,
                unsigned int *rm, unsigned int *reg)
@@ -5547,6 +5555,33 @@ x86_insn_modrm(const struct x86_emulate_state *state,
         *reg = state->modrm_reg;
 
     return state->modrm_mod;
+}
+
+unsigned long
+x86_insn_operand_ea(const struct x86_emulate_state *state,
+                    enum x86_segment *seg)
+{
+    *seg = state->ea.type == OP_MEM ? state->ea.mem.seg : x86_seg_none;
+
+    check_state(state);
+
+    return state->ea.mem.off;
+}
+
+unsigned long
+x86_insn_immediate(const struct x86_emulate_state *state, unsigned int nr)
+{
+    check_state(state);
+
+    switch ( nr )
+    {
+    case 0:
+        return state->imm1;
+    case 1:
+        return state->imm2;
+    }
+
+    return 0;
 }
 
 unsigned int

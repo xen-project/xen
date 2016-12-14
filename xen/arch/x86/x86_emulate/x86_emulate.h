@@ -628,9 +628,17 @@ x86_decode_insn(
         void *p_data, unsigned int bytes,
         struct x86_emulate_ctxt *ctxt));
 
+unsigned int
+x86_insn_opsize(const struct x86_emulate_state *state);
 int
 x86_insn_modrm(const struct x86_emulate_state *state,
                unsigned int *rm, unsigned int *reg);
+unsigned long
+x86_insn_operand_ea(const struct x86_emulate_state *state,
+                    enum x86_segment *seg);
+unsigned long
+x86_insn_immediate(const struct x86_emulate_state *state,
+                   unsigned int nr);
 unsigned int
 x86_insn_length(const struct x86_emulate_state *state,
                 const struct x86_emulate_ctxt *ctxt);

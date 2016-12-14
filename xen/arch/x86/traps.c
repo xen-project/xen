@@ -28,6 +28,7 @@
 #include <xen/init.h>
 #include <xen/sched.h>
 #include <xen/lib.h>
+#include <xen/err.h>
 #include <xen/errno.h>
 #include <xen/mm.h>
 #include <xen/console.h>
@@ -3340,13 +3341,94 @@ static inline int check_stack_limit(unsigned int ar, unsigned int limit,
             (!(ar & _SEGMENT_EC) ? (esp - 1) <= limit : (esp - decr) > limit));
 }
 
+struct gate_op_ctxt {
+    struct x86_emulate_ctxt ctxt;
+    struct {
+        unsigned long base, limit;
+    } cs;
+    bool insn_fetch;
+};
+
+static int gate_op_read(
+    enum x86_segment seg,
+    unsigned long offset,
+    void *p_data,
+    unsigned int bytes,
+    struct x86_emulate_ctxt *ctxt)
+{
+    const struct gate_op_ctxt *goc =
+        container_of(ctxt, struct gate_op_ctxt, ctxt);
+    unsigned int rc = bytes, sel = 0;
+    unsigned long addr = offset, limit = 0;
+
+    switch ( seg )
+    {
+    case x86_seg_cs:
+        addr += goc->cs.base;
+        limit = goc->cs.limit;
+        break;
+    case x86_seg_ds:
+        sel = read_sreg(ds);
+        break;
+    case x86_seg_es:
+        sel = read_sreg(es);
+        break;
+    case x86_seg_fs:
+        sel = read_sreg(fs);
+        break;
+    case x86_seg_gs:
+        sel = read_sreg(gs);
+        break;
+    case x86_seg_ss:
+        sel = ctxt->regs->ss;
+        break;
+    default:
+        return X86EMUL_UNHANDLEABLE;
+    }
+    if ( sel )
+    {
+        unsigned int ar;
+
+        ASSERT(!goc->insn_fetch);
+        if ( !read_descriptor(sel, current, &addr, &limit, &ar, 0) ||
+             !(ar & _SEGMENT_S) ||
+             !(ar & _SEGMENT_P) ||
+             ((ar & _SEGMENT_CODE) && !(ar & _SEGMENT_WR)) )
+            return X86EMUL_UNHANDLEABLE;
+        addr += offset;
+    }
+    else if ( seg != x86_seg_cs )
+        return X86EMUL_UNHANDLEABLE;
+
+    /* We don't mean to emulate any branches. */
+    if ( limit < bytes - 1 || offset > limit - bytes + 1 )
+        return X86EMUL_UNHANDLEABLE;
+
+    addr = (uint32_t)addr;
+
+    if ( (rc = __copy_from_user(p_data, (void *)addr, bytes)) )
+    {
+        /*
+         * TODO: This should report PFEC_insn_fetch when goc->insn_fetch &&
+         * cpu_has_nx, but we'd then need a "fetch" variant of
+         * __copy_from_user() respecting NX, SMEP, and protection keys.
+         */
+        x86_emul_pagefault(0, addr + bytes - rc, ctxt);
+        return X86EMUL_EXCEPTION;
+    }
+
+    return X86EMUL_OKAY;
+}
+
 static void emulate_gate_op(struct cpu_user_regs *regs)
 {
     struct vcpu *v = current;
-    unsigned int sel, ar, dpl, nparm, opnd_sel;
-    unsigned int op_default, op_bytes, ad_default, ad_bytes;
-    unsigned long off, eip, opnd_off, base, limit;
-    int jump;
+    unsigned int sel, ar, dpl, nparm, insn_len;
+    struct gate_op_ctxt ctxt = { .ctxt.regs = regs, .insn_fetch = true };
+    struct x86_emulate_state *state;
+    unsigned long off, base, limit;
+    uint16_t opnd_sel = 0;
+    int jump = -1, rc = X86EMUL_OKAY;
 
     /* Check whether this fault is due to the use of a call gate. */
     if ( !read_gate_descriptor(regs->error_code, v, &sel, &off, &ar) ||
@@ -3368,7 +3450,8 @@ static void emulate_gate_op(struct cpu_user_regs *regs)
      * Decode instruction (and perhaps operand) to determine RPL,
      * whether this is a jump or a call, and the call return offset.
      */
-    if ( !read_descriptor(regs->cs, v, &base, &limit, &ar, 0) ||
+    if ( !read_descriptor(regs->cs, v, &ctxt.cs.base, &ctxt.cs.limit,
+                          &ar, 0) ||
          !(ar & _SEGMENT_S) ||
          !(ar & _SEGMENT_P) ||
          !(ar & _SEGMENT_CODE) )
@@ -3377,179 +3460,73 @@ static void emulate_gate_op(struct cpu_user_regs *regs)
         return;
     }
 
-    op_bytes = op_default = ar & _SEGMENT_DB ? 4 : 2;
-    ad_default = ad_bytes = op_default;
-    opnd_sel = opnd_off = 0;
-    jump = -1;
-    for ( eip = regs->eip; eip - regs->_eip < 10; )
+    ctxt.ctxt.addr_size = ar & _SEGMENT_DB ? 32 : 16;
+    /* Leave zero in ctxt.ctxt.sp_size, as it's not needed for decoding. */
+    state = x86_decode_insn(&ctxt.ctxt, gate_op_read);
+    ctxt.insn_fetch = false;
+    if ( IS_ERR_OR_NULL(state) )
     {
-        switch ( insn_fetch(u8, base, eip, limit) )
+        if ( PTR_ERR(state) == -X86EMUL_EXCEPTION )
         {
-        case 0x66: /* operand-size override */
-            op_bytes = op_default ^ 6; /* switch between 2/4 bytes */
-            continue;
-        case 0x67: /* address-size override */
-            ad_bytes = ad_default != 4 ? 4 : 2; /* switch to 2/4 bytes */
-            continue;
-        case 0x2e: /* CS override */
-            opnd_sel = regs->cs;
-            ASSERT(opnd_sel);
-            continue;
-        case 0x3e: /* DS override */
-            opnd_sel = read_sreg(ds);
-            if ( !opnd_sel )
-                opnd_sel = dpl;
-            continue;
-        case 0x26: /* ES override */
-            opnd_sel = read_sreg(es);
-            if ( !opnd_sel )
-                opnd_sel = dpl;
-            continue;
-        case 0x64: /* FS override */
-            opnd_sel = read_sreg(fs);
-            if ( !opnd_sel )
-                opnd_sel = dpl;
-            continue;
-        case 0x65: /* GS override */
-            opnd_sel = read_sreg(gs);
-            if ( !opnd_sel )
-                opnd_sel = dpl;
-            continue;
-        case 0x36: /* SS override */
-            opnd_sel = regs->ss;
-            if ( !opnd_sel )
-                opnd_sel = dpl;
-            continue;
-        case 0xea:
-            ++jump;
-            /* FALLTHROUGH */
-        case 0x9a:
-            ++jump;
-            opnd_sel = regs->cs;
-            opnd_off = eip;
-            ad_bytes = ad_default;
-            eip += op_bytes + 2;
+            ASSERT(ctxt.ctxt.event_pending);
+            pv_inject_event(&ctxt.ctxt.event);
+        }
+        else
+        {
+            ASSERT(!ctxt.ctxt.event_pending);
+            do_guest_trap(TRAP_gp_fault, regs);
+        }
+        return;
+    }
+
+    switch ( ctxt.ctxt.opcode )
+    {
+        unsigned int modrm_345;
+
+    case 0xea:
+        ++jump;
+        /* fall through */
+    case 0x9a:
+        ++jump;
+        opnd_sel = x86_insn_immediate(state, 1);
+        break;
+    case 0xff:
+        if ( x86_insn_modrm(state, NULL, &modrm_345) >= 3 )
             break;
-        case 0xff:
-            {
-                unsigned int modrm;
+        switch ( modrm_345 & 7 )
+        {
+            enum x86_segment seg;
 
-                switch ( (modrm = insn_fetch(u8, base, eip, limit)) & 0xf8 )
-                {
-                case 0x28: case 0x68: case 0xa8:
-                    ++jump;
-                    /* FALLTHROUGH */
-                case 0x18: case 0x58: case 0x98:
-                    ++jump;
-                    if ( ad_bytes != 2 )
-                    {
-                        if ( (modrm & 7) == 4 )
-                        {
-                            unsigned int sib;
-                            sib = insn_fetch(u8, base, eip, limit);
-
-                            modrm = (modrm & ~7) | (sib & 7);
-                            if ( ((sib >>= 3) & 7) != 4 )
-                                opnd_off = *(unsigned long *)
-                                    decode_register(sib & 7, regs, 0);
-                            opnd_off <<= sib >> 3;
-                        }
-                        if ( (modrm & 7) != 5 || (modrm & 0xc0) )
-                            opnd_off += *(unsigned long *)
-                                decode_register(modrm & 7, regs, 0);
-                        else
-                            modrm |= 0x87;
-                        if ( !opnd_sel )
-                        {
-                            switch ( modrm & 7 )
-                            {
-                            default:
-                                opnd_sel = read_sreg(ds);
-                                break;
-                            case 4: case 5:
-                                opnd_sel = regs->ss;
-                                break;
-                            }
-                        }
-                    }
-                    else
-                    {
-                        switch ( modrm & 7 )
-                        {
-                        case 0: case 1: case 7:
-                            opnd_off = regs->ebx;
-                            break;
-                        case 6:
-                            if ( !(modrm & 0xc0) )
-                                modrm |= 0x80;
-                            else
-                        case 2: case 3:
-                            {
-                                opnd_off = regs->ebp;
-                                if ( !opnd_sel )
-                                    opnd_sel = regs->ss;
-                            }
-                            break;
-                        }
-                        if ( !opnd_sel )
-                            opnd_sel = read_sreg(ds);
-                        switch ( modrm & 7 )
-                        {
-                        case 0: case 2: case 4:
-                            opnd_off += regs->esi;
-                            break;
-                        case 1: case 3: case 5:
-                            opnd_off += regs->edi;
-                            break;
-                        }
-                    }
-                    switch ( modrm & 0xc0 )
-                    {
-                    case 0x40:
-                        opnd_off += insn_fetch(s8, base, eip, limit);
-                        break;
-                    case 0x80:
-                        if ( ad_bytes > 2 )
-                            opnd_off += insn_fetch(s32, base, eip, limit);
-                        else
-                            opnd_off += insn_fetch(s16, base, eip, limit);
-                        break;
-                    }
-                    if ( ad_bytes == 4 )
-                        opnd_off = (unsigned int)opnd_off;
-                    else if ( ad_bytes == 2 )
-                        opnd_off = (unsigned short)opnd_off;
-                    break;
-                }
-            }
+        case 5:
+            ++jump;
+            /* fall through */
+        case 3:
+            ++jump;
+            base = x86_insn_operand_ea(state, &seg);
+            rc = gate_op_read(seg,
+                              base + (x86_insn_opsize(state) >> 3),
+                              &opnd_sel, sizeof(opnd_sel), &ctxt.ctxt);
             break;
         }
         break;
     }
 
-    if ( jump < 0 )
+    insn_len = x86_insn_length(state, &ctxt.ctxt);
+    x86_emulate_free_state(state);
+
+    if ( rc == X86EMUL_EXCEPTION )
     {
- fail:
-        do_guest_trap(TRAP_gp_fault, regs);
- skip:
+        ASSERT(ctxt.ctxt.event_pending);
+        pv_inject_event(&ctxt.ctxt.event);
         return;
     }
 
-    if ( (opnd_sel != regs->cs &&
-          !read_descriptor(opnd_sel, v, &base, &limit, &ar, 0)) ||
-         !(ar & _SEGMENT_S) ||
-         !(ar & _SEGMENT_P) ||
-         ((ar & _SEGMENT_CODE) && !(ar & _SEGMENT_WR)) )
-    {
-        do_guest_trap(TRAP_gp_fault, regs);
-        return;
-    }
+    ASSERT(!ctxt.ctxt.event_pending);
 
-    opnd_off += op_bytes;
-#define ad_default ad_bytes
-    opnd_sel = insn_fetch(u16, base, opnd_off, limit);
-#undef ad_default
-    if ( (opnd_sel & ~3) != regs->error_code || dpl < (opnd_sel & 3) )
+    if ( rc != X86EMUL_OKAY ||
+         jump < 0 ||
+         (opnd_sel & ~3) != regs->error_code ||
+         dpl < (opnd_sel & 3) )
     {
         do_guest_trap(TRAP_gp_fault, regs);
         return;
@@ -3690,7 +3667,7 @@ static void emulate_gate_op(struct cpu_user_regs *regs)
             }
         }
         push(regs->cs);
-        push(eip);
+        push(regs->eip + insn_len);
 #undef push
         regs->esp = esp;
         regs->ss = ss;
