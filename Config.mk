@@ -283,9 +283,9 @@ MINIOS_UPSTREAM_URL ?= git://xenbits.xen.org/mini-os.git
 endif
 OVMF_UPSTREAM_REVISION ?= bc54e50e0fe03c570014f363b547426913e92449
 QEMU_UPSTREAM_REVISION ?= master
-MINIOS_UPSTREAM_REVISION ?= e20998fbec0af4d783abb1a0695ab4614064c520
-# Wed Sep 28 11:50:04 2016 +0200
-# minios: fix build issue with xen_*mb defines
+MINIOS_UPSTREAM_REVISION ?= 1e8e464febb32428c7651b0b585866e5ee5f786e
+# Tue Dec 13 15:02:02 2016 +0000
+# build: prepend OBJ_DIR to linker script
 
 SEABIOS_UPSTREAM_REVISION ?= rel-1.10.0
 # Wed Jun 22 14:53:24 2016 +0800
