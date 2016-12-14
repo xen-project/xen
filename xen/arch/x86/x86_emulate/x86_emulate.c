@@ -1288,6 +1288,7 @@ static bool vcpu_has(
 }
 
 #define vcpu_has_fpu()         vcpu_has(         1, EDX,  0, ctxt, ops)
+#define vcpu_has_sep()         vcpu_has(         1, EDX, 11, ctxt, ops)
 #define vcpu_has_cmov()        vcpu_has(         1, EDX, 15, ctxt, ops)
 #define vcpu_has_clflush()     vcpu_has(         1, EDX, 19, ctxt, ops)
 #define vcpu_has_mmx()         vcpu_has(         1, EDX, 23, ctxt, ops)
@@ -4900,6 +4901,7 @@ x86_emulate(
         uint64_t msr_content;
         int lm;
 
+        vcpu_must_have(sep);
         generate_exception_if(mode_ring0(), EXC_GP, 0);
         generate_exception_if(!in_protmode(ctxt, ops), EXC_GP, 0);
 
@@ -4946,6 +4948,7 @@ x86_emulate(
         uint64_t msr_content;
         bool user64 = rex_prefix & REX_W;
 
+        vcpu_must_have(sep);
         generate_exception_if(!mode_ring0(), EXC_GP, 0);
         generate_exception_if(!in_protmode(ctxt, ops), EXC_GP, 0);
 
