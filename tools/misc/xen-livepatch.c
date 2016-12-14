@@ -308,7 +308,7 @@ int action_func(int argc, char *argv[], unsigned int idx)
     {
         printf("%s: in wrong state (%s), expected (%s)\n",
                name, state2str(status.state),
-               state2str(action_options[idx].expected));
+               state2str(action_options[idx].allow));
         return -1;
     }
 
