@@ -154,7 +154,7 @@ static int init_acpi_config(libxl__gc *gc,
     config->acpi_revision = 5;
 
 out:
-    return 0;
+    return rc;
 }
 
 int libxl__dom_load_acpi(libxl__gc *gc,
