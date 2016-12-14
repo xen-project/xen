@@ -1484,7 +1484,9 @@ void vmx_vcpu_flush_pml_buffer(struct vcpu *v)
          * is extremely difficult to debug.
          */
         p2m_change_type_one(v->domain, gfn, p2m_ram_logdirty, p2m_ram_rw);
-        paging_mark_gfn_dirty(v->domain, gfn);
+
+        /* HVM guest: pfn == gfn */
+        paging_mark_pfn_dirty(v->domain, _pfn(gfn));
     }
 
     unmap_domain_page(pml_buf);

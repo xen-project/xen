@@ -159,7 +159,7 @@ void paging_log_dirty_init(struct domain *d,
 /* mark a page as dirty */
 void paging_mark_dirty(struct domain *d, mfn_t gmfn);
 /* mark a page as dirty with taking guest pfn as parameter */
-void paging_mark_gfn_dirty(struct domain *d, unsigned long pfn);
+void paging_mark_pfn_dirty(struct domain *d, pfn_t pfn);
 
 /* is this guest page dirty? 
  * This is called from inside paging code, with the paging lock held. */
@@ -175,12 +175,12 @@ int paging_mfn_is_dirty(struct domain *d, mfn_t gmfn);
  * TODO2: Abstract out the radix-tree mechanics?
  */
 #define LOGDIRTY_NODE_ENTRIES (1 << PAGETABLE_ORDER)
-#define L1_LOGDIRTY_IDX(pfn) ((pfn) & ((1 << (PAGE_SHIFT+3)) - 1))
-#define L2_LOGDIRTY_IDX(pfn) (((pfn) >> (PAGE_SHIFT+3)) & \
+#define L1_LOGDIRTY_IDX(pfn) (pfn_x(pfn) & ((1 << (PAGE_SHIFT + 3)) - 1))
+#define L2_LOGDIRTY_IDX(pfn) ((pfn_x(pfn) >> (PAGE_SHIFT + 3)) & \
                               (LOGDIRTY_NODE_ENTRIES-1))
-#define L3_LOGDIRTY_IDX(pfn) (((pfn) >> (PAGE_SHIFT+3+PAGETABLE_ORDER)) & \
+#define L3_LOGDIRTY_IDX(pfn) ((pfn_x(pfn) >> (PAGE_SHIFT + 3 + PAGETABLE_ORDER)) & \
                               (LOGDIRTY_NODE_ENTRIES-1))
-#define L4_LOGDIRTY_IDX(pfn) (((pfn) >> (PAGE_SHIFT+3+PAGETABLE_ORDER*2)) & \
+#define L4_LOGDIRTY_IDX(pfn) ((pfn_x(pfn) >> (PAGE_SHIFT + 3 + PAGETABLE_ORDER * 2)) & \
                               (LOGDIRTY_NODE_ENTRIES-1))
 
 /* VRAM dirty tracking support */

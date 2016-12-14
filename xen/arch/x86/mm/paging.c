@@ -265,25 +265,25 @@ static int paging_log_dirty_disable(struct domain *d, bool_t resuming)
 }
 
 /* Mark a page as dirty, with taking guest pfn as parameter */
-void paging_mark_gfn_dirty(struct domain *d, unsigned long pfn)
+void paging_mark_pfn_dirty(struct domain *d, pfn_t pfn)
 {
-    int changed;
+    bool changed;
     mfn_t mfn, *l4, *l3, *l2;
     unsigned long *l1;
-    int i1, i2, i3, i4;
+    unsigned int i1, i2, i3, i4;
 
     if ( !paging_mode_log_dirty(d) )
         return;
 
     /* Shared MFNs should NEVER be marked dirty */
-    BUG_ON(SHARED_M2P(pfn));
+    BUG_ON(SHARED_M2P(pfn_x(pfn)));
 
     /*
      * Values with the MSB set denote MFNs that aren't really part of the
      * domain's pseudo-physical memory map (e.g., the shared info frame).
      * Nothing to do here...
      */
-    if ( unlikely(!VALID_M2P(pfn)) )
+    if ( unlikely(!VALID_M2P(pfn_x(pfn))) )
         return;
 
     i1 = L1_LOGDIRTY_IDX(pfn);
@@ -331,8 +331,8 @@ void paging_mark_gfn_dirty(struct domain *d, unsigned long pfn)
     if ( changed )
     {
         PAGING_DEBUG(LOGDIRTY,
-                     "marked mfn %" PRI_mfn " (pfn=%lx), dom %d\n",
-                     mfn_x(mfn), pfn, d->domain_id);
+                     "d%d: marked mfn %" PRI_mfn " (pfn %" PRI_pfn ")\n",
+                     d->domain_id, mfn_x(mfn), pfn_x(pfn));
         d->arch.paging.log_dirty.dirty_count++;
     }
 
@@ -345,23 +345,23 @@ out:
 /* Mark a page as dirty */
 void paging_mark_dirty(struct domain *d, mfn_t gmfn)
 {
-    unsigned long pfn;
+    pfn_t pfn;
 
     if ( !paging_mode_log_dirty(d) || !mfn_valid(gmfn) ||
          page_get_owner(mfn_to_page(gmfn)) != d )
         return;
 
     /* We /really/ mean PFN here, even for non-translated guests. */
-    pfn = get_gpfn_from_mfn(mfn_x(gmfn));
+    pfn = _pfn(get_gpfn_from_mfn(mfn_x(gmfn)));
 
-    paging_mark_gfn_dirty(d, pfn);
+    paging_mark_pfn_dirty(d, pfn);
 }
 
 
 /* Is this guest page dirty? */
 int paging_mfn_is_dirty(struct domain *d, mfn_t gmfn)
 {
-    unsigned long pfn;
+    pfn_t pfn;
     mfn_t mfn, *l4, *l3, *l2;
     unsigned long *l1;
     int rv;
@@ -370,9 +370,9 @@ int paging_mfn_is_dirty(struct domain *d, mfn_t gmfn)
     ASSERT(paging_mode_log_dirty(d));
 
     /* We /really/ mean PFN here, even for non-translated guests. */
-    pfn = get_gpfn_from_mfn(mfn_x(gmfn));
+    pfn = _pfn(get_gpfn_from_mfn(mfn_x(gmfn)));
     /* Shared pages are always read-only; invalid pages can't be dirty. */
-    if ( unlikely(SHARED_M2P(pfn) || !VALID_M2P(pfn)) )
+    if ( unlikely(SHARED_M2P(pfn_x(pfn)) || !VALID_M2P(pfn_x(pfn))) )
         return 0;
 
     mfn = d->arch.paging.log_dirty.top;
