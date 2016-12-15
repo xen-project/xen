@@ -28,6 +28,13 @@ struct vvmcs_list {
 };
 
 struct nestedvmx {
+    /*
+     * vmxon_region_pa is also used to indicate whether a vcpu is in
+     * the VMX operation. When a vcpu is out of the VMX operation, its
+     * vmxon_region_pa is set to an invalid address INVALID_PADDR. We
+     * cannot use 0 for this purpose, because it's a valid VMXON region
+     * address.
+     */
     paddr_t    vmxon_region_pa;
     void       *iobitmap[2];		/* map (va) of L1 guest I/O bitmap */
     void       *msrbitmap;		/* map (va) of L1 guest MSR bitmap */

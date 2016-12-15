@@ -32,6 +32,11 @@ static DEFINE_PER_CPU(u64 *, vvmcs_buf);
 
 static void nvmx_purge_vvmcs(struct vcpu *v);
 
+static bool nvmx_vcpu_in_vmx(const struct vcpu *v)
+{
+    return vcpu_2_nvmx(v).vmxon_region_pa != INVALID_PADDR;
+}
+
 #define VMCS_BUF_SIZE 100
 
 int nvmx_cpu_up_prepare(unsigned int cpu)
@@ -107,7 +112,7 @@ int nvmx_vcpu_initialise(struct vcpu *v)
 
     nvmx->ept.enabled = 0;
     nvmx->guest_vpid = 0;
-    nvmx->vmxon_region_pa = 0;
+    nvmx->vmxon_region_pa = INVALID_PADDR;
     nvcpu->nv_vvmcx = NULL;
     nvcpu->nv_vvmcxaddr = VMCX_EADDR;
     nvmx->intr.intr_info = 0;
@@ -356,7 +361,7 @@ static int vmx_inst_check_privilege(struct cpu_user_regs *regs, int vmxop_check)
              !(v->arch.hvm_vcpu.guest_cr[4] & X86_CR4_VMXE) )
             goto invalid_op;
     }
-    else if ( !vcpu_2_nvmx(v).vmxon_region_pa )
+    else if ( !nvmx_vcpu_in_vmx(v) )
         goto invalid_op;
 
     if ( vmx_guest_x86_mode(v) < (hvm_long_mode_enabled(v) ? 8 : 2) )
@@ -1374,7 +1379,7 @@ int nvmx_handle_vmxon(struct cpu_user_regs *regs)
     if ( rc != X86EMUL_OKAY )
         return rc;
 
-    if ( nvmx->vmxon_region_pa )
+    if ( nvmx_vcpu_in_vmx(v) )
         gdprintk(XENLOG_WARNING, 
                  "vmxon again: orig %"PRIpaddr" new %lx\n",
                  nvmx->vmxon_region_pa, gpa);
@@ -1407,7 +1412,7 @@ int nvmx_handle_vmxoff(struct cpu_user_regs *regs)
         return rc;
 
     nvmx_purge_vvmcs(v);
-    nvmx->vmxon_region_pa = 0;
+    nvmx->vmxon_region_pa = INVALID_PADDR;
 
     vmreturn(regs, VMSUCCEED);
     return X86EMUL_OKAY;
