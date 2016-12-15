@@ -149,6 +149,20 @@ int hvm_monitor_cpuid(unsigned long insn_length, unsigned int leaf,
     return monitor_traps(curr, 1, &req);
 }
 
+void hvm_monitor_interrupt(unsigned int vector, unsigned int type,
+                           unsigned int err, uint64_t cr2)
+{
+    vm_event_request_t req = {
+        .reason = VM_EVENT_REASON_INTERRUPT,
+        .u.interrupt.x86.vector = vector,
+        .u.interrupt.x86.type = type,
+        .u.interrupt.x86.error_code = err,
+        .u.interrupt.x86.cr2 = cr2,
+    };
+
+    monitor_traps(current, 1, &req);
+}
+
 /*
  * Local variables:
  * mode: C

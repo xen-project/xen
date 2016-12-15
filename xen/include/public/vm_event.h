@@ -105,6 +105,11 @@
  * if any of those flags are set, only those will be honored).
  */
 #define VM_EVENT_FLAG_SET_EMUL_INSN_DATA (1 << 9)
+/*
+ * Have a one-shot VM_EVENT_REASON_INTERRUPT event sent for the first
+ * interrupt pending after resuming the VCPU.
+ */
+#define VM_EVENT_FLAG_GET_NEXT_INTERRUPT (1 << 10)
 
 /*
  * Reasons for the vm event request
@@ -139,6 +144,8 @@
  *       These kinds of events will be filtered out in future versions.
  */
 #define VM_EVENT_REASON_PRIVILEGED_CALL         11
+/* An interrupt has been delivered. */
+#define VM_EVENT_REASON_INTERRUPT               12
 
 /* Supported values for the vm_event_write_ctrlreg index. */
 #define VM_EVENT_X86_CR0    0
@@ -259,6 +266,14 @@ struct vm_event_cpuid {
     uint32_t _pad;
 };
 
+struct vm_event_interrupt_x86 {
+    uint32_t vector;
+    uint32_t type;
+    uint32_t error_code;
+    uint32_t _pad;
+    uint64_t cr2;
+};
+
 #define MEM_PAGING_DROP_PAGE       (1 << 0)
 #define MEM_PAGING_EVICT_FAIL      (1 << 1)
 
@@ -302,6 +317,9 @@ typedef struct vm_event_st {
         struct vm_event_debug                 software_breakpoint;
         struct vm_event_debug                 debug_exception;
         struct vm_event_cpuid                 cpuid;
+        union {
+            struct vm_event_interrupt_x86     x86;
+        } interrupt;
     } u;
 
     union {

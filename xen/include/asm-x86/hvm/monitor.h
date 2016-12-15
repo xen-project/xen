@@ -42,6 +42,8 @@ int hvm_monitor_debug(unsigned long rip, enum hvm_monitor_debug_type type,
                       unsigned long trap_type, unsigned long insn_length);
 int hvm_monitor_cpuid(unsigned long insn_length, unsigned int leaf,
                       unsigned int subleaf);
+void hvm_monitor_interrupt(unsigned int vector, unsigned int type,
+                           unsigned int err, uint64_t cr2);
 
 #endif /* __ASM_X86_HVM_MONITOR_H__ */
 

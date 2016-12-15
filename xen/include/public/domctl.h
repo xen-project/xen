@@ -1086,6 +1086,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_domctl_psr_cmt_op_t);
 #define XEN_DOMCTL_MONITOR_EVENT_DEBUG_EXCEPTION       5
 #define XEN_DOMCTL_MONITOR_EVENT_CPUID                 6
 #define XEN_DOMCTL_MONITOR_EVENT_PRIVILEGED_CALL       7
+#define XEN_DOMCTL_MONITOR_EVENT_INTERRUPT             8
 
 struct xen_domctl_monitor_op {
     uint32_t op; /* XEN_DOMCTL_MONITOR_OP_* */

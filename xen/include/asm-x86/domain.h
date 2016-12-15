@@ -577,6 +577,10 @@ struct arch_vcpu
     XEN_GUEST_HANDLE(vcpu_time_info_t) time_info_guest;
 
     struct arch_vm_event *vm_event;
+
+    struct {
+        bool next_interrupt_enabled;
+    } monitor;
 };
 
 smap_check_policy_t smap_policy_change(struct vcpu *v,

@@ -2072,6 +2072,25 @@ static int vmx_set_mode(struct vcpu *v, int mode)
     return 0;
 }
 
+static bool vmx_get_pending_event(struct vcpu *v, struct x86_event *info)
+{
+    unsigned long intr_info, error_code;
+
+    vmx_vmcs_enter(v);
+    __vmread(VM_ENTRY_INTR_INFO, &intr_info);
+    __vmread(VM_ENTRY_EXCEPTION_ERROR_CODE, &error_code);
+    vmx_vmcs_exit(v);
+
+    if ( !(intr_info & INTR_INFO_VALID_MASK) )
+        return false;
+
+    info->vector = MASK_EXTR(intr_info, INTR_INFO_VECTOR_MASK);
+    info->type = MASK_EXTR(intr_info, INTR_INFO_INTR_TYPE_MASK);
+    info->error_code = error_code;
+
+    return true;
+}
+
 static struct hvm_function_table __initdata vmx_function_table = {
     .name                 = "VMX",
     .cpu_up_prepare       = vmx_cpu_up_prepare,
@@ -2102,6 +2121,7 @@ static struct hvm_function_table __initdata vmx_function_table = {
     .inject_event         = vmx_inject_event,
     .init_hypercall_page  = vmx_init_hypercall_page,
     .event_pending        = vmx_event_pending,
+    .get_pending_event    = vmx_get_pending_event,
     .invlpg               = vmx_invlpg,
     .cpu_up               = vmx_cpu_up,
     .cpu_down             = vmx_cpu_down,

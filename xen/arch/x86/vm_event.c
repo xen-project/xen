@@ -134,6 +134,11 @@ void vm_event_set_registers(struct vcpu *v, vm_event_response_t *rsp)
     v->arch.user_regs.eip = rsp->data.regs.x86.rip;
 }
 
+void vm_event_monitor_next_interrupt(struct vcpu *v)
+{
+    v->arch.monitor.next_interrupt_enabled = true;
+}
+
 void vm_event_fill_regs(vm_event_request_t *req)
 {
     const struct cpu_user_regs *regs = guest_cpu_user_regs();

@@ -76,7 +76,8 @@ static inline uint32_t arch_monitor_get_capabilities(struct domain *d)
                    (1U << XEN_DOMCTL_MONITOR_EVENT_SOFTWARE_BREAKPOINT) |
                    (1U << XEN_DOMCTL_MONITOR_EVENT_GUEST_REQUEST) |
                    (1U << XEN_DOMCTL_MONITOR_EVENT_DEBUG_EXCEPTION) |
-                   (1U << XEN_DOMCTL_MONITOR_EVENT_CPUID);
+                   (1U << XEN_DOMCTL_MONITOR_EVENT_CPUID) |
+                   (1U << XEN_DOMCTL_MONITOR_EVENT_INTERRUPT);
 
     /* Since we know this is on VMX, we can just call the hvm func */
     if ( hvm_is_singlestep_supported() )

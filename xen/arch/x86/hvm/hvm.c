@@ -469,6 +469,12 @@ void hvm_migrate_pirqs(struct vcpu *v)
     spin_unlock(&d->event_lock);
 }
 
+static bool hvm_get_pending_event(struct vcpu *v, struct x86_event *info)
+{
+    info->cr2 = v->arch.hvm_vcpu.guest_cr[2];
+    return hvm_funcs.get_pending_event(v, info);
+}
+
 void hvm_do_resume(struct vcpu *v)
 {
     check_wakeup_from_wait();
@@ -535,8 +541,22 @@ void hvm_do_resume(struct vcpu *v)
     /* Inject pending hw/sw trap */
     if ( v->arch.hvm_vcpu.inject_trap.vector != -1 )
     {
-        hvm_inject_event(&v->arch.hvm_vcpu.inject_trap);
+        if ( !hvm_event_pending(v) )
+            hvm_inject_event(&v->arch.hvm_vcpu.inject_trap);
+
         v->arch.hvm_vcpu.inject_trap.vector = -1;
+    }
+
+    if ( unlikely(v->arch.vm_event) && v->arch.monitor.next_interrupt_enabled )
+    {
+        struct x86_event info;
+
+        if ( hvm_get_pending_event(v, &info) )
+        {
+            hvm_monitor_interrupt(info.vector, info.type, info.error_code,
+                                  info.cr2);
+            v->arch.monitor.next_interrupt_enabled = false;
+        }
     }
 }
 

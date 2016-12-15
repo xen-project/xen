@@ -150,6 +150,7 @@ struct hvm_function_table {
     void (*init_hypercall_page)(struct domain *d, void *hypercall_page);
 
     int  (*event_pending)(struct vcpu *v);
+    bool (*get_pending_event)(struct vcpu *v, struct x86_event *info);
     void (*invlpg)(struct vcpu *v, unsigned long vaddr);
 
     int  (*cpu_up_prepare)(unsigned int cpu);

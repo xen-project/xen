@@ -42,6 +42,11 @@ void vm_event_set_registers(struct vcpu *v, vm_event_response_t *rsp)
     regs->pc = rsp->data.regs.arm.pc;
 }
 
+void vm_event_monitor_next_interrupt(struct vcpu *v)
+{
+    /* Not supported on ARM. */
+}
+
 /*
  * Local variables:
  * mode: C

@@ -78,6 +78,8 @@ void vm_event_vcpu_unpause(struct vcpu *v);
 void vm_event_fill_regs(vm_event_request_t *req);
 void vm_event_set_registers(struct vcpu *v, vm_event_response_t *rsp);
 
+void vm_event_monitor_next_interrupt(struct vcpu *v);
+
 #endif /* __VM_EVENT_H__ */
 
 /*
