@@ -1380,9 +1380,12 @@ int nvmx_handle_vmxon(struct cpu_user_regs *regs)
         return rc;
 
     if ( nvmx_vcpu_in_vmx(v) )
-        gdprintk(XENLOG_WARNING, 
-                 "vmxon again: orig %"PRIpaddr" new %lx\n",
-                 nvmx->vmxon_region_pa, gpa);
+    {
+        vmreturn(regs,
+                 nvcpu->nv_vvmcxaddr != VMCX_EADDR ?
+                 VMFAIL_VALID : VMFAIL_INVALID);
+        return X86EMUL_OKAY;
+    }
 
     nvmx->vmxon_region_pa = gpa;
 
