@@ -68,10 +68,10 @@ int nestedsvm_vmcb_map(struct vcpu *v, uint64_t vmcbaddr)
     struct nestedvcpu *nv = &vcpu_nestedhvm(v);
 
     if (nv->nv_vvmcx != NULL && nv->nv_vvmcxaddr != vmcbaddr) {
-        ASSERT(nv->nv_vvmcxaddr != VMCX_EADDR);
+        ASSERT(nv->nv_vvmcxaddr != INVALID_PADDR);
         hvm_unmap_guest_frame(nv->nv_vvmcx, 1);
         nv->nv_vvmcx = NULL;
-        nv->nv_vvmcxaddr = VMCX_EADDR;
+        nv->nv_vvmcxaddr = INVALID_PADDR;
     }
 
     if ( !nv->nv_vvmcx )
@@ -154,7 +154,7 @@ void nsvm_vcpu_destroy(struct vcpu *v)
     if (nv->nv_n2vmcx) {
         free_vmcb(nv->nv_n2vmcx);
         nv->nv_n2vmcx = NULL;
-        nv->nv_n2vmcx_pa = VMCX_EADDR;
+        nv->nv_n2vmcx_pa = INVALID_PADDR;
     }
     if (svm->ns_iomap)
         svm->ns_iomap = NULL;
@@ -164,8 +164,8 @@ int nsvm_vcpu_reset(struct vcpu *v)
 {
     struct nestedsvm *svm = &vcpu_nestedsvm(v);
 
-    svm->ns_msr_hsavepa = VMCX_EADDR;
-    svm->ns_ovvmcb_pa = VMCX_EADDR;
+    svm->ns_msr_hsavepa = INVALID_PADDR;
+    svm->ns_ovvmcb_pa = INVALID_PADDR;
 
     svm->ns_tscratio = DEFAULT_TSC_RATIO;
 
@@ -425,7 +425,7 @@ static int nsvm_vmcb_prepare4vmrun(struct vcpu *v, struct cpu_user_regs *regs)
 
     /* Check if virtual VMCB cleanbits are valid */
     vcleanbits_valid = 1;
-    if (svm->ns_ovvmcb_pa == VMCX_EADDR)
+    if ( svm->ns_ovvmcb_pa == INVALID_PADDR )
         vcleanbits_valid = 0;
     if (svm->ns_ovvmcb_pa != nv->nv_vvmcxaddr)
         vcleanbits_valid = 0;
@@ -674,7 +674,7 @@ nsvm_vcpu_vmentry(struct vcpu *v, struct cpu_user_regs *regs,
     ns_vmcb = nv->nv_vvmcx;
     ASSERT(ns_vmcb != NULL);
     ASSERT(nv->nv_n2vmcx != NULL);
-    ASSERT(nv->nv_n2vmcx_pa != VMCX_EADDR);
+    ASSERT(nv->nv_n2vmcx_pa != INVALID_PADDR);
 
     /* Save values for later use. Needed for Nested-on-Nested and
      * Shadow-on-Shadow paging.
@@ -1490,8 +1490,8 @@ void nsvm_vcpu_switch(struct cpu_user_regs *regs)
     ASSERT(v->arch.hvm_svm.vmcb != NULL);
     ASSERT(nv->nv_n1vmcx != NULL);
     ASSERT(nv->nv_n2vmcx != NULL);
-    ASSERT(nv->nv_n1vmcx_pa != VMCX_EADDR);
-    ASSERT(nv->nv_n2vmcx_pa != VMCX_EADDR);
+    ASSERT(nv->nv_n1vmcx_pa != INVALID_PADDR);
+    ASSERT(nv->nv_n2vmcx_pa != INVALID_PADDR);
 
     if (nv->nv_vmexit_pending) {
  vmexit:

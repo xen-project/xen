@@ -97,8 +97,6 @@ static inline bool_t hvm_vcpu_io_need_completion(const struct hvm_vcpu_io *vio)
            !vio->io_req.data_is_ptr;
 }
 
-#define VMCX_EADDR    (~0ULL)
-
 struct nestedvcpu {
     bool_t nv_guestmode; /* vcpu in guestmode? */
     void *nv_vvmcx; /* l1 guest virtual VMCB/VMCS */

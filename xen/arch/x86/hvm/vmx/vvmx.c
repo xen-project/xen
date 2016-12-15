@@ -114,7 +114,7 @@ int nvmx_vcpu_initialise(struct vcpu *v)
     nvmx->guest_vpid = 0;
     nvmx->vmxon_region_pa = INVALID_PADDR;
     nvcpu->nv_vvmcx = NULL;
-    nvcpu->nv_vvmcxaddr = VMCX_EADDR;
+    nvcpu->nv_vvmcxaddr = INVALID_PADDR;
     nvmx->intr.intr_info = 0;
     nvmx->intr.error_code = 0;
     nvmx->iobitmap[0] = NULL;
@@ -756,10 +756,10 @@ static void nvmx_purge_vvmcs(struct vcpu *v)
     int i;
 
     __clear_current_vvmcs(v);
-    if ( nvcpu->nv_vvmcxaddr != VMCX_EADDR )
+    if ( nvcpu->nv_vvmcxaddr != INVALID_PADDR )
         hvm_unmap_guest_frame(nvcpu->nv_vvmcx, 1);
     nvcpu->nv_vvmcx = NULL;
-    nvcpu->nv_vvmcxaddr = VMCX_EADDR;
+    nvcpu->nv_vvmcxaddr = INVALID_PADDR;
     v->arch.hvm_vmx.vmcs_shadow_maddr = 0;
     for (i=0; i<2; i++) {
         if ( nvmx->iobitmap[i] ) {
@@ -1383,7 +1383,7 @@ int nvmx_handle_vmxon(struct cpu_user_regs *regs)
     if ( nvmx_vcpu_in_vmx(v) )
     {
         vmreturn(regs,
-                 nvcpu->nv_vvmcxaddr != VMCX_EADDR ?
+                 nvcpu->nv_vvmcxaddr != INVALID_PADDR ?
                  VMFAIL_VALID : VMFAIL_INVALID);
         return X86EMUL_OKAY;
     }
@@ -1499,7 +1499,7 @@ static int nvmx_vmresume(struct vcpu *v, struct cpu_user_regs *regs)
     struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
 
     /* check VMCS is valid and IO BITMAP is set */
-    if ( (nvcpu->nv_vvmcxaddr != VMCX_EADDR) &&
+    if ( (nvcpu->nv_vvmcxaddr != INVALID_PADDR) &&
             ((nvmx->iobitmap[0] && nvmx->iobitmap[1]) ||
             !(__n2_exec_control(v) & CPU_BASED_ACTIVATE_IO_BITMAP) ) )
         nvcpu->nv_vmentry_pending = 1;
@@ -1519,7 +1519,7 @@ int nvmx_handle_vmresume(struct cpu_user_regs *regs)
     if ( rc != X86EMUL_OKAY )
         return rc;
 
-    if ( vcpu_nestedhvm(v).nv_vvmcxaddr == VMCX_EADDR )
+    if ( vcpu_nestedhvm(v).nv_vvmcxaddr == INVALID_PADDR )
     {
         vmreturn (regs, VMFAIL_INVALID);
         return X86EMUL_OKAY;        
@@ -1544,7 +1544,7 @@ int nvmx_handle_vmlaunch(struct cpu_user_regs *regs)
     if ( rc != X86EMUL_OKAY )
         return rc;
 
-    if ( vcpu_nestedhvm(v).nv_vvmcxaddr == VMCX_EADDR )
+    if ( vcpu_nestedhvm(v).nv_vvmcxaddr == INVALID_PADDR )
     {
         vmreturn (regs, VMFAIL_INVALID);
         return X86EMUL_OKAY;
@@ -1589,7 +1589,7 @@ int nvmx_handle_vmptrld(struct cpu_user_regs *regs)
     if ( nvcpu->nv_vvmcxaddr != gpa )
         nvmx_purge_vvmcs(v);
 
-    if ( nvcpu->nv_vvmcxaddr == VMCX_EADDR )
+    if ( nvcpu->nv_vvmcxaddr == INVALID_PADDR )
     {
         bool_t writable;
         void *vvmcx = hvm_map_guest_frame_rw(paddr_to_pfn(gpa), 1, &writable);

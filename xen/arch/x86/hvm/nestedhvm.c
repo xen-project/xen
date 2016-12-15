@@ -54,7 +54,7 @@ nestedhvm_vcpu_reset(struct vcpu *v)
 
     hvm_unmap_guest_frame(nv->nv_vvmcx, 1);
     nv->nv_vvmcx = NULL;
-    nv->nv_vvmcxaddr = VMCX_EADDR;
+    nv->nv_vvmcxaddr = INVALID_PADDR;
     nv->nv_flushp2m = 0;
     nv->nv_p2m = NULL;
 

@@ -273,7 +273,7 @@ void svm_destroy_vmcb(struct vcpu *v)
     }
 
     nv->nv_n1vmcx = NULL;
-    nv->nv_n1vmcx_pa = VMCX_EADDR;
+    nv->nv_n1vmcx_pa = INVALID_PADDR;
     arch_svm->vmcb = NULL;
 }
 
