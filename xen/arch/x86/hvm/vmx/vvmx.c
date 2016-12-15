@@ -349,7 +349,6 @@ static inline u32 __n2_secondary_exec_control(struct vcpu *v)
 static int vmx_inst_check_privilege(struct cpu_user_regs *regs, int vmxop_check)
 {
     struct vcpu *v = current;
-    struct segment_register cs;
 
     if ( vmxop_check )
     {
@@ -360,15 +359,12 @@ static int vmx_inst_check_privilege(struct cpu_user_regs *regs, int vmxop_check)
     else if ( !vcpu_2_nvmx(v).vmxon_region_pa )
         goto invalid_op;
 
-    hvm_get_segment_register(v, x86_seg_cs, &cs);
-
-    if ( (regs->eflags & X86_EFLAGS_VM) ||
-         (hvm_long_mode_enabled(v) && cs.attr.fields.l == 0) )
+    if ( vmx_guest_x86_mode(v) < (hvm_long_mode_enabled(v) ? 8 : 2) )
         goto invalid_op;
     else if ( nestedhvm_vcpu_in_guestmode(v) )
         goto vmexit;
 
-    if ( (cs.sel & 3) > 0 )
+    if ( vmx_get_cpl() > 0 )
         goto gp_fault;
 
     return X86EMUL_OKAY;
@@ -413,15 +409,9 @@ static int decode_vmx_inst(struct cpu_user_regs *regs,
     }
     else
     {
-        bool_t mode_64bit = 0;
+        bool mode_64bit = (vmx_guest_x86_mode(v) == 8);
 
         decode->type = VMX_INST_MEMREG_TYPE_MEMORY;
-
-        if ( hvm_long_mode_enabled(v) )
-        {
-            hvm_get_segment_register(v, x86_seg_cs, &seg);
-            mode_64bit = seg.attr.fields.l;
-        }
 
         if ( info.fields.segment > VMX_SREG_GS )
             goto gp_fault;

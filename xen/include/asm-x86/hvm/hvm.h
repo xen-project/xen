@@ -117,6 +117,7 @@ struct hvm_function_table {
     unsigned int (*get_interrupt_shadow)(struct vcpu *v);
     void (*set_interrupt_shadow)(struct vcpu *v, unsigned int intr_shadow);
     int (*guest_x86_mode)(struct vcpu *v);
+    unsigned int (*get_cpl)(struct vcpu *v);
     void (*get_segment_register)(struct vcpu *v, enum x86_segment seg,
                                  struct segment_register *reg);
     void (*set_segment_register)(struct vcpu *v, enum x86_segment seg,
@@ -350,6 +351,12 @@ static inline void hvm_flush_guest_tlbs(void)
 
 void hvm_hypercall_page_initialise(struct domain *d,
                                    void *hypercall_page);
+
+static inline unsigned int
+hvm_get_cpl(struct vcpu *v)
+{
+    return hvm_funcs.get_cpl(v);
+}
 
 void hvm_get_segment_register(struct vcpu *v, enum x86_segment seg,
                               struct segment_register *reg);

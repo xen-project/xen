@@ -84,15 +84,12 @@ int xenoprofile_get_mode(struct vcpu *curr, const struct cpu_user_regs *regs)
 
     switch ( hvm_guest_x86_mode(curr) )
     {
-        struct segment_register ss;
-
     case 0: /* real mode */
         return 1;
     case 1: /* vm86 mode */
         return 0;
     default:
-        hvm_get_segment_register(curr, x86_seg_ss, &ss);
-        return (ss.sel & 3) != 3;
+        return hvm_get_cpl(curr) != 3;
     }
 }
 

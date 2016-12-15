@@ -78,8 +78,7 @@ static inline unsigned long gfn_of_rip(unsigned long rip)
     struct segment_register sreg;
     uint32_t pfec = PFEC_page_present | PFEC_insn_fetch;
 
-    hvm_get_segment_register(curr, x86_seg_ss, &sreg);
-    if ( sreg.attr.fields.dpl == 3 )
+    if ( hvm_get_cpl(curr) == 3 )
         pfec |= PFEC_user_mode;
 
     hvm_get_segment_register(curr, x86_seg_cs, &sreg);

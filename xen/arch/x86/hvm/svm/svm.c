@@ -616,6 +616,11 @@ static void svm_sync_vmcb(struct vcpu *v)
     svm_vmsave(arch_svm->vmcb);
 }
 
+static unsigned int svm_get_cpl(struct vcpu *v)
+{
+    return vmcb_get_cpl(v->arch.hvm_svm.vmcb);
+}
+
 static void svm_get_segment_register(struct vcpu *v, enum x86_segment seg,
                                      struct segment_register *reg)
 {
@@ -2197,6 +2202,7 @@ static struct hvm_function_table __initdata svm_function_table = {
     .get_interrupt_shadow = svm_get_interrupt_shadow,
     .set_interrupt_shadow = svm_set_interrupt_shadow,
     .guest_x86_mode       = svm_guest_x86_mode,
+    .get_cpl              = svm_get_cpl,
     .get_segment_register = svm_get_segment_register,
     .set_segment_register = svm_set_segment_register,
     .get_shadow_gs_base   = svm_get_shadow_gs_base,

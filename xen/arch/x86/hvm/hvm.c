@@ -2739,7 +2739,7 @@ static void hvm_unmap_entry(void *p)
 static int hvm_load_segment_selector(
     enum x86_segment seg, uint16_t sel, unsigned int eflags)
 {
-    struct segment_register desctab, cs, segr;
+    struct segment_register desctab, segr;
     struct desc_struct *pdesc, desc;
     u8 dpl, rpl, cpl;
     bool_t writable;
@@ -2771,7 +2771,6 @@ static int hvm_load_segment_selector(
     if ( (seg == x86_seg_ldtr) && (sel & 4) )
         goto fail;
 
-    hvm_get_segment_register(v, x86_seg_cs, &cs);
     hvm_get_segment_register(
         v, (sel & 4) ? x86_seg_ldtr : x86_seg_gdtr, &desctab);
 
@@ -2796,7 +2795,7 @@ static int hvm_load_segment_selector(
 
         dpl = (desc.b >> 13) & 3;
         rpl = sel & 3;
-        cpl = cs.sel & 3;
+        cpl = hvm_get_cpl(v);
 
         switch ( seg )
         {
@@ -3640,16 +3639,10 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
 
 bool hvm_check_cpuid_faulting(struct vcpu *v)
 {
-    struct segment_register sreg;
-
     if ( !v->arch.cpuid_faulting )
         return false;
 
-    hvm_get_segment_register(v, x86_seg_ss, &sreg);
-    if ( sreg.attr.fields.dpl == 0 )
-        return false;
-
-    return true;
+    return hvm_get_cpl(v) > 0;
 }
 
 static uint64_t _hvm_rdtsc_intercept(void)
@@ -3661,13 +3654,10 @@ static uint64_t _hvm_rdtsc_intercept(void)
     if ( currd->arch.vtsc )
         switch ( hvm_guest_x86_mode(curr) )
         {
-            struct segment_register sreg;
-
         case 8:
         case 4:
         case 2:
-            hvm_get_segment_register(curr, x86_seg_ss, &sreg);
-            if ( unlikely(sreg.attr.fields.dpl) )
+            if ( unlikely(hvm_get_cpl(curr)) )
             {
         case 1:
                 currd->arch.vtsc_usercount++;
@@ -4235,7 +4225,6 @@ int hvm_do_hypercall(struct cpu_user_regs *regs)
 {
     struct vcpu *curr = current;
     struct domain *currd = curr->domain;
-    struct segment_register sreg;
     int mode = hvm_guest_x86_mode(curr);
     unsigned long eax = regs->_eax;
 
@@ -4246,8 +4235,7 @@ int hvm_do_hypercall(struct cpu_user_regs *regs)
         /* Fallthrough to permission check. */
     case 4:
     case 2:
-        hvm_get_segment_register(curr, x86_seg_ss, &sreg);
-        if ( unlikely(sreg.attr.fields.dpl) )
+        if ( unlikely(hvm_get_cpl(curr)) )
         {
     default:
             regs->eax = -EPERM;

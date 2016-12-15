@@ -1706,7 +1706,7 @@ void *sh_emulate_map_dest(struct vcpu *v, unsigned long vaddr,
 #ifndef NDEBUG
     /* We don't emulate user-mode writes to page tables. */
     if ( has_hvm_container_domain(d)
-         ? hvm_get_seg_reg(x86_seg_ss, sh_ctxt)->attr.fields.dpl == 3
+         ? hvm_get_cpl(v) == 3
          : !guest_kernel_mode(v, guest_cpu_user_regs()) )
     {
         gdprintk(XENLOG_DEBUG, "User-mode write to pagetable reached "

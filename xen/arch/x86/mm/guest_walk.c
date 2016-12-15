@@ -174,7 +174,6 @@ guest_walk_tables(struct vcpu *v, struct p2m_domain *p2m,
 
     if ( is_hvm_domain(d) && !(pfec & PFEC_user_mode) )
     {
-        struct segment_register seg;
         const struct cpu_user_regs *regs = guest_cpu_user_regs();
 
         /* SMEP: kernel-mode instruction fetches from user-mode mappings
@@ -186,8 +185,6 @@ guest_walk_tables(struct vcpu *v, struct p2m_domain *p2m,
         switch ( v->arch.smap_check_policy )
         {
         case SMAP_CHECK_HONOR_CPL_AC:
-            hvm_get_segment_register(v, x86_seg_ss, &seg);
-
             /*
              * SMAP: kernel-mode data accesses from user-mode mappings
              * should fault.
@@ -199,8 +196,7 @@ guest_walk_tables(struct vcpu *v, struct p2m_domain *p2m,
              *   - Page fault in kernel mode
              */
             smap = hvm_smap_enabled(v) &&
-                   ((seg.attr.fields.dpl == 3) ||
-                    !(regs->eflags & X86_EFLAGS_AC));
+                   ((hvm_get_cpl(v) == 3) || !(regs->eflags & X86_EFLAGS_AC));
             break;
         case SMAP_CHECK_ENABLED:
             smap = hvm_smap_enabled(v);

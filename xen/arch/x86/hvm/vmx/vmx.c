@@ -554,7 +554,7 @@ static void vmx_update_guest_vendor(struct vcpu *v)
     vmx_vmcs_exit(v);
 }
 
-static int vmx_guest_x86_mode(struct vcpu *v)
+int vmx_guest_x86_mode(struct vcpu *v)
 {
     unsigned long cs_ar_bytes;
 
@@ -917,6 +917,26 @@ static void vmx_ctxt_switch_to(struct vcpu *v)
         v->domain->arch.hvm_domain.vmx.pi_switch_to(v);
 }
 
+
+unsigned int vmx_get_cpl(void)
+{
+    unsigned long attr;
+
+    __vmread(GUEST_SS_AR_BYTES, &attr);
+
+    return (attr >> 5) & 3;
+}
+
+static unsigned int _vmx_get_cpl(struct vcpu *v)
+{
+    unsigned int cpl;
+
+    vmx_vmcs_enter(v);
+    cpl = vmx_get_cpl();
+    vmx_vmcs_exit(v);
+
+    return cpl;
+}
 
 /* SDM volume 3b section 22.3.1.2: we can only enter virtual 8086 mode
  * if all of CS, SS, DS, ES, FS and GS are 16bit ring-3 data segments.
@@ -2068,6 +2088,7 @@ static struct hvm_function_table __initdata vmx_function_table = {
     .get_interrupt_shadow = vmx_get_interrupt_shadow,
     .set_interrupt_shadow = vmx_set_interrupt_shadow,
     .guest_x86_mode       = vmx_guest_x86_mode,
+    .get_cpl              = _vmx_get_cpl,
     .get_segment_register = vmx_get_segment_register,
     .set_segment_register = vmx_set_segment_register,
     .get_shadow_gs_base   = vmx_get_shadow_gs_base,
@@ -3789,19 +3810,13 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
     /* fall through */
     default:
     exit_and_crash:
-        {
-            struct segment_register ss;
+        gdprintk(XENLOG_WARNING, "Bad vmexit (reason %#lx)\n", exit_reason);
 
-            gdprintk(XENLOG_WARNING, "Bad vmexit (reason %#lx)\n",
-                     exit_reason);
-
-            hvm_get_segment_register(v, x86_seg_ss, &ss);
-            if ( ss.attr.fields.dpl )
-                hvm_inject_hw_exception(TRAP_invalid_op,
-                                        X86_EVENT_NO_EC);
-            else
-                domain_crash(v->domain);
-        }
+        if ( vmx_get_cpl() )
+            hvm_inject_hw_exception(TRAP_invalid_op,
+                                    X86_EVENT_NO_EC);
+        else
+            domain_crash(v->domain);
         break;
     }
 
@@ -3823,12 +3838,9 @@ out:
     if ( mode == 8 ? !is_canonical_address(regs->rip)
                    : regs->rip != regs->_eip )
     {
-        struct segment_register ss;
-
         gprintk(XENLOG_WARNING, "Bad rIP %lx for mode %u\n", regs->rip, mode);
 
-        hvm_get_segment_register(v, x86_seg_ss, &ss);
-        if ( ss.attr.fields.dpl )
+        if ( vmx_get_cpl() )
         {
             __vmread(VM_ENTRY_INTR_INFO, &intr_info);
             if ( !(intr_info & INTR_INFO_VALID_MASK) )
