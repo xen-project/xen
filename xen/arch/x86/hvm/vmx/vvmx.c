@@ -1373,6 +1373,7 @@ int nvmx_handle_vmxon(struct cpu_user_regs *regs)
     struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
     struct vmx_inst_decoded decode;
     unsigned long gpa = 0;
+    uint32_t nvmcs_revid;
     int rc;
 
     rc = decode_vmx_inst(regs, &decode, &gpa, 1);
@@ -1384,6 +1385,21 @@ int nvmx_handle_vmxon(struct cpu_user_regs *regs)
         vmreturn(regs,
                  nvcpu->nv_vvmcxaddr != VMCX_EADDR ?
                  VMFAIL_VALID : VMFAIL_INVALID);
+        return X86EMUL_OKAY;
+    }
+
+    if ( (gpa & ~PAGE_MASK) || (gpa >> v->domain->arch.paging.gfn_bits) )
+    {
+        vmreturn(regs, VMFAIL_INVALID);
+        return X86EMUL_OKAY;
+    }
+
+    rc = hvm_copy_from_guest_phys(&nvmcs_revid, gpa, sizeof(nvmcs_revid));
+    if ( rc != HVMCOPY_okay ||
+         (nvmcs_revid & ~VMX_BASIC_REVISION_MASK) ||
+         ((nvmcs_revid ^ vmx_basic_msr) & VMX_BASIC_REVISION_MASK) )
+    {
+        vmreturn(regs, VMFAIL_INVALID);
         return X86EMUL_OKAY;
     }
 
