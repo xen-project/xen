@@ -432,6 +432,7 @@ typedef union {
 #define CR4_OSFXSR     (1<<9)
 #define CR4_OSXMMEXCPT (1<<10)
 #define CR4_UMIP       (1<<11)
+#define CR4_FSGSBASE   (1<<16)
 #define CR4_OSXSAVE    (1<<18)
 
 /* EFLAGS bit definitions. */
@@ -5208,6 +5209,46 @@ x86_emulate(
             goto cannot_emulate;
         }
         break;
+
+    case X86EMUL_OPC_F3(0x0f, 0xae): /* Grp15 */
+    {
+        unsigned long cr4;
+
+        fail_if(modrm_mod != 3);
+        generate_exception_if((modrm_reg & 4) || !mode_64bit(), EXC_UD);
+        fail_if(!ops->read_cr);
+        if ( (rc = ops->read_cr(4, &cr4, ctxt)) != X86EMUL_OKAY )
+            goto done;
+        generate_exception_if(!(cr4 & CR4_FSGSBASE), EXC_UD);
+        seg = modrm_reg & 1 ? x86_seg_gs : x86_seg_fs;
+        fail_if(!ops->read_segment);
+        if ( (rc = ops->read_segment(seg, &sreg, ctxt)) != X86EMUL_OKAY )
+            goto done;
+        dst.reg = decode_register(modrm_rm, &_regs, 0);
+        if ( !(modrm_reg & 2) )
+        {
+            /* rd{f,g}sbase */
+            dst.type = OP_REG;
+            dst.bytes = (op_bytes == 8) ? 8 : 4;
+            dst.val = sreg.base;
+        }
+        else
+        {
+            /* wr{f,g}sbase */
+            if ( op_bytes == 8 )
+            {
+                sreg.base = *dst.reg;
+                generate_exception_if(!is_canonical_address(sreg.base),
+                                      EXC_GP, 0);
+            }
+            else
+                sreg.base = (uint32_t)*dst.reg;
+            fail_if(!ops->write_segment);
+            if ( (rc = ops->write_segment(seg, &sreg, ctxt)) != X86EMUL_OKAY )
+                goto done;
+        }
+        break;
+    }
 
     case X86EMUL_OPC(0x0f, 0xaf): /* imul */
         emulate_2op_SrcV_srcmem("imul", src, dst, _regs.eflags);
