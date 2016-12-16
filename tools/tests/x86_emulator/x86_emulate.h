@@ -31,6 +31,11 @@
 #define likely(x)   __builtin_expect(!!(x), true)
 #define unlikely(x) __builtin_expect(!!(x), false)
 
+#define container_of(ptr, type, member) ({             \
+    typeof(((type *)0)->member) *mptr__ = (ptr);       \
+    (type *)((char *)mptr__ - offsetof(type, member)); \
+})
+
 #define is_canonical_address(x) (((int64_t)(x) >> 47) == ((int64_t)(x) >> 63))
 
 #define MMAP_SZ 16384

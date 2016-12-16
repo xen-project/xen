@@ -5402,12 +5402,15 @@ x86_emulate(
         break;
 
     case X86EMUL_OPC(0x0f, 0xc7): /* Grp9 (cmpxchg8b/cmpxchg16b) */ {
-        unsigned long old[2], exp[2], new[2];
+        union {
+            uint32_t u32[2];
+            uint64_t u64[2];
+        } *old, *aux;
 
         generate_exception_if((modrm_reg & 7) != 1, EXC_UD);
         generate_exception_if(ea.type != OP_MEM, EXC_UD);
         fail_if(!ops->cmpxchg);
-        if ( op_bytes == 8 )
+        if ( rex_prefix & REX_W )
         {
             host_and_vcpu_must_have(cx16);
             op_bytes = 16;
@@ -5415,35 +5418,52 @@ x86_emulate(
         else
             op_bytes = 8;
 
+        old = container_of(&mmvalp->ymm[0], typeof(*old), u64[0]);
+        aux = container_of(&mmvalp->ymm[2], typeof(*aux), u64[0]);
+
         /* Get actual old value. */
         if ( (rc = ops->read(ea.mem.seg, ea.mem.off, old, op_bytes,
-                             ctxt)) != 0 )
+                             ctxt)) != X86EMUL_OKAY )
             goto done;
 
-        /* Get expected and proposed values. */
-        if ( op_bytes == 8 )
+        /* Get expected value. */
+        if ( !(rex_prefix & REX_W) )
         {
-            ((uint32_t *)exp)[0] = _regs.eax; ((uint32_t *)exp)[1] = _regs.edx;
-            ((uint32_t *)new)[0] = _regs.ebx; ((uint32_t *)new)[1] = _regs.ecx;
+            aux->u32[0] = _regs.eax;
+            aux->u32[1] = _regs.edx;
         }
         else
         {
-            exp[0] = _regs.eax; exp[1] = _regs.edx;
-            new[0] = _regs.ebx; new[1] = _regs.ecx;
+            aux->u64[0] = _regs.eax;
+            aux->u64[1] = _regs.edx;
         }
 
-        if ( memcmp(old, exp, op_bytes) )
+        if ( memcmp(old, aux, op_bytes) )
         {
             /* Expected != actual: store actual to rDX:rAX and clear ZF. */
-            _regs.eax = (op_bytes == 8) ? ((uint32_t *)old)[0] : old[0];
-            _regs.edx = (op_bytes == 8) ? ((uint32_t *)old)[1] : old[1];
+            _regs.eax = !(rex_prefix & REX_W) ? old->u32[0] : old->u64[0];
+            _regs.edx = !(rex_prefix & REX_W) ? old->u32[1] : old->u64[1];
             _regs.eflags &= ~EFLG_ZF;
         }
         else
         {
-            /* Expected == actual: attempt atomic cmpxchg and set ZF. */
-            if ( (rc = ops->cmpxchg(ea.mem.seg, ea.mem.off, old,
-                                    new, op_bytes, ctxt)) != 0 )
+            /*
+             * Expected == actual: Get proposed value, attempt atomic cmpxchg
+             * and set ZF.
+             */
+            if ( !(rex_prefix & REX_W) )
+            {
+                aux->u32[0] = _regs.ebx;
+                aux->u32[1] = _regs.ecx;
+            }
+            else
+            {
+                aux->u64[0] = _regs.ebx;
+                aux->u64[1] = _regs.ecx;
+            }
+
+            if ( (rc = ops->cmpxchg(ea.mem.seg, ea.mem.off, old, aux,
+                                    op_bytes, ctxt)) != X86EMUL_OKAY )
                 goto done;
             _regs.eflags |= EFLG_ZF;
         }
