@@ -471,8 +471,6 @@ static void pv_cpuid(uint32_t leaf, uint32_t subleaf, struct cpuid_leaf *res)
 
     switch ( leaf )
     {
-        uint32_t tmp;
-
     case 0x00000001:
         res->c = p->basic._1c;
         res->d = p->basic._1d;
@@ -624,57 +622,6 @@ static void pv_cpuid(uint32_t leaf, uint32_t subleaf, struct cpuid_leaf *res)
             res->a = (res->a & ~0xff) | 3;
         break;
 
-    case XSTATE_CPUID:
-        if ( !p->basic.xsave || subleaf >= 63 )
-            goto unsupported;
-        switch ( subleaf )
-        {
-        case 0:
-        {
-            uint64_t xfeature_mask = XSTATE_FP_SSE;
-            uint32_t xstate_size = XSTATE_AREA_MIN_SIZE;
-
-            if ( p->basic.avx )
-            {
-                xfeature_mask |= XSTATE_YMM;
-                xstate_size = (xstate_offsets[_XSTATE_YMM] +
-                               xstate_sizes[_XSTATE_YMM]);
-            }
-
-            if ( p->feat.avx512f )
-            {
-                xfeature_mask |= XSTATE_OPMASK | XSTATE_ZMM | XSTATE_HI_ZMM;
-                xstate_size = max(xstate_size,
-                                  xstate_offsets[_XSTATE_OPMASK] +
-                                  xstate_sizes[_XSTATE_OPMASK]);
-                xstate_size = max(xstate_size,
-                                  xstate_offsets[_XSTATE_ZMM] +
-                                  xstate_sizes[_XSTATE_ZMM]);
-                xstate_size = max(xstate_size,
-                                  xstate_offsets[_XSTATE_HI_ZMM] +
-                                  xstate_sizes[_XSTATE_HI_ZMM]);
-            }
-
-            res->a = xfeature_mask;
-            res->d = xfeature_mask >> 32;
-            res->c = xstate_size;
-
-            /*
-             * Always read CPUID.0xD[ECX=0].EBX from hardware, rather than
-             * domain policy.  It varies with enabled xstate, and the correct
-             * xcr0 is in context.
-             */
-            cpuid_count(leaf, subleaf, &tmp, &res->b, &tmp, &tmp);
-            break;
-        }
-
-        case 1:
-            res->a = p->xstate.Da1;
-            res->b = res->c = res->d = 0;
-            break;
-        }
-        break;
-
     case 0x80000001:
         res->c = p->extd.e1c;
         res->d = p->extd.e1d;
@@ -717,6 +664,7 @@ static void pv_cpuid(uint32_t leaf, uint32_t subleaf, struct cpuid_leaf *res)
         break;
 
     case 0x7:
+    case XSTATE_CPUID:
         ASSERT_UNREACHABLE();
         /* Now handled in guest_cpuid(). */
     }
@@ -782,98 +730,6 @@ static void hvm_cpuid(uint32_t leaf, uint32_t subleaf, struct cpuid_leaf *res)
     case 0xb:
         /* Fix the x2APIC identifier. */
         res->d = v->vcpu_id * 2;
-        break;
-
-    case XSTATE_CPUID:
-        if ( !p->basic.xsave || subleaf >= 63 )
-        {
-            *res = EMPTY_LEAF;
-            break;
-        }
-        switch ( subleaf )
-        {
-        case 0:
-        {
-            uint64_t xfeature_mask = XSTATE_FP_SSE;
-            uint32_t xstate_size = XSTATE_AREA_MIN_SIZE;
-
-            if ( p->basic.avx )
-            {
-                xfeature_mask |= XSTATE_YMM;
-                xstate_size = max(xstate_size,
-                                  xstate_offsets[_XSTATE_YMM] +
-                                  xstate_sizes[_XSTATE_YMM]);
-            }
-
-            if ( p->feat.mpx )
-            {
-                xfeature_mask |= XSTATE_BNDREGS | XSTATE_BNDCSR;
-                xstate_size = max(xstate_size,
-                                  xstate_offsets[_XSTATE_BNDCSR] +
-                                  xstate_sizes[_XSTATE_BNDCSR]);
-            }
-
-            if ( p->feat.avx512f )
-            {
-                xfeature_mask |= XSTATE_OPMASK | XSTATE_ZMM | XSTATE_HI_ZMM;
-                xstate_size = max(xstate_size,
-                                  xstate_offsets[_XSTATE_OPMASK] +
-                                  xstate_sizes[_XSTATE_OPMASK]);
-                xstate_size = max(xstate_size,
-                                  xstate_offsets[_XSTATE_ZMM] +
-                                  xstate_sizes[_XSTATE_ZMM]);
-                xstate_size = max(xstate_size,
-                                  xstate_offsets[_XSTATE_HI_ZMM] +
-                                  xstate_sizes[_XSTATE_HI_ZMM]);
-            }
-
-            if ( p->feat.pku )
-            {
-                xfeature_mask |= XSTATE_PKRU;
-                xstate_size = max(xstate_size,
-                                  xstate_offsets[_XSTATE_PKRU] +
-                                  xstate_sizes[_XSTATE_PKRU]);
-            }
-
-            if ( p->extd.lwp )
-            {
-                xfeature_mask |= XSTATE_LWP;
-                xstate_size = max(xstate_size,
-                                  xstate_offsets[_XSTATE_LWP] +
-                                  xstate_sizes[_XSTATE_LWP]);
-            }
-
-            res->a = xfeature_mask;
-            res->d = xfeature_mask >> 32;
-            res->c = xstate_size;
-
-            /*
-             * Always read CPUID[0xD,0].EBX from hardware, rather than domain
-             * policy.  It varies with enabled xstate, and the correct xcr0 is
-             * in context.
-             */
-            cpuid_count(leaf, subleaf, &tmp, &res->b, &tmp, &tmp);
-            break;
-        }
-
-        case 1:
-            res->a = p->xstate.Da1;
-
-            if ( p->xstate.xsaves )
-            {
-                /*
-                 * Always read CPUID[0xD,1].EBX from hardware, rather than
-                 * domain policy.  It varies with enabled xstate, and the
-                 * correct xcr0/xss are in context.
-                 */
-                cpuid_count(leaf, subleaf, &tmp, &res->b, &tmp, &tmp);
-            }
-            else
-                res->b = 0;
-
-            res->c = res->d = 0;
-            break;
-        }
         break;
 
     case 0x0000000a: /* Architectural Performance Monitor Features (Intel) */
@@ -956,6 +812,7 @@ static void hvm_cpuid(uint32_t leaf, uint32_t subleaf, struct cpuid_leaf *res)
         break;
 
     case 0x7:
+    case XSTATE_CPUID:
         ASSERT_UNREACHABLE();
         /* Now handled in guest_cpuid(). */
     }
@@ -993,10 +850,12 @@ void guest_cpuid(const struct vcpu *v, uint32_t leaf,
             break;
 
         case XSTATE_CPUID:
-            if ( subleaf > ARRAY_SIZE(p->xstate.raw) )
+            if ( !p->basic.xsave || subleaf >= ARRAY_SIZE(p->xstate.raw) )
                 return;
 
-            /* Fallthrough. */
+            *res = p->xstate.raw[subleaf];
+            break;
+
         default:
             goto legacy;
         }
@@ -1050,6 +909,31 @@ void guest_cpuid(const struct vcpu *v, uint32_t leaf,
                   ? v->arch.pv_vcpu.ctrlreg[4]
                   : v->arch.hvm_vcpu.guest_cr[4]) & X86_CR4_PKE )
                 res->c |= cpufeat_mask(X86_FEATURE_OSPKE);
+            break;
+        }
+        break;
+
+    case XSTATE_CPUID:
+        switch ( subleaf )
+        {
+        case 1:
+            if ( p->xstate.xsaves )
+            {
+                /*
+                 * TODO: Figure out what to do for XSS state.  VT-x manages
+                 * host vs guest MSR_XSS automatically, so as soon as we start
+                 * supporting any XSS states, the wrong XSS will be in
+                 * context.
+                 */
+                BUILD_BUG_ON(XSTATE_XSAVES_ONLY != 0);
+
+                /*
+                 * Read CPUID[0xD,0/1].EBX from hardware.  They vary with
+                 * enabled XSTATE, and appropraite XCR0|XSS are in context.
+                 */
+        case 0:
+                res->b = cpuid_count_ebx(leaf, subleaf);
+            }
             break;
         }
         break;

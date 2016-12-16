@@ -105,8 +105,10 @@ static int update_domain_cpuid_info(struct domain *d,
         if ( ctl->input[0] == 7 &&
              ctl->input[1] >= ARRAY_SIZE(p->feat.raw) )
             return 0;
+
+        BUILD_BUG_ON(ARRAY_SIZE(p->xstate.raw) < 2);
         if ( ctl->input[0] == XSTATE_CPUID &&
-             ctl->input[1] >= ARRAY_SIZE(p->xstate.raw) )
+             ctl->input[1] != 1 ) /* Everything else automatically calculated. */
             return 0;
         break;
 

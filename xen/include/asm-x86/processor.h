@@ -319,6 +319,16 @@ static always_inline unsigned int cpuid_edx(unsigned int op)
     return edx;
 }
 
+static always_inline unsigned int cpuid_count_ebx(
+    unsigned int leaf, unsigned int subleaf)
+{
+    unsigned int ebx, tmp;
+
+    cpuid_count(leaf, subleaf, &tmp, &ebx, &tmp, &tmp);
+
+    return ebx;
+}
+
 static inline unsigned long read_cr0(void)
 {
     unsigned long cr0;
