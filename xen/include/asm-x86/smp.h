@@ -25,6 +25,7 @@
  */
 DECLARE_PER_CPU(cpumask_var_t, cpu_sibling_mask);
 DECLARE_PER_CPU(cpumask_var_t, cpu_core_mask);
+DECLARE_PER_CPU(cpumask_var_t, scratch_cpumask);
 
 void smp_send_nmi_allbutself(void);
 

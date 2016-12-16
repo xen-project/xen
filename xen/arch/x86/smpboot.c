@@ -56,6 +56,8 @@ DEFINE_PER_CPU_READ_MOSTLY(cpumask_var_t, cpu_sibling_mask);
 /* representing HT and core siblings of each logical CPU */
 DEFINE_PER_CPU_READ_MOSTLY(cpumask_var_t, cpu_core_mask);
 
+DEFINE_PER_CPU_READ_MOSTLY(cpumask_var_t, scratch_cpumask);
+
 cpumask_t cpu_online_map __read_mostly;
 EXPORT_SYMBOL(cpu_online_map);
 
@@ -646,6 +648,7 @@ static void cpu_smpboot_free(unsigned int cpu)
 
     free_cpumask_var(per_cpu(cpu_sibling_mask, cpu));
     free_cpumask_var(per_cpu(cpu_core_mask, cpu));
+    free_cpumask_var(per_cpu(scratch_cpumask, cpu));
 
     if ( per_cpu(stubs.addr, cpu) )
     {
@@ -734,7 +737,8 @@ static int cpu_smpboot_alloc(unsigned int cpu)
         goto oom;
 
     if ( zalloc_cpumask_var(&per_cpu(cpu_sibling_mask, cpu)) &&
-         zalloc_cpumask_var(&per_cpu(cpu_core_mask, cpu)) )
+         zalloc_cpumask_var(&per_cpu(cpu_core_mask, cpu)) &&
+         alloc_cpumask_var(&per_cpu(scratch_cpumask, cpu)) )
         return 0;
 
  oom:
@@ -791,7 +795,8 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
         panic("No memory for socket CPU siblings map");
 
     if ( !zalloc_cpumask_var(&per_cpu(cpu_sibling_mask, 0)) ||
-         !zalloc_cpumask_var(&per_cpu(cpu_core_mask, 0)) )
+         !zalloc_cpumask_var(&per_cpu(cpu_core_mask, 0)) ||
+         !alloc_cpumask_var(&per_cpu(scratch_cpumask, 0)) )
         panic("No memory for boot CPU sibling/core maps");
 
     set_cpu_sibling_map(0);

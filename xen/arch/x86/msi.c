@@ -40,7 +40,6 @@ static void __pci_disable_msix(struct msi_desc *);
 /* bitmap indicate which fixed map is free */
 static DEFINE_SPINLOCK(msix_fixmap_lock);
 static DECLARE_BITMAP(msix_fixmap_pages, FIX_MSIX_MAX_PAGES);
-static DEFINE_PER_CPU(cpumask_var_t, scratch_mask);
 
 static int msix_fixmap_alloc(void)
 {
@@ -167,7 +166,7 @@ void msi_compose_msg(unsigned vector, const cpumask_t *cpu_mask, struct msi_msg 
 
     if ( cpu_mask )
     {
-        cpumask_t *mask = this_cpu(scratch_mask);
+        cpumask_t *mask = this_cpu(scratch_cpumask);
 
         if ( !cpumask_intersects(cpu_mask, &cpu_online_map) )
             return;
@@ -1458,43 +1457,12 @@ int pci_restore_msi_state(struct pci_dev *pdev)
     return 0;
 }
 
-static int msi_cpu_callback(
-    struct notifier_block *nfb, unsigned long action, void *hcpu)
-{
-    unsigned int cpu = (unsigned long)hcpu;
-
-    switch ( action )
-    {
-    case CPU_UP_PREPARE:
-        if ( !alloc_cpumask_var(&per_cpu(scratch_mask, cpu)) )
-            return notifier_from_errno(ENOMEM);
-        break;
-    case CPU_UP_CANCELED:
-    case CPU_DEAD:
-        free_cpumask_var(per_cpu(scratch_mask, cpu));
-        break;
-    default:
-        break;
-    }
-
-    return NOTIFY_DONE;
-}
-
-static struct notifier_block msi_cpu_nfb = {
-    .notifier_call = msi_cpu_callback
-};
-
 void __init early_msi_init(void)
 {
     if ( use_msi < 0 )
         use_msi = !(acpi_gbl_FADT.boot_flags & ACPI_FADT_NO_MSI);
     if ( !use_msi )
         return;
-
-    register_cpu_notifier(&msi_cpu_nfb);
-    if ( msi_cpu_callback(&msi_cpu_nfb, CPU_UP_PREPARE, NULL) &
-         NOTIFY_STOP_MASK )
-        BUG();
 }
 
 static void dump_msi(unsigned char key)

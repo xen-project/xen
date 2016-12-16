@@ -2477,6 +2477,7 @@ static int __get_page_type(struct page_info *page, unsigned long type,
     int rc = 0, iommu_ret = 0;
 
     ASSERT(!(type & ~(PGT_type_mask | PGT_pae_xen_l2)));
+    ASSERT(!in_irq());
 
     for ( ; ; )
     {
@@ -2509,20 +2510,21 @@ static int __get_page_type(struct page_info *page, unsigned long type,
                  * may be unnecessary (e.g., page was GDT/LDT) but those 
                  * circumstances should be very rare.
                  */
-                cpumask_t mask;
+                cpumask_t *mask = this_cpu(scratch_cpumask);
 
-                cpumask_copy(&mask, d->domain_dirty_cpumask);
+                BUG_ON(in_irq());
+                cpumask_copy(mask, d->domain_dirty_cpumask);
 
                 /* Don't flush if the timestamp is old enough */
-                tlbflush_filter(&mask, page->tlbflush_timestamp);
+                tlbflush_filter(mask, page->tlbflush_timestamp);
 
-                if ( unlikely(!cpumask_empty(&mask)) &&
+                if ( unlikely(!cpumask_empty(mask)) &&
                      /* Shadow mode: track only writable pages. */
                      (!shadow_mode_enabled(page_get_owner(page)) ||
                       ((nx & PGT_type_mask) == PGT_writable_page)) )
                 {
                     perfc_incr(need_flush_tlb_flush);
-                    flush_tlb_mask(&mask);
+                    flush_tlb_mask(mask);
                 }
 
                 /* We lose existing type and validity. */
@@ -3403,22 +3405,22 @@ long do_mmuext_op(
         case MMUEXT_TLB_FLUSH_MULTI:
         case MMUEXT_INVLPG_MULTI:
         {
-            cpumask_t pmask;
+            cpumask_t *mask = this_cpu(scratch_cpumask);
 
             if ( unlikely(d != pg_owner) )
                 rc = -EPERM;
             else if ( unlikely(vcpumask_to_pcpumask(d,
                                    guest_handle_to_param(op.arg2.vcpumask,
                                                          const_void),
-                                   &pmask)) )
+                                   mask)) )
                 rc = -EINVAL;
             if ( unlikely(rc) )
                 break;
 
             if ( op.cmd == MMUEXT_TLB_FLUSH_MULTI )
-                flush_tlb_mask(&pmask);
+                flush_tlb_mask(mask);
             else if ( __addr_ok(op.arg1.linear_addr) )
-                flush_tlb_one_mask(&pmask, op.arg1.linear_addr);
+                flush_tlb_one_mask(mask, op.arg1.linear_addr);
             break;
         }
 
@@ -3456,14 +3458,14 @@ long do_mmuext_op(
             else if ( likely(cache_flush_permitted(d)) )
             {
                 unsigned int cpu;
-                cpumask_t mask;
+                cpumask_t *mask = this_cpu(scratch_cpumask);
 
-                cpumask_clear(&mask);
+                cpumask_clear(mask);
                 for_each_online_cpu(cpu)
-                    if ( !cpumask_intersects(&mask,
+                    if ( !cpumask_intersects(mask,
                                              per_cpu(cpu_sibling_mask, cpu)) )
-                        __cpumask_set_cpu(cpu, &mask);
-                flush_mask(&mask, FLUSH_CACHE);
+                        __cpumask_set_cpu(cpu, mask);
+                flush_mask(mask, FLUSH_CACHE);
             }
             else
             {
@@ -4458,7 +4460,7 @@ static int __do_update_va_mapping(
     struct page_info *gl1pg;
     l1_pgentry_t  *pl1e;
     unsigned long  bmap_ptr, gl1mfn;
-    cpumask_t      pmask;
+    cpumask_t     *mask = NULL;
     int            rc;
 
     perfc_incr(calls_to_update_va);
@@ -4504,15 +4506,17 @@ static int __do_update_va_mapping(
             flush_tlb_local();
             break;
         case UVMF_ALL:
-            flush_tlb_mask(d->domain_dirty_cpumask);
+            mask = d->domain_dirty_cpumask;
             break;
         default:
+            mask = this_cpu(scratch_cpumask);
             rc = vcpumask_to_pcpumask(d, const_guest_handle_from_ptr(bmap_ptr,
                                                                      void),
-                                      &pmask);
-            flush_tlb_mask(&pmask);
+                                      mask);
             break;
         }
+        if ( mask )
+            flush_tlb_mask(mask);
         break;
 
     case UVMF_INVLPG:
@@ -4522,15 +4526,17 @@ static int __do_update_va_mapping(
             paging_invlpg(v, va);
             break;
         case UVMF_ALL:
-            flush_tlb_one_mask(d->domain_dirty_cpumask, va);
+            mask = d->domain_dirty_cpumask;
             break;
         default:
+            mask = this_cpu(scratch_cpumask);
             rc = vcpumask_to_pcpumask(d, const_guest_handle_from_ptr(bmap_ptr,
                                                                      void),
-                                      &pmask);
-            flush_tlb_one_mask(&pmask, va);
+                                      mask);
             break;
         }
+        if ( mask )
+            flush_tlb_one_mask(mask, va);
         break;
     }
 
