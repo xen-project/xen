@@ -11,12 +11,12 @@
 
 #include <asm/x86_64/uaccess.h>
 
-unsigned long copy_to_user(void *to, const void *from, unsigned len);
-unsigned long clear_user(void *to, unsigned len);
-unsigned long copy_from_user(void *to, const void *from, unsigned len);
+unsigned copy_to_user(void *to, const void *from, unsigned len);
+unsigned clear_user(void *to, unsigned len);
+unsigned copy_from_user(void *to, const void *from, unsigned len);
 /* Handles exceptions in both to and from, but doesn't do access_ok */
-unsigned long __copy_to_user_ll(void *to, const void *from, unsigned n);
-unsigned long __copy_from_user_ll(void *to, const void *from, unsigned n);
+unsigned __copy_to_user_ll(void __user*to, const void *from, unsigned n);
+unsigned __copy_from_user_ll(void *to, const void __user *from, unsigned n);
 
 extern long __get_user_bad(void);
 extern void __put_user_bad(void);
