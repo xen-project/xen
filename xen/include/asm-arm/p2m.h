@@ -30,7 +30,7 @@ struct p2m_domain {
     struct page_info *root;
 
     /* Current VMID in use */
-    uint8_t vmid;
+    uint16_t vmid;
 
     /* Current Translation Table Base Register for the p2m */
     uint64_t vttbr;

@@ -7,6 +7,7 @@
 #include <xen/vm_event.h>
 #include <xen/monitor.h>
 #include <xen/iocap.h>
+#include <xen/xmalloc.h>
 #include <public/vm_event.h>
 #include <asm/flushtlb.h>
 #include <asm/gic.h>
@@ -14,15 +15,25 @@
 #include <asm/hardirq.h>
 #include <asm/page.h>
 
+#define MAX_VMID_8_BIT  (1UL << 8)
+#define MAX_VMID_16_BIT (1UL << 16)
+
+#define INVALID_VMID 0 /* VMID 0 is reserved */
+
 #ifdef CONFIG_ARM_64
 static unsigned int __read_mostly p2m_root_order;
 static unsigned int __read_mostly p2m_root_level;
 #define P2M_ROOT_ORDER    p2m_root_order
 #define P2M_ROOT_LEVEL p2m_root_level
+static unsigned int __read_mostly max_vmid = MAX_VMID_8_BIT;
+/* VMID is by default 8 bit width on AArch64 */
+#define MAX_VMID       max_vmid
 #else
 /* First level P2M is alway 2 consecutive pages */
 #define P2M_ROOT_LEVEL 1
 #define P2M_ROOT_ORDER    1
+/* VMID is always 8 bit width on AArch32 */
+#define MAX_VMID        MAX_VMID_8_BIT
 #endif
 
 #define P2M_ROOT_PAGES    (1<<P2M_ROOT_ORDER)
@@ -1217,7 +1228,7 @@ static int p2m_alloc_table(struct domain *d)
 
     p2m->root = page;
 
-    p2m->vttbr = page_to_maddr(p2m->root) | ((uint64_t)p2m->vmid & 0xff) << 48;
+    p2m->vttbr = page_to_maddr(p2m->root) | ((uint64_t)p2m->vmid << 48);
 
     /*
      * Make sure that all TLBs corresponding to the new VMID are flushed
@@ -1228,19 +1239,27 @@ static int p2m_alloc_table(struct domain *d)
     return 0;
 }
 
-#define MAX_VMID 256
-#define INVALID_VMID 0 /* VMID 0 is reserved */
 
 static spinlock_t vmid_alloc_lock = SPIN_LOCK_UNLOCKED;
 
 /*
- * VTTBR_EL2 VMID field is 8 bits. Using a bitmap here limits us to
- * 256 concurrent domains.
+ * VTTBR_EL2 VMID field is 8 or 16 bits. AArch64 may support 16-bit VMID.
+ * Using a bitmap here limits us to 256 or 65536 (for AArch64) concurrent
+ * domains. The bitmap space will be allocated dynamically based on
+ * whether 8 or 16 bit VMIDs are supported.
  */
-static DECLARE_BITMAP(vmid_mask, MAX_VMID);
+static unsigned long *vmid_mask;
 
 static void p2m_vmid_allocator_init(void)
 {
+    /*
+     * allocate space for vmid_mask based on MAX_VMID
+     */
+    vmid_mask = xzalloc_array(unsigned long, BITS_TO_LONGS(MAX_VMID));
+
+    if ( !vmid_mask )
+        panic("Could not allocate VMID bitmap space");
+
     set_bit(INVALID_VMID, vmid_mask);
 }
 
@@ -1630,13 +1649,25 @@ void __init setup_virt_paging(void)
 
     unsigned int cpu;
     unsigned int pa_range = 0x10; /* Larger than any possible value */
+    bool vmid_8_bit = false;
 
     for_each_online_cpu ( cpu )
     {
         const struct cpuinfo_arm *info = &cpu_data[cpu];
         if ( info->mm64.pa_range < pa_range )
             pa_range = info->mm64.pa_range;
+
+        /* Set a flag if the current cpu does not support 16 bit VMIDs. */
+        if ( info->mm64.vmid_bits != MM64_VMID_16_BITS_SUPPORT )
+            vmid_8_bit = true;
     }
+
+    /*
+     * If the flag is not set then it means all CPUs support 16-bit
+     * VMIDs.
+     */
+    if ( !vmid_8_bit )
+        max_vmid = MAX_VMID_16_BIT;
 
     /* pa_range is 4 bits, but the defined encodings are only 3 bits */
     if ( pa_range >= ARRAY_SIZE(pa_range_info) || !pa_range_info[pa_range].pabits )
@@ -1644,6 +1675,10 @@ void __init setup_virt_paging(void)
 
     val |= VTCR_PS(pa_range);
     val |= VTCR_TG0_4K;
+
+    /* Set the VS bit only if 16 bit VMID is supported. */
+    if ( MAX_VMID == MAX_VMID_16_BIT )
+        val |= VTCR_VS;
     val |= VTCR_SL0(pa_range_info[pa_range].sl0);
     val |= VTCR_T0SZ(pa_range_info[pa_range].t0sz);
 
@@ -1651,9 +1686,10 @@ void __init setup_virt_paging(void)
     p2m_root_level = 2 - pa_range_info[pa_range].sl0;
     p2m_ipa_bits = 64 - pa_range_info[pa_range].t0sz;
 
-    printk("P2M: %d-bit IPA with %d-bit PA\n",
+    printk("P2M: %d-bit IPA with %d-bit PA and %d-bit VMID\n",
            p2m_ipa_bits,
-           pa_range_info[pa_range].pabits);
+           pa_range_info[pa_range].pabits,
+           ( MAX_VMID == MAX_VMID_16_BIT ) ? 16 : 8);
 #endif
     printk("P2M: %d levels with order-%d root, VTCR 0x%lx\n",
            4 - P2M_ROOT_LEVEL, P2M_ROOT_ORDER, val);

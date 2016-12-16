@@ -215,6 +215,8 @@
 
 #define VTCR_PS(x)      ((x)<<16)
 
+#define VTCR_VS    	    (_AC(0x1,UL)<<19)
+
 #endif
 
 #define VTCR_RES1       (_AC(1,UL)<<31)
@@ -268,6 +270,11 @@
 #define FSRS_FS_DEBUG           (_AC(0,UL)<<10|_AC(0x2,UL)<<0)
 /* FSR long format */
 #define FSRL_STATUS_DEBUG       (_AC(0x22,UL)<<0)
+
+#ifdef CONFIG_ARM_64
+#define MM64_VMID_8_BITS_SUPPORT    0x0
+#define MM64_VMID_16_BITS_SUPPORT   0x2
+#endif
 
 #ifndef __ASSEMBLY__
 
@@ -337,7 +344,16 @@ struct cpuinfo_arm {
             unsigned long tgranule_64K:4;
             unsigned long tgranule_4K:4;
             unsigned long __res0:32;
-       };
+
+            unsigned long hafdbs:4;
+            unsigned long vmid_bits:4;
+            unsigned long vh:4;
+            unsigned long hpds:4;
+            unsigned long lo:4;
+            unsigned long pan:4;
+            unsigned long __res1:8;
+            unsigned long __res2:32;
+        };
     } mm64;
 
     struct {
