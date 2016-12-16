@@ -781,8 +781,6 @@ void __init start_xen(unsigned long boot_phys_offset,
 
     gic_init();
 
-    p2m_vmid_allocator_init();
-
     softirq_init();
 
     tasklet_subsys_init();

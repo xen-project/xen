@@ -1239,7 +1239,7 @@ static spinlock_t vmid_alloc_lock = SPIN_LOCK_UNLOCKED;
  */
 static DECLARE_BITMAP(vmid_mask, MAX_VMID);
 
-void p2m_vmid_allocator_init(void)
+static void p2m_vmid_allocator_init(void)
 {
     set_bit(INVALID_VMID, vmid_mask);
 }
@@ -1657,6 +1657,9 @@ void __init setup_virt_paging(void)
 #endif
     printk("P2M: %d levels with order-%d root, VTCR 0x%lx\n",
            4 - P2M_ROOT_LEVEL, P2M_ROOT_ORDER, val);
+
+    p2m_vmid_allocator_init();
+
     /* It is not allowed to concatenate a level zero root */
     BUG_ON( P2M_ROOT_LEVEL == 0 && P2M_ROOT_ORDER > 0 );
     setup_virt_paging_one((void *)val);
