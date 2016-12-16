@@ -1085,11 +1085,11 @@ static void dma_msi_set_affinity(struct irq_desc *desc, const cpumask_t *mask)
         return;
     }
 
-    msi_compose_msg(desc->arch.vector, desc->arch.cpu_mask, &msg);
-    /* Are these overrides really needed? */
+    msi_compose_msg(desc->arch.vector, NULL, &msg);
+    msg.dest32 = dest;
     if (x2apic_enabled)
         msg.address_hi = dest & 0xFFFFFF00;
-    msg.address_lo &= ~MSI_ADDR_DEST_ID_MASK;
+    ASSERT(!(msg.address_lo & MSI_ADDR_DEST_ID_MASK));
     msg.address_lo |= MSI_ADDR_DEST_ID(dest);
     iommu->msi.msg = msg;
 
