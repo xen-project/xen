@@ -20,15 +20,9 @@
  * CPU vendor IDs
  */
 #define X86_VENDOR_INTEL 0
-#define X86_VENDOR_CYRIX 1
-#define X86_VENDOR_AMD 2
-#define X86_VENDOR_UMC 3
-#define X86_VENDOR_NEXGEN 4
-#define X86_VENDOR_CENTAUR 5
-#define X86_VENDOR_RISE 6
-#define X86_VENDOR_TRANSMETA 7
-#define X86_VENDOR_NSC 8
-#define X86_VENDOR_NUM 9
+#define X86_VENDOR_AMD 1
+#define X86_VENDOR_CENTAUR 2
+#define X86_VENDOR_NUM 3
 #define X86_VENDOR_UNKNOWN 0xff
 
 /*
