@@ -98,14 +98,15 @@ static int init_acpi_config(libxl__gc *gc,
     uint32_t domid = dom->guest_domid;
     xc_dominfo_t info;
     struct hvm_info_table *hvminfo;
-    int i, rc = 0;
+    int i, r, rc;
 
     config->dsdt_anycpu = config->dsdt_15cpu = dsdt_pvh;
     config->dsdt_anycpu_len = config->dsdt_15cpu_len = dsdt_pvh_len;
 
-    rc = xc_domain_getinfo(xch, domid, 1, &info);
-    if (rc < 0) {
-        LOG(ERROR, "getdomaininfo failed (rc=%d)", rc);
+    r = xc_domain_getinfo(xch, domid, 1, &info);
+    if (r < 0) {
+        LOG(ERROR, "getdomaininfo failed (rc=%d)", r);
+        rc = ERROR_FAIL;
         goto out;
     }
 
@@ -118,11 +119,12 @@ static int init_acpi_config(libxl__gc *gc,
         struct xen_vmemrange *vmemrange;
         struct acpi_numa *numa = &config->numa;
 
-        rc = xc_domain_getvnuma(xch, domid, &numa->nr_vnodes,
-                                &numa->nr_vmemranges,
-                                &hvminfo->nr_vcpus, NULL, NULL, NULL);
-        if (rc) {
-            LOG(ERROR, "xc_domain_getvnuma failed (rc=%d)", rc);
+        r = xc_domain_getvnuma(xch, domid, &numa->nr_vnodes,
+                               &numa->nr_vmemranges,
+                               &hvminfo->nr_vcpus, NULL, NULL, NULL);
+        if (r) {
+            LOG(ERROR, "xc_domain_getvnuma failed (rc=%d)", r);
+            rc = ERROR_FAIL;
             goto out;
         }
 
@@ -130,11 +132,12 @@ static int init_acpi_config(libxl__gc *gc,
         vdistance = libxl__zalloc(gc, dom->nr_vnodes * sizeof(*vdistance));
         vcpu_to_vnode = libxl__zalloc(gc, hvminfo->nr_vcpus *
                                       sizeof(*vcpu_to_vnode));
-        rc = xc_domain_getvnuma(xch, domid, &numa->nr_vnodes,
-                                &numa->nr_vmemranges, &hvminfo->nr_vcpus,
-                                vmemrange, vdistance, vcpu_to_vnode);
-	if (rc) {
-            LOG(ERROR, "xc_domain_getvnuma failed (rc=%d)", rc);
+        r = xc_domain_getvnuma(xch, domid, &numa->nr_vnodes,
+                               &numa->nr_vmemranges, &hvminfo->nr_vcpus,
+                               vmemrange, vdistance, vcpu_to_vnode);
+        if (r) {
+            LOG(ERROR, "xc_domain_getvnuma failed (rc=%d)", r);
+            rc = ERROR_FAIL;
             goto out;
         }
         numa->vmemrange = vmemrange;
