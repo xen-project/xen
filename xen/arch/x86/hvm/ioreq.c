@@ -156,13 +156,14 @@ bool_t handle_hvm_io_completion(struct vcpu *v)
     {
     case HVMIO_no_completion:
         break;
+
     case HVMIO_mmio_completion:
-        handle_mmio();
-        break;
+        return handle_mmio();
+
     case HVMIO_pio_completion:
-        (void)handle_pio(vio->io_req.addr, vio->io_req.size,
-                         vio->io_req.dir);
-        break;
+        return handle_pio(vio->io_req.addr, vio->io_req.size,
+                          vio->io_req.dir);
+
     case HVMIO_realmode_completion:
     {
         struct hvm_emulate_ctxt ctxt;
