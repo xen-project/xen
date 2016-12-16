@@ -5413,6 +5413,9 @@ x86_emulate(
         if ( rex_prefix & REX_W )
         {
             host_and_vcpu_must_have(cx16);
+            generate_exception_if(!is_aligned(ea.mem.seg, ea.mem.off, 16,
+                                              ctxt, ops),
+                                  EXC_GP, 0);
             op_bytes = 16;
         }
         else
