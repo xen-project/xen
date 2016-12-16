@@ -54,21 +54,10 @@ static void update_domain_cpuid_info(struct domain *d,
     switch ( ctl->input[0] )
     {
     case 0: {
-        union {
-            typeof(boot_cpu_data.x86_vendor_id) str;
-            struct {
-                uint32_t ebx, edx, ecx;
-            } reg;
-        } vendor_id = {
-            .reg = {
-                .ebx = ctl->ebx,
-                .edx = ctl->edx,
-                .ecx = ctl->ecx
-            }
-        };
         int old_vendor = d->arch.x86_vendor;
 
-        d->arch.x86_vendor = get_cpu_vendor(vendor_id.str, gcv_guest);
+        d->arch.x86_vendor = get_cpu_vendor(
+            ctl->ebx, ctl->ecx, ctl->edx, gcv_guest);
 
         if ( is_hvm_domain(d) && (d->arch.x86_vendor != old_vendor) )
         {

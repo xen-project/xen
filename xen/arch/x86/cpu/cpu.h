@@ -1,9 +1,13 @@
 /* attempt to consolidate cpu attributes */
 struct cpu_dev {
-	char	* c_vendor;
+	char	c_vendor[8];
 
-	/* some have two possibilities for cpuid string */
-	char	* c_ident[2];	
+	union {
+		char	c_ident[13];
+		struct {
+			uint32_t b, d, c;
+		};
+	};
 
 	void		(*c_early_init)(struct cpuinfo_x86 *c);
 	void		(*c_init)(struct cpuinfo_x86 * c);
