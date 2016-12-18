@@ -1582,6 +1582,7 @@ x86_emulate(
     union vex vex = {};
     unsigned int op_bytes, def_op_bytes, ad_bytes, def_ad_bytes;
     bool_t lock_prefix = 0;
+    bool_t tf = !!(ctxt->regs->eflags & EFLG_TF);
     int override_seg = -1, rc = X86EMUL_OKAY;
     struct operand src = { .reg = REG_POISON };
     struct operand dst = { .reg = REG_POISON };
@@ -3910,9 +3911,8 @@ x86_emulate(
     }
 
  no_writeback:
-    /* Inject #DB if single-step tracing was enabled at instruction start. */
-    if ( (ctxt->regs->eflags & EFLG_TF) && (rc == X86EMUL_OKAY) &&
-         (ops->inject_hw_exception != NULL) )
+    /* Should a singlestep #DB be raised? */
+    if ( tf && (rc == X86EMUL_OKAY) && (ops->inject_hw_exception != NULL) )
         rc = ops->inject_hw_exception(EXC_DB, -1, ctxt) ? : X86EMUL_EXCEPTION;
 
     /* Commit shadow register state. */
@@ -4142,6 +4142,23 @@ x86_emulate(
         if ( (rc = ops->write_segment(x86_seg_cs, &cs, ctxt)) ||
              (rc = ops->write_segment(x86_seg_ss, &ss, ctxt)) )
             goto done;
+
+        /*
+         * SYSCALL (unlike most instructions) evaluates its singlestep action
+         * based on the resulting EFLG_TF, not the starting EFLG_TF.
+         *
+         * As the #DB is raised after the CPL change and before the OS can
+         * switch stack, it is a large risk for privilege escalation.
+         *
+         * 64bit kernels should mask EFLG_TF in MSR_FMASK to avoid any
+         * vulnerability.  Running the #DB handler on an IST stack is also a
+         * mitigation.
+         *
+         * 32bit kernels have no ability to mask EFLG_TF at all.  Their only
+         * mitigation is to use a task gate for handling #DB (or to not use
+         * enable EFER.SCE to start with).
+         */
+        tf = !!(_regs.eflags & EFLG_TF);
 
         break;
     }
