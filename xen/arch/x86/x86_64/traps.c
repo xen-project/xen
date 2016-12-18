@@ -414,8 +414,8 @@ void subarch_percpu_traps_init(void)
     unmap_domain_page(stub_page);
 
     /* Common SYSCALL parameters. */
-    wrmsr(MSR_STAR, 0, ((unsigned int)FLAT_RING3_CS32 << 16) | __HYPERVISOR_CS);
-    wrmsr(MSR_SYSCALL_MASK, XEN_SYSCALL_MASK, 0U);
+    wrmsrl(MSR_STAR, XEN_MSR_STAR);
+    wrmsrl(MSR_SYSCALL_MASK, XEN_SYSCALL_MASK);
 }
 
 void init_int80_direct_trap(struct vcpu *v)

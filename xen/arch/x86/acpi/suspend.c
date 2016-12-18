@@ -53,8 +53,8 @@ void restore_rest_processor_state(void)
     /* Recover syscall MSRs */
     wrmsrl(MSR_LSTAR, saved_lstar);
     wrmsrl(MSR_CSTAR, saved_cstar);
-    wrmsr(MSR_STAR, 0, (FLAT_RING3_CS32<<16) | __HYPERVISOR_CS);
-    wrmsr(MSR_SYSCALL_MASK, XEN_SYSCALL_MASK, 0U);
+    wrmsrl(MSR_STAR, XEN_MSR_STAR);
+    wrmsrl(MSR_SYSCALL_MASK, XEN_SYSCALL_MASK);
 
     wrfsbase(saved_fs_base);
     wrgsbase(saved_gs_base);

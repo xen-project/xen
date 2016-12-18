@@ -86,6 +86,9 @@
 
 #define XEN_CR4_PV32_BITS (X86_CR4_SMEP|X86_CR4_SMAP)
 
+/* Common SYSCALL parameters. */
+#define XEN_MSR_STAR (((uint64_t)FLAT_RING3_CS32 << 48) |   \
+                      ((uint64_t)__HYPERVISOR_CS << 32))
 #define XEN_SYSCALL_MASK (X86_EFLAGS_AC|X86_EFLAGS_VM|X86_EFLAGS_RF|    \
                           X86_EFLAGS_NT|X86_EFLAGS_DF|X86_EFLAGS_IF|    \
                           X86_EFLAGS_TF)
