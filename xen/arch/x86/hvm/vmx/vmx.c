@@ -360,24 +360,10 @@ static void vmx_vcpu_destroy(struct vcpu *v)
     passive_domain_destroy(v);
 }
 
-static const u32 msr_index[VMX_MSR_COUNT] =
-{
-    [VMX_INDEX_MSR_LSTAR]        = MSR_LSTAR,
-    [VMX_INDEX_MSR_STAR]         = MSR_STAR,
-    [VMX_INDEX_MSR_SYSCALL_MASK] = MSR_SYSCALL_MASK
-};
-
-#define WRITE_MSR(address) do {                                         \
-        guest_msr_state->msrs[VMX_INDEX_MSR_ ## address] = msr_content; \
-        __set_bit(VMX_INDEX_MSR_ ## address, &guest_msr_state->flags);  \
-        wrmsrl(MSR_ ## address, msr_content);                           \
-    } while ( 0 )
-
 static enum handler_return
 long_mode_do_msr_read(unsigned int msr, uint64_t *msr_content)
 {
     struct vcpu *v = current;
-    struct vmx_msr_state *guest_msr_state = &v->arch.hvm_vmx.msr_state;
 
     switch ( msr )
     {
@@ -394,11 +380,11 @@ long_mode_do_msr_read(unsigned int msr, uint64_t *msr_content)
         break;
 
     case MSR_STAR:
-        *msr_content = guest_msr_state->msrs[VMX_INDEX_MSR_STAR];
+        *msr_content = v->arch.hvm_vmx.star;
         break;
 
     case MSR_LSTAR:
-        *msr_content = guest_msr_state->msrs[VMX_INDEX_MSR_LSTAR];
+        *msr_content = v->arch.hvm_vmx.lstar;
         break;
 
     case MSR_CSTAR:
@@ -406,7 +392,7 @@ long_mode_do_msr_read(unsigned int msr, uint64_t *msr_content)
         break;
 
     case MSR_SYSCALL_MASK:
-        *msr_content = guest_msr_state->msrs[VMX_INDEX_MSR_SYSCALL_MASK];
+        *msr_content = v->arch.hvm_vmx.sfmask;
         break;
 
     default:
@@ -422,7 +408,6 @@ static enum handler_return
 long_mode_do_msr_write(unsigned int msr, uint64_t msr_content)
 {
     struct vcpu *v = current;
-    struct vmx_msr_state *guest_msr_state = &v->arch.hvm_vmx.msr_state;
 
     HVM_DBG_LOG(DBG_LEVEL_MSR, "msr %#x content %#"PRIx64, msr, msr_content);
 
@@ -444,13 +429,15 @@ long_mode_do_msr_write(unsigned int msr, uint64_t msr_content)
         break;
 
     case MSR_STAR:
-        WRITE_MSR(STAR);
+        v->arch.hvm_vmx.star = msr_content;
+        wrmsrl(MSR_STAR, msr_content);
         break;
 
     case MSR_LSTAR:
         if ( !is_canonical_address(msr_content) )
             goto uncanonical_address;
-        WRITE_MSR(LSTAR);
+        v->arch.hvm_vmx.lstar = msr_content;
+        wrmsrl(MSR_LSTAR, msr_content);
         break;
 
     case MSR_CSTAR:
@@ -460,7 +447,8 @@ long_mode_do_msr_write(unsigned int msr, uint64_t msr_content)
         break;
 
     case MSR_SYSCALL_MASK:
-        WRITE_MSR(SYSCALL_MASK);
+        v->arch.hvm_vmx.sfmask = msr_content;
+        wrmsrl(MSR_SYSCALL_MASK, msr_content);
         break;
 
     default:
@@ -500,26 +488,10 @@ static void vmx_save_guest_msrs(struct vcpu *v)
 
 static void vmx_restore_guest_msrs(struct vcpu *v)
 {
-    struct vmx_msr_state *guest_msr_state;
-    unsigned long guest_flags;
-    int i;
-
-    guest_msr_state = &v->arch.hvm_vmx.msr_state;
-
     wrmsrl(MSR_SHADOW_GS_BASE, v->arch.hvm_vmx.shadow_gs);
-
-    guest_flags = guest_msr_state->flags;
-
-    while ( guest_flags )
-    {
-        i = find_first_set_bit(guest_flags);
-
-        HVM_DBG_LOG(DBG_LEVEL_2,
-                    "restore guest's index %d msr %x with value %lx",
-                    i, msr_index[i], guest_msr_state->msrs[i]);
-        wrmsrl(msr_index[i], guest_msr_state->msrs[i]);
-        __clear_bit(i, &guest_flags);
-    }
+    wrmsrl(MSR_STAR,           v->arch.hvm_vmx.star);
+    wrmsrl(MSR_LSTAR,          v->arch.hvm_vmx.lstar);
+    wrmsrl(MSR_SYSCALL_MASK,   v->arch.hvm_vmx.sfmask);
 
     if ( (v->arch.hvm_vcpu.guest_efer ^ read_efer()) & EFER_SCE )
     {
@@ -757,30 +729,21 @@ static int vmx_vmcs_restore(struct vcpu *v, struct hvm_hw_cpu *c)
 
 static void vmx_save_cpu_state(struct vcpu *v, struct hvm_hw_cpu *data)
 {
-    struct vmx_msr_state *guest_state = &v->arch.hvm_vmx.msr_state;
-
-    data->shadow_gs = v->arch.hvm_vmx.shadow_gs;
-    data->msr_cstar = v->arch.hvm_vmx.cstar;
-
-    /* save msrs */
+    data->shadow_gs        = v->arch.hvm_vmx.shadow_gs;
     data->msr_flags        = 0;
-    data->msr_lstar        = guest_state->msrs[VMX_INDEX_MSR_LSTAR];
-    data->msr_star         = guest_state->msrs[VMX_INDEX_MSR_STAR];
-    data->msr_syscall_mask = guest_state->msrs[VMX_INDEX_MSR_SYSCALL_MASK];
+    data->msr_lstar        = v->arch.hvm_vmx.lstar;
+    data->msr_star         = v->arch.hvm_vmx.star;
+    data->msr_cstar        = v->arch.hvm_vmx.cstar;
+    data->msr_syscall_mask = v->arch.hvm_vmx.sfmask;
 }
 
 static void vmx_load_cpu_state(struct vcpu *v, struct hvm_hw_cpu *data)
 {
-    struct vmx_msr_state *guest_state = &v->arch.hvm_vmx.msr_state;
-
-    /* restore msrs */
-    guest_state->flags = ((1u << VMX_MSR_COUNT) - 1);
-    guest_state->msrs[VMX_INDEX_MSR_LSTAR]        = data->msr_lstar;
-    guest_state->msrs[VMX_INDEX_MSR_STAR]         = data->msr_star;
-    guest_state->msrs[VMX_INDEX_MSR_SYSCALL_MASK] = data->msr_syscall_mask;
-
-    v->arch.hvm_vmx.cstar     = data->msr_cstar;
     v->arch.hvm_vmx.shadow_gs = data->shadow_gs;
+    v->arch.hvm_vmx.star      = data->msr_star;
+    v->arch.hvm_vmx.lstar     = data->msr_lstar;
+    v->arch.hvm_vmx.cstar     = data->msr_cstar;
+    v->arch.hvm_vmx.sfmask    = data->msr_syscall_mask;
 }
 
 

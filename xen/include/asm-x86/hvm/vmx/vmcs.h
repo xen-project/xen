@@ -39,19 +39,6 @@ struct vmx_msr_entry {
     u64 data;
 };
 
-enum {
-    VMX_INDEX_MSR_LSTAR = 0,
-    VMX_INDEX_MSR_STAR,
-    VMX_INDEX_MSR_SYSCALL_MASK,
-
-    VMX_MSR_COUNT
-};
-
-struct vmx_msr_state {
-    unsigned long flags;
-    unsigned long msrs[VMX_MSR_COUNT];
-};
-
 #define EPT_DEFAULT_MT      MTRR_TYPE_WRBACK
 
 struct ept_data {
@@ -123,9 +110,11 @@ struct arch_vmx_struct {
     u32                  secondary_exec_control;
     u32                  exception_bitmap;
 
-    struct vmx_msr_state msr_state;
-    unsigned long        shadow_gs;
-    unsigned long        cstar;
+    uint64_t             shadow_gs;
+    uint64_t             star;
+    uint64_t             lstar;
+    uint64_t             cstar;
+    uint64_t             sfmask;
 
     unsigned long       *msr_bitmap;
     unsigned int         msr_count;
