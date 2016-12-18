@@ -360,8 +360,6 @@ static void vmx_vcpu_destroy(struct vcpu *v)
     passive_domain_destroy(v);
 }
 
-static DEFINE_PER_CPU(struct vmx_msr_state, host_msr_state);
-
 static const u32 msr_index[VMX_MSR_COUNT] =
 {
     [VMX_INDEX_MSR_LSTAR]        = MSR_LSTAR,
@@ -369,23 +367,10 @@ static const u32 msr_index[VMX_MSR_COUNT] =
     [VMX_INDEX_MSR_SYSCALL_MASK] = MSR_SYSCALL_MASK
 };
 
-void vmx_save_host_msrs(void)
-{
-    struct vmx_msr_state *host_msr_state = &this_cpu(host_msr_state);
-    unsigned int i;
-
-    for ( i = 0; i < ARRAY_SIZE(msr_index); i++ )
-    {
-        ASSERT(msr_index[i]);
-        rdmsrl(msr_index[i], host_msr_state->msrs[i]);
-    }
-}
-
 #define WRITE_MSR(address) do {                                         \
         guest_msr_state->msrs[VMX_INDEX_MSR_ ## address] = msr_content; \
         __set_bit(VMX_INDEX_MSR_ ## address, &guest_msr_state->flags);  \
         wrmsrl(MSR_ ## address, msr_content);                           \
-        __set_bit(VMX_INDEX_MSR_ ## address, &host_msr_state->flags);   \
     } while ( 0 )
 
 static enum handler_return
@@ -438,7 +423,6 @@ long_mode_do_msr_write(unsigned int msr, uint64_t msr_content)
 {
     struct vcpu *v = current;
     struct vmx_msr_state *guest_msr_state = &v->arch.hvm_vmx.msr_state;
-    struct vmx_msr_state *host_msr_state = &this_cpu(host_msr_state);
 
     HVM_DBG_LOG(DBG_LEVEL_MSR, "msr %#x content %#"PRIx64, msr, msr_content);
 
@@ -499,15 +483,10 @@ long_mode_do_msr_write(unsigned int msr, uint64_t msr_content)
  */
 static void vmx_restore_host_msrs(void)
 {
-    struct vmx_msr_state *host_msr_state = &this_cpu(host_msr_state);
-    int i;
-
-    while ( host_msr_state->flags )
-    {
-        i = find_first_set_bit(host_msr_state->flags);
-        wrmsrl(msr_index[i], host_msr_state->msrs[i]);
-        __clear_bit(i, &host_msr_state->flags);
-    }
+    /* Relies on the SYSCALL trampoline being at the start of the stubs. */
+    wrmsrl(MSR_STAR,         XEN_MSR_STAR);
+    wrmsrl(MSR_LSTAR,        this_cpu(stubs.addr));
+    wrmsrl(MSR_SYSCALL_MASK, XEN_SYSCALL_MASK);
 }
 
 static void vmx_save_guest_msrs(struct vcpu *v)
@@ -521,12 +500,11 @@ static void vmx_save_guest_msrs(struct vcpu *v)
 
 static void vmx_restore_guest_msrs(struct vcpu *v)
 {
-    struct vmx_msr_state *guest_msr_state, *host_msr_state;
+    struct vmx_msr_state *guest_msr_state;
     unsigned long guest_flags;
     int i;
 
     guest_msr_state = &v->arch.hvm_vmx.msr_state;
-    host_msr_state = &this_cpu(host_msr_state);
 
     wrmsrl(MSR_SHADOW_GS_BASE, v->arch.hvm_vmx.shadow_gs);
 
@@ -539,7 +517,6 @@ static void vmx_restore_guest_msrs(struct vcpu *v)
         HVM_DBG_LOG(DBG_LEVEL_2,
                     "restore guest's index %d msr %x with value %lx",
                     i, msr_index[i], guest_msr_state->msrs[i]);
-        __set_bit(i, &host_msr_state->flags);
         wrmsrl(msr_index[i], guest_msr_state->msrs[i]);
         __clear_bit(i, &guest_flags);
     }

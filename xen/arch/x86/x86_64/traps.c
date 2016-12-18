@@ -386,7 +386,11 @@ void subarch_percpu_traps_init(void)
 
     stub_page = map_domain_page(_mfn(this_cpu(stubs.mfn)));
 
-    /* Trampoline for SYSCALL entry from 64-bit mode. */
+    /*
+     * Trampoline for SYSCALL entry from 64-bit mode.  The VT-x HVM vcpu
+     * context switch logic relies on the SYSCALL trampoline being at the
+     * start of the stubs.
+     */
     wrmsrl(MSR_LSTAR, stub_va);
     offset = write_stub_trampoline(stub_page + (stub_va & ~PAGE_MASK),
                                    stub_va, stack_bottom,
