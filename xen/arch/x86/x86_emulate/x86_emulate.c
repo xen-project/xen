@@ -2502,6 +2502,7 @@ x86_emulate(
     struct x86_emulate_state state;
     int rc;
     uint8_t b, d;
+    bool singlestep = ctxt->regs->eflags & EFLG_TF;
     struct operand src = { .reg = PTR_POISON };
     struct operand dst = { .reg = PTR_POISON };
     enum x86_swint_type swint_type;
@@ -4678,6 +4679,23 @@ x86_emulate(
              (rc = ops->write_segment(x86_seg_ss, &sreg, ctxt)) )
             goto done;
 
+        /*
+         * SYSCALL (unlike most instructions) evaluates its singlestep action
+         * based on the resulting EFLG_TF, not the starting EFLG_TF.
+         *
+         * As the #DB is raised after the CPL change and before the OS can
+         * switch stack, it is a large risk for privilege escalation.
+         *
+         * 64bit kernels should mask EFLG_TF in MSR_FMASK to avoid any
+         * vulnerability.  Running the #DB handler on an IST stack is also a
+         * mitigation.
+         *
+         * 32bit kernels have no ability to mask EFLG_TF at all.  Their only
+         * mitigation is to use a task gate for handling #DB (or to not use
+         * enable EFER.SCE to start with).
+         */
+        singlestep = _regs.eflags & EFLG_TF;
+
         break;
     }
 
@@ -5580,9 +5598,9 @@ x86_emulate(
     if ( !mode_64bit() )
         _regs.eip = (uint32_t)_regs.eip;
 
-    /* Was singestepping active at the start of this instruction? */
-    if ( (rc == X86EMUL_OKAY) && (ctxt->regs->eflags & EFLG_TF) )
-        ctxt->retire.singlestep = true;
+    /* Should a singlestep #DB be raised? */
+    if ( rc == X86EMUL_OKAY )
+        ctxt->retire.singlestep = singlestep;
 
     if ( rc != X86EMUL_DONE )
         *ctxt->regs = _regs;
