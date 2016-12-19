@@ -29,7 +29,7 @@ xendriverdomain_startcmd()
 {
 	printf "Starting xenservices: xl devd."
 
-	${sbindir}/xl devd --pidfile=$XLDEVD_PIDFILE ${XLDEVD_ARGS}
+	PATH="${bindir}:${sbindir}:$PATH" ${sbindir}/xl devd --pidfile ${XLDEVD_PIDFILE} ${XLDEVD_ARGS}
 
 	printf "\n"
 }
