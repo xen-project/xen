@@ -141,7 +141,7 @@ unsigned clear_user(void __user *to, unsigned n)
             _ASM_EXTABLE(0b,3b)
             _ASM_EXTABLE(1b,2b)
             : [cnt] "=&c" (n), [to] "+D" (to)
-            : [bytes] "g" (n & (BYTES_PER_LONG - 1)),
+            : [bytes] "r" (n & (BYTES_PER_LONG - 1)),
               [longs] "0" (n / BYTES_PER_LONG), "a" (0) );
         clac();
     }
