@@ -13,19 +13,13 @@ LD_LIBRARY_PATH="${libdir}"
 export LD_LIBRARY_PATH
 
 name="xendriverdomain"
-start_precmd="xendriverdomain_precmd"
-start_cmd="xendriverdomain_startcmd"
+start_cmd="xendriverdomain_start"
 stop_cmd="xendriverdomain_stop"
 extra_commands=""
 
 XLDEVD_PIDFILE="@XEN_RUN_DIR@/xldevd.pid"
 
-xendriverdomain_precmd()
-{
-	:
-}
-
-xendriverdomain_startcmd()
+xendriverdomain_start()
 {
 	printf "Starting xenservices: xl devd."
 
