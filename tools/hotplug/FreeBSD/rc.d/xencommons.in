@@ -11,6 +11,7 @@ LD_LIBRARY_PATH="${libdir}"
 export LD_LIBRARY_PATH
 
 name="xencommons"
+rcvar="xencommons_enable"
 start_precmd="xen_precmd"
 start_cmd="xen_startcmd"
 stop_cmd="xen_stop"
@@ -22,6 +23,9 @@ XENSTORED_PIDFILE="@XEN_RUN_DIR@/xenstored.pid"
 XENCONSOLED_PIDFILE="@XEN_RUN_DIR@/xenconsoled.pid"
 #XENCONSOLED_TRACE="@XEN_LOG_DIR@/xenconsole-trace.log"
 #XENSTORED_TRACE="@XEN_LOG_DIR@/xen/xenstore-trace.log"
+
+load_rc_config $name
+: ${xencommons_enable:=no}
 
 xen_precmd()
 {
@@ -116,5 +120,4 @@ xen_status()
 	fi
 }
 
-load_rc_config $name
 run_rc_command "$1"
