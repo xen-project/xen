@@ -4703,8 +4703,8 @@ x86_emulate(
     case X86EMUL_OPC(0x0f, 0x06): /* clts */
         generate_exception_if(!mode_ring0(), EXC_GP, 0);
         fail_if((ops->read_cr == NULL) || (ops->write_cr == NULL));
-        if ( (rc = ops->read_cr(0, &dst.val, ctxt)) ||
-             (rc = ops->write_cr(0, dst.val&~8, ctxt)) )
+        if ( (rc = ops->read_cr(0, &dst.val, ctxt)) != X86EMUL_OKAY ||
+             (rc = ops->write_cr(0, dst.val & ~CR0_TS, ctxt)) != X86EMUL_OKAY )
             goto done;
         break;
 
