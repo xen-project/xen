@@ -4002,13 +4002,15 @@ gp_fault:
 
 void hvm_ud_intercept(struct cpu_user_regs *regs)
 {
+    struct vcpu *cur = current;
+    bool should_emulate =
+        cur->domain->arch.x86_vendor != boot_cpu_data.x86_vendor;
     struct hvm_emulate_ctxt ctxt;
 
     hvm_emulate_init_once(&ctxt, regs);
 
     if ( opt_hvm_fep )
     {
-        struct vcpu *cur = current;
         const struct segment_register *cs = &ctxt.seg_reg[x86_seg_cs];
         uint32_t walk = (ctxt.seg_reg[x86_seg_ss].attr.fields.dpl == 3)
             ? PFEC_user_mode : 0;
@@ -4032,7 +4034,15 @@ void hvm_ud_intercept(struct cpu_user_regs *regs)
                 regs->eip = regs->_eip;
 
             add_taint(TAINT_HVM_FEP);
+
+            should_emulate = true;
         }
+    }
+
+    if ( !should_emulate )
+    {
+        hvm_inject_hw_exception(TRAP_invalid_op, X86_EVENT_NO_EC);
+        return;
     }
 
     switch ( hvm_emulate_one(&ctxt) )
