@@ -13,11 +13,15 @@ LD_LIBRARY_PATH="${libdir}"
 export LD_LIBRARY_PATH
 
 name="xendriverdomain"
+rcvar="xendriverdomain_enable"
 start_cmd="xendriverdomain_start"
 stop_cmd="xendriverdomain_stop"
 extra_commands=""
 
 XLDEVD_PIDFILE="/var/run/xldevd.pid"
+
+load_rc_config $name
+: ${xendriverdomain_enable:=no}
 
 xendriverdomain_start()
 {
@@ -38,5 +42,4 @@ xendriverdomain_stop()
 	wait_for_pids $rc_pids
 }
 
-load_rc_config $name
 run_rc_command "$1"
