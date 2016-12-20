@@ -1388,7 +1388,8 @@ int nvmx_handle_vmxon(struct cpu_user_regs *regs)
         return X86EMUL_OKAY;
     }
 
-    if ( (gpa & ~PAGE_MASK) || (gpa >> v->domain->arch.paging.gfn_bits) )
+    if ( (gpa & ~PAGE_MASK) ||
+         (gpa >> (v->domain->arch.paging.gfn_bits + PAGE_SHIFT)) )
     {
         vmreturn(regs, VMFAIL_INVALID);
         return X86EMUL_OKAY;
