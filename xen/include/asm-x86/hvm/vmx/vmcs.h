@@ -574,9 +574,18 @@ enum vmcs_field {
 #define VMX_GUEST_MSR 0
 #define VMX_HOST_MSR  1
 
-/* VM Instruction error numbers. */
-#define VMX_INSN_INVALID_CONTROL_STATE       7
-#define VMX_INSN_INVALID_HOST_STATE          8
+/* VM Instruction error numbers */
+enum vmx_insn_errno
+{
+    VMX_INSN_VMCLEAR_INVALID_PHYADDR       = 2,
+    VMX_INSN_VMLAUNCH_NONCLEAR_VMCS        = 4,
+    VMX_INSN_VMRESUME_NONLAUNCHED_VMCS     = 5,
+    VMX_INSN_INVALID_CONTROL_STATE         = 7,
+    VMX_INSN_INVALID_HOST_STATE            = 8,
+    VMX_INSN_VMPTRLD_INVALID_PHYADDR       = 9,
+    VMX_INSN_UNSUPPORTED_VMCS_COMPONENT    = 12,
+    VMX_INSN_VMXON_IN_VMX_ROOT             = 15,
+};
 
 void vmx_disable_intercept_for_msr(struct vcpu *v, u32 msr, int type);
 void vmx_enable_intercept_for_msr(struct vcpu *v, u32 msr, int type);

@@ -53,6 +53,10 @@
 #define X86_EFLAGS_VIP	0x00100000 /* Virtual Interrupt Pending */
 #define X86_EFLAGS_ID	0x00200000 /* CPUID detection flag */
 
+#define X86_EFLAGS_ARITH_MASK                          \
+    (X86_EFLAGS_CF | X86_EFLAGS_PF | X86_EFLAGS_AF |   \
+     X86_EFLAGS_ZF | X86_EFLAGS_SF | X86_EFLAGS_OF)
+
 /*
  * Intel CPU flags in CR0
  */

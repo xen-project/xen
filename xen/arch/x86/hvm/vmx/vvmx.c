@@ -469,28 +469,33 @@ gp_fault:
     return X86EMUL_EXCEPTION;
 }
 
-static void vmreturn(struct cpu_user_regs *regs, enum vmx_ops_result ops_res)
+static void vmsucceed(struct cpu_user_regs *regs)
+{
+    regs->eflags &= ~X86_EFLAGS_ARITH_MASK;
+}
+
+static void vmfail_valid(struct cpu_user_regs *regs, enum vmx_insn_errno errno)
+{
+    struct vcpu *v = current;
+    unsigned long eflags = regs->eflags;
+
+    regs->eflags = (eflags & ~X86_EFLAGS_ARITH_MASK) | X86_EFLAGS_ZF;
+    set_vvmcs(v, VM_INSTRUCTION_ERROR, errno);
+}
+
+static void vmfail_invalid(struct cpu_user_regs *regs)
 {
     unsigned long eflags = regs->eflags;
-    unsigned long mask = X86_EFLAGS_CF | X86_EFLAGS_PF | X86_EFLAGS_AF |
-                         X86_EFLAGS_ZF | X86_EFLAGS_SF | X86_EFLAGS_OF;
 
-    eflags &= ~mask;
+    regs->eflags = (eflags & ~X86_EFLAGS_ARITH_MASK) | X86_EFLAGS_CF;
+}
 
-    switch ( ops_res ) {
-    case VMSUCCEED:
-        break;
-    case VMFAIL_VALID:
-        /* TODO: error number, useful for guest VMM debugging */
-        eflags |= X86_EFLAGS_ZF;
-        break;
-    case VMFAIL_INVALID:
-    default:
-        eflags |= X86_EFLAGS_CF;
-        break;
-    }
-
-    regs->eflags = eflags;
+static void vmfail(struct cpu_user_regs *regs, enum vmx_insn_errno errno)
+{
+    if ( vcpu_nestedhvm(current).nv_vvmcxaddr != INVALID_PADDR )
+        vmfail_valid(regs, errno);
+    else
+        vmfail_invalid(regs);
 }
 
 bool_t nvmx_intercepts_exception(
@@ -1328,7 +1333,7 @@ static void virtual_vmexit(struct cpu_user_regs *regs)
         nvmx_update_apicv(v);
 
     nvcpu->nv_vmswitch_in_progress = 0;
-    vmreturn(regs, VMSUCCEED);
+    vmsucceed(regs);
 }
 
 void nvmx_switch_guest(void)
@@ -1382,16 +1387,14 @@ int nvmx_handle_vmxon(struct cpu_user_regs *regs)
 
     if ( nvmx_vcpu_in_vmx(v) )
     {
-        vmreturn(regs,
-                 nvcpu->nv_vvmcxaddr != INVALID_PADDR ?
-                 VMFAIL_VALID : VMFAIL_INVALID);
+        vmfail(regs, VMX_INSN_VMXON_IN_VMX_ROOT);
         return X86EMUL_OKAY;
     }
 
     if ( (gpa & ~PAGE_MASK) ||
          (gpa >> (v->domain->arch.paging.gfn_bits + PAGE_SHIFT)) )
     {
-        vmreturn(regs, VMFAIL_INVALID);
+        vmfail_invalid(regs);
         return X86EMUL_OKAY;
     }
 
@@ -1400,7 +1403,7 @@ int nvmx_handle_vmxon(struct cpu_user_regs *regs)
          (nvmcs_revid & ~VMX_BASIC_REVISION_MASK) ||
          ((nvmcs_revid ^ vmx_basic_msr) & VMX_BASIC_REVISION_MASK) )
     {
-        vmreturn(regs, VMFAIL_INVALID);
+        vmfail_invalid(regs);
         return X86EMUL_OKAY;
     }
 
@@ -1416,7 +1419,7 @@ int nvmx_handle_vmxon(struct cpu_user_regs *regs)
                      _mfn(PFN_DOWN(v->arch.hvm_vmx.vmcs_pa)));
     __vmptrld(v->arch.hvm_vmx.vmcs_pa);
     v->arch.hvm_vmx.launched = 0;
-    vmreturn(regs, VMSUCCEED);
+    vmsucceed(regs);
 
     return X86EMUL_OKAY;
 }
@@ -1434,7 +1437,7 @@ int nvmx_handle_vmxoff(struct cpu_user_regs *regs)
     nvmx_purge_vvmcs(v);
     nvmx->vmxon_region_pa = INVALID_PADDR;
 
-    vmreturn(regs, VMSUCCEED);
+    vmsucceed(regs);
     return X86EMUL_OKAY;
 }
 
@@ -1505,7 +1508,7 @@ static int nvmx_vmresume(struct vcpu *v, struct cpu_user_regs *regs)
             !(__n2_exec_control(v) & CPU_BASED_ACTIVATE_IO_BITMAP) ) )
         nvcpu->nv_vmentry_pending = 1;
     else
-        vmreturn(regs, VMFAIL_INVALID);
+        vmfail_invalid(regs);
 
     return X86EMUL_OKAY;
 }
@@ -1522,15 +1525,16 @@ int nvmx_handle_vmresume(struct cpu_user_regs *regs)
 
     if ( vcpu_nestedhvm(v).nv_vvmcxaddr == INVALID_PADDR )
     {
-        vmreturn (regs, VMFAIL_INVALID);
+        vmfail_invalid(regs);
         return X86EMUL_OKAY;        
     }
 
     launched = vvmcs_launched(&nvmx->launched_list,
                               PFN_DOWN(v->arch.hvm_vmx.vmcs_shadow_maddr));
-    if ( !launched ) {
-       vmreturn (regs, VMFAIL_VALID);
-       return X86EMUL_OKAY;
+    if ( !launched )
+    {
+        vmfail_valid(regs, VMX_INSN_VMRESUME_NONLAUNCHED_VMCS);
+        return X86EMUL_OKAY;
     }
     return nvmx_vmresume(v,regs);
 }
@@ -1547,15 +1551,16 @@ int nvmx_handle_vmlaunch(struct cpu_user_regs *regs)
 
     if ( vcpu_nestedhvm(v).nv_vvmcxaddr == INVALID_PADDR )
     {
-        vmreturn (regs, VMFAIL_INVALID);
+        vmfail_invalid(regs);
         return X86EMUL_OKAY;
     }
 
     launched = vvmcs_launched(&nvmx->launched_list,
                               PFN_DOWN(v->arch.hvm_vmx.vmcs_shadow_maddr));
-    if ( launched ) {
-       vmreturn (regs, VMFAIL_VALID);
-       return X86EMUL_OKAY;
+    if ( launched )
+    {
+        vmfail_valid(regs, VMX_INSN_VMLAUNCH_NONCLEAR_VMCS);
+        return X86EMUL_OKAY;
     }
     else {
         rc = nvmx_vmresume(v,regs);
@@ -1583,7 +1588,7 @@ int nvmx_handle_vmptrld(struct cpu_user_regs *regs)
 
     if ( gpa == vcpu_2_nvmx(v).vmxon_region_pa || gpa & 0xfff )
     {
-        vmreturn(regs, VMFAIL_INVALID);
+        vmfail_invalid(regs);
         goto out;
     }
 
@@ -1614,7 +1619,7 @@ int nvmx_handle_vmptrld(struct cpu_user_regs *regs)
              !map_io_bitmap_all(v) ||
              !_map_msr_bitmap(v) )
         {
-            vmreturn(regs, VMFAIL_VALID);
+            vmfail_valid(regs, VMX_INSN_VMPTRLD_INVALID_PHYADDR);
             goto out;
         }
     }
@@ -1622,7 +1627,7 @@ int nvmx_handle_vmptrld(struct cpu_user_regs *regs)
     if ( cpu_has_vmx_vmcs_shadowing )
         nvmx_set_vmcs_pointer(v, nvcpu->nv_vvmcx);
 
-    vmreturn(regs, VMSUCCEED);
+    vmsucceed(regs);
 
 out:
     return X86EMUL_OKAY;
@@ -1649,7 +1654,7 @@ int nvmx_handle_vmptrst(struct cpu_user_regs *regs)
     if ( rc != HVMCOPY_okay )
         return X86EMUL_EXCEPTION;
 
-    vmreturn(regs, VMSUCCEED);
+    vmsucceed(regs);
     return X86EMUL_OKAY;
 }
 
@@ -1695,7 +1700,12 @@ int nvmx_handle_vmclear(struct cpu_user_regs *regs)
         }
     }
 
-    vmreturn(regs, rc);
+    if ( rc == VMSUCCEED )
+        vmsucceed(regs);
+    else if ( rc == VMFAIL_VALID )
+        vmfail_valid(regs, VMX_INSN_VMCLEAR_INVALID_PHYADDR);
+    else
+        vmfail_invalid(regs);
 
     return X86EMUL_OKAY;
 }
@@ -1727,7 +1737,7 @@ int nvmx_handle_vmread(struct cpu_user_regs *regs)
         break;
     }
 
-    vmreturn(regs, VMSUCCEED);
+    vmsucceed(regs);
     return X86EMUL_OKAY;
 }
 
@@ -1759,7 +1769,10 @@ int nvmx_handle_vmwrite(struct cpu_user_regs *regs)
         break;
     }
 
-    vmreturn(regs, okay ? VMSUCCEED : VMFAIL_VALID);
+    if ( okay )
+        vmsucceed(regs);
+    else
+        vmfail_valid(regs, VMX_INSN_UNSUPPORTED_VMCS_COMPONENT);
 
     return X86EMUL_OKAY;
 }
@@ -1790,10 +1803,10 @@ int nvmx_handle_invept(struct cpu_user_regs *regs)
         __invept(INVEPT_ALL_CONTEXT, 0, 0);
         break;
     default:
-        vmreturn(regs, VMFAIL_INVALID);
+        vmfail_invalid(regs);
         return X86EMUL_OKAY;
     }
-    vmreturn(regs, VMSUCCEED);
+    vmsucceed(regs);
     return X86EMUL_OKAY;
 }
 
@@ -1815,11 +1828,11 @@ int nvmx_handle_invvpid(struct cpu_user_regs *regs)
         hvm_asid_flush_vcpu_asid(&vcpu_nestedhvm(current).nv_n2asid);
         break;
     default:
-        vmreturn(regs, VMFAIL_INVALID);
+        vmfail_invalid(regs);
         return X86EMUL_OKAY;
     }
 
-    vmreturn(regs, VMSUCCEED);
+    vmsucceed(regs);
     return X86EMUL_OKAY;
 }
 
