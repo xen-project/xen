@@ -54,7 +54,6 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <sys/param.h>
-#include <sys/sysctl.h>
 #include <unistd.h>
 #include <sys/stat.h>
 
