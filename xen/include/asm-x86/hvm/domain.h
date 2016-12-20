@@ -102,6 +102,16 @@ struct hvm_domain {
     struct hvm_vioapic    *vioapic;
     struct hvm_hw_stdvga   stdvga;
 
+    /*
+     * hvm_hw_pmtimer is a publicly-visible name. We will defer renaming
+     * it to the more appropriate hvm_hw_acpi until the expected
+     * comprehensive rewrte of migration code, thus avoiding code churn
+     * in public header files.
+     * Internally, however, we will be using hvm_hw_acpi.
+     */
+#define hvm_hw_acpi hvm_hw_pmtimer
+    struct hvm_hw_acpi     acpi;
+
     /* VCPU which is current target for 8259 interrupts. */
     struct vcpu           *i8259_target;
 
