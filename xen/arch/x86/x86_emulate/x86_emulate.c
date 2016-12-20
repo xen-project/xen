@@ -1290,6 +1290,7 @@ static bool vcpu_has(
 
 #define vcpu_has_fpu()         vcpu_has(         1, EDX,  0, ctxt, ops)
 #define vcpu_has_sep()         vcpu_has(         1, EDX, 11, ctxt, ops)
+#define vcpu_has_cx8()         vcpu_has(         1, EDX,  8, ctxt, ops)
 #define vcpu_has_cmov()        vcpu_has(         1, EDX, 15, ctxt, ops)
 #define vcpu_has_clflush()     vcpu_has(         1, EDX, 19, ctxt, ops)
 #define vcpu_has_mmx()         vcpu_has(         1, EDX, 23, ctxt, ops)
@@ -5427,7 +5428,10 @@ x86_emulate(
             op_bytes = 16;
         }
         else
+        {
+            vcpu_must_have(cx8);
             op_bytes = 8;
+        }
 
         old = container_of(&mmvalp->ymm[0], typeof(*old), u64[0]);
         aux = container_of(&mmvalp->ymm[2], typeof(*aux), u64[0]);
