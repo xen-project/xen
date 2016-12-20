@@ -1260,7 +1260,6 @@ vhd_journal_create(vhd_journal_t *j, const char *file, const char *jfile)
 	int i, err;
 	size_t size;
 	off_t off;
-	struct stat stats;
 
 	memset(j, 0, sizeof(vhd_journal_t));
 	j->jfd = -1;
