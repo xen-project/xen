@@ -31,6 +31,10 @@ struct acpi_20_facs Facs = {
  * Fixed ACPI Description Table (FADT).
  */
 
+/*
+ * These values must match register definitions in struct hvm_hw_acpi
+ * (in xen/include/public/arch-x86/hvm/save.h).
+ */
 #define ACPI_PM1A_EVT_BLK_BIT_WIDTH         0x20
 #define ACPI_PM1A_EVT_BLK_BIT_OFFSET        0x00
 #define ACPI_PM1A_CNT_BLK_BIT_WIDTH         0x10

@@ -291,6 +291,13 @@ struct xen_arch_domainconfig {
                                      XEN_X86_EMU_PIT)
     uint32_t emulation_flags;
 };
+
+/* Location of online VCPU bitmap. */
+#define XEN_ACPI_CPU_MAP             0xaf00
+#define XEN_ACPI_CPU_MAP_LEN         ((HVM_MAX_VCPUS + 7) / 8)
+
+/* GPE0 bit set during CPU hotplug */
+#define XEN_ACPI_GPE0_CPUHP_BIT      2
 #endif
 
 #endif /* !__ASSEMBLY__ */

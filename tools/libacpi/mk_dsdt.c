@@ -18,6 +18,7 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #if defined(CONFIG_X86)
+#include <xen/arch-x86/xen.h>
 #include <xen/hvm/hvm_info_table.h>
 #elif defined(CONFIG_ARM_64)
 #include <xen/arch-arm.h>
@@ -244,7 +245,8 @@ int main(int argc, char **argv)
 #endif
 
     /* Operation Region 'PRST': bitmask of online CPUs. */
-    stmt("OperationRegion", "PRST, SystemIO, 0xaf00, 32");
+    stmt("OperationRegion", "PRST, SystemIO, %#x, %d",
+        XEN_ACPI_CPU_MAP, XEN_ACPI_CPU_MAP_LEN);
     push_block("Field", "PRST, ByteAcc, NoLock, Preserve");
     indent(); printf("PRS, %u\n", max_cpus);
     pop_block();
@@ -283,7 +285,8 @@ int main(int argc, char **argv)
     /* Define GPE control method. */
     push_block("Scope", "\\_GPE");
     push_block("Method",
-               dm_version == QEMU_XEN_TRADITIONAL ? "_L02" : "_E02");
+               dm_version == QEMU_XEN_TRADITIONAL ? "_L%02d" : "_E%02d",
+               XEN_ACPI_GPE0_CPUHP_BIT);
     stmt("\\_SB.PRSC ()", NULL);
     pop_block();
     pop_block();
