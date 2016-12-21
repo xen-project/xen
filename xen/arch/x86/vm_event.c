@@ -112,14 +112,14 @@ void vm_event_set_registers(struct vcpu *v, vm_event_response_t *rsp)
 {
     ASSERT(atomic_read(&v->vm_event_pause_count));
 
-    v->arch.user_regs.eax = rsp->data.regs.x86.rax;
-    v->arch.user_regs.ebx = rsp->data.regs.x86.rbx;
-    v->arch.user_regs.ecx = rsp->data.regs.x86.rcx;
-    v->arch.user_regs.edx = rsp->data.regs.x86.rdx;
-    v->arch.user_regs.esp = rsp->data.regs.x86.rsp;
-    v->arch.user_regs.ebp = rsp->data.regs.x86.rbp;
-    v->arch.user_regs.esi = rsp->data.regs.x86.rsi;
-    v->arch.user_regs.edi = rsp->data.regs.x86.rdi;
+    v->arch.user_regs.rax = rsp->data.regs.x86.rax;
+    v->arch.user_regs.rbx = rsp->data.regs.x86.rbx;
+    v->arch.user_regs.rcx = rsp->data.regs.x86.rcx;
+    v->arch.user_regs.rdx = rsp->data.regs.x86.rdx;
+    v->arch.user_regs.rsp = rsp->data.regs.x86.rsp;
+    v->arch.user_regs.rbp = rsp->data.regs.x86.rbp;
+    v->arch.user_regs.rsi = rsp->data.regs.x86.rsi;
+    v->arch.user_regs.rdi = rsp->data.regs.x86.rdi;
 
     v->arch.user_regs.r8 = rsp->data.regs.x86.r8;
     v->arch.user_regs.r9 = rsp->data.regs.x86.r9;
@@ -130,8 +130,8 @@ void vm_event_set_registers(struct vcpu *v, vm_event_response_t *rsp)
     v->arch.user_regs.r14 = rsp->data.regs.x86.r14;
     v->arch.user_regs.r15 = rsp->data.regs.x86.r15;
 
-    v->arch.user_regs.eflags = rsp->data.regs.x86.rflags;
-    v->arch.user_regs.eip = rsp->data.regs.x86.rip;
+    v->arch.user_regs.rflags = rsp->data.regs.x86.rflags;
+    v->arch.user_regs.rip = rsp->data.regs.x86.rip;
 }
 
 void vm_event_monitor_next_interrupt(struct vcpu *v)
@@ -151,14 +151,14 @@ void vm_event_fill_regs(vm_event_request_t *req)
     /* Architecture-specific vmcs/vmcb bits */
     hvm_funcs.save_cpu_ctxt(curr, &ctxt);
 
-    req->data.regs.x86.rax = regs->eax;
-    req->data.regs.x86.rcx = regs->ecx;
-    req->data.regs.x86.rdx = regs->edx;
-    req->data.regs.x86.rbx = regs->ebx;
-    req->data.regs.x86.rsp = regs->esp;
-    req->data.regs.x86.rbp = regs->ebp;
-    req->data.regs.x86.rsi = regs->esi;
-    req->data.regs.x86.rdi = regs->edi;
+    req->data.regs.x86.rax = regs->rax;
+    req->data.regs.x86.rcx = regs->rcx;
+    req->data.regs.x86.rdx = regs->rdx;
+    req->data.regs.x86.rbx = regs->rbx;
+    req->data.regs.x86.rsp = regs->rsp;
+    req->data.regs.x86.rbp = regs->rbp;
+    req->data.regs.x86.rsi = regs->rsi;
+    req->data.regs.x86.rdi = regs->rdi;
 
     req->data.regs.x86.r8  = regs->r8;
     req->data.regs.x86.r9  = regs->r9;
@@ -169,8 +169,8 @@ void vm_event_fill_regs(vm_event_request_t *req)
     req->data.regs.x86.r14 = regs->r14;
     req->data.regs.x86.r15 = regs->r15;
 
-    req->data.regs.x86.rflags = regs->eflags;
-    req->data.regs.x86.rip    = regs->eip;
+    req->data.regs.x86.rflags = regs->rflags;
+    req->data.regs.x86.rip    = regs->rip;
 
     req->data.regs.x86.dr7 = curr->arch.debugreg[7];
     req->data.regs.x86.cr0 = ctxt.cr0;
