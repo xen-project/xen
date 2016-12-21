@@ -882,16 +882,16 @@ static int hvm_save_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
             ctxt.flags = XEN_X86_FPU_INITIALISED;
         }
 
-        ctxt.rax = v->arch.user_regs.eax;
-        ctxt.rbx = v->arch.user_regs.ebx;
-        ctxt.rcx = v->arch.user_regs.ecx;
-        ctxt.rdx = v->arch.user_regs.edx;
-        ctxt.rbp = v->arch.user_regs.ebp;
-        ctxt.rsi = v->arch.user_regs.esi;
-        ctxt.rdi = v->arch.user_regs.edi;
-        ctxt.rsp = v->arch.user_regs.esp;
-        ctxt.rip = v->arch.user_regs.eip;
-        ctxt.rflags = v->arch.user_regs.eflags;
+        ctxt.rax = v->arch.user_regs.rax;
+        ctxt.rbx = v->arch.user_regs.rbx;
+        ctxt.rcx = v->arch.user_regs.rcx;
+        ctxt.rdx = v->arch.user_regs.rdx;
+        ctxt.rbp = v->arch.user_regs.rbp;
+        ctxt.rsi = v->arch.user_regs.rsi;
+        ctxt.rdi = v->arch.user_regs.rdi;
+        ctxt.rsp = v->arch.user_regs.rsp;
+        ctxt.rip = v->arch.user_regs.rip;
+        ctxt.rflags = v->arch.user_regs.rflags;
         ctxt.r8  = v->arch.user_regs.r8;
         ctxt.r9  = v->arch.user_regs.r9;
         ctxt.r10 = v->arch.user_regs.r10;
@@ -1197,16 +1197,16 @@ static int hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
     if ( xsave_area )
         xsave_area->xsave_hdr.xcomp_bv = 0;
 
-    v->arch.user_regs.eax = ctxt.rax;
-    v->arch.user_regs.ebx = ctxt.rbx;
-    v->arch.user_regs.ecx = ctxt.rcx;
-    v->arch.user_regs.edx = ctxt.rdx;
-    v->arch.user_regs.ebp = ctxt.rbp;
-    v->arch.user_regs.esi = ctxt.rsi;
-    v->arch.user_regs.edi = ctxt.rdi;
-    v->arch.user_regs.esp = ctxt.rsp;
-    v->arch.user_regs.eip = ctxt.rip;
-    v->arch.user_regs.eflags = ctxt.rflags | X86_EFLAGS_MBS;
+    v->arch.user_regs.rax = ctxt.rax;
+    v->arch.user_regs.rbx = ctxt.rbx;
+    v->arch.user_regs.rcx = ctxt.rcx;
+    v->arch.user_regs.rdx = ctxt.rdx;
+    v->arch.user_regs.rbp = ctxt.rbp;
+    v->arch.user_regs.rsi = ctxt.rsi;
+    v->arch.user_regs.rdi = ctxt.rdi;
+    v->arch.user_regs.rsp = ctxt.rsp;
+    v->arch.user_regs.rip = ctxt.rip;
+    v->arch.user_regs.rflags = ctxt.rflags | X86_EFLAGS_MBS;
     v->arch.user_regs.r8  = ctxt.r8;
     v->arch.user_regs.r9  = ctxt.r9;
     v->arch.user_regs.r10 = ctxt.r10;
@@ -1658,7 +1658,7 @@ void hvm_vcpu_down(struct vcpu *v)
     }
 }
 
-void hvm_hlt(unsigned long rflags)
+void hvm_hlt(unsigned int eflags)
 {
     struct vcpu *curr = current;
 
@@ -1670,7 +1670,7 @@ void hvm_hlt(unsigned long rflags)
      * want to shut down. In a real processor, NMIs are the only way to break
      * out of this.
      */
-    if ( unlikely(!(rflags & X86_EFLAGS_IF)) )
+    if ( unlikely(!(eflags & X86_EFLAGS_IF)) )
         return hvm_vcpu_down(curr);
 
     do_sched_op(SCHEDOP_block, guest_handle_from_ptr(NULL, void));
@@ -2901,7 +2901,7 @@ void hvm_task_switch(
     struct segment_register gdt, tr, prev_tr, segr;
     struct desc_struct *optss_desc = NULL, *nptss_desc = NULL, tss_desc;
     bool_t otd_writable, ntd_writable;
-    unsigned long eflags;
+    unsigned int eflags;
     pagefault_info_t pfinfo;
     int exn_raised, rc;
     struct {
@@ -2975,20 +2975,20 @@ void hvm_task_switch(
     if ( rc != HVMCOPY_okay )
         goto out;
 
-    eflags = regs->eflags;
+    eflags = regs->_eflags;
     if ( taskswitch_reason == TSW_iret )
         eflags &= ~X86_EFLAGS_NT;
 
-    tss.eip    = regs->eip;
+    tss.eip    = regs->_eip;
     tss.eflags = eflags;
-    tss.eax    = regs->eax;
-    tss.ecx    = regs->ecx;
-    tss.edx    = regs->edx;
-    tss.ebx    = regs->ebx;
-    tss.esp    = regs->esp;
-    tss.ebp    = regs->ebp;
-    tss.esi    = regs->esi;
-    tss.edi    = regs->edi;
+    tss.eax    = regs->_eax;
+    tss.ecx    = regs->_ecx;
+    tss.edx    = regs->_edx;
+    tss.ebx    = regs->_ebx;
+    tss.esp    = regs->_esp;
+    tss.ebp    = regs->_ebp;
+    tss.esi    = regs->_esi;
+    tss.edi    = regs->_edi;
 
     hvm_get_segment_register(v, x86_seg_es, &segr);
     tss.es = segr.sel;
@@ -3032,16 +3032,16 @@ void hvm_task_switch(
     if ( hvm_set_cr3(tss.cr3, 1) )
         goto out;
 
-    regs->eip    = tss.eip;
-    regs->eflags = tss.eflags | 2;
-    regs->eax    = tss.eax;
-    regs->ecx    = tss.ecx;
-    regs->edx    = tss.edx;
-    regs->ebx    = tss.ebx;
-    regs->esp    = tss.esp;
-    regs->ebp    = tss.ebp;
-    regs->esi    = tss.esi;
-    regs->edi    = tss.edi;
+    regs->rip    = tss.eip;
+    regs->rflags = tss.eflags | X86_EFLAGS_MBS;
+    regs->rax    = tss.eax;
+    regs->rcx    = tss.ecx;
+    regs->rdx    = tss.edx;
+    regs->rbx    = tss.ebx;
+    regs->rsp    = tss.esp;
+    regs->rbp    = tss.ebp;
+    regs->rsi    = tss.esi;
+    regs->rdi    = tss.edi;
 
     exn_raised = 0;
     if ( hvm_load_segment_selector(x86_seg_es, tss.es, tss.eflags) ||
@@ -3054,7 +3054,7 @@ void hvm_task_switch(
 
     if ( taskswitch_reason == TSW_call_or_int )
     {
-        regs->eflags |= X86_EFLAGS_NT;
+        regs->_eflags |= X86_EFLAGS_NT;
         tss.back_link = prev_tr.sel;
 
         rc = hvm_copy_to_guest_linear(tr.base + offsetof(typeof(tss), back_link),
@@ -4017,7 +4017,7 @@ void hvm_ud_intercept(struct cpu_user_regs *regs)
         unsigned long addr;
         char sig[5]; /* ud2; .ascii "xen" */
 
-        if ( hvm_virtual_to_linear_addr(x86_seg_cs, cs, regs->eip,
+        if ( hvm_virtual_to_linear_addr(x86_seg_cs, cs, regs->rip,
                                         sizeof(sig), hvm_access_insn_fetch,
                                         (hvm_long_mode_enabled(cur) &&
                                          cs->attr.fields.l) ? 64 :
@@ -4026,12 +4026,12 @@ void hvm_ud_intercept(struct cpu_user_regs *regs)
                                           walk, NULL) == HVMCOPY_okay) &&
              (memcmp(sig, "\xf\xbxen", sizeof(sig)) == 0) )
         {
-            regs->eip += sizeof(sig);
-            regs->eflags &= ~X86_EFLAGS_RF;
+            regs->rip += sizeof(sig);
+            regs->_eflags &= ~X86_EFLAGS_RF;
 
             /* Zero the upper 32 bits of %rip if not in 64bit mode. */
             if ( !(hvm_long_mode_enabled(cur) && cs->attr.fields.l) )
-                regs->eip = regs->_eip;
+                regs->rip = regs->_eip;
 
             add_taint(TAINT_HVM_FEP);
 
@@ -4075,7 +4075,7 @@ enum hvm_intblk hvm_interrupt_blocked(struct vcpu *v, struct hvm_intack intack)
     }
 
     if ( (intack.source != hvm_intsrc_nmi) &&
-         !(guest_cpu_user_regs()->eflags & X86_EFLAGS_IF) )
+         !(guest_cpu_user_regs()->_eflags & X86_EFLAGS_IF) )
         return hvm_intblk_rflags_ie;
 
     intr_shadow = hvm_funcs.get_interrupt_shadow(v);
@@ -4268,7 +4268,7 @@ int hvm_do_hypercall(struct cpu_user_regs *regs)
         if ( unlikely(hvm_get_cpl(curr)) )
         {
     default:
-            regs->eax = -EPERM;
+            regs->rax = -EPERM;
             return HVM_HCALL_completed;
         }
     case 0:
@@ -4284,7 +4284,7 @@ int hvm_do_hypercall(struct cpu_user_regs *regs)
     if ( (eax >= ARRAY_SIZE(hvm_hypercall_table)) ||
          !hvm_hypercall_table[eax].native )
     {
-        regs->eax = -ENOSYS;
+        regs->rax = -ENOSYS;
         return HVM_HCALL_completed;
     }
 
@@ -4330,9 +4330,9 @@ int hvm_do_hypercall(struct cpu_user_regs *regs)
             case 6: regs->r9  = 0xdeadbeefdeadf00dUL;
             case 5: regs->r8  = 0xdeadbeefdeadf00dUL;
             case 4: regs->r10 = 0xdeadbeefdeadf00dUL;
-            case 3: regs->edx = 0xdeadbeefdeadf00dUL;
-            case 2: regs->esi = 0xdeadbeefdeadf00dUL;
-            case 1: regs->edi = 0xdeadbeefdeadf00dUL;
+            case 3: regs->rdx = 0xdeadbeefdeadf00dUL;
+            case 2: regs->rsi = 0xdeadbeefdeadf00dUL;
+            case 1: regs->rdi = 0xdeadbeefdeadf00dUL;
             }
         }
 #endif
@@ -4362,8 +4362,8 @@ int hvm_do_hypercall(struct cpu_user_regs *regs)
         }
 #endif
 
-        regs->_eax = hvm_hypercall_table[eax].compat(ebx, ecx, edx, esi, edi,
-                                                     ebp);
+        regs->rax = hvm_hypercall_table[eax].compat(ebx, ecx, edx, esi, edi,
+                                                    ebp);
 
 #ifndef NDEBUG
         if ( !curr->arch.hvm_vcpu.hcall_preempted )
@@ -4371,19 +4371,18 @@ int hvm_do_hypercall(struct cpu_user_regs *regs)
             /* Deliberately corrupt parameter regs used by this hypercall. */
             switch ( hypercall_args_table[eax].compat )
             {
-            case 6: regs->ebp = 0xdeadf00d;
-            case 5: regs->edi = 0xdeadf00d;
-            case 4: regs->esi = 0xdeadf00d;
-            case 3: regs->edx = 0xdeadf00d;
-            case 2: regs->ecx = 0xdeadf00d;
-            case 1: regs->ebx = 0xdeadf00d;
+            case 6: regs->rbp = 0xdeadf00d;
+            case 5: regs->rdi = 0xdeadf00d;
+            case 4: regs->rsi = 0xdeadf00d;
+            case 3: regs->rdx = 0xdeadf00d;
+            case 2: regs->rcx = 0xdeadf00d;
+            case 1: regs->rbx = 0xdeadf00d;
             }
         }
 #endif
     }
 
-    HVM_DBG_LOG(DBG_LEVEL_HCALL, "hcall%lu -> %lx",
-                eax, (unsigned long)regs->eax);
+    HVM_DBG_LOG(DBG_LEVEL_HCALL, "hcall%lu -> %lx", eax, regs->rax);
 
     if ( curr->arch.hvm_vcpu.hcall_preempted )
         return HVM_HCALL_preempted;
@@ -4503,9 +4502,9 @@ void hvm_vcpu_reset_state(struct vcpu *v, uint16_t cs, uint16_t ip)
 
     v->arch.vgc_flags = VGCF_online;
     memset(&v->arch.user_regs, 0, sizeof(v->arch.user_regs));
-    v->arch.user_regs.eflags = X86_EFLAGS_MBS;
-    v->arch.user_regs.edx = 0x00000f00;
-    v->arch.user_regs.eip = ip;
+    v->arch.user_regs.rflags = X86_EFLAGS_MBS;
+    v->arch.user_regs.rdx = 0x00000f00;
+    v->arch.user_regs.rip = ip;
     memset(&v->arch.debugreg, 0, sizeof(v->arch.debugreg));
 
     v->arch.hvm_vcpu.guest_cr[0] = X86_CR0_ET;
