@@ -202,7 +202,7 @@ static void show_guest_stack(struct vcpu *v, const struct cpu_user_regs *regs)
         return;
     }
 
-    stack = (unsigned long *)regs->esp;
+    stack = (unsigned long *)regs->rsp;
     printk("Guest stack trace from "__OP"sp=%p:\n  ", stack);
 
     if ( !access_ok(stack, sizeof(*stack)) )
@@ -367,8 +367,8 @@ static void _show_trace(unsigned long sp, unsigned long bp)
                 break;
             frame = (unsigned long *)next;
             next  = frame[0];
-            addr  = frame[(offsetof(struct cpu_user_regs, eip) -
-                           offsetof(struct cpu_user_regs, ebp))
+            addr  = frame[(offsetof(struct cpu_user_regs, rip) -
+                           offsetof(struct cpu_user_regs, rbp))
                          / BYTES_PER_LONG];
         }
         else
@@ -623,7 +623,7 @@ void fatal_trap(const struct cpu_user_regs *regs, bool_t show_remote)
     panic("FATAL TRAP: vector = %d (%s)\n"
           "[error_code=%04x] %s",
           trapnr, trapstr(trapnr), regs->error_code,
-          (regs->eflags & X86_EFLAGS_IF) ? "" : ", IN INTERRUPT CONTEXT");
+          (regs->_eflags & X86_EFLAGS_IF) ? "" : ", IN INTERRUPT CONTEXT");
 }
 
 void pv_inject_event(const struct x86_event *event)
@@ -663,7 +663,7 @@ void pv_inject_event(const struct x86_event *event)
         trace_pv_page_fault(event->cr2, error_code);
     }
     else
-        trace_pv_trap(vector, regs->eip, use_error_code, error_code);
+        trace_pv_trap(vector, regs->rip, use_error_code, error_code);
 
     if ( use_error_code )
     {
@@ -697,11 +697,11 @@ static inline void do_guest_trap(unsigned int trapnr,
     pv_inject_event(&event);
 }
 
-static void instruction_done(struct cpu_user_regs *regs, unsigned long eip)
+static void instruction_done(struct cpu_user_regs *regs, unsigned long rip)
 {
-    regs->eip = eip;
-    regs->eflags &= ~X86_EFLAGS_RF;
-    if ( regs->eflags & X86_EFLAGS_TF )
+    regs->rip = rip;
+    regs->_eflags &= ~X86_EFLAGS_RF;
+    if ( regs->_eflags & X86_EFLAGS_TF )
     {
         current->arch.debugreg[6] |= DR_STEP | DR_STATUS_RESERVED_ONE;
         do_guest_trap(TRAP_debug, regs);
@@ -799,12 +799,12 @@ void do_trap(struct cpu_user_regs *regs)
         return;
     }
 
-    if ( likely((fixup = search_exception_table(regs->eip)) != 0) )
+    if ( likely((fixup = search_exception_table(regs->rip)) != 0) )
     {
         dprintk(XENLOG_ERR, "Trap %d: %p -> %p\n",
-                trapnr, _p(regs->eip), _p(fixup));
-        this_cpu(last_extable_addr) = regs->eip;
-        regs->eip = fixup;
+                trapnr, _p(regs->rip), _p(fixup));
+        this_cpu(last_extable_addr) = regs->rip;
+        regs->rip = fixup;
         return;
     }
 
@@ -1042,10 +1042,10 @@ void pv_cpuid(struct cpu_user_regs *regs)
     struct vcpu *curr = current;
     struct domain *currd = curr->domain;
 
-    leaf = a = regs->eax;
-    b = regs->ebx;
-    subleaf = c = regs->ecx;
-    d = regs->edx;
+    leaf = a = regs->_eax;
+    b = regs->_ebx;
+    subleaf = c = regs->_ecx;
+    d = regs->_edx;
 
     if ( cpuid_hypervisor_leaves(leaf, subleaf, &a, &b, &c, &d) )
         goto out;
@@ -1065,10 +1065,10 @@ void pv_cpuid(struct cpu_user_regs *regs)
             limit = cpuid_eax(limit);
         if ( leaf > limit )
         {
-            regs->eax = 0;
-            regs->ebx = 0;
-            regs->ecx = 0;
-            regs->edx = 0;
+            regs->rax = 0;
+            regs->rbx = 0;
+            regs->rcx = 0;
+            regs->rdx = 0;
             return;
         }
     }
@@ -1382,10 +1382,10 @@ void pv_cpuid(struct cpu_user_regs *regs)
     }
 
  out:
-    regs->eax = a;
-    regs->ebx = b;
-    regs->ecx = c;
-    regs->edx = d;
+    regs->rax = a;
+    regs->rbx = b;
+    regs->rcx = c;
+    regs->rdx = d;
 }
 
 static int emulate_invalid_rdtscp(struct cpu_user_regs *regs)
@@ -1394,7 +1394,7 @@ static int emulate_invalid_rdtscp(struct cpu_user_regs *regs)
     unsigned long eip, rc;
     struct vcpu *v = current;
 
-    eip = regs->eip;
+    eip = regs->rip;
     if ( (rc = copy_from_user(opcode, (char *)eip, sizeof(opcode))) != 0 )
     {
         pv_inject_page_fault(0, eip + sizeof(opcode) - rc);
@@ -1413,7 +1413,7 @@ static int emulate_forced_invalid_op(struct cpu_user_regs *regs)
     char sig[5], instr[2];
     unsigned long eip, rc;
 
-    eip = regs->eip;
+    eip = regs->rip;
 
     /* Check for forced emulation signature: ud2 ; .ascii "xen". */
     if ( (rc = copy_from_user(sig, (char *)eip, sizeof(sig))) != 0 )
@@ -1437,7 +1437,7 @@ static int emulate_forced_invalid_op(struct cpu_user_regs *regs)
     /* If cpuid faulting is enabled and CPL>0 inject a #GP in place of #UD. */
     if ( current->arch.cpuid_faulting && !guest_kernel_mode(current, regs) )
     {
-        regs->eip = eip;
+        regs->rip = eip;
         do_guest_trap(TRAP_gp_fault, regs);
         return EXCRET_fault_fixed;
     }
@@ -1448,7 +1448,7 @@ static int emulate_forced_invalid_op(struct cpu_user_regs *regs)
 
     instruction_done(regs, eip);
 
-    trace_trap_one_addr(TRC_PV_FORCED_INVALID_OP, regs->eip);
+    trace_trap_one_addr(TRC_PV_FORCED_INVALID_OP, regs->rip);
 
     return EXCRET_fault_fixed;
 }
@@ -1457,7 +1457,7 @@ void do_invalid_op(struct cpu_user_regs *regs)
 {
     const struct bug_frame *bug = NULL;
     u8 bug_insn[2];
-    const char *prefix = "", *filename, *predicate, *eip = (char *)regs->eip;
+    const char *prefix = "", *filename, *predicate, *eip = (char *)regs->rip;
     unsigned long fixup;
     int id = -1, lineno;
     const struct virtual_region *region;
@@ -1473,12 +1473,12 @@ void do_invalid_op(struct cpu_user_regs *regs)
         return;
     }
 
-    if ( !is_active_kernel_text(regs->eip) ||
+    if ( !is_active_kernel_text(regs->rip) ||
          __copy_from_user(bug_insn, eip, sizeof(bug_insn)) ||
          memcmp(bug_insn, "\xf\xb", sizeof(bug_insn)) )
         goto die;
 
-    region = find_text_region(regs->eip);
+    region = find_text_region(regs->rip);
     if ( region )
     {
         for ( id = 0; id < BUGFRAME_NR; id++ )
@@ -1507,7 +1507,7 @@ void do_invalid_op(struct cpu_user_regs *regs)
         void (*fn)(struct cpu_user_regs *) = bug_ptr(bug);
 
         fn(regs);
-        regs->eip = (unsigned long)eip;
+        regs->rip = (unsigned long)eip;
         return;
     }
 
@@ -1528,7 +1528,7 @@ void do_invalid_op(struct cpu_user_regs *regs)
     case BUGFRAME_warn:
         printk("Xen WARN at %s%s:%d\n", prefix, filename, lineno);
         show_execution_state(regs);
-        regs->eip = (unsigned long)eip;
+        regs->rip = (unsigned long)eip;
         return;
 
     case BUGFRAME_bug:
@@ -1558,10 +1558,10 @@ void do_invalid_op(struct cpu_user_regs *regs)
     }
 
  die:
-    if ( (fixup = search_exception_table(regs->eip)) != 0 )
+    if ( (fixup = search_exception_table(regs->rip)) != 0 )
     {
-        this_cpu(last_extable_addr) = regs->eip;
-        regs->eip = fixup;
+        this_cpu(last_extable_addr) = regs->rip;
+        regs->rip = fixup;
         return;
     }
 
@@ -1622,7 +1622,7 @@ static int handle_gdt_ldt_mapping_fault(
         {
             if ( guest_mode(regs) )
                 trace_trap_two_addr(TRC_PV_GDT_LDT_MAPPING_FAULT,
-                                    regs->eip, offset);
+                                    regs->rip, offset);
         }
         else
         {
@@ -1764,7 +1764,7 @@ leaf:
          *   - Page fault in kernel mode
          */
         if ( (cr4 & X86_CR4_SMAP) && !(error_code & PFEC_user_mode) &&
-             (((regs->cs & 3) == 3) || !(regs->eflags & X86_EFLAGS_AC)) )
+             (((regs->cs & 3) == 3) || !(regs->_eflags & X86_EFLAGS_AC)) )
             return smap_fault;
     }
 
@@ -1794,7 +1794,7 @@ static int fixup_page_fault(unsigned long addr, struct cpu_user_regs *regs)
     struct domain *d = v->domain;
 
     /* No fixups in interrupt context or when interrupts are disabled. */
-    if ( in_irq() || !(regs->eflags & X86_EFLAGS_IF) )
+    if ( in_irq() || !(regs->_eflags & X86_EFLAGS_IF) )
         return 0;
 
     if ( !(regs->error_code & PFEC_page_present) &&
@@ -1841,7 +1841,7 @@ static int fixup_page_fault(unsigned long addr, struct cpu_user_regs *regs)
 
         ret = paging_fault(addr, regs);
         if ( ret == EXCRET_fault_fixed )
-            trace_trap_two_addr(TRC_PV_PAGING_FIXUP, regs->eip, addr);
+            trace_trap_two_addr(TRC_PV_PAGING_FIXUP, regs->rip, addr);
         return ret;
     }
 
@@ -1888,13 +1888,13 @@ void do_page_fault(struct cpu_user_regs *regs)
         if ( pf_type != real_fault )
             return;
 
-        if ( likely((fixup = search_exception_table(regs->eip)) != 0) )
+        if ( likely((fixup = search_exception_table(regs->rip)) != 0) )
         {
             perfc_incr(copy_user_faults);
             if ( unlikely(regs->error_code & PFEC_reserved_bit) )
                 reserved_bit_page_fault(addr, regs);
-            this_cpu(last_extable_addr) = regs->eip;
-            regs->eip = fixup;
+            this_cpu(last_extable_addr) = regs->rip;
+            regs->rip = fixup;
             return;
         }
 
@@ -1944,9 +1944,9 @@ void __init do_early_page_fault(struct cpu_user_regs *regs)
 
     BUG_ON(smp_processor_id() != 0);
 
-    if ( (regs->eip != prev_eip) || (cr2 != prev_cr2) )
+    if ( (regs->rip != prev_eip) || (cr2 != prev_cr2) )
     {
-        prev_eip = regs->eip;
+        prev_eip = regs->rip;
         prev_cr2 = cr2;
         stuck    = 0;
         return;
@@ -1956,7 +1956,7 @@ void __init do_early_page_fault(struct cpu_user_regs *regs)
     {
         console_start_sync();
         printk("Early fatal page fault at %04x:%p (cr2=%p, ec=%04x)\n",
-               regs->cs, _p(regs->eip), _p(cr2), regs->error_code);
+               regs->cs, _p(regs->rip), _p(cr2), regs->error_code);
         fatal_trap(regs, 0);
     }
 }
@@ -3702,7 +3702,7 @@ static void emulate_gate_op(struct cpu_user_regs *regs)
                 return;
             }
             push(regs->ss);
-            push(regs->esp);
+            push(regs->rsp);
             if ( nparm )
             {
                 const unsigned int *ustkp;
@@ -3738,7 +3738,7 @@ static void emulate_gate_op(struct cpu_user_regs *regs)
         else
         {
             sel |= (regs->cs & 3);
-            esp = regs->esp;
+            esp = regs->rsp;
             ss = regs->ss;
             if ( !read_descriptor(ss, v, &base, &limit, &ar, 0) ||
                  ((ar >> 13) & 3) != (sel & 3) )
@@ -3759,9 +3759,9 @@ static void emulate_gate_op(struct cpu_user_regs *regs)
             }
         }
         push(regs->cs);
-        push(regs->eip + insn_len);
+        push(regs->rip + insn_len);
 #undef push
-        regs->esp = esp;
+        regs->rsp = esp;
         regs->ss = ss;
     }
     else
@@ -3814,7 +3814,7 @@ void do_general_protection(struct cpu_user_regs *regs)
         ti = &v->arch.pv_vcpu.trap_ctxt[vector];
         if ( permit_softint(TI_GET_DPL(ti), v, regs) )
         {
-            regs->eip += 2;
+            regs->rip += 2;
             do_guest_trap(vector, regs);
             return;
         }
@@ -3829,7 +3829,7 @@ void do_general_protection(struct cpu_user_regs *regs)
     if ( (regs->error_code == 0) &&
          emulate_privileged_op(regs) )
     {
-        trace_trap_one_addr(TRC_PV_EMULATE_PRIVOP, regs->eip);
+        trace_trap_one_addr(TRC_PV_EMULATE_PRIVOP, regs->rip);
         return;
     }
 
@@ -3839,12 +3839,12 @@ void do_general_protection(struct cpu_user_regs *regs)
 
  gp_in_kernel:
 
-    if ( likely((fixup = search_exception_table(regs->eip)) != 0) )
+    if ( likely((fixup = search_exception_table(regs->rip)) != 0) )
     {
         dprintk(XENLOG_INFO, "GPF (%04x): %p -> %p\n",
-                regs->error_code, _p(regs->eip), _p(fixup));
-        this_cpu(last_extable_addr) = regs->eip;
-        regs->eip = fixup;
+                regs->error_code, _p(regs->rip), _p(fixup));
+        this_cpu(last_extable_addr) = regs->rip;
+        regs->rip = fixup;
         return;
     }
 
@@ -4094,20 +4094,20 @@ void do_debug(struct cpu_user_regs *regs)
 
     if ( !guest_mode(regs) )
     {
-        if ( regs->eflags & X86_EFLAGS_TF )
+        if ( regs->_eflags & X86_EFLAGS_TF )
         {
             /* In SYSENTER entry path we can't zap TF until EFLAGS is saved. */
             if ( (regs->rip >= (unsigned long)sysenter_entry) &&
                  (regs->rip <= (unsigned long)sysenter_eflags_saved) )
             {
                 if ( regs->rip == (unsigned long)sysenter_eflags_saved )
-                    regs->eflags &= ~X86_EFLAGS_TF;
+                    regs->_eflags &= ~X86_EFLAGS_TF;
                 goto out;
             }
             if ( !debugger_trap_fatal(TRAP_debug, regs) )
             {
                 WARN();
-                regs->eflags &= ~X86_EFLAGS_TF;
+                regs->_eflags &= ~X86_EFLAGS_TF;
             }
         }
         else
@@ -4118,7 +4118,7 @@ void do_debug(struct cpu_user_regs *regs)
              * watchpoint set on it. No need to bump EIP; the only faulting
              * trap is an instruction breakpoint, which can't happen to us.
              */
-            WARN_ON(!search_exception_table(regs->eip));
+            WARN_ON(!search_exception_table(regs->rip));
         }
         goto out;
     }
