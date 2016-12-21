@@ -109,6 +109,8 @@ compat_process_trap:
 /* %rbx: struct vcpu, interrupts disabled */
 ENTRY(compat_restore_all_guest)
         ASSERT_INTERRUPTS_DISABLED
+        mov   $~(X86_EFLAGS_IOPL|X86_EFLAGS_NT|X86_EFLAGS_VM),%r11d
+        and   UREGS_eflags(%rsp),%r11d
 .Lcr4_orig:
         .skip .Lcr4_alt_end - .Lcr4_alt, 0x90
 .Lcr4_orig_end:
@@ -144,6 +146,8 @@ ENTRY(compat_restore_all_guest)
                              (.Lcr4_orig_end - .Lcr4_orig), \
                              (.Lcr4_alt_end - .Lcr4_alt)
         .popsection
+        or    $X86_EFLAGS_IF,%r11
+        mov   %r11d,UREGS_eflags(%rsp)
         RESTORE_ALL adj=8 compat=1
 .Lft0:  iretq
         _ASM_PRE_EXTABLE(.Lft0, handle_exception)
