@@ -3142,7 +3142,7 @@ x86_emulate(
 
     case 0x90: /* nop / xchg %%r8,%%rax */
     case X86EMUL_OPC_F3(0, 0x90): /* pause / xchg %%r8,%%rax */
-        if ( !(rex_prefix & 1) )
+        if ( !(rex_prefix & REX_B) )
             break; /* nop / pause */
         /* fall through */
 
@@ -4971,7 +4971,6 @@ x86_emulate(
     case X86EMUL_OPC(0x0f, 0x35): /* sysexit */
     {
         uint64_t msr_content;
-        bool user64 = rex_prefix & REX_W;
 
         vcpu_must_have(sep);
         generate_exception_if(!mode_ring0(), EXC_GP, 0);
@@ -4982,16 +4981,17 @@ x86_emulate(
             goto done;
 
         generate_exception_if(!(msr_content & 0xfffc), EXC_GP, 0);
-        generate_exception_if(user64 && (!is_canonical_address(_regs.edx) ||
-                                         !is_canonical_address(_regs.ecx)),
+        generate_exception_if(op_bytes == 8 &&
+                              (!is_canonical_address(_regs.edx) ||
+                               !is_canonical_address(_regs.ecx)),
                               EXC_GP, 0);
 
         cs.sel = (msr_content | 3) + /* SELECTOR_RPL_MASK */
-                 (user64 ? 32 : 16);
+                 (op_bytes == 8 ? 32 : 16);
         cs.base = 0;   /* flat segment */
         cs.limit = ~0u;  /* 4GB limit */
-        cs.attr.bytes = user64 ? 0xafb  /* L+DB+P+DPL3+S+Code */
-                               : 0xcfb; /* G+DB+P+DPL3+S+Code */
+        cs.attr.bytes = op_bytes == 8 ? 0xafb  /* L+DB+P+DPL3+S+Code */
+                                      : 0xcfb; /* G+DB+P+DPL3+S+Code */
 
         sreg.sel = cs.sel + 8;
         sreg.base = 0;   /* flat segment */
@@ -5003,8 +5003,8 @@ x86_emulate(
              (rc = ops->write_segment(x86_seg_ss, &sreg, ctxt)) != 0 )
             goto done;
 
-        _regs.eip = user64 ? _regs.edx : (uint32_t)_regs.edx;
-        _regs.esp = user64 ? _regs.ecx : (uint32_t)_regs.ecx;
+        _regs.eip = op_bytes == 8 ? _regs.edx : (uint32_t)_regs.edx;
+        _regs.esp = op_bytes == 8 ? _regs.ecx : (uint32_t)_regs.ecx;
         break;
     }
 
