@@ -38,6 +38,11 @@
 
 #define is_canonical_address(x) (((int64_t)(x) >> 47) == ((int64_t)(x) >> 63))
 
+/* There's no strict need for these to be in sync with processor.h. */
+#define X86_VENDOR_INTEL   0
+#define X86_VENDOR_AMD     2
+#define X86_VENDOR_UNKNOWN 0xff
+
 #define MMAP_SZ 16384
 bool emul_test_make_stack_executable(void);
 

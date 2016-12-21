@@ -1396,7 +1396,11 @@ protmode_load_seg(
         case x86_seg_tr:
             goto raise_exn;
         }
-        memset(sreg, 0, sizeof(*sreg));
+        if ( ctxt->vendor != X86_VENDOR_AMD || !ops->read_segment ||
+             ops->read_segment(seg, sreg, ctxt) != X86EMUL_OKAY )
+            memset(sreg, 0, sizeof(*sreg));
+        else
+            sreg->attr.bytes = 0;
         sreg->sel = sel;
         return X86EMUL_OKAY;
     }

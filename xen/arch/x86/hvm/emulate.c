@@ -1899,6 +1899,7 @@ void hvm_emulate_init_once(
     hvmemul_get_seg_reg(x86_seg_ss, hvmemul_ctxt);
 
     hvmemul_ctxt->ctxt.regs = regs;
+    hvmemul_ctxt->ctxt.vendor = curr->domain->arch.x86_vendor;
     hvmemul_ctxt->ctxt.force_writeback = true;
 
     if ( cpu_has_vmx )

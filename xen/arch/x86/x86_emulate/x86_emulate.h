@@ -462,6 +462,9 @@ struct x86_emulate_ctxt
     /* Software event injection support. */
     enum x86_swint_emulation swint_emulate;
 
+    /* CPU vendor (X86_VENDOR_UNKNOWN for "don't care") */
+    unsigned char vendor;
+
     /* Set this if writes may have side effects. */
     bool force_writeback;
 
