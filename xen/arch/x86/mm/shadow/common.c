@@ -349,10 +349,10 @@ const struct x86_emulate_ops *shadow_init_emulation(
     }
 
     /* Attempt to prefetch whole instruction. */
-    sh_ctxt->insn_buf_eip = regs->eip;
+    sh_ctxt->insn_buf_eip = regs->rip;
     sh_ctxt->insn_buf_bytes =
         (!hvm_translate_linear_addr(
-            x86_seg_cs, regs->eip, sizeof(sh_ctxt->insn_buf),
+            x86_seg_cs, regs->rip, sizeof(sh_ctxt->insn_buf),
             hvm_access_insn_fetch, sh_ctxt, &addr) &&
          !hvm_fetch_from_guest_linear(
              sh_ctxt->insn_buf, addr, sizeof(sh_ctxt->insn_buf), 0, NULL))
@@ -375,18 +375,18 @@ void shadow_continue_emulation(struct sh_emulate_ctxt *sh_ctxt,
      * We don't refetch the segment bases, because we don't emulate
      * writes to segment registers
      */
-    diff = regs->eip - sh_ctxt->insn_buf_eip;
+    diff = regs->rip - sh_ctxt->insn_buf_eip;
     if ( diff > sh_ctxt->insn_buf_bytes )
     {
         /* Prefetch more bytes. */
         sh_ctxt->insn_buf_bytes =
             (!hvm_translate_linear_addr(
-                x86_seg_cs, regs->eip, sizeof(sh_ctxt->insn_buf),
+                x86_seg_cs, regs->rip, sizeof(sh_ctxt->insn_buf),
                 hvm_access_insn_fetch, sh_ctxt, &addr) &&
              !hvm_fetch_from_guest_linear(
                  sh_ctxt->insn_buf, addr, sizeof(sh_ctxt->insn_buf), 0, NULL))
             ? sizeof(sh_ctxt->insn_buf) : 0;
-        sh_ctxt->insn_buf_eip = regs->eip;
+        sh_ctxt->insn_buf_eip = regs->rip;
     }
 }
 

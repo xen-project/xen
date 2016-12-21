@@ -2872,7 +2872,7 @@ static int sh_page_fault(struct vcpu *v,
 #endif
 
     SHADOW_PRINTK("%pv va=%#lx err=%#x, rip=%lx\n",
-                  v, va, regs->error_code, regs->eip);
+                  v, va, regs->error_code, regs->rip);
 
     perfc_incr(shadow_fault);
 
@@ -3357,8 +3357,7 @@ static int sh_page_fault(struct vcpu *v,
         }
     }
 
-    SHADOW_PRINTK("emulate: eip=%#lx esp=%#lx\n",
-                  (unsigned long)regs->eip, (unsigned long)regs->esp);
+    SHADOW_PRINTK("emulate: eip=%#lx esp=%#lx\n", regs->rip, regs->rsp);
 
     emul_ops = shadow_init_emulation(&emul_ctxt, regs);
 
