@@ -38,8 +38,8 @@ xendriverdomain_stop()
 
 	rc_pid=$(check_pidfile ${XLDEVD_PIDFILE} ${sbindir}/xl)
 
-	kill -${sig_stop:-TERM} $rc_pids
-	wait_for_pids $rc_pids
+	kill -${sig_stop:-TERM} $rc_pid
+	wait_for_pids $rc_pid
 }
 
 run_rc_command "$1"
