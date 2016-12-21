@@ -941,6 +941,7 @@ csched_vcpu_acct(struct csched_private *prv, unsigned int cpu)
 
     ASSERT( current->processor == cpu );
     ASSERT( svc->sdom != NULL );
+    ASSERT( !is_idle_vcpu(svc->vcpu) );
 
     /*
      * If this VCPU's priority was boosted when it last awoke, reset it.
@@ -957,8 +958,7 @@ csched_vcpu_acct(struct csched_private *prv, unsigned int cpu)
     /*
      * Update credits
      */
-    if ( !is_idle_vcpu(svc->vcpu) )
-        burn_credits(svc, NOW());
+    burn_credits(svc, NOW());
 
     /*
      * Put this VCPU and domain back on the active list if it was
