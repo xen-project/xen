@@ -20,7 +20,7 @@ int xc_kexec_exec(xc_interface *xch, int type)
     exec = xc_hypercall_buffer_alloc(xch, exec, sizeof(*exec));
     if ( exec == NULL )
     {
-        PERROR("Count not alloc bounce buffer for kexec_exec hypercall");
+        PERROR("Could not alloc bounce buffer for kexec_exec hypercall");
         goto out;
     }
 
@@ -111,7 +111,7 @@ int xc_kexec_unload(xc_interface *xch, int type)
     unload = xc_hypercall_buffer_alloc(xch, unload, sizeof(*unload));
     if ( unload == NULL )
     {
-        PERROR("Count not alloc buffer for kexec unload hypercall");
+        PERROR("Could not alloc buffer for kexec unload hypercall");
         goto out;
     }
 
