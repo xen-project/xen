@@ -265,7 +265,7 @@ void vpmu_do_interrupt(struct cpu_user_regs *regs)
             cmp = (void *)&vpmu->xenpmu_data->pmu.r.regs;
             cmp->ip = cur_regs->rip;
             cmp->sp = cur_regs->rsp;
-            cmp->flags = cur_regs->eflags;
+            cmp->flags = cur_regs->rflags;
             cmp->ss = cur_regs->ss;
             cmp->cs = cur_regs->cs;
             if ( (cmp->cs & 3) > 1 )
@@ -288,7 +288,7 @@ void vpmu_do_interrupt(struct cpu_user_regs *regs)
 
             r->ip = cur_regs->rip;
             r->sp = cur_regs->rsp;
-            r->flags = cur_regs->eflags;
+            r->flags = cur_regs->rflags;
 
             if ( !has_hvm_container_vcpu(sampled) )
             {

@@ -48,7 +48,7 @@ void __trace_pv_trap(int trapnr, unsigned long eip,
 
 void __trace_pv_page_fault(unsigned long addr, unsigned error_code)
 {
-    unsigned long eip = guest_cpu_user_regs()->eip;
+    unsigned long eip = guest_cpu_user_regs()->rip;
 
     if ( is_pv_32bit_vcpu(current) )
     {
@@ -119,7 +119,7 @@ void __trace_trap_two_addr(unsigned event, unsigned long va1,
 
 void __trace_ptwr_emulation(unsigned long addr, l1_pgentry_t npte)
 {
-    unsigned long eip = guest_cpu_user_regs()->eip;
+    unsigned long eip = guest_cpu_user_regs()->rip;
 
     /* We have a couple of different modes to worry about:
      * - 32-on-32: 32-bit pte, 32-bit virtual addresses

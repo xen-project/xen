@@ -44,7 +44,7 @@ void __dummy__(void)
     OFFSET(UREGS_saved_upcall_mask, struct cpu_user_regs, saved_upcall_mask);
     OFFSET(UREGS_rip, struct cpu_user_regs, rip);
     OFFSET(UREGS_cs, struct cpu_user_regs, cs);
-    OFFSET(UREGS_eflags, struct cpu_user_regs, eflags);
+    OFFSET(UREGS_eflags, struct cpu_user_regs, rflags);
     OFFSET(UREGS_rsp, struct cpu_user_regs, rsp);
     OFFSET(UREGS_ss, struct cpu_user_regs, ss);
     OFFSET(UREGS_ds, struct cpu_user_regs, ds);

@@ -1044,11 +1044,11 @@ int arch_set_info_guest(
     init_int80_direct_trap(v);
 
     /* IOPL privileges are virtualised. */
-    v->arch.pv_vcpu.iopl = v->arch.user_regs.eflags & X86_EFLAGS_IOPL;
-    v->arch.user_regs.eflags &= ~X86_EFLAGS_IOPL;
+    v->arch.pv_vcpu.iopl = v->arch.user_regs._eflags & X86_EFLAGS_IOPL;
+    v->arch.user_regs._eflags &= ~X86_EFLAGS_IOPL;
 
     /* Ensure real hardware interrupts are enabled. */
-    v->arch.user_regs.eflags |= X86_EFLAGS_IF;
+    v->arch.user_regs._eflags |= X86_EFLAGS_IF;
 
     if ( !v->is_initialised )
     {
@@ -2235,7 +2235,7 @@ void hypercall_cancel_continuation(void)
     else
     {
         if ( is_pv_vcpu(current) )
-            regs->eip += 2; /* skip re-execute 'syscall' / 'int $xx' */
+            regs->rip += 2; /* skip re-execute 'syscall' / 'int $xx' */
         else
             current->arch.hvm_vcpu.hcall_preempted = 0;
     }
@@ -2264,11 +2264,11 @@ unsigned long hypercall_create_continuation(
         struct cpu_user_regs *regs = guest_cpu_user_regs();
         struct vcpu *curr = current;
 
-        regs->eax = op;
+        regs->rax = op;
 
         /* Ensure the hypercall trap instruction is re-executed. */
         if ( is_pv_vcpu(curr) )
-            regs->eip -= 2;  /* re-execute 'syscall' / 'int $xx' */
+            regs->rip -= 2;  /* re-execute 'syscall' / 'int $xx' */
         else
             curr->arch.hvm_vcpu.hcall_preempted = 1;
 
@@ -2297,12 +2297,12 @@ unsigned long hypercall_create_continuation(
                 arg = next_arg(p, args);
                 switch ( i )
                 {
-                case 0: regs->ebx = arg; break;
-                case 1: regs->ecx = arg; break;
-                case 2: regs->edx = arg; break;
-                case 3: regs->esi = arg; break;
-                case 4: regs->edi = arg; break;
-                case 5: regs->ebp = arg; break;
+                case 0: regs->rbx = arg; break;
+                case 1: regs->rcx = arg; break;
+                case 2: regs->rdx = arg; break;
+                case 3: regs->rsi = arg; break;
+                case 4: regs->rdi = arg; break;
+                case 5: regs->rbp = arg; break;
                 }
             }
         }
@@ -2372,12 +2372,12 @@ int hypercall_xlat_continuation(unsigned int *id, unsigned int nr,
 
             switch ( i )
             {
-            case 0: reg = &regs->ebx; break;
-            case 1: reg = &regs->ecx; break;
-            case 2: reg = &regs->edx; break;
-            case 3: reg = &regs->esi; break;
-            case 4: reg = &regs->edi; break;
-            case 5: reg = &regs->ebp; break;
+            case 0: reg = &regs->rbx; break;
+            case 1: reg = &regs->rcx; break;
+            case 2: reg = &regs->rdx; break;
+            case 3: reg = &regs->rsi; break;
+            case 4: reg = &regs->rdi; break;
+            case 5: reg = &regs->rbp; break;
             default: BUG(); reg = NULL; break;
             }
             if ( (mask & 1) )

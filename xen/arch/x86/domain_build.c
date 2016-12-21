@@ -1584,10 +1584,10 @@ int __init construct_dom0(
     /*
      * Initial register values:
      *  DS,ES,FS,GS = FLAT_KERNEL_DS
-     *       CS:EIP = FLAT_KERNEL_CS:start_pc
-     *       SS:ESP = FLAT_KERNEL_SS:start_stack
-     *          ESI = start_info
-     *  [EAX,EBX,ECX,EDX,EDI,EBP are zero]
+     *       CS:rIP = FLAT_KERNEL_CS:start_pc
+     *       SS:rSP = FLAT_KERNEL_SS:start_stack
+     *          rSI = start_info
+     *  [rAX,rBX,rCX,rDX,rDI,rBP,R8-R15 are zero]
      */
     regs = &v->arch.user_regs;
     regs->ds = regs->es = regs->fs = regs->gs =
@@ -1596,10 +1596,10 @@ int __init construct_dom0(
                 FLAT_KERNEL_SS : FLAT_COMPAT_KERNEL_SS);
     regs->cs = (!is_pv_32bit_domain(d) ?
                 FLAT_KERNEL_CS : FLAT_COMPAT_KERNEL_CS);
-    regs->eip = parms.virt_entry;
-    regs->esp = vstack_end;
-    regs->esi = vstartinfo_start;
-    regs->eflags = X86_EFLAGS_IF;
+    regs->rip = parms.virt_entry;
+    regs->rsp = vstack_end;
+    regs->rsi = vstartinfo_start;
+    regs->_eflags = X86_EFLAGS_IF;
 
 #ifdef CONFIG_SHADOW_PAGING
     if ( opt_dom0_shadow )
