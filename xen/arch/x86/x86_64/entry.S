@@ -41,28 +41,29 @@ restore_all_guest:
         testw $TRAP_syscall,4(%rsp)
         jz    iret_exit_to_guest
 
+        movq  24(%rsp),%r11           # RFLAGS
+        andq  $~(X86_EFLAGS_IOPL|X86_EFLAGS_NT|X86_EFLAGS_VM),%r11
+        orq   $X86_EFLAGS_IF,%r11
+
         /* Don't use SYSRET path if the return address is not canonical. */
         movq  8(%rsp),%rcx
         sarq  $47,%rcx
         incl  %ecx
         cmpl  $1,%ecx
-        ja    .Lforce_iret
+        movq  8(%rsp),%rcx            # RIP
+        ja    iret_exit_to_guest
 
         cmpw  $FLAT_USER_CS32,16(%rsp)# CS
-        movq  8(%rsp),%rcx            # RIP
-        movq  24(%rsp),%r11           # RFLAGS
         movq  32(%rsp),%rsp           # RSP
         je    1f
         sysretq
 1:      sysretl
 
-.Lforce_iret:
-        /* Mimic SYSRET behavior. */
-        movq  8(%rsp),%rcx            # RIP
-        movq  24(%rsp),%r11           # RFLAGS
         ALIGN
 /* No special register assumptions. */
 iret_exit_to_guest:
+        andl  $~(X86_EFLAGS_IOPL|X86_EFLAGS_NT|X86_EFLAGS_VM),24(%rsp)
+        orl   $X86_EFLAGS_IF,24(%rsp)
         addq  $8,%rsp
 .Lft0:  iretq
 

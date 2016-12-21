@@ -173,6 +173,10 @@ compat_bad_hypercall:
 /* %rbx: struct vcpu, interrupts disabled */
 ENTRY(compat_restore_all_guest)
         ASSERT_INTERRUPTS_DISABLED
+        mov   $~(X86_EFLAGS_IOPL|X86_EFLAGS_NT|X86_EFLAGS_VM),%r11d
+        and   UREGS_eflags(%rsp),%r11d
+        or    $X86_EFLAGS_IF,%r11
+        mov   %r11d,UREGS_eflags(%rsp)
         RESTORE_ALL adj=8 compat=1
 .Lft0:  iretq
 
