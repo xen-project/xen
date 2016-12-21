@@ -617,7 +617,7 @@ static int p4_check_ctrs(unsigned int const cpu,
 	uint64_t msr_content;
 	int i;
 	int ovf = 0;
-	unsigned long eip = regs->eip;
+	unsigned long eip = regs->rip;
 	int mode = xenoprofile_get_mode(current, regs);
 
 	stag = get_stagger();

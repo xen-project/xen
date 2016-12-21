@@ -135,7 +135,7 @@ static int ppro_check_ctrs(unsigned int const cpu,
 	u64 val;
 	int i;
 	int ovf = 0;
-	unsigned long eip = regs->eip;
+	unsigned long eip = regs->rip;
 	int mode = xenoprofile_get_mode(current, regs);
 	struct arch_msr_pair *msrs_content = vcpu_vpmu(current)->context;
 

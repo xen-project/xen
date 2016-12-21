@@ -316,22 +316,20 @@ static int athlon_check_ctrs(unsigned int const cpu,
 	uint64_t msr_content;
 	int i;
 	int ovf = 0;
-	unsigned long eip = regs->eip;
+	unsigned long eip = regs->rip;
 	int mode = 0;
 	struct vcpu *v = current;
 	struct cpu_user_regs *guest_regs = guest_cpu_user_regs();
 	unsigned int const nr_ctrs = model->num_counters;
 
 	if (!guest_mode(regs) &&
-	    (regs->eip == (unsigned long)svm_stgi_label)) {
+	    (eip == (unsigned long)svm_stgi_label)) {
 		/* SVM guest was running when NMI occurred */
 		ASSERT(is_hvm_vcpu(v));
-		eip = guest_regs->eip;
+		eip = guest_regs->rip;
 		mode = xenoprofile_get_mode(v, guest_regs);
-	} else {
-		eip = regs->eip;
+	} else
 		mode = xenoprofile_get_mode(v, regs);
-	}
 
 	for (i = 0 ; i < nr_ctrs; ++i) {
 		CTR_READ(msr_content, msrs, i);

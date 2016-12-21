@@ -150,7 +150,7 @@ static int valid_hypervisor_stack(const struct frame_head *head,
 void xenoprof_backtrace(struct vcpu *vcpu, const struct cpu_user_regs *regs,
 			unsigned long depth, int mode)
 {
-    const struct frame_head *head = (void *)regs->ebp;
+    const struct frame_head *head = (void *)regs->rbp;
 
     if (mode > 1) {
         while (depth-- && valid_hypervisor_stack(head, regs))
