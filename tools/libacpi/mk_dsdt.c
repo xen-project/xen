@@ -78,6 +78,7 @@ static void pop_block(void)
     printf("}\n");
 }
 
+#ifdef CONFIG_X86
 static void pci_hotplug_notify(unsigned int slt)
 {
     stmt("Notify", "\\_SB.PCI0.S%02X, EVT", slt);
@@ -99,20 +100,24 @@ static void decision_tree(
     decision_tree(s, (s+e)/2, var, leaf);
     pop_block();
 }
+#endif
 
 static struct option options[] = {
     { "maxcpu", 1, 0, 'c' },
+#ifdef CONFIG_X86
     { "dm-version", 1, 0, 'q' },
+#endif
     { "debug", 1, 0, 'd' },
     { 0, 0, 0, 0 }
 };
 
 int main(int argc, char **argv)
 {
-    unsigned int slot, dev, intx, link, cpu, max_cpus;
-    dm_version dm_version = QEMU_XEN_TRADITIONAL;
-
+    unsigned int cpu, max_cpus;
 #if defined(CONFIG_X86)
+    dm_version dm_version = QEMU_XEN_TRADITIONAL;
+    unsigned int slot, dev, intx, link;
+
     max_cpus = HVM_MAX_VCPUS;
 #elif defined(CONFIG_ARM_64)
     max_cpus = GUEST_MAX_VCPUS;
@@ -142,6 +147,7 @@ int main(int argc, char **argv)
             }
             break;
         }
+#ifdef CONFIG_X86
         case 'q':
             if (strcmp(optarg, "qemu-xen") == 0) {
                 dm_version = QEMU_XEN;
@@ -154,6 +160,7 @@ int main(int argc, char **argv)
                 return -1;
             }
             break;
+#endif
         case 'd':
             if (*optarg == 'y')
                 debug = true;
@@ -239,10 +246,7 @@ int main(int argc, char **argv)
 #ifdef CONFIG_ARM_64
     pop_block();
     /**** Processor end ****/
-    pop_block();
-    /**** DSDT DefinitionBlock end ****/
-    return 0;
-#endif
+#else
 
     /* Operation Region 'PRST': bitmask of online CPUs. */
     stmt("OperationRegion", "PRST, SystemIO, %#x, %d",
@@ -518,7 +522,7 @@ int main(int argc, char **argv)
 
     pop_block();
     /**** GPE end ****/
-
+#endif
 
     pop_block();
     /**** DSDT DefinitionBlock end ****/
