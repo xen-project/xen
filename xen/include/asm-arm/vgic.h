@@ -69,7 +69,7 @@ struct pending_irq
     unsigned long status;
     struct irq_desc *desc; /* only set it the irq corresponds to a physical irq */
     unsigned int irq;
-#define GIC_INVALID_LR         ~(uint8_t)0
+#define GIC_INVALID_LR         (uint8_t)~0
     uint8_t lr;
     uint8_t priority;
     /* inflight is used to append instances of pending_irq to
