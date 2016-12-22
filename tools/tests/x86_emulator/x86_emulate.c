@@ -50,4 +50,7 @@ typedef bool bool_t;
 #define __init
 #define __maybe_unused __attribute__((__unused__))
 
+#define likely(x)     __builtin_expect(!!(x), true)
+#define unlikely(x)   __builtin_expect(!!(x), false)
+
 #include "x86_emulate/x86_emulate.c"
