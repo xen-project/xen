@@ -16,11 +16,6 @@ or       = $(if $(strip $(1)),$(1),$(if $(strip $(2)),$(2),$(if $(strip $(3)),$(
 
 -include $(XEN_ROOT)/.config
 
-# A debug build of tools?
-# Hypervisor debug build is controlled by Kconfig.
-debug ?= y
-debug_symbols ?= $(debug)
-
 XEN_COMPILE_ARCH    ?= $(shell uname -m | sed -e s/i.86/x86_32/ \
                          -e s/i86pc/x86_32/ -e s/amd64/x86_64/ \
                          -e s/armv7.*/arm32/ -e s/armv8.*/arm64/ \
@@ -210,10 +205,6 @@ define buildmakevars2header-closure
 	          echo "#define $(var) \"$($(var))\"" >>$(1).tmp;) \
 	$(call move-if-changed,$(1).tmp,$(1))
 endef
-
-ifeq ($(debug_symbols),y)
-CFLAGS += -g
-endif
 
 CFLAGS += -fno-strict-aliasing
 

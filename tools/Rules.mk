@@ -26,6 +26,14 @@ CFLAGS_xeninclude = -I$(XEN_INCLUDE)
 
 XENSTORE_XENSTORED ?= y
 
+# A debug build of tools?
+debug ?= y
+debug_symbols ?= $(debug)
+
+ifeq ($(debug_symbols),y)
+CFLAGS += -g
+endif
+
 ifneq ($(nosharedlibs),y)
 INSTALL_SHLIB = $(INSTALL_PROG)
 SYMLINK_SHLIB = ln -sf
