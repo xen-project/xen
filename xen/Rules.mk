@@ -120,6 +120,8 @@ $(filter-out %.init.o $(nogcov-y),$(obj-y) $(obj-bin-y) $(extra-y)): CFLAGS += -
 endif
 
 ifeq ($(CONFIG_LTO),y)
+CFLAGS += -flto
+LDFLAGS-$(clang) += -plugin LLVMgold.so
 # Would like to handle all object files as bitcode, but objects made from
 # pure asm are in a different format and have to be collected separately.
 # Mirror the directory tree, collecting them as built_in_bin.o.
