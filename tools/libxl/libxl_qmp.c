@@ -499,7 +499,7 @@ static int qmp_next(libxl__gc *gc, libxl__qmp_handler *qmp)
                 break;
             }
         } while (s < s_end);
-   } while (s < s_end);
+    } while (s < s_end);
 
     return rc;
 }
