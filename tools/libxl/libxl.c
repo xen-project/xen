@@ -4905,6 +4905,13 @@ retry_transaction:
         goto out;
     }
 
+    r = xc_domain_getinfolist(ctx->xch, domid, 1, &info);
+    if (r != 1 || info.domain != domid) {
+        abort_transaction = 1;
+        rc = ERROR_FAIL;
+        goto out;
+    }
+
     libxl_dominfo_init(&ptr);
     xcinfo2xlinfo(ctx, &info, &ptr);
     uuid = libxl__uuid2string(gc, ptr.uuid);
