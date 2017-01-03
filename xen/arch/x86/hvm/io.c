@@ -136,7 +136,7 @@ bool handle_pio(uint16_t port, unsigned int size, int dir)
     ASSERT((size - 1) < 4 && size != 3);
 
     if ( dir == IOREQ_WRITE )
-        data = guest_cpu_user_regs()->eax;
+        data = guest_cpu_user_regs()->_eax;
 
     rc = hvmemul_do_pio_buffer(port, size, dir, &data);
 
