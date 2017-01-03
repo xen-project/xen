@@ -191,15 +191,6 @@ bool_t nvmx_ept_enabled(struct vcpu *v)
     return !!(nvmx->ept.enabled);
 }
 
-static const enum x86_segment sreg_to_index[] = {
-    [VMX_SREG_ES] = x86_seg_es,
-    [VMX_SREG_CS] = x86_seg_cs,
-    [VMX_SREG_SS] = x86_seg_ss,
-    [VMX_SREG_DS] = x86_seg_ds,
-    [VMX_SREG_FS] = x86_seg_fs,
-    [VMX_SREG_GS] = x86_seg_gs,
-};
-
 struct vmx_inst_decoded {
 #define VMX_INST_MEMREG_TYPE_MEMORY 0
 #define VMX_INST_MEMREG_TYPE_REG    1
@@ -418,9 +409,9 @@ static int decode_vmx_inst(struct cpu_user_regs *regs,
 
         decode->type = VMX_INST_MEMREG_TYPE_MEMORY;
 
-        if ( info.fields.segment > VMX_SREG_GS )
+        if ( info.fields.segment > x86_seg_gs )
             goto gp_fault;
-        hvm_get_segment_register(v, sreg_to_index[info.fields.segment], &seg);
+        hvm_get_segment_register(v, info.fields.segment, &seg);
         seg_base = seg.base;
 
         base = info.fields.base_reg_invalid ? 0 :
@@ -436,7 +427,7 @@ static int decode_vmx_inst(struct cpu_user_regs *regs,
         size = 1 << (info.fields.addr_size + 1);
 
         offset = base + index * scale + disp;
-        base = !mode_64bit || info.fields.segment >= VMX_SREG_FS ?
+        base = !mode_64bit || info.fields.segment >= x86_seg_fs ?
                seg_base + offset : offset;
         if ( offset + size - 1 < offset ||
              (mode_64bit ?

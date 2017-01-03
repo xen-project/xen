@@ -87,15 +87,6 @@ enum vmx_regs_enc {
     VMX_REG_R15,
 };
 
-enum vmx_sregs_enc {
-    VMX_SREG_ES,
-    VMX_SREG_CS,
-    VMX_SREG_SS,
-    VMX_SREG_DS,
-    VMX_SREG_FS,
-    VMX_SREG_GS,
-};
-
 union vmx_inst_info {
     struct {
         unsigned int scaling           :2; /* bit 0-1 */
