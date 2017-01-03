@@ -166,7 +166,8 @@ int get_cpu_vendor(const char v[], enum get_cpu_vendor mode)
 			if (!strcmp(v,cpu_devs[i]->c_ident[0]) ||
 			    (cpu_devs[i]->c_ident[1] && 
 			     !strcmp(v,cpu_devs[i]->c_ident[1]))) {
-				this_cpu = cpu_devs[i];
+				if (mode == gcv_host)
+					this_cpu = cpu_devs[i];
 				return i;
 			}
 		}
