@@ -322,10 +322,10 @@ static int nsvm_vcpu_hostrestore(struct vcpu *v, struct cpu_user_regs *regs)
     if (rc != X86EMUL_OKAY)
         gdprintk(XENLOG_ERR, "hvm_set_cr3 failed, rc: %u\n", rc);
 
-    regs->eax = n1vmcb->rax;
-    regs->esp = n1vmcb->rsp;
-    regs->eip = n1vmcb->rip;
-    regs->eflags = n1vmcb->rflags;
+    regs->rax = n1vmcb->rax;
+    regs->rsp = n1vmcb->rsp;
+    regs->rip = n1vmcb->rip;
+    regs->rflags = n1vmcb->rflags;
     n1vmcb->_dr7 = 0; /* disable all breakpoints */
     n1vmcb->_cpl = 0;
 
@@ -653,10 +653,10 @@ static int nsvm_vmcb_prepare4vmrun(struct vcpu *v, struct cpu_user_regs *regs)
     }
 
     /* Switch guest registers to l2 guest */
-    regs->eax = ns_vmcb->rax;
-    regs->eip = ns_vmcb->rip;
-    regs->esp = ns_vmcb->rsp;
-    regs->eflags = ns_vmcb->rflags;
+    regs->rax = ns_vmcb->rax;
+    regs->rip = ns_vmcb->rip;
+    regs->rsp = ns_vmcb->rsp;
+    regs->rflags = ns_vmcb->rflags;
 
 #undef vcleanbit_set
     return 0;
@@ -975,7 +975,7 @@ nsvm_vmcb_guest_intercepts_exitcode(struct vcpu *v,
             break;
         ns_vmcb = nv->nv_vvmcx;
         vmexits = nsvm_vmcb_guest_intercepts_msr(svm->ns_cached_msrpm,
-            regs->ecx, ns_vmcb->exitinfo1 != 0);
+            regs->_ecx, ns_vmcb->exitinfo1 != 0);
         if (vmexits == NESTEDHVM_VMEXIT_HOST)
             return 0;
         break;
