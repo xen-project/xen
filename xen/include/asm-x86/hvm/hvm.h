@@ -208,7 +208,7 @@ struct hvm_function_table {
     void (*altp2m_vcpu_update_p2m)(struct vcpu *v);
     void (*altp2m_vcpu_update_vmfunc_ve)(struct vcpu *v);
     bool_t (*altp2m_vcpu_emulate_ve)(struct vcpu *v);
-    int (*altp2m_vcpu_emulate_vmfunc)(struct cpu_user_regs *regs);
+    int (*altp2m_vcpu_emulate_vmfunc)(const struct cpu_user_regs *regs);
 
     /*
      * Parameters and callbacks for hardware-assisted TSC scaling,
