@@ -3695,12 +3695,9 @@ static uint64_t _hvm_rdtsc_intercept(void)
 
 void hvm_rdtsc_intercept(struct cpu_user_regs *regs)
 {
-    uint64_t tsc = _hvm_rdtsc_intercept();
+    msr_split(regs, _hvm_rdtsc_intercept());
 
-    regs->eax = (uint32_t)tsc;
-    regs->edx = (uint32_t)(tsc >> 32);
-
-    HVMTRACE_2D(RDTSC, regs->eax, regs->edx);
+    HVMTRACE_2D(RDTSC, regs->_eax, regs->_edx);
 }
 
 int hvm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)

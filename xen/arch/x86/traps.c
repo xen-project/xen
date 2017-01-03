@@ -3404,12 +3404,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             else if ( currd->arch.vtsc )
                 pv_soft_rdtsc(curr, regs, 0);
             else
-            {
-                uint64_t val = rdtsc();
-
-                regs->eax = (uint32_t)val;
-                regs->edx = (uint32_t)(val >> 32);
-            }
+                msr_split(regs, rdtsc());
         }
 
         if ( ctxt.ctxt.retire.singlestep )

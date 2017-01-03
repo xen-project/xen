@@ -71,6 +71,17 @@ static inline int wrmsr_safe(unsigned int msr, uint64_t val)
     return _rc;
 }
 
+static inline uint64_t msr_fold(const struct cpu_user_regs *regs)
+{
+    return (regs->rdx << 32) | regs->_eax;
+}
+
+static inline void msr_split(struct cpu_user_regs *regs, uint64_t val)
+{
+    regs->rdx = val >> 32;
+    regs->rax = (uint32_t)val;
+}
+
 static inline uint64_t rdtsc(void)
 {
     uint32_t low, high;

@@ -2322,15 +2322,11 @@ int nvmx_n2_vmexit_handler(struct cpu_user_regs *regs,
             nvcpu->nv_vmexit_pending = 1;
         else
         {
-            uint64_t tsc;
-
             /*
              * special handler is needed if L1 doesn't intercept rdtsc,
              * avoiding changing guest_tsc and messing up timekeeping in L1
              */
-            tsc = hvm_get_guest_tsc(v) + get_vvmcs(v, TSC_OFFSET);
-            regs->eax = (uint32_t)tsc;
-            regs->edx = (uint32_t)(tsc >> 32);
+            msr_split(regs, hvm_get_guest_tsc(v) + get_vvmcs(v, TSC_OFFSET));
             update_guest_eip();
 
             return 1;

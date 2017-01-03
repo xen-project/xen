@@ -1936,14 +1936,10 @@ static void svm_do_msr_access(struct cpu_user_regs *regs)
 
         rc = hvm_msr_read_intercept(regs->_ecx, &msr_content);
         if ( rc == X86EMUL_OKAY )
-        {
-            regs->rax = (uint32_t)msr_content;
-            regs->rdx = (uint32_t)(msr_content >> 32);
-        }
+            msr_split(regs, msr_content);
     }
     else
-        rc = hvm_msr_write_intercept(regs->_ecx,
-                                     (regs->rdx << 32) | regs->_eax, 1);
+        rc = hvm_msr_write_intercept(regs->_ecx, msr_fold(regs), 1);
 
     if ( rc == X86EMUL_OKAY )
         __update_guest_eip(regs, inst_len);
@@ -2618,8 +2614,7 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
         if ( vmcb_get_cpl(vmcb) )
             hvm_inject_hw_exception(TRAP_gp_fault, 0);
         else if ( (inst_len = __get_instruction_length(v, INSTR_XSETBV)) &&
-                  hvm_handle_xsetbv(regs->ecx,
-                                    (regs->rdx << 32) | regs->_eax) == 0 )
+                  hvm_handle_xsetbv(regs->_ecx, msr_fold(regs)) == 0 )
             __update_guest_eip(regs, inst_len);
         break;
 

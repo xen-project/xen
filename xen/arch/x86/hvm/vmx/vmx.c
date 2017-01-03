@@ -3626,22 +3626,18 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
     case EXIT_REASON_MSR_READ:
     {
         uint64_t msr_content;
-        if ( hvm_msr_read_intercept(regs->ecx, &msr_content) == X86EMUL_OKAY )
+        if ( hvm_msr_read_intercept(regs->_ecx, &msr_content) == X86EMUL_OKAY )
         {
-            regs->eax = (uint32_t)msr_content;
-            regs->edx = (uint32_t)(msr_content >> 32);
+            msr_split(regs, msr_content);
             update_guest_eip(); /* Safe: RDMSR */
         }
         break;
     }
+
     case EXIT_REASON_MSR_WRITE:
-    {
-        uint64_t msr_content;
-        msr_content = ((uint64_t)regs->edx << 32) | (uint32_t)regs->eax;
-        if ( hvm_msr_write_intercept(regs->ecx, msr_content, 1) == X86EMUL_OKAY )
+        if ( hvm_msr_write_intercept(regs->_ecx, msr_fold(regs), 1) == X86EMUL_OKAY )
             update_guest_eip(); /* Safe: WRMSR */
         break;
-    }
 
     case EXIT_REASON_VMXOFF:
         if ( nvmx_handle_vmxoff(regs) == X86EMUL_OKAY )
@@ -3802,8 +3798,7 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
         break;
 
     case EXIT_REASON_XSETBV:
-        if ( hvm_handle_xsetbv(regs->ecx,
-                               (regs->rdx << 32) | regs->_eax) == 0 )
+        if ( hvm_handle_xsetbv(regs->_ecx, msr_fold(regs)) == 0 )
             update_guest_eip(); /* Safe: XSETBV */
         break;
 
