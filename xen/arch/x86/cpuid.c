@@ -80,6 +80,88 @@ static void sanitise_featureset(uint32_t *fs)
                           (fs[FEATURESET_e1d] & ~CPUID_COMMON_1D_FEATURES));
 }
 
+static void recalculate_xstate(struct cpuid_policy *p)
+{
+    uint64_t xstates = XSTATE_FP_SSE;
+    uint32_t xstate_size = XSTATE_AREA_MIN_SIZE;
+    unsigned int i, Da1 = p->xstate.Da1;
+
+    /*
+     * The Da1 leaf is the only piece of information preserved in the common
+     * case.  Everything else is derived from other feature state.
+     */
+    memset(&p->xstate, 0, sizeof(p->xstate));
+
+    if ( !p->basic.xsave )
+        return;
+
+    if ( p->basic.avx )
+    {
+        xstates |= XSTATE_YMM;
+        xstate_size = max(xstate_size,
+                          xstate_offsets[_XSTATE_YMM] +
+                          xstate_sizes[_XSTATE_YMM]);
+    }
+
+    if ( p->feat.mpx )
+    {
+        xstates |= XSTATE_BNDREGS | XSTATE_BNDCSR;
+        xstate_size = max(xstate_size,
+                          xstate_offsets[_XSTATE_BNDCSR] +
+                          xstate_sizes[_XSTATE_BNDCSR]);
+    }
+
+    if ( p->feat.avx512f )
+    {
+        xstates |= XSTATE_OPMASK | XSTATE_ZMM | XSTATE_HI_ZMM;
+        xstate_size = max(xstate_size,
+                          xstate_offsets[_XSTATE_HI_ZMM] +
+                          xstate_sizes[_XSTATE_HI_ZMM]);
+    }
+
+    if ( p->feat.pku )
+    {
+        xstates |= XSTATE_PKRU;
+        xstate_size = max(xstate_size,
+                          xstate_offsets[_XSTATE_PKRU] +
+                          xstate_sizes[_XSTATE_PKRU]);
+    }
+
+    if ( p->extd.lwp )
+    {
+        xstates |= XSTATE_LWP;
+        xstate_size = max(xstate_size,
+                          xstate_offsets[_XSTATE_LWP] +
+                          xstate_sizes[_XSTATE_LWP]);
+    }
+
+    p->xstate.max_size  =  xstate_size;
+    p->xstate.xcr0_low  =  xstates & ~XSTATE_XSAVES_ONLY;
+    p->xstate.xcr0_high = (xstates & ~XSTATE_XSAVES_ONLY) >> 32;
+
+    p->xstate.Da1 = Da1;
+    if ( p->xstate.xsaves )
+    {
+        p->xstate.xss_low   =  xstates & XSTATE_XSAVES_ONLY;
+        p->xstate.xss_high  = (xstates & XSTATE_XSAVES_ONLY) >> 32;
+    }
+    else
+        xstates &= ~XSTATE_XSAVES_ONLY;
+
+    for ( i = 2; i < min(63ul, ARRAY_SIZE(p->xstate.comp)); ++i )
+    {
+        uint64_t curr_xstate = 1ul << i;
+
+        if ( !(xstates & curr_xstate) )
+            continue;
+
+        p->xstate.comp[i].size   = xstate_sizes[i];
+        p->xstate.comp[i].offset = xstate_offsets[i];
+        p->xstate.comp[i].xss    = curr_xstate & XSTATE_XSAVES_ONLY;
+        p->xstate.comp[i].align  = curr_xstate & xstate_align;
+    }
+}
+
 static void __init calculate_raw_policy(void)
 {
     struct cpuid_policy *p = &raw_policy;
@@ -149,6 +231,7 @@ static void __init calculate_host_policy(void)
               0x80000000u + ARRAY_SIZE(p->extd.raw) - 1);
 
     cpuid_featureset_to_policy(boot_cpu_data.x86_capability, p);
+    recalculate_xstate(p);
 }
 
 static void __init calculate_pv_max_policy(void)
@@ -168,6 +251,7 @@ static void __init calculate_pv_max_policy(void)
 
     sanitise_featureset(pv_featureset);
     cpuid_featureset_to_policy(pv_featureset, p);
+    recalculate_xstate(p);
 }
 
 static void __init calculate_hvm_max_policy(void)
@@ -221,6 +305,7 @@ static void __init calculate_hvm_max_policy(void)
 
     sanitise_featureset(hvm_featureset);
     cpuid_featureset_to_policy(hvm_featureset, p);
+    recalculate_xstate(p);
 }
 
 void __init init_guest_cpuid(void)
@@ -328,6 +413,7 @@ void recalculate_cpuid_policy(struct domain *d)
                            special_features[FEATURESET_7b0]);
 
     cpuid_featureset_to_policy(fs, p);
+    recalculate_xstate(p);
 }
 
 int init_domain_cpuid_policy(struct domain *d)

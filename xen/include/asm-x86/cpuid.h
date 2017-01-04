@@ -77,18 +77,15 @@ struct cpuid_policy
      *
      * Global *_policy objects:
      *
-     * - Host accurate:
-     *   - {xcr0,xss}_{high,low}
-     *
      * - Guest accurate:
-     *   - All of the feat union
+     *   - All of the feat and xstate unions
      *   - max_{,sub}leaf
      *   - All FEATURESET_* words
      *
      * Per-domain objects:
      *
      * - Guest accurate:
-     *   - All of the feat union
+     *   - All of the feat and xstate unions
      *   - max_{,sub}leaf
      *   - All FEATURESET_* words
      *
@@ -143,9 +140,10 @@ struct cpuid_policy
     /* Xstate feature leaf: 0x0000000D[xx] */
     union {
         struct cpuid_leaf raw[CPUID_GUEST_NR_XSTATE];
+
         struct {
             /* Subleaf 0. */
-            uint32_t xcr0_low, /* b */:32, /* c */:32, xcr0_high;
+            uint32_t xcr0_low, /* b */:32, max_size, xcr0_high;
 
             /* Subleaf 1. */
             union {
@@ -154,6 +152,13 @@ struct cpuid_policy
             };
             uint32_t /* b */:32, xss_low, xss_high;
         };
+
+        /* Per-component common state.  Valid for i >= 2. */
+        struct {
+            uint32_t size, offset;
+            bool xss:1, align:1;
+            uint32_t _res_d;
+        } comp[CPUID_GUEST_NR_XSTATE];
     } xstate;
 
     /* Extended leaves: 0x800000xx */
