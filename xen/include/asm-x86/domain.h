@@ -617,14 +617,6 @@ unsigned long pv_guest_cr4_fixup(const struct vcpu *, unsigned long guest_cr4);
              X86_CR4_OSXSAVE | X86_CR4_SMEP |               \
              X86_CR4_FSGSBASE | X86_CR4_SMAP))
 
-void domain_cpuid(const struct domain *d,
-                  unsigned int  input,
-                  unsigned int  sub_input,
-                  unsigned int  *eax,
-                  unsigned int  *ebx,
-                  unsigned int  *ecx,
-                  unsigned int  *edx);
-
 #define domain_max_vcpus(d) (is_hvm_domain(d) ? HVM_MAX_VCPUS : MAX_VIRT_CPUS)
 
 static inline struct vcpu_guest_context *alloc_vcpu_guest_context(void)

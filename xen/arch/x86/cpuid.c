@@ -342,6 +342,26 @@ int init_domain_cpuid_policy(struct domain *d)
     return 0;
 }
 
+static void domain_cpuid(const struct domain *d, uint32_t leaf,
+                         uint32_t subleaf, struct cpuid_leaf *res)
+{
+    unsigned int i;
+
+    for ( i = 0; i < MAX_CPUID_INPUT; i++ )
+    {
+        cpuid_input_t *cpuid = &d->arch.cpuids[i];
+
+        if ( (cpuid->input[0] == leaf) &&
+             ((cpuid->input[1] == XEN_CPUID_INPUT_UNUSED) ||
+              (cpuid->input[1] == subleaf)) )
+        {
+            *res = (struct cpuid_leaf){ cpuid->eax, cpuid->ebx,
+                                        cpuid->ecx, cpuid->edx };
+            return;
+        }
+    }
+}
+
 static void pv_cpuid(uint32_t leaf, uint32_t subleaf, struct cpuid_leaf *res)
 {
     struct vcpu *curr = current;
@@ -349,7 +369,7 @@ static void pv_cpuid(uint32_t leaf, uint32_t subleaf, struct cpuid_leaf *res)
     const struct cpuid_policy *p = currd->arch.cpuid;
 
     if ( !is_control_domain(currd) && !is_hardware_domain(currd) )
-        domain_cpuid(currd, leaf, subleaf, &res->a, &res->b, &res->c, &res->d);
+        domain_cpuid(currd, leaf, subleaf, res);
     else
         cpuid_count_leaf(leaf, subleaf, res);
 
@@ -612,7 +632,7 @@ static void hvm_cpuid(uint32_t leaf, uint32_t subleaf, struct cpuid_leaf *res)
     struct domain *d = v->domain;
     const struct cpuid_policy *p = d->arch.cpuid;
 
-    domain_cpuid(d, leaf, subleaf, &res->a, &res->b, &res->c, &res->d);
+    domain_cpuid(d, leaf, subleaf, res);
 
     switch ( leaf )
     {

@@ -2622,46 +2622,6 @@ void arch_dump_vcpu_info(struct vcpu *v)
     vpmu_dump(v);
 }
 
-void domain_cpuid(
-    const struct domain *d,
-    unsigned int  input,
-    unsigned int  sub_input,
-    unsigned int  *eax,
-    unsigned int  *ebx,
-    unsigned int  *ecx,
-    unsigned int  *edx)
-{
-    cpuid_input_t *cpuid;
-    int i;
-
-    for ( i = 0; i < MAX_CPUID_INPUT; i++ )
-    {
-        cpuid = &d->arch.cpuids[i];
-
-        if ( (cpuid->input[0] == input) &&
-             ((cpuid->input[1] == XEN_CPUID_INPUT_UNUSED) ||
-              (cpuid->input[1] == sub_input)) )
-        {
-            *eax = cpuid->eax;
-            *ebx = cpuid->ebx;
-            *ecx = cpuid->ecx;
-            *edx = cpuid->edx;
-
-            /*
-             * Do not advertise host's invariant TSC unless the TSC is
-             * emulated, or the domain cannot migrate to other hosts.
-             */
-            if ( (input == 0x80000007) && /* Advanced Power Management */
-                 !d->disable_migrate && !d->arch.vtsc )
-                *edx &= ~cpufeat_mask(X86_FEATURE_ITSC);
-
-            return;
-        }
-    }
-
-    *eax = *ebx = *ecx = *edx = 0;
-}
-
 void vcpu_kick(struct vcpu *v)
 {
     /*
