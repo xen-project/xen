@@ -530,7 +530,8 @@ typedef union {
 "pop  %"_tmp"; "                                                \
 "orl  %"_LO32 _tmp",("_STK"); "                                 \
 "popf; "                                                        \
-"pop  %"_sav"; "
+"pop  %"_tmp"; "                                                \
+"movl %"_LO32 _tmp",%"_LO32 _sav"; "
 
 /* After executing instruction: write-back necessary bits in EFLAGS. */
 #define _POST_EFLAGS(_sav, _msk, _tmp)          \
