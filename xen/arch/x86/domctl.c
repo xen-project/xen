@@ -48,30 +48,98 @@ static int gdbsx_guest_mem_io(domid_t domid, struct xen_domctl_gdbsx_memio *iop)
     return iop->remain ? -EFAULT : 0;
 }
 
-static void update_domain_cpuid_info(struct domain *d,
+static int update_legacy_cpuid_array(struct domain *d,
                                      const xen_domctl_cpuid_t *ctl)
+{
+    cpuid_input_t *cpuid, *unused = NULL;
+    unsigned int i;
+
+    /* Try to insert ctl into d->arch.cpuids[] */
+    for ( i = 0; i < MAX_CPUID_INPUT; i++ )
+    {
+        cpuid = &d->arch.cpuids[i];
+
+        if ( cpuid->input[0] == XEN_CPUID_INPUT_UNUSED )
+        {
+            if ( !unused )
+                unused = cpuid;
+            continue;
+        }
+
+        if ( (cpuid->input[0] == ctl->input[0]) &&
+             ((cpuid->input[1] == XEN_CPUID_INPUT_UNUSED) ||
+              (cpuid->input[1] == ctl->input[1])) )
+            break;
+    }
+
+    if ( !(ctl->eax | ctl->ebx | ctl->ecx | ctl->edx) )
+    {
+        if ( i < MAX_CPUID_INPUT )
+            cpuid->input[0] = XEN_CPUID_INPUT_UNUSED;
+    }
+    else if ( i < MAX_CPUID_INPUT )
+        *cpuid = *ctl;
+    else if ( unused )
+        *unused = *ctl;
+    else
+        return -ENOENT;
+
+    return 0;
+}
+
+static int update_domain_cpuid_info(struct domain *d,
+                                    const xen_domctl_cpuid_t *ctl)
 {
     struct cpuid_policy *p = d->arch.cpuid;
     const struct cpuid_leaf leaf = { ctl->eax, ctl->ebx, ctl->ecx, ctl->edx };
+    int rc;
+
+    /*
+     * Skip update for leaves we don't care about.  This avoids the overhead
+     * of recalculate_cpuid_policy() and making d->arch.cpuids[] needlessly
+     * longer to search.
+     */
+    switch ( ctl->input[0] )
+    {
+    case 0x00000000 ... ARRAY_SIZE(p->basic.raw) - 1:
+        if ( ctl->input[0] == 7 &&
+             ctl->input[1] >= ARRAY_SIZE(p->feat.raw) )
+            return 0;
+        if ( ctl->input[0] == XSTATE_CPUID &&
+             ctl->input[1] >= ARRAY_SIZE(p->xstate.raw) )
+            return 0;
+        break;
+
+    case 0x40000000: case 0x40000100:
+        /* Only care about the max_leaf limit. */
+
+    case 0x80000000 ... 0x80000000 + ARRAY_SIZE(p->extd.raw) - 1:
+        break;
+
+    default:
+        return 0;
+    }
+
+    rc = update_legacy_cpuid_array(d, ctl);
+    if ( rc )
+        return rc;
 
     /* Insert ctl data into cpuid_policy. */
-    if ( ctl->input[0] < ARRAY_SIZE(p->basic.raw) )
+    switch ( ctl->input[0] )
     {
+    case 0x00000000 ... ARRAY_SIZE(p->basic.raw) - 1:
         if ( ctl->input[0] == 7 )
-        {
-            if ( ctl->input[1] < ARRAY_SIZE(p->feat.raw) )
-                p->feat.raw[ctl->input[1]] = leaf;
-        }
+            p->feat.raw[ctl->input[1]] = leaf;
         else if ( ctl->input[0] == XSTATE_CPUID )
-        {
-            if ( ctl->input[1] < ARRAY_SIZE(p->xstate.raw) )
-                p->xstate.raw[ctl->input[1]] = leaf;
-        }
+            p->xstate.raw[ctl->input[1]] = leaf;
         else
             p->basic.raw[ctl->input[0]] = leaf;
-    }
-    else if ( (ctl->input[0] - 0x80000000) < ARRAY_SIZE(p->extd.raw) )
+        break;
+
+    case 0x80000000 ... 0x80000000 + ARRAY_SIZE(p->extd.raw) - 1:
         p->extd.raw[ctl->input[0] - 0x80000000] = leaf;
+        break;
+    }
 
     recalculate_cpuid_policy(d);
 
@@ -243,6 +311,8 @@ static void update_domain_cpuid_info(struct domain *d,
         }
         break;
     }
+
+    return 0;
 }
 
 void arch_get_domain_info(const struct domain *d,
@@ -869,53 +939,15 @@ long arch_do_domctl(
     }
 
     case XEN_DOMCTL_set_cpuid:
-    {
-        const xen_domctl_cpuid_t *ctl = &domctl->u.cpuid;
-        cpuid_input_t *cpuid, *unused = NULL;
-
         if ( d == currd ) /* no domain_pause() */
-        {
             ret = -EINVAL;
-            break;
-        }
-
-        for ( i = 0; i < MAX_CPUID_INPUT; i++ )
-        {
-            cpuid = &d->arch.cpuids[i];
-
-            if ( cpuid->input[0] == XEN_CPUID_INPUT_UNUSED )
-            {
-                if ( !unused )
-                    unused = cpuid;
-                continue;
-            }
-
-            if ( (cpuid->input[0] == ctl->input[0]) &&
-                 ((cpuid->input[1] == XEN_CPUID_INPUT_UNUSED) ||
-                  (cpuid->input[1] == ctl->input[1])) )
-                break;
-        }
-
-        domain_pause(d);
-
-        if ( !(ctl->eax | ctl->ebx | ctl->ecx | ctl->edx) )
-        {
-            if ( i < MAX_CPUID_INPUT )
-                cpuid->input[0] = XEN_CPUID_INPUT_UNUSED;
-        }
-        else if ( i < MAX_CPUID_INPUT )
-            *cpuid = *ctl;
-        else if ( unused )
-            *unused = *ctl;
         else
-            ret = -ENOENT;
-
-        if ( !ret )
-            update_domain_cpuid_info(d, ctl);
-
-        domain_unpause(d);
+        {
+            domain_pause(d);
+            ret = update_domain_cpuid_info(d, &domctl->u.cpuid);
+            domain_unpause(d);
+        }
         break;
-    }
 
     case XEN_DOMCTL_gettscinfo:
         if ( d == currd ) /* no domain_pause() */
