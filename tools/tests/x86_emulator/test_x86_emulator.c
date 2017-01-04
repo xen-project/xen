@@ -44,7 +44,47 @@ static int read(
     if ( verbose )
         printf("** %s(%u, %p,, %u,)\n", __func__, seg, (void *)offset, bytes);
 
-    bytes_read += bytes;
+    switch ( seg )
+    {
+        uint64_t value;
+
+    case x86_seg_gdtr:
+        /* Fake system segment type matching table index. */
+        if ( (offset & 7) || (bytes > 8) )
+            return X86EMUL_UNHANDLEABLE;
+#ifdef __x86_64__
+        if ( !(offset & 8) )
+        {
+            memset(p_data, 0, bytes);
+            return X86EMUL_OKAY;
+        }
+        value = (offset - 8) >> 4;
+#else
+        value = (offset - 8) >> 3;
+#endif
+        if ( value >= 0x10 )
+            return X86EMUL_UNHANDLEABLE;
+        value |= value << 40;
+        memcpy(p_data, &value, bytes);
+        return X86EMUL_OKAY;
+
+    case x86_seg_ldtr:
+        /* Fake user segment type matching table index. */
+        if ( (offset & 7) || (bytes > 8) )
+            return X86EMUL_UNHANDLEABLE;
+        value = offset >> 3;
+        if ( value >= 0x10 )
+            return X86EMUL_UNHANDLEABLE;
+        value |= (value | 0x10) << 40;
+        memcpy(p_data, &value, bytes);
+        return X86EMUL_OKAY;
+
+    default:
+        if ( !is_x86_user_segment(seg) )
+            return X86EMUL_UNHANDLEABLE;
+        bytes_read += bytes;
+        break;
+    }
     memcpy(p_data, (void *)offset, bytes);
     return X86EMUL_OKAY;
 }
@@ -73,6 +113,8 @@ static int write(
     if ( verbose )
         printf("** %s(%u, %p,, %u,)\n", __func__, seg, (void *)offset, bytes);
 
+    if ( !is_x86_user_segment(seg) )
+        return X86EMUL_UNHANDLEABLE;
     memcpy((void *)offset, p_data, bytes);
     return X86EMUL_OKAY;
 }
@@ -88,8 +130,37 @@ static int cmpxchg(
     if ( verbose )
         printf("** %s(%u, %p,, %u,)\n", __func__, seg, (void *)offset, bytes);
 
+    if ( !is_x86_user_segment(seg) )
+        return X86EMUL_UNHANDLEABLE;
     memcpy((void *)offset, new, bytes);
     return X86EMUL_OKAY;
+}
+
+static int read_segment(
+    enum x86_segment seg,
+    struct segment_register *reg,
+    struct x86_emulate_ctxt *ctxt)
+{
+    if ( !is_x86_user_segment(seg) )
+        return X86EMUL_UNHANDLEABLE;
+    memset(reg, 0, sizeof(*reg));
+    reg->attr.fields.p = 1;
+    return X86EMUL_OKAY;
+}
+
+static int read_msr(
+    unsigned int reg,
+    uint64_t *val,
+    struct x86_emulate_ctxt *ctxt)
+{
+    switch ( reg )
+    {
+    case 0xc0000080: /* EFER */
+        *val = ctxt->addr_size > 32 ? 0x500 /* LME|LMA */ : 0;
+        return X86EMUL_OKAY;
+    }
+
+    return X86EMUL_UNHANDLEABLE;
 }
 
 static struct x86_emulate_ops emulops = {
@@ -97,8 +168,10 @@ static struct x86_emulate_ops emulops = {
     .insn_fetch = fetch,
     .write      = write,
     .cmpxchg    = cmpxchg,
+    .read_segment = read_segment,
     .cpuid      = emul_test_cpuid,
     .read_cr    = emul_test_read_cr,
+    .read_msr   = read_msr,
     .get_fpu    = emul_test_get_fpu,
 };
 
@@ -609,6 +682,156 @@ int main(int argc, char **argv)
          (regs.eflags != 0x200) ||
          (regs.eip != (unsigned long)&instr[5]) )
         goto fail;
+    printf("okay\n");
+
+    printf("%-40s", "Testing lar (null selector)...");
+    instr[0] = 0x0f; instr[1] = 0x02; instr[2] = 0xc1;
+    regs.eflags = 0x240;
+    regs.eip    = (unsigned long)&instr[0];
+    regs.ecx    = 0;
+    regs.eax    = 0x11111111;
+    rc = x86_emulate(&ctxt, &emulops);
+    if ( (rc != X86EMUL_OKAY) ||
+         (regs.eax != 0x11111111) ||
+         (regs.eflags != 0x200) ||
+         (regs.eip != (unsigned long)&instr[3]) )
+        goto fail;
+    printf("okay\n");
+
+    printf("%-40s", "Testing lsl (null selector)...");
+    instr[0] = 0x0f; instr[1] = 0x03; instr[2] = 0xca;
+    regs.eflags = 0x240;
+    regs.eip    = (unsigned long)&instr[0];
+    regs.edx    = 0;
+    regs.ecx    = 0x11111111;
+    rc = x86_emulate(&ctxt, &emulops);
+    if ( (rc != X86EMUL_OKAY) ||
+         (regs.ecx != 0x11111111) ||
+         (regs.eflags != 0x200) ||
+         (regs.eip != (unsigned long)&instr[3]) )
+        goto fail;
+    printf("okay\n");
+
+    printf("%-40s", "Testing verr (null selector)...");
+    instr[0] = 0x0f; instr[1] = 0x00; instr[2] = 0x21;
+    regs.eflags = 0x240;
+    regs.eip    = (unsigned long)&instr[0];
+    regs.ecx    = (unsigned long)res;
+    *res        = 0;
+    rc = x86_emulate(&ctxt, &emulops);
+    if ( (rc != X86EMUL_OKAY) ||
+         (regs.eflags != 0x200) ||
+         (regs.eip != (unsigned long)&instr[3]) )
+        goto fail;
+    printf("okay\n");
+
+    printf("%-40s", "Testing verw (null selector)...");
+    instr[0] = 0x0f; instr[1] = 0x00; instr[2] = 0x2a;
+    regs.eflags = 0x240;
+    regs.eip    = (unsigned long)&instr[0];
+    regs.ecx    = 0;
+    regs.edx    = (unsigned long)res;
+    rc = x86_emulate(&ctxt, &emulops);
+    if ( (rc != X86EMUL_OKAY) ||
+         (regs.eflags != 0x200) ||
+         (regs.eip != (unsigned long)&instr[3]) )
+        goto fail;
+    printf("okay\n");
+
+    printf("%-40s", "Testing lar/lsl/verr/verw (all types)...");
+    for ( i = 0; i < 0x20; ++i )
+    {
+        unsigned int sel = i < 0x10 ?
+#ifndef __x86_64__
+                                      (i << 3) + 8
+#else
+                                      (i << 4) + 8
+#endif
+                                    : ((i - 0x10) << 3) | 4;
+        bool failed;
+
+#ifndef __x86_64__
+# define LAR_VALID 0xffff1a3eU
+# define LSL_VALID 0xffff0a0eU
+#else
+# define LAR_VALID 0xffff1a04U
+# define LSL_VALID 0xffff0a04U
+#endif
+#define VERR_VALID 0xccff0000U
+#define VERW_VALID 0x00cc0000U
+
+        instr[0] = 0x0f; instr[1] = 0x02; instr[2] = 0xc2;
+        regs.eflags = (LAR_VALID >> i) & 1 ? 0x200 : 0x240;
+        regs.eip    = (unsigned long)&instr[0];
+        regs.edx    = sel;
+        regs.eax    = 0x11111111;
+        rc = x86_emulate(&ctxt, &emulops);
+        if ( (rc != X86EMUL_OKAY) ||
+             (regs.eip != (unsigned long)&instr[3]) )
+            goto fail;
+        if ( (LAR_VALID >> i) & 1 )
+            failed = (regs.eflags != 0x240) ||
+                     ((regs.eax & 0xf0ff00) != (i << 8));
+        else
+            failed = (regs.eflags != 0x200) ||
+                     (regs.eax != 0x11111111);
+        if ( failed )
+        {
+            printf("LAR %04x (type %02x) ", sel, i);
+            goto fail;
+        }
+
+        instr[0] = 0x0f; instr[1] = 0x03; instr[2] = 0xd1;
+        regs.eflags = (LSL_VALID >> i) & 1 ? 0x200 : 0x240;
+        regs.eip    = (unsigned long)&instr[0];
+        regs.ecx    = sel;
+        regs.edx    = 0x11111111;
+        rc = x86_emulate(&ctxt, &emulops);
+        if ( (rc != X86EMUL_OKAY) ||
+             (regs.eip != (unsigned long)&instr[3]) )
+            goto fail;
+        if ( (LSL_VALID >> i) & 1 )
+            failed = (regs.eflags != 0x240) ||
+                     (regs.edx != (i & 0xf));
+        else
+            failed = (regs.eflags != 0x200) ||
+                     (regs.edx != 0x11111111);
+        if ( failed )
+        {
+            printf("LSL %04x (type %02x) ", sel, i);
+            goto fail;
+        }
+
+        instr[0] = 0x0f; instr[1] = 0x00; instr[2] = 0xe2;
+        regs.eflags = (VERR_VALID >> i) & 1 ? 0x200 : 0x240;
+        regs.eip    = (unsigned long)&instr[0];
+        regs.ecx    = 0;
+        regs.edx    = sel;
+        rc = x86_emulate(&ctxt, &emulops);
+        if ( (rc != X86EMUL_OKAY) ||
+             (regs.eip != (unsigned long)&instr[3]) )
+            goto fail;
+        if ( regs.eflags != ((VERR_VALID >> i) & 1 ? 0x240 : 0x200) )
+        {
+            printf("VERR %04x (type %02x) ", sel, i);
+            goto fail;
+        }
+
+        instr[0] = 0x0f; instr[1] = 0x00; instr[2] = 0xe9;
+        regs.eflags = (VERW_VALID >> i) & 1 ? 0x200 : 0x240;
+        regs.eip    = (unsigned long)&instr[0];
+        regs.ecx    = sel;
+        regs.edx    = 0;
+        rc = x86_emulate(&ctxt, &emulops);
+        if ( (rc != X86EMUL_OKAY) ||
+             (regs.eip != (unsigned long)&instr[3]) )
+            goto fail;
+        if ( regs.eflags != ((VERW_VALID >> i) & 1 ? 0x240 : 0x200) )
+        {
+            printf("VERW %04x (type %02x) ", sel, i);
+            goto fail;
+        }
+    }
     printf("okay\n");
 
 #define decl_insn(which) extern const unsigned char which[], which##_len[]

@@ -182,7 +182,7 @@ static const opcode_desc_t opcode_table[256] = {
 
 static const opcode_desc_t twobyte_table[256] = {
     /* 0x00 - 0x07 */
-    ModRM, ImplicitOps|ModRM, ModRM, ModRM,
+    ModRM, ImplicitOps|ModRM, DstReg|SrcMem16|ModRM, DstReg|SrcMem16|ModRM,
     0, ImplicitOps, ImplicitOps, ImplicitOps,
     /* 0x08 - 0x0F */
     ImplicitOps, ImplicitOps, 0, ImplicitOps,
@@ -1364,6 +1364,11 @@ realmode_load_seg(
     return rc;
 }
 
+/*
+ * Passing in x86_seg_none means
+ * - suppress any exceptions other than #PF,
+ * - don't commit any state.
+ */
 static int
 protmode_load_seg(
     enum x86_segment seg,
@@ -1406,7 +1411,7 @@ protmode_load_seg(
     }
 
     /* System segment descriptors must reside in the GDT. */
-    if ( !is_x86_user_segment(seg) && (sel & 4) )
+    if ( is_x86_system_segment(seg) && (sel & 4) )
         goto raise_exn;
 
     switch ( rc = ops->read(sel_seg, sel & 0xfff8, &desc, sizeof(desc), ctxt) )
@@ -1423,14 +1428,11 @@ protmode_load_seg(
         return rc;
     }
 
-    if ( !is_x86_user_segment(seg) )
-    {
-        /* System segments must have S flag == 0. */
-        if ( desc.b & (1u << 12) )
-            goto raise_exn;
-    }
+    /* System segments must have S flag == 0. */
+    if ( is_x86_system_segment(seg) && (desc.b & (1u << 12)) )
+        goto raise_exn;
     /* User segments must have S flag == 1. */
-    else if ( !(desc.b & (1u << 12)) )
+    if ( is_x86_user_segment(seg) && !(desc.b & (1u << 12)) )
         goto raise_exn;
 
     dpl = (desc.b >> 13) & 3;
@@ -1492,10 +1494,17 @@ protmode_load_seg(
              ((dpl < cpl) || (dpl < rpl)) )
             goto raise_exn;
         break;
+    case x86_seg_none:
+        /* Non-conforming segment: check DPL against RPL and CPL. */
+        if ( ((desc.b & (0x1c << 8)) != (0x1c << 8)) &&
+             ((dpl < cpl) || (dpl < rpl)) )
+            return X86EMUL_EXCEPTION;
+        a_flag = 0;
+        break;
     }
 
     /* Segment present in memory? */
-    if ( !(desc.b & (1 << 15)) )
+    if ( !(desc.b & (1 << 15)) && seg != x86_seg_none )
     {
         fault_type = seg != x86_seg_ss ? EXC_NP : EXC_SS;
         goto raise_exn;
@@ -1503,7 +1512,7 @@ protmode_load_seg(
 
     if ( !is_x86_user_segment(seg) )
     {
-        int lm = in_longmode(ctxt, ops);
+        int lm = (desc.b & (1u << 12)) ? 0 : in_longmode(ctxt, ops);
 
         if ( lm < 0 )
             return X86EMUL_UNHANDLEABLE;
@@ -1523,7 +1532,8 @@ protmode_load_seg(
                 return rc;
             }
             if ( (desc_hi.b & 0x00001f00) ||
-                 !is_canonical_address((uint64_t)desc_hi.a << 32) )
+                 (seg != x86_seg_none &&
+                  !is_canonical_address((uint64_t)desc_hi.a << 32)) )
                 goto raise_exn;
         }
     }
@@ -1566,7 +1576,8 @@ protmode_load_seg(
     return X86EMUL_OKAY;
 
  raise_exn:
-    generate_exception(fault_type, sel & 0xfffc);
+    generate_exception_if(seg != x86_seg_none, fault_type, sel & 0xfffc);
+    rc = X86EMUL_EXCEPTION;
  done:
     return rc;
 }
@@ -4420,6 +4431,29 @@ x86_emulate(
             if ( (rc = load_seg(seg, src.val, 0, NULL, ctxt, ops)) != 0 )
                 goto done;
             break;
+        case 4: /* verr / verw */
+            _regs.eflags &= ~EFLG_ZF;
+            switch ( rc = protmode_load_seg(x86_seg_none, src.val, false,
+                                            &sreg, ctxt, ops) )
+            {
+            case X86EMUL_OKAY:
+                if ( sreg.attr.fields.s &&
+                     ((modrm_reg & 1) ? ((sreg.attr.fields.type & 0xa) == 0x2)
+                                      : ((sreg.attr.fields.type & 0xa) != 0x8)) )
+                    _regs.eflags |= EFLG_ZF;
+                break;
+            case X86EMUL_EXCEPTION:
+                if ( ctxt->event_pending )
+                {
+                    ASSERT(ctxt->event.vector == EXC_PF);
+            default:
+                    goto done;
+                }
+                /* Instead of the exception, ZF remains cleared. */
+                rc = X86EMUL_OKAY;
+                break;
+            }
+            break;
         default:
             generate_exception_if(true, EXC_UD);
             break;
@@ -4627,6 +4661,98 @@ x86_emulate(
         }
         break;
     }
+
+    case X86EMUL_OPC(0x0f, 0x02): /* lar */
+        generate_exception_if(!in_protmode(ctxt, ops), EXC_UD);
+        _regs.eflags &= ~EFLG_ZF;
+        switch ( rc = protmode_load_seg(x86_seg_none, src.val, false, &sreg,
+                                        ctxt, ops) )
+        {
+        case X86EMUL_OKAY:
+            if ( !sreg.attr.fields.s )
+            {
+                switch ( sreg.attr.fields.type )
+                {
+                case 0x01: /* available 16-bit TSS */
+                case 0x03: /* busy 16-bit TSS */
+                case 0x04: /* 16-bit call gate */
+                case 0x05: /* 16/32-bit task gate */
+                    if ( in_longmode(ctxt, ops) )
+                        break;
+                    /* fall through */
+                case 0x02: /* LDT */
+                case 0x09: /* available 32/64-bit TSS */
+                case 0x0b: /* busy 32/64-bit TSS */
+                case 0x0c: /* 32/64-bit call gate */
+                    _regs.eflags |= EFLG_ZF;
+                    break;
+                }
+            }
+            else
+                _regs.eflags |= EFLG_ZF;
+            break;
+        case X86EMUL_EXCEPTION:
+            if ( ctxt->event_pending )
+            {
+                ASSERT(ctxt->event.vector == EXC_PF);
+        default:
+                goto done;
+            }
+            /* Instead of the exception, ZF remains cleared. */
+            rc = X86EMUL_OKAY;
+            break;
+        }
+        if ( _regs.eflags & EFLG_ZF )
+            dst.val = ((sreg.attr.bytes & 0xff) << 8) |
+                      ((sreg.limit >> (sreg.attr.fields.g ? 12 : 0)) &
+                       0xf0000) |
+                      ((sreg.attr.bytes & 0xf00) << 12);
+        else
+            dst.type = OP_NONE;
+        break;
+
+    case X86EMUL_OPC(0x0f, 0x03): /* lsl */
+        generate_exception_if(!in_protmode(ctxt, ops), EXC_UD);
+        _regs.eflags &= ~EFLG_ZF;
+        switch ( rc = protmode_load_seg(x86_seg_none, src.val, false, &sreg,
+                                        ctxt, ops) )
+        {
+        case X86EMUL_OKAY:
+            if ( !sreg.attr.fields.s )
+            {
+                switch ( sreg.attr.fields.type )
+                {
+                case 0x01: /* available 16-bit TSS */
+                case 0x03: /* busy 16-bit TSS */
+                    if ( in_longmode(ctxt, ops) )
+                        break;
+                    /* fall through */
+                case 0x02: /* LDT */
+                case 0x09: /* available 32/64-bit TSS */
+                case 0x0b: /* busy 32/64-bit TSS */
+                    _regs.eflags |= EFLG_ZF;
+                    break;
+                }
+            }
+            else
+                _regs.eflags |= EFLG_ZF;
+            break;
+        case X86EMUL_EXCEPTION:
+            if ( ctxt->event_pending )
+            {
+                ASSERT(ctxt->event.vector == EXC_PF);
+        default:
+                goto done;
+            }
+            /* Instead of the exception, ZF remains cleared. */
+            rc = X86EMUL_OKAY;
+            break;
+        }
+        if ( _regs.eflags & EFLG_ZF )
+            dst.val = sreg.limit;
+        else
+            dst.type = OP_NONE;
+        break;
 
     case X86EMUL_OPC(0x0f, 0x05): /* syscall */ {
         uint64_t msr_content;
