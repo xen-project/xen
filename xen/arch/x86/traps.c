@@ -906,26 +906,17 @@ void cpuid_hypervisor_leaves(const struct vcpu *v, uint32_t leaf,
                              uint32_t subleaf, struct cpuid_leaf *res)
 {
     const struct domain *d = v->domain;
+    const struct cpuid_policy *p = d->arch.cpuid;
     uint32_t base = is_viridian_domain(d) ? 0x40000100 : 0x40000000;
     uint32_t idx  = leaf - base;
-    uint32_t limit, dummy;
+    unsigned int limit = is_viridian_domain(d) ? p->hv2_limit : p->hv_limit;
 
-    if ( idx > XEN_CPUID_MAX_NUM_LEAVES )
-        return; /* Avoid unnecessary pass through domain_cpuid() */
-
-    domain_cpuid(d, base, 0, &limit, &dummy, &dummy, &dummy);
     if ( limit == 0 )
         /* Default number of leaves */
         limit = XEN_CPUID_MAX_NUM_LEAVES;
     else
-    {
-        /* User-specified number of leaves */
-        limit &= 0xff;
-        if ( limit < 2 )
-            limit = 2;
-        else if ( limit > XEN_CPUID_MAX_NUM_LEAVES )
-            limit = XEN_CPUID_MAX_NUM_LEAVES;
-    }
+        /* Clamp toolstack value between 2 and MAX_NUM_LEAVES. */
+        limit = min(max(limit, 2u), XEN_CPUID_MAX_NUM_LEAVES + 0u);
 
     if ( idx > limit )
         return;
@@ -1015,7 +1006,7 @@ void cpuid_hypervisor_leaves(const struct vcpu *v, uint32_t leaf,
         break;
 
     default:
-        BUG();
+        ASSERT_UNREACHABLE();
     }
 }
 

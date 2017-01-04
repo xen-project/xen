@@ -200,6 +200,9 @@ struct cpuid_policy
 #undef __DECL_BITFIELD
 #undef _DECL_BITFIELD
 #undef DECL_BITFIELD
+
+    /* Toolstack selected Hypervisor max_leaf (if non-zero). */
+    uint8_t hv_limit, hv2_limit;
 };
 
 /* Fill in a featureset bitmap from a CPUID policy. */

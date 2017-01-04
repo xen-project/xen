@@ -136,6 +136,14 @@ static int update_domain_cpuid_info(struct domain *d,
             p->basic.raw[ctl->input[0]] = leaf;
         break;
 
+    case 0x40000000:
+        p->hv_limit = ctl->eax;
+        break;
+
+    case 0x40000100:
+        p->hv2_limit = ctl->eax;
+        break;
+
     case 0x80000000 ... 0x80000000 + ARRAY_SIZE(p->extd.raw) - 1:
         p->extd.raw[ctl->input[0] - 0x80000000] = leaf;
         break;
