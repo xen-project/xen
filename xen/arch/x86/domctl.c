@@ -51,13 +51,13 @@ static int gdbsx_guest_mem_io(domid_t domid, struct xen_domctl_gdbsx_memio *iop)
 static int update_legacy_cpuid_array(struct domain *d,
                                      const xen_domctl_cpuid_t *ctl)
 {
-    cpuid_input_t *cpuid, *unused = NULL;
+    xen_domctl_cpuid_t *cpuid, *unused = NULL;
     unsigned int i;
 
     /* Try to insert ctl into d->arch.cpuids[] */
     for ( i = 0; i < MAX_CPUID_INPUT; i++ )
     {
-        cpuid = &d->arch.cpuids[i];
+        cpuid = &d->arch.cpuid->legacy[i];
 
         if ( cpuid->input[0] == XEN_CPUID_INPUT_UNUSED )
         {

@@ -234,9 +234,6 @@ struct paging_vcpu {
     struct shadow_vcpu shadow;
 };
 
-#define MAX_CPUID_INPUT 40
-typedef xen_domctl_cpuid_t cpuid_input_t;
-
 #define MAX_NESTEDP2M 10
 
 #define MAX_ALTP2M      10 /* arbitrary */
@@ -359,8 +356,6 @@ struct arch_domain
      * guest.
      */
     uint8_t x87_fip_width;
-
-    cpuid_input_t *cpuids;
 
     /* CPUID Policy. */
     struct cpuid_policy *cpuid;

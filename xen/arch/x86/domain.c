@@ -503,7 +503,7 @@ static bool emulation_flags_ok(const struct domain *d, uint32_t emflags)
 int arch_domain_create(struct domain *d, unsigned int domcr_flags,
                        struct xen_arch_domainconfig *config)
 {
-    int i, paging_initialised = 0;
+    bool paging_initialised = false;
     int rc = -ENOMEM;
 
     if ( config == NULL && !is_idle_domain(d) )
@@ -606,16 +606,6 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags,
         if ( (rc = init_domain_cpuid_policy(d)) )
             goto fail;
 
-        d->arch.cpuids = xmalloc_array(cpuid_input_t, MAX_CPUID_INPUT);
-        rc = -ENOMEM;
-        if ( d->arch.cpuids == NULL )
-            goto fail;
-        for ( i = 0; i < MAX_CPUID_INPUT; i++ )
-        {
-            d->arch.cpuids[i].input[0] = XEN_CPUID_INPUT_UNUSED;
-            d->arch.cpuids[i].input[1] = XEN_CPUID_INPUT_UNUSED;
-        }
-
         d->arch.x86_vendor = boot_cpu_data.x86_vendor;
         d->arch.x86        = boot_cpu_data.x86;
         d->arch.x86_model  = boot_cpu_data.x86_model;
@@ -678,7 +668,6 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags,
     iommu_domain_destroy(d);
     cleanup_domain_irq_mapping(d);
     free_xenheap_page(d->shared_info);
-    xfree(d->arch.cpuids);
     xfree(d->arch.cpuid);
     if ( paging_initialised )
         paging_final_teardown(d);
@@ -697,7 +686,6 @@ void arch_domain_destroy(struct domain *d)
         hvm_domain_destroy(d);
 
     xfree(d->arch.e820);
-    xfree(d->arch.cpuids);
     xfree(d->arch.cpuid);
 
     free_domain_pirqs(d);

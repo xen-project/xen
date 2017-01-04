@@ -330,6 +330,8 @@ void recalculate_cpuid_policy(struct domain *d)
 
 int init_domain_cpuid_policy(struct domain *d)
 {
+    unsigned int i;
+
     d->arch.cpuid = xmalloc(struct cpuid_policy);
 
     if ( !d->arch.cpuid )
@@ -338,6 +340,12 @@ int init_domain_cpuid_policy(struct domain *d)
     *d->arch.cpuid = is_pv_domain(d) ? pv_max_policy : hvm_max_policy;
 
     recalculate_cpuid_policy(d);
+
+    for ( i = 0; i < MAX_CPUID_INPUT; i++ )
+    {
+        d->arch.cpuid->legacy[i].input[0] = XEN_CPUID_INPUT_UNUSED;
+        d->arch.cpuid->legacy[i].input[1] = XEN_CPUID_INPUT_UNUSED;
+    }
 
     return 0;
 }
@@ -349,7 +357,7 @@ static void domain_cpuid(const struct domain *d, uint32_t leaf,
 
     for ( i = 0; i < MAX_CPUID_INPUT; i++ )
     {
-        cpuid_input_t *cpuid = &d->arch.cpuids[i];
+        xen_domctl_cpuid_t *cpuid = &d->arch.cpuid->legacy[i];
 
         if ( (cpuid->input[0] == leaf) &&
              ((cpuid->input[1] == XEN_CPUID_INPUT_UNUSED) ||
