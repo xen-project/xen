@@ -587,37 +587,9 @@ x86_emulate(
  * In debug builds, wrap x86_emulate() with some assertions about its expected
  * behaviour.
  */
-static inline int x86_emulate_wrapper(
+int x86_emulate_wrapper(
     struct x86_emulate_ctxt *ctxt,
-    const struct x86_emulate_ops *ops)
-{
-    unsigned long orig_eip = ctxt->regs->eip;
-    int rc = x86_emulate(ctxt, ops);
-
-    /* Retire flags should only be set for successful instruction emulation. */
-    if ( rc != X86EMUL_OKAY )
-        ASSERT(ctxt->retire.raw == 0);
-
-    /* All cases returning X86EMUL_EXCEPTION should have fault semantics. */
-    if ( rc == X86EMUL_EXCEPTION )
-        ASSERT(ctxt->regs->eip == orig_eip);
-
-    /*
-     * TODO: Make this true:
-     *
-    ASSERT(ctxt->event_pending == (rc == X86EMUL_EXCEPTION));
-     *
-     * Some codepaths still raise exceptions behind the back of the
-     * emulator. (i.e. return X86EMUL_EXCEPTION but without
-     * event_pending being set).  In the meantime, use a slightly
-     * relaxed check...
-     */
-    if ( ctxt->event_pending )
-        ASSERT(rc == X86EMUL_EXCEPTION);
-
-    return rc;
-}
-
+    const struct x86_emulate_ops *ops);
 #define x86_emulate x86_emulate_wrapper
 #endif
 

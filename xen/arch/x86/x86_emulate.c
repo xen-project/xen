@@ -21,6 +21,8 @@
 #undef cpuid
 #undef wbinvd
 
+#define r(name) r ## name
+
 #define cpu_has_amd_erratum(nr) \
         cpu_has_amd_erratum(&current_cpu_data, AMD_ERRATUM_##nr)
 
