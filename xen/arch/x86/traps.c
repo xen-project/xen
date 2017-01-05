@@ -2169,6 +2169,19 @@ static int priv_op_read_segment(enum x86_segment seg,
                                 struct segment_register *reg,
                                 struct x86_emulate_ctxt *ctxt)
 {
+    /* Check if this is an attempt to access the I/O bitmap. */
+    if ( seg == x86_seg_tr )
+    {
+        switch ( ctxt->opcode )
+        {
+        case 0x6c ... 0x6f: /* ins / outs */
+        case 0xe4 ... 0xe7: /* in / out (immediate port) */
+        case 0xec ... 0xef: /* in / out (port in %dx) */
+            /* Defer the check to priv_op_{read,write}_io(). */
+            return X86EMUL_DONE;
+        }
+    }
+
     if ( ctxt->addr_size < 64 )
     {
         unsigned long limit;
@@ -2182,11 +2195,6 @@ static int priv_op_read_segment(enum x86_segment seg,
         case x86_seg_fs: sel = read_sreg(fs);  break;
         case x86_seg_gs: sel = read_sreg(gs);  break;
         case x86_seg_ss: sel = ctxt->regs->ss; break;
-        case x86_seg_tr:
-            /* Check if this is an attempt to access to I/O bitmap. */
-            if ( (ctxt->opcode & ~0xb) == 0xe4 || (ctxt->opcode & ~3) == 0x6c )
-                return X86EMUL_DONE;
-            /* fall through */
         default: return X86EMUL_UNHANDLEABLE;
         }
 
