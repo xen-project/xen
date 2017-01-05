@@ -3,6 +3,7 @@
 #include <xen/lib.h>
 #include <xen/init.h>
 #include <xen/mm.h>
+#include <xen/stdbool.h>
 #include <asm/flushtlb.h>
 #include <asm/io.h>
 #include <asm/mtrr.h>
@@ -237,7 +238,7 @@ static void mtrr_wrmsr(unsigned int msr, uint64_t msr_content)
  * \param changed pointer which indicates whether the MTRR needed to be changed
  * \param msrwords pointer to the MSR values which the MSR should have
  */
-static void set_fixed_range(int msr, int * changed, unsigned int * msrwords)
+static void set_fixed_range(int msr, bool *changed, unsigned int *msrwords)
 {
 	uint64_t msr_content, val;
 
@@ -246,7 +247,7 @@ static void set_fixed_range(int msr, int * changed, unsigned int * msrwords)
 
 	if (msr_content != val) {
 		mtrr_wrmsr(msr, val);
-		*changed = TRUE;
+		*changed = true;
 	}
 }
 
@@ -302,10 +303,10 @@ static void generic_get_mtrr(unsigned int reg, unsigned long *base,
  * Checks and updates the fixed-range MTRRs if they differ from the saved set
  * \param frs pointer to fixed-range MTRR values, saved by get_fixed_ranges()
  */
-static int set_fixed_ranges(mtrr_type * frs)
+static bool set_fixed_ranges(mtrr_type *frs)
 {
 	unsigned long long *saved = (unsigned long long *) frs;
-	int changed = FALSE;
+	bool changed = false;
 	int block=-1, range;
 
 	while (fixed_range_blocks[++block].ranges)
@@ -316,13 +317,13 @@ static int set_fixed_ranges(mtrr_type * frs)
 	return changed;
 }
 
-/*  Set the MSR pair relating to a var range. Returns TRUE if
+/*  Set the MSR pair relating to a var range. Returns true if
     changes are made  */
-static int set_mtrr_var_ranges(unsigned int index, struct mtrr_var_range *vr)
+static bool set_mtrr_var_ranges(unsigned int index, struct mtrr_var_range *vr)
 {
 	uint32_t lo, hi, base_lo, base_hi, mask_lo, mask_hi;
 	uint64_t msr_content;
-	int changed = FALSE;
+	bool changed = false;
 
 	rdmsrl(MSR_IA32_MTRR_PHYSBASE(index), msr_content);
 	lo = (uint32_t)msr_content;
@@ -337,7 +338,7 @@ static int set_mtrr_var_ranges(unsigned int index, struct mtrr_var_range *vr)
 
 	if ((base_lo != lo) || (base_hi != hi)) {
 		mtrr_wrmsr(MSR_IA32_MTRR_PHYSBASE(index), vr->base);
-		changed = TRUE;
+		changed = true;
 	}
 
 	rdmsrl(MSR_IA32_MTRR_PHYSMASK(index), msr_content);
@@ -353,7 +354,7 @@ static int set_mtrr_var_ranges(unsigned int index, struct mtrr_var_range *vr)
 
 	if ((mask_lo != lo) || (mask_hi != hi)) {
 		mtrr_wrmsr(MSR_IA32_MTRR_PHYSMASK(index), vr->mask);
-		changed = TRUE;
+		changed = true;
 	}
 	return changed;
 }
@@ -478,7 +479,7 @@ static void generic_set_mtrr(unsigned int reg, unsigned long base,
     <base> The base address of the region.
     <size> The size of the region. If this is 0 the region is disabled.
     <type> The type of the region.
-    <do_safe> If TRUE, do the change safely. If FALSE, safety measures should
+    <do_safe> If true, do the change safely. If false, safety measures should
     be done externally.
     [RETURNS] Nothing.
 */
