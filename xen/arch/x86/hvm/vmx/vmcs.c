@@ -1778,10 +1778,10 @@ void vmcs_dump_vcpu(struct vcpu *v)
                vmr(GUEST_PDPTE(2)), vmr(GUEST_PDPTE(3)));
     }
     printk("RSP = 0x%016lx (0x%016lx)  RIP = 0x%016lx (0x%016lx)\n",
-           vmr(GUEST_RSP), regs->esp,
-           vmr(GUEST_RIP), regs->eip);
+           vmr(GUEST_RSP), regs->rsp,
+           vmr(GUEST_RIP), regs->rip);
     printk("RFLAGS=0x%08lx (0x%08lx)  DR7 = 0x%016lx\n",
-           vmr(GUEST_RFLAGS), regs->eflags,
+           vmr(GUEST_RFLAGS), regs->rflags,
            vmr(GUEST_DR7));
     printk("Sysenter RSP=%016lx CS:RIP=%04x:%016lx\n",
            vmr(GUEST_SYSENTER_ESP),

@@ -471,23 +471,23 @@ gp_fault:
 
 static void vmsucceed(struct cpu_user_regs *regs)
 {
-    regs->eflags &= ~X86_EFLAGS_ARITH_MASK;
+    regs->_eflags &= ~X86_EFLAGS_ARITH_MASK;
 }
 
 static void vmfail_valid(struct cpu_user_regs *regs, enum vmx_insn_errno errno)
 {
     struct vcpu *v = current;
-    unsigned long eflags = regs->eflags;
+    unsigned int eflags = regs->_eflags;
 
-    regs->eflags = (eflags & ~X86_EFLAGS_ARITH_MASK) | X86_EFLAGS_ZF;
+    regs->_eflags = (eflags & ~X86_EFLAGS_ARITH_MASK) | X86_EFLAGS_ZF;
     set_vvmcs(v, VM_INSTRUCTION_ERROR, errno);
 }
 
 static void vmfail_invalid(struct cpu_user_regs *regs)
 {
-    unsigned long eflags = regs->eflags;
+    unsigned int eflags = regs->_eflags;
 
-    regs->eflags = (eflags & ~X86_EFLAGS_ARITH_MASK) | X86_EFLAGS_CF;
+    regs->_eflags = (eflags & ~X86_EFLAGS_ARITH_MASK) | X86_EFLAGS_CF;
 }
 
 static void vmfail(struct cpu_user_regs *regs, enum vmx_insn_errno errno)
@@ -1135,9 +1135,9 @@ static void virtual_vmentry(struct cpu_user_regs *regs)
          !(v->arch.hvm_vcpu.guest_efer & EFER_LMA) )
         vvmcs_to_shadow_bulk(v, ARRAY_SIZE(gpdpte_fields), gpdpte_fields);
 
-    regs->eip = get_vvmcs(v, GUEST_RIP);
-    regs->esp = get_vvmcs(v, GUEST_RSP);
-    regs->eflags = get_vvmcs(v, GUEST_RFLAGS);
+    regs->rip = get_vvmcs(v, GUEST_RIP);
+    regs->rsp = get_vvmcs(v, GUEST_RSP);
+    regs->rflags = get_vvmcs(v, GUEST_RFLAGS);
 
     /* updating host cr0 to sync TS bit */
     __vmwrite(HOST_CR0, v->arch.hvm_vmx.host_cr0);
@@ -1169,8 +1169,8 @@ static void sync_vvmcs_guest_state(struct vcpu *v, struct cpu_user_regs *regs)
     shadow_to_vvmcs_bulk(v, ARRAY_SIZE(vmcs_gstate_field),
                          vmcs_gstate_field);
     /* RIP, RSP are in user regs */
-    set_vvmcs(v, GUEST_RIP, regs->eip);
-    set_vvmcs(v, GUEST_RSP, regs->esp);
+    set_vvmcs(v, GUEST_RIP, regs->rip);
+    set_vvmcs(v, GUEST_RSP, regs->rsp);
 
     /* CR3 sync if exec doesn't want cr3 load exiting: i.e. nested EPT */
     if ( !(__n2_exec_control(v) & CPU_BASED_CR3_LOAD_EXITING) )
@@ -1321,10 +1321,10 @@ static void virtual_vmexit(struct cpu_user_regs *regs)
     if ( lm_l1 != lm_l2 )
         paging_update_paging_modes(v);
 
-    regs->eip = get_vvmcs(v, HOST_RIP);
-    regs->esp = get_vvmcs(v, HOST_RSP);
+    regs->rip = get_vvmcs(v, HOST_RIP);
+    regs->rsp = get_vvmcs(v, HOST_RSP);
     /* VM exit clears all bits except bit 1 */
-    regs->eflags = 0x2;
+    regs->rflags = X86_EFLAGS_MBS;
 
     /* updating host cr0 to sync TS bit */
     __vmwrite(HOST_CR0, v->arch.hvm_vmx.host_cr0);
@@ -2248,7 +2248,7 @@ int nvmx_n2_vmexit_handler(struct cpu_user_regs *regs,
         ctrl = __n2_exec_control(v);
         if ( ctrl & CPU_BASED_ACTIVATE_MSR_BITMAP )
         {
-            status = vmx_check_msr_bitmap(nvmx->msrbitmap, regs->ecx,
+            status = vmx_check_msr_bitmap(nvmx->msrbitmap, regs->_ecx,
                          !!(exit_reason == EXIT_REASON_MSR_WRITE));
             if ( status )
                 nvcpu->nv_vmexit_pending = 1;
