@@ -312,12 +312,15 @@ void vmx_intr_assist(void)
         unsigned int i, n;
 
        /*
-        * Set eoi_exit_bitmap for periodic timer interrup to cause EOI-induced VM
-        * exit, then pending periodic time interrups have the chance to be injected
-        * for compensation
+        * intack.vector is the highest priority vector. So we set eoi_exit_bitmap
+        * for intack.vector - give a chance to post periodic time interrupts when
+        * periodic time interrupts become the highest one
         */
-        if (pt_vector != -1)
-            vmx_set_eoi_exit_bitmap(v, pt_vector);
+        if ( pt_vector != -1 )
+        {
+            ASSERT(intack.vector >= pt_vector);
+            vmx_set_eoi_exit_bitmap(v, intack.vector);
+        }
 
         /* we need update the RVI field */
         __vmread(GUEST_INTR_STATUS, &status);
