@@ -6851,6 +6851,17 @@ int libxl_retrieve_domain_configuration(libxl_ctx *ctx, uint32_t domid,
         d_config->b_info.max_memkb = max_memkb;
     }
 
+    /* Scheduler params */
+    {
+        libxl_domain_sched_params_dispose(&d_config->b_info.sched_params);
+        rc = libxl_domain_sched_params_get(ctx, domid,
+                                           &d_config->b_info.sched_params);
+        if (rc) {
+            LOGD(ERROR, domid, "Fail to get scheduler parameters");
+            goto out;
+        }
+    }
+
     /* Devices: disk, nic, vtpm, pcidev etc. */
 
     /* The MERGE macro implements following logic:
