@@ -2100,7 +2100,7 @@ static int pv_emul_virt_to_linear(unsigned long base, unsigned long offset,
 
     *addr = base + offset;
 
-    if ( ctxt->addr_size < 8 )
+    if ( ctxt->addr_size < 64 )
     {
         if ( limit < bytes - 1 || offset > limit - bytes + 1 )
             rc = X86EMUL_EXCEPTION;
@@ -2169,7 +2169,7 @@ static int priv_op_read_segment(enum x86_segment seg,
                                 struct segment_register *reg,
                                 struct x86_emulate_ctxt *ctxt)
 {
-    if ( ctxt->addr_size < 8 )
+    if ( ctxt->addr_size < 64 )
     {
         unsigned long limit;
         unsigned int sel, ar;
