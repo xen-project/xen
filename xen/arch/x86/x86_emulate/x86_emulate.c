@@ -1157,7 +1157,7 @@ _mode_iopl(
     int cpl = get_cpl(ctxt, ops);
     if ( cpl == -1 )
         return -1;
-    return (cpl <= ((ctxt->regs->_eflags >> 12) & 3));
+    return cpl <= MASK_EXTR(ctxt->regs->_eflags, EFLG_IOPL);
 }
 
 #define mode_ring0() ({                         \
