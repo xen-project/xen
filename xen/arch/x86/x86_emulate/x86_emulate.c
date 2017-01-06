@@ -1326,6 +1326,11 @@ static bool vcpu_has(
     vcpu_must_have(feat); \
 })
 #else
+/*
+ * For the test harness both are fine to be used interchangeably, i.e.
+ * features known to always be available (e.g. SSE/SSE2) to (64-bit) Xen
+ * may be checked for by just vcpu_must_have().
+ */
 #define host_and_vcpu_must_have(feat) vcpu_must_have(feat)
 #endif
 
@@ -4910,9 +4915,9 @@ x86_emulate(
         if ( vex.opcx == vex_none )
         {
             if ( vex.pfx & VEX_PREFIX_DOUBLE_MASK )
-                host_and_vcpu_must_have(sse2);
+                vcpu_must_have(sse2);
             else
-                host_and_vcpu_must_have(sse);
+                vcpu_must_have(sse);
             ea.bytes = 16;
             SET_SSE_PREFIX(buf[0], vex.pfx);
             get_fpu(X86EMUL_FPU_xmm, &fic);
@@ -5183,7 +5188,7 @@ x86_emulate(
             {
             case vex_66:
             case vex_f3:
-                host_and_vcpu_must_have(sse2);
+                vcpu_must_have(sse2);
                 /* Converting movdqu to movdqa here: Our buffer is aligned. */
                 buf[0] = 0x66;
                 get_fpu(X86EMUL_FPU_xmm, &fic);
@@ -5193,7 +5198,7 @@ x86_emulate(
                 if ( b != 0xe7 )
                     host_and_vcpu_must_have(mmx);
                 else
-                    host_and_vcpu_must_have(sse);
+                    vcpu_must_have(sse);
                 get_fpu(X86EMUL_FPU_mmx, &fic);
                 ea.bytes = 8;
                 break;

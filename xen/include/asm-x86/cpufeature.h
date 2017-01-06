@@ -38,8 +38,6 @@
 #define cpu_has_sep		boot_cpu_has(X86_FEATURE_SEP)
 #define cpu_has_mtrr		1
 #define cpu_has_mmx		1
-#define cpu_has_sse		boot_cpu_has(X86_FEATURE_SSE)
-#define cpu_has_sse2		boot_cpu_has(X86_FEATURE_SSE2)
 #define cpu_has_sse3		boot_cpu_has(X86_FEATURE_SSE3)
 #define cpu_has_sse4_2		boot_cpu_has(X86_FEATURE_SSE4_2)
 #define cpu_has_htt		boot_cpu_has(X86_FEATURE_HTT)
