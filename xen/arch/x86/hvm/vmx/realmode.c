@@ -66,30 +66,23 @@ static void realmode_deliver_exception(
         }
     }
 
-    frame[0] = regs->eip + insn_len;
+    frame[0] = regs->ip + insn_len;
     frame[1] = csr->sel;
-    frame[2] = regs->eflags & ~X86_EFLAGS_RF;
+    frame[2] = regs->flags & ~X86_EFLAGS_RF;
 
     /* We can't test hvmemul_ctxt->ctxt.sp_size: it may not be initialised. */
     if ( hvmemul_ctxt->seg_reg[x86_seg_ss].attr.fields.db )
-    {
-        regs->esp -= 6;
-        pstk = regs->esp;
-    }
+        pstk = regs->_esp -= 6;
     else
-    {
-        pstk = (uint16_t)(regs->esp - 6);
-        regs->esp &= ~0xffff;
-        regs->esp |= pstk;
-    }
+        pstk = regs->sp -= 6;
 
     pstk += hvmemul_get_seg_reg(x86_seg_ss, hvmemul_ctxt)->base;
     (void)hvm_copy_to_guest_phys(pstk, frame, sizeof(frame));
 
     csr->sel  = cs_eip >> 16;
     csr->base = (uint32_t)csr->sel << 4;
-    regs->eip = (uint16_t)cs_eip;
-    regs->eflags &= ~(X86_EFLAGS_TF | X86_EFLAGS_IF | X86_EFLAGS_RF);
+    regs->ip = (uint16_t)cs_eip;
+    regs->_eflags &= ~(X86_EFLAGS_TF | X86_EFLAGS_IF | X86_EFLAGS_RF);
 
     /* Exception delivery clears STI and MOV-SS blocking. */
     if ( hvmemul_ctxt->intr_shadow &

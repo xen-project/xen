@@ -3093,7 +3093,7 @@ void hvm_task_switch(
         if ( segr.attr.fields.db )
             sp = regs->_esp -= opsz;
         else
-            sp = *(uint16_t *)&regs->esp -= opsz;
+            sp = regs->sp -= opsz;
         if ( hvm_virtual_to_linear_addr(x86_seg_ss, &segr, sp, opsz,
                                         hvm_access_write,
                                         16 << segr.attr.fields.db,

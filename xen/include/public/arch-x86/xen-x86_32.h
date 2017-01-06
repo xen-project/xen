@@ -109,22 +109,44 @@
 
 #ifndef __ASSEMBLY__
 
+#if defined(XEN_GENERATING_COMPAT_HEADERS)
+/* nothing */
+#elif defined(__XEN__) || defined(__XEN_TOOLS__)
+/* Anonymous unions include all permissible names (e.g., al/ah/ax/eax). */
+#define __DECL_REG_LO8(which) union { \
+    uint32_t e ## which ## x, _e ## which ## x; \
+    uint16_t which ## x; \
+    struct { \
+        uint8_t which ## l; \
+        uint8_t which ## h; \
+    }; \
+}
+#define __DECL_REG_LO16(name) union { \
+    uint32_t e ## name, _e ## name; \
+    uint16_t name; \
+}
+#else
+/* Other sources must always use the proper 32-bit name (e.g., eax). */
+#define __DECL_REG_LO8(which) uint32_t e ## which ## x
+#define __DECL_REG_LO16(name) uint32_t e ## name
+#endif
+
 struct cpu_user_regs {
-    uint32_t ebx;
-    uint32_t ecx;
-    uint32_t edx;
-    uint32_t esi;
-    uint32_t edi;
-    uint32_t ebp;
-    uint32_t eax;
+    __DECL_REG_LO8(b);
+    __DECL_REG_LO8(c);
+    __DECL_REG_LO8(d);
+    __DECL_REG_LO16(si);
+    __DECL_REG_LO16(di);
+    __DECL_REG_LO16(bp);
+    __DECL_REG_LO8(a);
     uint16_t error_code;    /* private */
     uint16_t entry_vector;  /* private */
-    uint32_t eip;
+    __DECL_REG_LO16(ip);
     uint16_t cs;
     uint8_t  saved_upcall_mask;
     uint8_t  _pad0;
-    uint32_t eflags;        /* eflags.IF == !saved_upcall_mask */
-    uint32_t esp;
+    __DECL_REG_LO16(flags); /* eflags.IF == !saved_upcall_mask */
+    __DECL_REG_LO16(sp);
     uint16_t ss, _pad1;
     uint16_t es, _pad2;
     uint16_t ds, _pad3;
@@ -133,6 +155,9 @@ struct cpu_user_regs {
 };
 typedef struct cpu_user_regs cpu_user_regs_t;
 DEFINE_XEN_GUEST_HANDLE(cpu_user_regs_t);
+
+#undef __DECL_REG_LO8
+#undef __DECL_REG_LO16
 
 /*
  * Page-directory addresses above 4GB do not fit into architectural %cr3.

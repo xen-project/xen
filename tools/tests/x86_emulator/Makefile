@@ -46,7 +46,7 @@ x86_emulate/x86_emulate.c x86_emulate/x86_emulate.h:
 HOSTCFLAGS += $(CFLAGS_xeninclude)
 
 x86_emulate.o: x86_emulate.c x86_emulate/x86_emulate.c x86_emulate/x86_emulate.h
-	$(HOSTCC) $(HOSTCFLAGS) -c -g -o $@ $<
+	$(HOSTCC) $(HOSTCFLAGS) -D__XEN_TOOLS__ -c -g -o $@ $<
 
 test_x86_emulator.o: test_x86_emulator.c blowfish.h x86_emulate/x86_emulate.h
 	$(HOSTCC) $(HOSTCFLAGS) -c -g -o $@ $<

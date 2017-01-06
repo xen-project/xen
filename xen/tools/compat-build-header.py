@@ -7,6 +7,8 @@ pats = [
  [ r"__IfDeF__ (XEN_HAVE.*)", r"#ifdef \1" ],
  [ r"__ElSe__", r"#else" ],
  [ r"__EnDif__", r"#endif" ],
+ [ r"__DeFiNe__", r"#define" ],
+ [ r"__UnDeF__", r"#undef" ],
  [ r"\"xen-compat.h\"", r"<public/xen-compat.h>" ],
  [ r"(struct|union|enum)\s+(xen_?)?(\w)", r"\1 compat_\3" ],
  [ r"@KeeP@", r"" ],

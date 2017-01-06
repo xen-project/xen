@@ -57,7 +57,17 @@
 #define set_xen_guest_handle(hnd, val) set_xen_guest_handle_raw(hnd, val)
 
 #if defined(__i386__)
+# ifdef __XEN__
+__DeFiNe__ __DECL_REG_LO8(which) uint32_t _e ## which ## x
+__DeFiNe__ __DECL_REG_LO16(name) union { uint32_t e ## name, _e ## name; }
+# endif
 #include "xen-x86_32.h"
+# ifdef __XEN__
+__UnDeF__ __DECL_REG_LO8
+__UnDeF__ __DECL_REG_LO16
+__DeFiNe__ __DECL_REG_LO8(which) _e ## which ## x
+__DeFiNe__ __DECL_REG_LO16(name) _e ## name
+# endif
 #elif defined(__x86_64__)
 #include "xen-x86_64.h"
 #endif

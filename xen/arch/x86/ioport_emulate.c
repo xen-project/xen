@@ -12,8 +12,8 @@
 static void ioemul_handle_proliant_quirk(
     u8 opcode, char *io_emul_stub, struct cpu_user_regs *regs)
 {
-    uint16_t port = regs->edx;
-    uint8_t value = regs->eax;
+    uint16_t port = regs->dx;
+    uint8_t value = regs->al;
 
     if ( (opcode != 0xee) || (port != 0xcd4) || !(value & 0x80) )
         return;
