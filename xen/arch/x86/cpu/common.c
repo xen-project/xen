@@ -163,8 +163,11 @@ int get_cpu_vendor(uint32_t b, uint32_t c, uint32_t d, enum get_cpu_vendor mode)
 
 	for (i = 0; i < X86_VENDOR_NUM; i++) {
 		if (cpu_devs[i]) {
-			if (cpu_devs[i]->b == b && cpu_devs[i]->c == c &&
-			    cpu_devs[i]->d == d) {
+			struct {
+				uint32_t b, d, c;
+			} *ptr = (void *)cpu_devs[i]->c_ident;
+
+			if (ptr->b == b && ptr->c == c && ptr->d == d) {
 				if (mode == gcv_host)
 					this_cpu = cpu_devs[i];
 				return i;
