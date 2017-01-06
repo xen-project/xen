@@ -5343,8 +5343,27 @@ x86_emulate(
     case X86EMUL_OPC(0x0f, 0xae): case X86EMUL_OPC_66(0x0f, 0xae): /* Grp15 */
         switch ( modrm_reg & 7 )
         {
-        case 7: /* clflush{,opt} */
-            fail_if(modrm_mod == 3);
+        case 5: /* lfence */
+            fail_if(modrm_mod != 3);
+            generate_exception_if(vex.pfx, EXC_UD);
+            vcpu_must_have(sse2);
+            asm volatile ( "lfence" ::: "memory" );
+            break;
+        case 6: /* mfence */
+            fail_if(modrm_mod != 3);
+            generate_exception_if(vex.pfx, EXC_UD);
+            vcpu_must_have(sse2);
+            asm volatile ( "mfence" ::: "memory" );
+            break;
+        case 7:
+            if ( modrm_mod == 3 ) /* sfence */
+            {
+                generate_exception_if(vex.pfx, EXC_UD);
+                vcpu_must_have(sse);
+                asm volatile ( "sfence" ::: "memory" );
+                break;
+            }
+            /* else clflush{,opt} */
             if ( !vex.pfx )
                 vcpu_must_have(clflush);
             else
