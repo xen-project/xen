@@ -66,16 +66,16 @@ gdb_arch_resume(struct cpu_user_regs *regs,
                 struct gdb_context *ctx)
 {
     if ( addr != -1UL )
-        regs->eip = addr;
+        regs->rip = addr;
 
-    regs->eflags &= ~X86_EFLAGS_TF;
+    regs->_eflags &= ~X86_EFLAGS_TF;
 
     /* Set eflags.RF to ensure we do not re-enter. */
-    regs->eflags |= X86_EFLAGS_RF;
+    regs->_eflags |= X86_EFLAGS_RF;
 
     /* Set the trap flag if we are single stepping. */
     if ( type == GDB_STEP )
-        regs->eflags |= X86_EFLAGS_TF;
+        regs->_eflags |= X86_EFLAGS_TF;
 }
 
 /*

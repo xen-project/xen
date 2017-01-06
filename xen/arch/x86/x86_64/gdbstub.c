@@ -44,7 +44,7 @@ gdb_arch_read_reg_array(struct cpu_user_regs *regs, struct gdb_context *ctx)
     GDB_REG64(regs->r15);
 
     GDB_REG64(regs->rip);
-    GDB_REG32(regs->eflags);
+    GDB_REG32(regs->_eflags);
 
     GDB_REG32(regs->cs);
     GDB_REG32(regs->ss);
