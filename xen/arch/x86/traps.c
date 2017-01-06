@@ -3012,9 +3012,11 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
 
     /*
      * Un-mirror virtualized state from EFLAGS.
-     * Nothing we allow to be emulated can change TF, IF, or IOPL.
+     * Nothing we allow to be emulated can change anything other than the
+     * arithmetic bits, and the resume flag.
      */
-    ASSERT(!((regs->_eflags ^ eflags) & (X86_EFLAGS_IF | X86_EFLAGS_IOPL)));
+    ASSERT(!((regs->_eflags ^ eflags) &
+             ~(X86_EFLAGS_RF | X86_EFLAGS_ARITH_MASK)));
     regs->_eflags |= X86_EFLAGS_IF;
     regs->_eflags &= ~X86_EFLAGS_IOPL;
 
