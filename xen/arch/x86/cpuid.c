@@ -427,6 +427,9 @@ int init_domain_cpuid_policy(struct domain *d)
 
     *d->arch.cpuid = is_pv_domain(d) ? pv_max_policy : hvm_max_policy;
 
+    if ( d->disable_migrate )
+        d->arch.cpuid->extd.itsc = cpu_has_itsc;
+
     recalculate_cpuid_policy(d);
 
     for ( i = 0; i < MAX_CPUID_INPUT; i++ )
