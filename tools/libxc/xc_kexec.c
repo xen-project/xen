@@ -27,8 +27,8 @@ int xc_kexec_exec(xc_interface *xch, int type)
     exec->type = type;
 
     ret = xencall2(xch->xcall, __HYPERVISOR_kexec_op,
-		   KEXEC_CMD_kexec,
-		   HYPERCALL_BUFFER_AS_ARG(exec));
+                   KEXEC_CMD_kexec,
+                   HYPERCALL_BUFFER_AS_ARG(exec));
 
 out:
     xc_hypercall_buffer_free(xch, exec);
@@ -53,8 +53,8 @@ int xc_kexec_get_range(xc_interface *xch, int range,  int nr,
     get_range->nr = nr;
 
     ret = xencall2(xch->xcall, __HYPERVISOR_kexec_op,
-		   KEXEC_CMD_kexec_get_range,
-		   HYPERCALL_BUFFER_AS_ARG(get_range));
+                   KEXEC_CMD_kexec_get_range,
+                   HYPERCALL_BUFFER_AS_ARG(get_range));
 
     *size = get_range->size;
     *start = get_range->start;
@@ -93,8 +93,8 @@ int xc_kexec_load(xc_interface *xch, uint8_t type, uint16_t arch,
     set_xen_guest_handle(load->segments.h, segments);
 
     ret = xencall2(xch->xcall, __HYPERVISOR_kexec_op,
-		   KEXEC_CMD_kexec_load,
-		   HYPERCALL_BUFFER_AS_ARG(load));
+                   KEXEC_CMD_kexec_load,
+                   HYPERCALL_BUFFER_AS_ARG(load));
 
 out:
     xc_hypercall_buffer_free(xch, load);
@@ -118,8 +118,8 @@ int xc_kexec_unload(xc_interface *xch, int type)
     unload->type = type;
 
     ret = xencall2(xch->xcall, __HYPERVISOR_kexec_op,
-		   KEXEC_CMD_kexec_unload,
-		   HYPERCALL_BUFFER_AS_ARG(unload));
+                   KEXEC_CMD_kexec_unload,
+                   HYPERCALL_BUFFER_AS_ARG(unload));
 
 out:
     xc_hypercall_buffer_free(xch, unload);
