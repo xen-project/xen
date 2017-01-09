@@ -175,8 +175,9 @@ static void intel_ctxt_switch_levelling(const struct vcpu *next)
 		 * generating the maximum full cpuid policy into Xen, at which
 		 * this problem will disappear.
 		 */
-		set_cpuid_faulting(nextd && is_pv_domain(nextd) &&
-				   !is_control_domain(nextd));
+		set_cpuid_faulting(nextd && !is_control_domain(nextd) &&
+				   (is_pv_domain(nextd) ||
+				    next->arch.cpuid_faulting));
 		return;
 	}
 

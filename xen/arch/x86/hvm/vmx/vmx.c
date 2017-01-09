@@ -2866,11 +2866,19 @@ static int vmx_msr_write_intercept(unsigned int msr, uint64_t msr_content)
         break;
 
     case MSR_INTEL_MISC_FEATURES_ENABLES:
+    {
+        bool old_cpuid_faulting = v->arch.cpuid_faulting;
+
         if ( msr_content & ~MSR_MISC_FEATURES_CPUID_FAULTING )
             goto gp_fault;
-        v->arch.cpuid_faulting =
-            !!(msr_content & MSR_MISC_FEATURES_CPUID_FAULTING);
+
+        v->arch.cpuid_faulting = msr_content & MSR_MISC_FEATURES_CPUID_FAULTING;
+
+        if ( cpu_has_cpuid_faulting &&
+             (old_cpuid_faulting ^ v->arch.cpuid_faulting) )
+            ctxt_switch_levelling(v);
         break;
+    }
 
     default:
         if ( passive_domain_do_wrmsr(msr, msr_content) )
