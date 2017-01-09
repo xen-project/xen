@@ -615,6 +615,11 @@ static void xc_cpuid_pv_policy(xc_interface *xch,
 {
     switch ( input[0] )
     {
+    case 0x00000000:
+        if ( regs[0] > DEF_MAX_BASE )
+            regs[0] = DEF_MAX_BASE;
+        break;
+
     case 0x00000001:
     {
         /* Host topology exposed to PV guest.  Provide host value. */
@@ -654,6 +659,16 @@ static void xc_cpuid_pv_policy(xc_interface *xch,
     case 0x0000000d:
         xc_cpuid_config_xsave(xch, info, input, regs);
         break;
+
+    case 0x80000000:
+    {
+        unsigned int max = info->vendor == VENDOR_AMD
+            ? DEF_MAX_AMDEXT : DEF_MAX_INTELEXT;
+
+        if ( regs[0] > max )
+            regs[0] = max;
+        break;
+    }
 
     case 0x80000001:
     {
