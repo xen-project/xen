@@ -283,6 +283,13 @@ while (<$maint>) {
 
 	##Filename pattern matching
 	if ($type eq "F" || $type eq "X") {
+	    # Bash brace expansion, not nested
+	    # match {,*,*} and transform ',' to '|' one by one.
+	    # While there is more than one ',', convert one to '|'.
+	    while ($value =~ s/([^\\])\{(|[^},]*[^,\\]),((|[^},]*[^,\\]),(|[^}]*[^\\]))\}/$1\{$2|$3\}/g) {
+	    }
+	    $value =~ s/([^\\])\{(|[^},]*[^,\\]),(|[^}]*[^\\])\}/$1($2|$3)/g;
+
 	    $value =~ s@\.@\\\.@g;       ##Convert . to \.
 	    $value =~ s/\*/\.\*/g;       ##Convert * to .*
 	    $value =~ s/\?/\./g;         ##Convert ? to .
@@ -637,6 +644,12 @@ sub get_maintainers {
 			$line =~ s/([^\\])\.$/$1\?/g;	##Convert . back to ?
 			$line =~ s/\\\./\./g;       	##Convert \. to .
 			$line =~ s/\.\*/\*/g;       	##Convert .* to *
+			## Convert (|) back to {,}
+			# match (|*|*) and transform '|' to ',' one by one
+			# While there is more than one '|', convert one to ','.
+			while ($line =~ s/([^\\])\((|[^)|]*[^|\\])\|((|[^)|]*[^|\\])\|(|[^)]*[^\\]))\)/$1($2,$3)/g) {
+			}
+			$line =~ s/([^\\])\((|[^)|]*[^|\\])\|(|[^)]*[^\\])\)/$1\{$2,$3\}/g;
 		    }
 		    $line =~ s/^([A-Z]):/$1:\t/g;
 		    print("$line\n");
