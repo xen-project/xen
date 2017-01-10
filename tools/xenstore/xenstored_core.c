@@ -1157,17 +1157,6 @@ static int _rm(struct connection *conn, const void *ctx, struct node *node,
 }
 
 
-static void internal_rm(const char *name)
-{
-	char *tname = talloc_strdup(NULL, name);
-	struct node *node = read_node(NULL, tname, tname);
-	if (node)
-		_rm(NULL, tname, node, tname);
-	talloc_free(node);
-	talloc_free(tname);
-}
-
-
 static int do_rm(struct connection *conn, struct buffered_data *in)
 {
 	struct node *node;
@@ -1582,49 +1571,18 @@ static void setup_structure(void)
 		barf_perror("Could not create tdbname");
 
 	if (!(tdb_flags & TDB_INTERNAL))
-		tdb_ctx = tdb_open_ex(tdbname, 0, tdb_flags, O_RDWR, 0,
-				      &tdb_logger, NULL);
+		unlink(tdbname);
 
-	if (tdb_ctx) {
-		/* XXX When we make xenstored able to restart, this will have
-		   to become cleverer, checking for existing domains and not
-		   removing the corresponding entries, but for now xenstored
-		   cannot be restarted without losing all the registered
-		   watches, which breaks all the backend drivers anyway.  We
-		   can therefore get away with just clearing /local and
-		   expecting Xend to put the appropriate entries back in.
+	tdb_ctx = tdb_open_ex(tdbname, 7919, tdb_flags, O_RDWR|O_CREAT|O_EXCL,
+			      0640, &tdb_logger, NULL);
+	if (!tdb_ctx)
+		barf_perror("Could not create tdb file %s", tdbname);
 
-		   When this change is made it is important to note that
-		   dom0's entries must be cleaned up on reboot _before_ this
-		   daemon starts, otherwise the backend drivers and dom0's
-		   balloon driver will pick up stale entries.  In the case of
-		   the balloon driver, this can be fatal.
-		*/
-		char *tlocal = talloc_strdup(NULL, "/local");
+	manual_node("/", "tool");
+	manual_node("/tool", "xenstored");
+	manual_node("/tool/xenstored", NULL);
 
-		check_store();
-
-		if (remove_local) {
-			internal_rm("/local");
-			create_node(NULL, NULL, tlocal, NULL, 0);
-
-			check_store();
-		}
-
-		talloc_free(tlocal);
-	}
-	else {
-		tdb_ctx = tdb_open_ex(tdbname, 7919, tdb_flags, O_RDWR|O_CREAT,
-				      0640, &tdb_logger, NULL);
-		if (!tdb_ctx)
-			barf_perror("Could not create tdb file %s", tdbname);
-
-		manual_node("/", "tool");
-		manual_node("/tool", "xenstored");
-		manual_node("/tool/xenstored", NULL);
-
-		check_store();
-	}
+	check_store();
 }
 
 
