@@ -54,7 +54,7 @@
 #endif
 
 #define TDB_MAGIC_FOOD "TDB file\n"
-#define TDB_VERSION (0x26011967 + 6)
+#define TDB_VERSION (0x26011967 + 7)
 #define TDB_MAGIC (0x26011999U)
 #define TDB_FREE_MAGIC (~TDB_MAGIC)
 #define TDB_DEAD_MAGIC (0xFEE1DEAD)
