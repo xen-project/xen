@@ -926,17 +926,18 @@ static inline void svm_lwp_load(struct vcpu *v)
 /* Update LWP_CFG MSR (0xc0000105). Return -1 if error; otherwise returns 0. */
 static int svm_update_lwp_cfg(struct vcpu *v, uint64_t msr_content)
 {
-    unsigned int edx;
     uint32_t msr_low;
     static uint8_t lwp_intr_vector;
 
     if ( xsave_enabled(v) && cpu_has_lwp )
     {
-        hvm_cpuid(0x8000001c, NULL, NULL, NULL, &edx);
+        struct cpuid_leaf res;
+
+        guest_cpuid(v, 0x8000001c, 0, &res);
         msr_low = (uint32_t)msr_content;
         
         /* generate #GP if guest tries to turn on unsupported features. */
-        if ( msr_low & ~edx)
+        if ( msr_low & ~res.d)
             return -1;
 
         v->arch.hvm_svm.guest_lwp_cfg = msr_content;
