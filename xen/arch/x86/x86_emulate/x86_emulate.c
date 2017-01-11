@@ -1309,6 +1309,7 @@ static bool vcpu_has(
 #define vcpu_has_rtm()         vcpu_has(         7, EBX, 11, ctxt, ops)
 #define vcpu_has_smap()        vcpu_has(         7, EBX, 20, ctxt, ops)
 #define vcpu_has_clflushopt()  vcpu_has(         7, EBX, 23, ctxt, ops)
+#define vcpu_has_clwb()        vcpu_has(         7, EBX, 24, ctxt, ops)
 
 #define vcpu_must_have(feat) \
     generate_exception_if(!vcpu_has_##feat(), EXC_UD)
@@ -5334,11 +5335,20 @@ x86_emulate(
             vcpu_must_have(sse2);
             asm volatile ( "lfence" ::: "memory" );
             break;
-        case 6: /* mfence */
-            fail_if(modrm_mod != 3);
-            generate_exception_if(vex.pfx, EXC_UD);
-            vcpu_must_have(sse2);
-            asm volatile ( "mfence" ::: "memory" );
+        case 6:
+            if ( modrm_mod == 3 ) /* mfence */
+            {
+                generate_exception_if(vex.pfx, EXC_UD);
+                vcpu_must_have(sse2);
+                asm volatile ( "mfence" ::: "memory" );
+                break;
+            }
+            /* else clwb */
+            fail_if(!vex.pfx);
+            vcpu_must_have(clwb);
+            fail_if(!ops->wbinvd);
+            if ( (rc = ops->wbinvd(ctxt)) != X86EMUL_OKAY )
+                goto done;
             break;
         case 7:
             if ( modrm_mod == 3 ) /* sfence */
