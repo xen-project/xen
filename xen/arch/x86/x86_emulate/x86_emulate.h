@@ -164,6 +164,11 @@ enum x86_emulate_fpu_type {
     X86EMUL_FPU_ymm  /* AVX/XOP instruction set (%ymm0-%ymm7/15) */
 };
 
+struct cpuid_leaf
+{
+    uint32_t a, b, c, d;
+};
+
 struct x86_emulate_state;
 
 /*
@@ -415,10 +420,9 @@ struct x86_emulate_ops
      * #GP[0].  Used to implement CPUID faulting.
      */
     int (*cpuid)(
-        unsigned int *eax,
-        unsigned int *ebx,
-        unsigned int *ecx,
-        unsigned int *edx,
+        uint32_t leaf,
+        uint32_t subleaf,
+        struct cpuid_leaf *res,
         struct x86_emulate_ctxt *ctxt);
 
     /*

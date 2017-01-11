@@ -1,5 +1,6 @@
 #include <xen/init.h>
 #include <xen/lib.h>
+#include <xen/sched.h>
 #include <asm/cpuid.h>
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/vmx/vmcs.h>
@@ -16,6 +17,8 @@ static const uint32_t __initconst deep_features[] = INIT_DEEP_FEATURES;
 uint32_t __read_mostly raw_featureset[FSCAPINTS];
 uint32_t __read_mostly pv_featureset[FSCAPINTS];
 uint32_t __read_mostly hvm_featureset[FSCAPINTS];
+
+#define EMPTY_LEAF ((struct cpuid_leaf){})
 
 static void __init sanitise_featureset(uint32_t *fs)
 {
@@ -213,6 +216,38 @@ const uint32_t * __init lookup_deep_deps(uint32_t feature)
     }
 
     return NULL;
+}
+
+void guest_cpuid(const struct vcpu *v, uint32_t leaf,
+                 uint32_t subleaf, struct cpuid_leaf *res)
+{
+    const struct domain *d = v->domain;
+
+    *res = EMPTY_LEAF;
+
+    /* {hvm,pv}_cpuid() have this expectation. */
+    ASSERT(v == current);
+
+    if ( is_hvm_domain(d) )
+    {
+        res->c = subleaf;
+
+        hvm_cpuid(leaf, &res->a, &res->b, &res->c, &res->d);
+    }
+    else
+    {
+        struct cpu_user_regs regs = *guest_cpu_user_regs();
+
+        regs._eax = leaf;
+        regs._ecx = subleaf;
+
+        pv_cpuid(&regs);
+
+        res->a = regs._eax;
+        res->b = regs._ebx;
+        res->c = regs._ecx;
+        res->d = regs._edx;
+    }
 }
 
 static void __init __maybe_unused build_assertions(void)

@@ -41,22 +41,21 @@ bool emul_test_make_stack_executable(void)
 }
 
 int emul_test_cpuid(
-    unsigned int *eax,
-    unsigned int *ebx,
-    unsigned int *ecx,
-    unsigned int *edx,
+    uint32_t leaf,
+    uint32_t subleaf,
+    struct cpuid_leaf *res,
     struct x86_emulate_ctxt *ctxt)
 {
-    unsigned int leaf = *eax;
-
-    asm ("cpuid" : "+a" (*eax), "+c" (*ecx), "=d" (*edx), "=b" (*ebx));
+    asm ("cpuid"
+         : "=a" (res->a), "=b" (res->b), "=c" (res->c), "=d" (res->d)
+         : "a" (leaf), "c" (subleaf));
 
     /*
      * The emulator doesn't itself use MOVBE, so we can always run the
      * respective tests.
      */
     if ( leaf == 1 )
-        *ecx |= 1U << 22;
+        res->c |= 1U << 22;
 
     return X86EMUL_OKAY;
 }

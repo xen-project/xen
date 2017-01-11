@@ -1552,12 +1552,8 @@ static int hvmemul_wbinvd(
     return X86EMUL_OKAY;
 }
 
-int hvmemul_cpuid(
-    unsigned int *eax,
-    unsigned int *ebx,
-    unsigned int *ecx,
-    unsigned int *edx,
-    struct x86_emulate_ctxt *ctxt)
+int hvmemul_cpuid(uint32_t leaf, uint32_t subleaf,
+                  struct cpuid_leaf *res, struct x86_emulate_ctxt *ctxt)
 {
     /*
      * x86_emulate uses this function to query CPU features for its own internal
@@ -1568,7 +1564,7 @@ int hvmemul_cpuid(
          hvm_check_cpuid_faulting(current) )
         return X86EMUL_EXCEPTION;
 
-    hvm_cpuid(*eax, eax, ebx, ecx, edx);
+    guest_cpuid(current, leaf, subleaf, res);
     return X86EMUL_OKAY;
 }
 

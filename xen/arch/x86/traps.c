@@ -1412,6 +1412,7 @@ static int emulate_forced_invalid_op(struct cpu_user_regs *regs)
 {
     char sig[5], instr[2];
     unsigned long eip, rc;
+    struct cpuid_leaf res;
 
     eip = regs->rip;
 
@@ -1444,7 +1445,12 @@ static int emulate_forced_invalid_op(struct cpu_user_regs *regs)
 
     eip += sizeof(instr);
 
-    pv_cpuid(regs);
+    guest_cpuid(current, regs->_eax, regs->_ecx, &res);
+
+    regs->rax = res.a;
+    regs->rbx = res.b;
+    regs->rcx = res.c;
+    regs->rdx = res.d;
 
     instruction_done(regs, eip);
 
@@ -3254,10 +3260,10 @@ static int priv_op_wbinvd(struct x86_emulate_ctxt *ctxt)
     return X86EMUL_OKAY;
 }
 
-int pv_emul_cpuid(unsigned int *eax, unsigned int *ebx, unsigned int *ecx,
-                  unsigned int *edx, struct x86_emulate_ctxt *ctxt)
+int pv_emul_cpuid(uint32_t leaf, uint32_t subleaf,
+                  struct cpuid_leaf *res, struct x86_emulate_ctxt *ctxt)
 {
-    struct cpu_user_regs regs = *ctxt->regs;
+    const struct vcpu *curr = current;
 
     /*
      * x86_emulate uses this function to query CPU features for its own
@@ -3266,7 +3272,6 @@ int pv_emul_cpuid(unsigned int *eax, unsigned int *ebx, unsigned int *ecx,
      */
     if ( ctxt->opcode == X86EMUL_OPC(0x0f, 0xa2) )
     {
-        const struct vcpu *curr = current;
 
         /* If cpuid faulting is enabled and CPL>0 leave the #GP untouched. */
         if ( curr->arch.cpuid_faulting &&
@@ -3274,15 +3279,7 @@ int pv_emul_cpuid(unsigned int *eax, unsigned int *ebx, unsigned int *ecx,
             return X86EMUL_EXCEPTION;
     }
 
-    regs._eax = *eax;
-    regs._ecx = *ecx;
-
-    pv_cpuid(&regs);
-
-    *eax = regs._eax;
-    *ebx = regs._ebx;
-    *ecx = regs._ecx;
-    *edx = regs._edx;
+    guest_cpuid(curr, leaf, subleaf, res);
 
     return X86EMUL_OKAY;
 }

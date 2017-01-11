@@ -1265,19 +1265,19 @@ static bool vcpu_has(
     struct x86_emulate_ctxt *ctxt,
     const struct x86_emulate_ops *ops)
 {
-    unsigned int ebx = 0, ecx = 0, edx = 0;
+    struct cpuid_leaf res;
     int rc = X86EMUL_OKAY;
 
     fail_if(!ops->cpuid);
-    rc = ops->cpuid(&eax, &ebx, &ecx, &edx, ctxt);
+    rc = ops->cpuid(eax, 0, &res, ctxt);
     if ( rc == X86EMUL_OKAY )
     {
         switch ( reg )
         {
-        case EAX: reg = eax; break;
-        case EBX: reg = ebx; break;
-        case ECX: reg = ecx; break;
-        case EDX: reg = edx; break;
+        case EAX: reg = res.a; break;
+        case EBX: reg = res.b; break;
+        case ECX: reg = res.c; break;
+        case EDX: reg = res.d; break;
         default: BUG();
         }
         if ( !(reg & (1U << bit)) )
@@ -2722,6 +2722,7 @@ x86_emulate(
     {
         enum x86_segment seg;
         struct segment_register cs, sreg;
+        struct cpuid_leaf cpuid_leaf;
 
     case 0x00 ... 0x05: add: /* add */
         emulate_2op_SrcV("add", src, dst, _regs._eflags);
@@ -4525,15 +4526,14 @@ x86_emulate(
 
         case 0xfc: /* clzero */
         {
-            unsigned int eax = 1, ebx = 0, dummy = 0;
             unsigned long zero = 0;
 
             base = ad_bytes == 8 ? _regs.r(ax) :
                    ad_bytes == 4 ? _regs._eax : _regs.ax;
             limit = 0;
             if ( vcpu_has_clflush() &&
-                 ops->cpuid(&eax, &ebx, &dummy, &dummy, ctxt) == X86EMUL_OKAY )
-                limit = ((ebx >> 8) & 0xff) * 8;
+                 ops->cpuid(1, 0, &cpuid_leaf, ctxt) == X86EMUL_OKAY )
+                limit = ((cpuid_leaf.b >> 8) & 0xff) * 8;
             generate_exception_if(limit < sizeof(long) ||
                                   (limit & (limit - 1)), EXC_UD);
             base &= ~(limit - 1);
@@ -5265,22 +5265,18 @@ x86_emulate(
         dst.val = test_cc(b, _regs._eflags);
         break;
 
-    case X86EMUL_OPC(0x0f, 0xa2): /* cpuid */ {
-        unsigned int eax = _regs._eax, ebx = _regs._ebx;
-        unsigned int ecx = _regs._ecx, edx = _regs._edx;
-
+    case X86EMUL_OPC(0x0f, 0xa2): /* cpuid */
         fail_if(ops->cpuid == NULL);
-        rc = ops->cpuid(&eax, &ebx, &ecx, &edx, ctxt);
+        rc = ops->cpuid(_regs._eax, _regs._ecx, &cpuid_leaf, ctxt);
         generate_exception_if(rc == X86EMUL_EXCEPTION,
                               EXC_GP, 0); /* CPUID Faulting? */
         if ( rc != X86EMUL_OKAY )
             goto done;
-        _regs.r(ax) = eax;
-        _regs.r(bx) = ebx;
-        _regs.r(cx) = ecx;
-        _regs.r(dx) = edx;
+        _regs.r(ax) = cpuid_leaf.a;
+        _regs.r(bx) = cpuid_leaf.b;
+        _regs.r(cx) = cpuid_leaf.c;
+        _regs.r(dx) = cpuid_leaf.d;
         break;
-    }
 
     case X86EMUL_OPC(0x0f, 0xa3): bt: /* bt */
         emulate_2op_SrcV_nobyte("bt", src, dst, _regs._eflags);

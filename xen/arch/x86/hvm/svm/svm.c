@@ -1572,23 +1572,20 @@ static void svm_fpu_dirty_intercept(void)
 
 static void svm_vmexit_do_cpuid(struct cpu_user_regs *regs)
 {
-    unsigned int eax, ebx, ecx, edx, inst_len;
+    struct vcpu *curr = current;
+    unsigned int inst_len;
+    struct cpuid_leaf res;
 
-    if ( (inst_len = __get_instruction_length(current, INSTR_CPUID)) == 0 )
+    if ( (inst_len = __get_instruction_length(curr, INSTR_CPUID)) == 0 )
         return;
 
-    eax = regs->_eax;
-    ebx = regs->_ebx;
-    ecx = regs->_ecx;
-    edx = regs->_edx;
+    guest_cpuid(curr, regs->_eax, regs->_ecx, &res);
+    HVMTRACE_5D(CPUID, regs->_eax, res.a, res.b, res.c, res.d);
 
-    hvm_cpuid(regs->_eax, &eax, &ebx, &ecx, &edx);
-    HVMTRACE_5D(CPUID, regs->_eax, eax, ebx, ecx, edx);
-
-    regs->rax = eax;
-    regs->rbx = ebx;
-    regs->rcx = ecx;
-    regs->rdx = edx;
+    regs->rax = res.a;
+    regs->rbx = res.b;
+    regs->rcx = res.c;
+    regs->rdx = res.d;
 
     __update_guest_eip(regs, inst_len);
 }

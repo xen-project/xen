@@ -17,6 +17,7 @@
 
 #ifndef __ASSEMBLY__
 #include <xen/types.h>
+#include <asm/x86_emulate.h>
 #include <public/sysctl.h>
 
 extern const uint32_t known_features[FSCAPINTS];
@@ -63,6 +64,9 @@ extern struct cpuidmasks cpuidmask_defaults;
 
 /* Whether or not cpuid faulting is available for the current domain. */
 DECLARE_PER_CPU(bool, cpuid_faulting_enabled);
+
+void guest_cpuid(const struct vcpu *v, uint32_t leaf,
+                 uint32_t subleaf, struct cpuid_leaf *res);
 
 #endif /* __ASSEMBLY__ */
 #endif /* !__X86_CPUID_H__ */

@@ -2361,8 +2361,9 @@ static void vmx_fpu_dirty_intercept(void)
 
 static int vmx_do_cpuid(struct cpu_user_regs *regs)
 {
-    unsigned int eax, ebx, ecx, edx;
-    unsigned int leaf, subleaf;
+    struct vcpu *curr = current;
+    uint32_t leaf = regs->_eax, subleaf = regs->_ecx;
+    struct cpuid_leaf res;
 
     if ( hvm_check_cpuid_faulting(current) )
     {
@@ -2370,21 +2371,13 @@ static int vmx_do_cpuid(struct cpu_user_regs *regs)
         return 1;  /* Don't advance the guest IP! */
     }
 
-    eax = regs->_eax;
-    ebx = regs->_ebx;
-    ecx = regs->_ecx;
-    edx = regs->_edx;
+    guest_cpuid(curr, leaf, subleaf, &res);
+    HVMTRACE_5D(CPUID, leaf, res.a, res.b, res.c, res.d);
 
-    leaf = regs->_eax;
-    subleaf = regs->_ecx;
-
-    hvm_cpuid(leaf, &eax, &ebx, &ecx, &edx);
-    HVMTRACE_5D(CPUID, leaf, eax, ebx, ecx, edx);
-
-    regs->rax = eax;
-    regs->rbx = ebx;
-    regs->rcx = ecx;
-    regs->rdx = edx;
+    regs->rax = res.a;
+    regs->rbx = res.b;
+    regs->rcx = res.c;
+    regs->rdx = res.d;
 
     return hvm_monitor_cpuid(get_instruction_length(), leaf, subleaf);
 }
@@ -3559,15 +3552,7 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
     }
     case EXIT_REASON_CPUID:
     {
-        int rc;
-
-        if ( is_pvh_vcpu(v) )
-        {
-            pv_cpuid(regs);
-            rc = 0;
-        }
-        else
-            rc = vmx_do_cpuid(regs);
+        int rc = vmx_do_cpuid(regs);
 
         /*
          * rc < 0 error in monitor/vm_event, crash
