@@ -3293,6 +3293,7 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
 {
     struct vcpu *v = current;
     struct domain *d = v->domain;
+    const struct cpuid_policy *p = d->arch.cpuid;
     unsigned int count, dummy = 0;
 
     if ( !eax )
@@ -3330,8 +3331,6 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
 
     switch ( input )
     {
-        unsigned int _ebx, _ecx, _edx;
-
     case 0x1:
         /* Fix up VLAPIC details. */
         *ebx &= 0x00FFFFFFu;
@@ -3414,8 +3413,7 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
         break;
 
     case XSTATE_CPUID:
-        hvm_cpuid(1, NULL, NULL, &_ecx, NULL);
-        if ( !(_ecx & cpufeat_mask(X86_FEATURE_XSAVE)) || count >= 63 )
+        if ( !p->basic.xsave || count >= 63 )
         {
             *eax = *ebx = *ecx = *edx = 0;
             break;
@@ -3427,7 +3425,7 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
             uint64_t xfeature_mask = XSTATE_FP_SSE;
             uint32_t xstate_size = XSTATE_AREA_MIN_SIZE;
 
-            if ( _ecx & cpufeat_mask(X86_FEATURE_AVX) )
+            if ( p->basic.avx )
             {
                 xfeature_mask |= XSTATE_YMM;
                 xstate_size = max(xstate_size,
@@ -3435,10 +3433,7 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
                                   xstate_sizes[_XSTATE_YMM]);
             }
 
-            _ecx = 0;
-            hvm_cpuid(7, NULL, &_ebx, &_ecx, NULL);
-
-            if ( _ebx & cpufeat_mask(X86_FEATURE_MPX) )
+            if ( p->feat.mpx )
             {
                 xfeature_mask |= XSTATE_BNDREGS | XSTATE_BNDCSR;
                 xstate_size = max(xstate_size,
@@ -3446,7 +3441,7 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
                                   xstate_sizes[_XSTATE_BNDCSR]);
             }
 
-            if ( _ebx & cpufeat_mask(X86_FEATURE_AVX512F) )
+            if ( p->feat.avx512f )
             {
                 xfeature_mask |= XSTATE_OPMASK | XSTATE_ZMM | XSTATE_HI_ZMM;
                 xstate_size = max(xstate_size,
@@ -3460,7 +3455,7 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
                                   xstate_sizes[_XSTATE_HI_ZMM]);
             }
 
-            if ( _ecx & cpufeat_mask(X86_FEATURE_PKU) )
+            if ( p->feat.pku )
             {
                 xfeature_mask |= XSTATE_PKRU;
                 xstate_size = max(xstate_size,
@@ -3468,9 +3463,7 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
                                   xstate_sizes[_XSTATE_PKRU]);
             }
 
-            hvm_cpuid(0x80000001, NULL, NULL, &_ecx, NULL);
-
-            if ( _ecx & cpufeat_mask(X86_FEATURE_LWP) )
+            if ( p->extd.lwp )
             {
                 xfeature_mask |= XSTATE_LWP;
                 xstate_size = max(xstate_size,
@@ -3494,7 +3487,7 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
         case 1:
             *eax &= hvm_featureset[FEATURESET_Da1];
 
-            if ( *eax & cpufeat_mask(X86_FEATURE_XSAVES) )
+            if ( p->xstate.xsaves )
             {
                 /*
                  * Always read CPUID[0xD,1].EBX from hardware, rather than
@@ -3575,14 +3568,11 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
         if ( *eax > count )
             *eax = count;
 
-        hvm_cpuid(1, NULL, NULL, NULL, &_edx);
-        count = _edx & (cpufeat_mask(X86_FEATURE_PAE) |
-                        cpufeat_mask(X86_FEATURE_PSE36)) ? 36 : 32;
+        count = (p->basic.pae || p->basic.pse36) ? 36 : 32;
         if ( *eax < count )
             *eax = count;
 
-        hvm_cpuid(0x80000001, NULL, NULL, NULL, &_edx);
-        *eax |= (_edx & cpufeat_mask(X86_FEATURE_LM) ? vaddr_bits : 32) << 8;
+        *eax |= (p->extd.lm ? vaddr_bits : 32) << 8;
 
         *ebx &= hvm_featureset[FEATURESET_e8b];
         break;
@@ -3649,26 +3639,16 @@ void hvm_rdtsc_intercept(struct cpu_user_regs *regs)
 int hvm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
 {
     struct vcpu *v = current;
+    struct domain *d = v->domain;
     uint64_t *var_range_base, *fixed_range_base;
-    bool mtrr = false;
     int ret = X86EMUL_OKAY;
 
     var_range_base = (uint64_t *)v->arch.hvm_vcpu.mtrr.var_ranges;
     fixed_range_base = (uint64_t *)v->arch.hvm_vcpu.mtrr.fixed_ranges;
 
-    if ( msr == MSR_MTRRcap ||
-         (msr >= MSR_IA32_MTRR_PHYSBASE(0) && msr <= MSR_MTRRdefType) )
-    {
-        unsigned int edx;
-
-        hvm_cpuid(1, NULL, NULL, NULL, &edx);
-        if ( edx & cpufeat_mask(X86_FEATURE_MTRR) )
-            mtrr = true;
-    }
-
     switch ( msr )
     {
-        unsigned int eax, ebx, ecx, index;
+        unsigned int index;
 
     case MSR_EFER:
         *msr_content = v->arch.hvm_vcpu.guest_efer;
@@ -3704,53 +3684,49 @@ int hvm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
         break;
 
     case MSR_MTRRcap:
-        if ( !mtrr )
+        if ( !d->arch.cpuid->basic.mtrr )
             goto gp_fault;
         *msr_content = v->arch.hvm_vcpu.mtrr.mtrr_cap;
         break;
     case MSR_MTRRdefType:
-        if ( !mtrr )
+        if ( !d->arch.cpuid->basic.mtrr )
             goto gp_fault;
         *msr_content = v->arch.hvm_vcpu.mtrr.def_type
                         | (v->arch.hvm_vcpu.mtrr.enabled << 10);
         break;
     case MSR_MTRRfix64K_00000:
-        if ( !mtrr )
+        if ( !d->arch.cpuid->basic.mtrr )
             goto gp_fault;
         *msr_content = fixed_range_base[0];
         break;
     case MSR_MTRRfix16K_80000:
     case MSR_MTRRfix16K_A0000:
-        if ( !mtrr )
+        if ( !d->arch.cpuid->basic.mtrr )
             goto gp_fault;
         index = msr - MSR_MTRRfix16K_80000;
         *msr_content = fixed_range_base[index + 1];
         break;
     case MSR_MTRRfix4K_C0000...MSR_MTRRfix4K_F8000:
-        if ( !mtrr )
+        if ( !d->arch.cpuid->basic.mtrr )
             goto gp_fault;
         index = msr - MSR_MTRRfix4K_C0000;
         *msr_content = fixed_range_base[index + 3];
         break;
     case MSR_IA32_MTRR_PHYSBASE(0)...MSR_IA32_MTRR_PHYSMASK(MTRR_VCNT-1):
-        if ( !mtrr )
+        if ( !d->arch.cpuid->basic.mtrr )
             goto gp_fault;
         index = msr - MSR_IA32_MTRR_PHYSBASE(0);
         *msr_content = var_range_base[index];
         break;
 
     case MSR_IA32_XSS:
-        ecx = 1;
-        hvm_cpuid(XSTATE_CPUID, &eax, NULL, &ecx, NULL);
-        if ( !(eax & cpufeat_mask(X86_FEATURE_XSAVES)) )
+        if ( !d->arch.cpuid->xstate.xsaves )
             goto gp_fault;
         *msr_content = v->arch.hvm_vcpu.msr_xss;
         break;
 
     case MSR_IA32_BNDCFGS:
-        ecx = 0;
-        hvm_cpuid(7, NULL, &ebx, &ecx, NULL);
-        if ( !(ebx & cpufeat_mask(X86_FEATURE_MPX)) ||
+        if ( !d->arch.cpuid->feat.mpx ||
              !hvm_get_guest_bndcfgs(v, msr_content) )
             goto gp_fault;
         break;
@@ -3791,20 +3767,11 @@ int hvm_msr_write_intercept(unsigned int msr, uint64_t msr_content,
                             bool_t may_defer)
 {
     struct vcpu *v = current;
-    bool mtrr = false;
+    struct domain *d = v->domain;
     int ret = X86EMUL_OKAY;
 
     HVMTRACE_3D(MSR_WRITE, msr,
                (uint32_t)msr_content, (uint32_t)(msr_content >> 32));
-
-    if ( msr >= MSR_IA32_MTRR_PHYSBASE(0) && msr <= MSR_MTRRdefType )
-    {
-        unsigned int edx;
-
-        hvm_cpuid(1, NULL, NULL, NULL, &edx);
-        if ( edx & cpufeat_mask(X86_FEATURE_MTRR) )
-            mtrr = true;
-    }
 
     if ( may_defer && unlikely(monitored_msr(v->domain, msr)) )
     {
@@ -3821,7 +3788,7 @@ int hvm_msr_write_intercept(unsigned int msr, uint64_t msr_content,
 
     switch ( msr )
     {
-        unsigned int eax, ebx, ecx, index;
+        unsigned int index;
 
     case MSR_EFER:
         if ( hvm_set_efer(msr_content) )
@@ -3867,14 +3834,14 @@ int hvm_msr_write_intercept(unsigned int msr, uint64_t msr_content,
         goto gp_fault;
 
     case MSR_MTRRdefType:
-        if ( !mtrr )
+        if ( !d->arch.cpuid->basic.mtrr )
             goto gp_fault;
         if ( !mtrr_def_type_msr_set(v->domain, &v->arch.hvm_vcpu.mtrr,
                                     msr_content) )
            goto gp_fault;
         break;
     case MSR_MTRRfix64K_00000:
-        if ( !mtrr )
+        if ( !d->arch.cpuid->basic.mtrr )
             goto gp_fault;
         if ( !mtrr_fix_range_msr_set(v->domain, &v->arch.hvm_vcpu.mtrr, 0,
                                      msr_content) )
@@ -3882,7 +3849,7 @@ int hvm_msr_write_intercept(unsigned int msr, uint64_t msr_content,
         break;
     case MSR_MTRRfix16K_80000:
     case MSR_MTRRfix16K_A0000:
-        if ( !mtrr )
+        if ( !d->arch.cpuid->basic.mtrr )
             goto gp_fault;
         index = msr - MSR_MTRRfix16K_80000 + 1;
         if ( !mtrr_fix_range_msr_set(v->domain, &v->arch.hvm_vcpu.mtrr,
@@ -3890,7 +3857,7 @@ int hvm_msr_write_intercept(unsigned int msr, uint64_t msr_content,
             goto gp_fault;
         break;
     case MSR_MTRRfix4K_C0000...MSR_MTRRfix4K_F8000:
-        if ( !mtrr )
+        if ( !d->arch.cpuid->basic.mtrr )
             goto gp_fault;
         index = msr - MSR_MTRRfix4K_C0000 + 3;
         if ( !mtrr_fix_range_msr_set(v->domain, &v->arch.hvm_vcpu.mtrr,
@@ -3898,7 +3865,7 @@ int hvm_msr_write_intercept(unsigned int msr, uint64_t msr_content,
             goto gp_fault;
         break;
     case MSR_IA32_MTRR_PHYSBASE(0)...MSR_IA32_MTRR_PHYSMASK(MTRR_VCNT-1):
-        if ( !mtrr )
+        if ( !d->arch.cpuid->basic.mtrr )
             goto gp_fault;
         if ( !mtrr_var_range_msr_set(v->domain, &v->arch.hvm_vcpu.mtrr,
                                      msr, msr_content) )
@@ -3906,18 +3873,14 @@ int hvm_msr_write_intercept(unsigned int msr, uint64_t msr_content,
         break;
 
     case MSR_IA32_XSS:
-        ecx = 1;
-        hvm_cpuid(XSTATE_CPUID, &eax, NULL, &ecx, NULL);
         /* No XSS features currently supported for guests. */
-        if ( !(eax & cpufeat_mask(X86_FEATURE_XSAVES)) || msr_content != 0 )
+        if ( !d->arch.cpuid->xstate.xsaves || msr_content != 0 )
             goto gp_fault;
         v->arch.hvm_vcpu.msr_xss = msr_content;
         break;
 
     case MSR_IA32_BNDCFGS:
-        ecx = 0;
-        hvm_cpuid(7, NULL, &ebx, &ecx, NULL);
-        if ( !(ebx & cpufeat_mask(X86_FEATURE_MPX)) ||
+        if ( !d->arch.cpuid->feat.mpx ||
              !hvm_set_guest_bndcfgs(v, msr_content) )
             goto gp_fault;
         break;
