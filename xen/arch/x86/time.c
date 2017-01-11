@@ -2106,6 +2106,8 @@ void tsc_set_info(struct domain *d,
                                      d->arch.hvm_domain.sync_tsc);
         }
     }
+
+    recalculate_cpuid_policy(d);
 }
 
 /* vtsc may incur measurable performance degradation, diagnose with this */

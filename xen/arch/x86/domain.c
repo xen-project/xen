@@ -352,6 +352,7 @@ int switch_compat(struct domain *d)
     }
 
     domain_set_alloc_bitsize(d);
+    recalculate_cpuid_policy(d);
 
     d->arch.x87_fip_width = 4;
 

@@ -115,6 +115,11 @@ long arch_do_domctl(struct xen_domctl *domctl, struct domain *d,
 
         return 0;
     }
+
+    case XEN_DOMCTL_disable_migrate:
+        d->disable_migrate = domctl->u.disable_migrate.disable;
+        return 0;
+
     default:
     {
         int rc;

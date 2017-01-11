@@ -10,10 +10,10 @@
 const uint32_t known_features[] = INIT_KNOWN_FEATURES;
 const uint32_t special_features[] = INIT_SPECIAL_FEATURES;
 
-static const uint32_t __initconst pv_featuremask[] = INIT_PV_FEATURES;
-static const uint32_t __initconst hvm_shadow_featuremask[] = INIT_HVM_SHADOW_FEATURES;
-static const uint32_t __initconst hvm_hap_featuremask[] = INIT_HVM_HAP_FEATURES;
-static const uint32_t __initconst deep_features[] = INIT_DEEP_FEATURES;
+static const uint32_t pv_featuremask[] = INIT_PV_FEATURES;
+static const uint32_t hvm_shadow_featuremask[] = INIT_HVM_SHADOW_FEATURES;
+static const uint32_t hvm_hap_featuremask[] = INIT_HVM_HAP_FEATURES;
+static const uint32_t deep_features[] = INIT_DEEP_FEATURES;
 
 #define EMPTY_LEAF ((struct cpuid_leaf){})
 
@@ -33,7 +33,7 @@ static void cpuid_count_leaf(uint32_t leaf, uint32_t subleaf,
     cpuid_count(leaf, subleaf, &data->a, &data->b, &data->c, &data->d);
 }
 
-static void __init sanitise_featureset(uint32_t *fs)
+static void sanitise_featureset(uint32_t *fs)
 {
     /* for_each_set_bit() uses unsigned longs.  Extend with zeroes. */
     uint32_t disabled_features[
@@ -232,12 +232,12 @@ void __init init_guest_cpuid(void)
     calculate_hvm_max_policy();
 }
 
-const uint32_t * __init lookup_deep_deps(uint32_t feature)
+const uint32_t *lookup_deep_deps(uint32_t feature)
 {
     static const struct {
         uint32_t feature;
         uint32_t fs[FSCAPINTS];
-    } deep_deps[] __initconst = INIT_DEEP_DEPS;
+    } deep_deps[] = INIT_DEEP_DEPS;
     unsigned int start = 0, end = ARRAY_SIZE(deep_deps);
 
     BUILD_BUG_ON(ARRAY_SIZE(deep_deps) != NR_DEEP_DEPS);
@@ -262,6 +262,60 @@ const uint32_t * __init lookup_deep_deps(uint32_t feature)
     return NULL;
 }
 
+void recalculate_cpuid_policy(struct domain *d)
+{
+    struct cpuid_policy *p = d->arch.cpuid;
+    const struct cpuid_policy *max =
+        is_pv_domain(d) ? &pv_max_policy : &hvm_max_policy;
+    uint32_t fs[FSCAPINTS], max_fs[FSCAPINTS];
+    unsigned int i;
+
+    cpuid_policy_to_featureset(p, fs);
+    memcpy(max_fs, max->fs, sizeof(max_fs));
+
+    /*
+     * HVM domains using Shadow paging have further restrictions on their
+     * available paging features.
+     */
+    if ( is_hvm_domain(d) && !hap_enabled(d) )
+    {
+        for ( i = 0; i < ARRAY_SIZE(max_fs); i++ )
+            max_fs[i] &= hvm_shadow_featuremask[i];
+    }
+
+    /*
+     * 32bit PV domains can't use any Long Mode features, and cannot use
+     * SYSCALL on non-AMD hardware.
+     */
+    if ( is_pv_32bit_domain(d) )
+    {
+        __clear_bit(X86_FEATURE_LM, max_fs);
+        if ( boot_cpu_data.x86_vendor != X86_VENDOR_AMD )
+            __clear_bit(X86_FEATURE_SYSCALL, max_fs);
+    }
+
+    /*
+     * ITSC is masked by default (so domains are safe to migrate), but a
+     * toolstack which has configured disable_migrate or vTSC for a domain may
+     * safely select it, and needs a way of doing so.
+     */
+    if ( cpu_has_itsc && (d->disable_migrate || d->arch.vtsc) )
+        __set_bit(X86_FEATURE_ITSC, max_fs);
+
+    /* Clamp the toolstacks choices to reality. */
+    for ( i = 0; i < ARRAY_SIZE(fs); i++ )
+        fs[i] &= max_fs[i];
+
+    sanitise_featureset(fs);
+
+    /* Fold host's FDP_EXCP_ONLY and NO_FPU_SEL into guest's view. */
+    fs[FEATURESET_7b0] &= ~special_features[FEATURESET_7b0];
+    fs[FEATURESET_7b0] |= (host_featureset[FEATURESET_7b0] &
+                           special_features[FEATURESET_7b0]);
+
+    cpuid_featureset_to_policy(fs, p);
+}
+
 int init_domain_cpuid_policy(struct domain *d)
 {
     d->arch.cpuid = xmalloc(struct cpuid_policy);
@@ -270,6 +324,8 @@ int init_domain_cpuid_policy(struct domain *d)
         return -ENOMEM;
 
     *d->arch.cpuid = is_pv_domain(d) ? pv_max_policy : hvm_max_policy;
+
+    recalculate_cpuid_policy(d);
 
     return 0;
 }

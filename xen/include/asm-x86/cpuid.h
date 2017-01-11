@@ -86,13 +86,8 @@ struct cpuid_policy
      *
      * Per-domain objects:
      *
-     * - Host accurate:
-     *   - max_{,sub}leaf
-     *   - {xcr0,xss}_{high,low}
-     *   - All FEATURESET_* words
-     *
      * - Guest accurate:
-     *   - Nothing
+     *   - All FEATURESET_* words
      *
      * Everything else should be considered inaccurate, and not necesserily 0.
      */
@@ -201,6 +196,9 @@ extern struct cpuid_policy raw_policy, host_policy, pv_max_policy,
 
 /* Allocate and initialise a CPUID policy suitable for the domain. */
 int init_domain_cpuid_policy(struct domain *d);
+
+/* Clamp the CPUID policy to reality. */
+void recalculate_cpuid_policy(struct domain *d);
 
 void guest_cpuid(const struct vcpu *v, uint32_t leaf,
                  uint32_t subleaf, struct cpuid_leaf *res);

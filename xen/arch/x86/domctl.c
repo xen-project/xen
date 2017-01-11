@@ -51,6 +51,30 @@ static int gdbsx_guest_mem_io(domid_t domid, struct xen_domctl_gdbsx_memio *iop)
 static void update_domain_cpuid_info(struct domain *d,
                                      const xen_domctl_cpuid_t *ctl)
 {
+    struct cpuid_policy *p = d->arch.cpuid;
+    const struct cpuid_leaf leaf = { ctl->eax, ctl->ebx, ctl->ecx, ctl->edx };
+
+    /* Insert ctl data into cpuid_policy. */
+    if ( ctl->input[0] < ARRAY_SIZE(p->basic.raw) )
+    {
+        if ( ctl->input[0] == 7 )
+        {
+            if ( ctl->input[1] < ARRAY_SIZE(p->feat.raw) )
+                p->feat.raw[ctl->input[1]] = leaf;
+        }
+        else if ( ctl->input[0] == XSTATE_CPUID )
+        {
+            if ( ctl->input[1] < ARRAY_SIZE(p->xstate.raw) )
+                p->xstate.raw[ctl->input[1]] = leaf;
+        }
+        else
+            p->basic.raw[ctl->input[0]] = leaf;
+    }
+    else if ( (ctl->input[0] - 0x80000000) < ARRAY_SIZE(p->extd.raw) )
+        p->extd.raw[ctl->input[0] - 0x80000000] = leaf;
+
+    recalculate_cpuid_policy(d);
+
     switch ( ctl->input[0] )
     {
     case 0: {
@@ -1407,6 +1431,11 @@ long arch_do_domctl(
             ret = -EOPNOTSUPP;
             break;
         }
+        break;
+
+    case XEN_DOMCTL_disable_migrate:
+        d->disable_migrate = domctl->u.disable_migrate.disable;
+        recalculate_cpuid_policy(d);
         break;
 
     default:
