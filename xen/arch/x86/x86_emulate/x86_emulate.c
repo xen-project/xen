@@ -415,6 +415,8 @@ typedef union {
 #define MSR_SYSENTER_CS  0x00000174
 #define MSR_SYSENTER_ESP 0x00000175
 #define MSR_SYSENTER_EIP 0x00000176
+#define MSR_DEBUGCTL     0x000001d9
+#define DEBUGCTL_BTF     (1 << 1)
 #define MSR_EFER         0xc0000080
 #define MSR_STAR         0xc0000081
 #define MSR_LSTAR        0xc0000082
@@ -755,6 +757,7 @@ do {                                                                    \
     rc = ops->insn_fetch(x86_seg_cs, ip, NULL, 0, ctxt);                \
     if ( rc ) goto done;                                                \
     _regs.r(ip) = ip;                                                   \
+    singlestep = _regs._eflags & EFLG_TF;                               \
 } while (0)
 
 #define validate_far_branch(cs, ip) ({                                  \
@@ -771,6 +774,7 @@ do {                                                                    \
 #define commit_far_branch(cs, newip) ({                                 \
     validate_far_branch(cs, newip);                                     \
     _regs.r(ip) = (newip);                                              \
+    singlestep = _regs._eflags & EFLG_TF;                               \
     ops->write_segment(x86_seg_cs, cs, ctxt);                           \
 })
 
@@ -951,6 +955,9 @@ static inline void put_loop_count(
         }                                                               \
         goto no_writeback;                                              \
     }                                                                   \
+    if ( max_reps > 1 && (_regs._eflags & EFLG_TF) &&                   \
+         !is_branch_step(ctxt, ops) )                                   \
+        max_reps = 1;                                                   \
     max_reps;                                                           \
 })
 
@@ -1670,6 +1677,16 @@ static bool is_aligned(enum x86_segment seg, unsigned long offs,
     }
 
     return !((reg.base + offs) & (size - 1));
+}
+
+static bool is_branch_step(struct x86_emulate_ctxt *ctxt,
+                           const struct x86_emulate_ops *ops)
+{
+    uint64_t debugctl;
+
+    return ops->read_msr &&
+           ops->read_msr(MSR_DEBUGCTL, &debugctl, ctxt) == X86EMUL_OKAY &&
+           (debugctl & DEBUGCTL_BTF);
 }
 
 static bool umip_active(struct x86_emulate_ctxt *ctxt,
@@ -2516,7 +2533,7 @@ x86_emulate(
     struct x86_emulate_state state;
     int rc;
     uint8_t b, d;
-    bool singlestep = _regs._eflags & EFLG_TF;
+    bool singlestep = (_regs._eflags & EFLG_TF) && !is_branch_step(ctxt, ops);
     struct operand src = { .reg = PTR_POISON };
     struct operand dst = { .reg = PTR_POISON };
     enum x86_swint_type swint_type;
@@ -3206,6 +3223,7 @@ x86_emulate(
             goto done;
 
         _regs.r(ip) = imm1;
+        singlestep = _regs._eflags & EFLG_TF;
         break;
 
     case 0x9b:  /* wait/fwait */
@@ -5085,6 +5103,7 @@ x86_emulate(
             goto done;
         _regs.r(sp) = lm ? msr_content : (uint32_t)msr_content;
 
+        singlestep = _regs._eflags & EFLG_TF;
         break;
     }
 
@@ -5125,6 +5144,8 @@ x86_emulate(
 
         _regs.r(ip) = op_bytes == 8 ? _regs.r(dx) : _regs._edx;
         _regs.r(sp) = op_bytes == 8 ? _regs.r(cx) : _regs._ecx;
+
+        singlestep = _regs._eflags & EFLG_TF;
         break;
     }
 
@@ -5750,8 +5771,11 @@ x86_emulate(
         _regs.r(ip) = _regs._eip;
 
     /* Should a singlestep #DB be raised? */
-    if ( rc == X86EMUL_OKAY )
-        ctxt->retire.singlestep = singlestep;
+    if ( rc == X86EMUL_OKAY && singlestep && !ctxt->retire.mov_ss )
+    {
+        ctxt->retire.singlestep = true;
+        ctxt->retire.sti = false;
+    }
 
     if ( rc != X86EMUL_DONE )
         *ctxt->regs = _regs;
