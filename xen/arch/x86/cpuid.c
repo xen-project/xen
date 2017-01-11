@@ -136,19 +136,30 @@ static void __init calculate_host_policy(void)
 {
     struct cpuid_policy *p = &host_policy;
 
+    *p = raw_policy;
+
+    p->basic.max_leaf =
+        min_t(uint32_t, p->basic.max_leaf,   ARRAY_SIZE(p->basic.raw) - 1);
+    p->feat.max_subleaf =
+        min_t(uint32_t, p->feat.max_subleaf, ARRAY_SIZE(p->feat.raw) - 1);
+    p->extd.max_leaf =
+        min_t(uint32_t, p->extd.max_leaf,
+              0x80000000u + ARRAY_SIZE(p->extd.raw) - 1);
+
     cpuid_featureset_to_policy(boot_cpu_data.x86_capability, p);
 }
 
 static void __init calculate_pv_max_policy(void)
 {
     struct cpuid_policy *p = &pv_max_policy;
-    uint32_t pv_featureset[FSCAPINTS], host_featureset[FSCAPINTS];
+    uint32_t pv_featureset[FSCAPINTS];
     unsigned int i;
 
-    cpuid_policy_to_featureset(&host_policy, host_featureset);
+    *p = host_policy;
+    cpuid_policy_to_featureset(p, pv_featureset);
 
-    for ( i = 0; i < FSCAPINTS; ++i )
-        pv_featureset[i] = host_featureset[i] & pv_featuremask[i];
+    for ( i = 0; i < ARRAY_SIZE(pv_featureset); ++i )
+        pv_featureset[i] &= pv_featuremask[i];
 
     /* Unconditionally claim to be able to set the hypervisor bit. */
     __set_bit(X86_FEATURE_HYPERVISOR, pv_featureset);
@@ -168,20 +179,21 @@ static void __init calculate_pv_max_policy(void)
 static void __init calculate_hvm_max_policy(void)
 {
     struct cpuid_policy *p = &hvm_max_policy;
-    uint32_t hvm_featureset[FSCAPINTS], host_featureset[FSCAPINTS];
+    uint32_t hvm_featureset[FSCAPINTS];
     unsigned int i;
     const uint32_t *hvm_featuremask;
 
     if ( !hvm_enabled )
         return;
 
-    cpuid_policy_to_featureset(&host_policy, host_featureset);
+    *p = host_policy;
+    cpuid_policy_to_featureset(p, hvm_featureset);
 
     hvm_featuremask = hvm_funcs.hap_supported ?
         hvm_hap_featuremask : hvm_shadow_featuremask;
 
-    for ( i = 0; i < FSCAPINTS; ++i )
-        hvm_featureset[i] = host_featureset[i] & hvm_featuremask[i];
+    for ( i = 0; i < ARRAY_SIZE(hvm_featureset); ++i )
+        hvm_featureset[i] &= hvm_featuremask[i];
 
     /* Unconditionally claim to be able to set the hypervisor bit. */
     __set_bit(X86_FEATURE_HYPERVISOR, hvm_featureset);

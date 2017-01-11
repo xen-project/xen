@@ -78,10 +78,10 @@ struct cpuid_policy
      * Global *_policy objects:
      *
      * - Host accurate:
-     *   - max_{,sub}leaf
      *   - {xcr0,xss}_{high,low}
      *
      * - Guest accurate:
+     *   - max_{,sub}leaf
      *   - All FEATURESET_* words
      *
      * Per-domain objects:
