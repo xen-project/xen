@@ -3306,27 +3306,6 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
     if ( !edx )
         edx = &dummy;
 
-    if ( input & 0x7fffffff )
-    {
-        /*
-         * Requests outside the supported leaf ranges return zero on AMD
-         * and the highest basic leaf output on Intel. Uniformly follow
-         * the AMD model as the more sane one.
-         */
-        unsigned int limit;
-
-        domain_cpuid(d, (input >> 16) != 0x8000 ? 0 : 0x80000000, 0,
-                     &limit, &dummy, &dummy, &dummy);
-        if ( input > limit )
-        {
-            *eax = 0;
-            *ebx = 0;
-            *ecx = 0;
-            *edx = 0;
-            return;
-        }
-    }
-
     domain_cpuid(d, input, count, eax, ebx, ecx, edx);
 
     switch ( input )

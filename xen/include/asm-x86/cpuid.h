@@ -87,6 +87,7 @@ struct cpuid_policy
      * Per-domain objects:
      *
      * - Guest accurate:
+     *   - max_{,sub}leaf
      *   - All FEATURESET_* words
      *
      * Everything else should be considered inaccurate, and not necesserily 0.

@@ -1031,29 +1031,6 @@ void pv_cpuid(struct cpu_user_regs *regs)
     subleaf = c = regs->_ecx;
     d = regs->_edx;
 
-    if ( leaf & 0x7fffffff )
-    {
-        /*
-         * Requests outside the supported leaf ranges return zero on AMD
-         * and the highest basic leaf output on Intel. Uniformly follow
-         * the AMD model as the more sane one.
-         */
-        unsigned int limit = (leaf >> 16) != 0x8000 ? 0 : 0x80000000, dummy;
-
-        if ( !is_control_domain(currd) && !is_hardware_domain(currd) )
-            domain_cpuid(currd, limit, 0, &limit, &dummy, &dummy, &dummy);
-        else
-            limit = cpuid_eax(limit);
-        if ( leaf > limit )
-        {
-            regs->rax = 0;
-            regs->rbx = 0;
-            regs->rcx = 0;
-            regs->rdx = 0;
-            return;
-        }
-    }
-
     if ( !is_control_domain(currd) && !is_hardware_domain(currd) )
         domain_cpuid(currd, leaf, subleaf, &a, &b, &c, &d);
     else

@@ -283,6 +283,10 @@ void recalculate_cpuid_policy(struct domain *d)
     uint32_t fs[FSCAPINTS], max_fs[FSCAPINTS];
     unsigned int i;
 
+    p->basic.max_leaf   = min(p->basic.max_leaf,   max->basic.max_leaf);
+    p->feat.max_subleaf = min(p->feat.max_subleaf, max->feat.max_subleaf);
+    p->extd.max_leaf    = min(p->extd.max_leaf,    max->extd.max_leaf);
+
     cpuid_policy_to_featureset(p, fs);
     cpuid_policy_to_featureset(max, max_fs);
 
@@ -319,6 +323,9 @@ void recalculate_cpuid_policy(struct domain *d)
     for ( i = 0; i < ARRAY_SIZE(fs); i++ )
         fs[i] &= max_fs[i];
 
+    if ( p->basic.max_leaf < XSTATE_CPUID )
+        __clear_bit(X86_FEATURE_XSAVE, fs);
+
     sanitise_featureset(fs);
 
     /* Fold host's FDP_EXCP_ONLY and NO_FPU_SEL into guest's view. */
@@ -347,15 +354,36 @@ void guest_cpuid(const struct vcpu *v, uint32_t leaf,
                  uint32_t subleaf, struct cpuid_leaf *res)
 {
     const struct domain *d = v->domain;
+    const struct cpuid_policy *p = d->arch.cpuid;
 
     *res = EMPTY_LEAF;
 
     /*
      * First pass:
+     * - Perform max_leaf/subleaf calculations.  Out-of-range leaves return
+     *   all zeros, following the AMD model.
      * - Dispatch the virtualised leaves to their respective handlers.
      */
     switch ( leaf )
     {
+    case 0 ... CPUID_GUEST_NR_BASIC - 1:
+        if ( leaf > p->basic.max_leaf )
+            return;
+
+        switch ( leaf )
+        {
+        case 0x7:
+            if ( subleaf > p->feat.max_subleaf )
+                return;
+            break;
+
+        case XSTATE_CPUID:
+            if ( subleaf > ARRAY_SIZE(p->xstate.raw) )
+                return;
+            break;
+        }
+        break;
+
     case 0x40000000 ... 0x400000ff:
         if ( is_viridian_domain(d) )
             return cpuid_viridian_leaves(v, leaf, subleaf, res);
@@ -368,6 +396,14 @@ void guest_cpuid(const struct vcpu *v, uint32_t leaf,
          */
     case 0x40000100 ... 0x400001ff:
         return cpuid_hypervisor_leaves(v, leaf, subleaf, res);
+
+    case 0x80000000 ... 0x80000000 + CPUID_GUEST_NR_EXTD - 1:
+        if ( leaf > p->extd.max_leaf )
+            return;
+        break;
+
+    default:
+        return;
     }
 
     /* {hvm,pv}_cpuid() have this expectation. */
