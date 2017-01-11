@@ -100,8 +100,8 @@ static void update_domain_cpuid_info(struct domain *d,
         if ( is_pv_domain(d) && ((levelling_caps & LCAP_1cd) == LCAP_1cd) )
         {
             uint64_t mask = cpuidmask_defaults._1cd;
-            uint32_t ecx = ctl->ecx & pv_featureset[FEATURESET_1c];
-            uint32_t edx = ctl->edx & pv_featureset[FEATURESET_1d];
+            uint32_t ecx = p->basic._1c;
+            uint32_t edx = p->basic._1d;
 
             /*
              * Must expose hosts HTT and X2APIC value so a guest using native
@@ -175,7 +175,7 @@ static void update_domain_cpuid_info(struct domain *d,
         {
             uint64_t mask = cpuidmask_defaults._7ab0;
             uint32_t eax = ctl->eax;
-            uint32_t ebx = ctl->ebx & pv_featureset[FEATURESET_7b0];
+            uint32_t ebx = p->feat._7b0;
 
             if ( boot_cpu_data.x86_vendor == X86_VENDOR_AMD )
                 mask &= ((uint64_t)eax << 32) | ebx;
@@ -191,7 +191,7 @@ static void update_domain_cpuid_info(struct domain *d,
         if ( is_pv_domain(d) && ((levelling_caps & LCAP_Da1) == LCAP_Da1) )
         {
             uint64_t mask = cpuidmask_defaults.Da1;
-            uint32_t eax = ctl->eax & pv_featureset[FEATURESET_Da1];
+            uint32_t eax = p->xstate.Da1;
 
             if ( boot_cpu_data.x86_vendor == X86_VENDOR_INTEL )
                 mask &= (~0ULL << 32) | eax;
@@ -204,8 +204,8 @@ static void update_domain_cpuid_info(struct domain *d,
         if ( is_pv_domain(d) && ((levelling_caps & LCAP_e1cd) == LCAP_e1cd) )
         {
             uint64_t mask = cpuidmask_defaults.e1cd;
-            uint32_t ecx = ctl->ecx & pv_featureset[FEATURESET_e1c];
-            uint32_t edx = ctl->edx & pv_featureset[FEATURESET_e1d];
+            uint32_t ecx = p->extd.e1c;
+            uint32_t edx = p->extd.e1d;
 
             /*
              * Must expose hosts CMP_LEGACY value so a guest using native
