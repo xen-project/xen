@@ -337,6 +337,18 @@ void guest_cpuid(const struct vcpu *v, uint32_t leaf,
 
     *res = EMPTY_LEAF;
 
+    /*
+     * First pass:
+     * - Dispatch the virtualised leaves to their respective handlers.
+     */
+    switch ( leaf )
+    {
+    case 0x40000000 ... 0x400000ff:
+        if ( is_viridian_domain(d) )
+            return cpuid_viridian_leaves(v, leaf, subleaf, res);
+        break;
+    }
+
     /* {hvm,pv}_cpuid() have this expectation. */
     ASSERT(v == current);
 

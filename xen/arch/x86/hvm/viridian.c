@@ -66,77 +66,76 @@
 #define CPUID6A_MSR_BITMAPS     (1 << 1)
 #define CPUID6A_NESTED_PAGING   (1 << 3)
 
-int cpuid_viridian_leaves(unsigned int leaf, unsigned int *eax,
-                          unsigned int *ebx, unsigned int *ecx,
-                          unsigned int *edx)
+void cpuid_viridian_leaves(const struct vcpu *v, uint32_t leaf,
+                           uint32_t subleaf, struct cpuid_leaf *res)
 {
-    struct domain *d = current->domain;
+    const struct domain *d = v->domain;
 
-    if ( !is_viridian_domain(d) )
-        return 0;
+    ASSERT(is_viridian_domain(d));
+    ASSERT(leaf >= 0x40000000 && leaf < 0x40000100);
 
     leaf -= 0x40000000;
-    if ( leaf > 6 )
-        return 0;
 
-    *eax = *ebx = *ecx = *edx = 0;
     switch ( leaf )
     {
     case 0:
-        *eax = 0x40000006; /* Maximum leaf */
-        *ebx = 0x7263694d; /* Magic numbers  */
-        *ecx = 0x666F736F;
-        *edx = 0x76482074;
+        res->a = 0x40000006; /* Maximum leaf */
+        res->b = 0x7263694d; /* Magic numbers  */
+        res->c = 0x666F736F;
+        res->d = 0x76482074;
         break;
+
     case 1:
-        *eax = 0x31237648; /* Version number */
+        res->a = 0x31237648; /* Version number */
         break;
+
     case 2:
         /* Hypervisor information, but only if the guest has set its
            own version number. */
         if ( d->arch.hvm_domain.viridian.guest_os_id.raw == 0 )
             break;
-        *eax = 1; /* Build number */
-        *ebx = (xen_major_version() << 16) | xen_minor_version();
-        *ecx = 0; /* SP */
-        *edx = 0; /* Service branch and number */
+        res->a = 1; /* Build number */
+        res->b = (xen_major_version() << 16) | xen_minor_version();
+        res->c = 0; /* SP */
+        res->d = 0; /* Service branch and number */
         break;
+
     case 3:
         /* Which hypervisor MSRs are available to the guest */
-        *eax = (CPUID3A_MSR_APIC_ACCESS |
-                CPUID3A_MSR_HYPERCALL   |
-                CPUID3A_MSR_VP_INDEX);
+        res->a = (CPUID3A_MSR_APIC_ACCESS |
+                  CPUID3A_MSR_HYPERCALL   |
+                  CPUID3A_MSR_VP_INDEX);
         if ( !(viridian_feature_mask(d) & HVMPV_no_freq) )
-            *eax |= CPUID3A_MSR_FREQ;
+            res->a |= CPUID3A_MSR_FREQ;
         if ( viridian_feature_mask(d) & HVMPV_time_ref_count )
-            *eax |= CPUID3A_MSR_TIME_REF_COUNT;
+            res->a |= CPUID3A_MSR_TIME_REF_COUNT;
         if ( viridian_feature_mask(d) & HVMPV_reference_tsc )
-            *eax |= CPUID3A_MSR_REFERENCE_TSC;
+            res->a |= CPUID3A_MSR_REFERENCE_TSC;
         break;
+
     case 4:
         /* Recommended hypercall usage. */
         if ( (d->arch.hvm_domain.viridian.guest_os_id.raw == 0) ||
              (d->arch.hvm_domain.viridian.guest_os_id.fields.os < 4) )
             break;
-        *eax = CPUID4A_RELAX_TIMER_INT;
+        res->a = CPUID4A_RELAX_TIMER_INT;
         if ( viridian_feature_mask(d) & HVMPV_hcall_remote_tlb_flush )
-            *eax |= CPUID4A_HCALL_REMOTE_TLB_FLUSH;
+            res->a |= CPUID4A_HCALL_REMOTE_TLB_FLUSH;
         if ( !cpu_has_vmx_apic_reg_virt )
-            *eax |= CPUID4A_MSR_BASED_APIC;
-        *ebx = 2047; /* long spin count */
+            res->a |= CPUID4A_MSR_BASED_APIC;
+        res->b = 2047; /* long spin count */
         break;
+
     case 6:
         /* Detected and in use hardware features. */
         if ( cpu_has_vmx_virtualize_apic_accesses )
-            *eax |= CPUID6A_APIC_OVERLAY;
+            res->a |= CPUID6A_APIC_OVERLAY;
         if ( cpu_has_vmx_msr_bitmap || (read_efer() & EFER_SVME) )
-            *eax |= CPUID6A_MSR_BITMAPS;
+            res->a |= CPUID6A_MSR_BITMAPS;
         if ( hap_enabled(d) )
-            *eax |= CPUID6A_NESTED_PAGING;
+            res->a |= CPUID6A_NESTED_PAGING;
         break;
     }
-
-    return 1;
 }
 
 static void dump_guest_os_id(const struct domain *d)
