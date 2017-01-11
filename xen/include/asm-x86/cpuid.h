@@ -24,11 +24,6 @@
 extern const uint32_t known_features[FSCAPINTS];
 extern const uint32_t special_features[FSCAPINTS];
 
-extern uint32_t raw_featureset[FSCAPINTS];
-#define host_featureset boot_cpu_data.x86_capability
-extern uint32_t pv_featureset[FSCAPINTS];
-extern uint32_t hvm_featureset[FSCAPINTS];
-
 void init_guest_cpuid(void);
 
 const uint32_t *lookup_deep_deps(uint32_t feature);
@@ -87,7 +82,7 @@ struct cpuid_policy
      *   - {xcr0,xss}_{high,low}
      *
      * - Guest accurate:
-     *   - Nothing
+     *   - All FEATURESET_* words
      *
      * Everything else should be considered inaccurate, and not necesserily 0.
      */
@@ -98,6 +93,9 @@ struct cpuid_policy
         struct {
             /* Leaf 0x0 - Max and vendor. */
             uint32_t max_leaf, /* b */:32, /* c */:32, /* d */:32;
+
+            /* Leaf 0x1 - Family/model/stepping and features. */
+            uint32_t /* a */:32, /* b */:32, _1c, _1d;
         };
     } basic;
 
@@ -106,7 +104,7 @@ struct cpuid_policy
         struct cpuid_leaf raw[CPUID_GUEST_NR_FEAT];
         struct {
             /* Subleaf 0. */
-            uint32_t max_subleaf, /* b */:32, /* c */:32, /* d */:32;
+            uint32_t max_subleaf, _7b0, _7c0, _7d0;
         };
     } feat;
 
@@ -118,7 +116,7 @@ struct cpuid_policy
             uint32_t xcr0_low, /* b */:32, /* c */:32, xcr0_high;
 
             /* Subleaf 1. */
-            uint32_t /* a */:32, /* b */:32, xss_low, xss_high;
+            uint32_t Da1, /* b */:32, xss_low, xss_high;
         };
     } xstate;
 
@@ -128,9 +126,68 @@ struct cpuid_policy
         struct {
             /* Leaf 0x80000000 - Max and vendor. */
             uint32_t max_leaf, /* b */:32, /* c */:32, /* d */:32;
+
+            /* Leaf 0x80000001 - Family/model/stepping and features. */
+            uint32_t /* a */:32, /* b */:32, e1c, e1d;
+
+            uint64_t :64, :64; /* Brand string. */
+            uint64_t :64, :64; /* Brand string. */
+            uint64_t :64, :64; /* Brand string. */
+            uint64_t :64, :64; /* L1 cache/TLB. */
+            uint64_t :64, :64; /* L2/3 cache/TLB. */
+
+            /* Leaf 0x80000007 - Advanced Power Management. */
+            uint32_t /* a */:32, /* b */:32, /* c */:32, e7d;
+
+            /* Leaf 0x80000008 - Misc addr/feature info. */
+            uint32_t /* a */:32, e8b, /* c */:32, /* d */:32;
         };
     } extd;
+
+    /* Temporary featureset bitmap. */
+    uint32_t fs[FSCAPINTS];
 };
+
+/* Fill in a featureset bitmap from a CPUID policy. */
+static inline void cpuid_policy_to_featureset(
+    const struct cpuid_policy *p, uint32_t fs[FSCAPINTS])
+{
+    fs[FEATURESET_1d]  = p->basic._1d;
+    fs[FEATURESET_1c]  = p->basic._1c;
+    fs[FEATURESET_e1d] = p->extd.e1d;
+    fs[FEATURESET_e1c] = p->extd.e1c;
+    fs[FEATURESET_Da1] = p->xstate.Da1;
+    fs[FEATURESET_7b0] = p->feat._7b0;
+    fs[FEATURESET_7c0] = p->feat._7c0;
+    fs[FEATURESET_e7d] = p->extd.e7d;
+    fs[FEATURESET_e8b] = p->extd.e8b;
+    fs[FEATURESET_7d0] = p->feat._7d0;
+}
+
+/* Fill in a CPUID policy from a featureset bitmap. */
+static inline void cpuid_featureset_to_policy(
+    const uint32_t fs[FSCAPINTS], struct cpuid_policy *p)
+{
+    p->basic._1d  = fs[FEATURESET_1d];
+    p->basic._1c  = fs[FEATURESET_1c];
+    p->extd.e1d   = fs[FEATURESET_e1d];
+    p->extd.e1c   = fs[FEATURESET_e1c];
+    p->xstate.Da1 = fs[FEATURESET_Da1];
+    p->feat._7b0  = fs[FEATURESET_7b0];
+    p->feat._7c0  = fs[FEATURESET_7c0];
+    p->extd.e7d   = fs[FEATURESET_e7d];
+    p->extd.e8b   = fs[FEATURESET_e8b];
+    p->feat._7d0  = fs[FEATURESET_7d0];
+}
+
+extern struct cpuid_policy raw_policy, host_policy, pv_max_policy,
+    hvm_max_policy;
+
+/* Temporary compatibility defines. */
+#define raw_featureset raw_policy.fs
+#define host_featureset host_policy.fs
+#define pv_featureset pv_max_policy.fs
+#define hvm_featureset hvm_max_policy.fs
 
 void guest_cpuid(const struct vcpu *v, uint32_t leaf,
                  uint32_t subleaf, struct cpuid_leaf *res);

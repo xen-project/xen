@@ -15,13 +15,12 @@ static const uint32_t __initconst hvm_shadow_featuremask[] = INIT_HVM_SHADOW_FEA
 static const uint32_t __initconst hvm_hap_featuremask[] = INIT_HVM_HAP_FEATURES;
 static const uint32_t __initconst deep_features[] = INIT_DEEP_FEATURES;
 
-uint32_t __read_mostly raw_featureset[FSCAPINTS];
-uint32_t __read_mostly pv_featureset[FSCAPINTS];
-uint32_t __read_mostly hvm_featureset[FSCAPINTS];
-
 #define EMPTY_LEAF ((struct cpuid_leaf){})
 
-static struct cpuid_policy __read_mostly raw_policy;
+struct cpuid_policy __read_mostly raw_policy,
+    __read_mostly host_policy,
+    __read_mostly pv_max_policy,
+    __read_mostly hvm_max_policy;
 
 static void cpuid_leaf(uint32_t leaf, struct cpuid_leaf *data)
 {
@@ -131,47 +130,22 @@ static void __init calculate_raw_policy(void)
     for ( i = 1; i < min(ARRAY_SIZE(p->extd.raw),
                          p->extd.max_leaf + 1 - 0x80000000ul); ++i )
         cpuid_leaf(0x80000000 + i, &p->extd.raw[i]);
+
+    cpuid_policy_to_featureset(p, p->fs);
 }
 
-static void __init calculate_raw_featureset(void)
+static void __init calculate_host_policy(void)
 {
-    unsigned int max, tmp;
+    struct cpuid_policy *p = &host_policy;
 
-    max = cpuid_eax(0);
+    memcpy(p->fs, boot_cpu_data.x86_capability, sizeof(p->fs));
 
-    if ( max >= 1 )
-        cpuid(0x1, &tmp, &tmp,
-              &raw_featureset[FEATURESET_1c],
-              &raw_featureset[FEATURESET_1d]);
-    if ( max >= 7 )
-        cpuid_count(0x7, 0, &tmp,
-                    &raw_featureset[FEATURESET_7b0],
-                    &raw_featureset[FEATURESET_7c0],
-                    &raw_featureset[FEATURESET_7d0]);
-    if ( max >= 0xd )
-        cpuid_count(0xd, 1,
-                    &raw_featureset[FEATURESET_Da1],
-                    &tmp, &tmp, &tmp);
-
-    max = cpuid_eax(0x80000000);
-    if ( (max >> 16) != 0x8000 )
-        return;
-
-    if ( max >= 0x80000001 )
-        cpuid(0x80000001, &tmp, &tmp,
-              &raw_featureset[FEATURESET_e1c],
-              &raw_featureset[FEATURESET_e1d]);
-    if ( max >= 0x80000007 )
-        cpuid(0x80000007, &tmp, &tmp, &tmp,
-              &raw_featureset[FEATURESET_e7d]);
-    if ( max >= 0x80000008 )
-        cpuid(0x80000008, &tmp,
-              &raw_featureset[FEATURESET_e8b],
-              &tmp, &tmp);
+    cpuid_featureset_to_policy(host_featureset, p);
 }
 
-static void __init calculate_pv_featureset(void)
+static void __init calculate_pv_max_policy(void)
 {
+    struct cpuid_policy *p = &pv_max_policy;
     unsigned int i;
 
     for ( i = 0; i < FSCAPINTS; ++i )
@@ -189,10 +163,12 @@ static void __init calculate_pv_featureset(void)
     __set_bit(X86_FEATURE_CMP_LEGACY, pv_featureset);
 
     sanitise_featureset(pv_featureset);
+    cpuid_featureset_to_policy(pv_featureset, p);
 }
 
-static void __init calculate_hvm_featureset(void)
+static void __init calculate_hvm_max_policy(void)
 {
+    struct cpuid_policy *p = &hvm_max_policy;
     unsigned int i;
     const uint32_t *hvm_featuremask;
 
@@ -245,15 +221,15 @@ static void __init calculate_hvm_featureset(void)
     }
 
     sanitise_featureset(hvm_featureset);
+    cpuid_featureset_to_policy(hvm_featureset, p);
 }
 
 void __init init_guest_cpuid(void)
 {
     calculate_raw_policy();
-
-    calculate_raw_featureset();
-    calculate_pv_featureset();
-    calculate_hvm_featureset();
+    calculate_host_policy();
+    calculate_pv_max_policy();
+    calculate_hvm_max_policy();
 }
 
 const uint32_t * __init lookup_deep_deps(uint32_t feature)
