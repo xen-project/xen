@@ -917,53 +917,33 @@ static int hvm_save_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
 const char *hvm_efer_valid(const struct vcpu *v, uint64_t value,
                            signed int cr0_pg)
 {
-    unsigned int ext1_ecx = 0, ext1_edx = 0;
+    const struct domain *d = v->domain;
+    const struct cpuid_policy *p;
 
-    if ( cr0_pg < 0 && !is_hardware_domain(v->domain) )
-    {
-        unsigned int level;
-
-        ASSERT(v->domain == current->domain);
-        hvm_cpuid(0x80000000, &level, NULL, NULL, NULL);
-        if ( (level >> 16) == 0x8000 && level > 0x80000000 )
-            hvm_cpuid(0x80000001, NULL, NULL, &ext1_ecx, &ext1_edx);
-    }
+    if ( cr0_pg < 0 && !is_hardware_domain(d) )
+        p = d->arch.cpuid;
     else
-    {
-        ext1_edx = boot_cpu_data.x86_capability[cpufeat_word(X86_FEATURE_LM)];
-        ext1_ecx = boot_cpu_data.x86_capability[cpufeat_word(X86_FEATURE_SVM)];
-    }
+        p = &host_policy;
 
-    /*
-     * Guests may want to set EFER.SCE and EFER.LME at the same time, so we
-     * can't make the check depend on only X86_FEATURE_SYSCALL (which on VMX
-     * will be clear without the guest having entered 64-bit mode).
-     */
-    if ( (value & EFER_SCE) &&
-         !(ext1_edx & cpufeat_mask(X86_FEATURE_SYSCALL)) &&
-         (cr0_pg >= 0 || !(value & EFER_LME)) )
+    if ( (value & EFER_SCE) && !p->extd.syscall )
         return "SCE without feature";
 
-    if ( (value & (EFER_LME | EFER_LMA)) &&
-         !(ext1_edx & cpufeat_mask(X86_FEATURE_LM)) )
+    if ( (value & (EFER_LME | EFER_LMA)) && !p->extd.lm )
         return "LME/LMA without feature";
 
     if ( (value & EFER_LMA) && (!(value & EFER_LME) || !cr0_pg) )
         return "LMA/LME/CR0.PG inconsistency";
 
-    if ( (value & EFER_NX) && !(ext1_edx & cpufeat_mask(X86_FEATURE_NX)) )
+    if ( (value & EFER_NX) && !p->extd.nx )
         return "NX without feature";
 
-    if ( (value & EFER_SVME) &&
-         (!(ext1_ecx & cpufeat_mask(X86_FEATURE_SVM)) ||
-          !nestedhvm_enabled(v->domain)) )
+    if ( (value & EFER_SVME) && (!p->extd.svm || !nestedhvm_enabled(d)) )
         return "SVME without nested virt";
 
     if ( (value & EFER_LMSLE) && !cpu_has_lmsl )
         return "LMSLE without support";
 
-    if ( (value & EFER_FFXSE) &&
-         !(ext1_edx & cpufeat_mask(X86_FEATURE_FFXSR)) )
+    if ( (value & EFER_FFXSE) && !p->extd.ffxsr )
         return "FFXSE without feature";
 
     return NULL;

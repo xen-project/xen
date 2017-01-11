@@ -33,7 +33,7 @@ enum nestedhvm_vmexits {
 };
 
 /* Nested HVM on/off per domain */
-bool_t nestedhvm_enabled(struct domain *d);
+bool nestedhvm_enabled(const struct domain *d);
 
 /* Nested VCPU */
 int nestedhvm_vcpu_initialise(struct vcpu *v);
