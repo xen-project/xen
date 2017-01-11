@@ -532,6 +532,7 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags,
     if ( is_idle_domain(d) )
     {
         d->arch.emulation_flags = 0;
+        d->arch.cpuid = ZERO_BLOCK_PTR; /* Catch stray misuses. */
     }
     else
     {
@@ -600,6 +601,9 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags,
         if ( (rc = paging_domain_init(d, domcr_flags)) != 0 )
             goto fail;
         paging_initialised = 1;
+
+        if ( (rc = init_domain_cpuid_policy(d)) )
+            goto fail;
 
         d->arch.cpuids = xmalloc_array(cpuid_input_t, MAX_CPUID_INPUT);
         rc = -ENOMEM;
@@ -674,6 +678,7 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags,
     cleanup_domain_irq_mapping(d);
     free_xenheap_page(d->shared_info);
     xfree(d->arch.cpuids);
+    xfree(d->arch.cpuid);
     if ( paging_initialised )
         paging_final_teardown(d);
     free_perdomain_mappings(d);
@@ -692,6 +697,7 @@ void arch_domain_destroy(struct domain *d)
 
     xfree(d->arch.e820);
     xfree(d->arch.cpuids);
+    xfree(d->arch.cpuid);
 
     free_domain_pirqs(d);
     if ( !is_idle_domain(d) )

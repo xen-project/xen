@@ -262,6 +262,18 @@ const uint32_t * __init lookup_deep_deps(uint32_t feature)
     return NULL;
 }
 
+int init_domain_cpuid_policy(struct domain *d)
+{
+    d->arch.cpuid = xmalloc(struct cpuid_policy);
+
+    if ( !d->arch.cpuid )
+        return -ENOMEM;
+
+    *d->arch.cpuid = is_pv_domain(d) ? pv_max_policy : hvm_max_policy;
+
+    return 0;
+}
+
 void guest_cpuid(const struct vcpu *v, uint32_t leaf,
                  uint32_t subleaf, struct cpuid_leaf *res)
 {

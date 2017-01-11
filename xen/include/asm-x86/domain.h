@@ -362,6 +362,9 @@ struct arch_domain
 
     cpuid_input_t *cpuids;
 
+    /* CPUID Policy. */
+    struct cpuid_policy *cpuid;
+
     struct PITState vpit;
 
     /* TSC management (emulation, pv, scaling, stats) */

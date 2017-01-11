@@ -1540,6 +1540,8 @@ void __init noreturn __start_xen(unsigned long mbi_p)
     if ( !tboot_protect_mem_regions() )
         panic("Could not protect TXT memory regions");
 
+    init_guest_cpuid();
+
     if ( opt_dom0pvh )
         domcr_flags |= DOMCRF_pvh | DOMCRF_hap;
 
@@ -1589,8 +1591,6 @@ void __init noreturn __start_xen(unsigned long mbi_p)
         printk(XENLOG_WARNING
                "Multiple initrd candidates, picking module #%u\n",
                initrdidx);
-
-    init_guest_cpuid();
 
     /*
      * Temporarily clear SMAP in CR4 to allow user-accesses in construct_dom0().
