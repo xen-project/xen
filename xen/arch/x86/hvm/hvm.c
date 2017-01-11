@@ -3336,39 +3336,33 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
         *ebx &= 0x00FFFFFFu;
         *ebx |= (v->vcpu_id * 2) << 24;
 
-        *ecx &= hvm_featureset[FEATURESET_1c];
-        *edx &= hvm_featureset[FEATURESET_1d];
+        *ecx = p->basic._1c;
+        *edx = p->basic._1d;
 
         /* APIC exposed to guests, but Fast-forward MSR_APIC_BASE.EN back in. */
         if ( vlapic_hw_disabled(vcpu_vlapic(v)) )
             *edx &= ~cpufeat_bit(X86_FEATURE_APIC);
 
-        /* OSXSAVE cleared by hvm_featureset.  Fast-forward CR4 back in. */
+        /* OSXSAVE clear in policy.  Fast-forward CR4 back in. */
         if ( v->arch.hvm_vcpu.guest_cr[4] & X86_CR4_OSXSAVE )
             *ecx |= cpufeat_mask(X86_FEATURE_OSXSAVE);
 
-        /* Don't expose HAP-only features to non-hap guests. */
-        if ( !hap_enabled(d) )
-        {
-            *ecx &= ~cpufeat_mask(X86_FEATURE_PCID);
-
-            /*
-             * PSE36 is not supported in shadow mode.  This bit should be
-             * unilaterally cleared.
-             *
-             * However, an unspecified version of Hyper-V from 2011 refuses
-             * to start as the "cpu does not provide required hw features" if
-             * it can't see PSE36.
-             *
-             * As a workaround, leak the toolstack-provided PSE36 value into a
-             * shadow guest if the guest is already using PAE paging (and
-             * won't care about reverting back to PSE paging).  Otherwise,
-             * knoble it, so a 32bit guest doesn't get the impression that it
-             * could try to use PSE36 paging.
-             */
-            if ( !(hvm_pae_enabled(v) || hvm_long_mode_enabled(v)) )
-                *edx &= ~cpufeat_mask(X86_FEATURE_PSE36);
-        }
+        /*
+         * PSE36 is not supported in shadow mode.  This bit should be
+         * unilaterally cleared.
+         *
+         * However, an unspecified version of Hyper-V from 2011 refuses
+         * to start as the "cpu does not provide required hw features" if
+         * it can't see PSE36.
+         *
+         * As a workaround, leak the toolstack-provided PSE36 value into a
+         * shadow guest if the guest is already using PAE paging (and won't
+         * care about reverting back to PSE paging).  Otherwise, knoble it, so
+         * a 32bit guest doesn't get the impression that it could try to use
+         * PSE36 paging.
+         */
+        if ( !hap_enabled(d) && !(hvm_pae_enabled(v) || hvm_long_mode_enabled(v)) )
+            *edx &= ~cpufeat_mask(X86_FEATURE_PSE36);
 
         if ( vpmu_enabled(v) &&
              vpmu_is_set(vcpu_vpmu(v), VPMU_CPU_HAS_DS) )
@@ -3385,23 +3379,11 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
     case 0x7:
         if ( count == 0 )
         {
-            /* Fold host's FDP_EXCP_ONLY and NO_FPU_SEL into guest's view. */
-            *ebx &= (hvm_featureset[FEATURESET_7b0] &
-                     ~special_features[FEATURESET_7b0]);
-            *ebx |= (host_featureset[FEATURESET_7b0] &
-                     special_features[FEATURESET_7b0]);
+            *ebx = p->feat._7b0;
+            *ecx = p->feat._7c0;
+            *edx = p->feat._7d0;
 
-            *ecx &= hvm_featureset[FEATURESET_7c0];
-            *edx &= hvm_featureset[FEATURESET_7d0];
-
-            /* Don't expose HAP-only features to non-hap guests. */
-            if ( !hap_enabled(d) )
-            {
-                 *ebx &= ~cpufeat_mask(X86_FEATURE_INVPCID);
-                 *ecx &= ~cpufeat_mask(X86_FEATURE_PKU);
-            }
-
-            /* OSPKE cleared by hvm_featureset.  Fast-forward CR4 back in. */
+            /* OSPKE clear in policy.  Fast-forward CR4 back in. */
             if ( v->arch.hvm_vcpu.guest_cr[4] & X86_CR4_PKE )
                 *ecx |= cpufeat_mask(X86_FEATURE_OSPKE);
         }
@@ -3485,7 +3467,7 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
         }
 
         case 1:
-            *eax &= hvm_featureset[FEATURESET_Da1];
+            *eax = p->xstate.Da1;
 
             if ( p->xstate.xsaves )
             {
@@ -3517,8 +3499,8 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
         break;
 
     case 0x80000001:
-        *ecx &= hvm_featureset[FEATURESET_e1c];
-        *edx &= hvm_featureset[FEATURESET_e1d];
+        *ecx = p->extd.e1c;
+        *edx = p->extd.e1d;
 
         /* If not emulating AMD, clear the duplicated features in e1d. */
         if ( d->arch.x86_vendor != X86_VENDOR_AMD )
@@ -3527,28 +3509,22 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
         else if ( vlapic_hw_disabled(vcpu_vlapic(v)) )
             *edx &= ~cpufeat_bit(X86_FEATURE_APIC);
 
-        /* Don't expose HAP-only features to non-hap guests. */
-        if ( !hap_enabled(d) )
-        {
-            *edx &= ~cpufeat_mask(X86_FEATURE_PAGE1GB);
-
-            /*
-             * PSE36 is not supported in shadow mode.  This bit should be
-             * unilaterally cleared.
-             *
-             * However, an unspecified version of Hyper-V from 2011 refuses
-             * to start as the "cpu does not provide required hw features" if
-             * it can't see PSE36.
-             *
-             * As a workaround, leak the toolstack-provided PSE36 value into a
-             * shadow guest if the guest is already using PAE paging (and
-             * won't care about reverting back to PSE paging).  Otherwise,
-             * knoble it, so a 32bit guest doesn't get the impression that it
-             * could try to use PSE36 paging.
-             */
-            if ( !(hvm_pae_enabled(v) || hvm_long_mode_enabled(v)) )
-                *edx &= ~cpufeat_mask(X86_FEATURE_PSE36);
-        }
+        /*
+         * PSE36 is not supported in shadow mode.  This bit should be
+         * unilaterally cleared.
+         *
+         * However, an unspecified version of Hyper-V from 2011 refuses
+         * to start as the "cpu does not provide required hw features" if
+         * it can't see PSE36.
+         *
+         * As a workaround, leak the toolstack-provided PSE36 value into a
+         * shadow guest if the guest is already using PAE paging (and won't
+         * care about reverting back to PSE paging).  Otherwise, knoble it, so
+         * a 32bit guest doesn't get the impression that it could try to use
+         * PSE36 paging.
+         */
+        if ( !hap_enabled(d) && !(hvm_pae_enabled(v) || hvm_long_mode_enabled(v)) )
+            *edx &= ~cpufeat_mask(X86_FEATURE_PSE36);
 
         /* SYSCALL is hidden outside of long mode on Intel. */
         if ( d->arch.x86_vendor == X86_VENDOR_INTEL &&
@@ -3558,8 +3534,7 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
         break;
 
     case 0x80000007:
-        *edx &= (hvm_featureset[FEATURESET_e7d] |
-                 (host_featureset[FEATURESET_e7d] & cpufeat_mask(X86_FEATURE_ITSC)));
+        *edx = p->extd.e7d;
         break;
 
     case 0x80000008:
@@ -3574,7 +3549,7 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
 
         *eax |= (p->extd.lm ? vaddr_bits : 32) << 8;
 
-        *ebx &= hvm_featureset[FEATURESET_e8b];
+        *ebx = p->extd.e8b;
         break;
 
     case 0x8000001c:
