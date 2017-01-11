@@ -1512,7 +1512,7 @@ int arch_set_info_hvm_guest(struct vcpu *v, const vcpu_hvm_context_t *ctx)
     if ( v->arch.hvm_vcpu.guest_efer & EFER_LME )
         v->arch.hvm_vcpu.guest_efer |= EFER_LMA;
 
-    if ( v->arch.hvm_vcpu.guest_cr[4] & hvm_cr4_guest_reserved_bits(v, 0) )
+    if ( v->arch.hvm_vcpu.guest_cr[4] & ~hvm_cr4_guest_valid_bits(v, 0) )
     {
         gprintk(XENLOG_ERR, "Bad CR4 value: %#016lx\n",
                 v->arch.hvm_vcpu.guest_cr[4]);

@@ -957,67 +957,39 @@ const char *hvm_efer_valid(const struct vcpu *v, uint64_t value,
         X86_CR0_WP | X86_CR0_AM | X86_CR0_NW |  \
         X86_CR0_CD | X86_CR0_PG)))
 
-/* These bits in CR4 cannot be set by the guest. */
-unsigned long hvm_cr4_guest_reserved_bits(const struct vcpu *v,bool_t restore)
+/* These bits in CR4 can be set by the guest. */
+unsigned long hvm_cr4_guest_valid_bits(const struct vcpu *v, bool restore)
 {
-    unsigned int leaf1_ecx = 0, leaf1_edx = 0;
-    unsigned int leaf7_0_ebx = 0, leaf7_0_ecx = 0;
+    const struct domain *d = v->domain;
+    const struct cpuid_policy *p;
+    bool mce, vmxe;
 
-    if ( !restore && !is_hardware_domain(v->domain) )
-    {
-        unsigned int level;
-
-        ASSERT(v->domain == current->domain);
-        hvm_cpuid(0, &level, NULL, NULL, NULL);
-        if ( level >= 1 )
-            hvm_cpuid(1, NULL, NULL, &leaf1_ecx, &leaf1_edx);
-        if ( level >= 7 )
-            hvm_cpuid(7, NULL, &leaf7_0_ebx, &leaf7_0_ecx, NULL);
-    }
+    if ( !restore && !is_hardware_domain(d) )
+        p = d->arch.cpuid;
     else
-    {
-        leaf1_edx = boot_cpu_data.x86_capability[cpufeat_word(X86_FEATURE_VME)];
-        leaf1_ecx = boot_cpu_data.x86_capability[cpufeat_word(X86_FEATURE_PCID)];
-        leaf7_0_ebx = boot_cpu_data.x86_capability[cpufeat_word(X86_FEATURE_FSGSBASE)];
-        leaf7_0_ecx = boot_cpu_data.x86_capability[cpufeat_word(X86_FEATURE_PKU)];
-    }
+        p = &host_policy;
 
-    return ~(unsigned long)
-            ((leaf1_edx & cpufeat_mask(X86_FEATURE_VME) ?
-              X86_CR4_VME | X86_CR4_PVI : 0) |
-             (leaf1_edx & cpufeat_mask(X86_FEATURE_TSC) ?
-              X86_CR4_TSD : 0) |
-             (leaf1_edx & cpufeat_mask(X86_FEATURE_DE) ?
-              X86_CR4_DE : 0) |
-             (leaf1_edx & cpufeat_mask(X86_FEATURE_PSE) ?
-              X86_CR4_PSE : 0) |
-             (leaf1_edx & cpufeat_mask(X86_FEATURE_PAE) ?
-              X86_CR4_PAE : 0) |
-             (leaf1_edx & (cpufeat_mask(X86_FEATURE_MCE) |
-                           cpufeat_mask(X86_FEATURE_MCA)) ?
-              X86_CR4_MCE : 0) |
-             (leaf1_edx & cpufeat_mask(X86_FEATURE_PGE) ?
-              X86_CR4_PGE : 0) |
-             X86_CR4_PCE |
-             (leaf1_edx & cpufeat_mask(X86_FEATURE_FXSR) ?
-              X86_CR4_OSFXSR : 0) |
-             (leaf1_edx & cpufeat_mask(X86_FEATURE_SSE) ?
-              X86_CR4_OSXMMEXCPT : 0) |
-             ((restore || nestedhvm_enabled(v->domain)) &&
-              (leaf1_ecx & cpufeat_mask(X86_FEATURE_VMX)) ?
-              X86_CR4_VMXE : 0) |
-             (leaf7_0_ebx & cpufeat_mask(X86_FEATURE_FSGSBASE) ?
-              X86_CR4_FSGSBASE : 0) |
-             (leaf1_ecx & cpufeat_mask(X86_FEATURE_PCID) ?
-              X86_CR4_PCIDE : 0) |
-             (leaf1_ecx & cpufeat_mask(X86_FEATURE_XSAVE) ?
-              X86_CR4_OSXSAVE : 0) |
-             (leaf7_0_ebx & cpufeat_mask(X86_FEATURE_SMEP) ?
-              X86_CR4_SMEP : 0) |
-             (leaf7_0_ebx & cpufeat_mask(X86_FEATURE_SMAP) ?
-              X86_CR4_SMAP : 0) |
-              (leaf7_0_ecx & cpufeat_mask(X86_FEATURE_PKU) ?
-              X86_CR4_PKE : 0));
+    /* Logic broken out simply to aid readability below. */
+    mce  = p->basic.mce || p->basic.mca;
+    vmxe = p->basic.vmx && (restore || nestedhvm_enabled(d));
+
+    return ((p->basic.vme     ? X86_CR4_VME | X86_CR4_PVI : 0) |
+            (p->basic.tsc     ? X86_CR4_TSD               : 0) |
+            (p->basic.de      ? X86_CR4_DE                : 0) |
+            (p->basic.pse     ? X86_CR4_PSE               : 0) |
+            (p->basic.pae     ? X86_CR4_PAE               : 0) |
+            (mce              ? X86_CR4_MCE               : 0) |
+            (p->basic.pge     ? X86_CR4_PGE               : 0) |
+                                X86_CR4_PCE                    |
+            (p->basic.fxsr    ? X86_CR4_OSFXSR            : 0) |
+            (p->basic.sse     ? X86_CR4_OSXMMEXCPT        : 0) |
+            (vmxe             ? X86_CR4_VMXE              : 0) |
+            (p->feat.fsgsbase ? X86_CR4_FSGSBASE          : 0) |
+            (p->basic.pcid    ? X86_CR4_PCIDE             : 0) |
+            (p->basic.xsave   ? X86_CR4_OSXSAVE           : 0) |
+            (p->feat.smep     ? X86_CR4_SMEP              : 0) |
+            (p->feat.smap     ? X86_CR4_SMAP              : 0) |
+            (p->feat.pku      ? X86_CR4_PKE               : 0));
 }
 
 static int hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
@@ -1054,7 +1026,7 @@ static int hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
         return -EINVAL;
     }
 
-    if ( ctxt.cr4 & hvm_cr4_guest_reserved_bits(v, 1) )
+    if ( ctxt.cr4 & ~hvm_cr4_guest_valid_bits(v, 1) )
     {
         printk(XENLOG_G_ERR "HVM%d restore: bad CR4 %#" PRIx64 "\n",
                d->domain_id, ctxt.cr4);
@@ -2390,7 +2362,7 @@ int hvm_set_cr4(unsigned long value, bool_t may_defer)
     struct vcpu *v = current;
     unsigned long old_cr;
 
-    if ( value & hvm_cr4_guest_reserved_bits(v, 0) )
+    if ( value & ~hvm_cr4_guest_valid_bits(v, 0) )
     {
         HVM_DBG_LOG(DBG_LEVEL_1,
                     "Guest attempts to set reserved bit in CR4: %lx",

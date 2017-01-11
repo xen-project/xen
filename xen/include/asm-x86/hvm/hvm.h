@@ -615,7 +615,7 @@ static inline bool altp2m_vcpu_emulate_ve(struct vcpu *v)
 /* Check CR4/EFER values */
 const char *hvm_efer_valid(const struct vcpu *v, uint64_t value,
                            signed int cr0_pg);
-unsigned long hvm_cr4_guest_reserved_bits(const struct vcpu *v, bool_t restore);
+unsigned long hvm_cr4_guest_valid_bits(const struct vcpu *v, bool restore);
 
 /*
  * This must be defined as a macro instead of an inline function,
