@@ -230,8 +230,8 @@ long arch_do_sysctl(
         /* Bad featureset index? */
         if ( !p )
             ret = -EINVAL;
-
-        cpuid_policy_to_featureset(p, featureset);
+        else
+            cpuid_policy_to_featureset(p, featureset);
 
         /* Copy the requested featureset into place. */
         if ( !ret && copy_to_guest(sysctl->u.cpu_featureset.features,
