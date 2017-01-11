@@ -1064,11 +1064,8 @@ void pv_cpuid(struct cpu_user_regs *regs)
         uint32_t tmp;
 
     case 0x00000001:
-        c &= pv_featureset[FEATURESET_1c];
-        d &= pv_featureset[FEATURESET_1d];
-
-        if ( is_pv_32bit_domain(currd) )
-            c &= ~cpufeat_mask(X86_FEATURE_CX16);
+        c = p->basic._1c;
+        d = p->basic._1d;
 
         if ( !is_pvh_domain(currd) )
         {
@@ -1127,7 +1124,7 @@ void pv_cpuid(struct cpu_user_regs *regs)
              *    Emulated vs Faulted CPUID is distinguised based on whether a
              *    #UD or #GP is currently being serviced.
              */
-            /* OSXSAVE cleared by pv_featureset.  Fast-forward CR4 back in. */
+            /* OSXSAVE clear in policy.  Fast-forward CR4 back in. */
             if ( (curr->arch.pv_vcpu.ctrlreg[4] & X86_CR4_OSXSAVE) ||
                  (regs->entry_vector == TRAP_invalid_op &&
                   guest_kernel_mode(curr, regs) &&
@@ -1203,21 +1200,14 @@ void pv_cpuid(struct cpu_user_regs *regs)
             if ( cpu_has(&current_cpu_data, X86_FEATURE_DSCPL) )
                 c |= cpufeat_mask(X86_FEATURE_DSCPL);
         }
-
-        c |= cpufeat_mask(X86_FEATURE_HYPERVISOR);
         break;
 
     case 0x00000007:
         if ( subleaf == 0 )
         {
-            /* Fold host's FDP_EXCP_ONLY and NO_FPU_SEL into guest's view. */
-            b &= (pv_featureset[FEATURESET_7b0] &
-                  ~special_features[FEATURESET_7b0]);
-            b |= (host_featureset[FEATURESET_7b0] &
-                  special_features[FEATURESET_7b0]);
-
-            c &= pv_featureset[FEATURESET_7c0];
-            d &= pv_featureset[FEATURESET_7d0];
+            b = p->feat._7b0;
+            c = p->feat._7c0;
+            d = p->feat._7d0;
 
             if ( !is_pvh_domain(currd) )
             {
@@ -1226,7 +1216,7 @@ void pv_cpuid(struct cpu_user_regs *regs)
                  * and HVM guests no longer enter a PV codepath.
                  */
 
-                /* OSPKE cleared by pv_featureset.  Fast-forward CR4 back in. */
+                /* OSPKE clear in policy.  Fast-forward CR4 back in. */
                 if ( curr->arch.pv_vcpu.ctrlreg[4] & X86_CR4_PKE )
                     c |= cpufeat_mask(X86_FEATURE_OSPKE);
             }
@@ -1291,15 +1281,15 @@ void pv_cpuid(struct cpu_user_regs *regs)
         }
 
         case 1:
-            a &= pv_featureset[FEATURESET_Da1];
+            a = p->xstate.Da1;
             b = c = d = 0;
             break;
         }
         break;
 
     case 0x80000001:
-        c &= pv_featureset[FEATURESET_e1c];
-        d &= pv_featureset[FEATURESET_e1d];
+        c = p->extd.e1c;
+        d = p->extd.e1d;
 
         /* If not emulating AMD, clear the duplicated features in e1d. */
         if ( currd->arch.x86_vendor != X86_VENDOR_AMD )
@@ -1317,25 +1307,15 @@ void pv_cpuid(struct cpu_user_regs *regs)
         if ( is_hardware_domain(currd) && guest_kernel_mode(curr, regs) &&
              cpu_has_mtrr )
             d |= cpufeat_mask(X86_FEATURE_MTRR);
-
-        if ( is_pv_32bit_domain(currd) )
-        {
-            d &= ~cpufeat_mask(X86_FEATURE_LM);
-            c &= ~cpufeat_mask(X86_FEATURE_LAHF_LM);
-
-            if ( boot_cpu_data.x86_vendor != X86_VENDOR_AMD )
-                d &= ~cpufeat_mask(X86_FEATURE_SYSCALL);
-        }
         break;
 
     case 0x80000007:
-        d &= (pv_featureset[FEATURESET_e7d] |
-              (host_featureset[FEATURESET_e7d] & cpufeat_mask(X86_FEATURE_ITSC)));
+        d = p->extd.e7d;
         break;
 
     case 0x80000008:
         a = paddr_bits | (vaddr_bits << 8);
-        b &= pv_featureset[FEATURESET_e8b];
+        b = p->extd.e8b;
         break;
 
     case 0x00000005: /* MONITOR/MWAIT */
