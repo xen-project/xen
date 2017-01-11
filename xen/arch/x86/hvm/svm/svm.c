@@ -173,7 +173,7 @@ static void svm_save_dr(struct vcpu *v)
     v->arch.hvm_vcpu.flag_dr_dirty = 0;
     vmcb_set_dr_intercepts(vmcb, ~0u);
 
-    if ( flag_dr_dirty & 2 )
+    if ( v->domain->arch.cpuid->extd.dbext )
     {
         svm_intercept_msr(v, MSR_AMD64_DR0_ADDRESS_MASK, MSR_INTERCEPT_RW);
         svm_intercept_msr(v, MSR_AMD64_DR1_ADDRESS_MASK, MSR_INTERCEPT_RW);
@@ -196,8 +196,6 @@ static void svm_save_dr(struct vcpu *v)
 
 static void __restore_debug_registers(struct vmcb_struct *vmcb, struct vcpu *v)
 {
-    unsigned int ecx;
-
     if ( v->arch.hvm_vcpu.flag_dr_dirty )
         return;
 
@@ -205,8 +203,8 @@ static void __restore_debug_registers(struct vmcb_struct *vmcb, struct vcpu *v)
     vmcb_set_dr_intercepts(vmcb, 0);
 
     ASSERT(v == current);
-    hvm_cpuid(0x80000001, NULL, NULL, &ecx, NULL);
-    if ( test_bit(X86_FEATURE_DBEXT & 31, &ecx) )
+
+    if ( v->domain->arch.cpuid->extd.dbext )
     {
         svm_intercept_msr(v, MSR_AMD64_DR0_ADDRESS_MASK, MSR_INTERCEPT_NONE);
         svm_intercept_msr(v, MSR_AMD64_DR1_ADDRESS_MASK, MSR_INTERCEPT_NONE);
@@ -217,9 +215,6 @@ static void __restore_debug_registers(struct vmcb_struct *vmcb, struct vcpu *v)
         wrmsrl(MSR_AMD64_DR1_ADDRESS_MASK, v->arch.hvm_svm.dr_mask[1]);
         wrmsrl(MSR_AMD64_DR2_ADDRESS_MASK, v->arch.hvm_svm.dr_mask[2]);
         wrmsrl(MSR_AMD64_DR3_ADDRESS_MASK, v->arch.hvm_svm.dr_mask[3]);
-
-        /* Can't use hvm_cpuid() in svm_save_dr(): v != current. */
-        v->arch.hvm_vcpu.flag_dr_dirty |= 2;
     }
 
     write_debugreg(0, v->arch.debugreg[0]);
@@ -1359,11 +1354,7 @@ static void svm_init_erratum_383(struct cpuinfo_x86 *c)
 
 static int svm_handle_osvw(struct vcpu *v, uint32_t msr, uint64_t *val, bool_t read)
 {
-    unsigned int ecx;
-
-    /* Guest OSVW support */
-    hvm_cpuid(0x80000001, NULL, NULL, &ecx, NULL);
-    if ( !test_bit((X86_FEATURE_OSVW & 31), &ecx) )
+    if ( !v->domain->arch.cpuid->extd.osvw )
         return -1;
 
     if ( read )
@@ -1622,8 +1613,6 @@ static int svm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
 
     switch ( msr )
     {
-        unsigned int ecx;
-
     case MSR_IA32_SYSENTER_CS:
         *msr_content = v->arch.hvm_svm.guest_sysenter_cs;
         break;
@@ -1701,15 +1690,13 @@ static int svm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
         break;
 
     case MSR_AMD64_DR0_ADDRESS_MASK:
-        hvm_cpuid(0x80000001, NULL, NULL, &ecx, NULL);
-        if ( !test_bit(X86_FEATURE_DBEXT & 31, &ecx) )
+        if ( !v->domain->arch.cpuid->extd.dbext )
             goto gpf;
         *msr_content = v->arch.hvm_svm.dr_mask[0];
         break;
 
     case MSR_AMD64_DR1_ADDRESS_MASK ... MSR_AMD64_DR3_ADDRESS_MASK:
-        hvm_cpuid(0x80000001, NULL, NULL, &ecx, NULL);
-        if ( !test_bit(X86_FEATURE_DBEXT & 31, &ecx) )
+        if ( !v->domain->arch.cpuid->extd.dbext )
             goto gpf;
         *msr_content =
             v->arch.hvm_svm.dr_mask[msr - MSR_AMD64_DR1_ADDRESS_MASK + 1];
@@ -1783,8 +1770,6 @@ static int svm_msr_write_intercept(unsigned int msr, uint64_t msr_content)
 
     switch ( msr )
     {
-        unsigned int ecx;
-
     case MSR_IA32_SYSENTER_CS:
         vmcb->sysenter_cs = v->arch.hvm_svm.guest_sysenter_cs = msr_content;
         break;
@@ -1862,15 +1847,13 @@ static int svm_msr_write_intercept(unsigned int msr, uint64_t msr_content)
         break;
 
     case MSR_AMD64_DR0_ADDRESS_MASK:
-        hvm_cpuid(0x80000001, NULL, NULL, &ecx, NULL);
-        if ( !test_bit(X86_FEATURE_DBEXT & 31, &ecx) || (msr_content >> 32) )
+        if ( !v->domain->arch.cpuid->extd.dbext || (msr_content >> 32) )
             goto gpf;
         v->arch.hvm_svm.dr_mask[0] = msr_content;
         break;
 
     case MSR_AMD64_DR1_ADDRESS_MASK ... MSR_AMD64_DR3_ADDRESS_MASK:
-        hvm_cpuid(0x80000001, NULL, NULL, &ecx, NULL);
-        if ( !test_bit(X86_FEATURE_DBEXT & 31, &ecx) || (msr_content >> 32) )
+        if ( !v->domain->arch.cpuid->extd.dbext || (msr_content >> 32) )
             goto gpf;
         v->arch.hvm_svm.dr_mask[msr - MSR_AMD64_DR1_ADDRESS_MASK + 1] =
             msr_content;

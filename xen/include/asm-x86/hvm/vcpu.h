@@ -162,12 +162,12 @@ struct hvm_vcpu {
     spinlock_t          tm_lock;
     struct list_head    tm_list;
 
-    u8                  flag_dr_dirty;
-    bool_t              debug_state_latch;
-    bool_t              single_step;
+    bool                flag_dr_dirty;
+    bool                debug_state_latch;
+    bool                single_step;
 
-    bool_t              hcall_preempted;
-    bool_t              hcall_64bit;
+    bool                hcall_preempted;
+    bool                hcall_64bit;
 
     struct hvm_vcpu_asid n1asid;
 
