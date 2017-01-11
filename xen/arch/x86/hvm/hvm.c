@@ -3601,6 +3601,20 @@ gp_fault:
     return X86EMUL_EXCEPTION;
 }
 
+static bool is_cross_vendor(const struct x86_emulate_state *state,
+                            const struct x86_emulate_ctxt *ctxt)
+{
+    switch ( ctxt->opcode )
+    {
+    case X86EMUL_OPC(0x0f, 0x05): /* syscall */
+    case X86EMUL_OPC(0x0f, 0x34): /* sysenter */
+    case X86EMUL_OPC(0x0f, 0x35): /* sysexit */
+        return true;
+    }
+
+    return false;
+}
+
 void hvm_ud_intercept(struct cpu_user_regs *regs)
 {
     struct vcpu *cur = current;
@@ -3608,7 +3622,7 @@ void hvm_ud_intercept(struct cpu_user_regs *regs)
         cur->domain->arch.x86_vendor != boot_cpu_data.x86_vendor;
     struct hvm_emulate_ctxt ctxt;
 
-    hvm_emulate_init_once(&ctxt, regs);
+    hvm_emulate_init_once(&ctxt, opt_hvm_fep ? NULL : is_cross_vendor, regs);
 
     if ( opt_hvm_fep )
     {

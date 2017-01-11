@@ -639,6 +639,18 @@ x86_insn_immediate(const struct x86_emulate_state *state,
 unsigned int
 x86_insn_length(const struct x86_emulate_state *state,
                 const struct x86_emulate_ctxt *ctxt);
+bool
+x86_insn_is_mem_access(const struct x86_emulate_state *state,
+                       const struct x86_emulate_ctxt *ctxt);
+bool
+x86_insn_is_mem_write(const struct x86_emulate_state *state,
+                      const struct x86_emulate_ctxt *ctxt);
+bool
+x86_insn_is_portio(const struct x86_emulate_state *state,
+                   const struct x86_emulate_ctxt *ctxt);
+bool
+x86_insn_is_cr_access(const struct x86_emulate_state *state,
+                      const struct x86_emulate_ctxt *ctxt);
 
 #ifdef NDEBUG
 static inline void x86_emulate_free_state(struct x86_emulate_state *state) {}

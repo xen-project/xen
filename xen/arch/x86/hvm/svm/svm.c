@@ -2156,6 +2156,16 @@ static void svm_invlpg_intercept(unsigned long vaddr)
     paging_invlpg(current, vaddr);
 }
 
+static bool is_invlpg(const struct x86_emulate_state *state,
+                      const struct x86_emulate_ctxt *ctxt)
+{
+    unsigned int ext;
+
+    return ctxt->opcode == X86EMUL_OPC(0x0f, 0x01) &&
+           x86_insn_modrm(state, NULL, &ext) != 3 &&
+           (ext & 7) == 7;
+}
+
 static void svm_invlpg(struct vcpu *v, unsigned long vaddr)
 {
     svm_asid_g_invlpg(v, vaddr);
@@ -2501,7 +2511,7 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
             if ( handle_pio(port, bytes, dir) )
                 __update_guest_eip(regs, vmcb->exitinfo2 - vmcb->rip);
         }
-        else if ( !handle_mmio() )
+        else if ( !hvm_emulate_one_insn(x86_insn_is_portio) )
             hvm_inject_hw_exception(TRAP_gp_fault, 0);
         break;
 
@@ -2509,7 +2519,7 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
     case VMEXIT_CR0_WRITE ... VMEXIT_CR15_WRITE:
         if ( cpu_has_svm_decode && (vmcb->exitinfo1 & (1ULL << 63)) )
             svm_vmexit_do_cr_access(vmcb, regs);
-        else if ( !handle_mmio() ) 
+        else if ( !hvm_emulate_one_insn(x86_insn_is_cr_access) )
             hvm_inject_hw_exception(TRAP_gp_fault, 0);
         break;
 
@@ -2519,7 +2529,7 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
             svm_invlpg_intercept(vmcb->exitinfo1);
             __update_guest_eip(regs, vmcb->nextrip - vmcb->rip);
         }
-        else if ( !handle_mmio() )
+        else if ( !hvm_emulate_one_insn(is_invlpg) )
             hvm_inject_hw_exception(TRAP_gp_fault, 0);
         break;
 

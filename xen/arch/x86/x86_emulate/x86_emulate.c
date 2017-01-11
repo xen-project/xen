@@ -3678,7 +3678,7 @@ x86_emulate(
                 emulate_fpu_insn_memsrc("flds", src.val);
                 dst.type = OP_NONE;
                 break;
-            case 2: /* fstp m32fp */
+            case 2: /* fst m32fp */
                 emulate_fpu_insn_memdst("fsts", dst.val);
                 dst.bytes = 4;
                 break;
@@ -5926,6 +5926,186 @@ x86_insn_operand_ea(const struct x86_emulate_state *state,
     check_state(state);
 
     return state->ea.mem.off;
+}
+
+bool
+x86_insn_is_mem_access(const struct x86_emulate_state *state,
+                       const struct x86_emulate_ctxt *ctxt)
+{
+    if ( state->ea.type == OP_MEM )
+        return ctxt->opcode != 0x8d /* LEA */ &&
+               (ctxt->opcode != X86EMUL_OPC(0x0f, 0x01) ||
+                (state->modrm_reg & 7) != 7) /* INVLPG */;
+
+    switch ( ctxt->opcode )
+    {
+    case 0x6c ... 0x6f: /* INS / OUTS */
+    case 0xa4 ... 0xa7: /* MOVS / CMPS */
+    case 0xaa ... 0xaf: /* STOS / LODS / SCAS */
+    case 0xd7:          /* XLAT */
+        return true;
+
+    case X86EMUL_OPC(0x0f, 0x01):
+        /* Cover CLZERO. */
+        return (state->modrm_rm & 7) == 4 && (state->modrm_reg & 7) == 7;
+    }
+
+    return false;
+}
+
+bool
+x86_insn_is_mem_write(const struct x86_emulate_state *state,
+                      const struct x86_emulate_ctxt *ctxt)
+{
+    switch ( state->desc & DstMask )
+    {
+    case DstMem:
+        return state->modrm_mod != 3;
+
+    case DstBitBase:
+    case DstImplicit:
+        break;
+
+    default:
+        return false;
+    }
+
+    if ( state->modrm_mod == 3 )
+        /* CLZERO is the odd one. */
+        return ctxt->opcode == X86EMUL_OPC(0x0f, 0x01) &&
+               (state->modrm_rm & 7) == 4 && (state->modrm_reg & 7) == 7;
+
+    switch ( ctxt->opcode )
+    {
+    case 0x6c: case 0x6d:                /* INS */
+    case 0xa4: case 0xa5:                /* MOVS */
+    case 0xaa: case 0xab:                /* STOS */
+    case X86EMUL_OPC(0x0f, 0x11):        /* MOVUPS */
+    case X86EMUL_OPC_VEX(0x0f, 0x11):    /* VMOVUPS */
+    case X86EMUL_OPC_66(0x0f, 0x11):     /* MOVUPD */
+    case X86EMUL_OPC_VEX_66(0x0f, 0x11): /* VMOVUPD */
+    case X86EMUL_OPC_F3(0x0f, 0x11):     /* MOVSS */
+    case X86EMUL_OPC_VEX_F3(0x0f, 0x11): /* VMOVSS */
+    case X86EMUL_OPC_F2(0x0f, 0x11):     /* MOVSD */
+    case X86EMUL_OPC_VEX_F2(0x0f, 0x11): /* VMOVSD */
+    case X86EMUL_OPC(0x0f, 0x29):        /* MOVAPS */
+    case X86EMUL_OPC_VEX(0x0f, 0x29):    /* VMOVAPS */
+    case X86EMUL_OPC_66(0x0f, 0x29):     /* MOVAPD */
+    case X86EMUL_OPC_VEX_66(0x0f, 0x29): /* VMOVAPD */
+    case X86EMUL_OPC(0x0f, 0x2b):        /* MOVNTPS */
+    case X86EMUL_OPC_VEX(0x0f, 0x2b):    /* VMOVNTPS */
+    case X86EMUL_OPC_66(0x0f, 0x2b):     /* MOVNTPD */
+    case X86EMUL_OPC_VEX_66(0x0f, 0x2b): /* VMOVNTPD */
+    case X86EMUL_OPC(0x0f, 0x7e):        /* MOVD/MOVQ */
+    case X86EMUL_OPC_66(0x0f, 0x7e):     /* MOVD/MOVQ */
+    case X86EMUL_OPC_VEX_66(0x0f, 0x7e): /* VMOVD/VMOVQ */
+    case X86EMUL_OPC(0x0f, 0x7f):        /* VMOVQ */
+    case X86EMUL_OPC_66(0x0f, 0x7f):     /* MOVDQA */
+    case X86EMUL_OPC_VEX_66(0x0f, 0x7f): /* VMOVDQA */
+    case X86EMUL_OPC_F3(0x0f, 0x7f):     /* MOVDQU */
+    case X86EMUL_OPC_VEX_F3(0x0f, 0x7f): /* VMOVDQU */
+    case X86EMUL_OPC(0x0f, 0xab):        /* BTS */
+    case X86EMUL_OPC(0x0f, 0xb3):        /* BTR */
+    case X86EMUL_OPC(0x0f, 0xbb):        /* BTC */
+    case X86EMUL_OPC_66(0x0f, 0xd6):     /* MOVQ */
+    case X86EMUL_OPC_VEX_66(0x0f, 0xd6): /* VMOVQ */
+    case X86EMUL_OPC(0x0f, 0xe7):        /* MOVNTQ */
+    case X86EMUL_OPC_66(0x0f, 0xe7):     /* MOVNTDQ */
+    case X86EMUL_OPC_VEX_66(0x0f, 0xe7): /* VMOVNTDQ */
+        return true;
+
+    case 0xd9:
+        switch ( state->modrm_reg & 7 )
+        {
+        case 2: /* FST m32fp */
+        case 3: /* FSTP m32fp */
+        case 6: /* FNSTENV */
+        case 7: /* FNSTCW */
+            return true;
+        }
+        break;
+
+    case 0xdb:
+        switch ( state->modrm_reg & 7 )
+        {
+        case 1: /* FISTTP m32i */
+        case 2: /* FIST m32i */
+        case 3: /* FISTP m32i */
+        case 7: /* FSTP m80fp */
+            return true;
+        }
+        break;
+
+    case 0xdd:
+        switch ( state->modrm_reg & 7 )
+        {
+        case 1: /* FISTTP m64i */
+        case 2: /* FST m64fp */
+        case 3: /* FSTP m64fp */
+        case 6: /* FNSAVE */
+        case 7: /* FNSTSW */
+            return true;
+        }
+        break;
+
+    case 0xdf:
+        switch ( state->modrm_reg & 7 )
+        {
+        case 1: /* FISTTP m16i */
+        case 2: /* FIST m16i */
+        case 3: /* FISTP m16i */
+        case 6: /* FBSTP */
+        case 7: /* FISTP m64i */
+            return true;
+        }
+        break;
+
+    case X86EMUL_OPC(0x0f, 0x01):
+        return !(state->modrm_reg & 6); /* SGDT / SIDT */
+
+    case X86EMUL_OPC(0x0f, 0xba):
+        return (state->modrm_reg & 7) > 4; /* BTS / BTR / BTC */
+    }
+
+    return false;
+}
+
+bool
+x86_insn_is_portio(const struct x86_emulate_state *state,
+                   const struct x86_emulate_ctxt *ctxt)
+{
+    switch ( ctxt->opcode )
+    {
+    case 0x6c ... 0x6f: /* INS / OUTS */
+    case 0xe4 ... 0xe7: /* IN / OUT imm8 */
+    case 0xec ... 0xef: /* IN / OUT %dx */
+        return true;
+    }
+
+    return false;
+}
+
+bool
+x86_insn_is_cr_access(const struct x86_emulate_state *state,
+                      const struct x86_emulate_ctxt *ctxt)
+{
+    switch ( ctxt->opcode )
+    {
+        unsigned int ext;
+
+    case X86EMUL_OPC(0x0f, 0x01):
+        if ( x86_insn_modrm(state, NULL, &ext) >= 0
+             && (ext & 5) == 4 ) /* SMSW / LMSW */
+            return true;
+        break;
+
+    case X86EMUL_OPC(0x0f, 0x06): /* CLTS */
+    case X86EMUL_OPC(0x0f, 0x20): /* MOV from CRn */
+    case X86EMUL_OPC(0x0f, 0x22): /* MOV to CRn */
+        return true;
+    }
+
+    return false;
 }
 
 unsigned long

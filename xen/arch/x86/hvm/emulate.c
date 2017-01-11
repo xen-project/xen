@@ -1039,6 +1039,17 @@ static int hvmemul_cmpxchg(
     return hvmemul_write(seg, offset, p_new, bytes, ctxt);
 }
 
+static int hvmemul_validate(
+    const struct x86_emulate_state *state,
+    struct x86_emulate_ctxt *ctxt)
+{
+    const struct hvm_emulate_ctxt *hvmemul_ctxt =
+        container_of(ctxt, struct hvm_emulate_ctxt, ctxt);
+
+    return !hvmemul_ctxt->validate || hvmemul_ctxt->validate(state, ctxt)
+           ? X86EMUL_OKAY : X86EMUL_UNHANDLEABLE;
+}
+
 static int hvmemul_rep_ins(
     uint16_t src_port,
     enum x86_segment dst_seg,
@@ -1660,6 +1671,7 @@ static const struct x86_emulate_ops hvm_emulate_ops = {
     .insn_fetch    = hvmemul_insn_fetch,
     .write         = hvmemul_write,
     .cmpxchg       = hvmemul_cmpxchg,
+    .validate      = hvmemul_validate,
     .rep_ins       = hvmemul_rep_ins,
     .rep_outs      = hvmemul_rep_outs,
     .rep_movs      = hvmemul_rep_movs,
@@ -1805,7 +1817,8 @@ int hvm_emulate_one_mmio(unsigned long mfn, unsigned long gla)
     else
         ops = &hvm_ro_emulate_ops_mmio;
 
-    hvm_emulate_init_once(&ctxt, guest_cpu_user_regs());
+    hvm_emulate_init_once(&ctxt, x86_insn_is_mem_write,
+                          guest_cpu_user_regs());
     ctxt.ctxt.data = &mmio_ro_ctxt;
     rc = _hvm_emulate_one(&ctxt, ops);
     switch ( rc )
@@ -1830,7 +1843,7 @@ void hvm_emulate_one_vm_event(enum emul_kind kind, unsigned int trapnr,
     struct hvm_emulate_ctxt ctx = {{ 0 }};
     int rc;
 
-    hvm_emulate_init_once(&ctx, guest_cpu_user_regs());
+    hvm_emulate_init_once(&ctx, NULL, guest_cpu_user_regs());
 
     switch ( kind )
     {
@@ -1884,6 +1897,7 @@ void hvm_emulate_one_vm_event(enum emul_kind kind, unsigned int trapnr,
 
 void hvm_emulate_init_once(
     struct hvm_emulate_ctxt *hvmemul_ctxt,
+    hvm_emulate_validate_t *validate,
     struct cpu_user_regs *regs)
 {
     struct vcpu *curr = current;
@@ -1894,6 +1908,7 @@ void hvm_emulate_init_once(
     hvmemul_get_seg_reg(x86_seg_cs, hvmemul_ctxt);
     hvmemul_get_seg_reg(x86_seg_ss, hvmemul_ctxt);
 
+    hvmemul_ctxt->validate = validate;
     hvmemul_ctxt->ctxt.regs = regs;
     hvmemul_ctxt->ctxt.vendor = curr->domain->arch.x86_vendor;
     hvmemul_ctxt->ctxt.force_writeback = true;

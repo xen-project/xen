@@ -3717,7 +3717,7 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
         {
             /* INS, OUTS */
             if ( unlikely(is_pvh_vcpu(v)) /* PVH fixme */ ||
-                 !handle_mmio() )
+                 !hvm_emulate_one_insn(x86_insn_is_portio) )
                 hvm_inject_hw_exception(TRAP_gp_fault, 0);
         }
         else

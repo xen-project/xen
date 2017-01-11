@@ -78,7 +78,7 @@ void send_invalidate_req(void)
         gprintk(XENLOG_ERR, "Unsuccessful map-cache invalidate\n");
 }
 
-bool handle_mmio(void)
+bool hvm_emulate_one_insn(hvm_emulate_validate_t *validate)
 {
     struct hvm_emulate_ctxt ctxt;
     struct vcpu *curr = current;
@@ -87,7 +87,7 @@ bool handle_mmio(void)
 
     ASSERT(!is_pvh_vcpu(curr));
 
-    hvm_emulate_init_once(&ctxt, guest_cpu_user_regs());
+    hvm_emulate_init_once(&ctxt, validate, guest_cpu_user_regs());
 
     rc = hvm_emulate_one(&ctxt);
 
