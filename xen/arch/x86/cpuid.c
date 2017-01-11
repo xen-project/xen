@@ -350,33 +350,29 @@ int init_domain_cpuid_policy(struct domain *d)
     return 0;
 }
 
-static void pv_cpuid(struct cpu_user_regs *regs)
+static void pv_cpuid(uint32_t leaf, uint32_t subleaf, struct cpuid_leaf *res)
 {
-    uint32_t leaf, subleaf, a, b, c, d;
     struct vcpu *curr = current;
     struct domain *currd = curr->domain;
     const struct cpuid_policy *p = currd->arch.cpuid;
 
-    leaf = a = regs->_eax;
-    b = regs->_ebx;
-    subleaf = c = regs->_ecx;
-    d = regs->_edx;
-
     if ( !is_control_domain(currd) && !is_hardware_domain(currd) )
-        domain_cpuid(currd, leaf, subleaf, &a, &b, &c, &d);
+        domain_cpuid(currd, leaf, subleaf, &res->a, &res->b, &res->c, &res->d);
     else
-        cpuid_count(leaf, subleaf, &a, &b, &c, &d);
+        cpuid_count_leaf(leaf, subleaf, res);
 
     switch ( leaf )
     {
         uint32_t tmp;
 
     case 0x00000001:
-        c = p->basic._1c;
-        d = p->basic._1d;
+        res->c = p->basic._1c;
+        res->d = p->basic._1d;
 
         if ( !is_pvh_domain(currd) )
         {
+            const struct cpu_user_regs *regs = guest_cpu_user_regs();
+
             /*
              * Delete the PVH condition when HVMLite formally replaces PVH,
              * and HVM guests no longer enter a PV codepath.
@@ -437,7 +433,7 @@ static void pv_cpuid(struct cpu_user_regs *regs)
                  (regs->entry_vector == TRAP_invalid_op &&
                   guest_kernel_mode(curr, regs) &&
                   (read_cr4() & X86_CR4_OSXSAVE)) )
-                c |= cpufeat_mask(X86_FEATURE_OSXSAVE);
+                res->c |= cpufeat_mask(X86_FEATURE_OSXSAVE);
 
             /*
              * At the time of writing, a PV domain is the only viable option
@@ -461,7 +457,7 @@ static void pv_cpuid(struct cpu_user_regs *regs)
                  * of the XENPF_{add,del,read}_memtype hypercalls.
                  */
                 if ( cpu_has_mtrr )
-                    d |= cpufeat_mask(X86_FEATURE_MTRR);
+                    res->d |= cpufeat_mask(X86_FEATURE_MTRR);
 
                 /*
                  * MONITOR never leaked into PV guests, as PV guests cannot
@@ -484,7 +480,7 @@ static void pv_cpuid(struct cpu_user_regs *regs)
                  * fault is currently being serviced.  Yuck...
                  */
                 if ( cpu_has_monitor && regs->entry_vector == TRAP_gp_fault )
-                    c |= cpufeat_mask(X86_FEATURE_MONITOR);
+                    res->c |= cpufeat_mask(X86_FEATURE_MONITOR);
 
                 /*
                  * While MONITOR never leaked into PV guests, EIST always used
@@ -495,18 +491,18 @@ static void pv_cpuid(struct cpu_user_regs *regs)
                  * CPUID information.
                  */
                 if ( cpu_has_eist )
-                    c |= cpufeat_mask(X86_FEATURE_EIST);
+                    res->c |= cpufeat_mask(X86_FEATURE_EIST);
             }
         }
 
         if ( vpmu_enabled(curr) &&
              vpmu_is_set(vcpu_vpmu(curr), VPMU_CPU_HAS_DS) )
         {
-            d |= cpufeat_mask(X86_FEATURE_DS);
+            res->d |= cpufeat_mask(X86_FEATURE_DS);
             if ( cpu_has(&current_cpu_data, X86_FEATURE_DTES64) )
-                c |= cpufeat_mask(X86_FEATURE_DTES64);
+                res->c |= cpufeat_mask(X86_FEATURE_DTES64);
             if ( cpu_has(&current_cpu_data, X86_FEATURE_DSCPL) )
-                c |= cpufeat_mask(X86_FEATURE_DSCPL);
+                res->c |= cpufeat_mask(X86_FEATURE_DSCPL);
         }
         break;
 
@@ -516,8 +512,8 @@ static void pv_cpuid(struct cpu_user_regs *regs)
             goto unsupported;
 
         /* Report at most version 3 since that's all we currently emulate. */
-        if ( (a & 0xff) > 3 )
-            a = (a & ~0xff) | 3;
+        if ( (res->a & 0xff) > 3 )
+            res->a = (res->a & ~0xff) | 3;
         break;
 
     case XSTATE_CPUID:
@@ -551,33 +547,33 @@ static void pv_cpuid(struct cpu_user_regs *regs)
                                   xstate_sizes[_XSTATE_HI_ZMM]);
             }
 
-            a = (uint32_t)xfeature_mask;
-            d = (uint32_t)(xfeature_mask >> 32);
-            c = xstate_size;
+            res->a = xfeature_mask;
+            res->d = xfeature_mask >> 32;
+            res->c = xstate_size;
 
             /*
              * Always read CPUID.0xD[ECX=0].EBX from hardware, rather than
              * domain policy.  It varies with enabled xstate, and the correct
              * xcr0 is in context.
              */
-            cpuid_count(leaf, subleaf, &tmp, &b, &tmp, &tmp);
+            cpuid_count(leaf, subleaf, &tmp, &res->b, &tmp, &tmp);
             break;
         }
 
         case 1:
-            a = p->xstate.Da1;
-            b = c = d = 0;
+            res->a = p->xstate.Da1;
+            res->b = res->c = res->d = 0;
             break;
         }
         break;
 
     case 0x80000001:
-        c = p->extd.e1c;
-        d = p->extd.e1d;
+        res->c = p->extd.e1c;
+        res->d = p->extd.e1d;
 
         /* If not emulating AMD, clear the duplicated features in e1d. */
         if ( currd->arch.x86_vendor != X86_VENDOR_AMD )
-            d &= ~CPUID_COMMON_1D_FEATURES;
+            res->d &= ~CPUID_COMMON_1D_FEATURES;
 
         /*
          * MTRR used to unconditionally leak into PV guests.  They cannot MTRR
@@ -588,18 +584,18 @@ static void pv_cpuid(struct cpu_user_regs *regs)
          * the MTRR feature as an indication of the presence of the
          * XENPF_{add,del,read}_memtype hypercalls.
          */
-        if ( is_hardware_domain(currd) && guest_kernel_mode(curr, regs) &&
-             cpu_has_mtrr )
-            d |= cpufeat_mask(X86_FEATURE_MTRR);
+        if ( is_hardware_domain(currd) && cpu_has_mtrr &&
+             guest_kernel_mode(curr, guest_cpu_user_regs()) )
+            res->d |= cpufeat_mask(X86_FEATURE_MTRR);
         break;
 
     case 0x80000007:
-        d = p->extd.e7d;
+        res->d = p->extd.e7d;
         break;
 
     case 0x80000008:
-        a = paddr_bits | (vaddr_bits << 8);
-        b = p->extd.e8b;
+        res->a = paddr_bits | (vaddr_bits << 8);
+        res->b = p->extd.e8b;
         break;
 
     case 0x00000005: /* MONITOR/MWAIT */
@@ -609,57 +605,42 @@ static void pv_cpuid(struct cpu_user_regs *regs)
     case 0x8000001c: /* Light Weight Profiling */
     case 0x8000001e: /* Extended topology reporting */
     unsupported:
-        a = b = c = d = 0;
+        *res = EMPTY_LEAF;
         break;
 
     case 0x7:
         ASSERT_UNREACHABLE();
         /* Now handled in guest_cpuid(). */
     }
-
-    regs->rax = a;
-    regs->rbx = b;
-    regs->rcx = c;
-    regs->rdx = d;
 }
 
-static void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
-                      unsigned int *ecx, unsigned int *edx)
+static void hvm_cpuid(uint32_t leaf, uint32_t subleaf, struct cpuid_leaf *res)
 {
     struct vcpu *v = current;
     struct domain *d = v->domain;
     const struct cpuid_policy *p = d->arch.cpuid;
-    unsigned int count, dummy = 0;
 
-    if ( !eax )
-        eax = &dummy;
-    if ( !ebx )
-        ebx = &dummy;
-    if ( !ecx )
-        ecx = &dummy;
-    count = *ecx;
-    if ( !edx )
-        edx = &dummy;
+    domain_cpuid(d, leaf, subleaf, &res->a, &res->b, &res->c, &res->d);
 
-    domain_cpuid(d, input, count, eax, ebx, ecx, edx);
-
-    switch ( input )
+    switch ( leaf )
     {
+        unsigned int tmp;
+
     case 0x1:
         /* Fix up VLAPIC details. */
-        *ebx &= 0x00FFFFFFu;
-        *ebx |= (v->vcpu_id * 2) << 24;
+        res->b &= 0x00FFFFFFu;
+        res->b |= (v->vcpu_id * 2) << 24;
 
-        *ecx = p->basic._1c;
-        *edx = p->basic._1d;
+        res->c = p->basic._1c;
+        res->d = p->basic._1d;
 
         /* APIC exposed to guests, but Fast-forward MSR_APIC_BASE.EN back in. */
         if ( vlapic_hw_disabled(vcpu_vlapic(v)) )
-            *edx &= ~cpufeat_bit(X86_FEATURE_APIC);
+            res->d &= ~cpufeat_bit(X86_FEATURE_APIC);
 
         /* OSXSAVE clear in policy.  Fast-forward CR4 back in. */
         if ( v->arch.hvm_vcpu.guest_cr[4] & X86_CR4_OSXSAVE )
-            *ecx |= cpufeat_mask(X86_FEATURE_OSXSAVE);
+            res->c |= cpufeat_mask(X86_FEATURE_OSXSAVE);
 
         /*
          * PSE36 is not supported in shadow mode.  This bit should be
@@ -676,32 +657,32 @@ static void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
          * PSE36 paging.
          */
         if ( !hap_enabled(d) && !(hvm_pae_enabled(v) || hvm_long_mode_enabled(v)) )
-            *edx &= ~cpufeat_mask(X86_FEATURE_PSE36);
+            res->d &= ~cpufeat_mask(X86_FEATURE_PSE36);
 
         if ( vpmu_enabled(v) &&
              vpmu_is_set(vcpu_vpmu(v), VPMU_CPU_HAS_DS) )
         {
-            *edx |= cpufeat_mask(X86_FEATURE_DS);
+            res->d |= cpufeat_mask(X86_FEATURE_DS);
             if ( cpu_has(&current_cpu_data, X86_FEATURE_DTES64) )
-                *ecx |= cpufeat_mask(X86_FEATURE_DTES64);
+                res->c |= cpufeat_mask(X86_FEATURE_DTES64);
             if ( cpu_has(&current_cpu_data, X86_FEATURE_DSCPL) )
-                *ecx |= cpufeat_mask(X86_FEATURE_DSCPL);
+                res->c |= cpufeat_mask(X86_FEATURE_DSCPL);
         }
 
         break;
 
     case 0xb:
         /* Fix the x2APIC identifier. */
-        *edx = v->vcpu_id * 2;
+        res->d = v->vcpu_id * 2;
         break;
 
     case XSTATE_CPUID:
-        if ( !p->basic.xsave || count >= 63 )
+        if ( !p->basic.xsave || subleaf >= 63 )
         {
-            *eax = *ebx = *ecx = *edx = 0;
+            *res = EMPTY_LEAF;
             break;
         }
-        switch ( count )
+        switch ( subleaf )
         {
         case 0:
         {
@@ -754,21 +735,21 @@ static void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
                                   xstate_sizes[_XSTATE_LWP]);
             }
 
-            *eax = (uint32_t)xfeature_mask;
-            *edx = (uint32_t)(xfeature_mask >> 32);
-            *ecx = xstate_size;
+            res->a = xfeature_mask;
+            res->d = xfeature_mask >> 32;
+            res->c = xstate_size;
 
             /*
              * Always read CPUID[0xD,0].EBX from hardware, rather than domain
              * policy.  It varies with enabled xstate, and the correct xcr0 is
              * in context.
              */
-            cpuid_count(input, count, &dummy, ebx, &dummy, &dummy);
+            cpuid_count(leaf, subleaf, &tmp, &res->b, &tmp, &tmp);
             break;
         }
 
         case 1:
-            *eax = p->xstate.Da1;
+            res->a = p->xstate.Da1;
 
             if ( p->xstate.xsaves )
             {
@@ -777,12 +758,12 @@ static void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
                  * domain policy.  It varies with enabled xstate, and the
                  * correct xcr0/xss are in context.
                  */
-                cpuid_count(input, count, &dummy, ebx, &dummy, &dummy);
+                cpuid_count(leaf, subleaf, &tmp, &res->b, &tmp, &tmp);
             }
             else
-                *ebx = 0;
+                res->b = 0;
 
-            *ecx = *edx = 0;
+            res->c = res->d = 0;
             break;
         }
         break;
@@ -790,25 +771,25 @@ static void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
     case 0x0000000a: /* Architectural Performance Monitor Features (Intel) */
         if ( boot_cpu_data.x86_vendor != X86_VENDOR_INTEL || !vpmu_enabled(v) )
         {
-            *eax = *ebx = *ecx = *edx = 0;
+            *res = EMPTY_LEAF;
             break;
         }
 
         /* Report at most version 3 since that's all we currently emulate */
-        if ( (*eax & 0xff) > 3 )
-            *eax = (*eax & ~0xff) | 3;
+        if ( (res->a & 0xff) > 3 )
+            res->a = (res->a & ~0xff) | 3;
         break;
 
     case 0x80000001:
-        *ecx = p->extd.e1c;
-        *edx = p->extd.e1d;
+        res->c = p->extd.e1c;
+        res->d = p->extd.e1d;
 
         /* If not emulating AMD, clear the duplicated features in e1d. */
         if ( d->arch.x86_vendor != X86_VENDOR_AMD )
-            *edx &= ~CPUID_COMMON_1D_FEATURES;
+            res->d &= ~CPUID_COMMON_1D_FEATURES;
         /* fast-forward MSR_APIC_BASE.EN if it hasn't already been clobbered. */
         else if ( vlapic_hw_disabled(vcpu_vlapic(v)) )
-            *edx &= ~cpufeat_bit(X86_FEATURE_APIC);
+            res->d &= ~cpufeat_bit(X86_FEATURE_APIC);
 
         /*
          * PSE36 is not supported in shadow mode.  This bit should be
@@ -825,46 +806,46 @@ static void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
          * PSE36 paging.
          */
         if ( !hap_enabled(d) && !(hvm_pae_enabled(v) || hvm_long_mode_enabled(v)) )
-            *edx &= ~cpufeat_mask(X86_FEATURE_PSE36);
+            res->d &= ~cpufeat_mask(X86_FEATURE_PSE36);
 
         /* SYSCALL is hidden outside of long mode on Intel. */
         if ( d->arch.x86_vendor == X86_VENDOR_INTEL &&
              !hvm_long_mode_enabled(v))
-            *edx &= ~cpufeat_mask(X86_FEATURE_SYSCALL);
+            res->d &= ~cpufeat_mask(X86_FEATURE_SYSCALL);
 
         break;
 
     case 0x80000007:
-        *edx = p->extd.e7d;
+        res->d = p->extd.e7d;
         break;
 
     case 0x80000008:
-        *eax &= 0xff;
-        count = d->arch.paging.gfn_bits + PAGE_SHIFT;
-        if ( *eax > count )
-            *eax = count;
+        res->a &= 0xff;
+        tmp = d->arch.paging.gfn_bits + PAGE_SHIFT;
+        if ( res->a > tmp )
+            res->a = tmp;
 
-        count = (p->basic.pae || p->basic.pse36) ? 36 : 32;
-        if ( *eax < count )
-            *eax = count;
+        tmp = (p->basic.pae || p->basic.pse36) ? 36 : 32;
+        if ( res->a < tmp )
+            res->a = tmp;
 
-        *eax |= (p->extd.lm ? vaddr_bits : 32) << 8;
+        res->a |= (p->extd.lm ? vaddr_bits : 32) << 8;
 
-        *ebx = p->extd.e8b;
+        res->b = p->extd.e8b;
         break;
 
     case 0x8000001c:
         if ( !cpu_has_svm )
         {
-            *eax = *ebx = *ecx = *edx = 0;
+            *res = EMPTY_LEAF;
             break;
         }
 
         if ( cpu_has_lwp && (v->arch.xcr0 & XSTATE_LWP) )
             /* Turn on available bit and other features specified in lwp_cfg. */
-            *eax = (*edx & v->arch.hvm_svm.guest_lwp_cfg) | 1;
+            res->a = (res->d & v->arch.hvm_svm.guest_lwp_cfg) | 1;
         else
-            *eax = 0;
+            res->a = 0;
         break;
 
     case 0x7:
@@ -973,27 +954,7 @@ void guest_cpuid(const struct vcpu *v, uint32_t leaf,
  legacy:
     /* {hvm,pv}_cpuid() have this expectation. */
     ASSERT(v == current);
-
-    if ( is_hvm_domain(d) )
-    {
-        res->c = subleaf;
-
-        hvm_cpuid(leaf, &res->a, &res->b, &res->c, &res->d);
-    }
-    else
-    {
-        struct cpu_user_regs regs = *guest_cpu_user_regs();
-
-        regs._eax = leaf;
-        regs._ecx = subleaf;
-
-        pv_cpuid(&regs);
-
-        res->a = regs._eax;
-        res->b = regs._ebx;
-        res->c = regs._ecx;
-        res->d = regs._edx;
-    }
+    (is_hvm_domain(d) ? hvm_cpuid : pv_cpuid)(leaf, subleaf, res);
 }
 
 static void __init __maybe_unused build_assertions(void)
