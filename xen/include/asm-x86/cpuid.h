@@ -81,12 +81,14 @@ struct cpuid_policy
      *   - {xcr0,xss}_{high,low}
      *
      * - Guest accurate:
+     *   - All of the feat union
      *   - max_{,sub}leaf
      *   - All FEATURESET_* words
      *
      * Per-domain objects:
      *
      * - Guest accurate:
+     *   - All of the feat union
      *   - max_{,sub}leaf
      *   - All FEATURESET_* words
      *

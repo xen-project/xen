@@ -1179,30 +1179,6 @@ void pv_cpuid(struct cpu_user_regs *regs)
         }
         break;
 
-    case 0x00000007:
-        if ( subleaf == 0 )
-        {
-            b = p->feat._7b0;
-            c = p->feat._7c0;
-            d = p->feat._7d0;
-
-            if ( !is_pvh_domain(currd) )
-            {
-                /*
-                 * Delete the PVH condition when HVMLite formally replaces PVH,
-                 * and HVM guests no longer enter a PV codepath.
-                 */
-
-                /* OSPKE clear in policy.  Fast-forward CR4 back in. */
-                if ( curr->arch.pv_vcpu.ctrlreg[4] & X86_CR4_PKE )
-                    c |= cpufeat_mask(X86_FEATURE_OSPKE);
-            }
-        }
-        else
-            b = c = d = 0;
-        a = 0;
-        break;
-
     case 0x0000000a: /* Architectural Performance Monitor Features (Intel) */
         if ( boot_cpu_data.x86_vendor != X86_VENDOR_INTEL ||
              !vpmu_enabled(curr) )
@@ -1304,6 +1280,10 @@ void pv_cpuid(struct cpu_user_regs *regs)
     unsupported:
         a = b = c = d = 0;
         break;
+
+    case 0x7:
+        ASSERT_UNREACHABLE();
+        /* Now handled in guest_cpuid(). */
     }
 
     regs->rax = a;

@@ -362,6 +362,7 @@ void guest_cpuid(const struct vcpu *v, uint32_t leaf,
      * First pass:
      * - Perform max_leaf/subleaf calculations.  Out-of-range leaves return
      *   all zeros, following the AMD model.
+     * - Fill in *res for leaves no longer handled on the legacy path.
      * - Dispatch the virtualised leaves to their respective handlers.
      */
     switch ( leaf )
@@ -375,12 +376,18 @@ void guest_cpuid(const struct vcpu *v, uint32_t leaf,
         case 0x7:
             if ( subleaf > p->feat.max_subleaf )
                 return;
+
+            BUG_ON(subleaf >= ARRAY_SIZE(p->feat.raw));
+            *res = p->feat.raw[subleaf];
             break;
 
         case XSTATE_CPUID:
             if ( subleaf > ARRAY_SIZE(p->xstate.raw) )
                 return;
-            break;
+
+            /* Fallthrough. */
+        default:
+            goto legacy;
         }
         break;
 
@@ -400,12 +407,47 @@ void guest_cpuid(const struct vcpu *v, uint32_t leaf,
     case 0x80000000 ... 0x80000000 + CPUID_GUEST_NR_EXTD - 1:
         if ( leaf > p->extd.max_leaf )
             return;
-        break;
+        goto legacy;
 
     default:
         return;
     }
 
+    /*
+     * Skip dynamic adjustments if we are in the wrong context.
+     *
+     * All dynamic adjustments depends on current register state, which will
+     * be stale if the vcpu is running elsewhere.  It is simpler, quicker, and
+     * more reliable for the caller to do nothing (consistently) than to hand
+     * back stale data which it can't use safely.
+     */
+    if ( v != current )
+        return;
+
+    /*
+     * Second pass:
+     * - Dynamic adjustments
+     */
+    switch ( leaf )
+    {
+    case 0x7:
+        switch ( subleaf )
+        {
+        case 0:
+            /* OSPKE clear in policy.  Fast-forward CR4 back in. */
+            if ( (is_pv_domain(d)
+                  ? v->arch.pv_vcpu.ctrlreg[4]
+                  : v->arch.hvm_vcpu.guest_cr[4]) & X86_CR4_PKE )
+                res->c |= cpufeat_mask(X86_FEATURE_OSPKE);
+            break;
+        }
+        break;
+    }
+
+    /* Done. */
+    return;
+
+ legacy:
     /* {hvm,pv}_cpuid() have this expectation. */
     ASSERT(v == current);
 

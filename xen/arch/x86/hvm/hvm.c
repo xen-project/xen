@@ -3355,19 +3355,6 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
 
         break;
 
-    case 0x7:
-        if ( count == 0 )
-        {
-            *ebx = p->feat._7b0;
-            *ecx = p->feat._7c0;
-            *edx = p->feat._7d0;
-
-            /* OSPKE clear in policy.  Fast-forward CR4 back in. */
-            if ( v->arch.hvm_vcpu.guest_cr[4] & X86_CR4_PKE )
-                *ecx |= cpufeat_mask(X86_FEATURE_OSPKE);
-        }
-        break;
-
     case 0xb:
         /* Fix the x2APIC identifier. */
         *edx = v->vcpu_id * 2;
@@ -3544,6 +3531,10 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
         else
             *eax = 0;
         break;
+
+    case 0x7:
+        ASSERT_UNREACHABLE();
+        /* Now handled in guest_cpuid(). */
     }
 }
 
