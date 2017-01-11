@@ -17,6 +17,7 @@
 
 #ifndef __ASSEMBLY__
 #include <xen/types.h>
+#include <xen/kernel.h>
 #include <asm/x86_emulate.h>
 #include <public/sysctl.h>
 
@@ -28,7 +29,7 @@ extern uint32_t raw_featureset[FSCAPINTS];
 extern uint32_t pv_featureset[FSCAPINTS];
 extern uint32_t hvm_featureset[FSCAPINTS];
 
-void calculate_featuresets(void);
+void init_guest_cpuid(void);
 
 const uint32_t *lookup_deep_deps(uint32_t feature);
 
@@ -64,6 +65,72 @@ extern struct cpuidmasks cpuidmask_defaults;
 
 /* Whether or not cpuid faulting is available for the current domain. */
 DECLARE_PER_CPU(bool, cpuid_faulting_enabled);
+
+#define CPUID_GUEST_NR_BASIC      (0xdu + 1)
+#define CPUID_GUEST_NR_FEAT       (0u + 1)
+#define CPUID_GUEST_NR_XSTATE     (62u + 1)
+#define CPUID_GUEST_NR_EXTD_INTEL (0x8u + 1)
+#define CPUID_GUEST_NR_EXTD_AMD   (0x1cu + 1)
+#define CPUID_GUEST_NR_EXTD       MAX(CPUID_GUEST_NR_EXTD_INTEL, \
+                                      CPUID_GUEST_NR_EXTD_AMD)
+
+struct cpuid_policy
+{
+    /*
+     * WARNING: During the CPUID transition period, not all information here
+     * is accurate.  The following items are accurate, and can be relied upon.
+     *
+     * Global *_policy objects:
+     *
+     * - Host accurate:
+     *   - max_{,sub}leaf
+     *   - {xcr0,xss}_{high,low}
+     *
+     * - Guest accurate:
+     *   - Nothing
+     *
+     * Everything else should be considered inaccurate, and not necesserily 0.
+     */
+
+    /* Basic leaves: 0x000000xx */
+    union {
+        struct cpuid_leaf raw[CPUID_GUEST_NR_BASIC];
+        struct {
+            /* Leaf 0x0 - Max and vendor. */
+            uint32_t max_leaf, /* b */:32, /* c */:32, /* d */:32;
+        };
+    } basic;
+
+    /* Structured feature leaf: 0x00000007[xx] */
+    union {
+        struct cpuid_leaf raw[CPUID_GUEST_NR_FEAT];
+        struct {
+            /* Subleaf 0. */
+            uint32_t max_subleaf, /* b */:32, /* c */:32, /* d */:32;
+        };
+    } feat;
+
+    /* Xstate feature leaf: 0x0000000D[xx] */
+    union {
+        struct cpuid_leaf raw[CPUID_GUEST_NR_XSTATE];
+        struct {
+            /* Subleaf 0. */
+            uint32_t xcr0_low, /* b */:32, /* c */:32, xcr0_high;
+
+            /* Subleaf 1. */
+            uint32_t /* a */:32, /* b */:32, xss_low, xss_high;
+        };
+    } xstate;
+
+    /* Extended leaves: 0x800000xx */
+    union {
+        struct cpuid_leaf raw[CPUID_GUEST_NR_EXTD];
+        struct {
+            /* Leaf 0x80000000 - Max and vendor. */
+            uint32_t max_leaf, /* b */:32, /* c */:32, /* d */:32;
+        };
+    } extd;
+};
 
 void guest_cpuid(const struct vcpu *v, uint32_t leaf,
                  uint32_t subleaf, struct cpuid_leaf *res);

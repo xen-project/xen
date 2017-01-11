@@ -1590,7 +1590,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
                "Multiple initrd candidates, picking module #%u\n",
                initrdidx);
 
-    calculate_featuresets();
+    init_guest_cpuid();
 
     /*
      * Temporarily clear SMAP in CR4 to allow user-accesses in construct_dom0().

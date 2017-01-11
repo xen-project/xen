@@ -5,6 +5,7 @@
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/vmx/vmcs.h>
 #include <asm/processor.h>
+#include <asm/xstate.h>
 
 const uint32_t known_features[] = INIT_KNOWN_FEATURES;
 const uint32_t special_features[] = INIT_SPECIAL_FEATURES;
@@ -19,6 +20,19 @@ uint32_t __read_mostly pv_featureset[FSCAPINTS];
 uint32_t __read_mostly hvm_featureset[FSCAPINTS];
 
 #define EMPTY_LEAF ((struct cpuid_leaf){})
+
+static struct cpuid_policy __read_mostly raw_policy;
+
+static void cpuid_leaf(uint32_t leaf, struct cpuid_leaf *data)
+{
+    cpuid(leaf, &data->a, &data->b, &data->c, &data->d);
+}
+
+static void cpuid_count_leaf(uint32_t leaf, uint32_t subleaf,
+                             struct cpuid_leaf *data)
+{
+    cpuid_count(leaf, subleaf, &data->a, &data->b, &data->c, &data->d);
+}
 
 static void __init sanitise_featureset(uint32_t *fs)
 {
@@ -65,6 +79,58 @@ static void __init sanitise_featureset(uint32_t *fs)
      */
     fs[FEATURESET_e1d] = ((fs[FEATURESET_1d]  &  CPUID_COMMON_1D_FEATURES) |
                           (fs[FEATURESET_e1d] & ~CPUID_COMMON_1D_FEATURES));
+}
+
+static void __init calculate_raw_policy(void)
+{
+    struct cpuid_policy *p = &raw_policy;
+    unsigned int i;
+
+    cpuid_leaf(0, &p->basic.raw[0]);
+    for ( i = 1; i < min(ARRAY_SIZE(p->basic.raw),
+                         p->basic.max_leaf + 1ul); ++i )
+    {
+        switch ( i )
+        {
+        case 0x2: case 0x4: case 0x7: case 0xd:
+            /* Multi-invocation leaves.  Deferred. */
+            continue;
+        }
+
+        cpuid_leaf(i, &p->basic.raw[i]);
+    }
+
+    if ( p->basic.max_leaf >= 7 )
+    {
+        cpuid_count_leaf(7, 0, &p->feat.raw[0]);
+
+        for ( i = 1; i < min(ARRAY_SIZE(p->feat.raw),
+                             p->feat.max_subleaf + 1ul); ++i )
+            cpuid_count_leaf(7, i, &p->feat.raw[i]);
+    }
+
+    if ( p->basic.max_leaf >= XSTATE_CPUID )
+    {
+        uint64_t xstates;
+
+        cpuid_count_leaf(XSTATE_CPUID, 0, &p->xstate.raw[0]);
+        cpuid_count_leaf(XSTATE_CPUID, 1, &p->xstate.raw[1]);
+
+        xstates = ((uint64_t)(p->xstate.xcr0_high | p->xstate.xss_high) << 32) |
+            (p->xstate.xcr0_low | p->xstate.xss_low);
+
+        for ( i = 2; i < min(63ul, ARRAY_SIZE(p->xstate.raw)); ++i )
+        {
+            if ( xstates & (1ul << i) )
+                cpuid_count_leaf(XSTATE_CPUID, i, &p->xstate.raw[i]);
+        }
+    }
+
+    /* Extended leaves. */
+    cpuid_leaf(0x80000000, &p->extd.raw[0]);
+    for ( i = 1; i < min(ARRAY_SIZE(p->extd.raw),
+                         p->extd.max_leaf + 1 - 0x80000000ul); ++i )
+        cpuid_leaf(0x80000000 + i, &p->extd.raw[i]);
 }
 
 static void __init calculate_raw_featureset(void)
@@ -181,8 +247,10 @@ static void __init calculate_hvm_featureset(void)
     sanitise_featureset(hvm_featureset);
 }
 
-void __init calculate_featuresets(void)
+void __init init_guest_cpuid(void)
 {
+    calculate_raw_policy();
+
     calculate_raw_featureset();
     calculate_pv_featureset();
     calculate_hvm_featureset();
@@ -258,6 +326,18 @@ static void __init __maybe_unused build_assertions(void)
     BUILD_BUG_ON(ARRAY_SIZE(hvm_shadow_featuremask) != FSCAPINTS);
     BUILD_BUG_ON(ARRAY_SIZE(hvm_hap_featuremask) != FSCAPINTS);
     BUILD_BUG_ON(ARRAY_SIZE(deep_features) != FSCAPINTS);
+
+    /* Find some more clever allocation scheme if this trips. */
+    BUILD_BUG_ON(sizeof(struct cpuid_policy) > PAGE_SIZE);
+
+    BUILD_BUG_ON(sizeof(raw_policy.basic) !=
+                 sizeof(raw_policy.basic.raw));
+    BUILD_BUG_ON(sizeof(raw_policy.feat) !=
+                 sizeof(raw_policy.feat.raw));
+    BUILD_BUG_ON(sizeof(raw_policy.xstate) !=
+                 sizeof(raw_policy.xstate.raw));
+    BUILD_BUG_ON(sizeof(raw_policy.extd) !=
+                 sizeof(raw_policy.extd.raw));
 }
 
 /*
