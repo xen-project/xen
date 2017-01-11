@@ -29,6 +29,7 @@ class State(object):
         self.pv = []
         self.hvm_shadow = []
         self.hvm_hap = []
+        self.bitfields = [] # Text to declare named bitfields in C
 
 def parse_definitions(state):
     """
@@ -292,6 +293,28 @@ def crunch_numbers(state):
     for k, v in state.deep_deps.iteritems():
         state.deep_deps[k] = featureset_to_uint32s(v, nr_entries)
 
+    # Calculate the bitfield name declarations
+    for word in xrange(nr_entries):
+
+        names = []
+        for bit in xrange(32):
+
+            name = state.names.get(word * 32 + bit, "")
+
+            # Prepend an underscore if the name starts with a digit.
+            if name and name[0] in "0123456789":
+                name = "_" + name
+
+            # Don't generate names for the duplicate features, or ones
+            # fast-forwarded from other state
+            if (name.startswith("E1D_") or
+                name in ("APIC", "OSXSAVE", "OSPKE")):
+                name = ""
+
+            names.append(name.lower())
+
+        state.bitfields.append("bool " + ":1, ".join(names) + ":1")
+
 
 def write_results(state):
     state.output.write(
@@ -345,6 +368,15 @@ def write_results(state):
     state.output.write(
 """}
 
+""")
+
+    for idx, text in enumerate(state.bitfields):
+        state.output.write(
+            "#define CPUID_BITFIELD_%d \\\n    %s\n\n"
+            % (idx, text))
+
+    state.output.write(
+"""
 #endif /* __XEN_X86__FEATURESET_DATA__ */
 """)
 

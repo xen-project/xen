@@ -92,6 +92,10 @@ struct cpuid_policy
      * Everything else should be considered inaccurate, and not necesserily 0.
      */
 
+#define DECL_BITFIELD(word) _DECL_BITFIELD(FEATURESET_ ## word)
+#define _DECL_BITFIELD(x)   __DECL_BITFIELD(x)
+#define __DECL_BITFIELD(x)  CPUID_BITFIELD_ ## x
+
     /* Basic leaves: 0x000000xx */
     union {
         struct cpuid_leaf raw[CPUID_GUEST_NR_BASIC];
@@ -100,7 +104,15 @@ struct cpuid_policy
             uint32_t max_leaf, /* b */:32, /* c */:32, /* d */:32;
 
             /* Leaf 0x1 - Family/model/stepping and features. */
-            uint32_t /* a */:32, /* b */:32, _1c, _1d;
+            uint32_t /* a */:32, /* b */:32;
+            union {
+                uint32_t _1c;
+                struct { DECL_BITFIELD(1c); };
+            };
+            union {
+                uint32_t _1d;
+                struct { DECL_BITFIELD(1d); };
+            };
         };
     } basic;
 
@@ -109,7 +121,19 @@ struct cpuid_policy
         struct cpuid_leaf raw[CPUID_GUEST_NR_FEAT];
         struct {
             /* Subleaf 0. */
-            uint32_t max_subleaf, _7b0, _7c0, _7d0;
+            uint32_t max_subleaf;
+            union {
+                uint32_t _7b0;
+                struct { DECL_BITFIELD(7b0); };
+            };
+            union {
+                uint32_t _7c0;
+                struct { DECL_BITFIELD(7c0); };
+            };
+            union {
+                uint32_t _7d0;
+                struct { DECL_BITFIELD(7d0); };
+            };
         };
     } feat;
 
@@ -121,7 +145,11 @@ struct cpuid_policy
             uint32_t xcr0_low, /* b */:32, /* c */:32, xcr0_high;
 
             /* Subleaf 1. */
-            uint32_t Da1, /* b */:32, xss_low, xss_high;
+            union {
+                uint32_t Da1;
+                struct { DECL_BITFIELD(Da1); };
+            };
+            uint32_t /* b */:32, xss_low, xss_high;
         };
     } xstate;
 
@@ -133,7 +161,15 @@ struct cpuid_policy
             uint32_t max_leaf, /* b */:32, /* c */:32, /* d */:32;
 
             /* Leaf 0x80000001 - Family/model/stepping and features. */
-            uint32_t /* a */:32, /* b */:32, e1c, e1d;
+            uint32_t /* a */:32, /* b */:32;
+            union {
+                uint32_t e1c;
+                struct { DECL_BITFIELD(e1c); };
+            };
+            union {
+                uint32_t e1d;
+                struct { DECL_BITFIELD(e1d); };
+            };
 
             uint64_t :64, :64; /* Brand string. */
             uint64_t :64, :64; /* Brand string. */
@@ -142,12 +178,25 @@ struct cpuid_policy
             uint64_t :64, :64; /* L2/3 cache/TLB. */
 
             /* Leaf 0x80000007 - Advanced Power Management. */
-            uint32_t /* a */:32, /* b */:32, /* c */:32, e7d;
+            uint32_t /* a */:32, /* b */:32, /* c */:32;
+            union {
+                uint32_t e7d;
+                struct { DECL_BITFIELD(e7d); };
+            };
 
             /* Leaf 0x80000008 - Misc addr/feature info. */
-            uint32_t /* a */:32, e8b, /* c */:32, /* d */:32;
+            uint32_t /* a */:32;
+            union {
+                uint32_t e8b;
+                struct { DECL_BITFIELD(e8b); };
+            };
+            uint32_t /* c */:32, /* d */:32;
         };
     } extd;
+
+#undef __DECL_BITFIELD
+#undef _DECL_BITFIELD
+#undef DECL_BITFIELD
 
     /* Temporary featureset bitmap. */
     uint32_t fs[FSCAPINTS];
