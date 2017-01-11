@@ -346,7 +346,15 @@ void guest_cpuid(const struct vcpu *v, uint32_t leaf,
     case 0x40000000 ... 0x400000ff:
         if ( is_viridian_domain(d) )
             return cpuid_viridian_leaves(v, leaf, subleaf, res);
-        break;
+
+        /*
+         * Fallthrough.
+         *
+         * Intel reserve up until 0x4fffffff for hypervisor use.  AMD reserve
+         * only until 0x400000ff, but we already use double that.
+         */
+    case 0x40000100 ... 0x400001ff:
+        return cpuid_hypervisor_leaves(v, leaf, subleaf, res);
     }
 
     /* {hvm,pv}_cpuid() have this expectation. */

@@ -902,20 +902,18 @@ int wrmsr_hypervisor_regs(uint32_t idx, uint64_t val)
     return 0;
 }
 
-int cpuid_hypervisor_leaves( uint32_t idx, uint32_t sub_idx,
-               uint32_t *eax, uint32_t *ebx, uint32_t *ecx, uint32_t *edx)
+void cpuid_hypervisor_leaves(const struct vcpu *v, uint32_t leaf,
+                             uint32_t subleaf, struct cpuid_leaf *res)
 {
-    struct vcpu *curr = current;
-    struct domain *currd = curr->domain;
-    /* Optionally shift out of the way of Viridian architectural leaves. */
-    uint32_t base = is_viridian_domain(currd) ? 0x40000100 : 0x40000000;
+    const struct domain *d = v->domain;
+    uint32_t base = is_viridian_domain(d) ? 0x40000100 : 0x40000000;
+    uint32_t idx  = leaf - base;
     uint32_t limit, dummy;
 
-    idx -= base;
     if ( idx > XEN_CPUID_MAX_NUM_LEAVES )
-        return 0; /* Avoid unnecessary pass through domain_cpuid() */
+        return; /* Avoid unnecessary pass through domain_cpuid() */
 
-    domain_cpuid(currd, base, 0, &limit, &dummy, &dummy, &dummy);
+    domain_cpuid(d, base, 0, &limit, &dummy, &dummy, &dummy);
     if ( limit == 0 )
         /* Default number of leaves */
         limit = XEN_CPUID_MAX_NUM_LEAVES;
@@ -929,83 +927,70 @@ int cpuid_hypervisor_leaves( uint32_t idx, uint32_t sub_idx,
             limit = XEN_CPUID_MAX_NUM_LEAVES;
     }
 
-    if ( idx > limit ) 
-        return 0;
+    if ( idx > limit )
+        return;
 
     switch ( idx )
     {
     case 0:
-        *eax = base + limit; /* Largest leaf */
-        *ebx = XEN_CPUID_SIGNATURE_EBX;
-        *ecx = XEN_CPUID_SIGNATURE_ECX;
-        *edx = XEN_CPUID_SIGNATURE_EDX;
+        res->a = base + limit; /* Largest leaf */
+        res->b = XEN_CPUID_SIGNATURE_EBX;
+        res->c = XEN_CPUID_SIGNATURE_ECX;
+        res->d = XEN_CPUID_SIGNATURE_EDX;
         break;
 
     case 1:
-        *eax = (xen_major_version() << 16) | xen_minor_version();
-        *ebx = 0;          /* Reserved */
-        *ecx = 0;          /* Reserved */
-        *edx = 0;          /* Reserved */
+        res->a = (xen_major_version() << 16) | xen_minor_version();
         break;
 
     case 2:
-        *eax = 1;          /* Number of hypercall-transfer pages */
-        *ebx = 0x40000000; /* MSR base address */
-        if ( is_viridian_domain(currd) )
-            *ebx = 0x40000200;
-        *ecx = 0;          /* Features 1 */
-        *edx = 0;          /* Features 2 */
-        if ( is_pv_domain(currd) )
-            *ecx |= XEN_CPUID_FEAT1_MMU_PT_UPDATE_PRESERVE_AD;
+        res->a = 1;            /* Number of hypercall-transfer pages */
+                               /* MSR base address */
+        res->b = is_viridian_domain(d) ? 0x40000200 : 0x40000000;
+        if ( is_pv_domain(d) ) /* Features */
+            res->c |= XEN_CPUID_FEAT1_MMU_PT_UPDATE_PRESERVE_AD;
         break;
 
     case 3: /* Time leaf. */
-        switch ( sub_idx )
+        switch ( subleaf )
         {
         case 0: /* features */
-            *eax = ((!!currd->arch.vtsc << 0) |
-                    (!!host_tsc_is_safe() << 1) |
-                    (!!boot_cpu_has(X86_FEATURE_RDTSCP) << 2));
-            *ebx = currd->arch.tsc_mode;
-            *ecx = currd->arch.tsc_khz;
-            *edx = currd->arch.incarnation;
+            res->a = ((d->arch.vtsc << 0) |
+                      (!!host_tsc_is_safe() << 1) |
+                      (!!boot_cpu_has(X86_FEATURE_RDTSCP) << 2));
+            res->b = d->arch.tsc_mode;
+            res->c = d->arch.tsc_khz;
+            res->d = d->arch.incarnation;
             break;
 
         case 1: /* scale and offset */
         {
             uint64_t offset;
 
-            if ( !currd->arch.vtsc )
-                offset = currd->arch.vtsc_offset;
+            if ( !d->arch.vtsc )
+                offset = d->arch.vtsc_offset;
             else
                 /* offset already applied to value returned by virtual rdtscp */
                 offset = 0;
-            *eax = (uint32_t)offset;
-            *ebx = (uint32_t)(offset >> 32);
-            *ecx = currd->arch.vtsc_to_ns.mul_frac;
-            *edx = (s8)currd->arch.vtsc_to_ns.shift;
+            res->a = offset;
+            res->b = offset >> 32;
+            res->c = d->arch.vtsc_to_ns.mul_frac;
+            res->d = (s8)d->arch.vtsc_to_ns.shift;
             break;
         }
 
         case 2: /* physical cpu_khz */
-            *eax = cpu_khz;
-            *ebx = *ecx = *edx = 0;
-            break;
-
-        default:
-            *eax = *ebx = *ecx = *edx = 0;
+            res->a = cpu_khz;
             break;
         }
         break;
 
     case 4: /* HVM hypervisor leaf. */
-        *eax = *ebx = *ecx = *edx = 0;
-
-        if ( !has_hvm_container_domain(currd) || sub_idx != 0 )
+        if ( !has_hvm_container_domain(d) || subleaf != 0 )
             break;
 
         if ( cpu_has_vmx_apic_reg_virt )
-            *eax |= XEN_HVM_CPUID_APIC_ACCESS_VIRT;
+            res->a |= XEN_HVM_CPUID_APIC_ACCESS_VIRT;
 
         /*
          * We want to claim that x2APIC is virtualized if APIC MSR accesses
@@ -1016,24 +1001,22 @@ int cpuid_hypervisor_leaves( uint32_t idx, uint32_t sub_idx,
         if ( cpu_has_vmx_virtualize_x2apic_mode &&
              cpu_has_vmx_apic_reg_virt &&
              cpu_has_vmx_virtual_intr_delivery )
-            *eax |= XEN_HVM_CPUID_X2APIC_VIRT;
+            res->a |= XEN_HVM_CPUID_X2APIC_VIRT;
 
         /*
          * Indicate that memory mapped from other domains (either grants or
          * foreign pages) has valid IOMMU entries.
          */
-        *eax |= XEN_HVM_CPUID_IOMMU_MAPPINGS;
+        res->a |= XEN_HVM_CPUID_IOMMU_MAPPINGS;
 
         /* Indicate presence of vcpu id and set it in ebx */
-        *eax |= XEN_HVM_CPUID_VCPU_ID_PRESENT;
-        *ebx = curr->vcpu_id;
+        res->a |= XEN_HVM_CPUID_VCPU_ID_PRESENT;
+        res->b = v->vcpu_id;
         break;
 
     default:
         BUG();
     }
-
-    return 1;
 }
 
 void pv_cpuid(struct cpu_user_regs *regs)
@@ -1046,9 +1029,6 @@ void pv_cpuid(struct cpu_user_regs *regs)
     b = regs->_ebx;
     subleaf = c = regs->_ecx;
     d = regs->_edx;
-
-    if ( cpuid_hypervisor_leaves(leaf, subleaf, &a, &b, &c, &d) )
-        goto out;
 
     if ( leaf & 0x7fffffff )
     {
@@ -1381,7 +1361,6 @@ void pv_cpuid(struct cpu_user_regs *regs)
         break;
     }
 
- out:
     regs->rax = a;
     regs->rbx = b;
     regs->rcx = c;

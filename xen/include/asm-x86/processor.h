@@ -610,8 +610,8 @@ struct stubs {
 DECLARE_PER_CPU(struct stubs, stubs);
 unsigned long alloc_stub_page(unsigned int cpu, unsigned long *mfn);
 
-int cpuid_hypervisor_leaves( uint32_t idx, uint32_t sub_idx,
-          uint32_t *eax, uint32_t *ebx, uint32_t *ecx, uint32_t *edx);
+void cpuid_hypervisor_leaves(const struct vcpu *v, uint32_t leaf,
+                             uint32_t subleaf, struct cpuid_leaf *res);
 int rdmsr_hypervisor_regs(uint32_t idx, uint64_t *val);
 int wrmsr_hypervisor_regs(uint32_t idx, uint64_t val);
 

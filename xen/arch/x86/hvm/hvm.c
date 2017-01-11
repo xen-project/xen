@@ -3353,9 +3353,6 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
     if ( !edx )
         edx = &dummy;
 
-    if ( cpuid_hypervisor_leaves(input, count, eax, ebx, ecx, edx) )
-        return;
-
     if ( input & 0x7fffffff )
     {
         /*

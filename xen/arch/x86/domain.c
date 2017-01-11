@@ -2623,7 +2623,7 @@ void arch_dump_vcpu_info(struct vcpu *v)
 }
 
 void domain_cpuid(
-    struct domain *d,
+    const struct domain *d,
     unsigned int  input,
     unsigned int  sub_input,
     unsigned int  *eax,
