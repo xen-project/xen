@@ -627,8 +627,6 @@ enum get_cpu_vendor {
 int get_cpu_vendor(uint32_t b, uint32_t c, uint32_t d, enum get_cpu_vendor mode);
 uint8_t get_cpu_family(uint32_t raw, uint8_t *model, uint8_t *stepping);
 
-void pv_cpuid(struct cpu_user_regs *regs);
-
 #endif /* !__ASSEMBLY__ */
 
 #endif /* __ASM_X86_PROCESSOR_H */
