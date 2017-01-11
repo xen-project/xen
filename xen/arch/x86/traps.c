@@ -1024,6 +1024,7 @@ void pv_cpuid(struct cpu_user_regs *regs)
     uint32_t leaf, subleaf, a, b, c, d;
     struct vcpu *curr = current;
     struct domain *currd = curr->domain;
+    const struct cpuid_policy *p = currd->arch.cpuid;
 
     leaf = a = regs->_eax;
     b = regs->_ebx;
@@ -1060,7 +1061,7 @@ void pv_cpuid(struct cpu_user_regs *regs)
 
     switch ( leaf )
     {
-        uint32_t tmp, _ecx, _ebx;
+        uint32_t tmp;
 
     case 0x00000001:
         c &= pv_featureset[FEATURESET_1c];
@@ -1246,14 +1247,7 @@ void pv_cpuid(struct cpu_user_regs *regs)
         break;
 
     case XSTATE_CPUID:
-
-        if ( !is_control_domain(currd) && !is_hardware_domain(currd) )
-            domain_cpuid(currd, 1, 0, &tmp, &tmp, &_ecx, &tmp);
-        else
-            _ecx = cpuid_ecx(1);
-        _ecx &= pv_featureset[FEATURESET_1c];
-
-        if ( !(_ecx & cpufeat_mask(X86_FEATURE_XSAVE)) || subleaf >= 63 )
+        if ( !p->basic.xsave || subleaf >= 63 )
             goto unsupported;
         switch ( subleaf )
         {
@@ -1262,20 +1256,14 @@ void pv_cpuid(struct cpu_user_regs *regs)
             uint64_t xfeature_mask = XSTATE_FP_SSE;
             uint32_t xstate_size = XSTATE_AREA_MIN_SIZE;
 
-            if ( _ecx & cpufeat_mask(X86_FEATURE_AVX) )
+            if ( p->basic.avx )
             {
                 xfeature_mask |= XSTATE_YMM;
                 xstate_size = (xstate_offsets[_XSTATE_YMM] +
                                xstate_sizes[_XSTATE_YMM]);
             }
 
-            if ( !is_control_domain(currd) && !is_hardware_domain(currd) )
-                domain_cpuid(currd, 7, 0, &tmp, &_ebx, &tmp, &tmp);
-            else
-                cpuid_count(7, 0, &tmp, &_ebx, &tmp, &tmp);
-            _ebx &= pv_featureset[FEATURESET_7b0];
-
-            if ( _ebx & cpufeat_mask(X86_FEATURE_AVX512F) )
+            if ( p->feat.avx512f )
             {
                 xfeature_mask |= XSTATE_OPMASK | XSTATE_ZMM | XSTATE_HI_ZMM;
                 xstate_size = max(xstate_size,
