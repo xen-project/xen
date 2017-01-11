@@ -199,13 +199,14 @@ long arch_do_sysctl(
 
     case XEN_SYSCTL_get_cpu_featureset:
     {
-        static const uint32_t *const featureset_table[] = {
-            [XEN_SYSCTL_cpu_featureset_raw]  = raw_featureset,
-            [XEN_SYSCTL_cpu_featureset_host] = host_featureset,
-            [XEN_SYSCTL_cpu_featureset_pv]   = pv_featureset,
-            [XEN_SYSCTL_cpu_featureset_hvm]  = hvm_featureset,
+        static const struct cpuid_policy *const policy_table[] = {
+            [XEN_SYSCTL_cpu_featureset_raw]  = &raw_policy,
+            [XEN_SYSCTL_cpu_featureset_host] = &host_policy,
+            [XEN_SYSCTL_cpu_featureset_pv]   = &pv_max_policy,
+            [XEN_SYSCTL_cpu_featureset_hvm]  = &hvm_max_policy,
         };
-        const uint32_t *featureset = NULL;
+        const struct cpuid_policy *p = NULL;
+        uint32_t featureset[FSCAPINTS];
         unsigned int nr;
 
         /* Request for maximum number of features? */
@@ -223,12 +224,14 @@ long arch_do_sysctl(
                    FSCAPINTS);
 
         /* Look up requested featureset. */
-        if ( sysctl->u.cpu_featureset.index < ARRAY_SIZE(featureset_table) )
-            featureset = featureset_table[sysctl->u.cpu_featureset.index];
+        if ( sysctl->u.cpu_featureset.index < ARRAY_SIZE(policy_table) )
+            p = policy_table[sysctl->u.cpu_featureset.index];
 
         /* Bad featureset index? */
-        if ( !featureset )
+        if ( !p )
             ret = -EINVAL;
+
+        cpuid_policy_to_featureset(p, featureset);
 
         /* Copy the requested featureset into place. */
         if ( !ret && copy_to_guest(sysctl->u.cpu_featureset.features,

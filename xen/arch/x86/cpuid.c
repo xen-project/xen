@@ -130,23 +130,22 @@ static void __init calculate_raw_policy(void)
     for ( i = 1; i < min(ARRAY_SIZE(p->extd.raw),
                          p->extd.max_leaf + 1 - 0x80000000ul); ++i )
         cpuid_leaf(0x80000000 + i, &p->extd.raw[i]);
-
-    cpuid_policy_to_featureset(p, p->fs);
 }
 
 static void __init calculate_host_policy(void)
 {
     struct cpuid_policy *p = &host_policy;
 
-    memcpy(p->fs, boot_cpu_data.x86_capability, sizeof(p->fs));
-
-    cpuid_featureset_to_policy(host_featureset, p);
+    cpuid_featureset_to_policy(boot_cpu_data.x86_capability, p);
 }
 
 static void __init calculate_pv_max_policy(void)
 {
     struct cpuid_policy *p = &pv_max_policy;
+    uint32_t pv_featureset[FSCAPINTS], host_featureset[FSCAPINTS];
     unsigned int i;
+
+    cpuid_policy_to_featureset(&host_policy, host_featureset);
 
     for ( i = 0; i < FSCAPINTS; ++i )
         pv_featureset[i] = host_featureset[i] & pv_featuremask[i];
@@ -169,11 +168,14 @@ static void __init calculate_pv_max_policy(void)
 static void __init calculate_hvm_max_policy(void)
 {
     struct cpuid_policy *p = &hvm_max_policy;
+    uint32_t hvm_featureset[FSCAPINTS], host_featureset[FSCAPINTS];
     unsigned int i;
     const uint32_t *hvm_featuremask;
 
     if ( !hvm_enabled )
         return;
+
+    cpuid_policy_to_featureset(&host_policy, host_featureset);
 
     hvm_featuremask = hvm_funcs.hap_supported ?
         hvm_hap_featuremask : hvm_shadow_featuremask;
@@ -203,8 +205,7 @@ static void __init calculate_hvm_max_policy(void)
      * long mode (and init_amd() has cleared it out of host capabilities), but
      * HVM guests are able if running in protected mode.
      */
-    if ( (boot_cpu_data.x86_vendor == X86_VENDOR_AMD) &&
-         test_bit(X86_FEATURE_SEP, raw_featureset) )
+    if ( (boot_cpu_data.x86_vendor == X86_VENDOR_AMD) && raw_policy.basic.sep )
         __set_bit(X86_FEATURE_SEP, hvm_featureset);
 
     /*
@@ -271,7 +272,7 @@ void recalculate_cpuid_policy(struct domain *d)
     unsigned int i;
 
     cpuid_policy_to_featureset(p, fs);
-    memcpy(max_fs, max->fs, sizeof(max_fs));
+    cpuid_policy_to_featureset(max, max_fs);
 
     /*
      * HVM domains using Shadow paging have further restrictions on their
@@ -310,7 +311,7 @@ void recalculate_cpuid_policy(struct domain *d)
 
     /* Fold host's FDP_EXCP_ONLY and NO_FPU_SEL into guest's view. */
     fs[FEATURESET_7b0] &= ~special_features[FEATURESET_7b0];
-    fs[FEATURESET_7b0] |= (host_featureset[FEATURESET_7b0] &
+    fs[FEATURESET_7b0] |= (host_policy.feat._7b0 &
                            special_features[FEATURESET_7b0]);
 
     cpuid_featureset_to_policy(fs, p);

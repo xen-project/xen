@@ -197,9 +197,6 @@ struct cpuid_policy
 #undef __DECL_BITFIELD
 #undef _DECL_BITFIELD
 #undef DECL_BITFIELD
-
-    /* Temporary featureset bitmap. */
-    uint32_t fs[FSCAPINTS];
 };
 
 /* Fill in a featureset bitmap from a CPUID policy. */
@@ -236,12 +233,6 @@ static inline void cpuid_featureset_to_policy(
 
 extern struct cpuid_policy raw_policy, host_policy, pv_max_policy,
     hvm_max_policy;
-
-/* Temporary compatibility defines. */
-#define raw_featureset raw_policy.fs
-#define host_featureset host_policy.fs
-#define pv_featureset pv_max_policy.fs
-#define hvm_featureset hvm_max_policy.fs
 
 /* Allocate and initialise a CPUID policy suitable for the domain. */
 int init_domain_cpuid_policy(struct domain *d);
