@@ -608,8 +608,6 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags,
         if ( (rc = init_domain_cpuid_policy(d)) )
             goto fail;
 
-        d->arch.x86_vendor = boot_cpu_data.x86_vendor;
-
         d->arch.ioport_caps = 
             rangeset_new(d, "I/O Ports", RANGESETF_prettyprint_hex);
         rc = -ENOMEM;

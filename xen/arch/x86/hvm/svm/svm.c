@@ -591,7 +591,7 @@ static void svm_update_guest_vendor(struct vcpu *v)
     u32 bitmap = vmcb_get_exception_intercepts(vmcb);
 
     if ( opt_hvm_fep ||
-         (v->domain->arch.x86_vendor != boot_cpu_data.x86_vendor) )
+         (v->domain->arch.cpuid->x86_vendor != boot_cpu_data.x86_vendor) )
         bitmap |= (1U << TRAP_invalid_op);
     else
         bitmap &= ~(1U << TRAP_invalid_op);

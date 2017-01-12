@@ -544,7 +544,7 @@ void vmx_update_exception_bitmap(struct vcpu *v)
 static void vmx_update_guest_vendor(struct vcpu *v)
 {
     if ( opt_hvm_fep ||
-         (v->domain->arch.x86_vendor != boot_cpu_data.x86_vendor) )
+         (v->domain->arch.cpuid->x86_vendor != boot_cpu_data.x86_vendor) )
         v->arch.hvm_vmx.exception_bitmap |= (1U << TRAP_invalid_op);
     else
         v->arch.hvm_vmx.exception_bitmap &= ~(1U << TRAP_invalid_op);

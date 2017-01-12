@@ -1140,7 +1140,7 @@ struct hvm_ioreq_server *hvm_select_ioreq_server(struct domain *d,
                (p->addr & 3);
         /* AMD extended configuration space access? */
         if ( CF8_ADDR_HI(cf8) &&
-             d->arch.x86_vendor == X86_VENDOR_AMD &&
+             d->arch.cpuid->x86_vendor == X86_VENDOR_AMD &&
              (x86_fam = get_cpu_family(
                  d->arch.cpuid->basic.raw_fms, NULL, NULL)) > 0x10 &&
              x86_fam <= 0x17 )

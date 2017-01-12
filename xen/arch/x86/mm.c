@@ -5358,7 +5358,7 @@ int ptwr_do_page_fault(struct vcpu *v, unsigned long addr,
     struct ptwr_emulate_ctxt ptwr_ctxt = {
         .ctxt = {
             .regs = regs,
-            .vendor = d->arch.x86_vendor,
+            .vendor = d->arch.cpuid->x86_vendor,
             .addr_size = is_pv_32bit_domain(d) ? 32 : BITS_PER_LONG,
             .sp_size   = is_pv_32bit_domain(d) ? 32 : BITS_PER_LONG,
             .swint_emulate = x86_swint_emulate_none,
@@ -5514,7 +5514,7 @@ int mmio_ro_do_page_fault(struct vcpu *v, unsigned long addr,
     struct mmio_ro_emulate_ctxt mmio_ro_ctxt = { .cr2 = addr };
     struct x86_emulate_ctxt ctxt = {
         .regs = regs,
-        .vendor = v->domain->arch.x86_vendor,
+        .vendor = v->domain->arch.cpuid->x86_vendor,
         .addr_size = addr_size,
         .sp_size = addr_size,
         .swint_emulate = x86_swint_emulate_none,

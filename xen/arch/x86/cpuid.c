@@ -130,6 +130,8 @@ static void __init calculate_raw_policy(void)
     for ( i = 1; i < min(ARRAY_SIZE(p->extd.raw),
                          p->extd.max_leaf + 1 - 0x80000000ul); ++i )
         cpuid_leaf(0x80000000 + i, &p->extd.raw[i]);
+
+    p->x86_vendor = boot_cpu_data.x86_vendor;
 }
 
 static void __init calculate_host_policy(void)
@@ -592,7 +594,7 @@ static void pv_cpuid(uint32_t leaf, uint32_t subleaf, struct cpuid_leaf *res)
         res->d = p->extd.e1d;
 
         /* If not emulating AMD, clear the duplicated features in e1d. */
-        if ( currd->arch.x86_vendor != X86_VENDOR_AMD )
+        if ( p->x86_vendor != X86_VENDOR_AMD )
             res->d &= ~CPUID_COMMON_1D_FEATURES;
 
         /*
@@ -805,7 +807,7 @@ static void hvm_cpuid(uint32_t leaf, uint32_t subleaf, struct cpuid_leaf *res)
         res->d = p->extd.e1d;
 
         /* If not emulating AMD, clear the duplicated features in e1d. */
-        if ( d->arch.x86_vendor != X86_VENDOR_AMD )
+        if ( p->x86_vendor != X86_VENDOR_AMD )
             res->d &= ~CPUID_COMMON_1D_FEATURES;
         /* fast-forward MSR_APIC_BASE.EN if it hasn't already been clobbered. */
         else if ( vlapic_hw_disabled(vcpu_vlapic(v)) )
@@ -829,8 +831,7 @@ static void hvm_cpuid(uint32_t leaf, uint32_t subleaf, struct cpuid_leaf *res)
             res->d &= ~cpufeat_mask(X86_FEATURE_PSE36);
 
         /* SYSCALL is hidden outside of long mode on Intel. */
-        if ( d->arch.x86_vendor == X86_VENDOR_INTEL &&
-             !hvm_long_mode_enabled(v))
+        if ( p->x86_vendor == X86_VENDOR_INTEL && !hvm_long_mode_enabled(v) )
             res->d &= ~cpufeat_mask(X86_FEATURE_SYSCALL);
 
         break;

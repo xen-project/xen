@@ -1910,7 +1910,7 @@ void hvm_emulate_init_once(
 
     hvmemul_ctxt->validate = validate;
     hvmemul_ctxt->ctxt.regs = regs;
-    hvmemul_ctxt->ctxt.vendor = curr->domain->arch.x86_vendor;
+    hvmemul_ctxt->ctxt.vendor = curr->domain->arch.cpuid->x86_vendor;
     hvmemul_ctxt->ctxt.force_writeback = true;
 
     if ( cpu_has_vmx )

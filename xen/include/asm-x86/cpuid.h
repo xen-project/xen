@@ -204,6 +204,9 @@ struct cpuid_policy
     /* Toolstack selected Hypervisor max_leaf (if non-zero). */
     uint8_t hv_limit, hv2_limit;
 
+    /* Value calculated from raw data above. */
+    uint8_t x86_vendor;
+
     /* Temporary: Legacy data array. */
 #define MAX_CPUID_INPUT 40
     xen_domctl_cpuid_t legacy[MAX_CPUID_INPUT];

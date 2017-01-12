@@ -154,12 +154,11 @@ static int update_domain_cpuid_info(struct domain *d,
     switch ( ctl->input[0] )
     {
     case 0: {
-        int old_vendor = d->arch.x86_vendor;
+        int old_vendor = p->x86_vendor;
 
-        d->arch.x86_vendor = get_cpu_vendor(
-            ctl->ebx, ctl->ecx, ctl->edx, gcv_guest);
+        p->x86_vendor = get_cpu_vendor(ctl->ebx, ctl->ecx, ctl->edx, gcv_guest);
 
-        if ( is_hvm_domain(d) && (d->arch.x86_vendor != old_vendor) )
+        if ( is_hvm_domain(d) && (p->x86_vendor != old_vendor) )
         {
             struct vcpu *v;
 
@@ -290,7 +289,7 @@ static int update_domain_cpuid_info(struct domain *d,
                 ecx |= cpufeat_mask(X86_FEATURE_CMP_LEGACY);
 
             /* If not emulating AMD, clear the duplicated features in e1d. */
-            if ( d->arch.x86_vendor != X86_VENDOR_AMD )
+            if ( p->x86_vendor != X86_VENDOR_AMD )
                 edx &= ~CPUID_COMMON_1D_FEATURES;
 
             switch ( boot_cpu_data.x86_vendor )
