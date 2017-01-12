@@ -164,14 +164,6 @@ static void __init calculate_pv_max_policy(void)
     /* Unconditionally claim to be able to set the hypervisor bit. */
     __set_bit(X86_FEATURE_HYPERVISOR, pv_featureset);
 
-    /*
-     * Allow the toolstack to set HTT, X2APIC and CMP_LEGACY.  These bits
-     * affect how to interpret topology information in other cpuid leaves.
-     */
-    __set_bit(X86_FEATURE_HTT, pv_featureset);
-    __set_bit(X86_FEATURE_X2APIC, pv_featureset);
-    __set_bit(X86_FEATURE_CMP_LEGACY, pv_featureset);
-
     sanitise_featureset(pv_featureset);
     cpuid_featureset_to_policy(pv_featureset, p);
 }
@@ -197,14 +189,6 @@ static void __init calculate_hvm_max_policy(void)
 
     /* Unconditionally claim to be able to set the hypervisor bit. */
     __set_bit(X86_FEATURE_HYPERVISOR, hvm_featureset);
-
-    /*
-     * Allow the toolstack to set HTT, X2APIC and CMP_LEGACY.  These bits
-     * affect how to interpret topology information in other cpuid leaves.
-     */
-    __set_bit(X86_FEATURE_HTT, hvm_featureset);
-    __set_bit(X86_FEATURE_X2APIC, hvm_featureset);
-    __set_bit(X86_FEATURE_CMP_LEGACY, hvm_featureset);
 
     /*
      * Xen can provide an APIC emulation to HVM guests even if the host's APIC
@@ -299,6 +283,14 @@ void recalculate_cpuid_policy(struct domain *d)
         for ( i = 0; i < ARRAY_SIZE(max_fs); i++ )
             max_fs[i] &= hvm_shadow_featuremask[i];
     }
+
+    /*
+     * Allow the toolstack to set HTT, X2APIC and CMP_LEGACY.  These bits
+     * affect how to interpret topology information in other cpuid leaves.
+     */
+    __set_bit(X86_FEATURE_HTT, max_fs);
+    __set_bit(X86_FEATURE_X2APIC, max_fs);
+    __set_bit(X86_FEATURE_CMP_LEGACY, max_fs);
 
     /*
      * 32bit PV domains can't use any Long Mode features, and cannot use
