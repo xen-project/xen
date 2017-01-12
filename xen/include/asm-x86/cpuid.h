@@ -107,7 +107,7 @@ struct cpuid_policy
             uint32_t max_leaf, /* b */:32, /* c */:32, /* d */:32;
 
             /* Leaf 0x1 - Family/model/stepping and features. */
-            uint32_t /* a */:32, /* b */:32;
+            uint32_t raw_fms, /* b */:32;
             union {
                 uint32_t _1c;
                 struct { DECL_BITFIELD(1c); };

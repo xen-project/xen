@@ -625,7 +625,28 @@ enum get_cpu_vendor {
 };
 
 int get_cpu_vendor(uint32_t b, uint32_t c, uint32_t d, enum get_cpu_vendor mode);
-uint8_t get_cpu_family(uint32_t raw, uint8_t *model, uint8_t *stepping);
+
+static inline uint8_t get_cpu_family(uint32_t raw, uint8_t *model,
+                                     uint8_t *stepping)
+{
+    uint8_t fam = (raw >> 8) & 0xf;
+
+    if ( fam == 0xf )
+        fam += (raw >> 20) & 0xff;
+
+    if ( model )
+    {
+        uint8_t mod = (raw >> 4) & 0xf;
+
+        if ( fam >= 0x6 )
+            mod |= (raw >> 12) & 0xf0;
+
+        *model = mod;
+    }
+    if ( stepping )
+        *stepping = raw & 0xf;
+    return fam;
+}
 
 #endif /* !__ASSEMBLY__ */
 

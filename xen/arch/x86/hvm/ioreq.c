@@ -1125,7 +1125,7 @@ struct hvm_ioreq_server *hvm_select_ioreq_server(struct domain *d,
          (p->addr & ~3) == 0xcfc &&
          CF8_ENABLED(cf8) )
     {
-        uint32_t sbdf;
+        uint32_t sbdf, x86_fam;
 
         /* PCI config data cycle */
 
@@ -1141,7 +1141,9 @@ struct hvm_ioreq_server *hvm_select_ioreq_server(struct domain *d,
         /* AMD extended configuration space access? */
         if ( CF8_ADDR_HI(cf8) &&
              d->arch.x86_vendor == X86_VENDOR_AMD &&
-             d->arch.x86 >= 0x10 && d->arch.x86 <= 0x17 )
+             (x86_fam = get_cpu_family(
+                 d->arch.cpuid->basic.raw_fms, NULL, NULL)) > 0x10 &&
+             x86_fam <= 0x17 )
         {
             uint64_t msr_val;
 

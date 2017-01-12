@@ -186,25 +186,6 @@ int get_cpu_vendor(uint32_t b, uint32_t c, uint32_t d, enum get_cpu_vendor mode)
 	return X86_VENDOR_UNKNOWN;
 }
 
-uint8_t get_cpu_family(uint32_t raw, uint8_t *model, uint8_t *stepping)
-{
-	uint8_t fam, mod;
-
-	fam = (raw >> 8) & 0xf;
-	if (fam == 0xf)
-		fam += (raw >> 20) & 0xff;
-
-	mod = (raw >> 4) & 0xf;
-	if (fam >= 0x6)
-		mod |= (raw >> 12) & 0xf0;
-
-	if (model)
-		*model = mod;
-	if (stepping)
-		*stepping = raw & 0xf;
-	return fam;
-}
-
 static inline u32 _phys_pkg_id(u32 cpuid_apic, int index_msb)
 {
 	return cpuid_apic >> index_msb;

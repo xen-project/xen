@@ -338,9 +338,7 @@ struct arch_domain
     bool_t auto_unmask;
 
     /* Values snooped from updates to cpuids[] (below). */
-    u8 x86;                  /* CPU family */
     u8 x86_vendor;           /* CPU vendor */
-    u8 x86_model;            /* CPU model */
 
     /*
      * The width of the FIP/FDP register in the FPU that needs to be

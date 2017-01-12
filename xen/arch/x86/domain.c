@@ -609,8 +609,6 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags,
             goto fail;
 
         d->arch.x86_vendor = boot_cpu_data.x86_vendor;
-        d->arch.x86        = boot_cpu_data.x86;
-        d->arch.x86_model  = boot_cpu_data.x86_model;
 
         d->arch.ioport_caps = 
             rangeset_new(d, "I/O Ports", RANGESETF_prettyprint_hex);
