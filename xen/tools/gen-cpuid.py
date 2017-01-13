@@ -225,9 +225,14 @@ def crunch_numbers(state):
         XSAVE: [XSAVEOPT, XSAVEC, XGETBV1, XSAVES,
                 AVX, MPX, PKU, LWP],
 
-        # AVX is taken to mean hardware support for VEX encoded instructions,
-        # 256bit registers, and the instructions themselves.  Each of these
-        # subsequent instruction groups may only be VEX encoded.
+        # AVX is taken to mean hardware support for 256bit registers (which in
+        # practice depends on the VEX prefix to encode), and the instructions
+        # themselves.
+        #
+        # AVX is not taken to mean support for the VEX prefix itself (nor XOP
+        # for the XOP prefix).  VEX/XOP-encoded GPR instructions, such as
+        # those from the BMI{1,2}, TBM and LWP sets function fine in the
+        # absence of any enabled xstate.
         AVX: [FMA, FMA4, F16C, AVX2, XOP],
 
         # CX16 is only encodable in Long Mode.  LAHF_LM indicates that the
@@ -244,9 +249,10 @@ def crunch_numbers(state):
         # enabled.
         AVX2: [AVX512F],
 
-        # AVX512F is taken to mean hardware support for EVEX encoded
-        # instructions, 512bit registers, and the instructions themselves. All
-        # further AVX512 features are built on top of AVX512F
+        # AVX512F is taken to mean hardware support for 512bit registers
+        # (which in practice depends on the EVEX prefix to encode), and the
+        # instructions themselves. All further AVX512 features are built on
+        # top of AVX512F
         AVX512F: [AVX512DQ, AVX512IFMA, AVX512PF, AVX512ER, AVX512CD,
                   AVX512BW, AVX512VL, AVX512VBMI, AVX512_4VNNIW,
                   AVX512_4FMAPS, AVX512_VPOPCNTDQ],
