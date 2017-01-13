@@ -391,6 +391,8 @@ int vcpu_initialise(struct vcpu *v)
 
         vmce_init_vcpu(v);
     }
+    else if ( (rc = xstate_alloc_save_area(v)) != 0 )
+        return rc;
 
     spin_lock_init(&v->arch.vpmu.vpmu_lock);
 

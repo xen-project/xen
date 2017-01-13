@@ -417,6 +417,9 @@ typedef union {
 #define MSR_SYSENTER_EIP 0x00000176
 #define MSR_DEBUGCTL     0x000001d9
 #define DEBUGCTL_BTF     (1 << 1)
+#define MSR_BNDCFGS      0x00000d90
+#define BNDCFG_ENABLE    (1 << 0)
+#define BNDCFG_PRESERVE  (1 << 1)
 #define MSR_EFER         0xc0000080
 #define MSR_STAR         0xc0000081
 #define MSR_LSTAR        0xc0000082
@@ -1314,6 +1317,7 @@ static bool vcpu_has(
 #define vcpu_has_bmi1()        vcpu_has(         7, EBX,  3, ctxt, ops)
 #define vcpu_has_hle()         vcpu_has(         7, EBX,  4, ctxt, ops)
 #define vcpu_has_rtm()         vcpu_has(         7, EBX, 11, ctxt, ops)
+#define vcpu_has_mpx()         vcpu_has(         7, EBX, 14, ctxt, ops)
 #define vcpu_has_smap()        vcpu_has(         7, EBX, 20, ctxt, ops)
 #define vcpu_has_clflushopt()  vcpu_has(         7, EBX, 23, ctxt, ops)
 #define vcpu_has_clwb()        vcpu_has(         7, EBX, 24, ctxt, ops)
@@ -1834,6 +1838,34 @@ static int inject_swint(enum x86_swint_type type,
 
  raise_exn:
     generate_exception(fault_type, error_code);
+}
+
+static void adjust_bnd(struct x86_emulate_ctxt *ctxt,
+                       const struct x86_emulate_ops *ops, enum vex_pfx pfx)
+{
+    uint64_t bndcfg;
+    int rc;
+
+    if ( pfx == vex_f2 || !cpu_has_mpx || !vcpu_has_mpx() )
+        return;
+
+    if ( !mode_ring0() )
+        bndcfg = read_bndcfgu();
+    else if ( !ops->read_msr ||
+              ops->read_msr(MSR_BNDCFGS, &bndcfg, ctxt) != X86EMUL_OKAY )
+        return;
+    if ( (bndcfg & BNDCFG_ENABLE) && !(bndcfg & BNDCFG_PRESERVE) )
+    {
+        /*
+         * Using BNDMK or any other MPX instruction here is pointless, as
+         * we run with MPX disabled ourselves, and hence they're all no-ops.
+         * Therefore we have two ways to clear BNDn: Enable MPX temporarily
+         * (in which case executing any suitable non-prefixed branch
+         * instruction would do), or use XRSTOR.
+         */
+        xstate_set_init(XSTATE_BNDREGS);
+    }
+ done:;
 }
 
 int x86emul_unhandleable_rw(
@@ -3072,6 +3104,7 @@ x86_emulate(
     case 0x70 ... 0x7f: /* jcc (short) */
         if ( test_cc(b, _regs._eflags) )
             jmp_rel((int32_t)src.val);
+        adjust_bnd(ctxt, ops, vex.pfx);
         break;
 
     case 0x82: /* Grp1 (x86/32 only) */
@@ -3424,6 +3457,7 @@ x86_emulate(
              (rc = ops->insn_fetch(x86_seg_cs, dst.val, NULL, 0, ctxt)) )
             goto done;
         _regs.r(ip) = dst.val;
+        adjust_bnd(ctxt, ops, vex.pfx);
         break;
 
     case 0xc4: /* les */
@@ -4137,12 +4171,15 @@ x86_emulate(
         op_bytes = ((op_bytes == 4) && mode_64bit()) ? 8 : op_bytes;
         src.val = _regs.r(ip);
         jmp_rel(rel);
+        adjust_bnd(ctxt, ops, vex.pfx);
         goto push;
     }
 
     case 0xe9: /* jmp (near) */
     case 0xeb: /* jmp (short) */
         jmp_rel((int32_t)src.val);
+        if ( !(b & 2) )
+            adjust_bnd(ctxt, ops, vex.pfx);
         break;
 
     case 0xea: /* jmp (far, absolute) */
@@ -4402,12 +4439,14 @@ x86_emulate(
                 goto done;
             _regs.r(ip) = src.val;
             src.val = dst.val;
+            adjust_bnd(ctxt, ops, vex.pfx);
             goto push;
         case 4: /* jmp (near) */
             if ( (rc = ops->insn_fetch(x86_seg_cs, src.val, NULL, 0, ctxt)) )
                 goto done;
             _regs.r(ip) = src.val;
             dst.type = OP_NONE;
+            adjust_bnd(ctxt, ops, vex.pfx);
             break;
         case 3: /* call (far, absolute indirect) */
         case 5: /* jmp (far, absolute indirect) */
@@ -5281,6 +5320,7 @@ x86_emulate(
     case X86EMUL_OPC(0x0f, 0x80) ... X86EMUL_OPC(0x0f, 0x8f): /* jcc (near) */
         if ( test_cc(b, _regs._eflags) )
             jmp_rel((int32_t)src.val);
+        adjust_bnd(ctxt, ops, vex.pfx);
         break;
 
     case X86EMUL_OPC(0x0f, 0x90) ... X86EMUL_OPC(0x0f, 0x9f): /* setcc */

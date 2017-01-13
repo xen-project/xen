@@ -99,13 +99,20 @@ struct __attribute__((aligned (64))) xsave_struct
     char data[];                             /* Variable layout states */
 };
 
+struct xstate_bndcsr {
+    uint64_t bndcfgu;
+    uint64_t bndstatus;
+};
+
 /* extended state operations */
 bool_t __must_check set_xcr0(u64 xfeatures);
 uint64_t get_xcr0(void);
 void set_msr_xss(u64 xss);
 uint64_t get_msr_xss(void);
+uint64_t read_bndcfgu(void);
 void xsave(struct vcpu *v, uint64_t mask);
 void xrstor(struct vcpu *v, uint64_t mask);
+void xstate_set_init(uint64_t mask);
 bool_t xsave_enabled(const struct vcpu *v);
 int __must_check validate_xstate(u64 xcr0, u64 xcr0_accum,
                                  const struct xsave_hdr *);

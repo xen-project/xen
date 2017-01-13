@@ -496,15 +496,33 @@ bool_t xsave_enabled(const struct vcpu *v)
 int xstate_alloc_save_area(struct vcpu *v)
 {
     struct xsave_struct *save_area;
+    unsigned int size;
 
-    if ( !cpu_has_xsave || is_idle_vcpu(v) )
+    if ( !cpu_has_xsave )
         return 0;
 
-    BUG_ON(xsave_cntxt_size < XSTATE_AREA_MIN_SIZE);
+    if ( !is_idle_vcpu(v) || !cpu_has_xsavec )
+    {
+        size = xsave_cntxt_size;
+        BUG_ON(size < XSTATE_AREA_MIN_SIZE);
+    }
+    else
+    {
+        /*
+         * For idle vcpus on XSAVEC-capable CPUs allocate an area large
+         * enough to save any individual extended state.
+         */
+        unsigned int i;
+
+        for ( size = 0, i = 2; i < xstate_features; ++i )
+            if ( size < xstate_sizes[i] )
+                size = xstate_sizes[i];
+        size += XSTATE_AREA_MIN_SIZE;
+    }
 
     /* XSAVE/XRSTOR requires the save area be 64-byte-boundary aligned. */
     BUILD_BUG_ON(__alignof(*save_area) < 64);
-    save_area = _xzalloc(xsave_cntxt_size, __alignof(*save_area));
+    save_area = _xzalloc(size, __alignof(*save_area));
     if ( save_area == NULL )
         return -ENOMEM;
 
@@ -721,6 +739,67 @@ int handle_xsetbv(u32 index, u64 new_bv)
     }
 
     return 0;
+}
+
+uint64_t read_bndcfgu(void)
+{
+    unsigned long cr0 = read_cr0();
+    struct xsave_struct *xstate
+        = idle_vcpu[smp_processor_id()]->arch.xsave_area;
+    const struct xstate_bndcsr *bndcsr;
+
+    ASSERT(cpu_has_mpx);
+    clts();
+
+    if ( cpu_has_xsavec )
+    {
+        asm ( ".byte 0x0f,0xc7,0x27\n" /* xsavec */
+              : "=m" (*xstate)
+              : "a" (XSTATE_BNDCSR), "d" (0), "D" (xstate) );
+
+        bndcsr = (void *)(xstate + 1);
+    }
+    else
+    {
+        asm ( ".byte 0x0f,0xae,0x27\n" /* xsave */
+              : "=m" (*xstate)
+              : "a" (XSTATE_BNDCSR), "d" (0), "D" (xstate) );
+
+        bndcsr = (void *)xstate + xstate_offsets[_XSTATE_BNDCSR];
+    }
+
+    if ( cr0 & X86_CR0_TS )
+        write_cr0(cr0);
+
+    return xstate->xsave_hdr.xstate_bv & XSTATE_BNDCSR ? bndcsr->bndcfgu : 0;
+}
+
+void xstate_set_init(uint64_t mask)
+{
+    unsigned long cr0 = read_cr0();
+    unsigned long xcr0 = this_cpu(xcr0);
+    struct vcpu *v = idle_vcpu[smp_processor_id()];
+    struct xsave_struct *xstate = v->arch.xsave_area;
+
+    if ( ~xfeature_mask & mask )
+    {
+        ASSERT_UNREACHABLE();
+        return;
+    }
+
+    if ( (~xcr0 & mask) && !set_xcr0(xcr0 | mask) )
+        return;
+
+    clts();
+
+    memset(&xstate->xsave_hdr, 0, sizeof(xstate->xsave_hdr));
+    xrstor(v, mask);
+
+    if ( cr0 & X86_CR0_TS )
+        write_cr0(cr0);
+
+    if ( (~xcr0 & mask) && !set_xcr0(xcr0) )
+        BUG();
 }
 
 /*
