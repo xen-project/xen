@@ -1907,6 +1907,7 @@ struct x86_emulate_state {
     uint8_t modrm, modrm_mod, modrm_reg, modrm_rm;
     uint8_t rex_prefix;
     bool lock_prefix;
+    bool not_64bit; /* Instruction not available in 64bit. */
     opcode_desc_t desc;
     union vex vex;
     union evex evex;
@@ -1957,6 +1958,30 @@ x86_decode_onebyte(
 
     switch ( ctxt->opcode )
     {
+    case 0x06: /* push %%es */
+    case 0x07: /* pop %%es */
+    case 0x0e: /* push %%cs */
+    case 0x16: /* push %%ss */
+    case 0x17: /* pop %%ss */
+    case 0x1e: /* push %%ds */
+    case 0x1f: /* pop %%ds */
+    case 0x27: /* daa */
+    case 0x2f: /* das */
+    case 0x37: /* aaa */
+    case 0x3f: /* aas */
+    case 0x60: /* pusha */
+    case 0x61: /* popa */
+    case 0x62: /* bound */
+    case 0x82: /* Grp1 (x86/32 only) */
+    case 0xc4: /* les */
+    case 0xc5: /* lds */
+    case 0xce: /* into */
+    case 0xd4: /* aam */
+    case 0xd5: /* aad */
+    case 0xd6: /* salc */
+        state->not_64bit = true;
+        break;
+
     case 0x90: /* nop / pause */
         if ( repe_prefix() )
             ctxt->opcode |= X86EMUL_OPC_F3(0, 0);
@@ -2624,6 +2649,8 @@ x86_emulate(
     d = state.desc;
 #define state (&state)
 
+    generate_exception_if(state->not_64bit && mode_64bit(), EXC_UD);
+
     if ( ea.type == OP_REG )
         ea.reg = decode_register(modrm_rm, &_regs,
                                  (d & ByteOp) && !rex_prefix);
@@ -2832,8 +2859,6 @@ x86_emulate(
     case 0x0e: /* push %%cs */
     case 0x16: /* push %%ss */
     case 0x1e: /* push %%ds */
-        generate_exception_if(mode_64bit(), EXC_UD);
-        /* fall through */
     case X86EMUL_OPC(0x0f, 0xa0): /* push %%fs */
     case X86EMUL_OPC(0x0f, 0xa8): /* push %%gs */
         fail_if(ops->read_segment == NULL);
@@ -2846,8 +2871,6 @@ x86_emulate(
     case 0x07: /* pop %%es */
     case 0x17: /* pop %%ss */
     case 0x1f: /* pop %%ds */
-        generate_exception_if(mode_64bit(), EXC_UD);
-        /* fall through */
     case X86EMUL_OPC(0x0f, 0xa1): /* pop %%fs */
     case X86EMUL_OPC(0x0f, 0xa9): /* pop %%gs */
         fail_if(ops->write_segment == NULL);
@@ -2868,7 +2891,6 @@ x86_emulate(
         uint8_t al = _regs.al;
         unsigned int eflags = _regs._eflags;
 
-        generate_exception_if(mode_64bit(), EXC_UD);
         _regs._eflags &= ~(EFLG_CF|EFLG_AF|EFLG_SF|EFLG_ZF|EFLG_PF);
         if ( ((al & 0x0f) > 9) || (eflags & EFLG_AF) )
         {
@@ -2890,7 +2912,6 @@ x86_emulate(
 
     case 0x37: /* aaa */
     case 0x3f: /* aas */
-        generate_exception_if(mode_64bit(), EXC_UD);
         _regs._eflags &= ~EFLG_CF;
         if ( (_regs.al > 9) || (_regs._eflags & EFLG_AF) )
         {
@@ -2935,7 +2956,6 @@ x86_emulate(
             _regs._eax, _regs._ecx, _regs._edx, _regs._ebx,
             _regs._esp, _regs._ebp, _regs._esi, _regs._edi };
 
-        generate_exception_if(mode_64bit(), EXC_UD);
         fail_if(!ops->write);
         for ( i = 0; i < 8; i++ )
             if ( (rc = ops->write(x86_seg_ss, sp_pre_dec(op_bytes),
@@ -2950,7 +2970,6 @@ x86_emulate(
             &_regs._edi, &_regs._esi, &_regs._ebp, &dummy_esp,
             &_regs._ebx, &_regs._edx, &_regs._ecx, &_regs._eax };
 
-        generate_exception_if(mode_64bit(), EXC_UD);
         for ( i = 0; i < 8; i++ )
         {
             if ( (rc = read_ulong(x86_seg_ss, sp_post_inc(op_bytes),
@@ -2967,8 +2986,7 @@ x86_emulate(
     case 0x62: /* bound */ {
         unsigned long src_val2;
         int lb, ub, idx;
-        generate_exception_if(mode_64bit() || (src.type != OP_MEM),
-                              EXC_UD);
+        generate_exception_if(src.type != OP_MEM, EXC_UD);
         if ( (rc = read_ulong(src.mem.seg, src.mem.off + op_bytes,
                               &src_val2, op_bytes, ctxt, ops)) )
             goto done;
@@ -3127,10 +3145,7 @@ x86_emulate(
         adjust_bnd(ctxt, ops, vex.pfx);
         break;
 
-    case 0x82: /* Grp1 (x86/32 only) */
-        generate_exception_if(mode_64bit(), EXC_UD);
-        /* Fallthrough. */
-    case 0x80: case 0x81: case 0x83: /* Grp1 */
+    case 0x80: case 0x81: case 0x82: case 0x83: /* Grp1 */
         switch ( modrm_reg & 7 )
         {
         case 0: goto add;
@@ -3518,7 +3533,6 @@ x86_emulate(
 
     case 0xc4: /* les */
     case 0xc5: /* lds */
-        generate_exception_if(mode_64bit(), EXC_UD);
         seg = (b & 1) * 3; /* es = 0, ds = 3 */
     les:
         generate_exception_if(src.type != OP_MEM, EXC_UD);
@@ -3606,7 +3620,6 @@ x86_emulate(
         goto done;
 
     case 0xce: /* into */
-        generate_exception_if(mode_64bit(), EXC_UD);
         if ( !(_regs._eflags & EFLG_OF) )
             break;
         src.val = EXC_OF;
@@ -3648,7 +3661,6 @@ x86_emulate(
     case 0xd5: /* aad */ {
         unsigned int base = (uint8_t)src.val;
 
-        generate_exception_if(mode_64bit(), EXC_UD);
         if ( b & 0x01 )
         {
             uint16_t ax = _regs.ax;
@@ -3670,7 +3682,6 @@ x86_emulate(
     }
 
     case 0xd6: /* salc */
-        generate_exception_if(mode_64bit(), EXC_UD);
         _regs.al = (_regs._eflags & EFLG_CF) ? 0xff : 0x00;
         break;
 
