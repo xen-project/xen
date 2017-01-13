@@ -77,7 +77,6 @@ static bool verbose = false;
 LIST_HEAD(connections);
 static int tracefd = -1;
 static bool recovery = true;
-static bool remove_local = true;
 static int reopen_log_pipe[2];
 static int reopen_log_pipe0_pollfd_idx = -1;
 static char *tracefile = NULL;
@@ -1904,7 +1903,6 @@ static void usage(void)
 "  -R, --no-recovery       to request that no recovery should be attempted when\n"
 "                          the store is corrupted (debug only),\n"
 "  -I, --internal-db       store database in memory, not on disk\n"
-"  -L, --preserve-local    to request that /local is preserved on start-up,\n"
 "  -M, --memory-debug <file>  support memory debugging to file,\n"
 "  -V, --verbose           to request verbose execution.\n");
 }
@@ -1924,7 +1922,6 @@ static struct option options[] = {
 	{ "trace-file", 1, NULL, 'T' },
 	{ "transaction", 1, NULL, 't' },
 	{ "no-recovery", 0, NULL, 'R' },
-	{ "preserve-local", 0, NULL, 'L' },
 	{ "internal-db", 0, NULL, 'I' },
 	{ "verbose", 0, NULL, 'V' },
 	{ "watch-nb", 1, NULL, 'W' },
@@ -1948,7 +1945,7 @@ int main(int argc, char *argv[])
 	int timeout;
 
 
-	while ((opt = getopt_long(argc, argv, "DE:F:HNPS:t:T:RLVW:M:", options,
+	while ((opt = getopt_long(argc, argv, "DE:F:HNPS:t:T:RVW:M:", options,
 				  NULL)) != -1) {
 		switch (opt) {
 		case 'D':
@@ -1971,9 +1968,6 @@ int main(int argc, char *argv[])
 			break;
 		case 'R':
 			recovery = false;
-			break;
-		case 'L':
-			remove_local = false;
 			break;
 		case 'S':
 			quota_max_entry_size = strtol(optarg, NULL, 10);
