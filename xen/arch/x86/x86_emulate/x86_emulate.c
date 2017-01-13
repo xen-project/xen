@@ -862,13 +862,10 @@ do {                                                            \
 #define put_fpu(_fic)                                           \
 do {                                                            \
     _put_fpu();                                                 \
-    if( (_fic)->exn_raised == EXC_XM && ops->read_cr )          \
-    {                                                           \
-        unsigned long cr4;                                      \
-        if ( (ops->read_cr(4, &cr4, ctxt) == X86EMUL_OKAY) &&   \
-             !(cr4 & CR4_OSXMMEXCPT) )                          \
-            (_fic)->exn_raised = EXC_UD;                        \
-    }                                                           \
+    if ( (_fic)->exn_raised == EXC_XM && ops->read_cr &&        \
+         ops->read_cr(4, &cr4, ctxt) == X86EMUL_OKAY &&         \
+         !(cr4 & CR4_OSXMMEXCPT) )                              \
+        (_fic)->exn_raised = EXC_UD;                            \
     generate_exception_if((_fic)->exn_raised >= 0,              \
                           (_fic)->exn_raised);                  \
 } while (0)
@@ -1183,7 +1180,7 @@ _mode_iopl(
     _iopl;                                      \
 })
 #define mode_vif() ({                                        \
-    unsigned long cr4 = 0;                                   \
+    cr4 = 0;                                                 \
     if ( ops->read_cr && get_cpl(ctxt, ops) == 3 )           \
     {                                                        \
         rc = ops->read_cr(4, &cr4, ctxt);                    \
@@ -2783,6 +2780,7 @@ x86_emulate(
     {
         enum x86_segment seg;
         struct segment_register cs, sreg;
+        unsigned long cr4;
         struct cpuid_leaf cpuid_leaf;
 
     case 0x00 ... 0x05: add: /* add */
@@ -3282,8 +3280,7 @@ x86_emulate(
         if ( (_regs._eflags & EFLG_VM) &&
              MASK_EXTR(_regs._eflags, EFLG_IOPL) != 3 )
         {
-            unsigned long cr4 = 0;
-
+            cr4 = 0;
             if ( op_bytes == 2 && ops->read_cr )
             {
                 rc = ops->read_cr(4, &cr4, ctxt);
@@ -3301,8 +3298,8 @@ x86_emulate(
 
     case 0x9d: /* popf */ {
         uint32_t mask = EFLG_VIP | EFLG_VIF | EFLG_VM;
-        unsigned long cr4 = 0;
 
+        cr4 = 0;
         if ( !mode_ring0() )
         {
             if ( _regs._eflags & EFLG_VM )
@@ -4587,9 +4584,6 @@ x86_emulate(
 
 #ifdef __XEN__
         case 0xd1: /* xsetbv */
-        {
-            unsigned long cr4;
-
             generate_exception_if(vex.pfx, EXC_UD);
             if ( !ops->read_cr || ops->read_cr(4, &cr4, ctxt) != X86EMUL_OKAY )
                 cr4 = 0;
@@ -4599,7 +4593,6 @@ x86_emulate(
                                                 _regs._eax | (_regs.rdx << 32)),
                                   EXC_GP, 0);
             goto no_writeback;
-        }
 #endif
 
         case 0xd4: /* vmfunc */
@@ -5126,8 +5119,8 @@ x86_emulate(
         break;
 
     case X86EMUL_OPC(0x0f, 0x31): rdtsc: /* rdtsc */ {
-        unsigned long cr4;
         uint64_t val;
+
         if ( !mode_ring0() )
         {
             fail_if(ops->read_cr == NULL);
@@ -5495,9 +5488,6 @@ x86_emulate(
         break;
 
     case X86EMUL_OPC_F3(0x0f, 0xae): /* Grp15 */
-    {
-        unsigned long cr4;
-
         fail_if(modrm_mod != 3);
         generate_exception_if((modrm_reg & 4) || !mode_64bit(), EXC_UD);
         fail_if(!ops->read_cr);
@@ -5532,7 +5522,6 @@ x86_emulate(
                 goto done;
         }
         break;
-    }
 
     case X86EMUL_OPC(0x0f, 0xaf): /* imul */
         emulate_2op_SrcV_srcmem("imul", src, dst, _regs._eflags);
