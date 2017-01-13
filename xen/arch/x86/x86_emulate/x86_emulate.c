@@ -194,7 +194,8 @@ static const opcode_desc_t twobyte_table[256] = {
     ImplicitOps|ModRM, ImplicitOps|ModRM, ImplicitOps|ModRM, ImplicitOps|ModRM,
     ImplicitOps|ModRM, ImplicitOps|ModRM, ImplicitOps|ModRM, ImplicitOps|ModRM,
     /* 0x20 - 0x27 */
-    ImplicitOps|ModRM, ImplicitOps|ModRM, ImplicitOps|ModRM, ImplicitOps|ModRM,
+    DstMem|SrcImplicit|ModRM, DstMem|SrcImplicit|ModRM,
+    DstImplicit|SrcMem|ModRM, DstImplicit|SrcMem|ModRM,
     0, 0, 0, 0,
     /* 0x28 - 0x2F */
     ImplicitOps|ModRM, ImplicitOps|ModRM, ImplicitOps|ModRM, ImplicitOps|ModRM,
@@ -1320,6 +1321,7 @@ static bool vcpu_has(
 #define vcpu_has_movbe()       vcpu_has(         1, ECX, 22, ctxt, ops)
 #define vcpu_has_avx()         vcpu_has(         1, ECX, 28, ctxt, ops)
 #define vcpu_has_lahf_lm()     vcpu_has(0x80000001, ECX,  0, ctxt, ops)
+#define vcpu_has_cr8_legacy()  vcpu_has(0x80000001, ECX,  4, ctxt, ops)
 #define vcpu_has_lzcnt()       vcpu_has(0x80000001, ECX,  5, ctxt, ops)
 #define vcpu_has_misalignsse() vcpu_has(0x80000001, ECX,  7, ctxt, ops)
 #define vcpu_has_bmi1()        vcpu_has(         7, EBX,  3, ctxt, ops)
@@ -2047,6 +2049,19 @@ x86_decode_twobyte(
     case 0xd0 ... 0xfe:
         ctxt->opcode |= MASK_INSR(vex.pfx, X86EMUL_OPC_PFX_MASK);
         break;
+
+    case 0x20: case 0x22: /* mov to/from cr */
+        if ( lock_prefix && vcpu_has_cr8_legacy() )
+        {
+            modrm_reg += 8;
+            lock_prefix = false;
+        }
+        /* fall through */
+    case 0x21: case 0x23: /* mov to/from dr */
+        generate_exception_if(lock_prefix || ea.type != OP_REG, EXC_UD);
+        op_bytes = mode_64bit() ? 8 : 4;
+        break;
+
         /* Intentionally not handling here despite being modified by F3:
     case 0xb8: jmpe / popcnt
     case 0xbc: bsf / tzcnt
@@ -2683,14 +2698,10 @@ x86_emulate(
     case DstNone: /* case DstImplicit: */
         /*
          * The only implicit-operands instructions allowed a LOCK prefix are
-         * CMPXCHG{8,16}B, MOV CRn, MOV DRn.
+         * CMPXCHG{8,16}B (MOV CRn is being handled elsewhere).
          */
-        generate_exception_if(
-            lock_prefix &&
-            (ext != ext_0f ||
-             (((b < 0x20) || (b > 0x23)) && /* MOV CRn/DRn */
-              (b != 0xc7))),                /* CMPXCHG{8,16}B */
-            EXC_UD);
+        generate_exception_if(lock_prefix && (ext != ext_0f || b != 0xc7),
+                              EXC_UD);
         dst.type = OP_NONE;
         break;
 
@@ -5074,38 +5085,25 @@ x86_emulate(
     case X86EMUL_OPC(0x0f, 0x21): /* mov dr,reg */
     case X86EMUL_OPC(0x0f, 0x22): /* mov reg,cr */
     case X86EMUL_OPC(0x0f, 0x23): /* mov reg,dr */
-        generate_exception_if(ea.type != OP_REG, EXC_UD);
         generate_exception_if(!mode_ring0(), EXC_GP, 0);
-        modrm_reg |= lock_prefix << 3;
         if ( b & 2 )
         {
             /* Write to CR/DR. */
-            src.val = *(unsigned long *)decode_register(modrm_rm, &_regs, 0);
-            if ( !mode_64bit() )
-                src.val = (uint32_t)src.val;
-            rc = ((b & 1)
-                  ? (ops->write_dr
-                     ? ops->write_dr(modrm_reg, src.val, ctxt)
-                     : X86EMUL_UNHANDLEABLE)
-                  : (ops->write_cr
-                     ? ops->write_cr(modrm_reg, src.val, ctxt)
-                     : X86EMUL_UNHANDLEABLE));
+            typeof(ops->write_cr) write = (b & 1) ? ops->write_dr
+                                                  : ops->write_cr;
+
+            fail_if(!write);
+            rc = write(modrm_reg, src.val, ctxt);
         }
         else
         {
             /* Read from CR/DR. */
-            dst.type  = OP_REG;
-            dst.bytes = mode_64bit() ? 8 : 4;
-            dst.reg   = decode_register(modrm_rm, &_regs, 0);
-            rc = ((b & 1)
-                  ? (ops->read_dr
-                     ? ops->read_dr(modrm_reg, &dst.val, ctxt)
-                     : X86EMUL_UNHANDLEABLE)
-                  : (ops->read_cr
-                     ? ops->read_cr(modrm_reg, &dst.val, ctxt)
-                     : X86EMUL_UNHANDLEABLE));
+            typeof(ops->read_cr) read = (b & 1) ? ops->read_dr : ops->read_cr;
+
+            fail_if(!read);
+            rc = read(modrm_reg, &dst.val, ctxt);
         }
-        if ( rc != 0 )
+        if ( rc != X86EMUL_OKAY )
             goto done;
         break;
 
