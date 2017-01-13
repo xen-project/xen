@@ -433,6 +433,8 @@ typedef union {
 #define CR0_EM    (1<<2)
 #define CR0_TS    (1<<3)
 
+#define CR4_VME        (1<<0)
+#define CR4_PVI        (1<<1)
 #define CR4_TSD        (1<<2)
 #define CR4_OSFXSR     (1<<9)
 #define CR4_OSXMMEXCPT (1<<10)
@@ -1179,6 +1181,15 @@ _mode_iopl(
     int _iopl = _mode_iopl(ctxt, ops);          \
     fail_if(_iopl < 0);                         \
     _iopl;                                      \
+})
+#define mode_vif() ({                                        \
+    unsigned long cr4 = 0;                                   \
+    if ( ops->read_cr && get_cpl(ctxt, ops) == 3 )           \
+    {                                                        \
+        rc = ops->read_cr(4, &cr4, ctxt);                    \
+        if ( rc != X86EMUL_OKAY ) goto done;                 \
+    }                                                        \
+    !!(cr4 & (_regs._eflags & EFLG_VM ? CR4_VME : CR4_PVI)); \
 })
 
 static int ioport_access_check(
@@ -3268,20 +3279,44 @@ x86_emulate(
         break;
 
     case 0x9c: /* pushf */
-        generate_exception_if((_regs._eflags & EFLG_VM) &&
-                              MASK_EXTR(_regs._eflags, EFLG_IOPL) != 3,
-                              EXC_GP, 0);
-        src.val = _regs.r(flags) & ~(EFLG_VM | EFLG_RF);
+        if ( (_regs._eflags & EFLG_VM) &&
+             MASK_EXTR(_regs._eflags, EFLG_IOPL) != 3 )
+        {
+            unsigned long cr4 = 0;
+
+            if ( op_bytes == 2 && ops->read_cr )
+            {
+                rc = ops->read_cr(4, &cr4, ctxt);
+                if ( rc != X86EMUL_OKAY )
+                    goto done;
+            }
+            generate_exception_if(!(cr4 & CR4_VME), EXC_GP, 0);
+            src.val = (_regs.flags & ~EFLG_IF) | EFLG_IOPL;
+            if ( _regs._eflags & EFLG_VIF )
+                src.val |= EFLG_IF;
+        }
+        else
+            src.val = _regs.r(flags) & ~(EFLG_VM | EFLG_RF);
         goto push;
 
     case 0x9d: /* popf */ {
         uint32_t mask = EFLG_VIP | EFLG_VIF | EFLG_VM;
+        unsigned long cr4 = 0;
 
         if ( !mode_ring0() )
         {
-            generate_exception_if((_regs._eflags & EFLG_VM) &&
-                                  MASK_EXTR(_regs._eflags, EFLG_IOPL) != 3,
-                                  EXC_GP, 0);
+            if ( _regs._eflags & EFLG_VM )
+            {
+                if ( op_bytes == 2 && ops->read_cr )
+                {
+                    rc = ops->read_cr(4, &cr4, ctxt);
+                    if ( rc != X86EMUL_OKAY )
+                        goto done;
+                }
+                generate_exception_if(!(cr4 & CR4_VME) &&
+                                      MASK_EXTR(_regs._eflags, EFLG_IOPL) != 3,
+                                      EXC_GP, 0);
+            }
             mask |= EFLG_IOPL;
             if ( !mode_iopl() )
                 mask |= EFLG_IF;
@@ -3293,7 +3328,20 @@ x86_emulate(
                               &dst.val, op_bytes, ctxt, ops)) != 0 )
             goto done;
         if ( op_bytes == 2 )
+        {
             dst.val = (uint16_t)dst.val | (_regs._eflags & 0xffff0000u);
+            if ( cr4 & CR4_VME )
+            {
+                if ( dst.val & EFLG_IF )
+                {
+                    generate_exception_if(_regs._eflags & EFLG_VIP, EXC_GP, 0);
+                    dst.val |= EFLG_VIF;
+                }
+                else
+                    dst.val &= ~EFLG_VIF;
+                mask &= ~EFLG_VIF;
+            }
+        }
         dst.val &= EFLAGS_MODIFIABLE;
         _regs._eflags &= mask;
         _regs._eflags |= (dst.val & ~mask) | EFLG_MBS;
@@ -4400,16 +4448,29 @@ x86_emulate(
         break;
 
     case 0xfa: /* cli */
-        generate_exception_if(!mode_iopl(), EXC_GP, 0);
-        _regs._eflags &= ~EFLG_IF;
+        if ( mode_iopl() )
+            _regs._eflags &= ~EFLG_IF;
+        else
+        {
+            generate_exception_if(!mode_vif(), EXC_GP, 0);
+            _regs._eflags &= ~EFLG_VIF;
+        }
         break;
 
     case 0xfb: /* sti */
-        generate_exception_if(!mode_iopl(), EXC_GP, 0);
-        if ( !(_regs._eflags & EFLG_IF) )
+        if ( mode_iopl() )
         {
+            if ( !(_regs._eflags & EFLG_IF) )
+                ctxt->retire.sti = true;
             _regs._eflags |= EFLG_IF;
-            ctxt->retire.sti = true;
+        }
+        else
+        {
+            generate_exception_if((_regs._eflags & EFLG_VIP) || !mode_vif(),
+                                  EXC_GP, 0);
+            if ( !(_regs._eflags & EFLG_VIF) )
+                ctxt->retire.sti = true;
+            _regs._eflags |= EFLG_VIF;
         }
         break;
 
