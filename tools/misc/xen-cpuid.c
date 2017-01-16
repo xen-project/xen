@@ -124,7 +124,11 @@ static const char *str_7c0[32] =
     [ 2] = "REZ",      [ 3] = "pku",
     [ 4] = "ospke",
 
-    [5 ... 31] = "REZ",
+    [5 ... 13] = "REZ",
+
+    [14] = "avx512_vpopcntdq",
+
+    [15 ... 31] = "REZ",
 };
 
 static const char *str_e7d[32] =
