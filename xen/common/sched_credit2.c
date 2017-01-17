@@ -1946,12 +1946,42 @@ static void
 csched2_vcpu_migrate(
     const struct scheduler *ops, struct vcpu *vc, unsigned int new_cpu)
 {
+    struct domain *d = vc->domain;
     struct csched2_vcpu * const svc = CSCHED2_VCPU(vc);
     struct csched2_runqueue_data *trqd;
+    s_time_t now = NOW();
 
     /* Check if new_cpu is valid */
     ASSERT(cpumask_test_cpu(new_cpu, &CSCHED2_PRIV(ops)->initialized));
     ASSERT(cpumask_test_cpu(new_cpu, vc->cpu_hard_affinity));
+
+    /*
+     * Being passed a target pCPU which is outside of our cpupool is only
+     * valid if we are shutting down (or doing ACPI suspend), and we are
+     * moving everyone to BSP, no matter whether or not BSP is inside our
+     * cpupool.
+     *
+     * And since there indeed is the chance that it is not part of it, all
+     * we must do is remove _and_ unassign the vCPU from any runqueue, as
+     * well as updating v->processor with the target, so that the suspend
+     * process can continue.
+     *
+     * It will then be during resume that a new, meaningful, value for
+     * v->processor will be chosen, and during actual domain unpause that
+     * the vCPU will be assigned to and added to the proper runqueue.
+     */
+    if ( unlikely(!cpumask_test_cpu(new_cpu, cpupool_domain_cpumask(d))) )
+    {
+        ASSERT(system_state == SYS_STATE_suspend);
+        if ( __vcpu_on_runq(svc) )
+        {
+            __runq_remove(svc);
+            update_load(ops, svc->rqd, NULL, -1, now);
+        }
+        __runq_deassign(svc);
+        vc->processor = new_cpu;
+        return;
+    }
 
     trqd = RQD(ops, new_cpu);
 
@@ -1964,7 +1994,7 @@ csched2_vcpu_migrate(
      * pointing to a pcpu where we can't run any longer.
      */
     if ( trqd != svc->rqd )
-        migrate(ops, svc, trqd, NOW());
+        migrate(ops, svc, trqd, now);
     else
         vc->processor = new_cpu;
 }
