@@ -684,6 +684,52 @@ int main(int argc, char **argv)
         goto fail;
     printf("okay\n");
 
+    printf("%-40s", "Testing popcnt (%edx),%cx...");
+    if ( cpu_has_popcnt )
+    {
+        instr[0] = 0x66; instr[1] = 0xf3;
+        instr[2] = 0x0f; instr[3] = 0xb8; instr[4] = 0x0a;
+
+        *res        = 0xfedcba98;
+        regs.edx    = (unsigned long)res;
+        regs.eflags = 0xac3;
+        regs.eip    = (unsigned long)&instr[0];
+        rc = x86_emulate(&ctxt, &emulops);
+        if ( (rc != X86EMUL_OKAY) || (uint16_t)regs.ecx != 8 || *res != 0xfedcba98 ||
+             (regs.eflags & 0xfeb) != 0x202 ||
+             (regs.eip != (unsigned long)&instr[5]) )
+            goto fail;
+        printf("okay\n");
+
+        printf("%-40s", "Testing popcnt (%edx),%ecx...");
+        regs.eflags = 0xac3;
+        regs.eip    = (unsigned long)&instr[1];
+        rc = x86_emulate(&ctxt, &emulops);
+        if ( (rc != X86EMUL_OKAY) || regs.ecx != 20 || *res != 0xfedcba98 ||
+             (regs.eflags & 0xfeb) != 0x202 ||
+             (regs.eip != (unsigned long)&instr[5]) )
+            goto fail;
+        printf("okay\n");
+
+#ifdef __x86_64__
+        printf("%-40s", "Testing popcnt (%rdx),%rcx...");
+        instr[0]    = 0xf3;
+        instr[1]    = 0x48;
+        res[1]      = 0x12345678;
+        regs.eflags = 0xac3;
+        regs.eip    = (unsigned long)&instr[0];
+        rc = x86_emulate(&ctxt, &emulops);
+        if ( (rc != X86EMUL_OKAY) || regs.ecx != 33 ||
+             res[0] != 0xfedcba98 || res[1] != 0x12345678 ||
+             (regs.eflags & 0xfeb) != 0x202 ||
+             (regs.eip != (unsigned long)&instr[5]) )
+            goto fail;
+        printf("okay\n");
+#endif
+    }
+    else
+        printf("skipped\n");
+
     printf("%-40s", "Testing lar (null selector)...");
     instr[0] = 0x0f; instr[1] = 0x02; instr[2] = 0xc1;
     regs.eflags = 0x240;

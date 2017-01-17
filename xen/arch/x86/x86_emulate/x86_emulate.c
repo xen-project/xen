@@ -1335,6 +1335,7 @@ static bool vcpu_has(
 #define vcpu_has_cx16()        vcpu_has(         1, ECX, 13, ctxt, ops)
 #define vcpu_has_sse4_2()      vcpu_has(         1, ECX, 20, ctxt, ops)
 #define vcpu_has_movbe()       vcpu_has(         1, ECX, 22, ctxt, ops)
+#define vcpu_has_popcnt()      vcpu_has(         1, ECX, 23, ctxt, ops)
 #define vcpu_has_avx()         vcpu_has(         1, ECX, 28, ctxt, ops)
 #define vcpu_has_lahf_lm()     vcpu_has(0x80000001, ECX,  0, ctxt, ops)
 #define vcpu_has_cr8_legacy()  vcpu_has(0x80000001, ECX,  4, ctxt, ops)
@@ -2103,8 +2104,12 @@ x86_decode_twobyte(
         op_bytes = mode_64bit() ? 8 : 4;
         break;
 
+    case 0xb8: /* jmpe / popcnt */
+        if ( rep_prefix() )
+            ctxt->opcode |= MASK_INSR(vex.pfx, X86EMUL_OPC_PFX_MASK);
+        break;
+
         /* Intentionally not handling here despite being modified by F3:
-    case 0xb8: jmpe / popcnt
     case 0xbc: bsf / tzcnt
     case 0xbd: bsr / lzcnt
          * They're being dealt with in the execution phase (if at all).
@@ -5612,6 +5617,14 @@ x86_emulate(
 
     case X86EMUL_OPC(0x0f, 0xb7): /* movzx rm16,r{16,32,64} */
         dst.val = (uint16_t)src.val;
+        break;
+
+    case X86EMUL_OPC_F3(0x0f, 0xb8): /* popcnt r/m,r */
+        host_and_vcpu_must_have(popcnt);
+        asm ( "popcnt %1,%0" : "=r" (dst.val) : "rm" (src.val) );
+        _regs._eflags &= ~EFLAGS_MASK;
+        if ( !dst.val )
+            _regs._eflags |= EFLG_ZF;
         break;
 
     case X86EMUL_OPC(0x0f, 0xba): /* Grp8 */
