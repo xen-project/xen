@@ -635,7 +635,11 @@ void restore_vcpu_affinity(struct domain *d)
 
     for_each_vcpu ( d, v )
     {
-        spinlock_t *lock = vcpu_schedule_lock_irq(v);
+        spinlock_t *lock;
+
+        ASSERT(!vcpu_runnable(v));
+
+        lock = vcpu_schedule_lock_irq(v);
 
         if ( v->affinity_broken )
         {
@@ -659,17 +663,11 @@ void restore_vcpu_affinity(struct domain *d)
                     cpupool_domain_cpumask(v->domain));
         v->processor = cpumask_any(cpumask_scratch_cpu(cpu));
 
-        if ( v->processor == cpu )
-        {
-            set_bit(_VPF_migrating, &v->pause_flags);
-            spin_unlock_irq(lock);;
-            vcpu_sleep_nosync(v);
-            vcpu_migrate(v);
-        }
-        else
-        {
-            spin_unlock_irq(lock);
-        }
+        spin_unlock_irq(lock);;
+
+        lock = vcpu_schedule_lock_irq(v);
+        v->processor = SCHED_OP(VCPU2OP(v), pick_cpu, v);
+        spin_unlock_irq(lock);
     }
 
     domain_update_node_affinity(d);
