@@ -67,18 +67,6 @@ static void sanitise_featureset(uint32_t *fs)
             disabled_features[j] &= ~dfs[j];
         }
     }
-
-    /*
-     * Sort out shared bits.  We are constructing a featureset which needs to
-     * be applicable to a cross-vendor case.  Intel strictly clears the common
-     * bits in e1d, while AMD strictly duplicates them.
-     *
-     * We duplicate them here to be compatible with AMD while on Intel, and
-     * rely on logic closer to the guest to make the featureset stricter if
-     * emulating Intel.
-     */
-    fs[FEATURESET_e1d] = ((fs[FEATURESET_1d]  &  CPUID_COMMON_1D_FEATURES) |
-                          (fs[FEATURESET_e1d] & ~CPUID_COMMON_1D_FEATURES));
 }
 
 static void recalculate_xstate(struct cpuid_policy *p)
@@ -169,6 +157,8 @@ static void recalculate_xstate(struct cpuid_policy *p)
  */
 static void recalculate_misc(struct cpuid_policy *p)
 {
+    p->extd.e1d &= ~CPUID_COMMON_1D_FEATURES;
+
     switch ( p->x86_vendor )
     {
     case X86_VENDOR_INTEL:
@@ -181,6 +171,8 @@ static void recalculate_misc(struct cpuid_policy *p)
         p->extd.vendor_ebx = p->basic.vendor_ebx;
         p->extd.vendor_ecx = p->basic.vendor_ecx;
         p->extd.vendor_edx = p->basic.vendor_edx;
+
+        p->extd.e1d |= p->basic._1d & CPUID_COMMON_1D_FEATURES;
         break;
     }
 }
@@ -669,10 +661,6 @@ static void pv_cpuid(uint32_t leaf, uint32_t subleaf, struct cpuid_leaf *res)
         res->c = p->extd.e1c;
         res->d = p->extd.e1d;
 
-        /* If not emulating AMD, clear the duplicated features in e1d. */
-        if ( p->x86_vendor != X86_VENDOR_AMD )
-            res->d &= ~CPUID_COMMON_1D_FEATURES;
-
         /*
          * MTRR used to unconditionally leak into PV guests.  They cannot MTRR
          * infrastructure at all, and shouldn't be able to see the feature.
@@ -792,11 +780,8 @@ static void hvm_cpuid(uint32_t leaf, uint32_t subleaf, struct cpuid_leaf *res)
         res->c = p->extd.e1c;
         res->d = p->extd.e1d;
 
-        /* If not emulating AMD, clear the duplicated features in e1d. */
-        if ( p->x86_vendor != X86_VENDOR_AMD )
-            res->d &= ~CPUID_COMMON_1D_FEATURES;
         /* fast-forward MSR_APIC_BASE.EN if it hasn't already been clobbered. */
-        else if ( vlapic_hw_disabled(vcpu_vlapic(v)) )
+        if ( vlapic_hw_disabled(vcpu_vlapic(v)) )
             res->d &= ~cpufeat_bit(X86_FEATURE_APIC);
 
         /*

@@ -41,7 +41,6 @@ enum {
 #define DEF_MAX_BASE 0x0000000du
 #define DEF_MAX_INTELEXT  0x80000008u
 #define DEF_MAX_AMDEXT    0x8000001cu
-#define COMMON_1D CPUID_COMMON_1D_FEATURES
 
 int xc_get_cpu_levelling_caps(xc_interface *xch, uint32_t *caps)
 {
@@ -711,24 +710,6 @@ static void sanitise_featureset(struct cpuid_domain_info *info)
             info->featureset[i] &= ~dfs[i];
             disabled_features[i] &= ~dfs[i];
         }
-    }
-
-    switch ( info->vendor )
-    {
-    case VENDOR_INTEL:
-        /* Intel clears the common bits in e1d. */
-        info->featureset[featureword_of(X86_FEATURE_SYSCALL)] &= ~COMMON_1D;
-        break;
-
-    case VENDOR_AMD:
-        /* AMD duplicates the common bits between 1d and e1d. */
-        info->featureset[featureword_of(X86_FEATURE_SYSCALL)] =
-            ((info->featureset[featureword_of(X86_FEATURE_FPU)] & COMMON_1D) |
-             (info->featureset[featureword_of(X86_FEATURE_SYSCALL)] & ~COMMON_1D));
-        break;
-
-    default:
-        break;
     }
 }
 
