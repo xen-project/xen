@@ -81,7 +81,7 @@ struct cpuid_policy
      *   - All of the feat and xstate unions
      *   - max_{,sub}leaf
      *   - All FEATURESET_* words
-     *   - Low short vendor infomation
+     *   - Short vendor infomation
      *
      * Per-domain objects:
      *
@@ -89,7 +89,7 @@ struct cpuid_policy
      *   - All of the feat and xstate unions
      *   - max_{,sub}leaf
      *   - All FEATURESET_* words
-     *   - Low short vendor infomation
+     *   - Short vendor infomation
      *
      * Everything else should be considered inaccurate, and not necesserily 0.
      */
@@ -168,7 +168,7 @@ struct cpuid_policy
         struct cpuid_leaf raw[CPUID_GUEST_NR_EXTD];
         struct {
             /* Leaf 0x80000000 - Max and vendor. */
-            uint32_t max_leaf, /* b */:32, /* c */:32, /* d */:32;
+            uint32_t max_leaf, vendor_ebx, vendor_ecx, vendor_edx;
 
             /* Leaf 0x80000001 - Family/model/stepping and features. */
             uint32_t /* a */:32, /* b */:32;

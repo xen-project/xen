@@ -163,6 +163,28 @@ static void recalculate_xstate(struct cpuid_policy *p)
     }
 }
 
+/*
+ * Misc adjustments to the policy.  Mostly clobbering reserved fields and
+ * duplicating shared fields.
+ */
+static void recalculate_misc(struct cpuid_policy *p)
+{
+    switch ( p->x86_vendor )
+    {
+    case X86_VENDOR_INTEL:
+        p->extd.vendor_ebx = 0;
+        p->extd.vendor_ecx = 0;
+        p->extd.vendor_edx = 0;
+        break;
+
+    case X86_VENDOR_AMD:
+        p->extd.vendor_ebx = p->basic.vendor_ebx;
+        p->extd.vendor_ecx = p->basic.vendor_ecx;
+        p->extd.vendor_edx = p->basic.vendor_edx;
+        break;
+    }
+}
+
 static void __init calculate_raw_policy(void)
 {
     struct cpuid_policy *p = &raw_policy;
@@ -227,12 +249,12 @@ static void __init calculate_host_policy(void)
         min_t(uint32_t, p->basic.max_leaf,   ARRAY_SIZE(p->basic.raw) - 1);
     p->feat.max_subleaf =
         min_t(uint32_t, p->feat.max_subleaf, ARRAY_SIZE(p->feat.raw) - 1);
-    p->extd.max_leaf =
-        min_t(uint32_t, p->extd.max_leaf,
-              0x80000000u + ARRAY_SIZE(p->extd.raw) - 1);
+    p->extd.max_leaf = 0x80000000 | min_t(uint32_t, p->extd.max_leaf & 0xffff,
+                                          ARRAY_SIZE(p->extd.raw) - 1);
 
     cpuid_featureset_to_policy(boot_cpu_data.x86_capability, p);
     recalculate_xstate(p);
+    recalculate_misc(p);
 }
 
 static void __init calculate_pv_max_policy(void)
@@ -360,7 +382,10 @@ void recalculate_cpuid_policy(struct domain *d)
 
     p->basic.max_leaf   = min(p->basic.max_leaf,   max->basic.max_leaf);
     p->feat.max_subleaf = min(p->feat.max_subleaf, max->feat.max_subleaf);
-    p->extd.max_leaf    = min(p->extd.max_leaf,    max->extd.max_leaf);
+    p->extd.max_leaf    = 0x80000000 | min(p->extd.max_leaf & 0xffff,
+                                           (p->x86_vendor == X86_VENDOR_AMD
+                                            ? CPUID_GUEST_NR_EXTD_AMD
+                                            : CPUID_GUEST_NR_EXTD_INTEL) - 1);
 
     cpuid_policy_to_featureset(p, fs);
     cpuid_policy_to_featureset(max, max_fs);
@@ -428,6 +453,7 @@ void recalculate_cpuid_policy(struct domain *d)
 
     cpuid_featureset_to_policy(fs, p);
     recalculate_xstate(p);
+    recalculate_misc(p);
 }
 
 int init_domain_cpuid_policy(struct domain *d)
@@ -675,7 +701,6 @@ static void pv_cpuid(uint32_t leaf, uint32_t subleaf, struct cpuid_leaf *res)
     case 0x8000000a: /* SVM revision and features */
     case 0x8000001b: /* Instruction Based Sampling */
     case 0x8000001c: /* Light Weight Profiling */
-    case 0x8000001e: /* Extended topology reporting */
     unsupported:
         *res = EMPTY_LEAF;
         break;
@@ -683,6 +708,7 @@ static void pv_cpuid(uint32_t leaf, uint32_t subleaf, struct cpuid_leaf *res)
     case 0x0:
     case 0x7:
     case XSTATE_CPUID:
+    case 0x80000000:
         ASSERT_UNREACHABLE();
         /* Now handled in guest_cpuid(). */
     }
@@ -832,6 +858,7 @@ static void hvm_cpuid(uint32_t leaf, uint32_t subleaf, struct cpuid_leaf *res)
     case 0x0:
     case 0x7:
     case XSTATE_CPUID:
+    case 0x80000000:
         ASSERT_UNREACHABLE();
         /* Now handled in guest_cpuid(). */
     }
@@ -901,9 +928,21 @@ void guest_cpuid(const struct vcpu *v, uint32_t leaf,
         return cpuid_hypervisor_leaves(v, leaf, subleaf, res);
 
     case 0x80000000 ... 0x80000000 + CPUID_GUEST_NR_EXTD - 1:
-        if ( leaf > p->extd.max_leaf )
+        ASSERT((p->extd.max_leaf & 0xffff) < ARRAY_SIZE(p->extd.raw));
+        if ( (leaf & 0xffff) > min_t(uint32_t, p->extd.max_leaf & 0xffff,
+                                     ARRAY_SIZE(p->extd.raw) - 1) )
             return;
-        goto legacy;
+
+        switch ( leaf )
+        {
+        default:
+            goto legacy;
+
+        case 0x80000000:
+            *res = p->extd.raw[leaf & 0xffff];
+            break;
+        }
+        break;
 
     default:
         return;
