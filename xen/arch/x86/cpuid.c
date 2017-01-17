@@ -856,10 +856,11 @@ void guest_cpuid(const struct vcpu *v, uint32_t leaf,
         switch ( leaf )
         {
         case 0x7:
-            if ( subleaf > p->feat.max_subleaf )
+            ASSERT(p->feat.max_subleaf < ARRAY_SIZE(p->feat.raw));
+            if ( subleaf > min_t(uint32_t, p->feat.max_subleaf,
+                                 ARRAY_SIZE(p->feat.raw) - 1) )
                 return;
 
-            BUG_ON(subleaf >= ARRAY_SIZE(p->feat.raw));
             *res = p->feat.raw[subleaf];
             break;
 
