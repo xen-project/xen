@@ -463,6 +463,9 @@ typedef union {
 #define EFLG_MBS  (1<<1)
 #define EFLG_CF   (1<<0)
 
+/* Floating point status word definitions. */
+#define FSW_ES    (1U << 7)
+
 /* MXCSR bit definitions. */
 #define MXCSR_MM  (1U << 17)
 
@@ -870,6 +873,15 @@ do {                                                            \
     generate_exception_if((_fic)->exn_raised >= 0,              \
                           (_fic)->exn_raised);                  \
 } while (0)
+
+static inline bool fpu_check_write(void)
+{
+    uint16_t fsw;
+
+    asm ( "fnstsw %0" : "=am" (fsw) );
+
+    return !(fsw & FSW_ES);
+}
 
 #define emulate_fpu_insn(_op)                           \
     asm volatile (                                      \
@@ -3824,6 +3836,13 @@ x86_emulate(
             default:
                 generate_exception(EXC_UD);
             }
+            /*
+             * Control instructions can't raise FPU exceptions, so we need
+             * to consider suppressing writes only for non-control ones. All
+             * of them in this group have data width 4.
+             */
+            if ( dst.type == OP_MEM && dst.bytes == 4 && !fpu_check_write() )
+                dst.type = OP_NONE;
         }
         put_fpu(&fic);
         break;
@@ -3936,7 +3955,8 @@ x86_emulate(
             case 7: /* fstp m80fp */
                 fail_if(!ops->write);
                 emulate_fpu_insn_memdst("fstpt", *mmvalp);
-                if ( (rc = ops->write(ea.mem.seg, ea.mem.off, mmvalp,
+                if ( fpu_check_write() &&
+                     (rc = ops->write(ea.mem.seg, ea.mem.off, mmvalp,
                                       10, ctxt)) != X86EMUL_OKAY )
                     goto done;
                 dst.type = OP_NONE;
@@ -3944,6 +3964,8 @@ x86_emulate(
             default:
                 generate_exception(EXC_UD);
             }
+            if ( dst.type == OP_MEM && !fpu_check_write() )
+                dst.type = OP_NONE;
         }
         put_fpu(&fic);
         break;
@@ -4047,6 +4069,13 @@ x86_emulate(
             default:
                 generate_exception(EXC_UD);
             }
+            /*
+             * Control instructions can't raise FPU exceptions, so we need
+             * to consider suppressing writes only for non-control ones. All
+             * of them in this group have data width 8.
+             */
+            if ( dst.type == OP_MEM && dst.bytes == 8 && !fpu_check_write() )
+                dst.type = OP_NONE;
         }
         put_fpu(&fic);
         break;
@@ -4164,7 +4193,8 @@ x86_emulate(
             case 6: /* fbstp packed bcd */
                 fail_if(!ops->write);
                 emulate_fpu_insn_memdst("fbstp", *mmvalp);
-                if ( (rc = ops->write(ea.mem.seg, ea.mem.off, mmvalp,
+                if ( fpu_check_write() &&
+                     (rc = ops->write(ea.mem.seg, ea.mem.off, mmvalp,
                                       10, ctxt)) != X86EMUL_OKAY )
                     goto done;
                 dst.type = OP_NONE;
@@ -4174,6 +4204,8 @@ x86_emulate(
                 dst.bytes = 8;
                 break;
             }
+            if ( dst.type == OP_MEM && !fpu_check_write() )
+                dst.type = OP_NONE;
         }
         put_fpu(&fic);
         break;
