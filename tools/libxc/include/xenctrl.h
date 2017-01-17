@@ -2574,6 +2574,16 @@ int xc_kexec_load(xc_interface *xch, uint8_t type, uint16_t arch,
  */
 int xc_kexec_unload(xc_interface *xch, int type);
 
+/*
+ * Find out whether the image has been succesfully loaded.
+ *
+ * The type can be either KEXEC_TYPE_DEFAULT or KEXEC_TYPE_CRASH.
+ * If zero is returned, that means no image is loaded for the type.
+ * If one is returned, that means an image is loaded for the type.
+ * Otherwise, negative return value indicates error.
+ */
+int xc_kexec_status(xc_interface *xch, int type);
+
 typedef xenpf_resource_entry_t xc_resource_entry_t;
 
 /*

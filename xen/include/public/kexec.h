@@ -227,6 +227,19 @@ typedef struct xen_kexec_unload {
 } xen_kexec_unload_t;
 DEFINE_XEN_GUEST_HANDLE(xen_kexec_unload_t);
 
+/*
+ * Figure out whether we have an image loaded. A return value of
+ * zero indicates no image loaded. A return value of one
+ * indicates an image is loaded. A negative return value
+ * indicates an error.
+ *
+ * Type must be one of KEXEC_TYPE_DEFAULT or KEXEC_TYPE_CRASH.
+ */
+#define KEXEC_CMD_kexec_status 6
+typedef struct xen_kexec_status {
+    uint8_t type;
+} xen_kexec_status_t;
+DEFINE_XEN_GUEST_HANDLE(xen_kexec_status_t);
 #else /* __XEN_INTERFACE_VERSION__ < 0x00040400 */
 
 #define KEXEC_CMD_kexec_load KEXEC_CMD_kexec_load_v1

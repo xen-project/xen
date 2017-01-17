@@ -126,3 +126,27 @@ out:
 
     return ret;
 }
+
+int xc_kexec_status(xc_interface *xch, int type)
+{
+    DECLARE_HYPERCALL_BUFFER(xen_kexec_status_t, status);
+    int ret = -1;
+
+    status = xc_hypercall_buffer_alloc(xch, status, sizeof(*status));
+    if ( status == NULL )
+    {
+        PERROR("Could not alloc buffer for kexec status hypercall");
+        goto out;
+    }
+
+    status->type = type;
+
+    ret = xencall2(xch->xcall, __HYPERVISOR_kexec_op,
+                   KEXEC_CMD_kexec_status,
+                   HYPERCALL_BUFFER_AS_ARG(status));
+
+out:
+    xc_hypercall_buffer_free(xch, status);
+
+    return ret;
+}

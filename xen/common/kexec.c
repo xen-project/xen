@@ -1169,6 +1169,22 @@ static int kexec_unload(XEN_GUEST_HANDLE_PARAM(void) uarg)
     return kexec_do_unload(&unload);
 }
 
+static int kexec_status(XEN_GUEST_HANDLE_PARAM(void) uarg)
+{
+    xen_kexec_status_t status;
+    int base, bit;
+
+    if ( unlikely(copy_from_guest(&status, uarg, 1)) )
+        return -EFAULT;
+
+    /* No need to check KEXEC_FLAG_IN_PROGRESS. */
+
+    if ( kexec_load_get_bits(status.type, &base, &bit) )
+        return -EINVAL;
+
+    return test_bit(bit, &kexec_flags);
+}
+
 static int do_kexec_op_internal(unsigned long op,
                                 XEN_GUEST_HANDLE_PARAM(void) uarg,
                                 bool_t compat)
@@ -1207,6 +1223,9 @@ static int do_kexec_op_internal(unsigned long op,
         break;
     case KEXEC_CMD_kexec_unload:
         ret = kexec_unload(uarg);
+        break;
+    case KEXEC_CMD_kexec_status:
+        ret = kexec_status(uarg);
         break;
     }
 
