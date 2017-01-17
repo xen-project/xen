@@ -332,7 +332,11 @@ union vex {
 
 #define copy_REX_VEX(ptr, rex, vex) do { \
     if ( (vex).opcx != vex_none ) \
+    { \
+        if ( !mode_64bit() ) \
+            vex.reg |= 8; \
         ptr[0] = 0xc4, ptr[1] = (vex).raw[0], ptr[2] = (vex).raw[1]; \
+    } \
     else if ( mode_64bit() ) \
         ptr[1] = rex | REX_PREFIX; \
 } while (0)
@@ -2309,6 +2313,8 @@ x86_decode(
                             op_bytes = 8;
                         }
                     }
+                    else
+                        vex.b = 1;
                     switch ( b )
                     {
                     case 0x62:
@@ -2327,7 +2333,7 @@ x86_decode(
                         break;
                     }
                 }
-                if ( mode_64bit() && !vex.r )
+                if ( !vex.r )
                     rex_prefix |= REX_R;
 
                 ext = vex.opcx;
