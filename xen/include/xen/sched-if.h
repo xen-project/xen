@@ -47,6 +47,13 @@ DECLARE_PER_CPU(struct schedule_data, schedule_data);
 DECLARE_PER_CPU(struct scheduler *, scheduler);
 DECLARE_PER_CPU(struct cpupool *, cpupool);
 
+/*
+ * Scratch space, for avoiding having too many cpumask_t on the stack.
+ * Within each scheduler, when using the scratch mask of one pCPU:
+ * - the pCPU must belong to the scheduler,
+ * - the caller must own the per-pCPU scheduler lock (a.k.a. runqueue
+ *   lock).
+ */
 DECLARE_PER_CPU(cpumask_t, cpumask_scratch);
 #define cpumask_scratch        (&this_cpu(cpumask_scratch))
 #define cpumask_scratch_cpu(c) (&per_cpu(cpumask_scratch, c))

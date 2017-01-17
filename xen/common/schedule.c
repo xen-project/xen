@@ -65,12 +65,7 @@ static void poll_timer_fn(void *data);
 DEFINE_PER_CPU(struct schedule_data, schedule_data);
 DEFINE_PER_CPU(struct scheduler *, scheduler);
 
-/*
- * Scratch space, for avoiding having too many cpumask_var_t on the stack.
- * Properly serializing access, if necessary, is responsibility of each
- * scheduler (typically, one can expect this to be protected by the per pCPU
- * or per runqueue lock).
- */
+/* Scratch space for cpumasks. */
 DEFINE_PER_CPU(cpumask_t, cpumask_scratch);
 
 extern const struct scheduler *__start_schedulers_array[], *__end_schedulers_array[];

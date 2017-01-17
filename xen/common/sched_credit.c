@@ -1636,9 +1636,8 @@ csched_runq_steal(int peer_cpu, int cpu, int pri, int balance_step)
                  && !__vcpu_has_soft_affinity(vc, vc->cpu_hard_affinity) )
                 continue;
 
-            csched_balance_cpumask(vc, balance_step, cpumask_scratch_cpu(cpu));
-            if ( __csched_vcpu_is_migrateable(vc, cpu,
-                                              cpumask_scratch_cpu(cpu)) )
+            csched_balance_cpumask(vc, balance_step, cpumask_scratch);
+            if ( __csched_vcpu_is_migrateable(vc, cpu, cpumask_scratch) )
             {
                 /* We got a candidate. Grab it! */
                 TRACE_3D(TRC_CSCHED_STOLEN_VCPU, peer_cpu,
