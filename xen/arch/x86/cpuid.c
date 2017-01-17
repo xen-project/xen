@@ -17,6 +17,11 @@ static const uint32_t hvm_hap_featuremask[] = INIT_HVM_HAP_FEATURES;
 static const uint32_t deep_features[] = INIT_DEEP_FEATURES;
 
 #define EMPTY_LEAF ((struct cpuid_leaf){})
+static void zero_leaves(struct cpuid_leaf *l,
+                        unsigned int first, unsigned int last)
+{
+    memset(&l[first], 0, sizeof(*l) * (last - first + 1));
+}
 
 struct cpuid_policy __read_mostly raw_policy,
     __read_mostly host_policy,
@@ -153,21 +158,31 @@ static void recalculate_xstate(struct cpuid_policy *p)
 
 /*
  * Misc adjustments to the policy.  Mostly clobbering reserved fields and
- * duplicating shared fields.
+ * duplicating shared fields.  Intentionally hidden fields are annotated.
  */
 static void recalculate_misc(struct cpuid_policy *p)
 {
+    p->basic.raw[0x8] = EMPTY_LEAF;
+    p->basic.raw[0xc] = EMPTY_LEAF;
+
     p->extd.e1d &= ~CPUID_COMMON_1D_FEATURES;
 
     switch ( p->x86_vendor )
     {
     case X86_VENDOR_INTEL:
+        p->basic.l2_nr_queries = 1; /* Fixed to 1 query. */
+        p->basic.raw[0x3] = EMPTY_LEAF; /* PSN - always hidden. */
+        p->basic.raw[0x9] = EMPTY_LEAF; /* DCA - always hidden. */
+
         p->extd.vendor_ebx = 0;
         p->extd.vendor_ecx = 0;
         p->extd.vendor_edx = 0;
         break;
 
     case X86_VENDOR_AMD:
+        zero_leaves(p->basic.raw, 0x2, 0x3);
+        p->basic.raw[0x9] = EMPTY_LEAF;
+
         p->extd.vendor_ebx = p->basic.vendor_ebx;
         p->extd.vendor_ecx = p->basic.vendor_ecx;
         p->extd.vendor_edx = p->basic.vendor_edx;
@@ -188,7 +203,7 @@ static void __init calculate_raw_policy(void)
     {
         switch ( i )
         {
-        case 0x2: case 0x4: case 0x7: case 0xd:
+        case 0x4: case 0x7: case 0xd:
             /* Multi-invocation leaves.  Deferred. */
             continue;
         }
@@ -694,8 +709,9 @@ static void pv_cpuid(uint32_t leaf, uint32_t subleaf, struct cpuid_leaf *res)
         break;
 
     case 0x0:
-    case 0x7:
-    case XSTATE_CPUID:
+    case 0x2 ... 0x3:
+    case 0x7 ... 0x9:
+    case 0xc ... XSTATE_CPUID:
     case 0x80000000:
         ASSERT_UNREACHABLE();
         /* Now handled in guest_cpuid(). */
@@ -841,8 +857,9 @@ static void hvm_cpuid(uint32_t leaf, uint32_t subleaf, struct cpuid_leaf *res)
         break;
 
     case 0x0:
-    case 0x7:
-    case XSTATE_CPUID:
+    case 0x2 ... 0x3:
+    case 0x7 ... 0x9:
+    case 0xc ... XSTATE_CPUID:
     case 0x80000000:
         ASSERT_UNREACHABLE();
         /* Now handled in guest_cpuid(). */
@@ -894,6 +911,9 @@ void guest_cpuid(const struct vcpu *v, uint32_t leaf,
             goto legacy;
 
         case 0x0:
+        case 0x2 ... 0x3:
+        case 0x8 ... 0x9:
+        case 0xc:
             *res = p->basic.raw[leaf];
             break;
         }

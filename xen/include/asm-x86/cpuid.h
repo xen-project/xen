@@ -115,6 +115,9 @@ struct cpuid_policy
                 uint32_t _1d;
                 struct { DECL_BITFIELD(1d); };
             };
+
+            /* Leaf 0x2 - TLB/Cache/Prefetch. */
+            uint8_t l2_nr_queries; /* Documented as fixed to 1. */
         };
     } basic;
 
