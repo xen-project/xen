@@ -1373,7 +1373,7 @@ static int acpi_iomem_deny_access(struct domain *d)
 {
     acpi_status status;
     struct acpi_table_spcr *spcr = NULL;
-    unsigned long gfn;
+    unsigned long mfn;
     int rc;
 
     /* Firstly permit full MMIO capabilities. */
@@ -1391,9 +1391,9 @@ static int acpi_iomem_deny_access(struct domain *d)
         return -EINVAL;
     }
 
-    gfn = spcr->serial_port.address >> PAGE_SHIFT;
+    mfn = spcr->serial_port.address >> PAGE_SHIFT;
     /* Deny MMIO access for UART */
-    rc = iomem_deny_access(d, gfn, gfn + 1);
+    rc = iomem_deny_access(d, mfn, mfn + 1);
     if ( rc )
         return rc;
 

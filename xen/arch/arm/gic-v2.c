@@ -991,26 +991,26 @@ static void __init gicv2_dt_init(void)
 static int gicv2_iomem_deny_access(const struct domain *d)
 {
     int rc;
-    unsigned long gfn, nr;
+    unsigned long mfn, nr;
 
-    gfn = dbase >> PAGE_SHIFT;
-    rc = iomem_deny_access(d, gfn, gfn + 1);
+    mfn = dbase >> PAGE_SHIFT;
+    rc = iomem_deny_access(d, mfn, mfn + 1);
     if ( rc )
         return rc;
 
-    gfn = hbase >> PAGE_SHIFT;
-    rc = iomem_deny_access(d, gfn, gfn + 1);
+    mfn = hbase >> PAGE_SHIFT;
+    rc = iomem_deny_access(d, mfn, mfn + 1);
     if ( rc )
         return rc;
 
-    gfn = cbase >> PAGE_SHIFT;
+    mfn = cbase >> PAGE_SHIFT;
     nr = DIV_ROUND_UP(csize, PAGE_SIZE);
-    rc = iomem_deny_access(d, gfn, gfn + nr);
+    rc = iomem_deny_access(d, mfn, mfn + nr);
     if ( rc )
         return rc;
 
-    gfn = vbase >> PAGE_SHIFT;
-    return iomem_deny_access(d, gfn, gfn + nr);
+    mfn = vbase >> PAGE_SHIFT;
+    return iomem_deny_access(d, mfn, mfn + nr);
 }
 
 #ifdef CONFIG_ACPI
