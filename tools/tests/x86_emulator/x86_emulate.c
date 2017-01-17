@@ -60,6 +60,10 @@ int emul_test_cpuid(
     if ( leaf == 1 )
         res->c |= 1U << 22;
 
+    /* The emulator doesn't itself use ADCX/ADOX, so we can always run the test. */
+    if ( leaf == 7 && subleaf == 0 )
+        res->b |= 1U << 19;
+
     return X86EMUL_OKAY;
 }
 

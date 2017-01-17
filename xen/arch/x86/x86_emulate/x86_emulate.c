@@ -1345,6 +1345,7 @@ static bool vcpu_has(
 #define vcpu_has_hle()         vcpu_has(         7, EBX,  4, ctxt, ops)
 #define vcpu_has_rtm()         vcpu_has(         7, EBX, 11, ctxt, ops)
 #define vcpu_has_mpx()         vcpu_has(         7, EBX, 14, ctxt, ops)
+#define vcpu_has_adx()         vcpu_has(         7, EBX, 19, ctxt, ops)
 #define vcpu_has_smap()        vcpu_has(         7, EBX, 20, ctxt, ops)
 #define vcpu_has_clflushopt()  vcpu_has(         7, EBX, 23, ctxt, ops)
 #define vcpu_has_clwb()        vcpu_has(         7, EBX, 24, ctxt, ops)
@@ -5875,6 +5876,40 @@ x86_emulate(
         }
         break;
 #endif
+
+    case X86EMUL_OPC_66(0x0f38, 0xf6): /* adcx r/m,r */
+    case X86EMUL_OPC_F3(0x0f38, 0xf6): /* adox r/m,r */
+    {
+        unsigned int mask = rep_prefix() ? EFLG_OF : EFLG_CF;
+        unsigned int aux = _regs._eflags & mask ? ~0 : 0;
+        bool carry;
+
+        vcpu_must_have(adx);
+#ifdef __x86_64__
+        if ( op_bytes == 8 )
+            asm ( "add %[aux],%[aux]\n\t"
+                  "adc %[src],%[dst]\n\t"
+                  ASM_FLAG_OUT(, "setc %[carry]")
+                  : [dst] "+r" (dst.val),
+                    [carry] ASM_FLAG_OUT("=@ccc", "=qm") (carry),
+                    [aux] "+r" (aux)
+                  : [src] "rm" (src.val) );
+        else
+#endif
+            asm ( "add %[aux],%[aux]\n\t"
+                  "adc %k[src],%k[dst]\n\t"
+                  ASM_FLAG_OUT(, "setc %[carry]")
+                  : [dst] "+r" (dst.val),
+                    [carry] ASM_FLAG_OUT("=@ccc", "=qm") (carry),
+                    [aux] "+r" (aux)
+                  : [src] "rm" (src.val) );
+        if ( carry )
+            _regs._eflags |= mask;
+        else
+            _regs._eflags &= ~mask;
+        break;
+    }
+
     default:
         goto cannot_emulate;
     }

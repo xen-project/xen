@@ -885,10 +885,65 @@ int main(int argc, char **argv)
                               #which ": " insn "\n"                     \
                               ".equ " #which "_len, .-" #which "\n"     \
                               ".popsection"
-#define set_insn(which) (regs.eip = (unsigned long)memcpy(instr, which, \
-                                             (unsigned long)which##_len))
-#define check_eip(which) (regs.eip == (unsigned long)instr + \
+#define set_insn(which) (regs.eip = (unsigned long)(which))
+#define valid_eip(which) (regs.eip >= (unsigned long)(which) && \
+                          regs.eip < (unsigned long)(which) + \
                                       (unsigned long)which##_len)
+#define check_eip(which) (regs.eip == (unsigned long)(which) + \
+                                      (unsigned long)which##_len)
+
+    printf("%-40s", "Testing adcx/adox ...");
+    {
+        static const unsigned int data[] = {
+            0x01234567, 0x12345678, 0x23456789, 0x3456789a,
+            0x456789ab, 0x56789abc, 0x6789abcd, 0x789abcde,
+            0x89abcdef, 0x9abcdef0, 0xabcdef01, 0xbcdef012,
+            0xcdef0123, 0xdef01234, 0xef012345, 0xf0123456
+        };
+        decl_insn(adx);
+        unsigned int cf, of;
+
+        asm volatile ( put_insn(adx, ".Lloop%=:\n\t"
+                                     "adcx (%[addr]), %k[dst1]\n\t"
+                                     "adox -%c[full]-%c[elem](%[addr],%[cnt],2*%c[elem]), %k[dst2]\n\t"
+                                     "lea %c[elem](%[addr]),%[addr]\n\t"
+                                     "loop .Lloop%=\n\t"
+                                     "adcx %k[cnt], %k[dst1]\n\t"
+                                     "adox %k[cnt], %k[dst2]\n\t" )
+                       : [addr] "=S" (regs.esi), [cnt] "=c" (regs.ecx),
+                         [dst1] "=a" (regs.eax), [dst2] "=d" (regs.edx)
+                       : [full] "i" (sizeof(data)), [elem] "i" (sizeof(*data)),
+                         "[addr]" (data), "[cnt]" (ARRAY_SIZE(data)),
+                         "[dst1]" (0), "[dst2]" (0) );
+
+        set_insn(adx);
+        regs.eflags = 0x2d6;
+        of = cf = i = 0;
+        while ( (rc = x86_emulate(&ctxt, &emulops)) == X86EMUL_OKAY )
+        {
+            ++i;
+            /*
+             * Count CF/OF being set after each loop iteration during the
+             * first half (to observe different counts), in order to catch
+             * the wrong flag being fiddled with.
+             */
+            if ( i < ARRAY_SIZE(data) * 2 && !(i % 4) )
+            {
+                if ( regs.eflags & 0x001 )
+                   ++cf;
+                if ( regs.eflags & 0x800 )
+                   ++of;
+            }
+            if ( !valid_eip(adx) )
+                break;
+        }
+        if ( (rc != X86EMUL_OKAY) ||
+             i != ARRAY_SIZE(data) * 4 + 2 || cf != 1 || of != 5 ||
+             regs.eax != 0xffffffff || regs.ecx || regs.edx != 0xffffffff ||
+             !check_eip(adx) || regs.eflags != 0x2d6 )
+            goto fail;
+        printf("okay\n");
+    }
 
     printf("%-40s", "Testing movq %mm3,(%ecx)...");
     if ( stack_exec && cpu_has_mmx )
