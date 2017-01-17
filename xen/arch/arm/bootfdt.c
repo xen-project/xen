@@ -168,7 +168,7 @@ static void __init process_multiboot_node(const void *fdt, int node,
                                           const char *name,
                                           u32 address_cells, u32 size_cells)
 {
-    static int kind_guess = 0;
+    static int __initdata kind_guess = 0;
     const struct fdt_property *prop;
     const __be32 *cell;
     bootmodule_kind kind;
