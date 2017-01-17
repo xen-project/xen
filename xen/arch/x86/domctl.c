@@ -92,7 +92,7 @@ static int update_domain_cpuid_info(struct domain *d,
 {
     struct cpuid_policy *p = d->arch.cpuid;
     const struct cpuid_leaf leaf = { ctl->eax, ctl->ebx, ctl->ecx, ctl->edx };
-    int rc;
+    int rc, old_vendor = p->x86_vendor;
 
     /*
      * Skip update for leaves we don't care about.  This avoids the overhead
@@ -155,11 +155,7 @@ static int update_domain_cpuid_info(struct domain *d,
 
     switch ( ctl->input[0] )
     {
-    case 0: {
-        int old_vendor = p->x86_vendor;
-
-        p->x86_vendor = get_cpu_vendor(ctl->ebx, ctl->ecx, ctl->edx, gcv_guest);
-
+    case 0:
         if ( is_hvm_domain(d) && (p->x86_vendor != old_vendor) )
         {
             struct vcpu *v;
@@ -167,9 +163,7 @@ static int update_domain_cpuid_info(struct domain *d,
             for_each_vcpu( d, v )
                 hvm_update_guest_vendor(v);
         }
-
         break;
-    }
 
     case 1:
         if ( is_pv_domain(d) && ((levelling_caps & LCAP_1cd) == LCAP_1cd) )

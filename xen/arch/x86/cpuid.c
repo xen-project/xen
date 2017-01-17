@@ -355,6 +355,9 @@ void recalculate_cpuid_policy(struct domain *d)
     uint32_t fs[FSCAPINTS], max_fs[FSCAPINTS];
     unsigned int i;
 
+    p->x86_vendor = get_cpu_vendor(p->basic.vendor_ebx, p->basic.vendor_ecx,
+                                   p->basic.vendor_edx, gcv_guest);
+
     p->basic.max_leaf   = min(p->basic.max_leaf,   max->basic.max_leaf);
     p->feat.max_subleaf = min(p->feat.max_subleaf, max->feat.max_subleaf);
     p->extd.max_leaf    = min(p->extd.max_leaf,    max->extd.max_leaf);
@@ -677,6 +680,7 @@ static void pv_cpuid(uint32_t leaf, uint32_t subleaf, struct cpuid_leaf *res)
         *res = EMPTY_LEAF;
         break;
 
+    case 0x0:
     case 0x7:
     case XSTATE_CPUID:
         ASSERT_UNREACHABLE();
@@ -825,6 +829,7 @@ static void hvm_cpuid(uint32_t leaf, uint32_t subleaf, struct cpuid_leaf *res)
             res->a = 0;
         break;
 
+    case 0x0:
     case 0x7:
     case XSTATE_CPUID:
         ASSERT_UNREACHABLE();
@@ -850,7 +855,9 @@ void guest_cpuid(const struct vcpu *v, uint32_t leaf,
     switch ( leaf )
     {
     case 0 ... CPUID_GUEST_NR_BASIC - 1:
-        if ( leaf > p->basic.max_leaf )
+        ASSERT(p->basic.max_leaf < ARRAY_SIZE(p->basic.raw));
+        if ( leaf > min_t(uint32_t, p->basic.max_leaf,
+                          ARRAY_SIZE(p->basic.raw) - 1) )
             return;
 
         switch ( leaf )
@@ -873,6 +880,10 @@ void guest_cpuid(const struct vcpu *v, uint32_t leaf,
 
         default:
             goto legacy;
+
+        case 0x0:
+            *res = p->basic.raw[leaf];
+            break;
         }
         break;
 
