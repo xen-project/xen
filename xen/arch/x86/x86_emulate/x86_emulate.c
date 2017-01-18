@@ -4743,7 +4743,7 @@ x86_emulate(
     case 0xc3: /* movnti */
         /* Ignore the non-temporal hint for now. */
         vcpu_must_have_sse2();
-        generate_exception_if(dst.bytes <= 2, EXC_UD, -1);
+        generate_exception_if(vex.pfx, EXC_UD, -1);
         dst.val = src.val;
         break;
 
