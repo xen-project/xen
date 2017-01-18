@@ -1570,12 +1570,17 @@ static bool is_aligned(enum x86_segment seg, unsigned long offs,
     /* Expecting powers of two only. */
     ASSERT(!(size & (size - 1)));
 
-    /* No alignment checking when we have no way to read segment data. */
-    if ( !ops->read_segment )
-        return true;
+    if ( mode_64bit() && seg < x86_seg_fs )
+        memset(&reg, 0, sizeof(reg));
+    else
+    {
+        /* No alignment checking when we have no way to read segment data. */
+        if ( !ops->read_segment )
+            return true;
 
-    if ( ops->read_segment(seg, &reg, ctxt) != X86EMUL_OKAY )
-        return false;
+        if ( ops->read_segment(seg, &reg, ctxt) != X86EMUL_OKAY )
+            return false;
+    }
 
     return !((reg.base + offs) & (size - 1));
 }
