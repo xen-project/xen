@@ -160,39 +160,37 @@ static bool_t msix_memory_decoded(const struct pci_dev *dev, unsigned int pos)
  */
 void msi_compose_msg(unsigned vector, const cpumask_t *cpu_mask, struct msi_msg *msg)
 {
-    unsigned dest;
-
     memset(msg, 0, sizeof(*msg));
-    if ( !cpumask_intersects(cpu_mask, &cpu_online_map) )
+
+    if ( vector < FIRST_DYNAMIC_VECTOR )
         return;
 
-    if ( vector )
+    if ( cpu_mask )
     {
         cpumask_t *mask = this_cpu(scratch_mask);
 
+        if ( !cpumask_intersects(cpu_mask, &cpu_online_map) )
+            return;
+
         cpumask_and(mask, cpu_mask, &cpu_online_map);
-        dest = cpu_mask_to_apicid(mask);
-
-        msg->address_hi = MSI_ADDR_BASE_HI;
-        msg->address_lo =
-            MSI_ADDR_BASE_LO |
-            ((INT_DEST_MODE == 0) ?
-             MSI_ADDR_DESTMODE_PHYS:
-             MSI_ADDR_DESTMODE_LOGIC) |
-            ((INT_DELIVERY_MODE != dest_LowestPrio) ?
-             MSI_ADDR_REDIRECTION_CPU:
-             MSI_ADDR_REDIRECTION_LOWPRI) |
-            MSI_ADDR_DEST_ID(dest);
-        msg->dest32 = dest;
-
-        msg->data =
-            MSI_DATA_TRIGGER_EDGE |
-            MSI_DATA_LEVEL_ASSERT |
-            ((INT_DELIVERY_MODE != dest_LowestPrio) ?
-             MSI_DATA_DELIVERY_FIXED:
-             MSI_DATA_DELIVERY_LOWPRI) |
-            MSI_DATA_VECTOR(vector);
+        msg->dest32 = cpu_mask_to_apicid(mask);
     }
+
+    msg->address_hi = MSI_ADDR_BASE_HI;
+    msg->address_lo = MSI_ADDR_BASE_LO |
+                      (INT_DEST_MODE ? MSI_ADDR_DESTMODE_LOGIC
+                                     : MSI_ADDR_DESTMODE_PHYS) |
+                      ((INT_DELIVERY_MODE != dest_LowestPrio)
+                       ? MSI_ADDR_REDIRECTION_CPU
+                       : MSI_ADDR_REDIRECTION_LOWPRI) |
+                      MSI_ADDR_DEST_ID(msg->dest32);
+
+    msg->data = MSI_DATA_TRIGGER_EDGE |
+                MSI_DATA_LEVEL_ASSERT |
+                ((INT_DELIVERY_MODE != dest_LowestPrio)
+                 ? MSI_DATA_DELIVERY_FIXED
+                 : MSI_DATA_DELIVERY_LOWPRI) |
+                MSI_DATA_VECTOR(vector);
 }
 
 static bool_t read_msi_msg(struct msi_desc *entry, struct msi_msg *msg)
