@@ -1848,7 +1848,7 @@ x86_decode_twobyte(
     case 0x79 ... 0x7f:
     case 0xae:
     case 0xc2:
-    case 0xc4 ... 0xc7:
+    case 0xc4 ... 0xc6:
     case 0xd0 ... 0xfe:
         ctxt->opcode |= MASK_INSR(vex.pfx, X86EMUL_OPC_PFX_MASK);
         break;
@@ -5282,8 +5282,12 @@ x86_emulate(
         generate_exception_if((modrm_reg & 7) != 1, EXC_UD, -1);
         generate_exception_if(ea.type != OP_MEM, EXC_UD, -1);
         if ( op_bytes == 8 )
+        {
             host_and_vcpu_must_have(cx16);
-        op_bytes *= 2;
+            op_bytes = 16;
+        }
+        else
+            op_bytes = 8;
 
         /* Get actual old value. */
         if ( (rc = ops->read(ea.mem.seg, ea.mem.off, old, op_bytes,
