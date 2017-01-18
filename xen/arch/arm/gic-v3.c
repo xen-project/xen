@@ -455,7 +455,11 @@ static void gicv3_dir_irq(struct irq_desc *irqd)
 
 static unsigned int gicv3_read_irq(void)
 {
-    return READ_SYSREG32(ICC_IAR1_EL1);
+    unsigned int irq = READ_SYSREG32(ICC_IAR1_EL1);
+
+    dsb(sy);
+
+    return irq;
 }
 
 static inline uint64_t gicv3_mpidr_to_affinity(int cpu)
