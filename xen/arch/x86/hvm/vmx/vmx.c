@@ -2066,7 +2066,6 @@ static void vmx_cpuid_intercept(
     unsigned int *ecx, unsigned int *edx)
 {
     unsigned int input = *eax;
-    struct segment_register cs;
     struct vcpu *v = current;
 
     hvm_cpuid(input, eax, ebx, ecx, edx);
@@ -2075,8 +2074,7 @@ static void vmx_cpuid_intercept(
     {
         case 0x80000001:
             /* SYSCALL is visible iff running in long mode. */
-            vmx_get_segment_register(v, x86_seg_cs, &cs);
-            if ( cs.attr.fields.l )
+            if ( hvm_long_mode_enabled(v) )
                 *edx |= cpufeat_mask(X86_FEATURE_SYSCALL);
             else
                 *edx &= ~(cpufeat_mask(X86_FEATURE_SYSCALL));
