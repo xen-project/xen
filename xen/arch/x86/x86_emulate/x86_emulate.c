@@ -1403,23 +1403,6 @@ decode_register(
     return p;
 }
 
-#define decode_segment_failed x86_seg_tr
-static enum x86_segment
-decode_segment(uint8_t modrm_reg)
-{
-    switch ( modrm_reg )
-    {
-    case 0: return x86_seg_es;
-    case 1: return x86_seg_cs;
-    case 2: return x86_seg_ss;
-    case 3: return x86_seg_ds;
-    case 4: return x86_seg_fs;
-    case 5: return x86_seg_gs;
-    default: break;
-    }
-    return decode_segment_failed;
-}
-
 /* Inject a software interrupt/exception, emulating if needed. */
 static int inject_swint(enum x86_swint_type type,
                         uint8_t vector, uint8_t insn_len,
@@ -2463,8 +2446,8 @@ x86_emulate(
 
     case 0x8c: /* mov Sreg,r/m */ {
         struct segment_register reg;
-        enum x86_segment seg = decode_segment(modrm_reg);
-        generate_exception_if(seg == decode_segment_failed, EXC_UD, -1);
+        enum x86_segment seg = modrm_reg & 7; /* REX.R is ignored. */
+        generate_exception_if(!is_x86_user_segment(seg), EXC_UD, -1);
         fail_if(ops->read_segment == NULL);
         if ( (rc = ops->read_segment(seg, &reg, ctxt)) != 0 )
             goto done;
@@ -2475,9 +2458,9 @@ x86_emulate(
     }
 
     case 0x8e: /* mov r/m,Sreg */ {
-        enum x86_segment seg = decode_segment(modrm_reg);
-        generate_exception_if(seg == decode_segment_failed, EXC_UD, -1);
-        generate_exception_if(seg == x86_seg_cs, EXC_UD, -1);
+        enum x86_segment seg = modrm_reg & 7; /* REX.R is ignored. */
+        generate_exception_if(!is_x86_user_segment(seg) ||
+                              seg == x86_seg_cs, EXC_UD, -1);
         if ( (rc = load_seg(seg, src.val, 0, NULL, ctxt, ops)) != 0 )
             goto done;
         if ( seg == x86_seg_ss )
@@ -4825,4 +4808,15 @@ x86_emulate(
     _put_fpu();
     put_stub(stub);
     return X86EMUL_UNHANDLEABLE;
+}
+
+static inline void build_assertions(void)
+{
+    /* Check the values against SReg3 encoding in opcode/ModRM bytes. */
+    BUILD_BUG_ON(x86_seg_es != 0);
+    BUILD_BUG_ON(x86_seg_cs != 1);
+    BUILD_BUG_ON(x86_seg_ss != 2);
+    BUILD_BUG_ON(x86_seg_ds != 3);
+    BUILD_BUG_ON(x86_seg_fs != 4);
+    BUILD_BUG_ON(x86_seg_gs != 5);
 }

@@ -29,11 +29,11 @@ struct x86_emulate_ctxt;
 
 /* Comprehensive enumeration of x86 segment registers. */
 enum x86_segment {
-    /* General purpose. */
+    /* General purpose.  Matches the SReg3 encoding in opcode/ModRM bytes. */
+    x86_seg_es,
     x86_seg_cs,
     x86_seg_ss,
     x86_seg_ds,
-    x86_seg_es,
     x86_seg_fs,
     x86_seg_gs,
     /* System. */

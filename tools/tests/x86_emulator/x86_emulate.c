@@ -13,6 +13,16 @@ typedef bool bool_t;
 #define BUG() abort()
 #define ASSERT assert
 
+#if __GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 6)
+/* Force a compilation error if condition is true */
+#define BUILD_BUG_ON(cond) ({ _Static_assert(!(cond), "!(" #cond ")"); })
+#define BUILD_BUG_ON_ZERO(cond) \
+    sizeof(struct { _Static_assert(!(cond), "!(" #cond ")"); })
+#else
+#define BUILD_BUG_ON_ZERO(cond) sizeof(struct { int:-!!(cond); })
+#define BUILD_BUG_ON(cond) ((void)BUILD_BUG_ON_ZERO(cond))
+#endif
+
 #define cpu_has_amd_erratum(nr) 0
 #define mark_regs_dirty(r) ((void)(r))
 
