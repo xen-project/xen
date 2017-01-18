@@ -29,7 +29,8 @@ static unsigned long *shadow_io_bitmap[3];
 /* Nested HVM on/off per domain */
 bool nestedhvm_enabled(const struct domain *d)
 {
-    return is_hvm_domain(d) && d->arch.hvm_domain.params[HVM_PARAM_NESTEDHVM];
+    return is_hvm_domain(d) && d->arch.hvm_domain.params &&
+        d->arch.hvm_domain.params[HVM_PARAM_NESTEDHVM];
 }
 
 /* Nested VCPU */

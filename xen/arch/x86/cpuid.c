@@ -3,6 +3,7 @@
 #include <xen/sched.h>
 #include <asm/cpuid.h>
 #include <asm/hvm/hvm.h>
+#include <asm/hvm/nestedhvm.h>
 #include <asm/hvm/vmx/vmcs.h>
 #include <asm/processor.h>
 #include <asm/xstate.h>
@@ -361,14 +362,24 @@ void recalculate_cpuid_policy(struct domain *d)
     cpuid_policy_to_featureset(p, fs);
     cpuid_policy_to_featureset(max, max_fs);
 
-    /*
-     * HVM domains using Shadow paging have further restrictions on their
-     * available paging features.
-     */
-    if ( is_hvm_domain(d) && !hap_enabled(d) )
+    if ( is_hvm_domain(d) )
     {
-        for ( i = 0; i < ARRAY_SIZE(max_fs); i++ )
-            max_fs[i] &= hvm_shadow_featuremask[i];
+        /*
+         * HVM domains using Shadow paging have further restrictions on their
+         * available paging features.
+         */
+        if ( !hap_enabled(d) )
+        {
+            for ( i = 0; i < ARRAY_SIZE(max_fs); i++ )
+                max_fs[i] &= hvm_shadow_featuremask[i];
+        }
+
+        /* Hide nested-virt if it hasn't been explicitly configured. */
+        if ( !nestedhvm_enabled(d) )
+        {
+            __clear_bit(X86_FEATURE_VMX, max_fs);
+            __clear_bit(X86_FEATURE_SVM, max_fs);
+        }
     }
 
     /*
