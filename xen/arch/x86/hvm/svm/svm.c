@@ -1960,26 +1960,28 @@ static int svm_msr_write_intercept(unsigned int msr, uint64_t msr_content)
 
 static void svm_do_msr_access(struct cpu_user_regs *regs)
 {
-    int rc, inst_len;
-    struct vcpu *v = current;
-    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
-    uint64_t msr_content;
+    struct vcpu *curr = current;
+    bool_t rdmsr = !curr->arch.hvm_svm.vmcb->exitinfo1;
+    int rc, inst_len = __get_instruction_length(
+        curr, rdmsr ? INSTR_RDMSR : INSTR_WRMSR);
 
-    if ( vmcb->exitinfo1 == 0 )
+    if ( inst_len == 0 )
+        return;
+
+    if ( rdmsr )
     {
-        if ( (inst_len = __get_instruction_length(v, INSTR_RDMSR)) == 0 )
-            return;
-        rc = hvm_msr_read_intercept(regs->ecx, &msr_content);
-        regs->eax = (uint32_t)msr_content;
-        regs->edx = (uint32_t)(msr_content >> 32);
+        uint64_t msr_content = 0;
+
+        rc = hvm_msr_read_intercept(regs->_ecx, &msr_content);
+        if ( rc == X86EMUL_OKAY )
+        {
+            regs->rax = (uint32_t)msr_content;
+            regs->rdx = (uint32_t)(msr_content >> 32);
+        }
     }
     else
-    {
-        if ( (inst_len = __get_instruction_length(v, INSTR_WRMSR)) == 0 )
-            return;
-        msr_content = ((uint64_t)regs->edx << 32) | (uint32_t)regs->eax;
-        rc = hvm_msr_write_intercept(regs->ecx, msr_content, 1);
-    }
+        rc = hvm_msr_write_intercept(regs->_ecx,
+                                     (regs->rdx << 32) | regs->_eax, 1);
 
     if ( rc == X86EMUL_OKAY )
         __update_guest_eip(regs, inst_len);
