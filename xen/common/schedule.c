@@ -1844,6 +1844,7 @@ void schedule_dump(struct cpupool *c)
         cpus = &cpupool_free_cpus;
     }
 
+    printk("CPUs info:\n");
     for_each_cpu (i, cpus)
     {
         printk("CPU[%02d] ", i);

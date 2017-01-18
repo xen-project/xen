@@ -2631,48 +2631,33 @@ static void
 csched2_dump_pcpu(const struct scheduler *ops, int cpu)
 {
     struct csched2_private *prv = CSCHED2_PRIV(ops);
-    struct list_head *runq, *iter;
     struct csched2_vcpu *svc;
     unsigned long flags;
     spinlock_t *lock;
-    int loop;
 #define cpustr keyhandler_scratch
 
     /*
      * We need both locks:
+     * - we print current, so we need the runqueue lock for this
+     *   cpu (the one of the runqueue this cpu is associated to);
      * - csched2_dump_vcpu() wants to access domains' weights,
-     *   which are protected by the private scheduler lock;
-     * - we scan through the runqueue, so we need the proper runqueue
-     *   lock (the one of the runqueue this cpu is associated to).
+     *   which are protected by the private scheduler lock.
      */
     read_lock_irqsave(&prv->lock, flags);
     lock = per_cpu(schedule_data, cpu).schedule_lock;
     spin_lock(lock);
 
-    runq = &RQD(ops, cpu)->runq;
-
     cpumask_scnprintf(cpustr, sizeof(cpustr), per_cpu(cpu_sibling_mask, cpu));
-    printk(" sibling=%s, ", cpustr);
+    printk(" runq=%d, sibling=%s, ", c2r(ops, cpu), cpustr);
     cpumask_scnprintf(cpustr, sizeof(cpustr), per_cpu(cpu_core_mask, cpu));
     printk("core=%s\n", cpustr);
 
-    /* current VCPU */
+    /* current VCPU (nothing to say if that's the idle vcpu) */
     svc = CSCHED2_VCPU(curr_on_cpu(cpu));
-    if ( svc )
+    if ( svc && !is_idle_vcpu(svc->vcpu) )
     {
         printk("\trun: ");
         csched2_dump_vcpu(prv, svc);
-    }
-
-    loop = 0;
-    list_for_each( iter, runq )
-    {
-        svc = __runq_elem(iter);
-        if ( svc )
-        {
-            printk("\t%3d: ", ++loop);
-            csched2_dump_vcpu(prv, svc);
-        }
     }
 
     spin_unlock(lock);
@@ -2754,6 +2739,29 @@ csched2_dump(const struct scheduler *ops)
 
             vcpu_schedule_unlock(lock, svc->vcpu);
         }
+    }
+
+    printk("Runqueue info:\n");
+    for_each_cpu(i, &prv->active_queues)
+    {
+        struct csched2_runqueue_data *rqd = prv->rqd + i;
+        struct list_head *iter, *runq = &rqd->runq;
+        int loop = 0;
+
+        /* We need the lock to scan the runqueue. */
+        spin_lock(&rqd->lock);
+        printk("runqueue %d:\n", i);
+        list_for_each( iter, runq )
+        {
+            struct csched2_vcpu *svc = __runq_elem(iter);
+
+            if ( svc )
+            {
+                printk("\t%3d: ", loop++);
+                csched2_dump_vcpu(prv, svc);
+            }
+        }
+        spin_unlock(&rqd->lock);
     }
 
     read_unlock_irqrestore(&prv->lock, flags);
