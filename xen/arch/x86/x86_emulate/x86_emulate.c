@@ -1403,6 +1403,30 @@ decode_register(
     return p;
 }
 
+static bool_t is_aligned(enum x86_segment seg, unsigned long offs,
+                         unsigned int size, struct x86_emulate_ctxt *ctxt,
+                         const struct x86_emulate_ops *ops)
+{
+    struct segment_register reg;
+
+    /* Expecting powers of two only. */
+    ASSERT(!(size & (size - 1)));
+
+    if ( mode_64bit() && seg < x86_seg_fs )
+        memset(&reg, 0, sizeof(reg));
+    else
+    {
+        /* No alignment checking when we have no way to read segment data. */
+        if ( !ops->read_segment )
+            return 1;
+
+        if ( ops->read_segment(seg, &reg, ctxt) != X86EMUL_OKAY )
+            return 0;
+    }
+
+    return !((reg.base + offs) & (size - 1));
+}
+
 /* Inject a software interrupt/exception, emulating if needed. */
 static int inject_swint(enum x86_swint_type type,
                         uint8_t vector, uint8_t insn_len,
@@ -4755,6 +4779,9 @@ x86_emulate(
         if ( op_bytes == 8 )
         {
             vcpu_must_have_cx16();
+            generate_exception_if(!is_aligned(ea.mem.seg, ea.mem.off, 16,
+                                              ctxt, ops),
+                                  EXC_GP, 0);
             op_bytes = 16;
         }
         else
