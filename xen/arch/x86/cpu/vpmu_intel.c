@@ -818,7 +818,7 @@ static int core2_vpmu_do_interrupt(struct cpu_user_regs *regs)
         if ( is_pmc_quirk )
             handle_pmc_quirk(msr_content);
         core2_vpmu_cxt->global_status |= msr_content;
-        msr_content = ~global_ovf_ctrl_mask;
+        msr_content &= ~global_ovf_ctrl_mask;
         wrmsrl(MSR_CORE_PERF_GLOBAL_OVF_CTRL, msr_content);
     }
     else
