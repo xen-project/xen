@@ -1847,8 +1847,7 @@ x86_decode_twobyte(
     case 0x50 ... 0x77:
     case 0x79 ... 0x7f:
     case 0xae:
-    case 0xc2:
-    case 0xc4 ... 0xc6:
+    case 0xc2 ... 0xc6:
     case 0xd0 ... 0xfe:
         ctxt->opcode |= MASK_INSR(vex.pfx, X86EMUL_OPC_PFX_MASK);
         break;
@@ -2388,8 +2387,8 @@ x86_decode(
     }
 
     /*
-     * Undo the operand-size override effect of prefix 66 when it was
-     * determined to have another meaning.
+     * When prefix 66 has a meaning different from operand-size override,
+     * operand size defaults to 4 and can't be overridden to 2.
      */
     if ( op_bytes == 2 &&
          (ctxt->opcode & X86EMUL_OPC_PFX_MASK) == X86EMUL_OPC_66(0, 0) )
@@ -5272,7 +5271,6 @@ x86_emulate(
     case X86EMUL_OPC(0x0f, 0xc3): /* movnti */
         /* Ignore the non-temporal hint for now. */
         vcpu_must_have_sse2();
-        generate_exception_if(dst.bytes <= 2, EXC_UD, -1);
         dst.val = src.val;
         break;
 
