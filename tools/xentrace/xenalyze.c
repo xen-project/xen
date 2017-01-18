@@ -7651,11 +7651,11 @@ void sched_process(struct pcpu_info *p)
         case TRC_SCHED_CLASS_EVT(CSCHED2, 3): /* CREDIT_BURN       */
             if(opt.dump_all) {
                 struct {
-                    unsigned int vcpuid:16, domid:16, credit;
-                    int delta;
+                    unsigned int vcpuid:16, domid:16;
+                    int credit, delta;
                 } *r = (typeof(r))ri->d;
 
-                printf(" %s csched2:burn_credits d%uv%u, credit = %u, delta = %d\n",
+                printf(" %s csched2:burn_credits d%uv%u, credit = %d, delta = %d\n",
                        ri->dump_header, r->domid, r->vcpuid,
                        r->credit, r->delta);
             }
@@ -7664,10 +7664,10 @@ void sched_process(struct pcpu_info *p)
             if(opt.dump_all) {
                 struct {
                     unsigned int vcpuid:16, domid:16;
-                    unsigned int credit;
+                    int credit;
                 } *r = (typeof(r))ri->d;
 
-                printf(" %s csched2:tickle_check d%uv%u, credit = %u\n",
+                printf(" %s csched2:tickle_check d%uv%u, credit = %d\n",
                        ri->dump_header, r->domid, r->vcpuid, r->credit);
             }
             break;
@@ -7685,12 +7685,12 @@ void sched_process(struct pcpu_info *p)
             if(opt.dump_all) {
                 struct {
                     unsigned int vcpuid:16, domid:16;
-                    unsigned int credit_start, credit_end;
+                    int credit_start, credit_end;
                     unsigned int multiplier;
                 } *r = (typeof(r))ri->d;
 
                 printf(" %s csched2:reset_credits d%uv%u, "
-                       "credit_start = %u, credit_end = %u, mult = %u\n",
+                       "credit_start = %d, credit_end = %d, mult = %u\n",
                        ri->dump_header, r->domid, r->vcpuid,
                        r->credit_start, r->credit_end, r->multiplier);
             }
@@ -7752,12 +7752,12 @@ void sched_process(struct pcpu_info *p)
         case TRC_SCHED_CLASS_EVT(CSCHED2, 13): /* TICKLE_NEW       */
             if (opt.dump_all) {
                 struct {
-                    unsigned vcpuid:16, domid:16;
-                    unsigned processor, credit;
+                    unsigned int vcpuid:16, domid:16, processor;
+                    int credit;
                 } *r = (typeof(r))ri->d;
 
                 printf(" %s csched2:runq_tickle_new d%uv%u, "
-                       "processor = %u, credit = %u\n",
+                       "processor = %u, credit = %d\n",
                        ri->dump_header, r->domid, r->vcpuid,
                        r->processor, r->credit);
             }
