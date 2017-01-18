@@ -154,7 +154,7 @@ ELF_HANDLE_DECL(elf_shdr) elf_shdr_by_name(struct elf_binary *elf, const char *n
     const char *sname;
     unsigned i;
 
-    for ( i = 0; i < count; i++ )
+    for ( i = 1; i < count; i++ )
     {
         shdr = elf_shdr_by_index(elf, i);
         if ( !elf_access_ok(elf, ELF_HANDLE_PTRVAL(shdr), 1) )
