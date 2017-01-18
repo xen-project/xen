@@ -939,7 +939,7 @@ static int __init add_user_rmrr(void)
 
         do
         {
-            if ( !mfn_valid(base) )
+            if ( !mfn_valid(_mfn(base)) )
             {
                 printk(XENLOG_ERR VTDPREFIX
                        "Invalid pfn in RMRR range "ERMRRU_FMT"\n",

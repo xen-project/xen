@@ -441,7 +441,7 @@ int unmmap_broken_page(struct domain *d, mfn_t mfn, unsigned long gfn)
     if ( is_hardware_domain(d) )
         return 0;
 
-    if (!mfn_valid(mfn_x(mfn)))
+    if ( !mfn_valid(mfn) )
         return -EINVAL;
 
     if ( !has_hvm_container_domain(d) || !paging_mode_hap(d) )

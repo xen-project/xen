@@ -187,7 +187,7 @@ static void update_pagetable_mac(vmac_ctx_t *ctx)
     {
         struct page_info *page = mfn_to_page(mfn);
 
-        if ( !mfn_valid(mfn) )
+        if ( !mfn_valid(_mfn(mfn)) )
             continue;
         if ( is_page_in_use(page) && !is_xen_heap_page(page) )
         {
@@ -279,7 +279,7 @@ static void tboot_gen_xenheap_integrity(const uint8_t key[TB_KEY_SIZE],
     {
         struct page_info *page = __mfn_to_page(mfn);
 
-        if ( !mfn_valid(mfn) )
+        if ( !mfn_valid(_mfn(mfn)) )
             continue;
         if ( (mfn << PAGE_SHIFT) < __pa(&_end) )
             continue; /* skip Xen */

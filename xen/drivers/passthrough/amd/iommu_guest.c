@@ -199,7 +199,7 @@ void guest_iommu_add_ppr_log(struct domain *d, u32 entry[])
 
     mfn = guest_iommu_get_table_mfn(d, reg_to_u64(iommu->ppr_log.reg_base),
                                     sizeof(ppr_entry_t), tail);
-    ASSERT(mfn_valid(mfn));
+    ASSERT(mfn_valid(_mfn(mfn)));
 
     log_base = map_domain_page(_mfn(mfn));
     log = log_base + tail % (PAGE_SIZE / sizeof(ppr_entry_t));
@@ -248,7 +248,7 @@ void guest_iommu_add_event_log(struct domain *d, u32 entry[])
 
     mfn = guest_iommu_get_table_mfn(d, reg_to_u64(iommu->event_log.reg_base),
                                     sizeof(event_entry_t), tail);
-    ASSERT(mfn_valid(mfn));
+    ASSERT(mfn_valid(_mfn(mfn)));
 
     log_base = map_domain_page(_mfn(mfn));
     log = log_base + tail % (PAGE_SIZE / sizeof(event_entry_t));
@@ -420,7 +420,7 @@ static int do_invalidate_dte(struct domain *d, cmd_entry_t *cmd)
     dte_mfn = guest_iommu_get_table_mfn(d,
                                         reg_to_u64(g_iommu->dev_table.reg_base),
                                         sizeof(dev_entry_t), gbdf);
-    ASSERT(mfn_valid(dte_mfn));
+    ASSERT(mfn_valid(_mfn(dte_mfn)));
 
     /* Read guest dte information */
     dte_base = map_domain_page(_mfn(dte_mfn));
@@ -441,7 +441,7 @@ static int do_invalidate_dte(struct domain *d, cmd_entry_t *cmd)
     gcr3_mfn = mfn_x(get_gfn(d, gcr3_gfn, &p2mt));
     put_gfn(d, gcr3_gfn);
 
-    ASSERT(mfn_valid(gcr3_mfn));
+    ASSERT(mfn_valid(_mfn(gcr3_mfn)));
 
     iommu = find_iommu_for_device(0, mbdf);
     if ( !iommu )
@@ -502,7 +502,7 @@ static void guest_iommu_process_command(unsigned long _d)
         cmd_mfn = guest_iommu_get_table_mfn(d,
                                             reg_to_u64(iommu->cmd_buffer.reg_base),
                                             sizeof(cmd_entry_t), head);
-        ASSERT(mfn_valid(cmd_mfn));
+        ASSERT(mfn_valid(_mfn(cmd_mfn)));
 
         cmd_base = map_domain_page(_mfn(cmd_mfn));
         cmd = cmd_base + head % entries_per_page;

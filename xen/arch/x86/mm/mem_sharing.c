@@ -154,8 +154,6 @@ static inline shr_handle_t get_next_handle(void)
 
 #undef mfn_to_page
 #define mfn_to_page(_m) __mfn_to_page(mfn_x(_m))
-#undef mfn_valid
-#define mfn_valid(_mfn) __mfn_valid(mfn_x(_mfn))
 #undef page_to_mfn
 #define page_to_mfn(_pg) _mfn(__page_to_mfn(_pg))
 
@@ -827,7 +825,7 @@ static int nominate_page(struct domain *d, gfn_t gfn,
                 continue;
 
             amfn = get_gfn_type_access(ap2m, gfn_x(gfn), &ap2mt, &ap2ma, 0, NULL);
-            if ( mfn_valid(amfn) && (mfn_x(amfn) != mfn_x(mfn) || ap2ma != p2ma) )
+            if ( mfn_valid(amfn) && (!mfn_eq(amfn, mfn) || ap2ma != p2ma) )
             {
                 altp2m_list_unlock(d);
                 goto out;

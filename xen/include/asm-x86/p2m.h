@@ -465,7 +465,7 @@ static inline struct page_info *get_page_from_gfn(
     if (t)
         *t = p2m_ram_rw;
     page = __mfn_to_page(gfn);
-    return mfn_valid(gfn) && get_page(page, d) ? page : NULL;
+    return mfn_valid(_mfn(gfn)) && get_page(page, d) ? page : NULL;
 }
 
 

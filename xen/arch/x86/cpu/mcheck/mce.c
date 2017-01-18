@@ -226,7 +226,7 @@ static void mca_init_bank(enum mca_source who,
         (mib->mc_status & MCi_STATUS_ADDRV) &&
         (mc_check_addr(mib->mc_status, mib->mc_misc, MC_ADDR_PHYSICAL)) &&
         (who == MCA_POLLER || who == MCA_CMCI_HANDLER) &&
-        (mfn_valid(paddr_to_pfn(mib->mc_addr))))
+        (mfn_valid(_mfn(paddr_to_pfn(mib->mc_addr)))))
     {
         struct domain *d;
 

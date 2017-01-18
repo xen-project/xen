@@ -293,7 +293,7 @@ static void __hwdom_init amd_iommu_hwdom_init(struct domain *d)
              * XXX Should we really map all non-RAM (above 4G)? Minimally
              * a pfn_valid() check would seem desirable here.
              */
-            if ( mfn_valid(pfn) )
+            if ( mfn_valid(_mfn(pfn)) )
             {
                 int ret = amd_iommu_map_page(d, pfn, pfn,
                                              IOMMUF_readable|IOMMUF_writable);

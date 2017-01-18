@@ -257,7 +257,7 @@ static int __get_paged_frame(unsigned long gfn, unsigned long *frame, struct pag
     *frame = page_to_mfn(*page);
 #else
     *frame = mfn_x(gfn_to_mfn(rd, _gfn(gfn)));
-    *page = mfn_valid(*frame) ? mfn_to_page(*frame) : NULL;
+    *page = mfn_valid(_mfn(*frame)) ? mfn_to_page(*frame) : NULL;
     if ( (!(*page)) || (!get_page(*page, rd)) )
     {
         *frame = mfn_x(INVALID_MFN);
@@ -878,7 +878,7 @@ __gnttab_map_grant_ref(
     /* pg may be set, with a refcount included, from __get_paged_frame */
     if ( !pg )
     {
-        pg = mfn_valid(frame) ? mfn_to_page(frame) : NULL;
+        pg = mfn_valid(_mfn(frame)) ? mfn_to_page(frame) : NULL;
         if ( pg )
             owner = page_get_owner_and_reference(pg);
     }
@@ -1792,7 +1792,7 @@ gnttab_transfer(
 #endif
 
         /* Check the passed page frame for basic validity. */
-        if ( unlikely(!mfn_valid(mfn)) )
+        if ( unlikely(!mfn_valid(_mfn(mfn))) )
         { 
             put_gfn(d, gop.mfn);
             gdprintk(XENLOG_INFO, "gnttab_transfer: out-of-range %lx\n",
@@ -2256,7 +2256,7 @@ __acquire_grant_for_copy(
     }
     else
     {
-        ASSERT(mfn_valid(act->frame));
+        ASSERT(mfn_valid(_mfn(act->frame)));
         *page = mfn_to_page(act->frame);
         td = page_get_owner_and_reference(*page);
         /*
@@ -2935,7 +2935,7 @@ static int __gnttab_cache_flush(gnttab_cache_flush_t *cflush,
     d = rcu_lock_current_domain();
     mfn = cflush->a.dev_bus_addr >> PAGE_SHIFT;
 
-    if ( !mfn_valid(mfn) )
+    if ( !mfn_valid(_mfn(mfn)) )
     {
         rcu_unlock_domain(d);
         return -EINVAL;

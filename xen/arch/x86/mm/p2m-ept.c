@@ -70,7 +70,7 @@ static int atomic_write_ept_entry(ept_entry_t *entryptr, ept_entry_t new,
         {
             struct domain *fdom;
 
-            if ( !mfn_valid(new.mfn) )
+            if ( !mfn_valid(_mfn(new.mfn)) )
                 goto out;
 
             rc = -ESRCH;
@@ -776,7 +776,7 @@ ept_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
         ept_entry = table + (gfn_remainder >> (i * EPT_TABLE_ORDER));
     }
 
-    if ( mfn_valid(mfn_x(mfn)) || p2m_allows_invalid_mfn(p2mt) )
+    if ( mfn_valid(mfn) || p2m_allows_invalid_mfn(p2mt) )
     {
         int emt = epte_get_entry_emt(p2m->domain, gfn, mfn,
                                      i * EPT_TABLE_ORDER, &ipat, direct_mmio);

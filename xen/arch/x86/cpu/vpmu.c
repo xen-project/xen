@@ -634,7 +634,7 @@ static void pvpmu_finish(struct domain *d, xen_pmu_params_t *params)
     if ( xenpmu_data )
     {
         mfn = domain_page_map_to_mfn(xenpmu_data);
-        ASSERT(mfn_valid(mfn));
+        ASSERT(mfn_valid(_mfn(mfn)));
         unmap_domain_page_global(xenpmu_data);
         put_page_and_type(mfn_to_page(mfn));
     }

@@ -268,7 +268,8 @@ void __init discard_initial_modules(void)
         if ( mi->module[i].kind == BOOTMOD_XEN )
             continue;
 
-        if ( !mfn_valid(paddr_to_pfn(s)) || !mfn_valid(paddr_to_pfn(e)))
+        if ( !mfn_valid(_mfn(paddr_to_pfn(s))) ||
+             !mfn_valid(_mfn(paddr_to_pfn(e))))
             continue;
 
         dt_unreserved_regions(s, e, init_domheap_pages, 0);

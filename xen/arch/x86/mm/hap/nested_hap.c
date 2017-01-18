@@ -71,8 +71,6 @@
 /*        NESTED VIRT P2M FUNCTIONS         */
 /********************************************/
 /* Override macros from asm/page.h to make them work with mfn_t */
-#undef mfn_valid
-#define mfn_valid(_mfn) __mfn_valid(mfn_x(_mfn))
 #undef page_to_mfn
 #define page_to_mfn(_pg) _mfn(__page_to_mfn(_pg))
 

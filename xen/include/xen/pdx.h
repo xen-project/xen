@@ -21,7 +21,7 @@ extern void set_pdx_range(unsigned long smfn, unsigned long emfn);
 #define page_to_pdx(pg)  ((pg) - frame_table)
 #define pdx_to_page(pdx) (frame_table + (pdx))
 
-extern int __mfn_valid(unsigned long mfn);
+bool __mfn_valid(unsigned long mfn);
 
 static inline unsigned long pfn_to_pdx(unsigned long pfn)
 {

@@ -648,7 +648,7 @@ static void p2m_put_l3_page(const lpae_t pte)
     {
         unsigned long mfn = pte.p2m.base;
 
-        ASSERT(mfn_valid(mfn));
+        ASSERT(mfn_valid(_mfn(mfn)));
         put_page(mfn_to_page(mfn));
     }
 }
@@ -695,7 +695,7 @@ static void p2m_free_entry(struct p2m_domain *p2m,
         p2m_flush_tlb_sync(p2m);
 
     mfn = _mfn(entry.p2m.base);
-    ASSERT(mfn_valid(mfn_x(mfn)));
+    ASSERT(mfn_valid(mfn));
 
     free_domheap_page(mfn_to_page(mfn_x(mfn)));
 }
@@ -1412,7 +1412,7 @@ struct page_info *get_page_from_gva(struct vcpu *v, vaddr_t va,
     if ( rc )
         goto err;
 
-    if ( !mfn_valid(maddr >> PAGE_SHIFT) )
+    if ( !mfn_valid(_mfn(maddr >> PAGE_SHIFT)) )
         goto err;
 
     page = mfn_to_page(maddr >> PAGE_SHIFT);

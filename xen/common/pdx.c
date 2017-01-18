@@ -31,7 +31,7 @@ unsigned int __read_mostly pfn_pdx_hole_shift = 0;
 unsigned long __read_mostly pdx_group_valid[BITS_TO_LONGS(
     (FRAMETABLE_NR + PDX_GROUP_COUNT - 1) / PDX_GROUP_COUNT)] = { [0] = 1 };
 
-int __mfn_valid(unsigned long mfn)
+bool __mfn_valid(unsigned long mfn)
 {
     return likely(mfn < max_page) &&
            likely(!(mfn & pfn_hole_mask)) &&

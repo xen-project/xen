@@ -345,7 +345,7 @@ void __init arch_init_memory(void)
         /* Mark as I/O up to next RAM region. */
         for ( ; pfn < rstart_pfn; pfn++ )
         {
-            if ( !mfn_valid(pfn) )
+            if ( !mfn_valid(_mfn(pfn)) )
                 continue;
             share_xen_page_with_guest(
                 mfn_to_page(pfn), dom_io, XENSHARE_writable);
@@ -689,7 +689,7 @@ static int get_page_from_pagenr(unsigned long page_nr, struct domain *d)
 {
     struct page_info *page = mfn_to_page(page_nr);
 
-    if ( unlikely(!mfn_valid(page_nr)) || unlikely(!get_page(page, d)) )
+    if ( unlikely(!mfn_valid(_mfn(page_nr))) || unlikely(!get_page(page, d)) )
     {
         MEM_LOG("Could not get page ref for pfn %lx", page_nr);
         return 0;
@@ -792,7 +792,7 @@ bool is_iomem_page(mfn_t mfn)
 {
     struct page_info *page;
 
-    if ( !mfn_valid(mfn_x(mfn)) )
+    if ( !mfn_valid(mfn) )
         return true;
 
     /* Caller must know that it is an iomem page, or a reference is held. */
@@ -880,13 +880,13 @@ get_page_from_l1e(
         return -EINVAL;
     }
 
-    if ( !mfn_valid(mfn) ||
+    if ( !mfn_valid(_mfn(mfn)) ||
          (real_pg_owner = page_get_owner_and_reference(page)) == dom_io )
     {
         int flip = 0;
 
         /* Only needed the reference to confirm dom_io ownership. */
-        if ( mfn_valid(mfn) )
+        if ( mfn_valid(_mfn(mfn)) )
             put_page(page);
 
         /* DOMID_IO reverts to caller for privilege checks. */
@@ -2764,7 +2764,7 @@ int get_superpage(unsigned long mfn, struct domain *d)
 
     ASSERT(opt_allow_superpage);
 
-    if ( !mfn_valid(mfn | (L1_PAGETABLE_ENTRIES - 1)) )
+    if ( !mfn_valid(_mfn(mfn | (L1_PAGETABLE_ENTRIES - 1))) )
         return -EINVAL;
 
     spage = mfn_to_spage(mfn);
@@ -3579,7 +3579,7 @@ long do_mmuext_op(
                 MEM_LOG("Unaligned superpage reference mfn %lx", mfn);
                 rc = -EINVAL;
             }
-            else if ( !mfn_valid(mfn | (L1_PAGETABLE_ENTRIES - 1)) )
+            else if ( !mfn_valid(_mfn(mfn | (L1_PAGETABLE_ENTRIES - 1))) )
                 rc = -EINVAL;
             else if ( op.cmd == MMUEXT_MARK_SUPER )
                 rc = mark_superpage(mfn_to_spage(mfn), d);
@@ -4865,7 +4865,7 @@ int xenmem_add_to_physmap_one(
 
     /* Remove previously mapped page if it was present. */
     prev_mfn = mfn_x(get_gfn(d, gfn_x(gpfn), &p2mt));
-    if ( mfn_valid(prev_mfn) )
+    if ( mfn_valid(_mfn(prev_mfn)) )
     {
         if ( is_xen_heap_mfn(prev_mfn) )
             /* Xen heap frames are simply unhooked from this phys slot. */
@@ -5215,7 +5215,7 @@ static int ptwr_emulated_update(
 
     /* We are looking only for read-only mappings of p.t. pages. */
     ASSERT((l1e_get_flags(pte) & (_PAGE_RW|_PAGE_PRESENT)) == _PAGE_PRESENT);
-    ASSERT(mfn_valid(mfn));
+    ASSERT(mfn_valid(_mfn(mfn)));
     ASSERT((page->u.inuse.type_info & PGT_type_mask) == PGT_l1_page_table);
     ASSERT((page->u.inuse.type_info & PGT_count_mask) != 0);
     ASSERT(page_get_owner(page) == d);
@@ -5539,7 +5539,7 @@ int mmio_ro_do_page_fault(struct vcpu *v, unsigned long addr,
         return 0;
 
     mfn = l1e_get_pfn(pte);
-    if ( mfn_valid(mfn) )
+    if ( mfn_valid(_mfn(mfn)) )
     {
         struct page_info *page = mfn_to_page(mfn);
         struct domain *owner = page_get_owner_and_reference(page);

@@ -179,47 +179,47 @@ void show_page_walk(unsigned long addr)
     l4e = l4t[l4_table_offset(addr)];
     unmap_domain_page(l4t);
     mfn = l4e_get_pfn(l4e);
-    pfn = mfn_valid(mfn) && machine_to_phys_mapping_valid ?
+    pfn = mfn_valid(_mfn(mfn)) && machine_to_phys_mapping_valid ?
           get_gpfn_from_mfn(mfn) : INVALID_M2P_ENTRY;
     printk(" L4[0x%03lx] = %"PRIpte" %016lx\n",
            l4_table_offset(addr), l4e_get_intpte(l4e), pfn);
     if ( !(l4e_get_flags(l4e) & _PAGE_PRESENT) ||
-         !mfn_valid(mfn) )
+         !mfn_valid(_mfn(mfn)) )
         return;
 
     l3t = map_domain_page(_mfn(mfn));
     l3e = l3t[l3_table_offset(addr)];
     unmap_domain_page(l3t);
     mfn = l3e_get_pfn(l3e);
-    pfn = mfn_valid(mfn) && machine_to_phys_mapping_valid ?
+    pfn = mfn_valid(_mfn(mfn)) && machine_to_phys_mapping_valid ?
           get_gpfn_from_mfn(mfn) : INVALID_M2P_ENTRY;
     printk(" L3[0x%03lx] = %"PRIpte" %016lx%s\n",
            l3_table_offset(addr), l3e_get_intpte(l3e), pfn,
            (l3e_get_flags(l3e) & _PAGE_PSE) ? " (PSE)" : "");
     if ( !(l3e_get_flags(l3e) & _PAGE_PRESENT) ||
          (l3e_get_flags(l3e) & _PAGE_PSE) ||
-         !mfn_valid(mfn) )
+         !mfn_valid(_mfn(mfn)) )
         return;
 
     l2t = map_domain_page(_mfn(mfn));
     l2e = l2t[l2_table_offset(addr)];
     unmap_domain_page(l2t);
     mfn = l2e_get_pfn(l2e);
-    pfn = mfn_valid(mfn) && machine_to_phys_mapping_valid ?
+    pfn = mfn_valid(_mfn(mfn)) && machine_to_phys_mapping_valid ?
           get_gpfn_from_mfn(mfn) : INVALID_M2P_ENTRY;
     printk(" L2[0x%03lx] = %"PRIpte" %016lx %s\n",
            l2_table_offset(addr), l2e_get_intpte(l2e), pfn,
            (l2e_get_flags(l2e) & _PAGE_PSE) ? "(PSE)" : "");
     if ( !(l2e_get_flags(l2e) & _PAGE_PRESENT) ||
          (l2e_get_flags(l2e) & _PAGE_PSE) ||
-         !mfn_valid(mfn) )
+         !mfn_valid(_mfn(mfn)) )
         return;
 
     l1t = map_domain_page(_mfn(mfn));
     l1e = l1t[l1_table_offset(addr)];
     unmap_domain_page(l1t);
     mfn = l1e_get_pfn(l1e);
-    pfn = mfn_valid(mfn) && machine_to_phys_mapping_valid ?
+    pfn = mfn_valid(_mfn(mfn)) && machine_to_phys_mapping_valid ?
           get_gpfn_from_mfn(mfn) : INVALID_M2P_ENTRY;
     printk(" L1[0x%03lx] = %"PRIpte" %016lx\n",
            l1_table_offset(addr), l1e_get_intpte(l1e), pfn);

@@ -128,7 +128,7 @@ extern vaddr_t xenheap_virt_start;
 #else
 #define is_xen_heap_page(page) ((page)->count_info & PGC_xen_heap)
 #define is_xen_heap_mfn(mfn) \
-    (mfn_valid(mfn) && is_xen_heap_page(__mfn_to_page(mfn)))
+    (mfn_valid(_mfn(mfn)) && is_xen_heap_page(__mfn_to_page(mfn)))
 #endif
 
 #define is_xen_fixed_mfn(mfn)                                   \
@@ -194,7 +194,7 @@ static inline void __iomem *ioremap_wc(paddr_t start, size_t len)
 
 /* XXX -- account for base */
 #define mfn_valid(mfn)        ({                                              \
-    unsigned long __m_f_n = (mfn);                                            \
+    unsigned long __m_f_n = mfn_x(mfn);                                       \
     likely(pfn_to_pdx(__m_f_n) >= frametable_base_pdx && __mfn_valid(__m_f_n)); \
 })
 

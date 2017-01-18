@@ -172,7 +172,7 @@ p2m_mem_access_check_and_get_page(vaddr_t gva, unsigned long flag,
     if ( mfn_eq(mfn, INVALID_MFN) )
         goto err;
 
-    if ( !mfn_valid(mfn_x(mfn)) )
+    if ( !mfn_valid(mfn) )
         goto err;
 
     /*

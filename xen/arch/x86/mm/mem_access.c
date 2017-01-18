@@ -196,14 +196,14 @@ int p2m_set_altp2m_mem_access(struct domain *d, struct p2m_domain *hp2m,
     mfn = ap2m->get_entry(ap2m, gfn_l, &t, &old_a, 0, NULL, NULL);
 
     /* Check host p2m if no valid entry in alternate */
-    if ( !mfn_valid(mfn_x(mfn)) )
+    if ( !mfn_valid(mfn) )
     {
 
         mfn = __get_gfn_type_access(hp2m, gfn_l, &t, &old_a,
                                     P2M_ALLOC | P2M_UNSHARE, &page_order, 0);
 
         rc = -ESRCH;
-        if ( !mfn_valid(mfn_x(mfn)) || t != p2m_ram_rw )
+        if ( !mfn_valid(mfn) || t != p2m_ram_rw )
             return rc;
 
         /* If this is a superpage, copy that first */

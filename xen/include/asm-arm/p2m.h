@@ -292,7 +292,7 @@ static inline struct page_info *get_page_from_gfn(
     if ( !p2m_is_any_ram(p2mt) )
         return NULL;
 
-    if ( !mfn_valid(mfn) )
+    if ( !mfn_valid(_mfn(mfn)) )
         return NULL;
     page = mfn_to_page(mfn);
 

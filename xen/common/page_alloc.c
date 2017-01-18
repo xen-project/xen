@@ -985,7 +985,7 @@ static void free_heap_pages(
         if ( (page_to_mfn(pg) & mask) )
         {
             /* Merge with predecessor block? */
-            if ( !mfn_valid(page_to_mfn(pg-mask)) ||
+            if ( !mfn_valid(_mfn(page_to_mfn(pg-mask))) ||
                  !page_state_is(pg-mask, free) ||
                  (PFN_ORDER(pg-mask) != order) ||
                  (phys_to_nid(page_to_maddr(pg-mask)) != node) )
@@ -996,7 +996,7 @@ static void free_heap_pages(
         else
         {
             /* Merge with successor block? */
-            if ( !mfn_valid(page_to_mfn(pg+mask)) ||
+            if ( !mfn_valid(_mfn(page_to_mfn(pg+mask))) ||
                  !page_state_is(pg+mask, free) ||
                  (PFN_ORDER(pg+mask) != order) ||
                  (phys_to_nid(page_to_maddr(pg+mask)) != node) )
@@ -1082,7 +1082,7 @@ int offline_page(unsigned long mfn, int broken, uint32_t *status)
     struct domain *owner;
     struct page_info *pg;
 
-    if ( !mfn_valid(mfn) )
+    if ( !mfn_valid(_mfn(mfn)) )
     {
         dprintk(XENLOG_WARNING,
                 "try to offline page out of range %lx\n", mfn);
@@ -1191,7 +1191,7 @@ unsigned int online_page(unsigned long mfn, uint32_t *status)
     struct page_info *pg;
     int ret;
 
-    if ( !mfn_valid(mfn) )
+    if ( !mfn_valid(_mfn(mfn)) )
     {
         dprintk(XENLOG_WARNING, "call expand_pages() first\n");
         return -EINVAL;
@@ -1242,7 +1242,7 @@ int query_page_offline(unsigned long mfn, uint32_t *status)
 {
     struct page_info *pg;
 
-    if ( !mfn_valid(mfn) || !page_is_ram_type(mfn, RAM_TYPE_CONVENTIONAL) )
+    if ( !mfn_valid(_mfn(mfn)) || !page_is_ram_type(mfn, RAM_TYPE_CONVENTIONAL) )
     {
         dprintk(XENLOG_WARNING, "call expand_pages() first\n");
         return -EINVAL;
@@ -1412,7 +1412,7 @@ static void __init smp_scrub_heap_pages(void *data)
         pg = mfn_to_page(mfn);
 
         /* Check the mfn is valid and page is free. */
-        if ( !mfn_valid(mfn) || !page_state_is(pg, free) )
+        if ( !mfn_valid(_mfn(mfn)) || !page_state_is(pg, free) )
             continue;
 
         scrub_one_page(pg);

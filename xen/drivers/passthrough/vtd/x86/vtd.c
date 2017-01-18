@@ -129,7 +129,7 @@ void __hwdom_init vtd_set_hwdom_mapping(struct domain *d)
         unsigned long pfn = pdx_to_pfn(i);
 
         if ( pfn > (0xffffffffUL >> PAGE_SHIFT) ?
-             (!mfn_valid(pfn) ||
+             (!mfn_valid(_mfn(pfn)) ||
               !page_is_ram_type(pfn, RAM_TYPE_CONVENTIONAL)) :
              iommu_inclusive_mapping ?
              page_is_ram_type(pfn, RAM_TYPE_UNUSABLE) :

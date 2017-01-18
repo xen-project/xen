@@ -150,7 +150,7 @@ dbg_pv_va2mfn(dbgva_t vaddr, struct domain *dp, uint64_t pgd3val)
     DBGP2("l1t:%p l1to:%lx l1e:%lx mfn:%#"PRI_mfn"\n", l1t, l1_table_offset(vaddr),
           l1e, mfn_x(mfn));
 
-    return mfn_valid(mfn_x(mfn)) ? mfn : INVALID_MFN;
+    return mfn_valid(mfn) ? mfn : INVALID_MFN;
 }
 
 /* Returns: number of bytes remaining to be copied */

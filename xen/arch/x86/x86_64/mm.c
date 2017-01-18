@@ -65,7 +65,7 @@ void *do_page_walk(struct vcpu *v, unsigned long addr)
     l3e = l3t[l3_table_offset(addr)];
     unmap_domain_page(l3t);
     mfn = l3e_get_pfn(l3e);
-    if ( !(l3e_get_flags(l3e) & _PAGE_PRESENT) || !mfn_valid(mfn) )
+    if ( !(l3e_get_flags(l3e) & _PAGE_PRESENT) || !mfn_valid(_mfn(mfn)) )
         return NULL;
     if ( (l3e_get_flags(l3e) & _PAGE_PSE) )
     {
@@ -77,7 +77,7 @@ void *do_page_walk(struct vcpu *v, unsigned long addr)
     l2e = l2t[l2_table_offset(addr)];
     unmap_domain_page(l2t);
     mfn = l2e_get_pfn(l2e);
-    if ( !(l2e_get_flags(l2e) & _PAGE_PRESENT) || !mfn_valid(mfn) )
+    if ( !(l2e_get_flags(l2e) & _PAGE_PRESENT) || !mfn_valid(_mfn(mfn)) )
         return NULL;
     if ( (l2e_get_flags(l2e) & _PAGE_PSE) )
     {
@@ -89,7 +89,7 @@ void *do_page_walk(struct vcpu *v, unsigned long addr)
     l1e = l1t[l1_table_offset(addr)];
     unmap_domain_page(l1t);
     mfn = l1e_get_pfn(l1e);
-    if ( !(l1e_get_flags(l1e) & _PAGE_PRESENT) || !mfn_valid(mfn) )
+    if ( !(l1e_get_flags(l1e) & _PAGE_PRESENT) || !mfn_valid(_mfn(mfn)) )
         return NULL;
 
  ret:
@@ -366,7 +366,7 @@ static int setup_compat_m2p_table(struct mem_hotadd_info *info)
             continue;
 
         for ( n = 0; n < CNT; ++n)
-            if ( mfn_valid(i + n * PDX_GROUP_COUNT) )
+            if ( mfn_valid(_mfn(i + n * PDX_GROUP_COUNT)) )
                 break;
         if ( n == CNT )
             continue;
@@ -436,7 +436,7 @@ static int setup_m2p_table(struct mem_hotadd_info *info)
         va = RO_MPT_VIRT_START + i * sizeof(*machine_to_phys_mapping);
 
         for ( n = 0; n < CNT; ++n)
-            if ( mfn_valid(i + n * PDX_GROUP_COUNT) )
+            if ( mfn_valid(_mfn(i + n * PDX_GROUP_COUNT)) )
                 break;
         if ( n < CNT )
         {
@@ -554,7 +554,7 @@ void __init paging_init(void)
             for ( holes = k = 0; k < 1 << PAGETABLE_ORDER; ++k)
             {
                 for ( n = 0; n < CNT; ++n)
-                    if ( mfn_valid(MFN(i + k) + n * PDX_GROUP_COUNT) )
+                    if ( mfn_valid(_mfn(MFN(i + k) + n * PDX_GROUP_COUNT)) )
                         break;
                 if ( n == CNT )
                     ++holes;
@@ -587,7 +587,7 @@ void __init paging_init(void)
         }
 
         for ( n = 0; n < CNT; ++n)
-            if ( mfn_valid(MFN(i) + n * PDX_GROUP_COUNT) )
+            if ( mfn_valid(_mfn(MFN(i) + n * PDX_GROUP_COUNT)) )
                 break;
         if ( n == CNT )
             l1_pg = NULL;
@@ -653,7 +653,7 @@ void __init paging_init(void)
         memflags = MEMF_node(phys_to_nid(i <<
             (L2_PAGETABLE_SHIFT - 2 + PAGE_SHIFT)));
         for ( n = 0; n < CNT; ++n)
-            if ( mfn_valid(MFN(i) + n * PDX_GROUP_COUNT) )
+            if ( mfn_valid(_mfn(MFN(i) + n * PDX_GROUP_COUNT)) )
                 break;
         if ( n == CNT )
             continue;
