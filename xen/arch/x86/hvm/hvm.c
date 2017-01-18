@@ -5339,16 +5339,23 @@ static int hvmop_get_param(
     case HVM_PARAM_IOREQ_PFN:
     case HVM_PARAM_BUFIOREQ_PFN:
     case HVM_PARAM_BUFIOREQ_EVTCHN:
-    {
-        domid_t domid;
+        /*
+         * It may be necessary to create a default ioreq server here,
+         * because legacy versions of QEMU are not aware of the new API for
+         * explicit ioreq server creation. However, if the domain is not
+         * under construction then it will not be QEMU querying the
+         * parameters and thus the query should not have that side-effect.
+         */
+        if ( !d->creation_finished )
+        {
+            domid_t domid = d->arch.hvm_domain.params[HVM_PARAM_DM_DOMAIN];
 
-        /* May need to create server. */
-        domid = d->arch.hvm_domain.params[HVM_PARAM_DM_DOMAIN];
-        rc = hvm_create_ioreq_server(d, domid, 1,
-                                     HVM_IOREQSRV_BUFIOREQ_LEGACY, NULL);
-        if ( rc != 0 && rc != -EEXIST )
-            goto out;
-    }
+            rc = hvm_create_ioreq_server(d, domid, 1,
+                                         HVM_IOREQSRV_BUFIOREQ_LEGACY, NULL);
+            if ( rc != 0 && rc != -EEXIST )
+                goto out;
+        }
+
     /*FALLTHRU*/
     default:
         a.value = d->arch.hvm_domain.params[a.index];
