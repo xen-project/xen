@@ -79,7 +79,7 @@ elf_errorstatus elf_init(struct elf_binary *elf, const char *image_input, size_t
 
     /* Find symbol table and symbol string table. */
     count = elf_shdr_count(elf);
-    for ( i = 0; i < count; i++ )
+    for ( i = 1; i < count; i++ )
     {
         shdr = elf_shdr_by_index(elf, i);
         if ( !elf_access_ok(elf, ELF_HANDLE_PTRVAL(shdr), 1) )

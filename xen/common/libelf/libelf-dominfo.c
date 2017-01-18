@@ -536,7 +536,7 @@ elf_errorstatus elf_xen_parse(struct elf_binary *elf,
     if ( xen_elfnotes == 0 )
     {
         count = elf_shdr_count(elf);
-        for ( i = 0; i < count; i++ )
+        for ( i = 1; i < count; i++ )
         {
             shdr = elf_shdr_by_index(elf, i);
             if ( !elf_access_ok(elf, ELF_HANDLE_PTRVAL(shdr), 1) )
