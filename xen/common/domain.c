@@ -1004,13 +1004,6 @@ int domain_unpause_by_systemcontroller(struct domain *d)
 {
     int old, new, prev = d->controller_pause_count;
 
-    /*
-     * We record this information here for populate_physmap to figure out
-     * that the domain has finished being created. In fact, we're only
-     * allowed to set the MEMF_no_tlbflush flag during VM creation.
-     */
-    d->creation_finished = true;
-
     do
     {
         old = prev;
@@ -1021,6 +1014,20 @@ int domain_unpause_by_systemcontroller(struct domain *d)
 
         prev = cmpxchg(&d->controller_pause_count, old, new);
     } while ( prev != old );
+
+    /*
+     * d->controller_pause_count is initialised to 1, and the toolstack is
+     * responsible for making one unpause hypercall when it wishes the guest
+     * to start running.
+     *
+     * All other toolstack operations should make a pair of pause/unpause
+     * calls and rely on the reference counting here.
+     *
+     * Creation is considered finished when the controller reference count
+     * first drops to 0.
+     */
+    if ( new == 0 )
+        d->creation_finished = true;
 
     domain_unpause(d);
 
