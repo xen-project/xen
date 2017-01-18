@@ -4004,12 +4004,17 @@ x86_emulate(
                                          x86_seg_idtr : x86_seg_gdtr,
                                          &reg, ctxt)) )
                 goto done;
-            if ( op_bytes == 2 )
+            if ( mode_64bit() )
+                op_bytes = 8;
+            else if ( op_bytes == 2 )
+            {
                 reg.base &= 0xffffff;
-            if ( (rc = ops->write(ea.mem.seg, ea.mem.off+0,
-                                  &reg.limit, 2, ctxt)) ||
-                 (rc = ops->write(ea.mem.seg, ea.mem.off+2,
-                                  &reg.base, mode_64bit() ? 8 : 4, ctxt)) )
+                op_bytes = 4;
+            }
+            if ( (rc = ops->write(ea.mem.seg, ea.mem.off, &reg.limit,
+                                  2, ctxt)) != X86EMUL_OKAY ||
+                 (rc = ops->write(ea.mem.seg, ea.mem.off + 2, &reg.base,
+                                  op_bytes, ctxt)) != X86EMUL_OKAY )
                 goto done;
             break;
         case 2: /* lgdt */
@@ -4026,7 +4031,7 @@ x86_emulate(
             generate_exception_if(!is_canonical_address(base), EXC_GP, 0);
             reg.base = base;
             reg.limit = limit;
-            if ( op_bytes == 2 )
+            if ( !mode_64bit() && op_bytes == 2 )
                 reg.base &= 0xffffff;
             if ( (rc = ops->write_segment((modrm_reg & 1) ?
                                           x86_seg_idtr : x86_seg_gdtr,
