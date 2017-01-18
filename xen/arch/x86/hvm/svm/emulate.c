@@ -65,18 +65,18 @@ static unsigned long svm_nextrip_insn_length(struct vcpu *v)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
 
-    if ( !cpu_has_svm_nrips || (vmcb->nextrip <= vmcb->rip) )
+    if ( !cpu_has_svm_nrips )
         return 0;
 
 #ifndef NDEBUG
     switch ( vmcb->exitcode )
     {
-    case VMEXIT_CR0_READ... VMEXIT_DR15_WRITE:
+    case VMEXIT_CR0_READ ... VMEXIT_DR15_WRITE:
         /* faults due to instruction intercepts */
         /* (exitcodes 84-95) are reserved */
     case VMEXIT_IDTR_READ ... VMEXIT_TR_WRITE:
     case VMEXIT_RDTSC ... VMEXIT_MSR:
-    case VMEXIT_VMRUN ...  VMEXIT_XSETBV:
+    case VMEXIT_VMRUN ... VMEXIT_XSETBV:
         /* ...and the rest of the #VMEXITs */
     case VMEXIT_CR0_SEL_WRITE:
     case VMEXIT_EXCEPTION_BP:
@@ -156,14 +156,16 @@ int __get_instruction_length_from_list(struct vcpu *v,
         const enum instruction_index *list, unsigned int list_count)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
-    unsigned int i, j, inst_len = 0;
+    unsigned int i, j;
     enum instruction_index instr = 0;
     u8 buf[MAX_INST_LEN];
     const u8 *opcode = NULL;
-    unsigned long fetch_addr, fetch_limit;
+    unsigned long fetch_addr, fetch_limit, inst_len;
     unsigned int fetch_len, max_len;
 
-    if ( (inst_len = svm_nextrip_insn_length(v)) != 0 )
+    if ( (inst_len = svm_nextrip_insn_length(v)) > MAX_INST_LEN )
+        gprintk(XENLOG_WARNING, "NRip reported inst_len %lu\n", inst_len);
+    else if ( inst_len != 0 )
         return inst_len;
 
     if ( vmcb->exitcode == VMEXIT_IOIO )
@@ -180,7 +182,7 @@ int __get_instruction_length_from_list(struct vcpu *v,
     if ( !fetch(vmcb, buf, fetch_addr, fetch_len) )
         return 0;
 
-    while ( (inst_len < max_len) && is_prefix(buf[inst_len]) )
+    for ( inst_len = 0; (inst_len < max_len) && is_prefix(buf[inst_len]); )
     {
         inst_len++;
         if ( inst_len >= fetch_len )
