@@ -4296,9 +4296,8 @@ x86_emulate(
     }
 
     case 0x40 ... 0x4f: /* cmovcc */
-        dst.val = src.val;
-        if ( !test_cc(b, _regs.eflags) )
-            dst.type = OP_NONE;
+        if ( test_cc(b, _regs.eflags) )
+            dst.val = src.val;
         break;
 
     case 0x34: /* sysenter */ {
