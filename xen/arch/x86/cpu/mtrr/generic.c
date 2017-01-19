@@ -560,7 +560,7 @@ static int generic_have_wrcomb(void)
 /* generic structure...
  */
 const struct mtrr_ops generic_mtrr_ops = {
-	.use_intel_if      = 1,
+	.use_intel_if      = true,
 	.set_all	   = generic_set_all,
 	.get               = generic_get_mtrr,
 	.get_free_region   = generic_get_free_region,

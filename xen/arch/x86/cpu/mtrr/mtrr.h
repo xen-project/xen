@@ -9,7 +9,7 @@
 
 struct mtrr_ops {
 	u32	vendor;
-	u32	use_intel_if;
+	bool	use_intel_if;
 //	void	(*init)(void);
 	void	(*set)(unsigned int reg, unsigned long base,
 		       unsigned long size, mtrr_type type);
@@ -39,7 +39,7 @@ extern u64 size_or_mask, size_and_mask;
 extern const struct mtrr_ops *mtrr_if;
 
 #define is_cpu(vnd)	(mtrr_if && mtrr_if->vendor == X86_VENDOR_##vnd)
-#define use_intel()	(mtrr_if && mtrr_if->use_intel_if == 1)
+#define use_intel()	(mtrr_if && mtrr_if->use_intel_if)
 
 extern unsigned int num_var_ranges;
 
