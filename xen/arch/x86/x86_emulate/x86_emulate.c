@@ -986,7 +986,7 @@ static inline void put_loop_count(
             if ( using_si ) _regs.r(si) = _regs._esi;                   \
             if ( using_di ) _regs.r(di) = _regs._edi;                   \
         }                                                               \
-        goto no_writeback;                                              \
+        goto complete_insn;                                             \
     }                                                                   \
     if ( max_reps > 1 && (_regs._eflags & EFLG_TF) &&                   \
          !is_branch_step(ctxt, ops) )                                   \
@@ -1015,7 +1015,7 @@ static void __put_rep_prefix(
     {                                                                   \
         __put_rep_prefix(&_regs, ctxt->regs, ad_bytes, reps_completed); \
         if ( unlikely(rc == X86EMUL_EXCEPTION) )                        \
-            goto no_writeback;                                          \
+            goto complete_insn;                                         \
     }                                                                   \
 })
 
@@ -2692,7 +2692,7 @@ x86_emulate(
         state.caller = NULL;
 #endif
         if ( rc == X86EMUL_DONE )
-            goto no_writeback;
+            goto complete_insn;
         if ( rc != X86EMUL_OKAY )
             return rc;
     }
@@ -4298,7 +4298,7 @@ x86_emulate(
         if ( rc != 0 )
         {
             if ( rc == X86EMUL_DONE )
-                goto no_writeback;
+                goto complete_insn;
             goto done;
         }
         break;
@@ -4674,7 +4674,7 @@ x86_emulate(
             _regs._eflags &= ~EFLG_AC;
             if ( modrm == 0xcb )
                 _regs._eflags |= EFLG_AC;
-            goto no_writeback;
+            goto complete_insn;
 
 #ifdef __XEN__
         case 0xd1: /* xsetbv */
@@ -4686,7 +4686,7 @@ x86_emulate(
                                   handle_xsetbv(_regs._ecx,
                                                 _regs._eax | (_regs.rdx << 32)),
                                   EXC_GP, 0);
-            goto no_writeback;
+            goto complete_insn;
 #endif
 
         case 0xd4: /* vmfunc */
@@ -4695,7 +4695,7 @@ x86_emulate(
             fail_if(!ops->vmfunc);
             if ( (rc = ops->vmfunc(ctxt)) != X86EMUL_OKAY )
                 goto done;
-            goto no_writeback;
+            goto complete_insn;
 
         case 0xd5: /* xend */
             generate_exception_if(vex.pfx, EXC_UD);
@@ -4709,7 +4709,7 @@ x86_emulate(
                                   EXC_UD);
             /* Neither HLE nor RTM can be active when we get here. */
             _regs._eflags |= EFLG_ZF;
-            goto no_writeback;
+            goto complete_insn;
 
         case 0xdf: /* invlpga */
             generate_exception_if(!in_protmode(ctxt, ops), EXC_UD);
@@ -4718,7 +4718,7 @@ x86_emulate(
             if ( (rc = ops->invlpg(x86_seg_none, truncate_ea(_regs.r(ax)),
                                    ctxt)) )
                 goto done;
-            goto no_writeback;
+            goto complete_insn;
 
         case 0xf9: /* rdtscp */
         {
@@ -4766,7 +4766,7 @@ x86_emulate(
                 base += sizeof(zero);
                 limit -= sizeof(zero);
             }
-            goto no_writeback;
+            goto complete_insn;
         }
         }
 
@@ -6233,8 +6233,7 @@ x86_emulate(
         break;
     }
 
- no_writeback: /* Commit shadow register state. */
-
+ complete_insn: /* Commit shadow register state. */
     /* Zero the upper 32 bits of %rip if not in 64-bit mode. */
     if ( !mode_64bit() )
         _regs.r(ip) = _regs._eip;
