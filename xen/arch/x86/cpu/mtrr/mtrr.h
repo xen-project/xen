@@ -31,18 +31,6 @@ extern int generic_validate_add_page(unsigned long base, unsigned long size,
 
 extern const struct mtrr_ops generic_mtrr_ops;
 
-/* library functions for processor-specific routines */
-struct set_mtrr_context {
-	unsigned long flags;
-	unsigned long cr4val;
-	uint64_t deftype;
-	u32 ccr3;
-};
-
-void set_mtrr_done(struct set_mtrr_context *ctxt);
-void set_mtrr_cache_disable(struct set_mtrr_context *ctxt);
-void set_mtrr_prepare_save(struct set_mtrr_context *ctxt);
-
 void get_mtrr_state(void);
 
 extern void set_mtrr_ops(const struct mtrr_ops *);
@@ -56,6 +44,3 @@ extern const struct mtrr_ops *mtrr_if;
 extern unsigned int num_var_ranges;
 
 void mtrr_state_warn(void);
-
-extern int amd_init_mtrr(void);
-extern int cyrix_init_mtrr(void);
