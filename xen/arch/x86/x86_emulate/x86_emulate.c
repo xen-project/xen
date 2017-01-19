@@ -707,7 +707,11 @@ do{ asm volatile (                                                      \
 })
 #define truncate_ea(ea) truncate_word((ea), ad_bytes)
 
-#define mode_64bit() (ctxt->addr_size == 64)
+#ifdef __x86_64__
+# define mode_64bit() (ctxt->addr_size == 64)
+#else
+# define mode_64bit() false
+#endif
 
 #define fail_if(p)                                      \
 do {                                                    \
@@ -1353,6 +1357,7 @@ static bool vcpu_has(
 #define vcpu_has_misalignsse() vcpu_has(0x80000001, ECX,  7, ctxt, ops)
 #define vcpu_has_bmi1()        vcpu_has(         7, EBX,  3, ctxt, ops)
 #define vcpu_has_hle()         vcpu_has(         7, EBX,  4, ctxt, ops)
+#define vcpu_has_bmi2()        vcpu_has(         7, EBX,  8, ctxt, ops)
 #define vcpu_has_rtm()         vcpu_has(         7, EBX, 11, ctxt, ops)
 #define vcpu_has_mpx()         vcpu_has(         7, EBX, 14, ctxt, ops)
 #define vcpu_has_adx()         vcpu_has(         7, EBX, 19, ctxt, ops)
@@ -5897,12 +5902,21 @@ x86_emulate(
 #endif
 
     case X86EMUL_OPC_VEX(0x0f38, 0xf2):    /* andn r/m,r,r */
+    case X86EMUL_OPC_VEX(0x0f38, 0xf5):    /* bzhi r,r/m,r */
+    case X86EMUL_OPC_VEX_F3(0x0f38, 0xf5): /* pext r/m,r,r */
+    case X86EMUL_OPC_VEX_F2(0x0f38, 0xf5): /* pdep r/m,r,r */
     case X86EMUL_OPC_VEX(0x0f38, 0xf7):    /* bextr r,r/m,r */
+    case X86EMUL_OPC_VEX_66(0x0f38, 0xf7): /* shlx r,r/m,r */
+    case X86EMUL_OPC_VEX_F3(0x0f38, 0xf7): /* sarx r,r/m,r */
+    case X86EMUL_OPC_VEX_F2(0x0f38, 0xf7): /* shrx r,r/m,r */
     {
         uint8_t *buf = get_stub(stub);
         typeof(vex) *pvex = container_of(buf + 1, typeof(vex), raw[0]);
 
-        host_and_vcpu_must_have(bmi1);
+        if ( b == 0xf5 || vex.pfx )
+            host_and_vcpu_must_have(bmi2);
+        else
+            host_and_vcpu_must_have(bmi1);
         generate_exception_if(vex.l, EXC_UD);
 
         buf[0] = 0xc4;
@@ -5987,6 +6001,32 @@ x86_emulate(
             _regs._eflags &= ~mask;
         break;
     }
+
+    case X86EMUL_OPC_VEX_F2(0x0f38, 0xf6): /* mulx r/m,r,r */
+        vcpu_must_have(bmi2);
+        generate_exception_if(vex.l, EXC_UD);
+        ea.reg = decode_vex_gpr(vex.reg, &_regs, ctxt);
+        if ( mode_64bit() && vex.w )
+            asm ( "mulq %3" : "=a" (*ea.reg), "=d" (dst.val)
+                            : "0" (src.val), "rm" (_regs.r(dx)) );
+        else
+            asm ( "mull %3" : "=a" (*ea.reg), "=d" (dst.val)
+                            : "0" ((uint32_t)src.val), "rm" (_regs._edx) );
+        break;
+
+    case X86EMUL_OPC_VEX_F2(0x0f3a, 0xf0): /* rorx imm,r/m,r */
+        vcpu_must_have(bmi2);
+        generate_exception_if(vex.l || vex.reg != 0xf, EXC_UD);
+        if ( ea.type == OP_REG )
+            src.val = *ea.reg;
+        else if ( (rc = read_ulong(ea.mem.seg, ea.mem.off, &src.val, op_bytes,
+                                   ctxt, ops)) != X86EMUL_OKAY )
+            goto done;
+        if ( mode_64bit() && vex.w )
+            asm ( "rorq %b1,%0" : "=g" (dst.val) : "c" (imm1), "0" (src.val) );
+        else
+            asm ( "rorl %b1,%k0" : "=g" (dst.val) : "c" (imm1), "0" (src.val) );
+        break;
 
     default:
         goto cannot_emulate;

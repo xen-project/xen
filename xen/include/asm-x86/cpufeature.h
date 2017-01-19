@@ -58,6 +58,7 @@
 #define cpu_has_avx             boot_cpu_has(X86_FEATURE_AVX)
 #define cpu_has_lwp             boot_cpu_has(X86_FEATURE_LWP)
 #define cpu_has_bmi1            boot_cpu_has(X86_FEATURE_BMI1)
+#define cpu_has_bmi2            boot_cpu_has(X86_FEATURE_BMI2)
 #define cpu_has_mpx             boot_cpu_has(X86_FEATURE_MPX)
 #define cpu_has_arch_perfmon    boot_cpu_has(X86_FEATURE_ARCH_PERFMON)
 #define cpu_has_rdtscp          boot_cpu_has(X86_FEATURE_RDTSCP)
