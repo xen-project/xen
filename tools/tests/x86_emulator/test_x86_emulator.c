@@ -158,6 +158,11 @@ static int read_msr(
     case 0xc0000080: /* EFER */
         *val = ctxt->addr_size > 32 ? 0x500 /* LME|LMA */ : 0;
         return X86EMUL_OKAY;
+
+    case 0xc0000103: /* TSC_AUX */
+#define TSC_AUX_VALUE 0xCACACACA
+        *val = TSC_AUX_VALUE;
+        return X86EMUL_OKAY;
     }
 
     return X86EMUL_UNHANDLEABLE;
@@ -1471,6 +1476,16 @@ int main(int argc, char **argv)
     }
     else
         printf("skipped\n");
+
+    printf("%-40s", "Testing rdpid %ecx...");
+    instr[0] = 0xF3; instr[1] = 0x0f; instr[2] = 0xC7; instr[3] = 0xf9;
+    regs.eip = (unsigned long)&instr[0];
+    rc = x86_emulate(&ctxt, &emulops);
+    if ( (rc != X86EMUL_OKAY) ||
+         (regs.ecx != TSC_AUX_VALUE) ||
+         (regs.eip != (unsigned long)&instr[4]) )
+        goto fail;
+    printf("okay\n");
 
     printf("%-40s", "Testing movq %mm3,(%ecx)...");
     if ( stack_exec && cpu_has_mmx )

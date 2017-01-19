@@ -1367,6 +1367,7 @@ static bool vcpu_has(
 #define vcpu_has_smap()        vcpu_has(         7, EBX, 20, ctxt, ops)
 #define vcpu_has_clflushopt()  vcpu_has(         7, EBX, 23, ctxt, ops)
 #define vcpu_has_clwb()        vcpu_has(         7, EBX, 24, ctxt, ops)
+#define vcpu_has_rdpid()       vcpu_has(         7, ECX, 22, ctxt, ops)
 
 #define vcpu_must_have(feat) \
     generate_exception_if(!vcpu_has_##feat(), EXC_UD)
@@ -5800,8 +5801,23 @@ x86_emulate(
                 break;
 #endif
 
+            case 7: /* rdseed / rdpid */
+                if ( repe_prefix() ) /* rdpid */
+                {
+                    uint64_t tsc_aux;
+
+                    generate_exception_if(ea.type != OP_REG, EXC_UD);
+                    vcpu_must_have(rdpid);
+                    fail_if(!ops->read_msr);
+                    if ( (rc = ops->read_msr(MSR_TSC_AUX, &tsc_aux,
+                                             ctxt)) != X86EMUL_OKAY )
+                        goto done;
+                    dst = ea;
+                    dst.val = tsc_aux;
+                    dst.bytes = 4;
+                    break;
+                }
 #ifdef HAVE_GAS_RDSEED
-            case 7: /* rdseed */
                 generate_exception_if(rep_prefix(), EXC_UD);
                 host_and_vcpu_must_have(rdseed);
                 dst = ea;
