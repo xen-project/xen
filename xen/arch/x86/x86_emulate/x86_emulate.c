@@ -1351,6 +1351,7 @@ static bool vcpu_has(
 #define vcpu_has_movbe()       vcpu_has(         1, ECX, 22, ctxt, ops)
 #define vcpu_has_popcnt()      vcpu_has(         1, ECX, 23, ctxt, ops)
 #define vcpu_has_avx()         vcpu_has(         1, ECX, 28, ctxt, ops)
+#define vcpu_has_rdrand()      vcpu_has(         1, ECX, 30, ctxt, ops)
 #define vcpu_has_lahf_lm()     vcpu_has(0x80000001, ECX,  0, ctxt, ops)
 #define vcpu_has_cr8_legacy()  vcpu_has(0x80000001, ECX,  4, ctxt, ops)
 #define vcpu_has_lzcnt()       vcpu_has(0x80000001, ECX,  5, ctxt, ops)
@@ -1361,6 +1362,7 @@ static bool vcpu_has(
 #define vcpu_has_bmi2()        vcpu_has(         7, EBX,  8, ctxt, ops)
 #define vcpu_has_rtm()         vcpu_has(         7, EBX, 11, ctxt, ops)
 #define vcpu_has_mpx()         vcpu_has(         7, EBX, 14, ctxt, ops)
+#define vcpu_has_rdseed()      vcpu_has(         7, EBX, 18, ctxt, ops)
 #define vcpu_has_adx()         vcpu_has(         7, EBX, 19, ctxt, ops)
 #define vcpu_has_smap()        vcpu_has(         7, EBX, 20, ctxt, ops)
 #define vcpu_has_clflushopt()  vcpu_has(         7, EBX, 23, ctxt, ops)
@@ -5754,14 +5756,83 @@ x86_emulate(
         dst.val = src.val;
         break;
 
-    case X86EMUL_OPC(0x0f, 0xc7): /* Grp9 (cmpxchg8b/cmpxchg16b) */ {
+    case X86EMUL_OPC(0x0f, 0xc7): /* Grp9 */
+    {
         union {
             uint32_t u32[2];
             uint64_t u64[2];
         } *old, *aux;
 
+        if ( ea.type == OP_REG )
+        {
+            bool __maybe_unused carry;
+
+            switch ( modrm_reg & 7 )
+            {
+            default:
+                goto cannot_emulate;
+
+#ifdef HAVE_GAS_RDRAND
+            case 6: /* rdrand */
+                generate_exception_if(rep_prefix(), EXC_UD);
+                host_and_vcpu_must_have(rdrand);
+                dst = ea;
+                switch ( op_bytes )
+                {
+                case 2:
+                    asm ( "rdrand %w0" ASM_FLAG_OUT(, "; setc %1")
+                          : "=r" (dst.val), ASM_FLAG_OUT("=@ccc", "=qm") (carry) );
+                    break;
+                default:
+# ifdef __x86_64__
+                    asm ( "rdrand %k0" ASM_FLAG_OUT(, "; setc %1")
+                          : "=r" (dst.val), ASM_FLAG_OUT("=@ccc", "=qm") (carry) );
+                    break;
+                case 8:
+# endif
+                    asm ( "rdrand %0" ASM_FLAG_OUT(, "; setc %1")
+                          : "=r" (dst.val), ASM_FLAG_OUT("=@ccc", "=qm") (carry) );
+                    break;
+                }
+                _regs._eflags &= ~EFLAGS_MASK;
+                if ( carry )
+                    _regs._eflags |= EFLG_CF;
+                break;
+#endif
+
+#ifdef HAVE_GAS_RDSEED
+            case 7: /* rdseed */
+                generate_exception_if(rep_prefix(), EXC_UD);
+                host_and_vcpu_must_have(rdseed);
+                dst = ea;
+                switch ( op_bytes )
+                {
+                case 2:
+                    asm ( "rdseed %w0" ASM_FLAG_OUT(, "; setc %1")
+                          : "=r" (dst.val), ASM_FLAG_OUT("=@ccc", "=qm") (carry) );
+                    break;
+                default:
+# ifdef __x86_64__
+                    asm ( "rdseed %k0" ASM_FLAG_OUT(, "; setc %1")
+                          : "=r" (dst.val), ASM_FLAG_OUT("=@ccc", "=qm") (carry) );
+                    break;
+                case 8:
+# endif
+                    asm ( "rdseed %0" ASM_FLAG_OUT(, "; setc %1")
+                          : "=r" (dst.val), ASM_FLAG_OUT("=@ccc", "=qm") (carry) );
+                    break;
+                }
+                _regs._eflags &= ~EFLAGS_MASK;
+                if ( carry )
+                    _regs._eflags |= EFLG_CF;
+                break;
+#endif
+            }
+            break;
+        }
+
+        /* cmpxchg8b/cmpxchg16b */
         generate_exception_if((modrm_reg & 7) != 1, EXC_UD);
-        generate_exception_if(ea.type != OP_MEM, EXC_UD);
         fail_if(!ops->cmpxchg);
         if ( rex_prefix & REX_W )
         {

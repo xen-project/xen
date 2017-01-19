@@ -14,7 +14,9 @@ $(call cc-option-add,CFLAGS,CC,-Wnested-externs)
 $(call as-insn-check,CFLAGS,CC,"vmcall",-DHAVE_GAS_VMX)
 $(call as-insn-check,CFLAGS,CC,"crc32 %eax$$(comma)%eax",-DHAVE_GAS_SSE4_2)
 $(call as-insn-check,CFLAGS,CC,"invept (%rax)$$(comma)%rax",-DHAVE_GAS_EPT)
+$(call as-insn-check,CFLAGS,CC,"rdrand %eax",-DHAVE_GAS_RDRAND)
 $(call as-insn-check,CFLAGS,CC,"rdfsbase %rax",-DHAVE_GAS_FSGSBASE)
+$(call as-insn-check,CFLAGS,CC,"rdseed %eax",-DHAVE_GAS_RDSEED)
 $(call as-insn-check,CFLAGS,CC,".equ \"x\"$$(comma)1", \
                      -U__OBJECT_LABEL__ -DHAVE_GAS_QUOTED_SYM \
                      '-D__OBJECT_LABEL__=$(subst $(BASEDIR)/,,$(CURDIR))/$$@')
