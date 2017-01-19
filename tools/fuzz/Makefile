@@ -5,7 +5,5 @@ SUBDIRS-y :=
 SUBDIRS-y += libelf
 SUBDIRS-y += x86_instruction_emulator
 
-.PHONY: all clean distclean
-all clean distclean: %: subdirs-%
-
-install:
+.PHONY: all clean distclean install
+all clean distclean install: %: subdirs-%

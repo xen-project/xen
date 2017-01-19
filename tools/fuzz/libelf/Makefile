@@ -29,3 +29,6 @@ distclean: clean
 .PHONY: clean
 clean:
 	rm -f *.o *.a
+
+.PHONY: install
+install: all
