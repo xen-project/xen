@@ -676,6 +676,16 @@ do{ asm volatile (                                                      \
 #define __emulate_1op_8byte(_op, _dst, _eflags)
 #endif /* __i386__ */
 
+#define emulate_stub(dst, src...) do {                                  \
+    unsigned long tmp;                                                  \
+    asm volatile ( _PRE_EFLAGS("[efl]", "[msk]", "[tmp]")               \
+                   "call *%[stub];"                                     \
+                   _POST_EFLAGS("[efl]", "[msk]", "[tmp]")              \
+                   : dst, [tmp] "=&r" (tmp), [efl] "+g" (_regs._eflags) \
+                   : [stub] "r" (stub.func),                            \
+                     [msk] "i" (EFLAGS_MASK), ## src );                 \
+} while (0)
+
 /* Fetch next part of the instruction being emulated. */
 #define insn_fetch_bytes(_size)                                         \
 ({ unsigned long _x = 0, _ip = state->ip;                               \
@@ -1687,6 +1697,12 @@ decode_register(
     return p;
 }
 
+static void *decode_vex_gpr(unsigned int vex_reg, struct cpu_user_regs *regs,
+                            const struct x86_emulate_ctxt *ctxt)
+{
+    return decode_register(~vex_reg & (mode_64bit() ? 0xf : 7), regs, 0);
+}
+
 static bool is_aligned(enum x86_segment seg, unsigned long offs,
                        unsigned int size, struct x86_emulate_ctxt *ctxt,
                        const struct x86_emulate_ops *ops)
@@ -2320,7 +2336,10 @@ x86_decode(
                         }
                     }
                     else
+                    {
+                        ASSERT(op_bytes == 4);
                         vex.b = 1;
+                    }
                     switch ( b )
                     {
                     case 0x62:
@@ -5876,6 +5895,65 @@ x86_emulate(
         }
         break;
 #endif
+
+    case X86EMUL_OPC_VEX(0x0f38, 0xf2):    /* andn r/m,r,r */
+    case X86EMUL_OPC_VEX(0x0f38, 0xf7):    /* bextr r,r/m,r */
+    {
+        uint8_t *buf = get_stub(stub);
+        typeof(vex) *pvex = container_of(buf + 1, typeof(vex), raw[0]);
+
+        host_and_vcpu_must_have(bmi1);
+        generate_exception_if(vex.l, EXC_UD);
+
+        buf[0] = 0xc4;
+        *pvex = vex;
+        pvex->b = 1;
+        pvex->r = 1;
+        pvex->reg = ~0; /* rAX */
+        buf[3] = b;
+        buf[4] = 0x09; /* reg=rCX r/m=(%rCX) */
+        buf[5] = 0xc3;
+
+        src.reg = decode_vex_gpr(vex.reg, &_regs, ctxt);
+        emulate_stub([dst] "=&c" (dst.val), "[dst]" (&src.val), "a" (*src.reg));
+
+        put_stub(stub);
+        break;
+    }
+
+    case X86EMUL_OPC_VEX(0x0f38, 0xf3): /* Grp 17 */
+    {
+        uint8_t *buf = get_stub(stub);
+        typeof(vex) *pvex = container_of(buf + 1, typeof(vex), raw[0]);
+
+        switch ( modrm_reg & 7 )
+        {
+        case 1: /* blsr r,r/m */
+        case 2: /* blsmsk r,r/m */
+        case 3: /* blsi r,r/m */
+            host_and_vcpu_must_have(bmi1);
+            break;
+        default:
+            goto cannot_emulate;
+        }
+
+        generate_exception_if(vex.l, EXC_UD);
+
+        buf[0] = 0xc4;
+        *pvex = vex;
+        pvex->b = 1;
+        pvex->r = 1;
+        pvex->reg = ~0; /* rAX */
+        buf[3] = b;
+        buf[4] = (modrm & 0x38) | 0x01; /* r/m=(%rCX) */
+        buf[5] = 0xc3;
+
+        dst.reg = decode_vex_gpr(vex.reg, &_regs, ctxt);
+        emulate_stub("=&a" (dst.val), "c" (&src.val));
+
+        put_stub(stub);
+        break;
+    }
 
     case X86EMUL_OPC_66(0x0f38, 0xf6): /* adcx r/m,r */
     case X86EMUL_OPC_F3(0x0f38, 0xf6): /* adox r/m,r */

@@ -113,6 +113,12 @@ static inline uint64_t xgetbv(uint32_t xcr)
     (res.b & (1U << 5)) != 0; \
 })
 
+#define cpu_has_bmi1 ({ \
+    struct cpuid_leaf res; \
+    emul_test_cpuid(7, 0, &res, NULL); \
+    (res.b & (1U << 3)) != 0; \
+})
+
 int emul_test_cpuid(
     uint32_t leaf,
     uint32_t subleaf,

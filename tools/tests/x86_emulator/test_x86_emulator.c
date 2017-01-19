@@ -892,6 +892,133 @@ int main(int argc, char **argv)
 #define check_eip(which) (regs.eip == (unsigned long)(which) + \
                                       (unsigned long)which##_len)
 
+    printf("%-40s", "Testing andn (%edx),%ecx,%ebx...");
+    if ( stack_exec && cpu_has_bmi1 )
+    {
+        decl_insn(andn);
+
+        asm volatile ( put_insn(andn, "andn (%0), %%ecx, %%ebx")
+                       :: "d" (NULL) );
+        set_insn(andn);
+
+        *res        = 0xfedcba98;
+        regs.ecx    = 0xcccc3333;
+        regs.edx    = (unsigned long)res;
+        regs.eflags = 0xac3;
+        rc = x86_emulate(&ctxt, &emulops);
+        if ( (rc != X86EMUL_OKAY) || regs.ebx != 0x32108888 ||
+             regs.ecx != 0xcccc3333 || *res != 0xfedcba98 ||
+             (regs.eflags & 0xfeb) != 0x202 || !check_eip(andn) )
+            goto fail;
+        printf("okay\n");
+    }
+    else
+        printf("skipped\n");
+
+    printf("%-40s", "Testing bextr %edx,(%ecx),%ebx...");
+    if ( stack_exec && cpu_has_bmi1 )
+    {
+        decl_insn(bextr);
+#ifdef __x86_64__
+        decl_insn(bextr64);
+#endif
+
+        asm volatile ( put_insn(bextr, "bextr %%edx, (%0), %%ebx")
+                       :: "c" (NULL) );
+        set_insn(bextr);
+
+        regs.ecx    = (unsigned long)res;
+        regs.edx    = 0x0a03;
+        regs.eflags = 0xa43;
+        rc = x86_emulate(&ctxt, &emulops);
+        if ( (rc != X86EMUL_OKAY) || regs.ebx != ((*res >> 3) & 0x3ff) ||
+             regs.edx != 0x0a03 || *res != 0xfedcba98 ||
+             (regs.eflags & 0xf6b) != 0x202 || !check_eip(bextr) )
+            goto fail;
+        printf("okay\n");
+#ifdef __x86_64__
+        printf("%-40s", "Testing bextr %r9,(%r10),%r11...");
+
+        asm volatile ( put_insn(bextr64, "bextr %r9, (%r10), %r11") );
+        set_insn(bextr64);
+
+        res[0]      = 0x76543210;
+        res[1]      = 0xfedcba98;
+        regs.r10    = (unsigned long)res;
+        regs.r9     = 0x211e;
+        regs.eflags = 0xa43;
+        rc = x86_emulate(&ctxt, &emulops);
+        if ( (rc != X86EMUL_OKAY) || regs.r9 != 0x211e ||
+             regs.r11 != (((unsigned long)(res[1] << 1) << 1) |
+                          (res[0] >> 30)) ||
+             res[0] != 0x76543210 || res[1] != 0xfedcba98 ||
+             (regs.eflags & 0xf6b) != 0x202 || !check_eip(bextr64) )
+            goto fail;
+        printf("okay\n");
+#endif
+    }
+    else
+        printf("skipped\n");
+
+    printf("%-40s", "Testing blsi (%edx),%ecx...");
+    if ( stack_exec && cpu_has_bmi1 )
+    {
+        decl_insn(blsi);
+
+        asm volatile ( put_insn(blsi, "blsi (%0), %%ecx")
+                       :: "d" (NULL) );
+        set_insn(blsi);
+
+        *res        = 0xfedcba98;
+        regs.edx    = (unsigned long)res;
+        regs.eflags = 0xac2;
+        rc = x86_emulate(&ctxt, &emulops);
+        if ( (rc != X86EMUL_OKAY) || regs.ecx != 8 || *res != 0xfedcba98 ||
+             (regs.eflags & 0xf6b) != 0x203 || !check_eip(blsi) )
+            goto fail;
+        printf("okay\n");
+    }
+    else
+        printf("skipped\n");
+
+    printf("%-40s", "Testing blsmsk (%edx),%ecx...");
+    if ( stack_exec && cpu_has_bmi1 )
+    {
+        decl_insn(blsmsk);
+
+        asm volatile ( put_insn(blsmsk, "blsmsk (%0), %%ecx")
+                       :: "d" (NULL) );
+        set_insn(blsmsk);
+
+        regs.eflags = 0xac3;
+        rc = x86_emulate(&ctxt, &emulops);
+        if ( (rc != X86EMUL_OKAY) || regs.ecx != 0xf || *res != 0xfedcba98 ||
+             (regs.eflags & 0xf6b) != 0x202 || !check_eip(blsmsk) )
+            goto fail;
+        printf("okay\n");
+    }
+    else
+        printf("skipped\n");
+
+    printf("%-40s", "Testing blsr (%edx),%ecx...");
+    if ( stack_exec && cpu_has_bmi1 )
+    {
+        decl_insn(blsr);
+
+        asm volatile ( put_insn(blsr, "blsr (%0), %%ecx")
+                       :: "d" (NULL) );
+        set_insn(blsr);
+
+        regs.eflags = 0xac3;
+        rc = x86_emulate(&ctxt, &emulops);
+        if ( (rc != X86EMUL_OKAY) || regs.ecx != 0xfedcba90 ||
+             (regs.eflags & 0xf6b) != 0x202 || !check_eip(blsr) )
+            goto fail;
+        printf("okay\n");
+    }
+    else
+        printf("skipped\n");
+
     printf("%-40s", "Testing adcx/adox ...");
     {
         static const unsigned int data[] = {
