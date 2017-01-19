@@ -4690,8 +4690,7 @@ x86_emulate(
 #endif
 
         case 0xd4: /* vmfunc */
-            generate_exception_if(lock_prefix | rep_prefix() | (vex.pfx == vex_66),
-                                  EXC_UD);
+            generate_exception_if(vex.pfx, EXC_UD);
             fail_if(!ops->vmfunc);
             if ( (rc = ops->vmfunc(ctxt)) != X86EMUL_OKAY )
                 goto done;
