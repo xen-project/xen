@@ -5340,11 +5340,19 @@ static int ptwr_emulated_cmpxchg(
         container_of(ctxt, struct ptwr_emulate_ctxt, ctxt));
 }
 
+static int pv_emul_is_mem_write(const struct x86_emulate_state *state,
+                                struct x86_emulate_ctxt *ctxt)
+{
+    return x86_insn_is_mem_write(state, ctxt) ? X86EMUL_OKAY
+                                              : X86EMUL_UNHANDLEABLE;
+}
+
 static const struct x86_emulate_ops ptwr_emulate_ops = {
     .read       = ptwr_emulated_read,
     .insn_fetch = ptwr_emulated_read,
     .write      = ptwr_emulated_write,
     .cmpxchg    = ptwr_emulated_cmpxchg,
+    .validate   = pv_emul_is_mem_write,
     .cpuid      = pv_emul_cpuid,
 };
 
@@ -5463,6 +5471,7 @@ static const struct x86_emulate_ops mmio_ro_emulate_ops = {
     .read       = x86emul_unhandleable_rw,
     .insn_fetch = ptwr_emulated_read,
     .write      = mmio_ro_emulated_write,
+    .validate   = pv_emul_is_mem_write,
     .cpuid      = pv_emul_cpuid,
 };
 
@@ -5501,6 +5510,7 @@ static const struct x86_emulate_ops mmcfg_intercept_ops = {
     .read       = x86emul_unhandleable_rw,
     .insn_fetch = ptwr_emulated_read,
     .write      = mmcfg_intercept_write,
+    .validate   = pv_emul_is_mem_write,
     .cpuid      = pv_emul_cpuid,
 };
 
