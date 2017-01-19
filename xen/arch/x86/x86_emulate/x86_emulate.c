@@ -1355,6 +1355,7 @@ static bool vcpu_has(
 #define vcpu_has_cr8_legacy()  vcpu_has(0x80000001, ECX,  4, ctxt, ops)
 #define vcpu_has_lzcnt()       vcpu_has(0x80000001, ECX,  5, ctxt, ops)
 #define vcpu_has_misalignsse() vcpu_has(0x80000001, ECX,  7, ctxt, ops)
+#define vcpu_has_tbm()         vcpu_has(0x80000001, ECX, 21, ctxt, ops)
 #define vcpu_has_bmi1()        vcpu_has(         7, EBX,  3, ctxt, ops)
 #define vcpu_has_hle()         vcpu_has(         7, EBX,  4, ctxt, ops)
 #define vcpu_has_bmi2()        vcpu_has(         7, EBX,  8, ctxt, ops)
@@ -6027,6 +6028,84 @@ x86_emulate(
         else
             asm ( "rorl %b1,%k0" : "=g" (dst.val) : "c" (imm1), "0" (src.val) );
         break;
+
+    case X86EMUL_OPC_XOP(09, 0x01): /* XOP Grp1 */
+        switch ( modrm_reg & 7 )
+        {
+        case 1: /* blcfill r/m,r */
+        case 2: /* blsfill r/m,r */
+        case 3: /* blcs r/m,r */
+        case 4: /* tzmsk r/m,r */
+        case 5: /* blcic r/m,r */
+        case 6: /* blsic r/m,r */
+        case 7: /* t1mskc r/m,r */
+            host_and_vcpu_must_have(tbm);
+            break;
+        default:
+            goto cannot_emulate;
+        }
+
+    xop_09_rm_rv:
+    {
+        uint8_t *buf = get_stub(stub);
+        typeof(vex) *pxop = container_of(buf + 1, typeof(vex), raw[0]);
+
+        generate_exception_if(vex.l, EXC_UD);
+
+        buf[0] = 0x8f;
+        *pxop = vex;
+        pxop->b = 1;
+        pxop->r = 1;
+        pxop->reg = ~0; /* rAX */
+        buf[3] = b;
+        buf[4] = (modrm & 0x38) | 0x01; /* r/m=(%rCX) */
+        buf[5] = 0xc3;
+
+        dst.reg = decode_vex_gpr(vex.reg, &_regs, ctxt);
+        emulate_stub([dst] "=&a" (dst.val), "c" (&src.val));
+
+        put_stub(stub);
+        break;
+    }
+
+    case X86EMUL_OPC_XOP(09, 0x02): /* XOP Grp2 */
+        switch ( modrm_reg & 7 )
+        {
+        case 1: /* blcmsk r/m,r */
+        case 6: /* blci r/m,r */
+            host_and_vcpu_must_have(tbm);
+            goto xop_09_rm_rv;
+        }
+        goto cannot_emulate;
+
+    case X86EMUL_OPC_XOP(0a, 0x10): /* bextr imm,r/m,r */
+    {
+        uint8_t *buf = get_stub(stub);
+        typeof(vex) *pxop = container_of(buf + 1, typeof(vex), raw[0]);
+
+        host_and_vcpu_must_have(tbm);
+        generate_exception_if(vex.l || vex.reg != 0xf, EXC_UD);
+
+        if ( ea.type == OP_REG )
+            src.val = *ea.reg;
+        else if ( (rc = read_ulong(ea.mem.seg, ea.mem.off, &src.val, op_bytes,
+                                   ctxt, ops)) != X86EMUL_OKAY )
+            goto done;
+
+        buf[0] = 0x8f;
+        *pxop = vex;
+        pxop->b = 1;
+        pxop->r = 1;
+        buf[3] = b;
+        buf[4] = 0x09; /* reg=rCX r/m=(%rCX) */
+        *(uint32_t *)(buf + 5) = imm1;
+        buf[9] = 0xc3;
+
+        emulate_stub([dst] "=&c" (dst.val), "[dst]" (&src.val));
+
+        put_stub(stub);
+        break;
+    }
 
     default:
         goto cannot_emulate;

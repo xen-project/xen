@@ -125,6 +125,12 @@ static inline uint64_t xgetbv(uint32_t xcr)
     (res.b & (1U << 8)) != 0; \
 })
 
+#define cpu_has_tbm ({ \
+    struct cpuid_leaf res; \
+    emul_test_cpuid(0x80000001, 0, &res, NULL); \
+    (res.c & (1U << 21)) != 0; \
+})
+
 int emul_test_cpuid(
     uint32_t leaf,
     uint32_t subleaf,

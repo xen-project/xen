@@ -74,6 +74,7 @@
 #define cpu_has_eist		boot_cpu_has(X86_FEATURE_EIST)
 #define cpu_has_hypervisor	boot_cpu_has(X86_FEATURE_HYPERVISOR)
 #define cpu_has_cmp_legacy	boot_cpu_has(X86_FEATURE_CMP_LEGACY)
+#define cpu_has_tbm		boot_cpu_has(X86_FEATURE_TBM)
 #define cpu_has_itsc		boot_cpu_has(X86_FEATURE_ITSC)
 
 enum _cache_type {

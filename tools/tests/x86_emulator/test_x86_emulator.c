@@ -1244,6 +1244,234 @@ int main(int argc, char **argv)
         printf("okay\n");
     }
 
+    printf("%-40s", "Testing bextr $0x0a03,(%ecx),%ebx...");
+    if ( stack_exec && cpu_has_tbm )
+    {
+        decl_insn(bextr_imm);
+#ifdef __x86_64__
+        decl_insn(bextr64_imm);
+#endif
+
+        asm volatile ( put_insn(bextr_imm, "bextr $0x0a03, (%0), %%ebx")
+                       :: "c" (NULL) );
+        set_insn(bextr_imm);
+
+        *res        = 0xfedcba98;
+        regs.ecx    = (unsigned long)res;
+        regs.eflags = 0xa43;
+        rc = x86_emulate(&ctxt, &emulops);
+        if ( (rc != X86EMUL_OKAY) || regs.ebx != ((*res >> 3) & 0x3ff) ||
+             *res != 0xfedcba98 ||
+             (regs.eflags & 0xf6b) != 0x202 || !check_eip(bextr_imm) )
+            goto fail;
+        printf("okay\n");
+#ifdef __x86_64__
+        printf("%-40s", "Testing bextr $0x211e,(%r10),%r11...");
+
+        asm volatile ( put_insn(bextr64_imm, "bextr $0x211e, (%r10), %r11") );
+        set_insn(bextr64_imm);
+
+        res[0]      = 0x76543210;
+        res[1]      = 0xfedcba98;
+        regs.r10    = (unsigned long)res;
+        regs.eflags = 0xa43;
+        rc = x86_emulate(&ctxt, &emulops);
+        if ( (rc != X86EMUL_OKAY) ||
+             regs.r11 != (((unsigned long)(res[1] << 1) << 1) |
+                          (res[0] >> 30)) ||
+             res[0] != 0x76543210 || res[1] != 0xfedcba98 ||
+             (regs.eflags & 0xf6b) != 0x202 || !check_eip(bextr64_imm) )
+            goto fail;
+        printf("okay\n");
+#endif
+    }
+    else
+        printf("skipped\n");
+
+    res[0]      = 0xfedcba98;
+    res[1]      = 0x01234567;
+    regs.edx    = (unsigned long)res;
+
+    printf("%-40s", "Testing blcfill 4(%edx),%ecx...");
+    if ( stack_exec && cpu_has_tbm )
+    {
+        decl_insn(blcfill);
+
+        asm volatile ( put_insn(blcfill, "blcfill 4(%0), %%ecx")
+                       :: "d" (NULL) );
+        set_insn(blcfill);
+
+        regs.eflags = 0xac3;
+        rc = x86_emulate(&ctxt, &emulops);
+        if ( (rc != X86EMUL_OKAY) || res[1] != 0x01234567 ||
+             regs.ecx != ((res[1] + 1) & res[1]) ||
+             (regs.eflags & 0xfeb) != 0x202 || !check_eip(blcfill) )
+            goto fail;
+        printf("okay\n");
+    }
+    else
+        printf("skipped\n");
+
+    printf("%-40s", "Testing blci 4(%edx),%ecx...");
+    if ( stack_exec && cpu_has_tbm )
+    {
+        decl_insn(blci);
+
+        asm volatile ( put_insn(blci, "blci 4(%0), %%ecx")
+                       :: "d" (NULL) );
+        set_insn(blci);
+
+        regs.eflags = 0xac3;
+        rc = x86_emulate(&ctxt, &emulops);
+        if ( (rc != X86EMUL_OKAY) || res[1] != 0x01234567 ||
+             regs.ecx != (~(res[1] + 1) | res[1]) ||
+             (regs.eflags & 0xfeb) != 0x282 || !check_eip(blci) )
+            goto fail;
+        printf("okay\n");
+    }
+    else
+        printf("skipped\n");
+
+    printf("%-40s", "Testing blcic 4(%edx),%ecx...");
+    if ( stack_exec && cpu_has_tbm )
+    {
+        decl_insn(blcic);
+
+        asm volatile ( put_insn(blcic, "blcic 4(%0), %%ecx")
+                       :: "d" (NULL) );
+        set_insn(blcic);
+
+        regs.eflags = 0xac3;
+        rc = x86_emulate(&ctxt, &emulops);
+        if ( (rc != X86EMUL_OKAY) || res[1] != 0x01234567 ||
+             regs.ecx != ((res[1] + 1) & ~res[1]) ||
+             (regs.eflags & 0xfeb) != 0x202 || !check_eip(blcic) )
+            goto fail;
+        printf("okay\n");
+    }
+    else
+        printf("skipped\n");
+
+    printf("%-40s", "Testing blcmsk 4(%edx),%ecx...");
+    if ( stack_exec && cpu_has_tbm )
+    {
+        decl_insn(blcmsk);
+
+        asm volatile ( put_insn(blcmsk, "blcmsk 4(%0), %%ecx")
+                       :: "d" (NULL) );
+        set_insn(blcmsk);
+
+        regs.eflags = 0xac3;
+        rc = x86_emulate(&ctxt, &emulops);
+        if ( (rc != X86EMUL_OKAY) || res[1] != 0x01234567 ||
+             regs.ecx != ((res[1] + 1) ^ res[1]) ||
+             (regs.eflags & 0xfeb) != 0x202 || !check_eip(blcmsk) )
+            goto fail;
+        printf("okay\n");
+    }
+    else
+        printf("skipped\n");
+
+    printf("%-40s", "Testing blcs 4(%edx),%ecx...");
+    if ( stack_exec && cpu_has_tbm )
+    {
+        decl_insn(blcs);
+
+        asm volatile ( put_insn(blcs, "blcs 4(%0), %%ecx")
+                       :: "d" (NULL) );
+        set_insn(blcs);
+
+        regs.eflags = 0xac3;
+        rc = x86_emulate(&ctxt, &emulops);
+        if ( (rc != X86EMUL_OKAY) || res[1] != 0x01234567 ||
+             regs.ecx != ((res[1] + 1) | res[1]) ||
+             (regs.eflags & 0xfeb) != 0x202 || !check_eip(blcs) )
+            goto fail;
+        printf("okay\n");
+    }
+    else
+        printf("skipped\n");
+
+    printf("%-40s", "Testing blsfill (%edx),%ecx...");
+    if ( stack_exec && cpu_has_tbm )
+    {
+        decl_insn(blsfill);
+
+        asm volatile ( put_insn(blsfill, "blsfill (%0), %%ecx")
+                       :: "d" (NULL) );
+        set_insn(blsfill);
+
+        regs.eflags = 0xac3;
+        rc = x86_emulate(&ctxt, &emulops);
+        if ( (rc != X86EMUL_OKAY) || res[0] != 0xfedcba98 ||
+             regs.ecx != ((res[0] - 1) | res[0]) ||
+             (regs.eflags & 0xfeb) != 0x282 || !check_eip(blsfill) )
+            goto fail;
+        printf("okay\n");
+    }
+    else
+        printf("skipped\n");
+
+    printf("%-40s", "Testing blsic (%edx),%ecx...");
+    if ( stack_exec && cpu_has_tbm )
+    {
+        decl_insn(blsic);
+
+        asm volatile ( put_insn(blsic, "blsic (%0), %%ecx")
+                       :: "d" (NULL) );
+        set_insn(blsic);
+
+        regs.eflags = 0xac3;
+        rc = x86_emulate(&ctxt, &emulops);
+        if ( (rc != X86EMUL_OKAY) || res[0] != 0xfedcba98 ||
+             regs.ecx != ((res[0] - 1) | ~res[0]) ||
+             (regs.eflags & 0xfeb) != 0x282 || !check_eip(blsic) )
+            goto fail;
+        printf("okay\n");
+    }
+    else
+        printf("skipped\n");
+
+    printf("%-40s", "Testing t1mskc 4(%edx),%ecx...");
+    if ( stack_exec && cpu_has_tbm )
+    {
+        decl_insn(t1mskc);
+
+        asm volatile ( put_insn(t1mskc, "t1mskc 4(%0), %%ecx")
+                       :: "d" (NULL) );
+        set_insn(t1mskc);
+
+        regs.eflags = 0xac3;
+        rc = x86_emulate(&ctxt, &emulops);
+        if ( (rc != X86EMUL_OKAY) || res[1] != 0x01234567 ||
+             regs.ecx != ((res[1] + 1) | ~res[1]) ||
+             (regs.eflags & 0xfeb) != 0x282 || !check_eip(t1mskc) )
+            goto fail;
+        printf("okay\n");
+    }
+    else
+        printf("skipped\n");
+
+    printf("%-40s", "Testing tzmsk (%edx),%ecx...");
+    if ( stack_exec && cpu_has_tbm )
+    {
+        decl_insn(tzmsk);
+
+        asm volatile ( put_insn(tzmsk, "tzmsk (%0), %%ecx")
+                       :: "d" (NULL) );
+        set_insn(tzmsk);
+
+        regs.eflags = 0xac3;
+        rc = x86_emulate(&ctxt, &emulops);
+        if ( (rc != X86EMUL_OKAY) || res[0] != 0xfedcba98 ||
+             regs.ecx != ((res[0] - 1) & ~res[0]) ||
+             (regs.eflags & 0xfeb) != 0x202 || !check_eip(tzmsk) )
+            goto fail;
+        printf("okay\n");
+    }
+    else
+        printf("skipped\n");
+
     printf("%-40s", "Testing movq %mm3,(%ecx)...");
     if ( stack_exec && cpu_has_mmx )
     {

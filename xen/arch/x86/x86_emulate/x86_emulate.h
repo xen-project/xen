@@ -564,6 +564,11 @@ struct x86_emulate_ctxt
 # define X86EMUL_OPC_EVEX_F2(ext, byte) \
     (X86EMUL_OPC_F2(ext, byte) | X86EMUL_OPC_EVEX_)
 
+#define X86EMUL_OPC_XOP(ext, byte)    X86EMUL_OPC(0x8f##ext, byte)
+#define X86EMUL_OPC_XOP_66(ext, byte) X86EMUL_OPC_66(0x8f##ext, byte)
+#define X86EMUL_OPC_XOP_F3(ext, byte) X86EMUL_OPC_F3(0x8f##ext, byte)
+#define X86EMUL_OPC_XOP_F2(ext, byte) X86EMUL_OPC_F2(0x8f##ext, byte)
+
 struct x86_emulate_stub {
     union {
         void (*func)(void);
