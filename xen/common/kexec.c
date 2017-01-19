@@ -1182,7 +1182,7 @@ static int kexec_status(XEN_GUEST_HANDLE_PARAM(void) uarg)
     if ( kexec_load_get_bits(status.type, &base, &bit) )
         return -EINVAL;
 
-    return test_bit(bit, &kexec_flags);
+    return !!test_bit(bit, &kexec_flags);
 }
 
 static int do_kexec_op_internal(unsigned long op,
