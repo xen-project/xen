@@ -114,6 +114,7 @@ XEN_CPUFEATURE(MMX,           0*32+23) /*A  Multimedia Extensions */
 XEN_CPUFEATURE(FXSR,          0*32+24) /*A  FXSAVE and FXRSTOR instructions */
 XEN_CPUFEATURE(SSE,           0*32+25) /*A  Streaming SIMD Extensions */
 XEN_CPUFEATURE(SSE2,          0*32+26) /*A  Streaming SIMD Extensions-2 */
+XEN_CPUFEATURE(SS,            0*32+27) /*A  CPU self snoop */
 XEN_CPUFEATURE(HTT,           0*32+28) /*!A Hyper-Threading Technology */
 XEN_CPUFEATURE(TM1,           0*32+29) /*   Thermal Monitor 1 */
 XEN_CPUFEATURE(PBE,           0*32+31) /*   Pending Break Enable */
