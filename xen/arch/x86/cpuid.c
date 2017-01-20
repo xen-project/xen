@@ -177,6 +177,8 @@ static void recalculate_misc(struct cpuid_policy *p)
         p->extd.vendor_ebx = 0;
         p->extd.vendor_ecx = 0;
         p->extd.vendor_edx = 0;
+
+        p->extd.raw[0x1].a = p->extd.raw[0x1].b = 0;
         break;
 
     case X86_VENDOR_AMD:
@@ -187,6 +189,8 @@ static void recalculate_misc(struct cpuid_policy *p)
         p->extd.vendor_ecx = p->basic.vendor_ecx;
         p->extd.vendor_edx = p->basic.vendor_edx;
 
+        p->extd.raw_fms = p->basic.raw_fms;
+        p->extd.raw[0x1].b &= 0xff00ffff;
         p->extd.e1d |= p->basic._1d & CPUID_COMMON_1D_FEATURES;
         break;
     }
@@ -672,24 +676,6 @@ static void pv_cpuid(uint32_t leaf, uint32_t subleaf, struct cpuid_leaf *res)
             res->a = (res->a & ~0xff) | 3;
         break;
 
-    case 0x80000001:
-        res->c = p->extd.e1c;
-        res->d = p->extd.e1d;
-
-        /*
-         * MTRR used to unconditionally leak into PV guests.  They cannot MTRR
-         * infrastructure at all, and shouldn't be able to see the feature.
-         *
-         * Modern PVOPS Linux self-clobbers the MTRR feature, to avoid trying
-         * to use the associated MSRs.  Xenolinux-based PV dom0's however use
-         * the MTRR feature as an indication of the presence of the
-         * XENPF_{add,del,read}_memtype hypercalls.
-         */
-        if ( is_hardware_domain(currd) && cpu_has_mtrr &&
-             guest_kernel_mode(curr, guest_cpu_user_regs()) )
-            res->d |= cpufeat_mask(X86_FEATURE_MTRR);
-        break;
-
     case 0x80000007:
         res->d = p->extd.e7d;
         break;
@@ -712,7 +698,7 @@ static void pv_cpuid(uint32_t leaf, uint32_t subleaf, struct cpuid_leaf *res)
     case 0x2 ... 0x3:
     case 0x7 ... 0x9:
     case 0xc ... XSTATE_CPUID:
-    case 0x80000000:
+    case 0x80000000 ... 0x80000001:
         ASSERT_UNREACHABLE();
         /* Now handled in guest_cpuid(). */
     }
@@ -760,7 +746,7 @@ static void hvm_cpuid(uint32_t leaf, uint32_t subleaf, struct cpuid_leaf *res)
          * a 32bit guest doesn't get the impression that it could try to use
          * PSE36 paging.
          */
-        if ( !hap_enabled(d) && !(hvm_pae_enabled(v) || hvm_long_mode_enabled(v)) )
+        if ( !hap_enabled(d) && !hvm_pae_enabled(v) )
             res->d &= ~cpufeat_mask(X86_FEATURE_PSE36);
 
         if ( vpmu_enabled(v) &&
@@ -790,37 +776,6 @@ static void hvm_cpuid(uint32_t leaf, uint32_t subleaf, struct cpuid_leaf *res)
         /* Report at most version 3 since that's all we currently emulate */
         if ( (res->a & 0xff) > 3 )
             res->a = (res->a & ~0xff) | 3;
-        break;
-
-    case 0x80000001:
-        res->c = p->extd.e1c;
-        res->d = p->extd.e1d;
-
-        /* fast-forward MSR_APIC_BASE.EN if it hasn't already been clobbered. */
-        if ( vlapic_hw_disabled(vcpu_vlapic(v)) )
-            res->d &= ~cpufeat_bit(X86_FEATURE_APIC);
-
-        /*
-         * PSE36 is not supported in shadow mode.  This bit should be
-         * unilaterally cleared.
-         *
-         * However, an unspecified version of Hyper-V from 2011 refuses
-         * to start as the "cpu does not provide required hw features" if
-         * it can't see PSE36.
-         *
-         * As a workaround, leak the toolstack-provided PSE36 value into a
-         * shadow guest if the guest is already using PAE paging (and won't
-         * care about reverting back to PSE paging).  Otherwise, knoble it, so
-         * a 32bit guest doesn't get the impression that it could try to use
-         * PSE36 paging.
-         */
-        if ( !hap_enabled(d) && !(hvm_pae_enabled(v) || hvm_long_mode_enabled(v)) )
-            res->d &= ~cpufeat_mask(X86_FEATURE_PSE36);
-
-        /* SYSCALL is hidden outside of long mode on Intel. */
-        if ( p->x86_vendor == X86_VENDOR_INTEL && !hvm_long_mode_enabled(v) )
-            res->d &= ~cpufeat_mask(X86_FEATURE_SYSCALL);
-
         break;
 
     case 0x80000007:
@@ -860,7 +815,7 @@ static void hvm_cpuid(uint32_t leaf, uint32_t subleaf, struct cpuid_leaf *res)
     case 0x2 ... 0x3:
     case 0x7 ... 0x9:
     case 0xc ... XSTATE_CPUID:
-    case 0x80000000:
+    case 0x80000000 ... 0x80000001:
         ASSERT_UNREACHABLE();
         /* Now handled in guest_cpuid(). */
     }
@@ -943,7 +898,7 @@ void guest_cpuid(const struct vcpu *v, uint32_t leaf,
         default:
             goto legacy;
 
-        case 0x80000000:
+        case 0x80000000 ... 0x80000001:
             *res = p->extd.raw[leaf & 0xffff];
             break;
         }
@@ -1005,6 +960,52 @@ void guest_cpuid(const struct vcpu *v, uint32_t leaf,
                 res->b = cpuid_count_ebx(leaf, subleaf);
             }
             break;
+        }
+        break;
+
+    case 0x80000001:
+        if ( has_hvm_container_domain(d) )
+        {
+            /* Fast-forward MSR_APIC_BASE.EN. */
+            if ( vlapic_hw_disabled(vcpu_vlapic(v)) )
+                res->d &= ~cpufeat_bit(X86_FEATURE_APIC);
+
+            /*
+             * PSE36 is not supported in shadow mode.  This bit should be
+             * clear in hvm_shadow_featuremask[].
+             *
+             * However, an unspecified version of Hyper-V from 2011 refuses to
+             * start as the "cpu does not provide required hw features" if it
+             * can't see PSE36.
+             *
+             * As a workaround, leak the toolstack-provided PSE36 value into a
+             * shadow guest if the guest is already using PAE paging (and
+             * won't care about reverting back to PSE paging).  Otherwise,
+             * knoble it, so a 32bit guest doesn't get the impression that it
+             * could try to use PSE36 paging.
+             */
+            if ( !hap_enabled(d) && !hvm_pae_enabled(v) )
+                res->d &= ~cpufeat_mask(X86_FEATURE_PSE36);
+
+            /* SYSCALL is hidden outside of long mode on Intel. */
+            if ( p->x86_vendor == X86_VENDOR_INTEL && !hvm_long_mode_enabled(v) )
+                res->d &= ~cpufeat_mask(X86_FEATURE_SYSCALL);
+        }
+        else /* PV domain */
+        {
+            /*
+             * MTRR used to unconditionally leak into PV guests.  They cannot
+             * MTRR infrastructure at all, and shouldn't be able to see the
+             * feature.
+             *
+             * Modern PVOPS Linux self-clobbers the MTRR feature, to avoid
+             * trying to use the associated MSRs.  Xenolinux-based PV dom0's
+             * however use the MTRR feature as an indication of the presence
+             * of the XENPF_{add,del,read}_memtype hypercalls.
+             */
+            if ( is_hardware_domain(d) && cpu_has_mtrr &&
+                 guest_kernel_mode(v, guest_cpu_user_regs()) )
+                res->d |= cpufeat_mask(X86_FEATURE_MTRR);
         }
         break;
     }

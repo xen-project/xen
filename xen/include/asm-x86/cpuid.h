@@ -174,7 +174,7 @@ struct cpuid_policy
             uint32_t max_leaf, vendor_ebx, vendor_ecx, vendor_edx;
 
             /* Leaf 0x80000001 - Family/model/stepping and features. */
-            uint32_t /* a */:32, /* b */:32;
+            uint32_t raw_fms, /* b */:32;
             union {
                 uint32_t e1c;
                 struct { DECL_BITFIELD(e1c); };
