@@ -18,6 +18,8 @@ CFLAGS += $(CFLAGS_xeninclude) -D__XEN_TOOLS__
 
 x86_emulate.o: x86_emulate.c x86_emulate.h x86_emulate/x86_emulate.c x86_emulate/x86_emulate.h
 
+x86-insn-emulator-fuzzer.o: x86_emulate.h x86_emulate/x86_emulate.h
+
 x86-insn-emulator.a: x86_emulate.o
 	$(AR) rc $@ $^
 
