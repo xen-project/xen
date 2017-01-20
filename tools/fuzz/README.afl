@@ -1,0 +1,31 @@
+# OVERVIEW
+
+Some fuzzing targets have American Fuzzy Lop (AFL) support.
+
+See also http://lcamtuf.coredump.cx/afl/
+
+# HOW IT WORKS
+
+AFL provides a customised toolchain to build an executable, which in
+turn is launched by the fuzzer.
+
+# HOW TO USE IT
+
+Use the x86 instruction emulator fuzzer as an example.
+
+1. download and compile AFL in $AFLPATH.
+
+2. run the following commands to build:
+   $ cd tools/fuzz/x86_instruction_emulator
+   $ make distclean
+   $ make CC=$AFLPATH/afl-gcc afl # produces afl-x86-insn-emulator-fuzzer
+
+3. provide initial test case:
+   $ mkdir testcase_dir
+   $ echo -n -e '\xc3' > testcase_dir/ret.bin
+
+4. run the fuzzer with AFL:
+   $ $AFLPATH/afl-fuzz -m none -t 1000 -i testcase_dir -o findings_dir -- \
+     ./afl-x86-insn-emulator-fuzzer @@
+
+Please see AFL documentation for more information.
