@@ -167,6 +167,9 @@ static void recalculate_misc(struct cpuid_policy *p)
 
     p->extd.e1d &= ~CPUID_COMMON_1D_FEATURES;
 
+    /* Most of Power/RAS hidden from guests. */
+    p->extd.raw[0x7].a = p->extd.raw[0x7].b = p->extd.raw[0x7].c = 0;
+
     switch ( p->x86_vendor )
     {
     case X86_VENDOR_INTEL:
@@ -179,6 +182,9 @@ static void recalculate_misc(struct cpuid_policy *p)
         p->extd.vendor_edx = 0;
 
         p->extd.raw[0x1].a = p->extd.raw[0x1].b = 0;
+
+        p->extd.raw[0x5] = EMPTY_LEAF;
+        p->extd.raw[0x6].a = p->extd.raw[0x6].b = p->extd.raw[0x6].d = 0;
         break;
 
     case X86_VENDOR_AMD:
@@ -676,10 +682,6 @@ static void pv_cpuid(uint32_t leaf, uint32_t subleaf, struct cpuid_leaf *res)
             res->a = (res->a & ~0xff) | 3;
         break;
 
-    case 0x80000007:
-        res->d = p->extd.e7d;
-        break;
-
     case 0x80000008:
         res->a = paddr_bits | (vaddr_bits << 8);
         res->b = p->extd.e8b;
@@ -698,7 +700,7 @@ static void pv_cpuid(uint32_t leaf, uint32_t subleaf, struct cpuid_leaf *res)
     case 0x2 ... 0x3:
     case 0x7 ... 0x9:
     case 0xc ... XSTATE_CPUID:
-    case 0x80000000 ... 0x80000004:
+    case 0x80000000 ... 0x80000007:
         ASSERT_UNREACHABLE();
         /* Now handled in guest_cpuid(). */
     }
@@ -778,10 +780,6 @@ static void hvm_cpuid(uint32_t leaf, uint32_t subleaf, struct cpuid_leaf *res)
             res->a = (res->a & ~0xff) | 3;
         break;
 
-    case 0x80000007:
-        res->d = p->extd.e7d;
-        break;
-
     case 0x80000008:
         res->a &= 0xff;
         tmp = d->arch.paging.gfn_bits + PAGE_SHIFT;
@@ -815,7 +813,7 @@ static void hvm_cpuid(uint32_t leaf, uint32_t subleaf, struct cpuid_leaf *res)
     case 0x2 ... 0x3:
     case 0x7 ... 0x9:
     case 0xc ... XSTATE_CPUID:
-    case 0x80000000 ... 0x80000004:
+    case 0x80000000 ... 0x80000007:
         ASSERT_UNREACHABLE();
         /* Now handled in guest_cpuid(). */
     }
@@ -898,7 +896,7 @@ void guest_cpuid(const struct vcpu *v, uint32_t leaf,
         default:
             goto legacy;
 
-        case 0x80000000 ... 0x80000004:
+        case 0x80000000 ... 0x80000007:
             *res = p->extd.raw[leaf & 0xffff];
             break;
         }
