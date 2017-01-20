@@ -142,9 +142,6 @@ edd_next:
 edd_done:
         ret
 
-opt_edd:
-        .byte   0                               # edd=on/off/skipmbr
-
 GLOBAL(boot_edd_info_nr)
         .byte   0
 GLOBAL(boot_mbr_signature_nr)

@@ -945,7 +945,6 @@ store_edid:
 #endif
         ret
 
-opt_edid:       .byte   0       # EDID parsing option (force/no/default)
 mt_end:         .word   0       # End of video mode table if built
 edit_buf:       .space  6       # Line editor buffer
 card_name:      .word   0       # Pointer to adapter name
@@ -991,12 +990,6 @@ name_bann:      .asciz  "Video adapter: "
 
 force_size:     .word   0       # Use this size instead of the one in BIOS vars
 
-vesa_size:      .word   0,0,0   # width x depth x height
-
-/* If we don't run at all, assume basic video mode 3 at 80x25. */
-        .align  2
-GLOBAL(boot_vid_mode)
-        .word   VIDEO_80x25
 GLOBAL(boot_vid_info)
         .byte   0, 0    /* orig_x, orig_y */
         .byte   3       /* text mode 3    */

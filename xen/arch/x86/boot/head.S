@@ -183,8 +183,16 @@ __start:
         cmp     $sym_phys(__trampoline_seg_stop),%edi
         jb      1b
 
+        /* Bail if there is no command line to parse. */
+        mov     sym_phys(multiboot_ptr),%ebx
+        testl   $MBI_CMDLINE,MB_flags(%ebx)
+        jz      1f
+
+        pushl   $sym_phys(early_boot_opts)
+        pushl   MB_cmdline(%ebx)
         call    cmdline_parse_early
 
+1:
         /* Switch to low-memory stack.  */
         mov     sym_phys(trampoline_phys),%edi
         lea     0x10000(%edi),%esp
@@ -200,6 +208,7 @@ __start:
         /* Jump into the relocated trampoline. */
         lret
 
+cmdline_parse_early:
 #include "cmdline.S"
 
 reloc:

@@ -22,15 +22,8 @@ asm (
     "    jmp  reloc                    \n"
     );
 
-typedef unsigned int u32;
+#include "defs.h"
 #include "../../../include/xen/multiboot.h"
-
-#define __stdcall	__attribute__((__stdcall__))
-
-#define ALIGN_UP(arg, align) \
-                (((arg) + (align) - 1) & ~((typeof(arg))(align) - 1))
-
-#define _p(val)		((void *)(unsigned long)(val))
 
 static u32 alloc;
 

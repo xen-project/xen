@@ -253,9 +253,10 @@ xen/arch/arm/xen.lds
 xen/arch/x86/asm-offsets.s
 xen/arch/x86/boot/mkelf32
 xen/arch/x86/xen.lds
+xen/arch/x86/boot/cmdline.S
 xen/arch/x86/boot/reloc.S
-xen/arch/x86/boot/reloc.bin
-xen/arch/x86/boot/reloc.lnk
+xen/arch/x86/boot/*.bin
+xen/arch/x86/boot/*.lnk
 xen/arch/x86/efi.lds
 xen/arch/x86/efi/check.efi
 xen/arch/x86/efi/disabled

@@ -32,6 +32,8 @@ CFLAGS := $(filter-out -flto,$(CFLAGS))
 %.o: %.c
 	$(CC) $(CFLAGS) -c -fpic $< -o $@
 
+cmdline.o: cmdline.c $(CMDLINE_DEPS)
+
 reloc.o: reloc.c $(RELOC_DEPS)
 
 .PRECIOUS: %.bin %.lnk

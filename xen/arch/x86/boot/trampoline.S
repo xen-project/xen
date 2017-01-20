@@ -220,8 +220,23 @@ trampoline_boot_cpu_entry:
         /* Jump to the common bootstrap entry point. */
         jmp     trampoline_protmode_entry
 
+#include "video.h"
+
+        .align  2
+/* Keep in sync with cmdline.c:early_boot_opts_t type! */
+early_boot_opts:
 skip_realmode:
         .byte   0
+opt_edd:
+        .byte   0                               /* edd=on/off/skipmbr */
+opt_edid:
+        .byte   0                               /* EDID parsing option (force/no/default). */
+/* Padding. */
+        .byte   0
+GLOBAL(boot_vid_mode)
+        .word   VIDEO_80x25                     /* If we don't run at all, assume basic video mode 3 at 80x25. */
+vesa_size:
+        .word   0,0,0                           /* width x depth x height */
 
 GLOBAL(kbd_shift_flags)
         .byte   0
