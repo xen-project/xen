@@ -19,6 +19,8 @@ libelf.a: $(ELF_LIB_OBJS)
 .PHONY: libelf-fuzzer-all
 libelf-fuzzer-all: libelf.a libelf-fuzzer.o
 
+afl-libelf-fuzzer: afl-libelf-fuzzer.o libelf-fuzzer.o $(ELF_LIB_OBJS)
+
 # Common targets
 .PHONY: all
 all: libelf-fuzzer-all
@@ -28,7 +30,10 @@ distclean: clean
 
 .PHONY: clean
 clean:
-	rm -f *.o *.a
+	rm -f *.o *.a *-libelf-fuzzer
 
 .PHONY: install
 install: all
+
+.PHONY: afl
+afl: afl-libelf-fuzzer
