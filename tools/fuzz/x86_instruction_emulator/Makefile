@@ -21,8 +21,6 @@ x86_emulate.o: x86_emulate.c x86_emulate.h x86_emulate/x86_emulate.c x86_emulate
 x86-insn-emulator.a: x86_emulate.o
 	$(AR) rc $@ $^
 
-x86-insn-emulator-fuzzer.o: x86-insn-emulator-fuzzer.c
-
 # Common targets
 .PHONY: all
 all: x86-instruction-emulator-fuzzer-all
