@@ -6015,7 +6015,7 @@ x86_emulate(
         *pvex = vex;
         pvex->b = 1;
         pvex->r = 1;
-        pvex->reg = ~0; /* rAX */
+        pvex->reg = 0xf; /* rAX */
         buf[3] = b;
         buf[4] = 0x09; /* reg=rCX r/m=(%rCX) */
         buf[5] = 0xc3;
@@ -6049,7 +6049,7 @@ x86_emulate(
         *pvex = vex;
         pvex->b = 1;
         pvex->r = 1;
-        pvex->reg = ~0; /* rAX */
+        pvex->reg = 0xf; /* rAX */
         buf[3] = b;
         buf[4] = (modrm & 0x38) | 0x01; /* r/m=(%rCX) */
         buf[5] = 0xc3;
@@ -6147,7 +6147,7 @@ x86_emulate(
         *pxop = vex;
         pxop->b = 1;
         pxop->r = 1;
-        pxop->reg = ~0; /* rAX */
+        pxop->reg = 0xf; /* rAX */
         buf[3] = b;
         buf[4] = (modrm & 0x38) | 0x01; /* r/m=(%rCX) */
         buf[5] = 0xc3;
