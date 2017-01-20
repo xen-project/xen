@@ -5731,6 +5731,7 @@ void hvm_set_segment_register(struct vcpu *v, enum x86_segment seg,
     case x86_seg_cs:
         ASSERT(reg->attr.fields.p);                  /* Usable. */
         ASSERT(reg->attr.fields.s);                  /* User segment. */
+        ASSERT(reg->attr.fields.type & 0x1);         /* Accessed. */
         ASSERT((reg->base >> 32) == 0);              /* Upper bits clear. */
         break;
 
@@ -5740,6 +5741,7 @@ void hvm_set_segment_register(struct vcpu *v, enum x86_segment seg,
             ASSERT(reg->attr.fields.s);              /* User segment. */
             ASSERT(!(reg->attr.fields.type & 0x8));  /* Data segment. */
             ASSERT(reg->attr.fields.type & 0x2);     /* Writeable. */
+            ASSERT(reg->attr.fields.type & 0x1);     /* Accessed. */
             ASSERT((reg->base >> 32) == 0);          /* Upper bits clear. */
         }
         break;
@@ -5754,6 +5756,8 @@ void hvm_set_segment_register(struct vcpu *v, enum x86_segment seg,
 
             if ( reg->attr.fields.type & 0x8 )
                 ASSERT(reg->attr.fields.type & 0x2); /* Readable. */
+
+            ASSERT(reg->attr.fields.type & 0x1);     /* Accessed. */
 
             if ( seg == x86_seg_fs || seg == x86_seg_gs )
                 ASSERT(is_canonical_address(reg->base));

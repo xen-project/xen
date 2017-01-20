@@ -1471,6 +1471,11 @@ protmode_load_seg(
         else
             sreg->attr.bytes = 0;
         sreg->sel = sel;
+
+        /* Since CPL == SS.DPL, we need to put back DPL. */
+        if ( seg == x86_seg_ss )
+            sreg->attr.fields.dpl = sel;
+
         return X86EMUL_OKAY;
     }
 
