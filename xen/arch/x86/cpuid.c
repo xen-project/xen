@@ -213,6 +213,8 @@ static void recalculate_misc(struct cpuid_policy *p)
         zero_leaves(p->extd.raw, 0xb, 0x18);
 
         p->extd.raw[0x1b] = EMPTY_LEAF; /* IBS - not supported. */
+
+        p->extd.raw[0x1c].a = 0; /* LWP.a entirely dynamic. */
         break;
     }
 }
@@ -516,6 +518,11 @@ void recalculate_cpuid_policy(struct domain *d)
 
     if ( !p->extd.page1gb )
         p->extd.raw[0x19] = EMPTY_LEAF;
+
+    if ( p->extd.lwp )
+        p->extd.raw[0x1c].d &= max->extd.raw[0x1c].d;
+    else
+        p->extd.raw[0x1c] = EMPTY_LEAF;
 }
 
 int init_domain_cpuid_policy(struct domain *d)
@@ -729,7 +736,6 @@ static void pv_cpuid(uint32_t leaf, uint32_t subleaf, struct cpuid_leaf *res)
 
     case 0x00000005: /* MONITOR/MWAIT */
     case 0x0000000b: /* Extended Topology Enumeration */
-    case 0x8000001c: /* Light Weight Profiling */
     unsupported:
         *res = EMPTY_LEAF;
         break;
@@ -738,7 +744,7 @@ static void pv_cpuid(uint32_t leaf, uint32_t subleaf, struct cpuid_leaf *res)
     case 0x2 ... 0x3:
     case 0x7 ... 0x9:
     case 0xc ... XSTATE_CPUID:
-    case 0x80000000 ... 0x8000001b:
+    case 0x80000000 ... 0x8000001c:
         ASSERT_UNREACHABLE();
         /* Now handled in guest_cpuid(). */
     }
@@ -816,25 +822,11 @@ static void hvm_cpuid(uint32_t leaf, uint32_t subleaf, struct cpuid_leaf *res)
             res->a = (res->a & ~0xff) | 3;
         break;
 
-    case 0x8000001c:
-        if ( !cpu_has_svm )
-        {
-            *res = EMPTY_LEAF;
-            break;
-        }
-
-        if ( cpu_has_lwp && (v->arch.xcr0 & XSTATE_LWP) )
-            /* Turn on available bit and other features specified in lwp_cfg. */
-            res->a = (res->d & v->arch.hvm_svm.guest_lwp_cfg) | 1;
-        else
-            res->a = 0;
-        break;
-
     case 0x0:
     case 0x2 ... 0x3:
     case 0x7 ... 0x9:
     case 0xc ... XSTATE_CPUID:
-    case 0x80000000 ... 0x8000001b:
+    case 0x80000000 ... 0x8000001c:
         ASSERT_UNREACHABLE();
         /* Now handled in guest_cpuid(). */
     }
@@ -917,7 +909,7 @@ void guest_cpuid(const struct vcpu *v, uint32_t leaf,
         default:
             goto legacy;
 
-        case 0x80000000 ... 0x8000001b:
+        case 0x80000000 ... 0x8000001c:
             *res = p->extd.raw[leaf & 0xffff];
             break;
         }
@@ -1026,6 +1018,12 @@ void guest_cpuid(const struct vcpu *v, uint32_t leaf,
                  guest_kernel_mode(v, guest_cpu_user_regs()) )
                 res->d |= cpufeat_mask(X86_FEATURE_MTRR);
         }
+        break;
+
+    case 0x8000001c:
+        if ( (v->arch.xcr0 & XSTATE_LWP) && cpu_has_svm )
+            /* Turn on available bit and other features specified in lwp_cfg. */
+            res->a = (res->d & v->arch.hvm_svm.guest_lwp_cfg) | 1;
         break;
     }
 

@@ -931,13 +931,10 @@ static int svm_update_lwp_cfg(struct vcpu *v, uint64_t msr_content)
 
     if ( xsave_enabled(v) && cpu_has_lwp )
     {
-        struct cpuid_leaf res;
-
-        guest_cpuid(v, 0x8000001c, 0, &res);
         msr_low = (uint32_t)msr_content;
         
         /* generate #GP if guest tries to turn on unsupported features. */
-        if ( msr_low & ~res.d)
+        if ( msr_low & ~v->domain->arch.cpuid->extd.raw[0x1c].d )
             return -1;
 
         v->arch.hvm_svm.guest_lwp_cfg = msr_content;
