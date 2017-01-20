@@ -452,12 +452,7 @@ bool_t mtrr_var_range_msr_set(
         return 0;
 
     if ( d == current->domain )
-    {
-        struct cpuid_leaf res;
-
-        guest_cpuid(current, 0x80000008, 0, &res);
-        phys_addr = (uint8_t)res.a ?: 36;
-    }
+        phys_addr = d->arch.cpuid->extd.maxphysaddr;
     else
         phys_addr = paddr_bits;
     msr_mask = ~((((uint64_t)1) << phys_addr) - 1);

@@ -198,7 +198,7 @@ struct cpuid_policy
             };
 
             /* Leaf 0x80000008 - Misc addr/feature info. */
-            uint32_t /* a */:32;
+            uint8_t maxphysaddr, maxlinaddr, :8, :8;
             union {
                 uint32_t e8b;
                 struct { DECL_BITFIELD(e8b); };

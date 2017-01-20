@@ -170,6 +170,8 @@ static void recalculate_misc(struct cpuid_policy *p)
     /* Most of Power/RAS hidden from guests. */
     p->extd.raw[0x7].a = p->extd.raw[0x7].b = p->extd.raw[0x7].c = 0;
 
+    p->extd.raw[0x8].d = 0;
+
     switch ( p->x86_vendor )
     {
     case X86_VENDOR_INTEL:
@@ -185,6 +187,9 @@ static void recalculate_misc(struct cpuid_policy *p)
 
         p->extd.raw[0x5] = EMPTY_LEAF;
         p->extd.raw[0x6].a = p->extd.raw[0x6].b = p->extd.raw[0x6].d = 0;
+
+        p->extd.raw[0x8].a &= 0x0000ffff;
+        p->extd.raw[0x8].c = 0;
         break;
 
     case X86_VENDOR_AMD:
@@ -198,6 +203,9 @@ static void recalculate_misc(struct cpuid_policy *p)
         p->extd.raw_fms = p->basic.raw_fms;
         p->extd.raw[0x1].b &= 0xff00ffff;
         p->extd.e1d |= p->basic._1d & CPUID_COMMON_1D_FEATURES;
+
+        p->extd.raw[0x8].a &= 0x0000ffff; /* GuestMaxPhysAddr hidden. */
+        p->extd.raw[0x8].c &= 0x0003f0ff;
         break;
     }
 }
@@ -469,6 +477,15 @@ void recalculate_cpuid_policy(struct domain *d)
                            special_features[FEATURESET_7b0]);
 
     cpuid_featureset_to_policy(fs, p);
+
+    p->extd.maxphysaddr = min(p->extd.maxphysaddr, max->extd.maxphysaddr);
+    p->extd.maxphysaddr = min_t(uint8_t, p->extd.maxphysaddr,
+                                d->arch.paging.gfn_bits + PAGE_SHIFT);
+    p->extd.maxphysaddr = max_t(uint8_t, p->extd.maxphysaddr,
+                                (p->basic.pae || p->basic.pse36) ? 36 : 32);
+
+    p->extd.maxlinaddr = p->extd.lm ? 48 : 32;
+
     recalculate_xstate(p);
     recalculate_misc(p);
 }
@@ -682,11 +699,6 @@ static void pv_cpuid(uint32_t leaf, uint32_t subleaf, struct cpuid_leaf *res)
             res->a = (res->a & ~0xff) | 3;
         break;
 
-    case 0x80000008:
-        res->a = paddr_bits | (vaddr_bits << 8);
-        res->b = p->extd.e8b;
-        break;
-
     case 0x00000005: /* MONITOR/MWAIT */
     case 0x0000000b: /* Extended Topology Enumeration */
     case 0x8000000a: /* SVM revision and features */
@@ -700,7 +712,7 @@ static void pv_cpuid(uint32_t leaf, uint32_t subleaf, struct cpuid_leaf *res)
     case 0x2 ... 0x3:
     case 0x7 ... 0x9:
     case 0xc ... XSTATE_CPUID:
-    case 0x80000000 ... 0x80000007:
+    case 0x80000000 ... 0x80000008:
         ASSERT_UNREACHABLE();
         /* Now handled in guest_cpuid(). */
     }
@@ -716,8 +728,6 @@ static void hvm_cpuid(uint32_t leaf, uint32_t subleaf, struct cpuid_leaf *res)
 
     switch ( leaf )
     {
-        unsigned int tmp;
-
     case 0x1:
         /* Fix up VLAPIC details. */
         res->b &= 0x00FFFFFFu;
@@ -780,21 +790,6 @@ static void hvm_cpuid(uint32_t leaf, uint32_t subleaf, struct cpuid_leaf *res)
             res->a = (res->a & ~0xff) | 3;
         break;
 
-    case 0x80000008:
-        res->a &= 0xff;
-        tmp = d->arch.paging.gfn_bits + PAGE_SHIFT;
-        if ( res->a > tmp )
-            res->a = tmp;
-
-        tmp = (p->basic.pae || p->basic.pse36) ? 36 : 32;
-        if ( res->a < tmp )
-            res->a = tmp;
-
-        res->a |= (p->extd.lm ? vaddr_bits : 32) << 8;
-
-        res->b = p->extd.e8b;
-        break;
-
     case 0x8000001c:
         if ( !cpu_has_svm )
         {
@@ -813,7 +808,7 @@ static void hvm_cpuid(uint32_t leaf, uint32_t subleaf, struct cpuid_leaf *res)
     case 0x2 ... 0x3:
     case 0x7 ... 0x9:
     case 0xc ... XSTATE_CPUID:
-    case 0x80000000 ... 0x80000007:
+    case 0x80000000 ... 0x80000008:
         ASSERT_UNREACHABLE();
         /* Now handled in guest_cpuid(). */
     }
@@ -896,7 +891,7 @@ void guest_cpuid(const struct vcpu *v, uint32_t leaf,
         default:
             goto legacy;
 
-        case 0x80000000 ... 0x80000007:
+        case 0x80000000 ... 0x80000008:
             *res = p->extd.raw[leaf & 0xffff];
             break;
         }
