@@ -78,7 +78,7 @@ struct cpuid_policy
      * Global *_policy objects:
      *
      * - Guest accurate:
-     *   - All of the feat and xstate unions
+     *   - All of the feat, xstate and extd unions
      *   - max_{,sub}leaf
      *   - All FEATURESET_* words
      *   - Short vendor infomation
@@ -86,7 +86,7 @@ struct cpuid_policy
      * Per-domain objects:
      *
      * - Guest accurate:
-     *   - All of the feat and xstate unions
+     *   - All of the feat, xstate and extd unions
      *   - max_{,sub}leaf
      *   - All FEATURESET_* words
      *   - Short vendor infomation

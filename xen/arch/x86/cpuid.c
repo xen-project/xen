@@ -744,7 +744,7 @@ static void pv_cpuid(uint32_t leaf, uint32_t subleaf, struct cpuid_leaf *res)
     case 0x2 ... 0x3:
     case 0x7 ... 0x9:
     case 0xc ... XSTATE_CPUID:
-    case 0x80000000 ... 0x8000001c:
+    case 0x80000000 ... 0xffffffff:
         ASSERT_UNREACHABLE();
         /* Now handled in guest_cpuid(). */
     }
@@ -826,7 +826,7 @@ static void hvm_cpuid(uint32_t leaf, uint32_t subleaf, struct cpuid_leaf *res)
     case 0x2 ... 0x3:
     case 0x7 ... 0x9:
     case 0xc ... XSTATE_CPUID:
-    case 0x80000000 ... 0x8000001c:
+    case 0x80000000 ... 0xffffffff:
         ASSERT_UNREACHABLE();
         /* Now handled in guest_cpuid(). */
     }
@@ -904,15 +904,7 @@ void guest_cpuid(const struct vcpu *v, uint32_t leaf,
                                      ARRAY_SIZE(p->extd.raw) - 1) )
             return;
 
-        switch ( leaf )
-        {
-        default:
-            goto legacy;
-
-        case 0x80000000 ... 0x8000001c:
-            *res = p->extd.raw[leaf & 0xffff];
-            break;
-        }
+        *res = p->extd.raw[leaf & 0xffff];
         break;
 
     default:
