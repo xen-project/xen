@@ -6566,6 +6566,9 @@ x86_insn_is_mem_write(const struct x86_emulate_state *state,
 
     case X86EMUL_OPC(0x0f, 0xba):
         return (state->modrm_reg & 7) > 4; /* BTS / BTR / BTC */
+
+    case X86EMUL_OPC(0x0f, 0xc7):
+        return (state->modrm_reg & 7) == 1; /* CMPXCHG{8,16}B */
     }
 
     return false;
