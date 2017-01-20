@@ -209,6 +209,8 @@ static void recalculate_misc(struct cpuid_policy *p)
         p->extd.raw[0x8].c &= 0x0003f0ff;
 
         p->extd.raw[0x9] = EMPTY_LEAF;
+
+        zero_leaves(p->extd.raw, 0xb, 0x18);
         break;
     }
 }
@@ -509,6 +511,9 @@ void recalculate_cpuid_policy(struct domain *d)
 
     if ( !p->extd.svm )
         p->extd.raw[0xa] = EMPTY_LEAF;
+
+    if ( !p->extd.page1gb )
+        p->extd.raw[0x19] = EMPTY_LEAF;
 }
 
 int init_domain_cpuid_policy(struct domain *d)
@@ -732,7 +737,7 @@ static void pv_cpuid(uint32_t leaf, uint32_t subleaf, struct cpuid_leaf *res)
     case 0x2 ... 0x3:
     case 0x7 ... 0x9:
     case 0xc ... XSTATE_CPUID:
-    case 0x80000000 ... 0x8000000a:
+    case 0x80000000 ... 0x8000001a:
         ASSERT_UNREACHABLE();
         /* Now handled in guest_cpuid(). */
     }
@@ -828,7 +833,7 @@ static void hvm_cpuid(uint32_t leaf, uint32_t subleaf, struct cpuid_leaf *res)
     case 0x2 ... 0x3:
     case 0x7 ... 0x9:
     case 0xc ... XSTATE_CPUID:
-    case 0x80000000 ... 0x8000000a:
+    case 0x80000000 ... 0x8000001a:
         ASSERT_UNREACHABLE();
         /* Now handled in guest_cpuid(). */
     }
@@ -911,7 +916,7 @@ void guest_cpuid(const struct vcpu *v, uint32_t leaf,
         default:
             goto legacy;
 
-        case 0x80000000 ... 0x8000000a:
+        case 0x80000000 ... 0x8000001a:
             *res = p->extd.raw[leaf & 0xffff];
             break;
         }

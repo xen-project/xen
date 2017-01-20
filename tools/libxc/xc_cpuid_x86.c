@@ -479,6 +479,8 @@ static void xc_cpuid_hvm_policy(xc_interface *xch,
     case 0x80000005: /* AMD L1 cache/TLB info (dumped by Intel policy) */
     case 0x80000006: /* AMD L2/3 cache/TLB info ; Intel L2 cache features */
     case 0x8000000a: /* AMD SVM feature bits */
+    case 0x80000019: /* AMD 1G TLB */
+    case 0x8000001a: /* AMD perf hints */
     case 0x8000001c: /* AMD lightweight profiling */
         break;
 
