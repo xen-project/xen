@@ -211,6 +211,8 @@ static void recalculate_misc(struct cpuid_policy *p)
         p->extd.raw[0x9] = EMPTY_LEAF;
 
         zero_leaves(p->extd.raw, 0xb, 0x18);
+
+        p->extd.raw[0x1b] = EMPTY_LEAF; /* IBS - not supported. */
         break;
     }
 }
@@ -727,7 +729,6 @@ static void pv_cpuid(uint32_t leaf, uint32_t subleaf, struct cpuid_leaf *res)
 
     case 0x00000005: /* MONITOR/MWAIT */
     case 0x0000000b: /* Extended Topology Enumeration */
-    case 0x8000001b: /* Instruction Based Sampling */
     case 0x8000001c: /* Light Weight Profiling */
     unsupported:
         *res = EMPTY_LEAF;
@@ -737,7 +738,7 @@ static void pv_cpuid(uint32_t leaf, uint32_t subleaf, struct cpuid_leaf *res)
     case 0x2 ... 0x3:
     case 0x7 ... 0x9:
     case 0xc ... XSTATE_CPUID:
-    case 0x80000000 ... 0x8000001a:
+    case 0x80000000 ... 0x8000001b:
         ASSERT_UNREACHABLE();
         /* Now handled in guest_cpuid(). */
     }
@@ -833,7 +834,7 @@ static void hvm_cpuid(uint32_t leaf, uint32_t subleaf, struct cpuid_leaf *res)
     case 0x2 ... 0x3:
     case 0x7 ... 0x9:
     case 0xc ... XSTATE_CPUID:
-    case 0x80000000 ... 0x8000001a:
+    case 0x80000000 ... 0x8000001b:
         ASSERT_UNREACHABLE();
         /* Now handled in guest_cpuid(). */
     }
@@ -916,7 +917,7 @@ void guest_cpuid(const struct vcpu *v, uint32_t leaf,
         default:
             goto legacy;
 
-        case 0x80000000 ... 0x8000001a:
+        case 0x80000000 ... 0x8000001b:
             *res = p->extd.raw[leaf & 0xffff];
             break;
         }

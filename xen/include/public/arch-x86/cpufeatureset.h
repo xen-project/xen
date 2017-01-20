@@ -172,7 +172,7 @@ XEN_CPUFEATURE(SSE4A,         3*32+ 6) /*A  SSE-4A */
 XEN_CPUFEATURE(MISALIGNSSE,   3*32+ 7) /*A  Misaligned SSE mode */
 XEN_CPUFEATURE(3DNOWPREFETCH, 3*32+ 8) /*A  3DNow prefetch instructions */
 XEN_CPUFEATURE(OSVW,          3*32+ 9) /*   OS Visible Workaround */
-XEN_CPUFEATURE(IBS,           3*32+10) /*S  Instruction Based Sampling */
+XEN_CPUFEATURE(IBS,           3*32+10) /*   Instruction Based Sampling */
 XEN_CPUFEATURE(XOP,           3*32+11) /*A  extended AVX instructions */
 XEN_CPUFEATURE(SKINIT,        3*32+12) /*   SKINIT/STGI instructions */
 XEN_CPUFEATURE(WDT,           3*32+13) /*   Watchdog timer */
