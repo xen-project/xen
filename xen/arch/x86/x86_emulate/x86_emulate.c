@@ -4668,8 +4668,7 @@ x86_emulate(
         case 0xca: /* clac */
         case 0xcb: /* stac */
             vcpu_must_have(smap);
-            generate_exception_if(lock_prefix || vex.pfx || !mode_ring0(),
-                                  EXC_UD);
+            generate_exception_if(vex.pfx || !mode_ring0(), EXC_UD);
 
             _regs._eflags &= ~EFLG_AC;
             if ( modrm == 0xcb )
@@ -5475,6 +5474,7 @@ x86_emulate(
         break;
 
     case X86EMUL_OPC(0x0f, 0xa3): bt: /* bt */
+        generate_exception_if(lock_prefix, EXC_UD);
         emulate_2op_SrcV_nobyte("bt", src, dst, _regs._eflags);
         dst.type = OP_NONE;
         break;
