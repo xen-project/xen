@@ -4925,6 +4925,7 @@ int libxl_set_memory_target(libxl_ctx *ctx, uint32_t domid,
     char *uuid;
     xs_transaction_t t;
     libxl__domain_userdata_lock *lock;
+    int r;
 
     CTX_LOCK;
 
