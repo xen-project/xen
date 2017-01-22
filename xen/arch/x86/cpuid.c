@@ -4,6 +4,7 @@
 #include <asm/cpuid.h>
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/nestedhvm.h>
+#include <asm/hvm/svm/svm.h>
 #include <asm/hvm/vmx/vmcs.h>
 #include <asm/processor.h>
 #include <asm/xstate.h>
@@ -282,6 +283,19 @@ static void __init calculate_host_policy(void)
     cpuid_featureset_to_policy(boot_cpu_data.x86_capability, p);
     recalculate_xstate(p);
     recalculate_misc(p);
+
+    if ( p->extd.svm )
+    {
+        /* Clamp to implemented features which require hardware support. */
+        p->extd.raw[0xa].d &= ((1u << SVM_FEATURE_NPT) |
+                               (1u << SVM_FEATURE_LBRV) |
+                               (1u << SVM_FEATURE_NRIPS) |
+                               (1u << SVM_FEATURE_PAUSEFILTER) |
+                               (1u << SVM_FEATURE_DECODEASSISTS));
+        /* Enable features which are always emulated. */
+        p->extd.raw[0xa].d |= ((1u << SVM_FEATURE_VMCBCLEAN) |
+                               (1u << SVM_FEATURE_TSCRATEMSR));
+    }
 }
 
 static void __init calculate_pv_max_policy(void)
@@ -302,6 +316,8 @@ static void __init calculate_pv_max_policy(void)
     sanitise_featureset(pv_featureset);
     cpuid_featureset_to_policy(pv_featureset, p);
     recalculate_xstate(p);
+
+    p->extd.raw[0xa] = EMPTY_LEAF; /* No SVM for PV guests. */
 }
 
 static void __init calculate_hvm_max_policy(void)
@@ -490,6 +506,9 @@ void recalculate_cpuid_policy(struct domain *d)
 
     recalculate_xstate(p);
     recalculate_misc(p);
+
+    if ( !p->extd.svm )
+        p->extd.raw[0xa] = EMPTY_LEAF;
 }
 
 int init_domain_cpuid_policy(struct domain *d)
@@ -703,7 +722,6 @@ static void pv_cpuid(uint32_t leaf, uint32_t subleaf, struct cpuid_leaf *res)
 
     case 0x00000005: /* MONITOR/MWAIT */
     case 0x0000000b: /* Extended Topology Enumeration */
-    case 0x8000000a: /* SVM revision and features */
     case 0x8000001b: /* Instruction Based Sampling */
     case 0x8000001c: /* Light Weight Profiling */
     unsupported:
@@ -714,7 +732,7 @@ static void pv_cpuid(uint32_t leaf, uint32_t subleaf, struct cpuid_leaf *res)
     case 0x2 ... 0x3:
     case 0x7 ... 0x9:
     case 0xc ... XSTATE_CPUID:
-    case 0x80000000 ... 0x80000009:
+    case 0x80000000 ... 0x8000000a:
         ASSERT_UNREACHABLE();
         /* Now handled in guest_cpuid(). */
     }
@@ -810,7 +828,7 @@ static void hvm_cpuid(uint32_t leaf, uint32_t subleaf, struct cpuid_leaf *res)
     case 0x2 ... 0x3:
     case 0x7 ... 0x9:
     case 0xc ... XSTATE_CPUID:
-    case 0x80000000 ... 0x80000009:
+    case 0x80000000 ... 0x8000000a:
         ASSERT_UNREACHABLE();
         /* Now handled in guest_cpuid(). */
     }
@@ -893,7 +911,7 @@ void guest_cpuid(const struct vcpu *v, uint32_t leaf,
         default:
             goto legacy;
 
-        case 0x80000000 ... 0x80000009:
+        case 0x80000000 ... 0x8000000a:
             *res = p->extd.raw[leaf & 0xffff];
             break;
         }
