@@ -683,15 +683,16 @@ int main(int argc, char **argv)
         goto fail;
     printf("okay\n");
 
-#define decl_insn(which) extern const unsigned char which[], which##_len[]
+#define decl_insn(which) extern const unsigned char which[], \
+                         which##_end[] asm ( ".L" #which "_end" )
 #define put_insn(which, insn) ".pushsection .test, \"ax\", @progbits\n" \
                               #which ": " insn "\n"                     \
-                              ".equ " #which "_len, .-" #which "\n"     \
+                              ".L" #which "_end:\n"                     \
                               ".popsection"
 #define set_insn(which) (regs.eip = (unsigned long)memcpy(instr, which, \
-                                             (unsigned long)which##_len))
+                          (unsigned long)which##_end - (unsigned long)(which)))
 #define check_eip(which) (regs.eip == (unsigned long)instr + \
-                                      (unsigned long)which##_len)
+                          (unsigned long)which##_end - (unsigned long)(which))
 
     printf("%-40s", "Testing movq %mm3,(%ecx)...");
     if ( stack_exec && cpu_has_mmx )
