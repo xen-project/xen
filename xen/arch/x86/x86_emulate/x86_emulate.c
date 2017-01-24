@@ -924,13 +924,13 @@ static inline bool fpu_check_write(void)
         : "=m" (fic.insn_bytes)                         \
         : "m" (_arg) : "memory" )
 
-#define emulate_fpu_insn_stub(_bytes...)                                \
+#define emulate_fpu_insn_stub(bytes...)                                 \
 do {                                                                    \
-    uint8_t *buf = get_stub(stub);                                      \
-    unsigned int _nr = sizeof((uint8_t[]){ _bytes });                   \
-    fic.insn_bytes = _nr;                                               \
-    memcpy(buf, ((uint8_t[]){ _bytes, 0xc3 }), _nr + 1);                \
-    stub.func();                                                        \
+    unsigned int nr_ = sizeof((uint8_t[]){ bytes });                    \
+    fic.insn_bytes = nr_;                                               \
+    memcpy(get_stub(stub), ((uint8_t[]){ bytes, 0xc3 }), nr_ + 1);      \
+    asm volatile ( "call *%[stub]" : "+m" (fic) :                       \
+                   [stub] "rm" (stub.func) );                           \
     put_stub(stub);                                                     \
 } while (0)
 
@@ -944,7 +944,7 @@ do {                                                                    \
                    "call *%[func];"                                     \
                    _POST_EFLAGS("[eflags]", "[mask]", "[tmp]")          \
                    : [eflags] "+g" (_regs._eflags),                     \
-                     [tmp] "=&r" (tmp_)                                 \
+                     [tmp] "=&r" (tmp_), "+m" (fic)                     \
                    : [func] "rm" (stub.func),                           \
                      [mask] "i" (EFLG_ZF|EFLG_PF|EFLG_CF) );            \
     put_stub(stub);                                                     \
