@@ -885,17 +885,16 @@ int main(int argc, char **argv)
     }
     printf("okay\n");
 
-#define decl_insn(which) extern const unsigned char which[], which##_len[]
+#define decl_insn(which) extern const unsigned char which[], \
+                         which##_end[] asm ( ".L" #which "_end" )
 #define put_insn(which, insn) ".pushsection .test, \"ax\", @progbits\n" \
                               #which ": " insn "\n"                     \
-                              ".equ " #which "_len, .-" #which "\n"     \
+                              ".L" #which "_end:\n"                     \
                               ".popsection"
 #define set_insn(which) (regs.eip = (unsigned long)(which))
 #define valid_eip(which) (regs.eip >= (unsigned long)(which) && \
-                          regs.eip < (unsigned long)(which) + \
-                                      (unsigned long)which##_len)
-#define check_eip(which) (regs.eip == (unsigned long)(which) + \
-                                      (unsigned long)which##_len)
+                          regs.eip < (unsigned long)which##_end)
+#define check_eip(which) (regs.eip == (unsigned long)which##_end)
 
     printf("%-40s", "Testing andn (%edx),%ecx,%ebx...");
     if ( stack_exec && cpu_has_bmi1 )
