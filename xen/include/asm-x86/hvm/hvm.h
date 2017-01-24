@@ -248,8 +248,6 @@ void hvm_vcpu_reset_state(struct vcpu *v, uint16_t cs, uint16_t ip);
 void hvm_get_guest_pat(struct vcpu *v, u64 *guest_pat);
 int hvm_set_guest_pat(struct vcpu *v, u64 guest_pat);
 
-void hvm_set_guest_tsc_fixed(struct vcpu *v, u64 guest_tsc, u64 at_tsc);
-#define hvm_set_guest_tsc(v, t) hvm_set_guest_tsc_fixed(v, t, 0)
 u64 hvm_get_guest_tsc_fixed(struct vcpu *v, u64 at_tsc);
 #define hvm_get_guest_tsc(v) hvm_get_guest_tsc_fixed(v, 0)
 

@@ -369,7 +369,7 @@ u64 hvm_scale_tsc(const struct domain *d, u64 tsc)
     return tsc;
 }
 
-void hvm_set_guest_tsc_fixed(struct vcpu *v, u64 guest_tsc, u64 at_tsc)
+static void hvm_set_guest_tsc_fixed(struct vcpu *v, u64 guest_tsc, u64 at_tsc)
 {
     uint64_t tsc;
     uint64_t delta_tsc;
@@ -394,7 +394,9 @@ void hvm_set_guest_tsc_fixed(struct vcpu *v, u64 guest_tsc, u64 at_tsc)
     hvm_funcs.set_tsc_offset(v, v->arch.hvm_vcpu.cache_tsc_offset, at_tsc);
 }
 
-void hvm_set_guest_tsc_adjust(struct vcpu *v, u64 tsc_adjust)
+#define hvm_set_guest_tsc(v, t) hvm_set_guest_tsc_fixed(v, t, 0)
+
+static void hvm_set_guest_tsc_adjust(struct vcpu *v, u64 tsc_adjust)
 {
     v->arch.hvm_vcpu.cache_tsc_offset += tsc_adjust
                             - v->arch.hvm_vcpu.msr_tsc_adjust;
@@ -419,11 +421,6 @@ u64 hvm_get_guest_tsc_fixed(struct vcpu *v, uint64_t at_tsc)
     }
 
     return tsc + v->arch.hvm_vcpu.cache_tsc_offset;
-}
-
-u64 hvm_get_guest_tsc_adjust(struct vcpu *v)
-{
-    return v->arch.hvm_vcpu.msr_tsc_adjust;
 }
 
 void hvm_migrate_timers(struct vcpu *v)
@@ -3354,7 +3351,7 @@ int hvm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
         break;
 
     case MSR_IA32_TSC_ADJUST:
-        *msr_content = hvm_get_guest_tsc_adjust(v);
+        *msr_content = v->arch.hvm_vcpu.msr_tsc_adjust;
         break;
 
     case MSR_TSC_AUX:
