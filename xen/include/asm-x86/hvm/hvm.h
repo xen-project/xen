@@ -624,8 +624,8 @@ unsigned long hvm_cr4_guest_valid_bits(const struct vcpu *v, bool restore);
     struct vcpu *v_ = (v);                                      \
     struct domain *d_ = v_->domain;                             \
     if ( has_hvm_container_domain(d_) &&                        \
-         (cpu_has_vmx && d_->arch.hvm_domain.vmx.vcpu_block) )  \
-        d_->arch.hvm_domain.vmx.vcpu_block(v_);                 \
+         (d_->arch.hvm_domain.pi_ops.vcpu_block) )          \
+        d_->arch.hvm_domain.pi_ops.vcpu_block(v_);          \
 })
 
 #endif /* __ASM_X86_HVM_HVM_H__ */

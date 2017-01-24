@@ -77,65 +77,6 @@ struct vmx_domain {
     unsigned long apic_access_mfn;
     /* VMX_DOMAIN_* */
     unsigned int status;
-
-    /*
-     * To handle posted interrupts correctly, we need to set the following
-     * state:
-     *
-     * * The PI notification vector (NV)
-     * * The PI notification destination processor (NDST)
-     * * The PI "suppress notification" bit (SN)
-     * * The vcpu pi "blocked" list
-     *
-     * If a VM is currently running, we want the PI delivered to the guest vcpu
-     * on the proper pcpu (NDST = v->processor, SN clear).
-     *
-     * If the vm is blocked, we want the PI delivered to Xen so that it can
-     * wake it up  (SN clear, NV = pi_wakeup_vector, vcpu on block list).
-     *
-     * If the VM is currently either preempted or offline (i.e., not running
-     * because of some reason other than blocking waiting for an interrupt),
-     * there's nothing Xen can do -- we want the interrupt pending bit set in
-     * the guest, but we don't want to bother Xen with an interrupt (SN clear).
-     *
-     * There's a brief window of time between vmx_intr_assist() and checking
-     * softirqs where if an interrupt comes in it may be lost; so we need Xen
-     * to get an interrupt and raise a softirq so that it will go through the
-     * vmx_intr_assist() path again (SN clear, NV = posted_interrupt).
-     *
-     * The way we implement this now is by looking at what needs to happen on
-     * the following runstate transitions:
-     *
-     * A: runnable -> running
-     *  - SN = 0
-     *  - NDST = v->processor
-     * B: running -> runnable
-     *  - SN = 1
-     * C: running -> blocked
-     *  - NV = pi_wakeup_vector
-     *  - Add vcpu to blocked list
-     * D: blocked -> runnable
-     *  - NV = posted_intr_vector
-     *  - Take vcpu off blocked list
-     *
-     * For transitions A and B, we add hooks into vmx_ctxt_switch_{from,to}
-     * paths.
-     *
-     * For transition C, we add a new arch hook, arch_vcpu_block(), which is
-     * called from vcpu_block() and vcpu_do_poll().
-     *
-     * For transition D, rather than add an extra arch hook on vcpu_wake, we
-     * add a hook on the vmentry path which checks to see if either of the two
-     * actions need to be taken.
-     *
-     * These hooks only need to be called when the domain in question actually
-     * has a physical device assigned to it, so we set and clear the callbacks
-     * as appropriate when device assignment changes.
-     */
-    void (*vcpu_block) (struct vcpu *);
-    void (*pi_switch_from) (struct vcpu *v);
-    void (*pi_switch_to) (struct vcpu *v);
-    void (*pi_do_resume) (struct vcpu *v);
 };
 
 struct pi_desc {

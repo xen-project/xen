@@ -72,6 +72,33 @@ struct hvm_ioreq_server {
     bool_t                 bufioreq_atomic;
 };
 
+/*
+ * This structure defines function hooks to support hardware-assisted
+ * virtual interrupt delivery to guest. (e.g. VMX PI and SVM AVIC).
+ *
+ * These hooks are defined by the underlying arch-specific code
+ * as needed. For example:
+ *   - When the domain is enabled with virtual IPI delivery
+ *   - When the domain is enabled with virtual I/O int delivery
+ *     and actually has a physical device assigned .
+ */
+struct hvm_pi_ops {
+    /* Hook into ctx_switch_from. */
+    void (*switch_from)(struct vcpu *v);
+
+    /* Hook into ctx_switch_to. */
+    void (*switch_to)(struct vcpu *v);
+
+    /*
+     * Hook into arch_vcpu_block(), which is called
+     * from vcpu_block() and vcpu_do_poll().
+     */
+    void (*vcpu_block)(struct vcpu *);
+
+    /* Hook into the vmentry path. */
+    void (*do_resume)(struct vcpu *v);
+};
+
 struct hvm_domain {
     /* Guest page range used for non-default ioreq servers */
     struct {
@@ -157,6 +184,8 @@ struct hvm_domain {
         spinlock_t lock;
         struct list_head list;
     } write_map;
+
+    struct hvm_pi_ops pi_ops;
 
     union {
         struct vmx_domain vmx;
