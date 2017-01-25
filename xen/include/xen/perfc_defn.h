@@ -57,6 +57,7 @@ PERFCOUNTER(vcpu_hot,               "csched: vcpu_hot")
 
 /* credit2 specific counters */
 PERFCOUNTER(burn_credits_t2c,       "csched2: burn_credits_t2c")
+PERFCOUNTER(acct_load_balance,      "csched2: acct_load_balance")
 PERFCOUNTER(upd_max_weight_quick,   "csched2: update_max_weight_quick")
 PERFCOUNTER(upd_max_weight_full,    "csched2: update_max_weight_full")
 PERFCOUNTER(migrate_requested,      "csched2: migrate_requested")

@@ -1887,6 +1887,8 @@ retry:
                     (unsigned char *)&d);
     }
 
+    SCHED_STAT_CRANK(acct_load_balance);
+
     /* Look for "swap" which gives the best load average
      * FIXME: O(n^2)! */
 
