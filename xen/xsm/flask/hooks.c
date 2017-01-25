@@ -1776,9 +1776,6 @@ static struct xsm_operations flask_ops = {
 #ifdef CONFIG_X86
     .do_mca = flask_do_mca,
     .shadow_control = flask_shadow_control,
-    .hvm_set_pci_intx_level = flask_hvm_set_pci_intx_level,
-    .hvm_set_isa_irq_level = flask_hvm_set_isa_irq_level,
-    .hvm_set_pci_link_route = flask_hvm_set_pci_link_route,
     .mem_sharing_op = flask_mem_sharing_op,
     .apic = flask_apic,
     .machine_memory_map = flask_machine_memory_map,

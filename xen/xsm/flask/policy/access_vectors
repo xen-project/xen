@@ -284,6 +284,8 @@ class hvm
 # HVMOP_altp2m_destroy_p2m HVMOP_altp2m_switch_p2m
 # HVMOP_altp2m_set_mem_access HVMOP_altp2m_change_gfn
     altp2mhvm_op
+# DMOP
+    dm
 }
 
 # Class event describes event channels.  Interdomain event channels have their
