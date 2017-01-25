@@ -162,7 +162,6 @@ struct xsm_operations {
 #ifdef CONFIG_X86
     int (*do_mca) (void);
     int (*shadow_control) (struct domain *d, uint32_t op);
-    int (*hvm_inject_msi) (struct domain *d);
     int (*mem_sharing_op) (struct domain *d, struct domain *cd, int op);
     int (*apic) (struct domain *d, int cmd);
     int (*memtype) (uint32_t access);
@@ -630,11 +629,6 @@ static inline int xsm_do_mca(xsm_default_t def)
 static inline int xsm_shadow_control (xsm_default_t def, struct domain *d, uint32_t op)
 {
     return xsm_ops->shadow_control(d, op);
-}
-
-static inline int xsm_hvm_inject_msi (xsm_default_t def, struct domain *d)
-{
-    return xsm_ops->hvm_inject_msi(d);
 }
 
 static inline int xsm_mem_sharing_op (xsm_default_t def, struct domain *d, struct domain *cd, int op)

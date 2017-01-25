@@ -151,7 +151,7 @@ define(`device_model', `
 
 	allow $1 $2_target:domain { getdomaininfo shutdown };
 	allow $1 $2_target:mmu { map_read map_write adjust physmap target_hack };
-	allow $1 $2_target:hvm { getparam setparam hvmctl cacheattr send_irq dm };
+	allow $1 $2_target:hvm { getparam setparam hvmctl cacheattr dm };
 ')
 
 # make_device_model(priv, dm_dom, hvm_dom)

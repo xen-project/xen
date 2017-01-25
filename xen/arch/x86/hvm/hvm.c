@@ -543,12 +543,12 @@ void hvm_do_resume(struct vcpu *v)
     }
 
     /* Inject pending hw/sw trap */
-    if ( v->arch.hvm_vcpu.inject_trap.vector != -1 )
+    if ( v->arch.hvm_vcpu.inject_event.vector != -1 )
     {
         if ( !hvm_event_pending(v) )
-            hvm_inject_event(&v->arch.hvm_vcpu.inject_trap);
+            hvm_inject_event(&v->arch.hvm_vcpu.inject_event);
 
-        v->arch.hvm_vcpu.inject_trap.vector = -1;
+        v->arch.hvm_vcpu.inject_event.vector = -1;
     }
 
     if ( unlikely(v->arch.vm_event) && v->arch.monitor.next_interrupt_enabled )
@@ -1519,7 +1519,7 @@ int hvm_vcpu_initialise(struct vcpu *v)
         (void(*)(unsigned long))hvm_assert_evtchn_irq,
         (unsigned long)v);
 
-    v->arch.hvm_vcpu.inject_trap.vector = -1;
+    v->arch.hvm_vcpu.inject_event.vector = -1;
 
     if ( is_pvh_domain(d) )
     {
@@ -4192,35 +4192,6 @@ static void hvm_s3_resume(struct domain *d)
     }
 }
 
-static int hvmop_inject_msi(
-    XEN_GUEST_HANDLE_PARAM(xen_hvm_inject_msi_t) uop)
-{
-    struct xen_hvm_inject_msi op;
-    struct domain *d;
-    int rc;
-
-    if ( copy_from_guest(&op, uop, 1) )
-        return -EFAULT;
-
-    rc = rcu_lock_remote_domain_by_id(op.domid, &d);
-    if ( rc != 0 )
-        return rc;
-
-    rc = -EINVAL;
-    if ( !is_hvm_domain(d) )
-        goto out;
-
-    rc = xsm_hvm_inject_msi(XSM_DM_PRIV, d);
-    if ( rc )
-        goto out;
-
-    rc = hvm_inject_msi(d, op.addr, op.data);
-
- out:
-    rcu_unlock_domain(d);
-    return rc;
-}
-
 static int hvmop_flush_tlb_all(void)
 {
     struct domain *d = current->domain;
@@ -4871,11 +4842,6 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
             guest_handle_cast(arg, xen_hvm_param_t));
         break;
 
-    case HVMOP_inject_msi:
-        rc = hvmop_inject_msi(
-            guest_handle_cast(arg, xen_hvm_inject_msi_t));
-        break;
-
     case HVMOP_flush_tlbs:
         rc = guest_handle_is_null(arg) ? hvmop_flush_tlb_all() : -EINVAL;
         break;
@@ -4929,48 +4895,6 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
         /* Cycles will be taken at the vmexit and vmenter */
         trace_var(tr.event | TRC_GUEST, 0 /*!cycles*/,
                   tr.extra_bytes, tr.extra);
-        break;
-    }
-
-    case HVMOP_inject_trap: 
-    {
-        xen_hvm_inject_trap_t tr;
-        struct domain *d;
-        struct vcpu *v;
-
-        if ( copy_from_guest(&tr, arg, 1 ) )
-            return -EFAULT;
-
-        rc = rcu_lock_remote_domain_by_id(tr.domid, &d);
-        if ( rc != 0 )
-            return rc;
-
-        rc = -EINVAL;
-        if ( !is_hvm_domain(d) )
-            goto injtrap_fail;
-
-        rc = xsm_hvm_control(XSM_DM_PRIV, d, op);
-        if ( rc )
-            goto injtrap_fail;
-
-        rc = -ENOENT;
-        if ( tr.vcpuid >= d->max_vcpus || (v = d->vcpu[tr.vcpuid]) == NULL )
-            goto injtrap_fail;
-        
-        if ( v->arch.hvm_vcpu.inject_trap.vector != -1 )
-            rc = -EBUSY;
-        else 
-        {
-            v->arch.hvm_vcpu.inject_trap.vector = tr.vector;
-            v->arch.hvm_vcpu.inject_trap.type = tr.type;
-            v->arch.hvm_vcpu.inject_trap.error_code = tr.error_code;
-            v->arch.hvm_vcpu.inject_trap.insn_len = tr.insn_len;
-            v->arch.hvm_vcpu.inject_trap.cr2 = tr.cr2;
-            rc = 0;
-        }
-
-    injtrap_fail:
-        rcu_unlock_domain(d);
         break;
     }
 

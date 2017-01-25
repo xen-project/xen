@@ -247,6 +247,26 @@ static int set_mem_type(struct domain *d,
     return rc;
 }
 
+static int inject_event(struct domain *d,
+                        const struct xen_dm_op_inject_event *data)
+{
+    struct vcpu *v;
+
+    if ( data->vcpuid >= d->max_vcpus || !(v = d->vcpu[data->vcpuid]) )
+        return -EINVAL;
+
+    if ( v->arch.hvm_vcpu.inject_event.vector != -1 )
+        return -EBUSY;
+
+    v->arch.hvm_vcpu.inject_event.type = data->type;
+    v->arch.hvm_vcpu.inject_event.insn_len = data->insn_len;
+    v->arch.hvm_vcpu.inject_event.error_code = data->error_code;
+    v->arch.hvm_vcpu.inject_event.cr2 = data->cr2;
+    v->arch.hvm_vcpu.inject_event.vector = data->vector;
+
+    return 0;
+}
+
 static int dm_op(domid_t domid,
                  unsigned int nr_bufs,
                  xen_dm_op_buf_t bufs[])
@@ -443,6 +463,31 @@ static int dm_op(domid_t domid,
         break;
     }
 
+    case XEN_DMOP_inject_event:
+    {
+        const struct xen_dm_op_inject_event *data =
+            &op.u.inject_event;
+
+        rc = -EINVAL;
+        if ( data->pad0 || data->pad1 )
+            break;
+
+        rc = inject_event(d, data);
+        break;
+    }
+    case XEN_DMOP_inject_msi:
+    {
+        const struct xen_dm_op_inject_msi *data =
+            &op.u.inject_msi;
+
+        rc = -EINVAL;
+        if ( data->pad )
+            break;
+
+        rc = hvm_inject_msi(d, data->addr, data->data);
+        break;
+    }
+
     default:
         rc = -EOPNOTSUPP;
         break;
@@ -470,6 +515,8 @@ CHECK_dm_op_set_isa_irq_level;
 CHECK_dm_op_set_pci_link_route;
 CHECK_dm_op_modified_memory;
 CHECK_dm_op_set_mem_type;
+CHECK_dm_op_inject_event;
+CHECK_dm_op_inject_msi;
 
 #define MAX_NR_BUFS 2
 

@@ -527,29 +527,20 @@ int xc_hvm_set_pci_link_route(
 }
 
 int xc_hvm_inject_msi(
-    xc_interface *xch, domid_t dom, uint64_t addr, uint32_t data)
+    xc_interface *xch, domid_t dom, uint64_t msi_addr, uint32_t msi_data)
 {
-    DECLARE_HYPERCALL_BUFFER(struct xen_hvm_inject_msi, arg);
-    int rc;
+    struct xen_dm_op op;
+    struct xen_dm_op_inject_msi *data;
 
-    arg = xc_hypercall_buffer_alloc(xch, arg, sizeof(*arg));
-    if ( arg == NULL )
-    {
-        PERROR("Could not allocate memory for xc_hvm_inject_msi hypercall");
-        return -1;
-    }
+    memset(&op, 0, sizeof(op));
 
-    arg->domid = dom;
-    arg->addr  = addr;
-    arg->data  = data;
+    op.op = XEN_DMOP_inject_msi;
+    data = &op.u.inject_msi;
 
-    rc = xencall2(xch->xcall, __HYPERVISOR_hvm_op,
-                  HVMOP_inject_msi,
-                  HYPERCALL_BUFFER_AS_ARG(arg));
+    data->addr = msi_addr;
+    data->data = msi_data;
 
-    xc_hypercall_buffer_free(xch, arg);
-
-    return rc;
+    return do_dm_op(xch, dom, 1, &op, sizeof(op));
 }
 
 int xc_hvm_track_dirty_vram(
@@ -608,35 +599,26 @@ int xc_hvm_set_mem_type(
 }
 
 int xc_hvm_inject_trap(
-    xc_interface *xch, domid_t dom, int vcpu, uint32_t vector,
-    uint32_t type, uint32_t error_code, uint32_t insn_len,
+    xc_interface *xch, domid_t dom, int vcpu, uint8_t vector,
+    uint8_t type, uint32_t error_code, uint8_t insn_len,
     uint64_t cr2)
 {
-    DECLARE_HYPERCALL_BUFFER(struct xen_hvm_inject_trap, arg);
-    int rc;
+    struct xen_dm_op op;
+    struct xen_dm_op_inject_event *data;
 
-    arg = xc_hypercall_buffer_alloc(xch, arg, sizeof(*arg));
-    if ( arg == NULL )
-    {
-        PERROR("Could not allocate memory for xc_hvm_inject_trap hypercall");
-        return -1;
-    }
+    memset(&op, 0, sizeof(op));
 
-    arg->domid       = dom;
-    arg->vcpuid      = vcpu;
-    arg->vector      = vector;
-    arg->type        = type;
-    arg->error_code  = error_code;
-    arg->insn_len    = insn_len;
-    arg->cr2         = cr2;
+    op.op = XEN_DMOP_inject_event;
+    data = &op.u.inject_event;
 
-    rc = xencall2(xch->xcall, __HYPERVISOR_hvm_op,
-                  HVMOP_inject_trap,
-                  HYPERCALL_BUFFER_AS_ARG(arg));
+    data->vcpuid = vcpu;
+    data->vector = vector;
+    data->type = type;
+    data->error_code = error_code;
+    data->insn_len = insn_len;
+    data->cr2 = cr2;
 
-    xc_hypercall_buffer_free(xch, arg);
-
-    return rc;
+    return do_dm_op(xch, dom, 1, &op, sizeof(op));
 }
 
 int xc_livepatch_upload(xc_interface *xch,

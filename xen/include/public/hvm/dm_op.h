@@ -272,6 +272,52 @@ struct xen_dm_op_set_mem_type {
     uint64_aligned_t first_pfn;
 };
 
+/*
+ * XEN_DMOP_inject_event: Inject an event into a VCPU, which will
+ *                        get taken up when it is next scheduled.
+ *
+ * Note that the caller should know enough of the state of the CPU before
+ * injecting, to know what the effect of injecting the event will be.
+ */
+#define XEN_DMOP_inject_event 13
+
+struct xen_dm_op_inject_event {
+    /* IN - index of vCPU */
+    uint32_t vcpuid;
+    /* IN - interrupt vector */
+    uint8_t vector;
+    /* IN - event type (DMOP_EVENT_* ) */
+    uint8_t type;
+/* NB. This enumeration precisely matches hvm.h:X86_EVENTTYPE_* */
+# define XEN_DMOP_EVENT_ext_int    0 /* external interrupt */
+# define XEN_DMOP_EVENT_nmi        2 /* nmi */
+# define XEN_DMOP_EVENT_hw_exc     3 /* hardware exception */
+# define XEN_DMOP_EVENT_sw_int     4 /* software interrupt (CD nn) */
+# define XEN_DMOP_EVENT_pri_sw_exc 5 /* ICEBP (F1) */
+# define XEN_DMOP_EVENT_sw_exc     6 /* INT3 (CC), INTO (CE) */
+    /* IN - instruction length */
+    uint8_t insn_len;
+    uint8_t pad0;
+    /* IN - error code (or ~0 to skip) */
+    uint32_t error_code;
+    uint32_t pad1;
+    /* IN - CR2 for page faults */
+    uint64_aligned_t cr2;
+};
+
+/*
+ * XEN_DMOP_inject_msi: Inject an MSI for an emulated device.
+ */
+#define XEN_DMOP_inject_msi 14
+
+struct xen_dm_op_inject_msi {
+    /* IN - MSI data (lower 32 bits) */
+    uint32_t data;
+    uint32_t pad;
+    /* IN - MSI address (0xfeexxxxx) */
+    uint64_aligned_t addr;
+};
+
 struct xen_dm_op {
     uint32_t op;
     uint32_t pad;
@@ -288,6 +334,8 @@ struct xen_dm_op {
         struct xen_dm_op_set_pci_link_route set_pci_link_route;
         struct xen_dm_op_modified_memory modified_memory;
         struct xen_dm_op_set_mem_type set_mem_type;
+        struct xen_dm_op_inject_event inject_event;
+        struct xen_dm_op_inject_msi inject_msi;
     } u;
 };
 

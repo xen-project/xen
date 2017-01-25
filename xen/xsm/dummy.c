@@ -145,7 +145,6 @@ void __init xsm_fixup_ops (struct xsm_operations *ops)
 #ifdef CONFIG_X86
     set_to_dummy_if_null(ops, do_mca);
     set_to_dummy_if_null(ops, shadow_control);
-    set_to_dummy_if_null(ops, hvm_inject_msi);
     set_to_dummy_if_null(ops, mem_sharing_op);
     set_to_dummy_if_null(ops, apic);
     set_to_dummy_if_null(ops, machine_memory_map);

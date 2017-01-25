@@ -133,38 +133,6 @@ DEFINE_XEN_GUEST_HANDLE(xen_hvm_xentrace_t);
 /* Deprecated by XENMEM_access_op_get_access */
 #define HVMOP_get_mem_access        13
 
-#define HVMOP_inject_trap            14
-/* Inject a trap into a VCPU, which will get taken up on the next
- * scheduling of it. Note that the caller should know enough of the
- * state of the CPU before injecting, to know what the effect of
- * injecting the trap will be.
- */
-struct xen_hvm_inject_trap {
-    /* Domain to be queried. */
-    domid_t domid;
-    /* VCPU */
-    uint32_t vcpuid;
-    /* Vector number */
-    uint32_t vector;
-    /* Trap type (HVMOP_TRAP_*) */
-    uint32_t type;
-/* NB. This enumeration precisely matches hvm.h:X86_EVENTTYPE_* */
-# define HVMOP_TRAP_ext_int    0 /* external interrupt */
-# define HVMOP_TRAP_nmi        2 /* nmi */
-# define HVMOP_TRAP_hw_exc     3 /* hardware exception */
-# define HVMOP_TRAP_sw_int     4 /* software interrupt (CD nn) */
-# define HVMOP_TRAP_pri_sw_exc 5 /* ICEBP (F1) */
-# define HVMOP_TRAP_sw_exc     6 /* INT3 (CC), INTO (CE) */
-    /* Error code, or ~0u to skip */
-    uint32_t error_code;
-    /* Intruction length */
-    uint32_t insn_len;
-    /* CR2 for page faults */
-    uint64_aligned_t cr2;
-};
-typedef struct xen_hvm_inject_trap xen_hvm_inject_trap_t;
-DEFINE_XEN_GUEST_HANDLE(xen_hvm_inject_trap_t);
-
 #endif /* defined(__XEN__) || defined(__XEN_TOOLS__) */
 
 #define HVMOP_get_mem_type    15
@@ -183,19 +151,6 @@ DEFINE_XEN_GUEST_HANDLE(xen_hvm_get_mem_type_t);
 
 /* Following tools-only interfaces may change in future. */
 #if defined(__XEN__) || defined(__XEN_TOOLS__)
-
-/* MSI injection for emulated devices */
-#define HVMOP_inject_msi         16
-struct xen_hvm_inject_msi {
-    /* Domain to be injected */
-    domid_t   domid;
-    /* Data -- lower 32 bits */
-    uint32_t  data;
-    /* Address (0xfeexxxxx) */
-    uint64_t  addr;
-};
-typedef struct xen_hvm_inject_msi xen_hvm_inject_msi_t;
-DEFINE_XEN_GUEST_HANDLE(xen_hvm_inject_msi_t);
 
 /*
  * Definitions relating to DMOP_create_ioreq_server. (Defined here for

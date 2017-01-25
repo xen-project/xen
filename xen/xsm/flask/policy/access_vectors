@@ -263,8 +263,7 @@ class hvm
 # XEN_DOMCTL_pin_mem_cacheattr
     cacheattr
 # HVMOP_get_mem_type,
-# HVMOP_set_mem_access, HVMOP_get_mem_access, HVMOP_pagetable_dying,
-# HVMOP_inject_trap
+# HVMOP_set_mem_access, HVMOP_get_mem_access, HVMOP_pagetable_dying
     hvmctl
 # XEN_DOMCTL_mem_sharing_op and XENMEM_sharing_op_{share,add_physmap} with:
 #  source = the domain making the hypercall
@@ -272,8 +271,6 @@ class hvm
     mem_sharing
 # XEN_DOMCTL_audit_p2m
     audit_p2m
-# HVMOP_inject_msi
-    send_irq
 # checked in XENMEM_sharing_op_{share,add_physmap} with:
 #  source = domain whose memory is being shared
 #  target = client domain
