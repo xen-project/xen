@@ -708,6 +708,11 @@ int LLVMFuzzerTestOneInput(const uint8_t *data_p, size_t size)
     return 0;
 }
 
+unsigned int fuzz_minimal_input_size(void)
+{
+    return DATA_OFFSET + 1;
+}
+
 /*
  * Local variables:
  * mode: C
