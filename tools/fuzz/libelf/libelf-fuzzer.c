@@ -13,7 +13,9 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
     elf = &elf_buf;
 
     memset(elf, 0, sizeof(*elf));
-    elf_init(elf, (const char *)data, size);
+    if ( elf_init(elf, (const char *)data, size) < 0 )
+        return -1;
+
     elf_parse_binary(elf);
     elf_xen_parse(elf, &parms);
 
