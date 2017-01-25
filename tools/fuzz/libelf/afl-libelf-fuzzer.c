@@ -42,9 +42,7 @@ int main(int argc, char **argv)
 
     fclose(fp);
 
-    LLVMFuzzerTestOneInput(input, size);
-
-    return 0;
+    return LLVMFuzzerTestOneInput(input, size);
 }
 
 /*
