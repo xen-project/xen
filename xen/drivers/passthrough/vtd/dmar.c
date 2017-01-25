@@ -579,6 +579,68 @@ out:
     return ret;
 }
 
+static int register_one_rmrr(struct acpi_rmrr_unit *rmrru)
+{
+    bool ignore = false;
+    unsigned int i = 0;
+    int ret = 0;
+
+    /* Skip checking if segment is not accessible yet. */
+    if ( !pci_known_segment(rmrru->segment) )
+        i = UINT_MAX;
+
+    for ( ; i < rmrru->scope.devices_cnt; i++ )
+    {
+        u8 b = PCI_BUS(rmrru->scope.devices[i]);
+        u8 d = PCI_SLOT(rmrru->scope.devices[i]);
+        u8 f = PCI_FUNC(rmrru->scope.devices[i]);
+
+        if ( pci_device_detect(rmrru->segment, b, d, f) == 0 )
+        {
+            dprintk(XENLOG_WARNING VTDPREFIX,
+                    " Non-existent device (%04x:%02x:%02x.%u) is reported"
+                    " in RMRR (%"PRIx64", %"PRIx64")'s scope!\n",
+                    rmrru->segment, b, d, f,
+                    rmrru->base_address, rmrru->end_address);
+            ignore = true;
+        }
+        else
+        {
+            ignore = false;
+            break;
+        }
+    }
+
+    if ( ignore )
+    {
+        dprintk(XENLOG_WARNING VTDPREFIX,
+                "  Ignore the RMRR (%"PRIx64", %"PRIx64") due to "
+                "devices under its scope are not PCI discoverable!\n",
+                rmrru->base_address, rmrru->end_address);
+        scope_devices_free(&rmrru->scope);
+        xfree(rmrru);
+    }
+    else if ( rmrru->base_address > rmrru->end_address )
+    {
+        dprintk(XENLOG_WARNING VTDPREFIX,
+                "  The RMRR (%"PRIx64", %"PRIx64") is incorrect!\n",
+                rmrru->base_address, rmrru->end_address);
+        scope_devices_free(&rmrru->scope);
+        xfree(rmrru);
+        ret = -EFAULT;
+    }
+    else
+    {
+        if ( iommu_verbose )
+            dprintk(VTDPREFIX,
+                    "  RMRR region: base_addr %"PRIx64" end_addr %"PRIx64"\n",
+                    rmrru->base_address, rmrru->end_address);
+        acpi_register_rmrr_unit(rmrru);
+    }
+
+    return ret;
+}
+
 static int __init
 acpi_parse_one_rmrr(struct acpi_dmar_header *header)
 {
@@ -628,65 +690,10 @@ acpi_parse_one_rmrr(struct acpi_dmar_header *header)
     ret = acpi_parse_dev_scope(dev_scope_start, dev_scope_end,
                                &rmrru->scope, RMRR_TYPE, rmrr->segment);
 
-    if ( ret || (rmrru->scope.devices_cnt == 0) )
-        xfree(rmrru);
+    if ( !ret && (rmrru->scope.devices_cnt != 0) )
+        ret = register_one_rmrr(rmrru);
     else
-    {
-        u8 b, d, f;
-        bool_t ignore = 0;
-        unsigned int i = 0;
-
-        /* Skip checking if segment is not accessible yet. */
-        if ( !pci_known_segment(rmrr->segment) )
-            i = UINT_MAX;
-
-        for ( ; i < rmrru->scope.devices_cnt; i++ )
-        {
-            b = PCI_BUS(rmrru->scope.devices[i]);
-            d = PCI_SLOT(rmrru->scope.devices[i]);
-            f = PCI_FUNC(rmrru->scope.devices[i]);
-
-            if ( !pci_device_detect(rmrr->segment, b, d, f) )
-            {
-                printk(XENLOG_WARNING VTDPREFIX
-                       " Non-existent device (%04x:%02x:%02x.%u) reported in RMRR (%"PRIx64", %"PRIx64")'s scope!\n",
-                       rmrr->segment, b, d, f,
-                       rmrru->base_address, rmrru->end_address);
-                ignore = 1;
-            }
-            else
-            {
-                ignore = 0;
-                break;
-            }
-        }
-
-        if ( ignore )
-        {
-            printk(XENLOG_WARNING VTDPREFIX
-                   "  Ignore RMRR (%"PRIx64", %"PRIx64") (some devices in its scope are not PCI discoverable)\n",
-                   rmrru->base_address, rmrru->end_address);
-            scope_devices_free(&rmrru->scope);
-            xfree(rmrru);
-        }
-        else if ( base_addr > end_addr )
-        {
-            printk(XENLOG_WARNING VTDPREFIX
-                   "  RMRR (%"PRIx64", %"PRIx64") is incorrect\n",
-                   rmrru->base_address, rmrru->end_address);
-            scope_devices_free(&rmrru->scope);
-            xfree(rmrru);
-            ret = -EFAULT;
-        }
-        else
-        {
-            if ( iommu_verbose )
-                printk(VTDPREFIX
-                       "  RMRR region: base_addr %"PRIx64" end_address %"PRIx64"\n",
-                       rmrru->base_address, rmrru->end_address);
-            acpi_register_rmrr_unit(rmrru);
-        }
-    }
+        xfree(rmrru);
 
     return ret;
 }
