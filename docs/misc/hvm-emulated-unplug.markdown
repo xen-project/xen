@@ -34,7 +34,7 @@ drivers):
 6. The drivers write a two-byte bitmask of devices to unplug to IO
    port `0x10`.  The defined fields are:
 
-  * `1` -- All IDE disks (not including CD drives)
+  * `1` -- All emulated disks (not including CD drives)
   * `2` -- All emulated NICs
   * `4` -- All IDE disks except for the primary master (not including CD
 	   drives)
