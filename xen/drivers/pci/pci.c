@@ -119,11 +119,21 @@ const char *__init parse_pci(const char *s, unsigned int *seg_p,
                              unsigned int *bus_p, unsigned int *dev_p,
                              unsigned int *func_p)
 {
+    bool def_seg;
+
+    return parse_pci_seg(s, seg_p, bus_p, dev_p, func_p, &def_seg);
+}
+
+const char *__init parse_pci_seg(const char *s, unsigned int *seg_p,
+                                 unsigned int *bus_p, unsigned int *dev_p,
+                                 unsigned int *func_p, bool *def_seg)
+{
     unsigned long seg = simple_strtoul(s, &s, 16), bus, dev, func;
 
     if ( *s != ':' )
         return NULL;
     bus = simple_strtoul(s + 1, &s, 16);
+    *def_seg = false;
     if ( *s == ':' )
         dev = simple_strtoul(s + 1, &s, 16);
     else
@@ -131,6 +141,7 @@ const char *__init parse_pci(const char *s, unsigned int *seg_p,
         dev = bus;
         bus = seg;
         seg = 0;
+        *def_seg = true;
     }
     if ( func_p )
     {
