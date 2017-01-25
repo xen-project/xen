@@ -28,8 +28,166 @@
 
 #if defined(__XEN__) || defined(__XEN_TOOLS__)
 
+#include "../event_channel.h"
+
+#ifndef uint64_aligned_t
+#define uint64_aligned_t uint64_t
+#endif
+
+/*
+ * IOREQ Servers
+ *
+ * The interface between an I/O emulator an Xen is called an IOREQ Server.
+ * A domain supports a single 'legacy' IOREQ Server which is instantiated if
+ * parameter...
+ *
+ * HVM_PARAM_IOREQ_PFN is read (to get the gmfn containing the synchronous
+ * ioreq structures), or...
+ * HVM_PARAM_BUFIOREQ_PFN is read (to get the gmfn containing the buffered
+ * ioreq ring), or...
+ * HVM_PARAM_BUFIOREQ_EVTCHN is read (to get the event channel that Xen uses
+ * to request buffered I/O emulation).
+ *
+ * The following hypercalls facilitate the creation of IOREQ Servers for
+ * 'secondary' emulators which are invoked to implement port I/O, memory, or
+ * PCI config space ranges which they explicitly register.
+ */
+
+typedef uint16_t ioservid_t;
+
+/*
+ * XEN_DMOP_create_ioreq_server: Instantiate a new IOREQ Server for a
+ *                               secondary emulator.
+ *
+ * The <id> handed back is unique for target domain. The valur of
+ * <handle_bufioreq> should be one of HVM_IOREQSRV_BUFIOREQ_* defined in
+ * hvm_op.h. If the value is HVM_IOREQSRV_BUFIOREQ_OFF then  the buffered
+ * ioreq ring will not be allocated and hence all emulation requests to
+ * this server will be synchronous.
+ */
+#define XEN_DMOP_create_ioreq_server 1
+
+struct xen_dm_op_create_ioreq_server {
+    /* IN - should server handle buffered ioreqs */
+    uint8_t handle_bufioreq;
+    uint8_t pad[3];
+    /* OUT - server id */
+    ioservid_t id;
+};
+
+/*
+ * XEN_DMOP_get_ioreq_server_info: Get all the information necessary to
+ *                                 access IOREQ Server <id>.
+ *
+ * The emulator needs to map the synchronous ioreq structures and buffered
+ * ioreq ring (if it exists) that Xen uses to request emulation. These are
+ * hosted in the target domain's gmfns <ioreq_pfn> and <bufioreq_pfn>
+ * respectively. In addition, if the IOREQ Server is handling buffered
+ * emulation requests, the emulator needs to bind to event channel
+ * <bufioreq_port> to listen for them. (The event channels used for
+ * synchronous emulation requests are specified in the per-CPU ioreq
+ * structures in <ioreq_pfn>).
+ * If the IOREQ Server is not handling buffered emulation requests then the
+ * values handed back in <bufioreq_pfn> and <bufioreq_port> will both be 0.
+ */
+#define XEN_DMOP_get_ioreq_server_info 2
+
+struct xen_dm_op_get_ioreq_server_info {
+    /* IN - server id */
+    ioservid_t id;
+    uint16_t pad;
+    /* OUT - buffered ioreq port */
+    evtchn_port_t bufioreq_port;
+    /* OUT - sync ioreq pfn */
+    uint64_aligned_t ioreq_pfn;
+    /* OUT - buffered ioreq pfn */
+    uint64_aligned_t bufioreq_pfn;
+};
+
+/*
+ * XEN_DMOP_map_io_range_to_ioreq_server: Register an I/O range for
+ *                                        emulation by the client of
+ *                                        IOREQ Server <id>.
+ * XEN_DMOP_unmap_io_range_from_ioreq_server: Deregister an I/O range
+ *                                            previously registered for
+ *                                            emulation by the client of
+ *                                            IOREQ Server <id>.
+ *
+ * There are three types of I/O that can be emulated: port I/O, memory
+ * accesses and PCI config space accesses. The <type> field denotes which
+ * type of range* the <start> and <end> (inclusive) fields are specifying.
+ * PCI config space ranges are specified by segment/bus/device/function
+ * values which should be encoded using the DMOP_PCI_SBDF helper macro
+ * below.
+ *
+ * NOTE: unless an emulation request falls entirely within a range mapped
+ * by a secondary emulator, it will not be passed to that emulator.
+ */
+#define XEN_DMOP_map_io_range_to_ioreq_server 3
+#define XEN_DMOP_unmap_io_range_from_ioreq_server 4
+
+struct xen_dm_op_ioreq_server_range {
+    /* IN - server id */
+    ioservid_t id;
+    uint16_t pad;
+    /* IN - type of range */
+    uint32_t type;
+# define XEN_DMOP_IO_RANGE_PORT   0 /* I/O port range */
+# define XEN_DMOP_IO_RANGE_MEMORY 1 /* MMIO range */
+# define XEN_DMOP_IO_RANGE_PCI    2 /* PCI segment/bus/dev/func range */
+    /* IN - inclusive start and end of range */
+    uint64_aligned_t start, end;
+};
+
+#define XEN_DMOP_PCI_SBDF(s,b,d,f) \
+	((((s) & 0xffff) << 16) |  \
+	 (((b) & 0xff) << 8) |     \
+	 (((d) & 0x1f) << 3) |     \
+	 ((f) & 0x07))
+
+/*
+ * XEN_DMOP_set_ioreq_server_state: Enable or disable the IOREQ Server <id>
+ *
+ * The IOREQ Server will not be passed any emulation requests until it is
+ * in the enabled state.
+ * Note that the contents of the ioreq_pfn and bufioreq_fn (see
+ * XEN_DMOP_get_ioreq_server_info) are not meaningful until the IOREQ Server
+ * is in the enabled state.
+ */
+#define XEN_DMOP_set_ioreq_server_state 5
+
+struct xen_dm_op_set_ioreq_server_state {
+    /* IN - server id */
+    ioservid_t id;
+    /* IN - enabled? */
+    uint8_t enabled;
+    uint8_t pad;
+};
+
+/*
+ * XEN_DMOP_destroy_ioreq_server: Destroy the IOREQ Server <id>.
+ *
+ * Any registered I/O ranges will be automatically deregistered.
+ */
+#define XEN_DMOP_destroy_ioreq_server 6
+
+struct xen_dm_op_destroy_ioreq_server {
+    /* IN - server id */
+    ioservid_t id;
+    uint16_t pad;
+};
+
 struct xen_dm_op {
     uint32_t op;
+    uint32_t pad;
+    union {
+        struct xen_dm_op_create_ioreq_server create_ioreq_server;
+        struct xen_dm_op_get_ioreq_server_info get_ioreq_server_info;
+        struct xen_dm_op_ioreq_server_range map_io_range_to_ioreq_server;
+        struct xen_dm_op_ioreq_server_range unmap_io_range_from_ioreq_server;
+        struct xen_dm_op_set_ioreq_server_state set_ioreq_server_state;
+        struct xen_dm_op_destroy_ioreq_server destroy_ioreq_server;
+    } u;
 };
 
 #endif /* __XEN__ || __XEN_TOOLS__ */

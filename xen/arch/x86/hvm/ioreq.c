@@ -514,9 +514,9 @@ static int hvm_ioreq_server_alloc_rangesets(struct hvm_ioreq_server *s,
         char *name;
 
         rc = asprintf(&name, "ioreq_server %d %s", s->id,
-                      (i == HVMOP_IO_RANGE_PORT) ? "port" :
-                      (i == HVMOP_IO_RANGE_MEMORY) ? "memory" :
-                      (i == HVMOP_IO_RANGE_PCI) ? "pci" :
+                      (i == XEN_DMOP_IO_RANGE_PORT) ? "port" :
+                      (i == XEN_DMOP_IO_RANGE_MEMORY) ? "memory" :
+                      (i == XEN_DMOP_IO_RANGE_PCI) ? "pci" :
                       "");
         if ( rc )
             goto fail;
@@ -834,9 +834,9 @@ int hvm_map_io_range_to_ioreq_server(struct domain *d, ioservid_t id,
 
             switch ( type )
             {
-            case HVMOP_IO_RANGE_PORT:
-            case HVMOP_IO_RANGE_MEMORY:
-            case HVMOP_IO_RANGE_PCI:
+            case XEN_DMOP_IO_RANGE_PORT:
+            case XEN_DMOP_IO_RANGE_MEMORY:
+            case XEN_DMOP_IO_RANGE_PCI:
                 r = s->range[type];
                 break;
 
@@ -886,9 +886,9 @@ int hvm_unmap_io_range_from_ioreq_server(struct domain *d, ioservid_t id,
 
             switch ( type )
             {
-            case HVMOP_IO_RANGE_PORT:
-            case HVMOP_IO_RANGE_MEMORY:
-            case HVMOP_IO_RANGE_PCI:
+            case XEN_DMOP_IO_RANGE_PORT:
+            case XEN_DMOP_IO_RANGE_MEMORY:
+            case XEN_DMOP_IO_RANGE_PCI:
                 r = s->range[type];
                 break;
 
@@ -1129,12 +1129,12 @@ struct hvm_ioreq_server *hvm_select_ioreq_server(struct domain *d,
 
         /* PCI config data cycle */
 
-        sbdf = HVMOP_PCI_SBDF(0,
-                              PCI_BUS(CF8_BDF(cf8)),
-                              PCI_SLOT(CF8_BDF(cf8)),
-                              PCI_FUNC(CF8_BDF(cf8)));
+        sbdf = XEN_DMOP_PCI_SBDF(0,
+                                 PCI_BUS(CF8_BDF(cf8)),
+                                 PCI_SLOT(CF8_BDF(cf8)),
+                                 PCI_FUNC(CF8_BDF(cf8)));
 
-        type = HVMOP_IO_RANGE_PCI;
+        type = XEN_DMOP_IO_RANGE_PCI;
         addr = ((uint64_t)sbdf << 32) |
                CF8_ADDR_LO(cf8) |
                (p->addr & 3);
@@ -1155,7 +1155,7 @@ struct hvm_ioreq_server *hvm_select_ioreq_server(struct domain *d,
     else
     {
         type = (p->type == IOREQ_TYPE_PIO) ?
-                HVMOP_IO_RANGE_PORT : HVMOP_IO_RANGE_MEMORY;
+                XEN_DMOP_IO_RANGE_PORT : XEN_DMOP_IO_RANGE_MEMORY;
         addr = p->addr;
     }
 
@@ -1177,19 +1177,19 @@ struct hvm_ioreq_server *hvm_select_ioreq_server(struct domain *d,
         {
             unsigned long end;
 
-        case HVMOP_IO_RANGE_PORT:
+        case XEN_DMOP_IO_RANGE_PORT:
             end = addr + p->size - 1;
             if ( rangeset_contains_range(r, addr, end) )
                 return s;
 
             break;
-        case HVMOP_IO_RANGE_MEMORY:
+        case XEN_DMOP_IO_RANGE_MEMORY:
             end = addr + (p->size * p->count) - 1;
             if ( rangeset_contains_range(r, addr, end) )
                 return s;
 
             break;
-        case HVMOP_IO_RANGE_PCI:
+        case XEN_DMOP_IO_RANGE_PCI:
             if ( rangeset_contains_singleton(r, addr >> 32) )
             {
                 p->type = IOREQ_TYPE_PCI_CONFIG;

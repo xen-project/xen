@@ -1525,11 +1525,6 @@ static int flask_hvm_inject_msi(struct domain *d)
     return current_has_perm(d, SECCLASS_HVM, HVM__SEND_IRQ);
 }
 
-static int flask_hvm_ioreq_server(struct domain *d, int op)
-{
-    return current_has_perm(d, SECCLASS_HVM, HVM__HVMCTL);
-}
-
 static int flask_mem_sharing_op(struct domain *d, struct domain *cd, int op)
 {
     int rc = current_has_perm(cd, SECCLASS_HVM, HVM__MEM_SHARING);
@@ -1808,7 +1803,6 @@ static struct xsm_operations flask_ops = {
     .hvm_set_isa_irq_level = flask_hvm_set_isa_irq_level,
     .hvm_set_pci_link_route = flask_hvm_set_pci_link_route,
     .hvm_inject_msi = flask_hvm_inject_msi,
-    .hvm_ioreq_server = flask_hvm_ioreq_server,
     .mem_sharing_op = flask_mem_sharing_op,
     .apic = flask_apic,
     .machine_memory_map = flask_machine_memory_map,

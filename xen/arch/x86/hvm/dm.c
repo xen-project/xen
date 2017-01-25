@@ -78,8 +78,101 @@ static int dm_op(domid_t domid,
         goto out;
     }
 
+    rc = -EINVAL;
+    if ( op.pad )
+        goto out;
+
     switch ( op.op )
     {
+    case XEN_DMOP_create_ioreq_server:
+    {
+        struct domain *curr_d = current->domain;
+        struct xen_dm_op_create_ioreq_server *data =
+            &op.u.create_ioreq_server;
+
+        const_op = false;
+
+        rc = -EINVAL;
+        if ( data->pad[0] || data->pad[1] || data->pad[2] )
+            break;
+
+        rc = hvm_create_ioreq_server(d, curr_d->domain_id, 0,
+                                     data->handle_bufioreq, &data->id);
+        break;
+    }
+
+    case XEN_DMOP_get_ioreq_server_info:
+    {
+        struct xen_dm_op_get_ioreq_server_info *data =
+            &op.u.get_ioreq_server_info;
+
+        const_op = false;
+
+        rc = -EINVAL;
+        if ( data->pad )
+            break;
+
+        rc = hvm_get_ioreq_server_info(d, data->id,
+                                       &data->ioreq_pfn,
+                                       &data->bufioreq_pfn,
+                                       &data->bufioreq_port);
+        break;
+    }
+
+    case XEN_DMOP_map_io_range_to_ioreq_server:
+    {
+        const struct xen_dm_op_ioreq_server_range *data =
+            &op.u.map_io_range_to_ioreq_server;
+
+        rc = -EINVAL;
+        if ( data->pad )
+            break;
+
+        rc = hvm_map_io_range_to_ioreq_server(d, data->id, data->type,
+                                              data->start, data->end);
+        break;
+    }
+
+    case XEN_DMOP_unmap_io_range_from_ioreq_server:
+    {
+        const struct xen_dm_op_ioreq_server_range *data =
+            &op.u.unmap_io_range_from_ioreq_server;
+
+        rc = -EINVAL;
+        if ( data->pad )
+            break;
+
+        rc = hvm_unmap_io_range_from_ioreq_server(d, data->id, data->type,
+                                                  data->start, data->end);
+        break;
+    }
+
+    case XEN_DMOP_set_ioreq_server_state:
+    {
+        const struct xen_dm_op_set_ioreq_server_state *data =
+            &op.u.set_ioreq_server_state;
+
+        rc = -EINVAL;
+        if ( data->pad )
+            break;
+
+        rc = hvm_set_ioreq_server_state(d, data->id, !!data->enabled);
+        break;
+    }
+
+    case XEN_DMOP_destroy_ioreq_server:
+    {
+        const struct xen_dm_op_destroy_ioreq_server *data =
+            &op.u.destroy_ioreq_server;
+
+        rc = -EINVAL;
+        if ( data->pad )
+            break;
+
+        rc = hvm_destroy_ioreq_server(d, data->id);
+        break;
+    }
+
     default:
         rc = -EOPNOTSUPP;
         break;
@@ -95,6 +188,12 @@ static int dm_op(domid_t domid,
 
     return rc;
 }
+
+CHECK_dm_op_create_ioreq_server;
+CHECK_dm_op_get_ioreq_server_info;
+CHECK_dm_op_ioreq_server_range;
+CHECK_dm_op_set_ioreq_server_state;
+CHECK_dm_op_destroy_ioreq_server;
 
 #define MAX_NR_BUFS 1
 

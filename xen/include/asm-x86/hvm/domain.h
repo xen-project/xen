@@ -33,6 +33,7 @@
 #include <public/hvm/params.h>
 #include <public/hvm/save.h>
 #include <public/hvm/hvm_op.h>
+#include <public/hvm/dm_op.h>
 
 struct hvm_ioreq_page {
     unsigned long gmfn;
@@ -47,7 +48,7 @@ struct hvm_ioreq_vcpu {
     bool_t           pending;
 };
 
-#define NR_IO_RANGE_TYPES (HVMOP_IO_RANGE_PCI + 1)
+#define NR_IO_RANGE_TYPES (XEN_DMOP_IO_RANGE_PCI + 1)
 #define MAX_NR_IO_RANGES  256
 
 struct hvm_ioreq_server {
