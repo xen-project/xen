@@ -251,6 +251,27 @@ struct xen_dm_op_modified_memory {
     uint64_aligned_t first_pfn;
 };
 
+/*
+ * XEN_DMOP_set_mem_type: Notify that a region of memory is to be treated
+ *                        in a specific way. (See definition of
+ *                        hvmmem_type_t).
+ *
+ * NOTE: In the event of a continuation (return code -ERESTART), the
+ *       @first_pfn is set to the value of the pfn of the remaining
+ *       region and @nr reduced to the size of the remaining region.
+ */
+#define XEN_DMOP_set_mem_type 12
+
+struct xen_dm_op_set_mem_type {
+    /* IN - number of contiguous pages */
+    uint32_t nr;
+    /* IN - new hvmmem_type_t of region */
+    uint16_t mem_type;
+    uint16_t pad;
+    /* IN - first pfn in region */
+    uint64_aligned_t first_pfn;
+};
+
 struct xen_dm_op {
     uint32_t op;
     uint32_t pad;
@@ -266,6 +287,7 @@ struct xen_dm_op {
         struct xen_dm_op_set_isa_irq_level set_isa_irq_level;
         struct xen_dm_op_set_pci_link_route set_pci_link_route;
         struct xen_dm_op_modified_memory modified_memory;
+        struct xen_dm_op_set_mem_type set_mem_type;
     } u;
 };
 

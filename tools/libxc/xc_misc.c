@@ -590,30 +590,21 @@ int xc_hvm_modified_memory(
 }
 
 int xc_hvm_set_mem_type(
-    xc_interface *xch, domid_t dom, hvmmem_type_t mem_type, uint64_t first_pfn, uint64_t nr)
+    xc_interface *xch, domid_t dom, hvmmem_type_t mem_type, uint64_t first_pfn, uint32_t nr)
 {
-    DECLARE_HYPERCALL_BUFFER(struct xen_hvm_set_mem_type, arg);
-    int rc;
+    struct xen_dm_op op;
+    struct xen_dm_op_set_mem_type *data;
 
-    arg = xc_hypercall_buffer_alloc(xch, arg, sizeof(*arg));
-    if ( arg == NULL )
-    {
-        PERROR("Could not allocate memory for xc_hvm_set_mem_type hypercall");
-        return -1;
-    }
+    memset(&op, 0, sizeof(op));
 
-    arg->domid        = dom;
-    arg->hvmmem_type  = mem_type;
-    arg->first_pfn    = first_pfn;
-    arg->nr           = nr;
+    op.op = XEN_DMOP_set_mem_type;
+    data = &op.u.set_mem_type;
 
-    rc = xencall2(xch->xcall, __HYPERVISOR_hvm_op,
-                  HVMOP_set_mem_type,
-                  HYPERCALL_BUFFER_AS_ARG(arg));
+    data->mem_type = mem_type;
+    data->first_pfn = first_pfn;
+    data->nr = nr;
 
-    xc_hypercall_buffer_free(xch, arg);
-
-    return rc;
+    return do_dm_op(xch, dom, 1, &op, sizeof(op));
 }
 
 int xc_hvm_inject_trap(

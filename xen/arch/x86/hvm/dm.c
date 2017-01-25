@@ -171,6 +171,82 @@ static int modified_memory(struct domain *d,
     return rc;
 }
 
+static bool allow_p2m_type_change(p2m_type_t old, p2m_type_t new)
+{
+    return p2m_is_ram(old) ||
+           (p2m_is_hole(old) && new == p2m_mmio_dm) ||
+           (old == p2m_ioreq_server && new == p2m_ram_rw);
+}
+
+static int set_mem_type(struct domain *d,
+                        struct xen_dm_op_set_mem_type *data)
+{
+    xen_pfn_t last_pfn = data->first_pfn + data->nr - 1;
+    unsigned int iter = 0;
+    int rc = 0;
+
+    /* Interface types to internal p2m types */
+    static const p2m_type_t memtype[] = {
+        [HVMMEM_ram_rw]  = p2m_ram_rw,
+        [HVMMEM_ram_ro]  = p2m_ram_ro,
+        [HVMMEM_mmio_dm] = p2m_mmio_dm,
+        [HVMMEM_unused] = p2m_invalid,
+        [HVMMEM_ioreq_server] = p2m_ioreq_server,
+    };
+
+    if ( (data->first_pfn > last_pfn) ||
+         (last_pfn > domain_get_maximum_gpfn(d)) )
+        return -EINVAL;
+
+    if ( data->mem_type >= ARRAY_SIZE(memtype) ||
+         unlikely(data->mem_type == HVMMEM_unused) )
+        return -EINVAL;
+
+    while ( iter < data->nr )
+    {
+        unsigned long pfn = data->first_pfn + iter;
+        p2m_type_t t;
+
+        get_gfn_unshare(d, pfn, &t);
+        if ( p2m_is_paging(t) )
+        {
+            put_gfn(d, pfn);
+            p2m_mem_paging_populate(d, pfn);
+            return -EAGAIN;
+        }
+
+        if ( p2m_is_shared(t) )
+            rc = -EAGAIN;
+        else if ( !allow_p2m_type_change(t, memtype[data->mem_type]) )
+            rc = -EINVAL;
+        else
+            rc = p2m_change_type_one(d, pfn, t, memtype[data->mem_type]);
+
+        put_gfn(d, pfn);
+
+        if ( rc )
+            break;
+
+        iter++;
+
+        /*
+         * Check for continuation every 256th iteration and if the
+         * iteration is not the last.
+         */
+        if ( (iter < data->nr) && ((iter & 0xff) == 0) &&
+             hypercall_preempt_check() )
+        {
+            data->first_pfn += iter;
+            data->nr -= iter;
+
+            rc = -ERESTART;
+            break;
+        }
+    }
+
+    return rc;
+}
+
 static int dm_op(domid_t domid,
                  unsigned int nr_bufs,
                  xen_dm_op_buf_t bufs[])
@@ -352,6 +428,21 @@ static int dm_op(domid_t domid,
         break;
     }
 
+    case XEN_DMOP_set_mem_type:
+    {
+        struct xen_dm_op_set_mem_type *data =
+            &op.u.set_mem_type;
+
+        const_op = false;
+
+        rc = -EINVAL;
+        if ( data->pad )
+            break;
+
+        rc = set_mem_type(d, data);
+        break;
+    }
+
     default:
         rc = -EOPNOTSUPP;
         break;
@@ -378,6 +469,7 @@ CHECK_dm_op_set_pci_intx_level;
 CHECK_dm_op_set_isa_irq_level;
 CHECK_dm_op_set_pci_link_route;
 CHECK_dm_op_modified_memory;
+CHECK_dm_op_set_mem_type;
 
 #define MAX_NR_BUFS 2
 

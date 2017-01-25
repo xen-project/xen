@@ -64,6 +64,7 @@
 ?	dm_op_modified_memory		hvm/dm_op.h
 ?	dm_op_set_ioreq_server_state	hvm/dm_op.h
 ?	dm_op_set_isa_irq_level		hvm/dm_op.h
+?	dm_op_set_mem_type		hvm/dm_op.h
 ?	dm_op_set_pci_intx_level	hvm/dm_op.h
 ?	dm_op_set_pci_link_route	hvm/dm_op.h
 ?	dm_op_track_dirty_vram		hvm/dm_op.h

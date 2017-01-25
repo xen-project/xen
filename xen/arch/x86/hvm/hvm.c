@@ -4850,132 +4850,11 @@ static int hvmop_get_mem_type(
     return rc;
 }
 
-/*
- * Note that this value is effectively part of the ABI, even if we don't need
- * to make it a formal part of it: A guest suspended for migration in the
- * middle of a continuation would fail to work if resumed on a hypervisor
- * using a different value.
- */
-#define HVMOP_op_mask 0xff
-
-static bool_t hvm_allow_p2m_type_change(p2m_type_t old, p2m_type_t new)
-{
-    if ( p2m_is_ram(old) ||
-         (p2m_is_hole(old) && new == p2m_mmio_dm) ||
-         (old == p2m_ioreq_server && new == p2m_ram_rw) )
-        return 1;
-
-    return 0;
-}
-
-static int hvmop_set_mem_type(
-    XEN_GUEST_HANDLE_PARAM(xen_hvm_set_mem_type_t) arg,
-    unsigned long *iter)
-{
-    unsigned long start_iter = *iter;
-    struct xen_hvm_set_mem_type a;
-    struct domain *d;
-    int rc;
-
-    /* Interface types to internal p2m types */
-    static const p2m_type_t memtype[] = {
-        [HVMMEM_ram_rw]  = p2m_ram_rw,
-        [HVMMEM_ram_ro]  = p2m_ram_ro,
-        [HVMMEM_mmio_dm] = p2m_mmio_dm,
-        [HVMMEM_unused] = p2m_invalid,
-        [HVMMEM_ioreq_server] = p2m_ioreq_server
-    };
-
-    if ( copy_from_guest(&a, arg, 1) )
-        return -EFAULT;
-
-    rc = rcu_lock_remote_domain_by_id(a.domid, &d);
-    if ( rc != 0 )
-        return rc;
-
-    rc = -EINVAL;
-    if ( !is_hvm_domain(d) )
-        goto out;
-
-    rc = xsm_hvm_control(XSM_DM_PRIV, d, HVMOP_set_mem_type);
-    if ( rc )
-        goto out;
-
-    rc = -EINVAL;
-    if ( a.nr < start_iter ||
-         ((a.first_pfn + a.nr - 1) < a.first_pfn) ||
-         ((a.first_pfn + a.nr - 1) > domain_get_maximum_gpfn(d)) )
-        goto out;
-
-    if ( a.hvmmem_type >= ARRAY_SIZE(memtype) ||
-         unlikely(a.hvmmem_type == HVMMEM_unused) )
-        goto out;
-
-    while ( a.nr > start_iter )
-    {
-        unsigned long pfn = a.first_pfn + start_iter;
-        p2m_type_t t;
-
-        get_gfn_unshare(d, pfn, &t);
-        if ( p2m_is_paging(t) )
-        {
-            put_gfn(d, pfn);
-            p2m_mem_paging_populate(d, pfn);
-            rc = -EAGAIN;
-            goto out;
-        }
-        if ( p2m_is_shared(t) )
-        {
-            put_gfn(d, pfn);
-            rc = -EAGAIN;
-            goto out;
-        }
-        if ( !hvm_allow_p2m_type_change(t, memtype[a.hvmmem_type]) )
-        {
-            put_gfn(d, pfn);
-            goto out;
-        }
-
-        rc = p2m_change_type_one(d, pfn, t, memtype[a.hvmmem_type]);
-        put_gfn(d, pfn);
-
-        if ( rc )
-            goto out;
-
-        /* Check for continuation if it's not the last interation */
-        if ( a.nr > ++start_iter && !(start_iter & HVMOP_op_mask) &&
-             hypercall_preempt_check() )
-        {
-            rc = -ERESTART;
-            goto out;
-        }
-    }
-    rc = 0;
-
- out:
-    rcu_unlock_domain(d);
-    *iter = start_iter;
-
-    return rc;
-}
-
 long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
 {
-    unsigned long start_iter, mask;
     long rc = 0;
 
-    switch ( op & HVMOP_op_mask )
-    {
-    default:
-        mask = ~0UL;
-        break;
-    case HVMOP_set_mem_type:
-        mask = HVMOP_op_mask;
-        break;
-    }
-
-    start_iter = op & ~mask;
-    switch ( op &= mask )
+    switch ( op )
     {
     case HVMOP_set_evtchn_upcall_vector:
         rc = hvmop_set_evtchn_upcall_vector(
@@ -5004,12 +4883,6 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
     case HVMOP_get_mem_type:
         rc = hvmop_get_mem_type(
             guest_handle_cast(arg, xen_hvm_get_mem_type_t));
-        break;
-
-    case HVMOP_set_mem_type:
-        rc = hvmop_set_mem_type(
-            guest_handle_cast(arg, xen_hvm_set_mem_type_t),
-            &start_iter);
         break;
 
     case HVMOP_pagetable_dying:
@@ -5118,13 +4991,6 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
         rc = -ENOSYS;
         break;
     }
-    }
-
-    if ( rc == -ERESTART )
-    {
-        ASSERT(!(start_iter & mask));
-        rc = hypercall_create_continuation(__HYPERVISOR_hvm_op, "lh",
-                                           op | start_iter, arg);
     }
 
     return rc;

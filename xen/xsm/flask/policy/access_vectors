@@ -262,7 +262,7 @@ class hvm
     bind_irq
 # XEN_DOMCTL_pin_mem_cacheattr
     cacheattr
-# HVMOP_get_mem_type, HVMOP_set_mem_type,
+# HVMOP_get_mem_type,
 # HVMOP_set_mem_access, HVMOP_get_mem_access, HVMOP_pagetable_dying,
 # HVMOP_inject_trap
     hvmctl

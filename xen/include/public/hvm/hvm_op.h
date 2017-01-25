@@ -96,26 +96,6 @@ typedef enum {
     HVMMEM_ioreq_server
 } hvmmem_type_t;
 
-/* Following tools-only interfaces may change in future. */
-#if defined(__XEN__) || defined(__XEN_TOOLS__)
-
-#define HVMOP_set_mem_type    8
-/* Notify that a region of memory is to be treated in a specific way. */
-struct xen_hvm_set_mem_type {
-    /* Domain to be updated. */
-    domid_t domid;
-    /* Memory type */
-    uint16_t hvmmem_type;
-    /* Number of pages. */
-    uint32_t nr;
-    /* First pfn. */
-    uint64_aligned_t first_pfn;
-};
-typedef struct xen_hvm_set_mem_type xen_hvm_set_mem_type_t;
-DEFINE_XEN_GUEST_HANDLE(xen_hvm_set_mem_type_t);
-
-#endif /* defined(__XEN__) || defined(__XEN_TOOLS__) */
-
 /* Hint from PV drivers for pagetable destruction. */
 #define HVMOP_pagetable_dying        9
 struct xen_hvm_pagetable_dying {

@@ -1634,7 +1634,7 @@ int xc_hvm_modified_memory(
  * Allowed types are HVMMEM_ram_rw, HVMMEM_ram_ro, HVMMEM_mmio_dm
  */
 int xc_hvm_set_mem_type(
-    xc_interface *xch, domid_t dom, hvmmem_type_t memtype, uint64_t first_pfn, uint64_t nr);
+    xc_interface *xch, domid_t dom, hvmmem_type_t memtype, uint64_t first_pfn, uint32_t nr);
 
 /*
  * Injects a hardware/software CPU trap, to take effect the next time the HVM 
