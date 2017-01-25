@@ -194,6 +194,45 @@ struct xen_dm_op_track_dirty_vram {
     uint64_aligned_t first_pfn;
 };
 
+/*
+ * XEN_DMOP_set_pci_intx_level: Set the logical level of one of a domain's
+ *                              PCI INTx pins.
+ */
+#define XEN_DMOP_set_pci_intx_level 8
+
+struct xen_dm_op_set_pci_intx_level {
+    /* IN - PCI INTx identification (domain:bus:device:intx) */
+    uint16_t domain;
+    uint8_t bus, device, intx;
+    /* IN - Level: 0 -> deasserted, 1 -> asserted */
+    uint8_t  level;
+};
+
+/*
+ * XEN_DMOP_set_isa_irq_level: Set the logical level of a one of a domain's
+ *                             ISA IRQ lines.
+ */
+#define XEN_DMOP_set_isa_irq_level 9
+
+struct xen_dm_op_set_isa_irq_level {
+    /* IN - ISA IRQ (0-15) */
+    uint8_t  isa_irq;
+    /* IN - Level: 0 -> deasserted, 1 -> asserted */
+    uint8_t  level;
+};
+
+/*
+ * XEN_DMOP_set_pci_link_route: Map a PCI INTx line to an IRQ line.
+ */
+#define XEN_DMOP_set_pci_link_route 10
+
+struct xen_dm_op_set_pci_link_route {
+    /* PCI INTx line (0-3) */
+    uint8_t  link;
+    /* ISA IRQ (1-15) or 0 -> disable link */
+    uint8_t  isa_irq;
+};
+
 struct xen_dm_op {
     uint32_t op;
     uint32_t pad;
@@ -205,6 +244,9 @@ struct xen_dm_op {
         struct xen_dm_op_set_ioreq_server_state set_ioreq_server_state;
         struct xen_dm_op_destroy_ioreq_server destroy_ioreq_server;
         struct xen_dm_op_track_dirty_vram track_dirty_vram;
+        struct xen_dm_op_set_pci_intx_level set_pci_intx_level;
+        struct xen_dm_op_set_isa_irq_level set_isa_irq_level;
+        struct xen_dm_op_set_pci_link_route set_pci_link_route;
     } u;
 };
 

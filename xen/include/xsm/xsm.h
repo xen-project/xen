@@ -162,9 +162,6 @@ struct xsm_operations {
 #ifdef CONFIG_X86
     int (*do_mca) (void);
     int (*shadow_control) (struct domain *d, uint32_t op);
-    int (*hvm_set_pci_intx_level) (struct domain *d);
-    int (*hvm_set_isa_irq_level) (struct domain *d);
-    int (*hvm_set_pci_link_route) (struct domain *d);
     int (*hvm_inject_msi) (struct domain *d);
     int (*mem_sharing_op) (struct domain *d, struct domain *cd, int op);
     int (*apic) (struct domain *d, int cmd);
@@ -633,21 +630,6 @@ static inline int xsm_do_mca(xsm_default_t def)
 static inline int xsm_shadow_control (xsm_default_t def, struct domain *d, uint32_t op)
 {
     return xsm_ops->shadow_control(d, op);
-}
-
-static inline int xsm_hvm_set_pci_intx_level (xsm_default_t def, struct domain *d)
-{
-    return xsm_ops->hvm_set_pci_intx_level(d);
-}
-
-static inline int xsm_hvm_set_isa_irq_level (xsm_default_t def, struct domain *d)
-{
-    return xsm_ops->hvm_set_isa_irq_level(d);
-}
-
-static inline int xsm_hvm_set_pci_link_route (xsm_default_t def, struct domain *d)
-{
-    return xsm_ops->hvm_set_pci_link_route(d);
 }
 
 static inline int xsm_hvm_inject_msi (xsm_default_t def, struct domain *d)

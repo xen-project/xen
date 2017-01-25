@@ -74,6 +74,49 @@ static int track_dirty_vram(struct domain *d, xen_pfn_t first_pfn,
         hap_track_dirty_vram(d, first_pfn, nr, buf->h);
 }
 
+static int set_pci_intx_level(struct domain *d, uint16_t domain,
+                              uint8_t bus, uint8_t device,
+                              uint8_t intx, uint8_t level)
+{
+    if ( domain != 0 || bus != 0 || device > 0x1f || intx > 3 )
+        return -EINVAL;
+
+    switch ( level )
+    {
+    case 0:
+        hvm_pci_intx_deassert(d, device, intx);
+        break;
+    case 1:
+        hvm_pci_intx_assert(d, device, intx);
+        break;
+    default:
+        return -EINVAL;
+    }
+
+    return 0;
+}
+
+static int set_isa_irq_level(struct domain *d, uint8_t isa_irq,
+                             uint8_t level)
+{
+    if ( isa_irq > 15 )
+        return -EINVAL;
+
+    switch ( level )
+    {
+    case 0:
+        hvm_isa_irq_deassert(d, isa_irq);
+        break;
+    case 1:
+        hvm_isa_irq_assert(d, isa_irq);
+        break;
+    default:
+        return -EINVAL;
+    }
+
+    return 0;
+}
+
 static int dm_op(domid_t domid,
                  unsigned int nr_bufs,
                  xen_dm_op_buf_t bufs[])
@@ -211,6 +254,35 @@ static int dm_op(domid_t domid,
         break;
     }
 
+    case XEN_DMOP_set_pci_intx_level:
+    {
+        const struct xen_dm_op_set_pci_intx_level *data =
+            &op.u.set_pci_intx_level;
+
+        rc = set_pci_intx_level(d, data->domain, data->bus,
+                                data->device, data->intx,
+                                data->level);
+        break;
+    }
+
+    case XEN_DMOP_set_isa_irq_level:
+    {
+        const struct xen_dm_op_set_isa_irq_level *data =
+            &op.u.set_isa_irq_level;
+
+        rc = set_isa_irq_level(d, data->isa_irq, data->level);
+        break;
+    }
+
+    case XEN_DMOP_set_pci_link_route:
+    {
+        const struct xen_dm_op_set_pci_link_route *data =
+            &op.u.set_pci_link_route;
+
+        rc = hvm_set_pci_link_route(d, data->link, data->isa_irq);
+        break;
+    }
+
     default:
         rc = -EOPNOTSUPP;
         break;
@@ -233,6 +305,9 @@ CHECK_dm_op_ioreq_server_range;
 CHECK_dm_op_set_ioreq_server_state;
 CHECK_dm_op_destroy_ioreq_server;
 CHECK_dm_op_track_dirty_vram;
+CHECK_dm_op_set_pci_intx_level;
+CHECK_dm_op_set_isa_irq_level;
+CHECK_dm_op_set_pci_link_route;
 
 #define MAX_NR_BUFS 2
 

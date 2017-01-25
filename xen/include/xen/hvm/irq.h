@@ -122,7 +122,7 @@ void hvm_isa_irq_assert(
 void hvm_isa_irq_deassert(
     struct domain *d, unsigned int isa_irq);
 
-void hvm_set_pci_link_route(struct domain *d, u8 link, u8 isa_irq);
+int hvm_set_pci_link_route(struct domain *d, u8 link, u8 isa_irq);
 
 int hvm_inject_msi(struct domain *d, uint64_t addr, uint32_t data);
 

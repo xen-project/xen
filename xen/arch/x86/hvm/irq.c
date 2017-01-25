@@ -229,13 +229,14 @@ void hvm_assert_evtchn_irq(struct vcpu *v)
         hvm_set_callback_irq_level(v);
 }
 
-void hvm_set_pci_link_route(struct domain *d, u8 link, u8 isa_irq)
+int hvm_set_pci_link_route(struct domain *d, u8 link, u8 isa_irq)
 {
     struct hvm_irq *hvm_irq = &d->arch.hvm_domain.irq;
     u8 old_isa_irq;
     int i;
 
-    ASSERT((link <= 3) && (isa_irq <= 15));
+    if ( (link > 3) || (isa_irq > 15) )
+        return -EINVAL;
 
     spin_lock(&d->arch.hvm_domain.irq_lock);
 
@@ -273,6 +274,8 @@ void hvm_set_pci_link_route(struct domain *d, u8 link, u8 isa_irq)
 
     dprintk(XENLOG_G_INFO, "Dom%u PCI link %u changed %u -> %u\n",
             d->domain_id, link, old_isa_irq, isa_irq);
+
+    return 0;
 }
 
 int hvm_inject_msi(struct domain *d, uint64_t addr, uint32_t data)

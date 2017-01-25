@@ -259,12 +259,6 @@ class hvm
     setparam
 # HVMOP_get_param
     getparam
-# HVMOP_set_pci_intx_level (also needs hvmctl)
-    pcilevel
-# HVMOP_set_isa_irq_level
-    irqlevel
-# HVMOP_set_pci_link_route
-    pciroute
     bind_irq
 # XEN_DOMCTL_pin_mem_cacheattr
     cacheattr

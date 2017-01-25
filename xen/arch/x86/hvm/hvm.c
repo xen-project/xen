@@ -4049,50 +4049,6 @@ void hvm_hypercall_page_initialise(struct domain *d,
     hvm_funcs.init_hypercall_page(d, hypercall_page);
 }
 
-static int hvmop_set_pci_intx_level(
-    XEN_GUEST_HANDLE_PARAM(xen_hvm_set_pci_intx_level_t) uop)
-{
-    struct xen_hvm_set_pci_intx_level op;
-    struct domain *d;
-    int rc;
-
-    if ( copy_from_guest(&op, uop, 1) )
-        return -EFAULT;
-
-    if ( (op.domain > 0) || (op.bus > 0) || (op.device > 31) || (op.intx > 3) )
-        return -EINVAL;
-
-    rc = rcu_lock_remote_domain_by_id(op.domid, &d);
-    if ( rc != 0 )
-        return rc;
-
-    rc = -EINVAL;
-    if ( !is_hvm_domain(d) )
-        goto out;
-
-    rc = xsm_hvm_set_pci_intx_level(XSM_DM_PRIV, d);
-    if ( rc )
-        goto out;
-
-    rc = 0;
-    switch ( op.level )
-    {
-    case 0:
-        hvm_pci_intx_deassert(d, op.device, op.intx);
-        break;
-    case 1:
-        hvm_pci_intx_assert(d, op.device, op.intx);
-        break;
-    default:
-        rc = -EINVAL;
-        break;
-    }
-
- out:
-    rcu_unlock_domain(d);
-    return rc;
-}
-
 void hvm_vcpu_reset_state(struct vcpu *v, uint16_t cs, uint16_t ip)
 {
     struct domain *d = v->domain;
@@ -4234,83 +4190,6 @@ static void hvm_s3_resume(struct domain *d)
             hvm_set_guest_tsc(v, 0);
         domain_unpause(d);
     }
-}
-
-static int hvmop_set_isa_irq_level(
-    XEN_GUEST_HANDLE_PARAM(xen_hvm_set_isa_irq_level_t) uop)
-{
-    struct xen_hvm_set_isa_irq_level op;
-    struct domain *d;
-    int rc;
-
-    if ( copy_from_guest(&op, uop, 1) )
-        return -EFAULT;
-
-    if ( op.isa_irq > 15 )
-        return -EINVAL;
-
-    rc = rcu_lock_remote_domain_by_id(op.domid, &d);
-    if ( rc != 0 )
-        return rc;
-
-    rc = -EINVAL;
-    if ( !is_hvm_domain(d) )
-        goto out;
-
-    rc = xsm_hvm_set_isa_irq_level(XSM_DM_PRIV, d);
-    if ( rc )
-        goto out;
-
-    rc = 0;
-    switch ( op.level )
-    {
-    case 0:
-        hvm_isa_irq_deassert(d, op.isa_irq);
-        break;
-    case 1:
-        hvm_isa_irq_assert(d, op.isa_irq);
-        break;
-    default:
-        rc = -EINVAL;
-        break;
-    }
-
- out:
-    rcu_unlock_domain(d);
-    return rc;
-}
-
-static int hvmop_set_pci_link_route(
-    XEN_GUEST_HANDLE_PARAM(xen_hvm_set_pci_link_route_t) uop)
-{
-    struct xen_hvm_set_pci_link_route op;
-    struct domain *d;
-    int rc;
-
-    if ( copy_from_guest(&op, uop, 1) )
-        return -EFAULT;
-
-    if ( (op.link > 3) || (op.isa_irq > 15) )
-        return -EINVAL;
-
-    rc = rcu_lock_remote_domain_by_id(op.domid, &d);
-    if ( rc != 0 )
-        return rc;
-
-    rc = -EINVAL;
-    if ( !is_hvm_domain(d) )
-        goto out;
-
-    rc = xsm_hvm_set_pci_link_route(XSM_DM_PRIV, d);
-    if ( rc )
-        goto out;
-
-    rc = 0;
-    hvm_set_pci_link_route(d, op.link, op.isa_irq);
-
- out:
-    rcu_unlock_domain(d);
-    return rc;
 }
 
 static int hvmop_inject_msi(
@@ -5114,24 +4993,9 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
             guest_handle_cast(arg, xen_hvm_param_t));
         break;
 
-    case HVMOP_set_pci_intx_level:
-        rc = hvmop_set_pci_intx_level(
-            guest_handle_cast(arg, xen_hvm_set_pci_intx_level_t));
-        break;
-
-    case HVMOP_set_isa_irq_level:
-        rc = hvmop_set_isa_irq_level(
-            guest_handle_cast(arg, xen_hvm_set_isa_irq_level_t));
-        break;
-
     case HVMOP_inject_msi:
         rc = hvmop_inject_msi(
             guest_handle_cast(arg, xen_hvm_inject_msi_t));
-        break;
-
-    case HVMOP_set_pci_link_route:
-        rc = hvmop_set_pci_link_route(
-            guest_handle_cast(arg, xen_hvm_set_pci_link_route_t));
         break;
 
     case HVMOP_flush_tlbs:

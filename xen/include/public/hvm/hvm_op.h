@@ -38,6 +38,8 @@ struct xen_hvm_param {
 typedef struct xen_hvm_param xen_hvm_param_t;
 DEFINE_XEN_GUEST_HANDLE(xen_hvm_param_t);
 
+#if __XEN_INTERFACE_VERSION__ < 0x00040900
+
 /* Set the logical level of one of a domain's PCI INTx wires. */
 #define HVMOP_set_pci_intx_level  2
 struct xen_hvm_set_pci_intx_level {
@@ -75,6 +77,8 @@ struct xen_hvm_set_pci_link_route {
 };
 typedef struct xen_hvm_set_pci_link_route xen_hvm_set_pci_link_route_t;
 DEFINE_XEN_GUEST_HANDLE(xen_hvm_set_pci_link_route_t);
+
+#endif /* __XEN_INTERFACE_VERSION__ < 0x00040900 */
 
 /* Flushes all VCPU TLBs: @arg must be NULL. */
 #define HVMOP_flush_tlbs          5

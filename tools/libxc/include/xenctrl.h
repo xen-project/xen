@@ -1594,7 +1594,7 @@ int xc_physdev_unmap_pirq(xc_interface *xch,
 
 int xc_hvm_set_pci_intx_level(
     xc_interface *xch, domid_t dom,
-    uint8_t domain, uint8_t bus, uint8_t device, uint8_t intx,
+    uint16_t domain, uint8_t bus, uint8_t device, uint8_t intx,
     unsigned int level);
 int xc_hvm_set_isa_irq_level(
     xc_interface *xch, domid_t dom,

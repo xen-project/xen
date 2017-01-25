@@ -1502,21 +1502,6 @@ static int flask_ioport_mapping(struct domain *d, uint32_t start, uint32_t end, 
     return flask_ioport_permission(d, start, end, access);
 }
 
-static int flask_hvm_set_pci_intx_level(struct domain *d)
-{
-    return current_has_perm(d, SECCLASS_HVM, HVM__PCILEVEL);
-}
-
-static int flask_hvm_set_isa_irq_level(struct domain *d)
-{
-    return current_has_perm(d, SECCLASS_HVM, HVM__IRQLEVEL);
-}
-
-static int flask_hvm_set_pci_link_route(struct domain *d)
-{
-    return current_has_perm(d, SECCLASS_HVM, HVM__PCIROUTE);
-}
-
 static int flask_hvm_inject_msi(struct domain *d)
 {
     return current_has_perm(d, SECCLASS_HVM, HVM__SEND_IRQ);

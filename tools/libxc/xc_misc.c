@@ -470,33 +470,24 @@ int xc_getcpuinfo(xc_interface *xch, int max_cpus,
 
 int xc_hvm_set_pci_intx_level(
     xc_interface *xch, domid_t dom,
-    uint8_t domain, uint8_t bus, uint8_t device, uint8_t intx,
+    uint16_t domain, uint8_t bus, uint8_t device, uint8_t intx,
     unsigned int level)
 {
-    DECLARE_HYPERCALL_BUFFER(struct xen_hvm_set_pci_intx_level, arg);
-    int rc;
+    struct xen_dm_op op;
+    struct xen_dm_op_set_pci_intx_level *data;
 
-    arg = xc_hypercall_buffer_alloc(xch, arg, sizeof(*arg));
-    if ( arg == NULL )
-    {
-        PERROR("Could not allocate memory for xc_hvm_set_pci_intx_level hypercall");
-        return -1;
-    }
+    memset(&op, 0, sizeof(op));
 
-    arg->domid  = dom;
-    arg->domain = domain;
-    arg->bus    = bus;
-    arg->device = device;
-    arg->intx   = intx;
-    arg->level  = level;
+    op.op = XEN_DMOP_set_pci_intx_level;
+    data = &op.u.set_pci_intx_level;
 
-    rc = xencall2(xch->xcall, __HYPERVISOR_hvm_op,
-                  HVMOP_set_pci_intx_level,
-                  HYPERCALL_BUFFER_AS_ARG(arg));
+    data->domain = domain;
+    data->bus = bus;
+    data->device = device;
+    data->intx = intx;
+    data->level = level;
 
-    xc_hypercall_buffer_free(xch, arg);
-
-    return rc;
+    return do_dm_op(xch, dom, 1, &op, sizeof(op));
 }
 
 int xc_hvm_set_isa_irq_level(
@@ -504,53 +495,35 @@ int xc_hvm_set_isa_irq_level(
     uint8_t isa_irq,
     unsigned int level)
 {
-    DECLARE_HYPERCALL_BUFFER(struct xen_hvm_set_isa_irq_level, arg);
-    int rc;
+    struct xen_dm_op op;
+    struct xen_dm_op_set_isa_irq_level *data;
 
-    arg = xc_hypercall_buffer_alloc(xch, arg, sizeof(*arg));
-    if ( arg == NULL )
-    {
-        PERROR("Could not allocate memory for xc_hvm_set_isa_irq_level hypercall");
-        return -1;
-    }
+    memset(&op, 0, sizeof(op));
 
-    arg->domid   = dom;
-    arg->isa_irq = isa_irq;
-    arg->level   = level;
+    op.op = XEN_DMOP_set_isa_irq_level;
+    data = &op.u.set_isa_irq_level;
 
-    rc = xencall2(xch->xcall, __HYPERVISOR_hvm_op,
-                  HVMOP_set_isa_irq_level,
-                  HYPERCALL_BUFFER_AS_ARG(arg));
+    data->isa_irq = isa_irq;
+    data->level = level;
 
-    xc_hypercall_buffer_free(xch, arg);
-
-    return rc;
+    return do_dm_op(xch, dom, 1, &op, sizeof(op));
 }
 
 int xc_hvm_set_pci_link_route(
     xc_interface *xch, domid_t dom, uint8_t link, uint8_t isa_irq)
 {
-    DECLARE_HYPERCALL_BUFFER(struct xen_hvm_set_pci_link_route, arg);
-    int rc;
+    struct xen_dm_op op;
+    struct xen_dm_op_set_pci_link_route *data;
 
-    arg = xc_hypercall_buffer_alloc(xch, arg, sizeof(*arg));
-    if ( arg == NULL )
-    {
-        PERROR("Could not allocate memory for xc_hvm_set_pci_link_route hypercall");
-        return -1;
-    }
+    memset(&op, 0, sizeof(op));
 
-    arg->domid   = dom;
-    arg->link    = link;
-    arg->isa_irq = isa_irq;
+    op.op = XEN_DMOP_set_pci_link_route;
+    data = &op.u.set_pci_link_route;
 
-    rc = xencall2(xch->xcall, __HYPERVISOR_hvm_op,
-                  HVMOP_set_pci_link_route,
-                  HYPERCALL_BUFFER_AS_ARG(arg));
+    data->link = link;
+    data->isa_irq = isa_irq;
 
-    xc_hypercall_buffer_free(xch, arg);
-
-    return rc;
+    return do_dm_op(xch, dom, 1, &op, sizeof(op));
 }
 
 int xc_hvm_inject_msi(
