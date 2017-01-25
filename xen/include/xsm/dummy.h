@@ -727,6 +727,12 @@ static XSM_INLINE int xsm_pmu_op (XSM_DEFAULT_ARG struct domain *d, unsigned int
     }
 }
 
+static XSM_INLINE int xsm_dm_op(XSM_DEFAULT_ARG struct domain *d)
+{
+    XSM_ASSERT_ACTION(XSM_DM_PRIV);
+    return xsm_default_action(action, current->domain, d);
+}
+
 #endif /* CONFIG_X86 */
 
 #include <public/version.h>

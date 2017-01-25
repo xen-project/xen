@@ -2,6 +2,7 @@ subdir-y += svm
 subdir-y += vmx
 
 obj-y += asid.o
+obj-y += dm.o
 obj-y += emulate.o
 obj-y += hpet.o
 obj-y += hvm.o

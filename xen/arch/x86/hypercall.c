@@ -66,6 +66,7 @@ const hypercall_args_t hypercall_args_table[NR_hypercalls] =
     ARGS(kexec_op, 2),
     ARGS(tmem_op, 1),
     ARGS(xenpmu_op, 2),
+    ARGS(dm_op, 3),
     ARGS(mca, 1),
     ARGS(arch_1, 1),
 };
@@ -128,6 +129,7 @@ static const hypercall_table_t pv_hypercall_table[] = {
     HYPERCALL(tmem_op),
 #endif
     HYPERCALL(xenpmu_op),
+    COMPAT_CALL(dm_op),
     HYPERCALL(mca),
     HYPERCALL(arch_1),
 };

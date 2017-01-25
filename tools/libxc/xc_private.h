@@ -422,6 +422,8 @@ int xc_vm_event_control(xc_interface *xch, domid_t domain_id, unsigned int op,
 void *xc_vm_event_enable(xc_interface *xch, domid_t domain_id, int param,
                          uint32_t *port);
 
+int do_dm_op(xc_interface *xch, domid_t domid, unsigned int nr_bufs, ...);
+
 #endif /* __XC_PRIVATE_H__ */
 
 /*

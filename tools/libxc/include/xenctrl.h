@@ -41,6 +41,7 @@
 #include <xen/sched.h>
 #include <xen/memory.h>
 #include <xen/grant_table.h>
+#include <xen/hvm/dm_op.h>
 #include <xen/hvm/params.h>
 #include <xen/xsm/flask_op.h>
 #include <xen/tmem.h>
