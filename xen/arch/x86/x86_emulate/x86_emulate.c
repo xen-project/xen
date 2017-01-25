@@ -2323,6 +2323,11 @@ x86_decode(
             case 8:
                 /* VEX / XOP / EVEX */
                 generate_exception_if(rex_prefix || vex.pfx, EXC_UD);
+                /*
+                 * With operand size override disallowed (see above), op_bytes
+                 * should not have changed from its default.
+                 */
+                ASSERT(op_bytes == def_op_bytes);
 
                 vex.raw[0] = modrm;
                 if ( b == 0xc5 )
@@ -2351,7 +2356,8 @@ x86_decode(
                     }
                     else
                     {
-                        ASSERT(op_bytes == 4);
+                        /* Operand size fixed at 4 (no override via W bit). */
+                        op_bytes = 4;
                         vex.b = 1;
                     }
                     switch ( b )
