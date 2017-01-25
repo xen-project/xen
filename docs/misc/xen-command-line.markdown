@@ -1377,6 +1377,19 @@ Specify the host reboot method.
 'efi' instructs Xen to reboot using the EFI reboot call (in EFI mode by
  default it will use that method first).
 
+### rmrr
+> '= start<-end>=[s1]bdf1[,[s1]bdf2[,...]];start<-end>=[s2]bdf1[,[s2]bdf2[,...]]
+
+Define RMRR units that are missing from ACPI table along with device they
+belong to and use them for 1:1 mapping. End addresses can be omitted and one
+page will be mapped. The ranges are inclusive when start and end are specified.
+If segment of the first device is not specified, segment zero will be used.
+If other segments are not specified, first device segment will be used.
+If a segment is specified for other than the first device and it does not match
+the one specified for the first one, an error will be reported.
+Note: grub2 requires to escape or use quotations if special characters are used,
+namely ';', refer to the grub2 documentation if multiple ranges are specified.
+
 ### ro-hpet
 > `= <boolean>`
 
