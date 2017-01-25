@@ -573,29 +573,20 @@ int xc_hvm_track_dirty_vram(
 }
 
 int xc_hvm_modified_memory(
-    xc_interface *xch, domid_t dom, uint64_t first_pfn, uint64_t nr)
+    xc_interface *xch, domid_t dom, uint64_t first_pfn, uint32_t nr)
 {
-    DECLARE_HYPERCALL_BUFFER(struct xen_hvm_modified_memory, arg);
-    int rc;
+    struct xen_dm_op op;
+    struct xen_dm_op_modified_memory *data;
 
-    arg = xc_hypercall_buffer_alloc(xch, arg, sizeof(*arg));
-    if ( arg == NULL )
-    {
-        PERROR("Could not allocate memory for xc_hvm_modified_memory hypercall");
-        return -1;
-    }
+    memset(&op, 0, sizeof(op));
 
-    arg->domid     = dom;
-    arg->first_pfn = first_pfn;
-    arg->nr        = nr;
+    op.op = XEN_DMOP_modified_memory;
+    data = &op.u.modified_memory;
 
-    rc = xencall2(xch->xcall, __HYPERVISOR_hvm_op,
-                  HVMOP_modified_memory,
-                  HYPERCALL_BUFFER_AS_ARG(arg));
+    data->first_pfn = first_pfn;
+    data->nr = nr;
 
-    xc_hypercall_buffer_free(xch, arg);
-
-    return rc;
+    return do_dm_op(xch, dom, 1, &op, sizeof(op));
 }
 
 int xc_hvm_set_mem_type(

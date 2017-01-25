@@ -61,6 +61,7 @@
 ?	dm_op_destroy_ioreq_server	hvm/dm_op.h
 ?	dm_op_get_ioreq_server_info	hvm/dm_op.h
 ?	dm_op_ioreq_server_range	hvm/dm_op.h
+?	dm_op_modified_memory		hvm/dm_op.h
 ?	dm_op_set_ioreq_server_state	hvm/dm_op.h
 ?	dm_op_set_isa_irq_level		hvm/dm_op.h
 ?	dm_op_set_pci_intx_level	hvm/dm_op.h

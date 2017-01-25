@@ -4969,7 +4969,6 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
     default:
         mask = ~0UL;
         break;
-    case HVMOP_modified_memory:
     case HVMOP_set_mem_type:
         mask = HVMOP_op_mask;
         break;
@@ -5001,65 +5000,6 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
     case HVMOP_flush_tlbs:
         rc = guest_handle_is_null(arg) ? hvmop_flush_tlb_all() : -EINVAL;
         break;
-
-    case HVMOP_modified_memory:
-    {
-        struct xen_hvm_modified_memory a;
-        struct domain *d;
-
-        if ( copy_from_guest(&a, arg, 1) )
-            return -EFAULT;
-
-        rc = rcu_lock_remote_domain_by_id(a.domid, &d);
-        if ( rc != 0 )
-            return rc;
-
-        rc = -EINVAL;
-        if ( !is_hvm_domain(d) )
-            goto modmem_fail;
-
-        rc = xsm_hvm_control(XSM_DM_PRIV, d, op);
-        if ( rc )
-            goto modmem_fail;
-
-        rc = -EINVAL;
-        if ( a.nr < start_iter ||
-             ((a.first_pfn + a.nr - 1) < a.first_pfn) ||
-             ((a.first_pfn + a.nr - 1) > domain_get_maximum_gpfn(d)) )
-            goto modmem_fail;
-
-        rc = 0;
-        if ( !paging_mode_log_dirty(d) )
-            goto modmem_fail;
-
-        while ( a.nr > start_iter )
-        {
-            unsigned long pfn = a.first_pfn + start_iter;
-            struct page_info *page;
-
-            page = get_page_from_gfn(d, pfn, NULL, P2M_UNSHARE);
-            if ( page )
-            {
-                paging_mark_dirty(d, _mfn(page_to_mfn(page)));
-                /* These are most probably not page tables any more */
-                /* don't take a long time and don't die either */
-                sh_remove_shadows(d, _mfn(page_to_mfn(page)), 1, 0);
-                put_page(page);
-            }
-
-            /* Check for continuation if it's not the last interation */
-            if ( a.nr > ++start_iter && !(start_iter & HVMOP_op_mask) &&
-                 hypercall_preempt_check() )
-            {
-                rc = -ERESTART;
-                break;
-            }
-        }
-
-    modmem_fail:
-        rcu_unlock_domain(d);
-        break;
-    }
 
     case HVMOP_get_mem_type:
         rc = hvmop_get_mem_type(

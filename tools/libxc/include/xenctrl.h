@@ -1627,7 +1627,7 @@ int xc_hvm_track_dirty_vram(
  * Notify that some pages got modified by the Device Model
  */
 int xc_hvm_modified_memory(
-    xc_interface *xch, domid_t dom, uint64_t first_pfn, uint64_t nr);
+    xc_interface *xch, domid_t dom, uint64_t first_pfn, uint32_t nr);
 
 /*
  * Set a range of memory to a specific type.

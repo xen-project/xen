@@ -233,6 +233,24 @@ struct xen_dm_op_set_pci_link_route {
     uint8_t  isa_irq;
 };
 
+/*
+ * XEN_DMOP_modified_memory: Notify that a set of pages were modified by
+ *                           an emulator.
+ *
+ * NOTE: In the event of a continuation, the @first_pfn is set to the
+ *       value of the pfn of the remaining set of pages and @nr reduced
+ *       to the size of the remaining set.
+ */
+#define XEN_DMOP_modified_memory 11
+
+struct xen_dm_op_modified_memory {
+    /* IN - number of contiguous pages modified */
+    uint32_t nr;
+    uint32_t pad;
+    /* IN - first pfn modified */
+    uint64_aligned_t first_pfn;
+};
+
 struct xen_dm_op {
     uint32_t op;
     uint32_t pad;
@@ -247,6 +265,7 @@ struct xen_dm_op {
         struct xen_dm_op_set_pci_intx_level set_pci_intx_level;
         struct xen_dm_op_set_isa_irq_level set_isa_irq_level;
         struct xen_dm_op_set_pci_link_route set_pci_link_route;
+        struct xen_dm_op_modified_memory modified_memory;
     } u;
 };
 

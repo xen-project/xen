@@ -14,6 +14,7 @@
  * this program; If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <xen/event.h>
 #include <xen/guest_access.h>
 #include <xen/hypercall.h>
 #include <xen/sched.h>
@@ -115,6 +116,59 @@ static int set_isa_irq_level(struct domain *d, uint8_t isa_irq,
     }
 
     return 0;
+}
+
+static int modified_memory(struct domain *d,
+                           struct xen_dm_op_modified_memory *data)
+{
+    xen_pfn_t last_pfn = data->first_pfn + data->nr - 1;
+    unsigned int iter = 0;
+    int rc = 0;
+
+    if ( (data->first_pfn > last_pfn) ||
+         (last_pfn > domain_get_maximum_gpfn(d)) )
+        return -EINVAL;
+
+    if ( !paging_mode_log_dirty(d) )
+        return 0;
+
+    while ( iter < data->nr )
+    {
+        unsigned long pfn = data->first_pfn + iter;
+        struct page_info *page;
+
+        page = get_page_from_gfn(d, pfn, NULL, P2M_UNSHARE);
+        if ( page )
+        {
+            mfn_t gmfn = _mfn(page_to_mfn(page));
+
+            paging_mark_dirty(d, gmfn);
+            /*
+             * These are most probably not page tables any more
+             * don't take a long time and don't die either.
+             */
+            sh_remove_shadows(d, gmfn, 1, 0);
+            put_page(page);
+        }
+
+        iter++;
+
+        /*
+         * Check for continuation every 256th iteration and if the
+         * iteration is not the last.
+         */
+        if ( (iter < data->nr) && ((iter & 0xff) == 0) &&
+             hypercall_preempt_check() )
+        {
+            data->first_pfn += iter;
+            data->nr -= iter;
+
+            rc = -ERESTART;
+            break;
+        }
+    }
+
+    return rc;
 }
 
 static int dm_op(domid_t domid,
@@ -283,12 +337,27 @@ static int dm_op(domid_t domid,
         break;
     }
 
+    case XEN_DMOP_modified_memory:
+    {
+        struct xen_dm_op_modified_memory *data =
+            &op.u.modified_memory;
+
+        const_op = false;
+
+        rc = -EINVAL;
+        if ( data->pad )
+            break;
+
+        rc = modified_memory(d, data);
+        break;
+    }
+
     default:
         rc = -EOPNOTSUPP;
         break;
     }
 
-    if ( !rc &&
+    if ( (!rc || rc == -ERESTART) &&
          !const_op &&
          !copy_buf_to_guest(bufs, nr_bufs, 0, &op, sizeof(op)) )
         rc = -EFAULT;
@@ -308,6 +377,7 @@ CHECK_dm_op_track_dirty_vram;
 CHECK_dm_op_set_pci_intx_level;
 CHECK_dm_op_set_isa_irq_level;
 CHECK_dm_op_set_pci_link_route;
+CHECK_dm_op_modified_memory;
 
 #define MAX_NR_BUFS 2
 
@@ -317,6 +387,7 @@ int compat_dm_op(domid_t domid,
 {
     struct xen_dm_op_buf nat[MAX_NR_BUFS];
     unsigned int i;
+    int rc;
 
     if ( nr_bufs > MAX_NR_BUFS )
         return -E2BIG;
@@ -336,7 +407,13 @@ int compat_dm_op(domid_t domid,
 #undef XLAT_dm_op_buf_HNDL_h
     }
 
-    return dm_op(domid, nr_bufs, nat);
+    rc = dm_op(domid, nr_bufs, nat);
+
+    if ( rc == -ERESTART )
+        rc = hypercall_create_continuation(__HYPERVISOR_dm_op, "iih",
+                                           domid, nr_bufs, bufs);
+
+    return rc;
 }
 
 long do_dm_op(domid_t domid,
@@ -344,6 +421,7 @@ long do_dm_op(domid_t domid,
               XEN_GUEST_HANDLE_PARAM(xen_dm_op_buf_t) bufs)
 {
     struct xen_dm_op_buf nat[MAX_NR_BUFS];
+    int rc;
 
     if ( nr_bufs > MAX_NR_BUFS )
         return -E2BIG;
@@ -351,7 +429,13 @@ long do_dm_op(domid_t domid,
     if ( copy_from_guest_offset(nat, bufs, 0, nr_bufs) )
         return -EFAULT;
 
-    return dm_op(domid, nr_bufs, nat);
+    rc = dm_op(domid, nr_bufs, nat);
+
+    if ( rc == -ERESTART )
+        rc = hypercall_create_continuation(__HYPERVISOR_dm_op, "iih",
+                                           domid, nr_bufs, bufs);
+
+    return rc;
 }
 
 /*

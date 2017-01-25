@@ -99,19 +99,6 @@ typedef enum {
 /* Following tools-only interfaces may change in future. */
 #if defined(__XEN__) || defined(__XEN_TOOLS__)
 
-/* Notify that some pages got modified by the Device Model. */
-#define HVMOP_modified_memory    7
-struct xen_hvm_modified_memory {
-    /* Domain to be updated. */
-    domid_t  domid;
-    /* Number of pages. */
-    uint32_t nr;
-    /* First pfn. */
-    uint64_aligned_t first_pfn;
-};
-typedef struct xen_hvm_modified_memory xen_hvm_modified_memory_t;
-DEFINE_XEN_GUEST_HANDLE(xen_hvm_modified_memory_t);
-
 #define HVMOP_set_mem_type    8
 /* Notify that a region of memory is to be treated in a specific way. */
 struct xen_hvm_set_mem_type {
