@@ -991,9 +991,10 @@ static int __p2m_set_entry(struct p2m_domain *p2m,
 
     /*
      * The radix-tree can only work on 4KB. This is only used when
-     * memaccess is enabled.
+     * memaccess is enabled and during shutdown.
      */
-    ASSERT(!p2m->mem_access_enabled || page_order == 0);
+    ASSERT(!p2m->mem_access_enabled || page_order == 0 ||
+           p2m->domain->is_dying);
     /*
      * The access type should always be p2m_access_rwx when the mapping
      * is removed.
