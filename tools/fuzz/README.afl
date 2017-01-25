@@ -20,9 +20,10 @@ Use the x86 instruction emulator fuzzer as an example.
    $ make distclean
    $ make CC=$AFLPATH/afl-gcc afl # produces afl-x86-insn-emulator-fuzzer
 
-3. provide initial test case:
+3. provide initial test case (fuzzer dependent, see afl-*.c):
    $ mkdir testcase_dir
-   $ echo -n -e '\xc3' > testcase_dir/ret.bin
+   $ dd if=/dev/urandom of=testcase_dir/rand.bin \
+       bs=`./afl-x86-insn-emulator-fuzzer --min-input-size` count=1
 
 4. run the fuzzer with AFL:
    $ $AFLPATH/afl-fuzz -m none -t 1000 -i testcase_dir -o findings_dir -- \
