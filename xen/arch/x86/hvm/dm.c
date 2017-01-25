@@ -18,7 +18,9 @@
 #include <xen/hypercall.h>
 #include <xen/sched.h>
 
+#include <asm/hap.h>
 #include <asm/hvm/ioreq.h>
+#include <asm/shadow.h>
 
 #include <xsm/xsm.h>
 
@@ -50,6 +52,26 @@ static bool copy_buf_to_guest(const xen_dm_op_buf_t bufs[],
     size = min_t(size_t, bufs[idx].size, src_size);
 
     return !copy_to_guest(bufs[idx].h, src, size);
+}
+
+static int track_dirty_vram(struct domain *d, xen_pfn_t first_pfn,
+                            unsigned int nr, struct xen_dm_op_buf *buf)
+{
+    if ( nr > (GB(1) >> PAGE_SHIFT) )
+        return -EINVAL;
+
+    if ( d->is_dying )
+        return -ESRCH;
+
+    if ( !d->max_vcpus || !d->vcpu[0] )
+        return -EINVAL;
+
+    if ( ((nr + 7) / 8) > buf->size )
+        return -EINVAL;
+
+    return shadow_mode_enabled(d) ?
+        shadow_track_dirty_vram(d, first_pfn, nr, buf->h) :
+        hap_track_dirty_vram(d, first_pfn, nr, buf->h);
 }
 
 static int dm_op(domid_t domid,
@@ -173,6 +195,22 @@ static int dm_op(domid_t domid,
         break;
     }
 
+    case XEN_DMOP_track_dirty_vram:
+    {
+        const struct xen_dm_op_track_dirty_vram *data =
+            &op.u.track_dirty_vram;
+
+        rc = -EINVAL;
+        if ( data->pad )
+            break;
+
+        if ( nr_bufs < 2 )
+            break;
+
+        rc = track_dirty_vram(d, data->first_pfn, data->nr, &bufs[1]);
+        break;
+    }
+
     default:
         rc = -EOPNOTSUPP;
         break;
@@ -194,8 +232,9 @@ CHECK_dm_op_get_ioreq_server_info;
 CHECK_dm_op_ioreq_server_range;
 CHECK_dm_op_set_ioreq_server_state;
 CHECK_dm_op_destroy_ioreq_server;
+CHECK_dm_op_track_dirty_vram;
 
-#define MAX_NR_BUFS 1
+#define MAX_NR_BUFS 2
 
 int compat_dm_op(domid_t domid,
                  unsigned int nr_bufs,

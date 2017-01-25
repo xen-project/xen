@@ -95,22 +95,6 @@ typedef enum {
 /* Following tools-only interfaces may change in future. */
 #if defined(__XEN__) || defined(__XEN_TOOLS__)
 
-/* Track dirty VRAM. */
-#define HVMOP_track_dirty_vram    6
-struct xen_hvm_track_dirty_vram {
-    /* Domain to be tracked. */
-    domid_t  domid;
-    /* Number of pages to track. */
-    uint32_t nr;
-    /* First pfn to track. */
-    uint64_aligned_t first_pfn;
-    /* OUT variable. */
-    /* Dirty bitmap buffer. */
-    XEN_GUEST_HANDLE_64(uint8) dirty_bitmap;
-};
-typedef struct xen_hvm_track_dirty_vram xen_hvm_track_dirty_vram_t;
-DEFINE_XEN_GUEST_HANDLE(xen_hvm_track_dirty_vram_t);
-
 /* Notify that some pages got modified by the Device Model. */
 #define HVMOP_modified_memory    7
 struct xen_hvm_modified_memory {

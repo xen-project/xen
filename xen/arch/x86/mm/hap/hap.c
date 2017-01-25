@@ -68,7 +68,7 @@
 int hap_track_dirty_vram(struct domain *d,
                          unsigned long begin_pfn,
                          unsigned long nr,
-                         XEN_GUEST_HANDLE_64(uint8) guest_dirty_bitmap)
+                         XEN_GUEST_HANDLE_PARAM(void) guest_dirty_bitmap)
 {
     long rc = 0;
     struct sh_dirty_vram *dirty_vram;

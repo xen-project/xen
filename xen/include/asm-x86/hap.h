@@ -43,7 +43,7 @@ void  hap_vcpu_init(struct vcpu *v);
 int   hap_track_dirty_vram(struct domain *d,
                            unsigned long begin_pfn,
                            unsigned long nr,
-                           XEN_GUEST_HANDLE_64(uint8) dirty_bitmap);
+                           XEN_GUEST_HANDLE_PARAM(void) dirty_bitmap);
 
 extern const struct paging_mode *hap_paging_get_mode(struct vcpu *);
 int hap_set_allocation(struct domain *d, unsigned int pages, bool *preempted);

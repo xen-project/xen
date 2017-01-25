@@ -1620,7 +1620,7 @@ int xc_hvm_inject_msi(
  */
 int xc_hvm_track_dirty_vram(
     xc_interface *xch, domid_t dom,
-    uint64_t first_pfn, uint64_t nr,
+    uint64_t first_pfn, uint32_t nr,
     unsigned long *bitmap);
 
 /*

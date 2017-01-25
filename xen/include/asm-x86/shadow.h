@@ -63,7 +63,7 @@ int shadow_enable(struct domain *d, u32 mode);
 int shadow_track_dirty_vram(struct domain *d,
                             unsigned long first_pfn,
                             unsigned long nr,
-                            XEN_GUEST_HANDLE_64(uint8) dirty_bitmap);
+                            XEN_GUEST_HANDLE_PARAM(void) dirty_bitmap);
 
 /* Handler for shadow control ops: operations from user-space to enable
  * and disable ephemeral shadow modes (test mode and log-dirty mode) and

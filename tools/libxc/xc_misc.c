@@ -581,34 +581,22 @@ int xc_hvm_inject_msi(
 
 int xc_hvm_track_dirty_vram(
     xc_interface *xch, domid_t dom,
-    uint64_t first_pfn, uint64_t nr,
+    uint64_t first_pfn, uint32_t nr,
     unsigned long *dirty_bitmap)
 {
-    DECLARE_HYPERCALL_BOUNCE(dirty_bitmap, (nr+7) / 8, XC_HYPERCALL_BUFFER_BOUNCE_OUT);
-    DECLARE_HYPERCALL_BUFFER(struct xen_hvm_track_dirty_vram, arg);
-    int rc;
+    struct xen_dm_op op;
+    struct xen_dm_op_track_dirty_vram *data;
 
-    arg = xc_hypercall_buffer_alloc(xch, arg, sizeof(*arg));
-    if ( arg == NULL || xc_hypercall_bounce_pre(xch, dirty_bitmap) )
-    {
-        PERROR("Could not bounce memory for xc_hvm_track_dirty_vram hypercall");
-        rc = -1;
-        goto out;
-    }
+    memset(&op, 0, sizeof(op));
 
-    arg->domid     = dom;
-    arg->first_pfn = first_pfn;
-    arg->nr        = nr;
-    set_xen_guest_handle(arg->dirty_bitmap, dirty_bitmap);
+    op.op = XEN_DMOP_track_dirty_vram;
+    data = &op.u.track_dirty_vram;
 
-    rc = xencall2(xch->xcall, __HYPERVISOR_hvm_op,
-                  HVMOP_track_dirty_vram,
-                  HYPERCALL_BUFFER_AS_ARG(arg));
+    data->first_pfn = first_pfn;
+    data->nr = nr;
 
-out:
-    xc_hypercall_buffer_free(xch, arg);
-    xc_hypercall_bounce_post(xch, dirty_bitmap);
-    return rc;
+    return do_dm_op(xch, dom, 2, &op, sizeof(op),
+                    dirty_bitmap, (nr + 7) / 8);
 }
 
 int xc_hvm_modified_memory(

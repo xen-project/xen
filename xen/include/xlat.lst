@@ -62,6 +62,7 @@
 ?	dm_op_get_ioreq_server_info	hvm/dm_op.h
 ?	dm_op_ioreq_server_range	hvm/dm_op.h
 ?	dm_op_set_ioreq_server_state	hvm/dm_op.h
+?	dm_op_track_dirty_vram		hvm/dm_op.h
 ?	vcpu_hvm_context		hvm/hvm_vcpu.h
 ?	vcpu_hvm_x86_32			hvm/hvm_vcpu.h
 ?	vcpu_hvm_x86_64			hvm/hvm_vcpu.h

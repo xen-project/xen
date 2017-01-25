@@ -1180,9 +1180,6 @@ static int flask_hvm_param(struct domain *d, unsigned long op)
     case HVMOP_get_param:
         perm = HVM__GETPARAM;
         break;
-    case HVMOP_track_dirty_vram:
-        perm = HVM__TRACKDIRTYVRAM;
-        break;
     default:
         perm = HVM__HVMCTL;
     }

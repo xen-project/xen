@@ -177,6 +177,23 @@ struct xen_dm_op_destroy_ioreq_server {
     uint16_t pad;
 };
 
+/*
+ * XEN_DMOP_track_dirty_vram: Track modifications to the specified pfn
+ *                            range.
+ *
+ * NOTE: The bitmap passed back to the caller is passed in a
+ *       secondary buffer.
+ */
+#define XEN_DMOP_track_dirty_vram 7
+
+struct xen_dm_op_track_dirty_vram {
+    /* IN - number of pages to be tracked */
+    uint32_t nr;
+    uint32_t pad;
+    /* IN - first pfn to track */
+    uint64_aligned_t first_pfn;
+};
+
 struct xen_dm_op {
     uint32_t op;
     uint32_t pad;
@@ -187,6 +204,7 @@ struct xen_dm_op {
         struct xen_dm_op_ioreq_server_range unmap_io_range_from_ioreq_server;
         struct xen_dm_op_set_ioreq_server_state set_ioreq_server_state;
         struct xen_dm_op_destroy_ioreq_server destroy_ioreq_server;
+        struct xen_dm_op_track_dirty_vram track_dirty_vram;
     } u;
 };
 

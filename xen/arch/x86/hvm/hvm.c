@@ -5138,47 +5138,6 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
         rc = guest_handle_is_null(arg) ? hvmop_flush_tlb_all() : -EINVAL;
         break;
 
-    case HVMOP_track_dirty_vram:
-    {
-        struct xen_hvm_track_dirty_vram a;
-        struct domain *d;
-
-        if ( copy_from_guest(&a, arg, 1) )
-            return -EFAULT;
-
-        rc = rcu_lock_remote_domain_by_id(a.domid, &d);
-        if ( rc != 0 )
-            return rc;
-
-        rc = -EINVAL;
-        if ( !is_hvm_domain(d) )
-            goto tdv_fail;
-
-        if ( a.nr > GB(1) >> PAGE_SHIFT )
-            goto tdv_fail;
-
-        rc = xsm_hvm_control(XSM_DM_PRIV, d, op);
-        if ( rc )
-            goto tdv_fail;
-
-        rc = -ESRCH;
-        if ( d->is_dying )
-            goto tdv_fail;
-
-        rc = -EINVAL;
-        if ( d->vcpu == NULL || d->vcpu[0] == NULL )
-            goto tdv_fail;
-
-        if ( shadow_mode_enabled(d) )
-            rc = shadow_track_dirty_vram(d, a.first_pfn, a.nr, a.dirty_bitmap);
-        else
-            rc = hap_track_dirty_vram(d, a.first_pfn, a.nr, a.dirty_bitmap);
-
-    tdv_fail:
-        rcu_unlock_domain(d);
-        break;
-    }
-
     case HVMOP_modified_memory:
     {
         struct xen_hvm_modified_memory a;
