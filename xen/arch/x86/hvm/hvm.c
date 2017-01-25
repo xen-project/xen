@@ -542,13 +542,15 @@ void hvm_do_resume(struct vcpu *v)
         }
     }
 
-    /* Inject pending hw/sw trap */
-    if ( v->arch.hvm_vcpu.inject_event.vector != -1 )
+    /* Inject pending hw/sw event */
+    if ( v->arch.hvm_vcpu.inject_event.vector >= 0 )
     {
+        smp_rmb();
+
         if ( !hvm_event_pending(v) )
             hvm_inject_event(&v->arch.hvm_vcpu.inject_event);
 
-        v->arch.hvm_vcpu.inject_event.vector = -1;
+        v->arch.hvm_vcpu.inject_event.vector = HVM_EVENT_VECTOR_UNSET;
     }
 
     if ( unlikely(v->arch.vm_event) && v->arch.monitor.next_interrupt_enabled )
@@ -1519,7 +1521,7 @@ int hvm_vcpu_initialise(struct vcpu *v)
         (void(*)(unsigned long))hvm_assert_evtchn_irq,
         (unsigned long)v);
 
-    v->arch.hvm_vcpu.inject_event.vector = -1;
+    v->arch.hvm_vcpu.inject_event.vector = HVM_EVENT_VECTOR_UNSET;
 
     if ( is_pvh_domain(d) )
     {

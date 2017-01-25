@@ -77,6 +77,9 @@ enum hvm_intblk {
 #define HVM_HAP_SUPERPAGE_2MB   0x00000001
 #define HVM_HAP_SUPERPAGE_1GB   0x00000002
 
+#define HVM_EVENT_VECTOR_UNSET    (-1)
+#define HVM_EVENT_VECTOR_UPDATING (-2)
+
 /*
  * The hardware virtual machine (HVM) interface abstracts away from the
  * x86/x86_64 CPU virtualization assist specifics. Currently this interface
