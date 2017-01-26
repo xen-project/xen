@@ -83,6 +83,7 @@ struct vits_itte
  * Each entry just contains the VCPU ID of the respective vCPU.
  */
 typedef uint16_t coll_table_entry_t;
+#define UNMAPPED_COLLECTION      ((coll_table_entry_t)~0)
 
 /*
  * Our device table encodings:
@@ -98,6 +99,145 @@ typedef uint64_t dev_table_entry_t;
 
 #define GITS_BASER_RO_MASK       (GITS_BASER_TYPE_MASK | \
                                   (0x1fL << GITS_BASER_ENTRY_SIZE_SHIFT))
+
+/*
+ * The physical address is encoded slightly differently depending on
+ * the used page size: the highest four bits are stored in the lowest
+ * four bits of the field for 64K pages.
+ */
+static paddr_t get_baser_phys_addr(uint64_t reg)
+{
+    if ( reg & BIT(9) )
+        return (reg & GENMASK(47, 16)) |
+                ((reg & GENMASK(15, 12)) << 36);
+    else
+        return reg & GENMASK(47, 12);
+}
+
+/* Must be called with the ITS lock held. */
+static struct vcpu *get_vcpu_from_collection(struct virt_its *its,
+                                             uint16_t collid)
+{
+    paddr_t addr = get_baser_phys_addr(its->baser_coll);
+    coll_table_entry_t vcpu_id;
+    int ret;
+
+    ASSERT(spin_is_locked(&its->its_lock));
+
+    if ( collid >= its->max_collections )
+        return NULL;
+
+    ret = vgic_access_guest_memory(its->d,
+                                   addr + collid * sizeof(coll_table_entry_t),
+                                   &vcpu_id, sizeof(coll_table_entry_t), false);
+    if ( ret )
+        return NULL;
+
+    if ( vcpu_id == UNMAPPED_COLLECTION || vcpu_id >= its->d->max_vcpus )
+        return NULL;
+
+    return its->d->vcpu[vcpu_id];
+}
+
+/*
+ * Lookup the address of the Interrupt Translation Table associated with
+ * that device ID.
+ * TODO: add support for walking indirect tables.
+ */
+static int its_get_itt(struct virt_its *its, uint32_t devid,
+                       dev_table_entry_t *itt)
+{
+    paddr_t addr = get_baser_phys_addr(its->baser_dev);
+
+    if ( devid >= its->max_devices )
+        return -EINVAL;
+
+    return vgic_access_guest_memory(its->d,
+                                    addr + devid * sizeof(dev_table_entry_t),
+                                    itt, sizeof(*itt), false);
+}
+
+/*
+ * Lookup the address of the Interrupt Translation Table associated with
+ * a device ID and return the address of the ITTE belonging to the event ID
+ * (which is an index into that table).
+ */
+static paddr_t its_get_itte_address(struct virt_its *its,
+                                    uint32_t devid, uint32_t evid)
+{
+    dev_table_entry_t itt;
+    int ret;
+
+    ret = its_get_itt(its, devid, &itt);
+    if ( ret )
+        return INVALID_PADDR;
+
+    if ( evid >= DEV_TABLE_ITT_SIZE(itt) ||
+         DEV_TABLE_ITT_ADDR(itt) == INVALID_PADDR )
+        return INVALID_PADDR;
+
+    return DEV_TABLE_ITT_ADDR(itt) + evid * sizeof(struct vits_itte);
+}
+
+/*
+ * Queries the collection and device tables to get the vCPU and virtual
+ * LPI number for a given guest event. This first accesses the guest memory
+ * to resolve the address of the ITTE, then reads the ITTE entry at this
+ * address and puts the result in vcpu_ptr and vlpi_ptr.
+ * Must be called with the ITS lock held.
+ */
+bool read_itte(struct virt_its *its, uint32_t devid, uint32_t evid,
+               struct vcpu **vcpu_ptr, uint32_t *vlpi_ptr)
+{
+    paddr_t addr;
+    struct vits_itte itte;
+    struct vcpu *vcpu;
+
+    ASSERT(spin_is_locked(&its->its_lock));
+
+    addr = its_get_itte_address(its, devid, evid);
+    if ( addr == INVALID_PADDR )
+        return false;
+
+    if ( vgic_access_guest_memory(its->d, addr, &itte, sizeof(itte), false) )
+        return false;
+
+    vcpu = get_vcpu_from_collection(its, itte.collection);
+    if ( !vcpu )
+        return false;
+
+    *vcpu_ptr = vcpu;
+    *vlpi_ptr = itte.vlpi;
+    return true;
+}
+
+/*
+ * Queries the collection and device tables to translate the device ID and
+ * event ID and find the appropriate ITTE. The given collection ID and the
+ * virtual LPI number are then stored into that entry.
+ * If vcpu_ptr is provided, returns the VCPU belonging to that collection.
+ * Must be called with the ITS lock held.
+ */
+bool write_itte(struct virt_its *its, uint32_t devid,
+                uint32_t evid, uint32_t collid, uint32_t vlpi)
+{
+    paddr_t addr;
+    struct vits_itte itte;
+
+    ASSERT(spin_is_locked(&its->its_lock));
+
+    addr = its_get_itte_address(its, devid, evid);
+    if ( addr == INVALID_PADDR )
+        return false;
+
+    itte.collection = collid;
+    itte.vlpi = vlpi;
+
+    if ( vgic_access_guest_memory(its->d, addr, &itte, sizeof(itte), true) )
+        return false;
+
+    return true;
+}
 
 /**************************************
  * Functions that handle ITS commands *
