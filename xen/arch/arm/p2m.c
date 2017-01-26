@@ -1104,7 +1104,7 @@ int map_dev_mmio_region(struct domain *d,
     if ( !(nr && iomem_access_permitted(d, mfn_x(mfn), mfn_x(mfn) + nr - 1)) )
         return 0;
 
-    res = map_mmio_regions(d, gfn, nr, mfn);
+    res = p2m_insert_mapping(d, gfn, nr, mfn, p2m_mmio_direct_c);
     if ( res < 0 )
     {
         printk(XENLOG_G_ERR "Unable to map MFNs [%#"PRI_mfn" - %#"PRI_mfn" in Dom%d\n",
