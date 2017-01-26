@@ -1319,7 +1319,7 @@ static int handle_node(struct domain *d, struct kernel_info *kinfo,
 
 static int prepare_dtb(struct domain *d, struct kernel_info *kinfo)
 {
-    const p2m_type_t default_p2mt = p2m_mmio_direct_dev;
+    const p2m_type_t default_p2mt = p2m_mmio_direct_c;
     const void *fdt;
     int new_size;
     int ret;
