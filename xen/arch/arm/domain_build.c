@@ -48,20 +48,6 @@ struct map_range_data
     p2m_type_t p2mt;
 };
 
-static const struct dt_device_match dev_map_attrs[] __initconst =
-{
-    {
-        __DT_MATCH_COMPATIBLE("mmio-sram"),
-        __DT_MATCH_PROP("no-memory-wc"),
-        .data = (void *) (uintptr_t) p2m_mmio_direct_dev,
-    },
-    {
-        __DT_MATCH_COMPATIBLE("mmio-sram"),
-        .data = (void *) (uintptr_t) p2m_mmio_direct_nc,
-    },
-    { /* sentinel */ },
-};
-
 //#define DEBUG_11_ALLOCATION
 #ifdef DEBUG_11_ALLOCATION
 # define D11PRINT(fmt, args...) printk(XENLOG_DEBUG fmt, ##args)
@@ -1170,21 +1156,6 @@ static int handle_device(struct domain *d, struct dt_device_node *dev,
     return 0;
 }
 
-static p2m_type_t lookup_map_attr(struct dt_device_node *node,
-                                  p2m_type_t parent_p2mt)
-{
-    const struct dt_device_match *r;
-
-    /* Search and if nothing matches, use the parent's attributes.  */
-    r = dt_match_node(dev_map_attrs, node);
-
-    /*
-     * If this node does not dictate specific mapping attributes,
-     * it inherits its parent's attributes.
-     */
-    return r ? (uintptr_t) r->data : parent_p2mt;
-}
-
 static int handle_node(struct domain *d, struct kernel_info *kinfo,
                        struct dt_device_node *node,
                        p2m_type_t p2mt)
@@ -1275,7 +1246,6 @@ static int handle_node(struct domain *d, struct kernel_info *kinfo,
                "WARNING: Path %s is reserved, skip the node as we may re-use the path.\n",
                path);
 
-    p2mt = lookup_map_attr(node, p2mt);
     res = handle_device(d, node, p2mt);
     if ( res)
         return res;
