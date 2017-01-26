@@ -871,8 +871,8 @@ struct user_rmrr {
     u32 sbdf[MAX_USER_RMRR_DEV];
 };
 
-static __initdata unsigned int nr_rmrr;
-static struct __initdata user_rmrr user_rmrrs[MAX_USER_RMRR];
+static unsigned int __initdata nr_rmrr;
+static struct user_rmrr __initdata user_rmrrs[MAX_USER_RMRR];
 
 /* Macro for RMRR inclusive range formatting. */
 #define ERMRRU_FMT "[%lx-%lx]"
