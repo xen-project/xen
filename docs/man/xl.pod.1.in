@@ -401,6 +401,16 @@ for bytes.
 The mem-max value may not correspond to the actual memory used in the
 domain, as it may balloon down its memory to give more back to the OS.
 
+The value given just sets the memory amount the domain is allowed to allocate
+in the hypervisor. It can't be set lower than the current reservation, but
+it is allowed to be higher than the configured maximum memory size of the
+domain (B<maxmem> parameter in the domain's configuration). Using B<xl mem-max>
+to set the maximum memory above the initial B<maxmem> value will not allow the
+additional memory to be used via B<xl mem-set>. The initial B<maxmem> value is
+still used as an upper limit for B<xl mem-set>.
+
+The domain is not receiving any signal regarding the changed memory limit.
+
 =item B<mem-set> I<domain-id> I<mem>
 
 Set the domain's used memory using the balloon driver; append 't' for

@@ -4018,6 +4018,12 @@ out:
 
 /******************************************************************************/
 
+/*
+ * Set the maximum memory size of the domain in the hypervisor. There is no
+ * change of the current memory size involved. The specified memory size can
+ * even be above the configured maxmem size of the domain, but the related
+ * Xenstore entry memory/static-max isn't modified!
+ */
 int libxl_domain_setmaxmem(libxl_ctx *ctx, uint32_t domid, uint64_t max_memkb)
 {
     GC_INIT(ctx);
