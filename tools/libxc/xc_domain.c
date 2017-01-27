@@ -74,10 +74,10 @@ int xc_domain_cacheflush(xc_interface *xch, uint32_t domid,
     /*
      * The x86 architecture provides cache coherency guarantees which prevent
      * the need for this hypercall.  Avoid the overhead of making a hypercall
-     * just for Xen to return -ENOSYS.
+     * just for Xen to return -ENOSYS.  It is safe to ignore this call on x86
+     * so we just return 0.
      */
-    errno = ENOSYS;
-    return -1;
+    return 0;
 #else
     DECLARE_DOMCTL;
     domctl.cmd = XEN_DOMCTL_cacheflush;

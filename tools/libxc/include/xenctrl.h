@@ -2710,6 +2710,14 @@ int xc_livepatch_revert(xc_interface *xch, char *name, uint32_t timeout);
 int xc_livepatch_unload(xc_interface *xch, char *name, uint32_t timeout);
 int xc_livepatch_replace(xc_interface *xch, char *name, uint32_t timeout);
 
+/*
+ * Ensure cache coherency after memory modifications. A call to this function
+ * is only required on ARM as the x86 architecture provides cache coherency
+ * guarantees. Calling this function on x86 is allowed but has no effect.
+ */
+int xc_domain_cacheflush(xc_interface *xch, uint32_t domid,
+                         xen_pfn_t start_pfn, xen_pfn_t nr_pfns);
+
 /* Compat shims */
 #include "xenctrl_compat.h"
 
