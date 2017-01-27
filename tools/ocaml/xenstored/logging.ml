@@ -241,7 +241,6 @@ let string_of_access_type = function
 	| Xenbus.Xb.Op.Mkdir             -> "mkdir    "
 	| Xenbus.Xb.Op.Rm                -> "rm       "
 	| Xenbus.Xb.Op.Setperms          -> "setperms "
-	| Xenbus.Xb.Op.Restrict          -> "restrict "
 	| Xenbus.Xb.Op.Reset_watches     -> "reset watches"
 	| Xenbus.Xb.Op.Set_target        -> "settarget"
 

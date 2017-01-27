@@ -22,7 +22,6 @@ module Op :
       | Isintroduced
       | Resume
       | Set_target
-      | Restrict
       | Reset_watches
       | Invalid
     val operation_c_mapping : operation array

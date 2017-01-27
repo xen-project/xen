@@ -1309,7 +1309,6 @@ static struct {
 			{ "IS_DOMAIN_INTRODUCED", do_is_domain_introduced },
 	[XS_RESUME]            = { "RESUME",            do_resume },
 	[XS_SET_TARGET]        = { "SET_TARGET",        do_set_target },
-	[XS_RESTRICT]          = { "RESTRICT",          NULL },
 	[XS_RESET_WATCHES]     = { "RESET_WATCHES",     do_reset_watches },
 	[XS_DIRECTORY_PART]    = { "DIRECTORY_PART",    send_directory_part },
 };

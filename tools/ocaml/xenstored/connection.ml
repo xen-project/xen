@@ -122,9 +122,6 @@ let close con =
 let get_perm con =
 	con.perm
 
-let restrict con domid =
-	con.perm <- Perms.Connection.restrict con.perm domid
-
 let set_target con target_domid =
 	con.perm <- Perms.Connection.set_target (get_perm con) ~perms:[Perms.READ; Perms.WRITE] target_domid
 

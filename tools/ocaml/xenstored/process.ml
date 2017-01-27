@@ -172,30 +172,16 @@ let do_isintroduced con t domains cons data =
 		in
 	if domid = Define.domid_self || Domains.exist domains domid then "T\000" else "F\000"
 
-(* [restrict] is in the patch queue since xen3.2 *)
-let do_restrict con t domains cons data =
-	if not (Connection.is_dom0 con)
-	then raise Define.Permission_denied;
-	let domid =
-		match (split None '\000' data) with
-		| [ domid; "" ] -> c_int_of_string domid
-		| _          -> raise Invalid_Cmd_Args
-	in
-	Connection.restrict con domid
-
 (* only in xen >= 4.2 *)
 let do_reset_watches con t domains cons data =
   Connection.del_watches con;
   Connection.del_transactions con
 
 (* only in >= xen3.3                                                                                    *)
-(* we ensure backward compatibility with restrict by counting the number of argument of set_target ...  *)
-(* This is not very elegant, but it is safe as 'restrict' only restricts permission of dom0 connections *)
 let do_set_target con t domains cons data =
 	if not (Connection.is_dom0 con)
 	then raise Define.Permission_denied;
 	match split None '\000' data with
-		| [ domid; "" ]               -> do_restrict con t domains con data (* backward compatibility with xen3.2-pq *)
 		| [ domid; target_domid; "" ] -> Connections.set_target cons (c_int_of_string domid) (c_int_of_string target_domid)
 		| _                           -> raise Invalid_Cmd_Args
 
@@ -244,7 +230,6 @@ let function_of_type_simple_op ty =
 	| Xenbus.Xb.Op.Isintroduced
 	| Xenbus.Xb.Op.Resume
 	| Xenbus.Xb.Op.Set_target
-	| Xenbus.Xb.Op.Restrict
 	| Xenbus.Xb.Op.Reset_watches
 	| Xenbus.Xb.Op.Invalid           -> error "called function_of_type_simple_op on operation %s" (Xenbus.Xb.Op.to_string ty);
 	                                    raise (Invalid_argument (Xenbus.Xb.Op.to_string ty))
@@ -428,7 +413,6 @@ let function_of_type ty =
 	| Xenbus.Xb.Op.Isintroduced      -> reply_data do_isintroduced
 	| Xenbus.Xb.Op.Resume            -> reply_ack do_resume
 	| Xenbus.Xb.Op.Set_target        -> reply_ack do_set_target
-	| Xenbus.Xb.Op.Restrict          -> reply_ack do_restrict
 	| Xenbus.Xb.Op.Reset_watches     -> reply_ack do_reset_watches
 	| Xenbus.Xb.Op.Invalid           -> reply_ack do_error
 	| _                              -> function_of_type_simple_op ty
