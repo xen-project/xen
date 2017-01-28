@@ -1953,10 +1953,6 @@ csched2_vcpu_migrate(
     struct csched2_runqueue_data *trqd;
     s_time_t now = NOW();
 
-    /* Check if new_cpu is valid */
-    ASSERT(cpumask_test_cpu(new_cpu, &CSCHED2_PRIV(ops)->initialized));
-    ASSERT(cpumask_test_cpu(new_cpu, vc->cpu_hard_affinity));
-
     /*
      * Being passed a target pCPU which is outside of our cpupool is only
      * valid if we are shutting down (or doing ACPI suspend), and we are
@@ -1984,6 +1980,10 @@ csched2_vcpu_migrate(
         vc->processor = new_cpu;
         return;
     }
+
+    /* If here, new_cpu must be a valid Credit2 pCPU, and in our affinity. */
+    ASSERT(cpumask_test_cpu(new_cpu, &CSCHED2_PRIV(ops)->initialized));
+    ASSERT(cpumask_test_cpu(new_cpu, vc->cpu_hard_affinity));
 
     trqd = RQD(ops, new_cpu);
 
