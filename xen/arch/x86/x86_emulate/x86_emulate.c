@@ -415,23 +415,6 @@ typedef union {
 # define ASM_FLAG_OUT(yes, no) no
 #endif
 
-/* MSRs. */
-#define MSR_TSC          0x00000010
-#define MSR_SYSENTER_CS  0x00000174
-#define MSR_SYSENTER_ESP 0x00000175
-#define MSR_SYSENTER_EIP 0x00000176
-#define MSR_DEBUGCTL     0x000001d9
-#define DEBUGCTL_BTF     (1 << 1)
-#define MSR_BNDCFGS      0x00000d90
-#define BNDCFG_ENABLE    (1 << 0)
-#define BNDCFG_PRESERVE  (1 << 1)
-#define MSR_EFER         0xc0000080
-#define MSR_STAR         0xc0000081
-#define MSR_LSTAR        0xc0000082
-#define MSR_CSTAR        0xc0000083
-#define MSR_FMASK        0xc0000084
-#define MSR_TSC_AUX      0xc0000103
-
 /* Control register flags. */
 #define CR0_PE    (1<<0)
 #define CR0_MP    (1<<1)
@@ -1731,8 +1714,8 @@ static bool is_branch_step(struct x86_emulate_ctxt *ctxt,
     uint64_t debugctl;
 
     return ops->read_msr &&
-           ops->read_msr(MSR_DEBUGCTL, &debugctl, ctxt) == X86EMUL_OKAY &&
-           (debugctl & DEBUGCTL_BTF);
+           ops->read_msr(MSR_IA32_DEBUGCTLMSR, &debugctl, ctxt) == X86EMUL_OKAY &&
+           (debugctl & IA32_DEBUGCTLMSR_BTF);
 }
 
 static bool umip_active(struct x86_emulate_ctxt *ctxt,
@@ -1894,9 +1877,9 @@ static void adjust_bnd(struct x86_emulate_ctxt *ctxt,
     if ( !mode_ring0() )
         bndcfg = read_bndcfgu();
     else if ( !ops->read_msr ||
-              ops->read_msr(MSR_BNDCFGS, &bndcfg, ctxt) != X86EMUL_OKAY )
+              ops->read_msr(MSR_IA32_BNDCFGS, &bndcfg, ctxt) != X86EMUL_OKAY )
         return;
-    if ( (bndcfg & BNDCFG_ENABLE) && !(bndcfg & BNDCFG_PRESERVE) )
+    if ( (bndcfg & IA32_BNDCFGS_ENABLE) && !(bndcfg & IA32_BNDCFGS_PRESERVE) )
     {
         /*
          * Using BNDMK or any other MPX instruction here is pointless, as
@@ -4983,7 +4966,7 @@ x86_emulate(
                 goto done;
             _regs.rip = msr_content;
 
-            if ( (rc = ops->read_msr(MSR_FMASK, &msr_content, ctxt)) != 0 )
+            if ( (rc = ops->read_msr(MSR_SYSCALL_MASK, &msr_content, ctxt)) != 0 )
                 goto done;
             _regs._eflags &= ~(msr_content | X86_EFLAGS_RF);
         }
@@ -5009,7 +4992,7 @@ x86_emulate(
          * As the #DB is raised after the CPL change and before the OS can
          * switch stack, it is a large risk for privilege escalation.
          *
-         * 64bit kernels should mask EFLAGS.TF in MSR_FMASK to avoid any
+         * 64bit kernels should mask EFLAGS.TF in MSR_SYSCALL_MASK to avoid any
          * vulnerability.  Running the #DB handler on an IST stack is also a
          * mitigation.
          *
@@ -5207,7 +5190,7 @@ x86_emulate(
             generate_exception_if(cr4 & CR4_TSD, EXC_GP, 0);
         }
         fail_if(ops->read_msr == NULL);
-        if ( (rc = ops->read_msr(MSR_TSC, &val, ctxt)) != 0 )
+        if ( (rc = ops->read_msr(MSR_IA32_TSC, &val, ctxt)) != 0 )
             goto done;
         _regs.r(dx) = val >> 32;
         _regs.r(ax) = (uint32_t)val;
@@ -5240,7 +5223,8 @@ x86_emulate(
         generate_exception_if(!in_protmode(ctxt, ops), EXC_GP, 0);
 
         fail_if(ops->read_msr == NULL);
-        if ( (rc = ops->read_msr(MSR_SYSENTER_CS, &msr_content, ctxt)) != 0 )
+        if ( (rc = ops->read_msr(MSR_IA32_SYSENTER_CS, &msr_content, ctxt))
+             != 0 )
             goto done;
 
         generate_exception_if(!(msr_content & 0xfffc), EXC_GP, 0);
@@ -5266,11 +5250,13 @@ x86_emulate(
              (rc = ops->write_segment(x86_seg_ss, &sreg, ctxt)) != 0 )
             goto done;
 
-        if ( (rc = ops->read_msr(MSR_SYSENTER_EIP, &msr_content, ctxt)) != 0 )
+        if ( (rc = ops->read_msr(MSR_IA32_SYSENTER_EIP, &msr_content, ctxt))
+             != 0 )
             goto done;
         _regs.r(ip) = lm ? msr_content : (uint32_t)msr_content;
 
-        if ( (rc = ops->read_msr(MSR_SYSENTER_ESP, &msr_content, ctxt)) != 0 )
+        if ( (rc = ops->read_msr(MSR_IA32_SYSENTER_ESP, &msr_content, ctxt))
+             != 0 )
             goto done;
         _regs.r(sp) = lm ? msr_content : (uint32_t)msr_content;
 
@@ -5287,7 +5273,8 @@ x86_emulate(
         generate_exception_if(!in_protmode(ctxt, ops), EXC_GP, 0);
 
         fail_if(ops->read_msr == NULL);
-        if ( (rc = ops->read_msr(MSR_SYSENTER_CS, &msr_content, ctxt)) != 0 )
+        if ( (rc = ops->read_msr(MSR_IA32_SYSENTER_CS, &msr_content, ctxt))
+             != 0 )
             goto done;
 
         generate_exception_if(!(msr_content & 0xfffc), EXC_GP, 0);
