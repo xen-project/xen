@@ -6,6 +6,7 @@
 #include <string.h>
 #include <xen/xen.h>
 
+#include <asm/x86-defns.h>
 #include <asm/x86-vendors.h>
 
 #define BUG() abort()

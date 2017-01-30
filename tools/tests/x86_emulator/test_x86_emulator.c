@@ -23,15 +23,6 @@ static const struct {
 #endif
 };
 
-/* EFLAGS bit definitions. */
-#define EFLG_OF (1<<11)
-#define EFLG_DF (1<<10)
-#define EFLG_SF (1<<7)
-#define EFLG_ZF (1<<6)
-#define EFLG_AF (1<<4)
-#define EFLG_PF (1<<2)
-#define EFLG_CF (1<<0)
-
 static unsigned int bytes_read;
 
 static int read(
