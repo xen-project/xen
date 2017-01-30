@@ -415,21 +415,6 @@ typedef union {
 # define ASM_FLAG_OUT(yes, no) no
 #endif
 
-/* Control register flags. */
-#define CR0_PE    (1<<0)
-#define CR0_MP    (1<<1)
-#define CR0_EM    (1<<2)
-#define CR0_TS    (1<<3)
-
-#define CR4_VME        (1<<0)
-#define CR4_PVI        (1<<1)
-#define CR4_TSD        (1<<2)
-#define CR4_OSFXSR     (1<<9)
-#define CR4_OSXMMEXCPT (1<<10)
-#define CR4_UMIP       (1<<11)
-#define CR4_FSGSBASE   (1<<16)
-#define CR4_OSXSAVE    (1<<18)
-
 /* Floating point status word definitions. */
 #define FSW_ES    (1U << 7)
 
@@ -810,7 +795,7 @@ static int _get_fpu(
             if ( rc != X86EMUL_OKAY )
                 return rc;
             generate_exception_if(!(cr4 & ((type == X86EMUL_FPU_xmm)
-                                           ? CR4_OSFXSR : CR4_OSXSAVE)),
+                                           ? X86_CR4_OSFXSR : X86_CR4_OSXSAVE)),
                                   EXC_UD);
         }
 
@@ -820,16 +805,16 @@ static int _get_fpu(
         if ( type >= X86EMUL_FPU_ymm )
         {
             /* Should be unreachable if VEX decoding is working correctly. */
-            ASSERT((cr0 & CR0_PE) && !(ctxt->regs->_eflags & X86_EFLAGS_VM));
+            ASSERT((cr0 & X86_CR0_PE) && !(ctxt->regs->_eflags & X86_EFLAGS_VM));
         }
-        if ( cr0 & CR0_EM )
+        if ( cr0 & X86_CR0_EM )
         {
             generate_exception_if(type == X86EMUL_FPU_fpu, EXC_NM);
             generate_exception_if(type == X86EMUL_FPU_mmx, EXC_UD);
             generate_exception_if(type == X86EMUL_FPU_xmm, EXC_UD);
         }
-        generate_exception_if((cr0 & CR0_TS) &&
-                              (type != X86EMUL_FPU_wait || (cr0 & CR0_MP)),
+        generate_exception_if((cr0 & X86_CR0_TS) &&
+                              (type != X86EMUL_FPU_wait || (cr0 & X86_CR0_MP)),
                               EXC_NM);
     }
 
@@ -852,7 +837,7 @@ do {                                                            \
     _put_fpu();                                                 \
     if ( (_fic)->exn_raised == EXC_XM && ops->read_cr &&        \
          ops->read_cr(4, &cr4, ctxt) == X86EMUL_OKAY &&         \
-         !(cr4 & CR4_OSXMMEXCPT) )                              \
+         !(cr4 & X86_CR4_OSXMMEXCPT) )				\
         (_fic)->exn_raised = EXC_UD;                            \
     generate_exception_if((_fic)->exn_raised >= 0,              \
                           (_fic)->exn_raised);                  \
@@ -1184,7 +1169,7 @@ _mode_iopl(
         rc = ops->read_cr(4, &cr4, ctxt);                    \
         if ( rc != X86EMUL_OKAY ) goto done;                 \
     }                                                        \
-    !!(cr4 & (_regs._eflags & X86_EFLAGS_VM ? CR4_VME : CR4_PVI)); \
+    !!(cr4 & (_regs._eflags & X86_EFLAGS_VM ? X86_CR4_VME : X86_CR4_PVI)); \
 })
 
 static int ioport_access_check(
@@ -1258,7 +1243,7 @@ in_realmode(
         return 0;
 
     rc = ops->read_cr(0, &cr0, ctxt);
-    return (!rc && !(cr0 & CR0_PE));
+    return (!rc && !(cr0 & X86_CR0_PE));
 }
 
 static bool
@@ -1726,7 +1711,7 @@ static bool umip_active(struct x86_emulate_ctxt *ctxt,
     /* Intentionally not using mode_ring0() here to avoid its fail_if(). */
     return get_cpl(ctxt, ops) > 0 &&
            ops->read_cr && ops->read_cr(4, &cr4, ctxt) == X86EMUL_OKAY &&
-           (cr4 & CR4_UMIP);
+           (cr4 & X86_CR4_UMIP);
 }
 
 /* Inject a software interrupt/exception, emulating if needed. */
@@ -3345,7 +3330,7 @@ x86_emulate(
                 if ( rc != X86EMUL_OKAY )
                     goto done;
             }
-            generate_exception_if(!(cr4 & CR4_VME), EXC_GP, 0);
+            generate_exception_if(!(cr4 & X86_CR4_VME), EXC_GP, 0);
             src.val = (_regs.flags & ~X86_EFLAGS_IF) | X86_EFLAGS_IOPL;
             if ( _regs._eflags & X86_EFLAGS_VIF )
                 src.val |= X86_EFLAGS_IF;
@@ -3368,7 +3353,7 @@ x86_emulate(
                     if ( rc != X86EMUL_OKAY )
                         goto done;
                 }
-                generate_exception_if(!(cr4 & CR4_VME) &&
+                generate_exception_if(!(cr4 & X86_CR4_VME) &&
                                       MASK_EXTR(_regs._eflags, X86_EFLAGS_IOPL) != 3,
                                       EXC_GP, 0);
             }
@@ -3385,7 +3370,7 @@ x86_emulate(
         if ( op_bytes == 2 )
         {
             dst.val = (uint16_t)dst.val | (_regs._eflags & 0xffff0000u);
-            if ( cr4 & CR4_VME )
+            if ( cr4 & X86_CR4_VME )
             {
                 if ( dst.val & X86_EFLAGS_IF )
                 {
@@ -5009,7 +4994,7 @@ x86_emulate(
         generate_exception_if(!mode_ring0(), EXC_GP, 0);
         fail_if((ops->read_cr == NULL) || (ops->write_cr == NULL));
         if ( (rc = ops->read_cr(0, &dst.val, ctxt)) != X86EMUL_OKAY ||
-             (rc = ops->write_cr(0, dst.val & ~CR0_TS, ctxt)) != X86EMUL_OKAY )
+             (rc = ops->write_cr(0, dst.val & ~X86_CR0_TS, ctxt)) != X86EMUL_OKAY )
             goto done;
         break;
 
@@ -5187,7 +5172,7 @@ x86_emulate(
             fail_if(ops->read_cr == NULL);
             if ( (rc = ops->read_cr(4, &cr4, ctxt)) )
                 goto done;
-            generate_exception_if(cr4 & CR4_TSD, EXC_GP, 0);
+            generate_exception_if(cr4 & X86_CR4_TSD, EXC_GP, 0);
         }
         fail_if(ops->read_msr == NULL);
         if ( (rc = ops->read_msr(MSR_IA32_TSC, &val, ctxt)) != 0 )
@@ -5560,7 +5545,7 @@ x86_emulate(
         fail_if(!ops->read_cr);
         if ( (rc = ops->read_cr(4, &cr4, ctxt)) != X86EMUL_OKAY )
             goto done;
-        generate_exception_if(!(cr4 & CR4_FSGSBASE), EXC_UD);
+        generate_exception_if(!(cr4 & X86_CR4_FSGSBASE), EXC_UD);
         seg = modrm_reg & 1 ? x86_seg_gs : x86_seg_fs;
         fail_if(!ops->read_segment);
         if ( (rc = ops->read_segment(seg, &sreg, ctxt)) != X86EMUL_OKAY )
