@@ -32,7 +32,7 @@ $(TARGET): x86_emulate.o test_x86_emulator.o
 
 .PHONY: clean
 clean:
-	rm -rf $(TARGET) *.o *~ core blowfish.h blowfish.bin x86_emulate
+	rm -rf $(TARGET) *.o *~ core blowfish.h blowfish.bin x86_emulate asm
 
 .PHONY: distclean
 distclean: clean
@@ -43,9 +43,13 @@ install:
 x86_emulate/x86_emulate.c x86_emulate/x86_emulate.h:
 	[ -L x86_emulate ] || ln -sf $(XEN_ROOT)/xen/arch/x86/x86_emulate .
 
-HOSTCFLAGS += $(CFLAGS_xeninclude)
+asm/x86-vendors.h:
+	[ -L asm ] || ln -sf $(XEN_ROOT)/xen/include/asm-x86 asm
 
-x86_emulate.h := x86_emulate.h x86_emulate/x86_emulate.h
+HOSTCFLAGS += $(CFLAGS_xeninclude) -I.
+
+x86.h := asm/x86-vendors.h
+x86_emulate.h := x86_emulate.h x86_emulate/x86_emulate.h $(x86.h)
 
 x86_emulate.o: x86_emulate.c x86_emulate/x86_emulate.c $(x86_emulate.h)
 	$(HOSTCC) $(HOSTCFLAGS) -D__XEN_TOOLS__ -c -g -o $@ $<
