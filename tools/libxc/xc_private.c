@@ -803,7 +803,7 @@ int do_dm_op(xc_interface *xch, domid_t domid, unsigned int nr_bufs, ...)
 
         bounce[idx].h = xencall_alloc_buffer(xch->xcall, size);
         if ( bounce[idx].h == NULL )
-            goto fail3;
+            break; /* Error path handled after va_end(). */
 
         memcpy(bounce[idx].h, u, size);
         bounce[idx].u = u;
@@ -812,6 +812,9 @@ int do_dm_op(xc_interface *xch, domid_t domid, unsigned int nr_bufs, ...)
         bufs[idx].size = size;
     }
     va_end(args);
+
+    if ( idx != nr_bufs )
+        goto fail3;
 
     ret = xencall3(xch->xcall, __HYPERVISOR_dm_op,
                    domid, nr_bufs, HYPERCALL_BUFFER_AS_ARG(bufs));
