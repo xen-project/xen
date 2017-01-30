@@ -602,22 +602,15 @@ void vmx_pi_hooks_assign(struct domain *d);
 void vmx_pi_hooks_deassign(struct domain *d);
 
 /* EPT violation qualifications definitions */
-#define _EPT_READ_VIOLATION         0
-#define EPT_READ_VIOLATION          (1UL<<_EPT_READ_VIOLATION)
-#define _EPT_WRITE_VIOLATION        1
-#define EPT_WRITE_VIOLATION         (1UL<<_EPT_WRITE_VIOLATION)
-#define _EPT_EXEC_VIOLATION         2
-#define EPT_EXEC_VIOLATION          (1UL<<_EPT_EXEC_VIOLATION)
-#define _EPT_EFFECTIVE_READ         3
-#define EPT_EFFECTIVE_READ          (1UL<<_EPT_EFFECTIVE_READ)
-#define _EPT_EFFECTIVE_WRITE        4
-#define EPT_EFFECTIVE_WRITE         (1UL<<_EPT_EFFECTIVE_WRITE)
-#define _EPT_EFFECTIVE_EXEC         5
-#define EPT_EFFECTIVE_EXEC          (1UL<<_EPT_EFFECTIVE_EXEC)
-#define _EPT_GLA_VALID              7
-#define EPT_GLA_VALID               (1UL<<_EPT_GLA_VALID)
-#define _EPT_GLA_FAULT              8
-#define EPT_GLA_FAULT               (1UL<<_EPT_GLA_FAULT)
+typedef union __transparent__ ept_qual {
+    unsigned long raw;
+    struct {
+        bool read:1, write:1, fetch:1,
+            eff_read:1, eff_write:1, eff_exec:1, /* eff_user_exec */:1,
+            gla_valid:1,
+            gla_fault:1; /* Valid iff gla_valid. */
+    };
+} ept_qual_t;
 
 #define EPT_L4_PAGETABLE_SHIFT      39
 #define EPT_PAGETABLE_ENTRIES       512

@@ -2986,7 +2986,7 @@ static void vmx_wbinvd_intercept(void)
         wbinvd();
 }
 
-static void ept_handle_violation(unsigned long qualification, paddr_t gpa)
+static void ept_handle_violation(ept_qual_t q, paddr_t gpa)
 {
     unsigned long gla, gfn = gpa >> PAGE_SHIFT;
     mfn_t mfn;
@@ -3006,13 +3006,10 @@ static void ept_handle_violation(unsigned long qualification, paddr_t gpa)
      *   Volume 3C: System Programming Guide, Part 3
      */
     struct npfec npfec = {
-        .read_access = !!(qualification & EPT_READ_VIOLATION) ||
-                       !!(qualification & EPT_WRITE_VIOLATION),
-        .write_access = !!(qualification & EPT_WRITE_VIOLATION),
-        .insn_fetch = !!(qualification & EPT_EXEC_VIOLATION),
-        .present = !!(qualification & (EPT_EFFECTIVE_READ |
-                                       EPT_EFFECTIVE_WRITE |
-                                       EPT_EFFECTIVE_EXEC))
+        .read_access = q.read || q.write,
+        .write_access = q.write,
+        .insn_fetch = q.fetch,
+        .present = q.eff_read || q.eff_write || q.eff_exec,
     };
 
     if ( tb_init_done )
@@ -3025,17 +3022,17 @@ static void ept_handle_violation(unsigned long qualification, paddr_t gpa)
         } _d;
 
         _d.gpa = gpa;
-        _d.qualification = qualification;
+        _d.qualification = q.raw;
         _d.mfn = mfn_x(get_gfn_query_unlocked(d, gfn, &_d.p2mt));
 
         __trace_var(TRC_HVM_NPF, 0, sizeof(_d), &_d);
     }
 
-    if ( qualification & EPT_GLA_VALID )
+    if ( q.gla_valid )
     {
         __vmread(GUEST_LINEAR_ADDRESS, &gla);
         npfec.gla_valid = 1;
-        if( qualification & EPT_GLA_FAULT )
+        if( q.gla_fault )
             npfec.kind = npfec_kind_with_gla;
         else
             npfec.kind = npfec_kind_in_gpt;
@@ -3065,18 +3062,18 @@ static void ept_handle_violation(unsigned long qualification, paddr_t gpa)
     mfn = get_gfn_query_unlocked(d, gfn, &p2mt);
     gprintk(XENLOG_ERR,
             "EPT violation %#lx (%c%c%c/%c%c%c) gpa %#"PRIpaddr" mfn %#lx type %i\n",
-            qualification,
-            (qualification & EPT_READ_VIOLATION) ? 'r' : '-',
-            (qualification & EPT_WRITE_VIOLATION) ? 'w' : '-',
-            (qualification & EPT_EXEC_VIOLATION) ? 'x' : '-',
-            (qualification & EPT_EFFECTIVE_READ) ? 'r' : '-',
-            (qualification & EPT_EFFECTIVE_WRITE) ? 'w' : '-',
-            (qualification & EPT_EFFECTIVE_EXEC) ? 'x' : '-',
+            q.raw,
+            q.read  ? 'r' : '-',
+            q.write ? 'w' : '-',
+            q.fetch ? 'x' : '-',
+            q.eff_read  ? 'r' : '-',
+            q.eff_write ? 'w' : '-',
+            q.eff_exec  ? 'x' : '-',
             gpa, mfn_x(mfn), p2mt);
 
     ept_walk_table(d, gfn);
 
-    if ( qualification & EPT_GLA_VALID )
+    if ( q.gla_valid )
         gprintk(XENLOG_ERR, " --- GLA %#lx\n", gla);
 
     domain_crash(d);

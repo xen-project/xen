@@ -47,6 +47,7 @@
 
 #define __attribute_pure__  __attribute__((__pure__))
 #define __attribute_const__ __attribute__((__const__))
+#define __transparent__     __attribute__((__transparent_union__))
 
 /*
  * The difference between the following two attributes is that __used is
