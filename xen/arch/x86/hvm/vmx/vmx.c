@@ -1996,11 +1996,11 @@ static void vmx_vcpu_update_eptp(struct vcpu *v)
         p2m = p2m_get_hostp2m(d);
 
     ept = &p2m->ept;
-    ept->asr = pagetable_get_pfn(p2m_get_pagetable(p2m));
+    ept->mfn = pagetable_get_pfn(p2m_get_pagetable(p2m));
 
     vmx_vmcs_enter(v);
 
-    __vmwrite(EPT_POINTER, ept_get_eptp(ept));
+    __vmwrite(EPT_POINTER, ept->eptp);
 
     if ( v->arch.hvm_vmx.secondary_exec_control &
          SECONDARY_EXEC_ENABLE_VIRT_EXCEPTIONS )
@@ -3956,7 +3956,7 @@ void vmx_vmenter_helper(const struct cpu_user_regs *regs)
         if ( cpumask_test_cpu(cpu, ept->invalidate) )
         {
             cpumask_clear_cpu(cpu, ept->invalidate);
-            __invept(INVEPT_SINGLE_CONTEXT, ept_get_eptp(ept), 0);
+            __invept(INVEPT_SINGLE_CONTEXT, ept->eptp, 0);
         }
     }
 

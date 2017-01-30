@@ -1043,16 +1043,13 @@ uint64_t get_shadow_eptp(struct vcpu *v)
     struct p2m_domain *p2m = p2m_get_nestedp2m(v, np2m_base);
     struct ept_data *ept = &p2m->ept;
 
-    ept->asr = pagetable_get_pfn(p2m_get_pagetable(p2m));
-    return ept_get_eptp(ept);
+    ept->mfn = pagetable_get_pfn(p2m_get_pagetable(p2m));
+    return ept->eptp;
 }
 
 static uint64_t get_host_eptp(struct vcpu *v)
 {
-    struct domain *d = v->domain;
-    struct ept_data *ept_data = &p2m_get_hostp2m(d)->ept;
-
-    return ept_get_eptp(ept_data);
+    return p2m_get_hostp2m(v->domain)->ept.eptp;
 }
 
 static bool_t nvmx_vpid_enabled(const struct vcpu *v)

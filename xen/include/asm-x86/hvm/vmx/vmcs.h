@@ -58,12 +58,12 @@ struct vmx_msr_state {
 
 struct ept_data {
     union {
-    struct {
-            u64 ept_mt :3,
-                ept_wl :3,
-                ept_ad :1,  /* bit 6 - enable EPT A/D bits */
-                rsvd   :5,
-                asr    :52;
+        struct {
+            uint64_t mt:3,   /* Memory Type. */
+                     wl:3,   /* Walk length -1. */
+                     ad:1,   /* Enable EPT A/D bits. */
+                     :5,     /* rsvd. */
+                     mfn:52;
         };
         u64 eptp;
     };
@@ -94,10 +94,6 @@ struct pi_desc {
     };
     u32 rsvd[6];
 } __attribute__ ((aligned (64)));
-
-#define ept_get_wl(ept)   ((ept)->ept_wl)
-#define ept_get_asr(ept)  ((ept)->asr)
-#define ept_get_eptp(ept) ((ept)->eptp)
 
 #define NR_PML_ENTRIES   512
 

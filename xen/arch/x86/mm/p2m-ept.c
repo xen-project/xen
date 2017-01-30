@@ -430,7 +430,7 @@ static int ept_invalidate_emt_range(struct p2m_domain *p2m,
     int wrc, rc = 0, ret = GUEST_TABLE_MAP_FAILED;
 
     table = map_domain_page(_mfn(pagetable_get_pfn(p2m_get_pagetable(p2m))));
-    for ( i = ept_get_wl(&p2m->ept); i > target; --i )
+    for ( i = p2m->ept.wl; i > target; --i )
     {
         ret = ept_next_level(p2m, 1, &table, &gfn_remainder, i);
         if ( ret == GUEST_TABLE_MAP_FAILED )
@@ -500,8 +500,8 @@ static int ept_invalidate_emt_range(struct p2m_domain *p2m,
 static int resolve_misconfig(struct p2m_domain *p2m, unsigned long gfn)
 {
     struct ept_data *ept = &p2m->ept;
-    unsigned int level = ept_get_wl(ept);
-    unsigned long mfn = ept_get_asr(ept);
+    unsigned int level = ept->wl;
+    unsigned long mfn = ept->mfn;
     ept_entry_t *epte;
     int wrc, rc = 0;
 
@@ -687,7 +687,7 @@ ept_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
      * 3. passing a valid order.
      */
     if ( ((gfn | mfn_x(mfn)) & ((1UL << order) - 1)) ||
-         ((u64)gfn >> ((ept_get_wl(ept) + 1) * EPT_TABLE_ORDER)) ||
+         ((u64)gfn >> ((ept->wl + 1) * EPT_TABLE_ORDER)) ||
          (order % EPT_TABLE_ORDER) )
         return -EINVAL;
 
@@ -704,7 +704,7 @@ ept_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
     table = map_domain_page(_mfn(pagetable_get_pfn(p2m_get_pagetable(p2m))));
 
     ret = GUEST_TABLE_MAP_FAILED;
-    for ( i = ept_get_wl(ept); i > target; i-- )
+    for ( i = ept->wl; i > target; i-- )
     {
         ret = ept_next_level(p2m, 0, &table, &gfn_remainder, i);
         if ( !ret )
@@ -898,7 +898,7 @@ static mfn_t ept_get_entry(struct p2m_domain *p2m,
     /* This pfn is higher than the highest the p2m map currently holds */
     if ( gfn > p2m->max_mapped_pfn )
     {
-        for ( i = ept_get_wl(ept); i > 0; --i )
+        for ( i = ept->wl; i > 0; --i )
             if ( (gfn & ~((1UL << (i * EPT_TABLE_ORDER)) - 1)) >
                  p2m->max_mapped_pfn )
                 break;
@@ -907,7 +907,7 @@ static mfn_t ept_get_entry(struct p2m_domain *p2m,
 
     /* Should check if gfn obeys GAW here. */
 
-    for ( i = ept_get_wl(ept); i > 0; i-- )
+    for ( i = ept->wl; i > 0; i-- )
     {
     retry:
         if ( table[gfn_remainder >> (i * EPT_TABLE_ORDER)].recalc )
@@ -1009,7 +1009,7 @@ void ept_walk_table(struct domain *d, unsigned long gfn)
         goto out;
     }
 
-    for ( i = ept_get_wl(ept); i >= 0; i-- )
+    for ( i = ept->wl; i >= 0; i-- )
     {
         ept_entry_t *ept_entry, *next;
         u32 index;
@@ -1043,12 +1043,12 @@ out:
 static void ept_change_entry_type_global(struct p2m_domain *p2m,
                                          p2m_type_t ot, p2m_type_t nt)
 {
-    unsigned long mfn = ept_get_asr(&p2m->ept);
+    unsigned long mfn = p2m->ept.mfn;
 
     if ( !mfn )
         return;
 
-    if ( ept_invalidate_emt(_mfn(mfn), 1, ept_get_wl(&p2m->ept)) )
+    if ( ept_invalidate_emt(_mfn(mfn), 1, p2m->ept.wl) )
         ept_sync_domain(p2m);
 }
 
@@ -1057,11 +1057,11 @@ static int ept_change_entry_type_range(struct p2m_domain *p2m,
                                        unsigned long first_gfn,
                                        unsigned long last_gfn)
 {
-    unsigned int i, wl = ept_get_wl(&p2m->ept);
+    unsigned int i, wl = p2m->ept.wl;
     unsigned long mask = (1 << EPT_TABLE_ORDER) - 1;
     int rc = 0, sync = 0;
 
-    if ( !ept_get_asr(&p2m->ept) )
+    if ( !p2m->ept.mfn )
         return -EINVAL;
 
     for ( i = 0; i <= wl; )
@@ -1101,12 +1101,12 @@ static int ept_change_entry_type_range(struct p2m_domain *p2m,
 
 static void ept_memory_type_changed(struct p2m_domain *p2m)
 {
-    unsigned long mfn = ept_get_asr(&p2m->ept);
+    unsigned long mfn = p2m->ept.mfn;
 
     if ( !mfn )
         return;
 
-    if ( ept_invalidate_emt(_mfn(mfn), 0, ept_get_wl(&p2m->ept)) )
+    if ( ept_invalidate_emt(_mfn(mfn), 0, p2m->ept.wl) )
         ept_sync_domain(p2m);
 }
 
@@ -1179,7 +1179,7 @@ static void ept_enable_pml(struct p2m_domain *p2m)
         return;
 
     /* Enable EPT A/D bit for PML */
-    p2m->ept.ept_ad = 1;
+    p2m->ept.ad = 1;
     vmx_domain_update_eptp(p2m->domain);
 }
 
@@ -1191,7 +1191,7 @@ static void ept_disable_pml(struct p2m_domain *p2m)
     vmx_domain_disable_pml(p2m->domain);
 
     /* Disable EPT A/D bit */
-    p2m->ept.ept_ad = 0;
+    p2m->ept.ad = 0;
     vmx_domain_update_eptp(p2m->domain);
 }
 
@@ -1216,10 +1216,10 @@ int ept_p2m_init(struct p2m_domain *p2m)
     p2m->tlb_flush = ept_tlb_flush;
 
     /* Set the memory type used when accessing EPT paging structures. */
-    ept->ept_mt = EPT_DEFAULT_MT;
+    ept->mt = EPT_DEFAULT_MT;
 
     /* set EPT page-walk length, now it's actual walk length - 1, i.e. 3 */
-    ept->ept_wl = 3;
+    ept->wl = 3;
 
     if ( cpu_has_vmx_pml )
     {
@@ -1289,7 +1289,7 @@ static void ept_dump_p2m_table(unsigned char key)
             gfn_remainder = gfn;
             table = map_domain_page(_mfn(pagetable_get_pfn(p2m_get_pagetable(p2m))));
 
-            for ( i = ept_get_wl(ept); i > 0; i-- )
+            for ( i = ept->wl; i > 0; i-- )
             {
                 ept_entry = table + (gfn_remainder >> (i * EPT_TABLE_ORDER));
                 if ( ept_entry->emt == MTRR_NUM_TYPES )
@@ -1337,8 +1337,8 @@ void p2m_init_altp2m_ept(struct domain *d, unsigned int i)
     p2m->min_remapped_gfn = gfn_x(INVALID_GFN);
     p2m->max_remapped_gfn = 0;
     ept = &p2m->ept;
-    ept->asr = pagetable_get_pfn(p2m_get_pagetable(p2m));
-    d->arch.altp2m_eptp[i] = ept_get_eptp(ept);
+    ept->mfn = pagetable_get_pfn(p2m_get_pagetable(p2m));
+    d->arch.altp2m_eptp[i] = ept->eptp;
 }
 
 unsigned int p2m_find_altp2m_by_eptp(struct domain *d, uint64_t eptp)
@@ -1357,7 +1357,7 @@ unsigned int p2m_find_altp2m_by_eptp(struct domain *d, uint64_t eptp)
         p2m = d->arch.altp2m_p2m[i];
         ept = &p2m->ept;
 
-        if ( eptp == ept_get_eptp(ept) )
+        if ( eptp == ept->eptp )
             goto out;
     }
 

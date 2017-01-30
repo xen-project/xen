@@ -1247,8 +1247,8 @@ static int construct_vmcs(struct vcpu *v)
         struct p2m_domain *p2m = p2m_get_hostp2m(d);
         struct ept_data *ept = &p2m->ept;
 
-        ept->asr  = pagetable_get_pfn(p2m_get_pagetable(p2m));
-        __vmwrite(EPT_POINTER, ept_get_eptp(ept));
+        ept->mfn = pagetable_get_pfn(p2m_get_pagetable(p2m));
+        __vmwrite(EPT_POINTER, ept->eptp);
     }
 
     if ( paging_mode_hap(d) )
@@ -1593,7 +1593,7 @@ void vmx_domain_update_eptp(struct domain *d)
     ASSERT(atomic_read(&d->pause_count));
 
     for_each_vcpu ( d, v )
-        vmx_vcpu_update_eptp(v, ept_get_eptp(&p2m->ept));
+        vmx_vcpu_update_eptp(v, p2m->ept.eptp);
 
     ept_sync_domain(p2m);
 }
