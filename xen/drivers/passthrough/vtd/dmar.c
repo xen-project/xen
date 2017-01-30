@@ -975,13 +975,9 @@ static int __init add_user_rmrr(void)
         rmrr->scope.devices_cnt = user_rmrrs[i].dev_count;
 
         if ( register_one_rmrr(rmrr) )
-        {
             printk(XENLOG_ERR VTDPREFIX
                    "Could not register RMMR range "ERMRRU_FMT"\n",
                    ERMRRU_ARG(user_rmrrs[i]));
-            scope_devices_free(&rmrr->scope);
-            xfree(rmrr);
-        }
     }
 
     return 0;
