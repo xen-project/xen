@@ -525,7 +525,7 @@ CHECK_dm_op_inject_msi;
 
 int compat_dm_op(domid_t domid,
                  unsigned int nr_bufs,
-                 COMPAT_HANDLE_PARAM(compat_dm_op_buf_t) bufs)
+                 XEN_GUEST_HANDLE_PARAM(void) bufs)
 {
     struct xen_dm_op_buf nat[MAX_NR_BUFS];
     unsigned int i;
@@ -538,7 +538,7 @@ int compat_dm_op(domid_t domid,
     {
         struct compat_dm_op_buf cmp;
 
-        if ( copy_from_compat_offset(&cmp, bufs, i, 1) )
+        if ( copy_from_guest_offset(&cmp, bufs, i, 1) )
             return -EFAULT;
 
 #define XLAT_dm_op_buf_HNDL_h(_d_, _s_) \

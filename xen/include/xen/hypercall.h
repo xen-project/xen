@@ -203,7 +203,7 @@ extern int
 compat_dm_op(
     domid_t domid,
     unsigned int nr_bufs,
-    COMPAT_HANDLE_PARAM(compat_dm_op_buf_t) bufs);
+    XEN_GUEST_HANDLE_PARAM(void) bufs);
 
 #endif
 
