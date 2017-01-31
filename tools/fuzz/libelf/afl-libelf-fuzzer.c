@@ -13,6 +13,8 @@ int main(int argc, char **argv)
     size_t size;
     FILE *fp;
 
+    setbuf(stdout, NULL);
+
     if ( argc != 2 )
     {
         printf("Expecting only one argument\n");
