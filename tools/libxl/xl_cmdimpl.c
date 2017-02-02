@@ -2535,6 +2535,7 @@ static void reload_domain_config(uint32_t domid,
     if (t_len > 0) {
         LOG("\"xl\" configuration found, using it\n");
         libxl_domain_config_dispose(d_config);
+        libxl_domain_config_init(d_config);
         parse_config_data("<updated>", (const char *)t_data,
                           t_len, d_config);
         free(t_data);
