@@ -1376,9 +1376,10 @@ void __init noreturn __start_xen(unsigned long mbi_p)
     else
         end_boot_allocator();
 
+    vm_init();
+
     system_state = SYS_STATE_boot;
 
-    vm_init();
     console_init_ring();
     vesa_init();
 

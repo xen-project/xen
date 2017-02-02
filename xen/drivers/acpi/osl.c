@@ -89,7 +89,7 @@ acpi_physical_address __init acpi_os_get_root_pointer(void)
 void __iomem *
 acpi_os_map_memory(acpi_physical_address phys, acpi_size size)
 {
-	if (system_state >= SYS_STATE_active) {
+	if (system_state >= SYS_STATE_boot) {
 		mfn_t mfn = _mfn(PFN_DOWN(phys));
 		unsigned int offs = phys & (PAGE_SIZE - 1);
 
@@ -104,7 +104,7 @@ acpi_os_map_memory(acpi_physical_address phys, acpi_size size)
 
 void acpi_os_unmap_memory(void __iomem * virt, acpi_size size)
 {
-	if (system_state >= SYS_STATE_active)
+	if (system_state >= SYS_STATE_boot)
 		vunmap((void *)((unsigned long)virt & PAGE_MASK));
 }
 
