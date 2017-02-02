@@ -3134,7 +3134,7 @@ x86_emulate(
         if ( nr_reps == 1 && ops->read_io && ops->write )
         {
             rc = ops->read_io(port, dst.bytes, &dst.val, ctxt);
-            if ( rc == X86EMUL_OKAY )
+            if ( rc != X86EMUL_UNHANDLEABLE )
                 nr_reps = 0;
         }
         if ( (nr_reps > 1 || rc == X86EMUL_UNHANDLEABLE) && ops->rep_ins )
@@ -3175,7 +3175,7 @@ x86_emulate(
         {
             rc = read_ulong(ea.mem.seg, ea.mem.off, &dst.val, dst.bytes,
                             ctxt, ops);
-            if ( rc == X86EMUL_OKAY )
+            if ( rc != X86EMUL_UNHANDLEABLE )
                 nr_reps = 0;
         }
         if ( (nr_reps > 1 || rc == X86EMUL_UNHANDLEABLE) && ops->rep_outs )
