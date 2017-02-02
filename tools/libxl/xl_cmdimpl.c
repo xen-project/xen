@@ -3146,6 +3146,7 @@ start:
             case DOMAIN_RESTART_RENAME:
                 if (domid_soft_reset == INVALID_DOMID &&
                     !preserve_domain(&domid, event, &d_config)) {
+                    libxl_event_free(ctx, event);
                     /* If we fail then exit leaving the old domain in place. */
                     ret = -1;
                     goto out;
