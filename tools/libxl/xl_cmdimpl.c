@@ -993,6 +993,19 @@ static void parse_vcpu_affinity(libxl_domain_build_info *b_info,
     }
 }
 
+static unsigned long parse_ulong(const char *str)
+{
+    char *endptr;
+    unsigned long val;
+
+    val = strtoul(str, &endptr, 10);
+    if (endptr == str || val == ULONG_MAX) {
+        fprintf(stderr, "xl: failed to convert \"%s\" to number\n", str);
+        exit(EXIT_FAILURE);
+    }
+    return val;
+}
+
 static void replace_string(char **str, const char *val)
 {
     free(*str);
@@ -1061,24 +1074,13 @@ static int parse_nic_config(libxl_device_nic *nic, XLU_Config **config, char *to
         replace_string(&nic->coloft_forwarddev, oparg);
     } else if (MATCH_OPTION("accel", token, oparg)) {
         fprintf(stderr, "the accel parameter for vifs is currently not supported\n");
+    } else if (MATCH_OPTION("devid", token, oparg)) {
+        nic->devid = parse_ulong(oparg);
     } else {
         fprintf(stderr, "unrecognized argument `%s'\n", token);
         return 1;
     }
     return 0;
-}
-
-static unsigned long parse_ulong(const char *str)
-{
-    char *endptr;
-    unsigned long val;
-
-    val = strtoul(str, &endptr, 10);
-    if (endptr == str || val == ULONG_MAX) {
-        fprintf(stderr, "xl: failed to convert \"%s\" to number\n", str);
-        exit(EXIT_FAILURE);
-    }
-    return val;
 }
 
 static void parse_vnuma_config(const XLU_Config *config,
