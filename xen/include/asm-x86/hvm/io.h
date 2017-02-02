@@ -97,8 +97,6 @@ struct hvm_io_ops {
 int hvm_process_io_intercept(const struct hvm_io_handler *handler,
                              ioreq_t *p);
 
-const struct hvm_io_handler *hvm_find_io_handler(ioreq_t *p);
-
 int hvm_io_intercept(ioreq_t *p);
 
 struct hvm_io_handler *hvm_next_io_handler(struct domain *d);

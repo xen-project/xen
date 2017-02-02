@@ -210,7 +210,7 @@ int hvm_process_io_intercept(const struct hvm_io_handler *handler,
     return rc;
 }
 
-const struct hvm_io_handler *hvm_find_io_handler(ioreq_t *p)
+static const struct hvm_io_handler *hvm_find_io_handler(const ioreq_t *p)
 {
     struct domain *curr_d = current->domain;
     unsigned int i;
