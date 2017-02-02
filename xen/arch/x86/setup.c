@@ -1376,9 +1376,13 @@ void __init noreturn __start_xen(unsigned long mbi_p)
     else
         end_boot_allocator();
 
-    vm_init();
-
     system_state = SYS_STATE_boot;
+    /*
+     * No calls involving ACPI code should go between the setting of
+     * SYS_STATE_boot and vm_init() (or else acpi_os_{,un}map_memory()
+     * will break).
+     */
+    vm_init();
 
     console_init_ring();
     vesa_init();
