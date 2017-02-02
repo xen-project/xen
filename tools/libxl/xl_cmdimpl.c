@@ -2811,6 +2811,7 @@ static int create_domain(struct domain_create *dom_info)
     int ret, rc;
     libxl_evgen_domain_death *deathw = NULL;
     libxl_evgen_disk_eject **diskws = NULL; /* one per disk */
+    unsigned int num_diskws = 0;
     void *config_data = 0;
     int config_len = 0;
     int restore_fd = -1;
@@ -3119,8 +3120,9 @@ start:
         diskws = xmalloc(sizeof(*diskws) * d_config.num_disks);
         for (i = 0; i < d_config.num_disks; i++)
             diskws[i] = NULL;
+        num_diskws = d_config.num_disks;
     }
-    for (i = 0; i < d_config.num_disks; i++) {
+    for (i = 0; i < num_diskws; i++) {
         if (d_config.disks[i].removable) {
             ret = libxl_evenable_disk_eject(ctx, domid, d_config.disks[i].vdev,
                                             0, &diskws[i]);
@@ -3157,7 +3159,10 @@ start:
                 libxl_event_free(ctx, event);
                 libxl_evdisable_domain_death(ctx, deathw);
                 deathw = NULL;
-                evdisable_disk_ejects(diskws, d_config.num_disks);
+                evdisable_disk_ejects(diskws, num_diskws);
+                free(diskws);
+                diskws = NULL;
+                num_diskws = 0;
                 /* discard any other events which may have been generated */
                 while (!(ret = libxl_event_check(ctx, &event,
                                                  LIBXL_EVENTMASK_ALL, 0,0))) {
