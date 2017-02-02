@@ -160,7 +160,7 @@ static inline void apply_alternatives_all(void)
 {
 }
 
-static inline int apply_alternatives(void *start, size_t lenght)
+static inline int apply_alternatives(void *start, size_t length)
 {
     return 0;
 }

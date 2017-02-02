@@ -227,7 +227,7 @@ integer_param("sched_credit2_migrate_resist", opt_migrate_resist);
  *  avg[0] = load*P
  *  avg[i+1] = avg[i] + delta*load*P/W - delta*avg[i]/W,  0 <= delta <= W
  *
- * where W is the lenght of the window, P the multiplier for transitiong into
+ * where W is the length of the window, P the multiplier for transitiong into
  * Q-format fixed point arithmetic and load is the instantaneous load of a
  * runqueue, which basically is the number of runnable vcpus there are on the
  * runqueue (for the meaning of the other terms, look at the doc comment to
@@ -276,7 +276,7 @@ integer_param("sched_credit2_migrate_resist", opt_migrate_resist);
 #define LOADAVG_PRECISION_SHIFT_MIN (4)
 
 /*
- * Both the lenght of the window and the number of fractional bits can be
+ * Both the length of the window and the number of fractional bits can be
  * decided with boot parameters.
  *
  * The length of the window is always expressed in nanoseconds. The actual
@@ -574,7 +574,7 @@ __runq_elem(struct list_head *elem)
  * Track the runq load by gathering instantaneous load samples, and using
  * exponentially weighted moving average (EWMA) for the 'decaying'.
  *
- * We consider a window of lenght W=2^(prv->load_window_shift) nsecs
+ * We consider a window of length W=2^(prv->load_window_shift) nsecs
  * (which takes LOADAVG_GRANULARITY_SHIFT into account).
  *
  * If load is the instantaneous load, the formula for EWMA looks as follows,
@@ -591,7 +591,7 @@ __runq_elem(struct list_head *elem)
  *  avgload = a*load + (1 - a)*avgload
  *
  * For determining a, we consider _when_ we are doing the load update, wrt
- * the lenght of the window. We define delta as follows:
+ * the length of the window. We define delta as follows:
  *
  *  delta = t - load_last_update
  *
@@ -602,7 +602,7 @@ __runq_elem(struct list_head *elem)
  * There are two possible situations:
  *
  * a) delta <= W
- *    this means that, during the last window of lenght W, the runeuque load
+ *    this means that, during the last window of length W, the runeuque load
  *    was avgload for (W - detla) time, and load for delta time:
  *
  *                |----------- W ---------|
@@ -621,7 +621,7 @@ __runq_elem(struct list_head *elem)
  *     1 - a = 1 - (delta / W) = (W - delta) / W
  *
  *    Which matches the above description of what happened in the last
- *    window of lenght W.
+ *    window of length W.
  *
  *    Note that this also means that the weight that we assign to both the
  *    latest load sample, and to previous history, varies at each update.
@@ -2540,7 +2540,7 @@ csched2_schedule(
          * The reset condition is "has a scheduler epoch come to an end?".
          * The way this is enforced is checking whether the vcpu at the top
          * of the runqueue has negative credits. This means the epochs have
-         * variable lenght, as in one epoch expores when:
+         * variable length, as in one epoch expores when:
          *  1) the vcpu at the top of the runqueue has executed for
          *     around 10 ms (with default parameters);
          *  2) no other vcpu with higher credits wants to run.
@@ -3043,7 +3043,7 @@ csched2_init(struct scheduler *ops)
                __func__, opt_load_window_shift);
         opt_load_window_shift = LOADAVG_WINDOW_SHIFT;
     }
-    printk(XENLOG_INFO "load tracking window lenght %llu ns\n",
+    printk(XENLOG_INFO "load tracking window length %llu ns\n",
            1ULL << opt_load_window_shift);
 
     /* Basically no CPU information is available at this point; just

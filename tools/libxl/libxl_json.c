@@ -69,8 +69,8 @@ struct libxl__yajl_ctx {
 #  define DEBUG_GEN_FREE(ctx)                   ((void)0)
 #  define DEBUG_GEN(ctx, type)                  ((void)0)
 #  define DEBUG_GEN_VALUE(ctx, type, value)     ((void)0)
-#  define DEBUG_GEN_STRING(ctx, value, lenght)  ((void)0)
-#  define DEBUG_GEN_NUMBER(ctx, value, lenght)  ((void)0)
+#  define DEBUG_GEN_STRING(ctx, value, length)  ((void)0)
+#  define DEBUG_GEN_NUMBER(ctx, value, length)  ((void)0)
 #  define DEBUG_GEN_REPORT(ctx)                 ((void)0)
 #endif
 
