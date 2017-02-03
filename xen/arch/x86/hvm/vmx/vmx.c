@@ -3629,19 +3629,14 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
         update_guest_eip(); /* Safe: RDTSC, RDTSCP */
         hvm_rdtsc_intercept(regs);
         break;
+
     case EXIT_REASON_VMCALL:
-    {
-        int rc;
         HVMTRACE_1D(VMMCALL, regs->_eax);
-        rc = hvm_do_hypercall(regs);
-        if ( rc != HVM_HCALL_preempted )
-        {
+
+        if ( hvm_hypercall(regs) == HVM_HCALL_completed )
             update_guest_eip(); /* Safe: VMCALL */
-            if ( rc == HVM_HCALL_invalidate )
-                send_invalidate_req();
-        }
         break;
-    }
+
     case EXIT_REASON_CR_ACCESS:
     {
         __vmread(EXIT_QUALIFICATION, &exit_qualification);

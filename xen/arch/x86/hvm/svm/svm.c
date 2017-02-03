@@ -2542,13 +2542,9 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
             break;
         BUG_ON(vcpu_guestmode);
         HVMTRACE_1D(VMMCALL, regs->_eax);
-        rc = hvm_do_hypercall(regs);
-        if ( rc != HVM_HCALL_preempted )
-        {
+
+        if ( hvm_hypercall(regs) == HVM_HCALL_completed )
             __update_guest_eip(regs, inst_len);
-            if ( rc == HVM_HCALL_invalidate )
-                send_invalidate_req();
-        }
         break;
 
     case VMEXIT_DR0_READ ... VMEXIT_DR7_READ:

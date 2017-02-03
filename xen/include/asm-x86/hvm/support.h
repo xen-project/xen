@@ -105,8 +105,7 @@ enum hvm_copy_result hvm_fetch_from_guest_linear(
 
 #define HVM_HCALL_completed  0 /* hypercall completed - no further action */
 #define HVM_HCALL_preempted  1 /* hypercall preempted - re-execute VMCALL */
-#define HVM_HCALL_invalidate 2 /* invalidate ioemu-dm memory cache        */
-int hvm_do_hypercall(struct cpu_user_regs *pregs);
+int hvm_hypercall(struct cpu_user_regs *regs);
 
 void hvm_hlt(unsigned int eflags);
 void hvm_triple_fault(void);

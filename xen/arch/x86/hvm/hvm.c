@@ -3874,7 +3874,7 @@ static const hypercall_table_t hvm_hypercall_table[] = {
 #undef HYPERCALL
 #undef COMPAT_CALL
 
-int hvm_do_hypercall(struct cpu_user_regs *regs)
+int hvm_hypercall(struct cpu_user_regs *regs)
 {
     struct vcpu *curr = current;
     struct domain *currd = curr->domain;
@@ -4011,9 +4011,8 @@ int hvm_do_hypercall(struct cpu_user_regs *regs)
         return HVM_HCALL_preempted;
 
     if ( unlikely(currd->arch.hvm_domain.qemu_mapcache_invalidate) &&
-         test_and_clear_bool(currd->arch.hvm_domain.
-                             qemu_mapcache_invalidate) )
-        return HVM_HCALL_invalidate;
+         test_and_clear_bool(currd->arch.hvm_domain.qemu_mapcache_invalidate) )
+        send_invalidate_req();
 
     return HVM_HCALL_completed;
 }
