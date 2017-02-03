@@ -21,7 +21,7 @@ OUTPUT_ARCH(FORMAT)
 
 PHDRS
 {
-  text PT_LOAD /* XXX should be AT ( XEN_PHYS_START ) */ ;
+  text PT_LOAD ;
 #if defined(BUILD_ID)
   note PT_NOTE ;
 #endif
@@ -30,7 +30,7 @@ SECTIONS
 {
   . = XEN_VIRT_START;
   _start = .;
-  .text : /* XXX should be AT ( XEN_PHYS_START ) */ {
+  .text : {
         _stext = .;            /* Text section */
        *(.text)
        *(.text.cold)
