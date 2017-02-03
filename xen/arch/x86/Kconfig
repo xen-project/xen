@@ -32,6 +32,12 @@ menu "Architecture Features"
 
 source "arch/Kconfig"
 
+config PV
+	def_bool y
+
+config HVM
+	def_bool y
+
 config SHADOW_PAGING
         bool "Shadow Paging"
         default y
