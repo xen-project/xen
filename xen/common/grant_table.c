@@ -3547,10 +3547,10 @@ static void gnttab_usage_print(struct domain *rd)
 static void gnttab_usage_print_all(unsigned char key)
 {
     struct domain *d;
-    printk("%s [ key '%c' pressed\n", __FUNCTION__, key);
+    printk("%s [ key '%c' pressed\n", __func__, key);
     for_each_domain ( d )
         gnttab_usage_print(d);
-    printk("%s ] done\n", __FUNCTION__);
+    printk("%s ] done\n", __func__);
 }
 
 static int __init gnttab_usage_init(void)
