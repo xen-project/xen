@@ -234,7 +234,7 @@ static int __init dt_scan_depth1_nodes(const void *fdt, int node,
  */
 int __init acpi_boot_table_init(void)
 {
-    int error;
+    int error = 0;
 
     /*
      * Enable ACPI instead of device tree unless
@@ -245,10 +245,7 @@ int __init acpi_boot_table_init(void)
     if ( param_acpi_off || ( !param_acpi_force
                              && device_tree_for_each_node(device_tree_flattened,
                                                    dt_scan_depth1_nodes, NULL)))
-    {
-        disable_acpi();
-        return 0;
-    }
+        goto disable;
 
     /*
      * ACPI is disabled at this point. Enable it in order to parse
@@ -260,16 +257,22 @@ int __init acpi_boot_table_init(void)
     error = acpi_table_init();
     if ( error )
     {
-        disable_acpi();
-        return error;
+        printk("%s: Unable to initialize table parser (%d)\n",
+               __FUNCTION__, error);
+        goto disable;
     }
 
-    if ( acpi_table_parse(ACPI_SIG_FADT, acpi_parse_fadt) )
+    error = acpi_table_parse(ACPI_SIG_FADT, acpi_parse_fadt);
+    if ( error )
     {
-        /* disable ACPI if no FADT is found */
-        disable_acpi();
-        printk("Can't find FADT\n");
+        printk("%s: FADT not found (%d)\n", __FUNCTION__, error);
+        goto disable;
     }
 
     return 0;
+
+disable:
+    disable_acpi();
+
+    return error;
 }
