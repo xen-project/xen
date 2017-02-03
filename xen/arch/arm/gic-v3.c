@@ -1356,7 +1356,6 @@ gic_acpi_parse_madt_cpu(struct acpi_subtable_header *header,
     if ( !cpu_base_assigned )
     {
         cbase = processor->base_address;
-        csize = SZ_8K;
         vbase = processor->gicv_base_address;
         gicv3_info.maintenance_irq = processor->vgic_interrupt;
 
@@ -1505,6 +1504,25 @@ static void __init gicv3_acpi_init(void)
         panic("GICv3: No valid GICC entries exists");
 
     gicv3.rdist_stride = 0;
+
+    /*
+     * In ACPI, 0 is considered as the invalid address. However the rest
+     * of the initialization rely on the invalid address to be
+     * INVALID_ADDR.
+     *
+     * Also set the size of the GICC and GICV when there base address
+     * is not invalid as those values are not present in ACPI.
+     */
+    if ( !cbase )
+        cbase = INVALID_PADDR;
+    else
+        csize = SZ_8K;
+
+    if ( !vbase )
+        vbase = INVALID_PADDR;
+    else
+        vsize = GUEST_GICC_SIZE;
+
 }
 #else
 static void __init gicv3_acpi_init(void) { }
