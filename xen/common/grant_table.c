@@ -1259,7 +1259,7 @@ __gnttab_unmap_common_complete(struct gnttab_unmap_common *op)
 
     if ( op->flags & GNTMAP_device_map ) 
     {
-        if ( !is_iomem_page(act->frame) )
+        if ( !is_iomem_page(_mfn(act->frame)) )
         {
             if ( op->flags & GNTMAP_readonly )
                 put_page(pg);
@@ -1279,7 +1279,7 @@ __gnttab_unmap_common_complete(struct gnttab_unmap_common *op)
             goto act_release_out;
         }
 
-        if ( !is_iomem_page(op->frame) ) 
+        if ( !is_iomem_page(_mfn(op->frame)) )
         {
             if ( gnttab_host_mapping_get_page_type(op, ld, rd) )
                 put_page_type(pg);
@@ -3314,7 +3314,7 @@ gnttab_release_mappings(
             {
                 BUG_ON(!(act->pin & GNTPIN_devr_mask));
                 act->pin -= GNTPIN_devr_inc;
-                if ( !is_iomem_page(act->frame) )
+                if ( !is_iomem_page(_mfn(act->frame)) )
                     put_page(pg);
             }
 
@@ -3323,7 +3323,7 @@ gnttab_release_mappings(
                 BUG_ON(!(act->pin & GNTPIN_hstr_mask));
                 act->pin -= GNTPIN_hstr_inc;
                 if ( gnttab_release_host_mappings(d) &&
-                     !is_iomem_page(act->frame) )
+                     !is_iomem_page(_mfn(act->frame)) )
                     put_page(pg);
             }
         }
@@ -3333,7 +3333,7 @@ gnttab_release_mappings(
             {
                 BUG_ON(!(act->pin & GNTPIN_devw_mask));
                 act->pin -= GNTPIN_devw_inc;
-                if ( !is_iomem_page(act->frame) )
+                if ( !is_iomem_page(_mfn(act->frame)) )
                     put_page_and_type(pg);
             }
 
@@ -3342,7 +3342,7 @@ gnttab_release_mappings(
                 BUG_ON(!(act->pin & GNTPIN_hstw_mask));
                 act->pin -= GNTPIN_hstw_inc;
                 if ( gnttab_release_host_mappings(d) &&
-                     !is_iomem_page(act->frame) )
+                     !is_iomem_page(_mfn(act->frame)) )
                 {
                     if ( gnttab_host_mapping_get_page_type(map, d, rd) )
                         put_page_type(pg);

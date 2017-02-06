@@ -314,7 +314,7 @@ static inline struct page_info *get_page_from_gfn(
 }
 
 int get_page_type(struct page_info *page, unsigned long type);
-int is_iomem_page(unsigned long mfn);
+bool is_iomem_page(mfn_t mfn);
 static inline int get_page_and_type(struct page_info *page,
                                     struct domain *domain,
                                     unsigned long type)

@@ -326,7 +326,7 @@ void init_guest_l4_table(l4_pgentry_t[], const struct domain *,
 bool_t fill_ro_mpt(unsigned long mfn);
 void zap_ro_mpt(unsigned long mfn);
 
-int is_iomem_page(unsigned long mfn);
+bool is_iomem_page(mfn_t mfn);
 
 void clear_superpage_mark(struct page_info *page);
 

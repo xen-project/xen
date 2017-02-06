@@ -1349,11 +1349,9 @@ int replace_grant_host_mapping(unsigned long addr, unsigned long mfn,
     return GNTST_okay;
 }
 
-int is_iomem_page(unsigned long mfn)
+bool is_iomem_page(mfn_t mfn)
 {
-    if ( !mfn_valid(mfn) )
-        return 1;
-    return 0;
+    return !mfn_valid(mfn_x(mfn));
 }
 
 void clear_and_clean_page(struct page_info *page)

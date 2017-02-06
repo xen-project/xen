@@ -789,15 +789,15 @@ get_##level##_linear_pagetable(                                             \
 }
 
 
-int is_iomem_page(unsigned long mfn)
+bool is_iomem_page(mfn_t mfn)
 {
     struct page_info *page;
 
-    if ( !mfn_valid(mfn) )
-        return 1;
+    if ( !mfn_valid(mfn_x(mfn)) )
+        return true;
 
     /* Caller must know that it is an iomem page, or a reference is held. */
-    page = mfn_to_page(mfn);
+    page = mfn_to_page(mfn_x(mfn));
     ASSERT((page->count_info & PGC_count_mask) != 0);
 
     return (page_get_owner(page) == dom_io);
@@ -1209,7 +1209,7 @@ void put_page_from_l1e(l1_pgentry_t l1e, struct domain *l1e_owner)
     struct domain    *pg_owner;
     struct vcpu      *v;
 
-    if ( !(l1e_get_flags(l1e) & _PAGE_PRESENT) || is_iomem_page(pfn) )
+    if ( !(l1e_get_flags(l1e) & _PAGE_PRESENT) || is_iomem_page(_mfn(pfn)) )
         return;
 
     page = mfn_to_page(pfn);

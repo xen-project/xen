@@ -1240,7 +1240,7 @@ int p2m_mem_paging_nominate(struct domain *d, unsigned long gfn)
         goto out;
 
     /* Check for io memory page */
-    if ( is_iomem_page(mfn_x(mfn)) )
+    if ( is_iomem_page(mfn) )
         goto out;
 
     /* Check page count and type */
