@@ -155,7 +155,7 @@ static void __prepare_to_wait(struct waitqueue_vcpu *wqv)
 
     if ( unlikely(wqv->esp == 0) )
     {
-        gdprintk(XENLOG_ERR, "Stack too large in %s\n", __FUNCTION__);
+        gdprintk(XENLOG_ERR, "Stack too large in %s\n", __func__);
         domain_crash_synchronous();
     }
 

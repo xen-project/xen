@@ -536,12 +536,12 @@ uint64_t elf_lookup_addr(struct elf_binary * elf, const char *symbol)
     sym = elf_sym_by_name(elf, symbol);
     if ( !ELF_HANDLE_VALID(sym) )
     {
-        elf_err(elf, "%s: not found: %s\n", __FUNCTION__, symbol);
+        elf_err(elf, "%s: not found: %s\n", __func__, symbol);
         return -1;
     }
 
     value = elf_uval(elf, sym, st_value);
-    elf_msg(elf, "%s: symbol \"%s\" at 0x%" PRIx64 "\n", __FUNCTION__,
+    elf_msg(elf, "%s: symbol \"%s\" at 0x%" PRIx64 "\n", __func__,
             symbol, value);
     return value;
 }
