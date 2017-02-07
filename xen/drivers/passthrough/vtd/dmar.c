@@ -619,6 +619,7 @@ static int register_one_rmrr(struct acpi_rmrr_unit *rmrru)
                 rmrru->base_address, rmrru->end_address);
         scope_devices_free(&rmrru->scope);
         xfree(rmrru);
+        return 1;
     }
     else if ( rmrru->base_address > rmrru->end_address )
     {
@@ -691,7 +692,17 @@ acpi_parse_one_rmrr(struct acpi_dmar_header *header)
                                &rmrru->scope, RMRR_TYPE, rmrr->segment);
 
     if ( !ret && (rmrru->scope.devices_cnt != 0) )
+    {
         ret = register_one_rmrr(rmrru);
+        /*
+         * register_one_rmrr() returns greater than 0 when a specified
+         * PCIe device cannot be detected. To prevent VT-d from being
+         * disabled in such cases, reset the return value to 0 here.
+         */
+        if ( ret > 0 )
+            ret = 0;
+
+    }
     else
         xfree(rmrru);
 
