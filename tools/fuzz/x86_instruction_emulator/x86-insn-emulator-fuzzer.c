@@ -347,9 +347,6 @@ static int fuzz_read_msr(
 {
     unsigned int idx;
 
-    if ( reg >= MSR_INDEX_MAX )
-        return X86EMUL_UNHANDLEABLE;
-
     switch ( reg )
     {
     case MSR_TSC_AUX:
