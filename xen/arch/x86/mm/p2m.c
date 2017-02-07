@@ -147,15 +147,29 @@ static void p2m_teardown_hostp2m(struct domain *d)
     }
 }
 
-static void p2m_teardown_nestedp2m(struct domain *d);
+static void p2m_teardown_nestedp2m(struct domain *d)
+{
+    unsigned int i;
+    struct p2m_domain *p2m;
+
+    for ( i = 0; i < MAX_NESTEDP2M; i++ )
+    {
+        if ( !d->arch.nested_p2m[i] )
+            continue;
+        p2m = d->arch.nested_p2m[i];
+        list_del(&p2m->np2m_list);
+        p2m_free_one(p2m);
+        d->arch.nested_p2m[i] = NULL;
+    }
+}
 
 static int p2m_init_nestedp2m(struct domain *d)
 {
-    uint8_t i;
+    unsigned int i;
     struct p2m_domain *p2m;
 
     mm_lock_init(&d->arch.nested_p2m_lock);
-    for (i = 0; i < MAX_NESTEDP2M; i++)
+    for ( i = 0; i < MAX_NESTEDP2M; i++ )
     {
         d->arch.nested_p2m[i] = p2m = p2m_init_one(d);
         if ( p2m == NULL )
@@ -169,22 +183,6 @@ static int p2m_init_nestedp2m(struct domain *d)
     }
 
     return 0;
-}
-
-static void p2m_teardown_nestedp2m(struct domain *d)
-{
-    uint8_t i;
-    struct p2m_domain *p2m;
-
-    for (i = 0; i < MAX_NESTEDP2M; i++)
-    {
-        if ( !d->arch.nested_p2m[i] )
-            continue;
-        p2m = d->arch.nested_p2m[i];
-        list_del(&p2m->np2m_list);
-        p2m_free_one(p2m);
-        d->arch.nested_p2m[i] = NULL;
-    }
 }
 
 static void p2m_teardown_altp2m(struct domain *d)
