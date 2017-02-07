@@ -329,13 +329,16 @@ unsigned long __init alloc_boot_pages(
     unsigned long nr_pfns, unsigned long pfn_align)
 {
     unsigned long pg, _e;
-    int i;
+    unsigned int i = nr_bootmem_regions;
 
-    for ( i = nr_bootmem_regions - 1; i >= 0; i-- )
+    BOOT_BUG_ON(!nr_bootmem_regions);
+
+    while ( i-- )
     {
         struct bootmem_region *r = &bootmem_region_list[i];
+
         pg = (r->e - nr_pfns) & ~(pfn_align - 1);
-        if ( pg < r->s )
+        if ( pg >= r->e || pg < r->s )
             continue;
 
 #if defined(CONFIG_X86) && !defined(NDEBUG)
@@ -1352,6 +1355,7 @@ void __init end_boot_allocator(void)
         if ( r->s < r->e )
             init_heap_pages(mfn_to_page(r->s), r->e - r->s);
     }
+    nr_bootmem_regions = 0;
     init_heap_pages(virt_to_page(bootmem_region_list), 1);
 
     if ( !dma_bitsize && (num_online_nodes() > 1) )
