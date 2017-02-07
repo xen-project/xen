@@ -1638,8 +1638,17 @@ static int __init verify_tsc_reliability(void)
 
             printk("Switched to Platform timer %s TSC\n",
                    freq_string(plt_src.frequency));
+            return 0;
         }
     }
+
+    /*
+     * While with constant-rate TSCs the scale factor can be shared, when TSCs
+     * are not marked as 'reliable', re-sync during rendezvous.
+     */
+    if ( boot_cpu_has(X86_FEATURE_CONSTANT_TSC) &&
+         !boot_cpu_has(X86_FEATURE_TSC_RELIABLE) )
+        time_calibration_rendezvous_fn = time_calibration_tsc_rendezvous;
 
     return 0;
 }
@@ -1649,14 +1658,6 @@ __initcall(verify_tsc_reliability);
 int __init init_xen_time(void)
 {
     tsc_check_writability();
-
-    /* If we have constant-rate TSCs then scale factor can be shared. */
-    if ( boot_cpu_has(X86_FEATURE_CONSTANT_TSC) )
-    {
-        /* If TSCs are not marked as 'reliable', re-sync during rendezvous. */
-        if ( !boot_cpu_has(X86_FEATURE_TSC_RELIABLE) )
-            time_calibration_rendezvous_fn = time_calibration_tsc_rendezvous;
-    }
 
     open_softirq(TIME_CALIBRATE_SOFTIRQ, local_time_calibration);
 
