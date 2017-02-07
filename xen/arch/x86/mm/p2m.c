@@ -1620,8 +1620,10 @@ p2m_flush_table(struct p2m_domain *p2m)
 
     p2m_lock(p2m);
 
-    /* "Host" p2m tables can have shared entries &c that need a bit more 
-     * care when discarding them */
+    /*
+     * "Host" p2m tables can have shared entries &c that need a bit more care
+     * when discarding them.
+     */
     ASSERT(!p2m_is_hostp2m(p2m));
     /* Nested p2m's do not do pod, hence the asserts (and no pod lock)*/
     ASSERT(page_list_empty(&p2m->pod.super));
@@ -1635,19 +1637,21 @@ p2m_flush_table(struct p2m_domain *p2m)
 
     /* This is no longer a valid nested p2m for any address space */
     p2m->np2m_base = P2M_BASE_EADDR;
-    
-    /* Zap the top level of the trie */
-    mfn = pagetable_get_mfn(p2m_get_pagetable(p2m));
-    clear_domain_page(mfn);
 
     /* Make sure nobody else is using this p2m table */
     nestedhvm_vmcx_flushtlb(p2m);
 
+    /* Zap the top level of the trie */
+    mfn = pagetable_get_mfn(p2m_get_pagetable(p2m));
+    clear_domain_page(mfn);
+
     /* Free the rest of the trie pages back to the paging pool */
     top = mfn_to_page(mfn);
     while ( (pg = page_list_remove_head(&p2m->pages)) )
-        if ( pg != top ) 
+    {
+        if ( pg != top )
             d->arch.paging.free_page(d, pg);
+    }
     page_list_add(top, &p2m->pages);
 
     p2m_unlock(p2m);
