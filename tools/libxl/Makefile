@@ -137,7 +137,7 @@ LIBXL_OBJS = flexarray.o libxl.o libxl_create.o libxl_dm.o libxl_pci.o \
 			libxl_qmp.o libxl_event.o libxl_fork.o \
 			libxl_dom_suspend.o libxl_dom_save.o libxl_usb.o \
 			libxl_vtpm.o libxl_nic.o libxl_disk.o libxl_console.o \
-			libxl_cpupool.o libxl_sched.o \
+			libxl_cpupool.o libxl_mem.o libxl_sched.o \
                         $(LIBXL_OBJS-y)
 LIBXL_OBJS += libxl_genid.o
 LIBXL_OBJS += _libxl_types.o libxl_flask.o _libxl_types_internal.o
