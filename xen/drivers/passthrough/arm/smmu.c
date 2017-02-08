@@ -198,16 +198,6 @@ typedef paddr_t phys_addr_t;
 
 #define VA_BITS		0	/* Only used for configuring stage-1 input size */
 
-/* The macro ACCESS_ONCE start to be replaced in Linux in favor of
- * {READ, WRITE}_ONCE. Rather than introducing in the common code, keep a
- * version here. We will have to drop it when the SMMU code in Linux will
- * switch to {READ, WRITE}_ONCE.
- */
-#define __ACCESS_ONCE(x) ({ \
-	 __maybe_unused typeof(x) __var = 0; \
-	(volatile typeof(x) *)&(x); })
-#define ACCESS_ONCE(x) (*__ACCESS_ONCE(x))
-
 #define MODULE_DEVICE_TABLE(type, name)
 #define module_param_named(name, value, type, perm)
 #define MODULE_PARM_DESC(_parm, desc)
