@@ -65,7 +65,7 @@
  *  x23 - UART address
  *  x24 - cpuid
  *  x25 - identity map in place
- *  x26 -
+ *  x26 - skip_zero_bss
  *  x27 -
  *  x28 -
  *  x29 -
@@ -232,6 +232,10 @@ section_table:
         .long   0xe0500020       /* Characteristics (section flags) */
         .align  5
 real_start:
+        /* BSS should be zeroed when booting without EFI */
+        mov   x26, #0                /* x26 := skip_zero_bss */
+
+real_start_efi:
         msr   DAIFSet, 0xf           /* Disable all interrupts */
 
         /* Save the bootloader arguments in less-clobberable registers */
@@ -261,6 +265,8 @@ GLOBAL(init_secondary)
         sub   x20, x19, x0           /* x20 := phys-offset */
 
         mov   x22, #1                /* x22 := is_secondary_cpu */
+        /* Boot CPU already zero BSS so skip it on secondary CPUs. */
+        mov   x26, #1                /* X26 := skip_zero_bss */
 
 common_start:
         mov   x24, #0                /* x24 := CPU ID. Initialy zero until we
@@ -314,8 +320,8 @@ common_start:
 
 el2:    PRINT("- Xen starting at EL2 -\r\n")
 
-        /* Zero BSS On the boot CPU to avoid nasty surprises */
-        cbnz  x22, skip_bss
+        /* Zero BSS only when requested */
+        cbnz  x26, skip_bss
 
         PRINT("- Zero BSS -\r\n")
         ldr   x0, =__bss_start       /* Load start & end of bss */
@@ -787,7 +793,16 @@ ENTRY(efi_xen_start)
         mov   x1, xzr
         mov   x2, xzr
         mov   x3, xzr
-        b     real_start
+        /*
+         * The EFI stub and Xen may share some information living in
+         * BSS. Don't zero BSS to avoid loosing them.
+         *
+         * Note that the EFI firmware has already zeroed BSS for us
+         * before jump into the stub.
+         */
+        mov   x26, #1               /* x26 := skip_zero_bss */
+
+        b     real_start_efi
 ENDPROC(efi_xen_start)
 
 /*
