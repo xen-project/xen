@@ -1,7 +1,5 @@
 /*
- * Copyright (C) 2009      Citrix Ltd.
- * Author Vincent Hanquez <vincent.hanquez@eu.citrix.com>
- * Author Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+ * Copyright 2009-2017 Citrix Ltd and other contributors
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published
