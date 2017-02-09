@@ -144,13 +144,10 @@ static inline int test_and_set_bit(int nr, volatile void *addr)
 {
     int oldbit;
 
-#ifdef __GCC_ASM_FLAG_OUTPUTS__
-    asm volatile ( "lock; btsl %2,%1"
-                   : "=@ccc" (oldbit), "+m" (ADDR) : "Ir" (nr) : "memory" );
-#else
-    asm volatile ( "lock; btsl %2,%1\n\tsbbl %0,%0"
-                   : "=r" (oldbit), "+m" (ADDR) : "Ir" (nr) : "memory" );
-#endif
+    asm volatile ( "lock; btsl %[nr], %[addr]\n\t"
+                   ASM_FLAG_OUT(, "sbbl %[old], %[old]\n\t")
+                   : [old] ASM_FLAG_OUT("=@ccc", "=r") (oldbit),
+                     [addr] "+m" (ADDR) : [nr] "Ir" (nr) : "memory" );
 
     return oldbit;
 }
@@ -172,15 +169,10 @@ static inline int __test_and_set_bit(int nr, void *addr)
 {
     int oldbit;
 
-#ifdef __GCC_ASM_FLAG_OUTPUTS__
-    asm volatile ( "btsl %2,%1"
-                   : "=@ccc" (oldbit), "+m" (*(int *)addr)
-                   : "Ir" (nr) : "memory" );
-#else
-    asm volatile ( "btsl %2,%1\n\tsbbl %0,%0"
-                   : "=r" (oldbit), "+m" (*(int *)addr)
-                   : "Ir" (nr) : "memory" );
-#endif
+    asm volatile ( "btsl %[nr], %[addr]\n\t"
+                   ASM_FLAG_OUT(, "sbbl %[old], %[old]\n\t")
+                   : [old] ASM_FLAG_OUT("=@ccc", "=r") (oldbit),
+                     [addr] "+m" (*(int *)addr) : [nr] "Ir" (nr) : "memory" );
 
     return oldbit;
 }
@@ -201,13 +193,10 @@ static inline int test_and_clear_bit(int nr, volatile void *addr)
 {
     int oldbit;
 
-#ifdef __GCC_ASM_FLAG_OUTPUTS__
-    asm volatile ( "lock; btrl %2,%1"
-                   : "=@ccc" (oldbit), "+m" (ADDR) : "Ir" (nr) : "memory" );
-#else
-    asm volatile ( "lock; btrl %2,%1\n\tsbbl %0,%0"
-                   : "=r" (oldbit), "+m" (ADDR) : "Ir" (nr) : "memory" );
-#endif
+    asm volatile ( "lock; btrl %[nr], %[addr]\n\t"
+                   ASM_FLAG_OUT(, "sbbl %[old], %[old]\n\t")
+                   : [old] ASM_FLAG_OUT("=@ccc", "=r") (oldbit),
+                     [addr] "+m" (ADDR) : [nr] "Ir" (nr) : "memory" );
 
     return oldbit;
 }
@@ -229,15 +218,10 @@ static inline int __test_and_clear_bit(int nr, void *addr)
 {
     int oldbit;
 
-#ifdef __GCC_ASM_FLAG_OUTPUTS__
-    asm volatile ( "btrl %2,%1"
-                   : "=@ccc" (oldbit), "+m" (*(int *)addr)
-                   : "Ir" (nr) : "memory" );
-#else
-    asm volatile ( "btrl %2,%1\n\tsbbl %0,%0"
-                   : "=r" (oldbit), "+m" (*(int *)addr)
-                   : "Ir" (nr) : "memory" );
-#endif
+    asm volatile ( "btrl %[nr], %[addr]\n\t"
+                   ASM_FLAG_OUT(, "sbbl %[old], %[old]\n\t")
+                   : [old] ASM_FLAG_OUT("=@ccc", "=r") (oldbit),
+                     [addr] "+m" (*(int *)addr) : [nr] "Ir" (nr) : "memory" );
 
     return oldbit;
 }
@@ -251,15 +235,10 @@ static inline int __test_and_change_bit(int nr, void *addr)
 {
     int oldbit;
 
-#ifdef __GCC_ASM_FLAG_OUTPUTS__
-    asm volatile ( "btcl %2,%1"
-                   : "=@ccc" (oldbit), "+m" (*(int *)addr)
-                   : "Ir" (nr) : "memory" );
-#else
-    asm volatile ( "btcl %2,%1\n\tsbbl %0,%0"
-                   : "=r" (oldbit), "+m" (*(int *)addr)
-                   : "Ir" (nr) : "memory" );
-#endif
+    asm volatile ( "btcl %[nr], %[addr]\n\t"
+                   ASM_FLAG_OUT(, "sbbl %[old], %[old]\n\t")
+                   : [old] ASM_FLAG_OUT("=@ccc", "=r") (oldbit),
+                     [addr] "+m" (*(int *)addr) : [nr] "Ir" (nr) : "memory" );
 
     return oldbit;
 }
@@ -280,13 +259,10 @@ static inline int test_and_change_bit(int nr, volatile void *addr)
 {
     int oldbit;
 
-#ifdef __GCC_ASM_FLAG_OUTPUTS__
-    asm volatile ( "lock; btcl %2,%1"
-                   : "=@ccc" (oldbit), "+m" (ADDR) : "Ir" (nr) : "memory" );
-#else
-    asm volatile ( "lock; btcl %2,%1\n\tsbbl %0,%0"
-                   : "=r" (oldbit), "+m" (ADDR) : "Ir" (nr) : "memory" );
-#endif
+    asm volatile ( "lock; btcl %[nr], %[addr]\n\t"
+                   ASM_FLAG_OUT(, "sbbl %[old], %[old]\n\t")
+                   : [old] ASM_FLAG_OUT("=@ccc", "=r") (oldbit),
+                     [addr] "+m" (ADDR) : [nr] "Ir" (nr) : "memory" );
 
     return oldbit;
 }
@@ -305,15 +281,10 @@ static inline int variable_test_bit(int nr, const volatile void *addr)
 {
     int oldbit;
 
-#ifdef __GCC_ASM_FLAG_OUTPUTS__
-    asm volatile ( "btl %2,%1"
-                   : "=@ccc" (oldbit)
-                   : "m" (CONST_ADDR), "Ir" (nr) : "memory" );
-#else
-    asm volatile ( "btl %2,%1\n\tsbbl %0,%0"
-                   : "=r" (oldbit)
-                   : "m" (CONST_ADDR), "Ir" (nr) : "memory" );
-#endif
+    asm volatile ( "btl %[nr], %[addr]\n\t"
+                   ASM_FLAG_OUT(, "sbbl %[old], %[old]\n\t")
+                   : [old] ASM_FLAG_OUT("=@ccc", "=r") (oldbit)
+                   : [addr] "m" (CONST_ADDR), [nr] "Ir" (nr) : "memory" );
 
     return oldbit;
 }

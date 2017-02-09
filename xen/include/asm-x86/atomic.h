@@ -133,17 +133,13 @@ static inline int atomic_sub_return(int i, atomic_t *v)
 
 static inline int atomic_sub_and_test(int i, atomic_t *v)
 {
-    bool_t c;
+    bool c;
 
-#ifdef __GCC_ASM_FLAG_OUTPUTS__
-    asm volatile ( "lock; subl %2,%0"
-                   : "+m" (*(volatile int *)&v->counter), "=@ccz" (c)
-                   : "ir" (i) : "memory" );
-#else
-    asm volatile ( "lock; subl %2,%0; setz %1"
-                   : "+m" (*(volatile int *)&v->counter), "=qm" (c)
-                   : "ir" (i) : "memory" );
-#endif
+    asm volatile ( "lock; subl %[i], %[counter]\n\t"
+                   ASM_FLAG_OUT(, "setz %[zf]\n\t")
+                   : [counter] "+m" (*(volatile int *)&v->counter),
+                     [zf] ASM_FLAG_OUT("=@ccz", "=qm") (c)
+                   : [i] "ir" (i) : "memory" );
 
     return c;
 }
@@ -163,17 +159,13 @@ static inline int atomic_inc_return(atomic_t *v)
 
 static inline int atomic_inc_and_test(atomic_t *v)
 {
-    bool_t c;
+    bool c;
 
-#ifdef __GCC_ASM_FLAG_OUTPUTS__
-    asm volatile ( "lock; incl %0"
-                   : "+m" (*(volatile int *)&v->counter), "=@ccz" (c)
+    asm volatile ( "lock; incl %[counter]\n\t"
+                   ASM_FLAG_OUT(, "setz %[zf]\n\t")
+                   : [counter] "+m" (*(volatile int *)&v->counter),
+                     [zf] ASM_FLAG_OUT("=@ccz", "=qm") (c)
                    :: "memory" );
-#else
-    asm volatile ( "lock; incl %0; setz %1"
-                   : "+m" (*(volatile int *)&v->counter), "=qm" (c)
-                   :: "memory" );
-#endif
 
     return c;
 }
@@ -193,34 +185,26 @@ static inline int atomic_dec_return(atomic_t *v)
 
 static inline int atomic_dec_and_test(atomic_t *v)
 {
-    bool_t c;
+    bool c;
 
-#ifdef __GCC_ASM_FLAG_OUTPUTS__
-    asm volatile ( "lock; decl %0"
-                   : "+m" (*(volatile int *)&v->counter), "=@ccz" (c)
+    asm volatile ( "lock; decl %[counter]\n\t"
+                   ASM_FLAG_OUT(, "setz %[zf]\n\t")
+                   : [counter] "+m" (*(volatile int *)&v->counter),
+                     [zf] ASM_FLAG_OUT("=@ccz", "=qm") (c)
                    :: "memory" );
-#else
-    asm volatile ( "lock; decl %0; setz %1"
-                   : "+m" (*(volatile int *)&v->counter), "=qm" (c)
-                   :: "memory" );
-#endif
 
     return c;
 }
 
 static inline int atomic_add_negative(int i, atomic_t *v)
 {
-    bool_t c;
+    bool c;
 
-#ifdef __GCC_ASM_FLAG_OUTPUTS__
-    asm volatile ( "lock; addl %2,%0"
-                   : "+m" (*(volatile int *)&v->counter), "=@ccs" (c)
-                   : "ir" (i) : "memory" );
-#else
-    asm volatile ( "lock; addl %2,%0; sets %1"
-                   : "+m" (*(volatile int *)&v->counter), "=qm" (c)
-                   : "ir" (i) : "memory" );
-#endif
+    asm volatile ( "lock; addl %[i], %[counter]\n\t"
+                   ASM_FLAG_OUT(, "sets %[sf]\n\t")
+                   : [counter] "+m" (*(volatile int *)&v->counter),
+                     [sf] ASM_FLAG_OUT("=@ccs", "=qm") (c)
+                   : [i] "ir" (i) : "memory" );
 
     return c;
 }
