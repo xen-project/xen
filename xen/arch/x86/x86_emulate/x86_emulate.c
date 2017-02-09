@@ -4581,6 +4581,7 @@ x86_emulate(
         break;
 
     case 0xa3: bt: /* bt */
+        generate_exception_if(lock_prefix, EXC_UD, 0);
         emulate_2op_SrcV_nobyte("bt", src, dst, _regs.eflags);
         dst.type = OP_NONE;
         break;
