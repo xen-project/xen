@@ -331,7 +331,11 @@ union vex {
 
 #define copy_REX_VEX(ptr, rex, vex) do { \
     if ( (vex).opcx != vex_none ) \
+    { \
+        if ( !mode_64bit() ) \
+            vex.reg |= 8; \
         ptr[0] = 0xc4, ptr[1] = (vex).raw[0], ptr[2] = (vex).raw[1]; \
+    } \
     else if ( mode_64bit() ) \
         ptr[1] = rex | REX_PREFIX; \
 } while (0)
@@ -2027,6 +2031,11 @@ x86_decode(
             case 8:
                 /* VEX / XOP / EVEX */
                 generate_exception_if(rex_prefix || vex.pfx, EXC_UD, -1);
+                /*
+                 * With operand size override disallowed (see above), op_bytes
+                 * should not have changed from its default.
+                 */
+                ASSERT(op_bytes == def_op_bytes);
 
                 vex.raw[0] = modrm;
                 if ( b == 0xc5 )
@@ -2053,6 +2062,12 @@ x86_decode(
                             op_bytes = 8;
                         }
                     }
+                    else
+                    {
+                        /* Operand size fixed at 4 (no override via W bit). */
+                        op_bytes = 4;
+                        vex.b = 1;
+                    }
                     switch ( b )
                     {
                     case 0x62:
@@ -2071,7 +2086,7 @@ x86_decode(
                         break;
                     }
                 }
-                if ( mode_64bit() && !vex.r )
+                if ( !vex.r )
                     rex_prefix |= REX_R;
 
                 ext = vex.opcx;
