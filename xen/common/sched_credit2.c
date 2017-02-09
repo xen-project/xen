@@ -331,24 +331,23 @@ static int csched2_cpu_pick(const struct scheduler *ops, struct vcpu *vc);
  */
 static int get_fallback_cpu(struct csched2_vcpu *svc)
 {
-    int cpu;
+    int fallback_cpu, cpu = svc->vcpu->processor;
 
-    if ( likely(cpumask_test_cpu(svc->vcpu->processor,
-                                 svc->vcpu->cpu_hard_affinity)) )
-        return svc->vcpu->processor;
-
-    cpumask_and(cpumask_scratch, svc->vcpu->cpu_hard_affinity,
-                &svc->rqd->active);
-    cpu = cpumask_first(cpumask_scratch);
-    if ( likely(cpu < nr_cpu_ids) )
+    if ( likely(cpumask_test_cpu(cpu, svc->vcpu->cpu_hard_affinity)) )
         return cpu;
+
+    cpumask_and(cpumask_scratch_cpu(cpu), svc->vcpu->cpu_hard_affinity,
+                &svc->rqd->active);
+    fallback_cpu = cpumask_first(cpumask_scratch_cpu(cpu));
+    if ( likely(fallback_cpu < nr_cpu_ids) )
+        return fallback_cpu;
 
     cpumask_and(cpumask_scratch, svc->vcpu->cpu_hard_affinity,
                 cpupool_domain_cpumask(svc->vcpu->domain));
 
-    ASSERT(!cpumask_empty(cpumask_scratch));
+    ASSERT(!cpumask_empty(cpumask_scratch_cpu(cpu)));
 
-    return cpumask_first(cpumask_scratch);
+    return cpumask_first(cpumask_scratch_cpu(cpu));
 }
 
 /*
@@ -1129,7 +1128,7 @@ static int
 choose_cpu(const struct scheduler *ops, struct vcpu *vc)
 {
     struct csched2_private *prv = CSCHED2_PRIV(ops);
-    int i, min_rqi = -1, new_cpu;
+    int i, min_rqi = -1, new_cpu, cpu = vc->processor;
     struct csched2_vcpu *svc = CSCHED2_VCPU(vc);
     s_time_t min_avgload;
 
@@ -1172,9 +1171,9 @@ choose_cpu(const struct scheduler *ops, struct vcpu *vc)
         }
         else
         {
-            cpumask_and(cpumask_scratch, vc->cpu_hard_affinity,
+            cpumask_and(cpumask_scratch_cpu(cpu), vc->cpu_hard_affinity,
                         &svc->migrate_rqd->active);
-            new_cpu = cpumask_any(cpumask_scratch);
+            new_cpu = cpumask_any(cpumask_scratch_cpu(cpu));
             if ( new_cpu < nr_cpu_ids )
             {
                 d2printk("%pv +\n", svc->vcpu);
@@ -1232,9 +1231,9 @@ choose_cpu(const struct scheduler *ops, struct vcpu *vc)
         new_cpu = get_fallback_cpu(svc);
     else
     {
-        cpumask_and(cpumask_scratch, vc->cpu_hard_affinity,
+        cpumask_and(cpumask_scratch_cpu(cpu), vc->cpu_hard_affinity,
                     &prv->rqd[min_rqi].active);
-        new_cpu = cpumask_any(cpumask_scratch);
+        new_cpu = cpumask_any(cpumask_scratch_cpu(cpu));
         BUG_ON(new_cpu >= nr_cpu_ids);
     }
 
@@ -1293,6 +1292,8 @@ static void migrate(const struct scheduler *ops,
                     struct csched2_runqueue_data *trqd, 
                     s_time_t now)
 {
+    int cpu = svc->vcpu->processor;
+
     if ( svc->flags & CSFLAG_scheduled )
     {
         d2printk("%pv %d-%d a\n", svc->vcpu, svc->rqd->id, trqd->id);
@@ -1300,7 +1301,7 @@ static void migrate(const struct scheduler *ops,
         svc->migrate_rqd = trqd;
         set_bit(_VPF_migrating, &svc->vcpu->pause_flags);
         set_bit(__CSFLAG_runq_migrate_request, &svc->flags);
-        cpu_raise_softirq(svc->vcpu->processor, SCHEDULE_SOFTIRQ);
+        cpu_raise_softirq(cpu, SCHEDULE_SOFTIRQ);
         SCHED_STAT_CRANK(migrate_requested);
     }
     else
@@ -1316,9 +1317,9 @@ static void migrate(const struct scheduler *ops,
         }
         __runq_deassign(svc);
 
-        cpumask_and(cpumask_scratch, svc->vcpu->cpu_hard_affinity,
+        cpumask_and(cpumask_scratch_cpu(cpu), svc->vcpu->cpu_hard_affinity,
                     &trqd->active);
-        svc->vcpu->processor = cpumask_any(cpumask_scratch);
+        svc->vcpu->processor = cpumask_any(cpumask_scratch_cpu(cpu));
         BUG_ON(svc->vcpu->processor >= nr_cpu_ids);
 
         __runq_assign(svc, trqd);
