@@ -18,7 +18,7 @@
 
 #include "libxl_internal.h"
 
-char *libxl__device_frontend_path(libxl__gc *gc, libxl__device *device)
+static char *libxl__device_frontend_path(libxl__gc *gc, libxl__device *device)
 {
     char *dom_path = libxl__xs_get_dompath(gc, device->domid);
 
