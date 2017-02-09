@@ -1689,11 +1689,11 @@ x86_emulate(
             default:
                 BUG();
             case 2:
-                if ( in_realmode(ctxt, ops) || (_regs.eflags & EFLG_VM) )
+                if ( _regs.eflags & EFLG_VM )
                     break;
                 /* fall through */
             case 4:
-                if ( modrm_mod != 3 )
+                if ( modrm_mod != 3 || in_realmode(ctxt, ops) )
                     break;
                 /* fall through */
             case 8:
