@@ -387,11 +387,18 @@ void hvm_set_guest_tsc_fixed(struct vcpu *v, u64 guest_tsc, u64 at_tsc)
     }
 
     delta_tsc = guest_tsc - tsc;
-    v->arch.hvm_vcpu.msr_tsc_adjust += delta_tsc
-                          - v->arch.hvm_vcpu.cache_tsc_offset;
     v->arch.hvm_vcpu.cache_tsc_offset = delta_tsc;
 
     hvm_funcs.set_tsc_offset(v, v->arch.hvm_vcpu.cache_tsc_offset, at_tsc);
+}
+
+static void hvm_set_guest_tsc_msr(struct vcpu *v, u64 guest_tsc)
+{
+    uint64_t tsc_offset = v->arch.hvm_vcpu.cache_tsc_offset;
+
+    hvm_set_guest_tsc(v, guest_tsc);
+    v->arch.hvm_vcpu.msr_tsc_adjust += v->arch.hvm_vcpu.cache_tsc_offset
+                          - tsc_offset;
 }
 
 void hvm_set_guest_tsc_adjust(struct vcpu *v, u64 tsc_adjust)
@@ -3940,7 +3947,7 @@ int hvm_msr_write_intercept(unsigned int msr, uint64_t msr_content,
         break;
 
     case MSR_IA32_TSC:
-        hvm_set_guest_tsc(v, msr_content);
+        hvm_set_guest_tsc_msr(v, msr_content);
         break;
 
     case MSR_IA32_TSC_ADJUST:
