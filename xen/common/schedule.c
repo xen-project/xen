@@ -622,7 +622,10 @@ void vcpu_force_reschedule(struct vcpu *v)
 
 void restore_vcpu_affinity(struct domain *d)
 {
+    unsigned int cpu = smp_processor_id();
     struct vcpu *v;
+
+    ASSERT(system_state == SYS_STATE_resume);
 
     for_each_vcpu ( d, v )
     {
@@ -632,18 +635,34 @@ void restore_vcpu_affinity(struct domain *d)
         {
             cpumask_copy(v->cpu_hard_affinity, v->cpu_hard_affinity_saved);
             v->affinity_broken = 0;
+
         }
 
-        if ( v->processor == smp_processor_id() )
+        /*
+         * During suspend (in cpu_disable_scheduler()), we moved every vCPU
+         * to BSP (which, as of now, is pCPU 0), as a temporary measure to
+         * allow the nonboot processors to have their data structure freed
+         * and go to sleep. But nothing guardantees that the BSP is a valid
+         * pCPU for a particular domain.
+         *
+         * Therefore, here, before actually unpausing the domains, we should
+         * set v->processor of each of their vCPUs to something that will
+         * make sense for the scheduler of the cpupool in which they are in.
+         */
+        cpumask_and(cpumask_scratch_cpu(cpu), v->cpu_hard_affinity,
+                    cpupool_domain_cpumask(v->domain));
+        v->processor = cpumask_any(cpumask_scratch_cpu(cpu));
+
+        if ( v->processor == cpu )
         {
             set_bit(_VPF_migrating, &v->pause_flags);
-            vcpu_schedule_unlock_irq(lock, v);
+            spin_unlock_irq(lock);;
             vcpu_sleep_nosync(v);
             vcpu_migrate(v);
         }
         else
         {
-            vcpu_schedule_unlock_irq(lock, v);
+            spin_unlock_irq(lock);
         }
     }
 
