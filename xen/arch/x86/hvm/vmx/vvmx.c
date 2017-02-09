@@ -932,7 +932,7 @@ static inline void shadow_to_vvmcs(const struct vcpu *v, unsigned int field)
 {
     unsigned long value;
 
-    if ( __vmread_safe(field, &value) )
+    if ( vmread_safe(field, &value) == 0 )
         set_vvmcs(v, field, value);
 }
 

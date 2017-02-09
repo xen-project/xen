@@ -401,32 +401,27 @@ static always_inline void __vmwrite(unsigned long field, unsigned long value)
         );
 }
 
-static inline bool_t __vmread_safe(unsigned long field, unsigned long *value)
+static inline enum vmx_insn_errno vmread_safe(unsigned long field,
+                                              unsigned long *value)
 {
-    bool_t okay;
+    unsigned long ret = 0;
+    bool fail_invalid, fail_valid;
 
-    asm volatile (
-#ifdef HAVE_GAS_VMX
-                   "vmread %2, %1\n\t"
-#else
-                   VMREAD_OPCODE MODRM_EAX_ECX
-#endif
-                   /* CF==1 or ZF==1 --> rc = 0 */
-#ifdef __GCC_ASM_FLAG_OUTPUTS__
-                   : "=@ccnbe" (okay),
-#else
-                   "setnbe %0"
-                   : "=qm" (okay),
-#endif
-#ifdef HAVE_GAS_VMX
-                     "=rm" (*value)
-                   : "r" (field));
-#else
-                     "=c" (*value)
-                   : "a" (field));
-#endif
+    asm volatile ( GAS_VMX_OP("vmread %[field], %[value]\n\t",
+                              VMREAD_OPCODE MODRM_EAX_ECX)
+                   ASM_FLAG_OUT(, "setc %[invalid]\n\t")
+                   ASM_FLAG_OUT(, "setz %[valid]\n\t")
+                   : ASM_FLAG_OUT("=@ccc", [invalid] "=rm") (fail_invalid),
+                     ASM_FLAG_OUT("=@ccz", [valid] "=rm") (fail_valid),
+                     [value] GAS_VMX_OP("=rm", "=c") (*value)
+                   : [field] GAS_VMX_OP("r", "a") (field));
 
-    return okay;
+    if ( unlikely(fail_invalid) )
+        ret = VMX_INSN_FAIL_INVALID;
+    else if ( unlikely(fail_valid) )
+        __vmread(VM_INSTRUCTION_ERROR, &ret);
+
+    return ret;
 }
 
 static inline enum vmx_insn_errno vmwrite_safe(unsigned long field,
