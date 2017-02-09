@@ -594,7 +594,7 @@ int libxl_domain_preserve(libxl_ctx *ctx, uint32_t domid,
     return 0;
 }
 
-static void xcinfo2xlinfo(libxl_ctx *ctx,
+void libxl__xcinfo2xlinfo(libxl_ctx *ctx,
                           const xc_domaininfo_t *xcinfo,
                           libxl_dominfo *xlinfo)
 {
@@ -644,7 +644,7 @@ libxl_dominfo * libxl_list_domain(libxl_ctx *ctx, int *nb_domain_out)
     while ((ret = xc_domain_getinfolist(ctx->xch, domid, 1024, info)) > 0) {
         ptr = libxl__realloc(NOGC, ptr, (size + ret) * sizeof(libxl_dominfo));
         for (i = 0; i < ret; i++) {
-            xcinfo2xlinfo(ctx, &info[i], &ptr[size + i]);
+            libxl__xcinfo2xlinfo(ctx, &info[i], &ptr[size + i]);
         }
         domid = info[ret - 1].domain + 1;
         size += ret;
@@ -680,7 +680,7 @@ int libxl_domain_info(libxl_ctx *ctx, libxl_dominfo *info_r,
     }
 
     if (info_r)
-        xcinfo2xlinfo(ctx, &xcinfo, info_r);
+        libxl__xcinfo2xlinfo(ctx, &xcinfo, info_r);
     GC_FREE;
     return 0;
 }
@@ -4320,7 +4320,7 @@ retry_transaction:
     }
 
     libxl_dominfo_init(&ptr);
-    xcinfo2xlinfo(ctx, &info, &ptr);
+    libxl__xcinfo2xlinfo(ctx, &info, &ptr);
     uuid = libxl__uuid2string(gc, ptr.uuid);
     libxl__xs_printf(gc, t, GCSPRINTF("/vm/%s/memory", uuid),
                      "%"PRIu64, new_target_memkb / 1024);
@@ -4342,9 +4342,9 @@ out_no_transaction:
 }
 
 /* out_target_memkb and out_max_memkb can be NULL */
-static int libxl__get_memory_target(libxl__gc *gc, uint32_t domid,
-                                    uint64_t *out_target_memkb,
-                                    uint64_t *out_max_memkb)
+int libxl__get_memory_target(libxl__gc *gc, uint32_t domid,
+                             uint64_t *out_target_memkb,
+                             uint64_t *out_max_memkb)
 {
     int rc;
     char *target = NULL, *static_max = NULL, *endptr = NULL;

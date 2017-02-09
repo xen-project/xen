@@ -4246,6 +4246,13 @@ uint64_t libxl__get_targetmem_fudge(libxl__gc *gc,
     return info->video_memkb + mem_target_fudge;
 }
 
+int libxl__get_memory_target(libxl__gc *gc, uint32_t domid,
+                             uint64_t *out_target_memkb,
+                             uint64_t *out_max_memkb);
+void libxl__xcinfo2xlinfo(libxl_ctx *ctx,
+                          const xc_domaininfo_t *xcinfo,
+                          libxl_dominfo *xlinfo);
+
 /* Macros used to compare device identifier. Returns true if the two
  * devices have same identifier. */
 #define COMPARE_DEVID(a, b) ((a)->devid == (b)->devid)
