@@ -499,7 +499,7 @@ p2m_pt_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
     l2_pgentry_t l2e_content;
     l3_pgentry_t l3e_content;
     int rc;
-    unsigned int iommu_pte_flags = p2m_get_iommu_flags(p2mt);
+    unsigned int iommu_pte_flags = p2m_get_iommu_flags(p2mt, mfn);
     /*
      * old_mfn and iommu_old_flags control possible flush/update needs on the
      * IOMMU: We need to flush when MFN or flags (i.e. permissions) change.
@@ -565,9 +565,10 @@ p2m_pt_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
         {
             if ( flags & _PAGE_PSE )
             {
-                iommu_old_flags =
-                    p2m_get_iommu_flags(p2m_flags_to_type(flags));
                 old_mfn = l1e_get_pfn(*p2m_entry);
+                iommu_old_flags =
+                    p2m_get_iommu_flags(p2m_flags_to_type(flags),
+                                        _mfn(old_mfn));
             }
             else
             {
@@ -609,9 +610,10 @@ p2m_pt_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
         p2m_entry = p2m_find_entry(table, &gfn_remainder, gfn,
                                    0, L1_PAGETABLE_ENTRIES);
         ASSERT(p2m_entry);
-        iommu_old_flags =
-            p2m_get_iommu_flags(p2m_flags_to_type(l1e_get_flags(*p2m_entry)));
         old_mfn = l1e_get_pfn(*p2m_entry);
+        iommu_old_flags =
+            p2m_get_iommu_flags(p2m_flags_to_type(l1e_get_flags(*p2m_entry)),
+                                _mfn(old_mfn));
 
         if ( mfn_valid(mfn) || p2m_allows_invalid_mfn(p2mt) )
             entry_content = p2m_l1e_from_pfn(mfn_x(mfn),
@@ -637,9 +639,10 @@ p2m_pt_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
         {
             if ( flags & _PAGE_PSE )
             {
-                iommu_old_flags =
-                    p2m_get_iommu_flags(p2m_flags_to_type(flags));
                 old_mfn = l1e_get_pfn(*p2m_entry);
+                iommu_old_flags =
+                    p2m_get_iommu_flags(p2m_flags_to_type(flags),
+                                        _mfn(old_mfn));
             }
             else
             {

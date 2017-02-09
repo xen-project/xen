@@ -1053,16 +1053,7 @@ int set_identity_p2m_entry(struct domain *d, unsigned long gfn,
         ret = p2m_set_entry(p2m, gfn, _mfn(gfn), PAGE_ORDER_4K,
                             p2m_mmio_direct, p2ma);
     else if ( mfn_x(mfn) == gfn && p2mt == p2m_mmio_direct && a == p2ma )
-    {
         ret = 0;
-        /*
-         * PVH fixme: during Dom0 PVH construction, p2m entries are being set
-         * but iomem regions are not mapped with IOMMU. This makes sure that
-         * RMRRs are correctly mapped with IOMMU.
-         */
-        if ( is_hardware_domain(d) && !iommu_use_hap_pt(d) )
-            ret = iommu_map_page(d, gfn, gfn, IOMMUF_readable|IOMMUF_writable);
-    }
     else
     {
         if ( flag & XEN_DOMCTL_DEV_RDM_RELAXED )

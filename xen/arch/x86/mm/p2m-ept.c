@@ -672,7 +672,7 @@ ept_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
     uint8_t ipat = 0;
     bool_t need_modify_vtd_table = 1;
     bool_t vtd_pte_present = 0;
-    unsigned int iommu_flags = p2m_get_iommu_flags(p2mt);
+    unsigned int iommu_flags = p2m_get_iommu_flags(p2mt, mfn);
     bool_t needs_sync = 1;
     ept_entry_t old_entry = { .epte = 0 };
     ept_entry_t new_entry = { .epte = 0 };
@@ -798,7 +798,8 @@ ept_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
 
         /* Safe to read-then-write because we hold the p2m lock */
         if ( ept_entry->mfn == new_entry.mfn &&
-             p2m_get_iommu_flags(ept_entry->sa_p2mt) == iommu_flags )
+             p2m_get_iommu_flags(ept_entry->sa_p2mt, _mfn(ept_entry->mfn)) ==
+             iommu_flags )
             need_modify_vtd_table = 0;
 
         ept_p2m_type_to_flags(p2m, &new_entry, p2mt, p2ma);

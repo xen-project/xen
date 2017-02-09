@@ -799,7 +799,7 @@ void p2m_altp2m_propagate_change(struct domain *d, gfn_t gfn,
 /*
  * p2m type to IOMMU flags
  */
-static inline unsigned int p2m_get_iommu_flags(p2m_type_t p2mt)
+static inline unsigned int p2m_get_iommu_flags(p2m_type_t p2mt, mfn_t mfn)
 {
     unsigned int flags;
 
@@ -815,6 +815,10 @@ static inline unsigned int p2m_get_iommu_flags(p2m_type_t p2mt)
     case p2m_grant_map_ro:
         flags = IOMMUF_readable;
         break;
+    case p2m_mmio_direct:
+        flags = IOMMUF_readable;
+        if ( !rangeset_contains_singleton(mmio_ro_ranges, mfn_x(mfn)) )
+            flags |= IOMMUF_writable;
     default:
         flags = 0;
         break;
