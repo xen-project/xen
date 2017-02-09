@@ -874,15 +874,15 @@ do{ struct fpu_insn_ctxt fic;                           \
     put_fpu(&fic);                                      \
 } while (0)
 
-#define emulate_fpu_insn_stub(_bytes...)                                \
+#define emulate_fpu_insn_stub(bytes...)                                 \
 do {                                                                    \
-    uint8_t *buf = get_stub(stub);                                      \
-    unsigned int _nr = sizeof((uint8_t[]){ _bytes });                   \
-    struct fpu_insn_ctxt fic = { .insn_bytes = _nr };                   \
-    memcpy(buf, ((uint8_t[]){ _bytes, 0xc3 }), _nr + 1);                \
-    get_fpu(X86EMUL_FPU_fpu, &fic);                                     \
-    stub.func();                                                        \
-    put_fpu(&fic);                                                      \
+    unsigned int nr_ = sizeof((uint8_t[]){ bytes });                    \
+    struct fpu_insn_ctxt fic_ = { .insn_bytes = nr_ };                  \
+    memcpy(get_stub(stub), ((uint8_t[]){ bytes, 0xc3 }), nr_ + 1);      \
+    get_fpu(X86EMUL_FPU_fpu, &fic_);                                    \
+    asm volatile ( "call *%[stub]" : "+m" (fic_) :                      \
+                   [stub] "rm" (stub.func) );                           \
+    put_fpu(&fic_);                                                     \
     put_stub(stub);                                                     \
 } while (0)
 
@@ -897,7 +897,7 @@ do {                                                                    \
                    "call *%[func];"                                     \
                    _POST_EFLAGS("[eflags]", "[mask]", "[tmp]")          \
                    : [eflags] "+g" (_regs.eflags),                      \
-                     [tmp] "=&r" (tmp_)                                 \
+                     [tmp] "=&r" (tmp_), "+m" (fic_)                    \
                    : [func] "rm" (stub.func),                           \
                      [mask] "i" (EFLG_ZF|EFLG_PF|EFLG_CF) );            \
     put_fpu(&fic_);                                                     \
