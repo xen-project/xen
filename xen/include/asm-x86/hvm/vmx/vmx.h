@@ -306,6 +306,12 @@ extern uint8_t posted_intr_vector;
 #define INVVPID_ALL_CONTEXT                     2
 #define INVVPID_SINGLE_CONTEXT_RETAINING_GLOBAL 3
 
+#ifdef HAVE_GAS_VMX
+# define GAS_VMX_OP(yes, no) yes
+#else
+# define GAS_VMX_OP(yes, no) no
+#endif
+
 static always_inline void __vmptrld(u64 addr)
 {
     asm volatile (
@@ -421,6 +427,29 @@ static inline bool_t __vmread_safe(unsigned long field, unsigned long *value)
 #endif
 
     return okay;
+}
+
+static inline enum vmx_insn_errno vmwrite_safe(unsigned long field,
+                                               unsigned long value)
+{
+    unsigned long ret = 0;
+    bool fail_invalid, fail_valid;
+
+    asm volatile ( GAS_VMX_OP("vmwrite %[value], %[field]\n\t",
+                              VMWRITE_OPCODE MODRM_EAX_ECX)
+                   ASM_FLAG_OUT(, "setc %[invalid]\n\t")
+                   ASM_FLAG_OUT(, "setz %[valid]\n\t")
+                   : ASM_FLAG_OUT("=@ccc", [invalid] "=rm") (fail_invalid),
+                     ASM_FLAG_OUT("=@ccz", [valid] "=rm") (fail_valid)
+                   : [field] GAS_VMX_OP("r", "a") (field),
+                     [value] GAS_VMX_OP("rm", "c") (value));
+
+    if ( unlikely(fail_invalid) )
+        ret = VMX_INSN_FAIL_INVALID;
+    else if ( unlikely(fail_valid) )
+        __vmread(VM_INSTRUCTION_ERROR, &ret);
+
+    return ret;
 }
 
 static always_inline void __invept(unsigned long type, u64 eptp, u64 gpa)

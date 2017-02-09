@@ -522,6 +522,7 @@ enum vmx_insn_errno
     VMX_INSN_VMPTRLD_INVALID_PHYADDR       = 9,
     VMX_INSN_UNSUPPORTED_VMCS_COMPONENT    = 12,
     VMX_INSN_VMXON_IN_VMX_ROOT             = 15,
+    VMX_INSN_FAIL_INVALID                  = ~0,
 };
 
 void vmx_disable_intercept_for_msr(struct vcpu *v, u32 msr, int type);
