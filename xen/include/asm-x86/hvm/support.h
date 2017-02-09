@@ -68,7 +68,7 @@ enum hvm_copy_result {
  * address range does not map entirely onto ordinary machine memory.
  */
 enum hvm_copy_result hvm_copy_to_guest_phys(
-    paddr_t paddr, void *buf, int size);
+    paddr_t paddr, void *buf, int size, struct vcpu *v);
 enum hvm_copy_result hvm_copy_from_guest_phys(
     void *buf, paddr_t paddr, int size);
 

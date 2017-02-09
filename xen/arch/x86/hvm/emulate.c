@@ -1294,7 +1294,7 @@ static int hvmemul_rep_movs(
         rc = hvm_copy_from_guest_phys(buf, sgpa, bytes);
 
     if ( rc == HVMCOPY_okay )
-        rc = hvm_copy_to_guest_phys(dgpa, buf, bytes);
+        rc = hvm_copy_to_guest_phys(dgpa, buf, bytes, current);
 
     xfree(buf);
 
@@ -1405,7 +1405,7 @@ static int hvmemul_rep_stos(
         if ( df )
             gpa -= bytes - bytes_per_rep;
 
-        rc = hvm_copy_to_guest_phys(gpa, buf, bytes);
+        rc = hvm_copy_to_guest_phys(gpa, buf, bytes, current);
 
         if ( buf != p_data )
             xfree(buf);

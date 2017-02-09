@@ -77,7 +77,7 @@ static void realmode_deliver_exception(
         pstk = regs->sp -= 6;
 
     pstk += hvmemul_get_seg_reg(x86_seg_ss, hvmemul_ctxt)->base;
-    (void)hvm_copy_to_guest_phys(pstk, frame, sizeof(frame));
+    (void)hvm_copy_to_guest_phys(pstk, frame, sizeof(frame), current);
 
     csr->sel  = cs_eip >> 16;
     csr->base = (uint32_t)csr->sel << 4;

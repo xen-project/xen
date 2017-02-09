@@ -135,7 +135,7 @@ int hvm_process_io_intercept(const struct hvm_io_handler *handler,
             if ( p->data_is_ptr )
             {
                 switch ( hvm_copy_to_guest_phys(p->data + step * i,
-                                                &data, p->size) )
+                                                &data, p->size, current) )
                 {
                 case HVMCOPY_okay:
                     break;

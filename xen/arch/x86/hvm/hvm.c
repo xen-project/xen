@@ -3082,15 +3082,16 @@ void hvm_task_switch(
 #define HVMCOPY_phys       (0u<<2)
 #define HVMCOPY_linear     (1u<<2)
 static enum hvm_copy_result __hvm_copy(
-    void *buf, paddr_t addr, int size, unsigned int flags, uint32_t pfec,
-    pagefault_info_t *pfinfo)
+    void *buf, paddr_t addr, int size, struct vcpu *v, unsigned int flags,
+    uint32_t pfec, pagefault_info_t *pfinfo)
 {
-    struct vcpu *curr = current;
     unsigned long gfn;
     struct page_info *page;
     p2m_type_t p2mt;
     char *p;
     int count, todo = size;
+
+    ASSERT(has_hvm_container_vcpu(v));
 
     /*
      * XXX Disable for 4.1.0: PV-on-HVM drivers will do grant-table ops
@@ -3116,7 +3117,7 @@ static enum hvm_copy_result __hvm_copy(
 
         if ( flags & HVMCOPY_linear )
         {
-            gfn = paging_gva_to_gfn(curr, addr, &pfec);
+            gfn = paging_gva_to_gfn(v, addr, &pfec);
             if ( gfn == gfn_x(INVALID_GFN) )
             {
                 if ( pfec & PFEC_page_paged )
@@ -3143,12 +3144,12 @@ static enum hvm_copy_result __hvm_copy(
          * - 32-bit WinXP (& older Windows) on AMD CPUs for LAPIC accesses,
          * - newer Windows (like Server 2012) for HPET accesses.
          */
-        if ( !nestedhvm_vcpu_in_guestmode(curr)
-             && is_hvm_vcpu(curr)
+        if ( v == current && is_hvm_vcpu(v)
+             && !nestedhvm_vcpu_in_guestmode(v)
              && hvm_mmio_internal(gpa) )
             return HVMCOPY_bad_gfn_to_mfn;
 
-        page = get_page_from_gfn(curr->domain, gfn, &p2mt, P2M_UNSHARE);
+        page = get_page_from_gfn(v->domain, gfn, &p2mt, P2M_UNSHARE);
 
         if ( !page )
             return HVMCOPY_bad_gfn_to_mfn;
@@ -3156,7 +3157,7 @@ static enum hvm_copy_result __hvm_copy(
         if ( p2m_is_paging(p2mt) )
         {
             put_page(page);
-            p2m_mem_paging_populate(curr->domain, gfn);
+            p2m_mem_paging_populate(v->domain, gfn);
             return HVMCOPY_gfn_paged_out;
         }
         if ( p2m_is_shared(p2mt) )
@@ -3178,9 +3179,9 @@ static enum hvm_copy_result __hvm_copy(
             {
                 static unsigned long lastpage;
                 if ( xchg(&lastpage, gfn) != gfn )
-                    gdprintk(XENLOG_DEBUG, "guest attempted write to read-only"
-                             " memory page. gfn=%#lx, mfn=%#lx\n",
-                             gfn, page_to_mfn(page));
+                    dprintk(XENLOG_G_DEBUG,
+                            "%pv attempted write to read-only gfn %#lx (mfn=%#lx)\n",
+                            v, gfn, page_to_mfn(page));
             }
             else
             {
@@ -3188,7 +3189,7 @@ static enum hvm_copy_result __hvm_copy(
                     memcpy(p, buf, count);
                 else
                     memset(p, 0, count);
-                paging_mark_dirty(curr->domain, _mfn(page_to_mfn(page)));
+                paging_mark_dirty(v->domain, _mfn(page_to_mfn(page)));
             }
         }
         else
@@ -3209,16 +3210,16 @@ static enum hvm_copy_result __hvm_copy(
 }
 
 enum hvm_copy_result hvm_copy_to_guest_phys(
-    paddr_t paddr, void *buf, int size)
+    paddr_t paddr, void *buf, int size, struct vcpu *v)
 {
-    return __hvm_copy(buf, paddr, size,
+    return __hvm_copy(buf, paddr, size, v,
                       HVMCOPY_to_guest | HVMCOPY_phys, 0, NULL);
 }
 
 enum hvm_copy_result hvm_copy_from_guest_phys(
     void *buf, paddr_t paddr, int size)
 {
-    return __hvm_copy(buf, paddr, size,
+    return __hvm_copy(buf, paddr, size, current,
                       HVMCOPY_from_guest | HVMCOPY_phys, 0, NULL);
 }
 
@@ -3226,7 +3227,7 @@ enum hvm_copy_result hvm_copy_to_guest_linear(
     unsigned long addr, void *buf, int size, uint32_t pfec,
     pagefault_info_t *pfinfo)
 {
-    return __hvm_copy(buf, addr, size,
+    return __hvm_copy(buf, addr, size, current,
                       HVMCOPY_to_guest | HVMCOPY_linear,
                       PFEC_page_present | PFEC_write_access | pfec, pfinfo);
 }
@@ -3235,7 +3236,7 @@ enum hvm_copy_result hvm_copy_from_guest_linear(
     void *buf, unsigned long addr, int size, uint32_t pfec,
     pagefault_info_t *pfinfo)
 {
-    return __hvm_copy(buf, addr, size,
+    return __hvm_copy(buf, addr, size, current,
                       HVMCOPY_from_guest | HVMCOPY_linear,
                       PFEC_page_present | pfec, pfinfo);
 }
@@ -3244,7 +3245,7 @@ enum hvm_copy_result hvm_fetch_from_guest_linear(
     void *buf, unsigned long addr, int size, uint32_t pfec,
     pagefault_info_t *pfinfo)
 {
-    return __hvm_copy(buf, addr, size,
+    return __hvm_copy(buf, addr, size, current,
                       HVMCOPY_from_guest | HVMCOPY_linear,
                       PFEC_page_present | PFEC_insn_fetch | pfec, pfinfo);
 }
