@@ -510,19 +510,22 @@ void smt_idle_mask_clear(unsigned int cpu, cpumask_t *mask)
  */
 static int get_fallback_cpu(struct csched2_vcpu *svc)
 {
-    int fallback_cpu, cpu = svc->vcpu->processor;
+    struct vcpu *v = svc->vcpu;
+    int cpu = v->processor;
 
-    if ( likely(cpumask_test_cpu(cpu, svc->vcpu->cpu_hard_affinity)) )
+    cpumask_and(cpumask_scratch_cpu(cpu), v->cpu_hard_affinity,
+                cpupool_domain_cpumask(v->domain));
+
+    if ( likely(cpumask_test_cpu(cpu, cpumask_scratch_cpu(cpu))) )
         return cpu;
 
-    cpumask_and(cpumask_scratch_cpu(cpu), svc->vcpu->cpu_hard_affinity,
-                &svc->rqd->active);
-    fallback_cpu = cpumask_first(cpumask_scratch_cpu(cpu));
-    if ( likely(fallback_cpu < nr_cpu_ids) )
-        return fallback_cpu;
-
-    cpumask_and(cpumask_scratch, svc->vcpu->cpu_hard_affinity,
-                cpupool_domain_cpumask(svc->vcpu->domain));
+    if ( likely(cpumask_intersects(cpumask_scratch_cpu(cpu),
+                                   &svc->rqd->active)) )
+    {
+        cpumask_and(cpumask_scratch_cpu(cpu), &svc->rqd->active,
+                    cpumask_scratch_cpu(cpu));
+        return cpumask_first(cpumask_scratch_cpu(cpu));
+    }
 
     ASSERT(!cpumask_empty(cpumask_scratch_cpu(cpu)));
 
@@ -940,6 +943,9 @@ runq_tickle(const struct scheduler *ops, struct csched2_vcpu *new, s_time_t now)
                     (unsigned char *)&d);
     }
 
+    cpumask_and(cpumask_scratch_cpu(cpu), new->vcpu->cpu_hard_affinity,
+                cpupool_domain_cpumask(new->vcpu->domain));
+
     /*
      * First of all, consider idle cpus, checking if we can just
      * re-use the pcpu where we were running before.
@@ -952,7 +958,7 @@ runq_tickle(const struct scheduler *ops, struct csched2_vcpu *new, s_time_t now)
         cpumask_andnot(&mask, &rqd->idle, &rqd->smt_idle);
     else
         cpumask_copy(&mask, &rqd->smt_idle);
-    cpumask_and(&mask, &mask, new->vcpu->cpu_hard_affinity);
+    cpumask_and(&mask, &mask, cpumask_scratch_cpu(cpu));
     i = cpumask_test_or_cycle(cpu, &mask);
     if ( i < nr_cpu_ids )
     {
@@ -967,7 +973,7 @@ runq_tickle(const struct scheduler *ops, struct csched2_vcpu *new, s_time_t now)
      * gone through the scheduler yet.
      */
     cpumask_andnot(&mask, &rqd->idle, &rqd->tickled);
-    cpumask_and(&mask, &mask, new->vcpu->cpu_hard_affinity);
+    cpumask_and(&mask, &mask, cpumask_scratch_cpu(cpu));
     i = cpumask_test_or_cycle(cpu, &mask);
     if ( i < nr_cpu_ids )
     {
@@ -983,7 +989,7 @@ runq_tickle(const struct scheduler *ops, struct csched2_vcpu *new, s_time_t now)
      */
     cpumask_andnot(&mask, &rqd->active, &rqd->idle);
     cpumask_andnot(&mask, &mask, &rqd->tickled);
-    cpumask_and(&mask, &mask, new->vcpu->cpu_hard_affinity);
+    cpumask_and(&mask, &mask, cpumask_scratch_cpu(cpu));
     if ( cpumask_test_cpu(cpu, &mask) )
     {
         cur = CSCHED2_VCPU(curr_on_cpu(cpu));
@@ -1525,6 +1531,9 @@ csched2_cpu_pick(const struct scheduler *ops, struct vcpu *vc)
         goto out;
     }
 
+    cpumask_and(cpumask_scratch_cpu(cpu), vc->cpu_hard_affinity,
+                cpupool_domain_cpumask(vc->domain));
+
     /*
      * First check to see if we're here because someone else suggested a place
      * for us to move.
@@ -1536,13 +1545,13 @@ csched2_cpu_pick(const struct scheduler *ops, struct vcpu *vc)
             printk(XENLOG_WARNING "%s: target runqueue disappeared!\n",
                    __func__);
         }
-        else
+        else if ( cpumask_intersects(cpumask_scratch_cpu(cpu),
+                                     &svc->migrate_rqd->active) )
         {
-            cpumask_and(cpumask_scratch_cpu(cpu), vc->cpu_hard_affinity,
+            cpumask_and(cpumask_scratch_cpu(cpu), cpumask_scratch_cpu(cpu),
                         &svc->migrate_rqd->active);
             new_cpu = cpumask_any(cpumask_scratch_cpu(cpu));
-            if ( new_cpu < nr_cpu_ids )
-                goto out_up;
+            goto out_up;
         }
         /* Fall-through to normal cpu pick */
     }
@@ -1570,12 +1579,12 @@ csched2_cpu_pick(const struct scheduler *ops, struct vcpu *vc)
          */
         if ( rqd == svc->rqd )
         {
-            if ( cpumask_intersects(vc->cpu_hard_affinity, &rqd->active) )
+            if ( cpumask_intersects(cpumask_scratch_cpu(cpu), &rqd->active) )
                 rqd_avgload = max_t(s_time_t, rqd->b_avgload - svc->avgload, 0);
         }
         else if ( spin_trylock(&rqd->lock) )
         {
-            if ( cpumask_intersects(vc->cpu_hard_affinity, &rqd->active) )
+            if ( cpumask_intersects(cpumask_scratch_cpu(cpu), &rqd->active) )
                 rqd_avgload = rqd->b_avgload;
 
             spin_unlock(&rqd->lock);
@@ -1597,7 +1606,7 @@ csched2_cpu_pick(const struct scheduler *ops, struct vcpu *vc)
         goto out_up;
     }
 
-    cpumask_and(cpumask_scratch_cpu(cpu), vc->cpu_hard_affinity,
+    cpumask_and(cpumask_scratch_cpu(cpu), cpumask_scratch_cpu(cpu),
                 &prv->rqd[min_rqi].active);
     new_cpu = cpumask_any(cpumask_scratch_cpu(cpu));
     BUG_ON(new_cpu >= nr_cpu_ids);
@@ -1713,6 +1722,8 @@ static void migrate(const struct scheduler *ops,
         __runq_deassign(svc);
 
         cpumask_and(cpumask_scratch_cpu(cpu), svc->vcpu->cpu_hard_affinity,
+                    cpupool_domain_cpumask(svc->vcpu->domain));
+        cpumask_and(cpumask_scratch_cpu(cpu), cpumask_scratch_cpu(cpu),
                     &trqd->active);
         svc->vcpu->processor = cpumask_any(cpumask_scratch_cpu(cpu));
         ASSERT(svc->vcpu->processor < nr_cpu_ids);
@@ -1738,8 +1749,14 @@ static void migrate(const struct scheduler *ops,
 static bool_t vcpu_is_migrateable(struct csched2_vcpu *svc,
                                   struct csched2_runqueue_data *rqd)
 {
+    struct vcpu *v = svc->vcpu;
+    int cpu = svc->vcpu->processor;
+
+    cpumask_and(cpumask_scratch_cpu(cpu), v->cpu_hard_affinity,
+                cpupool_domain_cpumask(v->domain));
+
     return !(svc->flags & CSFLAG_runq_migrate_request) &&
-           cpumask_intersects(svc->vcpu->cpu_hard_affinity, &rqd->active);
+           cpumask_intersects(cpumask_scratch_cpu(cpu), &rqd->active);
 }
 
 static void balance_load(const struct scheduler *ops, int cpu, s_time_t now)
