@@ -334,7 +334,7 @@ extern unsigned int __find_first_zero_bit(
 extern unsigned int __find_next_zero_bit(
     const unsigned long *addr, unsigned int size, unsigned int offset);
 
-static inline unsigned int __scanbit(unsigned long val, unsigned int max)
+static always_inline unsigned int __scanbit(unsigned long val, unsigned int max)
 {
     if ( __builtin_constant_p(max) && max == BITS_PER_LONG )
         alternative_io("bsf %[in],%[out]; cmovz %[max],%k[out]",
