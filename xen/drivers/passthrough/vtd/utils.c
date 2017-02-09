@@ -95,8 +95,8 @@ void print_vtd_entries(struct iommu *iommu, int bus, int devfn, u64 gmfn)
     u64 *l, val;
     u32 l_index, level;
 
-    printk("print_vtd_entries: iommu %p dev %04x:%02x:%02x.%u gmfn %"PRIx64"\n",
-           iommu, iommu->intel->drhd->segment, bus,
+    printk("print_vtd_entries: iommu #%u dev %04x:%02x:%02x.%u gmfn %"PRI_gfn"\n",
+           iommu->index, iommu->intel->drhd->segment, bus,
            PCI_SLOT(devfn), PCI_FUNC(devfn), gmfn);
 
     if ( iommu->root_maddr == 0 )
@@ -112,12 +112,11 @@ void print_vtd_entries(struct iommu *iommu, int bus, int devfn, u64 gmfn)
         return;
     }
 
-    printk("    root_entry = %p\n", root_entry);
-    printk("    root_entry[%x] = %"PRIx64"\n", bus, root_entry[bus].val);
+    printk("    root_entry[%02x] = %"PRIx64"\n", bus, root_entry[bus].val);
     if ( !root_present(root_entry[bus]) )
     {
         unmap_vtd_domain_page(root_entry);
-        printk("    root_entry[%x] not present\n", bus);
+        printk("    root_entry[%02x] not present\n", bus);
         return;
     }
 
@@ -130,14 +129,13 @@ void print_vtd_entries(struct iommu *iommu, int bus, int devfn, u64 gmfn)
         return;
     }
 
-    printk("    context = %p\n", ctxt_entry);
     val = ctxt_entry[devfn].lo;
-    printk("    context[%x] = %"PRIx64"_%"PRIx64"\n",
+    printk("    context[%02x] = %"PRIx64"_%"PRIx64"\n",
            devfn, ctxt_entry[devfn].hi, val);
     if ( !context_present(ctxt_entry[devfn]) )
     {
         unmap_vtd_domain_page(ctxt_entry);
-        printk("    ctxt_entry[%x] not present\n", devfn);
+        printk("    ctxt_entry[%02x] not present\n", devfn);
         return;
     }
 
@@ -153,22 +151,19 @@ void print_vtd_entries(struct iommu *iommu, int bus, int devfn, u64 gmfn)
     do
     {
         l = map_vtd_domain_page(val);
-        printk("    l%d = %p\n", level, l);
         if ( l == NULL )
         {
-            printk("    l%d == NULL\n", level);
+            printk("    l%u == NULL\n", level);
             break;
         }
         l_index = get_level_index(gmfn, level);
-        printk("    l%d_index = %x\n", level, l_index);
-
         pte.val = l[l_index];
         unmap_vtd_domain_page(l);
-        printk("    l%d[%x] = %"PRIx64"\n", level, l_index, pte.val);
+        printk("    l%u[%03x] = %"PRIx64"\n", level, l_index, pte.val);
 
         if ( !dma_pte_present(pte) )
         {
-            printk("    l%d[%x] not present\n", level, l_index);
+            printk("    l%u[%03x] not present\n", level, l_index);
             break;
         }
         if ( dma_pte_superpage(pte) )
