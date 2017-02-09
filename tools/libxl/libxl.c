@@ -72,7 +72,7 @@ int libxl_ctx_alloc(libxl_ctx **pctx, int version,
 
     ctx->childproc_hooks = &libxl__childproc_default_hooks;
     ctx->childproc_user = 0;
-        
+
     ctx->sigchld_selfpipe[0] = -1;
     ctx->sigchld_selfpipe[1] = -1;
     libxl__ev_fd_init(&ctx->sigchld_selfpipe_efd);
@@ -355,8 +355,6 @@ const char *libxl_defbool_to_string(libxl_defbool b)
 }
 
 /******************************************************************************/
-
-
 int libxl__domain_rename(libxl__gc *gc, uint32_t domid,
                          const char *old_name, const char *new_name,
                          xs_transaction_t trans)
@@ -1242,7 +1240,7 @@ int libxl_evenable_domain_death(libxl_ctx *ctx, uint32_t domid,
     GC_INIT(ctx);
     libxl_evgen_domain_death *evg, *evg_search;
     int rc;
-    
+
     CTX_LOCK;
 
     evg = malloc(sizeof(*evg));  if (!evg) { rc = ERROR_NOMEM; goto out; }
@@ -1315,7 +1313,7 @@ static void disk_eject_xswatch_callback(libxl__egc *egc, libxl__ev_xswatch *w,
 
     libxl_event *ev = NEW_EVENT(egc, DISK_EJECT, evg->domid, evg->user);
     libxl_device_disk *disk = &ev->u.disk_eject.disk;
-    
+
     rc = libxl__xs_read_checked(gc, XBT_NULL, evg->be_ptr_path, &backend);
     if (rc) {
         LIBXL__EVENT_DISASTER(egc, "xs_read failed reading be_ptr_path",
@@ -1425,7 +1423,7 @@ void libxl_evdisable_disk_eject(libxl_ctx *ctx, libxl_evgen_disk_eject *evg) {
     GC_INIT(ctx);
     libxl__evdisable_disk_eject(gc, evg);
     GC_FREE;
-}    
+}
 
 /* Callbacks for libxl_domain_destroy */
 
@@ -2515,7 +2513,6 @@ out:
     return rc;
 }
 
-
 static int libxl__append_disk_list(libxl__gc *gc,
                                            uint32_t domid,
                                            libxl_device_disk **disks,
@@ -2862,7 +2859,7 @@ static char * libxl__alloc_vdev(libxl__gc *gc, void *get_vdev_user,
 
 /* Callbacks */
 
-char *libxl__device_disk_find_local_path(libxl__gc *gc, 
+char *libxl__device_disk_find_local_path(libxl__gc *gc,
                                           libxl_domid guest_domid,
                                           const libxl_device_disk *disk,
                                           bool qdisk_direct)
@@ -2884,7 +2881,7 @@ char *libxl__device_disk_find_local_path(libxl__gc *gc,
         path = libxl__strdup(gc, disk->pdev_path);
         LOG(DEBUG, "Directly accessing local RAW disk %s", path);
         goto out;
-    } 
+    }
 
     /*
      * If we're being called for a qemu path, we can pass the target
@@ -2894,9 +2891,9 @@ char *libxl__device_disk_find_local_path(libxl__gc *gc,
         path = libxl__strdup(gc, disk->pdev_path);
         LOG(DEBUG, "Directly accessing local QDISK target %s", path);
         goto out;
-    } 
+    }
 
-    /* 
+    /*
      * If the format isn't raw and / or we're using a script, then see
      * if the script has written a path to the "cooked" node
      */
@@ -2965,7 +2962,7 @@ void libxl__device_disk_local_initiate_attach(libxl__egc *egc,
         if (in_disk->script != NULL)
             disk->script = libxl__strdup(gc, in_disk->script);
         disk->vdev = NULL;
-        
+
         rc = libxl__device_disk_setdefault(gc, disk, LIBXL_TOOLSTACK_DOMID);
         if (rc) goto out;
 
@@ -3042,7 +3039,7 @@ void libxl__device_disk_local_initiate_detach(libxl__egc *egc,
         rc = libxl__device_from_disk(gc, LIBXL_TOOLSTACK_DOMID,
                                      disk, device);
         if (rc != 0) goto out;
-        
+
         aodev->action = LIBXL__DEVICE_ACTION_REMOVE;
         aodev->dev = device;
         aodev->callback = local_device_detach_cb;
