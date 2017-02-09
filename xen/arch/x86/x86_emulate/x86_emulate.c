@@ -2026,11 +2026,11 @@ x86_decode(
             default:
                 BUG(); /* Shouldn't be possible. */
             case 2:
-                if ( in_realmode(ctxt, ops) || (state->regs->eflags & EFLG_VM) )
+                if ( state->regs->eflags & EFLG_VM )
                     break;
                 /* fall through */
             case 4:
-                if ( modrm_mod != 3 )
+                if ( modrm_mod != 3 || in_realmode(ctxt, ops) )
                     break;
                 /* fall through */
             case 8:
