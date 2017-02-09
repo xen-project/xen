@@ -1315,16 +1315,24 @@ static inline int check_segment(struct segment_register *reg,
         return 0;
     }
 
-    if ( seg != x86_seg_tr && !reg->attr.fields.s )
+    if ( seg == x86_seg_tr )
+    {
+        if ( reg->attr.fields.s )
+        {
+            gprintk(XENLOG_ERR, "Code or data segment provided for TR\n");
+            return -EINVAL;
+        }
+
+        if ( reg->attr.fields.type != SYS_DESC_tss_busy )
+        {
+            gprintk(XENLOG_ERR, "Non-32-bit-TSS segment provided for TR\n");
+            return -EINVAL;
+        }
+    }
+    else if ( !reg->attr.fields.s )
     {
         gprintk(XENLOG_ERR,
                 "System segment provided for a code or data segment\n");
-        return -EINVAL;
-    }
-
-    if ( seg == x86_seg_tr && reg->attr.fields.s )
-    {
-        gprintk(XENLOG_ERR, "Code or data segment provided for TR\n");
         return -EINVAL;
     }
 
@@ -1387,7 +1395,8 @@ int arch_set_info_hvm_guest(struct vcpu *v, const vcpu_hvm_context_t *ctx)
 #define SEG(s, r) ({                                                        \
     s = (struct segment_register){ .base = (r)->s ## _base,                 \
                                    .limit = (r)->s ## _limit,               \
-                                   .attr.bytes = (r)->s ## _ar };           \
+                                   .attr.bytes = (r)->s ## _ar |            \
+                                       (x86_seg_##s != x86_seg_tr ? 1 : 2) }; \
     check_segment(&s, x86_seg_ ## s); })
 
         rc = SEG(cs, regs);
