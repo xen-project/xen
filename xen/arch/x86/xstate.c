@@ -92,7 +92,7 @@ static int setup_xstate_features(bool_t bsp)
 
     if ( bsp )
     {
-        xstate_features = fls(xfeature_mask);
+        xstate_features = flsl(xfeature_mask);
         xstate_offsets = xzalloc_array(unsigned int, xstate_features);
         if ( !xstate_offsets )
             return -ENOMEM;
