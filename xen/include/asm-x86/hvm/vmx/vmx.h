@@ -602,15 +602,16 @@ void vmx_pi_hooks_assign(struct domain *d);
 void vmx_pi_hooks_deassign(struct domain *d);
 
 /* EPT violation qualifications definitions */
-typedef union __transparent__ ept_qual {
+typedef union ept_qual {
     unsigned long raw;
     struct {
         bool read:1, write:1, fetch:1,
             eff_read:1, eff_write:1, eff_exec:1, /* eff_user_exec */:1,
             gla_valid:1,
             gla_fault:1; /* Valid iff gla_valid. */
+        unsigned long /* pad */:55;
     };
-} ept_qual_t;
+} __transparent__ ept_qual_t;
 
 #define EPT_L4_PAGETABLE_SHIFT      39
 #define EPT_PAGETABLE_ENTRIES       512
