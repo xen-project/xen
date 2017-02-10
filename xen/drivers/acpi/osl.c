@@ -104,6 +104,13 @@ acpi_os_map_memory(acpi_physical_address phys, acpi_size size)
 
 void acpi_os_unmap_memory(void __iomem * virt, acpi_size size)
 {
+	if (IS_ENABLED(CONFIG_X86) &&
+	    (unsigned long)virt >= DIRECTMAP_VIRT_START &&
+	    (unsigned long)virt < DIRECTMAP_VIRT_END) {
+		ASSERT(!((__pa(virt) + size - 1) >> 20));
+		return;
+	}
+
 	if (system_state >= SYS_STATE_boot)
 		vunmap((void *)((unsigned long)virt & PAGE_MASK));
 }
