@@ -819,6 +819,7 @@ static inline unsigned int p2m_get_iommu_flags(p2m_type_t p2mt, mfn_t mfn)
         flags = IOMMUF_readable;
         if ( !rangeset_contains_singleton(mmio_ro_ranges, mfn_x(mfn)) )
             flags |= IOMMUF_writable;
+        break;
     default:
         flags = 0;
         break;
