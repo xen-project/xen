@@ -15,6 +15,8 @@
  * License along with this library; If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <errno.h>
+
 #include "private.h"
 
 int osdep_xendevicemodel_open(xendevicemodel_handle *dmod)
@@ -32,6 +34,13 @@ int osdep_xendevicemodel_op(xendevicemodel_handle *dmod,
                             struct xendevicemodel_buf bufs[])
 {
     return xendevicemodel_xcall(dmod, domid, nr_bufs, bufs);
+}
+
+int osdep_xendevicemodel_restrict(xendevicemodel_handle *dmod,
+                                  domid_t domid)
+{
+    errno = EOPNOTSUPP;
+    return -1;
 }
 
 /*

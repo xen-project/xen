@@ -17,6 +17,7 @@ VERS_1.0 {
 		xendevicemodel_modified_memory;
 		xendevicemodel_set_mem_type;
 		xendevicemodel_inject_event;
+		xendevicemodel_restrict;
 		xendevicemodel_close;
 	local: *; /* Do not expose anything by default */
 };

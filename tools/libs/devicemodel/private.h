@@ -29,6 +29,9 @@ int osdep_xendevicemodel_op(xendevicemodel_handle *dmod,
                             domid_t domid, unsigned int nr_bufs,
                             struct xendevicemodel_buf bufs[]);
 
+int osdep_xendevicemodel_restrict(
+    xendevicemodel_handle *dmod, domid_t domid);
+
 #define PERROR(_f...) \
     xtl_log(dmod->logger, XTL_ERROR, errno, "xendevicemodel", _f)
 

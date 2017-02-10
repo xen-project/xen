@@ -112,6 +112,17 @@ int osdep_xendevicemodel_op(xendevicemodel_handle *dmod,
     return 0;
 }
 
+int osdep_xendevicemodel_restrict(xendevicemodel_handle *dmod,
+                                  domid_t domid)
+{
+    if (dmod->fd < 0) {
+        errno = EOPNOTSUPP;
+        return -1;
+    }
+
+    return ioctl(dmod->fd, IOCTL_PRIVCMD_RESTRICT, &domid);
+}
+
 /*
  * Local variables:
  * mode: C

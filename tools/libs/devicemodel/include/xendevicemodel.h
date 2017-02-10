@@ -283,6 +283,16 @@ int xendevicemodel_inject_event(
     xendevicemodel_handle *dmod, domid_t domid, int vcpu, uint8_t vector,
     uint8_t type, uint32_t error_code, uint8_t insn_len, uint64_t cr2);
 
+/**
+ * This function restricts the use of this handle to the specified
+ * domain.
+ *
+ * @parm dmod handle to the open devicemodel interface
+ * @parm domid the domain id
+ * @return 0 on success, -1 on failure.
+ */
+int xendevicemodel_restrict(xendevicemodel_handle *dmod, domid_t domid);
+
 #endif /* __XEN_TOOLS__ */
 
 #endif /* XENDEVICEMODEL_H */
