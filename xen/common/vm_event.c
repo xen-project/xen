@@ -127,25 +127,10 @@ static unsigned int vm_event_ring_available(struct vm_event_domain *ved)
 static void vm_event_wake_blocked(struct domain *d, struct vm_event_domain *ved)
 {
     struct vcpu *v;
-    int online = d->max_vcpus;
     unsigned int avail_req = vm_event_ring_available(ved);
 
     if ( avail_req == 0 || ved->blocked == 0 )
         return;
-
-    /*
-     * We ensure that we only have vCPUs online if there are enough free slots
-     * for their memory events to be processed.  This will ensure that no
-     * memory events are lost (due to the fact that certain types of events
-     * cannot be replayed, we need to ensure that there is space in the ring
-     * for when they are hit).
-     * See comment below in vm_event_put_request().
-     */
-    for_each_vcpu ( d, v )
-        if ( test_bit(ved->pause_flag, &v->pause_flags) )
-            online--;
-
-    ASSERT(online == (d->max_vcpus - ved->blocked));
 
     /* We remember which vcpu last woke up to avoid scanning always linearly
      * from zero and starving higher-numbered vcpus under high load */
@@ -160,13 +145,13 @@ static void vm_event_wake_blocked(struct domain *d, struct vm_event_domain *ved)
             if ( !v )
                 continue;
 
-            if ( !(ved->blocked) || online >= avail_req )
+            if ( !(ved->blocked) || avail_req == 0 )
                break;
 
             if ( test_and_clear_bit(ved->pause_flag, &v->pause_flags) )
             {
                 vcpu_unpause(v);
-                online++;
+                avail_req--;
                 ved->blocked--;
                 ved->last_vcpu_wake_up = k;
             }
@@ -280,8 +265,9 @@ void vm_event_put_request(struct domain *d,
     int free_req;
     unsigned int avail_req;
     RING_IDX req_prod;
+    struct vcpu *curr = current;
 
-    if ( current->domain != d )
+    if ( curr->domain != d )
     {
         req->flags |= VM_EVENT_FLAG_FOREIGN;
 #ifndef NDEBUG
@@ -316,8 +302,9 @@ void vm_event_put_request(struct domain *d,
      * See the comments above wake_blocked() for more information
      * on how this mechanism works to avoid waiting. */
     avail_req = vm_event_ring_available(ved);
-    if( current->domain == d && avail_req < d->max_vcpus )
-        vm_event_mark_and_pause(current, ved);
+    if( curr->domain == d && avail_req < d->max_vcpus &&
+        !atomic_read(&curr->vm_event_pause_count) )
+        vm_event_mark_and_pause(curr, ved);
 
     vm_event_ring_unlock(ved);
 
