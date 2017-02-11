@@ -107,7 +107,7 @@ static uint64_t vgic_fetch_irouter(struct vgic_irq_rank *rank,
     /* Get the index in the rank */
     offset &= INTERRUPT_RANK_MASK;
 
-    return vcpuid_to_vaffinity(rank->vcpu[offset]);
+    return vcpuid_to_vaffinity(read_atomic(&rank->vcpu[offset]));
 }
 
 /*
@@ -135,7 +135,7 @@ static void vgic_store_irouter(struct domain *d, struct vgic_irq_rank *rank,
     offset &= virq & INTERRUPT_RANK_MASK;
 
     new_vcpu = vgic_v3_irouter_to_vcpu(d, irouter);
-    old_vcpu = d->vcpu[rank->vcpu[offset]];
+    old_vcpu = d->vcpu[read_atomic(&rank->vcpu[offset])];
 
     /*
      * From the spec (see 8.9.13 in IHI 0069A), any write with an
@@ -153,7 +153,7 @@ static void vgic_store_irouter(struct domain *d, struct vgic_irq_rank *rank,
     if ( new_vcpu != old_vcpu )
         vgic_migrate_irq(old_vcpu, new_vcpu, virq);
 
-    rank->vcpu[offset] = new_vcpu->vcpu_id;
+    write_atomic(&rank->vcpu[offset], new_vcpu->vcpu_id);
 }
 
 static inline bool vgic_reg64_check_access(struct hsr_dabt dabt)

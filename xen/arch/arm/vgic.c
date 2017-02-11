@@ -85,7 +85,7 @@ static void vgic_rank_init(struct vgic_irq_rank *rank, uint8_t index,
     rank->index = index;
 
     for ( i = 0; i < NR_INTERRUPT_PER_RANK; i++ )
-        rank->vcpu[i] = vcpu;
+        write_atomic(&rank->vcpu[i], vcpu);
 }
 
 int domain_vgic_register(struct domain *d, int *mmio_count)
@@ -218,28 +218,11 @@ int vcpu_vgic_free(struct vcpu *v)
     return 0;
 }
 
-/* The function should be called by rank lock taken. */
-static struct vcpu *__vgic_get_target_vcpu(struct vcpu *v, unsigned int virq)
-{
-    struct vgic_irq_rank *rank = vgic_rank_irq(v, virq);
-
-    ASSERT(spin_is_locked(&rank->lock));
-
-    return v->domain->vcpu[rank->vcpu[virq & INTERRUPT_RANK_MASK]];
-}
-
-/* takes the rank lock */
 struct vcpu *vgic_get_target_vcpu(struct vcpu *v, unsigned int virq)
 {
-    struct vcpu *v_target;
     struct vgic_irq_rank *rank = vgic_rank_irq(v, virq);
-    unsigned long flags;
-
-    vgic_lock_rank(v, rank, flags);
-    v_target = __vgic_get_target_vcpu(v, virq);
-    vgic_unlock_rank(v, rank, flags);
-
-    return v_target;
+    int target = read_atomic(&rank->vcpu[virq & INTERRUPT_RANK_MASK]);
+    return v->domain->vcpu[target];
 }
 
 static int vgic_get_virq_priority(struct vcpu *v, unsigned int virq)
@@ -326,7 +309,7 @@ void vgic_disable_irqs(struct vcpu *v, uint32_t r, int n)
 
     while ( (i = find_next_bit(&mask, 32, i)) < 32 ) {
         irq = i + (32 * n);
-        v_target = __vgic_get_target_vcpu(v, irq);
+        v_target = vgic_get_target_vcpu(v, irq);
         p = irq_to_pending(v_target, irq);
         clear_bit(GIC_IRQ_GUEST_ENABLED, &p->status);
         gic_remove_from_queues(v_target, irq);
@@ -368,7 +351,7 @@ void vgic_enable_irqs(struct vcpu *v, uint32_t r, int n)
 
     while ( (i = find_next_bit(&mask, 32, i)) < 32 ) {
         irq = i + (32 * n);
-        v_target = __vgic_get_target_vcpu(v, irq);
+        v_target = vgic_get_target_vcpu(v, irq);
         p = irq_to_pending(v_target, irq);
         set_bit(GIC_IRQ_GUEST_ENABLED, &p->status);
         spin_lock_irqsave(&v_target->arch.vgic.lock, flags);
