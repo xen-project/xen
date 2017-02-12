@@ -497,7 +497,7 @@ int main(int argc, char **argv)
     if ( (rc != X86EMUL_OKAY) ||
          (*res != 0x33331112) ||
          (regs.ecx != 0x22222222) ||
-         !(regs.eflags & EFLG_ZF) ||
+         !(regs.eflags & X86_EFLAGS_ZF) ||
          (regs.eip != (unsigned long)&instr[2]) )
         goto fail;
 #else
@@ -571,11 +571,11 @@ int main(int argc, char **argv)
 
 #ifndef __x86_64__
     printf("%-40s", "Testing daa/das (all inputs)...");
-    /* Bits 0-7: AL; Bit 8: EFLG_AF; Bit 9: EFLG_CF; Bit 10: DAA vs. DAS. */
+    /* Bits 0-7: AL; Bit 8: EFLAGS.AF; Bit 9: EFLAGS.CF; Bit 10: DAA vs. DAS. */
     for ( i = 0; i < 0x800; i++ )
     {
-        regs.eflags  = (i & 0x200) ? EFLG_CF : 0;
-        regs.eflags |= (i & 0x100) ? EFLG_AF : 0;
+        regs.eflags  = (i & 0x200) ? X86_EFLAGS_CF : 0;
+        regs.eflags |= (i & 0x100) ? X86_EFLAGS_AF : 0;
         if ( i & 0x400 )
             __asm__ (
                 "pushf; and $0xffffffee,(%%esp); or %1,(%%esp); popf; das; "
@@ -588,24 +588,24 @@ int main(int argc, char **argv)
                 "pushf; popl %1"
                 : "=a" (bcdres_native), "=r" (regs.eflags)
                 : "0" (i & 0xff), "1" (regs.eflags) );
-        bcdres_native |= (regs.eflags & EFLG_PF) ? 0x1000 : 0;
-        bcdres_native |= (regs.eflags & EFLG_ZF) ? 0x800 : 0;
-        bcdres_native |= (regs.eflags & EFLG_SF) ? 0x400 : 0;
-        bcdres_native |= (regs.eflags & EFLG_CF) ? 0x200 : 0;
-        bcdres_native |= (regs.eflags & EFLG_AF) ? 0x100 : 0;
+        bcdres_native |= (regs.eflags & X86_EFLAGS_PF) ? 0x1000 : 0;
+        bcdres_native |= (regs.eflags & X86_EFLAGS_ZF) ? 0x800 : 0;
+        bcdres_native |= (regs.eflags & X86_EFLAGS_SF) ? 0x400 : 0;
+        bcdres_native |= (regs.eflags & X86_EFLAGS_CF) ? 0x200 : 0;
+        bcdres_native |= (regs.eflags & X86_EFLAGS_AF) ? 0x100 : 0;
 
         instr[0] = (i & 0x400) ? 0x2f: 0x27; /* daa/das */
-        regs.eflags  = (i & 0x200) ? EFLG_CF : 0;
-        regs.eflags |= (i & 0x100) ? EFLG_AF : 0;
+        regs.eflags  = (i & 0x200) ? X86_EFLAGS_CF : 0;
+        regs.eflags |= (i & 0x100) ? X86_EFLAGS_AF : 0;
         regs.eip    = (unsigned long)&instr[0];
         regs.eax    = (unsigned char)i;
         rc = x86_emulate(&ctxt, &emulops);
         bcdres_emul  = regs.eax;
-        bcdres_emul |= (regs.eflags & EFLG_PF) ? 0x1000 : 0;
-        bcdres_emul |= (regs.eflags & EFLG_ZF) ? 0x800 : 0;
-        bcdres_emul |= (regs.eflags & EFLG_SF) ? 0x400 : 0;
-        bcdres_emul |= (regs.eflags & EFLG_CF) ? 0x200 : 0;
-        bcdres_emul |= (regs.eflags & EFLG_AF) ? 0x100 : 0;
+        bcdres_emul |= (regs.eflags & X86_EFLAGS_PF) ? 0x1000 : 0;
+        bcdres_emul |= (regs.eflags & X86_EFLAGS_ZF) ? 0x800 : 0;
+        bcdres_emul |= (regs.eflags & X86_EFLAGS_SF) ? 0x400 : 0;
+        bcdres_emul |= (regs.eflags & X86_EFLAGS_CF) ? 0x200 : 0;
+        bcdres_emul |= (regs.eflags & X86_EFLAGS_AF) ? 0x100 : 0;
         if ( (rc != X86EMUL_OKAY) || (regs.eax > 255) ||
              (regs.eip != (unsigned long)&instr[1]) )
             goto fail;
