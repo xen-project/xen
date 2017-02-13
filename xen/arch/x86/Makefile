@@ -4,6 +4,7 @@ subdir-y += genapic
 subdir-y += hvm
 subdir-y += mm
 subdir-$(CONFIG_XENOPROF) += oprofile
+subdir-y += pv
 subdir-y += x86_64
 
 alternative-y := alternative.init.o
