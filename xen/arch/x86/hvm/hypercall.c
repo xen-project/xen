@@ -23,6 +23,29 @@
 
 #include <asm/hvm/support.h>
 
+static long hvm_memory_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
+{
+    const struct vcpu *curr = current;
+    long rc;
+
+    switch ( cmd & MEMOP_CMD_MASK )
+    {
+    case XENMEM_machine_memory_map:
+    case XENMEM_machphys_mapping:
+        return -ENOSYS;
+    }
+
+    if ( curr->arch.hvm_vcpu.hcall_64bit )
+        rc = do_memory_op(cmd, arg);
+    else
+        rc = compat_memory_op(cmd, arg);
+
+    if ( (cmd & MEMOP_CMD_MASK) == XENMEM_decrease_reservation )
+        curr->domain->arch.hvm_domain.qemu_mapcache_invalidate = true;
+
+    return rc;
+}
+
 static int grant_table_op_is_allowed(unsigned int cmd)
 {
     switch (cmd) {
@@ -47,23 +70,6 @@ static long hvm_grant_table_op(
     if ( !grant_table_op_is_allowed(cmd) )
         return -ENOSYS; /* all other commands need auditing */
     return do_grant_table_op(cmd, uop, count);
-}
-
-static long hvm_memory_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
-{
-    long rc;
-
-    switch ( cmd & MEMOP_CMD_MASK )
-    {
-    case XENMEM_machine_memory_map:
-    case XENMEM_machphys_mapping:
-        return -ENOSYS;
-    case XENMEM_decrease_reservation:
-        rc = do_memory_op(cmd, arg);
-        current->domain->arch.hvm_domain.qemu_mapcache_invalidate = 1;
-        return rc;
-    }
-    return do_memory_op(cmd, arg);
 }
 
 static long hvm_physdev_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
@@ -92,23 +98,6 @@ static long hvm_grant_table_op_compat32(unsigned int cmd,
     return compat_grant_table_op(cmd, uop, count);
 }
 
-static long hvm_memory_op_compat32(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
-{
-    int rc;
-
-    switch ( cmd & MEMOP_CMD_MASK )
-    {
-    case XENMEM_machine_memory_map:
-    case XENMEM_machphys_mapping:
-        return -ENOSYS;
-    case XENMEM_decrease_reservation:
-        rc = compat_memory_op(cmd, arg);
-        current->domain->arch.hvm_domain.qemu_mapcache_invalidate = 1;
-        return rc;
-    }
-    return compat_memory_op(cmd, arg);
-}
-
 static long hvm_physdev_op_compat32(
     int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 {
@@ -131,12 +120,14 @@ static long hvm_physdev_op_compat32(
     [ __HYPERVISOR_ ## x ] = { (hypercall_fn_t *) do_ ## x,  \
                                (hypercall_fn_t *) do_ ## x }
 
+#define HVM_CALL(x)                                          \
+    [ __HYPERVISOR_ ## x ] = { (hypercall_fn_t *) hvm_ ## x, \
+                               (hypercall_fn_t *) hvm_ ## x }
+
 #define COMPAT_CALL(x)                                       \
     [ __HYPERVISOR_ ## x ] = { (hypercall_fn_t *) do_ ## x,  \
                                (hypercall_fn_t *) compat_ ## x }
 
-#define do_memory_op          hvm_memory_op
-#define compat_memory_op      hvm_memory_op_compat32
 #define do_physdev_op         hvm_physdev_op
 #define compat_physdev_op     hvm_physdev_op_compat32
 #define do_grant_table_op     hvm_grant_table_op
@@ -144,7 +135,7 @@ static long hvm_physdev_op_compat32(
 #define do_arch_1             paging_domctl_continuation
 
 static const hypercall_table_t hvm_hypercall_table[] = {
-    COMPAT_CALL(memory_op),
+    HVM_CALL(memory_op),
     COMPAT_CALL(grant_table_op),
     COMPAT_CALL(vcpu_op),
     COMPAT_CALL(physdev_op),
@@ -167,8 +158,6 @@ static const hypercall_table_t hvm_hypercall_table[] = {
     HYPERCALL(arch_1)
 };
 
-#undef do_memory_op
-#undef compat_memory_op
 #undef do_physdev_op
 #undef compat_physdev_op
 #undef do_grant_table_op
@@ -176,6 +165,7 @@ static const hypercall_table_t hvm_hypercall_table[] = {
 #undef do_arch_1
 
 #undef HYPERCALL
+#undef HVM_CALL
 #undef COMPAT_CALL
 
 int hvm_hypercall(struct cpu_user_regs *regs)
