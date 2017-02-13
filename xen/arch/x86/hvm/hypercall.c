@@ -46,9 +46,11 @@ static long hvm_memory_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
     return rc;
 }
 
-static int grant_table_op_is_allowed(unsigned int cmd)
+static long hvm_grant_table_op(
+    unsigned int cmd, XEN_GUEST_HANDLE_PARAM(void) uop, unsigned int count)
 {
-    switch (cmd) {
+    switch ( cmd )
+    {
     case GNTTABOP_query_size:
     case GNTTABOP_setup_table:
     case GNTTABOP_set_version:
@@ -57,19 +59,16 @@ static int grant_table_op_is_allowed(unsigned int cmd)
     case GNTTABOP_map_grant_ref:
     case GNTTABOP_unmap_grant_ref:
     case GNTTABOP_swap_grant_ref:
-        return 1;
-    default:
-        /* all other commands need auditing */
-        return 0;
-    }
-}
+        break;
 
-static long hvm_grant_table_op(
-    unsigned int cmd, XEN_GUEST_HANDLE_PARAM(void) uop, unsigned int count)
-{
-    if ( !grant_table_op_is_allowed(cmd) )
-        return -ENOSYS; /* all other commands need auditing */
-    return do_grant_table_op(cmd, uop, count);
+    default: /* All other commands need auditing. */
+        return -ENOSYS;
+    }
+
+    if ( current->arch.hvm_vcpu.hcall_64bit )
+        return do_grant_table_op(cmd, uop, count);
+    else
+        return compat_grant_table_op(cmd, uop, count);
 }
 
 static long hvm_physdev_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
@@ -87,15 +86,6 @@ static long hvm_physdev_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
     case PHYSDEVOP_get_free_pirq:
         return do_physdev_op(cmd, arg);
     }
-}
-
-static long hvm_grant_table_op_compat32(unsigned int cmd,
-                                        XEN_GUEST_HANDLE_PARAM(void) uop,
-                                        unsigned int count)
-{
-    if ( !grant_table_op_is_allowed(cmd) )
-        return -ENOSYS;
-    return compat_grant_table_op(cmd, uop, count);
 }
 
 static long hvm_physdev_op_compat32(
@@ -130,13 +120,11 @@ static long hvm_physdev_op_compat32(
 
 #define do_physdev_op         hvm_physdev_op
 #define compat_physdev_op     hvm_physdev_op_compat32
-#define do_grant_table_op     hvm_grant_table_op
-#define compat_grant_table_op hvm_grant_table_op_compat32
 #define do_arch_1             paging_domctl_continuation
 
 static const hypercall_table_t hvm_hypercall_table[] = {
     HVM_CALL(memory_op),
-    COMPAT_CALL(grant_table_op),
+    HVM_CALL(grant_table_op),
     COMPAT_CALL(vcpu_op),
     COMPAT_CALL(physdev_op),
     COMPAT_CALL(xen_version),
@@ -160,8 +148,6 @@ static const hypercall_table_t hvm_hypercall_table[] = {
 
 #undef do_physdev_op
 #undef compat_physdev_op
-#undef do_grant_table_op
-#undef compat_grant_table_op
 #undef do_arch_1
 
 #undef HYPERCALL
