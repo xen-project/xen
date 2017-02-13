@@ -180,104 +180,82 @@ static const opcode_desc_t opcode_table[256] = {
     ImplicitOps, ImplicitOps, ByteOp|DstMem|SrcNone|ModRM, DstMem|SrcNone|ModRM
 };
 
-static const opcode_desc_t twobyte_table[256] = {
-    /* 0x00 - 0x07 */
-    ModRM, ImplicitOps|ModRM, DstReg|SrcMem16|ModRM, DstReg|SrcMem16|ModRM,
-    0, ImplicitOps, ImplicitOps, ImplicitOps,
-    /* 0x08 - 0x0F */
-    ImplicitOps, ImplicitOps, 0, ImplicitOps,
-    0, ImplicitOps|ModRM, ImplicitOps, ModRM|SrcImmByte,
-    /* 0x10 - 0x17 */
-    ImplicitOps|ModRM, ImplicitOps|ModRM, ImplicitOps|ModRM, ImplicitOps|ModRM,
-    ImplicitOps|ModRM, ImplicitOps|ModRM, ImplicitOps|ModRM, ImplicitOps|ModRM,
-    /* 0x18 - 0x1F */
-    ImplicitOps|ModRM, ImplicitOps|ModRM, ImplicitOps|ModRM, ImplicitOps|ModRM,
-    ImplicitOps|ModRM, ImplicitOps|ModRM, ImplicitOps|ModRM, ImplicitOps|ModRM,
-    /* 0x20 - 0x27 */
-    DstMem|SrcImplicit|ModRM, DstMem|SrcImplicit|ModRM,
-    DstImplicit|SrcMem|ModRM, DstImplicit|SrcMem|ModRM,
-    0, 0, 0, 0,
-    /* 0x28 - 0x2F */
-    ImplicitOps|ModRM, ImplicitOps|ModRM, ImplicitOps|ModRM, ImplicitOps|ModRM,
-    ImplicitOps|ModRM, ImplicitOps|ModRM, ImplicitOps|ModRM, ImplicitOps|ModRM,
-    /* 0x30 - 0x37 */
-    ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
-    ImplicitOps, ImplicitOps, 0, ImplicitOps,
-    /* 0x38 - 0x3F */
-    DstReg|SrcMem|ModRM, 0, DstReg|SrcImmByte|ModRM, 0, 0, 0, 0, 0,
-    /* 0x40 - 0x47 */
-    DstReg|SrcMem|ModRM|Mov, DstReg|SrcMem|ModRM|Mov,
-    DstReg|SrcMem|ModRM|Mov, DstReg|SrcMem|ModRM|Mov,
-    DstReg|SrcMem|ModRM|Mov, DstReg|SrcMem|ModRM|Mov,
-    DstReg|SrcMem|ModRM|Mov, DstReg|SrcMem|ModRM|Mov,
-    /* 0x48 - 0x4F */
-    DstReg|SrcMem|ModRM|Mov, DstReg|SrcMem|ModRM|Mov,
-    DstReg|SrcMem|ModRM|Mov, DstReg|SrcMem|ModRM|Mov,
-    DstReg|SrcMem|ModRM|Mov, DstReg|SrcMem|ModRM|Mov,
-    DstReg|SrcMem|ModRM|Mov, DstReg|SrcMem|ModRM|Mov,
-    /* 0x50 - 0x5F */
-    ModRM, ModRM, ModRM, ModRM, ModRM, ModRM, ModRM, ModRM,
-    ModRM, ModRM, ModRM, ModRM, ModRM, ModRM, ModRM, ModRM,
-    /* 0x60 - 0x6F */
-    ModRM, ModRM, ModRM, ModRM, ModRM, ModRM, ModRM, ModRM,
-    ModRM, ModRM, ModRM, ModRM, ModRM, ModRM, ModRM, ImplicitOps|ModRM,
-    /* 0x70 - 0x7F */
-    SrcImmByte|ModRM, SrcImmByte|ModRM, SrcImmByte|ModRM, SrcImmByte|ModRM,
-    ModRM, ModRM, ModRM, ImplicitOps,
-    ModRM, ModRM, 0, 0, ModRM, ModRM, ImplicitOps|ModRM, ImplicitOps|ModRM,
-    /* 0x80 - 0x87 */
-    DstImplicit|SrcImm, DstImplicit|SrcImm,
-    DstImplicit|SrcImm, DstImplicit|SrcImm,
-    DstImplicit|SrcImm, DstImplicit|SrcImm,
-    DstImplicit|SrcImm, DstImplicit|SrcImm,
-    /* 0x88 - 0x8F */
-    DstImplicit|SrcImm, DstImplicit|SrcImm,
-    DstImplicit|SrcImm, DstImplicit|SrcImm,
-    DstImplicit|SrcImm, DstImplicit|SrcImm,
-    DstImplicit|SrcImm, DstImplicit|SrcImm,
-    /* 0x90 - 0x97 */
-    ByteOp|DstMem|SrcNone|ModRM|Mov, ByteOp|DstMem|SrcNone|ModRM|Mov,
-    ByteOp|DstMem|SrcNone|ModRM|Mov, ByteOp|DstMem|SrcNone|ModRM|Mov,
-    ByteOp|DstMem|SrcNone|ModRM|Mov, ByteOp|DstMem|SrcNone|ModRM|Mov,
-    ByteOp|DstMem|SrcNone|ModRM|Mov, ByteOp|DstMem|SrcNone|ModRM|Mov,
-    /* 0x98 - 0x9F */
-    ByteOp|DstMem|SrcNone|ModRM|Mov, ByteOp|DstMem|SrcNone|ModRM|Mov,
-    ByteOp|DstMem|SrcNone|ModRM|Mov, ByteOp|DstMem|SrcNone|ModRM|Mov,
-    ByteOp|DstMem|SrcNone|ModRM|Mov, ByteOp|DstMem|SrcNone|ModRM|Mov,
-    ByteOp|DstMem|SrcNone|ModRM|Mov, ByteOp|DstMem|SrcNone|ModRM|Mov,
-    /* 0xA0 - 0xA7 */
-    ImplicitOps|Mov, ImplicitOps|Mov, ImplicitOps, DstBitBase|SrcReg|ModRM,
-    DstMem|SrcImmByte|ModRM, DstMem|SrcReg|ModRM, ModRM, ModRM,
-    /* 0xA8 - 0xAF */
-    ImplicitOps|Mov, ImplicitOps|Mov, ImplicitOps, DstBitBase|SrcReg|ModRM,
-    DstMem|SrcImmByte|ModRM, DstMem|SrcReg|ModRM,
-    ImplicitOps|ModRM, DstReg|SrcMem|ModRM,
-    /* 0xB0 - 0xB7 */
-    ByteOp|DstMem|SrcReg|ModRM, DstMem|SrcReg|ModRM,
-    DstReg|SrcMem|ModRM|Mov, DstBitBase|SrcReg|ModRM,
-    DstReg|SrcMem|ModRM|Mov, DstReg|SrcMem|ModRM|Mov,
-    ByteOp|DstReg|SrcMem|ModRM|Mov, DstReg|SrcMem16|ModRM|Mov,
-    /* 0xB8 - 0xBF */
-    DstReg|SrcMem|ModRM, ModRM,
-    DstBitBase|SrcImmByte|ModRM, DstBitBase|SrcReg|ModRM,
-    DstReg|SrcMem|ModRM, DstReg|SrcMem|ModRM,
-    ByteOp|DstReg|SrcMem|ModRM|Mov, DstReg|SrcMem16|ModRM|Mov,
-    /* 0xC0 - 0xC7 */
-    ByteOp|DstMem|SrcReg|ModRM, DstMem|SrcReg|ModRM,
-    SrcImmByte|ModRM, DstMem|SrcReg|ModRM|Mov,
-    SrcImmByte|ModRM, SrcImmByte|ModRM, SrcImmByte|ModRM, ImplicitOps|ModRM,
-    /* 0xC8 - 0xCF */
-    ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
-    ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
-    /* 0xD0 - 0xDF */
-    ModRM, ModRM, ModRM, ModRM, ModRM, ModRM, ImplicitOps|ModRM, ModRM,
-    ModRM, ModRM, ModRM, ModRM, ModRM, ModRM, ModRM, ModRM,
-    /* 0xE0 - 0xEF */
-    ModRM, ModRM, ModRM, ModRM, ModRM, ModRM, ModRM, ImplicitOps|ModRM,
-    ModRM, ModRM, ModRM, ModRM, ModRM, ModRM, ModRM, ModRM,
-    /* 0xF0 - 0xFF */
-    ModRM, ModRM, ModRM, ModRM, ModRM, ModRM, ModRM, ModRM,
-    ModRM, ModRM, ModRM, ModRM, ModRM, ModRM, ModRM, ModRM
+static const struct {
+    opcode_desc_t desc;
+} twobyte_table[256] = {
+    [0x00] = { ModRM },
+    [0x01] = { ImplicitOps|ModRM },
+    [0x02] = { DstReg|SrcMem16|ModRM },
+    [0x03] = { DstReg|SrcMem16|ModRM },
+    [0x05] = { ImplicitOps },
+    [0x06] = { ImplicitOps },
+    [0x07] = { ImplicitOps },
+    [0x08] = { ImplicitOps },
+    [0x09] = { ImplicitOps },
+    [0x0b] = { ImplicitOps },
+    [0x0d] = { ImplicitOps|ModRM },
+    [0x0e] = { ImplicitOps },
+    [0x0f] = { ModRM|SrcImmByte },
+    [0x10 ... 0x1f] = { ImplicitOps|ModRM },
+    [0x20 ... 0x21] = { DstMem|SrcImplicit|ModRM },
+    [0x22 ... 0x23] = { DstImplicit|SrcMem|ModRM },
+    [0x28 ... 0x2f] = { ImplicitOps|ModRM },
+    [0x30 ... 0x35] = { ImplicitOps },
+    [0x37] = { ImplicitOps },
+    [0x38] = { DstReg|SrcMem|ModRM },
+    [0x3a] = { DstReg|SrcImmByte|ModRM },
+    [0x40 ... 0x4f] = { DstReg|SrcMem|ModRM|Mov },
+    [0x50 ... 0x6e] = { ModRM },
+    [0x6f] = { ImplicitOps|ModRM },
+    [0x70 ... 0x73] = { SrcImmByte|ModRM },
+    [0x74 ... 0x76] = { ModRM },
+    [0x77] = { ImplicitOps },
+    [0x78 ... 0x79] = { ModRM },
+    [0x7c ... 0x7d] = { ModRM },
+    [0x7e ... 0x7f] = { ImplicitOps|ModRM },
+    [0x80 ... 0x8f] = { DstImplicit|SrcImm },
+    [0x90 ... 0x9f] = { ByteOp|DstMem|SrcNone|ModRM|Mov },
+    [0xa0 ... 0xa1] = { ImplicitOps|Mov },
+    [0xa2] = { ImplicitOps },
+    [0xa3] = { DstBitBase|SrcReg|ModRM },
+    [0xa4] = { DstMem|SrcImmByte|ModRM },
+    [0xa5] = { DstMem|SrcReg|ModRM },
+    [0xa6 ... 0xa7] = { ModRM },
+    [0xa8 ... 0xa9] = { ImplicitOps|Mov },
+    [0xaa] = { ImplicitOps },
+    [0xab] = { DstBitBase|SrcReg|ModRM },
+    [0xac] = { DstMem|SrcImmByte|ModRM },
+    [0xad] = { DstMem|SrcReg|ModRM },
+    [0xae] = { ImplicitOps|ModRM },
+    [0xaf] = { DstReg|SrcMem|ModRM },
+    [0xb0] = { ByteOp|DstMem|SrcReg|ModRM },
+    [0xb1] = { DstMem|SrcReg|ModRM },
+    [0xb2] = { DstReg|SrcMem|ModRM|Mov },
+    [0xb3] = { DstBitBase|SrcReg|ModRM },
+    [0xb4 ... 0xb5] = { DstReg|SrcMem|ModRM|Mov },
+    [0xb6] = { ByteOp|DstReg|SrcMem|ModRM|Mov },
+    [0xb7] = { DstReg|SrcMem16|ModRM|Mov },
+    [0xb8] = { DstReg|SrcMem|ModRM },
+    [0xb9] = { ModRM },
+    [0xba] = { DstBitBase|SrcImmByte|ModRM },
+    [0xbb] = { DstBitBase|SrcReg|ModRM },
+    [0xbc ... 0xbd] = { DstReg|SrcMem|ModRM },
+    [0xbe] = { ByteOp|DstReg|SrcMem|ModRM|Mov },
+    [0xbf] = { DstReg|SrcMem16|ModRM|Mov },
+    [0xc0] = { ByteOp|DstMem|SrcReg|ModRM },
+    [0xc1] = { DstMem|SrcReg|ModRM },
+    [0xc2] = { SrcImmByte|ModRM },
+    [0xc3] = { DstMem|SrcReg|ModRM|Mov },
+    [0xc4 ... 0xc6] = { SrcImmByte|ModRM },
+    [0xc7] = { ImplicitOps|ModRM },
+    [0xc8 ... 0xcf] = { ImplicitOps },
+    [0xd0 ... 0xd5] = { ModRM },
+    [0xd6] = { ImplicitOps|ModRM },
+    [0xd7 ... 0xdf] = { ModRM },
+    [0xe0 ... 0xe6] = { ModRM },
+    [0xe7] = { ImplicitOps|ModRM },
+    [0xe8 ... 0xef] = { ModRM },
+    [0xf0 ... 0xff] = { ModRM }
 };
 
 static const opcode_desc_t xop_table[] = {
@@ -2230,7 +2208,7 @@ x86_decode(
     {
         /* Two-byte opcode. */
         b = insn_fetch_type(uint8_t);
-        d = twobyte_table[b];
+        d = twobyte_table[b].desc;
         switch ( b )
         {
         default:
@@ -2341,15 +2319,15 @@ x86_decode(
                     {
                     case vex_0f:
                         opcode |= MASK_INSR(0x0f, X86EMUL_OPC_EXT_MASK);
-                        d = twobyte_table[b];
+                        d = twobyte_table[b].desc;
                         break;
                     case vex_0f38:
                         opcode |= MASK_INSR(0x0f38, X86EMUL_OPC_EXT_MASK);
-                        d = twobyte_table[0x38];
+                        d = twobyte_table[0x38].desc;
                         break;
                     case vex_0f3a:
                         opcode |= MASK_INSR(0x0f3a, X86EMUL_OPC_EXT_MASK);
-                        d = twobyte_table[0x3a];
+                        d = twobyte_table[0x3a].desc;
                         break;
                     default:
                         rc = X86EMUL_UNHANDLEABLE;
