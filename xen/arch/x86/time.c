@@ -1643,6 +1643,14 @@ static int __init verify_tsc_reliability(void)
     }
 
     /*
+     * Re-run the TSC writability check if it didn't run to completion, as
+     * X86_FEATURE_TSC_RELIABLE may have been cleared by now. This is needed
+     * for determining which rendezvous function to use (below).
+     */
+    if ( !disable_tsc_sync )
+        tsc_check_writability();
+
+    /*
      * While with constant-rate TSCs the scale factor can be shared, when TSCs
      * are not marked as 'reliable', re-sync during rendezvous.
      */
