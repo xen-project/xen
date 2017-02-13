@@ -23,6 +23,7 @@
 #include <xen/errno.h>
 #include <xen/trace.h>
 #include <xen/event.h>
+#include <asm/apicdef.h>
 #include <asm/current.h>
 #include <asm/cpufeature.h>
 #include <asm/processor.h>
@@ -318,6 +319,45 @@ void vmx_intr_assist(void)
         */
         if ( pt_vector != -1 )
         {
+            /*
+             * We assert that intack.vector is the highest priority vector for
+             * only an interrupt from vlapic can reach this point and the
+             * highest vector is chosen in hvm_vcpu_has_pending_irq().
+             * But, in fact, the assertion failed sometimes. It is suspected
+             * that PIR is not synced to vIRR which makes pt_vector is left in
+             * PIR. In order to verify this suspicion, dump some information
+             * when the assertion fails.
+             */
+            if ( unlikely(intack.vector < pt_vector) )
+            {
+                const struct vlapic *vlapic;
+                const struct pi_desc *pi_desc;
+                const uint32_t *word;
+                unsigned int i;
+
+                printk(XENLOG_ERR "%pv: intack: %02x:%u pt: %02x\n",
+                       current, intack.source, intack.vector, pt_vector);
+
+                vlapic = vcpu_vlapic(v);
+                if ( vlapic && vlapic->regs->data )
+                {
+                    word = (const void *)&vlapic->regs->data[APIC_IRR];
+                    printk(XENLOG_ERR "vIRR:");
+                    for ( i = NR_VECTORS / 32; i-- ; )
+                        printk(" %08x", word[i*4]);
+                    printk("\n");
+                }
+
+                pi_desc = &v->arch.hvm_vmx.pi_desc;
+                if ( pi_desc && pi_desc->pir )
+                {
+                    word = (const void *)&pi_desc->pir;
+                    printk(XENLOG_ERR " PIR:");
+                    for ( i = NR_VECTORS / 32; i-- ; )
+                        printk(" %08x", word[i]);
+                    printk("\n");
+                }
+            }
             ASSERT(intack.vector >= pt_vector);
             vmx_set_eoi_exit_bitmap(v, intack.vector);
         }
