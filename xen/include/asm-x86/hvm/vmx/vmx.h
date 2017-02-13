@@ -404,7 +404,7 @@ static always_inline void __vmwrite(unsigned long field, unsigned long value)
 static inline enum vmx_insn_errno vmread_safe(unsigned long field,
                                               unsigned long *value)
 {
-    unsigned long ret = 0;
+    unsigned long ret = VMX_INSN_SUCCEED;
     bool fail_invalid, fail_valid;
 
     asm volatile ( GAS_VMX_OP("vmread %[field], %[value]\n\t",
@@ -427,7 +427,7 @@ static inline enum vmx_insn_errno vmread_safe(unsigned long field,
 static inline enum vmx_insn_errno vmwrite_safe(unsigned long field,
                                                unsigned long value)
 {
-    unsigned long ret = 0;
+    unsigned long ret = VMX_INSN_SUCCEED;
     bool fail_invalid, fail_valid;
 
     asm volatile ( GAS_VMX_OP("vmwrite %[value], %[field]\n\t",

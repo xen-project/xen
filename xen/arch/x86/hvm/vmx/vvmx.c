@@ -483,6 +483,9 @@ static void vmfail_invalid(struct cpu_user_regs *regs)
 
 static void vmfail(struct cpu_user_regs *regs, enum vmx_insn_errno errno)
 {
+    if ( errno == VMX_INSN_SUCCEED )
+        return;
+
     if ( vcpu_nestedhvm(current).nv_vvmcxaddr != INVALID_PADDR &&
          errno != VMX_INSN_FAIL_INVALID )
         vmfail_valid(regs, errno);

@@ -513,6 +513,7 @@ enum vmcs_field {
 /* VM Instruction error numbers */
 enum vmx_insn_errno
 {
+    VMX_INSN_SUCCEED                       = 0,
     VMX_INSN_VMCLEAR_INVALID_PHYADDR       = 2,
     VMX_INSN_VMLAUNCH_NONCLEAR_VMCS        = 4,
     VMX_INSN_VMRESUME_NONLAUNCHED_VMCS     = 5,
