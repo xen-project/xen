@@ -191,11 +191,38 @@ struct vcpu *__init alloc_dom0_vcpu0(struct domain *dom0)
 }
 
 #ifdef CONFIG_SHADOW_PAGING
-static bool_t __initdata opt_dom0_shadow;
+bool __initdata opt_dom0_shadow;
 boolean_param("dom0_shadow", opt_dom0_shadow);
-#else
-#define opt_dom0_shadow 0
 #endif
+bool __initdata dom0_pvh;
+
+/*
+ * List of parameters that affect Dom0 creation:
+ *
+ *  - pvh               Create a PVHv2 Dom0.
+ *  - shadow            Use shadow paging for Dom0.
+ */
+static void __init parse_dom0_param(char *s)
+{
+    char *ss;
+
+    do {
+
+        ss = strchr(s, ',');
+        if ( ss )
+            *ss = '\0';
+
+        if ( !strcmp(s, "pvh") )
+            dom0_pvh = true;
+#ifdef CONFIG_SHADOW_PAGING
+        else if ( !strcmp(s, "shadow") )
+            opt_dom0_shadow = true;
+#endif
+
+        s = ss + 1;
+    } while ( ss );
+}
+custom_param("dom0", parse_dom0_param);
 
 static char __initdata opt_dom0_ioports_disable[200] = "";
 string_param("dom0_ioports_disable", opt_dom0_ioports_disable);
@@ -951,7 +978,7 @@ static int __init setup_permissions(struct domain *d)
     return rc;
 }
 
-int __init construct_dom0(
+static int __init construct_dom0_pv(
     struct domain *d,
     const module_t *image, unsigned long image_headroom,
     module_t *initrd,
@@ -1006,13 +1033,6 @@ int __init construct_dom0(
 
     /* Machine address of next candidate page-table page. */
     paddr_t mpt_alloc;
-
-    /* Sanity! */
-    BUG_ON(d->domain_id != 0);
-    BUG_ON(d->vcpu[0] == NULL);
-    BUG_ON(v->is_initialised);
-
-    process_pending_softirqs();
 
     printk("*** LOADING DOMAIN 0 ***\n");
 
@@ -1653,6 +1673,35 @@ out:
                elf_check_broken(&elf));
 
     return rc;
+}
+
+static int __init construct_dom0_pvh(struct domain *d, const module_t *image,
+                                     unsigned long image_headroom,
+                                     module_t *initrd,
+                                     void *(*bootstrap_map)(const module_t *),
+                                     char *cmdline)
+{
+
+    printk("** Building a PVH Dom0 **\n");
+
+    panic("Building a PVHv2 Dom0 is not yet supported.");
+    return 0;
+}
+
+int __init construct_dom0(struct domain *d, const module_t *image,
+                          unsigned long image_headroom, module_t *initrd,
+                          void *(*bootstrap_map)(const module_t *),
+                          char *cmdline)
+{
+    /* Sanity! */
+    BUG_ON(d->domain_id != 0);
+    BUG_ON(d->vcpu[0] == NULL);
+    BUG_ON(d->vcpu[0]->is_initialised);
+
+    process_pending_softirqs();
+
+    return (is_hvm_domain(d) ? construct_dom0_pvh : construct_dom0_pv)
+           (d, image, image_headroom, initrd,bootstrap_map, cmdline);
 }
 
 /*
