@@ -537,6 +537,8 @@ int vmx_check_msr_bitmap(unsigned long *msr_bitmap, u32 msr, int access_type);
 void virtual_vmcs_enter(const struct vcpu *);
 void virtual_vmcs_exit(const struct vcpu *);
 u64 virtual_vmcs_vmread(const struct vcpu *, u32 encoding);
+enum vmx_insn_errno virtual_vmcs_vmread_safe(const struct vcpu *v,
+                                             u32 vmcs_encoding, u64 *val);
 void virtual_vmcs_vmwrite(const struct vcpu *, u32 encoding, u64 val);
 enum vmx_insn_errno virtual_vmcs_vmwrite_safe(const struct vcpu *v,
                                               u32 vmcs_encoding, u64 val);

@@ -943,6 +943,18 @@ u64 virtual_vmcs_vmread(const struct vcpu *v, u32 vmcs_encoding)
     return res;
 }
 
+enum vmx_insn_errno virtual_vmcs_vmread_safe(const struct vcpu *v,
+                                             u32 vmcs_encoding, u64 *val)
+{
+    enum vmx_insn_errno ret;
+
+    virtual_vmcs_enter(v);
+    ret = vmread_safe(vmcs_encoding, val);
+    virtual_vmcs_exit(v);
+
+    return ret;
+}
+
 void virtual_vmcs_vmwrite(const struct vcpu *v, u32 vmcs_encoding, u64 val)
 {
     virtual_vmcs_enter(v);

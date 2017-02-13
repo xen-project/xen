@@ -264,6 +264,25 @@ u64 get_vvmcs_real(const struct vcpu *v, u32 encoding)
     return virtual_vmcs_vmread(v, encoding);
 }
 
+enum vmx_insn_errno get_vvmcs_virtual_safe(void *vvmcs, u32 encoding, u64 *val)
+{
+    *val = get_vvmcs_virtual(vvmcs, encoding);
+
+    /*
+     * TODO: This should not always succeed. Fields and values need to be
+     * audited against the features offered to the guest in the VT-x MSRs.
+     * This should be fixed when the MSR levelling work is started, at which
+     * point there will be a cpuid_policy-like object.
+     */
+    return VMX_INSN_SUCCEED;
+}
+
+enum vmx_insn_errno get_vvmcs_real_safe(const struct vcpu *v, u32 encoding,
+                                        u64 *val)
+{
+    return virtual_vmcs_vmread_safe(v, encoding, val);
+}
+
 void set_vvmcs_virtual(void *vvmcs, u32 vmcs_encoding, u64 val)
 {
     union vmcs_encoding enc;
@@ -1733,7 +1752,12 @@ int nvmx_handle_vmread(struct cpu_user_regs *regs)
     if ( rc != X86EMUL_OKAY )
         return rc;
 
-    value = get_vvmcs(v, reg_read(regs, decode.reg2));
+    rc = get_vvmcs_safe(v, reg_read(regs, decode.reg2), &value);
+    if ( rc != VMX_INSN_SUCCEED )
+    {
+        vmfail(regs, rc);
+        return X86EMUL_OKAY;
+    }
 
     switch ( decode.type ) {
     case VMX_INST_MEMREG_TYPE_MEMORY:
