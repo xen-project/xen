@@ -6793,7 +6793,9 @@ fi
 fi
 
 fi
-# Extract the first word of "bash", so it can be a program name with args.
+case "$host_os" in
+  freebsd*) ;;
+  *) # Extract the first word of "bash", so it can be a program name with args.
 set dummy bash; ac_word=$2
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
 $as_echo_n "checking for $ac_word... " >&6; }
@@ -6837,7 +6839,8 @@ fi
 if test x"${BASH}" = x"no"
 then
     as_fn_error $? "Unable to find bash, please install bash" "$LINENO" 5
-fi
+fi;;
+esac
 if echo "$PYTHON" | grep -q "^/"; then :
 
     PYTHONPATH=$PYTHON

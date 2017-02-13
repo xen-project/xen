@@ -320,7 +320,11 @@ AS_IF([test "x$xsmpolicy" = "xy"], [
         xsmpolicy="n"
     ])
 ])
-AX_PATH_PROG_OR_FAIL([BASH], [bash])
+dnl FreeBSD doesn't require bash (hotplug scripts are in plain sh)
+case "$host_os" in
+  freebsd*) ;;
+  *) AX_PATH_PROG_OR_FAIL([BASH], [bash]);;
+esac
 AS_IF([echo "$PYTHON" | grep -q "^/"], [
     PYTHONPATH=$PYTHON
     PYTHON=`basename $PYTHONPATH`
