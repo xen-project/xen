@@ -18,7 +18,6 @@
 #ifndef __ASM_X86_HVM_VMX_VMCS_H__
 #define __ASM_X86_HVM_VMX_VMCS_H__
 
-#include <asm/vpmu.h>
 #include <asm/hvm/io.h>
 #include <irq_vectors.h>
 

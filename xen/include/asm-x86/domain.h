@@ -8,6 +8,7 @@
 #include <asm/hvm/domain.h>
 #include <asm/e820.h>
 #include <asm/mce.h>
+#include <asm/vpmu.h>
 #include <asm/x86_emulate.h>
 #include <public/vcpu.h>
 #include <public/hvm/hvm_info_table.h>
