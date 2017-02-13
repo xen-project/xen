@@ -538,6 +538,8 @@ void virtual_vmcs_enter(const struct vcpu *);
 void virtual_vmcs_exit(const struct vcpu *);
 u64 virtual_vmcs_vmread(const struct vcpu *, u32 encoding);
 void virtual_vmcs_vmwrite(const struct vcpu *, u32 encoding, u64 val);
+enum vmx_insn_errno virtual_vmcs_vmwrite_safe(const struct vcpu *v,
+                                              u32 vmcs_encoding, u64 val);
 
 static inline int vmx_add_guest_msr(u32 msr)
 {

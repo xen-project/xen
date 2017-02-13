@@ -950,6 +950,18 @@ void virtual_vmcs_vmwrite(const struct vcpu *v, u32 vmcs_encoding, u64 val)
     virtual_vmcs_exit(v);
 }
 
+enum vmx_insn_errno virtual_vmcs_vmwrite_safe(const struct vcpu *v,
+                                              u32 vmcs_encoding, u64 val)
+{
+    enum vmx_insn_errno ret;
+
+    virtual_vmcs_enter(v);
+    ret = vmwrite_safe(vmcs_encoding, val);
+    virtual_vmcs_exit(v);
+
+    return ret;
+}
+
 /*
  * This function is only called in a vCPU's initialization phase,
  * so we can update the posted-interrupt descriptor in non-atomic way.

@@ -183,6 +183,9 @@ u64 get_vvmcs_virtual(void *vvmcs, u32 encoding);
 u64 get_vvmcs_real(const struct vcpu *, u32 encoding);
 void set_vvmcs_virtual(void *vvmcs, u32 encoding, u64 val);
 void set_vvmcs_real(const struct vcpu *, u32 encoding, u64 val);
+enum vmx_insn_errno set_vvmcs_virtual_safe(void *vvmcs, u32 encoding, u64 val);
+enum vmx_insn_errno set_vvmcs_real_safe(const struct vcpu *, u32 encoding,
+                                        u64 val);
 
 #define get_vvmcs(vcpu, encoding) \
   (cpu_has_vmx_vmcs_shadowing ? \
@@ -193,6 +196,11 @@ void set_vvmcs_real(const struct vcpu *, u32 encoding, u64 val);
   (cpu_has_vmx_vmcs_shadowing ? \
    set_vvmcs_real(vcpu, encoding, val) : \
    set_vvmcs_virtual(vcpu_nestedhvm(vcpu).nv_vvmcx, encoding, val))
+
+#define set_vvmcs_safe(vcpu, encoding, val) \
+  (cpu_has_vmx_vmcs_shadowing ? \
+   set_vvmcs_real_safe(vcpu, encoding, val) : \
+   set_vvmcs_virtual_safe(vcpu_nestedhvm(vcpu).nv_vvmcx, encoding, val))
 
 uint64_t get_shadow_eptp(struct vcpu *v);
 

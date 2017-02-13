@@ -305,6 +305,25 @@ void set_vvmcs_real(const struct vcpu *v, u32 encoding, u64 val)
     virtual_vmcs_vmwrite(v, encoding, val);
 }
 
+enum vmx_insn_errno set_vvmcs_virtual_safe(void *vvmcs, u32 encoding, u64 val)
+{
+    set_vvmcs_virtual(vvmcs, encoding, val);
+
+    /*
+     * TODO: This should not always succeed. Fields and values need to be
+     * audited against the features offered to the guest in the VT-x MSRs.
+     * This should be fixed when the MSR levelling work is started, at which
+     * point there will be a cpuid_policy-like object.
+     */
+    return VMX_INSN_SUCCEED;
+}
+
+enum vmx_insn_errno set_vvmcs_real_safe(const struct vcpu *v, u32 encoding,
+                                        u64 val)
+{
+    return virtual_vmcs_vmwrite_safe(v, encoding, val);
+}
+
 static unsigned long reg_read(struct cpu_user_regs *regs,
                               enum vmx_regs_enc index)
 {
@@ -1740,13 +1759,19 @@ int nvmx_handle_vmwrite(struct cpu_user_regs *regs)
     unsigned long operand; 
     u64 vmcs_encoding;
     bool_t okay = 1;
+    enum vmx_insn_errno err;
 
     if ( decode_vmx_inst(regs, &decode, &operand, 0)
              != X86EMUL_OKAY )
         return X86EMUL_EXCEPTION;
 
     vmcs_encoding = reg_read(regs, decode.reg2);
-    set_vvmcs(v, vmcs_encoding, operand);
+    err = set_vvmcs_safe(v, vmcs_encoding, operand);
+    if ( err != VMX_INSN_SUCCEED )
+    {
+        vmfail(regs, err);
+        return X86EMUL_OKAY;
+    }
 
     switch ( vmcs_encoding & ~VMCS_HIGH(0) )
     {
