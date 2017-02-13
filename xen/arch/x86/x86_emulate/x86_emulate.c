@@ -2671,6 +2671,8 @@ x86_emulate(
         ea.reg = decode_register(modrm_rm, &_regs,
                                  (d & ByteOp) && !rex_prefix);
 
+    memset(mmvalp, 0xaa /* arbitrary */, sizeof(*mmvalp));
+
     /* Decode and fetch the source operand: register, memory or immediate. */
     switch ( d & SrcMask )
     {
