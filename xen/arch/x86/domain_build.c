@@ -38,6 +38,7 @@
 #include <asm/hpet.h>
 
 #include <public/version.h>
+#include <public/hvm/hvm_info_table.h>
 
 static long __initdata dom0_nrpages;
 static long __initdata dom0_min_nrpages;
@@ -149,7 +150,7 @@ static nodemask_t __initdata dom0_nodes;
 
 unsigned int __init dom0_max_vcpus(void)
 {
-    unsigned int i, max_vcpus;
+    unsigned int i, max_vcpus, limit;
     nodeid_t node;
 
     for ( i = 0; i < dom0_nr_pxms; ++i )
@@ -169,8 +170,9 @@ unsigned int __init dom0_max_vcpus(void)
         max_vcpus = opt_dom0_max_vcpus_min;
     if ( opt_dom0_max_vcpus_max < max_vcpus )
         max_vcpus = opt_dom0_max_vcpus_max;
-    if ( max_vcpus > MAX_VIRT_CPUS )
-        max_vcpus = MAX_VIRT_CPUS;
+    limit = dom0_pvh ? HVM_MAX_VCPUS : MAX_VIRT_CPUS;
+    if ( max_vcpus > limit )
+        max_vcpus = limit;
 
     return max_vcpus;
 }
