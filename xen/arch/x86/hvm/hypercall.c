@@ -73,10 +73,12 @@ static long hvm_grant_table_op(
 
 static long hvm_physdev_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 {
+    const struct vcpu *curr = current;
+
     switch ( cmd )
     {
     default:
-        if ( !is_pvh_vcpu(current) || !is_hardware_domain(current->domain) )
+        if ( !is_pvh_vcpu(curr) || !is_hardware_domain(curr->domain) )
             return -ENOSYS;
         /* fall through */
     case PHYSDEVOP_map_pirq:
@@ -84,26 +86,13 @@ static long hvm_physdev_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
     case PHYSDEVOP_eoi:
     case PHYSDEVOP_irq_status_query:
     case PHYSDEVOP_get_free_pirq:
-        return do_physdev_op(cmd, arg);
+        break;
     }
-}
 
-static long hvm_physdev_op_compat32(
-    int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
-{
-    switch ( cmd )
-    {
-        case PHYSDEVOP_map_pirq:
-        case PHYSDEVOP_unmap_pirq:
-        case PHYSDEVOP_eoi:
-        case PHYSDEVOP_irq_status_query:
-        case PHYSDEVOP_get_free_pirq:
-            return compat_physdev_op(cmd, arg);
-        break;
-    default:
-            return -ENOSYS;
-        break;
-    }
+    if ( curr->arch.hvm_vcpu.hcall_64bit )
+        return do_physdev_op(cmd, arg);
+    else
+        return compat_physdev_op(cmd, arg);
 }
 
 #define HYPERCALL(x)                                         \
@@ -118,15 +107,13 @@ static long hvm_physdev_op_compat32(
     [ __HYPERVISOR_ ## x ] = { (hypercall_fn_t *) do_ ## x,  \
                                (hypercall_fn_t *) compat_ ## x }
 
-#define do_physdev_op         hvm_physdev_op
-#define compat_physdev_op     hvm_physdev_op_compat32
 #define do_arch_1             paging_domctl_continuation
 
 static const hypercall_table_t hvm_hypercall_table[] = {
     HVM_CALL(memory_op),
     HVM_CALL(grant_table_op),
     COMPAT_CALL(vcpu_op),
-    COMPAT_CALL(physdev_op),
+    HVM_CALL(physdev_op),
     COMPAT_CALL(xen_version),
     HYPERCALL(console_io),
     HYPERCALL(event_channel_op),
@@ -146,8 +133,6 @@ static const hypercall_table_t hvm_hypercall_table[] = {
     HYPERCALL(arch_1)
 };
 
-#undef do_physdev_op
-#undef compat_physdev_op
 #undef do_arch_1
 
 #undef HYPERCALL
