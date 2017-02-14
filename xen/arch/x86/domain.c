@@ -2225,9 +2225,7 @@ unsigned long hypercall_create_continuation(
 
         regs->rax = op;
 
-        if ( is_pv_vcpu(curr) ?
-             !is_pv_32bit_vcpu(curr) :
-             curr->arch.hvm_vcpu.hcall_64bit )
+        if ( !curr->hcall_compat )
         {
             for ( i = 0; *p != '\0'; i++ )
             {

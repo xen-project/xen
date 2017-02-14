@@ -205,6 +205,10 @@ struct vcpu
 
     /* A hypercall has been preempted. */
     bool             hcall_preempted;
+#ifdef CONFIG_COMPAT
+    /* A hypercall is using the compat ABI? */
+    bool             hcall_compat;
+#endif
 
 
     /*

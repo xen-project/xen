@@ -3253,8 +3253,7 @@ unsigned long copy_to_user_hvm(void *to, const void *from, unsigned int len)
 {
     int rc;
 
-    if ( !current->arch.hvm_vcpu.hcall_64bit &&
-         is_compat_arg_xlat_range(to, len) )
+    if ( current->hcall_compat && is_compat_arg_xlat_range(to, len) )
     {
         memcpy(to, from, len);
         return 0;
@@ -3268,8 +3267,7 @@ unsigned long clear_user_hvm(void *to, unsigned int len)
 {
     int rc;
 
-    if ( !current->arch.hvm_vcpu.hcall_64bit &&
-         is_compat_arg_xlat_range(to, len) )
+    if ( current->hcall_compat && is_compat_arg_xlat_range(to, len) )
     {
         memset(to, 0x00, len);
         return 0;
@@ -3283,8 +3281,7 @@ unsigned long copy_from_user_hvm(void *to, const void *from, unsigned len)
 {
     int rc;
 
-    if ( !current->arch.hvm_vcpu.hcall_64bit &&
-         is_compat_arg_xlat_range(from, len) )
+    if ( current->hcall_compat && is_compat_arg_xlat_range(from, len) )
     {
         memcpy(to, from, len);
         return 0;

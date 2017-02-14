@@ -234,7 +234,9 @@ void pv_hypercall(struct cpu_user_regs *regs)
             __trace_hypercall(TRC_PV_HYPERCALL_V2, eax, args);
         }
 
+        curr->hcall_compat = true;
         regs->_eax = pv_hypercall_table[eax].compat(ebx, ecx, edx, esi, edi, ebp);
+        curr->hcall_compat = false;
 
 #ifndef NDEBUG
         if ( !curr->hcall_preempted )

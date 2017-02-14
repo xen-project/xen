@@ -35,7 +35,7 @@ static long hvm_memory_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         return -ENOSYS;
     }
 
-    if ( curr->arch.hvm_vcpu.hcall_64bit )
+    if ( !curr->hcall_compat )
         rc = do_memory_op(cmd, arg);
     else
         rc = compat_memory_op(cmd, arg);
@@ -65,7 +65,7 @@ static long hvm_grant_table_op(
         return -ENOSYS;
     }
 
-    if ( current->arch.hvm_vcpu.hcall_64bit )
+    if ( !current->hcall_compat )
         return do_grant_table_op(cmd, uop, count);
     else
         return compat_grant_table_op(cmd, uop, count);
@@ -89,7 +89,7 @@ static long hvm_physdev_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         break;
     }
 
-    if ( curr->arch.hvm_vcpu.hcall_64bit )
+    if ( !curr->hcall_compat )
         return do_physdev_op(cmd, arg);
     else
         return compat_physdev_op(cmd, arg);
@@ -203,11 +203,8 @@ int hvm_hypercall(struct cpu_user_regs *regs)
         }
 #endif
 
-        curr->arch.hvm_vcpu.hcall_64bit = 1;
         regs->rax = hvm_hypercall_table[eax].native(rdi, rsi, rdx, r10, r8,
                                                     r9);
-
-        curr->arch.hvm_vcpu.hcall_64bit = 0;
 
 #ifndef NDEBUG
         if ( !curr->hcall_preempted )
@@ -250,8 +247,10 @@ int hvm_hypercall(struct cpu_user_regs *regs)
         }
 #endif
 
+        curr->hcall_compat = true;
         regs->rax = hvm_hypercall_table[eax].compat(ebx, ecx, edx, esi, edi,
                                                     ebp);
+        curr->hcall_compat = false;
 
 #ifndef NDEBUG
         if ( !curr->hcall_preempted )

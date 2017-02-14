@@ -166,8 +166,6 @@ struct hvm_vcpu {
     bool                debug_state_latch;
     bool                single_step;
 
-    bool                hcall_64bit;
-
     struct hvm_vcpu_asid n1asid;
 
     u32                 msr_tsc_aux;
