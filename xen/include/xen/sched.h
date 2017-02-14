@@ -203,6 +203,9 @@ struct vcpu
     /* VCPU need affinity restored */
     bool             affinity_broken;
 
+    /* A hypercall has been preempted. */
+    bool             hcall_preempted;
+
 
     /*
      * > 0: a single port is being polled;

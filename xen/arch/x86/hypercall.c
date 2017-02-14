@@ -141,9 +141,6 @@ static const hypercall_table_t pv_hypercall_table[] = {
 void pv_hypercall(struct cpu_user_regs *regs)
 {
     struct vcpu *curr = current;
-#ifndef NDEBUG
-    unsigned long old_rip = regs->rip;
-#endif
     unsigned long eax;
 
     ASSERT(guest_kernel_mode(curr, regs));
@@ -159,6 +156,8 @@ void pv_hypercall(struct cpu_user_regs *regs)
         regs->rax = -ENOSYS;
         return;
     }
+
+    curr->hcall_preempted = false;
 
     if ( !is_pv_32bit_vcpu(curr) )
     {
@@ -191,7 +190,7 @@ void pv_hypercall(struct cpu_user_regs *regs)
         regs->rax = pv_hypercall_table[eax].native(rdi, rsi, rdx, r10, r8, r9);
 
 #ifndef NDEBUG
-        if ( regs->rip == old_rip )
+        if ( !curr->hcall_preempted )
         {
             /* Deliberately corrupt parameter regs used by this hypercall. */
             switch ( hypercall_args_table[eax].native )
@@ -238,7 +237,7 @@ void pv_hypercall(struct cpu_user_regs *regs)
         regs->_eax = pv_hypercall_table[eax].compat(ebx, ecx, edx, esi, edi, ebp);
 
 #ifndef NDEBUG
-        if ( regs->rip == old_rip )
+        if ( !curr->hcall_preempted )
         {
             /* Deliberately corrupt parameter regs used by this hypercall. */
             switch ( hypercall_args_table[eax].compat )
@@ -253,6 +252,14 @@ void pv_hypercall(struct cpu_user_regs *regs)
         }
 #endif
     }
+
+    /*
+     * PV guests use SYSCALL or INT $0x82 to make a hypercall, both of which
+     * have trap semantics.  If the hypercall has been preempted, rewind the
+     * instruction pointer to reexecute the instruction.
+     */
+    if ( curr->hcall_preempted )
+        regs->rip -= 2;
 
     perfc_incr(hypercalls);
 }

@@ -176,7 +176,7 @@ int hvm_hypercall(struct cpu_user_regs *regs)
         return HVM_HCALL_completed;
     }
 
-    curr->arch.hvm_vcpu.hcall_preempted = 0;
+    curr->hcall_preempted = false;
 
     if ( mode == 8 )
     {
@@ -210,7 +210,7 @@ int hvm_hypercall(struct cpu_user_regs *regs)
         curr->arch.hvm_vcpu.hcall_64bit = 0;
 
 #ifndef NDEBUG
-        if ( !curr->arch.hvm_vcpu.hcall_preempted )
+        if ( !curr->hcall_preempted )
         {
             /* Deliberately corrupt parameter regs used by this hypercall. */
             switch ( hypercall_args_table[eax].native )
@@ -254,7 +254,7 @@ int hvm_hypercall(struct cpu_user_regs *regs)
                                                     ebp);
 
 #ifndef NDEBUG
-        if ( !curr->arch.hvm_vcpu.hcall_preempted )
+        if ( !curr->hcall_preempted )
         {
             /* Deliberately corrupt parameter regs used by this hypercall. */
             switch ( hypercall_args_table[eax].compat )
@@ -272,7 +272,7 @@ int hvm_hypercall(struct cpu_user_regs *regs)
 
     HVM_DBG_LOG(DBG_LEVEL_HCALL, "hcall%lu -> %lx", eax, regs->rax);
 
-    if ( curr->arch.hvm_vcpu.hcall_preempted )
+    if ( curr->hcall_preempted )
         return HVM_HCALL_preempted;
 
     if ( unlikely(currd->arch.hvm_domain.qemu_mapcache_invalidate) &&

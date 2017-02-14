@@ -2197,20 +2197,12 @@ void sync_vcpu_execstate(struct vcpu *v)
 
 void hypercall_cancel_continuation(void)
 {
-    struct cpu_user_regs *regs = guest_cpu_user_regs();
     struct mc_state *mcs = &current->mc_state;
 
     if ( mcs->flags & MCSF_in_multicall )
-    {
         __clear_bit(_MCSF_call_preempted, &mcs->flags);
-    }
     else
-    {
-        if ( is_pv_vcpu(current) )
-            regs->rip += 2; /* skip re-execute 'syscall' / 'int $xx' */
-        else
-            current->arch.hvm_vcpu.hcall_preempted = 0;
-    }
+        current->hcall_preempted = false;
 }
 
 unsigned long hypercall_create_continuation(
@@ -2238,11 +2230,7 @@ unsigned long hypercall_create_continuation(
 
         regs->rax = op;
 
-        /* Ensure the hypercall trap instruction is re-executed. */
-        if ( is_pv_vcpu(curr) )
-            regs->rip -= 2;  /* re-execute 'syscall' / 'int $xx' */
-        else
-            curr->arch.hvm_vcpu.hcall_preempted = 1;
+        curr->hcall_preempted = true;
 
         if ( is_pv_vcpu(curr) ?
              !is_pv_32bit_vcpu(curr) :
