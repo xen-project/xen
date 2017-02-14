@@ -348,12 +348,7 @@ void sync_vcpu_execstate(struct vcpu *v)
 
 void hypercall_cancel_continuation(void)
 {
-    struct mc_state *mcs = &current->mc_state;
-
-    if ( mcs->flags & MCSF_in_multicall )
-        __clear_bit(_MCSF_call_preempted, &mcs->flags);
-    else
-        current->hcall_preempted = false;
+    current->hcall_preempted = false;
 }
 
 unsigned long hypercall_create_continuation(
@@ -369,12 +364,12 @@ unsigned long hypercall_create_continuation(
     /* All hypercalls take at least one argument */
     BUG_ON( !p || *p == '\0' );
 
+    current->hcall_preempted = true;
+
     va_start(args, format);
 
     if ( mcs->flags & MCSF_in_multicall )
     {
-        __set_bit(_MCSF_call_preempted, &mcs->flags);
-
         for ( i = 0; *p != '\0'; i++ )
             mcs->call.args[i] = next_arg(p, args);
 
@@ -384,8 +379,6 @@ unsigned long hypercall_create_continuation(
     else
     {
         regs = guest_cpu_user_regs();
-
-        current->hcall_preempted = true;
 
 #ifdef CONFIG_ARM_64
         if ( !is_32bit_domain(current->domain) )

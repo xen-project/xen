@@ -2197,40 +2197,33 @@ void sync_vcpu_execstate(struct vcpu *v)
 
 void hypercall_cancel_continuation(void)
 {
-    struct mc_state *mcs = &current->mc_state;
-
-    if ( mcs->flags & MCSF_in_multicall )
-        __clear_bit(_MCSF_call_preempted, &mcs->flags);
-    else
-        current->hcall_preempted = false;
+    current->hcall_preempted = false;
 }
 
 unsigned long hypercall_create_continuation(
     unsigned int op, const char *format, ...)
 {
-    struct mc_state *mcs = &current->mc_state;
+    struct vcpu *curr = current;
+    struct mc_state *mcs = &curr->mc_state;
     const char *p = format;
     unsigned long arg;
     unsigned int i;
     va_list args;
 
+    curr->hcall_preempted = true;
+
     va_start(args, format);
 
     if ( mcs->flags & MCSF_in_multicall )
     {
-        __set_bit(_MCSF_call_preempted, &mcs->flags);
-
         for ( i = 0; *p != '\0'; i++ )
             mcs->call.args[i] = next_arg(p, args);
     }
     else
     {
         struct cpu_user_regs *regs = guest_cpu_user_regs();
-        struct vcpu *curr = current;
 
         regs->rax = op;
-
-        curr->hcall_preempted = true;
 
         if ( is_pv_vcpu(curr) ?
              !is_pv_32bit_vcpu(curr) :
@@ -2292,7 +2285,7 @@ int hypercall_xlat_continuation(unsigned int *id, unsigned int nr,
 
     if ( mcs->flags & MCSF_in_multicall )
     {
-        if ( !(mcs->flags & MCSF_call_preempted) )
+        if ( !current->hcall_preempted )
         {
             va_end(args);
             return 0;

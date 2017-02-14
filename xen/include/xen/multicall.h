@@ -11,9 +11,7 @@
 #endif
 
 #define _MCSF_in_multicall   0
-#define _MCSF_call_preempted 1
 #define MCSF_in_multicall    (1<<_MCSF_in_multicall)
-#define MCSF_call_preempted  (1<<_MCSF_call_preempted)
 struct mc_state {
     unsigned long flags;
     union {
