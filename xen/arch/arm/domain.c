@@ -348,17 +348,12 @@ void sync_vcpu_execstate(struct vcpu *v)
 
 void hypercall_cancel_continuation(void)
 {
-    struct cpu_user_regs *regs = guest_cpu_user_regs();
     struct mc_state *mcs = &current->mc_state;
 
     if ( mcs->flags & MCSF_in_multicall )
-    {
         __clear_bit(_MCSF_call_preempted, &mcs->flags);
-    }
     else
-    {
-        regs->pc += 4; /* undo re-execute 'hvc #XEN_HYPERCALL_TAG' */
-    }
+        current->hcall_preempted = false;
 }
 
 unsigned long hypercall_create_continuation(
@@ -390,8 +385,7 @@ unsigned long hypercall_create_continuation(
     {
         regs = guest_cpu_user_regs();
 
-        /* Ensure the hypercall trap instruction is re-executed. */
-        regs->pc -= 4;  /* re-execute 'hvc #XEN_HYPERCALL_TAG' */
+        current->hcall_preempted = true;
 
 #ifdef CONFIG_ARM_64
         if ( !is_32bit_domain(current->domain) )

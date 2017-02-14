@@ -1453,9 +1453,6 @@ static void do_trap_hypercall(struct cpu_user_regs *regs, register_t *nr,
                               unsigned long iss)
 {
     arm_hypercall_fn_t call = NULL;
-#ifndef NDEBUG
-    register_t orig_pc = regs->pc;
-#endif
 
     BUILD_BUG_ON(NR_hypercalls < ARRAY_SIZE(arm_hypercall_table) );
 
@@ -1469,6 +1466,8 @@ static void do_trap_hypercall(struct cpu_user_regs *regs, register_t *nr,
         return;
     }
 
+    current->hcall_preempted = false;
+
     perfc_incra(hypercalls, *nr);
     call = arm_hypercall_table[*nr].fn;
     if ( call == NULL )
@@ -1480,12 +1479,9 @@ static void do_trap_hypercall(struct cpu_user_regs *regs, register_t *nr,
     HYPERCALL_RESULT_REG(regs) = call(HYPERCALL_ARGS(regs));
 
 #ifndef NDEBUG
-    /*
-     * Clobber argument registers only if pc is unchanged, otherwise
-     * this is a hypercall continuation.
-     */
-    if ( orig_pc == regs->pc )
+    if ( !current->hcall_preempted )
     {
+        /* Deliberately corrupt parameter regs used by this hypercall. */
         switch ( arm_hypercall_table[*nr].nr_args ) {
         case 5: HYPERCALL_ARG5(regs) = 0xDEADBEEF;
         case 4: HYPERCALL_ARG4(regs) = 0xDEADBEEF;
@@ -1498,6 +1494,10 @@ static void do_trap_hypercall(struct cpu_user_regs *regs, register_t *nr,
         *nr = 0xDEADBEEF;
     }
 #endif
+
+    /* Ensure the hypercall trap instruction is re-executed. */
+    if ( current->hcall_preempted )
+        regs->pc -= 4;  /* re-execute 'hvc #XEN_HYPERCALL_TAG' */
 }
 
 static bool check_multicall_32bit_clean(struct multicall_entry *multi)
