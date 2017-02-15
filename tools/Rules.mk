@@ -15,6 +15,7 @@ XEN_LIBXENEVTCHN   = $(XEN_ROOT)/tools/libs/evtchn
 XEN_LIBXENGNTTAB   = $(XEN_ROOT)/tools/libs/gnttab
 XEN_LIBXENCALL     = $(XEN_ROOT)/tools/libs/call
 XEN_LIBXENFOREIGNMEMORY = $(XEN_ROOT)/tools/libs/foreignmemory
+XEN_LIBXENDEVICEMODEL = $(XEN_ROOT)/tools/libs/devicemodel
 XEN_LIBXC          = $(XEN_ROOT)/tools/libxc
 XEN_XENLIGHT       = $(XEN_ROOT)/tools/libxl
 XEN_XENSTORE       = $(XEN_ROOT)/tools/xenstore
@@ -117,10 +118,15 @@ CFLAGS_libxenforeignmemory = -I$(XEN_LIBXENFOREIGNMEMORY)/include $(CFLAGS_xenin
 LDLIBS_libxenforeignmemory = $(XEN_LIBXENFOREIGNMEMORY)/libxenforeignmemory$(libextension)
 SHLIB_libxenforeignmemory  = -Wl,-rpath-link=$(XEN_LIBXENFOREIGNMEMORY)
 
+CFLAGS_libxendevicemodel = -I$(XEN_LIBXENDEVICEMODEL)/include $(CFLAGS_xeninclude)
+SHDEPS_libxendevicemodel = $(SHLIB_libxentoollog)
+LDLIBS_libxendevicemodel = $(XEN_LIBXENDEVICEMODEL)/libxendevicemodel$(libextension)
+SHLIB_libxendevicemodel  = -Wl,-rpath-link=$(XEN_LIBXENDEVICEMODEL)
+
 # code which compiles against libxenctrl get __XEN_TOOLS__ and
 # therefore sees the unstable hypercall interfaces.
-CFLAGS_libxenctrl = -I$(XEN_LIBXC)/include $(CFLAGS_libxentoollog) $(CFLAGS_libxenforeignmemory) $(CFLAGS_xeninclude) -D__XEN_TOOLS__
-SHDEPS_libxenctrl = $(SHLIB_libxentoollog) $(SHLIB_libxenevtchn) $(SHLIB_libxengnttab) $(SHLIB_libxengntshr) $(SHLIB_libxencall) $(SHLIB_libxenforeignmemory)
+CFLAGS_libxenctrl = -I$(XEN_LIBXC)/include $(CFLAGS_libxentoollog) $(CFLAGS_libxenforeignmemory) $(CFLAGS_libxendevicemodel) $(CFLAGS_xeninclude) -D__XEN_TOOLS__
+SHDEPS_libxenctrl = $(SHLIB_libxentoollog) $(SHLIB_libxenevtchn) $(SHLIB_libxengnttab) $(SHLIB_libxengntshr) $(SHLIB_libxencall) $(SHLIB_libxenforeignmemory) $(SHLIB_libxendevicemodel)
 LDLIBS_libxenctrl = $(SHDEPS_libxenctrl) $(XEN_LIBXC)/libxenctrl$(libextension)
 SHLIB_libxenctrl  = $(SHDEPS_libxenctrl) -Wl,-rpath-link=$(XEN_LIBXC)
 

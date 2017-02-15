@@ -281,6 +281,7 @@ subdir-all-qemu-xen-dir: qemu-xen-dir-find
 		-Wl,-rpath-link=$(XEN_ROOT)/tools/libs/gnttab \
 		-Wl,-rpath-link=$(XEN_ROOT)/tools/libs/call \
 		-Wl,-rpath-link=$(XEN_ROOT)/tools/libs/foreignmemory \
+		-Wl,-rpath-link=$(XEN_ROOT)/tools/libs/devicemodel \
 		$(QEMU_UPSTREAM_RPATH)" \
 		--bindir=$(LIBEXEC_BIN) \
 		--datadir=$(SHAREDIR)/qemu-xen \

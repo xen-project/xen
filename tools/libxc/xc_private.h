@@ -36,6 +36,7 @@
 
 #include <xencall.h>
 #include <xenforeignmemory.h>
+#include <xendevicemodel.h>
 
 #include <xen/sys/privcmd.h>
 
@@ -97,6 +98,9 @@ struct xc_interface_core {
 
     /* Foreign mappings */
     xenforeignmemory_handle *fmem;
+
+    /* Device model */
+    xendevicemodel_handle *dmod;
 };
 
 int osdep_privcmd_open(xc_interface *xch);

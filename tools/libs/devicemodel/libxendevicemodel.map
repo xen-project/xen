@@ -1,0 +1,6 @@
+VERS_1.0 {
+	global:
+		xendevicemodel_open;
+		xendevicemodel_close;
+	local: *; /* Do not expose anything by default */
+};

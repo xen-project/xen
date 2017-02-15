@@ -113,6 +113,7 @@ CFLAGS-$(CONFIG_Linux) += -D_GNU_SOURCE
 CFLAGS	+= $(PTHREAD_CFLAGS)
 CFLAGS	+= $(CFLAGS_libxentoollog)
 CFLAGS	+= $(CFLAGS_libxenevtchn)
+CFLAGS	+= $(CFLAGS_libxendevicemodel)
 
 CTRL_LIB_OBJS := $(patsubst %.c,%.o,$(CTRL_SRCS-y))
 CTRL_PIC_OBJS := $(patsubst %.c,%.opic,$(CTRL_SRCS-y))
@@ -217,7 +218,7 @@ libxenctrl.so.$(MAJOR): libxenctrl.so.$(MAJOR).$(MINOR)
 	$(SYMLINK_SHLIB) $< $@
 
 libxenctrl.so.$(MAJOR).$(MINOR): $(CTRL_PIC_OBJS)
-	$(CC) $(LDFLAGS) $(PTHREAD_LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libxenctrl.so.$(MAJOR) $(SHLIB_LDFLAGS) -o $@ $^ $(LDLIBS_libxentoollog) $(LDLIBS_libxenevtchn) $(LDLIBS_libxengnttab) $(LDLIBS_libxengntshr) $(LDLIBS_libxencall) $(LDLIBS_libxenforeignmemory) $(PTHREAD_LIBS) $(APPEND_LDFLAGS)
+	$(CC) $(LDFLAGS) $(PTHREAD_LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libxenctrl.so.$(MAJOR) $(SHLIB_LDFLAGS) -o $@ $^ $(LDLIBS_libxentoollog) $(LDLIBS_libxenevtchn) $(LDLIBS_libxengnttab) $(LDLIBS_libxengntshr) $(LDLIBS_libxencall) $(LDLIBS_libxenforeignmemory) $(LDLIBS_libxendevicemodel) $(PTHREAD_LIBS) $(APPEND_LDFLAGS)
 
 # libxenguest
 

@@ -7,5 +7,6 @@ SUBDIRS-y += evtchn
 SUBDIRS-y += gnttab
 SUBDIRS-y += call
 SUBDIRS-y += foreignmemory
+SUBDIRS-y += devicemodel
 
 all clean install distclean: %: subdirs-%

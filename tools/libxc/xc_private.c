@@ -67,9 +67,14 @@ struct xc_interface_core *xc_interface_open(xentoollog_logger *logger,
     if ( xch->fmem == NULL )
         goto err;
 
+    xch->dmod = xendevicemodel_open(xch->error_handler, 0);
+    if ( xch->dmod == NULL )
+        goto err;
+
     return xch;
 
  err:
+    xenforeignmemory_close(xch->fmem);
     xencall_close(xch->xcall);
     xtl_logger_destroy(xch->error_handler_tofree);
     if (xch != &xch_buf) free(xch);
@@ -88,6 +93,9 @@ int xc_interface_close(xc_interface *xch)
 
     rc = xenforeignmemory_close(xch->fmem);
     if (rc) PERROR("Could not close foreign memory interface");
+
+    rc = xendevicemodel_close(xch->dmod);
+    if (rc) PERROR("Could not close device model interface");
 
     xtl_logger_destroy(xch->dombuild_logger_tofree);
     xtl_logger_destroy(xch->error_handler_tofree);

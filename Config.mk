@@ -269,7 +269,7 @@ MINIOS_UPSTREAM_URL ?= git://xenbits.xen.org/mini-os.git
 endif
 OVMF_UPSTREAM_REVISION ?= 5734d486b6aa0b69a39b2c8d52b355400bcf2551
 QEMU_UPSTREAM_REVISION ?= master
-MINIOS_UPSTREAM_REVISION ?= 1e8e464febb32428c7651b0b585866e5ee5f786e
+MINIOS_UPSTREAM_REVISION ?= ca013fa9baf92f47469ba1f2e1aaa31c41d8a0bb
 # Tue Dec 13 15:02:02 2016 +0000
 # build: prepend OBJ_DIR to linker script
 
@@ -280,9 +280,9 @@ SEABIOS_UPSTREAM_REVISION ?= rel-1.10.0
 ETHERBOOT_NICS ?= rtl8139 8086100e
 
 
-QEMU_TRADITIONAL_REVISION ?= 83256b312acfddda34d96e9bba30e93387481091
-# Wed Feb 22 16:25:19 2017 +0000
-# cirrus: add blit_is_unsafe call to cirrus_bitblt_cputovideo
+QEMU_TRADITIONAL_REVISION ?= 8b4834ee1202852ed83a9fc61268c65fb6961ea7
+# Wed Feb 22 11:00:38 2017 +0000
+# Request compatibility interface for device model operations
 
 # Specify which qemu-dm to use. This may be `ioemu' to use the old
 # Mercurial in-tree version, or a local directory, or a git URL.
