@@ -418,8 +418,7 @@ void iommu_domain_destroy(struct domain *d)
     if ( !iommu_enabled || !hd->platform_ops )
         return;
 
-    if ( need_iommu(d) )
-        iommu_teardown(d);
+    iommu_teardown(d);
 
     list_for_each_safe ( ioport_list, tmp, &hd->g2m_ioport_list )
     {
