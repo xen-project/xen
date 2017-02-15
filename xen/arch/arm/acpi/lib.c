@@ -23,7 +23,6 @@
 
 #include <xen/acpi.h>
 #include <xen/mm.h>
-#include <asm/config.h>
 
 char *__acpi_map_table(paddr_t phys, unsigned long size)
 {

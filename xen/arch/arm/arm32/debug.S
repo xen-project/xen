@@ -17,7 +17,6 @@
  * GNU General Public License for more details.
  */
 
-#include <asm/config.h>
 #include <asm/early_printk.h>
 
 #ifdef EARLY_PRINTK_INC
