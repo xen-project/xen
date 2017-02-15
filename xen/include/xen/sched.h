@@ -139,7 +139,7 @@ void evtchn_destroy_final(struct domain *d); /* from complete_domain_destroy */
 
 struct waitqueue_vcpu;
 
-struct vcpu 
+struct vcpu
 {
     int              vcpu_id;
 
@@ -176,20 +176,20 @@ struct vcpu
     uint64_t last_run_time;
 
     /* Has the FPU been initialised? */
-    bool_t           fpu_initialised;
+    bool             fpu_initialised;
     /* Has the FPU been used since it was last saved? */
-    bool_t           fpu_dirtied;
+    bool             fpu_dirtied;
     /* Initialization completed for this VCPU? */
-    bool_t           is_initialised;
+    bool             is_initialised;
     /* Currently running on a CPU? */
-    bool_t           is_running;
+    bool             is_running;
     /* VCPU should wake fast (do not deep sleep the CPU). */
-    bool_t           is_urgent;
+    bool             is_urgent;
 
 #ifdef VCPU_TRAP_LAST
 #define VCPU_TRAP_NONE    0
     struct {
-        bool_t           pending;
+        bool             pending;
         uint8_t          old_mask;
     }                async_exception_state[VCPU_TRAP_LAST];
 #define async_exception_state(t) async_exception_state[(t)-1]
@@ -197,11 +197,11 @@ struct vcpu
 #endif
 
     /* Require shutdown to be deferred for some asynchronous operation? */
-    bool_t           defer_shutdown;
+    bool             defer_shutdown;
     /* VCPU is paused following shutdown request (d->is_shutting_down)? */
-    bool_t           paused_for_shutdown;
+    bool             paused_for_shutdown;
     /* VCPU need affinity restored */
-    bool_t           affinity_broken;
+    bool             affinity_broken;
 
 
     /*
@@ -222,7 +222,7 @@ struct vcpu
     /* VCPU paused by system controller. */
     int              controller_pause_count;
 
-    /* Maptrack */
+    /* Grant table map tracking. */
     unsigned int     maptrack_head;
     unsigned int     maptrack_tail;
 
@@ -375,17 +375,17 @@ struct domain
     s8               need_iommu;
 #endif
     /* is node-affinity automatically computed? */
-    bool_t           auto_node_affinity;
+    bool             auto_node_affinity;
     /* Is this guest fully privileged (aka dom0)? */
-    bool_t           is_privileged;
+    bool             is_privileged;
     /* Is this a xenstore domain (not dom0)? */
-    bool_t           is_xenstore;
+    bool             is_xenstore;
     /* Domain's VCPUs are pinned 1:1 to physical CPUs? */
-    bool_t           is_pinned;
+    bool             is_pinned;
     /* Non-migratable and non-restoreable? */
-    bool_t           disable_migrate;
+    bool             disable_migrate;
     /* Is this guest being debugged by dom0? */
-    bool_t           debugger_attached;
+    bool             debugger_attached;
     /*
      * Set to true at the very end of domain creation, when the domain is
      * unpaused for the first time by the systemcontroller.
@@ -408,8 +408,8 @@ struct domain
 
     /* Guest has shut down (inc. reason code)? */
     spinlock_t       shutdown_lock;
-    bool_t           is_shutting_down; /* in process of shutting down? */
-    bool_t           is_shut_down;     /* fully shut down? */
+    bool             is_shutting_down; /* in process of shutting down? */
+    bool             is_shut_down;     /* fully shut down? */
 #define SHUTDOWN_CODE_INVALID ~0u
     unsigned int     shutdown_code;
 
@@ -558,7 +558,7 @@ struct domain *domain_create(domid_t domid, unsigned int domcr_flags,
 /*
  * rcu_lock_domain_by_id() is more efficient than get_domain_by_id().
  * This is the preferred function if the returned domain reference
- * is short lived,  but it cannot be used if the domain reference needs 
+ * is short lived,  but it cannot be used if the domain reference needs
  * to be kept beyond the current scope (e.g., across a softirq).
  * The returned domain reference must be discarded using rcu_unlock_domain().
  */
@@ -675,7 +675,7 @@ void sync_local_execstate(void);
  * sync_vcpu_execstate() will switch and commit @prev's state.
  */
 void context_switch(
-    struct vcpu *prev, 
+    struct vcpu *prev,
     struct vcpu *next);
 
 /*
@@ -853,7 +853,7 @@ uint64_t get_cpu_idle_time(unsigned int cpu);
 void watchdog_domain_init(struct domain *d);
 void watchdog_domain_destroy(struct domain *d);
 
-/* 
+/*
  * Use this check when the following are both true:
  *  - Using this feature or interface requires full access to the hardware
  *    (that is, this would not be suitable for a driver domain)
@@ -882,7 +882,7 @@ void watchdog_domain_destroy(struct domain *d);
 #define need_iommu(d)    (0)
 #endif
 
-static inline bool_t is_vcpu_online(const struct vcpu *v)
+static inline bool is_vcpu_online(const struct vcpu *v)
 {
     return !test_bit(_VPF_down, &v->pause_flags);
 }
@@ -890,7 +890,7 @@ static inline bool_t is_vcpu_online(const struct vcpu *v)
 void set_vcpu_migration_delay(unsigned int delay);
 unsigned int get_vcpu_migration_delay(void);
 
-extern bool_t sched_smt_power_savings;
+extern bool sched_smt_power_savings;
 
 extern enum cpufreq_controller {
     FREQCTL_none, FREQCTL_dom0_kernel, FREQCTL_xen
