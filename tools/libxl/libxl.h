@@ -2086,6 +2086,12 @@ int libxl_tmem_shared_auth(libxl_ctx *ctx, uint32_t domid, char* uuid,
 int libxl_tmem_freeable(libxl_ctx *ctx);
 
 int libxl_get_freecpus(libxl_ctx *ctx, libxl_bitmap *cpumap);
+
+/*
+ * Set poolid to LIBXL_CPUOOL_POOLID_ANY to have Xen choose a
+ * free poolid for you.
+ */
+#define LIBXL_CPUPOOL_POOLID_ANY 0xFFFFFFFF
 int libxl_cpupool_create(libxl_ctx *ctx, const char *name,
                          libxl_scheduler sched,
                          libxl_bitmap cpumap, libxl_uuid *uuid,

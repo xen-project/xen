@@ -8368,7 +8368,7 @@ int main_cpupoolcreate(int argc, char **argv)
     printf("number of cpus: %d\n", n_cpus);
 
     if (!dryrun_only) {
-        poolid = 0;
+        poolid = LIBXL_CPUPOOL_POOLID_ANY;
         if (libxl_cpupool_create(ctx, name, sched, cpumap, &uuid, &poolid)) {
             fprintf(stderr, "error on creating cpupool\n");
             goto out_cfg;

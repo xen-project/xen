@@ -139,8 +139,12 @@ int libxl_cpupool_create(libxl_ctx *ctx, const char *name,
     char *uuid_string;
     uint32_t xcpoolid;
 
-    /* Zero means "choose a poolid for me" */
-    xcpoolid = (*poolid) ? (*poolid) : XC_CPUPOOL_POOLID_ANY;
+    /* Accept '0' as 'any poolid' for backwards compatibility */
+    if ( *poolid == LIBXL_CPUPOOL_POOLID_ANY
+         || *poolid == 0 )
+        xcpoolid = XC_CPUPOOL_POOLID_ANY;
+    else
+        xcpoolid = *poolid;
 
     uuid_string = libxl__uuid2string(gc, *uuid);
     if (!uuid_string) {
