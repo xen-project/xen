@@ -2255,7 +2255,8 @@ static void device_disk_add(libxl__egc *egc, uint32_t domid,
             case LIBXL_DISK_BACKEND_QDISK:
                 flexarray_append(back, "params");
                 flexarray_append(back, GCSPRINTF("%s:%s",
-                              libxl__device_disk_string_of_format(disk->format), disk->pdev_path));
+                              libxl__device_disk_string_of_format(disk->format),
+                              disk->pdev_path ? : ""));
                 if (libxl_defbool_val(disk->colo_enable)) {
                     flexarray_append(back, "colo-host");
                     flexarray_append(back, libxl__sprintf(gc, "%s", disk->colo_host));
