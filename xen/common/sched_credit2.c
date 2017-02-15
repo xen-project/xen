@@ -129,35 +129,47 @@
 /*
  * Basic constants
  */
-/* Default weight: How much a new domain starts with */
+/* Default weight: How much a new domain starts with. */
 #define CSCHED2_DEFAULT_WEIGHT       256
-/* Min timer: Minimum length a timer will be set, to
- * achieve efficiency */
+/*
+ * Min timer: Minimum length a timer will be set, to
+ * achieve efficiency.
+ */
 #define CSCHED2_MIN_TIMER            MICROSECS(500)
-/* Amount of credit VMs begin with, and are reset to.
+/*
+ * Amount of credit VMs begin with, and are reset to.
  * ATM, set so that highest-weight VMs can only run for 10ms
- * before a reset event. */
+ * before a reset event.
+ */
 #define CSCHED2_CREDIT_INIT          MILLISECS(10)
-/* Carryover: How much "extra" credit may be carried over after
- * a reset. */
+/*
+ * Amount of credit the idle vcpus have. It never changes, as idle
+ * vcpus does not consume credits, and it must be lower than whatever
+ * amount of credit 'regular' vcpu would end up with.
+ */
+#define CSCHED2_IDLE_CREDIT          (-(1U<<30))
+/*
+ * Carryover: How much "extra" credit may be carried over after
+ * a reset.
+ */
 #define CSCHED2_CARRYOVER_MAX        CSCHED2_MIN_TIMER
-/* Stickiness: Cross-L2 migration resistance.  Should be less than
- * MIN_TIMER. */
+/*
+ * Stickiness: Cross-L2 migration resistance.  Should be less than
+ * MIN_TIMER.
+ */
 #define CSCHED2_MIGRATE_RESIST       ((opt_migrate_resist)*MICROSECS(1))
-/* How much to "compensate" a vcpu for L2 migration */
+/* How much to "compensate" a vcpu for L2 migration. */
 #define CSCHED2_MIGRATE_COMPENSATION MICROSECS(50)
 /* Reset: Value below which credit will be reset. */
 #define CSCHED2_CREDIT_RESET         0
 /* Max timer: Maximum time a guest can be run for. */
 #define CSCHED2_MAX_TIMER            CSCHED2_CREDIT_INIT
 
-
-#define CSCHED2_IDLE_CREDIT                 (-(1<<30))
-
 /*
  * Flags
  */
-/* CSFLAG_scheduled: Is this vcpu either running on, or context-switching off,
+/*
+ * CSFLAG_scheduled: Is this vcpu either running on, or context-switching off,
  * a physical cpu?
  * + Accessed only with runqueue lock held
  * + Set when chosen as next in csched2_schedule().
@@ -167,8 +179,9 @@
  * + Checked to be false in runq_insert.
  */
 #define __CSFLAG_scheduled 1
-#define CSFLAG_scheduled (1<<__CSFLAG_scheduled)
-/* CSFLAG_delayed_runq_add: Do we need to add this to the runqueue once it'd done
+#define CSFLAG_scheduled (1U<<__CSFLAG_scheduled)
+/*
+ * CSFLAG_delayed_runq_add: Do we need to add this to the runqueue once it'd done
  * being context switched out?
  * + Set when scheduling out in csched2_schedule() if prev is runnable
  * + Set in csched2_vcpu_wake if it finds CSFLAG_scheduled set
@@ -176,20 +189,21 @@
  *   clears the bit.
  */
 #define __CSFLAG_delayed_runq_add 2
-#define CSFLAG_delayed_runq_add (1<<__CSFLAG_delayed_runq_add)
-/* CSFLAG_runq_migrate_request: This vcpu is being migrated as a result of a
+#define CSFLAG_delayed_runq_add (1U<<__CSFLAG_delayed_runq_add)
+/*
+ * CSFLAG_runq_migrate_request: This vcpu is being migrated as a result of a
  * credit2-initiated runq migrate request; migrate it to the runqueue indicated
  * in the svc struct. 
  */
 #define __CSFLAG_runq_migrate_request 3
-#define CSFLAG_runq_migrate_request (1<<__CSFLAG_runq_migrate_request)
+#define CSFLAG_runq_migrate_request (1U<<__CSFLAG_runq_migrate_request)
 /*
  * CSFLAG_vcpu_yield: this vcpu was running, and has called vcpu_yield(). The
  * scheduler is invoked to see if we can give the cpu to someone else, and
  * get back to the yielding vcpu in a while.
  */
 #define __CSFLAG_vcpu_yield 4
-#define CSFLAG_vcpu_yield (1<<__CSFLAG_vcpu_yield)
+#define CSFLAG_vcpu_yield (1U<<__CSFLAG_vcpu_yield)
 
 static unsigned int __read_mostly opt_migrate_resist = 500;
 integer_param("sched_credit2_migrate_resist", opt_migrate_resist);
