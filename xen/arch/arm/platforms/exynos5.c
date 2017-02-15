@@ -18,7 +18,6 @@
  */
 
 #include <asm/p2m.h>
-#include <xen/config.h>
 #include <xen/device_tree.h>
 #include <xen/domain_page.h>
 #include <xen/mm.h>

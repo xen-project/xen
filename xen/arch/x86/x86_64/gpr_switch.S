@@ -5,7 +5,6 @@
  * Copyright (c) 2006, Novell, Inc.
  */
 
-#include <xen/config.h>
 #include <asm/asm_defns.h>
 
 ENTRY(host_to_guest_gpr_switch)

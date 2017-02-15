@@ -7,7 +7,6 @@
  * Original code from Linux kernel 2.6.27 (Alan Cox <Alan.Cox@linux.org>)
  */
 
-#include <xen/config.h>
 #include <xen/init.h>
 #include <xen/notifier.h>
 

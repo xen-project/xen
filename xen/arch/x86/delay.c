@@ -10,7 +10,6 @@
  * we have to worry about.
  */
 
-#include <xen/config.h>
 #include <xen/delay.h>
 #include <xen/time.h>
 #include <asm/msr.h>

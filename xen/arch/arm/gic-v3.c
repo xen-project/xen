@@ -21,7 +21,6 @@
  * GNU General Public License for more details.
  */
 
-#include <xen/config.h>
 #include <xen/lib.h>
 #include <xen/init.h>
 #include <xen/cpu.h>

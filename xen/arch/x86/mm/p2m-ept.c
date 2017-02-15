@@ -15,7 +15,6 @@
  * this program; If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <xen/config.h>
 #include <xen/domain_page.h>
 #include <xen/sched.h>
 #include <asm/current.h>

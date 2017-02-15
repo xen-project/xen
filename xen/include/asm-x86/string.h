@@ -1,8 +1,6 @@
 #ifndef __X86_STRING_H__
 #define __X86_STRING_H__
 
-#include <xen/config.h>
-
 #define __HAVE_ARCH_MEMCPY
 #define memcpy(t,f,n) (__builtin_memcpy((t),(f),(n)))
 

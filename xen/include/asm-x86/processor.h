@@ -5,7 +5,6 @@
 #define __ASM_X86_PROCESSOR_H
 
 #ifndef __ASSEMBLY__
-#include <xen/config.h>
 #include <xen/cache.h>
 #include <xen/types.h>
 #include <xen/smp.h>

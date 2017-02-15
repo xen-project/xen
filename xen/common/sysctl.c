@@ -6,7 +6,6 @@
  * Copyright (c) 2002-2006, K Fraser
  */
 
-#include <xen/config.h>
 #include <xen/types.h>
 #include <xen/lib.h>
 #include <xen/mm.h>

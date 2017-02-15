@@ -50,7 +50,6 @@
  * http://www.amd.com/us-en/assets/content_type/white_papers_and_tech_docs/32559.pdf
  */
 
-#include <xen/config.h>
 #include <xen/init.h>
 #include <xen/types.h>
 #include <xen/kernel.h>

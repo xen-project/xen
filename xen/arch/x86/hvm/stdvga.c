@@ -27,7 +27,6 @@
  *  can have side effects.
  */
 
-#include <xen/config.h>
 #include <xen/types.h>
 #include <xen/sched.h>
 #include <xen/domain_page.h>

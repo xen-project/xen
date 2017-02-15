@@ -20,7 +20,6 @@
  * this program; If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <xen/config.h>
 #include <xen/lib.h>
 #include <xen/version.h>
 #include <public/version.h>

@@ -14,7 +14,6 @@
  * License along with this program; If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <xen/config.h>
 #include <xen/sched.h>
 #include <xen/compile.h>
 #include <xen/mm.h>

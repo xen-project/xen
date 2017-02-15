@@ -5,7 +5,6 @@
  */
 #define COMPILE_OFFSETS
 
-#include <xen/config.h>
 #include <xen/perfc.h>
 #include <xen/sched.h>
 #include <xen/bitops.h>

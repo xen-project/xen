@@ -2,7 +2,6 @@
 #ifndef __X86_UACCESS_H__
 #define __X86_UACCESS_H__
 
-#include <xen/config.h>
 #include <xen/compiler.h>
 #include <xen/errno.h>
 #include <xen/prefetch.h>

@@ -24,7 +24,6 @@
  *  Ported to xen by using virtual IRQ line.
  */
 
-#include <xen/config.h>
 #include <xen/types.h>
 #include <xen/mm.h>
 #include <xen/xmalloc.h>

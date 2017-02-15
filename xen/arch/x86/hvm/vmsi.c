@@ -24,7 +24,6 @@
  * Will be merged it with virtual IOAPIC logic, since most is the same
 */
 
-#include <xen/config.h>
 #include <xen/types.h>
 #include <xen/mm.h>
 #include <xen/xmalloc.h>

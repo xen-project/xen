@@ -10,7 +10,6 @@
  *      compression (see tools/symbols.c for a more complete description)
  */
 
-#include <xen/config.h>
 #include <xen/symbols.h>
 #include <xen/kernel.h>
 #include <xen/init.h>

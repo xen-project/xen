@@ -1,7 +1,6 @@
 #ifndef _ASM_HW_IRQ_H
 #define _ASM_HW_IRQ_H
 
-#include <xen/config.h>
 #include <xen/device_tree.h>
 
 #define NR_VECTORS 256 /* XXX */

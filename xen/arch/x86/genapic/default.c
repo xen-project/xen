@@ -1,7 +1,6 @@
 /* 
  * Default generic APIC driver. This handles upto 8 CPUs.
  */
-#include <xen/config.h>
 #include <xen/cpumask.h>
 #include <asm/current.h>
 #include <asm/mpspec.h>

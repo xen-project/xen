@@ -3,7 +3,6 @@
  * 
  * Generic x86 APIC driver probe layer.
  */  
-#include <xen/config.h>
 #include <xen/cpumask.h>
 #include <xen/string.h>
 #include <xen/kernel.h>

@@ -17,8 +17,6 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <xen/config.h>
-
 /*
  * x0: bits 4:0  bit offset
  *     bits 31:5 word offset

@@ -3,7 +3,6 @@
 
 /* (C) 1992, 1993 Linus Torvalds, (C) 1997 Ingo Molnar */
 
-#include <xen/config.h>
 #include <asm/atomic.h>
 #include <asm/numa.h>
 #include <xen/cpumask.h>

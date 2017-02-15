@@ -7,7 +7,6 @@
 #ifndef __X86_CURRENT_H__
 #define __X86_CURRENT_H__
 
-#include <xen/config.h>
 #include <xen/percpu.h>
 #include <public/xen.h>
 #include <asm/page.h>

@@ -17,7 +17,6 @@
  * GNU General Public License for more details.
  */
 
-#include <xen/config.h>
 #include <xen/lib.h>
 #include <xen/spinlock.h>
 #include <xen/irq.h>

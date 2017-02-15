@@ -1,7 +1,6 @@
 #ifndef __ASM_APIC_H
 #define __ASM_APIC_H
 
-#include <xen/config.h>
 #include <asm/apicdef.h>
 #include <asm/fixmap.h>
 #include <asm/msr.h>

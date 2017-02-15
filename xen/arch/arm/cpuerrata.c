@@ -1,4 +1,3 @@
-#include <xen/config.h>
 #include <asm/cpufeature.h>
 #include <asm/cpuerrata.h>
 

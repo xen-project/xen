@@ -17,7 +17,6 @@
  * along with this program; If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <xen/config.h>
 #include <xen/acpi.h>
 #include <xen/sched.h>
 #include <asm/p2m.h>

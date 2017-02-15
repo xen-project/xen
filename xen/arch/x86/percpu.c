@@ -1,4 +1,3 @@
-#include <xen/config.h>
 #include <xen/percpu.h>
 #include <xen/cpu.h>
 #include <xen/init.h>

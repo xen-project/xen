@@ -1,8 +1,6 @@
 #ifndef __X86_ASM_NOPS_H__
 #define __X86_ASM_NOPS_H__
 
-#include <xen/config.h>
-
 /*
  * Define nops for use with alternative().
  */

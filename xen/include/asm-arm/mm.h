@@ -1,7 +1,6 @@
 #ifndef __ARCH_ARM_MM__
 #define __ARCH_ARM_MM__
 
-#include <xen/config.h>
 #include <xen/kernel.h>
 #include <asm/page.h>
 #include <public/xen.h>

@@ -1,7 +1,6 @@
 /* Excerpts written by Martin Mares <mj@atrey.karlin.mff.cuni.cz> */
 /* Modified for i386/x86-64 Xen by Keir Fraser */
 
-#include <xen/config.h>
 #include <xen/cache.h>
 #include <asm/page.h>
 #include <asm/percpu.h>

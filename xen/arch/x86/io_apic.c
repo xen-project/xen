@@ -20,7 +20,6 @@
  *	Paul Diefenbaugh	:	Added full ACPI support
  */
 
-#include <xen/config.h>
 #include <xen/lib.h>
 #include <xen/init.h>
 #include <xen/irq.h>

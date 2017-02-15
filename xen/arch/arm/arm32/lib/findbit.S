@@ -13,9 +13,6 @@
  *   also call with zero size.
  * Reworked by rmk.
  */
-
-#include <xen/config.h>
-
 #include "assembler.h"
                 .text
 

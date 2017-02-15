@@ -1,7 +1,6 @@
 #ifndef __ASM_DOMAIN_H__
 #define __ASM_DOMAIN_H__
 
-#include <xen/config.h>
 #include <xen/cache.h>
 #include <xen/sched.h>
 #include <asm/page.h>

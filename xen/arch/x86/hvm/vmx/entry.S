@@ -16,7 +16,6 @@
  * this program; If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <xen/config.h>
 #include <xen/errno.h>
 #include <xen/softirq.h>
 #include <asm/types.h>

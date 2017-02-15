@@ -4,7 +4,6 @@
  * linear frame buffer handling.
  */
 
-#include <xen/config.h>
 #include <xen/kernel.h>
 #include <xen/lib.h>
 #include <xen/errno.h>

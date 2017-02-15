@@ -2,7 +2,6 @@
  * Compatibility hypercall routines.
  */
 
-#include <xen/config.h>
 #include <xen/errno.h>
 #include <xen/softirq.h>
 #include <asm/asm_defns.h>

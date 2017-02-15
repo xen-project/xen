@@ -8,7 +8,6 @@
  *  Gareth Hughes <gareth@valinux.com>, May 2000
  */
 
-#include <xen/config.h>
 #include <xen/sched.h>
 #include <asm/current.h>
 #include <asm/processor.h>

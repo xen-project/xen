@@ -30,7 +30,6 @@
     System Programming Guide; Section 9.11. (1997 edition - PPro).
 */
 
-#include <xen/config.h>
 #include <xen/init.h>
 #include <xen/lib.h>
 #include <xen/smp.h>

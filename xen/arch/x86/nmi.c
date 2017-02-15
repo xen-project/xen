@@ -13,7 +13,6 @@
  *  Mikael Pettersson : PM converted to driver model. Disable/enable API.
  */
 
-#include <xen/config.h>
 #include <xen/init.h>
 #include <xen/lib.h>
 #include <xen/mm.h>

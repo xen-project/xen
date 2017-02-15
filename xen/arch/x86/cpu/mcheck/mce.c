@@ -6,7 +6,6 @@
 #include <xen/init.h>
 #include <xen/types.h>
 #include <xen/kernel.h>
-#include <xen/config.h>
 #include <xen/smp.h>
 #include <xen/errno.h>
 #include <xen/console.h>

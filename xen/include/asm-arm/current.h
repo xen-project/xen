@@ -1,7 +1,6 @@
 #ifndef __ARM_CURRENT_H__
 #define __ARM_CURRENT_H__
 
-#include <xen/config.h>
 #include <xen/percpu.h>
 #include <public/xen.h>
 

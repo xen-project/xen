@@ -24,7 +24,6 @@
  *
  */
 #include <asm/io.h>
-#include <xen/config.h>
 #include <xen/init.h>
 #include <xen/pfn.h>
 #include <xen/types.h>

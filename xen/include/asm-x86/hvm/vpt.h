@@ -19,7 +19,6 @@
 #ifndef __ASM_X86_HVM_VPT_H__
 #define __ASM_X86_HVM_VPT_H__
 
-#include <xen/config.h>
 #include <xen/init.h>
 #include <xen/lib.h>
 #include <xen/time.h>

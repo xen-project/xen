@@ -11,7 +11,6 @@
  * Version 2.  See the file COPYING for more details.
  */
 
-#include <xen/config.h>
 #include <xen/types.h>
 #include <xen/init.h>
 #include <xen/kernel.h>

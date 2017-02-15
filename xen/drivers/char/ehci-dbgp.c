@@ -5,7 +5,6 @@
  * Linux; see the Linux source for authorship and copyrights.
  */
 
-#include <xen/config.h>
 #include <xen/console.h>
 #include <xen/delay.h>
 #include <xen/errno.h>

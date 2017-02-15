@@ -7,7 +7,6 @@
  * copied from Linux
  */
 
-#include <xen/config.h>
 #include <xen/init.h>
 #include <xen/mm.h>
 #include <xen/acpi.h>

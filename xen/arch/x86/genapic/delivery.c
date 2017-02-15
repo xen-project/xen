@@ -1,4 +1,3 @@
-#include <xen/config.h>
 #include <xen/irq.h>
 #include <xen/sched.h>
 #include <asm/current.h>

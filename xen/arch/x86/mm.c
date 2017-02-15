@@ -83,7 +83,6 @@
  * an application-supplied buffer).
  */
 
-#include <xen/config.h>
 #include <xen/init.h>
 #include <xen/kernel.h>
 #include <xen/lib.h>

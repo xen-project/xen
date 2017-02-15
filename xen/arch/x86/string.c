@@ -5,7 +5,6 @@
  * against.
  */
 
-#include <xen/config.h>
 #include <xen/lib.h>
 
 #undef memcpy

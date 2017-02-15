@@ -32,7 +32,6 @@
 
 #ifndef __ASSEMBLY__
 
-#include <xen/config.h>
 #include <asm/types.h>
 
 #include <xen/pdx.h>

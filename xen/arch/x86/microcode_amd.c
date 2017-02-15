@@ -14,7 +14,6 @@
  *  License version 2. See file COPYING for details.
  */
 
-#include <xen/config.h>
 #include <xen/lib.h>
 #include <xen/kernel.h>
 #include <xen/init.h>

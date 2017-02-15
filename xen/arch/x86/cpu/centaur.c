@@ -1,4 +1,3 @@
-#include <xen/config.h>
 #include <xen/lib.h>
 #include <xen/init.h>
 #include <xen/bitops.h>

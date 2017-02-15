@@ -24,7 +24,6 @@
  * Copyright (c) 2010, DornerWorks, Ltd. <DornerWorks.com>
  */
 
-#include <xen/config.h>
 #include <xen/lib.h>
 #include <xen/sched.h>
 #include <xen/sched-if.h>

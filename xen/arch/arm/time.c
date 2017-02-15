@@ -17,7 +17,6 @@
  * GNU General Public License for more details.
  */
 
-#include <xen/config.h>
 #include <xen/console.h>
 #include <xen/device_tree.h>
 #include <xen/init.h>

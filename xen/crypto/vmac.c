@@ -7,7 +7,6 @@
  * ----------------------------------------------------------------------- */
 
 /* start for Xen */
-#include <xen/config.h>
 #include <xen/init.h>
 #include <xen/types.h>
 #include <xen/lib.h>

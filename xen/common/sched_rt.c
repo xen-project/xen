@@ -11,7 +11,6 @@
  * based on the code of credit Scheduler
  */
 
-#include <xen/config.h>
 #include <xen/init.h>
 #include <xen/lib.h>
 #include <xen/sched.h>

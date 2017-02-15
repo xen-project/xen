@@ -8,7 +8,6 @@
  *	later.
  */
 
-#include <xen/config.h>
 #include <xen/irq.h>
 #include <xen/sched.h>
 #include <xen/delay.h>

@@ -1,4 +1,3 @@
-#include <xen/config.h>
 #include <xen/init.h>
 #include <xen/string.h>
 #include <xen/delay.h>

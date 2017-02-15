@@ -4,7 +4,6 @@
  * Handle I/O port access quirks of various platforms.
  */
 
-#include <xen/config.h>
 #include <xen/init.h>
 #include <xen/sched.h>
 #include <xen/dmi.h>

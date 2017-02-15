@@ -1,7 +1,6 @@
 #ifndef __ARM_PAGE_H__
 #define __ARM_PAGE_H__
 
-#include <xen/config.h>
 #include <public/xen.h>
 #include <asm/processor.h>
 

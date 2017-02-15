@@ -1,7 +1,6 @@
 #ifndef _LIBFDT_ENV_H
 #define _LIBFDT_ENV_H
 
-#include <xen/config.h>
 #include <xen/types.h>
 #include <xen/string.h>
 #include <asm/byteorder.h>

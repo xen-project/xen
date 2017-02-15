@@ -1,4 +1,3 @@
-#include <xen/config.h>
 #include <xen/pci.h>
 #include <xen/acpi.h>
 #include <acpi/acpi.h>

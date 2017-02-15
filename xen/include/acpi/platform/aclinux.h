@@ -47,7 +47,6 @@
 #define ACPI_USE_SYSTEM_CLIBRARY
 #define ACPI_USE_DO_WHILE_0
 
-#include <xen/config.h>
 #include <xen/cache.h>
 #include <xen/string.h>
 #include <xen/kernel.h>

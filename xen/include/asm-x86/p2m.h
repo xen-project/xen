@@ -26,7 +26,6 @@
 #ifndef _XEN_ASM_X86_P2M_H
 #define _XEN_ASM_X86_P2M_H
 
-#include <xen/config.h>
 #include <xen/paging.h>
 #include <xen/p2m-common.h>
 #include <xen/mem_access.h>

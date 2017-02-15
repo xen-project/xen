@@ -23,7 +23,6 @@
  * Adapted for Xen by Dan Magenheimer (dan.magenheimer@oracle.com)
  */
 
-#include <xen/config.h>
 #include <xen/irq.h>
 #include <xen/mm.h>
 #include <xen/pfn.h>

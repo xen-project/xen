@@ -1,5 +1,4 @@
 
-#include <xen/config.h>
 #include <xen/version.h>
 #include <xen/init.h>
 #include <xen/sched.h>

@@ -25,7 +25,6 @@
  * separate file or part of the same file.
  */
 
-#include <xen/config.h>
 #include <xen/init.h>
 #include <xen/lib.h>
 #include <xen/string.h>

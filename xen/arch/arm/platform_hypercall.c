@@ -6,7 +6,6 @@
  * Copyright (c) 2015, Citrix
  */
 
-#include <xen/config.h>
 #include <xen/types.h>
 #include <xen/sched.h>
 #include <xen/guest_access.h>

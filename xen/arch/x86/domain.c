@@ -11,7 +11,6 @@
  *  Gareth Hughes <gareth@valinux.com>, May 2000
  */
 
-#include <xen/config.h>
 #include <xen/init.h>
 #include <xen/lib.h>
 #include <xen/errno.h>

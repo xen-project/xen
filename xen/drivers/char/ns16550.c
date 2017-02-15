@@ -8,7 +8,6 @@
  * Copyright (c) 2003-2005, K A Fraser
  */
 
-#include <xen/config.h>
 #include <xen/console.h>
 #include <xen/init.h>
 #include <xen/irq.h>

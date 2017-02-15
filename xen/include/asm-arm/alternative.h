@@ -2,7 +2,6 @@
 #define __ASM_ALTERNATIVE_H
 
 #include <asm/cpufeature.h>
-#include <xen/config.h>
 #include <xen/kconfig.h>
 
 #ifdef CONFIG_HAS_ALTERNATIVE

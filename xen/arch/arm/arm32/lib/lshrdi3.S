@@ -24,7 +24,6 @@ You should have received a copy of the GNU General Public License
 along with this program; see the file COPYING.  If not, see <http://www.gnu.org/licenses/>.  */
 
 
-#include <xen/config.h>
 #include "assembler.h"
 
 #ifdef __ARMEB__

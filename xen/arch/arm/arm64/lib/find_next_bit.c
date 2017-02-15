@@ -8,7 +8,6 @@
  * as published by the Free Software Foundation; either version
  * 2 of the License, or (at your option) any later version.
  */
-#include <xen/config.h>
 #include <xen/bitops.h>
 #include <asm/types.h>
 #include <asm/byteorder.h>

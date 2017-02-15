@@ -5,7 +5,6 @@
  * We need the APIC definitions automatically as part of 'smp.h'
  */
 #ifndef __ASSEMBLY__
-#include <xen/config.h>
 #include <xen/kernel.h>
 #include <xen/cpumask.h>
 #include <asm/current.h>

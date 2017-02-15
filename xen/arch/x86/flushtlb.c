@@ -7,7 +7,6 @@
  * Copyright (c) 2003-2006, K A Fraser
  */
 
-#include <xen/config.h>
 #include <xen/sched.h>
 #include <xen/softirq.h>
 #include <asm/flushtlb.h>

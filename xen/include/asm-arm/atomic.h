@@ -1,7 +1,6 @@
 #ifndef __ARCH_ARM_ATOMIC__
 #define __ARCH_ARM_ATOMIC__
 
-#include <xen/config.h>
 #include <xen/atomic.h>
 #include <xen/prefetch.h>
 #include <asm/system.h>

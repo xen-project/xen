@@ -6,7 +6,6 @@
  * Copyright (c) 2003-2008, K A Fraser
  */
 
-#include <xen/config.h>
 #include <xen/delay.h>
 #include <xen/init.h>
 #include <xen/mm.h>

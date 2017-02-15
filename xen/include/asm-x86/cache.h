@@ -4,7 +4,6 @@
 #ifndef __ARCH_X86_CACHE_H
 #define __ARCH_X86_CACHE_H
 
-#include <xen/config.h>
 
 /* L1 cache line size */
 #define L1_CACHE_SHIFT	(CONFIG_X86_L1_CACHE_SHIFT)

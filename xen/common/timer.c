@@ -5,7 +5,6 @@
  * Copyright (c) 2002-2005 K A Fraser
  */
 
-#include <xen/config.h>
 #include <xen/init.h>
 #include <xen/types.h>
 #include <xen/errno.h>

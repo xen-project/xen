@@ -24,7 +24,6 @@
  * IN THE SOFTWARE.
  */
 
-#include <xen/config.h>
 #include <xen/types.h>
 #include <xen/mm.h>
 #include <xen/xmalloc.h>

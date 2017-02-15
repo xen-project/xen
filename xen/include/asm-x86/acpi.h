@@ -23,7 +23,6 @@
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  */
 
-#include <xen/config.h>
 #include <acpi/pdc_intel.h>
 #include <acpi/acconfig.h>
 #include <acpi/actbl.h>

@@ -4,7 +4,6 @@
  * Generic domain-handling functions.
  */
 
-#include <xen/config.h>
 #include <xen/compat.h>
 #include <xen/init.h>
 #include <xen/lib.h>

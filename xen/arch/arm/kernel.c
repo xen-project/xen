@@ -3,7 +3,6 @@
  *
  * Copyright (C) 2011 Citrix Systems, Inc.
  */
-#include <xen/config.h>
 #include <xen/errno.h>
 #include <xen/init.h>
 #include <xen/lib.h>

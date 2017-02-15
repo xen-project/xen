@@ -1,4 +1,3 @@
-#include <xen/config.h>
 
 #if __LINUX_ARM_ARCH__ >= 6
 	.macro	bitop, name, instr

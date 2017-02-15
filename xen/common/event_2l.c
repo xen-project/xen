@@ -7,7 +7,6 @@
  * Version 2 or later.  See the file COPYING for more details.
  */
 
-#include <xen/config.h>
 #include <xen/init.h>
 #include <xen/lib.h>
 #include <xen/errno.h>

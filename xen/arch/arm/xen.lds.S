@@ -2,7 +2,6 @@
 /* Modified for i386/x86-64 Xen by Keir Fraser */
 /* Modified for ARM Xen by Ian Campbell */
 
-#include <xen/config.h>
 #include <xen/cache.h>
 #include <asm/page.h>
 #include <asm/percpu.h>

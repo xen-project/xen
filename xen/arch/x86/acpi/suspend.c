@@ -4,7 +4,6 @@
  *  Copyright (c) 2001 Patrick Mochel <mochel@osdl.org>
  */
 
-#include <xen/config.h>
 #include <xen/acpi.h>
 #include <xen/smp.h>
 #include <asm/processor.h>

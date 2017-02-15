@@ -24,7 +24,6 @@
  * copied from Linux
  */
 
-#include <xen/config.h>
 #include <xen/errno.h>
 #include <xen/init.h>
 #include <xen/acpi.h>

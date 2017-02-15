@@ -5,7 +5,6 @@
  *  Copyright (C) 1992, 1998 Linus Torvalds, Ingo Molnar
  */
 
-#include <xen/config.h>
 #include <xen/init.h>
 #include <xen/delay.h>
 #include <xen/errno.h>

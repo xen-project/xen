@@ -19,7 +19,6 @@
 #ifndef __ARCH_ARM_ARM64_INSN
 #define __ARCH_ARM_ARM64_INSN
 
-#include <xen/config.h>
 #include <xen/types.h>
 #include <xen/stdbool.h>
 

@@ -3,7 +3,6 @@
  *
  */
 
-#include <xen/config.h>
 #include <xen/types.h>
 #include <xen/guest_access.h>
 #include <xen/hypercall.h>

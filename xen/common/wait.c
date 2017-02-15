@@ -19,7 +19,6 @@
  * along with this program; If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <xen/config.h>
 #include <xen/sched.h>
 #include <xen/wait.h>
 #include <xen/errno.h>

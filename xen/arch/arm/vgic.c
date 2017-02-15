@@ -18,7 +18,6 @@
  */
 
 #include <xen/bitops.h>
-#include <xen/config.h>
 #include <xen/lib.h>
 #include <xen/init.h>
 #include <xen/softirq.h>

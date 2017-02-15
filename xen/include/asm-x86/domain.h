@@ -1,7 +1,6 @@
 #ifndef __ASM_DOMAIN_H__
 #define __ASM_DOMAIN_H__
 
-#include <xen/config.h>
 #include <xen/mm.h>
 #include <xen/radix-tree.h>
 #include <asm/hvm/vcpu.h>

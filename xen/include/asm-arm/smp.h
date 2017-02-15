@@ -2,7 +2,6 @@
 #define __ASM_SMP_H
 
 #ifndef __ASSEMBLY__
-#include <xen/config.h>
 #include <xen/cpumask.h>
 #include <xen/device_tree.h>
 #include <asm/current.h>

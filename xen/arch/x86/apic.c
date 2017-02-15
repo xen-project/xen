@@ -16,7 +16,6 @@
  *    Mikael Pettersson    :    PM converted to driver model.
  */
 
-#include <xen/config.h>
 #include <xen/perfc.h>
 #include <xen/errno.h>
 #include <xen/init.h>

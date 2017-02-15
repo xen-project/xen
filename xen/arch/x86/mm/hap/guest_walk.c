@@ -23,7 +23,6 @@ asm(".file \"" __OBJECT_FILE__ "\"");
 
 #include <xen/domain_page.h>
 #include <xen/paging.h>
-#include <xen/config.h>
 #include <xen/sched.h>
 #include "private.h" /* for hap_gva_to_gfn_* */
 

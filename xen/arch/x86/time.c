@@ -9,12 +9,10 @@
  * Copyright (c) 1991, 1992, 1995  Linus Torvalds
  */
 
-#include <xen/config.h>
 #include <xen/errno.h>
 #include <xen/event.h>
 #include <xen/sched.h>
 #include <xen/lib.h>
-#include <xen/config.h>
 #include <xen/init.h>
 #include <xen/time.h>
 #include <xen/timer.h>

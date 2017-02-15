@@ -1,7 +1,6 @@
 #ifndef __ARCH_X86_ATOMIC__
 #define __ARCH_X86_ATOMIC__
 
-#include <xen/config.h>
 #include <xen/atomic.h>
 #include <asm/system.h>
 

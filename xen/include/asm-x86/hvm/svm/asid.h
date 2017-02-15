@@ -18,7 +18,6 @@
 #ifndef __ASM_X86_HVM_SVM_ASID_H__
 #define __ASM_X86_HVM_SVM_ASID_H__
 
-#include <xen/config.h>
 #include <xen/types.h>
 #include <asm/hvm/asid.h>
 #include <asm/processor.h>

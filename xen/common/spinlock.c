@@ -1,5 +1,4 @@
 #include <xen/lib.h>
-#include <xen/config.h>
 #include <xen/irq.h>
 #include <xen/smp.h>
 #include <xen/time.h>

@@ -1,4 +1,3 @@
-#include <xen/config.h>
 #include <asm/asm_defns.h>
 #include <asm/regs.h>
 #include <public/xen.h>

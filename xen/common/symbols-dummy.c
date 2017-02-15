@@ -3,7 +3,6 @@
  *                  link of the hypervisor image.
  */
 
-#include <xen/config.h>
 #include <xen/types.h>
 #include <xen/symbols.h>
 

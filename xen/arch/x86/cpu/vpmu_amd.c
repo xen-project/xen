@@ -21,7 +21,6 @@
  *
  */
 
-#include <xen/config.h>
 #include <xen/xenoprof.h>
 #include <xen/hvm/save.h>
 #include <xen/sched.h>

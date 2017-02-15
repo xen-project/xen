@@ -18,7 +18,6 @@
  * GNU General Public License for more details.
  */
 
-#include <xen/config.h>
 #include <asm/platform.h>
 #include <xen/vmap.h>
 #include <xen/device_tree.h>

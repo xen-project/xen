@@ -18,7 +18,6 @@
  */
 
 #include <asm/p2m.h>
-#include <xen/config.h>
 #include <asm/platform.h>
 #include <asm/platforms/omap5.h>
 #include <xen/mm.h>

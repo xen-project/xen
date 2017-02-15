@@ -8,7 +8,6 @@
  * published by the Free Software Foundation.
  */
 
-#include <xen/config.h>
 #include <xen/init.h>
 #include <xen/lib.h>
 #include <xen/stdarg.h>

@@ -2,7 +2,6 @@
 #ifndef __ASM_X86_MM_H__
 #define __ASM_X86_MM_H__
 
-#include <xen/config.h>
 #include <xen/list.h>
 #include <xen/spinlock.h>
 #include <xen/rwlock.h>

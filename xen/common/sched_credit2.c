@@ -10,7 +10,6 @@
  * Based on an earlier verson by Emmanuel Ackaouy.
  */
 
-#include <xen/config.h>
 #include <xen/init.h>
 #include <xen/lib.h>
 #include <xen/sched.h>

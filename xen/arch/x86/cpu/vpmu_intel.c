@@ -18,7 +18,6 @@
  * Author: Haitao Shan <haitao.shan@intel.com>
  */
 
-#include <xen/config.h>
 #include <xen/sched.h>
 #include <xen/xenoprof.h>
 #include <xen/irq.h>

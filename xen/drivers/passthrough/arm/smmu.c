@@ -35,7 +35,6 @@
  */
 
 
-#include <xen/config.h>
 #include <xen/delay.h>
 #include <xen/errno.h>
 #include <xen/err.h>

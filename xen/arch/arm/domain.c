@@ -9,7 +9,6 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
-#include <xen/config.h>
 #include <xen/hypercall.h>
 #include <xen/init.h>
 #include <xen/lib.h>
