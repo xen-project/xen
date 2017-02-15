@@ -37,7 +37,6 @@
 #include <xen/domain_page.h>
 #include <xen/efi.h>
 #include <xen/vmap.h>
-#include <xen/kconfig.h>
 
 #define _COMPONENT		ACPI_OS_SERVICES
 ACPI_MODULE_NAME("osl")
