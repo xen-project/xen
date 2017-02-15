@@ -137,6 +137,10 @@ int libxl_cpupool_create(libxl_ctx *ctx, const char *name,
     int i;
     xs_transaction_t t;
     char *uuid_string;
+    uint32_t xcpoolid;
+
+    /* Zero means "choose a poolid for me" */
+    xcpoolid = (*poolid) ? (*poolid) : XC_CPUPOOL_POOLID_ANY;
 
     uuid_string = libxl__uuid2string(gc, *uuid);
     if (!uuid_string) {
@@ -144,12 +148,13 @@ int libxl_cpupool_create(libxl_ctx *ctx, const char *name,
         return ERROR_NOMEM;
     }
 
-    rc = xc_cpupool_create(ctx->xch, poolid, sched);
+    rc = xc_cpupool_create(ctx->xch, &xcpoolid, sched);
     if (rc) {
         LOGEV(ERROR, rc, "Could not create cpupool");
         GC_FREE;
         return ERROR_FAIL;
     }
+    *poolid = xcpoolid;
 
     libxl_for_each_bit(i, cpumap)
         if (libxl_bitmap_test(&cpumap, i)) {

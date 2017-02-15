@@ -1052,6 +1052,8 @@ typedef struct xc_cpupoolinfo {
     xc_cpumap_t cpumap;
 } xc_cpupoolinfo_t;
 
+#define XC_CPUPOOL_POOLID_ANY 0xFFFFFFFF
+
 /**
  * Create a new cpupool.
  *

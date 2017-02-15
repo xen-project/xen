@@ -1715,7 +1715,7 @@ static PyObject *pyxc_cpupool_create(XcObject *self,
                                      PyObject *args,
                                      PyObject *kwds)
 {
-    uint32_t cpupool = 0, sched = XEN_SCHEDULER_CREDIT;
+    uint32_t cpupool = XC_CPUPOOL_POOLID_ANY, sched = XEN_SCHEDULER_CREDIT;
 
     static char *kwd_list[] = { "pool", "sched", NULL };
 
