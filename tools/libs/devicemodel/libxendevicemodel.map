@@ -1,6 +1,22 @@
 VERS_1.0 {
 	global:
 		xendevicemodel_open;
+		xendevicemodel_create_ioreq_server;
+		xendevicemodel_get_ioreq_server_info;
+		xendevicemodel_map_io_range_to_ioreq_server;
+		xendevicemodel_unmap_io_range_from_ioreq_server;
+		xendevicemodel_map_pcidev_to_ioreq_server;
+		xendevicemodel_unmap_pcidev_from_ioreq_server;
+		xendevicemodel_destroy_ioreq_server;
+		xendevicemodel_set_ioreq_server_state;
+		xendevicemodel_set_pci_intx_level;
+		xendevicemodel_set_isa_irq_level;
+		xendevicemodel_set_pci_link_route;
+		xendevicemodel_inject_msi;
+		xendevicemodel_track_dirty_vram;
+		xendevicemodel_modified_memory;
+		xendevicemodel_set_mem_type;
+		xendevicemodel_inject_event;
 		xendevicemodel_close;
 	local: *; /* Do not expose anything by default */
 };

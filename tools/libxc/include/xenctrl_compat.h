@@ -120,6 +120,53 @@ int xc_gntshr_munmap(xc_gntshr *xcg, void *start_address, uint32_t count);
 
 #endif /* XC_WANT_COMPAT_GNTTAB_API */
 
+#ifdef XC_WANT_COMPAT_DEVICEMODEL_API
+
+int xc_hvm_create_ioreq_server(
+    xc_interface *xch, domid_t domid, int handle_bufioreq,
+    ioservid_t *id);
+int xc_hvm_get_ioreq_server_info(
+    xc_interface *xch, domid_t domid, ioservid_t id, xen_pfn_t *ioreq_pfn,
+    xen_pfn_t *bufioreq_pfn, evtchn_port_t *bufioreq_port);
+int xc_hvm_map_io_range_to_ioreq_server(
+    xc_interface *xch, domid_t domid, ioservid_t id, int is_mmio,
+    uint64_t start, uint64_t end);
+int xc_hvm_unmap_io_range_from_ioreq_server(
+    xc_interface *xch, domid_t domid, ioservid_t id, int is_mmio,
+    uint64_t start, uint64_t end);
+int xc_hvm_map_pcidev_to_ioreq_server(
+    xc_interface *xch, domid_t domid, ioservid_t id, uint16_t segment,
+    uint8_t bus, uint8_t device, uint8_t function);
+int xc_hvm_unmap_pcidev_from_ioreq_server(
+    xc_interface *xch, domid_t domid, ioservid_t id, uint16_t segment,
+    uint8_t bus, uint8_t device, uint8_t function);
+int xc_hvm_destroy_ioreq_server(
+    xc_interface *xch, domid_t domid, ioservid_t id);
+int xc_hvm_set_ioreq_server_state(
+    xc_interface *xch, domid_t domid, ioservid_t id, int enabled);
+int xc_hvm_set_pci_intx_level(
+    xc_interface *xch, domid_t domid, uint16_t segment, uint8_t bus,
+    uint8_t device, uint8_t intx, unsigned int level);
+int xc_hvm_set_isa_irq_level(
+    xc_interface *xch, domid_t domid, uint8_t irq, unsigned int level);
+int xc_hvm_set_pci_link_route(
+    xc_interface *xch, domid_t domid, uint8_t link, uint8_t irq);
+int xc_hvm_inject_msi(
+    xc_interface *xch, domid_t domid, uint64_t msi_addr, uint32_t msi_data);
+int xc_hvm_track_dirty_vram(
+    xc_interface *xch, domid_t domid, uint64_t first_pfn, uint32_t nr,
+    unsigned long *dirty_bitmap);
+int xc_hvm_modified_memory(
+    xc_interface *xch, domid_t domid, uint64_t first_pfn, uint32_t nr);
+int xc_hvm_set_mem_type(
+    xc_interface *xch, domid_t domid, hvmmem_type_t type,
+    uint64_t first_pfn, uint32_t nr);
+int xc_hvm_inject_trap(
+    xc_interface *xch, domid_t domid, int vcpu, uint8_t vector,
+    uint8_t type, uint32_t error_code, uint8_t insn_len, uint64_t cr2);
+
+#endif /* XC_WANT_COMPAT_DEVICEMODEL_API */
+
 #endif
 
 /*

@@ -1,13 +1,32 @@
 #ifndef XENDEVICEMODEL_PRIVATE_H
 #define XENDEVICEMODEL_PRIVATE_H
 
+#define __XEN_TOOLS__ 1
+
 #include <xentoollog.h>
 #include <xendevicemodel.h>
+#include <xencall.h>
 
 struct xendevicemodel_handle {
     xentoollog_logger *logger, *logger_tofree;
     unsigned int flags;
+    xencall_handle *xcall;
 };
+
+struct xendevicemodel_buf {
+    void *ptr;
+    size_t size;
+};
+
+int xendevicemodel_xcall(xendevicemodel_handle *dmod,
+                         domid_t domid, unsigned int nr_bufs,
+                         struct xendevicemodel_buf bufs[]);
+
+int osdep_xendevicemodel_open(xendevicemodel_handle *dmod);
+int osdep_xendevicemodel_close(xendevicemodel_handle *dmod);
+int osdep_xendevicemodel_op(xendevicemodel_handle *dmod,
+                            domid_t domid, unsigned int nr_bufs,
+                            struct xendevicemodel_buf bufs[]);
 
 #endif
 

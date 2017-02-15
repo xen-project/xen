@@ -8,8 +8,14 @@ SHLIB_LDFLAGS += -Wl,--version-script=libxendevicemodel.map
 CFLAGS   += -Werror -Wmissing-prototypes
 CFLAGS   += -I./include $(CFLAGS_xeninclude)
 CFLAGS   += $(CFLAGS_libxentoollog)
+CFLAGS   += $(CFLAGS_libxencall)
 
-SRCS-y   += core.c
+SRCS-y                 += core.c
+SRCS-$(CONFIG_Linux)   += compat.c
+SRCS-$(CONFIG_FreeBSD) += compat.c
+SRCS-$(CONFIG_SunOS)   += compat.c
+SRCS-$(CONFIG_NetBSD)  += compat.c
+SRCS-$(CONFIG_MiniOS)  += compat.c
 
 LIB_OBJS := $(patsubst %.c,%.o,$(SRCS-y))
 PIC_OBJS := $(patsubst %.c,%.opic,$(SRCS-y))

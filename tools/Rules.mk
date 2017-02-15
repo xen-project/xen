@@ -119,7 +119,7 @@ LDLIBS_libxenforeignmemory = $(XEN_LIBXENFOREIGNMEMORY)/libxenforeignmemory$(lib
 SHLIB_libxenforeignmemory  = -Wl,-rpath-link=$(XEN_LIBXENFOREIGNMEMORY)
 
 CFLAGS_libxendevicemodel = -I$(XEN_LIBXENDEVICEMODEL)/include $(CFLAGS_xeninclude)
-SHDEPS_libxendevicemodel = $(SHLIB_libxentoollog)
+SHDEPS_libxendevicemodel = $(SHLIB_libxentoollog) $(SHLIB_xencall)
 LDLIBS_libxendevicemodel = $(XEN_LIBXENDEVICEMODEL)/libxendevicemodel$(libextension)
 SHLIB_libxendevicemodel  = -Wl,-rpath-link=$(XEN_LIBXENDEVICEMODEL)
 

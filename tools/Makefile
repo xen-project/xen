@@ -262,6 +262,7 @@ subdir-all-qemu-xen-dir: qemu-xen-dir-find
 		--extra-cflags="-DXC_WANT_COMPAT_EVTCHN_API=1 \
 		-DXC_WANT_COMPAT_GNTTAB_API=1 \
 		-DXC_WANT_COMPAT_MAP_FOREIGN_API=1 \
+		-DXC_WANT_COMPAT_DEVICEMODEL_API=1 \
 		-I$(XEN_ROOT)/tools/include \
 		-I$(XEN_ROOT)/tools/libs/toollog/include \
 		-I$(XEN_ROOT)/tools/libs/evtchn/include \
