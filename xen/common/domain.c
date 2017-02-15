@@ -116,7 +116,7 @@ static void vcpu_info_reset(struct vcpu *v)
     v->vcpu_info = ((v->vcpu_id < XEN_LEGACY_MAX_VCPUS)
                     ? (vcpu_info_t *)&shared_info(d, vcpu_info[v->vcpu_id])
                     : &dummy_vcpu_info);
-    v->vcpu_info_mfn = mfn_x(INVALID_MFN);
+    v->vcpu_info_mfn = INVALID_MFN;
 }
 
 struct vcpu *alloc_vcpu(
@@ -1149,7 +1149,7 @@ int map_vcpu_info(struct vcpu *v, unsigned long gfn, unsigned offset)
     if ( offset > (PAGE_SIZE - sizeof(vcpu_info_t)) )
         return -EINVAL;
 
-    if ( v->vcpu_info_mfn != mfn_x(INVALID_MFN) )
+    if ( !mfn_eq(v->vcpu_info_mfn, INVALID_MFN) )
         return -EINVAL;
 
     /* Run this command on yourself or on other offline VCPUS. */
@@ -1188,7 +1188,7 @@ int map_vcpu_info(struct vcpu *v, unsigned long gfn, unsigned offset)
     }
 
     v->vcpu_info = new_info;
-    v->vcpu_info_mfn = page_to_mfn(page);
+    v->vcpu_info_mfn = _mfn(page_to_mfn(page));
 
     /* Set new vcpu_info pointer /before/ setting pending flags. */
     smp_wmb();
@@ -1207,22 +1207,19 @@ int map_vcpu_info(struct vcpu *v, unsigned long gfn, unsigned offset)
 
 /*
  * Unmap the vcpu info page if the guest decided to place it somewhere
- * else. This is used from arch_domain_destroy and domain_soft_reset.
+ * else. This is used from domain_kill() and domain_soft_reset().
  */
 void unmap_vcpu_info(struct vcpu *v)
 {
-    unsigned long mfn;
-
-    if ( v->vcpu_info_mfn == mfn_x(INVALID_MFN) )
+    if ( mfn_eq(v->vcpu_info_mfn, INVALID_MFN) )
         return;
 
-    mfn = v->vcpu_info_mfn;
     unmap_domain_page_global((void *)
                              ((unsigned long)v->vcpu_info & PAGE_MASK));
 
     vcpu_info_reset(v);
 
-    put_page_and_type(mfn_to_page(mfn));
+    put_page_and_type(mfn_to_page(mfn_x(v->vcpu_info_mfn)));
 }
 
 int default_initialise_vcpu(struct vcpu *v, XEN_GUEST_HANDLE_PARAM(void) arg)
