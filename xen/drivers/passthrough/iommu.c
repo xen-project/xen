@@ -244,8 +244,7 @@ void iommu_domain_destroy(struct domain *d)
     if ( !iommu_enabled || !dom_iommu(d)->platform_ops )
         return;
 
-    if ( need_iommu(d) )
-        iommu_teardown(d);
+    iommu_teardown(d);
 
     arch_iommu_domain_destroy(d);
 }
