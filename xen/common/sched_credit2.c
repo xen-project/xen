@@ -991,7 +991,7 @@ runq_tickle(const struct scheduler *ops, struct csched2_vcpu *new, s_time_t now)
     cpumask_andnot(&mask, &rqd->active, &rqd->idle);
     cpumask_andnot(&mask, &mask, &rqd->tickled);
     cpumask_and(&mask, &mask, cpumask_scratch_cpu(cpu));
-    if ( cpumask_test_cpu(cpu, &mask) )
+    if ( __cpumask_test_and_clear_cpu(cpu, &mask) )
     {
         cur = CSCHED2_VCPU(curr_on_cpu(cpu));
         burn_credits(rqd, cur, now);
@@ -1007,8 +1007,7 @@ runq_tickle(const struct scheduler *ops, struct csched2_vcpu *new, s_time_t now)
     for_each_cpu(i, &mask)
     {
         /* Already looked at this one above */
-        if ( i == cpu )
-            continue;
+        ASSERT(i != cpu);
 
         cur = CSCHED2_VCPU(curr_on_cpu(i));
 
