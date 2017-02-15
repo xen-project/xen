@@ -2627,28 +2627,15 @@ csched2_dump_vcpu(struct csched2_private *prv, struct csched2_vcpu *svc)
     printk("\n");
 }
 
-static void
-csched2_dump_pcpu(const struct scheduler *ops, int cpu)
+static inline void
+dump_pcpu(const struct scheduler *ops, int cpu)
 {
     struct csched2_private *prv = CSCHED2_PRIV(ops);
     struct csched2_vcpu *svc;
-    unsigned long flags;
-    spinlock_t *lock;
 #define cpustr keyhandler_scratch
 
-    /*
-     * We need both locks:
-     * - we print current, so we need the runqueue lock for this
-     *   cpu (the one of the runqueue this cpu is associated to);
-     * - csched2_dump_vcpu() wants to access domains' weights,
-     *   which are protected by the private scheduler lock.
-     */
-    read_lock_irqsave(&prv->lock, flags);
-    lock = per_cpu(schedule_data, cpu).schedule_lock;
-    spin_lock(lock);
-
     cpumask_scnprintf(cpustr, sizeof(cpustr), per_cpu(cpu_sibling_mask, cpu));
-    printk(" runq=%d, sibling=%s, ", c2r(ops, cpu), cpustr);
+    printk("CPU[%02d] runq=%d, sibling=%s, ", cpu, c2r(ops, cpu), cpustr);
     cpumask_scnprintf(cpustr, sizeof(cpustr), per_cpu(cpu_core_mask, cpu));
     printk("core=%s\n", cpustr);
 
@@ -2659,9 +2646,6 @@ csched2_dump_pcpu(const struct scheduler *ops, int cpu)
         printk("\trun: ");
         csched2_dump_vcpu(prv, svc);
     }
-
-    spin_unlock(lock);
-    read_unlock_irqrestore(&prv->lock, flags);
 #undef cpustr
 }
 
@@ -2671,7 +2655,7 @@ csched2_dump(const struct scheduler *ops)
     struct list_head *iter_sdom;
     struct csched2_private *prv = CSCHED2_PRIV(ops);
     unsigned long flags;
-    int i, loop;
+    unsigned int i, j, loop;
 #define cpustr keyhandler_scratch
 
     /*
@@ -2741,7 +2725,6 @@ csched2_dump(const struct scheduler *ops)
         }
     }
 
-    printk("Runqueue info:\n");
     for_each_cpu(i, &prv->active_queues)
     {
         struct csched2_runqueue_data *rqd = prv->rqd + i;
@@ -2750,7 +2733,13 @@ csched2_dump(const struct scheduler *ops)
 
         /* We need the lock to scan the runqueue. */
         spin_lock(&rqd->lock);
-        printk("runqueue %d:\n", i);
+
+        printk("Runqueue %d:\n", i);
+
+        for_each_cpu(j, &rqd->active)
+            dump_pcpu(ops, j);
+
+        printk("RUNQ:\n");
         list_for_each( iter, runq )
         {
             struct csched2_vcpu *svc = __runq_elem(iter);
@@ -3108,7 +3097,6 @@ static const struct scheduler sched_credit2_def = {
     .do_schedule    = csched2_schedule,
     .context_saved  = csched2_context_saved,
 
-    .dump_cpu_state = csched2_dump_pcpu,
     .dump_settings  = csched2_dump,
     .init           = csched2_init,
     .deinit         = csched2_deinit,

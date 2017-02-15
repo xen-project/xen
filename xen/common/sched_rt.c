@@ -320,10 +320,17 @@ static void
 rt_dump_pcpu(const struct scheduler *ops, int cpu)
 {
     struct rt_private *prv = rt_priv(ops);
+    struct rt_vcpu *svc;
     unsigned long flags;
 
     spin_lock_irqsave(&prv->lock, flags);
-    rt_dump_vcpu(ops, rt_vcpu(curr_on_cpu(cpu)));
+    printk("CPU[%02d]\n", cpu);
+    /* current VCPU (nothing to say if that's the idle vcpu). */
+    svc = rt_vcpu(curr_on_cpu(cpu));
+    if ( svc && !is_idle_vcpu(svc->vcpu) )
+    {
+        rt_dump_vcpu(ops, svc);
+    }
     spin_unlock_irqrestore(&prv->lock, flags);
 }
 

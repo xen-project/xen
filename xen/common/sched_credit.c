@@ -1988,13 +1988,13 @@ csched_dump_pcpu(const struct scheduler *ops, int cpu)
     runq = &spc->runq;
 
     cpumask_scnprintf(cpustr, sizeof(cpustr), per_cpu(cpu_sibling_mask, cpu));
-    printk(" sort=%d, sibling=%s, ", spc->runq_sort_last, cpustr);
+    printk("CPU[%02d] sort=%d, sibling=%s, ", cpu, spc->runq_sort_last, cpustr);
     cpumask_scnprintf(cpustr, sizeof(cpustr), per_cpu(cpu_core_mask, cpu));
     printk("core=%s\n", cpustr);
 
-    /* current VCPU */
+    /* current VCPU (nothing to say if that's the idle vcpu). */
     svc = CSCHED_VCPU(curr_on_cpu(cpu));
-    if ( svc )
+    if ( svc && !is_idle_vcpu(svc->vcpu) )
     {
         printk("\trun: ");
         csched_dump_vcpu(svc);
