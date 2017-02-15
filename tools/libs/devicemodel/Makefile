@@ -11,7 +11,7 @@ CFLAGS   += $(CFLAGS_libxentoollog)
 CFLAGS   += $(CFLAGS_libxencall)
 
 SRCS-y                 += core.c
-SRCS-$(CONFIG_Linux)   += compat.c
+SRCS-$(CONFIG_Linux)   += linux.c
 SRCS-$(CONFIG_FreeBSD) += compat.c
 SRCS-$(CONFIG_SunOS)   += compat.c
 SRCS-$(CONFIG_NetBSD)  += compat.c

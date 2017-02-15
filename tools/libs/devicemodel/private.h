@@ -11,6 +11,7 @@ struct xendevicemodel_handle {
     xentoollog_logger *logger, *logger_tofree;
     unsigned int flags;
     xencall_handle *xcall;
+    int fd;
 };
 
 struct xendevicemodel_buf {
@@ -27,6 +28,9 @@ int osdep_xendevicemodel_close(xendevicemodel_handle *dmod);
 int osdep_xendevicemodel_op(xendevicemodel_handle *dmod,
                             domid_t domid, unsigned int nr_bufs,
                             struct xendevicemodel_buf bufs[]);
+
+#define PERROR(_f...) \
+    xtl_log(dmod->logger, XTL_ERROR, errno, "xendevicemodel", _f)
 
 #endif
 
