@@ -48,12 +48,17 @@ static void sh_clean_dirty_bitmap(struct domain *);
  * Called for every domain from arch_domain_create() */
 int shadow_domain_init(struct domain *d, unsigned int domcr_flags)
 {
+    static const struct log_dirty_ops sh_ops = {
+        .enable  = sh_enable_log_dirty,
+        .disable = sh_disable_log_dirty,
+        .clean   = sh_clean_dirty_bitmap,
+    };
+
     INIT_PAGE_LIST_HEAD(&d->arch.paging.shadow.freelist);
     INIT_PAGE_LIST_HEAD(&d->arch.paging.shadow.pinned_shadows);
 
     /* Use shadow pagetables for log-dirty support */
-    paging_log_dirty_init(d, sh_enable_log_dirty,
-                          sh_disable_log_dirty, sh_clean_dirty_bitmap);
+    paging_log_dirty_init(d, &sh_ops);
 
 #if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC)
     d->arch.paging.shadow.oos_active = 0;

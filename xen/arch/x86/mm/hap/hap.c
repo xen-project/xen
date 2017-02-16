@@ -442,12 +442,16 @@ static void hap_destroy_monitor_table(struct vcpu* v, mfn_t mmfn)
 /************************************************/
 void hap_domain_init(struct domain *d)
 {
+    static const struct log_dirty_ops hap_ops = {
+        .enable  = hap_enable_log_dirty,
+        .disable = hap_disable_log_dirty,
+        .clean   = hap_clean_dirty_bitmap,
+    };
+
     INIT_PAGE_LIST_HEAD(&d->arch.paging.hap.freelist);
 
     /* Use HAP logdirty mechanism. */
-    paging_log_dirty_init(d, hap_enable_log_dirty,
-                          hap_disable_log_dirty,
-                          hap_clean_dirty_bitmap);
+    paging_log_dirty_init(d, &hap_ops);
 }
 
 /* return 0 for success, -errno for failure */

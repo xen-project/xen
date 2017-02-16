@@ -175,9 +175,11 @@ struct log_dirty_domain {
     unsigned int   dirty_count;
 
     /* functions which are paging mode specific */
-    int            (*enable_log_dirty   )(struct domain *d, bool_t log_global);
-    int            (*disable_log_dirty  )(struct domain *d);
-    void           (*clean_dirty_bitmap )(struct domain *d);
+    const struct log_dirty_ops {
+        int        (*enable  )(struct domain *d, bool log_global);
+        int        (*disable )(struct domain *d);
+        void       (*clean   )(struct domain *d);
+    } *ops;
 };
 
 struct paging_domain {
