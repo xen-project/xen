@@ -186,7 +186,7 @@ GLOBAL(idle_pg_table)
 GLOBAL(__page_tables_end)
 
 /* Init pagetables.  Enough page directories to map into the bottom 1GB. */
-        .section .init.data, "a", @progbits
+        .section .init.data, "aw", @progbits
         .align PAGE_SIZE, 0
 
 GLOBAL(l2_bootmap)
