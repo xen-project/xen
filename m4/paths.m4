@@ -76,6 +76,12 @@ AC_ARG_WITH([xen-dumpdir],
     [xen_dumpdir_path=$withval],
     [xen_dumpdir_path=$localstatedir/lib/xen/dump])
 
+AC_ARG_WITH([rundir],
+    AS_HELP_STRING([--with-rundir=DIR],
+    [Path to directory for runtime data. [LOCALSTATEDIR/run]]),
+    [rundir_path=$withval],
+    [rundir_path=$localstatedir/run])
+
 if test "$libexecdir" = '${exec_prefix}/libexec' ; then
     case "$host_os" in
          *netbsd*) ;;
@@ -98,7 +104,7 @@ AC_SUBST(LIBEXEC_INC)
 XENFIRMWAREDIR=${LIBEXEC}/boot
 AC_SUBST(XENFIRMWAREDIR)
 
-XEN_RUN_DIR=$localstatedir/run/xen
+XEN_RUN_DIR=$rundir_path/xen
 AC_SUBST(XEN_RUN_DIR)
 
 XEN_LOG_DIR=$localstatedir/log/xen
@@ -107,7 +113,7 @@ AC_SUBST(XEN_LOG_DIR)
 XEN_LIB_STORED=$localstatedir/lib/xenstored
 AC_SUBST(XEN_LIB_STORED)
 
-XEN_RUN_STORED=$localstatedir/run/xenstored
+XEN_RUN_STORED=$rundir_path/xenstored
 AC_SUBST(XEN_RUN_STORED)
 
 XEN_LIB_DIR=$localstatedir/lib/xen

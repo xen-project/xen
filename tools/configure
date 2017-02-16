@@ -794,6 +794,7 @@ with_initddir
 with_sysconfig_leaf_dir
 with_libexec_leaf_dir
 with_xen_dumpdir
+with_rundir
 enable_rpath
 enable_githttp
 enable_monitors
@@ -1498,6 +1499,8 @@ Optional Packages:
                           Name of subdirectory in libexecdir to use.
   --with-xen-dumpdir=DIR  Path to directory for domU crash dumps.
                           [LOCALSTATEDIR/lib/xen/dump]
+  --with-rundir=DIR       Path to directory for runtime data.
+                          [LOCALSTATEDIR/run]
   --with-linux-backend-modules="mod1 mod2"
                           List of Linux backend module or modalias names to be
                           autoloaded on startup.
@@ -3910,6 +3913,15 @@ else
 fi
 
 
+
+# Check whether --with-rundir was given.
+if test "${with_rundir+set}" = set; then :
+  withval=$with_rundir; rundir_path=$withval
+else
+  rundir_path=$localstatedir/run
+fi
+
+
 if test "$libexecdir" = '${exec_prefix}/libexec' ; then
     case "$host_os" in
          *netbsd*) ;;
@@ -3930,7 +3942,7 @@ LIBEXEC_INC=${LIBEXEC}/include
 XENFIRMWAREDIR=${LIBEXEC}/boot
 
 
-XEN_RUN_DIR=$localstatedir/run/xen
+XEN_RUN_DIR=$rundir_path/xen
 
 
 XEN_LOG_DIR=$localstatedir/log/xen
@@ -3939,7 +3951,7 @@ XEN_LOG_DIR=$localstatedir/log/xen
 XEN_LIB_STORED=$localstatedir/lib/xenstored
 
 
-XEN_RUN_STORED=$localstatedir/run/xenstored
+XEN_RUN_STORED=$rundir_path/xenstored
 
 
 XEN_LIB_DIR=$localstatedir/lib/xen
