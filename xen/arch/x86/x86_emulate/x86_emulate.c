@@ -604,14 +604,43 @@ do{ asm volatile (                                                      \
 #define __emulate_1op_8byte(_op, _dst, _eflags)
 #endif /* __i386__ */
 
+#ifdef __XEN__
+# define invoke_stub(pre, post, constraints...) do {                    \
+    union stub_exception_token res_ = { .raw = ~0 };                    \
+    asm volatile ( pre "\n\tcall *%[stub]\n\t" post "\n"                \
+                   ".Lret%=:\n\t"                                       \
+                   ".pushsection .fixup,\"ax\"\n"                       \
+                   ".Lfix%=:\n\t"                                       \
+                   "pop %[exn]\n\t"                                     \
+                   "jmp .Lret%=\n\t"                                    \
+                   ".popsection\n\t"                                    \
+                   _ASM_EXTABLE(.Lret%=, .Lfix%=)                       \
+                   : [exn] "+g" (res_), constraints,                    \
+                     [stub] "rm" (stub.func) );                         \
+    if ( unlikely(~res_.raw) )                                          \
+    {                                                                   \
+        gprintk(XENLOG_WARNING,                                         \
+                "exception %u (ec=%04x) in emulation stub (line %u)\n", \
+                res_.fields.trapnr, res_.fields.ec, __LINE__);          \
+        gprintk(XENLOG_INFO, "stub: %"__stringify(MAX_INST_LEN)"ph\n",  \
+                stub.func);                                             \
+        generate_exception_if(res_.fields.trapnr == EXC_UD, EXC_UD);    \
+        domain_crash(current->domain);                                  \
+        goto cannot_emulate;                                            \
+    }                                                                   \
+} while (0)
+#else
+# define invoke_stub(pre, post, constraints...)                         \
+    asm volatile ( pre "\n\tcall *%[stub]\n\t" post                     \
+                   : constraints, [stub] "rm" (stub.func) )
+#endif
+
 #define emulate_stub(dst, src...) do {                                  \
     unsigned long tmp;                                                  \
-    asm volatile ( _PRE_EFLAGS("[efl]", "[msk]", "[tmp]")               \
-                   "call *%[stub];"                                     \
-                   _POST_EFLAGS("[efl]", "[msk]", "[tmp]")              \
-                   : dst, [tmp] "=&r" (tmp), [efl] "+g" (_regs._eflags) \
-                   : [stub] "r" (stub.func),                            \
-                     [msk] "i" (EFLAGS_MASK), ## src );                 \
+    invoke_stub(_PRE_EFLAGS("[efl]", "[msk]", "[tmp]"),                 \
+                _POST_EFLAGS("[efl]", "[msk]", "[tmp]"),                \
+                dst, [tmp] "=&r" (tmp), [efl] "+g" (_regs._eflags)      \
+                : [msk] "i" (EFLAGS_MASK), ## src);                     \
 } while (0)
 
 /* Fetch next part of the instruction being emulated. */
@@ -858,8 +887,7 @@ do {                                                                    \
     unsigned int nr_ = sizeof((uint8_t[]){ bytes });                    \
     fic.insn_bytes = nr_;                                               \
     memcpy(get_stub(stub), ((uint8_t[]){ bytes, 0xc3 }), nr_ + 1);      \
-    asm volatile ( "call *%[stub]" : "+m" (fic) :                       \
-                   [stub] "rm" (stub.func) );                           \
+    invoke_stub("", "", "=m" (fic) : "m" (fic));                        \
     put_stub(stub);                                                     \
 } while (0)
 
@@ -869,14 +897,11 @@ do {                                                                    \
     unsigned long tmp_;                                                 \
     fic.insn_bytes = nr_;                                               \
     memcpy(get_stub(stub), ((uint8_t[]){ bytes, 0xc3 }), nr_ + 1);      \
-    asm volatile ( _PRE_EFLAGS("[eflags]", "[mask]", "[tmp]")           \
-                   "call *%[func];"                                     \
-                   _POST_EFLAGS("[eflags]", "[mask]", "[tmp]")          \
-                   : [eflags] "+g" (_regs._eflags),                     \
-                     [tmp] "=&r" (tmp_), "+m" (fic)                     \
-                   : [func] "rm" (stub.func),                           \
-                     [mask] "i" (X86_EFLAGS_ZF|X86_EFLAGS_PF|           \
-                                 X86_EFLAGS_CF) );                      \
+    invoke_stub(_PRE_EFLAGS("[eflags]", "[mask]", "[tmp]"),             \
+                _POST_EFLAGS("[eflags]", "[mask]", "[tmp]"),            \
+                [eflags] "+g" (_regs._eflags), [tmp] "=&r" (tmp_),      \
+                "+m" (fic)                                              \
+                : [mask] "i" (X86_EFLAGS_ZF|X86_EFLAGS_PF|X86_EFLAGS_CF)); \
     put_stub(stub);                                                     \
 } while (0)
 

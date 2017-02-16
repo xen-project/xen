@@ -274,7 +274,15 @@ extern struct exception_table_entry __stop___ex_table[];
 extern struct exception_table_entry __start___pre_ex_table[];
 extern struct exception_table_entry __stop___pre_ex_table[];
 
-extern unsigned long search_exception_table(unsigned long);
+union stub_exception_token {
+    struct {
+        uint16_t ec;
+        uint8_t trapnr;
+    } fields;
+    unsigned long raw;
+};
+
+extern unsigned long search_exception_table(const struct cpu_user_regs *regs);
 extern void sort_exception_tables(void);
 extern void sort_exception_table(struct exception_table_entry *start,
                                  const struct exception_table_entry *stop);

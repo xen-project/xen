@@ -798,21 +798,21 @@ void do_trap(struct cpu_user_regs *regs)
         return;
     }
 
-    if ( likely((fixup = search_exception_table(regs->rip)) != 0) )
-    {
-        dprintk(XENLOG_ERR, "Trap %d: %p -> %p\n",
-                trapnr, _p(regs->rip), _p(fixup));
-        this_cpu(last_extable_addr) = regs->rip;
-        regs->rip = fixup;
-        return;
-    }
-
     if ( ((trapnr == TRAP_copro_error) || (trapnr == TRAP_simd_error)) &&
          system_state >= SYS_STATE_active && has_hvm_container_vcpu(curr) &&
          curr->arch.hvm_vcpu.fpu_exception_callback )
     {
         curr->arch.hvm_vcpu.fpu_exception_callback(
             curr->arch.hvm_vcpu.fpu_exception_callback_arg, regs);
+        return;
+    }
+
+    if ( likely((fixup = search_exception_table(regs)) != 0) )
+    {
+        dprintk(XENLOG_ERR, "Trap %u: %p [%ps] -> %p\n",
+                trapnr, _p(regs->rip), _p(regs->rip), _p(fixup));
+        this_cpu(last_extable_addr) = regs->rip;
+        regs->rip = fixup;
         return;
     }
 
@@ -1185,7 +1185,7 @@ void do_invalid_op(struct cpu_user_regs *regs)
     }
 
  die:
-    if ( (fixup = search_exception_table(regs->rip)) != 0 )
+    if ( (fixup = search_exception_table(regs)) != 0 )
     {
         this_cpu(last_extable_addr) = regs->rip;
         regs->rip = fixup;
@@ -1515,7 +1515,7 @@ void do_page_fault(struct cpu_user_regs *regs)
         if ( pf_type != real_fault )
             return;
 
-        if ( likely((fixup = search_exception_table(regs->rip)) != 0) )
+        if ( likely((fixup = search_exception_table(regs)) != 0) )
         {
             perfc_incr(copy_user_faults);
             if ( unlikely(regs->error_code & PFEC_reserved_bit) )
@@ -3462,10 +3462,10 @@ void do_general_protection(struct cpu_user_regs *regs)
 
  gp_in_kernel:
 
-    if ( likely((fixup = search_exception_table(regs->rip)) != 0) )
+    if ( likely((fixup = search_exception_table(regs)) != 0) )
     {
-        dprintk(XENLOG_INFO, "GPF (%04x): %p -> %p\n",
-                regs->error_code, _p(regs->rip), _p(fixup));
+        dprintk(XENLOG_INFO, "GPF (%04x): %p [%ps] -> %p\n",
+                regs->error_code, _p(regs->rip), _p(regs->rip), _p(fixup));
         this_cpu(last_extable_addr) = regs->rip;
         regs->rip = fixup;
         return;
@@ -3741,7 +3741,7 @@ void do_debug(struct cpu_user_regs *regs)
              * watchpoint set on it. No need to bump EIP; the only faulting
              * trap is an instruction breakpoint, which can't happen to us.
              */
-            WARN_ON(!search_exception_table(regs->rip));
+            WARN_ON(!search_exception_table(regs));
         }
         goto out;
     }
