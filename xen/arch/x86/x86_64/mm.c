@@ -251,7 +251,7 @@ static void destroy_compat_m2p_mapping(struct mem_hotadd_info *info)
             }
         }
 
-        i += 1UL < (L2_PAGETABLE_SHIFT - 2);
+        i += 1UL << (L2_PAGETABLE_SHIFT - 2);
     }
 
     return;
