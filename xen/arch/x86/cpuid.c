@@ -582,8 +582,6 @@ void recalculate_cpuid_policy(struct domain *d)
 
 int init_domain_cpuid_policy(struct domain *d)
 {
-    unsigned int i;
-
     d->arch.cpuid = xmalloc(struct cpuid_policy);
 
     if ( !d->arch.cpuid )
@@ -596,68 +594,7 @@ int init_domain_cpuid_policy(struct domain *d)
 
     recalculate_cpuid_policy(d);
 
-    for ( i = 0; i < MAX_CPUID_INPUT; i++ )
-    {
-        d->arch.cpuid->legacy[i].input[0] = XEN_CPUID_INPUT_UNUSED;
-        d->arch.cpuid->legacy[i].input[1] = XEN_CPUID_INPUT_UNUSED;
-    }
-
     return 0;
-}
-
-static void domain_cpuid(const struct domain *d, uint32_t leaf,
-                         uint32_t subleaf, struct cpuid_leaf *res)
-{
-    unsigned int i;
-
-    for ( i = 0; i < MAX_CPUID_INPUT; i++ )
-    {
-        xen_domctl_cpuid_t *cpuid = &d->arch.cpuid->legacy[i];
-
-        if ( (cpuid->input[0] == leaf) &&
-             ((cpuid->input[1] == XEN_CPUID_INPUT_UNUSED) ||
-              (cpuid->input[1] == subleaf)) )
-        {
-            *res = (struct cpuid_leaf){ cpuid->eax, cpuid->ebx,
-                                        cpuid->ecx, cpuid->edx };
-            return;
-        }
-    }
-}
-
-static void pv_cpuid(uint32_t leaf, uint32_t subleaf, struct cpuid_leaf *res)
-{
-    struct vcpu *curr = current;
-    struct domain *currd = curr->domain;
-
-    if ( !is_control_domain(currd) && !is_hardware_domain(currd) )
-        domain_cpuid(currd, leaf, subleaf, res);
-    else
-        cpuid_count_leaf(leaf, subleaf, res);
-
-    switch ( leaf )
-    {
-    case 0x0 ... XSTATE_CPUID:
-    case 0x80000000 ... 0xffffffff:
-        ASSERT_UNREACHABLE();
-        /* Now handled in guest_cpuid(). */
-    }
-}
-
-static void hvm_cpuid(uint32_t leaf, uint32_t subleaf, struct cpuid_leaf *res)
-{
-    struct vcpu *v = current;
-    struct domain *d = v->domain;
-
-    domain_cpuid(d, leaf, subleaf, res);
-
-    switch ( leaf )
-    {
-    case 0x0 ... XSTATE_CPUID:
-    case 0x80000000 ... 0xffffffff:
-        ASSERT_UNREACHABLE();
-        /* Now handled in guest_cpuid(). */
-    }
 }
 
 void guest_cpuid(const struct vcpu *v, uint32_t leaf,
@@ -709,11 +646,6 @@ void guest_cpuid(const struct vcpu *v, uint32_t leaf,
             break;
 
         default:
-            goto legacy;
-
-        case 0x0 ... 0x3:
-        case 0x5 ... 0x6:
-        case 0x8 ... 0xc:
             *res = p->basic.raw[leaf];
             break;
         }
@@ -1030,14 +962,6 @@ void guest_cpuid(const struct vcpu *v, uint32_t leaf,
             res->a = (res->d & v->arch.hvm_svm.guest_lwp_cfg) | 1;
         break;
     }
-
-    /* Done. */
-    return;
-
- legacy:
-    /* {hvm,pv}_cpuid() have this expectation. */
-    ASSERT(v == current);
-    (is_hvm_domain(d) ? hvm_cpuid : pv_cpuid)(leaf, subleaf, res);
 }
 
 static void __init __maybe_unused build_assertions(void)

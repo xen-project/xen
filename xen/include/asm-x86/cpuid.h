@@ -72,29 +72,6 @@ DECLARE_PER_CPU(bool, cpuid_faulting_enabled);
 
 struct cpuid_policy
 {
-    /*
-     * WARNING: During the CPUID transition period, not all information here
-     * is accurate.  The following items are accurate, and can be relied upon.
-     *
-     * Global *_policy objects:
-     *
-     * - Guest accurate:
-     *   - All of the feat, xstate and extd unions
-     *   - max_{,sub}leaf
-     *   - All FEATURESET_* words
-     *   - Short vendor infomation
-     *
-     * Per-domain objects:
-     *
-     * - Guest accurate:
-     *   - All of the feat, xstate and extd unions
-     *   - max_{,sub}leaf
-     *   - All FEATURESET_* words
-     *   - Short vendor infomation
-     *
-     * Everything else should be considered inaccurate, and not necesserily 0.
-     */
-
 #define DECL_BITFIELD(word) _DECL_BITFIELD(FEATURESET_ ## word)
 #define _DECL_BITFIELD(x)   __DECL_BITFIELD(x)
 #define __DECL_BITFIELD(x)  CPUID_BITFIELD_ ## x
@@ -242,10 +219,6 @@ struct cpuid_policy
 
     /* Value calculated from raw data above. */
     uint8_t x86_vendor;
-
-    /* Temporary: Legacy data array. */
-#define MAX_CPUID_INPUT 40
-    xen_domctl_cpuid_t legacy[MAX_CPUID_INPUT];
 };
 
 /* Fill in a featureset bitmap from a CPUID policy. */

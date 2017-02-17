@@ -47,51 +47,12 @@ static int gdbsx_guest_mem_io(domid_t domid, struct xen_domctl_gdbsx_memio *iop)
     return iop->remain ? -EFAULT : 0;
 }
 
-static int update_legacy_cpuid_array(struct domain *d,
-                                     const xen_domctl_cpuid_t *ctl)
-{
-    xen_domctl_cpuid_t *cpuid, *unused = NULL;
-    unsigned int i;
-
-    /* Try to insert ctl into d->arch.cpuids[] */
-    for ( i = 0; i < MAX_CPUID_INPUT; i++ )
-    {
-        cpuid = &d->arch.cpuid->legacy[i];
-
-        if ( cpuid->input[0] == XEN_CPUID_INPUT_UNUSED )
-        {
-            if ( !unused )
-                unused = cpuid;
-            continue;
-        }
-
-        if ( (cpuid->input[0] == ctl->input[0]) &&
-             ((cpuid->input[1] == XEN_CPUID_INPUT_UNUSED) ||
-              (cpuid->input[1] == ctl->input[1])) )
-            break;
-    }
-
-    if ( !(ctl->eax | ctl->ebx | ctl->ecx | ctl->edx) )
-    {
-        if ( i < MAX_CPUID_INPUT )
-            cpuid->input[0] = XEN_CPUID_INPUT_UNUSED;
-    }
-    else if ( i < MAX_CPUID_INPUT )
-        *cpuid = *ctl;
-    else if ( unused )
-        *unused = *ctl;
-    else
-        return -ENOENT;
-
-    return 0;
-}
-
 static int update_domain_cpuid_info(struct domain *d,
                                     const xen_domctl_cpuid_t *ctl)
 {
     struct cpuid_policy *p = d->arch.cpuid;
     const struct cpuid_leaf leaf = { ctl->eax, ctl->ebx, ctl->ecx, ctl->edx };
-    int rc, old_vendor = p->x86_vendor;
+    int old_vendor = p->x86_vendor;
 
     /*
      * Skip update for leaves we don't care about.  This avoids the overhead
@@ -124,10 +85,6 @@ static int update_domain_cpuid_info(struct domain *d,
     default:
         return 0;
     }
-
-    rc = update_legacy_cpuid_array(d, ctl);
-    if ( rc )
-        return rc;
 
     /* Insert ctl data into cpuid_policy. */
     switch ( ctl->input[0] )
