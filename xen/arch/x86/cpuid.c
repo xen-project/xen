@@ -171,6 +171,7 @@ static void recalculate_misc(struct cpuid_policy *p)
     p->basic.raw[0x6] = EMPTY_LEAF; /* Therm/Power not exposed to guests. */
 
     p->basic.raw[0x8] = EMPTY_LEAF;
+    p->basic.raw[0xb] = EMPTY_LEAF; /* TODO: Rework topology logic. */
     p->basic.raw[0xc] = EMPTY_LEAF;
 
     p->extd.e1d &= ~CPUID_COMMON_1D_FEATURES;
@@ -636,12 +637,7 @@ static void pv_cpuid(uint32_t leaf, uint32_t subleaf, struct cpuid_leaf *res)
 
     switch ( leaf )
     {
-    case 0x0000000b: /* Extended Topology Enumeration */
-        *res = EMPTY_LEAF;
-        break;
-
-    case 0x0 ... 0xa:
-    case 0xc ... XSTATE_CPUID:
+    case 0x0 ... XSTATE_CPUID:
     case 0x80000000 ... 0xffffffff:
         ASSERT_UNREACHABLE();
         /* Now handled in guest_cpuid(). */
@@ -657,13 +653,7 @@ static void hvm_cpuid(uint32_t leaf, uint32_t subleaf, struct cpuid_leaf *res)
 
     switch ( leaf )
     {
-    case 0xb:
-        /* Fix the x2APIC identifier. */
-        res->d = v->vcpu_id * 2;
-        break;
-
-    case 0x0 ... 0xa:
-    case 0xc ... XSTATE_CPUID:
+    case 0x0 ... XSTATE_CPUID:
     case 0x80000000 ... 0xffffffff:
         ASSERT_UNREACHABLE();
         /* Now handled in guest_cpuid(). */
@@ -723,8 +713,7 @@ void guest_cpuid(const struct vcpu *v, uint32_t leaf,
 
         case 0x0 ... 0x3:
         case 0x5 ... 0x6:
-        case 0x8 ... 0xa:
-        case 0xc:
+        case 0x8 ... 0xc:
             *res = p->basic.raw[leaf];
             break;
         }
@@ -942,6 +931,23 @@ void guest_cpuid(const struct vcpu *v, uint32_t leaf,
             /* Report at most v3 since that's all we currently emulate. */
             if ( (res->a & 0xff) > 3 )
                 res->a = (res->a & ~0xff) | 3;
+        }
+        break;
+
+    case 0xb:
+        /*
+         * In principle, this leaf is Intel-only.  In practice, it is tightly
+         * coupled with x2apic, and we offer an x2apic-capable APIC emulation
+         * to guests on AMD hardware as well.
+         *
+         * TODO: Rework topology logic.
+         */
+        if ( p->basic.x2apic )
+        {
+            *(uint8_t *)&res->c = subleaf;
+
+            /* Fix the x2APIC identifier. */
+            res->d = v->vcpu_id * 2;
         }
         break;
 
