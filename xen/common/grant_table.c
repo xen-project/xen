@@ -814,7 +814,7 @@ __gnttab_map_grant_ref(
 
     /* Bounds check on the grant ref */
     if ( unlikely(op->ref >= nr_grant_entries(rgt)))
-        PIN_FAIL(unlock_out, GNTST_bad_gntref, "Bad ref (%d).\n", op->ref);
+        PIN_FAIL(unlock_out, GNTST_bad_gntref, "Bad ref %#x\n", op->ref);
 
     act = active_entry_acquire(rgt, op->ref);
     shah = shared_entry_header(rgt, op->ref);
@@ -1087,7 +1087,7 @@ __gnttab_unmap_common(
 
     if ( unlikely(op->handle >= lgt->maptrack_limit) )
     {
-        gdprintk(XENLOG_INFO, "Bad handle (%d).\n", op->handle);
+        gdprintk(XENLOG_INFO, "Bad handle %#x\n", op->handle);
         op->status = GNTST_bad_handle;
         return;
     }
@@ -1099,7 +1099,7 @@ __gnttab_unmap_common(
     if ( unlikely(!read_atomic(&op->map->flags)) )
     {
         grant_read_unlock(lgt);
-        gdprintk(XENLOG_INFO, "Zero flags for handle (%d).\n", op->handle);
+        gdprintk(XENLOG_INFO, "Zero flags for handle %#x\n", op->handle);
         op->status = GNTST_bad_handle;
         return;
     }
@@ -1132,7 +1132,7 @@ __gnttab_unmap_common(
     op->flags = read_atomic(&op->map->flags);
     if ( unlikely(!op->flags) || unlikely(op->map->domid != dom) )
     {
-        gdprintk(XENLOG_WARNING, "Unstable handle %u\n", op->handle);
+        gdprintk(XENLOG_WARNING, "Unstable handle %#x\n", op->handle);
         rc = GNTST_bad_handle;
         goto unmap_out;
     }
@@ -1706,7 +1706,7 @@ gnttab_prepare_for_transfer(
     if ( unlikely(ref >= nr_grant_entries(rgt)) )
     {
         gdprintk(XENLOG_INFO,
-                "Bad grant reference (%d) for transfer to domain(%d).\n",
+                "Bad grant reference %#x for transfer to d%d\n",
                 ref, rd->domain_id);
         goto fail;
     }
@@ -2672,7 +2672,7 @@ gnttab_set_version(XEN_GUEST_HANDLE_PARAM(gnttab_set_version_t) uop)
                 break;
             default:
                 gdprintk(XENLOG_INFO,
-                         "bad flags %#x in grant %u when switching version\n",
+                         "bad flags %#x in grant %#x when switching version\n",
                          flags, i);
                 /* fall through */
             case GTF_invalid:
@@ -2836,9 +2836,9 @@ __gnttab_swap_grant_ref(grant_ref_t ref_a, grant_ref_t ref_b)
 
     /* Bounds check on the grant refs */
     if ( unlikely(ref_a >= nr_grant_entries(d->grant_table)))
-        PIN_FAIL(out, GNTST_bad_gntref, "Bad ref-a (%d).\n", ref_a);
+        PIN_FAIL(out, GNTST_bad_gntref, "Bad ref-a %#x\n", ref_a);
     if ( unlikely(ref_b >= nr_grant_entries(d->grant_table)))
-        PIN_FAIL(out, GNTST_bad_gntref, "Bad ref-b (%d).\n", ref_b);
+        PIN_FAIL(out, GNTST_bad_gntref, "Bad ref-b %#x\n", ref_b);
 
     /* Swapping the same ref is a no-op. */
     if ( ref_a == ref_b )
@@ -2846,11 +2846,11 @@ __gnttab_swap_grant_ref(grant_ref_t ref_a, grant_ref_t ref_b)
 
     act_a = active_entry_acquire(gt, ref_a);
     if ( act_a->pin )
-        PIN_FAIL(out, GNTST_eagain, "ref a %ld busy\n", (long)ref_a);
+        PIN_FAIL(out, GNTST_eagain, "ref a %#x busy\n", ref_a);
 
     act_b = active_entry_acquire(gt, ref_b);
     if ( act_b->pin )
-        PIN_FAIL(out, GNTST_eagain, "ref b %ld busy\n", (long)ref_b);
+        PIN_FAIL(out, GNTST_eagain, "ref b %#x busy\n", ref_b);
 
     if ( gt->gt_version == 1 )
     {
@@ -3284,9 +3284,8 @@ gnttab_release_mappings(
 
         ref = map->ref;
 
-        gdprintk(XENLOG_INFO, "Grant release (%hu) ref:(%hu) "
-                "flags:(%x) dom:(%hu)\n",
-                handle, ref, map->flags, map->domid);
+        gdprintk(XENLOG_INFO, "Grant release %#x ref %#x flags %#x dom %u\n",
+                 handle, ref, map->flags, map->domid);
 
         rd = rcu_lock_domain_by_id(map->domid);
         if ( rd == NULL )
@@ -3530,8 +3529,8 @@ static void gnttab_usage_print(struct domain *rd)
             first = 0;
         }
 
-        /*      [ddd]    ddddd 0xXXXXXX 0xXXXXXXXX      ddddd 0xXXXXXX 0xXX */
-        printk("[%3d]    %5d 0x%06lx 0x%08x      %5d 0x%06"PRIx64" 0x%02x\n",
+        /*      [0xXXX]  ddddd 0xXXXXXX 0xXXXXXXXX      ddddd 0xXXXXXX 0xXX */
+        printk("[0x%03x]  %5d 0x%06lx 0x%08x      %5d 0x%06"PRIx64" 0x%02x\n",
                ref, act->domid, act->frame, act->pin,
                sha->domid, frame, status);
         active_entry_release(act);
