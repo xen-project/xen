@@ -355,11 +355,8 @@ mcheck_mca_logout(enum mca_source who, struct mca_banks *bankmask,
                 ASSERT(mig);
                 mca_init_global(mc_flags, mig);
                 /* A hook here to get global extended msrs */
-                {
-                    if (boot_cpu_data.x86_vendor ==
-                        X86_VENDOR_INTEL)
-                        intel_get_extended_msrs(mig, mci);
-                }
+                if (boot_cpu_data.x86_vendor == X86_VENDOR_INTEL)
+                    intel_get_extended_msrs(mig, mci);
             }
         }
 
