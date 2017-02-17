@@ -941,6 +941,8 @@ long arch_do_domctl(
     case XEN_DOMCTL_set_cpuid:
         if ( d == currd ) /* no domain_pause() */
             ret = -EINVAL;
+        else if ( d->creation_finished )
+            ret = -EEXIST; /* No changing once the domain is running. */
         else
         {
             domain_pause(d);
