@@ -425,16 +425,8 @@ int vcpu_initialise(struct vcpu *v)
         /* PV guests by default have a 100Hz ticker. */
         v->periodic_period = MILLISECS(10);
     }
-
-    v->arch.schedule_tail = continue_nonidle_domain;
-    v->arch.ctxt_switch_from = paravirt_ctxt_switch_from;
-    v->arch.ctxt_switch_to   = paravirt_ctxt_switch_to;
-
-    if ( is_idle_domain(d) )
-    {
-        v->arch.schedule_tail = continue_idle_domain;
-        v->arch.cr3           = __pa(idle_pg_table);
-    }
+    else
+        v->arch.cr3 = __pa(idle_pg_table);
 
     v->arch.pv_vcpu.ctrlreg[4] = real_cr4_to_pv_guest_cr4(mmu_cr4_features);
 
@@ -641,8 +633,23 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags,
             goto fail;
     }
     else
+    {
+        static const struct arch_csw pv_csw = {
+            .from = paravirt_ctxt_switch_from,
+            .to   = paravirt_ctxt_switch_to,
+            .tail = continue_nonidle_domain,
+        };
+        static const struct arch_csw idle_csw = {
+            .from = paravirt_ctxt_switch_from,
+            .to   = paravirt_ctxt_switch_to,
+            .tail = continue_idle_domain,
+        };
+
+        d->arch.ctxt_switch = is_idle_domain(d) ? &idle_csw : &pv_csw;
+
         /* 64-bit PV guest by default. */
         d->arch.is_32bit_pv = d->arch.has_32bit_shinfo = 0;
+    }
 
     /* initialize default tsc behavior in case tools don't */
     tsc_set_info(d, TSC_MODE_DEFAULT, 0UL, 0, 0);
@@ -1996,7 +2003,7 @@ static void __context_switch(void)
     {
         memcpy(&p->arch.user_regs, stack_regs, CTXT_SWITCH_STACK_BYTES);
         vcpu_save_fpu(p);
-        p->arch.ctxt_switch_from(p);
+        pd->arch.ctxt_switch->from(p);
     }
 
     /*
@@ -2022,7 +2029,7 @@ static void __context_switch(void)
                 set_msr_xss(n->arch.hvm_vcpu.msr_xss);
         }
         vcpu_restore_fpu_eager(n);
-        n->arch.ctxt_switch_to(n);
+        nd->arch.ctxt_switch->to(n);
     }
 
     psr_ctxt_switch_to(nd);
@@ -2141,12 +2148,20 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
     /* Ensure that the vcpu has an up-to-date time base. */
     update_vcpu_system_time(next);
 
-    schedule_tail(next);
+    /*
+     * Schedule tail *should* be a terminal function pointer, but leave a
+     * bug frame around just in case it returns, to save going back into the
+     * context switching code and leaving a far more subtle crash to diagnose.
+     */
+    nextd->arch.ctxt_switch->tail(next);
+    BUG();
 }
 
 void continue_running(struct vcpu *same)
 {
-    schedule_tail(same);
+    /* See the comment above. */
+    same->domain->arch.ctxt_switch->tail(same);
+    BUG();
 }
 
 int __sync_local_execstate(void)

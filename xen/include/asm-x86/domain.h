@@ -313,6 +313,12 @@ struct arch_domain
     } relmem;
     struct page_list_head relmem_list;
 
+    const struct arch_csw {
+        void (*from)(struct vcpu *);
+        void (*to)(struct vcpu *);
+        void (*tail)(struct vcpu *);
+    } *ctxt_switch;
+
     /* nestedhvm: translate l2 guest physical to host physical */
     struct p2m_domain *nested_p2m[MAX_NESTEDP2M];
     mm_lock_t nested_p2m_lock;
@@ -508,11 +514,6 @@ struct arch_vcpu
     /* other state */
 
     unsigned long      flags; /* TF_ */
-
-    void (*schedule_tail) (struct vcpu *);
-
-    void (*ctxt_switch_from) (struct vcpu *);
-    void (*ctxt_switch_to) (struct vcpu *);
 
     struct vpmu_struct vpmu;
 

@@ -102,16 +102,6 @@ unsigned long get_stack_dump_bottom (unsigned long sp);
     })
 
 /*
- * Schedule tail *should* be a terminal function pointer, but leave a bugframe
- * around just incase it returns, to save going back into the context
- * switching code and leaving a far more subtle crash to diagnose.
- */
-#define schedule_tail(vcpu) do {                \
-        (((vcpu)->arch.schedule_tail)(vcpu));   \
-        BUG();                                  \
-    } while (0)
-
-/*
  * Which VCPU's state is currently running on each CPU?
  * This is not necesasrily the same as 'current' as a CPU may be
  * executing a lazy state switch.

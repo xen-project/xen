@@ -1143,6 +1143,14 @@ void svm_host_osvw_init()
 
 static int svm_domain_initialise(struct domain *d)
 {
+    static const struct arch_csw csw = {
+        .from = svm_ctxt_switch_from,
+        .to   = svm_ctxt_switch_to,
+        .tail = svm_do_resume,
+    };
+
+    d->arch.ctxt_switch = &csw;
+
     return 0;
 }
 
@@ -1153,10 +1161,6 @@ static void svm_domain_destroy(struct domain *d)
 static int svm_vcpu_initialise(struct vcpu *v)
 {
     int rc;
-
-    v->arch.schedule_tail    = svm_do_resume;
-    v->arch.ctxt_switch_from = svm_ctxt_switch_from;
-    v->arch.ctxt_switch_to   = svm_ctxt_switch_to;
 
     v->arch.hvm_svm.launch_core = -1;
 

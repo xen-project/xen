@@ -267,7 +267,14 @@ void vmx_pi_hooks_deassign(struct domain *d)
 
 static int vmx_domain_initialise(struct domain *d)
 {
+    static const struct arch_csw csw = {
+        .from = vmx_ctxt_switch_from,
+        .to   = vmx_ctxt_switch_to,
+        .tail = vmx_do_resume,
+    };
     int rc;
+
+    d->arch.ctxt_switch = &csw;
 
     if ( !has_vlapic(d) )
         return 0;
@@ -293,10 +300,6 @@ static int vmx_vcpu_initialise(struct vcpu *v)
     spin_lock_init(&v->arch.hvm_vmx.vmcs_lock);
 
     INIT_LIST_HEAD(&v->arch.hvm_vmx.pi_blocking.list);
-
-    v->arch.schedule_tail    = vmx_do_resume;
-    v->arch.ctxt_switch_from = vmx_ctxt_switch_from;
-    v->arch.ctxt_switch_to   = vmx_ctxt_switch_to;
 
     if ( (rc = vmx_create_vmcs(v)) != 0 )
     {
