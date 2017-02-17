@@ -110,15 +110,16 @@ static int bank_mce_rdmsr(const struct vcpu *v, uint32_t msr, uint64_t *val)
     case MSR_IA32_MC0_CTL:
         /* stick all 1's to MCi_CTL */
         *val = ~0UL;
-        mce_printk(MCE_VERBOSE, "MCE: rd MC%u_CTL %#"PRIx64"\n", bank, *val);
+        mce_printk(MCE_VERBOSE, "MCE: %pv: rd MC%u_CTL %#"PRIx64"\n",
+                   v, bank, *val);
         break;
     case MSR_IA32_MC0_STATUS:
         if ( bank < GUEST_MC_BANK_NUM )
         {
             *val = v->arch.vmce.bank[bank].mci_status;
             if ( *val )
-                mce_printk(MCE_VERBOSE, "MCE: rd MC%u_STATUS %#"PRIx64"\n",
-                           bank, *val);
+                mce_printk(MCE_VERBOSE, "MCE: %pv: rd MC%u_STATUS %#"PRIx64"\n",
+                           v, bank, *val);
         }
         break;
     case MSR_IA32_MC0_ADDR:
@@ -126,8 +127,8 @@ static int bank_mce_rdmsr(const struct vcpu *v, uint32_t msr, uint64_t *val)
         {
             *val = v->arch.vmce.bank[bank].mci_addr;
             if ( *val )
-                mce_printk(MCE_VERBOSE, "MCE: rd MC%u_ADDR %#"PRIx64"\n",
-                           bank, *val);
+                mce_printk(MCE_VERBOSE, "MCE: %pv: rd MC%u_ADDR %#"PRIx64"\n",
+                           v, bank, *val);
         }
         break;
     case MSR_IA32_MC0_MISC:
@@ -135,8 +136,8 @@ static int bank_mce_rdmsr(const struct vcpu *v, uint32_t msr, uint64_t *val)
         {
             *val = v->arch.vmce.bank[bank].mci_misc;
             if ( *val )
-                mce_printk(MCE_VERBOSE, "MCE: rd MC%u_MISC %#"PRIx64"\n",
-                           bank, *val);
+                mce_printk(MCE_VERBOSE, "MCE: %pv: rd MC%u_MISC %#"PRIx64"\n",
+                           v, bank, *val);
         }
         break;
     default:
@@ -178,16 +179,16 @@ int vmce_rdmsr(uint32_t msr, uint64_t *val)
         *val = cur->arch.vmce.mcg_status;
         if (*val)
             mce_printk(MCE_VERBOSE,
-                       "MCE: rd MCG_STATUS %#"PRIx64"\n", *val);
+                       "MCE: %pv: rd MCG_STATUS %#"PRIx64"\n", cur, *val);
         break;
     case MSR_IA32_MCG_CAP:
         *val = cur->arch.vmce.mcg_cap;
-        mce_printk(MCE_VERBOSE, "MCE: rd MCG_CAP %#"PRIx64"\n", *val);
+        mce_printk(MCE_VERBOSE, "MCE: %pv: rd MCG_CAP %#"PRIx64"\n", cur, *val);
         break;
     case MSR_IA32_MCG_CTL:
         if ( cur->arch.vmce.mcg_cap & MCG_CTL_P )
             *val = ~0ULL;
-        mce_printk(MCE_VERBOSE, "MCE: rd MCG_CTL %#"PRIx64"\n", *val);
+        mce_printk(MCE_VERBOSE, "MCE: %pv: rd MCG_CTL %#"PRIx64"\n", cur, *val);
         break;
     default:
         ret = mce_bank_msr(cur, msr) ? bank_mce_rdmsr(cur, msr, val) : 0;
@@ -217,21 +218,24 @@ static int bank_mce_wrmsr(struct vcpu *v, uint32_t msr, uint64_t val)
          */
         break;
     case MSR_IA32_MC0_STATUS:
-        mce_printk(MCE_VERBOSE, "MCE: wr MC%u_STATUS %#"PRIx64"\n", bank, val);
+        mce_printk(MCE_VERBOSE, "MCE: %pv: wr MC%u_STATUS %#"PRIx64"\n",
+                   v, bank, val);
         if ( val )
             ret = -1;
         else if ( bank < GUEST_MC_BANK_NUM )
             v->arch.vmce.bank[bank].mci_status = val;
         break;
     case MSR_IA32_MC0_ADDR:
-        mce_printk(MCE_VERBOSE, "MCE: wr MC%u_ADDR %#"PRIx64"\n", bank, val);
+        mce_printk(MCE_VERBOSE, "MCE: %pv: wr MC%u_ADDR %#"PRIx64"\n",
+                   v, bank, val);
         if ( val )
             ret = -1;
         else if ( bank < GUEST_MC_BANK_NUM )
             v->arch.vmce.bank[bank].mci_addr = val;
         break;
     case MSR_IA32_MC0_MISC:
-        mce_printk(MCE_VERBOSE, "MCE: wr MC%u_MISC %#"PRIx64"\n", bank, val);
+        mce_printk(MCE_VERBOSE, "MCE: %pv: wr MC%u_MISC %#"PRIx64"\n",
+                   v, bank, val);
         if ( val )
             ret = -1;
         else if ( bank < GUEST_MC_BANK_NUM )
@@ -275,7 +279,8 @@ int vmce_wrmsr(uint32_t msr, uint64_t val)
         break;
     case MSR_IA32_MCG_STATUS:
         cur->arch.vmce.mcg_status = val;
-        mce_printk(MCE_VERBOSE, "MCE: wr MCG_STATUS %"PRIx64"\n", val);
+        mce_printk(MCE_VERBOSE, "MCE: %pv: wr MCG_STATUS %"PRIx64"\n",
+                   cur, val);
         break;
     case MSR_IA32_MCG_CAP:
         /*
@@ -283,7 +288,7 @@ int vmce_wrmsr(uint32_t msr, uint64_t val)
          * the effect of writing to the IA32_MCG_CAP is undefined. Here we
          * treat writing as 'write not change'. Guest would not surprise.
          */
-        mce_printk(MCE_VERBOSE, "MCE: MCG_CAP is r/o\n");
+        mce_printk(MCE_VERBOSE, "MCE: %pv: MCG_CAP is r/o\n", cur);
         break;
     default:
         ret = mce_bank_msr(cur, msr) ? bank_mce_wrmsr(cur, msr, val) : 0;
