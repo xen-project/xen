@@ -203,7 +203,7 @@ static void recalculate_misc(struct cpuid_policy *p)
     case X86_VENDOR_AMD:
         zero_leaves(p->basic.raw, 0x2, 0x3);
         memset(p->cache.raw, 0, sizeof(p->cache.raw));
-        p->basic.raw[0x9] = EMPTY_LEAF;
+        zero_leaves(p->basic.raw, 0x9, 0xa);
 
         p->extd.vendor_ebx = p->basic.vendor_ebx;
         p->extd.vendor_ecx = p->basic.vendor_ecx;
@@ -636,22 +636,11 @@ static void pv_cpuid(uint32_t leaf, uint32_t subleaf, struct cpuid_leaf *res)
 
     switch ( leaf )
     {
-    case 0x0000000a: /* Architectural Performance Monitor Features (Intel) */
-        if ( boot_cpu_data.x86_vendor != X86_VENDOR_INTEL ||
-             !vpmu_available(curr) )
-            goto unsupported;
-
-        /* Report at most version 3 since that's all we currently emulate. */
-        if ( (res->a & 0xff) > 3 )
-            res->a = (res->a & ~0xff) | 3;
-        break;
-
     case 0x0000000b: /* Extended Topology Enumeration */
-    unsupported:
         *res = EMPTY_LEAF;
         break;
 
-    case 0x0 ... 0x9:
+    case 0x0 ... 0xa:
     case 0xc ... XSTATE_CPUID:
     case 0x80000000 ... 0xffffffff:
         ASSERT_UNREACHABLE();
@@ -673,19 +662,7 @@ static void hvm_cpuid(uint32_t leaf, uint32_t subleaf, struct cpuid_leaf *res)
         res->d = v->vcpu_id * 2;
         break;
 
-    case 0x0000000a: /* Architectural Performance Monitor Features (Intel) */
-        if ( boot_cpu_data.x86_vendor != X86_VENDOR_INTEL || !vpmu_available(v) )
-        {
-            *res = EMPTY_LEAF;
-            break;
-        }
-
-        /* Report at most version 3 since that's all we currently emulate */
-        if ( (res->a & 0xff) > 3 )
-            res->a = (res->a & ~0xff) | 3;
-        break;
-
-    case 0x0 ... 0x9:
+    case 0x0 ... 0xa:
     case 0xc ... XSTATE_CPUID:
     case 0x80000000 ... 0xffffffff:
         ASSERT_UNREACHABLE();
@@ -746,7 +723,7 @@ void guest_cpuid(const struct vcpu *v, uint32_t leaf,
 
         case 0x0 ... 0x3:
         case 0x5 ... 0x6:
-        case 0x8 ... 0x9:
+        case 0x8 ... 0xa:
         case 0xc:
             *res = p->basic.raw[leaf];
             break;
@@ -952,6 +929,19 @@ void guest_cpuid(const struct vcpu *v, uint32_t leaf,
                   : v->arch.hvm_vcpu.guest_cr[4]) & X86_CR4_PKE )
                 res->c |= cpufeat_mask(X86_FEATURE_OSPKE);
             break;
+        }
+        break;
+
+    case 0xa:
+        /* TODO: Rework vPMU control in terms of toolstack choices. */
+        if ( boot_cpu_data.x86_vendor != X86_VENDOR_INTEL ||
+             !vpmu_available(v) )
+            *res = EMPTY_LEAF;
+        else
+        {
+            /* Report at most v3 since that's all we currently emulate. */
+            if ( (res->a & 0xff) > 3 )
+                res->a = (res->a & ~0xff) | 3;
         }
         break;
 
