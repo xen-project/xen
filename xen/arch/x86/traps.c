@@ -2010,7 +2010,7 @@ uint32_t guest_io_read(unsigned int port, unsigned int bytes,
         {
             sub_data = pv_pit_handler(port, 0, 0);
         }
-        else if ( (port == RTC_PORT(0)) )
+        else if ( port == RTC_PORT(0) )
         {
             sub_data = currd->arch.cmos_idx;
         }
@@ -2079,7 +2079,7 @@ void guest_io_write(unsigned int port, unsigned int bytes, uint32_t data,
         {
             pv_pit_handler(port, (uint8_t)data, 1);
         }
-        else if ( (port == RTC_PORT(0)) )
+        else if ( port == RTC_PORT(0) )
         {
             currd->arch.cmos_idx = data;
         }

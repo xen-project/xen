@@ -212,9 +212,6 @@ CFLAGS += -std=gnu99
 
 CFLAGS += -Wall -Wstrict-prototypes
 
-# Clang complains about macros that expand to 'if ( ( foo == bar ) ) ...'
-CFLAGS-$(clang) += -Wno-parentheses
-
 $(call cc-option-add,HOSTCFLAGS,HOSTCC,-Wdeclaration-after-statement)
 $(call cc-option-add,CFLAGS,CC,-Wdeclaration-after-statement)
 $(call cc-option-add,CFLAGS,CC,-Wno-unused-but-set-variable)
