@@ -254,20 +254,23 @@ static void conring_puts(const char *str)
 long read_console_ring(struct xen_sysctl_readconsole *op)
 {
     XEN_GUEST_HANDLE_PARAM(char) str;
-    uint32_t idx, len, max, sofar, c;
+    uint32_t idx, len, max, sofar, c, p;
 
     str   = guest_handle_cast(op->buffer, char),
     max   = op->count;
     sofar = 0;
 
-    c = conringc;
-    if ( op->incremental && ((int32_t)(op->index - c) > 0) )
+    c = read_atomic(&conringc);
+    p = read_atomic(&conringp);
+    if ( op->incremental &&
+         (c <= p ? c < op->index && op->index <= p
+                 : c < op->index || op->index <= p) )
         c = op->index;
 
-    while ( (c != conringp) && (sofar < max) )
+    while ( (c != p) && (sofar < max) )
     {
         idx = CONRING_IDX_MASK(c);
-        len = conringp - c;
+        len = p - c;
         if ( (idx + len) > conring_size )
             len = conring_size - idx;
         if ( (sofar + len) > max )
@@ -281,10 +284,7 @@ long read_console_ring(struct xen_sysctl_readconsole *op)
     if ( op->clear )
     {
         spin_lock_irq(&console_lock);
-        if ( (uint32_t)(conringp - c) > conring_size )
-            conringc = conringp - conring_size;
-        else
-            conringc = c;
+        conringc = p - c > conring_size ? p - conring_size : c;
         spin_unlock_irq(&console_lock);
     }
 
