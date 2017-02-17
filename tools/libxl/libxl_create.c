@@ -1608,7 +1608,6 @@ static void domain_create_cb(libxl__egc *egc,
 static int do_domain_create(libxl_ctx *ctx, libxl_domain_config *d_config,
                             uint32_t *domid, int restore_fd, int send_back_fd,
                             const libxl_domain_restore_params *params,
-                            const char *colo_proxy_script,
                             const libxl_asyncop_how *ao_how,
                             const libxl_asyncprogress_how *aop_console_how)
 {
@@ -1632,7 +1631,14 @@ static int do_domain_create(libxl_ctx *ctx, libxl_domain_config *d_config,
     }
     cdcs->dcs.callback = domain_create_cb;
     cdcs->dcs.domid_soft_reset = INVALID_DOMID;
-    cdcs->dcs.colo_proxy_script = colo_proxy_script;
+
+    if (cdcs->dcs.restore_params.checkpointed_stream ==
+        LIBXL_CHECKPOINTED_STREAM_COLO)
+        cdcs->dcs.colo_proxy_script =
+            cdcs->dcs.restore_params.colo_proxy_script;
+    else
+        cdcs->dcs.colo_proxy_script = NULL;
+
     libxl__ao_progress_gethow(&cdcs->dcs.aop_console_how, aop_console_how);
     cdcs->domid_out = domid;
 
@@ -1820,7 +1826,7 @@ int libxl_domain_create_new(libxl_ctx *ctx, libxl_domain_config *d_config,
                             const libxl_asyncprogress_how *aop_console_how)
 {
     unset_disk_colo_restore(d_config);
-    return do_domain_create(ctx, d_config, domid, -1, -1, NULL, NULL,
+    return do_domain_create(ctx, d_config, domid, -1, -1, NULL,
                             ao_how, aop_console_how);
 }
 
@@ -1831,17 +1837,14 @@ int libxl_domain_create_restore(libxl_ctx *ctx, libxl_domain_config *d_config,
                                 const libxl_asyncop_how *ao_how,
                                 const libxl_asyncprogress_how *aop_console_how)
 {
-    char *colo_proxy_script = NULL;
-
     if (params->checkpointed_stream == LIBXL_CHECKPOINTED_STREAM_COLO) {
-        colo_proxy_script = params->colo_proxy_script;
         set_disk_colo_restore(d_config);
     } else {
         unset_disk_colo_restore(d_config);
     }
 
     return do_domain_create(ctx, d_config, domid, restore_fd, send_back_fd,
-                            params, colo_proxy_script, ao_how, aop_console_how);
+                            params, ao_how, aop_console_how);
 }
 
 int libxl_domain_soft_reset(libxl_ctx *ctx,
