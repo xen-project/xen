@@ -10,14 +10,14 @@
 #include <stdlib.h>
 #include <string.h>
 
-static evtchn_port_t virq_port      = -1;
+static evtchn_port_t virq_port      = ~0;
 static xenevtchn_handle *xce_handle = NULL;
 static xc_interface *xch            = NULL;
 static struct xs_handle *xs_handle  = NULL;
 
 void cleanup(void)
 {
-    if (virq_port > -1)
+    if (virq_port != ~0)
         xenevtchn_unbind(xce_handle, virq_port);
     if (xce_handle)
         xenevtchn_close(xce_handle);
