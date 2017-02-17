@@ -43,11 +43,8 @@ extern uint8_t cmci_apic_vector;
 enum mcheck_type amd_mcheck_init(struct cpuinfo_x86 *c);
 enum mcheck_type intel_mcheck_init(struct cpuinfo_x86 *c, bool_t bsp);
 
-void intel_mcheck_timer(struct cpuinfo_x86 *c);
-void mce_intel_feature_init(struct cpuinfo_x86 *c);
 void amd_nonfatal_mcheck_init(struct cpuinfo_x86 *c);
 
-uint64_t mce_cap_init(void);
 extern unsigned int firstbank;
 
 struct mcinfo_extended *intel_get_extended_msrs(
@@ -56,7 +53,6 @@ struct mcinfo_extended *intel_get_extended_msrs(
 int mce_available(struct cpuinfo_x86 *c);
 unsigned int mce_firstbank(struct cpuinfo_x86 *c);
 /* Helper functions used for collecting error telemetry */
-struct mc_info *x86_mcinfo_getptr(void);
 void noreturn mc_panic(char *s);
 void x86_mc_get_cpu_info(unsigned, uint32_t *, uint16_t *, uint16_t *,
                          uint32_t *, uint32_t *, uint32_t *, uint32_t *);
