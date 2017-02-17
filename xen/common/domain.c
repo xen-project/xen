@@ -1211,15 +1211,17 @@ int map_vcpu_info(struct vcpu *v, unsigned long gfn, unsigned offset)
  */
 void unmap_vcpu_info(struct vcpu *v)
 {
-    if ( mfn_eq(v->vcpu_info_mfn, INVALID_MFN) )
+    mfn_t mfn = v->vcpu_info_mfn;
+
+    if ( mfn_eq(mfn, INVALID_MFN) )
         return;
 
     unmap_domain_page_global((void *)
                              ((unsigned long)v->vcpu_info & PAGE_MASK));
 
-    vcpu_info_reset(v);
+    vcpu_info_reset(v); /* NB: Clobbers v->vcpu_info_mfn */
 
-    put_page_and_type(mfn_to_page(mfn_x(v->vcpu_info_mfn)));
+    put_page_and_type(mfn_to_page(mfn_x(mfn)));
 }
 
 int default_initialise_vcpu(struct vcpu *v, XEN_GUEST_HANDLE_PARAM(void) arg)
