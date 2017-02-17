@@ -30,11 +30,11 @@ extern int mce_verbosity;
         } while (0)
 
 enum mcheck_type {
-	mcheck_unset = -1,
-	mcheck_none,
-	mcheck_amd_famXX,
-	mcheck_amd_k8,
-	mcheck_intel
+    mcheck_unset = -1,
+    mcheck_none,
+    mcheck_amd_famXX,
+    mcheck_amd_k8,
+    mcheck_intel
 };
 
 extern uint8_t cmci_apic_vector;
@@ -59,7 +59,7 @@ unsigned int mce_firstbank(struct cpuinfo_x86 *c);
 struct mc_info *x86_mcinfo_getptr(void);
 void noreturn mc_panic(char *s);
 void x86_mc_get_cpu_info(unsigned, uint32_t *, uint16_t *, uint16_t *,
-			 uint32_t *, uint32_t *, uint32_t *, uint32_t *);
+                         uint32_t *, uint32_t *, uint32_t *, uint32_t *);
 
 /* Register a handler for machine check exceptions. */
 typedef void (*x86_mce_vector_t)(const struct cpu_user_regs *regs);
@@ -80,10 +80,10 @@ extern bool_t intpose_inval(unsigned int, uint64_t);
 
 static inline uint64_t mca_rdmsr(unsigned int msr)
 {
-	uint64_t val;
-	if (intpose_lookup(smp_processor_id(), msr, &val) == NULL)
-		rdmsrl(msr, val);
-	return val;
+    uint64_t val;
+    if (intpose_lookup(smp_processor_id(), msr, &val) == NULL)
+        rdmsrl(msr, val);
+    return val;
 }
 
 /* Write an MSR, invalidating any interposed value */
@@ -101,19 +101,19 @@ static inline uint64_t mca_rdmsr(unsigned int msr)
  * of the MCA data observed in the logout operation. */
 
 enum mca_source {
-	MCA_POLLER,
-	MCA_CMCI_HANDLER,
-	MCA_RESET,
-	MCA_MCE_SCAN
+    MCA_POLLER,
+    MCA_CMCI_HANDLER,
+    MCA_RESET,
+    MCA_MCE_SCAN
 };
 
 struct mca_summary {
-	uint32_t	errcnt;	/* number of banks with valid errors */
-	int		ripv;	/* meaningful on #MC */
-	int		eipv;	/* meaningful on #MC */
-	bool_t		uc;	/* UC flag */
-	bool_t		pcc;	/* PCC flag */
-	bool_t		recoverable; /* software error recoverable flag */
+    uint32_t    errcnt; /* number of banks with valid errors */
+    int         ripv;   /* meaningful on #MC */
+    int         eipv;   /* meaningful on #MC */
+    bool_t      uc;     /* UC flag */
+    bool_t      pcc;    /* PCC flag */
+    bool_t      recoverable; /* software error recoverable flag */
 };
 
 DECLARE_PER_CPU(struct mca_banks *, poll_bankmask);
