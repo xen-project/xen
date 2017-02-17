@@ -576,7 +576,6 @@ static void xc_cpuid_pv_policy(xc_interface *xch,
     }
 
     case 0x00000005: /* MONITOR/MWAIT */
-    case 0x0000000a: /* Architectural Performance Monitor Features */
     case 0x0000000b: /* Extended Topology Enumeration */
     case 0x8000000a: /* SVM revision and features */
     case 0x8000001b: /* Instruction Based Sampling */
