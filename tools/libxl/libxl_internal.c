@@ -20,14 +20,25 @@
 void libxl__alloc_failed(libxl_ctx *ctx, const char *func,
                          size_t nmemb, size_t size) {
 #define M "libxl: FATAL ERROR: memory allocation failure"
-#define L (size ? M " (%s, %lu x %lu)\n" : M " (%s)\n"), \
-          func, (unsigned long)nmemb, (unsigned long)size
-    libxl__log(ctx, XTL_CRITICAL, ENOMEM, 0,0, func, INVALID_DOMID, L);
-    fprintf(stderr, L);
+#define M_SIZE M " (%s, %lu x %lu)\n"
+#define M_NSIZE M " (%s)\n"
+    if (size) {
+       libxl__log(ctx, XTL_CRITICAL, ENOMEM, 0, 0, func, INVALID_DOMID,
+                  M_SIZE, func, (unsigned long)nmemb, (unsigned long)size);
+       fprintf(stderr, M_SIZE, func, (unsigned long)nmemb,
+               (unsigned long)size);
+    } else {
+       libxl__log(ctx, XTL_CRITICAL, ENOMEM, 0, 0, func, INVALID_DOMID,
+                  M_NSIZE, func);
+       fprintf(stderr, M_NSIZE, func);
+
+    }
+
     fflush(stderr);
     _exit(-1);
+#undef M_NSIZE
+#undef M_SIZE
 #undef M
-#undef L
 }
 
 void libxl__ptr_add(libxl__gc *gc, void *ptr)

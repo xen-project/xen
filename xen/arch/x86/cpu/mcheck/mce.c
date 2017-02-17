@@ -591,9 +591,8 @@ int show_mca_info(int inited, struct cpuinfo_x86 *c)
             [mcheck_intel] = "Intel"
         };
 
-        snprintf(prefix, ARRAY_SIZE(prefix),
-                 g_type != mcheck_unset ? XENLOG_WARNING "CPU%i: "
-                 : XENLOG_INFO,
+        snprintf(prefix, ARRAY_SIZE(prefix), "%sCPU%u: ",
+                 g_type != mcheck_unset ? XENLOG_WARNING : XENLOG_INFO,
                  smp_processor_id());
         BUG_ON(inited >= ARRAY_SIZE(type_str));
         switch (inited) {
