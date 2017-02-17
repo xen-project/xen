@@ -199,6 +199,7 @@ static void recalculate_misc(struct cpuid_policy *p)
 
     case X86_VENDOR_AMD:
         zero_leaves(p->basic.raw, 0x2, 0x3);
+        memset(p->cache.raw, 0, sizeof(p->cache.raw));
         p->basic.raw[0x9] = EMPTY_LEAF;
 
         p->extd.vendor_ebx = p->basic.vendor_ebx;
@@ -240,6 +241,32 @@ static void __init calculate_raw_policy(void)
         }
 
         cpuid_leaf(i, &p->basic.raw[i]);
+    }
+
+    if ( p->basic.max_leaf >= 4 )
+    {
+        for ( i = 0; i < ARRAY_SIZE(p->cache.raw); ++i )
+        {
+            union {
+                struct cpuid_leaf l;
+                struct cpuid_cache_leaf c;
+            } u;
+
+            cpuid_count_leaf(4, i, &u.l);
+
+            if ( u.c.type == 0 )
+                break;
+
+            p->cache.subleaf[i] = u.c;
+        }
+
+        /*
+         * The choice of CPUID_GUEST_NR_CACHE is arbitrary.  It is expected
+         * that it will eventually need increasing for future hardware.
+         */
+        if ( i == ARRAY_SIZE(p->cache.raw) )
+            printk(XENLOG_WARNING
+                   "CPUID: Insufficient Leaf 4 space for this hardware\n");
     }
 
     if ( p->basic.max_leaf >= 7 )
@@ -520,6 +547,23 @@ void recalculate_cpuid_policy(struct domain *d)
     recalculate_xstate(p);
     recalculate_misc(p);
 
+    for ( i = 0; i < ARRAY_SIZE(p->cache.raw); ++i )
+    {
+        if ( p->cache.subleaf[i].type >= 1 &&
+             p->cache.subleaf[i].type <= 3 )
+        {
+            /* Subleaf has a valid cache type. Zero reserved fields. */
+            p->cache.raw[i].a &= 0xffffc3ffu;
+            p->cache.raw[i].d &= 0x00000007u;
+        }
+        else
+        {
+            /* Subleaf is not valid.  Zero the rest of the union. */
+            zero_leaves(p->cache.raw, i, ARRAY_SIZE(p->cache.raw) - 1);
+            break;
+        }
+    }
+
     if ( !p->extd.svm )
         p->extd.raw[0xa] = EMPTY_LEAF;
 
@@ -605,7 +649,7 @@ static void pv_cpuid(uint32_t leaf, uint32_t subleaf, struct cpuid_leaf *res)
         *res = EMPTY_LEAF;
         break;
 
-    case 0x0 ... 0x3:
+    case 0x0 ... 0x4:
     case 0x7 ... 0x9:
     case 0xc ... XSTATE_CPUID:
     case 0x80000000 ... 0xffffffff:
@@ -640,7 +684,7 @@ static void hvm_cpuid(uint32_t leaf, uint32_t subleaf, struct cpuid_leaf *res)
             res->a = (res->a & ~0xff) | 3;
         break;
 
-    case 0x0 ... 0x3:
+    case 0x0 ... 0x4:
     case 0x7 ... 0x9:
     case 0xc ... XSTATE_CPUID:
     case 0x80000000 ... 0xffffffff:
@@ -674,6 +718,13 @@ void guest_cpuid(const struct vcpu *v, uint32_t leaf,
 
         switch ( leaf )
         {
+        case 0x4:
+            if ( subleaf >= ARRAY_SIZE(p->cache.raw) )
+                return;
+
+            *res = p->cache.raw[subleaf];
+            break;
+
         case 0x7:
             ASSERT(p->feat.max_subleaf < ARRAY_SIZE(p->feat.raw));
             if ( subleaf > min_t(uint32_t, p->feat.max_subleaf,
