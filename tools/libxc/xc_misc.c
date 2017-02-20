@@ -560,7 +560,7 @@ int xc_hvm_track_dirty_vram(
     data->nr = nr;
 
     return do_dm_op(xch, dom, 2, &op, sizeof(op),
-                    dirty_bitmap, (nr + 7) / 8);
+                    dirty_bitmap, (size_t)((nr + 7) / 8));
 }
 
 int xc_hvm_modified_memory(
