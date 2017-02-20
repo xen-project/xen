@@ -896,6 +896,18 @@ static void vmx_ctxt_switch_from(struct vcpu *v)
     if ( unlikely(!this_cpu(vmxon)) )
         return;
 
+    if ( !v->is_running )
+    {
+        /*
+         * When this vCPU isn't marked as running anymore, a remote pCPU's
+         * attempt to pause us (from vmx_vmcs_enter()) won't have a reason
+         * to spin in vcpu_sleep_sync(), and hence that pCPU might have taken
+         * away the VMCS from us. As we're running with interrupts disabled,
+         * we also can't call vmx_vmcs_enter().
+         */
+        vmx_vmcs_reload(v);
+    }
+
     vmx_fpu_leave(v);
     vmx_save_guest_msrs(v);
     vmx_restore_host_msrs();
