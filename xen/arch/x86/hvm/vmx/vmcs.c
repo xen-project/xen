@@ -556,6 +556,20 @@ static void vmx_load_vmcs(struct vcpu *v)
     local_irq_restore(flags);
 }
 
+void vmx_vmcs_reload(struct vcpu *v)
+{
+    /*
+     * As we may be running with interrupts disabled, we can't acquire
+     * v->arch.hvm_vmx.vmcs_lock here. However, with interrupts disabled
+     * the VMCS can't be taken away from us anymore if we still own it.
+     */
+    ASSERT(v->is_running || !local_irq_is_enabled());
+    if ( v->arch.hvm_vmx.vmcs == this_cpu(current_vmcs) )
+        return;
+
+    vmx_load_vmcs(v);
+}
+
 int vmx_cpu_up_prepare(unsigned int cpu)
 {
     /*
@@ -1611,10 +1625,7 @@ void vmx_do_resume(struct vcpu *v)
     bool_t debug_state;
 
     if ( v->arch.hvm_vmx.active_cpu == smp_processor_id() )
-    {
-        if ( v->arch.hvm_vmx.vmcs != this_cpu(current_vmcs) )
-            vmx_load_vmcs(v);
-    }
+        vmx_vmcs_reload(v);
     else
     {
         /*
