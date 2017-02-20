@@ -487,6 +487,10 @@ extern const unsigned int vmx_introspection_force_enabled_msrs_size;
 #define VMX_GUEST_MSR 0
 #define VMX_HOST_MSR  1
 
+/* VM Instruction error numbers. */
+#define VMX_INSN_INVALID_CONTROL_STATE       7
+#define VMX_INSN_INVALID_HOST_STATE          8
+
 void vmx_disable_intercept_for_msr(struct vcpu *v, u32 msr, int type);
 void vmx_enable_intercept_for_msr(struct vcpu *v, u32 msr, int type);
 int vmx_read_guest_msr(u32 msr, u64 *val);
