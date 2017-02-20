@@ -770,17 +770,19 @@ int epte_get_entry_emt(struct domain *d, unsigned long gfn, mfn_t mfn,
     if ( v->domain != d )
         v = d->vcpu ? d->vcpu[0] : NULL;
 
-    if ( !mfn_valid(mfn_x(mfn)) ||
-         rangeset_contains_range(mmio_ro_ranges, mfn_x(mfn),
-                                 mfn_x(mfn) + (1UL << order) - 1) )
-    {
-        *ipat = 1;
-        return MTRR_TYPE_UNCACHABLE;
-    }
-
+    /* Mask, not add, for order so it works with INVALID_MFN on unmapping */
     if ( rangeset_overlaps_range(mmio_ro_ranges, mfn_x(mfn),
-                                 mfn_x(mfn) + (1UL << order) - 1) )
+                                 mfn_x(mfn) | ((1UL << order) - 1)) )
+    {
+        if ( !order || rangeset_contains_range(mmio_ro_ranges, mfn_x(mfn),
+                                               mfn_x(mfn) | ((1UL << order) - 1)) )
+        {
+            *ipat = 1;
+            return MTRR_TYPE_UNCACHABLE;
+        }
+        /* Force invalid memory type so resolve_misconfig() will split it */
         return -1;
+    }
 
     switch ( hvm_get_mem_pinned_cacheattr(d, gfn, order, &type) )
     {
@@ -791,21 +793,27 @@ int epte_get_entry_emt(struct domain *d, unsigned long gfn, mfn_t mfn,
         return -1;
     }
 
-    if ( !need_iommu(d) && !cache_flush_permitted(d) )
-    {
-        ASSERT(!direct_mmio ||
-               !((mfn_x(mfn) ^ d->arch.hvm_domain.vmx.apic_access_mfn) >>
-                 order));
-        *ipat = 1;
-        return MTRR_TYPE_WRBACK;
-    }
-
     if ( direct_mmio )
     {
         if ( (mfn_x(mfn) ^ d->arch.hvm_domain.vmx.apic_access_mfn) >> order )
             return MTRR_TYPE_UNCACHABLE;
         if ( order )
             return -1;
+        *ipat = 1;
+        return MTRR_TYPE_WRBACK;
+    }
+
+    if ( !mfn_valid(mfn_x(mfn)) )
+    {
+        *ipat = 1;
+        return MTRR_TYPE_UNCACHABLE;
+    }
+
+    if ( !need_iommu(d) && !cache_flush_permitted(d) )
+    {
+        ASSERT(!direct_mmio ||
+               !((mfn_x(mfn) ^ d->arch.hvm_domain.vmx.apic_access_mfn) >>
+                 order));
         *ipat = 1;
         return MTRR_TYPE_WRBACK;
     }
