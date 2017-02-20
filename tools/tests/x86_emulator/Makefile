@@ -40,11 +40,15 @@ distclean: clean
 .PHONY: install
 install:
 
-x86_emulate/x86_emulate.c x86_emulate/x86_emulate.h:
-	[ -L x86_emulate ] || ln -sf $(XEN_ROOT)/xen/arch/x86/x86_emulate .
+x86_emulate:
+	[ -L $@ ] || ln -sf $(XEN_ROOT)/xen/arch/x86/$@
 
-asm/x86-vendors.h asm/x86-defns.h asm/msr-index.h:
-	[ -L asm ] || ln -sf $(XEN_ROOT)/xen/include/asm-x86 asm
+x86_emulate/%: x86_emulate ;
+
+asm:
+	[ -L $@ ] || ln -sf $(XEN_ROOT)/xen/include/asm-x86 $@
+
+asm/%: asm ;
 
 HOSTCFLAGS += $(CFLAGS_xeninclude) -I.
 
