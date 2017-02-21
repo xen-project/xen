@@ -31,6 +31,7 @@ endif
 
 SUBDIRS-y += xenpmd
 SUBDIRS-y += libxl
+SUBDIRS-y += xl
 SUBDIRS-y += helpers
 SUBDIRS-$(CONFIG_X86) += xenpaging
 SUBDIRS-$(CONFIG_X86) += debugger/gdbsx

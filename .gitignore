@@ -190,7 +190,6 @@ tools/libxl/ssdt*
 tools/libxl/testenum
 tools/libxl/testenum.c
 tools/libxl/tmp.*
-tools/libxl/xl
 tools/misc/cpuperf/cpuperf-perfcntr
 tools/misc/cpuperf/cpuperf-xen
 tools/misc/xc_shadow
@@ -381,6 +380,7 @@ tools/firmware/etherboot/ipxe/
 tools/python/xen/lowlevel/xl/_pyxl_types.c
 tools/python/xen/lowlevel/xl/_pyxl_types.h
 tools/xenstore/xenstore-watch
+tools/xl/xl
 
 docs/txt/misc/*.txt
 docs/txt/man/*.txt

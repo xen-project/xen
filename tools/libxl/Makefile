@@ -178,16 +178,9 @@ LIBXLU_OBJS = libxlu_cfg_y.o libxlu_cfg_l.o libxlu_cfg.o \
 	libxlu_disk_l.o libxlu_disk.o libxlu_vif.o libxlu_pci.o
 $(LIBXLU_OBJS): CFLAGS += $(CFLAGS_libxenctrl) # For xentoollog.h
 
-CLIENTS = xl testidl libxl-save-helper
+$(TEST_PROG_OBJS) _libxl.api-for-check: CFLAGS += $(CFLAGS_libxentoollog)
 
-CFLAGS_XL += $(CFLAGS_libxenlight)
-CFLAGS_XL += -Wshadow
-
-XL_OBJS = xl.o xl_cmdimpl.o xl_cmdtable.o xl_sxp.o
-$(XL_OBJS) $(TEST_PROG_OBJS) _libxl.api-for-check: \
-            CFLAGS += $(CFLAGS_libxentoollog)
-$(XL_OBJS): CFLAGS += $(CFLAGS_XL)
-$(XL_OBJS): CFLAGS += -include $(XEN_ROOT)/tools/config.h # libxl_json.h needs it.
+CLIENTS = testidl libxl-save-helper
 
 libxl_dom.o: CFLAGS += -I$(XEN_ROOT)/tools  # include libacpi/x86.h
 libxl_x86_acpi.o: CFLAGS += -I$(XEN_ROOT)/tools
@@ -207,7 +200,7 @@ all: $(CLIENTS) $(TEST_PROGS) $(PKG_CONFIG) \
 		libxenlight.so libxenlight.a libxlutil.so libxlutil.a \
 	$(AUTOSRCS) $(AUTOINCS)
 
-$(LIBXL_OBJS) $(LIBXLU_OBJS) $(XL_OBJS) $(SAVE_HELPER_OBJS) \
+$(LIBXL_OBJS) $(LIBXLU_OBJS) $(SAVE_HELPER_OBJS) \
 		$(LIBXL_TEST_OBJS) $(TEST_PROG_OBJS): \
 	$(AUTOINCS) libxl.api-ok
 
@@ -249,7 +242,7 @@ libxl_internal_json.h: _libxl_types_internal_json.h
 xl.h: _paths.h
 
 $(LIBXL_OBJS) $(LIBXL_TEST_OBJS) $(LIBXLU_OBJS) \
-	$(XL_OBJS) $(TEST_PROG_OBJS) $(SAVE_HELPER_OBJS): libxl.h
+	$(TEST_PROG_OBJS) $(SAVE_HELPER_OBJS): libxl.h
 $(LIBXL_OBJS) $(LIBXL_TEST_OBJS): libxl_internal.h
 
 _libxl_type%.h _libxl_type%_json.h _libxl_type%_private.h _libxl_type%.c: libxl_type%.idl gentypes.py idl.py
@@ -288,9 +281,6 @@ libxlutil.so.$(XLUMAJOR).$(XLUMINOR): $(LIBXLU_OBJS) libxenlight.so
 libxlutil.a: $(LIBXLU_OBJS)
 	$(AR) rcs libxlutil.a $^
 
-xl: $(XL_OBJS) libxlutil.so libxenlight.so
-	$(CC) $(LDFLAGS) -o $@ $(XL_OBJS) $(LDLIBS_libxlutil) $(LDLIBS_libxenlight) $(LDLIBS_libxentoollog) -lyajl $(APPEND_LDFLAGS)
-
 test_%: test_%.o test_common.o libxlutil.so libxenlight_test.so
 	$(CC) $(LDFLAGS) -o $@ $^ $(filter-out %libxenlight.so, $(LDLIBS_libxenlight)) $(LDLIBS_libxentoollog) -lyajl $(APPEND_LDFLAGS)
 
@@ -306,13 +296,10 @@ $(PKG_CONFIG): % : %.in Makefile
 
 .PHONY: install
 install: all
-	$(INSTALL_DIR) $(DESTDIR)$(sbindir)
 	$(INSTALL_DIR) $(DESTDIR)$(libdir)
 	$(INSTALL_DIR) $(DESTDIR)$(includedir)
-	$(INSTALL_DIR) $(DESTDIR)$(BASH_COMPLETION_DIR)
 	$(INSTALL_DIR) $(DESTDIR)$(LIBEXEC_BIN)
 	$(INSTALL_DIR) $(DESTDIR)$(PKG_INSTALLDIR)
-	$(INSTALL_PROG) xl $(DESTDIR)$(sbindir)
 	$(INSTALL_PROG) libxl-save-helper $(DESTDIR)$(LIBEXEC_BIN)
 	$(INSTALL_SHLIB) libxenlight.so.$(MAJOR).$(MINOR) $(DESTDIR)$(libdir)
 	$(SYMLINK_SHLIB) libxenlight.so.$(MAJOR).$(MINOR) $(DESTDIR)$(libdir)/libxenlight.so.$(MAJOR)
@@ -323,7 +310,6 @@ install: all
 	$(SYMLINK_SHLIB) libxlutil.so.$(XLUMAJOR) $(DESTDIR)$(libdir)/libxlutil.so
 	$(INSTALL_DATA) libxlutil.a $(DESTDIR)$(libdir)
 	$(INSTALL_DATA) libxl.h libxl_event.h libxl_json.h _libxl_types.h _libxl_types_json.h _libxl_list.h libxl_utils.h libxl_uuid.h libxlutil.h $(DESTDIR)$(includedir)
-	$(INSTALL_DATA) bash-completion $(DESTDIR)$(BASH_COMPLETION_DIR)/xl.sh
 	$(INSTALL_DATA) xenlight.pc $(DESTDIR)$(PKG_INSTALLDIR)
 	$(INSTALL_DATA) xlutil.pc $(DESTDIR)$(PKG_INSTALLDIR)
 

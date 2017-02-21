@@ -1,0 +1,49 @@
+#
+# tools/xl/Makefile
+#
+
+XEN_ROOT = $(CURDIR)/../..
+include $(XEN_ROOT)/tools/Rules.mk
+
+CFLAGS += -Werror -Wno-format-zero-length -Wmissing-declarations \
+	-Wno-declaration-after-statement -Wformat-nonliteral
+CFLAGS += -I. -fPIC
+
+CFLAGS += $(PTHREAD_CFLAGS)
+LDFLAGS += $(PTHREAD_LDFLAGS)
+
+CFLAGS_XL += $(CFLAGS_libxenlight)
+CFLAGS_XL += -Wshadow
+
+XL_OBJS = xl.o xl_cmdimpl.o xl_cmdtable.o xl_sxp.o
+$(XL_OBJS): CFLAGS += $(CFLAGS_libxentoollog)
+$(XL_OBJS): CFLAGS += $(CFLAGS_XL)
+$(XL_OBJS): CFLAGS += -include $(XEN_ROOT)/tools/config.h # libxl_json.h needs it.
+
+# libxenlight should be built before building xl
+.PHONY: libxl
+libxl:
+	$(MAKE) -C $(XEN_ROOT)/tools/libxl
+$(XL_OBJS): libxl
+
+.PHONY: all
+all: xl
+
+xl: $(XL_OBJS)
+	$(CC) $(LDFLAGS) -o $@ $(XL_OBJS) $(LDLIBS_libxlutil) $(LDLIBS_libxenlight) $(LDLIBS_libxentoollog) -lyajl $(APPEND_LDFLAGS)
+
+.PHONY: install
+install: all
+	$(INSTALL_DIR) $(DESTDIR)$(sbindir)
+	$(INSTALL_DIR) $(DESTDIR)$(BASH_COMPLETION_DIR)
+	$(INSTALL_PROG) xl $(DESTDIR)$(sbindir)
+	$(INSTALL_DATA) bash-completion $(DESTDIR)$(BASH_COMPLETION_DIR)/xl.sh
+
+.PHONY: clean
+clean:
+	$(RM) -f *.o xl $(DEPS)
+
+distclean: clean
+
+
+-include $(DEPS)
