@@ -18,6 +18,8 @@ XEN_LIBXENFOREIGNMEMORY = $(XEN_ROOT)/tools/libs/foreignmemory
 XEN_LIBXENDEVICEMODEL = $(XEN_ROOT)/tools/libs/devicemodel
 XEN_LIBXC          = $(XEN_ROOT)/tools/libxc
 XEN_XENLIGHT       = $(XEN_ROOT)/tools/libxl
+# Currently libxlutil lives in the same directory as libxenlight
+XEN_XLUTIL         = $(XEN_XENLIGHT)
 XEN_XENSTORE       = $(XEN_ROOT)/tools/xenstore
 XEN_LIBXENSTAT     = $(XEN_ROOT)/tools/xenstat/libxenstat/src
 XEN_BLKTAP2        = $(XEN_ROOT)/tools/blktap2
@@ -177,6 +179,11 @@ CFLAGS_libxenlight = -I$(XEN_XENLIGHT) $(CFLAGS_libxenctrl) $(CFLAGS_xeninclude)
 SHDEPS_libxenlight = $(SHLIB_libxenctrl) $(SHLIB_libxenstore) $(SHLIB_libblktapctl)
 LDLIBS_libxenlight = $(SHDEPS_libxenlight) $(XEN_XENLIGHT)/libxenlight$(libextension)
 SHLIB_libxenlight  = $(SHDEPS_libxenlight) -Wl,-rpath-link=$(XEN_XENLIGHT)
+
+CFLAGS_libxlutil = -I$(XEN_XLUTIL)
+SHDEPS_libxlutil = $(SHLIB_libxenlight)
+LDLIBS_libxlutil = $(SHDEPS_libxlutil) $(XEN_XENLIGHT)/libxlutil$(libextension)
+SHLIB_libxlutil  = $(SHDEPS_libxlutil) -Wl,-rpath-link=$(XEN_XLUTIL)
 
 CFLAGS += -D__XEN_INTERFACE_VERSION__=__XEN_LATEST_INTERFACE_VERSION__
 
