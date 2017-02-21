@@ -7633,7 +7633,7 @@ void sched_process(struct pcpu_info *p)
                     unsigned int cpu:16, tasklet:8, idle:8;
                 } *r = (typeof(r))ri->d;
 
-                printf(" %s csched:schedule cpu %u, %s%s\n",
+                printf(" %s csched:schedule cpu %u%s%s\n",
                        ri->dump_header, r->cpu,
                        r->tasklet ? ", tasklet scheduled" : "",
                        r->idle ? ", idle" : ", busy");
