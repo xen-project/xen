@@ -1229,7 +1229,7 @@ Override the path to the blob to be used as BIOS. The blob provided here MUST
 be consistent with the B<bios=> which you have specified. You should not
 normally need to specify this option.
 
-This options does not have any effect if using B<bios="rombios"> or
+This option does not have any effect if using B<bios="rombios"> or
 B<device_model_version="qemu-xen-traditional">.
 
 =item B<pae=BOOLEAN>
