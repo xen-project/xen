@@ -272,7 +272,6 @@ F:  xen/test/livepatch/*
 
 MACHINE CHECK (MCA) & RAS
 M:	Christoph Egger <chegger@amazon.de>
-M:	Liu Jinsong <jinsong.liu@alibaba-inc.com>
 S:	Supported
 F:	xen/arch/x86/cpu/mcheck/
 
@@ -296,7 +295,6 @@ T:	git git://xenbits.xen.org/ovmf.git
 
 POWER MANAGEMENT
 M:	Jan Beulich <jbeulich@suse.com>
-M:	Liu Jinsong <jinsong.liu@alibaba-inc.com>
 S:	Supported
 F:	xen/arch/x86/acpi/
 X:	xen/arch/x86/acpi/boot.c
