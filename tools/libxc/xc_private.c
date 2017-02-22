@@ -64,8 +64,7 @@ struct xc_interface_core *xc_interface_open(xentoollog_logger *logger,
         goto err;
 
     xch->fmem = xenforeignmemory_open(xch->error_handler, 0);
-
-    if ( xch->xcall == NULL )
+    if ( xch->fmem == NULL )
         goto err;
 
     return xch;
