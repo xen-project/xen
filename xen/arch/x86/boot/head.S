@@ -1,4 +1,5 @@
 #include <xen/multiboot.h>
+#include <xen/multiboot2.h>
 #include <public/xen.h>
 #include <asm/asm_defns.h>
 #include <asm/desc.h>
@@ -18,6 +19,28 @@
 #define BOOT_PSEUDORM_CS 0x0020
 #define BOOT_PSEUDORM_DS 0x0028
 
+#define MB2_HT(name)      (MULTIBOOT2_HEADER_TAG_##name)
+#define MB2_TT(name)      (MULTIBOOT2_TAG_TYPE_##name)
+
+        .macro mb2ht_args arg:req, args:vararg
+        .long \arg
+        .ifnb \args
+        mb2ht_args \args
+        .endif
+        .endm
+
+        .macro mb2ht_init type:req, req:req, args:vararg
+        .align MULTIBOOT2_TAG_ALIGN
+.Lmb2ht_init_start\@:
+        .short \type
+        .short \req
+        .long .Lmb2ht_init_end\@ - .Lmb2ht_init_start\@
+        .ifnb \args
+        mb2ht_args \args
+        .endif
+.Lmb2ht_init_end\@:
+        .endm
+
 ENTRY(start)
         jmp     __start
 
@@ -32,6 +55,42 @@ multiboot1_header_start:       /*** MULTIBOOT1 HEADER ****/
         /* Checksum: must be the negated sum of the first two fields. */
         .long   -(MULTIBOOT_HEADER_MAGIC + MULTIBOOT_HEADER_FLAGS)
 multiboot1_header_end:
+
+/*** MULTIBOOT2 HEADER ****/
+/* Some ideas are taken from grub-2.00/grub-core/tests/boot/kernel-i386.S file. */
+        .align  MULTIBOOT2_HEADER_ALIGN
+
+multiboot2_header_start:
+        /* Magic number indicating a Multiboot2 header. */
+        .long   MULTIBOOT2_HEADER_MAGIC
+        /* Architecture: i386. */
+        .long   MULTIBOOT2_ARCHITECTURE_I386
+        /* Multiboot2 header length. */
+        .long   .Lmultiboot2_header_end - multiboot2_header_start
+        /* Multiboot2 header checksum. */
+        .long   -(MULTIBOOT2_HEADER_MAGIC + MULTIBOOT2_ARCHITECTURE_I386 + \
+                        (.Lmultiboot2_header_end - multiboot2_header_start))
+
+        /* Multiboot2 information request tag. */
+        mb2ht_init MB2_HT(INFORMATION_REQUEST), MB2_HT(REQUIRED), \
+                   MB2_TT(BASIC_MEMINFO), MB2_TT(MMAP)
+
+        /* Align modules at page boundry. */
+        mb2ht_init MB2_HT(MODULE_ALIGN), MB2_HT(REQUIRED)
+
+        /* Console flags tag. */
+        mb2ht_init MB2_HT(CONSOLE_FLAGS), MB2_HT(OPTIONAL), \
+                   MULTIBOOT2_CONSOLE_FLAGS_EGA_TEXT_SUPPORTED
+
+        /* Framebuffer tag. */
+        mb2ht_init MB2_HT(FRAMEBUFFER), MB2_HT(OPTIONAL), \
+                   0, /* Number of the columns - no preference. */ \
+                   0, /* Number of the lines - no preference. */ \
+                   0  /* Number of bits per pixel - no preference. */
+
+        /* Multiboot2 header end tag. */
+        mb2ht_init MB2_HT(END), MB2_HT(REQUIRED)
+.Lmultiboot2_header_end:
 
         .section .init.rodata, "a", @progbits
         .align 4
@@ -81,10 +140,52 @@ __start:
         mov     %ecx,%es
         mov     %ecx,%ss
 
-        /* Check for Multiboot bootloader */
+        /* Bootloaders may set multiboot{1,2}.mem_lower to a nonzero value. */
+        xor     %edx,%edx
+
+        /* Check for Multiboot2 bootloader. */
+        cmp     $MULTIBOOT2_BOOTLOADER_MAGIC,%eax
+        je      .Lmultiboot2_proto
+
+        /* Check for Multiboot bootloader. */
         cmp     $MULTIBOOT_BOOTLOADER_MAGIC,%eax
         jne     not_multiboot
 
+        /* Get mem_lower from Multiboot information. */
+        testb   $MBI_MEMLIMITS,MB_flags(%ebx)
+
+        /* Not available? BDA value will be fine. */
+        cmovnz  MB_mem_lower(%ebx),%edx
+        jmp     trampoline_setup
+
+.Lmultiboot2_proto:
+        /* Skip Multiboot2 information fixed part. */
+        lea     (MB2_fixed_sizeof+MULTIBOOT2_TAG_ALIGN-1)(%ebx),%ecx
+        and     $~(MULTIBOOT2_TAG_ALIGN-1),%ecx
+
+.Lmb2_tsize:
+        /* Check Multiboot2 information total size. */
+        mov     %ecx,%edi
+        sub     %ebx,%edi
+        cmp     %edi,MB2_fixed_total_size(%ebx)
+        jbe     trampoline_setup
+
+        /* Get mem_lower from Multiboot2 information. */
+        cmpl    $MULTIBOOT2_TAG_TYPE_BASIC_MEMINFO,MB2_tag_type(%ecx)
+        cmove   MB2_mem_lower(%ecx),%edx
+        je      trampoline_setup
+
+        /* Is it the end of Multiboot2 information? */
+        cmpl    $MULTIBOOT2_TAG_TYPE_END,MB2_tag_type(%ecx)
+        je      trampoline_setup
+
+        /* Go to next Multiboot2 information tag. */
+        add     MB2_tag_size(%ecx),%ecx
+        add     $(MULTIBOOT2_TAG_ALIGN-1),%ecx
+        and     $~(MULTIBOOT2_TAG_ALIGN-1),%ecx
+        jmp     .Lmb2_tsize
+
+trampoline_setup:
         /* Set up trampoline segment 64k below EBDA */
         movzwl  0x40e,%ecx          /* EBDA segment */
         cmp     $0xa000,%ecx        /* sanity check (high) */
@@ -99,9 +200,6 @@ __start:
          * Compare the value in the BDA with the information from the
          * multiboot structure (if available) and use the smallest.
          */
-        testb   $MBI_MEMLIMITS,(%ebx)
-        jz      2f                  /* not available? BDA value will be fine */
-        mov     MB_mem_lower(%ebx),%edx
         cmp     $0x100,%edx         /* is the multiboot value too small? */
         jb      2f                  /* if so, do not use it */
         shl     $10-4,%edx
@@ -120,6 +218,7 @@ __start:
         mov     $sym_phys(cpu0_stack)+1024,%esp
         push    %ecx                /* Boot trampoline address. */
         push    %ebx                /* Multiboot information address. */
+        push    %eax                /* Multiboot magic. */
         call    reloc
         mov     %eax,sym_phys(multiboot_ptr)
 
