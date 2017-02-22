@@ -269,9 +269,9 @@ SECTIONS
   .pad : {
     . = ALIGN(MB(16));
   } :text
-#else
-  efi = .;
 #endif
+
+  efi = DEFINED(efi) ? efi : .;
 
   /* Sections to be discarded */
   /DISCARD/ : {

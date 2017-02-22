@@ -1251,6 +1251,9 @@ void __init efi_init_memory(void)
     } *extra, *extra_head = NULL;
 #endif
 
+    if ( !efi_enabled(EFI_BOOT) )
+        return;
+
     printk(XENLOG_INFO "EFI memory map:%s\n",
            map_bs ? " (mapping BootServices)" : "");
     for ( i = 0; i < efi_memmap_size; i += efi_mdesc_size )
