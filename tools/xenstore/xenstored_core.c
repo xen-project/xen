@@ -209,7 +209,7 @@ static void trigger_reopen_log(int signal __attribute__((unused)))
 static void reopen_log(void)
 {
 	if (tracefile) {
-		if (tracefd > 0)
+		if (tracefd >= 0)
 			close(tracefd);
 
 		tracefd = open(tracefile, O_WRONLY|O_CREAT|O_APPEND, 0600);
