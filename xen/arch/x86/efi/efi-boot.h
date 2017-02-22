@@ -114,7 +114,7 @@ static void __init relocate_trampoline(unsigned long phys)
 
 static void __init place_string(u32 *addr, const char *s)
 {
-    static char *__initdata alloc = start;
+    char *alloc = NULL;
 
     if ( s && *s )
     {
@@ -122,7 +122,7 @@ static void __init place_string(u32 *addr, const char *s)
         const char *old = (char *)(long)*addr;
         size_t len2 = *addr ? strlen(old) + 1 : 0;
 
-        alloc -= len1 + len2;
+        alloc = ebmalloc(len1 + len2);
         /*
          * Insert new string before already existing one. This is needed
          * for options passed on the command line to override options from
@@ -205,12 +205,7 @@ static void __init efi_arch_process_memory_map(EFI_SYSTEM_TABLE *SystemTable,
 
 static void *__init efi_arch_allocate_mmap_buffer(UINTN map_size)
 {
-    place_string(&mbi.mem_upper, NULL);
-    mbi.mem_upper -= map_size;
-    mbi.mem_upper &= -__alignof__(EFI_MEMORY_DESCRIPTOR);
-    if ( mbi.mem_upper < xen_phys_start )
-        return NULL;
-    return (void *)(long)mbi.mem_upper;
+    return ebmalloc(map_size);
 }
 
 static void __init efi_arch_pre_exit_boot(void)

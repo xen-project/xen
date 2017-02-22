@@ -1123,8 +1123,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
 
     if ( !xen_phys_start )
         panic("Not enough memory to relocate Xen.");
-    reserve_e820_ram(&boot_e820, efi_enabled(EFI_LOADER) ? mbi->mem_upper : __pa(&_start),
-                     __pa(&_end));
+    reserve_e820_ram(&boot_e820, __pa(&_start), __pa(&_end));
 
     /* Late kexec reservation (dynamic start address). */
     kexec_reserve_area(&boot_e820);
