@@ -16,7 +16,7 @@
  * This entry point is entered from xen/arch/x86/boot/head.S with:
  *   - 0x4(%esp) = MULTIBOOT_MAGIC,
  *   - 0x8(%esp) = MULTIBOOT_INFORMATION_ADDRESS,
- *   - 0xc(%esp) = BOOT_TRAMPOLINE_ADDRESS.
+ *   - 0xc(%esp) = TOPMOST_LOW_MEMORY_STACK_ADDRESS.
  */
 asm (
     "    .text                         \n"

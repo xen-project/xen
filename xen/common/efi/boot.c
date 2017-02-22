@@ -79,6 +79,17 @@ static size_t wstrlen(const CHAR16 * s);
 static int set_color(u32 mask, int bpp, u8 *pos, u8 *sz);
 static bool_t match_guid(const EFI_GUID *guid1, const EFI_GUID *guid2);
 
+static void efi_init(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable);
+static void efi_console_set_mode(void);
+static EFI_GRAPHICS_OUTPUT_PROTOCOL *efi_get_gop(void);
+static UINTN efi_find_gop_mode(EFI_GRAPHICS_OUTPUT_PROTOCOL *gop,
+                               UINTN cols, UINTN rows, UINTN depth);
+static void efi_tables(void);
+static void setup_efi_pci(void);
+static void efi_variables(void);
+static void efi_set_gop_mode(EFI_GRAPHICS_OUTPUT_PROTOCOL *gop, UINTN gop_mode);
+static void efi_exit_boot(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable);
+
 static const EFI_BOOT_SERVICES *__initdata efi_bs;
 static UINT32 __initdata efi_bs_revision;
 static EFI_HANDLE __initdata efi_ih;
