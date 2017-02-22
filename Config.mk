@@ -289,9 +289,9 @@ SEABIOS_UPSTREAM_REVISION ?= rel-1.10.0
 ETHERBOOT_NICS ?= rtl8139 8086100e
 
 
-QEMU_TRADITIONAL_REVISION ?= 095261a9ad5c31b9ed431f8382e8aa223089c85b
-# Mon Nov 14 17:19:46 2016 +0000
-# qemu: ioport_read, ioport_write: be defensive about 32-bit addresses
+QEMU_TRADITIONAL_REVISION ?= b77d58b59ff0688e4aeb933450d07716ca0fb1f2
+# Wed Feb 22 16:25:19 2017 +0000
+# cirrus: add blit_is_unsafe call to cirrus_bitblt_cputovideo
 
 # Specify which qemu-dm to use. This may be `ioemu' to use the old
 # Mercurial in-tree version, or a local directory, or a git URL.
