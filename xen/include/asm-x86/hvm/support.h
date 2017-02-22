@@ -110,6 +110,9 @@ int hvm_hypercall(struct cpu_user_regs *regs);
 void hvm_hlt(unsigned int eflags);
 void hvm_triple_fault(void);
 
+#define VM86_TSS_UPDATED (1ULL << 63)
+void hvm_prepare_vm86_tss(struct vcpu *v, uint32_t base, uint32_t limit);
+
 void hvm_rdtsc_intercept(struct cpu_user_regs *regs);
 
 int __must_check hvm_handle_xsetbv(u32 index, u64 new_bv);

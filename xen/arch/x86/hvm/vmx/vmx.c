@@ -1073,12 +1073,21 @@ static void vmx_set_segment_register(struct vcpu *v, enum x86_segment seg,
         
         if ( seg == x86_seg_tr ) 
         {
-            if ( v->domain->arch.hvm_domain.params[HVM_PARAM_VM86_TSS] )
+            const struct domain *d = v->domain;
+            uint64_t val = d->arch.hvm_domain.params[HVM_PARAM_VM86_TSS_SIZED];
+
+            if ( val )
             {
                 sel = 0;
                 attr = vm86_tr_attr;
-                limit = 0xff;
-                base = v->domain->arch.hvm_domain.params[HVM_PARAM_VM86_TSS];
+                limit = ((val & ~VM86_TSS_UPDATED) >> 32) - 1;
+                base = (uint32_t)val;
+                if ( val & VM86_TSS_UPDATED )
+                {
+                    hvm_prepare_vm86_tss(v, base, limit);
+                    cmpxchg(&d->arch.hvm_domain.params[HVM_PARAM_VM86_TSS_SIZED],
+                            val, val & ~VM86_TSS_UPDATED);
+                }
                 v->arch.hvm_vmx.vm86_segment_mask &= ~(1u << seg);
             }
             else

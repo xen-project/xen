@@ -2852,6 +2852,50 @@ static int hvm_load_segment_selector(
     return 1;
 }
 
+struct tss32 {
+    uint16_t back_link, :16;
+    uint32_t esp0;
+    uint16_t ss0, :16;
+    uint32_t esp1;
+    uint16_t ss1, :16;
+    uint32_t esp2;
+    uint16_t ss2, :16;
+    uint32_t cr3, eip, eflags, eax, ecx, edx, ebx, esp, ebp, esi, edi;
+    uint16_t es, :16, cs, :16, ss, :16, ds, :16, fs, :16, gs, :16, ldt, :16;
+    uint16_t trace /* :1 */, iomap;
+};
+
+void hvm_prepare_vm86_tss(struct vcpu *v, uint32_t base, uint32_t limit)
+{
+    /*
+     * If the provided area is large enough to cover at least the ISA port
+     * range, keep the bitmaps outside the base structure. For rather small
+     * areas (namely relevant for guests having been migrated from older
+     * Xen versions), maximize interrupt vector and port coverage by pointing
+     * the I/O bitmap at 0x20 (which puts the interrupt redirection bitmap
+     * right at zero), accepting accesses to port 0x235 (represented by bit 5
+     * of byte 0x46) to trigger #GP (which will simply result in the access
+     * being handled by the emulator via a slightly different path than it
+     * would be anyway). Be sure to include one extra byte at the end of the
+     * I/O bitmap (hence the missing "- 1" in the comparison is not an
+     * off-by-one mistake), which we deliberately don't fill with all ones.
+     */
+    uint16_t iomap = (limit >= sizeof(struct tss32) + (0x100 / 8) + (0x400 / 8)
+                      ? sizeof(struct tss32) : 0) + (0x100 / 8);
+
+    ASSERT(limit >= sizeof(struct tss32) - 1);
+    /*
+     * Strictly speaking we'd have to use hvm_copy_to_guest_linear() below,
+     * but since the guest is (supposed to be, unless it corrupts that setup
+     * itself, which would harm only itself) running on an identmap, we can
+     * use the less overhead variant below, which also allows passing a vCPU
+     * argument.
+     */
+    hvm_copy_to_guest_phys(base, NULL, limit + 1, v);
+    hvm_copy_to_guest_phys(base + offsetof(struct tss32, iomap),
+                           &iomap, sizeof(iomap), v);
+}
+
 void hvm_task_switch(
     uint16_t tss_sel, enum hvm_task_switch_reason taskswitch_reason,
     int32_t errcode)
@@ -2864,18 +2908,7 @@ void hvm_task_switch(
     unsigned int eflags;
     pagefault_info_t pfinfo;
     int exn_raised, rc;
-    struct {
-        u16 back_link,__blh;
-        u32 esp0;
-        u16 ss0, _0;
-        u32 esp1;
-        u16 ss1, _1;
-        u32 esp2;
-        u16 ss2, _2;
-        u32 cr3, eip, eflags, eax, ecx, edx, ebx, esp, ebp, esi, edi;
-        u16 es, _3, cs, _4, ss, _5, ds, _6, fs, _7, gs, _8, ldt, _9;
-        u16 trace, iomap;
-    } tss;
+    struct tss32 tss;
 
     hvm_get_segment_register(v, x86_seg_gdtr, &gdt);
     hvm_get_segment_register(v, x86_seg_tr, &prev_tr);
@@ -3974,6 +4007,7 @@ static int hvm_allow_set_param(struct domain *d,
     /* The following parameters can be set by the guest. */
     case HVM_PARAM_CALLBACK_IRQ:
     case HVM_PARAM_VM86_TSS:
+    case HVM_PARAM_VM86_TSS_SIZED:
     case HVM_PARAM_ACPI_IOPORTS_LOCATION:
     case HVM_PARAM_VM_GENERATION_ID_ADDR:
     case HVM_PARAM_STORE_EVTCHN:
@@ -4182,6 +4216,40 @@ static int hvmop_set_param(
         }
         d->arch.x87_fip_width = a.value;
         break;
+
+    case HVM_PARAM_VM86_TSS:
+        /* Hardware would silently truncate high bits. */
+        if ( a.value != (uint32_t)a.value )
+        {
+            if ( d == curr_d )
+                domain_crash(d);
+            rc = -EINVAL;
+        }
+        /* Old hvmloader binaries hardcode the size to 128 bytes. */
+        if ( a.value )
+            a.value |= (128ULL << 32) | VM86_TSS_UPDATED;
+        a.index = HVM_PARAM_VM86_TSS_SIZED;
+        break;
+
+    case HVM_PARAM_VM86_TSS_SIZED:
+        if ( (a.value >> 32) < sizeof(struct tss32) )
+        {
+            if ( d == curr_d )
+                domain_crash(d);
+            rc = -EINVAL;
+        }
+        /*
+         * Cap at the theoretically useful maximum (base structure plus
+         * 256 bits interrupt redirection bitmap + 64k bits I/O bitmap
+         * plus one padding byte).
+         */
+        if ( (a.value >> 32) > sizeof(struct tss32) +
+                               (0x100 / 8) + (0x10000 / 8) + 1 )
+            a.value = (uint32_t)a.value |
+                      ((sizeof(struct tss32) + (0x100 / 8) +
+                                               (0x10000 / 8) + 1) << 32);
+        a.value |= VM86_TSS_UPDATED;
+        break;
     }
 
     if ( rc != 0 )
@@ -4211,6 +4279,7 @@ static int hvm_allow_get_param(struct domain *d,
     /* The following parameters can be read by the guest. */
     case HVM_PARAM_CALLBACK_IRQ:
     case HVM_PARAM_VM86_TSS:
+    case HVM_PARAM_VM86_TSS_SIZED:
     case HVM_PARAM_ACPI_IOPORTS_LOCATION:
     case HVM_PARAM_VM_GENERATION_ID_ADDR:
     case HVM_PARAM_STORE_PFN:
@@ -4268,6 +4337,16 @@ static int hvmop_get_param(
     case HVM_PARAM_ACPI_S_STATE:
         a.value = d->arch.hvm_domain.is_s3_suspended ? 3 : 0;
         break;
+
+    case HVM_PARAM_VM86_TSS:
+        a.value = (uint32_t)d->arch.hvm_domain.params[HVM_PARAM_VM86_TSS_SIZED];
+        break;
+
+    case HVM_PARAM_VM86_TSS_SIZED:
+        a.value = d->arch.hvm_domain.params[HVM_PARAM_VM86_TSS_SIZED] &
+                  ~VM86_TSS_UPDATED;
+        break;
+
     case HVM_PARAM_X87_FIP_WIDTH:
         a.value = d->arch.x87_fip_width;
         break;

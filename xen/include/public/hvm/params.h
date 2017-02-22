@@ -253,6 +253,12 @@
  */
 #define HVM_PARAM_X87_FIP_WIDTH 36
 
-#define HVM_NR_PARAMS 37
+/*
+ * TSS (and its size) used on Intel when CR0.PE=0. The address occupies
+ * the low 32 bits, while the size is in the high 32 ones.
+ */
+#define HVM_PARAM_VM86_TSS_SIZED 37
+
+#define HVM_NR_PARAMS 38
 
 #endif /* __XEN_PUBLIC_HVM_PARAMS_H__ */

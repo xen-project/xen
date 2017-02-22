@@ -177,18 +177,29 @@ static void cmos_write_memory_size(void)
 }
 
 /*
- * Set up an empty TSS area for virtual 8086 mode to use. 
- * The only important thing is that it musn't have any bits set 
- * in the interrupt redirection bitmap, so all zeros will do.
+ * Set up an empty TSS area for virtual 8086 mode to use. Its content is
+ * going to be managed by Xen, but zero fill it just in case.
  */
 static void init_vm86_tss(void)
 {
+/*
+ * Have the TSS cover the ISA port range, which makes it
+ * - 104 bytes base structure
+ * - 32 bytes interrupt redirection bitmap
+ * - 128 bytes I/O bitmap
+ * - one trailing byte
+ * or a total of to 265 bytes. As it needs to be a multiple of the requested
+ * alignment, this ends up requiring 384 bytes.
+ */
+#define TSS_SIZE (3 * 128)
     void *tss;
 
-    tss = mem_alloc(128, 128);
-    memset(tss, 0, 128);
-    hvm_param_set(HVM_PARAM_VM86_TSS, virt_to_phys(tss));
+    tss = mem_alloc(TSS_SIZE, 128);
+    memset(tss, 0, TSS_SIZE);
+    hvm_param_set(HVM_PARAM_VM86_TSS_SIZED,
+                  ((uint64_t)TSS_SIZE << 32) | virt_to_phys(tss));
     printf("vm86 TSS at %08lx\n", virt_to_phys(tss));
+#undef TSS_SIZE
 }
 
 static void apic_setup(void)
