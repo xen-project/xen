@@ -2735,6 +2735,10 @@ PyMODINIT_FUNC initxc(void)
       return;
 
     xc_error_obj = PyErr_NewException(PKG ".Error", PyExc_RuntimeError, NULL);
+    if (xc_error_obj == NULL) {
+        Py_DECREF(m);
+        return;
+    }
     zero = PyInt_FromLong(0);
 
     /* KAF: This ensures that we get debug output in a timely manner. */

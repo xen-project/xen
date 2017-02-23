@@ -987,6 +987,10 @@ PyMODINIT_FUNC initxs(void)
       return;
 
     xs_error = PyErr_NewException(PKG ".Error", PyExc_RuntimeError, NULL);
+    if (xs_error == NULL) {
+        Py_DECREF(m);
+        return;
+    }
 
     Py_INCREF(&xshandle_type);
     PyModule_AddObject(m, CLS, (PyObject *)&xshandle_type);
