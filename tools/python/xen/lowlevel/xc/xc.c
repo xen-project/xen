@@ -34,6 +34,17 @@
 
 #define FLASK_CTX_LEN 1024
 
+/* Python 2 compatibility */
+#if PY_MAJOR_VERSION >= 3
+#define PyLongOrInt_FromLong PyLong_FromLong
+#define PyLongOrInt_Check PyLong_Check
+#define PyLongOrInt_AsLong PyLong_AsLong
+#else
+#define PyLongOrInt_FromLong PyInt_FromLong
+#define PyLongOrInt_Check PyInt_Check
+#define PyLongOrInt_AsLong PyInt_AsLong
+#endif
+
 static PyObject *xc_error_obj, *zero;
 
 typedef struct {
@@ -127,9 +138,9 @@ static PyObject *pyxc_domain_create(XcObject *self,
         for ( i = 0; i < sizeof(xen_domain_handle_t); i++ )
         {
             PyObject *p = PyList_GetItem(pyhandle, i);
-            if ( !PyInt_Check(p) )
+            if ( !PyLongOrInt_Check(p) )
                 goto out_exception;
-            handle[i] = (uint8_t)PyInt_AsLong(p);
+            handle[i] = (uint8_t)PyLongOrInt_AsLong(p);
         }
     }
 
@@ -142,7 +153,7 @@ static PyObject *pyxc_domain_create(XcObject *self,
             return pyxc_error_to_exception(self->xc_handle);
 
 
-    return PyInt_FromLong(dom);
+    return PyLongOrInt_FromLong(dom);
 
 out_exception:
     errno = EINVAL;
@@ -242,7 +253,7 @@ static PyObject *pyxc_vcpu_setaffinity(XcObject *self,
     {
         for ( i = 0; i < PyList_Size(cpulist); i++ ) 
         {
-            long cpu = PyInt_AsLong(PyList_GetItem(cpulist, i));
+            long cpu = PyLongOrInt_AsLong(PyList_GetItem(cpulist, i));
             if ( cpu < 0 || cpu >= nr_cpus )
             {
                 free(cpumap);
@@ -284,9 +295,9 @@ static PyObject *pyxc_domain_sethandle(XcObject *self, PyObject *args)
     for ( i = 0; i < sizeof(xen_domain_handle_t); i++ )
     {
         PyObject *p = PyList_GetItem(pyhandle, i);
-        if ( !PyInt_Check(p) )
+        if ( !PyLongOrInt_Check(p) )
             goto out_exception;
-        handle[i] = (uint8_t)PyInt_AsLong(p);
+        handle[i] = (uint8_t)PyLongOrInt_AsLong(p);
     }
 
     if (xc_domain_sethandle(self->xc_handle, dom, handle) < 0)
@@ -361,7 +372,7 @@ static PyObject *pyxc_domain_getinfo(XcObject *self,
             return NULL;
         }
         for ( j = 0; j < sizeof(xen_domain_handle_t); j++ )
-            PyList_SetItem(pyhandle, j, PyInt_FromLong(info[i].handle[j]));
+            PyList_SetItem(pyhandle, j, PyLongOrInt_FromLong(info[i].handle[j]));
         PyDict_SetItemString(info_dict, "handle", pyhandle);
         Py_DECREF(pyhandle);
         PyList_SetItem(list, i, info_dict);
@@ -420,7 +431,7 @@ static PyObject *pyxc_vcpu_getinfo(XcObject *self,
     for ( i = 0; i < nr_cpus; i++ )
     {
         if (*(cpumap + i / 8) & 1 ) {
-            PyObject *pyint = PyInt_FromLong(i);
+            PyObject *pyint = PyLongOrInt_FromLong(i);
             PyList_Append(cpulist, pyint);
             Py_DECREF(pyint);
         }
@@ -836,7 +847,7 @@ static PyObject *pyxc_evtchn_alloc_unbound(XcObject *self,
     if ( (port = xc_evtchn_alloc_unbound(self->xc_handle, dom, remote_dom)) < 0 )
         return pyxc_error_to_exception(self->xc_handle);
 
-    return PyInt_FromLong(port);
+    return PyLongOrInt_FromLong(port);
 }
 
 static PyObject *pyxc_evtchn_reset(XcObject *self,
@@ -1063,7 +1074,7 @@ static PyObject *pyxc_topologyinfo(XcObject *self)
         }
         else
         {
-            PyObject *pyint = PyInt_FromLong(cputopo[i].core);
+            PyObject *pyint = PyLongOrInt_FromLong(cputopo[i].core);
             PyList_Append(cpu_to_core_obj, pyint);
             Py_DECREF(pyint);
         }
@@ -1074,7 +1085,7 @@ static PyObject *pyxc_topologyinfo(XcObject *self)
         }
         else
         {
-            PyObject *pyint = PyInt_FromLong(cputopo[i].socket);
+            PyObject *pyint = PyLongOrInt_FromLong(cputopo[i].socket);
             PyList_Append(cpu_to_socket_obj, pyint);
             Py_DECREF(pyint);
         }
@@ -1085,7 +1096,7 @@ static PyObject *pyxc_topologyinfo(XcObject *self)
         }
         else
         {
-            PyObject *pyint = PyInt_FromLong(cputopo[i].node);
+            PyObject *pyint = PyLongOrInt_FromLong(cputopo[i].node);
             PyList_Append(cpu_to_node_obj, pyint);
             Py_DECREF(pyint);
         }
@@ -1139,18 +1150,18 @@ static PyObject *pyxc_numainfo(XcObject *self)
         unsigned invalid_node;
 
         /* Total Memory */
-        pyint = PyInt_FromLong(meminfo[i].memsize >> 20); /* MB */
+        pyint = PyLongOrInt_FromLong(meminfo[i].memsize >> 20); /* MB */
         PyList_Append(node_to_memsize_obj, pyint);
         Py_DECREF(pyint);
 
         /* Free Memory */
-        pyint = PyInt_FromLong(meminfo[i].memfree >> 20); /* MB */
+        pyint = PyLongOrInt_FromLong(meminfo[i].memfree >> 20); /* MB */
         PyList_Append(node_to_memfree_obj, pyint);
         Py_DECREF(pyint);
 
         /* DMA memory. */
         xc_availheap(self->xc_handle, 0, 32, i, &free_heap);
-        pyint = PyInt_FromLong(free_heap >> 20); /* MB */
+        pyint = PyLongOrInt_FromLong(free_heap >> 20); /* MB */
         PyList_Append(node_to_dma32_mem_obj, pyint);
         Py_DECREF(pyint);
 
@@ -1166,7 +1177,7 @@ static PyObject *pyxc_numainfo(XcObject *self)
             }
             else
             {
-                pyint = PyInt_FromLong(dist);
+                pyint = PyLongOrInt_FromLong(dist);
                 PyList_Append(node_to_node_dist_obj, pyint);
                 Py_DECREF(pyint);
             }
@@ -1700,7 +1711,7 @@ static PyObject *cpumap_to_cpulist(XcObject *self, xc_cpumap_t cpumap)
     {
         if ( *cpumap & (1 << (i % 8)) )
         {
-            PyObject* pyint = PyInt_FromLong(i);
+            PyObject* pyint = PyLongOrInt_FromLong(i);
 
             PyList_Append(cpulist, pyint);
             Py_DECREF(pyint);
@@ -1726,7 +1737,7 @@ static PyObject *pyxc_cpupool_create(XcObject *self,
     if ( xc_cpupool_create(self->xc_handle, &cpupool, sched) < 0 )
         return pyxc_error_to_exception(self->xc_handle);
 
-    return PyInt_FromLong(cpupool);
+    return PyLongOrInt_FromLong(cpupool);
 }
 
 static PyObject *pyxc_cpupool_destroy(XcObject *self,
@@ -1882,7 +1893,7 @@ static PyObject *pyflask_context_to_sid(PyObject *self, PyObject *args,
         return PyErr_SetFromErrno(xc_error_obj);
     }
 
-    return PyInt_FromLong(sid);
+    return PyLongOrInt_FromLong(sid);
 }
 
 static PyObject *pyflask_sid_to_context(PyObject *self, PyObject *args,
@@ -2705,7 +2716,7 @@ PyMODINIT_FUNC initxc(void)
         Py_DECREF(m);
         return;
     }
-    zero = PyInt_FromLong(0);
+    zero = PyLongOrInt_FromLong(0);
 
     /* KAF: This ensures that we get debug output in a timely manner. */
     setbuf(stdout, NULL);

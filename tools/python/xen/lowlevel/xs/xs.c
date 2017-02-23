@@ -43,6 +43,14 @@
 #define PKG "xen.lowlevel.xs"
 #define CLS "xs"
 
+#if PY_MAJOR_VERSION < 3
+/* Python 2 compatibility */
+#define PyLong_FromLong PyInt_FromLong
+#undef PyLong_Check
+#define PyLong_Check PyInt_Check
+#define PyLong_AsLong PyInt_AsLong
+#endif
+
 static PyObject *xs_error;
 
 /** Python wrapper round an xs handle.
