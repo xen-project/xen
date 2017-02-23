@@ -2246,6 +2246,8 @@ static void pi_notification_interrupt(struct cpu_user_regs *regs)
     raise_softirq(VCPU_KICK_SOFTIRQ);
 }
 
+static void __init lbr_tsx_fixup_check(void);
+
 const struct hvm_function_table * __init start_vmx(void)
 {
     set_in_cr4(X86_CR4_VMXE);
@@ -2314,6 +2316,8 @@ const struct hvm_function_table * __init start_vmx(void)
     }
 
     setup_vmcs_dump();
+
+    lbr_tsx_fixup_check();
 
     return &vmx_function_table;
 }
@@ -2475,6 +2479,14 @@ static int vmx_cr_access(unsigned long exit_qualification)
     return X86EMUL_OKAY;
 }
 
+/* This defines the layout of struct lbr_info[] */
+#define LBR_LASTINT_FROM_IDX    0
+#define LBR_LASTINT_TO_IDX      1
+#define LBR_LASTBRANCH_TOS_IDX  2
+#define LBR_LASTBRANCH_FROM_IDX 3
+#define LBR_LASTBRANCH_TO_IDX   4
+#define LBR_LASTBRANCH_INFO     5
+
 static const struct lbr_info {
     u32 base, count;
 } p4_lbr[] = {
@@ -2578,6 +2590,56 @@ static const struct lbr_info *last_branch_msr_get(void)
     }
 
     return NULL;
+}
+
+enum
+{
+    LBR_FORMAT_32                 = 0x0, /* 32-bit record format */
+    LBR_FORMAT_LIP                = 0x1, /* 64-bit LIP record format */
+    LBR_FORMAT_EIP                = 0x2, /* 64-bit EIP record format */
+    LBR_FORMAT_EIP_FLAGS          = 0x3, /* 64-bit EIP, Flags */
+    LBR_FORMAT_EIP_FLAGS_TSX      = 0x4, /* 64-bit EIP, Flags, TSX */
+    LBR_FORMAT_EIP_FLAGS_TSX_INFO = 0x5, /* 64-bit EIP, Flags, TSX, LBR_INFO */
+    LBR_FORMAT_EIP_FLAGS_CYCLES   = 0x6, /* 64-bit EIP, Flags, Cycles */
+};
+
+#define LBR_FROM_SIGNEXT_2MSB  ((1ULL << 59) | (1ULL << 60))
+
+static bool __read_mostly lbr_tsx_fixup_needed;
+static uint32_t __read_mostly lbr_from_start;
+static uint32_t __read_mostly lbr_from_end;
+static uint32_t __read_mostly lbr_lastint_from;
+
+static void __init lbr_tsx_fixup_check(void)
+{
+    bool tsx_support = cpu_has_hle || cpu_has_rtm;
+    uint64_t caps;
+    uint32_t lbr_format;
+
+    /* Fixup is needed only when TSX support is disabled ... */
+    if ( tsx_support )
+        return;
+
+    if ( !cpu_has_pdcm )
+        return;
+
+    rdmsrl(MSR_IA32_PERF_CAPABILITIES, caps);
+    lbr_format = caps & MSR_IA32_PERF_CAP_LBR_FORMAT;
+
+    /* ... and the address format of LBR includes TSX bits 61:62 */
+    if ( lbr_format == LBR_FORMAT_EIP_FLAGS_TSX )
+    {
+        const struct lbr_info *lbr = last_branch_msr_get();
+
+        if ( lbr == NULL )
+            return;
+
+        lbr_lastint_from = lbr[LBR_LASTINT_FROM_IDX].base;
+        lbr_from_start = lbr[LBR_LASTBRANCH_FROM_IDX].base;
+        lbr_from_end = lbr_from_start + lbr[LBR_LASTBRANCH_FROM_IDX].count;
+
+        lbr_tsx_fixup_needed = true;
+    }
 }
 
 static int is_last_branch_msr(u32 ecx)
@@ -2837,7 +2899,11 @@ static int vmx_msr_write_intercept(unsigned int msr, uint64_t msr_content)
             for ( ; (rc == 0) && lbr->count; lbr++ )
                 for ( i = 0; (rc == 0) && (i < lbr->count); i++ )
                     if ( (rc = vmx_add_guest_msr(lbr->base + i)) == 0 )
+                    {
                         vmx_disable_intercept_for_msr(v, lbr->base + i, MSR_TYPE_R | MSR_TYPE_W);
+                        v->arch.hvm_vmx.lbr_tsx_fixup_enabled =
+                            lbr_tsx_fixup_needed;
+                    }
         }
 
         if ( (rc < 0) ||
@@ -3872,6 +3938,27 @@ out:
     }
 }
 
+static void lbr_tsx_fixup(void)
+{
+    struct vcpu *curr = current;
+    unsigned int msr_count = curr->arch.hvm_vmx.msr_count;
+    struct vmx_msr_entry *msr_area = curr->arch.hvm_vmx.msr_area;
+    struct vmx_msr_entry *msr;
+
+    if ( (msr = vmx_find_msr(lbr_from_start, VMX_GUEST_MSR)) != NULL )
+    {
+        /*
+         * Sign extend into bits 61:62 while preserving bit 63
+         * The loop relies on the fact that MSR array is sorted.
+         */
+        for ( ; msr < msr_area + msr_count && msr->index < lbr_from_end; msr++ )
+            msr->data |= ((LBR_FROM_SIGNEXT_2MSB & msr->data) << 2);
+    }
+
+    if ( (msr = vmx_find_msr(lbr_lastint_from, VMX_GUEST_MSR)) != NULL )
+        msr->data |= ((LBR_FROM_SIGNEXT_2MSB & msr->data) << 2);
+}
+
 void vmx_vmenter_helper(const struct cpu_user_regs *regs)
 {
     struct vcpu *curr = current;
@@ -3928,6 +4015,9 @@ void vmx_vmenter_helper(const struct cpu_user_regs *regs)
     }
 
  out:
+    if ( unlikely(curr->arch.hvm_vmx.lbr_tsx_fixup_enabled) )
+        lbr_tsx_fixup();
+
     HVMTRACE_ND(VMENTRY, 0, 1/*cycles*/, 0, 0, 0, 0, 0, 0, 0);
 
     __vmwrite(GUEST_RIP,    regs->rip);
