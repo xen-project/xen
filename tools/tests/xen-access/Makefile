@@ -2,6 +2,7 @@ XEN_ROOT=$(CURDIR)/../../..
 include $(XEN_ROOT)/tools/Rules.mk
 
 CFLAGS += -Werror
+CFLAGS += -DXC_WANT_COMPAT_DEVICEMODEL_API
 
 CFLAGS += $(CFLAGS_libxenctrl)
 CFLAGS += $(CFLAGS_libxenguest)
