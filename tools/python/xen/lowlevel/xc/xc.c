@@ -2640,11 +2640,6 @@ static PyMethodDef pyxc_methods[] = {
 };
 
 
-static PyObject *PyXc_getattr(PyObject *obj, char *name)
-{
-    return Py_FindMethod(pyxc_methods, obj, name);
-}
-
 static PyObject *PyXc_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
     XcObject *self = (XcObject *)type->tp_alloc(type, 0);
@@ -2686,7 +2681,7 @@ static PyTypeObject PyXcType = {
     0,
     (destructor)PyXc_dealloc,     /* tp_dealloc        */
     NULL,                         /* tp_print          */
-    PyXc_getattr,                 /* tp_getattr        */
+    NULL,                         /* tp_getattr        */
     NULL,                         /* tp_setattr        */
     NULL,                         /* tp_compare        */
     NULL,                         /* tp_repr           */

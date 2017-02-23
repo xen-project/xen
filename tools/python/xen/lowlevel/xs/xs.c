@@ -870,11 +870,6 @@ static PyMethodDef xshandle_methods[] = {
     { NULL /* Sentinel. */ },
 };
 
-static PyObject *xshandle_getattr(PyObject *self, char *name)
-{
-    return Py_FindMethod(xshandle_methods, self, name);
-}
-
 static PyObject *
 xshandle_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
@@ -938,7 +933,7 @@ static PyTypeObject xshandle_type = {
     0,
     (destructor)xshandle_dealloc, /* tp_dealloc        */
     NULL,                         /* tp_print          */
-    xshandle_getattr,             /* tp_getattr        */
+    NULL,                         /* tp_getattr        */
     NULL,                         /* tp_setattr        */
     NULL,                         /* tp_compare        */
     NULL,                         /* tp_repr           */
