@@ -16,8 +16,6 @@
  * Legacy SXP output handling
  */
 
-#include "libxl_osdeps.h"
-
 #include <stdlib.h>
 #include <inttypes.h>
 

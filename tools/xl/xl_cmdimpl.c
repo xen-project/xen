@@ -12,7 +12,7 @@
  * GNU Lesser General Public License for more details.
  */
 
-#include "libxl_osdeps.h"
+#define _GNU_SOURCE
 
 #include <stdio.h>
 #include <stdlib.h>
