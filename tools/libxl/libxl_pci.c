@@ -1370,7 +1370,7 @@ static int do_pci_remove(libxl__gc *gc, uint32_t domid,
     int hvm = 0, rc, num;
     int stubdomid = 0;
     uint32_t domainid = domid;
-    bool isstubdom = !libxl_is_stubdom(ctx, domid, &domainid);
+    bool isstubdom = libxl_is_stubdom(ctx, domid, &domainid);
 
 
     assigned = libxl_device_pci_list(ctx, domid, &num);
