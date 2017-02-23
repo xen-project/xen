@@ -99,6 +99,7 @@ tools/libs/evtchn/headers.chk
 tools/libs/gnttab/headers.chk
 tools/libs/call/headers.chk
 tools/libs/foreignmemory/headers.chk
+tools/libs/devicemodel/headers.chk
 tools/blktap2/daemon/blktapctrl
 tools/blktap2/drivers/img2qcow
 tools/blktap2/drivers/lock-util
