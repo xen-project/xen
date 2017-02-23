@@ -103,7 +103,7 @@ static PyObject *xspy_read(XsHandle *self, PyObject *args)
     xsval = xs_read(xh, th, path, &xsval_n);
     Py_END_ALLOW_THREADS
     if (xsval) {
-        PyObject *val = PyString_FromStringAndSize(xsval, xsval_n);
+        PyObject *val = PyBytes_FromStringAndSize(xsval, xsval_n);
         free(xsval);
         return val;
     }
@@ -179,7 +179,11 @@ static PyObject *xspy_ls(XsHandle *self, PyObject *args)
         int i;
         PyObject *val = PyList_New(xsval_n);
         for (i = 0; i < xsval_n; i++)
-            PyList_SetItem(val, i, PyString_FromString(xsval[i]));
+#if PY_MAJOR_VERSION >= 3
+            PyList_SetItem(val, i, PyUnicode_FromString(xsval[i]));
+#else
+            PyList_SetItem(val, i, PyBytes_FromString(xsval[i]));
+#endif
         free(xsval);
         return val;
     }
@@ -550,7 +554,11 @@ static PyObject *xspy_transaction_start(XsHandle *self)
     }
 
     snprintf(thstr, sizeof(thstr), "%lX", (unsigned long)th);
-    return PyString_FromString(thstr);
+#if PY_MAJOR_VERSION >= 3
+    return PyUnicode_FromString(thstr);
+#else
+    return PyBytes_FromString(thstr);
+#endif
 }
 
 #define xspy_transaction_end_doc "\n"					\
@@ -773,7 +781,11 @@ static PyObject *xspy_get_domain_path(XsHandle *self, PyObject *args)
     Py_END_ALLOW_THREADS
 
     if (xsval) {
-        PyObject *val = PyString_FromString(xsval);
+#if PY_MAJOR_VERSION >= 3
+        PyObject *val = PyUnicode_FromString(xsval);
+#else
+        PyObject *val = PyBytes_FromString(xsval);
+#endif
         free(xsval);
         return val;
     }

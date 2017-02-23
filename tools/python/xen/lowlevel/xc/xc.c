@@ -678,7 +678,7 @@ static void pyxc_dom_extract_cpuid(PyObject *config,
 
     for ( i = 0; i < 4; i++ )
         if ( (obj = PyDict_GetItemString(config, regs_extract[i])) != NULL )
-            regs[i] = PyString_AS_STRING(obj);
+            regs[i] = PyBytes_AS_STRING(obj);
 }
 
 static PyObject *pyxc_create_cpuid_dict(char **regs)
@@ -693,7 +693,7 @@ static PyObject *pyxc_create_cpuid_dict(char **regs)
        if ( regs[i] == NULL )
            continue;
        PyDict_SetItemString(dict, regs_extract[i],
-                            PyString_FromString(regs[i]));
+                            PyBytes_FromString(regs[i]));
        free(regs[i]);
        regs[i] = NULL;
    }
@@ -940,7 +940,7 @@ static PyObject *pyxc_readconsolering(XcObject *self,
         str = ptr;
     }
 
-    obj = PyString_FromStringAndSize(str, count);
+    obj = PyBytes_FromStringAndSize(str, count);
     free(str);
     return obj;
 }
