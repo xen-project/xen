@@ -20,12 +20,6 @@ $(XL_OBJS): CFLAGS += $(CFLAGS_libxentoollog)
 $(XL_OBJS): CFLAGS += $(CFLAGS_XL)
 $(XL_OBJS): CFLAGS += -include $(XEN_ROOT)/tools/config.h # libxl_json.h needs it.
 
-# libxenlight should be built before building xl
-.PHONY: libxl
-libxl:
-	$(MAKE) -C $(XEN_ROOT)/tools/libxl
-$(XL_OBJS): libxl
-
 .PHONY: all
 all: xl
 
