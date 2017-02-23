@@ -6732,7 +6732,7 @@ static int sched_vcpu_output(libxl_scheduler sched,
     return 0;
 }
 
-/* 
+/*
  * <nothing>             : List all domain params and sched params from all pools
  * -d [domid]            : List domain params for domain
  * -d [domid] [params]   : Set domain params for domain
@@ -8374,7 +8374,7 @@ int main_cpupoolcreate(int argc, char **argv)
     }
     /* We made it! */
     rc = EXIT_SUCCESS;
-   
+
 out_cfg:
     xlu_cfg_destroy(config);
 out:
