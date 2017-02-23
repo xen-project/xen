@@ -1358,17 +1358,12 @@ struct vmx_msr_entry *vmx_find_msr(u32 msr, int type)
 
 int vmx_read_guest_msr(u32 msr, u64 *val)
 {
-    struct vcpu *curr = current;
-    unsigned int i, msr_count = curr->arch.hvm_vmx.msr_count;
-    const struct vmx_msr_entry *msr_area = curr->arch.hvm_vmx.msr_area;
+    struct vmx_msr_entry *ent;
 
-    for ( i = 0; i < msr_count; i++ )
+    if ( (ent = vmx_find_msr(msr, VMX_GUEST_MSR)) != NULL )
     {
-        if ( msr_area[i].index == msr )
-        {
-            *val = msr_area[i].data;
-            return 0;
-        }
+        *val = ent->data;
+        return 0;
     }
 
     return -ESRCH;
@@ -1376,17 +1371,12 @@ int vmx_read_guest_msr(u32 msr, u64 *val)
 
 int vmx_write_guest_msr(u32 msr, u64 val)
 {
-    struct vcpu *curr = current;
-    unsigned int i, msr_count = curr->arch.hvm_vmx.msr_count;
-    struct vmx_msr_entry *msr_area = curr->arch.hvm_vmx.msr_area;
+    struct vmx_msr_entry *ent;
 
-    for ( i = 0; i < msr_count; i++ )
+    if ( (ent = vmx_find_msr(msr, VMX_GUEST_MSR)) != NULL )
     {
-        if ( msr_area[i].index == msr )
-        {
-            msr_area[i].data = val;
-            return 0;
-        }
+        ent->data = val;
+        return 0;
     }
 
     return -ESRCH;
