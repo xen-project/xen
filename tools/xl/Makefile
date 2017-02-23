@@ -20,6 +20,11 @@ $(XL_OBJS): CFLAGS += $(CFLAGS_libxentoollog)
 $(XL_OBJS): CFLAGS += $(CFLAGS_XL)
 $(XL_OBJS): CFLAGS += -include $(XEN_ROOT)/tools/config.h # libxl_json.h needs it.
 
+genpath-target = $(call buildmakevars2header,_paths.h)
+$(eval $(genpath-target))
+
+$(XL_OBJS): _paths.h
+
 .PHONY: all
 all: xl
 
@@ -35,7 +40,7 @@ install: all
 
 .PHONY: clean
 clean:
-	$(RM) -f *.o xl $(DEPS)
+	$(RM) -f *.o xl _paths.h $(DEPS)
 
 distclean: clean
 

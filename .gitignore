@@ -380,6 +380,7 @@ tools/firmware/etherboot/ipxe/
 tools/python/xen/lowlevel/xl/_pyxl_types.c
 tools/python/xen/lowlevel/xl/_pyxl_types.h
 tools/xenstore/xenstore-watch
+tools/xl/_paths.h
 tools/xl/xl
 
 docs/txt/misc/*.txt
