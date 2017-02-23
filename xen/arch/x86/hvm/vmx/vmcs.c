@@ -1318,6 +1318,44 @@ static int construct_vmcs(struct vcpu *v)
     return 0;
 }
 
+static int vmx_msr_entry_key_cmp(const void *key, const void *elt)
+{
+    const u32 *msr = key;
+    const struct vmx_msr_entry *entry = elt;
+
+    if ( *msr > entry->index )
+        return 1;
+    if ( *msr < entry->index )
+        return -1;
+
+    return 0;
+}
+
+struct vmx_msr_entry *vmx_find_msr(u32 msr, int type)
+{
+    struct vcpu *curr = current;
+    unsigned int msr_count;
+    struct vmx_msr_entry *msr_area;
+
+    if ( type == VMX_GUEST_MSR )
+    {
+        msr_count = curr->arch.hvm_vmx.msr_count;
+        msr_area = curr->arch.hvm_vmx.msr_area;
+    }
+    else
+    {
+        ASSERT(type == VMX_HOST_MSR);
+        msr_count = curr->arch.hvm_vmx.host_msr_count;
+        msr_area = curr->arch.hvm_vmx.host_msr_area;
+    }
+
+    if ( msr_area == NULL )
+        return NULL;
+
+    return bsearch(&msr, msr_area, msr_count, sizeof(struct vmx_msr_entry),
+                   vmx_msr_entry_key_cmp);
+}
+
 int vmx_read_guest_msr(u32 msr, u64 *val)
 {
     struct vcpu *curr = current;
@@ -1386,14 +1424,17 @@ int vmx_add_msr(u32 msr, int type)
             __vmwrite(VM_EXIT_MSR_LOAD_ADDR, virt_to_maddr(*msr_area));
     }
 
-    for ( idx = 0; idx < *msr_count; idx++ )
+    for ( idx = 0; idx < *msr_count && (*msr_area)[idx].index <= msr; idx++ )
         if ( (*msr_area)[idx].index == msr )
             return 0;
 
     if ( *msr_count == (PAGE_SIZE / sizeof(struct vmx_msr_entry)) )
         return -ENOSPC;
 
-    msr_area_elem = *msr_area + *msr_count;
+    memmove(*msr_area + idx + 1, *msr_area + idx,
+            sizeof(*msr_area_elem) * (*msr_count - idx));
+
+    msr_area_elem = *msr_area + idx;
     msr_area_elem->index = msr;
     msr_area_elem->mbz = 0;
 
