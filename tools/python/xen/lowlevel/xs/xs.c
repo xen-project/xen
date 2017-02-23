@@ -922,7 +922,7 @@ static void xshandle_dealloc(XsHandle *self)
 
     Py_XDECREF(self->watches);
 
-    self->ob_type->tp_free((PyObject *)self);
+    Py_TYPE(self)->tp_free((PyObject *)self);
 }
 
 static PyTypeObject xshandle_type = {

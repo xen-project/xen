@@ -2670,7 +2670,7 @@ static void PyXc_dealloc(XcObject *self)
         self->xc_handle = NULL;
     }
 
-    self->ob_type->tp_free((PyObject *)self);
+    Py_TYPE(self)->tp_free((PyObject *)self);
 }
 
 static PyTypeObject PyXcType = {
