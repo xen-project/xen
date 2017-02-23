@@ -79,7 +79,7 @@ int xendevicemodel_xcall(xendevicemodel_handle *dmod,
 {
     int ret = -1;
     void **xcall_bufs;
-    xen_dm_op_buf_t *op_bufs;
+    xen_dm_op_buf_t *op_bufs = NULL;
     unsigned int i;
 
     xcall_bufs = calloc(nr_bufs, sizeof(*xcall_bufs));
