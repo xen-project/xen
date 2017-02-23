@@ -19,8 +19,8 @@
 #include <stdlib.h>
 #include <inttypes.h>
 
-#include "libxl.h"
-#include "libxl_utils.h"
+#include <libxl.h>
+#include <libxl_utils.h>
 #include "xl.h"
 
 /* In general you should not add new output to this function since it

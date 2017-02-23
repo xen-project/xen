@@ -24,9 +24,9 @@
 #include <inttypes.h>
 #include <regex.h>
 
-#include "libxl.h"
-#include "libxl_utils.h"
-#include "libxlutil.h"
+#include <libxl.h>
+#include <libxl_utils.h>
+#include <libxlutil.h>
 #include "xl.h"
 
 xentoollog_logger_stdiostream *logger;

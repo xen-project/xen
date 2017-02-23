@@ -34,10 +34,10 @@
 #include <limits.h>
 #include <xen/hvm/e820.h>
 
-#include "libxl.h"
-#include "libxl_utils.h"
-#include "libxl_json.h"
-#include "libxlutil.h"
+#include <libxl.h>
+#include <libxl_utils.h>
+#include <libxl_json.h>
+#include <libxlutil.h>
 #include "xl.h"
 
 /* For calls which return an errno on failure */
