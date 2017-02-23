@@ -927,44 +927,15 @@ static void xshandle_dealloc(XsHandle *self)
 
 static PyTypeObject xshandle_type = {
     PyObject_HEAD_INIT(NULL)
-    0,
-    PKG "." CLS,
-    sizeof(XsHandle),
-    0,
-    (destructor)xshandle_dealloc, /* tp_dealloc        */
-    NULL,                         /* tp_print          */
-    NULL,                         /* tp_getattr        */
-    NULL,                         /* tp_setattr        */
-    NULL,                         /* tp_compare        */
-    NULL,                         /* tp_repr           */
-    NULL,                         /* tp_as_number      */
-    NULL,                         /* tp_as_sequence    */
-    NULL,                         /* tp_as_mapping     */
-    NULL,                         /* tp_hash           */
-    NULL,                         /* tp_call           */
-    NULL,                         /* tp_str            */
-    NULL,                         /* tp_getattro       */
-    NULL,                         /* tp_setattro       */
-    NULL,                         /* tp_as_buffer      */
-    Py_TPFLAGS_DEFAULT,           /* tp_flags          */
-    "Xenstore connections",       /* tp_doc            */
-    NULL,                         /* tp_traverse       */
-    NULL,                         /* tp_clear          */
-    NULL,                         /* tp_richcompare    */
-    0,                            /* tp_weaklistoffset */
-    NULL,                         /* tp_iter           */
-    NULL,                         /* tp_iternext       */
-    xshandle_methods,             /* tp_methods        */
-    NULL,                         /* tp_members        */
-    NULL,                         /* tp_getset         */
-    NULL,                         /* tp_base           */
-    NULL,                         /* tp_dict           */
-    NULL,                         /* tp_descr_get      */
-    NULL,                         /* tp_descr_set      */
-    0,                            /* tp_dictoffset     */
-    (initproc)xshandle_init,      /* tp_init           */
-    NULL,                         /* tp_alloc          */
-    xshandle_new,                 /* tp_new            */
+    .tp_name = PKG "." CLS,
+    .tp_basicsize = sizeof(XsHandle),
+    .tp_itemsize = 0,
+    .tp_dealloc = (destructor)xshandle_dealloc,
+    .tp_flags = Py_TPFLAGS_DEFAULT,
+    .tp_doc = "Xenstore connections",
+    .tp_methods = xshandle_methods,
+    .tp_init = (initproc)xshandle_init,
+    .tp_new = xshandle_new,
 };
 
 static PyMethodDef xs_methods[] = { { NULL } };
