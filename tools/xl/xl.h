@@ -1,5 +1,5 @@
 /*
- * Author Yang Hongyang <yanghy@cn.fujitsu.com>
+ * Copyright 2009-2017 Citrix Ltd and other contributors
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published
