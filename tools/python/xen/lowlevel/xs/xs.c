@@ -946,7 +946,11 @@ static void xshandle_dealloc(XsHandle *self)
 }
 
 static PyTypeObject xshandle_type = {
+#if PY_MAJOR_VERSION >= 3
+    .ob_base = { PyObject_HEAD_INIT(NULL) },
+#else
     PyObject_HEAD_INIT(NULL)
+#endif
     .tp_name = PKG "." CLS,
     .tp_basicsize = sizeof(XsHandle),
     .tp_itemsize = 0,
@@ -960,22 +964,43 @@ static PyTypeObject xshandle_type = {
 
 static PyMethodDef xs_methods[] = { { NULL } };
 
+#if PY_MAJOR_VERSION >= 3
+static PyModuleDef xs_module = {
+    PyModuleDef_HEAD_INIT,
+    PKG,     /* name */
+    NULL,   /* docstring */
+    -1,     /* size of per-interpreter state, -1 means the module use global
+               variables */
+    xs_methods
+};
+#endif
+
+#if PY_MAJOR_VERSION >= 3
+#define INITERROR return NULL
+PyMODINIT_FUNC PyInit_xs(void)
+#else
+#define INITERROR return
 PyMODINIT_FUNC initxs(void)
+#endif
 {
     PyObject* m;
 
     if (PyType_Ready(&xshandle_type) < 0)
-        return;
+        INITERROR;
 
+#if PY_MAJOR_VERSION >= 3
+    m = PyModule_Create(&xs_module);
+#else
     m = Py_InitModule(PKG, xs_methods);
+#endif
 
     if (m == NULL)
-      return;
+        INITERROR;
 
     xs_error = PyErr_NewException(PKG ".Error", PyExc_RuntimeError, NULL);
     if (xs_error == NULL) {
         Py_DECREF(m);
-        return;
+        INITERROR;
     }
 
     Py_INCREF(&xshandle_type);
@@ -983,6 +1008,9 @@ PyMODINIT_FUNC initxs(void)
 
     Py_INCREF(xs_error);
     PyModule_AddObject(m, "Error", xs_error);
+#if PY_MAJOR_VERSION >= 3
+    return m;
+#endif
 }
 
 

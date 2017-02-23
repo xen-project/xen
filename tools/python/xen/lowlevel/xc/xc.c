@@ -2685,7 +2685,11 @@ static void PyXc_dealloc(XcObject *self)
 }
 
 static PyTypeObject PyXcType = {
+#if PY_MAJOR_VERSION >= 3
+    .ob_base = { PyObject_HEAD_INIT(NULL) },
+#else
     PyObject_HEAD_INIT(NULL)
+#endif
     .tp_name = PKG "." CLS,
     .tp_basicsize = sizeof(XcObject),
     .tp_itemsize = 0,
@@ -2699,22 +2703,44 @@ static PyTypeObject PyXcType = {
 
 static PyMethodDef xc_methods[] = { { NULL } };
 
+
+#if PY_MAJOR_VERSION >= 3
+static PyModuleDef xc_module = {
+    PyModuleDef_HEAD_INIT,
+    PKG,     /* name */
+    NULL,   /* docstring */
+    -1,     /* size of per-interpreter state, -1 means the module use global
+               variables */
+    xc_methods
+};
+#endif
+
+#if PY_MAJOR_VERSION >= 3
+#define INITERROR return NULL
+PyMODINIT_FUNC PyInit_xc(void)
+#else
+#define INITERROR return
 PyMODINIT_FUNC initxc(void)
+#endif
 {
     PyObject *m;
 
     if (PyType_Ready(&PyXcType) < 0)
-        return;
+        INITERROR;
 
+#if PY_MAJOR_VERSION >= 3
+    m = PyModule_Create(&xc_module);
+#else
     m = Py_InitModule(PKG, xc_methods);
+#endif
 
     if (m == NULL)
-      return;
+        INITERROR;
 
     xc_error_obj = PyErr_NewException(PKG ".Error", PyExc_RuntimeError, NULL);
     if (xc_error_obj == NULL) {
         Py_DECREF(m);
-        return;
+        INITERROR;
     }
     zero = PyLongOrInt_FromLong(0);
 
@@ -2732,6 +2758,9 @@ PyMODINIT_FUNC initxc(void)
     PyModule_AddIntConstant(m, "XEN_SCHEDULER_CREDIT", XEN_SCHEDULER_CREDIT);
     PyModule_AddIntConstant(m, "XEN_SCHEDULER_CREDIT2", XEN_SCHEDULER_CREDIT2);
 
+#if PY_MAJOR_VERSION >= 3
+    return m;
+#endif
 }
 
 
