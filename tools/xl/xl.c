@@ -48,6 +48,15 @@ bool progress_use_cr = 0;
 
 xentoollog_level minmsglevel = minmsglevel_default;
 
+int logfile = 2;
+
+/* every libxl action in xl uses this same libxl context */
+libxl_ctx *ctx;
+
+xlchild children[child_max];
+
+const char *common_domname;
+
 /* Get autoballoon option based on presence of dom0_mem Xen command
    line option. */
 static int auto_autoballoon(void)
@@ -369,6 +378,55 @@ int main(int argc, char **argv)
  xit:
     return ret;
 }
+
+int child_report(xlchildnum child)
+{
+    int status;
+    pid_t got = xl_waitpid(child, &status, 0);
+    if (got < 0) {
+        fprintf(stderr, "xl: warning, failed to waitpid for %s: %s\n",
+                children[child].description, strerror(errno));
+        return ERROR_FAIL;
+    } else if (status) {
+        xl_report_child_exitstatus(XTL_ERROR, child, got, status);
+        return ERROR_FAIL;
+    } else {
+        return 0;
+    }
+}
+
+void help(const char *command)
+{
+    int i;
+    struct cmd_spec *cmd;
+
+    if (!command || !strcmp(command, "help")) {
+        printf("Usage xl [-vfN] <subcommand> [args]\n\n");
+        printf("xl full list of subcommands:\n\n");
+        for (i = 0; i < cmdtable_len; i++) {
+            printf(" %-19s ", cmd_table[i].cmd_name);
+            if (strlen(cmd_table[i].cmd_name) > 19)
+                printf("\n %-19s ", "");
+            printf("%s\n", cmd_table[i].cmd_desc);
+        }
+    } else {
+        cmd = cmdtable_lookup(command);
+        if (cmd) {
+            printf("Usage: xl [-v%s%s] %s %s\n\n%s.\n\n",
+                   cmd->modifies ? "f" : "",
+                   cmd->can_dryrun ? "N" : "",
+                   cmd->cmd_name,
+                   cmd->cmd_usage,
+                   cmd->cmd_desc);
+            if (cmd->cmd_option)
+                printf("Options:\n\n%s\n", cmd->cmd_option);
+        }
+        else {
+            printf("command \"%s\" not implemented\n", command);
+        }
+    }
+}
+
 
 /*
  * Local variables:
