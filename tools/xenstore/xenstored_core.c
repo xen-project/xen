@@ -80,7 +80,7 @@ static int tracefd = -1;
 static bool recovery = true;
 static int reopen_log_pipe[2];
 static int reopen_log_pipe0_pollfd_idx = -1;
-static char *tracefile = NULL;
+char *tracefile = NULL;
 static TDB_CONTEXT *tdb_ctx = NULL;
 static bool trigger_talloc_report = false;
 
@@ -205,12 +205,17 @@ static void trigger_reopen_log(int signal __attribute__((unused)))
 	dummy = write(reopen_log_pipe[1], &c, 1);
 }
 
+void close_log(void)
+{
+	if (tracefd >= 0)
+		close(tracefd);
+	tracefd = -1;
+}
 
-static void reopen_log(void)
+void reopen_log(void)
 {
 	if (tracefile) {
-		if (tracefd >= 0)
-			close(tracefd);
+		close_log();
 
 		tracefd = open(tracefile, O_WRONLY|O_CREAT|O_APPEND, 0600);
 
@@ -2030,6 +2035,8 @@ int main(int argc, char *argv[])
 		finish_daemonize();
 
 	signal(SIGHUP, trigger_reopen_log);
+	if (tracefile)
+		tracefile = talloc_strdup(NULL, tracefile);
 
 	/* Get ready to listen to the tools. */
 	initialize_fds(*sock, &sock_pollfd_idx, *ro_sock, &ro_sock_pollfd_idx,

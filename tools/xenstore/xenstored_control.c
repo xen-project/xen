@@ -44,6 +44,38 @@ static int do_control_check(void *ctx, struct connection *conn,
 	return 0;
 }
 
+static int do_control_log(void *ctx, struct connection *conn,
+			  char **vec, int num)
+{
+	if (num != 1)
+		return EINVAL;
+
+	if (!strcmp(vec[0], "on"))
+		reopen_log();
+	else if (!strcmp(vec[0], "off"))
+		close_log();
+	else
+		return EINVAL;
+
+	send_ack(conn, XS_CONTROL);
+	return 0;
+}
+
+static int do_control_logfile(void *ctx, struct connection *conn,
+			      char **vec, int num)
+{
+	if (num != 1)
+		return EINVAL;
+
+	close_log();
+	talloc_free(tracefile);
+	tracefile = talloc_strdup(NULL, vec[0]);
+	reopen_log();
+
+	send_ack(conn, XS_CONTROL);
+	return 0;
+}
+
 static int do_control_print(void *ctx, struct connection *conn,
 			    char **vec, int num)
 {
@@ -60,6 +92,8 @@ static int do_control_help(void *, struct connection *, char **, int);
 
 static struct cmd_s cmds[] = {
 	{ "check", do_control_check, "" },
+	{ "log", do_control_log, "on|off" },
+	{ "logfile", do_control_logfile, "<file>" },
 	{ "print", do_control_print, "<string>" },
 	{ "help", do_control_help, "" },
 };

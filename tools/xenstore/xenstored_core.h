@@ -168,7 +168,10 @@ void trace_create(const void *data, const char *type);
 void trace_destroy(const void *data, const char *type);
 void trace(const char *fmt, ...);
 void dtrace_io(const struct connection *conn, const struct buffered_data *data, int out);
+void reopen_log(void);
+void close_log(void);
 
+extern char *tracefile;
 extern int dom0_domid;
 extern int dom0_event;
 extern int priv_domid;
