@@ -161,7 +161,7 @@ static int flush_msr_inj(xc_interface *xc_handle)
     return xc_mca_op(xc_handle, &mc);
 }
 
-static int mca_cpuinfo(xc_interface *xc_handle)
+static unsigned int mca_cpuinfo(xc_interface *xc_handle)
 {
     struct xen_mc mc;
 
@@ -176,16 +176,18 @@ static int mca_cpuinfo(xc_interface *xc_handle)
         return 0;
 }
 
-static int inject_cmci(xc_interface *xc_handle, int cpu_nr)
+static int inject_cmci(xc_interface *xc_handle, unsigned int cpu_nr)
 {
     struct xen_mc mc;
-    int nr_cpus;
+    unsigned int nr_cpus;
 
     memset(&mc, 0, sizeof(struct xen_mc));
 
     nr_cpus = mca_cpuinfo(xc_handle);
     if (!nr_cpus)
         err(xc_handle, "Failed to get mca_cpuinfo");
+    if (cpu_nr >= nr_cpus)
+        err(xc_handle, "-c %u is larger than %u", cpu_nr, nr_cpus - 1);
 
     mc.cmd = XEN_MC_inject_v2;
     mc.interface_version = XEN_MCA_INTERFACE_VERSION;
@@ -420,7 +422,7 @@ int main(int argc, char *argv[])
     int c, opt_index;
     uint32_t domid;
     xc_interface *xc_handle;
-    int cpu_nr;
+    unsigned int cpu_nr;
     uint64_t gaddr, max_gpa;
 
     /* Default Value */
@@ -444,7 +446,7 @@ int main(int argc, char *argv[])
             dump=1;
             break;
         case 'c':
-            cpu_nr = strtol(optarg, &optarg, 10);
+            cpu_nr = strtoul(optarg, &optarg, 10);
             if ( strlen(optarg) != 0 )
                 err(xc_handle, "Please input a digit parameter for CPU");
             break;
