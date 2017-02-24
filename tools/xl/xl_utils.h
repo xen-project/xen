@@ -15,6 +15,8 @@
 #ifndef XL_UTILS_H
 #define XL_UTILS_H
 
+#include <getopt.h>
+
 /* For calls which return an errno on failure */
 #define CHK_ERRNOVAL( call ) ({                                         \
         int chk_errnoval = (call);                                      \
@@ -117,6 +119,31 @@
 /* Must be last in list */
 #define COMMON_LONG_OPTS {"help", 0, 0, 'h'}, \
                          {0, 0, 0, 0}
+
+int def_getopt(int argc, char * const argv[],
+               const char *optstring,
+               const struct option *longopts,
+               const char* helpstr, int reqargs);
+
+void dolog(const char *file, int line, const char *func, char *fmt, ...)
+	__attribute__((format(printf,4,5)));
+
+void xvasprintf(char **strp, const char *fmt, va_list ap)
+	__attribute__((format(printf,2,0)));
+
+void xasprintf(char **strp, const char *fmt, ...)
+	__attribute__((format(printf,2,3)));
+
+void *xmalloc(size_t sz);
+void *xcalloc(size_t n, size_t sz);
+void *xrealloc(void *ptr, size_t sz);
+char *xstrdup(const char *x);
+void string_realloc_append(char **accumulate, const char *more);
+
+void flush_stream(FILE *fh);
+uint32_t find_domain(const char *p) __attribute__((warn_unused_result));
+
+void print_bitmap(uint8_t *map, int maplen, FILE *stream);
 
 #endif /* XL_UTILS_H */
 

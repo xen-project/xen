@@ -19,7 +19,6 @@
 #include <string.h>
 #include <unistd.h>
 #include <time.h>
-#include <getopt.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/time.h>
@@ -48,7 +47,7 @@ libxl_ctx *ctx;
 
 xlchild children[child_max];
 
-static const char *common_domname;
+const char *common_domname;
 static int fd_lock = -1;
 
 static const char savefileheader_magic[32]=
@@ -128,22 +127,6 @@ struct domain_create {
     int send_back_fd; /* -1 means none */
     char **migration_domname_r; /* from malloc */
 };
-
-
-static uint32_t find_domain(const char *p) __attribute__((warn_unused_result));
-static uint32_t find_domain(const char *p)
-{
-    uint32_t domid;
-    int rc;
-
-    rc = libxl_domain_qualifier_to_domid(ctx, p, &domid);
-    if (rc) {
-        fprintf(stderr, "%s is an invalid domain identifier (rc=%d)\n", p, rc);
-        exit(EXIT_FAILURE);
-    }
-    common_domname = libxl_domid_to_name(ctx, domid);
-    return domid;
-}
 
 int child_report(xlchildnum child)
 {
@@ -253,47 +236,6 @@ release_lock:
     return rc;
 }
 
-static void *xmalloc(size_t sz) {
-    void *r;
-    r = malloc(sz);
-    if (!r) { fprintf(stderr,"xl: Unable to malloc %lu bytes.\n",
-                      (unsigned long)sz); exit(-ERROR_FAIL); }
-    return r;
-}
-
-static void *xcalloc(size_t n, size_t sz) __attribute__((unused));
-static void *xcalloc(size_t n, size_t sz) {
-    void *r = calloc(n, sz);
-    if (!r) {
-        fprintf(stderr,"xl: Unable to calloc %zu bytes.\n", sz*n);
-        exit(-ERROR_FAIL);
-    }
-    return r;
-}
-
-static void *xrealloc(void *ptr, size_t sz) {
-    void *r;
-    if (!sz) { free(ptr); return 0; }
-      /* realloc(non-0, 0) has a useless return value;
-       * but xrealloc(anything, 0) is like free
-       */
-    r = realloc(ptr, sz);
-    if (!r) { fprintf(stderr,"xl: Unable to realloc to %lu bytes.\n",
-                      (unsigned long)sz); exit(-ERROR_FAIL); }
-    return r;
-}
-
-static char *xstrdup(const char *x)
-{
-    char *r;
-    r = strdup(x);
-    if (!r) {
-        fprintf(stderr, "xl: Unable to strdup a string of length %zu.\n",
-                strlen(x));
-        exit(-ERROR_FAIL);
-    }
-    return r;
-}
 
 #define ARRAY_EXTEND_INIT__CORE(array,count,initfn,more)                \
     ({                                                                  \
@@ -312,46 +254,6 @@ static char *xstrdup(const char *x)
 
 #define ARRAY_EXTEND_INIT_NODEVID(array,count,initfn) \
     ARRAY_EXTEND_INIT__CORE((array),(count),(initfn), /* nothing */ )
-
-static void dolog(const char *file, int line, const char *func, char *fmt, ...)
-     __attribute__((format(printf,4,5)));
-
-static void dolog(const char *file, int line, const char *func, char *fmt, ...)
-{
-    va_list ap;
-    char *s = NULL;
-    int rc;
-
-    va_start(ap, fmt);
-    rc = vasprintf(&s, fmt, ap);
-    va_end(ap);
-    if (rc >= 0)
-        /* we ignore write errors since we have no way to report them;
-         * the alternative would be to abort the whole program */
-        libxl_write_exactly(NULL, logfile, s, rc, NULL, NULL);
-    free(s);
-}
-
-static void xvasprintf(char **strp, const char *fmt, va_list ap)
-    __attribute__((format(printf,2,0)));
-static void xvasprintf(char **strp, const char *fmt, va_list ap)
-{
-    int r = vasprintf(strp, fmt, ap);
-    if (r == -1) {
-        perror("asprintf failed");
-        exit(EXIT_FAILURE);
-    }
-}
-
-static void xasprintf(char **strp, const char *fmt, ...)
-    __attribute__((format(printf,2,3)));
-static void xasprintf(char **strp, const char *fmt, ...)
-{
-    va_list ap;
-    va_start(ap, fmt);
-    xvasprintf(strp, fmt, ap);
-    va_end(ap);
-}
 
 static yajl_gen_status printf_info_one_json(yajl_gen hand, int domid,
                                             libxl_domain_config *d_config)
@@ -387,19 +289,6 @@ static yajl_gen_status printf_info_one_json(yajl_gen hand, int domid,
 
 out:
     return s;
-}
-
-static void flush_stream(FILE *fh)
-{
-    const char *fh_name =
-        fh == stdout ? "stdout" :
-        fh == stderr ? "stderr" :
-        (abort(), (const char*)0);
-
-    if (ferror(fh) || fflush(fh)) {
-        perror(fh_name);
-        exit(EXIT_FAILURE);
-    }
 }
 
 static void printf_info(enum output_format output_format,
@@ -3294,48 +3183,6 @@ static int64_t parse_mem_size_kb(const char *mem)
     return kbytes;
 }
 
-/*
- * Callers should use SWITCH_FOREACH_OPT in preference to calling this
- * directly.
- */
-static int def_getopt(int argc, char * const argv[],
-                      const char *optstring,
-                      const struct option *longopts,
-                      const char* helpstr, int reqargs)
-{
-    int opt;
-    const struct option def_options[] = {
-        COMMON_LONG_OPTS
-    };
-
-    if (!longopts)
-        longopts = def_options;
-
-    opterr = 0;
-    while ((opt = getopt_long(argc, argv, optstring, longopts, NULL)) == '?') {
-        if (optopt == 'h') {
-            help(helpstr);
-            exit(0);
-        }
-        fprintf(stderr, "option `%c' not supported.\n", optopt);
-        exit(2);
-    }
-    if (opt == 'h') {
-        help(helpstr);
-        exit(0);
-    }
-    if (opt != -1)
-        return opt;
-
-    if (argc - optind <= reqargs - 1) {
-        fprintf(stderr, "'xl %s' requires at least %d argument%s.\n\n",
-                helpstr, reqargs, reqargs > 1 ? "s" : "");
-        help(helpstr);
-        exit(2);
-    }
-    return -1;
-}
-
 static int set_memory_max(uint32_t domid, const char *mem)
 {
     int64_t memorykb;
@@ -4152,56 +3999,6 @@ out:
         if (s != yajl_gen_status_ok)
             fprintf(stderr,
                     "unable to format domain config as JSON (YAJL:%d)\n", s);
-    }
-}
-
-static void print_bitmap(uint8_t *map, int maplen, FILE *stream)
-{
-    int i;
-    uint8_t pmap = 0, bitmask = 0;
-    int firstset = 0, state = 0;
-
-    for (i = 0; i < maplen; i++) {
-        if (i % 8 == 0) {
-            pmap = *map++;
-            bitmask = 1;
-        } else bitmask <<= 1;
-
-        switch (state) {
-        case 0:
-        case 2:
-            if ((pmap & bitmask) != 0) {
-                firstset = i;
-                state++;
-            }
-            continue;
-        case 1:
-        case 3:
-            if ((pmap & bitmask) == 0) {
-                fprintf(stream, "%s%d", state > 1 ? "," : "", firstset);
-                if (i - 1 > firstset)
-                    fprintf(stream, "-%d", i - 1);
-                state = 2;
-            }
-            continue;
-        }
-    }
-    switch (state) {
-        case 0:
-            fprintf(stream, "none");
-            break;
-        case 2:
-            break;
-        case 1:
-            if (firstset == 0) {
-                fprintf(stream, "all");
-                break;
-            }
-        case 3:
-            fprintf(stream, "%s%d", state > 1 ? "," : "", firstset);
-            if (i - 1 > firstset)
-                fprintf(stream, "-%d", i - 1);
-            break;
     }
 }
 
@@ -5329,22 +5126,6 @@ int main_vm_list(int argc, char **argv)
 
     list_vm();
     return EXIT_SUCCESS;
-}
-
-static void string_realloc_append(char **accumulate, const char *more)
-{
-    /* Appends more to accumulate.  Accumulate is either NULL, or
-     * points (always) to a malloc'd nul-terminated string. */
-
-    size_t oldlen = *accumulate ? strlen(*accumulate) : 0;
-    size_t morelen = strlen(more) + 1/*nul*/;
-    if (oldlen > SSIZE_MAX || morelen > SSIZE_MAX - oldlen) {
-        fprintf(stderr,"Additional config data far too large\n");
-        exit(-ERROR_FAIL);
-    }
-
-    *accumulate = xrealloc(*accumulate, oldlen + morelen);
-    memcpy(*accumulate + oldlen, more, morelen);
 }
 
 int main_create(int argc, char **argv)
