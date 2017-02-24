@@ -82,7 +82,6 @@ static int reopen_log_pipe[2];
 static int reopen_log_pipe0_pollfd_idx = -1;
 char *tracefile = NULL;
 static TDB_CONTEXT *tdb_ctx = NULL;
-static bool trigger_talloc_report = false;
 
 static void corrupt(struct connection *conn, const char *fmt, ...);
 static const char *sockmsg_string(enum xsd_sockmsg_type type);
@@ -1792,10 +1791,6 @@ static void init_sockets(int **psock, int **pro_sock)
 	static int minus_one = -1;
 	*psock = *pro_sock = &minus_one;
 }
-
-static void do_talloc_report(int sig)
-{
-}
 #else
 static int destroy_fd(void *_fd)
 {
@@ -1855,11 +1850,6 @@ static void init_sockets(int **psock, int **pro_sock)
 
 
 }
-
-static void do_talloc_report(int sig)
-{
-	trigger_talloc_report = true;
-}
 #endif
 
 static void usage(void)
@@ -1884,7 +1874,6 @@ static void usage(void)
 "  -R, --no-recovery       to request that no recovery should be attempted when\n"
 "                          the store is corrupted (debug only),\n"
 "  -I, --internal-db       store database in memory, not on disk\n"
-"  -M, --memory-debug <file>  support memory debugging to file,\n"
 "  -V, --verbose           to request verbose execution.\n");
 }
 
@@ -1906,7 +1895,6 @@ static struct option options[] = {
 	{ "internal-db", 0, NULL, 'I' },
 	{ "verbose", 0, NULL, 'V' },
 	{ "watch-nb", 1, NULL, 'W' },
-	{ "memory-debug", 1, NULL, 'M' },
 	{ NULL, 0, NULL, 0 } };
 
 extern void dump_conn(struct connection *conn); 
@@ -1922,11 +1910,10 @@ int main(int argc, char *argv[])
 	bool outputpid = false;
 	bool no_domain_init = false;
 	const char *pidfile = NULL;
-	const char *memfile = NULL;
 	int timeout;
 
 
-	while ((opt = getopt_long(argc, argv, "DE:F:HNPS:t:T:RVW:M:", options,
+	while ((opt = getopt_long(argc, argv, "DE:F:HNPS:t:T:RVW:", options,
 				  NULL)) != -1) {
 		switch (opt) {
 		case 'D':
@@ -1977,9 +1964,6 @@ int main(int argc, char *argv[])
 		case 'p':
 			priv_domid = strtol(optarg, NULL, 10);
 			break;
-		case 'M':
-			memfile = optarg;
-			break;
 		}
 	}
 	if (optind != argc)
@@ -2006,10 +1990,7 @@ int main(int argc, char *argv[])
 	/* Don't kill us with SIGPIPE. */
 	signal(SIGPIPE, SIG_IGN);
 
-	if (memfile) {
-		talloc_enable_null_tracking();
-		signal(SIGUSR1, do_talloc_report);
-	}
+	talloc_enable_null_tracking();
 
 	init_sockets(&sock, &ro_sock);
 
@@ -2053,18 +2034,6 @@ int main(int argc, char *argv[])
 	/* Main loop. */
 	for (;;) {
 		struct connection *conn, *next;
-
-		if (trigger_talloc_report) {
-			FILE *out;
-
-			assert(memfile);
-			trigger_talloc_report = false;
-			out = fopen(memfile, "a");
-			if (out) {
-				talloc_report_full(NULL, out);
-				fclose(out);
-			}
-		}
 
 		if (poll(fds, nr_fds, timeout) < 0) {
 			if (errno == EINTR)
