@@ -422,6 +422,8 @@ struct arch_domain
 #define has_vvga(d)        (!!((d)->arch.emulation_flags & XEN_X86_EMU_VGA))
 #define has_viommu(d)      (!!((d)->arch.emulation_flags & XEN_X86_EMU_IOMMU))
 #define has_vpit(d)        (!!((d)->arch.emulation_flags & XEN_X86_EMU_PIT))
+#define has_pirq(d)        (!!((d)->arch.emulation_flags & \
+                            XEN_X86_EMU_USE_PIRQ))
 
 #define has_arch_pdevs(d)    (!list_empty(&(d)->arch.pdev_list))
 

@@ -75,3 +75,23 @@ info structure that's passed at boot time (field rsdp_paddr).
 
 Description of paravirtualized devices will come from XenStore, just as it's
 done for HVM guests.
+
+## Interrupts ##
+
+### Interrupts from physical devices ###
+
+Interrupts from physical devices are delivered using native methods, this is
+done in order to take advantage of new hardware assisted virtualization
+functions, like posted interrupts. This implies that PVHv2 guests with physical
+devices will also have the necessary interrupt controllers in order to manage
+the delivery of interrupts from those devices, using the same interfaces that
+are available on native hardware.
+
+### Interrupts from paravirtualized devices ###
+
+Interrupts from paravirtualized devices are delivered using event channels, see
+[Event Channel Internals][event_channels] for more detailed information about
+event channels. Delivery of those interrupts can be configured in the same way
+as HVM guests, check xen/include/public/hvm/params.h and
+xen/include/public/hvm/hvm_op.h for more information about available delivery
+methods.
