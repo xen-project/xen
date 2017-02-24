@@ -76,7 +76,7 @@ static unsigned int nr_fds;
 
 static bool verbose = false;
 LIST_HEAD(connections);
-static int tracefd = -1;
+int tracefd = -1;
 static bool recovery = true;
 static int reopen_log_pipe[2];
 static int reopen_log_pipe0_pollfd_idx = -1;

@@ -172,6 +172,7 @@ void reopen_log(void);
 void close_log(void);
 
 extern char *tracefile;
+extern int tracefd;
 extern int dom0_domid;
 extern int dom0_event;
 extern int priv_domid;

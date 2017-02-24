@@ -76,6 +76,45 @@ static int do_control_logfile(void *ctx, struct connection *conn,
 	return 0;
 }
 
+static int do_control_memreport(void *ctx, struct connection *conn,
+				char **vec, int num)
+{
+	FILE *fp;
+	int fd;
+
+	if (num > 1)
+		return EINVAL;
+
+	if (num == 0) {
+		if (tracefd < 0) {
+			if (!tracefile)
+				return EBADF;
+			fp = fopen(tracefile, "a");
+		} else {
+			/*
+			 * Use dup() in order to avoid closing the file later
+			 * with fclose() which will release stream resources.
+			 */
+			fd = dup(tracefd);
+			if (fd < 0)
+				return EBADF;
+			fp = fdopen(fd, "a");
+			if (!fp)
+				close(fd);
+		}
+	} else
+		fp = fopen(vec[0], "a");
+
+	if (!fp)
+		return EBADF;
+
+	talloc_report_full(NULL, fp);
+	fclose(fp);
+
+	send_ack(conn, XS_CONTROL);
+	return 0;
+}
+
 static int do_control_print(void *ctx, struct connection *conn,
 			    char **vec, int num)
 {
@@ -94,6 +133,7 @@ static struct cmd_s cmds[] = {
 	{ "check", do_control_check, "" },
 	{ "log", do_control_log, "on|off" },
 	{ "logfile", do_control_logfile, "<file>" },
+	{ "memreport", do_control_memreport, "[<file>]" },
 	{ "print", do_control_print, "<string>" },
 	{ "help", do_control_help, "" },
 };
