@@ -212,6 +212,8 @@ struct elf_binary {
     /* misc */
     elf_log_callback *log_callback;
     void *log_caller_data;
+#else
+    struct vcpu *vcpu;
 #endif
     bool verbose;
     const char *broken;
@@ -351,6 +353,10 @@ elf_errorstatus elf_init(struct elf_binary *elf, const char *image, size_t size)
    */
 #ifdef __XEN__
 void elf_set_verbose(struct elf_binary *elf);
+static inline void elf_set_vcpu(struct elf_binary *elf, struct vcpu *v)
+{
+    elf->vcpu = v;
+}
 #else
 void elf_set_log(struct elf_binary *elf, elf_log_callback*,
                  void *log_caller_pointer, bool verbose);

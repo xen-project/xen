@@ -146,6 +146,27 @@ void elf_set_verbose(struct elf_binary *elf)
     elf->verbose = 1;
 }
 
+static elf_errorstatus elf_memcpy(struct vcpu *v, void *dst, void *src,
+                                  uint64_t size)
+{
+    unsigned int res;
+
+#ifdef CONFIG_X86
+    if ( is_hvm_vcpu(v) )
+    {
+        enum hvm_copy_result rc;
+
+        rc = hvm_copy_to_guest_phys((paddr_t)dst, src, size, v);
+        return rc != HVMCOPY_okay ? -1 : 0;
+    }
+#endif
+
+    res = src ? raw_copy_to_guest(dst, src, size) :
+                raw_clear_guest(dst, size);
+
+    return res ? -1 : 0;
+}
+
 static elf_errorstatus elf_load_image(struct elf_binary *elf, elf_ptrval dst, elf_ptrval src, uint64_t filesz, uint64_t memsz)
 {
     elf_errorstatus rc;
@@ -153,10 +174,12 @@ static elf_errorstatus elf_load_image(struct elf_binary *elf, elf_ptrval dst, el
         return -1;
     /* We trust the dom0 kernel image completely, so we don't care
      * about overruns etc. here. */
-    rc = raw_copy_to_guest(ELF_UNSAFE_PTR(dst), ELF_UNSAFE_PTR(src), filesz);
+    rc = elf_memcpy(elf->vcpu, ELF_UNSAFE_PTR(dst), ELF_UNSAFE_PTR(src),
+                    filesz);
     if ( rc != 0 )
         return -1;
-    rc = raw_clear_guest(ELF_UNSAFE_PTR(dst + filesz), memsz - filesz);
+    rc = elf_memcpy(elf->vcpu, ELF_UNSAFE_PTR(dst + filesz), NULL,
+                    memsz - filesz);
     if ( rc != 0 )
         return -1;
     return 0;
