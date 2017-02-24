@@ -96,6 +96,12 @@ struct save_file_header {
 
 #define SAVEFILE_BYTEORDER_VALUE ((uint32_t)0x01020304UL)
 
+void save_domain_core_begin(uint32_t domid,
+                            const char *override_config_file,
+                            uint8_t **config_data_r,
+                            int *config_len_r);
+void save_domain_core_writeconfig(int fd, const char *source,
+                                  const uint8_t *config_data, int config_len);
 
 /*
  * The xl process should always return either EXIT_SUCCESS or
