@@ -8,19 +8,37 @@
 
 #define verbose false /* Switch to true for far more logging. */
 
+static void blowfish_set_regs(struct cpu_user_regs *regs)
+{
+    regs->eax = 2;
+    regs->edx = 1;
+}
+
+static bool blowfish_check_regs(const struct cpu_user_regs *regs)
+{
+    return regs->eax == 2 && regs->edx == 1;
+}
+
 static const struct {
     const void *code;
     size_t size;
     unsigned int bitness;
     const char*name;
+    void (*set_regs)(struct cpu_user_regs *);
+    bool (*check_regs)(const struct cpu_user_regs *);
 } blobs[] = {
-    { blowfish_x86_32, sizeof(blowfish_x86_32), 32, "blowfish" },
-    { blowfish_x86_32_mno_accumulate_outgoing_args,
-      sizeof(blowfish_x86_32_mno_accumulate_outgoing_args),
-      32, "blowfish (push)" },
+#define BLOWFISH(bits, desc, tag)                   \
+    { .code = blowfish_x86_ ## bits ## tag,         \
+      .size = sizeof(blowfish_x86_ ## bits ## tag), \
+      .bitness = bits, .name = #desc,               \
+      .set_regs = blowfish_set_regs,                \
+      .check_regs = blowfish_check_regs }
 #ifdef __x86_64__
-    { blowfish_x86_64, sizeof(blowfish_x86_64), 64, "blowfish" },
+    BLOWFISH(64, blowfish, ),
 #endif
+    BLOWFISH(32, blowfish, ),
+    BLOWFISH(32, blowfish (push), _mno_accumulate_outgoing_args),
+#undef BLOWFISH
 };
 
 static unsigned int bytes_read;
@@ -2110,13 +2128,40 @@ int main(int argc, char **argv)
 
     for ( j = 0; j < ARRAY_SIZE(blobs); j++ )
     {
+        if ( !blobs[j].size )
+        {
+            printf("%-39s n/a\n", blobs[j].name);
+            continue;
+        }
+
         memcpy(res, blobs[j].code, blobs[j].size);
         ctxt.addr_size = ctxt.sp_size = blobs[j].bitness;
 
+        if ( ctxt.addr_size == sizeof(void *) * CHAR_BIT )
+        {
+            i = printf("Testing %s native execution...", blobs[j].name);
+            if ( blobs[j].set_regs )
+                blobs[j].set_regs(&regs);
+            asm volatile (
+#if defined(__i386__)
+                "call *%%ecx"
+#else
+                "call *%%rcx"
+#endif
+                : "+a" (regs.eax), "+d" (regs.edx) : "c" (res)
+#ifdef __x86_64__
+                : "rsi", "rdi", "r8", "r9", "r10", "r11"
+#endif
+            );
+            if ( !blobs[j].check_regs(&regs) )
+                goto fail;
+            printf("%*sokay\n", i < 40 ? 40 - i : 0, "");
+        }
+
         printf("Testing %s %u-bit code sequence",
                blobs[j].name, ctxt.addr_size);
-        regs.eax = 2;
-        regs.edx = 1;
+        if ( blobs[j].set_regs )
+            blobs[j].set_regs(&regs);
         regs.eip = (unsigned long)res;
         regs.esp = (unsigned long)res + MMAP_SZ - 4;
         if ( ctxt.addr_size == 64 )
@@ -2127,41 +2172,26 @@ int main(int argc, char **argv)
         *(uint32_t *)(unsigned long)regs.esp = 0x12345678;
         regs.eflags = 2;
         i = 0;
-        while ( regs.eip != 0x12345678 )
+        while ( regs.eip >= (unsigned long)res &&
+                regs.eip < (unsigned long)res + blobs[j].size )
         {
             if ( (i++ & 8191) == 0 )
                 printf(".");
             rc = x86_emulate(&ctxt, &emulops);
             if ( rc != X86EMUL_OKAY )
             {
-                printf("failed at %%eip == %08x\n", (unsigned int)regs.eip);
+                printf("failed at %%eip == %08lx (opcode %08x)\n",
+                       (unsigned long)regs.eip, ctxt.opcode);
                 return 1;
             }
         }
-        if ( (regs.esp != ((unsigned long)res + MMAP_SZ)) ||
-             (regs.eax != 2) || (regs.edx != 1) )
+        for ( ; i < 2 * 8192; i += 8192 )
+            printf(".");
+        if ( (regs.eip != 0x12345678) ||
+             (regs.esp != ((unsigned long)res + MMAP_SZ)) ||
+             !blobs[j].check_regs(&regs) )
             goto fail;
         printf("okay\n");
-
-        if ( ctxt.addr_size != sizeof(void *) * CHAR_BIT )
-            continue;
-
-        i = printf("Testing %s native execution...", blobs[j].name);
-        asm volatile (
-#if defined(__i386__)
-            "movl $0x100000,%%ecx; call *%%ecx"
-#else
-            "movl $0x100000,%%ecx; call *%%rcx"
-#endif
-            : "=a" (regs.eax), "=d" (regs.edx)
-            : "0" (2), "1" (1) : "ecx"
-#ifdef __x86_64__
-              , "rsi", "rdi", "r8", "r9", "r10", "r11"
-#endif
-        );
-        if ( (regs.eax != 2) || (regs.edx != 1) )
-            goto fail;
-        printf("%*sokay\n", i < 40 ? 40 - i : 0, "");
     }
 
     return 0;
