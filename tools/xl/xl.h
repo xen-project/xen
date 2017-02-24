@@ -30,6 +30,73 @@ struct cmd_spec {
     char *cmd_option;
 };
 
+struct domain_create {
+    int debug;
+    int daemonize;
+    int monitor; /* handle guest reboots etc */
+    int paused;
+    int dryrun;
+    int quiet;
+    int vnc;
+    int vncautopass;
+    int console_autoconnect;
+    int checkpointed_stream;
+    const char *config_file;
+    char *extra_config; /* extra config string */
+    const char *restore_file;
+    char *colo_proxy_script;
+    int migrate_fd; /* -1 means none */
+    int send_back_fd; /* -1 means none */
+    char **migration_domname_r; /* from malloc */
+};
+
+int create_domain(struct domain_create *dom_info);
+
+
+static const char savefileheader_magic[32]=
+    "Xen saved domain, xl format\n \0 \r";
+
+#ifndef LIBXL_HAVE_NO_SUSPEND_RESUME
+static const char migrate_receiver_banner[]=
+    "xl migration receiver ready, send binary domain data.\n";
+static const char migrate_receiver_ready[]=
+    "domain received, ready to unpause";
+static const char migrate_permission_to_go[]=
+    "domain is yours, you are cleared to unpause";
+static const char migrate_report[]=
+    "my copy unpause results are as follows";
+#endif
+
+  /* followed by one byte:
+   *     0: everything went well, domain is running
+   *            next thing is we all exit
+   * non-0: things went badly
+   *            next thing should be a migrate_permission_to_go
+   *            from target to source
+   */
+
+#define XL_MANDATORY_FLAG_JSON (1U << 0) /* config data is in JSON format */
+#define XL_MANDATORY_FLAG_STREAMv2 (1U << 1) /* stream is v2 */
+#define XL_MANDATORY_FLAG_ALL  (XL_MANDATORY_FLAG_JSON |        \
+                                XL_MANDATORY_FLAG_STREAMv2)
+
+struct save_file_header {
+    char magic[32]; /* savefileheader_magic */
+    /* All uint32_ts are in domain's byte order. */
+    uint32_t byteorder; /* SAVEFILE_BYTEORDER_VALUE */
+    uint32_t mandatory_flags; /* unknown flags => reject restore */
+    uint32_t optional_flags; /* unknown flags => reject restore */
+    uint32_t optional_data_len; /* skip, or skip tail, if not understood */
+};
+
+/* Optional data, in order:
+ *   4 bytes uint32_t  config file size
+ *   n bytes           config file in Unix text file format
+ */
+
+#define SAVEFILE_BYTEORDER_VALUE ((uint32_t)0x01020304UL)
+
+
 /*
  * The xl process should always return either EXIT_SUCCESS or
  * EXIT_FAILURE. main_* functions, implementing the various xl
