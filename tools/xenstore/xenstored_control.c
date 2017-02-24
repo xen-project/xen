@@ -17,30 +17,108 @@
 */
 
 #include <errno.h>
+#include <stdarg.h>
+#include <stdio.h>
+#include <string.h>
 
 #include "utils.h"
+#include "talloc.h"
 #include "xenstored_core.h"
 #include "xenstored_control.h"
+
+struct cmd_s {
+	char *cmd;
+	int (*func)(void *, struct connection *, char **, int);
+	char *pars;
+};
+
+static int do_control_check(void *ctx, struct connection *conn,
+			    char **vec, int num)
+{
+	if (num)
+		return EINVAL;
+
+	check_store();
+
+	send_ack(conn, XS_CONTROL);
+	return 0;
+}
+
+static int do_control_print(void *ctx, struct connection *conn,
+			    char **vec, int num)
+{
+	if (num != 1)
+		return EINVAL;
+
+	xprintf("control: %s", vec[0]);
+
+	send_ack(conn, XS_CONTROL);
+	return 0;
+}
+
+static int do_control_help(void *, struct connection *, char **, int);
+
+static struct cmd_s cmds[] = {
+	{ "check", do_control_check, "" },
+	{ "print", do_control_print, "<string>" },
+	{ "help", do_control_help, "" },
+};
+
+static int do_control_help(void *ctx, struct connection *conn,
+			   char **vec, int num)
+{
+	int cmd, len = 0;
+	char *resp;
+
+	if (num)
+		return EINVAL;
+
+	for (cmd = 0; cmd < ARRAY_SIZE(cmds); cmd++) {
+		len += strlen(cmds[cmd].cmd) + 1;
+		len += strlen(cmds[cmd].pars) + 1;
+	}
+	len++;
+
+	resp = talloc_array(ctx, char, len);
+	if (!resp)
+		return ENOMEM;
+
+	len = 0;
+	for (cmd = 0; cmd < ARRAY_SIZE(cmds); cmd++) {
+		strcpy(resp + len, cmds[cmd].cmd);
+		len += strlen(cmds[cmd].cmd);
+		resp[len] = '\t';
+		len++;
+		strcpy(resp + len, cmds[cmd].pars);
+		len += strlen(cmds[cmd].pars);
+		resp[len] = '\n';
+		len++;
+	}
+	resp[len] = 0;
+
+	send_reply(conn, XS_CONTROL, resp, len);
+	return 0;
+}
 
 int do_control(struct connection *conn, struct buffered_data *in)
 {
 	int num;
+	int cmd;
+	char **vec;
 
 	if (conn->id != 0)
 		return EACCES;
 
 	num = xs_count_strings(in->buffer, in->used);
+	vec = talloc_array(in, char *, num);
+	if (!vec)
+		return ENOMEM;
+	if (get_strings(in, vec, num) != num)
+		return EIO;
 
-	if (streq(in->buffer, "print")) {
-		if (num < 2)
-			return EINVAL;
-		xprintf("control: %s", in->buffer + strlen(in->buffer) + 1);
-	}
+	for (cmd = 0; cmd < ARRAY_SIZE(cmds); cmd++)
+		if (streq(vec[0], cmds[cmd].cmd))
+			return cmds[cmd].func(in, conn, vec + 1, num - 1);
 
-	if (streq(in->buffer, "check"))
-		check_store();
-
-	send_ack(conn, XS_CONTROL);
-
-	return 0;
+	return EINVAL;
 }
