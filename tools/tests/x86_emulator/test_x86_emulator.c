@@ -1155,7 +1155,7 @@ int main(int argc, char **argv)
         regs.eflags = 0xa43;
         rc = x86_emulate(&ctxt, &emulops);
         if ( (rc != X86EMUL_OKAY) ||
-             regs.ebx != ((signed)*res >> (regs.edx & 0x1f)) ||
+             regs.ebx != (unsigned)(((signed)*res >> (regs.edx & 0x1f))) ||
              regs.edx != 0xff13 || *res != 0xfedcba98 ||
              regs.eflags != 0xa43 || !check_eip(sarx) )
             goto fail;
