@@ -1034,9 +1034,9 @@ static int __init construct_dom0_pv(
     start_info_t *si;
     struct vcpu *v = d->vcpu[0];
     unsigned long long value;
-    char *image_base = bootstrap_map(image);
+    void *image_base = bootstrap_map(image);
     unsigned long image_len = image->mod_end;
-    char *image_start = image_base + image_headroom;
+    void *image_start = image_base + image_headroom;
     unsigned long initrd_len = initrd ? initrd->mod_end : 0;
     l4_pgentry_t *l4tab = NULL, *l4start = NULL;
     l3_pgentry_t *l3tab = NULL, *l3start = NULL;
