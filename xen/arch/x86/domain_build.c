@@ -40,6 +40,7 @@
 #include <public/version.h>
 #include <public/hvm/hvm_info_table.h>
 #include <public/arch-x86/hvm/start_info.h>
+#include <public/hvm/hvm_vcpu.h>
 
 static long __initdata dom0_nrpages;
 static long __initdata dom0_min_nrpages;
@@ -2151,6 +2152,59 @@ static int __init pvh_load_kernel(struct domain *d, const module_t *image,
     return 0;
 }
 
+static int __init pvh_setup_cpus(struct domain *d, paddr_t entry,
+                                 paddr_t start_info)
+{
+    struct vcpu *v = d->vcpu[0];
+    unsigned int cpu, i;
+    int rc;
+    /* 
+     * This sets the vCPU state according to the state described in
+     * docs/misc/hvmlite.markdown.
+     */
+    vcpu_hvm_context_t cpu_ctx = {
+        .mode = VCPU_HVM_MODE_32B,
+        .cpu_regs.x86_32.ebx = start_info,
+        .cpu_regs.x86_32.eip = entry,
+        .cpu_regs.x86_32.cr0 = X86_CR0_PE | X86_CR0_ET,
+        .cpu_regs.x86_32.cs_limit = ~0u,
+        .cpu_regs.x86_32.ds_limit = ~0u,
+        .cpu_regs.x86_32.ss_limit = ~0u,
+        .cpu_regs.x86_32.tr_limit = 0x67,
+        .cpu_regs.x86_32.cs_ar = 0xc9b,
+        .cpu_regs.x86_32.ds_ar = 0xc93,
+        .cpu_regs.x86_32.ss_ar = 0xc93,
+        .cpu_regs.x86_32.tr_ar = 0x8b,
+    };
+
+    cpu = v->processor;
+    for ( i = 1; i < d->max_vcpus; i++ )
+    {
+        cpu = cpumask_cycle(cpu, &dom0_cpus);
+        setup_dom0_vcpu(d, i, cpu);
+    }
+
+    rc = arch_set_info_hvm_guest(v, &cpu_ctx);
+    if ( rc )
+    {
+        printk("Unable to setup Dom0 BSP context: %d\n", rc);
+        return rc;
+    }
+
+    rc = setup_permissions(d);
+    if ( rc )
+    {
+        panic("Unable to setup Dom0 permissions: %d\n", rc);
+        return rc;
+    }
+
+    update_domain_wallclock_time(d);
+
+    clear_bit(_VPF_down, &v->pause_flags);
+
+    return 0;
+}
+
 static int __init construct_dom0_pvh(struct domain *d, const module_t *image,
                                      unsigned long image_headroom,
                                      module_t *initrd,
@@ -2176,6 +2230,13 @@ static int __init construct_dom0_pvh(struct domain *d, const module_t *image,
     if ( rc )
     {
         printk("Failed to load Dom0 kernel\n");
+        return rc;
+    }
+
+    rc = pvh_setup_cpus(d, entry, start_info);
+    if ( rc )
+    {
+        printk("Failed to setup Dom0 CPUs: %d\n", rc);
         return rc;
     }
 
