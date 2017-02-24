@@ -1989,7 +1989,6 @@ int hvm_set_efer(uint64_t value)
         printk(XENLOG_G_WARNING
                "%pv: Invalid EFER update: %#"PRIx64" -> %#"PRIx64" - %s\n",
                v, v->arch.hvm_vcpu.guest_efer, value, errstr);
-        hvm_inject_hw_exception(TRAP_gp_fault, 0);
         return X86EMUL_EXCEPTION;
     }
 
@@ -1998,7 +1997,6 @@ int hvm_set_efer(uint64_t value)
     {
         gdprintk(XENLOG_WARNING,
                  "Trying to change EFER.LME with paging enabled\n");
-        hvm_inject_hw_exception(TRAP_gp_fault, 0);
         return X86EMUL_EXCEPTION;
     }
 

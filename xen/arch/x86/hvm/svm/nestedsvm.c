@@ -278,6 +278,8 @@ static int nsvm_vcpu_hostrestore(struct vcpu *v, struct cpu_user_regs *regs)
     /* EFER */
     v->arch.hvm_vcpu.guest_efer = n1vmcb->_efer;
     rc = hvm_set_efer(n1vmcb->_efer);
+    if ( rc == X86EMUL_EXCEPTION )
+        hvm_inject_hw_exception(TRAP_gp_fault, 0);
     if (rc != X86EMUL_OKAY)
         gdprintk(XENLOG_ERR, "hvm_set_efer failed, rc: %u\n", rc);
 
@@ -538,6 +540,8 @@ static int nsvm_vmcb_prepare4vmrun(struct vcpu *v, struct cpu_user_regs *regs)
     /* EFER */
     v->arch.hvm_vcpu.guest_efer = ns_vmcb->_efer;
     rc = hvm_set_efer(ns_vmcb->_efer);
+    if ( rc == X86EMUL_EXCEPTION )
+        hvm_inject_hw_exception(TRAP_gp_fault, 0);
     if (rc != X86EMUL_OKAY)
         gdprintk(XENLOG_ERR, "hvm_set_efer failed, rc: %u\n", rc);
 
