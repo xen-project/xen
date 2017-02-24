@@ -14,8 +14,11 @@
 
 #define _GNU_SOURCE
 
+#include <fcntl.h>
 #include <limits.h>
 #include <stdlib.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 #include <unistd.h>
 
 #include <libxl.h>
@@ -248,6 +251,73 @@ void print_bitmap(uint8_t *map, int maplen, FILE *stream)
     }
 }
 
+int do_daemonize(char *name, const char *pidfile)
+{
+    char *fullname;
+    pid_t child1;
+    int nullfd, ret = 0;
+
+    child1 = xl_fork(child_waitdaemon, "domain monitoring daemonizing child");
+    if (child1) {
+        ret = child_report(child_waitdaemon);
+        if (ret) goto out;
+        ret = 1;
+        goto out;
+    }
+
+    postfork();
+
+    ret = libxl_create_logfile(ctx, name, &fullname);
+    if (ret) {
+        LOG("failed to open logfile %s: %s",fullname,strerror(errno));
+        exit(-1);
+    }
+
+    CHK_SYSCALL(logfile = open(fullname, O_WRONLY|O_CREAT|O_APPEND, 0644));
+    free(fullname);
+    assert(logfile >= 3);
+
+    CHK_SYSCALL(nullfd = open("/dev/null", O_RDONLY));
+    assert(nullfd >= 3);
+
+    dup2(nullfd, 0);
+    dup2(logfile, 1);
+    dup2(logfile, 2);
+
+    close(nullfd);
+
+    CHK_SYSCALL(daemon(0, 1));
+
+    if (pidfile) {
+        int fd = open(pidfile, O_RDWR | O_CREAT, S_IRUSR|S_IWUSR);
+        char *pid = NULL;
+
+        if (fd == -1) {
+            perror("Unable to open pidfile");
+            exit(1);
+        }
+
+        if (asprintf(&pid, "%ld\n", (long)getpid()) == -1) {
+            perror("Formatting pid");
+            exit(1);
+        }
+
+        if (write(fd, pid, strlen(pid)) < 0) {
+            perror("Writing pid");
+            exit(1);
+        }
+
+        if (close(fd) < 0) {
+            perror("Closing pidfile");
+            exit(1);
+        }
+
+        free(pid);
+    }
+
+out:
+    return ret;
+}
 
 /*
  * Local variables:
