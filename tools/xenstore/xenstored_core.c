@@ -51,6 +51,7 @@
 #include "xenstored_watch.h"
 #include "xenstored_transaction.h"
 #include "xenstored_domain.h"
+#include "xenstored_control.h"
 #include "tdb.h"
 
 #include "hashtable.h"
@@ -84,7 +85,6 @@ static TDB_CONTEXT *tdb_ctx = NULL;
 static bool trigger_talloc_report = false;
 
 static void corrupt(struct connection *conn, const char *fmt, ...);
-static void check_store(void);
 static const char *sockmsg_string(enum xsd_sockmsg_type type);
 
 #define log(...)							\
@@ -1261,29 +1261,6 @@ static int do_set_perms(struct connection *conn, struct buffered_data *in)
 	return 0;
 }
 
-static int do_control(struct connection *conn, struct buffered_data *in)
-{
-	int num;
-
-	if (conn->id != 0)
-		return EACCES;
-
-	num = xs_count_strings(in->buffer, in->used);
-
-	if (streq(in->buffer, "print")) {
-		if (num < 2)
-			return EINVAL;
-		xprintf("control: %s", in->buffer + get_string(in, 0));
-	}
-
-	if (streq(in->buffer, "check"))
-		check_store();
-
-	send_ack(conn, XS_CONTROL);
-
-	return 0;
-}
-
 static struct {
 	const char *str;
 	int (*func)(struct connection *conn, struct buffered_data *in);
@@ -1764,7 +1741,7 @@ static void clean_store(struct hashtable *reachable)
 }
 
 
-static void check_store(void)
+void check_store(void)
 {
 	char * root = talloc_strdup(NULL, "/");
 	struct hashtable * reachable =

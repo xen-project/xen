@@ -158,7 +158,7 @@ TDB_CONTEXT *tdb_context(struct connection *conn);
 bool replace_tdb(const char *newname, TDB_CONTEXT *newtdb);
 
 struct connection *new_connection(connwritefn_t *write, connreadfn_t *read);
-
+void check_store(void);
 
 /* Is this a valid node name? */
 bool is_valid_nodename(const char *node);

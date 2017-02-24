@@ -23,7 +23,9 @@ LDFLAGS += $(LDFLAGS-y)
 CLIENTS := xenstore-exists xenstore-list xenstore-read xenstore-rm xenstore-chmod
 CLIENTS += xenstore-write xenstore-ls xenstore-watch
 
-XENSTORED_OBJS = xenstored_core.o xenstored_watch.o xenstored_domain.o xenstored_transaction.o xs_lib.o talloc.o utils.o tdb.o hashtable.o
+XENSTORED_OBJS = xenstored_core.o xenstored_watch.o xenstored_domain.o
+XENSTORED_OBJS += xenstored_transaction.o xenstored_control.o
+XENSTORED_OBJS += xs_lib.o talloc.o utils.o tdb.o hashtable.o
 
 XENSTORED_OBJS_$(CONFIG_Linux) = xenstored_posix.o
 XENSTORED_OBJS_$(CONFIG_SunOS) = xenstored_solaris.o xenstored_posix.o xenstored_probes.o
