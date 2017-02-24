@@ -275,6 +275,8 @@ struct spage_info
 #define XENSHARE_readonly 1
 extern void share_xen_page_with_guest(
     struct page_info *page, struct domain *d, int readonly);
+extern int unshare_xen_page_with_guest(struct page_info *page,
+                                       struct domain *d);
 extern void share_xen_page_with_privileged_guests(
     struct page_info *page, int readonly);
 extern void free_shared_domheap_page(struct page_info *page);
@@ -596,5 +598,8 @@ typedef struct mm_rwlock {
                    &(d)->arch.relmem_list)
 
 extern const char zero_page[];
+
+/* Build a 32bit PSE page table using 4MB pages. */
+void write_32bit_pse_identmap(uint32_t *l2);
 
 #endif /* __ASM_X86_MM_H__ */

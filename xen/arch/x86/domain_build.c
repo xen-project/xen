@@ -21,6 +21,7 @@
 #include <xen/compat.h>
 #include <xen/libelf.h>
 #include <xen/pfn.h>
+#include <xen/guest_access.h>
 #include <asm/regs.h>
 #include <asm/system.h>
 #include <asm/io.h>
@@ -42,6 +43,21 @@
 static long __initdata dom0_nrpages;
 static long __initdata dom0_min_nrpages;
 static long __initdata dom0_max_nrpages = LONG_MAX;
+
+/*
+ * Have the TSS cover the ISA port range, which makes it
+ * - 104 bytes base structure
+ * - 32 bytes interrupt redirection bitmap
+ * - 128 bytes I/O bitmap
+ * - one trailing byte
+ * or a total of 265 bytes.
+ *
+ * NB: as PVHv2 Dom0 doesn't have legacy devices (ISA), it shouldn't have any
+ * business in accessing the ISA port range, much less in real mode, and due to
+ * the lack of firmware it shouldn't also execute any INT instruction. This is
+ * done just for consistency with what hvmloader does.
+ */
+#define HVM_VM86_TSS_SIZE 265
 
 /*
  * dom0_mem=[min:<min_amt>,][max:<max_amt>,][<amt>]
@@ -243,11 +259,12 @@ boolean_param("ro-hpet", ro_hpet);
 #define round_pgup(_p)    (((_p)+(PAGE_SIZE-1))&PAGE_MASK)
 #define round_pgdown(_p)  ((_p)&PAGE_MASK)
 
+static unsigned int __initdata memflags = MEMF_no_dma|MEMF_exact_node;
+
 static struct page_info * __init alloc_chunk(
     struct domain *d, unsigned long max_pages)
 {
     static unsigned int __initdata last_order = MAX_ORDER;
-    static unsigned int __initdata memflags = MEMF_no_dma|MEMF_exact_node;
     struct page_info *page;
     unsigned int order = get_order_from_pages(max_pages), free_order;
 
@@ -332,7 +349,9 @@ static unsigned long __init compute_dom0_nr_pages(
             avail -= max_pdx >> s;
     }
 
-    need_paging = opt_dom0_shadow || (is_pvh_domain(d) && !iommu_hap_pt_share);
+    need_paging = has_hvm_container_domain(d)
+                  ? !iommu_hap_pt_share || !paging_mode_hap(d)
+                  : opt_dom0_shadow;
     for ( ; ; need_paging = 0 )
     {
         nr_pages = dom0_nrpages;
@@ -364,7 +383,8 @@ static unsigned long __init compute_dom0_nr_pages(
         avail -= dom0_paging_pages(d, nr_pages);
     }
 
-    if ( (parms->p2m_base == UNSET_ADDR) && (dom0_nrpages <= 0) &&
+    if ( is_pv_domain(d) &&
+         (parms->p2m_base == UNSET_ADDR) && (dom0_nrpages <= 0) &&
          ((dom0_min_nrpages <= 0) || (nr_pages > min_pages)) )
     {
         /*
@@ -580,6 +600,7 @@ static __init void pvh_setup_e820(struct domain *d, unsigned long nr_pages)
     struct e820entry *entry, *entry_guest;
     unsigned int i;
     unsigned long pages, cur_pages = 0;
+    uint64_t start, end;
 
     /*
      * Craft the e820 memory map for Dom0 based on the hardware e820 map.
@@ -607,8 +628,22 @@ static __init void pvh_setup_e820(struct domain *d, unsigned long nr_pages)
             continue;
         }
 
-        *entry_guest = *entry;
-        pages = PFN_UP(entry_guest->size);
+        /*
+         * Make sure the start and length are aligned to PAGE_SIZE, because
+         * that's the minimum granularity of the 2nd stage translation. Since
+         * the p2m code uses PAGE_ORDER_4K internally, also use it here in
+         * order to prevent this code from getting out of sync.
+         */
+        start = ROUNDUP(entry->addr, PAGE_SIZE << PAGE_ORDER_4K);
+        end = (entry->addr + entry->size) &
+              ~((PAGE_SIZE << PAGE_ORDER_4K) - 1);
+        if ( start >= end )
+            continue;
+
+        entry_guest->type = E820_RAM;
+        entry_guest->addr = start;
+        entry_guest->size = end - start;
+        pages = PFN_DOWN(entry_guest->size);
         if ( (cur_pages + pages) > nr_pages )
         {
             /* Truncate region */
@@ -1676,14 +1711,339 @@ out:
     return rc;
 }
 
+static int __init modify_identity_mmio(struct domain *d, unsigned long pfn,
+                                       unsigned long nr_pages, const bool map)
+{
+    int rc;
+
+    for ( ; ; )
+    {
+        rc = (map ? map_mmio_regions : unmap_mmio_regions)
+             (d, _gfn(pfn), nr_pages, _mfn(pfn));
+        if ( rc == 0 )
+            break;
+        if ( rc < 0 )
+        {
+            printk(XENLOG_WARNING
+                   "Failed to identity %smap [%#lx,%#lx) for d%d: %d\n",
+                   map ? "" : "un", pfn, pfn + nr_pages, d->domain_id, rc);
+            break;
+        }
+        nr_pages -= rc;
+        pfn += rc;
+        process_pending_softirqs();
+    }
+
+    return rc;
+}
+
+/* Populate a HVM memory range using the biggest possible order. */
+static int __init pvh_populate_memory_range(struct domain *d,
+                                            unsigned long start,
+                                            unsigned long nr_pages)
+{
+    unsigned int order, i = 0;
+    struct page_info *page;
+    int rc;
+#define MAP_MAX_ITER 64
+
+    order = MAX_ORDER;
+    while ( nr_pages != 0 )
+    {
+        unsigned int range_order = get_order_from_pages(nr_pages + 1);
+
+        order = min(range_order ? range_order - 1 : 0, order);
+        page = alloc_domheap_pages(d, order, memflags);
+        if ( page == NULL )
+        {
+            if ( order == 0 && memflags )
+            {
+                /* Try again without any memflags. */
+                memflags = 0;
+                order = MAX_ORDER;
+                continue;
+            }
+            if ( order == 0 )
+            {
+                printk("Unable to allocate memory with order 0!\n");
+                return -ENOMEM;
+            }
+            order--;
+            continue;
+        }
+
+        rc = guest_physmap_add_page(d, _gfn(start), _mfn(page_to_mfn(page)),
+                                    order);
+        if ( rc != 0 )
+        {
+            printk("Failed to populate memory: [%#lx,%lx): %d\n",
+                   start, start + (1UL << order), rc);
+            return -ENOMEM;
+        }
+        start += 1UL << order;
+        nr_pages -= 1UL << order;
+        if ( (++i % MAP_MAX_ITER) == 0 )
+            process_pending_softirqs();
+    }
+
+    return 0;
+#undef MAP_MAX_ITER
+}
+
+/* Steal RAM from the end of a memory region. */
+static int __init pvh_steal_ram(struct domain *d, unsigned long size,
+                                unsigned long align, paddr_t limit,
+                                paddr_t *addr)
+{
+    unsigned int i = d->arch.nr_e820;
+
+    /*
+     * Alignment 0 should be set to 1, so it doesn't wrap around in the
+     * calculations below.
+     */
+    align = align ? : 1;
+    while ( i-- )
+    {
+        struct e820entry *entry = &d->arch.e820[i];
+
+        if ( entry->type != E820_RAM || entry->addr + entry->size > limit ||
+             entry->addr < MB(1) )
+            continue;
+
+        *addr = (entry->addr + entry->size - size) & ~(align - 1);
+        if ( *addr < entry->addr )
+            continue;
+
+        entry->size = *addr - entry->addr;
+        return 0;
+    }
+
+    return -ENOMEM;
+}
+
+/* NB: memory map must be sorted at all times for this to work correctly. */
+static int __init pvh_add_mem_range(struct domain *d, uint64_t s, uint64_t e,
+                                    unsigned int type)
+{
+    struct e820entry *map;
+    unsigned int i;
+
+    for ( i = 0; i < d->arch.nr_e820; i++ )
+    {
+        uint64_t rs = d->arch.e820[i].addr;
+        uint64_t re = rs + d->arch.e820[i].size;
+
+        if ( rs == e && d->arch.e820[i].type == type )
+        {
+            d->arch.e820[i].addr = s;
+            return 0;
+        }
+
+        if ( re == s && d->arch.e820[i].type == type &&
+             (i + 1 == d->arch.nr_e820 || d->arch.e820[i + 1].addr >= e) )
+        {
+            d->arch.e820[i].size += e - s;
+            return 0;
+        }
+
+        if ( rs >= e )
+            break;
+
+        if ( re > s )
+            return -EEXIST;
+    }
+
+    map = xzalloc_array(struct e820entry, d->arch.nr_e820 + 1);
+    if ( !map )
+    {
+        printk(XENLOG_WARNING "E820: out of memory to add region\n");
+        return -ENOMEM;
+    }
+
+    memcpy(map, d->arch.e820, i * sizeof(*d->arch.e820));
+    memcpy(map + i + 1, d->arch.e820 + i,
+           (d->arch.nr_e820 - i) * sizeof(*d->arch.e820));
+    map[i].addr = s;
+    map[i].size = e - s;
+    map[i].type = type;
+    xfree(d->arch.e820);
+    d->arch.e820 = map;
+    d->arch.nr_e820++;
+
+    return 0;
+}
+
+static int __init pvh_setup_vmx_realmode_helpers(struct domain *d)
+{
+    p2m_type_t p2mt;
+    uint32_t rc, *ident_pt;
+    mfn_t mfn;
+    paddr_t gaddr;
+    struct vcpu *v = d->vcpu[0];
+
+    /*
+     * Steal some space from the last RAM region below 4GB and use it to
+     * store the real-mode TSS. It needs to be aligned to 128 so that the
+     * TSS structure (which accounts for the first 104b) doesn't cross
+     * a page boundary.
+     */
+    if ( !pvh_steal_ram(d, HVM_VM86_TSS_SIZE, 128, GB(4), &gaddr) )
+    {
+        if ( hvm_copy_to_guest_phys(gaddr, NULL, HVM_VM86_TSS_SIZE, v) !=
+             HVMCOPY_okay )
+            printk("Unable to zero VM86 TSS area\n");
+        d->arch.hvm_domain.params[HVM_PARAM_VM86_TSS_SIZED] =
+            VM86_TSS_UPDATED | ((uint64_t)HVM_VM86_TSS_SIZE << 32) | gaddr;
+        if ( pvh_add_mem_range(d, gaddr, gaddr + HVM_VM86_TSS_SIZE,
+                               E820_RESERVED) )
+            printk("Unable to set VM86 TSS as reserved in the memory map\n");
+    }
+    else
+        printk("Unable to allocate VM86 TSS area\n");
+
+    /* Steal some more RAM for the identity page tables. */
+    if ( pvh_steal_ram(d, PAGE_SIZE, PAGE_SIZE, GB(4), &gaddr) )
+    {
+        printk("Unable to find memory to stash the identity page tables\n");
+        return -ENOMEM;
+    }
+
+    /*
+     * Identity-map page table is required for running with CR0.PG=0
+     * when using Intel EPT. Create a 32-bit non-PAE page directory of
+     * superpages.
+     */
+    ident_pt = map_domain_gfn(p2m_get_hostp2m(d), _gfn(PFN_DOWN(gaddr)),
+                              &mfn, &p2mt, 0, &rc);
+    if ( ident_pt == NULL )
+    {
+        printk("Unable to map identity page tables\n");
+        return -ENOMEM;
+    }
+    write_32bit_pse_identmap(ident_pt);
+    unmap_domain_page(ident_pt);
+    put_page(mfn_to_page(mfn_x(mfn)));
+    d->arch.hvm_domain.params[HVM_PARAM_IDENT_PT] = gaddr;
+    if ( pvh_add_mem_range(d, gaddr, gaddr + PAGE_SIZE, E820_RESERVED) )
+            printk("Unable to set identity page tables as reserved in the memory map\n");
+
+    return 0;
+}
+
+/* Assign the low 1MB to Dom0. */
+static void __init pvh_steal_low_ram(struct domain *d, unsigned long start,
+                                     unsigned long nr_pages)
+{
+    unsigned long mfn;
+
+    ASSERT(start + nr_pages <= PFN_DOWN(MB(1)));
+
+    for ( mfn = start; mfn < start + nr_pages; mfn++ )
+    {
+        struct page_info *pg = mfn_to_page(mfn);
+        int rc;
+
+        rc = unshare_xen_page_with_guest(pg, dom_io);
+        if ( rc )
+        {
+            printk("Unable to unshare Xen mfn %#lx: %d\n", mfn, rc);
+            continue;
+        }
+
+        share_xen_page_with_guest(pg, d, XENSHARE_writable);
+        rc = guest_physmap_add_entry(d, _gfn(mfn), _mfn(mfn), 0, p2m_ram_rw);
+        if ( rc )
+            printk("Unable to add mfn %#lx to p2m: %d\n", mfn, rc);
+    }
+}
+
+static int __init pvh_setup_p2m(struct domain *d)
+{
+    struct vcpu *v = d->vcpu[0];
+    unsigned long nr_pages;
+    unsigned int i;
+    int rc;
+    bool preempted;
+#define MB1_PAGES PFN_DOWN(MB(1))
+
+    nr_pages = compute_dom0_nr_pages(d, NULL, 0);
+
+    pvh_setup_e820(d, nr_pages);
+    do {
+        preempted = false;
+        paging_set_allocation(d, dom0_paging_pages(d, nr_pages),
+                              &preempted);
+        process_pending_softirqs();
+    } while ( preempted );
+
+    /*
+     * Memory below 1MB is identity mapped.
+     * NB: this only makes sense when booted from legacy BIOS.
+     */
+    rc = modify_identity_mmio(d, 0, MB1_PAGES, true);
+    if ( rc )
+    {
+        printk("Failed to identity map low 1MB: %d\n", rc);
+        return rc;
+    }
+
+    /* Populate memory map. */
+    for ( i = 0; i < d->arch.nr_e820; i++ )
+    {
+        unsigned long addr, size;
+
+        if ( d->arch.e820[i].type != E820_RAM )
+            continue;
+
+        addr = PFN_DOWN(d->arch.e820[i].addr);
+        size = PFN_DOWN(d->arch.e820[i].size);
+
+        if ( addr >= MB1_PAGES )
+            rc = pvh_populate_memory_range(d, addr, size);
+        else
+        {
+            ASSERT(addr + size < MB1_PAGES);
+            pvh_steal_low_ram(d, addr, size);
+        }
+
+        if ( rc )
+            return rc;
+    }
+
+    if ( cpu_has_vmx && paging_mode_hap(d) && !vmx_unrestricted_guest(v) )
+    {
+        /*
+         * Since Dom0 cannot be migrated, we will only setup the
+         * unrestricted guest helpers if they are needed by the current
+         * hardware we are running on.
+         */
+        rc = pvh_setup_vmx_realmode_helpers(d);
+        if ( rc )
+            return rc;
+    }
+
+    return 0;
+#undef MB1_PAGES
+}
+
 static int __init construct_dom0_pvh(struct domain *d, const module_t *image,
                                      unsigned long image_headroom,
                                      module_t *initrd,
                                      void *(*bootstrap_map)(const module_t *),
                                      char *cmdline)
 {
+    int rc;
 
     printk("** Building a PVH Dom0 **\n");
+
+    iommu_hwdom_init(d);
+
+    rc = pvh_setup_p2m(d);
+    if ( rc )
+    {
+        printk("Failed to setup Dom0 physical memory map\n");
+        return rc;
+    }
 
     panic("Building a PVHv2 Dom0 is not yet supported.");
     return 0;

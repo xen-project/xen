@@ -474,6 +474,22 @@ void share_xen_page_with_guest(
     spin_unlock(&d->page_alloc_lock);
 }
 
+int __init unshare_xen_page_with_guest(struct page_info *page,
+                                       struct domain *d)
+{
+    if ( page_get_owner(page) != d || !is_xen_heap_page(page) )
+        return -EINVAL;
+
+    if ( test_and_clear_bit(_PGC_allocated, &page->count_info) )
+        put_page(page);
+
+    /* Remove the owner and clear the flags. */
+    page->u.inuse.type_info = 0;
+    page_set_owner(page, NULL);
+
+    return 0;
+}
+
 void share_xen_page_with_privileged_guests(
     struct page_info *page, int readonly)
 {
@@ -6593,6 +6609,16 @@ void paging_invlpg(struct vcpu *v, unsigned long va)
         flush_tlb_one_local(va);
     else
         hvm_funcs.invlpg(v, va);
+}
+
+/* Build a 32bit PSE page table using 4MB pages. */
+void write_32bit_pse_identmap(uint32_t *l2)
+{
+    unsigned int i;
+
+    for ( i = 0; i < PAGE_SIZE / sizeof(*l2); i++ )
+        l2[i] = ((i << 22) | _PAGE_PRESENT | _PAGE_RW | _PAGE_USER |
+                 _PAGE_ACCESSED | _PAGE_DIRTY | _PAGE_PSE);
 }
 
 /*

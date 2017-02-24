@@ -3053,7 +3053,7 @@ int shadow_enable(struct domain *d, u32 mode)
     unsigned int old_pages;
     struct page_info *pg = NULL;
     uint32_t *e;
-    int i, rv = 0;
+    int rv = 0;
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
 
     mode |= PG_SH_enable;
@@ -3109,10 +3109,7 @@ int shadow_enable(struct domain *d, u32 mode)
         /* Fill it with 32-bit, non-PAE superpage entries, each mapping 4MB
          * of virtual address space onto the same physical address range */
         e = __map_domain_page(pg);
-        for ( i = 0; i < PAGE_SIZE / sizeof(*e); i++ )
-            e[i] = ((0x400000U * i)
-                    | _PAGE_PRESENT | _PAGE_RW | _PAGE_USER
-                    | _PAGE_ACCESSED | _PAGE_DIRTY | _PAGE_PSE);
+        write_32bit_pse_identmap(e);
         unmap_domain_page(e);
         pg->u.inuse.type_info = PGT_l2_page_table | 1 | PGT_validated;
     }
