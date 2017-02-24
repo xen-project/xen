@@ -734,6 +734,7 @@ static void p2m_free_entry(struct p2m_domain *p2m,
     unsigned int i;
     lpae_t *table;
     mfn_t mfn;
+    struct page_info *pg;
 
     /* Nothing to do if the entry is invalid. */
     if ( !p2m_valid(entry) )
@@ -771,7 +772,10 @@ static void p2m_free_entry(struct p2m_domain *p2m,
     mfn = _mfn(entry.p2m.base);
     ASSERT(mfn_valid(mfn_x(mfn)));
 
-    free_domheap_page(mfn_to_page(mfn_x(mfn)));
+    pg = mfn_to_page(mfn_x(mfn));
+
+    page_list_del(pg, &p2m->pages);
+    free_domheap_page(pg);
 }
 
 static bool p2m_split_superpage(struct p2m_domain *p2m, lpae_t *entry,
