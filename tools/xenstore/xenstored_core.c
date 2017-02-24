@@ -1261,7 +1261,7 @@ static int do_set_perms(struct connection *conn, struct buffered_data *in)
 	return 0;
 }
 
-static int do_debug(struct connection *conn, struct buffered_data *in)
+static int do_control(struct connection *conn, struct buffered_data *in)
 {
 	int num;
 
@@ -1273,13 +1273,13 @@ static int do_debug(struct connection *conn, struct buffered_data *in)
 	if (streq(in->buffer, "print")) {
 		if (num < 2)
 			return EINVAL;
-		xprintf("debug: %s", in->buffer + get_string(in, 0));
+		xprintf("control: %s", in->buffer + get_string(in, 0));
 	}
 
 	if (streq(in->buffer, "check"))
 		check_store();
 
-	send_ack(conn, XS_DEBUG);
+	send_ack(conn, XS_CONTROL);
 
 	return 0;
 }
@@ -1288,7 +1288,7 @@ static struct {
 	const char *str;
 	int (*func)(struct connection *conn, struct buffered_data *in);
 } const wire_funcs[XS_TYPE_COUNT] = {
-	[XS_DEBUG]             = { "DEBUG",             do_debug },
+	[XS_CONTROL]           = { "CONTROL",           do_control },
 	[XS_DIRECTORY]         = { "DIRECTORY",         send_directory },
 	[XS_READ]              = { "READ",              do_read },
 	[XS_GET_PERMS]         = { "GET_PERMS",         do_get_perms },

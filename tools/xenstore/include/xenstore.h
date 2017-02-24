@@ -262,7 +262,9 @@ bool xs_path_is_subpath(const char *parent, const char *child);
  */
 bool xs_is_domain_introduced(struct xs_handle *h, unsigned int domid);
 
-/* Only useful for DEBUG versions */
+char *xs_control_command(struct xs_handle *h, const char *cmd,
+			 void *data, unsigned int len);
+/* Deprecated: use xs_control_command() instead. */
 char *xs_debug_command(struct xs_handle *h, const char *cmd,
 		       void *data, unsigned int len);
 
