@@ -17,6 +17,7 @@ CFLAGS_XL += -Wshadow
 
 XL_OBJS = xl.o xl_cmdimpl.o xl_cmdtable.o xl_sxp.o xl_utils.o
 XL_OBJS += xl_tmem.o xl_parse.o xl_cpupool.o xl_flask.o
+XL_OBJS += xl_vtpm.o
 
 $(XL_OBJS): CFLAGS += $(CFLAGS_libxentoollog)
 $(XL_OBJS): CFLAGS += $(CFLAGS_XL)
