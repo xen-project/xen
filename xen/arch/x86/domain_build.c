@@ -2290,7 +2290,8 @@ static int __init pvh_setup_acpi_madt(struct domain *d, paddr_t *addr)
     if ( !madt )
     {
         printk("Unable to allocate memory for MADT table\n");
-        return -ENOMEM;
+        rc = -ENOMEM;
+        goto out;
     }
 
     /* Copy the native MADT table header. */
@@ -2298,7 +2299,8 @@ static int __init pvh_setup_acpi_madt(struct domain *d, paddr_t *addr)
     if ( !ACPI_SUCCESS(status) )
     {
         printk("Failed to get MADT ACPI table, aborting.\n");
-        return -EINVAL;
+        rc = -EINVAL;
+        goto out;
     }
     madt->header = *table;
     madt->address = APIC_DEFAULT_PHYS_BASE;
@@ -2358,7 +2360,8 @@ static int __init pvh_setup_acpi_madt(struct domain *d, paddr_t *addr)
     if ( pvh_steal_ram(d, size, 0, GB(4), addr) )
     {
         printk("Unable to find allocate guest RAM for MADT\n");
-        return -ENOMEM;
+        rc = -ENOMEM;
+        goto out;
     }
 
     /* Mark this region as E820_ACPI. */
@@ -2369,11 +2372,15 @@ static int __init pvh_setup_acpi_madt(struct domain *d, paddr_t *addr)
     if ( rc )
     {
         printk("Unable to copy MADT into guest memory\n");
-        return rc;
+        goto out;
     }
+
+    rc = 0;
+
+ out:
     xfree(madt);
 
-    return 0;
+    return rc;
 }
 
 static bool __init acpi_memory_banned(unsigned long address,
