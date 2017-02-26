@@ -2459,7 +2459,8 @@ static int __init pvh_setup_acpi_xsdt(struct domain *d, paddr_t madt_addr,
     if ( !xsdt )
     {
         printk("Unable to allocate memory for XSDT table\n");
-        return -ENOMEM;
+        rc = -ENOMEM;
+        goto out;
     }
 
     /* Copy the native XSDT table header. */
@@ -2467,7 +2468,8 @@ static int __init pvh_setup_acpi_xsdt(struct domain *d, paddr_t madt_addr,
     if ( !rsdp )
     {
         printk("Unable to map RSDP\n");
-        return -EINVAL;
+        rc = -EINVAL;
+        goto out;
     }
     xsdt_paddr = rsdp->xsdt_physical_address;
     acpi_os_unmap_memory(rsdp, sizeof(*rsdp));
@@ -2475,7 +2477,8 @@ static int __init pvh_setup_acpi_xsdt(struct domain *d, paddr_t madt_addr,
     if ( !table )
     {
         printk("Unable to map XSDT\n");
-        return -EINVAL;
+        rc = -EINVAL;
+        goto out;
     }
     xsdt->header = *table;
     acpi_os_unmap_memory(table, sizeof(*table));
@@ -2505,7 +2508,8 @@ static int __init pvh_setup_acpi_xsdt(struct domain *d, paddr_t madt_addr,
     if ( pvh_steal_ram(d, size, 0, GB(4), addr) )
     {
         printk("Unable to find guest RAM for XSDT\n");
-        return -ENOMEM;
+        rc = -ENOMEM;
+        goto out;
     }
 
     /* Mark this region as E820_ACPI. */
@@ -2516,11 +2520,15 @@ static int __init pvh_setup_acpi_xsdt(struct domain *d, paddr_t madt_addr,
     if ( rc )
     {
         printk("Unable to copy XSDT into guest memory\n");
-        return rc;
+        goto out;
     }
+
+    rc = 0;
+
+ out:
     xfree(xsdt);
 
-    return 0;
+    return rc;
 }
 
 static int __init pvh_setup_acpi(struct domain *d, paddr_t start_info)
