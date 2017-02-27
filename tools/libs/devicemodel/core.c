@@ -24,7 +24,7 @@
 xendevicemodel_handle *xendevicemodel_open(xentoollog_logger *logger,
                                            unsigned open_flags)
 {
-    xendevicemodel_handle *dmod = malloc(sizeof(*dmod));
+    xendevicemodel_handle *dmod = calloc(1, sizeof(*dmod));
     int rc;
 
     if (!dmod)
@@ -54,6 +54,7 @@ xendevicemodel_handle *xendevicemodel_open(xentoollog_logger *logger,
 
 err:
     xtl_logger_destroy(dmod->logger_tofree);
+    xencall_close(dmod->xcall);
     free(dmod);
     return NULL;
 }
