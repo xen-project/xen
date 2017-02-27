@@ -20,8 +20,13 @@ static void _clean_dirty_bitmap(struct domain *d)
 
 int shadow_domain_init(struct domain *d, unsigned int domcr_flags)
 {
-    paging_log_dirty_init(d, _enable_log_dirty,
-                          _disable_log_dirty, _clean_dirty_bitmap);
+    static const struct log_dirty_ops sh_none_ops = {
+        .enable  = _enable_log_dirty,
+        .disable = _disable_log_dirty,
+        .clean   = _clean_dirty_bitmap,
+    };
+
+    paging_log_dirty_init(d, &sh_none_ops);
     return is_pv_domain(d) ? 0 : -EOPNOTSUPP;
 }
 
