@@ -101,6 +101,11 @@ static const char *action_on_shutdown_names[] = {
     [LIBXL_ACTION_ON_SHUTDOWN_SOFT_RESET] = "soft-reset",
 };
 
+static const char *get_action_on_shutdown_name(libxl_action_on_shutdown a)
+{
+    return action_on_shutdown_names[a];
+}
+
 /* Optional data, in order:
  *   4 bytes uint32_t  config file size
  *   n bytes           config file in Unix text file format
@@ -2442,7 +2447,7 @@ static domain_restart_type handle_domain_death(uint32_t *r_domid,
 
     LOG("Action for shutdown reason code %d is %s",
         event->u.domain_shutdown.shutdown_reason,
-        action_on_shutdown_names[action]);
+        get_action_on_shutdown_name(action));
 
     if (action == LIBXL_ACTION_ON_SHUTDOWN_COREDUMP_DESTROY || action == LIBXL_ACTION_ON_SHUTDOWN_COREDUMP_RESTART) {
         char *corefile;
