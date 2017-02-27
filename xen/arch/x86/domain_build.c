@@ -2592,6 +2592,11 @@ static int __init pvh_setup_acpi(struct domain *d, paddr_t start_info)
 
     /* Craft a custom RSDP. */
     native_rsdp = acpi_os_map_memory(acpi_os_get_root_pointer(), sizeof(rsdp));
+    if ( !native_rsdp )
+    {
+        printk("Failed to map native RSDP\n");
+        return -ENOMEM;
+    }
     memcpy(rsdp.oem_id, native_rsdp->oem_id, sizeof(rsdp.oem_id));
     acpi_os_unmap_memory(native_rsdp, sizeof(rsdp));
     rsdp.xsdt_physical_address = xsdt_paddr;
