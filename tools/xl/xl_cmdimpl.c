@@ -1120,9 +1120,10 @@ int main_vncviewer(int argc, char **argv)
 
     domid = find_domain(argv[optind]);
 
-    if (vncviewer(domid, autopass))
-        return EXIT_FAILURE;
-    return EXIT_SUCCESS;
+    libxl_vncviewer_exec(ctx, domid, autopass);
+    fprintf(stderr, "Unable to execute vncviewer\n");
+
+    return EXIT_FAILURE;
 }
 
 static void pause_domain(uint32_t domid)
