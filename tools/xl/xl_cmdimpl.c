@@ -697,7 +697,7 @@ static int update_cpumap_range(const char *str, libxl_bitmap *cpumap)
  * single cpus or as eintire NUMA nodes) and turns it into the
  * corresponding libxl_bitmap (in cpumap).
  */
-static int cpurange_parse(const char *cpu, libxl_bitmap *cpumap)
+static int parse_cpurange(const char *cpu, libxl_bitmap *cpumap)
 {
     char *ptr, *saveptr = NULL, *buf = xstrdup(cpu);
     int rc = 0;
@@ -808,7 +808,7 @@ static void parse_vcpu_affinity(libxl_domain_build_info *b_info,
                 exit(EXIT_FAILURE);
             }
 
-            if (cpurange_parse(buf, &vcpu_affinity_array[j]))
+            if (parse_cpurange(buf, &vcpu_affinity_array[j]))
                 exit(EXIT_FAILURE);
 
             j++;
@@ -825,7 +825,7 @@ static void parse_vcpu_affinity(libxl_domain_build_info *b_info,
             exit(EXIT_FAILURE);
         }
 
-        if (cpurange_parse(buf, &vcpu_affinity_array[0]))
+        if (parse_cpurange(buf, &vcpu_affinity_array[0]))
             exit(EXIT_FAILURE);
 
         for (i = 1; i < b_info->max_vcpus; i++) {
@@ -5522,7 +5522,7 @@ int main_vcpupin(int argc, char **argv)
      */
     if (!strcmp(hard_str, "-"))
         hard = NULL;
-    else if (cpurange_parse(hard_str, hard))
+    else if (parse_cpurange(hard_str, hard))
         goto out;
     /*
      * Soft affinity is handled similarly. Only difference: we also want
@@ -5530,7 +5530,7 @@ int main_vcpupin(int argc, char **argv)
      */
     if (argc <= optind+3 || !strcmp(soft_str, "-"))
         soft = NULL;
-    else if (cpurange_parse(soft_str, soft))
+    else if (parse_cpurange(soft_str, soft))
         goto out;
 
     if (dryrun_only) {
@@ -7793,7 +7793,7 @@ int main_cpupoolcreate(int argc, char **argv)
             n_cpus++;
         }
     } else if (!xlu_cfg_get_string(config, "cpus", &buf, 0)) {
-        if (cpurange_parse(buf, &cpumap))
+        if (parse_cpurange(buf, &cpumap))
             goto out_cfg;
 
         n_cpus = 0;
@@ -7974,7 +7974,7 @@ int main_cpupoolcpuadd(int argc, char **argv)
     }
 
     pool = argv[optind++];
-    if (cpurange_parse(argv[optind], &cpumap))
+    if (parse_cpurange(argv[optind], &cpumap))
         goto out;
 
     if (libxl_cpupool_qualifier_to_cpupoolid(ctx, pool, &poolid, NULL) ||
@@ -8012,7 +8012,7 @@ int main_cpupoolcpuremove(int argc, char **argv)
     }
 
     pool = argv[optind++];
-    if (cpurange_parse(argv[optind], &cpumap))
+    if (parse_cpurange(argv[optind], &cpumap))
         goto out;
 
     if (libxl_cpupool_qualifier_to_cpupoolid(ctx, pool, &poolid, NULL) ||
