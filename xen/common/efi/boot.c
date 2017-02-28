@@ -146,6 +146,7 @@ static void __init __maybe_unused *ebmalloc(size_t size)
 
 static void __init __maybe_unused free_ebmalloc_unused_mem(void)
 {
+#if 0 /* FIXME: Putting a hole in the BSS breaks the IOMMU mappings for dom0. */
     unsigned long start, end;
 
     start = (unsigned long)ebmalloc_mem + PAGE_ALIGN(ebmalloc_allocated);
@@ -155,6 +156,7 @@ static void __init __maybe_unused free_ebmalloc_unused_mem(void)
     init_xenheap_pages(__pa(start), __pa(end));
 
     printk(XENLOG_INFO "Freed %lukB unused BSS memory\n", (end - start) >> 10);
+#endif
 }
 
 /*
