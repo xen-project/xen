@@ -603,7 +603,13 @@ For example, with `dom0_max_vcpus=4-8`:
 >      8    |  8
 >     10    |  8
 
-### dom0\_mem
+### dom0\_mem (ARM)
+> `= <size>`
+
+Set the amount of memory for the initial domain (dom0). It must be
+greater than zero. This parameter is required.
+
+### dom0\_mem (x86)
 > `= List of ( min:<size> | max:<size> | <size> )`
 
 Set the amount of memory for the initial domain (dom0). If a size is

@@ -12,6 +12,7 @@
 #include <xen/guest_access.h>
 #include <xen/iocap.h>
 #include <xen/acpi.h>
+#include <xen/warning.h>
 #include <acpi/actables.h>
 #include <asm/device.h>
 #include <asm/setup.h>
@@ -30,14 +31,11 @@ integer_param("dom0_max_vcpus", opt_dom0_max_vcpus);
 
 int dom0_11_mapping = 1;
 
-#define DOM0_MEM_DEFAULT 0x8000000 /* 128 MiB */
-static u64 __initdata dom0_mem = DOM0_MEM_DEFAULT;
+static u64 __initdata dom0_mem;
 
 static void __init parse_dom0_mem(const char *s)
 {
     dom0_mem = parse_size_and_unit(s, &s);
-    if ( dom0_mem == 0 )
-        dom0_mem = DOM0_MEM_DEFAULT;
 }
 custom_param("dom0_mem", parse_dom0_mem);
 
@@ -2125,6 +2123,12 @@ int construct_dom0(struct domain *d)
     BUG_ON(v->is_initialised);
 
     printk("*** LOADING DOMAIN 0 ***\n");
+    if ( dom0_mem <= 0 )
+    {
+        warning_add("PLEASE SPECIFY dom0_mem PARAMETER - USING 512M FOR NOW\n");
+        dom0_mem = MB(512);
+    }
+
 
     iommu_hwdom_init(d);
 
