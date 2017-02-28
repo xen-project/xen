@@ -379,8 +379,15 @@ void sched_destroy_vcpu(struct vcpu *v)
     SCHED_OP(VCPU2OP(v), free_vdata, v->sched_priv);
 }
 
-int sched_init_domain(struct domain *d)
+int sched_init_domain(struct domain *d, int poolid)
 {
+    int ret;
+
+    ASSERT(d->cpupool == NULL);
+
+    if ( (ret = cpupool_add_domain(d, poolid)) )
+        return ret;
+
     SCHED_STAT_CRANK(dom_init);
     TRACE_1D(TRC_SCHED_DOM_ADD, d->domain_id);
     return SCHED_OP(DOM2OP(d), init_domain, d);
@@ -388,9 +395,13 @@ int sched_init_domain(struct domain *d)
 
 void sched_destroy_domain(struct domain *d)
 {
+    ASSERT(d->cpupool != NULL || is_idle_domain(d));
+
     SCHED_STAT_CRANK(dom_destroy);
     TRACE_1D(TRC_SCHED_DOM_REM, d->domain_id);
     SCHED_OP(DOM2OP(d), destroy_domain, d);
+
+    cpupool_rm_domain(d);
 }
 
 void vcpu_sleep_nosync(struct vcpu *v)

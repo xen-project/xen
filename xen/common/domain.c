@@ -379,10 +379,7 @@ struct domain *domain_create(domid_t domid, unsigned int domcr_flags,
         goto fail;
     init_status |= INIT_arch;
 
-    if ( (err = cpupool_add_domain(d, poolid)) != 0 )
-        goto fail;
-
-    if ( (err = sched_init_domain(d)) != 0 )
+    if ( (err = sched_init_domain(d, poolid)) != 0 )
         goto fail;
 
     if ( (err = late_hwdom_init(d)) != 0 )
@@ -867,8 +864,6 @@ void domain_destroy(struct domain *d)
         return;
 
     TRACE_1D(TRC_DOM0_DOM_REM, d->domain_id);
-
-    cpupool_rm_domain(d);
 
     /* Delete from task list and task hashtable. */
     spin_lock(&domlist_update_lock);
