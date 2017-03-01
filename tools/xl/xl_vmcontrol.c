@@ -30,7 +30,6 @@
 #include "xl_utils.h"
 #include "xl_parse.h"
 
-extern libxl_ctx *ctx;
 extern int logfile;
 extern const char *common_domname;
 

@@ -23,8 +23,6 @@
 
 #include "xl.h"
 
-extern libxl_ctx *ctx;
-
 int main_getenforce(int argc, char **argv)
 {
     int ret;
