@@ -155,6 +155,9 @@ acpi_os_read_memory(acpi_physical_address phys_addr, u32 * value, u32 width)
 	u32 dummy;
 	void __iomem *virt_addr = acpi_os_map_memory(phys_addr, width >> 3);
 
+	if (!virt_addr)
+		return AE_ERROR;
+
 	if (!value)
 		value = &dummy;
 
@@ -181,6 +184,9 @@ acpi_status
 acpi_os_write_memory(acpi_physical_address phys_addr, u32 value, u32 width)
 {
 	void __iomem *virt_addr = acpi_os_map_memory(phys_addr, width >> 3);
+
+	if (!virt_addr)
+		return AE_ERROR;
 
 	switch (width) {
 	case 8:
