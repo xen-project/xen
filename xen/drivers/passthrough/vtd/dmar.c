@@ -1097,13 +1097,13 @@ static void __init parse_rmrr_param(const char *str)
     unsigned long start, end;
 
     do {
-        start = simple_strtoul(cur = s, &s, 0);
+        start = simple_strtoul(cur = s, &s, 16);
         if ( cur == s )
             break;
 
         if ( *s == '-' )
         {
-            end = simple_strtoul(cur = s + 1, &s, 0);
+            end = simple_strtoul(cur = s + 1, &s, 16);
             if ( cur == s )
                 break;
         }

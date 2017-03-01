@@ -1412,6 +1412,16 @@ If segment of the first device is not specified, segment zero will be used.
 If other segments are not specified, first device segment will be used.
 If a segment is specified for other than the first device and it does not match
 the one specified for the first one, an error will be reported.
+
+'start' and 'end' values are page numbers (not full physical addresses),
+in hexadecimal format (can optionally be preceded by "0x").
+
+Usage example: If device 0:0:1d.0 requires one page (0xd5d45) to be
+reserved, and device 0:0:1a.0 requires three pages (0xd5d46 thru 0xd5d48)
+to be reserved, one usage would be:
+
+rmrr=d5d45=0:0:1d.0;0xd5d46-0xd5d48=0:0:1a.0
+
 Note: grub2 requires to escape or use quotations if special characters are used,
 namely ';', refer to the grub2 documentation if multiple ranges are specified.
 
