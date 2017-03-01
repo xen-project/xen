@@ -3728,7 +3728,7 @@ sh_gva_to_gfn(struct vcpu *v, struct p2m_domain *p2m,
 #if (SHADOW_OPTIMIZATIONS & SHOPT_VIRTUAL_TLB)
     /* Check the vTLB cache first */
     unsigned long vtlb_gfn = vtlb_lookup(v, va, *pfec);
-    if ( VALID_GFN(vtlb_gfn) )
+    if ( vtlb_gfn != gfn_x(INVALID_GFN) )
         return vtlb_gfn;
 #endif /* (SHADOW_OPTIMIZATIONS & SHOPT_VIRTUAL_TLB) */
 

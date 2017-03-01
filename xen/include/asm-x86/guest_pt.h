@@ -32,8 +32,6 @@
 #error GUEST_PAGING_LEVELS not defined
 #endif
 
-#define VALID_GFN(m) (m != gfn_x(INVALID_GFN))
-
 static inline paddr_t
 gfn_to_paddr(gfn_t gfn)
 {
