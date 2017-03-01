@@ -134,7 +134,7 @@ struct iret_context {
 /* Anonymous unions include all permissible names (e.g., al/ah/ax/eax/rax). */
 #define __DECL_REG_LOHI(which) union { \
     uint64_t r ## which ## x; \
-    uint32_t _e ## which ## x; \
+    uint32_t e ## which ## x, _e ## which ## x; \
     uint16_t which ## x; \
     struct { \
         uint8_t which ## l; \
@@ -143,13 +143,13 @@ struct iret_context {
 }
 #define __DECL_REG_LO8(name) union { \
     uint64_t r ## name; \
-    uint32_t _e ## name; \
+    uint32_t e ## name, _e ## name; \
     uint16_t name; \
     uint8_t name ## l; \
 }
 #define __DECL_REG_LO16(name) union { \
     uint64_t r ## name; \
-    uint32_t _e ## name; \
+    uint32_t e ## name, _e ## name; \
     uint16_t name; \
 }
 #define __DECL_REG_HI(num) union { \
