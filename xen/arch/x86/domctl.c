@@ -252,6 +252,20 @@ static int update_domain_cpuid_info(struct domain *d,
         }
         break;
 
+    case 0xa:
+        if ( boot_cpu_data.x86_vendor != X86_VENDOR_INTEL )
+            break;
+
+        /* If PMU version is zero then the guest doesn't have VPMU */
+        if ( p->basic.pmu_version == 0 )
+        {
+            struct vcpu *v;
+
+            for_each_vcpu ( d, v )
+                vpmu_destroy(v);
+        }
+        break;
+
     case 0xd:
         if ( ctl->input[1] != 1 )
             break;

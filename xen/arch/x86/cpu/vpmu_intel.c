@@ -883,6 +883,10 @@ int vmx_vpmu_initialise(struct vcpu *v)
     if ( vpmu_mode == XENPMU_MODE_OFF )
         return 0;
 
+    if ( v->domain->arch.cpuid->basic.pmu_version <= 1 ||
+         v->domain->arch.cpuid->basic.pmu_version >= 5 )
+        return -EINVAL;
+
     if ( (arch_pmc_cnt + fixed_pmc_cnt) == 0 )
         return -EINVAL;
 

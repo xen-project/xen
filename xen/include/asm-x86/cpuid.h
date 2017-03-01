@@ -122,6 +122,18 @@ struct cpuid_policy
 
             /* Leaf 0x2 - TLB/Cache/Prefetch. */
             uint8_t l2_nr_queries; /* Documented as fixed to 1. */
+            uint8_t l2_desc[15];
+
+            uint64_t :64, :64; /* Leaf 0x3 - PSN. */
+            uint64_t :64, :64; /* Leaf 0x4 - Structured Cache. */
+            uint64_t :64, :64; /* Leaf 0x5 - MONITOR. */
+            uint64_t :64, :64; /* Leaf 0x6 - Therm/Perf. */
+            uint64_t :64, :64; /* Leaf 0x7 - Structured Features. */
+            uint64_t :64, :64; /* Leaf 0x8 - rsvd */
+            uint64_t :64, :64; /* Leaf 0x9 - DCA */
+
+            /* Leaf 0xa - Intel PMU. */
+            uint8_t pmu_version;
         };
     } basic;
 
