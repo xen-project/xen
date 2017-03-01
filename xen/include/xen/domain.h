@@ -2,6 +2,8 @@
 #ifndef __XEN_DOMAIN_H__
 #define __XEN_DOMAIN_H__
 
+#include <xen/types.h>
+
 #include <public/xen.h>
 #include <asm/domain.h>
 #include <asm/numa.h>
