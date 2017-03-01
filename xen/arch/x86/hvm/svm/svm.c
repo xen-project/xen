@@ -110,11 +110,11 @@ void __update_guest_eip(struct cpu_user_regs *regs, unsigned int inst_len)
     ASSERT(regs == guest_cpu_user_regs());
 
     regs->rip += inst_len;
-    regs->_eflags &= ~X86_EFLAGS_RF;
+    regs->eflags &= ~X86_EFLAGS_RF;
 
     curr->arch.hvm_svm.vmcb->interrupt_shadow = 0;
 
-    if ( regs->_eflags & X86_EFLAGS_TF )
+    if ( regs->eflags & X86_EFLAGS_TF )
         hvm_inject_hw_exception(TRAP_debug, X86_EVENT_NO_EC);
 }
 
@@ -514,7 +514,7 @@ static int svm_guest_x86_mode(struct vcpu *v)
 
     if ( unlikely(!(v->arch.hvm_vcpu.guest_cr[0] & X86_CR0_PE)) )
         return 0;
-    if ( unlikely(guest_cpu_user_regs()->_eflags & X86_EFLAGS_VM) )
+    if ( unlikely(guest_cpu_user_regs()->eflags & X86_EFLAGS_VM) )
         return 1;
     if ( hvm_long_mode_enabled(v) && likely(vmcb->cs.attr.fields.l) )
         return 8;
@@ -1199,7 +1199,7 @@ static void svm_inject_event(const struct x86_event *event)
     switch ( _event.vector )
     {
     case TRAP_debug:
-        if ( regs->_eflags & X86_EFLAGS_TF )
+        if ( regs->eflags & X86_EFLAGS_TF )
         {
             __restore_debug_registers(vmcb, curr);
             vmcb_set_dr6(vmcb, vmcb_get_dr6(vmcb) | 0x4000);
@@ -1289,7 +1289,7 @@ static void svm_inject_event(const struct x86_event *event)
      */
     if ( !((vmcb->_efer & EFER_LMA) && vmcb->cs.attr.fields.l) )
     {
-        regs->rip = regs->_eip;
+        regs->rip = regs->eip;
         vmcb->nextrip = (uint32_t)vmcb->nextrip;
     }
 
@@ -1571,8 +1571,8 @@ static void svm_vmexit_do_cpuid(struct cpu_user_regs *regs)
     if ( (inst_len = __get_instruction_length(curr, INSTR_CPUID)) == 0 )
         return;
 
-    guest_cpuid(curr, regs->_eax, regs->_ecx, &res);
-    HVMTRACE_5D(CPUID, regs->_eax, res.a, res.b, res.c, res.d);
+    guest_cpuid(curr, regs->eax, regs->ecx, &res);
+    HVMTRACE_5D(CPUID, regs->eax, res.a, res.b, res.c, res.d);
 
     regs->rax = res.a;
     regs->rbx = res.b;
@@ -1913,12 +1913,12 @@ static void svm_do_msr_access(struct cpu_user_regs *regs)
     {
         uint64_t msr_content = 0;
 
-        rc = hvm_msr_read_intercept(regs->_ecx, &msr_content);
+        rc = hvm_msr_read_intercept(regs->ecx, &msr_content);
         if ( rc == X86EMUL_OKAY )
             msr_split(regs, msr_content);
     }
     else
-        rc = hvm_msr_write_intercept(regs->_ecx, msr_fold(regs), 1);
+        rc = hvm_msr_write_intercept(regs->ecx, msr_fold(regs), 1);
 
     if ( rc == X86EMUL_OKAY )
         __update_guest_eip(regs, inst_len);
@@ -1935,7 +1935,7 @@ static void svm_vmexit_do_hlt(struct vmcb_struct *vmcb,
         return;
     __update_guest_eip(regs, inst_len);
 
-    hvm_hlt(regs->_eflags);
+    hvm_hlt(regs->eflags);
 }
 
 static void svm_vmexit_do_rdtsc(struct cpu_user_regs *regs)
@@ -2280,11 +2280,11 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
     if ( hvm_long_mode_enabled(v) )
         HVMTRACE_ND(VMEXIT64, vcpu_guestmode ? TRC_HVM_NESTEDFLAG : 0,
                     1/*cycles*/, 3, exit_reason,
-                    regs->_eip, regs->rip >> 32, 0, 0, 0);
+                    regs->eip, regs->rip >> 32, 0, 0, 0);
     else
         HVMTRACE_ND(VMEXIT, vcpu_guestmode ? TRC_HVM_NESTEDFLAG : 0,
                     1/*cycles*/, 2, exit_reason,
-                    regs->_eip, 0, 0, 0, 0);
+                    regs->eip, 0, 0, 0, 0);
 
     if ( vcpu_guestmode ) {
         enum nestedhvm_vmexits nsret;
@@ -2536,7 +2536,7 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
     case VMEXIT_INVLPGA:
         if ( (inst_len = __get_instruction_length(v, INSTR_INVLPGA)) == 0 )
             break;
-        svm_invlpga_intercept(v, regs->rax, regs->_ecx);
+        svm_invlpga_intercept(v, regs->rax, regs->ecx);
         __update_guest_eip(regs, inst_len);
         break;
 
@@ -2544,7 +2544,7 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
         if ( (inst_len = __get_instruction_length(v, INSTR_VMCALL)) == 0 )
             break;
         BUG_ON(vcpu_guestmode);
-        HVMTRACE_1D(VMMCALL, regs->_eax);
+        HVMTRACE_1D(VMMCALL, regs->eax);
 
         if ( hvm_hypercall(regs) == HVM_HCALL_completed )
             __update_guest_eip(regs, inst_len);
@@ -2598,7 +2598,7 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
         if ( vmcb_get_cpl(vmcb) )
             hvm_inject_hw_exception(TRAP_gp_fault, 0);
         else if ( (inst_len = __get_instruction_length(v, INSTR_XSETBV)) &&
-                  hvm_handle_xsetbv(regs->_ecx, msr_fold(regs)) == 0 )
+                  hvm_handle_xsetbv(regs->ecx, msr_fold(regs)) == 0 )
             __update_guest_eip(regs, inst_len);
         break;
 

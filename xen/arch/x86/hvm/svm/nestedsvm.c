@@ -979,7 +979,7 @@ nsvm_vmcb_guest_intercepts_exitcode(struct vcpu *v,
             break;
         ns_vmcb = nv->nv_vvmcx;
         vmexits = nsvm_vmcb_guest_intercepts_msr(svm->ns_cached_msrpm,
-            regs->_ecx, ns_vmcb->exitinfo1 != 0);
+            regs->ecx, ns_vmcb->exitinfo1 != 0);
         if (vmexits == NESTEDHVM_VMEXIT_HOST)
             return 0;
         break;
