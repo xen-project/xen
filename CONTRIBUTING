@@ -16,6 +16,7 @@ Most notably:
  - tools/blktap2      : BSD-Modified
  - tools/libxc        : LGPL v2.1
  - tools/libxl        : LGPL v2.1
+ - tools/xl           : LGPL v2.1
  - xen/include/public : MIT license
 
 When creating new components and directories that contain a
