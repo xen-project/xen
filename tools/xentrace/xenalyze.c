@@ -7528,6 +7528,23 @@ void sched_process(struct pcpu_info *p)
                 printf("\n");
             }
             break;
+        case TRC_SCHED_SWITCH_INFCONT:
+            if(opt.dump_all)
+            {
+                struct {
+                    unsigned int domid, vcpuid, rsince;
+                    int slice;
+                } *r = (typeof(r))ri->d;
+
+                printf(" %s sched_switch continue d%uv%u, run for %u.%uus",
+                       ri->dump_header, r->domid, r->vcpuid,
+                       r->rsince / 1000, r->rsince % 1000);
+                if ( r->slice > 0 )
+                    printf(", next slice %u.%uus", r->slice / 1000,
+                           r->slice % 1000);
+                printf("\n");
+            }
+            break;
         case TRC_SCHED_CTL:
         case TRC_SCHED_S_TIMER_FN:
         case TRC_SCHED_T_TIMER_FN:

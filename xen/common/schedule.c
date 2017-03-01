@@ -1397,6 +1397,10 @@ static void schedule(void)
     if ( unlikely(prev == next) )
     {
         pcpu_schedule_unlock_irq(lock, cpu);
+        TRACE_4D(TRC_SCHED_SWITCH_INFCONT,
+                 next->domain->domain_id, next->vcpu_id,
+                 now - prev->runstate.state_entry_time,
+                 next_slice.time);
         trace_continue_running(next);
         return continue_running(prev);
     }

@@ -35,6 +35,7 @@
 0x0002800e  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  switch_infprev    [ dom:vcpu = 0x%(1)04x%(2)04x, runtime = %(3)d ]
 0x0002800f  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  switch_infnext    [ new_dom:vcpu = 0x%(1)04x%(2)04x, time = %(3)d, r_time = %(4)d ]
 0x00028010  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  domain_shutdown_code [ dom:vcpu = 0x%(1)04x%(2)04x, reason = 0x%(3)08x ]
+0x00028011  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  switch_infcont    [ dom:vcpu = 0x%(1)04x%(2)04x, runtime = %(3)d, r_time = %(4)d ]
 
 0x00022001  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  csched:sched_tasklet
 0x00022002  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  csched:account_start [ dom:vcpu = 0x%(1)04x%(2)04x, active = %(3)d ]
