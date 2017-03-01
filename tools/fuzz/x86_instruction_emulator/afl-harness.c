@@ -17,6 +17,7 @@ int main(int argc, char **argv)
     size_t size;
     FILE *fp = NULL;
 
+    setbuf(stdin, NULL);
     setbuf(stdout, NULL);
 
     while ( 1 )
@@ -61,37 +62,44 @@ int main(int argc, char **argv)
     if ( LLVMFuzzerInitialize(&argc, &argv) )
         exit(-1);
 
-    if ( fp != stdin ) /* If not using stdin, open the provided file. */
+#ifdef __AFL_HAVE_MANUAL_CONTROL
+    __AFL_INIT();
+
+    while ( __AFL_LOOP(1000) )
+#endif
     {
-        fp = fopen(argv[optind], "rb");
-        if ( fp == NULL )
+        if ( fp != stdin ) /* If not using stdin, open the provided file. */
         {
-            perror("fopen");
+            fp = fopen(argv[optind], "rb");
+            if ( fp == NULL )
+            {
+                perror("fopen");
+                exit(-1);
+            }
+        }
+
+        size = fread(input, 1, INPUT_SIZE, fp);
+
+        if ( ferror(fp) )
+        {
+            perror("fread");
             exit(-1);
         }
+
+        if ( !feof(fp) )
+        {
+            printf("Input too large\n");
+            exit(-1);
+        }
+
+        if ( fp != stdin )
+        {
+            fclose(fp);
+            fp = NULL;
+        }
+
+        LLVMFuzzerTestOneInput(input, size);
     }
-
-    size = fread(input, 1, INPUT_SIZE, fp);
-
-    if ( ferror(fp) )
-    {
-        perror("fread");
-        exit(-1);
-    }
-
-    if ( !feof(fp) )
-    {
-        printf("Input too large\n");
-        exit(-1);
-    }
-
-    if ( fp != stdin )
-    {
-        fclose(fp);
-        fp = NULL;
-    }
-
-    LLVMFuzzerTestOneInput(input, size);
 
     return 0;
 }

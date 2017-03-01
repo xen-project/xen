@@ -18,7 +18,15 @@ Use the x86 instruction emulator fuzzer as an example.
 2. run the following commands to build:
    $ cd tools/fuzz/x86_instruction_emulator
    $ make distclean
-   $ make CC=$AFLPATH/afl-gcc afl # produces afl-harness
+
+   If you have a new enough version of Clang/LLVM and have configured AFL's
+   llvm_mode, make use of afl-clang-fast:
+
+     $ make CC=$AFLPATH/afl-clang-fast afl # produces afl-harness
+
+   If not, use the default afl-gcc:
+
+     $ make CC=$AFLPATH/afl-gcc afl # produces afl-harness
 
 3. provide initial test case (fuzzer dependent, see afl-*.c):
    $ mkdir testcase_dir
