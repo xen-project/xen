@@ -2966,20 +2966,20 @@ void hvm_task_switch(
     if ( rc != HVMCOPY_okay )
         goto out;
 
-    eflags = regs->_eflags;
+    eflags = regs->eflags;
     if ( taskswitch_reason == TSW_iret )
         eflags &= ~X86_EFLAGS_NT;
 
-    tss.eip    = regs->_eip;
+    tss.eip    = regs->eip;
     tss.eflags = eflags;
-    tss.eax    = regs->_eax;
-    tss.ecx    = regs->_ecx;
-    tss.edx    = regs->_edx;
-    tss.ebx    = regs->_ebx;
-    tss.esp    = regs->_esp;
-    tss.ebp    = regs->_ebp;
-    tss.esi    = regs->_esi;
-    tss.edi    = regs->_edi;
+    tss.eax    = regs->eax;
+    tss.ecx    = regs->ecx;
+    tss.edx    = regs->edx;
+    tss.ebx    = regs->ebx;
+    tss.esp    = regs->esp;
+    tss.ebp    = regs->ebp;
+    tss.esi    = regs->esi;
+    tss.edi    = regs->edi;
 
     hvm_get_segment_register(v, x86_seg_es, &segr);
     tss.es = segr.sel;
@@ -3045,7 +3045,7 @@ void hvm_task_switch(
 
     if ( taskswitch_reason == TSW_call_or_int )
     {
-        regs->_eflags |= X86_EFLAGS_NT;
+        regs->eflags |= X86_EFLAGS_NT;
         tss.back_link = prev_tr.sel;
 
         rc = hvm_copy_to_guest_linear(tr.base + offsetof(typeof(tss), back_link),
@@ -3082,7 +3082,7 @@ void hvm_task_switch(
         opsz = segr.attr.fields.db ? 4 : 2;
         hvm_get_segment_register(v, x86_seg_ss, &segr);
         if ( segr.attr.fields.db )
-            sp = regs->_esp -= opsz;
+            sp = regs->esp -= opsz;
         else
             sp = regs->sp -= opsz;
         if ( hvm_virtual_to_linear_addr(x86_seg_ss, &segr, sp, opsz,
@@ -3365,7 +3365,7 @@ void hvm_rdtsc_intercept(struct cpu_user_regs *regs)
 {
     msr_split(regs, _hvm_rdtsc_intercept());
 
-    HVMTRACE_2D(RDTSC, regs->_eax, regs->_edx);
+    HVMTRACE_2D(RDTSC, regs->eax, regs->edx);
 }
 
 int hvm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
@@ -3677,11 +3677,11 @@ void hvm_ud_intercept(struct cpu_user_regs *regs)
              (memcmp(sig, "\xf\xbxen", sizeof(sig)) == 0) )
         {
             regs->rip += sizeof(sig);
-            regs->_eflags &= ~X86_EFLAGS_RF;
+            regs->eflags &= ~X86_EFLAGS_RF;
 
             /* Zero the upper 32 bits of %rip if not in 64bit mode. */
             if ( !(hvm_long_mode_enabled(cur) && cs->attr.fields.l) )
-                regs->rip = regs->_eip;
+                regs->rip = regs->eip;
 
             add_taint(TAINT_HVM_FEP);
 
@@ -3725,7 +3725,7 @@ enum hvm_intblk hvm_interrupt_blocked(struct vcpu *v, struct hvm_intack intack)
     }
 
     if ( (intack.source != hvm_intsrc_nmi) &&
-         !(guest_cpu_user_regs()->_eflags & X86_EFLAGS_IF) )
+         !(guest_cpu_user_regs()->eflags & X86_EFLAGS_IF) )
         return hvm_intblk_rflags_ie;
 
     intr_shadow = hvm_funcs.get_interrupt_shadow(v);
