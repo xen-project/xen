@@ -56,6 +56,7 @@
 #define TRC_CSCHED2_RUNQ_CANDIDATE   TRC_SCHED_CLASS_EVT(CSCHED2, 20)
 #define TRC_CSCHED2_SCHEDULE         TRC_SCHED_CLASS_EVT(CSCHED2, 21)
 #define TRC_CSCHED2_RATELIMIT        TRC_SCHED_CLASS_EVT(CSCHED2, 22)
+#define TRC_CSCHED2_RUNQ_CAND_CHECK  TRC_SCHED_CLASS_EVT(CSCHED2, 23)
 
 /*
  * WARNING: This is still in an experimental phase.  Status and work can be found at the
@@ -2494,6 +2495,18 @@ runq_candidate(struct csched2_runqueue_data *rqd,
     {
         struct csched2_vcpu * svc = list_entry(iter, struct csched2_vcpu, runq_elem);
 
+        if ( unlikely(tb_init_done) )
+        {
+            struct {
+                unsigned vcpu:16, dom:16;
+            } d;
+            d.dom = svc->vcpu->domain->domain_id;
+            d.vcpu = svc->vcpu->vcpu_id;
+            __trace_var(TRC_CSCHED2_RUNQ_CAND_CHECK, 1,
+                        sizeof(d),
+                        (unsigned char *)&d);
+        }
+
         /* Only consider vcpus that are allowed to run on this processor. */
         if ( !cpumask_test_cpu(cpu, svc->vcpu->cpu_hard_affinity) )
         {
@@ -2542,9 +2555,11 @@ runq_candidate(struct csched2_runqueue_data *rqd,
         struct {
             unsigned vcpu:16, dom:16;
             unsigned tickled_cpu, skipped;
+            int credit;
         } d;
         d.dom = snext->vcpu->domain->domain_id;
         d.vcpu = snext->vcpu->vcpu_id;
+        d.credit = snext->credit;
         d.tickled_cpu = snext->tickled_cpu;
         d.skipped = *skipped;
         __trace_var(TRC_CSCHED2_RUNQ_CANDIDATE, 1,
