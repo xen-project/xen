@@ -218,6 +218,7 @@ struct cmd_spec *cmdtable_lookup(const char *s);
 
 extern libxl_ctx *ctx;
 extern xentoollog_logger_stdiostream *logger;
+extern int logfile;
 
 void xl_ctx_alloc(void);
 

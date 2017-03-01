@@ -30,8 +30,6 @@
 #include "xl_utils.h"
 #include "xl_parse.h"
 
-extern int logfile;
-
 static int fd_lock = -1;
 
 static void pause_domain(uint32_t domid)

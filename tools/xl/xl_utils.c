@@ -27,8 +27,6 @@
 #include "xl.h"
 #include "xl_utils.h"
 
-extern int logfile;
-
 void dolog(const char *file, int line, const char *func, char *fmt, ...)
 {
     va_list ap;
