@@ -569,7 +569,7 @@ static int get_fallback_cpu(struct csched2_vcpu *svc)
 
 /*
  * Time-to-credit, credit-to-time.
- * 
+ *
  * We keep track of the "residual" time to make sure that frequent short
  * schedules still get accounted for in the end.
  *
@@ -590,7 +590,7 @@ static s_time_t c2t(struct csched2_runqueue_data *rqd, s_time_t credit, struct c
 }
 
 /*
- * Runqueue related code
+ * Runqueue related code.
  */
 
 static inline int vcpu_on_runq(struct csched2_vcpu *svc)
@@ -601,6 +601,208 @@ static inline int vcpu_on_runq(struct csched2_vcpu *svc)
 static inline struct csched2_vcpu * runq_elem(struct list_head *elem)
 {
     return list_entry(elem, struct csched2_vcpu, runq_elem);
+}
+
+static void activate_runqueue(struct csched2_private *prv, int rqi)
+{
+    struct csched2_runqueue_data *rqd;
+
+    rqd = prv->rqd + rqi;
+
+    BUG_ON(!cpumask_empty(&rqd->active));
+
+    rqd->max_weight = 1;
+    rqd->id = rqi;
+    INIT_LIST_HEAD(&rqd->svc);
+    INIT_LIST_HEAD(&rqd->runq);
+    spin_lock_init(&rqd->lock);
+
+    __cpumask_set_cpu(rqi, &prv->active_queues);
+}
+
+static void deactivate_runqueue(struct csched2_private *prv, int rqi)
+{
+    struct csched2_runqueue_data *rqd;
+
+    rqd = prv->rqd + rqi;
+
+    BUG_ON(!cpumask_empty(&rqd->active));
+
+    rqd->id = -1;
+
+    __cpumask_clear_cpu(rqi, &prv->active_queues);
+}
+
+static inline bool_t same_node(unsigned int cpua, unsigned int cpub)
+{
+    return cpu_to_node(cpua) == cpu_to_node(cpub);
+}
+
+static inline bool_t same_socket(unsigned int cpua, unsigned int cpub)
+{
+    return cpu_to_socket(cpua) == cpu_to_socket(cpub);
+}
+
+static inline bool_t same_core(unsigned int cpua, unsigned int cpub)
+{
+    return same_socket(cpua, cpub) &&
+           cpu_to_core(cpua) == cpu_to_core(cpub);
+}
+
+static unsigned int
+cpu_to_runqueue(struct csched2_private *prv, unsigned int cpu)
+{
+    struct csched2_runqueue_data *rqd;
+    unsigned int rqi;
+
+    for ( rqi = 0; rqi < nr_cpu_ids; rqi++ )
+    {
+        unsigned int peer_cpu;
+
+        /*
+         * As soon as we come across an uninitialized runqueue, use it.
+         * In fact, either:
+         *  - we are initializing the first cpu, and we assign it to
+         *    runqueue 0. This is handy, especially if we are dealing
+         *    with the boot cpu (if credit2 is the default scheduler),
+         *    as we would not be able to use cpu_to_socket() and similar
+         *    helpers anyway (they're result of which is not reliable yet);
+         *  - we have gone through all the active runqueues, and have not
+         *    found anyone whose cpus' topology matches the one we are
+         *    dealing with, so activating a new runqueue is what we want.
+         */
+        if ( prv->rqd[rqi].id == -1 )
+            break;
+
+        rqd = prv->rqd + rqi;
+        BUG_ON(cpumask_empty(&rqd->active));
+
+        peer_cpu = cpumask_first(&rqd->active);
+        BUG_ON(cpu_to_socket(cpu) == XEN_INVALID_SOCKET_ID ||
+               cpu_to_socket(peer_cpu) == XEN_INVALID_SOCKET_ID);
+
+        if ( opt_runqueue == OPT_RUNQUEUE_ALL ||
+             (opt_runqueue == OPT_RUNQUEUE_CORE && same_core(peer_cpu, cpu)) ||
+             (opt_runqueue == OPT_RUNQUEUE_SOCKET && same_socket(peer_cpu, cpu)) ||
+             (opt_runqueue == OPT_RUNQUEUE_NODE && same_node(peer_cpu, cpu)) )
+            break;
+    }
+
+    /* We really expect to be able to assign each cpu to a runqueue. */
+    BUG_ON(rqi >= nr_cpu_ids);
+
+    return rqi;
+}
+
+/* Find the domain with the highest weight. */
+static void update_max_weight(struct csched2_runqueue_data *rqd, int new_weight,
+                              int old_weight)
+{
+    /* Try to avoid brute-force search:
+     * - If new_weight is larger, max_weigth <- new_weight
+     * - If old_weight != max_weight, someone else is still max_weight
+     *   (No action required)
+     * - If old_weight == max_weight, brute-force search for max weight
+     */
+    if ( new_weight > rqd->max_weight )
+    {
+        rqd->max_weight = new_weight;
+        SCHED_STAT_CRANK(upd_max_weight_quick);
+    }
+    else if ( old_weight == rqd->max_weight )
+    {
+        struct list_head *iter;
+        int max_weight = 1;
+
+        list_for_each( iter, &rqd->svc )
+        {
+            struct csched2_vcpu * svc = list_entry(iter, struct csched2_vcpu, rqd_elem);
+
+            if ( svc->weight > max_weight )
+                max_weight = svc->weight;
+        }
+
+        rqd->max_weight = max_weight;
+        SCHED_STAT_CRANK(upd_max_weight_full);
+    }
+
+    if ( unlikely(tb_init_done) )
+    {
+        struct {
+            unsigned rqi:16, max_weight:16;
+        } d;
+        d.rqi = rqd->id;
+        d.max_weight = rqd->max_weight;
+        __trace_var(TRC_CSCHED2_RUNQ_MAX_WEIGHT, 1,
+                    sizeof(d),
+                    (unsigned char *)&d);
+    }
+}
+
+/* Add and remove from runqueue assignment (not active run queue) */
+static void
+_runq_assign(struct csched2_vcpu *svc, struct csched2_runqueue_data *rqd)
+{
+
+    svc->rqd = rqd;
+    list_add_tail(&svc->rqd_elem, &svc->rqd->svc);
+
+    update_max_weight(svc->rqd, svc->weight, 0);
+
+    /* Expected new load based on adding this vcpu */
+    rqd->b_avgload += svc->avgload;
+
+    if ( unlikely(tb_init_done) )
+    {
+        struct {
+            unsigned vcpu:16, dom:16;
+            unsigned rqi:16;
+        } d;
+        d.dom = svc->vcpu->domain->domain_id;
+        d.vcpu = svc->vcpu->vcpu_id;
+        d.rqi=rqd->id;
+        __trace_var(TRC_CSCHED2_RUNQ_ASSIGN, 1,
+                    sizeof(d),
+                    (unsigned char *)&d);
+    }
+
+}
+
+static void
+runq_assign(const struct scheduler *ops, struct vcpu *vc)
+{
+    struct csched2_vcpu *svc = vc->sched_priv;
+
+    ASSERT(svc->rqd == NULL);
+
+    _runq_assign(svc, c2rqd(ops, vc->processor));
+}
+
+static void
+_runq_deassign(struct csched2_vcpu *svc)
+{
+    struct csched2_runqueue_data *rqd = svc->rqd;
+
+    ASSERT(!vcpu_on_runq(svc));
+    ASSERT(!(svc->flags & CSFLAG_scheduled));
+
+    list_del_init(&svc->rqd_elem);
+    update_max_weight(rqd, 0, svc->weight);
+
+    /* Expected new load based on removing this vcpu */
+    rqd->b_avgload = max_t(s_time_t, rqd->b_avgload - svc->avgload, 0);
+
+    svc->rqd = NULL;
+}
+
+static void
+runq_deassign(const struct scheduler *ops, struct vcpu *vc)
+{
+    struct csched2_vcpu *svc = vc->sched_priv;
+
+    ASSERT(svc->rqd == c2rqd(ops, vc->processor));
+
+    _runq_deassign(svc);
 }
 
 /*
@@ -1234,51 +1436,6 @@ void burn_credits(struct csched2_runqueue_data *rqd,
     }
 }
 
-/* Find the domain with the highest weight. */
-static void update_max_weight(struct csched2_runqueue_data *rqd, int new_weight,
-                              int old_weight)
-{
-    /* Try to avoid brute-force search:
-     * - If new_weight is larger, max_weigth <- new_weight
-     * - If old_weight != max_weight, someone else is still max_weight
-     *   (No action required)
-     * - If old_weight == max_weight, brute-force search for max weight
-     */
-    if ( new_weight > rqd->max_weight )
-    {
-        rqd->max_weight = new_weight;
-        SCHED_STAT_CRANK(upd_max_weight_quick);
-    }
-    else if ( old_weight == rqd->max_weight )
-    {
-        struct list_head *iter;
-        int max_weight = 1;
-
-        list_for_each( iter, &rqd->svc )
-        {
-            struct csched2_vcpu * svc = list_entry(iter, struct csched2_vcpu, rqd_elem);
-
-            if ( svc->weight > max_weight )
-                max_weight = svc->weight;
-        }
-
-        rqd->max_weight = max_weight;
-        SCHED_STAT_CRANK(upd_max_weight_full);
-    }
-
-    if ( unlikely(tb_init_done) )
-    {
-        struct {
-            unsigned rqi:16, max_weight:16;
-        } d;
-        d.rqi = rqd->id;
-        d.max_weight = rqd->max_weight;
-        __trace_var(TRC_CSCHED2_RUNQ_MAX_WEIGHT, 1,
-                    sizeof(d),
-                    (unsigned char *)&d);
-    }
-}
-
 #ifndef NDEBUG
 static inline void
 csched2_vcpu_check(struct vcpu *vc)
@@ -1341,72 +1498,6 @@ csched2_alloc_vdata(const struct scheduler *ops, struct vcpu *vc, void *dd)
     SCHED_STAT_CRANK(vcpu_alloc);
 
     return svc;
-}
-
-/* Add and remove from runqueue assignment (not active run queue) */
-static void
-_runq_assign(struct csched2_vcpu *svc, struct csched2_runqueue_data *rqd)
-{
-
-    svc->rqd = rqd;
-    list_add_tail(&svc->rqd_elem, &svc->rqd->svc);
-
-    update_max_weight(svc->rqd, svc->weight, 0);
-
-    /* Expected new load based on adding this vcpu */
-    rqd->b_avgload += svc->avgload;
-
-    if ( unlikely(tb_init_done) )
-    {
-        struct {
-            unsigned vcpu:16, dom:16;
-            unsigned rqi:16;
-        } d;
-        d.dom = svc->vcpu->domain->domain_id;
-        d.vcpu = svc->vcpu->vcpu_id;
-        d.rqi=rqd->id;
-        __trace_var(TRC_CSCHED2_RUNQ_ASSIGN, 1,
-                    sizeof(d),
-                    (unsigned char *)&d);
-    }
-
-}
-
-static void
-runq_assign(const struct scheduler *ops, struct vcpu *vc)
-{
-    struct csched2_vcpu *svc = vc->sched_priv;
-
-    ASSERT(svc->rqd == NULL);
-
-    _runq_assign(svc, c2rqd(ops, vc->processor));
-}
-
-static void
-_runq_deassign(struct csched2_vcpu *svc)
-{
-    struct csched2_runqueue_data *rqd = svc->rqd;
-
-    ASSERT(!vcpu_on_runq(svc));
-    ASSERT(!(svc->flags & CSFLAG_scheduled));
-
-    list_del_init(&svc->rqd_elem);
-    update_max_weight(rqd, 0, svc->weight);
-
-    /* Expected new load based on removing this vcpu */
-    rqd->b_avgload = max_t(s_time_t, rqd->b_avgload - svc->avgload, 0);
-
-    svc->rqd = NULL;
-}
-
-static void
-runq_deassign(const struct scheduler *ops, struct vcpu *vc)
-{
-    struct csched2_vcpu *svc = vc->sched_priv;
-
-    ASSERT(svc->rqd == c2rqd(ops, vc->processor));
-
-    _runq_deassign(svc);
 }
 
 static void
@@ -2792,97 +2883,6 @@ csched2_dump(const struct scheduler *ops)
 
     read_unlock_irqrestore(&prv->lock, flags);
 #undef cpustr
-}
-
-static void activate_runqueue(struct csched2_private *prv, int rqi)
-{
-    struct csched2_runqueue_data *rqd;
-
-    rqd = prv->rqd + rqi;
-
-    BUG_ON(!cpumask_empty(&rqd->active));
-
-    rqd->max_weight = 1;
-    rqd->id = rqi;
-    INIT_LIST_HEAD(&rqd->svc);
-    INIT_LIST_HEAD(&rqd->runq);
-    spin_lock_init(&rqd->lock);
-
-    __cpumask_set_cpu(rqi, &prv->active_queues);
-}
-
-static void deactivate_runqueue(struct csched2_private *prv, int rqi)
-{
-    struct csched2_runqueue_data *rqd;
-
-    rqd = prv->rqd + rqi;
-
-    BUG_ON(!cpumask_empty(&rqd->active));
-    
-    rqd->id = -1;
-
-    __cpumask_clear_cpu(rqi, &prv->active_queues);
-}
-
-static inline bool_t same_node(unsigned int cpua, unsigned int cpub)
-{
-    return cpu_to_node(cpua) == cpu_to_node(cpub);
-}
-
-static inline bool_t same_socket(unsigned int cpua, unsigned int cpub)
-{
-    return cpu_to_socket(cpua) == cpu_to_socket(cpub);
-}
-
-static inline bool_t same_core(unsigned int cpua, unsigned int cpub)
-{
-    return same_socket(cpua, cpub) &&
-           cpu_to_core(cpua) == cpu_to_core(cpub);
-}
-
-static unsigned int
-cpu_to_runqueue(struct csched2_private *prv, unsigned int cpu)
-{
-    struct csched2_runqueue_data *rqd;
-    unsigned int rqi;
-
-    for ( rqi = 0; rqi < nr_cpu_ids; rqi++ )
-    {
-        unsigned int peer_cpu;
-
-        /*
-         * As soon as we come across an uninitialized runqueue, use it.
-         * In fact, either:
-         *  - we are initializing the first cpu, and we assign it to
-         *    runqueue 0. This is handy, especially if we are dealing
-         *    with the boot cpu (if credit2 is the default scheduler),
-         *    as we would not be able to use cpu_to_socket() and similar
-         *    helpers anyway (they're result of which is not reliable yet);
-         *  - we have gone through all the active runqueues, and have not
-         *    found anyone whose cpus' topology matches the one we are
-         *    dealing with, so activating a new runqueue is what we want.
-         */
-        if ( prv->rqd[rqi].id == -1 )
-            break;
-
-        rqd = prv->rqd + rqi;
-        BUG_ON(cpumask_empty(&rqd->active));
-
-        peer_cpu = cpumask_first(&rqd->active);
-        BUG_ON(cpu_to_socket(cpu) == XEN_INVALID_SOCKET_ID ||
-               cpu_to_socket(peer_cpu) == XEN_INVALID_SOCKET_ID);
-
-        if ( opt_runqueue == OPT_RUNQUEUE_ALL ||
-             (opt_runqueue == OPT_RUNQUEUE_CORE && same_core(peer_cpu, cpu)) ||
-             (opt_runqueue == OPT_RUNQUEUE_SOCKET && same_socket(peer_cpu, cpu)) ||
-             (opt_runqueue == OPT_RUNQUEUE_NODE && same_node(peer_cpu, cpu)) )
-            break;
-    }
-
-    /* We really expect to be able to assign each cpu to a runqueue. */
-    BUG_ON(rqi >= nr_cpu_ids);
-
-    return rqi;
 }
 
 /* Returns the ID of the runqueue the cpu is assigned to. */
