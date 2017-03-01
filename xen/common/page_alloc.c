@@ -131,6 +131,7 @@
 #include <xen/domain_page.h>
 #include <xen/keyhandler.h>
 #include <xen/perfc.h>
+#include <xen/pfn.h>
 #include <xen/numa.h>
 #include <xen/nodemask.h>
 #include <xen/event.h>
@@ -175,9 +176,6 @@ size_param("bootscrub_chunk", opt_bootscrub_chunk);
  */
 static unsigned int dma_bitsize;
 integer_param("dma_bits", dma_bitsize);
-
-#define round_pgdown(_p)  ((_p)&PAGE_MASK)
-#define round_pgup(_p)    (((_p)+(PAGE_SIZE-1))&PAGE_MASK)
 
 /* Offlined page list, protected by heap_lock. */
 PAGE_LIST_HEAD(page_offlined_list);

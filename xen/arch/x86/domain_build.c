@@ -267,9 +267,6 @@ boolean_param("ro-hpet", ro_hpet);
 #define L3_PROT (BASE_PROT|_PAGE_DIRTY)
 #define L4_PROT (BASE_PROT|_PAGE_DIRTY)
 
-#define round_pgup(_p)    (((_p)+(PAGE_SIZE-1))&PAGE_MASK)
-#define round_pgdown(_p)  ((_p)&PAGE_MASK)
-
 static unsigned int __initdata memflags = MEMF_no_dma|MEMF_exact_node;
 
 static struct page_info * __init alloc_chunk(
