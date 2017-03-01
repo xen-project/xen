@@ -441,7 +441,7 @@ static int hvmemul_linear_to_phys(
     }
 
     /* Reverse mode if this is a backwards multi-iteration string operation. */
-    reverse = (hvmemul_ctxt->ctxt.regs->_eflags & X86_EFLAGS_DF) && (*reps > 1);
+    reverse = (hvmemul_ctxt->ctxt.regs->eflags & X86_EFLAGS_DF) && (*reps > 1);
 
     if ( reverse && ((PAGE_SIZE - offset) < bytes_per_rep) )
     {
@@ -538,7 +538,7 @@ static int hvmemul_virtual_to_linear(
     if ( IS_ERR(reg) )
         return -PTR_ERR(reg);
 
-    if ( (hvmemul_ctxt->ctxt.regs->_eflags & X86_EFLAGS_DF) && (*reps > 1) )
+    if ( (hvmemul_ctxt->ctxt.regs->eflags & X86_EFLAGS_DF) && (*reps > 1) )
     {
         /*
          * x86_emulate() clips the repetition count to ensure we don't wrap
@@ -1084,7 +1084,7 @@ static int hvmemul_rep_ins(
         return X86EMUL_UNHANDLEABLE;
 
     return hvmemul_do_pio_addr(src_port, reps, bytes_per_rep, IOREQ_READ,
-                               !!(ctxt->regs->_eflags & X86_EFLAGS_DF), gpa);
+                               !!(ctxt->regs->eflags & X86_EFLAGS_DF), gpa);
 }
 
 static int hvmemul_rep_outs_set_context(
@@ -1153,7 +1153,7 @@ static int hvmemul_rep_outs(
         return X86EMUL_UNHANDLEABLE;
 
     return hvmemul_do_pio_addr(dst_port, reps, bytes_per_rep, IOREQ_WRITE,
-                               !!(ctxt->regs->_eflags & X86_EFLAGS_DF), gpa);
+                               !!(ctxt->regs->eflags & X86_EFLAGS_DF), gpa);
 }
 
 static int hvmemul_rep_movs(
@@ -1172,7 +1172,7 @@ static int hvmemul_rep_movs(
     paddr_t sgpa, dgpa;
     uint32_t pfec = PFEC_page_present;
     p2m_type_t sp2mt, dp2mt;
-    int rc, df = !!(ctxt->regs->_eflags & X86_EFLAGS_DF);
+    int rc, df = !!(ctxt->regs->eflags & X86_EFLAGS_DF);
     char *buf;
 
     rc = hvmemul_virtual_to_linear(
@@ -1326,7 +1326,7 @@ static int hvmemul_rep_stos(
     unsigned long addr, bytes;
     paddr_t gpa;
     p2m_type_t p2mt;
-    bool_t df = !!(ctxt->regs->_eflags & X86_EFLAGS_DF);
+    bool_t df = !!(ctxt->regs->eflags & X86_EFLAGS_DF);
     int rc = hvmemul_virtual_to_linear(seg, offset, bytes_per_rep, reps,
                                        hvm_access_write, hvmemul_ctxt, &addr);
 
@@ -1776,7 +1776,7 @@ static int _hvm_emulate_one(struct hvm_emulate_ctxt *hvmemul_ctxt,
     if ( hvmemul_ctxt->ctxt.retire.hlt &&
          !hvm_local_events_need_delivery(curr) )
     {
-        hvm_hlt(regs->_eflags);
+        hvm_hlt(regs->eflags);
     }
 
     return X86EMUL_OKAY;
