@@ -327,7 +327,7 @@ int compat_mmuext_op(XEN_GUEST_HANDLE_PARAM(void) arg,
                 struct cpu_user_regs *regs = guest_cpu_user_regs();
                 struct mc_state *mcs = &current->mc_state;
                 unsigned int arg1 = !(mcs->flags & MCSF_in_multicall)
-                                    ? regs->_ecx
+                                    ? regs->ecx
                                     : mcs->call.args[1];
                 unsigned int left = arg1 & ~MMU_UPDATE_PREEMPTED;
 
@@ -341,7 +341,7 @@ int compat_mmuext_op(XEN_GUEST_HANDLE_PARAM(void) arg,
                     BUG_ON(!hypercall_xlat_continuation(&left, 4, 0x01, nat_ops,
                                                         cmp_uops));
                     if ( !(mcs->flags & MCSF_in_multicall) )
-                        regs->_ecx += count - i;
+                        regs->ecx += count - i;
                     else
                         mcs->compat_call.args[1] += count - i;
                 }

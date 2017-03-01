@@ -622,7 +622,7 @@ void fatal_trap(const struct cpu_user_regs *regs, bool_t show_remote)
     panic("FATAL TRAP: vector = %d (%s)\n"
           "[error_code=%04x] %s",
           trapnr, trapstr(trapnr), regs->error_code,
-          (regs->_eflags & X86_EFLAGS_IF) ? "" : ", IN INTERRUPT CONTEXT");
+          (regs->eflags & X86_EFLAGS_IF) ? "" : ", IN INTERRUPT CONTEXT");
 }
 
 void pv_inject_event(const struct x86_event *event)
@@ -699,8 +699,8 @@ static inline void do_guest_trap(unsigned int trapnr,
 static void instruction_done(struct cpu_user_regs *regs, unsigned long rip)
 {
     regs->rip = rip;
-    regs->_eflags &= ~X86_EFLAGS_RF;
-    if ( regs->_eflags & X86_EFLAGS_TF )
+    regs->eflags &= ~X86_EFLAGS_RF;
+    if ( regs->eflags & X86_EFLAGS_TF )
     {
         current->arch.debugreg[6] |= DR_STEP | DR_STATUS_RESERVED_ONE;
         do_guest_trap(TRAP_debug, regs);
@@ -1066,7 +1066,7 @@ static int emulate_forced_invalid_op(struct cpu_user_regs *regs)
 
     eip += sizeof(instr);
 
-    guest_cpuid(current, regs->_eax, regs->_ecx, &res);
+    guest_cpuid(current, regs->eax, regs->ecx, &res);
 
     regs->rax = res.a;
     regs->rbx = res.b;
@@ -1391,7 +1391,7 @@ leaf:
          *   - Page fault in kernel mode
          */
         if ( (cr4 & X86_CR4_SMAP) && !(error_code & PFEC_user_mode) &&
-             (((regs->cs & 3) == 3) || !(regs->_eflags & X86_EFLAGS_AC)) )
+             (((regs->cs & 3) == 3) || !(regs->eflags & X86_EFLAGS_AC)) )
             return smap_fault;
     }
 
@@ -1421,7 +1421,7 @@ static int fixup_page_fault(unsigned long addr, struct cpu_user_regs *regs)
     struct domain *d = v->domain;
 
     /* No fixups in interrupt context or when interrupts are disabled. */
-    if ( in_irq() || !(regs->_eflags & X86_EFLAGS_IF) )
+    if ( in_irq() || !(regs->eflags & X86_EFLAGS_IF) )
         return 0;
 
     if ( !(regs->error_code & PFEC_page_present) &&
@@ -2279,7 +2279,7 @@ static int priv_op_rep_ins(uint16_t port,
             break;
 
         /* x86_emulate() clips the repetition count to ensure we don't wrap. */
-        if ( unlikely(ctxt->regs->_eflags & X86_EFLAGS_DF) )
+        if ( unlikely(ctxt->regs->eflags & X86_EFLAGS_DF) )
             offset -= bytes_per_rep;
         else
             offset += bytes_per_rep;
@@ -2347,7 +2347,7 @@ static int priv_op_rep_outs(enum x86_segment seg, unsigned long offset,
             break;
 
         /* x86_emulate() clips the repetition count to ensure we don't wrap. */
-        if ( unlikely(ctxt->regs->_eflags & X86_EFLAGS_DF) )
+        if ( unlikely(ctxt->regs->eflags & X86_EFLAGS_DF) )
             offset -= bytes_per_rep;
         else
             offset += bytes_per_rep;
@@ -2977,14 +2977,14 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         return 0;
 
     /* Mirror virtualized state into EFLAGS. */
-    ASSERT(regs->_eflags & X86_EFLAGS_IF);
+    ASSERT(regs->eflags & X86_EFLAGS_IF);
     if ( vcpu_info(curr, evtchn_upcall_mask) )
-        regs->_eflags &= ~X86_EFLAGS_IF;
+        regs->eflags &= ~X86_EFLAGS_IF;
     else
-        regs->_eflags |= X86_EFLAGS_IF;
-    ASSERT(!(regs->_eflags & X86_EFLAGS_IOPL));
-    regs->_eflags |= curr->arch.pv_vcpu.iopl;
-    eflags = regs->_eflags;
+        regs->eflags |= X86_EFLAGS_IF;
+    ASSERT(!(regs->eflags & X86_EFLAGS_IOPL));
+    regs->eflags |= curr->arch.pv_vcpu.iopl;
+    eflags = regs->eflags;
 
     ctxt.ctxt.addr_size = ar & _SEGMENT_L ? 64 : ar & _SEGMENT_DB ? 32 : 16;
     /* Leave zero in ctxt.ctxt.sp_size, as it's not needed. */
@@ -2998,10 +2998,10 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
      * Nothing we allow to be emulated can change anything other than the
      * arithmetic bits, and the resume flag.
      */
-    ASSERT(!((regs->_eflags ^ eflags) &
+    ASSERT(!((regs->eflags ^ eflags) &
              ~(X86_EFLAGS_RF | X86_EFLAGS_ARITH_MASK)));
-    regs->_eflags |= X86_EFLAGS_IF;
-    regs->_eflags &= ~X86_EFLAGS_IOPL;
+    regs->eflags |= X86_EFLAGS_IF;
+    regs->eflags &= ~X86_EFLAGS_IOPL;
 
     /* More strict than x86_emulate_wrapper(). */
     ASSERT(ctxt.ctxt.event_pending == (rc == X86EMUL_EXCEPTION));
@@ -3321,7 +3321,8 @@ static void emulate_gate_op(struct cpu_user_regs *regs)
                      !(ar & _SEGMENT_WR) ||
                      !check_stack_limit(ar, limit, esp + nparm * 4, nparm * 4) )
                     return do_guest_trap(TRAP_gp_fault, regs);
-                ustkp = (unsigned int *)(unsigned long)((unsigned int)base + regs->_esp + nparm * 4);
+                ustkp = (unsigned int *)(unsigned long)
+                        ((unsigned int)base + regs->esp + nparm * 4);
                 if ( !compat_access_ok(ustkp - nparm, nparm * 4) )
                 {
                     do_guest_trap(TRAP_gp_fault, regs);
@@ -3701,20 +3702,20 @@ void do_debug(struct cpu_user_regs *regs)
 
     if ( !guest_mode(regs) )
     {
-        if ( regs->_eflags & X86_EFLAGS_TF )
+        if ( regs->eflags & X86_EFLAGS_TF )
         {
             /* In SYSENTER entry path we can't zap TF until EFLAGS is saved. */
             if ( (regs->rip >= (unsigned long)sysenter_entry) &&
                  (regs->rip <= (unsigned long)sysenter_eflags_saved) )
             {
                 if ( regs->rip == (unsigned long)sysenter_eflags_saved )
-                    regs->_eflags &= ~X86_EFLAGS_TF;
+                    regs->eflags &= ~X86_EFLAGS_TF;
                 goto out;
             }
             if ( !debugger_trap_fatal(TRAP_debug, regs) )
             {
                 WARN();
-                regs->_eflags &= ~X86_EFLAGS_TF;
+                regs->eflags &= ~X86_EFLAGS_TF;
             }
         }
         else

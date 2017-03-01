@@ -1667,7 +1667,7 @@ static int __init construct_dom0_pv(
     regs->rip = parms.virt_entry;
     regs->rsp = vstack_end;
     regs->rsi = vstartinfo_start;
-    regs->_eflags = X86_EFLAGS_IF;
+    regs->eflags = X86_EFLAGS_IF;
 
 #ifdef CONFIG_SHADOW_PAGING
     if ( opt_dom0_shadow )

@@ -1034,11 +1034,11 @@ int arch_set_info_guest(
     init_int80_direct_trap(v);
 
     /* IOPL privileges are virtualised. */
-    v->arch.pv_vcpu.iopl = v->arch.user_regs._eflags & X86_EFLAGS_IOPL;
-    v->arch.user_regs._eflags &= ~X86_EFLAGS_IOPL;
+    v->arch.pv_vcpu.iopl = v->arch.user_regs.eflags & X86_EFLAGS_IOPL;
+    v->arch.user_regs.eflags &= ~X86_EFLAGS_IOPL;
 
     /* Ensure real hardware interrupts are enabled. */
-    v->arch.user_regs._eflags |= X86_EFLAGS_IF;
+    v->arch.user_regs.eflags |= X86_EFLAGS_IF;
 
     if ( !v->is_initialised )
     {
@@ -1795,14 +1795,14 @@ static void load_segments(struct vcpu *n)
             if ( !ring_1(regs) )
             {
                 ret  = put_user(regs->ss,       esp-1);
-                ret |= put_user(regs->_esp,     esp-2);
+                ret |= put_user(regs->esp,      esp-2);
                 esp -= 2;
             }
 
             if ( ret |
                  put_user(rflags,              esp-1) |
                  put_user(cs_and_mask,         esp-2) |
-                 put_user(regs->_eip,          esp-3) |
+                 put_user(regs->eip,           esp-3) |
                  put_user(uregs->gs,           esp-4) |
                  put_user(uregs->fs,           esp-5) |
                  put_user(uregs->es,           esp-6) |
@@ -1817,12 +1817,12 @@ static void load_segments(struct vcpu *n)
                 vcpu_info(n, evtchn_upcall_mask) = 1;
 
             regs->entry_vector |= TRAP_syscall;
-            regs->_eflags      &= ~(X86_EFLAGS_VM|X86_EFLAGS_RF|X86_EFLAGS_NT|
+            regs->eflags       &= ~(X86_EFLAGS_VM|X86_EFLAGS_RF|X86_EFLAGS_NT|
                                     X86_EFLAGS_IOPL|X86_EFLAGS_TF);
             regs->ss            = FLAT_COMPAT_KERNEL_SS;
-            regs->_esp          = (unsigned long)(esp-7);
+            regs->esp           = (unsigned long)(esp-7);
             regs->cs            = FLAT_COMPAT_KERNEL_CS;
-            regs->_eip          = pv->failsafe_callback_eip;
+            regs->eip           = pv->failsafe_callback_eip;
             return;
         }
 
