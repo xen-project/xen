@@ -196,7 +196,7 @@ guest_walk_tables(struct vcpu *v, struct p2m_domain *p2m,
              *   - Page fault in kernel mode
              */
             smap = hvm_smap_enabled(v) &&
-                   ((hvm_get_cpl(v) == 3) || !(regs->_eflags & X86_EFLAGS_AC));
+                   ((hvm_get_cpl(v) == 3) || !(regs->eflags & X86_EFLAGS_AC));
             break;
         case SMAP_CHECK_ENABLED:
             smap = hvm_smap_enabled(v);
