@@ -28,7 +28,6 @@
 #include "xl_utils.h"
 
 extern int logfile;
-extern const char *common_domname;
 
 void dolog(const char *file, int line, const char *func, char *fmt, ...)
 {

@@ -210,6 +210,7 @@ int main_qemu_monitor_command(int argc, char **argv);
 
 void help(const char *command);
 
+extern const char *common_domname;
 extern struct cmd_spec cmd_table[];
 extern int cmdtable_len;
 /* Look up a command in the table, allowing unambiguous truncation */

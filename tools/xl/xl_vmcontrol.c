@@ -31,7 +31,6 @@
 #include "xl_parse.h"
 
 extern int logfile;
-extern const char *common_domname;
 
 static int fd_lock = -1;
 

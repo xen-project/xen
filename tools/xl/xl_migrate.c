@@ -30,8 +30,6 @@
 #include "xl_utils.h"
 #include "xl_parse.h"
 
-extern const char *common_domname;
-
 #ifndef LIBXL_HAVE_NO_SUSPEND_RESUME
 
 static pid_t create_migration_child(const char *rune, int *send_fd,

@@ -23,8 +23,6 @@
 #include "xl_utils.h"
 #include "xl_parse.h"
 
-extern const char *common_domname;
-
 static void button_press(uint32_t domid, const char *b)
 {
     libxl_trigger trigger;
