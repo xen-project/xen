@@ -646,9 +646,19 @@ static void sanitize_input(struct x86_emulate_ctxt *ctxt)
     }
 }
 
+int LLVMFuzzerInitialize(int *argc, char ***argv)
+{
+    if ( !emul_test_init() )
+    {
+        printf("Warning: Stack could not be made executable (%d).\n", errno);
+        return 1;
+    }
+
+    return 0;
+}
+
 int LLVMFuzzerTestOneInput(const uint8_t *data_p, size_t size)
 {
-    bool stack_exec;
     struct cpu_user_regs regs = {};
     struct x86_emulate_ctxt ctxt = {
         .regs = &regs,
@@ -656,13 +666,6 @@ int LLVMFuzzerTestOneInput(const uint8_t *data_p, size_t size)
         .sp_size = 8 * sizeof(void *),
     };
     int rc;
-
-    stack_exec = emul_test_init();
-    if ( !stack_exec )
-    {
-        printf("Warning: Stack could not be made executable (%d).\n", errno);
-        return 1;
-    }
 
     /* Reset all global state variables */
     memset(&input, 0, sizeof(input));

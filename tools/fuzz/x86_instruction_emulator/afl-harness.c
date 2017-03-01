@@ -5,6 +5,7 @@
 #include <string.h>
 #include <getopt.h>
 
+extern int LLVMFuzzerInitialize(int *argc, char ***argv);
 extern int LLVMFuzzerTestOneInput(const uint8_t *data_p, size_t size);
 extern unsigned int fuzz_minimal_input_size(void);
 
@@ -56,6 +57,9 @@ int main(int argc, char **argv)
         fp = stdin;
     else if ( optind != (argc - 1) )
         goto usage;
+
+    if ( LLVMFuzzerInitialize(&argc, &argv) )
+        exit(-1);
 
     if ( fp != stdin ) /* If not using stdin, open the provided file. */
     {
