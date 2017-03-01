@@ -98,6 +98,19 @@ static int debug_stack_lines = 40;
 
 integer_param("debug_stack_lines", debug_stack_lines);
 
+static enum {
+	TRAP,
+	NATIVE,
+} vwfi;
+
+static void __init parse_vwfi(const char *s)
+{
+	if ( !strcmp(s, "native") )
+		vwfi = NATIVE;
+	else
+		vwfi = TRAP;
+}
+custom_param("vwfi", parse_vwfi);
 
 void __cpuinit init_traps(void)
 {
@@ -124,8 +137,8 @@ void __cpuinit init_traps(void)
 
     /* Setup hypervisor traps */
     WRITE_SYSREG(HCR_PTW|HCR_BSU_INNER|HCR_AMO|HCR_IMO|HCR_FMO|HCR_VM|
-                 HCR_TWE|HCR_TWI|HCR_TSC|HCR_TAC|HCR_SWIO|HCR_TIDCP|HCR_FB,
-                 HCR_EL2);
+                 (vwfi != NATIVE ? (HCR_TWI|HCR_TWE) : 0) |
+                 HCR_TSC|HCR_TAC|HCR_SWIO|HCR_TIDCP|HCR_FB,HCR_EL2);
     isb();
 }
 
