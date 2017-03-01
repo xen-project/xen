@@ -31,6 +31,10 @@
 
 #include "private.h"
 
+#ifndef O_CLOEXEC
+#define O_CLOEXEC 0
+#endif
+
 int osdep_xendevicemodel_open(xendevicemodel_handle *dmod)
 {
     int fd = open("/dev/xen/privcmd", O_RDWR | O_CLOEXEC);
