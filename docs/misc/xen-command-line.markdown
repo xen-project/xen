@@ -1619,6 +1619,21 @@ Note that if **watchdog** option is also specified vpmu will be turned off.
 As the virtualisation is not 100% safe, don't use the vpmu flag on
 production systems (see http://xenbits.xen.org/xsa/advisory-163.html)!
 
+### vwfi
+> `= trap | native
+
+> Default: `trap`
+
+WFI is the ARM instruction to "wait for interrupt". WFE is similar and
+means "wait for event". This option, which is ARM specific, changes the
+way guest WFI and WFE are implemented in Xen. By default, Xen traps both
+instructions. In the case of WFI, Xen blocks the guest vcpu; in the case
+of WFE, Xen yield the guest vcpu. When setting vwfi to `native`, Xen
+doesn't trap either instruction, running them in guest context. Setting
+vwfi to `native` reduces irq latency significantly. It can also lead to
+suboptimal scheduling decisions, but only when the system is
+oversubscribed (i.e., in total there are more vCPUs than pCPUs).
+
 ### watchdog
 > `= force | <boolean>`
 
