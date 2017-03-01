@@ -504,12 +504,15 @@ void smt_idle_mask_set(unsigned int cpu, const cpumask_t *idlers,
 }
 
 /*
- * Clear the bits of all the siblings of cpu from mask.
+ * Clear the bits of all the siblings of cpu from mask (if necessary).
  */
 static inline
 void smt_idle_mask_clear(unsigned int cpu, cpumask_t *mask)
 {
-    cpumask_andnot(mask, mask, per_cpu(cpu_sibling_mask, cpu));
+    const cpumask_t *cpu_siblings = per_cpu(cpu_sibling_mask, cpu);
+
+    if ( cpumask_subset(cpu_siblings, mask) )
+        cpumask_andnot(mask, mask, per_cpu(cpu_sibling_mask, cpu));
 }
 
 /*
@@ -913,6 +916,14 @@ __runq_remove(struct csched2_vcpu *svc)
 
 void burn_credits(struct csched2_runqueue_data *rqd, struct csched2_vcpu *, s_time_t);
 
+static inline void
+tickle_cpu(unsigned int cpu, struct csched2_runqueue_data *rqd)
+{
+    __cpumask_set_cpu(cpu, &rqd->tickled);
+    smt_idle_mask_clear(cpu, &rqd->smt_idle);
+    cpu_raise_softirq(cpu, SCHEDULE_SOFTIRQ);
+}
+
 /*
  * Check what processor it is best to 'wake', for picking up a vcpu that has
  * just been put (back) in the runqueue. Logic is as follows:
@@ -1080,9 +1091,8 @@ runq_tickle(const struct scheduler *ops, struct csched2_vcpu *new, s_time_t now)
                     sizeof(d),
                     (unsigned char *)&d);
     }
-    __cpumask_set_cpu(ipid, &rqd->tickled);
-    smt_idle_mask_clear(ipid, &rqd->smt_idle);
-    cpu_raise_softirq(ipid, SCHEDULE_SOFTIRQ);
+
+    tickle_cpu(ipid, rqd);
 
     if ( unlikely(new->tickled_cpu != -1) )
         SCHED_STAT_CRANK(tickled_cpu_overwritten);
@@ -1395,7 +1405,9 @@ csched2_vcpu_sleep(const struct scheduler *ops, struct vcpu *vc)
     SCHED_STAT_CRANK(vcpu_sleep);
 
     if ( curr_on_cpu(vc->processor) == vc )
-        cpu_raise_softirq(vc->processor, SCHEDULE_SOFTIRQ);
+    {
+        tickle_cpu(vc->processor, svc->rqd);
+    }
     else if ( __vcpu_on_runq(svc) )
     {
         ASSERT(svc->rqd == RQD(ops, vc->processor));
@@ -1718,8 +1730,8 @@ static void migrate(const struct scheduler *ops,
         svc->migrate_rqd = trqd;
         __set_bit(_VPF_migrating, &svc->vcpu->pause_flags);
         __set_bit(__CSFLAG_runq_migrate_request, &svc->flags);
-        cpu_raise_softirq(cpu, SCHEDULE_SOFTIRQ);
         SCHED_STAT_CRANK(migrate_requested);
+        tickle_cpu(cpu, svc->rqd);
     }
     else
     {
