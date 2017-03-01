@@ -1172,10 +1172,6 @@ static int svm_vcpu_initialise(struct vcpu *v)
         return rc;
     }
 
-    /* PVH's VPMU is initialized via hypercall */
-    if ( has_vlapic(v->domain) )
-        vpmu_initialise(v);
-
     svm_guest_osvw_init(v);
 
     return 0;
@@ -1183,7 +1179,6 @@ static int svm_vcpu_initialise(struct vcpu *v)
 
 static void svm_vcpu_destroy(struct vcpu *v)
 {
-    vpmu_destroy(v);
     svm_destroy_vmcb(v);
     passive_domain_destroy(v);
 }

@@ -332,10 +332,6 @@ static int vmx_vcpu_initialise(struct vcpu *v)
         }
     }
 
-    /* PVH's VPMU is initialized via hypercall */
-    if ( has_vlapic(v->domain) )
-        vpmu_initialise(v);
-
     vmx_install_vlapic_mapping(v);
 
     /* %eax == 1 signals full real-mode support to the guest loader. */
@@ -356,7 +352,6 @@ static void vmx_vcpu_destroy(struct vcpu *v)
      */
     vmx_vcpu_disable_pml(v);
     vmx_destroy_vmcs(v);
-    vpmu_destroy(v);
     passive_domain_destroy(v);
 }
 

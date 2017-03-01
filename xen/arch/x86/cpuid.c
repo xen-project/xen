@@ -591,7 +591,7 @@ static void pv_cpuid(uint32_t leaf, uint32_t subleaf, struct cpuid_leaf *res)
     {
     case 0x0000000a: /* Architectural Performance Monitor Features (Intel) */
         if ( boot_cpu_data.x86_vendor != X86_VENDOR_INTEL ||
-             !vpmu_enabled(curr) )
+             !vpmu_available(curr) )
             goto unsupported;
 
         /* Report at most version 3 since that's all we currently emulate. */
@@ -629,7 +629,7 @@ static void hvm_cpuid(uint32_t leaf, uint32_t subleaf, struct cpuid_leaf *res)
         break;
 
     case 0x0000000a: /* Architectural Performance Monitor Features (Intel) */
-        if ( boot_cpu_data.x86_vendor != X86_VENDOR_INTEL || !vpmu_enabled(v) )
+        if ( boot_cpu_data.x86_vendor != X86_VENDOR_INTEL || !vpmu_available(v) )
         {
             *res = EMPTY_LEAF;
             break;
@@ -752,7 +752,7 @@ void guest_cpuid(const struct vcpu *v, uint32_t leaf,
         res->b |= (v->vcpu_id * 2) << 24;
 
         /* TODO: Rework vPMU control in terms of toolstack choices. */
-        if ( vpmu_enabled(v) &&
+        if ( vpmu_available(v) &&
              vpmu_is_set(vcpu_vpmu(v), VPMU_CPU_HAS_DS) )
         {
             res->d |= cpufeat_mask(X86_FEATURE_DS);

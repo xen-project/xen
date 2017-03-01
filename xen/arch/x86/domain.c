@@ -471,6 +471,8 @@ int vcpu_initialise(struct vcpu *v)
         if ( is_pv_domain(d) )
             xfree(v->arch.pv_vcpu.trap_ctxt);
     }
+    else if ( !is_idle_domain(v->domain) )
+        vpmu_initialise(v);
 
     return rc;
 }
@@ -487,6 +489,9 @@ void vcpu_destroy(struct vcpu *v)
     }
 
     vcpu_destroy_fpu(v);
+
+    if ( !is_idle_domain(v->domain) )
+        vpmu_destroy(v);
 
     if ( has_hvm_container_vcpu(v) )
         hvm_vcpu_destroy(v);

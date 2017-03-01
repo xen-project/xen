@@ -25,7 +25,7 @@
 
 #define vcpu_vpmu(vcpu)   (&(vcpu)->arch.vpmu)
 #define vpmu_vcpu(vpmu)   container_of((vpmu), struct vcpu, arch.vpmu)
-#define vpmu_enabled(vcpu) vpmu_is_set(vcpu_vpmu(vcpu), VPMU_CONTEXT_ALLOCATED)
+#define vpmu_available(vcpu) vpmu_is_set(vcpu_vpmu(vcpu), VPMU_AVAILABLE)
 
 #define MSR_TYPE_COUNTER            0
 #define MSR_TYPE_CTRL               1
@@ -74,6 +74,7 @@ struct vpmu_struct {
 #define VPMU_PASSIVE_DOMAIN_ALLOCATED       0x20
 /* PV(H) guests: VPMU registers are accessed by guest from shared page */
 #define VPMU_CACHED                         0x40
+#define VPMU_AVAILABLE                      0x80
 
 /* Intel-specific VPMU features */
 #define VPMU_CPU_HAS_DS                     0x100 /* Has Debug Store */
@@ -89,7 +90,8 @@ static inline void vpmu_reset(struct vpmu_struct *vpmu, const u32 mask)
 }
 static inline void vpmu_clear(struct vpmu_struct *vpmu)
 {
-    vpmu->flags = 0;
+    /* VPMU_AVAILABLE should be altered by get/put_vpmu(). */
+    vpmu->flags &= VPMU_AVAILABLE;
 }
 static inline bool_t vpmu_is_set(const struct vpmu_struct *vpmu, const u32 mask)
 {
