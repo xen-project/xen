@@ -45,7 +45,7 @@ distclean: clean
 
 .PHONY: clean
 clean:
-	rm -f *.a *.o *-x86-insn-emulator-fuzzer
+	rm -f *.a *.o .*.d *-x86-insn-emulator-fuzzer
 
 .PHONY: install
 install: all

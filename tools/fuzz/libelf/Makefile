@@ -30,7 +30,7 @@ distclean: clean
 
 .PHONY: clean
 clean:
-	rm -f *.o *.a *-libelf-fuzzer
+	rm -f *.o .*.d *.a *-libelf-fuzzer
 
 .PHONY: install
 install: all
