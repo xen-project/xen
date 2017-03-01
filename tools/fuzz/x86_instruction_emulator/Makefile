@@ -1,11 +1,11 @@
 XEN_ROOT=$(CURDIR)/../../..
 include $(XEN_ROOT)/tools/Rules.mk
 
-.PHONY: x86-instruction-emulator-fuzzer-all
+.PHONY: x86-insn-fuzz-all
 ifeq ($(CONFIG_X86_64),y)
-x86-instruction-emulator-fuzzer-all: x86-insn-emulator.a x86-insn-emulator-fuzzer.o afl
+x86-insn-fuzz-all: x86-insn-fuzzer.a fuzz-emul.o afl
 else
-x86-instruction-emulator-fuzzer-all:
+x86-insn-fuzz-all:
 endif
 
 x86_emulate:
@@ -28,17 +28,17 @@ x86_emulate.h := x86_emulate.h x86_emulate/x86_emulate.h $(x86.h)
 
 x86_emulate.o: x86_emulate.c x86_emulate/x86_emulate.c $(x86_emulate.h)
 
-x86-insn-emulator-fuzzer.o: $(x86_emulate.h)
+fuzz-emul.o: $(x86_emulate.h)
 
-x86-insn-emulator.a: x86-insn-emulator-fuzzer.o x86_emulate.o
+x86-insn-fuzzer.a: fuzz-emul.o x86_emulate.o
 	$(AR) rc $@ $^
 
-afl-x86-insn-emulator-fuzzer: afl-x86-insn-emulator-fuzzer.o x86-insn-emulator-fuzzer.o x86_emulate.o
+afl-harness: afl-harness.o fuzz-emul.o x86_emulate.o
 	$(CC) $(CFLAGS) $^ -o $@
 
 # Common targets
 .PHONY: all
-all: x86-instruction-emulator-fuzzer-all
+all: x86-insn-fuzz-all
 
 .PHONY: distclean
 distclean: clean
@@ -46,10 +46,10 @@ distclean: clean
 
 .PHONY: clean
 clean:
-	rm -f *.a *.o .*.d *-x86-insn-emulator-fuzzer
+	rm -f *.a *.o .*.d afl-harness
 
 .PHONY: install
 install: all
 
 .PHONY: afl
-afl: afl-x86-insn-emulator-fuzzer
+afl: afl-harness

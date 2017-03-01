@@ -158,7 +158,7 @@ tools/flask/utils/flask-label-pci
 tools/fuzz/libelf/afl-libelf-fuzzer
 tools/fuzz/x86_instruction_emulator/asm
 tools/fuzz/x86_instruction_emulator/x86_emulate*
-tools/fuzz/x86_instruction_emulator/afl-x86-insn-emulator-fuzzer
+tools/fuzz/x86_instruction_emulator/afl-harness
 tools/helpers/_paths.h
 tools/helpers/init-xenstore-domain
 tools/helpers/xen-init-dom0
