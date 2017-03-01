@@ -4156,7 +4156,7 @@ static int hvmop_set_param(
          * Remove the check below once we have
          * shadow-on-shadow.
          */
-        if ( cpu_has_svm && !paging_mode_hap(d) && a.value )
+        if ( !paging_mode_hap(d) && a.value )
             rc = -EINVAL;
         if ( a.value &&
              d->arch.hvm_domain.params[HVM_PARAM_ALTP2M] )
