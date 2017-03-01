@@ -13,7 +13,7 @@ $(ELF_LIB_OBJS): CFLAGS += -DFUZZ_NO_LIBXC $(CFLAGS_xeninclude)
 
 libelf-fuzzer.o: CFLAGS += $(CFLAGS_xeninclude)
 
-libelf.a: $(ELF_LIB_OBJS)
+libelf.a: libelf-fuzzer.o $(ELF_LIB_OBJS)
 	$(AR) rc $@ $^
 
 .PHONY: libelf-fuzzer-all
