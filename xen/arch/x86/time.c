@@ -991,17 +991,18 @@ bool_t update_secondary_system_time(struct vcpu *v,
                                     struct vcpu_time_info *u)
 {
     XEN_GUEST_HANDLE(vcpu_time_info_t) user_u = v->arch.time_info_guest;
-    smap_check_policy_t saved_policy;
+    struct guest_memory_policy policy =
+        { .smap_policy = SMAP_CHECK_ENABLED, .nested_guest_mode = false };
 
     if ( guest_handle_is_null(user_u) )
         return 1;
 
-    saved_policy = smap_policy_change(v, SMAP_CHECK_ENABLED);
+    update_guest_memory_policy(v, &policy);
 
     /* 1. Update userspace version. */
     if ( __copy_field_to_guest(user_u, u, version) == sizeof(u->version) )
     {
-        smap_policy_change(v, saved_policy);
+        update_guest_memory_policy(v, &policy);
         return 0;
     }
     wmb();
@@ -1012,7 +1013,7 @@ bool_t update_secondary_system_time(struct vcpu *v,
     u->version = version_update_end(u->version);
     __copy_field_to_guest(user_u, u, version);
 
-    smap_policy_change(v, saved_policy);
+    update_guest_memory_policy(v, &policy);
 
     return 1;
 }

@@ -578,8 +578,14 @@ struct arch_vcpu
     } monitor;
 };
 
-smap_check_policy_t smap_policy_change(struct vcpu *v,
-                                       smap_check_policy_t new_policy);
+struct guest_memory_policy
+{
+    smap_check_policy_t smap_policy;
+    bool nested_guest_mode;
+};
+
+void update_guest_memory_policy(struct vcpu *v,
+                                struct guest_memory_policy *policy);
 
 /* Shorthands to improve code legibility. */
 #define hvm_vmx         hvm_vcpu.u.vmx

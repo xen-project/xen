@@ -50,6 +50,7 @@
 #include <asm/mpspec.h>
 #include <asm/ldt.h>
 #include <asm/hvm/hvm.h>
+#include <asm/hvm/nestedhvm.h>
 #include <asm/hvm/support.h>
 #include <asm/hvm/viridian.h>
 #include <asm/debugreg.h>
@@ -200,12 +201,33 @@ void dump_pageframe_info(struct domain *d)
     spin_unlock(&d->page_alloc_lock);
 }
 
-smap_check_policy_t smap_policy_change(struct vcpu *v,
-    smap_check_policy_t new_policy)
+void update_guest_memory_policy(struct vcpu *v,
+                                struct guest_memory_policy *policy)
 {
-    smap_check_policy_t old_policy = v->arch.smap_check_policy;
-    v->arch.smap_check_policy = new_policy;
-    return old_policy;
+    smap_check_policy_t old_smap_policy = v->arch.smap_check_policy;
+    bool old_guest_mode = nestedhvm_is_n2(v);
+    bool new_guest_mode = policy->nested_guest_mode;
+
+    v->arch.smap_check_policy = policy->smap_policy;
+    policy->smap_policy = old_smap_policy;
+
+    /*
+     * When 'v' is in the nested guest mode, all guest copy
+     * functions/macros which finally call paging_gva_to_gfn()
+     * transfer data to/from L2 guest. If the copy is intended for L1
+     * guest, we must first clear the nested guest flag (by setting
+     * policy->nested_guest_mode to false) before the copy and then
+     * restore the nested guest flag (by setting
+     * policy->nested_guest_mode to true) after the copy.
+     */
+    if ( unlikely(old_guest_mode != new_guest_mode) )
+    {
+        if ( new_guest_mode )
+            nestedhvm_vcpu_enter_guestmode(v);
+        else
+            nestedhvm_vcpu_exit_guestmode(v);
+        policy->nested_guest_mode = old_guest_mode;
+    }
 }
 
 #ifndef CONFIG_BIGMEM
@@ -1929,13 +1951,14 @@ static void paravirt_ctxt_switch_to(struct vcpu *v)
 bool_t update_runstate_area(struct vcpu *v)
 {
     bool_t rc;
-    smap_check_policy_t smap_policy;
+    struct guest_memory_policy policy =
+        { .smap_policy = SMAP_CHECK_ENABLED, .nested_guest_mode = false };
     void __user *guest_handle = NULL;
 
     if ( guest_handle_is_null(runstate_guest(v)) )
         return 1;
 
-    smap_policy = smap_policy_change(v, SMAP_CHECK_ENABLED);
+    update_guest_memory_policy(v, &policy);
 
     if ( VM_ASSIST(v->domain, runstate_update_flag) )
     {
@@ -1969,7 +1992,7 @@ bool_t update_runstate_area(struct vcpu *v)
                             (void *)(&v->runstate.state_entry_time + 1) - 1, 1);
     }
 
-    smap_policy_change(v, smap_policy);
+    update_guest_memory_policy(v, &policy);
 
     return rc;
 }
