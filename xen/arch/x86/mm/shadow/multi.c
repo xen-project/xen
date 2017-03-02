@@ -3727,30 +3727,30 @@ sh_gva_to_gfn(struct vcpu *v, struct p2m_domain *p2m,
 
 #if (SHADOW_OPTIMIZATIONS & SHOPT_VIRTUAL_TLB)
     /* Check the vTLB cache first */
-    unsigned long vtlb_gfn = vtlb_lookup(v, va, pfec[0]);
+    unsigned long vtlb_gfn = vtlb_lookup(v, va, *pfec);
     if ( VALID_GFN(vtlb_gfn) )
         return vtlb_gfn;
 #endif /* (SHADOW_OPTIMIZATIONS & SHOPT_VIRTUAL_TLB) */
 
-    if ( (missing = sh_walk_guest_tables(v, va, &gw, pfec[0])) != 0 )
+    if ( (missing = sh_walk_guest_tables(v, va, &gw, *pfec)) != 0 )
     {
         if ( (missing & _PAGE_PRESENT) )
-            pfec[0] &= ~PFEC_page_present;
+            *pfec &= ~PFEC_page_present;
         if ( missing & _PAGE_INVALID_BITS )
-            pfec[0] |= PFEC_reserved_bit;
+            *pfec |= PFEC_reserved_bit;
         /*
          * SDM Intel 64 Volume 3, Chapter Paging, PAGE-FAULT EXCEPTIONS:
          * The PFEC_insn_fetch flag is set only when NX or SMEP are enabled.
          */
         if ( is_hvm_vcpu(v) && !hvm_nx_enabled(v) && !hvm_smep_enabled(v) )
-            pfec[0] &= ~PFEC_insn_fetch;
+            *pfec &= ~PFEC_insn_fetch;
         return gfn_x(INVALID_GFN);
     }
     gfn = guest_walk_to_gfn(&gw);
 
 #if (SHADOW_OPTIMIZATIONS & SHOPT_VIRTUAL_TLB)
     /* Remember this successful VA->GFN translation for later. */
-    vtlb_insert(v, va >> PAGE_SHIFT, gfn_x(gfn), pfec[0]);
+    vtlb_insert(v, va >> PAGE_SHIFT, gfn_x(gfn), *pfec);
 #endif /* (SHADOW_OPTIMIZATIONS & SHOPT_VIRTUAL_TLB) */
 
     return gfn_x(gfn);
