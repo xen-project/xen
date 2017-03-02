@@ -117,6 +117,16 @@ static int fuzz_insn_fetch(
     unsigned int bytes,
     struct x86_emulate_ctxt *ctxt)
 {
+    /*
+     * Zero-length instruction fetches are made at the destination of jumps,
+     * to perform segmentation checks.  No data needs returning.
+     */
+    if ( bytes == 0 )
+    {
+        assert(p_data == NULL);
+        return maybe_fail("insn_fetch", true);
+    }
+
     return data_read("insn_fetch", p_data, bytes);
 }
 
