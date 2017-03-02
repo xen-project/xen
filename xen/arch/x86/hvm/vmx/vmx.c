@@ -549,7 +549,7 @@ int vmx_guest_x86_mode(struct vcpu *v)
 
     if ( unlikely(!(v->arch.hvm_vcpu.guest_cr[0] & X86_CR0_PE)) )
         return 0;
-    if ( unlikely(guest_cpu_user_regs()->_eflags & X86_EFLAGS_VM) )
+    if ( unlikely(guest_cpu_user_regs()->eflags & X86_EFLAGS_VM) )
         return 1;
     __vmread(GUEST_CS_AR_BYTES, &cs_ar_bytes);
     if ( hvm_long_mode_enabled(v) &&
@@ -1670,7 +1670,7 @@ static void vmx_inject_event(const struct x86_event *event)
     switch ( _event.vector | -(_event.type == X86_EVENTTYPE_SW_INTERRUPT) )
     {
     case TRAP_debug:
-        if ( guest_cpu_user_regs()->_eflags & X86_EFLAGS_TF )
+        if ( guest_cpu_user_regs()->eflags & X86_EFLAGS_TF )
         {
             __restore_debug_registers(curr);
             write_debugreg(6, read_debugreg(6) | DR_STEP);
@@ -1770,7 +1770,7 @@ static void vmx_set_info_guest(struct vcpu *v)
      */
     __vmread(GUEST_INTERRUPTIBILITY_INFO, &intr_shadow);
     if ( v->domain->debugger_attached &&
-         (v->arch.user_regs._eflags & X86_EFLAGS_TF) &&
+         (v->arch.user_regs.eflags & X86_EFLAGS_TF) &&
          (intr_shadow & VMX_INTR_SHADOW_STI) )
     {
         intr_shadow &= ~VMX_INTR_SHADOW_STI;
@@ -2012,8 +2012,8 @@ static int vmx_vcpu_emulate_vmfunc(const struct cpu_user_regs *regs)
     struct vcpu *curr = current;
 
     if ( !cpu_has_vmx_vmfunc && altp2m_active(curr->domain) &&
-         regs->_eax == 0 &&
-         p2m_switch_vcpu_altp2m_by_id(curr, regs->_ecx) )
+         regs->eax == 0 &&
+         p2m_switch_vcpu_altp2m_by_id(curr, regs->ecx) )
         rc = X86EMUL_OKAY;
 
     return rc;
@@ -2336,7 +2336,7 @@ void update_guest_eip(void)
     unsigned long x;
 
     regs->rip += get_instruction_length(); /* Safe: callers audited */
-    regs->_eflags &= ~X86_EFLAGS_RF;
+    regs->eflags &= ~X86_EFLAGS_RF;
 
     __vmread(GUEST_INTERRUPTIBILITY_INFO, &x);
     if ( x & (VMX_INTR_SHADOW_STI | VMX_INTR_SHADOW_MOV_SS) )
@@ -2345,7 +2345,7 @@ void update_guest_eip(void)
         __vmwrite(GUEST_INTERRUPTIBILITY_INFO, x);
     }
 
-    if ( regs->_eflags & X86_EFLAGS_TF )
+    if ( regs->eflags & X86_EFLAGS_TF )
         hvm_inject_hw_exception(TRAP_debug, X86_EVENT_NO_EC);
 }
 
@@ -2366,7 +2366,7 @@ static void vmx_fpu_dirty_intercept(void)
 static int vmx_do_cpuid(struct cpu_user_regs *regs)
 {
     struct vcpu *curr = current;
-    uint32_t leaf = regs->_eax, subleaf = regs->_ecx;
+    uint32_t leaf = regs->eax, subleaf = regs->ecx;
     struct cpuid_leaf res;
 
     if ( hvm_check_cpuid_faulting(current) )
@@ -3159,8 +3159,8 @@ void vmx_enter_realmode(struct cpu_user_regs *regs)
     /* Adjust RFLAGS to enter virtual 8086 mode with IOPL == 3.  Since
      * we have CR4.VME == 1 and our own TSS with an empty interrupt
      * redirection bitmap, all software INTs will be handled by vm86 */
-    v->arch.hvm_vmx.vm86_saved_eflags = regs->_eflags;
-    regs->_eflags |= (X86_EFLAGS_VM | X86_EFLAGS_IOPL);
+    v->arch.hvm_vmx.vm86_saved_eflags = regs->eflags;
+    regs->eflags |= (X86_EFLAGS_VM | X86_EFLAGS_IOPL);
 }
 
 static int vmx_handle_eoi_write(void)
@@ -3302,10 +3302,10 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
 
     if ( hvm_long_mode_enabled(v) )
         HVMTRACE_ND(VMEXIT64, 0, 1/*cycles*/, 3, exit_reason,
-                    regs->_eip, regs->rip >> 32, 0, 0, 0);
+                    regs->eip, regs->rip >> 32, 0, 0, 0);
     else
         HVMTRACE_ND(VMEXIT, 0, 1/*cycles*/, 2, exit_reason,
-                    regs->_eip, 0, 0, 0, 0);
+                    regs->eip, 0, 0, 0, 0);
 
     perfc_incra(vmexits, exit_reason);
 
@@ -3390,8 +3390,8 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
     if ( v->arch.hvm_vmx.vmx_realmode )
     {
         /* Put RFLAGS back the way the guest wants it */
-        regs->_eflags &= ~(X86_EFLAGS_VM | X86_EFLAGS_IOPL);
-        regs->_eflags |= (v->arch.hvm_vmx.vm86_saved_eflags & X86_EFLAGS_IOPL);
+        regs->eflags &= ~(X86_EFLAGS_VM | X86_EFLAGS_IOPL);
+        regs->eflags |= (v->arch.hvm_vmx.vm86_saved_eflags & X86_EFLAGS_IOPL);
 
         /* Unless this exit was for an interrupt, we've hit something
          * vm86 can't handle.  Try again, using the emulator. */
@@ -3636,7 +3636,7 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
     }
     case EXIT_REASON_HLT:
         update_guest_eip(); /* Safe: HLT */
-        hvm_hlt(regs->_eflags);
+        hvm_hlt(regs->eflags);
         break;
     case EXIT_REASON_INVLPG:
         update_guest_eip(); /* Safe: INVLPG */
@@ -3652,7 +3652,7 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
         break;
 
     case EXIT_REASON_VMCALL:
-        HVMTRACE_1D(VMMCALL, regs->_eax);
+        HVMTRACE_1D(VMMCALL, regs->eax);
 
         if ( hvm_hypercall(regs) == HVM_HCALL_completed )
             update_guest_eip(); /* Safe: VMCALL */
@@ -3673,7 +3673,7 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
     {
         uint64_t msr_content = 0;
 
-        switch ( hvm_msr_read_intercept(regs->_ecx, &msr_content) )
+        switch ( hvm_msr_read_intercept(regs->ecx, &msr_content) )
         {
         case X86EMUL_OKAY:
             msr_split(regs, msr_content);
@@ -3688,7 +3688,7 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
     }
 
     case EXIT_REASON_MSR_WRITE:
-        switch ( hvm_msr_write_intercept(regs->_ecx, msr_fold(regs), 1) )
+        switch ( hvm_msr_write_intercept(regs->ecx, msr_fold(regs), 1) )
         {
         case X86EMUL_OKAY:
             update_guest_eip(); /* Safe: WRMSR */
@@ -3859,7 +3859,7 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
         break;
 
     case EXIT_REASON_XSETBV:
-        if ( hvm_handle_xsetbv(regs->_ecx, msr_fold(regs)) == 0 )
+        if ( hvm_handle_xsetbv(regs->ecx, msr_fold(regs)) == 0 )
             update_guest_eip(); /* Safe: XSETBV */
         break;
 
@@ -3912,7 +3912,7 @@ out:
      */
     mode = vmx_guest_x86_mode(v);
     if ( mode == 8 ? !is_canonical_address(regs->rip)
-                   : regs->rip != regs->_eip )
+                   : regs->rip != regs->eip )
     {
         gprintk(XENLOG_WARNING, "Bad rIP %lx for mode %u\n", regs->rip, mode);
 
@@ -3926,7 +3926,7 @@ out:
                 regs->rip = (long)(regs->rip << (64 - VADDR_BITS)) >>
                             (64 - VADDR_BITS);
             else
-                regs->rip = regs->_eip;
+                regs->rip = regs->eip;
         }
         else
             domain_crash(v->domain);

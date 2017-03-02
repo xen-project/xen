@@ -499,23 +499,23 @@ gp_fault:
 
 static void vmsucceed(struct cpu_user_regs *regs)
 {
-    regs->_eflags &= ~X86_EFLAGS_ARITH_MASK;
+    regs->eflags &= ~X86_EFLAGS_ARITH_MASK;
 }
 
 static void vmfail_valid(struct cpu_user_regs *regs, enum vmx_insn_errno errno)
 {
     struct vcpu *v = current;
-    unsigned int eflags = regs->_eflags;
+    unsigned int eflags = regs->eflags;
 
-    regs->_eflags = (eflags & ~X86_EFLAGS_ARITH_MASK) | X86_EFLAGS_ZF;
+    regs->eflags = (eflags & ~X86_EFLAGS_ARITH_MASK) | X86_EFLAGS_ZF;
     set_vvmcs(v, VM_INSTRUCTION_ERROR, errno);
 }
 
 static void vmfail_invalid(struct cpu_user_regs *regs)
 {
-    unsigned int eflags = regs->_eflags;
+    unsigned int eflags = regs->eflags;
 
-    regs->_eflags = (eflags & ~X86_EFLAGS_ARITH_MASK) | X86_EFLAGS_CF;
+    regs->eflags = (eflags & ~X86_EFLAGS_ARITH_MASK) | X86_EFLAGS_CF;
 }
 
 static void vmfail(struct cpu_user_regs *regs, enum vmx_insn_errno errno)
@@ -2244,7 +2244,7 @@ int nvmx_n2_vmexit_handler(struct cpu_user_regs *regs,
         ctrl = __n2_exec_control(v);
         if ( ctrl & CPU_BASED_ACTIVATE_MSR_BITMAP )
         {
-            status = vmx_check_msr_bitmap(nvmx->msrbitmap, regs->_ecx,
+            status = vmx_check_msr_bitmap(nvmx->msrbitmap, regs->ecx,
                          !!(exit_reason == EXIT_REASON_MSR_WRITE));
             if ( status )
                 nvcpu->nv_vmexit_pending = 1;

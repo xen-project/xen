@@ -71,7 +71,7 @@ static void realmode_deliver_exception(
 
     /* We can't test hvmemul_ctxt->ctxt.sp_size: it may not be initialised. */
     if ( hvmemul_ctxt->seg_reg[x86_seg_ss].attr.fields.db )
-        pstk = regs->_esp -= 6;
+        pstk = regs->esp -= 6;
     else
         pstk = regs->sp -= 6;
 
@@ -81,7 +81,7 @@ static void realmode_deliver_exception(
     csr->sel  = cs_eip >> 16;
     csr->base = (uint32_t)csr->sel << 4;
     regs->ip = (uint16_t)cs_eip;
-    regs->_eflags &= ~(X86_EFLAGS_TF | X86_EFLAGS_IF | X86_EFLAGS_RF);
+    regs->eflags &= ~(X86_EFLAGS_TF | X86_EFLAGS_IF | X86_EFLAGS_RF);
 
     /* Exception delivery clears STI and MOV-SS blocking. */
     if ( hvmemul_ctxt->intr_shadow &
