@@ -59,7 +59,7 @@ const uint32_t gw_page_flags[] = {
 static uint32_t mandatory_flags(struct vcpu *v, uint32_t pfec) 
 {
     /* Don't demand not-NX if the CPU wouldn't enforce it. */
-    if ( !guest_supports_nx(v) )
+    if ( !guest_nx_enabled(v) )
         pfec &= ~PFEC_insn_fetch;
 
     /* Don't demand R/W if the CPU wouldn't enforce it. */
@@ -272,7 +272,7 @@ guest_walk_tables(struct vcpu *v, struct p2m_domain *p2m,
             /* _PAGE_PSE_PAT not set: remove _PAGE_PAT from flags. */
             flags &= ~_PAGE_PAT;
 
-        if ( !guest_supports_1G_superpages(v) )
+        if ( !guest_can_use_l3_superpages(d) )
             rc |= _PAGE_PSE | _PAGE_INVALID_BIT;
         if ( gfn_x(start) & GUEST_L3_GFN_MASK & ~0x1 )
             rc |= _PAGE_INVALID_BITS;
@@ -326,7 +326,7 @@ guest_walk_tables(struct vcpu *v, struct p2m_domain *p2m,
     }
     rc |= ((gflags & mflags) ^ mflags);
 
-    pse2M = (gflags & _PAGE_PSE) && guest_supports_superpages(v); 
+    pse2M = (gflags & _PAGE_PSE) && guest_can_use_l2_superpages(v);
 
     if ( pse2M )
     {

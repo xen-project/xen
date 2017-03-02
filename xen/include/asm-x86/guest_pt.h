@@ -2,7 +2,7 @@
  * xen/asm-x86/guest_pt.h
  *
  * Types and accessors for guest pagetable entries, as distinct from
- * Xen's pagetable types. 
+ * Xen's pagetable types.
  *
  * Users must #define GUEST_PAGING_LEVELS to 2, 3 or 4 before including
  * this file.
@@ -10,17 +10,17 @@
  * Parts of this code are Copyright (c) 2006 by XenSource Inc.
  * Parts of this code are Copyright (c) 2006 by Michael A Fetterman
  * Parts based on earlier work by Michael A Fetterman, Ian Pratt et al.
- * 
+ *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; If not, see <http://www.gnu.org/licenses/>.
  */
@@ -168,33 +168,43 @@ static inline guest_l4e_t guest_l4e_from_gfn(gfn_t gfn, u32 flags)
 
 /* Which pagetable features are supported on this vcpu? */
 
-static inline int
-guest_supports_superpages(struct vcpu *v)
+static inline bool guest_can_use_l2_superpages(const struct vcpu *v)
 {
-    /* The _PAGE_PSE bit must be honoured in HVM guests, whenever
-     * CR4.PSE is set or the guest is in PAE or long mode. 
-     * It's also used in the dummy PT for vcpus with CR4.PG cleared. */
+    /*
+     * The L2 _PAGE_PSE bit must be honoured in HVM guests, whenever
+     * CR4.PSE is set or the guest is in PAE or long mode.
+     * It's also used in the dummy PT for vcpus with CR0.PG cleared.
+     */
     return (is_pv_vcpu(v)
             ? opt_allow_superpage
-            : (GUEST_PAGING_LEVELS != 2 
+            : (GUEST_PAGING_LEVELS != 2
                || !hvm_paging_enabled(v)
                || (v->arch.hvm_vcpu.guest_cr[4] & X86_CR4_PSE)));
 }
 
-static inline int
-guest_supports_1G_superpages(struct vcpu *v)
+static inline bool guest_can_use_l3_superpages(const struct domain *d)
 {
-    return (GUEST_PAGING_LEVELS >= 4 && hvm_pse1gb_supported(v->domain));
+    /*
+     * There are no control register settings for the hardware pagewalk on the
+     * subject of 1G superpages.
+     *
+     * Shadow pagetables don't support 1GB superpages at all, and will always
+     * treat L3 _PAGE_PSE as reserved.
+     *
+     * With HAP however, if the guest constructs a 1GB superpage on capable
+     * hardware, it will function irrespective of whether the feature is
+     * advertised.  Xen's model of performing a pagewalk should match.
+     */
+    return GUEST_PAGING_LEVELS >= 4 && paging_mode_hap(d) && cpu_has_page1gb;
 }
 
-static inline int
-guest_supports_nx(struct vcpu *v)
+static inline bool guest_nx_enabled(const struct vcpu *v)
 {
-    if ( GUEST_PAGING_LEVELS == 2 || !cpu_has_nx )
-        return 0;
-    if ( is_pv_vcpu(v) )
-        return cpu_has_nx;
-    return hvm_nx_enabled(v);
+    if ( GUEST_PAGING_LEVELS == 2 ) /* NX has no effect witout CR4.PAE. */
+        return false;
+
+    /* PV guests can't control EFER.NX, and inherits Xen's choice. */
+    return is_pv_vcpu(v) ? cpu_has_nx : hvm_nx_enabled(v);
 }
 
 
@@ -258,11 +268,11 @@ static inline paddr_t guest_walk_to_gpa(const walk_t *gw)
     return (gfn_x(gfn) << PAGE_SHIFT) | (gw->va & ~PAGE_MASK);
 }
 
-/* Given a walk_t from a successful walk, return the page-order of the 
+/* Given a walk_t from a successful walk, return the page-order of the
  * page or superpage that the virtual address is in. */
 static inline unsigned int guest_walk_to_page_order(const walk_t *gw)
 {
-    /* This is only valid for successful walks - otherwise the 
+    /* This is only valid for successful walks - otherwise the
      * PSE bits might be invalid. */
     ASSERT(guest_l1e_get_flags(gw->l1e) & _PAGE_PRESENT);
 #if GUEST_PAGING_LEVELS >= 3
@@ -275,28 +285,30 @@ static inline unsigned int guest_walk_to_page_order(const walk_t *gw)
 }
 
 
-/* Walk the guest pagetables, after the manner of a hardware walker. 
+/*
+ * Walk the guest pagetables, after the manner of a hardware walker.
  *
- * Inputs: a vcpu, a virtual address, a walk_t to fill, a 
- *         pointer to a pagefault code, the MFN of the guest's 
- *         top-level pagetable, and a mapping of the 
+ * Inputs: a vcpu, a virtual address, a walk_t to fill, a
+ *         pointer to a pagefault code, the MFN of the guest's
+ *         top-level pagetable, and a mapping of the
  *         guest's top-level pagetable.
- * 
+ *
  * We walk the vcpu's guest pagetables, filling the walk_t with what we
  * see and adding any Accessed and Dirty bits that are needed in the
  * guest entries.  Using the pagefault code, we check the permissions as
  * we go.  For the purposes of reading pagetables we treat all non-RAM
  * memory as contining zeroes.
- * 
- * Returns 0 for success, or the set of permission bits that we failed on 
- * if the walk did not complete. */
+ *
+ * Returns 0 for success, or the set of permission bits that we failed on
+ * if the walk did not complete.
+ */
 
 /* Macro-fu so you can call guest_walk_tables() and get the right one. */
 #define GPT_RENAME2(_n, _l) _n ## _ ## _l ## _levels
 #define GPT_RENAME(_n, _l) GPT_RENAME2(_n, _l)
 #define guest_walk_tables GPT_RENAME(guest_walk_tables, GUEST_PAGING_LEVELS)
 
-extern uint32_t 
+extern uint32_t
 guest_walk_tables(struct vcpu *v, struct p2m_domain *p2m, unsigned long va,
                   walk_t *gw, uint32_t pfec, mfn_t top_mfn, void *top_map);
 

@@ -302,10 +302,6 @@ int hvm_girq_dest_2_vcpu_id(struct domain *d, uint8_t dest, uint8_t dest_mode);
 #define hap_has_1gb (!!(hvm_funcs.hap_capabilities & HVM_HAP_SUPERPAGE_1GB))
 #define hap_has_2mb (!!(hvm_funcs.hap_capabilities & HVM_HAP_SUPERPAGE_2MB))
 
-/* Can the guest use 1GB superpages in its own pagetables? */
-#define hvm_pse1gb_supported(d) \
-    (cpu_has_page1gb && paging_mode_hap(d))
-
 #define hvm_long_mode_enabled(v) \
     ((v)->arch.hvm_vcpu.guest_efer & EFER_LMA)
 

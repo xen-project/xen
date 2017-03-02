@@ -238,7 +238,7 @@ shadow_check_gwalk(struct vcpu *v, unsigned long va, walk_t *gw, int version)
     l2p = (guest_l2e_t *)v->arch.paging.shadow.guest_vtable;
     mismatch |= (gw->l2e.l2 != l2p[guest_l2_table_offset(va)].l2);
 #endif
-    if ( !(guest_supports_superpages(v) &&
+    if ( !(guest_can_use_l2_superpages(v) &&
            (guest_l2e_get_flags(gw->l2e) & _PAGE_PSE)) )
     {
         l1p = map_domain_page(gw->l1mfn);
@@ -310,7 +310,7 @@ gw_remove_write_accesses(struct vcpu *v, unsigned long va, walk_t *gw)
         rc |= GW_RMWR_FLUSHTLB;
 #endif /* GUEST_PAGING_LEVELS >= 3 */
 
-    if ( !(guest_supports_superpages(v) &&
+    if ( !(guest_can_use_l2_superpages(v) &&
            (guest_l2e_get_flags(gw->l2e) & _PAGE_PSE))
 #if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC)
          && !mfn_is_out_of_sync(gw->l1mfn)
@@ -591,7 +591,7 @@ _sh_propagate(struct vcpu *v,
     //
     pass_thru_flags = (_PAGE_ACCESSED | _PAGE_USER |
                        _PAGE_RW | _PAGE_PRESENT);
-    if ( guest_supports_nx(v) )
+    if ( guest_nx_enabled(v) )
         pass_thru_flags |= _PAGE_NX_BIT;
     if ( level == 1 && !shadow_mode_refcounts(d) && mmio_mfn )
         pass_thru_flags |= _PAGE_PAT | _PAGE_PCD | _PAGE_PWT;
@@ -660,7 +660,7 @@ _sh_propagate(struct vcpu *v,
     if ( unlikely(((level == 1) ||
                    ((level == 2) &&
                     (gflags & _PAGE_PSE) &&
-                    guest_supports_superpages(v)))
+                    guest_can_use_l2_superpages(v)))
                   && !(gflags & _PAGE_DIRTY)) )
         sflags &= ~_PAGE_RW;
 
@@ -1846,7 +1846,7 @@ static shadow_l1e_t * shadow_get_and_create_l1e(struct vcpu *v,
         /* No l1 shadow installed: find and install it. */
         if ( !(flags & _PAGE_PRESENT) )
             return NULL; /* No guest page. */
-        if ( guest_supports_superpages(v) && (flags & _PAGE_PSE) )
+        if ( guest_can_use_l2_superpages(v) && (flags & _PAGE_PSE) )
         {
             /* Splintering a superpage */
             gfn_t l2gfn = guest_l2e_get_gfn(gw->l2e);
@@ -2251,7 +2251,7 @@ static int validate_gl2e(struct vcpu *v, void *new_ge, mfn_t sl2mfn, void *se)
     if ( guest_l2e_get_flags(new_gl2e) & _PAGE_PRESENT )
     {
         gfn_t gl1gfn = guest_l2e_get_gfn(new_gl2e);
-        if ( guest_supports_superpages(v) &&
+        if ( guest_can_use_l2_superpages(v) &&
              (guest_l2e_get_flags(new_gl2e) & _PAGE_PSE) )
         {
             // superpage -- need to look up the shadow L1 which holds the
