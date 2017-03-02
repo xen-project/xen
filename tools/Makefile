@@ -269,6 +269,7 @@ subdir-all-qemu-xen-dir: qemu-xen-dir-find
 		-I$(XEN_ROOT)/tools/libs/evtchn/include \
 		-I$(XEN_ROOT)/tools/libs/gnttab/include \
 		-I$(XEN_ROOT)/tools/libs/foreignmemory/include \
+		-I$(XEN_ROOT)/tools/libs/devicemodel/include \
 		-I$(XEN_ROOT)/tools/libxc/include \
 		-I$(XEN_ROOT)/tools/xenstore/include \
 		-I$(XEN_ROOT)/tools/xenstore/compat/include \
@@ -278,6 +279,7 @@ subdir-all-qemu-xen-dir: qemu-xen-dir-find
 		-L$(XEN_ROOT)/tools/libs/evtchn \
 		-L$(XEN_ROOT)/tools/libs/gnttab \
 		-L$(XEN_ROOT)/tools/libs/foreignmemory \
+		-L$(XEN_ROOT)/tools/libs/devicemodel \
 		-Wl,-rpath-link=$(XEN_ROOT)/tools/libs/toollog \
 		-Wl,-rpath-link=$(XEN_ROOT)/tools/libs/evtchn \
 		-Wl,-rpath-link=$(XEN_ROOT)/tools/libs/gnttab \
