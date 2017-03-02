@@ -32,24 +32,28 @@ asm(".file \"" __OBJECT_FILE__ "\"");
 #include <asm/page.h>
 #include <asm/guest_pt.h>
 
-/* Modify a guest pagetable entry to set the Accessed and Dirty bits.
- * Returns non-zero if it actually writes to guest memory. */
-static uint32_t set_ad_bits(void *guest_p, void *walk_p, int set_dirty)
+/*
+ * Modify a guest pagetable entry to set the Accessed and Dirty bits.
+ * Returns true if it actually writes to guest memory.
+ */
+static bool set_ad_bits(guest_intpte_t *guest_p, guest_intpte_t *walk_p,
+                        bool set_dirty)
 {
-    guest_intpte_t old, new;
+    guest_intpte_t new, old = *walk_p;
 
-    old = *(guest_intpte_t *)walk_p;
     new = old | _PAGE_ACCESSED | (set_dirty ? _PAGE_DIRTY : 0);
-    if ( old != new ) 
+    if ( old != new )
     {
-        /* Write the new entry into the walk, and try to write it back
+        /*
+         * Write the new entry into the walk, and try to write it back
          * into the guest table as well.  If the guest table has changed
-         * under out feet then leave it alone. */
-        *(guest_intpte_t *)walk_p = new;
-        if ( cmpxchg(((guest_intpte_t *)guest_p), old, new) == old ) 
-            return 1;
+         * under our feet then leave it alone.
+         */
+        *walk_p = new;
+        if ( cmpxchg(guest_p, old, new) == old )
+            return true;
     }
-    return 0;
+    return false;
 }
 
 /*
@@ -89,7 +93,7 @@ guest_walk_tables(struct vcpu *v, struct p2m_domain *p2m,
     guest_l4e_t *l4p;
 #endif
     uint32_t gflags, rc;
-    bool_t pse1G = 0, pse2M = 0;
+    unsigned int leaf_level;
     p2m_query_t qt = P2M_ALLOC | P2M_UNSHARE;
 
 #define AR_ACCUM_AND (_PAGE_USER | _PAGE_RW)
@@ -179,9 +183,7 @@ guest_walk_tables(struct vcpu *v, struct p2m_domain *p2m,
     ar_and &= gflags;
     ar_or  |= gflags;
 
-    pse1G = !!(gflags & _PAGE_PSE);
-
-    if ( pse1G )
+    if ( gflags & _PAGE_PSE )
     {
         /* Generate a fake l1 table entry so callers don't all 
          * have to understand superpages. */
@@ -204,6 +206,7 @@ guest_walk_tables(struct vcpu *v, struct p2m_domain *p2m,
                      ((va >> PAGE_SHIFT) & GUEST_L3_GFN_MASK));
         gw->l1e = guest_l1e_from_gfn(start, flags);
         gw->l2mfn = gw->l1mfn = INVALID_MFN;
+        leaf_level = 3;
         goto leaf;
     }
 
@@ -273,9 +276,7 @@ guest_walk_tables(struct vcpu *v, struct p2m_domain *p2m,
     ar_and &= gflags;
     ar_or  |= gflags;
 
-    pse2M = !!(gflags & _PAGE_PSE);
-
-    if ( pse2M )
+    if ( gflags & _PAGE_PSE )
     {
         /* Special case: this guest VA is in a PSE superpage, so there's
          * no guest l1e.  We make one up so that the propagation code
@@ -309,6 +310,7 @@ guest_walk_tables(struct vcpu *v, struct p2m_domain *p2m,
         gw->l1e = guest_l1e_from_gfn(start, flags);
 #endif
         gw->l1mfn = INVALID_MFN;
+        leaf_level = 2;
         goto leaf;
     }
 
@@ -339,6 +341,8 @@ guest_walk_tables(struct vcpu *v, struct p2m_domain *p2m,
     /* Accumulate l1e access rights. */
     ar_and &= gflags;
     ar_or  |= gflags;
+
+    leaf_level = 1;
 
  leaf:
     gw->pfec |= PFEC_page_present;
@@ -413,24 +417,32 @@ guest_walk_tables(struct vcpu *v, struct p2m_domain *p2m,
      * success.  Although the PRMs say higher-level _PAGE_ACCESSED bits
      * get set whenever a lower-level PT is used, at least some hardware
      * walkers behave this way. */
-#if GUEST_PAGING_LEVELS == 4 /* 64-bit only... */
-    if ( set_ad_bits(l4p + guest_l4_table_offset(va), &gw->l4e, 0) )
-        paging_mark_dirty(d, gw->l4mfn);
-    if ( set_ad_bits(l3p + guest_l3_table_offset(va), &gw->l3e,
-                     (pse1G && (walk & PFEC_write_access))) )
-        paging_mark_dirty(d, gw->l3mfn);
-#endif
-    if ( !pse1G )
+    switch ( leaf_level )
     {
-        if ( set_ad_bits(l2p + guest_l2_table_offset(va), &gw->l2e,
-                         (pse2M && (walk & PFEC_write_access))) )
+    default:
+        ASSERT_UNREACHABLE();
+        break;
+
+    case 1:
+        if ( set_ad_bits(&l1p[guest_l1_table_offset(va)].l1, &gw->l1e.l1,
+                         (walk & PFEC_write_access)) )
+            paging_mark_dirty(d, gw->l1mfn);
+        /* Fallthrough */
+    case 2:
+        if ( set_ad_bits(&l2p[guest_l2_table_offset(va)].l2, &gw->l2e.l2,
+                         (walk & PFEC_write_access) && leaf_level == 2) )
             paging_mark_dirty(d, gw->l2mfn);
-        if ( !pse2M )
-        {
-            if ( set_ad_bits(l1p + guest_l1_table_offset(va), &gw->l1e,
-                             (walk & PFEC_write_access)) )
-                paging_mark_dirty(d, gw->l1mfn);
-        }
+        /* Fallthrough */
+#if GUEST_PAGING_LEVELS == 4 /* 64-bit only... */
+    case 3:
+        if ( set_ad_bits(&l3p[guest_l3_table_offset(va)].l3, &gw->l3e.l3,
+                         (walk & PFEC_write_access) && leaf_level == 3) )
+            paging_mark_dirty(d, gw->l3mfn);
+
+        if ( set_ad_bits(&l4p[guest_l4_table_offset(va)].l4, &gw->l4e.l4,
+                         false) )
+            paging_mark_dirty(d, gw->l4mfn);
+#endif
     }
 
  out:
