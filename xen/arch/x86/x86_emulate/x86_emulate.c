@@ -2375,12 +2375,21 @@ x86_decode(
 
                 opcode |= b | MASK_INSR(vex.pfx, X86EMUL_OPC_PFX_MASK);
 
+                if ( !(d & ModRM) )
+                {
+                    modrm_reg = modrm_rm = modrm_mod = modrm = 0;
+                    break;
+                }
+
                 modrm = insn_fetch_type(uint8_t);
                 modrm_mod = (modrm & 0xc0) >> 6;
 
                 break;
             }
+    }
 
+    if ( d & ModRM )
+    {
         modrm_reg = ((rex_prefix & 4) << 1) | ((modrm & 0x38) >> 3);
         modrm_rm  = modrm & 0x07;
 
