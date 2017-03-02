@@ -20,6 +20,7 @@ libelf.a: $(ELF_LIB_OBJS)
 libelf-fuzzer-all: libelf.a libelf-fuzzer.o
 
 afl-libelf-fuzzer: afl-libelf-fuzzer.o libelf-fuzzer.o $(ELF_LIB_OBJS)
+	$(CC) $(CFLAGS) $^ -o $@
 
 # Common targets
 .PHONY: all

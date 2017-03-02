@@ -34,6 +34,7 @@ x86-insn-emulator.a: x86_emulate.o
 	$(AR) rc $@ $^
 
 afl-x86-insn-emulator-fuzzer: afl-x86-insn-emulator-fuzzer.o x86-insn-emulator-fuzzer.o x86_emulate.o
+	$(CC) $(CFLAGS) $^ -o $@
 
 # Common targets
 .PHONY: all
