@@ -3004,9 +3004,6 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
     regs->eflags |= X86_EFLAGS_IF;
     regs->eflags &= ~X86_EFLAGS_IOPL;
 
-    /* More strict than x86_emulate_wrapper(). */
-    ASSERT(ctxt.ctxt.event_pending == (rc == X86EMUL_EXCEPTION));
-
     switch ( rc )
     {
     case X86EMUL_OKAY:

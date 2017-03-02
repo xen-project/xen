@@ -6307,17 +6307,12 @@ int x86_emulate_wrapper(
         ASSERT(ctxt->regs->r(ip) == orig_ip);
 
     /*
-     * TODO: Make this true:
-     *
-    ASSERT(ctxt->event_pending == (rc == X86EMUL_EXCEPTION));
-     *
-     * Some codepaths still raise exceptions behind the back of the
-     * emulator. (i.e. return X86EMUL_EXCEPTION but without
-     * event_pending being set).  In the meantime, use a slightly
-     * relaxed check...
+     * An event being pending should exactly match returning
+     * X86EMUL_EXCEPTION.  (If this trips, the chances are a codepath has
+     * called hvm_inject_hw_exception() rather than using
+     * x86_emul_hw_exception().)
      */
-    if ( ctxt->event_pending )
-        ASSERT(rc == X86EMUL_EXCEPTION);
+    ASSERT(ctxt->event_pending == (rc == X86EMUL_EXCEPTION));
 
     return rc;
 }

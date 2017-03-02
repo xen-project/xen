@@ -5420,9 +5420,6 @@ int ptwr_do_page_fault(struct vcpu *v, unsigned long addr,
     page_unlock(page);
     put_page(page);
 
-    /* More strict than x86_emulate_wrapper(), as this is now true for PV. */
-    ASSERT(ptwr_ctxt.ctxt.event_pending == (rc == X86EMUL_EXCEPTION));
-
     switch ( rc )
     {
     case X86EMUL_EXCEPTION:
@@ -5573,9 +5570,6 @@ int mmio_ro_do_page_fault(struct vcpu *v, unsigned long addr,
         rc = x86_emulate(&ctxt, &mmcfg_intercept_ops);
     else
         rc = x86_emulate(&ctxt, &mmio_ro_emulate_ops);
-
-    /* More strict than x86_emulate_wrapper(), as this is now true for PV. */
-    ASSERT(ctxt.event_pending == (rc == X86EMUL_EXCEPTION));
 
     switch ( rc )
     {
