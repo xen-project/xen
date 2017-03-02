@@ -119,7 +119,11 @@ int __must_check hvm_handle_xsetbv(u32 index, u64 new_bv);
 
 void hvm_shadow_handle_cd(struct vcpu *v, unsigned long value);
 
-/* These functions all return X86EMUL return codes. */
+/*
+ * These functions all return X86EMUL return codes.  For hvm_set_*(), the
+ * caller is responsible for injecting #GP[0] if X86EMUL_EXCEPTION is
+ * returned.
+ */
 int hvm_set_efer(uint64_t value);
 int hvm_set_cr0(unsigned long value, bool_t may_defer);
 int hvm_set_cr3(unsigned long value, bool_t may_defer);

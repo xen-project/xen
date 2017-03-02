@@ -1520,23 +1520,37 @@ static int hvmemul_write_cr(
     unsigned long val,
     struct x86_emulate_ctxt *ctxt)
 {
+    int rc;
+
     HVMTRACE_LONG_2D(CR_WRITE, reg, TRC_PAR_LONG(val));
     switch ( reg )
     {
     case 0:
-        return hvm_set_cr0(val, 1);
+        rc = hvm_set_cr0(val, 1);
+        break;
+
     case 2:
         current->arch.hvm_vcpu.guest_cr[2] = val;
-        return X86EMUL_OKAY;
+        rc = X86EMUL_OKAY;
+        break;
+
     case 3:
-        return hvm_set_cr3(val, 1);
+        rc = hvm_set_cr3(val, 1);
+        break;
+
     case 4:
-        return hvm_set_cr4(val, 1);
+        rc = hvm_set_cr4(val, 1);
+        break;
+
     default:
+        rc = X86EMUL_UNHANDLEABLE;
         break;
     }
 
-    return X86EMUL_UNHANDLEABLE;
+    if ( rc == X86EMUL_EXCEPTION )
+        x86_emul_hw_exception(TRAP_gp_fault, 0, ctxt);
+
+    return rc;
 }
 
 static int hvmemul_read_msr(

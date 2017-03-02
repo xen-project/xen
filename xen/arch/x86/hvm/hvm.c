@@ -527,19 +527,25 @@ void hvm_do_resume(struct vcpu *v)
 
         if ( w->do_write.cr0 )
         {
-            hvm_set_cr0(w->cr0, 0);
+            if ( hvm_set_cr0(w->cr0, 0) == X86EMUL_EXCEPTION )
+                hvm_inject_hw_exception(TRAP_gp_fault, 0);
+
             w->do_write.cr0 = 0;
         }
 
         if ( w->do_write.cr4 )
         {
-            hvm_set_cr4(w->cr4, 0);
+            if ( hvm_set_cr4(w->cr4, 0) == X86EMUL_EXCEPTION )
+                hvm_inject_hw_exception(TRAP_gp_fault, 0);
+
             w->do_write.cr4 = 0;
         }
 
         if ( w->do_write.cr3 )
         {
-            hvm_set_cr3(w->cr3, 0);
+            if ( hvm_set_cr3(w->cr3, 0) == X86EMUL_EXCEPTION )
+                hvm_inject_hw_exception(TRAP_gp_fault, 0);
+
             w->do_write.cr3 = 0;
         }
     }
@@ -2068,6 +2074,7 @@ int hvm_mov_to_cr(unsigned int cr, unsigned int gpr)
 {
     struct vcpu *curr = current;
     unsigned long val, *reg;
+    int rc;
 
     if ( (reg = decode_register(gpr, guest_cpu_user_regs(), 0)) == NULL )
     {
@@ -2082,16 +2089,20 @@ int hvm_mov_to_cr(unsigned int cr, unsigned int gpr)
     switch ( cr )
     {
     case 0:
-        return hvm_set_cr0(val, 1);
+        rc = hvm_set_cr0(val, 1);
+        break;
 
     case 3:
-        return hvm_set_cr3(val, 1);
+        rc = hvm_set_cr3(val, 1);
+        break;
 
     case 4:
-        return hvm_set_cr4(val, 1);
+        rc = hvm_set_cr4(val, 1);
+        break;
 
     case 8:
         vlapic_set_reg(vcpu_vlapic(curr), APIC_TASKPRI, ((val & 0x0f) << 4));
+        rc = X86EMUL_OKAY;
         break;
 
     default:
@@ -2099,7 +2110,10 @@ int hvm_mov_to_cr(unsigned int cr, unsigned int gpr)
         goto exit_and_crash;
     }
 
-    return X86EMUL_OKAY;
+    if ( rc == X86EMUL_EXCEPTION )
+        hvm_inject_hw_exception(TRAP_gp_fault, 0);
+
+    return rc;
 
  exit_and_crash:
     domain_crash(curr->domain);
@@ -2199,7 +2213,7 @@ int hvm_set_cr0(unsigned long value, bool_t may_defer)
         HVM_DBG_LOG(DBG_LEVEL_1,
                     "Guest attempts to set upper 32 bits in CR0: %lx",
                     value);
-        goto gpf;
+        return X86EMUL_EXCEPTION;
     }
 
     value &= ~HVM_CR0_GUEST_RESERVED_BITS;
@@ -2209,7 +2223,7 @@ int hvm_set_cr0(unsigned long value, bool_t may_defer)
 
     if ( !nestedhvm_vmswitch_in_progress(v) &&
          (value & (X86_CR0_PE | X86_CR0_PG)) == X86_CR0_PG )
-        goto gpf;
+        return X86EMUL_EXCEPTION;
 
     /* A pvh is not expected to change to real mode. */
     if ( is_pvh_domain(d) &&
@@ -2217,7 +2231,7 @@ int hvm_set_cr0(unsigned long value, bool_t may_defer)
     {
         printk(XENLOG_G_WARNING
                "PVH attempting to turn off PE/PG. CR0:%lx\n", value);
-        goto gpf;
+        return X86EMUL_EXCEPTION;
     }
 
     if ( may_defer && unlikely(v->domain->arch.monitor.write_ctrlreg_enabled &
@@ -2243,7 +2257,7 @@ int hvm_set_cr0(unsigned long value, bool_t may_defer)
                  !nestedhvm_vmswitch_in_progress(v) )
             {
                 HVM_DBG_LOG(DBG_LEVEL_1, "Enable paging before PAE enable");
-                goto gpf;
+                return X86EMUL_EXCEPTION;
             }
             HVM_DBG_LOG(DBG_LEVEL_1, "Enabling long mode");
             v->arch.hvm_vcpu.guest_efer |= EFER_LMA;
@@ -2276,7 +2290,7 @@ int hvm_set_cr0(unsigned long value, bool_t may_defer)
         {
             HVM_DBG_LOG(DBG_LEVEL_1, "Guest attempts to clear CR0.PG "
                         "while CR4.PCIDE=1");
-            goto gpf;
+            return X86EMUL_EXCEPTION;
         }
 
         /* When CR0.PG is cleared, LMA is cleared immediately. */
@@ -2310,10 +2324,6 @@ int hvm_set_cr0(unsigned long value, bool_t may_defer)
     }
 
     return X86EMUL_OKAY;
-
- gpf:
-    hvm_inject_hw_exception(TRAP_gp_fault, 0);
-    return X86EMUL_EXCEPTION;
 }
 
 int hvm_set_cr3(unsigned long value, bool_t may_defer)
@@ -2373,7 +2383,7 @@ int hvm_set_cr4(unsigned long value, bool_t may_defer)
         HVM_DBG_LOG(DBG_LEVEL_1,
                     "Guest attempts to set reserved bit in CR4: %lx",
                     value);
-        goto gpf;
+        return X86EMUL_EXCEPTION;
     }
 
     if ( !(value & X86_CR4_PAE) )
@@ -2382,12 +2392,12 @@ int hvm_set_cr4(unsigned long value, bool_t may_defer)
         {
             HVM_DBG_LOG(DBG_LEVEL_1, "Guest cleared CR4.PAE while "
                         "EFER.LMA is set");
-            goto gpf;
+            return X86EMUL_EXCEPTION;
         }
         if ( is_pvh_vcpu(v) )
         {
             HVM_DBG_LOG(DBG_LEVEL_1, "32-bit PVH guest cleared CR4.PAE");
-            goto gpf;
+            return X86EMUL_EXCEPTION;
         }
     }
 
@@ -2399,7 +2409,7 @@ int hvm_set_cr4(unsigned long value, bool_t may_defer)
     {
         HVM_DBG_LOG(DBG_LEVEL_1, "Guest attempts to change CR4.PCIDE from "
                     "0 to 1 while either EFER.LMA=0 or CR3[11:0]!=000H");
-        goto gpf;
+        return X86EMUL_EXCEPTION;
     }
 
     if ( may_defer && unlikely(v->domain->arch.monitor.write_ctrlreg_enabled &
@@ -2434,10 +2444,6 @@ int hvm_set_cr4(unsigned long value, bool_t may_defer)
     }
 
     return X86EMUL_OKAY;
-
- gpf:
-    hvm_inject_hw_exception(TRAP_gp_fault, 0);
-    return X86EMUL_EXCEPTION;
 }
 
 bool_t hvm_virtual_to_linear_addr(
@@ -3020,7 +3026,10 @@ void hvm_task_switch(
     if ( hvm_load_segment_selector(x86_seg_ldtr, tss.ldt, 0) )
         goto out;
 
-    if ( hvm_set_cr3(tss.cr3, 1) )
+    rc = hvm_set_cr3(tss.cr3, 1);
+    if ( rc == X86EMUL_EXCEPTION )
+        hvm_inject_hw_exception(TRAP_gp_fault, 0);
+    if ( rc != X86EMUL_OKAY )
         goto out;
 
     regs->rip    = tss.eip;

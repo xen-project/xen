@@ -2533,13 +2533,18 @@ static int vmx_cr_access(unsigned long exit_qualification)
     }
     case VMX_CONTROL_REG_ACCESS_TYPE_LMSW: {
         unsigned long value = curr->arch.hvm_vcpu.guest_cr[0];
+        int rc;
 
         /* LMSW can (1) set PE; (2) set or clear MP, EM, and TS. */
         value = (value & ~(X86_CR0_MP|X86_CR0_EM|X86_CR0_TS)) |
                 (VMX_CONTROL_REG_ACCESS_DATA(exit_qualification) &
                  (X86_CR0_PE|X86_CR0_MP|X86_CR0_EM|X86_CR0_TS));
         HVMTRACE_LONG_1D(LMSW, value);
-        return hvm_set_cr0(value, 1);
+
+        if ( (rc = hvm_set_cr0(value, 1)) == X86EMUL_EXCEPTION )
+            hvm_inject_hw_exception(TRAP_gp_fault, 0);
+
+        return rc;
     }
     default:
         BUG();
