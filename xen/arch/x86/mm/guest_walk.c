@@ -81,7 +81,7 @@ static bool set_ad_bits(guest_intpte_t *guest_p, guest_intpte_t *walk_p,
  */
 bool
 guest_walk_tables(struct vcpu *v, struct p2m_domain *p2m,
-                  unsigned long va, walk_t *gw, 
+                  unsigned long va, walk_t *gw,
                   uint32_t walk, mfn_t top_mfn, void *top_map)
 {
     struct domain *d = v->domain;
@@ -154,13 +154,13 @@ guest_walk_tables(struct vcpu *v, struct p2m_domain *p2m,
     ar_or  |= gflags;
 
     /* Map the l3 table */
-    l3p = map_domain_gfn(p2m, 
-                         guest_l4e_get_gfn(gw->l4e), 
+    l3p = map_domain_gfn(p2m,
+                         guest_l4e_get_gfn(gw->l4e),
                          &gw->l3mfn,
                          &p2mt,
                          qt,
-                         &rc); 
-    if(l3p == NULL)
+                         &rc);
+    if ( l3p == NULL )
     {
         gw->pfec |= rc & PFEC_synth_mask;
         goto out;
@@ -178,23 +178,29 @@ guest_walk_tables(struct vcpu *v, struct p2m_domain *p2m,
         gw->pfec |= PFEC_reserved_bit | PFEC_page_present;
         goto out;
     }
-    
+
     /* Accumulate l3e access rights. */
     ar_and &= gflags;
     ar_or  |= gflags;
 
     if ( gflags & _PAGE_PSE )
     {
-        /* Generate a fake l1 table entry so callers don't all 
-         * have to understand superpages. */
+        /*
+         * Generate a fake l1 table entry so callers don't all
+         * have to understand superpages.
+         */
         gfn_t start = guest_l3e_get_gfn(gw->l3e);
-        /* Grant full access in the l1e, since all the guest entry's
-         * access controls are enforced in the l3e. */
+        /*
+         * Grant full access in the l1e, since all the guest entry's
+         * access controls are enforced in the l3e.
+         */
         int flags = (_PAGE_PRESENT|_PAGE_USER|_PAGE_RW|
                      _PAGE_ACCESSED|_PAGE_DIRTY);
-        /* Import cache-control bits. Note that _PAGE_PAT is actually
+        /*
+         * Import cache-control bits. Note that _PAGE_PAT is actually
          * _PAGE_PSE, and it is always set. We will clear it in case
-         * _PAGE_PSE_PAT (bit 12, i.e. first bit of gfn) is clear. */
+         * _PAGE_PSE_PAT (bit 12, i.e. first bit of gfn) is clear.
+         */
         flags |= (guest_l3e_get_flags(gw->l3e)
                   & (_PAGE_PAT|_PAGE_PWT|_PAGE_PCD));
         if ( !(gfn_x(start) & 1) )
@@ -227,13 +233,13 @@ guest_walk_tables(struct vcpu *v, struct p2m_domain *p2m,
 #endif /* PAE or 64... */
 
     /* Map the l2 table */
-    l2p = map_domain_gfn(p2m, 
-                         guest_l3e_get_gfn(gw->l3e), 
+    l2p = map_domain_gfn(p2m,
+                         guest_l3e_get_gfn(gw->l3e),
                          &gw->l2mfn,
-                         &p2mt, 
+                         &p2mt,
                          qt,
-                         &rc); 
-    if(l2p == NULL)
+                         &rc);
+    if ( l2p == NULL )
     {
         gw->pfec |= rc & PFEC_synth_mask;
         goto out;
@@ -278,22 +284,28 @@ guest_walk_tables(struct vcpu *v, struct p2m_domain *p2m,
 
     if ( gflags & _PAGE_PSE )
     {
-        /* Special case: this guest VA is in a PSE superpage, so there's
+        /*
+         * Special case: this guest VA is in a PSE superpage, so there's
          * no guest l1e.  We make one up so that the propagation code
-         * can generate a shadow l1 table.  Start with the gfn of the 
-         * first 4k-page of the superpage. */
+         * can generate a shadow l1 table.  Start with the gfn of the
+         * first 4k-page of the superpage.
+         */
 #if GUEST_PAGING_LEVELS == 2
         gfn_t start = _gfn(unfold_pse36(gw->l2e.l2) >> PAGE_SHIFT);
 #else
         gfn_t start = guest_l2e_get_gfn(gw->l2e);
 #endif
-        /* Grant full access in the l1e, since all the guest entry's 
-         * access controls are enforced in the shadow l2e. */
+        /*
+         * Grant full access in the l1e, since all the guest entry's
+         * access controls are enforced in the shadow l2e.
+         */
         int flags = (_PAGE_PRESENT|_PAGE_USER|_PAGE_RW|
                      _PAGE_ACCESSED|_PAGE_DIRTY);
-        /* Import cache-control bits. Note that _PAGE_PAT is actually
+        /*
+         * Import cache-control bits. Note that _PAGE_PAT is actually
          * _PAGE_PSE, and it is always set. We will clear it in case
-         * _PAGE_PSE_PAT (bit 12, i.e. first bit of gfn) is clear. */
+         * _PAGE_PSE_PAT (bit 12, i.e. first bit of gfn) is clear.
+         */
         flags |= (guest_l2e_get_flags(gw->l2e)
                   & (_PAGE_PAT|_PAGE_PWT|_PAGE_PCD));
         if ( !(gfn_x(start) & 1) )
@@ -413,10 +425,12 @@ guest_walk_tables(struct vcpu *v, struct p2m_domain *p2m,
 
     walk_ok = true;
 
-    /* Go back and set accessed and dirty bits only if the walk was a
+    /*
+     * Go back and set accessed and dirty bits only if the walk was a
      * success.  Although the PRMs say higher-level _PAGE_ACCESSED bits
      * get set whenever a lower-level PT is used, at least some hardware
-     * walkers behave this way. */
+     * walkers behave this way.
+     */
     switch ( leaf_level )
     {
     default:
@@ -447,20 +461,20 @@ guest_walk_tables(struct vcpu *v, struct p2m_domain *p2m,
 
  out:
 #if GUEST_PAGING_LEVELS == 4
-    if ( l3p ) 
+    if ( l3p )
     {
         unmap_domain_page(l3p);
         put_page(mfn_to_page(mfn_x(gw->l3mfn)));
     }
 #endif
 #if GUEST_PAGING_LEVELS >= 3
-    if ( l2p ) 
+    if ( l2p )
     {
         unmap_domain_page(l2p);
         put_page(mfn_to_page(mfn_x(gw->l2mfn)));
     }
 #endif
-    if ( l1p ) 
+    if ( l1p )
     {
         unmap_domain_page(l1p);
         put_page(mfn_to_page(mfn_x(gw->l1mfn)));
@@ -468,3 +482,13 @@ guest_walk_tables(struct vcpu *v, struct p2m_domain *p2m,
 
     return walk_ok;
 }
+
+/*
+ * Local variables:
+ * mode: C
+ * c-file-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */
