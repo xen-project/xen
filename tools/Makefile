@@ -116,7 +116,7 @@ clean: subdirs-clean
 .PHONY: distclean
 distclean: subdirs-distclean clean
 	rm -rf qemu-xen-traditional-dir qemu-xen-traditional-dir-remote
-	rm -rf qemu-xen-dir qemu-xen-dir-remote
+	rm -rf qemu-xen-dir qemu-xen-dir-remote qemu-xen-build
 	rm -rf ../config/Tools.mk config.h config.log config.status \
 		config.cache autom4te.cache
 
@@ -244,9 +244,10 @@ subdir-all-qemu-xen-dir: qemu-xen-dir-find
 	if test -d $(QEMU_UPSTREAM_LOC) ; then \
 		source=$(QEMU_UPSTREAM_LOC); \
 	else \
-		source=.; \
+		source=$(XEN_ROOT)/tools/qemu-xen-dir; \
 	fi; \
-	cd qemu-xen-dir; \
+	mkdir -p qemu-xen-build; \
+	cd qemu-xen-build; \
 	if $$source/scripts/tracetool.py --check-backend --backend log ; then \
 		enable_trace_backend='--enable-trace-backend=log'; \
 	elif $$source/scripts/tracetool.py --check-backend --backend stderr ; then \
@@ -301,12 +302,12 @@ subdir-all-qemu-xen-dir: qemu-xen-dir-find
 	$(MAKE) all
 
 subdir-install-qemu-xen-dir: subdir-all-qemu-xen-dir
-	cd qemu-xen-dir; \
+	cd qemu-xen-build; \
 	$(MAKE) install
 
 subdir-clean-qemu-xen-dir:
-	set -e; if test -d qemu-xen-dir/.; then \
-		$(MAKE) -C qemu-xen-dir clean; \
+	set -e; if test -d qemu-xen-build/.; then \
+		$(MAKE) -C qemu-xen-build clean; \
 	fi
 
 subdir-clean-debugger/gdbsx subdir-distclean-debugger/gdbsx: .phony

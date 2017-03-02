@@ -207,6 +207,7 @@ tools/misc/xenlockprof
 tools/misc/lowmemd
 tools/misc/xencov
 tools/pkg-config/*
+tools/qemu-xen-build
 tools/xentrace/xenalyze
 tools/pygrub/build/*
 tools/python/build/*
