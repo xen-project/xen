@@ -14,7 +14,7 @@ static uint8_t input[INPUT_SIZE];
 int main(int argc, char **argv)
 {
     size_t size;
-    FILE *fp;
+    FILE *fp = NULL;
 
     setbuf(stdout, NULL);
 
@@ -40,6 +40,7 @@ int main(int argc, char **argv)
             break;
 
         case '?':
+        usage:
             printf("Usage: %s $FILE | [--min-input-size]\n", argv[0]);
             exit(-1);
             break;
@@ -51,17 +52,19 @@ int main(int argc, char **argv)
         }
     }
 
-    if ( optind != (argc - 1) )
-    {
-        printf("Expecting only one argument\n");
-        exit(-1);
-    }
+    if ( optind == argc ) /* No positional parameters.  Use stdin. */
+        fp = stdin;
+    else if ( optind != (argc - 1) )
+        goto usage;
 
-    fp = fopen(argv[1], "rb");
-    if ( fp == NULL )
+    if ( fp != stdin ) /* If not using stdin, open the provided file. */
     {
-        perror("fopen");
-        exit(-1);
+        fp = fopen(argv[optind], "rb");
+        if ( fp == NULL )
+        {
+            perror("fopen");
+            exit(-1);
+        }
     }
 
     size = fread(input, 1, INPUT_SIZE, fp);
@@ -78,7 +81,11 @@ int main(int argc, char **argv)
         exit(-1);
     }
 
-    fclose(fp);
+    if ( fp != stdin )
+    {
+        fclose(fp);
+        fp = NULL;
+    }
 
     LLVMFuzzerTestOneInput(input, size);
 

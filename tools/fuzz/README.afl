@@ -25,8 +25,11 @@ Use the x86 instruction emulator fuzzer as an example.
    $ dd if=/dev/urandom of=testcase_dir/rand.bin \
        bs=`./afl-harness --min-input-size` count=1
 
+3a. use a tmpfs for findings_dir (Perf improvement and reduced disk load)
+   $ mkdir findings_dir
+   $ mount -t tmpfs -o size=512M tmpfs findings_dir
+
 4. run the fuzzer with AFL:
-   $ $AFLPATH/afl-fuzz -m none -t 1000 -i testcase_dir -o findings_dir -- \
-     ./afl-harness @@
+   $ $AFLPATH/afl-fuzz -t 1000 -i testcase_dir -o findings_dir -- ./afl-harness
 
 Please see AFL documentation for more information.
