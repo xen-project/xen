@@ -467,73 +467,6 @@ static void __init process_dom0_ioports_disable(struct domain *dom0)
     }
 }
 
-static __init void pvh_setup_e820(struct domain *d, unsigned long nr_pages)
-{
-    struct e820entry *entry, *entry_guest;
-    unsigned int i;
-    unsigned long pages, cur_pages = 0;
-    uint64_t start, end;
-
-    /*
-     * Craft the e820 memory map for Dom0 based on the hardware e820 map.
-     */
-    d->arch.e820 = xzalloc_array(struct e820entry, e820.nr_map);
-    if ( !d->arch.e820 )
-        panic("Unable to allocate memory for Dom0 e820 map");
-    entry_guest = d->arch.e820;
-
-    /* Clamp e820 memory map to match the memory assigned to Dom0 */
-    for ( i = 0, entry = e820.map; i < e820.nr_map; i++, entry++ )
-    {
-        if ( entry->type != E820_RAM )
-        {
-            *entry_guest = *entry;
-            goto next;
-        }
-
-        if ( nr_pages == cur_pages )
-        {
-            /*
-             * We already have all the assigned memory,
-             * skip this entry
-             */
-            continue;
-        }
-
-        /*
-         * Make sure the start and length are aligned to PAGE_SIZE, because
-         * that's the minimum granularity of the 2nd stage translation. Since
-         * the p2m code uses PAGE_ORDER_4K internally, also use it here in
-         * order to prevent this code from getting out of sync.
-         */
-        start = ROUNDUP(entry->addr, PAGE_SIZE << PAGE_ORDER_4K);
-        end = (entry->addr + entry->size) &
-              ~((PAGE_SIZE << PAGE_ORDER_4K) - 1);
-        if ( start >= end )
-            continue;
-
-        entry_guest->type = E820_RAM;
-        entry_guest->addr = start;
-        entry_guest->size = end - start;
-        pages = PFN_DOWN(entry_guest->size);
-        if ( (cur_pages + pages) > nr_pages )
-        {
-            /* Truncate region */
-            entry_guest->size = (nr_pages - cur_pages) << PAGE_SHIFT;
-            cur_pages = nr_pages;
-        }
-        else
-        {
-            cur_pages += pages;
-        }
- next:
-        d->arch.nr_e820++;
-        entry_guest++;
-    }
-    ASSERT(cur_pages == nr_pages);
-    ASSERT(d->arch.nr_e820 <= e820.nr_map);
-}
-
 static __init void dom0_update_physmap(struct domain *d, unsigned long pfn,
                                    unsigned long mfn, unsigned long vphysmap_s)
 {
@@ -1680,6 +1613,73 @@ static void __init pvh_steal_low_ram(struct domain *d, unsigned long start,
         if ( rc )
             printk("Unable to add mfn %#lx to p2m: %d\n", mfn, rc);
     }
+}
+
+static __init void pvh_setup_e820(struct domain *d, unsigned long nr_pages)
+{
+    struct e820entry *entry, *entry_guest;
+    unsigned int i;
+    unsigned long pages, cur_pages = 0;
+    uint64_t start, end;
+
+    /*
+     * Craft the e820 memory map for Dom0 based on the hardware e820 map.
+     */
+    d->arch.e820 = xzalloc_array(struct e820entry, e820.nr_map);
+    if ( !d->arch.e820 )
+        panic("Unable to allocate memory for Dom0 e820 map");
+    entry_guest = d->arch.e820;
+
+    /* Clamp e820 memory map to match the memory assigned to Dom0 */
+    for ( i = 0, entry = e820.map; i < e820.nr_map; i++, entry++ )
+    {
+        if ( entry->type != E820_RAM )
+        {
+            *entry_guest = *entry;
+            goto next;
+        }
+
+        if ( nr_pages == cur_pages )
+        {
+            /*
+             * We already have all the assigned memory,
+             * skip this entry
+             */
+            continue;
+        }
+
+        /*
+         * Make sure the start and length are aligned to PAGE_SIZE, because
+         * that's the minimum granularity of the 2nd stage translation. Since
+         * the p2m code uses PAGE_ORDER_4K internally, also use it here in
+         * order to prevent this code from getting out of sync.
+         */
+        start = ROUNDUP(entry->addr, PAGE_SIZE << PAGE_ORDER_4K);
+        end = (entry->addr + entry->size) &
+              ~((PAGE_SIZE << PAGE_ORDER_4K) - 1);
+        if ( start >= end )
+            continue;
+
+        entry_guest->type = E820_RAM;
+        entry_guest->addr = start;
+        entry_guest->size = end - start;
+        pages = PFN_DOWN(entry_guest->size);
+        if ( (cur_pages + pages) > nr_pages )
+        {
+            /* Truncate region */
+            entry_guest->size = (nr_pages - cur_pages) << PAGE_SHIFT;
+            cur_pages = nr_pages;
+        }
+        else
+        {
+            cur_pages += pages;
+        }
+ next:
+        d->arch.nr_e820++;
+        entry_guest++;
+    }
+    ASSERT(cur_pages == nr_pages);
+    ASSERT(d->arch.nr_e820 <= e820.nr_map);
 }
 
 static int __init pvh_setup_p2m(struct domain *d)
