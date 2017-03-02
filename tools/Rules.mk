@@ -245,3 +245,16 @@ ifeq (,$(findstring clean,$(MAKECMDGOALS)))
 $(XEN_ROOT)/config/Tools.mk:
 	$(error You have to run ./configure before building or installing the tools)
 endif
+
+$(PKG_CONFIG_DIR)/%.pc: %.pc.in Makefile
+	mkdir -p $(PKG_CONFIG_DIR)
+	@sed -e 's!@@version@@!$(PKG_CONFIG_VERSION)!g' \
+	     -e 's!@@prefix@@!$(PKG_CONFIG_PREFIX)!g' \
+	     -e 's!@@incdir@@!$(PKG_CONFIG_INCDIR)!g' \
+	     -e 's!@@libdir@@!$(PKG_CONFIG_LIBDIR)!g' < $< > $@
+
+%.pc: %.pc.in Makefile
+	@sed -e 's!@@version@@!$(PKG_CONFIG_VERSION)!g' \
+	     -e 's!@@prefix@@!$(PKG_CONFIG_PREFIX)!g' \
+	     -e 's!@@incdir@@!$(PKG_CONFIG_INCDIR)!g' \
+	     -e 's!@@libdir@@!$(PKG_CONFIG_LIBDIR)!g' < $< > $@

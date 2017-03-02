@@ -1,4 +1,5 @@
 XEN_ROOT = $(CURDIR)/../..
+PKG_CONFIG_DIR = ../pkg-config
 include $(XEN_ROOT)/tools/Rules.mk
 
 MAJOR    = 4.9
@@ -159,6 +160,22 @@ endif
 $(CTRL_LIB_OBJS) $(GUEST_LIB_OBJS) \
 $(CTRL_PIC_OBJS) $(GUEST_PIC_OBJS): xc_private.h
 
+PKG_CONFIG := xencontrol.pc
+PKG_CONFIG_VERSION := $(MAJOR).$(MINOR)
+
+ifneq ($(CONFIG_LIBXC_MINIOS),y)
+PKG_CONFIG_INST := $(PKG_CONFIG)
+$(PKG_CONFIG_INST): PKG_CONFIG_PREFIX = $(prefix)
+$(PKG_CONFIG_INST): PKG_CONFIG_INCDIR = $(includedir)
+$(PKG_CONFIG_INST): PKG_CONFIG_LIBDIR = $(libdir)
+endif
+
+PKG_CONFIG_LOCAL := $(foreach pc,$(PKG_CONFIG),$(PKG_CONFIG_DIR)/$(pc))
+
+$(PKG_CONFIG_LOCAL): PKG_CONFIG_PREFIX = $(XEN_ROOT)
+$(PKG_CONFIG_LOCAL): PKG_CONFIG_INCDIR = $(XEN_LIBXC)/include
+$(PKG_CONFIG_LOCAL): PKG_CONFIG_LIBDIR = $(CURDIR)
+
 .PHONY: all
 all: build
 
@@ -167,12 +184,13 @@ build:
 	$(MAKE) libs
 
 .PHONY: libs
-libs: $(LIB)
+libs: $(LIB) $(PKG_CONFIG_INST) $(PKG_CONFIG_LOCAL)
 
 .PHONY: install
 install: build
 	$(INSTALL_DIR) $(DESTDIR)$(libdir)
 	$(INSTALL_DIR) $(DESTDIR)$(includedir)
+	$(INSTALL_DIR) $(DESTDIR)$(PKG_INSTALLDIR)
 	$(INSTALL_SHLIB) libxenctrl.so.$(MAJOR).$(MINOR) $(DESTDIR)$(libdir)
 	$(INSTALL_DATA) libxenctrl.a $(DESTDIR)$(libdir)
 	$(SYMLINK_SHLIB) libxenctrl.so.$(MAJOR).$(MINOR) $(DESTDIR)$(libdir)/libxenctrl.so.$(MAJOR)
@@ -183,6 +201,7 @@ install: build
 	$(SYMLINK_SHLIB) libxenguest.so.$(MAJOR).$(MINOR) $(DESTDIR)$(libdir)/libxenguest.so.$(MAJOR)
 	$(SYMLINK_SHLIB) libxenguest.so.$(MAJOR) $(DESTDIR)$(libdir)/libxenguest.so
 	$(INSTALL_DATA) include/xenguest.h $(DESTDIR)$(includedir)
+	$(INSTALL_DATA) xencontrol.pc $(DESTDIR)$(PKG_INSTALLDIR)
 
 .PHONY: TAGS
 TAGS:
@@ -192,6 +211,7 @@ TAGS:
 clean:
 	rm -rf *.rpm $(LIB) *~ $(DEPS) \
             _paths.h \
+	    xencontrol.pc \
             $(CTRL_LIB_OBJS) $(CTRL_PIC_OBJS) \
             $(GUEST_LIB_OBJS) $(GUEST_PIC_OBJS)
 

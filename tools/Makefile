@@ -111,9 +111,10 @@ uninstall:
 
 .PHONY: clean
 clean: subdirs-clean
+	rm -rf pkg-config
 
 .PHONY: distclean
-distclean: subdirs-distclean
+distclean: subdirs-distclean clean
 	rm -rf qemu-xen-traditional-dir qemu-xen-traditional-dir-remote
 	rm -rf qemu-xen-dir qemu-xen-dir-remote
 	rm -rf ../config/Tools.mk config.h config.log config.status \

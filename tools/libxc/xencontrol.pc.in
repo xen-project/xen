@@ -1,0 +1,9 @@
+prefix=@@prefix@@
+includedir=@@incdir@@
+libdir=@@libdir@@
+
+Name: Xencontrol
+Description: The Xencontrol library for Xen hypervisor
+Version: @@version@@
+Cflags: -I${includedir}
+Libs: -L${libdir} -lxenctrl

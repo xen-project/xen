@@ -79,6 +79,7 @@ stubdom/newlib-1.*
 stubdom/newlib-x86*
 stubdom/ocaml-*
 stubdom/pciutils-*
+stubdom/pkg-config/*
 stubdom/polarssl-*
 stubdom/stubdompath.sh
 stubdom/tpm_emulator-*
@@ -179,6 +180,7 @@ tools/include/xen/*
 tools/include/xen-xsm/*
 tools/include/xen-foreign/*.(c|h|size)
 tools/include/xen-foreign/checker
+tools/libxc/*.pc
 tools/libxl/_libxl.api-for-check
 tools/libxl/*.api-ok
 tools/libxl/*.pc
@@ -204,6 +206,7 @@ tools/misc/xen-hvmctx
 tools/misc/xenlockprof
 tools/misc/lowmemd
 tools/misc/xencov
+tools/pkg-config/*
 tools/xentrace/xenalyze
 tools/pygrub/build/*
 tools/python/build/*
