@@ -749,7 +749,8 @@ void guest_cpuid(const struct vcpu *v, uint32_t leaf,
     case 0x1:
         /* TODO: Rework topology logic. */
         res->b &= 0x00ffffffu;
-        res->b |= (v->vcpu_id * 2) << 24;
+        if ( has_hvm_container_domain(d) )
+            res->b |= (v->vcpu_id * 2) << 24;
 
         /* TODO: Rework vPMU control in terms of toolstack choices. */
         if ( vpmu_available(v) &&
