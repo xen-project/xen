@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <getopt.h>
 
 extern int LLVMFuzzerTestOneInput(const uint8_t *data_p, size_t size);
 extern unsigned int fuzz_minimal_input_size(void);
@@ -17,16 +18,43 @@ int main(int argc, char **argv)
 
     setbuf(stdout, NULL);
 
-    if ( argc != 2 )
+    while ( 1 )
+    {
+        enum {
+            OPT_MIN_SIZE,
+        };
+        static const struct option lopts[] = {
+            { "min-input-size", no_argument, NULL, OPT_MIN_SIZE },
+            { 0, 0, 0, 0 }
+        };
+        int c = getopt_long_only(argc, argv, "", lopts, NULL);
+
+        if ( c == -1 )
+            break;
+
+        switch ( c )
+        {
+        case OPT_MIN_SIZE:
+            printf("%u\n", fuzz_minimal_input_size());
+            exit(0);
+            break;
+
+        case '?':
+            printf("Usage: %s $FILE | [--min-input-size]\n", argv[0]);
+            exit(-1);
+            break;
+
+        default:
+            printf("Bad getopt return %d (%c)\n", c, c);
+            exit(-1);
+            break;
+        }
+    }
+
+    if ( optind != (argc - 1) )
     {
         printf("Expecting only one argument\n");
         exit(-1);
-    }
-
-    if ( !strcmp(argv[1], "--min-input-size") )
-    {
-        printf("%u\n", fuzz_minimal_input_size());
-        exit(0);
     }
 
     fp = fopen(argv[1], "rb");
