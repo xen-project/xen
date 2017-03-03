@@ -292,24 +292,20 @@ extern size_t cacheline_bytes;
 
 static inline int invalidate_dcache_va_range(const void *p, unsigned long size)
 {
-    size_t off;
     const void *end = p + size;
+    size_t cacheline_mask = cacheline_bytes - 1;
 
     dsb(sy);           /* So the CPU issues all writes to the range */
 
-    off = (unsigned long)p % cacheline_bytes;
-    if ( off )
+    if ( (uintptr_t)p & cacheline_mask )
     {
-        p -= off;
+        p = (void *)((uintptr_t)p & ~cacheline_mask);
         asm volatile (__clean_and_invalidate_dcache_one(0) : : "r" (p));
         p += cacheline_bytes;
-        size -= cacheline_bytes - off;
     }
-    off = (unsigned long)end % cacheline_bytes;
-    if ( off )
+    if ( (uintptr_t)end & cacheline_mask )
     {
-        end -= off;
-        size -= off;
+        end = (void *)((uintptr_t)end & ~cacheline_mask);
         asm volatile (__clean_and_invalidate_dcache_one(0) : : "r" (end));
     }
 
@@ -323,9 +319,10 @@ static inline int invalidate_dcache_va_range(const void *p, unsigned long size)
 
 static inline int clean_dcache_va_range(const void *p, unsigned long size)
 {
-    const void *end;
+    const void *end = p + size;
     dsb(sy);           /* So the CPU issues all writes to the range */
-    for ( end = p + size; p < end; p += cacheline_bytes )
+    p = (void *)((uintptr_t)p & ~(cacheline_bytes - 1));
+    for ( ; p < end; p += cacheline_bytes )
         asm volatile (__clean_dcache_one(0) : : "r" (p));
     dsb(sy);           /* So we know the flushes happen before continuing */
     /* ARM callers assume that dcache_* functions cannot fail. */
@@ -335,9 +332,10 @@ static inline int clean_dcache_va_range(const void *p, unsigned long size)
 static inline int clean_and_invalidate_dcache_va_range
     (const void *p, unsigned long size)
 {
-    const void *end;
+    const void *end = p + size;
     dsb(sy);         /* So the CPU issues all writes to the range */
-    for ( end = p + size; p < end; p += cacheline_bytes )
+    p = (void *)((uintptr_t)p & ~(cacheline_bytes - 1));
+    for ( ; p < end; p += cacheline_bytes )
         asm volatile (__clean_and_invalidate_dcache_one(0) : : "r" (p));
     dsb(sy);         /* So we know the flushes happen before continuing */
     /* ARM callers assume that dcache_* functions cannot fail. */
