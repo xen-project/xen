@@ -1641,6 +1641,18 @@ int nvmx_handle_vmptrld(struct cpu_user_regs *regs)
         {
             if ( writable )
             {
+                struct vmcs_struct *vvmcs = vvmcx;
+
+                if ( ((vvmcs->vmcs_revision_id ^ vmx_basic_msr) &
+                                         VMX_BASIC_REVISION_MASK) ||
+                     (!cpu_has_vmx_vmcs_shadowing &&
+                      (vvmcs->vmcs_revision_id & ~VMX_BASIC_REVISION_MASK)) )
+                {
+                    hvm_unmap_guest_frame(vvmcx, 1);
+                    vmfail(regs, VMX_INSN_VMPTRLD_INCORRECT_VMCS_ID);
+
+                    return X86EMUL_OKAY;
+                }
                 nvcpu->nv_vvmcx = vvmcx;
                 nvcpu->nv_vvmcxaddr = gpa;
                 v->arch.hvm_vmx.vmcs_shadow_maddr =
