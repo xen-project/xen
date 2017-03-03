@@ -188,7 +188,7 @@ void dump_pageframe_info(struct domain *d)
         spin_unlock(&d->page_alloc_lock);
     }
 
-    if ( has_hvm_container_domain(d) )
+    if ( is_hvm_domain(d) )
         p2m_pod_dump_data(d);
 
     spin_lock(&d->page_alloc_lock);
@@ -412,7 +412,7 @@ int vcpu_initialise(struct vcpu *v)
 
     spin_lock_init(&v->arch.vpmu.vpmu_lock);
 
-    if ( has_hvm_container_domain(d) )
+    if ( is_hvm_domain(d) )
     {
         rc = hvm_vcpu_initialise(v);
         goto done;
@@ -488,7 +488,7 @@ void vcpu_destroy(struct vcpu *v)
     if ( !is_idle_domain(v->domain) )
         vpmu_destroy(v);
 
-    if ( has_hvm_container_vcpu(v) )
+    if ( is_hvm_vcpu(v) )
         hvm_vcpu_destroy(v);
     else
         xfree(v->arch.pv_vcpu.trap_ctxt);
@@ -575,7 +575,7 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags,
         d->arch.emulation_flags = emflags;
     }
 
-    if ( has_hvm_container_domain(d) )
+    if ( is_hvm_domain(d) )
     {
         d->arch.hvm_domain.hap_enabled =
             hvm_funcs.hap_supported && (domcr_flags & DOMCRF_hap);
@@ -649,7 +649,7 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags,
     if ( (rc = psr_domain_init(d)) != 0 )
         goto fail;
 
-    if ( has_hvm_container_domain(d) )
+    if ( is_hvm_domain(d) )
     {
         if ( (rc = hvm_domain_initialise(d)) != 0 )
             goto fail;
@@ -708,7 +708,7 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags,
 
 void arch_domain_destroy(struct domain *d)
 {
-    if ( has_hvm_container_domain(d) )
+    if ( is_hvm_domain(d) )
         hvm_domain_destroy(d);
 
     xfree(d->arch.e820);
@@ -760,8 +760,8 @@ int arch_domain_soft_reset(struct domain *d)
     p2m_type_t p2mt;
     unsigned int i;
 
-    /* Soft reset is supported for HVM/PVH domains only. */
-    if ( !has_hvm_container_domain(d) )
+    /* Soft reset is supported for HVM domains only. */
+    if ( !is_hvm_domain(d) )
         return -EINVAL;
 
     hvm_domain_soft_reset(d);
@@ -951,7 +951,7 @@ int arch_set_info_guest(
     v->fpu_initialised = !!(flags & VGCF_I387_VALID);
 
     v->arch.flags &= ~TF_kernel_mode;
-    if ( (flags & VGCF_in_kernel) || has_hvm_container_domain(d)/*???*/ )
+    if ( (flags & VGCF_in_kernel) || is_hvm_domain(d)/*???*/ )
         v->arch.flags |= TF_kernel_mode;
 
     v->arch.vgc_flags = flags;
@@ -996,7 +996,7 @@ int arch_set_info_guest(
         }
     }
 
-    if ( has_hvm_container_domain(d) )
+    if ( is_hvm_domain(d) )
     {
         for ( i = 0; i < ARRAY_SIZE(v->arch.debugreg); ++i )
             v->arch.debugreg[i] = c(debugreg[i]);
@@ -2021,7 +2021,7 @@ static void __context_switch(void)
             if ( xcr0 != get_xcr0() && !set_xcr0(xcr0) )
                 BUG();
 
-            if ( cpu_has_xsaves && has_hvm_container_vcpu(n) )
+            if ( cpu_has_xsaves && is_hvm_vcpu(n) )
                 set_msr_xss(n->arch.hvm_vcpu.msr_xss);
         }
         vcpu_restore_fpu_eager(n);
@@ -2111,7 +2111,7 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
 
         if ( is_pv_domain(nextd) &&
              (is_idle_domain(prevd) ||
-              has_hvm_container_domain(prevd) ||
+              is_hvm_domain(prevd) ||
               is_pv_32bit_domain(prevd) != is_pv_32bit_domain(nextd)) )
         {
             uint64_t efer = read_efer();
@@ -2413,7 +2413,7 @@ int domain_relinquish_resources(struct domain *d)
 
     pit_deinit(d);
 
-    if ( has_hvm_container_domain(d) )
+    if ( is_hvm_domain(d) )
         hvm_domain_relinquish_resources(d);
 
     return 0;
@@ -2456,7 +2456,7 @@ void vcpu_mark_events_pending(struct vcpu *v)
     if ( already_pending )
         return;
 
-    if ( has_hvm_container_vcpu(v) )
+    if ( is_hvm_vcpu(v) )
         hvm_assert_evtchn_irq(v);
     else
         vcpu_kick(v);

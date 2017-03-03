@@ -305,8 +305,8 @@ static int amd_vpmu_save(struct vcpu *v,  bool_t to_guest)
 
     context_save(v);
 
-    if ( !vpmu_is_set(vpmu, VPMU_RUNNING) &&
-         has_hvm_container_vcpu(v) && is_msr_bitmap_on(vpmu) )
+    if ( !vpmu_is_set(vpmu, VPMU_RUNNING) && is_hvm_vcpu(v) &&
+         is_msr_bitmap_on(vpmu) )
         amd_vpmu_unset_msr_bitmap(v);
 
     if ( to_guest )
@@ -367,7 +367,7 @@ static int amd_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content,
         return -EINVAL;
 
     /* For all counters, enable guest only mode for HVM guest */
-    if ( has_hvm_container_vcpu(v) && (type == MSR_TYPE_CTRL) &&
+    if ( is_hvm_vcpu(v) && (type == MSR_TYPE_CTRL) &&
          !is_guest_mode(msr_content) )
     {
         set_guest_mode(msr_content);
@@ -381,7 +381,7 @@ static int amd_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content,
             return 0;
         vpmu_set(vpmu, VPMU_RUNNING);
 
-        if ( has_hvm_container_vcpu(v) && is_msr_bitmap_on(vpmu) )
+        if ( is_hvm_vcpu(v) && is_msr_bitmap_on(vpmu) )
              amd_vpmu_set_msr_bitmap(v);
     }
 
@@ -390,7 +390,7 @@ static int amd_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content,
         (is_pmu_enabled(msr_content) == 0) && vpmu_is_set(vpmu, VPMU_RUNNING) )
     {
         vpmu_reset(vpmu, VPMU_RUNNING);
-        if ( has_hvm_container_vcpu(v) && is_msr_bitmap_on(vpmu) )
+        if ( is_hvm_vcpu(v) && is_msr_bitmap_on(vpmu) )
              amd_vpmu_unset_msr_bitmap(v);
         release_pmu_ownership(PMU_OWNER_HVM);
     }
@@ -433,7 +433,7 @@ static void amd_vpmu_destroy(struct vcpu *v)
 {
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
 
-    if ( has_hvm_container_vcpu(v) && is_msr_bitmap_on(vpmu) )
+    if ( is_hvm_vcpu(v) && is_msr_bitmap_on(vpmu) )
         amd_vpmu_unset_msr_bitmap(v);
 
     xfree(vpmu->context);

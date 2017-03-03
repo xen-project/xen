@@ -623,7 +623,7 @@ unsigned long hvm_cr4_guest_valid_bits(const struct vcpu *v, bool restore);
 #define arch_vcpu_block(v) ({                                   \
     struct vcpu *v_ = (v);                                      \
     struct domain *d_ = v_->domain;                             \
-    if ( has_hvm_container_domain(d_) &&                        \
+    if ( is_hvm_domain(d_) &&                               \
          (d_->arch.hvm_domain.pi_ops.vcpu_block) )          \
         d_->arch.hvm_domain.pi_ops.vcpu_block(v_);          \
 })

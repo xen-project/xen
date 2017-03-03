@@ -438,7 +438,7 @@ int page_is_ram_type(unsigned long mfn, unsigned long mem_type)
 
 unsigned long domain_get_maximum_gpfn(struct domain *d)
 {
-    if ( has_hvm_container_domain(d) )
+    if ( is_hvm_domain(d) )
         return p2m_get_hostp2m(d)->max_mapped_pfn;
     /* NB. PV guests specify nr_pfns rather than max_pfn so we adjust here. */
     return (arch_get_max_pfn(d) ?: 1) - 1;
@@ -3184,7 +3184,7 @@ long do_mmuext_op(
             break;
         }
 
-        if ( has_hvm_container_domain(d) )
+        if ( is_hvm_domain(d) )
         {
             switch ( op.cmd )
             {

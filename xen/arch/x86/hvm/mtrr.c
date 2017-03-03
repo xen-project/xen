@@ -540,7 +540,7 @@ int hvm_get_mem_pinned_cacheattr(struct domain *d, gfn_t gfn,
     uint64_t mask = ~(uint64_t)0 << order;
     int rc = -ENXIO;
 
-    ASSERT(has_hvm_container_domain(d));
+    ASSERT(is_hvm_domain(d));
 
     rcu_read_lock(&pinned_cacheattr_rcu_lock);
     list_for_each_entry_rcu ( range,

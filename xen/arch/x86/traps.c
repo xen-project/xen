@@ -799,7 +799,7 @@ void do_trap(struct cpu_user_regs *regs)
     }
 
     if ( ((trapnr == TRAP_copro_error) || (trapnr == TRAP_simd_error)) &&
-         system_state >= SYS_STATE_active && has_hvm_container_vcpu(curr) &&
+         system_state >= SYS_STATE_active && is_hvm_vcpu(curr) &&
          curr->arch.hvm_vcpu.fpu_exception_callback )
     {
         curr->arch.hvm_vcpu.fpu_exception_callback(
@@ -976,7 +976,7 @@ void cpuid_hypervisor_leaves(const struct vcpu *v, uint32_t leaf,
         break;
 
     case 4: /* HVM hypervisor leaf. */
-        if ( !has_hvm_container_domain(d) || subleaf != 0 )
+        if ( !is_hvm_domain(d) || subleaf != 0 )
             break;
 
         if ( cpu_has_vmx_apic_reg_virt )

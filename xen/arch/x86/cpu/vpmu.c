@@ -237,7 +237,7 @@ void vpmu_do_interrupt(struct cpu_user_regs *regs)
         vpmu->arch_vpmu_ops->arch_vpmu_save(sampling, 1);
         vpmu_reset(vpmu, VPMU_CONTEXT_SAVE | VPMU_CONTEXT_LOADED);
 
-        if ( has_hvm_container_vcpu(sampled) )
+        if ( is_hvm_vcpu(sampled) )
             *flags = 0;
         else
             *flags = PMU_SAMPLE_PV;
@@ -288,7 +288,7 @@ void vpmu_do_interrupt(struct cpu_user_regs *regs)
             r->sp = cur_regs->rsp;
             r->flags = cur_regs->rflags;
 
-            if ( !has_hvm_container_vcpu(sampled) )
+            if ( !is_hvm_vcpu(sampled) )
             {
                 r->ss = cur_regs->ss;
                 r->cs = cur_regs->cs;

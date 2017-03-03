@@ -168,7 +168,7 @@ unsigned int dbg_rw_guest_mem(struct domain *dp, void * __user gaddr,
 
         pagecnt = min_t(long, PAGE_SIZE - (addr & ~PAGE_MASK), len);
 
-        mfn = (has_hvm_container_domain(dp)
+        mfn = (is_hvm_domain(dp)
                ? dbg_hvm_va2mfn(addr, dp, toaddr, &gfn)
                : dbg_pv_va2mfn(addr, dp, pgd3));
         if ( mfn_eq(mfn, INVALID_MFN) )

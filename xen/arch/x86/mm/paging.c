@@ -420,7 +420,7 @@ static int paging_log_dirty_op(struct domain *d,
          * Mark dirty all currently write-mapped pages on e.g. the
          * final iteration of a save operation.
          */
-        if ( has_hvm_container_domain(d) &&
+        if ( is_hvm_domain(d) &&
              (sc->mode & XEN_DOMCTL_SHADOW_LOGDIRTY_FINAL) )
             hvm_mapped_guest_frames_mark_dirty(d);
 

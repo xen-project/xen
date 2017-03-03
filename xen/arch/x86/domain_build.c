@@ -357,9 +357,8 @@ static unsigned long __init compute_dom0_nr_pages(
             avail -= max_pdx >> s;
     }
 
-    need_paging = has_hvm_container_domain(d)
-                  ? !iommu_hap_pt_share || !paging_mode_hap(d)
-                  : opt_dom0_shadow;
+    need_paging = is_hvm_domain(d) ? !iommu_hap_pt_share || !paging_mode_hap(d)
+                                   : opt_dom0_shadow;
     for ( ; ; need_paging = 0 )
     {
         nr_pages = dom0_nrpages;

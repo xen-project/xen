@@ -940,7 +940,7 @@ static void __update_vcpu_system_time(struct vcpu *v, int force)
     }
     else
     {
-        if ( has_hvm_container_domain(d) && hvm_tsc_scaling_supported )
+        if ( is_hvm_domain(d) && hvm_tsc_scaling_supported )
         {
             tsc_stamp            = hvm_scale_tsc(d, t->stamp.local_tsc);
             _u.tsc_to_system_mul = d->arch.vtsc_to_ns.mul_frac;
@@ -1951,7 +1951,7 @@ void tsc_get_info(struct domain *d, uint32_t *tsc_mode,
                   uint64_t *elapsed_nsec, uint32_t *gtsc_khz,
                   uint32_t *incarnation)
 {
-    bool_t enable_tsc_scaling = has_hvm_container_domain(d) &&
+    bool_t enable_tsc_scaling = is_hvm_domain(d) &&
                                 hvm_tsc_scaling_supported && !d->arch.vtsc;
 
     *incarnation = d->arch.incarnation;
@@ -2031,7 +2031,7 @@ void tsc_set_info(struct domain *d,
          *  PV: guest has not migrated yet (and thus arch.tsc_khz == cpu_khz)
          */
         if ( tsc_mode == TSC_MODE_DEFAULT && host_tsc_is_safe() &&
-             (has_hvm_container_domain(d) ?
+             (is_hvm_domain(d) ?
               (d->arch.tsc_khz == cpu_khz ||
                hvm_get_tsc_scaling_ratio(d->arch.tsc_khz)) :
               incarnation == 0) )
@@ -2046,8 +2046,7 @@ void tsc_set_info(struct domain *d,
     case TSC_MODE_PVRDTSCP:
         d->arch.vtsc = !boot_cpu_has(X86_FEATURE_RDTSCP) ||
                        !host_tsc_is_safe();
-        enable_tsc_scaling = has_hvm_container_domain(d) &&
-                             !d->arch.vtsc &&
+        enable_tsc_scaling = is_hvm_domain(d) && !d->arch.vtsc &&
                              hvm_get_tsc_scaling_ratio(gtsc_khz ?: cpu_khz);
         d->arch.tsc_khz = (enable_tsc_scaling && gtsc_khz) ? gtsc_khz : cpu_khz;
         set_time_scale(&d->arch.vtsc_to_ns, d->arch.tsc_khz * 1000 );
@@ -2064,7 +2063,7 @@ void tsc_set_info(struct domain *d,
         break;
     }
     d->arch.incarnation = incarnation + 1;
-    if ( has_hvm_container_domain(d) )
+    if ( is_hvm_domain(d) )
     {
         if ( hvm_tsc_scaling_supported && !d->arch.vtsc )
             d->arch.hvm_domain.tsc_scaling_ratio =

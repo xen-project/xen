@@ -480,7 +480,7 @@ int hvm_local_events_need_delivery(struct vcpu *v)
 
 void arch_evtchn_inject(struct vcpu *v)
 {
-    if ( has_hvm_container_vcpu(v) )
+    if ( is_hvm_vcpu(v) )
         hvm_assert_evtchn_irq(v);
 }
 

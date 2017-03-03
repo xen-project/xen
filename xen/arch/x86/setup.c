@@ -1723,7 +1723,7 @@ void __hwdom_init setup_io_bitmap(struct domain *d)
 {
     int rc;
 
-    if ( has_hvm_container_domain(d) )
+    if ( is_hvm_domain(d) )
     {
         bitmap_fill(d->arch.hvm_domain.io_bitmap, 0x10000);
         rc = rangeset_report_ranges(d->arch.ioport_caps, 0, 0x10000,

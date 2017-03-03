@@ -88,7 +88,7 @@ void show_registers(const struct cpu_user_regs *regs)
     enum context context;
     struct vcpu *v = system_state >= SYS_STATE_smp_boot ? current : NULL;
 
-    if ( guest_mode(regs) && has_hvm_container_vcpu(v) )
+    if ( guest_mode(regs) && is_hvm_vcpu(v) )
     {
         struct segment_register sreg;
         context = CTXT_hvm_guest;
@@ -623,7 +623,7 @@ static void hypercall_page_initialise_ring3_kernel(void *hypercall_page)
 void hypercall_page_initialise(struct domain *d, void *hypercall_page)
 {
     memset(hypercall_page, 0xCC, PAGE_SIZE);
-    if ( has_hvm_container_domain(d) )
+    if ( is_hvm_domain(d) )
         hvm_hypercall_page_initialise(d, hypercall_page);
     else if ( !is_pv_32bit_domain(d) )
         hypercall_page_initialise_ring3_kernel(hypercall_page);

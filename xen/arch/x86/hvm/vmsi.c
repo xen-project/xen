@@ -560,8 +560,7 @@ void msixtbl_init(struct domain *d)
 {
     struct hvm_io_handler *handler;
 
-    if ( !has_hvm_container_domain(d) || !has_vlapic(d) ||
-         msixtbl_initialised(d) )
+    if ( !is_hvm_domain(d) || !has_vlapic(d) || msixtbl_initialised(d) )
         return;
 
     INIT_LIST_HEAD(&d->arch.hvm_domain.msixtbl_list);

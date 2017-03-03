@@ -874,8 +874,6 @@ void watchdog_domain_destroy(struct domain *d);
 #define is_pv_vcpu(v)   (is_pv_domain((v)->domain))
 #define is_hvm_domain(d) ((d)->guest_type == guest_type_hvm)
 #define is_hvm_vcpu(v)   (is_hvm_domain(v->domain))
-#define has_hvm_container_domain(d) ((d)->guest_type != guest_type_pv)
-#define has_hvm_container_vcpu(v)   (has_hvm_container_domain((v)->domain))
 #define is_pinned_vcpu(v) ((v)->domain->is_pinned || \
                            cpumask_weight((v)->cpu_hard_affinity) == 1)
 #ifdef CONFIG_HAS_PASSTHROUGH

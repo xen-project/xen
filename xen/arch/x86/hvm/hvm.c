@@ -3061,7 +3061,7 @@ static enum hvm_copy_result __hvm_copy(
     char *p;
     int count, todo = size;
 
-    ASSERT(has_hvm_container_vcpu(v));
+    ASSERT(is_hvm_vcpu(v));
 
     /*
      * XXX Disable for 4.1.0: PV-on-HVM drivers will do grant-table ops
@@ -4002,7 +4002,7 @@ static int hvmop_set_param(
         return -ESRCH;
 
     rc = -EINVAL;
-    if ( !has_hvm_container_domain(d) )
+    if ( !is_hvm_domain(d) )
         goto out;
 
     rc = hvm_allow_set_param(d, &a);
@@ -4257,7 +4257,7 @@ static int hvmop_get_param(
         return -ESRCH;
 
     rc = -EINVAL;
-    if ( !has_hvm_container_domain(d) )
+    if ( !is_hvm_domain(d) )
         goto out;
 
     rc = hvm_allow_get_param(d, &a);
