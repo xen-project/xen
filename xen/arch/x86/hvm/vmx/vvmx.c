@@ -1759,6 +1759,12 @@ int nvmx_handle_vmread(struct cpu_user_regs *regs)
     if ( rc != X86EMUL_OKAY )
         return rc;
 
+    if ( vcpu_nestedhvm(v).nv_vvmcxaddr == INVALID_PADDR )
+    {
+        vmfail_invalid(regs);
+        return X86EMUL_OKAY;
+    }
+
     rc = get_vvmcs_safe(v, reg_read(regs, decode.reg2), &value);
     if ( rc != VMX_INSN_SUCCEED )
     {
@@ -1795,6 +1801,12 @@ int nvmx_handle_vmwrite(struct cpu_user_regs *regs)
     if ( decode_vmx_inst(regs, &decode, &operand, 0)
              != X86EMUL_OKAY )
         return X86EMUL_EXCEPTION;
+
+    if ( vcpu_nestedhvm(v).nv_vvmcxaddr == INVALID_PADDR )
+    {
+        vmfail_invalid(regs);
+        return X86EMUL_OKAY;
+    }
 
     vmcs_encoding = reg_read(regs, decode.reg2);
     err = set_vvmcs_safe(v, vmcs_encoding, operand);
