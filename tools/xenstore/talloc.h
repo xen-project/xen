@@ -24,6 +24,8 @@
    License along with this library; If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include <sys/types.h>
+
 /* this is only needed for compatibility with the old talloc */
 typedef void TALLOC_CTX;
 
