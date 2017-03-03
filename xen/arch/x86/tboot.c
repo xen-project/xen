@@ -48,8 +48,6 @@ static uint64_t __initdata sinit_base, __initdata sinit_size;
 #define TXTCR_HEAP_BASE             0x0300
 #define TXTCR_HEAP_SIZE             0x0308
 
-extern char __init_begin[], __bss_start[], __bss_end[];
-
 #define SHA1_SIZE      20
 typedef uint8_t   sha1_hash_t[SHA1_SIZE];
 
