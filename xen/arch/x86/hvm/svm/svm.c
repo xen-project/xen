@@ -1330,7 +1330,7 @@ static int svm_cpu_up_prepare(unsigned int cpu)
     return 0;
 }
 
-static void svm_init_erratum_383(struct cpuinfo_x86 *c)
+static void svm_init_erratum_383(const struct cpuinfo_x86 *c)
 {
     uint64_t msr_content;
 
@@ -1365,11 +1365,12 @@ static int svm_handle_osvw(struct vcpu *v, uint32_t msr, uint64_t *val, bool_t r
     return 0;
 }
 
-static int svm_cpu_up(void)
+static int _svm_cpu_up(bool bsp)
 {
     uint64_t msr_content;
-    int rc, cpu = smp_processor_id();
-    struct cpuinfo_x86 *c = &cpu_data[cpu];
+    int rc;
+    unsigned int cpu = smp_processor_id();
+    const struct cpuinfo_x86 *c = &cpu_data[cpu];
  
     /* Check whether SVM feature is disabled in BIOS */
     rdmsrl(MSR_K8_VM_CR, msr_content);
@@ -1402,7 +1403,7 @@ static int svm_cpu_up(void)
         rdmsrl(MSR_EFER, msr_content);
     if ( msr_content & EFER_LMSLE )
     {
-        if ( c == &boot_cpu_data )
+        if ( 0 && /* FIXME: Migration! */ bsp )
             cpu_has_lmsl = 1;
         wrmsrl(MSR_EFER, msr_content ^ EFER_LMSLE);
     }
@@ -1419,13 +1420,18 @@ static int svm_cpu_up(void)
     return 0;
 }
 
+static int svm_cpu_up(void)
+{
+    return _svm_cpu_up(false);
+}
+
 const struct hvm_function_table * __init start_svm(void)
 {
     bool_t printed = 0;
 
     svm_host_osvw_reset();
 
-    if ( svm_cpu_up() )
+    if ( _svm_cpu_up(true) )
     {
         printk("SVM: failed to initialise.\n");
         return NULL;

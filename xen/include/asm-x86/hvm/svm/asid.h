@@ -22,7 +22,7 @@
 #include <asm/hvm/asid.h>
 #include <asm/processor.h>
 
-void svm_asid_init(struct cpuinfo_x86 *c);
+void svm_asid_init(const struct cpuinfo_x86 *c);
 
 static inline void svm_asid_g_invlpg(struct vcpu *v, unsigned long g_vaddr)
 {

@@ -22,7 +22,7 @@
 #include <asm/amd.h>
 #include <asm/hvm/nestedhvm.h>
 
-void svm_asid_init(struct cpuinfo_x86 *c)
+void svm_asid_init(const struct cpuinfo_x86 *c)
 {
     int nasids = 0;
 
