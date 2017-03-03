@@ -19,8 +19,11 @@
 # define __OP          "r"  /* Operand Prefix */
 #endif
 
-#define get_stub(stb) ((void *)((stb).addr = (uintptr_t)(stb).buf))
-#define put_stub(stb)
+#define get_stub(stb) ({                         \
+    assert(!(stb).addr);                         \
+    (void *)((stb).addr = (uintptr_t)(stb).buf); \
+})
+#define put_stub(stb) ((stb).addr = 0)
 
 bool emul_test_make_stack_executable(void)
 {
