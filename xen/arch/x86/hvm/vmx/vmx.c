@@ -259,9 +259,22 @@ void vmx_pi_hooks_deassign(struct domain *d)
 
     ASSERT(d->arch.hvm_domain.pi_ops.vcpu_block);
 
+    /*
+     * Note that we don't set 'd->arch.hvm_domain.pi_ops.switch_to' to NULL
+     * here. If we deassign the hooks while the vCPU is runnable in the
+     * runqueue with 'SN' set, all the future notification event will be
+     * suppressed since vmx_deliver_posted_intr() also use 'SN' bit
+     * as the suppression flag. Preserving the 'switch_to' hook function can
+     * clear the 'SN' bit when the vCPU becomes running next time. After
+     * that, No matter which status(runnable, running or block) the vCPU is in,
+     * the 'SN' bit will keep clear for the 'switch_from' hook function that set
+     * the 'SN' bit has been removed. At that time, the 'switch_to' hook function
+     * is also useless. Considering the function doesn't do harm to the whole
+     * system, leave it here until we find a clean solution to deassign the
+     * 'switch_to' hook function.
+     */
     d->arch.hvm_domain.pi_ops.vcpu_block = NULL;
     d->arch.hvm_domain.pi_ops.switch_from = NULL;
-    d->arch.hvm_domain.pi_ops.switch_to = NULL;
     d->arch.hvm_domain.pi_ops.do_resume = NULL;
 }
 
