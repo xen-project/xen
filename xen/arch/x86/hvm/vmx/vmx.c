@@ -154,13 +154,11 @@ static void vmx_pi_switch_to(struct vcpu *v)
     pi_clear_sn(pi_desc);
 }
 
-static void vmx_pi_do_resume(struct vcpu *v)
+static void vmx_pi_unblock_vcpu(struct vcpu *v)
 {
     unsigned long flags;
     spinlock_t *pi_blocking_list_lock;
     struct pi_desc *pi_desc = &v->arch.hvm_vmx.pi_desc;
-
-    ASSERT(!test_bit(_VPF_blocked, &v->pause_flags));
 
     /*
      * Set 'NV' field back to posted_intr_vector, so the
@@ -169,12 +167,12 @@ static void vmx_pi_do_resume(struct vcpu *v)
      */
     write_atomic(&pi_desc->nv, posted_intr_vector);
 
-    /* The vCPU is not on any blocking list. */
     pi_blocking_list_lock = v->arch.hvm_vmx.pi_blocking.lock;
 
     /* Prevent the compiler from eliminating the local variable.*/
     smp_rmb();
 
+    /* The vCPU is not on any blocking list. */
     if ( pi_blocking_list_lock == NULL )
         return;
 
@@ -192,6 +190,13 @@ static void vmx_pi_do_resume(struct vcpu *v)
     }
 
     spin_unlock_irqrestore(pi_blocking_list_lock, flags);
+}
+
+static void vmx_pi_do_resume(struct vcpu *v)
+{
+    ASSERT(!test_bit(_VPF_blocked, &v->pause_flags));
+
+    vmx_pi_unblock_vcpu(v);
 }
 
 /*
@@ -279,10 +284,21 @@ void vmx_pi_hooks_assign(struct domain *d)
 /* This function is called when pcidevs_lock is held */
 void vmx_pi_hooks_deassign(struct domain *d)
 {
+    struct vcpu *v;
+
     if ( !iommu_intpost || !has_hvm_container_domain(d) )
         return;
 
     ASSERT(d->arch.hvm_domain.pi_ops.vcpu_block);
+
+    /*
+     * Pausing the domain can make sure the vCPUs are not
+     * running and hence not calling the hooks simultaneously
+     * when deassigning the PI hooks and removing the vCPU
+     * from the blocking list.
+     */
+    ASSERT(current->domain != d);
+    domain_pause(d);
 
     /*
      * Note that we don't set 'd->arch.hvm_domain.pi_ops.switch_to' to NULL
@@ -301,6 +317,11 @@ void vmx_pi_hooks_deassign(struct domain *d)
     d->arch.hvm_domain.pi_ops.vcpu_block = NULL;
     d->arch.hvm_domain.pi_ops.switch_from = NULL;
     d->arch.hvm_domain.pi_ops.do_resume = NULL;
+
+    for_each_vcpu ( d, v )
+        vmx_pi_unblock_vcpu(v);
+
+    domain_unpause(d);
 }
 
 static int vmx_domain_initialise(struct domain *d)
