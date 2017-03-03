@@ -601,6 +601,8 @@ void vmx_pi_per_cpu_init(unsigned int cpu);
 void vmx_pi_hooks_assign(struct domain *d);
 void vmx_pi_hooks_deassign(struct domain *d);
 
+#define APIC_INVALID_DEST           0xffffffff
+
 /* EPT violation qualifications definitions */
 typedef union ept_qual {
     unsigned long raw;

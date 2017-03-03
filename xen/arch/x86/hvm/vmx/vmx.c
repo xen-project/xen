@@ -240,14 +240,39 @@ static void vmx_pi_do_resume(struct vcpu *v)
 /* This function is called when pcidevs_lock is held */
 void vmx_pi_hooks_assign(struct domain *d)
 {
+    struct vcpu *v;
+
     if ( !iommu_intpost || !has_hvm_container_domain(d) )
         return;
 
     ASSERT(!d->arch.hvm_domain.pi_ops.vcpu_block);
 
-    d->arch.hvm_domain.pi_ops.vcpu_block = vmx_vcpu_block;
+    /*
+     * We carefully handle the timing here:
+     * - Install the context switch first
+     * - Then set the NDST field
+     * - Install the block and resume hooks in the end
+     *
+     * This can make sure the PI (especially the NDST feild) is
+     * in proper state when we call vmx_vcpu_block().
+     */
     d->arch.hvm_domain.pi_ops.switch_from = vmx_pi_switch_from;
     d->arch.hvm_domain.pi_ops.switch_to = vmx_pi_switch_to;
+
+    for_each_vcpu ( d, v )
+    {
+        unsigned int dest = cpu_physical_id(v->processor);
+        struct pi_desc *pi_desc = &v->arch.hvm_vmx.pi_desc;
+
+        /*
+         * We don't need to update NDST if vmx_pi_switch_to()
+         * has already got called.
+         */
+        (void)cmpxchg(&pi_desc->ndst, APIC_INVALID_DEST,
+                x2apic_enabled ? dest : MASK_INSR(dest, PI_xAPIC_NDST_MASK));
+    }
+
+    d->arch.hvm_domain.pi_ops.vcpu_block = vmx_vcpu_block;
     d->arch.hvm_domain.pi_ops.do_resume = vmx_pi_do_resume;
 }
 

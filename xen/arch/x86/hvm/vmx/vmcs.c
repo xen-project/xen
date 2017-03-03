@@ -991,16 +991,13 @@ enum vmx_insn_errno virtual_vmcs_vmwrite_safe(const struct vcpu *v,
  */
 static void pi_desc_init(struct vcpu *v)
 {
-    uint32_t dest;
-
     v->arch.hvm_vmx.pi_desc.nv = posted_intr_vector;
 
-    dest = cpu_physical_id(v->processor);
-
-    if ( x2apic_enabled )
-        v->arch.hvm_vmx.pi_desc.ndst = dest;
-    else
-        v->arch.hvm_vmx.pi_desc.ndst = MASK_INSR(dest, PI_xAPIC_NDST_MASK);
+    /*
+     * Mark NDST as invalid, then we can use this invalid value as a
+     * marker to whether update NDST or not in vmx_pi_hooks_assign().
+     */
+    v->arch.hvm_vmx.pi_desc.ndst = APIC_INVALID_DEST;
 }
 
 static int construct_vmcs(struct vcpu *v)
