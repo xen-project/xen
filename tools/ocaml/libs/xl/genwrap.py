@@ -155,7 +155,7 @@ def gen_ocaml_keyedunions(ty, interface, indent, parent = None):
                 u.append("%s" % (f.name.capitalize()))
             elif isinstance(f.type, idl.Struct):
                 if f.type.rawname is not None:
-                    u.append("%s of %s" % (f.name.capitalize(), f.type.rawname.capitalize()))
+                    u.append("%s of %s.t" % (f.name.capitalize(), f.type.rawname.capitalize()))
                 elif f.type.has_fields():
                     u.append("%s of %s_%s" % (f.name.capitalize(), nparent, f.name))
                 else:
@@ -325,7 +325,7 @@ def c_val(ty, c, o, indent="", parent = None):
                 s += "\t\t    case %d:\n" % (n)
                 s += "\t\t        %s = %s;\n" % (parent + ty.keyvar.name, f.enumname)
                 (nparent,fexpr) = ty.member(c, f, False)
-                s += "%s" % c_val(f.type, fexpr, "Field(%s, 0)" % o, indent=indent+"\t\t        ")
+                s += "%s" % c_val(f.type, fexpr, "Field(%s, 0)" % o, parent=nparent, indent=indent+"\t\t        ")
                 s += "break;\n"
                 n += 1
         s += "\t\t    default: failwith_xl(ERROR_FAIL, \"variant handling bug %s%s (block)\"); break;\n" % (parent, ty.keyvar.name)
