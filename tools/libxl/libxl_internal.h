@@ -1129,7 +1129,6 @@ typedef struct {
     libxl__file_reference pv_kernel;
     libxl__file_reference pv_ramdisk;
     const char * pv_cmdline;
-    bool pvh_enabled;
 
     xen_vmemrange_t *vmemranges;
     uint32_t num_vmemranges;

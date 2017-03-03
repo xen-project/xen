@@ -164,7 +164,6 @@ struct xc_dom_image {
     domid_t console_domid;
     domid_t xenstore_domid;
     xen_pfn_t shared_info_mfn;
-    int pvh_enabled;
 
     xc_interface *xch;
     domid_t guest_domid;

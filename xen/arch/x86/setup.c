@@ -62,10 +62,6 @@ integer_param("maxcpus", max_cpus);
 
 unsigned long __read_mostly cr4_pv32_mask;
 
-/* Boot dom0 in pvh mode */
-static bool_t __initdata opt_dom0pvh;
-boolean_param("dom0pvh", opt_dom0pvh);
-
 /* **** Linux config option: propagated to domain0. */
 /* "acpi=off":    Sisables both ACPI table parsing and interpreter. */
 /* "acpi=force":  Override the disable blacklist.                   */
@@ -1544,9 +1540,6 @@ void __init noreturn __start_xen(unsigned long mbi_p)
         panic("Could not protect TXT memory regions");
 
     init_guest_cpuid();
-
-    if ( opt_dom0pvh )
-        domcr_flags |= DOMCRF_pvh | DOMCRF_hap;
 
     if ( dom0_pvh )
     {

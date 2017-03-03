@@ -718,12 +718,6 @@ typedef struct libxl__ctx libxl_ctx;
 #define LIBXL_HAVE_DOMAIN_CREATE_RESTORE_SEND_BACK_FD 1
 
 /*
- * LIBXL_HAVE_CREATEINFO_PVH
- * If this is defined, then libxl supports creation of a PVH guest.
- */
-#define LIBXL_HAVE_CREATEINFO_PVH 1
-
-/*
  * LIBXL_HAVE_DRIVER_DOMAIN_CREATION 1
  *
  * If this is defined, libxl_domain_create_info contains a driver_domain

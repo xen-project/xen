@@ -78,7 +78,7 @@ static long hvm_physdev_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
     switch ( cmd )
     {
     default:
-        if ( !is_pvh_vcpu(curr) || !is_hardware_domain(curr->domain) )
+        if ( !is_hardware_domain(curr->domain) )
             return -ENOSYS;
         /* fall through */
     case PHYSDEVOP_map_pirq:
@@ -86,7 +86,7 @@ static long hvm_physdev_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
     case PHYSDEVOP_eoi:
     case PHYSDEVOP_irq_status_query:
     case PHYSDEVOP_get_free_pirq:
-        if ( !has_pirq(curr->domain) && !is_pvh_vcpu(curr) )
+        if ( !has_pirq(curr->domain) )
             return -ENOSYS;
         break;
     }

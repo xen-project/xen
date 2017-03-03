@@ -605,9 +605,8 @@ long arch_do_domctl(
         break;
 
     case XEN_DOMCTL_get_address_size:
-        domctl->u.address_size.size =
-            (is_pv_32bit_domain(d) || is_pvh_32bit_domain(d)) ?
-            32 : BITS_PER_LONG;
+        domctl->u.address_size.size = is_pv_32bit_domain(d) ? 32 :
+                                                              BITS_PER_LONG;
         copyback = 1;
         break;
 
@@ -1480,7 +1479,7 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 {
     unsigned int i;
     const struct domain *d = v->domain;
-    bool_t compat = is_pv_32bit_domain(d) || is_pvh_32bit_domain(d);
+    bool_t compat = is_pv_32bit_domain(d);
 #define c(fld) (!compat ? (c.nat->fld) : (c.cmp->fld))
 
     if ( !is_pv_domain(d) )

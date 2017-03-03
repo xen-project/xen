@@ -589,7 +589,7 @@ int p2m_alloc_table(struct p2m_domain *p2m)
 }
 
 /*
- * pvh fixme: when adding support for pvh non-hardware domains, this path must
+ * hvm fixme: when adding support for pvh non-hardware domains, this path must
  * cleanup any foreign p2m types (release refcnts on them).
  */
 void p2m_teardown(struct p2m_domain *p2m)
@@ -2411,10 +2411,10 @@ int p2m_add_foreign(struct domain *tdom, unsigned long fgfn,
     struct domain *fdom;
 
     ASSERT(tdom);
-    if ( foreigndom == DOMID_SELF || !is_pvh_domain(tdom) )
+    if ( foreigndom == DOMID_SELF )
         return -EINVAL;
     /*
-     * pvh fixme: until support is added to p2m teardown code to cleanup any
+     * hvm fixme: until support is added to p2m teardown code to cleanup any
      * foreign entries, limit this to hardware domain only.
      */
     if ( !is_hardware_domain(tdom) )

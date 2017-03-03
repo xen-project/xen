@@ -38,9 +38,6 @@ int libxl__domain_create_info_setdefault(libxl__gc *gc,
     if (c_info->type == LIBXL_DOMAIN_TYPE_HVM) {
         libxl_defbool_setdefault(&c_info->hap, true);
         libxl_defbool_setdefault(&c_info->oos, true);
-    } else {
-        libxl_defbool_setdefault(&c_info->pvh, false);
-        libxl_defbool_setdefault(&c_info->hap, libxl_defbool_val(c_info->pvh));
     }
 
     libxl_defbool_setdefault(&c_info->run_hotplug_scripts, true);
@@ -475,8 +472,6 @@ int libxl__domain_build(libxl__gc *gc,
 
         break;
     case LIBXL_DOMAIN_TYPE_PV:
-        state->pvh_enabled = libxl_defbool_val(d_config->c_info.pvh);
-
         ret = libxl__build_pv(gc, domid, info, state);
         if (ret)
             goto out;
@@ -536,14 +531,6 @@ int libxl__domain_make(libxl__gc *gc, libxl_domain_config *d_config,
         flags |= XEN_DOMCTL_CDF_hvm_guest;
         flags |= libxl_defbool_val(info->hap) ? XEN_DOMCTL_CDF_hap : 0;
         flags |= libxl_defbool_val(info->oos) ? 0 : XEN_DOMCTL_CDF_oos_off;
-    } else if (libxl_defbool_val(info->pvh)) {
-        flags |= XEN_DOMCTL_CDF_pvh_guest;
-        if (!libxl_defbool_val(info->hap)) {
-            LOGD(ERROR, *domid, "HAP must be on for PVH");
-            rc = ERROR_INVAL;
-            goto out;
-        }
-        flags |= XEN_DOMCTL_CDF_hap;
     }
 
     /* Ultimately, handle is an array of 16 uint8_t, same as uuid */

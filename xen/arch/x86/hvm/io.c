@@ -84,8 +84,6 @@ bool hvm_emulate_one_insn(hvm_emulate_validate_t *validate)
     struct hvm_vcpu_io *vio = &curr->arch.hvm_vcpu.hvm_io;
     int rc;
 
-    ASSERT(!is_pvh_vcpu(curr));
-
     hvm_emulate_init_once(&ctxt, validate, guest_cpu_user_regs());
 
     rc = hvm_emulate_one(&ctxt);

@@ -606,8 +606,8 @@ int vm_event_domctl(struct domain *d, xen_domctl_vm_event_op_t *vec,
             struct p2m_domain *p2m = p2m_get_hostp2m(d);
 
             rc = -EOPNOTSUPP;
-            /* pvh fixme: p2m_is_foreign types need addressing */
-            if ( is_pvh_vcpu(current) || is_pvh_domain(hardware_domain) )
+            /* hvm fixme: p2m_is_foreign types need addressing */
+            if ( is_hvm_domain(hardware_domain) )
                 break;
 
             rc = -ENODEV;
@@ -707,8 +707,8 @@ int vm_event_domctl(struct domain *d, xen_domctl_vm_event_op_t *vec,
         {
         case XEN_VM_EVENT_ENABLE:
             rc = -EOPNOTSUPP;
-            /* pvh fixme: p2m_is_foreign types need addressing */
-            if ( is_pvh_vcpu(current) || is_pvh_domain(hardware_domain) )
+            /* hvm fixme: p2m_is_foreign types need addressing */
+            if ( is_hvm_domain(hardware_domain) )
                 break;
 
             rc = -ENODEV;

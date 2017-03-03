@@ -167,7 +167,6 @@ struct cpuid_domain_info
     } vendor;
 
     bool hvm;
-    bool pvh;
     uint64_t xfeature_mask;
 
     uint32_t *featureset;
@@ -231,7 +230,6 @@ static int get_cpuid_domain_info(xc_interface *xch, domid_t domid,
         return -ESRCH;
 
     info->hvm = di.hvm;
-    info->pvh = di.pvh;
 
     info->featureset = calloc(host_nr_features, sizeof(*info->featureset));
     if ( !info->featureset )
@@ -682,13 +680,10 @@ static void sanitise_featureset(struct cpuid_domain_info *info)
                 clear_bit(X86_FEATURE_SYSCALL, info->featureset);
         }
 
-        if ( !info->pvh )
-        {
-            clear_bit(X86_FEATURE_PSE, info->featureset);
-            clear_bit(X86_FEATURE_PSE36, info->featureset);
-            clear_bit(X86_FEATURE_PGE, info->featureset);
-            clear_bit(X86_FEATURE_PAGE1GB, info->featureset);
-        }
+        clear_bit(X86_FEATURE_PSE, info->featureset);
+        clear_bit(X86_FEATURE_PSE36, info->featureset);
+        clear_bit(X86_FEATURE_PGE, info->featureset);
+        clear_bit(X86_FEATURE_PAGE1GB, info->featureset);
     }
 
     if ( info->xfeature_mask == 0 )

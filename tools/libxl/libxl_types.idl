@@ -382,7 +382,6 @@ libxl_domain_create_info = Struct("domain_create_info",[
     ("poolid",       uint32),
     ("pool_name",    string),
     ("run_hotplug_scripts",libxl_defbool),
-    ("pvh",          libxl_defbool),
     ("driver_domain",libxl_defbool),
     ], dir=DIR_IN)
 

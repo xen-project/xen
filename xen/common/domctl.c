@@ -194,9 +194,6 @@ void getdomaininfo(struct domain *d, struct xen_domctl_getdomaininfo *info)
     case guest_type_hvm:
         info->flags |= XEN_DOMINF_hvm_guest;
         break;
-    case guest_type_pvh:
-        info->flags |= XEN_DOMINF_pvh_guest;
-        break;
     default:
         break;
     }
@@ -501,7 +498,6 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
         ret = -EINVAL;
         if ( (op->u.createdomain.flags &
              ~(XEN_DOMCTL_CDF_hvm_guest
-               | XEN_DOMCTL_CDF_pvh_guest
                | XEN_DOMCTL_CDF_hap
                | XEN_DOMCTL_CDF_s3_integrity
                | XEN_DOMCTL_CDF_oos_off
@@ -532,15 +528,9 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
             rover = dom;
         }
 
-        if ( (op->u.createdomain.flags & XEN_DOMCTL_CDF_hvm_guest)
-             && (op->u.createdomain.flags & XEN_DOMCTL_CDF_pvh_guest) )
-            return -EINVAL;
-
         domcr_flags = 0;
         if ( op->u.createdomain.flags & XEN_DOMCTL_CDF_hvm_guest )
             domcr_flags |= DOMCRF_hvm;
-        if ( op->u.createdomain.flags & XEN_DOMCTL_CDF_pvh_guest )
-            domcr_flags |= DOMCRF_pvh;
         if ( op->u.createdomain.flags & XEN_DOMCTL_CDF_hap )
             domcr_flags |= DOMCRF_hap;
         if ( op->u.createdomain.flags & XEN_DOMCTL_CDF_s3_integrity )

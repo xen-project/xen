@@ -91,9 +91,6 @@ struct hvm_function_table {
     /* Support Hardware-Assisted Paging? */
     bool_t hap_supported;
 
-    /* Necessary hardware support for PVH mode? */
-    bool_t pvh_supported;
-
     /* Necessary hardware support for alternate p2m's? */
     bool altp2m_supported;
 

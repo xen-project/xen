@@ -304,8 +304,6 @@ struct domain *domain_create(domid_t domid, unsigned int domcr_flags,
 
     if ( domcr_flags & DOMCRF_hvm )
         d->guest_type = guest_type_hvm;
-    else if ( domcr_flags & DOMCRF_pvh )
-        d->guest_type = guest_type_pvh;
     else
         d->guest_type = guest_type_pv;
 

@@ -180,9 +180,6 @@ static int __init hvm_enable(void)
         printk("\n");
     }
 
-    if ( !fns->pvh_supported )
-        printk(XENLOG_INFO "HVM: PVH mode not supported on this platform\n");
-
     if ( !opt_altp2m_enabled )
         hvm_funcs.altp2m_supported = 0;
 
@@ -431,10 +428,6 @@ u64 hvm_get_guest_tsc_fixed(struct vcpu *v, uint64_t at_tsc)
 
 void hvm_migrate_timers(struct vcpu *v)
 {
-    /* PVH doesn't use rtc and emulated timers, it uses pvclock mechanism. */
-    if ( is_pvh_vcpu(v) )
-        return;
-
     rtc_migrate_timers(v);
     pt_migrate(v);
 }
@@ -600,19 +593,6 @@ static int hvm_print_line(
     return X86EMUL_OKAY;
 }
 
-static int handle_pvh_io(
-    int dir, unsigned int port, unsigned int bytes, uint32_t *val)
-{
-    struct domain *currd = current->domain;
-
-    if ( dir == IOREQ_WRITE )
-        guest_io_write(port, bytes, *val, currd);
-    else
-        *val = guest_io_read(port, bytes, currd);
-
-    return X86EMUL_OKAY;
-}
-
 int hvm_domain_initialise(struct domain *d)
 {
     int rc;
@@ -622,22 +602,6 @@ int hvm_domain_initialise(struct domain *d)
         gdprintk(XENLOG_WARNING, "Attempt to create a HVM guest "
                  "on a non-VT/AMDV platform.\n");
         return -EINVAL;
-    }
-
-    if ( is_pvh_domain(d) )
-    {
-        if ( !hvm_funcs.pvh_supported )
-        {
-            printk(XENLOG_G_WARNING "Attempt to create a PVH guest "
-                   "on a system without necessary hardware support\n");
-            return -EINVAL;
-        }
-        if ( !hap_enabled(d) )
-        {
-            printk(XENLOG_G_INFO "PVH guest must have HAP on\n");
-            return -EINVAL;
-        }
-
     }
 
     spin_lock_init(&d->arch.hvm_domain.irq_lock);
@@ -681,12 +645,6 @@ int hvm_domain_initialise(struct domain *d)
 
     hvm_ioreq_init(d);
 
-    if ( is_pvh_domain(d) )
-    {
-        register_portio_handler(d, 0, 0x10003, handle_pvh_io);
-        return 0;
-    }
-
     hvm_init_guest_time(d);
 
     d->arch.hvm_domain.params[HVM_PARAM_TRIPLE_FAULT_REASON] = SHUTDOWN_reboot;
@@ -729,9 +687,6 @@ int hvm_domain_initialise(struct domain *d)
 
 void hvm_domain_relinquish_resources(struct domain *d)
 {
-    if ( is_pvh_domain(d) )
-        return;
-
     if ( hvm_funcs.nhvm_domain_relinquish_resources )
         hvm_funcs.nhvm_domain_relinquish_resources(d);
 
@@ -759,9 +714,6 @@ void hvm_domain_destroy(struct domain *d)
     d->arch.hvm_domain.params = NULL;
 
     hvm_destroy_cacheattr_region_list(d);
-
-    if ( is_pvh_domain(d) )
-        return;
 
     hvm_funcs.domain_destroy(d);
     rtc_deinit(d);
@@ -1531,13 +1483,6 @@ int hvm_vcpu_initialise(struct vcpu *v)
 
     v->arch.hvm_vcpu.inject_event.vector = HVM_EVENT_VECTOR_UNSET;
 
-    if ( is_pvh_domain(d) )
-    {
-        /* This is for hvm_long_mode_enabled(v). */
-        v->arch.hvm_vcpu.guest_efer = EFER_LMA | EFER_LME;
-        return 0;
-    }
-
     rc = setup_compat_arg_xlat(v); /* teardown: free_compat_arg_xlat() */
     if ( rc != 0 )
         goto fail4;
@@ -1875,9 +1820,6 @@ int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
             __put_gfn(hostp2m, gfn);
 
         rc = 0;
-        if ( unlikely(is_pvh_domain(currd)) )
-            goto out;
-
         if ( !handle_mmio_with_translation(gla, gpa >> PAGE_SHIFT, npfec) )
             hvm_inject_hw_exception(TRAP_gp_fault, 0);
         rc = 1;
@@ -2225,15 +2167,6 @@ int hvm_set_cr0(unsigned long value, bool_t may_defer)
          (value & (X86_CR0_PE | X86_CR0_PG)) == X86_CR0_PG )
         return X86EMUL_EXCEPTION;
 
-    /* A pvh is not expected to change to real mode. */
-    if ( is_pvh_domain(d) &&
-         (value & (X86_CR0_PE | X86_CR0_PG)) != (X86_CR0_PG | X86_CR0_PE) )
-    {
-        printk(XENLOG_G_WARNING
-               "PVH attempting to turn off PE/PG. CR0:%lx\n", value);
-        return X86EMUL_EXCEPTION;
-    }
-
     if ( may_defer && unlikely(v->domain->arch.monitor.write_ctrlreg_enabled &
                                monitor_ctrlreg_bitmask(VM_EVENT_X86_CR0)) )
     {
@@ -2392,11 +2325,6 @@ int hvm_set_cr4(unsigned long value, bool_t may_defer)
         {
             HVM_DBG_LOG(DBG_LEVEL_1, "Guest cleared CR4.PAE while "
                         "EFER.LMA is set");
-            return X86EMUL_EXCEPTION;
-        }
-        if ( is_pvh_vcpu(v) )
-        {
-            HVM_DBG_LOG(DBG_LEVEL_1, "32-bit PVH guest cleared CR4.PAE");
             return X86EMUL_EXCEPTION;
         }
     }
@@ -3551,8 +3479,7 @@ int hvm_msr_write_intercept(unsigned int msr, uint64_t msr_content,
         break;
 
     case MSR_IA32_APICBASE:
-        if ( unlikely(is_pvh_vcpu(v)) ||
-             !vlapic_msr_set(vcpu_vlapic(v), msr_content) )
+        if ( !vlapic_msr_set(vcpu_vlapic(v), msr_content) )
             goto gp_fault;
         break;
 
@@ -4075,8 +4002,7 @@ static int hvmop_set_param(
         return -ESRCH;
 
     rc = -EINVAL;
-    if ( !has_hvm_container_domain(d) ||
-         (is_pvh_domain(d) && (a.index != HVM_PARAM_CALLBACK_IRQ)) )
+    if ( !has_hvm_container_domain(d) )
         goto out;
 
     rc = hvm_allow_set_param(d, &a);
@@ -4331,8 +4257,7 @@ static int hvmop_get_param(
         return -ESRCH;
 
     rc = -EINVAL;
-    if ( !has_hvm_container_domain(d) ||
-         (is_pvh_domain(d) && (a.index != HVM_PARAM_CALLBACK_IRQ)) )
+    if ( !has_hvm_container_domain(d) )
         goto out;
 
     rc = hvm_allow_get_param(d, &a);

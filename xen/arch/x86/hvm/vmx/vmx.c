@@ -2157,9 +2157,6 @@ static int vmx_set_mode(struct vcpu *v, int mode)
 {
     unsigned long attr;
 
-    if ( !is_pvh_vcpu(v) )
-        return 0;
-
     ASSERT((mode == 4) || (mode == 8));
 
     attr = (mode == 4) ? 0xc09b : 0xa09b;
@@ -2389,12 +2386,6 @@ const struct hvm_function_table * __init start_vmx(void)
         vmx_function_table.deliver_posted_intr = NULL;
         vmx_function_table.sync_pir_to_irr = NULL;
     }
-
-    if ( cpu_has_vmx_ept
-         && cpu_has_vmx_pat
-         && cpu_has_vmx_msr_bitmap
-         && cpu_has_vmx_secondary_exec_control )
-        vmx_function_table.pvh_supported = 1;
 
     if ( cpu_has_vmx_tsc_scaling )
         vmx_function_table.tsc_scaling.ratio_frac_bits = 48;
@@ -3895,8 +3886,7 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
         if ( exit_qualification & 0x10 )
         {
             /* INS, OUTS */
-            if ( unlikely(is_pvh_vcpu(v)) /* PVH fixme */ ||
-                 !hvm_emulate_one_insn(x86_insn_is_portio) )
+            if ( !hvm_emulate_one_insn(x86_insn_is_portio) )
                 hvm_inject_hw_exception(TRAP_gp_fault, 0);
         }
         else

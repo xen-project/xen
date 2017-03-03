@@ -532,7 +532,7 @@ p2m_pt_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
 
     if ( unlikely(p2m_is_foreign(p2mt)) )
     {
-        /* pvh fixme: foreign types are only supported on ept at present */
+        /* hvm fixme: foreign types are only supported on ept at present */
         gdprintk(XENLOG_WARNING, "Unimplemented foreign p2m type.\n");
         return -EINVAL;
     }

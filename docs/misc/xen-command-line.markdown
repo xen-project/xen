@@ -681,13 +681,6 @@ Flag that makes a dom0 boot in PVHv2 mode.
 
 Flag that makes a dom0 use shadow paging.
 
-### dom0pvh
-> `= <boolean>`
-
-> Default: `false`
-
-Flag that makes a 64bit dom0 boot in PVH mode. No 32bit support at present.
-
 ### dtuart (ARM)
 > `= path [:options]`
 

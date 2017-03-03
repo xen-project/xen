@@ -3041,7 +3041,7 @@ static struct domain *get_pg_owner(domid_t domid)
         goto out;
     }
 
-    if ( !is_pvh_domain(curr) && unlikely(paging_mode_translate(curr)) )
+    if ( unlikely(paging_mode_translate(curr)) )
     {
         MEM_LOG("Cannot mix foreign mappings with translated domains");
         goto out;

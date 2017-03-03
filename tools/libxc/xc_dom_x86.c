@@ -373,7 +373,7 @@ static x86_pgentry_t get_pg_prot_x86(struct xc_dom_image *dom, int l,
     unsigned m;
 
     prot = domx86->params->lvl_prot[l];
-    if ( l > 0 || dom->pvh_enabled )
+    if ( l > 0 )
         return prot;
 
     for ( m = 0; m < domx86->n_mappings; m++ )
@@ -870,18 +870,15 @@ static int vcpu_x86_32(struct xc_dom_image *dom)
     DOMPRINTF("%s: cr3: pfn 0x%" PRIpfn " mfn 0x%" PRIpfn "",
               __FUNCTION__, dom->pgtables_seg.pfn, cr3_pfn);
 
-    if ( !dom->pvh_enabled )
-    {
-        ctxt->user_regs.ds = FLAT_KERNEL_DS_X86_32;
-        ctxt->user_regs.es = FLAT_KERNEL_DS_X86_32;
-        ctxt->user_regs.fs = FLAT_KERNEL_DS_X86_32;
-        ctxt->user_regs.gs = FLAT_KERNEL_DS_X86_32;
-        ctxt->user_regs.ss = FLAT_KERNEL_SS_X86_32;
-        ctxt->user_regs.cs = FLAT_KERNEL_CS_X86_32;
+    ctxt->user_regs.ds = FLAT_KERNEL_DS_X86_32;
+    ctxt->user_regs.es = FLAT_KERNEL_DS_X86_32;
+    ctxt->user_regs.fs = FLAT_KERNEL_DS_X86_32;
+    ctxt->user_regs.gs = FLAT_KERNEL_DS_X86_32;
+    ctxt->user_regs.ss = FLAT_KERNEL_SS_X86_32;
+    ctxt->user_regs.cs = FLAT_KERNEL_CS_X86_32;
 
-        ctxt->kernel_ss = ctxt->user_regs.ss;
-        ctxt->kernel_sp = ctxt->user_regs.esp;
-    }
+    ctxt->kernel_ss = ctxt->user_regs.ss;
+    ctxt->kernel_sp = ctxt->user_regs.esp;
 
     rc = xc_vcpu_setcontext(dom->xch, dom->guest_domid, 0, &any_ctx);
     if ( rc != 0 )
@@ -916,18 +913,15 @@ static int vcpu_x86_64(struct xc_dom_image *dom)
     DOMPRINTF("%s: cr3: pfn 0x%" PRIpfn " mfn 0x%" PRIpfn "",
               __FUNCTION__, dom->pgtables_seg.pfn, cr3_pfn);
 
-    if ( !dom->pvh_enabled )
-    {
-        ctxt->user_regs.ds = FLAT_KERNEL_DS_X86_64;
-        ctxt->user_regs.es = FLAT_KERNEL_DS_X86_64;
-        ctxt->user_regs.fs = FLAT_KERNEL_DS_X86_64;
-        ctxt->user_regs.gs = FLAT_KERNEL_DS_X86_64;
-        ctxt->user_regs.ss = FLAT_KERNEL_SS_X86_64;
-        ctxt->user_regs.cs = FLAT_KERNEL_CS_X86_64;
+    ctxt->user_regs.ds = FLAT_KERNEL_DS_X86_64;
+    ctxt->user_regs.es = FLAT_KERNEL_DS_X86_64;
+    ctxt->user_regs.fs = FLAT_KERNEL_DS_X86_64;
+    ctxt->user_regs.gs = FLAT_KERNEL_DS_X86_64;
+    ctxt->user_regs.ss = FLAT_KERNEL_SS_X86_64;
+    ctxt->user_regs.cs = FLAT_KERNEL_CS_X86_64;
 
-        ctxt->kernel_ss = ctxt->user_regs.ss;
-        ctxt->kernel_sp = ctxt->user_regs.esp;
-    }
+    ctxt->kernel_ss = ctxt->user_regs.ss;
+    ctxt->kernel_sp = ctxt->user_regs.esp;
 
     rc = xc_vcpu_setcontext(dom->xch, dom->guest_domid, 0, &any_ctx);
     if ( rc != 0 )
@@ -1106,7 +1100,7 @@ static int meminit_pv(struct xc_dom_image *dom)
     rc = x86_compat(dom->xch, dom->guest_domid, dom->guest_type);
     if ( rc )
         return rc;
-    if ( xc_dom_feature_translated(dom) && !dom->pvh_enabled )
+    if ( xc_dom_feature_translated(dom) )
     {
         dom->shadow_enabled = 1;
         rc = x86_shadow(dom->xch, dom->guest_domid);
@@ -1593,9 +1587,6 @@ static int bootearly(struct xc_dom_image *dom)
 static int map_grant_table_frames(struct xc_dom_image *dom)
 {
     int i, rc;
-
-    if ( dom->pvh_enabled )
-        return 0;
 
     for ( i = 0; ; i++ )
     {

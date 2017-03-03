@@ -225,8 +225,7 @@ void vpmu_do_interrupt(struct cpu_user_regs *regs)
         if ( !vpmu->xenpmu_data )
             return;
 
-        if ( is_pvh_vcpu(sampling) &&
-             !(vpmu_mode & XENPMU_MODE_ALL) &&
+        if ( !(vpmu_mode & XENPMU_MODE_ALL) &&
              !vpmu->arch_vpmu_ops->do_interrupt(regs) )
             return;
 
