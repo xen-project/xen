@@ -45,6 +45,7 @@ struct domain_create {
     char *extra_config; /* extra config string */
     const char *restore_file;
     char *colo_proxy_script;
+    bool userspace_colo_proxy;
     int migrate_fd; /* -1 means none */
     int send_back_fd; /* -1 means none */
     char **migration_domname_r; /* from malloc */

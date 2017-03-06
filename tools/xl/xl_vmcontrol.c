@@ -877,6 +877,8 @@ start:
         params.stream_version =
             (hdr.mandatory_flags & XL_MANDATORY_FLAG_STREAMv2) ? 2 : 1;
         params.colo_proxy_script = dom_info->colo_proxy_script;
+        libxl_defbool_set(&params.userspace_colo_proxy,
+                          dom_info->userspace_colo_proxy);
 
         ret = libxl_domain_create_restore(ctx, &d_config,
                                           &domid, restore_fd,

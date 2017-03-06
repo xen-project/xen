@@ -1633,11 +1633,15 @@ static int do_domain_create(libxl_ctx *ctx, libxl_domain_config *d_config,
     cdcs->dcs.domid_soft_reset = INVALID_DOMID;
 
     if (cdcs->dcs.restore_params.checkpointed_stream ==
-        LIBXL_CHECKPOINTED_STREAM_COLO)
+        LIBXL_CHECKPOINTED_STREAM_COLO) {
         cdcs->dcs.colo_proxy_script =
             cdcs->dcs.restore_params.colo_proxy_script;
-    else
+        cdcs->dcs.crs.cps.is_userspace_proxy =
+            libxl_defbool_val(cdcs->dcs.restore_params.userspace_colo_proxy);
+    } else {
         cdcs->dcs.colo_proxy_script = NULL;
+        cdcs->dcs.crs.cps.is_userspace_proxy = false;
+    }
 
     libxl__ao_progress_gethow(&cdcs->dcs.aop_console_how, aop_console_how);
     cdcs->domid_out = domid;

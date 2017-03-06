@@ -774,8 +774,12 @@ static void colo_setup_checkpoint_devices(libxl__egc *egc,
 
     STATE_AO_GC(crs->ao);
 
-    cds->device_kind_flags = (1 << LIBXL__DEVICE_KIND_VIF) |
-                             (1 << LIBXL__DEVICE_KIND_VBD);
+    if (crs->cps.is_userspace_proxy)
+        cds->device_kind_flags = (1 << LIBXL__DEVICE_KIND_VBD);
+    else
+        cds->device_kind_flags = (1 << LIBXL__DEVICE_KIND_VIF) |
+                                 (1 << LIBXL__DEVICE_KIND_VBD);
+
     cds->callback = colo_restore_setup_cds_done;
     cds->ao = ao;
     cds->domid = crs->domid;
