@@ -110,8 +110,13 @@ void libxl__colo_save_setup(libxl__egc *egc, libxl__colo_save_state *css)
         css->colo_proxy_script = GCSPRINTF("%s/colo-proxy-setup",
                                            libxl__xen_script_dir_path());
 
-    cds->device_kind_flags = (1 << LIBXL__DEVICE_KIND_VIF) |
-                             (1 << LIBXL__DEVICE_KIND_VBD);
+    /* If enable userspace proxy mode, we don't need VIF */
+    if (css->cps.is_userspace_proxy)
+        cds->device_kind_flags = (1 << LIBXL__DEVICE_KIND_VBD);
+    else
+        cds->device_kind_flags = (1 << LIBXL__DEVICE_KIND_VIF) |
+                                 (1 << LIBXL__DEVICE_KIND_VBD);
+
     cds->ops = colo_ops;
     cds->callback = colo_save_setup_done;
     cds->ao = ao;

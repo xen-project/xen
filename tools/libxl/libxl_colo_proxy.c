@@ -152,6 +152,10 @@ int colo_proxy_setup(libxl__colo_proxy_state *cps)
 
     STATE_AO_GC(cps->ao);
 
+    /* If enable userspace proxy mode, we don't need setup kernel proxy */
+    if (cps->is_userspace_proxy)
+        return 0;
+
     skfd = socket(PF_NETLINK, SOCK_RAW, NETLINK_COLO);
     if (skfd < 0) {
         LOGD(ERROR, ao->domid, "can not create a netlink socket: %s", strerror(errno));
@@ -222,6 +226,13 @@ out:
 
 void colo_proxy_teardown(libxl__colo_proxy_state *cps)
 {
+    /*
+     * If enable userspace proxy mode,
+     * we don't need teardown kernel proxy
+     */
+    if (cps->is_userspace_proxy)
+        return;
+
     if (cps->sock_fd >= 0) {
         close(cps->sock_fd);
         cps->sock_fd = -1;
@@ -232,6 +243,13 @@ void colo_proxy_teardown(libxl__colo_proxy_state *cps)
 
 void colo_proxy_preresume(libxl__colo_proxy_state *cps)
 {
+    /*
+     * If enable userspace proxy mode,
+     * we don't need preresume kernel proxy
+     */
+    if (cps->is_userspace_proxy)
+        return;
+
     colo_proxy_send(cps, NULL, 0, COLO_CHECKPOINT);
     /* TODO: need to handle if the call fails... */
 }
@@ -261,6 +279,19 @@ int colo_proxy_checkpoint(libxl__colo_proxy_state *cps,
     int ret = -1;
 
     STATE_AO_GC(cps->ao);
+
+    /*
+     * Enable userspace proxy to periodical checkpoint mode,
+     * sleeping temporarily for colo userspace proxy mode.
+     * then we will use socket recv instead of this usleep.
+     * In other words, we use socket communicate with Qemu
+     * Proxy part(colo-compare), for example, notify checkpoint
+     * event.
+     */
+    if (cps->is_userspace_proxy) {
+        usleep(timeout_us);
+        return 0;
+    }
 
     size = colo_proxy_recv(cps, &buff, timeout_us);
 
