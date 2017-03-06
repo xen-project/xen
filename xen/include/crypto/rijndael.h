@@ -45,10 +45,10 @@ typedef struct {
 	u32	dk[4*(AES_MAXROUNDS + 1)];	/* decrypt key schedule */
 } rijndael_ctx;
 
-int	 rijndael_set_key(rijndael_ctx *, const u_char *, int);
-int	 rijndael_set_key_enc_only(rijndael_ctx *, const u_char *, int);
-void	 rijndael_decrypt(rijndael_ctx *, const u_char *, u_char *);
-void	 rijndael_encrypt(rijndael_ctx *, const u_char *, u_char *);
+int	 rijndael_set_key(rijndael_ctx *, const unsigned char *, int);
+int	 rijndael_set_key_enc_only(rijndael_ctx *, const unsigned char *, int);
+void	 rijndael_decrypt(rijndael_ctx *, const unsigned char *, unsigned char *);
+void	 rijndael_encrypt(rijndael_ctx *, const unsigned char *, unsigned char *);
 
 int	rijndaelKeySetupEnc(unsigned int [], const unsigned char [], int);
 int	rijndaelKeySetupDec(unsigned int [], const unsigned char [], int);

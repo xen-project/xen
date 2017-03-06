@@ -1236,7 +1236,7 @@ rijndaelDecrypt(const u32 rk[/*4*(Nr + 1)*/], int Nr, const u8 ct[16],
 
 /* setup key context for encryption only */
 int
-rijndael_set_key_enc_only(rijndael_ctx *ctx, const u_char *key, int bits)
+rijndael_set_key_enc_only(rijndael_ctx *ctx, const unsigned char *key, int bits)
 {
 	int rounds;
 
@@ -1252,7 +1252,7 @@ rijndael_set_key_enc_only(rijndael_ctx *ctx, const u_char *key, int bits)
 
 /* setup key context for both encryption and decryption */
 int
-rijndael_set_key(rijndael_ctx *ctx, const u_char *key, int bits)
+rijndael_set_key(rijndael_ctx *ctx, const unsigned char *key, int bits)
 {
 	int rounds;
 
@@ -1269,13 +1269,13 @@ rijndael_set_key(rijndael_ctx *ctx, const u_char *key, int bits)
 }
 
 void
-rijndael_decrypt(rijndael_ctx *ctx, const u_char *src, u_char *dst)
+rijndael_decrypt(rijndael_ctx *ctx, const unsigned char *src, unsigned char *dst)
 {
 	rijndaelDecrypt(ctx->dk, ctx->Nr, src, dst);
 }
 
 void
-rijndael_encrypt(rijndael_ctx *ctx, const u_char *src, u_char *dst)
+rijndael_encrypt(rijndael_ctx *ctx, const unsigned char *src, unsigned char *dst)
 {
 	rijndaelEncrypt(ctx->ek, ctx->Nr, src, dst);
 }
