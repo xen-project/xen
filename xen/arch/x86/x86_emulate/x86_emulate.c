@@ -2269,7 +2269,8 @@ x86_decode_twobyte(
         }
         /* fall through */
     case 0x21: case 0x23: /* mov to/from dr */
-        generate_exception_if(lock_prefix || ea.type != OP_REG, EXC_UD);
+        ASSERT(ea.type == OP_REG); /* Early operand adjustment ensures this. */
+        generate_exception_if(lock_prefix, EXC_UD);
         op_bytes = mode_64bit() ? 8 : 4;
         break;
 
@@ -2681,6 +2682,23 @@ x86_decode(
                     d |= DstEax | SrcMem;
                     break;
                 }
+                break;
+            }
+            break;
+
+        case ext_0f:
+            switch ( b )
+            {
+            case 0x20: /* mov cr,reg */
+            case 0x21: /* mov dr,reg */
+            case 0x22: /* mov reg,cr */
+            case 0x23: /* mov reg,dr */
+                /*
+                 * Mov to/from cr/dr ignore the encoding of Mod, and behave as
+                 * if they were encoded as reg/reg instructions.  No futher
+                 * disp/SIB bytes are fetched.
+                 */
+                modrm_mod = 3;
                 break;
             }
             break;

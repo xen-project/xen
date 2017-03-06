@@ -1000,6 +1000,27 @@ int main(int argc, char **argv)
     }
     printf("okay\n");
 
+    printf("%-40s", "Testing mov %%cr4,%%esi (bad ModRM)...");
+    /*
+     * Mod = 1, Reg = 4, R/M = 6 would normally encode a memory reference of
+     * disp8(%esi), but mov to/from cr/dr are special and behave as if they
+     * were encoded with Mod == 3.
+     */
+    instr[0] = 0x0f; instr[1] = 0x20, instr[2] = 0x66;
+    instr[3] = 0; /* Supposed disp8. */
+    regs.esi = 0;
+    regs.eip = (unsigned long)&instr[0];
+    rc = x86_emulate(&ctxt, &emulops);
+    /*
+     * We don't care precicely what gets read from %cr4 into %esi, just so
+     * long as ModRM is treated as a register operand and 0(%esi) isn't
+     * followed as a memory reference.
+     */
+    if ( (rc != X86EMUL_OKAY) ||
+         (regs.eip != (unsigned long)&instr[3]) )
+        goto fail;
+    printf("okay\n");
+
 #define decl_insn(which) extern const unsigned char which[], \
                          which##_end[] asm ( ".L" #which "_end" )
 #define put_insn(which, insn) ".pushsection .test, \"ax\", @progbits\n" \
