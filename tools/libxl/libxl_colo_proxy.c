@@ -18,9 +18,13 @@
 #include "libxl_internal.h"
 
 #include <netlink/netlink.h>
+#include <arpa/inet.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
 
 /* Consistent with the new COLO netlink channel in kernel side */
 #define NETLINK_COLO 28
+#define COLO_DEFAULT_WAIT_TIME 500000
 
 enum colo_netlink_op {
     COLO_QUERY_CHECKPOINT = (NLMSG_MIN_TYPE + 1),
@@ -73,6 +77,63 @@ static int colo_proxy_send(libxl__colo_proxy_state *cps, uint8_t *buff,
             strerror(errno));
     }
 
+    return ret;
+}
+
+static int colo_userspace_proxy_send(libxl__colo_proxy_state *cps,
+                                     uint8_t *buff,
+                                     uint32_t size)
+{
+    int ret = 0;
+    uint32_t len = 0;
+
+    len = htonl(size);
+    ret = send(cps->sock_fd, (uint8_t *)&len, sizeof(len), 0);
+    if (ret != sizeof(len)) {
+        goto err;
+    }
+
+    ret = send(cps->sock_fd, (uint8_t *)buff, size, 0);
+    if (ret != size) {
+        goto err;
+    }
+
+err:
+    return ret;
+}
+
+static int colo_userspace_proxy_recv(libxl__colo_proxy_state *cps,
+                                     char *buff,
+                                     unsigned int timeout_us)
+{
+    struct timeval tv;
+    int ret;
+    uint32_t len = 0;
+    uint32_t size = 0;
+
+    STATE_AO_GC(cps->ao);
+
+    if (timeout_us) {
+        tv.tv_sec = timeout_us / 1000000;
+        tv.tv_usec = timeout_us % 1000000;
+        ret = setsockopt(cps->sock_fd, SOL_SOCKET, SO_RCVTIMEO, &tv,
+                         sizeof(tv));
+        if (ret < 0) {
+            LOGD(ERROR, ao->domid,
+                 "colo_userspace_proxy_recv setsockopt error: %s",
+                 strerror(errno));
+        }
+    }
+
+    ret = recv(cps->sock_fd, (uint8_t *)&len, sizeof(len), 0);
+    if (ret < 0) {
+        goto err;
+    }
+
+    size = ntohl(len);
+    ret = recv(cps->sock_fd, buff, size, 0);
+
+err:
     return ret;
 }
 
@@ -153,8 +214,45 @@ int colo_proxy_setup(libxl__colo_proxy_state *cps)
     STATE_AO_GC(cps->ao);
 
     /* If enable userspace proxy mode, we don't need setup kernel proxy */
-    if (cps->is_userspace_proxy)
+    if (cps->is_userspace_proxy) {
+        struct sockaddr_in addr;
+        int port;
+        char recvbuff[1024];
+        const char sendbuf[] = "COLO_USERSPACE_PROXY_INIT";
+
+        memset(&addr, 0, sizeof(addr));
+        port = atoi(cps->checkpoint_port);
+        addr.sin_family = AF_INET;
+        addr.sin_port = htons(port);
+        addr.sin_addr.s_addr = inet_addr(cps->checkpoint_host);
+
+        skfd = socket(AF_INET, SOCK_STREAM, 0);
+        if (skfd < 0) {
+            LOGD(ERROR, ao->domid, "can not create a TCP socket: %s",
+                 strerror(errno));
+            goto out;
+        }
+
+        cps->sock_fd = skfd;
+
+        if (connect(skfd, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
+            LOGD(ERROR, ao->domid, "connect error");
+            goto out;
+        }
+
+        ret = colo_userspace_proxy_send(cps, (uint8_t *)sendbuf, strlen(sendbuf));
+        if (ret < 0)
+            goto out;
+
+        ret = colo_userspace_proxy_recv(cps, recvbuff, COLO_DEFAULT_WAIT_TIME);
+        if (ret < 0) {
+            LOGD(ERROR, ao->domid, "Can't recv msg from qemu colo-compare: %s",
+                 strerror(errno));
+            goto out;
+        }
+
         return 0;
+    }
 
     skfd = socket(PF_NETLINK, SOCK_RAW, NETLINK_COLO);
     if (skfd < 0) {
@@ -247,8 +345,13 @@ void colo_proxy_preresume(libxl__colo_proxy_state *cps)
      * If enable userspace proxy mode,
      * we don't need preresume kernel proxy
      */
-    if (cps->is_userspace_proxy)
+    if (cps->is_userspace_proxy) {
+        const char sendbuf[] = "COLO_CHECKPOINT";
+        colo_userspace_proxy_send(cps,
+                                  (uint8_t *)sendbuf,
+                                  strlen(sendbuf));
         return;
+    }
 
     colo_proxy_send(cps, NULL, 0, COLO_CHECKPOINT);
     /* TODO: need to handle if the call fails... */
@@ -277,6 +380,7 @@ int colo_proxy_checkpoint(libxl__colo_proxy_state *cps,
     struct nlmsghdr *h;
     struct colo_msg *m;
     int ret = -1;
+    char recvbuff[1024];
 
     STATE_AO_GC(cps->ao);
 
@@ -289,8 +393,19 @@ int colo_proxy_checkpoint(libxl__colo_proxy_state *cps,
      * event.
      */
     if (cps->is_userspace_proxy) {
-        usleep(timeout_us);
-        return 0;
+        ret = colo_userspace_proxy_recv(cps, recvbuff, timeout_us);
+        if (ret <= 0) {
+            ret = 0;
+            goto out1;
+        }
+
+        if (!strcmp(recvbuff, "DO_CHECKPOINT")) {
+            ret = 1;
+        } else {
+            LOGD(ERROR, ao->domid, "receive qemu colo-compare checkpoint error");
+            ret = 0;
+        }
+        goto out1;
     }
 
     size = colo_proxy_recv(cps, &buff, timeout_us);
@@ -317,5 +432,8 @@ int colo_proxy_checkpoint(libxl__colo_proxy_state *cps,
 
 out:
     free(buff);
+    return ret;
+
+out1:
     return ret;
 }

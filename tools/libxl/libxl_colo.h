@@ -69,6 +69,8 @@ struct libxl__colo_proxy_state {
      *          False means use kernel colo proxy.
      */
     bool is_userspace_proxy;
+    const char *checkpoint_host;
+    const char *checkpoint_port;
 };
 
 struct libxl__colo_save_state {

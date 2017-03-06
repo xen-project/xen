@@ -250,6 +250,8 @@ static void libxl__device_nic_add(libxl__egc *egc, uint32_t domid,
     MAYBE_ADD_COLO_ARGS(filter_sec_redirector1_indev);
     MAYBE_ADD_COLO_ARGS(filter_sec_redirector1_outdev);
     MAYBE_ADD_COLO_ARGS(filter_sec_rewriter0_queue);
+    MAYBE_ADD_COLO_ARGS(checkpoint_host);
+    MAYBE_ADD_COLO_ARGS(checkpoint_port);
 
 #undef MAYBE_ADD_COLO_ARGS
 
@@ -459,6 +461,8 @@ static int libxl__device_nic_from_xenstore(libxl__gc *gc,
     CHECK_COLO_ARGS(filter_sec_redirector1_indev);
     CHECK_COLO_ARGS(filter_sec_redirector1_outdev);
     CHECK_COLO_ARGS(filter_sec_rewriter0_queue);
+    CHECK_COLO_ARGS(checkpoint_host);
+    CHECK_COLO_ARGS(checkpoint_port);
 
 #undef CHECK_COLO_ARGS
 

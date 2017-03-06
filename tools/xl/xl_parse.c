@@ -551,6 +551,10 @@ int parse_nic_config(libxl_device_nic *nic, XLU_Config **config, char *token)
         replace_string(&nic->colo_filter_sec_redirector1_outdev, oparg);
     } else if (MATCH_OPTION("colo_filter_sec_rewriter0_queue", token, oparg)) {
         replace_string(&nic->colo_filter_sec_rewriter0_queue, oparg);
+    } else if (MATCH_OPTION("colo_checkpoint_host", token, oparg)) {
+        replace_string(&nic->colo_checkpoint_host, oparg);
+    } else if (MATCH_OPTION("colo_checkpoint_port", token, oparg)) {
+        replace_string(&nic->colo_checkpoint_port, oparg);
     } else if (MATCH_OPTION("accel", token, oparg)) {
         fprintf(stderr, "the accel parameter for vifs is currently not supported\n");
     } else if (MATCH_OPTION("devid", token, oparg)) {
