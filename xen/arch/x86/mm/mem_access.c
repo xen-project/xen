@@ -32,14 +32,68 @@
 
 #include "mm-locks.h"
 
+/*
+ * Get access type for a gfn.
+ * If gfn == INVALID_GFN, gets the default access type.
+ */
+static int _p2m_get_mem_access(struct p2m_domain *p2m, gfn_t gfn,
+                               xenmem_access_t *access)
+{
+    p2m_type_t t;
+    p2m_access_t a;
+    mfn_t mfn;
+
+    static const xenmem_access_t memaccess[] = {
+#define ACCESS(ac) [p2m_access_##ac] = XENMEM_access_##ac
+            ACCESS(n),
+            ACCESS(r),
+            ACCESS(w),
+            ACCESS(rw),
+            ACCESS(x),
+            ACCESS(rx),
+            ACCESS(wx),
+            ACCESS(rwx),
+            ACCESS(rx2rw),
+            ACCESS(n2rwx),
+#undef ACCESS
+    };
+
+    /* If request to get default access. */
+    if ( gfn_eq(gfn, INVALID_GFN) )
+    {
+        *access = memaccess[p2m->default_access];
+        return 0;
+    }
+
+    gfn_lock(p2m, gfn, 0);
+    mfn = p2m->get_entry(p2m, gfn_x(gfn), &t, &a, 0, NULL, NULL);
+    gfn_unlock(p2m, gfn, 0);
+
+    if ( mfn_eq(mfn, INVALID_MFN) )
+        return -ESRCH;
+
+    if ( (unsigned int)a >= ARRAY_SIZE(memaccess) )
+        return -ERANGE;
+
+    *access =  memaccess[a];
+    return 0;
+}
+
 bool p2m_mem_access_emulate_check(struct vcpu *v,
                                   const vm_event_response_t *rsp)
 {
     xenmem_access_t access;
     bool violation = 1;
     const struct vm_event_mem_access *data = &rsp->u.mem_access;
+    struct domain *d = v->domain;
+    struct p2m_domain *p2m = NULL;
 
-    if ( p2m_get_mem_access(v->domain, _gfn(data->gfn), &access) == 0 )
+    if ( altp2m_active(d) )
+        p2m = p2m_get_altp2m(v);
+    if ( !p2m )
+        p2m = p2m_get_hostp2m(d);
+
+    if ( _p2m_get_mem_access(p2m, _gfn(data->gfn), &access) == 0 )
     {
         switch ( access )
         {
@@ -405,51 +459,11 @@ long p2m_set_mem_access_multi(struct domain *d,
     return rc;
 }
 
-/*
- * Get access type for a gfn.
- * If gfn == INVALID_GFN, gets the default access type.
- */
 int p2m_get_mem_access(struct domain *d, gfn_t gfn, xenmem_access_t *access)
 {
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
-    p2m_type_t t;
-    p2m_access_t a;
-    mfn_t mfn;
 
-    static const xenmem_access_t memaccess[] = {
-#define ACCESS(ac) [p2m_access_##ac] = XENMEM_access_##ac
-            ACCESS(n),
-            ACCESS(r),
-            ACCESS(w),
-            ACCESS(rw),
-            ACCESS(x),
-            ACCESS(rx),
-            ACCESS(wx),
-            ACCESS(rwx),
-            ACCESS(rx2rw),
-            ACCESS(n2rwx),
-#undef ACCESS
-    };
-
-    /* If request to get default access. */
-    if ( gfn_eq(gfn, INVALID_GFN) )
-    {
-        *access = memaccess[p2m->default_access];
-        return 0;
-    }
-
-    gfn_lock(p2m, gfn, 0);
-    mfn = p2m->get_entry(p2m, gfn_x(gfn), &t, &a, 0, NULL, NULL);
-    gfn_unlock(p2m, gfn, 0);
-
-    if ( mfn_eq(mfn, INVALID_MFN) )
-        return -ESRCH;
-
-    if ( (unsigned) a >= ARRAY_SIZE(memaccess) )
-        return -ERANGE;
-
-    *access =  memaccess[a];
-    return 0;
+    return _p2m_get_mem_access(p2m, gfn, access);
 }
 
 /*
