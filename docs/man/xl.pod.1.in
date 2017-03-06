@@ -563,6 +563,11 @@ Disable disk replication. Requires enabling unsafe mode.
 Enable COLO HA. This conflicts with B<-i> and B<-b>, and memory
 checkpoint compression must be disabled.
 
+=item B<-p>
+
+Use userspace COLO Proxy. This option must be used in conjunction
+with B<-c>.
+
 =back
 
 =item B<pause> I<domain-id>

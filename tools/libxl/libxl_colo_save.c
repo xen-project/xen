@@ -101,6 +101,8 @@ void libxl__colo_save_setup(libxl__egc *egc, libxl__colo_save_state *css)
     css->qdisk_setuped = false;
     css->qdisk_used = false;
     libxl__ev_child_init(&css->child);
+    css->cps.is_userspace_proxy =
+        libxl_defbool_val(dss->remus->userspace_colo_proxy);
 
     if (dss->remus->netbufscript)
         css->colo_proxy_script = libxl__strdup(gc, dss->remus->netbufscript);

@@ -64,6 +64,11 @@ struct libxl__colo_proxy_state {
 
     int sock_fd;
     int index;
+    /*
+     * Private, True means use userspace colo proxy
+     *          False means use kernel colo proxy.
+     */
+    bool is_userspace_proxy;
 };
 
 struct libxl__colo_save_state {

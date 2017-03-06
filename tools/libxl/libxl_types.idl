@@ -844,14 +844,15 @@ libxl_sched_credit2_params = Struct("sched_credit2_params", [
     ], dispose_fn=None)
 
 libxl_domain_remus_info = Struct("domain_remus_info",[
-    ("interval",     integer),
-    ("allow_unsafe", libxl_defbool),
-    ("blackhole",    libxl_defbool),
-    ("compression",  libxl_defbool),
-    ("netbuf",       libxl_defbool),
-    ("netbufscript", string),
-    ("diskbuf",      libxl_defbool),
-    ("colo",         libxl_defbool)
+    ("interval",             integer),
+    ("allow_unsafe",         libxl_defbool),
+    ("blackhole",            libxl_defbool),
+    ("compression",          libxl_defbool),
+    ("netbuf",               libxl_defbool),
+    ("netbufscript",         string),
+    ("diskbuf",              libxl_defbool),
+    ("colo",                 libxl_defbool),
+    ("userspace_colo_proxy", libxl_defbool)
     ])
 
 libxl_event_type = Enumeration("event_type", [

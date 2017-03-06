@@ -607,7 +607,7 @@ int main_remus(int argc, char **argv)
 
     memset(&r_info, 0, sizeof(libxl_domain_remus_info));
 
-    SWITCH_FOREACH_OPT(opt, "Fbundi:s:N:ec", NULL, "remus", 2) {
+    SWITCH_FOREACH_OPT(opt, "Fbundi:s:N:ecp", NULL, "remus", 2) {
     case 'i':
         r_info.interval = atoi(optarg);
         break;
@@ -637,6 +637,9 @@ int main_remus(int argc, char **argv)
         break;
     case 'c':
         libxl_defbool_set(&r_info.colo, true);
+        break;
+    case 'p':
+        libxl_defbool_set(&r_info.userspace_colo_proxy, true);
     }
 
     domid = find_domain(argv[optind]);
@@ -645,8 +648,16 @@ int main_remus(int argc, char **argv)
     /* Defaults */
     libxl_defbool_setdefault(&r_info.blackhole, false);
     libxl_defbool_setdefault(&r_info.colo, false);
+    libxl_defbool_setdefault(&r_info.userspace_colo_proxy, false);
+
     if (!libxl_defbool_val(r_info.colo) && !r_info.interval)
         r_info.interval = 200;
+
+    if (libxl_defbool_val(r_info.userspace_colo_proxy) &&
+        !libxl_defbool_val(r_info.colo)) {
+        fprintf(stderr, "Option -p must be used in conjunction with -c");
+        exit(-1);
+    }
 
     if (libxl_defbool_val(r_info.colo)) {
         if (r_info.interval || libxl_defbool_val(r_info.blackhole) ||

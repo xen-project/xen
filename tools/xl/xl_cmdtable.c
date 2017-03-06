@@ -506,7 +506,8 @@ struct cmd_spec cmd_table[] = {
       "-n                      Disable network output buffering. Works only in unsafe mode.\n"
       "-d                      Disable disk replication. Works only in unsafe mode.\n"
       "-c                      Enable COLO HA. It is conflict with -i and -b, and memory\n"
-      "                        checkpoint must be disabled"
+      "                        checkpoint must be disabled.\n"
+      "-p                      Use COLO userspace proxy."
     },
 #endif
     { "devd",
