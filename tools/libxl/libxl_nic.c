@@ -212,6 +212,9 @@ static void libxl__device_nic_add(libxl__egc *egc, uint32_t domid,
     MAYBE_ADD_COLO_ARGS(sock_compare_sec_in_id);
     MAYBE_ADD_COLO_ARGS(sock_compare_sec_in_ip);
     MAYBE_ADD_COLO_ARGS(sock_compare_sec_in_port);
+    MAYBE_ADD_COLO_ARGS(sock_compare_notify_id);
+    MAYBE_ADD_COLO_ARGS(sock_compare_notify_ip);
+    MAYBE_ADD_COLO_ARGS(sock_compare_notify_port);
     MAYBE_ADD_COLO_ARGS(sock_redirector0_id);
     MAYBE_ADD_COLO_ARGS(sock_redirector0_ip);
     MAYBE_ADD_COLO_ARGS(sock_redirector0_port);
@@ -232,6 +235,7 @@ static void libxl__device_nic_add(libxl__egc *egc, uint32_t domid,
     MAYBE_ADD_COLO_ARGS(compare_pri_in);
     MAYBE_ADD_COLO_ARGS(compare_sec_in);
     MAYBE_ADD_COLO_ARGS(compare_out);
+    MAYBE_ADD_COLO_ARGS(compare_notify_dev);
 
     MAYBE_ADD_COLO_ARGS(sock_sec_redirector0_id);
     MAYBE_ADD_COLO_ARGS(sock_sec_redirector0_ip);
@@ -418,6 +422,9 @@ static int libxl__device_nic_from_xenstore(libxl__gc *gc,
     CHECK_COLO_ARGS(sock_compare_sec_in_id);
     CHECK_COLO_ARGS(sock_compare_sec_in_ip);
     CHECK_COLO_ARGS(sock_compare_sec_in_port);
+    CHECK_COLO_ARGS(sock_compare_notify_id);
+    CHECK_COLO_ARGS(sock_compare_notify_ip);
+    CHECK_COLO_ARGS(sock_compare_notify_port);
     CHECK_COLO_ARGS(sock_redirector0_id);
     CHECK_COLO_ARGS(sock_redirector0_ip);
     CHECK_COLO_ARGS(sock_redirector0_port);
@@ -438,6 +445,7 @@ static int libxl__device_nic_from_xenstore(libxl__gc *gc,
     CHECK_COLO_ARGS(compare_pri_in);
     CHECK_COLO_ARGS(compare_sec_in);
     CHECK_COLO_ARGS(compare_out);
+    CHECK_COLO_ARGS(compare_notify_dev);
     CHECK_COLO_ARGS(sock_sec_redirector0_id);
     CHECK_COLO_ARGS(sock_sec_redirector0_ip);
     CHECK_COLO_ARGS(sock_sec_redirector0_port);

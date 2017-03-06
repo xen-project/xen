@@ -1323,6 +1323,10 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
                                             sock_compare_sec_in_ip,
                                             sock_compare_sec_in_port);
 
+                    APPEND_COLO_SOCK_SERVER(sock_compare_notify_id,
+                                            sock_compare_notify_ip,
+                                            sock_compare_notify_port);
+
                     APPEND_COLO_SOCK_SERVER(sock_redirector0_id,
                                             sock_redirector0_ip,
                                             sock_redirector0_port);
@@ -1364,13 +1368,15 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
                     }
                     if (nics[i].colo_compare_pri_in &&
                         nics[i].colo_compare_sec_in &&
-                        nics[i].colo_compare_out) {
+                        nics[i].colo_compare_out &&
+                        nics[i].colo_compare_notify_dev) {
                         flexarray_append(dm_args, "-object");
                         flexarray_append(dm_args,
-                           GCSPRINTF("colo-compare,id=c1,primary_in=%s,secondary_in=%s,outdev=%s",
+                           GCSPRINTF("colo-compare,id=c1,primary_in=%s,secondary_in=%s,outdev=%s,notify_dev=%s",
                                      nics[i].colo_compare_pri_in,
                                      nics[i].colo_compare_sec_in,
-                                     nics[i].colo_compare_out));
+                                     nics[i].colo_compare_out,
+                                     nics[i].colo_compare_notify_dev));
                     }
                 }
                 ioemu_nics++;

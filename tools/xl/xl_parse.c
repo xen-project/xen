@@ -494,6 +494,12 @@ int parse_nic_config(libxl_device_nic *nic, XLU_Config **config, char *token)
         replace_string(&nic->colo_sock_compare_pri_in_ip, oparg);
     } else if (MATCH_OPTION("colo_sock_compare_pri_in_port", token, oparg)) {
         replace_string(&nic->colo_sock_compare_pri_in_port, oparg);
+    } else if (MATCH_OPTION("colo_sock_compare_notify_id", token, oparg)) {
+        replace_string(&nic->colo_sock_compare_notify_id, oparg);
+    } else if (MATCH_OPTION("colo_sock_compare_notify_ip", token, oparg)) {
+        replace_string(&nic->colo_sock_compare_notify_ip, oparg);
+    } else if (MATCH_OPTION("colo_sock_compare_notify_port", token, oparg)) {
+        replace_string(&nic->colo_sock_compare_notify_port, oparg);
     } else if (MATCH_OPTION("colo_filter_mirror_queue", token, oparg)) {
         replace_string(&nic->colo_filter_mirror_queue, oparg);
     } else if (MATCH_OPTION("colo_filter_mirror_outdev", token, oparg)) {
@@ -516,6 +522,8 @@ int parse_nic_config(libxl_device_nic *nic, XLU_Config **config, char *token)
         replace_string(&nic->colo_compare_sec_in, oparg);
     } else if (MATCH_OPTION("colo_compare_out", token, oparg)) {
         replace_string(&nic->colo_compare_out, oparg);
+    } else if (MATCH_OPTION("colo_compare_notify_dev", token, oparg)) {
+        replace_string(&nic->colo_compare_notify_dev, oparg);
 
     } else if (MATCH_OPTION("colo_sock_sec_redirector0_id", token, oparg)) {
         replace_string(&nic->colo_sock_sec_redirector0_id, oparg);
