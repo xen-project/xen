@@ -516,6 +516,33 @@ int parse_nic_config(libxl_device_nic *nic, XLU_Config **config, char *token)
         replace_string(&nic->colo_compare_sec_in, oparg);
     } else if (MATCH_OPTION("colo_compare_out", token, oparg)) {
         replace_string(&nic->colo_compare_out, oparg);
+
+    } else if (MATCH_OPTION("colo_sock_sec_redirector0_id", token, oparg)) {
+        replace_string(&nic->colo_sock_sec_redirector0_id, oparg);
+    } else if (MATCH_OPTION("colo_sock_sec_redirector0_ip", token, oparg)) {
+        replace_string(&nic->colo_sock_sec_redirector0_ip, oparg);
+    } else if (MATCH_OPTION("colo_sock_sec_redirector0_port", token, oparg)) {
+        replace_string(&nic->colo_sock_sec_redirector0_port, oparg);
+    } else if (MATCH_OPTION("colo_sock_sec_redirector1_id", token, oparg)) {
+        replace_string(&nic->colo_sock_sec_redirector1_id, oparg);
+    } else if (MATCH_OPTION("colo_sock_sec_redirector1_ip", token, oparg)) {
+        replace_string(&nic->colo_sock_sec_redirector1_ip, oparg);
+    } else if (MATCH_OPTION("colo_sock_sec_redirector1_port", token, oparg)) {
+        replace_string(&nic->colo_sock_sec_redirector1_port, oparg);
+    } else if (MATCH_OPTION("colo_filter_sec_redirector0_queue", token, oparg)) {
+        replace_string(&nic->colo_filter_sec_redirector0_queue, oparg);
+    } else if (MATCH_OPTION("colo_filter_sec_redirector0_indev", token, oparg)) {
+        replace_string(&nic->colo_filter_sec_redirector0_indev, oparg);
+    } else if (MATCH_OPTION("colo_filter_sec_redirector0_outdev", token, oparg)) {
+        replace_string(&nic->colo_filter_sec_redirector0_outdev, oparg);
+    } else if (MATCH_OPTION("colo_filter_sec_redirector1_queue", token, oparg)) {
+        replace_string(&nic->colo_filter_sec_redirector1_queue, oparg);
+    } else if (MATCH_OPTION("colo_filter_sec_redirector1_indev", token, oparg)) {
+        replace_string(&nic->colo_filter_sec_redirector1_indev, oparg);
+    } else if (MATCH_OPTION("colo_filter_sec_redirector1_outdev", token, oparg)) {
+        replace_string(&nic->colo_filter_sec_redirector1_outdev, oparg);
+    } else if (MATCH_OPTION("colo_filter_sec_rewriter0_queue", token, oparg)) {
+        replace_string(&nic->colo_filter_sec_rewriter0_queue, oparg);
     } else if (MATCH_OPTION("accel", token, oparg)) {
         fprintf(stderr, "the accel parameter for vifs is currently not supported\n");
     } else if (MATCH_OPTION("devid", token, oparg)) {

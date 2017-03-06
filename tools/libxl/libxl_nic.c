@@ -233,6 +233,20 @@ static void libxl__device_nic_add(libxl__egc *egc, uint32_t domid,
     MAYBE_ADD_COLO_ARGS(compare_sec_in);
     MAYBE_ADD_COLO_ARGS(compare_out);
 
+    MAYBE_ADD_COLO_ARGS(sock_sec_redirector0_id);
+    MAYBE_ADD_COLO_ARGS(sock_sec_redirector0_ip);
+    MAYBE_ADD_COLO_ARGS(sock_sec_redirector0_port);
+    MAYBE_ADD_COLO_ARGS(sock_sec_redirector1_id);
+    MAYBE_ADD_COLO_ARGS(sock_sec_redirector1_ip);
+    MAYBE_ADD_COLO_ARGS(sock_sec_redirector1_port);
+    MAYBE_ADD_COLO_ARGS(filter_sec_redirector0_queue);
+    MAYBE_ADD_COLO_ARGS(filter_sec_redirector0_indev);
+    MAYBE_ADD_COLO_ARGS(filter_sec_redirector0_outdev);
+    MAYBE_ADD_COLO_ARGS(filter_sec_redirector1_queue);
+    MAYBE_ADD_COLO_ARGS(filter_sec_redirector1_indev);
+    MAYBE_ADD_COLO_ARGS(filter_sec_redirector1_outdev);
+    MAYBE_ADD_COLO_ARGS(filter_sec_rewriter0_queue);
+
 #undef MAYBE_ADD_COLO_ARGS
 
     flexarray_append(back, "mac");
@@ -424,6 +438,19 @@ static int libxl__device_nic_from_xenstore(libxl__gc *gc,
     CHECK_COLO_ARGS(compare_pri_in);
     CHECK_COLO_ARGS(compare_sec_in);
     CHECK_COLO_ARGS(compare_out);
+    CHECK_COLO_ARGS(sock_sec_redirector0_id);
+    CHECK_COLO_ARGS(sock_sec_redirector0_ip);
+    CHECK_COLO_ARGS(sock_sec_redirector0_port);
+    CHECK_COLO_ARGS(sock_sec_redirector1_id);
+    CHECK_COLO_ARGS(sock_sec_redirector1_ip);
+    CHECK_COLO_ARGS(sock_sec_redirector1_port);
+    CHECK_COLO_ARGS(filter_sec_redirector0_queue);
+    CHECK_COLO_ARGS(filter_sec_redirector0_indev);
+    CHECK_COLO_ARGS(filter_sec_redirector0_outdev);
+    CHECK_COLO_ARGS(filter_sec_redirector1_queue);
+    CHECK_COLO_ARGS(filter_sec_redirector1_indev);
+    CHECK_COLO_ARGS(filter_sec_redirector1_outdev);
+    CHECK_COLO_ARGS(filter_sec_rewriter0_queue);
 
 #undef CHECK_COLO_ARGS
 

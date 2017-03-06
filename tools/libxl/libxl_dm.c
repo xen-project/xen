@@ -1274,6 +1274,40 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
 
                 if (state->saved_state) {
                     /* secondary colo run */
+
+                    APPEND_COLO_SOCK_CLIENT(sock_sec_redirector0_id,
+                                            sock_sec_redirector0_ip,
+                                            sock_sec_redirector0_port);
+
+                    APPEND_COLO_SOCK_CLIENT(sock_sec_redirector1_id,
+                                            sock_sec_redirector1_ip,
+                                            sock_sec_redirector1_port);
+
+                    if (nics[i].colo_filter_sec_redirector0_queue &&
+                        nics[i].colo_filter_sec_redirector0_indev) {
+                        flexarray_append(dm_args, "-object");
+                        flexarray_append(dm_args,
+                           GCSPRINTF("filter-redirector,id=rs1,netdev=net%d,queue=%s,indev=%s",
+                                     nics[i].devid,
+                                     nics[i].colo_filter_sec_redirector0_queue,
+                                     nics[i].colo_filter_sec_redirector0_indev));
+                    }
+                    if (nics[i].colo_filter_sec_redirector1_queue &&
+                        nics[i].colo_filter_sec_redirector1_indev) {
+                        flexarray_append(dm_args, "-object");
+                        flexarray_append(dm_args,
+                           GCSPRINTF("filter-redirector,id=rs2,netdev=net%d,queue=%s,outdev=%s",
+                                     nics[i].devid,
+                                     nics[i].colo_filter_sec_redirector1_queue,
+                                     nics[i].colo_filter_sec_redirector1_outdev));
+                    }
+                    if (nics[i].colo_filter_sec_rewriter0_queue) {
+                        flexarray_append(dm_args, "-object");
+                        flexarray_append(dm_args,
+                           GCSPRINTF("filter-rewriter,id=rs3,netdev=net%d,queue=%s",
+                                     nics[i].devid,
+                                     nics[i].colo_filter_sec_rewriter0_queue));
+                    }
                 } else {
                     /* primary colo run */
 
