@@ -629,7 +629,36 @@ libxl_device_nic = Struct("device_nic", [
     ("gatewaydev", string),
     # Note that the COLO configuration settings should be considered unstable.
     # They may change incompatibly in future versions of Xen.
-    ("coloft_forwarddev", string)
+    ("coloft_forwarddev", string),
+    ("colo_sock_mirror_id", string),
+    ("colo_sock_mirror_ip", string),
+    ("colo_sock_mirror_port", string),
+    ("colo_sock_compare_pri_in_id", string),
+    ("colo_sock_compare_pri_in_ip", string),
+    ("colo_sock_compare_pri_in_port", string),
+    ("colo_sock_compare_sec_in_id", string),
+    ("colo_sock_compare_sec_in_ip", string),
+    ("colo_sock_compare_sec_in_port", string),
+    ("colo_sock_redirector0_id", string),
+    ("colo_sock_redirector0_ip", string),
+    ("colo_sock_redirector0_port", string),
+    ("colo_sock_redirector1_id", string),
+    ("colo_sock_redirector1_ip", string),
+    ("colo_sock_redirector1_port", string),
+    ("colo_sock_redirector2_id", string),
+    ("colo_sock_redirector2_ip", string),
+    ("colo_sock_redirector2_port", string),
+    ("colo_filter_mirror_queue", string),
+    ("colo_filter_mirror_outdev", string),
+    ("colo_filter_redirector0_queue", string),
+    ("colo_filter_redirector0_indev", string),
+    ("colo_filter_redirector0_outdev", string),
+    ("colo_filter_redirector1_queue", string),
+    ("colo_filter_redirector1_indev", string),
+    ("colo_filter_redirector1_outdev", string),
+    ("colo_compare_pri_in", string),
+    ("colo_compare_sec_in", string),
+    ("colo_compare_out", string)
     ])
 
 libxl_device_pci = Struct("device_pci", [

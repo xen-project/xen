@@ -1244,7 +1244,105 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
                                            nics[i].devid, ifname,
                                            libxl_tapif_script(gc),
                                            libxl_tapif_script(gc)));
+
+                /* Userspace COLO Proxy need this */
+#define APPEND_COLO_SOCK_SERVER(sock_id, sock_ip, sock_port) ({             \
+    if (nics[i].colo_##sock_id &&                                           \
+        nics[i].colo_##sock_ip &&                                           \
+        nics[i].colo_##sock_port) {                                         \
+        flexarray_append(dm_args, "-chardev");                              \
+        flexarray_append(dm_args,                                           \
+            GCSPRINTF("socket,id=%s,host=%s,port=%s,server,nowait",         \
+                      nics[i].colo_##sock_id,                               \
+                      nics[i].colo_##sock_ip,                               \
+                      nics[i].colo_##sock_port));                           \
+        }                                                                   \
+})
+
+#define APPEND_COLO_SOCK_CLIENT(sock_id, sock_ip, sock_port) ({             \
+    if (nics[i].colo_##sock_id &&                                           \
+        nics[i].colo_##sock_ip &&                                           \
+        nics[i].colo_##sock_port) {                                         \
+        flexarray_append(dm_args, "-chardev");                              \
+        flexarray_append(dm_args,                                           \
+            GCSPRINTF("socket,id=%s,host=%s,port=%s",                       \
+                      nics[i].colo_##sock_id,                               \
+                      nics[i].colo_##sock_ip,                               \
+                      nics[i].colo_##sock_port));                           \
+        }                                                                   \
+})
+
+                if (state->saved_state) {
+                    /* secondary colo run */
+                } else {
+                    /* primary colo run */
+
+                    APPEND_COLO_SOCK_SERVER(sock_mirror_id,
+                                            sock_mirror_ip,
+                                            sock_mirror_port);
+
+                    APPEND_COLO_SOCK_SERVER(sock_compare_pri_in_id,
+                                            sock_compare_pri_in_ip,
+                                            sock_compare_pri_in_port);
+
+                    APPEND_COLO_SOCK_SERVER(sock_compare_sec_in_id,
+                                            sock_compare_sec_in_ip,
+                                            sock_compare_sec_in_port);
+
+                    APPEND_COLO_SOCK_SERVER(sock_redirector0_id,
+                                            sock_redirector0_ip,
+                                            sock_redirector0_port);
+
+                    APPEND_COLO_SOCK_CLIENT(sock_redirector1_id,
+                                            sock_redirector1_ip,
+                                            sock_redirector1_port);
+
+                    APPEND_COLO_SOCK_CLIENT(sock_redirector2_id,
+                                            sock_redirector2_ip,
+                                            sock_redirector2_port);
+
+                    if (nics[i].colo_filter_mirror_queue &&
+                        nics[i].colo_filter_mirror_outdev) {
+                        flexarray_append(dm_args, "-object");
+                        flexarray_append(dm_args,
+                           GCSPRINTF("filter-mirror,id=m1,netdev=net%d,queue=%s,outdev=%s",
+                                     nics[i].devid,
+                                     nics[i].colo_filter_mirror_queue,
+                                     nics[i].colo_filter_mirror_outdev));
+                    }
+                    if (nics[i].colo_filter_redirector0_queue &&
+                        nics[i].colo_filter_redirector0_indev) {
+                        flexarray_append(dm_args, "-object");
+                        flexarray_append(dm_args,
+                           GCSPRINTF("filter-redirector,id=r1,netdev=net%d,queue=%s,indev=%s",
+                                     nics[i].devid,
+                                     nics[i].colo_filter_redirector0_queue,
+                                     nics[i].colo_filter_redirector0_indev));
+                    }
+                    if (nics[i].colo_filter_redirector1_queue &&
+                        nics[i].colo_filter_redirector1_outdev) {
+                        flexarray_append(dm_args, "-object");
+                        flexarray_append(dm_args,
+                          GCSPRINTF("filter-redirector,id=r2,netdev=net%d,queue=%s,outdev=%s",
+                                     nics[i].devid,
+                                     nics[i].colo_filter_redirector1_queue,
+                                     nics[i].colo_filter_redirector1_outdev));
+                    }
+                    if (nics[i].colo_compare_pri_in &&
+                        nics[i].colo_compare_sec_in &&
+                        nics[i].colo_compare_out) {
+                        flexarray_append(dm_args, "-object");
+                        flexarray_append(dm_args,
+                           GCSPRINTF("colo-compare,id=c1,primary_in=%s,secondary_in=%s,outdev=%s",
+                                     nics[i].colo_compare_pri_in,
+                                     nics[i].colo_compare_sec_in,
+                                     nics[i].colo_compare_out));
+                    }
+                }
                 ioemu_nics++;
+
+#undef APPEND_COLO_SOCK_SERVER
+#undef APPEND_COLO_SOCK_CLIENT
             }
         }
         /* If we have no emulated nics, tell qemu not to create any */

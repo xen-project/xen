@@ -196,6 +196,45 @@ static void libxl__device_nic_add(libxl__egc *egc, uint32_t domid,
         flexarray_append(back, nic->coloft_forwarddev);
     }
 
+#define MAYBE_ADD_COLO_ARGS(arg) ({                                       \
+    if (nic->colo_##arg) {                                                \
+        flexarray_append(back, "colo_"#arg);                              \
+        flexarray_append(back, nic->colo_##arg);                          \
+    }                                                                     \
+})
+
+    MAYBE_ADD_COLO_ARGS(sock_mirror_id);
+    MAYBE_ADD_COLO_ARGS(sock_mirror_ip);
+    MAYBE_ADD_COLO_ARGS(sock_mirror_port);
+    MAYBE_ADD_COLO_ARGS(sock_compare_pri_in_id);
+    MAYBE_ADD_COLO_ARGS(sock_compare_pri_in_ip);
+    MAYBE_ADD_COLO_ARGS(sock_compare_pri_in_port);
+    MAYBE_ADD_COLO_ARGS(sock_compare_sec_in_id);
+    MAYBE_ADD_COLO_ARGS(sock_compare_sec_in_ip);
+    MAYBE_ADD_COLO_ARGS(sock_compare_sec_in_port);
+    MAYBE_ADD_COLO_ARGS(sock_redirector0_id);
+    MAYBE_ADD_COLO_ARGS(sock_redirector0_ip);
+    MAYBE_ADD_COLO_ARGS(sock_redirector0_port);
+    MAYBE_ADD_COLO_ARGS(sock_redirector1_id);
+    MAYBE_ADD_COLO_ARGS(sock_redirector1_ip);
+    MAYBE_ADD_COLO_ARGS(sock_redirector1_port);
+    MAYBE_ADD_COLO_ARGS(sock_redirector2_id);
+    MAYBE_ADD_COLO_ARGS(sock_redirector2_ip);
+    MAYBE_ADD_COLO_ARGS(sock_redirector2_port);
+    MAYBE_ADD_COLO_ARGS(filter_mirror_queue);
+    MAYBE_ADD_COLO_ARGS(filter_mirror_outdev);
+    MAYBE_ADD_COLO_ARGS(filter_redirector0_queue);
+    MAYBE_ADD_COLO_ARGS(filter_redirector0_indev);
+    MAYBE_ADD_COLO_ARGS(filter_redirector0_outdev);
+    MAYBE_ADD_COLO_ARGS(filter_redirector1_queue);
+    MAYBE_ADD_COLO_ARGS(filter_redirector1_indev);
+    MAYBE_ADD_COLO_ARGS(filter_redirector1_outdev);
+    MAYBE_ADD_COLO_ARGS(compare_pri_in);
+    MAYBE_ADD_COLO_ARGS(compare_sec_in);
+    MAYBE_ADD_COLO_ARGS(compare_out);
+
+#undef MAYBE_ADD_COLO_ARGS
+
     flexarray_append(back, "mac");
     flexarray_append(back,GCSPRINTF(LIBXL_MAC_FMT, LIBXL_MAC_BYTES(nic->mac)));
     if (nic->ip) {
@@ -348,6 +387,45 @@ static int libxl__device_nic_from_xenstore(libxl__gc *gc,
                                 GCSPRINTF("%s/forwarddev", libxl_path),
                                 (const char **)(&nic->coloft_forwarddev));
     if (rc) goto out;
+
+#define CHECK_COLO_ARGS(arg) ({                                           \
+    rc = libxl__xs_read_checked(NOGC, XBT_NULL,                           \
+                                GCSPRINTF("%s/colo_"#arg, libxl_path),    \
+                                (const char **)(&nic->colo_##arg));       \
+    if (rc) goto out;                                                     \
+})
+
+    CHECK_COLO_ARGS(sock_mirror_id);
+    CHECK_COLO_ARGS(sock_mirror_ip);
+    CHECK_COLO_ARGS(sock_mirror_port);
+    CHECK_COLO_ARGS(sock_compare_pri_in_id);
+    CHECK_COLO_ARGS(sock_compare_pri_in_ip);
+    CHECK_COLO_ARGS(sock_compare_pri_in_port);
+    CHECK_COLO_ARGS(sock_compare_sec_in_id);
+    CHECK_COLO_ARGS(sock_compare_sec_in_ip);
+    CHECK_COLO_ARGS(sock_compare_sec_in_port);
+    CHECK_COLO_ARGS(sock_redirector0_id);
+    CHECK_COLO_ARGS(sock_redirector0_ip);
+    CHECK_COLO_ARGS(sock_redirector0_port);
+    CHECK_COLO_ARGS(sock_redirector1_id);
+    CHECK_COLO_ARGS(sock_redirector1_ip);
+    CHECK_COLO_ARGS(sock_redirector1_port);
+    CHECK_COLO_ARGS(sock_redirector2_id);
+    CHECK_COLO_ARGS(sock_redirector2_ip);
+    CHECK_COLO_ARGS(sock_redirector2_port);
+    CHECK_COLO_ARGS(filter_mirror_queue);
+    CHECK_COLO_ARGS(filter_mirror_outdev);
+    CHECK_COLO_ARGS(filter_redirector0_queue);
+    CHECK_COLO_ARGS(filter_redirector0_indev);
+    CHECK_COLO_ARGS(filter_redirector0_outdev);
+    CHECK_COLO_ARGS(filter_redirector1_queue);
+    CHECK_COLO_ARGS(filter_redirector1_indev);
+    CHECK_COLO_ARGS(filter_redirector1_outdev);
+    CHECK_COLO_ARGS(compare_pri_in);
+    CHECK_COLO_ARGS(compare_sec_in);
+    CHECK_COLO_ARGS(compare_out);
+
+#undef CHECK_COLO_ARGS
 
     /* vif_ioemu nics use the same xenstore entries as vif interfaces */
     rc = libxl__xs_read_checked(gc, XBT_NULL,
