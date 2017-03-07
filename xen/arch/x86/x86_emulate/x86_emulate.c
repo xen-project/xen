@@ -5620,7 +5620,7 @@ x86_emulate(
         {
             if ( ctxt->vendor == X86_VENDOR_AMD )
                 vex.l = 0;
-            generate_exception_if(vex.l, EXC_UD);
+            generate_exception_if(vex.l || vex.reg != 0xf, EXC_UD);
             host_and_vcpu_must_have(avx);
             get_fpu(X86EMUL_FPU_ymm, &fic);
         }
@@ -5673,6 +5673,7 @@ x86_emulate(
         }
         else
         {
+            generate_exception_if(vex.reg != 0xf, EXC_UD);
             host_and_vcpu_must_have(avx);
             get_fpu(X86EMUL_FPU_ymm, &fic);
         }
@@ -6273,6 +6274,7 @@ x86_emulate(
     case X86EMUL_OPC_VEX(0x0f, 0x77):    /* vzero{all,upper} */
         if ( vex.opcx != vex_none )
         {
+            generate_exception_if(vex.reg != 0xf, EXC_UD);
             host_and_vcpu_must_have(avx);
             get_fpu(X86EMUL_FPU_ymm, &fic);
         }
