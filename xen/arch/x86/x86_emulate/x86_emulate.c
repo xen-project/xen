@@ -373,6 +373,8 @@ static const struct {
     [0x37 ... 0x3f] = { .simd_size = simd_packed_int },
     [0x40] = { .simd_size = simd_packed_int },
     [0x41] = { .simd_size = simd_packed_int, .two_op = 1 },
+    [0xdb] = { .simd_size = simd_packed_int, .two_op = 1 },
+    [0xdc ... 0xdf] = { .simd_size = simd_packed_int },
     [0xf0] = { .two_op = 1 },
     [0xf1] = { .to_mem = 1, .two_op = 1 },
     [0xf2 ... 0xf3] = {},
@@ -402,6 +404,7 @@ static const struct {
     [0x4a ... 0x4b] = { .simd_size = simd_packed_fp, .four_op = 1 },
     [0x4c] = { .simd_size = simd_packed_int, .four_op = 1 },
     [0x60 ... 0x63] = { .simd_size = simd_packed_int, .two_op = 1 },
+    [0xdf] = { .simd_size = simd_packed_int, .two_op = 1 },
     [0xf0] = {},
 };
 
@@ -1475,6 +1478,7 @@ static bool vcpu_has(
 #define vcpu_has_sse4_2()      vcpu_has(         1, ECX, 20, ctxt, ops)
 #define vcpu_has_movbe()       vcpu_has(         1, ECX, 22, ctxt, ops)
 #define vcpu_has_popcnt()      vcpu_has(         1, ECX, 23, ctxt, ops)
+#define vcpu_has_aesni()       vcpu_has(         1, ECX, 25, ctxt, ops)
 #define vcpu_has_avx()         vcpu_has(         1, ECX, 28, ctxt, ops)
 #define vcpu_has_rdrand()      vcpu_has(         1, ECX, 30, ctxt, ops)
 #define vcpu_has_mmxext()     (vcpu_has(0x80000001, EDX, 22, ctxt, ops) || \
@@ -7183,6 +7187,22 @@ x86_emulate(
         host_and_vcpu_must_have(sse4_2);
         goto simd_0f38_common;
 
+    case X86EMUL_OPC_66(0x0f38, 0xdb):     /* aesimc xmm/m128,xmm */
+    case X86EMUL_OPC_VEX_66(0x0f38, 0xdb): /* vaesimc xmm/m128,xmm */
+    case X86EMUL_OPC_66(0x0f38, 0xdc):     /* aesenc xmm/m128,xmm,xmm */
+    case X86EMUL_OPC_VEX_66(0x0f38, 0xdc): /* vaesenc xmm/m128,xmm,xmm */
+    case X86EMUL_OPC_66(0x0f38, 0xdd):     /* aesenclast xmm/m128,xmm,xmm */
+    case X86EMUL_OPC_VEX_66(0x0f38, 0xdd): /* vaesenclast xmm/m128,xmm,xmm */
+    case X86EMUL_OPC_66(0x0f38, 0xde):     /* aesdec xmm/m128,xmm,xmm */
+    case X86EMUL_OPC_VEX_66(0x0f38, 0xde): /* vaesdec xmm/m128,xmm,xmm */
+    case X86EMUL_OPC_66(0x0f38, 0xdf):     /* aesdeclast xmm/m128,xmm,xmm */
+    case X86EMUL_OPC_VEX_66(0x0f38, 0xdf): /* vaesdeclast xmm/m128,xmm,xmm */
+        host_and_vcpu_must_have(aesni);
+        if ( vex.opcx == vex_none )
+            goto simd_0f38_common;
+        generate_exception_if(vex.l, EXC_UD);
+        goto simd_0f_avx;
+
     case X86EMUL_OPC(0x0f38, 0xf0): /* movbe m,r */
     case X86EMUL_OPC(0x0f38, 0xf1): /* movbe r,m */
         vcpu_must_have(movbe);
@@ -7550,6 +7570,14 @@ x86_emulate(
             _regs.r(cx) = (uint32_t)dst.val;
         dst.type = OP_NONE;
         break;
+
+    case X86EMUL_OPC_66(0x0f3a, 0xdf):     /* aeskeygenassist $imm8,xmm/m128,xmm */
+    case X86EMUL_OPC_VEX_66(0x0f3a, 0xdf): /* vaeskeygenassist $imm8,xmm/m128,xmm */
+        host_and_vcpu_must_have(aesni);
+        if ( vex.opcx == vex_none )
+            goto simd_0f3a_common;
+        generate_exception_if(vex.l, EXC_UD);
+        goto simd_0f_imm8_avx;
 
     case X86EMUL_OPC_VEX_F2(0x0f3a, 0xf0): /* rorx imm,r/m,r */
         vcpu_must_have(bmi2);
