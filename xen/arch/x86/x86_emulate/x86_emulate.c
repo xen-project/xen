@@ -274,10 +274,11 @@ static const struct {
     [0x6e] = { DstImplicit|SrcMem|ModRM|Mov },
     [0x6f] = { DstImplicit|SrcMem|ModRM|Mov, simd_packed_int },
     [0x70] = { SrcImmByte|ModRM|TwoOp, simd_other },
-    [0x71 ... 0x73] = { SrcImmByte|ModRM },
+    [0x71 ... 0x73] = { DstImplicit|SrcImmByte|ModRM },
     [0x74 ... 0x76] = { DstImplicit|SrcMem|ModRM, simd_packed_int },
     [0x77] = { DstImplicit|SrcNone },
-    [0x78 ... 0x79] = { ModRM },
+    [0x78] = { ImplicitOps|ModRM },
+    [0x79] = { DstReg|SrcMem|ModRM, simd_packed_int },
     [0x7c ... 0x7d] = { DstImplicit|SrcMem|ModRM, simd_other },
     [0x7e] = { DstMem|SrcImplicit|ModRM|Mov },
     [0x7f] = { DstMem|SrcImplicit|ModRM|Mov, simd_packed_int },
@@ -315,7 +316,7 @@ static const struct {
     [0xc2] = { DstImplicit|SrcImmByte|ModRM, simd_any_fp },
     [0xc3] = { DstMem|SrcReg|ModRM|Mov },
     [0xc4] = { DstReg|SrcImmByte|ModRM, simd_packed_int },
-    [0xc5] = { SrcImmByte|ModRM },
+    [0xc5] = { DstReg|SrcImmByte|ModRM|Mov },
     [0xc6] = { DstImplicit|SrcImmByte|ModRM, simd_packed_fp },
     [0xc7] = { ImplicitOps|ModRM },
     [0xc8 ... 0xcf] = { ImplicitOps },
@@ -5666,6 +5667,18 @@ x86_emulate(
     CASE_SIMD_PACKED_FP(_VEX, 0x0f, 0x50): /* vmovmskp{s,d} {x,y}mm,reg */
     CASE_SIMD_PACKED_INT(0x0f, 0xd7):      /* pmovmskb {,x}mm,reg */
     case X86EMUL_OPC_VEX_66(0x0f, 0xd7):   /* vpmovmskb {x,y}mm,reg */
+        opc = init_prefixes(stub);
+        opc[0] = b;
+        /* Convert GPR destination to %rAX. */
+        rex_prefix &= ~REX_R;
+        vex.r = 1;
+        if ( !mode_64bit() )
+            vex.w = 0;
+        opc[1] = modrm & 0xc7;
+        fic.insn_bytes = PFX_BYTES + 2;
+    simd_0f_to_gpr:
+        opc[fic.insn_bytes - PFX_BYTES] = 0xc3;
+
         generate_exception_if(ea.type != OP_REG, EXC_UD);
 
         if ( vex.opcx == vex_none )
@@ -5692,17 +5705,6 @@ x86_emulate(
                 host_and_vcpu_must_have(avx2);
             get_fpu(X86EMUL_FPU_ymm, &fic);
         }
-
-        opc = init_prefixes(stub);
-        opc[0] = b;
-        /* Convert GPR destination to %rAX. */
-        rex_prefix &= ~REX_R;
-        vex.r = 1;
-        if ( !mode_64bit() )
-            vex.w = 0;
-        opc[1] = modrm & 0xc7;
-        fic.insn_bytes = PFX_BYTES + 2;
-        opc[2] = 0xc3;
 
         copy_REX_VEX(opc, rex_prefix, vex);
         invoke_stub("", "", "=a" (dst.val) : [dummy] "i" (0));
@@ -5964,6 +5966,134 @@ x86_emulate(
         opc[2] = imm1;
         fic.insn_bytes = PFX_BYTES + 3;
         break;
+
+    CASE_SIMD_PACKED_INT(0x0f, 0x71):    /* Grp12 */
+    case X86EMUL_OPC_VEX_66(0x0f, 0x71):
+    CASE_SIMD_PACKED_INT(0x0f, 0x72):    /* Grp13 */
+    case X86EMUL_OPC_VEX_66(0x0f, 0x72):
+        switch ( modrm_reg & 7 )
+        {
+        case 2: /* psrl{w,d} $imm8,{,x}mm */
+                /* vpsrl{w,d} $imm8,{x,y}mm,{x,y}mm */
+        case 4: /* psra{w,d} $imm8,{,x}mm */
+                /* vpsra{w,d} $imm8,{x,y}mm,{x,y}mm */
+        case 6: /* psll{w,d} $imm8,{,x}mm */
+                /* vpsll{w,d} $imm8,{x,y}mm,{x,y}mm */
+            break;
+        default:
+            goto cannot_emulate;
+        }
+    simd_0f_shift_imm:
+        generate_exception_if(ea.type != OP_REG, EXC_UD);
+
+        if ( vex.opcx != vex_none )
+        {
+            if ( vex.l )
+                host_and_vcpu_must_have(avx2);
+            else
+                host_and_vcpu_must_have(avx);
+            get_fpu(X86EMUL_FPU_ymm, &fic);
+        }
+        else if ( vex.pfx )
+        {
+            vcpu_must_have(sse2);
+            get_fpu(X86EMUL_FPU_xmm, &fic);
+        }
+        else
+        {
+            host_and_vcpu_must_have(mmx);
+            get_fpu(X86EMUL_FPU_mmx, &fic);
+        }
+
+        opc = init_prefixes(stub);
+        opc[0] = b;
+        opc[1] = modrm;
+        opc[2] = imm1;
+        fic.insn_bytes = PFX_BYTES + 3;
+    simd_0f_reg_only:
+        opc[fic.insn_bytes - PFX_BYTES] = 0xc3;
+
+        copy_REX_VEX(opc, rex_prefix, vex);
+        invoke_stub("", "", [dummy_out] "=g" (dummy) : [dummy_in] "i" (0) );
+
+        put_stub(stub);
+        put_fpu(&fic);
+
+        ASSERT(!state->simd_size);
+        break;
+
+    case X86EMUL_OPC(0x0f, 0x73):        /* Grp14 */
+        switch ( modrm_reg & 7 )
+        {
+        case 2: /* psrlq $imm8,mm */
+        case 6: /* psllq $imm8,mm */
+            goto simd_0f_shift_imm;
+        }
+        goto cannot_emulate;
+
+    case X86EMUL_OPC_66(0x0f, 0x73):
+    case X86EMUL_OPC_VEX_66(0x0f, 0x73):
+        switch ( modrm_reg & 7 )
+        {
+        case 2: /* psrlq $imm8,xmm */
+                /* vpsrlq $imm8,{x,y}mm,{x,y}mm */
+        case 3: /* psrldq $imm8,xmm */
+                /* vpsrldq $imm8,{x,y}mm,{x,y}mm */
+        case 6: /* psllq $imm8,xmm */
+                /* vpsllq $imm8,{x,y}mm,{x,y}mm */
+        case 7: /* pslldq $imm8,xmm */
+                /* vpslldq $imm8,{x,y}mm,{x,y}mm */
+            goto simd_0f_shift_imm;
+        }
+        goto cannot_emulate;
+
+    case X86EMUL_OPC(0x0f, 0x77):        /* emms */
+    case X86EMUL_OPC_VEX(0x0f, 0x77):    /* vzero{all,upper} */
+        if ( vex.opcx != vex_none )
+        {
+            host_and_vcpu_must_have(avx);
+            get_fpu(X86EMUL_FPU_ymm, &fic);
+        }
+        else
+        {
+            host_and_vcpu_must_have(mmx);
+            get_fpu(X86EMUL_FPU_mmx, &fic);
+        }
+
+        opc = init_prefixes(stub);
+        opc[0] = b;
+        fic.insn_bytes = PFX_BYTES + 1;
+        goto simd_0f_reg_only;
+
+    case X86EMUL_OPC_66(0x0f, 0x78):     /* Grp17 */
+        switch ( modrm_reg & 7 )
+        {
+        case 0: /* extrq $imm8,$imm8,xmm */
+            break;
+        default:
+            goto cannot_emulate;
+        }
+        /* fall through */
+    case X86EMUL_OPC_F2(0x0f, 0x78):     /* insertq $imm8,$imm8,xmm,xmm */
+        generate_exception_if(ea.type != OP_REG, EXC_UD);
+
+        host_and_vcpu_must_have(sse4a);
+        get_fpu(X86EMUL_FPU_xmm, &fic);
+
+        opc = init_prefixes(stub);
+        opc[0] = b;
+        opc[1] = modrm;
+        opc[2] = imm1;
+        opc[3] = imm2;
+        fic.insn_bytes = PFX_BYTES + 4;
+        goto simd_0f_reg_only;
+
+    case X86EMUL_OPC_66(0x0f, 0x79):     /* extrq xmm,xmm */
+    case X86EMUL_OPC_F2(0x0f, 0x79):     /* insertq xmm,xmm */
+        generate_exception_if(ea.type != OP_REG, EXC_UD);
+        host_and_vcpu_must_have(sse4a);
+        op_bytes = 8;
+        goto simd_0f_xmm;
 
     case X86EMUL_OPC_F3(0x0f, 0x7e):     /* movq xmm/m64,xmm */
     case X86EMUL_OPC_VEX_F3(0x0f, 0x7e): /* vmovq xmm/m64,xmm */
@@ -6334,6 +6464,22 @@ x86_emulate(
         memcpy(mmvalp, &src.val, 2);
         ea.type = OP_MEM;
         goto simd_0f_int_imm8;
+
+    case X86EMUL_OPC_VEX_66(0x0f, 0xc5):   /* vpextrw $imm8,xmm,reg */
+        generate_exception_if(vex.l, EXC_UD);
+        /* fall through */
+    CASE_SIMD_PACKED_INT(0x0f, 0xc5):      /* pextrw $imm8,{,x}mm,reg */
+        opc = init_prefixes(stub);
+        opc[0] = b;
+        /* Convert GPR destination to %rAX. */
+        rex_prefix &= ~REX_R;
+        vex.r = 1;
+        if ( !mode_64bit() )
+            vex.w = 0;
+        opc[1] = modrm & 0xc7;
+        opc[2] = imm1;
+        fic.insn_bytes = PFX_BYTES + 3;
+        goto simd_0f_to_gpr;
 
     case X86EMUL_OPC(0x0f, 0xc7): /* Grp9 */
     {
