@@ -86,10 +86,15 @@ static int maybe_fail(struct x86_emulate_ctxt *ctxt,
 
     printf("maybe_fail %s: %d\n", why, rc);
 
+    if ( rc == X86EMUL_EXCEPTION )
+        /* Fake up a pagefault. */
+        x86_emul_pagefault(0, 0, ctxt);
+
     return rc;
 }
 
 static int data_read(struct x86_emulate_ctxt *ctxt,
+                     enum x86_segment seg,
                      const char *why, void *dst, unsigned int bytes)
 {
     struct fuzz_state *s = ctxt->data;
@@ -98,7 +103,17 @@ static int data_read(struct x86_emulate_ctxt *ctxt,
     int rc;
 
     if ( s->data_index + bytes > s->data_num )
+    {
+        /*
+         * Fake up a segment limit violation.  System segment limit volations
+         * are reported by X86EMUL_EXCEPTION alone, so the emulator can fill
+         * in the correct context.
+         */
+        if ( !is_x86_system_segment(seg) )
+            x86_emul_hw_exception(13, 0, ctxt);
+
         rc = X86EMUL_EXCEPTION;
+    }
     else
         rc = maybe_fail(ctxt, why, true);
 
@@ -126,7 +141,7 @@ static int fuzz_read(
     /* Reads expected for all user and system segments. */
     assert(is_x86_user_segment(seg) || is_x86_system_segment(seg));
 
-    return data_read(ctxt, "read", p_data, bytes);
+    return data_read(ctxt, seg, "read", p_data, bytes);
 }
 
 static int fuzz_read_io(
@@ -135,7 +150,7 @@ static int fuzz_read_io(
     unsigned long *val,
     struct x86_emulate_ctxt *ctxt)
 {
-    return data_read(ctxt, "read_io", val, bytes);
+    return data_read(ctxt, x86_seg_none, "read_io", val, bytes);
 }
 
 static int fuzz_insn_fetch(
@@ -157,7 +172,7 @@ static int fuzz_insn_fetch(
         return maybe_fail(ctxt, "insn_fetch", true);
     }
 
-    return data_read(ctxt, "insn_fetch", p_data, bytes);
+    return data_read(ctxt, seg, "insn_fetch", p_data, bytes);
 }
 
 static int _fuzz_rep_read(struct x86_emulate_ctxt *ctxt,
@@ -166,7 +181,7 @@ static int _fuzz_rep_read(struct x86_emulate_ctxt *ctxt,
     int rc;
     unsigned long bytes_read = 0;
 
-    rc = data_read(ctxt, why, &bytes_read, sizeof(bytes_read));
+    rc = data_read(ctxt, x86_seg_none, why, &bytes_read, sizeof(bytes_read));
 
     if ( bytes_read <= *reps )
         *reps = bytes_read;
@@ -436,7 +451,7 @@ static int fuzz_read_msr(
          * should preferably return consistent values, but returning
          * random values is fine in fuzzer.
          */
-        return data_read(ctxt, "read_msr", val, sizeof(*val));
+        return data_read(ctxt, x86_seg_none, "read_msr", val, sizeof(*val));
     case MSR_EFER:
         *val = c->msr[MSRI_EFER];
         *val &= ~EFER_LMA;
@@ -458,6 +473,7 @@ static int fuzz_read_msr(
         }
     }
 
+    x86_emul_hw_exception(13, 0, ctxt);
     return X86EMUL_EXCEPTION;
 }
 
@@ -491,6 +507,7 @@ static int fuzz_write_msr(
         }
     }
 
+    x86_emul_hw_exception(13, 0, ctxt);
     return X86EMUL_EXCEPTION;
 }
 
