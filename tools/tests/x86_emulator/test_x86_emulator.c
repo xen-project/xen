@@ -1665,12 +1665,7 @@ int main(int argc, char **argv)
     {
         decl_insn(vmovdqu_from_mem);
 
-#if 0 /* Don't use AVX2 instructions for now */
-        asm volatile ( "vpcmpgtb %%ymm4, %%ymm4, %%ymm4\n"
-#else
-        asm volatile ( "vpcmpgtb %%xmm4, %%xmm4, %%xmm4\n\t"
-                       "vinsertf128 $1, %%xmm4, %%ymm4, %%ymm4\n"
-#endif
+        asm volatile ( "vpxor %%xmm4, %%xmm4, %%xmm4\n"
                        put_insn(vmovdqu_from_mem, "vmovdqu (%0), %%ymm4")
                        :: "d" (NULL) );
 
@@ -1684,7 +1679,7 @@ int main(int argc, char **argv)
 #if 0 /* Don't use AVX2 instructions for now */
         asm ( "vpcmpeqb %%ymm2, %%ymm2, %%ymm2\n\t"
               "vpcmpeqb %%ymm4, %%ymm2, %%ymm0\n\t"
-              "vpmovmskb %%ymm1, %0" : "=r" (rc) );
+              "vpmovmskb %%ymm0, %0" : "=r" (rc) );
 #else
         asm ( "vextractf128 $1, %%ymm4, %%xmm3\n\t"
               "vpcmpeqb %%xmm2, %%xmm2, %%xmm2\n\t"
@@ -2091,6 +2086,67 @@ int main(int argc, char **argv)
     else
         printf("skipped\n");
 #endif
+
+    printf("%-40s", "Testing lddqu 4(%edx),%xmm4...");
+    if ( stack_exec && cpu_has_sse3 )
+    {
+        decl_insn(lddqu);
+
+        asm volatile ( "pcmpgtb %%xmm4, %%xmm4\n"
+                       put_insn(lddqu, "lddqu 4(%0), %%xmm4")
+                       :: "d" (NULL) );
+
+        set_insn(lddqu);
+        memset(res, 0x55, 64);
+        memset(res + 1, 0xff, 16);
+        regs.edx = (unsigned long)res;
+        rc = x86_emulate(&ctxt, &emulops);
+        if ( rc != X86EMUL_OKAY || !check_eip(lddqu) )
+            goto fail;
+        asm ( "pcmpeqb %%xmm2, %%xmm2\n\t"
+              "pcmpeqb %%xmm4, %%xmm2\n\t"
+              "pmovmskb %%xmm2, %0" : "=r" (rc) );
+        if ( rc != 0xffff )
+            goto fail;
+        printf("okay\n");
+    }
+    else
+        printf("skipped\n");
+
+    printf("%-40s", "Testing vlddqu (%ecx),%ymm4...");
+    if ( stack_exec && cpu_has_avx )
+    {
+        decl_insn(vlddqu);
+
+        asm volatile ( "vpxor %%xmm4, %%xmm4, %%xmm4\n"
+                       put_insn(vlddqu, "vlddqu (%0), %%ymm4")
+                       :: "c" (NULL) );
+
+        set_insn(vlddqu);
+        memset(res + 1, 0xff, 32);
+        regs.ecx = (unsigned long)(res + 1);
+        rc = x86_emulate(&ctxt, &emulops);
+        if ( rc != X86EMUL_OKAY || !check_eip(vlddqu) )
+            goto fail;
+#if 0 /* Don't use AVX2 instructions for now */
+        asm ( "vpcmpeqb %%ymm2, %%ymm2, %%ymm2\n\t"
+              "vpcmpeqb %%ymm4, %%ymm2, %%ymm0\n\t"
+              "vpmovmskb %%ymm0, %0" : "=r" (rc) );
+#else
+        asm ( "vextractf128 $1, %%ymm4, %%xmm3\n\t"
+              "vpcmpeqb %%xmm2, %%xmm2, %%xmm2\n\t"
+              "vpcmpeqb %%xmm4, %%xmm2, %%xmm0\n\t"
+              "vpcmpeqb %%xmm3, %%xmm2, %%xmm1\n\t"
+              "vpmovmskb %%xmm0, %0\n\t"
+              "vpmovmskb %%xmm1, %1" : "=r" (rc), "=r" (i) );
+        rc |= i << 16;
+#endif
+        if ( ~rc )
+            goto fail;
+        printf("okay\n");
+    }
+    else
+        printf("skipped\n");
 
 #undef decl_insn
 #undef put_insn
