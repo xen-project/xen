@@ -42,8 +42,10 @@
 
 #define is_canonical_address(x) (((int64_t)(x) >> 47) == ((int64_t)(x) >> 63))
 
+extern uint32_t mxcsr_mask;
+
 #define MMAP_SZ 16384
-bool emul_test_make_stack_executable(void);
+bool emul_test_init(void);
 
 #include "x86_emulate/x86_emulate.h"
 
@@ -66,6 +68,12 @@ static inline uint64_t xgetbv(uint32_t xcr)
     struct cpuid_leaf res; \
     emul_test_cpuid(1, 0, &res, NULL); \
     (res.d & (1U << 23)) != 0; \
+})
+
+#define cpu_has_fxsr ({ \
+    struct cpuid_leaf res; \
+    emul_test_cpuid(1, 0, &res, NULL); \
+    (res.d & (1U << 24)) != 0; \
 })
 
 #define cpu_has_sse ({ \

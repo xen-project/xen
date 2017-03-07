@@ -29,7 +29,7 @@ unsigned int *__read_mostly xstate_sizes;
 u64 __read_mostly xstate_align;
 static unsigned int __read_mostly xstate_features;
 
-static uint32_t __read_mostly mxcsr_mask = 0x0000ffbf;
+uint32_t __read_mostly mxcsr_mask = 0x0000ffbf;
 
 /* Cached xcr0 for fast read */
 static DEFINE_PER_CPU(uint64_t, xcr0);

@@ -219,7 +219,7 @@ int main(int argc, char **argv)
     }
     instr = (char *)res + 0x100;
 
-    stack_exec = emul_test_make_stack_executable();
+    stack_exec = emul_test_init();
 
     if ( !stack_exec )
         printf("Warning: Stack could not be made executable (%d).\n", errno);
@@ -2392,6 +2392,87 @@ int main(int argc, char **argv)
         rc |= i << 16;
 #endif
         if ( ~rc )
+            goto fail;
+        printf("okay\n");
+    }
+    else
+        printf("skipped\n");
+
+    printf("%-40s", "Testing stmxcsr (%edx)...");
+    if ( cpu_has_sse )
+    {
+        decl_insn(stmxcsr);
+
+        asm volatile ( put_insn(stmxcsr, "stmxcsr (%0)") :: "d" (NULL) );
+
+        res[0] = 0x12345678;
+        res[1] = 0x87654321;
+        asm ( "stmxcsr %0" : "=m" (res[2]) );
+        set_insn(stmxcsr);
+        regs.edx = (unsigned long)res;
+        rc = x86_emulate(&ctxt, &emulops);
+        if ( rc != X86EMUL_OKAY || !check_eip(stmxcsr) ||
+             res[0] != res[2] || res[1] != 0x87654321 )
+            goto fail;
+        printf("okay\n");
+    }
+    else
+        printf("skipped\n");
+
+    printf("%-40s", "Testing ldmxcsr 4(%ecx)...");
+    if ( cpu_has_sse )
+    {
+        decl_insn(ldmxcsr);
+
+        asm volatile ( put_insn(ldmxcsr, "ldmxcsr 4(%0)") :: "c" (NULL) );
+
+        set_insn(ldmxcsr);
+        res[1] = mxcsr_mask;
+        regs.ecx = (unsigned long)res;
+        rc = x86_emulate(&ctxt, &emulops);
+        asm ( "stmxcsr %0; ldmxcsr %1" : "=m" (res[0]) : "m" (res[2]) );
+        if ( rc != X86EMUL_OKAY || !check_eip(ldmxcsr) ||
+             res[0] != mxcsr_mask )
+            goto fail;
+        printf("okay\n");
+    }
+    else
+        printf("skipped\n");
+
+    printf("%-40s", "Testing vstmxcsr (%ecx)...");
+    if ( cpu_has_avx )
+    {
+        decl_insn(vstmxcsr);
+
+        asm volatile ( put_insn(vstmxcsr, "vstmxcsr (%0)") :: "c" (NULL) );
+
+        res[0] = 0x12345678;
+        res[1] = 0x87654321;
+        set_insn(vstmxcsr);
+        regs.ecx = (unsigned long)res;
+        rc = x86_emulate(&ctxt, &emulops);
+        if ( rc != X86EMUL_OKAY || !check_eip(vstmxcsr) ||
+             res[0] != res[2] || res[1] != 0x87654321 )
+            goto fail;
+        printf("okay\n");
+    }
+    else
+        printf("skipped\n");
+
+    printf("%-40s", "Testing vldmxcsr 4(%edx)...");
+    if ( cpu_has_avx )
+    {
+        decl_insn(vldmxcsr);
+
+        asm volatile ( put_insn(vldmxcsr, "vldmxcsr 4(%0)") :: "d" (NULL) );
+
+        set_insn(vldmxcsr);
+        res[1] = mxcsr_mask;
+        regs.edx = (unsigned long)res;
+        rc = x86_emulate(&ctxt, &emulops);
+        asm ( "stmxcsr %0; ldmxcsr %1" : "=m" (res[0]) : "m" (res[2]) );
+        if ( rc != X86EMUL_OKAY || !check_eip(vldmxcsr) ||
+             res[0] != mxcsr_mask )
             goto fail;
         printf("okay\n");
     }

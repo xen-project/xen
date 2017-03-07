@@ -2178,7 +2178,6 @@ x86_decode_twobyte(
     case 0x50 ... 0x77:
     case 0x79 ... 0x7d:
     case 0x7f:
-    case 0xae:
     case 0xc2 ... 0xc3:
     case 0xc5 ... 0xc6:
     case 0xd0 ... 0xfe:
@@ -2206,6 +2205,24 @@ x86_decode_twobyte(
             state->simd_size = simd_other;
             /* Avoid the state->desc adjustment below. */
             return X86EMUL_OKAY;
+        }
+        break;
+
+    case 0xae:
+        ctxt->opcode |= MASK_INSR(vex.pfx, X86EMUL_OPC_PFX_MASK);
+        /* fall through */
+    case X86EMUL_OPC_VEX(0, 0xae):
+        switch ( modrm_reg & 7 )
+        {
+        case 2: /* {,v}ldmxcsr */
+            state->desc = DstImplicit | SrcMem | ModRM | Mov;
+            op_bytes = 4;
+            break;
+
+        case 3: /* {,v}stmxcsr */
+            state->desc = DstMem | SrcImplicit | ModRM | Mov;
+            op_bytes = 4;
+            break;
         }
         break;
 
@@ -6210,6 +6227,23 @@ x86_emulate(
     case X86EMUL_OPC(0x0f, 0xae): case X86EMUL_OPC_66(0x0f, 0xae): /* Grp15 */
         switch ( modrm_reg & 7 )
         {
+        case 2: /* ldmxcsr */
+            generate_exception_if(vex.pfx, EXC_UD);
+            vcpu_must_have(sse);
+        ldmxcsr:
+            generate_exception_if(src.type != OP_MEM, EXC_UD);
+            generate_exception_if(src.val & ~mxcsr_mask, EXC_GP, 0);
+            asm volatile ( "ldmxcsr %0" :: "m" (src.val) );
+            break;
+
+        case 3: /* stmxcsr */
+            generate_exception_if(vex.pfx, EXC_UD);
+            vcpu_must_have(sse);
+        stmxcsr:
+            generate_exception_if(dst.type != OP_MEM, EXC_UD);
+            asm volatile ( "stmxcsr %0" : "=m" (dst.val) );
+            break;
+
         case 5: /* lfence */
             fail_if(modrm_mod != 3);
             generate_exception_if(vex.pfx, EXC_UD);
@@ -6252,6 +6286,20 @@ x86_emulate(
             goto cannot_emulate;
         }
         break;
+
+    case X86EMUL_OPC_VEX(0x0f, 0xae): /* Grp15 */
+        switch ( modrm_reg & 7 )
+        {
+        case 2: /* vldmxcsr */
+            generate_exception_if(vex.l || vex.reg != 0xf, EXC_UD);
+            vcpu_must_have(avx);
+            goto ldmxcsr;
+        case 3: /* vstmxcsr */
+            generate_exception_if(vex.l || vex.reg != 0xf, EXC_UD);
+            vcpu_must_have(avx);
+            goto stmxcsr;
+        }
+        goto cannot_emulate;
 
     case X86EMUL_OPC_F3(0x0f, 0xae): /* Grp15 */
         fail_if(modrm_mod != 3);

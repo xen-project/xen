@@ -25,9 +25,28 @@
 })
 #define put_stub(stb) ((stb).addr = 0)
 
-bool emul_test_make_stack_executable(void)
+uint32_t mxcsr_mask = 0x0000ffbf;
+
+bool emul_test_init(void)
 {
     unsigned long sp;
+
+    if ( cpu_has_fxsr )
+    {
+        static union __attribute__((__aligned__(16))) {
+            char x[464];
+            struct {
+                uint32_t other[6];
+                uint32_t mxcsr;
+                uint32_t mxcsr_mask;
+                /* ... */
+            };
+        } fxs;
+
+        asm ( "fxsave %0" : "=m" (fxs) );
+        if ( fxs.mxcsr_mask )
+            mxcsr_mask = fxs.mxcsr_mask;
+    }
 
     /*
      * Mark the entire stack executable so that the stub executions

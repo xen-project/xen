@@ -657,7 +657,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data_p, size_t size)
     };
     int rc;
 
-    stack_exec = emul_test_make_stack_executable();
+    stack_exec = emul_test_init();
     if ( !stack_exec )
     {
         printf("Warning: Stack could not be made executable (%d).\n", errno);

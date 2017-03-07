@@ -15,6 +15,8 @@
 #define FCW_RESET                 0x0040
 #define MXCSR_DEFAULT             0x1f80
 
+extern uint32_t mxcsr_mask;
+
 #define XSTATE_CPUID              0x0000000d
 
 #define XCR_XFEATURE_ENABLED_MASK 0x00000000  /* index of XCR0 */
