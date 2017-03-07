@@ -95,19 +95,6 @@ static int vlapic_find_highest_vector(const void *bitmap)
     return (fls(word[word_offset*4]) - 1) + (word_offset * 32);
 }
 
-static int vlapic_find_lowest_vector(const void *bitmap)
-{
-    const uint32_t *word = bitmap;
-    unsigned int word_offset;
-
-    /* Work forwards through the bitmap (first 32-bit word in every four). */
-    for ( word_offset = 0; word_offset < NR_VECTORS / 32; word_offset++)
-        if ( word[word_offset * 4] )
-            return (ffs(word[word_offset * 4]) - 1) + (word_offset * 32);
-
-    return -1;
-}
-
 /*
  * IRR-specific bitmap update & search routines.
  */
@@ -1201,19 +1188,17 @@ int vlapic_has_pending_irq(struct vcpu *v)
         vlapic_clear_vector(vector, &vlapic->regs->data[APIC_ISR]);
 
     isr = vlapic_find_highest_isr(vlapic);
-    isr = (isr != -1) ? isr : 0;
-    if ( (isr & 0xf0) >= (irr & 0xf0) )
-    {
-        /*
-         * There's already a higher priority vector pending so
-         * we need to abort any previous APIC assist to ensure there
-         * is an EOI.
-         */
-        viridian_abort_apic_assist(v);
-        return -1;
-    }
+    if ( isr == -1 )
+        return irr;
 
-    return irr;
+    /*
+     * A vector is pending in the ISR so, regardless of whether the new
+     * vector in the IRR is lower or higher in priority, any pending
+     * APIC assist must be aborted to ensure an EOI.
+     */
+    viridian_abort_apic_assist(v);
+
+    return ((isr & 0xf0) < (irr & 0xf0)) ? irr : -1;
 }
 
 int vlapic_ack_pending_irq(struct vcpu *v, int vector, bool_t force_ack)
@@ -1230,16 +1215,15 @@ int vlapic_ack_pending_irq(struct vcpu *v, int vector, bool_t force_ack)
          vlapic_test_vector(vector, &vlapic->regs->data[APIC_TMR]) )
         goto done;
 
-    isr = vlapic_find_lowest_vector(&vlapic->regs->data[APIC_ISR]);
-    if ( isr >= 0 && isr < vector )
-        goto done;
-
-    /*
-     * This vector is edge triggered and there are no lower priority
-     * vectors pending, so we can use APIC assist to avoid exiting
-     * for EOI.
-     */
-    viridian_start_apic_assist(v, vector);
+    isr = vlapic_find_highest_isr(vlapic);
+    if ( isr == -1 )
+    {
+        /*
+         * This vector is edge triggered and no other vectors are pending
+         * in the ISR so we can use APIC assist to avoid exiting for EOI.
+         */
+        viridian_start_apic_assist(v, vector);
+    }
 
  done:
     vlapic_set_vector(vector, &vlapic->regs->data[APIC_ISR]);
