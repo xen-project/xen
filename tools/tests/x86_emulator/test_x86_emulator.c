@@ -1566,6 +1566,29 @@ int main(int argc, char **argv)
     else
         printf("skipped\n");
 
+    printf("%-40s", "Testing movq 32(%ecx),%xmm1...");
+    if ( stack_exec && cpu_has_sse2 )
+    {
+        decl_insn(movq_from_mem2);
+
+        asm volatile ( "pcmpeqb %%xmm1, %%xmm1\n"
+                       put_insn(movq_from_mem2, "movq 32(%0), %%xmm1")
+                       :: "c" (NULL) );
+
+        set_insn(movq_from_mem2);
+        rc = x86_emulate(&ctxt, &emulops);
+        if ( rc != X86EMUL_OKAY || !check_eip(movq_from_mem2) )
+            goto fail;
+        asm ( "pcmpgtb %%xmm0, %%xmm0\n\t"
+              "pcmpeqb %%xmm1, %%xmm0\n\t"
+              "pmovmskb %%xmm0, %0" : "=r" (rc) );
+        if ( rc != 0xffff )
+            goto fail;
+        printf("okay\n");
+    }
+    else
+        printf("skipped\n");
+
     printf("%-40s", "Testing vmovq %xmm1,32(%edx)...");
     if ( stack_exec && cpu_has_avx )
     {
@@ -1584,6 +1607,29 @@ int main(int argc, char **argv)
              *((uint64_t *)res + 4) ||
              memcmp(res, res + 10, 24) ||
              memcmp(res, res + 6, 8) )
+            goto fail;
+        printf("okay\n");
+    }
+    else
+        printf("skipped\n");
+
+    printf("%-40s", "Testing vmovq 32(%edx),%xmm0...");
+    if ( stack_exec && cpu_has_avx )
+    {
+        decl_insn(vmovq_from_mem);
+
+        asm volatile ( "pcmpeqb %%xmm0, %%xmm0\n"
+                       put_insn(vmovq_from_mem, "vmovq 32(%0), %%xmm0")
+                       :: "d" (NULL) );
+
+        set_insn(vmovq_from_mem);
+        rc = x86_emulate(&ctxt, &emulops);
+        if ( rc != X86EMUL_OKAY || !check_eip(vmovq_from_mem) )
+            goto fail;
+        asm ( "pcmpgtb %%xmm1, %%xmm1\n\t"
+              "pcmpeqb %%xmm0, %%xmm1\n\t"
+              "pmovmskb %%xmm1, %0" : "=r" (rc) );
+        if ( rc != 0xffff )
             goto fail;
         printf("okay\n");
     }
@@ -1821,6 +1867,33 @@ int main(int argc, char **argv)
     else
         printf("skipped\n");
 
+    printf("%-40s", "Testing movd 32(%ecx),%mm4...");
+    if ( stack_exec && cpu_has_mmx )
+    {
+        decl_insn(movd_from_mem);
+
+        asm volatile ( "pcmpgtb %%mm4, %%mm4\n"
+                       put_insn(movd_from_mem, "movd 32(%0), %%mm4")
+                       :: "c" (NULL) );
+
+        set_insn(movd_from_mem);
+        rc = x86_emulate(&ctxt, &emulops);
+        if ( rc != X86EMUL_OKAY || !check_eip(movd_from_mem) )
+            goto fail;
+        asm ( "pxor %%mm2,%%mm2\n\t"
+              "pcmpeqb %%mm4, %%mm2\n\t"
+              "pmovmskb %%mm2, %0" : "=r" (rc) );
+        if ( rc != 0xf0 )
+            goto fail;
+        asm ( "pcmpeqb %%mm4, %%mm3\n\t"
+              "pmovmskb %%mm3, %0" : "=r" (rc) );
+        if ( rc != 0x0f )
+            goto fail;
+        printf("okay\n");
+    }
+    else
+        printf("skipped\n");
+
     printf("%-40s", "Testing movd %xmm2,32(%edx)...");
     if ( stack_exec && cpu_has_sse2 )
     {
@@ -1845,6 +1918,34 @@ int main(int argc, char **argv)
     else
         printf("skipped\n");
 
+    printf("%-40s", "Testing movd 32(%edx),%xmm3...");
+    if ( stack_exec && cpu_has_sse2 )
+    {
+        decl_insn(movd_from_mem2);
+
+        asm volatile ( "pcmpeqb %%xmm3, %%xmm3\n"
+                       put_insn(movd_from_mem2, "movd 32(%0), %%xmm3")
+                       :: "d" (NULL) );
+
+        set_insn(movd_from_mem2);
+        rc = x86_emulate(&ctxt, &emulops);
+        if ( rc != X86EMUL_OKAY || !check_eip(movd_from_mem2) )
+            goto fail;
+        asm ( "pxor %%xmm1,%%xmm1\n\t"
+              "pcmpeqb %%xmm3, %%xmm1\n\t"
+              "pmovmskb %%xmm1, %0" : "=r" (rc) );
+        if ( rc != 0xfff0 )
+            goto fail;
+        asm ( "pcmpeqb %%xmm2, %%xmm2\n\t"
+              "pcmpeqb %%xmm3, %%xmm2\n\t"
+              "pmovmskb %%xmm2, %0" : "=r" (rc) );
+        if ( rc != 0x000f )
+            goto fail;
+        printf("okay\n");
+    }
+    else
+        printf("skipped\n");
+
     printf("%-40s", "Testing vmovd %xmm1,32(%ecx)...");
     if ( stack_exec && cpu_has_avx )
     {
@@ -1863,6 +1964,34 @@ int main(int argc, char **argv)
              res[8] + 1 ||
              memcmp(res, res + 9, 28) ||
              memcmp(res, res + 6, 8) )
+            goto fail;
+        printf("okay\n");
+    }
+    else
+        printf("skipped\n");
+
+    printf("%-40s", "Testing vmovd 32(%ecx),%xmm2...");
+    if ( stack_exec && cpu_has_avx )
+    {
+        decl_insn(vmovd_from_mem);
+
+        asm volatile ( "pcmpeqb %%xmm2, %%xmm2\n"
+                       put_insn(vmovd_from_mem, "vmovd 32(%0), %%xmm2")
+                       :: "c" (NULL) );
+
+        set_insn(vmovd_from_mem);
+        rc = x86_emulate(&ctxt, &emulops);
+        if ( rc != X86EMUL_OKAY || !check_eip(vmovd_from_mem) )
+            goto fail;
+        asm ( "pxor %%xmm0,%%xmm0\n\t"
+              "pcmpeqb %%xmm2, %%xmm0\n\t"
+              "pmovmskb %%xmm0, %0" : "=r" (rc) );
+        if ( rc != 0xfff0 )
+            goto fail;
+        asm ( "pcmpeqb %%xmm1, %%xmm1\n\t"
+              "pcmpeqb %%xmm2, %%xmm1\n\t"
+              "pmovmskb %%xmm1, %0" : "=r" (rc) );
+        if ( rc != 0x000f )
             goto fail;
         printf("okay\n");
     }
@@ -1899,6 +2028,34 @@ int main(int argc, char **argv)
     else
         printf("skipped\n");
 
+    printf("%-40s", "Testing movd %ebx,%mm4...");
+    if ( stack_exec && cpu_has_mmx )
+    {
+        decl_insn(movd_from_reg);
+
+        /* See comment next to movd above. */
+        asm volatile ( "pcmpgtb %%mm4, %%mm4\n"
+                       put_insn(movd_from_reg, "movd %%ebx, %%mm4")
+                       :: );
+
+        set_insn(movd_from_reg);
+        rc = x86_emulate(&ctxt, &emulops);
+        if ( (rc != X86EMUL_OKAY) || !check_eip(movd_from_reg) )
+            goto fail;
+        asm ( "pxor %%mm2,%%mm2\n\t"
+              "pcmpeqb %%mm4, %%mm2\n\t"
+              "pmovmskb %%mm2, %0" : "=r" (rc) );
+        if ( rc != 0xf0 )
+            goto fail;
+        asm ( "pcmpeqb %%mm4, %%mm3\n\t"
+              "pmovmskb %%mm3, %0" : "=r" (rc) );
+        if ( rc != 0x0f )
+            goto fail;
+        printf("okay\n");
+    }
+    else
+        printf("skipped\n");
+
     printf("%-40s", "Testing movd %xmm2,%ebx...");
     if ( stack_exec && cpu_has_sse2 )
     {
@@ -1924,6 +2081,35 @@ int main(int argc, char **argv)
     else
         printf("skipped\n");
 
+    printf("%-40s", "Testing movd %ebx,%xmm3...");
+    if ( stack_exec && cpu_has_sse2 )
+    {
+        decl_insn(movd_from_reg2);
+
+        /* See comment next to movd above. */
+        asm volatile ( "pcmpgtb %%xmm3, %%xmm3\n"
+                       put_insn(movd_from_reg2, "movd %%ebx, %%xmm3")
+                       :: );
+
+        set_insn(movd_from_reg2);
+        rc = x86_emulate(&ctxt, &emulops);
+        if ( (rc != X86EMUL_OKAY) || !check_eip(movd_from_reg2) )
+            goto fail;
+        asm ( "pxor %%xmm1,%%xmm1\n\t"
+              "pcmpeqb %%xmm3, %%xmm1\n\t"
+              "pmovmskb %%xmm1, %0" : "=r" (rc) );
+        if ( rc != 0xfff0 )
+            goto fail;
+        asm ( "pcmpeqb %%xmm2, %%xmm2\n\t"
+              "pcmpeqb %%xmm3, %%xmm2\n\t"
+              "pmovmskb %%xmm2, %0" : "=r" (rc) );
+        if ( rc != 0x000f )
+            goto fail;
+        printf("okay\n");
+    }
+    else
+        printf("skipped\n");
+
     printf("%-40s", "Testing vmovd %xmm1,%ebx...");
     if ( stack_exec && cpu_has_avx )
     {
@@ -1943,6 +2129,35 @@ int main(int argc, char **argv)
         rc = x86_emulate(&ctxt, &emulops);
         if ( (rc != X86EMUL_OKAY) || !check_eip(vmovd_to_reg) ||
              regs.ebx != 0xffffffff )
+            goto fail;
+        printf("okay\n");
+    }
+    else
+        printf("skipped\n");
+
+    printf("%-40s", "Testing vmovd %ebx,%xmm2...");
+    if ( stack_exec && cpu_has_avx )
+    {
+        decl_insn(vmovd_from_reg);
+
+        /* See comment next to movd above. */
+        asm volatile ( "pcmpgtb %%xmm2, %%xmm2\n"
+                       put_insn(vmovd_from_reg, "vmovd %%ebx, %%xmm2")
+                       :: );
+
+        set_insn(vmovd_from_reg);
+        rc = x86_emulate(&ctxt, &emulops);
+        if ( (rc != X86EMUL_OKAY) || !check_eip(vmovd_from_reg) )
+            goto fail;
+        asm ( "pxor %%xmm0,%%xmm0\n\t"
+              "pcmpeqb %%xmm2, %%xmm0\n\t"
+              "pmovmskb %%xmm0, %0" : "=r" (rc) );
+        if ( rc != 0xfff0 )
+            goto fail;
+        asm ( "pcmpeqb %%xmm1, %%xmm1\n\t"
+              "pcmpeqb %%xmm2, %%xmm1\n\t"
+              "pmovmskb %%xmm1, %0" : "=r" (rc) );
+        if ( rc != 0x000f )
             goto fail;
         printf("okay\n");
     }
@@ -2086,6 +2301,41 @@ int main(int argc, char **argv)
     else
         printf("skipped\n");
 #endif
+
+    printf("%-40s", "Testing maskmovq (zero mask)...");
+    if ( stack_exec && cpu_has_sse )
+    {
+        decl_insn(maskmovq);
+
+        asm volatile ( "pcmpgtb %mm4, %mm4\n"
+                       put_insn(maskmovq, "maskmovq %mm4, %mm4") );
+
+        set_insn(maskmovq);
+        regs.edi = 0;
+        rc = x86_emulate(&ctxt, &emulops);
+        if ( rc != X86EMUL_OKAY || !check_eip(maskmovq) )
+            goto fail;
+        printf("okay\n");
+    }
+    else
+        printf("skipped\n");
+
+    printf("%-40s", "Testing maskmovdqu (zero mask)...");
+    if ( stack_exec && cpu_has_sse2 )
+    {
+        decl_insn(maskmovdqu);
+
+        asm volatile ( "pcmpgtb %xmm3, %xmm3\n"
+                       put_insn(maskmovdqu, "maskmovdqu %xmm3, %xmm3") );
+
+        set_insn(maskmovdqu);
+        rc = x86_emulate(&ctxt, &emulops);
+        if ( rc != X86EMUL_OKAY || !check_eip(maskmovdqu) )
+            goto fail;
+        printf("okay\n");
+    }
+    else
+        printf("skipped\n");
 
     printf("%-40s", "Testing lddqu 4(%edx),%xmm4...");
     if ( stack_exec && cpu_has_sse3 )

@@ -241,9 +241,12 @@ static const struct {
     [0x0f] = { ModRM|SrcImmByte },
     [0x10] = { DstImplicit|SrcMem|ModRM|Mov, simd_any_fp },
     [0x11] = { DstMem|SrcImplicit|ModRM|Mov, simd_any_fp },
-    [0x12 ... 0x13] = { ImplicitOps|ModRM },
+    [0x12] = { DstImplicit|SrcMem|ModRM|Mov, simd_other },
+    [0x13] = { DstMem|SrcImplicit|ModRM|Mov, simd_other },
     [0x14 ... 0x15] = { DstImplicit|SrcMem|ModRM, simd_packed_fp },
-    [0x16 ... 0x1f] = { ImplicitOps|ModRM },
+    [0x16] = { DstImplicit|SrcMem|ModRM|Mov, simd_other },
+    [0x17] = { DstMem|SrcImplicit|ModRM|Mov, simd_other },
+    [0x18 ... 0x1f] = { ImplicitOps|ModRM },
     [0x20 ... 0x21] = { DstMem|SrcImplicit|ModRM },
     [0x22 ... 0x23] = { DstImplicit|SrcMem|ModRM },
     [0x28] = { DstImplicit|SrcMem|ModRM|Mov, simd_packed_fp },
@@ -256,7 +259,7 @@ static const struct {
     [0x38] = { DstReg|SrcMem|ModRM },
     [0x3a] = { DstReg|SrcImmByte|ModRM },
     [0x40 ... 0x4f] = { DstReg|SrcMem|ModRM|Mov },
-    [0x50] = { ModRM },
+    [0x50] = { DstReg|SrcImplicit|ModRM|Mov },
     [0x51] = { DstImplicit|SrcMem|ModRM|TwoOp, simd_any_fp },
     [0x52 ... 0x53] = { DstImplicit|SrcMem|ModRM|TwoOp, simd_single_fp },
     [0x54 ... 0x57] = { DstImplicit|SrcMem|ModRM, simd_packed_fp },
@@ -267,14 +270,16 @@ static const struct {
     [0x63 ... 0x67] = { DstImplicit|SrcMem|ModRM, simd_packed_int },
     [0x68 ... 0x6a] = { DstImplicit|SrcMem|ModRM, simd_other },
     [0x6b ... 0x6d] = { DstImplicit|SrcMem|ModRM, simd_packed_int },
-    [0x6e ... 0x6f] = { ImplicitOps|ModRM },
+    [0x6e] = { DstImplicit|SrcMem|ModRM|Mov },
+    [0x6f] = { DstImplicit|SrcMem|ModRM|Mov, simd_packed_int },
     [0x70] = { SrcImmByte|ModRM|TwoOp, simd_other },
     [0x71 ... 0x73] = { SrcImmByte|ModRM },
     [0x74 ... 0x76] = { DstImplicit|SrcMem|ModRM, simd_packed_int },
     [0x77] = { DstImplicit|SrcNone },
     [0x78 ... 0x79] = { ModRM },
     [0x7c ... 0x7d] = { DstImplicit|SrcMem|ModRM, simd_other },
-    [0x7e ... 0x7f] = { ImplicitOps|ModRM },
+    [0x7e] = { DstMem|SrcImplicit|ModRM|Mov },
+    [0x7f] = { DstMem|SrcImplicit|ModRM|Mov, simd_packed_int },
     [0x80 ... 0x8f] = { DstImplicit|SrcImm },
     [0x90 ... 0x9f] = { ByteOp|DstMem|SrcNone|ModRM|Mov },
     [0xa0 ... 0xa1] = { ImplicitOps|Mov },
@@ -316,19 +321,19 @@ static const struct {
     [0xd0] = { DstImplicit|SrcMem|ModRM, simd_other },
     [0xd1 ... 0xd3] = { DstImplicit|SrcMem|ModRM, simd_other },
     [0xd4 ... 0xd5] = { DstImplicit|SrcMem|ModRM, simd_packed_int },
-    [0xd6] = { ImplicitOps|ModRM },
-    [0xd7] = { ModRM },
+    [0xd6] = { DstMem|SrcImplicit|ModRM|Mov, simd_other },
+    [0xd7] = { DstReg|SrcImplicit|ModRM|Mov },
     [0xd8 ... 0xdf] = { DstImplicit|SrcMem|ModRM, simd_packed_int },
     [0xe0] = { DstImplicit|SrcMem|ModRM, simd_packed_int },
     [0xe1 ... 0xe2] = { DstImplicit|SrcMem|ModRM, simd_other },
     [0xe3 ... 0xe5] = { DstImplicit|SrcMem|ModRM, simd_packed_int },
     [0xe6] = { ModRM },
-    [0xe7] = { ImplicitOps|ModRM },
+    [0xe7] = { DstMem|SrcImplicit|ModRM|Mov, simd_packed_int },
     [0xe8 ... 0xef] = { DstImplicit|SrcMem|ModRM, simd_packed_int },
     [0xf0] = { DstImplicit|SrcMem|ModRM|Mov, simd_other },
     [0xf1 ... 0xf3] = { DstImplicit|SrcMem|ModRM, simd_other },
     [0xf4 ... 0xf6] = { DstImplicit|SrcMem|ModRM, simd_packed_int },
-    [0xf7] = { ModRM },
+    [0xf7] = { DstMem|SrcMem|ModRM|Mov, simd_packed_int },
     [0xf8 ... 0xfe] = { DstImplicit|SrcMem|ModRM, simd_packed_int },
     [0xff] = { ModRM }
 };
@@ -364,11 +369,6 @@ enum vex_pfx {
 
 static const uint8_t sse_prefix[] = { 0x66, 0xf3, 0xf2 };
 
-#define SET_SSE_PREFIX(dst, vex_pfx) do { \
-    if ( vex_pfx ) \
-        (dst) = sse_prefix[(vex_pfx) - 1]; \
-} while (0)
-
 union vex {
     uint8_t raw[2];
     struct {
@@ -383,15 +383,40 @@ union vex {
     };
 };
 
+#ifdef __x86_64__
+# define PFX2 REX_PREFIX
+#else
+# define PFX2 0x3e
+#endif
+#define PFX_BYTES 3
+#define init_prefixes(stub) ({ \
+    uint8_t *buf_ = get_stub(stub); \
+    buf_[0] = 0x3e; \
+    buf_[1] = PFX2; \
+    buf_[2] = 0x0f; \
+    buf_ + 3; \
+})
+
 #define copy_REX_VEX(ptr, rex, vex) do { \
     if ( (vex).opcx != vex_none ) \
     { \
         if ( !mode_64bit() ) \
             vex.reg |= 8; \
-        ptr[0] = 0xc4, ptr[1] = (vex).raw[0], ptr[2] = (vex).raw[1]; \
+        (ptr)[0 - PFX_BYTES] = 0xc4; \
+        (ptr)[1 - PFX_BYTES] = (vex).raw[0]; \
+        (ptr)[2 - PFX_BYTES] = (vex).raw[1]; \
     } \
-    else if ( mode_64bit() ) \
-        ptr[1] = rex | REX_PREFIX; \
+    else \
+    { \
+        if ( (vex).pfx ) \
+            (ptr)[0 - PFX_BYTES] = sse_prefix[(vex).pfx - 1]; \
+        /* \
+         * "rex" is always zero for other than 64-bit mode, so OR-ing it \
+         * into any prefix (and not just REX_PREFIX) is safe on 32-bit \
+         * (test harness) builds. \
+         */ \
+        (ptr)[1 - PFX_BYTES] |= rex; \
+    } \
 } while (0)
 
 union evex {
@@ -2149,7 +2174,8 @@ x86_decode_twobyte(
     case 0x10 ... 0x18:
     case 0x28 ... 0x2f:
     case 0x50 ... 0x77:
-    case 0x79 ... 0x7f:
+    case 0x79 ... 0x7d:
+    case 0x7f:
     case 0xae:
     case 0xc2 ... 0xc3:
     case 0xc5 ... 0xc6:
@@ -2167,6 +2193,18 @@ x86_decode_twobyte(
     case 0x21: case 0x23: /* mov to/from dr */
         generate_exception_if(lock_prefix || ea.type != OP_REG, EXC_UD);
         op_bytes = mode_64bit() ? 8 : 4;
+        break;
+
+    case 0x7e:
+        ctxt->opcode |= MASK_INSR(vex.pfx, X86EMUL_OPC_PFX_MASK);
+        if ( vex.pfx == vex_f3 ) /* movq xmm/m64,xmm */
+        {
+    case X86EMUL_OPC_VEX_F3(0, 0x7e): /* vmovq xmm/m64,xmm */
+            state->desc = DstImplicit | SrcMem | ModRM | Mov;
+            state->simd_size = simd_other;
+            /* Avoid the state->desc adjustment below. */
+            return X86EMUL_OKAY;
+        }
         break;
 
     case 0xb8: /* jmpe / popcnt */
@@ -2779,7 +2817,7 @@ x86_emulate(
     struct cpu_user_regs _regs = *ctxt->regs;
     struct x86_emulate_state state;
     int rc;
-    uint8_t b, d;
+    uint8_t b, d, *opc = NULL;
     bool singlestep = (_regs._eflags & X86_EFLAGS_TF) &&
 	    !is_branch_step(ctxt, ops);
     bool sfence = false;
@@ -5246,6 +5284,7 @@ x86_emulate(
     CASE_SIMD_ALL_FP(_VEX, 0x0f, 0x5e):    /* vdiv{p,s}{s,d} {x,y}mm/mem,{x,y}mm,{x,y}mm */
     CASE_SIMD_ALL_FP(, 0x0f, 0x5f):        /* max{p,s}{s,d} xmm/mem,xmm */
     CASE_SIMD_ALL_FP(_VEX, 0x0f, 0x5f):    /* vmax{p,s}{s,d} {x,y}mm/mem,{x,y}mm,{x,y}mm */
+    simd_0f_fp:
         if ( vex.opcx == vex_none )
         {
             if ( vex.pfx & VEX_PREFIX_DOUBLE_MASK )
@@ -5269,24 +5308,57 @@ x86_emulate(
             get_fpu(X86EMUL_FPU_ymm, &fic);
         }
     simd_0f_common:
-    {
-        uint8_t *buf = get_stub(stub);
-
-        buf[0] = 0x3e;
-        buf[1] = 0x3e;
-        buf[2] = 0x0f;
-        buf[3] = b;
-        buf[4] = modrm;
+        opc = init_prefixes(stub);
+        opc[0] = b;
+        opc[1] = modrm;
         if ( ea.type == OP_MEM )
         {
             /* convert memory operand to (%rAX) */
             rex_prefix &= ~REX_B;
             vex.b = 1;
-            buf[4] &= 0x38;
+            opc[1] &= 0x38;
         }
-        fic.insn_bytes = 5;
+        fic.insn_bytes = PFX_BYTES + 2;
         break;
-    }
+
+    case X86EMUL_OPC_66(0x0f, 0x12):       /* movlpd m64,xmm */
+    case X86EMUL_OPC_VEX_66(0x0f, 0x12):   /* vmovlpd m64,xmm,xmm */
+    CASE_SIMD_PACKED_FP(, 0x0f, 0x13):     /* movlp{s,d} xmm,m64 */
+    CASE_SIMD_PACKED_FP(_VEX, 0x0f, 0x13): /* vmovlp{s,d} xmm,m64 */
+    case X86EMUL_OPC_66(0x0f, 0x16):       /* movhpd m64,xmm */
+    case X86EMUL_OPC_VEX_66(0x0f, 0x16):   /* vmovhpd m64,xmm,xmm */
+    CASE_SIMD_PACKED_FP(, 0x0f, 0x17):     /* movhp{s,d} xmm,m64 */
+    CASE_SIMD_PACKED_FP(_VEX, 0x0f, 0x17): /* vmovhp{s,d} xmm,m64 */
+        generate_exception_if(ea.type != OP_MEM, EXC_UD);
+        /* fall through */
+    case X86EMUL_OPC(0x0f, 0x12):          /* movlps m64,xmm */
+                                           /* movhlps xmm,xmm */
+    case X86EMUL_OPC_VEX(0x0f, 0x12):      /* vmovlps m64,xmm,xmm */
+                                           /* vmovhlps xmm,xmm,xmm */
+    case X86EMUL_OPC(0x0f, 0x16):          /* movhps m64,xmm */
+                                           /* movlhps xmm,xmm */
+    case X86EMUL_OPC_VEX(0x0f, 0x16):      /* vmovhps m64,xmm,xmm */
+                                           /* vmovlhps xmm,xmm,xmm */
+        generate_exception_if(vex.l, EXC_UD);
+        if ( (d & DstMask) != DstMem )
+            d &= ~TwoOp;
+        op_bytes = 8;
+        goto simd_0f_fp;
+
+    case X86EMUL_OPC_F3(0x0f, 0x12):       /* movsldup xmm/m128,xmm */
+    case X86EMUL_OPC_VEX_F3(0x0f, 0x12):   /* vmovsldup {x,y}mm/mem,{x,y}mm */
+    case X86EMUL_OPC_F2(0x0f, 0x12):       /* movddup xmm/m64,xmm */
+    case X86EMUL_OPC_VEX_F2(0x0f, 0x12):   /* vmovddup {x,y}mm/mem,{x,y}mm */
+    case X86EMUL_OPC_F3(0x0f, 0x16):       /* movshdup xmm/m128,xmm */
+    case X86EMUL_OPC_VEX_F3(0x0f, 0x16):   /* vmovshdup {x,y}mm/mem,{x,y}mm */
+        d |= TwoOp;
+        op_bytes = !(vex.pfx & VEX_PREFIX_DOUBLE_MASK) || vex.l
+                   ? 16 << vex.l : 8;
+    simd_0f_sse3_avx:
+        if ( vex.opcx != vex_none )
+            goto simd_0f_avx;
+        host_and_vcpu_must_have(sse3);
+        goto simd_0f_xmm;
 
     case X86EMUL_OPC(0x0f, 0x20): /* mov cr,reg */
     case X86EMUL_OPC(0x0f, 0x21): /* mov dr,reg */
@@ -5442,6 +5514,58 @@ x86_emulate(
         singlestep = _regs._eflags & X86_EFLAGS_TF;
         break;
 
+    CASE_SIMD_PACKED_FP(, 0x0f, 0x50):     /* movmskp{s,d} xmm,reg */
+    CASE_SIMD_PACKED_FP(_VEX, 0x0f, 0x50): /* vmovmskp{s,d} {x,y}mm,reg */
+    CASE_SIMD_PACKED_INT(0x0f, 0xd7):      /* pmovmskb {,x}mm,reg */
+    case X86EMUL_OPC_VEX_66(0x0f, 0xd7):   /* vpmovmskb {x,y}mm,reg */
+        generate_exception_if(ea.type != OP_REG, EXC_UD);
+
+        if ( vex.opcx == vex_none )
+        {
+            if ( vex.pfx & VEX_PREFIX_DOUBLE_MASK )
+                vcpu_must_have(sse2);
+            else
+            {
+                if ( b != 0x50 )
+                    host_and_vcpu_must_have(mmx);
+                vcpu_must_have(sse);
+            }
+            if ( b == 0x50 || (vex.pfx & VEX_PREFIX_DOUBLE_MASK) )
+                get_fpu(X86EMUL_FPU_xmm, &fic);
+            else
+                get_fpu(X86EMUL_FPU_mmx, &fic);
+        }
+        else
+        {
+            generate_exception_if(vex.reg != 0xf, EXC_UD);
+            if ( b == 0x50 || !vex.l )
+                host_and_vcpu_must_have(avx);
+            else
+                host_and_vcpu_must_have(avx2);
+            get_fpu(X86EMUL_FPU_ymm, &fic);
+        }
+
+        opc = init_prefixes(stub);
+        opc[0] = b;
+        /* Convert GPR destination to %rAX. */
+        rex_prefix &= ~REX_R;
+        vex.r = 1;
+        if ( !mode_64bit() )
+            vex.w = 0;
+        opc[1] = modrm & 0xc7;
+        fic.insn_bytes = PFX_BYTES + 2;
+        opc[2] = 0xc3;
+
+        copy_REX_VEX(opc, rex_prefix, vex);
+        invoke_stub("", "", "=a" (dst.val) : [dummy] "i" (0));
+
+        put_stub(stub);
+        put_fpu(&fic);
+
+        ASSERT(!state->simd_size);
+        dst.bytes = 4;
+        break;
+
     CASE_SIMD_PACKED_INT(0x0f, 0x60):    /* punpcklbw {,x}mm/mem,{,x}mm */
     case X86EMUL_OPC_VEX_66(0x0f, 0x60): /* vpunpcklbw {x,y}mm/mem,{x,y}mm,{x,y}mm */
     CASE_SIMD_PACKED_INT(0x0f, 0x61):    /* punpcklwd {,x}mm/mem,{,x}mm */
@@ -5555,134 +5679,76 @@ x86_emulate(
         get_fpu(X86EMUL_FPU_mmx, &fic);
         goto simd_0f_common;
 
-    case X86EMUL_OPC(0x0f, 0xe7):        /* movntq mm,m64 */
-    case X86EMUL_OPC_66(0x0f, 0xe7):     /* movntdq xmm,m128 */
-    case X86EMUL_OPC_VEX_66(0x0f, 0xe7): /* vmovntdq xmm,m128 */
-                                         /* vmovntdq ymm,m256 */
-        fail_if(ea.type != OP_MEM);
-        /* fall through */
-    case X86EMUL_OPC(0x0f, 0x6f):        /* movq mm/m64,mm */
-    case X86EMUL_OPC_66(0x0f, 0x6f):     /* movdqa xmm/m128,xmm */
-    case X86EMUL_OPC_F3(0x0f, 0x6f):     /* movdqu xmm/m128,xmm */
-    case X86EMUL_OPC_VEX_66(0x0f, 0x6f): /* vmovdqa xmm/m128,xmm */
-                                         /* vmovdqa ymm/m256,ymm */
-    case X86EMUL_OPC_VEX_F3(0x0f, 0x6f): /* vmovdqu xmm/m128,xmm */
-                                         /* vmovdqu ymm/m256,ymm */
-    case X86EMUL_OPC(0x0f, 0x7e):        /* movd mm,r/m32 */
-                                         /* movq mm,r/m64 */
-    case X86EMUL_OPC_66(0x0f, 0x7e):     /* movd xmm,r/m32 */
-                                         /* movq xmm,r/m64 */
-    case X86EMUL_OPC_VEX_66(0x0f, 0x7e): /* vmovd xmm,r/m32 */
-                                         /* vmovq xmm,r/m64 */
-    case X86EMUL_OPC(0x0f, 0x7f):        /* movq mm,mm/m64 */
-    case X86EMUL_OPC_66(0x0f, 0x7f):     /* movdqa xmm,xmm/m128 */
-    case X86EMUL_OPC_VEX_66(0x0f, 0x7f): /* vmovdqa xmm,xmm/m128 */
-                                         /* vmovdqa ymm,ymm/m256 */
-    case X86EMUL_OPC_F3(0x0f, 0x7f):     /* movdqu xmm,xmm/m128 */
-    case X86EMUL_OPC_VEX_F3(0x0f, 0x7f): /* vmovdqu xmm,xmm/m128 */
-                                         /* vmovdqu ymm,ymm/m256 */
-    case X86EMUL_OPC_66(0x0f, 0xd6):     /* movq xmm,xmm/m64 */
-    case X86EMUL_OPC_VEX_66(0x0f, 0xd6): /* vmovq xmm,xmm/m64 */
-    {
-        uint8_t *buf = get_stub(stub);
-
-        fic.insn_bytes = 5;
-        buf[0] = 0x3e;
-        buf[1] = 0x3e;
-        buf[2] = 0x0f;
-        buf[3] = b;
-        buf[4] = modrm;
-        buf[5] = 0xc3;
-        if ( vex.opcx == vex_none )
+    CASE_SIMD_PACKED_INT(0x0f, 0x6e):    /* mov{d,q} r/m,{,x}mm */
+    case X86EMUL_OPC_VEX_66(0x0f, 0x6e): /* vmov{d,q} r/m,xmm */
+    CASE_SIMD_PACKED_INT(0x0f, 0x7e):    /* mov{d,q} {,x}mm,r/m */
+    case X86EMUL_OPC_VEX_66(0x0f, 0x7e): /* vmov{d,q} xmm,r/m */
+        if ( vex.opcx != vex_none )
         {
-            switch ( vex.pfx )
-            {
-            case vex_66:
-            case vex_f3:
-                vcpu_must_have(sse2);
-                /* Converting movdqu to movdqa here: Our buffer is aligned. */
-                buf[0] = 0x66;
-                get_fpu(X86EMUL_FPU_xmm, &fic);
-                ea.bytes = 16;
-                break;
-            case vex_none:
-                if ( b != 0xe7 )
-                    host_and_vcpu_must_have(mmx);
-                else
-                    vcpu_must_have(sse);
-                get_fpu(X86EMUL_FPU_mmx, &fic);
-                ea.bytes = 8;
-                break;
-            default:
-                goto cannot_emulate;
-            }
+            generate_exception_if(vex.l || vex.reg != 0xf, EXC_UD);
+            host_and_vcpu_must_have(avx);
+            get_fpu(X86EMUL_FPU_ymm, &fic);
+        }
+        else if ( vex.pfx )
+        {
+            vcpu_must_have(sse2);
+            get_fpu(X86EMUL_FPU_xmm, &fic);
         }
         else
         {
-            fail_if(vex.reg != 0xf);
-            host_and_vcpu_must_have(avx);
-            get_fpu(X86EMUL_FPU_ymm, &fic);
-            ea.bytes = 16 << vex.l;
+            host_and_vcpu_must_have(mmx);
+            get_fpu(X86EMUL_FPU_mmx, &fic);
         }
-        switch ( b )
-        {
-        case 0x7e:
-            generate_exception_if(vex.l, EXC_UD);
-            ea.bytes = op_bytes;
-            break;
-        case 0xd6:
-            generate_exception_if(vex.l, EXC_UD);
-            ea.bytes = 8;
-            break;
-        }
-        if ( ea.type == OP_MEM )
-        {
-            uint32_t mxcsr = 0;
 
-            if ( ea.bytes < 16 || vex.pfx == vex_f3 )
-                mxcsr = MXCSR_MM;
-            else if ( vcpu_has_misalignsse() )
-                asm ( "stmxcsr %0" : "=m" (mxcsr) );
-            generate_exception_if(!(mxcsr & MXCSR_MM) &&
-                                  !is_aligned(ea.mem.seg, ea.mem.off, ea.bytes,
-                                              ctxt, ops),
-                                  EXC_GP, 0);
-            if ( b == 0x6f )
-                rc = ops->read(ea.mem.seg, ea.mem.off+0, mmvalp,
-                               ea.bytes, ctxt);
-            else
-                fail_if(!ops->write); /* Check before running the stub. */
-        }
-        if ( ea.type == OP_MEM || b == 0x7e )
-        {
-            /* Convert memory operand or GPR destination to (%rAX) */
-            rex_prefix &= ~REX_B;
-            vex.b = 1;
-            buf[4] &= 0x38;
-            if ( ea.type == OP_MEM )
-                ea.reg = (void *)mmvalp;
-            else /* Ensure zero-extension of a 32-bit result. */
-                *ea.reg = 0;
-        }
-        if ( !rc )
-        {
-           copy_REX_VEX(buf, rex_prefix, vex);
-           asm volatile ( "call *%0" : : "r" (stub.func), "a" (ea.reg)
-                                     : "memory" );
-        }
-        put_fpu(&fic);
+        opc = init_prefixes(stub);
+        opc[0] = b;
+        /* Convert memory/GPR operand to (%rAX). */
+        rex_prefix &= ~REX_B;
+        vex.b = 1;
+        if ( !mode_64bit() )
+            vex.w = 0;
+        opc[1] = modrm & 0x38;
+        fic.insn_bytes = PFX_BYTES + 2;
+        opc[2] = 0xc3;
+
+        copy_REX_VEX(opc, rex_prefix, vex);
+        invoke_stub("", "", "+m" (src.val) : "a" (&src.val));
+        dst.val = src.val;
+
         put_stub(stub);
-        if ( !rc && (b != 0x6f) && (ea.type == OP_MEM) )
-        {
-            ASSERT(ops->write); /* See the fail_if() above. */
-            rc = ops->write(ea.mem.seg, ea.mem.off, mmvalp,
-                            ea.bytes, ctxt);
-        }
-        if ( rc )
-            goto done;
-        dst.type = OP_NONE;
+        put_fpu(&fic);
+
+        ASSERT(!state->simd_size);
         break;
-    }
+
+    case X86EMUL_OPC_66(0x0f, 0xe7):     /* movntdq xmm,m128 */
+    case X86EMUL_OPC_VEX_66(0x0f, 0xe7): /* vmovntdq {x,y}mm,mem */
+        generate_exception_if(ea.type != OP_MEM, EXC_UD);
+        sfence = true;
+        /* fall through */
+    case X86EMUL_OPC_66(0x0f, 0x6f):     /* movdqa xmm/m128,xmm */
+    case X86EMUL_OPC_VEX_66(0x0f, 0x6f): /* vmovdqa {x,y}mm/mem,{x,y}mm */
+    case X86EMUL_OPC_F3(0x0f, 0x6f):     /* movdqu xmm/m128,xmm */
+    case X86EMUL_OPC_VEX_F3(0x0f, 0x6f): /* vmovdqu {x,y}mm/mem,{x,y}mm */
+    case X86EMUL_OPC_66(0x0f, 0x7f):     /* movdqa xmm,xmm/m128 */
+    case X86EMUL_OPC_VEX_66(0x0f, 0x7f): /* vmovdqa {x,y}mm,{x,y}mm/m128 */
+    case X86EMUL_OPC_F3(0x0f, 0x7f):     /* movdqu xmm,xmm/m128 */
+    case X86EMUL_OPC_VEX_F3(0x0f, 0x7f): /* vmovdqu {x,y}mm,{x,y}mm/mem */
+        d |= TwoOp;
+        op_bytes = 16 << vex.l;
+        if ( vex.opcx != vex_none )
+            goto simd_0f_avx;
+        goto simd_0f_sse2;
+
+    case X86EMUL_OPC_VEX_66(0x0f, 0xd6): /* vmovq xmm,xmm/m64 */
+        generate_exception_if(vex.l, EXC_UD);
+        d |= TwoOp;
+        /* fall through */
+    case X86EMUL_OPC_66(0x0f, 0xd6):     /* movq xmm,xmm/m64 */
+    case X86EMUL_OPC(0x0f, 0x6f):        /* movq mm/m64,mm */
+    case X86EMUL_OPC(0x0f, 0x7f):        /* movq mm,mm/m64 */
+        op_bytes = 8;
+        goto simd_0f_int;
 
     CASE_SIMD_PACKED_INT(0x0f, 0x70):    /* pshuf{w,d} $imm8,{,x}mm/mem,{,x}mm */
     case X86EMUL_OPC_VEX_66(0x0f, 0x70): /* vpshufd $imm8,{x,y}mm/mem,{x,y}mm */
@@ -5717,25 +5783,25 @@ x86_emulate(
             get_fpu(X86EMUL_FPU_mmx, &fic);
         }
     simd_0f_imm8:
-    {
-        uint8_t *buf = get_stub(stub);
-
-        buf[0] = 0x3e;
-        buf[1] = 0x3e;
-        buf[2] = 0x0f;
-        buf[3] = b;
-        buf[4] = modrm;
+        opc = init_prefixes(stub);
+        opc[0] = b;
+        opc[1] = modrm;
         if ( ea.type == OP_MEM )
         {
             /* Convert memory operand to (%rAX). */
             rex_prefix &= ~REX_B;
             vex.b = 1;
-            buf[4] &= 0x38;
+            opc[1] &= 0x38;
         }
-        buf[5] = imm1;
-        fic.insn_bytes = 6;
+        opc[2] = imm1;
+        fic.insn_bytes = PFX_BYTES + 3;
         break;
-    }
+
+    case X86EMUL_OPC_F3(0x0f, 0x7e):     /* movq xmm/m64,xmm */
+    case X86EMUL_OPC_VEX_F3(0x0f, 0x7e): /* vmovq xmm/m64,xmm */
+        generate_exception_if(vex.l, EXC_UD);
+        op_bytes = 8;
+        goto simd_0f_int;
 
     case X86EMUL_OPC_F2(0x0f, 0xf0):     /* lddqu m128,xmm */
     case X86EMUL_OPC_VEX_F2(0x0f, 0xf0): /* vlddqu mem,{x,y}mm */
@@ -5754,10 +5820,7 @@ x86_emulate(
     case X86EMUL_OPC_VEX_66(0x0f, 0xd0): /* vaddsubpd {x,y}mm/mem,{x,y}mm,{x,y}mm */
     case X86EMUL_OPC_VEX_F2(0x0f, 0xd0): /* vaddsubps {x,y}mm/mem,{x,y}mm,{x,y}mm */
         op_bytes = 16 << vex.l;
-        if ( vex.opcx != vex_none )
-            goto simd_0f_avx;
-        host_and_vcpu_must_have(sse3);
-        goto simd_0f_xmm;
+        goto simd_0f_sse3_avx;
 
     case X86EMUL_OPC(0x0f, 0x80) ... X86EMUL_OPC(0x0f, 0x8f): /* jcc (near) */
         if ( test_cc(b, _regs._eflags) )
@@ -6307,6 +6370,17 @@ x86_emulate(
         vcpu_must_have(sse2);
         goto simd_0f_mmx;
 
+    case X86EMUL_OPC_F3(0x0f, 0xd6):     /* movq2dq mm,xmm */
+    case X86EMUL_OPC_F2(0x0f, 0xd6):     /* movdq2q xmm,mm */
+        generate_exception_if(ea.type != OP_REG, EXC_UD);
+        op_bytes = 8;
+        host_and_vcpu_must_have(mmx);
+        goto simd_0f_int;
+
+    case X86EMUL_OPC(0x0f, 0xe7):        /* movntq mm,m64 */
+        generate_exception_if(ea.type != OP_MEM, EXC_UD);
+        sfence = true;
+        /* fall through */
     case X86EMUL_OPC(0x0f, 0xda):        /* pminub mm/m64,mm */
     case X86EMUL_OPC(0x0f, 0xde):        /* pmaxub mm/m64,mm */
     case X86EMUL_OPC(0x0f, 0xea):        /* pminsw mm/m64,mm */
@@ -6317,6 +6391,73 @@ x86_emulate(
     case X86EMUL_OPC(0x0f, 0xf6):        /* psadbw mm/m64,mm */
         vcpu_must_have(sse);
         goto simd_0f_mmx;
+
+    CASE_SIMD_PACKED_INT(0x0f, 0xf7):    /* maskmov{q,dqu} {,x}mm,{,x}mm */
+    case X86EMUL_OPC_VEX_66(0x0f, 0xf7): /* vmaskmovdqu xmm,xmm */
+        generate_exception_if(ea.type != OP_REG, EXC_UD);
+        if ( vex.opcx != vex_none )
+        {
+            generate_exception_if(vex.l || vex.reg != 0xf, EXC_UD);
+            d |= TwoOp;
+            host_and_vcpu_must_have(avx);
+            get_fpu(X86EMUL_FPU_ymm, &fic);
+        }
+        else if ( vex.pfx )
+        {
+            vcpu_must_have(sse2);
+            get_fpu(X86EMUL_FPU_xmm, &fic);
+        }
+        else
+        {
+            host_and_vcpu_must_have(mmx);
+            vcpu_must_have(sse);
+            get_fpu(X86EMUL_FPU_mmx, &fic);
+        }
+
+        /*
+         * While we can't reasonably provide fully correct behavior here
+         * (in particular avoiding the memory read in anticipation of all
+         * bytes in the range eventually being written), we can (and should)
+         * still suppress the memory access if all mask bits are clear. Read
+         * the mask bits via {,v}pmovmskb for that purpose.
+         */
+        opc = init_prefixes(stub);
+        opc[0] = 0xd7; /* {,v}pmovmskb */
+        /* (Ab)use "sfence" for latching the original REX.R / VEX.R. */
+        sfence = rex_prefix & REX_R;
+        /* Convert GPR destination to %rAX. */
+        rex_prefix &= ~REX_R;
+        vex.r = 1;
+        if ( !mode_64bit() )
+            vex.w = 0;
+        opc[1] = modrm & 0xc7;
+        fic.insn_bytes = PFX_BYTES + 2;
+        opc[2] = 0xc3;
+
+        copy_REX_VEX(opc, rex_prefix, vex);
+        invoke_stub("", "", "=a" (ea.val) : [dummy] "i" (0));
+
+        put_stub(stub);
+        if ( !ea.val )
+        {
+            put_fpu(&fic);
+            goto complete_insn;
+        }
+
+        opc = init_prefixes(stub);
+        opc[0] = b;
+        opc[1] = modrm;
+        /* Restore high bit of XMM destination. */
+        if ( sfence )
+        {
+            rex_prefix |= REX_R;
+            vex.r = 0;
+        }
+
+        ea.type = OP_MEM;
+        ea.mem.off = truncate_ea(_regs.r(di));
+        sfence = true;
+        break;
 
     case X86EMUL_OPC(0x0f38, 0xf0): /* movbe m,r */
     case X86EMUL_OPC(0x0f38, 0xf1): /* movbe r,m */
@@ -6581,23 +6722,14 @@ x86_emulate(
 
     if ( state->simd_size )
     {
-#ifdef __XEN__
-        uint8_t *buf = stub.ptr;
-#else
-        uint8_t *buf = get_stub(stub);
-#endif
-
         generate_exception_if(!op_bytes, EXC_UD);
         generate_exception_if(vex.opcx && (d & TwoOp) && vex.reg != 0xf,
                               EXC_UD);
 
-        if ( !buf )
+        if ( !opc )
             BUG();
-        if ( vex.opcx == vex_none )
-            SET_SSE_PREFIX(buf[0], vex.pfx);
-
-        buf[fic.insn_bytes] = 0xc3;
-        copy_REX_VEX(buf, rex_prefix, vex);
+        opc[fic.insn_bytes - PFX_BYTES] = 0xc3;
+        copy_REX_VEX(opc, rex_prefix, vex);
 
         if ( ea.type == OP_MEM )
         {
@@ -6605,10 +6737,16 @@ x86_emulate(
 
             if ( op_bytes < 16 ||
                  (vex.opcx
-                  ? /* vmov{a,nt}p{s,d} are exceptions. */
-                    ext != ext_0f || ((b | 1) != 0x29 && b != 0x2b)
-                  : /* movup{s,d} and lddqu are exceptions. */
-                    ext == ext_0f && ((b | 1) == 0x11 || b == 0xf0)) )
+                  ? /* vmov{{a,nt}p{s,d},dqa,ntdq} are exceptions. */
+                    ext != ext_0f ||
+                    ((b | 1) != 0x29 && b != 0x2b &&
+                     ((b | 0x10) != 0x7f || vex.pfx != vex_66) &&
+                     b != 0xe7)
+                  : /* movup{s,d}, {,mask}movdqu, and lddqu are exceptions. */
+                    ext == ext_0f &&
+                    ((b | 1) == 0x11 ||
+                     ((b | 0x10) == 0x7f && vex.pfx == vex_f3) ||
+                     b == 0xf7 || b == 0xf0)) )
                 mxcsr = MXCSR_MM;
             else if ( vcpu_has_misalignsse() )
                 asm ( "stmxcsr %0" : "=m" (mxcsr) );
@@ -6616,14 +6754,25 @@ x86_emulate(
                                   !is_aligned(ea.mem.seg, ea.mem.off, op_bytes,
                                               ctxt, ops),
                                   EXC_GP, 0);
-            if ( (d & SrcMask) == SrcMem )
+            switch ( d & SrcMask )
             {
+            case SrcMem:
                 rc = ops->read(ea.mem.seg, ea.mem.off, mmvalp, op_bytes, ctxt);
                 if ( rc != X86EMUL_OKAY )
                     goto done;
+                /* fall through */
+            case SrcMem16:
                 dst.type = OP_NONE;
+                break;
+            default:
+                if ( (d & DstMask) != DstMem )
+                {
+                    ASSERT_UNREACHABLE();
+                    goto cannot_emulate;
+                }
+                break;
             }
-            else if ( (d & DstMask) == DstMem )
+            if ( (d & DstMask) == DstMem )
             {
                 fail_if(!ops->write); /* Check before running the stub. */
                 ASSERT(d & Mov);
@@ -6631,19 +6780,18 @@ x86_emulate(
                 dst.bytes = op_bytes;
                 dst.mem = ea.mem;
             }
-            else if ( (d & SrcMask) == SrcMem16 )
-                dst.type = OP_NONE;
-            else
-            {
-                ASSERT_UNREACHABLE();
-                goto cannot_emulate;
-            }
         }
         else
             dst.type = OP_NONE;
 
-        invoke_stub("", "", "+m" (*mmvalp), "+m" (fic.exn_raised)
-                            : "a" (mmvalp));
+        /* {,v}maskmov{q,dqu}, as an exception, uses rDI. */
+        if ( likely((ctxt->opcode & ~(X86EMUL_OPC_PFX_MASK |
+                                      X86EMUL_OPC_ENCODING_MASK)) !=
+                    X86EMUL_OPC(0x0f, 0xf7)) )
+            invoke_stub("", "", "+m" (*mmvalp), "+m" (fic.exn_raised)
+                                : "a" (mmvalp));
+        else
+            invoke_stub("", "", "+m" (*mmvalp) : "D" (mmvalp));
 
         put_stub(stub);
         put_fpu(&fic);
@@ -6894,6 +7042,8 @@ x86_insn_is_mem_access(const struct x86_emulate_state *state,
     case 0xa4 ... 0xa7: /* MOVS / CMPS */
     case 0xaa ... 0xaf: /* STOS / LODS / SCAS */
     case 0xd7:          /* XLAT */
+    CASE_SIMD_PACKED_INT(0x0f, 0xf7):    /* MASKMOV{Q,DQU} */
+    case X86EMUL_OPC_VEX_66(0x0f, 0xf7): /* VMASKMOVDQU */
         return true;
 
     case X86EMUL_OPC(0x0f, 0x01):
@@ -6911,7 +7061,8 @@ x86_insn_is_mem_write(const struct x86_emulate_state *state,
     switch ( state->desc & DstMask )
     {
     case DstMem:
-        return state->modrm_mod != 3;
+        /* The SrcMem check is to cover {,V}MASKMOV{Q,DQU}. */
+        return state->modrm_mod != 3 || (state->desc & SrcMask) == SrcMem;
 
     case DstBitBase:
     case DstImplicit:
@@ -6931,22 +7082,9 @@ x86_insn_is_mem_write(const struct x86_emulate_state *state,
     case 0x6c: case 0x6d:                /* INS */
     case 0xa4: case 0xa5:                /* MOVS */
     case 0xaa: case 0xab:                /* STOS */
-    case X86EMUL_OPC(0x0f, 0x7e):        /* MOVD/MOVQ */
-    case X86EMUL_OPC_66(0x0f, 0x7e):     /* MOVD/MOVQ */
-    case X86EMUL_OPC_VEX_66(0x0f, 0x7e): /* VMOVD/VMOVQ */
-    case X86EMUL_OPC(0x0f, 0x7f):        /* VMOVQ */
-    case X86EMUL_OPC_66(0x0f, 0x7f):     /* MOVDQA */
-    case X86EMUL_OPC_VEX_66(0x0f, 0x7f): /* VMOVDQA */
-    case X86EMUL_OPC_F3(0x0f, 0x7f):     /* MOVDQU */
-    case X86EMUL_OPC_VEX_F3(0x0f, 0x7f): /* VMOVDQU */
     case X86EMUL_OPC(0x0f, 0xab):        /* BTS */
     case X86EMUL_OPC(0x0f, 0xb3):        /* BTR */
     case X86EMUL_OPC(0x0f, 0xbb):        /* BTC */
-    case X86EMUL_OPC_66(0x0f, 0xd6):     /* MOVQ */
-    case X86EMUL_OPC_VEX_66(0x0f, 0xd6): /* VMOVQ */
-    case X86EMUL_OPC(0x0f, 0xe7):        /* MOVNTQ */
-    case X86EMUL_OPC_66(0x0f, 0xe7):     /* MOVNTDQ */
-    case X86EMUL_OPC_VEX_66(0x0f, 0xe7): /* VMOVNTDQ */
         return true;
 
     case 0xd9:
