@@ -32,6 +32,7 @@ XENSTORED_OBJS_$(CONFIG_FreeBSD) = xenstored_posix.o
 XENSTORED_OBJS_$(CONFIG_MiniOS) = xenstored_minios.o
 
 XENSTORED_OBJS += $(XENSTORED_OBJS_y)
+LDLIBS_xenstored += -lrt
 
 ifneq ($(XENSTORE_STATIC_CLIENTS),y)
 LIBXENSTORE := libxenstore.so
@@ -73,7 +74,7 @@ endif
 $(XENSTORED_OBJS): CFLAGS += $(CFLAGS_libxengnttab)
 
 xenstored: $(XENSTORED_OBJS)
-	$(CC) $^ $(LDFLAGS) $(LDLIBS_libxenevtchn) $(LDLIBS_libxengnttab) $(LDLIBS_libxenctrl) $(SOCKET_LIBS) -o $@ $(APPEND_LDFLAGS)
+	$(CC) $^ $(LDFLAGS) $(LDLIBS_libxenevtchn) $(LDLIBS_libxengnttab) $(LDLIBS_libxenctrl) $(LDLIBS_xenstored) $(SOCKET_LIBS) -o $@ $(APPEND_LDFLAGS)
 
 xenstored.a: $(XENSTORED_OBJS)
 	$(AR) cr $@ $^
