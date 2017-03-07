@@ -43,6 +43,8 @@
 #define SrcMask     (7<<3)
 /* Generic ModRM decode. */
 #define ModRM       (1<<6)
+/* vSIB addressing mode (0f38 extension opcodes only), aliasing ModRM. */
+#define vSIB        (1<<6)
 /* Destination is only written; never read. */
 #define Mov         (1<<7)
 /* VEX/EVEX (SIMD only): 2nd source operand unused (must be all ones) */
@@ -338,6 +340,33 @@ static const struct {
     [0xf7] = { DstMem|SrcMem|ModRM|Mov, simd_packed_int },
     [0xf8 ... 0xfe] = { DstImplicit|SrcMem|ModRM, simd_packed_int },
     [0xff] = { ModRM }
+};
+
+/*
+ * "two_op" and "four_op" below refer to the number of register operands
+ * (one of which possibly also allowing to be a memory one). The named
+ * operand counts do not include any immediate operands.
+ */
+static const struct {
+    uint8_t simd_size:5;
+    uint8_t to_mem:1;
+    uint8_t two_op:1;
+    uint8_t vsib:1;
+} ext0f38_table[256] = {
+    [0x2a] = { .simd_size = simd_packed_int, .two_op = 1 },
+    [0xf0] = { .two_op = 1 },
+    [0xf1] = { .to_mem = 1, .two_op = 1 },
+    [0xf2 ... 0xf3] = {},
+    [0xf5 ... 0xf7] = {},
+};
+
+static const struct {
+    uint8_t simd_size:5;
+    uint8_t to_mem:1;
+    uint8_t two_op:1;
+    uint8_t four_op:1;
+} ext0f3a_table[256] = {
+    [0xf0] = {},
 };
 
 static const opcode_desc_t xop_table[] = {
@@ -2134,7 +2163,7 @@ x86_decode_onebyte(
             /* fall through */
         case 3: /* call (far, absolute indirect) */
         case 5: /* jmp (far, absolute indirect) */
-            state->desc = DstNone | SrcMem | ModRM | Mov;
+            state->desc = DstNone | SrcMem | Mov;
             break;
         }
         break;
@@ -2204,7 +2233,7 @@ x86_decode_twobyte(
         if ( vex.pfx == vex_f3 ) /* movq xmm/m64,xmm */
         {
     case X86EMUL_OPC_VEX_F3(0, 0x7e): /* vmovq xmm/m64,xmm */
-            state->desc = DstImplicit | SrcMem | ModRM | Mov;
+            state->desc = DstImplicit | SrcMem | Mov;
             state->simd_size = simd_other;
             /* Avoid the state->desc adjustment below. */
             return X86EMUL_OKAY;
@@ -2218,12 +2247,12 @@ x86_decode_twobyte(
         switch ( modrm_reg & 7 )
         {
         case 2: /* {,v}ldmxcsr */
-            state->desc = DstImplicit | SrcMem | ModRM | Mov;
+            state->desc = DstImplicit | SrcMem | Mov;
             op_bytes = 4;
             break;
 
         case 3: /* {,v}stmxcsr */
-            state->desc = DstMem | SrcImplicit | ModRM | Mov;
+            state->desc = DstMem | SrcImplicit | Mov;
             op_bytes = 4;
             break;
         }
@@ -2244,7 +2273,7 @@ x86_decode_twobyte(
         ctxt->opcode |= MASK_INSR(vex.pfx, X86EMUL_OPC_PFX_MASK);
         /* fall through */
     case X86EMUL_OPC_VEX_66(0, 0xc4): /* vpinsrw */
-        state->desc = DstReg | SrcMem16 | ModRM;
+        state->desc = DstReg | SrcMem16;
         break;
     }
 
@@ -2280,8 +2309,8 @@ x86_decode_0f38(
         break;
 
     case 0xf1: /* movbe / crc32 */
-        if ( !repne_prefix() )
-            state->desc = (state->desc & ~(DstMask | SrcMask)) | DstMem | SrcReg | Mov;
+        if ( repne_prefix() )
+            state->desc = DstReg | SrcMem;
         if ( rep_prefix() )
             ctxt->opcode |= MASK_INSR(vex.pfx, X86EMUL_OPC_PFX_MASK);
         break;
@@ -2532,10 +2561,7 @@ x86_decode(
                 opcode |= b | MASK_INSR(vex.pfx, X86EMUL_OPC_PFX_MASK);
 
                 if ( !(d & ModRM) )
-                {
-                    modrm_reg = modrm_rm = modrm_mod = modrm = 0;
                     break;
-                }
 
                 modrm = insn_fetch_type(uint8_t);
                 modrm_mod = (modrm & 0xc0) >> 6;
@@ -2546,6 +2572,8 @@ x86_decode(
 
     if ( d & ModRM )
     {
+        d &= ~ModRM;
+#undef ModRM /* Only its aliases are valid to use from here on. */
         modrm_reg = ((rex_prefix & 4) << 1) | ((modrm & 0x38) >> 3);
         modrm_rm  = modrm & 0x07;
 
@@ -2555,8 +2583,9 @@ x86_decode(
          * normally be only addition/removal of SrcImm/SrcImm16, so their
          * fetching can be taken care of by the common code below.
          */
-        if ( ext == ext_none )
+        switch ( ext )
         {
+        case ext_none:
             switch ( b )
             {
             case 0xf6 ... 0xf7: /* Grp3 */
@@ -2582,6 +2611,25 @@ x86_decode(
                 }
                 break;
             }
+            break;
+
+        case vex_0f38:
+            d = ext0f38_table[b].to_mem ? DstMem | SrcReg
+                                        : DstReg | SrcMem;
+            if ( ext0f38_table[b].two_op )
+                d |= TwoOp;
+            if ( ext0f38_table[b].vsib )
+                d |= vSIB;
+            state->simd_size = ext0f38_table[b].simd_size;
+            break;
+
+        case vex_0f3a:
+            /*
+             * Cannot update d here yet, as the immediate operand still
+             * needs fetching.
+             */
+        default:
+            break;
         }
 
         if ( modrm_mod == 3 )
@@ -2592,6 +2640,7 @@ x86_decode(
         else if ( ad_bytes == 2 )
         {
             /* 16-bit ModR/M decode. */
+            generate_exception_if(d & vSIB, EXC_UD);
             ea.type = OP_MEM;
             switch ( modrm_rm )
             {
@@ -2648,7 +2697,7 @@ x86_decode(
                 sib = insn_fetch_type(uint8_t);
                 sib_index = ((sib >> 3) & 7) | ((rex_prefix << 2) & 8);
                 sib_base  = (sib & 7) | ((rex_prefix << 3) & 8);
-                if ( sib_index != 4 )
+                if ( sib_index != 4 && !(d & vSIB) )
                     ea.mem.off = *(long *)decode_register(sib_index,
                                                           state->regs, 0);
                 ea.mem.off <<= (sib >> 6) & 3;
@@ -2674,6 +2723,7 @@ x86_decode(
             }
             else
             {
+                generate_exception_if(d & vSIB, EXC_UD);
                 modrm_rm |= (rex_prefix & 1) << 3;
                 ea.mem.off = *(long *)decode_register(modrm_rm,
                                                       state->regs, 0);
@@ -2696,6 +2746,11 @@ x86_decode(
                 break;
             }
         }
+    }
+    else
+    {
+        modrm_mod = 0xff;
+        modrm_reg = modrm_rm = modrm = 0;
     }
 
     if ( override_seg != x86_seg_none )
@@ -2745,6 +2800,13 @@ x86_decode(
         break;
 
     case ext_0f3a:
+        d = ext0f3a_table[b].to_mem ? DstMem | SrcReg : DstReg | SrcMem;
+        if ( ext0f3a_table[b].two_op )
+            d |= TwoOp;
+        else if ( ext0f3a_table[b].four_op && !mode_64bit() && vex.opcx )
+            imm1 &= 0x7f;
+        state->desc = d;
+        state->simd_size = ext0f3a_table[b].simd_size;
         if ( !vex.opcx )
             ctxt->opcode |= MASK_INSR(vex.pfx, X86EMUL_OPC_PFX_MASK);
         break;
@@ -6853,7 +6915,6 @@ x86_emulate(
             if ( vex.l )
                 vcpu_must_have(avx2);
         }
-        state->simd_size = simd_packed_int;
         goto movdqa;
 
     case X86EMUL_OPC(0x0f38, 0xf0): /* movbe m,r */
@@ -7402,7 +7463,7 @@ x86_insn_modrm(const struct x86_emulate_state *state,
 {
     check_state(state);
 
-    if ( !(state->desc & ModRM) )
+    if ( state->modrm_mod > 3 )
         return -EINVAL;
 
     if ( rm )
