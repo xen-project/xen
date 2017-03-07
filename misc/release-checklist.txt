@@ -190,39 +190,9 @@ RELEASE TARBALL
        mkdir /volatile/iwj/website-thing/xen.org/oss-xen/release/$v
        mv dist/xen-$v.tar.gz /volatile/iwj/website-thing/xen.org/oss-xen/release/$v/.
 
-#hg archive -t files /volatile/iwj/d/xen-$v
-
-cd /u/iwj/work/xen.git
-mkdir /volatile/iwj/d/xen-$v
-git archive --format=tar RELEASE-$v |tar Cxf /volatile/iwj/d/xen-$v -
-[OR FOR RCs
-git archive --format=tar $v |tar Cxf /volatile/iwj/d/xen-$v -
-]
-
-cd /volatile/iwj/d/xen-$v/tools/
-mkdir ioemu-qemu-xen   # 4.0, 4.1
-mkdir qemu-xen qemu-xen-traditional  # 4.2+
-
-    cd /u/iwj/work/1/qemu-iwj.git
-    git-archive --format=tar xen-$v |tar Cxf /volatile/iwj/d/xen-$v/tools/ioemu-qemu-xen -   # 4.0, 4.1
-    git-archive --format=tar xen-$v |tar Cxf /volatile/iwj/d/xen-$v/tools/qemu-xen-traditional -   # 4.2+
-
-    cd /u/iwj/work/1/qemu-upstream.git # now we have a merged tree
-    git-pull
-    git-archive --format=tar qemu-xen-$v |tar Cxf /volatile/iwj/d/xen-$v/tools/qemu-xen -   # 4.2+
-
-cd ..
-# ONE OF:
-ssh xenbits.xen.org cat /home/xen/release-checklist.patch-4.2 | patch Config.mk
-ssh xenbits.xen.org cat /home/xen/release-checklist.patch-4.1 | patch -p1 Config.mk
-ssh xenbits.xen.org cat /home/xen/release-checklist.patch-4.0 | patch -p1 Config.mk
-
         # website-thing is cvs -d hg.uk.xensource.com:/usr/groups/sources/cvs/akamai co xen.org
 	cd /volatile/iwj/website-thing/xen.org
 	mkdir oss-xen/release/$v
-
-cd ..
-GZIP=-9v tar zcf /volatile/iwj/website-thing/xen.org/oss-xen/release/$v/xen-$v.tar.gz xen-$v
 
 # test build
                 cd /volatile/iwj/d
@@ -232,13 +202,9 @@ GZIP=-9v tar zcf /volatile/iwj/website-thing/xen.org/oss-xen/release/$v/xen-$v.t
 #                rsync -a --delete xen-$v build/
                 cd xen-$v
                 export http_proxy=http://localhost:3128/
-                (make -j4 KERNELS='' && echo ok.) 2>&1 | tee ../log.$v                      # pre 4.2
                 (./configure && make -j4 KERNELS='' && echo ok.) 2>&1 | tee ../log.$v       # post 4.2
 
 # [[ test build amd64 ]]
-
-### check that tarball's .hgtags has the release tag put there by Keir
-##tar zvvxOf /volatile/iwj/website-thing/xen.org/oss-xen/release/$v/xen-$v.tar.gz xen-$v/.hgtags |less
 
 	cvs add -kb oss-xen/release/$v/
 
