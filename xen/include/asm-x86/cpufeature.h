@@ -87,6 +87,7 @@
 #define cpu_has_hle		boot_cpu_has(X86_FEATURE_HLE)
 #define cpu_has_rtm		boot_cpu_has(X86_FEATURE_RTM)
 #define cpu_has_pdcm		boot_cpu_has(X86_FEATURE_PDCM)
+#define cpu_has_sha		boot_cpu_has(X86_FEATURE_SHA)
 
 enum _cache_type {
     CACHE_TYPE_NULL = 0,
