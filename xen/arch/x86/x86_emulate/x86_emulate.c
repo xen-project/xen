@@ -398,6 +398,7 @@ static const struct {
     [0x22] = { .simd_size = simd_none },
     [0x40 ... 0x41] = { .simd_size = simd_packed_fp },
     [0x42] = { .simd_size = simd_packed_int },
+    [0x44] = { .simd_size = simd_packed_int },
     [0x4a ... 0x4b] = { .simd_size = simd_packed_fp, .four_op = 1 },
     [0x4c] = { .simd_size = simd_packed_int, .four_op = 1 },
     [0x60 ... 0x63] = { .simd_size = simd_packed_int, .two_op = 1 },
@@ -1467,6 +1468,7 @@ static bool vcpu_has(
 #define vcpu_has_sse()         vcpu_has(         1, EDX, 25, ctxt, ops)
 #define vcpu_has_sse2()        vcpu_has(         1, EDX, 26, ctxt, ops)
 #define vcpu_has_sse3()        vcpu_has(         1, ECX,  0, ctxt, ops)
+#define vcpu_has_pclmulqdq()   vcpu_has(         1, ECX,  1, ctxt, ops)
 #define vcpu_has_ssse3()       vcpu_has(         1, ECX,  9, ctxt, ops)
 #define vcpu_has_cx16()        vcpu_has(         1, ECX, 13, ctxt, ops)
 #define vcpu_has_sse4_1()      vcpu_has(         1, ECX, 19, ctxt, ops)
@@ -7466,6 +7468,14 @@ x86_emulate(
         op_bytes = 4;
         /* fall through */
     case X86EMUL_OPC_VEX_66(0x0f3a, 0x41): /* vdppd $imm8,{x,y}mm/mem,{x,y}mm,{x,y}mm */
+        generate_exception_if(vex.l, EXC_UD);
+        goto simd_0f_imm8_avx;
+
+    case X86EMUL_OPC_66(0x0f3a, 0x44):     /* pclmulqdq $imm8,xmm/m128,xmm */
+    case X86EMUL_OPC_VEX_66(0x0f3a, 0x44): /* vpclmulqdq $imm8,xmm/m128,xmm,xmm */
+        host_and_vcpu_must_have(pclmulqdq);
+        if ( vex.opcx == vex_none )
+            goto simd_0f3a_common;
         generate_exception_if(vex.l, EXC_UD);
         goto simd_0f_imm8_avx;
 

@@ -42,6 +42,7 @@
 #define cpu_has_ssse3		boot_cpu_has(X86_FEATURE_SSSE3)
 #define cpu_has_sse4_1		boot_cpu_has(X86_FEATURE_SSE4_1)
 #define cpu_has_sse4_2		boot_cpu_has(X86_FEATURE_SSE4_2)
+#define cpu_has_pclmulqdq	boot_cpu_has(X86_FEATURE_PCLMULQDQ)
 #define cpu_has_popcnt		boot_cpu_has(X86_FEATURE_POPCNT)
 #define cpu_has_htt		boot_cpu_has(X86_FEATURE_HTT)
 #define cpu_has_nx		boot_cpu_has(X86_FEATURE_NX)
