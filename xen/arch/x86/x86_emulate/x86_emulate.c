@@ -370,7 +370,7 @@ static const struct {
     [0x2a] = { .simd_size = simd_packed_int, .two_op = 1 },
     [0x2b] = { .simd_size = simd_packed_int },
     [0x30 ... 0x35] = { .simd_size = simd_other, .two_op = 1 },
-    [0x38 ... 0x3f] = { .simd_size = simd_packed_int },
+    [0x37 ... 0x3f] = { .simd_size = simd_packed_int },
     [0x40] = { .simd_size = simd_packed_int },
     [0x41] = { .simd_size = simd_packed_int, .two_op = 1 },
     [0xf0] = { .two_op = 1 },
@@ -400,6 +400,7 @@ static const struct {
     [0x42] = { .simd_size = simd_packed_int },
     [0x4a ... 0x4b] = { .simd_size = simd_packed_fp, .four_op = 1 },
     [0x4c] = { .simd_size = simd_packed_int, .four_op = 1 },
+    [0x60 ... 0x63] = { .simd_size = simd_packed_int, .two_op = 1 },
     [0xf0] = {},
 };
 
@@ -6004,6 +6005,7 @@ x86_emulate(
     case X86EMUL_OPC_VEX_66(0x0f38, 0x28): /* vpmuldq {x,y}mm/mem,{x,y}mm,{x,y}mm */
     case X86EMUL_OPC_VEX_66(0x0f38, 0x29): /* vpcmpeqq {x,y}mm/mem,{x,y}mm,{x,y}mm */
     case X86EMUL_OPC_VEX_66(0x0f38, 0x2b): /* vpackusdw {x,y}mm/mem,{x,y}mm,{x,y}mm */
+    case X86EMUL_OPC_VEX_66(0x0f38, 0x37): /* vpcmpgtq {x,y}mm/mem,{x,y}mm,{x,y}mm */
     case X86EMUL_OPC_VEX_66(0x0f38, 0x38): /* vpminsb {x,y}mm/mem,{x,y}mm,{x,y}mm */
     case X86EMUL_OPC_VEX_66(0x0f38, 0x39): /* vpminsd {x,y}mm/mem,{x,y}mm,{x,y}mm */
     case X86EMUL_OPC_VEX_66(0x0f38, 0x3a): /* vpminub {x,y}mm/mem,{x,y}mm,{x,y}mm */
@@ -7175,6 +7177,10 @@ x86_emulate(
         }
         goto movdqa;
 
+    case X86EMUL_OPC_66(0x0f38, 0x37): /* pcmpgtq xmm/m128,xmm */
+        host_and_vcpu_must_have(sse4_2);
+        goto simd_0f38_common;
+
     case X86EMUL_OPC(0x0f38, 0xf0): /* movbe m,r */
     case X86EMUL_OPC(0x0f38, 0xf1): /* movbe r,m */
         vcpu_must_have(movbe);
@@ -7471,6 +7477,69 @@ x86_emulate(
     case X86EMUL_OPC_VEX_66(0x0f3a, 0x4c): /* vpblendvb {x,y}mm,{x,y}mm/mem,{x,y}mm,{x,y}mm */
         generate_exception_if(vex.w, EXC_UD);
         goto simd_0f_int_imm8;
+
+    case X86EMUL_OPC_66(0x0f3a, 0x60):     /* pcmpestrm $imm8,xmm/m128,xmm */
+    case X86EMUL_OPC_VEX_66(0x0f3a, 0x60): /* vpcmpestrm $imm8,xmm/m128,xmm */
+    case X86EMUL_OPC_66(0x0f3a, 0x61):     /* pcmpestri $imm8,xmm/m128,xmm */
+    case X86EMUL_OPC_VEX_66(0x0f3a, 0x61): /* vpcmpestri $imm8,xmm/m128,xmm */
+    case X86EMUL_OPC_66(0x0f3a, 0x62):     /* pcmpistrm $imm8,xmm/m128,xmm */
+    case X86EMUL_OPC_VEX_66(0x0f3a, 0x62): /* vpcmpistrm $imm8,xmm/m128,xmm */
+    case X86EMUL_OPC_66(0x0f3a, 0x63):     /* pcmpistri $imm8,xmm/m128,xmm */
+    case X86EMUL_OPC_VEX_66(0x0f3a, 0x63): /* vpcmpistri $imm8,xmm/m128,xmm */
+        if ( vex.opcx == vex_none )
+        {
+            host_and_vcpu_must_have(sse4_2);
+            get_fpu(X86EMUL_FPU_xmm, &fic);
+        }
+        else
+        {
+            generate_exception_if(vex.l || vex.reg != 0xf, EXC_UD);
+            host_and_vcpu_must_have(avx);
+            get_fpu(X86EMUL_FPU_ymm, &fic);
+        }
+
+        opc = init_prefixes(stub);
+        if ( vex.opcx == vex_none )
+            opc++[0] = 0x3a;
+        opc[0] = b;
+        opc[1] = modrm;
+        if ( ea.type == OP_MEM )
+        {
+            /* Convert memory operand to (%rDI). */
+            rex_prefix &= ~REX_B;
+            vex.b = 1;
+            opc[1] &= 0x3f;
+            opc[1] |= 0x07;
+
+            rc = ops->read(ea.mem.seg, ea.mem.off, mmvalp, 16, ctxt);
+            if ( rc != X86EMUL_OKAY )
+                goto done;
+        }
+        opc[2] = imm1;
+        fic.insn_bytes = PFX_BYTES + 3;
+        opc[3] = 0xc3;
+        if ( vex.opcx == vex_none )
+        {
+            /* Cover for extra prefix byte. */
+            --opc;
+            ++fic.insn_bytes;
+        }
+
+        copy_REX_VEX(opc, rex_prefix, vex);
+#ifdef __x86_64__
+        if ( rex_prefix & REX_W )
+            emulate_stub("=c" (dst.val), "m" (*mmvalp), "D" (mmvalp),
+                         "a" (_regs.rax), "d" (_regs.rdx));
+        else
+#endif
+            emulate_stub("=c" (dst.val), "m" (*mmvalp), "D" (mmvalp),
+                         "a" (_regs.eax), "d" (_regs.edx));
+
+        state->simd_size = simd_none;
+        if ( b & 1 )
+            _regs.r(cx) = (uint32_t)dst.val;
+        dst.type = OP_NONE;
+        break;
 
     case X86EMUL_OPC_VEX_F2(0x0f3a, 0xf0): /* rorx imm,r/m,r */
         vcpu_must_have(bmi2);

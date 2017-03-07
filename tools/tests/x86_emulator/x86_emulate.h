@@ -100,6 +100,12 @@ static inline uint64_t xgetbv(uint32_t xcr)
     (res.c & (1U << 19)) != 0; \
 })
 
+#define cpu_has_sse4_2 ({ \
+    struct cpuid_leaf res; \
+    emul_test_cpuid(1, 0, &res, NULL); \
+    (res.c & (1U << 20)) != 0; \
+})
+
 #define cpu_has_popcnt ({ \
     struct cpuid_leaf res; \
     emul_test_cpuid(1, 0, &res, NULL); \

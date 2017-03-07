@@ -2542,6 +2542,149 @@ int main(int argc, char **argv)
     else
         printf("skipped\n");
 
+    printf("%-40s", "Testing pcmpestri $0x1a,(%ecx),%xmm2...");
+    if ( stack_exec && cpu_has_sse4_2 )
+    {
+        decl_insn(pcmpestri);
+
+        memcpy(res, "abcdefgh\0\1\2\3\4\5\6\7", 16);
+        asm volatile ( "movq %0, %%xmm2\n"
+                       put_insn(pcmpestri, "pcmpestri $0b00011010, (%1), %%xmm2")
+                       :: "m" (res[0]), "c" (NULL) );
+
+        set_insn(pcmpestri);
+        regs.eax = regs.edx = 12;
+        regs.ecx = (unsigned long)res;
+        regs.eflags = X86_EFLAGS_PF | X86_EFLAGS_AF |
+                      X86_EFLAGS_IF | X86_EFLAGS_OF;
+        rc = x86_emulate(&ctxt, &emulops);
+        if ( rc != X86EMUL_OKAY || !check_eip(pcmpestri) ||
+             regs.ecx != 9 ||
+             (regs.eflags & X86_EFLAGS_ARITH_MASK) !=
+             (X86_EFLAGS_CF | X86_EFLAGS_ZF | X86_EFLAGS_SF) )
+            goto fail;
+        printf("okay\n");
+    }
+    else
+        printf("skipped\n");
+
+    printf("%-40s", "Testing pcmpestrm $0x5a,(%ecx),%xmm2...");
+    if ( stack_exec && cpu_has_sse4_2 )
+    {
+        decl_insn(pcmpestrm);
+
+        asm volatile ( "movq %0, %%xmm2\n"
+                       put_insn(pcmpestrm, "pcmpestrm $0b01011010, (%1), %%xmm2")
+                       :: "m" (res[0]), "c" (NULL) );
+
+        set_insn(pcmpestrm);
+        regs.ecx = (unsigned long)res;
+        regs.eflags = X86_EFLAGS_PF | X86_EFLAGS_AF |
+                      X86_EFLAGS_IF | X86_EFLAGS_OF;
+        rc = x86_emulate(&ctxt, &emulops);
+        if ( rc != X86EMUL_OKAY || !check_eip(pcmpestrm) )
+            goto fail;
+        asm ( "pmovmskb %%xmm0, %0" : "=r" (rc) );
+        if ( rc != 0x0e00 ||
+             (regs.eflags & X86_EFLAGS_ARITH_MASK) !=
+             (X86_EFLAGS_CF | X86_EFLAGS_ZF | X86_EFLAGS_SF) )
+            goto fail;
+        printf("okay\n");
+    }
+    else
+        printf("skipped\n");
+
+    printf("%-40s", "Testing pcmpistri $0x1a,(%ecx),%xmm2...");
+    if ( stack_exec && cpu_has_sse4_2 )
+    {
+        decl_insn(pcmpistri);
+
+        asm volatile ( "movq %0, %%xmm2\n"
+                       put_insn(pcmpistri, "pcmpistri $0b00011010, (%1), %%xmm2")
+                       :: "m" (res[0]), "c" (NULL) );
+
+        set_insn(pcmpistri);
+        regs.eflags = X86_EFLAGS_CF | X86_EFLAGS_PF | X86_EFLAGS_AF |
+                      X86_EFLAGS_IF | X86_EFLAGS_OF;
+        rc = x86_emulate(&ctxt, &emulops);
+        if ( rc != X86EMUL_OKAY || !check_eip(pcmpistri) ||
+             regs.ecx != 16 ||
+             (regs.eflags & X86_EFLAGS_ARITH_MASK) !=
+             (X86_EFLAGS_ZF | X86_EFLAGS_SF) )
+            goto fail;
+        printf("okay\n");
+    }
+    else
+        printf("skipped\n");
+
+    printf("%-40s", "Testing pcmpistrm $0x4a,(%ecx),%xmm2...");
+    if ( stack_exec && cpu_has_sse4_2 )
+    {
+        decl_insn(pcmpistrm);
+
+        asm volatile ( "movq %0, %%xmm2\n"
+                       put_insn(pcmpistrm, "pcmpistrm $0b01001010, (%1), %%xmm2")
+                       :: "m" (res[0]), "c" (NULL) );
+
+        set_insn(pcmpistrm);
+        regs.ecx = (unsigned long)res;
+        regs.eflags = X86_EFLAGS_PF | X86_EFLAGS_AF | X86_EFLAGS_IF;
+        rc = x86_emulate(&ctxt, &emulops);
+        if ( rc != X86EMUL_OKAY || !check_eip(pcmpistrm) )
+            goto fail;
+        asm ( "pmovmskb %%xmm0, %0" : "=r" (rc) );
+        if ( rc != 0xffff ||
+            (regs.eflags & X86_EFLAGS_ARITH_MASK) !=
+            (X86_EFLAGS_CF | X86_EFLAGS_ZF | X86_EFLAGS_SF | X86_EFLAGS_OF) )
+            goto fail;
+        printf("okay\n");
+    }
+    else
+        printf("skipped\n");
+
+    printf("%-40s", "Testing vpcmpestri $0x7a,(%esi),%xmm2...");
+    if ( stack_exec && cpu_has_avx )
+    {
+        decl_insn(vpcmpestri);
+
+#ifdef __x86_64__
+        /*
+         * gas up to at least 2.27 doesn't honor explict "rex.w" for
+         * VEX/EVEX encoded instructions, and also doesn't provide any
+         * other means to control VEX.W.
+         */
+        asm volatile ( "movq %0, %%xmm2\n"
+                       put_insn(vpcmpestri,
+                                ".byte 0xC4, 0xE3, 0xF9, 0x61, 0x16, 0x7A")
+                       :: "m" (res[0]) );
+#else
+        asm volatile ( "movq %0, %%xmm2\n"
+                       put_insn(vpcmpestri,
+                                "vpcmpestri $0b01111010, (%1), %%xmm2")
+                       :: "m" (res[0]), "S" (NULL) );
+#endif
+
+        set_insn(vpcmpestri);
+#ifdef __x86_64__
+        regs.rax = ~0U + 1UL;
+        regs.rcx = ~0UL;
+#else
+        regs.eax = 0x7fffffff;
+#endif
+        regs.esi = (unsigned long)res;
+        regs.eflags = X86_EFLAGS_PF | X86_EFLAGS_AF | X86_EFLAGS_SF |
+                      X86_EFLAGS_IF | X86_EFLAGS_OF;
+        rc = x86_emulate(&ctxt, &emulops);
+        if ( rc != X86EMUL_OKAY || !check_eip(vpcmpestri) ||
+             regs.ecx != 11 ||
+             (regs.eflags & X86_EFLAGS_ARITH_MASK) !=
+             (X86_EFLAGS_ZF | X86_EFLAGS_CF) )
+            goto fail;
+        printf("okay\n");
+    }
+    else
+        printf("skipped\n");
+
     printf("%-40s", "Testing stmxcsr (%edx)...");
     if ( cpu_has_sse )
     {
