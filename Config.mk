@@ -254,10 +254,10 @@ SEABIOS_UPSTREAM_URL ?= git://xenbits.xen.org/seabios.git
 MINIOS_UPSTREAM_URL ?= git://xenbits.xen.org/mini-os.git
 endif
 OVMF_UPSTREAM_REVISION ?= 52a99493cce88a9d4ec8a02d7f1bd1a1001ce60d
-QEMU_UPSTREAM_REVISION ?= qemu-xen-4.6.4
+QEMU_UPSTREAM_REVISION ?= qemu-xen-4.6.5
 # Wed Sep 16 17:38:44 2015 +0200
 # trace: remove malloc tracing
-MINIOS_UPSTREAM_REVISION ?= xen-RELEASE-4.6.4
+MINIOS_UPSTREAM_REVISION ?= xen-RELEASE-4.6.5
 # Fri May 13 15:21:10 2016 +0100
 # lib/sys.c: enclose file_types in define guards
 
@@ -268,7 +268,7 @@ SEABIOS_UPSTREAM_REVISION ?= rel-1.8.2
 ETHERBOOT_NICS ?= rtl8139 8086100e
 
 
-QEMU_TRADITIONAL_REVISION ?= b7e9d3976ba48f277da6004311f5025b07a884ea
+QEMU_TRADITIONAL_REVISION ?= xen-4.6.5
 # Wed Feb 22 16:25:19 2017 +0000
 # cirrus: add blit_is_unsafe call to cirrus_bitblt_cputovideo
 
