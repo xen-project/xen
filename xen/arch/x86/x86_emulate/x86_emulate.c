@@ -1404,6 +1404,7 @@ static bool vcpu_has(
 #define vcpu_has_sse2()        vcpu_has(         1, EDX, 26, ctxt, ops)
 #define vcpu_has_sse3()        vcpu_has(         1, ECX,  0, ctxt, ops)
 #define vcpu_has_cx16()        vcpu_has(         1, ECX, 13, ctxt, ops)
+#define vcpu_has_sse4_1()      vcpu_has(         1, ECX, 19, ctxt, ops)
 #define vcpu_has_sse4_2()      vcpu_has(         1, ECX, 20, ctxt, ops)
 #define vcpu_has_movbe()       vcpu_has(         1, ECX, 22, ctxt, ops)
 #define vcpu_has_popcnt()      vcpu_has(         1, ECX, 23, ctxt, ops)
@@ -5921,6 +5922,7 @@ x86_emulate(
     case X86EMUL_OPC_VEX_66(0x0f, 0x7f): /* vmovdqa {x,y}mm,{x,y}mm/m128 */
     case X86EMUL_OPC_F3(0x0f, 0x7f):     /* movdqu xmm,xmm/m128 */
     case X86EMUL_OPC_VEX_F3(0x0f, 0x7f): /* vmovdqu {x,y}mm,{x,y}mm/mem */
+    movdqa:
         d |= TwoOp;
         op_bytes = 16 << vex.l;
         if ( vex.opcx != vex_none )
@@ -6830,6 +6832,23 @@ x86_emulate(
         ea.mem.off = truncate_ea(_regs.r(di));
         sfence = true;
         break;
+
+    case X86EMUL_OPC_66(0x0f38, 0x2a):     /* movntdqa m128,xmm */
+    case X86EMUL_OPC_VEX_66(0x0f38, 0x2a): /* vmovntdqa mem,{x,y}mm */
+        generate_exception_if(ea.type != OP_MEM, EXC_UD);
+        /* Ignore the non-temporal hint for now, using movdqa instead. */
+        asm volatile ( "mfence" ::: "memory" );
+        b = 0x6f;
+        if ( vex.opcx == vex_none )
+            vcpu_must_have(sse4_1);
+        else
+        {
+            vex.opcx = vex_0f;
+            if ( vex.l )
+                vcpu_must_have(avx2);
+        }
+        state->simd_size = simd_packed_int;
+        goto movdqa;
 
     case X86EMUL_OPC(0x0f38, 0xf0): /* movbe m,r */
     case X86EMUL_OPC(0x0f38, 0xf1): /* movbe r,m */
