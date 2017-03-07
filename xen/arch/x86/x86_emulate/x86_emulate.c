@@ -1410,6 +1410,8 @@ static bool vcpu_has(
 #define vcpu_has_popcnt()      vcpu_has(         1, ECX, 23, ctxt, ops)
 #define vcpu_has_avx()         vcpu_has(         1, ECX, 28, ctxt, ops)
 #define vcpu_has_rdrand()      vcpu_has(         1, ECX, 30, ctxt, ops)
+#define vcpu_has_mmxext()     (vcpu_has(0x80000001, EDX, 22, ctxt, ops) || \
+                               vcpu_has_sse())
 #define vcpu_has_lahf_lm()     vcpu_has(0x80000001, ECX,  0, ctxt, ops)
 #define vcpu_has_cr8_legacy()  vcpu_has(0x80000001, ECX,  4, ctxt, ops)
 #define vcpu_has_lzcnt()       vcpu_has(0x80000001, ECX,  5, ctxt, ops)
@@ -5706,8 +5708,12 @@ x86_emulate(
             else
             {
                 if ( b != 0x50 )
+                {
                     host_and_vcpu_must_have(mmx);
-                vcpu_must_have(sse);
+                    vcpu_must_have(mmxext);
+                }
+                else
+                    vcpu_must_have(sse);
             }
             if ( b == 0x50 || (vex.pfx & VEX_PREFIX_DOUBLE_MASK) )
                 get_fpu(X86EMUL_FPU_xmm, &fic);
@@ -5968,7 +5974,7 @@ x86_emulate(
         else
         {
             host_and_vcpu_must_have(mmx);
-            vcpu_must_have(sse);
+            vcpu_must_have(mmxext);
             get_fpu(X86EMUL_FPU_mmx, &fic);
         }
     simd_0f_imm8:
@@ -6271,7 +6277,7 @@ x86_emulate(
             if ( modrm_mod == 3 ) /* sfence */
             {
                 generate_exception_if(vex.pfx, EXC_UD);
-                vcpu_must_have(sse);
+                vcpu_must_have(mmxext);
                 asm volatile ( "sfence" ::: "memory" );
                 break;
             }
@@ -6753,7 +6759,7 @@ x86_emulate(
     case X86EMUL_OPC(0x0f, 0xe3):        /* pavgw mm/m64,mm */
     case X86EMUL_OPC(0x0f, 0xe4):        /* pmulhuw mm/m64,mm */
     case X86EMUL_OPC(0x0f, 0xf6):        /* psadbw mm/m64,mm */
-        vcpu_must_have(sse);
+        vcpu_must_have(mmxext);
         goto simd_0f_mmx;
 
     case X86EMUL_OPC_66(0x0f, 0xe6):       /* cvttpd2dq xmm/mem,xmm */
@@ -6784,7 +6790,7 @@ x86_emulate(
         else
         {
             host_and_vcpu_must_have(mmx);
-            vcpu_must_have(sse);
+            vcpu_must_have(mmxext);
             get_fpu(X86EMUL_FPU_mmx, &fic);
         }
 
