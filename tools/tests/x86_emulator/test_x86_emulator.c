@@ -30,12 +30,18 @@ static bool simd_check_sse2(void)
     return cpu_has_sse2;
 }
 
+static bool simd_check_sse4(void)
+{
+    return cpu_has_sse4_2;
+}
+
 static bool simd_check_avx(void)
 {
     return cpu_has_avx;
 }
 #define simd_check_sse_avx   simd_check_avx
 #define simd_check_sse2_avx  simd_check_avx
+#define simd_check_sse4_avx  simd_check_avx
 
 static void simd_set_regs(struct cpu_user_regs *regs)
 {
@@ -99,6 +105,18 @@ static const struct {
     SIMD(SSE2 packed u32,        sse2,      16u4),
     SIMD(SSE2 packed s64,        sse2,      16i8),
     SIMD(SSE2 packed u64,        sse2,      16u8),
+    SIMD(SSE4 scalar single,     sse4,        f4),
+    SIMD(SSE4 packed single,     sse4,      16f4),
+    SIMD(SSE4 scalar double,     sse4,        f8),
+    SIMD(SSE4 packed double,     sse4,      16f8),
+    SIMD(SSE4 packed s8,         sse4,      16i1),
+    SIMD(SSE4 packed u8,         sse4,      16u1),
+    SIMD(SSE4 packed s16,        sse4,      16i2),
+    SIMD(SSE4 packed u16,        sse4,      16u2),
+    SIMD(SSE4 packed s32,        sse4,      16i4),
+    SIMD(SSE4 packed u32,        sse4,      16u4),
+    SIMD(SSE4 packed s64,        sse4,      16i8),
+    SIMD(SSE4 packed u64,        sse4,      16u8),
     SIMD(SSE/AVX scalar single,  sse_avx,     f4),
     SIMD(SSE/AVX packed single,  sse_avx,   16f4),
     SIMD(SSE2/AVX scalar single, sse2_avx,    f4),
@@ -113,6 +131,18 @@ static const struct {
     SIMD(SSE2/AVX packed u32,    sse2_avx,  16u4),
     SIMD(SSE2/AVX packed s64,    sse2_avx,  16i8),
     SIMD(SSE2/AVX packed u64,    sse2_avx,  16u8),
+    SIMD(SSE4/AVX scalar single, sse4_avx,    f4),
+    SIMD(SSE4/AVX packed single, sse4_avx,  16f4),
+    SIMD(SSE4/AVX scalar double, sse4_avx,    f8),
+    SIMD(SSE4/AVX packed double, sse4_avx,  16f8),
+    SIMD(SSE4/AVX packed s8,     sse4_avx,  16i1),
+    SIMD(SSE4/AVX packed u8,     sse4_avx,  16u1),
+    SIMD(SSE4/AVX packed s16,    sse4_avx,  16i2),
+    SIMD(SSE4/AVX packed u16,    sse4_avx,  16u2),
+    SIMD(SSE4/AVX packed s32,    sse4_avx,  16i4),
+    SIMD(SSE4/AVX packed u32,    sse4_avx,  16u4),
+    SIMD(SSE4/AVX packed s64,    sse4_avx,  16i8),
+    SIMD(SSE4/AVX packed u64,    sse4_avx,  16u8),
 #undef SIMD_
 #undef SIMD
 };
@@ -2679,6 +2709,99 @@ int main(int argc, char **argv)
              regs.ecx != 11 ||
              (regs.eflags & X86_EFLAGS_ARITH_MASK) !=
              (X86_EFLAGS_ZF | X86_EFLAGS_CF) )
+            goto fail;
+        printf("okay\n");
+    }
+    else
+        printf("skipped\n");
+
+    printf("%-40s", "Testing extrq $4,$56,%xmm2...");
+    if ( stack_exec && cpu_has_sse4a )
+    {
+        decl_insn(extrq_imm);
+
+        res[0] = 0x44332211;
+        res[1] = 0x88776655;
+        asm volatile ( "movq %0, %%xmm2\n"
+                       put_insn(extrq_imm, "extrq $4, $56, %%xmm2")
+                       :: "m" (res[0]) : "memory" );
+
+        set_insn(extrq_imm);
+        rc = x86_emulate(&ctxt, &emulops);
+        asm ( "movq %%xmm2, %0" : "=m" (res[4]) :: "memory" );
+        if ( rc != X86EMUL_OKAY || !check_eip(extrq_imm) ||
+             res[4] != 0x54433221 || res[5] != 0x877665 )
+            goto fail;
+        printf("okay\n");
+    }
+    else
+        printf("skipped\n");
+
+    printf("%-40s", "Testing extrq %xmm3,%xmm2...");
+    if ( stack_exec && cpu_has_sse4a )
+    {
+        decl_insn(extrq_reg);
+
+        res[4] = 56 + (4 << 8);
+        res[5] = 0;
+        asm volatile ( "movq %0, %%xmm2\n"
+                       "movq %1, %%xmm3\n"
+                       put_insn(extrq_reg, "extrq %%xmm3, %%xmm2")
+                       :: "m" (res[0]), "m" (res[4]) : "memory" );
+
+        set_insn(extrq_reg);
+        rc = x86_emulate(&ctxt, &emulops);
+        asm ( "movq %%xmm2, %0" : "=m" (res[4]) :: "memory" );
+        if ( rc != X86EMUL_OKAY || !check_eip(extrq_reg) ||
+             res[4] != 0x54433221 || res[5] != 0x877665 )
+            goto fail;
+        printf("okay\n");
+    }
+    else
+        printf("skipped\n");
+
+    printf("%-40s", "Testing insertq $12,$40,%xmm2,%xmm3...");
+    if ( stack_exec && cpu_has_sse4a )
+    {
+        decl_insn(insertq_imm);
+
+        res[4] = 0xccbbaa99;
+        res[5] = 0x00ffeedd;
+        asm volatile ( "movq %1, %%xmm2\n"
+                       "movq %0, %%xmm3\n"
+                       put_insn(insertq_imm, "insertq $12, $40, %%xmm2, %%xmm3")
+                       :: "m" (res[0]), "m" (res[4]) : "memory" );
+
+        set_insn(insertq_imm);
+        rc = x86_emulate(&ctxt, &emulops);
+        asm ( "movq %%xmm3, %0" : "=m" (res[4]) :: "memory" );
+        if ( rc != X86EMUL_OKAY || !check_eip(insertq_imm) ||
+             res[4] != 0xbaa99211 || res[5] != 0x887ddccb )
+            goto fail;
+        printf("okay\n");
+    }
+    else
+        printf("skipped\n");
+
+    printf("%-40s", "Testing insertq %xmm2,%xmm3...");
+    if ( stack_exec && cpu_has_sse4a )
+    {
+        decl_insn(insertq_reg);
+
+        res[4] = 0xccbbaa99;
+        res[5] = 0x00ffeedd;
+        res[6] = 40 + (12 << 8);
+        res[7] = 0;
+        asm volatile ( "movdqu %1, %%xmm2\n"
+                       "movq %0, %%xmm3\n"
+                       put_insn(insertq_reg, "insertq %%xmm2, %%xmm3")
+                       :: "m" (res[0]), "m" (res[4]) : "memory" );
+
+        set_insn(insertq_reg);
+        rc = x86_emulate(&ctxt, &emulops);
+        asm ( "movq %%xmm3, %0" : "=m" (res[4]) :: "memory" );
+        if ( rc != X86EMUL_OKAY || !check_eip(insertq_reg) ||
+             res[4] != 0xbaa99211 || res[5] != 0x887ddccb )
             goto fail;
         printf("okay\n");
     }

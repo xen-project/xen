@@ -70,7 +70,9 @@ typedef long long __attribute__((vector_size(VEC_SIZE))) vdi_t;
 #if VEC_SIZE == 8 && defined(__SSE__)
 # define to_bool(cmp) (__builtin_ia32_pmovmskb(cmp) == 0xff)
 #elif VEC_SIZE == 16
-# if defined(__SSE__) && ELEM_SIZE == 4
+# if defined(__SSE4_1__)
+#  define to_bool(cmp) __builtin_ia32_ptestc128(cmp, (vdi_t){} == 0)
+# elif defined(__SSE__) && ELEM_SIZE == 4
 #  define to_bool(cmp) (__builtin_ia32_movmskps(cmp) == 0xf)
 # elif defined(__SSE2__)
 #  if ELEM_SIZE == 8
@@ -182,9 +184,122 @@ static inline bool _to_bool(byte_vec_t bv)
     __builtin_ia32_maskmovdqu((vqi_t)(y), ~m_, d_); \
 })
 #endif
+#if VEC_SIZE == 16 && defined(__SSE3__)
+# if FLOAT_SIZE == 4
+#  define addsub(x, y) __builtin_ia32_addsubps(x, y)
+#  define dup_hi(x) __builtin_ia32_movshdup(x)
+#  define dup_lo(x) __builtin_ia32_movsldup(x)
+#  define hadd(x, y) __builtin_ia32_haddps(x, y)
+#  define hsub(x, y) __builtin_ia32_hsubps(x, y)
+# elif FLOAT_SIZE == 8
+#  define addsub(x, y) __builtin_ia32_addsubpd(x, y)
+#  define dup_lo(x) ({ \
+    double __attribute__((vector_size(16))) r_; \
+    asm ( "movddup %1,%0" : "=x" (r_) : "m" ((x)[0]) ); \
+    r_; \
+})
+#  define hadd(x, y) __builtin_ia32_haddpd(x, y)
+#  define hsub(x, y) __builtin_ia32_hsubpd(x, y)
+# endif
+#endif
+#if VEC_SIZE == 16 && defined(__SSSE3__)
+# if INT_SIZE == 1
+#  define abs(x) ((vec_t)__builtin_ia32_pabsb128((vqi_t)(x)))
+# elif INT_SIZE == 2
+#  define abs(x) __builtin_ia32_pabsw128(x)
+# elif INT_SIZE == 4
+#  define abs(x) __builtin_ia32_pabsd128(x)
+# endif
+# if INT_SIZE == 1 || UINT_SIZE == 1
+#  define copysignz(x, y) ((vec_t)__builtin_ia32_psignb128((vqi_t)(x), (vqi_t)(y)))
+#  define swap(x) ((vec_t)__builtin_ia32_pshufb128((vqi_t)(x), (vqi_t)(inv - 1)))
+#  define rotr(x, n) ((vec_t)__builtin_ia32_palignr128((vdi_t)(x), (vdi_t)(x), (n) * 8))
+# elif INT_SIZE == 2 || UINT_SIZE == 2
+#  define copysignz(x, y) ((vec_t)__builtin_ia32_psignw128((vhi_t)(x), (vhi_t)(y)))
+#  define hadd(x, y) ((vec_t)__builtin_ia32_phaddw128((vhi_t)(x), (vhi_t)(y)))
+#  define hsub(x, y) ((vec_t)__builtin_ia32_phsubw128((vhi_t)(x), (vhi_t)(y)))
+#  define rotr(x, n) ((vec_t)__builtin_ia32_palignr128((vdi_t)(x), (vdi_t)(x), (n) * 16))
+# elif INT_SIZE == 4 || UINT_SIZE == 4
+#  define copysignz(x, y) ((vec_t)__builtin_ia32_psignd128((vsi_t)(x), (vsi_t)(y)))
+#  define hadd(x, y) ((vec_t)__builtin_ia32_phaddd128((vsi_t)(x), (vsi_t)(y)))
+#  define hsub(x, y) ((vec_t)__builtin_ia32_phsubd128((vsi_t)(x), (vsi_t)(y)))
+#  define rotr(x, n) ((vec_t)__builtin_ia32_palignr128((vdi_t)(x), (vdi_t)(x), (n) * 32))
+# elif INT_SIZE == 8 || UINT_SIZE == 8
+#  define rotr(x, n) ((vec_t)__builtin_ia32_palignr128((vdi_t)(x), (vdi_t)(x), (n) * 64))
+# endif
+#endif
+#if VEC_SIZE == 16 && defined(__SSE4_1__)
+# if INT_SIZE == 1
+#  define max(x, y) ((vec_t)__builtin_ia32_pmaxsb128((vqi_t)(x), (vqi_t)(y)))
+#  define min(x, y) ((vec_t)__builtin_ia32_pminsb128((vqi_t)(x), (vqi_t)(y)))
+#  define widen1(x) ((vec_t)__builtin_ia32_pmovsxbw128((vqi_t)(x)))
+#  define widen2(x) ((vec_t)__builtin_ia32_pmovsxbd128((vqi_t)(x)))
+#  define widen3(x) ((vec_t)__builtin_ia32_pmovsxbq128((vqi_t)(x)))
+# elif INT_SIZE == 2
+#  define widen1(x) ((vec_t)__builtin_ia32_pmovsxwd128(x))
+#  define widen2(x) ((vec_t)__builtin_ia32_pmovsxwq128(x))
+# elif INT_SIZE == 4
+#  define max(x, y) __builtin_ia32_pmaxsd128(x, y)
+#  define min(x, y) __builtin_ia32_pminsd128(x, y)
+#  define mul_full(x, y) ((vec_t)__builtin_ia32_pmuldq128(x, y))
+#  define widen1(x) ((vec_t)__builtin_ia32_pmovsxdq128(x))
+# elif UINT_SIZE == 1
+#  define widen1(x) ((vec_t)__builtin_ia32_pmovzxbw128((vqi_t)(x)))
+#  define widen2(x) ((vec_t)__builtin_ia32_pmovzxbd128((vqi_t)(x)))
+#  define widen3(x) ((vec_t)__builtin_ia32_pmovzxbq128((vqi_t)(x)))
+# elif UINT_SIZE == 2
+#  define max(x, y) ((vec_t)__builtin_ia32_pmaxuw128((vhi_t)(x), (vhi_t)(y)))
+#  define min(x, y) ((vec_t)__builtin_ia32_pminuw128((vhi_t)(x), (vhi_t)(y)))
+#  define widen1(x) ((vec_t)__builtin_ia32_pmovzxwd128((vhi_t)(x)))
+#  define widen2(x) ((vec_t)__builtin_ia32_pmovzxwq128((vhi_t)(x)))
+# elif UINT_SIZE == 4
+#  define max(x, y) ((vec_t)__builtin_ia32_pmaxud128((vsi_t)(x), (vsi_t)(y)))
+#  define min(x, y) ((vec_t)__builtin_ia32_pminud128((vsi_t)(x), (vsi_t)(y)))
+#  define widen1(x) ((vec_t)__builtin_ia32_pmovzxdq128((vsi_t)(x)))
+# endif
+# undef select
+# if defined(INT_SIZE) || defined(UINT_SIZE)
+#  define select(d, x, y, m) \
+    (*(d) = (vec_t)__builtin_ia32_pblendvb128((vqi_t)(y), (vqi_t)(x), (vqi_t)(m)))
+# elif FLOAT_SIZE == 4
+#  define dot_product(x, y) __builtin_ia32_dpps(x, y, 0b11110001)
+#  define select(d, x, y, m) (*(d) = __builtin_ia32_blendvps(y, x, m))
+#  define trunc(x) __builtin_ia32_roundps(x, 0b1011)
+# elif FLOAT_SIZE == 8
+#  define dot_product(x, y) __builtin_ia32_dppd(x, y, 0b00110001)
+#  define select(d, x, y, m) (*(d) = __builtin_ia32_blendvpd(y, x, m))
+#  define trunc(x) __builtin_ia32_roundpd(x, 0b1011)
+# endif
+# if INT_SIZE == 2 || UINT_SIZE == 2
+#  define mix(x, y) ((vec_t)__builtin_ia32_pblendw128((vhi_t)(x), (vhi_t)(y), 0b10101010))
+# elif INT_SIZE == 4 || UINT_SIZE == 4
+#  define mix(x, y) ((vec_t)__builtin_ia32_pblendw128((vhi_t)(x), (vhi_t)(y), 0b11001100))
+# elif INT_SIZE == 8 || UINT_SIZE == 8
+#  define mix(x, y) ((vec_t)__builtin_ia32_pblendw128((vhi_t)(x), (vhi_t)(y), 0b11110000))
+# elif FLOAT_SIZE == 4
+#  define mix(x, y) __builtin_ia32_blendps(x, y, 0b1010)
+# elif FLOAT_SIZE == 8
+#  define mix(x, y) __builtin_ia32_blendpd(x, y, 0b10)
+# endif
+#endif
 #if VEC_SIZE == FLOAT_SIZE
 # define max(x, y) ((vec_t){({ typeof(x[0]) x_ = (x)[0], y_ = (y)[0]; x_ > y_ ? x_ : y_; })})
 # define min(x, y) ((vec_t){({ typeof(x[0]) x_ = (x)[0], y_ = (y)[0]; x_ < y_ ? x_ : y_; })})
+# ifdef __SSE4_1__
+#  if FLOAT_SIZE == 4
+#   define trunc(x) ({ \
+    float __attribute__((vector_size(16))) r_; \
+    asm ( "roundss $0b1011,%1,%0" : "=x" (r_) : "m" (x) ); \
+    (vec_t){ r_[0] }; \
+})
+#  elif FLOAT_SIZE == 8
+#   define trunc(x) ({ \
+    double __attribute__((vector_size(16))) r_; \
+    asm ( "roundsd $0b1011,%1,%0" : "=x" (r_) : "m" (x) ); \
+    (vec_t){ r_[0] }; \
+})
+#  endif
+# endif
 #endif
 
 /*
@@ -288,6 +403,14 @@ int simd_test(void)
     x = src * src;
     touch(x);
     if ( !to_bool(sqrt(x) == src) ) return __LINE__;
+# endif
+
+# ifdef trunc
+    x = 1 / src;
+    y = (vec_t){ 1 };
+    touch(x);
+    z = trunc(x);
+    if ( !to_bool(y == z) ) return __LINE__;
 # endif
 
 #else
@@ -416,6 +539,17 @@ int simd_test(void)
 # endif
 #endif
 
+#ifdef abs
+    x = src * alt;
+    touch(x);
+    if ( !to_bool(abs(x) == src) ) return __LINE__;
+#endif
+
+#ifdef copysignz
+    touch(alt);
+    if ( !to_bool(copysignz((vec_t){} + 1, alt) == alt) ) return __LINE__;
+#endif
+
 #ifdef swap
     touch(src);
     if ( !to_bool(swap(src) == inv) ) return __LINE__;
@@ -435,16 +569,140 @@ int simd_test(void)
     if ( !to_bool(z == ELEM_COUNT / 2) ) return __LINE__;
 #endif
 
+#if defined(INT_SIZE) && defined(widen1) && defined(interleave_lo)
+
+    x = src * alt;
+    y = interleave_lo(x, alt < 0);
+    touch(x);
+    z = widen1(x);
+    touch(x);
+    if ( !to_bool(z == y) ) return __LINE__;
+
+# ifdef widen2
+    y = interleave_lo(alt < 0, alt < 0);
+    y = interleave_lo(z, y);
+    touch(x);
+    z = widen2(x);
+    touch(x);
+    if ( !to_bool(z == y) ) return __LINE__;
+
+#  ifdef widen3
+    y = interleave_lo(alt < 0, alt < 0);
+    y = interleave_lo(y, y);
+    y = interleave_lo(z, y);
+    touch(x);
+    z = widen3(x);
+    touch(x);
+    if ( !to_bool(z == y) ) return __LINE__;
+#  endif
+# endif
+
+#endif
+
+#if defined(UINT_SIZE) && defined(interleave_lo)
+
+    y = interleave_lo(src, (vec_t){});
+    z = interleave_lo(y, (vec_t){});
+
+# ifdef widen1
+    touch(src);
+    x = widen1(src);
+    touch(src);
+    if ( !to_bool(x == y) ) return __LINE__;
+# endif
+
+# ifdef widen2
+    touch(src);
+    x = widen2(src);
+    touch(src);
+    if ( !to_bool(x == z) ) return __LINE__;
+# endif
+
+# ifdef widen3
+    touch(src);
+    x = widen3(src);
+    touch(src);
+    if ( !to_bool(x == interleave_lo(z, (vec_t){})) ) return __LINE__;
+# endif
+
+#endif
+
+#ifdef dup_lo
+    touch(src);
+    x = dup_lo(src);
+    touch(src);
+    if ( !to_bool(x - src == (alt - 1) / 2) ) return __LINE__;
+#endif
+
+#ifdef dup_hi
+    touch(src);
+    x = dup_hi(src);
+    touch(src);
+    if ( !to_bool(x - src == (alt + 1) / 2) ) return __LINE__;
+#endif
+
+    for ( i = 0; i < ELEM_COUNT; ++i )
+        y[i] = (i & 1 ? inv : src)[i];
+
 #ifdef select
 # ifdef UINT_SIZE
     select(&z, src, inv, alt);
 # else
     select(&z, src, inv, alt > 0);
 # endif
-    for ( i = 0; i < ELEM_COUNT; ++i )
-        y[i] = (i & 1 ? inv : src)[i];
     if ( !to_bool(z == y) ) return __LINE__;
 #endif
+
+#ifdef mix
+    touch(src);
+    touch(inv);
+    x = mix(src, inv);
+    if ( !to_bool(x == y) ) return __LINE__;
+
+# ifdef addsub
+    touch(src);
+    touch(inv);
+    x = addsub(src, inv);
+    touch(src);
+    touch(inv);
+    y = mix(src - inv, src + inv);
+    if ( !to_bool(x == y) ) return __LINE__;
+# endif
+#endif
+
+#ifdef rotr
+    x = rotr(src, 1);
+    y = (src & (ELEM_COUNT - 1)) + 1;
+    if ( !to_bool(x == y) ) return __LINE__;
+#endif
+
+#ifdef dot_product
+    touch(src);
+    touch(inv);
+    x = dot_product(src, inv);
+    if ( !to_bool(x == (vec_t){ (ELEM_COUNT * (ELEM_COUNT + 1) *
+                                 (ELEM_COUNT + 2)) / 6 }) ) return __LINE__;
+#endif
+
+#ifdef hadd
+    x = src;
+    for ( i = ELEM_COUNT; i >>= 1; )
+    {
+        touch(x);
+        x = hadd((vec_t){}, x);
+    }
+    if ( x[ELEM_COUNT - 1] != (ELEM_COUNT * (ELEM_COUNT + 1)) / 2 ) return __LINE__;
+
+# ifdef hsub
+    touch(src);
+    touch(inv);
+    x = hsub(src, inv);
+    for ( i = ELEM_COUNT; i >>= 1; )
+        x = hadd(x, (vec_t){});
+    if ( !to_bool(x == 0) ) return __LINE__;
+# endif
+#endif
+
 
     return 0;
 }

@@ -22,24 +22,31 @@ sse-flts := 4
 sse2-vecs := $(sse-vecs)
 sse2-ints := 1 2 4 8
 sse2-flts := 4 8
+sse4-vecs := $(sse2-vecs)
+sse4-ints := $(sse2-ints)
+sse4-flts := $(sse2-flts)
 
 # When converting SSE to AVX, have the compiler avoid XMM0 to widen
-# coverage of the VEX.vvvv checks in the emulator.
-sse2avx := -ffixed-xmm0 -Wa,-msse2avx
+# coverage of the VEX.vvvv checks in the emulator. We must not do this,
+# however, for SSE4.1 and later, as there are instructions with XMM0 as
+# an implicit operand.
+sse2avx-sse  := -ffixed-xmm0 -Wa,-msse2avx
+sse2avx-sse2 := $(sse2avx-sse)
+sse2avx-sse4 := -Wa,-msse2avx
 
-simd-cflags := $(foreach flavor,sse sse2, \
+simd-cflags := $(foreach flavor,sse sse2 sse4, \
                  $(foreach vec,$($(flavor)-vecs), \
                    $(foreach int,$($(flavor)-ints), \
                      "-D$(flavor)_$(vec)i$(int) -m$(flavor) -O2 -DVEC_SIZE=$(vec) -DINT_SIZE=$(int)" \
                      "-D$(flavor)_$(vec)u$(int) -m$(flavor) -O2 -DVEC_SIZE=$(vec) -DUINT_SIZE=$(int)" \
-                     "-D$(flavor)_avx_$(vec)i$(int) -m$(flavor) $(sse2avx) -O2 -DVEC_SIZE=$(vec) -DINT_SIZE=$(int)" \
-                     "-D$(flavor)_avx_$(vec)u$(int) -m$(flavor) $(sse2avx) -O2 -DVEC_SIZE=$(vec) -DUINT_SIZE=$(int)") \
+                     "-D$(flavor)_avx_$(vec)i$(int) -m$(flavor) $(sse2avx-$(flavor)) -O2 -DVEC_SIZE=$(vec) -DINT_SIZE=$(int)" \
+                     "-D$(flavor)_avx_$(vec)u$(int) -m$(flavor) $(sse2avx-$(flavor)) -O2 -DVEC_SIZE=$(vec) -DUINT_SIZE=$(int)") \
                    $(foreach flt,$($(flavor)-flts), \
                      "-D$(flavor)_$(vec)f$(flt) -m$(flavor) -O2 -DVEC_SIZE=$(vec) -DFLOAT_SIZE=$(flt)" \
-                     "-D$(flavor)_avx_$(vec)f$(flt) -m$(flavor) $(sse2avx) -O2 -DVEC_SIZE=$(vec) -DFLOAT_SIZE=$(flt)")) \
+                     "-D$(flavor)_avx_$(vec)f$(flt) -m$(flavor) $(sse2avx-$(flavor)) -O2 -DVEC_SIZE=$(vec) -DFLOAT_SIZE=$(flt)")) \
                  $(foreach flt,$($(flavor)-flts), \
                    "-D$(flavor)_f$(flt) -m$(flavor) -mfpmath=sse -O2 -DFLOAT_SIZE=$(flt)" \
-                   "-D$(flavor)_avx_f$(flt) -m$(flavor) -mfpmath=sse $(sse2avx) -O2 -DFLOAT_SIZE=$(flt)"))
+                   "-D$(flavor)_avx_f$(flt) -m$(flavor) -mfpmath=sse $(sse2avx-$(flavor)) -O2 -DFLOAT_SIZE=$(flt)"))
 
 $(addsuffix .h,$(TESTCASES)): %.h: %.c testcase.mk Makefile
 	rm -f $@.new $*.bin
