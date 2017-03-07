@@ -5,6 +5,7 @@
 
 #include "x86_emulate.h"
 #include "blowfish.h"
+#include "simd.h"
 
 #define verbose false /* Switch to true for far more logging. */
 
@@ -19,11 +20,43 @@ static bool blowfish_check_regs(const struct cpu_user_regs *regs)
     return regs->eax == 2 && regs->edx == 1;
 }
 
+static bool simd_check_sse(void)
+{
+    return cpu_has_sse;
+}
+
+static bool simd_check_sse2(void)
+{
+    return cpu_has_sse2;
+}
+
+static bool simd_check_avx(void)
+{
+    return cpu_has_avx;
+}
+#define simd_check_sse_avx   simd_check_avx
+#define simd_check_sse2_avx  simd_check_avx
+
+static void simd_set_regs(struct cpu_user_regs *regs)
+{
+    if ( cpu_has_mmx )
+        asm volatile ( "emms" );
+}
+
+static bool simd_check_regs(const struct cpu_user_regs *regs)
+{
+    if ( !regs->eax )
+        return true;
+    printf("[line %u] ", (unsigned int)regs->eax);
+    return false;
+}
+
 static const struct {
     const void *code;
     size_t size;
     unsigned int bitness;
     const char*name;
+    bool (*check_cpu)(void);
     void (*set_regs)(struct cpu_user_regs *);
     bool (*check_regs)(const struct cpu_user_regs *);
 } blobs[] = {
@@ -39,6 +72,49 @@ static const struct {
     BLOWFISH(32, blowfish, ),
     BLOWFISH(32, blowfish (push), _mno_accumulate_outgoing_args),
 #undef BLOWFISH
+#define SIMD_(bits, desc, feat, form)                               \
+    { .code = simd_x86_ ## bits ## _D ## feat ## _ ## form,         \
+      .size = sizeof(simd_x86_ ## bits ## _D ## feat ## _ ## form), \
+      .bitness = bits, .name = #desc,                               \
+      .check_cpu = simd_check_ ## feat,                             \
+      .set_regs = simd_set_regs,                                    \
+      .check_regs = simd_check_regs }
+#ifdef __x86_64__
+# define SIMD(desc, feat, form) SIMD_(64, desc, feat, form), \
+                                SIMD_(32, desc, feat, form)
+#else
+# define SIMD(desc, feat, form) SIMD_(32, desc, feat, form)
+#endif
+    SIMD(SSE scalar single,      sse,         f4),
+    SIMD(SSE packed single,      sse,       16f4),
+    SIMD(SSE2 scalar single,     sse2,        f4),
+    SIMD(SSE2 packed single,     sse2,      16f4),
+    SIMD(SSE2 scalar double,     sse2,        f8),
+    SIMD(SSE2 packed double,     sse2,      16f8),
+    SIMD(SSE2 packed s8,         sse2,      16i1),
+    SIMD(SSE2 packed u8,         sse2,      16u1),
+    SIMD(SSE2 packed s16,        sse2,      16i2),
+    SIMD(SSE2 packed u16,        sse2,      16u2),
+    SIMD(SSE2 packed s32,        sse2,      16i4),
+    SIMD(SSE2 packed u32,        sse2,      16u4),
+    SIMD(SSE2 packed s64,        sse2,      16i8),
+    SIMD(SSE2 packed u64,        sse2,      16u8),
+    SIMD(SSE/AVX scalar single,  sse_avx,     f4),
+    SIMD(SSE/AVX packed single,  sse_avx,   16f4),
+    SIMD(SSE2/AVX scalar single, sse2_avx,    f4),
+    SIMD(SSE2/AVX packed single, sse2_avx,  16f4),
+    SIMD(SSE2/AVX scalar double, sse2_avx,    f8),
+    SIMD(SSE2/AVX packed double, sse2_avx,  16f8),
+    SIMD(SSE2/AVX packed s8,     sse2_avx,  16i1),
+    SIMD(SSE2/AVX packed u8,     sse2_avx,  16u1),
+    SIMD(SSE2/AVX packed s16,    sse2_avx,  16i2),
+    SIMD(SSE2/AVX packed u16,    sse2_avx,  16u2),
+    SIMD(SSE2/AVX packed s32,    sse2_avx,  16i4),
+    SIMD(SSE2/AVX packed u32,    sse2_avx,  16u4),
+    SIMD(SSE2/AVX packed s64,    sse2_avx,  16i8),
+    SIMD(SSE2/AVX packed u64,    sse2_avx,  16u8),
+#undef SIMD_
+#undef SIMD
 };
 
 static unsigned int bytes_read;
@@ -2588,6 +2664,9 @@ int main(int argc, char **argv)
             printf("%-39s n/a\n", blobs[j].name);
             continue;
         }
+
+        if ( blobs[j].check_cpu && !blobs[j].check_cpu() )
+            continue;
 
         memcpy(res, blobs[j].code, blobs[j].size);
         ctxt.addr_size = ctxt.sp_size = blobs[j].bitness;

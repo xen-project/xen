@@ -11,10 +11,35 @@ all: $(TARGET)
 run: $(TARGET)
 	./$(TARGET)
 
-TESTCASES := blowfish
+TESTCASES := blowfish simd
 
 blowfish-cflags := ""
 blowfish-cflags-x86_32 := "-mno-accumulate-outgoing-args -Dstatic="
+
+sse-vecs := 16
+sse-ints :=
+sse-flts := 4
+sse2-vecs := $(sse-vecs)
+sse2-ints := 1 2 4 8
+sse2-flts := 4 8
+
+# When converting SSE to AVX, have the compiler avoid XMM0 to widen
+# coverage of the VEX.vvvv checks in the emulator.
+sse2avx := -ffixed-xmm0 -Wa,-msse2avx
+
+simd-cflags := $(foreach flavor,sse sse2, \
+                 $(foreach vec,$($(flavor)-vecs), \
+                   $(foreach int,$($(flavor)-ints), \
+                     "-D$(flavor)_$(vec)i$(int) -m$(flavor) -O2 -DVEC_SIZE=$(vec) -DINT_SIZE=$(int)" \
+                     "-D$(flavor)_$(vec)u$(int) -m$(flavor) -O2 -DVEC_SIZE=$(vec) -DUINT_SIZE=$(int)" \
+                     "-D$(flavor)_avx_$(vec)i$(int) -m$(flavor) $(sse2avx) -O2 -DVEC_SIZE=$(vec) -DINT_SIZE=$(int)" \
+                     "-D$(flavor)_avx_$(vec)u$(int) -m$(flavor) $(sse2avx) -O2 -DVEC_SIZE=$(vec) -DUINT_SIZE=$(int)") \
+                   $(foreach flt,$($(flavor)-flts), \
+                     "-D$(flavor)_$(vec)f$(flt) -m$(flavor) -O2 -DVEC_SIZE=$(vec) -DFLOAT_SIZE=$(flt)" \
+                     "-D$(flavor)_avx_$(vec)f$(flt) -m$(flavor) $(sse2avx) -O2 -DVEC_SIZE=$(vec) -DFLOAT_SIZE=$(flt)")) \
+                 $(foreach flt,$($(flavor)-flts), \
+                   "-D$(flavor)_f$(flt) -m$(flavor) -mfpmath=sse -O2 -DFLOAT_SIZE=$(flt)" \
+                   "-D$(flavor)_avx_f$(flt) -m$(flavor) -mfpmath=sse $(sse2avx) -O2 -DFLOAT_SIZE=$(flt)"))
 
 $(addsuffix .h,$(TESTCASES)): %.h: %.c testcase.mk Makefile
 	rm -f $@.new $*.bin
