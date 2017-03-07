@@ -254,7 +254,7 @@ static const struct {
     [0x2a] = { DstImplicit|SrcMem|ModRM|Mov, simd_other },
     [0x2b] = { DstMem|SrcImplicit|ModRM|Mov, simd_any_fp },
     [0x2c ... 0x2d] = { DstImplicit|SrcMem|ModRM|Mov, simd_other },
-    [0x2e ... 0x2f] = { ImplicitOps|ModRM },
+    [0x2e ... 0x2f] = { ImplicitOps|ModRM|TwoOp },
     [0x30 ... 0x35] = { ImplicitOps },
     [0x37] = { ImplicitOps },
     [0x38] = { DstReg|SrcMem|ModRM },
@@ -3038,6 +3038,7 @@ x86_emulate(
         struct segment_register cs, sreg;
         struct cpuid_leaf cpuid_leaf;
         uint64_t msr_val;
+        unsigned long dummy;
 
     case 0x00 ... 0x05: add: /* add */
         emulate_2op_SrcV("add", src, dst, _regs._eflags);
@@ -5480,6 +5481,57 @@ x86_emulate(
         put_fpu(&fic);
 
         state->simd_size = simd_none;
+        break;
+
+    CASE_SIMD_PACKED_FP(, 0x0f, 0x2e):     /* ucomis{s,d} xmm/mem,xmm */
+    CASE_SIMD_PACKED_FP(_VEX, 0x0f, 0x2e): /* vucomis{s,d} xmm/mem,xmm */
+    CASE_SIMD_PACKED_FP(, 0x0f, 0x2f):     /* comis{s,d} xmm/mem,xmm */
+    CASE_SIMD_PACKED_FP(_VEX, 0x0f, 0x2f): /* vcomis{s,d} xmm/mem,xmm */
+        if ( vex.opcx == vex_none )
+        {
+            if ( vex.pfx )
+                vcpu_must_have(sse2);
+            else
+                vcpu_must_have(sse);
+            get_fpu(X86EMUL_FPU_xmm, &fic);
+        }
+        else
+        {
+            host_and_vcpu_must_have(avx);
+            get_fpu(X86EMUL_FPU_ymm, &fic);
+        }
+
+        opc = init_prefixes(stub);
+        opc[0] = b;
+        opc[1] = modrm;
+        if ( ea.type == OP_MEM )
+        {
+            rc = ops->read(ea.mem.seg, ea.mem.off, mmvalp, vex.pfx ? 8 : 4,
+                           ctxt);
+            if ( rc != X86EMUL_OKAY )
+                goto done;
+
+            /* Convert memory operand to (%rAX). */
+            rex_prefix &= ~REX_B;
+            vex.b = 1;
+            opc[1] &= 0x38;
+        }
+        fic.insn_bytes = PFX_BYTES + 2;
+        opc[2] = 0xc3;
+
+        copy_REX_VEX(opc, rex_prefix, vex);
+        invoke_stub(_PRE_EFLAGS("[eflags]", "[mask]", "[tmp]"),
+                    _POST_EFLAGS("[eflags]", "[mask]", "[tmp]"),
+                    [eflags] "+g" (_regs.eflags),
+                    [tmp] "=&r" (dummy), "+m" (*mmvalp),
+                    "+m" (fic.exn_raised)
+                    : [func] "rm" (stub.func), "a" (mmvalp),
+                      [mask] "i" (EFLAGS_MASK));
+
+        put_stub(stub);
+        put_fpu(&fic);
+
+        ASSERT(!state->simd_size);
         break;
 
     case X86EMUL_OPC(0x0f, 0x30): /* wrmsr */
