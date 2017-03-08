@@ -535,7 +535,7 @@ void mcheck_cmn_handler(const struct cpu_user_regs *regs)
     gstatus = mca_rdmsr(MSR_IA32_MCG_STATUS);
     if ((gstatus & MCG_STATUS_MCIP) != 0) {
         mce_printk(MCE_CRITICAL, "MCE: Clear MCIP@ last step");
-        mca_wrmsr(MSR_IA32_MCG_STATUS, gstatus & ~MCG_STATUS_MCIP);
+        mca_wrmsr(MSR_IA32_MCG_STATUS, 0);
     }
     mce_barrier_exit(&mce_trap_bar);
 
