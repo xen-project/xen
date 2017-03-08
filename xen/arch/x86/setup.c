@@ -657,7 +657,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
     /* Critical region without IDT or TSS.  Any fault is deadly! */
 
     set_processor_id(0);
-    set_current((struct vcpu *)0xfffff000); /* debug sanity. */
+    set_current(INVALID_VCPU); /* debug sanity. */
     idle_vcpu[0] = current;
 
     percpu_init_areas();

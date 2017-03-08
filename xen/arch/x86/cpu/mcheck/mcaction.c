@@ -100,7 +100,8 @@ mc_memerr_dhandler(struct mca_binfo *binfo,
                     goto vmce_failed;
                 }
 
-                if ( boot_cpu_data.x86_vendor == X86_VENDOR_INTEL )
+                if (boot_cpu_data.x86_vendor == X86_VENDOR_INTEL ||
+                    global->mc_vcpuid == XEN_MC_VCPUID_INVALID)
                     vmce_vcpuid = VMCE_INJECT_BROADCAST;
                 else
                     vmce_vcpuid = global->mc_vcpuid;

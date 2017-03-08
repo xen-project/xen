@@ -391,7 +391,7 @@ int fill_vmsr_data(struct mcinfo_bank *mc_bank, struct domain *d,
 {
     struct vcpu *v = d->vcpu[0];
 
-    if ( mc_bank->mc_domid != (uint16_t)~0 )
+    if ( mc_bank->mc_domid != DOMID_INVALID )
     {
         if ( v->arch.vmce.mcg_status & MCG_STATUS_MCIP )
         {

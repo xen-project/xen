@@ -88,6 +88,8 @@
 #define XEN_MC_NOTDELIVERED 0x10
 /* Note, XEN_MC_CANNOTHANDLE and XEN_MC_NOTDELIVERED are mutually exclusive. */
 
+/* Applicable to all mc_vcpuid fields below. */
+#define XEN_MC_VCPUID_INVALID 0xffff
 
 #ifndef __ASSEMBLY__
 

@@ -16,6 +16,7 @@
 #include <asm/current.h>
 #include <asm/flushtlb.h>
 #include <asm/hardirq.h>
+#include <asm/setup.h>
 
 static struct vcpu *__read_mostly override;
 
@@ -28,7 +29,7 @@ static inline struct vcpu *mapcache_current_vcpu(void)
      * When current isn't properly set up yet, this is equivalent to
      * running in an idle vCPU (callers must check for NULL).
      */
-    if ( v == (struct vcpu *)0xfffff000 )
+    if ( v == INVALID_VCPU )
         return NULL;
 
     /*

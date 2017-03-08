@@ -18,6 +18,7 @@
 #include <xen/cpu.h>
 
 #include <asm/processor.h>
+#include <asm/setup.h>
 #include <asm/system.h>
 #include <asm/apic.h>
 #include <asm/msr.h>
@@ -215,6 +216,7 @@ static void mca_init_bank(enum mca_source who,
     mib->common.type = MC_TYPE_BANK;
     mib->common.size = sizeof (struct mcinfo_bank);
     mib->mc_bank = bank;
+    mib->mc_domid = DOMID_INVALID;
 
     if (mib->mc_status & MCi_STATUS_MISCV)
         mib->mc_misc = mca_rdmsr(MSR_IA32_MCx_MISC(bank));
@@ -245,15 +247,15 @@ static int mca_init_global(uint32_t flags, struct mcinfo_global *mig)
 {
     uint64_t status;
     int cpu_nr;
-    struct vcpu *v = current;
-    struct domain *d;
+    const struct vcpu *curr = current;
 
     /* Set global information */
     mig->common.type = MC_TYPE_GLOBAL;
     mig->common.size = sizeof (struct mcinfo_global);
     status = mca_rdmsr(MSR_IA32_MCG_STATUS);
     mig->mc_gstatus = status;
-    mig->mc_domid = mig->mc_vcpuid = -1;
+    mig->mc_domid = DOMID_INVALID;
+    mig->mc_vcpuid = XEN_MC_VCPUID_INVALID;
     mig->mc_flags = flags;
     cpu_nr = smp_processor_id();
     /* Retrieve detector information */
@@ -261,13 +263,9 @@ static int mca_init_global(uint32_t flags, struct mcinfo_global *mig)
                         &mig->mc_coreid, &mig->mc_core_threadid,
                         &mig->mc_apicid, NULL, NULL, NULL);
 
-    /* This is really meaningless */
-    if (v != NULL && ((d = v->domain) != NULL)) {
-        mig->mc_domid = d->domain_id;
-        mig->mc_vcpuid = v->vcpu_id;
-    } else {
-        mig->mc_domid = -1;
-        mig->mc_vcpuid = -1;
+    if (curr != INVALID_VCPU) {
+        mig->mc_domid = curr->domain->domain_id;
+        mig->mc_vcpuid = curr->vcpu_id;
     }
 
     return 0;
