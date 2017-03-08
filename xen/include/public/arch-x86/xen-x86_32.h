@@ -114,7 +114,7 @@
 #elif defined(__XEN__) || defined(__XEN_TOOLS__)
 /* Anonymous unions include all permissible names (e.g., al/ah/ax/eax). */
 #define __DECL_REG_LO8(which) union { \
-    uint32_t e ## which ## x, _e ## which ## x; \
+    uint32_t e ## which ## x; \
     uint16_t which ## x; \
     struct { \
         uint8_t which ## l; \
