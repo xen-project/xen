@@ -269,11 +269,6 @@ F:  xen/include/asm-*/livepatch.h
 F:  xen/include/xen/livepatch*
 F:  xen/test/livepatch/*
 
-MACHINE CHECK (MCA) & RAS
-M:	Christoph Egger <chegger@amazon.de>
-S:	Supported
-F:	xen/arch/x86/cpu/mcheck/
-
 MINI-OS
 M:	Samuel Thibault <samuel.thibault@ens-lyon.org>
 S:	Supported
