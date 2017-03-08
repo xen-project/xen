@@ -811,7 +811,7 @@ do{ asm volatile (                                                      \
     unsigned long tmp;                                                  \
     invoke_stub(_PRE_EFLAGS("[efl]", "[msk]", "[tmp]"),                 \
                 _POST_EFLAGS("[efl]", "[msk]", "[tmp]"),                \
-                dst, [tmp] "=&r" (tmp), [efl] "+g" (_regs._eflags)      \
+                dst, [tmp] "=&r" (tmp), [efl] "+g" (_regs.eflags)       \
                 : [msk] "i" (EFLAGS_MASK), ## src);                     \
 } while (0)
 
@@ -890,7 +890,7 @@ do {                                                                    \
 } while (0)
 #define register_address_adjust(reg, adj)                               \
     _register_address_increment(reg,                                    \
-                                _regs._eflags & X86_EFLAGS_DF ?         \
+                                _regs.eflags & X86_EFLAGS_DF ?          \
                                 -(adj) : (adj),                         \
                                 ad_bytes)
 
@@ -914,7 +914,7 @@ do {                                                                    \
     rc = ops->insn_fetch(x86_seg_cs, ip, NULL, 0, ctxt);                \
     if ( rc ) goto done;                                                \
     _regs.r(ip) = ip;                                                   \
-    singlestep = _regs._eflags & X86_EFLAGS_TF;                         \
+    singlestep = _regs.eflags & X86_EFLAGS_TF;                          \
 } while (0)
 
 #define validate_far_branch(cs, ip) ({                                  \
@@ -931,7 +931,7 @@ do {                                                                    \
 #define commit_far_branch(cs, newip) ({                                 \
     validate_far_branch(cs, newip);                                     \
     _regs.r(ip) = (newip);                                              \
-    singlestep = _regs._eflags & X86_EFLAGS_TF;                         \
+    singlestep = _regs.eflags & X86_EFLAGS_TF;                          \
     ops->write_segment(x86_seg_cs, cs, ctxt);                           \
 })
 
@@ -984,7 +984,7 @@ static int _get_fpu(
         if ( type >= X86EMUL_FPU_ymm )
         {
             /* Should be unreachable if VEX decoding is working correctly. */
-            ASSERT((cr0 & X86_CR0_PE) && !(ctxt->regs->_eflags & X86_EFLAGS_VM));
+            ASSERT((cr0 & X86_CR0_PE) && !(ctxt->regs->eflags & X86_EFLAGS_VM));
         }
         if ( cr0 & X86_CR0_EM )
         {
@@ -1071,7 +1071,7 @@ do {                                                                    \
     memcpy(get_stub(stub), ((uint8_t[]){ bytes, 0xc3 }), nr_ + 1);      \
     invoke_stub(_PRE_EFLAGS("[eflags]", "[mask]", "[tmp]"),             \
                 _POST_EFLAGS("[eflags]", "[mask]", "[tmp]"),            \
-                [eflags] "+g" (_regs._eflags), [tmp] "=&r" (tmp_),      \
+                [eflags] "+g" (_regs.eflags), [tmp] "=&r" (tmp_),       \
                 "+m" (fic)                                              \
                 : [mask] "i" (X86_EFLAGS_ZF|X86_EFLAGS_PF|X86_EFLAGS_CF)); \
     put_stub(stub);                                                     \
@@ -1082,7 +1082,7 @@ static inline unsigned long get_loop_count(
     int ad_bytes)
 {
     return (ad_bytes > 4) ? regs->r(cx)
-                          : (ad_bytes < 4) ? regs->cx : regs->_ecx;
+                          : (ad_bytes < 4) ? regs->cx : regs->ecx;
 }
 
 static inline void put_loop_count(
@@ -1110,12 +1110,12 @@ static inline void put_loop_count(
         if ( mode_64bit() && ad_bytes == 4 )                            \
         {                                                               \
             _regs.r(cx) = 0;                                            \
-            if ( using_si ) _regs.r(si) = _regs._esi;                   \
-            if ( using_di ) _regs.r(di) = _regs._edi;                   \
+            if ( using_si ) _regs.r(si) = _regs.esi;                    \
+            if ( using_di ) _regs.r(di) = _regs.edi;                    \
         }                                                               \
         goto complete_insn;                                             \
     }                                                                   \
-    if ( max_reps > 1 && (_regs._eflags & X86_EFLAGS_TF) &&             \
+    if ( max_reps > 1 && (_regs.eflags & X86_EFLAGS_TF) &&              \
          !is_branch_step(ctxt, ops) )                                   \
         max_reps = 1;                                                   \
     max_reps;                                                           \
@@ -1149,7 +1149,7 @@ static void __put_rep_prefix(
 /* Clip maximum repetitions so that the index register at most just wraps. */
 #define truncate_ea_and_reps(ea, reps, bytes_per_rep) ({                  \
     unsigned long todo__, ea__ = truncate_word(ea, ad_bytes);             \
-    if ( !(_regs._eflags & X86_EFLAGS_DF) )                               \
+    if ( !(_regs.eflags & X86_EFLAGS_DF) )                                \
         todo__ = truncate_word(-(ea), ad_bytes) / (bytes_per_rep);        \
     else if ( truncate_word((ea) + (bytes_per_rep) - 1, ad_bytes) < ea__ )\
         todo__ = 1;                                                       \
@@ -1306,7 +1306,7 @@ get_cpl(
 {
     struct segment_register reg;
 
-    if ( ctxt->regs->_eflags & X86_EFLAGS_VM )
+    if ( ctxt->regs->eflags & X86_EFLAGS_VM )
         return 3;
 
     if ( (ops->read_segment == NULL) ||
@@ -1324,7 +1324,7 @@ _mode_iopl(
     int cpl = get_cpl(ctxt, ops);
     if ( cpl == -1 )
         return -1;
-    return cpl <= MASK_EXTR(ctxt->regs->_eflags, X86_EFLAGS_IOPL);
+    return cpl <= MASK_EXTR(ctxt->regs->eflags, X86_EFLAGS_IOPL);
 }
 
 #define mode_ring0() ({                         \
@@ -1344,7 +1344,7 @@ _mode_iopl(
         rc = ops->read_cr(4, &cr4, ctxt);                    \
         if ( rc != X86EMUL_OKAY ) goto done;                 \
     }                                                        \
-    !!(cr4 & (_regs._eflags & X86_EFLAGS_VM ? X86_CR4_VME : X86_CR4_PVI)); \
+    !!(cr4 & (_regs.eflags & X86_EFLAGS_VM ? X86_CR4_VME : X86_CR4_PVI)); \
 })
 
 static int ioport_access_check(
@@ -1357,7 +1357,7 @@ static int ioport_access_check(
     struct segment_register tr;
     int rc = X86EMUL_OKAY;
 
-    if ( !(ctxt->regs->_eflags & X86_EFLAGS_VM) && mode_iopl() )
+    if ( !(ctxt->regs->eflags & X86_EFLAGS_VM) && mode_iopl() )
         return X86EMUL_OKAY;
 
     fail_if(ops->read_segment == NULL);
@@ -1426,7 +1426,7 @@ in_protmode(
     struct x86_emulate_ctxt *ctxt,
     const struct x86_emulate_ops  *ops)
 {
-    return !(in_realmode(ctxt, ops) || (ctxt->regs->_eflags & X86_EFLAGS_VM));
+    return !(in_realmode(ctxt, ops) || (ctxt->regs->eflags & X86_EFLAGS_VM));
 }
 
 #define EAX 0
@@ -1958,8 +1958,8 @@ static int inject_swint(enum x86_swint_type type,
              * a 32bit OS.  Someone with many TUITs can see about reading the
              * TSS Software Interrupt Redirection bitmap.
              */
-            if ( (ctxt->regs->_eflags & X86_EFLAGS_VM) &&
-                 ((ctxt->regs->_eflags & X86_EFLAGS_IOPL) != X86_EFLAGS_IOPL) )
+            if ( (ctxt->regs->eflags & X86_EFLAGS_VM) &&
+                 ((ctxt->regs->eflags & X86_EFLAGS_IOPL) != X86_EFLAGS_IOPL) )
                 goto raise_exn;
 
             /*
@@ -2525,7 +2525,7 @@ x86_decode(
             default:
                 BUG(); /* Shouldn't be possible. */
             case 2:
-                if ( state->regs->_eflags & X86_EFLAGS_VM )
+                if ( state->regs->eflags & X86_EFLAGS_VM )
                     break;
                 /* fall through */
             case 4:
@@ -2995,7 +2995,7 @@ x86_emulate(
     struct x86_emulate_state state;
     int rc;
     uint8_t b, d, *opc = NULL;
-    bool singlestep = (_regs._eflags & X86_EFLAGS_TF) &&
+    bool singlestep = (_regs.eflags & X86_EFLAGS_TF) &&
 	    !is_branch_step(ctxt, ops);
     bool sfence = false;
     struct operand src = { .reg = PTR_POISON };
@@ -3217,36 +3217,36 @@ x86_emulate(
         unsigned long dummy;
 
     case 0x00 ... 0x05: add: /* add */
-        emulate_2op_SrcV("add", src, dst, _regs._eflags);
+        emulate_2op_SrcV("add", src, dst, _regs.eflags);
         break;
 
     case 0x08 ... 0x0d: or:  /* or */
-        emulate_2op_SrcV("or", src, dst, _regs._eflags);
+        emulate_2op_SrcV("or", src, dst, _regs.eflags);
         break;
 
     case 0x10 ... 0x15: adc: /* adc */
-        emulate_2op_SrcV("adc", src, dst, _regs._eflags);
+        emulate_2op_SrcV("adc", src, dst, _regs.eflags);
         break;
 
     case 0x18 ... 0x1d: sbb: /* sbb */
-        emulate_2op_SrcV("sbb", src, dst, _regs._eflags);
+        emulate_2op_SrcV("sbb", src, dst, _regs.eflags);
         break;
 
     case 0x20 ... 0x25: and: /* and */
-        emulate_2op_SrcV("and", src, dst, _regs._eflags);
+        emulate_2op_SrcV("and", src, dst, _regs.eflags);
         break;
 
     case 0x28 ... 0x2d: sub: /* sub */
-        emulate_2op_SrcV("sub", src, dst, _regs._eflags);
+        emulate_2op_SrcV("sub", src, dst, _regs.eflags);
         break;
 
     case 0x30 ... 0x35: xor: /* xor */
-        emulate_2op_SrcV("xor", src, dst, _regs._eflags);
+        emulate_2op_SrcV("xor", src, dst, _regs.eflags);
         break;
 
     case 0x38 ... 0x3d: cmp: /* cmp */
         generate_exception_if(lock_prefix, EXC_UD);
-        emulate_2op_SrcV("cmp", src, dst, _regs._eflags);
+        emulate_2op_SrcV("cmp", src, dst, _regs.eflags);
         dst.type = OP_NONE;
         break;
 
@@ -3284,36 +3284,36 @@ x86_emulate(
     case 0x27: /* daa */
     case 0x2f: /* das */ {
         uint8_t al = _regs.al;
-        unsigned int eflags = _regs._eflags;
+        unsigned int eflags = _regs.eflags;
 
-        _regs._eflags &= ~(X86_EFLAGS_CF | X86_EFLAGS_AF | X86_EFLAGS_SF |
-                           X86_EFLAGS_ZF | X86_EFLAGS_PF);
+        _regs.eflags &= ~(X86_EFLAGS_CF | X86_EFLAGS_AF | X86_EFLAGS_SF |
+                          X86_EFLAGS_ZF | X86_EFLAGS_PF);
         if ( ((al & 0x0f) > 9) || (eflags & X86_EFLAGS_AF) )
         {
-            _regs._eflags |= X86_EFLAGS_AF;
+            _regs.eflags |= X86_EFLAGS_AF;
             if ( b == 0x2f && (al < 6 || (eflags & X86_EFLAGS_CF)) )
-                _regs._eflags |= X86_EFLAGS_CF;
+                _regs.eflags |= X86_EFLAGS_CF;
             _regs.al += (b == 0x27) ? 6 : -6;
         }
         if ( (al > 0x99) || (eflags & X86_EFLAGS_CF) )
         {
             _regs.al += (b == 0x27) ? 0x60 : -0x60;
-            _regs._eflags |= X86_EFLAGS_CF;
+            _regs.eflags |= X86_EFLAGS_CF;
         }
-        _regs._eflags |= !_regs.al ? X86_EFLAGS_ZF : 0;
-        _regs._eflags |= ((int8_t)_regs.al < 0) ? X86_EFLAGS_SF : 0;
-        _regs._eflags |= even_parity(_regs.al) ? X86_EFLAGS_PF : 0;
+        _regs.eflags |= !_regs.al ? X86_EFLAGS_ZF : 0;
+        _regs.eflags |= ((int8_t)_regs.al < 0) ? X86_EFLAGS_SF : 0;
+        _regs.eflags |= even_parity(_regs.al) ? X86_EFLAGS_PF : 0;
         break;
     }
 
     case 0x37: /* aaa */
     case 0x3f: /* aas */
-        _regs._eflags &= ~X86_EFLAGS_CF;
-        if ( (_regs.al > 9) || (_regs._eflags & X86_EFLAGS_AF) )
+        _regs.eflags &= ~X86_EFLAGS_CF;
+        if ( (_regs.al > 9) || (_regs.eflags & X86_EFLAGS_AF) )
         {
             _regs.al += (b == 0x37) ? 6 : -6;
             _regs.ah += (b == 0x37) ? 1 : -1;
-            _regs._eflags |= X86_EFLAGS_CF | X86_EFLAGS_AF;
+            _regs.eflags |= X86_EFLAGS_CF | X86_EFLAGS_AF;
         }
         _regs.al &= 0x0f;
         break;
@@ -3324,9 +3324,9 @@ x86_emulate(
         dst.bytes = op_bytes;
         dst.val   = *dst.reg;
         if ( b & 8 )
-            emulate_1op("dec", dst, _regs._eflags);
+            emulate_1op("dec", dst, _regs.eflags);
         else
-            emulate_1op("inc", dst, _regs._eflags);
+            emulate_1op("inc", dst, _regs.eflags);
         break;
 
     case 0x50 ... 0x57: /* push reg */
@@ -3349,8 +3349,8 @@ x86_emulate(
     case 0x60: /* pusha */ {
         int i;
         unsigned int regs[] = {
-            _regs._eax, _regs._ecx, _regs._edx, _regs._ebx,
-            _regs._esp, _regs._ebp, _regs._esi, _regs._edi };
+            _regs.eax, _regs.ecx, _regs.edx, _regs.ebx,
+            _regs.esp, _regs.ebp, _regs.esi, _regs.edi };
 
         fail_if(!ops->write);
         for ( i = 0; i < 8; i++ )
@@ -3363,8 +3363,8 @@ x86_emulate(
     case 0x61: /* popa */ {
         int i;
         unsigned int dummy_esp, *regs[] = {
-            &_regs._edi, &_regs._esi, &_regs._ebp, &dummy_esp,
-            &_regs._ebx, &_regs._edx, &_regs._ecx, &_regs._eax };
+            &_regs.edi, &_regs.esi, &_regs.ebp, &dummy_esp,
+            &_regs.ebx, &_regs.edx, &_regs.ecx, &_regs.eax };
 
         for ( i = 0; i < 8; i++ )
         {
@@ -3419,12 +3419,12 @@ x86_emulate(
                 goto done;
             if ( src_rpl > (dst.val & 3) )
             {
-                _regs._eflags |= X86_EFLAGS_ZF;
+                _regs.eflags |= X86_EFLAGS_ZF;
                 dst.val = (dst.val & ~3) | src_rpl;
             }
             else
             {
-                _regs._eflags &= ~X86_EFLAGS_ZF;
+                _regs.eflags &= ~X86_EFLAGS_ZF;
                 dst.type = OP_NONE;
             }
             generate_exception_if(!in_protmode(ctxt, ops), EXC_UD);
@@ -3536,7 +3536,7 @@ x86_emulate(
     }
 
     case 0x70 ... 0x7f: /* jcc (short) */
-        if ( test_cc(b, _regs._eflags) )
+        if ( test_cc(b, _regs.eflags) )
             jmp_rel((int32_t)src.val);
         adjust_bnd(ctxt, ops, vex.pfx);
         break;
@@ -3557,7 +3557,7 @@ x86_emulate(
 
     case 0xa8 ... 0xa9: /* test imm,%%eax */
     case 0x84 ... 0x85: test: /* test */
-        emulate_2op_SrcV("test", src, dst, _regs._eflags);
+        emulate_2op_SrcV("test", src, dst, _regs.eflags);
         dst.type = OP_NONE;
         break;
 
@@ -3655,7 +3655,7 @@ x86_emulate(
         {
         case 2: _regs.ax = (int8_t)_regs.al; break; /* cbw */
         case 4: _regs.r(ax) = (uint32_t)(int16_t)_regs.ax; break; /* cwde */
-        case 8: _regs.r(ax) = (int32_t)_regs._eax; break; /* cdqe */
+        case 8: _regs.r(ax) = (int32_t)_regs.eax; break; /* cdqe */
         }
         break;
 
@@ -3663,7 +3663,7 @@ x86_emulate(
         switch ( op_bytes )
         {
         case 2: _regs.dx = -((int16_t)_regs.ax < 0); break;
-        case 4: _regs.r(dx) = (uint32_t)-((int32_t)_regs._eax < 0); break;
+        case 4: _regs.r(dx) = (uint32_t)-((int32_t)_regs.eax < 0); break;
 #ifdef __x86_64__
         case 8: _regs.rdx = -((int64_t)_regs.rax < 0); break;
 #endif
@@ -3687,7 +3687,7 @@ x86_emulate(
             goto done;
 
         _regs.r(ip) = imm1;
-        singlestep = _regs._eflags & X86_EFLAGS_TF;
+        singlestep = _regs.eflags & X86_EFLAGS_TF;
         break;
 
     case 0x9b:  /* wait/fwait */
@@ -3699,8 +3699,8 @@ x86_emulate(
         break;
 
     case 0x9c: /* pushf */
-        if ( (_regs._eflags & X86_EFLAGS_VM) &&
-             MASK_EXTR(_regs._eflags, X86_EFLAGS_IOPL) != 3 )
+        if ( (_regs.eflags & X86_EFLAGS_VM) &&
+             MASK_EXTR(_regs.eflags, X86_EFLAGS_IOPL) != 3 )
         {
             cr4 = 0;
             if ( op_bytes == 2 && ops->read_cr )
@@ -3711,7 +3711,7 @@ x86_emulate(
             }
             generate_exception_if(!(cr4 & X86_CR4_VME), EXC_GP, 0);
             src.val = (_regs.flags & ~X86_EFLAGS_IF) | X86_EFLAGS_IOPL;
-            if ( _regs._eflags & X86_EFLAGS_VIF )
+            if ( _regs.eflags & X86_EFLAGS_VIF )
                 src.val |= X86_EFLAGS_IF;
         }
         else
@@ -3724,7 +3724,7 @@ x86_emulate(
         cr4 = 0;
         if ( !mode_ring0() )
         {
-            if ( _regs._eflags & X86_EFLAGS_VM )
+            if ( _regs.eflags & X86_EFLAGS_VM )
             {
                 if ( op_bytes == 2 && ops->read_cr )
                 {
@@ -3733,7 +3733,7 @@ x86_emulate(
                         goto done;
                 }
                 generate_exception_if(!(cr4 & X86_CR4_VME) &&
-                                      MASK_EXTR(_regs._eflags, X86_EFLAGS_IOPL) != 3,
+                                      MASK_EXTR(_regs.eflags, X86_EFLAGS_IOPL) != 3,
                                       EXC_GP, 0);
             }
             mask |= X86_EFLAGS_IOPL;
@@ -3748,12 +3748,12 @@ x86_emulate(
             goto done;
         if ( op_bytes == 2 )
         {
-            dst.val = (uint16_t)dst.val | (_regs._eflags & 0xffff0000u);
+            dst.val = (uint16_t)dst.val | (_regs.eflags & 0xffff0000u);
             if ( cr4 & X86_CR4_VME )
             {
                 if ( dst.val & X86_EFLAGS_IF )
                 {
-                    generate_exception_if(_regs._eflags & X86_EFLAGS_VIP,
+                    generate_exception_if(_regs.eflags & X86_EFLAGS_VIP,
                                           EXC_GP, 0);
                     dst.val |= X86_EFLAGS_VIF;
                 }
@@ -3763,21 +3763,21 @@ x86_emulate(
             }
         }
         dst.val &= EFLAGS_MODIFIABLE;
-        _regs._eflags &= mask;
-        _regs._eflags |= (dst.val & ~mask) | X86_EFLAGS_MBS;
+        _regs.eflags &= mask;
+        _regs.eflags |= (dst.val & ~mask) | X86_EFLAGS_MBS;
         break;
     }
 
     case 0x9e: /* sahf */
         if ( mode_64bit() )
             vcpu_must_have(lahf_lm);
-        *(uint8_t *)&_regs._eflags = (_regs.ah & EFLAGS_MASK) | X86_EFLAGS_MBS;
+        *(uint8_t *)&_regs.eflags = (_regs.ah & EFLAGS_MASK) | X86_EFLAGS_MBS;
         break;
 
     case 0x9f: /* lahf */
         if ( mode_64bit() )
             vcpu_must_have(lahf_lm);
-        _regs.ah = (_regs._eflags & EFLAGS_MASK) | X86_EFLAGS_MBS;
+        _regs.ah = (_regs.eflags & EFLAGS_MASK) | X86_EFLAGS_MBS;
         break;
 
     case 0xa4 ... 0xa5: /* movs */ {
@@ -3820,9 +3820,9 @@ x86_emulate(
         register_address_adjust(_regs.r(di), src.bytes);
         put_rep_prefix(1);
         /* cmp: dst - src ==> src=*%%edi,dst=*%%esi ==> *%%esi - *%%edi */
-        emulate_2op_SrcV("cmp", src, dst, _regs._eflags);
-        if ( (repe_prefix() && !(_regs._eflags & X86_EFLAGS_ZF)) ||
-             (repne_prefix() && (_regs._eflags & X86_EFLAGS_ZF)) )
+        emulate_2op_SrcV("cmp", src, dst, _regs.eflags);
+        if ( (repe_prefix() && !(_regs.eflags & X86_EFLAGS_ZF)) ||
+             (repne_prefix() && (_regs.eflags & X86_EFLAGS_ZF)) )
             _regs.r(ip) = next_eip;
         break;
     }
@@ -3870,9 +3870,9 @@ x86_emulate(
         put_rep_prefix(1);
         /* cmp: %%eax - *%%edi ==> src=%%eax,dst=*%%edi ==> src - dst */
         dst.bytes = src.bytes;
-        emulate_2op_SrcV("cmp", dst, src, _regs._eflags);
-        if ( (repe_prefix() && !(_regs._eflags & X86_EFLAGS_ZF)) ||
-             (repne_prefix() && (_regs._eflags & X86_EFLAGS_ZF)) )
+        emulate_2op_SrcV("cmp", dst, src, _regs.eflags);
+        if ( (repe_prefix() && !(_regs.eflags & X86_EFLAGS_ZF)) ||
+             (repne_prefix() && (_regs.eflags & X86_EFLAGS_ZF)) )
             _regs.r(ip) = next_eip;
         break;
     }
@@ -3893,26 +3893,26 @@ x86_emulate(
         switch ( modrm_reg & 7 )
         {
         case 0: /* rol */
-            emulate_2op_SrcB("rol", src, dst, _regs._eflags);
+            emulate_2op_SrcB("rol", src, dst, _regs.eflags);
             break;
         case 1: /* ror */
-            emulate_2op_SrcB("ror", src, dst, _regs._eflags);
+            emulate_2op_SrcB("ror", src, dst, _regs.eflags);
             break;
         case 2: /* rcl */
-            emulate_2op_SrcB("rcl", src, dst, _regs._eflags);
+            emulate_2op_SrcB("rcl", src, dst, _regs.eflags);
             break;
         case 3: /* rcr */
-            emulate_2op_SrcB("rcr", src, dst, _regs._eflags);
+            emulate_2op_SrcB("rcr", src, dst, _regs.eflags);
             break;
         case 4: /* sal/shl */
         case 6: /* sal/shl */
-            emulate_2op_SrcB("sal", src, dst, _regs._eflags);
+            emulate_2op_SrcB("sal", src, dst, _regs.eflags);
             break;
         case 5: /* shr */
-            emulate_2op_SrcB("shr", src, dst, _regs._eflags);
+            emulate_2op_SrcB("shr", src, dst, _regs.eflags);
             break;
         case 7: /* sar */
-            emulate_2op_SrcB("sar", src, dst, _regs._eflags);
+            emulate_2op_SrcB("sar", src, dst, _regs.eflags);
             break;
         }
         break;
@@ -3982,7 +3982,7 @@ x86_emulate(
         if ( dst.bytes == 2 )
             _regs.sp = _regs.bp;
         else
-            _regs.r(sp) = dst.bytes == 4 ? _regs._ebp : _regs.r(bp);
+            _regs.r(sp) = dst.bytes == 4 ? _regs.ebp : _regs.r(bp);
 
         /* Second writeback, to %%ebp. */
         dst.type = OP_REG;
@@ -4017,7 +4017,7 @@ x86_emulate(
         goto done;
 
     case 0xce: /* into */
-        if ( !(_regs._eflags & X86_EFLAGS_OF) )
+        if ( !(_regs.eflags & X86_EFLAGS_OF) )
             break;
         src.val = EXC_OF;
         swint_type = x86_swint_into;
@@ -4036,10 +4036,10 @@ x86_emulate(
                               &eflags, op_bytes, ctxt, ops)) )
             goto done;
         if ( op_bytes == 2 )
-            eflags = (uint16_t)eflags | (_regs._eflags & 0xffff0000u);
+            eflags = (uint16_t)eflags | (_regs.eflags & 0xffff0000u);
         eflags &= EFLAGS_MODIFIABLE;
-        _regs._eflags &= mask;
-        _regs._eflags |= (eflags & ~mask) | X86_EFLAGS_MBS;
+        _regs.eflags &= mask;
+        _regs.eflags |= (eflags & ~mask) | X86_EFLAGS_MBS;
         if ( (rc = load_seg(x86_seg_cs, sel, 1, &cs, ctxt, ops)) ||
              (rc = commit_far_branch(&cs, (uint32_t)eip)) )
             goto done;
@@ -4071,15 +4071,15 @@ x86_emulate(
             generate_exception_if(!base, EXC_DE);
             _regs.ax = ((al / base) << 8) | (al % base);
         }
-        _regs._eflags &= ~(X86_EFLAGS_SF | X86_EFLAGS_ZF | X86_EFLAGS_PF);
-        _regs._eflags |= !_regs.al ? X86_EFLAGS_ZF : 0;
-        _regs._eflags |= ((int8_t)_regs.al < 0) ? X86_EFLAGS_SF : 0;
-        _regs._eflags |= even_parity(_regs.al) ? X86_EFLAGS_PF : 0;
+        _regs.eflags &= ~(X86_EFLAGS_SF | X86_EFLAGS_ZF | X86_EFLAGS_PF);
+        _regs.eflags |= !_regs.al ? X86_EFLAGS_ZF : 0;
+        _regs.eflags |= ((int8_t)_regs.al < 0) ? X86_EFLAGS_SF : 0;
+        _regs.eflags |= even_parity(_regs.al) ? X86_EFLAGS_PF : 0;
         break;
     }
 
     case 0xd6: /* salc */
-        _regs.al = (_regs._eflags & X86_EFLAGS_CF) ? 0xff : 0x00;
+        _regs.al = (_regs.eflags & X86_EFLAGS_CF) ? 0xff : 0x00;
         break;
 
     case 0xd7: /* xlat */ {
@@ -4597,7 +4597,7 @@ x86_emulate(
 
     case 0xe0 ... 0xe2: /* loop{,z,nz} */ {
         unsigned long count = get_loop_count(&_regs, ad_bytes);
-        int do_jmp = !(_regs._eflags & X86_EFLAGS_ZF); /* loopnz */
+        int do_jmp = !(_regs.eflags & X86_EFLAGS_ZF); /* loopnz */
 
         if ( b == 0xe1 )
             do_jmp = !do_jmp; /* loopz */
@@ -4631,7 +4631,7 @@ x86_emulate(
         {
             /* out */
             fail_if(ops->write_io == NULL);
-            rc = ops->write_io(port, op_bytes, _regs._eax, ctxt);
+            rc = ops->write_io(port, op_bytes, _regs.eax, ctxt);
         }
         else
         {
@@ -4685,7 +4685,7 @@ x86_emulate(
         break;
 
     case 0xf5: /* cmc */
-        _regs._eflags ^= X86_EFLAGS_CF;
+        _regs.eflags ^= X86_EFLAGS_CF;
         break;
 
     case 0xf6 ... 0xf7: /* Grp3 */
@@ -4702,32 +4702,32 @@ x86_emulate(
             dst.val = ~dst.val;
             break;
         case 3: /* neg */
-            emulate_1op("neg", dst, _regs._eflags);
+            emulate_1op("neg", dst, _regs.eflags);
             break;
         case 4: /* mul */
-            _regs._eflags &= ~(X86_EFLAGS_OF | X86_EFLAGS_CF);
+            _regs.eflags &= ~(X86_EFLAGS_OF | X86_EFLAGS_CF);
             switch ( dst.bytes )
             {
             case 1:
                 dst.val = _regs.al;
                 dst.val *= src.val;
                 if ( (uint8_t)dst.val != (uint16_t)dst.val )
-                    _regs._eflags |= X86_EFLAGS_OF | X86_EFLAGS_CF;
+                    _regs.eflags |= X86_EFLAGS_OF | X86_EFLAGS_CF;
                 dst.bytes = 2;
                 break;
             case 2:
                 dst.val = _regs.ax;
                 dst.val *= src.val;
                 if ( (uint16_t)dst.val != (uint32_t)dst.val )
-                    _regs._eflags |= X86_EFLAGS_OF | X86_EFLAGS_CF;
+                    _regs.eflags |= X86_EFLAGS_OF | X86_EFLAGS_CF;
                 _regs.dx = dst.val >> 16;
                 break;
 #ifdef __x86_64__
             case 4:
-                dst.val = _regs._eax;
+                dst.val = _regs.eax;
                 dst.val *= src.val;
                 if ( (uint32_t)dst.val != dst.val )
-                    _regs._eflags |= X86_EFLAGS_OF | X86_EFLAGS_CF;
+                    _regs.eflags |= X86_EFLAGS_OF | X86_EFLAGS_CF;
                 _regs.rdx = dst.val >> 32;
                 break;
 #endif
@@ -4735,7 +4735,7 @@ x86_emulate(
                 u[0] = src.val;
                 u[1] = _regs.r(ax);
                 if ( mul_dbl(u) )
-                    _regs._eflags |= X86_EFLAGS_OF | X86_EFLAGS_CF;
+                    _regs.eflags |= X86_EFLAGS_OF | X86_EFLAGS_CF;
                 _regs.r(dx) = u[1];
                 dst.val = u[0];
                 break;
@@ -4743,13 +4743,13 @@ x86_emulate(
             break;
         case 5: /* imul */
         imul:
-            _regs._eflags &= ~(X86_EFLAGS_OF | X86_EFLAGS_CF);
+            _regs.eflags &= ~(X86_EFLAGS_OF | X86_EFLAGS_CF);
             switch ( dst.bytes )
             {
             case 1:
                 dst.val = (int8_t)src.val * (int8_t)_regs.al;
                 if ( (int8_t)dst.val != (int16_t)dst.val )
-                    _regs._eflags |= X86_EFLAGS_OF | X86_EFLAGS_CF;
+                    _regs.eflags |= X86_EFLAGS_OF | X86_EFLAGS_CF;
                 ASSERT(b > 0x6b);
                 dst.bytes = 2;
                 break;
@@ -4757,16 +4757,16 @@ x86_emulate(
                 dst.val = ((uint32_t)(int16_t)src.val *
                            (uint32_t)(int16_t)_regs.ax);
                 if ( (int16_t)dst.val != (int32_t)dst.val )
-                    _regs._eflags |= X86_EFLAGS_OF | X86_EFLAGS_CF;
+                    _regs.eflags |= X86_EFLAGS_OF | X86_EFLAGS_CF;
                 if ( b > 0x6b )
                     _regs.dx = dst.val >> 16;
                 break;
 #ifdef __x86_64__
             case 4:
                 dst.val = ((uint64_t)(int32_t)src.val *
-                           (uint64_t)(int32_t)_regs._eax);
+                           (uint64_t)(int32_t)_regs.eax);
                 if ( (int32_t)dst.val != dst.val )
-                    _regs._eflags |= X86_EFLAGS_OF | X86_EFLAGS_CF;
+                    _regs.eflags |= X86_EFLAGS_OF | X86_EFLAGS_CF;
                 if ( b > 0x6b )
                     _regs.rdx = dst.val >> 32;
                 break;
@@ -4775,7 +4775,7 @@ x86_emulate(
                 u[0] = src.val;
                 u[1] = _regs.r(ax);
                 if ( imul_dbl(u) )
-                    _regs._eflags |= X86_EFLAGS_OF | X86_EFLAGS_CF;
+                    _regs.eflags |= X86_EFLAGS_OF | X86_EFLAGS_CF;
                 if ( b > 0x6b )
                     _regs.r(dx) = u[1];
                 dst.val = u[0];
@@ -4796,7 +4796,7 @@ x86_emulate(
                 _regs.ah = u[1];
                 break;
             case 2:
-                u[0] = (_regs._edx << 16) | _regs.ax;
+                u[0] = (_regs.edx << 16) | _regs.ax;
                 u[1] = 0;
                 v    = (uint16_t)src.val;
                 generate_exception_if(
@@ -4807,7 +4807,7 @@ x86_emulate(
                 break;
 #ifdef __x86_64__
             case 4:
-                u[0] = (_regs.rdx << 32) | _regs._eax;
+                u[0] = (_regs.rdx << 32) | _regs.eax;
                 u[1] = 0;
                 v    = (uint32_t)src.val;
                 generate_exception_if(
@@ -4841,7 +4841,7 @@ x86_emulate(
                 _regs.ah = u[1];
                 break;
             case 2:
-                u[0] = (int32_t)((_regs._edx << 16) | _regs.ax);
+                u[0] = (int32_t)((_regs.edx << 16) | _regs.ax);
                 u[1] = ((long)u[0] < 0) ? ~0UL : 0UL;
                 v    = (int16_t)src.val;
                 generate_exception_if(
@@ -4852,7 +4852,7 @@ x86_emulate(
                 break;
 #ifdef __x86_64__
             case 4:
-                u[0] = (_regs.rdx << 32) | _regs._eax;
+                u[0] = (_regs.rdx << 32) | _regs.eax;
                 u[1] = ((long)u[0] < 0) ? ~0UL : 0UL;
                 v    = (int32_t)src.val;
                 generate_exception_if(
@@ -4876,47 +4876,47 @@ x86_emulate(
         break;
 
     case 0xf8: /* clc */
-        _regs._eflags &= ~X86_EFLAGS_CF;
+        _regs.eflags &= ~X86_EFLAGS_CF;
         break;
 
     case 0xf9: /* stc */
-        _regs._eflags |= X86_EFLAGS_CF;
+        _regs.eflags |= X86_EFLAGS_CF;
         break;
 
     case 0xfa: /* cli */
         if ( mode_iopl() )
-            _regs._eflags &= ~X86_EFLAGS_IF;
+            _regs.eflags &= ~X86_EFLAGS_IF;
         else
         {
             generate_exception_if(!mode_vif(), EXC_GP, 0);
-            _regs._eflags &= ~X86_EFLAGS_VIF;
+            _regs.eflags &= ~X86_EFLAGS_VIF;
         }
         break;
 
     case 0xfb: /* sti */
         if ( mode_iopl() )
         {
-            if ( !(_regs._eflags & X86_EFLAGS_IF) )
+            if ( !(_regs.eflags & X86_EFLAGS_IF) )
                 ctxt->retire.sti = true;
-            _regs._eflags |= X86_EFLAGS_IF;
+            _regs.eflags |= X86_EFLAGS_IF;
         }
         else
         {
-            generate_exception_if((_regs._eflags & X86_EFLAGS_VIP) ||
+            generate_exception_if((_regs.eflags & X86_EFLAGS_VIP) ||
 				  !mode_vif(),
                                   EXC_GP, 0);
-            if ( !(_regs._eflags & X86_EFLAGS_VIF) )
+            if ( !(_regs.eflags & X86_EFLAGS_VIF) )
                 ctxt->retire.sti = true;
-            _regs._eflags |= X86_EFLAGS_VIF;
+            _regs.eflags |= X86_EFLAGS_VIF;
         }
         break;
 
     case 0xfc: /* cld */
-        _regs._eflags &= ~X86_EFLAGS_DF;
+        _regs.eflags &= ~X86_EFLAGS_DF;
         break;
 
     case 0xfd: /* std */
-        _regs._eflags |= X86_EFLAGS_DF;
+        _regs.eflags |= X86_EFLAGS_DF;
         break;
 
     case 0xfe: /* Grp4 */
@@ -4926,10 +4926,10 @@ x86_emulate(
         switch ( modrm_reg & 7 )
         {
         case 0: /* inc */
-            emulate_1op("inc", dst, _regs._eflags);
+            emulate_1op("inc", dst, _regs.eflags);
             break;
         case 1: /* dec */
-            emulate_1op("dec", dst, _regs._eflags);
+            emulate_1op("dec", dst, _regs.eflags);
             break;
         case 2: /* call (near) */
             dst.val = _regs.r(ip);
@@ -4978,7 +4978,7 @@ x86_emulate(
                 goto done;
             break;
         case 4: /* verr / verw */
-            _regs._eflags &= ~X86_EFLAGS_ZF;
+            _regs.eflags &= ~X86_EFLAGS_ZF;
             switch ( rc = protmode_load_seg(x86_seg_none, src.val, false,
                                             &sreg, ctxt, ops) )
             {
@@ -4986,7 +4986,7 @@ x86_emulate(
                 if ( sreg.attr.fields.s &&
                      ((modrm_reg & 1) ? ((sreg.attr.fields.type & 0xa) == 0x2)
                                       : ((sreg.attr.fields.type & 0xa) != 0x8)) )
-                    _regs._eflags |= X86_EFLAGS_ZF;
+                    _regs.eflags |= X86_EFLAGS_ZF;
                 break;
             case X86EMUL_EXCEPTION:
                 if ( ctxt->event_pending )
@@ -5016,9 +5016,9 @@ x86_emulate(
             vcpu_must_have(smap);
             generate_exception_if(vex.pfx || !mode_ring0(), EXC_UD);
 
-            _regs._eflags &= ~X86_EFLAGS_AC;
+            _regs.eflags &= ~X86_EFLAGS_AC;
             if ( modrm == 0xcb )
-                _regs._eflags |= X86_EFLAGS_AC;
+                _regs.eflags |= X86_EFLAGS_AC;
             goto complete_insn;
 
 #ifdef __XEN__
@@ -5028,8 +5028,8 @@ x86_emulate(
                 cr4 = 0;
             generate_exception_if(!(cr4 & X86_CR4_OSXSAVE), EXC_UD);
             generate_exception_if(!mode_ring0() ||
-                                  handle_xsetbv(_regs._ecx,
-                                                _regs._eax | (_regs.rdx << 32)),
+                                  handle_xsetbv(_regs.ecx,
+                                                _regs.eax | (_regs.rdx << 32)),
                                   EXC_GP, 0);
             goto complete_insn;
 #endif
@@ -5052,7 +5052,7 @@ x86_emulate(
             generate_exception_if(!vcpu_has_rtm() && !vcpu_has_hle(),
                                   EXC_UD);
             /* Neither HLE nor RTM can be active when we get here. */
-            _regs._eflags |= X86_EFLAGS_ZF;
+            _regs.eflags |= X86_EFLAGS_ZF;
             goto complete_insn;
 
         case 0xdf: /* invlpga */
@@ -5077,7 +5077,7 @@ x86_emulate(
             unsigned long zero = 0;
 
             base = ad_bytes == 8 ? _regs.r(ax) :
-                   ad_bytes == 4 ? _regs._eax : _regs.ax;
+                   ad_bytes == 4 ? _regs.eax : _regs.ax;
             limit = 0;
             if ( vcpu_has_clflush() &&
                  ops->cpuid(1, 0, &cpuid_leaf, ctxt) == X86EMUL_OKAY )
@@ -5201,7 +5201,7 @@ x86_emulate(
 
     case X86EMUL_OPC(0x0f, 0x02): /* lar */
         generate_exception_if(!in_protmode(ctxt, ops), EXC_UD);
-        _regs._eflags &= ~X86_EFLAGS_ZF;
+        _regs.eflags &= ~X86_EFLAGS_ZF;
         switch ( rc = protmode_load_seg(x86_seg_none, src.val, false, &sreg,
                                         ctxt, ops) )
         {
@@ -5221,12 +5221,12 @@ x86_emulate(
                 case 0x09: /* available 32/64-bit TSS */
                 case 0x0b: /* busy 32/64-bit TSS */
                 case 0x0c: /* 32/64-bit call gate */
-                    _regs._eflags |= X86_EFLAGS_ZF;
+                    _regs.eflags |= X86_EFLAGS_ZF;
                     break;
                 }
             }
             else
-                _regs._eflags |= X86_EFLAGS_ZF;
+                _regs.eflags |= X86_EFLAGS_ZF;
             break;
         case X86EMUL_EXCEPTION:
             if ( ctxt->event_pending )
@@ -5239,7 +5239,7 @@ x86_emulate(
             rc = X86EMUL_OKAY;
             break;
         }
-        if ( _regs._eflags & X86_EFLAGS_ZF )
+        if ( _regs.eflags & X86_EFLAGS_ZF )
             dst.val = ((sreg.attr.bytes & 0xff) << 8) |
                       ((sreg.limit >> (sreg.attr.fields.g ? 12 : 0)) &
                        0xf0000) |
@@ -5250,7 +5250,7 @@ x86_emulate(
 
     case X86EMUL_OPC(0x0f, 0x03): /* lsl */
         generate_exception_if(!in_protmode(ctxt, ops), EXC_UD);
-        _regs._eflags &= ~X86_EFLAGS_ZF;
+        _regs.eflags &= ~X86_EFLAGS_ZF;
         switch ( rc = protmode_load_seg(x86_seg_none, src.val, false, &sreg,
                                         ctxt, ops) )
         {
@@ -5267,12 +5267,12 @@ x86_emulate(
                 case 0x02: /* LDT */
                 case 0x09: /* available 32/64-bit TSS */
                 case 0x0b: /* busy 32/64-bit TSS */
-                    _regs._eflags |= X86_EFLAGS_ZF;
+                    _regs.eflags |= X86_EFLAGS_ZF;
                     break;
                 }
             }
             else
-                _regs._eflags |= X86_EFLAGS_ZF;
+                _regs.eflags |= X86_EFLAGS_ZF;
             break;
         case X86EMUL_EXCEPTION:
             if ( ctxt->event_pending )
@@ -5285,7 +5285,7 @@ x86_emulate(
             rc = X86EMUL_OKAY;
             break;
         }
-        if ( _regs._eflags & X86_EFLAGS_ZF )
+        if ( _regs.eflags & X86_EFLAGS_ZF )
             dst.val = sreg.limit;
         else
             dst.type = OP_NONE;
@@ -5319,7 +5319,7 @@ x86_emulate(
             cs.attr.bytes = 0xa9b; /* L+DB+P+S+Code */
 
             _regs.rcx = _regs.rip;
-            _regs.r11 = _regs._eflags & ~X86_EFLAGS_RF;
+            _regs.r11 = _regs.eflags & ~X86_EFLAGS_RF;
 
             if ( (rc = ops->read_msr(mode_64bit() ? MSR_LSTAR : MSR_CSTAR,
                                      &msr_val, ctxt)) != X86EMUL_OKAY )
@@ -5329,16 +5329,16 @@ x86_emulate(
             if ( (rc = ops->read_msr(MSR_SYSCALL_MASK,
                                      &msr_val, ctxt)) != X86EMUL_OKAY )
                 goto done;
-            _regs._eflags &= ~(msr_val | X86_EFLAGS_RF);
+            _regs.eflags &= ~(msr_val | X86_EFLAGS_RF);
         }
         else
 #endif
         {
             cs.attr.bytes = 0xc9b; /* G+DB+P+S+Code */
 
-            _regs.r(cx) = _regs._eip;
-            _regs._eip = msr_val;
-            _regs._eflags &= ~(X86_EFLAGS_VM | X86_EFLAGS_IF | X86_EFLAGS_RF);
+            _regs.r(cx) = _regs.eip;
+            _regs.eip = msr_val;
+            _regs.eflags &= ~(X86_EFLAGS_VM | X86_EFLAGS_IF | X86_EFLAGS_RF);
         }
 
         fail_if(ops->write_segment == NULL);
@@ -5361,7 +5361,7 @@ x86_emulate(
          * Their only mitigation is to use a task gate for handling
          * #DB (or to not use enable EFER.SCE to start with).
          */
-        singlestep = _regs._eflags & X86_EFLAGS_TF;
+        singlestep = _regs.eflags & X86_EFLAGS_TF;
         break;
 
     case X86EMUL_OPC(0x0f, 0x06): /* clts */
@@ -5714,8 +5714,8 @@ x86_emulate(
     case X86EMUL_OPC(0x0f, 0x30): /* wrmsr */
         generate_exception_if(!mode_ring0(), EXC_GP, 0);
         fail_if(ops->write_msr == NULL);
-        if ( (rc = ops->write_msr(_regs._ecx,
-                                  ((uint64_t)_regs.r(dx) << 32) | _regs._eax,
+        if ( (rc = ops->write_msr(_regs.ecx,
+                                  ((uint64_t)_regs.r(dx) << 32) | _regs.eax,
                                   ctxt)) != 0 )
             goto done;
         break;
@@ -5739,7 +5739,7 @@ x86_emulate(
     case X86EMUL_OPC(0x0f, 0x32): /* rdmsr */
         generate_exception_if(!mode_ring0(), EXC_GP, 0);
         fail_if(ops->read_msr == NULL);
-        if ( (rc = ops->read_msr(_regs._ecx, &msr_val, ctxt)) != X86EMUL_OKAY )
+        if ( (rc = ops->read_msr(_regs.ecx, &msr_val, ctxt)) != X86EMUL_OKAY )
             goto done;
         _regs.r(dx) = msr_val >> 32;
         _regs.r(ax) = (uint32_t)msr_val;
@@ -5747,7 +5747,7 @@ x86_emulate(
 
     case X86EMUL_OPC(0x0f, 0x40) ... X86EMUL_OPC(0x0f, 0x4f): /* cmovcc */
         vcpu_must_have(cmov);
-        if ( test_cc(b, _regs._eflags) )
+        if ( test_cc(b, _regs.eflags) )
             dst.val = src.val;
         break;
 
@@ -5768,7 +5768,7 @@ x86_emulate(
         if ( lm < 0 )
             goto cannot_emulate;
 
-        _regs._eflags &= ~(X86_EFLAGS_VM | X86_EFLAGS_IF | X86_EFLAGS_RF);
+        _regs.eflags &= ~(X86_EFLAGS_VM | X86_EFLAGS_IF | X86_EFLAGS_RF);
 
         cs.sel = msr_val & ~3; /* SELECTOR_RPL_MASK */
         cs.base = 0;   /* flat segment */
@@ -5796,7 +5796,7 @@ x86_emulate(
             goto done;
         _regs.r(sp) = lm ? msr_val : (uint32_t)msr_val;
 
-        singlestep = _regs._eflags & X86_EFLAGS_TF;
+        singlestep = _regs.eflags & X86_EFLAGS_TF;
         break;
     }
 
@@ -5833,10 +5833,10 @@ x86_emulate(
              (rc = ops->write_segment(x86_seg_ss, &sreg, ctxt)) != 0 )
             goto done;
 
-        _regs.r(ip) = op_bytes == 8 ? _regs.r(dx) : _regs._edx;
-        _regs.r(sp) = op_bytes == 8 ? _regs.r(cx) : _regs._ecx;
+        _regs.r(ip) = op_bytes == 8 ? _regs.r(dx) : _regs.edx;
+        _regs.r(sp) = op_bytes == 8 ? _regs.r(cx) : _regs.ecx;
 
-        singlestep = _regs._eflags & X86_EFLAGS_TF;
+        singlestep = _regs.eflags & X86_EFLAGS_TF;
         break;
 
     CASE_SIMD_PACKED_FP(, 0x0f, 0x50):     /* movmskp{s,d} xmm,reg */
@@ -6345,13 +6345,13 @@ x86_emulate(
         goto simd_0f_sse3_avx;
 
     case X86EMUL_OPC(0x0f, 0x80) ... X86EMUL_OPC(0x0f, 0x8f): /* jcc (near) */
-        if ( test_cc(b, _regs._eflags) )
+        if ( test_cc(b, _regs.eflags) )
             jmp_rel((int32_t)src.val);
         adjust_bnd(ctxt, ops, vex.pfx);
         break;
 
     case X86EMUL_OPC(0x0f, 0x90) ... X86EMUL_OPC(0x0f, 0x9f): /* setcc */
-        dst.val = test_cc(b, _regs._eflags);
+        dst.val = test_cc(b, _regs.eflags);
         break;
 
     case X86EMUL_OPC(0x0f, 0xa2): /* cpuid */
@@ -6373,7 +6373,7 @@ x86_emulate(
         generate_exception_if((msr_val & MSR_MISC_FEATURES_CPUID_FAULTING),
                               EXC_GP, 0); /* Faulting active? (Inc. CPL test) */
 
-        rc = ops->cpuid(_regs._eax, _regs._ecx, &cpuid_leaf, ctxt);
+        rc = ops->cpuid(_regs.eax, _regs.ecx, &cpuid_leaf, ctxt);
         if ( rc != X86EMUL_OKAY )
             goto done;
         _regs.r(ax) = cpuid_leaf.a;
@@ -6384,7 +6384,7 @@ x86_emulate(
 
     case X86EMUL_OPC(0x0f, 0xa3): bt: /* bt */
         generate_exception_if(lock_prefix, EXC_UD);
-        emulate_2op_SrcV_nobyte("bt", src, dst, _regs._eflags);
+        emulate_2op_SrcV_nobyte("bt", src, dst, _regs.eflags);
         dst.type = OP_NONE;
         break;
 
@@ -6415,20 +6415,20 @@ x86_emulate(
                    ((dst.orig_val << shift) |
                     ((src.val >> (width - shift)) & ((1ull << shift) - 1))));
         dst.val = truncate_word(dst.val, dst.bytes);
-        _regs._eflags &= ~(X86_EFLAGS_OF | X86_EFLAGS_SF | X86_EFLAGS_ZF |
-                           X86_EFLAGS_PF | X86_EFLAGS_CF);
+        _regs.eflags &= ~(X86_EFLAGS_OF | X86_EFLAGS_SF | X86_EFLAGS_ZF |
+                          X86_EFLAGS_PF | X86_EFLAGS_CF);
         if ( (dst.val >> ((b & 8) ? (shift - 1) : (width - shift))) & 1 )
-            _regs._eflags |= X86_EFLAGS_CF;
+            _regs.eflags |= X86_EFLAGS_CF;
         if ( ((dst.val ^ dst.orig_val) >> (width - 1)) & 1 )
-            _regs._eflags |= X86_EFLAGS_OF;
-        _regs._eflags |= ((dst.val >> (width - 1)) & 1) ? X86_EFLAGS_SF : 0;
-        _regs._eflags |= (dst.val == 0) ? X86_EFLAGS_ZF : 0;
-        _regs._eflags |= even_parity(dst.val) ? X86_EFLAGS_PF : 0;
+            _regs.eflags |= X86_EFLAGS_OF;
+        _regs.eflags |= ((dst.val >> (width - 1)) & 1) ? X86_EFLAGS_SF : 0;
+        _regs.eflags |= (dst.val == 0) ? X86_EFLAGS_ZF : 0;
+        _regs.eflags |= even_parity(dst.val) ? X86_EFLAGS_PF : 0;
         break;
     }
 
     case X86EMUL_OPC(0x0f, 0xab): bts: /* bts */
-        emulate_2op_SrcV_nobyte("bts", src, dst, _regs._eflags);
+        emulate_2op_SrcV_nobyte("bts", src, dst, _regs.eflags);
         break;
 
     case X86EMUL_OPC(0x0f, 0xae): case X86EMUL_OPC_66(0x0f, 0xae): /* Grp15 */
@@ -6545,7 +6545,7 @@ x86_emulate(
         break;
 
     case X86EMUL_OPC(0x0f, 0xaf): /* imul */
-        emulate_2op_SrcV_srcmem("imul", src, dst, _regs._eflags);
+        emulate_2op_SrcV_srcmem("imul", src, dst, _regs.eflags);
         break;
 
     case X86EMUL_OPC(0x0f, 0xb0): case X86EMUL_OPC(0x0f, 0xb1): /* cmpxchg */
@@ -6553,8 +6553,8 @@ x86_emulate(
         src.orig_val = src.val;
         src.val = _regs.r(ax);
         /* cmp: %%eax - dst ==> dst and src swapped for macro invocation */
-        emulate_2op_SrcV("cmp", dst, src, _regs._eflags);
-        if ( _regs._eflags & X86_EFLAGS_ZF )
+        emulate_2op_SrcV("cmp", dst, src, _regs.eflags);
+        if ( _regs.eflags & X86_EFLAGS_ZF )
         {
             /* Success: write back to memory. */
             dst.val = src.orig_val;
@@ -6574,7 +6574,7 @@ x86_emulate(
         goto les;
 
     case X86EMUL_OPC(0x0f, 0xb3): btr: /* btr */
-        emulate_2op_SrcV_nobyte("btr", src, dst, _regs._eflags);
+        emulate_2op_SrcV_nobyte("btr", src, dst, _regs.eflags);
         break;
 
     case X86EMUL_OPC(0x0f, 0xb6): /* movzx rm8,r{16,32,64} */
@@ -6591,9 +6591,9 @@ x86_emulate(
     case X86EMUL_OPC_F3(0x0f, 0xb8): /* popcnt r/m,r */
         host_and_vcpu_must_have(popcnt);
         asm ( "popcnt %1,%0" : "=r" (dst.val) : "rm" (src.val) );
-        _regs._eflags &= ~EFLAGS_MASK;
+        _regs.eflags &= ~EFLAGS_MASK;
         if ( !dst.val )
-            _regs._eflags |= X86_EFLAGS_ZF;
+            _regs.eflags |= X86_EFLAGS_ZF;
         break;
 
     case X86EMUL_OPC(0x0f, 0xba): /* Grp8 */
@@ -6608,7 +6608,7 @@ x86_emulate(
         break;
 
     case X86EMUL_OPC(0x0f, 0xbb): btc: /* btc */
-        emulate_2op_SrcV_nobyte("btc", src, dst, _regs._eflags);
+        emulate_2op_SrcV_nobyte("btc", src, dst, _regs.eflags);
         break;
 
     case X86EMUL_OPC(0x0f, 0xbc): /* bsf or tzcnt */
@@ -6618,21 +6618,21 @@ x86_emulate(
         asm ( "bsf %2,%0" ASM_FLAG_OUT(, "; setz %1")
               : "=r" (dst.val), ASM_FLAG_OUT("=@ccz", "=qm") (zf)
               : "rm" (src.val) );
-        _regs._eflags &= ~X86_EFLAGS_ZF;
+        _regs.eflags &= ~X86_EFLAGS_ZF;
         if ( (vex.pfx == vex_f3) && vcpu_has_bmi1() )
         {
-            _regs._eflags &= ~X86_EFLAGS_CF;
+            _regs.eflags &= ~X86_EFLAGS_CF;
             if ( zf )
             {
-                _regs._eflags |= X86_EFLAGS_CF;
+                _regs.eflags |= X86_EFLAGS_CF;
                 dst.val = op_bytes * 8;
             }
             else if ( !dst.val )
-                _regs._eflags |= X86_EFLAGS_ZF;
+                _regs.eflags |= X86_EFLAGS_ZF;
         }
         else if ( zf )
         {
-            _regs._eflags |= X86_EFLAGS_ZF;
+            _regs.eflags |= X86_EFLAGS_ZF;
             dst.type = OP_NONE;
         }
         break;
@@ -6645,25 +6645,25 @@ x86_emulate(
         asm ( "bsr %2,%0" ASM_FLAG_OUT(, "; setz %1")
               : "=r" (dst.val), ASM_FLAG_OUT("=@ccz", "=qm") (zf)
               : "rm" (src.val) );
-        _regs._eflags &= ~X86_EFLAGS_ZF;
+        _regs.eflags &= ~X86_EFLAGS_ZF;
         if ( (vex.pfx == vex_f3) && vcpu_has_lzcnt() )
         {
-            _regs._eflags &= ~X86_EFLAGS_CF;
+            _regs.eflags &= ~X86_EFLAGS_CF;
             if ( zf )
             {
-                _regs._eflags |= X86_EFLAGS_CF;
+                _regs.eflags |= X86_EFLAGS_CF;
                 dst.val = op_bytes * 8;
             }
             else
             {
                 dst.val = op_bytes * 8 - 1 - dst.val;
                 if ( !dst.val )
-                    _regs._eflags |= X86_EFLAGS_ZF;
+                    _regs.eflags |= X86_EFLAGS_ZF;
             }
         }
         else if ( zf )
         {
-            _regs._eflags |= X86_EFLAGS_ZF;
+            _regs.eflags |= X86_EFLAGS_ZF;
             dst.type = OP_NONE;
         }
         break;
@@ -6774,9 +6774,9 @@ x86_emulate(
                           : "=r" (dst.val), ASM_FLAG_OUT("=@ccc", "=qm") (carry) );
                     break;
                 }
-                _regs._eflags &= ~EFLAGS_MASK;
+                _regs.eflags &= ~EFLAGS_MASK;
                 if ( carry )
-                    _regs._eflags |= X86_EFLAGS_CF;
+                    _regs.eflags |= X86_EFLAGS_CF;
                 break;
 #endif
 
@@ -6815,9 +6815,9 @@ x86_emulate(
                           : "=r" (dst.val), ASM_FLAG_OUT("=@ccc", "=qm") (carry) );
                     break;
                 }
-                _regs._eflags &= ~EFLAGS_MASK;
+                _regs.eflags &= ~EFLAGS_MASK;
                 if ( carry )
-                    _regs._eflags |= X86_EFLAGS_CF;
+                    _regs.eflags |= X86_EFLAGS_CF;
                 break;
 #endif
             }
@@ -6852,8 +6852,8 @@ x86_emulate(
         /* Get expected value. */
         if ( !(rex_prefix & REX_W) )
         {
-            aux->u32[0] = _regs._eax;
-            aux->u32[1] = _regs._edx;
+            aux->u32[0] = _regs.eax;
+            aux->u32[1] = _regs.edx;
         }
         else
         {
@@ -6866,7 +6866,7 @@ x86_emulate(
             /* Expected != actual: store actual to rDX:rAX and clear ZF. */
             _regs.r(ax) = !(rex_prefix & REX_W) ? old->u32[0] : old->u64[0];
             _regs.r(dx) = !(rex_prefix & REX_W) ? old->u32[1] : old->u64[1];
-            _regs._eflags &= ~X86_EFLAGS_ZF;
+            _regs.eflags &= ~X86_EFLAGS_ZF;
         }
         else
         {
@@ -6876,8 +6876,8 @@ x86_emulate(
              */
             if ( !(rex_prefix & REX_W) )
             {
-                aux->u32[0] = _regs._ebx;
-                aux->u32[1] = _regs._ecx;
+                aux->u32[0] = _regs.ebx;
+                aux->u32[1] = _regs.ecx;
             }
             else
             {
@@ -6888,7 +6888,7 @@ x86_emulate(
             if ( (rc = ops->cmpxchg(ea.mem.seg, ea.mem.off, old, aux,
                                     op_bytes, ctxt)) != X86EMUL_OKAY )
                 goto done;
-            _regs._eflags |= X86_EFLAGS_ZF;
+            _regs.eflags |= X86_EFLAGS_ZF;
         }
         break;
     }
@@ -7360,7 +7360,7 @@ x86_emulate(
     case X86EMUL_OPC_F3(0x0f38, 0xf6): /* adox r/m,r */
     {
         unsigned int mask = rep_prefix() ? X86_EFLAGS_OF : X86_EFLAGS_CF;
-        unsigned int aux = _regs._eflags & mask ? ~0 : 0;
+        unsigned int aux = _regs.eflags & mask ? ~0 : 0;
         bool carry;
 
         vcpu_must_have(adx);
@@ -7383,9 +7383,9 @@ x86_emulate(
                     [aux] "+r" (aux)
                   : [src] "rm" (src.val) );
         if ( carry )
-            _regs._eflags |= mask;
+            _regs.eflags |= mask;
         else
-            _regs._eflags &= ~mask;
+            _regs.eflags &= ~mask;
         break;
     }
 
@@ -7398,7 +7398,7 @@ x86_emulate(
                             : "0" (src.val), "rm" (_regs.r(dx)) );
         else
             asm ( "mull %3" : "=a" (*ea.reg), "=d" (dst.val)
-                            : "0" ((uint32_t)src.val), "rm" (_regs._edx) );
+                            : "0" ((uint32_t)src.val), "rm" (_regs.edx) );
         break;
 
     case X86EMUL_OPC(0x0f3a, 0x0f):    /* palignr $imm8,mm/m64,mm */
@@ -7831,7 +7831,7 @@ x86_emulate(
  complete_insn: /* Commit shadow register state. */
     /* Zero the upper 32 bits of %rip if not in 64-bit mode. */
     if ( !mode_64bit() )
-        _regs.r(ip) = _regs._eip;
+        _regs.r(ip) = _regs.eip;
 
     /* Should a singlestep #DB be raised? */
     if ( rc == X86EMUL_OKAY && singlestep && !ctxt->retire.mov_ss )
@@ -7848,7 +7848,7 @@ x86_emulate(
         rc = X86EMUL_OKAY;
     }
 
-    ctxt->regs->_eflags &= ~X86_EFLAGS_RF;
+    ctxt->regs->eflags &= ~X86_EFLAGS_RF;
 
  done:
     _put_fpu();
