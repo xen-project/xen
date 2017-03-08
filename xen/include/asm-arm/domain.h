@@ -14,7 +14,7 @@
 struct hvm_domain
 {
     uint64_t              params[HVM_NR_PARAMS];
-}  __cacheline_aligned;
+};
 
 #ifdef CONFIG_ARM_64
 enum domain_type {
