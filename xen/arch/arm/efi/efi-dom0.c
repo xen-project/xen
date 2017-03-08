@@ -112,25 +112,24 @@ void __init acpi_create_efi_mmap_table(struct domain *d,
                                        const struct meminfo *mem,
                                        struct membank tbl_add[])
 {
-    EFI_MEMORY_DESCRIPTOR *memory_map;
-    unsigned int i, offset;
+    EFI_MEMORY_DESCRIPTOR *desc;
+    unsigned int i;
     u8 *base_ptr;
 
     base_ptr = d->arch.efi_acpi_table
                + acpi_get_table_offset(tbl_add, TBL_MMAP);
-    memory_map = (EFI_MEMORY_DESCRIPTOR *)base_ptr;
+    desc = (EFI_MEMORY_DESCRIPTOR *)base_ptr;
 
-    offset = 0;
-    for( i = 0; i < mem->nr_banks; i++, offset++ )
-        fill_efi_memory_descriptor(&memory_map[offset], EfiConventionalMemory,
+    for ( i = 0; i < mem->nr_banks; i++, desc++ )
+        fill_efi_memory_descriptor(desc, EfiConventionalMemory,
                                    mem->bank[i].start, mem->bank[i].size);
 
-    for( i = 0; i < acpi_mem.nr_banks; i++, offset++ )
-        fill_efi_memory_descriptor(&memory_map[offset], EfiACPIReclaimMemory,
+    for ( i = 0; i < acpi_mem.nr_banks; i++, desc++ )
+        fill_efi_memory_descriptor(desc, EfiACPIReclaimMemory,
                                    acpi_mem.bank[i].start,
                                    acpi_mem.bank[i].size);
 
-    fill_efi_memory_descriptor(&memory_map[offset], EfiACPIReclaimMemory,
+    fill_efi_memory_descriptor(desc, EfiACPIReclaimMemory,
                                d->arch.efi_acpi_gpa, d->arch.efi_acpi_len);
 
     tbl_add[TBL_MMAP].start = d->arch.efi_acpi_gpa
