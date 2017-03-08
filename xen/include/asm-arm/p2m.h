@@ -95,6 +95,9 @@ struct p2m_domain {
 
     /* back pointer to domain */
     struct domain *domain;
+
+    /* Keeping track on which CPU this p2m was used and for which vCPU */
+    uint8_t last_vcpu_ran[NR_CPUS];
 };
 
 /*
