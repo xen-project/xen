@@ -94,7 +94,7 @@ void pv_hypercall(struct cpu_user_regs *regs)
 
     ASSERT(guest_kernel_mode(curr, regs));
 
-    eax = is_pv_32bit_vcpu(curr) ? regs->_eax : regs->rax;
+    eax = is_pv_32bit_vcpu(curr) ? regs->eax : regs->rax;
 
     BUILD_BUG_ON(ARRAY_SIZE(pv_hypercall_table) >
                  ARRAY_SIZE(hypercall_args_table));
@@ -156,12 +156,12 @@ void pv_hypercall(struct cpu_user_regs *regs)
     }
     else
     {
-        unsigned int ebx = regs->_ebx;
-        unsigned int ecx = regs->_ecx;
-        unsigned int edx = regs->_edx;
-        unsigned int esi = regs->_esi;
-        unsigned int edi = regs->_edi;
-        unsigned int ebp = regs->_ebp;
+        unsigned int ebx = regs->ebx;
+        unsigned int ecx = regs->ecx;
+        unsigned int edx = regs->edx;
+        unsigned int esi = regs->esi;
+        unsigned int edi = regs->edi;
+        unsigned int ebp = regs->ebp;
 
 #ifndef NDEBUG
         /* Deliberately corrupt parameter regs not used by this hypercall. */
@@ -184,7 +184,7 @@ void pv_hypercall(struct cpu_user_regs *regs)
         }
 
         curr->hcall_compat = true;
-        regs->_eax = pv_hypercall_table[eax].compat(ebx, ecx, edx, esi, edi, ebp);
+        regs->eax = pv_hypercall_table[eax].compat(ebx, ecx, edx, esi, edi, ebp);
         curr->hcall_compat = false;
 
 #ifndef NDEBUG
@@ -193,12 +193,12 @@ void pv_hypercall(struct cpu_user_regs *regs)
             /* Deliberately corrupt parameter regs used by this hypercall. */
             switch ( hypercall_args_table[eax].compat )
             {
-            case 6: regs->_ebp = 0xdeadf00d;
-            case 5: regs->_edi = 0xdeadf00d;
-            case 4: regs->_esi = 0xdeadf00d;
-            case 3: regs->_edx = 0xdeadf00d;
-            case 2: regs->_ecx = 0xdeadf00d;
-            case 1: regs->_ebx = 0xdeadf00d;
+            case 6: regs->ebp = 0xdeadf00d;
+            case 5: regs->edi = 0xdeadf00d;
+            case 4: regs->esi = 0xdeadf00d;
+            case 3: regs->edx = 0xdeadf00d;
+            case 2: regs->ecx = 0xdeadf00d;
+            case 1: regs->ebx = 0xdeadf00d;
             }
         }
 #endif

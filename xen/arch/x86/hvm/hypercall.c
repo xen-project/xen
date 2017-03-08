@@ -146,7 +146,7 @@ int hvm_hypercall(struct cpu_user_regs *regs)
     struct vcpu *curr = current;
     struct domain *currd = curr->domain;
     int mode = hvm_guest_x86_mode(curr);
-    unsigned long eax = regs->_eax;
+    unsigned long eax = regs->eax;
 
     switch ( mode )
     {
@@ -226,12 +226,12 @@ int hvm_hypercall(struct cpu_user_regs *regs)
     }
     else
     {
-        unsigned int ebx = regs->_ebx;
-        unsigned int ecx = regs->_ecx;
-        unsigned int edx = regs->_edx;
-        unsigned int esi = regs->_esi;
-        unsigned int edi = regs->_edi;
-        unsigned int ebp = regs->_ebp;
+        unsigned int ebx = regs->ebx;
+        unsigned int ecx = regs->ecx;
+        unsigned int edx = regs->edx;
+        unsigned int esi = regs->esi;
+        unsigned int edi = regs->edi;
+        unsigned int ebp = regs->ebp;
 
         HVM_DBG_LOG(DBG_LEVEL_HCALL, "hcall%lu(%x, %x, %x, %x, %x, %x)", eax,
                     ebx, ecx, edx, esi, edi, ebp);
