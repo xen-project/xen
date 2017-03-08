@@ -830,22 +830,6 @@ void *x86_mcinfo_reserve(struct mc_info *mi, int size)
     return memset(mic_index, 0, size);
 }
 
-void *x86_mcinfo_add(struct mc_info *mi, void *mcinfo)
-{
-    struct mcinfo_common *mic, *buf;
-
-    mic = (struct mcinfo_common *)mcinfo;
-    buf = x86_mcinfo_reserve(mi, mic->size);
-
-    if ( !buf )
-        mce_printk(MCE_CRITICAL,
-                   "mcinfo_add: No space left in mc_info\n");
-    else
-        memcpy(buf, mic, mic->size);
-
-    return buf;
-}
-
 static void x86_mcinfo_apei_save(
     struct mcinfo_global *mc_global, struct mcinfo_bank *mc_bank)
 {

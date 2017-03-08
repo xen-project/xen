@@ -138,7 +138,7 @@ extern void mce_need_clearbank_register(mce_need_clearbank_t);
  * architectural) provided by newer CPU families/models without the need
  * to duplicate the whole handler resulting in various handlers each with
  * its own tweaks and bugs. The callback receives an struct mc_info pointer
- * which it can use with x86_mcinfo_add to add additional telemetry,
+ * which it can use with x86_mcinfo_reserve to add additional telemetry,
  * the current MCA bank number we are reading telemetry from, and the
  * MCi_STATUS value for that bank.
  */
@@ -146,7 +146,6 @@ typedef struct mcinfo_extended *(*x86_mce_callback_t)
     (struct mc_info *, uint16_t, uint64_t);
 extern void x86_mce_callback_register(x86_mce_callback_t);
 
-void *x86_mcinfo_add(struct mc_info *mi, void *mcinfo);
 void *x86_mcinfo_reserve(struct mc_info *mi, int size);
 void x86_mcinfo_dump(struct mc_info *mi);
 
