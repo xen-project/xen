@@ -200,16 +200,12 @@ intel_get_extended_msrs(struct mcinfo_global *mig, struct mc_info *mi)
             !(mig->mc_gstatus & MCG_STATUS_EIPV))
         return NULL;
 
-    mc_ext = x86_mcinfo_reserve(mi, sizeof(*mc_ext));
+    mc_ext = x86_mcinfo_reserve(mi, sizeof(*mc_ext), MC_TYPE_EXTENDED);
     if (!mc_ext)
     {
         mi->flags |= MCINFO_FLAGS_UNCOMPLETE;
         return NULL;
     }
-
-    /* this function will called when CAP(9).MCG_EXT_P = 1 */
-    mc_ext->common.type = MC_TYPE_EXTENDED;
-    mc_ext->common.size = sizeof(struct mcinfo_extended);
 
     for (i = MSR_IA32_MCG_EAX; i <= MSR_IA32_MCG_MISC; i++)
         intel_get_extended_msr(mc_ext, i);

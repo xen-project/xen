@@ -13,14 +13,12 @@ mci_action_add_pageoffline(int bank, struct mc_info *mi,
     if (!mi)
         return NULL;
 
-    rec = x86_mcinfo_reserve(mi, sizeof(*rec));
+    rec = x86_mcinfo_reserve(mi, sizeof(*rec), MC_TYPE_RECOVERY);
     if (!rec) {
         mi->flags |= MCINFO_FLAGS_UNCOMPLETE;
         return NULL;
     }
 
-    rec->common.type = MC_TYPE_RECOVERY;
-    rec->common.size = sizeof(*rec);
     rec->mc_bank = bank;
     rec->action_types = MC_ACTION_PAGE_OFFLINE;
     rec->action_info.page_retire.mfn = mfn;

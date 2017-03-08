@@ -146,7 +146,8 @@ typedef struct mcinfo_extended *(*x86_mce_callback_t)
     (struct mc_info *, uint16_t, uint64_t);
 extern void x86_mce_callback_register(x86_mce_callback_t);
 
-void *x86_mcinfo_reserve(struct mc_info *mi, int size);
+void *x86_mcinfo_reserve(struct mc_info *mi,
+                         unsigned int size, unsigned int type);
 void x86_mcinfo_dump(struct mc_info *mi);
 
 static inline int mce_vendor_bank_msr(const struct vcpu *v, uint32_t msr)

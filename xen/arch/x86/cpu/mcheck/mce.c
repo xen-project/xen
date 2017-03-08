@@ -204,7 +204,7 @@ static void mca_init_bank(enum mca_source who,
     if (!mi)
         return;
 
-    mib = x86_mcinfo_reserve(mi, sizeof(*mib));
+    mib = x86_mcinfo_reserve(mi, sizeof(*mib), MC_TYPE_BANK);
     if (!mib)
     {
         mi->flags |= MCINFO_FLAGS_UNCOMPLETE;
@@ -213,8 +213,6 @@ static void mca_init_bank(enum mca_source who,
 
     mib->mc_status = mca_rdmsr(MSR_IA32_MCx_STATUS(bank));
 
-    mib->common.type = MC_TYPE_BANK;
-    mib->common.size = sizeof (struct mcinfo_bank);
     mib->mc_bank = bank;
     mib->mc_domid = DOMID_INVALID;
 
@@ -250,8 +248,6 @@ static int mca_init_global(uint32_t flags, struct mcinfo_global *mig)
     const struct vcpu *curr = current;
 
     /* Set global information */
-    mig->common.type = MC_TYPE_GLOBAL;
-    mig->common.size = sizeof (struct mcinfo_global);
     status = mca_rdmsr(MSR_IA32_MCG_STATUS);
     mig->mc_gstatus = status;
     mig->mc_domid = DOMID_INVALID;
@@ -348,7 +344,7 @@ mcheck_mca_logout(enum mca_source who, struct mca_banks *bankmask,
             if ( (mctc = mctelem_reserve(which)) != NULL ) {
                 mci = mctelem_dataptr(mctc);
                 mcinfo_clear(mci);
-                mig = x86_mcinfo_reserve(mci, sizeof(*mig));
+                mig = x86_mcinfo_reserve(mci, sizeof(*mig), MC_TYPE_GLOBAL);
                 /* mc_info should at least hold up the global information */
                 ASSERT(mig);
                 mca_init_global(mc_flags, mig);
@@ -800,7 +796,8 @@ static void mcinfo_clear(struct mc_info *mi)
     x86_mcinfo_nentries(mi) = 0;
 }
 
-void *x86_mcinfo_reserve(struct mc_info *mi, int size)
+void *x86_mcinfo_reserve(struct mc_info *mi,
+                         unsigned int size, unsigned int type)
 {
     int i;
     unsigned long end1, end2;
@@ -827,7 +824,11 @@ void *x86_mcinfo_reserve(struct mc_info *mi, int size)
     /* there's enough space. add entry. */
     x86_mcinfo_nentries(mi)++;
 
-    return memset(mic_index, 0, size);
+    memset(mic_index, 0, size);
+    mic_index->size = size;
+    mic_index->type = type;
+
+    return mic_index;
 }
 
 static void x86_mcinfo_apei_save(
