@@ -1616,9 +1616,6 @@ static enum mce_result mce_action(const struct cpu_user_regs *regs,
         handlers = mce_uhandlers;
     }
 
-    /* At least a default handler should be registerd */
-    ASSERT(handler_num);
-
     local_mi = (struct mc_info*)mctelem_dataptr(mctc);
     x86_mcinfo_lookup(mic, local_mi, MC_TYPE_GLOBAL);
     if (mic == NULL) {
@@ -1651,7 +1648,6 @@ static enum mce_result mce_action(const struct cpu_user_regs *regs,
                 break;
             }
         }
-        ASSERT(i != handler_num);
     }
 
     return worst_result;
