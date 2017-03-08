@@ -46,6 +46,8 @@
 #define MAX_VIRT_CPUS 8
 #endif
 
+#define INVALID_VCPU_ID MAX_VIRT_CPUS
+
 #define asmlinkage /* Nothing needed */
 
 #define __LINUX_ARM_ARCH__ 7
