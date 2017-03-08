@@ -386,36 +386,64 @@ int inject_vmce(struct domain *d, int vcpu)
     return ret;
 }
 
-int fill_vmsr_data(struct mcinfo_bank *mc_bank, struct domain *d,
-                   uint64_t gstatus)
+static int vcpu_fill_mc_msrs(struct vcpu *v, uint64_t mcg_status,
+                             uint64_t mci_status, uint64_t mci_addr,
+                             uint64_t mci_misc)
 {
-    struct vcpu *v = d->vcpu[0];
-
-    if ( mc_bank->mc_domid != DOMID_INVALID )
+    if ( v->arch.vmce.mcg_status & MCG_STATUS_MCIP )
     {
-        if ( v->arch.vmce.mcg_status & MCG_STATUS_MCIP )
-        {
-            mce_printk(MCE_QUIET, "MCE: guest has not handled previous"
-                       " vMCE yet!\n");
-            return -1;
-        }
-
-        spin_lock(&v->arch.vmce.lock);
-
-        v->arch.vmce.mcg_status = gstatus;
-        /*
-         * 1. Skip bank 0 to avoid 'bank 0 quirk' of old processors
-         * 2. Filter MCi_STATUS MSCOD model specific error code to guest
-         */
-        v->arch.vmce.bank[1].mci_status = mc_bank->mc_status &
-                                              MCi_STATUS_MSCOD_MASK;
-        v->arch.vmce.bank[1].mci_addr = mc_bank->mc_addr;
-        v->arch.vmce.bank[1].mci_misc = mc_bank->mc_misc;
-
-        spin_unlock(&v->arch.vmce.lock);
+        mce_printk(MCE_QUIET, "MCE: %pv: guest has not handled previous"
+                   " vMCE yet!\n", v);
+        return -EBUSY;
     }
 
+    spin_lock(&v->arch.vmce.lock);
+
+    v->arch.vmce.mcg_status = mcg_status;
+    /*
+     * 1. Skip bank 0 to avoid 'bank 0 quirk' of old processors
+     * 2. Filter MCi_STATUS MSCOD model specific error code to guest
+     */
+    v->arch.vmce.bank[1].mci_status = mci_status & MCi_STATUS_MSCOD_MASK;
+    v->arch.vmce.bank[1].mci_addr = mci_addr;
+    v->arch.vmce.bank[1].mci_misc = mci_misc;
+
+    spin_unlock(&v->arch.vmce.lock);
+
     return 0;
+}
+
+int fill_vmsr_data(struct mcinfo_bank *mc_bank, struct domain *d,
+                   uint64_t gstatus, bool broadcast)
+{
+    struct vcpu *v = d->vcpu[0];
+    int ret, err;
+
+    if ( mc_bank->mc_domid == DOMID_INVALID )
+        return -EINVAL;
+
+    /*
+     * vMCE with the actual error information is injected to vCPU0,
+     * and, if broadcast is required, we choose to inject less severe
+     * vMCEs to other vCPUs. Thus guest can always get the severest
+     * error (i.e. the actual one) on vCPU0. If guest can recover from
+     * the severest error on vCPU0, the less severe errors on other
+     * vCPUs will not prevent guest from recovering on those vCPUs.
+     */
+    ret = vcpu_fill_mc_msrs(v, gstatus, mc_bank->mc_status,
+                            mc_bank->mc_addr, mc_bank->mc_misc);
+    if ( broadcast )
+        for_each_vcpu ( d, v )
+        {
+            if ( !v->vcpu_id )
+                continue;
+            err = vcpu_fill_mc_msrs(v, MCG_STATUS_MCIP | MCG_STATUS_RIPV,
+                                    0, 0, 0);
+            if ( err )
+                ret = err;
+        }
+
+    return ret;
 }
 
 /* It's said some ram is setup as mmio_direct for UC cache attribute */

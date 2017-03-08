@@ -88,21 +88,21 @@ mc_memerr_dhandler(struct mca_binfo *binfo,
                     goto vmce_failed;
                 }
 
-                bank->mc_addr = gfn << PAGE_SHIFT |
-                  (bank->mc_addr & (PAGE_SIZE -1 ));
-                if ( fill_vmsr_data(bank, d,
-                      global->mc_gstatus) == -1 )
-                {
-                    mce_printk(MCE_QUIET, "Fill vMCE# data for DOM%d "
-                      "failed\n", bank->mc_domid);
-                    goto vmce_failed;
-                }
-
                 if (boot_cpu_data.x86_vendor == X86_VENDOR_INTEL ||
                     global->mc_vcpuid == XEN_MC_VCPUID_INVALID)
                     vmce_vcpuid = VMCE_INJECT_BROADCAST;
                 else
                     vmce_vcpuid = global->mc_vcpuid;
+
+                bank->mc_addr = gfn << PAGE_SHIFT |
+                  (bank->mc_addr & (PAGE_SIZE -1 ));
+                if (fill_vmsr_data(bank, d, global->mc_gstatus,
+                                   vmce_vcpuid == VMCE_INJECT_BROADCAST))
+                {
+                    mce_printk(MCE_QUIET, "Fill vMCE# data for DOM%d "
+                      "failed\n", bank->mc_domid);
+                    goto vmce_failed;
+                }
 
                 /* We will inject vMCE to DOMU*/
                 if ( inject_vmce(d, vmce_vcpuid) < 0 )
