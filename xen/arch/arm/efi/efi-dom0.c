@@ -96,6 +96,18 @@ void __init acpi_create_efi_system_table(struct domain *d,
     tbl_add[TBL_EFIT].size = table_size;
 }
 
+static void __init fill_efi_memory_descriptor(EFI_MEMORY_DESCRIPTOR *desc,
+                                              UINT32 type,
+                                              EFI_PHYSICAL_ADDRESS start,
+                                              UINT64 size)
+{
+    desc->Type = type;
+    desc->PhysicalStart = start;
+    BUG_ON(size & EFI_PAGE_MASK);
+    desc->NumberOfPages = EFI_SIZE_TO_PAGES(size);
+    desc->Attribute = EFI_MEMORY_WB;
+}
+
 void __init acpi_create_efi_mmap_table(struct domain *d,
                                        const struct meminfo *mem,
                                        struct membank tbl_add[])
@@ -110,28 +122,16 @@ void __init acpi_create_efi_mmap_table(struct domain *d,
 
     offset = 0;
     for( i = 0; i < mem->nr_banks; i++, offset++ )
-    {
-        memory_map[offset].Type = EfiConventionalMemory;
-        memory_map[offset].PhysicalStart = mem->bank[i].start;
-        BUG_ON(mem->bank[i].size & EFI_PAGE_MASK);
-        memory_map[offset].NumberOfPages = EFI_SIZE_TO_PAGES(mem->bank[i].size);
-        memory_map[offset].Attribute = EFI_MEMORY_WB;
-    }
+        fill_efi_memory_descriptor(&memory_map[offset], EfiConventionalMemory,
+                                   mem->bank[i].start, mem->bank[i].size);
 
     for( i = 0; i < acpi_mem.nr_banks; i++, offset++ )
-    {
-        memory_map[offset].Type = EfiACPIReclaimMemory;
-        memory_map[offset].PhysicalStart = acpi_mem.bank[i].start;
-        BUG_ON(acpi_mem.bank[i].size & EFI_PAGE_MASK);
-        memory_map[offset].NumberOfPages = EFI_SIZE_TO_PAGES(acpi_mem.bank[i].size);
-        memory_map[offset].Attribute = EFI_MEMORY_WB;
-    }
+        fill_efi_memory_descriptor(&memory_map[offset], EfiACPIReclaimMemory,
+                                   acpi_mem.bank[i].start,
+                                   acpi_mem.bank[i].size);
 
-    memory_map[offset].Type = EfiACPIReclaimMemory;
-    memory_map[offset].PhysicalStart = d->arch.efi_acpi_gpa;
-    BUG_ON(d->arch.efi_acpi_len & EFI_PAGE_MASK);
-    memory_map[offset].NumberOfPages = EFI_SIZE_TO_PAGES(d->arch.efi_acpi_len);
-    memory_map[offset].Attribute = EFI_MEMORY_WB;
+    fill_efi_memory_descriptor(&memory_map[offset], EfiACPIReclaimMemory,
+                               d->arch.efi_acpi_gpa, d->arch.efi_acpi_len);
 
     tbl_add[TBL_MMAP].start = d->arch.efi_acpi_gpa
                               + acpi_get_table_offset(tbl_add, TBL_MMAP);
