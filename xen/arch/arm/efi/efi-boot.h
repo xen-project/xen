@@ -7,7 +7,6 @@
 #include <xen/libfdt/libfdt.h>
 #include <asm/setup.h>
 #include <asm/smp.h>
-#include "efi-dom0.h"
 
 void noreturn efi_xen_start(void *fdt_ptr, uint32_t fdt_size);
 void __flush_dcache_area(const void *vaddr, unsigned long size);
@@ -165,7 +164,7 @@ static EFI_STATUS __init efi_process_memory_map_bootinfo(EFI_MEMORY_DESCRIPTOR *
 #ifdef CONFIG_ACPI
         else if ( desc_ptr->Type == EfiACPIReclaimMemory )
         {
-            if ( !meminfo_add_bank(&acpi_mem, desc_ptr) )
+            if ( !meminfo_add_bank(&bootinfo.acpi, desc_ptr) )
             {
                 PrintStr(L"Error: All " __stringify(NR_MEM_BANKS)
                           " acpi meminfo mem banks exhausted.\r\n");

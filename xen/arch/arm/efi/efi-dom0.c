@@ -22,7 +22,6 @@
  */
 
 #include "efi.h"
-#include "efi-dom0.h"
 #include <xen/sched.h>
 #include <xen/pfn.h>
 #include <xen/libfdt/libfdt.h>
@@ -32,7 +31,6 @@
 #define XZ_EXTERN STATIC
 #include "../../../common/xz/crc32.c"
 
-struct meminfo __initdata acpi_mem;
 /* Constant to indicate "Xen" in unicode u16 format */
 static const CHAR16 xen_efi_fw_vendor[] = {0x0058, 0x0065, 0x006E, 0x0000};
 
@@ -46,7 +44,7 @@ size_t __init estimate_efi_size(int mem_nr_banks)
     int acpi_mem_nr_banks = 0;
 
     if ( !acpi_disabled )
-        acpi_mem_nr_banks = acpi_mem.nr_banks;
+        acpi_mem_nr_banks = bootinfo.acpi.nr_banks;
 
     size = ROUNDUP(est_size + ect_size + fw_vendor_size, 8);
     /* plus 1 for new created tables */
@@ -124,10 +122,10 @@ void __init acpi_create_efi_mmap_table(struct domain *d,
         fill_efi_memory_descriptor(desc, EfiConventionalMemory,
                                    mem->bank[i].start, mem->bank[i].size);
 
-    for ( i = 0; i < acpi_mem.nr_banks; i++, desc++ )
+    for ( i = 0; i < bootinfo.acpi.nr_banks; i++, desc++ )
         fill_efi_memory_descriptor(desc, EfiACPIReclaimMemory,
-                                   acpi_mem.bank[i].start,
-                                   acpi_mem.bank[i].size);
+                                   bootinfo.acpi.bank[i].start,
+                                   bootinfo.acpi.bank[i].size);
 
     fill_efi_memory_descriptor(desc, EfiACPIReclaimMemory,
                                d->arch.efi_acpi_gpa, d->arch.efi_acpi_len);
@@ -135,7 +133,7 @@ void __init acpi_create_efi_mmap_table(struct domain *d,
     tbl_add[TBL_MMAP].start = d->arch.efi_acpi_gpa
                               + acpi_get_table_offset(tbl_add, TBL_MMAP);
     tbl_add[TBL_MMAP].size = sizeof(EFI_MEMORY_DESCRIPTOR)
-                             * (mem->nr_banks + acpi_mem.nr_banks + 1);
+                             * (mem->nr_banks + bootinfo.acpi.nr_banks + 1);
 }
 
 /* Create /hypervisor/uefi node for efi properties. */

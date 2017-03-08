@@ -43,6 +43,9 @@ struct bootmodules {
 struct bootinfo {
     struct meminfo mem;
     struct bootmodules modules;
+#ifdef CONFIG_ACPI
+    struct meminfo acpi;
+#endif
 };
 
 extern struct bootinfo bootinfo;
