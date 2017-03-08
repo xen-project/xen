@@ -124,15 +124,28 @@ static void __init *lookup_fdt_config_table(EFI_SYSTEM_TABLE *sys_table)
     return fdt;
 }
 
+static bool __init meminfo_add_bank(struct meminfo *mem,
+                                    EFI_MEMORY_DESCRIPTOR *desc)
+{
+    struct membank *bank;
+
+    if ( mem->nr_banks > NR_MEM_BANKS )
+        return false;
+
+    bank = &mem->bank[mem->nr_banks];
+    bank->start = desc->PhysicalStart;
+    bank->size = desc->NumberOfPages * EFI_PAGE_SIZE;
+
+    mem->nr_banks++;
+
+    return true;
+}
+
 static EFI_STATUS __init efi_process_memory_map_bootinfo(EFI_MEMORY_DESCRIPTOR *map,
                                                 UINTN mmap_size,
                                                 UINTN desc_size)
 {
     int Index;
-    int i = 0;
-#ifdef CONFIG_ACPI
-    int j = 0;
-#endif
     EFI_MEMORY_DESCRIPTOR *desc_ptr = map;
 
     for ( Index = 0; Index < (mmap_size / desc_size); Index++ )
@@ -142,37 +155,27 @@ static EFI_STATUS __init efi_process_memory_map_bootinfo(EFI_MEMORY_DESCRIPTOR *
               (desc_ptr->Type == EfiBootServicesCode ||
                desc_ptr->Type == EfiBootServicesData)) )
         {
-            if ( i >= NR_MEM_BANKS )
+            if ( !meminfo_add_bank(&bootinfo.mem, desc_ptr) )
             {
                 PrintStr(L"Warning: All " __stringify(NR_MEM_BANKS)
                           " bootinfo mem banks exhausted.\r\n");
                 break;
             }
-            bootinfo.mem.bank[i].start = desc_ptr->PhysicalStart;
-            bootinfo.mem.bank[i].size = desc_ptr->NumberOfPages * EFI_PAGE_SIZE;
-            ++i;
         }
 #ifdef CONFIG_ACPI
         else if ( desc_ptr->Type == EfiACPIReclaimMemory )
         {
-            if ( j >= NR_MEM_BANKS )
+            if ( !meminfo_add_bank(&acpi_mem, desc_ptr) )
             {
                 PrintStr(L"Error: All " __stringify(NR_MEM_BANKS)
                           " acpi meminfo mem banks exhausted.\r\n");
                 return EFI_LOAD_ERROR;
             }
-            acpi_mem.bank[j].start = desc_ptr->PhysicalStart;
-            acpi_mem.bank[j].size  = desc_ptr->NumberOfPages * EFI_PAGE_SIZE;
-            ++j;
         }
 #endif
         desc_ptr = NextMemoryDescriptor(desc_ptr, desc_size);
     }
 
-    bootinfo.mem.nr_banks = i;
-#ifdef CONFIG_ACPI
-    acpi_mem.nr_banks = j;
-#endif
     return EFI_SUCCESS;
 }
 
