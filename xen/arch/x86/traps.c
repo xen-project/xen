@@ -1206,9 +1206,23 @@ void do_int3(struct cpu_user_regs *regs)
 
     if ( !guest_mode(regs) )
     {
-        debugger_trap_fatal(TRAP_int3, regs);
+        unsigned long fixup;
+
+        if ( (fixup = search_exception_table(regs)) != 0 )
+        {
+            this_cpu(last_extable_addr) = regs->rip;
+            dprintk(XENLOG_DEBUG, "Trap %u: %p [%ps] -> %p\n",
+                    TRAP_int3, _p(regs->rip), _p(regs->rip), _p(fixup));
+            regs->rip = fixup;
+            return;
+        }
+
+        if ( !debugger_trap_fatal(TRAP_int3, regs) )
+            printk(XENLOG_DEBUG "Hit embedded breakpoint at %p [%ps]\n",
+                   _p(regs->rip), _p(regs->rip));
+
         return;
-    } 
+    }
 
     do_guest_trap(TRAP_int3, regs);
 }

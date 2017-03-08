@@ -140,9 +140,13 @@ static int __init stub_selftest(void)
         { .opc = { 0x02, 0x04, 0x04, 0xc3 }, /* add (%rsp,%rax),%al */
           .rax = 0xfedcba9876543210,
           .res.fields.trapnr = TRAP_stack_error },
+        { .opc = { 0xcc, 0xc3, 0xc3, 0xc3 }, /* int3 */
+          .res.fields.trapnr = TRAP_int3 },
     };
     unsigned long addr = this_cpu(stubs.addr) + STUB_BUF_SIZE / 2;
     unsigned int i;
+
+    printk("Running stub recovery selftests...\n");
 
     for ( i = 0; i < ARRAY_SIZE(tests); ++i )
     {
