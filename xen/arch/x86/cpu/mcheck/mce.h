@@ -124,24 +124,24 @@ extern void mcheck_mca_clearbanks(struct mca_banks *);
 extern mctelem_cookie_t mcheck_mca_logout(enum mca_source, struct mca_banks *,
     struct mca_summary *, struct mca_banks *);
 
-/* Register a callback to be made during bank telemetry logout.
- * This callback is only available to those machine check handlers
+/* Register callbacks to be made during bank telemetry logout.
+ * Those callbacks are only available to those machine check handlers
  * that call to the common mcheck_cmn_handler or who use the common
  * telemetry logout function mcheck_mca_logout in error polling.
- *
- * This can be used to collect additional information (typically non-
- * architectural) provided by newer CPU families/models without the need
- * to duplicate the whole handler resulting in various handlers each with
- * its own tweaks and bugs.  The callback receives an struct mc_info pointer
- * which it can use with x86_mcinfo_add to add additional telemetry,
- * the current MCA bank number we are reading telemetry from, and the
- * MCi_STATUS value for that bank.
  */
 
 /* Register a handler for judging whether the bank need to be cleared */
 typedef int (*mce_need_clearbank_t)(enum mca_source who, u64 status);
 extern void mce_need_clearbank_register(mce_need_clearbank_t);
 
+/* Register a callback to collect additional information (typically non-
+ * architectural) provided by newer CPU families/models without the need
+ * to duplicate the whole handler resulting in various handlers each with
+ * its own tweaks and bugs. The callback receives an struct mc_info pointer
+ * which it can use with x86_mcinfo_add to add additional telemetry,
+ * the current MCA bank number we are reading telemetry from, and the
+ * MCi_STATUS value for that bank.
+ */
 typedef struct mcinfo_extended *(*x86_mce_callback_t)
     (struct mc_info *, uint16_t, uint64_t);
 extern void x86_mce_callback_register(x86_mce_callback_t);
