@@ -2344,7 +2344,11 @@ x86_decode_0f38(
     switch ( ctxt->opcode & X86EMUL_OPC_MASK )
     {
     case 0x00 ... 0xef:
-    case 0xf2 ... 0xff:
+    case 0xf2 ... 0xf5:
+    case 0xf7 ... 0xff:
+        op_bytes = 0;
+        /* fall through */
+    case 0xf6: /* adcx / adox */
         ctxt->opcode |= MASK_INSR(vex.pfx, X86EMUL_OPC_PFX_MASK);
         break;
 
@@ -2359,6 +2363,22 @@ x86_decode_0f38(
             state->desc = DstReg | SrcMem;
         if ( rep_prefix() )
             ctxt->opcode |= MASK_INSR(vex.pfx, X86EMUL_OPC_PFX_MASK);
+        break;
+
+    case X86EMUL_OPC_VEX(0, 0xf2):    /* andn */
+    case X86EMUL_OPC_VEX(0, 0xf3):    /* Grp 17 */
+    case X86EMUL_OPC_VEX(0, 0xf5):    /* bzhi */
+    case X86EMUL_OPC_VEX_F3(0, 0xf5): /* pext */
+    case X86EMUL_OPC_VEX_F2(0, 0xf5): /* pdep */
+    case X86EMUL_OPC_VEX_F2(0, 0xf6): /* mulx */
+    case X86EMUL_OPC_VEX(0, 0xf7):    /* bextr */
+    case X86EMUL_OPC_VEX_66(0, 0xf7): /* shlx */
+    case X86EMUL_OPC_VEX_F3(0, 0xf7): /* sarx */
+    case X86EMUL_OPC_VEX_F2(0, 0xf7): /* shrx */
+        break;
+
+    default:
+        op_bytes = 0;
         break;
     }
 
@@ -2376,6 +2396,13 @@ x86_decode_0f3a(
 
     switch ( ctxt->opcode & X86EMUL_OPC_MASK )
     {
+    case X86EMUL_OPC_66(0, 0x14)
+     ... X86EMUL_OPC_66(0, 0x17):     /* pextr*, extractps */
+    case X86EMUL_OPC_VEX_66(0, 0x14)
+     ... X86EMUL_OPC_VEX_66(0, 0x17): /* vpextr*, vextractps */
+    case X86EMUL_OPC_VEX_F2(0, 0xf0): /* rorx */
+        break;
+
     case X86EMUL_OPC_66(0, 0x20):     /* pinsrb */
     case X86EMUL_OPC_VEX_66(0, 0x20): /* vpinsrb */
         state->desc = DstImplicit | SrcMem;
@@ -2386,6 +2413,10 @@ x86_decode_0f3a(
     case X86EMUL_OPC_66(0, 0x22):     /* pinsr{d,q} */
     case X86EMUL_OPC_VEX_66(0, 0x22): /* vpinsr{d,q} */
         state->desc = DstImplicit | SrcMem;
+        break;
+
+    default:
+        op_bytes = 0;
         break;
     }
 
