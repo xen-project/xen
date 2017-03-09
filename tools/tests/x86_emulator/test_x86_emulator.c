@@ -2910,6 +2910,45 @@ int main(int argc, char **argv)
     else
         printf("skipped\n");
 
+#ifdef __x86_64__
+    printf("%-40s", "Testing vzeroupper (compat)...");
+    if ( cpu_has_avx )
+    {
+        decl_insn(vzeroupper);
+
+        ctxt.sp_size = ctxt.addr_size = 32;
+
+        asm volatile ( "vxorps %xmm2, %xmm2, %xmm3\n"
+                       "vcmpeqps %ymm3, %ymm3, %ymm4\n"
+                       "vmovaps %ymm4, %ymm9\n"
+                       put_insn(vzeroupper, "vzeroupper") );
+
+        set_insn(vzeroupper);
+        rc = x86_emulate(&ctxt, &emulops);
+        if ( rc != X86EMUL_OKAY || !check_eip(vzeroupper) )
+            goto fail;
+
+        /* XMM0...XMM7 should have their high parts cleared. */
+        asm ( "vextractf128 $1, %%ymm4, %%xmm0\n\t"
+              "vpmovmskb %%xmm4, %0\n\t"
+              "vpmovmskb %%xmm0, %1" : "=r" (rc), "=r" (i) );
+        if ( rc != 0xffff || i )
+            goto fail;
+
+        /* XMM8...XMM15 should have their high parts preserved. */
+        asm ( "vextractf128 $1, %%ymm9, %%xmm1\n\t"
+              "vpmovmskb %%xmm9, %0\n\t"
+              "vpmovmskb %%xmm1, %1" : "=r" (rc), "=r" (i) );
+        if ( rc != 0xffff || i != 0xffff )
+            goto fail;
+        printf("okay\n");
+
+        ctxt.sp_size = ctxt.addr_size = 64;
+    }
+    else
+        printf("skipped\n");
+#endif
+
 #undef decl_insn
 #undef put_insn
 #undef set_insn

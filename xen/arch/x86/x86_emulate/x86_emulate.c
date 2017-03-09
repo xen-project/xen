@@ -6277,6 +6277,45 @@ x86_emulate(
             generate_exception_if(vex.reg != 0xf, EXC_UD);
             host_and_vcpu_must_have(avx);
             get_fpu(X86EMUL_FPU_ymm, &fic);
+
+#ifdef __x86_64__
+            if ( !mode_64bit() )
+            {
+                /*
+                 * Can't use the actual instructions here, as we must not
+                 * touch YMM8...YMM15.
+                 */
+                if ( vex.l )
+                {
+                    /* vpxor %xmmN, %xmmN, %xmmN */
+                    asm volatile ( ".byte 0xc5,0xf9,0xef,0xc0" );
+                    asm volatile ( ".byte 0xc5,0xf1,0xef,0xc9" );
+                    asm volatile ( ".byte 0xc5,0xe9,0xef,0xd2" );
+                    asm volatile ( ".byte 0xc5,0xe1,0xef,0xdb" );
+                    asm volatile ( ".byte 0xc5,0xd9,0xef,0xe4" );
+                    asm volatile ( ".byte 0xc5,0xd1,0xef,0xed" );
+                    asm volatile ( ".byte 0xc5,0xc9,0xef,0xf6" );
+                    asm volatile ( ".byte 0xc5,0xc1,0xef,0xff" );
+                }
+                else
+                {
+                    /* vpor %xmmN, %xmmN, %xmmN */
+                    asm volatile ( ".byte 0xc5,0xf9,0xeb,0xc0" );
+                    asm volatile ( ".byte 0xc5,0xf1,0xeb,0xc9" );
+                    asm volatile ( ".byte 0xc5,0xe9,0xeb,0xd2" );
+                    asm volatile ( ".byte 0xc5,0xe1,0xeb,0xdb" );
+                    asm volatile ( ".byte 0xc5,0xd9,0xeb,0xe4" );
+                    asm volatile ( ".byte 0xc5,0xd1,0xeb,0xed" );
+                    asm volatile ( ".byte 0xc5,0xc9,0xeb,0xf6" );
+                    asm volatile ( ".byte 0xc5,0xc1,0xeb,0xff" );
+                }
+
+                put_fpu(&fic);
+
+                ASSERT(!state->simd_size);
+                break;
+            }
+#endif
         }
         else
         {
