@@ -54,6 +54,12 @@ ov=4.0
 	OSSTEST_CONFIG=production-config ./mg-branch-setup xen-$v-testing bisect
 	OSSTEST_CONFIG=production-config ./mg-branch-setup qemu-upstream-$v-testing bisect
 
+# make branches etc. in Cambridge osstest
+        ssh osstest@osstest.xs.citrite.net
+	cd testing.git
+	OSSTEST_CONFIG=production-config-cambridge ./mg-branch-setup xen-$v-testing bisect
+	OSSTEST_CONFIG=production-config-cambridge ./mg-branch-setup qemu-upstream-$v-testing bisect
+
 * add branch to osstest
         ie add both eg qemu-upstream-4.2-testing and xen-4.2-testing to BRANCHES in cr-for-branches
 
