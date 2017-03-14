@@ -12,6 +12,7 @@
 #include <asm/processor.h>
 #include <asm/e820.h>
 #include <asm/tboot.h>
+#include <asm/setup.h>
 #include <crypto/vmac.h>
 
 /* tboot=<physical address of shared page> */
@@ -370,13 +371,14 @@ void tboot_shutdown(uint32_t shutdown_type)
         g_tboot_shared->mac_regions[0].start = bootsym_phys(trampoline_start);
         g_tboot_shared->mac_regions[0].size = bootsym_phys(trampoline_end) -
                                               bootsym_phys(trampoline_start);
-        /* hypervisor code + data */
+        /* hypervisor .text + .rodata */
         g_tboot_shared->mac_regions[1].start = (uint64_t)__pa(&_stext);
-        g_tboot_shared->mac_regions[1].size = __pa(&__init_begin) -
+        g_tboot_shared->mac_regions[1].size = __pa(&__2M_rodata_end) -
                                               __pa(&_stext);
-        /* bss */
-        g_tboot_shared->mac_regions[2].start = (uint64_t)__pa(&__bss_start);
-        g_tboot_shared->mac_regions[2].size = __pa(&__bss_end) - __pa(&__bss_start);
+        /* hypervisor .data + .bss */
+        g_tboot_shared->mac_regions[2].start = (uint64_t)__pa(&__2M_rwdata_start);
+        g_tboot_shared->mac_regions[2].size = __pa(&__2M_rwdata_end) -
+                                              __pa(&__2M_rwdata_start);
 
         /*
          * MAC domains and other Xen memory
