@@ -39,12 +39,12 @@ type domains = {
 	mutable n_paused: int;
 }
 
-let init eventchn = {
+let init eventchn on_first_conflict_pause = {
 	eventchn = eventchn;
 	table = Hashtbl.create 10;
 	doms_conflict_paused = Queue.create ();
 	doms_with_conflict_penalty = Queue.create ();
-	on_first_conflict_pause = (fun () -> ()); (* Dummy value for now, pending subsequent commit. *)
+	on_first_conflict_pause = on_first_conflict_pause;
 	n_paused = 0;
 }
 let del doms id = Hashtbl.remove doms.table id
