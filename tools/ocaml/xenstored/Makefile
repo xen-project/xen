@@ -31,6 +31,7 @@ OBJS = define \
 	domains \
 	connection \
 	connections \
+	history \
 	parse_arg \
 	process \
 	xenstored
