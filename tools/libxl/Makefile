@@ -337,7 +337,6 @@ clean:
 	$(MAKE) -C $(ACPI_PATH) ACPI_BUILD_DIR=$(CURDIR) clean
 
 distclean: clean
-	$(RM) -f xenlight.pc.in xlutil.pc.in
 
 realclean: distclean
 	$(RM) -f $(AUTOSRCS) $(AUTOINCS)
