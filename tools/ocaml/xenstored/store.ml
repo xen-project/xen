@@ -211,6 +211,7 @@ let apply rnode path fct =
 	lookup rnode path fct
 end
 
+(* The Store.t type *)
 type t =
 {
 	mutable stat_transaction_coalesce: int;
