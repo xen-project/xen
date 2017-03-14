@@ -278,6 +278,16 @@ let write_response_log ~ty ~tid ~con ~response =
 	| Packet.Reply x -> write_answer_log ~ty ~tid ~con ~data:x
 	| Packet.Error e -> write_answer_log ~ty:(Xenbus.Xb.Op.Error) ~tid ~con ~data:e
 
+let record_commit ~con ~tid ~before ~after =
+	let inc r = r := Int64.add 1L !r in
+	let finish_count = inc Transaction.counter; !Transaction.counter in
+	(* This call would leak memory if historic activity is retained forever
+	   so can only be uncommented if history is guaranteed not to grow
+	   unboundedly.
+	History.push {History.con=con; tid=tid; before=before; after=after; finish_count=finish_count}
+	*)
+	()
+
 (* Replay a stored transaction against a fresh store, check the responses are
    all equivalent: if so, commit the transaction. Otherwise send the abort to
    the client. *)
@@ -348,8 +358,14 @@ let do_transaction_end con t domains cons data =
 		Connection.end_transaction con (Transaction.get_id t) commit in
 	if not success then
 		raise Transaction_again;
-	if commit then
-		process_watch (List.rev (Transaction.get_paths t)) cons
+	if commit then begin
+		process_watch (List.rev (Transaction.get_paths t)) cons;
+		match t.Transaction.ty with
+		| Transaction.No ->
+			() (* no need to record anything *)
+		| Transaction.Full(id, oldstore, cstore) ->
+			record_commit ~con ~tid:id ~before:oldstore ~after:cstore
+	end
 
 let do_introduce con t domains cons data =
 	if not (Connection.is_dom0 con)
@@ -432,7 +448,11 @@ let process_packet ~store ~cons ~doms ~con ~req =
 			else
 				Connection.get_transaction con tid
 			in
+
+		let before = Store.copy store in
 		let response = input_handle_error ~cons ~doms ~fct ~con ~t ~req in
+		let after = Store.copy store in
+		if tid = Transaction.none then record_commit ~con ~tid ~before ~after;
 
 		let response = try
 			if tid <> Transaction.none then
