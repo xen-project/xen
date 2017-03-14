@@ -249,6 +249,8 @@ $(XEN_ROOT)/config/Tools.mk:
 	$(error You have to run ./configure before building or installing the tools)
 endif
 
+PKG_CONFIG_DIR ?= $(XEN_ROOT)/tools/pkg-config
+
 $(PKG_CONFIG_DIR)/%.pc: %.pc.in Makefile
 	mkdir -p $(PKG_CONFIG_DIR)
 	@sed -e 's!@@version@@!$(PKG_CONFIG_VERSION)!g' \
