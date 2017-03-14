@@ -44,12 +44,14 @@ let add_domain cons dom =
 	| Some p -> Hashtbl.add cons.ports p con;
 	| None -> ()
 
-let select cons =
-	Hashtbl.fold
-		(fun _ con (ins, outs) ->
-		 let fd = Connection.get_fd con in
-		 (fd :: ins,  if Connection.has_output con then fd :: outs else outs))
-		cons.anonymous ([], [])
+let select ?(only_if = (fun _ -> true)) cons =
+	Hashtbl.fold (fun _ con (ins, outs) ->
+		if (only_if con) then (
+			let fd = Connection.get_fd con in
+			(fd :: ins,  if Connection.has_output con then fd :: outs else outs)
+		) else (ins, outs)
+	)
+	cons.anonymous ([], [])
 
 let find cons =
 	Hashtbl.find cons.anonymous
