@@ -36,3 +36,6 @@ extern const struct efi_pci_rom *efi_pci_roms;
 
 extern UINT64 efi_boot_max_var_store_size, efi_boot_remain_var_store_size,
               efi_boot_max_var_size;
+
+extern UINT64 efi_apple_properties_addr;
+extern UINTN efi_apple_properties_len;

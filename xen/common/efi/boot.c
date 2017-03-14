@@ -38,6 +38,8 @@
   { 0xf2fd1544, 0x9794, 0x4a2c, {0x99, 0x2e, 0xe5, 0xbb, 0xcf, 0x20, 0xe3, 0x94} }
 #define SHIM_LOCK_PROTOCOL_GUID \
   { 0x605dab50, 0xe046, 0x4300, {0xab, 0xb6, 0x3d, 0xd8, 0x10, 0xdd, 0x8b, 0x23} }
+#define APPLE_PROPERTIES_PROTOCOL_GUID \
+  { 0x91bd12fe, 0xf6c3, 0x44fb, { 0xa5, 0xb7, 0x51, 0x22, 0xab, 0x30, 0x3a, 0xe0} }
 
 typedef EFI_STATUS
 (/* _not_ EFIAPI */ *EFI_SHIM_LOCK_VERIFY) (
@@ -47,6 +49,44 @@ typedef EFI_STATUS
 typedef struct {
     EFI_SHIM_LOCK_VERIFY Verify;
 } EFI_SHIM_LOCK_PROTOCOL;
+
+struct _EFI_APPLE_PROPERTIES;
+
+typedef EFI_STATUS
+(EFIAPI *EFI_APPLE_PROPERTIES_GET) (
+    IN struct _EFI_APPLE_PROPERTIES *This,
+    IN const EFI_DEVICE_PATH *Device,
+    IN const CHAR16 *PropertyName,
+    OUT VOID *Buffer,
+    IN OUT UINT32 *BufferSize);
+
+typedef EFI_STATUS
+(EFIAPI *EFI_APPLE_PROPERTIES_SET) (
+    IN struct _EFI_APPLE_PROPERTIES *This,
+    IN const EFI_DEVICE_PATH *Device,
+    IN const CHAR16 *PropertyName,
+    IN const VOID *Value,
+    IN UINT32 ValueLen);
+
+typedef EFI_STATUS
+(EFIAPI *EFI_APPLE_PROPERTIES_DELETE) (
+    IN struct _EFI_APPLE_PROPERTIES *This,
+    IN const EFI_DEVICE_PATH *Device,
+    IN const CHAR16 *PropertyName);
+
+typedef EFI_STATUS
+(EFIAPI *EFI_APPLE_PROPERTIES_GETALL) (
+    IN struct _EFI_APPLE_PROPERTIES *This,
+    OUT VOID *Buffer,
+    IN OUT UINT32 *BufferSize);
+
+typedef struct _EFI_APPLE_PROPERTIES {
+    UINTN Version; /* 0x10000 */
+    EFI_APPLE_PROPERTIES_GET Get;
+    EFI_APPLE_PROPERTIES_SET Set;
+    EFI_APPLE_PROPERTIES_DELETE Delete;
+    EFI_APPLE_PROPERTIES_GETALL GetAll;
+} EFI_APPLE_PROPERTIES;
 
 union string {
     CHAR16 *w;
@@ -900,6 +940,46 @@ static void __init efi_variables(void)
     }
 }
 
+static void __init efi_get_apple_properties(void)
+{
+    static EFI_GUID __initdata props_guid = APPLE_PROPERTIES_PROTOCOL_GUID;
+    EFI_APPLE_PROPERTIES *props;
+    UINT32 size = 0;
+    VOID *data;
+    EFI_STATUS status;
+
+    if ( efi_bs->LocateProtocol(&props_guid, NULL,
+                                (void **)&props) != EFI_SUCCESS )
+        return;
+    if ( props->Version != 0x10000 )
+    {
+        PrintStr(L"Warning: Unsupported Apple device properties version: ");
+        DisplayUint(props->Version, 0);
+        PrintStr(newline);
+        return;
+    }
+
+    props->GetAll(props, NULL, &size);
+    if ( !size ||
+         efi_bs->AllocatePool(EfiRuntimeServicesData, size,
+                              &data) != EFI_SUCCESS )
+        return;
+
+    status = props->GetAll(props, data, &size);
+    if ( status == EFI_SUCCESS )
+    {
+        efi_apple_properties_addr = (UINTN)data;
+        efi_apple_properties_len = size;
+    }
+    else
+    {
+        efi_bs->FreePool(data);
+        PrintStr(L"Warning: Could not query Apple device properties: ");
+        DisplayUint(status, 0);
+        PrintStr(newline);
+    }
+}
+
 static void __init efi_set_gop_mode(EFI_GRAPHICS_OUTPUT_PROTOCOL *gop, UINTN gop_mode)
 {
     EFI_GRAPHICS_OUTPUT_MODE_INFORMATION *mode_info;
@@ -1207,6 +1287,9 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
 
     /* Get snapshot of variable store parameters. */
     efi_variables();
+
+    /* Collect Apple device properties, if any. */
+    efi_get_apple_properties();
 
     efi_arch_memory_setup();
 

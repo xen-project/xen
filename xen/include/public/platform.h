@@ -240,6 +240,7 @@ DEFINE_XEN_GUEST_HANDLE(xenpf_efi_runtime_call_t);
 #define  XEN_FW_EFI_MEM_INFO       3
 #define  XEN_FW_EFI_RT_VERSION     4
 #define  XEN_FW_EFI_PCI_ROM        5
+#define  XEN_FW_EFI_APPLE_PROPERTIES 6
 #define XEN_FW_KBD_SHIFT_FLAGS    5
 struct xenpf_firmware_info {
     /* IN variables. */
@@ -299,6 +300,11 @@ struct xenpf_firmware_info {
                 uint64_t address;
                 xen_ulong_t size;
             } pci_rom;
+            struct {
+                /* OUT variables */
+                uint64_t address;
+                xen_ulong_t size;
+            } apple_properties;
         } efi_info; /* XEN_FW_EFI_INFO */
 
         /* Int16, Fn02: Get keyboard shift flags. */
