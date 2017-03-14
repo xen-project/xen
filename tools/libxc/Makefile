@@ -1,5 +1,4 @@
 XEN_ROOT = $(CURDIR)/../..
-PKG_CONFIG_DIR = ../pkg-config
 include $(XEN_ROOT)/tools/Rules.mk
 
 MAJOR    = 4.9

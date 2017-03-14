@@ -1,4 +1,7 @@
 XEN_ROOT = $(CURDIR)/..
+
+export PKG_CONFIG_DIR = $(CURDIR)/pkg-config
+
 include $(XEN_ROOT)/tools/Rules.mk
 
 SUBDIRS-y :=

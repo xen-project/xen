@@ -3,6 +3,7 @@ MINI_OS = $(XEN_ROOT)/extras/mini-os
 
 export XEN_ROOT
 export XEN_OS=MiniOS
+export PKG_CONFIG_DIR = $(CURDIR)/pkg-config
 
 # Remove flags which are meant for tools, e.g. "-m64"
 export EXTRA_CFLAGS_XEN_TOOLS=
