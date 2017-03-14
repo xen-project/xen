@@ -255,6 +255,7 @@ tools/xenstore/xenstore-control
 tools/xenstore/xenstore-ls
 tools/xenstore/xenstored
 tools/xenstore/xenstored_test
+tools/xenstore/xenstore.pc
 tools/xenstore/xs_tdb_dump
 tools/xentrace/xentrace_setsize
 tools/xentrace/tbctl
