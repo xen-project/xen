@@ -41,9 +41,26 @@ LIB_STATIC = $(LIBNAME).a
 LIB_SHARED = $(LIBSONAME).$(MINOR)
 IBIN = tap-ctl
 
+PKG_CONFIG := xenblktapctl.pc
+PKG_CONFIG_VERSION := $(MAJOR).$(MINOR)
+
+ifneq ($(CONFIG_LIBXC_MINIOS),y)
+PKG_CONFIG_INST := $(PKG_CONFIG)
+$(PKG_CONFIG_INST): PKG_CONFIG_PREFIX = $(prefix)
+$(PKG_CONFIG_INST): PKG_CONFIG_INCDIR = $(includedir)
+$(PKG_CONFIG_INST): PKG_CONFIG_LIBDIR = $(libdir)
+endif
+
+PKG_CONFIG_LOCAL := $(foreach pc,$(PKG_CONFIG),$(PKG_CONFIG_DIR)/$(pc))
+
+$(PKG_CONFIG_LOCAL): PKG_CONFIG_PREFIX = $(XEN_ROOT)
+$(PKG_CONFIG_LOCAL): PKG_CONFIG_INCDIR = $(XEN_BLKTAP2)/include
+$(PKG_CONFIG_LOCAL): PKG_CONFIG_LIBDIR = $(CURDIR)
+$(PKG_CONFIG_LOCAL): PKG_CONFIG_CFLAGS_LOCAL = $(CFLAGS_xeninclude) $(CFLAGS_libxenctrl)
+
 all: build
 
-build: $(IBIN) $(LIB_STATIC) $(LIB_SHARED)
+build: $(IBIN) $(LIB_STATIC) $(LIB_SHARED) $(PKG_CONFIG_INST) $(PKG_CONFIG_LOCAL)
 
 $(LIBNAME).so: $(LIBSONAME)
 	ln -sf $< $@
@@ -60,18 +77,20 @@ $(LIB_STATIC): $(CTL_OBJS)
 $(LIB_SHARED): $(CTL_PICS)
 	$(CC) $(LDFLAGS) -fPIC  -Wl,$(SONAME_LDFLAG) -Wl,$(LIBSONAME) $(SHLIB_LDFLAGS) -rdynamic $^ -o $@  $(APPEND_LDFLAGS)
 
-install: $(IBIN) $(LIB_STATIC) $(LIB_SHARED)
+install: build
 	$(INSTALL_DIR) -p $(DESTDIR)$(sbindir)
 	$(INSTALL_PROG) $(IBIN) $(DESTDIR)$(sbindir)
 	$(INSTALL_DATA) $(LIB_STATIC) $(DESTDIR)$(libdir)
 	$(INSTALL_PROG) $(LIB_SHARED) $(DESTDIR)$(libdir)
 	ln -sf $(LIBSONAME) $(DESTDIR)$(libdir)/$(LIBNAME).so
 	ln -sf $(LIB_SHARED) $(DESTDIR)$(libdir)/$(LIBSONAME)
+	$(INSTALL_DATA) xenblktapctl.pc $(DESTDIR)$(PKG_INSTALLDIR)
 
 clean:
 	rm -f $(OBJS) $(PICS) $(DEPS) $(IBIN) $(LIB_STATIC) $(LIB_SHARED)
 	rm -f $(LIBNAME).so $(LIBSONAME)
 	rm -f *~
+	rm -f xenblktapctl.pc
 
 distclean: clean
 

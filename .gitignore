@@ -108,6 +108,7 @@ tools/libs/foreignmemory/headers.chk
 tools/libs/foreignmemory/xenforeignmemory.pc
 tools/libs/devicemodel/headers.chk
 tools/libs/devicemodel/xendevicemodel.pc
+tools/blktap2/control/xenblktapctl.pc
 tools/blktap2/daemon/blktapctrl
 tools/blktap2/drivers/img2qcow
 tools/blktap2/drivers/lock-util
