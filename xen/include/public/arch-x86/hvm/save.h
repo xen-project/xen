@@ -135,7 +135,7 @@ struct hvm_hw_cpu {
     uint64_t shadow_gs;
 
     /* msr content saved/restored. */
-    uint64_t msr_flags;
+    uint64_t msr_flags; /* Obsolete, ignored. */
     uint64_t msr_lstar;
     uint64_t msr_star;
     uint64_t msr_cstar;
@@ -249,7 +249,7 @@ struct hvm_hw_cpu_compat {
     uint64_t shadow_gs;
 
     /* msr content saved/restored. */
-    uint64_t msr_flags;
+    uint64_t msr_flags; /* Obsolete, ignored. */
     uint64_t msr_lstar;
     uint64_t msr_star;
     uint64_t msr_cstar;
