@@ -5,6 +5,6 @@ libdir=@@libdir@@
 Name: Xenevtchn
 Description: The Xenevtchn library for Xen hypervisor
 Version: @@version@@
-Cflags: -I${includedir} @@cflagslocal@@
+Cflags: -I${includedir}
 Libs: @@libsflag@@${libdir} -lxenevtchn
 Requires.private: xentoollog
