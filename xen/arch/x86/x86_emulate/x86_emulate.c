@@ -1757,7 +1757,13 @@ x86_emulate(
         modrm_reg = ((rex_prefix & 4) << 1) | ((modrm & 0x38) >> 3);
         modrm_rm  = modrm & 0x07;
 
-        if ( modrm_mod == 3 )
+        if ( modrm_mod == 3 ||
+             /*
+              * Mov to/from cr/dr ignore the encoding of Mod, and behave as
+              * if they were encoded as reg/reg instructions.  No further
+              * disp/SIB bytes are fetched.
+              */
+             (twobyte && (b & ~3) == 0x20) )
         {
             modrm_rm |= (rex_prefix & 1) << 3;
             ea.type = OP_REG;
@@ -4275,7 +4281,7 @@ x86_emulate(
     case 0x21: /* mov dr,reg */
     case 0x22: /* mov reg,cr */
     case 0x23: /* mov reg,dr */
-        generate_exception_if(ea.type != OP_REG, EXC_UD, -1);
+        ASSERT(ea.type == OP_REG); /* Early operand adjustment ensures this. */
         generate_exception_if(!mode_ring0(), EXC_GP, 0);
         modrm_reg |= lock_prefix << 3;
         if ( b & 2 )
