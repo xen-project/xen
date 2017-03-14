@@ -73,12 +73,13 @@ let can_coalesce oldroot currentroot path =
 
 type ty = No | Full of (
 	int *          (* Transaction id *)
-	Store.Node.t * (* Original root *)
+	Store.t *      (* Original store *)
 	Store.t        (* A pointer to the canonical store: its root changes on each transaction-commit *)
 )
 
 type t = {
 	ty: ty;
+	start_count: int64;
 	store: Store.t; (* This is the store that we change in write operations. *)
 	quota: Quota.t;
 	mutable paths: (Xenbus.Xb.Op.operation * Store.Path.t) list;
@@ -87,10 +88,13 @@ type t = {
 	mutable write_lowpath: Store.Path.t option;
 }
 
+let counter = ref 0L
+
 let make id store =
-	let ty = if id = none then No else Full(id, Store.get_root store, store) in
+	let ty = if id = none then No else Full(id, Store.copy store, store) in
 	{
 		ty = ty;
+		start_count = !counter;
 		store = if id = none then store else Store.copy store;
 		quota = Quota.copy store.Store.quota;
 		paths = [];
@@ -161,7 +165,7 @@ let commit ~con t =
 	let has_commited =
 	match t.ty with
 	| No                         -> true
-	| Full (id, oldroot, cstore) ->       (* "cstore" meaning current canonical store *)
+	| Full (id, oldstore, cstore) ->       (* "cstore" meaning current canonical store *)
 		let commit_partial oldroot cstore store =
 			(* get the lowest path of the query and verify that it hasn't
 			   been modified by others transactions. *)
@@ -204,7 +208,7 @@ let commit ~con t =
 		if !test_eagain && Random.int 3 = 0 then
 			false
 		else
-			try_commit oldroot cstore t.store
+			try_commit (Store.get_root oldstore) cstore t.store
 		in
 	if has_commited && has_write_ops then
 		Disk.write t.store;
