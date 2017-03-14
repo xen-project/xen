@@ -1104,6 +1104,9 @@ static int construct_vmcs(struct vcpu *v)
             vmx_disable_intercept_for_msr(v, MSR_IA32_BNDCFGS, MSR_TYPE_R | MSR_TYPE_W);
     }
 
+    /* All guest MSR state is dirty. */
+    v->arch.hvm_vmx.msr_state.flags = ((1u << VMX_MSR_COUNT) - 1);
+
     /* I/O access bitmap. */
     __vmwrite(IO_BITMAP_A, __pa(d->arch.hvm_domain.io_bitmap));
     __vmwrite(IO_BITMAP_B, __pa(d->arch.hvm_domain.io_bitmap) + PAGE_SIZE);

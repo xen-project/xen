@@ -353,7 +353,7 @@ static void svm_save_cpu_state(struct vcpu *v, struct hvm_hw_cpu *data)
     data->msr_cstar        = vmcb->cstar;
     data->msr_syscall_mask = vmcb->sfmask;
     data->msr_efer         = v->arch.hvm_vcpu.guest_efer;
-    data->msr_flags        = -1ULL;
+    data->msr_flags        = 0;
 }
 
 
