@@ -94,13 +94,13 @@ endif
 
 CFLAGS_libxentoollog = -I$(XEN_LIBXENTOOLLOG)/include $(CFLAGS_xeninclude)
 SHDEPS_libxentoollog =
-LDLIBS_libxentoollog = $(XEN_LIBXENTOOLLOG)/libxentoollog$(libextension)
-SHLIB_libxentoollog  = -Wl,-rpath-link=$(XEN_LIBXENTOOLLOG)
+LDLIBS_libxentoollog = $(SHDEPS_libxentoollog) $(XEN_LIBXENTOOLLOG)/libxentoollog$(libextension)
+SHLIB_libxentoollog  = $(SHDEPS_libxentoollog) -Wl,-rpath-link=$(XEN_LIBXENTOOLLOG)
 
 CFLAGS_libxenevtchn = -I$(XEN_LIBXENEVTCHN)/include $(CFLAGS_xeninclude)
 SHDEPS_libxenevtchn =
-LDLIBS_libxenevtchn = $(XEN_LIBXENEVTCHN)/libxenevtchn$(libextension)
-SHLIB_libxenevtchn  = -Wl,-rpath-link=$(XEN_LIBXENEVTCHN)
+LDLIBS_libxenevtchn = $(SHDEPS_libxenevtchn) $(XEN_LIBXENEVTCHN)/libxenevtchn$(libextension)
+SHLIB_libxenevtchn  = $(SHDEPS_libxenevtchn) -Wl,-rpath-link=$(XEN_LIBXENEVTCHN)
 
 CFLAGS_libxengnttab = -I$(XEN_LIBXENGNTTAB)/include $(CFLAGS_xeninclude)
 SHDEPS_libxengnttab = $(SHLIB_libxentoollog)
@@ -109,21 +109,24 @@ SHLIB_libxengnttab  = $(SHDEPS_libxengnttab) -Wl,-rpath-link=$(XEN_LIBXENGNTTAB)
 
 # xengntshr_* interfaces are actually part of libxengnttab.so
 CFLAGS_libxengntshr = -I$(XEN_LIBXENGNTTAB)/include $(CFLAGS_xeninclude)
-LDLIBS_libxengntshr = $(XEN_LIBXENGNTTAB)/libxengnttab$(libextension)
-SHLIB_libxengntshr  = -Wl,-rpath-link=$(XEN_LIBXENGNTTAB)
+SHDEPS_libxengntshr = $(SHDEPS_libxengnttab)
+LDLIBS_libxengntshr = $(SHDEPS_libxengntshr) $(XEN_LIBXENGNTTAB)/libxengnttab$(libextension)
+SHLIB_libxengntshr  = $(SHDEPS_libxengntshr) -Wl,-rpath-link=$(XEN_LIBXENGNTTAB)
 
 CFLAGS_libxencall = -I$(XEN_LIBXENCALL)/include $(CFLAGS_xeninclude)
-LDLIBS_libxencall = $(XEN_LIBXENCALL)/libxencall$(libextension)
-SHLIB_libxencall  = -Wl,-rpath-link=$(XEN_LIBXENCALL)
+SHDEPS_libxencall =
+LDLIBS_libxencall = $(SHDEPS_libxencall) $(XEN_LIBXENCALL)/libxencall$(libextension)
+SHLIB_libxencall  = $(SHDEPS_libxencall) -Wl,-rpath-link=$(XEN_LIBXENCALL)
 
 CFLAGS_libxenforeignmemory = -I$(XEN_LIBXENFOREIGNMEMORY)/include $(CFLAGS_xeninclude)
-LDLIBS_libxenforeignmemory = $(XEN_LIBXENFOREIGNMEMORY)/libxenforeignmemory$(libextension)
-SHLIB_libxenforeignmemory  = -Wl,-rpath-link=$(XEN_LIBXENFOREIGNMEMORY)
+SHDEPS_libxenforeignmemory =
+LDLIBS_libxenforeignmemory = $(SHDEPS_libxenforeignmemory) $(XEN_LIBXENFOREIGNMEMORY)/libxenforeignmemory$(libextension)
+SHLIB_libxenforeignmemory  = $(SHDEPS_libxenforeignmemory) -Wl,-rpath-link=$(XEN_LIBXENFOREIGNMEMORY)
 
 CFLAGS_libxendevicemodel = -I$(XEN_LIBXENDEVICEMODEL)/include $(CFLAGS_xeninclude)
 SHDEPS_libxendevicemodel = $(SHLIB_libxentoollog) $(SHLIB_xencall)
-LDLIBS_libxendevicemodel = $(XEN_LIBXENDEVICEMODEL)/libxendevicemodel$(libextension)
-SHLIB_libxendevicemodel  = -Wl,-rpath-link=$(XEN_LIBXENDEVICEMODEL)
+LDLIBS_libxendevicemodel = $(SHDEPS_libxendevicemodel) $(XEN_LIBXENDEVICEMODEL)/libxendevicemodel$(libextension)
+SHLIB_libxendevicemodel  = $(SHDEPS_libxendevicemodel) -Wl,-rpath-link=$(XEN_LIBXENDEVICEMODEL)
 
 # code which compiles against libxenctrl get __XEN_TOOLS__ and
 # therefore sees the unstable hypercall interfaces.
