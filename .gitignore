@@ -96,6 +96,7 @@ config/Tools.mk
 config/Stubdom.mk
 config/Docs.mk
 tools/libs/toollog/headers.chk
+tools/libs/toollog/xentoollog.pc
 tools/libs/evtchn/headers.chk
 tools/libs/gnttab/headers.chk
 tools/libs/call/headers.chk

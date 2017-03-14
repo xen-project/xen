@@ -1,0 +1,9 @@
+prefix=@@prefix@@
+includedir=@@incdir@@
+libdir=@@libdir@@
+
+Name: Xentoollog
+Description: The Xentoollog library for Xen hypervisor
+Version: @@version@@
+Cflags: -I${includedir}
+Libs: @@libsflag@@${libdir} -lxentoollog
