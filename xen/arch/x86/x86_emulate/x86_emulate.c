@@ -6509,6 +6509,7 @@ x86_emulate(
             vcpu_must_have(sse);
         ldmxcsr:
             generate_exception_if(src.type != OP_MEM, EXC_UD);
+            get_fpu(vex.opcx ? X86EMUL_FPU_ymm : X86EMUL_FPU_xmm, &fic);
             generate_exception_if(src.val & ~mxcsr_mask, EXC_GP, 0);
             asm volatile ( "ldmxcsr %0" :: "m" (src.val) );
             break;
@@ -6518,6 +6519,7 @@ x86_emulate(
             vcpu_must_have(sse);
         stmxcsr:
             generate_exception_if(dst.type != OP_MEM, EXC_UD);
+            get_fpu(vex.opcx ? X86EMUL_FPU_ymm : X86EMUL_FPU_xmm, &fic);
             asm volatile ( "stmxcsr %0" : "=m" (dst.val) );
             break;
 
