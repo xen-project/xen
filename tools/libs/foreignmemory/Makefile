@@ -24,6 +24,23 @@ ifneq ($(nosharedlibs),y)
 LIB += libxenforeignmemory.so
 endif
 
+PKG_CONFIG := xenforeignmemory.pc
+PKG_CONFIG_VERSION := $(MAJOR).$(MINOR)
+
+ifneq ($(CONFIG_LIBXC_MINIOS),y)
+PKG_CONFIG_INST := $(PKG_CONFIG)
+$(PKG_CONFIG_INST): PKG_CONFIG_PREFIX = $(prefix)
+$(PKG_CONFIG_INST): PKG_CONFIG_INCDIR = $(includedir)
+$(PKG_CONFIG_INST): PKG_CONFIG_LIBDIR = $(libdir)
+endif
+
+PKG_CONFIG_LOCAL := $(foreach pc,$(PKG_CONFIG),$(PKG_CONFIG_DIR)/$(pc))
+
+$(PKG_CONFIG_LOCAL): PKG_CONFIG_PREFIX = $(XEN_ROOT)
+$(PKG_CONFIG_LOCAL): PKG_CONFIG_INCDIR = $(XEN_LIBXENFOREIGNMEMORY)/include
+$(PKG_CONFIG_LOCAL): PKG_CONFIG_LIBDIR = $(CURDIR)
+$(PKG_CONFIG_LOCAL): PKG_CONFIG_CFLAGS_LOCAL = $(CFLAGS_xeninclude)
+
 .PHONY: all
 all: build
 
@@ -32,7 +49,7 @@ build:
 	$(MAKE) libs
 
 .PHONY: libs
-libs: headers.chk $(LIB)
+libs: headers.chk $(LIB) $(PKG_CONFIG_INST) $(PKG_CONFIG_LOCAL)
 
 headers.chk: $(wildcard include/*.h)
 
@@ -56,6 +73,7 @@ install: build
 	$(SYMLINK_SHLIB) libxenforeignmemory.so.$(MAJOR).$(MINOR) $(DESTDIR)$(libdir)/libxenforeignmemory.so.$(MAJOR)
 	$(SYMLINK_SHLIB) libxenforeignmemory.so.$(MAJOR) $(DESTDIR)$(libdir)/libxenforeignmemory.so
 	$(INSTALL_DATA) include/xenforeignmemory.h $(DESTDIR)$(includedir)
+	$(INSTALL_DATA) xenforeignmemory.pc $(DESTDIR)$(PKG_INSTALLDIR)
 
 .PHONY: TAGS
 TAGS:
@@ -66,6 +84,7 @@ clean:
 	rm -rf *.rpm $(LIB) *~ $(DEPS) $(LIB_OBJS) $(PIC_OBJS)
 	rm -f libxenforeignmemory.so.$(MAJOR).$(MINOR) libxenforeignmemory.so.$(MAJOR)
 	rm -f headers.chk
+	rm -f xenforeignmemory.pc
 
 .PHONY: distclean
 distclean: clean

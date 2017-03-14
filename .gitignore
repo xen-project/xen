@@ -105,6 +105,7 @@ tools/libs/gnttab/xengnttab.pc
 tools/libs/call/headers.chk
 tools/libs/call/xencall.pc
 tools/libs/foreignmemory/headers.chk
+tools/libs/foreignmemory/xenforeignmemory.pc
 tools/libs/devicemodel/headers.chk
 tools/blktap2/daemon/blktapctrl
 tools/blktap2/drivers/img2qcow
