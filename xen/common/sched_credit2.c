@@ -620,13 +620,22 @@ static void reset_credit(const struct scheduler *ops, int cpu, s_time_t now,
 
     list_for_each( iter, &rqd->svc )
     {
+        unsigned int svc_cpu;
         struct csched2_vcpu * svc;
         int start_credit;
 
         svc = list_entry(iter, struct csched2_vcpu, rqd_elem);
+        svc_cpu = svc->vcpu->processor;
 
         BUG_ON( is_idle_vcpu(svc->vcpu) );
         BUG_ON( svc->rqd != rqd );
+
+        /*
+         * If svc is running, it is our responsibility to make sure, here,
+         * that the credit it has spent so far get accounted.
+         */
+        if ( svc->vcpu == curr_on_cpu(svc_cpu) )
+            burn_credits(rqd, svc, now);
 
         start_credit = svc->credit;
 
