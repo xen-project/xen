@@ -189,7 +189,6 @@ libs: $(LIB) $(PKG_CONFIG_INST) $(PKG_CONFIG_LOCAL)
 install: build
 	$(INSTALL_DIR) $(DESTDIR)$(libdir)
 	$(INSTALL_DIR) $(DESTDIR)$(includedir)
-	$(INSTALL_DIR) $(DESTDIR)$(PKG_INSTALLDIR)
 	$(INSTALL_SHLIB) libxenctrl.so.$(MAJOR).$(MINOR) $(DESTDIR)$(libdir)
 	$(INSTALL_DATA) libxenctrl.a $(DESTDIR)$(libdir)
 	$(SYMLINK_SHLIB) libxenctrl.so.$(MAJOR).$(MINOR) $(DESTDIR)$(libdir)/libxenctrl.so.$(MAJOR)

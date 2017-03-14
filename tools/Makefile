@@ -64,12 +64,14 @@ endif
 build all: subdirs-all
 
 .PHONY: install
-install: subdirs-install
+install:
 	$(INSTALL_DIR) -m 700 $(DESTDIR)$(XEN_DUMP_DIR)
 	$(INSTALL_DIR) $(DESTDIR)$(XEN_LOG_DIR)
 	$(INSTALL_DIR) $(DESTDIR)$(XEN_RUN_DIR)
 	$(INSTALL_DIR) $(DESTDIR)$(XEN_LIB_DIR)
 	$(INSTALL_DIR) $(DESTDIR)$(XEN_RUN_STORED)
+	$(INSTALL_DIR) $(DESTDIR)$(PKG_INSTALLDIR)
+	$(MAKE) subdirs-install
 
 .PHONY: uninstall
 uninstall: D=$(DESTDIR)
@@ -85,6 +87,7 @@ uninstall:
 	rm -rf $(D)$(XEN_LIB_DIR)
 	rm -rf $(D)$(XEN_LIB_STORED)
 	rm -rf $(D)$(XEN_RUN_STORED)
+	rm -rf $(D)$(PKG_INSTALLDIR)
 	rm -rf $(D)$(bindir)/cpuperf-perfcntr $(D)$(bindir)/cpuperf-xen
 	rm -rf $(D)$(bindir)/xc_shadow
 	rm -rf $(D)$(bindir)/pygrub
