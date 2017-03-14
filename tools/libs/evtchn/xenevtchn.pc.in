@@ -1,0 +1,10 @@
+prefix=@@prefix@@
+includedir=@@incdir@@
+libdir=@@libdir@@
+
+Name: Xenevtchn
+Description: The Xenevtchn library for Xen hypervisor
+Version: @@version@@
+Cflags: -I${includedir} @@cflagslocal@@
+Libs: @@libsflag@@${libdir} -lxenevtchn
+Requires.private: xentoollog
