@@ -14,6 +14,8 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU Lesser General Public License for more details.
  *)
+let error fmt = Logging.error "transaction" fmt
+
 open Stdext
 
 let none = 0
