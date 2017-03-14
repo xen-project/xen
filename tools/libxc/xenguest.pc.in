@@ -1,0 +1,10 @@
+prefix=@@prefix@@
+includedir=@@incdir@@
+libdir=@@libdir@@
+
+Name: Xenguest
+Description: The Xenguest library for Xen hypervisor
+Version: @@version@@
+Cflags: -I${includedir}
+Libs: @@libsflag@@${libdir} -lxenguest
+Requires.private: xentoollog,xencall,xenforeignmemory,xenevtchn
