@@ -296,3 +296,8 @@ let debug con =
 	let domid = get_domstr con in
 	let watches = List.map (fun (path, token) -> Printf.sprintf "watch %s: %s %s\n" domid path token) (list_watches con) in
 	String.concat "" watches
+
+let decr_conflict_credit doms con =
+	match con.dom with
+	| None -> () (* It's a socket connection. We don't know which domain we're in, so treat it as if it's free to conflict *)
+	| Some dom -> Domains.decr_conflict_credit doms dom
