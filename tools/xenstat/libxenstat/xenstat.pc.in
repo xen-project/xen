@@ -1,0 +1,10 @@
+prefix=@@prefix@@
+includedir=@@incdir@@
+libdir=@@libdir@@
+
+Name: Xenstat
+Description: The Xenstat library for Xen hypervisor
+Version: @@version@@
+Cflags: -I${includedir}
+Libs: @@libsflag@@${libdir} -lxenstat
+Requires.private: xencontrol,xenstore

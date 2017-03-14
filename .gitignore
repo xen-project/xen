@@ -243,6 +243,7 @@ tools/xenmon/xenbaked
 tools/xenpaging/xenpaging
 tools/xenpmd/xenpmd
 tools/xenstat/libxenstat/src/_paths.h
+tools/xenstat/libxenstat/xenstat.pc
 tools/xenstat/xentop/xentop
 tools/xenstore/xenstore
 tools/xenstore/xenstore-chmod
