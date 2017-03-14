@@ -254,10 +254,18 @@ $(PKG_CONFIG_DIR)/%.pc: %.pc.in Makefile
 	@sed -e 's!@@version@@!$(PKG_CONFIG_VERSION)!g' \
 	     -e 's!@@prefix@@!$(PKG_CONFIG_PREFIX)!g' \
 	     -e 's!@@incdir@@!$(PKG_CONFIG_INCDIR)!g' \
-	     -e 's!@@libdir@@!$(PKG_CONFIG_LIBDIR)!g' < $< > $@
+	     -e 's!@@libdir@@!$(PKG_CONFIG_LIBDIR)!g' \
+	     -e 's!@@firmwaredir@@!$(XENFIRMWAREDIR)!g' \
+	     -e 's!@@libexecbin@@!$(LIBEXEC_BIN)!g' \
+	     -e 's!@@cflagslocal@@!$(PKG_CONFIG_CFLAGS_LOCAL)!g' \
+	     -e 's!@@libsflag@@!-Wl,-rpath-link=!g' < $< > $@
 
 %.pc: %.pc.in Makefile
 	@sed -e 's!@@version@@!$(PKG_CONFIG_VERSION)!g' \
 	     -e 's!@@prefix@@!$(PKG_CONFIG_PREFIX)!g' \
 	     -e 's!@@incdir@@!$(PKG_CONFIG_INCDIR)!g' \
-	     -e 's!@@libdir@@!$(PKG_CONFIG_LIBDIR)!g' < $< > $@
+	     -e 's!@@libdir@@!$(PKG_CONFIG_LIBDIR)!g' \
+	     -e 's!@@firmwaredir@@!$(XENFIRMWAREDIR)!g' \
+	     -e 's!@@libexecbin@@!$(LIBEXEC_BIN)!g' \
+	     -e 's!@@cflagslocal@@!!g' \
+	     -e 's!@@libsflag@@!-L!g' < $< > $@
