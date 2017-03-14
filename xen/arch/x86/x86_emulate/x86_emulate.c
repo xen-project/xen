@@ -7780,7 +7780,9 @@ x86_emulate(
     }
 
     default:
-        goto cannot_emulate;
+    cannot_emulate:
+        rc = X86EMUL_UNHANDLEABLE;
+        goto done;
     }
 
     if ( state->simd_size )
@@ -7924,11 +7926,6 @@ x86_emulate(
     _put_fpu();
     put_stub(stub);
     return rc;
-
- cannot_emulate:
-    _put_fpu();
-    put_stub(stub);
-    return X86EMUL_UNHANDLEABLE;
 #undef state
 }
 
