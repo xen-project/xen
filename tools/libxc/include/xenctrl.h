@@ -487,6 +487,11 @@ typedef union
 } start_info_any_t;
 #endif
 
+typedef struct xc_vcpu_extstate {
+    uint64_t xfeature_mask;
+    uint64_t size;
+    void *buffer;
+} xc_vcpu_extstate_t;
 
 typedef struct xen_arch_domainconfig xc_domain_configuration_t;
 int xc_domain_create(xc_interface *xch, uint32_t ssidref,
@@ -879,6 +884,24 @@ int xc_vcpu_getcontext(xc_interface *xch,
                        uint32_t domid,
                        uint32_t vcpu,
                        vcpu_guest_context_any_t *ctxt);
+
+/**
+ * This function returns information about the XSAVE state of a particular
+ * vcpu of a domain. If extstate->size and extstate->xfeature_mask are 0,
+ * the call is considered a query to retrieve them and the buffer is not
+ * filled.
+ *
+ * @parm xch a handle to an open hypervisor interface
+ * @parm domid the domain to get information from
+ * @parm vcpu the vcpu number
+ * @parm extstate a pointer to a structure to store the XSAVE state of the
+ *                domain
+ * @return 0 on success, negative error code on failure
+ */
+int xc_vcpu_get_extstate(xc_interface *xch,
+                         uint32_t domid,
+                         uint32_t vcpu,
+                         xc_vcpu_extstate_t *extstate);
 
 typedef xen_domctl_getvcpuinfo_t xc_vcpuinfo_t;
 int xc_vcpu_getinfo(xc_interface *xch,

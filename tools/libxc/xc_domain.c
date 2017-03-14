@@ -555,6 +555,65 @@ int xc_vcpu_getcontext(xc_interface *xch,
     return rc;
 }
 
+int xc_vcpu_get_extstate(xc_interface *xch,
+                         uint32_t domid,
+                         uint32_t vcpu,
+                         xc_vcpu_extstate_t *extstate)
+{
+    int rc;
+    DECLARE_DOMCTL;
+    DECLARE_HYPERCALL_BUFFER(void, buffer);
+    bool get_state;
+
+    if ( !extstate )
+        return -EINVAL;
+
+    domctl.cmd = XEN_DOMCTL_getvcpuextstate;
+    domctl.domain = (domid_t)domid;
+    domctl.u.vcpuextstate.vcpu = (uint16_t)vcpu;
+    domctl.u.vcpuextstate.xfeature_mask = extstate->xfeature_mask;
+    domctl.u.vcpuextstate.size = extstate->size;
+
+    get_state = (extstate->size != 0);
+
+    if ( get_state )
+    {
+        buffer = xc_hypercall_buffer_alloc(xch, buffer, extstate->size);
+
+        if ( !buffer )
+        {
+            PERROR("Unable to allocate memory for vcpu%u's xsave context",
+                   vcpu);
+            rc = -ENOMEM;
+            goto out;
+        }
+
+        set_xen_guest_handle(domctl.u.vcpuextstate.buffer, buffer);
+    }
+
+    rc = do_domctl(xch, &domctl);
+
+    if ( rc )
+        goto out;
+
+    /* A query for the size of buffer to use. */
+    if ( !extstate->size && !extstate->xfeature_mask )
+    {
+        extstate->xfeature_mask = domctl.u.vcpuextstate.xfeature_mask;
+        extstate->size = domctl.u.vcpuextstate.size;
+        goto out;
+    }
+
+    if ( get_state )
+        memcpy(extstate->buffer, buffer, extstate->size);
+
+out:
+    if ( get_state )
+        xc_hypercall_buffer_free(xch, buffer);
+
+    return rc;
+}
+
 int xc_watchdog(xc_interface *xch,
                 uint32_t id,
                 uint32_t timeout)
