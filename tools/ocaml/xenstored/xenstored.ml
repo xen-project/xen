@@ -385,6 +385,7 @@ let _ =
 			Symbol.mark_all_as_unused ();
 			Store.mark_symbols store;
 			Connections.iter cons Connection.mark_symbols;
+			History.mark_symbols ();
 			Symbol.garbage ()
 		end;
 
