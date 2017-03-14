@@ -1617,7 +1617,7 @@ int __hwdom_init xen_in_range(unsigned long mfn)
     paddr_t start, end;
     int i;
 
-    enum { region_s3, region_text, region_bss, nr_regions };
+    enum { region_s3, region_ro, region_rw, nr_regions };
     static struct {
         paddr_t s, e;
     } xen_regions[nr_regions] __hwdom_initdata;
@@ -1628,12 +1628,12 @@ int __hwdom_init xen_in_range(unsigned long mfn)
         /* S3 resume code (and other real mode trampoline code) */
         xen_regions[region_s3].s = bootsym_phys(trampoline_start);
         xen_regions[region_s3].e = bootsym_phys(trampoline_end);
-        /* hypervisor code + data */
-        xen_regions[region_text].s =__pa(&_stext);
-        xen_regions[region_text].e = __pa(&__init_begin);
-        /* bss */
-        xen_regions[region_bss].s = __pa(&__bss_start);
-        xen_regions[region_bss].e = __pa(&__bss_end);
+        /* hypervisor .text + .rodata */
+        xen_regions[region_ro].s = __pa(&_stext);
+        xen_regions[region_ro].e = __pa(&__2M_rodata_end);
+        /* hypervisor .data + .bss */
+        xen_regions[region_rw].s = __pa(&__2M_rwdata_start);
+        xen_regions[region_rw].e = __pa(&__2M_rwdata_end);
     }
 
     start = (paddr_t)mfn << PAGE_SHIFT;
