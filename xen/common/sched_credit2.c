@@ -559,6 +559,13 @@ __runq_remove(struct csched2_vcpu *svc)
 
 void burn_credits(struct csched2_runqueue_data *rqd, struct csched2_vcpu *, s_time_t);
 
+static inline void
+tickle_cpu(unsigned int cpu, struct csched2_runqueue_data *rqd)
+{
+    cpumask_set_cpu(cpu, &rqd->tickled);
+    cpu_raise_softirq(cpu, SCHEDULE_SOFTIRQ);
+}
+
 /* Check to see if the item on the runqueue is higher priority than what's
  * currently running; if so, wake up the processor */
 static /*inline*/ void
@@ -660,9 +667,8 @@ tickle:
                   sizeof(d),
                   (unsigned char *)&d);
     }
-    cpumask_set_cpu(ipid, &rqd->tickled);
     SCHED_STAT_CRANK(tickle_idlers_some);
-    cpu_raise_softirq(ipid, SCHEDULE_SOFTIRQ);
+    tickle_cpu(ipid, rqd);
 
 no_tickle:
     return;
@@ -1027,7 +1033,7 @@ csched2_vcpu_sleep(const struct scheduler *ops, struct vcpu *vc)
     SCHED_STAT_CRANK(vcpu_sleep);
 
     if ( curr_on_cpu(vc->processor) == vc )
-        cpu_raise_softirq(vc->processor, SCHEDULE_SOFTIRQ);
+        tickle_cpu(vc->processor, svc->rqd);
     else if ( __vcpu_on_runq(svc) )
     {
         BUG_ON(svc->rqd != RQD(ops, vc->processor));
@@ -1308,8 +1314,8 @@ static void migrate(const struct scheduler *ops,
         svc->migrate_rqd = trqd;
         set_bit(_VPF_migrating, &svc->vcpu->pause_flags);
         set_bit(__CSFLAG_runq_migrate_request, &svc->flags);
-        cpu_raise_softirq(cpu, SCHEDULE_SOFTIRQ);
         SCHED_STAT_CRANK(migrate_requested);
+        tickle_cpu(cpu, svc->rqd);
     }
     else
     {
