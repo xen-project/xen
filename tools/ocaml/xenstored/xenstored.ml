@@ -89,6 +89,8 @@ let parse_config filename =
 	let pidfile = ref default_pidfile in
 	let options = [
 		("merge-activate", Config.Set_bool Transaction.do_coalesce);
+		("conflict-burst-limit", Config.Set_float Define.conflict_burst_limit);
+		("conflict-rate-limit-is-aggregate", Config.Set_bool Define.conflict_rate_limit_is_aggregate);
 		("perms-activate", Config.Set_bool Perms.activate);
 		("quota-activate", Config.Set_bool Quota.activate);
 		("quota-maxwatch", Config.Set_int Define.maxwatch);
