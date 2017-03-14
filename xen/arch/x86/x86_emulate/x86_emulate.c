@@ -2211,6 +2211,17 @@ x86_decode(
                     break;
                 }
                 break;
+            case 0x20: /* mov cr,reg */
+            case 0x21: /* mov dr,reg */
+            case 0x22: /* mov reg,cr */
+            case 0x23: /* mov reg,dr */
+                /*
+                 * Mov to/from cr/dr ignore the encoding of Mod, and behave as
+                 * if they were encoded as reg/reg instructions.  No futher
+                 * disp/SIB bytes are fetched.
+                 */
+                modrm_mod = 3;
+                break;
             }
             break;
 
@@ -4759,7 +4770,7 @@ x86_emulate(
     case X86EMUL_OPC(0x0f, 0x21): /* mov dr,reg */
     case X86EMUL_OPC(0x0f, 0x22): /* mov reg,cr */
     case X86EMUL_OPC(0x0f, 0x23): /* mov reg,dr */
-        generate_exception_if(ea.type != OP_REG, EXC_UD, -1);
+        ASSERT(ea.type == OP_REG); /* Early operand adjustment ensures this. */
         generate_exception_if(!mode_ring0(), EXC_GP, 0);
         modrm_reg |= lock_prefix << 3;
         if ( b & 2 )
