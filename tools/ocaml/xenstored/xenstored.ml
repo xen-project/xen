@@ -53,14 +53,16 @@ let process_connection_fds store cons domains rset wset =
 
 let process_domains store cons domains =
 	let do_io_domain domain =
-		if not (Domain.is_bad_domain domain) then
-			let io_credit = Domain.get_io_credit domain in
-			if io_credit > 0 then (
-				let con = Connections.find_domain cons (Domain.get_id domain) in
-				Process.do_input store cons domains con;
-				Process.do_output store cons domains con;
-				Domain.decr_io_credit domain;
-			) in
+		if Domain.is_bad_domain domain
+		|| Domain.get_io_credit domain <= 0
+		|| Domain.is_paused_for_conflict domain
+		then () (* nothing to do *)
+		else (
+			let con = Connections.find_domain cons (Domain.get_id domain) in
+			Process.do_input store cons domains con;
+			Process.do_output store cons domains con;
+			Domain.decr_io_credit domain
+		) in
 	Domains.iter domains do_io_domain
 
 let sigusr1_handler store =
@@ -90,6 +92,7 @@ let parse_config filename =
 	let options = [
 		("merge-activate", Config.Set_bool Transaction.do_coalesce);
 		("conflict-burst-limit", Config.Set_float Define.conflict_burst_limit);
+		("conflict-max-history-seconds", Config.Set_float Define.conflict_max_history_seconds);
 		("conflict-rate-limit-is-aggregate", Config.Set_bool Define.conflict_rate_limit_is_aggregate);
 		("perms-activate", Config.Set_bool Perms.activate);
 		("quota-activate", Config.Set_bool Quota.activate);
@@ -262,7 +265,22 @@ let _ =
 
 	let store = Store.create () in
 	let eventchn = Event.init () in
-	let domains = Domains.init eventchn in
+	let next_frequent_ops = ref 0. in
+	let advance_next_frequent_ops () =
+		next_frequent_ops := (Unix.gettimeofday () +. !Define.conflict_max_history_seconds)
+	in
+	let delay_next_frequent_ops_by duration =
+		next_frequent_ops := !next_frequent_ops +. duration
+	in
+	let domains = Domains.init eventchn advance_next_frequent_ops in
+
+	(* For things that need to be done periodically but more often
+	 * than the periodic_ops function *)
+	let frequent_ops () =
+		if Unix.gettimeofday () > !next_frequent_ops then (
+			Domains.incr_conflict_credit domains;
+			advance_next_frequent_ops ()
+		) in
 	let cons = Connections.create () in
 
 	let quit = ref false in
@@ -394,23 +412,34 @@ let _ =
 			     gc.Gc.heap_words gc.Gc.heap_chunks
 			     gc.Gc.live_words gc.Gc.live_blocks
 			     gc.Gc.free_words gc.Gc.free_blocks
-		)
-		in
+		);
+		let elapsed = Unix.gettimeofday () -. now in
+		delay_next_frequent_ops_by elapsed
+	in
 
-		let period_ops_interval = 15. in
-		let period_start = ref 0. in
+	let period_ops_interval = 15. in
+	let period_start = ref 0. in
 
 	let main_loop () =
-
+		let is_peaceful c =
+			match Connection.get_domain c with
+			| None -> true (* Treat socket-connections as exempt, and free to conflict. *)
+			| Some dom -> not (Domain.is_paused_for_conflict dom)
+		in
+		frequent_ops ();
 		let mw = Connections.has_more_work cons in
+		let peaceful_mw = List.filter is_peaceful mw in
 		List.iter
 			(fun c ->
 			 match Connection.get_domain c with
 			 | None -> () | Some d -> Domain.incr_io_credit d)
-			mw;
+			peaceful_mw;
+		let start_time = Unix.gettimeofday () in
 		let timeout =
-			if List.length mw > 0 then 0. else period_ops_interval in
-		let inset, outset = Connections.select cons in
+			let until_next_activity = min (max 0. (!next_frequent_ops -. start_time)) period_ops_interval in
+			if peaceful_mw <> [] then 0. else until_next_activity
+		in
+		let inset, outset = Connections.select ~only_if:is_peaceful cons in
 		let rset, wset, _ =
 		try
 			Select.select (spec_fds @ inset) outset [] timeout
@@ -420,6 +449,7 @@ let _ =
 			List.partition (fun fd -> List.mem fd spec_fds) rset in
 		if List.length sfds > 0 then
 			process_special_fds sfds;
+
 		if List.length cfds > 0 || List.length wset > 0 then
 			process_connection_fds store cons domains cfds wset;
 		if timeout <> 0. then (
@@ -427,6 +457,7 @@ let _ =
 			if now > !period_start +. period_ops_interval then
 				(period_start := now; periodic_ops now)
 		);
+
 		process_domains store cons domains
 		in
 
