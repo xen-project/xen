@@ -286,7 +286,7 @@ let transaction_replay c t doms cons =
 	| Transaction.No ->
 		error "attempted to replay a non-full transaction";
 		false
-	| Transaction.Full(id, oldroot, cstore) ->
+	| Transaction.Full(id, oldstore, cstore) ->
 		let tid = Connection.start_transaction c cstore in
 		let new_t = Transaction.make tid cstore in
 		let con = sprintf "r(%d):%s" id (Connection.get_domstr c) in
