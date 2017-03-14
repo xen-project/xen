@@ -515,6 +515,7 @@ enum vmx_insn_errno
     VMX_INSN_VMPTRLD_INCORRECT_VMCS_ID     = 11,
     VMX_INSN_UNSUPPORTED_VMCS_COMPONENT    = 12,
     VMX_INSN_VMXON_IN_VMX_ROOT             = 15,
+    VMX_INSN_VMENTRY_BLOCKED_BY_MOV_SS     = 26,
     VMX_INSN_FAIL_INVALID                  = ~0,
 };
 

@@ -1572,6 +1572,7 @@ int nvmx_handle_vmresume(struct cpu_user_regs *regs)
     bool_t launched;
     struct vcpu *v = current;
     struct nestedvmx *nvmx = &vcpu_2_nvmx(v);
+    unsigned long intr_shadow;
     int rc = vmx_inst_check_privilege(regs, 0);
 
     if ( rc != X86EMUL_OKAY )
@@ -1581,6 +1582,13 @@ int nvmx_handle_vmresume(struct cpu_user_regs *regs)
     {
         vmfail_invalid(regs);
         return X86EMUL_OKAY;        
+    }
+
+    __vmread(GUEST_INTERRUPTIBILITY_INFO, &intr_shadow);
+    if ( intr_shadow & VMX_INTR_SHADOW_MOV_SS )
+    {
+        vmfail_valid(regs, VMX_INSN_VMENTRY_BLOCKED_BY_MOV_SS);
+        return X86EMUL_OKAY;
     }
 
     launched = vvmcs_launched(&nvmx->launched_list,
@@ -1598,6 +1606,7 @@ int nvmx_handle_vmlaunch(struct cpu_user_regs *regs)
     bool_t launched;
     struct vcpu *v = current;
     struct nestedvmx *nvmx = &vcpu_2_nvmx(v);
+    unsigned long intr_shadow;
     int rc = vmx_inst_check_privilege(regs, 0);
 
     if ( rc != X86EMUL_OKAY )
@@ -1606,6 +1615,13 @@ int nvmx_handle_vmlaunch(struct cpu_user_regs *regs)
     if ( vcpu_nestedhvm(v).nv_vvmcxaddr == INVALID_PADDR )
     {
         vmfail_invalid(regs);
+        return X86EMUL_OKAY;
+    }
+
+    __vmread(GUEST_INTERRUPTIBILITY_INFO, &intr_shadow);
+    if ( intr_shadow & VMX_INTR_SHADOW_MOV_SS )
+    {
+        vmfail_valid(regs, VMX_INSN_VMENTRY_BLOCKED_BY_MOV_SS);
         return X86EMUL_OKAY;
     }
 
