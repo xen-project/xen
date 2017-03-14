@@ -193,7 +193,6 @@ tools/libxc/*.pc
 tools/libxl/_libxl.api-for-check
 tools/libxl/*.api-ok
 tools/libxl/*.pc
-tools/libxl/*.pc.in
 tools/libxl/dsdt*
 tools/libxl/libxlu_cfg_y.output
 tools/libxl/mk_dsdt

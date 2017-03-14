@@ -1,0 +1,12 @@
+prefix=@@prefix@@
+includedir=@@incdir@@
+libdir=@@libdir@@
+xenfirmwaredir=@@firmwaredir@@
+libexec_bin=@@libexecbin@@
+
+Name: Xenlight
+Description: The Xenlight library for Xen hypervisor
+Version: @@version@@
+Cflags: -I${includedir}
+Libs: @@libsflag@@${libdir} -lxenlight
+Requires.private: xentoollog,xenevtchn,xenctrl,xenguest,xenstore,blktapctl
