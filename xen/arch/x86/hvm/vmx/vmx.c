@@ -574,13 +574,12 @@ static int vmx_vmcs_restore(struct vcpu *v, struct hvm_hw_cpu *c)
 static void vmx_save_cpu_state(struct vcpu *v, struct hvm_hw_cpu *data)
 {
     struct vmx_msr_state *guest_state = &v->arch.hvm_vmx.msr_state;
-    unsigned long guest_flags = guest_state->flags;
 
     data->shadow_gs = v->arch.hvm_vmx.shadow_gs;
     data->msr_cstar = v->arch.hvm_vmx.cstar;
 
     /* save msrs */
-    data->msr_flags        = guest_flags;
+    data->msr_flags        = 0;
     data->msr_lstar        = guest_state->msrs[VMX_INDEX_MSR_LSTAR];
     data->msr_star         = guest_state->msrs[VMX_INDEX_MSR_STAR];
     data->msr_syscall_mask = guest_state->msrs[VMX_INDEX_MSR_SYSCALL_MASK];
@@ -594,7 +593,7 @@ static void vmx_load_cpu_state(struct vcpu *v, struct hvm_hw_cpu *data)
     struct vmx_msr_state *guest_state = &v->arch.hvm_vmx.msr_state;
 
     /* restore msrs */
-    guest_state->flags = data->msr_flags & 7;
+    guest_state->flags = ((1u << VMX_MSR_COUNT) - 1);
     guest_state->msrs[VMX_INDEX_MSR_LSTAR]        = data->msr_lstar;
     guest_state->msrs[VMX_INDEX_MSR_STAR]         = data->msr_star;
     guest_state->msrs[VMX_INDEX_MSR_SYSCALL_MASK] = data->msr_syscall_mask;
