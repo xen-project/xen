@@ -100,6 +100,8 @@ tools/libs/toollog/xentoollog.pc
 tools/libs/evtchn/headers.chk
 tools/libs/evtchn/xenevtchn.pc
 tools/libs/gnttab/headers.chk
+tools/libs/gnttab/xengntshr.pc
+tools/libs/gnttab/xengnttab.pc
 tools/libs/call/headers.chk
 tools/libs/foreignmemory/headers.chk
 tools/libs/devicemodel/headers.chk
