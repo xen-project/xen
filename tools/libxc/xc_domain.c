@@ -560,7 +560,8 @@ int xc_vcpu_get_extstate(xc_interface *xch,
                          uint32_t vcpu,
                          xc_vcpu_extstate_t *extstate)
 {
-    int rc;
+    int rc = -ENODEV;
+#if defined (__i386__) || defined(__x86_64__)
     DECLARE_DOMCTL;
     DECLARE_HYPERCALL_BUFFER(void, buffer);
     bool get_state;
@@ -610,6 +611,7 @@ int xc_vcpu_get_extstate(xc_interface *xch,
 out:
     if ( get_state )
         xc_hypercall_buffer_free(xch, buffer);
+#endif
 
     return rc;
 }
