@@ -375,7 +375,7 @@ typedef struct colo_msg {
 int colo_proxy_checkpoint(libxl__colo_proxy_state *cps,
                           unsigned int timeout_us)
 {
-    uint8_t *buff;
+    uint8_t *buff = NULL;
     int64_t size;
     struct nlmsghdr *h;
     struct colo_msg *m;
@@ -396,7 +396,7 @@ int colo_proxy_checkpoint(libxl__colo_proxy_state *cps,
         ret = colo_userspace_proxy_recv(cps, recvbuff, timeout_us);
         if (ret <= 0) {
             ret = 0;
-            goto out1;
+            goto out;
         }
 
         if (!strcmp(recvbuff, "DO_CHECKPOINT")) {
@@ -405,14 +405,16 @@ int colo_proxy_checkpoint(libxl__colo_proxy_state *cps,
             LOGD(ERROR, ao->domid, "receive qemu colo-compare checkpoint error");
             ret = 0;
         }
-        goto out1;
+        goto out;
     }
 
     size = colo_proxy_recv(cps, &buff, timeout_us);
 
     /* timeout, return no checkpoint message. */
-    if (size <= 0)
-        return 0;
+    if (size <= 0) {
+        ret = 0;
+        goto out;
+    }
 
     h = (struct nlmsghdr *) buff;
 
@@ -432,8 +434,5 @@ int colo_proxy_checkpoint(libxl__colo_proxy_state *cps,
 
 out:
     free(buff);
-    return ret;
-
-out1:
     return ret;
 }
