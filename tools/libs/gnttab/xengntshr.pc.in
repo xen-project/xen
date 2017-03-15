@@ -1,8 +1,0 @@
-prefix=@@prefix@@
-includedir=@@incdir@@
-libdir=@@libdir@@
-
-Name: Xengntshr
-Description: The Xengntshr library for Xen hypervisor
-Version: @@version@@
-Requires: xengnttab

@@ -26,7 +26,7 @@ ifneq ($(nosharedlibs),y)
 LIB += libxengnttab.so
 endif
 
-PKG_CONFIG := xengnttab.pc xengntshr.pc
+PKG_CONFIG := xengnttab.pc
 PKG_CONFIG_VERSION := $(MAJOR).$(MINOR)
 
 ifneq ($(CONFIG_LIBXC_MINIOS),y)
@@ -76,7 +76,6 @@ install: build
 	$(SYMLINK_SHLIB) libxengnttab.so.$(MAJOR) $(DESTDIR)$(libdir)/libxengnttab.so
 	$(INSTALL_DATA) include/xengnttab.h $(DESTDIR)$(includedir)
 	$(INSTALL_DATA) xengnttab.pc $(DESTDIR)$(PKG_INSTALLDIR)
-	$(INSTALL_DATA) xengntshr.pc $(DESTDIR)$(PKG_INSTALLDIR)
 
 .PHONY: TAGS
 TAGS:
@@ -87,7 +86,7 @@ clean:
 	rm -rf *.rpm $(LIB) *~ $(DEPS) $(LIB_OBJS) $(PIC_OBJS)
 	rm -f libxengnttab.so.$(MAJOR).$(MINOR) libxengnttab.so.$(MAJOR)
 	rm -f headers.chk
-	rm -f xengnttab.pc xengntshr.pc
+	rm -f xengnttab.pc
 
 .PHONY: distclean
 distclean: clean

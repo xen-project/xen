@@ -7,4 +7,4 @@ Description: The Xenvchan library for Xen hypervisor
 Version: @@version@@
 Cflags: -I${includedir} @@cflagslocal@@
 Libs: @@libsflag@@${libdir} -lxenvchan
-Requires.private: xentoollog,xenstore,xengntshr,xenevtchn,xengnttab
+Requires.private: xentoollog,xenstore,xenevtchn,xengnttab
