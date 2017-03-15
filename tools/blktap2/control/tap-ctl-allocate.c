@@ -33,6 +33,7 @@
 #include <string.h>
 #include <getopt.h>
 #include <libgen.h>
+#include <sys/sysmacros.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/ioctl.h>

@@ -39,6 +39,7 @@
 #define SYSFS_PCI_DEV          "/sys/bus/pci/devices"
 #define SYSFS_PCIBACK_DRIVER   "/sys/bus/pci/drivers/pciback"
 #define NETBACK_NIC_NAME       "vif%u.%d"
+#include <sys/sysmacros.h>
 #include <pty.h>
 #include <uuid/uuid.h>
 #elif defined(__sun__)
