@@ -524,7 +524,6 @@ int parse_nic_config(libxl_device_nic *nic, XLU_Config **config, char *token)
         replace_string(&nic->colo_compare_out, oparg);
     } else if (MATCH_OPTION("colo_compare_notify_dev", token, oparg)) {
         replace_string(&nic->colo_compare_notify_dev, oparg);
-
     } else if (MATCH_OPTION("colo_sock_sec_redirector0_id", token, oparg)) {
         replace_string(&nic->colo_sock_sec_redirector0_id, oparg);
     } else if (MATCH_OPTION("colo_sock_sec_redirector0_ip", token, oparg)) {
