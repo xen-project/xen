@@ -52,9 +52,9 @@ build_atomic_write(write_u16_atomic, "h", WORD, uint16_t, "r")
 build_atomic_write(write_u32_atomic, "",  WORD, uint32_t, "r")
 build_atomic_write(write_int_atomic, "",  WORD, int, "r")
 
-#if 0 /* defined (CONFIG_ARM_64) */
-build_atomic_read(read_u64_atomic, "x", uint64_t, "=r")
-build_atomic_write(write_u64_atomic, "x", uint64_t, "r")
+#if defined (CONFIG_ARM_64)
+build_atomic_read(read_u64_atomic, "", "", uint64_t, "=r")
+build_atomic_write(write_u64_atomic, "", "", uint64_t, "r")
 #endif
 
 build_add_sized(add_u8_sized, "b", BYTE, uint8_t, "ri")
