@@ -128,7 +128,7 @@ static int dm_op(domid_t domid,
     if ( rc )
         return rc;
 
-    if ( !has_hvm_container_domain(d) )
+    if ( !is_hvm_domain(d) )
         goto out;
 
     rc = xsm_dm_op(XSM_DM_PRIV, d);
