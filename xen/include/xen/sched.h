@@ -307,10 +307,6 @@ struct vm_event_per_domain
 
 struct evtchn_port_ops;
 
-/*
- * PVH is a PV guest running in an HVM container.  is_hvm_* checks
- * will be false, but has_hvm_container_* checks will be true.
- */
 enum guest_type {
     guest_type_pv, guest_type_hvm
 };
