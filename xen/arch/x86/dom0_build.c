@@ -5,46 +5,18 @@
  */
 
 #include <xen/init.h>
-#include <xen/lib.h>
-#include <xen/ctype.h>
-#include <xen/sched.h>
-#include <xen/sched-if.h>
-#include <xen/smp.h>
-#include <xen/delay.h>
-#include <xen/event.h>
-#include <xen/console.h>
-#include <xen/kernel.h>
-#include <xen/domain.h>
-#include <xen/version.h>
 #include <xen/iocap.h>
-#include <xen/bitops.h>
-#include <xen/compat.h>
 #include <xen/libelf.h>
 #include <xen/pfn.h>
-#include <xen/guest_access.h>
-#include <xen/acpi.h>
-#include <asm/regs.h>
-#include <asm/system.h>
-#include <asm/io.h>
-#include <asm/processor.h>
-#include <asm/desc.h>
+#include <xen/sched.h>
+#include <xen/sched-if.h>
+#include <xen/softirq.h>
+
 #include <asm/dom0_build.h>
-#include <asm/i387.h>
-#include <asm/paging.h>
-#include <asm/p2m.h>
-#include <asm/e820.h>
-#include <asm/acpi.h>
-#include <asm/setup.h>
-#include <asm/bzimage.h> /* for bzimage_parse */
-#include <asm/io_apic.h>
 #include <asm/hpet.h>
-
-#include <acpi/actables.h>
-
-#include <public/version.h>
-#include <public/hvm/hvm_info_table.h>
-#include <public/arch-x86/hvm/start_info.h>
-#include <public/hvm/hvm_vcpu.h>
+#include <asm/io_apic.h>
+#include <asm/p2m.h>
+#include <asm/setup.h>
 
 static long __initdata dom0_nrpages;
 static long __initdata dom0_min_nrpages;
