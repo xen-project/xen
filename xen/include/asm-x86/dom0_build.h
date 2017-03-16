@@ -20,6 +20,15 @@ int dom0_construct_pv(struct domain *d, const module_t *image,
                       void *(*bootstrap_map)(const module_t *),
                       char *cmdline);
 
+int dom0_construct_pvh(struct domain *d, const module_t *image,
+                       unsigned long image_headroom,
+                       module_t *initrd,
+                       void *(*bootstrap_map)(const module_t *),
+                       char *cmdline);
+
+unsigned long dom0_paging_pages(const struct domain *d,
+                                unsigned long nr_pages);
+
 #endif	/* _DOM0_BUILD_H_ */
 
 /*
