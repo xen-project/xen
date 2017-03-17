@@ -1079,9 +1079,9 @@ int libxl__qmp_start_replication(libxl__gc *gc, int domid, bool primary)
     return qmp_run_command(gc, domid, "xen-set-replication", args, NULL, NULL);
 }
 
-int libxl__qmp_get_replication_error(libxl__gc *gc, int domid)
+int libxl__qmp_query_xen_replication_status(libxl__gc *gc, int domid)
 {
-    return qmp_run_command(gc, domid, "xen-get-replication-error", NULL,
+    return qmp_run_command(gc, domid, "query-xen-replication-status", NULL,
                            NULL, NULL);
 }
 

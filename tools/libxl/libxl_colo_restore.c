@@ -986,7 +986,7 @@ static void colo_suspend_vm_done(libxl__egc *egc,
 
     crcs->status = LIBXL_COLO_SUSPENDED;
 
-    if (libxl__qmp_get_replication_error(gc, crs->domid)) {
+    if (libxl__qmp_query_xen_replication_status(gc, crs->domid)) {
         LOGD(ERROR, crs->domid, "replication error occurs when secondary vm is running");
         goto out;
     }

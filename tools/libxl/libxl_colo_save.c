@@ -345,7 +345,8 @@ static void colo_read_svm_suspended_done(libxl__egc *egc,
         goto out;
     }
 
-    if (!css->paused && libxl__qmp_get_replication_error(gc, dss->domid)) {
+    if (!css->paused &&
+        libxl__qmp_query_xen_replication_status(gc, dss->domid)) {
         LOGD(ERROR, dss->domid,
              "replication error occurs when primary vm is running");
         goto out;
