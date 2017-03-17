@@ -1831,7 +1831,7 @@ _hidden int libxl__qmp_start_replication(libxl__gc *gc, int domid,
 /* Get replication error that occurs when the vm is running */
 _hidden int libxl__qmp_get_replication_error(libxl__gc *gc, int domid);
 /* Do checkpoint */
-_hidden int libxl__qmp_do_checkpoint(libxl__gc *gc, int domid);
+_hidden int libxl__qmp_colo_do_checkpoint(libxl__gc *gc, int domid);
 /* Stop replication */
 _hidden int libxl__qmp_stop_replication(libxl__gc *gc, int domid,
                                         bool primary);

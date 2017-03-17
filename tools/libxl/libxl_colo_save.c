@@ -460,7 +460,7 @@ static void colo_preresume_cb(libxl__egc *egc,
     }
 
     if (!css->paused) {
-        if (libxl__qmp_do_checkpoint(gc, dss->domid)) {
+        if (libxl__qmp_colo_do_checkpoint(gc, dss->domid)) {
             LOGD(ERROR, dss->domid, "doing checkpoint fails");
             goto out;
         }

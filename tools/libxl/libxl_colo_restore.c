@@ -607,7 +607,7 @@ static void colo_restore_preresume_cb(libxl__egc *egc,
     }
 
     if (crs->qdisk_setuped) {
-        if (libxl__qmp_do_checkpoint(gc, crs->domid)) {
+        if (libxl__qmp_colo_do_checkpoint(gc, crs->domid)) {
             LOGD(ERROR, crs->domid, "doing checkpoint fails");
             goto out;
         }

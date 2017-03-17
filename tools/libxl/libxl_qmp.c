@@ -1085,9 +1085,10 @@ int libxl__qmp_get_replication_error(libxl__gc *gc, int domid)
                            NULL, NULL);
 }
 
-int libxl__qmp_do_checkpoint(libxl__gc *gc, int domid)
+int libxl__qmp_colo_do_checkpoint(libxl__gc *gc, int domid)
 {
-    return qmp_run_command(gc, domid, "xen-do-checkpoint", NULL, NULL, NULL);
+    return qmp_run_command(gc, domid, "xen-colo-do-checkpoint",
+                           NULL, NULL, NULL);
 }
 
 int libxl__qmp_stop_replication(libxl__gc *gc, int domid, bool primary)
