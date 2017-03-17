@@ -78,7 +78,27 @@ static struct scheduler __read_mostly ops;
           : (typeof((opsptr)->fn(opsptr, ##__VA_ARGS__)))0 )
 
 #define DOM2OP(_d)    (((_d)->cpupool == NULL) ? &ops : ((_d)->cpupool->sched))
-#define VCPU2OP(_v)   (DOM2OP((_v)->domain))
+static inline struct scheduler *VCPU2OP(const struct vcpu *v)
+{
+    struct domain *d = v->domain;
+
+    if ( likely(d->cpupool != NULL) )
+        return d->cpupool->sched;
+
+    /*
+     * If d->cpupool is NULL, this is a vCPU of the idle domain. And this
+     * case is special because the idle domain does not really belong to
+     * a cpupool and, hence, doesn't really have a scheduler). In fact, its
+     * vCPUs (may) run on pCPUs which are in different pools, with different
+     * schedulers.
+     *
+     * What we want, in this case, is the scheduler of the pCPU where this
+     * particular idle vCPU is running. And, since v->processor never changes
+     * for idle vCPUs, it is safe to use it, with no locks, to figure that out.
+     */
+    ASSERT(is_idle_domain(d));
+    return per_cpu(scheduler, v->processor);
+}
 #define VCPU2ONLINE(_v) cpupool_domain_cpumask((_v)->domain)
 
 static inline void trace_runstate_change(struct vcpu *v, int new_state)
