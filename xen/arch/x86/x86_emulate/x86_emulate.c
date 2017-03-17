@@ -553,10 +553,10 @@ typedef union {
  * the compiler for automatic variables. Use this helper to instantiate a
  * suitably aligned variable, producing a pointer to access it.
  */
-#define DECLARE_ALIGNED(type, var)                                   \
-    long __##var[sizeof(type) + __alignof(type) - __alignof(long)];  \
-    type *const var##p =                                             \
-        (void *)((long)(__##var + __alignof(type) - __alignof(long)) \
+#define DECLARE_ALIGNED(type, var)                                        \
+    long __##var[(sizeof(type) + __alignof(type)) / __alignof(long) - 1]; \
+    type *const var##p =                                                  \
+        (void *)(((long)__##var + __alignof(type) - __alignof(__##var))   \
                  & -__alignof(type))
 
 #ifdef __GCC_ASM_FLAG_OUTPUTS__
