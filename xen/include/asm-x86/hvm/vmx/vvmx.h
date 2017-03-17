@@ -51,7 +51,6 @@ struct nestedvmx {
     } ept;
     uint32_t guest_vpid;
     struct list_head launched_list;
-    bool shadow_vmcs;
 };
 
 #define vcpu_2_nvmx(v)	(vcpu_nestedhvm(v).u.nvmx)

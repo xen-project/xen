@@ -1119,19 +1119,10 @@ static bool_t nvmx_vpid_enabled(const struct vcpu *v)
 
 static void nvmx_set_vmcs_pointer(struct vcpu *v, struct vmcs_struct *vvmcs)
 {
-    struct nestedvmx *nvmx = &vcpu_2_nvmx(v);
     paddr_t vvmcs_maddr = v->arch.hvm_vmx.vmcs_shadow_maddr;
 
     __vmpclear(vvmcs_maddr);
-    if ( !nvmx->shadow_vmcs )
-    {
-        /*
-         * We must set the shadow VMCS-indicator in order for the next vmentry
-         * to succeed with a newly set up link pointer in vmcs01.
-         * Note: guest can see that this bit was set.
-         */
-        vvmcs->vmcs_revision_id |= VMCS_RID_TYPE_MASK;
-    }
+    vvmcs->vmcs_revision_id |= VMCS_RID_TYPE_MASK;
     __vmwrite(VMCS_LINK_POINTER, vvmcs_maddr);
     __vmwrite(VMREAD_BITMAP, page_to_maddr(v->arch.hvm_vmx.vmread_bitmap));
     __vmwrite(VMWRITE_BITMAP, page_to_maddr(v->arch.hvm_vmx.vmwrite_bitmap));
@@ -1139,13 +1130,10 @@ static void nvmx_set_vmcs_pointer(struct vcpu *v, struct vmcs_struct *vvmcs)
 
 static void nvmx_clear_vmcs_pointer(struct vcpu *v, struct vmcs_struct *vvmcs)
 {
-    struct nestedvmx *nvmx = &vcpu_2_nvmx(v);
     paddr_t vvmcs_maddr = v->arch.hvm_vmx.vmcs_shadow_maddr;
 
     __vmpclear(vvmcs_maddr);
-    if ( !nvmx->shadow_vmcs )
-        vvmcs->vmcs_revision_id &= ~VMCS_RID_TYPE_MASK;
-    nvmx->shadow_vmcs = false;
+    vvmcs->vmcs_revision_id &= ~VMCS_RID_TYPE_MASK;
     __vmwrite(VMCS_LINK_POINTER, ~0ul);
     __vmwrite(VMREAD_BITMAP, 0);
     __vmwrite(VMWRITE_BITMAP, 0);
@@ -1686,14 +1674,12 @@ int nvmx_handle_vmptrld(struct cpu_user_regs *regs)
         {
             if ( writable )
             {
-                struct nestedvmx *nvmx = &vcpu_2_nvmx(v);
                 struct vmcs_struct *vvmcs = vvmcx;
 
-                nvmx->shadow_vmcs =
-                    vvmcs->vmcs_revision_id & ~VMX_BASIC_REVISION_MASK;
                 if ( ((vvmcs->vmcs_revision_id ^ vmx_basic_msr) &
                                          VMX_BASIC_REVISION_MASK) ||
-                     (!cpu_has_vmx_vmcs_shadowing && nvmx->shadow_vmcs) )
+                     (!cpu_has_vmx_vmcs_shadowing &&
+                      (vvmcs->vmcs_revision_id & ~VMX_BASIC_REVISION_MASK)) )
                 {
                     hvm_unmap_guest_frame(vvmcx, 1);
                     vmfail(regs, VMX_INSN_VMPTRLD_INCORRECT_VMCS_ID);
