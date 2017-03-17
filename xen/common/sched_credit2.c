@@ -2437,8 +2437,6 @@ csched2_runtime(const struct scheduler *ops, int cpu,
     return time;
 }
 
-void __dump_execstate(void *unused);
-
 /*
  * Find a candidate.
  */
