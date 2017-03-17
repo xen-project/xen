@@ -66,6 +66,9 @@ struct p2m_domain {
     /* Radix tree to store the p2m_access_t settings as the pte's don't have
      * enough available bits to store this information. */
     struct radix_tree_root mem_access_settings;
+
+    /* Keeping track on which CPU this p2m was used and for which vCPU */
+    uint8_t last_vcpu_ran[NR_CPUS];
 };
 
 /* List of possible type for each page in the p2m entry.

@@ -96,6 +96,8 @@ void p2m_save_state(struct vcpu *p)
 void p2m_restore_state(struct vcpu *n)
 {
     register_t hcr;
+    struct p2m_domain *p2m = &n->domain->arch.p2m;
+    uint8_t *last_vcpu_ran;
 
     hcr = READ_SYSREG(HCR_EL2);
 
@@ -112,6 +114,17 @@ void p2m_restore_state(struct vcpu *n)
 
     WRITE_SYSREG(hcr, HCR_EL2);
     isb();
+
+    last_vcpu_ran = &p2m->last_vcpu_ran[smp_processor_id()];
+
+    /*
+     * Flush local TLB for the domain to prevent wrong TLB translation
+     * when running multiple vCPU of the same domain on a single pCPU.
+     */
+    if ( *last_vcpu_ran != INVALID_VCPU_ID && *last_vcpu_ran != n->vcpu_id )
+        flush_tlb_local();
+
+    *last_vcpu_ran = n->vcpu_id;
 }
 
 void flush_tlb_domain(struct domain *d)
@@ -1422,6 +1435,7 @@ int p2m_init(struct domain *d)
 {
     struct p2m_domain *p2m = &d->arch.p2m;
     int rc = 0;
+    unsigned int cpu;
 
     spin_lock_init(&p2m->lock);
     INIT_PAGE_LIST_HEAD(&p2m->pages);
@@ -1446,6 +1460,17 @@ int p2m_init(struct domain *d)
 
 err:
     spin_unlock(&p2m->lock);
+
+    /*
+     * Make sure that the type chosen to is able to store the an vCPU ID
+     * between 0 and the maximum of virtual CPUS supported as long as
+     * the INVALID_VCPU_ID.
+     */
+    BUILD_BUG_ON((1 << (sizeof(p2m->last_vcpu_ran[0]) * 8)) < MAX_VIRT_CPUS);
+    BUILD_BUG_ON((1 << (sizeof(p2m->last_vcpu_ran[0])* 8)) < INVALID_VCPU_ID);
+
+    for_each_possible_cpu(cpu)
+       p2m->last_vcpu_ran[cpu] = INVALID_VCPU_ID;
 
     return rc;
 }
