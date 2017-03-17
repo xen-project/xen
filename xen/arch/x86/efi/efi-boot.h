@@ -13,7 +13,7 @@ static struct file __initdata ucode;
 static multiboot_info_t __initdata mbi = {
     .flags = MBI_MODULES | MBI_LOADERNAME
 };
-static module_t __initdata mb_modules[3];
+static module_t __initdata mb_modules[4];
 
 static void __init edd_put_string(u8 *dst, size_t n, const char *src)
 {
