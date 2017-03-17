@@ -5,7 +5,12 @@
 
 #include "x86_emulate.h"
 #include "blowfish.h"
-#include "simd.h"
+#include "sse.h"
+#include "sse2.h"
+#include "sse4.h"
+#include "sse-avx.h"
+#include "sse2-avx.h"
+#include "sse4-avx.h"
 
 #define verbose false /* Switch to true for far more logging. */
 
@@ -79,8 +84,8 @@ static const struct {
     BLOWFISH(32, blowfish (push), _mno_accumulate_outgoing_args),
 #undef BLOWFISH
 #define SIMD_(bits, desc, feat, form)                               \
-    { .code = simd_x86_ ## bits ## _D ## feat ## _ ## form,         \
-      .size = sizeof(simd_x86_ ## bits ## _D ## feat ## _ ## form), \
+    { .code = feat ## _x86_ ## bits ## _D ## _ ## form,             \
+      .size = sizeof(feat ## _x86_ ## bits ## _D ## _ ## form),     \
       .bitness = bits, .name = #desc,                               \
       .check_cpu = simd_check_ ## feat,                             \
       .set_regs = simd_set_regs,                                    \

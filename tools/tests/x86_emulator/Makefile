@@ -11,7 +11,8 @@ all: $(TARGET)
 run: $(TARGET)
 	./$(TARGET)
 
-TESTCASES := blowfish simd
+SIMD := sse sse2 sse4
+TESTCASES := blowfish $(SIMD) $(addsuffix -avx,$(filter sse%,$(SIMD)))
 
 blowfish-cflags := ""
 blowfish-cflags-x86_32 := "-mno-accumulate-outgoing-args -Dstatic="
@@ -34,19 +35,28 @@ sse2avx-sse  := -ffixed-xmm0 -Wa,-msse2avx
 sse2avx-sse2 := $(sse2avx-sse)
 sse2avx-sse4 := -Wa,-msse2avx
 
-simd-cflags := $(foreach flavor,sse sse2 sse4, \
-                 $(foreach vec,$($(flavor)-vecs), \
-                   $(foreach int,$($(flavor)-ints), \
-                     "-D$(flavor)_$(vec)i$(int) -m$(flavor) -O2 -DVEC_SIZE=$(vec) -DINT_SIZE=$(int)" \
-                     "-D$(flavor)_$(vec)u$(int) -m$(flavor) -O2 -DVEC_SIZE=$(vec) -DUINT_SIZE=$(int)" \
-                     "-D$(flavor)_avx_$(vec)i$(int) -m$(flavor) $(sse2avx-$(flavor)) -O2 -DVEC_SIZE=$(vec) -DINT_SIZE=$(int)" \
-                     "-D$(flavor)_avx_$(vec)u$(int) -m$(flavor) $(sse2avx-$(flavor)) -O2 -DVEC_SIZE=$(vec) -DUINT_SIZE=$(int)") \
-                   $(foreach flt,$($(flavor)-flts), \
-                     "-D$(flavor)_$(vec)f$(flt) -m$(flavor) -O2 -DVEC_SIZE=$(vec) -DFLOAT_SIZE=$(flt)" \
-                     "-D$(flavor)_avx_$(vec)f$(flt) -m$(flavor) $(sse2avx-$(flavor)) -O2 -DVEC_SIZE=$(vec) -DFLOAT_SIZE=$(flt)")) \
-                 $(foreach flt,$($(flavor)-flts), \
-                   "-D$(flavor)_f$(flt) -m$(flavor) -mfpmath=sse -O2 -DFLOAT_SIZE=$(flt)" \
-                   "-D$(flavor)_avx_f$(flt) -m$(flavor) -mfpmath=sse $(sse2avx-$(flavor)) -O2 -DFLOAT_SIZE=$(flt)"))
+define simd-defs
+$(1)-cflags := \
+	$(foreach vec,$($(1)-vecs), \
+	  $(foreach int,$($(1)-ints), \
+	    "-D_$(vec)i$(int) -m$(1) -O2 -DVEC_SIZE=$(vec) -DINT_SIZE=$(int)" \
+	    "-D_$(vec)u$(int) -m$(1) -O2 -DVEC_SIZE=$(vec) -DUINT_SIZE=$(int)") \
+	  $(foreach flt,$($(1)-flts), \
+	    "-D_$(vec)f$(flt) -m$(1) -O2 -DVEC_SIZE=$(vec) -DFLOAT_SIZE=$(flt)")) \
+	$(foreach flt,$($(1)-flts), \
+	  "-D_f$(flt) -m$(1) -mfpmath=sse -O2 -DFLOAT_SIZE=$(flt)")
+$(1)-avx-cflags := \
+	$(foreach vec,$($(1)-vecs), \
+	  $(foreach int,$($(1)-ints), \
+	    "-D_$(vec)i$(int) -m$(1) $(sse2avx-$(1)) -O2 -DVEC_SIZE=$(vec) -DINT_SIZE=$(int)" \
+	    "-D_$(vec)u$(int) -m$(1) $(sse2avx-$(1)) -O2 -DVEC_SIZE=$(vec) -DUINT_SIZE=$(int)") \
+	  $(foreach flt,$($(1)-flts), \
+	    "-D_$(vec)f$(flt) -m$(1) $(sse2avx-$(1)) -O2 -DVEC_SIZE=$(vec) -DFLOAT_SIZE=$(flt)")) \
+	$(foreach flt,$($(1)-flts), \
+	  "-D_f$(flt) -m$(1) -mfpmath=sse $(sse2avx-$(1)) -O2 -DFLOAT_SIZE=$(flt)")
+endef
+
+$(foreach flavor,$(SIMD),$(eval $(call simd-defs,$(flavor))))
 
 $(addsuffix .h,$(TESTCASES)): %.h: %.c testcase.mk Makefile
 	rm -f $@.new $*.bin
@@ -54,13 +64,16 @@ $(addsuffix .h,$(TESTCASES)): %.h: %.c testcase.mk Makefile
 	    for cflags in $($*-cflags) $($*-cflags-$(arch)); do \
 		$(MAKE) -f testcase.mk TESTCASE=$* XEN_TARGET_ARCH=$(arch) $*-cflags="$$cflags" all; \
 		flavor=$$(echo $${cflags} | sed -e 's, .*,,' -e 'y,-=,__,') ; \
-		(echo "static const unsigned int $*_$(arch)$${flavor}[] = {"; \
+		(echo "static const unsigned int $(subst -,_,$*)_$(arch)$${flavor}[] = {"; \
 		 od -v -t x $*.bin | sed -e 's/^[0-9]* /0x/' -e 's/ /, 0x/g' -e 's/$$/,/'; \
 		 echo "};") >>$@.new; \
 		rm -f $*.bin; \
 	    done; \
 	)
 	mv $@.new $@
+
+$(addsuffix .c,$(SIMD)) $(addsuffix -avx.c,$(filter sse%,$(SIMD))):
+	ln -sf simd.c $@
 
 $(TARGET): x86_emulate.o test_x86_emulator.o
 	$(HOSTCC) -o $@ $^
