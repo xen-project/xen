@@ -107,7 +107,9 @@ struct vgic_irq_rank {
 
     /*
      * It's more convenient to store a target VCPU per vIRQ
-     * than the register ITARGETSR/IROUTER itself
+     * than the register ITARGETSR/IROUTER itself.
+     * Use atomic operations to read/write the vcpu fields to avoid
+     * taking the rank lock.
      */
     uint8_t vcpu[32];
 };
