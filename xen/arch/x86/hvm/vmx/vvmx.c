@@ -1630,13 +1630,6 @@ int nvmx_handle_vmlaunch(struct cpu_user_regs *regs)
         return X86EMUL_OKAY;
     }
 
-    /* Check that guest is not using a shadow vmcs for vmentry */
-    if ( nvmx->shadow_vmcs )
-    {
-        vmfail_invalid(regs);
-        return X86EMUL_OKAY;
-    }
-
     __vmread(GUEST_INTERRUPTIBILITY_INFO, &intr_shadow);
     if ( intr_shadow & VMX_INTR_SHADOW_MOV_SS )
     {
