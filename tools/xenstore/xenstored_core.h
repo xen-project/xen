@@ -33,6 +33,12 @@
 #include "list.h"
 #include "tdb.h"
 
+#define MIN(a, b) (((a) < (b))? (a) : (b))
+
+typedef int32_t wrl_creditt;
+#define WRL_CREDIT_MAX (1000*1000*1000)
+/* ^ satisfies non-overflow condition for wrl_xfer_credit */
+
 struct buffered_data
 {
 	struct list_head list;
