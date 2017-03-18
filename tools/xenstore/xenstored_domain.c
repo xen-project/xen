@@ -22,6 +22,7 @@
 #include <stdlib.h>
 #include <stdarg.h>
 #include <time.h>
+#include <syslog.h>
 
 #include "utils.h"
 #include "talloc.h"
@@ -78,6 +79,7 @@ struct domain
 	/* write rate limit */
 	wrl_creditt wrl_credit; /* [ -wrl_config_writecost, +_dburst ] */
 	struct wrl_timestampt wrl_timestamp;
+	bool wrl_delay_logged;
 };
 
 static LIST_HEAD(domains);
@@ -769,6 +771,7 @@ long wrl_ntransactions;
 
 static long wrl_ndomains;
 static wrl_creditt wrl_reserve; /* [-wrl_config_newdoms_dburst, +_gburst ] */
+static time_t wrl_log_last_warning; /* 0: no previous warning */
 
 void wrl_gettime_now(struct wrl_timestampt *now_wt)
 {
@@ -918,6 +921,9 @@ void wrl_check_timeout(struct domain *domain,
 	      wakeup);
 }
 
+#define WRL_LOG(now, ...) \
+	(syslog(LOG_WARNING, "write rate limit: " __VA_ARGS__))
+
 void wrl_apply_debit_actual(struct domain *domain)
 {
 	struct wrl_timestampt now;
@@ -933,6 +939,26 @@ void wrl_apply_debit_actual(struct domain *domain)
 	trace("wrl: domain %u credit=%ld (reserve=%ld)\n",
 	      domain->domid,
 	      (long)domain->wrl_credit, (long)wrl_reserve);
+
+	if (domain->wrl_credit < 0) {
+		if (!domain->wrl_delay_logged) {
+			domain->wrl_delay_logged = true;
+			WRL_LOG(now, "domain %ld is affected",
+				(long)domain->domid);
+		} else if (!wrl_log_last_warning) {
+			WRL_LOG(now, "rate limiting restarts");
+		}
+		wrl_log_last_warning = now.sec;
+	}
+}
+
+void wrl_log_periodic(struct wrl_timestampt now)
+{
+	if (wrl_log_last_warning &&
+	    (now.sec - wrl_log_last_warning) > WRL_LOGEVERY) {
+		WRL_LOG(now, "not in force recently");
+		wrl_log_last_warning = 0;
+	}
 }
 
 void wrl_apply_debit_direct(struct connection *conn)
