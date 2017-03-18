@@ -715,11 +715,9 @@ Ocfs2 has only very limited security; it is assumed that anyone who can
 access the filesystem bits on the shared disk can mount the filesystem and use
 it.  But in a virtualized data center,
 higher isolation requirements may apply.
-As a result, a Xen boot option -- &quot;tmem_shared_auth&quot; -- was
-added.  The option defaults to disabled,
-but when it is enabled, management tools must explicitly authenticate (or may
+As a result, management tools must explicitly authenticate (or may
 explicitly deny) shared pool access to any client.
-On Xen, this is done with the &quot;xm
+On Xen, this is done with the &quot;xl
 tmem-shared-auth&quot; command.
 <P>
 <b><i>32-bit implementation</i>.</b>

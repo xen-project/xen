@@ -846,7 +846,6 @@ struct client *client_create(domid_t cli_id)
     client->info.version = TMEM_SPEC_VERSION;
     client->info.maxpools = MAX_POOLS_PER_DOMAIN;
     client->info.flags.u.compress = tmem_compression_enabled();
-    client->shared_auth_required = tmem_shared_auth();
     for ( i = 0; i < MAX_GLOBAL_SHARED_POOLS; i++)
         client->shared_auth_uuid[i][0] =
             client->shared_auth_uuid[i][1] = -1L;
@@ -1530,7 +1529,7 @@ int do_tmem_new_pool(domid_t this_cli_id,
             pool->shared = 0;
             goto out;
         }
-        if ( client->shared_auth_required && !tmem_global.shared_auth )
+        if ( !tmem_global.shared_auth )
         {
             for ( i = 0; i < MAX_GLOBAL_SHARED_POOLS; i++)
                 if ( (client->shared_auth_uuid[i][0] == uuid_lo) &&

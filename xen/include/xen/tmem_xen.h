@@ -41,12 +41,6 @@ static inline bool_t tmem_compression_enabled(void)
     return opt_tmem_compress;
 }
 
-extern bool_t opt_tmem_shared_auth;
-static inline bool_t tmem_shared_auth(void)
-{
-    return opt_tmem_shared_auth;
-}
-
 #ifdef CONFIG_TMEM
 extern bool_t opt_tmem;
 static inline bool_t tmem_enabled(void)
@@ -291,7 +285,6 @@ struct client {
     long eph_count, eph_count_max;
     domid_t cli_id;
     xen_tmem_client_t info;
-    bool_t shared_auth_required;
     /* For save/restore/migration. */
     bool_t was_frozen;
     struct list_head persistent_invalidated_list;
