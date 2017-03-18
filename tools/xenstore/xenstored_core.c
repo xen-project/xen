@@ -353,6 +353,7 @@ static void initialize_fds(int sock, int *p_sock_pollfd_idx,
 			   int *ptimeout)
 {
 	struct connection *conn;
+	struct wrl_timestampt now;
 
 	if (fds)
 		memset(fds, 0, sizeof(struct pollfd) * current_array_size);
@@ -372,8 +373,11 @@ static void initialize_fds(int sock, int *p_sock_pollfd_idx,
 		xce_pollfd_idx = set_fd(xc_evtchn_fd(xce_handle),
 					POLLIN|POLLPRI);
 
+	wrl_gettime_now(&now);
+
 	list_for_each_entry(conn, &connections, list) {
 		if (conn->domain) {
+			wrl_check_timeout(conn->domain, now, ptimeout);
 			if (domain_can_read(conn) ||
 			    (domain_can_write(conn) &&
 			     !list_empty(&conn->out_list)))
@@ -806,6 +810,7 @@ static void delete_node_single(struct connection *conn, struct node *node)
 		corrupt(conn, "Could not delete '%s'", node->name);
 		return;
 	}
+
 	domain_entry_dec(conn, node);
 }
 
@@ -945,6 +950,7 @@ static void do_write(struct connection *conn, struct buffered_data *in)
 	}
 
 	add_change_node(conn->transaction, name, false);
+	wrl_apply_debit_direct(conn);
 	fire_watches(conn, name, false);
 	send_ack(conn, XS_WRITE);
 }
@@ -969,6 +975,7 @@ static void do_mkdir(struct connection *conn, const char *name)
 			return;
 		}
 		add_change_node(conn->transaction, name, false);
+		wrl_apply_debit_direct(conn);
 		fire_watches(conn, name, false);
 	}
 	send_ack(conn, XS_MKDIR);
@@ -1094,6 +1101,7 @@ static void do_rm(struct connection *conn, const char *name)
 
 	if (_rm(conn, node, name)) {
 		add_change_node(conn->transaction, name, true);
+		wrl_apply_debit_direct(conn);
 		fire_watches(conn, name, true);
 		send_ack(conn, XS_RM);
 	}
@@ -1169,6 +1177,7 @@ static void do_set_perms(struct connection *conn, struct buffered_data *in)
 	}
 
 	add_change_node(conn->transaction, name, false);
+	wrl_apply_debit_direct(conn);
 	fire_watches(conn, name, false);
 	send_ack(conn, XS_SET_PERMS);
 }
