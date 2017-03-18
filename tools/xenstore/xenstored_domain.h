@@ -72,6 +72,7 @@ int domain_watch(struct connection *conn);
 #define WRL_DBURST     10
 #define WRL_GBURST   1000
 #define WRL_NEWDOMS     5
+#define WRL_LOGEVERY  120 /* seconds */
 
 struct wrl_timestampt {
 	time_t sec;
@@ -87,6 +88,7 @@ void wrl_credit_update(struct domain *domain, struct wrl_timestampt now);
 void wrl_check_timeout(struct domain *domain,
                        struct wrl_timestampt now,
                        int *ptimeout);
+void wrl_log_periodic(struct wrl_timestampt now);
 void wrl_apply_debit_direct(struct connection *conn);
 void wrl_apply_debit_trans_commit(struct connection *conn);
 
