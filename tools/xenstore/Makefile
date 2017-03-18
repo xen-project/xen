@@ -19,6 +19,7 @@ XENSTORED_OBJS_$(CONFIG_NetBSD) = xenstored_netbsd.o xenstored_posix.o
 XENSTORED_OBJS_$(CONFIG_MiniOS) = xenstored_minios.o
 
 XENSTORED_OBJS += $(XENSTORED_OBJS_y)
+LDLIBS_xenstored += -lrt
 
 ifneq ($(XENSTORE_STATIC_CLIENTS),y)
 LIBXENSTORE := libxenstore.so
@@ -61,7 +62,7 @@ init-xenstore-domain: init-xenstore-domain.o $(LIBXENSTORE)
 	$(CC) $(LDFLAGS) $^ $(LDLIBS_libxenctrl) $(LDLIBS_libxenguest) $(LDLIBS_libxenstore) -o $@ $(APPEND_LDFLAGS)
 
 xenstored: $(XENSTORED_OBJS)
-	$(CC) $(LDFLAGS) $^ $(LDLIBS_libxenctrl) $(SOCKET_LIBS) -o $@ $(APPEND_LDFLAGS)
+	$(CC) $(LDFLAGS) $^ $(LDLIBS_libxenctrl) $(LDLIBS_xenstored) $(SOCKET_LIBS) -o $@ $(APPEND_LDFLAGS)
 
 xenstored.a: $(XENSTORED_OBJS)
 	$(AR) cr $@ $^
