@@ -138,9 +138,9 @@ static int xc_tmem_uuid_parse(char *uuid_str, uint64_t *uuid_lo, uint64_t *uuid_
         else if ( *p >= '0' && *p <= '9' )
             digit = *p - '0';
         else if ( *p >= 'A' && *p <= 'F' )
-            digit = *p - 'A';
+            digit = *p - 'A' + 10;
         else if ( *p >= 'a' && *p <= 'f' )
-            digit = *p - 'a';
+            digit = *p - 'a' + 10;
         else
             return -1;
         *x = (*x << 4) | digit;
