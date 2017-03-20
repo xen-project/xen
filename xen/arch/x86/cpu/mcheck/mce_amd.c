@@ -120,9 +120,11 @@ bool mc_amd_recoverable_scan(uint64_t status)
     case MC_EC_BUS_TYPE: /* value in addr MSR is physical */
         /* should run cpu offline action */
         break;
+
     case MC_EC_MEM_TYPE: /* value in addr MSR is physical */
         ret = true; /* run memory page offline action */
         break;
+
     case MC_EC_TLB_TYPE: /* value in addr MSR is virtual */
         /* should run tlb flush action and retry */
         break;
@@ -144,6 +146,7 @@ bool mc_amd_addrcheck(uint64_t status, uint64_t misc, int addrtype)
     case MC_EC_BUS_TYPE: /* value in addr MSR is physical */
     case MC_EC_MEM_TYPE: /* value in addr MSR is physical */
         return (addrtype == MC_ADDR_PHYSICAL);
+
     case MC_EC_TLB_TYPE: /* value in addr MSR is virtual */
         return (addrtype == MC_ADDR_VIRTUAL);
     }
@@ -191,6 +194,7 @@ int mcequirk_amd_apply(enum mcequirk_amd_flags flags)
         wrmsrl(MSR_IA32_MCx_CTL(4), ~(1ULL << 10));
         wrmsrl(MSR_IA32_MCx_STATUS(4), 0ULL);
         break;
+
     case MCEQUIRK_F10_GART:
         if ( rdmsr_safe(MSR_AMD64_MCx_MASK(4), val) == 0 )
                 wrmsr_safe(MSR_AMD64_MCx_MASK(4), val | (1 << 10));

@@ -593,10 +593,12 @@ int show_mca_info(int inited, struct cpuinfo_x86 *c)
             printk("%s%s machine check reporting enabled\n",
                    prefix, type_str[inited]);
             break;
+
         case mcheck_amd_famXX:
             printk("%s%s Fam%xh machine check reporting enabled\n",
                    prefix, type_str[inited], c->x86);
             break;
+
         case mcheck_none:
             printk("%sNo machine check initialization\n", prefix);
             break;
@@ -702,11 +704,10 @@ static int cpu_callback(
     case CPU_UP_PREPARE:
         rc = cpu_bank_alloc(cpu);
         break;
+
     case CPU_UP_CANCELED:
     case CPU_DEAD:
         cpu_bank_free(cpu);
-        break;
-    default:
         break;
     }
 
@@ -1515,6 +1516,7 @@ long do_mca(XEN_GUEST_HANDLE_PARAM(xen_mc_t) u_xen_mc)
                 printk("Not trigger MCE on all CPUs, may HANG!\n");
             on_selected_cpus(cpumap, x86_mc_mceinject, NULL, 1);
             break;
+
         case XEN_MC_INJECT_TYPE_CMCI:
             if ( !cmci_apic_vector )
                 ret = x86_mcerr(
@@ -1526,6 +1528,7 @@ long do_mca(XEN_GUEST_HANDLE_PARAM(xen_mc_t) u_xen_mc)
                 send_IPI_mask(cpumap, cmci_apic_vector);
             }
             break;
+
         default:
             ret = x86_mcerr("Wrong mca type\n", -EINVAL);
             break;
@@ -1672,16 +1675,19 @@ static int mce_delayed_action(mctelem_cookie_t mctc)
         x86_mcinfo_dump(mctelem_dataptr(mctc));
         panic("MCE: Software recovery failed for the UCR");
         break;
+
     case MCER_RECOVERED:
         dprintk(XENLOG_INFO, "MCE: Error is successfully recovered\n");
         ret  = 1;
         break;
+
     case MCER_CONTINUE:
         dprintk(XENLOG_INFO, "MCE: Error can't be recovered, "
             "system is tainted\n");
         x86_mcinfo_dump(mctelem_dataptr(mctc));
         ret = 1;
         break;
+
     default:
         ret = 0;
         break;

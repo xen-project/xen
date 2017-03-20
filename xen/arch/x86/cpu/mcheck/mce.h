@@ -158,6 +158,7 @@ static inline int mce_vendor_bank_msr(const struct vcpu *v, uint32_t msr)
             msr < MSR_IA32_MCx_CTL2(v->arch.vmce.mcg_cap & MCG_CAP_COUNT) )
             return 1;
         break;
+
     case X86_VENDOR_AMD:
         switch (msr) {
         case MSR_F10_MC4_MISC1:

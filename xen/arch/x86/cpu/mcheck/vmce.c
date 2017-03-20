@@ -113,6 +113,7 @@ static int bank_mce_rdmsr(const struct vcpu *v, uint32_t msr, uint64_t *val)
         mce_printk(MCE_VERBOSE, "MCE: %pv: rd MC%u_CTL %#"PRIx64"\n",
                    v, bank, *val);
         break;
+
     case MSR_IA32_MC0_STATUS:
         if ( bank < GUEST_MC_BANK_NUM )
         {
@@ -122,6 +123,7 @@ static int bank_mce_rdmsr(const struct vcpu *v, uint32_t msr, uint64_t *val)
                            v, bank, *val);
         }
         break;
+
     case MSR_IA32_MC0_ADDR:
         if ( bank < GUEST_MC_BANK_NUM )
         {
@@ -131,6 +133,7 @@ static int bank_mce_rdmsr(const struct vcpu *v, uint32_t msr, uint64_t *val)
                            v, bank, *val);
         }
         break;
+
     case MSR_IA32_MC0_MISC:
         if ( bank < GUEST_MC_BANK_NUM )
         {
@@ -140,15 +143,18 @@ static int bank_mce_rdmsr(const struct vcpu *v, uint32_t msr, uint64_t *val)
                            v, bank, *val);
         }
         break;
+
     default:
         switch ( boot_cpu_data.x86_vendor )
         {
         case X86_VENDOR_INTEL:
             ret = vmce_intel_rdmsr(v, msr, val);
             break;
+
         case X86_VENDOR_AMD:
             ret = vmce_amd_rdmsr(v, msr, val);
             break;
+
         default:
             ret = 0;
             break;
@@ -181,15 +187,18 @@ int vmce_rdmsr(uint32_t msr, uint64_t *val)
             mce_printk(MCE_VERBOSE,
                        "MCE: %pv: rd MCG_STATUS %#"PRIx64"\n", cur, *val);
         break;
+
     case MSR_IA32_MCG_CAP:
         *val = cur->arch.vmce.mcg_cap;
         mce_printk(MCE_VERBOSE, "MCE: %pv: rd MCG_CAP %#"PRIx64"\n", cur, *val);
         break;
+
     case MSR_IA32_MCG_CTL:
         if ( cur->arch.vmce.mcg_cap & MCG_CTL_P )
             *val = ~0ULL;
         mce_printk(MCE_VERBOSE, "MCE: %pv: rd MCG_CTL %#"PRIx64"\n", cur, *val);
         break;
+
     default:
         ret = mce_bank_msr(cur, msr) ? bank_mce_rdmsr(cur, msr, val) : 0;
         break;
@@ -217,6 +226,7 @@ static int bank_mce_wrmsr(struct vcpu *v, uint32_t msr, uint64_t val)
          * treat it as not implement and ignore write change it.
          */
         break;
+
     case MSR_IA32_MC0_STATUS:
         mce_printk(MCE_VERBOSE, "MCE: %pv: wr MC%u_STATUS %#"PRIx64"\n",
                    v, bank, val);
@@ -225,6 +235,7 @@ static int bank_mce_wrmsr(struct vcpu *v, uint32_t msr, uint64_t val)
         else if ( bank < GUEST_MC_BANK_NUM )
             v->arch.vmce.bank[bank].mci_status = val;
         break;
+
     case MSR_IA32_MC0_ADDR:
         mce_printk(MCE_VERBOSE, "MCE: %pv: wr MC%u_ADDR %#"PRIx64"\n",
                    v, bank, val);
@@ -233,6 +244,7 @@ static int bank_mce_wrmsr(struct vcpu *v, uint32_t msr, uint64_t val)
         else if ( bank < GUEST_MC_BANK_NUM )
             v->arch.vmce.bank[bank].mci_addr = val;
         break;
+
     case MSR_IA32_MC0_MISC:
         mce_printk(MCE_VERBOSE, "MCE: %pv: wr MC%u_MISC %#"PRIx64"\n",
                    v, bank, val);
@@ -241,15 +253,18 @@ static int bank_mce_wrmsr(struct vcpu *v, uint32_t msr, uint64_t val)
         else if ( bank < GUEST_MC_BANK_NUM )
             v->arch.vmce.bank[bank].mci_misc = val;
         break;
+
     default:
         switch ( boot_cpu_data.x86_vendor )
         {
         case X86_VENDOR_INTEL:
             ret = vmce_intel_wrmsr(v, msr, val);
             break;
+
         case X86_VENDOR_AMD:
             ret = vmce_amd_wrmsr(v, msr, val);
             break;
+
         default:
             ret = 0;
             break;
@@ -277,11 +292,13 @@ int vmce_wrmsr(uint32_t msr, uint64_t val)
     case MSR_IA32_MCG_CTL:
         /* If MCG_CTL exists then stick to all 1's, else ignore. */
         break;
+
     case MSR_IA32_MCG_STATUS:
         cur->arch.vmce.mcg_status = val;
         mce_printk(MCE_VERBOSE, "MCE: %pv: wr MCG_STATUS %"PRIx64"\n",
                    cur, val);
         break;
+
     case MSR_IA32_MCG_CAP:
         /*
          * According to Intel SDM, IA32_MCG_CAP is a read-only register,
@@ -290,6 +307,7 @@ int vmce_wrmsr(uint32_t msr, uint64_t val)
          */
         mce_printk(MCE_VERBOSE, "MCE: %pv: MCG_CAP is r/o\n", cur);
         break;
+
     default:
         ret = mce_bank_msr(cur, msr) ? bank_mce_wrmsr(cur, msr, val) : 0;
         break;

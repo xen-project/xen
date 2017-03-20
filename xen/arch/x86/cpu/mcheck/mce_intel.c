@@ -302,8 +302,6 @@ static void intel_srar_dhandler(
     case INTEL_SRAR_INSTR_FETCH:
         intel_memerr_dhandler(binfo, result, regs);
         break;
-    default:
-        break;
     }
 }
 
@@ -329,8 +327,6 @@ static void intel_srao_dhandler(
         case INTEL_SRAO_MEM_SCRUB:
         case INTEL_SRAO_L3_EWB:
             intel_memerr_dhandler(binfo, result, regs);
-            break;
-        default:
             break;
         }
     }
@@ -378,6 +374,7 @@ static void intel_default_mce_uhandler(
     case intel_mce_fatal:
         *result = MCER_RESET;
         break;
+
     default:
         *result = MCER_CONTINUE;
         break;
@@ -843,15 +840,15 @@ static int cpu_callback(
     case CPU_UP_PREPARE:
         rc = cpu_mcabank_alloc(cpu);
         break;
+
     case CPU_DYING:
         cpu_mcheck_disable();
         break;
+
     case CPU_UP_CANCELED:
     case CPU_DEAD:
         cpu_mcheck_distribute_cmci();
         cpu_mcabank_free(cpu);
-        break;
-    default:
         break;
     }
 
