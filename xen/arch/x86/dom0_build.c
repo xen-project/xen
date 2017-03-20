@@ -158,8 +158,9 @@ static cpumask_t __initdata dom0_cpus;
 
 static struct vcpu *__init setup_dom0_vcpu(struct domain *d,
                                            unsigned int vcpu_id,
-                                           unsigned int cpu)
+                                           unsigned int prev_cpu)
 {
+    unsigned int cpu = cpumask_cycle(prev_cpu, &dom0_cpus);
     struct vcpu *v = alloc_vcpu(d, vcpu_id, cpu);
 
     if ( v )
@@ -215,7 +216,8 @@ struct vcpu *__init alloc_dom0_vcpu0(struct domain *dom0)
         return NULL;
     dom0->max_vcpus = max_vcpus;
 
-    return setup_dom0_vcpu(dom0, 0, cpumask_first(&dom0_cpus));
+    return setup_dom0_vcpu(dom0, 0,
+                           cpumask_last(&dom0_cpus) /* so it wraps around to first pcpu */);
 }
 
 #ifdef CONFIG_SHADOW_PAGING
@@ -1155,8 +1157,10 @@ static int __init construct_dom0_pv(
     cpu = v->processor;
     for ( i = 1; i < d->max_vcpus; i++ )
     {
-        cpu = cpumask_cycle(cpu, &dom0_cpus);
-        setup_dom0_vcpu(d, i, cpu);
+        const struct vcpu *p = setup_dom0_vcpu(d, i, cpu);
+
+        if ( p )
+            cpu = p->processor;
     }
 
     d->arch.paging.mode = 0;
@@ -1902,8 +1906,10 @@ static int __init pvh_setup_cpus(struct domain *d, paddr_t entry,
     cpu = v->processor;
     for ( i = 1; i < d->max_vcpus; i++ )
     {
-        cpu = cpumask_cycle(cpu, &dom0_cpus);
-        setup_dom0_vcpu(d, i, cpu);
+        const struct vcpu *p = setup_dom0_vcpu(d, i, cpu);
+
+        if ( p )
+            cpu = p->processor;
     }
 
     rc = arch_set_info_hvm_guest(v, &cpu_ctx);
