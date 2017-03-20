@@ -1664,12 +1664,16 @@ static void domain_soft_reset_cb(libxl__egc *egc,
         goto error;
     }
 
-    savefile = GCSPRINTF(LIBXL_DEVICE_MODEL_SAVE_FILE".%d", dds->domid);
-    restorefile = GCSPRINTF(LIBXL_DEVICE_MODEL_RESTORE_FILE".%d", dds->domid);
-    rc = rename(savefile, restorefile);
-    if (rc) {
-        LOGD(ERROR, dds->domid, "failed to rename dm save file.");
-        goto error;
+    if (cdcs->dcs.guest_config->b_info.device_model_version !=
+        LIBXL_DEVICE_MODEL_VERSION_NONE) {
+        savefile = GCSPRINTF(LIBXL_DEVICE_MODEL_SAVE_FILE".%d", dds->domid);
+        restorefile = GCSPRINTF(LIBXL_DEVICE_MODEL_RESTORE_FILE".%d",
+                                dds->domid);
+        rc = rename(savefile, restorefile);
+        if (rc) {
+            LOGD(ERROR, dds->domid, "failed to rename dm save file.");
+            goto error;
+        }
     }
 
     initiate_domain_create(egc, &cdcs->dcs);
