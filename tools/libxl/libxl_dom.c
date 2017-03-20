@@ -767,7 +767,7 @@ int libxl__build_pv(libxl__gc *gc, uint32_t domid,
     if (ret != 0)
         goto out;
 
-    if (xc_dom_feature_translated(dom)) {
+    if (xc_dom_translated(dom)) {
         state->console_mfn = dom->console_pfn;
         state->store_mfn = dom->xenstore_pfn;
     } else {

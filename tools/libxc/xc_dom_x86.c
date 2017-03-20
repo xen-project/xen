@@ -546,7 +546,7 @@ static int alloc_magic_pages(struct xc_dom_image *dom)
     dom->console_pfn = xc_dom_alloc_page(dom, "console");
     if ( dom->console_pfn == INVALID_PFN )
         return -1;
-    if ( xc_dom_feature_translated(dom) )
+    if ( xc_dom_translated(dom) )
     {
         dom->shared_info_pfn = xc_dom_alloc_page(dom, "shared info");
         if ( dom->shared_info_pfn == INVALID_PFN )
@@ -720,8 +720,7 @@ static int start_info_x86_32(struct xc_dom_image *dom)
     start_info_x86_32_t *start_info =
         xc_dom_pfn_to_ptr(dom, dom->start_info_pfn, 1);
     xen_pfn_t shinfo =
-        xc_dom_feature_translated(dom) ? dom->shared_info_pfn : dom->
-        shared_info_mfn;
+        xc_dom_translated(dom) ? dom->shared_info_pfn : dom->shared_info_mfn;
 
     DOMPRINTF_CALLED(dom->xch);
 
@@ -767,8 +766,7 @@ static int start_info_x86_64(struct xc_dom_image *dom)
     start_info_x86_64_t *start_info =
         xc_dom_pfn_to_ptr(dom, dom->start_info_pfn, 1);
     xen_pfn_t shinfo =
-        xc_dom_feature_translated(dom) ? dom->shared_info_pfn : dom->
-        shared_info_mfn;
+        xc_dom_translated(dom) ? dom->shared_info_pfn : dom->shared_info_mfn;
 
     DOMPRINTF_CALLED(dom->xch);
 
@@ -1063,29 +1061,6 @@ static int x86_compat(xc_interface *xch, domid_t domid, char *guest_type)
     return rc;
 }
 
-static int x86_shadow(xc_interface *xch, domid_t domid)
-{
-    int rc, mode;
-
-    DOMPRINTF_CALLED(xch);
-
-    mode = XEN_DOMCTL_SHADOW_ENABLE_REFCOUNT |
-        XEN_DOMCTL_SHADOW_ENABLE_TRANSLATE;
-
-    rc = xc_shadow_control(xch, domid,
-                           XEN_DOMCTL_SHADOW_OP_ENABLE,
-                           NULL, 0, NULL, mode, NULL);
-    if ( rc != 0 )
-    {
-        xc_dom_panic(xch, XC_INTERNAL_ERROR,
-                     "%s: SHADOW_OP_ENABLE (mode=0x%x) failed (rc=%d)",
-                     __FUNCTION__, mode, rc);
-        return rc;
-    }
-    xc_dom_printf(xch, "%s: shadow enabled (mode=0x%x)", __FUNCTION__, mode);
-    return rc;
-}
-
 static int meminit_pv(struct xc_dom_image *dom)
 {
     int rc;
@@ -1100,13 +1075,6 @@ static int meminit_pv(struct xc_dom_image *dom)
     rc = x86_compat(dom->xch, dom->guest_domid, dom->guest_type);
     if ( rc )
         return rc;
-    if ( xc_dom_feature_translated(dom) )
-    {
-        dom->shadow_enabled = 1;
-        rc = x86_shadow(dom->xch, dom->guest_domid);
-        if ( rc )
-            return rc;
-    }
 
     /* try to claim pages for early warning of insufficient memory avail */
     if ( dom->claim_enabled )
@@ -1576,37 +1544,14 @@ static int meminit_hvm(struct xc_dom_image *dom)
 
 static int bootearly(struct xc_dom_image *dom)
 {
-    DOMPRINTF("%s: doing nothing", __FUNCTION__);
-    return 0;
-}
-
-/*
- * Map grant table frames into guest physmap. PVH manages grant during boot
- * via HVM mechanisms.
- */
-static int map_grant_table_frames(struct xc_dom_image *dom)
-{
-    int i, rc;
-
-    for ( i = 0; ; i++ )
+    if ( dom->container_type == XC_DOM_PV_CONTAINER &&
+         elf_xen_feature_get(XENFEAT_auto_translated_physmap, dom->f_active) )
     {
-        rc = xc_domain_add_to_physmap(dom->xch, dom->guest_domid,
-                                      XENMAPSPACE_grant_table,
-                                      i, dom->p2m_size + i);
-        if ( rc != 0 )
-        {
-            if ( (i > 0) && (errno == EINVAL) )
-            {
-                DOMPRINTF("%s: %d grant tables mapped", __FUNCTION__, i);
-                break;
-            }
-            xc_dom_panic(dom->xch, XC_INTERNAL_ERROR,
-                         "%s: mapping grant tables failed " "(pfn=0x%" PRIpfn
-                         ", rc=%d, errno=%d)", __FUNCTION__, dom->p2m_size + i,
-                         rc, errno);
-            return rc;
-        }
+        DOMPRINTF("PV Autotranslate guests no longer supported");
+        errno = EOPNOTSUPP;
+        return -1;
     }
+
     return 0;
 }
 
@@ -1629,47 +1574,20 @@ static int bootlate_pv(struct xc_dom_image *dom)
         if ( !strcmp(types[i].guest, dom->guest_type) )
             pgd_type = types[i].pgd_type;
 
-    if ( !xc_dom_feature_translated(dom) )
+    /* Drop references to all initial page tables before pinning. */
+    xc_dom_unmap_one(dom, dom->pgtables_seg.pfn);
+    xc_dom_unmap_one(dom, dom->p2m_seg.pfn);
+    rc = pin_table(dom->xch, pgd_type,
+                   xc_dom_p2m(dom, dom->pgtables_seg.pfn),
+                   dom->guest_domid);
+    if ( rc != 0 )
     {
-        /* paravirtualized guest */
-
-        /* Drop references to all initial page tables before pinning. */
-        xc_dom_unmap_one(dom, dom->pgtables_seg.pfn);
-        xc_dom_unmap_one(dom, dom->p2m_seg.pfn);
-        rc = pin_table(dom->xch, pgd_type,
-                       xc_dom_p2m(dom, dom->pgtables_seg.pfn),
-                       dom->guest_domid);
-        if ( rc != 0 )
-        {
-            xc_dom_panic(dom->xch, XC_INTERNAL_ERROR,
-                         "%s: pin_table failed (pfn 0x%" PRIpfn ", rc=%d)",
-                         __FUNCTION__, dom->pgtables_seg.pfn, rc);
-            return rc;
-        }
-        shinfo = dom->shared_info_mfn;
+        xc_dom_panic(dom->xch, XC_INTERNAL_ERROR,
+                     "%s: pin_table failed (pfn 0x%" PRIpfn ", rc=%d)",
+                     __FUNCTION__, dom->pgtables_seg.pfn, rc);
+        return rc;
     }
-    else
-    {
-        /* paravirtualized guest with auto-translation */
-
-        /* Map shared info frame into guest physmap. */
-        rc = xc_domain_add_to_physmap(dom->xch, dom->guest_domid,
-                                      XENMAPSPACE_shared_info,
-                                      0, dom->shared_info_pfn);
-        if ( rc != 0 )
-        {
-            xc_dom_panic(dom->xch, XC_INTERNAL_ERROR, "%s: mapping"
-                         " shared_info failed (pfn=0x%" PRIpfn ", rc=%d, errno: %d)",
-                         __FUNCTION__, dom->shared_info_pfn, rc, errno);
-            return rc;
-        }
-
-        rc = map_grant_table_frames(dom);
-        if ( rc != 0 )
-            return rc;
-
-        shinfo = dom->shared_info_pfn;
-    }
+    shinfo = dom->shared_info_mfn;
 
     /* setup shared_info page */
     DOMPRINTF("%s: shared_info: pfn 0x%" PRIpfn ", mfn 0x%" PRIpfn "",
@@ -1823,13 +1741,10 @@ static int bootlate_hvm(struct xc_dom_image *dom)
     return 0;
 }
 
-int xc_dom_feature_translated(struct xc_dom_image *dom)
+bool xc_dom_translated(const struct xc_dom_image *dom)
 {
-    /* Guests running inside HVM containers are always auto-translated. */
-    if ( dom->container_type == XC_DOM_HVM_CONTAINER )
-        return 1;
-
-    return elf_xen_feature_get(XENFEAT_auto_translated_physmap, dom->f_active);
+    /* HVM guests are translated.  PV guests are not. */
+    return dom->container_type == XC_DOM_HVM_CONTAINER;
 }
 
 /* ------------------------------------------------------------------------ */

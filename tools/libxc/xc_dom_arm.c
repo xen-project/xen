@@ -419,8 +419,6 @@ static int meminit(struct xc_dom_image *dom)
     if ( rc )
         return rc;
 
-    dom->shadow_enabled = 1;
-
     for ( i = 0; ramsize && i < GUEST_RAM_BANKS; i++ )
     {
         uint64_t banksize = ramsize > bankmax[i] ? bankmax[i] : ramsize;
@@ -504,9 +502,9 @@ static int meminit(struct xc_dom_image *dom)
     return 0;
 }
 
-int xc_dom_feature_translated(struct xc_dom_image *dom)
+bool xc_dom_translated(const struct xc_dom_image *dom)
 {
-    return 1;
+    return true;
 }
 
 /* ------------------------------------------------------------------------ */

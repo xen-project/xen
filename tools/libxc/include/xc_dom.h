@@ -168,7 +168,6 @@ struct xc_dom_image {
     xc_interface *xch;
     domid_t guest_domid;
     int claim_enabled; /* 0 by default, 1 enables it */
-    int shadow_enabled;
 
     int xen_version;
     xen_capabilities_info_t xen_caps;
@@ -334,7 +333,7 @@ int xc_dom_gnttab_seed(xc_interface *xch, domid_t domid,
                        xen_pfn_t xenstore_gmfn,
                        domid_t console_domid,
                        domid_t xenstore_domid);
-int xc_dom_feature_translated(struct xc_dom_image *dom);
+bool xc_dom_translated(const struct xc_dom_image *dom);
 
 /* --- debugging bits ---------------------------------------------- */
 
@@ -420,7 +419,7 @@ static inline void *xc_dom_vaddr_to_ptr(struct xc_dom_image *dom,
 
 static inline xen_pfn_t xc_dom_p2m(struct xc_dom_image *dom, xen_pfn_t pfn)
 {
-    if ( dom->shadow_enabled || xc_dom_feature_translated(dom) )
+    if ( xc_dom_translated(dom) )
         return pfn;
     if (pfn < dom->rambase_pfn || pfn >= dom->rambase_pfn + dom->total_pages)
         return INVALID_MFN;

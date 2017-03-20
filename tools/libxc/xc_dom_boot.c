@@ -407,7 +407,7 @@ int xc_dom_gnttab_hvm_seed(xc_interface *xch, domid_t domid,
 
 int xc_dom_gnttab_init(struct xc_dom_image *dom)
 {
-    if ( xc_dom_feature_translated(dom) ) {
+    if ( xc_dom_translated(dom) ) {
         return xc_dom_gnttab_hvm_seed(dom->xch, dom->guest_domid,
                                       dom->console_pfn, dom->xenstore_pfn,
                                       dom->console_domid, dom->xenstore_domid);
