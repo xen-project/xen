@@ -946,6 +946,8 @@ static struct node *construct_node(struct connection *conn, const void *ctx,
 	base = basename(name);
 	baselen = strlen(base) + 1;
 	children = talloc_array(ctx, char, parent->childlen + baselen);
+	if (!children)
+		goto nomem;
 	memcpy(children, parent->children, parent->childlen);
 	memcpy(children + parent->childlen, base, baselen);
 	parent->children = children;
@@ -953,13 +955,19 @@ static struct node *construct_node(struct connection *conn, const void *ctx,
 
 	/* Allocate node */
 	node = talloc(ctx, struct node);
+	if (!node)
+		goto nomem;
 	node->tdb = tdb_context(conn);
 	node->name = talloc_strdup(node, name);
+	if (!node->name)
+		goto nomem;
 
 	/* Inherit permissions, except unprivileged domains own what they create */
 	node->num_perms = parent->num_perms;
 	node->perms = talloc_memdup(node, parent->perms,
 				    node->num_perms * sizeof(node->perms[0]));
+	if (!node->perms)
+		goto nomem;
 	if (domain_is_unprivileged(conn))
 		node->perms[0].id = conn->id;
 
@@ -969,6 +977,10 @@ static struct node *construct_node(struct connection *conn, const void *ctx,
 	node->parent = parent;
 	domain_entry_inc(conn, node);
 	return node;
+
+nomem:
+	errno = ENOMEM;
+	return NULL;
 }
 
 static int destroy_node(void *_node)
