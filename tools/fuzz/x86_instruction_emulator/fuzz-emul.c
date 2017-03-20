@@ -21,7 +21,9 @@
 
 #define SEG_NUM x86_seg_none
 
-struct input_struct {
+/* Layout of data expected as fuzzing input. */
+struct fuzz_corpus
+{
     unsigned long cr[5];
     uint64_t msr[MSR_INDEX_MAX];
     struct cpu_user_regs regs;
@@ -29,19 +31,36 @@ struct input_struct {
     unsigned long options;
     unsigned char data[4096];
 } input;
-#define DATA_OFFSET offsetof(struct input_struct, data)
-static unsigned int data_index;
-static unsigned int data_num;
+#define DATA_OFFSET offsetof(struct fuzz_corpus, data)
+
+/*
+ * Internal state of the fuzzing harness.  Calculated initially from the input
+ * corpus, and later mutates by the emulation callbacks.
+ */
+struct fuzz_state
+{
+    /* Fuzzer's input data. */
+    struct fuzz_corpus *corpus;
+
+    /* Real amount of data backing corpus->data[]. */
+    size_t data_num;
+
+    /* Amount of corpus->data[] consumed thus far. */
+    size_t data_index;
+};
 
 /*
  * Randomly return success or failure when processing data.  If
  * `exception` is false, this function turns _EXCEPTION to _OKAY.
  */
-static int maybe_fail(const char *why, bool exception)
+static int maybe_fail(struct x86_emulate_ctxt *ctxt,
+                      const char *why, bool exception)
 {
+    struct fuzz_state *s = ctxt->data;
+    const struct fuzz_corpus *c = s->corpus;
     int rc;
 
-    if ( data_index >= data_num )
+    if ( s->data_index >= s->data_num )
         rc = X86EMUL_EXCEPTION;
     else
     {
@@ -50,13 +69,13 @@ static int maybe_fail(const char *why, bool exception)
          * 25% unhandlable
          * 25% exception
          */
-        if ( input.data[data_index] > 0xc0 )
+        if ( c->data[s->data_index] > 0xc0 )
             rc = X86EMUL_EXCEPTION;
-        else if ( input.data[data_index] > 0x80 )
+        else if ( c->data[s->data_index] > 0x80 )
             rc = X86EMUL_UNHANDLEABLE;
         else
             rc = X86EMUL_OKAY;
-        data_index++;
+        s->data_index++;
     }
 
     if ( rc == X86EMUL_EXCEPTION && !exception )
@@ -67,20 +86,23 @@ static int maybe_fail(const char *why, bool exception)
     return rc;
 }
 
-static int data_read(const char *why, void *dst, unsigned int bytes)
+static int data_read(struct x86_emulate_ctxt *ctxt,
+                     const char *why, void *dst, unsigned int bytes)
 {
+    struct fuzz_state *s = ctxt->data;
+    const struct fuzz_corpus *c = s->corpus;
     unsigned int i;
     int rc;
 
-    if ( data_index + bytes > data_num )
+    if ( s->data_index + bytes > s->data_num )
         rc = X86EMUL_EXCEPTION;
     else
-        rc = maybe_fail(why, true);
+        rc = maybe_fail(ctxt, why, true);
 
     if ( rc == X86EMUL_OKAY )
     {
-        memcpy(dst,  input.data + data_index, bytes);
-        data_index += bytes;
+        memcpy(dst, &c->data[s->data_index], bytes);
+        s->data_index += bytes;
 
         printf("%s: ", why);
         for ( i = 0; i < bytes; i++ )
@@ -98,7 +120,7 @@ static int fuzz_read(
     unsigned int bytes,
     struct x86_emulate_ctxt *ctxt)
 {
-    return data_read("read", p_data, bytes);
+    return data_read(ctxt, "read", p_data, bytes);
 }
 
 static int fuzz_read_io(
@@ -107,7 +129,7 @@ static int fuzz_read_io(
     unsigned long *val,
     struct x86_emulate_ctxt *ctxt)
 {
-    return data_read("read_io", val, bytes);
+    return data_read(ctxt, "read_io", val, bytes);
 }
 
 static int fuzz_insn_fetch(
@@ -124,18 +146,19 @@ static int fuzz_insn_fetch(
     if ( bytes == 0 )
     {
         assert(p_data == NULL);
-        return maybe_fail("insn_fetch", true);
+        return maybe_fail(ctxt, "insn_fetch", true);
     }
 
-    return data_read("insn_fetch", p_data, bytes);
+    return data_read(ctxt, "insn_fetch", p_data, bytes);
 }
 
-static int _fuzz_rep_read(const char *why, unsigned long *reps)
+static int _fuzz_rep_read(struct x86_emulate_ctxt *ctxt,
+                          const char *why, unsigned long *reps)
 {
     int rc;
     unsigned long bytes_read = 0;
 
-    rc = data_read(why, &bytes_read, sizeof(bytes_read));
+    rc = data_read(ctxt, why, &bytes_read, sizeof(bytes_read));
 
     if ( bytes_read <= *reps )
         *reps = bytes_read;
@@ -156,9 +179,10 @@ static int _fuzz_rep_read(const char *why, unsigned long *reps)
     return rc;
 }
 
-static int _fuzz_rep_write(const char *why, unsigned long *reps)
+static int _fuzz_rep_write(struct x86_emulate_ctxt *ctxt,
+                           const char *why, unsigned long *reps)
 {
-    int rc = maybe_fail(why, true);
+    int rc = maybe_fail(ctxt, why, true);
 
     switch ( rc )
     {
@@ -184,7 +208,7 @@ static int fuzz_rep_ins(
     unsigned long *reps,
     struct x86_emulate_ctxt *ctxt)
 {
-    return _fuzz_rep_read("rep_ins", reps);
+    return _fuzz_rep_read(ctxt, "rep_ins", reps);
 }
 
 static int fuzz_rep_movs(
@@ -196,7 +220,7 @@ static int fuzz_rep_movs(
     unsigned long *reps,
     struct x86_emulate_ctxt *ctxt)
 {
-    return _fuzz_rep_read("rep_movs", reps);
+    return _fuzz_rep_read(ctxt, "rep_movs", reps);
 }
 
 static int fuzz_rep_outs(
@@ -207,7 +231,7 @@ static int fuzz_rep_outs(
     unsigned long *reps,
     struct x86_emulate_ctxt *ctxt)
 {
-    return _fuzz_rep_write("rep_outs", reps);
+    return _fuzz_rep_write(ctxt, "rep_outs", reps);
 }
 
 static int fuzz_rep_stos(
@@ -218,7 +242,7 @@ static int fuzz_rep_stos(
     unsigned long *reps,
     struct x86_emulate_ctxt *ctxt)
 {
-    return _fuzz_rep_write("rep_stos", reps);
+    return _fuzz_rep_write(ctxt, "rep_stos", reps);
 }
 
 static int fuzz_write(
@@ -228,7 +252,7 @@ static int fuzz_write(
     unsigned int bytes,
     struct x86_emulate_ctxt *ctxt)
 {
-    return maybe_fail("write", true);
+    return maybe_fail(ctxt, "write", true);
 }
 
 static int fuzz_cmpxchg(
@@ -239,7 +263,7 @@ static int fuzz_cmpxchg(
     unsigned int bytes,
     struct x86_emulate_ctxt *ctxt)
 {
-    return maybe_fail("cmpxchg", true);
+    return maybe_fail(ctxt, "cmpxchg", true);
 }
 
 static int fuzz_invlpg(
@@ -247,13 +271,13 @@ static int fuzz_invlpg(
     unsigned long offset,
     struct x86_emulate_ctxt *ctxt)
 {
-    return maybe_fail("invlpg", false);
+    return maybe_fail(ctxt, "invlpg", false);
 }
 
 static int fuzz_wbinvd(
     struct x86_emulate_ctxt *ctxt)
 {
-    return maybe_fail("wbinvd", true);
+    return maybe_fail(ctxt, "wbinvd", true);
 }
 
 static int fuzz_write_io(
@@ -262,7 +286,7 @@ static int fuzz_write_io(
     unsigned long val,
     struct x86_emulate_ctxt *ctxt)
 {
-    return maybe_fail("write_io", true);
+    return maybe_fail(ctxt, "write_io", true);
 }
 
 static int fuzz_read_segment(
@@ -270,10 +294,13 @@ static int fuzz_read_segment(
     struct segment_register *reg,
     struct x86_emulate_ctxt *ctxt)
 {
+    const struct fuzz_state *s = ctxt->data;
+    const struct fuzz_corpus *c = s->corpus;
+
     if ( seg >= SEG_NUM )
         return X86EMUL_UNHANDLEABLE;
 
-    *reg = input.segments[seg];
+    *reg = c->segments[seg];
 
     return X86EMUL_OKAY;
 }
@@ -283,15 +310,17 @@ static int fuzz_write_segment(
     const struct segment_register *reg,
     struct x86_emulate_ctxt *ctxt)
 {
+    struct fuzz_state *s = ctxt->data;
+    struct fuzz_corpus *c = s->corpus;
     int rc;
 
     if ( seg >= SEG_NUM )
         return X86EMUL_UNHANDLEABLE;
 
-    rc = maybe_fail("write_segment", true);
+    rc = maybe_fail(ctxt, "write_segment", true);
 
     if ( rc == X86EMUL_OKAY )
-        input.segments[seg] = *reg;
+        c->segments[seg] = *reg;
 
     return rc;
 }
@@ -301,10 +330,13 @@ static int fuzz_read_cr(
     unsigned long *val,
     struct x86_emulate_ctxt *ctxt)
 {
-    if ( reg >= ARRAY_SIZE(input.cr) )
+    const struct fuzz_state *s = ctxt->data;
+    const struct fuzz_corpus *c = s->corpus;
+
+    if ( reg >= ARRAY_SIZE(c->cr) )
         return X86EMUL_UNHANDLEABLE;
 
-    *val = input.cr[reg];
+    *val = c->cr[reg];
 
     return X86EMUL_OKAY;
 }
@@ -314,16 +346,18 @@ static int fuzz_write_cr(
     unsigned long val,
     struct x86_emulate_ctxt *ctxt)
 {
+    struct fuzz_state *s = ctxt->data;
+    struct fuzz_corpus *c = s->corpus;
     int rc;
 
-    if ( reg >= ARRAY_SIZE(input.cr) )
+    if ( reg >= ARRAY_SIZE(c->cr) )
         return X86EMUL_UNHANDLEABLE;
 
-    rc = maybe_fail("write_cr", true);
+    rc = maybe_fail(ctxt, "write_cr", true);
     if ( rc != X86EMUL_OKAY )
         return rc;
 
-    input.cr[reg] = val;
+    c->cr[reg] = val;
 
     return X86EMUL_OKAY;
 }
@@ -355,6 +389,8 @@ static int fuzz_read_msr(
     uint64_t *val,
     struct x86_emulate_ctxt *ctxt)
 {
+    const struct fuzz_state *s = ctxt->data;
+    const struct fuzz_corpus *c = s->corpus;
     unsigned int idx;
 
     switch ( reg )
@@ -366,12 +402,12 @@ static int fuzz_read_msr(
          * should preferably return consistent values, but returning
          * random values is fine in fuzzer.
          */
-        return data_read("read_msr", val, sizeof(*val));
+        return data_read(ctxt, "read_msr", val, sizeof(*val));
     case MSR_EFER:
-        *val = input.msr[MSRI_EFER];
+        *val = c->msr[MSRI_EFER];
         *val &= ~EFER_LMA;
-        if ( (*val & EFER_LME) && (input.cr[4] & X86_CR4_PAE) &&
-             (input.cr[0] & X86_CR0_PG) )
+        if ( (*val & EFER_LME) && (c->cr[4] & X86_CR4_PAE) &&
+             (c->cr[0] & X86_CR0_PG) )
         {
             printf("Setting EFER_LMA\n");
             *val |= EFER_LMA;
@@ -383,7 +419,7 @@ static int fuzz_read_msr(
     {
         if ( msr_index[idx] == reg )
         {
-            *val = input.msr[idx];
+            *val = c->msr[idx];
             return X86EMUL_OKAY;
         }
     }
@@ -396,10 +432,12 @@ static int fuzz_write_msr(
     uint64_t val,
     struct x86_emulate_ctxt *ctxt)
 {
+    struct fuzz_state *s = ctxt->data;
+    struct fuzz_corpus *c = s->corpus;
     unsigned int idx;
     int rc;
 
-    rc = maybe_fail("write_msr", true);
+    rc = maybe_fail(ctxt, "write_msr", true);
     if ( rc != X86EMUL_OKAY )
         return rc;
 
@@ -414,7 +452,7 @@ static int fuzz_write_msr(
     {
         if ( msr_index[idx] == reg )
         {
-            input.msr[idx] = val;
+            c->msr[idx] = val;
             return X86EMUL_OKAY;
         }
     }
@@ -462,14 +500,16 @@ static void setup_fpu_exception_handler(void)
 
 static void dump_state(struct x86_emulate_ctxt *ctxt)
 {
+    struct fuzz_state *s = ctxt->data;
+    const struct fuzz_corpus *c = s->corpus;
     struct cpu_user_regs *regs = ctxt->regs;
     uint64_t val = 0;
 
     printf(" -- State -- \n");
     printf("addr / sp size: %d / %d\n", ctxt->addr_size, ctxt->sp_size);
-    printf(" cr0: %lx\n", input.cr[0]);
-    printf(" cr3: %lx\n", input.cr[3]);
-    printf(" cr4: %lx\n", input.cr[4]);
+    printf(" cr0: %lx\n", c->cr[0]);
+    printf(" cr3: %lx\n", c->cr[3]);
+    printf(" cr4: %lx\n", c->cr[4]);
 
     printf(" rip: %"PRIx64"\n", regs->rip);
 
@@ -489,19 +529,25 @@ static bool long_mode_active(struct x86_emulate_ctxt *ctxt)
 
 static bool in_longmode(struct x86_emulate_ctxt *ctxt)
 {
-    return long_mode_active(ctxt) && input.segments[x86_seg_cs].attr.fields.l;
+    const struct fuzz_state *s = ctxt->data;
+    const struct fuzz_corpus *c = s->corpus;
+
+    return long_mode_active(ctxt) && c->segments[x86_seg_cs].attr.fields.l;
 }
 
 static void set_sizes(struct x86_emulate_ctxt *ctxt)
 {
+    struct fuzz_state *s = ctxt->data;
+    const struct fuzz_corpus *c = s->corpus;
+
     ctxt->lma = long_mode_active(ctxt);
 
     if ( in_longmode(ctxt) )
         ctxt->addr_size = ctxt->sp_size = 64;
     else
     {
-        ctxt->addr_size = input.segments[x86_seg_cs].attr.fields.db ? 32 : 16;
-        ctxt->sp_size   = input.segments[x86_seg_ss].attr.fields.db ? 32 : 16;
+        ctxt->addr_size = c->segments[x86_seg_cs].attr.fields.db ? 32 : 16;
+        ctxt->sp_size   = c->segments[x86_seg_ss].attr.fields.db ? 32 : 16;
     }
 }
 
@@ -561,9 +607,11 @@ enum {
         printf("Disabling hook "#h"\n");               \
     }
 
-static void disable_hooks(void)
+static void disable_hooks(struct x86_emulate_ctxt *ctxt)
 {
-    unsigned long bitmap = input.options;
+    struct fuzz_state *s = ctxt->data;
+    const struct fuzz_corpus *c = s->corpus;
+    unsigned long bitmap = c->options;
 
     /* See also sanitize_input, some hooks can't be disabled. */
     MAYBE_DISABLE_HOOK(read);
@@ -612,11 +660,13 @@ static void disable_hooks(void)
  */
 static void sanitize_input(struct x86_emulate_ctxt *ctxt)
 {
-    struct cpu_user_regs *regs = &input.regs;
-    unsigned long bitmap = input.options;
+    struct fuzz_state *s = ctxt->data;
+    struct fuzz_corpus *c = s->corpus;
+    struct cpu_user_regs *regs = &c->regs;
+    unsigned long bitmap = c->options;
 
     /* Some hooks can't be disabled. */
-    input.options &= ~((1<<HOOK_read)|(1<<HOOK_insn_fetch));
+    c->options &= ~((1<<HOOK_read)|(1<<HOOK_insn_fetch));
 
     /* Zero 'private' entries */
     regs->error_code = 0;
@@ -630,8 +680,8 @@ static void sanitize_input(struct x86_emulate_ctxt *ctxt)
      * CR0.PG can't be set if CR0.PE isn't set.  Set is more interesting, so
      * set PE if PG is set.
      */
-    if ( input.cr[0] & X86_CR0_PG )
-        input.cr[0] |= X86_CR0_PE;
+    if ( c->cr[0] & X86_CR0_PG )
+        c->cr[0] |= X86_CR0_PE;
 
     /* EFLAGS.VM not available in long mode */
     if ( long_mode_active(ctxt) )
@@ -640,8 +690,8 @@ static void sanitize_input(struct x86_emulate_ctxt *ctxt)
     /* EFLAGS.VM implies 16-bit mode */
     if ( regs->rflags & X86_EFLAGS_VM )
     {
-        input.segments[x86_seg_cs].attr.fields.db = 0;
-        input.segments[x86_seg_ss].attr.fields.db = 0;
+        c->segments[x86_seg_cs].attr.fields.db = 0;
+        c->segments[x86_seg_ss].attr.fields.db = 0;
     }
 }
 
@@ -659,7 +709,9 @@ int LLVMFuzzerInitialize(int *argc, char ***argv)
 int LLVMFuzzerTestOneInput(const uint8_t *data_p, size_t size)
 {
     struct cpu_user_regs regs = {};
+    struct fuzz_state state = {};
     struct x86_emulate_ctxt ctxt = {
+        .data = &state,
         .regs = &regs,
         .addr_size = 8 * sizeof(void *),
         .sp_size = 8 * sizeof(void *),
@@ -668,8 +720,6 @@ int LLVMFuzzerTestOneInput(const uint8_t *data_p, size_t size)
 
     /* Reset all global state variables */
     memset(&input, 0, sizeof(input));
-    data_index = 0;
-    data_num = 0;
 
     if ( size <= DATA_OFFSET )
     {
@@ -685,11 +735,12 @@ int LLVMFuzzerTestOneInput(const uint8_t *data_p, size_t size)
 
     memcpy(&input, data_p, size);
 
-    data_num = size - DATA_OFFSET;
+    state.corpus = &input;
+    state.data_num = size - DATA_OFFSET;
 
     sanitize_input(&ctxt);
 
-    disable_hooks();
+    disable_hooks(&ctxt);
 
     do {
         /* FIXME: Until we actually implement SIGFPE handling properly */
