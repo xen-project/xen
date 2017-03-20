@@ -47,6 +47,9 @@ struct fuzz_state
 
     /* Amount of corpus->data[] consumed thus far. */
     size_t data_index;
+
+    /* Emulation ops, some of which are disabled based on corpus->options. */
+    struct x86_emulate_ops ops;
 };
 
 /*
@@ -461,7 +464,7 @@ static int fuzz_write_msr(
 }
 
 #define SET(h) .h = fuzz_##h
-static struct x86_emulate_ops fuzz_emulops = {
+static const struct x86_emulate_ops all_fuzzer_ops = {
     SET(read),
     SET(insn_fetch),
     SET(write),
@@ -603,7 +606,7 @@ enum {
 #define MAYBE_DISABLE_HOOK(h)                          \
     if ( bitmap & (1 << HOOK_##h) )                    \
     {                                                  \
-        fuzz_emulops.h = NULL;                         \
+        s->ops.h = NULL;                               \
         printf("Disabling hook "#h"\n");               \
     }
 
@@ -709,7 +712,9 @@ int LLVMFuzzerInitialize(int *argc, char ***argv)
 int LLVMFuzzerTestOneInput(const uint8_t *data_p, size_t size)
 {
     struct cpu_user_regs regs = {};
-    struct fuzz_state state = {};
+    struct fuzz_state state = {
+        .ops = all_fuzzer_ops,
+    };
     struct x86_emulate_ctxt ctxt = {
         .data = &state,
         .regs = &regs,
@@ -749,7 +754,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data_p, size_t size)
         set_sizes(&ctxt);
         dump_state(&ctxt);
 
-        rc = x86_emulate(&ctxt, &fuzz_emulops);
+        rc = x86_emulate(&ctxt, &state.ops);
         printf("Emulation result: %d\n", rc);
     } while ( rc == X86EMUL_OKAY );
 
