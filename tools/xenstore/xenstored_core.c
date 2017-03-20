@@ -937,8 +937,10 @@ static struct node *construct_node(struct connection *conn, const void *ctx,
 	if (!parent)
 		return NULL;
 
-	if (domain_entry(conn) >= quota_nb_entry_per_domain)
+	if (domain_entry(conn) >= quota_nb_entry_per_domain) {
+		errno = ENOSPC;
 		return NULL;
+	}
 
 	/* Add child to parent. */
 	base = basename(name);
