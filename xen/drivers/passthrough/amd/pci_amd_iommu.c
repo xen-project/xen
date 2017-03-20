@@ -222,21 +222,27 @@ int __init amd_iov_detect(void)
     return scan_pci_devices();
 }
 
-static int allocate_domain_resources(struct domain_iommu *hd)
+int amd_iommu_alloc_root(struct domain_iommu *hd)
 {
-    /* allocate root table */
-    spin_lock(&hd->arch.mapping_lock);
-    if ( !hd->arch.root_table )
+    if ( unlikely(!hd->arch.root_table) )
     {
         hd->arch.root_table = alloc_amd_iommu_pgtable();
         if ( !hd->arch.root_table )
-        {
-            spin_unlock(&hd->arch.mapping_lock);
             return -ENOMEM;
-        }
     }
-    spin_unlock(&hd->arch.mapping_lock);
+
     return 0;
+}
+
+static int __must_check allocate_domain_resources(struct domain_iommu *hd)
+{
+    int rc;
+
+    spin_lock(&hd->arch.mapping_lock);
+    rc = amd_iommu_alloc_root(hd);
+    spin_unlock(&hd->arch.mapping_lock);
+
+    return rc;
 }
 
 static int get_paging_mode(unsigned long entries)
@@ -259,14 +265,6 @@ static int amd_iommu_domain_init(struct domain *d)
 {
     struct domain_iommu *hd = dom_iommu(d);
 
-    /* allocate page directroy */
-    if ( allocate_domain_resources(hd) != 0 )
-    {
-        if ( hd->arch.root_table )
-            free_domheap_page(hd->arch.root_table);
-        return -ENOMEM;
-    }
-
     /* For pv and dom0, stick with get_paging_mode(max_page)
      * For HVM dom0, use 2 level page table at first */
     hd->arch.paging_mode = is_hvm_domain(d) ?
@@ -279,6 +277,9 @@ static void __hwdom_init amd_iommu_hwdom_init(struct domain *d)
 {
     unsigned long i; 
     const struct amd_iommu *iommu;
+
+    if ( allocate_domain_resources(dom_iommu(d)) )
+        BUG();
 
     if ( !iommu_passthrough && !need_iommu(d) )
     {
@@ -363,7 +364,7 @@ static int reassign_device(struct domain *source, struct domain *target,
                            u8 devfn, struct pci_dev *pdev)
 {
     struct amd_iommu *iommu;
-    int bdf;
+    int bdf, rc;
     struct domain_iommu *t = dom_iommu(target);
 
     bdf = PCI_BDF2(pdev->bus, pdev->devfn);
@@ -385,10 +386,9 @@ static int reassign_device(struct domain *source, struct domain *target,
         pdev->domain = target;
     }
 
-    /* IO page tables might be destroyed after pci-detach the last device
-     * In this case, we have to re-allocate root table for next pci-attach.*/
-    if ( t->arch.root_table == NULL )
-        allocate_domain_resources(t);
+    rc = allocate_domain_resources(t);
+    if ( rc )
+        return rc;
 
     amd_iommu_setup_domain_device(target, iommu, devfn, pdev);
     AMD_IOMMU_DEBUG("Re-assign %04x:%02x:%02x.%u from dom%d to dom%d\n",

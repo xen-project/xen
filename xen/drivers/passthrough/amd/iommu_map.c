@@ -636,10 +636,9 @@ int amd_iommu_map_page(struct domain *d, unsigned long gfn, unsigned long mfn,
 {
     bool_t need_flush = 0;
     struct domain_iommu *hd = dom_iommu(d);
+    int rc;
     unsigned long pt_mfn[7];
     unsigned int merge_level;
-
-    BUG_ON( !hd->arch.root_table );
 
     if ( iommu_use_hap_pt(d) )
         return 0;
@@ -647,6 +646,15 @@ int amd_iommu_map_page(struct domain *d, unsigned long gfn, unsigned long mfn,
     memset(pt_mfn, 0, sizeof(pt_mfn));
 
     spin_lock(&hd->arch.mapping_lock);
+
+    rc = amd_iommu_alloc_root(hd);
+    if ( rc )
+    {
+        spin_unlock(&hd->arch.mapping_lock);
+        AMD_IOMMU_DEBUG("Root table alloc failed, gfn = %lx\n", gfn);
+        domain_crash(d);
+        return rc;
+    }
 
     /* Since HVM domain is initialized with 2 level IO page table,
      * we might need a deeper page table for lager gfn now */
@@ -717,14 +725,18 @@ int amd_iommu_unmap_page(struct domain *d, unsigned long gfn)
     unsigned long pt_mfn[7];
     struct domain_iommu *hd = dom_iommu(d);
 
-    BUG_ON( !hd->arch.root_table );
-
     if ( iommu_use_hap_pt(d) )
         return 0;
 
     memset(pt_mfn, 0, sizeof(pt_mfn));
 
     spin_lock(&hd->arch.mapping_lock);
+
+    if ( !hd->arch.root_table )
+    {
+        spin_unlock(&hd->arch.mapping_lock);
+        return 0;
+    }
 
     /* Since HVM domain is initialized with 2 level IO page table,
      * we might need a deeper page table for lager gfn now */
