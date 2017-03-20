@@ -724,11 +724,15 @@ static void intel_init_mca(struct cpuinfo_x86 *c)
 
     first = mce_firstbank(c);
 
+#define CAP(enabled, name) ((enabled) ? ", " name : "")
     if (smp_processor_id() == 0)
     {
-        dprintk(XENLOG_INFO, "MCA Capability: BCAST %x SER %x"
-                " CMCI %x firstbank %x extended MCE MSR %x\n",
-                broadcast, ser, cmci, first, ext_num);
+        dprintk(XENLOG_INFO,
+                "MCA capability: firstbank %d, %d ext MSRs%s%s%s\n",
+                first, ext_num,
+                CAP(broadcast, "BCAST"),
+                CAP(ser, "SER"),
+                CAP(cmci, "CMCI"));
 
         mce_broadcast = broadcast;
         cmci_support = cmci;
@@ -739,12 +743,15 @@ static void intel_init_mca(struct cpuinfo_x86 *c)
     else if (cmci != cmci_support || ser != ser_support ||
              broadcast != mce_broadcast ||
              first != firstbank || ext_num != nr_intel_ext_msrs)
-    {
         dprintk(XENLOG_WARNING,
-                "CPU %u has different MCA capability (%x,%x,%x,%x,%x)"
+                "CPU%u has different MCA capability "
+                "(firstbank %d, %d ext MSRs%s%s%s)"
                 " than BSP, may cause undetermined result!!!\n",
-                smp_processor_id(), broadcast, ser, cmci, first, ext_num);
-    }
+                smp_processor_id(), first, ext_num,
+                CAP(broadcast, "BCAST"),
+                CAP(ser, "SER"),
+                CAP(cmci, "CMCI"));
+#undef CAP
 }
 
 static void intel_mce_post_reset(void)
