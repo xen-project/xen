@@ -9,7 +9,7 @@
 #ifndef __ASM_X86_HVM_VIRIDIAN_H__
 #define __ASM_X86_HVM_VIRIDIAN_H__
 
-union viridian_apic_assist
+union viridian_vp_assist
 {   uint64_t raw;
     struct
     {
@@ -22,10 +22,10 @@ union viridian_apic_assist
 struct viridian_vcpu
 {
     struct {
-        union viridian_apic_assist msr;
+        union viridian_vp_assist msr;
         void *va;
         int vector;
-    } apic_assist;
+    } vp_assist;
 };
 
 union viridian_guest_os_id
