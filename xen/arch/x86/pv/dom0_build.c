@@ -875,10 +875,6 @@ int __init dom0_construct_pv(struct domain *d,
         paging_update_paging_modes(v);
 #endif
 
-    /*
-     * PVH Fixme: XENFEAT_supervisor_mode_kernel has been reused in PVH with a
-     * different meaning.
-     */
     if ( test_bit(XENFEAT_supervisor_mode_kernel, parms.f_required) )
         panic("Dom0 requires supervisor-mode execution");
 
