@@ -116,7 +116,7 @@ ssize_t apei_read_mce(struct mce *m, u64 *record_id)
 }
 
 /* Check whether there is record in ERST */
-bool_t apei_check_mce(void)
+bool apei_check_mce(void)
 {
 	return erst_get_record_count() > 0;
 }

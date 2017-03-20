@@ -41,7 +41,7 @@ extern uint8_t cmci_apic_vector;
 
 /* Init functions */
 enum mcheck_type amd_mcheck_init(struct cpuinfo_x86 *c);
-enum mcheck_type intel_mcheck_init(struct cpuinfo_x86 *c, bool_t bsp);
+enum mcheck_type intel_mcheck_init(struct cpuinfo_x86 *c, bool bsp);
 
 void amd_nonfatal_mcheck_init(struct cpuinfo_x86 *c);
 
@@ -50,7 +50,7 @@ extern unsigned int firstbank;
 struct mcinfo_extended *intel_get_extended_msrs(
     struct mcinfo_global *mig, struct mc_info *mi);
 
-int mce_available(struct cpuinfo_x86 *c);
+bool mce_available(const struct cpuinfo_x86 *c);
 unsigned int mce_firstbank(struct cpuinfo_x86 *c);
 /* Helper functions used for collecting error telemetry */
 void noreturn mc_panic(char *s);
@@ -66,13 +66,13 @@ extern void x86_mce_vector_register(x86_mce_vector_t);
 extern void mcheck_cmn_handler(const struct cpu_user_regs *regs);
 
 /* Register a handler for judging whether mce is recoverable. */
-typedef int (*mce_recoverable_t)(uint64_t status);
+typedef bool (*mce_recoverable_t)(uint64_t status);
 extern void mce_recoverable_register(mce_recoverable_t);
 
 /* Read an MSR, checking for an interposed value first */
 extern struct intpose_ent *intpose_lookup(unsigned int, uint64_t,
     uint64_t *);
-extern bool_t intpose_inval(unsigned int, uint64_t);
+extern bool intpose_inval(unsigned int, uint64_t);
 
 static inline uint64_t mca_rdmsr(unsigned int msr)
 {
@@ -107,18 +107,18 @@ struct mca_summary {
     uint32_t    errcnt; /* number of banks with valid errors */
     int         ripv;   /* meaningful on #MC */
     int         eipv;   /* meaningful on #MC */
-    bool_t      uc;     /* UC flag */
-    bool_t      pcc;    /* PCC flag */
-    bool_t      recoverable; /* software error recoverable flag */
+    bool        uc;     /* UC flag */
+    bool        pcc;    /* PCC flag */
+    bool        recoverable; /* software error recoverable flag */
 };
 
 DECLARE_PER_CPU(struct mca_banks *, poll_bankmask);
 DECLARE_PER_CPU(struct mca_banks *, no_cmci_banks);
 DECLARE_PER_CPU(struct mca_banks *, mce_clear_banks);
 
-extern bool_t cmci_support;
-extern bool_t is_mc_panic;
-extern bool_t mce_broadcast;
+extern bool cmci_support;
+extern bool is_mc_panic;
+extern bool mce_broadcast;
 extern void mcheck_mca_clearbanks(struct mca_banks *);
 
 extern mctelem_cookie_t mcheck_mca_logout(enum mca_source, struct mca_banks *,
@@ -131,7 +131,7 @@ extern mctelem_cookie_t mcheck_mca_logout(enum mca_source, struct mca_banks *,
  */
 
 /* Register a handler for judging whether the bank need to be cleared */
-typedef int (*mce_need_clearbank_t)(enum mca_source who, u64 status);
+typedef bool (*mce_need_clearbank_t)(enum mca_source who, u64 status);
 extern void mce_need_clearbank_register(mce_need_clearbank_t);
 
 /* Register a callback to collect additional information (typically non-

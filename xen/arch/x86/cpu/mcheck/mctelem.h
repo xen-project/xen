@@ -70,6 +70,6 @@ extern void mctelem_ack(mctelem_class_t, mctelem_cookie_t);
 extern void mctelem_defer(mctelem_cookie_t);
 extern void mctelem_process_deferred(unsigned int,
     int (*)(mctelem_cookie_t));
-int mctelem_has_deferred(unsigned int);
+bool mctelem_has_deferred(unsigned int);
 
 #endif

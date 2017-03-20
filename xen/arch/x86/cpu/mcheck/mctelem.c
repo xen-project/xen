@@ -189,11 +189,11 @@ void mctelem_process_deferred(unsigned int cpu,
 	}
 }
 
-int mctelem_has_deferred(unsigned int cpu)
+bool mctelem_has_deferred(unsigned int cpu)
 {
 	if (per_cpu(mctctl.pending, cpu) != NULL)
-		return 1;
-	return 0;
+		return true;
+	return false;
 }
 
 /* Free an entry to its native free list; the entry must not be linked on

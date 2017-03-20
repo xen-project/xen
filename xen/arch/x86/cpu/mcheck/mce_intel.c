@@ -22,9 +22,9 @@
 #include "mcaction.h"
 
 static DEFINE_PER_CPU_READ_MOSTLY(struct mca_banks *, mce_banks_owned);
-bool_t __read_mostly cmci_support = 0;
-static bool_t __read_mostly ser_support = 0;
-static bool_t __read_mostly mce_force_broadcast;
+bool __read_mostly cmci_support;
+static bool __read_mostly ser_support;
+static bool __read_mostly mce_force_broadcast;
 boolean_param("mce_fb", mce_force_broadcast);
 
 static int __read_mostly nr_intel_ext_msrs;
@@ -81,13 +81,13 @@ static void intel_thermal_interrupt(struct cpu_user_regs *regs)
 }
 
 /* Thermal monitoring depends on APIC, ACPI and clock modulation */
-static int intel_thermal_supported(struct cpuinfo_x86 *c)
+static bool intel_thermal_supported(struct cpuinfo_x86 *c)
 {
     if (!cpu_has_apic)
-        return 0;
+        return false;
     if (!cpu_has(c, X86_FEATURE_ACPI) || !cpu_has(c, X86_FEATURE_TM1))
-        return 0;
-    return 1;
+        return false;
+    return true;
 }
 
 static u32 __read_mostly lvtthmr_init;
@@ -268,12 +268,12 @@ static void intel_memerr_dhandler(
     mc_memerr_dhandler(binfo, result, regs);
 }
 
-static int intel_srar_check(uint64_t status)
+static bool intel_srar_check(uint64_t status)
 {
     return ( intel_check_mce_type(status) == intel_mce_ucr_srar );
 }
 
-static int intel_checkaddr(uint64_t status, uint64_t misc, int addrtype)
+static bool intel_checkaddr(uint64_t status, uint64_t misc, int addrtype)
 {
     if (!(status & MCi_STATUS_ADDRV) ||
         !(status & MCi_STATUS_MISCV) ||
@@ -307,7 +307,7 @@ static void intel_srar_dhandler(
     }
 }
 
-static int intel_srao_check(uint64_t status)
+static bool intel_srao_check(uint64_t status)
 {
     return ( intel_check_mce_type(status) == intel_mce_ucr_srao );
 }
@@ -336,7 +336,7 @@ static void intel_srao_dhandler(
     }
 }
 
-static int intel_default_check(uint64_t status)
+static bool intel_default_check(uint64_t status)
 {
     return 1;
 }
@@ -398,51 +398,51 @@ static const struct mca_error_handler intel_mce_uhandlers[] = {
  * 3) ser_support = 1, SRAO, UC = 1, S = 1, AR = 0, [EN = 1]
 */
 
-static int intel_need_clearbank_scan(enum mca_source who, u64 status)
+static bool intel_need_clearbank_scan(enum mca_source who, u64 status)
 {
     if ( who == MCA_CMCI_HANDLER) {
         /* CMCI need clear bank */
         if ( !(status & MCi_STATUS_UC) )
-            return 1;
+            return true;
         /* Spurious need clear bank */
         else if ( ser_support && !(status & MCi_STATUS_OVER)
                     && !(status & MCi_STATUS_EN) )
-            return 1;
+            return true;
         /* UCNA OVER = 0 need clear bank */
         else if ( ser_support && !(status & MCi_STATUS_OVER) 
                     && !(status & MCi_STATUS_PCC) && !(status & MCi_STATUS_S) 
                     && !(status & MCi_STATUS_AR))
-            return 1;
+            return true;
         /* Only Log, no clear */
-        else return 0;
+        else return false;
     }
     else if ( who == MCA_MCE_SCAN) {
         if ( !ser_support )
-            return 0;
+            return false;
         /* 
          * For fatal error, it shouldn't be cleared so that sticky bank
          * have chance to be handled after reboot by polling
          */
         if ( (status & MCi_STATUS_UC) && (status & MCi_STATUS_PCC) )
-            return 0;
+            return false;
         /* Spurious need clear bank */
         else if ( !(status & MCi_STATUS_OVER)
                     && (status & MCi_STATUS_UC) && !(status & MCi_STATUS_EN))
-            return 1;
+            return true;
         /* SRAR OVER=0 clear bank. OVER = 1 have caused reset */
         else if ( (status & MCi_STATUS_UC)
                     && (status & MCi_STATUS_S) && (status & MCi_STATUS_AR )
                     && !(status & MCi_STATUS_OVER) )
-            return 1;
+            return true;
         /* SRAO need clear bank */
         else if ( !(status & MCi_STATUS_AR) 
                     && (status & MCi_STATUS_S) && (status & MCi_STATUS_UC))
-            return 1; 
+            return true;
         else
-            return 0;
+            return false;
     }
 
-    return 1;
+    return true;
 }
 
 /* MCE continues/is recoverable when 
@@ -452,30 +452,30 @@ static int intel_need_clearbank_scan(enum mca_source who, u64 status)
  * 4) SRAO ser_support = 1, PCC = 0, S = 1, AR = 0, EN = 1 [UC = 1]
  * 5) UCNA ser_support = 1, OVER = 0, EN = 1, PCC = 0, S = 0, AR = 0, [UC = 1]
  */
-static int intel_recoverable_scan(uint64_t status)
+static bool intel_recoverable_scan(uint64_t status)
 {
 
     if ( !(status & MCi_STATUS_UC ) )
-        return 1;
+        return true;
     else if ( ser_support && !(status & MCi_STATUS_EN) 
                 && !(status & MCi_STATUS_OVER) )
-        return 1;
+        return true;
     /* SRAR error */
     else if ( ser_support && !(status & MCi_STATUS_OVER) 
                 && !(status & MCi_STATUS_PCC) && (status & MCi_STATUS_S)
                 && (status & MCi_STATUS_AR) && (status & MCi_STATUS_EN) )
-        return 1;
+        return true;
     /* SRAO error */
     else if (ser_support && !(status & MCi_STATUS_PCC)
                 && (status & MCi_STATUS_S) && !(status & MCi_STATUS_AR)
                 && (status & MCi_STATUS_EN))
-        return 1;
+        return true;
     /* UCNA error */
     else if (ser_support && !(status & MCi_STATUS_OVER)
                 && (status & MCi_STATUS_EN) && !(status & MCi_STATUS_PCC)
                 && !(status & MCi_STATUS_S) && !(status & MCi_STATUS_AR))
-        return 1;
-    return 0;
+        return true;
+    return false;
 }
 
 /* CMCI */
@@ -686,10 +686,10 @@ static void intel_init_cmci(struct cpuinfo_x86 *c)
 
 /* MCA */
 
-static int mce_is_broadcast(struct cpuinfo_x86 *c)
+static bool mce_is_broadcast(struct cpuinfo_x86 *c)
 {
     if (mce_force_broadcast)
-        return 1;
+        return true;
 
     /* According to Intel SDM Dec, 2009, 15.10.4.1, For processors with
      * DisplayFamily_DisplayModel encoding of 06H_EH and above,
@@ -697,14 +697,14 @@ static int mce_is_broadcast(struct cpuinfo_x86 *c)
      */
     if (c->x86_vendor == X86_VENDOR_INTEL && c->x86 == 6 &&
         c->x86_model >= 0xe)
-            return 1;
-    return 0;
+        return true;
+    return false;
 }
 
 /* Check and init MCA */
 static void intel_init_mca(struct cpuinfo_x86 *c)
 {
-    bool_t broadcast, cmci = 0, ser = 0;
+    bool broadcast, cmci = false, ser = false;
     int ext_num = 0, first;
     uint64_t msr_content;
 
@@ -713,11 +713,11 @@ static void intel_init_mca(struct cpuinfo_x86 *c)
     rdmsrl(MSR_IA32_MCG_CAP, msr_content);
 
     if ((msr_content & MCG_CMCI_P) && cpu_has_apic)
-        cmci = 1;
+        cmci = true;
 
     /* Support Software Error Recovery */
     if (msr_content & MCG_SER_P)
-        ser = 1;
+        ser = true;
 
     if (msr_content & MCG_EXT_P)
         ext_num = (msr_content >> MCG_EXT_CNT) & 0xff;
@@ -856,7 +856,7 @@ static struct notifier_block cpu_nfb = {
 };
 
 /* p4/p6 family have similar MCA initialization process */
-enum mcheck_type intel_mcheck_init(struct cpuinfo_x86 *c, bool_t bsp)
+enum mcheck_type intel_mcheck_init(struct cpuinfo_x86 *c, bool bsp)
 {
     if ( bsp )
     {

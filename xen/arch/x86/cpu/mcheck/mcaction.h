@@ -12,7 +12,7 @@ mc_memerr_dhandler(struct mca_binfo *binfo,
 #define MC_ADDR_PHYSICAL  0
 #define MC_ADDR_VIRTUAL   1
 
-typedef int (*mce_check_addr_t)(uint64_t status, uint64_t misc, int addr_type);
+typedef bool (*mce_check_addr_t)(uint64_t status, uint64_t misc, int addr_type);
 extern void mce_register_addrcheck(mce_check_addr_t);
 
 extern mce_check_addr_t mc_check_addr;

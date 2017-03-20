@@ -147,12 +147,12 @@ struct mca_error_handler
      * a seperate function to decode the corresponding actions
      * for the particular mca error later.
      */
-    int (*owned_error)(uint64_t status);
+    bool (*owned_error)(uint64_t status);
     void (*recovery_handler)(struct mca_binfo *binfo,
                     enum mce_result *result, const struct cpu_user_regs *regs);
 };
 
 /* Global variables */
-extern bool_t opt_mce;
+extern bool opt_mce;
 
 #endif /* X86_MCA_H */

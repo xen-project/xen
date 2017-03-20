@@ -406,9 +406,9 @@ void identify_cpu(struct cpuinfo_x86 *c)
 		for ( i = 0 ; i < NCAPINTS ; i++ )
 			boot_cpu_data.x86_capability[i] &= c->x86_capability[i];
 
-		mcheck_init(c, 0);
+		mcheck_init(c, false);
 	} else {
-		mcheck_init(c, 1);
+		mcheck_init(c, true);
 
 		mtrr_bp_init();
 	}

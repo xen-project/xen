@@ -30,10 +30,10 @@
 #include "util.h"
 #include "vmce.h"
 
-bool_t __read_mostly opt_mce = 1;
+bool __read_mostly opt_mce = true;
 boolean_param("mce", opt_mce);
-bool_t __read_mostly mce_broadcast = 0;
-bool_t is_mc_panic;
+bool __read_mostly mce_broadcast;
+bool is_mc_panic;
 unsigned int __read_mostly nr_mce_banks;
 unsigned int __read_mostly firstbank;
 uint8_t __read_mostly cmci_apic_vector;
@@ -285,7 +285,7 @@ mcheck_mca_logout(enum mca_source who, struct mca_banks *bankmask,
     uint64_t gstatus, status;
     struct mcinfo_global *mig = NULL; /* on stack */
     mctelem_cookie_t mctc = NULL;
-    bool_t uc = 0, pcc = 0, recover = 1, need_clear = 1;
+    bool uc = false, pcc = false, recover = true, need_clear = true;
     uint32_t mc_flags = 0;
     struct mc_info *mci = NULL;
     mctelem_class_t which = MC_URGENT; /* XXXgcc */
@@ -356,15 +356,14 @@ mcheck_mca_logout(enum mca_source who, struct mca_banks *bankmask,
 
         /* flag for uncorrected errors */
         if (!uc && ((status & MCi_STATUS_UC) != 0))
-            uc = 1;
+            uc = true;
 
         /* flag processor context corrupt */
         if (!pcc && ((status & MCi_STATUS_PCC) != 0))
-            pcc = 1;
+            pcc = true;
 
         if (recover && uc)
-            /* uc = 1, recover = 1, we need not panic.
-             */
+            /* uc = true, recover = true, we need not panic. */
             recover = mc_recoverable_scan(status);
 
         mca_init_bank(who, mci, i);
@@ -372,7 +371,7 @@ mcheck_mca_logout(enum mca_source who, struct mca_banks *bankmask,
         if (mc_callback_bank_extended)
             mc_callback_bank_extended(mci, i, status);
 
-        /* By default, need_clear = 1 */
+        /* By default, need_clear = true */
         if (who != MCA_MCE_SCAN && need_clear)
             /* Clear bank */
             mcabank_clear(i);
@@ -554,7 +553,7 @@ void mcheck_mca_clearbanks(struct mca_banks *bankmask)
 }
 
 /*check the existence of Machine Check*/
-int mce_available(struct cpuinfo_x86 *c)
+bool mce_available(const struct cpuinfo_x86 *c)
 {
     return cpu_has(c, X86_FEATURE_MCE) && cpu_has(c, X86_FEATURE_MCA);
 }
@@ -719,7 +718,7 @@ static struct notifier_block cpu_nfb = {
 };
 
 /* This has to be run for each processor */
-void mcheck_init(struct cpuinfo_x86 *c, bool_t bsp)
+void mcheck_init(struct cpuinfo_x86 *c, bool bsp)
 {
     enum mcheck_type inited = mcheck_none;
 
@@ -1059,15 +1058,15 @@ static void intpose_add(unsigned int cpu_nr, uint64_t msr, uint64_t val)
     printk("intpose_add: interpose array full - request dropped\n");
 }
 
-bool_t intpose_inval(unsigned int cpu_nr, uint64_t msr)
+bool intpose_inval(unsigned int cpu_nr, uint64_t msr)
 {
     struct intpose_ent *ent = intpose_lookup(cpu_nr, msr, NULL);
 
     if ( !ent )
-        return 0;
+        return false;
 
     ent->cpu_nr = -1;
-    return 1;
+    return true;
 }
 
 #define IS_MCA_BANKREG(r) \
@@ -1075,7 +1074,7 @@ bool_t intpose_inval(unsigned int cpu_nr, uint64_t msr)
     (r) <= MSR_IA32_MCx_MISC(nr_mce_banks - 1) && \
     ((r) - MSR_IA32_MC0_CTL) % 4 != 0) /* excludes MCi_CTL */
 
-static int x86_mc_msrinject_verify(struct xen_mc_msrinject *mci)
+static bool x86_mc_msrinject_verify(struct xen_mc_msrinject *mci)
 {
     struct cpuinfo_x86 *c;
     int i, errs = 0;
@@ -1569,7 +1568,7 @@ static void mc_panic_dump(void)
 
 void mc_panic(char *s)
 {
-    is_mc_panic = 1;
+    is_mc_panic = true;
     console_force_unlock();
 
     printk("Fatal machine check: %s\n", s);
@@ -1669,7 +1668,7 @@ static int mce_delayed_action(mctelem_cookie_t mctc)
     {
     case MCER_RESET:
         dprintk(XENLOG_ERR, "MCE delayed action failed\n");
-        is_mc_panic = 1;
+        is_mc_panic = true;
         x86_mcinfo_dump(mctelem_dataptr(mctc));
         panic("MCE: Software recovery failed for the UCR");
         break;
