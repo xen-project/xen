@@ -280,7 +280,7 @@ static void tboot_gen_xenheap_integrity(const uint8_t key[TB_KEY_SIZE],
 
         if ( !mfn_valid(_mfn(mfn)) )
             continue;
-        if ( (mfn << PAGE_SHIFT) < __pa(&_end) )
+        if ( is_xen_fixed_mfn(mfn) )
             continue; /* skip Xen */
         if ( (mfn >= PFN_DOWN(g_tboot_shared->tboot_base - 3 * PAGE_SIZE))
              && (mfn < PFN_UP(g_tboot_shared->tboot_base
@@ -361,7 +361,8 @@ void tboot_shutdown(uint32_t shutdown_type)
     if ( shutdown_type == TB_SHUTDOWN_S3 )
     {
         /*
-         * Xen regions for tboot to MAC
+         * Xen regions for tboot to MAC. This needs to remain in sync with
+         * xen_in_range().
          */
         g_tboot_shared->num_mac_regions = 3;
         /* S3 resume code (and other real mode trampoline code) */
