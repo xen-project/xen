@@ -135,6 +135,13 @@ struct segment_register {
     uint64_t   base;
 };
 
+struct x86_emul_fpu_aux {
+    unsigned long ip, dp;
+    uint16_t cs, ds;
+    unsigned int op:11;
+    unsigned int dval:1;
+};
+
 /*
  * Return codes from state-accessor functions and from x86_emulate().
  */
@@ -439,10 +446,12 @@ struct x86_emulate_ops
      *  the get_fpu one having got called before!
      * @backout: Undo updates to the specified register file (can, besides
      *           X86EMUL_FPU_none, only be X86EMUL_FPU_fpu at present);
+     * @aux: Packaged up FIP/FDP/FOP values to load into FPU.
      */
     void (*put_fpu)(
         struct x86_emulate_ctxt *ctxt,
-        enum x86_emulate_fpu_type backout);
+        enum x86_emulate_fpu_type backout,
+        const struct x86_emul_fpu_aux *aux);
 
     /* invlpg: Invalidate paging structures which map addressed byte. */
     int (*invlpg)(

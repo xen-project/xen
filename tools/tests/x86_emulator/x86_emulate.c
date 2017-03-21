@@ -140,7 +140,8 @@ int emul_test_get_fpu(
 
 void emul_test_put_fpu(
     struct x86_emulate_ctxt *ctxt,
-    enum x86_emulate_fpu_type backout)
+    enum x86_emulate_fpu_type backout,
+    const struct x86_emul_fpu_aux *aux)
 {
     /* TBD */
 }

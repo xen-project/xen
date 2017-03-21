@@ -1660,11 +1660,72 @@ static int hvmemul_get_fpu(
 
 static void hvmemul_put_fpu(
     struct x86_emulate_ctxt *ctxt,
-    enum x86_emulate_fpu_type backout)
+    enum x86_emulate_fpu_type backout,
+    const struct x86_emul_fpu_aux *aux)
 {
     struct vcpu *curr = current;
 
     curr->arch.hvm_vcpu.fpu_exception_callback = NULL;
+
+    if ( aux )
+    {
+        typeof(curr->arch.xsave_area->fpu_sse) *fpu_ctxt = curr->arch.fpu_ctxt;
+        bool dval = aux->dval;
+        int mode = hvm_guest_x86_mode(curr);
+
+        ASSERT(backout == X86EMUL_FPU_none);
+        /*
+         * Latch current register state so that we can replace FIP/FDP/FOP
+         * (which have values resulting from our own invocation of the FPU
+         * instruction during emulation).
+         * NB: See also the comment in hvmemul_get_fpu(); we don't need to
+         * set ->fpu_dirtied here as it is going to be cleared below, and
+         * we also don't need to reload FCW as we're forcing full state to
+         * be reloaded anyway.
+         */
+        save_fpu_enable();
+
+        if ( boot_cpu_has(X86_FEATURE_FDP_EXCP_ONLY) &&
+             !(fpu_ctxt->fsw & ~fpu_ctxt->fcw & 0x003f) )
+            dval = false;
+
+        switch ( mode )
+        {
+        case 8:
+            fpu_ctxt->fip.addr = aux->ip;
+            if ( dval )
+                fpu_ctxt->fdp.addr = aux->dp;
+            fpu_ctxt->x[FPU_WORD_SIZE_OFFSET] = 8;
+            break;
+
+        case 4: case 2:
+            fpu_ctxt->fip.offs = aux->ip;
+            fpu_ctxt->fip.sel  = aux->cs;
+            if ( dval )
+            {
+                fpu_ctxt->fdp.offs = aux->dp;
+                fpu_ctxt->fdp.sel  = aux->ds;
+            }
+            fpu_ctxt->x[FPU_WORD_SIZE_OFFSET] = mode;
+            break;
+
+        case 0: case 1:
+            fpu_ctxt->fip.addr = aux->ip | (aux->cs << 4);
+            if ( dval )
+                fpu_ctxt->fdp.addr = aux->dp | (aux->ds << 4);
+            fpu_ctxt->x[FPU_WORD_SIZE_OFFSET] = 2;
+            break;
+
+        default:
+            ASSERT_UNREACHABLE();
+            return;
+        }
+
+        fpu_ctxt->fop = aux->op;
+
+        /* Re-use backout code below. */
+        backout = X86EMUL_FPU_fpu;
+    }
 
     if ( backout == X86EMUL_FPU_fpu )
     {

@@ -536,6 +536,55 @@ struct operand {
         unsigned long    off;
     } mem;
 };
+
+struct x86_emulate_state {
+    unsigned int op_bytes, ad_bytes;
+
+    enum {
+        ext_none = vex_none,
+        ext_0f   = vex_0f,
+        ext_0f38 = vex_0f38,
+        ext_0f3a = vex_0f3a,
+        /*
+         * For XOP use values such that the respective instruction field
+         * can be used without adjustment.
+         */
+        ext_8f08 = 8,
+        ext_8f09,
+        ext_8f0a,
+    } ext;
+    uint8_t modrm, modrm_mod, modrm_reg, modrm_rm;
+    uint8_t rex_prefix;
+    bool lock_prefix;
+    bool not_64bit; /* Instruction not available in 64bit. */
+    bool fpu_ctrl;  /* Instruction is an FPU control one. */
+    opcode_desc_t desc;
+    union vex vex;
+    union evex evex;
+    enum simd_opsize simd_size;
+
+    /*
+     * Data operand effective address (usually computed from ModRM).
+     * Default is a memory operand relative to segment DS.
+     */
+    struct operand ea;
+
+    /* Immediate operand values, if any. Use otherwise unused fields. */
+#define imm1 ea.val
+#define imm2 ea.orig_val
+
+    unsigned long ip;
+    struct cpu_user_regs *regs;
+
+#ifndef NDEBUG
+    /*
+     * Track caller of x86_decode_insn() to spot missing as well as
+     * premature calls to x86_emulate_free_state().
+     */
+    void *caller;
+#endif
+};
+
 #ifdef __x86_64__
 #define PTR_POISON ((void *)0x8086000000008086UL) /* non-canonical */
 #else
@@ -1028,13 +1077,48 @@ do {                                                            \
 static void put_fpu(
     struct fpu_insn_ctxt *fic,
     bool failed_late,
+    const struct x86_emulate_state *state,
     struct x86_emulate_ctxt *ctxt,
     const struct x86_emulate_ops *ops)
 {
     if ( unlikely(failed_late) && fic->type == X86EMUL_FPU_fpu )
-        ops->put_fpu(ctxt, X86EMUL_FPU_fpu);
+        ops->put_fpu(ctxt, X86EMUL_FPU_fpu, NULL);
+    else if ( unlikely(fic->type == X86EMUL_FPU_fpu) && !state->fpu_ctrl )
+    {
+        struct x86_emul_fpu_aux aux = {
+            .ip = ctxt->regs->r(ip),
+            .cs = ctxt->regs->cs,
+            .op = ((ctxt->opcode & 7) << 8) | state->modrm,
+        };
+        struct segment_register sreg;
+
+        if ( ops->read_segment &&
+             ops->read_segment(x86_seg_cs, &sreg, ctxt) == X86EMUL_OKAY )
+            aux.cs = sreg.sel;
+        if ( state->ea.type == OP_MEM )
+        {
+            aux.dp = state->ea.mem.off;
+            if ( ops->read_segment &&
+                 ops->read_segment(state->ea.mem.seg, &sreg,
+                                   ctxt) == X86EMUL_OKAY )
+                aux.ds = sreg.sel;
+            else
+                switch ( state->ea.mem.seg )
+                {
+                case x86_seg_cs: aux.ds = ctxt->regs->cs; break;
+                case x86_seg_ds: aux.ds = ctxt->regs->ds; break;
+                case x86_seg_es: aux.ds = ctxt->regs->es; break;
+                case x86_seg_fs: aux.ds = ctxt->regs->fs; break;
+                case x86_seg_gs: aux.ds = ctxt->regs->gs; break;
+                case x86_seg_ss: aux.ds = ctxt->regs->ss; break;
+                default:         ASSERT_UNREACHABLE();    break;
+                }
+            aux.dval = true;
+        }
+        ops->put_fpu(ctxt, X86EMUL_FPU_none, &aux);
+    }
     else if ( fic->type != X86EMUL_FPU_none && ops->put_fpu )
-        ops->put_fpu(ctxt, X86EMUL_FPU_none);
+        ops->put_fpu(ctxt, X86EMUL_FPU_none, NULL);
     fic->type = X86EMUL_FPU_none;
 }
 
@@ -2087,53 +2171,6 @@ int x86emul_unhandleable_rw(
 {
     return X86EMUL_UNHANDLEABLE;
 }
-
-struct x86_emulate_state {
-    unsigned int op_bytes, ad_bytes;
-
-    enum {
-        ext_none = vex_none,
-        ext_0f   = vex_0f,
-        ext_0f38 = vex_0f38,
-        ext_0f3a = vex_0f3a,
-        /*
-         * For XOP use values such that the respective instruction field
-         * can be used without adjustment.
-         */
-        ext_8f08 = 8,
-        ext_8f09,
-        ext_8f0a,
-    } ext;
-    uint8_t modrm, modrm_mod, modrm_reg, modrm_rm;
-    uint8_t rex_prefix;
-    bool lock_prefix;
-    bool not_64bit; /* Instruction not available in 64bit. */
-    opcode_desc_t desc;
-    union vex vex;
-    union evex evex;
-    enum simd_opsize simd_size;
-
-    /*
-     * Data operand effective address (usually computed from ModRM).
-     * Default is a memory operand relative to segment DS.
-     */
-    struct operand ea;
-
-    /* Immediate operand values, if any. Use otherwise unused fields. */
-#define imm1 ea.val
-#define imm2 ea.orig_val
-
-    unsigned long ip;
-    struct cpu_user_regs *regs;
-
-#ifndef NDEBUG
-    /*
-     * Track caller of x86_decode_insn() to spot missing as well as
-     * premature calls to x86_emulate_free_state().
-     */
-    void *caller;
-#endif
-};
 
 /* Helper definitions. */
 #define op_bytes (state->op_bytes)
@@ -4251,8 +4288,10 @@ x86_emulate(
                 dst.bytes = 4;
                 break;
             case 4: /* fldenv - TODO */
+                state->fpu_ctrl = true;
                 goto cannot_emulate;
             case 5: /* fldcw m2byte */
+                state->fpu_ctrl = true;
                 if ( (rc = ops->read(ea.mem.seg, ea.mem.off, &src.val,
                                      2, ctxt)) != X86EMUL_OKAY )
                     goto done;
@@ -4260,8 +4299,10 @@ x86_emulate(
                 dst.type = OP_NONE;
                 break;
             case 6: /* fnstenv - TODO */
+                state->fpu_ctrl = true;
                 goto cannot_emulate;
             case 7: /* fnstcw m2byte */
+                state->fpu_ctrl = true;
                 emulate_fpu_insn_memdst("fnstcw", dst.val);
                 dst.bytes = 2;
                 break;
@@ -4350,6 +4391,7 @@ x86_emulate(
         case 0xe3: /* fninit */
         case 0xe4: /* fnsetpm - 287 only, ignored by 387 */
         /* case 0xe5: frstpm - 287 only, #UD on 387 */
+            state->fpu_ctrl = true;
             emulate_fpu_insn_stub(0xdb, modrm);
             break;
         default:
@@ -4493,8 +4535,10 @@ x86_emulate(
                 break;
             case 4: /* frstor - TODO */
             case 6: /* fnsave - TODO */
+                state->fpu_ctrl = true;
                 goto cannot_emulate;
             case 7: /* fnstsw m2byte */
+                state->fpu_ctrl = true;
                 emulate_fpu_insn_memdst("fnstsw", dst.val);
                 dst.bytes = 2;
                 break;
@@ -4567,6 +4611,7 @@ x86_emulate(
         {
         case 0xe0:
             /* fnstsw %ax */
+            state->fpu_ctrl = true;
             dst.bytes = 2;
             dst.type = OP_REG;
             dst.reg = (void *)&_regs.ax;
@@ -7914,7 +7959,7 @@ x86_emulate(
     }
 
  complete_insn: /* Commit shadow register state. */
-    put_fpu(&fic, false, ctxt, ops);
+    put_fpu(&fic, false, state, ctxt, ops);
 
     /* Zero the upper 32 bits of %rip if not in 64-bit mode. */
     if ( !mode_64bit() )
@@ -7938,7 +7983,7 @@ x86_emulate(
     ctxt->regs->eflags &= ~X86_EFLAGS_RF;
 
  done:
-    put_fpu(&fic, fic.insn_bytes > 0 && dst.type == OP_MEM, ctxt, ops);
+    put_fpu(&fic, fic.insn_bytes > 0 && dst.type == OP_MEM, state, ctxt, ops);
     put_stub(stub);
     return rc;
 #undef state
