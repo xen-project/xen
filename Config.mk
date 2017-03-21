@@ -280,9 +280,9 @@ SEABIOS_UPSTREAM_REVISION ?= rel-1.10.0
 ETHERBOOT_NICS ?= rtl8139 8086100e
 
 
-QEMU_TRADITIONAL_REVISION ?= 8b4834ee1202852ed83a9fc61268c65fb6961ea7
-# Wed Feb 22 11:00:38 2017 +0000
-# Request compatibility interface for device model operations
+QEMU_TRADITIONAL_REVISION ?= 8051789e982499050680a26febeada7467e18a8d
+# Thu Mar 9 11:14:55 2017 +0000
+# cirrus/vnc: zap drop bitblit support from console code.
 
 # Specify which qemu-dm to use. This may be `ioemu' to use the old
 # Mercurial in-tree version, or a local directory, or a git URL.
