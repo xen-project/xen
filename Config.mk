@@ -248,9 +248,9 @@ ETHERBOOT_NICS ?= rtl8139 8086100e
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= 0a1a01ca7050036f4922133a239f369326e5bf18
-# Wed Feb 22 16:25:19 2017 +0000
-# cirrus: add blit_is_unsafe call to cirrus_bitblt_cputovideo
+QEMU_TAG ?= 204a7fc1aad139ac0a21aae1479e04bb92070cd6
+# Thu Mar 9 11:14:55 2017 +0000
+# cirrus/vnc: zap drop bitblit support from console code.
 
 # Short answer -- do not enable this unless you know what you are
 # doing and are prepared for some pain.
