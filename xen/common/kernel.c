@@ -23,6 +23,7 @@
 enum system_state system_state = SYS_STATE_early_boot;
 
 xen_commandline_t saved_cmdline;
+static const char __initconst opt_builtin_cmdline[] = CONFIG_CMDLINE;
 
 static void __init assign_integer_param(
     const struct kernel_param *param, uint64_t val)
@@ -46,17 +47,12 @@ static void __init assign_integer_param(
     }
 }
 
-void __init cmdline_parse(const char *cmdline)
+static void __init _cmdline_parse(const char *cmdline)
 {
     char opt[100], *optval, *optkey, *q;
     const char *p = cmdline;
     const struct kernel_param *param;
     int bool_assert;
-
-    if ( cmdline == NULL )
-        return;
-
-    safe_strcpy(saved_cmdline, cmdline);
 
     for ( ; ; )
     {
@@ -145,6 +141,28 @@ void __init cmdline_parse(const char *cmdline)
             }
         }
     }
+}
+
+/**
+ *    cmdline_parse -- parses the xen command line.
+ * If CONFIG_CMDLINE is set, it would be parsed prior to @cmdline.
+ * But if CONFIG_CMDLINE_OVERRIDE is set to y, @cmdline will be ignored.
+ */
+void __init cmdline_parse(const char *cmdline)
+{
+    if ( opt_builtin_cmdline[0] )
+    {
+        printk("Built-in command line: %s\n", opt_builtin_cmdline);
+        _cmdline_parse(opt_builtin_cmdline);
+    }
+
+#ifndef CONFIG_CMDLINE_OVERRIDE
+    if ( cmdline == NULL )
+        return;
+
+    safe_strcpy(saved_cmdline, cmdline);
+    _cmdline_parse(cmdline);
+#endif
 }
 
 int __init parse_bool(const char *s)

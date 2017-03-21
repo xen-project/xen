@@ -237,4 +237,25 @@ config FAST_SYMBOL_LOOKUP
 	  The only user of this is Live patching.
 
 	  If unsure, say Y.
+
+config CMDLINE
+	string "Built-in hypervisor command string" if EXPERT = "y"
+	default ""
+	---help---
+	  Enter arguments here that should be compiled into the hypervisor
+	  image and used at boot time. When the system boots, this string
+	  will be parsed prior to the bootloader command line. So if a
+	  non-cumulative option is set both in this string and in the
+	  bootloader command line, only the latter one will take effect.
+
+config CMDLINE_OVERRIDE
+	bool "Built-in command line overrides bootloader arguments"
+	default n
+	depends on CMDLINE != ""
+	---help---
+	  Set this option to 'Y' to have the hypervisor ignore the bootloader
+	  command line, and use ONLY the built-in command line.
+
+	  This is used to work around broken bootloaders. This should
+	  be set to 'N' under normal conditions.
 endmenu
