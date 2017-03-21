@@ -937,6 +937,7 @@ do {                                                                    \
 
 struct fpu_insn_ctxt {
     uint8_t insn_bytes;
+    uint8_t type;
     int8_t exn_raised;
 };
 
@@ -956,14 +957,15 @@ static int _get_fpu(
 {
     int rc;
 
-    fic->exn_raised = -1;
-
     fail_if(!ops->get_fpu);
+    ASSERT(type != X86EMUL_FPU_none);
     rc = ops->get_fpu(fpu_handle_exception, fic, type, ctxt);
 
     if ( rc == X86EMUL_OKAY )
     {
         unsigned long cr0;
+
+        fic->type = type;
 
         fail_if(!ops->read_cr);
         if ( type >= X86EMUL_FPU_xmm )
@@ -1006,21 +1008,31 @@ do {                                                            \
     rc = _get_fpu(_type, _fic, ctxt, ops);                      \
     if ( rc ) goto done;                                        \
 } while (0)
-#define _put_fpu()                                              \
+
+#define check_fpu_exn(fic)                                      \
 do {                                                            \
-    if ( ops->put_fpu != NULL )                                 \
-        (ops->put_fpu)(ctxt);                                   \
+    generate_exception_if((fic)->exn_raised >= 0,               \
+                          (fic)->exn_raised);                   \
 } while (0)
-#define put_fpu(_fic)                                           \
+
+#define check_xmm_exn(fic)                                      \
 do {                                                            \
-    _put_fpu();                                                 \
-    if ( (_fic)->exn_raised == EXC_XM && ops->read_cr &&        \
+    if ( (fic)->exn_raised == EXC_XM && ops->read_cr &&         \
          ops->read_cr(4, &cr4, ctxt) == X86EMUL_OKAY &&         \
-         !(cr4 & X86_CR4_OSXMMEXCPT) )				\
-        (_fic)->exn_raised = EXC_UD;                            \
-    generate_exception_if((_fic)->exn_raised >= 0,              \
-                          (_fic)->exn_raised);                  \
+         !(cr4 & X86_CR4_OSXMMEXCPT) )                          \
+        (fic)->exn_raised = EXC_UD;                             \
+    check_fpu_exn(fic);                                         \
 } while (0)
+
+static void put_fpu(
+    struct fpu_insn_ctxt *fic,
+    struct x86_emulate_ctxt *ctxt,
+    const struct x86_emulate_ops *ops)
+{
+    if ( fic->type != X86EMUL_FPU_none && ops->put_fpu )
+        ops->put_fpu(ctxt);
+    fic->type = X86EMUL_FPU_none;
+}
 
 static inline bool fpu_check_write(void)
 {
@@ -3033,7 +3045,7 @@ x86_emulate(
     struct operand dst = { .reg = PTR_POISON };
     unsigned long cr4;
     enum x86_swint_type swint_type;
-    struct fpu_insn_ctxt fic;
+    struct fpu_insn_ctxt fic = { .type = X86EMUL_FPU_none, .exn_raised = -1 };
     struct x86_emulate_stub stub = {};
     DECLARE_ALIGNED(mmval_t, mmval);
 
@@ -3726,7 +3738,7 @@ x86_emulate(
         host_and_vcpu_must_have(fpu);
         get_fpu(X86EMUL_FPU_wait, &fic);
         asm volatile ( "fwait" ::: "memory" );
-        put_fpu(&fic);
+        check_fpu_exn(&fic);
         break;
 
     case 0x9c: /* pushf */
@@ -4171,7 +4183,7 @@ x86_emulate(
                 break;
             }
         }
-        put_fpu(&fic);
+        check_fpu_exn(&fic);
         break;
 
     case 0xd9: /* FPU 0xd9 */
@@ -4260,7 +4272,7 @@ x86_emulate(
             if ( dst.type == OP_MEM && dst.bytes == 4 && !fpu_check_write() )
                 dst.type = OP_NONE;
         }
-        put_fpu(&fic);
+        check_fpu_exn(&fic);
         break;
 
     case 0xda: /* FPU 0xda */
@@ -4311,7 +4323,7 @@ x86_emulate(
                 break;
             }
         }
-        put_fpu(&fic);
+        check_fpu_exn(&fic);
         break;
 
     case 0xdb: /* FPU 0xdb */
@@ -4383,7 +4395,7 @@ x86_emulate(
             if ( dst.type == OP_MEM && !fpu_check_write() )
                 dst.type = OP_NONE;
         }
-        put_fpu(&fic);
+        check_fpu_exn(&fic);
         break;
 
     case 0xdc: /* FPU 0xdc */
@@ -4434,7 +4446,7 @@ x86_emulate(
                 break;
             }
         }
-        put_fpu(&fic);
+        check_fpu_exn(&fic);
         break;
 
     case 0xdd: /* FPU 0xdd */
@@ -4493,7 +4505,7 @@ x86_emulate(
             if ( dst.type == OP_MEM && dst.bytes == 8 && !fpu_check_write() )
                 dst.type = OP_NONE;
         }
-        put_fpu(&fic);
+        check_fpu_exn(&fic);
         break;
 
     case 0xde: /* FPU 0xde */
@@ -4541,7 +4553,7 @@ x86_emulate(
                 break;
             }
         }
-        put_fpu(&fic);
+        check_fpu_exn(&fic);
         break;
 
     case 0xdf: /* FPU 0xdf */
@@ -4623,7 +4635,7 @@ x86_emulate(
             if ( dst.type == OP_MEM && !fpu_check_write() )
                 dst.type = OP_NONE;
         }
-        put_fpu(&fic);
+        check_fpu_exn(&fic);
         break;
 
     case 0xe0 ... 0xe2: /* loop{,z,nz} */ {
@@ -5685,7 +5697,7 @@ x86_emulate(
                             : "c" (mmvalp), "m" (*mmvalp));
 
         put_stub(stub);
-        put_fpu(&fic);
+        check_xmm_exn(&fic);
 
         state->simd_size = simd_none;
         break;
@@ -5737,7 +5749,7 @@ x86_emulate(
                       [mask] "i" (EFLAGS_MASK));
 
         put_stub(stub);
-        put_fpu(&fic);
+        check_xmm_exn(&fic);
 
         ASSERT(!state->simd_size);
         break;
@@ -5921,7 +5933,7 @@ x86_emulate(
         invoke_stub("", "", "=a" (dst.val) : [dummy] "i" (0));
 
         put_stub(stub);
-        put_fpu(&fic);
+        check_xmm_exn(&fic);
 
         ASSERT(!state->simd_size);
         dst.bytes = 4;
@@ -6129,7 +6141,7 @@ x86_emulate(
         dst.val = src.val;
 
         put_stub(stub);
-        put_fpu(&fic);
+        check_xmm_exn(&fic);
 
         ASSERT(!state->simd_size);
         break;
@@ -6271,7 +6283,7 @@ x86_emulate(
         invoke_stub("", "", [dummy_out] "=g" (dummy) : [dummy_in] "i" (0) );
 
         put_stub(stub);
-        put_fpu(&fic);
+        check_xmm_exn(&fic);
 
         ASSERT(!state->simd_size);
         break;
@@ -6340,8 +6352,6 @@ x86_emulate(
                     asm volatile ( ".byte 0xc5,0xc9,0xeb,0xf6" );
                     asm volatile ( ".byte 0xc5,0xc1,0xeb,0xff" );
                 }
-
-                put_fpu(&fic);
 
                 ASSERT(!state->simd_size);
                 break;
@@ -7090,10 +7100,7 @@ x86_emulate(
 
         put_stub(stub);
         if ( !ea.val )
-        {
-            put_fpu(&fic);
             goto complete_insn;
-        }
 
         opc = init_prefixes(stub);
         opc[0] = b;
@@ -7241,7 +7248,7 @@ x86_emulate(
         emulate_stub("+m" (*mmvalp), "a" (mmvalp));
 
         put_stub(stub);
-        put_fpu(&fic);
+        check_xmm_exn(&fic);
 
         state->simd_size = simd_none;
         dst.type = OP_NONE;
@@ -7545,7 +7552,7 @@ x86_emulate(
         invoke_stub("", "", "=m" (dst.val) : "a" (&dst.val));
 
         put_stub(stub);
-        put_fpu(&fic);
+        check_xmm_exn(&fic);
 
         ASSERT(!state->simd_size);
         dst.bytes = dst.type == OP_REG || b == 0x17 ? 4 : 1 << (b & 3);
@@ -7861,7 +7868,7 @@ x86_emulate(
             invoke_stub("", "", "+m" (*mmvalp) : "D" (mmvalp));
 
         put_stub(stub);
-        put_fpu(&fic);
+        check_xmm_exn(&fic);
     }
 
     switch ( dst.type )
@@ -7903,6 +7910,8 @@ x86_emulate(
     }
 
  complete_insn: /* Commit shadow register state. */
+    put_fpu(&fic, ctxt, ops);
+
     /* Zero the upper 32 bits of %rip if not in 64-bit mode. */
     if ( !mode_64bit() )
         _regs.r(ip) = _regs.eip;
@@ -7925,7 +7934,7 @@ x86_emulate(
     ctxt->regs->eflags &= ~X86_EFLAGS_RF;
 
  done:
-    _put_fpu();
+    put_fpu(&fic, ctxt, ops);
     put_stub(stub);
     return rc;
 #undef state
