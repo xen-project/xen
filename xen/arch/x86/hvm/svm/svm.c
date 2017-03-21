@@ -2211,6 +2211,7 @@ static struct hvm_function_table __initdata svm_function_table = {
     .update_guest_cr      = svm_update_guest_cr,
     .update_guest_efer    = svm_update_guest_efer,
     .update_guest_vendor  = svm_update_guest_vendor,
+    .fpu_leave            = svm_fpu_leave,
     .set_guest_pat        = svm_set_guest_pat,
     .get_guest_pat        = svm_get_guest_pat,
     .set_tsc_offset       = svm_set_tsc_offset,

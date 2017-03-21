@@ -433,6 +433,7 @@ static struct x86_emulate_ops fuzz_emulops = {
     SET(wbinvd),
     SET(invlpg),
     .get_fpu    = emul_test_get_fpu,
+    .put_fpu    = emul_test_put_fpu,
     .cpuid      = emul_test_cpuid,
 };
 #undef SET

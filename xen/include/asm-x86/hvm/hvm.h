@@ -137,6 +137,8 @@ struct hvm_function_table {
 
     void (*update_guest_vendor)(struct vcpu *v);
 
+    void (*fpu_leave)(struct vcpu *v);
+
     int  (*get_guest_pat)(struct vcpu *v, u64 *);
     int  (*set_guest_pat)(struct vcpu *v, u64);
 

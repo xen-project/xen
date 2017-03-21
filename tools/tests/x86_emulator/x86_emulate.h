@@ -178,3 +178,7 @@ int emul_test_get_fpu(
     void *exception_callback_arg,
     enum x86_emulate_fpu_type type,
     struct x86_emulate_ctxt *ctxt);
+
+void emul_test_put_fpu(
+    struct x86_emulate_ctxt *ctxt,
+    enum x86_emulate_fpu_type backout);

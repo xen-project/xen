@@ -965,6 +965,7 @@ static int _get_fpu(
     {
         unsigned long cr0;
 
+        fail_if(type == X86EMUL_FPU_fpu && !ops->put_fpu);
         fic->type = type;
 
         fail_if(!ops->read_cr);
@@ -1026,11 +1027,14 @@ do {                                                            \
 
 static void put_fpu(
     struct fpu_insn_ctxt *fic,
+    bool failed_late,
     struct x86_emulate_ctxt *ctxt,
     const struct x86_emulate_ops *ops)
 {
-    if ( fic->type != X86EMUL_FPU_none && ops->put_fpu )
-        ops->put_fpu(ctxt);
+    if ( unlikely(failed_late) && fic->type == X86EMUL_FPU_fpu )
+        ops->put_fpu(ctxt, X86EMUL_FPU_fpu);
+    else if ( fic->type != X86EMUL_FPU_none && ops->put_fpu )
+        ops->put_fpu(ctxt, X86EMUL_FPU_none);
     fic->type = X86EMUL_FPU_none;
 }
 
@@ -3734,9 +3738,9 @@ x86_emulate(
         break;
 
     case 0x9b:  /* wait/fwait */
-        fic.insn_bytes = 1;
         host_and_vcpu_must_have(fpu);
         get_fpu(X86EMUL_FPU_wait, &fic);
+        fic.insn_bytes = 1;
         asm volatile ( "fwait" ::: "memory" );
         check_fpu_exn(&fic);
         break;
@@ -7910,7 +7914,7 @@ x86_emulate(
     }
 
  complete_insn: /* Commit shadow register state. */
-    put_fpu(&fic, ctxt, ops);
+    put_fpu(&fic, false, ctxt, ops);
 
     /* Zero the upper 32 bits of %rip if not in 64-bit mode. */
     if ( !mode_64bit() )
@@ -7934,7 +7938,7 @@ x86_emulate(
     ctxt->regs->eflags &= ~X86_EFLAGS_RF;
 
  done:
-    put_fpu(&fic, ctxt, ops);
+    put_fpu(&fic, fic.insn_bytes > 0 && dst.type == OP_MEM, ctxt, ops);
     put_stub(stub);
     return rc;
 #undef state

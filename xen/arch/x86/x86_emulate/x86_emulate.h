@@ -437,9 +437,12 @@ struct x86_emulate_ops
      * put_fpu: Relinquish the FPU. Unhook from FPU/SIMD exception handlers.
      *  The handler, if installed, must be prepared to get called without
      *  the get_fpu one having got called before!
+     * @backout: Undo updates to the specified register file (can, besides
+     *           X86EMUL_FPU_none, only be X86EMUL_FPU_fpu at present);
      */
     void (*put_fpu)(
-        struct x86_emulate_ctxt *ctxt);
+        struct x86_emulate_ctxt *ctxt,
+        enum x86_emulate_fpu_type backout);
 
     /* invlpg: Invalidate paging structures which map addressed byte. */
     int (*invlpg)(

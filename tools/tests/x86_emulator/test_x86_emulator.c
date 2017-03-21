@@ -298,6 +298,7 @@ static struct x86_emulate_ops emulops = {
     .read_cr    = emul_test_read_cr,
     .read_msr   = read_msr,
     .get_fpu    = emul_test_get_fpu,
+    .put_fpu    = emul_test_put_fpu,
 };
 
 int main(int argc, char **argv)

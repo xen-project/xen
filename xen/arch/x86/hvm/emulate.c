@@ -15,6 +15,7 @@
 #include <xen/paging.h>
 #include <xen/trace.h>
 #include <asm/event.h>
+#include <asm/i387.h>
 #include <asm/xstate.h>
 #include <asm/hvm/emulate.h>
 #include <asm/hvm/hvm.h>
@@ -1621,6 +1622,35 @@ static int hvmemul_get_fpu(
 
     if ( !curr->fpu_dirtied )
         hvm_funcs.fpu_dirty_intercept();
+    else if ( type == X86EMUL_FPU_fpu )
+    {
+        const typeof(curr->arch.xsave_area->fpu_sse) *fpu_ctxt =
+            curr->arch.fpu_ctxt;
+
+        /*
+         * Latch current register state so that we can back out changes
+         * if needed (namely when a memory write fails after register state
+         * has already been updated).
+         * NB: We don't really need the "enable" part of the called function
+         * (->fpu_dirtied set implies CR0.TS clear), but the additional
+         * overhead should be low enough to not warrant introduction of yet
+         * another slightly different function. However, we need to undo the
+         * ->fpu_dirtied clearing the function does as well as the possible
+         * masking of all exceptions by FNSTENV.)
+         */
+        save_fpu_enable();
+        curr->fpu_dirtied = true;
+        if ( (fpu_ctxt->fcw & 0x3f) != 0x3f )
+        {
+            uint16_t fcw;
+
+            asm ( "fnstcw %0" : "=m" (fcw) );
+            if ( (fcw & 0x3f) == 0x3f )
+                asm ( "fldcw %0" :: "m" (fpu_ctxt->fcw) );
+            else
+                ASSERT(fcw == fpu_ctxt->fcw);
+        }
+    }
 
     curr->arch.hvm_vcpu.fpu_exception_callback = exception_callback;
     curr->arch.hvm_vcpu.fpu_exception_callback_arg = exception_callback_arg;
@@ -1629,10 +1659,24 @@ static int hvmemul_get_fpu(
 }
 
 static void hvmemul_put_fpu(
-    struct x86_emulate_ctxt *ctxt)
+    struct x86_emulate_ctxt *ctxt,
+    enum x86_emulate_fpu_type backout)
 {
     struct vcpu *curr = current;
+
     curr->arch.hvm_vcpu.fpu_exception_callback = NULL;
+
+    if ( backout == X86EMUL_FPU_fpu )
+    {
+        /*
+         * To back out changes to the register file simply adjust state such
+         * that upon next FPU insn use by the guest we'll reload the state
+         * saved (or freshly loaded) by hvmemul_get_fpu().
+         */
+        curr->fpu_dirtied = false;
+        stts();
+        hvm_funcs.fpu_leave(curr);
+    }
 }
 
 static int hvmemul_invlpg(

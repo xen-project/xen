@@ -138,4 +138,11 @@ int emul_test_get_fpu(
     return X86EMUL_OKAY;
 }
 
+void emul_test_put_fpu(
+    struct x86_emulate_ctxt *ctxt,
+    enum x86_emulate_fpu_type backout)
+{
+    /* TBD */
+}
+
 #include "x86_emulate/x86_emulate.c"
