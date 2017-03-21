@@ -155,7 +155,7 @@ static const struct {
 static unsigned int bytes_read;
 
 static int read(
-    unsigned int seg,
+    enum x86_segment seg,
     unsigned long offset,
     void *p_data,
     unsigned int bytes,
@@ -210,7 +210,7 @@ static int read(
 }
 
 static int fetch(
-    unsigned int seg,
+    enum x86_segment seg,
     unsigned long offset,
     void *p_data,
     unsigned int bytes,
@@ -224,7 +224,7 @@ static int fetch(
 }
 
 static int write(
-    unsigned int seg,
+    enum x86_segment seg,
     unsigned long offset,
     void *p_data,
     unsigned int bytes,
@@ -240,7 +240,7 @@ static int write(
 }
 
 static int cmpxchg(
-    unsigned int seg,
+    enum x86_segment seg,
     unsigned long offset,
     void *old,
     void *new,
