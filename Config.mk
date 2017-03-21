@@ -289,9 +289,9 @@ SEABIOS_UPSTREAM_REVISION ?= rel-1.10.0
 ETHERBOOT_NICS ?= rtl8139 8086100e
 
 
-QEMU_TRADITIONAL_REVISION ?= b77d58b59ff0688e4aeb933450d07716ca0fb1f2
-# Wed Feb 22 16:25:19 2017 +0000
-# cirrus: add blit_is_unsafe call to cirrus_bitblt_cputovideo
+QEMU_TRADITIONAL_REVISION ?= 3bed93d7724564e15b1025723af81d2971bb0e4b
+# Thu Mar 9 11:14:55 2017 +0000
+# cirrus/vnc: zap drop bitblit support from console code.
 
 # Specify which qemu-dm to use. This may be `ioemu' to use the old
 # Mercurial in-tree version, or a local directory, or a git URL.
