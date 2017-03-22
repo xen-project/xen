@@ -23,17 +23,73 @@
 #include <public/hvm/hvm_op.h>
 
 /* Viridian MSR numbers. */
-#define HV_X64_MSR_GUEST_OS_ID                  0x40000000
-#define HV_X64_MSR_HYPERCALL                    0x40000001
-#define HV_X64_MSR_VP_INDEX                     0x40000002
-#define HV_X64_MSR_TIME_REF_COUNT               0x40000020
-#define HV_X64_MSR_REFERENCE_TSC                0x40000021
-#define HV_X64_MSR_TSC_FREQUENCY                0x40000022
-#define HV_X64_MSR_APIC_FREQUENCY               0x40000023
-#define HV_X64_MSR_EOI                          0x40000070
-#define HV_X64_MSR_ICR                          0x40000071
-#define HV_X64_MSR_TPR                          0x40000072
-#define HV_X64_MSR_VP_ASSIST_PAGE               0x40000073
+#define HV_X64_MSR_GUEST_OS_ID                   0x40000000
+#define HV_X64_MSR_HYPERCALL                     0x40000001
+#define HV_X64_MSR_VP_INDEX                      0x40000002
+#define HV_X64_MSR_RESET                         0x40000003
+#define HV_X64_MSR_VP_RUNTIME                    0x40000010
+#define HV_X64_MSR_TIME_REF_COUNT                0x40000020
+#define HV_X64_MSR_REFERENCE_TSC                 0x40000021
+#define HV_X64_MSR_TSC_FREQUENCY                 0x40000022
+#define HV_X64_MSR_APIC_FREQUENCY                0x40000023
+#define HV_X64_MSR_EOI                           0x40000070
+#define HV_X64_MSR_ICR                           0x40000071
+#define HV_X64_MSR_TPR                           0x40000072
+#define HV_X64_MSR_VP_ASSIST_PAGE                0x40000073
+#define HV_X64_MSR_SCONTROL                      0x40000080
+#define HV_X64_MSR_SVERSION                      0x40000081
+#define HV_X64_MSR_SIEFP                         0x40000082
+#define HV_X64_MSR_SIMP                          0x40000083
+#define HV_X64_MSR_EOM                           0x40000084
+#define HV_X64_MSR_SINT0                         0x40000090
+#define HV_X64_MSR_SINT1                         0x40000091
+#define HV_X64_MSR_SINT2                         0x40000092
+#define HV_X64_MSR_SINT3                         0x40000093
+#define HV_X64_MSR_SINT4                         0x40000094
+#define HV_X64_MSR_SINT5                         0x40000095
+#define HV_X64_MSR_SINT6                         0x40000096
+#define HV_X64_MSR_SINT7                         0x40000097
+#define HV_X64_MSR_SINT8                         0x40000098
+#define HV_X64_MSR_SINT9                         0x40000099
+#define HV_X64_MSR_SINT10                        0x4000009A
+#define HV_X64_MSR_SINT11                        0x4000009B
+#define HV_X64_MSR_SINT12                        0x4000009C
+#define HV_X64_MSR_SINT13                        0x4000009D
+#define HV_X64_MSR_SINT14                        0x4000009E
+#define HV_X64_MSR_SINT15                        0x4000009F
+#define HV_X64_MSR_STIMER0_CONFIG                0x400000B0
+#define HV_X64_MSR_STIMER0_COUNT                 0x400000B1
+#define HV_X64_MSR_STIMER1_CONFIG                0x400000B2
+#define HV_X64_MSR_STIMER1_COUNT                 0x400000B3
+#define HV_X64_MSR_STIMER2_CONFIG                0x400000B4
+#define HV_X64_MSR_STIMER2_COUNT                 0x400000B5
+#define HV_X64_MSR_STIMER3_CONFIG                0x400000B6
+#define HV_X64_MSR_STIMER3_COUNT                 0x400000B7
+#define HV_X64_MSR_POWER_STATE_TRIGGER_C1        0x400000C1
+#define HV_X64_MSR_POWER_STATE_TRIGGER_C2        0x400000C2
+#define HV_X64_MSR_POWER_STATE_TRIGGER_C3        0x400000C3
+#define HV_X64_MSR_POWER_STATE_CONFIG_C1         0x400000D1
+#define HV_X64_MSR_POWER_STATE_CONFIG_C2         0x400000D2
+#define HV_X64_MSR_POWER_STATE_CONFIG_C3         0x400000D3
+#define HV_X64_MSR_STATS_PARTITION_RETAIL_PAGE   0x400000E0
+#define HV_X64_MSR_STATS_PARTITION_INTERNAL_PAGE 0x400000E1
+#define HV_X64_MSR_STATS_VP_RETAIL_PAGE          0x400000E2
+#define HV_X64_MSR_STATS_VP_INTERNAL_PAGE        0x400000E3
+#define HV_X64_MSR_GUEST_IDLE                    0x400000F0
+#define HV_X64_MSR_SYNTH_DEBUG_CONTROL           0x400000F1
+#define HV_X64_MSR_SYNTH_DEBUG_STATUS            0x400000F2
+#define HV_X64_MSR_SYNTH_DEBUG_SEND_BUFFER       0x400000F3
+#define HV_X64_MSR_SYNTH_DEBUG_RECEIVE_BUFFER    0x400000F4
+#define HV_X64_MSR_SYNTH_DEBUG_PENDING_BUFFER    0x400000F5
+#define HV_X64_MSR_CRASH_P0                      0x40000100
+#define HV_X64_MSR_CRASH_P1                      0x40000101
+#define HV_X64_MSR_CRASH_P2                      0x40000102
+#define HV_X64_MSR_CRASH_P3                      0x40000103
+#define HV_X64_MSR_CRASH_P4                      0x40000104
+#define HV_X64_MSR_CRASH_CTL                     0x40000105
+
+#define VIRIDIAN_MSR_MIN HV_X64_MSR_GUEST_OS_ID
+#define VIRIDIAN_MSR_MAX HV_X64_MSR_CRASH_CTL
 
 /* Viridian Hypercall Status Codes. */
 #define HV_STATUS_SUCCESS                       0x0000
@@ -41,9 +97,11 @@
 #define HV_STATUS_INVALID_PARAMETER             0x0005
 
 /* Viridian Hypercall Codes. */
-#define HvFlushVirtualAddressSpace 2
-#define HvFlushVirtualAddressList  3
-#define HvNotifyLongSpinWait       8
+#define HvFlushVirtualAddressSpace 0x0002
+#define HvFlushVirtualAddressList  0x0003
+#define HvNotifyLongSpinWait       0x0008
+#define HvGetPartitionId           0x0046
+#define HvExtCallQueryCapabilities 0x8001
 
 /* Viridian Hypercall Flags. */
 #define HV_FLUSH_ALL_PROCESSORS 1
@@ -528,6 +586,10 @@ int wrmsr_viridian_regs(uint32_t idx, uint64_t val)
         break;
 
     default:
+        if ( idx >= VIRIDIAN_MSR_MIN && idx <= VIRIDIAN_MSR_MAX )
+            gprintk(XENLOG_WARNING, "write to unimplemented MSR %#x\n",
+                    idx);
+
         return 0;
     }
 
@@ -651,6 +713,10 @@ int rdmsr_viridian_regs(uint32_t idx, uint64_t *val)
     }
 
     default:
+        if ( idx >= VIRIDIAN_MSR_MIN && idx <= VIRIDIAN_MSR_MAX )
+            gprintk(XENLOG_WARNING, "read from unimplemented MSR %#x\n",
+                    idx);
+
         return 0;
     }
 
@@ -804,6 +870,18 @@ int viridian_hypercall(struct cpu_user_regs *regs)
     }
 
     default:
+        gprintk(XENLOG_WARNING, "unimplemented hypercall %04x\n",
+                input.call_code);
+
+    case HvGetPartitionId:
+    case HvExtCallQueryCapabilities:
+        /*
+         * These hypercalls seem to be erroneously issued by Windows
+         * despite neither AccessPartitionId nor EnableExtendedHypercalls
+         * being set in CPUID leaf 2.
+         * Given that return a status of 'invalid code' has not so far
+         * caused any problems it's not worth logging.
+         */
         status = HV_STATUS_INVALID_HYPERCALL_CODE;
         break;
     }
