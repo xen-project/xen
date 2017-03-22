@@ -283,6 +283,8 @@ static void initialize_vp_assist(struct vcpu *v)
     struct page_info *page = get_page_from_gfn(d, gmfn, NULL, P2M_ALLOC);
     void *va;
 
+    ASSERT(!v->arch.hvm_vcpu.viridian.vp_assist.va);
+
     /*
      * See section 7.8.7 of the specification for details of this
      * enlightenment.
@@ -305,14 +307,6 @@ static void initialize_vp_assist(struct vcpu *v)
     }
 
     clear_page(va);
-
-    /*
-     * If we overwrite an existing address here then something has
-     * gone wrong and a domain page will leak. Instead crash the
-     * domain to make the problem obvious.
-     */
-    if ( v->arch.hvm_vcpu.viridian.vp_assist.va )
-        domain_crash(d);
 
     v->arch.hvm_vcpu.viridian.vp_assist.va = va;
     return;
@@ -904,7 +898,8 @@ static int viridian_load_vcpu_ctxt(struct domain *d, hvm_domain_context_t *h)
         return -EINVAL;
 
     v->arch.hvm_vcpu.viridian.vp_assist.msr.raw = ctxt.vp_assist_msr;
-    if ( v->arch.hvm_vcpu.viridian.vp_assist.msr.fields.enabled )
+    if ( v->arch.hvm_vcpu.viridian.vp_assist.msr.fields.enabled &&
+         !v->arch.hvm_vcpu.viridian.vp_assist.va )
         initialize_vp_assist(v);
 
     v->arch.hvm_vcpu.viridian.vp_assist.vector = ctxt.vp_assist_vector;
