@@ -1123,6 +1123,7 @@ typedef struct {
     uint32_t console_port;
     uint32_t console_domid;
     unsigned long console_mfn;
+    char *console_tty;
 
     char *saved_state;
 

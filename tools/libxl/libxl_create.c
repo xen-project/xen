@@ -1697,6 +1697,7 @@ static int do_domain_soft_reset(libxl_ctx *ctx,
     libxl__domain_build_state *state;
     libxl__domain_save_state *dss;
     char *dom_path, *xs_store_mfn, *xs_console_mfn;
+    const char *console_tty;
     uint32_t domid_out;
     int rc;
 
@@ -1736,6 +1737,15 @@ static int do_domain_soft_reset(libxl_ctx *ctx,
                              NULL);
     state->console_mfn = xs_console_mfn ? atol(xs_console_mfn): 0;
     free(xs_console_mfn);
+
+    rc = libxl__xs_read_mandatory(gc, XBT_NULL,
+                                  GCSPRINTF("%s/console/tty", dom_path),
+                                  &console_tty);
+    if (rc) {
+        LOGD(ERROR, domid_soft_reset, "failed to read console/tty.");
+        goto out;
+    }
+    state->console_tty = libxl__strdup(gc, console_tty);
 
     dss->ao = ao;
     dss->domid = dss->dsps.domid = domid_soft_reset;

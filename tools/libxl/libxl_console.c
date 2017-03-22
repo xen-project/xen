@@ -316,7 +316,10 @@ int libxl__device_console_add(libxl__gc *gc, uint32_t domid,
     flexarray_append(ro_front, "output");
     flexarray_append(ro_front, console->output);
     flexarray_append(ro_front, "tty");
-    flexarray_append(ro_front, "");
+    if (state && state->console_tty)
+        flexarray_append(ro_front, state->console_tty);
+    else
+        flexarray_append(ro_front, "");
 
     if (state) {
         flexarray_append(ro_front, "port");
