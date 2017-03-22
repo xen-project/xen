@@ -1696,8 +1696,8 @@ static int do_domain_soft_reset(libxl_ctx *ctx,
     libxl__domain_create_state *dcs;
     libxl__domain_build_state *state;
     libxl__domain_save_state *dss;
-    char *dom_path, *xs_store_mfn, *xs_console_mfn;
-    const char *console_tty;
+    const char *console_tty, *xs_store_mfn, *xs_console_mfn;
+    char *dom_path;
     uint32_t domid_out;
     int rc;
 
@@ -1726,17 +1726,23 @@ static int do_domain_soft_reset(libxl_ctx *ctx,
         goto out;
     }
 
-    xs_store_mfn = xs_read(ctx->xsh, XBT_NULL,
-                           GCSPRINTF("%s/store/ring-ref", dom_path),
-                           NULL);
+    rc = libxl__xs_read_checked(gc, XBT_NULL,
+                                GCSPRINTF("%s/store/ring-ref", dom_path),
+                                &xs_store_mfn);
+    if (rc) {
+        LOGD(ERROR, domid_soft_reset, "failed to read store/ring-ref.");
+        goto out;
+    }
     state->store_mfn = xs_store_mfn ? atol(xs_store_mfn): 0;
-    free(xs_store_mfn);
 
-    xs_console_mfn = xs_read(ctx->xsh, XBT_NULL,
-                             GCSPRINTF("%s/console/ring-ref", dom_path),
-                             NULL);
+    rc = libxl__xs_read_checked(gc, XBT_NULL,
+                                GCSPRINTF("%s/console/ring-ref", dom_path),
+                                &xs_console_mfn);
+    if (rc) {
+        LOGD(ERROR, domid_soft_reset, "failed to read console/ring-ref.");
+        goto out;
+    }
     state->console_mfn = xs_console_mfn ? atol(xs_console_mfn): 0;
-    free(xs_console_mfn);
 
     rc = libxl__xs_read_mandatory(gc, XBT_NULL,
                                   GCSPRINTF("%s/console/tty", dom_path),
