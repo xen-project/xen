@@ -115,6 +115,17 @@ void *xenforeignmemory_map(xenforeignmemory_handle *fmem, uint32_t dom,
 int xenforeignmemory_unmap(xenforeignmemory_handle *fmem,
                            void *addr, size_t pages);
 
+/**
+ * This function restricts the use of this handle to the specified
+ * domain.
+ *
+ * @parm fmem handle to the open foreignmemory interface
+ * @parm domid the domain id
+ * @return 0 on success, -1 on failure.
+ */
+int xenforeignmemory_restrict(xenforeignmemory_handle *fmem,
+                              domid_t domid);
+
 #endif
 
 /*

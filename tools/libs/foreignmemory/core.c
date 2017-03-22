@@ -106,6 +106,12 @@ int xenforeignmemory_unmap(xenforeignmemory_handle *fmem,
     return osdep_xenforeignmemory_unmap(fmem, addr, num);
 }
 
+int xenforeignmemory_restrict(xenforeignmemory_handle *fmem,
+                              domid_t domid)
+{
+    return osdep_xenforeignmemory_restrict(fmem, domid);
+}
+
 /*
  * Local variables:
  * mode: C

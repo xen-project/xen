@@ -32,6 +32,9 @@ void *osdep_xenforeignmemory_map(xenforeignmemory_handle *fmem,
 int osdep_xenforeignmemory_unmap(xenforeignmemory_handle *fmem,
                                  void *addr, size_t num);
 
+int osdep_xenforeignmemory_restrict(xenforeignmemory_handle *fmem,
+                                    domid_t domid);
+
 #if defined(__NetBSD__) || defined(__sun__)
 /* Strictly compat for those two only only */
 void *compat_mapforeign_batch(xenforeignmem_handle *fmem, uint32_t dom,

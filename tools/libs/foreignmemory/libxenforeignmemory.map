@@ -4,5 +4,6 @@ VERS_1.0 {
 		xenforeignmemory_close;
 		xenforeignmemory_map;
 		xenforeignmemory_unmap;
+		xenforeignmemory_restrict;
 	local: *; /* Do not expose anything by default */
 };
