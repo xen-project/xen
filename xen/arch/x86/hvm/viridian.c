@@ -119,14 +119,16 @@ void cpuid_viridian_leaves(const struct vcpu *v, uint32_t leaf,
     switch ( leaf )
     {
     case 0:
+        /* See section 2.4.1 of the specification */
         res->a = 0x40000006; /* Maximum leaf */
-        res->b = 0x7263694d; /* Magic numbers  */
-        res->c = 0x666F736F;
-        res->d = 0x76482074;
+        memcpy(&res->b, "Micr", 4);
+        memcpy(&res->c, "osof", 4);
+        memcpy(&res->d, "t Hv", 4);
         break;
 
     case 1:
-        res->a = 0x31237648; /* Version number */
+        /* See section 2.4.2 of the specification */
+        memcpy(&res->a, "Hv#1", 4);
         break;
 
     case 2:
