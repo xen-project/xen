@@ -155,7 +155,7 @@ let do_transaction_end con t domains cons data =
 	if not success then
 		raise Transaction_again;
 	if commit then
-		process_watch (List.rev (Transaction.get_ops t)) cons
+		process_watch (List.rev (Transaction.get_paths t)) cons
 
 let do_introduce con t domains cons data =
 	if not (Connection.is_dom0 con)
@@ -303,7 +303,7 @@ let reply_ack fct con t doms cons data =
 	fct con t doms cons data;
 	Packet.Ack (fun () ->
 		if Transaction.get_id t = Transaction.none then
-			process_watch (Transaction.get_ops t) cons
+			process_watch (Transaction.get_paths t) cons
 	)
 
 let reply_data fct con t doms cons data =
@@ -383,6 +383,15 @@ let process_packet ~store ~cons ~doms ~con ~req =
 				Connection.get_transaction con tid
 			in
 		let response = input_handle_error ~cons ~doms ~fct ~con ~t ~req in
+
+		let response = try
+			if tid <> Transaction.none then
+				(* Remember the request and response for this operation in case we need to replay the transaction *)
+				Transaction.add_operation ~perm:(Connection.get_perm con) t req response;
+			response
+		with Quota.Limit_reached ->
+			Packet.Error "EQUOTA"
+		in
 
 		(* Put the response on the wire *)
 		send_response ty con t rid response
