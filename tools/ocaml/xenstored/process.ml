@@ -298,7 +298,7 @@ let transaction_replay c t doms cons =
 		false
 	| Transaction.Full(id, oldstore, cstore) ->
 		let tid = Connection.start_transaction c cstore in
-		let new_t = Transaction.make tid cstore in
+		let new_t = Transaction.make ~internal:true tid cstore in
 		let con = sprintf "r(%d):%s" id (Connection.get_domstr c) in
 		let perform_exn (request, response) =
 			write_access_log ~ty:request.Packet.ty ~tid ~con ~data:request.Packet.data;
@@ -355,7 +355,7 @@ let do_transaction_end con t domains cons data =
 		in
 	let success =
 		let commit = if commit then Some (fun con trans -> transaction_replay con trans domains cons) else None in
-		Connection.end_transaction con (Transaction.get_id t) commit in
+		History.end_transaction t con (Transaction.get_id t) commit in
 	if not success then
 		raise Transaction_again;
 	if commit then begin
