@@ -115,7 +115,8 @@ _clean: delete-unfresh-files
 	$(MAKE) -f $(BASEDIR)/Rules.mk -C drivers clean
 	$(MAKE) -f $(BASEDIR)/Rules.mk -C xsm clean
 	$(MAKE) -f $(BASEDIR)/Rules.mk -C crypto clean
-	$(MAKE) -f $(BASEDIR)/Rules.mk -C arch/$(TARGET_ARCH) clean
+	$(MAKE) -f $(BASEDIR)/Rules.mk -C arch/arm clean
+	$(MAKE) -f $(BASEDIR)/Rules.mk -C arch/x86 clean
 	$(MAKE) -f $(BASEDIR)/Rules.mk -C test clean
 	$(MAKE) -f $(BASEDIR)/tools/kconfig/Makefile.kconfig ARCH=$(ARCH) SRCARCH=$(SRCARCH) clean
 	find . \( -name "*.o" -o -name ".*.d" -o -name "*.gcno" \) -exec rm -f {} \;
