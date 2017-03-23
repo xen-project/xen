@@ -36,6 +36,7 @@ OBJS = define \
 	stdext \
 	trie \
 	config \
+	packet \
 	logging \
 	quota \
 	perms \

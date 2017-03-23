@@ -126,8 +126,7 @@ let do_watch con t rid domains cons data =
 		| _                   -> raise Invalid_Cmd_Args
 		in
 	let watch = Connections.add_watch cons con node token in
-	Connection.send_ack con (Transaction.get_id t) rid Xenbus.Xb.Op.Watch;
-	Connection.fire_single_watch watch
+	Packet.Ack (fun () -> Connection.fire_single_watch watch)
 
 let do_unwatch con t domains cons data =
 	let (node, token) =
@@ -289,20 +288,32 @@ let do_set_target con t domains cons data =
 		| _                           -> raise Invalid_Cmd_Args
 
 (*------------- Generic handling of ty ------------------*)
+let send_response ty con t rid response =
+	match response with
+	| Packet.Ack f ->
+		Connection.send_ack con (Transaction.get_id t) rid ty;
+		(* Now do any necessary follow-up actions *)
+		f ()
+	| Packet.Reply ret ->
+		Connection.send_reply con (Transaction.get_id t) rid ty ret
+	| Packet.Error e ->
+		Connection.send_error con (Transaction.get_id t) rid e
+
 let reply_ack fct ty con t rid doms cons data =
 	fct con t doms cons data;
-	Connection.send_ack con (Transaction.get_id t) rid ty;
-	if Transaction.get_id t = Transaction.none then
-		process_watch (Transaction.get_ops t) cons
+	Packet.Ack (fun () ->
+		if Transaction.get_id t = Transaction.none then
+			process_watch (Transaction.get_ops t) cons
+	)
 
 let reply_data fct ty con t rid doms cons data =
 	let ret = fct con t doms cons data in
-	Connection.send_reply con (Transaction.get_id t) rid ty ret
+	Packet.Reply ret
 
 let reply_data_or_ack fct ty con t rid doms cons data =
 	match fct con t doms cons data with
-		| Some ret -> Connection.send_reply con (Transaction.get_id t) rid ty ret
-		| None -> Connection.send_ack con (Transaction.get_id t) rid ty
+		| Some ret -> Packet.Reply ret
+		| None -> Packet.Ack (fun () -> ())
 
 let reply_none fct ty con t rid doms cons data =
 	(* let the function reply *)
@@ -335,7 +346,7 @@ let function_of_type ty =
 
 let input_handle_error ~cons ~doms ~fct ~ty ~con ~t ~rid ~data =
 	let reply_error e =
-		Connection.send_error con (Transaction.get_id t) rid e in
+		Packet.Error e in
 	try
 		fct ty con t rid doms cons data
 	with
@@ -368,7 +379,10 @@ let process_packet ~store ~cons ~doms ~con ~tid ~rid ~ty ~data =
 			else
 				Connection.get_transaction con tid
 			in
-		input_handle_error ~cons ~doms ~fct ~ty ~con ~t ~rid ~data;
+		let response = input_handle_error ~cons ~doms ~fct ~ty ~con ~t ~rid ~data in
+
+		(* Put the response on the wire *)
+		send_response ty con t rid response
 	with exn ->
 		error "process packet: %s" (Printexc.to_string exn);
 		Connection.send_error con tid rid "EIO"
