@@ -484,7 +484,7 @@ let do_input store cons doms con =
 	if newpacket then (
 		let packet = Connection.pop_in con in
 		let tid, rid, ty, data = Xenbus.Xb.Packet.unpack packet in
-		let req = {Packet.tid; Packet.rid; Packet.ty; Packet.data} in
+		let req = {Packet.tid=tid; Packet.rid=rid; Packet.ty=ty; Packet.data=data} in
 
 		(* As we don't log IO, do not call an unnecessary sanitize_data 
 		   info "[%s] -> [%d] %s \"%s\""
