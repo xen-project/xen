@@ -58,3 +58,15 @@ let push (x: history_record) =
 	match dom with
 	| None -> () (* treat socket connections as always free to conflict *)
 	| Some d -> if not (Domain.is_free_to_conflict d) then history := x :: !history
+
+(* Find the connections from records since commit-count [since] for which [f record] returns [true] *)
+let filter_connections ~since ~f =
+	(* The "mem" call is an optimisation, to avoid calling f if we have picked con already. *)
+	(* Using a hash table rather than a list is to optimise the "mem" call. *)
+	List.fold_left (fun acc hist_rec ->
+		if hist_rec.finish_count > since
+		&& not (Hashtbl.mem acc hist_rec.con)
+		&& f hist_rec
+		then Hashtbl.replace acc hist_rec.con ();
+		acc
+	) (Hashtbl.create 1023) !history
