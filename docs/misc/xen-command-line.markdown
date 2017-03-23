@@ -1616,6 +1616,14 @@ The optional `keep` parameter causes Xen to continue using the vga
 console even after dom0 has been started.  The default behaviour is to
 relinquish control to dom0.
 
+### viridian-version
+> `= [<major>],[<minor>],[<build>]`
+
+> Default: `6,0,0x1772`
+
+<major>, <minor> and <build> must be integers. The values will be
+encoded in guest CPUID 0x40000002 if viridian enlightenments are enabled.
+
 ### vpid (Intel)
 > `= <boolean>`
 

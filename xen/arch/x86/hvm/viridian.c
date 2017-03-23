@@ -164,6 +164,16 @@ typedef struct {
 #define CPUID6A_MSR_BITMAPS     (1 << 1)
 #define CPUID6A_NESTED_PAGING   (1 << 3)
 
+/*
+ * Version and build number reported by CPUID leaf 2
+ *
+ * These numbers are chosen to match the version numbers reported by
+ * Windows Server 2008.
+ */
+static uint16_t __read_mostly viridian_major = 6;
+static uint16_t __read_mostly viridian_minor = 0;
+static uint32_t __read_mostly viridian_build = 0x1772;
+
 void cpuid_viridian_leaves(const struct vcpu *v, uint32_t leaf,
                            uint32_t subleaf, struct cpuid_leaf *res)
 {
@@ -194,8 +204,8 @@ void cpuid_viridian_leaves(const struct vcpu *v, uint32_t leaf,
            own version number. */
         if ( d->arch.hvm_domain.viridian.guest_os_id.raw == 0 )
             break;
-        res->a = 1; /* Build number */
-        res->b = (xen_major_version() << 16) | xen_minor_version();
+        res->a = viridian_build;
+        res->b = ((uint32_t)viridian_major << 16) | viridian_minor;
         res->c = 0; /* SP */
         res->d = 0; /* Service branch and number */
         break;
@@ -989,6 +999,48 @@ static int viridian_load_vcpu_ctxt(struct domain *d, hvm_domain_context_t *h)
 
 HVM_REGISTER_SAVE_RESTORE(VIRIDIAN_VCPU, viridian_save_vcpu_ctxt,
                           viridian_load_vcpu_ctxt, 1, HVMSR_PER_VCPU);
+
+static void __init parse_viridian_version(char *arg)
+{
+    const char *t;
+    unsigned int n[3];
+    unsigned int i = 0;
+
+    n[0] = viridian_major;
+    n[1] = viridian_minor;
+    n[2] = viridian_build;
+
+    while ( (t = strsep(&arg, ",")) != NULL )
+    {
+        const char *e;
+
+        if ( *t == '\0' )
+            continue;
+
+        n[i++] = simple_strtoul(t, &e, 0);
+        if ( *e != '\0' )
+            goto fail;
+    }
+    if ( i != 3 )
+        goto fail;
+
+    if ( ((typeof(viridian_major))n[0] != n[0]) ||
+         ((typeof(viridian_minor))n[1] != n[1]) ||
+         ((typeof(viridian_build))n[2] != n[2]) )
+        goto fail;
+
+    viridian_major = n[0];
+    viridian_minor = n[1];
+    viridian_build = n[2];
+
+    printk("viridian-version = %#x,%#x,%#x\n",
+           viridian_major, viridian_minor, viridian_build);
+    return;
+
+ fail:
+    printk(XENLOG_WARNING "Invalid viridian-version, using default\n");
+}
+custom_param("viridian-version", parse_viridian_version);
 
 /*
  * Local variables:
