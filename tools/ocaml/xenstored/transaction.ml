@@ -75,7 +75,8 @@ type t = {
 	ty: ty;
 	store: Store.t;
 	quota: Quota.t;
-	mutable ops: (Xenbus.Xb.Op.operation * Store.Path.t) list;
+	mutable paths: (Xenbus.Xb.Op.operation * Store.Path.t) list;
+	mutable operations: (Packet.request * Packet.response) list;
 	mutable read_lowpath: Store.Path.t option;
 	mutable write_lowpath: Store.Path.t option;
 }
@@ -86,16 +87,24 @@ let make id store =
 		ty = ty;
 		store = if id = none then store else Store.copy store;
 		quota = Quota.copy store.Store.quota;
-		ops = [];
+		paths = [];
+		operations = [];
 		read_lowpath = None;
 		write_lowpath = None;
 	}
 
 let get_id t = match t.ty with No -> none | Full (id, _, _) -> id
 let get_store t = t.store
-let get_ops t = t.ops
+let get_paths t = t.paths
 
-let add_wop t ty path = t.ops <- (ty, path) :: t.ops
+let add_wop t ty path = t.paths <- (ty, path) :: t.paths
+let add_operation ~perm t request response =
+	if !Define.maxrequests >= 0
+		&& not (Perms.Connection.is_dom0 perm)
+		&& List.length t.operations >= !Define.maxrequests
+		then raise Quota.Limit_reached;
+	t.operations <- (request, response) :: t.operations
+let get_operations t = List.rev t.operations
 let set_read_lowpath t path = t.read_lowpath <- get_lowest path t.read_lowpath
 let set_write_lowpath t path = t.write_lowpath <- get_lowest path t.write_lowpath
 
@@ -141,7 +150,7 @@ let getperms t perm path =
 	r
 
 let commit ~con t =
-	let has_write_ops = List.length t.ops > 0 in
+	let has_write_ops = List.length t.paths > 0 in
 	let has_coalesced = ref false in
 	let has_commited =
 	match t.ty with
