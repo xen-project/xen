@@ -54,11 +54,8 @@
 #define CONFIG_AEABI
 
 /* Linkage for ARM */
-#define __ALIGN .align 2
-#define __ALIGN_STR ".align 2"
 #ifdef __ASSEMBLY__
-#define ALIGN __ALIGN
-#define ALIGN_STR __ALIGN_STR
+#define ALIGN .align 2
 #define ENTRY(name)                             \
   .globl name;                                  \
   ALIGN;                                        \

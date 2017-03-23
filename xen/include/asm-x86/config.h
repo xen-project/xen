@@ -50,11 +50,8 @@
 #define OPT_CONSOLE_STR "vga"
 
 /* Linkage for x86 */
-#define __ALIGN .align 16,0x90
-#define __ALIGN_STR ".align 16,0x90"
 #ifdef __ASSEMBLY__
-#define ALIGN __ALIGN
-#define ALIGN_STR __ALIGN_STR
+#define ALIGN .align 16,0x90
 #define ENTRY(name)                             \
   .globl name;                                  \
   ALIGN;                                        \
