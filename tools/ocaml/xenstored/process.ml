@@ -281,6 +281,38 @@ let input_handle_error ~cons ~doms ~fct ~con ~t ~req =
 	| (Failure "int_of_string")    -> reply_error "EINVAL"
 	| Define.Unknown_operation     -> reply_error "ENOSYS"
 
+(* Replay a stored transaction against a fresh store, check the responses are
+   all equivalent: if so, commit the transaction. Otherwise send the abort to
+   the client. *)
+let transaction_replay c t doms cons =
+	match t.Transaction.ty with
+	| Transaction.No ->
+		error "attempted to replay a non-full transaction";
+		false
+	| Transaction.Full(id, oldroot, cstore) ->
+		let tid = Connection.start_transaction c cstore in
+		let new_t = Transaction.make tid cstore in
+		let con = sprintf "r(%d):%s" id (Connection.get_domstr c) in
+		let perform_exn (request, response) =
+			let fct = function_of_type_simple_op request.Packet.ty in
+			let response' = input_handle_error ~cons ~doms ~fct ~con:c ~t:new_t ~req:request in
+			if not(Packet.response_equal response response') then raise Transaction_again in
+		finally
+		(fun () ->
+			try
+				Logging.start_transaction ~con ~tid;
+				List.iter perform_exn (Transaction.get_operations t);
+				Logging.end_transaction ~con ~tid;
+
+				Transaction.commit ~con new_t
+			with e ->
+				info "transaction_replay %d caught: %s" tid (Printexc.to_string e);
+				false
+			)
+		(fun () ->
+			Connection.end_transaction c tid None
+		)
+
 let do_watch con t domains cons data =
 	let (node, token) = 
 		match (split None '\000' data) with
@@ -313,6 +345,7 @@ let do_transaction_end con t domains cons data =
 		| _        -> raise Invalid_Cmd_Args
 		in
 	let success =
+		let commit = if commit then Some (fun con trans -> transaction_replay con trans domains cons) else None in
 		Connection.end_transaction con (Transaction.get_id t) commit in
 	if not success then
 		raise Transaction_again;
