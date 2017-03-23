@@ -1601,11 +1601,17 @@ per-vcpu event channel upcall vectors.
 Note that this enlightenment will have no effect if the guest is
 using APICv posted interrupts.
 
+=item B<crash_ctl>
+
+This group incorporates the crash control MSRs. These enlightenments
+allow Windows to write crash information such that it can be logged
+by Xen.
+
 =item B<defaults>
 
 This is a special value that enables the default set of groups, which
-is currently the B<base>, B<freq>, B<time_ref_count> and B<apic_assist>
-groups.
+is currently the B<base>, B<freq>, B<time_ref_count>, B<apic_assist>
+and B<crash_ctl> groups.
 
 =item B<all>
 

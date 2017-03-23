@@ -135,13 +135,18 @@
 #define _HVMPV_apic_assist 5
 #define HVMPV_apic_assist (1 << _HVMPV_apic_assist)
 
+/* Enable crash MSRs */
+#define _HVMPV_crash_ctl 6
+#define HVMPV_crash_ctl (1 << _HVMPV_crash_ctl)
+
 #define HVMPV_feature_mask \
         (HVMPV_base_freq | \
          HVMPV_no_freq | \
          HVMPV_time_ref_count | \
          HVMPV_reference_tsc | \
          HVMPV_hcall_remote_tlb_flush | \
-         HVMPV_apic_assist)
+         HVMPV_apic_assist | \
+         HVMPV_crash_ctl)
 
 #endif
 

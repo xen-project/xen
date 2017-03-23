@@ -26,6 +26,7 @@ struct viridian_vcpu
         void *va;
         int vector;
     } vp_assist;
+    uint64_t crash_param[5];
 };
 
 union viridian_guest_os_id

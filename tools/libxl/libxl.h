@@ -288,6 +288,12 @@
 #define LIBXL_HAVE_SCHED_CREDIT2_PARAMS 1
 
 /*
+ * LIBXL_HAVE_VIRIDIAN_CRASH_CTL indicates that the 'crash_ctl' value
+ * is present in the viridian enlightenment enumeration.
+ */
+#define LIBXL_HAVE_VIRIDIAN_CRASH_CTL 1
+
+/*
  * libxl ABI compatibility
  *
  * The only guarantee which libxl makes regarding ABI compatibility
