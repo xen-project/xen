@@ -1624,6 +1624,14 @@ relinquish control to dom0.
 <major>, <minor> and <build> must be integers. The values will be
 encoded in guest CPUID 0x40000002 if viridian enlightenments are enabled.
 
+### viridian-spinlock-retry-count
+> `= <integer>`
+
+> Default: `2047`
+
+Specify the maximum number of retries before an enlightened Windows
+guest will notify Xen that it has failed to acquire a spinlock.
+
 ### vpid (Intel)
 > `= <boolean>`
 

@@ -174,6 +174,14 @@ static uint16_t __read_mostly viridian_major = 6;
 static uint16_t __read_mostly viridian_minor = 0;
 static uint32_t __read_mostly viridian_build = 0x1772;
 
+/*
+ * Maximum number of retries before the guest will notify of failure
+ * to acquire a spinlock.
+ */
+static uint32_t __read_mostly viridian_spinlock_retry_count = 2047;
+integer_param("viridian-spinlock-retry-count",
+              viridian_spinlock_retry_count);
+
 void cpuid_viridian_leaves(const struct vcpu *v, uint32_t leaf,
                            uint32_t subleaf, struct cpuid_leaf *res)
 {
@@ -251,7 +259,13 @@ void cpuid_viridian_leaves(const struct vcpu *v, uint32_t leaf,
             res->a |= CPUID4A_HCALL_REMOTE_TLB_FLUSH;
         if ( !cpu_has_vmx_apic_reg_virt )
             res->a |= CPUID4A_MSR_BASED_APIC;
-        res->b = 2047; /* long spin count */
+
+        /*
+         * This value is the recommended number of attempts to try to
+         * acquire a spinlock before notifying the hypervisor via the
+         * HvNotifyLongSpinWait hypercall.
+         */
+        res->b = viridian_spinlock_retry_count;
         break;
 
     case 6:
