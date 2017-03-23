@@ -965,7 +965,7 @@ int viridian_hypercall(struct cpu_user_regs *regs)
     default:
         gprintk(XENLOG_WARNING, "unimplemented hypercall %04x\n",
                 input.call_code);
-
+        /* Fallthrough. */
     case HvGetPartitionId:
     case HvExtCallQueryCapabilities:
         /*
