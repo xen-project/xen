@@ -377,6 +377,25 @@ struct cmd_spec cmd_table[] = {
       "Destroy a domain's virtual TPM device",
       "<Domain> <DevId|uuid>",
     },
+    { "vdispl-attach",
+      &main_vdisplattach, 1, 1,
+      "Create a new virtual display device",
+      "<Domain> [backend=<BackDomain>] [be-alloc=<BackAlloc>] [connectors='<Connectors>']",
+      "    BackAlloc  - set to 1 to if backend allocates display buffers\n"
+      "    Connectors - list of connector's description in ID:WxH format,\n"
+      "                 where: ID - unique connector ID, W - connector width,\n"
+      "                 H - connector height: connectors='id0:800x600;id1:1024x768'\n"
+    },
+    { "vdispl-list",
+      &main_vdispllist, 0, 0,
+      "List virtual display devices for a domain",
+      "<Domain(s)>",
+    },
+    { "vdispl-detach",
+      &main_vdispldetach, 0, 1,
+      "Destroy a domain's virtual display device",
+      "<Domain> <DevId>",
+    },
     { "uptime",
       &main_uptime, 0, 0,
       "Print uptime for all/some domains",

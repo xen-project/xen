@@ -804,6 +804,51 @@ int parse_usbdev_config(libxl_device_usbdev *usbdev, char *token)
     return 0;
 }
 
+int parse_vdispl_config(libxl_device_vdispl *vdispl, char *token)
+{
+    char *oparg;
+    libxl_string_list connectors = NULL;
+    int i;
+    int rc;
+
+    if (MATCH_OPTION("backend", token, oparg)) {
+        vdispl->backend_domname = strdup(oparg);
+    } else if (MATCH_OPTION("be-alloc", token, oparg)) {
+        vdispl->be_alloc = strtoul(oparg, NULL, 0);
+    } else if (MATCH_OPTION("connectors", token, oparg)) {
+        split_string_into_string_list(oparg, ";", &connectors);
+
+        vdispl->num_connectors = libxl_string_list_length(&connectors);
+        vdispl->connectors = calloc(vdispl->num_connectors,
+                                    sizeof(*vdispl->connectors));
+
+        for(i = 0; i < vdispl->num_connectors; i++)
+        {
+            char *resolution;
+
+            rc = split_string_into_pair(connectors[i], ":",
+                                        &vdispl->connectors[i].id,
+                                        &resolution);
+
+            rc= sscanf(resolution, "%ux%u", &vdispl->connectors[i].width,
+                       &vdispl->connectors[i].height);
+            if (rc != 2) {
+                fprintf(stderr, "Can't parse connector resolution\n");
+                goto out;
+            }
+        }
+    } else {
+        fprintf(stderr, "Unknown string \"%s\" in vdispl spec\n", token);
+        rc = 1; goto out;
+    }
+
+    rc = 0;
+
+out:
+    libxl_string_list_dispose(&connectors);
+    return rc;
+}
+
 void parse_config_data(const char *config_source,
                        const char *config_data,
                        int config_len,
@@ -813,7 +858,7 @@ void parse_config_data(const char *config_source,
     long l, vcpus = 0;
     XLU_Config *config;
     XLU_ConfigList *cpus, *vbds, *nics, *pcis, *cvfbs, *cpuids, *vtpms,
-                   *usbctrls, *usbdevs, *p9devs;
+                   *usbctrls, *usbdevs, *p9devs, *vdispls;
     XLU_ConfigList *channels, *ioports, *irqs, *iomem, *viridian, *dtdevs,
                    *mca_caps;
     int num_ioports, num_irqs, num_iomem, num_cpus, num_viridian, num_mca_caps;
@@ -1486,6 +1531,34 @@ void parse_config_data(const char *config_source,
                exit(1);
             }
             free(buf2);
+        }
+    }
+
+    if (!xlu_cfg_get_list(config, "vdispl", &vdispls, 0, 0)) {
+        d_config->num_vdispls = 0;
+        d_config->vdispls = NULL;
+        while ((buf = xlu_cfg_get_listitem(vdispls, d_config->num_vdispls)) != NULL) {
+            libxl_device_vdispl *vdispl;
+            char * buf2 = strdup(buf);
+            char *p;
+            vdispl = ARRAY_EXTEND_INIT(d_config->vdispls,
+                                       d_config->num_vdispls,
+                                       libxl_device_vdispl_init);
+            p = strtok (buf2, ",");
+            while (p != NULL)
+            {
+                while (*p == ' ') p++;
+                if (parse_vdispl_config(vdispl, p)) {
+                    free(buf2);
+                    exit(1);
+                }
+                p = strtok (NULL, ",");
+            }
+            free(buf2);
+            if (vdispl->num_connectors == 0) {
+                fprintf(stderr, "At least one connector should be specified.\n");
+                exit(1);
+            }
         }
     }
 
