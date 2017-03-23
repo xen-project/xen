@@ -119,94 +119,6 @@ let do_getperms con t domains cons data =
 	let perms = Transaction.getperms t (Connection.get_perm con) path in
 	Perms.Node.to_string perms ^ "\000"
 
-let do_watch con t domains cons data =
-	let (node, token) = 
-		match (split None '\000' data) with
-		| [node; token; ""]   -> node, token
-		| _                   -> raise Invalid_Cmd_Args
-		in
-	let watch = Connections.add_watch cons con node token in
-	Packet.Ack (fun () -> Connection.fire_single_watch watch)
-
-let do_unwatch con t domains cons data =
-	let (node, token) =
-		match (split None '\000' data) with
-		| [node; token; ""]   -> node, token
-		| _                   -> raise Invalid_Cmd_Args
-		in
-	Connections.del_watch cons con node token
-
-let do_transaction_start con t domains cons data =
-	if Transaction.get_id t <> Transaction.none then
-		raise Transaction_nested;
-	let store = Transaction.get_store t in
-	string_of_int (Connection.start_transaction con store) ^ "\000"
-
-let do_transaction_end con t domains cons data =
-	let commit =
-		match (split None '\000' data) with
-		| "T" :: _ -> true
-		| "F" :: _ -> false
-		| x :: _   -> raise (Invalid_argument x)
-		| _        -> raise Invalid_Cmd_Args
-		in
-	let success =
-		Connection.end_transaction con (Transaction.get_id t) commit in
-	if not success then
-		raise Transaction_again;
-	if commit then
-		process_watch (List.rev (Transaction.get_paths t)) cons
-
-let do_introduce con t domains cons data =
-	if not (Connection.is_dom0 con)
-	then raise Define.Permission_denied;
-	let (domid, mfn, port) =
-		match (split None '\000' data) with
-		| domid :: mfn :: port :: _ ->
-			int_of_string domid, Nativeint.of_string mfn, int_of_string port
-		| _                         -> raise Invalid_Cmd_Args;
-		in
-	let dom =
-		if Domains.exist domains domid then
-			Domains.find domains domid
-		else try
-			let ndom = Xenctrl.with_intf (fun xc ->
-				Domains.create xc domains domid mfn port) in
-			Connections.add_domain cons ndom;
-			Connections.fire_spec_watches cons "@introduceDomain";
-			ndom
-		with _ -> raise Invalid_Cmd_Args
-	in
-	if (Domain.get_remote_port dom) <> port || (Domain.get_mfn dom) <> mfn then
-		raise Domain_not_match
-
-let do_release con t domains cons data =
-	if not (Connection.is_dom0 con)
-	then raise Define.Permission_denied;
-	let domid =
-		match (split None '\000' data) with
-		| [domid;""] -> int_of_string domid
-		| _          -> raise Invalid_Cmd_Args
-		in
-	let fire_spec_watches = Domains.exist domains domid in
-	Domains.del domains domid;
-	Connections.del_domain cons domid;
-	if fire_spec_watches 
-	then Connections.fire_spec_watches cons "@releaseDomain"
-	else raise Invalid_Cmd_Args
-
-let do_resume con t domains cons data =
-	if not (Connection.is_dom0 con)
-	then raise Define.Permission_denied;
-	let domid =
-		match (split None '\000' data) with
-		| domid :: _ -> int_of_string domid
-		| _          -> raise Invalid_Cmd_Args
-		in
-	if Domains.exist domains domid
-	then Domains.resume domains domid
-	else raise Invalid_Cmd_Args
-
 let do_getdomainpath con t domains cons data =
 	let domid =
 		match (split None '\000' data) with
@@ -319,29 +231,31 @@ let reply_none fct con t doms cons data =
 	(* let the function reply *)
 	fct con t doms cons data
 
-let function_of_type ty =
+(* Functions for 'simple' operations that cannot be part of a transaction *)
+let function_of_type_simple_op ty =
 	match ty with
-	| Xenbus.Xb.Op.Debug             -> reply_data_or_ack do_debug
+	| Xenbus.Xb.Op.Debug
+	| Xenbus.Xb.Op.Watch
+	| Xenbus.Xb.Op.Unwatch
+	| Xenbus.Xb.Op.Transaction_start
+	| Xenbus.Xb.Op.Transaction_end
+	| Xenbus.Xb.Op.Introduce
+	| Xenbus.Xb.Op.Release
+	| Xenbus.Xb.Op.Isintroduced
+	| Xenbus.Xb.Op.Resume
+	| Xenbus.Xb.Op.Set_target
+	| Xenbus.Xb.Op.Restrict
+	| Xenbus.Xb.Op.Reset_watches
+	| Xenbus.Xb.Op.Invalid           -> error "called function_of_type_simple_op on operation %s" (Xenbus.Xb.Op.to_string ty);
+	                                    raise (Invalid_argument (Xenbus.Xb.Op.to_string ty))
 	| Xenbus.Xb.Op.Directory         -> reply_data do_directory
 	| Xenbus.Xb.Op.Read              -> reply_data do_read
 	| Xenbus.Xb.Op.Getperms          -> reply_data do_getperms
-	| Xenbus.Xb.Op.Watch             -> reply_none do_watch
-	| Xenbus.Xb.Op.Unwatch           -> reply_ack do_unwatch
-	| Xenbus.Xb.Op.Transaction_start -> reply_data do_transaction_start
-	| Xenbus.Xb.Op.Transaction_end   -> reply_ack do_transaction_end
-	| Xenbus.Xb.Op.Introduce         -> reply_ack do_introduce
-	| Xenbus.Xb.Op.Release           -> reply_ack do_release
 	| Xenbus.Xb.Op.Getdomainpath     -> reply_data do_getdomainpath
 	| Xenbus.Xb.Op.Write             -> reply_ack do_write
 	| Xenbus.Xb.Op.Mkdir             -> reply_ack do_mkdir
 	| Xenbus.Xb.Op.Rm                -> reply_ack do_rm
 	| Xenbus.Xb.Op.Setperms          -> reply_ack do_setperms
-	| Xenbus.Xb.Op.Isintroduced      -> reply_data do_isintroduced
-	| Xenbus.Xb.Op.Resume            -> reply_ack do_resume
-	| Xenbus.Xb.Op.Set_target        -> reply_ack do_set_target
-	| Xenbus.Xb.Op.Restrict          -> reply_ack do_restrict
-	| Xenbus.Xb.Op.Reset_watches     -> reply_ack do_reset_watches
-	| Xenbus.Xb.Op.Invalid           -> reply_ack do_error
 	| _                              -> reply_ack do_error
 
 let input_handle_error ~cons ~doms ~fct ~con ~t ~req =
@@ -366,6 +280,111 @@ let input_handle_error ~cons ~doms ~fct ~con ~t ~req =
 	| Quota.Transaction_opened     -> reply_error "EQUOTA"
 	| (Failure "int_of_string")    -> reply_error "EINVAL"
 	| Define.Unknown_operation     -> reply_error "ENOSYS"
+
+let do_watch con t domains cons data =
+	let (node, token) = 
+		match (split None '\000' data) with
+		| [node; token; ""]   -> node, token
+		| _                   -> raise Invalid_Cmd_Args
+		in
+	let watch = Connections.add_watch cons con node token in
+	Packet.Ack (fun () -> Connection.fire_single_watch watch)
+
+let do_unwatch con t domains cons data =
+	let (node, token) =
+		match (split None '\000' data) with
+		| [node; token; ""]   -> node, token
+		| _                   -> raise Invalid_Cmd_Args
+		in
+	Connections.del_watch cons con node token
+
+let do_transaction_start con t domains cons data =
+	if Transaction.get_id t <> Transaction.none then
+		raise Transaction_nested;
+	let store = Transaction.get_store t in
+	string_of_int (Connection.start_transaction con store) ^ "\000"
+
+let do_transaction_end con t domains cons data =
+	let commit =
+		match (split None '\000' data) with
+		| "T" :: _ -> true
+		| "F" :: _ -> false
+		| x :: _   -> raise (Invalid_argument x)
+		| _        -> raise Invalid_Cmd_Args
+		in
+	let success =
+		Connection.end_transaction con (Transaction.get_id t) commit in
+	if not success then
+		raise Transaction_again;
+	if commit then
+		process_watch (List.rev (Transaction.get_paths t)) cons
+
+let do_introduce con t domains cons data =
+	if not (Connection.is_dom0 con)
+	then raise Define.Permission_denied;
+	let (domid, mfn, port) =
+		match (split None '\000' data) with
+		| domid :: mfn :: port :: _ ->
+			int_of_string domid, Nativeint.of_string mfn, int_of_string port
+		| _                         -> raise Invalid_Cmd_Args;
+		in
+	let dom =
+		if Domains.exist domains domid then
+			Domains.find domains domid
+		else try
+			let ndom = Xenctrl.with_intf (fun xc ->
+				Domains.create xc domains domid mfn port) in
+			Connections.add_domain cons ndom;
+			Connections.fire_spec_watches cons "@introduceDomain";
+			ndom
+		with _ -> raise Invalid_Cmd_Args
+	in
+	if (Domain.get_remote_port dom) <> port || (Domain.get_mfn dom) <> mfn then
+		raise Domain_not_match
+
+let do_release con t domains cons data =
+	if not (Connection.is_dom0 con)
+	then raise Define.Permission_denied;
+	let domid =
+		match (split None '\000' data) with
+		| [domid;""] -> int_of_string domid
+		| _          -> raise Invalid_Cmd_Args
+		in
+	let fire_spec_watches = Domains.exist domains domid in
+	Domains.del domains domid;
+	Connections.del_domain cons domid;
+	if fire_spec_watches 
+	then Connections.fire_spec_watches cons "@releaseDomain"
+	else raise Invalid_Cmd_Args
+
+let do_resume con t domains cons data =
+	if not (Connection.is_dom0 con)
+	then raise Define.Permission_denied;
+	let domid =
+		match (split None '\000' data) with
+		| domid :: _ -> int_of_string domid
+		| _          -> raise Invalid_Cmd_Args
+		in
+	if Domains.exist domains domid
+	then Domains.resume domains domid
+	else raise Invalid_Cmd_Args
+
+let function_of_type ty =
+	match ty with
+	| Xenbus.Xb.Op.Debug             -> reply_data_or_ack do_debug
+	| Xenbus.Xb.Op.Watch             -> reply_none do_watch
+	| Xenbus.Xb.Op.Unwatch           -> reply_ack do_unwatch
+	| Xenbus.Xb.Op.Transaction_start -> reply_data do_transaction_start
+	| Xenbus.Xb.Op.Transaction_end   -> reply_ack do_transaction_end
+	| Xenbus.Xb.Op.Introduce         -> reply_ack do_introduce
+	| Xenbus.Xb.Op.Release           -> reply_ack do_release
+	| Xenbus.Xb.Op.Isintroduced      -> reply_data do_isintroduced
+	| Xenbus.Xb.Op.Resume            -> reply_ack do_resume
+	| Xenbus.Xb.Op.Set_target        -> reply_ack do_set_target
+	| Xenbus.Xb.Op.Restrict          -> reply_ack do_restrict
+	| Xenbus.Xb.Op.Reset_watches     -> reply_ack do_reset_watches
+	| Xenbus.Xb.Op.Invalid           -> reply_ack do_error
+	| _                              -> function_of_type_simple_op ty
 
 (**
  * Nothrow guarantee.
