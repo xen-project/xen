@@ -434,6 +434,36 @@ let function_of_type ty =
 	| _                              -> function_of_type_simple_op ty
 
 (**
+ * Determines which individual (non-transactional) operations we want to retain.
+ * We only want to retain operations that have side-effects in the store since
+ * these can be the cause of transactions failing.
+ *)
+let retain_op_in_history ty =
+	match ty with
+	| Xenbus.Xb.Op.Write
+	| Xenbus.Xb.Op.Mkdir
+	| Xenbus.Xb.Op.Rm
+	| Xenbus.Xb.Op.Setperms          -> true
+	| Xenbus.Xb.Op.Debug
+	| Xenbus.Xb.Op.Directory
+	| Xenbus.Xb.Op.Read
+	| Xenbus.Xb.Op.Getperms
+	| Xenbus.Xb.Op.Watch
+	| Xenbus.Xb.Op.Unwatch
+	| Xenbus.Xb.Op.Transaction_start
+	| Xenbus.Xb.Op.Transaction_end
+	| Xenbus.Xb.Op.Introduce
+	| Xenbus.Xb.Op.Release
+	| Xenbus.Xb.Op.Getdomainpath
+	| Xenbus.Xb.Op.Watchevent
+	| Xenbus.Xb.Op.Error
+	| Xenbus.Xb.Op.Isintroduced
+	| Xenbus.Xb.Op.Resume
+	| Xenbus.Xb.Op.Set_target
+	| Xenbus.Xb.Op.Reset_watches
+	| Xenbus.Xb.Op.Invalid           -> false
+
+(**
  * Nothrow guarantee.
  *)
 let process_packet ~store ~cons ~doms ~con ~req =
@@ -449,10 +479,18 @@ let process_packet ~store ~cons ~doms ~con ~req =
 				Connection.get_transaction con tid
 			in
 
-		let before = Store.copy store in
-		let response = input_handle_error ~cons ~doms ~fct ~con ~t ~req in
-		let after = Store.copy store in
-		if tid = Transaction.none then record_commit ~con ~tid ~before ~after;
+		let execute () = input_handle_error ~cons ~doms ~fct ~con ~t ~req in
+
+		let response =
+			(* Note that transactions are recorded in history separately. *)
+			if tid = Transaction.none && retain_op_in_history ty then begin
+				let before = Store.copy store in
+				let response = execute () in
+				let after = Store.copy store in
+				record_commit ~con ~tid ~before ~after;
+				response
+			end else execute ()
+		in
 
 		let response = try
 			if tid <> Transaction.none then
