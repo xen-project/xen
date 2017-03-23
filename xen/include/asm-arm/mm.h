@@ -32,12 +32,6 @@ struct page_info
         struct {
             /* Type reference count and various PGT_xxx flags and fields. */
             unsigned long type_info;
-            /*
-             * Reference count for page table used in the P2M code.
-             * The counter is protected by the p2m->lock of the
-             * associated domain.
-             */
-            unsigned long p2m_refcount;
         } inuse;
         /* Page is on a free list: ((count_info & PGC_count_mask) == 0). */
         struct {
