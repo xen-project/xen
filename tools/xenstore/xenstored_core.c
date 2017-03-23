@@ -374,6 +374,7 @@ static void initialize_fds(int sock, int *p_sock_pollfd_idx,
 					POLLIN|POLLPRI);
 
 	wrl_gettime_now(&now);
+	wrl_log_periodic(now);
 
 	list_for_each_entry(conn, &connections, list) {
 		if (conn->domain) {
