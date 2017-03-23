@@ -335,7 +335,7 @@ let transaction_replay c t doms cons =
 					then (punish hist_rec.History.con; true)
 					else false
 				) in
-				let guilty_cons = History.filter_connections ~since:t.Transaction.start_count ~f:judge_and_sentence in
+				let guilty_cons = History.filter_connections ~ignore:c ~since:t.Transaction.start_count ~f:judge_and_sentence in
 				if Hashtbl.length guilty_cons = 0 then debug "Found no culprit for conflict in %s: must be self or not in history." con;
 				false
 			)
