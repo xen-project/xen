@@ -87,12 +87,29 @@ type t = {
 	mutable read_lowpath: Store.Path.t option;
 	mutable write_lowpath: Store.Path.t option;
 }
+let get_id t = match t.ty with No -> none | Full (id, _, _) -> id
 
 let counter = ref 0L
 
-let make id store =
+(* Scope for optimisation: different data-structure and functions to search/filter it *)
+let short_running_txns = ref []
+
+let oldest_short_running_transaction () =
+	let rec last = function
+		| [] -> None
+		| [x] -> Some x
+		| x :: xs -> last xs
+	in last !short_running_txns
+
+let end_transaction txn =
+	let cutoff = Unix.gettimeofday () -. !Define.conflict_max_history_seconds in
+	short_running_txns := List.filter
+		(function (start_time, tx) -> start_time >= cutoff && tx != txn)
+		!short_running_txns
+
+let make ?(internal=false) id store =
 	let ty = if id = none then No else Full(id, Store.copy store, store) in
-	{
+	let txn = {
 		ty = ty;
 		start_count = !counter;
 		store = if id = none then store else Store.copy store;
@@ -101,9 +118,13 @@ let make id store =
 		operations = [];
 		read_lowpath = None;
 		write_lowpath = None;
-	}
+	} in
+	if id <> none && not internal then (
+		let now = Unix.gettimeofday () in
+		short_running_txns := (now, txn) :: !short_running_txns
+	);
+	txn
 
-let get_id t = match t.ty with No -> none | Full (id, _, _) -> id
 let get_store t = t.store
 let get_paths t = t.paths
 
