@@ -281,6 +281,18 @@ let input_handle_error ~cons ~doms ~fct ~con ~t ~req =
 	| (Failure "int_of_string")    -> reply_error "EINVAL"
 	| Define.Unknown_operation     -> reply_error "ENOSYS"
 
+let write_access_log ~ty ~tid ~con ~data =
+	Logging.xb_op ~ty ~tid ~con data
+
+let write_answer_log ~ty ~tid ~con ~data =
+	Logging.xb_answer ~ty ~tid ~con data
+
+let write_response_log ~ty ~tid ~con ~response =
+	match response with
+	| Packet.Ack _   -> write_answer_log ~ty ~tid ~con ~data:""
+	| Packet.Reply x -> write_answer_log ~ty ~tid ~con ~data:x
+	| Packet.Error e -> write_answer_log ~ty:(Xenbus.Xb.Op.Error) ~tid ~con ~data:e
+
 (* Replay a stored transaction against a fresh store, check the responses are
    all equivalent: if so, commit the transaction. Otherwise send the abort to
    the client. *)
@@ -294,8 +306,10 @@ let transaction_replay c t doms cons =
 		let new_t = Transaction.make tid cstore in
 		let con = sprintf "r(%d):%s" id (Connection.get_domstr c) in
 		let perform_exn (request, response) =
+			write_access_log ~ty:request.Packet.ty ~tid ~con ~data:request.Packet.data;
 			let fct = function_of_type_simple_op request.Packet.ty in
 			let response' = input_handle_error ~cons ~doms ~fct ~con:c ~t:new_t ~req:request in
+			write_response_log ~ty:request.Packet.ty ~tid ~con ~response:response';
 			if not(Packet.response_equal response response') then raise Transaction_again in
 		finally
 		(fun () ->
@@ -451,12 +465,6 @@ let process_packet ~store ~cons ~doms ~con ~req =
 		error "process packet: %s" (Printexc.to_string exn);
 		Connection.send_error con tid rid "EIO"
 
-let write_access_log ~ty ~tid ~con ~data =
-	Logging.xb_op ~ty ~tid ~con:(Connection.get_domstr con) data
-
-let write_answer_log ~ty ~tid ~con ~data =
-	Logging.xb_answer ~ty ~tid ~con:(Connection.get_domstr con) data
-
 let do_input store cons doms con =
 	let newpacket =
 		try
@@ -483,7 +491,7 @@ let do_input store cons doms con =
 		         (Connection.get_domstr con) tid
 		         (Xenbus.Xb.Op.to_string ty) (sanitize_data data); *)
 		process_packet ~store ~cons ~doms ~con ~req;
-		write_access_log ~ty ~tid ~con ~data;
+		write_access_log ~ty ~tid ~con:(Connection.get_domstr con) ~data;
 		Connection.incr_ops con;
 	)
 
@@ -496,7 +504,7 @@ let do_output store cons doms con =
 			   info "[%s] <- %s \"%s\""
 			         (Connection.get_domstr con)
 			         (Xenbus.Xb.Op.to_string ty) (sanitize_data data);*)
-			write_answer_log ~ty ~tid ~con ~data;
+			write_answer_log ~ty ~tid ~con:(Connection.get_domstr con) ~data;
 		);
 		try
 			ignore (Connection.do_output con)
