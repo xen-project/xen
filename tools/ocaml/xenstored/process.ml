@@ -344,11 +344,11 @@ let function_of_type ty =
 	| Xenbus.Xb.Op.Invalid           -> reply_ack do_error
 	| _                              -> reply_ack do_error
 
-let input_handle_error ~cons ~doms ~fct ~ty ~con ~t ~rid ~data =
+let input_handle_error ~cons ~doms ~fct ~con ~t ~req =
 	let reply_error e =
 		Packet.Error e in
 	try
-		fct con t doms cons data
+		fct con t doms cons req.Packet.data
 	with
 	| Define.Invalid_path          -> reply_error "EINVAL"
 	| Define.Already_exist         -> reply_error "EEXIST"
@@ -370,7 +370,10 @@ let input_handle_error ~cons ~doms ~fct ~ty ~con ~t ~rid ~data =
 (**
  * Nothrow guarantee.
  *)
-let process_packet ~store ~cons ~doms ~con ~tid ~rid ~ty ~data =
+let process_packet ~store ~cons ~doms ~con ~req =
+	let ty = req.Packet.ty in
+	let tid = req.Packet.tid in
+	let rid = req.Packet.rid in
 	try
 		let fct = function_of_type ty in
 		let t =
@@ -379,7 +382,7 @@ let process_packet ~store ~cons ~doms ~con ~tid ~rid ~ty ~data =
 			else
 				Connection.get_transaction con tid
 			in
-		let response = input_handle_error ~cons ~doms ~fct ~ty ~con ~t ~rid ~data in
+		let response = input_handle_error ~cons ~doms ~fct ~con ~t ~req in
 
 		(* Put the response on the wire *)
 		send_response ty con t rid response
@@ -412,11 +415,13 @@ let do_input store cons doms con =
 	if newpacket then (
 		let packet = Connection.pop_in con in
 		let tid, rid, ty, data = Xenbus.Xb.Packet.unpack packet in
+		let req = {Packet.tid; Packet.rid; Packet.ty; Packet.data} in
+
 		(* As we don't log IO, do not call an unnecessary sanitize_data 
 		   info "[%s] -> [%d] %s \"%s\""
 		         (Connection.get_domstr con) tid
 		         (Xenbus.Xb.Op.to_string ty) (sanitize_data data); *)
-		process_packet ~store ~cons ~doms ~con ~tid ~rid ~ty ~data;
+		process_packet ~store ~cons ~doms ~con ~req;
 		write_access_log ~ty ~tid ~con ~data;
 		Connection.incr_ops con;
 	)
