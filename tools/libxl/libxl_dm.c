@@ -1293,7 +1293,7 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
                                      nics[i].colo_filter_sec_redirector0_indev));
                     }
                     if (nics[i].colo_filter_sec_redirector1_queue &&
-                        nics[i].colo_filter_sec_redirector1_indev) {
+                        nics[i].colo_filter_sec_redirector1_outdev) {
                         flexarray_append(dm_args, "-object");
                         flexarray_append(dm_args,
                            GCSPRINTF("filter-redirector,id=rs2,netdev=net%d,queue=%s,outdev=%s",
