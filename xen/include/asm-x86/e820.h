@@ -16,7 +16,7 @@ struct __packed e820entry {
     uint32_t type;
 };
 
-#define E820MAX	128
+#define E820MAX	1024
 
 struct e820map {
     unsigned int nr_map;

@@ -1,7 +1,7 @@
         .code16
 
 #define SMAP    0x534d4150
-#define E820MAX 128
+#define E820_BIOS_MAX 128
 
 get_memory_map:
 
@@ -23,7 +23,7 @@ get_memory_map:
         jne     .Lmem88
 
         movb    bootsym(e820nr),%al             # up to 128 entries
-        cmpb    $E820MAX,%al
+        cmpb    $E820_BIOS_MAX,%al
         jae     .Lmem88
 
         incb    bootsym(e820nr)
@@ -86,7 +86,7 @@ ENTRY(e820map_copy)
 
         .align  4
 e820map:
-        .fill   E820MAX*20,1,0
+        .fill   E820_BIOS_MAX*20,1,0
 e820nr:
         .long   0
 GLOBAL(lowmem_kb)
