@@ -74,6 +74,7 @@ type ty = No | Full of (int * Store.Node.t * Store.t)
 type t = {
 	ty: ty;
 	store: Store.t;
+	quota: Quota.t;
 	mutable ops: (Xenbus.Xb.Op.operation * Store.Path.t) list;
 	mutable read_lowpath: Store.Path.t option;
 	mutable write_lowpath: Store.Path.t option;
@@ -84,6 +85,7 @@ let make id store =
 	{
 		ty = ty;
 		store = if id = none then store else Store.copy store;
+		quota = Quota.copy store.Store.quota;
 		ops = [];
 		read_lowpath = None;
 		write_lowpath = None;
@@ -155,7 +157,7 @@ let commit ~con t =
 
 					(* it has to be in the store, otherwise it means bugs
 					   in the lowpath registration. we don't need to handle none. *)
-					maybe (fun n -> Store.set_node cstore p n) n;
+					maybe (fun n -> Store.set_node cstore p n t.quota store.Store.quota) n;
 					Logging.write_coalesce ~tid:(get_id t) ~con (Store.Path.to_string p);
 				) t.write_lowpath;
 				maybe (fun p ->
