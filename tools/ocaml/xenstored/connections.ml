@@ -98,11 +98,10 @@ let iter cons fct =
 	iter_domains cons fct; iter_anonymous cons fct
 
 let has_more_work cons =
-	Hashtbl.fold (fun id con acc ->
-		if Connection.has_more_input con then
-			con :: acc
-		else
-			acc) cons.domains []
+	Hashtbl.fold
+		(fun id con acc ->
+		 if Connection.has_more_work con then con :: acc else acc)
+		cons.domains []
 
 let key_of_str path =
 	if path.[0] = '@'
