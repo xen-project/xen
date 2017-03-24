@@ -378,6 +378,7 @@ let do_transaction_end con t domains cons data =
 		| x :: _   -> raise (Invalid_argument x)
 		| _        -> raise Invalid_Cmd_Args
 		in
+	let commit = commit && not (Transaction.is_read_only t) in
 	let success =
 		let commit = if commit then Some (fun con trans -> transaction_replay con trans domains cons) else None in
 		History.end_transaction t con (Transaction.get_id t) commit in
