@@ -128,6 +128,7 @@ let make ?(internal=false) id store =
 let get_store t = t.store
 let get_paths t = t.paths
 
+let is_read_only t = t.paths = []
 let add_wop t ty path = t.paths <- (ty, path) :: t.paths
 let add_operation ~perm t request response =
 	if !Define.maxrequests >= 0
