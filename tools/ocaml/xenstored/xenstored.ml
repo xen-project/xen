@@ -437,7 +437,10 @@ let _ =
 			peaceful_mw;
 		let start_time = Unix.gettimeofday () in
 		let timeout =
-			let until_next_activity = min (max 0. (!next_frequent_ops -. start_time)) period_ops_interval in
+			let until_next_activity =
+				if Domains.all_at_max_credit domains
+				then period_ops_interval
+				else min (max 0. (!next_frequent_ops -. start_time)) period_ops_interval in
 			if peaceful_mw <> [] then 0. else until_next_activity
 		in
 		let inset, outset = Connections.select ~only_if:is_peaceful cons in
