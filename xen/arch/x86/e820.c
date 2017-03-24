@@ -33,6 +33,7 @@ static bool_t __initdata e820_verbose;
 boolean_param("e820-verbose", e820_verbose);
 
 struct e820map e820;
+struct e820map __initdata e820_raw;
 
 /*
  * This function checks if the entire range <start,end> is mapped with type.
@@ -75,7 +76,7 @@ static void __init add_memory_region(unsigned long long start,
 
     x = e820.nr_map;
 
-    if (x == E820MAX) {
+    if (x == ARRAY_SIZE(e820.map)) {
         printk(KERN_ERR "Ooops! Too many entries in the memory map!\n");
         return;
     }
@@ -133,7 +134,8 @@ static struct change_member *change_point[2*E820MAX] __initdata;
 static struct e820entry *overlap_list[E820MAX] __initdata;
 static struct e820entry new_bios[E820MAX] __initdata;
 
-static int __init sanitize_e820_map(struct e820entry * biosmap, char * pnr_map)
+static int __init sanitize_e820_map(struct e820entry *biosmap,
+                                    unsigned int *pnr_map)
 {
     struct change_member *change_tmp;
     unsigned long current_type, last_type;
@@ -266,7 +268,7 @@ static int __init sanitize_e820_map(struct e820entry * biosmap, char * pnr_map)
                     change_point[chgidx]->addr - last_addr;
 				/* move forward only if the new size was non-zero */
                 if (new_bios[new_bios_entry].size != 0)
-                    if (++new_bios_entry >= E820MAX)
+                    if (++new_bios_entry >= ARRAY_SIZE(new_bios))
                         break; 	/* no more space left for new bios entries */
             }
             if (current_type != 0)	{
@@ -508,17 +510,14 @@ static void __init reserve_dmi_region(void)
     }
 }
 
-static void __init machine_specific_memory_setup(
-    struct e820entry *raw, unsigned int *raw_nr)
+static void __init machine_specific_memory_setup(struct e820map *raw)
 {
     unsigned long mpt_limit, ro_mpt_limit;
     uint64_t top_of_ram, size;
     int i;
 
-    char nr = (char)*raw_nr;
-    sanitize_e820_map(raw, &nr);
-    *raw_nr = nr;
-    (void)copy_e820_map(raw, nr);
+    sanitize_e820_map(raw->map, &raw->nr_map);
+    copy_e820_map(raw->map, raw->nr_map);
 
     if ( opt_mem )
         clip_to_limit(opt_mem, NULL);
@@ -691,16 +690,15 @@ int __init reserve_e820_ram(struct e820map *e820, uint64_t s, uint64_t e)
     return e820_change_range_type(e820, s, e, E820_RAM, E820_RESERVED);
 }
 
-unsigned long __init init_e820(
-    const char *str, struct e820entry *raw, unsigned int *raw_nr)
+unsigned long __init init_e820(const char *str, struct e820map *raw)
 {
     if ( e820_verbose )
     {
         printk("Initial %s RAM map:\n", str);
-        print_e820_memory_map(raw, *raw_nr);
+        print_e820_memory_map(raw->map, raw->nr_map);
     }
 
-    machine_specific_memory_setup(raw, raw_nr);
+    machine_specific_memory_setup(raw);
 
     printk("%s RAM map:\n", str);
     print_e820_memory_map(e820.map, e820.nr_map);

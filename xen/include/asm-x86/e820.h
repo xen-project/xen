@@ -30,15 +30,14 @@ extern int e820_change_range_type(
     uint32_t orig_type, uint32_t new_type);
 extern int e820_add_range(
     struct e820map *, uint64_t s, uint64_t e, uint32_t type);
-extern unsigned long init_e820(const char *, struct e820entry *, unsigned int *);
+extern unsigned long init_e820(const char *, struct e820map *);
 extern struct e820map e820;
+extern struct e820map e820_raw;
 
 /* These symbols live in the boot trampoline. */
-extern struct e820entry e820map[];
-extern unsigned int e820nr;
 extern unsigned int lowmem_kb, highmem_kb;
+unsigned int e820map_copy(struct e820entry *map, unsigned int limit);
 
-#define e820_raw bootsym(e820map)
-#define e820_raw_nr bootsym(e820nr)
+#define copy_bios_e820 bootsym(e820map_copy)
 
 #endif /*__E820_HEADER*/

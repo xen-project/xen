@@ -782,14 +782,17 @@ void __init noreturn __start_xen(unsigned long mbi_p)
     }
     else if ( efi_enabled(EFI_BOOT) )
         memmap_type = "EFI";
-    else if ( e820_raw_nr != 0 )
+    else if ( (e820_raw.nr_map = 
+                   copy_bios_e820(e820_raw.map,
+                                  ARRAY_SIZE(e820_raw.map))) != 0 )
     {
         memmap_type = "Xen-e820";
     }
     else if ( mbi->flags & MBI_MEMMAP )
     {
         memmap_type = "Multiboot-e820";
-        while ( (bytes < mbi->mmap_length) && (e820_raw_nr < E820MAX) )
+        while ( bytes < mbi->mmap_length &&
+                e820_raw.nr_map < ARRAY_SIZE(e820_raw.map) )
         {
             memory_map_t *map = __va(mbi->mmap_addr + bytes);
 
@@ -813,12 +816,12 @@ void __init noreturn __start_xen(unsigned long mbi_p)
                 map->length_high = 0;
             }
 
-            e820_raw[e820_raw_nr].addr = 
+            e820_raw.map[e820_raw.nr_map].addr =
                 ((u64)map->base_addr_high << 32) | (u64)map->base_addr_low;
-            e820_raw[e820_raw_nr].size = 
+            e820_raw.map[e820_raw.nr_map].size =
                 ((u64)map->length_high << 32) | (u64)map->length_low;
-            e820_raw[e820_raw_nr].type = map->type;
-            e820_raw_nr++;
+            e820_raw.map[e820_raw.nr_map].type = map->type;
+            e820_raw.nr_map++;
 
             bytes += map->size + 4;
         }
@@ -826,30 +829,30 @@ void __init noreturn __start_xen(unsigned long mbi_p)
     else if ( bootsym(lowmem_kb) )
     {
         memmap_type = "Xen-e801";
-        e820_raw[0].addr = 0;
-        e820_raw[0].size = bootsym(lowmem_kb) << 10;
-        e820_raw[0].type = E820_RAM;
-        e820_raw[1].addr = 0x100000;
-        e820_raw[1].size = bootsym(highmem_kb) << 10;
-        e820_raw[1].type = E820_RAM;
-        e820_raw_nr = 2;
+        e820_raw.map[0].addr = 0;
+        e820_raw.map[0].size = bootsym(lowmem_kb) << 10;
+        e820_raw.map[0].type = E820_RAM;
+        e820_raw.map[1].addr = 0x100000;
+        e820_raw.map[1].size = bootsym(highmem_kb) << 10;
+        e820_raw.map[1].type = E820_RAM;
+        e820_raw.nr_map = 2;
     }
     else if ( mbi->flags & MBI_MEMLIMITS )
     {
         memmap_type = "Multiboot-e801";
-        e820_raw[0].addr = 0;
-        e820_raw[0].size = mbi->mem_lower << 10;
-        e820_raw[0].type = E820_RAM;
-        e820_raw[1].addr = 0x100000;
-        e820_raw[1].size = mbi->mem_upper << 10;
-        e820_raw[1].type = E820_RAM;
-        e820_raw_nr = 2;
+        e820_raw.map[0].addr = 0;
+        e820_raw.map[0].size = mbi->mem_lower << 10;
+        e820_raw.map[0].type = E820_RAM;
+        e820_raw.map[1].addr = 0x100000;
+        e820_raw.map[1].size = mbi->mem_upper << 10;
+        e820_raw.map[1].type = E820_RAM;
+        e820_raw.nr_map = 2;
     }
     else
         panic("Bootloader provided no memory information.");
 
     /* Sanitise the raw E820 map to produce a final clean version. */
-    max_page = raw_max_page = init_e820(memmap_type, e820_raw, &e820_raw_nr);
+    max_page = raw_max_page = init_e820(memmap_type, &e820_raw);
 
     /* Create a temporary copy of the E820 map. */
     memcpy(&boot_e820, &e820, sizeof(e820));

@@ -156,8 +156,8 @@ static void __init efi_arch_process_memory_map(EFI_SYSTEM_TABLE *SystemTable,
     unsigned int i;
 
     /* Populate E820 table and check trampoline area availability. */
-    e = e820map - 1;
-    for ( e820nr = i = 0; i < map_size; i += desc_size )
+    e = e820_raw.map - 1;
+    for ( e820_raw.nr_map = i = 0; i < map_size; i += desc_size )
     {
         EFI_MEMORY_DESCRIPTOR *desc = map + i;
         u64 len = desc->NumberOfPages << EFI_PAGE_SHIFT;
@@ -194,10 +194,10 @@ static void __init efi_arch_process_memory_map(EFI_SYSTEM_TABLE *SystemTable,
             type = E820_NVS;
             break;
         }
-        if ( e820nr && type == e->type &&
+        if ( e820_raw.nr_map && type == e->type &&
              desc->PhysicalStart == e->addr + e->size )
             e->size += len;
-        else if ( !len || e820nr >= E820MAX )
+        else if ( !len || e820_raw.nr_map >= ARRAY_SIZE(e820_raw.map) )
             continue;
         else
         {
@@ -205,7 +205,7 @@ static void __init efi_arch_process_memory_map(EFI_SYSTEM_TABLE *SystemTable,
             e->addr = desc->PhysicalStart;
             e->size = len;
             e->type = type;
-            ++e820nr;
+            ++e820_raw.nr_map;
         }
     }
 
