@@ -383,7 +383,7 @@ let set_node store path node =
 let write store perm path value =
 	let node, existing = get_deepest_existing_node store path in
 	let owner = Node.get_owner node in
-	if existing then
+	if existing || (Perms.Connection.is_dom0 perm) then
 		(* Only check the string length limit *)
 		Quota.check store.quota (-1) (String.length value)
 	else
@@ -398,7 +398,7 @@ let mkdir store perm path =
 	let node, existing = get_deepest_existing_node store path in
 	let owner = Node.get_owner node in
 	(* It's upt to the mkdir logic to decide what to do with existing path *)
-	if not existing then Quota.check store.quota owner 0;
+	if not (existing || (Perms.Connection.is_dom0 perm)) then Quota.check store.quota owner 0;
 	store.root <- path_mkdir store perm path;
 	Quota.add_entry store.quota owner
 
@@ -416,7 +416,7 @@ let setperms store perm path nperms =
 	| Some node ->
 		let old_owner = Node.get_owner node in
 		let new_owner = Perms.Node.get_owner nperms in
-		if old_owner <> new_owner then Quota.check store.quota new_owner 0;
+		if not ((old_owner = new_owner) || (Perms.Connection.is_dom0 perm)) then Quota.check store.quota new_owner 0;
 		store.root <- path_setperms store perm path nperms;
 		Quota.del_entry store.quota old_owner;
 		Quota.add_entry store.quota new_owner
