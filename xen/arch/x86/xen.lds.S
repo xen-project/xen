@@ -335,3 +335,5 @@ ASSERT(IS_ALIGNED(__bss_end,        8), "__bss_end misaligned")
 
 ASSERT((trampoline_end - trampoline_start) < TRAMPOLINE_SPACE - MBI_SPACE_MIN,
     "not enough room for trampoline and mbi data")
+ASSERT((wakeup_stack - wakeup_stack_start) >= WAKEUP_STACK_MIN,
+    "wakeup stack too small")

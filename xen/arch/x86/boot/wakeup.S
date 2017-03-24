@@ -173,6 +173,5 @@ bogus_saved_magic:
         movw    $0x0e00 + 'S', 0xb8014
         jmp     bogus_saved_magic
 
-        .align  16
-        .fill   PAGE_SIZE,1,0
-wakeup_stack:
+/* Stack for wakeup: rest of first trampoline page. */
+ENTRY(wakeup_stack_start)
