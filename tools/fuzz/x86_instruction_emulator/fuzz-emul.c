@@ -402,7 +402,8 @@ enum {
     MSRI_STAR,
     MSRI_LSTAR,
     MSRI_CSTAR,
-    MSRI_SYSCALL_MASK
+    MSRI_SYSCALL_MASK,
+    MSRI_IA32_DEBUGCTLMSR,
 };
 
 static const unsigned int msr_index[MSR_INDEX_MAX] = {
@@ -413,7 +414,8 @@ static const unsigned int msr_index[MSR_INDEX_MAX] = {
     [MSRI_STAR]              = MSR_STAR,
     [MSRI_LSTAR]             = MSR_LSTAR,
     [MSRI_CSTAR]             = MSR_CSTAR,
-    [MSRI_SYSCALL_MASK]      = MSR_SYSCALL_MASK
+    [MSRI_SYSCALL_MASK]      = MSR_SYSCALL_MASK,
+    [MSRI_IA32_DEBUGCTLMSR]  = MSR_IA32_DEBUGCTLMSR,
 };
 
 static int fuzz_read_msr(
