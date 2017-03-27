@@ -146,8 +146,10 @@ let create0 doms =
 	dom
 
 let decr_conflict_credit doms dom =
+	dom.Domain.caused_conflicts <- Int64.add 1L dom.Domain.caused_conflicts;
 	let before = dom.Domain.conflict_credit in
 	let after = max (-1.0) (before -. 1.0) in
+	debug "decr_conflict_credit dom%d %F -> %F" (Domain.get_id dom) before after;
 	dom.Domain.conflict_credit <- after;
 	let newly_penalised =
 		before >= !Define.conflict_burst_limit
@@ -178,7 +180,9 @@ let decr_conflict_credit doms dom =
 let incr_conflict_credit_from_queue doms =
 	let process_queue q requeue_test =
 		let d = pop q in
+		let before = d.Domain.conflict_credit in (* just for debug-logging *)
 		d.Domain.conflict_credit <- min (d.Domain.conflict_credit +. 1.0) !Define.conflict_burst_limit;
+		debug "incr_conflict_credit_from_queue: dom%d: %F -> %F" (Domain.get_id d) before d.Domain.conflict_credit;
 		if requeue_test d.Domain.conflict_credit then (
 			push d q (* Make it queue up again for its next point of credit. *)
 		)
@@ -200,6 +204,7 @@ let incr_conflict_credit doms =
 			let before = dom.Domain.conflict_credit in
 			let after = min (before +. 1.0) !Define.conflict_burst_limit in
 			dom.Domain.conflict_credit <- after;
+			debug "incr_conflict_credit dom%d: %F -> %F" (Domain.get_id dom) before after;
 
 			if before <= 0.0 && after > 0.0
 			then doms.n_paused <- doms.n_paused - 1;

@@ -315,6 +315,7 @@ let transaction_replay c t doms cons =
 				Transaction.commit ~con replay_t
 			with
 			| Transaction_again -> (
+				Transaction.failed_commits := Int64.add !Transaction.failed_commits 1L;
 				let victim_domstr = Connection.get_domstr c in
 				debug "Apportioning blame for EAGAIN in txn %d, domain=%s" id victim_domstr;
 				let punish guilty_con =
@@ -336,7 +337,10 @@ let transaction_replay c t doms cons =
 					else false
 				) in
 				let guilty_cons = History.filter_connections ~ignore:c ~since:t.Transaction.start_count ~f:judge_and_sentence in
-				if Hashtbl.length guilty_cons = 0 then debug "Found no culprit for conflict in %s: must be self or not in history." con;
+				if Hashtbl.length guilty_cons = 0 then (
+					debug "Found no culprit for conflict in %s: must be self or not in history." con;
+					Transaction.failed_commits_no_culprit := Int64.add !Transaction.failed_commits_no_culprit 1L
+				);
 				false
 			)
 			| e ->
