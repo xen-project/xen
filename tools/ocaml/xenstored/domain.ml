@@ -34,6 +34,7 @@ type t =
 	mutable conflict_credit: float; (* Must be positive to perform writes; a commit
 	                                   that later causes conflict with another
 	                                   domain's transaction costs credit. *)
+	mutable caused_conflicts: int64;
 }
 
 let is_dom0 d = d.id = 0
@@ -93,4 +94,11 @@ let make id mfn remote_port interface eventchn = {
 	bad_client = false;
 	io_credit = 0;
 	conflict_credit = !Define.conflict_burst_limit;
+	caused_conflicts = 0L;
 }
+
+let log_and_reset_conflict_stats logfn dom =
+	if dom.caused_conflicts > 0L then (
+		logfn dom.id dom.caused_conflicts;
+		dom.caused_conflicts <- 0L
+	)
