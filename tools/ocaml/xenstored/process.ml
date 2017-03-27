@@ -281,12 +281,7 @@ let write_response_log ~ty ~tid ~con ~response =
 let record_commit ~con ~tid ~before ~after =
 	let inc r = r := Int64.add 1L !r in
 	let finish_count = inc Transaction.counter; !Transaction.counter in
-	(* This call would leak memory if historic activity is retained forever
-	   so can only be uncommented if history is guaranteed not to grow
-	   unboundedly.
 	History.push {History.con=con; tid=tid; before=before; after=after; finish_count=finish_count}
-	*)
-	()
 
 (* Replay a stored transaction against a fresh store, check the responses are
    all equivalent: if so, commit the transaction. Otherwise send the abort to
