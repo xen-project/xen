@@ -520,7 +520,7 @@ static int send_memory_live(struct xc_sr_context *ctx)
 static int colo_merge_secondary_dirty_bitmap(struct xc_sr_context *ctx)
 {
     xc_interface *xch = ctx->xch;
-    struct xc_sr_record rec;
+    struct xc_sr_record rec = { 0, 0, NULL };
     uint64_t *pfns = NULL;
     uint64_t pfn;
     unsigned count, i;
