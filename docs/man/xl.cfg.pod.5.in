@@ -516,6 +516,37 @@ value is optional if this is a guest domain.
 
 =back
 
+=item B<p9=[ "9PFS_SPEC_STRING", "9PFS_SPEC_STRING", ...]>
+
+Creates a Xen 9pfs connection to share a filesystem from backend to
+frontend.
+
+Each B<9PFS_SPEC_STRING> is a comma-separated list of C<KEY=VALUE>
+settings, from the following list:
+
+=over 4
+
+=item C<tag=STRING>
+
+9pfs tag to identify the filesystem share. The tag is needed on the
+guest side to mount it.
+
+=item C<security_model="none">
+
+Only "none" is supported today, which means that files are stored using
+the same credentials as they are created on the guest (no user ownership
+squash or remap).
+
+=item C<path=STRING>
+
+Filesystem path on the backend to export.
+
+=item C<backend=DOMAIN>
+
+Specify the backend domain name or id, defaults to dom0.
+
+=back
+
 =item B<vfb=[ "VFB_SPEC_STRING", "VFB_SPEC_STRING", ...]>
 
 Specifies the paravirtual framebuffer devices which should be supplied

@@ -1322,6 +1322,9 @@ static void domcreate_launch_dm(libxl__egc *egc, libxl__multidev *multidev,
         libxl__device_console_dispose(&console);
     }
 
+    for (i = 0; i < d_config->num_p9s; i++)
+        libxl__device_p9_add(gc, domid, &d_config->p9[i]);
+
     switch (d_config->c_info.type) {
     case LIBXL_DOMAIN_TYPE_HVM:
     {

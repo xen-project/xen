@@ -812,7 +812,7 @@ void parse_config_data(const char *config_source,
     long l, vcpus = 0;
     XLU_Config *config;
     XLU_ConfigList *cpus, *vbds, *nics, *pcis, *cvfbs, *cpuids, *vtpms,
-                   *usbctrls, *usbdevs;
+                   *usbctrls, *usbdevs, *p9devs;
     XLU_ConfigList *channels, *ioports, *irqs, *iomem, *viridian, *dtdevs;
     int num_ioports, num_irqs, num_iomem, num_cpus, num_viridian;
     int pci_power_mgmt = 0;
@@ -1344,6 +1344,59 @@ void parse_config_data(const char *config_source,
             parse_disk_config(&config, buf2, disk);
 
             free(buf2);
+        }
+    }
+
+    if (!xlu_cfg_get_list(config, "p9", &p9devs, 0, 0)) {
+        libxl_device_p9 *p9;
+        char *security_model = NULL;
+        char *path = NULL;
+        char *tag = NULL;
+        char *backend = NULL;
+        char *p, *p2, *buf2;
+
+        d_config->num_p9s = 0;
+        d_config->p9 = NULL;
+        while ((buf = xlu_cfg_get_listitem (p9devs, d_config->num_p9s)) != NULL) {
+            p9 = ARRAY_EXTEND_INIT(d_config->p9,
+                                   d_config->num_p9s,
+                                   libxl_device_p9_init);
+            libxl_device_p9_init(p9);
+
+            buf2 = strdup(buf);
+            p = strtok(buf2, ",");
+            if(p) {
+               do {
+                  while(*p == ' ')
+                     ++p;
+                  if ((p2 = strchr(p, '=')) == NULL)
+                     break;
+                  *p2 = '\0';
+                  if (!strcmp(p, "security_model")) {
+                     security_model = strdup(p2 + 1);
+                  } else if(!strcmp(p, "path")) {
+                     path = strdup(p2 + 1);
+                  } else if(!strcmp(p, "tag")) {
+                     tag = strdup(p2 + 1);
+                  } else if(!strcmp(p, "backend")) {
+                     backend = strdup(p2 + 1);
+                  } else {
+                     fprintf(stderr, "Unknown string `%s' in 9pfs spec\n", p);
+                     exit(1);
+                  }
+               } while ((p = strtok(NULL, ",")) != NULL);
+            }
+            if (!path || !security_model || !tag) {
+               fprintf(stderr, "9pfs spec missing required field!\n");
+               exit(1);
+            }
+            free(buf2);
+
+            replace_string(&p9->tag, tag);
+            replace_string(&p9->security_model, security_model);
+            replace_string(&p9->path, path);
+            if (backend)
+                    replace_string(&p9->backend_domname, backend);
         }
     }
 

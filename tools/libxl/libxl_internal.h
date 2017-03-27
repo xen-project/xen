@@ -1248,6 +1248,8 @@ _hidden int libxl__device_vkb_setdefault(libxl__gc *gc, libxl_device_vkb *vkb);
 _hidden int libxl__device_pci_setdefault(libxl__gc *gc, libxl_device_pci *pci);
 _hidden void libxl__rdm_setdefault(libxl__gc *gc,
                                    libxl_domain_build_info *b_info);
+_hidden int libxl__device_p9_setdefault(libxl__gc *gc,
+                                        libxl_device_p9 *p9);
 
 _hidden const char *libxl__device_nic_devname(libxl__gc *gc,
                                               uint32_t domid,
@@ -2661,6 +2663,10 @@ _hidden int libxl__device_vkb_add(libxl__gc *gc, uint32_t domid,
 /* Internal function to connect a vfb device */
 _hidden int libxl__device_vfb_add(libxl__gc *gc, uint32_t domid,
                                   libxl_device_vfb *vfb);
+
+/* Internal function to connect a 9pfs device */
+_hidden int libxl__device_p9_add(libxl__gc *gc, uint32_t domid,
+                                 libxl_device_p9 *p9);
 
 /* Waits for the passed device to reach state XenbusStateInitWait.
  * This is not really useful by itself, but is important when executing
