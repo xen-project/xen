@@ -90,6 +90,11 @@ type t = {
 let get_id t = match t.ty with No -> none | Full (id, _, _) -> id
 
 let counter = ref 0L
+let failed_commits = ref 0L
+let failed_commits_no_culprit = ref 0L
+let reset_conflict_stats () =
+	failed_commits := 0L;
+	failed_commits_no_culprit := 0L
 
 (* Scope for optimisation: different data-structure and functions to search/filter it *)
 let short_running_txns = ref []

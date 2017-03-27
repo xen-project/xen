@@ -376,6 +376,7 @@ let _ =
 	let last_scan_time = ref 0. in
 
 	let periodic_ops now =
+		debug "periodic_ops starting";
 		(* we garbage collect the string->int dictionary after a sizeable amount of operations,
 		 * there's no need to be really fast even if we got loose
 		 * objects since names are often reuse.
@@ -395,7 +396,11 @@ let _ =
 
 		(* make sure we don't print general stats faster than 2 min *)
 		if now > (!last_stat_time +. 120.) then (
+			info "Transaction conflict statistics for last %F seconds:" (now -. !last_stat_time);
 			last_stat_time := now;
+			Domains.iter domains (Domain.log_and_reset_conflict_stats (info "Dom%d caused %Ld conflicts"));
+			info "%Ld failed transactions; of these no culprit was found for %Ld" !Transaction.failed_commits !Transaction.failed_commits_no_culprit;
+			Transaction.reset_conflict_stats ();
 
 			let gc = Gc.stat () in
 			let (lanon, lanon_ops, lanon_watchs,
@@ -415,6 +420,7 @@ let _ =
 			     gc.Gc.free_words gc.Gc.free_blocks
 		);
 		let elapsed = Unix.gettimeofday () -. now in
+		debug "periodic_ops took %F seconds." elapsed;
 		delay_next_frequent_ops_by elapsed
 	in
 
