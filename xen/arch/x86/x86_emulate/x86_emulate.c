@@ -1604,6 +1604,7 @@ static bool vcpu_has(
 #define vcpu_has_clwb()        vcpu_has(         7, EBX, 24, ctxt, ops)
 #define vcpu_has_sha()         vcpu_has(         7, EBX, 29, ctxt, ops)
 #define vcpu_has_rdpid()       vcpu_has(         7, ECX, 22, ctxt, ops)
+#define vcpu_has_clzero()      vcpu_has(0x80000008, EBX,  0, ctxt, ops)
 
 #define vcpu_must_have(feat) \
     generate_exception_if(!vcpu_has_##feat(), EXC_UD)
@@ -5182,6 +5183,8 @@ x86_emulate(
         case 0xfc: /* clzero */
         {
             unsigned long zero = 0;
+
+            vcpu_must_have(clzero);
 
             base = ad_bytes == 8 ? _regs.r(ax) :
                    ad_bytes == 4 ? _regs.eax : _regs.ax;
