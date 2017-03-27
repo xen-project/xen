@@ -870,11 +870,6 @@ int __init dom0_construct_pv(struct domain *d,
     regs->rsi = vstartinfo_start;
     regs->eflags = X86_EFLAGS_IF;
 
-#ifdef CONFIG_SHADOW_PAGING
-    if ( opt_dom0_shadow && paging_enable(d, PG_SH_enable) == 0 )
-        paging_update_paging_modes(v);
-#endif
-
     if ( test_bit(XENFEAT_supervisor_mode_kernel, parms.f_required) )
         panic("Dom0 requires supervisor-mode execution");
 

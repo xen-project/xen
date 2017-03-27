@@ -174,7 +174,6 @@ struct vcpu *__init alloc_dom0_vcpu0(struct domain *dom0)
 
 #ifdef CONFIG_SHADOW_PAGING
 bool __initdata opt_dom0_shadow;
-boolean_param("dom0_shadow", opt_dom0_shadow);
 #endif
 bool __initdata dom0_pvh;
 
@@ -252,8 +251,8 @@ unsigned long __init dom0_compute_nr_pages(
             avail -= max_pdx >> s;
     }
 
-    need_paging = is_hvm_domain(d) ? !iommu_hap_pt_share || !paging_mode_hap(d)
-                                   : opt_dom0_shadow;
+    need_paging = is_hvm_domain(d) &&
+        (!iommu_hap_pt_share || !paging_mode_hap(d));
     for ( ; ; need_paging = 0 )
     {
         nr_pages = dom0_nrpages;
@@ -455,6 +454,14 @@ int __init construct_dom0(struct domain *d, const module_t *image,
     BUG_ON(d->vcpu[0]->is_initialised);
 
     process_pending_softirqs();
+
+#ifdef CONFIG_SHADOW_PAGING
+    if ( opt_dom0_shadow && !dom0_pvh )
+    {
+        opt_dom0_shadow = false;
+        printk(XENLOG_WARNING "Shadow Dom0 requires PVH. Option ignored.\n");
+    }
+#endif
 
     return (is_hvm_domain(d) ? dom0_construct_pvh : dom0_construct_pv)
            (d, image, image_headroom, initrd,bootstrap_map, cmdline);

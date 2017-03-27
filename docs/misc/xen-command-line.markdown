@@ -652,11 +652,6 @@ restrictions set up here. Note that the values to be specified here are
 ACPI PXM ones, not Xen internal node numbers. `relaxed` sets up vCPU
 affinities to prefer but be not limited to the specified node(s).
 
-### dom0\_shadow
-> `= <boolean>`
-
-This option is deprecated, please use `dom0=shadow` instead.
-
 ### dom0\_vcpus\_pin
 > `= <boolean>`
 
@@ -679,7 +674,8 @@ Flag that makes a dom0 boot in PVHv2 mode.
 
 > Default: `false`
 
-Flag that makes a dom0 use shadow paging.
+Flag that makes a dom0 use shadow paging. Only works when "pvh" is
+enabled.
 
 ### dtuart (ARM)
 > `= path [:options]`
