@@ -2310,7 +2310,8 @@ x86_decode_twobyte(
     case 0x7f:
     case 0xc2 ... 0xc3:
     case 0xc5 ... 0xc6:
-    case 0xd0 ... 0xfe:
+    case 0xd0 ... 0xef:
+    case 0xf1 ... 0xfe:
         ctxt->opcode |= MASK_INSR(vex.pfx, X86EMUL_OPC_PFX_MASK);
         break;
 
@@ -2332,9 +2333,9 @@ x86_decode_twobyte(
         if ( vex.pfx == vex_f3 ) /* movq xmm/m64,xmm */
         {
     case X86EMUL_OPC_VEX_F3(0, 0x7e): /* vmovq xmm/m64,xmm */
-            state->desc = DstImplicit | SrcMem | Mov;
+            state->desc = DstImplicit | SrcMem | TwoOp;
             state->simd_size = simd_other;
-            /* Avoid the state->desc adjustment below. */
+            /* Avoid the state->desc clobbering of TwoOp below. */
             return X86EMUL_OKAY;
         }
         break;
@@ -2374,11 +2375,25 @@ x86_decode_twobyte(
     case X86EMUL_OPC_VEX_66(0, 0xc4): /* vpinsrw */
         state->desc = DstReg | SrcMem16;
         break;
+
+    case 0xf0:
+        ctxt->opcode |= MASK_INSR(vex.pfx, X86EMUL_OPC_PFX_MASK);
+        if ( vex.pfx == vex_f2 ) /* lddqu mem,xmm */
+        {
+        /* fall through */
+    case X86EMUL_OPC_VEX_F2(0, 0xf0): /* vlddqu mem,{x,y}mm */
+            state->desc = DstImplicit | SrcMem | TwoOp;
+            state->simd_size = simd_other;
+            /* Avoid the state->desc clobbering of TwoOp below. */
+            return X86EMUL_OKAY;
+        }
+        break;
     }
 
     /*
      * Scalar forms of most VEX-encoded TwoOp instructions have
-     * three operands.
+     * three operands.  Those which do really have two operands
+     * should have exited earlier.
      */
     if ( state->simd_size && vex.opcx &&
          (vex.pfx & VEX_PREFIX_SCALAR_MASK) )
