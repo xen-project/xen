@@ -280,6 +280,7 @@ let _ =
 	 * than the periodic_ops function *)
 	let frequent_ops () =
 		if Unix.gettimeofday () > !next_frequent_ops then (
+			History.trim ();
 			Domains.incr_conflict_credit domains;
 			advance_next_frequent_ops ()
 		) in
