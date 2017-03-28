@@ -14,6 +14,8 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU Lesser General Public License for more details.
  *)
+let error fmt = Logging.error "transaction" fmt
+
 open Stdext
 
 let none = 0
@@ -69,34 +71,69 @@ let can_coalesce oldroot currentroot path =
 	else
 		false
 
-type ty = No | Full of (int * Store.Node.t * Store.t)
+type ty = No | Full of (
+	int *          (* Transaction id *)
+	Store.t *      (* Original store *)
+	Store.t        (* A pointer to the canonical store: its root changes on each transaction-commit *)
+)
 
 type t = {
 	ty: ty;
-	store: Store.t;
+	start_count: int64;
+	store: Store.t; (* This is the store that we change in write operations. *)
 	quota: Quota.t;
 	mutable paths: (Xenbus.Xb.Op.operation * Store.Path.t) list;
 	mutable operations: (Packet.request * Packet.response) list;
 	mutable read_lowpath: Store.Path.t option;
 	mutable write_lowpath: Store.Path.t option;
 }
+let get_id t = match t.ty with No -> none | Full (id, _, _) -> id
 
-let make id store =
-	let ty = if id = none then No else Full(id, Store.get_root store, store) in
-	{
+let counter = ref 0L
+let failed_commits = ref 0L
+let failed_commits_no_culprit = ref 0L
+let reset_conflict_stats () =
+	failed_commits := 0L;
+	failed_commits_no_culprit := 0L
+
+(* Scope for optimisation: different data-structure and functions to search/filter it *)
+let short_running_txns = ref []
+
+let oldest_short_running_transaction () =
+	let rec last = function
+		| [] -> None
+		| [x] -> Some x
+		| x :: xs -> last xs
+	in last !short_running_txns
+
+let end_transaction txn =
+	let cutoff = Unix.gettimeofday () -. !Define.conflict_max_history_seconds in
+	short_running_txns := List.filter
+		(function (start_time, tx) -> start_time >= cutoff && tx != txn)
+		!short_running_txns
+
+let make ?(internal=false) id store =
+	let ty = if id = none then No else Full(id, Store.copy store, store) in
+	let txn = {
 		ty = ty;
+		start_count = !counter;
 		store = if id = none then store else Store.copy store;
 		quota = Quota.copy store.Store.quota;
 		paths = [];
 		operations = [];
 		read_lowpath = None;
 		write_lowpath = None;
-	}
+	} in
+	if id <> none && not internal then (
+		let now = Unix.gettimeofday () in
+		short_running_txns := (now, txn) :: !short_running_txns
+	);
+	txn
 
-let get_id t = match t.ty with No -> none | Full (id, _, _) -> id
 let get_store t = t.store
 let get_paths t = t.paths
 
+let is_read_only t = t.paths = []
 let add_wop t ty path = t.paths <- (ty, path) :: t.paths
 let add_operation ~perm t request response =
 	if !Define.maxrequests >= 0
@@ -155,7 +192,7 @@ let commit ~con t =
 	let has_commited =
 	match t.ty with
 	| No                         -> true
-	| Full (id, oldroot, cstore) ->
+	| Full (id, oldstore, cstore) ->       (* "cstore" meaning current canonical store *)
 		let commit_partial oldroot cstore store =
 			(* get the lowest path of the query and verify that it hasn't
 			   been modified by others transactions. *)
@@ -198,7 +235,7 @@ let commit ~con t =
 		if !test_eagain && Random.int 3 = 0 then
 			false
 		else
-			try_commit oldroot cstore t.store
+			try_commit (Store.get_root oldstore) cstore t.store
 		in
 	if has_commited && has_write_ops then
 		Disk.write t.store;

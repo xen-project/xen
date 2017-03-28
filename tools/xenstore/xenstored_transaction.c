@@ -139,6 +139,7 @@ static int destroy_transaction(void *_transaction)
 {
 	struct transaction *trans = _transaction;
 
+	wrl_ntransactions--;
 	trace_destroy(trans, "transaction");
 	if (trans->tdb)
 		tdb_close(trans->tdb);
@@ -201,6 +202,7 @@ int do_transaction_start(struct connection *conn, struct buffered_data *in)
 	talloc_steal(conn, trans);
 	talloc_set_destructor(trans, destroy_transaction);
 	conn->transaction_started++;
+	wrl_ntransactions++;
 
 	snprintf(id_str, sizeof(id_str), "%u", trans->id);
 	send_reply(conn, XS_TRANSACTION_START, id_str, strlen(id_str)+1);
@@ -232,6 +234,9 @@ int do_transaction_end(struct connection *conn, struct buffered_data *in)
 		/* FIXME: Merge, rather failing on any change. */
 		if (trans->generation != generation)
 			return EAGAIN;
+
+		wrl_apply_debit_trans_commit(conn);
+
 		if (!replace_tdb(trans->tdb_name, trans->tdb))
 			return errno;
 		/* Don't close this: we won! */

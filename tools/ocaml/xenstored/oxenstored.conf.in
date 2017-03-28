@@ -9,6 +9,38 @@ test-eagain = false
 # Activate transaction merge support
 merge-activate = true
 
+# Limits applied to domains whose writes cause other domains' transaction
+# commits to fail. Must include decimal point.
+
+# The burst limit is the number of conflicts a domain can cause to
+# fail in a short period; this value is used for both the initial and
+# the maximum value of each domain's conflict-credit, which falls by
+# one point for each conflict caused, and when it reaches zero the
+# domain's requests are ignored.
+conflict-burst-limit = 5.0
+
+# The conflict-credit is replenished over time:
+# one point is issued after each conflict-max-history-seconds, so this
+# is the minimum pause-time during which a domain will be ignored.
+conflict-max-history-seconds = 0.05
+
+# If the conflict-rate-limit-is-aggregate flag is true then after each
+# tick one point of conflict-credit is given to just one domain: the
+# one at the front of the queue. If false, then after each tick each
+# domain gets a point of conflict-credit.
+# 
+# In environments where it is known that every transaction will
+# involve a set of nodes that is writable by at most one other domain,
+# then it is safe to set this aggregate-limit flag to false for better
+# performance. (This can be determined by considering the layout of
+# the xenstore tree and permissions, together with the content of the
+# transactions that require protection.)
+# 
+# A transaction which involves a set of nodes which can be modified by
+# multiple other domains can suffer conflicts caused by any of those
+# domains, so the flag must be set to true.
+conflict-rate-limit-is-aggregate = true
+
 # Activate node permission system
 perms-activate = true
 

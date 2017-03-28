@@ -29,6 +29,10 @@ let maxwatch = ref (50)
 let maxtransaction = ref (20)
 let maxrequests = ref (-1)   (* maximum requests per transaction *)
 
+let conflict_burst_limit = ref 5.0
+let conflict_max_history_seconds = ref 0.05
+let conflict_rate_limit_is_aggregate = ref true
+
 let domid_self = 0x7FF0
 
 exception Not_a_directory of string

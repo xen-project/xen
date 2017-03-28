@@ -65,4 +65,31 @@ void domain_watch_inc(struct connection *conn);
 void domain_watch_dec(struct connection *conn);
 int domain_watch(struct connection *conn);
 
+/* Write rate limiting */
+
+#define WRL_FACTOR   1000 /* for fixed-point arithmetic */
+#define WRL_RATE      200
+#define WRL_DBURST     10
+#define WRL_GBURST   1000
+#define WRL_NEWDOMS     5
+#define WRL_LOGEVERY  120 /* seconds */
+
+struct wrl_timestampt {
+	time_t sec;
+	int msec;
+};
+
+extern long wrl_ntransactions;
+
+void wrl_gettime_now(struct wrl_timestampt *now_ts);
+void wrl_domain_new(struct domain *domain);
+void wrl_domain_destroy(struct domain *domain);
+void wrl_credit_update(struct domain *domain, struct wrl_timestampt now);
+void wrl_check_timeout(struct domain *domain,
+                       struct wrl_timestampt now,
+                       int *ptimeout);
+void wrl_log_periodic(struct wrl_timestampt now);
+void wrl_apply_debit_direct(struct connection *conn);
+void wrl_apply_debit_trans_commit(struct connection *conn);
+
 #endif /* _XENSTORED_DOMAIN_H */

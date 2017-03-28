@@ -336,6 +336,7 @@ static void initialize_fds(int sock, int *p_sock_pollfd_idx,
 			   int *ptimeout)
 {
 	struct connection *conn;
+	struct wrl_timestampt now;
 
 	if (fds)
 		memset(fds, 0, sizeof(struct pollfd) * current_array_size);
@@ -355,8 +356,12 @@ static void initialize_fds(int sock, int *p_sock_pollfd_idx,
 		xce_pollfd_idx = set_fd(xenevtchn_fd(xce_handle),
 					POLLIN|POLLPRI);
 
+	wrl_gettime_now(&now);
+	wrl_log_periodic(now);
+
 	list_for_each_entry(conn, &connections, list) {
 		if (conn->domain) {
+			wrl_check_timeout(conn->domain, now, ptimeout);
 			if (domain_can_read(conn) ||
 			    (domain_can_write(conn) &&
 			     !list_empty(&conn->out_list)))
@@ -450,6 +455,7 @@ static bool write_node(struct connection *conn, struct node *node)
 		goto error;
 
 	add_change_node(conn, node, false);
+	wrl_apply_debit_direct(conn);
 
 	data.dptr = talloc_size(node, data.dsize);
 	hdr = (void *)data.dptr;
@@ -907,8 +913,10 @@ static void delete_node_single(struct connection *conn, struct node *node,
 		return;
 	}
 
-	if (changed)
+	if (changed) {
 		add_change_node(conn, node, true);
+		wrl_apply_debit_direct(conn);
+	}
 
 	domain_entry_dec(conn, node);
 }

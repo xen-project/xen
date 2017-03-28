@@ -16,6 +16,7 @@
 
 let error fmt = Logging.error "process" fmt
 let info fmt = Logging.info "process" fmt
+let debug fmt = Logging.debug "process" fmt
 
 open Printf
 open Stdext
@@ -25,6 +26,7 @@ exception Transaction_nested
 exception Domain_not_match
 exception Invalid_Cmd_Args
 
+(* This controls the do_debug fn in this module, not the debug logging-function. *)
 let allow_debug = ref false
 
 let c_int_of_string s =
@@ -278,6 +280,11 @@ let write_response_log ~ty ~tid ~con ~response =
 	| Packet.Reply x -> write_answer_log ~ty ~tid ~con ~data:x
 	| Packet.Error e -> write_answer_log ~ty:(Xenbus.Xb.Op.Error) ~tid ~con ~data:e
 
+let record_commit ~con ~tid ~before ~after =
+	let inc r = r := Int64.add 1L !r in
+	let finish_count = inc Transaction.counter; !Transaction.counter in
+	History.push {History.con=con; tid=tid; before=before; after=after; finish_count=finish_count}
+
 (* Replay a stored transaction against a fresh store, check the responses are
    all equivalent: if so, commit the transaction. Otherwise send the abort to
    the client. *)
@@ -286,25 +293,57 @@ let transaction_replay c t doms cons =
 	| Transaction.No ->
 		error "attempted to replay a non-full transaction";
 		false
-	| Transaction.Full(id, oldroot, cstore) ->
+	| Transaction.Full(id, oldstore, cstore) ->
 		let tid = Connection.start_transaction c cstore in
-		let new_t = Transaction.make tid cstore in
+		let replay_t = Transaction.make ~internal:true tid cstore in
 		let con = sprintf "r(%d):%s" id (Connection.get_domstr c) in
-		let perform_exn (request, response) =
-			write_access_log ~ty:request.Packet.ty ~tid ~con ~data:request.Packet.data;
+
+		let perform_exn ~wlog txn (request, response) =
+			if wlog then write_access_log ~ty:request.Packet.ty ~tid ~con ~data:request.Packet.data;
 			let fct = function_of_type_simple_op request.Packet.ty in
-			let response' = input_handle_error ~cons ~doms ~fct ~con:c ~t:new_t ~req:request in
-			write_response_log ~ty:request.Packet.ty ~tid ~con ~response:response';
-			if not(Packet.response_equal response response') then raise Transaction_again in
+			let response' = input_handle_error ~cons ~doms ~fct ~con:c ~t:txn ~req:request in
+			if wlog then write_response_log ~ty:request.Packet.ty ~tid ~con ~response:response';
+			if not(Packet.response_equal response response') then raise Transaction_again
+		in
 		finally
 		(fun () ->
 			try
 				Logging.start_transaction ~con ~tid;
-				List.iter perform_exn (Transaction.get_operations t);
-				Logging.end_transaction ~con ~tid;
+				List.iter (perform_exn ~wlog:true replay_t) (Transaction.get_operations t); (* May throw EAGAIN *)
 
-				Transaction.commit ~con new_t
-			with e ->
+				Logging.end_transaction ~con ~tid;
+				Transaction.commit ~con replay_t
+			with
+			| Transaction_again -> (
+				Transaction.failed_commits := Int64.add !Transaction.failed_commits 1L;
+				let victim_domstr = Connection.get_domstr c in
+				debug "Apportioning blame for EAGAIN in txn %d, domain=%s" id victim_domstr;
+				let punish guilty_con =
+					debug "Blaming domain %s for conflict with domain %s txn %d"
+						(Connection.get_domstr guilty_con) victim_domstr id;
+					Connection.decr_conflict_credit doms guilty_con
+				in
+				let judge_and_sentence hist_rec = (
+					let can_apply_on store = (
+						let store = Store.copy store in
+						let trial_t = Transaction.make ~internal:true Transaction.none store in
+						try List.iter (perform_exn ~wlog:false trial_t) (Transaction.get_operations t);
+							true
+						with Transaction_again -> false
+					) in
+					if can_apply_on hist_rec.History.before
+					&& not (can_apply_on hist_rec.History.after)
+					then (punish hist_rec.History.con; true)
+					else false
+				) in
+				let guilty_cons = History.filter_connections ~ignore:c ~since:t.Transaction.start_count ~f:judge_and_sentence in
+				if Hashtbl.length guilty_cons = 0 then (
+					debug "Found no culprit for conflict in %s: must be self or not in history." con;
+					Transaction.failed_commits_no_culprit := Int64.add !Transaction.failed_commits_no_culprit 1L
+				);
+				false
+			)
+			| e ->
 				info "transaction_replay %d caught: %s" tid (Printexc.to_string e);
 				false
 			)
@@ -343,13 +382,20 @@ let do_transaction_end con t domains cons data =
 		| x :: _   -> raise (Invalid_argument x)
 		| _        -> raise Invalid_Cmd_Args
 		in
+	let commit = commit && not (Transaction.is_read_only t) in
 	let success =
 		let commit = if commit then Some (fun con trans -> transaction_replay con trans domains cons) else None in
-		Connection.end_transaction con (Transaction.get_id t) commit in
+		History.end_transaction t con (Transaction.get_id t) commit in
 	if not success then
 		raise Transaction_again;
-	if commit then
-		process_watch (List.rev (Transaction.get_paths t)) cons
+	if commit then begin
+		process_watch (List.rev (Transaction.get_paths t)) cons;
+		match t.Transaction.ty with
+		| Transaction.No ->
+			() (* no need to record anything *)
+		| Transaction.Full(id, oldstore, cstore) ->
+			record_commit ~con ~tid:id ~before:oldstore ~after:cstore
+	end
 
 let do_introduce con t domains cons data =
 	if not (Connection.is_dom0 con)
@@ -418,6 +464,36 @@ let function_of_type ty =
 	| _                              -> function_of_type_simple_op ty
 
 (**
+ * Determines which individual (non-transactional) operations we want to retain.
+ * We only want to retain operations that have side-effects in the store since
+ * these can be the cause of transactions failing.
+ *)
+let retain_op_in_history ty =
+	match ty with
+	| Xenbus.Xb.Op.Write
+	| Xenbus.Xb.Op.Mkdir
+	| Xenbus.Xb.Op.Rm
+	| Xenbus.Xb.Op.Setperms          -> true
+	| Xenbus.Xb.Op.Debug
+	| Xenbus.Xb.Op.Directory
+	| Xenbus.Xb.Op.Read
+	| Xenbus.Xb.Op.Getperms
+	| Xenbus.Xb.Op.Watch
+	| Xenbus.Xb.Op.Unwatch
+	| Xenbus.Xb.Op.Transaction_start
+	| Xenbus.Xb.Op.Transaction_end
+	| Xenbus.Xb.Op.Introduce
+	| Xenbus.Xb.Op.Release
+	| Xenbus.Xb.Op.Getdomainpath
+	| Xenbus.Xb.Op.Watchevent
+	| Xenbus.Xb.Op.Error
+	| Xenbus.Xb.Op.Isintroduced
+	| Xenbus.Xb.Op.Resume
+	| Xenbus.Xb.Op.Set_target
+	| Xenbus.Xb.Op.Reset_watches
+	| Xenbus.Xb.Op.Invalid           -> false
+
+(**
  * Nothrow guarantee.
  *)
 let process_packet ~store ~cons ~doms ~con ~req =
@@ -432,7 +508,19 @@ let process_packet ~store ~cons ~doms ~con ~req =
 			else
 				Connection.get_transaction con tid
 			in
-		let response = input_handle_error ~cons ~doms ~fct ~con ~t ~req in
+
+		let execute () = input_handle_error ~cons ~doms ~fct ~con ~t ~req in
+
+		let response =
+			(* Note that transactions are recorded in history separately. *)
+			if tid = Transaction.none && retain_op_in_history ty then begin
+				let before = Store.copy store in
+				let response = execute () in
+				let after = Store.copy store in
+				record_commit ~con ~tid ~before ~after;
+				response
+			end else execute ()
+		in
 
 		let response = try
 			if tid <> Transaction.none then
