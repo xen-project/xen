@@ -433,7 +433,7 @@ static struct node *read_node(struct connection *conn, const void *ctx,
 	return node;
 }
 
-static int xs_write_node(struct connection *conn, struct node *node)
+static int write_node(struct connection *conn, struct node *node)
 {
 	/*
 	 * conn will be null when this is called from manual_node.
@@ -1022,7 +1022,7 @@ static struct node *create_node(struct connection *conn, const void *ctx,
 	/* We write out the nodes down, setting destructor in case
 	 * something goes wrong. */
 	for (i = node; i; i = i->parent) {
-		if (xs_write_node(conn, i)) {
+		if (write_node(conn, i)) {
 			domain_entry_dec(conn, i);
 			return NULL;
 		}
@@ -1062,7 +1062,7 @@ static int do_write(struct connection *conn, struct buffered_data *in)
 	} else {
 		node->data = in->buffer + offset;
 		node->datalen = datalen;
-		if (xs_write_node(conn, node))
+		if (write_node(conn, node))
 			return errno;
 	}
 
@@ -1133,24 +1133,24 @@ static void memdel(void *mem, unsigned off, unsigned len, unsigned total)
 }
 
 
-static int xs_remove_child_entry(struct connection *conn, struct node *node,
+static int remove_child_entry(struct connection *conn, struct node *node,
 			      size_t offset)
 {
 	size_t childlen = strlen(node->children + offset);
 	memdel(node->children, offset, childlen + 1, node->childlen);
 	node->childlen -= childlen + 1;
-	return xs_write_node(conn, node);
+	return write_node(conn, node);
 }
 
 
-static int xs_delete_child(struct connection *conn,
+static int delete_child(struct connection *conn,
 			struct node *node, const char *childname)
 {
 	unsigned int i;
 
 	for (i = 0; i < node->childlen; i += strlen(node->children+i) + 1) {
 		if (streq(node->children+i, childname)) {
-			return xs_remove_child_entry(conn, node, i);
+			return remove_child_entry(conn, node, i);
 		}
 	}
 	corrupt(conn, "Can't find child '%s' in %s", childname, node->name);
@@ -1174,7 +1174,7 @@ static int _rm(struct connection *conn, const void *ctx, struct node *node,
 	if (!parent)
 		return (errno == ENOMEM) ? ENOMEM : EINVAL;
 
-	if (xs_delete_child(conn, parent, basename(name)))
+	if (delete_child(conn, parent, basename(name)))
 		return EINVAL;
 
 	delete_node(conn, node, true);
@@ -1278,7 +1278,7 @@ static int do_set_perms(struct connection *conn, struct buffered_data *in)
 	node->num_perms = num;
 	domain_entry_inc(conn, node);
 
-	if (xs_write_node(conn, node))
+	if (write_node(conn, node))
 		return errno;
 
 	fire_watches(conn, in, name, false);
@@ -1538,7 +1538,7 @@ static void manual_node(const char *name, const char *child)
 	if (child)
 		node->childlen = strlen(child) + 1;
 
-	if (xs_write_node(NULL, node))
+	if (write_node(NULL, node))
 		barf_perror("Could not create initial node %s", name);
 	talloc_free(node);
 }
@@ -1677,7 +1677,7 @@ static int check_store_(const char *name, struct hashtable *reachable)
 					    childname);
 
 					if (recovery) {
-						xs_remove_child_entry(NULL, node,
+						remove_child_entry(NULL, node,
 								   i);
 						i -= childlen + 1;
 					}
@@ -1699,7 +1699,7 @@ static int check_store_(const char *name, struct hashtable *reachable)
 				    childname);
 
 				if (recovery) {
-					xs_remove_child_entry(NULL, node, i);
+					remove_child_entry(NULL, node, i);
 					i -= childlen + 1;
 				}
 			} else {
