@@ -106,10 +106,14 @@ let oldest_short_running_transaction () =
 		| x :: xs -> last xs
 	in last !short_running_txns
 
-let end_transaction txn =
+let trim_short_running_transactions txn =
 	let cutoff = Unix.gettimeofday () -. !Define.conflict_max_history_seconds in
+	let keep = match txn with
+		| None -> (function (start_time, _) -> start_time >= cutoff)
+		| Some t -> (function (start_time, tx) -> start_time >= cutoff && tx != t)
+	in
 	short_running_txns := List.filter
-		(function (start_time, tx) -> start_time >= cutoff && tx != txn)
+		keep
 		!short_running_txns
 
 let make ?(internal=false) id store =

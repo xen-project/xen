@@ -39,7 +39,8 @@ let mark_symbols () =
 (* Keep only enough commit-history to protect the running transactions that we are still tracking *)
 (* There is scope for optimisation here, replacing List.filter with something more efficient,
  * probably on a different list-like structure. *)
-let trim () =
+let trim ?txn () =
+	Transaction.trim_short_running_transactions txn;
 	history := match Transaction.oldest_short_running_transaction () with
 	| None -> [] (* We have no open transaction, so no history is needed *)
 	| Some (_, txn) -> (
@@ -49,8 +50,7 @@ let trim () =
 
 let end_transaction txn con tid commit =
 	let success = Connection.end_transaction con tid commit in
-	Transaction.end_transaction txn;
-	trim ();
+	trim ~txn ();
 	success
 
 let push (x: history_record) =
