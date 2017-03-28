@@ -508,6 +508,7 @@ libxl_domain_build_info = Struct("domain_build_info",[
                                        ("acpi",             libxl_defbool),
                                        ("acpi_s3",          libxl_defbool),
                                        ("acpi_s4",          libxl_defbool),
+                                       ("acpi_laptop_slate",libxl_defbool),
                                        ("nx",               libxl_defbool),
                                        ("viridian",         libxl_defbool),
                                        ("viridian_enable",  libxl_bitmap),

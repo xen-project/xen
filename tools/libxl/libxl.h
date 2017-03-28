@@ -294,6 +294,12 @@
 #define LIBXL_HAVE_VIRIDIAN_CRASH_CTL 1
 
 /*
+ * LIBXL_HAVE_BUILDINFO_HVM_ACPI_LAPTOP_SLATE indicates that
+ * libxl_domain_build_info has the u.hvm.acpi_laptop_slate field.
+ */
+#define LIBXL_HAVE_BUILDINFO_HVM_ACPI_LAPTOP_SLATE 1
+
+/*
  * libxl ABI compatibility
  *
  * The only guarantee which libxl makes regarding ABI compatibility

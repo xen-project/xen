@@ -313,6 +313,7 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
         libxl_defbool_setdefault(&b_info->u.hvm.acpi,               true);
         libxl_defbool_setdefault(&b_info->u.hvm.acpi_s3,            true);
         libxl_defbool_setdefault(&b_info->u.hvm.acpi_s4,            true);
+        libxl_defbool_setdefault(&b_info->u.hvm.acpi_laptop_slate,  false);
         libxl_defbool_setdefault(&b_info->u.hvm.nx,                 true);
         libxl_defbool_setdefault(&b_info->u.hvm.viridian,           false);
         libxl_defbool_setdefault(&b_info->u.hvm.hpet,               true);
@@ -458,6 +459,8 @@ int libxl__domain_build(libxl__gc *gc,
         localents[i++] = libxl_defbool_val(info->u.hvm.acpi_s3) ? "1" : "0";
         localents[i++] = "platform/acpi_s4";
         localents[i++] = libxl_defbool_val(info->u.hvm.acpi_s4) ? "1" : "0";
+        localents[i++] = "platform/acpi_laptop_slate";
+        localents[i++] = libxl_defbool_val(info->u.hvm.acpi_laptop_slate) ? "1" : "0";
         if (info->u.hvm.mmio_hole_memkb) {
             uint64_t max_ram_below_4g =
                 (1ULL << 32) - (info->u.hvm.mmio_hole_memkb << 10);

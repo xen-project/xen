@@ -1256,6 +1256,11 @@ ACPI table. True (1) by default.
 Include S4 (suspend-to-disk) power state in the virtual firmware ACPI
 table. True (1) by default.
 
+=item B<acpi_laptop_slate=BOOLEAN>
+
+Include the Windows laptop/slate mode switch device in the virtual
+firmware ACPI table. False (0) by default.
+
 =item B<apic=BOOLEAN>
 
 Include information regarding APIC (Advanced Programmable Interrupt

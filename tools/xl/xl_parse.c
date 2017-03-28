@@ -1065,6 +1065,7 @@ void parse_config_data(const char *config_source,
         xlu_cfg_get_defbool(config, "apic", &b_info->u.hvm.apic, 0);
         xlu_cfg_get_defbool(config, "acpi_s3", &b_info->u.hvm.acpi_s3, 0);
         xlu_cfg_get_defbool(config, "acpi_s4", &b_info->u.hvm.acpi_s4, 0);
+        xlu_cfg_get_defbool(config, "acpi_laptop_slate", &b_info->u.hvm.acpi_laptop_slate, 0);
         xlu_cfg_get_defbool(config, "nx", &b_info->u.hvm.nx, 0);
         xlu_cfg_get_defbool(config, "hpet", &b_info->u.hvm.hpet, 0);
         xlu_cfg_get_defbool(config, "vpt_align", &b_info->u.hvm.vpt_align, 0);
