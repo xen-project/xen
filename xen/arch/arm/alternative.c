@@ -155,7 +155,7 @@ static int __apply_alternatives_multi_stop(void *unused)
         int ret;
         struct alt_region region;
         mfn_t xen_mfn = _mfn(virt_to_mfn(_start));
-        unsigned int xen_size = _end - _start;
+        paddr_t xen_size = _end - _start;
         unsigned int xen_order = get_order_from_bytes(xen_size);
         void *xenmap;
         struct virtual_region patch_region = {
