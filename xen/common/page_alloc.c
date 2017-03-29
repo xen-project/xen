@@ -574,7 +574,7 @@ static unsigned long init_node_heap(int node, unsigned long mfn,
 
     for ( i = 0; i < NR_ZONES; i++ )
         for ( j = 0; j <= MAX_ORDER; j++ )
-            INIT_PAGE_LIST_HEAD(&(*_heap[node])[i][j]);
+            INIT_PAGE_LIST_HEAD(&heap(node, i, j));
 
     return needed;
 }
