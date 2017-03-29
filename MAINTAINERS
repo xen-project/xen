@@ -434,6 +434,7 @@ F:	xen/arch/x86/
 F:	xen/include/asm-x86/
 F:	tools/firmware/hvmloader/
 F:	tools/tests/x86_emulator/
+F:	tools/fuzz/x86_instruction_emulator/
 
 X86 I/O EMULATION
 M:	Paul Durrant <paul.durrant@citrix.com>
