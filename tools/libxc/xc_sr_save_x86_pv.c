@@ -609,6 +609,10 @@ static int write_one_vcpu_extended(struct xc_sr_context *ctx, uint32_t id)
         return -1;
     }
 
+    /* No content? Skip the record. */
+    if ( domctl.u.ext_vcpucontext.size == 0 )
+        return 0;
+
     return write_split_record(ctx, &rec, &domctl.u.ext_vcpucontext,
                               domctl.u.ext_vcpucontext.size);
 }
@@ -663,6 +667,10 @@ static int write_one_vcpu_xsave(struct xc_sr_context *ctx, uint32_t id)
         PERROR("Unable to get vcpu%u's xsave context", id);
         goto err;
     }
+
+    /* No xsave state? Skip this record. */
+    if ( domctl.u.vcpuextstate.size == 0 )
+        goto out;
 
     rc = write_split_record(ctx, &rec, buffer, domctl.u.vcpuextstate.size);
     if ( rc )
@@ -729,6 +737,10 @@ static int write_one_vcpu_msrs(struct xc_sr_context *ctx, uint32_t id)
         PERROR("Unable to get vcpu%u's msrs", id);
         goto err;
     }
+
+    /* No MSRs? Skip this record. */
+    if ( domctl.u.vcpu_msrs.msr_count == 0 )
+        goto out;
 
     rc = write_split_record(ctx, &rec, buffer,
                             domctl.u.vcpu_msrs.msr_count *

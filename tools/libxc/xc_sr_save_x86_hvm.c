@@ -112,6 +112,10 @@ static int write_hvm_params(struct xc_sr_context *ctx)
         }
     }
 
+    /* No params? Skip this record. */
+    if ( hdr.count == 0 )
+        return 0;
+
     rc = write_split_record(ctx, &rec, entries, hdr.count * sizeof(*entries));
     if ( rc )
         PERROR("Failed to write HVM_PARAMS record");
