@@ -312,6 +312,10 @@ class VerifyLibxc(VerifyBase):
     def verify_record_x86_pv_p2m_frames(self, content):
         """ x86 PV p2m frames record """
 
+        if len(content) < 8:
+            raise RecordError("x86_pv_p2m_frames: record length must be at"
+                              " least 8 bytes long")
+
         if len(content) % 8 != 0:
             raise RecordError("Length expected to be a multiple of 8, not %d"
                               % (len(content), ))
@@ -324,9 +328,13 @@ class VerifyLibxc(VerifyBase):
         """ Generic for all REC_TYPE_x86_pv_vcpu_{basic,extended,xsave,msrs} """
         minsz = calcsize(X86_PV_VCPU_HDR_FORMAT)
 
-        if len(content) <= minsz:
+        if len(content) < minsz:
             raise RecordError("X86_PV_VCPU_%s record length must be at least %d"
                               " bytes long" % (name, minsz))
+
+        if len(content) == minsz:
+            self.info("Warning: X86_PV_VCPU_%s record with zero content"
+                      % (name, ))
 
         vcpuid, res1 = unpack(X86_PV_VCPU_HDR_FORMAT, content[:minsz])
 
@@ -384,6 +392,9 @@ class VerifyLibxc(VerifyBase):
 
         if rsvd != 0:
             raise RecordError("Reserved field not zero (0x%04x)" % (rsvd, ))
+
+        if count == 0:
+            self.info("Warning: HVM_PARAMS record with zero content")
 
         sz += count * calcsize(HVM_PARAMS_ENTRY_FORMAT)
 
