@@ -203,12 +203,12 @@ The default mode (tsc_mode==0) checks TSC-safeness of the underlying
 hardware on which the virtual machine is launched.  If it is
 TSC-safe, rdtsc will execute at hardware speed; if it is not, rdtsc
 will be emulated.  Once a virtual machine is save/restored or migrated,
-however, there are two possibilities:  For a paravirtualized (PV) domain,
-TSC will always be emulated.  For a fully-virtualized (HVM) domain,
-TSC remains native IF the source physical machine and target physical machine
-have the same TSC frequency; else TSC is emulated.  Note that, though
-emulated, the "apparent" TSC frequency will be the TSC frequency
-of the initial physical machine, even after migration.
+however, there are two possibilities: TSC remains native IF the source
+physical machine and target physical machine have the same TSC frequency
+(or, for HVM/PVH guests, if TSC scaling support is available); else TSC
+is emulated.  Note that, though emulated, the "apparent" TSC frequency
+will be the TSC frequency of the initial physical machine, even after
+migration.
 
 For environments where both TSC-safeness AND highest performance
 even across migration is a requirement, application code can be specially
