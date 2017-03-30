@@ -3,7 +3,7 @@
   Andrew Cooper <<andrew.cooper3@citrix.com>>
   Wen Congyang <<wency@cn.fujitsu.com>>
   Yang Hongyang <<hongyang.yang@easystack.cn>>
-% Revision 1
+% Revision 2
 
 Introduction
 ============
@@ -631,6 +631,11 @@ The set of valid records depends on the guest architecture and type.  No
 assumptions should be made about the ordering or interleaving of
 independent records.  Record dependencies are noted below.
 
+Some records are used for signalling, and explicitly have zero length.  All
+other records contain data relevant to the migration.  Data records with no
+content should be elided on the source side, as their presence serves no
+purpose, but results in extra work for the restore side.
+
 x86 PV Guest
 ------------
 
@@ -719,3 +724,12 @@ restored.
 The image header may only be extended by _appending_ additional
 fields.  In particular, the `marker`, `id` and `version` fields must
 never change size or location.
+
+
+Errata
+======
+
+1. For compatibility with older code, the receving side of a stream should
+   tolerate and ignore variable sized records with zero content.  Xen releases
+   between 4.6 and 4.8 could end up generating valid HVM\_PARAMS or
+   X86\_PV\_VCPU\_{EXTENDED,XSAVE,MSRS} records with zero-length content.
