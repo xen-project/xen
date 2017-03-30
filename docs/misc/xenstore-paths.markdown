@@ -218,6 +218,8 @@ Various boolean platform properties.
 * acpi -- is ACPI enabled for this domain
 * acpi_s3 -- is ACPI S3 support enabled for this domain
 * acpi_s4 -- is ACPI S4 support enabled for this domain
+* acpi_laptop_slate -- is the ACPI laptop/slate device present in
+                       this domain
 
 #### ~/platform/generation-id = INTEGER ":" INTEGER [HVM,INTERNAL]
 
