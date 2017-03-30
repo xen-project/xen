@@ -39,11 +39,30 @@ static int handle_hvm_params(struct xc_sr_context *ctx,
     unsigned int i;
     int rc;
 
-    if ( rec->length < sizeof(*hdr)
-         || rec->length < sizeof(*hdr) + hdr->count * sizeof(*entry) )
+    if ( rec->length < sizeof(*hdr) )
     {
-        ERROR("hvm_params record is too short");
+        ERROR("HVM_PARAMS record truncated: length %u, header size %zu",
+              rec->length, sizeof(*hdr));
         return -1;
+    }
+
+    if ( rec->length != (sizeof(*hdr) + hdr->count * sizeof(*entry)) )
+    {
+        ERROR("HVM_PARAMS record truncated: header %zu, count %u, "
+              "expected len %zu, got %u",
+              sizeof(*hdr), hdr->count, hdr->count * sizeof(*entry),
+              rec->length);
+        return -1;
+    }
+
+    /*
+     * Tolerate empty records.  Older sending sides used to accidentally
+     * generate them.
+     */
+    if ( hdr->count == 0 )
+    {
+        DBGPRINTF("Skipping empty HVM_PARAMS record\n");
+        return 0;
     }
 
     for ( i = 0; i < hdr->count; i++, entry++ )
