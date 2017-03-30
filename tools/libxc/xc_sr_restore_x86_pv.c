@@ -753,14 +753,25 @@ static int handle_x86_pv_vcpu_blob(struct xc_sr_context *ctx,
     }
 
     /* Confirm that there is a complete header. */
-    if ( rec->length <= sizeof(*vhdr) )
+    if ( rec->length < sizeof(*vhdr) )
     {
-        ERROR("%s record truncated: length %u, min %zu",
-              rec_name, rec->length, sizeof(*vhdr) + 1);
+        ERROR("%s record truncated: length %u, header size %zu",
+              rec_name, rec->length, sizeof(*vhdr));
         goto out;
     }
 
     blobsz = rec->length - sizeof(*vhdr);
+
+    /*
+     * Tolerate empty records.  Older sending sides used to accidentally
+     * generate them.
+     */
+    if ( blobsz == 0 )
+    {
+        DBGPRINTF("Skipping empty %s record for vcpu %u\n",
+                  rec_type_to_str(rec->type), vhdr->vcpu_id);
+        goto out;
+    }
 
     /* Check that the vcpu id is within range. */
     if ( vhdr->vcpu_id >= ctx->x86_pv.restore.nr_vcpus )
