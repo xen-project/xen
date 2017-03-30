@@ -435,6 +435,21 @@ XS_RESET_WATCHES xenstore message. See
 [xen/include/public/io/xs\_wire.h][XSWIRE] for the XenStore wire
 protocol definition.
 
+#### ~/control/laptop-slate-mode = (""|"laptop"|"slate") [w]
+
+This is the PV laptop/slate mode control node. If the toolstack has
+provisioned a guest with the ACPI laptop/slate mode device then it
+can write the desired mode here to cause the guest to switch modes if
+necessary. The guest acknowledges a request by writing the empty
+string back to the control node.
+
+#### ~/control/feature-laptop-slate-mode = (""|"0"|"1") [w]
+
+This may be initialized to "" by the toolstack and may then be set
+to 0 or 1 by a guest to indicate whether it is capable or incapable,
+respectively, of responding to a mode value written to
+~/control/laptop-slate-mode.
+
 ### Domain Controlled Paths
 
 #### ~/data/* [w]
