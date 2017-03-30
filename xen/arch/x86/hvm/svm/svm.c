@@ -1183,6 +1183,121 @@ static void svm_vcpu_destroy(struct vcpu *v)
     passive_domain_destroy(v);
 }
 
+/*
+ * Emulate enough of interrupt injection to cover the DPL check (omitted by
+ * hardware), and to work out whether it is safe to move %rip fowards for
+ * architectural trap vs fault semantics in the exception frame (which
+ * hardware won't cope with).
+ *
+ * The event parameter will be modified to a fault if necessary.
+ */
+static void svm_emul_swint_injection(struct x86_event *event)
+{
+    struct vcpu *curr = current;
+    const struct vmcb_struct *vmcb = curr->arch.hvm_svm.vmcb;
+    const struct cpu_user_regs *regs = guest_cpu_user_regs();
+    unsigned int trap = event->vector, type = event->type;
+    unsigned int fault = TRAP_gp_fault, ec = 0;
+    pagefault_info_t pfinfo;
+    struct segment_register cs, idtr;
+    unsigned int idte_size, idte_offset;
+    unsigned long idte_linear_addr;
+    struct { uint32_t a, b, c, d; } idte = {};
+    bool lm = vmcb_get_efer(vmcb) & EFER_LMA;
+    int rc;
+
+    if ( !(vmcb_get_cr0(vmcb) & X86_CR0_PE) )
+        goto raise_exception; /* TODO: support real-mode injection? */
+
+    idte_size   = lm ? 16 : 8;
+    idte_offset = trap * idte_size;
+
+    /* ICEBP sets the External Event bit despite being an instruction. */
+    ec = (trap << 3) | X86_XEC_IDT |
+        (type == X86_EVENTTYPE_PRI_SW_EXCEPTION ? X86_XEC_EXT : 0);
+
+    /*
+     * TODO: This does not cover the v8086 mode with CR4.VME case
+     * correctly, but falls on the safe side from the point of view of a
+     * 32bit OS.  Someone with many TUITs can see about reading the TSS
+     * Software Interrupt Redirection bitmap.
+     */
+    if ( (regs->eflags & X86_EFLAGS_VM) &&
+         MASK_EXTR(regs->eflags, X86_EFLAGS_IOPL) != 3 )
+        goto raise_exception;
+
+    /*
+     * Read all 8/16 bytes so the idtr limit check is applied properly to
+     * this entry, even though we don't look at all the words read.
+     */
+    hvm_get_segment_register(curr, x86_seg_cs, &cs);
+    hvm_get_segment_register(curr, x86_seg_idtr, &idtr);
+    if ( !hvm_virtual_to_linear_addr(x86_seg_idtr, &idtr, idte_offset,
+                                     idte_size, hvm_access_read,
+                                     &cs, &idte_linear_addr) )
+        goto raise_exception;
+
+    rc = hvm_copy_from_guest_linear(&idte, idte_linear_addr, idte_size,
+                                    PFEC_implicit, &pfinfo);
+    if ( rc )
+    {
+        if ( rc == HVMCOPY_bad_gva_to_gfn )
+        {
+            fault = TRAP_page_fault;
+            ec = pfinfo.ec;
+            event->cr2 = pfinfo.linear;
+        }
+
+        goto raise_exception;
+    }
+
+    /* This must be an interrupt, trap, or task gate. */
+    switch ( (idte.b >> 8) & 0x1f )
+    {
+    case SYS_DESC_irq_gate:
+    case SYS_DESC_trap_gate:
+        break;
+    case SYS_DESC_irq_gate16:
+    case SYS_DESC_trap_gate16:
+    case SYS_DESC_task_gate:
+        if ( !lm )
+            break;
+        /* fall through */
+    default:
+        goto raise_exception;
+    }
+
+    /* The 64-bit high half's type must be zero. */
+    if ( idte.d & 0x1f00 )
+        goto raise_exception;
+
+    /* ICEBP counts as a hardware event, and bypasses the dpl check. */
+    if ( type != X86_EVENTTYPE_PRI_SW_EXCEPTION &&
+         vmcb_get_cpl(vmcb) > ((idte.b >> 13) & 3) )
+        goto raise_exception;
+
+    /* Is this entry present? */
+    if ( !(idte.b & (1u << 15)) )
+    {
+        fault = TRAP_no_segment;
+        goto raise_exception;
+    }
+
+    /*
+     * Any further fault during injection will cause a double fault.  It
+     * is fine to leave this up to hardware, and software won't be in a
+     * position to care about the architectural correctness of %rip in the
+     * exception frame.
+     */
+    return;
+
+ raise_exception:
+    event->vector = fault;
+    event->type = X86_EVENTTYPE_HW_EXCEPTION;
+    event->insn_len = 0;
+    event->error_code = ec;
+}
+
 static void svm_inject_event(const struct x86_event *event)
 {
     struct vcpu *curr = current;
@@ -1190,6 +1305,24 @@ static void svm_inject_event(const struct x86_event *event)
     eventinj_t eventinj = vmcb->eventinj;
     struct x86_event _event = *event;
     struct cpu_user_regs *regs = guest_cpu_user_regs();
+
+    /*
+     * For hardware lacking NRips support, and always for ICEBP instructions,
+     * the processor requires extra help to deliver software events.
+     *
+     * Xen must emulate enough of the event injection to be sure that a
+     * further fault shouldn't occur during delivery.  This covers the fact
+     * that hardware doesn't perform DPL checking on injection.
+     *
+     * Also, it accounts for proper positioning of %rip for an event with trap
+     * semantics (where %rip should point after the instruction) which suffers
+     * a fault during injection (at which point %rip should point at the
+     * instruction).
+     */
+    if ( event->type == X86_EVENTTYPE_PRI_SW_EXCEPTION ||
+         (!cpu_has_svm_nrips && (event->type == X86_EVENTTYPE_SW_INTERRUPT ||
+                                 event->type == X86_EVENTTYPE_SW_EXCEPTION)) )
+        svm_emul_swint_injection(&_event);
 
     switch ( _event.vector )
     {
