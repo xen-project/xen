@@ -72,6 +72,9 @@ static int construct_vmcb(struct vcpu *v)
     struct arch_svm_struct *arch_svm = &v->arch.hvm_svm;
     struct vmcb_struct *vmcb = arch_svm->vmcb;
 
+    /* Build-time check of the size of VMCB AMD structure. */
+    BUILD_BUG_ON(sizeof(*vmcb) != PAGE_SIZE);
+
     vmcb->_general1_intercepts = 
         GENERAL1_INTERCEPT_INTR        | GENERAL1_INTERCEPT_NMI         |
         GENERAL1_INTERCEPT_SMI         | GENERAL1_INTERCEPT_INIT        |
