@@ -536,8 +536,7 @@ enum {
     HOOK_put_fpu,
     HOOK_invlpg,
     HOOK_vmfunc,
-    OPTION_swint_emulation, /* Two bits */
-    CANONICALIZE_rip = OPTION_swint_emulation + 2,
+    CANONICALIZE_rip,
     CANONICALIZE_rsp,
     CANONICALIZE_rbp
 };
@@ -575,19 +574,6 @@ static void disable_hooks(void)
     MAYBE_DISABLE_HOOK(cpuid);
     MAYBE_DISABLE_HOOK(get_fpu);
     MAYBE_DISABLE_HOOK(invlpg);
-}
-
-static void set_swint_support(struct x86_emulate_ctxt *ctxt)
-{
-    unsigned int swint_opt = (input.options >> OPTION_swint_emulation) & 3;
-    static const enum x86_swint_emulation map[4] = {
-        x86_swint_emulate_none,
-        x86_swint_emulate_none,
-        x86_swint_emulate_icebp,
-        x86_swint_emulate_all
-    };
-
-    ctxt->swint_emulate = map[swint_opt];
 }
 
 /*
@@ -692,8 +678,6 @@ int LLVMFuzzerTestOneInput(const uint8_t *data_p, size_t size)
     sanitize_input(&ctxt);
 
     disable_hooks();
-
-    set_swint_support(&ctxt);
 
     do {
         /* FIXME: Until we actually implement SIGFPE handling properly */

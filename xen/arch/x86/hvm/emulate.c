@@ -2033,13 +2033,6 @@ void hvm_emulate_init_once(
     hvmemul_ctxt->ctxt.regs = regs;
     hvmemul_ctxt->ctxt.vendor = curr->domain->arch.cpuid->x86_vendor;
     hvmemul_ctxt->ctxt.force_writeback = true;
-
-    if ( cpu_has_vmx )
-        hvmemul_ctxt->ctxt.swint_emulate = x86_swint_emulate_none;
-    else if ( cpu_has_svm_nrips )
-        hvmemul_ctxt->ctxt.swint_emulate = x86_swint_emulate_icebp;
-    else
-        hvmemul_ctxt->ctxt.swint_emulate = x86_swint_emulate_all;
 }
 
 void hvm_emulate_init_per_insn(

@@ -60,27 +60,6 @@ static inline bool is_x86_system_segment(enum x86_segment seg)
     return seg >= x86_seg_tr && seg < x86_seg_none;
 }
 
-/* Classification of the types of software generated interrupts/exceptions. */
-enum x86_swint_type {
-    x86_swint_icebp, /* 0xf1 */
-    x86_swint_int3,  /* 0xcc */
-    x86_swint_into,  /* 0xce */
-    x86_swint_int,   /* 0xcd $n */
-};
-
-/*
- * How much help is required with software event injection?
- *
- * All software events return from x86_emulate() with X86EMUL_EXCEPTION and
- * fault-like semantics.  This just controls whether the emulator performs
- * presence/dpl/etc checks and possibly raises exceptions instead.
- */
-enum x86_swint_emulation {
-    x86_swint_emulate_none, /* Hardware supports all software injection properly */
-    x86_swint_emulate_icebp,/* Help needed with `icebp` (0xf1) */
-    x86_swint_emulate_all,  /* Help needed with all software events */
-};
-
 /*
  * x86 event types. This enumeration is valid for:
  *  Intel VMX: {VM_ENTRY,VM_EXIT,IDT_VECTORING}_INTR_INFO[10:8]
@@ -472,9 +451,6 @@ struct x86_emulate_ctxt
      * Input-only state:
      */
 
-    /* Software event injection support. */
-    enum x86_swint_emulation swint_emulate;
-
     /* CPU vendor (X86_VENDOR_UNKNOWN for "don't care") */
     unsigned char vendor;
 
@@ -695,35 +671,6 @@ static inline void x86_emul_pagefault(
     ctxt->event.type = X86_EVENTTYPE_HW_EXCEPTION;
     ctxt->event.error_code = error_code;
     ctxt->event.cr2 = cr2;
-
-    ctxt->event_pending = true;
-}
-
-static inline void x86_emul_software_event(
-    enum x86_swint_type type, uint8_t vector, uint8_t insn_len,
-    struct x86_emulate_ctxt *ctxt)
-{
-    ASSERT(!ctxt->event_pending);
-
-    switch ( type )
-    {
-    case x86_swint_icebp:
-        ctxt->event.type = X86_EVENTTYPE_PRI_SW_EXCEPTION;
-        break;
-
-    case x86_swint_int3:
-    case x86_swint_into:
-        ctxt->event.type = X86_EVENTTYPE_SW_EXCEPTION;
-        break;
-
-    case x86_swint_int:
-        ctxt->event.type = X86_EVENTTYPE_SW_INTERRUPT;
-        break;
-    }
-
-    ctxt->event.vector = vector;
-    ctxt->event.error_code = X86_EVENT_NO_EC;
-    ctxt->event.insn_len = insn_len;
 
     ctxt->event_pending = true;
 }

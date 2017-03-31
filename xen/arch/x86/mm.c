@@ -5412,7 +5412,6 @@ int ptwr_do_page_fault(struct vcpu *v, unsigned long addr,
             .vendor = d->arch.cpuid->x86_vendor,
             .addr_size = is_pv_32bit_domain(d) ? 32 : BITS_PER_LONG,
             .sp_size   = is_pv_32bit_domain(d) ? 32 : BITS_PER_LONG,
-            .swint_emulate = x86_swint_emulate_none,
         },
     };
     int rc;
@@ -5567,7 +5566,6 @@ int mmio_ro_do_page_fault(struct vcpu *v, unsigned long addr,
         .vendor = v->domain->arch.cpuid->x86_vendor,
         .addr_size = addr_size,
         .sp_size = addr_size,
-        .swint_emulate = x86_swint_emulate_none,
         .data = &mmio_ro_ctxt
     };
     int rc;

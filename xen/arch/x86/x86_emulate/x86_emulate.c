@@ -1999,142 +1999,6 @@ static bool umip_active(struct x86_emulate_ctxt *ctxt,
            (cr4 & X86_CR4_UMIP);
 }
 
-/* Inject a software interrupt/exception, emulating if needed. */
-static int inject_swint(enum x86_swint_type type,
-                        uint8_t vector, uint8_t insn_len,
-                        struct x86_emulate_ctxt *ctxt,
-                        const struct x86_emulate_ops *ops)
-{
-    int rc, error_code, fault_type = EXC_GP;
-
-    /*
-     * Without hardware support, injecting software interrupts/exceptions is
-     * problematic.
-     *
-     * All software methods of generating exceptions (other than BOUND) yield
-     * traps, so eip in the exception frame needs to point after the
-     * instruction, not at it.
-     *
-     * However, if injecting it as a hardware exception causes a fault during
-     * delivery, our adjustment of eip will cause the fault to be reported
-     * after the faulting instruction, not pointing to it.
-     *
-     * Therefore, eip can only safely be wound forwards if we are certain that
-     * injecting an equivalent hardware exception won't fault, which means
-     * emulating everything the processor would do on a control transfer.
-     *
-     * However, emulation of complete control transfers is very complicated.
-     * All we care about is that guest userspace cannot avoid the descriptor
-     * DPL check by using the Xen emulator, and successfully invoke DPL=0
-     * descriptors.
-     *
-     * Any OS which would further fault during injection is going to receive a
-     * double fault anyway, and won't be in a position to care that the
-     * faulting eip is incorrect.
-     */
-
-    if ( (ctxt->swint_emulate == x86_swint_emulate_all) ||
-         ((ctxt->swint_emulate == x86_swint_emulate_icebp) &&
-          (type == x86_swint_icebp)) )
-    {
-        if ( !in_realmode(ctxt, ops) )
-        {
-            unsigned int idte_size, idte_offset;
-            struct { uint32_t a, b, c, d; } idte = {};
-            int lm = in_longmode(ctxt, ops);
-
-            if ( lm < 0 )
-                return X86EMUL_UNHANDLEABLE;
-
-            idte_size = lm ? 16 : 8;
-            idte_offset = vector * idte_size;
-
-            /* icebp sets the External Event bit despite being an instruction. */
-            error_code = (vector << 3) | ECODE_IDT |
-                (type == x86_swint_icebp ? ECODE_EXT : 0);
-
-            /*
-             * TODO - this does not cover the v8086 mode with CR4.VME case
-             * correctly, but falls on the safe side from the point of view of
-             * a 32bit OS.  Someone with many TUITs can see about reading the
-             * TSS Software Interrupt Redirection bitmap.
-             */
-            if ( (ctxt->regs->eflags & X86_EFLAGS_VM) &&
-                 ((ctxt->regs->eflags & X86_EFLAGS_IOPL) != X86_EFLAGS_IOPL) )
-                goto raise_exn;
-
-            /*
-             * Read all 8/16 bytes so the idtr limit check is applied properly
-             * to this entry, even though we only end up looking at the 2nd
-             * word.
-             */
-            switch ( rc = ops->read(x86_seg_idtr, idte_offset,
-                                    &idte, idte_size, ctxt) )
-            {
-            case X86EMUL_OKAY:
-                break;
-
-            case X86EMUL_EXCEPTION:
-                if ( !ctxt->event_pending )
-                    goto raise_exn;
-                /* fallthrough */
-
-            default:
-                return rc;
-            }
-
-            /* This must be an interrupt, trap, or task gate. */
-#ifdef __XEN__
-            switch ( (idte.b >> 8) & 0x1f )
-            {
-            case SYS_DESC_irq_gate:
-            case SYS_DESC_trap_gate:
-                break;
-            case SYS_DESC_irq_gate16:
-            case SYS_DESC_trap_gate16:
-            case SYS_DESC_task_gate:
-                if ( !lm )
-                    break;
-                /* fall through */
-            default:
-                goto raise_exn;
-            }
-#endif
-
-            /* The 64-bit high half's type must be zero. */
-            if ( idte.d & 0x1f00 )
-                goto raise_exn;
-
-            /* icebp counts as a hardware event, and bypasses the dpl check. */
-            if ( type != x86_swint_icebp )
-            {
-                int cpl = get_cpl(ctxt, ops);
-
-                fail_if(cpl < 0);
-
-                if ( cpl > ((idte.b >> 13) & 3) )
-                    goto raise_exn;
-            }
-
-            /* Is this entry present? */
-            if ( !(idte.b & (1u << 15)) )
-            {
-                fault_type = EXC_NP;
-                goto raise_exn;
-            }
-        }
-    }
-
-    x86_emul_software_event(type, vector, insn_len, ctxt);
-    rc = X86EMUL_OKAY;
-
- done:
-    return rc;
-
- raise_exn:
-    generate_exception(fault_type, error_code);
-}
-
 static void adjust_bnd(struct x86_emulate_ctxt *ctxt,
                        const struct x86_emulate_ops *ops, enum vex_pfx pfx)
 {
@@ -3101,7 +2965,6 @@ x86_emulate(
     struct operand src = { .reg = PTR_POISON };
     struct operand dst = { .reg = PTR_POISON };
     unsigned long cr4;
-    enum x86_swint_type swint_type;
     struct fpu_insn_ctxt fic = { .type = X86EMUL_FPU_none, .exn_raised = -1 };
     struct x86_emulate_stub stub = {};
     DECLARE_ALIGNED(mmval_t, mmval);
@@ -4103,25 +3966,38 @@ x86_emulate(
             goto done;
         break;
 
-    case 0xcc: /* int3 */
-        src.val = EXC_BP;
-        swint_type = x86_swint_int3;
-        goto swint;
-
-    case 0xcd: /* int imm8 */
-        swint_type = x86_swint_int;
-    swint:
-        rc = inject_swint(swint_type, (uint8_t)src.val,
-                          _regs.r(ip) - ctxt->regs->r(ip),
-                          ctxt, ops) ? : X86EMUL_EXCEPTION;
-        goto done;
-
     case 0xce: /* into */
         if ( !(_regs.eflags & X86_EFLAGS_OF) )
             break;
-        src.val = EXC_OF;
-        swint_type = x86_swint_into;
-        goto swint;
+        /* Fallthrough */
+    case 0xcc: /* int3 */
+    case 0xcd: /* int imm8 */
+    case 0xf1: /* int1 (icebp) */
+        ASSERT(!ctxt->event_pending);
+        switch ( ctxt->opcode )
+        {
+        case 0xcc: /* int3 */
+            ctxt->event.vector = EXC_BP;
+            ctxt->event.type = X86_EVENTTYPE_SW_EXCEPTION;
+            break;
+        case 0xcd: /* int imm8 */
+            ctxt->event.vector = imm1;
+            ctxt->event.type = X86_EVENTTYPE_SW_INTERRUPT;
+            break;
+        case 0xce: /* into */
+            ctxt->event.vector = EXC_OF;
+            ctxt->event.type = X86_EVENTTYPE_SW_EXCEPTION;
+            break;
+        case 0xf1: /* icebp */
+            ctxt->event.vector = EXC_DB;
+            ctxt->event.type = X86_EVENTTYPE_PRI_SW_EXCEPTION;
+            break;
+        }
+        ctxt->event.error_code = X86_EVENT_NO_EC;
+        ctxt->event.insn_len = _regs.r(ip) - ctxt->regs->r(ip);
+        ctxt->event_pending = true;
+        rc = X86EMUL_EXCEPTION;
+        goto done;
 
     case 0xcf: /* iret */ {
         unsigned long sel, eip, eflags;
@@ -4781,11 +4657,6 @@ x86_emulate(
              (rc = commit_far_branch(&cs, imm1)) )
             goto done;
         break;
-
-    case 0xf1: /* int1 (icebp) */
-        src.val = EXC_DB;
-        swint_type = x86_swint_icebp;
-        goto swint;
 
     case 0xf4: /* hlt */
         generate_exception_if(!mode_ring0(), EXC_GP, 0);
