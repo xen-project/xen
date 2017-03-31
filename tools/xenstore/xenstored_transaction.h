@@ -19,6 +19,12 @@
 #define _XENSTORED_TRANSACTION_H
 #include "xenstored_core.h"
 
+enum node_access_type {
+    NODE_ACCESS_READ,
+    NODE_ACCESS_WRITE,
+    NODE_ACCESS_DELETE
+};
+
 struct transaction;
 
 int do_transaction_start(struct connection *conn, struct buffered_data *node);
@@ -30,13 +36,15 @@ struct transaction *transaction_lookup(struct connection *conn, uint32_t id);
 void transaction_entry_inc(struct transaction *trans, unsigned int domid);
 void transaction_entry_dec(struct transaction *trans, unsigned int domid);
 
-/* This node was changed. */
-void add_change_node(struct connection *conn, struct node *node,
-                     bool recurse);
+/* This node was accessed. */
+int access_node(struct connection *conn, struct node *node,
+                enum node_access_type type, TDB_DATA *key);
 
-/* Return tdb context to use for this connection. */
-TDB_CONTEXT *tdb_transaction_context(struct transaction *trans);
+/* Prepend the transaction to name if appropriate. */
+int transaction_prepend(struct connection *conn, const char *name,
+                        TDB_DATA *key);
 
 void conn_delete_all_transactions(struct connection *conn);
+int check_transactions(struct hashtable *hash);
 
 #endif /* _XENSTORED_TRANSACTION_H */

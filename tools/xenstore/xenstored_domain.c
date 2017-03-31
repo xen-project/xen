@@ -268,9 +268,15 @@ bool domain_can_read(struct connection *conn)
 	return (intf->req_cons != intf->req_prod);
 }
 
+static bool domid_is_unprivileged(unsigned int domid)
+{
+	return domid != 0 && domid != priv_domid;
+}
+
 bool domain_is_unprivileged(struct connection *conn)
 {
-	return (conn && conn->domain && conn->domain->domid != 0 && conn->domain->domid != priv_domid);
+	return conn && conn->domain &&
+	       domid_is_unprivileged(conn->domain->domid);
 }
 
 bool domain_can_write(struct connection *conn)
@@ -699,13 +705,23 @@ void domain_entry_dec(struct connection *conn, struct node *node)
 	}
 }
 
-void domain_entry_fix(unsigned int domid, int num)
+int domain_entry_fix(unsigned int domid, int num, bool update)
 {
 	struct domain *d;
+	int cnt;
 
 	d = find_domain_by_domid(domid);
-	if (d && ((d->nbentry += num) < 0))
-		d->nbentry = 0;
+	if (!d)
+		return 0;
+
+	cnt = d->nbentry + num;
+	if (cnt < 0)
+		cnt = 0;
+
+	if (update)
+		d->nbentry = cnt;
+
+	return domid_is_unprivileged(domid) ? cnt : 0;
 }
 
 int domain_entry(struct connection *conn)
