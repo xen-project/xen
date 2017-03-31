@@ -925,7 +925,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
                      1UL << (PAGE_SHIFT + 32)) )
             e = min(HYPERVISOR_VIRT_END - DIRECTMAP_VIRT_START,
                     1UL << (PAGE_SHIFT + 32));
-#define reloc_size ((__pa(&_end) + mask) & ~mask)
+#define reloc_size ((__pa(__2M_rwdata_end) + mask) & ~mask)
         /* Is the region suitable for relocating Xen? */
         if ( !xen_phys_start && e <= limit )
         {
@@ -1122,8 +1122,10 @@ void __init noreturn __start_xen(unsigned long mbi_p)
 
     if ( !xen_phys_start )
         panic("Not enough memory to relocate Xen.");
-    reserve_e820_ram(&boot_e820, efi_enabled ? mbi->mem_upper : __pa(&_start),
-                     __pa(&_end));
+
+    /* This needs to remain in sync with xen_in_range(). */
+    reserve_e820_ram(&boot_e820, efi_enabled ? mbi->mem_upper : __pa(_stext),
+                     __pa(__2M_rwdata_end));
 
     /* Late kexec reservation (dynamic start address). */
     kexec_reserve_area(&boot_e820);
@@ -1683,6 +1685,14 @@ int __hwdom_init xen_in_range(unsigned long mfn)
         /* S3 resume code (and other real mode trampoline code) */
         xen_regions[region_s3].s = bootsym_phys(trampoline_start);
         xen_regions[region_s3].e = bootsym_phys(trampoline_end);
+
+        /*
+         * This needs to remain in sync with the uses of the same symbols in
+         * - __start_xen() (above)
+         * - is_xen_fixed_mfn()
+         * - tboot_shutdown()
+         */
+
         /* hypervisor .text + .rodata */
         xen_regions[region_ro].s = __pa(&_stext);
         xen_regions[region_ro].e = __pa(&__2M_rodata_end);

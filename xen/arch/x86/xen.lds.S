@@ -299,7 +299,7 @@ SECTIONS
 }
 
 ASSERT(__image_base__ > XEN_VIRT_START ||
-       _end <= XEN_VIRT_END - NR_CPUS * PAGE_SIZE,
+       __2M_rwdata_end <= XEN_VIRT_END - NR_CPUS * PAGE_SIZE,
        "Xen image overlaps stubs area")
 
 #ifdef CONFIG_KEXEC
