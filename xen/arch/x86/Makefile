@@ -90,6 +90,9 @@ else
 all_symbols =
 endif
 
+syms-warn-dup-y := --warn-dup
+syms-warn-dup-$(CONFIG_SUPPRESS_DUPLICATE_SYMBOL_WARNINGS) :=
+
 $(TARGET): $(TARGET)-syms $(efi-y) boot/mkelf32
 	./boot/mkelf32 $(notes_phdrs) $(TARGET)-syms $(TARGET) 0x100000 \
 	               `$(NM) $(TARGET)-syms | sed -ne 's/^\([^ ]*\) . __2M_rwdata_end$$/0x\1/p'`
@@ -131,7 +134,7 @@ $(TARGET)-syms: prelink.o xen.lds $(BASEDIR)/common/symbols-dummy.o
 	$(LD) $(LDFLAGS) -T xen.lds -N prelink.o $(build_id_linker) \
 	    $(@D)/.$(@F).0.o -o $(@D)/.$(@F).1
 	$(NM) -pa --format=sysv $(@D)/.$(@F).1 \
-		| $(BASEDIR)/tools/symbols $(all_symbols) --sysv --sort --warn-dup \
+		| $(BASEDIR)/tools/symbols $(all_symbols) --sysv --sort $(syms-warn-dup-y) \
 		>$(@D)/.$(@F).1.S
 	$(MAKE) -f $(BASEDIR)/Rules.mk $(@D)/.$(@F).1.o
 	$(LD) $(LDFLAGS) -T xen.lds -N prelink.o $(build_id_linker) \

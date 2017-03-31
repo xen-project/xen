@@ -238,6 +238,16 @@ config FAST_SYMBOL_LOOKUP
 
 	  If unsure, say Y.
 
+config SUPPRESS_DUPLICATE_SYMBOL_WARNINGS
+	bool "Suppress duplicate symbol warnings" if !LIVEPATCH
+	default y if !LIVEPATCH
+	---help---
+	  Multiple symbols with the same name aren't generally a problem
+	  unless Live patching is to be used, so these warnings can be
+	  suppressed by enabling this option.  Certain other options (known
+	  to produce many duplicate names) may select this to avoid the
+	  build becoming overly verbose.
+
 config CMDLINE
 	string "Built-in hypervisor command string" if EXPERT = "y"
 	default ""
