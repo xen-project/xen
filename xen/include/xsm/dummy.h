@@ -712,18 +712,13 @@ static XSM_INLINE int xsm_pmu_op (XSM_DEFAULT_ARG struct domain *d, unsigned int
     XSM_ASSERT_ACTION(XSM_OTHER);
     switch ( op )
     {
-    case XENPMU_mode_set:
-    case XENPMU_mode_get:
-    case XENPMU_feature_set:
-    case XENPMU_feature_get:
-        return xsm_default_action(XSM_PRIV, d, current->domain);
     case XENPMU_init:
     case XENPMU_finish:
     case XENPMU_lvtpc_set:
     case XENPMU_flush:
         return xsm_default_action(XSM_HOOK, d, current->domain);
     default:
-        return -EPERM;
+        return xsm_default_action(XSM_PRIV, d, current->domain);
     }
 }
 
