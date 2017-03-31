@@ -326,15 +326,14 @@ const struct x86_emulate_ops *shadow_init_emulation(
 
     sh_ctxt->ctxt.regs = regs;
     sh_ctxt->ctxt.vendor = v->domain->arch.cpuid->x86_vendor;
+    sh_ctxt->ctxt.lma = hvm_long_mode_active(v);
 
     /* Segment cache initialisation. Primed with CS. */
     creg = hvm_get_seg_reg(x86_seg_cs, sh_ctxt);
 
     /* Work out the emulation mode. */
-    if ( hvm_long_mode_active(v) && creg->attr.fields.l )
-    {
+    if ( sh_ctxt->ctxt.lma && creg->attr.fields.l )
         sh_ctxt->ctxt.addr_size = sh_ctxt->ctxt.sp_size = 64;
-    }
     else
     {
         sreg = hvm_get_seg_reg(x86_seg_ss, sh_ctxt);

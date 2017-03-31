@@ -2966,6 +2966,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
     struct priv_op_ctxt ctxt = {
         .ctxt.regs = regs,
         .ctxt.vendor = currd->arch.cpuid->x86_vendor,
+        .ctxt.lma = !is_pv_32bit_domain(currd),
     };
     int rc;
     unsigned int eflags, ar;

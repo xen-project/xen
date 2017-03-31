@@ -473,6 +473,9 @@ struct x86_emulate_ctxt
     /* Stack pointer width in bits (16, 32 or 64). */
     unsigned int sp_size;
 
+    /* Long mode active? */
+    bool lma;
+
     /*
      * Output-only state:
      */

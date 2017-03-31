@@ -484,6 +484,8 @@ static bool in_longmode(struct x86_emulate_ctxt *ctxt)
 
 static void set_sizes(struct x86_emulate_ctxt *ctxt)
 {
+    ctxt->lma = long_mode_active(ctxt);
+
     if ( in_longmode(ctxt) )
         ctxt->addr_size = ctxt->sp_size = 64;
     else

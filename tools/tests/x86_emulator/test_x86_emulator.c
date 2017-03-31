@@ -319,6 +319,7 @@ int main(int argc, char **argv)
     ctxt.regs = &regs;
     ctxt.force_writeback = 0;
     ctxt.vendor    = X86_VENDOR_UNKNOWN;
+    ctxt.lma       = sizeof(void *) == 8;
     ctxt.addr_size = 8 * sizeof(void *);
     ctxt.sp_size   = 8 * sizeof(void *);
 
@@ -2922,6 +2923,7 @@ int main(int argc, char **argv)
     {
         decl_insn(vzeroupper);
 
+        ctxt.lma = false;
         ctxt.sp_size = ctxt.addr_size = 32;
 
         asm volatile ( "vxorps %xmm2, %xmm2, %xmm3\n"
@@ -2949,6 +2951,7 @@ int main(int argc, char **argv)
             goto fail;
         printf("okay\n");
 
+        ctxt.lma = true;
         ctxt.sp_size = ctxt.addr_size = 64;
     }
     else
@@ -3001,6 +3004,7 @@ int main(int argc, char **argv)
             continue;
 
         memcpy(res, blobs[j].code, blobs[j].size);
+        ctxt.lma = blobs[j].bitness == 64;
         ctxt.addr_size = ctxt.sp_size = blobs[j].bitness;
 
         if ( ctxt.addr_size == sizeof(void *) * CHAR_BIT )

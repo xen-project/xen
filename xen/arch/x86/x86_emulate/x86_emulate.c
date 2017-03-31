@@ -968,11 +968,10 @@ do {                                                                    \
 
 #define validate_far_branch(cs, ip) ({                                  \
     if ( sizeof(ip) <= 4 ) {                                            \
-        ASSERT(in_longmode(ctxt, ops) <= 0);                            \
+        ASSERT(!ctxt->lma);                                             \
         generate_exception_if((ip) > (cs)->limit, EXC_GP, 0);           \
     } else                                                              \
-        generate_exception_if(in_longmode(ctxt, ops) &&                 \
-                              (cs)->attr.fields.l                       \
+        generate_exception_if(ctxt->lma && (cs)->attr.fields.l          \
                               ? !is_canonical_address(ip)               \
                               : (ip) > (cs)->limit, EXC_GP, 0);         \
 })
@@ -1630,20 +1629,6 @@ static bool vcpu_has(
 #endif
 
 static int
-in_longmode(
-    struct x86_emulate_ctxt *ctxt,
-    const struct x86_emulate_ops *ops)
-{
-    uint64_t efer;
-
-    if ( !ops->read_msr ||
-         unlikely(ops->read_msr(MSR_EFER, &efer, ctxt) != X86EMUL_OKAY) )
-        return -1;
-
-    return !!(efer & EFER_LMA);
-}
-
-static int
 realmode_load_seg(
     enum x86_segment seg,
     uint16_t sel,
@@ -1767,8 +1752,7 @@ protmode_load_seg(
          * Experimentally in long mode, the L and D bits are checked before
          * the Present bit.
          */
-        if ( in_longmode(ctxt, ops) &&
-             (desc.b & (1 << 21)) && (desc.b & (1 << 22)) )
+        if ( ctxt->lma && (desc.b & (1 << 21)) && (desc.b & (1 << 22)) )
             goto raise_exn;
         sel = (sel ^ rpl) | cpl;
         break;
@@ -1818,10 +1802,8 @@ protmode_load_seg(
 
     if ( !is_x86_user_segment(seg) )
     {
-        int lm = (desc.b & (1u << 12)) ? 0 : in_longmode(ctxt, ops);
+        bool lm = (desc.b & (1u << 12)) ? false : ctxt->lma;
 
-        if ( lm < 0 )
-            return X86EMUL_UNHANDLEABLE;
         if ( lm )
         {
             switch ( rc = ops->read(sel_seg, (sel & 0xfff8) + 8,
@@ -5195,7 +5177,7 @@ x86_emulate(
                 case 0x03: /* busy 16-bit TSS */
                 case 0x04: /* 16-bit call gate */
                 case 0x05: /* 16/32-bit task gate */
-                    if ( in_longmode(ctxt, ops) )
+                    if ( ctxt->lma )
                         break;
                     /* fall through */
                 case 0x02: /* LDT */
@@ -5242,7 +5224,7 @@ x86_emulate(
                 {
                 case 0x01: /* available 16-bit TSS */
                 case 0x03: /* busy 16-bit TSS */
-                    if ( in_longmode(ctxt, ops) )
+                    if ( ctxt->lma )
                         break;
                     /* fall through */
                 case 0x02: /* LDT */
@@ -5292,10 +5274,7 @@ x86_emulate(
         sreg.attr.bytes = 0xc93; /* G+DB+P+S+Data */
 
 #ifdef __x86_64__
-        rc = in_longmode(ctxt, ops);
-        if ( rc < 0 )
-            goto cannot_emulate;
-        if ( rc )
+        if ( ctxt->lma )
         {
             cs.attr.bytes = 0xa9b; /* L+DB+P+S+Code */
 
@@ -5732,9 +5711,7 @@ x86_emulate(
             dst.val = src.val;
         break;
 
-    case X86EMUL_OPC(0x0f, 0x34): /* sysenter */ {
-        int lm;
-
+    case X86EMUL_OPC(0x0f, 0x34): /* sysenter */
         vcpu_must_have(sep);
         generate_exception_if(mode_ring0(), EXC_GP, 0);
         generate_exception_if(!in_protmode(ctxt, ops), EXC_GP, 0);
@@ -5745,17 +5722,14 @@ x86_emulate(
             goto done;
 
         generate_exception_if(!(msr_val & 0xfffc), EXC_GP, 0);
-        lm = in_longmode(ctxt, ops);
-        if ( lm < 0 )
-            goto cannot_emulate;
 
         _regs.eflags &= ~(X86_EFLAGS_VM | X86_EFLAGS_IF | X86_EFLAGS_RF);
 
         cs.sel = msr_val & ~3; /* SELECTOR_RPL_MASK */
         cs.base = 0;   /* flat segment */
         cs.limit = ~0u;  /* 4GB limit */
-        cs.attr.bytes = lm ? 0xa9b  /* G+L+P+S+Code */
-                           : 0xc9b; /* G+DB+P+S+Code */
+        cs.attr.bytes = ctxt->lma ? 0xa9b  /* G+L+P+S+Code */
+                                  : 0xc9b; /* G+DB+P+S+Code */
 
         sreg.sel = cs.sel + 8;
         sreg.base = 0;   /* flat segment */
@@ -5770,16 +5744,15 @@ x86_emulate(
         if ( (rc = ops->read_msr(MSR_IA32_SYSENTER_EIP,
                                  &msr_val, ctxt)) != X86EMUL_OKAY )
             goto done;
-        _regs.r(ip) = lm ? msr_val : (uint32_t)msr_val;
+        _regs.r(ip) = ctxt->lma ? msr_val : (uint32_t)msr_val;
 
         if ( (rc = ops->read_msr(MSR_IA32_SYSENTER_ESP,
                                  &msr_val, ctxt)) != X86EMUL_OKAY )
             goto done;
-        _regs.r(sp) = lm ? msr_val : (uint32_t)msr_val;
+        _regs.r(sp) = ctxt->lma ? msr_val : (uint32_t)msr_val;
 
         singlestep = _regs.eflags & X86_EFLAGS_TF;
         break;
-    }
 
     case X86EMUL_OPC(0x0f, 0x35): /* sysexit */
         vcpu_must_have(sep);
@@ -7922,7 +7895,12 @@ int x86_emulate_wrapper(
     const struct x86_emulate_ops *ops)
 {
     unsigned long orig_ip = ctxt->regs->r(ip);
-    int rc = x86_emulate(ctxt, ops);
+    int rc;
+
+    if ( mode_64bit() )
+        ASSERT(ctxt->lma);
+
+    rc = x86_emulate(ctxt, ops);
 
     /* Retire flags should only be set for successful instruction emulation. */
     if ( rc != X86EMUL_OKAY )
