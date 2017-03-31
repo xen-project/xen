@@ -890,6 +890,17 @@ void __init noreturn __start_xen(unsigned long mbi_p)
         mod[i].reserved = 0;
     }
 
+    if ( efi_enabled )
+    {
+        /*
+         * This needs to remain in sync with xen_in_range() and the
+         * respective reserve_e820_ram() invocation below.
+         */
+        mod[mbi->mods_count].mod_start = PFN_DOWN(mbi->mem_upper);
+        mod[mbi->mods_count].mod_end = __pa(__2M_rwdata_end) -
+                                       (mbi->mem_upper & PAGE_MASK);
+    }
+
     modules_headroom = bzimage_headroom(bootstrap_map(mod), mod->mod_end);
     bootstrap_map(NULL);
 
@@ -1070,8 +1081,9 @@ void __init noreturn __start_xen(unsigned long mbi_p)
             if ( mod[j].reserved )
                 continue;
 
-            /* Don't overlap with other modules. */
-            end = consider_modules(s, e, size, mod, mbi->mods_count, j);
+            /* Don't overlap with other modules (or Xen itself). */
+            end = consider_modules(s, e, size, mod,
+                                   mbi->mods_count + efi_enabled, j);
 
             if ( highmem_start && end > highmem_start )
                 continue;
@@ -1096,9 +1108,9 @@ void __init noreturn __start_xen(unsigned long mbi_p)
          */
         while ( !kexec_crash_area.start )
         {
-            /* Don't overlap with modules. */
-            e = consider_modules(s, e, PAGE_ALIGN(kexec_crash_area.size),
-                                 mod, mbi->mods_count, -1);
+            /* Don't overlap with modules (or Xen itself). */
+            e = consider_modules(s, e, PAGE_ALIGN(kexec_crash_area.size), mod,
+                                 mbi->mods_count + efi_enabled, -1);
             if ( s >= e )
                 break;
             if ( e > kexec_crash_area_limit )
