@@ -308,7 +308,7 @@ enum VMEXIT_EXITCODE
 /* Definition of segment state is borrowed by the generic HVM code. */
 typedef struct segment_register svm_segment_register_t;
 
-typedef union __packed
+typedef union
 {
     u64 bytes;
     struct 
@@ -322,7 +322,7 @@ typedef union __packed
     } fields;
 } eventinj_t;
 
-typedef union __packed
+typedef union
 {
     u64 bytes;
     struct 
@@ -340,7 +340,7 @@ typedef union __packed
     } fields;
 } vintr_t;
 
-typedef union __packed
+typedef union
 {
     u64 bytes;
     struct 
@@ -357,7 +357,7 @@ typedef union __packed
     } fields;
 } ioio_info_t;
 
-typedef union __packed
+typedef union
 {
     u64 bytes;
     struct
@@ -366,7 +366,7 @@ typedef union __packed
     } fields;
 } lbrctrl_t;
 
-typedef union __packed
+typedef union
 {
     uint32_t bytes;
     struct
@@ -401,7 +401,7 @@ typedef union __packed
 #define IOPM_SIZE   (12 * 1024)
 #define MSRPM_SIZE  (8  * 1024)
 
-struct __packed vmcb_struct {
+struct vmcb_struct {
     u32 _cr_intercepts;         /* offset 0x00 - cleanbit 0 */
     u32 _dr_intercepts;         /* offset 0x04 - cleanbit 0 */
     u32 _exception_intercepts;  /* offset 0x08 - cleanbit 0 */
