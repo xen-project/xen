@@ -12,11 +12,11 @@ config ARM_32
 config ARM_64
 	def_bool y
 	depends on 64BIT
-	select HAS_ALTERNATIVE
 	select HAS_GICV3
 
 config ARM
 	def_bool y
+	select HAS_ALTERNATIVE
 	select HAS_ARM_HDLCD
 	select HAS_DEVICE_TREE
 	select HAS_MEM_ACCESS

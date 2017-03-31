@@ -25,6 +25,7 @@
 #include <xen/livepatch.h>
 #include <xen/livepatch_payload.h>
 
+#include <asm/alternative.h>
 #include <asm/event.h>
 
 /*

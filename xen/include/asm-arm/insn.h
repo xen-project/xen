@@ -5,6 +5,8 @@
 
 #if defined(CONFIG_ARM_64)
 # include <asm/arm64/insn.h>
+#elif defined(CONFIG_ARM_32)
+# include <asm/arm32/insn.h>
 #else
 # error "unknown ARM variant"
 #endif
