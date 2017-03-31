@@ -506,7 +506,7 @@ static int hvmemul_virtual_to_linear(
     unsigned long *reps,
     enum hvm_access_type access_type,
     struct hvm_emulate_ctxt *hvmemul_ctxt,
-    unsigned long *paddr)
+    unsigned long *linear)
 {
     struct segment_register *reg;
     int okay;
@@ -514,7 +514,7 @@ static int hvmemul_virtual_to_linear(
 
     if ( seg == x86_seg_none )
     {
-        *paddr = offset;
+        *linear = offset;
         return X86EMUL_OKAY;
     }
 
@@ -549,16 +549,16 @@ static int hvmemul_virtual_to_linear(
         okay = hvm_virtual_to_linear_addr(
             seg, reg, offset - (*reps - 1) * bytes_per_rep,
             *reps * bytes_per_rep, access_type,
-            hvmemul_ctxt->ctxt.addr_size, paddr);
-        *paddr += (*reps - 1) * bytes_per_rep;
+            hvmemul_ctxt->ctxt.addr_size, linear);
+        *linear += (*reps - 1) * bytes_per_rep;
         if ( hvmemul_ctxt->ctxt.addr_size != 64 )
-            *paddr = (uint32_t)*paddr;
+            *linear = (uint32_t)*linear;
     }
     else
     {
         okay = hvm_virtual_to_linear_addr(
             seg, reg, offset, *reps * bytes_per_rep, access_type,
-            hvmemul_ctxt->ctxt.addr_size, paddr);
+            hvmemul_ctxt->ctxt.addr_size, linear);
     }
 
     if ( okay )

@@ -136,13 +136,13 @@ static struct segment_register *hvm_get_seg_reg(
     return seg_reg;
 }
 
-static int hvm_translate_linear_addr(
+static int hvm_translate_virtual_addr(
     enum x86_segment seg,
     unsigned long offset,
     unsigned int bytes,
     enum hvm_access_type access_type,
     struct sh_emulate_ctxt *sh_ctxt,
-    unsigned long *paddr)
+    unsigned long *linear)
 {
     const struct segment_register *reg;
     int okay;
@@ -152,7 +152,7 @@ static int hvm_translate_linear_addr(
         return -PTR_ERR(reg);
 
     okay = hvm_virtual_to_linear_addr(
-        seg, reg, offset, bytes, access_type, sh_ctxt->ctxt.addr_size, paddr);
+        seg, reg, offset, bytes, access_type, sh_ctxt->ctxt.addr_size, linear);
 
     if ( !okay )
     {
@@ -183,7 +183,7 @@ hvm_read(enum x86_segment seg,
     unsigned long addr;
     int rc;
 
-    rc = hvm_translate_linear_addr(
+    rc = hvm_translate_virtual_addr(
         seg, offset, bytes, access_type, sh_ctxt, &addr);
     if ( rc || !bytes )
         return rc;
@@ -265,7 +265,7 @@ hvm_emulate_write(enum x86_segment seg,
     if ( seg == x86_seg_ss )
         perfc_incr(shadow_fault_emulate_stack);
 
-    rc = hvm_translate_linear_addr(
+    rc = hvm_translate_virtual_addr(
         seg, offset, bytes, hvm_access_write, sh_ctxt, &addr);
     if ( rc || !bytes )
         return rc;
@@ -291,7 +291,7 @@ hvm_emulate_cmpxchg(enum x86_segment seg,
     if ( bytes > sizeof(long) )
         return X86EMUL_UNHANDLEABLE;
 
-    rc = hvm_translate_linear_addr(
+    rc = hvm_translate_virtual_addr(
         seg, offset, bytes, hvm_access_write, sh_ctxt, &addr);
     if ( rc )
         return rc;
@@ -345,7 +345,7 @@ const struct x86_emulate_ops *shadow_init_emulation(
     /* Attempt to prefetch whole instruction. */
     sh_ctxt->insn_buf_eip = regs->rip;
     sh_ctxt->insn_buf_bytes =
-        (!hvm_translate_linear_addr(
+        (!hvm_translate_virtual_addr(
             x86_seg_cs, regs->rip, sizeof(sh_ctxt->insn_buf),
             hvm_access_insn_fetch, sh_ctxt, &addr) &&
          !hvm_fetch_from_guest_linear(
@@ -374,7 +374,7 @@ void shadow_continue_emulation(struct sh_emulate_ctxt *sh_ctxt,
     {
         /* Prefetch more bytes. */
         sh_ctxt->insn_buf_bytes =
-            (!hvm_translate_linear_addr(
+            (!hvm_translate_virtual_addr(
                 x86_seg_cs, regs->rip, sizeof(sh_ctxt->insn_buf),
                 hvm_access_insn_fetch, sh_ctxt, &addr) &&
              !hvm_fetch_from_guest_linear(
