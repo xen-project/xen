@@ -71,7 +71,7 @@ enum x86_swint_emulation {
  * Attribute for segment selector. This is a copy of bit 40:47 & 52:55 of the
  * segment descriptor. It happens to match the format of an AMD SVM VMCB.
  */
-typedef union __attribute__((__packed__)) segment_attributes {
+typedef union segment_attributes {
     uint16_t bytes;
     struct
     {
@@ -91,7 +91,7 @@ typedef union __attribute__((__packed__)) segment_attributes {
  * Full state of a segment register (visible and hidden portions).
  * Again, this happens to match the format of an AMD SVM VMCB.
  */
-struct __attribute__((__packed__)) segment_register {
+struct segment_register {
     uint16_t   sel;
     segment_attributes_t attr;
     uint32_t   limit;
