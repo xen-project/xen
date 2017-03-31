@@ -549,7 +549,7 @@ static int hvmemul_virtual_to_linear(
         okay = hvm_virtual_to_linear_addr(
             seg, reg, offset - (*reps - 1) * bytes_per_rep,
             *reps * bytes_per_rep, access_type,
-            hvmemul_ctxt->ctxt.addr_size, linear);
+            hvmemul_get_seg_reg(x86_seg_cs, hvmemul_ctxt), linear);
         *linear += (*reps - 1) * bytes_per_rep;
         if ( hvmemul_ctxt->ctxt.addr_size != 64 )
             *linear = (uint32_t)*linear;
@@ -558,7 +558,7 @@ static int hvmemul_virtual_to_linear(
     {
         okay = hvm_virtual_to_linear_addr(
             seg, reg, offset, *reps * bytes_per_rep, access_type,
-            hvmemul_ctxt->ctxt.addr_size, linear);
+            hvmemul_get_seg_reg(x86_seg_cs, hvmemul_ctxt), linear);
     }
 
     if ( okay )
@@ -2075,7 +2075,7 @@ void hvm_emulate_init_per_insn(
                                         hvmemul_ctxt->insn_buf_eip,
                                         sizeof(hvmemul_ctxt->insn_buf),
                                         hvm_access_insn_fetch,
-                                        hvmemul_ctxt->ctxt.addr_size,
+                                        &hvmemul_ctxt->seg_reg[x86_seg_cs],
                                         &addr) &&
              hvm_fetch_from_guest_linear(hvmemul_ctxt->insn_buf, addr,
                                          sizeof(hvmemul_ctxt->insn_buf),

@@ -152,7 +152,8 @@ static int hvm_translate_virtual_addr(
         return -PTR_ERR(reg);
 
     okay = hvm_virtual_to_linear_addr(
-        seg, reg, offset, bytes, access_type, sh_ctxt->ctxt.addr_size, linear);
+        seg, reg, offset, bytes, access_type,
+        hvm_get_seg_reg(x86_seg_cs, sh_ctxt), linear);
 
     if ( !okay )
     {

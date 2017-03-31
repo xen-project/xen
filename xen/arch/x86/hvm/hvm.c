@@ -2394,9 +2394,10 @@ bool_t hvm_virtual_to_linear_addr(
     unsigned long offset,
     unsigned int bytes,
     enum hvm_access_type access_type,
-    unsigned int addr_size,
+    const struct segment_register *active_cs,
     unsigned long *linear_addr)
 {
+    const struct vcpu *curr = current;
     unsigned long addr = offset, last_byte;
     bool_t okay = 0;
 
@@ -2408,10 +2409,11 @@ bool_t hvm_virtual_to_linear_addr(
      */
     ASSERT(seg < x86_seg_none);
 
-    if ( !(current->arch.hvm_vcpu.guest_cr[0] & X86_CR0_PE) )
+    if ( !(curr->arch.hvm_vcpu.guest_cr[0] & X86_CR0_PE) ||
+         (guest_cpu_user_regs()->eflags & X86_EFLAGS_VM) )
     {
         /*
-         * REAL MODE: Don't bother with segment access checks.
+         * REAL/VM86 MODE: Don't bother with segment access checks.
          * Certain of them are not done in native real mode anyway.
          */
         addr = (uint32_t)(addr + reg->base);
@@ -2419,10 +2421,33 @@ bool_t hvm_virtual_to_linear_addr(
         if ( last_byte < addr )
             goto out;
     }
-    else if ( addr_size != 64 )
+    else if ( hvm_long_mode_active(curr) &&
+              (is_x86_system_segment(seg) || active_cs->attr.fields.l) )
     {
         /*
-         * COMPATIBILITY MODE: Apply segment checks and add base.
+         * User segments are always treated as present.  System segment may
+         * not be, and also incur limit checks.
+         */
+        if ( is_x86_system_segment(seg) &&
+             (!reg->attr.fields.p || (offset + bytes - !!bytes) > reg->limit) )
+            goto out;
+
+        /*
+         * LONG MODE: FS, GS and system segments: add segment base. All
+         * addresses must be canonical.
+         */
+        if ( seg >= x86_seg_fs )
+            addr += reg->base;
+
+        last_byte = addr + bytes - !!bytes;
+        if ( !is_canonical_address(addr) || last_byte < addr ||
+             !is_canonical_address(last_byte) )
+            goto out;
+    }
+    else
+    {
+        /*
+         * PROTECTED/COMPATIBILITY MODE: Apply segment checks and add base.
          */
 
         /*
@@ -2468,28 +2493,6 @@ bool_t hvm_virtual_to_linear_addr(
         }
         else if ( (last_byte > reg->limit) || (last_byte < offset) )
             goto out; /* last byte is beyond limit or wraps 0xFFFFFFFF */
-    }
-    else
-    {
-        /*
-         * User segments are always treated as present.  System segment may
-         * not be, and also incur limit checks.
-         */
-        if ( is_x86_system_segment(seg) &&
-             (!reg->attr.fields.p || (offset + bytes - !!bytes) > reg->limit) )
-            goto out;
-
-        /*
-         * LONG MODE: FS, GS and system segments: add segment base. All
-         * addresses must be canonical.
-         */
-        if ( seg >= x86_seg_fs )
-            addr += reg->base;
-
-        last_byte = addr + bytes - !!bytes;
-        if ( !is_canonical_address(addr) || last_byte < addr ||
-             !is_canonical_address(last_byte) )
-            goto out;
     }
 
     /* All checks ok. */
@@ -3026,11 +3029,12 @@ void hvm_task_switch(
 
     if ( errcode >= 0 )
     {
+        struct segment_register cs;
         unsigned long linear_addr;
         unsigned int opsz, sp;
 
-        hvm_get_segment_register(v, x86_seg_cs, &segr);
-        opsz = segr.attr.fields.db ? 4 : 2;
+        hvm_get_segment_register(v, x86_seg_cs, &cs);
+        opsz = cs.attr.fields.db ? 4 : 2;
         hvm_get_segment_register(v, x86_seg_ss, &segr);
         if ( segr.attr.fields.db )
             sp = regs->esp -= opsz;
@@ -3038,8 +3042,7 @@ void hvm_task_switch(
             sp = regs->sp -= opsz;
         if ( hvm_virtual_to_linear_addr(x86_seg_ss, &segr, sp, opsz,
                                         hvm_access_write,
-                                        16 << segr.attr.fields.db,
-                                        &linear_addr) )
+                                        &cs, &linear_addr) )
         {
             rc = hvm_copy_to_guest_linear(linear_addr, &errcode, opsz, 0,
                                           &pfinfo);
@@ -3619,9 +3622,7 @@ void hvm_ud_intercept(struct cpu_user_regs *regs)
 
         if ( hvm_virtual_to_linear_addr(x86_seg_cs, cs, regs->rip,
                                         sizeof(sig), hvm_access_insn_fetch,
-                                        (hvm_long_mode_active(cur) &&
-                                         cs->attr.fields.l) ? 64 :
-                                        cs->attr.fields.db ? 32 : 16, &addr) &&
+                                        cs, &addr) &&
              (hvm_fetch_from_guest_linear(sig, addr, sizeof(sig),
                                           walk, NULL) == HVMCOPY_okay) &&
              (memcmp(sig, "\xf\xbxen", sizeof(sig)) == 0) )

@@ -472,7 +472,7 @@ bool_t hvm_virtual_to_linear_addr(
     unsigned long offset,
     unsigned int bytes,
     enum hvm_access_type access_type,
-    unsigned int addr_size,
+    const struct segment_register *active_cs,
     unsigned long *linear_addr);
 
 void *hvm_map_guest_frame_rw(unsigned long gfn, bool_t permanent,
