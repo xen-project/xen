@@ -47,7 +47,7 @@ dump_hypervisor_backtrace(struct vcpu *vcpu, const struct frame_head *head,
 static inline int is_32bit_vcpu(struct vcpu *vcpu)
 {
     if (is_hvm_vcpu(vcpu))
-        return !hvm_long_mode_enabled(vcpu);
+        return !hvm_long_mode_active(vcpu);
     else
         return is_pv_32bit_vcpu(vcpu);
 }

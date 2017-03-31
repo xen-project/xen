@@ -2241,7 +2241,7 @@ int hvm_set_cr0(unsigned long value, bool_t may_defer)
         }
 
         /* When CR0.PG is cleared, LMA is cleared immediately. */
-        if ( hvm_long_mode_enabled(v) )
+        if ( hvm_long_mode_active(v) )
         {
             v->arch.hvm_vcpu.guest_efer &= ~EFER_LMA;
             hvm_update_guest_efer(v);
@@ -2335,7 +2335,7 @@ int hvm_set_cr4(unsigned long value, bool_t may_defer)
 
     if ( !(value & X86_CR4_PAE) )
     {
-        if ( hvm_long_mode_enabled(v) )
+        if ( hvm_long_mode_active(v) )
         {
             HVM_DBG_LOG(DBG_LEVEL_1, "Guest cleared CR4.PAE while "
                         "EFER.LMA is set");
@@ -2346,7 +2346,7 @@ int hvm_set_cr4(unsigned long value, bool_t may_defer)
     old_cr = v->arch.hvm_vcpu.guest_cr[4];
 
     if ( (value & X86_CR4_PCIDE) && !(old_cr & X86_CR4_PCIDE) &&
-         (!hvm_long_mode_enabled(v) ||
+         (!hvm_long_mode_active(v) ||
           (v->arch.hvm_vcpu.guest_cr[3] & 0xfff)) )
     {
         HVM_DBG_LOG(DBG_LEVEL_1, "Guest attempts to change CR4.PCIDE from "
@@ -3619,7 +3619,7 @@ void hvm_ud_intercept(struct cpu_user_regs *regs)
 
         if ( hvm_virtual_to_linear_addr(x86_seg_cs, cs, regs->rip,
                                         sizeof(sig), hvm_access_insn_fetch,
-                                        (hvm_long_mode_enabled(cur) &&
+                                        (hvm_long_mode_active(cur) &&
                                          cs->attr.fields.l) ? 64 :
                                         cs->attr.fields.db ? 32 : 16, &addr) &&
              (hvm_fetch_from_guest_linear(sig, addr, sizeof(sig),
@@ -3630,7 +3630,7 @@ void hvm_ud_intercept(struct cpu_user_regs *regs)
             regs->eflags &= ~X86_EFLAGS_RF;
 
             /* Zero the upper 32 bits of %rip if not in 64bit mode. */
-            if ( !(hvm_long_mode_enabled(cur) && cs->attr.fields.l) )
+            if ( !(hvm_long_mode_active(cur) && cs->attr.fields.l) )
                 regs->rip = regs->eip;
 
             add_taint(TAINT_HVM_FEP);

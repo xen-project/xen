@@ -331,7 +331,7 @@ const struct x86_emulate_ops *shadow_init_emulation(
     creg = hvm_get_seg_reg(x86_seg_cs, sh_ctxt);
 
     /* Work out the emulation mode. */
-    if ( hvm_long_mode_enabled(v) && creg->attr.fields.l )
+    if ( hvm_long_mode_active(v) && creg->attr.fields.l )
     {
         sh_ctxt->ctxt.addr_size = sh_ctxt->ctxt.sp_size = 64;
     }
@@ -2921,7 +2921,7 @@ static void sh_update_paging_modes(struct vcpu *v)
             v->arch.guest_table = d->arch.paging.shadow.unpaged_pagetable;
             v->arch.paging.mode = &SHADOW_INTERNAL_NAME(sh_paging_mode, 2);
         }
-        else if ( hvm_long_mode_enabled(v) )
+        else if ( hvm_long_mode_active(v) )
         {
             // long mode guest...
             v->arch.paging.mode =

@@ -611,7 +611,7 @@ int vmx_guest_x86_mode(struct vcpu *v)
     if ( unlikely(guest_cpu_user_regs()->eflags & X86_EFLAGS_VM) )
         return 1;
     __vmread(GUEST_CS_AR_BYTES, &cs_ar_bytes);
-    if ( hvm_long_mode_enabled(v) &&
+    if ( hvm_long_mode_active(v) &&
          likely(cs_ar_bytes & X86_SEG_AR_CS_LM_ACTIVE) )
         return 8;
     return (likely(cs_ar_bytes & X86_SEG_AR_DEF_OP_SIZE) ? 4 : 2);
@@ -3392,7 +3392,7 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
 
     __vmread(VM_EXIT_REASON, &exit_reason);
 
-    if ( hvm_long_mode_enabled(v) )
+    if ( hvm_long_mode_active(v) )
         HVMTRACE_ND(VMEXIT64, 0, 1/*cycles*/, 3, exit_reason,
                     regs->eip, regs->rip >> 32, 0, 0, 0);
     else
@@ -3632,7 +3632,7 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
             {
                 if ( trace_will_trace_event(TRC_SHADOW) )
                     break;
-                if ( hvm_long_mode_enabled(v) )
+                if ( hvm_long_mode_active(v) )
                     HVMTRACE_LONG_2D(PF_XEN, regs->error_code,
                                      TRC_PAR_LONG(exit_qualification) );
                 else

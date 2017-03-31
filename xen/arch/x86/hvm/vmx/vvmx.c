@@ -392,7 +392,7 @@ static int vmx_inst_check_privilege(struct cpu_user_regs *regs, int vmxop_check)
     else if ( !nvmx_vcpu_in_vmx(v) )
         goto invalid_op;
 
-    if ( vmx_guest_x86_mode(v) < (hvm_long_mode_enabled(v) ? 8 : 2) )
+    if ( vmx_guest_x86_mode(v) < (hvm_long_mode_active(v) ? 8 : 2) )
         goto invalid_op;
     else if ( nestedhvm_vcpu_in_guestmode(v) )
         goto vmexit;
@@ -1154,13 +1154,13 @@ static void virtual_vmentry(struct cpu_user_regs *regs)
     /*
      * EFER handling:
      * hvm_set_efer won't work if CR0.PG = 1, so we change the value
-     * directly to make hvm_long_mode_enabled(v) work in L2.
+     * directly to make hvm_long_mode_active(v) work in L2.
      * An additional update_paging_modes is also needed if
      * there is 32/64 switch. v->arch.hvm_vcpu.guest_efer doesn't
      * need to be saved, since its value on vmexit is determined by
      * L1 exit_controls
      */
-    lm_l1 = !!hvm_long_mode_enabled(v);
+    lm_l1 = hvm_long_mode_active(v);
     lm_l2 = !!(get_vvmcs(v, VM_ENTRY_CONTROLS) & VM_ENTRY_IA32E_MODE);
 
     if ( lm_l2 )
@@ -1359,7 +1359,7 @@ static void virtual_vmexit(struct cpu_user_regs *regs)
     nvcpu->nv_vmexit_pending = 0;
     nvcpu->nv_vmswitch_in_progress = 1;
 
-    lm_l2 = !!hvm_long_mode_enabled(v);
+    lm_l2 = hvm_long_mode_active(v);
     lm_l1 = !!(get_vvmcs(v, VM_EXIT_CONTROLS) & VM_EXIT_IA32E_MODE);
 
     if ( lm_l1 )

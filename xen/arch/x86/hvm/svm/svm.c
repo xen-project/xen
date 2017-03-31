@@ -516,7 +516,7 @@ static int svm_guest_x86_mode(struct vcpu *v)
         return 0;
     if ( unlikely(guest_cpu_user_regs()->eflags & X86_EFLAGS_VM) )
         return 1;
-    if ( hvm_long_mode_enabled(v) && likely(vmcb->cs.attr.fields.l) )
+    if ( hvm_long_mode_active(v) && likely(vmcb->cs.attr.fields.l) )
         return 8;
     return (likely(vmcb->cs.attr.fields.db) ? 4 : 2);
 }
@@ -2279,7 +2279,7 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
 
     exit_reason = vmcb->exitcode;
 
-    if ( hvm_long_mode_enabled(v) )
+    if ( hvm_long_mode_active(v) )
         HVMTRACE_ND(VMEXIT64, vcpu_guestmode ? TRC_HVM_NESTEDFLAG : 0,
                     1/*cycles*/, 3, exit_reason,
                     regs->eip, regs->rip >> 32, 0, 0, 0);
@@ -2429,7 +2429,7 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
         {
             if ( trace_will_trace_event(TRC_SHADOW) )
                 break;
-            if ( hvm_long_mode_enabled(v) )
+            if ( hvm_long_mode_active(v) )
                 HVMTRACE_LONG_2D(PF_XEN, regs->error_code, TRC_PAR_LONG(va));
             else
                 HVMTRACE_2D(PF_XEN, regs->error_code, va);

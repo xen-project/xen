@@ -2051,7 +2051,7 @@ void hvm_emulate_init_per_insn(
     unsigned int pfec = PFEC_page_present;
     unsigned long addr;
 
-    if ( hvm_long_mode_enabled(curr) &&
+    if ( hvm_long_mode_active(curr) &&
          hvmemul_ctxt->seg_reg[x86_seg_cs].attr.fields.l )
         hvmemul_ctxt->ctxt.addr_size = hvmemul_ctxt->ctxt.sp_size = 64;
     else

@@ -690,10 +690,10 @@ static void hap_update_cr3(struct vcpu *v, int do_locking)
 const struct paging_mode *
 hap_paging_get_mode(struct vcpu *v)
 {
-    return !hvm_paging_enabled(v)   ? &hap_paging_real_mode :
-        hvm_long_mode_enabled(v) ? &hap_paging_long_mode :
-        hvm_pae_enabled(v)       ? &hap_paging_pae_mode  :
-                                   &hap_paging_protected_mode;
+    return (!hvm_paging_enabled(v)  ? &hap_paging_real_mode :
+            hvm_long_mode_active(v) ? &hap_paging_long_mode :
+            hvm_pae_enabled(v)      ? &hap_paging_pae_mode  :
+                                      &hap_paging_protected_mode);
 }
 
 static void hap_update_paging_modes(struct vcpu *v)
