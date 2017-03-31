@@ -13,7 +13,11 @@ static struct file __initdata ucode;
 static multiboot_info_t __initdata mbi = {
     .flags = MBI_MODULES | MBI_LOADERNAME
 };
-static module_t __initdata mb_modules[4];
+/*
+ * The array size needs to be one larger than the number of modules we
+ * support - see __start_xen().
+ */
+static module_t __initdata mb_modules[5];
 
 static void __init edd_put_string(u8 *dst, size_t n, const char *src)
 {
