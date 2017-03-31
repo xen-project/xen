@@ -117,6 +117,25 @@ static void __init parse_vwfi(const char *s)
 }
 custom_param("vwfi", parse_vwfi);
 
+static int __init vwfi_init(void)
+{
+    /*
+     * HCR_EL2 has already been set on cpu0, change the setting here, if
+     * needed. Other cpus haven't booted yet, init_traps will setup
+     * HCR_EL2 correctly.
+     */
+    if ( vwfi == NATIVE )
+    {
+        register_t hcr;
+
+        hcr = READ_SYSREG(HCR_EL2);
+        WRITE_SYSREG(hcr & ~(HCR_TWI|HCR_TWE), HCR_EL2);
+    }
+
+    return 0;
+}
+presmp_initcall(vwfi_init);
+
 void init_traps(void)
 {
     /* Setup Hyp vector base */
