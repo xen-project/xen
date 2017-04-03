@@ -6566,11 +6566,11 @@ done
 
 if test "x$ocamltools" = "xy"; then :
 
-    if test "x$OCAMLC" = "xno" || test "x$OCAMLFIND" = "xno"; then :
+    if test "x$OCAMLOPT" = "xno" || test "x$OCAMLFIND" = "xno"; then :
 
         if test "x$enable_ocamltools" = "xyes"; then :
 
-            as_fn_error $? "Ocaml tools enabled, but unable to find Ocaml" "$LINENO" 5
+            as_fn_error $? "Ocaml tools enabled, but missing ocamlopt or ocamlfind" "$LINENO" 5
 fi
         ocamltools="n"
 
