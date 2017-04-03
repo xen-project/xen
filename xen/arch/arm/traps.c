@@ -32,6 +32,7 @@
 #include <xen/perfc.h>
 #include <xen/virtual_region.h>
 #include <xen/mem_access.h>
+#include <xen/iocap.h>
 #include <public/sched.h>
 #include <public/xen.h>
 #include <asm/debugger.h>
@@ -49,6 +50,7 @@
 #include <asm/gic.h>
 #include <asm/vgic.h>
 #include <asm/cpuerrata.h>
+#include <asm/acpi.h>
 
 /* The base of the stack must always be double-word aligned, which means
  * that both the kernel half of struct cpu_user_regs (which is pushed in
@@ -2534,6 +2536,35 @@ static bool try_handle_mmio(struct cpu_user_regs *regs,
     return !!handle_mmio(info);
 }
 
+/*
+ * When using ACPI, most of the MMIO regions will be mapped on-demand
+ * in stage-2 page tables for the hardware domain because Xen is not
+ * able to know from the EFI memory map the MMIO regions.
+ */
+static bool try_map_mmio(gfn_t gfn)
+{
+    struct domain *d = current->domain;
+
+    /* For the hardware domain, all MMIOs are mapped with GFN == MFN */
+    mfn_t mfn = _mfn(gfn_x(gfn));
+
+    /*
+     * Device-Tree should already have everything mapped when building
+     * the hardware domain.
+     */
+    if ( acpi_disabled )
+        return false;
+
+    if ( !is_hardware_domain(d) )
+        return false;
+
+    /* The hardware domain can only map permitted MMIO regions */
+    if ( !iomem_access_permitted(d, mfn_x(mfn), mfn_x(mfn) + 1) )
+        return false;
+
+    return !map_regions_p2mt(d, gfn, 1, mfn, p2m_mmio_direct_c);
+}
+
 static void do_trap_data_abort_guest(struct cpu_user_regs *regs,
                                      const union hsr hsr)
 {
@@ -2609,6 +2640,9 @@ static void do_trap_data_abort_guest(struct cpu_user_regs *regs,
          */
         mfn = p2m_lookup(current->domain, _gfn(paddr_to_pfn(info.gpa)), NULL);
         if ( !mfn_eq(mfn, INVALID_MFN) )
+            return;
+
+        if ( try_map_mmio(_gfn(paddr_to_pfn(info.gpa))) )
             return;
 
         break;
