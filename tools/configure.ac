@@ -295,9 +295,9 @@ AC_PROG_OCAML
 AC_PROG_FINDLIB
 
 AS_IF([test "x$ocamltools" = "xy"], [
-    AS_IF([test "x$OCAMLC" = "xno" || test "x$OCAMLFIND" = "xno"], [
+    AS_IF([test "x$OCAMLOPT" = "xno" || test "x$OCAMLFIND" = "xno"], [
         AS_IF([test "x$enable_ocamltools" = "xyes"], [
-            AC_MSG_ERROR([Ocaml tools enabled, but unable to find Ocaml])])
+            AC_MSG_ERROR([Ocaml tools enabled, but missing ocamlopt or ocamlfind])])
         ocamltools="n"
     ], [
         AX_COMPARE_VERSION([$OCAMLVERSION], [lt], [3.09.3], [
