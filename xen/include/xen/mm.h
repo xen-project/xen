@@ -60,7 +60,11 @@ TYPE_SAFE(unsigned long, mfn);
 
 #ifndef mfn_t
 #define mfn_t /* Grep fodder: mfn_t, _mfn() and mfn_x() are defined above */
+#define _mfn
+#define mfn_x
 #undef mfn_t
+#undef _mfn
+#undef mfn_x
 #endif
 
 static inline mfn_t mfn_add(mfn_t mfn, unsigned long i)
@@ -89,7 +93,11 @@ TYPE_SAFE(unsigned long, gfn);
 
 #ifndef gfn_t
 #define gfn_t /* Grep fodder: gfn_t, _gfn() and gfn_x() are defined above */
+#define _gfn
+#define gfn_x
 #undef gfn_t
+#undef _gfn
+#undef gfn_x
 #endif
 
 static inline gfn_t gfn_add(gfn_t gfn, unsigned long i)
@@ -118,7 +126,11 @@ TYPE_SAFE(unsigned long, pfn);
 
 #ifndef pfn_t
 #define pfn_t /* Grep fodder: pfn_t, _pfn() and pfn_x() are defined above */
+#define _pfn
+#define pfn_x
 #undef pfn_t
+#undef _pfn
+#undef pfn_x
 #endif
 
 struct page_info;
