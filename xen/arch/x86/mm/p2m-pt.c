@@ -452,7 +452,7 @@ static int do_recalc(struct p2m_domain *p2m, unsigned long gfn)
                      mfn |= _PAGE_PSE_PAT >> PAGE_SHIFT;
                 }
                 else
-                     mfn &= ~(_PAGE_PSE_PAT >> PAGE_SHIFT);
+                     mfn &= ~((unsigned long)_PAGE_PSE_PAT >> PAGE_SHIFT);
                 flags |= _PAGE_PSE;
             }
             e = l1e_from_pfn(mfn, flags);
