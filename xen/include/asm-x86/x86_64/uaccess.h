@@ -29,8 +29,9 @@ extern void *xlat_malloc(unsigned long *xlat_page_current, size_t size);
 /*
  * Valid if in +ve half of 48-bit address space, or above Xen-reserved area.
  * This is also valid for range checks (addr, addr+size). As long as the
- * start address is outside the Xen-reserved area then we will access a
- * non-canonical address (and thus fault) before ever reaching VIRT_START.
+ * start address is outside the Xen-reserved area, sequential accesses
+ * (starting at addr) will hit a non-canonical address (and thus fault)
+ * before ever reaching VIRT_START.
  */
 #define __addr_ok(addr) \
     (((unsigned long)(addr) < (1UL<<47)) || \
@@ -40,7 +41,8 @@ extern void *xlat_malloc(unsigned long *xlat_page_current, size_t size);
     (__addr_ok(addr) || is_compat_arg_xlat_range(addr, size))
 
 #define array_access_ok(addr, count, size) \
-    (access_ok(addr, (count)*(size)))
+    (likely(((count) ?: 0UL) < (~0UL / (size))) && \
+     access_ok(addr, (count) * (size)))
 
 #define __compat_addr_ok(d, addr) \
     ((unsigned long)(addr) < HYPERVISOR_COMPAT_VIRT_START(d))
