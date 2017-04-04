@@ -30,7 +30,7 @@ struct xc_interface_core *xc_interface_open(xentoollog_logger *logger,
                                             xentoollog_logger *dombuild_logger,
                                             unsigned open_flags)
 {
-    struct xc_interface_core xch_buf, *xch = &xch_buf;
+    struct xc_interface_core xch_buf = { 0 }, *xch = &xch_buf;
 
     xch->flags = open_flags;
     xch->dombuild_logger_file = 0;
