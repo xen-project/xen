@@ -330,7 +330,7 @@ int pt_irq_create_bind(
             spin_unlock(&d->event_lock);
             return -ENOMEM;
         }
-        for ( i = 0; i < NR_HVM_IRQS; i++ )
+        for ( i = 0; i < NR_HVM_DOMU_IRQS; i++ )
             INIT_LIST_HEAD(&hvm_irq_dpci->girq[i]);
 
         hvm_domain_irq(d)->dpci = hvm_irq_dpci;
