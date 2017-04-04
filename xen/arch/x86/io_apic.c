@@ -2274,8 +2274,6 @@ static int ioapic_physbase_to_id(unsigned long physbase)
     return -EINVAL;
 }
 
-unsigned apic_gsi_base(int apic);
-
 static int apic_pin_2_gsi_irq(int apic, int pin)
 {
     int idx;
@@ -2286,7 +2284,7 @@ static int apic_pin_2_gsi_irq(int apic, int pin)
     idx = find_irq_entry(apic, pin, mp_INT);
 
     return idx >= 0 ? pin_2_irq(idx, apic, pin)
-                    : apic_gsi_base(apic) + pin;
+                    : io_apic_gsi_base(apic) + pin;
 }
 
 int ioapic_guest_read(unsigned long physbase, unsigned int reg, u32 *pval)

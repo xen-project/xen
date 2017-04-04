@@ -127,6 +127,9 @@ struct __packed IO_APIC_route_entry {
 /* I/O APIC entries */
 extern struct mpc_config_ioapic mp_ioapics[MAX_IO_APICS];
 
+/* Base GSI for this IO APIC */
+unsigned int io_apic_gsi_base(unsigned int apic);
+
 /* Only need to remap ioapic RTE (reg: 10~3Fh) */
 #define ioapic_reg_remapped(reg) (iommu_intremap && ((reg) >= 0x10))
 

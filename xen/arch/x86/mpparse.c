@@ -913,7 +913,7 @@ unsigned __init highest_gsi(void)
 	return res;
 }
 
-unsigned apic_gsi_base(int apic)
+unsigned int io_apic_gsi_base(unsigned int apic)
 {
 	return mp_ioapic_routing[apic].gsi_base;
 }
