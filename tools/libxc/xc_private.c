@@ -131,7 +131,7 @@ static struct xc_interface_core *xc_interface_open_common(xentoollog_logger *log
                                                           unsigned open_flags,
                                                           enum xc_osdep_type type)
 {
-    struct xc_interface_core xch_buf, *xch = &xch_buf;
+    struct xc_interface_core xch_buf = { 0 }, *xch = &xch_buf;
 
     xch->type = type;
     xch->flags = open_flags;
