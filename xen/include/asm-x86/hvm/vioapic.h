@@ -49,12 +49,14 @@
 
 struct hvm_vioapic {
     struct domain *domain;
+    uint32_t nr_pins;
     union {
-        XEN_HVM_VIOAPIC(, VIOAPIC_NUM_PINS);
+        XEN_HVM_VIOAPIC(,);
         struct hvm_hw_vioapic domU;
     };
 };
 
+#define hvm_vioapic_size(cnt) offsetof(struct hvm_vioapic, redirtbl[cnt])
 #define domain_vioapic(d) ((d)->arch.hvm_domain.vioapic)
 #define vioapic_domain(v) ((v)->domain)
 

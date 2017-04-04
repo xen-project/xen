@@ -393,6 +393,8 @@ XEN_HVM_VIOAPIC(hvm_hw_vioapic, VIOAPIC_NUM_PINS);
 
 #ifndef __XEN__
 #undef XEN_HVM_VIOAPIC
+#else
+#undef VIOAPIC_NUM_PINS
 #endif
 
 DECLARE_HVM_SAVE_TYPE(IOAPIC, 4, struct hvm_hw_vioapic);
