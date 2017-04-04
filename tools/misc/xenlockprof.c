@@ -24,7 +24,7 @@ int main(int argc, char *argv[])
     uint32_t           i, j, n;
     uint64_t           time;
     double             l, b, sl, sb;
-    char               name[60];
+    char               name[100];
     DECLARE_HYPERCALL_BUFFER(xc_lockprof_data_t, data);
 
     if ( (argc > 2) || ((argc == 2) && (strcmp(argv[1], "-r") != 0)) )
