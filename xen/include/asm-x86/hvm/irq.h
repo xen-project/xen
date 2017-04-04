@@ -95,6 +95,7 @@ struct hvm_irq {
     (((((dev)<<2) + ((dev)>>3) + (intx)) & 31) + 16)
 #define hvm_pci_intx_link(dev, intx) \
     (((dev) + (intx)) & 3)
+#define hvm_domain_irq(d) (&(d)->arch.hvm_domain.irq)
 
 #define hvm_isa_irq_to_gsi(isa_irq) ((isa_irq) ? : 2)
 

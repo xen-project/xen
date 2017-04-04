@@ -317,7 +317,7 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( is_hvm_domain(currd) &&
              domain_pirq_to_emuirq(currd, eoi.irq) > 0 )
         {
-            struct hvm_irq *hvm_irq = &currd->arch.hvm_domain.irq;
+            struct hvm_irq *hvm_irq = hvm_domain_irq(currd);
             int gsi = domain_pirq_to_emuirq(currd, eoi.irq);
 
             /* if this is a level irq and count > 0, send another

@@ -373,7 +373,7 @@ struct vlapic *vlapic_lowest_prio(
     struct domain *d, const struct vlapic *source,
     int short_hand, uint32_t dest, bool_t dest_mode)
 {
-    int old = d->arch.hvm_domain.irq.round_robin_prev_vcpu;
+    int old = hvm_domain_irq(d)->round_robin_prev_vcpu;
     uint32_t ppr, target_ppr = UINT_MAX;
     struct vlapic *vlapic, *target = NULL;
     struct vcpu *v;
@@ -394,8 +394,8 @@ struct vlapic *vlapic_lowest_prio(
     } while ( v->vcpu_id != old );
 
     if ( target != NULL )
-        d->arch.hvm_domain.irq.round_robin_prev_vcpu =
-            vlapic_vcpu(target)->vcpu_id;
+        hvm_domain_irq(d)->round_robin_prev_vcpu =
+           vlapic_vcpu(target)->vcpu_id;
 
     return target;
 }

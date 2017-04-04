@@ -195,7 +195,7 @@ struct hvm_irq_dpci *domain_get_irq_dpci(const struct domain *d)
     if ( !d || !is_hvm_domain(d) )
         return NULL;
 
-    return d->arch.hvm_domain.irq.dpci;
+    return hvm_domain_irq(d)->dpci;
 }
 
 void free_hvm_irq_dpci(struct hvm_irq_dpci *dpci)
@@ -333,7 +333,7 @@ int pt_irq_create_bind(
         for ( i = 0; i < NR_HVM_IRQS; i++ )
             INIT_LIST_HEAD(&hvm_irq_dpci->girq[i]);
 
-        d->arch.hvm_domain.irq.dpci = hvm_irq_dpci;
+        hvm_domain_irq(d)->dpci = hvm_irq_dpci;
     }
 
     info = pirq_get_info(d, pirq);
@@ -788,7 +788,7 @@ static int _hvm_dpci_msi_eoi(struct domain *d,
 
 void hvm_dpci_msi_eoi(struct domain *d, int vector)
 {
-    if ( !iommu_enabled || !d->arch.hvm_domain.irq.dpci )
+    if ( !iommu_enabled || !hvm_domain_irq(d)->dpci )
        return;
 
     spin_lock(&d->event_lock);
@@ -798,7 +798,7 @@ void hvm_dpci_msi_eoi(struct domain *d, int vector)
 
 static void hvm_dirq_assist(struct domain *d, struct hvm_pirq_dpci *pirq_dpci)
 {
-    if ( unlikely(!d->arch.hvm_domain.irq.dpci) )
+    if ( unlikely(!hvm_domain_irq(d)->dpci) )
     {
         ASSERT_UNREACHABLE();
         return;

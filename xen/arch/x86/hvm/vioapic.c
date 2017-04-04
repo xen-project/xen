@@ -123,7 +123,7 @@ static void vioapic_write_redirent(
     int top_word, uint32_t val)
 {
     struct domain *d = vioapic_domain(vioapic);
-    struct hvm_irq *hvm_irq = &d->arch.hvm_domain.irq;
+    struct hvm_irq *hvm_irq = hvm_domain_irq(d);
     union vioapic_redir_entry *pent, ent;
     int unmasked = 0;
 
@@ -389,7 +389,7 @@ void vioapic_irq_positive_edge(struct domain *d, unsigned int irq)
 void vioapic_update_EOI(struct domain *d, u8 vector)
 {
     struct hvm_vioapic *vioapic = domain_vioapic(d);
-    struct hvm_irq *hvm_irq = &d->arch.hvm_domain.irq;
+    struct hvm_irq *hvm_irq = hvm_domain_irq(d);
     union vioapic_redir_entry *ent;
     int gsi;
 

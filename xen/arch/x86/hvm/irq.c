@@ -60,7 +60,7 @@ static void deassert_irq(struct domain *d, unsigned isa_irq)
 static void __hvm_pci_intx_assert(
     struct domain *d, unsigned int device, unsigned int intx)
 {
-    struct hvm_irq *hvm_irq = &d->arch.hvm_domain.irq;
+    struct hvm_irq *hvm_irq = hvm_domain_irq(d);
     unsigned int gsi, link, isa_irq;
 
     ASSERT((device <= 31) && (intx <= 3));
@@ -90,7 +90,7 @@ void hvm_pci_intx_assert(
 static void __hvm_pci_intx_deassert(
     struct domain *d, unsigned int device, unsigned int intx)
 {
-    struct hvm_irq *hvm_irq = &d->arch.hvm_domain.irq;
+    struct hvm_irq *hvm_irq = hvm_domain_irq(d);
     unsigned int gsi, link, isa_irq;
 
     ASSERT((device <= 31) && (intx <= 3));
@@ -119,7 +119,7 @@ void hvm_pci_intx_deassert(
 void hvm_isa_irq_assert(
     struct domain *d, unsigned int isa_irq)
 {
-    struct hvm_irq *hvm_irq = &d->arch.hvm_domain.irq;
+    struct hvm_irq *hvm_irq = hvm_domain_irq(d);
     unsigned int gsi = hvm_isa_irq_to_gsi(isa_irq);
 
     ASSERT(isa_irq <= 15);
@@ -136,7 +136,7 @@ void hvm_isa_irq_assert(
 void hvm_isa_irq_deassert(
     struct domain *d, unsigned int isa_irq)
 {
-    struct hvm_irq *hvm_irq = &d->arch.hvm_domain.irq;
+    struct hvm_irq *hvm_irq = hvm_domain_irq(d);
     unsigned int gsi = hvm_isa_irq_to_gsi(isa_irq);
 
     ASSERT(isa_irq <= 15);
@@ -153,7 +153,7 @@ void hvm_isa_irq_deassert(
 static void hvm_set_callback_irq_level(struct vcpu *v)
 {
     struct domain *d = v->domain;
-    struct hvm_irq *hvm_irq = &d->arch.hvm_domain.irq;
+    struct hvm_irq *hvm_irq = hvm_domain_irq(d);
     unsigned int gsi, pdev, pintx, asserted;
 
     ASSERT(v->vcpu_id == 0);
@@ -201,7 +201,7 @@ static void hvm_set_callback_irq_level(struct vcpu *v)
 void hvm_maybe_deassert_evtchn_irq(void)
 {
     struct domain *d = current->domain;
-    struct hvm_irq *hvm_irq = &d->arch.hvm_domain.irq;
+    struct hvm_irq *hvm_irq = hvm_domain_irq(d);
 
     if ( hvm_irq->callback_via_asserted &&
          !vcpu_info(d->vcpu[0], evtchn_upcall_pending) )
@@ -230,7 +230,7 @@ void hvm_assert_evtchn_irq(struct vcpu *v)
 
 int hvm_set_pci_link_route(struct domain *d, u8 link, u8 isa_irq)
 {
-    struct hvm_irq *hvm_irq = &d->arch.hvm_domain.irq;
+    struct hvm_irq *hvm_irq = hvm_domain_irq(d);
     u8 old_isa_irq;
     int i;
 
@@ -323,7 +323,7 @@ int hvm_inject_msi(struct domain *d, uint64_t addr, uint32_t data)
 
 void hvm_set_callback_via(struct domain *d, uint64_t via)
 {
-    struct hvm_irq *hvm_irq = &d->arch.hvm_domain.irq;
+    struct hvm_irq *hvm_irq = hvm_domain_irq(d);
     unsigned int gsi=0, pdev=0, pintx=0;
     uint8_t via_type;
 
@@ -486,7 +486,7 @@ void arch_evtchn_inject(struct vcpu *v)
 
 static void irq_dump(struct domain *d)
 {
-    struct hvm_irq *hvm_irq = &d->arch.hvm_domain.irq;
+    struct hvm_irq *hvm_irq = hvm_domain_irq(d);
     int i; 
     printk("Domain %d:\n", d->domain_id);
     printk("PCI 0x%16.16"PRIx64"%16.16"PRIx64
@@ -541,7 +541,7 @@ __initcall(dump_irq_info_key_init);
 
 static int irq_save_pci(struct domain *d, hvm_domain_context_t *h)
 {
-    struct hvm_irq *hvm_irq = &d->arch.hvm_domain.irq;
+    struct hvm_irq *hvm_irq = hvm_domain_irq(d);
     unsigned int asserted, pdev, pintx;
     int rc;
 
@@ -573,7 +573,7 @@ static int irq_save_pci(struct domain *d, hvm_domain_context_t *h)
 
 static int irq_save_isa(struct domain *d, hvm_domain_context_t *h)
 {
-    struct hvm_irq *hvm_irq = &d->arch.hvm_domain.irq;
+    struct hvm_irq *hvm_irq = hvm_domain_irq(d);
 
     /* Save ISA IRQ lines */
     return ( hvm_save_entry(ISA_IRQ, 0, h, &hvm_irq->isa_irq) );
@@ -581,7 +581,7 @@ static int irq_save_isa(struct domain *d, hvm_domain_context_t *h)
 
 static int irq_save_link(struct domain *d, hvm_domain_context_t *h)
 {
-    struct hvm_irq *hvm_irq = &d->arch.hvm_domain.irq;
+    struct hvm_irq *hvm_irq = hvm_domain_irq(d);
 
     /* Save PCI-ISA link state */
     return ( hvm_save_entry(PCI_LINK, 0, h, &hvm_irq->pci_link) );
@@ -589,7 +589,7 @@ static int irq_save_link(struct domain *d, hvm_domain_context_t *h)
 
 static int irq_load_pci(struct domain *d, hvm_domain_context_t *h)
 {
-    struct hvm_irq *hvm_irq = &d->arch.hvm_domain.irq;
+    struct hvm_irq *hvm_irq = hvm_domain_irq(d);
     int link, dev, intx, gsi;
 
     /* Load the PCI IRQ lines */
@@ -622,7 +622,7 @@ static int irq_load_pci(struct domain *d, hvm_domain_context_t *h)
 
 static int irq_load_isa(struct domain *d, hvm_domain_context_t *h)
 {
-    struct hvm_irq *hvm_irq = &d->arch.hvm_domain.irq;
+    struct hvm_irq *hvm_irq = hvm_domain_irq(d);
     int irq;
 
     /* Load the ISA IRQ lines */
@@ -641,7 +641,7 @@ static int irq_load_isa(struct domain *d, hvm_domain_context_t *h)
 
 static int irq_load_link(struct domain *d, hvm_domain_context_t *h)
 {
-    struct hvm_irq *hvm_irq = &d->arch.hvm_domain.irq;
+    struct hvm_irq *hvm_irq = hvm_domain_irq(d);
     int link, gsi;
 
     /* Load the PCI-ISA IRQ link routing table */

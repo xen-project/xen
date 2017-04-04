@@ -66,7 +66,7 @@ void flush_all_cache()
 static int _hvm_dpci_isairq_eoi(struct domain *d,
                                 struct hvm_pirq_dpci *pirq_dpci, void *arg)
 {
-    struct hvm_irq *hvm_irq = &d->arch.hvm_domain.irq;
+    struct hvm_irq *hvm_irq = hvm_domain_irq(d);
     unsigned int isairq = (long)arg;
     const struct dev_intx_gsi_link *digl;
 
