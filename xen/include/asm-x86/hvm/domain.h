@@ -125,7 +125,7 @@ struct hvm_domain {
 
     /* Lock protects access to irq, vpic and vioapic. */
     spinlock_t             irq_lock;
-    struct hvm_irq         irq;
+    struct hvm_irq        *irq;
     struct hvm_hw_vpic     vpic[2]; /* 0=master; 1=slave */
     struct hvm_vioapic    *vioapic;
     struct hvm_hw_stdvga   stdvga;

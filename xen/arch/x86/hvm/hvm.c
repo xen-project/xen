@@ -619,10 +619,18 @@ int hvm_domain_initialise(struct domain *d)
     d->arch.hvm_domain.params = xzalloc_array(uint64_t, HVM_NR_PARAMS);
     d->arch.hvm_domain.io_handler = xzalloc_array(struct hvm_io_handler,
                                                   NR_IO_HANDLERS);
+    d->arch.hvm_domain.irq = xzalloc_bytes(hvm_irq_size(NR_HVM_DOMU_IRQS));
+
     rc = -ENOMEM;
-    if ( !d->arch.hvm_domain.pl_time ||
+    if ( !d->arch.hvm_domain.pl_time || !d->arch.hvm_domain.irq ||
          !d->arch.hvm_domain.params  || !d->arch.hvm_domain.io_handler )
         goto fail1;
+
+    /* Set the default number of GSIs */
+    hvm_domain_irq(d)->nr_gsis = NR_HVM_DOMU_IRQS;
+
+    BUILD_BUG_ON(NR_HVM_DOMU_IRQS < NR_ISAIRQS);
+    ASSERT(hvm_domain_irq(d)->nr_gsis >= NR_ISAIRQS);
 
     /* need link to containing domain */
     d->arch.hvm_domain.pl_time->domain = d;
@@ -680,6 +688,7 @@ int hvm_domain_initialise(struct domain *d)
     xfree(d->arch.hvm_domain.io_handler);
     xfree(d->arch.hvm_domain.params);
     xfree(d->arch.hvm_domain.pl_time);
+    xfree(d->arch.hvm_domain.irq);
  fail0:
     hvm_destroy_cacheattr_region_list(d);
     return rc;
@@ -722,6 +731,9 @@ void hvm_domain_destroy(struct domain *d)
 
     xfree(d->arch.hvm_domain.pl_time);
     d->arch.hvm_domain.pl_time = NULL;
+
+    xfree(d->arch.hvm_domain.irq);
+    d->arch.hvm_domain.irq = NULL;
 }
 
 static int hvm_save_tsc_adjust(struct domain *d, hvm_domain_context_t *h)

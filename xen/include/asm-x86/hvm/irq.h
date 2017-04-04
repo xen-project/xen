@@ -67,18 +67,6 @@ struct hvm_irq {
     u8 pci_link_assert_count[4];
 
     /*
-     * Number of wires asserting each GSI.
-     * 
-     * GSIs 0-15 are the ISA IRQs. ISA devices map directly into this space
-     * except ISA IRQ 0, which is connected to GSI 2.
-     * PCI links map into this space via the PCI-ISA bridge.
-     * 
-     * GSIs 16+ are used only be PCI devices. The mapping from PCI device to
-     * GSI is as follows: ((device*4 + device/8 + INTx#) & 31) + 16
-     */
-    u8 gsi_assert_count[VIOAPIC_NUM_PINS];
-
-    /*
      * GSIs map onto PIC/IO-APIC in the usual way:
      *  0-7:  Master 8259 PIC, IO-APIC pins 0-7
      *  8-15: Slave  8259 PIC, IO-APIC pins 8-15
@@ -89,13 +77,27 @@ struct hvm_irq {
     u8 round_robin_prev_vcpu;
 
     struct hvm_irq_dpci *dpci;
+
+    /*
+     * Number of wires asserting each GSI.
+     *
+     * GSIs 0-15 are the ISA IRQs. ISA devices map directly into this space
+     * except ISA IRQ 0, which is connected to GSI 2.
+     * PCI links map into this space via the PCI-ISA bridge.
+     *
+     * GSIs 16+ are used only be PCI devices. The mapping from PCI device to
+     * GSI is as follows: ((device*4 + device/8 + INTx#) & 31) + 16
+     */
+    unsigned int nr_gsis;
+    u8 gsi_assert_count[];
 };
 
 #define hvm_pci_intx_gsi(dev, intx)  \
     (((((dev)<<2) + ((dev)>>3) + (intx)) & 31) + 16)
 #define hvm_pci_intx_link(dev, intx) \
     (((dev) + (intx)) & 3)
-#define hvm_domain_irq(d) (&(d)->arch.hvm_domain.irq)
+#define hvm_domain_irq(d) ((d)->arch.hvm_domain.irq)
+#define hvm_irq_size(cnt) offsetof(struct hvm_irq, gsi_assert_count[cnt])
 
 #define hvm_isa_irq_to_gsi(isa_irq) ((isa_irq) ? : 2)
 
