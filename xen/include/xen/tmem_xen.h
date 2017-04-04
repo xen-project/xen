@@ -198,7 +198,6 @@ static inline int tmem_get_tmemop_from_client(tmem_op_t *op, tmem_cli_op_t uops)
         switch ( cop.cmd )
         {
         case TMEM_NEW_POOL:   u = XLAT_tmem_op_u_creat; break;
-        case TMEM_AUTH:       u = XLAT_tmem_op_u_creat; break;
         default:              u = XLAT_tmem_op_u_gen ;  break;
         }
         XLAT_tmem_op(op, &cop);

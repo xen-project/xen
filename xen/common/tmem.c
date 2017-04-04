@@ -1604,8 +1604,8 @@ fail:
 
 /************ TMEM CONTROL OPERATIONS ************************************/
 
-static int tmemc_shared_pool_auth(domid_t cli_id, uint64_t uuid_lo,
-                                  uint64_t uuid_hi, bool_t auth)
+int tmemc_shared_pool_auth(domid_t cli_id, uint64_t uuid_lo,
+                           uint64_t uuid_hi, bool auth)
 {
     struct client *client;
     int i, free = -1;
@@ -1912,12 +1912,8 @@ long do_tmem_op(tmem_cli_op_t uops)
     {
     case TMEM_CONTROL:
     case TMEM_RESTORE_NEW:
-        rc = -EOPNOTSUPP;
-        break;
-
     case TMEM_AUTH:
-        rc = tmemc_shared_pool_auth(op.u.creat.arg1,op.u.creat.uuid[0],
-                         op.u.creat.uuid[1],op.u.creat.flags);
+        rc = -EOPNOTSUPP;
         break;
 
     default:

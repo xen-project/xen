@@ -22,6 +22,8 @@ struct client *client_create(domid_t cli_id);
 int do_tmem_new_pool(domid_t this_cli_id, uint32_t d_poolid, uint32_t flags,
                      uint64_t uuid_lo, uint64_t uuid_hi);
 
+int tmemc_shared_pool_auth(domid_t cli_id, uint64_t uuid_lo,
+                           uint64_t uuid_hi, bool auth);
 #endif /* CONFIG_TMEM */
 
 #endif /* __XEN_TMEM_CONTROL_H__ */

@@ -22,30 +22,6 @@
 #include <assert.h>
 #include <xen/tmem.h>
 
-static int do_tmem_op(xc_interface *xch, tmem_op_t *op)
-{
-    int ret;
-    DECLARE_HYPERCALL_BOUNCE(op, sizeof(*op), XC_HYPERCALL_BUFFER_BOUNCE_BOTH);
-
-    if ( xc_hypercall_bounce_pre(xch, op) )
-    {
-        PERROR("Could not bounce buffer for tmem op hypercall");
-        return -EFAULT;
-    }
-
-    ret = xencall1(xch->xcall, __HYPERVISOR_tmem_op,
-                   HYPERCALL_BUFFER_AS_ARG(op));
-    if ( ret < 0 )
-    {
-        if ( errno == EACCES )
-            DPRINTF("tmem operation failed -- need to"
-                    " rebuild the user-space tool set?\n");
-    }
-    xc_hypercall_bounce_post(xch, op);
-
-    return ret;
-}
-
 int xc_tmem_control(xc_interface *xch,
                     int32_t pool_id,
                     uint32_t cmd,
@@ -69,7 +45,8 @@ int xc_tmem_control(xc_interface *xch,
     sysctl.u.tmem_op.oid.oid[1] = 0;
     sysctl.u.tmem_op.oid.oid[2] = 0;
 
-    if ( cmd == XEN_SYSCTL_TMEM_OP_SET_CLIENT_INFO )
+    if ( cmd == XEN_SYSCTL_TMEM_OP_SET_CLIENT_INFO ||
+         cmd == XEN_SYSCTL_TMEM_OP_SET_AUTH )
         HYPERCALL_BOUNCE_SET_DIR(buf, XC_HYPERCALL_BUFFER_BOUNCE_IN);
     if ( len )
     {
@@ -176,22 +153,25 @@ static int xc_tmem_uuid_parse(char *uuid_str, uint64_t *uuid_lo, uint64_t *uuid_
 int xc_tmem_auth(xc_interface *xch,
                  int cli_id,
                  char *uuid_str,
-                 int arg1)
+                 int enable)
 {
-    tmem_op_t op;
-
-    op.cmd = TMEM_AUTH;
-    op.pool_id = 0;
-    op.u.creat.arg1 = cli_id;
-    op.u.creat.flags = arg1;
-    if ( xc_tmem_uuid_parse(uuid_str, &op.u.creat.uuid[0],
-                                      &op.u.creat.uuid[1]) < 0 )
+    xen_tmem_pool_info_t pool = {
+        .flags.u.auth = enable,
+        .id = 0,
+        .n_pages = 0,
+        .uuid[0] = 0,
+        .uuid[1] = 0,
+    };
+    if ( xc_tmem_uuid_parse(uuid_str, &pool.uuid[0],
+                                      &pool.uuid[1]) < 0 )
     {
         PERROR("Can't parse uuid, use xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx");
         return -1;
     }
-
-    return do_tmem_op(xch, &op);
+    return xc_tmem_control(xch, 0 /* pool_id */,
+                           XEN_SYSCTL_TMEM_OP_SET_AUTH,
+                           cli_id, sizeof(pool),
+                           0 /* arg */, &pool);
 }
 
 /* Save/restore/live migrate */

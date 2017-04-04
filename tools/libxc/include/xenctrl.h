@@ -1901,7 +1901,7 @@ int xc_tmem_control_oid(xc_interface *xch, int32_t pool_id, uint32_t subop,
 int xc_tmem_control(xc_interface *xch,
                     int32_t pool_id, uint32_t subop, uint32_t cli_id,
                     uint32_t len, uint32_t arg, void *buf);
-int xc_tmem_auth(xc_interface *xch, int cli_id, char *uuid_str, int arg1);
+int xc_tmem_auth(xc_interface *xch, int cli_id, char *uuid_str, int enable);
 int xc_tmem_save(xc_interface *xch, int dom, int live, int fd, int field_marker);
 int xc_tmem_save_extra(xc_interface *xch, int dom, int fd, int field_marker);
 void xc_tmem_save_done(xc_interface *xch, int dom);
