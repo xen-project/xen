@@ -48,13 +48,15 @@
 #define VIOAPIC_REG_RTE0    0x10
 
 struct hvm_vioapic {
-    struct hvm_hw_vioapic hvm_hw_vioapic;
     struct domain *domain;
+    union {
+        XEN_HVM_VIOAPIC(, VIOAPIC_NUM_PINS);
+        struct hvm_hw_vioapic domU;
+    };
 };
 
-#define domain_vioapic(d) (&(d)->arch.hvm_domain.vioapic->hvm_hw_vioapic)
-#define vioapic_domain(v) (container_of((v), struct hvm_vioapic, \
-                                        hvm_hw_vioapic)->domain)
+#define domain_vioapic(d) ((d)->arch.hvm_domain.vioapic)
+#define vioapic_domain(v) ((v)->domain)
 
 int vioapic_init(struct domain *d);
 void vioapic_deinit(struct domain *d);

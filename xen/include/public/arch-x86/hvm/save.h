@@ -361,30 +361,39 @@ DECLARE_HVM_SAVE_TYPE(PIC, 3, struct hvm_hw_vpic);
  * IO-APIC
  */
 
+union vioapic_redir_entry
+{
+    uint64_t bits;
+    struct {
+        uint8_t vector;
+        uint8_t delivery_mode:3;
+        uint8_t dest_mode:1;
+        uint8_t delivery_status:1;
+        uint8_t polarity:1;
+        uint8_t remote_irr:1;
+        uint8_t trig_mode:1;
+        uint8_t mask:1;
+        uint8_t reserve:7;
+        uint8_t reserved[4];
+        uint8_t dest_id;
+    } fields;
+};
+
 #define VIOAPIC_NUM_PINS  48 /* 16 ISA IRQs, 32 non-legacy PCI IRQS. */
 
-struct hvm_hw_vioapic {
-    uint64_t base_address;
-    uint32_t ioregsel;
-    uint32_t id;
-    union vioapic_redir_entry
-    {
-        uint64_t bits;
-        struct {
-            uint8_t vector;
-            uint8_t delivery_mode:3;
-            uint8_t dest_mode:1;
-            uint8_t delivery_status:1;
-            uint8_t polarity:1;
-            uint8_t remote_irr:1;
-            uint8_t trig_mode:1;
-            uint8_t mask:1;
-            uint8_t reserve:7;
-            uint8_t reserved[4];
-            uint8_t dest_id;
-        } fields;
-    } redirtbl[VIOAPIC_NUM_PINS];
-};
+#define XEN_HVM_VIOAPIC(name, cnt)                      \
+    struct name {                                       \
+        uint64_t base_address;                          \
+        uint32_t ioregsel;                              \
+        uint32_t id;                                    \
+        union vioapic_redir_entry redirtbl[cnt];        \
+    }
+
+XEN_HVM_VIOAPIC(hvm_hw_vioapic, VIOAPIC_NUM_PINS);
+
+#ifndef __XEN__
+#undef XEN_HVM_VIOAPIC
+#endif
 
 DECLARE_HVM_SAVE_TYPE(IOAPIC, 4, struct hvm_hw_vioapic);
 
