@@ -783,3 +783,55 @@ func (Ctx *Context) ListDomain() (glist []Dominfo) {
 
 	return
 }
+
+type Vcpuinfo struct {
+	Vcpuid     uint32
+	Cpu        uint32
+	Online     bool
+	Blocked    bool
+	Running    bool
+	VCpuTime   time.Duration
+	Cpumap     Bitmap
+	CpumapSoft Bitmap
+}
+
+func (cvci C.libxl_vcpuinfo) toGo() (gvci Vcpuinfo) {
+	gvci.Vcpuid = uint32(cvci.vcpuid)
+	gvci.Cpu = uint32(cvci.cpu)
+	gvci.Online = bool(cvci.online)
+	gvci.Blocked = bool(cvci.blocked)
+	gvci.Running = bool(cvci.running)
+	gvci.VCpuTime = time.Duration(cvci.vcpu_time)
+	gvci.Cpumap = cvci.cpumap.toGo()
+	gvci.CpumapSoft = cvci.cpumap_soft.toGo()
+
+	return
+}
+
+//libxl_vcpuinfo *libxl_list_vcpu(libxl_ctx *ctx, uint32_t domid,
+//				int *nb_vcpu, int *nr_cpus_out);
+//void libxl_vcpuinfo_list_free(libxl_vcpuinfo *, int nr_vcpus);
+func (Ctx *Context) ListVcpu(id Domid) (glist []Vcpuinfo) {
+	err := Ctx.CheckOpen()
+	if err != nil {
+		return
+	}
+
+	var nbVcpu C.int
+	var nrCpu C.int
+
+	clist := C.libxl_list_vcpu(Ctx.ctx, C.uint32_t(id), &nbVcpu, &nrCpu)
+	defer C.libxl_vcpuinfo_list_free(clist, nbVcpu)
+
+	if int(nbVcpu) == 0 {
+		return
+	}
+
+	gslice := (*[1 << 30]C.libxl_vcpuinfo)(unsafe.Pointer(clist))[:nbVcpu:nbVcpu]
+	for i := range gslice {
+		info := gslice[i].toGo()
+		glist = append(glist, info)
+	}
+
+	return
+}
