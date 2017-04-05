@@ -835,3 +835,58 @@ func (Ctx *Context) ListVcpu(id Domid) (glist []Vcpuinfo) {
 
 	return
 }
+
+type ConsoleType int
+
+const (
+	ConsoleTypeUnknown = ConsoleType(C.LIBXL_CONSOLE_TYPE_UNKNOWN)
+	ConsoleTypeSerial  = ConsoleType(C.LIBXL_CONSOLE_TYPE_SERIAL)
+	ConsoleTypePV      = ConsoleType(C.LIBXL_CONSOLE_TYPE_PV)
+)
+
+func (ct ConsoleType) String() (str string) {
+	cstr := C.libxl_console_type_to_string(C.libxl_console_type(ct))
+	str = C.GoString(cstr)
+
+	return
+}
+
+//int libxl_console_get_tty(libxl_ctx *ctx, uint32_t domid, int cons_num,
+//libxl_console_type type, char **path);
+func (Ctx *Context) ConsoleGetTty(id Domid, consNum int, conType ConsoleType) (path string, err error) {
+	err = Ctx.CheckOpen()
+	if err != nil {
+		return
+	}
+
+	var cpath *C.char
+	ret := C.libxl_console_get_tty(Ctx.ctx, C.uint32_t(id), C.int(consNum), C.libxl_console_type(conType), &cpath)
+	if ret != 0 {
+		err = Error(-ret)
+		return
+	}
+	defer C.free(cpath)
+
+	path = C.GoString(cpath)
+	return
+}
+
+//int libxl_primary_console_get_tty(libxl_ctx *ctx, uint32_t domid_vm,
+//					char **path);
+func (Ctx *Context) PrimaryConsoleGetTty(domid uint32) (path string, err error) {
+	err = Ctx.CheckOpen()
+	if err != nil {
+		return
+	}
+
+	var cpath *C.char
+	ret := C.libxl_primary_console_get_tty(Ctx.ctx, C.uint32_t(domid), &cpath)
+	if ret != 0 {
+		err = Error(-ret)
+		return
+	}
+	defer C.free(cpath)
+
+	path = C.GoString(cpath)
+	return
+}
