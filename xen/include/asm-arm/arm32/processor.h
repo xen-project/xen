@@ -37,7 +37,7 @@ struct cpu_user_regs
         uint32_t pc, pc32;
     };
     uint32_t cpsr; /* Return mode */
-    uint32_t pad0; /* Doubleword-align the kernel half of the frame */
+    uint32_t hsr;  /* Exception Syndrome */
 
     /* Outer guest frame only from here on... */
 
