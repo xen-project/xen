@@ -19,6 +19,16 @@
  * along with this program; If not, see <http://www.gnu.org/licenses/>.
  */
 
+/*
+ * Locking order:
+ *
+ * its->vcmd_lock                        (protects the command queue)
+ *     its->its_lock                     (protects the translation tables)
+ *         d->its_devices_lock           (protects the device RB tree)
+ *             v->vgic.lock              (protects the struct pending_irq)
+ *                 d->pend_lpi_tree_lock (protects the radix tree)
+ */
+
 #include <xen/bitops.h>
 #include <xen/config.h>
 #include <xen/domain_page.h>
@@ -43,7 +53,7 @@
 struct virt_its {
     struct domain *d;
     unsigned int devid_bits;
-    unsigned int intid_bits;
+    unsigned int evid_bits;
     spinlock_t vcmd_lock;       /* Protects the virtual command buffer, which */
     uint64_t cwriter;           /* consists of CWRITER and CREADR and those   */
     uint64_t creadr;            /* shadow variables cwriter and creadr. */
@@ -53,6 +63,7 @@ struct virt_its {
     uint64_t baser_dev, baser_coll;     /* BASER0 and BASER1 for the guest */
     unsigned int max_collections;
     unsigned int max_devices;
+    /* changing "enabled" requires to hold *both* the vcmd_lock and its_lock */
     bool enabled;
 };
 
@@ -65,6 +76,581 @@ struct vits_itte
     uint32_t vlpi;
     uint16_t collection;
     uint16_t pad;
+};
+
+/*
+ * Our collection table encoding:
+ * Each entry just contains the VCPU ID of the respective vCPU.
+ */
+typedef uint16_t coll_table_entry_t;
+
+/*
+ * Our device table encodings:
+ * Contains the guest physical address of the Interrupt Translation Table in
+ * bits [51:8], and the size of it is encoded as the number of bits minus one
+ * in the lowest 5 bits of the word.
+ */
+typedef uint64_t dev_table_entry_t;
+#define DEV_TABLE_ITT_ADDR(x) ((x) & GENMASK(51, 8))
+#define DEV_TABLE_ITT_SIZE(x) (BIT(((x) & GENMASK(4, 0)) + 1))
+#define DEV_TABLE_ENTRY(addr, bits)                     \
+        (((addr) & GENMASK(51, 8)) | (((bits) - 1) & GENMASK(4, 0)))
+
+#define GITS_BASER_RO_MASK       (GITS_BASER_TYPE_MASK | \
+                                  (0x1fL << GITS_BASER_ENTRY_SIZE_SHIFT))
+
+/**************************************
+ * Functions that handle ITS commands *
+ **************************************/
+
+static uint64_t its_cmd_mask_field(uint64_t *its_cmd, unsigned int word,
+                                   unsigned int shift, unsigned int size)
+{
+    return (its_cmd[word] >> shift) & GENMASK(size - 1, 0);
+}
+
+#define its_cmd_get_command(cmd)        its_cmd_mask_field(cmd, 0,  0,  8)
+#define its_cmd_get_deviceid(cmd)       its_cmd_mask_field(cmd, 0, 32, 32)
+#define its_cmd_get_size(cmd)           its_cmd_mask_field(cmd, 1,  0,  5)
+#define its_cmd_get_id(cmd)             its_cmd_mask_field(cmd, 1,  0, 32)
+#define its_cmd_get_physical_id(cmd)    its_cmd_mask_field(cmd, 1, 32, 32)
+#define its_cmd_get_collection(cmd)     its_cmd_mask_field(cmd, 2,  0, 16)
+#define its_cmd_get_target_addr(cmd)    its_cmd_mask_field(cmd, 2, 16, 32)
+#define its_cmd_get_validbit(cmd)       its_cmd_mask_field(cmd, 2, 63,  1)
+#define its_cmd_get_ittaddr(cmd)        (its_cmd_mask_field(cmd, 2, 8, 44) << 8)
+
+#define ITS_CMD_BUFFER_SIZE(baser)      ((((baser) & 0xff) + 1) << 12)
+#define ITS_CMD_OFFSET(reg)             ((reg) & GENMASK(19, 5))
+
+static void dump_its_command(uint64_t *command)
+{
+    gdprintk(XENLOG_WARNING, "  cmd 0x%02lx: %016lx %016lx %016lx %016lx\n",
+             its_cmd_get_command(command),
+             command[0], command[1], command[2], command[3]);
+}
+
+/*
+ * Must be called with the vcmd_lock held.
+ * TODO: Investigate whether we can be smarter here and don't need to hold
+ * the lock all of the time.
+ */
+static int vgic_its_handle_cmds(struct domain *d, struct virt_its *its)
+{
+    paddr_t addr = its->cbaser & GENMASK(51, 12);
+    uint64_t command[4];
+
+    ASSERT(spin_is_locked(&its->vcmd_lock));
+
+    if ( its->cwriter >= ITS_CMD_BUFFER_SIZE(its->cbaser) )
+        return -1;
+
+    while ( its->creadr != its->cwriter )
+    {
+        int ret;
+
+        ret = vgic_access_guest_memory(d, addr + its->creadr,
+                                       command, sizeof(command), false);
+        if ( ret )
+            return ret;
+
+        switch ( its_cmd_get_command(command) )
+        {
+        case GITS_CMD_SYNC:
+            /* We handle ITS commands synchronously, so we ignore SYNC. */
+            break;
+        default:
+            gdprintk(XENLOG_WARNING, "vGITS: unhandled ITS command\n");
+            dump_its_command(command);
+            break;
+        }
+
+        write_u64_atomic(&its->creadr, (its->creadr + ITS_CMD_SIZE) %
+                         ITS_CMD_BUFFER_SIZE(its->cbaser));
+
+        if ( ret )
+        {
+            gdprintk(XENLOG_WARNING,
+                     "vGITS: ITS command error %d while handling command\n",
+                     ret);
+            dump_its_command(command);
+        }
+    }
+
+    return 0;
+}
+
+/*****************************
+ * ITS registers read access *
+ *****************************/
+
+/* Identifying as an ARM IP, using "X" as the product ID. */
+#define GITS_IIDR_VALUE                 0x5800034c
+
+static int vgic_v3_its_mmio_read(struct vcpu *v, mmio_info_t *info,
+                                 register_t *r, void *priv)
+{
+    struct virt_its *its = priv;
+    uint64_t reg;
+
+    switch ( info->gpa & 0xffff )
+    {
+    case VREG32(GITS_CTLR):
+    {
+        /*
+         * We try to avoid waiting for the command queue lock and report
+         * non-quiescent if that lock is already taken.
+         */
+        bool have_cmd_lock;
+
+        if ( info->dabt.size != DABT_WORD ) goto bad_width;
+
+        have_cmd_lock = spin_trylock(&its->vcmd_lock);
+        reg = its->enabled ? GITS_CTLR_ENABLE : 0;
+
+        if ( have_cmd_lock && its->cwriter == its->creadr )
+            reg |= GITS_CTLR_QUIESCENT;
+
+        if ( have_cmd_lock )
+            spin_unlock(&its->vcmd_lock);
+
+        *r = vgic_reg32_extract(reg, info);
+        break;
+    }
+
+    case VREG32(GITS_IIDR):
+        if ( info->dabt.size != DABT_WORD ) goto bad_width;
+        *r = vgic_reg32_extract(GITS_IIDR_VALUE, info);
+        break;
+
+    case VREG64(GITS_TYPER):
+        if ( !vgic_reg64_check_access(info->dabt) ) goto bad_width;
+
+        reg = GITS_TYPER_PHYSICAL;
+        reg |= (sizeof(struct vits_itte) - 1) << GITS_TYPER_ITT_SIZE_SHIFT;
+        reg |= (its->evid_bits - 1) << GITS_TYPER_IDBITS_SHIFT;
+        reg |= (its->devid_bits - 1) << GITS_TYPER_DEVIDS_SHIFT;
+        *r = vgic_reg64_extract(reg, info);
+        break;
+
+    case VRANGE32(0x0018, 0x001C):
+        goto read_reserved;
+    case VRANGE32(0x0020, 0x003C):
+        goto read_impl_defined;
+    case VRANGE32(0x0040, 0x007C):
+        goto read_reserved;
+
+    case VREG64(GITS_CBASER):
+        if ( !vgic_reg64_check_access(info->dabt) ) goto bad_width;
+        spin_lock(&its->its_lock);
+        *r = vgic_reg64_extract(its->cbaser, info);
+        spin_unlock(&its->its_lock);
+        break;
+
+    case VREG64(GITS_CWRITER):
+        if ( !vgic_reg64_check_access(info->dabt) ) goto bad_width;
+
+        /* CWRITER is only written by the guest, so no extra locking here. */
+        reg = its->cwriter;
+        *r = vgic_reg64_extract(reg, info);
+        break;
+
+    case VREG64(GITS_CREADR):
+        if ( !vgic_reg64_check_access(info->dabt) ) goto bad_width;
+
+        /*
+         * Lockless access, to avoid waiting for the whole command queue to be
+         * finished completely. Xen updates its->creadr atomically after each
+         * command has been handled, this allows other VCPUs to monitor the
+         * progress.
+         */
+        reg = read_u64_atomic(&its->creadr);
+        *r = vgic_reg64_extract(reg, info);
+        break;
+
+    case VRANGE64(0x0098, 0x00F8):
+        goto read_reserved;
+
+    case VREG64(GITS_BASER0):           /* device table */
+        if ( !vgic_reg64_check_access(info->dabt) ) goto bad_width;
+        spin_lock(&its->its_lock);
+        *r = vgic_reg64_extract(its->baser_dev, info);
+        spin_unlock(&its->its_lock);
+        break;
+
+    case VREG64(GITS_BASER1):           /* collection table */
+        if ( !vgic_reg64_check_access(info->dabt) ) goto bad_width;
+        spin_lock(&its->its_lock);
+        *r = vgic_reg64_extract(its->baser_coll, info);
+        spin_unlock(&its->its_lock);
+        break;
+
+    case VRANGE64(GITS_BASER2, GITS_BASER7):
+        goto read_as_zero_64;
+    case VRANGE32(0x0140, 0xBFFC):
+        goto read_reserved;
+    case VRANGE32(0xC000, 0xFFCC):
+        goto read_impl_defined;
+    case VRANGE32(0xFFD0, 0xFFE4):
+        goto read_impl_defined;
+
+    case VREG32(GITS_PIDR2):
+        if ( info->dabt.size != DABT_WORD ) goto bad_width;
+        *r = vgic_reg32_extract(GIC_PIDR2_ARCH_GICv3, info);
+        break;
+
+    case VRANGE32(0xFFEC, 0xFFFC):
+        goto read_impl_defined;
+
+    default:
+        printk(XENLOG_G_ERR
+               "%pv: vGITS: unhandled read r%d offset %#04lx\n",
+               v, info->dabt.reg, (unsigned long)info->gpa & 0xffff);
+        return 0;
+    }
+
+    return 1;
+
+read_as_zero_64:
+    if ( !vgic_reg64_check_access(info->dabt) ) goto bad_width;
+    *r = 0;
+
+    return 1;
+
+read_impl_defined:
+    printk(XENLOG_G_DEBUG
+           "%pv: vGITS: RAZ on implementation defined register offset %#04lx\n",
+           v, info->gpa & 0xffff);
+    *r = 0;
+    return 1;
+
+read_reserved:
+    printk(XENLOG_G_DEBUG
+           "%pv: vGITS: RAZ on reserved register offset %#04lx\n",
+           v, info->gpa & 0xffff);
+    *r = 0;
+    return 1;
+
+bad_width:
+    printk(XENLOG_G_ERR "vGITS: bad read width %d r%d offset %#04lx\n",
+           info->dabt.size, info->dabt.reg, (unsigned long)info->gpa & 0xffff);
+    domain_crash_synchronous();
+
+    return 0;
+}
+
+/******************************
+ * ITS registers write access *
+ ******************************/
+
+static unsigned int its_baser_table_size(uint64_t baser)
+{
+    unsigned int ret, page_size[4] = {SZ_4K, SZ_16K, SZ_64K, SZ_64K};
+
+    ret = page_size[(baser >> GITS_BASER_PAGE_SIZE_SHIFT) & 3];
+
+    return ret * ((baser & GITS_BASER_SIZE_MASK) + 1);
+}
+
+static unsigned int its_baser_nr_entries(uint64_t baser)
+{
+    unsigned int entry_size = GITS_BASER_ENTRY_SIZE(baser);
+
+    return its_baser_table_size(baser) / entry_size;
+}
+
+/* Must be called with the ITS lock held. */
+static bool vgic_v3_verify_its_status(struct virt_its *its, bool status)
+{
+    ASSERT(spin_is_locked(&its->its_lock));
+
+    if ( !status )
+        return false;
+
+    if ( !(its->cbaser & GITS_VALID_BIT) ||
+         !(its->baser_dev & GITS_VALID_BIT) ||
+         !(its->baser_coll & GITS_VALID_BIT) )
+    {
+        printk(XENLOG_G_WARNING "d%d tried to enable ITS without having the tables configured.\n",
+               its->d->domain_id);
+        return false;
+    }
+
+    /*
+     * TODO: Protect against a guest crafting ITS tables.
+     * The spec says that "at the time of the new allocation for use by the ITS"
+     * all tables must contain zeroes. We could enforce this here by clearing
+     * all the tables, but this would be moot since at the moment the guest
+     * can change the tables at any point in time anyway. Right now there are
+     * expectations about the tables being consistent (a VCPU lock protecting
+     * an LPI), which should go away with proper per-IRQ locking.
+     * So for now we ignore this issue and rely on Dom0 not doing bad things.
+     */
+    ASSERT(is_hardware_domain(its->d));
+
+    return true;
+}
+
+static void sanitize_its_base_reg(uint64_t *reg)
+{
+    uint64_t r = *reg;
+
+    /* Avoid outer shareable. */
+    switch ( (r >> GITS_BASER_SHAREABILITY_SHIFT) & 0x03 )
+    {
+    case GIC_BASER_OuterShareable:
+        r &= ~GITS_BASER_SHAREABILITY_MASK;
+        r |= GIC_BASER_InnerShareable << GITS_BASER_SHAREABILITY_SHIFT;
+        break;
+    default:
+        break;
+    }
+
+    /* Avoid any inner non-cacheable mapping. */
+    switch ( (r >> GITS_BASER_INNER_CACHEABILITY_SHIFT) & 0x07 )
+    {
+    case GIC_BASER_CACHE_nCnB:
+    case GIC_BASER_CACHE_nC:
+        r &= ~GITS_BASER_INNER_CACHEABILITY_MASK;
+        r |= GIC_BASER_CACHE_RaWb << GITS_BASER_INNER_CACHEABILITY_SHIFT;
+        break;
+    default:
+        break;
+    }
+
+    /* Only allow non-cacheable or same-as-inner. */
+    switch ( (r >> GITS_BASER_OUTER_CACHEABILITY_SHIFT) & 0x07 )
+    {
+    case GIC_BASER_CACHE_SameAsInner:
+    case GIC_BASER_CACHE_nC:
+        break;
+    default:
+        r &= ~GITS_BASER_OUTER_CACHEABILITY_MASK;
+        r |= GIC_BASER_CACHE_nC << GITS_BASER_OUTER_CACHEABILITY_SHIFT;
+        break;
+    }
+
+    *reg = r;
+}
+
+static int vgic_v3_its_mmio_write(struct vcpu *v, mmio_info_t *info,
+                                  register_t r, void *priv)
+{
+    struct domain *d = v->domain;
+    struct virt_its *its = priv;
+    uint64_t reg;
+    uint32_t reg32;
+
+    switch ( info->gpa & 0xffff )
+    {
+    case VREG32(GITS_CTLR):
+    {
+        uint32_t ctlr;
+
+        if ( info->dabt.size != DABT_WORD ) goto bad_width;
+
+        /*
+         * We need to take the vcmd_lock to prevent a guest from disabling
+         * the ITS while commands are still processed.
+         */
+        spin_lock(&its->vcmd_lock);
+        spin_lock(&its->its_lock);
+        ctlr = its->enabled ? GITS_CTLR_ENABLE : 0;
+        reg32 = ctlr;
+        vgic_reg32_update(&reg32, r, info);
+
+        if ( ctlr ^ reg32 )
+            its->enabled = vgic_v3_verify_its_status(its,
+                                                     reg32 & GITS_CTLR_ENABLE);
+        spin_unlock(&its->its_lock);
+        spin_unlock(&its->vcmd_lock);
+        return 1;
+    }
+
+    case VREG32(GITS_IIDR):
+        goto write_ignore_32;
+
+    case VREG32(GITS_TYPER):
+        goto write_ignore_32;
+
+    case VRANGE32(0x0018, 0x001C):
+        goto write_reserved;
+    case VRANGE32(0x0020, 0x003C):
+        goto write_impl_defined;
+    case VRANGE32(0x0040, 0x007C):
+        goto write_reserved;
+
+    case VREG64(GITS_CBASER):
+        if ( !vgic_reg64_check_access(info->dabt) ) goto bad_width;
+
+        spin_lock(&its->its_lock);
+        /* Changing base registers with the ITS enabled is UNPREDICTABLE. */
+        if ( its->enabled )
+        {
+            spin_unlock(&its->its_lock);
+            gdprintk(XENLOG_WARNING,
+                     "vGITS: tried to change CBASER with the ITS enabled.\n");
+            return 1;
+        }
+
+        reg = its->cbaser;
+        vgic_reg64_update(&reg, r, info);
+        sanitize_its_base_reg(&reg);
+
+        its->cbaser = reg;
+        its->creadr = 0;
+        spin_unlock(&its->its_lock);
+
+        return 1;
+
+    case VREG64(GITS_CWRITER):
+        if ( !vgic_reg64_check_access(info->dabt) ) goto bad_width;
+
+        spin_lock(&its->vcmd_lock);
+        reg = ITS_CMD_OFFSET(its->cwriter);
+        vgic_reg64_update(&reg, r, info);
+        its->cwriter = ITS_CMD_OFFSET(reg);
+
+        if ( its->enabled )
+            if ( vgic_its_handle_cmds(d, its) )
+                gdprintk(XENLOG_WARNING, "error handling ITS commands\n");
+
+        spin_unlock(&its->vcmd_lock);
+
+        return 1;
+
+    case VREG64(GITS_CREADR):
+        goto write_ignore_64;
+
+    case VRANGE32(0x0098, 0x00FC):
+        goto write_reserved;
+
+    case VREG64(GITS_BASER0):           /* device table */
+        if ( !vgic_reg64_check_access(info->dabt) ) goto bad_width;
+
+        spin_lock(&its->its_lock);
+
+        /*
+         * Changing base registers with the ITS enabled is UNPREDICTABLE,
+         * we choose to ignore it, but warn.
+         */
+        if ( its->enabled )
+        {
+            spin_unlock(&its->its_lock);
+            gdprintk(XENLOG_WARNING, "vGITS: tried to change BASER with the ITS enabled.\n");
+
+            return 1;
+        }
+
+        reg = its->baser_dev;
+        vgic_reg64_update(&reg, r, info);
+
+        /* We don't support indirect tables for now. */
+        reg &= ~(GITS_BASER_RO_MASK | GITS_BASER_INDIRECT);
+        reg |= (sizeof(dev_table_entry_t) - 1) << GITS_BASER_ENTRY_SIZE_SHIFT;
+        reg |= GITS_BASER_TYPE_DEVICE << GITS_BASER_TYPE_SHIFT;
+        sanitize_its_base_reg(&reg);
+
+        if ( reg & GITS_VALID_BIT )
+        {
+            its->max_devices = its_baser_nr_entries(reg);
+            if ( its->max_devices > BIT(its->devid_bits) )
+                its->max_devices = BIT(its->devid_bits);
+        }
+        else
+            its->max_devices = 0;
+
+        its->baser_dev = reg;
+        spin_unlock(&its->its_lock);
+        return 1;
+
+    case VREG64(GITS_BASER1):           /* collection table */
+        if ( !vgic_reg64_check_access(info->dabt) ) goto bad_width;
+
+        spin_lock(&its->its_lock);
+        /*
+         * Changing base registers with the ITS enabled is UNPREDICTABLE,
+         * we choose to ignore it, but warn.
+         */
+        if ( its->enabled )
+        {
+            spin_unlock(&its->its_lock);
+            gdprintk(XENLOG_INFO, "vGITS: tried to change BASER with the ITS enabled.\n");
+            return 1;
+        }
+
+        reg = its->baser_coll;
+        vgic_reg64_update(&reg, r, info);
+        /* No indirect tables for the collection table. */
+        reg &= ~(GITS_BASER_RO_MASK | GITS_BASER_INDIRECT);
+        reg |= (sizeof(coll_table_entry_t) - 1) << GITS_BASER_ENTRY_SIZE_SHIFT;
+        reg |= GITS_BASER_TYPE_COLLECTION << GITS_BASER_TYPE_SHIFT;
+        sanitize_its_base_reg(&reg);
+
+        if ( reg & GITS_VALID_BIT )
+            its->max_collections = its_baser_nr_entries(reg);
+        else
+            its->max_collections = 0;
+        its->baser_coll = reg;
+        spin_unlock(&its->its_lock);
+        return 1;
+
+    case VRANGE64(GITS_BASER2, GITS_BASER7):
+        goto write_ignore_64;
+
+    case VRANGE32(0x0140, 0xBFFC):
+        goto write_reserved;
+    case VRANGE32(0xC000, 0xFFCC):
+        goto write_impl_defined;
+    case VRANGE32(0xFFD0, 0xFFE4):      /* IMPDEF identification registers */
+        goto write_impl_defined;
+
+    case VREG32(GITS_PIDR2):
+        goto write_ignore_32;
+
+    case VRANGE32(0xFFEC, 0xFFFC):      /* IMPDEF identification registers */
+        goto write_impl_defined;
+
+    default:
+        printk(XENLOG_G_ERR
+               "%pv: vGITS: unhandled write r%d offset %#04lx\n",
+               v, info->dabt.reg, (unsigned long)info->gpa & 0xffff);
+        return 0;
+    }
+
+    return 1;
+
+write_ignore_64:
+    if ( !vgic_reg64_check_access(info->dabt) ) goto bad_width;
+    return 1;
+
+write_ignore_32:
+    if ( info->dabt.size != DABT_WORD ) goto bad_width;
+    return 1;
+
+write_impl_defined:
+    printk(XENLOG_G_DEBUG
+           "%pv: vGITS: WI on implementation defined register offset %#04lx\n",
+           v, info->gpa & 0xffff);
+    return 1;
+
+write_reserved:
+    printk(XENLOG_G_DEBUG
+           "%pv: vGITS: WI on implementation defined register offset %#04lx\n",
+           v, info->gpa & 0xffff);
+    return 1;
+
+bad_width:
+    printk(XENLOG_G_ERR "vGITS: bad write width %d r%d offset %#08lx\n",
+           info->dabt.size, info->dabt.reg, (unsigned long)info->gpa & 0xffff);
+
+    domain_crash_synchronous();
+
+    return 0;
+}
+
+static const struct mmio_handler_ops vgic_its_mmio_handler = {
+    .read  = vgic_v3_its_mmio_read,
+    .write = vgic_v3_its_mmio_write,
 };
 
 int vgic_v3_its_init_domain(struct domain *d)
