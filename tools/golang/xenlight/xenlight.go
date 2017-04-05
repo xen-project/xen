@@ -713,3 +713,73 @@ func (Ctx *Context) DomainUnpause(Id Domid) (err error) {
 	}
 	return
 }
+
+//int libxl_domain_pause(libxl_ctx *ctx, uint32_t domain);
+func (Ctx *Context) DomainPause(id Domid) (err error) {
+	err = Ctx.CheckOpen()
+	if err != nil {
+		return
+	}
+
+	ret := C.libxl_domain_pause(Ctx.ctx, C.uint32_t(id))
+
+	if ret != 0 {
+		err = Error(-ret)
+	}
+	return
+}
+
+//int libxl_domain_shutdown(libxl_ctx *ctx, uint32_t domid);
+func (Ctx *Context) DomainShutdown(id Domid) (err error) {
+	err = Ctx.CheckOpen()
+	if err != nil {
+		return
+	}
+
+	ret := C.libxl_domain_shutdown(Ctx.ctx, C.uint32_t(id))
+
+	if ret != 0 {
+		err = Error(-ret)
+	}
+	return
+}
+
+//int libxl_domain_reboot(libxl_ctx *ctx, uint32_t domid);
+func (Ctx *Context) DomainReboot(id Domid) (err error) {
+	err = Ctx.CheckOpen()
+	if err != nil {
+		return
+	}
+
+	ret := C.libxl_domain_reboot(Ctx.ctx, C.uint32_t(id))
+
+	if ret != 0 {
+		err = Error(-ret)
+	}
+	return
+}
+
+//libxl_dominfo * libxl_list_domain(libxl_ctx*, int *nb_domain_out);
+//void libxl_dominfo_list_free(libxl_dominfo *list, int nb_domain);
+func (Ctx *Context) ListDomain() (glist []Dominfo) {
+	err := Ctx.CheckOpen()
+	if err != nil {
+		return
+	}
+
+	var nbDomain C.int
+	clist := C.libxl_list_domain(Ctx.ctx, &nbDomain)
+	defer C.libxl_dominfo_list_free(clist, nbDomain)
+
+	if int(nbDomain) == 0 {
+		return
+	}
+
+	gslice := (*[1 << 30]C.libxl_dominfo)(unsafe.Pointer(clist))[:nbDomain:nbDomain]
+	for i := range gslice {
+		info := gslice[i].toGo()
+		glist = append(glist, *info)
+	}
+
+	return
+}
