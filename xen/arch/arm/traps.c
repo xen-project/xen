@@ -639,6 +639,39 @@ static void inject_dabt_exception(struct cpu_user_regs *regs,
 #endif
 }
 
+#if 0
+/* Inject a virtual Abort/SError into the guest. */
+static void inject_vabt_exception(struct cpu_user_regs *regs)
+{
+    const union hsr hsr = { .bits = regs->hsr };
+
+    /*
+     * SVC/HVC/SMC already have an adjusted PC (See ARM ARM DDI 0487A.j
+     * D1.10.1 for more details), which we need to correct in order to
+     * return to after having injected the SError.
+     */
+    switch ( hsr.ec )
+    {
+    case HSR_EC_SVC32:
+    case HSR_EC_HVC32:
+    case HSR_EC_SMC32:
+#ifdef CONFIG_ARM_64
+    case HSR_EC_SVC64:
+    case HSR_EC_HVC64:
+    case HSR_EC_SMC64:
+#endif
+        regs->pc -= hsr.len ? 4 : 2;
+        break;
+
+    default:
+        break;
+    }
+
+    current->arch.hcr_el2 |= HCR_VA;
+    WRITE_SYSREG(current->arch.hcr_el2, HCR_EL2);
+}
+#endif
+
 struct reg_ctxt {
     /* Guest-side state */
     uint32_t sctlr_el1;

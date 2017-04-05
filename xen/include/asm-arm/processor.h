@@ -252,6 +252,7 @@
 #define HSR_EC_HVC32                0x12
 #define HSR_EC_SMC32                0x13
 #ifdef CONFIG_ARM_64
+#define HSR_EC_SVC64                0x15
 #define HSR_EC_HVC64                0x16
 #define HSR_EC_SMC64                0x17
 #define HSR_EC_SYSREG               0x18
