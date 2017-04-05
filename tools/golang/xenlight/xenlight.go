@@ -118,6 +118,103 @@ type Context struct {
 	logger *C.xentoollog_logger_stdiostream
 }
 
+type Hwcap []C.uint32_t
+
+func (chwcap C.libxl_hwcap) CToGo() (ghwcap Hwcap) {
+	// Alloc a Go slice for the bytes
+	size := 8
+	ghwcap = make([]C.uint32_t, size)
+
+	// Make a slice pointing to the C array
+	mapslice := (*[1 << 30]C.uint32_t)(unsafe.Pointer(&chwcap[0]))[:size:size]
+
+	// And copy the C array into the Go array
+	copy(ghwcap, mapslice)
+
+	return
+}
+
+/*
+ * Types: IDL
+ *
+ * FIXME: Generate these automatically from the IDL
+ */
+
+type Physinfo struct {
+	ThreadsPerCore    uint32
+	CoresPerSocket    uint32
+	MaxCpuId          uint32
+	NrCpus            uint32
+	CpuKhz            uint32
+	TotalPages        uint64
+	FreePages         uint64
+	ScrubPages        uint64
+	OutstandingPages  uint64
+	SharingFreedPages uint64
+	SharingUsedFrames uint64
+	NrNodes           uint32
+	HwCap             Hwcap
+	CapHvm            bool
+	CapHvmDirectio    bool
+}
+
+func (cphys *C.libxl_physinfo) toGo() (physinfo *Physinfo) {
+
+	physinfo = &Physinfo{}
+	physinfo.ThreadsPerCore = uint32(cphys.threads_per_core)
+	physinfo.CoresPerSocket = uint32(cphys.cores_per_socket)
+	physinfo.MaxCpuId = uint32(cphys.max_cpu_id)
+	physinfo.NrCpus = uint32(cphys.nr_cpus)
+	physinfo.CpuKhz = uint32(cphys.cpu_khz)
+	physinfo.TotalPages = uint64(cphys.total_pages)
+	physinfo.FreePages = uint64(cphys.free_pages)
+	physinfo.ScrubPages = uint64(cphys.scrub_pages)
+	physinfo.ScrubPages = uint64(cphys.scrub_pages)
+	physinfo.SharingFreedPages = uint64(cphys.sharing_freed_pages)
+	physinfo.SharingUsedFrames = uint64(cphys.sharing_used_frames)
+	physinfo.NrNodes = uint32(cphys.nr_nodes)
+	physinfo.HwCap = cphys.hw_cap.CToGo()
+	physinfo.CapHvm = bool(cphys.cap_hvm)
+	physinfo.CapHvmDirectio = bool(cphys.cap_hvm_directio)
+
+	return
+}
+
+type VersionInfo struct {
+	XenVersionMajor int
+	XenVersionMinor int
+	XenVersionExtra string
+	Compiler        string
+	CompileBy       string
+	CompileDomain   string
+	CompileDate     string
+	Capabilities    string
+	Changeset       string
+	VirtStart       uint64
+	Pagesize        int
+	Commandline     string
+	BuildId         string
+}
+
+func (cinfo *C.libxl_version_info) toGo() (info *VersionInfo) {
+	info = &VersionInfo{}
+	info.XenVersionMajor = int(cinfo.xen_version_major)
+	info.XenVersionMinor = int(cinfo.xen_version_minor)
+	info.XenVersionExtra = C.GoString(cinfo.xen_version_extra)
+	info.Compiler = C.GoString(cinfo.compiler)
+	info.CompileBy = C.GoString(cinfo.compile_by)
+	info.CompileDomain = C.GoString(cinfo.compile_domain)
+	info.CompileDate = C.GoString(cinfo.compile_date)
+	info.Capabilities = C.GoString(cinfo.capabilities)
+	info.Changeset = C.GoString(cinfo.changeset)
+	info.VirtStart = uint64(cinfo.virt_start)
+	info.Pagesize = int(cinfo.pagesize)
+	info.Commandline = C.GoString(cinfo.commandline)
+	info.BuildId = C.GoString(cinfo.build_id)
+
+	return
+}
+
 /*
  * Context
  */
@@ -162,5 +259,108 @@ func (Ctx *Context) CheckOpen() (err error) {
 	if Ctx.ctx == nil {
 		err = fmt.Errorf("Context not opened")
 	}
+	return
+}
+
+//int libxl_get_max_cpus(libxl_ctx *ctx);
+func (Ctx *Context) GetMaxCpus() (maxCpus int, err error) {
+	err = Ctx.CheckOpen()
+	if err != nil {
+		return
+	}
+
+	ret := C.libxl_get_max_cpus(Ctx.ctx)
+	if ret < 0 {
+		err = Error(-ret)
+		return
+	}
+	maxCpus = int(ret)
+	return
+}
+
+//int libxl_get_online_cpus(libxl_ctx *ctx);
+func (Ctx *Context) GetOnlineCpus() (onCpus int, err error) {
+	err = Ctx.CheckOpen()
+	if err != nil {
+		return
+	}
+
+	ret := C.libxl_get_online_cpus(Ctx.ctx)
+	if ret < 0 {
+		err = Error(-ret)
+		return
+	}
+	onCpus = int(ret)
+	return
+}
+
+//int libxl_get_max_nodes(libxl_ctx *ctx);
+func (Ctx *Context) GetMaxNodes() (maxNodes int, err error) {
+	err = Ctx.CheckOpen()
+	if err != nil {
+		return
+	}
+	ret := C.libxl_get_max_nodes(Ctx.ctx)
+	if ret < 0 {
+		err = Error(-ret)
+		return
+	}
+	maxNodes = int(ret)
+	return
+}
+
+//int libxl_get_free_memory(libxl_ctx *ctx, uint64_t *memkb);
+func (Ctx *Context) GetFreeMemory() (memkb uint64, err error) {
+	err = Ctx.CheckOpen()
+	if err != nil {
+		return
+	}
+	var cmem C.uint64_t
+	ret := C.libxl_get_free_memory(Ctx.ctx, &cmem)
+
+	if ret < 0 {
+		err = Error(-ret)
+		return
+	}
+
+	memkb = uint64(cmem)
+	return
+
+}
+
+//int libxl_get_physinfo(libxl_ctx *ctx, libxl_physinfo *physinfo)
+func (Ctx *Context) GetPhysinfo() (physinfo *Physinfo, err error) {
+	err = Ctx.CheckOpen()
+	if err != nil {
+		return
+	}
+	var cphys C.libxl_physinfo
+	C.libxl_physinfo_init(&cphys)
+	defer C.libxl_physinfo_dispose(&cphys)
+
+	ret := C.libxl_get_physinfo(Ctx.ctx, &cphys)
+
+	if ret < 0 {
+		err = Error(ret)
+		return
+	}
+	physinfo = cphys.toGo()
+
+	return
+}
+
+//const libxl_version_info* libxl_get_version_info(libxl_ctx *ctx);
+func (Ctx *Context) GetVersionInfo() (info *VersionInfo, err error) {
+	err = Ctx.CheckOpen()
+	if err != nil {
+		return
+	}
+
+	var cinfo *C.libxl_version_info
+
+	cinfo = C.libxl_get_version_info(Ctx.ctx)
+
+	info = cinfo.toGo()
+
 	return
 }
