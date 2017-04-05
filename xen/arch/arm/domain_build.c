@@ -2148,6 +2148,10 @@ int construct_dom0(struct domain *d)
         return -EINVAL;
     }
     d->arch.type = kinfo.type;
+
+    if ( is_64bit_domain(d) )
+        vcpu_switch_to_aarch64_mode(v);
+
 #endif
 
     allocate_memory(d, &kinfo);
@@ -2240,6 +2244,9 @@ int construct_dom0(struct domain *d)
             printk("Failed to allocate dom0 vcpu %d on pcpu %d\n", i, cpu);
             break;
         }
+
+        if ( is_64bit_domain(d) )
+            vcpu_switch_to_aarch64_mode(d->vcpu[i]);
     }
 
     return 0;

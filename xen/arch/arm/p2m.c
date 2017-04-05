@@ -137,11 +137,6 @@ void p2m_restore_state(struct vcpu *n)
     WRITE_SYSREG64(p2m->vttbr, VTTBR_EL2);
     isb();
 
-    if ( is_32bit_domain(n->domain) )
-        n->arch.hcr_el2 &= ~HCR_RW;
-    else
-        n->arch.hcr_el2 |= HCR_RW;
-
     WRITE_SYSREG(n->arch.sctlr, SCTLR_EL1);
     isb();
 

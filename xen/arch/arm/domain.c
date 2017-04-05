@@ -537,6 +537,11 @@ void vcpu_destroy(struct vcpu *v)
     free_xenheap_pages(v->arch.stack, STACK_ORDER);
 }
 
+void vcpu_switch_to_aarch64_mode(struct vcpu *v)
+{
+    v->arch.hcr_el2 |= HCR_RW;
+}
+
 int arch_domain_create(struct domain *d, unsigned int domcr_flags,
                        struct xen_arch_domainconfig *config)
 {
