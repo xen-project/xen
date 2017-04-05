@@ -148,6 +148,7 @@ int gic_route_irq_to_guest(struct domain *d, unsigned int virq,
     /* Caller has already checked that the IRQ is an SPI */
     ASSERT(virq >= 32);
     ASSERT(virq < vgic_num_irqs(d));
+    ASSERT(!is_lpi(virq));
 
     vgic_lock_rank(v_target, rank, flags);
 
@@ -184,6 +185,7 @@ int gic_remove_irq_from_guest(struct domain *d, unsigned int virq,
     ASSERT(spin_is_locked(&desc->lock));
     ASSERT(test_bit(_IRQ_GUEST, &desc->status));
     ASSERT(p->desc == desc);
+    ASSERT(!is_lpi(virq));
 
     vgic_lock_rank(v_target, rank, flags);
 
@@ -420,6 +422,10 @@ void gic_raise_inflight_irq(struct vcpu *v, unsigned int virtual_irq)
 {
     struct pending_irq *n = irq_to_pending(v, virtual_irq);
 
+    /* If an LPI has been removed meanwhile, there is nothing left to raise. */
+    if ( unlikely(!n) )
+        return;
+
     ASSERT(spin_is_locked(&v->arch.vgic.lock));
 
     if ( list_empty(&n->lr_queue) )
@@ -439,20 +445,25 @@ void gic_raise_guest_irq(struct vcpu *v, unsigned int virtual_irq,
 {
     int i;
     unsigned int nr_lrs = gic_hw_ops->info->nr_lrs;
+    struct pending_irq *p = irq_to_pending(v, virtual_irq);
 
     ASSERT(spin_is_locked(&v->arch.vgic.lock));
+
+    if ( unlikely(!p) )
+        /* An unmapped LPI does not need to be raised. */
+        return;
 
     if ( v == current && list_empty(&v->arch.vgic.lr_pending) )
     {
         i = find_first_zero_bit(&this_cpu(lr_mask), nr_lrs);
         if (i < nr_lrs) {
             set_bit(i, &this_cpu(lr_mask));
-            gic_set_lr(i, irq_to_pending(v, virtual_irq), GICH_LR_PENDING);
+            gic_set_lr(i, p, GICH_LR_PENDING);
             return;
         }
     }
 
-    gic_add_to_lr_pending(v, irq_to_pending(v, virtual_irq));
+    gic_add_to_lr_pending(v, p);
 }
 
 static void gic_update_one_lr(struct vcpu *v, int i)
@@ -467,6 +478,17 @@ static void gic_update_one_lr(struct vcpu *v, int i)
     gic_hw_ops->read_lr(i, &lr_val);
     irq = lr_val.virq;
     p = irq_to_pending(v, irq);
+    /* An LPI might have been unmapped, in which case we just clean up here. */
+    if ( unlikely(!p) )
+    {
+        ASSERT(is_lpi(irq));
+
+        gic_hw_ops->clear_lr(i);
+        clear_bit(i, &this_cpu(lr_mask));
+
+        return;
+    }
+
     if ( lr_val.state & GICH_LR_ACTIVE )
     {
         set_bit(GIC_IRQ_GUEST_ACTIVE, &p->status);

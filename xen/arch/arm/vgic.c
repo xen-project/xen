@@ -236,6 +236,9 @@ bool vgic_migrate_irq(struct vcpu *old, struct vcpu *new, unsigned int irq)
     unsigned long flags;
     struct pending_irq *p;
 
+    /* This will never be called for an LPI, as we don't migrate them. */
+    ASSERT(!is_lpi(irq));
+
     spin_lock_irqsave(&old->arch.vgic.lock, flags);
 
     p = irq_to_pending(old, irq);
@@ -320,6 +323,9 @@ void vgic_disable_irqs(struct vcpu *v, uint32_t r, int n)
     int i = 0;
     struct vcpu *v_target;
 
+    /* LPIs will never be disabled via this function. */
+    ASSERT(!is_lpi(32 * n + 31));
+
     while ( (i = find_next_bit(&mask, 32, i)) < 32 ) {
         irq = i + (32 * n);
         v_target = vgic_get_target_vcpu(v, irq);
@@ -366,6 +372,9 @@ void vgic_enable_irqs(struct vcpu *v, uint32_t r, int n)
     int i = 0;
     struct vcpu *v_target;
     struct domain *d = v->domain;
+
+    /* LPIs will never be enabled via this function. */
+    ASSERT(!is_lpi(32 * n + 31));
 
     while ( (i = find_next_bit(&mask, 32, i)) < 32 ) {
         irq = i + (32 * n);
@@ -447,6 +456,12 @@ bool vgic_to_sgi(struct vcpu *v, register_t sgir, enum gic_sgi_mode irqmode,
     return true;
 }
 
+/*
+ * Returns the pointer to the struct pending_irq belonging to the given
+ * interrupt.
+ * This can return NULL if called for an LPI which has been unmapped
+ * meanwhile.
+ */
 struct pending_irq *irq_to_pending(struct vcpu *v, unsigned int irq)
 {
     struct pending_irq *n;
@@ -490,6 +505,12 @@ void vgic_vcpu_inject_irq(struct vcpu *v, unsigned int virq)
     spin_lock_irqsave(&v->arch.vgic.lock, flags);
 
     n = irq_to_pending(v, virq);
+    /* If an LPI has been removed, there is nothing to inject here. */
+    if ( unlikely(!n) )
+    {
+        spin_unlock_irqrestore(&v->arch.vgic.lock, flags);
+        return;
+    }
 
     /* vcpu offline */
     if ( test_bit(_VPF_down, &v->pause_flags) )
