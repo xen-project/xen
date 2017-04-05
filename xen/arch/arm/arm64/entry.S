@@ -187,13 +187,14 @@ hyp_error:
 /* Traps taken in Current EL with SP_ELx */
 hyp_sync:
         entry   hyp=1
-        msr     daifclr, #2
+        msr     daifclr, #6
         mov     x0, sp
         bl      do_trap_hypervisor
         exit    hyp=1
 
 hyp_irq:
         entry   hyp=1
+        msr     daifclr, #4
         mov     x0, sp
         bl      do_trap_irq
         exit    hyp=1
@@ -208,7 +209,7 @@ guest_sync:
         ALTERNATIVE("bl check_pending_vserror; cbnz x0, 1f",
                     "nop; nop",
                     SKIP_SYNCHRONIZE_SERROR_ENTRY_EXIT)
-        msr     daifclr, #2
+        msr     daifclr, #6
         mov     x0, sp
         bl      do_trap_hypervisor
 1:
@@ -224,6 +225,7 @@ guest_irq:
         ALTERNATIVE("bl check_pending_vserror; cbnz x0, 1f",
                     "nop; nop",
                     SKIP_SYNCHRONIZE_SERROR_ENTRY_EXIT)
+        msr     daifclr, #4
         mov     x0, sp
         bl      do_trap_irq
 1:
@@ -235,7 +237,7 @@ guest_fiq_invalid:
 
 guest_error:
         entry   hyp=0, compat=0
-        msr     daifclr, #2
+        msr     daifclr, #6
         mov     x0, sp
         bl      do_trap_guest_serror
         exit    hyp=0, compat=0
@@ -250,7 +252,7 @@ guest_sync_compat:
         ALTERNATIVE("bl check_pending_vserror; cbnz x0, 1f",
                     "nop; nop",
                     SKIP_SYNCHRONIZE_SERROR_ENTRY_EXIT)
-        msr     daifclr, #2
+        msr     daifclr, #6
         mov     x0, sp
         bl      do_trap_hypervisor
 1:
@@ -266,6 +268,7 @@ guest_irq_compat:
         ALTERNATIVE("bl check_pending_vserror; cbnz x0, 1f",
                     "nop; nop",
                     SKIP_SYNCHRONIZE_SERROR_ENTRY_EXIT)
+        msr     daifclr, #4
         mov     x0, sp
         bl      do_trap_irq
 1:
@@ -277,7 +280,7 @@ guest_fiq_invalid_compat:
 
 guest_error_compat:
         entry   hyp=0, compat=1
-        msr     daifclr, #2
+        msr     daifclr, #6
         mov     x0, sp
         bl      do_trap_guest_serror
         exit    hyp=0, compat=1
