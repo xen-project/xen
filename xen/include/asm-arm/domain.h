@@ -204,6 +204,9 @@ struct arch_vcpu
     register_t tpidr_el1;
     register_t tpidrro_el0;
 
+    /* HYP configuration */
+    register_t hcr_el2;
+
     uint32_t teecr, teehbr; /* ThumbEE, 32-bit guests only */
 #ifdef CONFIG_ARM_32
     /*

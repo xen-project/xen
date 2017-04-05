@@ -513,6 +513,8 @@ int vcpu_initialise(struct vcpu *v)
 
     v->arch.actlr = READ_SYSREG32(ACTLR_EL1);
 
+    v->arch.hcr_el2 = get_default_hcr_flags();
+
     processor_vcpu_initialise(v);
 
     if ( (rc = vcpu_vgic_init(v)) != 0 )

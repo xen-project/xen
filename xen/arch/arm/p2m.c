@@ -128,27 +128,24 @@ void p2m_save_state(struct vcpu *p)
 
 void p2m_restore_state(struct vcpu *n)
 {
-    register_t hcr;
     struct p2m_domain *p2m = &n->domain->arch.p2m;
     uint8_t *last_vcpu_ran;
 
     if ( is_idle_vcpu(n) )
         return;
 
-    hcr = READ_SYSREG(HCR_EL2);
-
     WRITE_SYSREG64(p2m->vttbr, VTTBR_EL2);
     isb();
 
     if ( is_32bit_domain(n->domain) )
-        hcr &= ~HCR_RW;
+        n->arch.hcr_el2 &= ~HCR_RW;
     else
-        hcr |= HCR_RW;
+        n->arch.hcr_el2 |= HCR_RW;
 
     WRITE_SYSREG(n->arch.sctlr, SCTLR_EL1);
     isb();
 
-    WRITE_SYSREG(hcr, HCR_EL2);
+    WRITE_SYSREG(n->arch.hcr_el2, HCR_EL2);
     isb();
 
     last_vcpu_ran = &p2m->last_vcpu_ran[smp_processor_id()];
