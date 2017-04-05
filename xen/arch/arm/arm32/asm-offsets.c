@@ -27,6 +27,7 @@ void __dummy__(void)
    OFFSET(UREGS_lr, struct cpu_user_regs, lr);
    OFFSET(UREGS_pc, struct cpu_user_regs, pc);
    OFFSET(UREGS_cpsr, struct cpu_user_regs, cpsr);
+   OFFSET(UREGS_hsr, struct cpu_user_regs, hsr);
 
    OFFSET(UREGS_LR_usr, struct cpu_user_regs, lr_usr);
    OFFSET(UREGS_SP_usr, struct cpu_user_regs, sp_usr);
