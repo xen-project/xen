@@ -323,6 +323,58 @@ func (cdi *C.libxl_dominfo) toGo() (di *Dominfo) {
 	return
 }
 
+// # Consistent with values defined in domctl.h
+// # Except unknown which we have made up
+// libxl_scheduler = Enumeration("scheduler", [
+//     (0, "unknown"),
+//     (4, "sedf"),
+//     (5, "credit"),
+//     (6, "credit2"),
+//     (7, "arinc653"),
+//     (8, "rtds"),
+//     ])
+type Scheduler int
+
+var (
+	SchedulerUnknown  Scheduler = C.LIBXL_SCHEDULER_UNKNOWN
+	SchedulerSedf     Scheduler = C.LIBXL_SCHEDULER_SEDF
+	SchedulerCredit   Scheduler = C.LIBXL_SCHEDULER_CREDIT
+	SchedulerCredit2  Scheduler = C.LIBXL_SCHEDULER_CREDIT2
+	SchedulerArinc653 Scheduler = C.LIBXL_SCHEDULER_ARINC653
+	SchedulerRTDS     Scheduler = C.LIBXL_SCHEDULER_RTDS
+)
+
+// const char *libxl_scheduler_to_string(libxl_scheduler p);
+func (s Scheduler) String() string {
+	cs := C.libxl_scheduler_to_string(C.libxl_scheduler(s))
+	// No need to free const return value
+
+	return C.GoString(cs)
+}
+
+// int libxl_scheduler_from_string(const char *s, libxl_scheduler *e);
+func (s *Scheduler) FromString(gstr string) (err error) {
+	*s, err = SchedulerFromString(gstr)
+	return
+}
+
+func SchedulerFromString(name string) (s Scheduler, err error) {
+	cname := C.CString(name)
+	defer C.free(unsafe.Pointer(cname))
+
+	var cs C.libxl_scheduler
+
+	ret := C.libxl_scheduler_from_string(cname, &cs)
+	if ret != 0 {
+		err = Error(-ret)
+		return
+	}
+
+	s = Scheduler(cs)
+
+	return
+}
+
 /*
  * Bitmap operations
  */
