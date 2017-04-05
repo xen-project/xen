@@ -380,10 +380,12 @@ check_pending_vserror:
          * exception handler, and the elr_el2 will be set to
          * abort_guest_exit_start or abort_guest_exit_end.
          */
+        .global abort_guest_exit_start
 abort_guest_exit_start:
 
         isb
 
+        .global abort_guest_exit_end
 abort_guest_exit_end:
         /* Mask PSTATE asynchronous abort bit, close the checking window. */
         msr     daifset, #4
