@@ -33,6 +33,7 @@ import "C"
 
 import (
 	"fmt"
+	"time"
 	"unsafe"
 )
 
@@ -113,6 +114,12 @@ func (e Error) Error() string {
  * Types: Builtins
  */
 
+type Domid uint32
+
+type MemKB uint64
+
+type Uuid C.libxl_uuid
+
 type Context struct {
 	ctx    *C.libxl_ctx
 	logger *C.xentoollog_logger_stdiostream
@@ -120,7 +127,7 @@ type Context struct {
 
 type Hwcap []C.uint32_t
 
-func (chwcap C.libxl_hwcap) CToGo() (ghwcap Hwcap) {
+func (chwcap C.libxl_hwcap) toGo() (ghwcap Hwcap) {
 	// Alloc a Go slice for the bytes
 	size := 8
 	ghwcap = make([]C.uint32_t, size)
@@ -173,7 +180,7 @@ func (cphys *C.libxl_physinfo) toGo() (physinfo *Physinfo) {
 	physinfo.SharingFreedPages = uint64(cphys.sharing_freed_pages)
 	physinfo.SharingUsedFrames = uint64(cphys.sharing_used_frames)
 	physinfo.NrNodes = uint32(cphys.nr_nodes)
-	physinfo.HwCap = cphys.hw_cap.CToGo()
+	physinfo.HwCap = cphys.hw_cap.toGo()
 	physinfo.CapHvm = bool(cphys.cap_hvm)
 	physinfo.CapHvmDirectio = bool(cphys.cap_hvm_directio)
 
@@ -211,6 +218,93 @@ func (cinfo *C.libxl_version_info) toGo() (info *VersionInfo) {
 	info.Pagesize = int(cinfo.pagesize)
 	info.Commandline = C.GoString(cinfo.commandline)
 	info.BuildId = C.GoString(cinfo.build_id)
+
+	return
+}
+
+type ShutdownReason int32
+
+const (
+	ShutdownReasonUnknown   = ShutdownReason(C.LIBXL_SHUTDOWN_REASON_UNKNOWN)
+	ShutdownReasonPoweroff  = ShutdownReason(C.LIBXL_SHUTDOWN_REASON_POWEROFF)
+	ShutdownReasonReboot    = ShutdownReason(C.LIBXL_SHUTDOWN_REASON_REBOOT)
+	ShutdownReasonSuspend   = ShutdownReason(C.LIBXL_SHUTDOWN_REASON_SUSPEND)
+	ShutdownReasonCrash     = ShutdownReason(C.LIBXL_SHUTDOWN_REASON_CRASH)
+	ShutdownReasonWatchdog  = ShutdownReason(C.LIBXL_SHUTDOWN_REASON_WATCHDOG)
+	ShutdownReasonSoftReset = ShutdownReason(C.LIBXL_SHUTDOWN_REASON_SOFT_RESET)
+)
+
+func (sr ShutdownReason) String() (str string) {
+	cstr := C.libxl_shutdown_reason_to_string(C.libxl_shutdown_reason(sr))
+	str = C.GoString(cstr)
+
+	return
+}
+
+type DomainType int32
+
+const (
+	DomainTypeInvalid = DomainType(C.LIBXL_DOMAIN_TYPE_INVALID)
+	DomainTypeHvm     = DomainType(C.LIBXL_DOMAIN_TYPE_HVM)
+	DomainTypePv      = DomainType(C.LIBXL_DOMAIN_TYPE_PV)
+)
+
+func (dt DomainType) String() (str string) {
+	cstr := C.libxl_domain_type_to_string(C.libxl_domain_type(dt))
+	str = C.GoString(cstr)
+
+	return
+}
+
+type Dominfo struct {
+	Uuid      Uuid
+	Domid     Domid
+	Ssidref   uint32
+	SsidLabel string
+	Running   bool
+	Blocked   bool
+	Paused    bool
+	Shutdown  bool
+	Dying     bool
+	NeverStop bool
+
+	ShutdownReason   int32
+	OutstandingMemkb MemKB
+	CurrentMemkb     MemKB
+	SharedMemkb      MemKB
+	PagedMemkb       MemKB
+	MaxMemkb         MemKB
+	CpuTime          time.Duration
+	VcpuMaxId        uint32
+	VcpuOnline       uint32
+	Cpupool          uint32
+	DomainType       int32
+}
+
+func (cdi *C.libxl_dominfo) toGo() (di *Dominfo) {
+
+	di = &Dominfo{}
+	di.Uuid = Uuid(cdi.uuid)
+	di.Domid = Domid(cdi.domid)
+	di.Ssidref = uint32(cdi.ssidref)
+	di.SsidLabel = C.GoString(cdi.ssid_label)
+	di.Running = bool(cdi.running)
+	di.Blocked = bool(cdi.blocked)
+	di.Paused = bool(cdi.paused)
+	di.Shutdown = bool(cdi.shutdown)
+	di.Dying = bool(cdi.dying)
+	di.NeverStop = bool(cdi.never_stop)
+	di.ShutdownReason = int32(cdi.shutdown_reason)
+	di.OutstandingMemkb = MemKB(cdi.outstanding_memkb)
+	di.CurrentMemkb = MemKB(cdi.current_memkb)
+	di.SharedMemkb = MemKB(cdi.shared_memkb)
+	di.PagedMemkb = MemKB(cdi.paged_memkb)
+	di.MaxMemkb = MemKB(cdi.max_memkb)
+	di.CpuTime = time.Duration(cdi.cpu_time)
+	di.VcpuMaxId = uint32(cdi.vcpu_max_id)
+	di.VcpuOnline = uint32(cdi.vcpu_online)
+	di.Cpupool = uint32(cdi.cpupool)
+	di.DomainType = int32(cdi.domain_type)
 
 	return
 }
@@ -362,5 +456,41 @@ func (Ctx *Context) GetVersionInfo() (info *VersionInfo, err error) {
 
 	info = cinfo.toGo()
 
+	return
+}
+
+func (Ctx *Context) DomainInfo(Id Domid) (di *Dominfo, err error) {
+	err = Ctx.CheckOpen()
+	if err != nil {
+		return
+	}
+
+	var cdi C.libxl_dominfo
+	C.libxl_dominfo_init(&cdi)
+	defer C.libxl_dominfo_dispose(&cdi)
+
+	ret := C.libxl_domain_info(Ctx.ctx, &cdi, C.uint32_t(Id))
+
+	if ret != 0 {
+		err = Error(-ret)
+		return
+	}
+
+	di = cdi.toGo()
+
+	return
+}
+
+func (Ctx *Context) DomainUnpause(Id Domid) (err error) {
+	err = Ctx.CheckOpen()
+	if err != nil {
+		return
+	}
+
+	ret := C.libxl_domain_unpause(Ctx.ctx, C.uint32_t(Id))
+
+	if ret != 0 {
+		err = Error(-ret)
+	}
 	return
 }
