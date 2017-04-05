@@ -57,8 +57,11 @@ struct hvm_vioapic {
 };
 
 #define hvm_vioapic_size(cnt) offsetof(struct hvm_vioapic, redirtbl[cnt])
-#define domain_vioapic(d) ((d)->arch.hvm_domain.vioapic)
+#define domain_vioapic(d, i) ((d)->arch.hvm_domain.vioapic[i])
 #define vioapic_domain(v) ((v)->domain)
+
+struct hvm_vioapic *gsi_vioapic(const struct domain *d, unsigned int gsi,
+                                unsigned int *pin);
 
 int vioapic_init(struct domain *d);
 void vioapic_deinit(struct domain *d);

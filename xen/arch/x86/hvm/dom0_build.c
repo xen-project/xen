@@ -729,7 +729,7 @@ static int __init pvh_setup_acpi_madt(struct domain *d, paddr_t *addr)
     io_apic = (void *)(madt + 1);
     io_apic->header.type = ACPI_MADT_TYPE_IO_APIC;
     io_apic->header.length = sizeof(*io_apic);
-    io_apic->id = domain_vioapic(d)->id;
+    io_apic->id = domain_vioapic(d, 0)->id;
     io_apic->address = VIOAPIC_DEFAULT_BASE_ADDRESS;
 
     x2apic = (void *)(io_apic + 1);

@@ -1107,7 +1107,7 @@ static int __vlapic_accept_pic_intr(struct vcpu *v)
     if ( !has_vioapic(d) )
         return 0;
 
-    redir0 = domain_vioapic(d)->redirtbl[0];
+    redir0 = domain_vioapic(d, 0)->redirtbl[0];
 
     /* We deliver 8259 interrupts to the appropriate CPU as follows. */
     return ((/* IOAPIC pin0 is unmasked and routing to this LAPIC? */

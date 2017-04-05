@@ -78,7 +78,8 @@ void hvm_set_guest_time(struct vcpu *v, u64 guest_time)
 static int pt_irq_vector(struct periodic_time *pt, enum hvm_intsrc src)
 {
     struct vcpu *v = pt->vcpu;
-    unsigned int gsi, isa_irq;
+    struct hvm_vioapic *vioapic;
+    unsigned int gsi, isa_irq, pin;
 
     if ( pt->source == PTSRC_lapic )
         return pt->irq;
@@ -91,13 +92,23 @@ static int pt_irq_vector(struct periodic_time *pt, enum hvm_intsrc src)
                 + (isa_irq & 7));
 
     ASSERT(src == hvm_intsrc_lapic);
-    return domain_vioapic(v->domain)->redirtbl[gsi].fields.vector;
+    vioapic = gsi_vioapic(v->domain, gsi, &pin);
+    if ( !vioapic )
+    {
+        dprintk(XENLOG_WARNING, "d%u: invalid GSI (%u) for platform timer\n",
+                v->domain->domain_id, gsi);
+        domain_crash(v->domain);
+        return -1;
+    }
+
+    return vioapic->redirtbl[pin].fields.vector;
 }
 
 static int pt_irq_masked(struct periodic_time *pt)
 {
     struct vcpu *v = pt->vcpu;
-    unsigned int gsi, isa_irq;
+    unsigned int gsi, isa_irq, pin;
+    struct hvm_vioapic *vioapic;
     uint8_t pic_imr;
 
     if ( pt->source == PTSRC_lapic )
@@ -110,9 +121,17 @@ static int pt_irq_masked(struct periodic_time *pt)
     isa_irq = pt->irq;
     gsi = hvm_isa_irq_to_gsi(isa_irq);
     pic_imr = v->domain->arch.hvm_domain.vpic[isa_irq >> 3].imr;
+    vioapic = gsi_vioapic(v->domain, gsi, &pin);
+    if ( !vioapic )
+    {
+        dprintk(XENLOG_WARNING, "d%u: invalid GSI (%u) for platform timer\n",
+                v->domain->domain_id, gsi);
+        domain_crash(v->domain);
+        return -1;
+    }
 
     return (((pic_imr & (1 << (isa_irq & 7))) || !vlapic_accept_pic_intr(v)) &&
-            domain_vioapic(v->domain)->redirtbl[gsi].fields.mask);
+            vioapic->redirtbl[pin].fields.mask);
 }
 
 static void pt_lock(struct periodic_time *pt)
