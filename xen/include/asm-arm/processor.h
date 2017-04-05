@@ -708,6 +708,8 @@ int call_smc(register_t function_id, register_t arg0, register_t arg1,
 
 void do_trap_guest_error(struct cpu_user_regs *regs);
 
+register_t get_default_hcr_flags(void);
+
 #endif /* __ASSEMBLY__ */
 #endif /* __ASM_ARM_PROCESSOR_H */
 /*

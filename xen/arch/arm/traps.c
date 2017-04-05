@@ -136,6 +136,13 @@ static int __init vwfi_init(void)
 }
 presmp_initcall(vwfi_init);
 
+register_t get_default_hcr_flags(void)
+{
+    return  (HCR_PTW|HCR_BSU_INNER|HCR_AMO|HCR_IMO|HCR_FMO|HCR_VM|
+             (vwfi != NATIVE ? (HCR_TWI|HCR_TWE) : 0) |
+             HCR_TSC|HCR_TAC|HCR_SWIO|HCR_TIDCP|HCR_FB);
+}
+
 void init_traps(void)
 {
     /* Setup Hyp vector base */
@@ -160,9 +167,7 @@ void init_traps(void)
                  CPTR_EL2);
 
     /* Setup hypervisor traps */
-    WRITE_SYSREG(HCR_PTW|HCR_BSU_INNER|HCR_AMO|HCR_IMO|HCR_FMO|HCR_VM|
-                 (vwfi != NATIVE ? (HCR_TWI|HCR_TWE) : 0) |
-                 HCR_TSC|HCR_TAC|HCR_SWIO|HCR_TIDCP|HCR_FB,HCR_EL2);
+    WRITE_SYSREG(get_default_hcr_flags(), HCR_EL2);
     isb();
 }
 
