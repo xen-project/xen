@@ -167,6 +167,9 @@ static int __init update_serrors_cpu_caps(void)
     if ( serrors_op != SERRORS_DIVERSE )
         cpus_set_cap(SKIP_SYNCHRONIZE_SERROR_ENTRY_EXIT);
 
+    if ( serrors_op != SERRORS_FORWARD )
+        cpus_set_cap(SKIP_CTXT_SWITCH_SERROR_SYNC);
+
     return 0;
 }
 __initcall(update_serrors_cpu_caps);

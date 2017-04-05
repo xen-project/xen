@@ -29,6 +29,7 @@
 #include <asm/cpufeature.h>
 #include <asm/vfp.h>
 #include <asm/procinfo.h>
+#include <asm/alternative.h>
 
 #include <asm/gic.h>
 #include <asm/vgic.h>
@@ -311,6 +312,17 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
         update_runstate_area(prev);
 
     local_irq_disable();
+
+    /*
+     * If the serrors_op is "FORWARD", we have to prevent forwarding
+     * SError to wrong vCPU. So before context switch, we have to use
+     * the SYNCRONIZE_SERROR to guarantee that the pending SError would
+     * be caught by current vCPU.
+     *
+     * The SKIP_CTXT_SWITCH_SERROR_SYNC will be set to cpu_hwcaps when the
+     * serrors_op is NOT "FORWARD".
+     */
+    SYNCHRONIZE_SERROR(SKIP_CTXT_SWITCH_SERROR_SYNC);
 
     set_current(next);
 
