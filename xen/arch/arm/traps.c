@@ -2989,6 +2989,19 @@ asmlinkage void leave_hypervisor_tail(void)
         local_irq_disable();
         if (!softirq_pending(smp_processor_id())) {
             gic_inject();
+
+            /*
+             * If the SErrors handle option is "DIVERSE", we have to prevent
+             * slipping the hypervisor SError to guest. In this option, before
+             * returning from trap, we have to synchronize SErrors to guarantee
+             * that the pending SError would be caught in hypervisor.
+             *
+             * If option is NOT "DIVERSE", SKIP_SYNCHRONIZE_SERROR_ENTRY_EXIT
+             * will be set to cpu_hwcaps. This means we can use the alternative
+             * to skip synchronizing SErrors for other SErrors handle options.
+             */
+            SYNCHRONIZE_SERROR(SKIP_SYNCHRONIZE_SERROR_ENTRY_EXIT);
+
             return;
         }
         local_irq_enable();
