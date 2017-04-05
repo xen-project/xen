@@ -934,7 +934,8 @@ void wrl_apply_debit_actual(struct domain *domain)
 	      (long)domain->wrl_credit, (long)wrl_reserve);
 
 	if (domain->wrl_credit < 0) {
-		if (!domain->wrl_delay_logged++) {
+		if (!domain->wrl_delay_logged) {
+			domain->wrl_delay_logged = true;
 			WRL_LOG(now, "domain %ld is affected",
 				(long)domain->domid);
 		} else if (!wrl_log_last_warning) {
