@@ -1,5 +1,6 @@
 #include <asm/asm_defns.h>
 #include <asm/regs.h>
+#include <asm/alternative.h>
 #include <public/xen.h>
 
 #define SAVE_ONE_BANKED(reg)    mrs r11, reg; str r11, [sp, #UREGS_##reg]
@@ -44,6 +45,14 @@ save_guest_regs:
         SAVE_BANKED(fiq)
         SAVE_ONE_BANKED(R8_fiq); SAVE_ONE_BANKED(R9_fiq); SAVE_ONE_BANKED(R10_fiq)
         SAVE_ONE_BANKED(R11_fiq); SAVE_ONE_BANKED(R12_fiq);
+
+        /*
+         * If the SKIP_SYNCHRONIZE_SERROR_ENTRY_EXIT has been set in the cpu
+         * feature, the checking of pending SErrors will be skipped.
+         */
+        ALTERNATIVE("nop",
+                    "b skip_check",
+                    SKIP_SYNCHRONIZE_SERROR_ENTRY_EXIT)
         /*
          * Start to check pending virtual abort in the gap of Guest -> HYP
          * world switch.
@@ -99,6 +108,7 @@ abort_guest_exit_end:
          */
         bne return_from_trap
 
+skip_check:
         mov pc, lr
 
 #define DEFINE_TRAP_ENTRY(trap)                                         \
