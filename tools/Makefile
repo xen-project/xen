@@ -34,6 +34,7 @@ endif
 
 SUBDIRS-y += xenpmd
 SUBDIRS-y += libxl
+SUBDIRS-$(CONFIG_GOLANG) += golang
 SUBDIRS-y += xl
 SUBDIRS-y += helpers
 SUBDIRS-$(CONFIG_X86) += xenpaging
