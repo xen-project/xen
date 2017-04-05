@@ -141,6 +141,20 @@ func (chwcap C.libxl_hwcap) toGo() (ghwcap Hwcap) {
 	return
 }
 
+// typedef struct {
+//     uint32_t size;          /* number of bytes in map */
+//     uint8_t *map;
+// } libxl_bitmap;
+
+// Implement the Go bitmap type such that the underlying data can
+// easily be copied in and out.  NB that we still have to do copies
+// both directions, because cgo runtime restrictions forbid passing to
+// a C function a pointer to a Go-allocated structure which contains a
+// pointer.
+type Bitmap struct {
+	bitmap []C.uint8_t
+}
+
 /*
  * Types: IDL
  *
@@ -305,6 +319,159 @@ func (cdi *C.libxl_dominfo) toGo() (di *Dominfo) {
 	di.VcpuOnline = uint32(cdi.vcpu_online)
 	di.Cpupool = uint32(cdi.cpupool)
 	di.DomainType = int32(cdi.domain_type)
+
+	return
+}
+
+/*
+ * Bitmap operations
+ */
+
+// Return a Go bitmap which is a copy of the referred C bitmap.
+func (cbm C.libxl_bitmap) toGo() (gbm Bitmap) {
+	// Alloc a Go slice for the bytes
+	size := int(cbm.size)
+	gbm.bitmap = make([]C.uint8_t, size)
+
+	// Make a slice pointing to the C array
+	mapslice := (*[1 << 30]C.uint8_t)(unsafe.Pointer(cbm._map))[:size:size]
+
+	// And copy the C array into the Go array
+	copy(gbm.bitmap, mapslice)
+
+	return
+}
+
+// Must be C.libxl_bitmap_dispose'd of afterwards
+func (gbm Bitmap) toC() (cbm C.libxl_bitmap) {
+	C.libxl_bitmap_init(&cbm)
+
+	size := len(gbm.bitmap)
+	cbm._map = (*C.uint8_t)(C.malloc(C.size_t(size)))
+	cbm.size = C.uint32_t(size)
+	if cbm._map == nil {
+		panic("C.calloc failed!")
+	}
+
+	// Make a slice pointing to the C array
+	mapslice := (*[1 << 30]C.uint8_t)(unsafe.Pointer(cbm._map))[:size:size]
+
+	// And copy the Go array into the C array
+	copy(mapslice, gbm.bitmap)
+
+	return
+}
+
+func (bm *Bitmap) Test(bit int) bool {
+	ubit := uint(bit)
+	if bit > bm.Max() || bm.bitmap == nil {
+		return false
+	}
+
+	return (bm.bitmap[bit/8] & (1 << (ubit & 7))) != 0
+}
+
+func (bm *Bitmap) Set(bit int) {
+	ibit := bit / 8
+	if ibit+1 > len(bm.bitmap) {
+		bm.bitmap = append(bm.bitmap, make([]C.uint8_t, ibit+1-len(bm.bitmap))...)
+	}
+
+	bm.bitmap[ibit] |= 1 << (uint(bit) & 7)
+}
+
+func (bm *Bitmap) SetRange(start int, end int) {
+	for i := start; i <= end; i++ {
+		bm.Set(i)
+	}
+}
+
+func (bm *Bitmap) Clear(bit int) {
+	ubit := uint(bit)
+	if bit > bm.Max() || bm.bitmap == nil {
+		return
+	}
+
+	bm.bitmap[bit/8] &= ^(1 << (ubit & 7))
+}
+
+func (bm *Bitmap) ClearRange(start int, end int) {
+	for i := start; i <= end; i++ {
+		bm.Clear(i)
+	}
+}
+
+func (bm *Bitmap) Max() int {
+	return len(bm.bitmap)*8 - 1
+}
+
+func (bm *Bitmap) IsEmpty() bool {
+	for i := 0; i < len(bm.bitmap); i++ {
+		if bm.bitmap[i] != 0 {
+			return false
+		}
+	}
+	return true
+}
+
+func (a Bitmap) And(b Bitmap) (c Bitmap) {
+	var max, min int
+	if len(a.bitmap) > len(b.bitmap) {
+		max = len(a.bitmap)
+		min = len(b.bitmap)
+	} else {
+		max = len(b.bitmap)
+		min = len(a.bitmap)
+	}
+	c.bitmap = make([]C.uint8_t, max)
+
+	for i := 0; i < min; i++ {
+		c.bitmap[i] = a.bitmap[i] & b.bitmap[i]
+	}
+	return
+}
+
+func (bm Bitmap) String() (s string) {
+	lastOnline := false
+	crange := false
+	printed := false
+	var i int
+	/// --x-xxxxx-x -> 2,4-8,10
+	/// --x-xxxxxxx -> 2,4-10
+	for i = 0; i <= bm.Max(); i++ {
+		if bm.Test(i) {
+			if !lastOnline {
+				// Switching offline -> online, print this cpu
+				if printed {
+					s += ","
+				}
+				s += fmt.Sprintf("%d", i)
+				printed = true
+			} else if !crange {
+				// last was online, but we're not in a range; print -
+				crange = true
+				s += "-"
+			} else {
+				// last was online, we're in a range,  nothing else to do
+			}
+			lastOnline = true
+		} else {
+			if lastOnline {
+				// Switching online->offline; do we need to end a range?
+				if crange {
+					s += fmt.Sprintf("%d", i-1)
+				}
+			}
+			lastOnline = false
+			crange = false
+		}
+	}
+	if lastOnline {
+		// Switching online->offline; do we need to end a range?
+		if crange {
+			s += fmt.Sprintf("%d", i-1)
+		}
+	}
 
 	return
 }
