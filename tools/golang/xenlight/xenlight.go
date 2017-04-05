@@ -375,6 +375,311 @@ func SchedulerFromString(name string) (s Scheduler, err error) {
 	return
 }
 
+// libxl_cpupoolinfo = Struct("cpupoolinfo", [
+//     ("poolid",      uint32),
+//     ("pool_name",   string),
+//     ("sched",       libxl_scheduler),
+//     ("n_dom",       uint32),
+//     ("cpumap",      libxl_bitmap)
+//     ], dir=DIR_OUT)
+
+type CpupoolInfo struct {
+	Poolid      uint32
+	PoolName    string
+	Scheduler   Scheduler
+	DomainCount int
+	Cpumap      Bitmap
+}
+
+func (cci C.libxl_cpupoolinfo) toGo() (gci CpupoolInfo) {
+	gci.Poolid = uint32(cci.poolid)
+	gci.PoolName = C.GoString(cci.pool_name)
+	gci.Scheduler = Scheduler(cci.sched)
+	gci.DomainCount = int(cci.n_dom)
+	gci.Cpumap = cci.cpumap.toGo()
+
+	return
+}
+
+// libxl_cpupoolinfo * libxl_list_cpupool(libxl_ctx*, int *nb_pool_out);
+// void libxl_cpupoolinfo_list_free(libxl_cpupoolinfo *list, int nb_pool);
+func (Ctx *Context) ListCpupool() (list []CpupoolInfo) {
+	err := Ctx.CheckOpen()
+	if err != nil {
+		return
+	}
+
+	var nbPool C.int
+
+	c_cpupool_list := C.libxl_list_cpupool(Ctx.ctx, &nbPool)
+
+	defer C.libxl_cpupoolinfo_list_free(c_cpupool_list, nbPool)
+
+	if int(nbPool) == 0 {
+		return
+	}
+
+	// Magic
+	cpupoolListSlice := (*[1 << 30]C.libxl_cpupoolinfo)(unsafe.Pointer(c_cpupool_list))[:nbPool:nbPool]
+	for i := range cpupoolListSlice {
+		info := cpupoolListSlice[i].toGo()
+		list = append(list, info)
+	}
+
+	return
+}
+
+// int libxl_cpupool_info(libxl_ctx *ctx, libxl_cpupoolinfo *info, uint32_t poolid);
+func (Ctx *Context) CpupoolInfo(Poolid uint32) (pool CpupoolInfo) {
+	err := Ctx.CheckOpen()
+	if err != nil {
+		return
+	}
+
+	var c_cpupool C.libxl_cpupoolinfo
+
+	ret := C.libxl_cpupool_info(Ctx.ctx, &c_cpupool, C.uint32_t(Poolid))
+	if ret != 0 {
+		err = Error(-ret)
+		return
+	}
+	defer C.libxl_cpupoolinfo_dispose(&c_cpupool)
+
+	pool = c_cpupool.toGo()
+
+	return
+}
+
+// int libxl_cpupool_create(libxl_ctx *ctx, const char *name,
+//                          libxl_scheduler sched,
+//                          libxl_bitmap cpumap, libxl_uuid *uuid,
+//                          uint32_t *poolid);
+// FIXME: uuid
+// FIXME: Setting poolid
+func (Ctx *Context) CpupoolCreate(Name string, Scheduler Scheduler, Cpumap Bitmap) (err error, Poolid uint32) {
+	err = Ctx.CheckOpen()
+	if err != nil {
+		return
+	}
+
+	poolid := C.uint32_t(C.LIBXL_CPUPOOL_POOLID_ANY)
+	name := C.CString(Name)
+	defer C.free(unsafe.Pointer(name))
+
+	// For now, just do what xl does, and make a new uuid every time we create the pool
+	var uuid C.libxl_uuid
+	C.libxl_uuid_generate(&uuid)
+
+	cbm := Cpumap.toC()
+	defer C.libxl_bitmap_dispose(&cbm)
+
+	ret := C.libxl_cpupool_create(Ctx.ctx, name, C.libxl_scheduler(Scheduler),
+		cbm, &uuid, &poolid)
+	if ret != 0 {
+		err = Error(-ret)
+		return
+	}
+
+	Poolid = uint32(poolid)
+
+	return
+}
+
+// int libxl_cpupool_destroy(libxl_ctx *ctx, uint32_t poolid);
+func (Ctx *Context) CpupoolDestroy(Poolid uint32) (err error) {
+	err = Ctx.CheckOpen()
+	if err != nil {
+		return
+	}
+
+	ret := C.libxl_cpupool_destroy(Ctx.ctx, C.uint32_t(Poolid))
+	if ret != 0 {
+		err = Error(-ret)
+		return
+	}
+
+	return
+}
+
+// int libxl_cpupool_cpuadd(libxl_ctx *ctx, uint32_t poolid, int cpu);
+func (Ctx *Context) CpupoolCpuadd(Poolid uint32, Cpu int) (err error) {
+	err = Ctx.CheckOpen()
+	if err != nil {
+		return
+	}
+
+	ret := C.libxl_cpupool_cpuadd(Ctx.ctx, C.uint32_t(Poolid), C.int(Cpu))
+	if ret != 0 {
+		err = Error(-ret)
+		return
+	}
+
+	return
+}
+
+// int libxl_cpupool_cpuadd_cpumap(libxl_ctx *ctx, uint32_t poolid,
+//                                 const libxl_bitmap *cpumap);
+func (Ctx *Context) CpupoolCpuaddCpumap(Poolid uint32, Cpumap Bitmap) (err error) {
+	err = Ctx.CheckOpen()
+	if err != nil {
+		return
+	}
+
+	cbm := Cpumap.toC()
+	defer C.libxl_bitmap_dispose(&cbm)
+
+	ret := C.libxl_cpupool_cpuadd_cpumap(Ctx.ctx, C.uint32_t(Poolid), &cbm)
+	if ret != 0 {
+		err = Error(-ret)
+		return
+	}
+
+	return
+}
+
+// int libxl_cpupool_cpuremove(libxl_ctx *ctx, uint32_t poolid, int cpu);
+func (Ctx *Context) CpupoolCpuremove(Poolid uint32, Cpu int) (err error) {
+	err = Ctx.CheckOpen()
+	if err != nil {
+		return
+	}
+
+	ret := C.libxl_cpupool_cpuremove(Ctx.ctx, C.uint32_t(Poolid), C.int(Cpu))
+	if ret != 0 {
+		err = Error(-ret)
+		return
+	}
+
+	return
+}
+
+// int libxl_cpupool_cpuremove_cpumap(libxl_ctx *ctx, uint32_t poolid,
+//                                    const libxl_bitmap *cpumap);
+func (Ctx *Context) CpupoolCpuremoveCpumap(Poolid uint32, Cpumap Bitmap) (err error) {
+	err = Ctx.CheckOpen()
+	if err != nil {
+		return
+	}
+
+	cbm := Cpumap.toC()
+	defer C.libxl_bitmap_dispose(&cbm)
+
+	ret := C.libxl_cpupool_cpuremove_cpumap(Ctx.ctx, C.uint32_t(Poolid), &cbm)
+	if ret != 0 {
+		err = Error(-ret)
+		return
+	}
+
+	return
+}
+
+// int libxl_cpupool_rename(libxl_ctx *ctx, const char *name, uint32_t poolid);
+func (Ctx *Context) CpupoolRename(Name string, Poolid uint32) (err error) {
+	err = Ctx.CheckOpen()
+	if err != nil {
+		return
+	}
+
+	name := C.CString(Name)
+	defer C.free(unsafe.Pointer(name))
+
+	ret := C.libxl_cpupool_rename(Ctx.ctx, name, C.uint32_t(Poolid))
+	if ret != 0 {
+		err = Error(-ret)
+		return
+	}
+
+	return
+}
+
+// int libxl_cpupool_cpuadd_node(libxl_ctx *ctx, uint32_t poolid, int node, int *cpus);
+func (Ctx *Context) CpupoolCpuaddNode(Poolid uint32, Node int) (Cpus int, err error) {
+	err = Ctx.CheckOpen()
+	if err != nil {
+		return
+	}
+
+	ccpus := C.int(0)
+
+	ret := C.libxl_cpupool_cpuadd_node(Ctx.ctx, C.uint32_t(Poolid), C.int(Node), &ccpus)
+	if ret != 0 {
+		err = Error(-ret)
+		return
+	}
+
+	Cpus = int(ccpus)
+
+	return
+}
+
+// int libxl_cpupool_cpuremove_node(libxl_ctx *ctx, uint32_t poolid, int node, int *cpus);
+func (Ctx *Context) CpupoolCpuremoveNode(Poolid uint32, Node int) (Cpus int, err error) {
+	err = Ctx.CheckOpen()
+	if err != nil {
+		return
+	}
+
+	ccpus := C.int(0)
+
+	ret := C.libxl_cpupool_cpuremove_node(Ctx.ctx, C.uint32_t(Poolid), C.int(Node), &ccpus)
+	if ret != 0 {
+		err = Error(-ret)
+		return
+	}
+
+	Cpus = int(ccpus)
+
+	return
+}
+
+// int libxl_cpupool_movedomain(libxl_ctx *ctx, uint32_t poolid, uint32_t domid);
+func (Ctx *Context) CpupoolMovedomain(Poolid uint32, Id Domid) (err error) {
+	err = Ctx.CheckOpen()
+	if err != nil {
+		return
+	}
+
+	ret := C.libxl_cpupool_movedomain(Ctx.ctx, C.uint32_t(Poolid), C.uint32_t(Id))
+	if ret != 0 {
+		err = Error(-ret)
+		return
+	}
+
+	return
+}
+
+//
+// Utility functions
+//
+func (Ctx *Context) CpupoolFindByName(name string) (info CpupoolInfo, found bool) {
+	plist := Ctx.ListCpupool()
+
+	for i := range plist {
+		if plist[i].PoolName == name {
+			found = true
+			info = plist[i]
+			return
+		}
+	}
+	return
+}
+
+func (Ctx *Context) CpupoolMakeFree(Cpumap Bitmap) (err error) {
+	plist := Ctx.ListCpupool()
+
+	for i := range plist {
+		var Intersection Bitmap
+		Intersection = Cpumap.And(plist[i].Cpumap)
+		if !Intersection.IsEmpty() {
+			err = Ctx.CpupoolCpuremoveCpumap(plist[i].Poolid, Intersection)
+			if err != nil {
+				return
+			}
+		}
+	}
+	return
+}
+
 /*
  * Bitmap operations
  */
