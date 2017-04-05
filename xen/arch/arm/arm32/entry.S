@@ -24,6 +24,9 @@
         add r11, sp, #UREGS_kernel_sizeof+4;                            \
         str r11, [sp, #UREGS_sp];                                       \
                                                                         \
+        mrc CP32(r11, HSR);             /* Save exception syndrome */   \
+        str r11, [sp, #UREGS_hsr];                                      \
+                                                                        \
         mrs r11, SPSR_hyp;                                              \
         str r11, [sp, #UREGS_cpsr];                                     \
         and r11, #PSR_MODE_MASK;                                        \
