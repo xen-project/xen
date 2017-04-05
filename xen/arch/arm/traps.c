@@ -143,6 +143,25 @@ register_t get_default_hcr_flags(void)
              HCR_TSC|HCR_TAC|HCR_SWIO|HCR_TIDCP|HCR_FB);
 }
 
+static enum {
+    SERRORS_DIVERSE,
+    SERRORS_FORWARD,
+    SERRORS_PANIC,
+} serrors_op;
+
+static void __init parse_serrors_behavior(const char *str)
+{
+    if ( !strcmp(str, "forward") )
+        serrors_op = SERRORS_FORWARD;
+    else if ( !strcmp(str, "panic") )
+        serrors_op = SERRORS_PANIC;
+    else
+        serrors_op = SERRORS_DIVERSE;
+
+    return;
+}
+custom_param("serrors", parse_serrors_behavior);
+
 void init_traps(void)
 {
     /* Setup Hyp vector base */
