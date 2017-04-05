@@ -2583,12 +2583,12 @@ static void do_trap_instr_abort_guest(struct cpu_user_regs *regs,
 
     /*
      * If this bit has been set, it means that this instruction abort is caused
-     * by a guest external abort. Currently we crash the guest to protect the
-     * hypervisor. In future one can better handle this by injecting a virtual
-     * abort to the guest.
+     * by a guest external abort. We can handle this instruction abort as guest
+     * SError.
      */
     if ( hsr.iabt.eat )
-        domain_crash_synchronous();
+        return __do_trap_serror(regs, true);
+
 
     if ( hpfar_is_valid(hsr.iabt.s1ptw, fsc) )
         gpa = get_faulting_ipa(gva);
@@ -2715,12 +2715,10 @@ static void do_trap_data_abort_guest(struct cpu_user_regs *regs,
 
     /*
      * If this bit has been set, it means that this data abort is caused
-     * by a guest external abort. Currently we crash the guest to protect the
-     * hypervisor. In future one can better handle this by injecting a virtual
-     * abort to the guest.
+     * by a guest external abort. We treat this data abort as guest SError.
      */
     if ( dabt.eat )
-        domain_crash_synchronous();
+        return __do_trap_serror(regs, true);
 
     info.dabt = dabt;
 #ifdef CONFIG_ARM_32
