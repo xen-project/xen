@@ -723,6 +723,18 @@ void abort_guest_exit_end(void);
     ( (unsigned long)abort_guest_exit_end == (r)->pc ) \
 )
 
+/*
+ * Synchronize SError unless the feature is selected.
+ * This is relying on the SErrors are currently unmasked.
+ */
+#define SYNCHRONIZE_SERROR(feat)                                  \
+    do {                                                          \
+        ASSERT(!cpus_have_cap(feat) || local_abort_is_enabled()); \
+        asm volatile(ALTERNATIVE("dsb sy; isb",                   \
+                                 "nop; nop", feat)                \
+                                 : : : "memory");                 \
+    } while (0)
+
 #endif /* __ASSEMBLY__ */
 #endif /* __ASM_ARM_PROCESSOR_H */
 /*
