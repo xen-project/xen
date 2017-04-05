@@ -90,11 +90,12 @@ compat/xlat.h: $(addprefix compat/.xlat/,$(xlat-y)) Makefile
 
 ifeq ($(XEN_TARGET_ARCH),$(XEN_COMPILE_ARCH))
 
-all: headers.chk headers++.chk
+all: headers.chk headers99.chk headers++.chk
 
 PUBLIC_HEADERS := $(filter-out public/arch-% public/dom0_ops.h, $(wildcard public/*.h public/*/*.h) $(public-y))
 
-PUBLIC_ANSI_HEADERS := $(filter-out public/%ctl.h public/xsm/% public/%hvm/save.h, $(PUBLIC_HEADERS))
+PUBLIC_C99_HEADERS :=
+PUBLIC_ANSI_HEADERS := $(filter-out public/%ctl.h public/xsm/% public/%hvm/save.h $(PUBLIC_C99_HEADERS), $(PUBLIC_HEADERS))
 
 headers.chk: $(PUBLIC_ANSI_HEADERS) Makefile
 	for i in $(filter %.h,$^); do \
@@ -104,16 +105,24 @@ headers.chk: $(PUBLIC_ANSI_HEADERS) Makefile
 	done >$@.new
 	mv $@.new $@
 
+headers99.chk: $(PUBLIC_C99_HEADERS) Makefile
+	rm -f $@.new
+	$(foreach i, $(filter %.h,$^),                                        \
+	    $(CC) -x c -std=c99 -Wall -Werror                                 \
+	    -include stdint.h $(foreach j, $($(i)-prereq), -include $(j).h)   \
+	    -S -o /dev/null $(i)                                              \
+	    || exit $$?; echo $(i) >> $@.new;)
+	mv $@.new $@
+
 headers++.chk: $(PUBLIC_HEADERS) Makefile
-	if $(CXX) -v >/dev/null 2>&1; then \
-	    for i in $(filter %.h,$^); do \
-	        echo '#include "'$$i'"' \
-	        | $(CXX) -x c++ -std=gnu++98 -Wall -Werror -D__XEN_TOOLS__ \
-	          -include stdint.h -include public/xen.h -S -o /dev/null - \
-	        || exit 1; \
-	        echo $$i; \
-	    done ; \
-	fi >$@.new
+	rm -f $@.new
+	$(CXX) -v >/dev/null 2>&1 || exit 0;                                  \
+	$(foreach i, $(filter %.h,$^),                                        \
+	    echo "#include "\"$(i)\"                                          \
+	    | $(CXX) -x c++ -std=gnu++98 -Wall -Werror -D__XEN_TOOLS__        \
+	      -include stdint.h -include public/xen.h                         \
+	      $(foreach j, $($(i)-prereq), -include c$(j)) -S -o /dev/null -  \
+	    || exit $$?; echo $(i) >> $@.new;)
 	mv $@.new $@
 
 endif
@@ -128,5 +137,5 @@ all: $(BASEDIR)/include/asm-x86/cpuid-autogen.h
 endif
 
 clean::
-	rm -rf compat headers.chk headers++.chk
+	rm -rf compat headers*.chk
 	rm -f $(BASEDIR)/include/asm-x86/cpuid-autogen.h
