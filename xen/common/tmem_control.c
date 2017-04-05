@@ -402,6 +402,101 @@ static int tmemc_get_pool(int cli_id,
     return rc ? : idx;
 }
 
+static int tmemc_set_pools(int cli_id,
+                           XEN_GUEST_HANDLE(xen_tmem_pool_info_t) pools,
+                           uint32_t len)
+{
+    unsigned int i;
+    int rc = 0;
+    unsigned int nr = len / sizeof(xen_tmem_pool_info_t);
+    struct client *client = tmem_client_from_cli_id(cli_id);
+
+    if ( len % sizeof(xen_tmem_pool_info_t) )
+        return -EINVAL;
+
+    if ( nr > MAX_POOLS_PER_DOMAIN )
+        return -E2BIG;
+
+    if ( !guest_handle_okay(pools, nr) )
+        return -EINVAL;
+
+    if ( !client )
+    {
+        client = client_create(cli_id);
+        if ( !client )
+            return -ENOMEM;
+    }
+    for ( i = 0; i < nr; i++ )
+    {
+        xen_tmem_pool_info_t pool;
+
+        if ( __copy_from_guest_offset(&pool, pools, i, 1 ) )
+            return -EFAULT;
+
+        if ( pool.n_pages )
+            return -EINVAL;
+
+        rc = do_tmem_new_pool(cli_id, pool.id, pool.flags.raw,
+                              pool.uuid[0], pool.uuid[1]);
+        if ( rc < 0 )
+            break;
+
+        pool.id = rc;
+        if ( __copy_to_guest_offset(pools, i, &pool, 1) )
+            return -EFAULT;
+    }
+
+    /* And how many we have processed. */
+    return rc ? : i;
+}
+
+static int tmemc_auth_pools(int cli_id,
+                            XEN_GUEST_HANDLE(xen_tmem_pool_info_t) pools,
+                            uint32_t len)
+{
+    unsigned int i;
+    int rc = 0;
+    unsigned int nr = len / sizeof(xen_tmem_pool_info_t);
+    struct client *client = tmem_client_from_cli_id(cli_id);
+
+    if ( len % sizeof(xen_tmem_pool_info_t) )
+        return -EINVAL;
+
+    if ( nr > MAX_POOLS_PER_DOMAIN )
+        return -E2BIG;
+
+    if ( !guest_handle_okay(pools, nr) )
+        return -EINVAL;
+
+    if ( !client )
+    {
+        client = client_create(cli_id);
+        if ( !client )
+            return -ENOMEM;
+    }
+
+    for ( i = 0; i < nr; i++ )
+    {
+        xen_tmem_pool_info_t pool;
+
+        if ( __copy_from_guest_offset(&pool, pools, i, 1 ) )
+            return -EFAULT;
+
+        if ( pool.n_pages )
+            return -EINVAL;
+
+        rc = tmemc_shared_pool_auth(cli_id, pool.uuid[0], pool.uuid[1],
+                                    pool.flags.u.auth);
+
+        if ( rc < 0 )
+            break;
+
+    }
+
+    /* And how many we have processed. */
+    return rc ? : i;
+}
+
 int tmem_control(struct xen_sysctl_tmem_op *op)
 {
     int ret;
@@ -437,6 +532,12 @@ int tmem_control(struct xen_sysctl_tmem_op *op)
         break;
     case XEN_SYSCTL_TMEM_OP_GET_POOLS:
         ret = tmemc_get_pool(op->cli_id, op->u.pool, op->len);
+        break;
+    case XEN_SYSCTL_TMEM_OP_SET_POOLS: /* TMEM_RESTORE_NEW */
+        ret = tmemc_set_pools(op->cli_id, op->u.pool, op->len);
+        break;
+    case XEN_SYSCTL_TMEM_OP_SET_AUTH: /* TMEM_AUTH */
+        ret = tmemc_auth_pools(op->cli_id, op->u.pool, op->len);
         break;
     default:
         ret = do_tmem_control(op);

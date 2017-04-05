@@ -770,7 +770,9 @@ DEFINE_XEN_GUEST_HANDLE(xen_sysctl_psr_cat_op_t);
 #define XEN_SYSCTL_TMEM_OP_SET_CLIENT_INFO        6
 #define XEN_SYSCTL_TMEM_OP_GET_POOLS              7
 #define XEN_SYSCTL_TMEM_OP_QUERY_FREEABLE_MB      8
+#define XEN_SYSCTL_TMEM_OP_SET_POOLS              9
 #define XEN_SYSCTL_TMEM_OP_SAVE_BEGIN             10
+#define XEN_SYSCTL_TMEM_OP_SET_AUTH               11
 #define XEN_SYSCTL_TMEM_OP_SAVE_GET_NEXT_PAGE     19
 #define XEN_SYSCTL_TMEM_OP_SAVE_GET_NEXT_INV      20
 #define XEN_SYSCTL_TMEM_OP_SAVE_END               21
@@ -812,10 +814,14 @@ typedef struct xen_tmem_client xen_tmem_client_t;
 DEFINE_XEN_GUEST_HANDLE(xen_tmem_client_t);
 
 /*
- * XEN_SYSCTL_TMEM_OP_GET_POOLS uses the 'pool' array in
- * xen_sysctl_tmem_op with this structure. The hypercall will
+ * XEN_SYSCTL_TMEM_OP_[GET|SET]_POOLS or XEN_SYSCTL_TMEM_OP_SET_AUTH
+ * uses the 'pool' array in * xen_sysctl_tmem_op with this structure.
+ * The XEN_SYSCTL_TMEM_OP_GET_POOLS hypercall will
  * return the number of entries in 'pool' or a negative value
  * if an error was encountered.
+ * The XEN_SYSCTL_TMEM_OP_SET_[AUTH|POOLS] will return the number of
+ * entries in 'pool' processed or a negative value if an error
+ * was encountered.
  */
 struct xen_tmem_pool_info {
     union {
@@ -823,14 +829,15 @@ struct xen_tmem_pool_info {
         struct {
             uint32_t persist:1,    /* See TMEM_POOL_PERSIST. */
                      shared:1,     /* See TMEM_POOL_SHARED. */
-                     rsv:2,
+                     auth:1,       /* See TMEM_POOL_AUTH. */
+                     rsv1:1,
                      pagebits:8,   /* TMEM_POOL_PAGESIZE_[SHIFT,MASK]. */
                      rsv2:12,
                      version:8;    /* TMEM_POOL_VERSION_[SHIFT,MASK]. */
         } u;
     } flags;
     uint32_t id;                  /* Less than tmem_client.maxpools. */
-    uint64_t n_pages;
+    uint64_t n_pages;             /* Zero on XEN_SYSCTL_TMEM_OP_SET_[AUTH|POOLS]. */
     uint64_aligned_t uuid[2];
 };
 typedef struct xen_tmem_pool_info xen_tmem_pool_info_t;

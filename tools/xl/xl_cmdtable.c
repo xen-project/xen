@@ -416,7 +416,7 @@ struct cmd_spec cmd_table[] = {
       "  -a                             Authenticate for all tmem pools\n"
       "  -u UUID                        Specify uuid\n"
       "                                 (abcdef01-2345-6789-1234-567890abcdef)\n"
-      "  -A AUTH                        0=auth,1=deauth",
+      "  -A AUTH                        0=deauth,1=auth",
     },
     { "tmem-freeable",
       &main_tmem_freeable, 0, 0,

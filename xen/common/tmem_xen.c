@@ -20,9 +20,6 @@ boolean_param("tmem", opt_tmem);
 bool_t __read_mostly opt_tmem_compress = 0;
 boolean_param("tmem_compress", opt_tmem_compress);
 
-bool_t __read_mostly opt_tmem_shared_auth = 0;
-boolean_param("tmem_shared_auth", opt_tmem_shared_auth);
-
 atomic_t freeable_page_count = ATOMIC_INIT(0);
 
 /* these are a concurrency bottleneck, could be percpu and dynamically
