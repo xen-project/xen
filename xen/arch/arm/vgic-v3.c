@@ -151,9 +151,10 @@ static void vgic_store_irouter(struct domain *d, struct vgic_irq_rank *rank,
 
     /* Only migrate the IRQ if the target vCPU has changed */
     if ( new_vcpu != old_vcpu )
-        vgic_migrate_irq(old_vcpu, new_vcpu, virq);
-
-    write_atomic(&rank->vcpu[offset], new_vcpu->vcpu_id);
+    {
+        if ( vgic_migrate_irq(old_vcpu, new_vcpu, virq) )
+            write_atomic(&rank->vcpu[offset], new_vcpu->vcpu_id);
+    }
 }
 
 static inline bool vgic_reg64_check_access(struct hsr_dabt dabt)
