@@ -238,18 +238,21 @@ static int vgic_get_virq_priority(struct vcpu *v, unsigned int virq)
     return priority;
 }
 
-void vgic_migrate_irq(struct vcpu *old, struct vcpu *new, unsigned int irq)
+bool vgic_migrate_irq(struct vcpu *old, struct vcpu *new, unsigned int irq)
 {
     unsigned long flags;
     struct pending_irq *p = irq_to_pending(old, irq);
 
     /* nothing to do for virtual interrupts */
     if ( p->desc == NULL )
-        return;
+        return true;
 
     /* migration already in progress, no need to do anything */
     if ( test_bit(GIC_IRQ_GUEST_MIGRATING, &p->status) )
-        return;
+    {
+        gprintk(XENLOG_WARNING, "irq %u migration failed: requested while in progress\n", irq);
+        return false;
+    }
 
     perfc_incr(vgic_irq_migrates);
 
@@ -259,7 +262,7 @@ void vgic_migrate_irq(struct vcpu *old, struct vcpu *new, unsigned int irq)
     {
         irq_set_affinity(p->desc, cpumask_of(new->processor));
         spin_unlock_irqrestore(&old->arch.vgic.lock, flags);
-        return;
+        return true;
     }
     /* If the IRQ is still lr_pending, re-inject it to the new vcpu */
     if ( !list_empty(&p->lr_queue) )
@@ -270,7 +273,7 @@ void vgic_migrate_irq(struct vcpu *old, struct vcpu *new, unsigned int irq)
         irq_set_affinity(p->desc, cpumask_of(new->processor));
         spin_unlock_irqrestore(&old->arch.vgic.lock, flags);
         vgic_vcpu_inject_irq(new, irq);
-        return;
+        return true;
     }
     /* if the IRQ is in a GICH_LR register, set GIC_IRQ_GUEST_MIGRATING
      * and wait for the EOI */
@@ -278,6 +281,7 @@ void vgic_migrate_irq(struct vcpu *old, struct vcpu *new, unsigned int irq)
         set_bit(GIC_IRQ_GUEST_MIGRATING, &p->status);
 
     spin_unlock_irqrestore(&old->arch.vgic.lock, flags);
+    return true;
 }
 
 void arch_move_irqs(struct vcpu *v)

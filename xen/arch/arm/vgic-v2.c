@@ -157,12 +157,11 @@ static void vgic_store_itargetsr(struct domain *d, struct vgic_irq_rank *rank,
         /* Only migrate the vIRQ if the target vCPU has changed */
         if ( new_target != old_target )
         {
-            vgic_migrate_irq(d->vcpu[old_target],
+            if ( vgic_migrate_irq(d->vcpu[old_target],
                              d->vcpu[new_target],
-                             virq);
+                             virq) )
+                write_atomic(&rank->vcpu[offset], new_target);
         }
-
-        write_atomic(&rank->vcpu[offset], new_target);
     }
 }
 
