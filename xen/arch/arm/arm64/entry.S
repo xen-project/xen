@@ -178,40 +178,10 @@ hyp_error_invalid:
         invalid BAD_ERROR
 
 hyp_error:
-        /*
-         * Only two possibilities:
-         * 1) Either we come from the exit path, having just unmasked
-         *    PSTATE.A: change the return code to an EL2 fault, and
-         *    carry on, as we're already in a sane state to handle it.
-         * 2) Or we come from anywhere else, and that's a bug: we panic.
-         */
         entry   hyp=1
         msr     daifclr, #2
-
-        /*
-         * The ELR_EL2 may be modified by an interrupt, so we have to use the
-         * saved value in cpu_user_regs to check whether we come from 1) or
-         * not.
-         */
-        ldr     x0, [sp, #UREGS_PC]
-        adr     x1, abort_guest_exit_start
-        cmp     x0, x1
-        adr     x1, abort_guest_exit_end
-        ccmp    x0, x1, #4, ne
         mov     x0, sp
-        mov     x1, #BAD_ERROR
-
-        /*
-         * Not equal, the exception come from 2). It's a bug, we have to
-         * panic the hypervisor.
-         */
-        b.ne    do_bad_mode
-
-        /*
-         * Otherwise, the exception come from 1). It happened because of
-         * the guest. Crash this guest.
-         */
-        bl      do_trap_guest_error
+        bl      do_trap_hyp_serror
         exit    hyp=1
 
 /* Traps taken in Current EL with SP_ELx */
@@ -267,7 +237,7 @@ guest_error:
         entry   hyp=0, compat=0
         msr     daifclr, #2
         mov     x0, sp
-        bl      do_trap_guest_error
+        bl      do_trap_guest_serror
         exit    hyp=0, compat=0
 
 guest_sync_compat:
@@ -309,7 +279,7 @@ guest_error_compat:
         entry   hyp=0, compat=1
         msr     daifclr, #2
         mov     x0, sp
-        bl      do_trap_guest_error
+        bl      do_trap_guest_serror
         exit    hyp=0, compat=1
 
 ENTRY(return_to_new_vcpu32)
