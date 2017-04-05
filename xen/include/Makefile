@@ -94,8 +94,10 @@ all: headers.chk headers99.chk headers++.chk
 
 PUBLIC_HEADERS := $(filter-out public/arch-% public/dom0_ops.h, $(wildcard public/*.h public/*/*.h) $(public-y))
 
-PUBLIC_C99_HEADERS :=
+PUBLIC_C99_HEADERS := public/io/9pfs.h
 PUBLIC_ANSI_HEADERS := $(filter-out public/%ctl.h public/xsm/% public/%hvm/save.h $(PUBLIC_C99_HEADERS), $(PUBLIC_HEADERS))
+
+public/io/9pfs.h-prereq := string
 
 headers.chk: $(PUBLIC_ANSI_HEADERS) Makefile
 	for i in $(filter %.h,$^); do \
