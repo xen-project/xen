@@ -864,7 +864,7 @@ static void _show_registers(struct cpu_user_regs *regs,
     printk("   HCR_EL2: %016"PRIregister"\n", READ_SYSREG(HCR_EL2));
     printk(" TTBR0_EL2: %016"PRIx64"\n", READ_SYSREG64(TTBR0_EL2));
     printk("\n");
-    printk("   ESR_EL2: %08"PRIx32"\n", READ_SYSREG32(ESR_EL2));
+    printk("   ESR_EL2: %08"PRIx32"\n", regs->hsr);
     printk(" HPFAR_EL2: %016"PRIregister"\n", READ_SYSREG(HPFAR_EL2));
 
 #ifdef CONFIG_ARM_32
@@ -2694,7 +2694,7 @@ static void enter_hypervisor_head(struct cpu_user_regs *regs)
 
 asmlinkage void do_trap_hypervisor(struct cpu_user_regs *regs)
 {
-    const union hsr hsr = { .bits = READ_SYSREG32(ESR_EL2) };
+    const union hsr hsr = { .bits = regs->hsr };
 
     enter_hypervisor_head(regs);
 

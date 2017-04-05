@@ -121,9 +121,13 @@ lr      .req    x30             // link register
 
         stp     lr, x21, [sp, #UREGS_LR]
 
-        mrs     x22, elr_el2
-        mrs     x23, spsr_el2
-        stp     x22, x23, [sp, #UREGS_PC]
+        mrs     x21, elr_el2
+        str     x21, [sp, #UREGS_PC]
+
+        add     x21, sp, #UREGS_CPSR
+        mrs     x22, spsr_el2
+        mrs     x23, esr_el2
+        stp     w22, w23, [x21]
 
         .endm
 
@@ -307,7 +311,8 @@ ENTRY(return_to_new_vcpu64)
 return_from_trap:
         msr     daifset, #2 /* Mask interrupts */
 
-        ldp     x21, x22, [sp, #UREGS_PC]       // load ELR, SPSR
+        ldr     x21, [sp, #UREGS_PC]            // load ELR
+        ldr     w22, [sp, #UREGS_CPSR]          // load SPSR
 
         pop     x0, x1
         pop     x2, x3
