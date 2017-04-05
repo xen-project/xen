@@ -51,6 +51,13 @@
 # error "unknown ARM variant"
 #endif
 
+static inline int local_abort_is_enabled(void)
+{
+    unsigned long flags;
+    local_save_flags(flags);
+    return !(flags & PSR_ABT_MASK);
+}
+
 #define arch_fetch_and_add(x, v) __sync_fetch_and_add(x, v)
 
 extern struct vcpu *__context_switch(struct vcpu *prev, struct vcpu *next);
