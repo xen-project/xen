@@ -2694,7 +2694,18 @@ static void do_trap_smc(struct cpu_user_regs *regs, const union hsr hsr)
 static void enter_hypervisor_head(struct cpu_user_regs *regs)
 {
     if ( guest_mode(regs) )
+    {
+        /*
+         * If we pended a virtual abort, preserve it until it gets cleared.
+         * See ARM ARM DDI 0487A.j D1.14.3 (Virtual Interrupts) for details,
+         * but the crucial bit is "On taking a vSError interrupt, HCR_EL2.VSE
+         * (alias of HCR.VA) is cleared to 0."
+         */
+        if ( current->arch.hcr_el2 & HCR_VA )
+            current->arch.hcr_el2 = READ_SYSREG(HCR_EL2);
+
         gic_clear_lrs(current);
+    }
 }
 
 asmlinkage void do_trap_hypervisor(struct cpu_user_regs *regs)
