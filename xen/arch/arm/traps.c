@@ -162,6 +162,15 @@ static void __init parse_serrors_behavior(const char *str)
 }
 custom_param("serrors", parse_serrors_behavior);
 
+static int __init update_serrors_cpu_caps(void)
+{
+    if ( serrors_op != SERRORS_DIVERSE )
+        cpus_set_cap(SKIP_SYNCHRONIZE_SERROR_ENTRY_EXIT);
+
+    return 0;
+}
+__initcall(update_serrors_cpu_caps);
+
 void init_traps(void)
 {
     /* Setup Hyp vector base */
