@@ -1,5 +1,6 @@
 #include <asm/asm_defns.h>
 #include <asm/regs.h>
+#include <asm/alternative.h>
 #include <public/xen.h>
 
 /*
@@ -229,12 +230,14 @@ hyp_irq:
 
 guest_sync:
         entry   hyp=0, compat=0
-        bl      check_pending_vserror
         /*
-         * If x0 is Non-zero, a vSError took place, the initial exception
-         * doesn't have any significance to be handled. Exit ASAP
+         * The vSError will be checked while SKIP_SYNCHRONIZE_SERROR_ENTRY_EXIT
+         * is not set. If a vSError took place, the initial exception will be
+         * skipped. Exit ASAP
          */
-        cbnz    x0, 1f
+        ALTERNATIVE("bl check_pending_vserror; cbnz x0, 1f",
+                    "nop; nop",
+                    SKIP_SYNCHRONIZE_SERROR_ENTRY_EXIT)
         msr     daifclr, #2
         mov     x0, sp
         bl      do_trap_hypervisor
@@ -243,12 +246,14 @@ guest_sync:
 
 guest_irq:
         entry   hyp=0, compat=0
-        bl      check_pending_vserror
         /*
-         * If x0 is Non-zero, a vSError took place, the initial exception
-         * doesn't have any significance to be handled. Exit ASAP
+         * The vSError will be checked while SKIP_SYNCHRONIZE_SERROR_ENTRY_EXIT
+         * is not set. If a vSError took place, the initial exception will be
+         * skipped. Exit ASAP
          */
-        cbnz    x0, 1f
+        ALTERNATIVE("bl check_pending_vserror; cbnz x0, 1f",
+                    "nop; nop",
+                    SKIP_SYNCHRONIZE_SERROR_ENTRY_EXIT)
         mov     x0, sp
         bl      do_trap_irq
 1:
@@ -267,12 +272,14 @@ guest_error:
 
 guest_sync_compat:
         entry   hyp=0, compat=1
-        bl      check_pending_vserror
         /*
-         * If x0 is Non-zero, a vSError took place, the initial exception
-         * doesn't have any significance to be handled. Exit ASAP
+         * The vSError will be checked while SKIP_SYNCHRONIZE_SERROR_ENTRY_EXIT
+         * is not set. If a vSError took place, the initial exception will be
+         * skipped. Exit ASAP
          */
-        cbnz    x0, 1f
+        ALTERNATIVE("bl check_pending_vserror; cbnz x0, 1f",
+                    "nop; nop",
+                    SKIP_SYNCHRONIZE_SERROR_ENTRY_EXIT)
         msr     daifclr, #2
         mov     x0, sp
         bl      do_trap_hypervisor
@@ -281,12 +288,14 @@ guest_sync_compat:
 
 guest_irq_compat:
         entry   hyp=0, compat=1
-        bl      check_pending_vserror
         /*
-         * If x0 is Non-zero, a vSError took place, the initial exception
-         * doesn't have any significance to be handled. Exit ASAP
+         * The vSError will be checked while SKIP_SYNCHRONIZE_SERROR_ENTRY_EXIT
+         * is not set. If a vSError took place, the initial exception will be
+         * skipped. Exit ASAP
          */
-        cbnz    x0, 1f
+        ALTERNATIVE("bl check_pending_vserror; cbnz x0, 1f",
+                    "nop; nop",
+                    SKIP_SYNCHRONIZE_SERROR_ENTRY_EXIT)
         mov     x0, sp
         bl      do_trap_irq
 1:
