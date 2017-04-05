@@ -1460,6 +1460,9 @@ int xc_lockprof_query(xc_interface *xch,
 void *xc_memalign(xc_interface *xch, size_t alignment, size_t size);
 
 /**
+ * Avoid using this function, as it does not work for all cases (such
+ * as 4M superpages, or guests using PSE36). Only used for debugging.
+ *
  * Translates a virtual address in the context of a given domain and
  * vcpu returning the GFN containing the address (that is, an MFN for 
  * PV guests, a PFN for HVM guests).  Returns 0 for failure.

@@ -93,7 +93,7 @@ unsigned long xc_translate_foreign_address(xc_interface *xch, uint32_t dom,
             return 0;
         }
         paddr = pte & 0x000ffffffffff000ull;
-        if (level == 2 && (pte & PTE_PSE)) {
+        if ((level == 2 || (level == 3 && pt_levels == 4)) && (pte & PTE_PSE)) {
             mask = ((mask ^ ~-mask) >> 1); /* All bits below first set bit */
             return ((paddr & ~mask) | (virt & mask)) >> PAGE_SHIFT;
         }
