@@ -111,9 +111,10 @@ headers.chk: $(PUBLIC_ANSI_HEADERS) Makefile
 headers99.chk: $(PUBLIC_C99_HEADERS) Makefile
 	rm -f $@.new
 	$(foreach i, $(filter %.h,$^),                                        \
-	    $(CC) -x c -std=c99 -Wall -Werror                                 \
-	    -include stdint.h $(foreach j, $($(i)-prereq), -include $(j).h)   \
-	    -S -o /dev/null $(i)                                              \
+	    echo "#include "\"$(i)\"                                          \
+	    | $(CC) -x c -std=c99 -Wall -Werror                               \
+	      -include stdint.h $(foreach j, $($(i)-prereq), -include $(j).h) \
+	      -S -o /dev/null -                                               \
 	    || exit $$?; echo $(i) >> $@.new;)
 	mv $@.new $@
 
