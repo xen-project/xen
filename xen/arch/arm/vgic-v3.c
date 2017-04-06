@@ -161,15 +161,6 @@ static void vgic_store_irouter(struct domain *d, struct vgic_irq_rank *rank,
     }
 }
 
-static inline bool vgic_reg64_check_access(struct hsr_dabt dabt)
-{
-    /*
-     * 64 bits registers can be accessible using 32-bit and 64-bit unless
-     * stated otherwise (See 8.1.3 ARM IHI 0069A).
-     */
-    return ( dabt.size == DABT_DOUBLE_WORD || dabt.size == DABT_WORD );
-}
-
 static int __vgic_v3_rdistr_rd_mmio_read(struct vcpu *v, mmio_info_t *info,
                                          uint32_t gicr_reg,
                                          register_t *r)
