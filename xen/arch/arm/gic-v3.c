@@ -42,6 +42,7 @@
 #include <asm/device.h>
 #include <asm/gic.h>
 #include <asm/gic_v3_defs.h>
+#include <asm/gic_v3_its.h>
 #include <asm/cpufeature.h>
 #include <asm/acpi.h>
 
@@ -1227,11 +1228,12 @@ static void __init gicv3_dt_init(void)
      */
     res = dt_device_get_address(node, 1 + gicv3.rdist_count,
                                 &cbase, &csize);
-    if ( res )
-        return;
+    if ( !res )
+        dt_device_get_address(node, 1 + gicv3.rdist_count + 2,
+                              &vbase, &vsize);
 
-    dt_device_get_address(node, 1 + gicv3.rdist_count + 2,
-                          &vbase, &vsize);
+    /* Check for ITS child nodes and build the host ITS list accordingly. */
+    gicv3_its_dt_init(node);
 }
 
 static int gicv3_iomem_deny_access(const struct domain *d)

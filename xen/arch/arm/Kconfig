@@ -45,6 +45,11 @@ config ACPI
 config HAS_GICV3
 	bool
 
+config HAS_ITS
+        bool
+        prompt "GICv3 ITS MSI controller support" if EXPERT = "y"
+        depends on HAS_GICV3
+
 endmenu
 
 menu "ARM errata workaround via the alternative framework"
