@@ -363,6 +363,7 @@ struct csched2_runqueue_data {
     struct list_head runq; /* Ordered list of runnable vms */
     struct list_head svc;  /* List of all vcpus assigned to this runqueue */
     unsigned int max_weight;
+    unsigned int pick_bias;/* Last CPU we picked. Start from it next time */
 
     cpumask_t idle,        /* Currently idle pcpus */
         smt_idle,          /* Fully idle-and-untickled cores (see below) */
@@ -1679,7 +1680,9 @@ csched2_cpu_pick(const struct scheduler *ops, struct vcpu *vc)
         {
             cpumask_and(cpumask_scratch_cpu(cpu), cpumask_scratch_cpu(cpu),
                         &svc->migrate_rqd->active);
-            new_cpu = cpumask_any(cpumask_scratch_cpu(cpu));
+            new_cpu = cpumask_cycle(svc->migrate_rqd->pick_bias,
+                                    cpumask_scratch_cpu(cpu));
+            svc->migrate_rqd->pick_bias = new_cpu;
             goto out_up;
         }
         /* Fall-through to normal cpu pick */
@@ -1737,7 +1740,9 @@ csched2_cpu_pick(const struct scheduler *ops, struct vcpu *vc)
 
     cpumask_and(cpumask_scratch_cpu(cpu), cpumask_scratch_cpu(cpu),
                 &prv->rqd[min_rqi].active);
-    new_cpu = cpumask_any(cpumask_scratch_cpu(cpu));
+    new_cpu = cpumask_cycle(prv->rqd[min_rqi].pick_bias,
+                            cpumask_scratch_cpu(cpu));
+    prv->rqd[min_rqi].pick_bias = new_cpu;
     BUG_ON(new_cpu >= nr_cpu_ids);
 
  out_up:
@@ -1854,7 +1859,9 @@ static void migrate(const struct scheduler *ops,
                     cpupool_domain_cpumask(svc->vcpu->domain));
         cpumask_and(cpumask_scratch_cpu(cpu), cpumask_scratch_cpu(cpu),
                     &trqd->active);
-        svc->vcpu->processor = cpumask_any(cpumask_scratch_cpu(cpu));
+        svc->vcpu->processor = cpumask_cycle(trqd->pick_bias,
+                                             cpumask_scratch_cpu(cpu));
+        trqd->pick_bias = svc->vcpu->processor;
         ASSERT(svc->vcpu->processor < nr_cpu_ids);
 
         _runq_assign(svc, trqd);
@@ -2819,13 +2826,15 @@ csched2_dump(const struct scheduler *ops)
         printk("Runqueue %d:\n"
                "\tncpus              = %u\n"
                "\tcpus               = %s\n"
-               "\tmax_weight         = %d\n"
+               "\tmax_weight         = %u\n"
+               "\tpick_bias          = %u\n"
                "\tinstload           = %d\n"
                "\taveload            = %"PRI_stime" (~%"PRI_stime"%%)\n",
                i,
                cpumask_weight(&prv->rqd[i].active),
                cpustr,
                prv->rqd[i].max_weight,
+               prv->rqd[i].pick_bias,
                prv->rqd[i].load,
                prv->rqd[i].avgload,
                fraction);
@@ -2927,6 +2936,9 @@ init_pdata(struct csched2_private *prv, unsigned int cpu)
     __cpumask_set_cpu(cpu, &rqd->active);
     __cpumask_set_cpu(cpu, &prv->initialized);
     __cpumask_set_cpu(cpu, &rqd->smt_idle);
+
+    if ( cpumask_weight(&rqd->active) == 1 )
+        rqd->pick_bias = cpu;
 
     return rqi;
 }
@@ -3040,6 +3052,8 @@ csched2_deinit_pdata(const struct scheduler *ops, void *pcpu, int cpu)
         printk(XENLOG_INFO " No cpus left on runqueue, disabling\n");
         deactivate_runqueue(prv, rqi);
     }
+    else if ( rqd->pick_bias == cpu )
+        rqd->pick_bias = cpumask_first(&rqd->active);
 
     spin_unlock(&rqd->lock);
 
