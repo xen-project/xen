@@ -134,6 +134,7 @@
 #define TRC_CSCHED_BOOST_END     TRC_SCHED_CLASS_EVT(CSCHED, 8)
 #define TRC_CSCHED_SCHEDULE      TRC_SCHED_CLASS_EVT(CSCHED, 9)
 #define TRC_CSCHED_RATELIMIT     TRC_SCHED_CLASS_EVT(CSCHED, 10)
+#define TRC_CSCHED_STEAL_CHECK   TRC_SCHED_CLASS_EVT(CSCHED, 11)
 
 
 /*
@@ -1753,13 +1754,16 @@ csched_load_balance(struct csched_private *prv, int cpu,
                  * balancing and trying to lock this CPU.
                  */
                 spinlock_t *lock = pcpu_schedule_trylock(peer_cpu);
-
+                SCHED_STAT_CRANK(steal_trylock);
                 if ( !lock )
                 {
                     SCHED_STAT_CRANK(steal_trylock_failed);
+                    TRACE_2D(TRC_CSCHED_STEAL_CHECK, peer_cpu, /* skip */ 0);
                     peer_cpu = cpumask_cycle(peer_cpu, &workers);
                     continue;
                 }
+
+                TRACE_2D(TRC_CSCHED_STEAL_CHECK, peer_cpu, /* checked */ 1);
 
                 /* Any work over there to steal? */
                 speer = cpumask_test_cpu(peer_cpu, online) ?

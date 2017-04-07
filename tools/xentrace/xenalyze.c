@@ -7651,6 +7651,17 @@ void sched_process(struct pcpu_info *p)
                        r->runtime / 1000, r->runtime % 1000);
             }
             break;
+        case TRC_SCHED_CLASS_EVT(CSCHED, 11): /* STEAL_CHECK   */
+            if(opt.dump_all) {
+                struct {
+                    unsigned int peer_cpu, check;
+                } *r = (typeof(r))ri->d;
+
+                printf(" %s csched:load_balance %s %u\n",
+                       ri->dump_header, r->check ? "checking" : "skipping",
+                       r->peer_cpu);
+            }
+            break;
         /* CREDIT 2 (TRC_CSCHED2_xxx) */
         case TRC_SCHED_CLASS_EVT(CSCHED2, 1): /* TICK              */
         case TRC_SCHED_CLASS_EVT(CSCHED2, 4): /* CREDIT_ADD        */

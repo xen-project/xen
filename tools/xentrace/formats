@@ -47,6 +47,7 @@
 0x00022008  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  csched:unboost       [ dom:vcpu = 0x%(1)04x%(2)04x ]
 0x00022009  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  csched:schedule      [ cpu[16]:tasklet[8]:idle[8] = %(1)08x ]
 0x0002200A  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  csched:ratelimit     [ dom:vcpu = 0x%(1)08x, runtime = %(2)d ]
+0x0002200B  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  csched:steal_check   [ peer_cpu = %(1)d, checked = %(2)d ]
 
 0x00022201  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  csched2:tick
 0x00022202  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  csched2:runq_pos       [ dom:vcpu = 0x%(1)08x, pos = %(2)d]
