@@ -12,12 +12,15 @@
         .code32
 
 #define sym_phys(sym)     ((sym) - __XEN_VIRT_START)
+#define sym_esi(sym)      sym_phys(sym)(%esi)
+#define sym_fs(sym)       %fs:sym_phys(sym)
 
 #define BOOT_CS32        0x0008
 #define BOOT_CS64        0x0010
 #define BOOT_DS          0x0018
 #define BOOT_PSEUDORM_CS 0x0020
 #define BOOT_PSEUDORM_DS 0x0028
+#define BOOT_FS          0x0030
 
 #define MB2_HT(name)      (MULTIBOOT2_HEADER_TAG_##name)
 #define MB2_TT(name)      (MULTIBOOT2_TAG_TYPE_##name)
@@ -100,13 +103,6 @@ multiboot2_header_start:
 .Lmultiboot2_header_end:
 
         .section .init.rodata, "a", @progbits
-        .align 4
-
-        .word   0
-gdt_boot_descr:
-        .word   6*8-1
-        .long   sym_phys(trampoline_gdt)
-        .long   0 /* Needed for 64-bit lgdt */
 
 .Lbad_cpu_msg: .asciz "ERR: Not a 64-bit CPU!"
 .Lbad_ldr_msg: .asciz "ERR: Not a Multiboot bootloader!"
@@ -118,6 +114,13 @@ gdt_boot_descr:
         .section .init.data, "aw", @progbits
         .align 4
 
+        .word   0
+gdt_boot_descr:
+        .word   7*8-1
+gdt_boot_base:
+        .long   sym_phys(trampoline_gdt)
+        .long   0 /* Needed for 64-bit lgdt */
+
 vga_text_buffer:
         .long   0xb8000
 
@@ -127,21 +130,21 @@ efi_platform:
         .section .init.text, "ax", @progbits
 
 bad_cpu:
-        mov     $(sym_phys(.Lbad_cpu_msg)),%esi # Error message
+        add     $sym_phys(.Lbad_cpu_msg),%esi   # Error message
         jmp     .Lget_vtb
 not_multiboot:
-        mov     $(sym_phys(.Lbad_ldr_msg)),%esi # Error message
+        add     $sym_phys(.Lbad_ldr_msg),%esi   # Error message
         jmp     .Lget_vtb
 .Lmb2_no_st:
         /*
          * Here we are on EFI platform. vga_text_buffer was zapped earlier
          * because there is pretty good chance that VGA is unavailable.
          */
-        mov     $(sym_phys(.Lbad_ldr_nst)),%esi # Error message
+        add     $sym_phys(.Lbad_ldr_nst),%esi   # Error message
         jmp     .Lget_vtb
 .Lmb2_no_ih:
         /* Ditto. */
-        mov     $(sym_phys(.Lbad_ldr_nih)),%esi # Error message
+        add     $sym_phys(.Lbad_ldr_nih),%esi   # Error message
         jmp     .Lget_vtb
 .Lmb2_no_bs:
         /*
@@ -149,7 +152,7 @@ not_multiboot:
          * via start label. Then reliable vga_text_buffer zap is impossible
          * in Multiboot2 scanning loop and we have to zero %edi below.
          */
-        mov     $(sym_phys(.Lbad_ldr_nbs)),%esi # Error message
+        add     $sym_phys(.Lbad_ldr_nbs),%esi   # Error message
         xor     %edi,%edi                       # No VGA text buffer
         jmp     .Lsend_chr
 .Lmb2_efi_ia_32:
@@ -157,11 +160,11 @@ not_multiboot:
          * Here we are on EFI IA-32 platform. Then reliable vga_text_buffer zap is
          * impossible in Multiboot2 scanning loop and we have to zero %edi below.
          */
-        mov     $(sym_phys(.Lbad_efi_msg)),%esi # Error message
+        add     $sym_phys(.Lbad_efi_msg),%esi   # Error message
         xor     %edi,%edi                       # No VGA text buffer
         jmp     .Lsend_chr
 .Lget_vtb:
-        mov     sym_phys(vga_text_buffer),%edi
+        mov     sym_esi(vga_text_buffer),%edi
 .Lsend_chr:
         mov     (%esi),%bl
         test    %bl,%bl        # Terminate on '\0' sentinel
@@ -325,9 +328,13 @@ __efi64_mb2_start:
 x86_32_switch:
         mov     %r15,%rdi
 
+        /* Store Xen image load base address in place accessible for 32-bit code. */
+        lea     __image_base__(%rip),%esi
+
         cli
 
         /* Initialize GDTR. */
+        add     %esi,gdt_boot_base(%rip)
         lgdt    gdt_boot_descr(%rip)
 
         /* Reload code selector. */
@@ -363,12 +370,8 @@ __start:
         cld
         cli
 
-        /* Initialise GDT and basic data segments. */
-        lgdt    %cs:sym_phys(gdt_boot_descr)
-        mov     $BOOT_DS,%ecx
-        mov     %ecx,%ds
-        mov     %ecx,%es
-        mov     %ecx,%ss
+        /* Load default Xen image load base address. */
+        mov     $sym_phys(__image_base__),%esi
 
         /* Bootloaders may set multiboot{1,2}.mem_lower to a nonzero value. */
         xor     %edx,%edx
@@ -425,6 +428,25 @@ __start:
         jmp     .Lmb2_tsize
 
 trampoline_bios_setup:
+        /*
+         * Called on legacy BIOS platforms only.
+         *
+         * Initialize GDTR and basic data segments.
+         */
+        add     %esi,sym_esi(gdt_boot_base)
+        lgdt    sym_esi(gdt_boot_descr)
+
+        mov     $BOOT_DS,%ecx
+        mov     %ecx,%ds
+        mov     %ecx,%es
+        mov     %ecx,%ss
+        /* %esp is initialized later. */
+
+        /* Load null descriptor to unused segment registers. */
+        xor     %ecx,%ecx
+        mov     %ecx,%fs
+        mov     %ecx,%gs
+
         /* Set up trampoline segment 64k below EBDA */
         movzwl  0x40e,%ecx          /* EBDA segment */
         cmp     $0xa000,%ecx        /* sanity check (high) */
@@ -452,21 +474,49 @@ trampoline_bios_setup:
         /* From arch/x86/smpboot.c: start_eip had better be page-aligned! */
         xor     %cl, %cl
         shl     $4, %ecx
-        mov     %ecx,sym_phys(trampoline_phys)
+        mov     %ecx,sym_esi(trampoline_phys)
 
 trampoline_setup:
-        mov     sym_phys(trampoline_phys),%ecx
+        /*
+         * Called on legacy BIOS and EFI platforms.
+         *
+         * Initialize bits 0-15 of BOOT_FS segment descriptor base address.
+         */
+        mov     %si,BOOT_FS+2+sym_esi(trampoline_gdt)
+
+        /* Initialize bits 16-23 of BOOT_FS segment descriptor base address. */
+        shld    $16,%esi,%edx
+        mov     %dl,BOOT_FS+4+sym_esi(trampoline_gdt)
+
+        /* Initialize bits 24-31 of BOOT_FS segment descriptor base address. */
+        mov     %dh,BOOT_FS+7+sym_esi(trampoline_gdt)
+
+        /*
+         * Initialize %fs and later use it to access Xen data where possible.
+         * According to Intel 64 and IA-32 Architectures Software Developer's
+         * Manual it is safe to do that without reloading GDTR before.
+         */
+        mov     $BOOT_FS,%edx
+        mov     %edx,%fs
+
+        /* Save Xen image load base address for later use. */
+        mov     %esi,sym_fs(xen_phys_start)
+        mov     %esi,sym_fs(trampoline_xen_phys_start)
+
+        /* Setup stack. %ss was initialized earlier. */
+        lea     1024+sym_esi(cpu0_stack),%esp
+
+        mov     sym_fs(trampoline_phys),%ecx
 
         /* Get bottom-most low-memory stack address. */
         add     $TRAMPOLINE_SPACE,%ecx
 
         /* Save the Multiboot info struct (after relocation) for later use. */
-        mov     $sym_phys(cpu0_stack)+1024,%esp
         push    %ecx                /* Bottom-most low-memory stack address. */
         push    %ebx                /* Multiboot information address. */
         push    %eax                /* Multiboot magic. */
         call    reloc
-        mov     %eax,sym_phys(multiboot_ptr)
+        mov     %eax,sym_fs(multiboot_ptr)
 
         /*
          * Now trampoline_phys points to the following structure (lowest address
@@ -489,16 +539,20 @@ trampoline_setup:
          * Do not zero BSS on EFI platform here.
          * It was initialized earlier.
          */
-        cmpb    $0,sym_phys(efi_platform)
+        cmpb    $0,sym_fs(efi_platform)
         jnz     1f
 
         /* Initialize BSS (no nasty surprises!). */
         mov     $sym_phys(__bss_start),%edi
         mov     $sym_phys(__bss_end),%ecx
+        push    %fs
+        pop     %es
         sub     %edi,%ecx
         xor     %eax,%eax
         shr     $2,%ecx
         rep stosl
+        push    %ds
+        pop     %es
 
 1:
         /* Interrogate CPU extended features via CPUID. */
@@ -512,8 +566,8 @@ trampoline_setup:
         jbe     1f
         mov     $0x80000001,%eax
         cpuid
-1:      mov     %edx,sym_phys(cpuid_ext_features)
-        mov     %edx,sym_phys(boot_cpu_data)+CPUINFO_FEATURE_OFFSET(X86_FEATURE_LM)
+1:      mov     %edx,sym_fs(cpuid_ext_features)
+        mov     %edx,sym_fs(boot_cpu_data)+CPUINFO_FEATURE_OFFSET(X86_FEATURE_LM)
 
         /* Check for availability of long mode. */
         bt      $cpufeat_bit(X86_FEATURE_LM),%edx
@@ -521,15 +575,52 @@ trampoline_setup:
 
         /* Stash TSC to calculate a good approximation of time-since-boot */
         rdtsc
-        mov     %eax,sym_phys(boot_tsc_stamp)
-        mov     %edx,sym_phys(boot_tsc_stamp+4)
+        mov     %eax,sym_fs(boot_tsc_stamp)
+        mov     %edx,sym_fs(boot_tsc_stamp)+4
+
+        /*
+         * Update frame addresses in page tables excluding l2_identmap
+         * without its first entry which points to l1_identmap.
+         */
+        mov     $((__page_tables_end-__page_tables_start)/8),%ecx
+        mov     $(((l2_identmap-__page_tables_start)/8)+1),%edx
+1:      cmp     $((l2_identmap+l2_identmap_sizeof-__page_tables_start)/8),%ecx
+        cmove   %edx,%ecx
+        testl   $_PAGE_PRESENT,sym_fs(__page_tables_start)-8(,%ecx,8)
+        jz      2f
+        add     %esi,sym_fs(__page_tables_start)-8(,%ecx,8)
+2:      loop    1b
+
+        /* Initialize L2 boot-map/direct map page table entries (16MB). */
+        lea     sym_esi(start),%ebx
+        lea     (1<<L2_PAGETABLE_SHIFT)*7+(PAGE_HYPERVISOR|_PAGE_PSE)(%ebx),%eax
+        shr     $(L2_PAGETABLE_SHIFT-3),%ebx
+        mov     $8,%ecx
+1:      mov     %eax,sym_fs(l2_bootmap)-8(%ebx,%ecx,8)
+        mov     %eax,sym_fs(l2_identmap)-8(%ebx,%ecx,8)
+        sub     $(1<<L2_PAGETABLE_SHIFT),%eax
+        loop    1b
+
+        /* Initialize L3 boot-map page directory entry. */
+        lea     __PAGE_HYPERVISOR+(L2_PAGETABLE_ENTRIES*8)*3+sym_esi(l2_bootmap),%eax
+        mov     $4,%ecx
+1:      mov     %eax,sym_fs(l3_bootmap)-8(,%ecx,8)
+        sub     $(L2_PAGETABLE_ENTRIES*8),%eax
+        loop    1b
+
+        /*
+         * During boot, hook 4kB mappings of first 2MB of memory into L2.
+         * This avoids mixing cachability for the legacy VGA region.
+         */
+        lea     __PAGE_HYPERVISOR+sym_esi(l1_identmap),%edi
+        mov     %edi,sym_fs(l2_bootmap)
 
         /* Apply relocations to bootstrap trampoline. */
-        mov     sym_phys(trampoline_phys),%edx
+        mov     sym_fs(trampoline_phys),%edx
         mov     $sym_phys(__trampoline_rel_start),%edi
 1:
-        mov     (%edi),%eax
-        add     %edx,(%edi,%eax)
+        mov     %fs:(%edi),%eax
+        add     %edx,%fs:(%edi,%eax)
         add     $4,%edi
         cmp     $sym_phys(__trampoline_rel_stop),%edi
         jb      1b
@@ -538,28 +629,29 @@ trampoline_setup:
         shr     $4,%edx
         mov     $sym_phys(__trampoline_seg_start),%edi
 1:
-        mov     (%edi),%eax
-        mov     %dx,(%edi,%eax)
+        mov     %fs:(%edi),%eax
+        mov     %dx,%fs:(%edi,%eax)
         add     $4,%edi
         cmp     $sym_phys(__trampoline_seg_stop),%edi
         jb      1b
 
         /* Do not parse command line on EFI platform here. */
-        cmpb    $0,sym_phys(efi_platform)
+        cmpb    $0,sym_fs(efi_platform)
         jnz     1f
 
         /* Bail if there is no command line to parse. */
-        mov     sym_phys(multiboot_ptr),%ebx
+        mov     sym_fs(multiboot_ptr),%ebx
         testl   $MBI_CMDLINE,MB_flags(%ebx)
         jz      1f
 
-        pushl   $sym_phys(early_boot_opts)
+        lea     sym_esi(early_boot_opts),%eax
+        push    %eax
         pushl   MB_cmdline(%ebx)
         call    cmdline_parse_early
 
 1:
         /* Switch to low-memory stack which lives at the end of trampoline region. */
-        mov     sym_phys(trampoline_phys),%edi
+        mov     sym_fs(trampoline_phys),%edi
         lea     TRAMPOLINE_SPACE+TRAMPOLINE_STACK_SPACE(%edi),%esp
         lea     trampoline_boot_cpu_entry-trampoline_start(%edi),%eax
         pushl   $BOOT_CS32
@@ -568,7 +660,7 @@ trampoline_setup:
         /* Copy bootstrap trampoline to low memory, below 1MB. */
         mov     $sym_phys(trampoline_start),%esi
         mov     $((trampoline_end - trampoline_start) / 4),%ecx
-        rep movsl
+        rep movsl %fs:(%esi),%es:(%edi)
 
         /* Jump into the relocated trampoline. */
         lret

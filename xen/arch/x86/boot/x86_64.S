@@ -81,7 +81,6 @@ GLOBAL(boot_cpu_compat_gdt_table)
         .quad 0x0000910000000000     /* per-CPU entry (limit == cpu)      */
         .align PAGE_SIZE, 0
 
-GLOBAL(__page_tables_start)
 /*
  * Mapping of first 2 megabytes of memory. This is mapped with 4kB mappings
  * to avoid type conflicts with fixed-range MTRRs covering the lowest megabyte
@@ -100,6 +99,13 @@ l1_identmap:
         pfn = pfn + 1
         .endr
         .size l1_identmap, . - l1_identmap
+
+/*
+ * __page_tables_start does not cover l1_identmap because it (l1_identmap)
+ * contains 1-1 mappings. This means that frame addresses of these mappings
+ * are static and should not be updated at runtime.
+ */
+GLOBAL(__page_tables_start)
 
 /*
  * Space for mapping the first 4GB of memory, with the first 16 megabytes
@@ -186,21 +192,14 @@ GLOBAL(idle_pg_table)
 
 GLOBAL(__page_tables_end)
 
-/* Init pagetables.  Enough page directories to map into the bottom 1GB. */
+/* Init pagetables. Enough page directories to map into 4GB. */
         .section .init.data, "aw", @progbits
         .align PAGE_SIZE, 0
 
 GLOBAL(l2_bootmap)
-        .quad sym_phys(l1_identmap) + __PAGE_HYPERVISOR
-        idx = 1
-        .rept 7
-        .quad (idx << L2_PAGETABLE_SHIFT) | __PAGE_HYPERVISOR | _PAGE_PSE
-        idx = idx + 1
-        .endr
-        .fill L2_PAGETABLE_ENTRIES - 8, 8, 0
+        .fill 4 * L2_PAGETABLE_ENTRIES, 8, 0
         .size l2_bootmap, . - l2_bootmap
 
 GLOBAL(l3_bootmap)
-        .quad sym_phys(l2_bootmap) + __PAGE_HYPERVISOR
-        .fill L3_PAGETABLE_ENTRIES - 1, 8, 0
+        .fill L3_PAGETABLE_ENTRIES, 8, 0
         .size l3_bootmap, . - l3_bootmap

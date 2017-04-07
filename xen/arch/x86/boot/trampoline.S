@@ -74,6 +74,11 @@ trampoline_gdt:
         /* 0x0028: real-mode data @ BOOT_TRAMPOLINE */
         .long   0x0000ffff
         .long   0x00009200
+        /*
+         * 0x0030: ring 0 Xen data, 16 MiB size, base
+         * address is computed at runtime.
+         */
+        .quad   0x00c0920000000fff
 
         .pushsection .trampoline_rel, "a"
         .long   trampoline_gdt + BOOT_PSEUDORM_CS + 2 - .

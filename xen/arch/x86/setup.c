@@ -325,9 +325,6 @@ static void *__init bootstrap_map(const module_t *mod)
     if ( start >= end )
         return NULL;
 
-    if ( end <= BOOTSTRAP_MAP_BASE )
-        return (void *)(unsigned long)start;
-
     ret = (void *)(map_cur + (unsigned long)(start & mask));
     start &= ~mask;
     end = (end + mask) & ~mask;
@@ -711,6 +708,8 @@ void __init noreturn __start_xen(unsigned long mbi_p)
 
     printk("Command line: %s\n", cmdline);
 
+    printk("Xen image load base address: %#lx\n", xen_phys_start);
+
     printk("Video information:\n");
 
     /* Print VGA display mode information. */
@@ -981,7 +980,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
                     /* Not present, 1GB mapping, or already relocated? */
                     if ( !(l3e_get_flags(*pl3e) & _PAGE_PRESENT) ||
                          (l3e_get_flags(*pl3e) & _PAGE_PSE) ||
-                         (l3e_get_pfn(*pl3e) > 0x1000) )
+                         (l3e_get_pfn(*pl3e) > PFN_DOWN(xen_phys_start)) )
                         continue;
                     *pl3e = l3e_from_intpte(l3e_get_intpte(*pl3e) +
                                             xen_phys_start);
@@ -991,7 +990,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
                         /* Not present, PSE, or already relocated? */
                         if ( !(l2e_get_flags(*pl2e) & _PAGE_PRESENT) ||
                              (l2e_get_flags(*pl2e) & _PAGE_PSE) ||
-                             (l2e_get_pfn(*pl2e) > 0x1000) )
+                             (l2e_get_pfn(*pl2e) > PFN_DOWN(xen_phys_start)) )
                             continue;
                         *pl2e = l2e_from_intpte(l2e_get_intpte(*pl2e) +
                                                 xen_phys_start);
@@ -1014,7 +1013,8 @@ void __init noreturn __start_xen(unsigned long mbi_p)
             {
                 unsigned int flags;
 
-                if ( !(l2e_get_flags(*pl2e) & _PAGE_PRESENT) )
+                if ( !(l2e_get_flags(*pl2e) & _PAGE_PRESENT) ||
+                     (l2e_get_pfn(*pl2e) > PFN_DOWN(xen_phys_start)) )
                     continue;
 
                 if ( !using_2M_mapping() )
@@ -1068,6 +1068,8 @@ void __init noreturn __start_xen(unsigned long mbi_p)
                 : "memory" );
 
             bootstrap_map(NULL);
+
+            printk("New Xen image base address: %#lx\n", xen_phys_start);
         }
 
         /* Is the region suitable for relocating the multiboot modules? */
