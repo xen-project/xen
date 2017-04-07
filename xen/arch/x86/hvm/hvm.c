@@ -651,7 +651,7 @@ int hvm_domain_initialise(struct domain *d)
     else
         d->arch.hvm_domain.io_bitmap = hvm_io_bitmap;
 
-    register_dpci_portio_handler(d);
+    register_g2m_portio_handler(d);
 
     hvm_ioreq_init(d);
 

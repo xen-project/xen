@@ -167,8 +167,8 @@ bool handle_pio(uint16_t port, unsigned int size, int dir)
     return true;
 }
 
-static bool_t dpci_portio_accept(const struct hvm_io_handler *handler,
-                                 const ioreq_t *p)
+static bool_t g2m_portio_accept(const struct hvm_io_handler *handler,
+                                const ioreq_t *p)
 {
     struct vcpu *curr = current;
     const struct domain_iommu *dio = dom_iommu(curr->domain);
@@ -190,10 +190,8 @@ static bool_t dpci_portio_accept(const struct hvm_io_handler *handler,
     return 0;
 }
 
-static int dpci_portio_read(const struct hvm_io_handler *handler,
-                            uint64_t addr,
-                            uint32_t size,
-                            uint64_t *data)
+static int g2m_portio_read(const struct hvm_io_handler *handler,
+                           uint64_t addr, uint32_t size, uint64_t *data)
 {
     struct hvm_vcpu_io *vio = &current->arch.hvm_vcpu.hvm_io;
     const struct g2m_ioport *g2m_ioport = vio->g2m_ioport;
@@ -217,10 +215,8 @@ static int dpci_portio_read(const struct hvm_io_handler *handler,
     return X86EMUL_OKAY;
 }
 
-static int dpci_portio_write(const struct hvm_io_handler *handler,
-                             uint64_t addr,
-                             uint32_t size,
-                             uint64_t data)
+static int g2m_portio_write(const struct hvm_io_handler *handler,
+                            uint64_t addr, uint32_t size, uint64_t data)
 {
     struct hvm_vcpu_io *vio = &current->arch.hvm_vcpu.hvm_io;
     const struct g2m_ioport *g2m_ioport = vio->g2m_ioport;
@@ -244,13 +240,13 @@ static int dpci_portio_write(const struct hvm_io_handler *handler,
     return X86EMUL_OKAY;
 }
 
-static const struct hvm_io_ops dpci_portio_ops = {
-    .accept = dpci_portio_accept,
-    .read = dpci_portio_read,
-    .write = dpci_portio_write
+static const struct hvm_io_ops g2m_portio_ops = {
+    .accept = g2m_portio_accept,
+    .read = g2m_portio_read,
+    .write = g2m_portio_write
 };
 
-void register_dpci_portio_handler(struct domain *d)
+void register_g2m_portio_handler(struct domain *d)
 {
     struct hvm_io_handler *handler = hvm_next_io_handler(d);
 
@@ -258,7 +254,7 @@ void register_dpci_portio_handler(struct domain *d)
         return;
 
     handler->type = IOREQ_TYPE_PIO;
-    handler->ops = &dpci_portio_ops;
+    handler->ops = &g2m_portio_ops;
 }
 
 /*
