@@ -95,6 +95,26 @@ static const struct hvm_io_handler null_handler = {
     .ops = &null_ops
 };
 
+static int ioreq_server_read(const struct hvm_io_handler *io_handler,
+                    uint64_t addr,
+                    uint32_t size,
+                    uint64_t *data)
+{
+    if ( hvm_copy_from_guest_phys(data, addr, size) != HVMCOPY_okay )
+        return X86EMUL_UNHANDLEABLE;
+
+    return X86EMUL_OKAY;
+}
+
+static const struct hvm_io_ops ioreq_server_ops = {
+    .read = ioreq_server_read,
+    .write = null_write
+};
+
+static const struct hvm_io_handler ioreq_server_handler = {
+    .ops = &ioreq_server_ops
+};
+
 static int hvmemul_do_io(
     bool_t is_mmio, paddr_t addr, unsigned long *reps, unsigned int size,
     uint8_t dir, bool_t df, bool_t data_is_addr, uintptr_t data)
@@ -195,6 +215,9 @@ static int hvmemul_do_io(
          *   a race with an unmap operation on the ioreq server, so re-try the
          *   instruction.
          *
+         *   - If the accesss is a read, this could be part of a
+         *   read-modify-write instruction, emulate the read first.
+         *
          * Note: Even when an ioreq server is found, its value could become
          * stale later, because it is possible that
          *
@@ -225,6 +248,17 @@ static int hvmemul_do_io(
                 if ( s == NULL )
                 {
                     rc = X86EMUL_RETRY;
+                    vio->io_req.state = STATE_IOREQ_NONE;
+                    break;
+                }
+
+                /*
+                 * This is part of a read-modify-write instruction.
+                 * Emulate the read part so we have the value available.
+                 */
+                if ( dir == IOREQ_READ )
+                {
+                    rc = hvm_process_io_intercept(&ioreq_server_handler, &p);
                     vio->io_req.state = STATE_IOREQ_NONE;
                     break;
                 }
