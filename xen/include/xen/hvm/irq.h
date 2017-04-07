@@ -63,6 +63,7 @@ struct hvm_gmsi_info {
     uint32_t gvec;
     uint32_t gflags;
     int dest_vcpu_id; /* -1 :multi-dest, non-negative: dest_vcpu_id */
+    bool posted; /* directly deliver to guest via VT-d PI? */
 };
 
 struct hvm_girq_dpci_mapping {
