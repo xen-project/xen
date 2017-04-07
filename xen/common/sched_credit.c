@@ -708,12 +708,15 @@ static inline int
 __csched_vcpu_is_migrateable(struct vcpu *vc, int dest_cpu, cpumask_t *mask)
 {
     /*
-     * Don't pick up work that's in the peer's scheduling tail or hot on
-     * peer PCPU. Only pick up work that prefers and/or is allowed to run
-     * on our CPU.
+     * Don't pick up work that's hot on peer PCPU, or that can't (or
+     * would prefer not to) run on cpu.
+     *
+     * The caller is supposed to have already checked that vc is also
+     * not running.
      */
-    return !vc->is_running &&
-           !__csched_vcpu_is_cache_hot(vc) &&
+    ASSERT(!vc->is_running);
+
+    return !__csched_vcpu_is_cache_hot(vc) &&
            cpumask_test_cpu(dest_cpu, mask);
 }
 
@@ -1622,7 +1625,9 @@ csched_runq_steal(int peer_cpu, int cpu, int pri, int balance_step)
         BUG_ON( is_idle_vcpu(vc) );
 
         /*
-         * If the vcpu has no useful soft affinity, skip this vcpu.
+         * If the vcpu is still in peer_cpu's scheduling tail, or if it
+         * has no useful soft affinity, skip it.
+         *
          * In fact, what we want is to check if we have any "soft-affine
          * work" to steal, before starting to look at "hard-affine work".
          *
@@ -1633,8 +1638,9 @@ csched_runq_steal(int peer_cpu, int cpu, int pri, int balance_step)
          * vCPUs with useful soft affinities in some sort of bitmap
          * or counter.
          */
-        if ( balance_step == CSCHED_BALANCE_SOFT_AFFINITY
-             && !__vcpu_has_soft_affinity(vc, vc->cpu_hard_affinity) )
+        if ( vc->is_running ||
+             (balance_step == CSCHED_BALANCE_SOFT_AFFINITY
+              && !__vcpu_has_soft_affinity(vc, vc->cpu_hard_affinity)) )
             continue;
 
         csched_balance_cpumask(vc, balance_step, cpumask_scratch);
