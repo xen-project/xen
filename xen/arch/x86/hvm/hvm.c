@@ -609,6 +609,7 @@ int hvm_domain_initialise(struct domain *d)
     spin_lock_init(&d->arch.hvm_domain.uc_lock);
     spin_lock_init(&d->arch.hvm_domain.write_map.lock);
     INIT_LIST_HEAD(&d->arch.hvm_domain.write_map.list);
+    INIT_LIST_HEAD(&d->arch.hvm_domain.g2m_ioport_list);
 
     hvm_init_cacheattr_region_list(d);
 
@@ -718,6 +719,9 @@ void hvm_domain_relinquish_resources(struct domain *d)
 
 void hvm_domain_destroy(struct domain *d)
 {
+    struct list_head *ioport_list, *tmp;
+    struct g2m_ioport *ioport;
+
     xfree(d->arch.hvm_domain.io_handler);
     d->arch.hvm_domain.io_handler = NULL;
 
@@ -736,6 +740,14 @@ void hvm_domain_destroy(struct domain *d)
 
     xfree(d->arch.hvm_domain.irq);
     d->arch.hvm_domain.irq = NULL;
+
+    list_for_each_safe ( ioport_list, tmp,
+                         &d->arch.hvm_domain.g2m_ioport_list )
+    {
+        ioport = list_entry(ioport_list, struct g2m_ioport, list);
+        list_del(&ioport->list);
+        xfree(ioport);
+    }
 }
 
 static int hvm_save_tsc_adjust(struct domain *d, hvm_domain_context_t *h)

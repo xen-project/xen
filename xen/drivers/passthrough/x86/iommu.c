@@ -123,7 +123,6 @@ int arch_iommu_domain_init(struct domain *d)
     struct domain_iommu *hd = dom_iommu(d);
 
     spin_lock_init(&hd->arch.mapping_lock);
-    INIT_LIST_HEAD(&hd->arch.g2m_ioport_list);
     INIT_LIST_HEAD(&hd->arch.mapped_rmrrs);
 
     return 0;
@@ -131,16 +130,6 @@ int arch_iommu_domain_init(struct domain *d)
 
 void arch_iommu_domain_destroy(struct domain *d)
 {
-    const struct domain_iommu *hd = dom_iommu(d);
-    struct list_head *ioport_list, *tmp;
-    struct g2m_ioport *ioport;
-
-    list_for_each_safe ( ioport_list, tmp, &hd->arch.g2m_ioport_list )
-    {
-        ioport = list_entry(ioport_list, struct g2m_ioport, list);
-        list_del(&ioport->list);
-        xfree(ioport);
-    }
 }
 
 /*

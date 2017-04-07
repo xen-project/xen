@@ -181,6 +181,9 @@ struct hvm_domain {
 
     unsigned long *io_bitmap;
 
+    /* List of guest to machine IO ports mapping. */
+    struct list_head g2m_ioport_list;
+
     /* List of permanently write-mapped pages. */
     struct {
         spinlock_t lock;
