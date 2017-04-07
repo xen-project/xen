@@ -20,6 +20,38 @@
 #ifndef __ASM_ARM_ITS_H__
 #define __ASM_ARM_ITS_H__
 
+#define GITS_CTLR                       0x000
+#define GITS_IIDR                       0x004
+#define GITS_TYPER                      0x008
+#define GITS_CBASER                     0x080
+#define GITS_CWRITER                    0x088
+#define GITS_CREADR                     0x090
+#define GITS_BASER_NR_REGS              8
+#define GITS_BASER0                     0x100
+#define GITS_BASER1                     0x108
+#define GITS_BASER2                     0x110
+#define GITS_BASER3                     0x118
+#define GITS_BASER4                     0x120
+#define GITS_BASER5                     0x128
+#define GITS_BASER6                     0x130
+#define GITS_BASER7                     0x138
+
+/* Register bits */
+#define GITS_TYPER_DEVIDS_SHIFT         13
+#define GITS_TYPER_DEVIDS_MASK          (0x1fUL << GITS_TYPER_DEVIDS_SHIFT)
+#define GITS_TYPER_DEVICE_ID_BITS(r)    (((r & GITS_TYPER_DEVIDS_MASK) >> \
+                                               GITS_TYPER_DEVIDS_SHIFT) + 1)
+
+#define GITS_TYPER_IDBITS_SHIFT         8
+#define GITS_TYPER_IDBITS_MASK          (0x1fUL << GITS_TYPER_IDBITS_SHIFT)
+#define GITS_TYPER_EVENT_ID_BITS(r)     (((r & GITS_TYPER_IDBITS_MASK) >> \
+                                               GITS_TYPER_IDBITS_SHIFT) + 1)
+
+#define GITS_TYPER_ITT_SIZE_SHIFT       4
+#define GITS_TYPER_ITT_SIZE_MASK        (0xfUL << GITS_TYPER_ITT_SIZE_SHIFT)
+#define GITS_TYPER_ITT_SIZE(r)          ((((r) & GITS_TYPER_ITT_SIZE_MASK) >> \
+                                                 GITS_TYPER_ITT_SIZE_SHIFT) + 1)
+
 #include <xen/device_tree.h>
 
 /* data structure for each hardware ITS */
@@ -28,6 +60,10 @@ struct host_its {
     const struct dt_device_node *dt_node;
     paddr_t addr;
     paddr_t size;
+    void __iomem *its_base;
+    unsigned int devid_bits;
+    unsigned int evid_bits;
+    unsigned int itte_size;
 };
 
 
@@ -40,6 +76,9 @@ void gicv3_its_dt_init(const struct dt_device_node *node);
 
 bool gicv3_its_host_has_its(void);
 
+/* Initialize the host structures for the host ITSes. */
+int gicv3_its_init(void);
+
 #else
 
 static inline void gicv3_its_dt_init(const struct dt_device_node *node)
@@ -49,6 +88,11 @@ static inline void gicv3_its_dt_init(const struct dt_device_node *node)
 static inline bool gicv3_its_host_has_its(void)
 {
     return false;
+}
+
+static inline int gicv3_its_init(void)
+{
+    return 0;
 }
 
 #endif /* CONFIG_HAS_ITS */

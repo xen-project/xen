@@ -19,8 +19,10 @@
  */
 
 #include <xen/lib.h>
+#include <xen/mm.h>
 #include <asm/gic_v3_defs.h>
 #include <asm/gic_v3_its.h>
+#include <asm/io.h>
 
 /*
  * No lock here, as this list gets only populated upon boot while scanning
@@ -31,6 +33,37 @@ LIST_HEAD(host_its_list);
 bool gicv3_its_host_has_its(void)
 {
     return !list_empty(&host_its_list);
+}
+
+static int gicv3_its_init_single_its(struct host_its *hw_its)
+{
+    uint64_t reg;
+
+    hw_its->its_base = ioremap_nocache(hw_its->addr, hw_its->size);
+    if ( !hw_its->its_base )
+        return -ENOMEM;
+
+    reg = readq_relaxed(hw_its->its_base + GITS_TYPER);
+    hw_its->devid_bits = GITS_TYPER_DEVICE_ID_BITS(reg);
+    hw_its->evid_bits = GITS_TYPER_EVENT_ID_BITS(reg);
+    hw_its->itte_size = GITS_TYPER_ITT_SIZE(reg);
+
+    return 0;
+}
+
+int gicv3_its_init(void)
+{
+    struct host_its *hw_its;
+    int ret;
+
+    list_for_each_entry(hw_its, &host_its_list, entry)
+    {
+        ret = gicv3_its_init_single_its(hw_its);
+        if ( ret )
+            return ret;
+    }
+
+    return 0;
 }
 
 /* Scan the DT for any ITS nodes and create a list of host ITSes out of it. */

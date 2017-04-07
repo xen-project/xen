@@ -1590,6 +1590,11 @@ static int __init gicv3_init(void)
     spin_lock(&gicv3.lock);
 
     gicv3_dist_init();
+
+    res = gicv3_its_init();
+    if ( res )
+        panic("GICv3: ITS: initialization failed: %d\n", res);
+
     res = gicv3_cpu_init();
     gicv3_hyp_init();
 
