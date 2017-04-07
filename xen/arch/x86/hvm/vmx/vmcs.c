@@ -591,6 +591,7 @@ void vmx_cpu_dead(unsigned int cpu)
     vmx_free_vmcs(per_cpu(vmxon_region, cpu));
     per_cpu(vmxon_region, cpu) = 0;
     nvmx_cpu_dead(cpu);
+    vmx_pi_desc_fixup(cpu);
 }
 
 int vmx_cpu_up(void)

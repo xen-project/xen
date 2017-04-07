@@ -199,6 +199,76 @@ static void vmx_pi_do_resume(struct vcpu *v)
     vmx_pi_unblock_vcpu(v);
 }
 
+void vmx_pi_desc_fixup(unsigned int cpu)
+{
+    unsigned int new_cpu, dest;
+    unsigned long flags;
+    struct arch_vmx_struct *vmx, *tmp;
+    spinlock_t *new_lock, *old_lock = &per_cpu(vmx_pi_blocking, cpu).lock;
+    struct list_head *blocked_vcpus = &per_cpu(vmx_pi_blocking, cpu).list;
+
+    if ( !iommu_intpost )
+        return;
+
+    /*
+     * We are in the context of CPU_DEAD or CPU_UP_CANCELED notification,
+     * and it is impossible for a second CPU go down in parallel. So we
+     * can safely acquire the old cpu's lock and then acquire the new_cpu's
+     * lock after that.
+     */
+    spin_lock_irqsave(old_lock, flags);
+
+    list_for_each_entry_safe(vmx, tmp, blocked_vcpus, pi_blocking.list)
+    {
+        /*
+         * Suppress notification or we may miss an interrupt when the
+         * target cpu is dying.
+         */
+        pi_set_sn(&vmx->pi_desc);
+
+        /*
+         * Check whether a notification is pending before doing the
+         * movement, if that is the case we need to wake up it directly
+         * other than moving it to the new cpu's list.
+         */
+        if ( pi_test_on(&vmx->pi_desc) )
+        {
+            list_del(&vmx->pi_blocking.list);
+            vmx->pi_blocking.lock = NULL;
+            vcpu_unblock(container_of(vmx, struct vcpu, arch.hvm_vmx));
+        }
+        else
+        {
+            /*
+             * We need to find an online cpu as the NDST of the PI descriptor, it
+             * doesn't matter whether it is within the cpupool of the domain or
+             * not. As long as it is online, the vCPU will be woken up once the
+             * notification event arrives.
+             */
+            new_cpu = cpumask_any(&cpu_online_map);
+            new_lock = &per_cpu(vmx_pi_blocking, new_cpu).lock;
+
+            spin_lock(new_lock);
+
+            ASSERT(vmx->pi_blocking.lock == old_lock);
+
+            dest = cpu_physical_id(new_cpu);
+            write_atomic(&vmx->pi_desc.ndst,
+                         x2apic_enabled ? dest : MASK_INSR(dest, PI_xAPIC_NDST_MASK));
+
+            list_move(&vmx->pi_blocking.list,
+                      &per_cpu(vmx_pi_blocking, new_cpu).list);
+            vmx->pi_blocking.lock = new_lock;
+
+            spin_unlock(new_lock);
+        }
+
+        pi_clear_sn(&vmx->pi_desc);
+    }
+
+    spin_unlock_irqrestore(old_lock, flags);
+}
+
 /*
  * To handle posted interrupts correctly, we need to set the following
  * state:
