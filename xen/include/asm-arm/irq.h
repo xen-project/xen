@@ -18,7 +18,15 @@ struct arch_irq_desc {
 };
 
 #define NR_LOCAL_IRQS	32
+
+/*
+ * This only covers the interrupts that Xen cares about, so SGIs, PPIs and
+ * SPIs. LPIs are too numerous, also only propagated to guests, so they are
+ * not included in this number.
+ */
 #define NR_IRQS		1024
+
+#define LPI_OFFSET      8192
 
 #define nr_irqs NR_IRQS
 #define nr_static_irqs NR_IRQS

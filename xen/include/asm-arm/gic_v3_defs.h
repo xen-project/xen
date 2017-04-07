@@ -45,6 +45,9 @@
 
 /* Additional bits in GICD_TYPER defined by GICv3 */
 #define GICD_TYPE_ID_BITS_SHIFT 19
+#define GICD_TYPE_ID_BITS(r)    ((((r) >> GICD_TYPE_ID_BITS_SHIFT) & 0x1f) + 1)
+
+#define GICD_TYPE_LPIS               (1U << 17)
 
 #define GICD_CTLR_RWP                (1UL << 31)
 #define GICD_CTLR_ARE_NS             (1U << 4)
@@ -95,11 +98,60 @@
 #define GICR_IGRPMODR0               (0x0D00)
 #define GICR_NSACR                   (0x0E00)
 
+#define GICR_CTLR_ENABLE_LPIS        (1U << 0)
+
 #define GICR_TYPER_PLPIS             (1U << 0)
 #define GICR_TYPER_VLPIS             (1U << 1)
 #define GICR_TYPER_LAST              (1U << 4)
 
+/* For specifying the inner cacheability type only */
+#define GIC_BASER_CACHE_nCnB         0ULL
+/* For specifying the outer cacheability type only */
+#define GIC_BASER_CACHE_SameAsInner  0ULL
+#define GIC_BASER_CACHE_nC           1ULL
+#define GIC_BASER_CACHE_RaWt         2ULL
+#define GIC_BASER_CACHE_RaWb         3ULL
+#define GIC_BASER_CACHE_WaWt         4ULL
+#define GIC_BASER_CACHE_WaWb         5ULL
+#define GIC_BASER_CACHE_RaWaWt       6ULL
+#define GIC_BASER_CACHE_RaWaWb       7ULL
+#define GIC_BASER_CACHE_MASK         7ULL
+
+#define GIC_BASER_NonShareable       0ULL
+#define GIC_BASER_InnerShareable     1ULL
+#define GIC_BASER_OuterShareable     2ULL
+
+#define GICR_PROPBASER_OUTER_CACHEABILITY_SHIFT         56
+#define GICR_PROPBASER_OUTER_CACHEABILITY_MASK               \
+        (7UL << GICR_PROPBASER_OUTER_CACHEABILITY_SHIFT)
+#define GICR_PROPBASER_SHAREABILITY_SHIFT               10
+#define GICR_PROPBASER_SHAREABILITY_MASK                     \
+        (3UL << GICR_PROPBASER_SHAREABILITY_SHIFT)
+#define GICR_PROPBASER_INNER_CACHEABILITY_SHIFT         7
+#define GICR_PROPBASER_INNER_CACHEABILITY_MASK               \
+        (7UL << GICR_PROPBASER_INNER_CACHEABILITY_SHIFT)
+#define GICR_PROPBASER_RES0_MASK                             \
+        (GENMASK(63, 59) | GENMASK(55, 52) | GENMASK(6, 5))
+
+#define GICR_PENDBASER_SHAREABILITY_SHIFT               10
+#define GICR_PENDBASER_INNER_CACHEABILITY_SHIFT         7
+#define GICR_PENDBASER_OUTER_CACHEABILITY_SHIFT         56
+#define GICR_PENDBASER_SHAREABILITY_MASK                     \
+	(3UL << GICR_PENDBASER_SHAREABILITY_SHIFT)
+#define GICR_PENDBASER_INNER_CACHEABILITY_MASK               \
+	(7UL << GICR_PENDBASER_INNER_CACHEABILITY_SHIFT)
+#define GICR_PENDBASER_OUTER_CACHEABILITY_MASK               \
+        (7UL << GICR_PENDBASER_OUTER_CACHEABILITY_SHIFT)
+#define GICR_PENDBASER_PTZ                              BIT(62)
+#define GICR_PENDBASER_RES0_MASK                             \
+        (BIT(63) | GENMASK(61, 59) | GENMASK(55, 52) |       \
+         GENMASK(15, 12) | GENMASK(6, 0))
+
 #define DEFAULT_PMR_VALUE            0xff
+
+#define LPI_PROP_PRIO_MASK           0xfc
+#define LPI_PROP_RES1                (1 << 1)
+#define LPI_PROP_ENABLED             (1 << 0)
 
 #define GICH_VMCR_EOI                (1 << 9)
 #define GICH_VMCR_VENG1              (1 << 1)

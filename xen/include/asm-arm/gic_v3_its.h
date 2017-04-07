@@ -76,7 +76,10 @@ void gicv3_its_dt_init(const struct dt_device_node *node);
 
 bool gicv3_its_host_has_its(void);
 
-/* Initialize the host structures for the host ITSes. */
+int gicv3_lpi_init_rdist(void __iomem * rdist_base);
+
+/* Initialize the host structures for LPIs and the host ITSes. */
+int gicv3_lpi_init_host_lpis(unsigned int host_lpi_bits);
 int gicv3_its_init(void);
 
 #else
@@ -88,6 +91,16 @@ static inline void gicv3_its_dt_init(const struct dt_device_node *node)
 static inline bool gicv3_its_host_has_its(void)
 {
     return false;
+}
+
+static inline int gicv3_lpi_init_rdist(void __iomem * rdist_base)
+{
+    return -ENODEV;
+}
+
+static inline int gicv3_lpi_init_host_lpis(unsigned int host_lpi_bits)
+{
+    return 0;
 }
 
 static inline int gicv3_its_init(void)

@@ -547,6 +547,9 @@ static void __init gicv3_dist_init(void)
     type = readl_relaxed(GICD + GICD_TYPER);
     nr_lines = 32 * ((type & GICD_TYPE_LINES) + 1);
 
+    if ( type & GICD_TYPE_LPIS )
+        gicv3_lpi_init_host_lpis(GICD_TYPE_ID_BITS(type));
+
     printk("GICv3: %d lines, (IID %8.8x).\n",
            nr_lines, readl_relaxed(GICD + GICD_IIDR));
 
@@ -659,6 +662,20 @@ static int __init gicv3_populate_rdist(void)
             if ( (typer >> 32) == aff )
             {
                 this_cpu(rbase) = ptr;
+
+                if ( typer & GICR_TYPER_PLPIS )
+                {
+                    int ret;
+
+                    ret = gicv3_lpi_init_rdist(ptr);
+                    if ( ret && ret != -ENODEV )
+                    {
+                        printk("GICv3: CPU%d: Cannot initialize LPIs: %u\n",
+                               smp_processor_id(), ret);
+                        break;
+                    }
+                }
+
                 printk("GICv3: CPU%d: Found redistributor in region %d @%p\n",
                         smp_processor_id(), i, ptr);
                 return 0;
