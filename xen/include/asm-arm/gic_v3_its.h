@@ -79,7 +79,11 @@
 #define GITS_BASER_OUTER_CACHEABILITY_MASK   (0x7ULL << GITS_BASER_OUTER_CACHEABILITY_SHIFT)
 #define GITS_BASER_INNER_CACHEABILITY_MASK   (0x7ULL << GITS_BASER_INNER_CACHEABILITY_SHIFT)
 
+#define GITS_CBASER_SIZE_MASK           0xff
+
 #include <xen/device_tree.h>
+
+#define HOST_ITS_FLUSH_CMD_QUEUE        (1U << 0)
 
 /* data structure for each hardware ITS */
 struct host_its {
@@ -91,6 +95,8 @@ struct host_its {
     unsigned int devid_bits;
     unsigned int evid_bits;
     unsigned int itte_size;
+    void *cmd_buf;
+    unsigned int flags;
 };
 
 

@@ -20,9 +20,12 @@
 
 #include <xen/lib.h>
 #include <xen/mm.h>
+#include <xen/sizes.h>
 #include <asm/gic_v3_defs.h>
 #include <asm/gic_v3_its.h>
 #include <asm/io.h>
+
+#define ITS_CMD_QUEUE_SZ                SZ_1M
 
 /*
  * No lock here, as this list gets only populated upon boot while scanning
@@ -58,6 +61,51 @@ static uint64_t encode_baser_phys_addr(paddr_t addr, unsigned int page_bits)
 
     /* For 64K pages address bits 51-48 are encoded in bits 15-12. */
     return ret | ((addr & GENMASK(51, 48)) >> (48 - 12));
+}
+
+static void *its_map_cbaser(struct host_its *its)
+{
+    void __iomem *cbasereg = its->its_base + GITS_CBASER;
+    uint64_t reg;
+    void *buffer;
+
+    reg  = GIC_BASER_InnerShareable << GITS_BASER_SHAREABILITY_SHIFT;
+    reg |= GIC_BASER_CACHE_SameAsInner << GITS_BASER_OUTER_CACHEABILITY_SHIFT;
+    reg |= GIC_BASER_CACHE_RaWaWb << GITS_BASER_INNER_CACHEABILITY_SHIFT;
+
+    buffer = _xzalloc(ITS_CMD_QUEUE_SZ, SZ_64K);
+    if ( !buffer )
+        return NULL;
+
+    if ( virt_to_maddr(buffer) & ~GENMASK(51, 12) )
+    {
+        xfree(buffer);
+        return NULL;
+    }
+
+    reg |= GITS_VALID_BIT | virt_to_maddr(buffer);
+    reg |= ((ITS_CMD_QUEUE_SZ / SZ_4K) - 1) & GITS_CBASER_SIZE_MASK;
+    writeq_relaxed(reg, cbasereg);
+    reg = readq_relaxed(cbasereg);
+
+    /* If the ITS dropped shareability, drop cacheability as well. */
+    if ( (reg & GITS_BASER_SHAREABILITY_MASK) == 0 )
+    {
+        reg &= ~GITS_BASER_INNER_CACHEABILITY_MASK;
+        writeq_relaxed(reg, cbasereg);
+    }
+
+    /*
+     * If the command queue memory is mapped as uncached, we need to flush
+     * it on every access.
+     */
+    if ( !(reg & GITS_BASER_INNER_CACHEABILITY_MASK) )
+    {
+        its->flags |= HOST_ITS_FLUSH_CMD_QUEUE;
+        printk(XENLOG_WARNING "using non-cacheable ITS command queue\n");
+    }
+
+    return buffer;
 }
 
 /* The ITS BASE registers work with page sizes of 4K, 16K or 64K. */
@@ -179,6 +227,11 @@ static int gicv3_its_init_single_its(struct host_its *hw_its)
             continue;
         }
     }
+
+    hw_its->cmd_buf = its_map_cbaser(hw_its);
+    if ( !hw_its->cmd_buf )
+        return -ENOMEM;
+    writeq_relaxed(0, hw_its->its_base + GITS_CWRITER);
 
     return 0;
 }
