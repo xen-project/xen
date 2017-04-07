@@ -183,8 +183,8 @@ static void free_remap_entry(struct iommu *iommu, int index)
     GET_IREMAP_ENTRY(ir_ctrl->iremap_maddr, index,
                      iremap_entries, iremap_entry);
 
-    memset(iremap_entry, 0, sizeof(struct iremap_entry));
-    iommu_flush_cache_entry(iremap_entry, sizeof(struct iremap_entry));
+    memset(iremap_entry, 0, sizeof(*iremap_entry));
+    iommu_flush_cache_entry(iremap_entry, sizeof(*iremap_entry));
     iommu_flush_iec_index(iommu, 0, index);
 
     unmap_vtd_domain_page(iremap_entries);
@@ -310,7 +310,7 @@ static int ioapic_rte_to_remap_entry(struct iommu *iommu,
     GET_IREMAP_ENTRY(ir_ctrl->iremap_maddr, index,
                      iremap_entries, iremap_entry);
 
-    memcpy(&new_ire, iremap_entry, sizeof(struct iremap_entry));
+    new_ire = *iremap_entry;
 
     if ( rte_upper )
     {
@@ -353,8 +353,8 @@ static int ioapic_rte_to_remap_entry(struct iommu *iommu,
         remap_rte->format = 1;    /* indicate remap format */
     }
 
-    memcpy(iremap_entry, &new_ire, sizeof(struct iremap_entry));
-    iommu_flush_cache_entry(iremap_entry, sizeof(struct iremap_entry));
+    *iremap_entry = new_ire;
+    iommu_flush_cache_entry(iremap_entry, sizeof(*iremap_entry));
     iommu_flush_iec_index(iommu, 0, index);
 
     unmap_vtd_domain_page(iremap_entries);
@@ -639,8 +639,8 @@ static int msi_msg_to_remap_entry(
     remap_rte->address_hi = 0;
     remap_rte->data = index - i;
 
-    memcpy(iremap_entry, &new_ire, sizeof(struct iremap_entry));
-    iommu_flush_cache_entry(iremap_entry, sizeof(struct iremap_entry));
+    *iremap_entry = new_ire;
+    iommu_flush_cache_entry(iremap_entry, sizeof(*iremap_entry));
     iommu_flush_iec_index(iommu, 0, index);
 
     unmap_vtd_domain_page(iremap_entries);
