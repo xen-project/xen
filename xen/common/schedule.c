@@ -1823,6 +1823,9 @@ int schedule_cpu_switch(unsigned int cpu, struct cpupool *c)
 
  out:
     per_cpu(cpupool, cpu) = c;
+    /* When a cpu is added to a pool, trigger it to go pick up some work */
+    if ( c != NULL )
+        cpu_raise_softirq(cpu, SCHEDULE_SOFTIRQ);
 
     return 0;
 }
