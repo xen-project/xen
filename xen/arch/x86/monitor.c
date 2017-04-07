@@ -211,6 +211,24 @@ int arch_monitor_domctl_event(struct domain *d,
         break;
     }
 
+    case XEN_DOMCTL_MONITOR_EVENT_DESC_ACCESS:
+    {
+        bool old_status = ad->monitor.descriptor_access_enabled;
+        struct vcpu *v;
+
+        if ( unlikely(old_status == requested_status) )
+            return -EEXIST;
+
+        domain_pause(d);
+        ad->monitor.descriptor_access_enabled = requested_status;
+
+        for_each_vcpu ( d, v )
+            hvm_funcs.set_descriptor_access_exiting(v, requested_status);
+
+        domain_unpause(d);
+        break;
+    }
+
     case XEN_DOMCTL_MONITOR_EVENT_SOFTWARE_BREAKPOINT:
     {
         bool_t old_status = ad->monitor.software_breakpoint_enabled;

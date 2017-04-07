@@ -629,4 +629,46 @@ typedef struct {
     u16 eptp_index;
 } ve_info_t;
 
+/* VM-Exit instruction info for LIDT, LGDT, SIDT, SGDT */
+typedef union idt_or_gdt_instr_info {
+    unsigned long raw;
+    struct {
+        unsigned long scaling   :2,  /* bits 0:1 - Scaling */
+                                :5,  /* bits 6:2 - Undefined */
+        addr_size               :3,  /* bits 9:7 - Address size */
+                                :1,  /* bit 10 - Cleared to 0 */
+        operand_size            :1,  /* bit 11 - Operand size */
+                                :3,  /* bits 14:12 - Undefined */
+        segment_reg             :3,  /* bits 17:15 - Segment register */
+        index_reg               :4,  /* bits 21:18 - Index register */
+        index_reg_invalid       :1,  /* bit 22 - Index register invalid */
+        base_reg                :4,  /* bits 26:23 - Base register */
+        base_reg_invalid        :1,  /* bit 27 - Base register invalid */
+        instr_identity          :1,  /* bit 28 - 0:GDT, 1:IDT */
+        instr_write             :1,  /* bit 29 - 0:store, 1:load */
+                                :34; /* bits 30:63 - Undefined */
+    };
+} idt_or_gdt_instr_info_t;
+
+/* VM-Exit instruction info for LLDT, LTR, SLDT, STR */
+typedef union ldt_or_tr_instr_info {
+    unsigned long raw;
+    struct {
+        unsigned long scaling   :2,  /* bits 0:1 - Scaling */
+                                :1,  /* bit 2 - Undefined */
+        reg1                    :4,  /* bits 6:3 - Reg1 */
+        addr_size               :3,  /* bits 9:7 - Address size */
+        mem_reg                 :1,  /* bit 10 - Mem/Reg */
+                                :4,  /* bits 14:11 - Undefined */
+        segment_reg             :3,  /* bits 17:15 - Segment register */
+        index_reg               :4,  /* bits 21:18 - Index register */
+        index_reg_invalid       :1,  /* bit 22 - Index register invalid */
+        base_reg                :4,  /* bits 26:23 - Base register */
+        base_reg_invalid        :1,  /* bit 27 - Base register invalid */
+        instr_identity          :1,  /* bit 28 - 0:LDT, 1:TR */
+        instr_write             :1,  /* bit 29 - 0:store, 1:load */
+                                :34; /* bits 31:63 - Undefined */
+    };
+} ldt_or_tr_instr_info_t;
+
 #endif /* __ASM_X86_HVM_VMX_VMX_H__ */

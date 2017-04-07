@@ -146,6 +146,8 @@
 #define VM_EVENT_REASON_PRIVILEGED_CALL         11
 /* An interrupt has been delivered. */
 #define VM_EVENT_REASON_INTERRUPT               12
+/* A descriptor table register was accessed. */
+#define VM_EVENT_REASON_DESCRIPTOR_ACCESS       13
 
 /* Supported values for the vm_event_write_ctrlreg index. */
 #define VM_EVENT_X86_CR0    0
@@ -259,6 +261,28 @@ struct vm_event_mov_to_msr {
     uint64_t value;
 };
 
+#define VM_EVENT_DESC_IDTR           1
+#define VM_EVENT_DESC_GDTR           2
+#define VM_EVENT_DESC_LDTR           3
+#define VM_EVENT_DESC_TR             4
+
+struct vm_event_desc_access {
+    union {
+        struct {
+            uint32_t instr_info;         /* VMX: VMCS Instruction-Information */
+            uint32_t _pad1;
+            uint64_t exit_qualification; /* VMX: VMCS Exit Qualification */
+        } vmx;
+        struct {
+            uint64_t exitinfo;           /* SVM: VMCB EXITINFO */
+            uint64_t _pad2;
+        } svm;
+    } arch;
+    uint8_t descriptor;                  /* VM_EVENT_DESC_* */
+    uint8_t is_write;
+    uint8_t _pad[6];
+};
+
 struct vm_event_cpuid {
     uint32_t insn_length;
     uint32_t leaf;
@@ -313,6 +337,7 @@ typedef struct vm_event_st {
         struct vm_event_mem_access            mem_access;
         struct vm_event_write_ctrlreg         write_ctrlreg;
         struct vm_event_mov_to_msr            mov_to_msr;
+        struct vm_event_desc_access           desc_access;
         struct vm_event_singlestep            singlestep;
         struct vm_event_debug                 software_breakpoint;
         struct vm_event_debug                 debug_exception;

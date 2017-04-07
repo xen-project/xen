@@ -229,6 +229,12 @@ void vm_event_emulate_check(struct vcpu *v, vm_event_response_t *rsp)
         }
         break;
 
+    case VM_EVENT_REASON_DESCRIPTOR_ACCESS:
+        if ( rsp->flags & VM_EVENT_FLAG_SET_EMUL_READ_DATA )
+            v->arch.vm_event->emul.read = rsp->data.emul.read;
+        v->arch.vm_event->emulate_flags = rsp->flags;
+        break;
+
     default:
         break;
     };

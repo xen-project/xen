@@ -866,6 +866,23 @@ static void svm_set_rdtsc_exiting(struct vcpu *v, bool_t enable)
     vmcb_set_general2_intercepts(vmcb, general2_intercepts);
 }
 
+static void svm_set_descriptor_access_exiting(struct vcpu *v, bool enable)
+{
+    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
+    u32 general1_intercepts = vmcb_get_general1_intercepts(vmcb);
+    u32 mask = GENERAL1_INTERCEPT_IDTR_READ | GENERAL1_INTERCEPT_GDTR_READ
+            | GENERAL1_INTERCEPT_LDTR_READ | GENERAL1_INTERCEPT_TR_READ
+            | GENERAL1_INTERCEPT_IDTR_WRITE | GENERAL1_INTERCEPT_GDTR_WRITE
+            | GENERAL1_INTERCEPT_LDTR_WRITE | GENERAL1_INTERCEPT_TR_WRITE;
+
+    if ( enable )
+        general1_intercepts |= mask;
+    else
+        general1_intercepts &= ~mask;
+
+    vmcb_set_general1_intercepts(vmcb, general1_intercepts);
+}
+
 static unsigned int svm_get_insn_bytes(struct vcpu *v, uint8_t *buf)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
@@ -2370,6 +2387,7 @@ static struct hvm_function_table __initdata svm_function_table = {
     .msr_read_intercept   = svm_msr_read_intercept,
     .msr_write_intercept  = svm_msr_write_intercept,
     .set_rdtsc_exiting    = svm_set_rdtsc_exiting,
+    .set_descriptor_access_exiting = svm_set_descriptor_access_exiting,
     .get_insn_bytes       = svm_get_insn_bytes,
 
     .nhvm_vcpu_initialise = nsvm_vcpu_initialise,
@@ -2787,6 +2805,30 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
 
     case VMEXIT_PAUSE:
         svm_vmexit_do_pause(regs);
+        break;
+
+    case VMEXIT_IDTR_READ:
+    case VMEXIT_IDTR_WRITE:
+        hvm_descriptor_access_intercept(vmcb->exitintinfo.bytes, 0,
+            VM_EVENT_DESC_IDTR, exit_reason == VMEXIT_IDTR_WRITE);
+        break;
+
+    case VMEXIT_GDTR_READ:
+    case VMEXIT_GDTR_WRITE:
+        hvm_descriptor_access_intercept(vmcb->exitintinfo.bytes, 0,
+            VM_EVENT_DESC_GDTR, exit_reason == VMEXIT_GDTR_WRITE);
+        break;
+
+    case VMEXIT_LDTR_READ:
+    case VMEXIT_LDTR_WRITE:
+        hvm_descriptor_access_intercept(vmcb->exitintinfo.bytes, 0,
+            VM_EVENT_DESC_LDTR, exit_reason == VMEXIT_LDTR_WRITE);
+        break;
+
+    case VMEXIT_TR_READ:
+    case VMEXIT_TR_WRITE:
+        hvm_descriptor_access_intercept(vmcb->exitintinfo.bytes, 0,
+            VM_EVENT_DESC_TR, exit_reason == VMEXIT_TR_WRITE);
         break;
 
     default:

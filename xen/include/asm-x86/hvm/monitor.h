@@ -38,6 +38,9 @@ bool_t hvm_monitor_cr(unsigned int index, unsigned long value,
 #define hvm_monitor_crX(cr, new, old) \
                         hvm_monitor_cr(VM_EVENT_X86_##cr, new, old)
 void hvm_monitor_msr(unsigned int msr, uint64_t value);
+void hvm_monitor_descriptor_access(uint64_t exit_info,
+                                   uint64_t vmx_exit_qualification,
+                                   uint8_t descriptor, bool is_write);
 int hvm_monitor_debug(unsigned long rip, enum hvm_monitor_debug_type type,
                       unsigned long trap_type, unsigned long insn_length);
 int hvm_monitor_cpuid(unsigned long insn_length, unsigned int leaf,

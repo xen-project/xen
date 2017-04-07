@@ -128,6 +128,9 @@ int hvm_set_efer(uint64_t value);
 int hvm_set_cr0(unsigned long value, bool_t may_defer);
 int hvm_set_cr3(unsigned long value, bool_t may_defer);
 int hvm_set_cr4(unsigned long value, bool_t may_defer);
+int hvm_descriptor_access_intercept(uint64_t exit_info,
+                                    uint64_t vmx_exit_qualification,
+                                    unsigned int descriptor, bool is_write);
 int hvm_mov_to_cr(unsigned int cr, unsigned int gpr);
 int hvm_mov_from_cr(unsigned int cr, unsigned int gpr);
 void hvm_ud_intercept(struct cpu_user_regs *);

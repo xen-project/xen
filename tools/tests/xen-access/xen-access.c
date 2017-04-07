@@ -337,7 +337,7 @@ void usage(char* progname)
 {
     fprintf(stderr, "Usage: %s [-m] <domain_id> write|exec", progname);
 #if defined(__i386__) || defined(__x86_64__)
-            fprintf(stderr, "|breakpoint|altp2m_write|altp2m_exec|debug|cpuid");
+            fprintf(stderr, "|breakpoint|altp2m_write|altp2m_exec|debug|cpuid|desc_access");
 #elif defined(__arm__) || defined(__aarch64__)
             fprintf(stderr, "|privcall");
 #endif
@@ -368,6 +368,7 @@ int main(int argc, char *argv[])
     int altp2m = 0;
     int debug = 0;
     int cpuid = 0;
+    int desc_access = 0;
     uint16_t altp2m_view_id = 0;
 
     char* progname = argv[0];
@@ -433,6 +434,10 @@ int main(int argc, char *argv[])
     else if ( !strcmp(argv[0], "cpuid") )
     {
         cpuid = 1;
+    }
+    else if ( !strcmp(argv[0], "desc_access") )
+    {
+        desc_access = 1;
     }
 #elif defined(__arm__) || defined(__aarch64__)
     else if ( !strcmp(argv[0], "privcall") )
@@ -571,6 +576,16 @@ int main(int argc, char *argv[])
         }
     }
 
+    if ( desc_access )
+    {
+        rc = xc_monitor_descriptor_access(xch, domain_id, 1);
+        if ( rc < 0 )
+        {
+            ERROR("Error %d setting descriptor access listener with vm_event\n", rc);
+            goto exit;
+        }
+    }
+
     if ( privcall )
     {
         rc = xc_monitor_privileged_call(xch, domain_id, 1);
@@ -595,6 +610,8 @@ int main(int argc, char *argv[])
                 rc = xc_monitor_debug_exceptions(xch, domain_id, 0, 0);
             if ( cpuid )
                 rc = xc_monitor_cpuid(xch, domain_id, 0);
+            if ( desc_access )
+                rc = xc_monitor_descriptor_access(xch, domain_id, 0);
 
             if ( privcall )
                 rc = xc_monitor_privileged_call(xch, domain_id, 0);
@@ -778,6 +795,16 @@ int main(int argc, char *argv[])
                 rsp.flags |= VM_EVENT_FLAG_SET_REGISTERS;
                 rsp.data = req.data;
                 rsp.data.regs.x86.rip += req.u.cpuid.insn_length;
+                break;
+            case VM_EVENT_REASON_DESCRIPTOR_ACCESS:
+                printf("Descriptor access: rip=%016"PRIx64", vcpu %d: "\
+                       "VMExit info=0x%"PRIx32", descriptor=%d, is write=%d\n",
+                       req.data.regs.x86.rip,
+                       req.vcpu_id,
+                       req.u.desc_access.arch.vmx.instr_info,
+                       req.u.desc_access.descriptor,
+                       req.u.desc_access.is_write);
+                rsp.flags |= VM_EVENT_FLAG_EMULATE;
                 break;
             default:
                 fprintf(stderr, "UNKNOWN REASON CODE %d\n", req.reason);

@@ -2010,6 +2010,8 @@ int xc_monitor_mov_to_msr(xc_interface *xch, domid_t domain_id, uint32_t msr,
 int xc_monitor_singlestep(xc_interface *xch, domid_t domain_id, bool enable);
 int xc_monitor_software_breakpoint(xc_interface *xch, domid_t domain_id,
                                    bool enable);
+int xc_monitor_descriptor_access(xc_interface *xch, domid_t domain_id,
+                                 bool enable);
 int xc_monitor_guest_request(xc_interface *xch, domid_t domain_id,
                              bool enable, bool sync);
 int xc_monitor_debug_exceptions(xc_interface *xch, domid_t domain_id,

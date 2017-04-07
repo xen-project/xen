@@ -173,6 +173,7 @@ struct hvm_function_table {
     void (*handle_cd)(struct vcpu *v, unsigned long value);
     void (*set_info_guest)(struct vcpu *v);
     void (*set_rdtsc_exiting)(struct vcpu *v, bool_t);
+    void (*set_descriptor_access_exiting)(struct vcpu *v, bool);
 
     /* Nested HVM */
     int (*nhvm_vcpu_initialise)(struct vcpu *v);
