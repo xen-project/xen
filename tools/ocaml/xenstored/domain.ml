@@ -62,7 +62,7 @@ let string_of_port = function
 | Some x -> string_of_int (Xeneventchn.to_int x)
 
 let dump d chan =
-	fprintf chan "dom,%d,%nd,%s\n" d.id d.mfn (string_of_port d.port)
+	fprintf chan "dom,%d,%nd,%d\n" d.id d.mfn d.remote_port
 
 let notify dom = match dom.port with
 | None ->
