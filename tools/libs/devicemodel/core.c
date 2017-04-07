@@ -244,6 +244,31 @@ int xendevicemodel_unmap_io_range_from_ioreq_server(
     return xendevicemodel_op(dmod, domid, 1, &op, sizeof(op));
 }
 
+int xendevicemodel_map_mem_type_to_ioreq_server(
+    xendevicemodel_handle *dmod, domid_t domid, ioservid_t id, uint16_t type,
+    uint32_t flags)
+{
+    struct xen_dm_op op;
+    struct xen_dm_op_map_mem_type_to_ioreq_server *data;
+
+    if (type != HVMMEM_ioreq_server ||
+        flags & ~XEN_DMOP_IOREQ_MEM_ACCESS_WRITE) {
+        errno = EINVAL;
+        return -1;
+    }
+
+    memset(&op, 0, sizeof(op));
+
+    op.op = XEN_DMOP_map_mem_type_to_ioreq_server;
+    data = &op.u.map_mem_type_to_ioreq_server;
+
+    data->id = id;
+    data->type = type;
+    data->flags = flags;
+
+    return xendevicemodel_op(dmod, domid, 1, &op, sizeof(op));
+}
+
 int xendevicemodel_map_pcidev_to_ioreq_server(
     xendevicemodel_handle *dmod, domid_t domid, ioservid_t id,
     uint16_t segment, uint8_t bus, uint8_t device, uint8_t function)

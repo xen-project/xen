@@ -104,6 +104,24 @@ int xendevicemodel_unmap_io_range_from_ioreq_server(
     uint64_t start, uint64_t end);
 
 /**
+ * This function registers/deregisters a memory type for emulation.
+ *
+ * @parm dmod a handle to an open devicemodel interface.
+ * @parm domid the domain id to be serviced.
+ * @parm id the IOREQ Server id.
+ * @parm type the memory type to be emulated. For now, only HVMMEM_ioreq_server
+ *            is supported, and in the future new types can be introduced, e.g.
+ *            HVMMEM_ioreq_serverX mapped to ioreq server X.
+ * @parm flags operations to be emulated; 0 for unmap. For now, only write
+ *             operations will be emulated and can be extended to emulate
+ *             read ones in the future.
+ * @return 0 on success, -1 on failure.
+ */
+int xendevicemodel_map_mem_type_to_ioreq_server(
+    xendevicemodel_handle *dmod, domid_t domid, ioservid_t id, uint16_t type,
+    uint32_t flags);
+
+/**
  * This function registers a PCI device for config space emulation.
  *
  * @parm dmod a handle to an open devicemodel interface.

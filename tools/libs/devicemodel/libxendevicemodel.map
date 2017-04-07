@@ -5,6 +5,7 @@ VERS_1.0 {
 		xendevicemodel_get_ioreq_server_info;
 		xendevicemodel_map_io_range_to_ioreq_server;
 		xendevicemodel_unmap_io_range_from_ioreq_server;
+		xendevicemodel_map_mem_type_to_ioreq_server;
 		xendevicemodel_map_pcidev_to_ioreq_server;
 		xendevicemodel_unmap_pcidev_from_ioreq_server;
 		xendevicemodel_destroy_ioreq_server;
