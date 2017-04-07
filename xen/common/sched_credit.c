@@ -1593,64 +1593,65 @@ static struct csched_vcpu *
 csched_runq_steal(int peer_cpu, int cpu, int pri, int balance_step)
 {
     const struct csched_pcpu * const peer_pcpu = CSCHED_PCPU(peer_cpu);
-    const struct vcpu * const peer_vcpu = curr_on_cpu(peer_cpu);
     struct csched_vcpu *speer;
     struct list_head *iter;
     struct vcpu *vc;
+
+    ASSERT(peer_pcpu != NULL);
 
     /*
      * Don't steal from an idle CPU's runq because it's about to
      * pick up work from it itself.
      */
-    if ( peer_pcpu != NULL && !is_idle_vcpu(peer_vcpu) )
+    if ( unlikely(is_idle_vcpu(curr_on_cpu(peer_cpu))) )
+        goto out;
+
+    list_for_each( iter, &peer_pcpu->runq )
     {
-        list_for_each( iter, &peer_pcpu->runq )
+        speer = __runq_elem(iter);
+
+        /*
+         * If next available VCPU here is not of strictly higher
+         * priority than ours, this PCPU is useless to us.
+         */
+        if ( speer->pri <= pri )
+            break;
+
+        /* Is this VCPU runnable on our PCPU? */
+        vc = speer->vcpu;
+        BUG_ON( is_idle_vcpu(vc) );
+
+        /*
+         * If the vcpu has no useful soft affinity, skip this vcpu.
+         * In fact, what we want is to check if we have any "soft-affine
+         * work" to steal, before starting to look at "hard-affine work".
+         *
+         * Notice that, if not even one vCPU on this runq has a useful
+         * soft affinity, we could have avoid considering this runq for
+         * a soft balancing step in the first place. This, for instance,
+         * can be implemented by taking note of on what runq there are
+         * vCPUs with useful soft affinities in some sort of bitmap
+         * or counter.
+         */
+        if ( balance_step == CSCHED_BALANCE_SOFT_AFFINITY
+             && !__vcpu_has_soft_affinity(vc, vc->cpu_hard_affinity) )
+            continue;
+
+        csched_balance_cpumask(vc, balance_step, cpumask_scratch);
+        if ( __csched_vcpu_is_migrateable(vc, cpu, cpumask_scratch) )
         {
-            speer = __runq_elem(iter);
-
-            /*
-             * If next available VCPU here is not of strictly higher
-             * priority than ours, this PCPU is useless to us.
-             */
-            if ( speer->pri <= pri )
-                break;
-
-            /* Is this VCPU runnable on our PCPU? */
-            vc = speer->vcpu;
-            BUG_ON( is_idle_vcpu(vc) );
-
-            /*
-             * If the vcpu has no useful soft affinity, skip this vcpu.
-             * In fact, what we want is to check if we have any "soft-affine
-             * work" to steal, before starting to look at "hard-affine work".
-             *
-             * Notice that, if not even one vCPU on this runq has a useful
-             * soft affinity, we could have avoid considering this runq for
-             * a soft balancing step in the first place. This, for instance,
-             * can be implemented by taking note of on what runq there are
-             * vCPUs with useful soft affinities in some sort of bitmap
-             * or counter.
-             */
-            if ( balance_step == CSCHED_BALANCE_SOFT_AFFINITY
-                 && !__vcpu_has_soft_affinity(vc, vc->cpu_hard_affinity) )
-                continue;
-
-            csched_balance_cpumask(vc, balance_step, cpumask_scratch);
-            if ( __csched_vcpu_is_migrateable(vc, cpu, cpumask_scratch) )
-            {
-                /* We got a candidate. Grab it! */
-                TRACE_3D(TRC_CSCHED_STOLEN_VCPU, peer_cpu,
-                         vc->domain->domain_id, vc->vcpu_id);
-                SCHED_VCPU_STAT_CRANK(speer, migrate_q);
-                SCHED_STAT_CRANK(migrate_queued);
-                WARN_ON(vc->is_urgent);
-                __runq_remove(speer);
-                vc->processor = cpu;
-                return speer;
-            }
+            /* We got a candidate. Grab it! */
+            TRACE_3D(TRC_CSCHED_STOLEN_VCPU, peer_cpu,
+                     vc->domain->domain_id, vc->vcpu_id);
+            SCHED_VCPU_STAT_CRANK(speer, migrate_q);
+            SCHED_STAT_CRANK(migrate_queued);
+            WARN_ON(vc->is_urgent);
+            __runq_remove(speer);
+            vc->processor = cpu;
+            return speer;
         }
     }
-
+ out:
     SCHED_STAT_CRANK(steal_peer_idle);
     return NULL;
 }
