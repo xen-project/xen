@@ -317,6 +317,15 @@ int p2m_set_ioreq_server(struct domain *d,
         if ( p2m->ioreq.server != NULL )
             goto out;
 
+        /*
+         * It is possible that an ioreq server has just been unmapped,
+         * released the spin lock, with some p2m_ioreq_server entries
+         * in p2m table remained. We shall refuse another ioreq server
+         * mapping request in such case.
+         */
+        if ( read_atomic(&p2m->ioreq.entry_count) )
+            goto out;
+
         p2m->ioreq.server = s;
         p2m->ioreq.flags = flags;
     }

@@ -533,6 +533,8 @@ static int resolve_misconfig(struct p2m_domain *p2m, unsigned long gfn)
             {
                 for ( gfn -= i, i = 0; i < EPT_PAGETABLE_ENTRIES; ++i )
                 {
+                    p2m_type_t nt;
+
                     e = atomic_read_ept_entry(&epte[i]);
                     if ( e.emt == MTRR_NUM_TYPES )
                         e.emt = 0;
@@ -542,11 +544,18 @@ static int resolve_misconfig(struct p2m_domain *p2m, unsigned long gfn)
                                                _mfn(e.mfn), 0, &ipat,
                                                e.sa_p2mt == p2m_mmio_direct);
                     e.ipat = ipat;
-                    if ( e.recalc && p2m_is_changeable(e.sa_p2mt) )
+
+                    nt = p2m_recalc_type(e.recalc, e.sa_p2mt, p2m, gfn + i);
+                    if ( nt != e.sa_p2mt )
                     {
-                         e.sa_p2mt = p2m_is_logdirty_range(p2m, gfn + i, gfn + i)
-                                     ? p2m_ram_logdirty : p2m_ram_rw;
-                         ept_p2m_type_to_flags(p2m, &e, e.sa_p2mt, e.access);
+                        if ( e.sa_p2mt == p2m_ioreq_server )
+                        {
+                            ASSERT(p2m->ioreq.entry_count > 0);
+                            p2m->ioreq.entry_count--;
+                        }
+
+                        e.sa_p2mt = nt;
+                        ept_p2m_type_to_flags(p2m, &e, e.sa_p2mt, e.access);
                     }
                     e.recalc = 0;
                     wrc = atomic_write_ept_entry(&epte[i], e, level);
@@ -562,23 +571,24 @@ static int resolve_misconfig(struct p2m_domain *p2m, unsigned long gfn)
 
                 if ( recalc && p2m_is_changeable(e.sa_p2mt) )
                 {
-                     unsigned long mask = ~0UL << (level * EPT_TABLE_ORDER);
+                    unsigned long mask = ~0UL << (level * EPT_TABLE_ORDER);
 
-                     switch ( p2m_is_logdirty_range(p2m, gfn & mask,
-                                                    gfn | ~mask) )
-                     {
-                     case 0:
-                          e.sa_p2mt = p2m_ram_rw;
-                          e.recalc = 0;
-                          break;
-                     case 1:
-                          e.sa_p2mt = p2m_ram_logdirty;
-                          e.recalc = 0;
-                          break;
-                     default: /* Force split. */
-                          emt = -1;
-                          break;
-                     }
+                    ASSERT(e.sa_p2mt != p2m_ioreq_server);
+                    switch ( p2m_is_logdirty_range(p2m, gfn & mask,
+                                                   gfn | ~mask) )
+                    {
+                    case 0:
+                         e.sa_p2mt = p2m_ram_rw;
+                         e.recalc = 0;
+                         break;
+                    case 1:
+                         e.sa_p2mt = p2m_ram_logdirty;
+                         e.recalc = 0;
+                         break;
+                    default: /* Force split. */
+                         emt = -1;
+                         break;
+                    }
                 }
                 if ( unlikely(emt < 0) )
                 {
@@ -816,6 +826,23 @@ ept_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
         new_entry.suppress_ve = is_epte_valid(&old_entry) ?
                                     old_entry.suppress_ve : 1;
 
+    /*
+     * p2m_ioreq_server is only used for 4K pages, so the
+     * count is only done on ept page table entries.
+     */
+    if ( p2mt == p2m_ioreq_server )
+    {
+        ASSERT(i == 0);
+        p2m->ioreq.entry_count++;
+    }
+
+    if ( ept_entry->sa_p2mt == p2m_ioreq_server )
+    {
+        ASSERT(i == 0);
+        ASSERT(p2m->ioreq.entry_count > 0);
+        p2m->ioreq.entry_count--;
+    }
+
     rc = atomic_write_ept_entry(ept_entry, new_entry, target);
     if ( unlikely(rc) )
         old_entry.epte = 0;
@@ -964,12 +991,8 @@ static mfn_t ept_get_entry(struct p2m_domain *p2m,
 
     if ( is_epte_valid(ept_entry) )
     {
-        if ( (recalc || ept_entry->recalc) &&
-             p2m_is_changeable(ept_entry->sa_p2mt) )
-            *t = p2m_is_logdirty_range(p2m, gfn, gfn) ? p2m_ram_logdirty
-                                                      : p2m_ram_rw;
-        else
-            *t = ept_entry->sa_p2mt;
+        *t = p2m_recalc_type(recalc || ept_entry->recalc,
+                             ept_entry->sa_p2mt, p2m, gfn);
         *a = ept_entry->access;
         if ( sve )
             *sve = ept_entry->suppress_ve;

@@ -120,7 +120,8 @@ typedef unsigned int p2m_query_t;
 
 /* Types that can be subject to bulk transitions. */
 #define P2M_CHANGEABLE_TYPES (p2m_to_mask(p2m_ram_rw) \
-                              | p2m_to_mask(p2m_ram_logdirty) )
+                              | p2m_to_mask(p2m_ram_logdirty) \
+                              | p2m_to_mask(p2m_ioreq_server) )
 
 #define P2M_POD_TYPES (p2m_to_mask(p2m_populate_on_demand))
 
@@ -349,6 +350,7 @@ struct p2m_domain {
           * are to be emulated by an ioreq server.
           */
          unsigned int flags;
+         unsigned long entry_count;
      } ioreq;
 };
 
@@ -742,6 +744,28 @@ static inline p2m_type_t p2m_flags_to_type(unsigned long flags)
     /* AMD IOMMUs use bits 9-11 to encode next io page level and bits
      * 59-62 for iommu flags so we can't use them to store p2m type info. */
     return (flags >> 12) & 0x7f;
+}
+
+static inline p2m_type_t p2m_recalc_type_range(bool recalc, p2m_type_t t,
+                                               struct p2m_domain *p2m,
+                                               unsigned long gfn_start,
+                                               unsigned long gfn_end)
+{
+    if ( !recalc || !p2m_is_changeable(t) )
+        return t;
+
+    if ( t == p2m_ioreq_server && p2m->ioreq.server != NULL )
+        return t;
+
+    return p2m_is_logdirty_range(p2m, gfn_start, gfn_end) ? p2m_ram_logdirty
+                                                          : p2m_ram_rw;
+}
+
+static inline p2m_type_t p2m_recalc_type(bool recalc, p2m_type_t t,
+                                         struct p2m_domain *p2m,
+                                         unsigned long gfn)
+{
+    return p2m_recalc_type_range(recalc, t, p2m, gfn, gfn);
 }
 
 int p2m_pt_handle_deferred_changes(uint64_t gpa);

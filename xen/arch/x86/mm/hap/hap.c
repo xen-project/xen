@@ -187,6 +187,15 @@ out:
  */
 static int hap_enable_log_dirty(struct domain *d, bool_t log_global)
 {
+    struct p2m_domain *p2m = p2m_get_hostp2m(d);
+
+    /*
+     * Refuse to turn on global log-dirty mode if
+     * there are outstanding p2m_ioreq_server pages.
+     */
+    if ( log_global && read_atomic(&p2m->ioreq.entry_count) )
+        return -EBUSY;
+
     /* turn on PG_log_dirty bit in paging mode */
     paging_lock(d);
     d->arch.paging.mode |= PG_log_dirty;

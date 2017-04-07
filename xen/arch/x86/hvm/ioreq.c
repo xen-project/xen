@@ -955,6 +955,14 @@ int hvm_map_mem_type_to_ioreq_server(struct domain *d, ioservid_t id,
 
     spin_unlock_recursive(&d->arch.hvm_domain.ioreq_server.lock);
 
+    if ( rc == 0 && flags == 0 )
+    {
+        struct p2m_domain *p2m = p2m_get_hostp2m(d);
+
+        if ( read_atomic(&p2m->ioreq.entry_count) )
+            p2m_change_entry_type_global(d, p2m_ioreq_server, p2m_ram_rw);
+    }
+
     return rc;
 }
 
