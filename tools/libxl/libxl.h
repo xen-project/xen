@@ -210,6 +210,12 @@
 #define LIBXL_HAVE_SCHED_RTDS 1
 
 /*
+ * LIBXL_HAVE_SCHED_NULL indicates that the 'null' static scheduler
+ * is available.
+ */
+#define LIBXL_HAVE_SCHED_NULL 1
+
+/*
  * libxl_domain_build_info has u.hvm.viridian_enable and _disable bitmaps
  * of the specified width.
  */

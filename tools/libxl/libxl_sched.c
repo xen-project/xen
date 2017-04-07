@@ -178,6 +178,20 @@ static int sched_arinc653_domain_set(libxl__gc *gc, uint32_t domid,
     return 0;
 }
 
+static int sched_null_domain_set(libxl__gc *gc, uint32_t domid,
+                                 const libxl_domain_sched_params *scinfo)
+{
+    /* There aren't any domain-specific parameters to be set. */
+    return 0;
+}
+
+static int sched_null_domain_get(libxl__gc *gc, uint32_t domid,
+                                 libxl_domain_sched_params *scinfo)
+{
+    /* There aren't any domain-specific parameters to return. */
+    return 0;
+}
+
 static int sched_credit_domain_get(libxl__gc *gc, uint32_t domid,
                                    libxl_domain_sched_params *scinfo)
 {
@@ -730,6 +744,9 @@ int libxl_domain_sched_params_set(libxl_ctx *ctx, uint32_t domid,
     case LIBXL_SCHEDULER_RTDS:
         ret=sched_rtds_domain_set(gc, domid, scinfo);
         break;
+    case LIBXL_SCHEDULER_NULL:
+        ret=sched_null_domain_set(gc, domid, scinfo);
+        break;
     default:
         LOGD(ERROR, domid, "Unknown scheduler");
         ret=ERROR_INVAL;
@@ -758,6 +775,7 @@ int libxl_vcpu_sched_params_set(libxl_ctx *ctx, uint32_t domid,
     case LIBXL_SCHEDULER_CREDIT:
     case LIBXL_SCHEDULER_CREDIT2:
     case LIBXL_SCHEDULER_ARINC653:
+    case LIBXL_SCHEDULER_NULL:
         LOGD(ERROR, domid, "per-VCPU parameter setting not supported for this scheduler");
         rc = ERROR_INVAL;
         break;
@@ -792,6 +810,7 @@ int libxl_vcpu_sched_params_set_all(libxl_ctx *ctx, uint32_t domid,
     case LIBXL_SCHEDULER_CREDIT:
     case LIBXL_SCHEDULER_CREDIT2:
     case LIBXL_SCHEDULER_ARINC653:
+    case LIBXL_SCHEDULER_NULL:
         LOGD(ERROR, domid, "per-VCPU parameter setting not supported for this scheduler");
         rc = ERROR_INVAL;
         break;
@@ -832,6 +851,9 @@ int libxl_domain_sched_params_get(libxl_ctx *ctx, uint32_t domid,
     case LIBXL_SCHEDULER_RTDS:
         ret=sched_rtds_domain_get(gc, domid, scinfo);
         break;
+    case LIBXL_SCHEDULER_NULL:
+        ret=sched_null_domain_get(gc, domid, scinfo);
+        break;
     default:
         LOGD(ERROR, domid, "Unknown scheduler");
         ret=ERROR_INVAL;
@@ -858,6 +880,7 @@ int libxl_vcpu_sched_params_get(libxl_ctx *ctx, uint32_t domid,
     case LIBXL_SCHEDULER_CREDIT:
     case LIBXL_SCHEDULER_CREDIT2:
     case LIBXL_SCHEDULER_ARINC653:
+    case LIBXL_SCHEDULER_NULL:
         LOGD(ERROR, domid, "per-VCPU parameter getting not supported for this scheduler");
         rc = ERROR_INVAL;
         break;
@@ -890,6 +913,7 @@ int libxl_vcpu_sched_params_get_all(libxl_ctx *ctx, uint32_t domid,
     case LIBXL_SCHEDULER_CREDIT:
     case LIBXL_SCHEDULER_CREDIT2:
     case LIBXL_SCHEDULER_ARINC653:
+    case LIBXL_SCHEDULER_NULL:
         LOGD(ERROR, domid, "per-VCPU parameter getting not supported for this scheduler");
         rc = ERROR_INVAL;
         break;
