@@ -285,6 +285,8 @@ let _ =
 
 	let quit = ref false in
 
+	Logging.init_xenstored_log();
+
 	if cf.restart then (
 		DB.from_file store domains cons (Paths.xen_run_stored ^ "/db");
 		Event.bind_dom_exc_virq eventchn
@@ -311,7 +313,6 @@ let _ =
 	Sys.set_signal Sys.sigusr1 (Sys.Signal_handle (fun i -> sigusr1_handler store));
 	Sys.set_signal Sys.sigpipe Sys.Signal_ignore;
 
-	Logging.init_xenstored_log();
 	if cf.activate_access_log then begin
 		let post_rotate () = DB.to_file store cons (Paths.xen_run_stored ^ "/db") in
 		Logging.init_access_log post_rotate
