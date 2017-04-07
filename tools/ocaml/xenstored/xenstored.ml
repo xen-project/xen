@@ -213,7 +213,7 @@ let to_channel store cons chan =
 	(* dump the store *)
 	Store.dump_fct store (fun path node ->
 		let name, perms, value = Store.Node.unpack node in
-		let fullpath = (Store.Path.to_string path) ^ "/" ^ name in
+		let fullpath = Store.Path.to_string (Store.Path.of_path_and_name path name) in
 		let permstr = Perms.Node.to_string perms in
 		fprintf chan "store,%s,%s,%s\n" (hexify fullpath) (hexify permstr) (hexify value)
 	);

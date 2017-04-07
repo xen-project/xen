@@ -122,6 +122,11 @@ let of_string s =
 		| "" :: path when is_valid path -> path
 		| _ -> raise Define.Invalid_path
 
+let of_path_and_name path name =
+	match path, name with
+	| [], "" -> []
+	| _ -> path @ [name]
+
 let create path connection_path =
 	of_string (Utils.path_validate path connection_path)
 
@@ -343,7 +348,8 @@ let path_exists store path =
 let traversal root_node f =
 	let rec _traversal path node =
 		f path node;
-		List.iter (_traversal (path @ [ Symbol.to_string node.Node.name ])) node.Node.children
+		let node_path = Path.of_path_and_name path (Symbol.to_string node.Node.name) in
+		List.iter (_traversal node_path) node.Node.children
 		in
 	_traversal [] root_node
 
