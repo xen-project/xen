@@ -606,6 +606,12 @@ void p2m_change_type_range(struct domain *d,
 int p2m_change_type_one(struct domain *d, unsigned long gfn,
                         p2m_type_t ot, p2m_type_t nt);
 
+/* Synchronously change the p2m type for a range of gfns */
+void p2m_finish_type_change(struct domain *d,
+                            gfn_t first_gfn,
+                            unsigned long max_nr,
+                            p2m_type_t ot, p2m_type_t nt);
+
 /* Report a change affecting memory types. */
 void p2m_memory_type_changed(struct domain *d);
 

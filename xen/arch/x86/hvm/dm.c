@@ -384,15 +384,50 @@ static int dm_op(domid_t domid,
 
     case XEN_DMOP_map_mem_type_to_ioreq_server:
     {
-        const struct xen_dm_op_map_mem_type_to_ioreq_server *data =
+        struct xen_dm_op_map_mem_type_to_ioreq_server *data =
             &op.u.map_mem_type_to_ioreq_server;
+        unsigned long first_gfn = data->opaque;
+
+        const_op = false;
 
         rc = -EOPNOTSUPP;
         if ( !hap_enabled(d) )
             break;
 
-        rc = hvm_map_mem_type_to_ioreq_server(d, data->id,
-                                              data->type, data->flags);
+        if ( first_gfn == 0 )
+            rc = hvm_map_mem_type_to_ioreq_server(d, data->id,
+                                                  data->type, data->flags);
+        else
+            rc = 0;
+
+        /*
+         * Iterate p2m table when an ioreq server unmaps from p2m_ioreq_server,
+         * and reset the remaining p2m_ioreq_server entries back to p2m_ram_rw.
+         */
+        if ( rc == 0 && data->flags == 0 )
+        {
+            struct p2m_domain *p2m = p2m_get_hostp2m(d);
+
+            while ( read_atomic(&p2m->ioreq.entry_count) &&
+                    first_gfn <= p2m->max_mapped_pfn )
+            {
+                /* Iterate p2m table for 256 gfns each time. */
+                p2m_finish_type_change(d, _gfn(first_gfn), 256,
+                                       p2m_ioreq_server, p2m_ram_rw);
+
+                first_gfn += 256;
+
+                /* Check for continuation if it's not the last iteration. */
+                if ( first_gfn <= p2m->max_mapped_pfn &&
+                     hypercall_preempt_check() )
+                {
+                    rc = -ERESTART;
+                    data->opaque = first_gfn;
+                    break;
+                }
+            }
+        }
+
         break;
     }
 
