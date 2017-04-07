@@ -271,7 +271,7 @@ static int svm_vmcb_restore(struct vcpu *v, struct hvm_hw_cpu *c)
 
     if ( c->pending_valid )
     {
-        if ( (c->pending_type == 1) || (c->pending_type > 6) ||
+        if ( (c->pending_type == 1) || (c->pending_type > 4) ||
              (c->pending_reserved != 0) )
         {
             dprintk(XENLOG_ERR, "%pv: Invalid pending event %#"PRIx32"\n",
