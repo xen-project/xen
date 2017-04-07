@@ -1843,15 +1843,10 @@ int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
          (npfec.write_access &&
           (p2m_is_discard_write(p2mt) || (p2mt == p2m_ioreq_server))) )
     {
-        __put_gfn(p2m, gfn);
-        if ( ap2m_active )
-            __put_gfn(hostp2m, gfn);
-
-        rc = 0;
         if ( !handle_mmio_with_translation(gla, gpa >> PAGE_SHIFT, npfec) )
             hvm_inject_hw_exception(TRAP_gp_fault, 0);
         rc = 1;
-        goto out;
+        goto out_put_gfn;
     }
 
     /* Check if the page has been paged out */
