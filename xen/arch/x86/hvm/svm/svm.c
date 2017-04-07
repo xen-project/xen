@@ -269,13 +269,23 @@ static int svm_vmcb_restore(struct vcpu *v, struct hvm_hw_cpu *c)
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
     struct p2m_domain *p2m = p2m_get_hostp2m(v->domain);
 
-    if ( c->pending_valid &&
-         ((c->pending_type == 1) || (c->pending_type > 6) ||
-          (c->pending_reserved != 0)) )
+    if ( c->pending_valid )
     {
-        gdprintk(XENLOG_ERR, "Invalid pending event %#"PRIx32".\n",
-                 c->pending_event);
-        return -EINVAL;
+       if ( (c->pending_type == 1) || (c->pending_type > 6) ||
+            (c->pending_reserved != 0) )
+        {
+            dprintk(XENLOG_ERR, "%pv: Invalid pending event %#"PRIx32"\n",
+                    v, c->pending_event);
+            return -EINVAL;
+        }
+
+        if ( c->pending_error_valid &&
+             c->error_code != (uint16_t)c->error_code )
+        {
+            dprintk(XENLOG_ERR, "%pv: Invalid error code %#"PRIx32"\n",
+                    v, c->error_code);
+            return -EINVAL;
+        }
     }
 
     if ( !paging_mode_hap(v->domain) )
@@ -1421,6 +1431,8 @@ static void svm_inject_event(const struct x86_event *event)
         vmcb->nextrip = (uint32_t)vmcb->nextrip;
     }
 
+    ASSERT(!eventinj.fields.ev ||
+           eventinj.fields.errorcode == (uint16_t)eventinj.fields.errorcode);
     vmcb->eventinj = eventinj;
 
     if ( _event.vector == TRAP_page_fault )

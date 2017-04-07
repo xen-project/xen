@@ -3126,7 +3126,7 @@ static enum hvm_copy_result __hvm_copy(
                 if ( pfinfo )
                 {
                     pfinfo->linear = addr;
-                    pfinfo->ec = pfec;
+                    pfinfo->ec = pfec & ~PFEC_implicit;
                 }
                 return HVMCOPY_bad_gva_to_gfn;
             }
