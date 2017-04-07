@@ -37,6 +37,11 @@
 #define GITS_BASER7                     0x138
 
 /* Register bits */
+#define GITS_VALID_BIT                  BIT(63)
+
+#define GITS_CTLR_QUIESCENT             BIT(31)
+#define GITS_CTLR_ENABLE                BIT(0)
+
 #define GITS_TYPER_DEVIDS_SHIFT         13
 #define GITS_TYPER_DEVIDS_MASK          (0x1fUL << GITS_TYPER_DEVIDS_SHIFT)
 #define GITS_TYPER_DEVICE_ID_BITS(r)    (((r & GITS_TYPER_DEVIDS_MASK) >> \
@@ -51,6 +56,28 @@
 #define GITS_TYPER_ITT_SIZE_MASK        (0xfUL << GITS_TYPER_ITT_SIZE_SHIFT)
 #define GITS_TYPER_ITT_SIZE(r)          ((((r) & GITS_TYPER_ITT_SIZE_MASK) >> \
                                                  GITS_TYPER_ITT_SIZE_SHIFT) + 1)
+
+#define GITS_BASER_INDIRECT             BIT(62)
+#define GITS_BASER_INNER_CACHEABILITY_SHIFT        59
+#define GITS_BASER_TYPE_SHIFT           56
+#define GITS_BASER_TYPE_MASK            (7ULL << GITS_BASER_TYPE_SHIFT)
+#define GITS_BASER_OUTER_CACHEABILITY_SHIFT        53
+#define GITS_BASER_TYPE_NONE            0UL
+#define GITS_BASER_TYPE_DEVICE          1UL
+#define GITS_BASER_TYPE_VCPU            2UL
+#define GITS_BASER_TYPE_CPU             3UL
+#define GITS_BASER_TYPE_COLLECTION      4UL
+#define GITS_BASER_TYPE_RESERVED5       5UL
+#define GITS_BASER_TYPE_RESERVED6       6UL
+#define GITS_BASER_TYPE_RESERVED7       7UL
+#define GITS_BASER_ENTRY_SIZE_SHIFT     48
+#define GITS_BASER_ENTRY_SIZE(reg)                                       \
+                        (((reg >> GITS_BASER_ENTRY_SIZE_SHIFT) & 0x1f) + 1)
+#define GITS_BASER_SHAREABILITY_SHIFT   10
+#define GITS_BASER_PAGE_SIZE_SHIFT      8
+#define GITS_BASER_SHAREABILITY_MASK   (0x3ULL << GITS_BASER_SHAREABILITY_SHIFT)
+#define GITS_BASER_OUTER_CACHEABILITY_MASK   (0x7ULL << GITS_BASER_OUTER_CACHEABILITY_SHIFT)
+#define GITS_BASER_INNER_CACHEABILITY_MASK   (0x7ULL << GITS_BASER_INNER_CACHEABILITY_SHIFT)
 
 #include <xen/device_tree.h>
 
