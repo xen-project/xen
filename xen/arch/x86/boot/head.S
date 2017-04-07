@@ -524,14 +524,6 @@ trampoline_setup:
         mov     %eax,sym_phys(boot_tsc_stamp)
         mov     %edx,sym_phys(boot_tsc_stamp+4)
 
-        /*
-         * During boot, hook 4kB mappings of first 2MB of memory into L2.
-         * This avoids mixing cachability for the legacy VGA region, and is
-         * corrected when Xen relocates itself.
-         */
-        mov     $sym_phys(l1_identmap)+__PAGE_HYPERVISOR,%edi
-        mov     %edi,sym_phys(l2_xenmap)
-
         /* Apply relocations to bootstrap trampoline. */
         mov     sym_phys(trampoline_phys),%edx
         mov     $sym_phys(__trampoline_rel_start),%edi

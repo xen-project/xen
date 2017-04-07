@@ -121,8 +121,9 @@ GLOBAL(l2_identmap)
  * page.
  */
 GLOBAL(l2_xenmap)
-        idx = 0
-        .rept 8
+        .quad 0
+        idx = 1
+        .rept 7
         .quad sym_phys(__image_base__) + (idx << L2_PAGETABLE_SHIFT) + (PAGE_HYPERVISOR | _PAGE_PSE)
         idx = idx + 1
         .endr

@@ -1007,7 +1007,8 @@ void __init noreturn __start_xen(unsigned long mbi_p)
              * Undo the temporary-hooking of the l1_identmap.  __2M_text_start
              * is contained in this PTE.
              */
-            BUG_ON(l2_table_offset((unsigned long)_erodata) ==
+            BUG_ON(using_2M_mapping() &&
+                   l2_table_offset((unsigned long)_erodata) ==
                    l2_table_offset((unsigned long)_stext));
             *pl2e++ = l2e_from_pfn(xen_phys_start >> PAGE_SHIFT,
                                    PAGE_HYPERVISOR_RX | _PAGE_PSE);

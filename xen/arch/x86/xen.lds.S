@@ -54,7 +54,7 @@ SECTIONS
   __2M_text_start = .;         /* Start of 2M superpages, mapped RX. */
 #endif
 
-  . = __XEN_VIRT_START + MB(1);
+  . = __XEN_VIRT_START + XEN_IMG_OFFSET;
   _start = .;
   .text : {
         _stext = .;            /* Text and read-only data */
