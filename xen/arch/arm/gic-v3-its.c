@@ -19,11 +19,14 @@
  */
 
 #include <xen/lib.h>
+#include <xen/delay.h>
 #include <xen/mm.h>
 #include <xen/sizes.h>
+#include <asm/gic.h>
 #include <asm/gic_v3_defs.h>
 #include <asm/gic_v3_its.h>
 #include <asm/io.h>
+#include <asm/page.h>
 
 #define ITS_CMD_QUEUE_SZ                SZ_1M
 
@@ -36,6 +39,160 @@ LIST_HEAD(host_its_list);
 bool gicv3_its_host_has_its(void)
 {
     return !list_empty(&host_its_list);
+}
+
+#define BUFPTR_MASK                     GENMASK(19, 5)
+static int its_send_command(struct host_its *hw_its, const void *its_cmd)
+{
+    /*
+     * The command queue should actually never become full, if it does anyway
+     * and this situation is not resolved quickly, this points to a much
+     * bigger problem, probably an hardware error.
+     * So to cover the one-off case where we actually hit a full command
+     * queue, we introduce a small grace period to not give up too quickly.
+     * Given the usual multi-hundred MHz frequency the ITS usually runs with,
+     * one millisecond (for a single command) seem to be more than enough.
+     * But this value is rather arbitrarily chosen based on theoretical
+     * considerations.
+     */
+    s_time_t deadline = NOW() + MILLISECS(1);
+    uint64_t readp, writep;
+    int ret = -EBUSY;
+
+    /* No ITS commands from an interrupt handler (at the moment). */
+    ASSERT(!in_irq());
+
+    spin_lock(&hw_its->cmd_lock);
+
+    do {
+        readp = readq_relaxed(hw_its->its_base + GITS_CREADR) & BUFPTR_MASK;
+        writep = readq_relaxed(hw_its->its_base + GITS_CWRITER) & BUFPTR_MASK;
+
+        if ( ((writep + ITS_CMD_SIZE) % ITS_CMD_QUEUE_SZ) != readp )
+        {
+            ret = 0;
+            break;
+        }
+
+        /*
+         * If the command queue is full, wait for a bit in the hope it drains
+         * before giving up.
+         */
+        spin_unlock(&hw_its->cmd_lock);
+        cpu_relax();
+        udelay(1);
+        spin_lock(&hw_its->cmd_lock);
+    } while ( NOW() <= deadline );
+
+    if ( ret )
+    {
+        spin_unlock(&hw_its->cmd_lock);
+        if ( printk_ratelimit() )
+            printk(XENLOG_WARNING "host ITS: command queue full.\n");
+        return ret;
+    }
+
+    memcpy(hw_its->cmd_buf + writep, its_cmd, ITS_CMD_SIZE);
+    if ( hw_its->flags & HOST_ITS_FLUSH_CMD_QUEUE )
+        clean_and_invalidate_dcache_va_range(hw_its->cmd_buf + writep,
+                                             ITS_CMD_SIZE);
+    else
+        dsb(ishst);
+
+    writep = (writep + ITS_CMD_SIZE) % ITS_CMD_QUEUE_SZ;
+    writeq_relaxed(writep & BUFPTR_MASK, hw_its->its_base + GITS_CWRITER);
+
+    spin_unlock(&hw_its->cmd_lock);
+
+    return 0;
+}
+
+/* Wait for an ITS to finish processing all commands. */
+static int gicv3_its_wait_commands(struct host_its *hw_its)
+{
+    /*
+     * As there could be quite a number of commands in a queue, we will
+     * wait a bit longer than the one millisecond for a single command above.
+     * Again this value is based on theoretical considerations, actually the
+     * command queue should drain much faster.
+     */
+    s_time_t deadline = NOW() + MILLISECS(100);
+    uint64_t readp, writep;
+
+    do {
+        spin_lock(&hw_its->cmd_lock);
+        readp = readq_relaxed(hw_its->its_base + GITS_CREADR) & BUFPTR_MASK;
+        writep = readq_relaxed(hw_its->its_base + GITS_CWRITER) & BUFPTR_MASK;
+        spin_unlock(&hw_its->cmd_lock);
+
+        if ( readp == writep )
+            return 0;
+
+        cpu_relax();
+        udelay(1);
+    } while ( NOW() <= deadline );
+
+    return -ETIMEDOUT;
+}
+
+static uint64_t encode_rdbase(struct host_its *hw_its, unsigned int cpu,
+                              uint64_t reg)
+{
+    reg &= ~GENMASK(51, 16);
+
+    reg |= gicv3_get_redist_address(cpu, hw_its->flags & HOST_ITS_USES_PTA);
+
+    return reg;
+}
+
+static int its_send_cmd_sync(struct host_its *its, unsigned int cpu)
+{
+    uint64_t cmd[4];
+
+    cmd[0] = GITS_CMD_SYNC;
+    cmd[1] = 0x00;
+    cmd[2] = encode_rdbase(its, cpu, 0x0);
+    cmd[3] = 0x00;
+
+    return its_send_command(its, cmd);
+}
+
+static int its_send_cmd_mapc(struct host_its *its, uint32_t collection_id,
+                             unsigned int cpu)
+{
+    uint64_t cmd[4];
+
+    cmd[0] = GITS_CMD_MAPC;
+    cmd[1] = 0x00;
+    cmd[2] = encode_rdbase(its, cpu, collection_id);
+    cmd[2] |= GITS_VALID_BIT;
+    cmd[3] = 0x00;
+
+    return its_send_command(its, cmd);
+}
+
+/* Set up the (1:1) collection mapping for the given host CPU. */
+int gicv3_its_setup_collection(unsigned int cpu)
+{
+    struct host_its *its;
+    int ret;
+
+    list_for_each_entry(its, &host_its_list, entry)
+    {
+        ret = its_send_cmd_mapc(its, cpu, cpu);
+        if ( ret )
+            return ret;
+
+        ret = its_send_cmd_sync(its, cpu);
+        if ( ret )
+            return ret;
+
+        ret = gicv3_its_wait_commands(its);
+        if ( ret )
+            return ret;
+    }
+
+    return 0;
 }
 
 #define BASER_ATTR_MASK                                           \
@@ -182,6 +339,41 @@ retry:
     return -EINVAL;
 }
 
+/*
+ * Before an ITS gets initialized, it should be in a quiescent state, where
+ * all outstanding commands and transactions have finished.
+ * So if the ITS is already enabled, turn it off and wait for all outstanding
+ * operations to get processed by polling the QUIESCENT bit.
+ */
+static int gicv3_disable_its(struct host_its *hw_its)
+{
+    uint32_t reg;
+    /*
+     * As we also need to wait for the command queue to drain, we use the same
+     * (arbitrary) timeout value as above for gicv3_its_wait_commands().
+     */
+    s_time_t deadline = NOW() + MILLISECS(100);
+
+    reg = readl_relaxed(hw_its->its_base + GITS_CTLR);
+    if ( !(reg & GITS_CTLR_ENABLE) && (reg & GITS_CTLR_QUIESCENT) )
+        return 0;
+
+    writel_relaxed(reg & ~GITS_CTLR_ENABLE, hw_its->its_base + GITS_CTLR);
+
+    do {
+        reg = readl_relaxed(hw_its->its_base + GITS_CTLR);
+        if ( reg & GITS_CTLR_QUIESCENT )
+            return 0;
+
+        cpu_relax();
+        udelay(1);
+    } while ( NOW() <= deadline );
+
+    printk(XENLOG_ERR "ITS@%lx not quiescent.\n", hw_its->addr);
+
+    return -ETIMEDOUT;
+}
+
 static int gicv3_its_init_single_its(struct host_its *hw_its)
 {
     uint64_t reg;
@@ -191,10 +383,17 @@ static int gicv3_its_init_single_its(struct host_its *hw_its)
     if ( !hw_its->its_base )
         return -ENOMEM;
 
+    ret = gicv3_disable_its(hw_its);
+    if ( ret )
+        return ret;
+
     reg = readq_relaxed(hw_its->its_base + GITS_TYPER);
     hw_its->devid_bits = GITS_TYPER_DEVICE_ID_BITS(reg);
     hw_its->evid_bits = GITS_TYPER_EVENT_ID_BITS(reg);
     hw_its->itte_size = GITS_TYPER_ITT_SIZE(reg);
+    if ( reg & GITS_TYPER_PTA )
+        hw_its->flags |= HOST_ITS_USES_PTA;
+    spin_lock_init(&hw_its->cmd_lock);
 
     for ( i = 0; i < GITS_BASER_NR_REGS; i++ )
     {

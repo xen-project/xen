@@ -45,12 +45,40 @@ static struct {
 } lpi_data;
 
 struct lpi_redist_data {
+    paddr_t             redist_addr;
+    unsigned int        redist_id;
     void                *pending_table;
 };
 
 static DEFINE_PER_CPU(struct lpi_redist_data, lpi_redist);
 
 #define MAX_NR_HOST_LPIS   (lpi_data.max_host_lpi_ids - LPI_OFFSET)
+
+/*
+ * An ITS can refer to redistributors in two ways: either by an ID (possibly
+ * the CPU number) or by its MMIO address. This is a hardware implementation
+ * choice, so we have to cope with both approaches. The GICv3 code calculates
+ * both values and calls this function to let the ITS store them when it's
+ * later required to provide them. This is done in a per-CPU variable.
+ */
+void gicv3_set_redist_address(paddr_t address, unsigned int redist_id)
+{
+    this_cpu(lpi_redist).redist_addr = address;
+    this_cpu(lpi_redist).redist_id = redist_id;
+}
+
+/*
+ * Returns a redistributor's ID (either as an address or as an ID).
+ * This must be (and is) called only after it has been setup by the above
+ * function.
+ */
+uint64_t gicv3_get_redist_address(unsigned int cpu, bool use_pta)
+{
+    if ( use_pta )
+        return per_cpu(lpi_redist, cpu).redist_addr & GENMASK(51, 16);
+    else
+        return per_cpu(lpi_redist, cpu).redist_id << 16;
+}
 
 static int gicv3_lpi_allocate_pendtable(uint64_t *reg)
 {

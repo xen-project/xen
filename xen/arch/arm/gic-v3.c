@@ -665,7 +665,24 @@ static int __init gicv3_populate_rdist(void)
 
                 if ( typer & GICR_TYPER_PLPIS )
                 {
+                    paddr_t rdist_addr;
+                    unsigned int procnum;
                     int ret;
+
+                    /*
+                     * The ITS refers to redistributors either by their physical
+                     * address or by their ID. Which one to use is an ITS
+                     * choice. So determine those two values here (which we
+                     * can do only here in GICv3 code) and tell the
+                     * ITS code about it, so it can use them later to be able
+                     * to address those redistributors accordingly.
+                     */
+                    rdist_addr = gicv3.rdist_regions[i].base;
+                    rdist_addr += ptr - gicv3.rdist_regions[i].map_base;
+                    procnum = (typer & GICR_TYPER_PROC_NUM_MASK);
+                    procnum >>= GICR_TYPER_PROC_NUM_SHIFT;
+
+                    gicv3_set_redist_address(rdist_addr, procnum);
 
                     ret = gicv3_lpi_init_rdist(ptr);
                     if ( ret && ret != -ENODEV )
@@ -704,7 +721,7 @@ static int __init gicv3_populate_rdist(void)
 
 static int gicv3_cpu_init(void)
 {
-    int i;
+    int i, ret;
     uint32_t priority;
 
     /* Register ourselves with the rest of the world */
@@ -713,6 +730,13 @@ static int gicv3_cpu_init(void)
 
     if ( gicv3_enable_redist() )
         return -ENODEV;
+
+    if ( gicv3_its_host_has_its() )
+    {
+        ret = gicv3_its_setup_collection(smp_processor_id());
+        if ( ret )
+            return ret;
+    }
 
     /* Set priority on PPI and SGI interrupts */
     priority = (GIC_PRI_IPI << 24 | GIC_PRI_IPI << 16 | GIC_PRI_IPI << 8 |

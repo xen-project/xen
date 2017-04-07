@@ -103,6 +103,8 @@
 #define GICR_TYPER_PLPIS             (1U << 0)
 #define GICR_TYPER_VLPIS             (1U << 1)
 #define GICR_TYPER_LAST              (1U << 4)
+#define GICR_TYPER_PROC_NUM_SHIFT    8
+#define GICR_TYPER_PROC_NUM_MASK     (0xffff << GICR_TYPER_PROC_NUM_SHIFT)
 
 /* For specifying the inner cacheability type only */
 #define GIC_BASER_CACHE_nCnB         0ULL
