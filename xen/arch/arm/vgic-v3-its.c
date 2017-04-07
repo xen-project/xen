@@ -69,11 +69,15 @@ struct vits_itte
 
 int vgic_v3_its_init_domain(struct domain *d)
 {
+    spin_lock_init(&d->arch.vgic.its_devices_lock);
+    d->arch.vgic.its_devices = RB_ROOT;
+
     return 0;
 }
 
 void vgic_v3_its_free_domain(struct domain *d)
 {
+    ASSERT(RB_EMPTY_ROOT(&d->arch.vgic.its_devices));
 }
 
 /*

@@ -98,7 +98,10 @@
 #define GITS_CMD_MOVALL                 0x0e
 #define GITS_CMD_DISCARD                0x0f
 
+#define ITS_DOORBELL_OFFSET             0x10040
+
 #include <xen/device_tree.h>
+#include <xen/rbtree.h>
 
 #define HOST_ITS_FLUSH_CMD_QUEUE        (1U << 0)
 #define HOST_ITS_USES_PTA               (1U << 1)
@@ -147,6 +150,16 @@ int gicv3_its_setup_collection(unsigned int cpu);
 /* Initialize and destroy the per-domain parts of the virtual ITS support. */
 int vgic_v3_its_init_domain(struct domain *d);
 void vgic_v3_its_free_domain(struct domain *d);
+
+/*
+ * Map a device on the host by allocating an ITT on the host (ITS).
+ * "nr_event" specifies how many events (interrupts) this device will need.
+ * Setting "valid" to false deallocates the device.
+ */
+int gicv3_its_map_guest_device(struct domain *d,
+                               paddr_t host_doorbell, uint32_t host_devid,
+                               paddr_t guest_doorbell, uint32_t guest_devid,
+                               uint64_t nr_events, bool valid);
 
 int gicv3_allocate_host_lpi_block(struct domain *d, uint32_t *first_lpi);
 void gicv3_free_host_lpi_block(uint32_t first_lpi);

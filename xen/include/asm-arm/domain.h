@@ -10,6 +10,7 @@
 #include <asm/gic.h>
 #include <public/hvm/params.h>
 #include <xen/serial.h>
+#include <xen/rbtree.h>
 
 struct hvm_domain
 {
@@ -108,6 +109,8 @@ struct arch_domain
         } *rdist_regions;
         int nr_regions;                     /* Number of rdist regions */
         uint32_t rdist_stride;              /* Re-Distributor stride */
+        struct rb_root its_devices;         /* Devices mapped to an ITS */
+        spinlock_t its_devices_lock;        /* Protects the its_devices tree */
 #endif
     } vgic;
 
