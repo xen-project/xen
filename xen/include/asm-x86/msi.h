@@ -103,6 +103,7 @@ struct msi_desc {
 		__u16	entry_nr;	/* specific enabled entry 	  */
 	} msi_attrib;
 
+	bool irte_initialized;
 	uint8_t gvec;			/* guest vector. valid when pi_desc isn't NULL */
 	const struct pi_desc *pi_desc;	/* pointer to posted descriptor */
 

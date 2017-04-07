@@ -579,6 +579,7 @@ static struct msi_desc *alloc_msi_entry(unsigned int nr)
         entry[nr].irq = -1;
         entry[nr].remap_index = -1;
         entry[nr].pi_desc = NULL;
+        entry[nr].irte_initialized = false;
     }
 
     return entry;

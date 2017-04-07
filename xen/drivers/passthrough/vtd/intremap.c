@@ -169,10 +169,55 @@ bool_t __init iommu_supports_eim(void)
     return 1;
 }
 
+/*
+ * Assume iremap_lock has been acquired. It is to make sure software will not
+ * change the same IRTE behind us. With this assumption, if only high qword or
+ * low qword in IRTE is to be updated, this function's atomic variant can
+ * present an atomic update to VT-d hardware even when cmpxchg16b
+ * instruction is not supported.
+ */
+static void update_irte(struct iommu *iommu, struct iremap_entry *entry,
+                        const struct iremap_entry *new_ire, bool atomic)
+{
+    ASSERT(spin_is_locked(&iommu_ir_ctrl(iommu)->iremap_lock));
+
+    if ( cpu_has_cx16 )
+    {
+        __uint128_t ret;
+        struct iremap_entry old_ire;
+
+        old_ire = *entry;
+        ret = cmpxchg16b(entry, &old_ire, new_ire);
+
+        /*
+         * In the above, we use cmpxchg16 to atomically update the 128-bit
+         * IRTE, and the hardware cannot update the IRTE behind us, so
+         * the return value of cmpxchg16 should be the same as old_ire.
+         * This ASSERT validate it.
+         */
+        ASSERT(ret == old_ire.val);
+    }
+    else
+    {
+        /*
+         * If the caller requests an atomic update but we can't meet it, 
+         * a bug will be raised.
+         */
+        if ( entry->lo == new_ire->lo )
+            write_atomic(&entry->hi, new_ire->hi);
+        else if ( entry->hi == new_ire->hi )
+            write_atomic(&entry->lo, new_ire->lo);
+        else if ( !atomic )
+            *entry = *new_ire;
+        else
+            BUG();
+    }
+}
+
 /* Mark specified intr remap entry as free */
 static void free_remap_entry(struct iommu *iommu, int index)
 {
-    struct iremap_entry *iremap_entry = NULL, *iremap_entries;
+    struct iremap_entry *iremap_entry = NULL, *iremap_entries, new_ire = { };
     struct ir_ctrl *ir_ctrl = iommu_ir_ctrl(iommu);
 
     if ( index < 0 || index > IREMAP_ENTRY_NR - 1 )
@@ -183,7 +228,7 @@ static void free_remap_entry(struct iommu *iommu, int index)
     GET_IREMAP_ENTRY(ir_ctrl->iremap_maddr, index,
                      iremap_entries, iremap_entry);
 
-    memset(iremap_entry, 0, sizeof(*iremap_entry));
+    update_irte(iommu, iremap_entry, &new_ire, false);
     iommu_flush_cache_entry(iremap_entry, sizeof(*iremap_entry));
     iommu_flush_iec_index(iommu, 0, index);
 
@@ -286,6 +331,7 @@ static int ioapic_rte_to_remap_entry(struct iommu *iommu,
     int index;
     unsigned long flags;
     struct ir_ctrl *ir_ctrl = iommu_ir_ctrl(iommu);
+    bool init = false;
 
     remap_rte = (struct IO_APIC_route_remap_entry *) old_rte;
     spin_lock_irqsave(&ir_ctrl->iremap_lock, flags);
@@ -296,6 +342,7 @@ static int ioapic_rte_to_remap_entry(struct iommu *iommu,
         index = alloc_remap_entry(iommu, 1);
         if ( index < IREMAP_ENTRY_NR )
             apic_pin_2_ir_idx[apic][ioapic_pin] = index;
+        init = true;
     }
 
     if ( index > IREMAP_ENTRY_NR - 1 )
@@ -353,7 +400,7 @@ static int ioapic_rte_to_remap_entry(struct iommu *iommu,
         remap_rte->format = 1;    /* indicate remap format */
     }
 
-    *iremap_entry = new_ire;
+    update_irte(iommu, iremap_entry, &new_ire, !init);
     iommu_flush_cache_entry(iremap_entry, sizeof(*iremap_entry));
     iommu_flush_iec_index(iommu, 0, index);
 
@@ -567,7 +614,10 @@ static int msi_msg_to_remap_entry(
     {
         /* Free specified unused IRTEs */
         for ( i = 0; i < nr; ++i )
+        {
             free_remap_entry(iommu, msi_desc->remap_index + i);
+            msi_desc[i].irte_initialized = false;
+        }
         spin_unlock_irqrestore(&ir_ctrl->iremap_lock, flags);
         return 0;
     }
@@ -639,7 +689,10 @@ static int msi_msg_to_remap_entry(
     remap_rte->address_hi = 0;
     remap_rte->data = index - i;
 
-    *iremap_entry = new_ire;
+    update_irte(iommu, iremap_entry, &new_ire, msi_desc->irte_initialized);
+    if ( !msi_desc->irte_initialized )
+        msi_desc->irte_initialized = true;
+
     iommu_flush_cache_entry(iremap_entry, sizeof(*iremap_entry));
     iommu_flush_iec_index(iommu, 0, index);
 
