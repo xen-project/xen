@@ -73,6 +73,7 @@ static bool_t __read_mostly full_width_write;
  */
 #define FIXED_CTR_CTRL_BITS 4
 #define FIXED_CTR_CTRL_MASK ((1 << FIXED_CTR_CTRL_BITS) - 1)
+#define FIXED_CTR_CTRL_ANYTHREAD_MASK 0x4
 
 #define ARCH_CNTR_ENABLED   (1ULL << 22)
 
@@ -946,6 +947,7 @@ int __init core2_vpmu_init(void)
 {
     u64 caps;
     unsigned int version = 0;
+    unsigned int i;
 
     if ( current_cpu_data.cpuid_level >= 0xa )
         version = MASK_EXTR(cpuid_eax(0xa), PMU_VERSION_MASK);
@@ -979,8 +981,11 @@ int __init core2_vpmu_init(void)
     full_width_write = (caps >> 13) & 1;
 
     fixed_ctrl_mask = ~((1ull << (fixed_pmc_cnt * FIXED_CTR_CTRL_BITS)) - 1);
-    if ( version == 2 )
-        fixed_ctrl_mask |= 0x444;
+    /* mask .AnyThread bits for all fixed counters */
+    for( i = 0; i < fixed_pmc_cnt; i++ )
+       fixed_ctrl_mask |=
+           (FIXED_CTR_CTRL_ANYTHREAD_MASK << (FIXED_CTR_CTRL_BITS * i));
+
     fixed_counters_mask = ~((1ull << core2_get_bitwidth_fix_count()) - 1);
     global_ctrl_mask = ~((((1ULL << fixed_pmc_cnt) - 1) << 32) |
                          ((1ULL << arch_pmc_cnt) - 1));
