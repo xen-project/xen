@@ -62,10 +62,14 @@ struct vgic_irq_rank *vgic_rank_irq(struct vcpu *v, unsigned int irq)
 
 void vgic_init_pending_irq(struct pending_irq *p, unsigned int virq)
 {
+    /* The lpi_vcpu_id field must be big enough to hold a VCPU ID. */
+    BUILD_BUG_ON(BIT(sizeof(p->lpi_vcpu_id) * 8) < MAX_VIRT_CPUS);
+
     memset(p, 0, sizeof(*p));
     INIT_LIST_HEAD(&p->inflight);
     INIT_LIST_HEAD(&p->lr_queue);
     p->irq = virq;
+    p->lpi_vcpu_id = INVALID_VCPU_ID;
 }
 
 static void vgic_rank_init(struct vgic_irq_rank *rank, uint8_t index,
