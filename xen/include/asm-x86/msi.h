@@ -4,6 +4,7 @@
 #include <xen/cpumask.h>
 #include <xen/pci.h>
 #include <asm/byteorder.h>
+#include <asm/hvm/vmx/vmcs.h>
 
 /*
  * Constants for Intel APIC based MSI messages.
@@ -101,6 +102,9 @@ struct msi_desc {
 		__u8	guest_masked : 1;
 		__u16	entry_nr;	/* specific enabled entry 	  */
 	} msi_attrib;
+
+	uint8_t gvec;			/* guest vector. valid when pi_desc isn't NULL */
+	const struct pi_desc *pi_desc;	/* pointer to posted descriptor */
 
 	struct list_head list;
 

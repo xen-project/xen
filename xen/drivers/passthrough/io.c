@@ -415,7 +415,8 @@ int pt_irq_create_bind(
         if ( iommu_intpost )
         {
             if ( vcpu )
-                pi_update_irte(vcpu, info, pirq_dpci->gmsi.gvec);
+                pi_update_irte(&vcpu->arch.hvm_vmx.pi_desc, info,
+                               pirq_dpci->gmsi.gvec);
             else
                 dprintk(XENLOG_G_INFO,
                         "%pv: deliver interrupt in remapping mode,gvec:%02x\n",
@@ -619,6 +620,8 @@ int pt_irq_destroy_bind(
         else
             what = "bogus";
     }
+    else if ( pirq_dpci && pirq_dpci->gmsi.posted )
+        pi_update_irte(NULL, pirq, 0);
 
     if ( pirq_dpci && (pirq_dpci->flags & HVM_IRQ_DPCI_MAPPED) &&
          list_empty(&pirq_dpci->digl_list) )
