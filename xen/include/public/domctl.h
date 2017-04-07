@@ -346,6 +346,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_domctl_max_vcpus_t);
 #define XEN_SCHEDULER_CREDIT2  6
 #define XEN_SCHEDULER_ARINC653 7
 #define XEN_SCHEDULER_RTDS     8
+#define XEN_SCHEDULER_NULL     9
 
 typedef struct xen_domctl_sched_credit {
     uint16_t weight;

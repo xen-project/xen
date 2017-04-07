@@ -187,6 +187,14 @@ config SCHED_ARINC653
 	  The ARINC653 scheduler is a hard real-time scheduler for single
 	  cores, targeted for avionics, drones, and medical devices.
 
+config SCHED_NULL
+	bool "Null scheduler support (EXPERIMENTAL)"
+	default y
+	---help---
+	  The null scheduler is a static, zero overhead scheduler,
+	  for when there always are less vCPUs than pCPUs, typically
+	  in embedded or HPC scenarios.
+
 choice
 	prompt "Default Scheduler?"
 	default SCHED_CREDIT_DEFAULT
@@ -199,6 +207,8 @@ choice
 		bool "RT Scheduler" if SCHED_RTDS
 	config SCHED_ARINC653_DEFAULT
 		bool "ARINC653 Scheduler" if SCHED_ARINC653
+	config SCHED_NULL_DEFAULT
+		bool "Null Scheduler" if SCHED_NULL
 endchoice
 
 config SCHED_DEFAULT
@@ -207,6 +217,7 @@ config SCHED_DEFAULT
 	default "credit2" if SCHED_CREDIT2_DEFAULT
 	default "rtds" if SCHED_RTDS_DEFAULT
 	default "arinc653" if SCHED_ARINC653_DEFAULT
+	default "null" if SCHED_NULL_DEFAULT
 	default "credit"
 
 endmenu
