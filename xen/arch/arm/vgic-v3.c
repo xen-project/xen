@@ -28,6 +28,7 @@
 #include <asm/current.h>
 #include <asm/mmio.h>
 #include <asm/gic_v3_defs.h>
+#include <asm/gic_v3_its.h>
 #include <asm/vgic.h>
 #include <asm/vgic-emul.h>
 #include <asm/vreg.h>
@@ -1438,7 +1439,7 @@ static inline unsigned int vgic_v3_rdist_count(struct domain *d)
 static int vgic_v3_domain_init(struct domain *d)
 {
     struct vgic_rdist_region *rdist_regions;
-    int rdist_count, i;
+    int rdist_count, i, ret;
 
     /* Allocate memory for Re-distributor regions */
     rdist_count = vgic_v3_rdist_count(d);
@@ -1498,6 +1499,10 @@ static int vgic_v3_domain_init(struct domain *d)
         d->arch.vgic.rdist_regions[0].first_cpu = 0;
     }
 
+    ret = vgic_v3_its_init_domain(d);
+    if ( ret )
+        return ret;
+
     /* Register mmio handle for the Distributor */
     register_mmio_handler(d, &vgic_distr_mmio_handler, d->arch.vgic.dbase,
                           SZ_64K, NULL);
@@ -1522,6 +1527,7 @@ static int vgic_v3_domain_init(struct domain *d)
 
 static void vgic_v3_domain_free(struct domain *d)
 {
+    vgic_v3_its_free_domain(d);
     xfree(d->arch.vgic.rdist_regions);
 }
 
