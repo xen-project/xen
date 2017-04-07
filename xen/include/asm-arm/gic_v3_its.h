@@ -103,6 +103,9 @@
 #define HOST_ITS_FLUSH_CMD_QUEUE        (1U << 0)
 #define HOST_ITS_USES_PTA               (1U << 1)
 
+/* We allocate LPIs on the hosts in chunks of 32 to reduce handling overhead. */
+#define LPI_BLOCK                       32U
+
 /* data structure for each hardware ITS */
 struct host_its {
     struct list_head entry;
@@ -140,6 +143,9 @@ uint64_t gicv3_get_redist_address(unsigned int cpu, bool use_pta);
 
 /* Map a collection for this host CPU to each host ITS. */
 int gicv3_its_setup_collection(unsigned int cpu);
+
+int gicv3_allocate_host_lpi_block(struct domain *d, uint32_t *first_lpi);
+void gicv3_free_host_lpi_block(uint32_t first_lpi);
 
 #else
 

@@ -28,6 +28,9 @@ struct arch_irq_desc {
 
 #define LPI_OFFSET      8192
 
+/* LPIs are always numbered starting at 8192, so 0 is a good invalid case. */
+#define INVALID_LPI     0
+
 #define nr_irqs NR_IRQS
 #define nr_static_irqs NR_IRQS
 #define arch_hwdom_irqs(domid) NR_IRQS
@@ -40,6 +43,11 @@ struct irq_desc *__irq_to_desc(int irq);
 #define irq_to_desc(irq)    __irq_to_desc(irq)
 
 void do_IRQ(struct cpu_user_regs *regs, unsigned int irq, int is_fiq);
+
+static inline bool is_lpi(unsigned int irq)
+{
+    return irq >= LPI_OFFSET;
+}
 
 #define domain_pirq_to_irq(d, pirq) (pirq)
 

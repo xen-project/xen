@@ -20,13 +20,36 @@
 
 #include <xen/lib.h>
 #include <xen/mm.h>
+#include <xen/sched.h>
 #include <xen/sizes.h>
 #include <xen/warning.h>
+#include <asm/atomic.h>
+#include <asm/domain.h>
 #include <asm/gic.h>
 #include <asm/gic_v3_defs.h>
 #include <asm/gic_v3_its.h>
 #include <asm/io.h>
 #include <asm/page.h>
+
+/*
+ * There could be a lot of LPIs on the host side, and they always go to
+ * a guest. So having a struct irq_desc for each of them would be wasteful
+ * and useless.
+ * Instead just store enough information to find the right VCPU to inject
+ * those LPIs into, which just requires the virtual LPI number.
+ * To avoid a global lock on this data structure, this is using a lockless
+ * approach relying on the architectural atomicity of native data types:
+ * We read or write the "data" view of this union atomically, then can
+ * access the broken-down fields in our local copy.
+ */
+union host_lpi {
+    uint64_t data;
+    struct {
+        uint32_t virt_lpi;
+        uint16_t dom_id;
+        uint16_t vcpu_id;
+    };
+};
 
 #define LPI_PROPTABLE_NEEDS_FLUSHING    (1U << 0)
 
@@ -35,12 +58,23 @@ static struct {
     /* The global LPI property table, shared by all redistributors. */
     uint8_t *lpi_property;
     /*
+     * A two-level table to lookup LPIs firing on the host and look up the
+     * VCPU and virtual LPI number to inject into.
+     */
+    union host_lpi **host_lpis;
+    /*
      * Number of physical LPIs the host supports. This is a property of
      * the GIC hardware. We depart from the habit of naming these things
      * "physical" in Xen, as the GICv3/4 spec uses the term "physical LPI"
      * in a different context to differentiate them from "virtual LPIs".
      */
     unsigned long int max_host_lpi_ids;
+    /*
+     * Protects allocation and deallocation of host LPIs and next_free_lpi,
+     * but not the actual data stored in the host_lpi entry.
+     */
+    spinlock_t host_lpis_lock;
+    uint32_t next_free_lpi;
     unsigned int flags;
 } lpi_data;
 
@@ -53,6 +87,28 @@ struct lpi_redist_data {
 static DEFINE_PER_CPU(struct lpi_redist_data, lpi_redist);
 
 #define MAX_NR_HOST_LPIS   (lpi_data.max_host_lpi_ids - LPI_OFFSET)
+#define HOST_LPIS_PER_PAGE      (PAGE_SIZE / sizeof(union host_lpi))
+
+static union host_lpi *gic_get_host_lpi(uint32_t plpi)
+{
+    union host_lpi *block;
+
+    if ( !is_lpi(plpi) || plpi >= MAX_NR_HOST_LPIS + LPI_OFFSET )
+        return NULL;
+
+    ASSERT(plpi >= LPI_OFFSET);
+
+    plpi -= LPI_OFFSET;
+
+    block = lpi_data.host_lpis[plpi / HOST_LPIS_PER_PAGE];
+    if ( !block )
+        return NULL;
+
+    /* Matches the write barrier in allocation code. */
+    smp_rmb();
+
+    return &block[plpi % HOST_LPIS_PER_PAGE];
+}
 
 /*
  * An ITS can refer to redistributors in two ways: either by an ID (possibly
@@ -220,8 +276,18 @@ int gicv3_lpi_init_rdist(void __iomem * rdist_base)
 static unsigned int max_lpi_bits = 20;
 integer_param("max_lpi_bits", max_lpi_bits);
 
+/*
+ * Allocate the 2nd level array for host LPIs. This one holds pointers
+ * to the page with the actual "union host_lpi" entries. Our LPI limit
+ * avoids excessive memory usage.
+ */
 int gicv3_lpi_init_host_lpis(unsigned int host_lpi_bits)
 {
+    unsigned int nr_lpi_ptrs;
+
+    /* We rely on the data structure being atomically accessible. */
+    BUILD_BUG_ON(sizeof(union host_lpi) > sizeof(unsigned long));
+
     /*
      * An implementation needs to support at least 14 bits of LPI IDs.
      * Tell the user about it, the actual number is reported below.
@@ -240,9 +306,173 @@ int gicv3_lpi_init_host_lpis(unsigned int host_lpi_bits)
     if ( lpi_data.max_host_lpi_ids > BIT(24) )
         warning_add("Using high number of LPIs, limit memory usage with max_lpi_bits\n");
 
+    spin_lock_init(&lpi_data.host_lpis_lock);
+    lpi_data.next_free_lpi = 0;
+
+    nr_lpi_ptrs = MAX_NR_HOST_LPIS / (PAGE_SIZE / sizeof(union host_lpi));
+    lpi_data.host_lpis = xzalloc_array(union host_lpi *, nr_lpi_ptrs);
+    if ( !lpi_data.host_lpis )
+        return -ENOMEM;
+
     printk("GICv3: using at most %lu LPIs on the host.\n", MAX_NR_HOST_LPIS);
 
     return 0;
+}
+
+static int find_unused_host_lpi(uint32_t start, uint32_t *index)
+{
+    unsigned int chunk;
+    uint32_t i = *index;
+
+    ASSERT(spin_is_locked(&lpi_data.host_lpis_lock));
+
+    for ( chunk = start;
+          chunk < MAX_NR_HOST_LPIS / HOST_LPIS_PER_PAGE;
+          chunk++ )
+    {
+        /* If we hit an unallocated chunk, use entry 0 in that one. */
+        if ( !lpi_data.host_lpis[chunk] )
+        {
+            *index = 0;
+            return chunk;
+        }
+
+        /* Find an unallocated entry in this chunk. */
+        for ( ; i < HOST_LPIS_PER_PAGE; i += LPI_BLOCK )
+        {
+            if ( lpi_data.host_lpis[chunk][i].dom_id == DOMID_INVALID )
+            {
+                *index = i;
+                return chunk;
+            }
+        }
+        i = 0;
+    }
+
+    return -1;
+}
+
+/*
+ * Allocate a block of 32 LPIs on the given host ITS for device "devid",
+ * starting with "eventid". Put them into the respective ITT by issuing a
+ * MAPTI command for each of them.
+ */
+int gicv3_allocate_host_lpi_block(struct domain *d, uint32_t *first_lpi)
+{
+    uint32_t lpi, lpi_idx;
+    int chunk;
+    int i;
+
+    spin_lock(&lpi_data.host_lpis_lock);
+    lpi_idx = lpi_data.next_free_lpi % HOST_LPIS_PER_PAGE;
+    chunk = find_unused_host_lpi(lpi_data.next_free_lpi / HOST_LPIS_PER_PAGE,
+                                 &lpi_idx);
+
+    if ( chunk == - 1 )          /* rescan for a hole from the beginning */
+    {
+        lpi_idx = 0;
+        chunk = find_unused_host_lpi(0, &lpi_idx);
+        if ( chunk == -1 )
+        {
+            spin_unlock(&lpi_data.host_lpis_lock);
+            return -ENOSPC;
+        }
+    }
+
+    /* If we hit an unallocated chunk, we initialize it and use entry 0. */
+    if ( !lpi_data.host_lpis[chunk] )
+    {
+        union host_lpi *new_chunk;
+
+        /* TODO: NUMA locality for quicker IRQ path? */
+        new_chunk = alloc_xenheap_page();
+        if ( !new_chunk )
+        {
+            spin_unlock(&lpi_data.host_lpis_lock);
+            return -ENOMEM;
+        }
+
+        for ( i = 0; i < HOST_LPIS_PER_PAGE; i += LPI_BLOCK )
+            new_chunk[i].dom_id = DOMID_INVALID;
+
+        /*
+         * Make sure all slots are really marked empty before publishing the
+         * new chunk.
+         */
+        smp_wmb();
+
+        lpi_data.host_lpis[chunk] = new_chunk;
+        lpi_idx = 0;
+    }
+
+    lpi = chunk * HOST_LPIS_PER_PAGE + lpi_idx;
+
+    for ( i = 0; i < LPI_BLOCK; i++ )
+    {
+        union host_lpi hlpi;
+
+        /*
+         * Mark this host LPI as belonging to the domain, but don't assign
+         * any virtual LPI or a VCPU yet.
+         */
+        hlpi.virt_lpi = INVALID_LPI;
+        hlpi.dom_id = d->domain_id;
+        hlpi.vcpu_id = INVALID_VCPU_ID;
+        write_u64_atomic(&lpi_data.host_lpis[chunk][lpi_idx + i].data,
+                         hlpi.data);
+
+        /*
+         * Enable this host LPI, so we don't have to do this during the
+         * guest's runtime.
+         */
+        lpi_data.lpi_property[lpi + i] |= LPI_PROP_ENABLED;
+    }
+
+    lpi_data.next_free_lpi = lpi + LPI_BLOCK;
+
+    /*
+     * We have allocated and initialized the host LPI entries, so it's safe
+     * to drop the lock now. Access to the structures can be done concurrently
+     * as it involves only an atomic uint64_t access.
+     */
+    spin_unlock(&lpi_data.host_lpis_lock);
+
+    if ( lpi_data.flags & LPI_PROPTABLE_NEEDS_FLUSHING )
+        clean_and_invalidate_dcache_va_range(&lpi_data.lpi_property[lpi],
+                                             LPI_BLOCK);
+
+    *first_lpi = lpi + LPI_OFFSET;
+
+    return 0;
+}
+
+void gicv3_free_host_lpi_block(uint32_t first_lpi)
+{
+    union host_lpi *hlpi, empty_lpi = { .dom_id = DOMID_INVALID };
+    int i;
+
+    /* This should only be called with the beginning of a block. */
+    ASSERT((first_lpi % LPI_BLOCK) == 0);
+
+    hlpi = gic_get_host_lpi(first_lpi);
+    if ( !hlpi )
+        return;         /* Nothing to free here. */
+
+    spin_lock(&lpi_data.host_lpis_lock);
+
+    for ( i = 0; i < LPI_BLOCK; i++ )
+        write_u64_atomic(&hlpi[i].data, empty_lpi.data);
+
+    /*
+     * Make sure the next allocation can reuse this block, as we do only
+     * forward scanning when finding an unused block.
+     */
+    if ( lpi_data.next_free_lpi > first_lpi )
+        lpi_data.next_free_lpi = first_lpi;
+
+    spin_unlock(&lpi_data.host_lpis_lock);
+
+    return;
 }
 
 /*
