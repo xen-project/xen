@@ -117,25 +117,6 @@ static void __init parse_vwfi(const char *s)
 }
 custom_param("vwfi", parse_vwfi);
 
-static int __init vwfi_init(void)
-{
-    /*
-     * HCR_EL2 has already been set on cpu0, change the setting here, if
-     * needed. Other cpus haven't booted yet, init_traps will setup
-     * HCR_EL2 correctly.
-     */
-    if ( vwfi == NATIVE )
-    {
-        register_t hcr;
-
-        hcr = READ_SYSREG(HCR_EL2);
-        WRITE_SYSREG(hcr & ~(HCR_TWI|HCR_TWE), HCR_EL2);
-    }
-
-    return 0;
-}
-presmp_initcall(vwfi_init);
-
 register_t get_default_hcr_flags(void)
 {
     return  (HCR_PTW|HCR_BSU_INNER|HCR_AMO|HCR_IMO|HCR_FMO|HCR_VM|
