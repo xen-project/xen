@@ -489,7 +489,17 @@ static inline void __runq_tickle(struct csched_vcpu *new)
                 __trace_var(TRC_CSCHED_TICKLE, 1, sizeof(cpu), &cpu);
         }
 
-        /* Send scheduler interrupts to designated CPUs */
+        /*
+         * Mark the designated CPUs as busy and send them all the scheduler
+         * interrupt. We need the for_each_cpu for dealing with the
+         * !opt_tickle_one_idle case. We must use cpumask_clear_cpu() and
+         * can't use cpumask_andnot(), because prv->idlers needs atomic access.
+         *
+         * In the default (and most common) case, when opt_rickle_one_idle is
+         * true, the loop does only one step, and only one bit is cleared.
+         */
+        for_each_cpu(cpu, &mask)
+            cpumask_clear_cpu(cpu, prv->idlers);
         cpumask_raise_softirq(&mask, SCHEDULE_SOFTIRQ);
     }
     else
@@ -990,6 +1000,13 @@ csched_vcpu_acct(struct csched_private *prv, unsigned int cpu)
             SCHED_VCPU_STAT_CRANK(svc, migrate_r);
             SCHED_STAT_CRANK(migrate_running);
             set_bit(_VPF_migrating, &current->pause_flags);
+            /*
+             * As we are about to tickle cpu, we should clear its bit in
+             * idlers. But, if we are here, it means there is someone running
+             * on it, and hence the bit must be zero already.
+             */
+            ASSERT(!cpumask_test_cpu(cpu,
+                                     CSCHED_PRIV(per_cpu(scheduler, cpu))->idlers));
             cpu_raise_softirq(cpu, SCHEDULE_SOFTIRQ);
         }
     }
@@ -1082,13 +1099,22 @@ static void
 csched_vcpu_sleep(const struct scheduler *ops, struct vcpu *vc)
 {
     struct csched_vcpu * const svc = CSCHED_VCPU(vc);
+    unsigned int cpu = vc->processor;
 
     SCHED_STAT_CRANK(vcpu_sleep);
 
     BUG_ON( is_idle_vcpu(vc) );
 
-    if ( curr_on_cpu(vc->processor) == vc )
-        cpu_raise_softirq(vc->processor, SCHEDULE_SOFTIRQ);
+    if ( curr_on_cpu(cpu) == vc )
+    {
+        /*
+         * We are about to tickle cpu, so we should clear its bit in idlers.
+         * But, we are here because vc is going to sleep while running on cpu,
+         * so the bit must be zero already.
+         */
+        ASSERT(!cpumask_test_cpu(cpu, CSCHED_PRIV(per_cpu(scheduler, cpu))->idlers));
+        cpu_raise_softirq(cpu, SCHEDULE_SOFTIRQ);
+    }
     else if ( __vcpu_on_runq(svc) )
         __runq_remove(svc);
 }
