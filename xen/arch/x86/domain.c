@@ -550,11 +550,54 @@ static void pv_domain_destroy(struct domain *d)
     d->arch.pv_domain.gdt_ldt_l1tab = NULL;
 }
 
+static int pv_domain_initialise(struct domain *d, unsigned int domcr_flags,
+                                struct xen_arch_domainconfig *config)
+{
+    static const struct arch_csw pv_csw = {
+        .from = paravirt_ctxt_switch_from,
+        .to   = paravirt_ctxt_switch_to,
+        .tail = continue_nonidle_domain,
+    };
+    int rc = -ENOMEM;
+
+    d->arch.pv_domain.gdt_ldt_l1tab =
+        alloc_xenheap_pages(0, MEMF_node(domain_to_node(d)));
+    if ( !d->arch.pv_domain.gdt_ldt_l1tab )
+        goto fail;
+    clear_page(d->arch.pv_domain.gdt_ldt_l1tab);
+
+    if ( levelling_caps & ~LCAP_faulting )
+    {
+        d->arch.pv_domain.cpuidmasks = xmalloc(struct cpuidmasks);
+        if ( !d->arch.pv_domain.cpuidmasks )
+            goto fail;
+        *d->arch.pv_domain.cpuidmasks = cpuidmask_defaults;
+    }
+
+    rc = create_perdomain_mapping(d, GDT_LDT_VIRT_START,
+                                  GDT_LDT_MBYTES << (20 - PAGE_SHIFT),
+                                  NULL, NULL);
+    if ( rc )
+        goto fail;
+
+    d->arch.ctxt_switch = &pv_csw;
+
+    /* 64-bit PV guest by default. */
+    d->arch.is_32bit_pv = d->arch.has_32bit_shinfo = 0;
+
+    return 0;
+
+ fail:
+    pv_domain_destroy(d);
+
+    return rc;
+}
+
 int arch_domain_create(struct domain *d, unsigned int domcr_flags,
                        struct xen_arch_domainconfig *config)
 {
     bool paging_initialised = false;
-    int rc = -ENOMEM;
+    int rc;
 
     if ( config == NULL && !is_idle_domain(d) )
         return -EINVAL;
@@ -610,30 +653,6 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags,
         d->arch.emulation_flags = emflags;
     }
 
-    rc = 0; /* HVM and idle domain */
-    if ( is_pv_domain(d) )
-    {
-        d->arch.pv_domain.gdt_ldt_l1tab =
-            alloc_xenheap_pages(0, MEMF_node(domain_to_node(d)));
-        if ( !d->arch.pv_domain.gdt_ldt_l1tab )
-            goto fail;
-        clear_page(d->arch.pv_domain.gdt_ldt_l1tab);
-
-        if ( levelling_caps & ~LCAP_faulting )
-        {
-            d->arch.pv_domain.cpuidmasks = xmalloc(struct cpuidmasks);
-            if ( !d->arch.pv_domain.cpuidmasks )
-                goto fail;
-            *d->arch.pv_domain.cpuidmasks = cpuidmask_defaults;
-        }
-
-        rc = create_perdomain_mapping(d, GDT_LDT_VIRT_START,
-                                      GDT_LDT_MBYTES << (20 - PAGE_SHIFT),
-                                      NULL, NULL);
-    }
-    if ( rc )
-        goto fail;
-
     mapcache_domain_init(d);
 
     HYPERVISOR_COMPAT_VIRT_START(d) =
@@ -686,23 +705,20 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags,
         if ( (rc = hvm_domain_initialise(d, domcr_flags, config)) != 0 )
             goto fail;
     }
-    else
+    else if ( is_idle_domain(d) )
     {
-        static const struct arch_csw pv_csw = {
-            .from = paravirt_ctxt_switch_from,
-            .to   = paravirt_ctxt_switch_to,
-            .tail = continue_nonidle_domain,
-        };
         static const struct arch_csw idle_csw = {
             .from = paravirt_ctxt_switch_from,
             .to   = paravirt_ctxt_switch_to,
             .tail = continue_idle_domain,
         };
 
-        d->arch.ctxt_switch = is_idle_domain(d) ? &idle_csw : &pv_csw;
-
-        /* 64-bit PV guest by default. */
-        d->arch.is_32bit_pv = d->arch.has_32bit_shinfo = 0;
+        d->arch.ctxt_switch = &idle_csw;
+    }
+    else
+    {
+        if ( (rc = pv_domain_initialise(d, domcr_flags, config)) != 0 )
+            goto fail;
     }
 
     /* initialize default tsc behavior in case tools don't */
@@ -729,8 +745,6 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags,
     xfree(d->arch.cpuid);
     if ( paging_initialised )
         paging_final_teardown(d);
-    if ( is_pv_domain(d) )
-        pv_domain_destroy(d);
     free_perdomain_mappings(d);
 
     return rc;
