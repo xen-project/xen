@@ -6,6 +6,14 @@
 #include <public/xen.h>
 #include <xen/pdx.h>
 
+#if defined(CONFIG_ARM_32)
+# include <asm/arm32/mm.h>
+#elif defined(CONFIG_ARM_64)
+# include <asm/arm64/mm.h>
+#else
+# error "unknown ARM variant"
+#endif
+
 /* Align Xen to a 2 MiB boundary. */
 #define XEN_PADDR_ALIGN (1 << 21)
 

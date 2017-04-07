@@ -520,9 +520,6 @@ static unsigned long init_node_heap(int node, unsigned long mfn,
     unsigned long needed = (sizeof(**_heap) +
                             sizeof(**avail) * NR_ZONES +
                             PAGE_SIZE - 1) >> PAGE_SHIFT;
-#ifdef DIRECTMAP_VIRT_END
-    unsigned long eva = min(DIRECTMAP_VIRT_END, HYPERVISOR_VIRT_END);
-#endif
     int i, j;
 
     if ( !first_node_initialised )
@@ -532,9 +529,8 @@ static unsigned long init_node_heap(int node, unsigned long mfn,
         first_node_initialised = 1;
         needed = 0;
     }
-#ifdef DIRECTMAP_VIRT_END
     else if ( *use_tail && nr >= needed &&
-              (mfn + nr) <= (virt_to_mfn(eva - 1) + 1) &&
+              arch_mfn_in_directmap(mfn + nr) &&
               (!xenheap_bits ||
                !((mfn + nr - 1) >> (xenheap_bits - PAGE_SHIFT))) )
     {
@@ -543,7 +539,7 @@ static unsigned long init_node_heap(int node, unsigned long mfn,
                       PAGE_SIZE - sizeof(**avail) * NR_ZONES;
     }
     else if ( nr >= needed &&
-              (mfn + needed) <= (virt_to_mfn(eva - 1) + 1) &&
+              arch_mfn_in_directmap(mfn + needed) &&
               (!xenheap_bits ||
                !((mfn + needed - 1) >> (xenheap_bits - PAGE_SHIFT))) )
     {
@@ -552,7 +548,6 @@ static unsigned long init_node_heap(int node, unsigned long mfn,
                       PAGE_SIZE - sizeof(**avail) * NR_ZONES;
         *use_tail = 0;
     }
-#endif
     else if ( get_order_from_bytes(sizeof(**_heap)) ==
               get_order_from_pages(needed) )
     {

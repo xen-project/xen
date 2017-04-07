@@ -602,4 +602,15 @@ extern const char zero_page[];
 /* Build a 32bit PSE page table using 4MB pages. */
 void write_32bit_pse_identmap(uint32_t *l2);
 
+/*
+ * x86 maps part of physical memory via the directmap region.
+ * Return whether the input MFN falls in that range.
+ */
+static inline bool arch_mfn_in_directmap(unsigned long mfn)
+{
+    unsigned long eva = min(DIRECTMAP_VIRT_END, HYPERVISOR_VIRT_END);
+
+    return mfn <= (virt_to_mfn(eva - 1) + 1);
+}
+
 #endif /* __ASM_X86_MM_H__ */
