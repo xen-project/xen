@@ -112,7 +112,7 @@ GLOBAL(__page_tables_start)
  * actualy mapped (mostly using superpages).  Uses 4x 4k pages.
  */
 GLOBAL(l2_identmap)
-        .quad sym_phys(l1_identmap) + __PAGE_HYPERVISOR
+        .quad sym_offs(l1_identmap) + __PAGE_HYPERVISOR
         idx = 1
         .rept 7
         .quad (idx << L2_PAGETABLE_SHIFT) | PAGE_HYPERVISOR | _PAGE_PSE
@@ -130,7 +130,7 @@ GLOBAL(l2_xenmap)
         .quad 0
         idx = 1
         .rept 7
-        .quad sym_phys(__image_base__) + (idx << L2_PAGETABLE_SHIFT) + (PAGE_HYPERVISOR | _PAGE_PSE)
+        .quad sym_offs(__image_base__) + (idx << L2_PAGETABLE_SHIFT) + (PAGE_HYPERVISOR | _PAGE_PSE)
         idx = idx + 1
         .endr
         .fill L2_PAGETABLE_ENTRIES - 8, 8, 0
@@ -141,7 +141,7 @@ l2_fixmap:
         idx = 0
         .rept L2_PAGETABLE_ENTRIES
         .if idx == l2_table_offset(FIXADDR_TOP - 1)
-        .quad sym_phys(l1_fixmap) + __PAGE_HYPERVISOR
+        .quad sym_offs(l1_fixmap) + __PAGE_HYPERVISOR
         .else
         .quad 0
         .endif
@@ -153,7 +153,7 @@ l2_fixmap:
 l3_identmap:
         idx = 0
         .rept 4
-        .quad sym_phys(l2_identmap) + (idx << PAGE_SHIFT) + __PAGE_HYPERVISOR
+        .quad sym_offs(l2_identmap) + (idx << PAGE_SHIFT) + __PAGE_HYPERVISOR
         idx = idx + 1
         .endr
         .fill L3_PAGETABLE_ENTRIES - 4, 8, 0
@@ -164,9 +164,9 @@ l3_xenmap:
         idx = 0
         .rept L3_PAGETABLE_ENTRIES
         .if idx == l3_table_offset(XEN_VIRT_START)
-        .quad sym_phys(l2_xenmap) + __PAGE_HYPERVISOR
+        .quad sym_offs(l2_xenmap) + __PAGE_HYPERVISOR
         .elseif idx == l3_table_offset(FIXADDR_TOP - 1)
-        .quad sym_phys(l2_fixmap) + __PAGE_HYPERVISOR
+        .quad sym_offs(l2_fixmap) + __PAGE_HYPERVISOR
         .else
         .quad 0
         .endif
@@ -176,13 +176,13 @@ l3_xenmap:
 
 /* Top-level master (and idle-domain) page directory. */
 GLOBAL(idle_pg_table)
-        .quad sym_phys(l3_bootmap) + __PAGE_HYPERVISOR
+        .quad sym_offs(l3_bootmap) + __PAGE_HYPERVISOR
         idx = 1
         .rept L4_PAGETABLE_ENTRIES - 1
         .if idx == l4_table_offset(DIRECTMAP_VIRT_START)
-        .quad sym_phys(l3_identmap) + __PAGE_HYPERVISOR
+        .quad sym_offs(l3_identmap) + __PAGE_HYPERVISOR
         .elseif idx == l4_table_offset(XEN_VIRT_START)
-        .quad sym_phys(l3_xenmap) + __PAGE_HYPERVISOR
+        .quad sym_offs(l3_xenmap) + __PAGE_HYPERVISOR
         .else
         .quad 0
         .endif

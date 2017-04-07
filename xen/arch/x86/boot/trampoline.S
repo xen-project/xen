@@ -112,7 +112,7 @@ trampoline_protmode_entry:
         mov     %ecx,%cr4
 
         /* Load pagetable base register. */
-        mov     $sym_phys(idle_pg_table),%eax
+        mov     $sym_offs(idle_pg_table),%eax
         add     bootsym_rel(trampoline_xen_phys_start,4,%eax)
         mov     %eax,%cr3
 
