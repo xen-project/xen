@@ -287,8 +287,9 @@ let _ =
 
 	Logging.init_xenstored_log();
 
-	if cf.restart then (
-		DB.from_file store domains cons (Paths.xen_run_stored ^ "/db");
+	let filename = Paths.xen_run_stored ^ "/db" in
+	if cf.restart && Sys.file_exists filename then (
+		DB.from_file store domains cons filename;
 		Event.bind_dom_exc_virq eventchn
 	) else (
 		if !Disk.enable then (
