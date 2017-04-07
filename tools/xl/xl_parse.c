@@ -1156,7 +1156,9 @@ void parse_config_data(const char *config_source,
 
         xlu_cfg_get_defbool(config, "nestedhvm", &b_info->u.hvm.nested_hvm, 0);
 
-        xlu_cfg_get_defbool(config, "altp2mhvm", &b_info->u.hvm.altp2m, 0);
+        if (!xlu_cfg_get_defbool(config, "altp2mhvm", &b_info->u.hvm.altp2m, 0))
+            fprintf(stderr, "WARNING: Specifying \"altp2mhvm\" is deprecated. "
+                    "Please use \"altp2m\" instead.\n");
 
         xlu_cfg_replace_string(config, "smbios_firmware",
                                &b_info->u.hvm.smbios_firmware, 0);
@@ -1214,6 +1216,22 @@ void parse_config_data(const char *config_source,
     }
     default:
         abort();
+    }
+
+    if (!xlu_cfg_get_long(config, "altp2m", &l, 1)) {
+        if (l < LIBXL_ALTP2M_MODE_DISABLED ||
+            l > LIBXL_ALTP2M_MODE_LIMITED) {
+            fprintf(stderr, "ERROR: invalid value %ld for \"altp2m\"\n", l);
+            exit (1);
+        }
+
+        b_info->altp2m = l;
+    } else if (!xlu_cfg_get_string(config, "altp2m", &buf, 0)) {
+        if (libxl_altp2m_mode_from_string(buf, &b_info->altp2m)) {
+            fprintf(stderr, "ERROR: invalid value \"%s\" for \"altp2m\"\n",
+                    buf);
+            exit (1);
+        }
     }
 
     if (!xlu_cfg_get_list(config, "ioports", &ioports, &num_ioports, 0)) {

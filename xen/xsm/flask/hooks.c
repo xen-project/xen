@@ -1197,8 +1197,27 @@ static int flask_hvm_param_altp2mhvm(struct domain *d)
     return current_has_perm(d, SECCLASS_HVM, HVM__ALTP2MHVM);
 }
 
-static int flask_hvm_altp2mhvm_op(struct domain *d)
+static int flask_hvm_altp2mhvm_op(struct domain *d, uint64_t mode, uint32_t op)
 {
+    /*
+     * Require both mode and XSM to allow the operation. Assume XSM rules
+     * are written with the XSM_TARGET policy in mind, so add restrictions
+     * on the domain acting on itself when forbidden by the mode.
+     */
+    switch ( mode )
+    {
+    case XEN_ALTP2M_mixed:
+        break;
+    case XEN_ALTP2M_limited:
+        if ( HVMOP_altp2m_vcpu_enable_notify == op )
+            break;
+        /* fall-through */
+    case XEN_ALTP2M_external:
+        if ( d == current->domain )
+            return -EPERM;
+        break;
+    };
+
     return current_has_perm(d, SECCLASS_HVM, HVM__ALTP2MHVM_OP);
 }
 

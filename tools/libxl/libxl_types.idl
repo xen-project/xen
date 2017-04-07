@@ -441,6 +441,14 @@ libxl_rdm_reserve = Struct("rdm_reserve", [
     ("policy",      libxl_rdm_reserve_policy),
     ])
 
+# Consistent with the values defined for HVM_PARAM_ALTP2M
+libxl_altp2m_mode = Enumeration("altp2m_mode", [
+    (0, "disabled"),
+    (1, "mixed"),
+    (2, "external"),
+    (3, "limited"),
+    ], init_val = "LIBXL_ALTP2M_MODE_DISABLED")
+
 libxl_domain_build_info = Struct("domain_build_info",[
     ("max_vcpus",       integer),
     ("avail_vcpus",     libxl_bitmap),
@@ -519,6 +527,9 @@ libxl_domain_build_info = Struct("domain_build_info",[
                                        ("mmio_hole_memkb",  MemKB),
                                        ("timer_mode",       libxl_timer_mode),
                                        ("nested_hvm",       libxl_defbool),
+                                       # The u.hvm.altp2m field is used solely
+                                       # for x86 HVM guests and is maintained
+                                       # for legacy purposes.
                                        ("altp2m",           libxl_defbool),
                                        ("system_firmware",  string),
                                        ("smbios_firmware",  string),
@@ -569,6 +580,9 @@ libxl_domain_build_info = Struct("domain_build_info",[
 
     ("arch_arm", Struct(None, [("gic_version", libxl_gic_version),
                               ])),
+    # Alternate p2m is not bound to any architecture or guest type, as it is
+    # supported by x86 HVM and ARM support is planned.
+    ("altp2m", libxl_altp2m_mode),
 
     ], dir=DIR_IN
 )

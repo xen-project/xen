@@ -902,14 +902,16 @@ static void initiate_domain_create(libxl__egc *egc,
 
     if (d_config->c_info.type == LIBXL_DOMAIN_TYPE_HVM &&
         (libxl_defbool_val(d_config->b_info.u.hvm.nested_hvm) &&
-         libxl_defbool_val(d_config->b_info.u.hvm.altp2m))) {
+        (libxl_defbool_val(d_config->b_info.u.hvm.altp2m) ||
+        (d_config->b_info.altp2m != LIBXL_ALTP2M_MODE_DISABLED)))) {
         ret = ERROR_INVAL;
         LOGD(ERROR, domid, "nestedhvm and altp2mhvm cannot be used together");
         goto error_out;
     }
 
     if (d_config->c_info.type == LIBXL_DOMAIN_TYPE_HVM &&
-        libxl_defbool_val(d_config->b_info.u.hvm.altp2m) &&
+        (libxl_defbool_val(d_config->b_info.u.hvm.altp2m) ||
+        (d_config->b_info.altp2m != LIBXL_ALTP2M_MODE_DISABLED)) &&
         pod_enabled) {
         ret = ERROR_INVAL;
         LOGD(ERROR, domid, "Cannot enable PoD and ALTP2M at the same time");
