@@ -173,6 +173,7 @@ void __dummy__(void)
     OFFSET(MB2_fixed_total_size, multiboot2_fixed_t, total_size);
     OFFSET(MB2_tag_type, multiboot2_tag_t, type);
     OFFSET(MB2_tag_size, multiboot2_tag_t, size);
+    OFFSET(MB2_load_base_addr, multiboot2_tag_load_base_addr_t, load_base_addr);
     OFFSET(MB2_mem_lower, multiboot2_tag_basic_meminfo_t, mem_lower);
     OFFSET(MB2_efi64_st, multiboot2_tag_efi64_t, pointer);
     OFFSET(MB2_efi64_ih, multiboot2_tag_efi64_ih_t, pointer);

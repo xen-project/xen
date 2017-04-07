@@ -59,10 +59,16 @@
 #define MULTIBOOT2_HEADER_TAG_EFI_BS                    7
 #define MULTIBOOT2_HEADER_TAG_ENTRY_ADDRESS_EFI32       8
 #define MULTIBOOT2_HEADER_TAG_ENTRY_ADDRESS_EFI64       9
+#define MULTIBOOT2_HEADER_TAG_RELOCATABLE               10
 
 /* Header tag flags. */
 #define MULTIBOOT2_HEADER_TAG_REQUIRED                  0
 #define MULTIBOOT2_HEADER_TAG_OPTIONAL                  1
+
+/* Where image should be loaded (suggestion not requirement). */
+#define MULTIBOOT2_LOAD_PREFERENCE_NONE                 0
+#define MULTIBOOT2_LOAD_PREFERENCE_LOW                  1
+#define MULTIBOOT2_LOAD_PREFERENCE_HIGH                 2
 
 /* Header console tag console_flags. */
 #define MULTIBOOT2_CONSOLE_FLAGS_CONSOLE_REQUIRED       1
@@ -90,6 +96,7 @@
 #define MULTIBOOT2_TAG_TYPE_EFI_BS                      18
 #define MULTIBOOT2_TAG_TYPE_EFI32_IH                    19
 #define MULTIBOOT2_TAG_TYPE_EFI64_IH                    20
+#define MULTIBOOT2_TAG_TYPE_LOAD_BASE_ADDR              21
 
 /* Multiboot 2 tag alignment. */
 #define MULTIBOOT2_TAG_ALIGN                            8
@@ -116,6 +123,12 @@ typedef struct {
     u32 type;
     u32 size;
 } multiboot2_tag_t;
+
+typedef struct {
+    u32 type;
+    u32 size;
+    u32 load_base_addr;
+} multiboot2_tag_load_base_addr_t;
 
 typedef struct {
     u32 type;

@@ -81,6 +81,13 @@ multiboot2_header_start:
         /* Align modules at page boundry. */
         mb2ht_init MB2_HT(MODULE_ALIGN), MB2_HT(REQUIRED)
 
+        /* Load address preference. */
+        mb2ht_init MB2_HT(RELOCATABLE), MB2_HT(OPTIONAL), \
+                   sym_offs(start), /* Min load address. */ \
+                   0xffffffff, /* The end of image max load address (4 GiB - 1). */ \
+                   0x200000, /* Load address alignment (2 MiB). */ \
+                   MULTIBOOT2_LOAD_PREFERENCE_HIGH
+
         /* Console flags tag. */
         mb2ht_init MB2_HT(CONSOLE_FLAGS), MB2_HT(OPTIONAL), \
                    MULTIBOOT2_CONSOLE_FLAGS_EGA_TEXT_SUPPORTED
@@ -403,6 +410,15 @@ __start:
         cmp     %edi,MB2_fixed_total_size(%ebx)
         jbe     trampoline_bios_setup
 
+        /* Get Xen image load base address from Multiboot2 information. */
+        cmpl    $MULTIBOOT2_TAG_TYPE_LOAD_BASE_ADDR,MB2_tag_type(%ecx)
+        jne     .Lmb2_mem_lower
+
+        mov     MB2_load_base_addr(%ecx),%esi
+        sub     $XEN_IMG_OFFSET,%esi
+        jmp     .Lmb2_next_tag
+
+.Lmb2_mem_lower:
         /* Get mem_lower from Multiboot2 information. */
         cmpl    $MULTIBOOT2_TAG_TYPE_BASIC_MEMINFO,MB2_tag_type(%ecx)
         cmove   MB2_mem_lower(%ecx),%edx
