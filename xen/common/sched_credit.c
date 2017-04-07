@@ -229,6 +229,7 @@ struct csched_private {
     uint32_t credit;
     int credit_balance;
     uint32_t runq_sort;
+    uint32_t *balance_bias;
     unsigned ratelimit_us;
     /* Period of master and tick in milliseconds */
     unsigned tslice_ms, tick_period_us, ticks_per_tslice;
@@ -560,6 +561,7 @@ csched_deinit_pdata(const struct scheduler *ops, void *pcpu, int cpu)
 {
     struct csched_private *prv = CSCHED_PRIV(ops);
     struct csched_pcpu *spc = pcpu;
+    unsigned int node = cpu_to_node(cpu);
     unsigned long flags;
 
     /*
@@ -582,6 +584,12 @@ csched_deinit_pdata(const struct scheduler *ops, void *pcpu, int cpu)
     {
         prv->master = cpumask_first(prv->cpus);
         migrate_timer(&prv->master_ticker, prv->master);
+    }
+    if ( prv->balance_bias[node] == cpu )
+    {
+        cpumask_and(cpumask_scratch, prv->cpus, &node_to_cpumask(node));
+        if ( !cpumask_empty(cpumask_scratch) )
+            prv->balance_bias[node] =  cpumask_first(cpumask_scratch);
     }
     kill_timer(&spc->ticker);
     if ( prv->ncpus == 0 )
@@ -621,6 +629,10 @@ init_pdata(struct csched_private *prv, struct csched_pcpu *spc, int cpu)
         set_timer(&prv->master_ticker,
                   NOW() + MILLISECS(prv->tslice_ms));
     }
+
+    cpumask_and(cpumask_scratch, prv->cpus, &node_to_cpumask(cpu_to_node(cpu)));
+    if ( cpumask_weight(cpumask_scratch) == 1 )
+        prv->balance_bias[cpu_to_node(cpu)] = cpu;
 
     init_timer(&spc->ticker, csched_tick, (void *)(unsigned long)cpu, cpu);
     set_timer(&spc->ticker, NOW() + MICROSECS(prv->tick_period_us) );
@@ -1735,7 +1747,7 @@ csched_load_balance(struct csched_private *prv, int cpu,
     struct csched_vcpu *speer;
     cpumask_t workers;
     cpumask_t *online;
-    int peer_cpu, peer_node, bstep;
+    int peer_cpu, first_cpu, peer_node, bstep;
     int node = cpu_to_node(cpu);
 
     BUG_ON( cpu != snext->vcpu->processor );
@@ -1779,9 +1791,10 @@ csched_load_balance(struct csched_private *prv, int cpu,
             cpumask_and(&workers, &workers, &node_to_cpumask(peer_node));
             __cpumask_clear_cpu(cpu, &workers);
 
-            peer_cpu = cpumask_first(&workers);
-            if ( peer_cpu >= nr_cpu_ids )
+            first_cpu = cpumask_cycle(prv->balance_bias[peer_node], &workers);
+            if ( first_cpu >= nr_cpu_ids )
                 goto next_node;
+            peer_cpu = first_cpu;
             do
             {
                 spinlock_t *lock;
@@ -1845,13 +1858,19 @@ csched_load_balance(struct csched_private *prv, int cpu,
                 if ( speer != NULL )
                 {
                     *stolen = 1;
+                    /*
+                     * Next time we'll look for work to steal on this node, we
+                     * will start from the next pCPU, with respect to this one,
+                     * so we don't risk stealing always from the same ones.
+                     */
+                    prv->balance_bias[peer_node] = peer_cpu;
                     return speer;
                 }
 
  next_cpu:
                 peer_cpu = cpumask_cycle(peer_cpu, &workers);
 
-            } while( peer_cpu != cpumask_first(&workers) );
+            } while( peer_cpu != first_cpu );
 
  next_node:
             peer_node = cycle_node(peer_node, node_online_map);
@@ -2204,10 +2223,19 @@ csched_init(struct scheduler *ops)
     prv = xzalloc(struct csched_private);
     if ( prv == NULL )
         return -ENOMEM;
+
+    prv->balance_bias = xzalloc_array(uint32_t, MAX_NUMNODES);
+    if ( prv->balance_bias == NULL )
+    {
+        xfree(prv);
+        return -ENOMEM;
+    }
+
     if ( !zalloc_cpumask_var(&prv->cpus) ||
          !zalloc_cpumask_var(&prv->idlers) )
     {
         free_cpumask_var(prv->cpus);
+        xfree(prv->balance_bias);
         xfree(prv);
         return -ENOMEM;
     }
@@ -2253,6 +2281,7 @@ csched_deinit(struct scheduler *ops)
         ops->sched_data = NULL;
         free_cpumask_var(prv->cpus);
         free_cpumask_var(prv->idlers);
+        xfree(prv->balance_bias);
         xfree(prv);
     }
 }
