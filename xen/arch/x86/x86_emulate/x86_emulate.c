@@ -1802,9 +1802,22 @@ protmode_load_seg(
 
     if ( !is_x86_user_segment(seg) )
     {
-        bool lm = (desc.b & (1u << 12)) ? false : ctxt->lma;
+        /*
+         * Whether to use an 8- or 16-byte descriptor in long mode depends
+         * on sub-mode, descriptor type, and vendor:
+         * - non-system descriptors are always 8-byte ones,
+         * - system descriptors are always 16-byte ones in 64-bit mode,
+         * - (call) gates are always 16-byte ones,
+         * - other system descriptors in compatibility mode have
+         *   - only their low 8-byte bytes read on Intel,
+         *   - all 16 bytes read with the high 8 bytes ignored on AMD.
+         */
+        bool wide = desc.b & 0x1000
+                    ? false : (desc.b & 0xf00) != 0xc00 &&
+                               ctxt->vendor != X86_VENDOR_AMD
+                               ? mode_64bit() : ctxt->lma;
 
-        if ( lm )
+        if ( wide )
         {
             switch ( rc = ops->read(sel_seg, (sel & 0xfff8) + 8,
                                     &desc_hi, sizeof(desc_hi), ctxt) )
@@ -1819,6 +1832,9 @@ protmode_load_seg(
             default:
                 return rc;
             }
+            if ( !mode_64bit() && ctxt->vendor == X86_VENDOR_AMD &&
+                 (desc.b & 0xf00) != 0xc00 )
+                desc_hi.b = desc_hi.a = 0;
             if ( (desc_hi.b & 0x00001f00) ||
                  (seg != x86_seg_none &&
                   !is_canonical_address((uint64_t)desc_hi.a << 32)) )
