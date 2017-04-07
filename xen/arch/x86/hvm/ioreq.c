@@ -753,6 +753,8 @@ int hvm_destroy_ioreq_server(struct domain *d, ioservid_t id)
 
         domain_pause(d);
 
+        p2m_set_ioreq_server(d, 0, s);
+
         hvm_ioreq_server_disable(s, 0);
 
         list_del(&s->list_entry);
@@ -905,6 +907,48 @@ int hvm_unmap_io_range_from_ioreq_server(struct domain *d, ioservid_t id,
                 break;
 
             rc = rangeset_remove_range(r, start, end);
+            break;
+        }
+    }
+
+    spin_unlock_recursive(&d->arch.hvm_domain.ioreq_server.lock);
+
+    return rc;
+}
+
+/*
+ * Map or unmap an ioreq server to specific memory type. For now, only
+ * HVMMEM_ioreq_server is supported, and in the future new types can be
+ * introduced, e.g. HVMMEM_ioreq_serverX mapped to ioreq server X. And
+ * currently, only write operations are to be forwarded to an ioreq server.
+ * Support for the emulation of read operations can be added when an ioreq
+ * server has such requirement in the future.
+ */
+int hvm_map_mem_type_to_ioreq_server(struct domain *d, ioservid_t id,
+                                     uint32_t type, uint32_t flags)
+{
+    struct hvm_ioreq_server *s;
+    int rc;
+
+    if ( type != HVMMEM_ioreq_server )
+        return -EINVAL;
+
+    if ( flags & ~XEN_DMOP_IOREQ_MEM_ACCESS_WRITE )
+        return -EINVAL;
+
+    spin_lock_recursive(&d->arch.hvm_domain.ioreq_server.lock);
+
+    rc = -ENOENT;
+    list_for_each_entry ( s,
+                          &d->arch.hvm_domain.ioreq_server.list,
+                          list_entry )
+    {
+        if ( s == d->arch.hvm_domain.default_ioreq_server )
+            continue;
+
+        if ( s->id == id )
+        {
+            rc = p2m_set_ioreq_server(d, flags, s);
             break;
         }
     }

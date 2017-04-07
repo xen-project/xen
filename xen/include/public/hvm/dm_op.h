@@ -318,6 +318,32 @@ struct xen_dm_op_inject_msi {
     uint64_aligned_t addr;
 };
 
+/*
+ * XEN_DMOP_map_mem_type_to_ioreq_server : map or unmap the IOREQ Server <id>
+ *                                      to specific memory type <type>
+ *                                      for specific accesses <flags>
+ *
+ * For now, flags only accept the value of XEN_DMOP_IOREQ_MEM_ACCESS_WRITE,
+ * which means only write operations are to be forwarded to an ioreq server.
+ * Support for the emulation of read operations can be added when an ioreq
+ * server has such requirement in future.
+ */
+#define XEN_DMOP_map_mem_type_to_ioreq_server 15
+
+struct xen_dm_op_map_mem_type_to_ioreq_server {
+    ioservid_t id;      /* IN - ioreq server id */
+    uint16_t type;      /* IN - memory type */
+    uint32_t flags;     /* IN - types of accesses to be forwarded to the
+                           ioreq server. flags with 0 means to unmap the
+                           ioreq server */
+
+#define XEN_DMOP_IOREQ_MEM_ACCESS_READ (1u << 0)
+#define XEN_DMOP_IOREQ_MEM_ACCESS_WRITE (1u << 1)
+
+    uint64_t opaque;    /* IN/OUT - only used for hypercall continuation,
+                           has to be set to zero by the caller */
+};
+
 struct xen_dm_op {
     uint32_t op;
     uint32_t pad;
@@ -336,6 +362,8 @@ struct xen_dm_op {
         struct xen_dm_op_set_mem_type set_mem_type;
         struct xen_dm_op_inject_event inject_event;
         struct xen_dm_op_inject_msi inject_msi;
+        struct xen_dm_op_map_mem_type_to_ioreq_server
+                map_mem_type_to_ioreq_server;
     } u;
 };
 

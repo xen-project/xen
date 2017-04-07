@@ -131,6 +131,13 @@ static void ept_p2m_type_to_flags(struct p2m_domain *p2m, ept_entry_t *entry,
             entry->r = entry->w = entry->x = 1;
             entry->a = entry->d = !!cpu_has_vmx_ept_ad;
             break;
+        case p2m_ioreq_server:
+            entry->r = 1;
+            entry->w = !(p2m->ioreq.flags & XEN_DMOP_IOREQ_MEM_ACCESS_WRITE);
+            entry->x = 0;
+            entry->a = !!cpu_has_vmx_ept_ad;
+            entry->d = entry->w && entry->a;
+            break;
         case p2m_mmio_direct:
             entry->r = entry->x = 1;
             entry->w = !rangeset_contains_singleton(mmio_ro_ranges,
@@ -170,7 +177,6 @@ static void ept_p2m_type_to_flags(struct p2m_domain *p2m, ept_entry_t *entry,
             entry->a = entry->d = !!cpu_has_vmx_ept_ad;
             break;
         case p2m_grant_map_ro:
-        case p2m_ioreq_server:
             entry->r = 1;
             entry->w = entry->x = 0;
             entry->a = !!cpu_has_vmx_ept_ad;

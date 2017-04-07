@@ -3306,8 +3306,7 @@ static int sh_page_fault(struct vcpu *v,
     }
 
     /* Need to hand off device-model MMIO to the device model */
-    if ( p2mt == p2m_mmio_dm
-         || (p2mt == p2m_ioreq_server && ft == ft_demand_write) )
+    if ( p2mt == p2m_mmio_dm )
     {
         gpa = guest_walk_to_gpa(&gw);
         goto mmio;

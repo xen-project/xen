@@ -100,6 +100,7 @@ static int hvmemul_do_io(
     uint8_t dir, bool_t df, bool_t data_is_addr, uintptr_t data)
 {
     struct vcpu *curr = current;
+    struct domain *currd = curr->domain;
     struct hvm_vcpu_io *vio = &curr->arch.hvm_vcpu.hvm_io;
     ioreq_t p = {
         .type = is_mmio ? IOREQ_TYPE_COPY : IOREQ_TYPE_PIO,
@@ -141,7 +142,7 @@ static int hvmemul_do_io(
              (p.dir != dir) ||
              (p.df != df) ||
              (p.data_is_ptr != data_is_addr) )
-            domain_crash(curr->domain);
+            domain_crash(currd);
 
         if ( data_is_addr )
             return X86EMUL_UNHANDLEABLE;
@@ -178,8 +179,60 @@ static int hvmemul_do_io(
         break;
     case X86EMUL_UNHANDLEABLE:
     {
-        struct hvm_ioreq_server *s =
-            hvm_select_ioreq_server(curr->domain, &p);
+        /*
+         * Xen isn't emulating the instruction internally, so see if there's
+         * an ioreq server that can handle it.
+         *
+         * Rules:
+         * A> PIO or MMIO accesses run through hvm_select_ioreq_server() to
+         * choose the ioreq server by range. If no server is found, the access
+         * is ignored.
+         *
+         * B> p2m_ioreq_server accesses are handled by the designated
+         * ioreq server for the domain, but there are some corner cases:
+         *
+         *   - If the domain ioreq server is NULL, it's likely we suffer from
+         *   a race with an unmap operation on the ioreq server, so re-try the
+         *   instruction.
+         *
+         * Note: Even when an ioreq server is found, its value could become
+         * stale later, because it is possible that
+         *
+         *   - the PIO or MMIO address is removed from the rangeset of the
+         *   ioreq server, before the event is delivered to the device model.
+         *
+         *   - the p2m_ioreq_server type is unmapped from the ioreq server,
+         *   before the event is delivered to the device model.
+         *
+         * However, there's no cheap approach to avoid above situations in xen,
+         * so the device model side needs to check the incoming ioreq event.
+         */
+        struct hvm_ioreq_server *s = NULL;
+        p2m_type_t p2mt = p2m_invalid;
+
+        if ( is_mmio )
+        {
+            unsigned long gmfn = paddr_to_pfn(addr);
+
+            get_gfn_query_unlocked(currd, gmfn, &p2mt);
+
+            if ( p2mt == p2m_ioreq_server )
+            {
+                unsigned int flags;
+
+                s = p2m_get_ioreq_server(currd, &flags);
+
+                if ( s == NULL )
+                {
+                    rc = X86EMUL_RETRY;
+                    vio->io_req.state = STATE_IOREQ_NONE;
+                    break;
+                }
+            }
+        }
+
+        if ( !s )
+            s = hvm_select_ioreq_server(currd, &p);
 
         /* If there is no suitable backing DM, just ignore accesses */
         if ( !s )
@@ -190,7 +243,7 @@ static int hvmemul_do_io(
         else
         {
             rc = hvm_send_ioreq(s, &p, 0);
-            if ( rc != X86EMUL_RETRY || curr->domain->is_shutting_down )
+            if ( rc != X86EMUL_RETRY || currd->is_shutting_down )
                 vio->io_req.state = STATE_IOREQ_NONE;
             else if ( data_is_addr )
                 rc = X86EMUL_OKAY;

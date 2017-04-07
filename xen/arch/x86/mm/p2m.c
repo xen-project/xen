@@ -82,6 +82,8 @@ static int p2m_initialise(struct domain *d, struct p2m_domain *p2m)
     else
         p2m_pt_init(p2m);
 
+    spin_lock_init(&p2m->ioreq.lock);
+
     return ret;
 }
 
@@ -284,6 +286,62 @@ void p2m_memory_type_changed(struct domain *d)
         p2m->memory_type_changed(p2m);
         p2m_unlock(p2m);
     }
+}
+
+int p2m_set_ioreq_server(struct domain *d,
+                         unsigned int flags,
+                         struct hvm_ioreq_server *s)
+{
+    struct p2m_domain *p2m = p2m_get_hostp2m(d);
+    int rc;
+
+    /*
+     * Use lock to prevent concurrent setting attempts
+     * from multiple ioreq servers.
+     */
+    spin_lock(&p2m->ioreq.lock);
+
+    /* Unmap ioreq server from p2m type by passing flags with 0. */
+    if ( flags == 0 )
+    {
+        rc = -EINVAL;
+        if ( p2m->ioreq.server != s )
+            goto out;
+
+        p2m->ioreq.server = NULL;
+        p2m->ioreq.flags = 0;
+    }
+    else
+    {
+        rc = -EBUSY;
+        if ( p2m->ioreq.server != NULL )
+            goto out;
+
+        p2m->ioreq.server = s;
+        p2m->ioreq.flags = flags;
+    }
+
+    rc = 0;
+
+ out:
+    spin_unlock(&p2m->ioreq.lock);
+
+    return rc;
+}
+
+struct hvm_ioreq_server *p2m_get_ioreq_server(struct domain *d,
+                                              unsigned int *flags)
+{
+    struct p2m_domain *p2m = p2m_get_hostp2m(d);
+    struct hvm_ioreq_server *s;
+
+    spin_lock(&p2m->ioreq.lock);
+
+    s = p2m->ioreq.server;
+    *flags = p2m->ioreq.flags;
+
+    spin_unlock(&p2m->ioreq.lock);
+    return s;
 }
 
 void p2m_enable_hardware_log_dirty(struct domain *d)

@@ -173,9 +173,14 @@ static int modified_memory(struct domain *d,
 
 static bool allow_p2m_type_change(p2m_type_t old, p2m_type_t new)
 {
+    if ( new == p2m_ioreq_server )
+        return old == p2m_ram_rw;
+
+    if ( old == p2m_ioreq_server )
+        return new == p2m_ram_rw;
+
     return p2m_is_ram(old) ||
-           (p2m_is_hole(old) && new == p2m_mmio_dm) ||
-           (old == p2m_ioreq_server && new == p2m_ram_rw);
+           (p2m_is_hole(old) && new == p2m_mmio_dm);
 }
 
 static int set_mem_type(struct domain *d,
@@ -201,6 +206,18 @@ static int set_mem_type(struct domain *d,
     if ( data->mem_type >= ARRAY_SIZE(memtype) ||
          unlikely(data->mem_type == HVMMEM_unused) )
         return -EINVAL;
+
+    if ( data->mem_type  == HVMMEM_ioreq_server )
+    {
+        unsigned int flags;
+
+        if ( !hap_enabled(d) )
+            return -EOPNOTSUPP;
+
+        /* Do not change to HVMMEM_ioreq_server if no ioreq server mapped. */
+        if ( !p2m_get_ioreq_server(d, &flags) )
+            return -EINVAL;
+    }
 
     while ( iter < data->nr )
     {
@@ -362,6 +379,20 @@ static int dm_op(domid_t domid,
 
         rc = hvm_unmap_io_range_from_ioreq_server(d, data->id, data->type,
                                                   data->start, data->end);
+        break;
+    }
+
+    case XEN_DMOP_map_mem_type_to_ioreq_server:
+    {
+        const struct xen_dm_op_map_mem_type_to_ioreq_server *data =
+            &op.u.map_mem_type_to_ioreq_server;
+
+        rc = -EOPNOTSUPP;
+        if ( !hap_enabled(d) )
+            break;
+
+        rc = hvm_map_mem_type_to_ioreq_server(d, data->id,
+                                              data->type, data->flags);
         break;
     }
 

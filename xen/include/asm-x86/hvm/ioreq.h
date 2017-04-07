@@ -37,6 +37,8 @@ int hvm_map_io_range_to_ioreq_server(struct domain *d, ioservid_t id,
 int hvm_unmap_io_range_from_ioreq_server(struct domain *d, ioservid_t id,
                                          uint32_t type, uint64_t start,
                                          uint64_t end);
+int hvm_map_mem_type_to_ioreq_server(struct domain *d, ioservid_t id,
+                                     uint32_t type, uint32_t flags);
 int hvm_set_ioreq_server_state(struct domain *d, ioservid_t id,
                                bool_t enabled);
 

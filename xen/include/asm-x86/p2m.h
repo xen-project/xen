@@ -89,7 +89,8 @@ typedef unsigned int p2m_query_t;
                        | p2m_to_mask(p2m_ram_paging_out)      \
                        | p2m_to_mask(p2m_ram_paged)           \
                        | p2m_to_mask(p2m_ram_paging_in)       \
-                       | p2m_to_mask(p2m_ram_shared))
+                       | p2m_to_mask(p2m_ram_shared)          \
+                       | p2m_to_mask(p2m_ioreq_server))
 
 /* Types that represent a physmap hole that is ok to replace with a shared
  * entry */
@@ -111,8 +112,7 @@ typedef unsigned int p2m_query_t;
 #define P2M_RO_TYPES (p2m_to_mask(p2m_ram_logdirty)     \
                       | p2m_to_mask(p2m_ram_ro)         \
                       | p2m_to_mask(p2m_grant_map_ro)   \
-                      | p2m_to_mask(p2m_ram_shared)     \
-                      | p2m_to_mask(p2m_ioreq_server))
+                      | p2m_to_mask(p2m_ram_shared))
 
 /* Write-discard types, which should discard the write operations */
 #define P2M_DISCARD_WRITE_TYPES (p2m_to_mask(p2m_ram_ro)     \
@@ -336,6 +336,20 @@ struct p2m_domain {
         struct ept_data ept;
         /* NPT-equivalent structure could be added here. */
     };
+
+     struct {
+         spinlock_t lock;
+         /*
+          * ioreq server who's responsible for the emulation of
+          * gfns with specific p2m type(for now, p2m_ioreq_server).
+          */
+         struct hvm_ioreq_server *server;
+         /*
+          * flags specifies whether read, write or both operations
+          * are to be emulated by an ioreq server.
+          */
+         unsigned int flags;
+     } ioreq;
 };
 
 /* get host p2m table */
@@ -826,6 +840,11 @@ static inline unsigned int p2m_get_iommu_flags(p2m_type_t p2mt, mfn_t mfn)
 
     return flags;
 }
+
+int p2m_set_ioreq_server(struct domain *d, unsigned int flags,
+                         struct hvm_ioreq_server *s);
+struct hvm_ioreq_server *p2m_get_ioreq_server(struct domain *d,
+                                              unsigned int *flags);
 
 #endif /* _XEN_ASM_X86_P2M_H */
 

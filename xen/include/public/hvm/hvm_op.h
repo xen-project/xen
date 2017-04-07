@@ -93,7 +93,13 @@ typedef enum {
     HVMMEM_unused,             /* Placeholder; setting memory to this type
                                   will fail for code after 4.7.0 */
 #endif
-    HVMMEM_ioreq_server
+    HVMMEM_ioreq_server        /* Memory type claimed by an ioreq server; type
+                                  changes to this value are only allowed after
+                                  an ioreq server has claimed its ownership.
+                                  Only pages with HVMMEM_ram_rw are allowed to
+                                  change to this type; conversely, pages with
+                                  this type are only allowed to be changed back
+                                  to HVMMEM_ram_rw. */
 } hvmmem_type_t;
 
 /* Hint from PV drivers for pagetable destruction. */
