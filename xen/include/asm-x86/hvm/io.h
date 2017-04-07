@@ -19,6 +19,7 @@
 #ifndef __ASM_X86_HVM_IO_H__
 #define __ASM_X86_HVM_IO_H__
 
+#include <xen/mm.h>
 #include <asm/hvm/vpic.h>
 #include <asm/hvm/vioapic.h>
 #include <public/hvm/ioreq.h>
