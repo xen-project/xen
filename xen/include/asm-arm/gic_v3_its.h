@@ -137,6 +137,8 @@ void gicv3_its_dt_init(const struct dt_device_node *node);
 
 bool gicv3_its_host_has_its(void);
 
+unsigned int vgic_v3_its_count(const struct domain *d);
+
 void gicv3_do_LPI(unsigned int lpi);
 
 int gicv3_lpi_init_rdist(void __iomem * rdist_base);
@@ -192,6 +194,11 @@ static inline void gicv3_its_dt_init(const struct dt_device_node *node)
 static inline bool gicv3_its_host_has_its(void)
 {
     return false;
+}
+
+static inline unsigned int vgic_v3_its_count(const struct domain *d)
+{
+    return 0;
 }
 
 static inline void gicv3_do_LPI(unsigned int lpi)

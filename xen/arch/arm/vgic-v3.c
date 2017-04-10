@@ -1814,6 +1814,9 @@ int vgic_v3_init(struct domain *d, int *mmio_count)
     /* GICD region + number of Redistributors */
     *mmio_count = vgic_v3_rdist_count(d) + 1;
 
+    /* one region per ITS */
+    *mmio_count += vgic_v3_its_count(d);
+
     register_vgic_ops(d, &v3_ops);
 
     return 0;

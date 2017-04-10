@@ -1454,6 +1454,21 @@ static const struct mmio_handler_ops vgic_its_mmio_handler = {
     .write = vgic_v3_its_mmio_write,
 };
 
+unsigned int vgic_v3_its_count(const struct domain *d)
+{
+    struct host_its *hw_its;
+    unsigned int ret = 0;
+
+    /* Only Dom0 can use emulated ITSes so far. */
+    if ( !is_hardware_domain(d) )
+        return 0;
+
+    list_for_each_entry(hw_its, &host_its_list, entry)
+        ret++;
+
+    return ret;
+}
+
 int vgic_v3_its_init_domain(struct domain *d)
 {
     spin_lock_init(&d->arch.vgic.its_devices_lock);
