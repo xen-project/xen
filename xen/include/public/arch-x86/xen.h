@@ -159,10 +159,10 @@ DEFINE_XEN_GUEST_HANDLE(trap_info_t);
 typedef uint64_t tsc_timestamp_t; /* RDTSC timestamp */
 
 /*
- * The following is all CPU context. Note that the fpu_ctxt block is filled 
+ * The following is all CPU context. Note that the fpu_ctxt block is filled
  * in by FXSAVE if the CPU has feature FXSR; otherwise FSAVE is used.
  *
- * Also note that when calling DOMCTL_setvcpucontext and VCPU_initialise
+ * Also note that when calling DOMCTL_setvcpucontext and VCPUOP_initialise
  * for HVM and PVH guests, not all information in this structure is updated:
  *
  * - For HVM guests, the structures read include: fpu_ctxt (if
