@@ -114,21 +114,6 @@ void vmx_realmode_emulate_one(struct hvm_emulate_ctxt *hvmemul_ctxt)
 
     if ( rc == X86EMUL_EXCEPTION )
     {
-        if ( !hvmemul_ctxt->ctxt.event_pending )
-        {
-            unsigned long intr_info;
-
-            __vmread(VM_ENTRY_INTR_INFO, &intr_info);
-            __vmwrite(VM_ENTRY_INTR_INFO, 0);
-            if ( !(intr_info & INTR_INFO_VALID_MASK) )
-            {
-                gdprintk(XENLOG_ERR, "Exception pending but no info.\n");
-                goto fail;
-            }
-            hvmemul_ctxt->ctxt.event.vector = (uint8_t)intr_info;
-            hvmemul_ctxt->ctxt.event.insn_len = 0;
-        }
-
         if ( unlikely(curr->domain->debugger_attached) &&
              ((hvmemul_ctxt->ctxt.event.vector == TRAP_debug) ||
               (hvmemul_ctxt->ctxt.event.vector == TRAP_int3)) )

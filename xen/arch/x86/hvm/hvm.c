@@ -3696,8 +3696,7 @@ void hvm_ud_intercept(struct cpu_user_regs *regs)
         hvm_inject_hw_exception(TRAP_invalid_op, X86_EVENT_NO_EC);
         break;
     case X86EMUL_EXCEPTION:
-        if ( ctxt.ctxt.event_pending )
-            hvm_inject_event(&ctxt.ctxt.event);
+        hvm_inject_event(&ctxt.ctxt.event);
         /* fall through */
     default:
         hvm_emulate_writeback(&ctxt);

@@ -3457,7 +3457,7 @@ static int sh_page_fault(struct vcpu *v,
 
     r = x86_emulate(&emul_ctxt.ctxt, emul_ops);
 
-    if ( r == X86EMUL_EXCEPTION && emul_ctxt.ctxt.event_pending )
+    if ( r == X86EMUL_EXCEPTION )
     {
         /*
          * This emulation covers writes to shadow pagetables.  We tolerate #PF

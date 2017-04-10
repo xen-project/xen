@@ -2035,8 +2035,7 @@ int hvm_emulate_one_mmio(unsigned long mfn, unsigned long gla)
         hvm_dump_emulation_state(XENLOG_G_WARNING "MMCFG", &ctxt);
         break;
     case X86EMUL_EXCEPTION:
-        if ( ctxt.ctxt.event_pending )
-            hvm_inject_event(&ctxt.ctxt.event);
+        hvm_inject_event(&ctxt.ctxt.event);
         /* fallthrough */
     default:
         hvm_emulate_writeback(&ctxt);
@@ -2095,8 +2094,7 @@ void hvm_emulate_one_vm_event(enum emul_kind kind, unsigned int trapnr,
         hvm_inject_hw_exception(trapnr, errcode);
         break;
     case X86EMUL_EXCEPTION:
-        if ( ctx.ctxt.event_pending )
-            hvm_inject_event(&ctx.ctxt.event);
+        hvm_inject_event(&ctx.ctxt.event);
         break;
     }
 

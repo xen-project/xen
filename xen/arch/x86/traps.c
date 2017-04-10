@@ -3185,15 +3185,9 @@ static void emulate_gate_op(struct cpu_user_regs *regs)
     if ( IS_ERR_OR_NULL(state) )
     {
         if ( PTR_ERR(state) == -X86EMUL_EXCEPTION )
-        {
-            ASSERT(ctxt.ctxt.event_pending);
             pv_inject_event(&ctxt.ctxt.event);
-        }
         else
-        {
-            ASSERT(!ctxt.ctxt.event_pending);
             do_guest_trap(TRAP_gp_fault, regs);
-        }
         return;
     }
 
@@ -3234,12 +3228,9 @@ static void emulate_gate_op(struct cpu_user_regs *regs)
 
     if ( rc == X86EMUL_EXCEPTION )
     {
-        ASSERT(ctxt.ctxt.event_pending);
         pv_inject_event(&ctxt.ctxt.event);
         return;
     }
-
-    ASSERT(!ctxt.ctxt.event_pending);
 
     if ( rc != X86EMUL_OKAY ||
          jump < 0 ||

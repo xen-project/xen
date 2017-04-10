@@ -100,8 +100,7 @@ bool hvm_emulate_one_insn(hvm_emulate_validate_t *validate)
         return false;
 
     case X86EMUL_EXCEPTION:
-        if ( ctxt.ctxt.event_pending )
-            hvm_inject_event(&ctxt.ctxt.event);
+        hvm_inject_event(&ctxt.ctxt.event);
         break;
     }
 
