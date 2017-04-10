@@ -557,25 +557,21 @@ static XSM_INLINE int xsm_hvm_param_altp2mhvm(XSM_DEFAULT_ARG struct domain *d)
 
 static XSM_INLINE int xsm_hvm_altp2mhvm_op(XSM_DEFAULT_ARG struct domain *d, uint64_t mode, uint32_t op)
 {
-    xsm_default_t a;
     XSM_ASSERT_ACTION(XSM_OTHER);
 
     switch ( mode )
     {
     case XEN_ALTP2M_mixed:
-        a = XSM_TARGET;
-        break;
+        return xsm_default_action(XSM_TARGET, current->domain, d);
     case XEN_ALTP2M_external:
-        a = XSM_DM_PRIV;
-        break;
+        return xsm_default_action(XSM_DM_PRIV, current->domain, d);
     case XEN_ALTP2M_limited:
-        a = (HVMOP_altp2m_vcpu_enable_notify == op) ? XSM_TARGET : XSM_DM_PRIV;
-        break;
+        if ( HVMOP_altp2m_vcpu_enable_notify == op )
+            return xsm_default_action(XSM_TARGET, current->domain, d);
+        return xsm_default_action(XSM_DM_PRIV, current->domain, d);
     default:
         return -EPERM;
-    };
-
-    return xsm_default_action(a, current->domain, d);
+    }
 }
 
 static XSM_INLINE int xsm_vm_event_control(XSM_DEFAULT_ARG struct domain *d, int mode, int op)
