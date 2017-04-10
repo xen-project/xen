@@ -4,6 +4,7 @@ subdir-y += vmx
 obj-y += asid.o
 obj-y += dm.o
 obj-bin-y += dom0_build.init.o
+obj-y += domain.o
 obj-y += emulate.o
 obj-y += hpet.o
 obj-y += hvm.o
