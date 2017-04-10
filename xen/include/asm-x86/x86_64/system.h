@@ -14,20 +14,21 @@
  */
 
 static always_inline __uint128_t __cmpxchg16b(
-    volatile void *ptr, const __uint128_t *old, const __uint128_t *new)
+    volatile void *ptr, const __uint128_t *oldp, const __uint128_t *newp)
 {
-    __uint128_t prev;
-    uint64_t new_high = *new >> 64;
-    uint64_t new_low = *new;
+    union {
+        struct { uint64_t lo, hi; };
+        __uint128_t raw;
+    } new = { .raw = *newp }, old = { .raw = *oldp }, prev;
 
     ASSERT(cpu_has_cx16);
 
-    asm volatile ( "lock; cmpxchg16b %1"
-                   : "=A" (prev), "+m" (*__xg(ptr))
-                   : "c" (new_high), "b" (new_low),
-                     "0" (*old) );
+    /* Don't use "=A" here - clang can't deal with that. */
+    asm volatile ( "lock; cmpxchg16b %2"
+                   : "=d" (prev.hi), "=a" (prev.lo), "+m" (*__xg(ptr))
+                   : "c" (new.hi), "b" (new.lo), "0" (old.hi), "1" (old.lo) );
 
-    return prev;
+    return prev.raw;
 }
 
 #define cmpxchg16b(ptr, o, n) ({                           \
