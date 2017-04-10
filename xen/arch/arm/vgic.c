@@ -234,22 +234,28 @@ static int vgic_get_virq_priority(struct vcpu *v, unsigned int virq)
 bool vgic_migrate_irq(struct vcpu *old, struct vcpu *new, unsigned int irq)
 {
     unsigned long flags;
-    struct pending_irq *p = irq_to_pending(old, irq);
+    struct pending_irq *p;
+
+    spin_lock_irqsave(&old->arch.vgic.lock, flags);
+
+    p = irq_to_pending(old, irq);
 
     /* nothing to do for virtual interrupts */
     if ( p->desc == NULL )
+    {
+        spin_unlock_irqrestore(&old->arch.vgic.lock, flags);
         return true;
+    }
 
     /* migration already in progress, no need to do anything */
     if ( test_bit(GIC_IRQ_GUEST_MIGRATING, &p->status) )
     {
         gprintk(XENLOG_WARNING, "irq %u migration failed: requested while in progress\n", irq);
+        spin_unlock_irqrestore(&old->arch.vgic.lock, flags);
         return false;
     }
 
     perfc_incr(vgic_irq_migrates);
-
-    spin_lock_irqsave(&old->arch.vgic.lock, flags);
 
     if ( list_empty(&p->inflight) )
     {
@@ -285,6 +291,17 @@ void arch_move_irqs(struct vcpu *v)
     struct vcpu *v_target;
     int i;
 
+    /*
+     * We don't migrate LPIs at the moment.
+     * If we ever do, we must make sure that the struct pending_irq does
+     * not go away, as there is no lock preventing this here.
+     * To ensure this, we check if the loop below ever touches LPIs.
+     * In the moment vgic_num_irqs() just covers SPIs, as it's mostly used
+     * for allocating the pending_irq and irq_desc array, in which LPIs
+     * don't participate.
+     */
+    ASSERT(!is_lpi(vgic_num_irqs(d) - 1));
+
     for ( i = 32; i < vgic_num_irqs(d); i++ )
     {
         v_target = vgic_get_target_vcpu(v, i);
@@ -299,6 +316,7 @@ void vgic_disable_irqs(struct vcpu *v, uint32_t r, int n)
 {
     const unsigned long mask = r;
     struct pending_irq *p;
+    struct irq_desc *desc;
     unsigned int irq;
     unsigned long flags;
     int i = 0;
@@ -307,17 +325,19 @@ void vgic_disable_irqs(struct vcpu *v, uint32_t r, int n)
     while ( (i = find_next_bit(&mask, 32, i)) < 32 ) {
         irq = i + (32 * n);
         v_target = vgic_get_target_vcpu(v, irq);
+
+        spin_lock_irqsave(&v_target->arch.vgic.lock, flags);
         p = irq_to_pending(v_target, irq);
         clear_bit(GIC_IRQ_GUEST_ENABLED, &p->status);
-        spin_lock_irqsave(&v_target->arch.vgic.lock, flags);
         gic_remove_from_lr_pending(v_target, p);
+        desc = p->desc;
         spin_unlock_irqrestore(&v_target->arch.vgic.lock, flags);
 
-        if ( p->desc != NULL )
+        if ( desc != NULL )
         {
-            spin_lock_irqsave(&p->desc->lock, flags);
-            p->desc->handler->disable(p->desc);
-            spin_unlock_irqrestore(&p->desc->lock, flags);
+            spin_lock_irqsave(&desc->lock, flags);
+            desc->handler->disable(desc);
+            spin_unlock_irqrestore(&desc->lock, flags);
         }
         i++;
     }
@@ -352,9 +372,9 @@ void vgic_enable_irqs(struct vcpu *v, uint32_t r, int n)
     while ( (i = find_next_bit(&mask, 32, i)) < 32 ) {
         irq = i + (32 * n);
         v_target = vgic_get_target_vcpu(v, irq);
+        spin_lock_irqsave(&v_target->arch.vgic.lock, flags);
         p = irq_to_pending(v_target, irq);
         set_bit(GIC_IRQ_GUEST_ENABLED, &p->status);
-        spin_lock_irqsave(&v_target->arch.vgic.lock, flags);
         if ( !list_empty(&p->inflight) && !test_bit(GIC_IRQ_GUEST_VISIBLE, &p->status) )
             gic_raise_guest_irq(v_target, irq, p->priority);
         spin_unlock_irqrestore(&v_target->arch.vgic.lock, flags);
@@ -463,13 +483,15 @@ void vgic_clear_pending_irqs(struct vcpu *v)
 void vgic_vcpu_inject_irq(struct vcpu *v, unsigned int virq)
 {
     uint8_t priority;
-    struct pending_irq *iter, *n = irq_to_pending(v, virq);
+    struct pending_irq *iter, *n;
     unsigned long flags;
     bool running;
 
     priority = vgic_get_virq_priority(v, virq);
 
     spin_lock_irqsave(&v->arch.vgic.lock, flags);
+
+    n = irq_to_pending(v, virq);
 
     /* vcpu offline */
     if ( test_bit(_VPF_down, &v->pause_flags) )

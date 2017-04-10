@@ -289,6 +289,11 @@ enum gic_sgi_mode;
  */
 #define REG_RANK_INDEX(b, n, s) ((((n) >> s) & ((b)-1)) % 32)
 
+/*
+ * In the moment vgic_num_irqs() just covers SPIs and the private IRQs,
+ * as it's mostly used for allocating the pending_irq and irq_desc array,
+ * in which LPIs don't participate.
+ */
 #define vgic_num_irqs(d)        ((d)->arch.vgic.nr_spis + 32)
 
 extern int domain_vgic_init(struct domain *d, unsigned int nr_spis);
