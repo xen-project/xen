@@ -57,18 +57,21 @@ static struct {
     unsigned int nr_rdist_regions;
     const struct rdist_region *regions;
     uint32_t rdist_stride; /* Re-distributor stride */
+    unsigned int intid_bits;  /* Number of interrupt ID bits */
 } vgic_v3_hw;
 
 void vgic_v3_setup_hw(paddr_t dbase,
                       unsigned int nr_rdist_regions,
                       const struct rdist_region *regions,
-                      uint32_t rdist_stride)
+                      uint32_t rdist_stride,
+                      unsigned int intid_bits)
 {
     vgic_v3_hw.enabled = 1;
     vgic_v3_hw.dbase = dbase;
     vgic_v3_hw.nr_rdist_regions = nr_rdist_regions;
     vgic_v3_hw.regions = regions;
     vgic_v3_hw.rdist_stride = rdist_stride;
+    vgic_v3_hw.intid_bits = intid_bits;
 }
 
 static struct vcpu *vgic_v3_irouter_to_vcpu(struct domain *d, uint64_t irouter)
@@ -1485,6 +1488,8 @@ static int vgic_v3_domain_init(struct domain *d)
 
             first_cpu += size / d->arch.vgic.rdist_stride;
         }
+
+        d->arch.vgic.intid_bits = vgic_v3_hw.intid_bits;
     }
     else
     {
@@ -1500,6 +1505,15 @@ static int vgic_v3_domain_init(struct domain *d)
         d->arch.vgic.rdist_regions[0].base = GUEST_GICV3_GICR0_BASE;
         d->arch.vgic.rdist_regions[0].size = GUEST_GICV3_GICR0_SIZE;
         d->arch.vgic.rdist_regions[0].first_cpu = 0;
+
+        /*
+         * TODO: only SPIs for now, adjust this when guests need LPIs.
+         * Please note that this value just describes the bits required
+         * in the stream interface, which is of no real concern for our
+         * emulation. So we just go with "10" here to cover all eventual
+         * SPIs (even if the guest implements less).
+         */
+        d->arch.vgic.intid_bits = 10;
     }
 
     ret = vgic_v3_its_init_domain(d);

@@ -111,6 +111,7 @@ struct arch_domain
         uint32_t rdist_stride;              /* Re-Distributor stride */
         struct rb_root its_devices;         /* Devices mapped to an ITS */
         spinlock_t its_devices_lock;        /* Protects the its_devices tree */
+        unsigned int intid_bits;
 #endif
     } vgic;
 
