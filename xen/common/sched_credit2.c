@@ -635,17 +635,17 @@ static void deactivate_runqueue(struct csched2_private *prv, int rqi)
     __cpumask_clear_cpu(rqi, &prv->active_queues);
 }
 
-static inline bool_t same_node(unsigned int cpua, unsigned int cpub)
+static inline bool same_node(unsigned int cpua, unsigned int cpub)
 {
     return cpu_to_node(cpua) == cpu_to_node(cpub);
 }
 
-static inline bool_t same_socket(unsigned int cpua, unsigned int cpub)
+static inline bool same_socket(unsigned int cpua, unsigned int cpub)
 {
     return cpu_to_socket(cpua) == cpu_to_socket(cpub);
 }
 
-static inline bool_t same_core(unsigned int cpua, unsigned int cpub)
+static inline bool same_core(unsigned int cpua, unsigned int cpub)
 {
     return same_socket(cpua, cpub) &&
            cpu_to_core(cpua) == cpu_to_core(cpub);
@@ -1882,7 +1882,7 @@ static void migrate(const struct scheduler *ops,
  *  - svc is not already flagged to migrate,
  *  - if svc is allowed to run on at least one of the pcpus of rqd.
  */
-static bool_t vcpu_is_migrateable(struct csched2_vcpu *svc,
+static bool vcpu_is_migrateable(struct csched2_vcpu *svc,
                                   struct csched2_runqueue_data *rqd)
 {
     struct vcpu *v = svc->vcpu;
@@ -1900,7 +1900,7 @@ static void balance_load(const struct scheduler *ops, int cpu, s_time_t now)
     struct csched2_private *prv = csched2_priv(ops);
     int i, max_delta_rqi = -1;
     struct list_head *push_iter, *pull_iter;
-    bool_t inner_load_updated = 0;
+    bool inner_load_updated = 0;
 
     balance_state_t st = { .best_push_svc = NULL, .best_pull_svc = NULL };
 
@@ -2584,7 +2584,7 @@ runq_candidate(struct csched2_runqueue_data *rqd,
  */
 static struct task_slice
 csched2_schedule(
-    const struct scheduler *ops, s_time_t now, bool_t tasklet_work_scheduled)
+    const struct scheduler *ops, s_time_t now, bool tasklet_work_scheduled)
 {
     const int cpu = smp_processor_id();
     struct csched2_runqueue_data *rqd;
@@ -2592,7 +2592,7 @@ csched2_schedule(
     struct csched2_vcpu *snext = NULL;
     unsigned int skipped_vcpus = 0;
     struct task_slice ret;
-    bool_t tickled;
+    bool tickled;
 
     SCHED_STAT_CRANK(schedule);
     CSCHED2_VCPU_CHECK(current);
