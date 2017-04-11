@@ -27,7 +27,8 @@ A value C<VALUE> is one of:
 
 =item B<"STRING">
 
-A string, surrounded by either single or double quotes.
+A string, surrounded by either single or double quotes. But if the
+STRING is part of a SPEC_STRING, the quotes should be omitted.
 
 =item B<NUMBER>
 
@@ -569,7 +570,7 @@ settings, from the following list:
 Allow access to the display via the VNC protocol.  This enables the
 other VNC-related settings.  The default is to enable this.
 
-=item C<vnclisten="ADDRESS[:DISPLAYNUM]">
+=item C<vnclisten=ADDRESS[:DISPLAYNUM]>
 
 Specifies the IP address, and optionally VNC display number, to use.
 
@@ -589,7 +590,7 @@ vnclisten string.
 Requests that the VNC display setup search for a free TCP port to use.
 The actual display used can be accessed with C<xl vncviewer>.
 
-=item C<vncpasswd="PASSWORD">
+=item C<vncpasswd=PASSWORD>
 
 Specifies the password for the VNC server. If password is set to an
 empty string, authentication on the VNC server will be disabled
@@ -616,7 +617,7 @@ Enable OpenGL acceleration of the SDL display. Only effects machines
 using C<device_model_version="qemu-xen-traditional"> and only if the
 device-model was compiled with OpenGL support. Disabled by default.
 
-=item C<keymap="LANG">
+=item C<keymap=LANG>
 
 Configure the keymap to use for the keyboard associated with this
 display. If the input method does not easily support raw keycodes
