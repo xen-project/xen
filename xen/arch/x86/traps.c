@@ -459,9 +459,9 @@ void show_stack_overflow(unsigned int cpu, const struct cpu_user_regs *regs)
     esp_bottom = (esp | (STACK_SIZE - 1)) + 1;
     esp_top    = esp_bottom - PRIMARY_STACK_SIZE;
 
-    printk("Valid stack range: %p-%p, sp=%p, tss.esp0=%p\n",
+    printk("Valid stack range: %p-%p, sp=%p, tss.rsp0=%p\n",
            (void *)esp_top, (void *)esp_bottom, (void *)esp,
-           (void *)per_cpu(init_tss, cpu).esp0);
+           (void *)per_cpu(init_tss, cpu).rsp0);
 
     /*
      * Trigger overflow trace if %esp is anywhere within the guard page, or

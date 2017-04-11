@@ -428,19 +428,18 @@ static always_inline void __mwait(unsigned long eax, unsigned long ecx)
 #define IOBMP_INVALID_OFFSET    0x8000
 
 struct __packed __cacheline_aligned tss_struct {
-    unsigned short	back_link,__blh;
-    union { u64 rsp0, esp0; };
-    union { u64 rsp1, esp1; };
-    union { u64 rsp2, esp2; };
-    u64 reserved1;
-    u64 ist[7]; /* Interrupt Stack Table is 1-based so tss->ist[0]
-                 * corresponds to an IST value of 1 in an Interrupt
-                 * Descriptor */
-    u64 reserved2;
-    u16 reserved3;
-    u16 bitmap;
+    uint32_t :32;
+    uint64_t rsp0, rsp1, rsp2;
+    uint64_t :64;
+    /*
+     * Interrupt Stack Table is 1-based so tss->ist[0] corresponds to an IST
+     * value of 1 in an Interrupt Descriptor.
+     */
+    uint64_t ist[7];
+    uint64_t :64;
+    uint16_t :16, bitmap;
     /* Pads the TSS to be cacheline-aligned (total size is 0x80). */
-    u8 __cacheline_filler[24];
+    uint8_t __cacheline_filler[24];
 };
 
 #define IST_NONE 0UL
