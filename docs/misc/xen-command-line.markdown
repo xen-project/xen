@@ -570,7 +570,7 @@ also slow in responding to load changes.
 The default value of `1 sec` is rather long.
 
 ### credit2\_runqueue
-> `= core | socket | node | all`
+> `= cpu | core | socket | node | all`
 
 > Default: `socket`
 
@@ -581,6 +581,7 @@ balancing (for instance, it will deal better with hyperthreading),
 but also more overhead.
 
 Available alternatives, with their meaning, are:
+* `cpu`: one runqueue per each logical pCPUs of the host;
 * `core`: one runqueue per each physical core of the host;
 * `socket`: one runqueue per each physical socket (which often,
             but not always, matches a NUMA node) of the host;

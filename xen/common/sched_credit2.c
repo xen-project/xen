@@ -301,6 +301,9 @@ integer_param("credit2_balance_over", opt_overload_balance_tolerance);
  * want that to happen basing on topology. At the moment, it is possible
  * to choose to arrange runqueues to be:
  *
+ * - per-cpu: meaning that there will be one runqueue per logical cpu. This
+ *            will happen when if the opt_runqueue parameter is set to 'cpu'.
+ *
  * - per-core: meaning that there will be one runqueue per each physical
  *             core of the host. This will happen if the opt_runqueue
  *             parameter is set to 'core';
@@ -322,11 +325,13 @@ integer_param("credit2_balance_over", opt_overload_balance_tolerance);
  * either the same physical core, the same physical socket, the same NUMA
  * node, or just all of them, will be put together to form runqueues.
  */
-#define OPT_RUNQUEUE_CORE   0
-#define OPT_RUNQUEUE_SOCKET 1
-#define OPT_RUNQUEUE_NODE   2
-#define OPT_RUNQUEUE_ALL    3
+#define OPT_RUNQUEUE_CPU    0
+#define OPT_RUNQUEUE_CORE   1
+#define OPT_RUNQUEUE_SOCKET 2
+#define OPT_RUNQUEUE_NODE   3
+#define OPT_RUNQUEUE_ALL    4
 static const char *const opt_runqueue_str[] = {
+    [OPT_RUNQUEUE_CPU] = "cpu",
     [OPT_RUNQUEUE_CORE] = "core",
     [OPT_RUNQUEUE_SOCKET] = "socket",
     [OPT_RUNQUEUE_NODE] = "node",
@@ -683,6 +688,8 @@ cpu_to_runqueue(struct csched2_private *prv, unsigned int cpu)
         BUG_ON(cpu_to_socket(cpu) == XEN_INVALID_SOCKET_ID ||
                cpu_to_socket(peer_cpu) == XEN_INVALID_SOCKET_ID);
 
+        if (opt_runqueue == OPT_RUNQUEUE_CPU)
+            continue;
         if ( opt_runqueue == OPT_RUNQUEUE_ALL ||
              (opt_runqueue == OPT_RUNQUEUE_CORE && same_core(peer_cpu, cpu)) ||
              (opt_runqueue == OPT_RUNQUEUE_SOCKET && same_socket(peer_cpu, cpu)) ||
