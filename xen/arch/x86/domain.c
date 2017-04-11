@@ -2040,7 +2040,7 @@ static void __context_switch(void)
 
         for ( i = 0; i < NR_RESERVED_GDT_PAGES; i++ )
             l1e_write(pl1e + FIRST_RESERVED_GDT_PAGE + i,
-                      l1e_from_pfn(mfn + i, __PAGE_HYPERVISOR));
+                      l1e_from_pfn(mfn + i, __PAGE_HYPERVISOR_RW));
     }
 
     if ( need_full_gdt(pd) &&

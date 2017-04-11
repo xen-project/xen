@@ -1475,7 +1475,7 @@ void sh_install_xen_entries_in_l4(struct domain *d, mfn_t gl4mfn, mfn_t sl4mfn)
     /* Install the per-domain mappings for this domain */
     sl4e[shadow_l4_table_offset(PERDOMAIN_VIRT_START)] =
         shadow_l4e_from_mfn(page_to_mfn(d->arch.perdomain_l3_pg),
-                            __PAGE_HYPERVISOR);
+                            __PAGE_HYPERVISOR_RW);
 
     if ( !shadow_mode_external(d) && !is_pv_32bit_domain(d) &&
          !VM_ASSIST(d, m2p_strict) )
@@ -1489,7 +1489,7 @@ void sh_install_xen_entries_in_l4(struct domain *d, mfn_t gl4mfn, mfn_t sl4mfn)
      * monitor pagetable structure, which is built in make_monitor_table
      * and maintained by sh_update_linear_entries. */
     sl4e[shadow_l4_table_offset(SH_LINEAR_PT_VIRT_START)] =
-        shadow_l4e_from_mfn(sl4mfn, __PAGE_HYPERVISOR);
+        shadow_l4e_from_mfn(sl4mfn, __PAGE_HYPERVISOR_RW);
 
     /* Self linear mapping.  */
     if ( shadow_mode_translate(d) && !shadow_mode_external(d) )
@@ -1501,7 +1501,7 @@ void sh_install_xen_entries_in_l4(struct domain *d, mfn_t gl4mfn, mfn_t sl4mfn)
     else
     {
         sl4e[shadow_l4_table_offset(LINEAR_PT_VIRT_START)] =
-            shadow_l4e_from_mfn(gl4mfn, __PAGE_HYPERVISOR);
+            shadow_l4e_from_mfn(gl4mfn, __PAGE_HYPERVISOR_RW);
     }
 
     unmap_domain_page(sl4e);
@@ -1654,12 +1654,12 @@ sh_make_monitor_table(struct vcpu *v)
             m3mfn = shadow_alloc(d, SH_type_monitor_table, 0);
             mfn_to_page(m3mfn)->shadow_flags = 3;
             l4e[shadow_l4_table_offset(SH_LINEAR_PT_VIRT_START)]
-                = l4e_from_pfn(mfn_x(m3mfn), __PAGE_HYPERVISOR);
+                = l4e_from_pfn(mfn_x(m3mfn), __PAGE_HYPERVISOR_RW);
 
             m2mfn = shadow_alloc(d, SH_type_monitor_table, 0);
             mfn_to_page(m2mfn)->shadow_flags = 2;
             l3e = map_domain_page(m3mfn);
-            l3e[0] = l3e_from_pfn(mfn_x(m2mfn), __PAGE_HYPERVISOR);
+            l3e[0] = l3e_from_pfn(mfn_x(m2mfn), __PAGE_HYPERVISOR_RW);
             unmap_domain_page(l3e);
 
             if ( is_pv_32bit_domain(d) )
@@ -1668,7 +1668,7 @@ sh_make_monitor_table(struct vcpu *v)
                  * area into its usual VAs in the monitor tables */
                 m3mfn = shadow_alloc(d, SH_type_monitor_table, 0);
                 mfn_to_page(m3mfn)->shadow_flags = 3;
-                l4e[0] = l4e_from_pfn(mfn_x(m3mfn), __PAGE_HYPERVISOR);
+                l4e[0] = l4e_from_pfn(mfn_x(m3mfn), __PAGE_HYPERVISOR_RW);
 
                 m2mfn = shadow_alloc(d, SH_type_monitor_table, 0);
                 mfn_to_page(m2mfn)->shadow_flags = 2;
@@ -3838,7 +3838,7 @@ sh_update_linear_entries(struct vcpu *v)
         {
             __linear_l4_table[l4_linear_offset(SH_LINEAR_PT_VIRT_START)] =
                 l4e_from_pfn(pagetable_get_pfn(v->arch.shadow_table[0]),
-                             __PAGE_HYPERVISOR);
+                             __PAGE_HYPERVISOR_RW);
         }
         else
         {
@@ -3846,7 +3846,7 @@ sh_update_linear_entries(struct vcpu *v)
             ml4e = map_domain_page(pagetable_get_mfn(v->arch.monitor_table));
             ml4e[l4_table_offset(SH_LINEAR_PT_VIRT_START)] =
                 l4e_from_pfn(pagetable_get_pfn(v->arch.shadow_table[0]),
-                             __PAGE_HYPERVISOR);
+                             __PAGE_HYPERVISOR_RW);
             unmap_domain_page(ml4e);
         }
     }
@@ -3902,7 +3902,7 @@ sh_update_linear_entries(struct vcpu *v)
             ml2e[i] =
                 (shadow_l3e_get_flags(sl3e[i]) & _PAGE_PRESENT)
                 ? l2e_from_pfn(mfn_x(shadow_l3e_get_mfn(sl3e[i])),
-                               __PAGE_HYPERVISOR)
+                               __PAGE_HYPERVISOR_RW)
                 : l2e_empty();
         }
 

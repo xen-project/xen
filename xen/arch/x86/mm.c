@@ -384,7 +384,7 @@ void __init arch_init_memory(void)
                     for ( ; i < L3_PAGETABLE_ENTRIES; ++i )
                         l3tab[i] = l3e_empty();
                     split_l4e = l4e_from_pfn(virt_to_mfn(l3tab),
-                                             __PAGE_HYPERVISOR);
+                                             __PAGE_HYPERVISOR_RW);
                 }
                 else
                     ++root_pgt_pv_xen_slots;
@@ -1588,9 +1588,9 @@ void init_guest_l4_table(l4_pgentry_t l4tab[], const struct domain *d,
             split_l4e;
 #endif
     l4tab[l4_table_offset(LINEAR_PT_VIRT_START)] =
-        l4e_from_pfn(domain_page_map_to_mfn(l4tab), __PAGE_HYPERVISOR);
+        l4e_from_pfn(domain_page_map_to_mfn(l4tab), __PAGE_HYPERVISOR_RW);
     l4tab[l4_table_offset(PERDOMAIN_VIRT_START)] =
-        l4e_from_page(d->arch.perdomain_l3_pg, __PAGE_HYPERVISOR);
+        l4e_from_page(d->arch.perdomain_l3_pg, __PAGE_HYPERVISOR_RW);
     if ( zap_ro_mpt || is_pv_32bit_domain(d) || paging_mode_refcounts(d) )
         l4tab[l4_table_offset(RO_MPT_VIRT_START)] = l4e_empty();
 }
@@ -6380,7 +6380,7 @@ int create_perdomain_mapping(struct domain *d, unsigned long va,
         }
         l2tab = __map_domain_page(pg);
         clear_page(l2tab);
-        l3tab[l3_table_offset(va)] = l3e_from_page(pg, __PAGE_HYPERVISOR);
+        l3tab[l3_table_offset(va)] = l3e_from_page(pg, __PAGE_HYPERVISOR_RW);
     }
     else
         l2tab = map_domain_page(_mfn(l3e_get_pfn(l3tab[l3_table_offset(va)])));
@@ -6422,7 +6422,7 @@ int create_perdomain_mapping(struct domain *d, unsigned long va,
                 l1tab = __map_domain_page(pg);
             }
             clear_page(l1tab);
-            *pl2e = l2e_from_page(pg, __PAGE_HYPERVISOR);
+            *pl2e = l2e_from_page(pg, __PAGE_HYPERVISOR_RW);
         }
         else if ( !l1tab )
             l1tab = map_domain_page(_mfn(l2e_get_pfn(*pl2e)));

@@ -470,7 +470,7 @@ static int setup_m2p_table(struct mem_hotadd_info *info)
                 clear_page(l2_ro_mpt);
                 l3e_write(&l3_ro_mpt[l3_table_offset(va)],
                           l3e_from_paddr(__pa(l2_ro_mpt),
-                                         __PAGE_HYPERVISOR | _PAGE_USER));
+                                         __PAGE_HYPERVISOR_RO | _PAGE_USER));
                 l2_ro_mpt += l2_table_offset(va);
             }
 
@@ -515,7 +515,7 @@ void __init paging_init(void)
             l3_ro_mpt = page_to_virt(l3_pg);
             clear_page(l3_ro_mpt);
             l4e_write(&idle_pg_table[l4_table_offset(va)],
-                      l4e_from_page(l3_pg, __PAGE_HYPERVISOR));
+                      l4e_from_page(l3_pg, __PAGE_HYPERVISOR_RW));
         }
     }
 
@@ -525,7 +525,7 @@ void __init paging_init(void)
     l3_ro_mpt = page_to_virt(l3_pg);
     clear_page(l3_ro_mpt);
     l4e_write(&idle_pg_table[l4_table_offset(RO_MPT_VIRT_START)],
-              l4e_from_page(l3_pg, __PAGE_HYPERVISOR | _PAGE_USER));
+              l4e_from_page(l3_pg, __PAGE_HYPERVISOR_RO | _PAGE_USER));
 
     /*
      * Allocate and map the machine-to-phys table.
@@ -612,7 +612,7 @@ void __init paging_init(void)
             l2_ro_mpt = page_to_virt(l2_pg);
             clear_page(l2_ro_mpt);
             l3e_write(&l3_ro_mpt[l3_table_offset(va)],
-                      l3e_from_page(l2_pg, __PAGE_HYPERVISOR | _PAGE_USER));
+                      l3e_from_page(l2_pg, __PAGE_HYPERVISOR_RO | _PAGE_USER));
             ASSERT(!l2_table_offset(va));
         }
         /* NB. Cannot be GLOBAL: guest user mode should not see it. */
@@ -634,7 +634,7 @@ void __init paging_init(void)
     compat_idle_pg_table_l2 = l2_ro_mpt;
     clear_page(l2_ro_mpt);
     l3e_write(&l3_ro_mpt[l3_table_offset(HIRO_COMPAT_MPT_VIRT_START)],
-              l3e_from_paddr(__pa(l2_ro_mpt), __PAGE_HYPERVISOR));
+              l3e_from_paddr(__pa(l2_ro_mpt), __PAGE_HYPERVISOR_RO));
     l2_ro_mpt += l2_table_offset(HIRO_COMPAT_MPT_VIRT_START);
     /* Allocate and map the compatibility mode machine-to-phys table. */
     mpt_size = (mpt_size >> 1) + (1UL << (L2_PAGETABLE_SHIFT - 1));
@@ -679,7 +679,7 @@ void __init paging_init(void)
 
     /* Set up linear page table mapping. */
     l4e_write(&idle_pg_table[l4_table_offset(LINEAR_PT_VIRT_START)],
-              l4e_from_paddr(__pa(idle_pg_table), __PAGE_HYPERVISOR));
+              l4e_from_paddr(__pa(idle_pg_table), __PAGE_HYPERVISOR_RW));
     return;
 
  nomem:
