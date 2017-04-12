@@ -321,29 +321,6 @@ static always_inline void stac(void)
 .endif
 
 /*
- * Reload registers not preserved by C code from frame.
- *
- * @compat: R8-R11 don't need reloading
- *
- * For the way it is used in RESTORE_ALL, this macro must preserve EFLAGS.ZF.
- */
-.macro LOAD_C_CLOBBERED compat=0 ax=1
-.if !\compat
-        movq  UREGS_r11(%rsp),%r11
-        movq  UREGS_r10(%rsp),%r10
-        movq  UREGS_r9(%rsp),%r9
-        movq  UREGS_r8(%rsp),%r8
-.endif
-.if \ax
-        LOAD_ONE_REG(ax, \compat)
-.endif
-        LOAD_ONE_REG(cx, \compat)
-        LOAD_ONE_REG(dx, \compat)
-        LOAD_ONE_REG(si, \compat)
-        LOAD_ONE_REG(di, \compat)
-.endm
-
-/*
  * Restore all previously saved registers.
  *
  * @adj: extra stack pointer adjustment to be folded into the adjustment done
@@ -353,8 +330,16 @@ static always_inline void stac(void)
 .macro RESTORE_ALL adj=0 compat=0
 .if !\compat
         testl $TRAP_regs_dirty,UREGS_entry_vector(%rsp)
+        movq  UREGS_r11(%rsp),%r11
+        movq  UREGS_r10(%rsp),%r10
+        movq  UREGS_r9(%rsp),%r9
+        movq  UREGS_r8(%rsp),%r8
 .endif
-        LOAD_C_CLOBBERED \compat
+        LOAD_ONE_REG(ax, \compat)
+        LOAD_ONE_REG(cx, \compat)
+        LOAD_ONE_REG(dx, \compat)
+        LOAD_ONE_REG(si, \compat)
+        LOAD_ONE_REG(di, \compat)
 .if !\compat
         jz    987f
         movq  UREGS_r15(%rsp),%r15
