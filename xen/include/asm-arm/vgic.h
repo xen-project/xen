@@ -60,12 +60,18 @@ struct pending_irq
      * vcpu while it is still inflight and on an GICH_LR register on the
      * old vcpu.
      *
+     * GIC_IRQ_GUEST_PRISTINE_LPI: the IRQ is a newly mapped LPI, which
+     * has never been in an LR before. This means that any trace of an
+     * LPI with the same number in an LR must be from an older LPI, which
+     * has been unmapped before.
+     *
      */
 #define GIC_IRQ_GUEST_QUEUED   0
 #define GIC_IRQ_GUEST_ACTIVE   1
 #define GIC_IRQ_GUEST_VISIBLE  2
 #define GIC_IRQ_GUEST_ENABLED  3
 #define GIC_IRQ_GUEST_MIGRATING   4
+#define GIC_IRQ_GUEST_PRISTINE_LPI  5
     unsigned long status;
     struct irq_desc *desc; /* only set it the irq corresponds to a physical irq */
     unsigned int irq;

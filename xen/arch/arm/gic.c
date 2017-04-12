@@ -375,6 +375,8 @@ static inline void gic_set_lr(int lr, struct pending_irq *p,
 {
     ASSERT(!local_irq_is_enabled());
 
+    clear_bit(GIC_IRQ_GUEST_PRISTINE_LPI, &p->status);
+
     gic_hw_ops->update_lr(lr, p, state);
 
     set_bit(GIC_IRQ_GUEST_VISIBLE, &p->status);
@@ -440,6 +442,40 @@ void gic_raise_inflight_irq(struct vcpu *v, unsigned int virtual_irq)
 #endif
 }
 
+/*
+ * Find an unused LR to insert an IRQ into, starting with the LR given
+ * by @lr. If this new interrupt is a PRISTINE LPI, scan the other LRs to
+ * avoid inserting the same IRQ twice. This situation can occur when an
+ * event gets discarded while the LPI is in an LR, and a new LPI with the
+ * same number gets mapped quickly afterwards.
+ */
+static unsigned int gic_find_unused_lr(struct vcpu *v,
+                                       struct pending_irq *p,
+                                       unsigned int lr)
+{
+    unsigned int nr_lrs = gic_hw_ops->info->nr_lrs;
+    unsigned long *lr_mask = (unsigned long *) &this_cpu(lr_mask);
+    struct gic_lr lr_val;
+
+    ASSERT(spin_is_locked(&v->arch.vgic.lock));
+
+    if ( unlikely(test_bit(GIC_IRQ_GUEST_PRISTINE_LPI, &p->status)) )
+    {
+        unsigned int used_lr;
+
+        for_each_set_bit(used_lr, lr_mask, nr_lrs)
+        {
+            gic_hw_ops->read_lr(used_lr, &lr_val);
+            if ( lr_val.virq == p->irq )
+                return used_lr;
+        }
+    }
+
+    lr = find_next_zero_bit(lr_mask, nr_lrs, lr);
+
+    return lr;
+}
+
 void gic_raise_guest_irq(struct vcpu *v, unsigned int virtual_irq,
         unsigned int priority)
 {
@@ -455,7 +491,8 @@ void gic_raise_guest_irq(struct vcpu *v, unsigned int virtual_irq,
 
     if ( v == current && list_empty(&v->arch.vgic.lr_pending) )
     {
-        i = find_first_zero_bit(&this_cpu(lr_mask), nr_lrs);
+        i = gic_find_unused_lr(v, p, 0);
+
         if (i < nr_lrs) {
             set_bit(i, &this_cpu(lr_mask));
             gic_set_lr(i, p, GICH_LR_PENDING);
@@ -478,8 +515,14 @@ static void gic_update_one_lr(struct vcpu *v, int i)
     gic_hw_ops->read_lr(i, &lr_val);
     irq = lr_val.virq;
     p = irq_to_pending(v, irq);
-    /* An LPI might have been unmapped, in which case we just clean up here. */
-    if ( unlikely(!p) )
+    /*
+     * An LPI might have been unmapped, in which case we just clean up here.
+     * If that LPI is marked as PRISTINE, the information in the LR is bogus,
+     * as it belongs to a previous, already unmapped LPI. So we discard it
+     * here as well.
+     */
+    if ( unlikely(!p ||
+                  test_and_clear_bit(GIC_IRQ_GUEST_PRISTINE_LPI, &p->status)) )
     {
         ASSERT(is_lpi(irq));
 
@@ -589,7 +632,7 @@ static void gic_restore_pending_irqs(struct vcpu *v)
     inflight_r = &v->arch.vgic.inflight_irqs;
     list_for_each_entry_safe ( p, t, &v->arch.vgic.lr_pending, lr_queue )
     {
-        lr = find_next_zero_bit(&this_cpu(lr_mask), nr_lrs, lr);
+        lr = gic_find_unused_lr(v, p, lr);
         if ( lr >= nr_lrs )
         {
             /* No more free LRs: find a lower priority irq to evict */
