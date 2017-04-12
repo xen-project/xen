@@ -28,18 +28,23 @@ t=RELEASE-$r
 
 # QEMU
 
-  git-checkout $s
-  git-tag -u 'Xen.org Xen tree code signing' -m "Xen $v" xen-$v $s
+  git checkout $s
+  git show # should show appropriate intended commit
+  git-tag -u 'Xen.org Xen tree code signing' -m "Xen $v" xen-$v
 
   git-push xenbits.xen.org:/home/xen/git/qemu-xen-traditional.git $s:stable-$x xen-$v
 
 # consider making tag in minios, and updating xen.git Config.mk
+  git checkout SOMETHING
+  git show # should show appropriate intended commit
   git-tag -u 'xen tree' -s -m "Xen $r$rc" xen-$t
   git push xen@xenbits.xen.org:/home/xen/git/mini-os.git xen-$t
 
 * Also tag upstream qemu tree (Stefano)
-    git tag -u 'xen tree' -s -m "Xen $r$rc" qemu-xen-$v SOMETHING
-    git push osstest@xenbits.xen.org:/home/xen/git/qemu-xen.git qemu-xen-$v
+  git checkout SOMETHING
+  git show # should show appropriate intended commit
+  git tag -u 'xen tree' -s -m "Xen $r$rc" qemu-xen-$v 
+  git push osstest@xenbits.xen.org:/home/xen/git/qemu-xen.git qemu-xen-$v
 
 * consider bumping sonames of shlibs
 
