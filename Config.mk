@@ -280,7 +280,7 @@ SEABIOS_UPSTREAM_REVISION ?= rel-1.10.0
 ETHERBOOT_NICS ?= rtl8139 8086100e
 
 
-QEMU_TRADITIONAL_REVISION ?= xen-4.9.0-rc1
+QEMU_TRADITIONAL_REVISION ?= xen-4.9.0-rc1.1
 # Thu Mar 9 11:14:55 2017 +0000
 # cirrus/vnc: zap drop bitblit support from console code.
 
