@@ -11,10 +11,10 @@
 #include <public/xen.h>
 #include <irq_vectors.h>
 
-ENTRY(compat_hypercall)
+ENTRY(entry_int82)
         ASM_CLAC
         pushq $0
-        SAVE_VOLATILE type=TRAP_syscall compat=1
+        SAVE_VOLATILE type=HYPERCALL_VECTOR compat=1
         CR4_PV32_RESTORE
 
         cmpb  $0,untrusted_msi(%rip)

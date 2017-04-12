@@ -3872,7 +3872,7 @@ void __init trap_init(void)
 
     /* The 32-on-64 hypercall vector is only accessible from ring 1. */
     _set_gate(idt_table + HYPERCALL_VECTOR,
-              SYS_DESC_trap_gate, 1, &compat_hypercall);
+              SYS_DESC_trap_gate, 1, entry_int82);
 
     /* Fast trap for int80 (faster than taking the #GP-fixup path). */
     _set_gate(idt_table + 0x80, SYS_DESC_trap_gate, 3, &int80_direct_trap);

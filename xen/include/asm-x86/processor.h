@@ -529,6 +529,8 @@ DECLARE_TRAP_HANDLER(simd_coprocessor_error);
 DECLARE_TRAP_HANDLER_CONST(machine_check);
 DECLARE_TRAP_HANDLER(alignment_check);
 
+DECLARE_TRAP_HANDLER(entry_int82);
+
 #undef DECLARE_TRAP_HANDLER_CONST
 #undef DECLARE_TRAP_HANDLER
 
@@ -538,7 +540,6 @@ void do_reserved_trap(struct cpu_user_regs *regs);
 
 void sysenter_entry(void);
 void sysenter_eflags_saved(void);
-void compat_hypercall(void);
 void int80_direct_trap(void);
 
 #define STUBS_PER_PAGE (PAGE_SIZE / STUB_BUF_SIZE)
