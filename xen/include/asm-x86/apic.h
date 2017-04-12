@@ -213,6 +213,7 @@ extern int lapic_suspend(void);
 extern int lapic_resume(void);
 extern void record_boot_APIC_mode(void);
 extern enum apic_mode current_local_apic_mode(void);
+extern void check_for_unexpected_msi(unsigned int vector);
 
 extern int check_nmi_watchdog (void);
 
