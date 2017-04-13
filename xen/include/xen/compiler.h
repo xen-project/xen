@@ -100,4 +100,31 @@
 # define ASM_FLAG_OUT(yes, no) no
 #endif
 
+/*
+ * NB: we need to disable the gcc-compat warnings for clang in some places or
+ * else it will complain with: "'break' is bound to loop, GCC binds it to
+ * switch" when a switch is used inside of a while expression inside of a
+ * switch statement, ie:
+ *
+ * switch ( ... )
+ * {
+ * case ...:
+ *      while ( ({ int x; switch ( foo ) { case 1: x = 1; break; } x }) )
+ *      {
+ *              ...
+ *
+ * This has already been reported upstream:
+ * http://bugs.llvm.org/show_bug.cgi?id=32595 
+ */
+#ifdef __clang__
+# define CLANG_DISABLE_WARN_GCC_COMPAT_START                    \
+    _Pragma("clang diagnostic push")                            \
+    _Pragma("clang diagnostic ignored \"-Wgcc-compat\"")
+# define CLANG_DISABLE_WARN_GCC_COMPAT_END                      \
+    _Pragma("clang diagnostic pop")
+#else
+# define CLANG_DISABLE_WARN_GCC_COMPAT_START
+# define CLANG_DISABLE_WARN_GCC_COMPAT_END
+#endif
+
 #endif /* __LINUX_COMPILER_H */

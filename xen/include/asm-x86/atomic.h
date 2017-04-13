@@ -45,6 +45,7 @@ void __bad_atomic_size(void);
 
 #define read_atomic(p) ({                                 \
     unsigned long x_;                                     \
+    CLANG_DISABLE_WARN_GCC_COMPAT_START                   \
     switch ( sizeof(*(p)) ) {                             \
     case 1: x_ = read_u8_atomic((uint8_t *)(p)); break;   \
     case 2: x_ = read_u16_atomic((uint16_t *)(p)); break; \
@@ -52,6 +53,7 @@ void __bad_atomic_size(void);
     case 8: x_ = read_u64_atomic((uint64_t *)(p)); break; \
     default: x_ = 0; __bad_atomic_size(); break;          \
     }                                                     \
+    CLANG_DISABLE_WARN_GCC_COMPAT_END                     \
     (typeof(*(p)))x_;                                     \
 })
 
