@@ -421,7 +421,11 @@ void vioapic_irq_positive_edge(struct domain *d, unsigned int irq)
     struct hvm_vioapic *vioapic = gsi_vioapic(d, irq, &pin);
     union vioapic_redir_entry *ent;
 
-    ASSERT(vioapic);
+    if ( !vioapic )
+    {
+        ASSERT_UNREACHABLE();
+        return;
+    }
 
     HVM_DBG_LOG(DBG_LEVEL_IOAPIC, "irq %x", irq);
 
