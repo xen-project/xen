@@ -275,8 +275,8 @@ static inline void
 dec_nr_runnable(unsigned int cpu)
 {
     ASSERT(spin_is_locked(per_cpu(schedule_data, cpu).schedule_lock));
+    ASSERT(CSCHED_PCPU(cpu)->nr_runnable >= 1);
     CSCHED_PCPU(cpu)->nr_runnable--;
-    ASSERT(CSCHED_PCPU(cpu)->nr_runnable >= 0);
 }
 
 static inline void
