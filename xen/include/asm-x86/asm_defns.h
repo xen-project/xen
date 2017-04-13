@@ -325,7 +325,8 @@ static always_inline void stac(void)
  *
  * @adj: extra stack pointer adjustment to be folded into the adjustment done
  *       anyway at the end of the macro
- * @compat: R8-R15 don't need reloading
+ * @compat: R8-R15 don't need reloading, but they are clobbered for added
+ *          safety against information leaks.
  */
 .macro RESTORE_ALL adj=0 compat=0
 .if !\compat
@@ -334,6 +335,11 @@ static always_inline void stac(void)
         movq  UREGS_r10(%rsp),%r10
         movq  UREGS_r9(%rsp),%r9
         movq  UREGS_r8(%rsp),%r8
+.else
+        xor %r11, %r11
+        xor %r10, %r10
+        xor %r9, %r9
+        xor %r8, %r8
 .endif
         LOAD_ONE_REG(ax, \compat)
         LOAD_ONE_REG(cx, \compat)
@@ -361,6 +367,11 @@ static always_inline void stac(void)
 789:    BUG   /* Corruption of partial register state. */
         .subsection 0
 #endif
+.else
+        xor %r15, %r15
+        xor %r14, %r14
+        xor %r13, %r13
+        xor %r12, %r12
 .endif
 987:
         LOAD_ONE_REG(bp, \compat)
