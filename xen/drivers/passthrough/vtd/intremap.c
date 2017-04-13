@@ -200,8 +200,10 @@ static void update_irte(struct iommu *iommu, struct iremap_entry *entry,
     else
     {
         /*
-         * If the caller requests an atomic update but we can't meet it, 
-         * a bug will be raised.
+         * VT-d hardware doesn't update IRTEs behind us, nor the software
+         * since we hold iremap_lock. If the caller wants VT-d hardware to
+         * always see a consistent entry, but we can't meet it, a bug will
+         * be raised.
          */
         if ( entry->lo == new_ire->lo )
             write_atomic(&entry->hi, new_ire->hi);
@@ -690,8 +692,7 @@ static int msi_msg_to_remap_entry(
     remap_rte->data = index - i;
 
     update_irte(iommu, iremap_entry, &new_ire, msi_desc->irte_initialized);
-    if ( !msi_desc->irte_initialized )
-        msi_desc->irte_initialized = true;
+    msi_desc->irte_initialized = true;
 
     iommu_flush_cache_entry(iremap_entry, sizeof(*iremap_entry));
     iommu_flush_iec_index(iommu, 0, index);
