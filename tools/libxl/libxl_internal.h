@@ -38,7 +38,7 @@
 #include <ctype.h>
 
 #include <sys/mman.h>
-#include <sys/poll.h>
+#include <poll.h>
 #include <sys/select.h>
 #include <sys/stat.h>
 #include <sys/time.h>

@@ -24,7 +24,7 @@
 #include <getopt.h>
 #include <assert.h>
 #include <ctype.h>
-#include <sys/poll.h>
+#include <poll.h>
 #include <sys/statvfs.h>
 
 #include <xen/xen.h>

@@ -36,7 +36,7 @@
 #include <signal.h>
 #include <unistd.h>
 #include <sys/mman.h>
-#include <sys/poll.h>
+#include <poll.h>
 
 #include <xenctrl.h>
 #include <xenevtchn.h>
