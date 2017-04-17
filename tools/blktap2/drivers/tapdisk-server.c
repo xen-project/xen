@@ -30,7 +30,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <sys/ioctl.h>
-#include <sys/signal.h>
+#include <signal.h>
 
 #include "tapdisk-utils.h"
 #include "tapdisk-server.h"
