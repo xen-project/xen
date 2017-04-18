@@ -11,7 +11,7 @@
 
 /*
  * Per-page-frame information.
- * 
+ *
  * Every architecture must ensure the following:
  *  1. 'struct page_info' contains a 'struct page_list_entry list'.
  *  2. Provide a PFN_ORDER() macro for accessing the order of a free page.
@@ -46,11 +46,11 @@ struct page_info
          * For unused shadow pages, a list of free shadow pages;
          * for multi-page shadows, links to the other pages in this shadow;
          * for pinnable shadows, if pinned, a list of all pinned shadows
-         * (see sh_type_is_pinnable() for the definition of "pinnable" 
+         * (see sh_type_is_pinnable() for the definition of "pinnable"
          * shadow types).  N.B. a shadow may be both pinnable and multi-page.
          * In that case the pages are inserted in order in the list of
-         * pinned shadows and walkers of that list must be prepared 
-         * to keep them all together during updates. 
+         * pinned shadows and walkers of that list must be prepared
+         * to keep them all together during updates.
          */
         struct page_list_entry list;
         /* For non-pinnable single-page shadows, a higher entry that points
@@ -338,20 +338,19 @@ const unsigned long *get_platform_badpages(unsigned int *array_size);
  * All users of page lock for pte serialization live in mm.c, use it
  * to lock a page table page during pte updates, do not take other locks within
  * the critical section delimited by page_lock/unlock, and perform no
- * nesting. 
+ * nesting.
  *
  * All users of page lock for memory sharing live in mm/mem_sharing.c. Page_lock
- * is used in memory sharing to protect addition (share) and removal (unshare) 
- * of (gfn,domain) tupples to a list of gfn's that the shared page is currently 
- * backing. Nesting may happen when sharing (and locking) two pages -- deadlock 
+ * is used in memory sharing to protect addition (share) and removal (unshare)
+ * of (gfn,domain) tupples to a list of gfn's that the shared page is currently
+ * backing. Nesting may happen when sharing (and locking) two pages -- deadlock
  * is avoided by locking pages in increasing order.
  * All memory sharing code paths take the p2m lock of the affected gfn before
- * taking the lock for the underlying page. We enforce ordering between page_lock 
- * and p2m_lock using an mm-locks.h construct. 
+ * taking the lock for the underlying page. We enforce ordering between page_lock
+ * and p2m_lock using an mm-locks.h construct.
  *
  * These two users (pte serialization and memory sharing) do not collide, since
  * sharing is only supported for hvm guests, which do not perform pv pte updates.
- * 
  */
 int page_lock(struct page_info *page);
 void page_unlock(struct page_info *page);
@@ -404,25 +403,25 @@ static inline int get_page_and_type(struct page_info *page,
 
 int check_descriptor(const struct domain *, struct desc_struct *d);
 
-extern bool_t opt_allow_superpage;
+extern bool opt_allow_superpage;
 extern paddr_t mem_hotplug;
 
 /******************************************************************************
- * With shadow pagetables, the different kinds of address start 
+ * With shadow pagetables, the different kinds of address start
  * to get get confusing.
- * 
- * Virtual addresses are what they usually are: the addresses that are used 
- * to accessing memory while the guest is running.  The MMU translates from 
- * virtual addresses to machine addresses. 
- * 
+ *
+ * Virtual addresses are what they usually are: the addresses that are used
+ * to accessing memory while the guest is running.  The MMU translates from
+ * virtual addresses to machine addresses.
+ *
  * (Pseudo-)physical addresses are the abstraction of physical memory the
- * guest uses for allocation and so forth.  For the purposes of this code, 
+ * guest uses for allocation and so forth.  For the purposes of this code,
  * we can largely ignore them.
  *
  * Guest frame numbers (gfns) are the entries that the guest puts in its
  * pagetables.  For normal paravirtual guests, they are actual frame numbers,
- * with the translation done by the guest.  
- * 
+ * with the translation done by the guest.
+ *
  * Machine frame numbers (mfns) are the entries that the hypervisor puts
  * in the shadow page tables.
  *
@@ -461,7 +460,7 @@ extern paddr_t mem_hotplug;
  * Disable some users of set_gpfn_from_mfn() (e.g., free_heap_pages()) until
  * the machine_to_phys_mapping is actually set up.
  */
-extern bool_t machine_to_phys_mapping_valid;
+extern bool machine_to_phys_mapping_valid;
 #define set_gpfn_from_mfn(mfn, pfn) do {        \
     if ( machine_to_phys_mapping_valid )        \
         _set_gpfn_from_mfn(mfn, pfn);           \
@@ -573,7 +572,7 @@ extern struct domain *dom_xen, *dom_io, *dom_cow;	/* for vmcoreinfo */
 
 /* Definition of an mm lock: spinlock with extra fields for debugging */
 typedef struct mm_lock {
-    spinlock_t         lock; 
+    spinlock_t         lock;
     int                unlock_level;
     int                locker;          /* processor which holds the lock */
     const char        *locker_function; /* func that took it */
