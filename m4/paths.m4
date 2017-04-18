@@ -147,3 +147,15 @@ AC_SUBST(XEN_PAGING_DIR)
 XEN_DUMP_DIR=$xen_dumpdir_path
 AC_SUBST(XEN_DUMP_DIR)
 ])
+
+case "$host_os" in
+*freebsd*) XENSTORED_KVA=/dev/xen/xenstored ;;
+*) XENSTORED_KVA=/proc/xen/xsd_kva ;;
+esac
+AC_SUBST(XENSTORED_KVA)
+
+case "$host_os" in
+*freebsd*) XENSTORED_PORT=/dev/xen/xenstored ;;
+*) XENSTORED_PORT=/proc/xen/xsd_port ;;
+esac
+AC_SUBST(XENSTORED_PORT)

@@ -731,6 +731,8 @@ LIBEXEC_LIB
 LIBEXEC_BIN
 LIBEXEC
 CONFIG_LEAF_DIR
+XENSTORED_PORT
+XENSTORED_KVA
 FILE_OFFSET_BITS
 OBJEXT
 EXEEXT
@@ -3795,6 +3797,18 @@ esac
 #serial 11
 
 
+
+
+case "$host_os" in
+*freebsd*) XENSTORED_KVA=/dev/xen/xenstored ;;
+*) XENSTORED_KVA=/proc/xen/xsd_kva ;;
+esac
+
+
+case "$host_os" in
+*freebsd*) XENSTORED_PORT=/dev/xen/xenstored ;;
+*) XENSTORED_PORT=/proc/xen/xsd_port ;;
+esac
 
 
 # systemd.m4 - Macros to check for and enable systemd          -*- Autoconf -*-

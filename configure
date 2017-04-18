@@ -614,6 +614,8 @@ LIBEXEC_LIB
 LIBEXEC_BIN
 LIBEXEC
 CONFIG_LEAF_DIR
+XENSTORED_PORT
+XENSTORED_KVA
 host_os
 host_vendor
 host_cpu
@@ -1873,6 +1875,18 @@ case $host_os in *\ *) host_os=`echo "$host_os" | sed 's/ /-/g'`;; esac
 
 
 
+
+
+case "$host_os" in
+*freebsd*) XENSTORED_KVA=/dev/xen/xenstored ;;
+*) XENSTORED_KVA=/proc/xen/xsd_kva ;;
+esac
+
+
+case "$host_os" in
+*freebsd*) XENSTORED_PORT=/dev/xen/xenstored ;;
+*) XENSTORED_PORT=/proc/xen/xsd_port ;;
+esac
 
 
 
