@@ -1401,18 +1401,17 @@ static int alloc_l1_table(struct page_info *page)
 
     for ( i = 0; i < L1_PAGETABLE_ENTRIES; i++ )
     {
-        if ( is_guest_l1_slot(i) )
-            switch ( ret = get_page_from_l1e(pl1e[i], d, d) )
-            {
-            default:
-                goto fail;
-            case 0:
-                break;
-            case _PAGE_RW ... _PAGE_RW | PAGE_CACHE_ATTRS:
-                ASSERT(!(ret & ~(_PAGE_RW | PAGE_CACHE_ATTRS)));
-                l1e_flip_flags(pl1e[i], ret);
-                break;
-            }
+        switch ( ret = get_page_from_l1e(pl1e[i], d, d) )
+        {
+        default:
+            goto fail;
+        case 0:
+            break;
+        case _PAGE_RW ... _PAGE_RW | PAGE_CACHE_ATTRS:
+            ASSERT(!(ret & ~(_PAGE_RW | PAGE_CACHE_ATTRS)));
+            l1e_flip_flags(pl1e[i], ret);
+            break;
+        }
 
         adjust_guest_l1e(pl1e[i], d);
     }
@@ -1423,8 +1422,7 @@ static int alloc_l1_table(struct page_info *page)
  fail:
     gdprintk(XENLOG_WARNING, "Failure in alloc_l1_table: slot %#x\n", i);
     while ( i-- > 0 )
-        if ( is_guest_l1_slot(i) )
-            put_page_from_l1e(pl1e[i], d);
+        put_page_from_l1e(pl1e[i], d);
 
     unmap_domain_page(pl1e);
     return ret;
@@ -1711,8 +1709,7 @@ static void free_l1_table(struct page_info *page)
     pl1e = map_domain_page(_mfn(pfn));
 
     for ( i = 0; i < L1_PAGETABLE_ENTRIES; i++ )
-        if ( is_guest_l1_slot(i) )
-            put_page_from_l1e(pl1e[i], d);
+        put_page_from_l1e(pl1e[i], d);
 
     unmap_domain_page(pl1e);
 }
