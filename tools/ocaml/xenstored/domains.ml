@@ -127,11 +127,14 @@ let create xc doms domid mfn port =
 	Domain.bind_interdomain dom;
 	dom
 
+let xenstored_kva = ref ""
+let xenstored_port = ref ""
+
 let create0 doms =
 	let port, interface =
 		(
-			let port = Utils.read_file_single_integer Define.xenstored_proc_port
-			and fd = Unix.openfile Define.xenstored_proc_kva
+			let port = Utils.read_file_single_integer !xenstored_port
+			and fd = Unix.openfile !xenstored_kva
 					       [ Unix.O_RDWR ] 0o600 in
 			let interface = Xenmmap.mmap fd Xenmmap.RDWR Xenmmap.SHARED
 						  (Xenmmap.getpagesize()) 0 in

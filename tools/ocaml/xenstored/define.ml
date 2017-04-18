@@ -17,9 +17,6 @@
 let xenstored_major = 1
 let xenstored_minor = 0
 
-let xenstored_proc_kva = "/proc/xen/xsd_kva"
-let xenstored_proc_port = "/proc/xen/xsd_port"
-
 let xs_daemon_socket = Paths.xen_run_stored ^ "/socket"
 let xs_daemon_socket_ro = Paths.xen_run_stored ^ "/socket_ro"
 

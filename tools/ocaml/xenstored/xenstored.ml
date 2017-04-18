@@ -118,7 +118,9 @@ let parse_config filename =
 		("access-log-special-ops", Config.Set_bool Logging.access_log_special_ops);
 		("allow-debug", Config.Set_bool Process.allow_debug);
 		("ring-scan-interval", Config.Set_int ring_scan_interval);
-		("pid-file", Config.Set_string pidfile); ] in
+		("pid-file", Config.Set_string pidfile);
+		("xenstored-kva", Config.Set_string Domains.xenstored_kva);
+		("xenstored-port", Config.Set_string Domains.xenstored_port); ] in
 	begin try Config.read filename options (fun _ _ -> raise Not_found)
 	with
 	| Config.Error err -> List.iter (fun (k, e) ->

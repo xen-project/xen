@@ -69,3 +69,6 @@ persistent = false
 # Perodically scanning all the rings as a safenet for lazy clients.
 # Define the interval in seconds, set to negative to disable.
 # ring-scan-interval = 20
+
+xenstored-kva = @XENSTORED_KVA@
+xenstored-port = @XENSTORED_PORT@
