@@ -3138,7 +3138,7 @@ long do_mmuext_op(
     unsigned long type;
     unsigned int i, done = 0;
     struct vcpu *curr = current;
-    struct domain *d = curr->domain;
+    struct domain *currd = curr->domain;
     struct domain *pg_owner;
     int rc = put_old_guest_table(curr);
 
@@ -3182,7 +3182,7 @@ long do_mmuext_op(
         return -EINVAL;
     }
 
-    rc = xsm_mmuext_op(XSM_TARGET, d, pg_owner);
+    rc = xsm_mmuext_op(XSM_TARGET, currd, pg_owner);
     if ( rc )
     {
         put_pg_owner(pg_owner);
@@ -3203,7 +3203,7 @@ long do_mmuext_op(
             break;
         }
 
-        if ( is_hvm_domain(d) )
+        if ( is_hvm_domain(currd) )
         {
             switch ( op.cmd )
             {
@@ -3272,7 +3272,7 @@ long do_mmuext_op(
                 break;
             }
 
-            rc = xsm_memory_pin_page(XSM_HOOK, d, pg_owner, page);
+            rc = xsm_memory_pin_page(XSM_HOOK, currd, pg_owner, page);
             if ( !rc && unlikely(test_and_set_bit(_PGT_pinned,
                                                   &page->u.inuse.type_info)) )
             {
@@ -3288,7 +3288,7 @@ long do_mmuext_op(
             paging_mark_dirty(pg_owner, _mfn(page_to_mfn(page)));
 
             /* We can race domain destruction (domain_relinquish_resources). */
-            if ( unlikely(pg_owner != d) )
+            if ( unlikely(pg_owner != currd) )
             {
                 bool drop_ref;
 
@@ -3349,9 +3349,9 @@ long do_mmuext_op(
             break;
 
         case MMUEXT_NEW_BASEPTR:
-            if ( unlikely(d != pg_owner) )
+            if ( unlikely(currd != pg_owner) )
                 rc = -EPERM;
-            else if ( unlikely(paging_mode_translate(d)) )
+            else if ( unlikely(paging_mode_translate(currd)) )
                 rc = -EINVAL;
             else
                 rc = new_guest_cr3(op.arg1.mfn);
@@ -3360,9 +3360,9 @@ long do_mmuext_op(
         case MMUEXT_NEW_USER_BASEPTR: {
             unsigned long old_mfn;
 
-            if ( unlikely(d != pg_owner) )
+            if ( unlikely(currd != pg_owner) )
                 rc = -EPERM;
-            else if ( unlikely(paging_mode_translate(d)) )
+            else if ( unlikely(paging_mode_translate(currd)) )
                 rc = -EINVAL;
             if ( unlikely(rc) )
                 break;
@@ -3379,7 +3379,7 @@ long do_mmuext_op(
             {
                 rc = get_page_and_type_from_pagenr(op.arg1.mfn,
                                                    PGT_root_page_table,
-                                                   d, 0, 1);
+                                                   currd, 0, 1);
 
                 if ( unlikely(rc) )
                 {
@@ -3391,7 +3391,8 @@ long do_mmuext_op(
                                  rc, op.arg1.mfn);
                     break;
                 }
-                if ( VM_ASSIST(d, m2p_strict) )
+
+                if ( VM_ASSIST(currd, m2p_strict) )
                     zap_ro_mpt(op.arg1.mfn);
             }
 
@@ -3419,14 +3420,14 @@ long do_mmuext_op(
         }
 
         case MMUEXT_TLB_FLUSH_LOCAL:
-            if ( likely(d == pg_owner) )
+            if ( likely(currd == pg_owner) )
                 flush_tlb_local();
             else
                 rc = -EPERM;
             break;
 
         case MMUEXT_INVLPG_LOCAL:
-            if ( unlikely(d != pg_owner) )
+            if ( unlikely(currd != pg_owner) )
                 rc = -EPERM;
             else
                 paging_invlpg(curr, op.arg1.linear_addr);
@@ -3437,9 +3438,9 @@ long do_mmuext_op(
         {
             cpumask_t *mask = this_cpu(scratch_cpumask);
 
-            if ( unlikely(d != pg_owner) )
+            if ( unlikely(currd != pg_owner) )
                 rc = -EPERM;
-            else if ( unlikely(vcpumask_to_pcpumask(d,
+            else if ( unlikely(vcpumask_to_pcpumask(currd,
                                    guest_handle_to_param(op.arg2.vcpumask,
                                                          const_void),
                                    mask)) )
@@ -3455,32 +3456,33 @@ long do_mmuext_op(
         }
 
         case MMUEXT_TLB_FLUSH_ALL:
-            if ( likely(d == pg_owner) )
-                flush_tlb_mask(d->domain_dirty_cpumask);
+            if ( likely(currd == pg_owner) )
+                flush_tlb_mask(currd->domain_dirty_cpumask);
             else
                 rc = -EPERM;
             break;
 
         case MMUEXT_INVLPG_ALL:
-            if ( unlikely(d != pg_owner) )
+            if ( unlikely(currd != pg_owner) )
                 rc = -EPERM;
             else if ( __addr_ok(op.arg1.linear_addr) )
-                flush_tlb_one_mask(d->domain_dirty_cpumask, op.arg1.linear_addr);
+                flush_tlb_one_mask(currd->domain_dirty_cpumask,
+                                   op.arg1.linear_addr);
             break;
 
         case MMUEXT_FLUSH_CACHE:
-            if ( unlikely(d != pg_owner) )
+            if ( unlikely(currd != pg_owner) )
                 rc = -EPERM;
-            else if ( unlikely(!cache_flush_permitted(d)) )
+            else if ( unlikely(!cache_flush_permitted(currd)) )
                 rc = -EACCES;
             else
                 wbinvd();
             break;
 
         case MMUEXT_FLUSH_CACHE_GLOBAL:
-            if ( unlikely(d != pg_owner) )
+            if ( unlikely(currd != pg_owner) )
                 rc = -EPERM;
-            else if ( likely(cache_flush_permitted(d)) )
+            else if ( likely(cache_flush_permitted(currd)) )
             {
                 unsigned int cpu;
                 cpumask_t *mask = this_cpu(scratch_cpumask);
@@ -3501,9 +3503,9 @@ long do_mmuext_op(
             unsigned int ents = op.arg2.nr_ents;
             unsigned long ptr = ents ? op.arg1.linear_addr : 0;
 
-            if ( unlikely(d != pg_owner) )
+            if ( unlikely(currd != pg_owner) )
                 rc = -EPERM;
-            else if ( paging_mode_external(d) )
+            else if ( paging_mode_external(currd) )
                 rc = -EINVAL;
             else if ( ((ptr & (PAGE_SIZE - 1)) != 0) || !__addr_ok(ptr) ||
                       (ents > 8192) )
@@ -3606,7 +3608,7 @@ long do_mmuext_op(
 
             if ( !opt_allow_superpage )
                 rc = -EOPNOTSUPP;
-            else if ( unlikely(d != pg_owner) )
+            else if ( unlikely(currd != pg_owner) )
                 rc = -EPERM;
             else if ( mfn & (L1_PAGETABLE_ENTRIES - 1) )
             {
@@ -3617,7 +3619,7 @@ long do_mmuext_op(
             else if ( !mfn_valid(_mfn(mfn | (L1_PAGETABLE_ENTRIES - 1))) )
                 rc = -EINVAL;
             else if ( op.cmd == MMUEXT_MARK_SUPER )
-                rc = mark_superpage(mfn_to_spage(mfn), d);
+                rc = mark_superpage(mfn_to_spage(mfn), currd);
             else
                 rc = unmark_superpage(mfn_to_spage(mfn));
             break;
