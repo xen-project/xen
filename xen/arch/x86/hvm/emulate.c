@@ -1955,9 +1955,6 @@ static int _hvm_emulate_one(struct hvm_emulate_ctxt *hvmemul_ctxt,
         memcpy(vio->mmio_insn, hvmemul_ctxt->insn_buf, vio->mmio_insn_bytes);
     }
 
-    if ( rc != X86EMUL_OKAY )
-        return rc;
-
     if ( hvmemul_ctxt->ctxt.retire.singlestep )
         hvm_inject_hw_exception(TRAP_debug, X86_EVENT_NO_EC);
 
@@ -1966,14 +1963,18 @@ static int _hvm_emulate_one(struct hvm_emulate_ctxt *hvmemul_ctxt,
     /* MOV-SS instruction toggles MOV-SS shadow, else we just clear it. */
     if ( hvmemul_ctxt->ctxt.retire.mov_ss )
         new_intr_shadow ^= HVM_INTR_SHADOW_MOV_SS;
-    else
+    else if ( rc != X86EMUL_RETRY )
         new_intr_shadow &= ~HVM_INTR_SHADOW_MOV_SS;
 
     /* STI instruction toggles STI shadow, else we just clear it. */
     if ( hvmemul_ctxt->ctxt.retire.sti )
         new_intr_shadow ^= HVM_INTR_SHADOW_STI;
-    else
+    else if ( rc != X86EMUL_RETRY )
         new_intr_shadow &= ~HVM_INTR_SHADOW_STI;
+
+    /* IRET, if valid in the given context, clears NMI blocking. */
+    if ( hvmemul_ctxt->ctxt.retire.unblock_nmi )
+        new_intr_shadow &= ~HVM_INTR_SHADOW_NMI;
 
     if ( hvmemul_ctxt->intr_shadow != new_intr_shadow )
     {
@@ -1987,7 +1988,7 @@ static int _hvm_emulate_one(struct hvm_emulate_ctxt *hvmemul_ctxt,
         hvm_hlt(regs->eflags);
     }
 
-    return X86EMUL_OKAY;
+    return rc;
 }
 
 int hvm_emulate_one(

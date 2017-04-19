@@ -490,6 +490,7 @@ struct x86_emulate_ctxt
             bool hlt:1;          /* Instruction HLTed. */
             bool mov_ss:1;       /* Instruction sets MOV-SS irq shadow. */
             bool sti:1;          /* Instruction sets STI irq shadow. */
+            bool unblock_nmi:1;  /* Instruction clears NMI blocking. */
             bool singlestep:1;   /* Singlestepping was active. */
         };
     } retire;

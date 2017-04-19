@@ -4002,6 +4002,7 @@ x86_emulate(
         uint32_t mask = X86_EFLAGS_VIP | X86_EFLAGS_VIF | X86_EFLAGS_VM;
 
         fail_if(!in_realmode(ctxt, ops));
+        ctxt->retire.unblock_nmi = true;
         if ( (rc = read_ulong(x86_seg_ss, sp_post_inc(op_bytes),
                               &eip, op_bytes, ctxt, ops)) ||
              (rc = read_ulong(x86_seg_ss, sp_post_inc(op_bytes),
@@ -7918,9 +7919,17 @@ int x86_emulate_wrapper(
 
     rc = x86_emulate(ctxt, ops);
 
-    /* Retire flags should only be set for successful instruction emulation. */
+    /*
+     * Most retire flags should only be set for successful instruction
+     * emulation.
+     */
     if ( rc != X86EMUL_OKAY )
-        ASSERT(ctxt->retire.raw == 0);
+    {
+        typeof(ctxt->retire) retire = ctxt->retire;
+
+        retire.unblock_nmi = false;
+        ASSERT(!retire.raw);
+    }
 
     /* All cases returning X86EMUL_EXCEPTION should have fault semantics. */
     if ( rc == X86EMUL_EXCEPTION )
