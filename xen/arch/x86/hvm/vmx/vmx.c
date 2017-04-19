@@ -2325,7 +2325,6 @@ static struct hvm_function_table __initdata vmx_function_table = {
     .handle_cd            = vmx_handle_cd,
     .set_info_guest       = vmx_set_info_guest,
     .set_rdtsc_exiting    = vmx_set_rdtsc_exiting,
-    .set_descriptor_access_exiting = vmx_set_descriptor_access_exiting,
     .nhvm_vcpu_initialise = nvmx_vcpu_initialise,
     .nhvm_vcpu_destroy    = nvmx_vcpu_destroy,
     .nhvm_vcpu_reset      = nvmx_vcpu_reset,
@@ -2445,6 +2444,10 @@ const struct hvm_function_table * __init start_vmx(void)
         printk("VMX: failed to initialise.\n");
         return NULL;
     }
+
+    if ( cpu_has_vmx_dt_exiting )
+        vmx_function_table.set_descriptor_access_exiting =
+            vmx_set_descriptor_access_exiting;
 
     /*
      * Do not enable EPT when (!cpu_has_vmx_pat), to prevent security hole

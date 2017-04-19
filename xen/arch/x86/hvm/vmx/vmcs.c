@@ -226,6 +226,7 @@ static int vmx_init_vmcs_config(void)
         opt = (SECONDARY_EXEC_VIRTUALIZE_APIC_ACCESSES |
                SECONDARY_EXEC_WBINVD_EXITING |
                SECONDARY_EXEC_ENABLE_EPT |
+               SECONDARY_EXEC_DESCRIPTOR_TABLE_EXITING |
                SECONDARY_EXEC_ENABLE_RDTSCP |
                SECONDARY_EXEC_PAUSE_LOOP_EXITING |
                SECONDARY_EXEC_ENABLE_INVPCID |
@@ -1019,6 +1020,13 @@ static int construct_vmcs(struct vcpu *v)
         v->arch.hvm_vmx.exec_control |= CPU_BASED_RDTSC_EXITING;
 
     v->arch.hvm_vmx.secondary_exec_control = vmx_secondary_exec_control;
+
+    /*
+     * Disable descriptor table exiting: It's controlled by the VM event
+     * monitor requesting it.
+     */
+    v->arch.hvm_vmx.secondary_exec_control &=
+        ~SECONDARY_EXEC_DESCRIPTOR_TABLE_EXITING;
 
     /* Disable VPID for now: we decide when to enable it on VMENTER. */
     v->arch.hvm_vmx.secondary_exec_control &= ~SECONDARY_EXEC_ENABLE_VPID;
