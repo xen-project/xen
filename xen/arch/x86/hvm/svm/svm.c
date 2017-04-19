@@ -2833,10 +2833,9 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
 
     default:
     unexpected_exit_type:
-        gdprintk(XENLOG_ERR, "unexpected VMEXIT: exit reason = %#"PRIx64", "
-                 "exitinfo1 = %#"PRIx64", exitinfo2 = %#"PRIx64"\n",
-                 exit_reason, 
-                 (u64)vmcb->exitinfo1, (u64)vmcb->exitinfo2);
+        gprintk(XENLOG_ERR, "Unexpected vmexit: reason %#"PRIx64", "
+                "exitinfo1 %#"PRIx64", exitinfo2 %#"PRIx64"\n",
+                exit_reason, vmcb->exitinfo1, vmcb->exitinfo2);
         svm_crash_or_fault(v);
         break;
     }
