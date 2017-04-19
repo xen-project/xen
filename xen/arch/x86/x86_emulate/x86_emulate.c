@@ -8017,8 +8017,14 @@ x86_insn_modrm(const struct x86_emulate_state *state,
 {
     check_state(state);
 
-    if ( state->modrm_mod > 3 )
+    if ( unlikely(state->modrm_mod > 3) )
+    {
+        if ( rm )
+            *rm = ~0U;
+        if ( reg )
+            *reg = ~0U;
         return -EINVAL;
+    }
 
     if ( rm )
         *rm = state->modrm_rm;
