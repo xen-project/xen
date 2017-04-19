@@ -89,6 +89,13 @@ int emul_test_cpuid(
         res->c |= 1U << 22;
     }
 
+    /*
+     * The emulator doesn't itself use CLZERO, so we can always run the
+     * respective test(s).
+     */
+    if ( leaf == 0x80000008 )
+        res->b |= 1U << 0;
+
     return X86EMUL_OKAY;
 }
 
