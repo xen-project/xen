@@ -3598,6 +3598,28 @@ gp_fault:
     return X86EMUL_EXCEPTION;
 }
 
+static bool is_sysdesc_access(const struct x86_emulate_state *state,
+                              const struct x86_emulate_ctxt *ctxt)
+{
+    unsigned int ext;
+    int mode = x86_insn_modrm(state, NULL, &ext);
+
+    switch ( ctxt->opcode )
+    {
+    case X86EMUL_OPC(0x0f, 0x00):
+        if ( !(ext & 4) ) /* SLDT / STR / LLDT / LTR */
+            return true;
+        break;
+
+    case X86EMUL_OPC(0x0f, 0x01):
+        if ( mode != 3 && !(ext & 4) ) /* SGDT / SIDT / LGDT / LIDT */
+            return true;
+        break;
+    }
+
+    return false;
+}
+
 int hvm_descriptor_access_intercept(uint64_t exit_info,
                                     uint64_t vmx_exit_qualification,
                                     unsigned int descriptor, bool is_write)
@@ -3611,24 +3633,8 @@ int hvm_descriptor_access_intercept(uint64_t exit_info,
         hvm_monitor_descriptor_access(exit_info, vmx_exit_qualification,
                                       descriptor, is_write);
     }
-    else
-    {
-        struct hvm_emulate_ctxt ctxt;
-
-        hvm_emulate_init_once(&ctxt, NULL, guest_cpu_user_regs());
-        switch ( hvm_emulate_one(&ctxt) )
-        {
-        case X86EMUL_UNHANDLEABLE:
-            domain_crash(currd);
-            return X86EMUL_UNHANDLEABLE;
-        case X86EMUL_EXCEPTION:
-            hvm_inject_event(&ctxt.ctxt.event);
-            /* fall through */
-        default:
-            hvm_emulate_writeback(&ctxt);
-            break;
-        }
-    }
+    else if ( !hvm_emulate_one_insn(is_sysdesc_access) )
+        domain_crash(currd);
 
     return X86EMUL_OKAY;
 }
