@@ -53,6 +53,7 @@ static struct kexec_image *kexec_image[KEXEC_IMAGE_NR];
 #define KEXEC_FLAG_DEFAULT_POS   (KEXEC_IMAGE_NR + 0)
 #define KEXEC_FLAG_CRASH_POS     (KEXEC_IMAGE_NR + 1)
 #define KEXEC_FLAG_IN_PROGRESS   (KEXEC_IMAGE_NR + 2)
+#define KEXEC_FLAG_IN_HYPERCALL  (KEXEC_IMAGE_NR + 3)
 
 static unsigned long kexec_flags = 0; /* the lowest bits are for KEXEC_IMAGE... */
 
@@ -1193,6 +1194,9 @@ static int do_kexec_op_internal(unsigned long op,
     if ( ret )
         return ret;
 
+    if ( test_and_set_bit(KEXEC_FLAG_IN_HYPERCALL, &kexec_flags) )
+        return hypercall_create_continuation(__HYPERVISOR_kexec_op, "lh", op, uarg);
+
     switch ( op )
     {
     case KEXEC_CMD_kexec_get_range:
@@ -1226,6 +1230,8 @@ static int do_kexec_op_internal(unsigned long op,
         ret = kexec_status(uarg);
         break;
     }
+
+    clear_bit(KEXEC_FLAG_IN_HYPERCALL, &kexec_flags);
 
     return ret;
 }
