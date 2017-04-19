@@ -2676,7 +2676,7 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
             if ( handle_pio(port, bytes, dir) )
                 __update_guest_eip(regs, vmcb->exitinfo2 - vmcb->rip);
         }
-        else if ( !hvm_emulate_one_insn(x86_insn_is_portio) )
+        else if ( !hvm_emulate_one_insn(x86_insn_is_portio, "port I/O") )
             hvm_inject_hw_exception(TRAP_gp_fault, 0);
         break;
 
@@ -2684,7 +2684,7 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
     case VMEXIT_CR0_WRITE ... VMEXIT_CR15_WRITE:
         if ( cpu_has_svm_decode && (vmcb->exitinfo1 & (1ULL << 63)) )
             svm_vmexit_do_cr_access(vmcb, regs);
-        else if ( !hvm_emulate_one_insn(x86_insn_is_cr_access) )
+        else if ( !hvm_emulate_one_insn(x86_insn_is_cr_access, "CR access") )
             hvm_inject_hw_exception(TRAP_gp_fault, 0);
         break;
 
@@ -2694,7 +2694,7 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
             svm_invlpg_intercept(vmcb->exitinfo1);
             __update_guest_eip(regs, vmcb->nextrip - vmcb->rip);
         }
-        else if ( !hvm_emulate_one_insn(is_invlpg) )
+        else if ( !hvm_emulate_one_insn(is_invlpg, "invlpg") )
             hvm_inject_hw_exception(TRAP_gp_fault, 0);
         break;
 

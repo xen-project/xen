@@ -3633,7 +3633,7 @@ int hvm_descriptor_access_intercept(uint64_t exit_info,
         hvm_monitor_descriptor_access(exit_info, vmx_exit_qualification,
                                       descriptor, is_write);
     }
-    else if ( !hvm_emulate_one_insn(is_sysdesc_access) )
+    else if ( !hvm_emulate_one_insn(is_sysdesc_access, "sysdesc access") )
         domain_crash(currd);
 
     return X86EMUL_OKAY;

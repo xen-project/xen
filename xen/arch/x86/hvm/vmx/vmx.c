@@ -4013,7 +4013,7 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
         if ( exit_qualification & 0x10 )
         {
             /* INS, OUTS */
-            if ( !hvm_emulate_one_insn(x86_insn_is_portio) )
+            if ( !hvm_emulate_one_insn(x86_insn_is_portio, "port I/O") )
                 hvm_inject_hw_exception(TRAP_gp_fault, 0);
         }
         else

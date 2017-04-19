@@ -2033,7 +2033,7 @@ int hvm_emulate_one_mmio(unsigned long mfn, unsigned long gla)
     switch ( rc )
     {
     case X86EMUL_UNHANDLEABLE:
-        hvm_dump_emulation_state(XENLOG_G_WARNING "MMCFG", &ctxt);
+        hvm_dump_emulation_state(XENLOG_G_WARNING, "MMCFG", &ctxt);
         break;
     case X86EMUL_EXCEPTION:
         hvm_inject_event(&ctxt.ctxt.event);
@@ -2091,7 +2091,7 @@ void hvm_emulate_one_vm_event(enum emul_kind kind, unsigned int trapnr,
          */
         return;
     case X86EMUL_UNHANDLEABLE:
-        hvm_dump_emulation_state(XENLOG_G_DEBUG "Mem event", &ctx);
+        hvm_dump_emulation_state(XENLOG_G_DEBUG, "Mem event", &ctx);
         hvm_inject_hw_exception(trapnr, errcode);
         break;
     case X86EMUL_EXCEPTION:
@@ -2218,7 +2218,7 @@ static const char *guest_x86_mode_to_str(int mode)
     }
 }
 
-void hvm_dump_emulation_state(const char *prefix,
+void hvm_dump_emulation_state(const char *loglvl, const char *prefix,
                               struct hvm_emulate_ctxt *hvmemul_ctxt)
 {
     struct vcpu *curr = current;
@@ -2226,8 +2226,8 @@ void hvm_dump_emulation_state(const char *prefix,
     const struct segment_register *cs =
         hvmemul_get_seg_reg(x86_seg_cs, hvmemul_ctxt);
 
-    printk("%s emulation failed: %pv %s @ %04x:%08lx -> %*ph\n",
-           prefix, curr, mode_str, cs->sel, hvmemul_ctxt->insn_buf_eip,
+    printk("%s%s emulation failed: %pv %s @ %04x:%08lx -> %*ph\n",
+           loglvl, prefix, curr, mode_str, cs->sel, hvmemul_ctxt->insn_buf_eip,
            hvmemul_ctxt->insn_buf_bytes, hvmemul_ctxt->insn_buf);
 }
 

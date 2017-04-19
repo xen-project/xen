@@ -77,7 +77,7 @@ void send_invalidate_req(void)
         gprintk(XENLOG_ERR, "Unsuccessful map-cache invalidate\n");
 }
 
-bool hvm_emulate_one_insn(hvm_emulate_validate_t *validate)
+bool hvm_emulate_one_insn(hvm_emulate_validate_t *validate, const char *descr)
 {
     struct hvm_emulate_ctxt ctxt;
     struct vcpu *curr = current;
@@ -96,7 +96,7 @@ bool hvm_emulate_one_insn(hvm_emulate_validate_t *validate)
     switch ( rc )
     {
     case X86EMUL_UNHANDLEABLE:
-        hvm_dump_emulation_state(XENLOG_G_WARNING "MMIO", &ctxt);
+        hvm_dump_emulation_state(XENLOG_G_WARNING, descr, &ctxt);
         return false;
 
     case X86EMUL_EXCEPTION:
