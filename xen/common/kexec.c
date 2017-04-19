@@ -820,7 +820,6 @@ static int kexec_exec(XEN_GUEST_HANDLE_PARAM(void) uarg)
 static int kexec_swap_images(int type, struct kexec_image *new,
                              struct kexec_image **old)
 {
-    static DEFINE_SPINLOCK(kexec_lock);
     int base, bit, pos;
     int new_slot, old_slot;
 
@@ -832,7 +831,7 @@ static int kexec_swap_images(int type, struct kexec_image *new,
     if ( kexec_load_get_bits(type, &base, &bit) )
         return -EINVAL;
 
-    spin_lock(&kexec_lock);
+    ASSERT(test_bit(KEXEC_FLAG_IN_HYPERCALL, &kexec_flags));
 
     pos = (test_bit(bit, &kexec_flags) != 0);
     old_slot = base + pos;
@@ -845,8 +844,6 @@ static int kexec_swap_images(int type, struct kexec_image *new,
 
     clear_bit(old_slot, &kexec_flags);
     *old = kexec_image[old_slot];
-
-    spin_unlock(&kexec_lock);
 
     return 0;
 }
