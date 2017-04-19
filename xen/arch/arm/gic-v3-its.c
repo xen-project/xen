@@ -505,6 +505,10 @@ static int gicv3_its_init_single_its(struct host_its *hw_its)
         return -ENOMEM;
     writeq_relaxed(0, hw_its->its_base + GITS_CWRITER);
 
+    /* Now enable interrupt translation and command processing on that ITS. */
+    reg = readl_relaxed(hw_its->its_base + GITS_CTLR);
+    writel_relaxed(reg | GITS_CTLR_ENABLE, hw_its->its_base + GITS_CTLR);
+
     return 0;
 }
 
