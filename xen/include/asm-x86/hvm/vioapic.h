@@ -50,6 +50,7 @@
 struct hvm_vioapic {
     struct domain *domain;
     uint32_t nr_pins;
+    unsigned int base_gsi;
     union {
         XEN_HVM_VIOAPIC(,);
         struct hvm_hw_vioapic domU;

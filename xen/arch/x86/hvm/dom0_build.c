@@ -719,7 +719,7 @@ static int __init pvh_setup_acpi_madt(struct domain *d, paddr_t *addr)
         io_apic->header.length = sizeof(*io_apic);
         io_apic->id = domain_vioapic(d, i)->id;
         io_apic->address = domain_vioapic(d, i)->base_address;
-        io_apic->global_irq_base = io_apic_gsi_base(i);
+        io_apic->global_irq_base = domain_vioapic(d, i)->base_gsi;
         io_apic++;
     }
 
