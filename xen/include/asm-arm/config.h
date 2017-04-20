@@ -111,7 +111,11 @@
 
 #define XEN_VIRT_START         _AT(vaddr_t,0x00200000)
 #define FIXMAP_ADDR(n)        (_AT(vaddr_t,0x00400000) + (n) * PAGE_SIZE)
+
 #define BOOT_FDT_VIRT_START    _AT(vaddr_t,0x00600000)
+#define BOOT_FDT_SLOT_SIZE     MB(2)
+#define BOOT_FDT_VIRT_END      (BOOT_FDT_VIRT_START + BOOT_FDT_SLOT_SIZE)
+
 #define BOOT_RELOC_VIRT_START  _AT(vaddr_t,0x00800000)
 #ifdef CONFIG_LIVEPATCH
 #define LIVEPATCH_VMAP_START   _AT(vaddr_t,0x00800000)
