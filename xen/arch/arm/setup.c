@@ -725,6 +725,12 @@ void __init start_xen(unsigned long boot_phys_offset,
     smp_clear_cpu_maps();
 
     device_tree_flattened = early_fdt_map(fdt_paddr);
+    if ( !device_tree_flattened )
+        panic("Invalid device tree blob at physical address %#lx.\n"
+              "The DTB must be 8-byte aligned and must not exceed 2 MB in size.\n\n"
+              "Please check your bootloader.",
+              fdt_paddr);
+
     fdt_size = boot_fdt_info(device_tree_flattened, fdt_paddr);
 
     cmdline = boot_fdt_cmdline(device_tree_flattened);

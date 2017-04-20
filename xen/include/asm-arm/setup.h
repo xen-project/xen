@@ -3,6 +3,9 @@
 
 #include <public/version.h>
 
+#define MIN_FDT_ALIGN 8
+#define MAX_FDT_SIZE SZ_2M
+
 #define NR_MEM_BANKS 64
 
 #define MAX_MODULES 5 /* Current maximum useful modules */

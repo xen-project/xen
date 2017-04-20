@@ -39,6 +39,8 @@
 #include <xsm/xsm.h>
 #include <xen/pfn.h>
 #include <xen/sizes.h>
+#include <xen/libfdt/libfdt.h>
+#include <asm/setup.h>
 
 struct domain *dom_xen, *dom_io, *dom_cow;
 
@@ -474,11 +476,36 @@ void * __init early_fdt_map(paddr_t fdt_paddr)
 {
     /* We are using 2MB superpage for mapping the FDT */
     paddr_t base_paddr = fdt_paddr & SECOND_MASK;
+    paddr_t offset;
+    void *fdt_virt;
+
+    /*
+     * Check whether the physical FDT address is set and meets the minimum
+     * alignment requirement. Since we are relying on MIN_FDT_ALIGN to be at
+     * least 8 bytes so that we always access the magic and size fields
+     * of the FDT header after mapping the first chunk, double check if
+     * that is indeed the case.
+     */
+    BUILD_BUG_ON(MIN_FDT_ALIGN < 8);
+    if ( !fdt_paddr || fdt_paddr % MIN_FDT_ALIGN )
+        return NULL;
+
+    /* The FDT is mapped using 2MB superpage */
+    BUILD_BUG_ON(BOOT_FDT_VIRT_START % SZ_2M);
 
     create_mappings(boot_second, BOOT_FDT_VIRT_START, paddr_to_pfn(base_paddr),
                     SZ_2M >> PAGE_SHIFT, SZ_2M);
 
-    return (void *)BOOT_FDT_VIRT_START + (fdt_paddr % SECOND_SIZE);
+    offset = fdt_paddr % SECOND_SIZE;
+    fdt_virt = (void *)BOOT_FDT_VIRT_START + offset;
+
+    if ( fdt_magic(fdt_virt) != FDT_MAGIC )
+        return NULL;
+
+    if ( fdt_totalsize(fdt_virt) > MAX_FDT_SIZE )
+        return NULL;
+
+    return fdt_virt;
 }
 
 void __init remove_early_mappings(void)
