@@ -724,9 +724,7 @@ void __init start_xen(unsigned long boot_phys_offset,
 
     smp_clear_cpu_maps();
 
-    /* This is mapped by head.S */
-    device_tree_flattened = (void *)BOOT_FDT_VIRT_START
-        + (fdt_paddr & ((1 << SECOND_SHIFT) - 1));
+    device_tree_flattened = early_fdt_map(fdt_paddr);
     fdt_size = boot_fdt_info(device_tree_flattened, fdt_paddr);
 
     cmdline = boot_fdt_cmdline(device_tree_flattened);
