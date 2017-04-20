@@ -431,5 +431,5 @@ int __init early_microcode_init(void)
         register_cpu_notifier(&microcode_percpu_nfb);
     }
 
-    return 0;
+    return rc;
 }
