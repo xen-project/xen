@@ -269,6 +269,40 @@ void clear_fixmap(unsigned map)
     flush_xen_data_tlb_range_va(FIXMAP_ADDR(map), PAGE_SIZE);
 }
 
+/* Create Xen's mappings of memory.
+ * Mapping_size must be either 2MB or 32MB.
+ * Base and virt must be mapping_size aligned.
+ * Size must be a multiple of mapping_size.
+ * second must be a contiguous set of second level page tables
+ * covering the region starting at virt_offset. */
+static void __init create_mappings(lpae_t *second,
+                                   unsigned long virt_offset,
+                                   unsigned long base_mfn,
+                                   unsigned long nr_mfns,
+                                   unsigned int mapping_size)
+{
+    unsigned long i, count;
+    const unsigned long granularity = mapping_size >> PAGE_SHIFT;
+    lpae_t pte, *p;
+
+    ASSERT((mapping_size == MB(2)) || (mapping_size == MB(32)));
+    ASSERT(!((virt_offset >> PAGE_SHIFT) % granularity));
+    ASSERT(!(base_mfn % granularity));
+    ASSERT(!(nr_mfns % granularity));
+
+    count = nr_mfns / LPAE_ENTRIES;
+    p = second + second_linear_offset(virt_offset);
+    pte = mfn_to_xen_entry(base_mfn, WRITEALLOC);
+    if ( granularity == 16 * LPAE_ENTRIES )
+        pte.pt.contig = 1;  /* These maps are in 16-entry contiguous chunks. */
+    for ( i = 0; i < count; i++ )
+    {
+        write_pte(p + i, pte);
+        pte.pt.base += 1 << LPAE_SHIFT;
+    }
+    flush_xen_data_tlb_local();
+}
+
 #ifdef CONFIG_DOMAIN_PAGE
 void *map_domain_page_global(mfn_t mfn)
 {
@@ -631,40 +665,6 @@ void mmu_init_secondary_cpu(void)
     /* From now on, no mapping may be both writable and executable. */
     WRITE_SYSREG32(READ_SYSREG32(SCTLR_EL2) | SCTLR_WXN, SCTLR_EL2);
     flush_xen_text_tlb_local();
-}
-
-/* Create Xen's mappings of memory.
- * Mapping_size must be either 2MB or 32MB.
- * Base and virt must be mapping_size aligned.
- * Size must be a multiple of mapping_size.
- * second must be a contiguous set of second level page tables
- * covering the region starting at virt_offset. */
-static void __init create_mappings(lpae_t *second,
-                                   unsigned long virt_offset,
-                                   unsigned long base_mfn,
-                                   unsigned long nr_mfns,
-                                   unsigned int mapping_size)
-{
-    unsigned long i, count;
-    const unsigned long granularity = mapping_size >> PAGE_SHIFT;
-    lpae_t pte, *p;
-
-    ASSERT((mapping_size == MB(2)) || (mapping_size == MB(32)));
-    ASSERT(!((virt_offset >> PAGE_SHIFT) % granularity));
-    ASSERT(!(base_mfn % granularity));
-    ASSERT(!(nr_mfns % granularity));
-
-    count = nr_mfns / LPAE_ENTRIES;
-    p = second + second_linear_offset(virt_offset);
-    pte = mfn_to_xen_entry(base_mfn, WRITEALLOC);
-    if ( granularity == 16 * LPAE_ENTRIES )
-        pte.pt.contig = 1;  /* These maps are in 16-entry contiguous chunks. */
-    for ( i = 0; i < count; i++ )
-    {
-        write_pte(p + i, pte);
-        pte.pt.base += 1 << LPAE_SHIFT;
-    }
-    flush_xen_data_tlb_local();
 }
 
 #ifdef CONFIG_ARM_32
