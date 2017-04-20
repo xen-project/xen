@@ -545,19 +545,6 @@ paging:
         ldr   x23, =EARLY_UART_VIRTUAL_ADDRESS
 #endif
 
-        /* Map the DTB in the boot misc slot */
-        cbnz  x22, 1f                /* Only on boot CPU */
-
-        ldr   x4, =boot_second       /* x4 := vaddr (boot_second) */
-        lsr   x2, x21, #SECOND_SHIFT
-        lsl   x2, x2, #SECOND_SHIFT  /* x2 := 2MB-aligned paddr of DTB */
-        mov   x3, #PT_MEM            /* x2 := 2MB RAM incl. DTB */
-        orr   x2, x2, x3
-        ldr   x1, =BOOT_FDT_VIRT_START
-        lsr   x1, x1, #(SECOND_SHIFT - 3)   /* x4 := Slot for BOOT_FDT_VIRT_START */
-        str   x2, [x4, x1]           /* Map it in the early fdt slot */
-1:
-
         /*
          * Flush the TLB in case the 1:1 mapping happens to clash with
          * the virtual addresses used by the fixmap or DTB.

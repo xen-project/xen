@@ -39,6 +39,7 @@
 #include <xen/vmap.h>
 #include <xsm/xsm.h>
 #include <xen/pfn.h>
+#include <xen/sizes.h>
 
 struct domain *dom_xen, *dom_io, *dom_cow;
 
@@ -467,6 +468,18 @@ static inline lpae_t pte_of_xenaddr(vaddr_t va)
     paddr_t ma = va + phys_offset;
     unsigned long mfn = ma >> PAGE_SHIFT;
     return mfn_to_xen_entry(mfn, WRITEALLOC);
+}
+
+/* Map the FDT in the early boot page table */
+void * __init early_fdt_map(paddr_t fdt_paddr)
+{
+    /* We are using 2MB superpage for mapping the FDT */
+    paddr_t base_paddr = fdt_paddr & SECOND_MASK;
+
+    create_mappings(boot_second, BOOT_FDT_VIRT_START, paddr_to_pfn(base_paddr),
+                    SZ_2M >> PAGE_SHIFT, SZ_2M);
+
+    return (void *)BOOT_FDT_VIRT_START + (fdt_paddr % SECOND_SIZE);
 }
 
 void __init remove_early_mappings(void)
