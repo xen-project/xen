@@ -479,6 +479,7 @@ void * __init early_fdt_map(paddr_t fdt_paddr)
     paddr_t base_paddr = fdt_paddr & SECOND_MASK;
     paddr_t offset;
     void *fdt_virt;
+    uint32_t size;
 
     /*
      * Check whether the physical FDT address is set and meets the minimum
@@ -503,8 +504,16 @@ void * __init early_fdt_map(paddr_t fdt_paddr)
     if ( fdt_magic(fdt_virt) != FDT_MAGIC )
         return NULL;
 
-    if ( fdt_totalsize(fdt_virt) > MAX_FDT_SIZE )
+    size = fdt_totalsize(fdt_virt);
+    if ( size > MAX_FDT_SIZE )
         return NULL;
+
+    if ( (offset + size) > SZ_2M )
+    {
+        create_mappings(boot_second, BOOT_FDT_VIRT_START + SZ_2M,
+                        paddr_to_pfn(base_paddr + SZ_2M),
+                        SZ_2M >> PAGE_SHIFT, SZ_2M);
+    }
 
     return fdt_virt;
 }
@@ -513,7 +522,9 @@ void __init remove_early_mappings(void)
 {
     lpae_t pte = {0};
     write_pte(xen_second + second_table_offset(BOOT_FDT_VIRT_START), pte);
-    flush_xen_data_tlb_range_va(BOOT_FDT_VIRT_START, SECOND_SIZE);
+    write_pte(xen_second + second_table_offset(BOOT_FDT_VIRT_START + SZ_2M),
+              pte);
+    flush_xen_data_tlb_range_va(BOOT_FDT_VIRT_START, BOOT_FDT_SLOT_SIZE);
 }
 
 extern void relocate_xen(uint64_t ttbr, void *src, void *dst, size_t len);
@@ -572,6 +583,8 @@ void __init setup_pagetables(unsigned long boot_phys_offset, paddr_t xen_paddr)
     /* ... DTB */
     pte = boot_second[second_table_offset(BOOT_FDT_VIRT_START)];
     xen_second[second_table_offset(BOOT_FDT_VIRT_START)] = pte;
+    pte = boot_second[second_table_offset(BOOT_FDT_VIRT_START + SZ_2M)];
+    xen_second[second_table_offset(BOOT_FDT_VIRT_START + SZ_2M)] = pte;
 
     /* ... Boot Misc area for xen relocation */
     dest_va = BOOT_RELOC_VIRT_START;
