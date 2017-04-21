@@ -581,11 +581,10 @@ int rcu_lock_remote_domain_by_id(domid_t dom, struct domain **d);
  */
 int rcu_lock_live_remote_domain_by_id(domid_t dom, struct domain **d);
 
-/* Finish a RCU critical region started by rcu_lock_domain_by_id(). */
 static inline void rcu_unlock_domain(struct domain *d)
 {
     if ( d != current->domain )
-        rcu_read_unlock(&domlist_read_lock);
+        rcu_read_unlock(d);
 }
 
 static inline struct domain *rcu_lock_domain(struct domain *d)
