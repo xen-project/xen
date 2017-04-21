@@ -83,6 +83,8 @@ static const unsigned int vlapic_lvt_mask[VLAPIC_LVT_NUM] =
     ((vlapic_get_reg(vlapic, APIC_LVTT) & APIC_TIMER_MODE_MASK) \
      == APIC_TIMER_MODE_TSC_DEADLINE)
 
+static void vlapic_do_init(struct vlapic *vlapic);
+
 static int vlapic_find_highest_vector(const void *bitmap)
 {
     const uint32_t *word = bitmap;
@@ -281,7 +283,7 @@ static void vlapic_init_sipi_one(struct vcpu *target, uint32_t icr)
         rc = vcpu_reset(target);
         ASSERT(!rc);
         target->fpu_initialised = fpu_initialised;
-        vlapic_reset(vcpu_vlapic(target));
+        vlapic_do_init(vcpu_vlapic(target));
         domain_unlock(target->domain);
         break;
     }
@@ -1237,16 +1239,14 @@ bool_t is_vlapic_lvtpc_enabled(struct vlapic *vlapic)
             !(vlapic_get_reg(vlapic, APIC_LVTPC) & APIC_LVT_MASKED));
 }
 
-/* Reset the VLPAIC back to its power-on/reset state. */
-void vlapic_reset(struct vlapic *vlapic)
+/* Reset the VLAPIC back to its init state. */
+static void vlapic_do_init(struct vlapic *vlapic)
 {
-    struct vcpu *v = vlapic_vcpu(vlapic);
     int i;
 
-    if ( !has_vlapic(v->domain) )
+    if ( !has_vlapic(vlapic_vcpu(vlapic)->domain) )
         return;
 
-    vlapic_set_reg(vlapic, APIC_ID,  (v->vcpu_id * 2) << 24);
     vlapic_set_reg(vlapic, APIC_LVR, VLAPIC_VERSION);
 
     for ( i = 0; i < 8; i++ )
@@ -1257,7 +1257,12 @@ void vlapic_reset(struct vlapic *vlapic)
     }
     vlapic_set_reg(vlapic, APIC_ICR,     0);
     vlapic_set_reg(vlapic, APIC_ICR2,    0);
-    vlapic_set_reg(vlapic, APIC_LDR,     0);
+    /*
+     * LDR is read-only in x2APIC mode. Preserve its value when handling
+     * INIT signal in x2APIC mode.
+     */
+    if ( !vlapic_x2apic_mode(vlapic) )
+        vlapic_set_reg(vlapic, APIC_LDR, 0);
     vlapic_set_reg(vlapic, APIC_TASKPRI, 0);
     vlapic_set_reg(vlapic, APIC_TMICT,   0);
     vlapic_set_reg(vlapic, APIC_TMCCT,   0);
@@ -1273,6 +1278,23 @@ void vlapic_reset(struct vlapic *vlapic)
 
     TRACE_0D(TRC_HVM_EMUL_LAPIC_STOP_TIMER);
     destroy_periodic_time(&vlapic->pt);
+}
+
+/* Reset the VLAPIC back to its power-on/reset state. */
+void vlapic_reset(struct vlapic *vlapic)
+{
+    const struct vcpu *v = vlapic_vcpu(vlapic);
+
+    if ( !has_vlapic(v->domain) )
+        return;
+
+    vlapic->hw.apic_base_msr = (MSR_IA32_APICBASE_ENABLE |
+                                APIC_DEFAULT_PHYS_BASE);
+    if ( v->vcpu_id == 0 )
+        vlapic->hw.apic_base_msr |= MSR_IA32_APICBASE_BSP;
+
+    vlapic_set_reg(vlapic, APIC_ID, (v->vcpu_id * 2) << 24);
+    vlapic_do_init(vlapic);
 }
 
 /* rearm the actimer if needed, after a HVM restore */
@@ -1488,11 +1510,6 @@ int vlapic_init(struct vcpu *v)
     clear_page(vlapic->regs);
 
     vlapic_reset(vlapic);
-
-    vlapic->hw.apic_base_msr = (MSR_IA32_APICBASE_ENABLE |
-                                APIC_DEFAULT_PHYS_BASE);
-    if ( v->vcpu_id == 0 )
-        vlapic->hw.apic_base_msr |= MSR_IA32_APICBASE_BSP;
 
     spin_lock_init(&vlapic->esr_lock);
 
