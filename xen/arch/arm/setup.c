@@ -757,15 +757,17 @@ void __init start_xen(unsigned long boot_phys_offset,
     /* Parse the ACPI tables for possible boot-time configuration */
     acpi_boot_table_init();
 
-    if ( acpi_disabled )
-        printk("Booting using Device Tree\n");
-    else
-        printk("Booting using ACPI\n");
-
     end_boot_allocator();
 
     vm_init();
-    dt_unflatten_host_device_tree();
+
+    if ( acpi_disabled )
+    {
+        printk("Booting using Device Tree\n");
+        dt_unflatten_host_device_tree();
+    }
+    else
+        printk("Booting using ACPI\n");
 
     init_IRQ();
 
