@@ -1074,7 +1074,7 @@ get_page_from_l1e(
 
  could_not_pin:
     gdprintk(XENLOG_WARNING, "Error getting mfn %" PRI_mfn " (pfn %" PRI_pfn
-             ") from L1 entry %" PRIpte " for l1e_owner d%d, pg_owner d%d",
+             ") from L1 entry %" PRIpte " for l1e_owner d%d, pg_owner d%d\n",
              mfn, get_gpfn_from_mfn(mfn),
              l1e_get_intpte(l1e), l1e_owner->domain_id, pg_owner->domain_id);
     if ( real_pg_owner != NULL )
