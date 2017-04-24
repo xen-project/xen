@@ -536,7 +536,8 @@ static int hvm_print_line(
     return X86EMUL_OKAY;
 }
 
-int hvm_domain_initialise(struct domain *d)
+int hvm_domain_initialise(struct domain *d, unsigned long domcr_flags,
+                          struct xen_arch_domainconfig *config)
 {
     unsigned int nr_gsis;
     int rc;
@@ -553,6 +554,10 @@ int hvm_domain_initialise(struct domain *d)
     spin_lock_init(&d->arch.hvm_domain.write_map.lock);
     INIT_LIST_HEAD(&d->arch.hvm_domain.write_map.list);
     INIT_LIST_HEAD(&d->arch.hvm_domain.g2m_ioport_list);
+
+    rc = create_perdomain_mapping(d, PERDOMAIN_VIRT_START, 0, NULL, NULL);
+    if ( rc )
+        goto fail;
 
     hvm_init_cacheattr_region_list(d);
 
@@ -637,6 +642,8 @@ int hvm_domain_initialise(struct domain *d)
     xfree(d->arch.hvm_domain.irq);
  fail0:
     hvm_destroy_cacheattr_region_list(d);
+    destroy_perdomain_mapping(d, PERDOMAIN_VIRT_START, 0);
+ fail:
     return rc;
 }
 

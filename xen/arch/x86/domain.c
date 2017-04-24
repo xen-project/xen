@@ -598,16 +598,8 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags,
         d->arch.emulation_flags = emflags;
     }
 
-    if ( is_hvm_domain(d) )
-    {
-        d->arch.hvm_domain.hap_enabled =
-            hvm_funcs.hap_supported && (domcr_flags & DOMCRF_hap);
-
-        rc = create_perdomain_mapping(d, PERDOMAIN_VIRT_START, 0, NULL, NULL);
-    }
-    else if ( is_idle_domain(d) )
-        rc = 0;
-    else
+    rc = 0; /* HVM and idle domain */
+    if ( is_pv_domain(d) )
     {
         d->arch.pv_domain.gdt_ldt_l1tab =
             alloc_xenheap_pages(0, MEMF_node(domain_to_node(d)));
@@ -637,6 +629,11 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags,
 
     if ( !is_idle_domain(d) )
     {
+        /* Need to determine if HAP is enabled before initialising paging */
+        if ( is_hvm_domain(d) )
+            d->arch.hvm_domain.hap_enabled =
+                hvm_funcs.hap_supported && (domcr_flags & DOMCRF_hap);
+
         if ( (rc = paging_domain_init(d, domcr_flags)) != 0 )
             goto fail;
         paging_initialised = 1;
@@ -674,7 +671,7 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags,
 
     if ( is_hvm_domain(d) )
     {
-        if ( (rc = hvm_domain_initialise(d)) != 0 )
+        if ( (rc = hvm_domain_initialise(d, domcr_flags, config)) != 0 )
             goto fail;
     }
     else
