@@ -338,7 +338,8 @@ static int setup_compat_l4(struct vcpu *v)
 
 static void release_compat_l4(struct vcpu *v)
 {
-    free_domheap_page(pagetable_get_page(v->arch.guest_table));
+    if ( !pagetable_is_null(v->arch.guest_table) )
+        free_domheap_page(pagetable_get_page(v->arch.guest_table));
     v->arch.guest_table = pagetable_null();
     v->arch.guest_table_user = pagetable_null();
 }
@@ -379,9 +380,7 @@ int switch_compat(struct domain *d)
     for_each_vcpu( d, v )
     {
         free_compat_arg_xlat(v);
-
-        if ( !pagetable_is_null(v->arch.guest_table) )
-            release_compat_l4(v);
+        release_compat_l4(v);
     }
 
     return rc;
