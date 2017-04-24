@@ -400,6 +400,50 @@ static void pv_destroy_gdt_ldt_l1tab(struct vcpu *v)
                               1U << GDT_LDT_VCPU_SHIFT);
 }
 
+static void pv_vcpu_destroy(struct vcpu *v);
+static int pv_vcpu_initialise(struct vcpu *v)
+{
+    struct domain *d = v->domain;
+    int rc;
+
+    ASSERT(!is_idle_domain(d));
+
+    spin_lock_init(&v->arch.pv_vcpu.shadow_ldt_lock);
+
+    rc = pv_create_gdt_ldt_l1tab(v);
+    if ( rc )
+        return rc;
+
+    BUILD_BUG_ON(NR_VECTORS * sizeof(*v->arch.pv_vcpu.trap_ctxt) >
+                 PAGE_SIZE);
+    v->arch.pv_vcpu.trap_ctxt = xzalloc_array(struct trap_info,
+                                              NR_VECTORS);
+    if ( !v->arch.pv_vcpu.trap_ctxt )
+    {
+        rc = -ENOMEM;
+        goto done;
+    }
+
+    /* PV guests by default have a 100Hz ticker. */
+    v->periodic_period = MILLISECS(10);
+
+    v->arch.pv_vcpu.ctrlreg[4] = real_cr4_to_pv_guest_cr4(mmu_cr4_features);
+
+    if ( is_pv_32bit_domain(d) )
+    {
+        if ( (rc = setup_compat_arg_xlat(v)) )
+            goto done;
+
+        if ( (rc = setup_compat_l4(v)) )
+            goto done;
+    }
+
+ done:
+    if ( rc )
+        pv_vcpu_destroy(v);
+    return rc;
+}
+
 int vcpu_initialise(struct vcpu *v)
 {
     struct domain *d = v->domain;
@@ -426,61 +470,18 @@ int vcpu_initialise(struct vcpu *v)
     spin_lock_init(&v->arch.vpmu.vpmu_lock);
 
     if ( is_hvm_domain(d) )
-    {
         rc = hvm_vcpu_initialise(v);
-        goto done;
-    }
-
-
-    spin_lock_init(&v->arch.pv_vcpu.shadow_ldt_lock);
-
-    if ( !is_idle_domain(d) )
-    {
-        rc = pv_create_gdt_ldt_l1tab(v);
-        if ( rc )
-            goto done;
-
-        BUILD_BUG_ON(NR_VECTORS * sizeof(*v->arch.pv_vcpu.trap_ctxt) >
-                     PAGE_SIZE);
-        v->arch.pv_vcpu.trap_ctxt = xzalloc_array(struct trap_info,
-                                                  NR_VECTORS);
-        if ( !v->arch.pv_vcpu.trap_ctxt )
-        {
-            pv_destroy_gdt_ldt_l1tab(v);
-            rc = -ENOMEM;
-            goto done;
-        }
-
-        /* PV guests by default have a 100Hz ticker. */
-        v->periodic_period = MILLISECS(10);
-    }
+    else if ( !is_idle_domain(d) )
+        rc = pv_vcpu_initialise(v);
     else
+    {
+        /* Idle domain */
         v->arch.cr3 = __pa(idle_pg_table);
-
-    v->arch.pv_vcpu.ctrlreg[4] = real_cr4_to_pv_guest_cr4(mmu_cr4_features);
-
-    if ( is_pv_32bit_domain(d) )
-    {
-        if ( (rc = setup_compat_arg_xlat(v)) )
-            goto done;
-
-        if ( (rc = setup_compat_l4(v)) )
-        {
-            free_compat_arg_xlat(v);
-            goto done;
-        }
+        rc = 0;
     }
- done:
+
     if ( rc )
-    {
         vcpu_destroy_fpu(v);
-
-        if ( is_pv_domain(d) )
-        {
-            pv_destroy_gdt_ldt_l1tab(v);
-            xfree(v->arch.pv_vcpu.trap_ctxt);
-        }
-    }
     else if ( !is_idle_domain(v->domain) )
         vpmu_initialise(v);
 
