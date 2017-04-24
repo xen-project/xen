@@ -487,16 +487,23 @@ int vcpu_initialise(struct vcpu *v)
     return rc;
 }
 
-void vcpu_destroy(struct vcpu *v)
+static void pv_vcpu_destroy(struct vcpu *v)
 {
-    xfree(v->arch.vm_event);
-    v->arch.vm_event = NULL;
-
     if ( is_pv_32bit_vcpu(v) )
     {
         free_compat_arg_xlat(v);
         release_compat_l4(v);
     }
+
+    pv_destroy_gdt_ldt_l1tab(v);
+    xfree(v->arch.pv_vcpu.trap_ctxt);
+    v->arch.pv_vcpu.trap_ctxt = NULL;
+}
+
+void vcpu_destroy(struct vcpu *v)
+{
+    xfree(v->arch.vm_event);
+    v->arch.vm_event = NULL;
 
     vcpu_destroy_fpu(v);
 
@@ -506,10 +513,7 @@ void vcpu_destroy(struct vcpu *v)
     if ( is_hvm_vcpu(v) )
         hvm_vcpu_destroy(v);
     else
-    {
-        pv_destroy_gdt_ldt_l1tab(v);
-        xfree(v->arch.pv_vcpu.trap_ctxt);
-    }
+        pv_vcpu_destroy(v);
 }
 
 static bool emulation_flags_ok(const struct domain *d, uint32_t emflags)
