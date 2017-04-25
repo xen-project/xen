@@ -6514,8 +6514,13 @@ void destroy_perdomain_mapping(struct domain *d, unsigned long va,
 
 void free_perdomain_mappings(struct domain *d)
 {
-    l3_pgentry_t *l3tab = __map_domain_page(d->arch.perdomain_l3_pg);
+    l3_pgentry_t *l3tab;
     unsigned int i;
+
+    if ( !d->arch.perdomain_l3_pg )
+        return;
+
+    l3tab = __map_domain_page(d->arch.perdomain_l3_pg);
 
     for ( i = 0; i < PERDOMAIN_SLOTS; ++i)
         if ( l3e_get_flags(l3tab[i]) & _PAGE_PRESENT )
@@ -6555,6 +6560,7 @@ void free_perdomain_mappings(struct domain *d)
 
     unmap_domain_page(l3tab);
     free_domheap_page(d->arch.perdomain_l3_pg);
+    d->arch.perdomain_l3_pg = NULL;
 }
 
 #ifdef MEMORY_GUARD
