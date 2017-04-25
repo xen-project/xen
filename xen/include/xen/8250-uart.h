@@ -42,7 +42,7 @@
 #define UART_IER_ELSI     0x04    /* rx line status       */
 #define UART_IER_EMSI     0x08    /* MODEM status         */
 
-/* Interrupt Identificatiegister */
+/* Interrupt Identification Register */
 #define UART_IIR_NOINT    0x01    /* no interrupt pending */
 #define UART_IIR_IMA      0x06    /* interrupt identity:  */
 #define UART_IIR_LSI      0x06    /*  - rx line status    */
