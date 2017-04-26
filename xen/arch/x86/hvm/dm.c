@@ -25,6 +25,13 @@
 
 #include <xsm/xsm.h>
 
+struct dmop_args {
+    domid_t domid;
+    unsigned int nr_bufs;
+    /* Reserve enough buf elements for all current hypercalls. */
+    struct xen_dm_op_buf buf[2];
+};
+
 static bool copy_buf_from_guest(const xen_dm_op_buf_t bufs[],
                                 unsigned int nr_bufs, void *dst,
                                 unsigned int idx, size_t dst_size)
@@ -56,7 +63,7 @@ static bool copy_buf_to_guest(const xen_dm_op_buf_t bufs[],
 }
 
 static int track_dirty_vram(struct domain *d, xen_pfn_t first_pfn,
-                            unsigned int nr, struct xen_dm_op_buf *buf)
+                            unsigned int nr, const struct xen_dm_op_buf *buf)
 {
     if ( nr > (GB(1) >> PAGE_SHIFT) )
         return -EINVAL;
@@ -287,16 +294,14 @@ static int inject_event(struct domain *d,
     return 0;
 }
 
-static int dm_op(domid_t domid,
-                 unsigned int nr_bufs,
-                 xen_dm_op_buf_t bufs[])
+static int dm_op(const struct dmop_args *op_args)
 {
     struct domain *d;
     struct xen_dm_op op;
     bool const_op = true;
     long rc;
 
-    rc = rcu_lock_remote_domain_by_id(domid, &d);
+    rc = rcu_lock_remote_domain_by_id(op_args->domid, &d);
     if ( rc )
         return rc;
 
@@ -307,7 +312,7 @@ static int dm_op(domid_t domid,
     if ( rc )
         goto out;
 
-    if ( !copy_buf_from_guest(bufs, nr_bufs, &op, 0, sizeof(op)) )
+    if ( !copy_buf_from_guest(&op_args->buf[0], op_args->nr_bufs, &op, 0, sizeof(op)) )
     {
         rc = -EFAULT;
         goto out;
@@ -466,10 +471,10 @@ static int dm_op(domid_t domid,
         if ( data->pad )
             break;
 
-        if ( nr_bufs < 2 )
+        if ( op_args->nr_bufs < 2 )
             break;
 
-        rc = track_dirty_vram(d, data->first_pfn, data->nr, &bufs[1]);
+        rc = track_dirty_vram(d, data->first_pfn, data->nr, &op_args->buf[1]);
         break;
     }
 
@@ -564,7 +569,7 @@ static int dm_op(domid_t domid,
 
     if ( (!rc || rc == -ERESTART) &&
          !const_op &&
-         !copy_buf_to_guest(bufs, nr_bufs, 0, &op, sizeof(op)) )
+         !copy_buf_to_guest(&op_args->buf[0], op_args->nr_bufs, 0, &op, sizeof(op)) )
         rc = -EFAULT;
 
  out:
@@ -587,20 +592,21 @@ CHECK_dm_op_set_mem_type;
 CHECK_dm_op_inject_event;
 CHECK_dm_op_inject_msi;
 
-#define MAX_NR_BUFS 2
-
 int compat_dm_op(domid_t domid,
                  unsigned int nr_bufs,
                  XEN_GUEST_HANDLE_PARAM(void) bufs)
 {
-    struct xen_dm_op_buf nat[MAX_NR_BUFS];
+    struct dmop_args args;
     unsigned int i;
     int rc;
 
-    if ( nr_bufs > MAX_NR_BUFS )
+    if ( nr_bufs > ARRAY_SIZE(args.buf) )
         return -E2BIG;
 
-    for ( i = 0; i < nr_bufs; i++ )
+    args.domid = domid;
+    args.nr_bufs = nr_bufs;
+
+    for ( i = 0; i < args.nr_bufs; i++ )
     {
         struct compat_dm_op_buf cmp;
 
@@ -610,12 +616,12 @@ int compat_dm_op(domid_t domid,
 #define XLAT_dm_op_buf_HNDL_h(_d_, _s_) \
         guest_from_compat_handle((_d_)->h, (_s_)->h)
 
-        XLAT_dm_op_buf(&nat[i], &cmp);
+        XLAT_dm_op_buf(&args.buf[i], &cmp);
 
 #undef XLAT_dm_op_buf_HNDL_h
     }
 
-    rc = dm_op(domid, nr_bufs, nat);
+    rc = dm_op(&args);
 
     if ( rc == -ERESTART )
         rc = hypercall_create_continuation(__HYPERVISOR_dm_op, "iih",
@@ -628,16 +634,19 @@ long do_dm_op(domid_t domid,
               unsigned int nr_bufs,
               XEN_GUEST_HANDLE_PARAM(xen_dm_op_buf_t) bufs)
 {
-    struct xen_dm_op_buf nat[MAX_NR_BUFS];
+    struct dmop_args args;
     int rc;
 
-    if ( nr_bufs > MAX_NR_BUFS )
+    if ( nr_bufs > ARRAY_SIZE(args.buf) )
         return -E2BIG;
 
-    if ( copy_from_guest_offset(nat, bufs, 0, nr_bufs) )
+    args.domid = domid;
+    args.nr_bufs = nr_bufs;
+
+    if ( copy_from_guest_offset(&args.buf[0], bufs, 0, args.nr_bufs) )
         return -EFAULT;
 
-    rc = dm_op(domid, nr_bufs, nat);
+    rc = dm_op(&args);
 
     if ( rc == -ERESTART )
         rc = hypercall_create_continuation(__HYPERVISOR_dm_op, "iih",
