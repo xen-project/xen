@@ -32,37 +32,46 @@ struct dmop_args {
     struct xen_dm_op_buf buf[2];
 };
 
-static bool copy_buf_from_guest(const xen_dm_op_buf_t bufs[],
-                                unsigned int nr_bufs, void *dst,
-                                unsigned int idx, size_t dst_size)
+static bool _raw_copy_from_guest_buf(void *dst,
+                                     const struct dmop_args *args,
+                                     unsigned int buf_idx,
+                                     size_t dst_bytes)
 {
     size_t buf_bytes;
 
-    if ( idx >= nr_bufs )
+    if ( buf_idx >= args->nr_bufs )
         return false;
 
-    buf_bytes = bufs[idx].size;
-    if ( dst_size > buf_bytes )
+    buf_bytes =  args->buf[buf_idx].size;
+
+    if ( dst_bytes > buf_bytes )
         return false;
 
-    return !copy_from_guest(dst, bufs[idx].h, dst_size);
+    return !copy_from_guest(dst, args->buf[buf_idx].h, dst_bytes);
 }
 
-static bool copy_buf_to_guest(const xen_dm_op_buf_t bufs[],
-                              unsigned int nr_bufs, unsigned int idx,
-                              const void *src, size_t src_size)
+static bool _raw_copy_to_guest_buf(const struct dmop_args *args,
+                                   unsigned int buf_idx,
+                                   const void *src, size_t src_bytes)
 {
     size_t buf_bytes;
 
-    if ( idx >= nr_bufs )
+    if ( buf_idx >= args->nr_bufs )
         return false;
 
-    buf_bytes = bufs[idx].size;
-    if ( src_size > buf_bytes )
+    buf_bytes = args->buf[buf_idx].size;
+
+    if ( src_bytes > buf_bytes )
         return false;
 
-    return !copy_to_guest(bufs[idx].h, src, src_size);
+    return !copy_to_guest(args->buf[buf_idx].h, src, src_bytes);
 }
+
+#define COPY_FROM_GUEST_BUF(dst, args, buf_idx) \
+    _raw_copy_from_guest_buf(&(dst), args, buf_idx, sizeof(dst))
+
+#define COPY_TO_GUEST_BUF(args, buf_idx, src) \
+    _raw_copy_to_guest_buf(args, buf_idx, &(src), sizeof(src))
 
 static int track_dirty_vram(struct domain *d, xen_pfn_t first_pfn,
                             unsigned int nr, const struct xen_dm_op_buf *buf)
@@ -314,7 +323,7 @@ static int dm_op(const struct dmop_args *op_args)
     if ( rc )
         goto out;
 
-    if ( !copy_buf_from_guest(&op_args->buf[0], op_args->nr_bufs, &op, 0, sizeof(op)) )
+    if ( !COPY_FROM_GUEST_BUF(op, op_args, 0) )
     {
         rc = -EFAULT;
         goto out;
@@ -570,8 +579,7 @@ static int dm_op(const struct dmop_args *op_args)
     }
 
     if ( (!rc || rc == -ERESTART) &&
-         !const_op &&
-         !copy_buf_to_guest(&op_args->buf[0], op_args->nr_bufs, 0, &op, sizeof(op)) )
+         !const_op && !COPY_TO_GUEST_BUF(op_args, 0, op) )
         rc = -EFAULT;
 
  out:
