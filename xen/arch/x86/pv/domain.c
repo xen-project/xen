@@ -60,16 +60,12 @@ int switch_compat(struct domain *d)
         return 0;
 
     d->arch.has_32bit_shinfo = 1;
-    if ( is_pv_domain(d) )
-        d->arch.is_32bit_pv = 1;
+    d->arch.is_32bit_pv = 1;
 
     for_each_vcpu( d, v )
     {
-        rc = setup_compat_arg_xlat(v);
-        if ( !rc )
-            rc = setup_compat_l4(v);
-
-        if ( rc )
+        if ( (rc = setup_compat_arg_xlat(v)) ||
+             (rc = setup_compat_l4(v)) )
             goto undo_and_fail;
     }
 
