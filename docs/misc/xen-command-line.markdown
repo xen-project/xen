@@ -1083,11 +1083,12 @@ wait descriptor timed out', try increasing this value.
 ### iommu\_inclusive\_mapping (VT-d)
 > `= <boolean>`
 
-> Default: `false`
+> Default: `true`
 
-Use this to work around firmware issues providing correct RMRR entries. Rather
-than only mapping RAM pages for IOMMU accesses for Dom0, with this option all
-pages not marked as unusable in the E820 table will get a mapping established.
+Use this to work around firmware issues providing incorrect RMRR entries.
+Rather than only mapping RAM pages for IOMMU accesses for Dom0, with this
+option all pages not marked as unusable in the E820 table will get a mapping
+established.
 
 ### irq\_ratelimit
 > `= <integer>`
