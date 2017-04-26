@@ -254,8 +254,8 @@ int xendevicemodel_track_dirty_vram(
     uint32_t nr, unsigned long *dirty_bitmap);
 
 /**
- * This function notifies the hypervisor that a set of domain pages
- * have been modified.
+ * This function notifies the hypervisor that a set of contiguous
+ * domain pages have been modified.
  *
  * @parm dmod a handle to an open devicemodel interface.
  * @parm domid the domain id to be serviced
@@ -266,6 +266,21 @@ int xendevicemodel_track_dirty_vram(
 int xendevicemodel_modified_memory(
     xendevicemodel_handle *dmod, domid_t domid, uint64_t first_pfn,
     uint32_t nr);
+
+/**
+ * This function notifies the hypervisor that a set of discontiguous
+ * domain pages have been modified.
+ *
+ * @parm dmod a handle to an open devicemodel interface.
+ * @parm domid the domain id to be serviced
+ * @parm extents an array of extent structs, which each hold
+                 a start_pfn and nr (number of pfns).
+ * @parm nr the number of extents in the array
+ * @return 0 on success, -1 on failure.
+ */
+int xendevicemodel_modified_memory_bulk(
+    xendevicemodel_handle *dmod, domid_t domid,
+    struct xen_dm_op_modified_memory_extent extents[], uint32_t nr);
 
 /**
  * This function notifies the hypervisor that a set of domain pages

@@ -459,22 +459,36 @@ int xendevicemodel_track_dirty_vram(
                              dirty_bitmap, (size_t)(nr + 7) / 8);
 }
 
-int xendevicemodel_modified_memory(
-    xendevicemodel_handle *dmod, domid_t domid, uint64_t first_pfn,
-    uint32_t nr)
+int xendevicemodel_modified_memory_bulk(
+    xendevicemodel_handle *dmod, domid_t domid,
+    struct xen_dm_op_modified_memory_extent *extents, uint32_t nr)
 {
     struct xen_dm_op op;
-    struct xen_dm_op_modified_memory *data;
+    struct xen_dm_op_modified_memory *header;
+    size_t extents_size = nr * sizeof(struct xen_dm_op_modified_memory_extent);
 
     memset(&op, 0, sizeof(op));
 
     op.op = XEN_DMOP_modified_memory;
-    data = &op.u.modified_memory;
+    header = &op.u.modified_memory;
 
-    data->first_pfn = first_pfn;
-    data->nr = nr;
+    header->nr_extents = nr;
+    header->opaque = 0;
 
-    return xendevicemodel_op(dmod, domid, 1, &op, sizeof(op));
+    return xendevicemodel_op(dmod, domid, 2, &op, sizeof(op),
+                             extents, extents_size);
+}
+
+int xendevicemodel_modified_memory(
+    xendevicemodel_handle *dmod, domid_t domid, uint64_t first_pfn,
+    uint32_t nr)
+{
+    struct xen_dm_op_modified_memory_extent extent;
+
+    extent.first_pfn = first_pfn;
+    extent.nr = nr;
+
+    return xendevicemodel_modified_memory_bulk(dmod, domid, &extent, 1);
 }
 
 int xendevicemodel_set_mem_type(
