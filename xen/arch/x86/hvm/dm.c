@@ -36,30 +36,32 @@ static bool copy_buf_from_guest(const xen_dm_op_buf_t bufs[],
                                 unsigned int nr_bufs, void *dst,
                                 unsigned int idx, size_t dst_size)
 {
-    size_t size;
+    size_t buf_bytes;
 
     if ( idx >= nr_bufs )
         return false;
 
-    memset(dst, 0, dst_size);
+    buf_bytes = bufs[idx].size;
+    if ( dst_size > buf_bytes )
+        return false;
 
-    size = min_t(size_t, dst_size, bufs[idx].size);
-
-    return !copy_from_guest(dst, bufs[idx].h, size);
+    return !copy_from_guest(dst, bufs[idx].h, dst_size);
 }
 
 static bool copy_buf_to_guest(const xen_dm_op_buf_t bufs[],
                               unsigned int nr_bufs, unsigned int idx,
                               const void *src, size_t src_size)
 {
-    size_t size;
+    size_t buf_bytes;
 
     if ( idx >= nr_bufs )
         return false;
 
-    size = min_t(size_t, bufs[idx].size, src_size);
+    buf_bytes = bufs[idx].size;
+    if ( src_size > buf_bytes )
+        return false;
 
-    return !copy_to_guest(bufs[idx].h, src, size);
+    return !copy_to_guest(bufs[idx].h, src, src_size);
 }
 
 static int track_dirty_vram(struct domain *d, xen_pfn_t first_pfn,
