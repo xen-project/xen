@@ -27,13 +27,13 @@ static int setup_compat_l4(struct vcpu *v)
     if ( pg == NULL )
         return -ENOMEM;
 
-    /* This page needs to look like a pagetable so that it can be shadowed */
-    pg->u.inuse.type_info = PGT_l4_page_table|PGT_validated|1;
-
     l4tab = __map_domain_page(pg);
     clear_page(l4tab);
     init_guest_l4_table(l4tab, v->domain, 1);
     unmap_domain_page(l4tab);
+
+    /* This page needs to look like a pagetable so that it can be shadowed */
+    pg->u.inuse.type_info = PGT_l4_page_table | PGT_validated | 1;
 
     v->arch.guest_table = pagetable_from_page(pg);
     v->arch.guest_table_user = v->arch.guest_table;
