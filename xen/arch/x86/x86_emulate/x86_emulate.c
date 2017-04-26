@@ -837,7 +837,8 @@ do{ asm volatile (                                                      \
                    ".popsection\n\t"                                    \
                    _ASM_EXTABLE(.Lret%=, .Lfix%=)                       \
                    : [exn] "+g" (res_), constraints,                    \
-                     [stub] "rm" (stub.func) );                         \
+                     [stub] "rm" (stub.func),                           \
+                     "m" (*(uint8_t(*)[MAX_INST_LEN + 1])stub.ptr) );   \
     if ( unlikely(~res_.raw) )                                          \
     {                                                                   \
         gprintk(XENLOG_WARNING,                                         \
@@ -853,7 +854,8 @@ do{ asm volatile (                                                      \
 #else
 # define invoke_stub(pre, post, constraints...)                         \
     asm volatile ( pre "\n\tcall *%[stub]\n\t" post                     \
-                   : constraints, [stub] "rm" (stub.func) )
+                   : constraints, [stub] "rm" (stub.func),              \
+                     "m" (*(uint8_t(*)[MAX_INST_LEN + 1])stub.buf) )
 #endif
 
 #define emulate_stub(dst, src...) do {                                  \
