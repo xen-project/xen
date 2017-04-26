@@ -32,10 +32,11 @@ struct dmop_args {
     struct xen_dm_op_buf buf[2];
 };
 
-static bool _raw_copy_from_guest_buf(void *dst,
-                                     const struct dmop_args *args,
-                                     unsigned int buf_idx,
-                                     size_t dst_bytes)
+static bool _raw_copy_from_guest_buf_offset(void *dst,
+                                            const struct dmop_args *args,
+                                            unsigned int buf_idx,
+                                            size_t offset_bytes,
+                                            size_t dst_bytes)
 {
     size_t buf_bytes;
 
@@ -44,15 +45,19 @@ static bool _raw_copy_from_guest_buf(void *dst,
 
     buf_bytes =  args->buf[buf_idx].size;
 
-    if ( dst_bytes > buf_bytes )
+    if ( (offset_bytes + dst_bytes) < offset_bytes ||
+         (offset_bytes + dst_bytes) > buf_bytes )
         return false;
 
-    return !copy_from_guest(dst, args->buf[buf_idx].h, dst_bytes);
+    return !copy_from_guest_offset(dst, args->buf[buf_idx].h,
+                                   offset_bytes, dst_bytes);
 }
 
-static bool _raw_copy_to_guest_buf(const struct dmop_args *args,
-                                   unsigned int buf_idx,
-                                   const void *src, size_t src_bytes)
+static bool _raw_copy_to_guest_buf_offset(const struct dmop_args *args,
+                                          unsigned int buf_idx,
+                                          size_t offset_bytes,
+                                          const void *src,
+                                          size_t src_bytes)
 {
     size_t buf_bytes;
 
@@ -61,17 +66,28 @@ static bool _raw_copy_to_guest_buf(const struct dmop_args *args,
 
     buf_bytes = args->buf[buf_idx].size;
 
-    if ( src_bytes > buf_bytes )
+
+    if ( (offset_bytes + src_bytes) < offset_bytes ||
+         (offset_bytes + src_bytes) > buf_bytes )
         return false;
 
-    return !copy_to_guest(args->buf[buf_idx].h, src, src_bytes);
+    return !copy_to_guest_offset(args->buf[buf_idx].h, offset_bytes,
+                                 src, src_bytes);
 }
 
-#define COPY_FROM_GUEST_BUF(dst, args, buf_idx) \
-    _raw_copy_from_guest_buf(&(dst), args, buf_idx, sizeof(dst))
+#define COPY_FROM_GUEST_BUF_OFFSET(dst, bufs, buf_idx, offset_bytes) \
+    _raw_copy_from_guest_buf_offset(&(dst), bufs, buf_idx, offset_bytes, \
+                                    sizeof(dst))
 
-#define COPY_TO_GUEST_BUF(args, buf_idx, src) \
-    _raw_copy_to_guest_buf(args, buf_idx, &(src), sizeof(src))
+#define COPY_TO_GUEST_BUF_OFFSET(bufs, buf_idx, offset_bytes, src) \
+    _raw_copy_to_guest_buf_offset(bufs, buf_idx, offset_bytes, \
+                                  &(src), sizeof(src))
+
+#define COPY_FROM_GUEST_BUF(dst, bufs, buf_idx) \
+    COPY_FROM_GUEST_BUF_OFFSET(dst, bufs, buf_idx, 0)
+
+#define COPY_TO_GUEST_BUF(bufs, buf_idx, src) \
+    COPY_TO_GUEST_BUF_OFFSET(bufs, buf_idx, 0, src)
 
 static int track_dirty_vram(struct domain *d, xen_pfn_t first_pfn,
                             unsigned int nr, const struct xen_dm_op_buf *buf)
