@@ -417,13 +417,13 @@ F:	xen/include/asm-x86/hvm/monitor.h
 
 VTPM
 M:	Daniel De Graaf <dgdegra@tycho.nsa.gov>
-M:	Quan Xu <xuquan8@huawei.com>
+M:	Quan Xu <quan.xu0@gmail.com>
 S:	Supported
 F:	extras/mini-os/tpm*
 F:	extras/mini-os/include/tpm*
 F:	stubdom/vtpm/
 F:	stubdom/vtpmmgr/
-F:	docs/misc/vtpm.txt
+F:	docs/misc/vtpm-platforms.txt
 
 X86 ARCHITECTURE
 M:	Jan Beulich <jbeulich@suse.com>
