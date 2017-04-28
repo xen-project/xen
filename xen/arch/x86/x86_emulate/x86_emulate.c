@@ -855,7 +855,7 @@ do{ asm volatile (                                                      \
 # define invoke_stub(pre, post, constraints...)                         \
     asm volatile ( pre "\n\tcall *%[stub]\n\t" post                     \
                    : constraints, [stub] "rm" (stub.func),              \
-                     "m" (*(uint8_t(*)[MAX_INST_LEN + 1])stub.buf) )
+                     "m" (*(typeof(stub.buf) *)stub.addr) )
 #endif
 
 #define emulate_stub(dst, src...) do {                                  \
