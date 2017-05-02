@@ -4422,6 +4422,17 @@ int steal_page(
         y = cmpxchg(&page->count_info, x, x & ~PGC_count_mask);
     } while ( y != x );
 
+    /*
+     * With the sole reference dropped temporarily, no-one can update type
+     * information. Type count also needs to be zero in this case, but e.g.
+     * PGT_seg_desc_page may still have PGT_validated set, which we need to
+     * clear before transferring ownership (as validation criteria vary
+     * depending on domain type).
+     */
+    BUG_ON(page->u.inuse.type_info & (PGT_count_mask | PGT_locked |
+                                      PGT_pinned));
+    page->u.inuse.type_info = 0;
+
     /* Swizzle the owner then reinstate the PGC_allocated reference. */
     page_set_owner(page, NULL);
     y = page->count_info;
