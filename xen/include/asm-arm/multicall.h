@@ -1,7 +1,11 @@
 #ifndef __ASM_ARM_MULTICALL_H__
 #define __ASM_ARM_MULTICALL_H__
 
-extern void do_multicall_call(struct multicall_entry *call);
+extern enum mc_disposition {
+    mc_continue,
+    mc_exit,
+    mc_preempt,
+} do_multicall_call(struct multicall_entry *call);
 
 #endif /* __ASM_ARM_MULTICALL_H__ */
 /*
