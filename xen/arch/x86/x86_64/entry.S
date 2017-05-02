@@ -349,7 +349,7 @@ int80_slow_path:
         jmp   handle_exception_saved
 
 /* CREATE A BASIC EXCEPTION FRAME ON GUEST OS STACK:                     */
-/*   { RCX, R11, [DS-GS,] [CR2,] [ERRCODE,] RIP, CS, RFLAGS, RSP, SS }   */
+/*   { RCX, R11, [DS-GS,] [ERRCODE,] RIP, CS, RFLAGS, RSP, SS }          */
 /* %rdx: trap_bounce, %rbx: struct vcpu                                  */
 /* On return only %rbx and %rdx are guaranteed non-clobbered.            */
 create_bounce_frame:
@@ -369,7 +369,7 @@ create_bounce_frame:
 2:      andq  $~0xf,%rsi                # Stack frames are 16-byte aligned.
         movq  $HYPERVISOR_VIRT_START,%rax
         cmpq  %rax,%rsi
-        movq  $HYPERVISOR_VIRT_END+60,%rax
+        movq  $HYPERVISOR_VIRT_END+12*8,%rax
         sbb   %ecx,%ecx                 # In +ve address space? Then okay.
         cmpq  %rax,%rsi
         adc   %ecx,%ecx                 # Above Xen private area? Then okay.
