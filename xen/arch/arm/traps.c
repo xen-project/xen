@@ -1395,30 +1395,33 @@ static bool_t check_multicall_32bit_clean(struct multicall_entry *multi)
     return true;
 }
 
-void do_multicall_call(struct multicall_entry *multi)
+enum mc_disposition do_multicall_call(struct multicall_entry *multi)
 {
     arm_hypercall_fn_t call = NULL;
 
     if ( multi->op >= ARRAY_SIZE(arm_hypercall_table) )
     {
         multi->result = -ENOSYS;
-        return;
+        return mc_continue;
     }
 
     call = arm_hypercall_table[multi->op].fn;
     if ( call == NULL )
     {
         multi->result = -ENOSYS;
-        return;
+        return mc_continue;
     }
 
     if ( is_32bit_domain(current->domain) &&
          !check_multicall_32bit_clean(multi) )
-        return;
+        return mc_continue;
 
     multi->result = call(multi->args[0], multi->args[1],
                          multi->args[2], multi->args[3],
                          multi->args[4]);
+
+    return likely(!psr_mode_is_user(guest_cpu_user_regs()))
+           ? mc_continue : mc_preempt;
 }
 
 /*

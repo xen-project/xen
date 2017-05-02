@@ -7,8 +7,21 @@
 
 #include <xen/errno.h>
 
+enum mc_disposition {
+    mc_continue,
+    mc_exit,
+    mc_preempt,
+};
+
+#define multicall_ret(call)                                  \
+    (unlikely((call)->op == __HYPERVISOR_iret)               \
+     ? mc_exit                                               \
+       : likely(guest_kernel_mode(current,                   \
+                                  guest_cpu_user_regs()))    \
+         ? mc_continue : mc_preempt)
+
 #define do_multicall_call(_call)                             \
-    do {                                                     \
+    ({                                                       \
         __asm__ __volatile__ (                               \
             "    movq  %c1(%0),%%rax; "                      \
             "    leaq  hypercall_table(%%rip),%%rdi; "       \
@@ -36,9 +49,11 @@
               /* all the caller-saves registers */           \
             : "rax", "rcx", "rdx", "rsi", "rdi",             \
               "r8",  "r9",  "r10", "r11" );                  \
-    } while ( 0 )
+        multicall_ret(_call);                                \
+    })
 
 #define compat_multicall_call(_call)                         \
+    ({                                                       \
         __asm__ __volatile__ (                               \
             "    movl  %c1(%0),%%eax; "                      \
             "    leaq  compat_hypercall_table(%%rip),%%rdi; "\
@@ -65,6 +80,8 @@
               "i" (offsetof(__typeof__(*_call), result))     \
               /* all the caller-saves registers */           \
             : "rax", "rcx", "rdx", "rsi", "rdi",             \
-              "r8",  "r9",  "r10", "r11" )                   \
+              "r8",  "r9",  "r10", "r11" );                  \
+        multicall_ret(_call);                                \
+    })
 
 #endif /* __ASM_X86_MULTICALL_H__ */
