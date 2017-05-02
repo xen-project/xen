@@ -40,6 +40,7 @@ do_multicall(
     struct mc_state *mcs = &current->mc_state;
     uint32_t         i;
     int              rc = 0;
+    enum mc_disposition disp = mc_continue;
 
     if ( unlikely(__test_and_set_bit(_MCSF_in_multicall, &mcs->flags)) )
     {
@@ -50,7 +51,7 @@ do_multicall(
     if ( unlikely(!guest_handle_okay(call_list, nr_calls)) )
         rc = -EFAULT;
 
-    for ( i = 0; !rc && i < nr_calls; i++ )
+    for ( i = 0; !rc && disp == mc_continue && i < nr_calls; i++ )
     {
         if ( i && hypercall_preempt_check() )
             goto preempted;
@@ -63,7 +64,7 @@ do_multicall(
 
         trace_multicall_call(&mcs->call);
 
-        arch_do_multicall_call(mcs);
+        disp = arch_do_multicall_call(mcs);
 
 #ifndef NDEBUG
         {
@@ -77,7 +78,14 @@ do_multicall(
         }
 #endif
 
-        if ( unlikely(__copy_field_to_guest(call_list, &mcs->call, result)) )
+        if ( unlikely(disp == mc_exit) )
+        {
+            if ( __copy_field_to_guest(call_list, &mcs->call, result) )
+                /* nothing, best effort only */;
+            rc = mcs->call.result;
+        }
+        else if ( unlikely(__copy_field_to_guest(call_list, &mcs->call,
+                                                 result)) )
             rc = -EFAULT;
         else if ( mcs->flags & MCSF_call_preempted )
         {
@@ -92,6 +100,9 @@ do_multicall(
         else
             guest_handle_add_offset(call_list, 1);
     }
+
+    if ( unlikely(disp == mc_preempt) && i < nr_calls )
+        goto preempted;
 
     perfc_incr(calls_to_multicall);
     perfc_add(calls_from_multicall, i);

@@ -255,15 +255,19 @@ void pv_hypercall(struct cpu_user_regs *regs)
     perfc_incr(hypercalls);
 }
 
-void arch_do_multicall_call(struct mc_state *state)
+enum mc_disposition arch_do_multicall_call(struct mc_state *state)
 {
-    if ( !is_pv_32bit_vcpu(current) )
+    struct vcpu *curr = current;
+    unsigned long op;
+
+    if ( !is_pv_32bit_vcpu(curr) )
     {
         struct multicall_entry *call = &state->call;
 
-        if ( (call->op < ARRAY_SIZE(pv_hypercall_table)) &&
-             pv_hypercall_table[call->op].native )
-            call->result = pv_hypercall_table[call->op].native(
+        op = call->op;
+        if ( (op < ARRAY_SIZE(pv_hypercall_table)) &&
+             pv_hypercall_table[op].native )
+            call->result = pv_hypercall_table[op].native(
                 call->args[0], call->args[1], call->args[2],
                 call->args[3], call->args[4], call->args[5]);
         else
@@ -274,15 +278,21 @@ void arch_do_multicall_call(struct mc_state *state)
     {
         struct compat_multicall_entry *call = &state->compat_call;
 
-        if ( (call->op < ARRAY_SIZE(pv_hypercall_table)) &&
-             pv_hypercall_table[call->op].compat )
-            call->result = pv_hypercall_table[call->op].compat(
+        op = call->op;
+        if ( (op < ARRAY_SIZE(pv_hypercall_table)) &&
+             pv_hypercall_table[op].compat )
+            call->result = pv_hypercall_table[op].compat(
                 call->args[0], call->args[1], call->args[2],
                 call->args[3], call->args[4], call->args[5]);
         else
             call->result = -ENOSYS;
     }
 #endif
+
+    return unlikely(op == __HYPERVISOR_iret)
+           ? mc_exit
+           : likely(guest_kernel_mode(curr, guest_cpu_user_regs()))
+             ? mc_continue : mc_preempt;
 }
 
 /*
