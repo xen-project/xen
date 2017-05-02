@@ -544,7 +544,7 @@ static int nmi_show_execution_state(const struct cpu_user_regs *regs, int cpu)
     return 1;
 }
 
-static const char *trapstr(unsigned int trapnr)
+const char *trapstr(unsigned int trapnr)
 {
     static const char * const strings[] = {
         "divide error", "debug", "nmi", "bkpt", "overflow", "bounds",

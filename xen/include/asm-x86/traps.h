@@ -51,4 +51,6 @@ uint32_t guest_io_read(unsigned int port, unsigned int bytes,
 void guest_io_write(unsigned int port, unsigned int bytes, uint32_t data,
                     struct domain *);
 
+const char *trapstr(unsigned int trapnr);
+
 #endif /* ASM_TRAP_H */
