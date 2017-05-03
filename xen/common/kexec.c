@@ -837,11 +837,9 @@ static int kexec_swap_images(int type, struct kexec_image *new,
     old_slot = base + pos;
     new_slot = base + !pos;
 
+    kexec_image[new_slot] = new;
     if ( new )
-    {
-        kexec_image[new_slot] = new;
         set_bit(new_slot, &kexec_flags);
-    }
     change_bit(bit, &kexec_flags);
 
     clear_bit(old_slot, &kexec_flags);
