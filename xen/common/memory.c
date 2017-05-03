@@ -123,7 +123,8 @@ static void increase_reservation(struct memop_args *a)
         }
 
         /* Inform the domain of the new page's machine address. */ 
-        if ( !guest_handle_is_null(a->extent_list) )
+        if ( !paging_mode_translate(d) &&
+             !guest_handle_is_null(a->extent_list) )
         {
             mfn = page_to_mfn(page);
             if ( unlikely(__copy_to_guest_offset(a->extent_list, i, &mfn, 1)) )
@@ -219,7 +220,8 @@ static void populate_physmap(struct memop_args *a)
 
             guest_physmap_add_page(d, gpfn, mfn, a->extent_order);
 
-            if ( !paging_mode_translate(d) )
+            if ( !paging_mode_translate(d) &&
+                 !guest_handle_is_null(a->extent_list) )
             {
                 for ( j = 0; j < (1U << a->extent_order); j++ )
                     set_gpfn_from_mfn(mfn + j, gpfn + j);
