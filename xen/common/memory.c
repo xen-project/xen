@@ -640,6 +640,9 @@ static long memory_exchange(XEN_GUEST_HANDLE_PARAM(xen_memory_exchange_t) arg)
             }
         }
         BUG_ON( !(d->is_dying) && (j != (1UL << out_chunk_order)) );
+
+        if ( rc )
+            goto fail;
     }
 
     exch.nr_exchanged = exch.in.nr_extents;
