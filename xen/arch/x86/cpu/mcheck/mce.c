@@ -534,6 +534,7 @@ void mcheck_cmn_handler(const struct cpu_user_regs *regs)
             mc_panic(ebuf);
         }
         atomic_set(&found_error, 0);
+        atomic_set(&severity_cpu, -1);
     }
     mce_barrier_exit(&mce_trap_bar); 
 
