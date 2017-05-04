@@ -128,7 +128,7 @@ static bool __init meminfo_add_bank(struct meminfo *mem,
 {
     struct membank *bank;
 
-    if ( mem->nr_banks > NR_MEM_BANKS )
+    if ( mem->nr_banks >= NR_MEM_BANKS )
         return false;
 
     bank = &mem->bank[mem->nr_banks];
