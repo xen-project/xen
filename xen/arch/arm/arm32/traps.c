@@ -62,7 +62,18 @@ asmlinkage void do_trap_prefetch_abort(struct cpu_user_regs *regs)
 
 asmlinkage void do_trap_data_abort(struct cpu_user_regs *regs)
 {
-    do_trap_hyp_serror(regs);
+    /*
+     * We cannot distinguish Xen SErrors from synchronous data aborts. We
+     * want to avoid treating any Xen synchronous aborts as SErrors and
+     * forwarding them to the guest. Instead, crash the system in all
+     * cases when the abort comes from Xen. Even if they are Xen SErrors
+     * it would be a reasonable thing to do, and the default behavior with
+     * serror_op == DIVERSE.
+     */
+    if ( VABORT_GEN_BY_GUEST(regs) )
+        do_trap_guest_serror(regs);
+    else
+        do_unexpected_trap("Data Abort", regs);
 }
 
 /*
