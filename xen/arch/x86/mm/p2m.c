@@ -501,9 +501,9 @@ struct page_info *get_page_from_gfn_p2m(
                 if ( fdom == NULL )
                     page = NULL;
             }
-            else if ( !get_page(page, d)
+            else if ( !get_page(page, d) &&
                       /* Page could be shared */
-                      && !get_page(page, dom_cow) )
+                      (!p2m_is_shared(*t) || !get_page(page, dom_cow)) )
                 page = NULL;
         }
         p2m_read_unlock(p2m);
