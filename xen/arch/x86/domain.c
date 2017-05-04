@@ -1885,8 +1885,6 @@ static void save_segments(struct vcpu *v)
     this_cpu(dirty_segment_mask) = dirty_segment_mask;
 }
 
-#define switch_kernel_stack(v) ((void)0)
-
 static void paravirt_ctxt_switch_from(struct vcpu *v)
 {
     save_segments(v);
@@ -1904,8 +1902,6 @@ static void paravirt_ctxt_switch_from(struct vcpu *v)
 static void paravirt_ctxt_switch_to(struct vcpu *v)
 {
     unsigned long cr4;
-
-    switch_kernel_stack(v);
 
     cr4 = pv_guest_cr4_to_real_cr4(v);
     if ( unlikely(cr4 != read_cr4()) )
