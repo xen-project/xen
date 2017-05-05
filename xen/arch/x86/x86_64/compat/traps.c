@@ -339,6 +339,7 @@ int compat_set_trap_table(XEN_GUEST_HANDLE(trap_info_compat_t) traps)
     if ( guest_handle_is_null(traps) )
     {
         memset(dst, 0, NR_VECTORS * sizeof(*dst));
+        init_int80_direct_trap(current);
         return 0;
     }
 
