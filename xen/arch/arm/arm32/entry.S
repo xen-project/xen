@@ -149,7 +149,7 @@ trap_##trap:                                                            \
 GLOBAL(hyp_traps_vector)
         .word 0                         /* 0x00 - Reset */
         b trap_undefined_instruction    /* 0x04 - Undefined Instruction */
-        b trap_supervisor_call          /* 0x08 - Supervisor Call */
+        b trap_hypervisor_call          /* 0x08 - Hypervisor Call */
         b trap_prefetch_abort           /* 0x0c - Prefetch Abort */
         b trap_data_abort               /* 0x10 - Data Abort */
         b trap_hypervisor               /* 0x14 - Hypervisor */
@@ -157,7 +157,7 @@ GLOBAL(hyp_traps_vector)
         b trap_fiq                      /* 0x1c - FIQ */
 
 DEFINE_TRAP_ENTRY(undefined_instruction)
-DEFINE_TRAP_ENTRY(supervisor_call)
+DEFINE_TRAP_ENTRY(hypervisor_call)
 DEFINE_TRAP_ENTRY(prefetch_abort)
 DEFINE_TRAP_ENTRY(hypervisor)
 DEFINE_TRAP_ENTRY_NOIRQ(irq)

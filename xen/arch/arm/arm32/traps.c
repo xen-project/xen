@@ -50,9 +50,9 @@ die:
     do_unexpected_trap("Undefined Instruction", regs);
 }
 
-asmlinkage void do_trap_supervisor_call(struct cpu_user_regs *regs)
+asmlinkage void do_trap_hypervisor_call(struct cpu_user_regs *regs)
 {
-    do_unexpected_trap("Supervisor Call", regs);
+    do_unexpected_trap("Hypervisor Call", regs);
 }
 
 asmlinkage void do_trap_prefetch_abort(struct cpu_user_regs *regs)
