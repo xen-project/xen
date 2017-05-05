@@ -559,9 +559,9 @@ static int libxl__build_device_model_args_old(libxl__gc *gc,
         }
         if (libxl_defbool_val(b_info->u.hvm.usb)
             || b_info->u.hvm.usbdevice
-            || b_info->u.hvm.usbdevice_list) {
-            if ( b_info->u.hvm.usbdevice && b_info->u.hvm.usbdevice_list )
-            {
+            || libxl_string_list_length(&b_info->u.hvm.usbdevice_list)) {
+            if (b_info->u.hvm.usbdevice
+                && libxl_string_list_length(&b_info->u.hvm.usbdevice_list)) {
                 LOGD(ERROR, domid, "Both usbdevice and usbdevice_list set");
                 return ERROR_INVAL;
             }
@@ -1149,9 +1149,9 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
         }
         if (libxl_defbool_val(b_info->u.hvm.usb)
             || b_info->u.hvm.usbdevice
-            || b_info->u.hvm.usbdevice_list) {
-            if ( b_info->u.hvm.usbdevice && b_info->u.hvm.usbdevice_list )
-            {
+            || libxl_string_list_length(&b_info->u.hvm.usbdevice_list)) {
+            if (b_info->u.hvm.usbdevice
+                && libxl_string_list_length(&b_info->u.hvm.usbdevice_list)) {
                 LOGD(ERROR, guest_domid, "Both usbdevice and usbdevice_list set");
                 return ERROR_INVAL;
             }
