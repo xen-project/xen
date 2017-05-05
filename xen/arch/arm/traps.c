@@ -2778,9 +2778,10 @@ asmlinkage void do_trap_guest_sync(struct cpu_user_regs *regs)
         break;
 
     default:
-        printk("Unknown Guest Trap. HSR=0x%x EC=0x%x IL=%x Syndrome=0x%"PRIx32"\n",
-               hsr.bits, hsr.ec, hsr.len, hsr.iss);
-        do_unexpected_trap("Guest", regs);
+        gprintk(XENLOG_WARNING,
+                "Unknown Guest Trap. HSR=0x%x EC=0x%x IL=%x Syndrome=0x%"PRIx32"\n",
+                hsr.bits, hsr.ec, hsr.len, hsr.iss);
+        inject_undef_exception(regs, hsr);
     }
 }
 
