@@ -2579,7 +2579,7 @@ static void enter_hypervisor_head(struct cpu_user_regs *regs)
         gic_clear_lrs(current);
 }
 
-asmlinkage void do_trap_hypervisor(struct cpu_user_regs *regs)
+asmlinkage void do_trap_guest_sync(struct cpu_user_regs *regs)
 {
     const union hsr hsr = { .bits = regs->hsr };
 
@@ -2699,6 +2699,21 @@ asmlinkage void do_trap_hypervisor(struct cpu_user_regs *regs)
         do_trap_data_abort_guest(regs, hsr);
         break;
 
+    default:
+        printk("Unknown Guest Trap. HSR=0x%x EC=0x%x IL=%x Syndrome=0x%"PRIx32"\n",
+               hsr.bits, hsr.ec, hsr.len, hsr.iss);
+        do_unexpected_trap("Guest", regs);
+    }
+}
+
+asmlinkage void do_trap_hyp_sync(struct cpu_user_regs *regs)
+{
+    const union hsr hsr = { .bits = regs->hsr };
+
+    enter_hypervisor_head(regs);
+
+    switch ( hsr.ec )
+    {
 #ifdef CONFIG_ARM_64
     case HSR_EC_BRK:
         do_trap_brk(regs, hsr);
