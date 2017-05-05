@@ -371,7 +371,6 @@ long do_set_trap_table(XEN_GUEST_HANDLE_PARAM(const_trap_info_t) traps)
     if ( guest_handle_is_null(traps) )
     {
         memset(dst, 0, NR_VECTORS * sizeof(*dst));
-        init_int80_direct_trap(curr);
         return 0;
     }
 
@@ -392,9 +391,6 @@ long do_set_trap_table(XEN_GUEST_HANDLE_PARAM(const_trap_info_t) traps)
         fixup_guest_code_selector(curr->domain, cur.cs);
 
         memcpy(&dst[cur.vector], &cur, sizeof(cur));
-
-        if ( cur.vector == 0x80 )
-            init_int80_direct_trap(curr);
 
         guest_handle_add_offset(traps, 1);
 
@@ -420,7 +416,6 @@ int compat_set_trap_table(XEN_GUEST_HANDLE(trap_info_compat_t) traps)
     if ( guest_handle_is_null(traps) )
     {
         memset(dst, 0, NR_VECTORS * sizeof(*dst));
-        init_int80_direct_trap(curr);
         return 0;
     }
 
@@ -438,9 +433,6 @@ int compat_set_trap_table(XEN_GUEST_HANDLE(trap_info_compat_t) traps)
         fixup_guest_code_selector(curr->domain, cur.cs);
 
         XLAT_trap_info(dst + cur.vector, &cur);
-
-        if ( cur.vector == 0x80 )
-            init_int80_direct_trap(curr);
 
         guest_handle_add_offset(traps, 1);
 

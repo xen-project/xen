@@ -336,12 +336,36 @@ UNLIKELY_END(msi_check)
 
         movq  STACK_CPUINFO_FIELD(current_vcpu)(%rbx), %rbx
 
-        /* Check that the callback is non-null. */
-        leaq  VCPU_int80_bounce(%rbx),%rdx
-        cmpb  $0,TRAPBOUNCE_flags(%rdx)
+        mov   VCPU_trap_ctxt(%rbx), %rsi
+        mov   VCPU_domain(%rbx), %rax
+
+        /*
+         * if ( null_trap_bounce(v, &v->arch.pv_vcpu.trap_ctxt[0x80]) )
+         *    goto int80_slow_path;
+         */
+        mov    0x80 * TRAPINFO_sizeof + TRAPINFO_eip(%rsi), %rdi
+        movzwl 0x80 * TRAPINFO_sizeof + TRAPINFO_cs (%rsi), %ecx
+
+        mov   %ecx, %edx
+        and   $~3, %edx
+
+        cmpb  $0, DOMAIN_is_32bit_pv(%rax)
+        cmove %rdi, %rdx
+
+        test  %rdx, %rdx
         jz    int80_slow_path
 
-        movq  VCPU_domain(%rbx),%rax
+        /* Construct trap_bounce from trap_ctxt[0x80]. */
+        lea   VCPU_trap_bounce(%rbx), %rdx
+        movw  %cx, TRAPBOUNCE_cs(%rdx)
+        movq  %rdi, TRAPBOUNCE_eip(%rdx)
+
+        /* TB_flags = TBF_EXCEPTION | (TI_GET_IF(ti) ? TBF_INTERRUPT : 0); */
+        testb $4, 0x80 * TRAPINFO_sizeof + TRAPINFO_flags(%rsi)
+        setnz %cl
+        lea   TBF_EXCEPTION(, %rcx, TBF_INTERRUPT), %ecx
+        mov   %cl, TRAPBOUNCE_flags(%rdx)
+
         cmpb  $0, DOMAIN_is_32bit_pv(%rax)
         jne   compat_int80_direct_trap
 

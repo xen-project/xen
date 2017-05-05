@@ -482,7 +482,6 @@ struct pv_vcpu
 
     /* Bounce information for propagating an exception to guest OS. */
     struct trap_bounce trap_bounce;
-    struct trap_bounce int80_bounce;
 
     /* I/O-port access bitmap. */
     XEN_GUEST_HANDLE(uint8) iobmp; /* Guest kernel vaddr of the bitmap. */

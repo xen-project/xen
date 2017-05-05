@@ -142,20 +142,6 @@ bool set_guest_nmi_trapbounce(void)
     return !null_trap_bounce(curr, tb);
 }
 
-void init_int80_direct_trap(struct vcpu *v)
-{
-    struct trap_info *ti = &v->arch.pv_vcpu.trap_ctxt[0x80];
-    struct trap_bounce *tb = &v->arch.pv_vcpu.int80_bounce;
-
-    tb->cs  = ti->cs;
-    tb->eip = ti->address;
-
-    if ( null_trap_bounce(v, tb) )
-        tb->flags = 0;
-    else
-        tb->flags = TBF_EXCEPTION | (TI_GET_IF(ti) ? TBF_INTERRUPT : 0);
-}
-
 struct softirq_trap {
     struct domain *domain;   /* domain to inject trap */
     struct vcpu *vcpu;       /* vcpu to inject trap */

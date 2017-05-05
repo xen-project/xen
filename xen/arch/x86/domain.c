@@ -892,8 +892,6 @@ int arch_set_info_guest(
         goto out;
     }
 
-    init_int80_direct_trap(v);
-
     /* IOPL privileges are virtualised. */
     v->arch.pv_vcpu.iopl = v->arch.user_regs.eflags & X86_EFLAGS_IOPL;
     v->arch.user_regs.eflags &= ~X86_EFLAGS_IOPL;
