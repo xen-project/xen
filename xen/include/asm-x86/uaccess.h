@@ -104,37 +104,35 @@ extern void __put_user_bad(void);
 #define __put_user(x,ptr) \
   __put_user_nocheck((__typeof__(*(ptr)))(x),(ptr),sizeof(*(ptr)))
 
-#define __put_user_nocheck(x,ptr,size)				\
-({								\
-	long __pu_err;						\
-	__put_user_size((x),(ptr),(size),__pu_err,-EFAULT);	\
-	__pu_err;						\
-})
-
-#define __put_user_check(x,ptr,size)					\
+#define __put_user_nocheck(x, ptr, size)				\
 ({									\
-	long __pu_err = -EFAULT;					\
-	__typeof__(*(ptr)) __user *__pu_addr = (ptr);			\
-	if (access_ok(__pu_addr,size))					\
-		__put_user_size((x),__pu_addr,(size),__pu_err,-EFAULT);	\
-	__pu_err;							\
-})							
-
-#define __get_user_nocheck(x,ptr,size)                          \
-({                                                              \
-	long __gu_err;                                          \
-	__get_user_size((x),(ptr),(size),__gu_err,-EFAULT);     \
-	__gu_err;                                               \
+	int err_; 							\
+	__put_user_size(x, ptr, size, err_, -EFAULT);			\
+	err_;								\
 })
 
-#define __get_user_check(x,ptr,size)                            \
-({                                                              \
-	long __gu_err;                                          \
-	__typeof__(*(ptr)) __user *__gu_addr = (ptr);           \
-	__get_user_size((x),__gu_addr,(size),__gu_err,-EFAULT); \
-	if (!access_ok(__gu_addr,size)) __gu_err = -EFAULT;     \
-	__gu_err;                                               \
-})							
+#define __put_user_check(x, ptr, size)					\
+({									\
+	__typeof__(*(ptr)) __user *ptr_ = (ptr);			\
+	__typeof__(size) size_ = (size);				\
+	access_ok(ptr_, size_) ? __put_user_nocheck(x, ptr_, size_)	\
+			       : -EFAULT;				\
+})
+
+#define __get_user_nocheck(x, ptr, size)				\
+({									\
+	int err_; 							\
+	__get_user_size(x, ptr, size, err_, -EFAULT);			\
+	err_;								\
+})
+
+#define __get_user_check(x, ptr, size)					\
+({									\
+	__typeof__(*(ptr)) __user *ptr_ = (ptr);			\
+	__typeof__(size) size_ = (size);				\
+	access_ok(ptr_, size_) ? __get_user_nocheck(x, ptr_, size_)	\
+			       : -EFAULT;				\
+})
 
 struct __large_struct { unsigned long buf[100]; };
 #define __m(x) (*(const struct __large_struct *)(x))
