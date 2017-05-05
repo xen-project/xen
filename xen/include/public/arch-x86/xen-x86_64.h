@@ -173,7 +173,7 @@ struct iret_context {
 #define __DECL_REG_LOHI(name) __DECL_REG(name ## x)
 #define __DECL_REG_LO8        __DECL_REG
 #define __DECL_REG_LO16       __DECL_REG
-#define __DECL_REG_HI         __DECL_REG
+#define __DECL_REG_HI(num)    uint64_t r ## num
 #endif
 
 struct cpu_user_regs {
