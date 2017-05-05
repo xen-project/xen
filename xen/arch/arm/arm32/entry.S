@@ -130,7 +130,7 @@ GLOBAL(hyp_traps_vector)
         b trap_supervisor_call          /* 0x08 - Supervisor Call */
         b trap_prefetch_abort           /* 0x0c - Prefetch Abort */
         b trap_data_abort               /* 0x10 - Data Abort */
-        b trap_hypervisor               /* 0x14 - Hypervisor */
+        b trap_guest_sync               /* 0x14 - Hypervisor */
         b trap_irq                      /* 0x18 - IRQ */
         b trap_fiq                      /* 0x1c - FIQ */
 
@@ -138,7 +138,7 @@ DEFINE_TRAP_ENTRY(undefined_instruction)
 DEFINE_TRAP_ENTRY(supervisor_call)
 DEFINE_TRAP_ENTRY(prefetch_abort)
 DEFINE_TRAP_ENTRY(data_abort)
-DEFINE_TRAP_ENTRY(hypervisor)
+DEFINE_TRAP_ENTRY(guest_sync)
 DEFINE_TRAP_ENTRY_NOIRQ(irq)
 DEFINE_TRAP_ENTRY_NOIRQ(fiq)
 
