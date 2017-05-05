@@ -3232,6 +3232,8 @@ long do_mmuext_op(
 
         switch ( op.cmd )
         {
+            struct page_info *page;
+
         case MMUEXT_PIN_L1_TABLE:
             type = PGT_l1_page_table;
             goto pin_page;
@@ -3249,9 +3251,7 @@ long do_mmuext_op(
                 break;
             type = PGT_l4_page_table;
 
-        pin_page: {
-            struct page_info *page;
-
+        pin_page:
             /* Ignore pinning of invalid paging levels. */
             if ( (op.cmd - MMUEXT_PIN_L1_TABLE) > (CONFIG_PAGING_LEVELS - 1) )
                 break;
@@ -3313,13 +3313,9 @@ long do_mmuext_op(
                         curr->arch.old_guest_table = page;
                 }
             }
-
             break;
-        }
 
-        case MMUEXT_UNPIN_TABLE: {
-            struct page_info *page;
-
+        case MMUEXT_UNPIN_TABLE:
             if ( paging_mode_refcounts(pg_owner) )
                 break;
 
@@ -3357,9 +3353,7 @@ long do_mmuext_op(
 
             /* A page is dirtied when its pin status is cleared. */
             paging_mark_dirty(pg_owner, _mfn(page_to_mfn(page)));
-
             break;
-        }
 
         case MMUEXT_NEW_BASEPTR:
             if ( unlikely(d != pg_owner) )
@@ -3414,7 +3408,7 @@ long do_mmuext_op(
 
             if ( old_mfn != 0 )
             {
-                struct page_info *page = mfn_to_page(old_mfn);
+                page = mfn_to_page(old_mfn);
 
                 if ( paging_mode_refcounts(d) )
                     put_page(page);
@@ -3478,7 +3472,7 @@ long do_mmuext_op(
             else
                 rc = -EPERM;
             break;
-    
+
         case MMUEXT_INVLPG_ALL:
             if ( unlikely(d != pg_owner) )
                 rc = -EPERM;
@@ -3542,9 +3536,7 @@ long do_mmuext_op(
             break;
         }
 
-        case MMUEXT_CLEAR_PAGE: {
-            struct page_info *page;
-
+        case MMUEXT_CLEAR_PAGE:
             page = get_page_from_gfn(pg_owner, op.arg1.mfn, NULL, P2M_ALLOC);
             if ( !page || !get_page_type(page, PGT_writable_page) )
             {
@@ -3563,7 +3555,6 @@ long do_mmuext_op(
 
             put_page_and_type(page);
             break;
-        }
 
         case MMUEXT_COPY_PAGE:
         {
