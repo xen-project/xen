@@ -496,7 +496,7 @@ void __init paging_init(void)
     unsigned int n, memflags;
     l3_pgentry_t *l3_ro_mpt;
     l2_pgentry_t *l2_ro_mpt = NULL;
-    struct page_info *l1_pg, *l2_pg, *l3_pg;
+    struct page_info *l1_pg;
 
     /*
      * We setup the L3s for 1:1 mapping if host support memory hotplug
@@ -509,23 +509,22 @@ void __init paging_init(void)
         if ( !(l4e_get_flags(idle_pg_table[l4_table_offset(va)]) &
               _PAGE_PRESENT) )
         {
-            l3_pg = alloc_domheap_page(NULL, 0);
-            if ( !l3_pg )
+            l3_pgentry_t *pl3t = alloc_xen_pagetable();
+
+            if ( !pl3t )
                 goto nomem;
-            l3_ro_mpt = page_to_virt(l3_pg);
-            clear_page(l3_ro_mpt);
+            clear_page(pl3t);
             l4e_write(&idle_pg_table[l4_table_offset(va)],
-                      l4e_from_page(l3_pg, __PAGE_HYPERVISOR_RW));
+                      l4e_from_paddr(__pa(pl3t), __PAGE_HYPERVISOR_RW));
         }
     }
 
     /* Create user-accessible L2 directory to map the MPT for guests. */
-    if ( (l3_pg = alloc_domheap_page(NULL, 0)) == NULL )
+    if ( (l3_ro_mpt = alloc_xen_pagetable()) == NULL )
         goto nomem;
-    l3_ro_mpt = page_to_virt(l3_pg);
     clear_page(l3_ro_mpt);
     l4e_write(&idle_pg_table[l4_table_offset(RO_MPT_VIRT_START)],
-              l4e_from_page(l3_pg, __PAGE_HYPERVISOR_RO | _PAGE_USER));
+              l4e_from_paddr(__pa(l3_ro_mpt), __PAGE_HYPERVISOR_RO | _PAGE_USER));
 
     /*
      * Allocate and map the machine-to-phys table.
@@ -607,12 +606,12 @@ void __init paging_init(void)
         }
         if ( !((unsigned long)l2_ro_mpt & ~PAGE_MASK) )
         {
-            if ( (l2_pg = alloc_domheap_page(NULL, memflags)) == NULL )
+            if ( (l2_ro_mpt = alloc_xen_pagetable()) == NULL )
                 goto nomem;
-            l2_ro_mpt = page_to_virt(l2_pg);
             clear_page(l2_ro_mpt);
             l3e_write(&l3_ro_mpt[l3_table_offset(va)],
-                      l3e_from_page(l2_pg, __PAGE_HYPERVISOR_RO | _PAGE_USER));
+                      l3e_from_paddr(__pa(l2_ro_mpt),
+                                     __PAGE_HYPERVISOR_RO | _PAGE_USER));
             ASSERT(!l2_table_offset(va));
         }
         /* NB. Cannot be GLOBAL: guest user mode should not see it. */
