@@ -480,6 +480,22 @@ struct page_info *get_page_from_gfn_p2m(
     p2m_access_t _a;
     p2m_type_t _t;
     mfn_t mfn;
+#ifndef NDEBUG
+    /*
+     * Temporary debugging code, added in the hope of finding the origin
+     * of calls to get_page(..., dom_cow) as observed during osstest
+     * migration failures (see
+     * lists.xenproject.org/archives/html/xen-devel/2017-04/msg03331.html).
+     */
+    static unsigned long cnt, thr;
+
+    if ( d->is_dying && ++cnt > thr )
+    {
+        thr |= cnt;
+        printk("%pv: d%d dying (looking up %lx)\n", current, d->domain_id, gfn);
+        dump_execution_state();
+    }
+#endif
 
     /* Allow t or a to be NULL */
     t = t ?: &_t;
