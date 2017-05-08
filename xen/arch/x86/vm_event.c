@@ -113,26 +113,8 @@ void vm_event_set_registers(struct vcpu *v, vm_event_response_t *rsp)
 {
     ASSERT(atomic_read(&v->vm_event_pause_count));
 
-    v->arch.user_regs.rax = rsp->data.regs.x86.rax;
-    v->arch.user_regs.rbx = rsp->data.regs.x86.rbx;
-    v->arch.user_regs.rcx = rsp->data.regs.x86.rcx;
-    v->arch.user_regs.rdx = rsp->data.regs.x86.rdx;
-    v->arch.user_regs.rsp = rsp->data.regs.x86.rsp;
-    v->arch.user_regs.rbp = rsp->data.regs.x86.rbp;
-    v->arch.user_regs.rsi = rsp->data.regs.x86.rsi;
-    v->arch.user_regs.rdi = rsp->data.regs.x86.rdi;
-
-    v->arch.user_regs.r8 = rsp->data.regs.x86.r8;
-    v->arch.user_regs.r9 = rsp->data.regs.x86.r9;
-    v->arch.user_regs.r10 = rsp->data.regs.x86.r10;
-    v->arch.user_regs.r11 = rsp->data.regs.x86.r11;
-    v->arch.user_regs.r12 = rsp->data.regs.x86.r12;
-    v->arch.user_regs.r13 = rsp->data.regs.x86.r13;
-    v->arch.user_regs.r14 = rsp->data.regs.x86.r14;
-    v->arch.user_regs.r15 = rsp->data.regs.x86.r15;
-
-    v->arch.user_regs.rflags = rsp->data.regs.x86.rflags;
-    v->arch.user_regs.rip = rsp->data.regs.x86.rip;
+    v->arch.vm_event->gprs = rsp->data.regs.x86;
+    v->arch.vm_event->set_gprs = true;
 }
 
 void vm_event_monitor_next_interrupt(struct vcpu *v)

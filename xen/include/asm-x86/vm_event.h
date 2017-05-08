@@ -32,6 +32,8 @@ struct arch_vm_event {
         struct vm_event_emul_insn_data insn;
     } emul;
     struct monitor_write_data write_data;
+    struct vm_event_regs_x86 gprs;
+    bool set_gprs;
 };
 
 int vm_event_init_domain(struct domain *d);
