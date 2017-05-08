@@ -407,6 +407,7 @@ F:	xen/arch/*/vm_event.c
 F:	xen/arch/arm/mem_access.c
 F:	xen/arch/x86/mm/mem_access.c
 F:	xen/arch/x86/hvm/monitor.c
+F:	xen/arch/x88/hvm/vm_event.c
 F:	xen/common/mem_access.c
 F:	xen/common/monitor.c
 F:	xen/common/vm_event.c
@@ -414,6 +415,7 @@ F:	xen/include/*/mem_access.h
 F:	xen/include/*/monitor.h
 F:	xen/include/*/vm_event.h
 F:	xen/include/asm-x86/hvm/monitor.h
+F:	xen/include/asm-x86/hvm/vm_event.h
 
 VTPM
 M:	Daniel De Graaf <dgdegra@tycho.nsa.gov>
