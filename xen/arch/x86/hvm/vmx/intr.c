@@ -318,6 +318,7 @@ void vmx_intr_assist(void)
         */
         if ( pt_vector != -1 )
         {
+#ifndef NDEBUG
             /*
              * We assert that intack.vector is the highest priority vector for
              * only an interrupt from vlapic can reach this point and the
@@ -334,7 +335,7 @@ void vmx_intr_assist(void)
                 const uint32_t *word;
                 unsigned int i;
 
-                printk(XENLOG_ERR "%pv: intack: %02x:%u pt: %02x\n",
+                printk(XENLOG_ERR "%pv: intack: %u:%02x pt: %02x\n",
                        current, intack.source, intack.vector, pt_vector);
 
                 vlapic = vcpu_vlapic(v);
@@ -357,6 +358,7 @@ void vmx_intr_assist(void)
                     printk("\n");
                 }
             }
+#endif
             ASSERT(intack.vector >= pt_vector);
             vmx_set_eoi_exit_bitmap(v, intack.vector);
         }
