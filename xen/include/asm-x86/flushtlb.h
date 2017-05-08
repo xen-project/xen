@@ -55,7 +55,7 @@ static inline void tlbflush_filter(cpumask_t *mask, uint32_t page_timestamp)
 
     for_each_cpu ( cpu, mask )
         if ( !NEED_FLUSH(per_cpu(tlbflush_time, cpu), page_timestamp) )
-            cpumask_clear_cpu(cpu, mask);
+            __cpumask_clear_cpu(cpu, mask);
 }
 
 void new_tlbflush_clock_period(void);
