@@ -258,7 +258,7 @@ int80_slow_path:
         jmp   handle_exception_saved
 
 /* CREATE A BASIC EXCEPTION FRAME ON GUEST OS STACK:                     */
-/*   { RCX, R11, [DS-GS,] [CR2,] [ERRCODE,] RIP, CS, RFLAGS, RSP, SS }   */
+/*   { RCX, R11, [ERRCODE,] RIP, CS, RFLAGS, RSP, SS }                   */
 /* %rdx: trap_bounce, %rbx: struct vcpu                                  */
 /* On return only %rbx and %rdx are guaranteed non-clobbered.            */
 create_bounce_frame:
@@ -276,9 +276,9 @@ create_bounce_frame:
         movq  UREGS_rsp+8(%rsp),%rsi
         andb  $0xfc,UREGS_cs+8(%rsp)    # Indicate kernel context to guest.
 2:      andq  $~0xf,%rsi                # Stack frames are 16-byte aligned.
-        movq  $HYPERVISOR_VIRT_START,%rax
+        movq  $HYPERVISOR_VIRT_START+1,%rax
         cmpq  %rax,%rsi
-        movq  $HYPERVISOR_VIRT_END+60,%rax
+        movq  $HYPERVISOR_VIRT_END+8*8,%rax
         sbb   %ecx,%ecx                 # In +ve address space? Then okay.
         cmpq  %rax,%rsi
         adc   %ecx,%ecx                 # Above Xen private area? Then okay.
@@ -286,13 +286,18 @@ UNLIKELY_START(g, create_bounce_frame_bad_sp)
         lea   UNLIKELY_DISPATCH_LABEL(create_bounce_frame_bad_sp)(%rip), %rdi
         jmp   asm_domain_crash_synchronous  /* Does not return */
 __UNLIKELY_END(create_bounce_frame_bad_sp)
-        subq  $40,%rsi
+
+#define STORE_GUEST_STACK(reg, n) \
+0:      movq  %reg,(n)*8(%rsi); \
+        _ASM_EXTABLE(0b, domain_crash_page_fault_ ## n ## x8)
+
+        subq  $7*8,%rsi
         movq  UREGS_ss+8(%rsp),%rax
         ASM_STAC
         movq  VCPU_domain(%rbx),%rdi
-.Lft2:  movq  %rax,32(%rsi)             # SS
+        STORE_GUEST_STACK(rax,6)        # SS
         movq  UREGS_rsp+8(%rsp),%rax
-.Lft3:  movq  %rax,24(%rsi)             # RSP
+        STORE_GUEST_STACK(rax,5)        # RSP
         movq  VCPU_vcpu_info(%rbx),%rax
         pushq VCPUINFO_upcall_mask(%rax)
         testb $TBF_INTERRUPT,TRAPBOUNCE_flags(%rdx)
@@ -301,7 +306,7 @@ __UNLIKELY_END(create_bounce_frame_bad_sp)
         popq  %rax
         shlq  $32,%rax                  # Bits 32-39: saved_upcall_mask
         movw  UREGS_cs+8(%rsp),%ax      # Bits  0-15: CS
-.Lft4:  movq  %rax,8(%rsi)              # CS / saved_upcall_mask
+        STORE_GUEST_STACK(rax,3)        # CS / saved_upcall_mask
         shrq  $32,%rax
         testb $0xFF,%al                 # Bits 0-7: saved_upcall_mask
         setz  %ch                       # %ch == !saved_upcall_mask
@@ -313,21 +318,23 @@ __UNLIKELY_END(create_bounce_frame_bad_sp)
         testb $1 << VMASST_TYPE_architectural_iopl,DOMAIN_vm_assist(%rdi)
         cmovnzl VCPU_iopl(%rbx),%ecx    # Bits 13:12 (EFLAGS.IOPL)
         orl   %ecx,%eax                 # Fold EFLAGS.IOPL into %eax
-.Lft5:  movq  %rax,16(%rsi)             # RFLAGS
+        STORE_GUEST_STACK(rax,4)        # RFLAGS
         movq  UREGS_rip+8(%rsp),%rax
-.Lft6:  movq  %rax,(%rsi)               # RIP
+        STORE_GUEST_STACK(rax,2)        # RIP
         testb $TBF_EXCEPTION_ERRCODE,TRAPBOUNCE_flags(%rdx)
         jz    1f
         subq  $8,%rsi
         movl  TRAPBOUNCE_error_code(%rdx),%eax
-.Lft7:  movq  %rax,(%rsi)               # ERROR CODE
+        STORE_GUEST_STACK(rax,2)        # ERROR CODE
 1:
-        subq  $16,%rsi
         movq  UREGS_r11+8(%rsp),%rax
-.Lft12: movq  %rax,8(%rsi)              # R11
+        STORE_GUEST_STACK(rax,1)        # R11
         movq  UREGS_rcx+8(%rsp),%rax
-.Lft13: movq  %rax,(%rsi)               # RCX
+        STORE_GUEST_STACK(rax,0)        # RCX
         ASM_CLAC
+
+#undef STORE_GUEST_STACK
+
         /* Rewrite our stack frame and return to guest-OS mode. */
         /* IA32 Ref. Vol. 3: TF, VM, RF and NT flags are cleared on trap. */
         /* Also clear AC: alignment checks shouldn't trigger in kernel mode. */
@@ -345,24 +352,22 @@ UNLIKELY_START(z, create_bounce_frame_bad_bounce_ip)
 __UNLIKELY_END(create_bounce_frame_bad_bounce_ip)
         movq  %rax,UREGS_rip+8(%rsp)
         ret
-        _ASM_EXTABLE(.Lft2,  domain_crash_page_fault_32)
-        _ASM_EXTABLE(.Lft3,  domain_crash_page_fault_24)
-        _ASM_EXTABLE(.Lft4,  domain_crash_page_fault_8)
-        _ASM_EXTABLE(.Lft5,  domain_crash_page_fault_16)
-        _ASM_EXTABLE(.Lft6,  domain_crash_page_fault)
-        _ASM_EXTABLE(.Lft7,  domain_crash_page_fault)
-        _ASM_EXTABLE(.Lft12, domain_crash_page_fault_8)
-        _ASM_EXTABLE(.Lft13, domain_crash_page_fault)
 
-domain_crash_page_fault_32:
+        .pushsection .fixup, "ax", @progbits
+        # Numeric tags below represent the intended overall %rsi adjustment.
+domain_crash_page_fault_6x8:
         addq  $8,%rsi
-domain_crash_page_fault_24:
+domain_crash_page_fault_5x8:
         addq  $8,%rsi
-domain_crash_page_fault_16:
+domain_crash_page_fault_4x8:
         addq  $8,%rsi
-domain_crash_page_fault_8:
+domain_crash_page_fault_3x8:
         addq  $8,%rsi
-domain_crash_page_fault:
+domain_crash_page_fault_2x8:
+        addq  $8,%rsi
+domain_crash_page_fault_1x8:
+        addq  $8,%rsi
+domain_crash_page_fault_0x8:
         ASM_CLAC
         movq  %rsi,%rdi
         call  show_page_walk
@@ -380,6 +385,7 @@ ENTRY(dom_crash_sync_extable)
         orb   %al,UREGS_cs(%rsp)
         xorl  %edi,%edi
         jmp   asm_domain_crash_synchronous /* Does not return */
+        .popsection
 
 ENTRY(common_interrupt)
         SAVE_ALL CLAC
