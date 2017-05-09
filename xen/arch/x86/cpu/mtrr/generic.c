@@ -391,7 +391,6 @@ static unsigned long set_mtrr_state(void)
 }
 
 
-static unsigned long cr4 = 0;
 static DEFINE_SPINLOCK(set_atomicity_lock);
 
 /*
@@ -403,8 +402,6 @@ static DEFINE_SPINLOCK(set_atomicity_lock);
 
 static void prepare_set(void)
 {
-	unsigned long cr0;
-
 	/*  Note that this is not ideal, since the cache is only flushed/disabled
 	   for this CPU while the MTRRs are changed, but changing this requires
 	   more invasive changes to the way the kernel boots  */
@@ -412,18 +409,12 @@ static void prepare_set(void)
 	spin_lock(&set_atomicity_lock);
 
 	/*  Enter the no-fill (CD=1, NW=0) cache mode and flush caches. */
-	cr0 = read_cr0() | 0x40000000;	/* set CD flag */
-	write_cr0(cr0);
+	write_cr0(read_cr0() | X86_CR0_CD);
 	wbinvd();
 
-	/*  Save value of CR4 and clear Page Global Enable (bit 7)  */
-	if ( cpu_has_pge ) {
-		cr4 = read_cr4();
-		write_cr4(cr4 & ~X86_CR4_PGE);
-	}
-
-	/* Flush all TLBs via a mov %cr3, %reg; mov %reg, %cr3 */
-	flush_tlb_local();
+	/*  TLB flushing here relies on Xen always using CR4.PGE. */
+	BUILD_BUG_ON(!(XEN_MINIMAL_CR4 & X86_CR4_PGE));
+	write_cr4(read_cr4() & ~X86_CR4_PGE);
 
 	/*  Save MTRR state */
 	rdmsrl(MSR_MTRRdefType, deftype);
@@ -434,18 +425,15 @@ static void prepare_set(void)
 
 static void post_set(void)
 {
-	/*  Flush TLBs (no need to flush caches - they are disabled)  */
-	flush_tlb_local();
-
 	/* Intel (P6) standard MTRRs */
 	mtrr_wrmsr(MSR_MTRRdefType, deftype);
-		
-	/*  Enable caches  */
-	write_cr0(read_cr0() & 0xbfffffff);
 
-	/*  Restore value of CR4  */
-	if ( cpu_has_pge )
-		write_cr4(cr4);
+	/*  Enable caches  */
+	write_cr0(read_cr0() & ~X86_CR0_CD);
+
+	/*  Reenable CR4.PGE (also flushes the TLB) */
+	write_cr4(read_cr4() | X86_CR4_PGE);
+
 	spin_unlock(&set_atomicity_lock);
 }
 
