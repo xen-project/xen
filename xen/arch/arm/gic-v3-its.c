@@ -800,6 +800,65 @@ out:
     return ret;
 }
 
+/* Must be called with the its_device_lock held. */
+static struct its_device *get_its_device(struct domain *d, paddr_t vdoorbell,
+                                         uint32_t vdevid)
+{
+    struct rb_node *node = d->arch.vgic.its_devices.rb_node;
+    struct its_device *dev;
+
+    ASSERT(spin_is_locked(&d->arch.vgic.its_devices_lock));
+
+    while (node)
+    {
+        int cmp;
+
+        dev = rb_entry(node, struct its_device, rbnode);
+        cmp = compare_its_guest_devices(dev, vdoorbell, vdevid);
+
+        if ( !cmp )
+            return dev;
+
+        if ( cmp > 0 )
+            node = node->rb_left;
+        else
+            node = node->rb_right;
+    }
+
+    return NULL;
+}
+
+static struct pending_irq *get_event_pending_irq(struct domain *d,
+                                                 paddr_t vdoorbell_address,
+                                                 uint32_t vdevid,
+                                                 uint32_t eventid,
+                                                 uint32_t *host_lpi)
+{
+    struct its_device *dev;
+    struct pending_irq *pirq = NULL;
+
+    spin_lock(&d->arch.vgic.its_devices_lock);
+    dev = get_its_device(d, vdoorbell_address, vdevid);
+    if ( dev && eventid < dev->eventids )
+    {
+        pirq = &dev->pend_irqs[eventid];
+        if ( host_lpi )
+            *host_lpi = dev->host_lpi_blocks[eventid / LPI_BLOCK] +
+                        (eventid % LPI_BLOCK);
+    }
+    spin_unlock(&d->arch.vgic.its_devices_lock);
+
+    return pirq;
+}
+
+struct pending_irq *gicv3_its_get_event_pending_irq(struct domain *d,
+                                                    paddr_t vdoorbell_address,
+                                                    uint32_t vdevid,
+                                                    uint32_t eventid)
+{
+    return get_event_pending_irq(d, vdoorbell_address, vdevid, eventid, NULL);
+}
+
 /* Scan the DT for any ITS nodes and create a list of host ITSes out of it. */
 void gicv3_its_dt_init(const struct dt_device_node *node)
 {
