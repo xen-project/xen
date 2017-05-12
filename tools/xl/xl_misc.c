@@ -182,7 +182,7 @@ int main_devd(int argc, char **argv)
         }
     }
 
-    libxl_device_events_handler(ctx, 0);
+    ret = libxl_device_events_handler(ctx, 0) ? EXIT_FAILURE : EXIT_SUCCESS;
 
 out:
     return ret;
