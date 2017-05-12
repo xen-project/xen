@@ -295,10 +295,12 @@ ioemu/linkfarm.stamp: $(XEN_ROOT)/tools/qemu-xen-traditional-dir
 	$(buildmakevars2shellvars);						\
 	cd ioemu;								\
 	src="$$XEN_ROOT/tools/qemu-xen-traditional-dir"; export src;		\
-	(cd $$src && find * -type d -print) | xargs mkdir -p;			\
-	(cd $$src && find *	! -type l  -type f  $(addprefix ! -name ,	\
+	(cd $$src && find * -type d						\
+		$(addprefix ! -path , '*-softmmu*' '*-linux-user*') -print)	\
+		| xargs mkdir -p;						\
+	(cd $$src && find *	! -type l  -type f  $(addprefix ! -path ,	\
 			'*.[oda1]' 'config-*' config.mak qemu-dm qemu-img-xen	\
-			'*.html' '*.pod'					\
+			'*.html' '*.pod' '*-softmmu*' '*-linux-user*'		\
 			)) >linkfarm.stamp.tmp;				\
 	cmp -s linkfarm.stamp.tmp linkfarm.stamp &&			\
 		rm linkfarm.stamp.tmp || {				\
