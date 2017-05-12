@@ -2,13 +2,23 @@
 #define __X86_STRING_H__
 
 #define __HAVE_ARCH_MEMCPY
-#define memcpy(t,f,n) (__builtin_memcpy((t),(f),(n)))
+void *memcpy(void *dest, const void *src, size_t n);
+#define memcpy(d, s, n) __builtin_memcpy(d, s, n)
 
-/* Some versions of gcc don't have this builtin. It's non-critical anyway. */
 #define __HAVE_ARCH_MEMMOVE
-extern void *memmove(void *dest, const void *src, size_t n);
+void *memmove(void *dest, const void *src, size_t n);
+#define memmove(d, s, n) __builtin_memmove(d, s, n)
 
 #define __HAVE_ARCH_MEMSET
-#define memset(s,c,n) (__builtin_memset((s),(c),(n)))
+void *memset(void *dest, int c, size_t n);
+#define memset(s, c, n) __builtin_memset(s, c, n)
 
 #endif /* __X86_STRING_H__ */
+/*
+ * Local variables:
+ * mode: C
+ * c-file-style: "BSD"
+ * c-basic-offset: 4
+ * indent-tabs-mode: nil
+ * End:
+ */
