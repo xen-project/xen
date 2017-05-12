@@ -175,6 +175,7 @@ CFLAGS_libblktapctl =
 SHDEPS_libblktapctl =
 LDLIBS_libblktapctl =
 SHLIB_libblktapctl  =
+PKG_CONFIG_REMOVE += xenblktapctl
 endif
 
 CFLAGS_libxenlight = -I$(XEN_XENLIGHT) $(CFLAGS_libxenctrl) $(CFLAGS_xeninclude)
@@ -250,6 +251,8 @@ endif
 
 PKG_CONFIG_DIR ?= $(XEN_ROOT)/tools/pkg-config
 
+PKG_CONFIG_FILTER = $(foreach l,$(PKG_CONFIG_REMOVE),-e 's!\([ ,]\)$(l),!\1!g' -e 's![ ,]$(l)$$!!g')
+
 $(PKG_CONFIG_DIR)/%.pc: %.pc.in Makefile
 	mkdir -p $(PKG_CONFIG_DIR)
 	@sed -e 's!@@version@@!$(PKG_CONFIG_VERSION)!g' \
@@ -259,7 +262,8 @@ $(PKG_CONFIG_DIR)/%.pc: %.pc.in Makefile
 	     -e 's!@@firmwaredir@@!$(XENFIRMWAREDIR)!g' \
 	     -e 's!@@libexecbin@@!$(LIBEXEC_BIN)!g' \
 	     -e 's!@@cflagslocal@@!$(PKG_CONFIG_CFLAGS_LOCAL)!g' \
-	     -e 's!@@libsflag@@!-Wl,-rpath-link=!g' < $< > $@
+	     -e 's!@@libsflag@@!-Wl,-rpath-link=!g' \
+	     $(PKG_CONFIG_FILTER) < $< > $@
 
 %.pc: %.pc.in Makefile
 	@sed -e 's!@@version@@!$(PKG_CONFIG_VERSION)!g' \
@@ -269,4 +273,5 @@ $(PKG_CONFIG_DIR)/%.pc: %.pc.in Makefile
 	     -e 's!@@firmwaredir@@!$(XENFIRMWAREDIR)!g' \
 	     -e 's!@@libexecbin@@!$(LIBEXEC_BIN)!g' \
 	     -e 's!@@cflagslocal@@!!g' \
-	     -e 's!@@libsflag@@!-L!g' < $< > $@
+	     -e 's!@@libsflag@@!-L!g' \
+	     $(PKG_CONFIG_FILTER) < $< > $@
