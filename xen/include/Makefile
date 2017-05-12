@@ -120,7 +120,10 @@ headers99.chk: $(PUBLIC_C99_HEADERS) Makefile
 
 headers++.chk: $(PUBLIC_HEADERS) Makefile
 	rm -f $@.new
-	$(CXX) -v >/dev/null 2>&1 || exit 0;                                  \
+	if ! $(CXX) -v >/dev/null 2>&1; then                                  \
+	    touch $@.new;                                                     \
+	    exit 0;                                                           \
+	fi;                                                                   \
 	$(foreach i, $(filter %.h,$^),                                        \
 	    echo "#include "\"$(i)\"                                          \
 	    | $(CXX) -x c++ -std=gnu++98 -Wall -Werror -D__XEN_TOOLS__        \
