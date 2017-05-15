@@ -632,11 +632,20 @@ void pv_inject_event(const struct x86_event *event)
     struct trap_bounce *tb;
     const struct trap_info *ti;
     const uint8_t vector = event->vector;
-    const bool use_error_code =
-        ((vector < 32) && (TRAP_HAVE_EC & (1u << vector)));
     unsigned int error_code = event->error_code;
+    bool use_error_code;
 
     ASSERT(vector == event->vector); /* Confirm no truncation. */
+    if ( event->type == X86_EVENTTYPE_HW_EXCEPTION )
+    {
+        ASSERT(vector < 32);
+        use_error_code = TRAP_HAVE_EC & (1u << vector);
+    }
+    else
+    {
+        ASSERT(event->type == X86_EVENTTYPE_SW_INTERRUPT);
+        use_error_code = false;
+    }
     if ( use_error_code )
         ASSERT(error_code != X86_EVENT_NO_EC);
     else
@@ -649,7 +658,8 @@ void pv_inject_event(const struct x86_event *event)
     tb->cs    = ti->cs;
     tb->eip   = ti->address;
 
-    if ( vector == TRAP_page_fault )
+    if ( event->type == X86_EVENTTYPE_HW_EXCEPTION &&
+         vector == TRAP_page_fault )
     {
         v->arch.pv_vcpu.ctrlreg[2] = event->cr2;
         arch_set_cr2(v, event->cr2);
@@ -689,6 +699,7 @@ static inline void do_guest_trap(unsigned int trapnr,
 {
     const struct x86_event event = {
         .vector = trapnr,
+        .type = X86_EVENTTYPE_HW_EXCEPTION,
         .error_code = (((trapnr < 32) && (TRAP_HAVE_EC & (1u << trapnr)))
                        ? regs->error_code : X86_EVENT_NO_EC),
     };
@@ -3427,7 +3438,7 @@ void do_general_protection(struct cpu_user_regs *regs)
         if ( permit_softint(TI_GET_DPL(ti), v, regs) )
         {
             regs->rip += 2;
-            do_guest_trap(vector, regs);
+            pv_inject_sw_interrupt(vector);
             return;
         }
     }

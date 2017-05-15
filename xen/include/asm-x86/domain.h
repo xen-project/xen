@@ -655,6 +655,17 @@ static inline void pv_inject_page_fault(int errcode, unsigned long cr2)
     pv_inject_event(&event);
 }
 
+static inline void pv_inject_sw_interrupt(unsigned int vector)
+{
+    const struct x86_event event = {
+        .vector = vector,
+        .type = X86_EVENTTYPE_SW_INTERRUPT,
+        .error_code = X86_EVENT_NO_EC,
+    };
+
+    pv_inject_event(&event);
+}
+
 #endif /* __ASM_DOMAIN_H__ */
 
 /*
