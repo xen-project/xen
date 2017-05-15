@@ -694,19 +694,6 @@ void pv_inject_event(const struct x86_event *event)
     }
 }
 
-static inline void do_guest_trap(unsigned int trapnr,
-                                 const struct cpu_user_regs *regs)
-{
-    const struct x86_event event = {
-        .vector = trapnr,
-        .type = X86_EVENTTYPE_HW_EXCEPTION,
-        .error_code = (((trapnr < 32) && (TRAP_HAVE_EC & (1u << trapnr)))
-                       ? regs->error_code : X86_EVENT_NO_EC),
-    };
-
-    pv_inject_event(&event);
-}
-
 static void instruction_done(struct cpu_user_regs *regs, unsigned long rip)
 {
     regs->rip = rip;
@@ -714,7 +701,7 @@ static void instruction_done(struct cpu_user_regs *regs, unsigned long rip)
     if ( regs->eflags & X86_EFLAGS_TF )
     {
         current->arch.debugreg[6] |= DR_STEP | DR_STATUS_RESERVED_ONE;
-        do_guest_trap(TRAP_debug, regs);
+        pv_inject_hw_exception(TRAP_debug, X86_EVENT_NO_EC);
     }
 }
 
@@ -762,7 +749,7 @@ int set_guest_machinecheck_trapbounce(void)
     struct vcpu *v = current;
     struct trap_bounce *tb = &v->arch.pv_vcpu.trap_bounce;
  
-    do_guest_trap(TRAP_machine_check, guest_cpu_user_regs());
+    pv_inject_hw_exception(TRAP_machine_check, X86_EVENT_NO_EC);
     tb->flags &= ~TBF_EXCEPTION; /* not needed for MCE delivery path */
     return !null_trap_bounce(v, tb);
 }
@@ -775,7 +762,7 @@ int set_guest_nmi_trapbounce(void)
 {
     struct vcpu *v = current;
     struct trap_bounce *tb = &v->arch.pv_vcpu.trap_bounce;
-    do_guest_trap(TRAP_nmi, guest_cpu_user_regs());
+    pv_inject_hw_exception(TRAP_nmi, X86_EVENT_NO_EC);
     tb->flags &= ~TBF_EXCEPTION; /* not needed for NMI delivery path */
     return !null_trap_bounce(v, tb);
 }
@@ -803,9 +790,13 @@ void do_trap(struct cpu_user_regs *regs)
     if ( debugger_trap_entry(trapnr, regs) )
         return;
 
+    ASSERT(trapnr < 32);
+
     if ( guest_mode(regs) )
     {
-        do_guest_trap(trapnr, regs);
+        pv_inject_hw_exception(trapnr,
+                               (TRAP_HAVE_EC & (1u << trapnr))
+                               ? regs->error_code : X86_EVENT_NO_EC);
         return;
     }
 
@@ -1071,7 +1062,7 @@ static int emulate_forced_invalid_op(struct cpu_user_regs *regs)
     if ( current->arch.cpuid_faulting && !guest_kernel_mode(current, regs) )
     {
         regs->rip = eip;
-        do_guest_trap(TRAP_gp_fault, regs);
+        pv_inject_hw_exception(TRAP_gp_fault, regs->error_code);
         return EXCRET_fault_fixed;
     }
 
@@ -1107,7 +1098,7 @@ void do_invalid_op(struct cpu_user_regs *regs)
     {
         if ( !emulate_invalid_rdtscp(regs) &&
              !emulate_forced_invalid_op(regs) )
-            do_guest_trap(TRAP_invalid_op, regs);
+            pv_inject_hw_exception(TRAP_invalid_op, X86_EVENT_NO_EC);
         return;
     }
 
@@ -1235,7 +1226,7 @@ void do_int3(struct cpu_user_regs *regs)
         return;
     }
 
-    do_guest_trap(TRAP_int3, regs);
+    pv_inject_hw_exception(TRAP_int3, X86_EVENT_NO_EC);
 }
 
 static void reserved_bit_page_fault(
@@ -3049,7 +3040,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         {
             curr->arch.debugreg[6] |= ctxt.bpmatch | DR_STATUS_RESERVED_ONE;
             if ( !(curr->arch.pv_vcpu.trap_bounce.flags & TBF_EXCEPTION) )
-                do_guest_trap(TRAP_debug, regs);
+                pv_inject_hw_exception(TRAP_debug, X86_EVENT_NO_EC);
         }
         /* fall through */
     case X86EMUL_RETRY:
@@ -3164,12 +3155,12 @@ static void emulate_gate_op(struct cpu_user_regs *regs)
          (((ar >> 13) & 3) < (regs->cs & 3)) ||
          ((ar & _SEGMENT_TYPE) != 0xc00) )
     {
-        do_guest_trap(TRAP_gp_fault, regs);
+        pv_inject_hw_exception(TRAP_gp_fault, regs->error_code);
         return;
     }
     if ( !(ar & _SEGMENT_P) )
     {
-        do_guest_trap(TRAP_no_segment, regs);
+        pv_inject_hw_exception(TRAP_no_segment, regs->error_code);
         return;
     }
     dpl = (ar >> 13) & 3;
@@ -3185,7 +3176,7 @@ static void emulate_gate_op(struct cpu_user_regs *regs)
          !(ar & _SEGMENT_P) ||
          !(ar & _SEGMENT_CODE) )
     {
-        do_guest_trap(TRAP_gp_fault, regs);
+        pv_inject_hw_exception(TRAP_gp_fault, regs->error_code);
         return;
     }
 
@@ -3198,7 +3189,7 @@ static void emulate_gate_op(struct cpu_user_regs *regs)
         if ( PTR_ERR(state) == -X86EMUL_EXCEPTION )
             pv_inject_event(&ctxt.ctxt.event);
         else
-            do_guest_trap(TRAP_gp_fault, regs);
+            pv_inject_hw_exception(TRAP_gp_fault, regs->error_code);
         return;
     }
 
@@ -3248,7 +3239,7 @@ static void emulate_gate_op(struct cpu_user_regs *regs)
          (opnd_sel & ~3) != regs->error_code ||
          dpl < (opnd_sel & 3) )
     {
-        do_guest_trap(TRAP_gp_fault, regs);
+        pv_inject_hw_exception(TRAP_gp_fault, regs->error_code);
         return;
     }
 
@@ -3296,7 +3287,7 @@ static void emulate_gate_op(struct cpu_user_regs *regs)
             /* Inner stack known only for kernel ring. */
             if ( (sel & 3) != GUEST_KERNEL_RPL(v->domain) )
             {
-                do_guest_trap(TRAP_gp_fault, regs);
+                pv_inject_hw_exception(TRAP_gp_fault, regs->error_code);
                 return;
             }
             esp = v->arch.pv_vcpu.kernel_sp;
@@ -3320,7 +3311,7 @@ static void emulate_gate_op(struct cpu_user_regs *regs)
             stkp = (unsigned int *)(unsigned long)((unsigned int)base + esp);
             if ( !compat_access_ok(stkp - 4 - nparm, 16 + nparm * 4) )
             {
-                do_guest_trap(TRAP_gp_fault, regs);
+                pv_inject_hw_exception(TRAP_gp_fault, regs->error_code);
                 return;
             }
             push(regs->ss);
@@ -3335,12 +3326,12 @@ static void emulate_gate_op(struct cpu_user_regs *regs)
                      (ar & _SEGMENT_CODE) ||
                      !(ar & _SEGMENT_WR) ||
                      !check_stack_limit(ar, limit, esp + nparm * 4, nparm * 4) )
-                    return do_guest_trap(TRAP_gp_fault, regs);
+                    return pv_inject_hw_exception(TRAP_gp_fault, regs->error_code);
                 ustkp = (unsigned int *)(unsigned long)
                         ((unsigned int)base + regs->esp + nparm * 4);
                 if ( !compat_access_ok(ustkp - nparm, 0 + nparm * 4) )
                 {
-                    do_guest_trap(TRAP_gp_fault, regs);
+                    pv_inject_hw_exception(TRAP_gp_fault, regs->error_code);
                     return;
                 }
                 do
@@ -3366,7 +3357,7 @@ static void emulate_gate_op(struct cpu_user_regs *regs)
             if ( !read_descriptor(ss, v, &base, &limit, &ar, 0) ||
                  ((ar >> 13) & 3) != (sel & 3) )
             {
-                do_guest_trap(TRAP_gp_fault, regs);
+                pv_inject_hw_exception(TRAP_gp_fault, regs->error_code);
                 return;
             }
             if ( !check_stack_limit(ar, limit, esp, 2 * 4) )
@@ -3377,7 +3368,7 @@ static void emulate_gate_op(struct cpu_user_regs *regs)
             stkp = (unsigned int *)(unsigned long)((unsigned int)base + esp);
             if ( !compat_access_ok(stkp - 2, 2 * 4) )
             {
-                do_guest_trap(TRAP_gp_fault, regs);
+                pv_inject_hw_exception(TRAP_gp_fault, regs->error_code);
                 return;
             }
         }
@@ -3457,7 +3448,7 @@ void do_general_protection(struct cpu_user_regs *regs)
     }
 
     /* Pass on GPF as is. */
-    do_guest_trap(TRAP_gp_fault, regs);
+    pv_inject_hw_exception(TRAP_gp_fault, regs->error_code);
     return;
 
  gp_in_kernel:
@@ -3677,7 +3668,7 @@ void do_device_not_available(struct cpu_user_regs *regs)
 
     if ( curr->arch.pv_vcpu.ctrlreg[0] & X86_CR0_TS )
     {
-        do_guest_trap(TRAP_no_device, regs);
+        pv_inject_hw_exception(TRAP_no_device, X86_EVENT_NO_EC);
         curr->arch.pv_vcpu.ctrlreg[0] &= ~X86_CR0_TS;
     }
     else
@@ -3750,7 +3741,7 @@ void do_debug(struct cpu_user_regs *regs)
     v->arch.debugreg[6] = read_debugreg(6);
 
     ler_enable();
-    do_guest_trap(TRAP_debug, regs);
+    pv_inject_hw_exception(TRAP_debug, X86_EVENT_NO_EC);
     return;
 
  out:
