@@ -501,6 +501,10 @@ struct libxl__ctx {
     libxl_version_info version_info;
 };
 
+/*
+ * libxl__device is a transparent structure that doesn't contain private fields
+ * or external memory references, and as such can be copied by assignment.
+ */
 typedef struct {
     uint32_t backend_devid;
     uint32_t backend_domid;
