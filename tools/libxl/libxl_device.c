@@ -1520,13 +1520,24 @@ static void check_and_maybe_remove_guest(libxl__gc *gc,
  */
 static int add_device(libxl__egc *egc, libxl__ao *ao,
                       libxl__ddomain_guest *dguest,
-                      libxl__ddomain_device *ddev)
+                      libxl__device *dev)
 {
     AO_GC;
-    libxl__device *dev = ddev->dev;
     libxl__ao_device *aodev;
+    libxl__ddomain_device *ddev;
     libxl__dm_spawn_state *dmss;
     int rc = 0;
+
+    /*
+     * New device addition, allocate a struct to hold it and add it
+     * to the list of active devices for a given guest.
+     */
+    ddev = libxl__zalloc(NOGC, sizeof(*ddev));
+    ddev->dev = libxl__zalloc(NOGC, sizeof(*ddev->dev));
+    *ddev->dev = *dev;
+    LIBXL_SLIST_INSERT_HEAD(&dguest->devices, ddev, next);
+    LOGD(DEBUG, dev->domid, "Added device %s to the list of active devices",
+         libxl__device_backend_path(gc, dev));
 
     switch(dev->backend_kind) {
     case LIBXL__DEVICE_KIND_VBD:
@@ -1607,6 +1618,22 @@ static int remove_device(libxl__egc *egc, libxl__ao *ao,
         break;
     }
 
+    /*
+     * Removal of an active device, remove it from the list and
+     * free it's data structures if they are no longer needed.
+     *
+     * NB: the freeing is safe because all the async ops launched
+     * above or from add_device make a copy of the data they use, so
+     * there's no risk of dereferencing.
+     */
+    LIBXL_SLIST_REMOVE(&dguest->devices, ddev, libxl__ddomain_device,
+                       next);
+    LOGD(DEBUG, dev->domid, "Removed device %s from the list of active devices",
+         libxl__device_backend_path(gc, dev));
+
+    free(ddev->dev);
+    free(ddev);
+
 out:
     return rc;
 }
@@ -1678,38 +1705,13 @@ static void backend_watch_callback(libxl__egc *egc, libxl__ev_xswatch *watch,
          */
         goto skip;
     } else if (ddev == NULL) {
-        /*
-         * New device addition, allocate a struct to hold it and add it
-         * to the list of active devices for a given guest.
-         */
-        ddev = libxl__zalloc(NOGC, sizeof(*ddev));
-        ddev->dev = libxl__zalloc(NOGC, sizeof(*ddev->dev));
-        *ddev->dev = *dev;
-        LIBXL_SLIST_INSERT_HEAD(&dguest->devices, ddev, next);
-        LOGD(DEBUG, dev->domid, "Added device %s to the list of active devices",
-             path);
-        rc = add_device(egc, nested_ao, dguest, ddev);
+        rc = add_device(egc, nested_ao, dguest, dev);
         if (rc > 0)
             free_ao = true;
     } else if (state == XenbusStateClosed && online == 0) {
-        /*
-         * Removal of an active device, remove it from the list and
-         * free it's data structures if they are no longer needed.
-         *
-         * NB: the freeing is safe because all the async ops launched from
-         * backend_watch_callback make a copy of the data they use, so
-         * there's no risk of dereferencing.
-         */
-        LIBXL_SLIST_REMOVE(&dguest->devices, ddev, libxl__ddomain_device,
-                           next);
-        LOGD(DEBUG, dev->domid, "Removed device %s from the list of active devices",
-             path);
         rc = remove_device(egc, nested_ao, dguest, ddev);
         if (rc > 0)
             free_ao = true;
-
-        free(ddev->dev);
-        free(ddev);
         check_and_maybe_remove_guest(gc, ddomain, dguest);
     }
 
@@ -1720,9 +1722,6 @@ static void backend_watch_callback(libxl__egc *egc, libxl__ev_xswatch *watch,
 
 skip:
     libxl__nested_ao_free(nested_ao);
-    if (ddev)
-        free(ddev->dev);
-    free(ddev);
     check_and_maybe_remove_guest(gc, ddomain, dguest);
     return;
 }
