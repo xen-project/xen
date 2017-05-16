@@ -87,6 +87,7 @@ static int libxl__estimate_madt_size(libxl__gc *gc,
         break;
     default:
         LOG(ERROR, "Unknown GIC version");
+        *size = 0;
         rc = ERROR_FAIL;
         break;
     }
