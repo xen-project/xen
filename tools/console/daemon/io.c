@@ -1117,8 +1117,12 @@ void handle_io(void)
 		ret = poll(fds, nr_fds, next_timeout ? poll_timeout : -1);
 
 		if (log_reload) {
+			int saved_errno = errno;
+
 			handle_log_reload();
 			log_reload = 0;
+
+			errno = saved_errno;
 		}
 
 		/* Abort if poll failed, except for EINTR cases
