@@ -1493,6 +1493,24 @@ static libxl__ddomain_device *search_for_device(libxl__ddomain_guest *dguest,
     return NULL;
 }
 
+static void check_and_maybe_remove_guest(libxl__gc *gc,
+                                         libxl__ddomain *ddomain,
+                                         libxl__ddomain_guest *dguest)
+{
+    assert(ddomain);
+
+    if (dguest != NULL &&
+        dguest->num_vifs + dguest->num_vbds + dguest->num_qdisks == 0) {
+        LIBXL_SLIST_REMOVE(&ddomain->guests, dguest, libxl__ddomain_guest,
+                           next);
+        LOGD(DEBUG, dguest->domid, "Removed domain from the list of active guests");
+        /* Clear any leftovers in libxl/<domid> */
+        libxl__xs_rm_checked(gc, XBT_NULL,
+                             GCSPRINTF("libxl/%u", dguest->domid));
+        free(dguest);
+    }
+}
+
 /*
  * The following comment applies to both add_device and remove_device.
  *
@@ -1602,7 +1620,7 @@ static void backend_watch_callback(libxl__egc *egc, libxl__ev_xswatch *watch,
     STATE_AO_GC(nested_ao);
     char *p, *path;
     const char *sstate, *sonline;
-    int state, online, rc, num_devs;
+    int state, online, rc;
     libxl__device *dev;
     libxl__ddomain_device *ddev = NULL;
     libxl__ddomain_guest *dguest = NULL;
@@ -1677,6 +1695,10 @@ static void backend_watch_callback(libxl__egc *egc, libxl__ev_xswatch *watch,
         /*
          * Removal of an active device, remove it from the list and
          * free it's data structures if they are no longer needed.
+         *
+         * NB: the freeing is safe because all the async ops launched from
+         * backend_watch_callback make a copy of the data they use, so
+         * there's no risk of dereferencing.
          */
         LIBXL_SLIST_REMOVE(&dguest->devices, ddev, libxl__ddomain_device,
                            next);
@@ -1688,17 +1710,7 @@ static void backend_watch_callback(libxl__egc *egc, libxl__ev_xswatch *watch,
 
         free(ddev->dev);
         free(ddev);
-        /* If this was the last device in the domain, remove it from the list */
-        num_devs = dguest->num_vifs + dguest->num_vbds + dguest->num_qdisks;
-        if (num_devs == 0) {
-            LIBXL_SLIST_REMOVE(&ddomain->guests, dguest, libxl__ddomain_guest,
-                               next);
-            LOGD(DEBUG, dguest->domid, "Removed domain from the list of active guests");
-            /* Clear any leftovers in libxl/<domid> */
-            libxl__xs_rm_checked(gc, XBT_NULL,
-                                 GCSPRINTF("libxl/%u", dguest->domid));
-            free(dguest);
-        }
+        check_and_maybe_remove_guest(gc, ddomain, dguest);
     }
 
     if (free_ao)
@@ -1711,7 +1723,7 @@ skip:
     if (ddev)
         free(ddev->dev);
     free(ddev);
-    free(dguest);
+    check_and_maybe_remove_guest(gc, ddomain, dguest);
     return;
 }
 
