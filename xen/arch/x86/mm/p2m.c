@@ -1030,33 +1030,44 @@ void p2m_change_type_range(struct domain *d,
     p2m_unlock(p2m);
 }
 
-/* Synchronously modify the p2m type for a range of gfns from ot to nt. */
-void p2m_finish_type_change(struct domain *d,
-                            gfn_t first_gfn, unsigned long max_nr,
-                            p2m_type_t ot, p2m_type_t nt)
+/*
+ * Finish p2m type change for gfns which are marked as need_recalc in a range.
+ * Returns: 0/1 for success, negative for failure
+ */
+int p2m_finish_type_change(struct domain *d,
+                           gfn_t first_gfn, unsigned long max_nr)
 {
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
-    p2m_type_t t;
     unsigned long gfn = gfn_x(first_gfn);
     unsigned long last_gfn = gfn + max_nr - 1;
-
-    ASSERT(ot != nt);
-    ASSERT(p2m_is_changeable(ot) && p2m_is_changeable(nt));
+    int rc = 0;
 
     p2m_lock(p2m);
 
     last_gfn = min(last_gfn, p2m->max_mapped_pfn);
     while ( gfn <= last_gfn )
     {
-        get_gfn_query_unlocked(d, gfn, &t);
-
-        if ( t == ot )
-            p2m_change_type_one(d, gfn, t, nt);
+        rc = p2m->recalc(p2m, gfn);
+        /*
+         * ept->recalc could return 0/1/-ENOMEM. pt->recalc could return
+         * 0/-ENOMEM/-ENOENT, -ENOENT isn't an error as we are looping
+         * gfn here.
+         */
+        if ( rc == -ENOENT )
+            rc = 0;
+        else if ( rc < 0 )
+        {
+            gdprintk(XENLOG_ERR, "p2m->recalc failed! Dom%d gfn=%lx\n",
+                     d->domain_id, gfn);
+            break;
+        }
 
         gfn++;
     }
 
     p2m_unlock(p2m);
+
+    return rc;
 }
 
 /*

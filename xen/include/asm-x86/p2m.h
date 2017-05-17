@@ -246,6 +246,8 @@ struct p2m_domain {
                                     p2m_query_t q,
                                     unsigned int *page_order,
                                     bool_t *sve);
+    int                (*recalc)(struct p2m_domain *p2m,
+                                 unsigned long gfn);
     void               (*enable_hardware_log_dirty)(struct p2m_domain *p2m);
     void               (*disable_hardware_log_dirty)(struct p2m_domain *p2m);
     void               (*flush_hardware_cached_dirty)(struct p2m_domain *p2m);
@@ -607,10 +609,9 @@ int p2m_change_type_one(struct domain *d, unsigned long gfn,
                         p2m_type_t ot, p2m_type_t nt);
 
 /* Synchronously change the p2m type for a range of gfns */
-void p2m_finish_type_change(struct domain *d,
-                            gfn_t first_gfn,
-                            unsigned long max_nr,
-                            p2m_type_t ot, p2m_type_t nt);
+int p2m_finish_type_change(struct domain *d,
+                           gfn_t first_gfn,
+                           unsigned long max_nr);
 
 /* Report a change affecting memory types. */
 void p2m_memory_type_changed(struct domain *d);

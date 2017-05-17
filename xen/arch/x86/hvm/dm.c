@@ -490,8 +490,9 @@ static int dm_op(const struct dmop_args *op_args)
                     first_gfn <= p2m->max_mapped_pfn )
             {
                 /* Iterate p2m table for 256 gfns each time. */
-                p2m_finish_type_change(d, _gfn(first_gfn), 256,
-                                       p2m_ioreq_server, p2m_ram_rw);
+                rc = p2m_finish_type_change(d, _gfn(first_gfn), 256);
+                if ( rc < 0 )
+                    break;
 
                 first_gfn += 256;
 
