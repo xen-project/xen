@@ -5,7 +5,6 @@ export PKG_CONFIG_DIR = $(CURDIR)/pkg-config
 include $(XEN_ROOT)/tools/Rules.mk
 
 SUBDIRS-y :=
-SUBDIRS-y += include
 SUBDIRS-y += libs
 SUBDIRS-y += libxc
 SUBDIRS-y += flask
@@ -50,7 +49,7 @@ SUBDIRS-$(OCAML_TOOLS) += ocaml
 endif
 
 ifeq ($(CONFIG_RUMP),y)
-SUBDIRS-y := include libxc xenstore
+SUBDIRS-y := libxc xenstore
 endif
 
 # For the sake of linking, set the sys-root

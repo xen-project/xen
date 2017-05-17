@@ -38,9 +38,14 @@ mini-os-dir-force-update: mini-os-dir
 export XEN_TARGET_ARCH
 export DESTDIR
 
+.PHONY: build-tools-public-headers
+build-tools-public-headers:
+	$(MAKE) -C tools/include
+
 # build and install everything into the standard system directories
 .PHONY: install
 install: $(TARGS_INSTALL)
+	$(MAKE) -C tools/include install
 
 .PHONY: build
 build: $(TARGS_BUILD)
@@ -50,11 +55,11 @@ build-xen:
 	$(MAKE) -C xen build
 
 .PHONY: build-tools
-build-tools:
+build-tools: build-tools-public-headers
 	$(MAKE) -C tools build
 
 .PHONY: build-stubdom
-build-stubdom: mini-os-dir
+build-stubdom: mini-os-dir build-tools-public-headers
 	$(MAKE) -C stubdom build
 ifeq (x86_64,$(XEN_TARGET_ARCH))
 	XEN_TARGET_ARCH=x86_32 $(MAKE) -C stubdom pv-grub
@@ -75,6 +80,7 @@ test:
 .PHONY: dist
 dist: DESTDIR=$(DISTDIR)/install
 dist: $(TARGS_DIST) dist-misc
+	make -C tools/include dist
 
 dist-misc:
 	$(INSTALL_DIR) $(DISTDIR)/
@@ -101,7 +107,7 @@ install-tools:
 	$(MAKE) -C tools install
 
 .PHONY: install-stubdom
-install-stubdom: mini-os-dir
+install-stubdom: mini-os-dir build-tools-public-headers
 	$(MAKE) -C stubdom install
 ifeq (x86_64,$(XEN_TARGET_ARCH))
 	XEN_TARGET_ARCH=x86_32 $(MAKE) -C stubdom install-grub
@@ -168,6 +174,7 @@ src-tarball: subtree-force-update-all
 
 .PHONY: clean
 clean: $(TARGS_CLEAN)
+	$(MAKE) -C tools/include clean
 
 .PHONY: clean-xen
 clean-xen:
@@ -191,6 +198,7 @@ clean-docs:
 # clean, but blow away tarballs
 .PHONY: distclean
 distclean: $(TARGS_DISTCLEAN)
+	$(MAKE) -C tools/include distclean
 	rm -f config/Toplevel.mk
 	rm -rf dist
 	rm -rf config.log config.status config.cache autom4te.cache

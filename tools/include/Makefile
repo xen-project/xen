@@ -63,6 +63,8 @@ clean:
 	rm -rf xen xen-xsm acpi
 	$(MAKE) -C xen-foreign clean
 
+.PHONY: dist
+dist: install
 
 .PHONY: distclean
 distclean: clean
