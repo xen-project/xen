@@ -103,7 +103,7 @@ install-xen:
 	$(MAKE) -C xen install
 
 .PHONY: install-tools
-install-tools:
+install-tools: build-tools-public-headers
 	$(MAKE) -C tools install
 
 .PHONY: install-stubdom
