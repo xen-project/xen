@@ -1005,12 +1005,18 @@ int p2m_set_entry(struct p2m_domain *p2m,
 
     while ( nr )
     {
+        unsigned long mask;
+        unsigned long order;
+
         /*
+         * Don't take into account the MFN when removing mapping (i.e
+         * MFN_INVALID) to calculate the correct target order.
+         *
          * XXX: Support superpage mappings if nr is not aligned to a
          * superpage size.
          */
-        unsigned long mask = gfn_x(sgfn) | mfn_x(smfn) | nr;
-        unsigned long order;
+        mask = !mfn_eq(smfn, INVALID_MFN) ? mfn_x(smfn) : 0;
+        mask |= gfn_x(sgfn) | nr;
 
         /* Always map 4k by 4k when memaccess is enabled */
         if ( unlikely(p2m->mem_access_enabled) )
