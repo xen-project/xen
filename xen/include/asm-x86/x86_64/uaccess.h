@@ -42,7 +42,7 @@ extern void *xlat_malloc(unsigned long *xlat_page_current, size_t size);
 
 #define array_access_ok(addr, count, size) \
     (likely(((count) ?: 0UL) < (~0UL / (size))) && \
-     access_ok(addr, (count) * (size)))
+     access_ok(addr, 0 + (count) * (size)))
 
 #define __compat_addr_ok(d, addr) \
     ((unsigned long)(addr) < HYPERVISOR_COMPAT_VIRT_START(d))
@@ -55,7 +55,7 @@ extern void *xlat_malloc(unsigned long *xlat_page_current, size_t size);
 
 #define compat_array_access_ok(addr,count,size) \
     (likely((count) < (~0U / (size))) && \
-     compat_access_ok(addr, (count) * (size)))
+     compat_access_ok(addr, 0 + (count) * (size)))
 
 #define __put_user_size(x,ptr,size,retval,errret)			\
 do {									\

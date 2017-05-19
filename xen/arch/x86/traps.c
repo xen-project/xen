@@ -3318,7 +3318,7 @@ static void emulate_gate_op(struct cpu_user_regs *regs)
                 return;
             }
             stkp = (unsigned int *)(unsigned long)((unsigned int)base + esp);
-            if ( !compat_access_ok(stkp - 4 - nparm, (4 + nparm) * 4) )
+            if ( !compat_access_ok(stkp - 4 - nparm, 16 + nparm * 4) )
             {
                 do_guest_trap(TRAP_gp_fault, regs);
                 return;
@@ -3338,7 +3338,7 @@ static void emulate_gate_op(struct cpu_user_regs *regs)
                     return do_guest_trap(TRAP_gp_fault, regs);
                 ustkp = (unsigned int *)(unsigned long)
                         ((unsigned int)base + regs->esp + nparm * 4);
-                if ( !compat_access_ok(ustkp - nparm, nparm * 4) )
+                if ( !compat_access_ok(ustkp - nparm, 0 + nparm * 4) )
                 {
                     do_guest_trap(TRAP_gp_fault, regs);
                     return;
