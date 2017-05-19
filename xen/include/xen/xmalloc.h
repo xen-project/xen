@@ -33,17 +33,17 @@ extern void *_xzalloc(unsigned long size, unsigned long align);
 static inline void *_xmalloc_array(
     unsigned long size, unsigned long align, unsigned long num)
 {
-	/* Check for overflow. */
-	if (size && num > UINT_MAX / size)
-		return NULL;
- 	return _xmalloc(size * num, align);
+    /* Check for overflow. */
+    if ( size && num > UINT_MAX / size )
+        return NULL;
+    return _xmalloc(size * num, align);
 }
 
 static inline void *_xzalloc_array(
     unsigned long size, unsigned long align, unsigned long num)
 {
     /* Check for overflow. */
-    if (size && num > UINT_MAX / size)
+    if ( size && num > UINT_MAX / size )
         return NULL;
     return _xzalloc(size * num, align);
 }
