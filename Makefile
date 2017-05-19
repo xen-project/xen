@@ -42,6 +42,10 @@ export DESTDIR
 build-tools-public-headers:
 	$(MAKE) -C tools/include
 
+.PHONY: dist-tools-public-headers
+dist-tools-public-headers: build-tools-public-headers
+	$(MAKE) -C tools/include dist
+
 # build and install everything into the standard system directories
 .PHONY: install
 install: $(TARGS_INSTALL)
@@ -80,13 +84,15 @@ test:
 .PHONY: dist
 dist: DESTDIR=$(DISTDIR)/install
 dist: $(TARGS_DIST) dist-misc
-	make -C tools/include dist
 
 dist-misc:
 	$(INSTALL_DIR) $(DISTDIR)/
 	$(INSTALL_DATA) ./COPYING $(DISTDIR)
 	$(INSTALL_DATA) ./README $(DISTDIR)
 	$(INSTALL_PROG) ./install.sh $(DISTDIR)
+
+
+dist-tools: dist-tools-public-headers
 dist-%: DESTDIR=$(DISTDIR)/install
 dist-%: install-%
 	@: # do nothing
