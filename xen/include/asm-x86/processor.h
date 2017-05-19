@@ -396,17 +396,6 @@ static inline bool_t read_pkru_wd(uint32_t pkru, unsigned int pkey)
     outb((data), 0x23); \
 } while (0)
 
-/* Stop speculative execution */
-static inline void sync_core(void)
-{
-    int tmp;
-    asm volatile (
-        "cpuid"
-        : "=a" (tmp)
-        : "0" (1)
-        : "ebx","ecx","edx","memory" );
-}
-
 static always_inline void __monitor(const void *eax, unsigned long ecx,
                                     unsigned long edx)
 {
