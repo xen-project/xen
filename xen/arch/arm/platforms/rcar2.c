@@ -46,7 +46,7 @@ static int __init rcar2_smp_init(void)
     return 0;
 }
 
-static const char const *rcar2_dt_compat[] __initdata =
+static const char *const rcar2_dt_compat[] __initconst =
 {
     "renesas,lager",
     NULL
