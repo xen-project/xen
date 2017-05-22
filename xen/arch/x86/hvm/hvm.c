@@ -4544,6 +4544,13 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
 {
     long rc = 0;
 
+    /*
+     * NB: hvm_op can be part of a restarted hypercall; but at the
+     * moment the only hypercalls which do continuations don't need to
+     * store any iteration information (since they're just re-trying
+     * the acquisition of a lock).
+     */
+
     switch ( op )
     {
     case HVMOP_set_evtchn_upcall_vector:
@@ -4635,6 +4642,10 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
         break;
     }
     }
+
+    if ( rc == -ERESTART )
+        rc = hypercall_create_continuation(__HYPERVISOR_hvm_op, "lh",
+                                           op, arg);
 
     return rc;
 }
