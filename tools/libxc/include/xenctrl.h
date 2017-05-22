@@ -1660,10 +1660,6 @@ void xc_clear_last_error(xc_interface *xch);
 int xc_hvm_param_set(xc_interface *handle, domid_t dom, uint32_t param, uint64_t value);
 int xc_hvm_param_get(xc_interface *handle, domid_t dom, uint32_t param, uint64_t *value);
 
-/* Deprecated: use xc_hvm_param_set/get() instead. */
-int xc_set_hvm_param(xc_interface *handle, domid_t dom, int param, unsigned long value);
-int xc_get_hvm_param(xc_interface *handle, domid_t dom, int param, unsigned long *value);
-
 /* HVM guest pass-through */
 int xc_assign_device(xc_interface *xch,
                      uint32_t domid,
