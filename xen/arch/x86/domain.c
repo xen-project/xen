@@ -1723,16 +1723,6 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
     {
         __context_switch();
 
-        if ( is_pv_domain(nextd) &&
-             (is_idle_domain(prevd) ||
-              is_hvm_domain(prevd) ||
-              is_pv_32bit_domain(prevd) != is_pv_32bit_domain(nextd)) )
-        {
-            uint64_t efer = read_efer();
-            if ( !(efer & EFER_SCE) )
-                write_efer(efer | EFER_SCE);
-        }
-
         /* Re-enable interrupts before restoring state which may fault. */
         local_irq_enable();
 

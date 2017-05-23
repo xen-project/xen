@@ -342,8 +342,8 @@ static int vmx_init_vmcs_config(void)
     }
 
     min = VM_EXIT_ACK_INTR_ON_EXIT;
-    opt = VM_EXIT_SAVE_GUEST_PAT | VM_EXIT_LOAD_HOST_PAT |
-          VM_EXIT_CLEAR_BNDCFGS;
+    opt = (VM_EXIT_SAVE_GUEST_PAT | VM_EXIT_LOAD_HOST_PAT |
+           VM_EXIT_LOAD_HOST_EFER | VM_EXIT_CLEAR_BNDCFGS);
     min |= VM_EXIT_IA32E_MODE;
     _vmx_vmexit_control = adjust_vmx_controls(
         "VMExit Control", min, opt, MSR_IA32_VMX_EXIT_CTLS, &mismatch);
@@ -383,7 +383,8 @@ static int vmx_init_vmcs_config(void)
         _vmx_secondary_exec_control &= ~SECONDARY_EXEC_ENABLE_VIRT_EXCEPTIONS;
 
     min = 0;
-    opt = VM_ENTRY_LOAD_GUEST_PAT | VM_ENTRY_LOAD_BNDCFGS;
+    opt = (VM_ENTRY_LOAD_GUEST_PAT | VM_ENTRY_LOAD_GUEST_EFER |
+           VM_ENTRY_LOAD_BNDCFGS);
     _vmx_vmentry_control = adjust_vmx_controls(
         "VMEntry Control", min, opt, MSR_IA32_VMX_ENTRY_CTLS, &mismatch);
 
@@ -1150,6 +1151,8 @@ static int construct_vmcs(struct vcpu *v)
         v->arch.hvm_vmx.host_cr0 |= X86_CR0_TS;
     __vmwrite(HOST_CR0, v->arch.hvm_vmx.host_cr0);
     __vmwrite(HOST_CR4, mmu_cr4_features);
+    if ( cpu_has_vmx_efer )
+        __vmwrite(HOST_EFER, read_efer());
 
     /* Host CS:RIP. */
     __vmwrite(HOST_CS_SELECTOR, __HYPERVISOR_CS);
@@ -1907,7 +1910,17 @@ void vmcs_dump_vcpu(struct vcpu *v)
     vmentry_ctl = vmr32(VM_ENTRY_CONTROLS),
     vmexit_ctl = vmr32(VM_EXIT_CONTROLS);
     cr4 = vmr(GUEST_CR4);
-    efer = vmr(GUEST_EFER);
+
+    /*
+     * The guests EFER setting comes from the GUEST_EFER VMCS field whenever
+     * available, or the guest load-only MSR list on Gen1 hardware, the entry
+     * for which may be elided for performance reasons if identical to Xen's
+     * setting.
+     */
+    if ( cpu_has_vmx_efer )
+        efer = vmr(GUEST_EFER);
+    else if ( vmx_read_guest_loadonly_msr(v, MSR_EFER, &efer) )
+        efer = read_efer();
 
     printk("*** Guest State ***\n");
     printk("CR0: actual=0x%016lx, shadow=0x%016lx, gh_mask=%016lx\n",
@@ -1944,9 +1957,8 @@ void vmcs_dump_vcpu(struct vcpu *v)
     vmx_dump_sel("LDTR", GUEST_LDTR_SELECTOR);
     vmx_dump_sel2("IDTR", GUEST_IDTR_LIMIT);
     vmx_dump_sel("  TR", GUEST_TR_SELECTOR);
-    if ( (vmexit_ctl & (VM_EXIT_SAVE_GUEST_PAT | VM_EXIT_SAVE_GUEST_EFER)) ||
-         (vmentry_ctl & (VM_ENTRY_LOAD_GUEST_PAT | VM_ENTRY_LOAD_GUEST_EFER)) )
-        printk("EFER = 0x%016lx  PAT = 0x%016lx\n", efer, vmr(GUEST_PAT));
+    printk("EFER(%s) = 0x%016lx  PAT = 0x%016lx\n",
+           cpu_has_vmx_efer ? "VMCS" : "MSR LL", efer, vmr(GUEST_PAT));
     printk("PreemptionTimer = 0x%08x  SM Base = 0x%08x\n",
            vmr32(GUEST_PREEMPTION_TIMER), vmr32(GUEST_SMBASE));
     printk("DebugCtl = 0x%016lx  DebugExceptions = 0x%016lx\n",

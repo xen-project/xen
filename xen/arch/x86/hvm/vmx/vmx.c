@@ -509,15 +509,6 @@ static void vmx_restore_guest_msrs(struct vcpu *v)
     wrmsrl(MSR_LSTAR,          v->arch.hvm_vmx.lstar);
     wrmsrl(MSR_SYSCALL_MASK,   v->arch.hvm_vmx.sfmask);
 
-    if ( (v->arch.hvm_vcpu.guest_efer ^ read_efer()) & EFER_SCE )
-    {
-        HVM_DBG_LOG(DBG_LEVEL_2,
-                    "restore guest's EFER with value %lx",
-                    v->arch.hvm_vcpu.guest_efer);
-        write_efer((read_efer() & ~EFER_SCE) |
-                   (v->arch.hvm_vcpu.guest_efer & EFER_SCE));
-    }
-
     if ( cpu_has_rdtscp )
         wrmsr_tsc_aux(hvm_msr_tsc_aux(v));
 }
@@ -1649,22 +1640,79 @@ static void vmx_update_guest_cr(struct vcpu *v, unsigned int cr,
 
 static void vmx_update_guest_efer(struct vcpu *v)
 {
-    unsigned long vm_entry_value;
+    unsigned long entry_ctls, guest_efer = v->arch.hvm_vcpu.guest_efer,
+        xen_efer = read_efer();
+
+    if ( paging_mode_shadow(v->domain) )
+    {
+        /*
+         * When using shadow pagetables, EFER.NX is a Xen-owned bit and is not
+         * under guest control.
+         */
+        guest_efer &= ~EFER_NX;
+        guest_efer |= xen_efer & EFER_NX;
+    }
+
+    if ( !vmx_unrestricted_guest(v) )
+    {
+        /*
+         * When Unrestricted Guest is not enabled in the VMCS, hardware does
+         * not tolerate the LME and LMA settings being different.  As writes
+         * to CR0 are intercepted, it is safe to leave LME clear at this
+         * point, and fix up both LME and LMA when CR0.PG is set.
+         */
+        if ( !(guest_efer & EFER_LMA) )
+            guest_efer &= ~EFER_LME;
+    }
 
     vmx_vmcs_enter(v);
 
-    __vmread(VM_ENTRY_CONTROLS, &vm_entry_value);
-    if ( v->arch.hvm_vcpu.guest_efer & EFER_LMA )
-        vm_entry_value |= VM_ENTRY_IA32E_MODE;
+    /*
+     * The intended guest running mode is derived from VM_ENTRY_IA32E_MODE,
+     * which (architecturally) is the guest's LMA setting.
+     */
+    __vmread(VM_ENTRY_CONTROLS, &entry_ctls);
+
+    entry_ctls &= ~VM_ENTRY_IA32E_MODE;
+    if ( guest_efer & EFER_LMA )
+        entry_ctls |= VM_ENTRY_IA32E_MODE;
+
+    __vmwrite(VM_ENTRY_CONTROLS, entry_ctls);
+
+    /* We expect to use EFER loading in the common case, but... */
+    if ( likely(cpu_has_vmx_efer) )
+        __vmwrite(GUEST_EFER, guest_efer);
+
+    /* ... on Gen1 VT-x hardware, we have to use MSR load/save lists instead. */
     else
-        vm_entry_value &= ~VM_ENTRY_IA32E_MODE;
-    __vmwrite(VM_ENTRY_CONTROLS, vm_entry_value);
+    {
+        /*
+         * When the guests choice of EFER matches Xen's, remove the load/save
+         * list entries.  It is unnecessary overhead, especially as this is
+         * expected to be the common case for 64bit guests.
+         */
+        if ( guest_efer == xen_efer )
+        {
+            vmx_del_msr(v, MSR_EFER, VMX_MSR_HOST);
+            vmx_del_msr(v, MSR_EFER, VMX_MSR_GUEST_LOADONLY);
+        }
+        else
+        {
+            vmx_add_msr(v, MSR_EFER, xen_efer, VMX_MSR_HOST);
+            vmx_add_msr(v, MSR_EFER, guest_efer, VMX_MSR_GUEST_LOADONLY);
+        }
+    }
 
     vmx_vmcs_exit(v);
 
-    if ( v == current )
-        write_efer((read_efer() & ~EFER_SCE) |
-                   (v->arch.hvm_vcpu.guest_efer & EFER_SCE));
+    /*
+     * If the guests virtualised view of MSR_EFER matches the value loaded
+     * into hardware, clear the read intercept to avoid unnecessary VMExits.
+     */
+    if ( guest_efer == v->arch.hvm_vcpu.guest_efer )
+        vmx_clear_msr_intercept(v, MSR_EFER, VMX_MSR_R);
+    else
+        vmx_set_msr_intercept(v, MSR_EFER, VMX_MSR_R);
 }
 
 void nvmx_enqueue_n2_exceptions(struct vcpu *v, 

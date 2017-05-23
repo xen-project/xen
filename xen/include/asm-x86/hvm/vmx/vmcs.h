@@ -306,6 +306,8 @@ extern u64 vmx_ept_vpid_cap;
     (vmx_cpu_based_exec_control & CPU_BASED_MONITOR_TRAP_FLAG)
 #define cpu_has_vmx_pat \
     (vmx_vmentry_control & VM_ENTRY_LOAD_GUEST_PAT)
+#define cpu_has_vmx_efer \
+    (vmx_vmentry_control & VM_ENTRY_LOAD_GUEST_EFER)
 #define cpu_has_vmx_unrestricted_guest \
     (vmx_secondary_exec_control & SECONDARY_EXEC_UNRESTRICTED_GUEST)
 #define vmx_unrestricted_guest(v)               \
@@ -582,6 +584,20 @@ static inline int vmx_read_guest_msr(const struct vcpu *v, uint32_t msr,
                                      uint64_t *val)
 {
     const struct vmx_msr_entry *ent = vmx_find_msr(v, msr, VMX_MSR_GUEST);
+
+    if ( !ent )
+        return -ESRCH;
+
+    *val = ent->data;
+
+    return 0;
+}
+
+static inline int vmx_read_guest_loadonly_msr(
+    const struct vcpu *v, uint32_t msr, uint64_t *val)
+{
+    const struct vmx_msr_entry *ent =
+        vmx_find_msr(v, msr, VMX_MSR_GUEST_LOADONLY);
 
     if ( !ent )
         return -ESRCH;
