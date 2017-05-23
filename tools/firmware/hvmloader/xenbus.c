@@ -141,7 +141,19 @@ static void ring_read(char *data, uint32_t len)
         /* Don't overrun the producer pointer */
         while ( (part = MASK_XENSTORE_IDX(rings->rsp_prod -
                                           rings->rsp_cons)) == 0 )
+        {
+            /*
+             * Don't wait for producer to fill the ring if it is already full.
+             * Condition happens when you write string > 1K into the ring.
+             * eg case prod=1272 cons=248.
+             */
+            if ( rings->rsp_prod - rings->rsp_cons == XENSTORE_RING_SIZE )
+            {
+                part = XENSTORE_RING_SIZE;
+                break;
+            }
             ring_wait();
+        }
         /* Don't overrun the end of the ring */
         if ( part > (XENSTORE_RING_SIZE - MASK_XENSTORE_IDX(rings->rsp_cons)) )
             part = XENSTORE_RING_SIZE - MASK_XENSTORE_IDX(rings->rsp_cons);
