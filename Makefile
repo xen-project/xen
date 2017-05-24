@@ -38,18 +38,13 @@ mini-os-dir-force-update: mini-os-dir
 export XEN_TARGET_ARCH
 export DESTDIR
 
-.PHONY: build-tools-public-headers
-build-tools-public-headers:
-	$(MAKE) -C tools/include
-
-.PHONY: dist-tools-public-headers
-dist-tools-public-headers: build-tools-public-headers
-	$(MAKE) -C tools/include dist
+.PHONY: %-tools-public-headers
+%-tools-public-headers:
+	$(MAKE) -C tools/include $*
 
 # build and install everything into the standard system directories
 .PHONY: install
 install: $(TARGS_INSTALL)
-	$(MAKE) -C tools/include install
 
 .PHONY: build
 build: $(TARGS_BUILD)
@@ -80,7 +75,22 @@ build-docs:
 test:
 	$(MAKE) -C tools/python test
 
-# build and install everything into local dist directory
+# For most targets here,
+#   make COMPONENT-TARGET
+# is implemented, more or less, by
+#   make -C COMPONENT TARGET
+#
+# Each rule that does this needs to have dependencies on any
+# other COMPONENTs that have to be processed first.  See
+# The install-tools target here for an example.
+#
+# dist* targets are special: these do not occur in lower-level
+# Makefiles.  Instead, these are all implemented only here.
+# They run the appropriate install targets with DESTDIR set.
+#
+# Also, we have a number of targets COMPONENT which run
+# dist-COMPONENT, for convenience.
+
 .PHONY: dist
 dist: DESTDIR=$(DISTDIR)/install
 dist: $(TARGS_DIST) dist-misc
@@ -92,12 +102,10 @@ dist-misc:
 	$(INSTALL_PROG) ./install.sh $(DISTDIR)
 
 
-dist-tools: dist-tools-public-headers
 dist-%: DESTDIR=$(DISTDIR)/install
 dist-%: install-%
 	@: # do nothing
 
-# Legacy dist targets
 .PHONY: xen tools stubdom docs
 xen: dist-xen
 tools: dist-tools
@@ -109,11 +117,11 @@ install-xen:
 	$(MAKE) -C xen install
 
 .PHONY: install-tools
-install-tools: build-tools-public-headers
+install-tools: install-tools-public-headers
 	$(MAKE) -C tools install
 
 .PHONY: install-stubdom
-install-stubdom: mini-os-dir build-tools-public-headers
+install-stubdom: mini-os-dir install-tools-public-headers
 	$(MAKE) -C stubdom install
 ifeq (x86_64,$(XEN_TARGET_ARCH))
 	XEN_TARGET_ARCH=x86_32 $(MAKE) -C stubdom install-grub
@@ -180,18 +188,17 @@ src-tarball: subtree-force-update-all
 
 .PHONY: clean
 clean: $(TARGS_CLEAN)
-	$(MAKE) -C tools/include clean
 
 .PHONY: clean-xen
 clean-xen:
 	$(MAKE) -C xen clean
 
 .PHONY: clean-tools
-clean-tools:
+clean-tools: clean-tools-public-headers
 	$(MAKE) -C tools clean
 
 .PHONY: clean-stubdom
-clean-stubdom:
+clean-stubdom: clean-tools-public-headers
 	$(MAKE) -C stubdom crossclean
 ifeq (x86_64,$(XEN_TARGET_ARCH))
 	XEN_TARGET_ARCH=x86_32 $(MAKE) -C stubdom crossclean
