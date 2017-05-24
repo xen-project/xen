@@ -4,8 +4,8 @@ include $(XEN_ROOT)/tools/Rules.mk
 # Relative to $(XEN_ROOT)/xen/xsm/flask
 FLASK_H_DEPEND := policy/initial_sids
 
-.PHONY: all
-all: xen-foreign xen/.dir xen-xsm/.dir
+.PHONY: all build
+all build: xen-foreign xen/.dir xen-xsm/.dir
 
 .PHONY: xen-foreign
 xen-foreign:
