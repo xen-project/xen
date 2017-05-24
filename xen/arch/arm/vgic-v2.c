@@ -252,15 +252,15 @@ static int vgic_v2_distr_mmio_read(struct vcpu *v, mmio_info_t *info,
     case VRANGE32(GICD_IPRIORITYR, GICD_IPRIORITYRN):
     {
         uint32_t ipriorityr;
+        uint8_t rank_index;
 
         if ( dabt.size != DABT_BYTE && dabt.size != DABT_WORD ) goto bad_width;
         rank = vgic_rank_offset(v, 8, gicd_reg - GICD_IPRIORITYR, DABT_WORD);
         if ( rank == NULL ) goto read_as_zero;
+        rank_index = REG_RANK_INDEX(8, gicd_reg - GICD_IPRIORITYR, DABT_WORD);
 
         vgic_lock_rank(v, rank, flags);
-        ipriorityr = rank->ipriorityr[REG_RANK_INDEX(8,
-                                                     gicd_reg - GICD_IPRIORITYR,
-                                                     DABT_WORD)];
+        ipriorityr = ACCESS_ONCE(rank->ipriorityr[rank_index]);
         vgic_unlock_rank(v, rank, flags);
         *r = vgic_reg32_extract(ipriorityr, info);
 
@@ -499,7 +499,7 @@ static int vgic_v2_distr_mmio_write(struct vcpu *v, mmio_info_t *info,
 
     case VRANGE32(GICD_IPRIORITYR, GICD_IPRIORITYRN):
     {
-        uint32_t *ipriorityr;
+        uint32_t *ipriorityr, priority;
 
         if ( dabt.size != DABT_BYTE && dabt.size != DABT_WORD ) goto bad_width;
         rank = vgic_rank_offset(v, 8, gicd_reg - GICD_IPRIORITYR, DABT_WORD);
@@ -508,7 +508,10 @@ static int vgic_v2_distr_mmio_write(struct vcpu *v, mmio_info_t *info,
         ipriorityr = &rank->ipriorityr[REG_RANK_INDEX(8,
                                                       gicd_reg - GICD_IPRIORITYR,
                                                       DABT_WORD)];
-        vgic_reg32_update(ipriorityr, r, info);
+        priority = ACCESS_ONCE(*ipriorityr);
+        vgic_reg32_update(&priority, r, info);
+        ACCESS_ONCE(*ipriorityr) = priority;
+
         vgic_unlock_rank(v, rank, flags);
         return 1;
     }
