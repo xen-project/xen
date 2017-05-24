@@ -227,14 +227,8 @@ struct vcpu *vgic_get_target_vcpu(struct vcpu *v, unsigned int virq)
 static int vgic_get_virq_priority(struct vcpu *v, unsigned int virq)
 {
     struct vgic_irq_rank *rank = vgic_rank_irq(v, virq);
-    unsigned long flags;
-    int priority;
 
-    vgic_lock_rank(v, rank, flags);
-    priority = rank->priority[virq & INTERRUPT_RANK_MASK];
-    vgic_unlock_rank(v, rank, flags);
-
-    return priority;
+    return ACCESS_ONCE(rank->priority[virq & INTERRUPT_RANK_MASK]);
 }
 
 bool vgic_migrate_irq(struct vcpu *old, struct vcpu *new, unsigned int irq)
