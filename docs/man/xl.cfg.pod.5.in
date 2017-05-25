@@ -1116,6 +1116,55 @@ FIFO-based event channel ABI support up to 131,071 event channels.
 Other guests are limited to 4095 (64-bit x86 and ARM) or 1023 (32-bit
 x86).
 
+=item B<vdispl=[ "VDISPL_SPEC_STRING", "VDISPL_SPEC_STRING", ...]>
+
+Specifies the virtual display devices to be provided to the guest.
+
+Each B<VDISPL_SPEC_STRING> is a comma-separated list of C<KEY=VALUE>
+settings, from the following list:
+
+=over 4
+
+=item C<backend=DOMAIN>
+
+Specifies the backend domain name or id. If not specified Domain-0 is used.
+
+=item C<be-alloc=BOOLEAN>
+
+Indicates if backend can be a buffer provider/allocator for this domain. See
+display protocol for details.
+
+=item C<connectors=CONNECTORS>
+
+Specifies virtual connectors for the device in following format
+<id>:<W>x<H>;<id>:<W>x<H>... where:
+
+=over 4
+
+=item C<id>
+
+String connector ID. Space, comma symbols are not allowed.
+
+=item C<W>
+
+Connector width in pixels.
+
+=item C<H>
+
+Connector height in pixels.
+
+=back
+
+B<EXAMPLE>
+
+=over 4
+
+connectors=id0:1920x1080;id1:800x600;id2:640x480
+
+=back
+
+=back
+
 =back
 
 =head2 Paravirtualised (PV) Guest Specific Options

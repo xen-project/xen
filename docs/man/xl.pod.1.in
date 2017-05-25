@@ -1434,6 +1434,48 @@ List virtual Trusted Platform Modules for a domain.
 
 =back
 
+=head2 VDISPL DEVICES
+
+=over 4
+
+=item B<vdispl-attach> I<domain-id> I<vdispl-device>
+
+Creates a new vdispl device in the domain specified by I<domain-id>.
+I<vdispl-device> describes the device to attach, using the same format as the
+B<vdispl> string in the domain config file. See L<xl.cfg> for
+more information.
+
+B<NOTES>
+
+=over 4
+
+As in I<vdispl-device> string semicolon is used then put quotes or escaping
+when using from the shell.
+
+B<EXAMPLE>
+
+=over 4
+
+xl vdispl-attach DomU connectors='id0:1920x1080;id1:800x600;id2:640x480'
+
+or
+
+xl vdispl-attach DomU connectors=id0:1920x1080\;id1:800x600\;id2:640x480
+
+=back
+
+=back
+
+=item B<vdispl-detach> I<domain-id> I<dev-id>
+
+Removes the vdispl device specified by I<dev-id> from the domain specified by I<domain-id>.
+
+=item B<vdispl-list> I<domain-id>
+
+List virtual displays for a domain.
+
+=back
+
 =head1 PCI PASS-THROUGH
 
 =over 4
