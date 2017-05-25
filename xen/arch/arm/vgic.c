@@ -309,7 +309,10 @@ void vgic_disable_irqs(struct vcpu *v, uint32_t r, int n)
         v_target = vgic_get_target_vcpu(v, irq);
         p = irq_to_pending(v_target, irq);
         clear_bit(GIC_IRQ_GUEST_ENABLED, &p->status);
-        gic_remove_from_queues(v_target, irq);
+        spin_lock_irqsave(&v_target->arch.vgic.lock, flags);
+        gic_remove_from_lr_pending(v_target, p);
+        spin_unlock_irqrestore(&v_target->arch.vgic.lock, flags);
+
         if ( p->desc != NULL )
         {
             spin_lock_irqsave(&p->desc->lock, flags);

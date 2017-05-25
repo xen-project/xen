@@ -400,15 +400,11 @@ static inline void gic_add_to_lr_pending(struct vcpu *v, struct pending_irq *n)
     list_add_tail(&n->lr_queue, &v->arch.vgic.lr_pending);
 }
 
-void gic_remove_from_queues(struct vcpu *v, unsigned int virtual_irq)
+void gic_remove_from_lr_pending(struct vcpu *v, struct pending_irq *p)
 {
-    struct pending_irq *p = irq_to_pending(v, virtual_irq);
-    unsigned long flags;
+    ASSERT(spin_is_locked(&v->arch.vgic.lock));
 
-    spin_lock_irqsave(&v->arch.vgic.lock, flags);
-    if ( !list_empty(&p->lr_queue) )
-        list_del_init(&p->lr_queue);
-    spin_unlock_irqrestore(&v->arch.vgic.lock, flags);
+    list_del_init(&p->lr_queue);
 }
 
 void gic_raise_inflight_irq(struct vcpu *v, unsigned int virtual_irq)
@@ -609,7 +605,7 @@ void gic_clear_pending_irqs(struct vcpu *v)
 
     v->arch.lr_mask = 0;
     list_for_each_entry_safe ( p, t, &v->arch.vgic.lr_pending, lr_queue )
-        list_del_init(&p->lr_queue);
+        gic_remove_from_lr_pending(v, p);
 }
 
 int gic_events_need_delivery(void)
