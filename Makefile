@@ -90,6 +90,11 @@ test:
 #
 # Also, we have a number of targets COMPONENT which run
 # dist-COMPONENT, for convenience.
+#
+# The Makefiles invoked with -C from the toplevel should
+# generally have the following targets:
+#       all  build  install  clean  distclean
+
 
 .PHONY: dist
 dist: DESTDIR=$(DISTDIR)/install
