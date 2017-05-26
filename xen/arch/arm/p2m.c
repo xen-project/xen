@@ -1469,12 +1469,14 @@ int p2m_cache_flush(struct domain *d, gfn_t start, unsigned long nr)
         /* XXX: Implement preemption */
         while ( gfn_x(start) < gfn_x(next_gfn) )
         {
-            flush_page_to_ram(mfn_x(mfn), true);
+            flush_page_to_ram(mfn_x(mfn), false);
 
             start = gfn_add(start, 1);
             mfn = mfn_add(mfn, 1);
         }
     }
+
+    invalidate_icache();
 
     p2m_read_unlock(p2m);
 
