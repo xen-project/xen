@@ -833,7 +833,7 @@ static struct page_info *alloc_heap_pages(
         /* Ensure cache and RAM are consistent for platforms where the
          * guest can control its own visibility of/through the cache.
          */
-        flush_page_to_ram(page_to_mfn(&pg[i]));
+        flush_page_to_ram(page_to_mfn(&pg[i]), true);
     }
 
     spin_unlock(&heap_lock);

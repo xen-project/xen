@@ -118,7 +118,7 @@ void flush_area_mask(const cpumask_t *, const void *va, unsigned int flags);
 #define flush_tlb_one_all(v)                    \
     flush_tlb_one_mask(&cpu_online_map, v)
 
-static inline void flush_page_to_ram(unsigned long mfn) {}
+static inline void flush_page_to_ram(unsigned long mfn, bool sync_icache) {}
 static inline int invalidate_dcache_va_range(const void *p,
                                              unsigned long size)
 { return -EOPNOTSUPP; }
