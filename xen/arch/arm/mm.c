@@ -421,7 +421,7 @@ unsigned long domain_page_map_to_mfn(const void *ptr)
 }
 #endif
 
-void flush_page_to_ram(unsigned long mfn)
+void flush_page_to_ram(unsigned long mfn, bool sync_icache)
 {
     void *v = map_domain_page(_mfn(mfn));
 
@@ -436,7 +436,8 @@ void flush_page_to_ram(unsigned long mfn)
      * I-Cache (See D4.9.2 in ARM DDI 0487A.k_iss10775). Instead of using flush
      * by VA on select platforms, we just flush the entire cache here.
      */
-    invalidate_icache();
+    if ( sync_icache )
+        invalidate_icache();
 }
 
 void __init arch_init_memory(void)

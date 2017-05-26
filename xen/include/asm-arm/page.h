@@ -408,7 +408,7 @@ static inline void flush_xen_data_tlb_range_va(unsigned long va,
 }
 
 /* Flush the dcache for an entire page. */
-void flush_page_to_ram(unsigned long mfn);
+void flush_page_to_ram(unsigned long mfn, bool sync_icache);
 
 /*
  * Print a walk of a page table or p2m
