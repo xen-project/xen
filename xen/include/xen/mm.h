@@ -224,6 +224,8 @@ struct npfec {
 #define  MEMF_no_owner    (1U<<_MEMF_no_owner)
 #define _MEMF_no_tlbflush 6
 #define  MEMF_no_tlbflush (1U<<_MEMF_no_tlbflush)
+#define _MEMF_no_icache_flush 7
+#define  MEMF_no_icache_flush (1U<<_MEMF_no_icache_flush)
 #define _MEMF_node        8
 #define  MEMF_node_mask   ((1U << (8 * sizeof(nodeid_t))) - 1)
 #define  MEMF_node(n)     ((((n) + 1) & MEMF_node_mask) << _MEMF_node)

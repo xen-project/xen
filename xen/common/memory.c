@@ -152,16 +152,26 @@ static void populate_physmap(struct memop_args *a)
                             max_order(curr_d)) )
         return;
 
-    /*
-     * With MEMF_no_tlbflush set, alloc_heap_pages() will ignore
-     * TLB-flushes. After VM creation, this is a security issue (it can
-     * make pages accessible to guest B, when guest A may still have a
-     * cached mapping to them). So we do this only during domain creation,
-     * when the domain itself has not yet been unpaused for the first
-     * time.
-     */
     if ( unlikely(!d->creation_finished) )
+    {
+        /*
+         * With MEMF_no_tlbflush set, alloc_heap_pages() will ignore
+         * TLB-flushes. After VM creation, this is a security issue (it can
+         * make pages accessible to guest B, when guest A may still have a
+         * cached mapping to them). So we do this only during domain creation,
+         * when the domain itself has not yet been unpaused for the first
+         * time.
+         */
         a->memflags |= MEMF_no_tlbflush;
+        /*
+         * With MEMF_no_icache_flush, alloc_heap_pages() will skip
+         * performing icache flushes. We do it only before domain
+         * creation as once the domain is running there is a danger of
+         * executing instructions from stale caches if icache flush is
+         * delayed.
+         */
+        a->memflags |= MEMF_no_icache_flush;
+    }
 
     for ( i = a->nr_done; i < a->nr_extents; i++ )
     {
@@ -211,7 +221,6 @@ static void populate_physmap(struct memop_args *a)
                 }
 
                 mfn = gpfn;
-                page = mfn_to_page(mfn);
             }
             else
             {
@@ -255,6 +264,10 @@ static void populate_physmap(struct memop_args *a)
 out:
     if ( need_tlbflush )
         filtered_flush_tlb_mask(tlbflush_timestamp);
+
+    if ( a->memflags & MEMF_no_icache_flush )
+        invalidate_icache();
+
     a->nr_done = i;
 }
 
