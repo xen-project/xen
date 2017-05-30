@@ -136,7 +136,7 @@ struct arch_vmx_struct {
     /* Are we emulating rather than VMENTERing? */
     uint8_t              vmx_emulate;
 
-    bool                 lbr_tsx_fixup_enabled;
+    uint8_t              lbr_fixup_enabled;
 
     /* Bitmask of segments that we can't safely use in virtual 8086 mode */
     uint16_t             vm86_segment_mask;
