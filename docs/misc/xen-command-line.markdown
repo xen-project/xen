@@ -324,6 +324,44 @@ Both option `com1` and `com2` follow the same format.
 
 A typical setup for most situations might be `com1=115200,8n1`
 
+In addition to the above positional specification for UART parameters,
+name=value pair specfications are also supported. This is used to add
+flexibility for UART devices which require additional UART parameter
+configurations.
+
+The comma separation still delineates positional parameters. Hence,
+unless the parameter is explicitly specified with name=value option, it
+will be considered a positional parameter.
+
+The syntax consists of
+com1=(comma-separated positional parameters),(comma separated name-value pairs)
+
+The accepted name keywords for name=value pairs are
+ * `baud` - accepts integer baud rate (eg. 115200) or `auto`
+ * `bridge`- Similar to bridge-bdf in positional parameters.
+             Used to determine the PCI bridge to access the UART device.
+             Notation is xx:xx.xx <bus>:<device>.<function>
+ * `clock-hz`- accepts large integers to setup UART clock frequencies.
+               Do note - these values are multiplied by 16.
+ * `data-bits` - integer between 5 and 8
+ * `dev` - accepted values are `pci` OR `amt`. If this option
+           is used to specify if the serial device is pci-based. The io_base
+           cannot be specified when `dev=pci` or `dev=amt` is used.
+ * `io-base` - accepts integer which specified IO base port for UART registers
+ * `irq` - IRQ number to use
+ * `parity` - accepted values are same as positional parameters
+ * `port` - Used to specify which port the PCI serial device is located on
+            Notation is xx:xx.xx <bus>:<device>.<function>
+ * `reg-shift` - register shifts required to set UART registers
+ * `reg-width` - register width required to set UART registers
+                 (only accepts 1 and 4)
+ * `stop-bits` - only accepts 1 or 2 for the number of stop bits
+
+The following are examples of correct specifications:
+`com1=115200,8n1,0x3f8,4`
+`com1=115200,8n1,0x3f8,4,reg_width=4,reg_shift=2`
+`com1=baud=115200,parity=n,stop_bits=1,io_base=0x3f8,reg_width=4`
+
 ### conring\_size
 > `= <size>`
 
