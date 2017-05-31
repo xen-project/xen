@@ -1,6 +1,6 @@
 =head1 NAME
 
-XL - Xen management tool, based on LibXenlight
+xl - Xen management tool, based on LibXenlight
 
 =head1 SYNOPSIS
 
@@ -82,7 +82,7 @@ though it is unsafe.
 
 =item B<-t>
 
-Always use carriage-return-based overwriting for printing progress
+Always use carriage-return-based overwriting for displaying progress
 messages without scrolling the screen.  Without -t, this is done only
 if stderr is a tty.
 
@@ -97,17 +97,17 @@ previously, most commands take I<domain-id> as the first parameter.
 
 =item B<button-press> I<domain-id> I<button>
 
-I<This command is deprecated. Please use C<xl trigger> in preference>
+I<This command is deprecated. Please use C<xl trigger> instead.>
 
-Indicate an ACPI button press to the domain. I<button> is may be 'power' or
+Indicate an ACPI button press to the domain, where I<button> can be 'power' or
 'sleep'. This command is only available for HVM domains.
 
 =item B<create> [I<configfile>] [I<OPTIONS>]
 
-The create subcommand takes a config file as first argument: see
-L<xl.cfg> for full details of that file format and possible options.
-If I<configfile> is missing B<XL> creates the domain starting from the
-default value for every option.
+The create subcommand takes a config file as its first argument: see
+L<xl.cfg(5)> for full details of the file format and possible options.
+If I<configfile> is missing B<xl> creates the domain assuming the default
+values for every option.
 
 I<configfile> has to be an absolute path to a file.
 
@@ -120,7 +120,7 @@ return until its death.
 
 B<OPTIONS>
 
-=over 4 
+=over 4
 
 =item B<-q>, B<--quiet>
 
@@ -144,7 +144,7 @@ Attach to domain's VNC server, forking a vncviewer process.
 
 =item B<-A>, B<--vncviewer-autopass>
 
-Pass VNC password to vncviewer via stdin.
+Pass the VNC password to vncviewer via stdin.
 
 =item B<-c>
 
@@ -187,7 +187,7 @@ cpus 0-3, and passes through two PCI devices.
 
 =back
 
-=item B<config-update> B<domid> [I<configfile>] [I<OPTIONS>]
+=item B<config-update> I<domain-id> [I<configfile>] [I<OPTIONS>]
 
 Update the saved configuration for a running domain. This has no
 immediate effect but will be applied when the guest is next
@@ -195,7 +195,7 @@ restarted. This command is useful to ensure that runtime modifications
 made to the guest will be preserved when the guest is restarted.
 
 Since Xen 4.5 xl has improved capabilities to handle dynamic domain
-configuration changes and will preserve any changes made a runtime
+configuration changes and will preserve any changes made at runtime
 when necessary. Therefore it should not normally be necessary to use
 this command any more.
 
@@ -203,7 +203,7 @@ I<configfile> has to be an absolute path to a file.
 
 B<OPTIONS>
 
-=over 4 
+=over 4
 
 =item B<-f=FILE>, B<--defconfig=FILE>
 
@@ -221,11 +221,11 @@ I<key=value> pairs on the command line.
 
 =item B<console> [I<OPTIONS>] I<domain-id>
 
-Attach to domain I<domain-id>'s console.  If you've set up your domains to
-have a traditional log in console this will look much like a normal
-text log in screen.
+Attach to the console of a domain specified by I<domain-id>.  If you've set up
+your domains to have a traditional login console this will look much like a
+normal text login screen.
 
-Use the key combination Ctrl+] to detach the domain console.
+Use the key combination Ctrl+] to detach from the domain console.
 
 B<OPTIONS>
 
@@ -246,10 +246,10 @@ Connect to console number I<NUM>. Console numbers start from 0.
 
 =item B<destroy> [I<OPTIONS>] I<domain-id>
 
-Immediately terminate the domain I<domain-id>.  This doesn't give the
-domain OS any chance to react, and is the equivalent of ripping the
-power cord out on a physical machine.  In most cases you will want to
-use the B<shutdown> command instead.
+Immediately terminate the domain specified by I<domain-id>.  This doesn't give
+the domain OS any chance to react, and is the equivalent of ripping the power
+cord out on a physical machine.  In most cases you will want to use the
+B<shutdown> command instead.
 
 B<OPTIONS>
 
@@ -257,8 +257,8 @@ B<OPTIONS>
 
 =item I<-f>
 
-Allow domain 0 to be destroyed.  Because domain cannot destroy itself, this is
-only possible when using a disaggregated toolstack, and is most useful when
+Allow domain 0 to be destroyed.  Because a domain cannot destroy itself, this
+is only possible when using a disaggregated toolstack, and is most useful when
 using a hardware domain separated from domain 0.
 
 =back
@@ -273,26 +273,26 @@ Converts a domain id to a domain name.
 
 =item B<rename> I<domain-id> I<new-name>
 
-Change the domain name of I<domain-id> to I<new-name>.
+Change the domain name of a domain specified by I<domain-id> to I<new-name>.
 
 =item B<dump-core> I<domain-id> [I<filename>]
 
 Dumps the virtual machine's memory for the specified domain to the
 I<filename> specified, without pausing the domain.  The dump file will
-be written to a distribution specific directory for dump files.  Such
-as: @XEN_DUMP_DIR@/dump.
+be written to a distribution specific directory for dump files, for example:
+@XEN_DUMP_DIR@/dump.
 
 =item B<help> [I<--long>]
 
-Displays the short help message (i.e. common commands).
+Displays the short help message (i.e. common commands) by default.
 
-The I<--long> option prints out the complete set of B<xl> subcommands,
-grouped by function.
+If the I<--long> option is specified, it displays the complete set of B<xl>
+subcommands, grouped by function.
 
 =item B<list> [I<OPTIONS>] [I<domain-id> ...]
 
-Prints information about one or more domains.  If no domains are
-specified it prints out information about all domains.
+Displays information about one or more domains.  If no domains are
+specified it displays information about all domains.
 
 
 B<OPTIONS>
@@ -301,23 +301,24 @@ B<OPTIONS>
 
 =item B<-l>, B<--long>
 
-The output for B<xl list> is not the table view shown below, but 
-instead presents the data in as a JSON data structure.
+The output for B<xl list> is not the table view shown below, but
+instead presents the data as a JSON data structure.
 
 =item B<-Z>, B<--context>
-Also prints the security labels.
+
+Also displays the security labels.
 
 =item B<-v>, B<--verbose>
 
-Also prints the domain UUIDs, the shutdown reason and security labels.
+Also displays the domain UUIDs, the shutdown reason and security labels.
 
-=item B<-c>, <--cpupool>
+=item B<-c>, B<--cpupool>
 
-Also prints the cpupool the domain belong to.
+Also displays the cpupool the domain belongs to.
 
-=item B<-n>, <--numa>
+=item B<-n>, B<--numa>
 
-Also prints the domain NUMA node affinity.
+Also displays the domain NUMA node affinity.
 
 =back
 
@@ -350,15 +351,15 @@ The domain is currently running on a CPU.
 
 =item B<b - blocked>
 
-The domain is blocked, and not running or runnable.  This can be caused
-because the domain is waiting on IO (a traditional wait state) or has
+The domain is blocked, and not running or runnable.  This can be because the
+domain is waiting on IO (a traditional wait state) or has
 gone to sleep because there was nothing else for it to do.
 
 =item B<p - paused>
 
 The domain has been paused, usually occurring through the administrator
 running B<xl pause>.  When in a paused state the domain will still
-consume allocated resources like memory, but will not be eligible for
+consume allocated resources (like memory), but will not be eligible for
 scheduling by the Xen hypervisor.
 
 =item B<s - shutdown>
@@ -369,12 +370,12 @@ domain is not dying yet.
 =item B<c - crashed>
 
 The domain has crashed, which is always a violent ending.  Usually
-this state can only occur if the domain has been configured not to
-restart on crash.  See L<xl.cfg(5)> for more info.
+this state only occurs if the domain has been configured not to
+restart on a crash.  See L<xl.cfg(5)> for more info.
 
 =item B<d - dying>
 
-The domain is in process of dying, but hasn't completely shutdown or
+The domain is in the process of dying, but hasn't completely shut down or
 crashed.
 
 =back
@@ -384,10 +385,10 @@ B<NOTES>
 =over 4
 
 The Time column is deceptive.  Virtual IO (network and block devices)
-used by domains requires coordination by Domain0, which means that
+used by the domains requires coordination by Domain0, which means that
 Domain0 is actually charged for much of the time that a DomainU is
 doing IO.  Use of this time value to determine relative utilizations
-by domains is thus very suspect, as a high IO workload may show as
+by domains is thus very unreliable, as a high IO workload may show as
 less utilized than a high CPU workload.  Consider yourself warned.
 
 =back
@@ -409,7 +410,7 @@ to set the maximum memory above the initial B<maxmem> value will not allow the
 additional memory to be used via B<xl mem-set>. The initial B<maxmem> value is
 still used as an upper limit for B<xl mem-set>.
 
-The domain is not receiving any signal regarding the changed memory limit.
+The domain will not receive any signal regarding the changed memory limit.
 
 =item B<mem-set> I<domain-id> I<mem>
 
@@ -442,16 +443,17 @@ Use <sshcommand> instead of ssh.  String will be passed to sh. If empty, run
 
 =item B<-e>
 
-On the new host, do not wait in the background (on <host>) for the death of the
+On the new <host>, do not wait in the background for the death of the
 domain. See the corresponding option of the I<create> subcommand.
 
 =item B<-C> I<config>
 
-Send <config> instead of config file from creation.
+Send the specified <config> file instead of the file used on creation of the
+domain.
 
 =item B<--debug>
 
-Print huge (!) amount of debug during the migration process.
+Display huge (!) amount of debug information during the migration process.
 
 =item B<-p>
 
@@ -484,18 +486,18 @@ The supported options are:
 
 =over 4
 
-=item B<colo-host>      :Secondary host's ip address.
+=item B<colo-host>   : Secondary host's ip address.
 
-=item B<colo-port>      :Secondary host's port, we will run a nbd server on
-secondary host, and the nbd server will listen this port.
+=item B<colo-port>   : Secondary host's port, we will run a nbd server on the
+secondary host, and the nbd server will listen on this port.
 
-=item B<colo-export>    :Nbd server's disk export name of secondary host.
+=item B<colo-export> : Nbd server's disk export name of the secondary host.
 
-=item B<active-disk>    :Secondary's guest write will be buffered in this disk,
-and it's used by secondary.
+=item B<active-disk> : Secondary's guest write will be buffered to this disk,
+and it's used by the secondary.
 
-=item B<hidden-disk>    :Primary's modified contents will be buffered in this
-disk, and it's used by secondary.
+=item B<hidden-disk> : Primary's modified contents will be buffered in this
+disk, and it's used by the secondary.
 
 =back
 
@@ -507,8 +509,8 @@ The supported options are:
 
 =over 4
 
-=item B<forwarddev>     :Forward devices for primary and secondary, they are
-directly connected.
+=item B<forwarddev> : Forward devices for the primary and the secondary, they
+are directly connected.
 
 
 =back
@@ -532,8 +534,8 @@ If empty, run <host> instead of ssh <host> xl migrate-receive -r [-e].
 
 =item B<-e>
 
-On the new host, do not wait in the background (on <host>) for the death
-of the domain. See the corresponding option of the I<create> subcommand.
+On the new <host>, do not wait in the background for the death of the domain.
+See the corresponding option of the I<create> subcommand.
 
 =item B<-N> I<netbufscript>
 
@@ -573,19 +575,19 @@ with B<-c>.
 =item B<pause> I<domain-id>
 
 Pause a domain.  When in a paused state the domain will still consume
-allocated resources such as memory, but will not be eligible for
+allocated resources (such as memory), but will not be eligible for
 scheduling by the Xen hypervisor.
 
 =item B<reboot> [I<OPTIONS>] I<domain-id>
 
 Reboot a domain.  This acts just as if the domain had the B<reboot>
 command run from the console.  The command returns as soon as it has
-executed the reboot action, which may be significantly before the
+executed the reboot action, which may be significantly earlier than when the
 domain actually reboots.
 
 For HVM domains this requires PV drivers to be installed in your guest
 OS. If PV drivers are not present but you have configured the guest OS
-to behave appropriately you may be able to use the I<-F> option
+to behave appropriately you may be able to use the I<-F> option to
 trigger a reset button press.
 
 The behavior of what happens to a domain when it reboots is set by the
@@ -600,14 +602,14 @@ B<OPTIONS>
 
 If the guest does not support PV reboot control then fallback to
 sending an ACPI power event (equivalent to the I<reset> option to
-I<trigger>.
+I<trigger>).
 
 You should ensure that the guest is configured to behave as expected
 in response to this event.
 
 =back
 
-=item B<restore> [I<OPTIONS>] [I<ConfigFile>] I<CheckpointFile>
+=item B<restore> [I<OPTIONS>] [I<configfile>] I<checkpointfile>
 
 Build a domain from an B<xl save> state file.  See B<save> for more info.
 
@@ -617,7 +619,7 @@ B<OPTIONS>
 
 =item B<-p>
 
-Do not unpause domain after restoring it.
+Do not unpause the domain after restoring it.
 
 =item B<-e>
 
@@ -630,17 +632,17 @@ Enable debug messages.
 
 =item B<-V>, B<--vncviewer>
 
-Attach to domain's VNC server, forking a vncviewer process.
+Attach to the domain's VNC server, forking a vncviewer process.
 
 =item B<-A>, B<--vncviewer-autopass>
 
-Pass VNC password to vncviewer via stdin.
+Pass the VNC password to vncviewer via stdin.
 
 
 
 =back
 
-=item B<save> [I<OPTIONS>] I<domain-id> I<CheckpointFile> [I<ConfigFile>]
+=item B<save> [I<OPTIONS>] I<domain-id> I<checkpointfile> [I<configfile>]
 
 Saves a running domain to a state file so that it can be restored
 later.  Once saved, the domain will no longer be running on the
@@ -653,41 +655,32 @@ file used to create the domain.
 
 =item B<-c>
 
-Leave domain running after creating the snapshot.
+Leave the domain running after creating the snapshot.
 
 =item B<-p>
 
-Leave domain paused after creating the snapshot.
+Leave the domain paused after creating the snapshot.
 
 =back
 
 =item B<sharing> [I<domain-id>]
 
-List count of shared pages. 
-
-B<OPTIONS>
-
-=over 4
-
-=item I<domain_id>
-
-List specifically for that domain. Otherwise, list for all domains.
-
-=back
+Display the number of shared pages for a specified domain. If no domain is
+specified it displays information about all domains.
 
 =item B<shutdown> [I<OPTIONS>] I<-a|domain-id>
 
 Gracefully shuts down a domain.  This coordinates with the domain OS
 to perform graceful shutdown, so there is no guarantee that it will
 succeed, and may take a variable length of time depending on what
-services must be shutdown in the domain.
+services must be shut down in the domain.
 
 For HVM domains this requires PV drivers to be installed in your guest
 OS. If PV drivers are not present but you have configured the guest OS
-to behave appropriately you may be able to use the I<-F> option
+to behave appropriately you may be able to use the I<-F> option to
 trigger a power button press.
 
-The command returns immediately after signally the domain unless that
+The command returns immediately after signaling the domain unless the
 B<-w> flag is used.
 
 The behavior of what happens to a domain when it reboots is set by the
@@ -711,7 +704,7 @@ Wait for the domain to complete shutdown before returning.
 
 If the guest does not support PV shutdown control then fallback to
 sending an ACPI power event (equivalent to the I<power> option to
-I<trigger>.
+I<trigger>).
 
 You should ensure that the guest is configured to behave as expected
 in response to this event.
@@ -779,7 +772,7 @@ For example:
  xl vcpu-pin 0 3 - 6-9
 
 will set soft affinity for vCPU 3 of domain 0 to pCPUs 6,7,8 and 9,
-leaving its hard affinity untouched. On the othe hand:
+leaving its hard affinity untouched. On the other hand:
 
  xl vcpu-pin 0 3 3,4 6-9
 
@@ -806,7 +799,7 @@ An example format for the list is as follows:
 
 =item B<vncviewer> [I<OPTIONS>] I<domain-id>
 
-Attach to domain's VNC server, forking a vncviewer process.
+Attach to the domain's VNC server, forking a vncviewer process.
 
 B<OPTIONS>
 
@@ -814,7 +807,7 @@ B<OPTIONS>
 
 =item I<--autopass>
 
-Pass VNC password to vncviewer via stdin.
+Pass the VNC password to vncviewer via stdin.
 
 =back
 
@@ -829,7 +822,7 @@ Pass VNC password to vncviewer via stdin.
 Send debug I<keys> to Xen. It is the same as pressing the Xen
 "conswitch" (Ctrl-A by default) three times and then pressing "keys".
 
-=item B<dmesg> [B<-c>]
+=item B<dmesg> [I<OPTIONS>]
 
 Reads the Xen message buffer, similar to dmesg on a Linux system.  The
 buffer contains informational, warning, and error messages created
@@ -846,7 +839,7 @@ Clears Xen's message buffer.
 
 =back
 
-=item B<info> [B<-n>, B<--numa>]
+=item B<info> [I<OPTIONS>]
 
 Print information about the Xen host in I<name : value> format.  When
 reporting a Xen bug, please provide this information as part of the
@@ -873,13 +866,13 @@ Sample output looks as follows:
  xen_major              : 4
  xen_minor              : 2
  xen_extra              : -unstable
- xen_caps               : xen-3.0-x86_64 xen-3.0-x86_32p hvm-3.0-x86_32 hvm-3.0-x86_32p hvm-3.0-x86_64 
+ xen_caps               : xen-3.0-x86_64 xen-3.0-x86_32p hvm-3.0-x86_32 hvm-3.0-x86_32p hvm-3.0-x86_64
  xen_scheduler          : credit
  xen_pagesize           : 4096
  platform_params        : virt_start=0xffff800000000000
  xen_changeset          : Wed Nov 02 17:09:09 2011 +0000 24066:54a5e994a241
- xen_commandline        : com1=115200,8n1 guest_loglvl=all dom0_mem=750M console=com1 
- cc_compiler            : gcc version 4.4.5 (Debian 4.4.5-8) 
+ xen_commandline        : com1=115200,8n1 guest_loglvl=all dom0_mem=750M console=com1
+ cc_compiler            : gcc version 4.4.5 (Debian 4.4.5-8)
  cc_compile_by          : sstabellini
  cc_compile_domain      : uk.xensource.com
  cc_compile_date        : Tue Nov  8 12:03:05 UTC 2011
@@ -913,7 +906,7 @@ global value (outstanding_claims) is then reduced as the domain's memory
 is populated and eventually reaches zero. Most of the time the value will
 be zero, but if you are launching multiple guests, and B<claim_mode> is
 enabled, this value can increase/decrease. Note that the value also
-affects the B<free_memory>  - as it will reflect the free memory
+affects the B<free_memory> - as it will reflect the free memory
 in the hypervisor minus the outstanding pages claimed for guests.
 See xl I<info> B<claims> parameter for detailed listing.
 
@@ -941,9 +934,8 @@ List host NUMA topology information
 
 =item B<top>
 
-Executes the B<xentop> command, which provides real time monitoring of
-domains.  Xentop is a curses interface, and reasonably self
-explanatory.
+Executes the B<xentop(1)> command, which provides real time monitoring of
+domains.  Xentop has a curses interface, and is reasonably self explanatory.
 
 =item B<uptime>
 
@@ -984,8 +976,8 @@ default B<credit> is used for scheduling.
 
 =item B<sched-credit> [I<OPTIONS>]
 
-Set or get credit scheduler parameters.  The credit scheduler is a
-proportional fair share CPU scheduler built from the ground up to be
+Set or get credit (aka credit1) scheduler parameters.  The credit scheduler is
+a proportional fair share CPU scheduler built from the ground up to be
 work conserving on SMP hosts.
 
 Each domain (including Domain0) is assigned a weight and a cap.
@@ -1172,7 +1164,7 @@ all the domains:
     vm2                          2    0     10000      4000
     vm2                          2    1     10000      4000
 
-Without any arguments, it will output the default scheduing
+Without any arguments, it will output the default scheduling
 parameters for each domain:
 
     xl sched-rtds
@@ -1183,7 +1175,7 @@ parameters for each domain:
     vm2                          2     10000      4000
 
 
-2) Use, for instance B<-d vm1, -v all> to see the budget and
+2) Use, for instancei, B<-d vm1, -v all> to see the budget and
 period of all VCPUs of a specific domain (B<vm1>):
 
     xl sched-rtds -d vm1 -v all
@@ -1200,7 +1192,7 @@ To see the parameters of a subset of the VCPUs of a domain, use:
     vm1                          1    0       300       150
     vm1                          1    3      1000       500
 
-If no B<-v> is speficified, the default scheduling parameter for the
+If no B<-v> is specified, the default scheduling parameters for the
 domain are shown:
 
     xl sched-rtds -d vm1
@@ -1224,17 +1216,17 @@ e.g., "xl sched-rtds -d vm1 -v all -p 500 -b 250".
 Xen can group the physical cpus of a server in cpu-pools. Each physical CPU is
 assigned at most to one cpu-pool. Domains are each restricted to a single
 cpu-pool. Scheduling does not cross cpu-pool boundaries, so each cpu-pool has
-an own scheduler.
+its own scheduler.
 Physical cpus and domains can be moved from one cpu-pool to another only by an
 explicit command.
 Cpu-pools can be specified either by name or by id.
 
 =over 4
 
-=item B<cpupool-create> [I<OPTIONS>] [I<ConfigFile>] [I<Variable=Value> ...]
+=item B<cpupool-create> [I<OPTIONS>] [I<configfile>] [I<variable=value> ...]
 
-Create a cpu pool based an config from a I<ConfigFile> or command-line
-parameters.  Variable settings from the I<ConfigFile> may be altered
+Create a cpu pool based an config from a I<configfile> or command-line
+parameters.  Variable settings from the I<configfile> may be altered
 by specifying new or additional assignments on the command line.
 
 See the L<xlcpupool.cfg(5)> manpage for more information.
@@ -1249,10 +1241,19 @@ Use the given configuration file.
 
 =back
 
-=item B<cpupool-list> [I<-c|--cpus>] [I<cpu-pool>]
+=item B<cpupool-list> [I<OPTIONS>] [I<cpu-pool>]
 
 List CPU pools on the host.
-If I<-c> is specified, B<xl> prints a list of CPUs used by I<cpu-pool>.
+
+B<OPTIONS>
+
+=over 4
+
+=item B<-c>, B<--cpus>
+
+If this option is specified, B<xl> prints a list of CPUs used by I<cpu-pool>.
+
+=back
 
 =item B<cpupool-destroy> I<cpu-pool>
 
@@ -1288,7 +1289,7 @@ Removes one or more CPUs or NUMA nodes from I<cpu-pool>. CPUs and NUMA
 nodes can be specified as single CPU/node IDs or as ranges, using the
 exact same syntax as in B<cpupool-cpu-add> above.
 
-=item B<cpupool-migrate> I<domain> I<cpu-pool>
+=item B<cpupool-migrate> I<domain-id> I<cpu-pool>
 
 Moves a domain specified by domain-id or domain-name into a cpu-pool.
 Domain-0 can't be moved to another cpu-pool.
@@ -1302,7 +1303,7 @@ Splits up the machine into one cpu-pool per numa node.
 =head1 VIRTUAL DEVICE COMMANDS
 
 Most virtual devices can be added and removed while guests are
-running, assuming that the necessary support exists in the guest.  The
+running, assuming that the necessary support exists in the guest OS.  The
 effect to the guest OS is much the same as any hotplug event.
 
 =head2 BLOCK DEVICES
@@ -1311,30 +1312,16 @@ effect to the guest OS is much the same as any hotplug event.
 
 =item B<block-attach> I<domain-id> I<disc-spec-component(s)> ...
 
-Create a new virtual block device.  This will trigger a hotplug event
-for the guest.
+Create a new virtual block device and attach it to the specified domain.
+A disc specification is in the same format used for the B<disk> variable in
+the domain config file. See L<xl-disk-configuration(5)>. This will trigger a
+hotplug event for the guest.
 
 Note that only PV block devices are supported by block-attach.
 Requests to attach emulated devices (eg, vdev=hdc) will result in only
 the PV view being available to the guest.
 
-B<OPTIONS>
-
-=over 4
-
-=item I<domain-id>
-
-The domain id of the guest domain that the device will be attached to.
-
-=item I<disc-spec-component>
-
-A disc specification in the same format used for the B<disk> variable in
-the domain config file. See
-L<xl-disk-configuration(5)>.
-
-=back
-
-=item B<block-detach> I<domain-id> I<devid> [B<--force>]
+=item B<block-detach> I<domain-id> I<devid> [I<OPTIONS>]
 
 Detach a domain's virtual block device. I<devid> may be the symbolic
 name or the numeric device id given to the device by domain 0.  You
@@ -1342,50 +1329,41 @@ will need to run B<xl block-list> to determine that number.
 
 Detaching the device requires the cooperation of the domain.  If the
 domain fails to release the device (perhaps because the domain is hung
-or is still using the device), the detach will fail.  The B<--force>
-parameter will forcefully detach the device, but may cause IO errors
-in the domain.
+or is still using the device), the detach will fail.
+
+B<OPTIONS>
+
+=over 4
+
+=item B<--force>
+
+If this parameter is specified the device will be forcefully detached, which
+may cause IO errors in the domain.
+
+=back
+
+
 
 =item B<block-list> I<domain-id>
 
 List virtual block devices for a domain.
 
-=item B<cd-insert> I<domain-id> I<VirtualDevice> I<target>
+=item B<cd-insert> I<domain-id> I<virtualdevice> I<target>
 
-Insert a cdrom into a guest domain's existing virtial cd drive. The
-virtual drive must already exist but can be current empty.
+Insert a cdrom into a guest domain's existing virtual cd drive. The
+virtual drive must already exist but can be empty. How the device should be
+presented to the guest domain is specified by the I<virtualdevice> parameter;
+for example "hdc". Parameter I<target> is the target path in the backend domain
+(usually domain 0) to be exported; can be a block device or a file etc.
+See B<target> in L<xl-disk-configuration(5)>.
 
 Only works with HVM domains.
 
-B<OPTIONS>
 
-=over 4
+=item B<cd-eject> I<domain-id> I<virtualdevice>
 
-=item I<VirtualDevice>
-
-How the device should be presented to the guest domain; for example "hdc".
-
-=item I<target>
-
-the target path in the backend domain (usually domain 0) to be
-exported; Can be a block device or a file etc. See B<target> in
-L<xl-disk-configuration(5)>.
-
-=back
-
-=item B<cd-eject> I<domain-id> I<VirtualDevice>
-
-Eject a cdrom from a guest's virtual cd drive. Only works with HVM domains.
-
-B<OPTIONS>
-
-=over 4
-
-=item I<VirtualDevice>
-
-How the device should be presented to the guest domain; for example "hdc".
-
-=back
+Eject a cdrom from a guest domain's virtual cd drive, specified by
+I<virtualdevice>. Only works with HVM domains.
 
 =back
 
@@ -1397,17 +1375,17 @@ How the device should be presented to the guest domain; for example "hdc".
 
 Creates a new network device in the domain specified by I<domain-id>.
 I<network-device> describes the device to attach, using the same format as the
-B<vif> string in the domain config file. See L<xl.cfg> and
+B<vif> string in the domain config file. See L<xl.cfg(5)> and
 L<xl-network-configuration(5)>
 for more informations.
 
-Note that only attaching PV network interface is supported.
+Note that only attaching PV network interfaces is supported.
 
 =item B<network-detach> I<domain-id> I<devid|mac>
 
 Removes the network device from the domain specified by I<domain-id>.
 I<devid> is the virtual interface device number within the domain
-(i.e. the 3 in vif22.3). Alternatively the I<mac> address can be used to
+(i.e. the 3 in vif22.3). Alternatively, the I<mac> address can be used to
 select the virtual interface to detach.
 
 =item B<network-list> I<domain-id>
@@ -1426,28 +1404,28 @@ List virtual channel interfaces for a domain.
 
 =back
 
-=head2 VTPM DEVICES
+=head2 VIRTUAL TRUSTED PLATFORM MODULE (vTPM) DEVICES
 
 =over 4
 
 =item B<vtpm-attach> I<domain-id> I<vtpm-device>
 
-Creates a new vtpm device in the domain specified by I<domain-id>.
-I<vtpm-device> describes the device to attach, using the same format as the
-B<vtpm> string in the domain config file. See L<xl.cfg> for
-more information.
+Creates a new vtpm (virtual Trusted Platform Module) device in the domain
+specified by I<domain-id>. I<vtpm-device> describes the device to attach,
+using the same format as the B<vtpm> string in the domain config file.
+See L<xl.cfg(5)> for more information.
 
 =item B<vtpm-detach> I<domain-id> I<devid|uuid>
 
 Removes the vtpm device from the domain specified by I<domain-id>.
-I<devid> is the numeric device id given to the virtual trusted
-platform module device. You will need to run B<xl vtpm-list> to determine that number.
-Alternatively the I<uuid> of the vtpm can be used to
+I<devid> is the numeric device id given to the virtual Trusted
+Platform Module device. You will need to run B<xl vtpm-list> to determine that
+number. Alternatively, the I<uuid> of the vtpm can be used to
 select the virtual device to detach.
 
 =item B<vtpm-list> I<domain-id>
 
-List virtual trusted platform modules for a domain.
+List virtual Trusted Platform Modules for a domain.
 
 =back
 
@@ -1478,7 +1456,7 @@ being used.
 
 =item B<pci-assignable-remove> [I<-r>] I<BDF>
 
-Make the device at PCI Bus/Device/Function BDF assignable to guests.  This
+Make the device at PCI Bus/Device/Function BDF not assignable to guests.  This
 will at least unbind the device from pciback.  If the -r option is specified,
 it will also attempt to re-bind the device to its original driver, making it
 usable by Domain 0 again.  If the device is not bound to pciback, it will
@@ -1489,13 +1467,21 @@ return success.
 Hot-plug a new pass-through pci device to the specified domain.
 B<BDF> is the PCI Bus/Device/Function of the physical device to pass-through.
 
-=item B<pci-detach> [I<-f>] I<domain-id> I<BDF>
+=item B<pci-detach> [I<OPTIONS>] I<domain-id> I<BDF>
 
 Hot-unplug a previously assigned pci device from a domain. B<BDF> is the PCI
 Bus/Device/Function of the physical device to be removed from the guest domain.
 
-If B<-f> is specified, B<xl> is going to forcefully remove the device even
-without guest's collaboration.
+B<OPTIONS>
+
+=over 4
+
+=item B<-f>
+
+If this parameter is specified, B<xl> is going to forcefully remove the device
+even without guest domain's collaboration.
+
+=back
 
 =item B<pci-list> I<domain-id>
 
@@ -1513,7 +1499,7 @@ Create a new USB controller in the domain specified by I<domain-id>,
 I<usbctrl-device> describes the device to attach, using form
 C<KEY=VALUE KEY=VALUE ...> where B<KEY=VALUE> has the same
 meaning as the B<usbctrl> description in the domain config file.
-See L<xl.cfg> for more information.
+See L<xl.cfg(5)> for more information.
 
 =item B<usbctrl-detach> I<domain-id> I<devid>
 
@@ -1526,13 +1512,13 @@ Hot-plug a new pass-through USB device to the domain specified by
 I<domain-id>, I<usbdev-device> describes the device to attach, using
 form C<KEY=VALUE KEY=VALUE ...> where B<KEY=VALUE> has the same
 meaning as the B<usbdev> description in the domain config file.
-See L<xl.cfg> for more information.
+See L<xl.cfg(5)> for more information.
 
 =item B<usbdev-detach> I<domain-id> I<controller=devid> I<port=number>
 
 Hot-unplug a previously assigned USB device from a domain.
-B<controller=devid> and B<port=number> is USB controller:port in guest
-where the USB device is attached to.
+B<controller=devid> and B<port=number> is USB controller:port in the guest
+domain the USB device is attached to.
 
 =item B<usb-list> I<domain-id>
 
@@ -1555,7 +1541,7 @@ B<Warning:> This qemu monitor access is provided for convenience when
 debugging, troubleshooting, and experimenting.  Its use is not
 supported by the Xen Project.
 
-Specifically, not all information printed by the qemu monitor will
+Specifically, not all information displayed by the qemu monitor will
 necessarily be accurate or complete, because in a Xen system qemu
 does not have a complete view of the guest.
 
@@ -1576,13 +1562,23 @@ Obtain information of USB devices connected as such via the device model
 
 =back
 
-=head1 TMEM
+=head1 TRANSCENDENT MEMORY (TMEM)
 
 =over 4
 
-=item B<tmem-list> I[<-l>] I<domain-id>
+=item B<tmem-list> I<[OPTIONS]> I<domain-id>
 
-List tmem pools. If I<-l> is specified, also list tmem stats.
+List tmem pools.
+
+B<OPTIONS>
+
+=over 4
+
+=item B<-l>
+
+If this parameter is specified, also list tmem stats.
+
+=back
 
 =item B<tmem-freeze> I<domain-id>
 
@@ -1718,15 +1714,15 @@ for any of these monitoring types.
 
 =over 4
 
-=item B<psr-cmt-attach> [I<domain-id>]
+=item B<psr-cmt-attach> I<domain-id>
 
 attach: Attach the platform shared resource monitoring service to a domain.
 
-=item B<psr-cmt-detach> [I<domain-id>]
+=item B<psr-cmt-detach> I<domain-id>
 
 detach: Detach the platform shared resource monitoring service from a domain.
 
-=item B<psr-cmt-show> [I<psr-monitor-type>] [I<domain-id>]
+=item B<psr-cmt-show> I<psr-monitor-type> [I<domain-id>]
 
 Show monitoring data for a certain domain or all domains. Current supported
 monitor types are:
@@ -1819,7 +1815,7 @@ And the following documents on the xen.org website:
 L<http://xenbits.xen.org/docs/unstable/misc/xsm-flask.txt>
 L<http://xenbits.xen.org/docs/unstable/misc/xl-psr.html>
 
-For systems that don't automatically bring CPU online:
+For systems that don't automatically bring the CPU online:
 
 L<http://wiki.xen.org/wiki/Paravirt_Linux_CPU_Hotplug>
 
