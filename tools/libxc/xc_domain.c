@@ -1455,6 +1455,23 @@ int xc_hvm_param_get(xc_interface *handle, domid_t dom, uint32_t param, uint64_t
     return rc;
 }
 
+int xc_set_hvm_param(xc_interface *handle, domid_t dom, int param, unsigned long value)
+{
+    return xc_hvm_param_set(handle, dom, param, value);
+}
+
+int xc_get_hvm_param(xc_interface *handle, domid_t dom, int param, unsigned long *value)
+{
+    uint64_t v;
+    int ret;
+
+    ret = xc_hvm_param_get(handle, dom, param, &v);
+    if (ret < 0)
+        return ret;
+    *value = v;
+    return 0;
+}
+
 int xc_domain_setdebugging(xc_interface *xch,
                            uint32_t domid,
                            unsigned int enable)

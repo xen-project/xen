@@ -280,8 +280,7 @@ static struct xenpaging *xenpaging_init(int argc, char *argv[])
     xentoollog_logger *dbg = NULL;
     char *p;
     int rc;
-    uint64_t ring_pfn;
-    unsigned long mmap_pfn;
+    unsigned long ring_pfn, mmap_pfn;
 
     /* Allocate memory */
     paging = calloc(1, sizeof(struct xenpaging));
@@ -339,8 +338,8 @@ static struct xenpaging *xenpaging_init(int argc, char *argv[])
     }
 
     /* Map the ring page */
-    xc_hvm_param_get(xch, paging->vm_event.domain_id,
-                     HVM_PARAM_PAGING_RING_PFN, &ring_pfn);
+    xc_get_hvm_param(xch, paging->vm_event.domain_id, 
+                        HVM_PARAM_PAGING_RING_PFN, &ring_pfn);
     mmap_pfn = ring_pfn;
     paging->vm_event.ring_page = 
         xc_map_foreign_pages(xch, paging->vm_event.domain_id,
