@@ -96,6 +96,7 @@ int __init acpi_parse_mcfg(struct acpi_table_header *header)
     if (!pci_mmcfg_config) {
         printk(KERN_WARNING PREFIX
                "No memory for MCFG config tables\n");
+        pci_mmcfg_config_num = 0;
         return -ENOMEM;
     }
 
