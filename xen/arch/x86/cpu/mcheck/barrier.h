@@ -10,6 +10,13 @@ struct mce_softirq_barrier {
     atomic_t outgen;
 };
 
+#define DEFINE_MCE_BARRIER(name)        \
+    struct mce_softirq_barrier name = { \
+        .val    = ATOMIC_INIT(0),       \
+        .ingen  = ATOMIC_INIT(0),       \
+        .outgen = ATOMIC_INIT(0),       \
+    }
+
 /*
  * Initialize a barrier. Just set it to 0.
  */
