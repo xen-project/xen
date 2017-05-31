@@ -41,9 +41,9 @@
 
 /*
  * Fixmap pages to reserve for ACPI boot-time tables (see asm-x86/fixmap.h or
- * asm-arm/config.h)
+ * asm-arm/config.h, 64 pages(256KB) is large enough for most cases.)
  */
-#define NUM_FIXMAP_ACPI_PAGES  4
+#define NUM_FIXMAP_ACPI_PAGES  64
 
 #define BAD_MADT_ENTRY(entry, end) (                                        \
                 (!(entry)) || (unsigned long)(entry) + sizeof(*(entry)) > (end) ||  \
