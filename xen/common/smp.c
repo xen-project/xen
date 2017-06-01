@@ -53,6 +53,7 @@ void on_selected_cpus(
     unsigned int nr_cpus;
 
     ASSERT(local_irq_is_enabled());
+    ASSERT(cpumask_subset(selected, &cpu_online_map));
 
     spin_lock(&call_lock);
 
