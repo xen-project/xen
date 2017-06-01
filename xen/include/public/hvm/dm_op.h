@@ -391,17 +391,17 @@ DEFINE_XEN_GUEST_HANDLE(xen_dm_op_buf_t);
 
 /* ` enum neg_errnoval
  * ` HYPERVISOR_dm_op(domid_t domid,
- * `                  xen_dm_op_buf_t bufs[],
- * `                  unsigned int nr_bufs)
+ * `                  unsigned int nr_bufs,
+ * `                  xen_dm_op_buf_t bufs[])
  * `
  *
  * @domid is the domain the hypercall operates on.
+ * @nr_bufs is the number of buffers in the @bufs array.
  * @bufs points to an array of buffers where @bufs[0] contains a struct
  * xen_dm_op, describing the specific device model operation and its
  * parameters.
  * @bufs[1..] may be referenced in the parameters for the purposes of
  * passing extra information to or from the domain.
- * @nr_bufs is the number of buffers in the @bufs array.
  */
 
 #endif /* __XEN_PUBLIC_HVM_DM_OP_H__ */
