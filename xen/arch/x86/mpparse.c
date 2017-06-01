@@ -819,8 +819,6 @@ void mp_unregister_lapic(uint32_t apic_id, uint32_t cpu)
 	cpumask_clear_cpu(cpu, &cpu_present_map);
 }
 
-#ifdef	CONFIG_X86_IO_APIC
-
 #define MP_ISA_BUS		0
 #define MP_MAX_IOAPIC_PIN	127
 
@@ -1101,5 +1099,4 @@ int mp_register_gsi (u32 gsi, int triggering, int polarity)
 				       triggering, polarity);
 }
 
-#endif /* CONFIG_X86_IO_APIC */
 #endif /* CONFIG_ACPI */

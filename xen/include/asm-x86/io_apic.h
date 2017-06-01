@@ -13,8 +13,6 @@
  * Copyright (C) 1997, 1998, 1999, 2000 Ingo Molnar
  */
 
-#ifdef CONFIG_X86_IO_APIC
-
 #define IO_APIC_BASE(idx) \
 		((volatile int *)(__fix_to_virt(FIX_IO_APIC_BASE_0 + idx) \
 		+ (mp_ioapics[idx].mpc_apicaddr & ~PAGE_MASK)))
@@ -198,12 +196,6 @@ extern void free_ioapic_entries(struct IO_APIC_route_entry **ioapic_entries);
 extern int save_IO_APIC_setup(struct IO_APIC_route_entry **ioapic_entries);
 extern void mask_IO_APIC_setup(struct IO_APIC_route_entry **ioapic_entries);
 extern int restore_IO_APIC_setup(struct IO_APIC_route_entry **ioapic_entries);
-
-#else  /* !CONFIG_X86_IO_APIC */
-static inline void init_ioapic_mappings(void) {}
-static inline void ioapic_suspend(void) {}
-static inline void ioapic_resume(void) {}
-#endif
 
 unsigned highest_gsi(void);
 

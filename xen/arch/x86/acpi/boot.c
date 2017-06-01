@@ -204,8 +204,6 @@ acpi_parse_lapic_nmi(struct acpi_subtable_header * header, const unsigned long e
 	return 0;
 }
 
-#if defined(CONFIG_X86_IO_APIC) /*&& defined(CONFIG_ACPI_INTERPRETER)*/
-
 static int __init
 acpi_parse_ioapic(struct acpi_subtable_header * header, const unsigned long end)
 {
@@ -265,8 +263,6 @@ acpi_parse_nmi_src(struct acpi_subtable_header * header, const unsigned long end
 
 	return 0;
 }
-
-#endif /* CONFIG_X86_IO_APIC */
 
 #ifdef CONFIG_HPET_TIMER
 
@@ -561,7 +557,6 @@ static int __init acpi_parse_madt_lapic_entries(void)
 	return 0;
 }
 
-#ifdef CONFIG_X86_IO_APIC
 /*
  * Parse IOAPIC related entries in MADT
  * returns 0 on success, < 0 on error
@@ -627,13 +622,6 @@ static int __init acpi_parse_madt_ioapic_entries(void)
 
 	return 0;
 }
-#else
-static inline int acpi_parse_madt_ioapic_entries(void)
-{
-	return -1;
-}
-#endif /* !CONFIG_X86_IO_APIC */
-
 
 static void __init acpi_process_madt(void)
 {
