@@ -49,8 +49,6 @@ const struct genapic *apic_x2apic_probe(void);
 	} while (0)
 
 
-#ifdef CONFIG_X86_LOCAL_APIC
-
 /*
  * Basic functions accessing APICs.
  */
@@ -204,11 +202,5 @@ extern unsigned int nmi_watchdog;
 #define NMI_NONE	0
 #define NMI_IO_APIC	1
 #define NMI_LOCAL_APIC	2
-
-#else /* !CONFIG_X86_LOCAL_APIC */
-static inline int lapic_suspend(void) {return 0;}
-static inline int lapic_resume(void) {return 0;}
-
-#endif /* !CONFIG_X86_LOCAL_APIC */
 
 #endif /* __ASM_APIC_H */

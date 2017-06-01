@@ -54,15 +54,12 @@ bool_t __initdata acpi_ioapic;
 static bool_t acpi_skip_timer_override __initdata;
 boolean_param("acpi_skip_timer_override", acpi_skip_timer_override);
 
-#ifdef CONFIG_X86_LOCAL_APIC
 static u64 acpi_lapic_addr __initdata = APIC_DEFAULT_PHYS_BASE;
-#endif
 
 /* --------------------------------------------------------------------------
                               Boot-time Configuration
    -------------------------------------------------------------------------- */
 
-#ifdef CONFIG_X86_LOCAL_APIC
 static int __init acpi_parse_madt(struct acpi_table_header *table)
 {
 	struct acpi_table_madt *madt;
@@ -206,8 +203,6 @@ acpi_parse_lapic_nmi(struct acpi_subtable_header * header, const unsigned long e
 
 	return 0;
 }
-
-#endif				/*CONFIG_X86_LOCAL_APIC */
 
 #if defined(CONFIG_X86_IO_APIC) /*&& defined(CONFIG_ACPI_INTERPRETER)*/
 
@@ -510,7 +505,6 @@ static int __init acpi_parse_fadt(struct acpi_table_header *table)
 	return 0;
 }
 
-#ifdef	CONFIG_X86_LOCAL_APIC
 /*
  * Parse LAPIC entries in MADT
  * returns 0 on success, < 0 on error
@@ -566,7 +560,6 @@ static int __init acpi_parse_madt_lapic_entries(void)
 	}
 	return 0;
 }
-#endif /* CONFIG_X86_LOCAL_APIC */
 
 #ifdef CONFIG_X86_IO_APIC
 /*
@@ -644,7 +637,6 @@ static inline int acpi_parse_madt_ioapic_entries(void)
 
 static void __init acpi_process_madt(void)
 {
-#ifdef CONFIG_X86_LOCAL_APIC
 	int error;
 
 	if (!acpi_table_parse(ACPI_SIG_MADT, acpi_parse_madt)) {
@@ -677,8 +669,6 @@ static void __init acpi_process_madt(void)
 			disable_acpi();
 		}
 	}
-#endif
-	return;
 }
 
 /*
