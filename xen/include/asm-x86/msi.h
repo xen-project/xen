@@ -119,10 +119,9 @@ struct msi_desc {
 	};
 	struct pci_dev *dev;
 	int irq;
+	int remap_index;		/* index in interrupt remapping table */
 
 	struct msi_msg msg;		/* Last set MSI message */
-
-	int remap_index;		/* index in interrupt remapping table */
 };
 
 /*
