@@ -157,7 +157,7 @@ void clear_local_APIC(void)
     maxlvt = get_maxlvt();
 
     /* Work around AMD Erratum 411. This is a nice thing to do anyway. */
-    apic_write_around(APIC_TMICT, 0);
+    apic_write(APIC_TMICT, 0);
 
     /*
      * Masking an LVT entry on a P6 can trigger a local APIC error
@@ -165,52 +165,52 @@ void clear_local_APIC(void)
      */
     if (maxlvt >= 3) {
         v = ERROR_APIC_VECTOR; /* any non-zero vector will do */
-        apic_write_around(APIC_LVTERR, v | APIC_LVT_MASKED);
+        apic_write(APIC_LVTERR, v | APIC_LVT_MASKED);
     }
     /*
      * Careful: we have to set masks only first to deassert
      * any level-triggered sources.
      */
     v = apic_read(APIC_LVTT);
-    apic_write_around(APIC_LVTT, v | APIC_LVT_MASKED);
+    apic_write(APIC_LVTT, v | APIC_LVT_MASKED);
     v = apic_read(APIC_LVT0);
-    apic_write_around(APIC_LVT0, v | APIC_LVT_MASKED);
+    apic_write(APIC_LVT0, v | APIC_LVT_MASKED);
     v = apic_read(APIC_LVT1);
-    apic_write_around(APIC_LVT1, v | APIC_LVT_MASKED);
+    apic_write(APIC_LVT1, v | APIC_LVT_MASKED);
     if (maxlvt >= 4) {
         v = apic_read(APIC_LVTPC);
-        apic_write_around(APIC_LVTPC, v | APIC_LVT_MASKED);
+        apic_write(APIC_LVTPC, v | APIC_LVT_MASKED);
     }
 
 /* lets not touch this if we didn't frob it */
 #ifdef CONFIG_X86_MCE_THERMAL
     if (maxlvt >= 5) {
         v = apic_read(APIC_LVTTHMR);
-        apic_write_around(APIC_LVTTHMR, v | APIC_LVT_MASKED);
+        apic_write(APIC_LVTTHMR, v | APIC_LVT_MASKED);
     }
 #endif
 
     if (maxlvt >= 6) {
         v = apic_read(APIC_CMCI);
-        apic_write_around(APIC_CMCI, v | APIC_LVT_MASKED);
+        apic_write(APIC_CMCI, v | APIC_LVT_MASKED);
     }
     /*
      * Clean APIC state for other OSs:
      */
-    apic_write_around(APIC_LVTT, APIC_LVT_MASKED);
-    apic_write_around(APIC_LVT0, APIC_LVT_MASKED);
-    apic_write_around(APIC_LVT1, APIC_LVT_MASKED);
+    apic_write(APIC_LVTT, APIC_LVT_MASKED);
+    apic_write(APIC_LVT0, APIC_LVT_MASKED);
+    apic_write(APIC_LVT1, APIC_LVT_MASKED);
     if (maxlvt >= 3)
-        apic_write_around(APIC_LVTERR, APIC_LVT_MASKED);
+        apic_write(APIC_LVTERR, APIC_LVT_MASKED);
     if (maxlvt >= 4)
-        apic_write_around(APIC_LVTPC, APIC_LVT_MASKED);
+        apic_write(APIC_LVTPC, APIC_LVT_MASKED);
 
 #ifdef CONFIG_X86_MCE_THERMAL
     if (maxlvt >= 5)
-        apic_write_around(APIC_LVTTHMR, APIC_LVT_MASKED);
+        apic_write(APIC_LVTTHMR, APIC_LVT_MASKED);
 #endif
     if (maxlvt >= 6)
-        apic_write_around(APIC_CMCI, APIC_LVT_MASKED);
+        apic_write(APIC_CMCI, APIC_LVT_MASKED);
 
     if (maxlvt > 3)        /* Due to Pentium errata 3AP and 11AP. */
         apic_write(APIC_ESR, 0);
@@ -259,7 +259,7 @@ void disconnect_bsp_APIC(int virt_wire_setup)
         value &= ~APIC_VECTOR_MASK;
         value |= APIC_SPIV_APIC_ENABLED;
         value |= 0xf;
-        apic_write_around(APIC_SPIV, value);
+        apic_write(APIC_SPIV, value);
 
         if (!virt_wire_setup) {
             /* For LVT0 make it edge triggered, active high, external and enabled */
@@ -269,11 +269,11 @@ void disconnect_bsp_APIC(int virt_wire_setup)
                        APIC_LVT_LEVEL_TRIGGER | APIC_LVT_MASKED );
             value |= APIC_LVT_REMOTE_IRR | APIC_SEND_PENDING;
             value = SET_APIC_DELIVERY_MODE(value, APIC_MODE_EXTINT);
-            apic_write_around(APIC_LVT0, value);
+            apic_write(APIC_LVT0, value);
         }
         else {
             /* Disable LVT0 */
-            apic_write_around(APIC_LVT0, APIC_LVT_MASKED);
+            apic_write(APIC_LVT0, APIC_LVT_MASKED);
         }
 
         /* For LVT1 make it edge triggered, active high, nmi and enabled */
@@ -284,7 +284,7 @@ void disconnect_bsp_APIC(int virt_wire_setup)
             APIC_LVT_LEVEL_TRIGGER | APIC_LVT_MASKED);
         value |= APIC_LVT_REMOTE_IRR | APIC_SEND_PENDING;
         value = SET_APIC_DELIVERY_MODE(value, APIC_MODE_NMI);
-        apic_write_around(APIC_LVT1, value);
+        apic_write(APIC_LVT1, value);
     }
 }
 
@@ -296,8 +296,7 @@ void disable_local_APIC(void)
      * Disable APIC (implies clearing of registers
      * for 82489DX!).
      */
-    apic_write_around(APIC_SPIV,
-        apic_read(APIC_SPIV) & ~APIC_SPIV_APIC_ENABLED);
+    apic_write(APIC_SPIV, apic_read(APIC_SPIV) & ~APIC_SPIV_APIC_ENABLED);
 
     if (enabled_via_apicbase) {
         uint64_t msr_content;
@@ -424,8 +423,7 @@ void __init sync_Arb_IDs(void)
     apic_wait_icr_idle();
 
     apic_printk(APIC_DEBUG, "Synchronizing Arb IDs.\n");
-    apic_write_around(APIC_ICR, APIC_DEST_ALLINC | APIC_INT_LEVELTRIG
-                      | APIC_DM_INIT);
+    apic_write(APIC_ICR, APIC_DEST_ALLINC | APIC_INT_LEVELTRIG | APIC_DM_INIT);
 }
 
 /*
@@ -460,13 +458,13 @@ void __init init_bsp_APIC(void)
     else
         value |= APIC_SPIV_FOCUS_DISABLED;
     value |= SPURIOUS_APIC_VECTOR;
-    apic_write_around(APIC_SPIV, value);
+    apic_write(APIC_SPIV, value);
 
     /*
      * Set up the virtual wire mode.
      */
-    apic_write_around(APIC_LVT0, APIC_DM_EXTINT);
-    apic_write_around(APIC_LVT1, APIC_DM_NMI);
+    apic_write(APIC_LVT0, APIC_DM_EXTINT);
+    apic_write(APIC_LVT1, APIC_DM_NMI);
 }
 
 static void apic_pm_activate(void)
@@ -551,7 +549,7 @@ void setup_local_APIC(void)
     /*
      * Set Task Priority to reject any interrupts below FIRST_DYNAMIC_VECTOR.
      */
-    apic_write_around(APIC_TASKPRI, (FIRST_DYNAMIC_VECTOR & 0xF0) - 0x10);
+    apic_write(APIC_TASKPRI, (FIRST_DYNAMIC_VECTOR & 0xF0) - 0x10);
 
     /*
      * After a crash, we no longer service the interrupts and a pending
@@ -623,7 +621,7 @@ void setup_local_APIC(void)
                     smp_processor_id());
     }
 
-    apic_write_around(APIC_SPIV, value);
+    apic_write(APIC_SPIV, value);
 
     /*
      * Set up LVT0, LVT1:
@@ -645,7 +643,7 @@ void setup_local_APIC(void)
         apic_printk(APIC_VERBOSE, "masked ExtINT on CPU#%d\n",
                     smp_processor_id());
     }
-    apic_write_around(APIC_LVT0, value);
+    apic_write(APIC_LVT0, value);
 
     /*
      * only the BP should see the LINT1 NMI signal, obviously.
@@ -654,7 +652,7 @@ void setup_local_APIC(void)
         value = APIC_DM_NMI;
     else
         value = APIC_DM_NMI | APIC_LVT_MASKED;
-    apic_write_around(APIC_LVT1, value);
+    apic_write(APIC_LVT1, value);
 
     if (!esr_disable) {
         maxlvt = get_maxlvt();
@@ -663,7 +661,7 @@ void setup_local_APIC(void)
         oldvalue = apic_read(APIC_ESR);
 
         value = ERROR_APIC_VECTOR;      // enables sending errors
-        apic_write_around(APIC_LVTERR, value);
+        apic_write(APIC_LVTERR, value);
         /*
          * spec says clear errors after enabling vector.
          */
@@ -1075,12 +1073,12 @@ static void __setup_APIC_LVTT(unsigned int clocks)
         lvtt_value |= APIC_TIMER_MODE_TSC_DEADLINE;
     }
 
-    apic_write_around(APIC_LVTT, lvtt_value);
+    apic_write(APIC_LVTT, lvtt_value);
 
     tmp_value = apic_read(APIC_TDCR);
-    apic_write_around(APIC_TDCR, (tmp_value | APIC_TDR_DIV_1));
+    apic_write(APIC_TDCR, tmp_value | APIC_TDR_DIV_1);
 
-    apic_write_around(APIC_TMICT, clocks/APIC_DIVISOR);
+    apic_write(APIC_TMICT, clocks / APIC_DIVISOR);
 }
 
 static void setup_APIC_timer(void)
@@ -1206,10 +1204,10 @@ void disable_APIC_timer(void)
         unsigned long v;
 
         /* Work around AMD Erratum 411. This is a nice thing to do anyway. */
-        apic_write_around(APIC_TMICT, 0);
+        apic_write(APIC_TMICT, 0);
 
         v = apic_read(APIC_LVTT);
-        apic_write_around(APIC_LVTT, v | APIC_LVT_MASKED);
+        apic_write(APIC_LVTT, v | APIC_LVT_MASKED);
     }
 }
 
@@ -1219,7 +1217,7 @@ void enable_APIC_timer(void)
         unsigned long v;
         
         v = apic_read(APIC_LVTT);
-        apic_write_around(APIC_LVTT, v & ~APIC_LVT_MASKED);
+        apic_write(APIC_LVTT, v & ~APIC_LVT_MASKED);
     }
 }
 

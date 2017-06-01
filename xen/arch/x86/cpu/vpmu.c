@@ -441,13 +441,12 @@ int vpmu_load(struct vcpu *v, bool_t from_guest)
     {
         int ret;
 
-        apic_write_around(APIC_LVTPC, vpmu->hw_lapic_lvtpc);
+        apic_write(APIC_LVTPC, vpmu->hw_lapic_lvtpc);
         /* Arch code needs to set VPMU_CONTEXT_LOADED */
         ret = vpmu->arch_vpmu_ops->arch_vpmu_load(v, from_guest);
         if ( ret )
         {
-            apic_write_around(APIC_LVTPC,
-                              vpmu->hw_lapic_lvtpc | APIC_LVT_MASKED);
+            apic_write(APIC_LVTPC, vpmu->hw_lapic_lvtpc | APIC_LVT_MASKED);
             return ret;
         }
     }

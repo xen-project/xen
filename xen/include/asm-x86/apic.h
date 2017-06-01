@@ -161,27 +161,10 @@ void apic_wait_icr_idle(void);
 
 int get_physical_broadcast(void);
 
-#ifdef CONFIG_X86_GOOD_APIC
-# define FORCE_READ_AROUND_WRITE 0
-# define apic_read_around(x)
-# define apic_write_around(x,y) apic_write((x),(y))
-#else
-# define FORCE_READ_AROUND_WRITE 1
-# define apic_read_around(x) apic_read(x)
-# define apic_write_around(x,y) apic_write_atomic((x),(y))
-#endif
-
 static inline void ack_APIC_irq(void)
 {
-	/*
-	 * ack_APIC_irq() actually gets compiled as a single instruction:
-	 * - a single rmw on Pentium/82489DX
-	 * - a single write on P6+ cores (CONFIG_X86_GOOD_APIC)
-	 * ... yummie.
-	 */
-
 	/* Docs say use 0 for future compatibility */
-	apic_write_around(APIC_EOI, 0);
+	apic_write(APIC_EOI, 0);
 }
 
 extern int get_maxlvt(void);

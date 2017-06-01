@@ -115,7 +115,7 @@ static void __default_send_IPI_shortcut(unsigned int shortcut, int vector,
     /*
      * Send the IPI. The write to APIC_ICR fires this off.
      */
-    apic_write_around(APIC_ICR, cfg);
+    apic_write(APIC_ICR, cfg);
 }
 
 void send_IPI_self_legacy(uint8_t vector)
@@ -145,7 +145,7 @@ void send_IPI_mask_flat(const cpumask_t *cpumask, int vector)
      * prepare target chip field
      */
     cfg = __prepare_ICR2(mask);
-    apic_write_around(APIC_ICR2, cfg);
+    apic_write(APIC_ICR2, cfg);
 
     /*
      * program the ICR
@@ -155,7 +155,7 @@ void send_IPI_mask_flat(const cpumask_t *cpumask, int vector)
     /*
      * Send the IPI. The write to APIC_ICR fires this off.
      */
-    apic_write_around(APIC_ICR, cfg);
+    apic_write(APIC_ICR, cfg);
     
     local_irq_restore(flags);
 }
@@ -181,7 +181,7 @@ void send_IPI_mask_phys(const cpumask_t *mask, int vector)
          * prepare target chip field
          */
         cfg = __prepare_ICR2(cpu_physical_id(query_cpu));
-        apic_write_around(APIC_ICR2, cfg);
+        apic_write(APIC_ICR2, cfg);
 
         /*
          * program the ICR
@@ -191,7 +191,7 @@ void send_IPI_mask_phys(const cpumask_t *mask, int vector)
         /*
          * Send the IPI. The write to APIC_ICR fires this off.
          */
-        apic_write_around(APIC_ICR, cfg);
+        apic_write(APIC_ICR, cfg);
     }
 
     local_irq_restore(flags);

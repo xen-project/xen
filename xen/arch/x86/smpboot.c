@@ -385,7 +385,6 @@ static int wakeup_secondary_cpu(int phys_apicid, unsigned long start_eip)
     /*
      * Be paranoid about clearing APIC errors.
      */
-    apic_read_around(APIC_SPIV);
     apic_write(APIC_ESR, 0);
     apic_read(APIC_ESR);
 
@@ -439,7 +438,6 @@ static int wakeup_secondary_cpu(int phys_apicid, unsigned long start_eip)
     for ( i = 0; i < 2; i++ )
     {
         Dprintk("Sending STARTUP #%d.\n", i+1);
-        apic_read_around(APIC_SPIV);
         apic_write(APIC_ESR, 0);
         apic_read(APIC_ESR);
         Dprintk("After apic_write.\n");
@@ -472,7 +470,6 @@ static int wakeup_secondary_cpu(int phys_apicid, unsigned long start_eip)
         /* Due to the Pentium erratum 3AP. */
         if ( maxlvt > 3 )
         {
-            apic_read_around(APIC_SPIV);
             apic_write(APIC_ESR, 0);
         }
         accept_status = (apic_read(APIC_ESR) & 0xEF);

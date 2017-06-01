@@ -158,7 +158,7 @@ static void intel_init_thermal(struct cpuinfo_x86 *c)
     /* The temperature transition interrupt handler setup */
     val = thermal_apic_vector;    /* our delivery vector */
     val |= (APIC_DM_FIXED | APIC_LVT_MASKED);  /* we'll mask till we're ready */
-    apic_write_around(APIC_LVTTHMR, val);
+    apic_write(APIC_LVTTHMR, val);
 
     rdmsrl(MSR_IA32_THERM_INTERRUPT, msr_content);
     wrmsrl(MSR_IA32_THERM_INTERRUPT, msr_content | 0x03);
@@ -166,7 +166,7 @@ static void intel_init_thermal(struct cpuinfo_x86 *c)
     rdmsrl(MSR_IA32_MISC_ENABLE, msr_content);
     wrmsrl(MSR_IA32_MISC_ENABLE, msr_content | (1ULL<<3));
 
-    apic_write_around(APIC_LVTTHMR, val & ~APIC_LVT_MASKED);
+    apic_write(APIC_LVTTHMR, val & ~APIC_LVT_MASKED);
     if (opt_cpu_info)
         printk(KERN_INFO "CPU%u: Thermal monitoring enabled (%s)\n",
                 cpu, tm2 ? "TM2" : "TM1");
@@ -673,10 +673,10 @@ static void intel_init_cmci(struct cpuinfo_x86 *c)
 
     apic = cmci_apic_vector;
     apic |= (APIC_DM_FIXED | APIC_LVT_MASKED);
-    apic_write_around(APIC_CMCI, apic);
+    apic_write(APIC_CMCI, apic);
 
     l = apic_read(APIC_CMCI);
-    apic_write_around(APIC_CMCI, l & ~APIC_LVT_MASKED);
+    apic_write(APIC_CMCI, l & ~APIC_LVT_MASKED);
 
     mce_set_owner();
 }
