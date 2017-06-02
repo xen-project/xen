@@ -377,8 +377,26 @@ __start:
         cld
         cli
 
-        /* Load default Xen image load base address. */
-        mov     $sym_offs(__image_base__),%esi
+        /*
+         * Multiboot (both 1 and 2) specify the stack pointer as undefined
+         * when entering in BIOS circumstances.  This is unhelpful for
+         * relocatable images, where one push/pop is required to calculate
+         * images load address.
+         *
+         * On a BIOS-based system, the IVT and BDA occupy the first 5/16ths of
+         * the first page of RAM, with the rest free for use.  Use the top of
+         * this page for a temporary stack, being one of the safest locations
+         * to clobber.
+         */
+        mov     $0x1000, %esp
+
+        /* Calculate the load base address. */
+        call    1f
+1:      pop     %esi
+        sub     $sym_offs(1b), %esi
+
+        /* Set up stack. */
+        lea     STACK_SIZE + sym_esi(cpu0_stack), %esp
 
         /* Bootloaders may set multiboot{1,2}.mem_lower to a nonzero value. */
         xor     %edx,%edx
@@ -410,15 +428,6 @@ __start:
         cmp     %edi,MB2_fixed_total_size(%ebx)
         jbe     trampoline_bios_setup
 
-        /* Get Xen image load base address from Multiboot2 information. */
-        cmpl    $MULTIBOOT2_TAG_TYPE_LOAD_BASE_ADDR,MB2_tag_type(%ecx)
-        jne     .Lmb2_mem_lower
-
-        mov     MB2_load_base_addr(%ecx),%esi
-        sub     $XEN_IMG_OFFSET,%esi
-        jmp     .Lmb2_next_tag
-
-.Lmb2_mem_lower:
         /* Get mem_lower from Multiboot2 information. */
         cmpl    $MULTIBOOT2_TAG_TYPE_BASIC_MEMINFO,MB2_tag_type(%ecx)
         cmove   MB2_mem_lower(%ecx),%edx
@@ -518,9 +527,6 @@ trampoline_setup:
         /* Save Xen image load base address for later use. */
         mov     %esi,sym_fs(xen_phys_start)
         mov     %esi,sym_fs(trampoline_xen_phys_start)
-
-        /* Setup stack. %ss was initialized earlier. */
-        lea     1024+sym_esi(cpu0_stack),%esp
 
         mov     sym_fs(trampoline_phys),%ecx
 
