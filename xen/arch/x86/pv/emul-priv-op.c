@@ -58,7 +58,7 @@ struct priv_op_ctxt {
 #define TSC_AUX 2
 };
 
-/* I/O emulation support. Helper routines for, and type of, the stack stub.*/
+/* I/O emulation support. Helper routines for, and type of, the stack stub. */
 void host_to_guest_gpr_switch(struct cpu_user_regs *);
 unsigned long guest_to_host_gpr_switch(unsigned long);
 
@@ -101,7 +101,7 @@ static io_emul_stub_t *io_emul_stub_setup(struct priv_op_ctxt *ctxt, u8 opcode,
 
 
 /* Perform IOPL check between the vcpu's shadowed IOPL, and the assumed cpl. */
-static bool_t iopl_ok(const struct vcpu *v, const struct cpu_user_regs *regs)
+static bool iopl_ok(const struct vcpu *v, const struct cpu_user_regs *regs)
 {
     unsigned int cpl = guest_kernel_mode(v, regs) ?
         (VM_ASSIST(v->domain, architectural_iopl) ? 0 : 1) : 3;
@@ -112,16 +112,14 @@ static bool_t iopl_ok(const struct vcpu *v, const struct cpu_user_regs *regs)
 }
 
 /* Has the guest requested sufficient permission for this I/O access? */
-static int guest_io_okay(
-    unsigned int port, unsigned int bytes,
-    struct vcpu *v, struct cpu_user_regs *regs)
+static bool guest_io_okay(unsigned int port, unsigned int bytes,
+                          struct vcpu *v, struct cpu_user_regs *regs)
 {
     /* If in user mode, switch to kernel mode just to read I/O bitmap. */
-    int user_mode = !(v->arch.flags & TF_kernel_mode);
-#define TOGGLE_MODE() if ( user_mode ) toggle_guest_mode(v)
+    const bool user_mode = !(v->arch.flags & TF_kernel_mode);
 
     if ( iopl_ok(v, regs) )
-        return 1;
+        return true;
 
     if ( v->arch.pv_vcpu.iobmp_limit > (port + bytes) )
     {
@@ -131,7 +129,9 @@ static int guest_io_okay(
          * Grab permission bytes from guest space. Inaccessible bytes are
          * read as 0xff (no access allowed).
          */
-        TOGGLE_MODE();
+        if ( user_mode )
+            toggle_guest_mode(v);
+
         switch ( __copy_from_guest_offset(x.bytes, v->arch.pv_vcpu.iobmp,
                                           port>>3, 2) )
         {
@@ -141,43 +141,45 @@ static int guest_io_okay(
             /* fallthrough */
         case 0:  break;
         }
-        TOGGLE_MODE();
 
-        if ( (x.mask & (((1<<bytes)-1) << (port&7))) == 0 )
-            return 1;
+        if ( user_mode )
+            toggle_guest_mode(v);
+
+        if ( (x.mask & (((1 << bytes) - 1) << (port & 7))) == 0 )
+            return true;
     }
 
-    return 0;
+    return false;
 }
 
 /* Has the administrator granted sufficient permission for this I/O access? */
-static bool_t admin_io_okay(unsigned int port, unsigned int bytes,
-                            const struct domain *d)
+static bool admin_io_okay(unsigned int port, unsigned int bytes,
+                          const struct domain *d)
 {
     /*
      * Port 0xcf8 (CONFIG_ADDRESS) is only visible for DWORD accesses.
      * We never permit direct access to that register.
      */
     if ( (port == 0xcf8) && (bytes == 4) )
-        return 0;
+        return false;
 
     /* We also never permit direct access to the RTC/CMOS registers. */
     if ( ((port & ~1) == RTC_PORT(0)) )
-        return 0;
+        return false;
 
     return ioports_access_permitted(d, port, port + bytes - 1);
 }
 
-static bool_t pci_cfg_ok(struct domain *currd, unsigned int start,
-                         unsigned int size, uint32_t *write)
+static bool pci_cfg_ok(struct domain *currd, unsigned int start,
+                       unsigned int size, uint32_t *write)
 {
     uint32_t machine_bdf;
 
     if ( !is_hardware_domain(currd) )
-        return 0;
+        return false;
 
     if ( !CF8_ENABLED(currd->arch.pci_cf8) )
-        return 1;
+        return true;
 
     machine_bdf = CF8_BDF(currd->arch.pci_cf8);
     if ( write )
@@ -185,7 +187,7 @@ static bool_t pci_cfg_ok(struct domain *currd, unsigned int start,
         const unsigned long *ro_map = pci_get_ro_map(0);
 
         if ( ro_map && test_bit(machine_bdf, ro_map) )
-            return 0;
+            return false;
     }
     start |= CF8_ADDR_LO(currd->arch.pci_cf8);
     /* AMD extended configuration space access? */
@@ -196,7 +198,7 @@ static bool_t pci_cfg_ok(struct domain *currd, unsigned int start,
         uint64_t msr_val;
 
         if ( rdmsr_safe(MSR_AMD64_NB_CFG, msr_val) )
-            return 0;
+            return false;
         if ( msr_val & (1ULL << AMD64_NB_CFG_CF8_EXT_ENABLE_BIT) )
             start |= CF8_ADDR_HI(currd->arch.pci_cf8);
     }
@@ -273,7 +275,8 @@ uint32_t guest_io_read(unsigned int port, unsigned int bytes,
 }
 
 static unsigned int check_guest_io_breakpoint(struct vcpu *v,
-    unsigned int port, unsigned int len)
+                                              unsigned int port,
+                                              unsigned int len)
 {
     unsigned int width, i, match = 0;
     unsigned long start;
@@ -301,7 +304,7 @@ static unsigned int check_guest_io_breakpoint(struct vcpu *v,
         }
 
         if ( (start < (port + len)) && ((start + width) > port) )
-            match |= 1 << i;
+            match |= 1u << i;
     }
 
     return match;
@@ -342,7 +345,8 @@ void guest_io_write(unsigned int port, unsigned int bytes, uint32_t data,
 {
     if ( admin_io_okay(port, bytes, currd) )
     {
-        switch ( bytes ) {
+        switch ( bytes )
+        {
         case 1:
             outb((uint8_t)data, port);
             if ( pv_post_outb_hook )
@@ -741,7 +745,7 @@ static int priv_op_write_cr(unsigned int reg, unsigned long val,
         if ( (val ^ read_cr0()) & ~X86_CR0_TS )
         {
             gdprintk(XENLOG_WARNING,
-                    "Attempt to change unmodifiable CR0 flags\n");
+                     "Attempt to change unmodifiable CR0 flags\n");
             break;
         }
         do_fpu_taskswitch(!!(val & X86_CR0_TS));
@@ -948,16 +952,16 @@ static int priv_op_read_msr(unsigned int reg, uint64_t *val,
             *val |= MSR_MISC_FEATURES_CPUID_FAULTING;
         return X86EMUL_OKAY;
 
-    case MSR_P6_PERFCTR(0)...MSR_P6_PERFCTR(7):
-    case MSR_P6_EVNTSEL(0)...MSR_P6_EVNTSEL(3):
-    case MSR_CORE_PERF_FIXED_CTR0...MSR_CORE_PERF_FIXED_CTR2:
-    case MSR_CORE_PERF_FIXED_CTR_CTRL...MSR_CORE_PERF_GLOBAL_OVF_CTRL:
+    case MSR_P6_PERFCTR(0) ... MSR_P6_PERFCTR(7):
+    case MSR_P6_EVNTSEL(0) ... MSR_P6_EVNTSEL(3):
+    case MSR_CORE_PERF_FIXED_CTR0 ... MSR_CORE_PERF_FIXED_CTR2:
+    case MSR_CORE_PERF_FIXED_CTR_CTRL ... MSR_CORE_PERF_GLOBAL_OVF_CTRL:
         if ( boot_cpu_data.x86_vendor == X86_VENDOR_INTEL )
         {
             vpmu_msr = true;
             /* fall through */
-    case MSR_AMD_FAM15H_EVNTSEL0...MSR_AMD_FAM15H_PERFCTR5:
-    case MSR_K7_EVNTSEL0...MSR_K7_PERFCTR3:
+    case MSR_AMD_FAM15H_EVNTSEL0 ... MSR_AMD_FAM15H_PERFCTR5:
+    case MSR_K7_EVNTSEL0 ... MSR_K7_PERFCTR3:
             if ( vpmu_msr || (boot_cpu_data.x86_vendor == X86_VENDOR_AMD) )
             {
                 if ( vpmu_do_rdmsr(reg, val) )
@@ -1153,15 +1157,15 @@ static int priv_op_write_msr(unsigned int reg, uint64_t val,
         curr->arch.cpuid_faulting = !!(val & MSR_MISC_FEATURES_CPUID_FAULTING);
         return X86EMUL_OKAY;
 
-    case MSR_P6_PERFCTR(0)...MSR_P6_PERFCTR(7):
-    case MSR_P6_EVNTSEL(0)...MSR_P6_EVNTSEL(3):
-    case MSR_CORE_PERF_FIXED_CTR0...MSR_CORE_PERF_FIXED_CTR2:
-    case MSR_CORE_PERF_FIXED_CTR_CTRL...MSR_CORE_PERF_GLOBAL_OVF_CTRL:
+    case MSR_P6_PERFCTR(0) ... MSR_P6_PERFCTR(7):
+    case MSR_P6_EVNTSEL(0) ... MSR_P6_EVNTSEL(3):
+    case MSR_CORE_PERF_FIXED_CTR0 ... MSR_CORE_PERF_FIXED_CTR2:
+    case MSR_CORE_PERF_FIXED_CTR_CTRL ... MSR_CORE_PERF_GLOBAL_OVF_CTRL:
         if ( boot_cpu_data.x86_vendor == X86_VENDOR_INTEL )
         {
             vpmu_msr = true;
-    case MSR_AMD_FAM15H_EVNTSEL0...MSR_AMD_FAM15H_PERFCTR5:
-    case MSR_K7_EVNTSEL0...MSR_K7_PERFCTR3:
+    case MSR_AMD_FAM15H_EVNTSEL0 ... MSR_AMD_FAM15H_PERFCTR5:
+    case MSR_K7_EVNTSEL0 ... MSR_K7_PERFCTR3:
             if ( vpmu_msr || (boot_cpu_data.x86_vendor == X86_VENDOR_AMD) )
             {
                 if ( (vpmu_mode & XENPMU_MODE_ALL) &&

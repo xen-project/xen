@@ -50,7 +50,6 @@ static int read_gate_descriptor(unsigned int gate_sel,
     struct desc_struct desc;
     const struct desc_struct *pdesc;
 
-
     pdesc = (const struct desc_struct *)
         (!(gate_sel & 4) ? GDT_VIRT_START(v) : LDT_VIRT_START(v))
         + (gate_sel >> 3);
@@ -97,8 +96,8 @@ static int read_gate_descriptor(unsigned int gate_sel,
     return 1;
 }
 
-static inline int check_stack_limit(unsigned int ar, unsigned int limit,
-                                    unsigned int esp, unsigned int decr)
+static inline bool check_stack_limit(unsigned int ar, unsigned int limit,
+                                     unsigned int esp, unsigned int decr)
 {
     return (((esp - decr) < (esp - 1)) &&
             (!(ar & _SEGMENT_EC) ? (esp - 1) <= limit : (esp - decr) > limit));
