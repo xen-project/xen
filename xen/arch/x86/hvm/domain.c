@@ -70,23 +70,38 @@ static int check_segment(struct segment_register *reg, enum x86_segment seg)
         return -EINVAL;
     }
 
-    if ( seg == x86_seg_cs && !(reg->attr.fields.type & 0x8) )
+    switch ( seg )
     {
-        gprintk(XENLOG_ERR, "Non-code segment provided for CS\n");
-        return -EINVAL;
-    }
+    case x86_seg_cs:
+        if ( !(reg->attr.fields.type & 0x8) )
+        {
+            gprintk(XENLOG_ERR, "Non-code segment provided for CS\n");
+            return -EINVAL;
+        }
+        break;
 
-    if ( seg == x86_seg_ss &&
-         ((reg->attr.fields.type & 0x8) || !(reg->attr.fields.type & 0x2)) )
-    {
-        gprintk(XENLOG_ERR, "Non-writeable segment provided for SS\n");
-        return -EINVAL;
-    }
+    case x86_seg_ss:
+        if ( (reg->attr.fields.type & 0x8) || !(reg->attr.fields.type & 0x2) )
+        {
+            gprintk(XENLOG_ERR, "Non-writeable segment provided for SS\n");
+            return -EINVAL;
+        }
+        break;
 
-    if ( reg->attr.fields.s && seg != x86_seg_ss && seg != x86_seg_cs &&
-         (reg->attr.fields.type & 0x8) && !(reg->attr.fields.type & 0x2) )
-    {
-        gprintk(XENLOG_ERR, "Non-readable segment provided for DS or ES\n");
+    case x86_seg_ds:
+    case x86_seg_es:
+        if ( (reg->attr.fields.type & 0x8) && !(reg->attr.fields.type & 0x2) )
+        {
+            gprintk(XENLOG_ERR, "Non-readable segment provided for DS or ES\n");
+            return -EINVAL;
+        }
+        break;
+
+    case x86_seg_tr:
+        break;
+
+    default:
+        ASSERT_UNREACHABLE();
         return -EINVAL;
     }
 
