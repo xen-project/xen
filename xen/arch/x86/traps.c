@@ -78,6 +78,8 @@
 #include <asm/cpuid.h>
 #include <xsm/xsm.h>
 
+#include "pv/emulate.h"
+
 /*
  * opt_nmi: one of 'ignore', 'dom0', or 'fatal'.
  *  fatal:  Xen prints diagnostic message and then hangs.
@@ -694,17 +696,6 @@ void pv_inject_event(const struct x86_event *event)
     }
 }
 
-static void instruction_done(struct cpu_user_regs *regs, unsigned long rip)
-{
-    regs->rip = rip;
-    regs->eflags &= ~X86_EFLAGS_RF;
-    if ( regs->eflags & X86_EFLAGS_TF )
-    {
-        current->arch.debugreg[6] |= DR_STEP | DR_STATUS_RESERVED_ONE;
-        pv_inject_hw_exception(TRAP_debug, X86_EVENT_NO_EC);
-    }
-}
-
 static unsigned int check_guest_io_breakpoint(struct vcpu *v,
     unsigned int port, unsigned int len)
 {
@@ -1027,7 +1018,7 @@ static int emulate_invalid_rdtscp(struct cpu_user_regs *regs)
         return 0;
     eip += sizeof(opcode);
     pv_soft_rdtsc(v, regs, 1);
-    instruction_done(regs, eip);
+    pv_emul_instruction_done(regs, eip);
     return EXCRET_fault_fixed;
 }
 
@@ -1075,7 +1066,7 @@ static int emulate_forced_invalid_op(struct cpu_user_regs *regs)
     regs->rcx = res.c;
     regs->rdx = res.d;
 
-    instruction_done(regs, eip);
+    pv_emul_instruction_done(regs, eip);
 
     trace_trap_one_addr(TRC_PV_FORCED_INVALID_OP, regs->rip);
 
@@ -1623,60 +1614,6 @@ long do_fpu_taskswitch(int set)
     return 0;
 }
 
-static int read_descriptor(unsigned int sel,
-                           const struct vcpu *v,
-                           unsigned long *base,
-                           unsigned long *limit,
-                           unsigned int *ar,
-                           bool_t insn_fetch)
-{
-    struct desc_struct desc;
-
-    if ( sel < 4)
-        desc.b = desc.a = 0;
-    else if ( __get_user(desc,
-                         (const struct desc_struct *)(!(sel & 4)
-                                                      ? GDT_VIRT_START(v)
-                                                      : LDT_VIRT_START(v))
-                         + (sel >> 3)) )
-        return 0;
-    if ( !insn_fetch )
-        desc.b &= ~_SEGMENT_L;
-
-    *ar = desc.b & 0x00f0ff00;
-    if ( !(desc.b & _SEGMENT_L) )
-    {
-        *base = ((desc.a >> 16) + ((desc.b & 0xff) << 16) +
-                 (desc.b & 0xff000000));
-        *limit = (desc.a & 0xffff) | (desc.b & 0x000f0000);
-        if ( desc.b & _SEGMENT_G )
-            *limit = ((*limit + 1) << 12) - 1;
-#ifndef NDEBUG
-        if ( sel > 3 )
-        {
-            unsigned int a, l;
-            unsigned char valid;
-
-            asm volatile (
-                "larl %2,%0 ; setz %1"
-                : "=r" (a), "=qm" (valid) : "rm" (sel));
-            BUG_ON(valid && ((a & 0x00f0ff00) != *ar));
-            asm volatile (
-                "lsll %2,%0 ; setz %1"
-                : "=r" (l), "=qm" (valid) : "rm" (sel));
-            BUG_ON(valid && (l != *limit));
-        }
-#endif
-    }
-    else
-    {
-        *base = 0UL;
-        *limit = ~0UL;
-    }
-
-    return 1;
-}
-
 static int read_gate_descriptor(unsigned int gate_sel,
                                 const struct vcpu *v,
                                 unsigned int *sel,
@@ -1841,7 +1778,8 @@ static int priv_op_read_segment(enum x86_segment seg,
         default: return X86EMUL_UNHANDLEABLE;
         }
 
-        if ( !read_descriptor(sel, current, &reg->base, &limit, &ar, 0) )
+        if ( !pv_emul_read_descriptor(sel, current, &reg->base,
+                                      &limit, &ar, 0) )
             return X86EMUL_UNHANDLEABLE;
 
         reg->limit = limit;
@@ -2987,8 +2925,8 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
     int rc;
     unsigned int eflags, ar;
 
-    if ( !read_descriptor(regs->cs, curr, &ctxt.cs.base, &ctxt.cs.limit,
-                          &ar, 1) ||
+    if ( !pv_emul_read_descriptor(regs->cs, curr, &ctxt.cs.base,
+                                  &ctxt.cs.limit, &ar, 1) ||
          !(ar & _SEGMENT_S) ||
          !(ar & _SEGMENT_P) ||
          !(ar & _SEGMENT_CODE) )
@@ -3110,7 +3048,7 @@ static int gate_op_read(
         unsigned int ar;
 
         ASSERT(!goc->insn_fetch);
-        if ( !read_descriptor(sel, current, &addr, &limit, &ar, 0) ||
+        if ( !pv_emul_read_descriptor(sel, current, &addr, &limit, &ar, 0) ||
              !(ar & _SEGMENT_S) ||
              !(ar & _SEGMENT_P) ||
              ((ar & _SEGMENT_CODE) && !(ar & _SEGMENT_WR)) )
@@ -3170,8 +3108,8 @@ static void emulate_gate_op(struct cpu_user_regs *regs)
      * Decode instruction (and perhaps operand) to determine RPL,
      * whether this is a jump or a call, and the call return offset.
      */
-    if ( !read_descriptor(regs->cs, v, &ctxt.cs.base, &ctxt.cs.limit,
-                          &ar, 0) ||
+    if ( !pv_emul_read_descriptor(regs->cs, v, &ctxt.cs.base, &ctxt.cs.limit,
+                                  &ar, 0) ||
          !(ar & _SEGMENT_S) ||
          !(ar & _SEGMENT_P) ||
          !(ar & _SEGMENT_CODE) )
@@ -3243,7 +3181,7 @@ static void emulate_gate_op(struct cpu_user_regs *regs)
         return;
     }
 
-    if ( !read_descriptor(sel, v, &base, &limit, &ar, 0) ||
+    if ( !pv_emul_read_descriptor(sel, v, &base, &limit, &ar, 0) ||
          !(ar & _SEGMENT_S) ||
          !(ar & _SEGMENT_CODE) ||
          (!jump || (ar & _SEGMENT_EC) ?
@@ -3293,7 +3231,7 @@ static void emulate_gate_op(struct cpu_user_regs *regs)
             esp = v->arch.pv_vcpu.kernel_sp;
             ss = v->arch.pv_vcpu.kernel_ss;
             if ( (ss & 3) != (sel & 3) ||
-                 !read_descriptor(ss, v, &base, &limit, &ar, 0) ||
+                 !pv_emul_read_descriptor(ss, v, &base, &limit, &ar, 0) ||
                  ((ar >> 13) & 3) != (sel & 3) ||
                  !(ar & _SEGMENT_S) ||
                  (ar & _SEGMENT_CODE) ||
@@ -3320,7 +3258,8 @@ static void emulate_gate_op(struct cpu_user_regs *regs)
             {
                 const unsigned int *ustkp;
 
-                if ( !read_descriptor(regs->ss, v, &base, &limit, &ar, 0) ||
+                if ( !pv_emul_read_descriptor(regs->ss, v, &base,
+                                              &limit, &ar, 0) ||
                      ((ar >> 13) & 3) != (regs->cs & 3) ||
                      !(ar & _SEGMENT_S) ||
                      (ar & _SEGMENT_CODE) ||
@@ -3354,7 +3293,7 @@ static void emulate_gate_op(struct cpu_user_regs *regs)
             sel |= (regs->cs & 3);
             esp = regs->rsp;
             ss = regs->ss;
-            if ( !read_descriptor(ss, v, &base, &limit, &ar, 0) ||
+            if ( !pv_emul_read_descriptor(ss, v, &base, &limit, &ar, 0) ||
                  ((ar >> 13) & 3) != (sel & 3) )
             {
                 pv_inject_hw_exception(TRAP_gp_fault, regs->error_code);
@@ -3382,7 +3321,7 @@ static void emulate_gate_op(struct cpu_user_regs *regs)
         sel |= (regs->cs & 3);
 
     regs->cs = sel;
-    instruction_done(regs, off);
+    pv_emul_instruction_done(regs, off);
 }
 
 void do_general_protection(struct cpu_user_regs *regs)
