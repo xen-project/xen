@@ -626,33 +626,6 @@ void fatal_trap(const struct cpu_user_regs *regs, bool_t show_remote)
           (regs->eflags & X86_EFLAGS_IF) ? "" : ", IN INTERRUPT CONTEXT");
 }
 
-/*
- * Called from asm to set up the MCE trapbounce info.
- * Returns 0 if no callback is set up, else 1.
- */
-int set_guest_machinecheck_trapbounce(void)
-{
-    struct vcpu *v = current;
-    struct trap_bounce *tb = &v->arch.pv_vcpu.trap_bounce;
- 
-    pv_inject_hw_exception(TRAP_machine_check, X86_EVENT_NO_EC);
-    tb->flags &= ~TBF_EXCEPTION; /* not needed for MCE delivery path */
-    return !null_trap_bounce(v, tb);
-}
-
-/*
- * Called from asm to set up the NMI trapbounce info.
- * Returns 0 if no callback is set up, else 1.
- */
-int set_guest_nmi_trapbounce(void)
-{
-    struct vcpu *v = current;
-    struct trap_bounce *tb = &v->arch.pv_vcpu.trap_bounce;
-    pv_inject_hw_exception(TRAP_nmi, X86_EVENT_NO_EC);
-    tb->flags &= ~TBF_EXCEPTION; /* not needed for NMI delivery path */
-    return !null_trap_bounce(v, tb);
-}
-
 void do_reserved_trap(struct cpu_user_regs *regs)
 {
     unsigned int trapnr = regs->entry_vector;
