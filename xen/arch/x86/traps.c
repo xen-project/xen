@@ -79,8 +79,6 @@
 #include <xsm/xsm.h>
 #include <asm/pv/traps.h>
 
-#include "pv/emulate.h"
-
 /*
  * opt_nmi: one of 'ignore', 'dom0', or 'fatal'.
  *  fatal:  Xen prints diagnostic message and then hangs.
