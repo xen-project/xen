@@ -213,6 +213,37 @@ int pv_domain_initialise(struct domain *d, unsigned int domcr_flags,
     return rc;
 }
 
+void toggle_guest_mode(struct vcpu *v)
+{
+    if ( is_pv_32bit_vcpu(v) )
+        return;
+
+    if ( cpu_has_fsgsbase )
+    {
+        if ( v->arch.flags & TF_kernel_mode )
+            v->arch.pv_vcpu.gs_base_kernel = __rdgsbase();
+        else
+            v->arch.pv_vcpu.gs_base_user = __rdgsbase();
+    }
+    v->arch.flags ^= TF_kernel_mode;
+    asm volatile ( "swapgs" );
+    update_cr3(v);
+    /* Don't flush user global mappings from the TLB. Don't tick TLB clock. */
+    asm volatile ( "mov %0, %%cr3" : : "r" (v->arch.cr3) : "memory" );
+
+    if ( !(v->arch.flags & TF_kernel_mode) )
+        return;
+
+    if ( v->arch.pv_vcpu.need_update_runstate_area &&
+         update_runstate_area(v) )
+        v->arch.pv_vcpu.need_update_runstate_area = 0;
+
+    if ( v->arch.pv_vcpu.pending_system_time.version &&
+         update_secondary_system_time(v,
+                                      &v->arch.pv_vcpu.pending_system_time) )
+        v->arch.pv_vcpu.pending_system_time.version = 0;
+}
+
 /*
  * Local variables:
  * mode: C
