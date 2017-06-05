@@ -350,7 +350,7 @@ int __init init_irq_data(void)
     struct irq_desc *desc;
     int irq, vector;
 
-    for (vector = 0; vector < NR_VECTORS; ++vector)
+    for ( vector = 0; vector < NR_VECTORS; ++vector )
         this_cpu(vector_irq)[vector] = INT_MIN;
 
     irq_desc = xzalloc_array(struct irq_desc, nr_irqs);
@@ -358,17 +358,20 @@ int __init init_irq_data(void)
     if ( !irq_desc )
         return -ENOMEM;
 
-    for (irq = 0; irq < nr_irqs_gsi; irq++) {
+    for ( irq = 0; irq < nr_irqs_gsi; irq++ )
+    {
         desc = irq_to_desc(irq);
         desc->irq = irq;
         init_one_irq_desc(desc);
     }
-    for (; irq < nr_irqs; irq++)
+    for ( ; irq < nr_irqs; irq++ )
         irq_to_desc(irq)->irq = irq;
 
+#ifdef CONFIG_PV
     /* Never allocate the hypercall vector or Linux/BSD fast-trap vector. */
     set_bit(LEGACY_SYSCALL_VECTOR, used_vectors);
     set_bit(HYPERCALL_VECTOR, used_vectors);
+#endif
     
     /* IRQ_MOVE_CLEANUP_VECTOR used for clean up vectors */
     set_bit(IRQ_MOVE_CLEANUP_VECTOR, used_vectors);

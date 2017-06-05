@@ -706,7 +706,11 @@ autogen_stubs: /* Automatically generated stubs. */
         .rept NR_VECTORS
 
         /* Common interrupts, heading towards do_IRQ(). */
+#ifdef CONFIG_PV
         .if vec >= FIRST_DYNAMIC_VECTOR && vec != HYPERCALL_VECTOR && vec != LEGACY_SYSCALL_VECTOR
+#else
+        .if vec >= FIRST_DYNAMIC_VECTOR
+#endif
 
         ALIGN
 1:      pushq $0
