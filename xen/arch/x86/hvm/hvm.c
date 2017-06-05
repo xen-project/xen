@@ -802,49 +802,49 @@ static int hvm_save_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
         ctxt.cs_sel = seg.sel;
         ctxt.cs_limit = seg.limit;
         ctxt.cs_base = seg.base;
-        ctxt.cs_arbytes = seg.attr.bytes;
+        ctxt.cs_arbytes = seg.attr;
 
         hvm_get_segment_register(v, x86_seg_ds, &seg);
         ctxt.ds_sel = seg.sel;
         ctxt.ds_limit = seg.limit;
         ctxt.ds_base = seg.base;
-        ctxt.ds_arbytes = seg.attr.bytes;
+        ctxt.ds_arbytes = seg.attr;
 
         hvm_get_segment_register(v, x86_seg_es, &seg);
         ctxt.es_sel = seg.sel;
         ctxt.es_limit = seg.limit;
         ctxt.es_base = seg.base;
-        ctxt.es_arbytes = seg.attr.bytes;
+        ctxt.es_arbytes = seg.attr;
 
         hvm_get_segment_register(v, x86_seg_ss, &seg);
         ctxt.ss_sel = seg.sel;
         ctxt.ss_limit = seg.limit;
         ctxt.ss_base = seg.base;
-        ctxt.ss_arbytes = seg.attr.bytes;
+        ctxt.ss_arbytes = seg.attr;
 
         hvm_get_segment_register(v, x86_seg_fs, &seg);
         ctxt.fs_sel = seg.sel;
         ctxt.fs_limit = seg.limit;
         ctxt.fs_base = seg.base;
-        ctxt.fs_arbytes = seg.attr.bytes;
+        ctxt.fs_arbytes = seg.attr;
 
         hvm_get_segment_register(v, x86_seg_gs, &seg);
         ctxt.gs_sel = seg.sel;
         ctxt.gs_limit = seg.limit;
         ctxt.gs_base = seg.base;
-        ctxt.gs_arbytes = seg.attr.bytes;
+        ctxt.gs_arbytes = seg.attr;
 
         hvm_get_segment_register(v, x86_seg_tr, &seg);
         ctxt.tr_sel = seg.sel;
         ctxt.tr_limit = seg.limit;
         ctxt.tr_base = seg.base;
-        ctxt.tr_arbytes = seg.attr.bytes;
+        ctxt.tr_arbytes = seg.attr;
 
         hvm_get_segment_register(v, x86_seg_ldtr, &seg);
         ctxt.ldtr_sel = seg.sel;
         ctxt.ldtr_limit = seg.limit;
         ctxt.ldtr_base = seg.base;
-        ctxt.ldtr_arbytes = seg.attr.bytes;
+        ctxt.ldtr_arbytes = seg.attr;
 
         if ( v->fpu_initialised )
         {
@@ -1056,49 +1056,49 @@ static int hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
     seg.sel = ctxt.cs_sel;
     seg.limit = ctxt.cs_limit;
     seg.base = ctxt.cs_base;
-    seg.attr.bytes = ctxt.cs_arbytes;
+    seg.attr = ctxt.cs_arbytes;
     hvm_set_segment_register(v, x86_seg_cs, &seg);
 
     seg.sel = ctxt.ds_sel;
     seg.limit = ctxt.ds_limit;
     seg.base = ctxt.ds_base;
-    seg.attr.bytes = ctxt.ds_arbytes;
+    seg.attr = ctxt.ds_arbytes;
     hvm_set_segment_register(v, x86_seg_ds, &seg);
 
     seg.sel = ctxt.es_sel;
     seg.limit = ctxt.es_limit;
     seg.base = ctxt.es_base;
-    seg.attr.bytes = ctxt.es_arbytes;
+    seg.attr = ctxt.es_arbytes;
     hvm_set_segment_register(v, x86_seg_es, &seg);
 
     seg.sel = ctxt.ss_sel;
     seg.limit = ctxt.ss_limit;
     seg.base = ctxt.ss_base;
-    seg.attr.bytes = ctxt.ss_arbytes;
+    seg.attr = ctxt.ss_arbytes;
     hvm_set_segment_register(v, x86_seg_ss, &seg);
 
     seg.sel = ctxt.fs_sel;
     seg.limit = ctxt.fs_limit;
     seg.base = ctxt.fs_base;
-    seg.attr.bytes = ctxt.fs_arbytes;
+    seg.attr = ctxt.fs_arbytes;
     hvm_set_segment_register(v, x86_seg_fs, &seg);
 
     seg.sel = ctxt.gs_sel;
     seg.limit = ctxt.gs_limit;
     seg.base = ctxt.gs_base;
-    seg.attr.bytes = ctxt.gs_arbytes;
+    seg.attr = ctxt.gs_arbytes;
     hvm_set_segment_register(v, x86_seg_gs, &seg);
 
     seg.sel = ctxt.tr_sel;
     seg.limit = ctxt.tr_limit;
     seg.base = ctxt.tr_base;
-    seg.attr.bytes = ctxt.tr_arbytes;
+    seg.attr = ctxt.tr_arbytes;
     hvm_set_segment_register(v, x86_seg_tr, &seg);
 
     seg.sel = ctxt.ldtr_sel;
     seg.limit = ctxt.ldtr_limit;
     seg.base = ctxt.ldtr_base;
-    seg.attr.bytes = ctxt.ldtr_arbytes;
+    seg.attr = ctxt.ldtr_arbytes;
     hvm_set_segment_register(v, x86_seg_ldtr, &seg);
 
     /* Cover xsave-absent save file restoration on xsave-capable host. */
@@ -1961,9 +1961,9 @@ int hvm_set_efer(uint64_t value)
          * When LME becomes set, clobber %cs.L to keep the guest firmly in
          * compatibility mode until it reloads %cs itself.
          */
-        if ( cs.attr.fields.l )
+        if ( cs.l )
         {
-            cs.attr.fields.l = 0;
+            cs.l = 0;
             hvm_set_segment_register(v, x86_seg_cs, &cs);
         }
     }
@@ -2425,14 +2425,14 @@ bool_t hvm_virtual_to_linear_addr(
             goto out;
     }
     else if ( hvm_long_mode_active(curr) &&
-              (is_x86_system_segment(seg) || active_cs->attr.fields.l) )
+              (is_x86_system_segment(seg) || active_cs->l) )
     {
         /*
          * User segments are always treated as present.  System segment may
          * not be, and also incur limit checks.
          */
         if ( is_x86_system_segment(seg) &&
-             (!reg->attr.fields.p || (offset + bytes - !!bytes) > reg->limit) )
+             (!reg->p || (offset + bytes - !!bytes) > reg->limit) )
             goto out;
 
         /*
@@ -2460,20 +2460,20 @@ bool_t hvm_virtual_to_linear_addr(
         addr = (uint32_t)(addr + reg->base);
 
         /* Segment not valid for use (cooked meaning of .p)? */
-        if ( !reg->attr.fields.p )
+        if ( !reg->p )
             goto out;
 
         /* Read/write restrictions only exist for user segments. */
-        if ( reg->attr.fields.s )
+        if ( reg->s )
         {
             switch ( access_type )
             {
             case hvm_access_read:
-                if ( (reg->attr.fields.type & 0xa) == 0x8 )
+                if ( (reg->type & 0xa) == 0x8 )
                     goto out; /* execute-only code segment */
                 break;
             case hvm_access_write:
-                if ( (reg->attr.fields.type & 0xa) != 0x2 )
+                if ( (reg->type & 0xa) != 0x2 )
                     goto out; /* not a writable data segment */
                 break;
             default:
@@ -2484,10 +2484,10 @@ bool_t hvm_virtual_to_linear_addr(
         last_byte = (uint32_t)offset + bytes - !!bytes;
 
         /* Is this a grows-down data segment? Special limit check if so. */
-        if ( reg->attr.fields.s && (reg->attr.fields.type & 0xc) == 0x4 )
+        if ( reg->s && (reg->type & 0xc) == 0x4 )
         {
             /* Is upper limit 0xFFFF or 0xFFFFFFFF? */
-            if ( !reg->attr.fields.db )
+            if ( !reg->db )
                 last_byte = (uint16_t)last_byte;
 
             /* Check first byte and last byte against respective bounds. */
@@ -2683,7 +2683,7 @@ static int hvm_load_segment_selector(
         segr.sel = sel;
         segr.base = (uint32_t)sel << 4;
         segr.limit = 0xffffu;
-        segr.attr.bytes = 0xf3;
+        segr.attr = 0xf3;
         hvm_set_segment_register(v, seg, &segr);
         return 0;
     }
@@ -2707,7 +2707,7 @@ static int hvm_load_segment_selector(
         v, (sel & 4) ? x86_seg_ldtr : x86_seg_gdtr, &desctab);
 
     /* Segment not valid for use (cooked meaning of .p)? */
-    if ( !desctab.attr.fields.p )
+    if ( !desctab.p )
         goto fail;
 
     /* Check against descriptor table limit. */
@@ -2785,10 +2785,10 @@ static int hvm_load_segment_selector(
     segr.base = (((desc.b <<  0) & 0xff000000u) |
                  ((desc.b << 16) & 0x00ff0000u) |
                  ((desc.a >> 16) & 0x0000ffffu));
-    segr.attr.bytes = (((desc.b >>  8) & 0x00ffu) |
-                       ((desc.b >> 12) & 0x0f00u));
+    segr.attr = (((desc.b >>  8) & 0x00ffu) |
+                 ((desc.b >> 12) & 0x0f00u));
     segr.limit = (desc.b & 0x000f0000u) | (desc.a & 0x0000ffffu);
-    if ( segr.attr.fields.g )
+    if ( segr.g )
         segr.limit = (segr.limit << 12) | 0xfffu;
     segr.sel = sel;
     hvm_set_segment_register(v, seg, &segr);
@@ -2886,13 +2886,13 @@ void hvm_task_switch(
     tr.base = (((tss_desc.b <<  0) & 0xff000000u) |
                ((tss_desc.b << 16) & 0x00ff0000u) |
                ((tss_desc.a >> 16) & 0x0000ffffu));
-    tr.attr.bytes = (((tss_desc.b >>  8) & 0x00ffu) |
-                     ((tss_desc.b >> 12) & 0x0f00u));
+    tr.attr = (((tss_desc.b >>  8) & 0x00ffu) |
+               ((tss_desc.b >> 12) & 0x0f00u));
     tr.limit = (tss_desc.b & 0x000f0000u) | (tss_desc.a & 0x0000ffffu);
-    if ( tr.attr.fields.g )
+    if ( tr.g )
         tr.limit = (tr.limit << 12) | 0xfffu;
 
-    if ( tr.attr.fields.type != ((taskswitch_reason == TSW_iret) ? 0xb : 0x9) )
+    if ( tr.type != ((taskswitch_reason == TSW_iret) ? 0xb : 0x9) )
     {
         hvm_inject_hw_exception(
             (taskswitch_reason == TSW_iret) ? TRAP_invalid_tss : TRAP_gp_fault,
@@ -2900,7 +2900,7 @@ void hvm_task_switch(
         goto out;
     }
 
-    if ( !tr.attr.fields.p )
+    if ( !tr.p )
     {
         hvm_inject_hw_exception(TRAP_no_segment, tss_sel & 0xfff8);
         goto out;
@@ -3018,7 +3018,7 @@ void hvm_task_switch(
             goto out;
     }
 
-    tr.attr.fields.type = 0xb; /* busy 32-bit tss */
+    tr.type = 0xb; /* busy 32-bit tss */
     hvm_set_segment_register(v, x86_seg_tr, &tr);
 
     v->arch.hvm_vcpu.guest_cr[0] |= X86_CR0_TS;
@@ -3038,9 +3038,9 @@ void hvm_task_switch(
         unsigned int opsz, sp;
 
         hvm_get_segment_register(v, x86_seg_cs, &cs);
-        opsz = cs.attr.fields.db ? 4 : 2;
+        opsz = cs.db ? 4 : 2;
         hvm_get_segment_register(v, x86_seg_ss, &segr);
-        if ( segr.attr.fields.db )
+        if ( segr.db )
             sp = regs->esp -= opsz;
         else
             sp = regs->sp -= opsz;
@@ -3660,7 +3660,7 @@ void hvm_ud_intercept(struct cpu_user_regs *regs)
     if ( opt_hvm_fep )
     {
         const struct segment_register *cs = &ctxt.seg_reg[x86_seg_cs];
-        uint32_t walk = (ctxt.seg_reg[x86_seg_ss].attr.fields.dpl == 3)
+        uint32_t walk = (ctxt.seg_reg[x86_seg_ss].dpl == 3)
             ? PFEC_user_mode : 0;
         unsigned long addr;
         char sig[5]; /* ud2; .ascii "xen" */
@@ -3676,7 +3676,7 @@ void hvm_ud_intercept(struct cpu_user_regs *regs)
             regs->eflags &= ~X86_EFLAGS_RF;
 
             /* Zero the upper 32 bits of %rip if not in 64bit mode. */
-            if ( !(hvm_long_mode_active(cur) && cs->attr.fields.l) )
+            if ( !(hvm_long_mode_active(cur) && cs->l) )
                 regs->rip = regs->eip;
 
             add_taint(TAINT_HVM_FEP);
@@ -3828,25 +3828,25 @@ void hvm_vcpu_reset_state(struct vcpu *v, uint16_t cs, uint16_t ip)
     reg.sel = cs;
     reg.base = (uint32_t)reg.sel << 4;
     reg.limit = 0xffff;
-    reg.attr.bytes = 0x09b;
+    reg.attr = 0x9b;
     hvm_set_segment_register(v, x86_seg_cs, &reg);
 
     reg.sel = reg.base = 0;
     reg.limit = 0xffff;
-    reg.attr.bytes = 0x093;
+    reg.attr = 0x93;
     hvm_set_segment_register(v, x86_seg_ds, &reg);
     hvm_set_segment_register(v, x86_seg_es, &reg);
     hvm_set_segment_register(v, x86_seg_fs, &reg);
     hvm_set_segment_register(v, x86_seg_gs, &reg);
     hvm_set_segment_register(v, x86_seg_ss, &reg);
 
-    reg.attr.bytes = 0x82; /* LDT */
+    reg.attr = 0x82; /* LDT */
     hvm_set_segment_register(v, x86_seg_ldtr, &reg);
 
-    reg.attr.bytes = 0x8b; /* 32-bit TSS (busy) */
+    reg.attr = 0x8b; /* 32-bit TSS (busy) */
     hvm_set_segment_register(v, x86_seg_tr, &reg);
 
-    reg.attr.bytes = 0;
+    reg.attr = 0;
     hvm_set_segment_register(v, x86_seg_gdtr, &reg);
     hvm_set_segment_register(v, x86_seg_idtr, &reg);
 
@@ -4787,8 +4787,8 @@ void hvm_get_segment_register(struct vcpu *v, enum x86_segment seg,
     {
     case x86_seg_ss:
         /* SVM may retain %ss.DB when %ss is loaded with a NULL selector. */
-        if ( !reg->attr.fields.p )
-            reg->attr.fields.db = 0;
+        if ( !reg->p )
+            reg->db = 0;
         break;
 
     case x86_seg_tr:
@@ -4796,14 +4796,14 @@ void hvm_get_segment_register(struct vcpu *v, enum x86_segment seg,
          * SVM doesn't track %tr.B. Architecturally, a loaded TSS segment will
          * always be busy.
          */
-        reg->attr.fields.type |= 0x2;
+        reg->type |= 0x2;
 
         /*
          * %cs and %tr are unconditionally present.  SVM ignores these present
          * bits and will happily run without them set.
          */
     case x86_seg_cs:
-        reg->attr.fields.p = 1;
+        reg->p = 1;
         break;
 
     case x86_seg_gdtr:
@@ -4812,21 +4812,21 @@ void hvm_get_segment_register(struct vcpu *v, enum x86_segment seg,
          * Treat GDTR/IDTR as being present system segments.  This avoids them
          * needing special casing for segmentation checks.
          */
-        reg->attr.bytes = 0x80;
+        reg->attr = 0x80;
         break;
 
     default: /* Avoid triggering -Werror=switch */
         break;
     }
 
-    if ( reg->attr.fields.p )
+    if ( reg->p )
     {
         /*
          * For segments which are present/usable, cook the system flag.  SVM
          * ignores the S bit on all segments and will happily run with them in
          * any state.
          */
-        reg->attr.fields.s = is_x86_user_segment(seg);
+        reg->s = is_x86_user_segment(seg);
 
         /*
          * SVM discards %cs.G on #VMEXIT.  Other user segments do have .G
@@ -4836,14 +4836,14 @@ void hvm_get_segment_register(struct vcpu *v, enum x86_segment seg,
          *
          * Unconditionally recalculate G.
          */
-        reg->attr.fields.g = !!(reg->limit >> 20);
+        reg->g = !!(reg->limit >> 20);
 
         /*
          * SVM doesn't track the Accessed flag.  It will always be set for
          * usable user segments loaded into the descriptor cache.
          */
         if ( is_x86_user_segment(seg) )
-            reg->attr.fields.type |= 0x1;
+            reg->type |= 0x1;
     }
 }
 
@@ -4851,25 +4851,25 @@ void hvm_set_segment_register(struct vcpu *v, enum x86_segment seg,
                               struct segment_register *reg)
 {
     /* Set G to match the limit field.  VT-x cares, while SVM doesn't. */
-    if ( reg->attr.fields.p )
-        reg->attr.fields.g = !!(reg->limit >> 20);
+    if ( reg->p )
+        reg->g = !!(reg->limit >> 20);
 
     switch ( seg )
     {
     case x86_seg_cs:
-        ASSERT(reg->attr.fields.p);                  /* Usable. */
-        ASSERT(reg->attr.fields.s);                  /* User segment. */
-        ASSERT(reg->attr.fields.type & 0x1);         /* Accessed. */
+        ASSERT(reg->p);                              /* Usable. */
+        ASSERT(reg->s);                              /* User segment. */
+        ASSERT(reg->type & 0x1);                     /* Accessed. */
         ASSERT((reg->base >> 32) == 0);              /* Upper bits clear. */
         break;
 
     case x86_seg_ss:
-        if ( reg->attr.fields.p )
+        if ( reg->p )
         {
-            ASSERT(reg->attr.fields.s);              /* User segment. */
-            ASSERT(!(reg->attr.fields.type & 0x8));  /* Data segment. */
-            ASSERT(reg->attr.fields.type & 0x2);     /* Writeable. */
-            ASSERT(reg->attr.fields.type & 0x1);     /* Accessed. */
+            ASSERT(reg->s);                          /* User segment. */
+            ASSERT(!(reg->type & 0x8));              /* Data segment. */
+            ASSERT(reg->type & 0x2);                 /* Writeable. */
+            ASSERT(reg->type & 0x1);                 /* Accessed. */
             ASSERT((reg->base >> 32) == 0);          /* Upper bits clear. */
         }
         break;
@@ -4878,14 +4878,14 @@ void hvm_set_segment_register(struct vcpu *v, enum x86_segment seg,
     case x86_seg_es:
     case x86_seg_fs:
     case x86_seg_gs:
-        if ( reg->attr.fields.p )
+        if ( reg->p )
         {
-            ASSERT(reg->attr.fields.s);              /* User segment. */
+            ASSERT(reg->s);                          /* User segment. */
 
-            if ( reg->attr.fields.type & 0x8 )
-                ASSERT(reg->attr.fields.type & 0x2); /* Readable. */
+            if ( reg->type & 0x8 )
+                ASSERT(reg->type & 0x2);             /* Readable. */
 
-            ASSERT(reg->attr.fields.type & 0x1);     /* Accessed. */
+            ASSERT(reg->type & 0x1);                 /* Accessed. */
 
             if ( seg == x86_seg_fs || seg == x86_seg_gs )
                 ASSERT(is_canonical_address(reg->base));
@@ -4895,23 +4895,23 @@ void hvm_set_segment_register(struct vcpu *v, enum x86_segment seg,
         break;
 
     case x86_seg_tr:
-        ASSERT(reg->attr.fields.p);                  /* Usable. */
-        ASSERT(!reg->attr.fields.s);                 /* System segment. */
+        ASSERT(reg->p);                              /* Usable. */
+        ASSERT(!reg->s);                             /* System segment. */
         ASSERT(!(reg->sel & 0x4));                   /* !TI. */
-        if ( reg->attr.fields.type == SYS_DESC_tss_busy )
+        if ( reg->type == SYS_DESC_tss_busy )
             ASSERT(is_canonical_address(reg->base));
-        else if ( reg->attr.fields.type == SYS_DESC_tss16_busy )
+        else if ( reg->type == SYS_DESC_tss16_busy )
             ASSERT((reg->base >> 32) == 0);
         else
             ASSERT(!"%tr typecheck failure");
         break;
 
     case x86_seg_ldtr:
-        if ( reg->attr.fields.p )
+        if ( reg->p )
         {
-            ASSERT(!reg->attr.fields.s);             /* System segment. */
+            ASSERT(!reg->s);                         /* System segment. */
             ASSERT(!(reg->sel & 0x4));               /* !TI. */
-            ASSERT(reg->attr.fields.type == SYS_DESC_ldt);
+            ASSERT(reg->type == SYS_DESC_ldt);
             ASSERT(is_canonical_address(reg->base));
         }
         break;

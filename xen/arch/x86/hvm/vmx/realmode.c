@@ -70,7 +70,7 @@ static void realmode_deliver_exception(
     frame[2] = regs->flags & ~X86_EFLAGS_RF;
 
     /* We can't test hvmemul_ctxt->ctxt.sp_size: it may not be initialised. */
-    if ( hvmemul_ctxt->seg_reg[x86_seg_ss].attr.fields.db )
+    if ( hvmemul_ctxt->seg_reg[x86_seg_ss].db )
         pstk = regs->esp -= 6;
     else
         pstk = regs->sp -= 6;
@@ -207,13 +207,13 @@ void vmx_realmode(struct cpu_user_regs *regs)
          * DS, ES, FS and GS the most uninvasive trick is to set DPL == RPL.
          */
         sreg = hvmemul_get_seg_reg(x86_seg_ds, &hvmemul_ctxt);
-        sreg->attr.fields.dpl = sreg->sel & 3;
+        sreg->dpl = sreg->sel & 3;
         sreg = hvmemul_get_seg_reg(x86_seg_es, &hvmemul_ctxt);
-        sreg->attr.fields.dpl = sreg->sel & 3;
+        sreg->dpl = sreg->sel & 3;
         sreg = hvmemul_get_seg_reg(x86_seg_fs, &hvmemul_ctxt);
-        sreg->attr.fields.dpl = sreg->sel & 3;
+        sreg->dpl = sreg->sel & 3;
         sreg = hvmemul_get_seg_reg(x86_seg_gs, &hvmemul_ctxt);
-        sreg->attr.fields.dpl = sreg->sel & 3;
+        sreg->dpl = sreg->sel & 3;
         hvmemul_ctxt.seg_reg_dirty |=
             (1ul << x86_seg_ds) | (1ul << x86_seg_es) |
             (1ul << x86_seg_fs) | (1ul << x86_seg_gs);

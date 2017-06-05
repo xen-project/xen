@@ -158,12 +158,12 @@ static int construct_vmcb(struct vcpu *v)
     vmcb->gs.base = 0;
 
     /* Guest segment AR bytes. */
-    vmcb->es.attr.bytes = 0xc93; /* read/write, accessed */
-    vmcb->ss.attr.bytes = 0xc93;
-    vmcb->ds.attr.bytes = 0xc93;
-    vmcb->fs.attr.bytes = 0xc93;
-    vmcb->gs.attr.bytes = 0xc93;
-    vmcb->cs.attr.bytes = 0xc9b; /* exec/read, accessed */
+    vmcb->es.attr = 0xc93; /* read/write, accessed */
+    vmcb->ss.attr = 0xc93;
+    vmcb->ds.attr = 0xc93;
+    vmcb->fs.attr = 0xc93;
+    vmcb->gs.attr = 0xc93;
+    vmcb->cs.attr = 0xc9b; /* exec/read, accessed */
 
     /* Guest IDT. */
     vmcb->idtr.base = 0;
@@ -177,10 +177,10 @@ static int construct_vmcb(struct vcpu *v)
     vmcb->ldtr.sel = 0;
     vmcb->ldtr.base = 0;
     vmcb->ldtr.limit = 0;
-    vmcb->ldtr.attr.bytes = 0;
+    vmcb->ldtr.attr = 0;
 
     /* Guest TSS. */
-    vmcb->tr.attr.bytes = 0x08b; /* 32-bit TSS (busy) */
+    vmcb->tr.attr = 0x08b; /* 32-bit TSS (busy) */
     vmcb->tr.base = 0;
     vmcb->tr.limit = 0xff;
 

@@ -973,7 +973,7 @@ do {                                                                    \
         ASSERT(!ctxt->lma);                                             \
         generate_exception_if((ip) > (cs)->limit, EXC_GP, 0);           \
     } else                                                              \
-        generate_exception_if(ctxt->lma && (cs)->attr.fields.l          \
+        generate_exception_if(ctxt->lma && (cs)->l                      \
                               ? !is_canonical_address(ip)               \
                               : (ip) > (cs)->limit, EXC_GP, 0);         \
 })
@@ -1414,7 +1414,7 @@ get_cpl(
          ops->read_segment(x86_seg_ss, &reg, ctxt) )
         return -1;
 
-    return reg.attr.fields.dpl;
+    return reg.dpl;
 }
 
 static int
@@ -1470,7 +1470,7 @@ static int ioport_access_check(
         return rc == X86EMUL_DONE ? X86EMUL_OKAY : rc;
 
     /* Ensure the TSS has an io-bitmap-offset field. */
-    generate_exception_if(tr.attr.fields.type != 0xb, EXC_GP, 0);
+    generate_exception_if(tr.type != 0xb, EXC_GP, 0);
 
     switch ( rc = read_ulong(x86_seg_tr, 0x66, &iobmp, 2, ctxt, ops) )
     {
@@ -1693,12 +1693,12 @@ protmode_load_seg(
              ops->read_segment(seg, sreg, ctxt) != X86EMUL_OKAY )
             memset(sreg, 0, sizeof(*sreg));
         else
-            sreg->attr.bytes = 0;
+            sreg->attr = 0;
         sreg->sel = sel;
 
         /* Since CPL == SS.DPL, we need to put back DPL. */
         if ( seg == x86_seg_ss )
-            sreg->attr.fields.dpl = sel;
+            sreg->dpl = sel;
 
         return X86EMUL_OKAY;
     }
@@ -1873,10 +1873,10 @@ protmode_load_seg(
                   ((desc.b <<  0) & 0xff000000u) |
                   ((desc.b << 16) & 0x00ff0000u) |
                   ((desc.a >> 16) & 0x0000ffffu));
-    sreg->attr.bytes = (((desc.b >>  8) & 0x00ffu) |
-                        ((desc.b >> 12) & 0x0f00u));
+    sreg->attr = (((desc.b >>  8) & 0x00ffu) |
+                  ((desc.b >> 12) & 0x0f00u));
     sreg->limit = (desc.b & 0x000f0000u) | (desc.a & 0x0000ffffu);
-    if ( sreg->attr.fields.g )
+    if ( sreg->g )
         sreg->limit = (sreg->limit << 12) | 0xfffu;
     sreg->sel = sel;
     return X86EMUL_OKAY;
@@ -4964,9 +4964,9 @@ x86_emulate(
                                             &sreg, ctxt, ops) )
             {
             case X86EMUL_OKAY:
-                if ( sreg.attr.fields.s &&
-                     ((modrm_reg & 1) ? ((sreg.attr.fields.type & 0xa) == 0x2)
-                                      : ((sreg.attr.fields.type & 0xa) != 0x8)) )
+                if ( sreg.s &&
+                     ((modrm_reg & 1) ? ((sreg.type & 0xa) == 0x2)
+                                      : ((sreg.type & 0xa) != 0x8)) )
                     _regs.eflags |= X86_EFLAGS_ZF;
                 break;
             case X86EMUL_EXCEPTION:
@@ -5189,9 +5189,9 @@ x86_emulate(
                                         ctxt, ops) )
         {
         case X86EMUL_OKAY:
-            if ( !sreg.attr.fields.s )
+            if ( !sreg.s )
             {
-                switch ( sreg.attr.fields.type )
+                switch ( sreg.type )
                 {
                 case 0x01: /* available 16-bit TSS */
                 case 0x03: /* busy 16-bit TSS */
@@ -5223,10 +5223,9 @@ x86_emulate(
             break;
         }
         if ( _regs.eflags & X86_EFLAGS_ZF )
-            dst.val = ((sreg.attr.bytes & 0xff) << 8) |
-                      ((sreg.limit >> (sreg.attr.fields.g ? 12 : 0)) &
-                       0xf0000) |
-                      ((sreg.attr.bytes & 0xf00) << 12);
+            dst.val = ((sreg.attr & 0xff) << 8) |
+                      ((sreg.limit >> (sreg.g ? 12 : 0)) & 0xf0000) |
+                      ((sreg.attr & 0xf00) << 12);
         else
             dst.type = OP_NONE;
         break;
@@ -5238,9 +5237,9 @@ x86_emulate(
                                         ctxt, ops) )
         {
         case X86EMUL_OKAY:
-            if ( !sreg.attr.fields.s )
+            if ( !sreg.s )
             {
-                switch ( sreg.attr.fields.type )
+                switch ( sreg.type )
                 {
                 case 0x01: /* available 16-bit TSS */
                 case 0x03: /* busy 16-bit TSS */
@@ -5291,12 +5290,12 @@ x86_emulate(
 
         cs.base = sreg.base = 0; /* flat segment */
         cs.limit = sreg.limit = ~0u;  /* 4GB limit */
-        sreg.attr.bytes = 0xc93; /* G+DB+P+S+Data */
+        sreg.attr = 0xc93; /* G+DB+P+S+Data */
 
 #ifdef __x86_64__
         if ( ctxt->lma )
         {
-            cs.attr.bytes = 0xa9b; /* L+DB+P+S+Code */
+            cs.attr = 0xa9b; /* L+DB+P+S+Code */
 
             _regs.rcx = _regs.rip;
             _regs.r11 = _regs.eflags & ~X86_EFLAGS_RF;
@@ -5314,7 +5313,7 @@ x86_emulate(
         else
 #endif
         {
-            cs.attr.bytes = 0xc9b; /* G+DB+P+S+Code */
+            cs.attr = 0xc9b; /* G+DB+P+S+Code */
 
             _regs.r(cx) = _regs.eip;
             _regs.eip = msr_val;
@@ -5747,13 +5746,13 @@ x86_emulate(
         cs.sel = msr_val & ~3; /* SELECTOR_RPL_MASK */
         cs.base = 0;   /* flat segment */
         cs.limit = ~0u;  /* 4GB limit */
-        cs.attr.bytes = ctxt->lma ? 0xa9b  /* G+L+P+S+Code */
-                                  : 0xc9b; /* G+DB+P+S+Code */
+        cs.attr = ctxt->lma ? 0xa9b  /* G+L+P+S+Code */
+                            : 0xc9b; /* G+DB+P+S+Code */
 
         sreg.sel = cs.sel + 8;
         sreg.base = 0;   /* flat segment */
         sreg.limit = ~0u;  /* 4GB limit */
-        sreg.attr.bytes = 0xc93; /* G+DB+P+S+Data */
+        sreg.attr = 0xc93; /* G+DB+P+S+Data */
 
         fail_if(ops->write_segment == NULL);
         if ( (rc = ops->write_segment(x86_seg_cs, &cs, ctxt)) != 0 ||
@@ -5793,13 +5792,13 @@ x86_emulate(
                  (op_bytes == 8 ? 32 : 16);
         cs.base = 0;   /* flat segment */
         cs.limit = ~0u;  /* 4GB limit */
-        cs.attr.bytes = op_bytes == 8 ? 0xafb  /* L+DB+P+DPL3+S+Code */
-                                      : 0xcfb; /* G+DB+P+DPL3+S+Code */
+        cs.attr = op_bytes == 8 ? 0xafb  /* L+DB+P+DPL3+S+Code */
+                                : 0xcfb; /* G+DB+P+DPL3+S+Code */
 
         sreg.sel = cs.sel + 8;
         sreg.base = 0;   /* flat segment */
         sreg.limit = ~0u;  /* 4GB limit */
-        sreg.attr.bytes = 0xcf3; /* G+DB+P+DPL3+S+Data */
+        sreg.attr = 0xcf3; /* G+DB+P+DPL3+S+Data */
 
         fail_if(ops->write_segment == NULL);
         if ( (rc = ops->write_segment(x86_seg_cs, &cs, ctxt)) != 0 ||

@@ -176,7 +176,7 @@ void vm_event_fill_regs(vm_event_request_t *req)
     req->data.regs.x86.gs_base = seg.base;
 
     hvm_get_segment_register(curr, x86_seg_cs, &seg);
-    req->data.regs.x86.cs_arbytes = seg.attr.bytes;
+    req->data.regs.x86.cs_arbytes = seg.attr;
 }
 
 void vm_event_emulate_check(struct vcpu *v, vm_event_response_t *rsp)

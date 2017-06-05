@@ -264,7 +264,7 @@ static int read_segment(
     if ( !is_x86_user_segment(seg) )
         return X86EMUL_UNHANDLEABLE;
     memset(reg, 0, sizeof(*reg));
-    reg->attr.fields.p = 1;
+    reg->p = 1;
     return X86EMUL_OKAY;
 }
 

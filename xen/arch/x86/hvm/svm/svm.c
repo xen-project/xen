@@ -526,9 +526,9 @@ static int svm_guest_x86_mode(struct vcpu *v)
         return 0;
     if ( unlikely(guest_cpu_user_regs()->eflags & X86_EFLAGS_VM) )
         return 1;
-    if ( hvm_long_mode_active(v) && likely(vmcb->cs.attr.fields.l) )
+    if ( hvm_long_mode_active(v) && likely(vmcb->cs.l) )
         return 8;
-    return (likely(vmcb->cs.attr.fields.db) ? 4 : 2);
+    return likely(vmcb->cs.db) ? 4 : 2;
 }
 
 void svm_update_guest_cr(struct vcpu *v, unsigned int cr)
@@ -653,7 +653,7 @@ static void svm_get_segment_register(struct vcpu *v, enum x86_segment seg,
         break;
     case x86_seg_ss:
         *reg = vmcb->ss;
-        reg->attr.fields.dpl = vmcb_get_cpl(vmcb);
+        reg->dpl = vmcb_get_cpl(vmcb);
         break;
     case x86_seg_tr:
         svm_sync_vmcb(v);
@@ -726,7 +726,7 @@ static void svm_set_segment_register(struct vcpu *v, enum x86_segment seg,
         break;
     case x86_seg_ss:
         vmcb->ss = *reg;
-        vmcb_set_cpl(vmcb, reg->attr.fields.dpl);
+        vmcb_set_cpl(vmcb, reg->dpl);
         break;
     case x86_seg_tr:
         vmcb->tr = *reg;
@@ -1442,7 +1442,7 @@ static void svm_inject_event(const struct x86_event *event)
      * If injecting an event outside of 64bit mode, zero the upper bits of the
      * %eip and nextrip after the adjustments above.
      */
-    if ( !((vmcb_get_efer(vmcb) & EFER_LMA) && vmcb->cs.attr.fields.l) )
+    if ( !((vmcb_get_efer(vmcb) & EFER_LMA) && vmcb->cs.l) )
     {
         regs->rip = regs->eip;
         vmcb->nextrip = (uint32_t)vmcb->nextrip;

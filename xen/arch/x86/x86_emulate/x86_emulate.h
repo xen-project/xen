@@ -83,33 +83,26 @@ struct x86_event {
     unsigned long cr2;          /* Only for TRAP_page_fault h/w exception */
 };
 
-/* 
- * Attribute for segment selector. This is a copy of bit 40:47 & 52:55 of the
- * segment descriptor. It happens to match the format of an AMD SVM VMCB.
- */
-typedef union segment_attributes {
-    uint16_t bytes;
-    struct
-    {
-        uint16_t type:4;    /* 0;  Bit 40-43 */
-        uint16_t s:   1;    /* 4;  Bit 44 */
-        uint16_t dpl: 2;    /* 5;  Bit 45-46 */
-        uint16_t p:   1;    /* 7;  Bit 47 */
-        uint16_t avl: 1;    /* 8;  Bit 52 */
-        uint16_t l:   1;    /* 9;  Bit 53 */
-        uint16_t db:  1;    /* 10; Bit 54 */
-        uint16_t g:   1;    /* 11; Bit 55 */
-        uint16_t pad: 4;
-    } fields;
-} segment_attributes_t;
-
 /*
  * Full state of a segment register (visible and hidden portions).
- * Again, this happens to match the format of an AMD SVM VMCB.
+ * Chosen to match the format of an AMD SVM VMCB.
  */
 struct segment_register {
     uint16_t   sel;
-    segment_attributes_t attr;
+    union {
+        uint16_t attr;
+        struct {
+            uint16_t type:4;
+            uint16_t s:   1;
+            uint16_t dpl: 2;
+            uint16_t p:   1;
+            uint16_t avl: 1;
+            uint16_t l:   1;
+            uint16_t db:  1;
+            uint16_t g:   1;
+            uint16_t pad: 4;
+        };
+    };
     uint32_t   limit;
     uint64_t   base;
 };

@@ -304,7 +304,7 @@ void vpmu_do_interrupt(struct cpu_user_regs *regs)
                 r->cs = seg.sel;
                 hvm_get_segment_register(sampled, x86_seg_ss, &seg);
                 r->ss = seg.sel;
-                r->cpl = seg.attr.fields.dpl;
+                r->cpl = seg.dpl;
                 if ( !(sampled->arch.hvm_vcpu.guest_cr[0] & X86_CR0_PE) )
                     *flags |= PMU_SAMPLE_REAL;
             }

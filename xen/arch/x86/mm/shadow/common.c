@@ -332,13 +332,13 @@ const struct x86_emulate_ops *shadow_init_emulation(
     creg = hvm_get_seg_reg(x86_seg_cs, sh_ctxt);
 
     /* Work out the emulation mode. */
-    if ( sh_ctxt->ctxt.lma && creg->attr.fields.l )
+    if ( sh_ctxt->ctxt.lma && creg->l )
         sh_ctxt->ctxt.addr_size = sh_ctxt->ctxt.sp_size = 64;
     else
     {
         sreg = hvm_get_seg_reg(x86_seg_ss, sh_ctxt);
-        sh_ctxt->ctxt.addr_size = creg->attr.fields.db ? 32 : 16;
-        sh_ctxt->ctxt.sp_size   = sreg->attr.fields.db ? 32 : 16;
+        sh_ctxt->ctxt.addr_size = creg->db ? 32 : 16;
+        sh_ctxt->ctxt.sp_size   = sreg->db ? 32 : 16;
     }
 
     /* Attempt to prefetch whole instruction. */

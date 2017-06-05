@@ -24,7 +24,7 @@
 static void svm_dump_sel(const char *name, const struct segment_register *s)
 {
     printk("%s: %04x %04x %08x %016"PRIx64"\n",
-           name, s->sel, s->attr.bytes, s->limit, s->base);
+           name, s->sel, s->attr, s->limit, s->base);
 }
 
 void svm_vmcb_dump(const char *from, const struct vmcb_struct *vmcb)
@@ -147,7 +147,7 @@ bool svm_vmcb_isvalid(const char *from, const struct vmcb_struct *vmcb,
     }
 
     if ( (efer & EFER_LME) && (cr0 & X86_CR0_PG) && (cr4 & X86_CR4_PAE) &&
-         vmcb->cs.attr.fields.l && vmcb->cs.attr.fields.db )
+         vmcb->cs.l && vmcb->cs.db )
         PRINTF("EFER_LME, CR0.PG, CR4.PAE, CS.L and CS.D are all non-zero\n");
 
     if ( !(vmcb_get_general2_intercepts(vmcb) & GENERAL2_INTERCEPT_VMRUN) )

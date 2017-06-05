@@ -479,7 +479,7 @@ static int priv_op_read_segment(enum x86_segment seg,
             return X86EMUL_UNHANDLEABLE;
 
         reg->limit = limit;
-        reg->attr.bytes = ar >> 8;
+        reg->attr = ar >> 8;
     }
     else
     {
@@ -500,19 +500,19 @@ static int priv_op_read_segment(enum x86_segment seg,
 
         reg->limit = ~0U;
 
-        reg->attr.bytes = 0;
-        reg->attr.fields.type = _SEGMENT_WR >> 8;
+        reg->attr = 0;
+        reg->type = _SEGMENT_WR >> 8;
         if ( seg == x86_seg_cs )
         {
-            reg->attr.fields.type |= _SEGMENT_CODE >> 8;
-            reg->attr.fields.l = 1;
+            reg->type |= _SEGMENT_CODE >> 8;
+            reg->l = 1;
         }
         else
-            reg->attr.fields.db = 1;
-        reg->attr.fields.s   = 1;
-        reg->attr.fields.dpl = 3;
-        reg->attr.fields.p   = 1;
-        reg->attr.fields.g   = 1;
+            reg->db = 1;
+        reg->s   = 1;
+        reg->dpl = 3;
+        reg->p   = 1;
+        reg->g   = 1;
     }
 
     /*
@@ -521,9 +521,9 @@ static int priv_op_read_segment(enum x86_segment seg,
      */
     if ( (seg == x86_seg_ss ||
           (seg == x86_seg_cs &&
-           !(reg->attr.fields.type & (_SEGMENT_EC >> 8)))) &&
+           !(reg->type & (_SEGMENT_EC >> 8)))) &&
          guest_kernel_mode(current, ctxt->regs) )
-        reg->attr.fields.dpl = 0;
+        reg->dpl = 0;
 
     return X86EMUL_OKAY;
 }
@@ -578,11 +578,11 @@ static int priv_op_rep_ins(uint16_t port,
     if ( rc != X86EMUL_OKAY )
         return rc;
 
-    if ( !sreg.attr.fields.p )
+    if ( !sreg.p )
         return X86EMUL_UNHANDLEABLE;
-    if ( !sreg.attr.fields.s ||
-         (sreg.attr.fields.type & (_SEGMENT_CODE >> 8)) ||
-         !(sreg.attr.fields.type & (_SEGMENT_WR >> 8)) )
+    if ( !sreg.s ||
+         (sreg.type & (_SEGMENT_CODE >> 8)) ||
+         !(sreg.type & (_SEGMENT_WR >> 8)) )
     {
         x86_emul_hw_exception(TRAP_gp_fault, 0, ctxt);
         return X86EMUL_EXCEPTION;
@@ -643,11 +643,11 @@ static int priv_op_rep_outs(enum x86_segment seg, unsigned long offset,
     if ( rc != X86EMUL_OKAY )
         return rc;
 
-    if ( !sreg.attr.fields.p )
+    if ( !sreg.p )
         return X86EMUL_UNHANDLEABLE;
-    if ( !sreg.attr.fields.s ||
-         ((sreg.attr.fields.type & (_SEGMENT_CODE >> 8)) &&
-          !(sreg.attr.fields.type & (_SEGMENT_WR >> 8))) )
+    if ( !sreg.s ||
+         ((sreg.type & (_SEGMENT_CODE >> 8)) &&
+          !(sreg.type & (_SEGMENT_WR >> 8))) )
     {
         x86_emul_hw_exception(seg != x86_seg_ss ? TRAP_gp_fault
                                                 : TRAP_stack_error,

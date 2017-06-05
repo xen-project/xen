@@ -27,13 +27,13 @@
 static int check_segment(struct segment_register *reg, enum x86_segment seg)
 {
 
-    if ( reg->attr.fields.pad != 0 )
+    if ( reg->pad != 0 )
     {
         gprintk(XENLOG_ERR, "Segment attribute bits 12-15 are not zero\n");
         return -EINVAL;
     }
 
-    if ( reg->attr.bytes == 0 )
+    if ( reg->attr == 0 )
     {
         if ( seg != x86_seg_ds && seg != x86_seg_es )
         {
@@ -45,26 +45,26 @@ static int check_segment(struct segment_register *reg, enum x86_segment seg)
 
     if ( seg == x86_seg_tr )
     {
-        if ( reg->attr.fields.s )
+        if ( reg->s )
         {
             gprintk(XENLOG_ERR, "Code or data segment provided for TR\n");
             return -EINVAL;
         }
 
-        if ( reg->attr.fields.type != SYS_DESC_tss_busy )
+        if ( reg->type != SYS_DESC_tss_busy )
         {
             gprintk(XENLOG_ERR, "Non-32-bit-TSS segment provided for TR\n");
             return -EINVAL;
         }
     }
-    else if ( !reg->attr.fields.s )
+    else if ( !reg->s )
     {
         gprintk(XENLOG_ERR,
                 "System segment provided for a code or data segment\n");
         return -EINVAL;
     }
 
-    if ( !reg->attr.fields.p )
+    if ( !reg->p )
     {
         gprintk(XENLOG_ERR, "Non-present segment provided\n");
         return -EINVAL;
@@ -73,7 +73,7 @@ static int check_segment(struct segment_register *reg, enum x86_segment seg)
     switch ( seg )
     {
     case x86_seg_cs:
-        if ( !(reg->attr.fields.type & 0x8) )
+        if ( !(reg->type & 0x8) )
         {
             gprintk(XENLOG_ERR, "Non-code segment provided for CS\n");
             return -EINVAL;
@@ -81,7 +81,7 @@ static int check_segment(struct segment_register *reg, enum x86_segment seg)
         break;
 
     case x86_seg_ss:
-        if ( (reg->attr.fields.type & 0x8) || !(reg->attr.fields.type & 0x2) )
+        if ( (reg->type & 0x8) || !(reg->type & 0x2) )
         {
             gprintk(XENLOG_ERR, "Non-writeable segment provided for SS\n");
             return -EINVAL;
@@ -90,7 +90,7 @@ static int check_segment(struct segment_register *reg, enum x86_segment seg)
 
     case x86_seg_ds:
     case x86_seg_es:
-        if ( (reg->attr.fields.type & 0x8) && !(reg->attr.fields.type & 0x2) )
+        if ( (reg->type & 0x8) && !(reg->type & 0x2) )
         {
             gprintk(XENLOG_ERR, "Non-readable segment provided for DS or ES\n");
             return -EINVAL;
@@ -136,12 +136,11 @@ int arch_set_info_hvm_guest(struct vcpu *v, const vcpu_hvm_context_t *ctx)
             return -EINVAL;
 
 #define SEG(s, r) ({                                                        \
-    s = (struct segment_register){ .base = (r)->s ## _base,                 \
-                                   .limit = (r)->s ## _limit,               \
-                                   .attr.bytes = (r)->s ## _ar };           \
+    s = (struct segment_register)                                           \
+        { 0, { (r)->s ## _ar }, (r)->s ## _base, (r)->s ## _limit };        \
     /* Set accessed / busy bit for present segments. */                     \
-    if ( s.attr.fields.p )                                                  \
-        s.attr.fields.type |= (x86_seg_##s != x86_seg_tr ? 1 : 2);          \
+    if ( s.p )                                                              \
+        s.type |= (x86_seg_##s != x86_seg_tr ? 1 : 2);                      \
     check_segment(&s, x86_seg_ ## s); })
 
         rc = SEG(cs, regs);
@@ -156,7 +155,7 @@ int arch_set_info_hvm_guest(struct vcpu *v, const vcpu_hvm_context_t *ctx)
 
         /* Basic sanity checks. */
         limit = cs.limit;
-        if ( cs.attr.fields.g )
+        if ( cs.g )
             limit = (limit << 12) | 0xfff;
         if ( regs->eip > limit )
         {
@@ -165,24 +164,24 @@ int arch_set_info_hvm_guest(struct vcpu *v, const vcpu_hvm_context_t *ctx)
             return -EINVAL;
         }
 
-        if ( ss.attr.fields.dpl != cs.attr.fields.dpl )
+        if ( ss.dpl != cs.dpl )
         {
             gprintk(XENLOG_ERR, "SS.DPL (%u) is different than CS.DPL (%u)\n",
-                    ss.attr.fields.dpl, cs.attr.fields.dpl);
+                    ss.dpl, cs.dpl);
             return -EINVAL;
         }
 
-        if ( ds.attr.fields.p && ds.attr.fields.dpl > cs.attr.fields.dpl )
+        if ( ds.p && ds.dpl > cs.dpl )
         {
             gprintk(XENLOG_ERR, "DS.DPL (%u) is greater than CS.DPL (%u)\n",
-                    ds.attr.fields.dpl, cs.attr.fields.dpl);
+                    ds.dpl, cs.dpl);
             return -EINVAL;
         }
 
-        if ( es.attr.fields.p && es.attr.fields.dpl > cs.attr.fields.dpl )
+        if ( es.p && es.dpl > cs.dpl )
         {
             gprintk(XENLOG_ERR, "ES.DPL (%u) is greater than CS.DPL (%u)\n",
-                    es.attr.fields.dpl, cs.attr.fields.dpl);
+                    es.dpl, cs.dpl);
             return -EINVAL;
         }
 
@@ -260,7 +259,7 @@ int arch_set_info_hvm_guest(struct vcpu *v, const vcpu_hvm_context_t *ctx)
         v->arch.hvm_vcpu.guest_cr[4] = regs->cr4;
         v->arch.hvm_vcpu.guest_efer  = regs->efer;
 
-#define SEG(l, a) (struct segment_register){ .limit = (l), .attr.bytes = (a) }
+#define SEG(l, a) (struct segment_register){ 0, { a }, l, 0 }
         cs = SEG(~0u, 0xa9b); /* 64bit code segment. */
         ds = ss = es = SEG(~0u, 0xc93);
         tr = SEG(0x67, 0x8b); /* 64bit TSS (busy). */

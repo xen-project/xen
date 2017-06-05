@@ -583,7 +583,7 @@ static bool in_longmode(struct x86_emulate_ctxt *ctxt)
     const struct fuzz_state *s = ctxt->data;
     const struct fuzz_corpus *c = s->corpus;
 
-    return long_mode_active(ctxt) && c->segments[x86_seg_cs].attr.fields.l;
+    return long_mode_active(ctxt) && c->segments[x86_seg_cs].l;
 }
 
 static void set_sizes(struct x86_emulate_ctxt *ctxt)
@@ -597,8 +597,8 @@ static void set_sizes(struct x86_emulate_ctxt *ctxt)
         ctxt->addr_size = ctxt->sp_size = 64;
     else
     {
-        ctxt->addr_size = c->segments[x86_seg_cs].attr.fields.db ? 32 : 16;
-        ctxt->sp_size   = c->segments[x86_seg_ss].attr.fields.db ? 32 : 16;
+        ctxt->addr_size = c->segments[x86_seg_cs].db ? 32 : 16;
+        ctxt->sp_size   = c->segments[x86_seg_ss].db ? 32 : 16;
     }
 }
 
@@ -741,8 +741,8 @@ static void sanitize_input(struct x86_emulate_ctxt *ctxt)
     /* EFLAGS.VM implies 16-bit mode */
     if ( regs->rflags & X86_EFLAGS_VM )
     {
-        c->segments[x86_seg_cs].attr.fields.db = 0;
-        c->segments[x86_seg_ss].attr.fields.db = 0;
+        c->segments[x86_seg_cs].db = 0;
+        c->segments[x86_seg_ss].db = 0;
     }
 }
 

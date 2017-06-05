@@ -1069,24 +1069,20 @@ static unsigned int _vmx_get_cpl(struct vcpu *v)
     return cpl;
 }
 
-/* SDM volume 3b section 22.3.1.2: we can only enter virtual 8086 mode
- * if all of CS, SS, DS, ES, FS and GS are 16bit ring-3 data segments.
- * The guest thinks it's got ring-0 segments, so we need to fudge
- * things.  We store the ring-3 version in the VMCS to avoid lots of
- * shuffling on vmenter and vmexit, and translate in these accessors. */
-
-#define rm_cs_attr (((union segment_attributes) {                       \
-        .fields = { .type = 0xb, .s = 1, .dpl = 0, .p = 1, .avl = 0,    \
-                    .l = 0, .db = 0, .g = 0, .pad = 0 } }).bytes)
-#define rm_ds_attr (((union segment_attributes) {                       \
-        .fields = { .type = 0x3, .s = 1, .dpl = 0, .p = 1, .avl = 0,    \
-                    .l = 0, .db = 0, .g = 0, .pad = 0 } }).bytes)
-#define vm86_ds_attr (((union segment_attributes) {                     \
-        .fields = { .type = 0x3, .s = 1, .dpl = 3, .p = 1, .avl = 0,    \
-                    .l = 0, .db = 0, .g = 0, .pad = 0 } }).bytes)
-#define vm86_tr_attr (((union segment_attributes) {                     \
-        .fields = { .type = 0xb, .s = 0, .dpl = 0, .p = 1, .avl = 0,    \
-                    .l = 0, .db = 0, .g = 0, .pad = 0 } }).bytes)
+/*
+ * SDM Vol 3: VM Entries > Checks on Guest Segment Registers:
+ *
+ * We can only enter virtual 8086 mode if all of CS, SS, DS, ES, FS and GS are
+ * 16bit ring-3 data segments.  On hardware lacking the unrestricted_guest
+ * feature, Xen fakes up real mode using vm86 mode.  The guest thinks it's got
+ * ring-0 segments, so we need to fudge things.  We store the ring-3 version
+ * in the VMCS to avoid lots of shuffling on vmenter and vmexit, and translate
+ * in these accessors.
+ */
+#define rm_cs_attr   0x9b
+#define rm_ds_attr   0x93
+#define vm86_ds_attr 0xf3
+#define vm86_tr_attr 0x8b
 
 static void vmx_get_segment_register(struct vcpu *v, enum x86_segment seg,
                                      struct segment_register *reg)
@@ -1157,7 +1153,7 @@ static void vmx_get_segment_register(struct vcpu *v, enum x86_segment seg,
      * Fold VT-x representation into Xen's representation.  The Present bit is
      * unconditionally set to the inverse of unusable.
      */
-    reg->attr.bytes =
+    reg->attr =
         (!(attr & (1u << 16)) << 7) | (attr & 0x7f) | ((attr >> 4) & 0xf00);
 
     /* Adjust for virtual 8086 mode */
@@ -1176,7 +1172,7 @@ static void vmx_get_segment_register(struct vcpu *v, enum x86_segment seg,
              * but for SS we assume it has: the Ubuntu graphical bootloader
              * does this and gets badly confused if we leave the old SS in 
              * place. */
-            reg->attr.bytes = (seg == x86_seg_cs ? rm_cs_attr : rm_ds_attr);
+            reg->attr = (seg == x86_seg_cs ? rm_cs_attr : rm_ds_attr);
             *sreg = *reg;
         }
         else 
@@ -1196,7 +1192,7 @@ static void vmx_set_segment_register(struct vcpu *v, enum x86_segment seg,
     uint64_t base;
 
     sel = reg->sel;
-    attr = reg->attr.bytes;
+    attr = reg->attr;
     limit = reg->limit;
     base = reg->base;
 
@@ -1234,8 +1230,7 @@ static void vmx_set_segment_register(struct vcpu *v, enum x86_segment seg,
              * cause confusion for the guest if it reads the selector,
              * but otherwise we have to emulate if *any* segment hasn't
              * been reloaded. */
-            if ( base < 0x100000 && !(base & 0xf) && limit >= 0xffff
-                 && reg->attr.fields.p )
+            if ( base < 0x100000 && !(base & 0xf) && limit >= 0xffff && reg->p )
             {
                 sel = base >> 4;
                 attr = vm86_ds_attr;
