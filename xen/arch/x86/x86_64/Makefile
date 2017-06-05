@@ -1,7 +1,6 @@
 subdir-y += compat
 
 obj-bin-y += entry.o
-obj-bin-y += gpr_switch.o
 obj-y += traps.o
 obj-$(CONFIG_KEXEC) += machine_kexec.o
 obj-y += pci.o
