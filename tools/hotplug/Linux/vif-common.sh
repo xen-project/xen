@@ -120,6 +120,38 @@ fi
 ip=${ip:-}
 ip=$(xenstore_read_default "$XENBUS_PATH/ip" "$ip")
 
+IPTABLES_WAIT_RUNE="-w"
+IPTABLES_WAIT_RUNE_CHECKED=false
+
+# When iptables introduced locking, in the event of lock contention,
+# they made "fail" rather than "wait for the lock" the default
+# behavior.  In order to select "wait for the lock" behavior, you have
+# to add the '-w' parameter.  Unfortunately, both the locking and the
+# option were only introduced in 2013, and older versions of iptables
+# will fail if the '-w' parameter is included (since they don't
+# recognize it).  So check to see if it's supported the first time we
+# use it.
+iptables_w()
+{
+    if ! $IPTABLES_WAIT_RUNE_CHECKED ; then
+	iptables $IPTABLES_WAIT_RUNE -L -n >& /dev/null
+	if [[ $? == 0 ]] ; then
+	    # If we succeed, then -w is supported; don't check again
+	    IPTABLES_WAIT_RUNE_CHECKED=true
+	elif [[ $? == 2 ]] ; then
+	    iptables -L -n >& /dev/null
+	    if [[ $? != 2 ]] ; then
+		# If we fail with PARAMETER_PROBLEM (2) with -w and
+		# don't fail with PARAMETER_PROBLEM without it, then
+		# it's the -w option
+		IPTABLES_WAIT_RUNE_CHECKED=true
+		IPTABLES_WAIT_RUNE=""
+	    fi
+	fi
+    fi
+    iptables $IPTABLES_WAIT_RUNE "$@"
+}
+
 frob_iptable()
 {
   if [ "$command" == "online" -o "$command" == "add" ]
@@ -129,9 +161,9 @@ frob_iptable()
     local c="-D"
   fi
 
-  iptables "$c" FORWARD -m physdev --physdev-is-bridged --physdev-in "$dev" \
+  iptables_w "$c" FORWARD -m physdev --physdev-is-bridged --physdev-in "$dev" \
     "$@" -j ACCEPT 2>/dev/null &&
-  iptables "$c" FORWARD -m physdev --physdev-is-bridged --physdev-out "$dev" \
+  iptables_w "$c" FORWARD -m physdev --physdev-is-bridged --physdev-out "$dev" \
     -j ACCEPT 2>/dev/null
 
   if [ \( "$command" == "online" -o "$command" == "add" \) -a $? -ne 0 ]
@@ -154,7 +186,7 @@ handle_iptable()
   # binary is not sufficient, because the user may not have the appropriate
   # modules installed.  If iptables is not working, then there's no need to do
   # anything with it, so we can just return.
-  if ! iptables -L -n >&/dev/null
+  if ! iptables_w -L -n >&/dev/null
   then
     return
   fi
