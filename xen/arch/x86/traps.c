@@ -1487,25 +1487,6 @@ void __init do_early_page_fault(struct cpu_user_regs *regs)
     }
 }
 
-long do_fpu_taskswitch(int set)
-{
-    struct vcpu *v = current;
-
-    if ( set )
-    {
-        v->arch.pv_vcpu.ctrlreg[0] |= X86_CR0_TS;
-        stts();
-    }
-    else
-    {
-        v->arch.pv_vcpu.ctrlreg[0] &= ~X86_CR0_TS;
-        if ( v->fpu_dirtied )
-            clts();
-    }
-
-    return 0;
-}
-
 void do_general_protection(struct cpu_user_regs *regs)
 {
     struct vcpu *v = current;
@@ -2295,31 +2276,6 @@ long set_debugreg(struct vcpu *v, unsigned int reg, unsigned long value)
 
     v->arch.debugreg[reg] = value;
     return 0;
-}
-
-long do_set_debugreg(int reg, unsigned long value)
-{
-    return set_debugreg(current, reg, value);
-}
-
-unsigned long do_get_debugreg(int reg)
-{
-    struct vcpu *curr = current;
-
-    switch ( reg )
-    {
-    case 0 ... 3:
-    case 6:
-        return curr->arch.debugreg[reg];
-    case 7:
-        return (curr->arch.debugreg[7] |
-                curr->arch.debugreg[5]);
-    case 4 ... 5:
-        return ((curr->arch.pv_vcpu.ctrlreg[4] & X86_CR4_DE) ?
-                curr->arch.debugreg[reg + 2] : 0);
-    }
-
-    return -EINVAL;
 }
 
 void asm_domain_crash_synchronous(unsigned long addr)
