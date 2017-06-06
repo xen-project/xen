@@ -200,4 +200,9 @@ bool_t cpu_has_pending_apic_eoi(void);
 
 static inline void arch_move_irqs(struct vcpu *v) { }
 
+struct msi_info;
+int allocate_and_map_gsi_pirq(struct domain *d, int index, int *pirq_p);
+int allocate_and_map_msi_pirq(struct domain *d, int index, int *pirq_p,
+                              int type, struct msi_info *msi);
+
 #endif /* _ASM_HW_IRQ_H */

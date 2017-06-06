@@ -2537,3 +2537,166 @@ bool_t hvm_domain_use_pirq(const struct domain *d, const struct pirq *pirq)
     return is_hvm_domain(d) && pirq &&
            pirq->arch.hvm.emuirq != IRQ_UNBOUND; 
 }
+
+static int allocate_pirq(struct domain *d, int index, int pirq, int irq,
+                         int type, int *nr)
+{
+    int current_pirq;
+
+    ASSERT(spin_is_locked(&d->event_lock));
+    current_pirq = domain_irq_to_pirq(d, irq);
+    if ( pirq < 0 )
+    {
+        if ( current_pirq )
+        {
+            dprintk(XENLOG_G_ERR, "dom%d: %d:%d already mapped to %d\n",
+                    d->domain_id, index, pirq, current_pirq);
+            if ( current_pirq < 0 )
+                return -EBUSY;
+        }
+        else if ( type == MAP_PIRQ_TYPE_MULTI_MSI )
+        {
+            if ( *nr <= 0 || *nr > 32 )
+                return -EDOM;
+            if ( *nr != 1 && !iommu_intremap )
+                return -EOPNOTSUPP;
+
+            while ( *nr & (*nr - 1) )
+                *nr += *nr & -*nr;
+            pirq = get_free_pirqs(d, *nr);
+            if ( pirq < 0 )
+            {
+                while ( (*nr >>= 1) > 1 )
+                    if ( get_free_pirqs(d, *nr) > 0 )
+                        break;
+                dprintk(XENLOG_G_ERR, "dom%d: no block of %d free pirqs\n",
+                        d->domain_id, *nr << 1);
+            }
+        }
+        else
+        {
+            pirq = get_free_pirq(d, type);
+            if ( pirq < 0 )
+                dprintk(XENLOG_G_ERR, "dom%d: no free pirq\n", d->domain_id);
+        }
+    }
+    else if ( current_pirq && pirq != current_pirq )
+    {
+        dprintk(XENLOG_G_ERR, "dom%d: irq %d already mapped to pirq %d\n",
+                d->domain_id, irq, current_pirq);
+        return -EEXIST;
+    }
+
+    return pirq;
+}
+
+int allocate_and_map_gsi_pirq(struct domain *d, int index, int *pirq_p)
+{
+    int irq, pirq, ret;
+
+    if ( index < 0 || index >= nr_irqs_gsi )
+    {
+        dprintk(XENLOG_G_ERR, "dom%d: map invalid irq %d\n", d->domain_id,
+                index);
+        return -EINVAL;
+    }
+
+    irq = domain_pirq_to_irq(current->domain, index);
+    if ( irq <= 0 )
+    {
+        if ( is_hardware_domain(current->domain) )
+            irq = index;
+        else
+        {
+            dprintk(XENLOG_G_ERR, "dom%d: map pirq with incorrect irq!\n",
+                    d->domain_id);
+            return -EINVAL;
+        }
+    }
+
+    /* Verify or get pirq. */
+    spin_lock(&d->event_lock);
+    pirq = allocate_pirq(d, index, *pirq_p, irq, MAP_PIRQ_TYPE_GSI, NULL);
+    if ( pirq < 0 )
+    {
+        ret = pirq;
+        goto done;
+    }
+
+    ret = map_domain_pirq(d, pirq, irq, MAP_PIRQ_TYPE_GSI, NULL);
+    if ( !ret )
+        *pirq_p = pirq;
+
+ done:
+    spin_unlock(&d->event_lock);
+
+    return ret;
+}
+
+int allocate_and_map_msi_pirq(struct domain *d, int index, int *pirq_p,
+                              int type, struct msi_info *msi)
+{
+    int irq, pirq, ret;
+
+    switch ( type )
+    {
+    case MAP_PIRQ_TYPE_MSI:
+        if ( !msi->table_base )
+            msi->entry_nr = 1;
+        irq = index;
+        if ( irq == -1 )
+        {
+    case MAP_PIRQ_TYPE_MULTI_MSI:
+            irq = create_irq(NUMA_NO_NODE);
+        }
+
+        if ( irq < nr_irqs_gsi || irq >= nr_irqs )
+        {
+            dprintk(XENLOG_G_ERR, "dom%d: can't create irq for msi!\n",
+                    d->domain_id);
+            return -EINVAL;
+        }
+
+        msi->irq = irq;
+        break;
+
+    default:
+        dprintk(XENLOG_G_ERR, "dom%d: wrong pirq type %x\n",
+                d->domain_id, type);
+        ASSERT_UNREACHABLE();
+        return -EINVAL;
+    }
+
+    msi->irq = irq;
+
+    pcidevs_lock();
+    /* Verify or get pirq. */
+    spin_lock(&d->event_lock);
+    pirq = allocate_pirq(d, index, *pirq_p, irq, type, &msi->entry_nr);
+    if ( pirq < 0 )
+    {
+        ret = pirq;
+        goto done;
+    }
+
+    ret = map_domain_pirq(d, pirq, irq, type, msi);
+    if ( !ret )
+        *pirq_p = pirq;
+
+ done:
+    spin_unlock(&d->event_lock);
+    pcidevs_unlock();
+    if ( ret )
+    {
+        switch ( type )
+        {
+        case MAP_PIRQ_TYPE_MSI:
+            if ( index == -1 )
+        case MAP_PIRQ_TYPE_MULTI_MSI:
+                destroy_irq(irq);
+            break;
+        }
+    }
+
+    return ret;
+}
