@@ -248,8 +248,7 @@ static void hap_clean_dirty_bitmap(struct domain *d)
 /************************************************/
 static struct page_info *hap_alloc(struct domain *d)
 {
-    struct page_info *pg = NULL;
-    void *p;
+    struct page_info *pg;
 
     ASSERT(paging_locked_by_me(d));
 
@@ -259,9 +258,7 @@ static struct page_info *hap_alloc(struct domain *d)
 
     d->arch.paging.hap.free_pages--;
 
-    p = __map_domain_page(pg);
-    clear_page(p);
-    unmap_domain_page(p);
+    clear_domain_page(page_to_mfn(pg));
 
     return pg;
 }
