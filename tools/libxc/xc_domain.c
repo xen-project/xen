@@ -1672,7 +1672,6 @@ int xc_domain_update_msi_irq(
     domctl.domain = (domid_t)domid;
 
     bind = &(domctl.u.bind_pt_irq);
-    bind->hvm_domid = domid;
     bind->irq_type = PT_IRQ_TYPE_MSI;
     bind->machine_irq = pirq;
     bind->u.msi.gvec = gvec;
@@ -1699,7 +1698,6 @@ int xc_domain_unbind_msi_irq(
     domctl.domain = (domid_t)domid;
 
     bind = &(domctl.u.bind_pt_irq);
-    bind->hvm_domid = domid;
     bind->irq_type = PT_IRQ_TYPE_MSI;
     bind->machine_irq = pirq;
     bind->u.msi.gvec = gvec;
@@ -1729,7 +1727,6 @@ static int xc_domain_bind_pt_irq_int(
     domctl.domain = (domid_t)domid;
 
     bind = &(domctl.u.bind_pt_irq);
-    bind->hvm_domid = domid;
     bind->irq_type = irq_type;
     bind->machine_irq = machine_irq;
     switch ( irq_type )
@@ -1788,7 +1785,6 @@ static int xc_domain_unbind_pt_irq_int(
     domctl.domain = (domid_t)domid;
 
     bind = &(domctl.u.bind_pt_irq);
-    bind->hvm_domid = domid;
     bind->irq_type = irq_type;
     bind->machine_irq = machine_irq;
     switch ( irq_type )

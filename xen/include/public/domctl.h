@@ -37,7 +37,7 @@
 #include "hvm/save.h"
 #include "memory.h"
 
-#define XEN_DOMCTL_INTERFACE_VERSION 0x0000000d
+#define XEN_DOMCTL_INTERFACE_VERSION 0x0000000e
 
 /*
  * NB. xen_domctl.domain is an IN/OUT parameter for this operation.
@@ -559,7 +559,6 @@ typedef enum pt_irq_type_e {
 struct xen_domctl_bind_pt_irq {
     uint32_t machine_irq;
     pt_irq_type_t irq_type;
-    uint32_t hvm_domid;
 
     union {
         struct {
