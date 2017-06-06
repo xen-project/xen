@@ -1003,14 +1003,12 @@ bool_t vlapic_msr_set(struct vlapic *vlapic, uint64_t value)
         }
         else
         {
-            if ( unlikely(vlapic_x2apic_mode(vlapic)) )
-                return 0;
             vlapic->hw.disabled |= VLAPIC_HW_DISABLED;
             pt_may_unmask_irq(vlapic_domain(vlapic), NULL);
         }
     }
-    else if ( !(value & MSR_IA32_APICBASE_ENABLE) &&
-              unlikely(value & MSR_IA32_APICBASE_EXTD) )
+    else if ( ((vlapic->hw.apic_base_msr ^ value) & MSR_IA32_APICBASE_EXTD) &&
+              unlikely(!vlapic_xapic_mode(vlapic)) )
         return 0;
 
     vlapic->hw.apic_base_msr = value;
