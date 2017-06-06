@@ -1180,8 +1180,6 @@ guest_physmap_mark_populate_on_demand(struct domain *d, unsigned long gfn,
 {
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
     unsigned long i, n, pod_count = 0;
-    p2m_type_t ot;
-    mfn_t omfn;
     int rc = 0;
 
     if ( !paging_mode_translate(d) )
@@ -1194,10 +1192,11 @@ guest_physmap_mark_populate_on_demand(struct domain *d, unsigned long gfn,
     /* Make sure all gpfns are unused */
     for ( i = 0; i < (1UL << order); i += n )
     {
+        p2m_type_t ot;
         p2m_access_t a;
         unsigned int cur_order;
 
-        omfn = p2m->get_entry(p2m, gfn + i, &ot, &a, 0, &cur_order, NULL);
+        p2m->get_entry(p2m, gfn + i, &ot, &a, 0, &cur_order, NULL);
         n = 1UL << min(order, cur_order);
         if ( p2m_is_ram(ot) )
         {
