@@ -119,6 +119,17 @@ tools/firmware/ovmf-dir-force-update:
 install-docs:
 	$(MAKE) -C docs install
 
+# We only have build-tests install-tests, not uninstall-tests etc.
+.PHONY: build-tests
+build-tests: build-xen
+	export BASEDIR=$(XEN_ROOT)/xen; \
+	$(MAKE) -f $$BASEDIR/Rules.mk -C xen/test build
+
+.PHONY: install-tests
+install-tests: install-xen
+	export BASEDIR=$(XEN_ROOT)/xen; \
+	$(MAKE) -f $$BASEDIR/Rules.mk -C xen/test install
+
 # build xen and the tools and place them in the install
 # directory. 'make install' should then copy them to the normal system
 # directories
