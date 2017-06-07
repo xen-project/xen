@@ -1,7 +1,13 @@
-.PHONY: tests
-tests:
-	$(MAKE) -f $(BASEDIR)/Rules.mk -C livepatch livepatch
 
-.PHONY: clean
-clean::
-	$(MAKE) -f $(BASEDIR)/Rules.mk -C livepatch clean
+tests all: build
+
+
+ifneq ($(XEN_TARGET_ARCH),x86_32)
+# Xen 32-bit x86 hypervisor no longer supported, so has no test livepatches
+SUBDIRS += livepatch
+endif
+
+%:
+	set -e; for s in $(SUBDIRS); do \
+		$(MAKE) -f $(BASEDIR)/Rules.mk -C $$s $*; \
+	done
