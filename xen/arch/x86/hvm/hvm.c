@@ -2616,11 +2616,11 @@ static void hvm_unmap_entry(void *p)
 }
 
 static int hvm_load_segment_selector(
-    enum x86_segment seg, uint16_t sel, unsigned int eflags)
+    enum x86_segment seg, uint16_t sel, unsigned int cpl, unsigned int eflags)
 {
     struct segment_register desctab, segr;
     struct desc_struct *pdesc, desc;
-    u8 dpl, rpl, cpl;
+    u8 dpl, rpl;
     bool_t writable;
     int fault_type = TRAP_invalid_tss;
     struct vcpu *v = current;
@@ -2674,7 +2674,6 @@ static int hvm_load_segment_selector(
 
         dpl = (desc.b >> 13) & 3;
         rpl = sel & 3;
-        cpl = hvm_get_cpl(v);
 
         switch ( seg )
         {
@@ -2804,7 +2803,7 @@ void hvm_task_switch(
     struct segment_register gdt, tr, prev_tr, segr;
     struct desc_struct *optss_desc = NULL, *nptss_desc = NULL, tss_desc;
     bool_t otd_writable, ntd_writable;
-    unsigned int eflags;
+    unsigned int eflags, new_cpl;
     pagefault_info_t pfinfo;
     int exn_raised, rc;
     struct tss32 tss;
@@ -2918,7 +2917,9 @@ void hvm_task_switch(
     if ( rc != HVMCOPY_okay )
         goto out;
 
-    if ( hvm_load_segment_selector(x86_seg_ldtr, tss.ldt, 0) )
+    new_cpl = tss.eflags & X86_EFLAGS_VM ? 3 : tss.cs & 3;
+
+    if ( hvm_load_segment_selector(x86_seg_ldtr, tss.ldt, new_cpl, 0) )
         goto out;
 
     rc = hvm_set_cr3(tss.cr3, 1);
@@ -2939,12 +2940,12 @@ void hvm_task_switch(
     regs->rdi    = tss.edi;
 
     exn_raised = 0;
-    if ( hvm_load_segment_selector(x86_seg_es, tss.es, tss.eflags) ||
-         hvm_load_segment_selector(x86_seg_cs, tss.cs, tss.eflags) ||
-         hvm_load_segment_selector(x86_seg_ss, tss.ss, tss.eflags) ||
-         hvm_load_segment_selector(x86_seg_ds, tss.ds, tss.eflags) ||
-         hvm_load_segment_selector(x86_seg_fs, tss.fs, tss.eflags) ||
-         hvm_load_segment_selector(x86_seg_gs, tss.gs, tss.eflags) )
+    if ( hvm_load_segment_selector(x86_seg_es, tss.es, new_cpl, tss.eflags) ||
+         hvm_load_segment_selector(x86_seg_cs, tss.cs, new_cpl, tss.eflags) ||
+         hvm_load_segment_selector(x86_seg_ss, tss.ss, new_cpl, tss.eflags) ||
+         hvm_load_segment_selector(x86_seg_ds, tss.ds, new_cpl, tss.eflags) ||
+         hvm_load_segment_selector(x86_seg_fs, tss.fs, new_cpl, tss.eflags) ||
+         hvm_load_segment_selector(x86_seg_gs, tss.gs, new_cpl, tss.eflags) )
         exn_raised = 1;
 
     if ( taskswitch_reason == TSW_call_or_int )
