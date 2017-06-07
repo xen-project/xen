@@ -273,7 +273,7 @@ MINIOS_UPSTREAM_REVISION ?= ca013fa9baf92f47469ba1f2e1aaa31c41d8a0bb
 # Tue Dec 13 15:02:02 2016 +0000
 # build: prepend OBJ_DIR to linker script
 
-SEABIOS_UPSTREAM_REVISION ?= rel-1.10.0
+SEABIOS_UPSTREAM_REVISION ?= rel-1.10.2
 # Wed Jun 22 14:53:24 2016 +0800
 # fw/msr_feature_control: add support to set MSR_IA32_FEATURE_CONTROL
 
