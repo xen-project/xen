@@ -49,7 +49,7 @@ static void __init assign_integer_param(
 
 static void __init _cmdline_parse(const char *cmdline)
 {
-    char opt[100], *optval, *optkey, *q;
+    char opt[128], *optval, *optkey, *q;
     const char *p = cmdline;
     const struct kernel_param *param;
     int bool_assert;
