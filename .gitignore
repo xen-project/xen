@@ -276,6 +276,7 @@ xen/include/xen/compile.h
 xen/test/livepatch/config.h
 xen/test/livepatch/xen_bye_world.livepatch
 xen/test/livepatch/xen_hello_world.livepatch
+xen/test/livepatch/xen_nop.livepatch
 xen/test/livepatch/xen_replace_world.livepatch
 xen/tools/kconfig/.tmp_gtkcheck
 xen/tools/kconfig/.tmp_qtcheck
