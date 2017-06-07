@@ -371,10 +371,6 @@ perms_strictly_increased(uint32_t old_flags, uint32_t new_flags)
     return ((of | (of ^ nf)) == nf);
 }
 
-#endif /* !__ASSEMBLY__ */
-
-#define PAGE_ALIGN(x) (((x) + PAGE_SIZE - 1) & PAGE_MASK)
-
 static inline void invalidate_icache(void)
 {
 /*
@@ -382,6 +378,10 @@ static inline void invalidate_icache(void)
  * coherent on x86.
  */
 }
+
+#endif /* !__ASSEMBLY__ */
+
+#define PAGE_ALIGN(x) (((x) + PAGE_SIZE - 1) & PAGE_MASK)
 
 #endif /* __X86_PAGE_H__ */
 
