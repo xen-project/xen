@@ -27,7 +27,7 @@ LIVEPATCHES += $(LIVEPATCH_NOP)
 
 LIVEPATCH_DEBUG_DIR ?= $(DEBUG_DIR)/xen-livepatch
 
-default: livepatch
+build default: livepatch
 
 install: livepatch
 	$(INSTALL_DIR) $(DESTDIR)$(LIVEPATCH_DEBUG_DIR)
