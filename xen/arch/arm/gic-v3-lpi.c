@@ -47,7 +47,7 @@ union host_lpi {
     struct {
         uint32_t virt_lpi;
         uint16_t dom_id;
-        uint16_t vcpu_id;
+        uint16_t pad;
     };
 };
 
@@ -417,7 +417,6 @@ int gicv3_allocate_host_lpi_block(struct domain *d, uint32_t *first_lpi)
          */
         hlpi.virt_lpi = INVALID_LPI;
         hlpi.dom_id = d->domain_id;
-        hlpi.vcpu_id = INVALID_VCPU_ID;
         write_u64_atomic(&lpi_data.host_lpis[chunk][lpi_idx + i].data,
                          hlpi.data);
 
