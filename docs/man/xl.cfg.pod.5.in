@@ -1,6 +1,6 @@
 =head1 NAME
 
-xl.cfg - XL Domain Configuration File Syntax
+xl.cfg - xl domain configuration file syntax
 
 =head1 SYNOPSIS
 
@@ -8,20 +8,21 @@ xl.cfg - XL Domain Configuration File Syntax
 
 =head1 DESCRIPTION
 
-To create a VM (a domain in Xen terminology, sometimes called a guest)
-with xl requires the provision of a domain config file.  Typically
-these live in `/etc/xen/DOMAIN.cfg` where DOMAIN is the name of the
+Creating a VM (a domain in Xen terminology, sometimes called a guest)
+with xl requires the provision of a domain configuration file.  Typically,
+these live in F</etc/xen/DOMAIN.cfg>, where DOMAIN is the name of the
 domain.
 
 =head1 SYNTAX
 
-A domain config file consists of a series of C<KEY=VALUE> pairs.
+A domain configuration file consists of a series of options, specified by
+using C<KEY=VALUE> pairs.
 
-Some C<KEY>s are mandatory, others are general options which apply to
-any guest type while others relate only to specific guest types
+Some C<KEY>s are mandatory, some are general options which apply to
+any guest type, while others relate only to specific guest types
 (e.g. PV or HVM guests).
 
-A value C<VALUE> is one of:
+A C<VALUE> can be one of:
 
 =over 4
 
@@ -33,7 +34,7 @@ STRING is part of a SPEC_STRING, the quotes should be omitted.
 =item B<NUMBER>
 
 A number, in either decimal, octal (using a C<0> prefix) or
-hexadecimal (using a C<0x> prefix).
+hexadecimal (using a C<0x> prefix) format.
 
 =item B<BOOLEAN>
 
@@ -42,12 +43,12 @@ value).
 
 =item B<[ VALUE, VALUE, ... ]>
 
-A list of C<VALUES> of the above types. Lists can be heterogeneous and
+A list of C<VALUE>s of the above types. Lists can be heterogeneous and
 nested.
 
 =back
 
-The semantics of each C<KEY> defines which form of C<VALUE> is required.
+The semantics of each C<KEY> defines which type of C<VALUE> is required.
 
 Pairs may be separated either by a newline or a semicolon.  Both
 of the following are valid:
@@ -61,7 +62,7 @@ of the following are valid:
 
 =head2 Mandatory Configuration Items
 
-The following key is mandatory for any guest type:
+The following key is mandatory for any guest type.
 
 =over 4
 
@@ -78,14 +79,14 @@ single host must be unique.
 
 =item B<builder="generic">
 
-Specifies that this is to be a PV domain. This is the default.
+Specifies that this is to be a PV domain, suitable for hosting Xen-aware guest
+operating systems. This is the default.
 
 =item B<builder="hvm">
 
 Specifies that this is to be an HVM domain.  That is, a fully
 virtualised computer with emulated BIOS, disk and network peripherals,
-etc.  The default is a PV domain, suitable for hosting Xen-aware guest
-operating systems.
+etc.
 
 =back
 
@@ -99,56 +100,56 @@ The following options apply to guests of any type.
 
 =item B<pool="CPUPOOLNAME">
 
-Put the guest's vcpus into the named cpu pool.
+Put the guest's vCPUs into the named CPU pool.
 
 =item B<vcpus=N>
 
-Start the guest with N vcpus initially online.
+Start the guest with N vCPUs initially online.
 
 =item B<maxvcpus=M>
 
-Allow the guest to bring up a maximum of M vcpus. At start of day if
-`vcpus=N` is less than `maxvcpus=M` then the first `N` vcpus will be
-created online and the remainder will be offline.
+Allow the guest to bring up a maximum of M vCPUs. When starting the guest, if
+B<vcpus=N> is less than B<maxvcpus=M> then the first B<N> vCPUs will be
+created online and the remainder will be created offline.
 
-=item B<cpus="CPU-LIST">
+=item B<cpus="CPULIST">
 
-List of which cpus the guest is allowed to use. Default is no pinning at
-all (more on this below). A C<CPU-LIST> may be specified as follows:
+List of host CPUs the guest is allowed to use. Default is no pinning at
+all (more on this below). A C<CPULIST> may be specified as follows:
 
 =over 4
 
 =item "all"
 
-To allow all the vcpus of the guest to run on all the cpus on the host.
+To allow all the vCPUs of the guest to run on all the CPUs on the host.
 
 =item "0-3,5,^1"
 
-To allow all the vcpus of the guest to run on cpus 0,2,3,5. Combining
-this with "all" is possible, meaning "all,^7" results in all the vcpus
-of the guest running on all the cpus on the host except cpu 7.
+To allow all the vCPUs of the guest to run on CPUs 0,2,3,5. It is possible to
+combine this with "all", meaning "all,^7" results in all the vCPUs
+of the guest being allowed to run on all the CPUs of the host except CPU 7.
 
-=item "nodes:0-3,node:^2"
+=item "nodes:0-3,^node:2"
 
-To allow all the vcpus of the guest to run on the cpus from NUMA nodes
-0,1,3 of the host. So, if cpus 0-3 belongs to node 0, cpus 4-7 belongs
-to node 1 and cpus 8-11 to node 3, the above would mean all the vcpus
-of the guest will run on cpus 0-3,8-11.
+To allow all the vCPUs of the guest to run on the CPUs from NUMA nodes
+0,1,3 of the host. So, if CPUs 0-3 belong to node 0, CPUs 4-7 belong
+to node 1, CPUs 8-11 to node 2 and CPUs 12-15 to node 3, the above would mean
+all the vCPUs of the guest would be allowed to run on CPUs 0-7,12-15.
 
 Combining this notation with the one above is possible. For instance,
-"1,node:2,^6", means all the vcpus of the guest will run on cpu 1 and
-on all the cpus of NUMA node 2, but not on cpu 6. Following the same
-example as above, that would be cpus 1,4,5,7.
+"1,node:1,^6", means all the vCPUs of the guest will run on CPU 1 and
+on all the CPUs of NUMA node 1, but not on CPU 6. Following the same
+example as above, that would be CPUs 1,4,5,7.
 
-Combining this with "all" is also possible, meaning "all,^nodes:1"
-results in all the vcpus of the guest running on all the cpus on the
-host, except for the cpus belonging to the host NUMA node 1.
+Combining this with "all" is also possible, meaning "all,^node:1"
+results in all the vCPUs of the guest running on all the CPUs on the
+host, except for the CPUs belonging to the host NUMA node 1.
 
 =item ["2", "3-8,^5"]
 
-To ask for specific vcpu mapping. That means (in this example), vcpu 0
-of the guest will run on cpu 2 of the host and vcpu 1 of the guest will
-run on cpus 3,4,6,7,8 of the host.
+To ask for specific vCPU mapping. That means (in this example), vCPU 0
+of the guest will run on CPU 2 of the host and vCPU 1 of the guest will
+run on CPUs 3,4,6,7,8 of the host (excluding CPU 5).
 
 More complex notation can be also used, exactly as described above. So
 "all,^5-8", or just "all", or "node:0,node:2,^9-11,18-20" are all legal,
@@ -156,34 +157,35 @@ for each element of the list.
 
 =back
 
-If this option is not specified, no vcpu to cpu pinning is established,
-and the vcpus of the guest can run on all the cpus of the host. If this
-option is specified, the intersection of the vcpu pinning mask, provided
-here, and the soft affinity mask, provided via B<cpus\_soft=> (if any),
-is utilized to compute the domain node-affinity, for driving memory
+If this option is not specified, no vCPU to CPU pinning is established,
+and the vCPUs of the guest can run on all the CPUs of the host. If this
+option is specified, the intersection of the vCPU pinning mask, provided
+here, and the soft affinity mask, if provided via B<cpus_soft=>,
+is utilized to compute the domain node-affinity for driving memory
 allocations.
 
-=item B<cpus_soft="CPU-LIST">
+=item B<cpus_soft="CPULIST">
 
 Exactly as B<cpus=>, but specifies soft affinity, rather than pinning
-(hard affinity). When using the credit scheduler, this means what cpus
-the vcpus of the domain prefer.
+(hard affinity). When using the credit scheduler, this means what CPUs
+the vCPUs of the domain prefer.
 
-A C<CPU-LIST> is specified exactly as above, for B<cpus=>.
+A C<CPULIST> is specified exactly as for B<cpus=>, detailed earlier in the
+manual.
 
-If this option is not specified, the vcpus of the guest will not have
-any preference regarding on what cpu to run. If this option is specified,
-the intersection of the soft affinity mask, provided here, and the vcpu
-pinning, provided via B<cpus=> (if any), is utilized to compute the
-domain node-affinity, for driving memory allocations.
+If this option is not specified, the vCPUs of the guest will not have
+any preference regarding host CPUs. If this option is specified,
+the intersection of the soft affinity mask, provided here, and the vCPU
+pinning, if provided via B<cpus=>, is utilized to compute the
+domain node-affinity for driving memory allocations.
 
 If this option is not specified (and B<cpus=> is not specified either),
 libxl automatically tries to place the guest on the least possible
 number of nodes. A heuristic approach is used for choosing the best
 node (or set of nodes), with the goal of maximizing performance for
 the guest and, at the same time, achieving efficient utilization of
-host cpus and memory. In that case, the soft affinity of all the vcpus
-of the domain will be set to the pcpus belonging to the NUMA nodes
+host CPUs and memory. In that case, the soft affinity of all the vCPUs
+of the domain will be set to host CPUs belonging to NUMA nodes
 chosen during placement.
 
 For more details, see L<xl-numa-placement(7)>.
@@ -205,22 +207,22 @@ Honoured by the credit and credit2 schedulers.
 
 The cap optionally fixes the maximum amount of CPU a domain will be
 able to consume, even if the host system has idle CPU cycles.
-The cap is expressed in percentage of one physical CPU:
+The cap is expressed as a percentage of one physical CPU:
 100 is 1 physical CPU, 50 is half a CPU, 400 is 4 CPUs, etc.
-The default, 0, means there is no upper cap.
+The default, 0, means there is no cap.
 Honoured by the credit and credit2 schedulers.
 
-NB: Many systems have features that will scale down the computing
-power of a cpu that is not 100% utilized.  This can be in the
-operating system, but can also sometimes be below the operating system
+B<NOTE>: Many systems have features that will scale down the computing
+power of a CPU that is not 100% utilized.  This can be done in the
+operating system, but can also sometimes be done below the operating system,
 in the BIOS.  If you set a cap such that individual cores are running
 at less than 100%, this may have an impact on the performance of your
 workload over and above the impact of the cap. For example, if your
-processor runs at 2GHz, and you cap a vm at 50%, the power management
+processor runs at 2GHz, and you cap a VM at 50%, the power management
 system may also reduce the clock speed to 1GHz; the effect will be
 that your VM gets 25% of the available power (50% of 1GHz) rather than
 50% (50% of 2GHz).  If you are not getting the performance you expect,
-look at performance and cpufreq options in your operating system and
+look at performance and CPU frequency options in your operating system and
 your BIOS.
 
 =back
@@ -236,14 +238,14 @@ Start the guest with MBYTES megabytes of RAM.
 =item B<maxmem=MBYTES>
 
 Specifies the maximum amount of memory a guest can ever see.
-The value of B<maxmem=> must be equal or greater than B<memory=>.
+The value of B<maxmem=> must be equal to or greater than that of B<memory=>.
 
 In combination with B<memory=> it will start the guest "pre-ballooned",
 if the values of B<memory=> and B<maxmem=> differ.
 A "pre-ballooned" HVM guest needs a balloon driver, without a balloon driver
 it will crash.
 
-NOTE: Because of the way ballooning works, the guest has to allocate
+B<NOTE>: Because of the way ballooning works, the guest has to allocate
 memory to keep track of maxmem pages, regardless of how much memory it
 actually has available to it.  A guest with maxmem=262144 and
 memory=8096 will report significantly less memory available for use
@@ -259,54 +261,54 @@ of having to track the unused pages.
 =item B<vnuma=[ VNODE_SPEC, VNODE_SPEC, ... ]>
 
 Specify virtual NUMA configuration with positional arguments. The
-nth B<VNODE_SPEC> in the list specifies the configuration of nth
+nth B<VNODE_SPEC> in the list specifies the configuration of the nth
 virtual node.
 
-Note that virtual NUMA for PV guest is not yet supported, because
-there is an issue with cpuid handling that affects PV virtual NUMA.
-Furthermore, guests with virtual NUMA cannot be saved or migrated
+Note that virtual NUMA is not supported for PV guests yet, because
+there is an issue with the CPUID instruction handling that affects PV virtual
+NUMA. Furthermore, guests with virtual NUMA cannot be saved or migrated
 because the migration stream does not preserve node information.
 
 Each B<VNODE_SPEC> is a list, which has a form of
-"[VNODE_CONFIG_OPTION,VNODE_CONFIG_OPTION, ... ]"  (without quotes).
+"[VNODE_CONFIG_OPTION, VNODE_CONFIG_OPTION, ... ]"  (without the quotes).
 
-For example vnuma = [ ["pnode=0","size=512","vcpus=0-4","vdistances=10,20"] ]
+For example, vnuma = [ ["pnode=0","size=512","vcpus=0-4","vdistances=10,20"] ]
 means vnode 0 is mapped to pnode 0, has 512MB ram, has vcpus 0 to 4, the
 distance to itself is 10 and the distance to vnode 1 is 20.
 
-Each B<VNODE_CONFIG_OPTION> is a quoted key=value pair. Supported
+Each B<VNODE_CONFIG_OPTION> is a quoted C<KEY=VALUE> pair. Supported
 B<VNODE_CONFIG_OPTION>s are (they are all mandatory at the moment):
 
 =over 4
 
 =item B<pnode=NUMBER>
 
-Specify which physical node this virtual node maps to.
+Specifies which physical node this virtual node maps to.
 
 =item B<size=MBYTES>
 
-Specify the size of this virtual node. The sum of memory size of all
+Specifies the size of this virtual node. The sum of memory sizes of all
 vnodes will become B<maxmem=>. If B<maxmem=> is specified separately,
 a check is performed to make sure the sum of all vnode memory matches
 B<maxmem=>.
 
-=item B<vcpus=CPU-STRING>
+=item B<vcpus="CPUSTRING">
 
-Specify which vcpus belong to this node. B<CPU-STRING> is a string
-separated by comma. You can specify range and single cpu. An example
-is "vcpus=0-5,8", which means you specify vcpu 0 to vcpu 5, and vcpu
-8.
+Specifies which vCPUs belong to this node. B<"CPUSTRING"> is a string of numerical
+values separated by a comma. You can specify a range and/or a single CPU.
+An example would be "vcpus=0-5,8", which means you specified vCPU 0 to vCPU 5,
+and vCPU 8.
 
 =item B<vdistances=NUMBER, NUMBER, ... >
 
-Specify virtual distance from this node to all nodes (including
+Specifies the virtual distance from this node to all nodes (including
 itself) with positional arguments. For example, "vdistance=10,20"
 for vnode 0 means the distance from vnode 0 to vnode 0 is 10, from
 vnode 0 to vnode 1 is 20. The number of arguments supplied must match
 the total number of vnodes.
 
-Normally you can use the values from "xl info -n" or "numactl
---hardware" to fill in vdistance list.
+Normally you can use the values from B<xl info -n> or B<numactl
+--hardware> to fill the vdistances list.
 
 =back
 
@@ -319,7 +321,7 @@ Normally you can use the values from "xl info -n" or "numactl
 =item B<on_poweroff="ACTION">
 
 Specifies what should be done with the domain if it shuts itself down.
-The C<ACTION>s are:
+The B<ACTION>s are:
 
 =over 4
 
@@ -339,8 +341,7 @@ domain with the same configuration as the original
 
 =item B<preserve>
 
-keep the domain.  It can be examined, and later destroyed with `xl
-destroy`.
+keep the domain.  It can be examined, and later destroyed with B<xl destroy>.
 
 =item B<coredump-destroy>
 
@@ -360,37 +361,37 @@ and non-Xen-aware HVM guests are not supported.
 
 =back
 
-The default for C<on_poweroff> is C<destroy>.
+The default for B<on_poweroff> is B<destroy>.
 
 =item B<on_reboot="ACTION">
 
 Action to take if the domain shuts down with a reason code requesting
-a reboot.  Default is C<restart>.
+a reboot.  Default is B<restart>.
 
 =item B<on_watchdog="ACTION">
 
 Action to take if the domain shuts down due to a Xen watchdog timeout.
-Default is C<destroy>.
+Default is B<destroy>.
 
 =item B<on_crash="ACTION">
 
-Action to take if the domain crashes.  Default is C<destroy>.
+Action to take if the domain crashes.  Default is B<destroy>.
 
 =item B<on_soft_reset="ACTION">
 
-Action to take if the domain performs 'soft reset' (e.g. does kexec).
-Default is C<soft-reset>.
+Action to take if the domain performs a 'soft reset' (e.g. does B<kexec>).
+Default is B<soft-reset>.
 
 =back
 
 =head3 Direct Kernel Boot
 
-Direct kernel boot allows booting directly from a kernel and initrd
-stored in the host physical machine OS, allowing command line arguments
-to be passed directly. PV guest direct kernel boot is supported. HVM
-guest direct kernel boot is supported with limitation (it's supported
-when using qemu-xen and default BIOS 'seabios'; not supported in case of
-stubdom-dm and old rombios.)
+Direct kernel boot allows booting guests with a kernel and an initrd
+stored on a filesystem available to the host physical machine, allowing
+command line arguments to be passed directly. PV guest direct kernel boot is
+supported. HVM guest direct kernel boot is supported with some limitations
+(it's supported when using B<qemu-xen> and the default BIOS 'seabios',
+but not supported in case of using B<stubdom-dm> and the old 'rombios'.)
 
 =over 4
 
@@ -404,20 +405,20 @@ Load the specified file as the ramdisk.
 
 =item B<cmdline="STRING">
 
-Append B<cmdline="STRING"> to the kernel command line. (Note: it is
-guest specific what meaning this has). It can replace B<root="STRING">
-plus B<extra="STRING"> and is preferred. When B<cmdline="STRING"> is set,
+Append B<STRING> to the kernel command line. (Note: the meaning of
+this is guest specific). It can replace B<root="STRING">
+along with B<extra="STRING"> and is preferred. When B<cmdline="STRING"> is set,
 B<root="STRING"> and B<extra="STRING"> will be ignored.
 
 =item B<root="STRING">
 
-Append B<root="STRING"> to the kernel command line (Note: it is guest
-specific what meaning this has).
+Append B<root=STRING> to the kernel command line (Note: the meaning of this
+is guest specific).
 
 =item B<extra="STRING">
 
-Append B<STRING> to the kernel command line. (Note: it is guest
-specific what meaning this has).
+Append B<STRING> to the kernel command line. (Note: the meaning of this
+is guest specific).
 
 =back
 
@@ -438,7 +439,7 @@ Assign an XSM security label to this domain.
 
 Specify an XSM security label used for this domain temporarily during
 its build. The domain's XSM label will be changed to the execution
-seclabel (specified by "seclabel") once the build is complete, prior to
+seclabel (specified by B<seclabel>) once the build is complete, prior to
 unpausing the domain. With a properly constructed security policy (such
 as nomigrate_t in the example policy), this can be used to build a
 domain whose memory is not accessible to the toolstack domain.
@@ -447,7 +448,7 @@ domain whose memory is not accessible to the toolstack domain.
 
 Disable migration of this domain.  This enables certain other features
 which are incompatible with migration. Currently this is limited to
-enabling the invariant TSC feature flag in cpuid results when TSC is
+enabling the invariant TSC feature flag in CPUID results when TSC is
 not emulated.
 
 =item B<driver_domain=BOOLEAN>
@@ -460,12 +461,12 @@ features needed in order to run a driver domain.
 Specify a partial device tree (compiled via the Device Tree Compiler).
 Everything under the node "/passthrough" will be copied into the guest
 device tree. For convenience, the node "/aliases" is also copied to allow
-the user to defined aliases which can be used by the guest kernel.
+the user to define aliases which can be used by the guest kernel.
 
 Given the complexity of verifying the validity of a device tree, this
-option should only be used with trusted device tree.
+option should only be used with a trusted device tree.
 
-Note that the partial device tree should avoid to use the phandle 65000
+Note that the partial device tree should avoid using the phandle 65000
 which is reserved by the toolstack.
 
 =back
@@ -481,45 +482,46 @@ devices which the guest will contain.
 
 Specifies the disks (both emulated disks and Xen virtual block
 devices) which are to be provided to the guest, and what objects on
-the host they should map to.  See L<xl-disk-configuration(5)>.
+the host they should map to.  See L<xl-disk-configuration(5)> for more
+details.
 
 =item B<vif=[ "NET_SPEC_STRING", "NET_SPEC_STRING", ...]>
 
-Specifies the networking provision (both emulated network adapters,
-and Xen virtual interfaces) to provided to the guest.  See
-L<xl-network-configuration(5)>.
+Specifies the network interfaces (both emulated network adapters,
+and Xen virtual interfaces) which are to be provided to the guest.  See
+L<xl-network-configuration(5)> for more details.
 
 =item B<vtpm=[ "VTPM_SPEC_STRING", "VTPM_SPEC_STRING", ...]>
 
-Specifies the virtual trusted platform module to be
-provided to the guest. Please see L<xen-vtpm(7)> for more details.
+Specifies the Virtual Trusted Platform module to be
+provided to the guest. See L<xen-vtpm(7)> for more details.
 
 Each B<VTPM_SPEC_STRING> is a comma-separated list of C<KEY=VALUE>
-settings, from the following list:
+settings from the following list:
 
 =over 4
 
-=item C<backend=DOMAIN>
+=item B<backend=domain-id>
 
-Specify the backend domain name or id. This value is required!
+Specifies the backend domain name or id. B<This value is required!>
 If this domain is a guest, the backend should be set to the
-vtpm domain name. If this domain is a vtpm, the
-backend should be set to the vtpm manager domain name.
+vTPM domain name. If this domain is a vTPM, the
+backend should be set to the vTPM manager domain name.
 
-=item C<uuid=UUID>
+=item B<uuid=UUID>
 
-Specify the uuid of this vtpm device. The uuid is used to uniquely
-identify the vtpm device. You can create one using the uuidgen
-program on unix systems. If left unspecified, a new uuid
+Specifies the UUID of this vTPM device. The UUID is used to uniquely
+identify the vTPM device. You can create one using the B<uuidgen(1)>
+program on unix systems. If left unspecified, a new UUID
 will be randomly generated every time the domain boots.
-If this is a vtpm domain, you should specify a value. The
+If this is a vTPM domain, you should specify a value. The
 value is optional if this is a guest domain.
 
 =back
 
 =item B<p9=[ "9PFS_SPEC_STRING", "9PFS_SPEC_STRING", ...]>
 
-Creates a Xen 9pfs connection to share a filesystem from backend to
+Creates a Xen 9pfs connection to share a filesystem from the backend to the
 frontend.
 
 Each B<9PFS_SPEC_STRING> is a comma-separated list of C<KEY=VALUE>
@@ -527,22 +529,22 @@ settings, from the following list:
 
 =over 4
 
-=item C<tag=STRING>
+=item B<tag=STRING>
 
 9pfs tag to identify the filesystem share. The tag is needed on the
 guest side to mount it.
 
-=item C<security_model="none">
+=item B<security_model="none">
 
-Only "none" is supported today, which means that files are stored using
-the same credentials as they are created on the guest (no user ownership
+Only "none" is supported today, which means that the files are stored using
+the same credentials as those they have in the guest (no user ownership
 squash or remap).
 
-=item C<path=STRING>
+=item B<path=STRING>
 
 Filesystem path on the backend to export.
 
-=item C<backend=DOMAIN>
+=item B<backend=domain-id>
 
 Specify the backend domain name or id, defaults to dom0.
 
@@ -554,78 +556,78 @@ Specifies the paravirtual framebuffer devices which should be supplied
 to the domain.
 
 This option does not control the emulated graphics card presented to
-an HVM guest. See L<Emulated VGA Graphics Device> below for how to
-configure the emulated device. If L<Emulated VGA Graphics Device> options
-are used in a PV guest configuration, xl will pick up B<vnc>, B<vnclisten>,
+an HVM guest. See B<Emulated VGA Graphics Device> below for how to
+configure the emulated device. If B<Emulated VGA Graphics Device> options
+are used in a PV guest configuration, B<xl> will pick up B<vnc>, B<vnclisten>,
 B<vncpasswd>, B<vncdisplay>, B<vncunused>, B<sdl>, B<opengl> and
-B<keymap> to construct paravirtual framebuffer device for the guest.
+B<keymap> to construct the paravirtual framebuffer device for the guest.
 
 Each B<VFB_SPEC_STRING> is a comma-separated list of C<KEY=VALUE>
 settings, from the following list:
 
 =over 4
 
-=item C<vnc=BOOLEAN>
+=item B<vnc=BOOLEAN>
 
 Allow access to the display via the VNC protocol.  This enables the
-other VNC-related settings.  The default is to enable this.
+other VNC-related settings.  Default is 1 (enabled).
 
-=item C<vnclisten=ADDRESS[:DISPLAYNUM]>
+=item B<vnclisten=ADDRESS[:DISPLAYNUM]>
 
-Specifies the IP address, and optionally VNC display number, to use.
+Specifies the IP address, and optionally the VNC display number, to use.
 
-NB that if you specify the display number here, you should not use
-vncdisplay.
+Note: if you specify the display number here, you should not use
+the B<vncdisplay> option.
 
-=item C<vncdisplay=DISPLAYNUM>
+=item B<vncdisplay=DISPLAYNUM>
 
 Specifies the VNC display number to use.  The actual TCP port number
 will be DISPLAYNUM+5900.
 
-NB that you should not use this option if you set the displaynum in the
-vnclisten string.
+Note: you should not use this option if you set the DISPLAYNUM in the
+B<vnclisten> option.
 
-=item C<vncunused=BOOLEAN>
+=item B<vncunused=BOOLEAN>
 
-Requests that the VNC display setup search for a free TCP port to use.
-The actual display used can be accessed with C<xl vncviewer>.
+Requests that the VNC display setup searches for a free TCP port to use.
+The actual display used can be accessed with B<xl vncviewer>.
 
-=item C<vncpasswd=PASSWORD>
+=item B<vncpasswd=PASSWORD>
 
-Specifies the password for the VNC server. If password is set to an
-empty string, authentication on the VNC server will be disabled
+Specifies the password for the VNC server. If the password is set to an
+empty string, authentication on the VNC server will be disabled,
 allowing any user to connect.
 
-=item C<sdl=BOOLEAN>
+=item B<sdl=BOOLEAN>
 
 Specifies that the display should be presented via an X window (using
-Simple DirectMedia Layer). The default is to not enable this mode.
+Simple DirectMedia Layer). The default is 0 (not enabled).
 
-=item C<display=DISPLAY>
+=item B<display=DISPLAY>
 
-Specifies the X Window display that should be used when the sdl option
+Specifies the X Window display that should be used when the B<sdl> option
 is used.
 
-=item C<xauthority=XAUTHORITY>
+=item B<xauthority=XAUTHORITY>
 
 Specifies the path to the X authority file that should be used to
-connect to the X server when the sdl option is used.
+connect to the X server when the B<sdl> option is used.
 
-=item C<opengl=BOOLEAN>
+=item B<opengl=BOOLEAN>
 
 Enable OpenGL acceleration of the SDL display. Only effects machines
-using C<device_model_version="qemu-xen-traditional"> and only if the
-device-model was compiled with OpenGL support. Disabled by default.
+using B<device_model_version="qemu-xen-traditional"> and only if the
+device-model was compiled with OpenGL support. The default is 0 (disabled).
 
-=item C<keymap=LANG>
+=item B<keymap=LANG>
 
 Configure the keymap to use for the keyboard associated with this
 display. If the input method does not easily support raw keycodes
 (e.g. this is often the case when using VNC) then this allows us to
 correctly map the input keys into keycodes seen by the guest. The
 specific values which are accepted are defined by the version of the
-device-model which you are using. See L</"Keymaps"> below or consult the
-L<qemu(1)> manpage. The default is B<en-us>.
+device-model which you are using. See B<Keymaps> below or consult the
+B<qemu(1)> manpage. The default is B<en-us>.
 
 =back
 
@@ -644,35 +646,35 @@ are:
 
 =over 4
 
-=item C<backend=DOMAIN>
+=item B<backend=domain-id>
 
-Specify the backend domain name or id. This parameter is optional. If
+Specifies the backend domain name or id. This parameter is optional. If
 this parameter is omitted then the toolstack domain will be assumed.
 
-=item C<name=NAME>
+=item B<name=NAME>
 
-Specify the string name for this device. This parameter is mandatory.
-This should be a well-known name for the specific application (e.g.
+Specifies the name for this device. B<This parameter is mandatory!>
+This should be a well-known name for a specific application (e.g.
 guest agent) and should be used by the frontend to connect the
 application to the right channel device. There is no formal registry
 of channel names, so application authors are encouraged to make their
-names unique by including domain name and version number in the string
+names unique by including the domain name and a version number in the string
 (e.g. org.mydomain.guestagent.1).
 
-=item C<connection=CONNECTION>
+=item B<connection=CONNECTION>
 
-Specify how the backend will be implemented. The following options are
+Specifies how the backend will be implemented. The following options are
 available:
 
 =over 4
 
-=item B<connection=SOCKET>
+=item B<SOCKET>
 
 The backend will bind a Unix domain socket (at the path given by
-B<path=PATH>), call listen and accept connections. The backend will proxy
+B<path=PATH>), listen for and accept connections. The backend will proxy
 data between the channel and the connected socket.
 
-=item B<connection=PTY>
+=item B<PTY>
 
 The backend will create a pty and proxy data between the channel and the
 master device. The command B<xl channel-list> can be used to discover the
@@ -684,87 +686,93 @@ assigned slave device.
 
 =item B<rdm="RDM_RESERVATION_STRING">
 
-(HVM/x86 only) Specifies information about Reserved Device Memory (RDM),
+B<HVM/x86 only!> Specifies information about Reserved Device Memory (RDM),
 which is necessary to enable robust device passthrough. One example of RDM
-is reported through ACPI Reserved Memory Region Reporting (RMRR) structure
-on x86 platform.
+is reporting through the ACPI Reserved Memory Region Reporting (RMRR) structure
+on the x86 platform.
 
-B<RDM_RESERVE_STRING> has the form C<[KEY=VALUE,KEY=VALUE,...> where:
-
-=over 4
-
-=item B<KEY=VALUE>
-
-Possible B<KEY>s are:
+B<RDM_RESERVATION_STRING> is a comma separated list of C<KEY=VALUE> settings,
+from the following list:
 
 =over 4
 
-=item B<strategy="STRING">
+=item B<strategy=STRING>
 
-Currently there is only one valid type:
+Currently there is only one valid type, and that is "host".
 
-"host" means all reserved device memory on this platform should be checked to
-reserve regions in this VM's guest address space. This global rdm parameter
-allows user to specify reserved regions explicitly, and using "host" includes
-all reserved regions reported on this platform, which is useful when doing
-hotplug.
+=over 4
 
-By default this isn't set so we don't check all rdms. Instead, we just check
-rdm specific to a given device if you're assigning this kind of device. Note
-this option is not recommended unless you can make sure any conflict does exist.
+=item B<host>
+
+If set to "host" it means all reserved device memory on this platform should
+be checked to reserve regions in this VM's address space. This global RDM
+parameter allows the user to specify reserved regions explicitly, and using
+"host" includes all reserved regions reported on this platform, which is
+useful when doing hotplug.
+
+By default this isn't set so we don't check all RDMs. Instead, we just check
+the RDM specific to a given device if we're assigning this kind of a device.
+
+Note: this option is not recommended unless you can make sure that no
+conflicts exist.
 
 For example, you're trying to set "memory = 2800" to allocate memory to one
-given VM but the platform owns two RDM regions like,
+given VM but the platform owns two RDM regions like:
 
 Device A [sbdf_A]: RMRR region_A: base_addr ac6d3000 end_address ac6e6fff
+
 Device B [sbdf_B]: RMRR region_B: base_addr ad800000 end_address afffffff
 
 In this conflict case,
 
-#1. If B<strategy> is set to "host", for example,
+#1. If B<strategy> is set to "host", for example:
 
 rdm = "strategy=host,policy=strict" or rdm = "strategy=host,policy=relaxed"
 
-It means all conflicts will be handled according to the policy
+it means all conflicts will be handled according to the policy
 introduced by B<policy> as described below.
 
 #2. If B<strategy> is not set at all, but
 
 pci = [ 'sbdf_A, rdm_policy=xxxxx' ]
 
-It means only one conflict of region_A will be handled according to the policy
-introduced by B<rdm_policy="STRING"> as described inside pci options.
-
-=item B<policy="STRING">
-
-Specifies how to deal with conflicts when reserving reserved device
-memory in guest address space.
-
-When that conflict is unsolved,
-
-"strict" means VM can't be created, or the associated device can't be
-attached in the case of hotplug.
-
-"relaxed" allows VM to be created but may cause VM to crash if
-pass-through device accesses RDM. For example Windows IGD GFX driver
-always accessed RDM regions so it leads to VM crash.
-
-Note this may be overridden by rdm_policy option in PCI device configuration.
+it means only one conflict of region_A will be handled according to the policy
+introduced by B<rdm_policy=STRING> as described inside B<pci> options.
 
 =back
 
-=back
+=item B<policy=STRING>
 
-=item B<usbctrl=[ "USBCTRL_SPEC_STRING", "USBCTRL_SPEC_STRING", ... ]>
-
-Specifies the USB controllers created for this guest. Each
-B<USB_SPEC_STRING> has the form C<KEY=VALUE,KEY=VALUE,...> where:
+Specifies how to deal with conflicts when reserving already reserved device
+memory in the guest address space.
 
 =over 4
 
-=item B<KEY=VALUE>
+=item B<strict>
 
-Possible B<KEY>s are:
+Specifies that in case of an unresolved conflict the VM can't be created,
+or the associated device can't be attached in the case of hotplug.
+
+=item B<relaxed>
+
+Specifies that in case of an unresolved conflict the VM is allowed to be
+created but may cause the VM to crash if a pass-through device accesses RDM.
+For example, the Windows IGD GFX driver always accesses RDM regions so it
+leads to a VM crash.
+
+Note: this may be overridden by the B<rdm_policy> option in the B<pci>
+device configuration.
+
+=back
+
+=back
+
+=item B<usbctrl=[ "USBCTRL_SPEC_STRING", "USBCTRL_SPEC_STRING", ...]>
+
+Specifies the USB controllers created for this guest.
+
+Each B<USBCTRL_SPEC_STRING> is a comma-separated list of C<KEY=VALUE>
+settings, from the following list:
 
 =over 4
 
@@ -772,64 +780,80 @@ Possible B<KEY>s are:
 
 Specifies the usb controller type.
 
-"pv" denotes a kernel based pvusb backend.
+=over 4
 
-"qusb" specifies a qemu base backend for pvusb.
+=item B<pv>
 
-"devicemodel" specifies a USB controller emulated by qemu.
+Specifies a kernel based PVUSB backend.
+
+=item B<qusb>
+
+Specifies a QEMU based PVUSB backend.
+
+=item B<devicemodel>
+
+Specifies a USB controller emulated by QEMU.
 It will show up as a PCI-device in the guest.
 
-"auto" (the default) determines whether a kernel based backend is installed.
-If this is the case, "pv" is selected, "qusb" will be selected if no kernel
-backend is currently available.
-For HVM domains "devicemodel" will be selected.
+=item B<auto>
+
+Determines whether a kernel based backend is installed.
+If this is the case, B<pv> is used, otherwise B<qusb> will be used.
+For HVM domains B<devicemodel> will be selected.
+
+This option is the default.
+
+=back
 
 =item B<version=VERSION>
 
 Specifies the usb controller version.  Possible values include
 1 (USB1.1), 2 (USB2.0) and 3 (USB3.0).
 Default is 2 (USB2.0).
-3 (USB3.0) is available for the type "devicemodel" only.
+Value 3 (USB3.0) is available for the B<devicemodel> type only.
 
 =item B<ports=PORTS>
 
-Specifies the total ports of the usb controller. The maximum
-number is 31. Default is 8.
-With the type "devicemodel" the number of ports is more limited:
+Specifies the total number of ports of the usb controller. The maximum
+number is 31. The default is 8.
+With the type B<devicemodel> the number of ports is more limited:
 a USB1.1 controller always has 2 ports,
 a USB2.0 controller always has 6 ports
 and a USB3.0 controller can have up to 15 ports.
 
-USB controller ids start from 0.  In line with the USB spec, however,
+USB controller ids start from 0.  In line with the USB specification, however,
 ports on a controller start from 1.
 
-E.g.
-usbctrl=["version=1,ports=4", "version=2,ports=8",]
-The first controller has:
-controller id = 0, and port 1,2,3,4.
-The second controller has:
-controller id = 1, and port 1,2,3,4,5,6,7,8.
+B<EXAMPLE>
+
+=over 2
+
+usbctrl=["version=1,ports=4", "version=2,ports=8"]
+
+The first controller is USB1.1 and has:
+
+controller id = 0, and ports 1,2,3,4.
+
+The second controller is USB2.0 and has:
+
+controller id = 1, and ports 1,2,3,4,5,6,7,8.
 
 =back
 
 =back
 
-=item B<usbdev=[ "USB_SPEC_STRING", "USB_SPEC_STRING", ... ]>
+=item B<usbdev=[ "USBDEV_SPEC_STRING", "USBDEV_SPEC_STRING", ...]>
 
-Specifies the USB devices to be attached to the guest at boot. Each
-B<USB_SPEC_STRING> has the form C<KEY=VALUE,KEY=VALUE,...> where:
+Specifies the USB devices to be attached to the guest at boot.
 
-=over 4
-
-=item B<KEY=VALUE>
-
-Possible B<KEY>s are:
+Each B<USBDEV_SPEC_STRING> is a comma-separated list of C<KEY=VALUE>
+settings, from the following list:
 
 =over 4
 
 =item B<devtype=hostdev>
 
-Specifies USB device type. Currently only support 'hostdev'.
+Specifies USB device type. Currently only "hostdev" is supported.
 
 =item B<hostbus=busnum>
 
@@ -841,249 +865,245 @@ Specifies devnum of the USB device from the host perspective.
 
 =item B<controller=CONTROLLER>
 
-Specifies USB controller id, to which controller the USB device is attached.
+Specifies the USB controller id, to which controller the USB device is
+attached.
+
+If no controller is specified, an available controller:port combination
+will be used.  If there are no available controller:port combinations,
+a new controller will be created.
 
 =item B<port=PORT>
 
-Specifies USB port, to which port the USB device is attached. B<port=PORT>
-is valid only when B<controller=CONTROLLER> is specified.
+Specifies the USB port to which the USB device is attached. The B<port>
+option is valid only when the B<controller> option is specified.
 
 =back
 
-If no controller is specified, an available controller:port combination
-will be used.  If there are no available controller:port options,
-a new controller will be created.
+=item B<pci=[ "PCI_SPEC_STRING", "PCI_SPEC_STRING", ...]>
 
-=back
-
-=item B<pci=[ "PCI_SPEC_STRING", "PCI_SPEC_STRING", ... ]>
-
-Specifies the host PCI devices to passthrough to this guest. Each B<PCI_SPEC_STRING>
-has the form C<[DDDD:]BB:DD.F[@VSLOT],KEY=VALUE,KEY=VALUE,...> where:
+Specifies the host PCI devices to passthrough to this guest.
+Each B<PCI_SPEC_STRING> has the form of
+B<[DDDD:]BB:DD.F[@VSLOT],KEY=VALUE,KEY=VALUE,...> where:
 
 =over 4
 
-=item B<DDDD:BB:DD.F>
+=item B<[DDDD:]BB:DD.F>
 
-Identifies the PCI device from the host perspective in domain
+Identifies the PCI device from the host perspective in the domain
 (B<DDDD>), Bus (B<BB>), Device (B<DD>) and Function (B<F>) syntax. This is
-the same scheme as used in the output of C<lspci> for the device in
-question. Note: By default C<lspci> will omit the domain (B<DDDD>) if it
+the same scheme as used in the output of B<lspci(1)> for the device in
+question.
+
+Note: by default B<lspci(1)> will omit the domain (B<DDDD>) if it
 is zero and it is optional here also. You may specify the function
 (B<F>) as B<*> to indicate all functions.
 
 =item B<@VSLOT>
 
-Specifies the virtual device where the guest will see this
+Specifies the virtual slot where the guest will see this
 device. This is equivalent to the B<DD> which the guest sees. In a
 guest B<DDDD> and B<BB> are C<0000:00>.
-
-=item B<KEY=VALUE>
-
-Possible B<KEY>s are:
-
-=over 4
 
 =item B<permissive=BOOLEAN>
 
 By default pciback only allows PV guests to write "known safe" values
-into PCI config space, likewise QEMU (both qemu-xen and
-qemu-traditional) imposes the same constraint on HVM guests. However
-many devices require writes to other areas of config space in order to
-operate properly.  This option tells the backend (pciback or QEMU) to
-allow all writes to PCI config space of this device by this domain.
+into PCI configuration space, likewise QEMU (both qemu-xen and
+qemu-xen-traditional) imposes the same constraint on HVM guests.
+However, many devices require writes to other areas of the configuration space
+in order to operate properly.  This option tells the backend (pciback or QEMU)
+to allow all writes to the PCI configuration space of this device by this
+domain.
 
-This option should be enabled with caution: it gives the guest much
+B<This option should be enabled with caution:> it gives the guest much
 more control over the device, which may have security or stability
-implications.  It is recommended to enable this option only for
-trusted VMs under administrator control.
+implications.  It is recommended to only enable this option for
+trusted VMs under administrator's control.
 
 =item B<msitranslate=BOOLEAN>
 
 Specifies that MSI-INTx translation should be turned on for the PCI
 device. When enabled, MSI-INTx translation will always enable MSI on
-the PCI device regardless whether the guest uses INTx or MSI. Some
+the PCI device regardless of whether the guest uses INTx or MSI. Some
 device drivers, such as NVIDIA's, detect an inconsistency and do not
 function when this option is enabled. Therefore the default is false (0).
 
 =item B<seize=BOOLEAN>
 
-Tells xl to automatically attempt to re-assign a device to
+Tells B<xl> to automatically attempt to re-assign a device to
 pciback if it is not already assigned.
 
-WARNING: If you set this option, xl will gladly re-assign a critical
+B<WARNING:> If you set this option, B<xl> will gladly re-assign a critical
 system device, such as a network or a disk controller being used by
 dom0 without confirmation.  Please use with care.
 
 =item B<power_mgmt=BOOLEAN>
 
-(HVM only) Specifies that the VM should be able to program the
-D0-D3hot power management states for the PCI device. False (0) by
-default.
+B<(HVM only)> Specifies that the VM should be able to program the
+D0-D3hot power management states for the PCI device. The default is false (0).
 
-=item B<rdm_policy="STRING">
+=item B<rdm_policy=STRING>
 
-(HVM/x86 only) This is same as policy option inside the rdm option but
-just specific to a given device. Therefore the default is "relaxed" as
-same as policy option as well.
+B<(HVM/x86 only)> This is the same as the policy setting inside the B<rdm>
+option but just specific to a given device. The default is "relaxed".
 
-Note this would override global B<rdm> option.
-
-=back
+Note: this would override global B<rdm> option.
 
 =back
 
 =item B<pci_permissive=BOOLEAN>
 
-Changes the default value of 'permissive' for all PCI devices passed
-through to this VM. See L<permissive|/"permissive_boolean"> above.
+Changes the default value of B<permissive> for all PCI devices passed
+through to this VM. See B<permissive> above.
 
 =item B<pci_msitranslate=BOOLEAN>
 
-Changes the default value of 'msitranslate' for all PCI devices passed
-through to this VM. See L<msitranslate|/"msitranslate_boolean"> above.
+Changes the default value of B<msitranslate> for all PCI devices passed
+through to this VM. See B<msitranslate> above.
 
 =item B<pci_seize=BOOLEAN>
 
-Changes the default value of 'seize' for all PCI devices passed
-through to this VM. See L<seize|/"seize_boolean"> above.
+Changes the default value of B<seize> for all PCI devices passed
+through to this VM. See B<seize> above.
 
 =item B<pci_power_mgmt=BOOLEAN>
 
-(HVM only) Changes the default value of 'power_mgmt' for all PCI
-devices passed through to this VM. See L<power_mgt|/"power_mgmt_boolean">
+B<(HVM only)> Changes the default value of B<power_mgmt> for all PCI
+devices passed through to this VM. See B<power_mgmt>
 above.
 
 =item B<gfx_passthru=BOOLEAN|"STRING">
 
 Enable graphics device PCI passthrough. This option makes an assigned
-PCI graphics card become primary graphics card in the VM. The QEMU
+PCI graphics card become the primary graphics card in the VM. The QEMU
 emulated graphics adapter is disabled and the VNC console for the VM
 will not have any graphics output. All graphics output, including boot
 time QEMU BIOS messages from the VM, will go to the physical outputs
-of the passedthrough physical graphics card.
+of the passed through physical graphics card.
 
-The graphics card PCI device to passthrough is chosen with B<pci>
-option, exactly in the same way as normal Xen PCI device
-passthrough/assignment is done.  Note that gfx_passthru does not do
-any kind of sharing of the GPU, so you can only assign the GPU to one
+The graphics card PCI device to pass through is chosen with the B<pci>
+option, in exactly the same way a normal Xen PCI device
+passthrough/assignment is done.  Note that B<gfx_passthru> does not do
+any kind of sharing of the GPU, so you can assign the GPU to only one
 single VM at a time.
 
-gfx_passthru also enables various legacy VGA memory ranges, BARs, MMIOs,
+B<gfx_passthru> also enables various legacy VGA memory ranges, BARs, MMIOs,
 and ioports to be passed through to the VM, since those are required
 for correct operation of things like VGA BIOS, text mode, VBE, etc.
 
-Enabling gfx_passthru option also copies the physical graphics card
+Enabling the B<gfx_passthru> option also copies the physical graphics card
 video BIOS to the guest memory, and executes the VBIOS in the guest
 to initialize the graphics card.
 
 Most graphics adapters require vendor specific tweaks for properly
 working graphics passthrough. See the XenVGAPassthroughTestedAdapters
 L<http://wiki.xen.org/wiki/XenVGAPassthroughTestedAdapters> wiki page
-for currently supported graphics cards for gfx_passthru.
+for graphics cards currently supported by B<gfx_passthru>.
 
-gfx_passthru is currently supported both with the qemu-xen-traditional
+B<gfx_passthru> is currently supported both with the qemu-xen-traditional
 device-model and upstream qemu-xen device-model.
 
-When given as a boolean the B<gfx_passthru> option either disables gfx
-passthru or enables autodetection.
+When given as a boolean the B<gfx_passthru> option either disables graphics
+card passthrough or enables autodetection.
 
-But when given as a string the B<gfx_passthru> option describes the type
-of device to enable. Note this behavior is only supported with the upstream
-qemu-xen device-model. With qemu-xen-traditional IGD is always assumed
-and other options than autodetect or explicit IGD will result in an error.
+When given as a string the B<gfx_passthru> option describes the type
+of device to enable. Note that this behavior is only supported with the
+upstream qemu-xen device-model. With qemu-xen-traditional IGD (Intel Graphics
+Device) is always assumed and options other than autodetect or explicit IGD
+will result in an error.
 
-Currently, valid options are:
+Currently, valid values for the option are:
 
 =over 4
 
-=item B<gfx_passthru=0>
+=item B<0>
 
 Disables graphics device PCI passthrough.
 
-=item B<gfx_passthru=1>, B<gfx_passthru="default">
+=item B<1>, B<"default">
 
 Enables graphics device PCI passthrough and autodetects the type of device
 which is being used.
 
-=item "igd"
+=item B<"igd">
 
 Enables graphics device PCI passthrough but forcing the type of device to
 Intel Graphics Device.
 
 =back
 
-Note that some graphics adapters (AMD/ATI cards, for example) do not
-necessarily require gfx_passthru option, so you can use the normal Xen
+Note that some graphics cards (AMD/ATI cards, for example) do not
+necessarily require the B<gfx_passthru> option, so you can use the normal Xen
 PCI passthrough to assign the graphics card as a secondary graphics
 card to the VM. The QEMU-emulated graphics card remains the primary
 graphics card, and VNC output is available from the QEMU-emulated
 primary adapter.
 
-More information about Xen gfx_passthru feature is available
+More information about the Xen B<gfx_passthru> feature is available
 on the XenVGAPassthrough L<http://wiki.xen.org/wiki/XenVGAPassthrough>
 wiki page.
 
 =item B<rdm_mem_boundary=MBYTES>
 
-Number of megabytes to set a boundary for checking rdm conflict.
+Number of megabytes to set for a boundary when checking for RDM conflicts.
 
-When RDM conflicts with RAM, RDM probably scatter the whole RAM space.
-Especially multiple RDM entries would worsen this to lead to a complicated
-memory layout. So here we're trying to figure out a simple solution to
-avoid breaking existing layout. So when a conflict occurs,
+When RDM conflicts with RAM, RDM is probably scattered over the whole RAM
+space. Having multiple RDM entries would worsen this and lead to a complicated
+memory layout. Here we're trying to figure out a simple solution to
+avoid breaking the existing layout. When a conflict occurs,
 
     #1. Above a predefined boundary
-        - move lowmem_end below reserved region to solve conflict;
+        - move lowmem_end below the reserved region to solve the conflict;
 
     #2. Below a predefined boundary
-        - Check strict/relaxed policy.
-        "strict" policy leads to fail libxl. Note when both policies
-        are specified on a given region, 'strict' is always preferred.
-        "relaxed" policy issue a warning message and also mask this
+        - Check if the policy is strict or relaxed.
+        A "strict" policy leads to a fail in libxl.
+        Note that when both policies are specified on a given region,
+        "strict" is always preferred.
+        The "relaxed" policy issues a warning message and also masks this
         entry INVALID to indicate we shouldn't expose this entry to
         hvmloader.
 
-Here the default is 2G.
+The default value is 2048.
 
-=item B<dtdev=[ "DTDEV_PATH", "DTDEV_PATH", ... ]>
+=item B<dtdev=[ "DTDEV_PATH", "DTDEV_PATH", ...]>
 
-Specifies the host device tree nodes to passthrough to this guest. Each
-DTDEV_PATH is the absolute path in the device tree.
+Specifies the host device tree nodes to passt hrough to this guest. Each
+DTDEV_PATH is an absolute path in the device tree.
 
-=item B<ioports=[ "IOPORT_RANGE", "IOPORT_RANGE", ... ]>
+=item B<ioports=[ "IOPORT_RANGE", "IOPORT_RANGE", ...]>
 
-Allow guest to access specific legacy I/O ports. Each B<IOPORT_RANGE>
-is given in hexadecimal and may either a span e.g. C<2f8-2ff>
-(inclusive) or a single I/O port C<2f8>.
+Allow the guest to access specific legacy I/O ports. Each B<IOPORT_RANGE>
+is given in hexadecimal format and may either be a range, e.g. C<2f8-2ff>
+(inclusive), or a single I/O port, e.g. C<2f8>.
 
-It is recommended to use this option only for trusted VMs under
-administrator control.
+It is recommended to only use this option for trusted VMs under
+administrator's control.
 
-=item B<iomem=[ "IOMEM_START,NUM_PAGES[@GFN]", "IOMEM_START,NUM_PAGES[@GFN]", ... ]>
+=item B<iomem=[ "IOMEM_START,NUM_PAGES[@GFN]", "IOMEM_START,NUM_PAGES[@GFN]", ...]>
 
 Allow auto-translated domains to access specific hardware I/O memory pages.
 
-B<IOMEM_START> is a physical page number. B<NUM_PAGES> is the number of pages
-beginning with B<START_PAGE> to allow access. B<GFN> specifies the guest frame
-number where the mapping will start in the domU's address space. If B<GFN> is
-not given, the mapping will be performed using B<IOMEM_START> as a start in the
-domU's address space, therefore performing an 1:1 mapping as default.
-All of these values must be given in hexadecimal.
+B<IOMEM_START> is a physical page number. B<NUM_PAGES> is the number of pages,
+beginning with B<START_PAGE>, to allow access to. B<GFN> specifies the guest
+frame number where the mapping will start in the guest's address space. If
+B<GFN> is not specified, the mapping will be performed using B<IOMEM_START>
+as a start in the guest's address space, therefore performing a 1:1 mapping
+by default.
+All of these values must be given in hexadecimal format.
 
 Note that the IOMMU won't be updated with the mappings specified with this
-option. This option therefore should not be used to passthrough any
-IOMMU-protected device.
+option. This option therefore should not be used to pass through any
+IOMMU-protected devices.
 
-It is recommended to use this option only for trusted VMs under
-administrator control.
+It is recommended to only use this option for trusted VMs under
+administrator's control.
 
-=item B<irqs=[ NUMBER, NUMBER, ... ]>
+=item B<irqs=[ NUMBER, NUMBER, ...]>
 
 Allow a guest to access specific physical IRQs.
 
-It is recommended to use this option only for trusted VMs under
-administrator control.
+It is recommended to only use this option for trusted VMs under
+administrator's control.
 
 =item B<max_event_channels=N>
 
@@ -1091,7 +1111,7 @@ Limit the guest to using at most N event channels (PV interrupts).
 Guests use hypervisor resources for each event channel they use.
 
 The default of 1023 should be sufficient for typical guests.  The
-maximum value depends what the guest supports.  Guests supporting the
+maximum value depends on what the guest supports.  Guests supporting the
 FIFO-based event channel ABI support up to 131,071 event channels.
 Other guests are limited to 4095 (64-bit x86 and ARM) or 1023 (32-bit
 x86).
@@ -1100,7 +1120,7 @@ x86).
 
 =head2 Paravirtualised (PV) Guest Specific Options
 
-The following options apply only to Paravirtual guests.
+The following options apply only to Paravirtual (PV) guests.
 
 =over 4
 
@@ -1115,7 +1135,7 @@ for PV guests.
 
 Append B<ARG>s to the arguments to the B<bootloader>
 program. Alternatively if the argument is a simple string then it will
-be split into words at whitespace (this second option is deprecated).
+be split into words at whitespace B<(this second option is deprecated)>.
 
 =item B<e820_host=BOOLEAN>
 
@@ -1144,19 +1164,41 @@ anyway.
 
 =head2 Fully-virtualised (HVM) Guest Specific Options
 
-The following options apply only to HVM guests.
+The following options apply only to Fully-virtualised (HVM) guests.
 
 =head3 Boot Device
 
 =over 4
 
-=item B<boot=[c|d|n]>
+=item B<boot="STRING">
 
-Selects the emulated virtual device to boot from. Options are hard
-disk (B<c>), cd-rom (B<d>) or network/PXE (B<n>). Multiple options can be
-given and will be attempted in the order they are given. e.g. to boot
-from cd-rom but fallback to the hard disk you can give B<dc>. The
-default is B<cd>.
+Specifies the emulated virtual device to boot from.
+
+Possible values are:
+
+=over 4
+
+=item B<c>
+
+Hard disk.
+
+=item B<d>
+
+CD-ROM.
+
+=item B<n>
+
+Network / PXE.
+
+=back
+
+B<Note:> multiple options can be given and will be attempted in the order they
+are given, e.g. to boot from CD-ROM but fall back to the hard disk you can
+specify it as B<dc>.
+
+The default is B<cd>, meaning try booting from the hard disk first, but fall
+back to the CD-ROM.
+
 
 =back
 
@@ -1164,13 +1206,29 @@ default is B<cd>.
 
 =over 4
 
-=item B<hdtype="STRING">
+=item B<hdtype=STRING>
 
-Select the hd disk type (ide|ahci).
-If hdtype=ahci adds ich9 disk controller in AHCI mode and uses it with
-upstream qemu to emulate disks instead of IDE. It decreases boot time
-but may not be supported by default in Windows xp and older Windows.
-The default is ide.
+Specifies the hard disk type.
+
+Possible values are:
+
+=over 4
+
+=item B<ide>
+
+If thise mode is specified B<xl> adds an emulated IDE controller, which is
+suitable even for older operation systems.
+
+=item B<ahci>
+
+If this mode is specified, B<xl> adds an ich9 disk controller in AHCI mode and
+uses it with upstream QEMU to emulate disks instead of IDE. It decreases boot
+time but may not be supported by default in older operating systems, e.g.
+Windows XP.
+
+=back
+
+The default is B<ide>.
 
 =back
 
@@ -1178,7 +1236,7 @@ The default is ide.
 
 The following options control the mechanisms used to virtualise guest
 memory.  The defaults are selected to give the best results for the
-common case and so you should normally leave these options
+common cases so you should normally leave these options
 unspecified.
 
 =over 4
@@ -1188,7 +1246,7 @@ unspecified.
 Turns "hardware assisted paging" (the use of the hardware nested page
 table feature) on or off.  This feature is called EPT (Extended Page
 Tables) by Intel and NPT (Nested Page Tables) or RVI (Rapid
-Virtualisation Indexing) by AMD.  Affects HVM guests only.  If turned
+Virtualisation Indexing) by AMD. If turned
 off, Xen will run the guest in "shadow page table" mode where the
 guest's page table updates and/or TLB flushes etc. will be emulated.
 Use of HAP is the default when available.
@@ -1197,7 +1255,7 @@ Use of HAP is the default when available.
 
 Turns "out of sync pagetables" on or off.  When running in shadow page
 table mode, the guest's page table updates may be deferred as
-specified in the Intel/AMD architecture manuals.  However this may
+specified in the Intel/AMD architecture manuals.  However, this may
 expose unexpected bugs in the guest, or find bugs in Xen, so it is
 possible to disable this feature.  Use of out of sync page tables,
 when Xen thinks it appropriate, is the default.
@@ -1206,8 +1264,8 @@ when Xen thinks it appropriate, is the default.
 
 Number of megabytes to set aside for shadowing guest pagetable pages
 (effectively acting as a cache of translated pages) or to use for HAP
-state. By default this is 1MB per guest vcpu plus 8KB per MB of guest
-RAM. You should not normally need to adjust this value. However if you
+state. By default this is 1MB per guest vCPU plus 8KB per MB of guest
+RAM. You should not normally need to adjust this value. However, if you
 are not using hardware assisted paging (i.e. you are using shadow
 mode) and your guest workload consists of a very large number of
 similar processes then increasing this value may improve performance.
@@ -1219,7 +1277,7 @@ similar processes then increasing this value may improve performance.
 The following options allow various processor and platform level
 features to be hidden or exposed from the guest's point of view. This
 can be useful when running older guest Operating Systems which may
-misbehave when faced with more modern features. In general you should
+misbehave when faced with more modern features. In general, you should
 accept the defaults for these options wherever possible.
 
 =over 4
@@ -1235,8 +1293,8 @@ it may be useful to request a different one, like UEFI.
 =item B<rombios>
 
 Loads ROMBIOS, a 16-bit x86 compatible BIOS. This is used by default
-when device_model_version=qemu-xen-traditional. This is the only BIOS
-option supported when device_model_version=qemu-xen-traditional. This is
+when B<device_model_version=qemu-xen-traditional>. This is the only BIOS
+option supported when B<device_model_version=qemu-xen-traditional>. This is
 the BIOS used by all previous Xen versions.
 
 =item B<seabios>
@@ -1266,7 +1324,7 @@ Hide or expose the IA32 Physical Address Extensions. These extensions
 make it possible for a 32 bit guest Operating System to access more
 than 4GB of RAM. Enabling PAE also enabled other features such as
 NX. PAE is required if you wish to run a 64-bit guest Operating
-System. In general you should leave this enabled and allow the guest
+System. In general, you should leave this enabled and allow the guest
 Operating System to choose whether or not to use PAE. (X86 only)
 
 =item B<acpi=BOOLEAN>
@@ -1274,7 +1332,7 @@ Operating System to choose whether or not to use PAE. (X86 only)
 Expose ACPI (Advanced Configuration and Power Interface) tables from
 the virtual firmware to the guest Operating System. ACPI is required
 by most modern guest Operating Systems. This option is enabled by
-default and usually you should omit it. However it may be necessary to
+default and usually you should omit it. However, it may be necessary to
 disable ACPI for compatibility with some guest Operating Systems.
 This option is true for x86 while it's false for ARM by default.
 
@@ -1295,95 +1353,95 @@ firmware ACPI table. False (0) by default.
 
 =item B<apic=BOOLEAN>
 
-Include information regarding APIC (Advanced Programmable Interrupt
+B<(x86 only)> Include information regarding APIC (Advanced Programmable Interrupt
 Controller) in the firmware/BIOS tables on a single processor
 guest. This causes the MP (multiprocessor) and PIR (PCI Interrupt
 Routing) tables to be exported by the virtual firmware. This option
-has no effect on a guest with multiple virtual CPUS as they must
+has no effect on a guest with multiple virtual CPUs as they must
 always include these tables. This option is enabled by default and you
 should usually omit it but it may be necessary to disable these
 firmware tables when using certain older guest Operating
 Systems. These tables have been superseded by newer constructs within
-the ACPI tables. (X86 only)
+the ACPI tables.
 
 =item B<nx=BOOLEAN>
 
-Hides or exposes the No-eXecute capability. This allows a guest
-Operating system to map pages such that they cannot be executed which
+B<(x86 only)> Hides or exposes the No-eXecute capability. This allows a guest
+Operating System to map pages in such a way that they cannot be executed which
 can enhance security. This options requires that PAE also be
-enabled. (X86 only)
+enabled.
 
 =item B<hpet=BOOLEAN>
 
-Enables or disables HPET (High Precision Event Timer). This option is
-enabled by default and you should usually omit it. It may be necessary
-to disable the HPET in order to improve compatibility with guest
-Operating Systems (X86 only)
+B<(x86 only)> Enables or disables HPET (High Precision Event Timer). This
+option is enabled by default and you should usually omit it.
+It may be necessary to disable the HPET in order to improve compatibility with
+guest Operating Systems.
 
-=item B<altp2m=MODE>
+=item B<altp2m="MODE">
 
-Specifies access mode to the alternate-p2m capability. Alternate-p2m allows a
-guest to manage multiple p2m guest physical "memory views" (as opposed to a
-single p2m). This option is disabled by default and is available to x86 hvm
-domains. You may want this option if you want to access-control/isolate
+B<(x86 only)> Specifies the access mode to the alternate-p2m capability.
+Alternate-p2m allows a guest to manage multiple p2m guest physical "memory
+views" (as opposed to a single p2m).
+You may want this option if you want to access-control/isolate
 access to specific guest physical memory pages accessed by the guest, e.g. for
 domain memory introspection or for isolation/access-control of memory between
-components within a single guest domain.
+components within a single guest domain. This option is disabled by default.
 
 The valid values are as follows:
 
 =over 4
 
-=item B<"disabled">
+=item B<disabled>
 
 Altp2m is disabled for the domain (default).
 
-=item B<"mixed">
+=item B<mixed>
 
 The mixed mode allows access to the altp2m interface for both in-guest
 and external tools as well.
 
-=item B<"external">
+=item B<external>
 
-Enables access to the alternate-p2m capability for hvm guests only
-by external privileged tools.
+Enables access to the alternate-p2m capability by external privileged tools.
 
-=item B<"limited">
+=item B<limited>
 
-Enables limited access to the alternate-p2m capability for hvm guests only,
+Enables limited access to the alternate-p2m capability,
 ie. giving the guest access only to enable/disable the VMFUNC and #VE features.
 
 =back
 
 =item B<altp2mhvm=BOOLEAN>
 
-Enables or disables hvm guest access to alternate-p2m capability.
+Enables or disables HVM guest access to alternate-p2m capability.
 Alternate-p2m allows a guest to manage multiple p2m guest physical
 "memory views" (as opposed to a single p2m). This option is
-disabled by default and is available only to hvm domains.
+disabled by default and is available only to HVM domains.
 You may want this option if you want to access-control/isolate
 access to specific guest physical memory pages accessed by
 the guest, e.g. for HVM domain memory introspection or
 for isolation/access-control of memory between components within
-a single guest hvm domain. This option is deprecated, use the option
-"altp2m" instead.
+a single guest HVM domain. B<This option is deprecated, use the option
+"altp2m" instead.>
 
-Note: While the option "altp2mhvm" is deprecated, legacy applications for
+B<Note>: While the option "altp2mhvm" is deprecated, legacy applications for
 x86 systems will continue to work using it.
 
 =item B<nestedhvm=BOOLEAN>
 
 Enable or disables guest access to hardware virtualisation features,
 e.g. it allows a guest Operating System to also function as a
-hypervisor. This option is disabled by default. You may want this
+hypervisor. You may want this
 option if you want to run another hypervisor (including another copy
 of Xen) within a Xen guest or to support a guest Operating System
 which uses hardware virtualisation extensions (e.g. Windows XP
 compatibility mode on more modern Windows OS).
+This option is disabled by default.
 
 =item B<cpuid="LIBXL_STRING"> or B<cpuid=[ "XEND_STRING", "XEND_STRING" ]>
 
-Configure the value returned when a guest executes CPUID instruction.
+Configure the value returned when a guest executes the CPUID instruction.
 Two versions of config syntax are recognized: libxl and xend.
 
 The libxl syntax is a comma separated list of key=value pairs, preceded by the
@@ -1398,8 +1456,8 @@ Possible values for a single feature bit:
   's' -> as 'k' but preserve across save/restore and migration (not implemented)
 
 Note: when specifying B<cpuid> for hypervisor leaves (0x4000xxxx major group)
-only the lowest 8 bits of leaf's 0x4000xx00 EAX register are processed, the rest
-are ignored (these 8 bits signify maximum number of hypervisor leaves).
+only the lowest 8 bits of leaf's 0x4000xx00 EAX register are processed, the
+rest are ignored (these 8 bits signify maximum number of hypervisor leaves).
 
 List of keys taking a value:
 apicidsize brandid clflush family localapicid maxleaf maxhvleaf model nc
@@ -1426,31 +1484,32 @@ The xend syntax is a list of values in the form of
 Example to hide two features from the guest: 'tm', which is bit #29 in EDX, and
 'pni' (SSE3), which is bit #0 in ECX:
 
-xend: [ '1:ecx=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx0,edx=xx0xxxxxxxxxxxxxxxxxxxxxxxxxxxxx' ]
+xend: [ "1:ecx=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx0,edx=xx0xxxxxxxxxxxxxxxxxxxxxxxxxxxxx" ]
 
-libxl: 'host,tm=0,sse3=0'
+libxl: "host,tm=0,sse3=0"
 
-More info about the CPUID instruction can be found in the processor manuals, and
-in Wikipedia: L<http://en.wikipedia.org/wiki/CPUID>
+More info about the CPUID instruction can be found in the processor manuals,
+and on Wikipedia: L<http://en.wikipedia.org/wiki/CPUID>
 
 =item B<acpi_firmware="STRING">
 
-Specify a path to a file that contains extra ACPI firmware tables to pass in to
+Specifies a path to a file that contains extra ACPI firmware tables to pass into
 a guest. The file can contain several tables in their binary AML form
 concatenated together. Each table self describes its length so no additional
 information is needed. These tables will be added to the ACPI table set in the
 guest. Note that existing tables cannot be overridden by this feature. For
-example this cannot be used to override tables like DSDT, FADT, etc.
+example, this cannot be used to override tables like DSDT, FADT, etc.
 
 =item B<smbios_firmware="STRING">
 
-Specify a path to a file that contains extra SMBIOS firmware structures to pass
-in to a guest. The file can contain a set DMTF predefined structures which will
-override the internal defaults. Not all predefined structures can be overridden,
+Specifies a path to a file that contains extra SMBIOS firmware structures to
+pass into a guest. The file can contain a set of DMTF predefined structures
+which will override the internal defaults. Not all predefined structures can be
+overridden,
 only the following types: 0, 1, 2, 3, 11, 22, 39. The file can also contain any
 number of vendor defined SMBIOS structures (type 128 - 255). Since SMBIOS
 structures do not present their overall size, each entry in the file must be
-preceded by a 32b integer indicating the size of the next structure.
+preceded by a 32b integer indicating the size of the following structure.
 
 =item B<ms_vm_genid="OPTION">
 
@@ -1467,19 +1526,19 @@ Valid options are:
 
 =over 4
 
-=item B<"generate">
+=item B<generate>
 
 Generate a random VM generation ID every time the domain is created or
 restored.
 
-=item B<"none">
+=item B<none>
 
 Do not provide a VM generation ID.
 
 =back
 
-See also "Virtual Machine Generation ID" by Microsoft
-(http://www.microsoft.com/en-us/download/details.aspx?id=30707).
+See also "Virtual Machine Generation ID" by Microsoft:
+L<http://www.microsoft.com/en-us/download/details.aspx?id=30707>
 
 =back 
 
@@ -1489,13 +1548,14 @@ See also "Virtual Machine Generation ID" by Microsoft
 
 =item B<tsc_mode="MODE">
 
-Specifies how the TSC (Time Stamp Counter) should be provided to the
-guest (X86 only). Specifying this option as a number is
-deprecated. Options are:
+B<(x86 only)> Specifies how the TSC (Time Stamp Counter) should be provided to
+the guest. B<Specifying this option as a number is deprecated.>
+
+Options are:
 
 =over 4
 
-=item B<"default">
+=item B<default>
 
 Guest rdtsc/p is executed natively when monotonicity can be guaranteed
 and emulated otherwise (with frequency scaled if necessary).
@@ -1505,37 +1565,35 @@ provides constant host TSC, its guest TSC frequency will be the same
 as the host. If it is later migrated to another host that provide
 constant host TSC and supports Intel VMX TSC scaling/AMD SVM TSC
 ratio, its guest TSC frequency will be the same before and after
-migration, and guest rdtsc/p will be executed natively as well after
-migration.
+migration, and guest rdtsc/p will be executed natively after migration as well
 
-=item B<"always_emulate">
+=item B<always_emulate>
 
-Guest rdtsc/p always emulated at 1GHz (kernel and user). Guest rdtsc/p
-always emulated and the virtual TSC will appear to increment (kernel
-and user) at a fixed 1GHz rate, regardless of the PCPU HZ rate or
-power state; Although there is an overhead associated with emulation
+Guest rdtsc/p is always emulated and the virtual TSC will appear to increment
+(kernel and user) at a fixed 1GHz rate, regardless of the pCPU HZ rate or
+power state. Although there is an overhead associated with emulation,
 this will NOT affect underlying CPU performance.
 
-=item B<"native">
+=item B<native>
 
-Guest rdtsc always executed natively (no monotonicity/frequency
-guarantees); guest rdtscp emulated at native frequency if unsupported
+Guest rdtsc/p is always executed natively (no monotonicity/frequency
+guarantees). Guest rdtsc/p is emulated at native frequency if unsupported
 by h/w, else executed natively.
 
-=item B<"native_paravirt">
+=item B<native_paravirt>
 
-Same as B<native>, except xen manages TSC_AUX register so guest can
+Same as B<native>, except Xen manages the TSC_AUX register so the guest can
 determine when a restore/migration has occurred and assumes guest
-obtains/uses pvclock-like mechanism to adjust for monotonicity and
+obtains/uses a pvclock-like mechanism to adjust for monotonicity and
 frequency changes.
 
 If a HVM container in B<native_paravirt> TSC mode can execute both guest
 rdtsc and guest rdtscp natively, then the guest TSC frequency will be
-determined in the similar way to that of B<default> TSC mode.
+determined in a similar way to that of B<default> TSC mode.
 
 =back
 
-Please see L<xen-tscmode(7)> for more information on this option.
+Please see B<xen-tscmode(7)> for more information on this option.
 
 =item B<localtime=BOOLEAN>
 
@@ -1544,7 +1602,7 @@ i.e. set to UTC.
 
 =item B<rtc_timeoffset=SECONDS>
 
-Set the real time clock offset in seconds. False (0) by default.
+Set the real time clock offset in seconds. No offset (0) by default.
 
 =item B<vpt_align=BOOLEAN>
 
@@ -1553,33 +1611,33 @@ reduce guest interrupts. Enabling this option can reduce power
 consumption, especially when a guest uses a high timer interrupt
 frequency (HZ) values. The default is true (1).
 
-=item B<timer_mode=MODE>
+=item B<timer_mode="MODE">
 
 Specifies the mode for Virtual Timers. The valid values are as follows:
 
 =over 4
 
-=item B<"delay_for_missed_ticks">
+=item B<delay_for_missed_ticks>
 
-Delay for missed ticks. Do not advance a vcpu's time beyond the
+Delay for missed ticks. Do not advance a vCPU's time beyond the
 correct delivery time for interrupts that have been missed due to
-preemption. Deliver missed interrupts when the vcpu is rescheduled and
-advance the vcpu's virtual time stepwise for each one.
+preemption. Deliver missed interrupts when the vCPU is rescheduled and
+advance the vCPU's virtual time stepwise for each one.
 
-=item B<"no_delay_for_missed_ticks">
+=item B<no_delay_for_missed_ticks>
 
 No delay for missed ticks. As above, missed interrupts are delivered,
 but guest time always tracks wallclock (i.e., real) time while doing
 so.
 
-=item B<"no_missed_ticks_pending">
+=item B<no_missed_ticks_pending>
 
 No missed interrupts are held pending. Instead, to ensure ticks are
 delivered at some non-zero rate, if we detect missed ticks then the
-internal tick alarm is not disabled if the VCPU is preempted during
+internal tick alarm is not disabled if the vCPU is preempted during
 the next tick period.
 
-=item B<"one_missed_tick_pending">
+=item B<one_missed_tick_pending>
 
 One missed tick pending. Missed interrupts are collapsed
 together and delivered as one 'late tick'.  Guest time always tracks
@@ -1596,7 +1654,7 @@ wallclock (i.e., real) time.
 =item B<mmio_hole=MBYTES>
 
 Specifies the size the MMIO hole below 4GiB will be.  Only valid for
-device_model_version = "qemu-xen".
+B<device_model_version="qemu-xen">.
 
 Cannot be smaller than 256. Cannot be larger than 3840.
 
@@ -1627,7 +1685,7 @@ Windows L<http://wiki.xen.org/wiki/XenWindowsGplPv>.
 Setting B<xen_platform_pci=0> with the default device_model "qemu-xen"
 requires at least QEMU 1.6.
 
-=item B<viridian=[ "GROUP", "GROUP", ...]>
+=item B<viridian=[ "GROUP", "GROUP", ...]> or B<viridian=BOOLEAN>
 
 The groups of Microsoft Hyper-V (AKA viridian) compatible enlightenments
 exposed to the guest. The following groups of enlightenments may be
@@ -1673,7 +1731,7 @@ on hosts with higher levels of (physical) CPU contention.
 This set incorporates use of the APIC assist page to avoid EOI of
 the local APIC.
 This enlightenment may improve performance of guests that make use of
-per-vcpu event channel upcall vectors.
+per-vCPU event channel upcall vectors.
 Note that this enlightenment will have no effect if the guest is
 using APICv posted interrupts.
 
@@ -1745,36 +1803,38 @@ qemu-xen-traditional device-model, the amount of video RAM is fixed at 4 MB,
 which is sufficient for 1024x768 at 32 bpp. For the upstream qemu-xen
 device-model, the default and minimum is 8 MB.
 
-For B<qxl> vga, the default is both default and minimal 128MB.
+For QXL vga, both the default and minimal are 128MB.
 If B<videoram> is set less than 128MB, an error will be triggered.
 
 =item B<stdvga=BOOLEAN>
 
-Select a standard VGA card with VBE (VESA BIOS Extensions) as the
-emulated graphics device. The default is false (0) which means to emulate
-a Cirrus Logic GD5446 VGA card. If your guest supports VBE 2.0 or
+Speficies a standard VGA card with VBE (VESA BIOS Extensions) as the
+emulated graphics device. If your guest supports VBE 2.0 or
 later (e.g. Windows XP onwards) then you should enable this.
 stdvga supports more video ram and bigger resolutions than Cirrus.
-This option is deprecated, use vga="stdvga" instead.
+The default is false (0) which means to emulate
+a Cirrus Logic GD5446 VGA card.
+B<This option is deprecated, use vga="stdvga" instead>.
 
 =item B<vga="STRING">
 
-Selects the emulated video card (none|stdvga|cirrus|qxl).
-The default is cirrus.
+Selects the emulated video card.
+Options are: B<none>, B<stdvga>, B<cirrus> and B<qxl>.
+The default is B<cirrus>.
 
 In general, QXL should work with the Spice remote display protocol
-for acceleration, and QXL driver is necessary in guest in this case.
+for acceleration, and a QXL driver is necessary in the guest in that case.
 QXL can also work with the VNC protocol, but it will be like a standard
-VGA without acceleration.
+VGA card without acceleration.
 
 =item B<vnc=BOOLEAN>
 
 Allow access to the display via the VNC protocol.  This enables the
-other VNC-related settings.  The default is to enable this.
+other VNC-related settings.  The default is (1) enabled.
 
 =item B<vnclisten="ADDRESS[:DISPLAYNUM]">
 
-Specifies the IP address, and optionally VNC display number, to use.
+Specifies the IP address and, optionally, the VNC display number to use.
 
 =item B<vncdisplay=DISPLAYNUM>
 
@@ -1783,12 +1843,12 @@ will be DISPLAYNUM+5900.
 
 =item B<vncunused=BOOLEAN>
 
-Requests that the VNC display setup search for a free TCP port to use.
-The actual display used can be accessed with C<xl vncviewer>.
+Requests that the VNC display setup searches for a free TCP port to use.
+The actual display used can be accessed with B<xl vncviewer>.
 
 =item B<vncpasswd="PASSWORD">
 
-Specifies the password for the VNC server. If password is set to an
+Specifies the password for the VNC server. If the password is set to an
 empty string, authentication on the VNC server will be disabled
 allowing any user to connect.
 
@@ -1799,19 +1859,19 @@ display. If the input method does not easily support raw keycodes
 (e.g. this is often the case when using VNC) then this allows us to
 correctly map the input keys into keycodes seen by the guest. The
 specific values which are accepted are defined by the version of the
-device-model which you are using. See L</"Keymaps"> below or consult the
-L<qemu(1)> manpage. The default is B<en-us>.
+device-model which you are using. See B<Keymaps> below or consult the
+B<qemu(1)> manpage. The default is B<en-us>.
 
 =item B<sdl=BOOLEAN>
 
 Specifies that the display should be presented via an X window (using
-Simple DirectMedia Layer). The default is not to enable this mode.
+Simple DirectMedia Layer). The default is (0) not enabled.
 
 =item B<opengl=BOOLEAN>
 
 Enable OpenGL acceleration of the SDL display. Only effects machines
 using B<device_model_version="qemu-xen-traditional"> and only if the
-device-model was compiled with OpenGL support. False (0) by default.
+device-model was compiled with OpenGL support. Default is (0) false.
 
 =item B<nographic=BOOLEAN>
 
@@ -1834,66 +1894,72 @@ other SPICE-related settings.
 
 =item B<spicehost="ADDRESS">
 
-Specify the interface address to listen on if given, otherwise any
+Specifies the interface address to listen on if given, otherwise any
 interface.
 
 =item B<spiceport=NUMBER>
 
-Specify the port to listen on by the SPICE server if the SPICE is
+Specifies the port to listen on by the SPICE server if SPICE is
 enabled.
 
 =item B<spicetls_port=NUMBER>
 
-Specify the secure port to listen on by the SPICE server if the SPICE
-is enabled. At least one of the spiceport or spicetls_port must be
-given if SPICE is enabled.  NB. the options depending on spicetls_port
+Specifies the secure port to listen on by the SPICE server if SPICE
+is enabled. At least one of B<spiceport> or B<spicetls_port> must be
+given if SPICE is enabled.
+
+B<Note:> the options depending on B<spicetls_port>
 have not been supported.
 
 =item B<spicedisable_ticketing=BOOLEAN>
 
-Enable client connection without password. When disabled, spicepasswd
-must be set. The default is false (0).
+Enable clients to connect without specifying a password. When disabled,
+B<spicepasswd> must be set. The default is (0) false.
 
 =item B<spicepasswd="PASSWORD">
 
-Specify the ticket password which is used by a client for connection.
+Specify the password which is used by clients for establishing a connection.
 
 =item B<spiceagent_mouse=BOOLEAN>
 
-Whether SPICE agent is used for client mouse mode. The default is true (1)
-(turn on)
+Whether SPICE agent is used for client mouse mode. The default is (1) true.
 
 =item B<spicevdagent=BOOLEAN>
 
-Enables spice vdagent. The Spice vdagent is an optional component for
+Enables the SPICE vdagent. The SPICE vdagent is an optional component for
 enhancing user experience and performing guest-oriented management
-tasks. Its features includes: client mouse mode (no need to grab mouse
-by client, no mouse lag), automatic adjustment of screen resolution,
-copy and paste (text and image) between client and domU. It also
-requires vdagent service installed on domU o.s. to work. The default is 0.
+tasks. Its features include: client mouse mode (no need to grab the mouse
+by the client, no mouse lag), automatic adjustment of screen resolution,
+copy and paste (text and image) between the client and the guest. It also
+requires the vdagent service installed on the guest OS to work.
+The default is (0) disabled.
 
 =item B<spice_clipboard_sharing=BOOLEAN>
 
-Enables Spice clipboard sharing (copy/paste). It requires spicevdagent
-enabled. The default is false (0).
+Enables SPICE clipboard sharing (copy/paste). It requires that
+B<spicevdagent> is enabled. The default is (0) false.
 
 =item B<spiceusbredirection=NUMBER>
 
-Enables spice usbredirection. Creates NUMBER usbredirection channels
-for redirection of up to 4 usb devices from spice client to domU's qemu.
-It requires an usb controller and if not defined it will automatically adds
-an usb2 controller. The default is disabled (0).
+Enables SPICE USB redirection. Creates a NUMBER of USB redirection channels
+for redirecting up to 4 USB devices from the SPICE client to the guest's QEMU.
+It requires an USB controller and, if not defined, it will automatically add
+an USB2.0 controller. The default is (0) disabled.
 
-=item B<spice_image_compression=[auto_glz|auto_lz|quic|glz|lz|off]>
+=item B<spice_image_compression="COMPRESSION">
 
-Specifies what image compression is to be used by spice (if given), otherwise
-the qemu default will be used. Please see documentations of your current qemu
-version for details.
+Specifies what image compression is to be used by SPICE (if given), otherwise
+the QEMU default will be used. Please see the documentation of your QEMU
+version for more details.
 
-=item B<spice_streaming_video=[filter|all|off]>
+Available options are: B<auto_glz, auto_lz, quic, glz, lz, off>.
 
-Specifies what streaming video setting is to be used by spice (if given),
-otherwise the qemu default will be used.
+=item B<spice_streaming_video="VIDEO">
+
+Specifies what streaming video setting is to be used by SPICE (if given),
+otherwise the QEMU default will be used.
+
+Available options are: B<filter, all, off>.
 
 =back
 
@@ -1904,17 +1970,17 @@ otherwise the qemu default will be used.
 =item B<serial=[ "DEVICE", "DEVICE", ...]>
 
 Redirect virtual serial ports to B<DEVICE>s. Please see the
-B<-serial> option in the L<qemu(1)> manpage for details of the valid
+B<-serial> option in the B<qemu(1)> manpage for details of the valid
 B<DEVICE> options. Default is B<vc> when in graphical mode and
 B<stdio> if B<nographics=1> is used.
 
 The form serial=DEVICE is also accepted for backwards compatibility.
 
-=item B<soundhw=DEVICE>
+=item B<soundhw="DEVICE">
 
 Select the virtual sound card to expose to the guest. The valid
 devices are defined by the device model configuration, please see the
-L<qemu(1)> manpage for details. The default is not to export any sound
+B<qemu(1)> manpage for details. The default is not to export any sound
 device.
 
 =item B<usb=BOOLEAN>
@@ -1923,17 +1989,17 @@ Enables or disables an emulated USB bus in the guest.
 
 =item B<usbversion=NUMBER>
 
-Specifies the type of an emulated USB bus in the guest. 1 for usb1,
-2 for usb2 and 3 for usb3, it is available only with upstream qemu.
-Due to implementation limitations this is not compatible with the usb
-and usbdevice parameters.
-Default is 0 (no usb controller defined).
+Specifies the type of an emulated USB bus in the guest, values 1 for USB1.1,
+2 for USB2.0 and 3 for USB3.0. It is available only with an upstream QEMU.
+Due to implementation limitations this is not compatible with the B<usb>
+and B<usbdevice> parameters.
+Default is (0) no USB controller defined.
 
 =item B<usbdevice=[ "DEVICE", "DEVICE", ...]>
 
 Adds B<DEVICE>s to the emulated USB bus. The USB bus must also be
 enabled using B<usb=1>. The most common use for this option is
-B<usbdevice=['tablet']> which adds pointer device using absolute
+B<usbdevice=['tablet']> which adds a pointer device using absolute
 coordinates. Such devices function better than relative coordinate
 devices (such as a standard mouse) since many methods of exporting
 guest graphics (such as VNC) work better in this mode. Note that this
@@ -1942,7 +2008,7 @@ host/client side.
 
 Host devices can also be passed through in this way, by specifying
 host:USBID, where USBID is of the form xxxx:yyyy.  The USBID can
-typically be found by using lsusb or usb-devices.
+typically be found by using B<lsusb(1)> or B<usb-devices(1)>.
 
 If you wish to use the "host:bus.addr" format, remove any leading '0' from the
 bus and addr. For example, for the USB device on bus 008 dev 002, you should
@@ -1950,7 +2016,7 @@ write "host:8.2".
 
 The form usbdevice=DEVICE is also accepted for backwards compatibility.
 
-More valid options can be found in the "usbdevice" section of the qemu
+More valid options can be found in the "usbdevice" section of the QEMU
 documentation.
 
 =item B<vendor_device="VENDOR_DEVICE">
@@ -1972,7 +2038,7 @@ specified, enabling the use of XenServer PV drivers in the guest.
 =back
 
 This parameter only takes effect when device_model_version=qemu-xen.
-See L<xen-pci-device-reservations(7)> for more information.
+See B<xen-pci-device-reservations(7)> for more information.
 
 =back
 
@@ -1989,7 +2055,9 @@ device).
 =item B<device_model_version="DEVICE-MODEL">
 
 Selects which variant of the device-model should be used for this
-guest. Valid values are:
+guest.
+
+Valid values are:
 
 =over 4
 
@@ -2000,7 +2068,7 @@ This device-model is the default for Linux dom0.
 
 =item B<qemu-xen-traditional>
 
-Use the device-model based upon the historical Xen fork of Qemu.
+Use the device-model based upon the historical Xen fork of QEMU.
 This device-model is still the default for NetBSD dom0.
 
 =item B<none>
@@ -2019,7 +2087,7 @@ model which they were installed with.
 
 Override the path to the binary to be used as the device-model. The
 binary provided here MUST be consistent with the
-`device_model_version` which you have specified. You should not
+B<device_model_version> which you have specified. You should not
 normally need to specify this option.
 
 =item B<device_model_stubdomain_override=BOOLEAN>
@@ -2063,7 +2131,7 @@ using. Commonly this includes:
 
 The default is B<en-us>.
 
-See L<qemu(1)> for more information.
+See B<qemu(1)> for more information.
 
 =head2 Architecture Specific options
 
@@ -2073,8 +2141,9 @@ See L<qemu(1)> for more information.
 
 =item B<gic_version="vN">
 
-Version of the GIC emulated for the guest. Currently, the following
-versions are supported:
+Version of the GIC emulated for the guest.
+
+Currently, the following versions are supported:
 
 =over 4
 
@@ -2089,12 +2158,12 @@ GICv2 compatibility mode.
 
 =item B<default>
 
-Emulate the same version as the native GIC hardware used by host where
+Emulate the same version as the native GIC hardware used by the host where
 the domain was created.
 
 =back
 
-This requires hardware compatibility with the requested version. Either
+This requires hardware compatibility with the requested version, either
 natively or via hardware backwards compatibility support.
 
 =back
