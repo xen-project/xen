@@ -44,7 +44,7 @@ extern int guest_has_trap_callback(struct domain *d, uint16_t vcpuid,
  * return 0 on successful delivery
  */
 extern int send_guest_trap(struct domain *d, uint16_t vcpuid,
-				unsigned int trap_nr);
+                           unsigned int trap_nr);
 
 uint32_t guest_io_read(unsigned int port, unsigned int bytes,
                        struct domain *);
@@ -54,3 +54,13 @@ void guest_io_write(unsigned int port, unsigned int bytes, uint32_t data,
 const char *trapstr(unsigned int trapnr);
 
 #endif /* ASM_TRAP_H */
+
+/*
+ * Local variables:
+ * mode: C
+ * c-file-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */
