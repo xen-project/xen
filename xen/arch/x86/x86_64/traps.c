@@ -335,8 +335,6 @@ void subarch_percpu_traps_init(void)
     wrmsrl(MSR_SYSCALL_MASK, XEN_SYSCALL_MASK);
 }
 
-#include "compat/traps.c"
-
 void hypercall_page_initialise(struct domain *d, void *hypercall_page)
 {
     memset(hypercall_page, 0xCC, PAGE_SIZE);
