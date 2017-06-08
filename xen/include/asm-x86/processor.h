@@ -480,9 +480,6 @@ void show_execution_state(const struct cpu_user_regs *regs);
 void show_page_walk(unsigned long addr);
 void noreturn fatal_trap(const struct cpu_user_regs *regs, bool_t show_remote);
 
-void compat_show_guest_stack(struct vcpu *v,
-                             const struct cpu_user_regs *regs, int lines);
-
 extern void mtrr_ap_init(void);
 extern void mtrr_bp_init(void);
 
