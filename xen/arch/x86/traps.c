@@ -1,18 +1,18 @@
 /******************************************************************************
  * arch/x86/traps.c
- * 
+ *
  * Modifications to Linux original are copyright (c) 2002-2004, K A Fraser
- * 
+ *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; If not, see <http://www.gnu.org/licenses/>.
  */
@@ -112,7 +112,7 @@ void (*ioemul_handle_quirk)(
 static int debug_stack_lines = 20;
 integer_param("debug_stack_lines", debug_stack_lines);
 
-static bool_t opt_ler;
+static bool opt_ler;
 boolean_param("ler", opt_ler);
 
 #define stack_words_per_line 4
@@ -591,7 +591,7 @@ void vcpu_show_execution_state(struct vcpu *v)
 }
 
 static cpumask_t show_state_mask;
-static bool_t opt_show_all;
+static bool opt_show_all;
 boolean_param("async-show-all", opt_show_all);
 
 static int nmi_show_execution_state(const struct cpu_user_regs *regs, int cpu)
@@ -602,8 +602,8 @@ static int nmi_show_execution_state(const struct cpu_user_regs *regs, int cpu)
     if ( opt_show_all )
         show_execution_state(regs);
     else
-        printk(XENLOG_ERR "CPU%d @ %04x:%08lx (%pS)\n", cpu, regs->cs, regs->rip,
-               guest_mode(regs) ? _p(regs->rip) : NULL);
+        printk(XENLOG_ERR "CPU%d @ %04x:%08lx (%pS)\n", cpu, regs->cs,
+               regs->rip, guest_mode(regs) ? _p(regs->rip) : NULL);
     cpumask_clear_cpu(cpu, &show_state_mask);
 
     return 1;
@@ -628,7 +628,7 @@ const char *trapstr(unsigned int trapnr)
  * are disabled). In such situations we can't do much that is safe. We try to
  * print out some tracing and then we just spin.
  */
-void fatal_trap(const struct cpu_user_regs *regs, bool_t show_remote)
+void fatal_trap(const struct cpu_user_regs *regs, bool show_remote)
 {
     static DEFINE_PER_CPU(char, depth);
     unsigned int trapnr = regs->entry_vector;
@@ -1080,8 +1080,8 @@ void do_int3(struct cpu_user_regs *regs)
     pv_inject_hw_exception(TRAP_int3, X86_EVENT_NO_EC);
 }
 
-static void reserved_bit_page_fault(
-    unsigned long addr, struct cpu_user_regs *regs)
+static void reserved_bit_page_fault(unsigned long addr,
+                                    struct cpu_user_regs *regs)
 {
     printk("%pv: reserved bit in page table (ec=%04X)\n",
            current, regs->error_code);
@@ -1089,8 +1089,8 @@ static void reserved_bit_page_fault(
     show_execution_state(regs);
 }
 
-static int handle_gdt_ldt_mapping_fault(
-    unsigned long offset, struct cpu_user_regs *regs)
+static int handle_gdt_ldt_mapping_fault(unsigned long offset,
+                                        struct cpu_user_regs *regs)
 {
     struct vcpu *curr = current;
     /* Which vcpu's area did we fault in, and is it in the ldt sub-area? */
@@ -1158,8 +1158,8 @@ enum pf_type {
     spurious_fault
 };
 
-static enum pf_type __page_fault_type(
-    unsigned long addr, const struct cpu_user_regs *regs)
+static enum pf_type __page_fault_type(unsigned long addr,
+                                      const struct cpu_user_regs *regs)
 {
     unsigned long mfn, cr3 = read_cr3();
     l4_pgentry_t l4e, *l4t;
@@ -1265,8 +1265,8 @@ leaf:
     return spurious_fault;
 }
 
-static enum pf_type spurious_page_fault(
-    unsigned long addr, const struct cpu_user_regs *regs)
+static enum pf_type spurious_page_fault(unsigned long addr,
+                                        const struct cpu_user_regs *regs)
 {
     unsigned long flags;
     enum pf_type pf_type;
@@ -1375,7 +1375,8 @@ void do_page_fault(struct cpu_user_regs *regs)
         if ( (pf_type == smep_fault) || (pf_type == smap_fault) )
         {
             console_start_sync();
-            printk("Xen SM%cP violation\n", (pf_type == smep_fault) ? 'E' : 'A');
+            printk("Xen SM%cP violation\n",
+                   (pf_type == smep_fault) ? 'E' : 'A');
             fatal_trap(regs, 0);
         }
 
@@ -1425,9 +1426,9 @@ void do_page_fault(struct cpu_user_regs *regs)
 
 /*
  * Early #PF handler to print CR2, error code, and stack.
- * 
+ *
  * We also deal with spurious faults here, even though they should never happen
- * during early boot (an issue was seen once, but was most likely a hardware 
+ * during early boot (an issue was seen once, but was most likely a hardware
  * problem).
  */
 void __init do_early_page_fault(struct cpu_user_regs *regs)
@@ -1471,7 +1472,7 @@ void do_general_protection(struct cpu_user_regs *regs)
 
     /*
      * Cunning trick to allow arbitrary "INT n" handling.
-     * 
+     *
      * We set DPL == 0 on all vectors in the IDT. This prevents any INT <n>
      * instruction from trapping to the appropriate vector, when that might not
      * be expected by Xen or the guest OS. For example, that entry might be for
@@ -1479,12 +1480,12 @@ void do_general_protection(struct cpu_user_regs *regs)
      * expect an error code on the stack (which a software trap never
      * provides), or might be a hardware interrupt handler that doesn't like
      * being called spuriously.
-     * 
+     *
      * Instead, a GPF occurs with the faulting IDT vector in the error code.
-     * Bit 1 is set to indicate that an IDT entry caused the fault. Bit 0 is 
+     * Bit 1 is set to indicate that an IDT entry caused the fault. Bit 0 is
      * clear (which got already checked above) to indicate that it's a software
      * fault, not a hardware one.
-     * 
+     *
      * NOTE: Vectors 3 and 4 are dealt with from their own handler. This is
      * okay because they can only be triggered by an explicit DPL-checked
      * instruction. The DPL specified by the guest OS for these vectors is NOT
@@ -1630,7 +1631,8 @@ static void io_check_error(const struct cpu_user_regs *regs)
     outb((inb(0x61) & 0x07) | 0x00, 0x61); /* enable IOCK */
 }
 
-static void unknown_nmi_error(const struct cpu_user_regs *regs, unsigned char reason)
+static void unknown_nmi_error(const struct cpu_user_regs *regs,
+                              unsigned char reason)
 {
     switch ( opt_nmi[0] )
     {
@@ -1650,14 +1652,14 @@ static int dummy_nmi_callback(const struct cpu_user_regs *regs, int cpu)
 {
     return 0;
 }
- 
+
 static nmi_callback_t *nmi_callback = dummy_nmi_callback;
 
 void do_nmi(const struct cpu_user_regs *regs)
 {
     unsigned int cpu = smp_processor_id();
     unsigned char reason;
-    bool_t handle_unknown = 0;
+    bool handle_unknown = false;
 
     ++nmi_count(cpu);
 
@@ -1666,7 +1668,7 @@ void do_nmi(const struct cpu_user_regs *regs)
 
     if ( (nmi_watchdog == NMI_NONE) ||
          (!nmi_watchdog_tick(regs) && watchdog_force) )
-        handle_unknown = 1;
+        handle_unknown = true;
 
     /* Only the BSP gets external NMIs from the system. */
     if ( cpu == 0 )
@@ -1786,7 +1788,8 @@ void do_debug(struct cpu_user_regs *regs)
     return;
 }
 
-static void __init noinline __set_intr_gate(unsigned int n, uint32_t dpl, void *addr)
+static void __init noinline __set_intr_gate(unsigned int n,
+                                            uint32_t dpl, void *addr)
 {
     _set_gate(&idt_table[n], SYS_DESC_irq_gate, dpl, addr);
 }
@@ -1967,28 +1970,28 @@ long set_debugreg(struct vcpu *v, unsigned int reg, unsigned long value)
 
     switch ( reg )
     {
-    case 0: 
+    case 0:
         if ( !access_ok(value, sizeof(long)) )
             return -EPERM;
-        if ( v == curr ) 
+        if ( v == curr )
             write_debugreg(0, value);
         break;
-    case 1: 
+    case 1:
         if ( !access_ok(value, sizeof(long)) )
             return -EPERM;
-        if ( v == curr ) 
+        if ( v == curr )
             write_debugreg(1, value);
         break;
-    case 2: 
+    case 2:
         if ( !access_ok(value, sizeof(long)) )
             return -EPERM;
-        if ( v == curr ) 
+        if ( v == curr )
             write_debugreg(2, value);
         break;
     case 3:
         if ( !access_ok(value, sizeof(long)) )
             return -EPERM;
-        if ( v == curr ) 
+        if ( v == curr )
             write_debugreg(3, value);
         break;
     case 6:
@@ -1998,7 +2001,7 @@ long set_debugreg(struct vcpu *v, unsigned int reg, unsigned long value)
          */
         value &= ~DR_STATUS_RESERVED_ZERO; /* reserved bits => 0 */
         value |=  DR_STATUS_RESERVED_ONE;  /* reserved bits => 1 */
-        if ( v == curr ) 
+        if ( v == curr )
             write_debugreg(6, value);
         break;
     case 7:
