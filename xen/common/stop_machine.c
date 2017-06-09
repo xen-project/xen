@@ -95,6 +95,7 @@ int stop_machine_run(int (*fn)(void *), void *data, unsigned int cpu)
     stopmachine_data.fn_data = data;
     stopmachine_data.nr_cpus = nr_cpus;
     stopmachine_data.fn_cpu = cpu;
+    stopmachine_data.fn_result = 0;
     atomic_set(&stopmachine_data.done, 0);
     stopmachine_data.state = STOPMACHINE_START;
 
@@ -113,7 +114,11 @@ int stop_machine_run(int (*fn)(void *), void *data, unsigned int cpu)
 
     stopmachine_set_state(STOPMACHINE_INVOKE);
     if ( (cpu == smp_processor_id()) || (cpu == NR_CPUS) )
-        stopmachine_data.fn_result = (*fn)(data);
+    {
+        ret = (*fn)(data);
+        if ( ret )
+            write_atomic(&stopmachine_data.fn_result, ret);
+    }
     stopmachine_wait_state();
     ret = stopmachine_data.fn_result;
 
@@ -151,8 +156,12 @@ static void stopmachine_action(unsigned long cpu)
         case STOPMACHINE_INVOKE:
             if ( (stopmachine_data.fn_cpu == smp_processor_id()) ||
                  (stopmachine_data.fn_cpu == NR_CPUS) )
-                stopmachine_data.fn_result =
-                    stopmachine_data.fn(stopmachine_data.fn_data);
+            {
+                int ret = stopmachine_data.fn(stopmachine_data.fn_data);
+
+                if ( ret )
+                    write_atomic(&stopmachine_data.fn_result, ret);
+            }
             break;
         default:
             break;
