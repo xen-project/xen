@@ -19,7 +19,9 @@
  * this program; If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "config.h"
 #include "util.h"
+#include <xen/arch-x86/hvm/start_info.h>
 
 #define TEST_FAIL 0
 #define TEST_PASS 1
@@ -28,11 +30,13 @@
 /*
  * Memory layout during tests:
  *  4MB to 8MB is cleared.
- *  Page directory resides at 8MB.
- *  4 page table pages reside at 8MB+4kB to 8MB+20kB.
- *  Pagetables identity-map 0-16MB, except 4kB at va 6MB maps to pa 5MB.
+ *  Page directory resides at 4MB.
+ *  2 page table pages reside at 4MB+4kB to 4MB+12kB.
+ *  Pagetables identity-map 0-8MB, except 4kB at va 6MB maps to pa 5MB.
  */
-#define PD_START (8ul << 20)
+#define TEST_MEM_BASE (4ul << 20)
+#define TEST_MEM_SIZE (4ul << 20)
+#define PD_START TEST_MEM_BASE
 #define PT_START (PD_START + 4096)
 
 static void setup_paging(void)
@@ -41,10 +45,10 @@ static void setup_paging(void)
     uint32_t *pt = (uint32_t *)PT_START;
     uint32_t i;
 
-    /* Identity map 0-16MB. */
-    for ( i = 0; i < 4; i++ )
+    /* Identity map 0-8MB. */
+    for ( i = 0; i < 2; i++ )
         pd[i] = (unsigned long)pt + (i<<12) + 3;
-    for ( i = 0; i < (4*1024); i++ )
+    for ( i = 0; i < 2 * 1024; i++ )
         pt[i] = (i << 12) + 3;
 
     /* Page at virtual 6MB maps to physical 5MB. */
@@ -112,7 +116,7 @@ static int rep_io_test(void)
     stop_paging();
 
     i = 0;
-    for ( p = (uint32_t *)0x400000ul; p < (uint32_t *)0x700000ul; p++ )
+    for ( p = (uint32_t *)0x4ff000ul; p < (uint32_t *)0x602000ul; p++ )
     {
         uint32_t expected = 0;
         if ( check[i].addr == (unsigned long)p )
@@ -144,12 +148,12 @@ static int shadow_gs_test(void)
     if ( !(edx & (1u<<29)) )
         return TEST_SKIP;
 
-    /* Long mode pagetable setup: Identity map 0-16MB with 2MB mappings. */
+    /* Long mode pagetable setup: Identity map 0-8MB with 2MB mappings. */
     *pd = (unsigned long)pd + 0x1007; /* Level 4 */
     pd += 512;
     *pd = (unsigned long)pd + 0x1007; /* Level 3 */
     pd += 512;
-    for ( i = 0; i < 8; i++ )         /* Level 2 */
+    for ( i = 0; i < 4; i++ )         /* Level 2 */
         *pd++ = (i << 21) + 0x1e3;
 
     asm volatile (
@@ -191,8 +195,7 @@ static int shadow_gs_test(void)
 
 void perform_tests(void)
 {
-    int i, passed, skipped;
-
+    unsigned int i, passed, skipped;
     static struct {
         int (* const test)(void);
         const char *description;
@@ -204,10 +207,78 @@ void perform_tests(void)
 
     printf("Testing HVM environment:\n");
 
-    if ( hvm_info->low_mem_pgend < 0x1000 )
+    BUILD_BUG_ON(SCRATCH_PHYSICAL_ADDRESS > HVMLOADER_PHYSICAL_ADDRESS);
+    if ( hvm_info->low_mem_pgend <
+         ((TEST_MEM_BASE + TEST_MEM_SIZE) >> PAGE_SHIFT) )
     {
-        printf("Skipping tests due to insufficient memory (<16MB)\n");
+        printf("Skipping tests due to insufficient memory (<%luMB)\n",
+               (TEST_MEM_BASE + TEST_MEM_SIZE) >> 20);
         return;
+    }
+
+    if ( (unsigned long)_end > TEST_MEM_BASE )
+    {
+        printf("Skipping tests due to overlap with base image\n");
+        return;
+    }
+
+    if ( hvm_start_info->cmdline_paddr &&
+         hvm_start_info->cmdline_paddr < TEST_MEM_BASE + TEST_MEM_SIZE &&
+         ((hvm_start_info->cmdline_paddr +
+           strlen((char *)(uintptr_t)hvm_start_info->cmdline_paddr)) >=
+          TEST_MEM_BASE) )
+    {
+        printf("Skipping tests due to overlap with command line\n");
+        return;
+    }
+
+    if ( hvm_start_info->rsdp_paddr )
+    {
+        printf("Skipping tests due to non-zero RSDP address\n");
+        return;
+    }
+
+    if ( hvm_start_info->nr_modules )
+    {
+        const struct hvm_modlist_entry *modlist =
+            (void *)(uintptr_t)hvm_start_info->modlist_paddr;
+
+        if ( hvm_start_info->modlist_paddr > UINTPTR_MAX ||
+             ((UINTPTR_MAX - (uintptr_t)modlist) / sizeof(*modlist) <
+              hvm_start_info->nr_modules) )
+        {
+            printf("Skipping tests due to inaccessible module list\n");
+            return;
+        }
+
+        if ( TEST_MEM_BASE < (uintptr_t)(modlist +
+                                         hvm_start_info->nr_modules) &&
+             (uintptr_t)modlist < TEST_MEM_BASE + TEST_MEM_SIZE )
+        {
+            printf("Skipping tests due to overlap with module list\n");
+            return;
+        }
+
+        for ( i = 0; i < hvm_start_info->nr_modules; ++i )
+        {
+            if ( TEST_MEM_BASE < modlist[i].paddr + modlist[i].size &&
+                 modlist[i].paddr < TEST_MEM_BASE + TEST_MEM_SIZE )
+            {
+                printf("Skipping tests due to overlap with module %u\n", i);
+                return;
+            }
+
+            if ( modlist[i].cmdline_paddr &&
+                 modlist[i].cmdline_paddr < TEST_MEM_BASE + TEST_MEM_SIZE &&
+                 ((modlist[i].cmdline_paddr +
+                   strlen((char *)(uintptr_t)modlist[i].cmdline_paddr)) >=
+                  TEST_MEM_BASE) )
+            {
+                printf("Skipping tests due to overlap with module %u cmdline\n",
+                       i);
+                return;
+            }
+        }
     }
 
     passed = skipped = 0;
