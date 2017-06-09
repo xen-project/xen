@@ -653,7 +653,7 @@ static void svm_get_segment_register(struct vcpu *v, enum x86_segment seg,
         break;
     case x86_seg_ss:
         *reg = vmcb->ss;
-        reg->attr.fields.dpl = vmcb->_cpl;
+        reg->attr.fields.dpl = vmcb_get_cpl(vmcb);
         break;
     case x86_seg_tr:
         svm_sync_vmcb(v);
@@ -726,7 +726,7 @@ static void svm_set_segment_register(struct vcpu *v, enum x86_segment seg,
         break;
     case x86_seg_ss:
         vmcb->ss = *reg;
-        vmcb->_cpl = vmcb->ss.attr.fields.dpl;
+        vmcb_set_cpl(vmcb, reg->attr.fields.dpl);
         break;
     case x86_seg_tr:
         vmcb->tr = *reg;
@@ -1442,7 +1442,7 @@ static void svm_inject_event(const struct x86_event *event)
      * If injecting an event outside of 64bit mode, zero the upper bits of the
      * %eip and nextrip after the adjustments above.
      */
-    if ( !((vmcb->_efer & EFER_LMA) && vmcb->cs.attr.fields.l) )
+    if ( !((vmcb_get_efer(vmcb) & EFER_LMA) && vmcb->cs.attr.fields.l) )
     {
         regs->rip = regs->eip;
         vmcb->nextrip = (uint32_t)vmcb->nextrip;
