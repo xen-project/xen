@@ -80,14 +80,15 @@ size_t hvm_save_size(struct domain *d)
 int hvm_save_one(struct domain *d, uint16_t typecode, uint16_t instance, 
                  XEN_GUEST_HANDLE_64(uint8) handle)
 {
-    int rv = 0;
+    int rv = -ENOENT;
     size_t sz = 0;
     struct vcpu *v;
     hvm_domain_context_t ctxt = { 0, };
+    const struct hvm_save_descriptor *desc;
 
     if ( d->is_dying 
          || typecode > HVM_SAVE_CODE_MAX 
-         || hvm_sr_handlers[typecode].size < sizeof(struct hvm_save_descriptor)
+         || hvm_sr_handlers[typecode].size < sizeof(*desc)
          || hvm_sr_handlers[typecode].save == NULL )
         return -EINVAL;
 
@@ -108,13 +109,11 @@ int hvm_save_one(struct domain *d, uint16_t typecode, uint16_t instance,
                d->domain_id, typecode);
         rv = -EFAULT;
     }
-    else
+    else if ( ctxt.cur >= sizeof(*desc) )
     {
         uint32_t off;
-        const struct hvm_save_descriptor *desc;
 
-        rv = -ENOENT;
-        for ( off = 0; off < (ctxt.cur - sizeof(*desc)); off += desc->length )
+        for ( off = 0; off <= (ctxt.cur - sizeof(*desc)); off += desc->length )
         {
             desc = (void *)(ctxt.data + off);
             /* Move past header */
@@ -123,7 +122,8 @@ int hvm_save_one(struct domain *d, uint16_t typecode, uint16_t instance,
             {
                 uint32_t copy_length = desc->length;
 
-                if ( off + copy_length > ctxt.cur )
+                if ( ctxt.cur < copy_length ||
+                     off > ctxt.cur - copy_length )
                     copy_length = ctxt.cur - off;
                 rv = 0;
                 if ( copy_to_guest(handle, ctxt.data + off, copy_length) )
