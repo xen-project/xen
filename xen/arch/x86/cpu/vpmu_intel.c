@@ -80,12 +80,13 @@ static bool_t __read_mostly full_width_write;
 #define FIXED_CTR_CTRL_MASK ((1 << FIXED_CTR_CTRL_BITS) - 1)
 
 #define ARCH_CNTR_ENABLED   (1ULL << 22)
+#define ARCH_CNTR_PIN_CONTROL (1ULL << 19)
 
 /* Number of general-purpose and fixed performance counters */
 static unsigned int __read_mostly arch_pmc_cnt, fixed_pmc_cnt;
 
 /* Masks used for testing whether and MSR is valid */
-#define ARCH_CTRL_MASK  (~((1ull << 32) - 1) | (1ull << 21))
+#define ARCH_CTRL_MASK  (~((1ull << 32) - 1) | (1ull << 21) | ARCH_CNTR_PIN_CONTROL)
 static uint64_t __read_mostly fixed_ctrl_mask, fixed_counters_mask;
 static uint64_t __read_mostly global_ovf_ctrl_mask, global_ctrl_mask;
 
