@@ -271,7 +271,7 @@ static __init int brcm_init(void)
     return brcm_populate_plat_regs();
 }
 
-static const char const *brcm_dt_compat[] __initconst =
+static const char *const brcm_dt_compat[] __initconst =
 {
     "brcm,bcm7445d0",
     NULL
