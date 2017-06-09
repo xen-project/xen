@@ -1761,9 +1761,8 @@ static void load_segments(struct vcpu *n)
         struct pv_vcpu *pv = &n->arch.pv_vcpu;
         struct cpu_user_regs *regs = guest_cpu_user_regs();
         unsigned long *rsp =
-            (n->arch.flags & TF_kernel_mode) ?
-            (unsigned long *)regs->rsp :
-            (unsigned long *)pv->kernel_sp;
+            (unsigned long *)(((n->arch.flags & TF_kernel_mode)
+                               ? regs->rsp : pv->kernel_sp) & ~0xf);
         unsigned long cs_and_mask, rflags;
 
         /* Fold upcall mask and architectural IOPL into RFLAGS.IF. */
