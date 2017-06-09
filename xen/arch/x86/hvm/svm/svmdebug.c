@@ -26,60 +26,52 @@ static void svm_dump_sel(const char *name, const svm_segment_register_t *s)
            name, s->sel, s->attr.bytes, s->limit, s->base);
 }
 
-/* This function can directly access fields which are covered by clean bits. */
-void svm_vmcb_dump(const char *from, struct vmcb_struct *vmcb)
+void svm_vmcb_dump(const char *from, const struct vmcb_struct *vmcb)
 {
     printk("Dumping guest's current state at %s...\n", from);
-    printk("Size of VMCB = %d, paddr = %#lx, vaddr = %p\n",
-           (int) sizeof(struct vmcb_struct), virt_to_maddr(vmcb), vmcb);
+    printk("Size of VMCB = %zu, paddr = %"PRIpaddr", vaddr = %p\n",
+           sizeof(struct vmcb_struct), virt_to_maddr(vmcb), vmcb);
 
     printk("cr_intercepts = %#x dr_intercepts = %#x "
            "exception_intercepts = %#x\n",
-           vmcb->_cr_intercepts, vmcb->_dr_intercepts, 
-           vmcb->_exception_intercepts);
+           vmcb_get_cr_intercepts(vmcb), vmcb_get_dr_intercepts(vmcb),
+           vmcb_get_exception_intercepts(vmcb));
     printk("general1_intercepts = %#x general2_intercepts = %#x\n",
-           vmcb->_general1_intercepts, vmcb->_general2_intercepts);
-    printk("iopm_base_pa = %#Lx msrpm_base_pa = %#Lx tsc_offset = %#Lx\n",
-           (unsigned long long)vmcb->_iopm_base_pa,
-           (unsigned long long)vmcb->_msrpm_base_pa,
-           (unsigned long long)vmcb->_tsc_offset);
-    printk("tlb_control = %#x vintr = %#Lx interrupt_shadow = %#Lx\n",
-           vmcb->tlb_control,
-           (unsigned long long)vmcb->_vintr.bytes,
-           (unsigned long long)vmcb->interrupt_shadow);
+           vmcb_get_general1_intercepts(vmcb), vmcb_get_general2_intercepts(vmcb));
+    printk("iopm_base_pa = %#"PRIx64" msrpm_base_pa = %#"PRIx64" tsc_offset = %#"PRIx64"\n",
+           vmcb_get_iopm_base_pa(vmcb), vmcb_get_msrpm_base_pa(vmcb),
+           vmcb_get_tsc_offset(vmcb));
+    printk("tlb_control = %#x vintr = %#"PRIx64" interrupt_shadow = %#"PRIx64"\n",
+           vmcb->tlb_control, vmcb_get_vintr(vmcb).bytes,
+           vmcb->interrupt_shadow);
     printk("eventinj %016"PRIx64", valid? %d, ec? %d, type %u, vector %#x\n",
            vmcb->eventinj.bytes, vmcb->eventinj.fields.v,
            vmcb->eventinj.fields.ev, vmcb->eventinj.fields.type,
            vmcb->eventinj.fields.vector);
-    printk("exitcode = %#Lx exitintinfo = %#Lx\n",
-           (unsigned long long)vmcb->exitcode,
-           (unsigned long long)vmcb->exitintinfo.bytes);
-    printk("exitinfo1 = %#Lx exitinfo2 = %#Lx \n",
-           (unsigned long long)vmcb->exitinfo1,
-           (unsigned long long)vmcb->exitinfo2);
-    printk("np_enable = %Lx guest_asid = %#x\n",
-           (unsigned long long)vmcb->_np_enable, vmcb->_guest_asid);
-    printk("cpl = %d efer = %#Lx star = %#Lx lstar = %#Lx\n",
-           vmcb->_cpl, (unsigned long long)vmcb->_efer,
-           (unsigned long long)vmcb->star, (unsigned long long)vmcb->lstar);
-    printk("CR0 = 0x%016llx CR2 = 0x%016llx\n",
-           (unsigned long long)vmcb->_cr0, (unsigned long long)vmcb->_cr2);
-    printk("CR3 = 0x%016llx CR4 = 0x%016llx\n", 
-           (unsigned long long)vmcb->_cr3, (unsigned long long)vmcb->_cr4);
-    printk("RSP = 0x%016llx  RIP = 0x%016llx\n", 
-           (unsigned long long)vmcb->rsp, (unsigned long long)vmcb->rip);
-    printk("RAX = 0x%016llx  RFLAGS=0x%016llx\n",
-           (unsigned long long)vmcb->rax, (unsigned long long)vmcb->rflags);
-    printk("DR6 = 0x%016llx, DR7 = 0x%016llx\n", 
-           (unsigned long long)vmcb->_dr6, (unsigned long long)vmcb->_dr7);
-    printk("CSTAR = 0x%016llx SFMask = 0x%016llx\n",
-           (unsigned long long)vmcb->cstar, 
-           (unsigned long long)vmcb->sfmask);
-    printk("KernGSBase = 0x%016llx PAT = 0x%016llx \n", 
-           (unsigned long long)vmcb->kerngsbase,
-           (unsigned long long)vmcb->_g_pat);
-    printk("H_CR3 = 0x%016llx CleanBits = %#x\n",
-           (unsigned long long)vmcb->_h_cr3, vmcb->cleanbits.bytes);
+    printk("exitcode = %#"PRIx64" exitintinfo = %#"PRIx64"\n",
+           vmcb->exitcode, vmcb->exitintinfo.bytes);
+    printk("exitinfo1 = %#"PRIx64" exitinfo2 = %#"PRIx64"\n",
+           vmcb->exitinfo1, vmcb->exitinfo2);
+    printk("np_enable = %#"PRIx64" guest_asid = %#x\n",
+           vmcb_get_np_enable(vmcb), vmcb_get_guest_asid(vmcb));
+    printk("cpl = %d efer = %#"PRIx64" star = %#"PRIx64" lstar = %#"PRIx64"\n",
+           vmcb_get_cpl(vmcb), vmcb_get_efer(vmcb), vmcb->star, vmcb->lstar);
+    printk("CR0 = 0x%016"PRIx64" CR2 = 0x%016"PRIx64"\n",
+           vmcb_get_cr0(vmcb), vmcb_get_cr2(vmcb));
+    printk("CR3 = 0x%016"PRIx64" CR4 = 0x%016"PRIx64"\n",
+           vmcb_get_cr3(vmcb), vmcb_get_cr4(vmcb));
+    printk("RSP = 0x%016"PRIx64"  RIP = 0x%016"PRIx64"\n",
+           vmcb->rsp, vmcb->rip);
+    printk("RAX = 0x%016"PRIx64"  RFLAGS=0x%016"PRIx64"\n",
+           vmcb->rax, vmcb->rflags);
+    printk("DR6 = 0x%016"PRIx64", DR7 = 0x%016"PRIx64"\n",
+           vmcb_get_dr6(vmcb), vmcb_get_dr7(vmcb));
+    printk("CSTAR = 0x%016"PRIx64" SFMask = 0x%016"PRIx64"\n",
+           vmcb->cstar, vmcb->sfmask);
+    printk("KernGSBase = 0x%016"PRIx64" PAT = 0x%016"PRIx64"\n",
+           vmcb->kerngsbase, vmcb_get_g_pat(vmcb));
+    printk("H_CR3 = 0x%016"PRIx64" CleanBits = %#x\n",
+           vmcb_get_h_cr3(vmcb), vmcb->cleanbits.bytes);
 
     /* print out all the selectors */
     printk("       sel attr  limit   base\n");

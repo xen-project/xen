@@ -22,7 +22,7 @@
 #include <asm/types.h>
 #include <asm/hvm/svm/vmcb.h>
 
-void svm_vmcb_dump(const char *from, struct vmcb_struct *vmcb);
+void svm_vmcb_dump(const char *from, const struct vmcb_struct *vmcb);
 bool_t svm_vmcb_isvalid(const char *from, struct vmcb_struct *vmcb,
                         bool_t verbose);
 
