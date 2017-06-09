@@ -666,6 +666,7 @@ ept_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
     ept_entry_t *table, *ept_entry = NULL;
     unsigned long gfn_remainder = gfn;
     unsigned int i, target = order / EPT_TABLE_ORDER;
+    unsigned long fn_mask = !mfn_eq(mfn, INVALID_MFN) ? (gfn | mfn_x(mfn)) : gfn;
     int ret, rc = 0;
     bool_t entry_written = 0;
     bool_t direct_mmio = (p2mt == p2m_mmio_direct);
@@ -686,7 +687,7 @@ ept_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
      * 2. gfn not exceeding guest physical address width.
      * 3. passing a valid order.
      */
-    if ( ((gfn | mfn_x(mfn)) & ((1UL << order) - 1)) ||
+    if ( (fn_mask & ((1UL << order) - 1)) ||
          ((u64)gfn >> ((ept_get_wl(ept) + 1) * EPT_TABLE_ORDER)) ||
          (order % EPT_TABLE_ORDER) )
         return -EINVAL;

@@ -480,12 +480,15 @@ int p2m_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
     while ( todo )
     {
         if ( hap_enabled(d) )
-            order = (!((gfn | mfn_x(mfn) | todo) &
-                       ((1ul << PAGE_ORDER_1G) - 1)) &&
+        {
+            unsigned long fn_mask = !mfn_eq(mfn, INVALID_MFN) ?
+                                     (gfn | mfn_x(mfn) | todo) : (gfn | todo);
+
+            order = (!(fn_mask & ((1ul << PAGE_ORDER_1G) - 1)) &&
                      hap_has_1gb) ? PAGE_ORDER_1G :
-                    (!((gfn | mfn_x(mfn) | todo) &
-                       ((1ul << PAGE_ORDER_2M) - 1)) &&
+                    (!(fn_mask & ((1ul << PAGE_ORDER_2M) - 1)) &&
                      hap_has_2mb) ? PAGE_ORDER_2M : PAGE_ORDER_4K;
+        }
         else
             order = 0;
 
