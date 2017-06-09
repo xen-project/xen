@@ -88,7 +88,7 @@ static void *crash_heap_current = NULL, *crash_heap_end = NULL;
 /*
  * Parse command lines in the format
  *
- *   crashkernel=<ramsize-range>:<size>[,...][{@,<}<address>]
+ *   crashkernel=<ramsize-range>:<size>[,...][{@,<,below=}<address>]
  *
  * with <ramsize-range> being of form
  *
@@ -97,6 +97,10 @@ static void *crash_heap_current = NULL, *crash_heap_end = NULL;
  * as well as the legacy ones in the format
  *
  *   crashkernel=<size>[{@,<}<address>]
+ *   crashkernel=<size>,below=address
+ *
+ * < and below are synonyomous, the latter being useful for grub2 systems
+ * which would otherwise require escaping of the < option
  */
 static void __init parse_crashkernel(const char *str)
 {
@@ -111,7 +115,7 @@ static void __init parse_crashkernel(const char *str)
             {
                 printk(XENLOG_WARNING "crashkernel: too many ranges\n");
                 cur = NULL;
-                str = strpbrk(str, "@<");
+                str = strpbrk(str, "@,<");
                 break;
             }
 
@@ -162,6 +166,8 @@ static void __init parse_crashkernel(const char *str)
             kexec_crash_area.start = parse_size_and_unit(cur = str + 1, &str);
         else if ( *str == '<' )
             kexec_crash_area_limit = parse_size_and_unit(cur = str + 1, &str);
+        else if ( !strncmp(str, ",below=", 7) )
+            kexec_crash_area_limit = parse_size_and_unit(cur = str + 7, &str);
         else
             printk(XENLOG_WARNING "crashkernel: '%s' ignored\n", str);
     }

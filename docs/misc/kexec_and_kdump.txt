@@ -136,7 +136,13 @@ command line parameter to the Xen hypervisor. It has two forms:
 
       e.g. crashkernel=128M@256M
 
-   Regardless of which of the two forms of the crashkernel command line you
+  iii) crashkernel=size,below=offset
+
+      This allows us to place the crash kernel within the usuable address
+      space without having to worry about a specific phyiscal address.
+      The '<' and 'below' options are  synonymous
+
+   Regardless of which of the forms of the crashkernel command line you
    use, the crash kernel region should appear in /proc/iomem on x86. If it
    doesn't then either the crashkernel parameter is missing, or for some
    reason the region couldn't be placed - for instance because it is too large.
