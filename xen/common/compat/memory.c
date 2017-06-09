@@ -249,12 +249,14 @@ int compat_memory_op(unsigned int cmd, XEN_GUEST_HANDLE_PARAM(void) compat)
             unsigned int limit = (COMPAT_ARG_XLAT_SIZE - sizeof(*nat.atpb))
                                  / (sizeof(nat.atpb->idxs.p) + sizeof(nat.atpb->gpfns.p));
             /* Use an intermediate variable to suppress warnings on old gcc: */
-            unsigned int size = cmp.atpb.size;
+            unsigned int size;
             xen_ulong_t *idxs = (void *)(nat.atpb + 1);
             xen_pfn_t *gpfns = (void *)(idxs + limit);
 
-            if ( copy_from_guest(&cmp.atpb, compat, 1) ||
-                 !compat_handle_okay(cmp.atpb.idxs, size) ||
+            if ( copy_from_guest(&cmp.atpb, compat, 1) )
+                return -EFAULT;
+            size = cmp.atpb.size;
+            if ( !compat_handle_okay(cmp.atpb.idxs, size) ||
                  !compat_handle_okay(cmp.atpb.gpfns, size) ||
                  !compat_handle_okay(cmp.atpb.errs, size) )
                 return -EFAULT;
