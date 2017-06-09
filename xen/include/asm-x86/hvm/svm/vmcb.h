@@ -544,51 +544,47 @@ void svm_intercept_msr(struct vcpu *v, uint32_t msr, int enable);
  * VMCB accessor functions.
  */
 
-#define VMCB_ACCESSORS(_type, _name, _cleanbit)                             \
-static inline void vmcb_set_##_name(struct vmcb_struct *vmcb, _type value)  \
-{                                                                           \
-    vmcb->_##_name = value;                                                 \
-    vmcb->cleanbits.fields._cleanbit = 0;                                   \
-}                                                                           \
-static inline _type vmcb_get_##_name(const struct vmcb_struct *vmcb)        \
-{                                                                           \
-    return vmcb->_##_name;                                                  \
+#define VMCB_ACCESSORS(name, cleanbit)            \
+static inline void                                \
+vmcb_set_ ## name(struct vmcb_struct *vmcb,       \
+                  typeof(vmcb->_ ## name) value)  \
+{                                                 \
+    vmcb->_ ## name = value;                      \
+    vmcb->cleanbits.fields.cleanbit = 0;          \
+}                                                 \
+static inline typeof(alloc_vmcb()->_ ## name)     \
+vmcb_get_ ## name(const struct vmcb_struct *vmcb) \
+{                                                 \
+    return vmcb->_ ## name;                       \
 }
 
-VMCB_ACCESSORS(u32, cr_intercepts, intercepts)
-VMCB_ACCESSORS(u32, dr_intercepts, intercepts)
-VMCB_ACCESSORS(u32, exception_intercepts, intercepts)
-VMCB_ACCESSORS(u32, general1_intercepts, intercepts)
-VMCB_ACCESSORS(u32, general2_intercepts, intercepts)
-VMCB_ACCESSORS(u16, pause_filter_count, intercepts)
-VMCB_ACCESSORS(u64, tsc_offset, intercepts)
-VMCB_ACCESSORS(u64, iopm_base_pa, iopm)
-VMCB_ACCESSORS(u64, msrpm_base_pa, iopm)
-VMCB_ACCESSORS(u32, guest_asid, asid)
-VMCB_ACCESSORS(vintr_t, vintr, tpr)
-VMCB_ACCESSORS(u64, np_enable, np)
-VMCB_ACCESSORS(u64, h_cr3, np)
-VMCB_ACCESSORS(u64, g_pat, np)
-VMCB_ACCESSORS(u64, cr0, cr)
-VMCB_ACCESSORS(u64, cr3, cr)
-VMCB_ACCESSORS(u64, cr4, cr)
-VMCB_ACCESSORS(u64, efer, cr)
-VMCB_ACCESSORS(u64, dr6, dr)
-VMCB_ACCESSORS(u64, dr7, dr)
-/* Updates are all via hvm_set_segment_register(). */
-/* VMCB_ACCESSORS(svm_segment_register_t, gdtr, dt) */
-/* VMCB_ACCESSORS(svm_segment_register_t, idtr, dt) */
-/* VMCB_ACCESSORS(svm_segment_register_t, cs, seg) */
-/* VMCB_ACCESSORS(svm_segment_register_t, ds, seg) */
-/* VMCB_ACCESSORS(svm_segment_register_t, es, seg) */
-/* VMCB_ACCESSORS(svm_segment_register_t, ss, seg) */
-VMCB_ACCESSORS(u8, cpl, seg)
-VMCB_ACCESSORS(u64, cr2, cr2)
-VMCB_ACCESSORS(u64, debugctlmsr, lbr)
-VMCB_ACCESSORS(u64, lastbranchfromip, lbr)
-VMCB_ACCESSORS(u64, lastbranchtoip, lbr)
-VMCB_ACCESSORS(u64, lastintfromip, lbr)
-VMCB_ACCESSORS(u64, lastinttoip, lbr)
+VMCB_ACCESSORS(cr_intercepts, intercepts)
+VMCB_ACCESSORS(dr_intercepts, intercepts)
+VMCB_ACCESSORS(exception_intercepts, intercepts)
+VMCB_ACCESSORS(general1_intercepts, intercepts)
+VMCB_ACCESSORS(general2_intercepts, intercepts)
+VMCB_ACCESSORS(pause_filter_count, intercepts)
+VMCB_ACCESSORS(tsc_offset, intercepts)
+VMCB_ACCESSORS(iopm_base_pa, iopm)
+VMCB_ACCESSORS(msrpm_base_pa, iopm)
+VMCB_ACCESSORS(guest_asid, asid)
+VMCB_ACCESSORS(vintr, tpr)
+VMCB_ACCESSORS(np_enable, np)
+VMCB_ACCESSORS(h_cr3, np)
+VMCB_ACCESSORS(g_pat, np)
+VMCB_ACCESSORS(cr0, cr)
+VMCB_ACCESSORS(cr3, cr)
+VMCB_ACCESSORS(cr4, cr)
+VMCB_ACCESSORS(efer, cr)
+VMCB_ACCESSORS(dr6, dr)
+VMCB_ACCESSORS(dr7, dr)
+VMCB_ACCESSORS(cpl, seg)
+VMCB_ACCESSORS(cr2, cr2)
+VMCB_ACCESSORS(debugctlmsr, lbr)
+VMCB_ACCESSORS(lastbranchfromip, lbr)
+VMCB_ACCESSORS(lastbranchtoip, lbr)
+VMCB_ACCESSORS(lastintfromip, lbr)
+VMCB_ACCESSORS(lastinttoip, lbr)
 
 #undef VMCB_ACCESSORS
 
