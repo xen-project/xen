@@ -479,9 +479,9 @@ static inline struct page_info *get_page_from_gfn(
     if ( paging_mode_translate(d) )
         return get_page_from_gfn_p2m(d, p2m_get_hostp2m(d), gfn, t, NULL, q);
 
-    /* Non-translated guests see 1-1 RAM mappings everywhere */
-    if (t)
-        *t = p2m_ram_rw;
+    /* Non-translated guests see 1-1 RAM / MMIO mappings everywhere */
+    if ( t )
+        *t = likely(d != dom_io) ? p2m_ram_rw : p2m_mmio_direct;
     page = __mfn_to_page(gfn);
     return mfn_valid(_mfn(gfn)) && get_page(page, d) ? page : NULL;
 }
