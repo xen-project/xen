@@ -102,7 +102,7 @@ $(BINDINGS): $(SHLIB) $(SHLIB_LINKS) src/xenstat.h
 SWIG_FLAGS=-module xenstat -Isrc
 
 # Python bindings
-PYTHON_VERSION=2.3
+PYTHON_VERSION=$(PYTHON:python%=%)
 PYTHON_FLAGS=-I/usr/include/python$(PYTHON_VERSION) -lpython$(PYTHON_VERSION)
 $(PYMOD): $(PYSRC)
 $(PYSRC): bindings/swig/xenstat.i
