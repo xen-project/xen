@@ -16,6 +16,7 @@
  *
  */
 
+#include <xen/sched.h>
 #include <asm/processor.h>
 #include <asm/msr-index.h>
 #include <asm/hvm/svm/svmdebug.h>
@@ -87,93 +88,75 @@ void svm_vmcb_dump(const char *from, const struct vmcb_struct *vmcb)
     svm_dump_sel("  TR", &vmcb->tr);
 }
 
-bool_t
-svm_vmcb_isvalid(const char *from, struct vmcb_struct *vmcb,
-                 bool_t verbose)
+bool svm_vmcb_isvalid(const char *from, const struct vmcb_struct *vmcb,
+                      const struct vcpu *v, bool verbose)
 {
-    bool_t ret = 0; /* ok */
+    bool ret = false; /* ok */
+    unsigned long cr0 = vmcb_get_cr0(vmcb);
+    unsigned long cr3 = vmcb_get_cr3(vmcb);
+    unsigned long cr4 = vmcb_get_cr4(vmcb);
+    uint64_t efer = vmcb_get_efer(vmcb);
 
-#define PRINTF(...) \
-    if (verbose) { ret = 1; printk("%s: ", from); printk(__VA_ARGS__); \
-    } else return 1;
+#define PRINTF(fmt, args...) do { \
+    if ( !verbose ) return true; \
+    ret = true; \
+    printk(XENLOG_GUEST "%pv[%s]: " fmt, v, from, ## args); \
+} while (0)
 
-    if ((vmcb->_efer & EFER_SVME) == 0) {
-        PRINTF("EFER: SVME bit not set (%#"PRIx64")\n", vmcb->_efer);
-    }
+    if ( !(efer & EFER_SVME) )
+        PRINTF("EFER: SVME bit not set (%#"PRIx64")\n", efer);
 
-    if ((vmcb->_cr0 & X86_CR0_CD) == 0 && (vmcb->_cr0 & X86_CR0_NW) != 0) {
-        PRINTF("CR0: CD bit is zero and NW bit set (%#"PRIx64")\n",
-                vmcb->_cr0);
-    }
+    if ( !(cr0 & X86_CR0_CD) && (cr0 & X86_CR0_NW) )
+        PRINTF("CR0: CD bit is zero and NW bit set (%#"PRIx64")\n", cr0);
 
-    if ((vmcb->_cr0 >> 32U) != 0) {
-        PRINTF("CR0: bits [63:32] are not zero (%#"PRIx64")\n",
-                vmcb->_cr0);
-    }
+    if ( cr0 >> 32 )
+        PRINTF("CR0: bits [63:32] are not zero (%#"PRIx64")\n", cr0);
 
-    if ((vmcb->_cr3 & 0x7) != 0) {
-        PRINTF("CR3: MBZ bits are set (%#"PRIx64")\n", vmcb->_cr3);
-    }
-    if ((vmcb->_efer & EFER_LMA) && (vmcb->_cr3 & 0xfe) != 0) {
-        PRINTF("CR3: MBZ bits are set (%#"PRIx64")\n", vmcb->_cr3);
-    }
+    if ( (cr0 & X86_CR0_PG) &&
+         ((cr3 & 7) ||
+          ((!(cr4 & X86_CR4_PAE) || (efer & EFER_LMA)) && (cr3 & 0xfe0)) ||
+          ((efer & EFER_LMA) &&
+           (cr3 >> v->domain->arch.cpuid->extd.maxphysaddr))) )
+        PRINTF("CR3: MBZ bits are set (%#"PRIx64")\n", cr3);
 
-    if ((vmcb->_cr4 >> 19U) != 0) {
-        PRINTF("CR4: bits [63:19] are not zero (%#"PRIx64")\n",
-                vmcb->_cr4);
-    }
+    if ( cr4 & ~hvm_cr4_guest_valid_bits(v, false) )
+        PRINTF("CR4: invalid bits are set (%#"PRIx64", valid: %#"PRIx64")\n",
+               cr4, hvm_cr4_guest_valid_bits(v, false));
 
-    if (((vmcb->_cr4 >> 11U) & 0x7fU) != 0) {
-        PRINTF("CR4: bits [17:11] are not zero (%#"PRIx64")\n",
-                vmcb->_cr4);
-    }
-
-    if ((vmcb->_dr6 >> 32U) != 0) {
+    if ( vmcb_get_dr6(vmcb) >> 32 )
         PRINTF("DR6: bits [63:32] are not zero (%#"PRIx64")\n",
-                vmcb->_dr6);
-    }
+               vmcb_get_dr6(vmcb));
 
-    if ((vmcb->_dr7 >> 32U) != 0) {
+    if ( vmcb_get_dr7(vmcb) >> 32 )
         PRINTF("DR7: bits [63:32] are not zero (%#"PRIx64")\n",
-                vmcb->_dr7);
-    }
+               vmcb_get_dr7(vmcb));
 
-    if ((vmcb->_efer >> 15U) != 0) {
-        PRINTF("EFER: bits [63:15] are not zero (%#"PRIx64")\n",
-                vmcb->_efer);
-    }
+    if ( efer & ~(EFER_SCE | EFER_LME | EFER_LMA | EFER_NX | EFER_SVME |
+                  EFER_LMSLE | EFER_FFXSE) )
+        PRINTF("EFER: undefined bits are not zero (%#"PRIx64")\n", efer);
 
-    if ((vmcb->_efer & EFER_LME) != 0 && ((vmcb->_cr0 & X86_CR0_PG) != 0)) {
-        if ((vmcb->_cr4 & X86_CR4_PAE) == 0) {
-            PRINTF("EFER_LME and CR0.PG are both set and CR4.PAE is zero.\n");
-        }
-        if ((vmcb->_cr0 & X86_CR0_PE) == 0) {
-            PRINTF("EFER_LME and CR0.PG are both set and CR0.PE is zero.\n");
-        }
-    }
+    if ( hvm_efer_valid(v, efer, -1) )
+        PRINTF("EFER: %s (%"PRIx64")\n", hvm_efer_valid(v, efer, -1), efer);
 
-    if ((vmcb->_efer & EFER_LME) != 0
-        && (vmcb->_cr0 & X86_CR0_PG) != 0
-        && (vmcb->_cr4 & X86_CR4_PAE) != 0
-        && (vmcb->cs.attr.fields.l != 0)
-        && (vmcb->cs.attr.fields.db != 0))
+    if ( (efer & EFER_LME) && (cr0 & X86_CR0_PG) )
     {
-        PRINTF("EFER_LME, CR0.PG, CR4.PAE, CS.L and CS.D are all non-zero.\n");
+        if ( !(cr4 & X86_CR4_PAE) )
+            PRINTF("EFER_LME and CR0.PG are both set and CR4.PAE is zero\n");
+        if ( !(cr0 & X86_CR0_PE) )
+            PRINTF("EFER_LME and CR0.PG are both set and CR0.PE is zero\n");
     }
 
-    if ((vmcb->_general2_intercepts & GENERAL2_INTERCEPT_VMRUN) == 0) {
+    if ( (efer & EFER_LME) && (cr0 & X86_CR0_PG) && (cr4 & X86_CR4_PAE) &&
+         vmcb->cs.attr.fields.l && vmcb->cs.attr.fields.db )
+        PRINTF("EFER_LME, CR0.PG, CR4.PAE, CS.L and CS.D are all non-zero\n");
+
+    if ( !(vmcb_get_general2_intercepts(vmcb) & GENERAL2_INTERCEPT_VMRUN) )
         PRINTF("GENERAL2_INTERCEPT: VMRUN intercept bit is clear (%#"PRIx32")\n",
-            vmcb->_general2_intercepts);
-    }
+               vmcb_get_general2_intercepts(vmcb));
 
-    if (vmcb->eventinj.fields.resvd1 != 0) {
+    if ( vmcb->eventinj.fields.resvd1 )
         PRINTF("eventinj: MBZ bits are set (%#"PRIx64")\n",
-                vmcb->eventinj.bytes);
-    }
-
-    if (vmcb->_np_enable && vmcb->_h_cr3 == 0) {
-        PRINTF("nested paging enabled but host cr3 is 0\n");
-    }
+               vmcb->eventinj.bytes);
 
 #undef PRINTF
     return ret;

@@ -658,13 +658,13 @@ static int nsvm_vmcb_prepare4vmrun(struct vcpu *v, struct cpu_user_regs *regs)
     /* Cleanbits */
     n2vmcb->cleanbits.bytes = 0;
 
-    rc = svm_vmcb_isvalid(__func__, ns_vmcb, 1);
+    rc = svm_vmcb_isvalid(__func__, ns_vmcb, v, true);
     if (rc) {
         gdprintk(XENLOG_ERR, "virtual vmcb invalid\n");
         return NSVM_ERROR_VVMCB;
     }
 
-    rc = svm_vmcb_isvalid(__func__, n2vmcb, 1);
+    rc = svm_vmcb_isvalid(__func__, n2vmcb, v, true);
     if (rc) {
         gdprintk(XENLOG_ERR, "n2vmcb invalid\n");
         return NSVM_ERROR_VMENTRY;
