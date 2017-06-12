@@ -2841,6 +2841,14 @@ int xc_psr_cat_get_l3_info(xc_interface *xch, uint32_t socket,
                            uint32_t *cos_max, uint32_t *cbm_len);
 #endif
 
+/*
+ * Ensure cache coherency after memory modifications. A call to this function
+ * is only required on ARM as the x86 architecture provides cache coherency
+ * guarantees. Calling this function on x86 is allowed but has no effect.
+ */
+int xc_domain_cacheflush(xc_interface *xch, uint32_t domid,
+                         xen_pfn_t start_pfn, xen_pfn_t nr_pfns);
+
 #endif /* XENCTRL_H */
 
 /*

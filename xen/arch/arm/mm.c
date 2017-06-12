@@ -390,6 +390,16 @@ void flush_page_to_ram(unsigned long mfn)
 
     clean_and_invalidate_dcache_va_range(v, PAGE_SIZE);
     unmap_domain_page(v);
+
+    /*
+     * For some of the instruction cache (such as VIPT), the entire I-Cache
+     * needs to be flushed to guarantee that all the aliases of a given
+     * physical address will be removed from the cache.
+     * Invalidating the I-Cache by VA highly depends on the behavior of the
+     * I-Cache (See D4.9.2 in ARM DDI 0487A.k_iss10775). Instead of using flush
+     * by VA on select platforms, we just flush the entire cache here.
+     */
+    invalidate_icache();
 }
 
 void __init arch_init_memory(void)
