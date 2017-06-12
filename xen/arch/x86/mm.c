@@ -1591,7 +1591,7 @@ void init_guest_l4_table(l4_pgentry_t l4tab[], const struct domain *d,
         l4e_from_pfn(domain_page_map_to_mfn(l4tab), __PAGE_HYPERVISOR_RW);
     l4tab[l4_table_offset(PERDOMAIN_VIRT_START)] =
         l4e_from_page(d->arch.perdomain_l3_pg, __PAGE_HYPERVISOR_RW);
-    if ( zap_ro_mpt || is_pv_32bit_domain(d) || paging_mode_refcounts(d) )
+    if ( zap_ro_mpt || is_pv_32bit_domain(d) )
         l4tab[l4_table_offset(RO_MPT_VIRT_START)] = l4e_empty();
 }
 
@@ -1902,12 +1902,7 @@ static int mod_l1_entry(l1_pgentry_t *pl1e, l1_pgentry_t nl1e,
     if ( unlikely(__copy_from_user(&ol1e, pl1e, sizeof(ol1e)) != 0) )
         return -EFAULT;
 
-    if ( unlikely(paging_mode_refcounts(pt_dom)) )
-    {
-        if ( UPDATE_ENTRY(l1, pl1e, ol1e, nl1e, gl1mfn, pt_vcpu, preserve_ad) )
-            return 0;
-        return -EBUSY;
-    }
+    ASSERT(!paging_mode_refcounts(pt_dom));
 
     if ( l1e_get_flags(nl1e) & _PAGE_PRESENT )
     {
@@ -2359,8 +2354,7 @@ int free_page_type(struct page_info *page, unsigned long type,
         /* A page table is dirtied when its type count becomes zero. */
         paging_mark_dirty(owner, _mfn(page_to_mfn(page)));
 
-        if ( shadow_mode_refcounts(owner) )
-            return 0;
+        ASSERT(!shadow_mode_refcounts(owner));
 
         gmfn = mfn_to_gmfn(owner, page_to_mfn(page));
         ASSERT(VALID_M2P(gmfn));
@@ -2960,14 +2954,11 @@ int new_guest_cr3(unsigned long mfn)
         unsigned long gt_mfn = pagetable_get_pfn(curr->arch.guest_table);
         l4_pgentry_t *pl4e = map_domain_page(_mfn(gt_mfn));
 
-        rc = paging_mode_refcounts(d)
-             ? -EINVAL /* Old code was broken, but what should it be? */
-             : mod_l4_entry(
-                    pl4e,
-                    l4e_from_pfn(
-                        mfn,
-                        (_PAGE_PRESENT|_PAGE_RW|_PAGE_USER|_PAGE_ACCESSED)),
-                    gt_mfn, 0, curr);
+        rc = mod_l4_entry(pl4e,
+                          l4e_from_pfn(mfn,
+                                       (_PAGE_PRESENT | _PAGE_RW |
+                                        _PAGE_USER | _PAGE_ACCESSED)),
+                          gt_mfn, 0, curr);
         unmap_domain_page(pl4e);
         switch ( rc )
         {
@@ -3066,13 +3057,6 @@ static struct domain *get_pg_owner(domid_t domid)
     if ( unlikely(domid == curr->domain_id) )
     {
         gdprintk(XENLOG_WARNING, "Cannot specify itself as foreign domain\n");
-        goto out;
-    }
-
-    if ( !is_hvm_domain(curr) && unlikely(paging_mode_translate(curr)) )
-    {
-        gdprintk(XENLOG_WARNING,
-                 "Cannot mix foreign mappings with translated domains\n");
         goto out;
     }
 
@@ -3384,11 +3368,9 @@ long do_mmuext_op(
 
             if ( op.arg1.mfn != 0 )
             {
-                if ( paging_mode_refcounts(d) )
-                    rc = get_page_from_pagenr(op.arg1.mfn, d) ? 0 : -EINVAL;
-                else
-                    rc = get_page_and_type_from_pagenr(
-                        op.arg1.mfn, PGT_root_page_table, d, 0, 1);
+                rc = get_page_and_type_from_pagenr(op.arg1.mfn,
+                                                   PGT_root_page_table,
+                                                   d, 0, 1);
 
                 if ( unlikely(rc) )
                 {
@@ -3400,7 +3382,7 @@ long do_mmuext_op(
                                  rc, op.arg1.mfn);
                     break;
                 }
-                if ( VM_ASSIST(d, m2p_strict) && !paging_mode_refcounts(d) )
+                if ( VM_ASSIST(d, m2p_strict) )
                     zap_ro_mpt(op.arg1.mfn);
             }
 
@@ -3410,21 +3392,18 @@ long do_mmuext_op(
             {
                 page = mfn_to_page(old_mfn);
 
-                if ( paging_mode_refcounts(d) )
-                    put_page(page);
-                else
-                    switch ( rc = put_page_and_type_preemptible(page) )
-                    {
-                    case -EINTR:
-                        rc = -ERESTART;
-                        /* fallthrough */
-                    case -ERESTART:
-                        curr->arch.old_guest_table = page;
-                        break;
-                    default:
-                        BUG_ON(rc);
-                        break;
-                    }
+                switch ( rc = put_page_and_type_preemptible(page) )
+                {
+                case -EINTR:
+                    rc = -ERESTART;
+                    /* fallthrough */
+                case -ERESTART:
+                    curr->arch.old_guest_table = page;
+                    break;
+                default:
+                    BUG_ON(rc);
+                    break;
+                }
             }
 
             break;
@@ -4035,8 +4014,7 @@ static int create_grant_pte_mapping(
 
     page_unlock(page);
 
-    if ( !paging_mode_refcounts(d) )
-        put_page_from_l1e(ol1e, d);
+    put_page_from_l1e(ol1e, d);
 
  failed:
     unmap_domain_page(va);
@@ -4162,7 +4140,7 @@ static int create_grant_va_mapping(
     put_page(l1pg);
     guest_unmap_l1e(pl1e);
 
-    if ( okay && !paging_mode_refcounts(d) )
+    if ( okay )
         put_page_from_l1e(ol1e, d);
 
     return okay ? GNTST_okay : GNTST_general_error;
@@ -4387,7 +4365,7 @@ int replace_grant_host_mapping(
     guest_unmap_l1e(pl1e);
 
     rc = replace_grant_va_mapping(addr, frame, ol1e, curr);
-    if ( rc && !paging_mode_refcounts(curr->domain) )
+    if ( rc )
         put_page_from_l1e(ol1e, curr->domain);
 
     return rc;
