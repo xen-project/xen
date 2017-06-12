@@ -34,7 +34,7 @@ SONAME_FLAGS=-Wl,$(SONAME_LDFLAG) -Wl,libxenstat.so.$(MAJOR)
 CFLAGS+=-fPIC
 CFLAGS+=-Isrc $(CFLAGS_libxenctrl) $(CFLAGS_libxenstore) $(CFLAGS_xeninclude) -include $(XEN_ROOT)/tools/config.h
 
-LDLIBS-y = $(LDLIBS_libxenstore) $(LDLIBS_libxenctrl)
+LDLIBS-y = $(LDLIBS_libxenstore) $(LDLIBS_libxenctrl) -lyajl
 LDLIBS-$(CONFIG_SunOS) += -lkstat
 
 PKG_CONFIG := xenstat.pc
