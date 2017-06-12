@@ -4,15 +4,19 @@
 #include <xen/atomic.h>
 #include <asm/system.h>
 
-#define build_read_atomic(name, size, type, reg, barrier) \
+#define build_read_atomic(name, size, type, reg) \
 static inline type name(const volatile type *addr) \
-{ type ret; asm volatile("mov" size " %1,%0":reg (ret) \
-:"m" (*(volatile type *)addr) barrier); return ret; }
+{ \
+    type ret; \
+    asm volatile ( "mov" size " %1,%0" : reg (ret) : "m" (*addr) ); \
+    return ret; \
+}
 
-#define build_write_atomic(name, size, type, reg, barrier) \
+#define build_write_atomic(name, size, type, reg) \
 static inline void name(volatile type *addr, type val) \
-{ asm volatile("mov" size " %1,%0": "=m" (*(volatile type *)addr) \
-:reg (val) barrier); }
+{ \
+    asm volatile ( "mov" size " %1,%0" : "=m" (*addr) : reg (val) ); \
+}
 
 #define build_add_sized(name, size, type, reg) \
     static inline void name(volatile type *addr, type val)              \
@@ -22,15 +26,15 @@ static inline void name(volatile type *addr, type val) \
                      : reg (val));                                      \
     }
 
-build_read_atomic(read_u8_atomic, "b", uint8_t, "=q", )
-build_read_atomic(read_u16_atomic, "w", uint16_t, "=r", )
-build_read_atomic(read_u32_atomic, "l", uint32_t, "=r", )
-build_read_atomic(read_u64_atomic, "q", uint64_t, "=r", )
+build_read_atomic(read_u8_atomic, "b", uint8_t, "=q")
+build_read_atomic(read_u16_atomic, "w", uint16_t, "=r")
+build_read_atomic(read_u32_atomic, "l", uint32_t, "=r")
+build_read_atomic(read_u64_atomic, "q", uint64_t, "=r")
 
-build_write_atomic(write_u8_atomic, "b", uint8_t, "q", )
-build_write_atomic(write_u16_atomic, "w", uint16_t, "r", )
-build_write_atomic(write_u32_atomic, "l", uint32_t, "r", )
-build_write_atomic(write_u64_atomic, "q", uint64_t, "r", )
+build_write_atomic(write_u8_atomic, "b", uint8_t, "q")
+build_write_atomic(write_u16_atomic, "w", uint16_t, "r")
+build_write_atomic(write_u32_atomic, "l", uint32_t, "r")
+build_write_atomic(write_u64_atomic, "q", uint64_t, "r")
 
 build_add_sized(add_u8_sized, "b", uint8_t, "qi")
 build_add_sized(add_u16_sized, "w", uint16_t, "ri")
