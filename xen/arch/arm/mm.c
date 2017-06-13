@@ -529,6 +529,13 @@ void __init remove_early_mappings(void)
 
 extern void relocate_xen(uint64_t ttbr, void *src, void *dst, size_t len);
 
+/* Clear a translation table and clean & invalidate the cache */
+static void clear_table(void *table)
+{
+    clear_page(table);
+    clean_and_invalidate_dcache_va_range(table, PAGE_SIZE);
+}
+
 /* Boot-time pagetable setup.
  * Changes here may need matching changes in head.S */
 void __init setup_pagetables(unsigned long boot_phys_offset, paddr_t xen_paddr)
@@ -604,18 +611,13 @@ void __init setup_pagetables(unsigned long boot_phys_offset, paddr_t xen_paddr)
 
     /* Clear the copy of the boot pagetables. Each secondary CPU
      * rebuilds these itself (see head.S) */
-    memset(boot_pgtable, 0x0, PAGE_SIZE);
-    clean_and_invalidate_dcache(boot_pgtable);
+    clear_table(boot_pgtable);
 #ifdef CONFIG_ARM_64
-    memset(boot_first, 0x0, PAGE_SIZE);
-    clean_and_invalidate_dcache(boot_first);
-    memset(boot_first_id, 0x0, PAGE_SIZE);
-    clean_and_invalidate_dcache(boot_first_id);
+    clear_table(boot_first);
+    clear_table(boot_first_id);
 #endif
-    memset(boot_second, 0x0, PAGE_SIZE);
-    clean_and_invalidate_dcache(boot_second);
-    memset(boot_third, 0x0, PAGE_SIZE);
-    clean_and_invalidate_dcache(boot_third);
+    clear_table(boot_second);
+    clear_table(boot_third);
 
     /* Break up the Xen mapping into 4k pages and protect them separately. */
     for ( i = 0; i < LPAE_ENTRIES; i++ )
