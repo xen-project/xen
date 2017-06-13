@@ -254,9 +254,11 @@ void dump_hyp_walk(vaddr_t addr)
     dump_pt_walk(ttbr, addr, HYP_PT_ROOT_LEVEL, 1);
 }
 
-/* Standard entry type that we'll use to build Xen's own pagetables.
+/*
+ * Standard entry type that we'll use to build Xen's own pagetables.
  * We put the same permissions at every level, because they're ignored
- * by the walker in non-leaf entries. */
+ * by the walker in non-leaf entries.
+ */
 static inline lpae_t mfn_to_xen_entry(unsigned long mfn, unsigned attr)
 {
     paddr_t pa = ((paddr_t) mfn) << PAGE_SHIFT;
@@ -274,10 +276,12 @@ static inline lpae_t mfn_to_xen_entry(unsigned long mfn, unsigned attr)
             .xn = 1,              /* No need to execute outside .text */
             .avail = 0,           /* Reference count for domheap mapping */
         }};;
-    /* Setting the User bit is strange, but the ATS1H[RW] instructions
+    /*
+     * Setting the User bit is strange, but the ATS1H[RW] instructions
      * don't seem to work otherwise, and since we never run on Xen
      * pagetables in User mode it's OK.  If this changes, remember
-     * to update the hard-coded values in head.S too */
+     * to update the hard-coded values in head.S too.
+     */
 
     switch ( attr )
     {
@@ -298,7 +302,8 @@ static inline lpae_t mfn_to_xen_entry(unsigned long mfn, unsigned attr)
         break;
     case UNCACHED:
     case DEV_SHARED:
-        /* Shareability is ignored for non-Normal memory, Outer is as
+        /*
+         * Shareability is ignored for non-Normal memory, Outer is as
          * good as anything.
          *
          * On ARMv8 sharability is ignored and explicitly treated as Outer
@@ -314,8 +319,9 @@ static inline lpae_t mfn_to_xen_entry(unsigned long mfn, unsigned attr)
     ASSERT(!(pa & ~PAGE_MASK));
     ASSERT(!(pa & ~PADDR_MASK));
 
-    // XXX shifts
+    /* XXX shifts */
     e.bits |= pa;
+
     return e;
 }
 
