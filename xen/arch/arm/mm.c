@@ -261,7 +261,6 @@ void dump_hyp_walk(vaddr_t addr)
  */
 static inline lpae_t mfn_to_xen_entry(unsigned long mfn, unsigned attr)
 {
-    paddr_t pa = ((paddr_t) mfn) << PAGE_SHIFT;
     lpae_t e = (lpae_t) {
         .pt = {
             .valid = 1,           /* Mappings are present */
@@ -316,11 +315,9 @@ static inline lpae_t mfn_to_xen_entry(unsigned long mfn, unsigned attr)
         break;
     }
 
-    ASSERT(!(pa & ~PAGE_MASK));
-    ASSERT(!(pa & ~PADDR_MASK));
+    ASSERT(!(pfn_to_paddr(mfn) & ~PADDR_MASK));
 
-    /* XXX shifts */
-    e.bits |= pa;
+    e.pt.base = mfn;
 
     return e;
 }
