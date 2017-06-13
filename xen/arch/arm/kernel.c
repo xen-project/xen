@@ -183,7 +183,7 @@ static void kernel_zimage_load(struct kernel_info *info)
             return;
         }
 
-        dst = map_domain_page(_mfn(paddr_to_pfn(ma)));
+        dst = map_domain_page(maddr_to_mfn(ma));
 
         copy_from_paddr(dst + s, paddr + offs, l);
 

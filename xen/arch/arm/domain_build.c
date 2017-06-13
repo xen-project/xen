@@ -1007,9 +1007,9 @@ static int map_range_to_domain(const struct dt_device_node *dev,
     if ( need_mapping )
     {
         res = map_regions_p2mt(d,
-                               _gfn(paddr_to_pfn(addr)),
+                               gaddr_to_gfn(addr),
                                PFN_UP(len),
-                               _mfn(paddr_to_pfn(addr)),
+                               maddr_to_mfn(addr),
                                mr_data->p2mt);
 
         if ( res < 0 )
@@ -1544,9 +1544,9 @@ static void acpi_map_other_tables(struct domain *d)
         addr = acpi_gbl_root_table_list.tables[i].address;
         size = acpi_gbl_root_table_list.tables[i].length;
         res = map_regions_p2mt(d,
-                               _gfn(paddr_to_pfn(addr)),
+                               gaddr_to_gfn(addr),
                                PFN_UP(size),
-                               _mfn(paddr_to_pfn(addr)),
+                               maddr_to_mfn(addr),
                                p2m_mmio_direct_c);
         if ( res )
         {
@@ -1901,7 +1901,7 @@ static int prepare_acpi(struct domain *d, struct kernel_info *kinfo)
 
     /* Map the EFI and ACPI tables to Dom0 */
     rc = map_regions_p2mt(d,
-                          _gfn(paddr_to_pfn(d->arch.efi_acpi_gpa)),
+                          gaddr_to_gfn(d->arch.efi_acpi_gpa),
                           PFN_UP(d->arch.efi_acpi_len),
                           _mfn(virt_to_mfn(d->arch.efi_acpi_table)),
                           p2m_mmio_direct_c);
@@ -2014,7 +2014,7 @@ static void initrd_load(struct kernel_info *kinfo)
             return;
         }
 
-        dst = map_domain_page(_mfn(paddr_to_pfn(ma)));
+        dst = map_domain_page(maddr_to_mfn(ma));
 
         copy_from_paddr(dst + s, paddr + offs, l);
 

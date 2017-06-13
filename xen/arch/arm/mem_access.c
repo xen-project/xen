@@ -113,7 +113,7 @@ p2m_mem_access_check_and_get_page(vaddr_t gva, unsigned long flag,
     if ( rc < 0 )
         goto err;
 
-    gfn = _gfn(paddr_to_pfn(ipa));
+    gfn = gaddr_to_gfn(ipa);
 
     /*
      * We do this first as this is faster in the default case when no
@@ -203,7 +203,7 @@ bool_t p2m_mem_access_check(paddr_t gpa, vaddr_t gla, const struct npfec npfec)
     if ( !p2m->mem_access_enabled )
         return true;
 
-    rc = p2m_get_mem_access(v->domain, _gfn(paddr_to_pfn(gpa)), &xma);
+    rc = p2m_get_mem_access(v->domain, gaddr_to_gfn(gpa), &xma);
     if ( rc )
         return true;
 
@@ -245,13 +245,13 @@ bool_t p2m_mem_access_check(paddr_t gpa, vaddr_t gla, const struct npfec npfec)
     /* First, handle rx2rw and n2rwx conversion automatically. */
     if ( npfec.write_access && xma == XENMEM_access_rx2rw )
     {
-        rc = p2m_set_mem_access(v->domain, _gfn(paddr_to_pfn(gpa)), 1,
+        rc = p2m_set_mem_access(v->domain, gaddr_to_gfn(gpa), 1,
                                 0, ~0, XENMEM_access_rw, 0);
         return false;
     }
     else if ( xma == XENMEM_access_n2rwx )
     {
-        rc = p2m_set_mem_access(v->domain, _gfn(paddr_to_pfn(gpa)), 1,
+        rc = p2m_set_mem_access(v->domain, gaddr_to_gfn(gpa), 1,
                                 0, ~0, XENMEM_access_rwx, 0);
     }
 
@@ -273,7 +273,7 @@ bool_t p2m_mem_access_check(paddr_t gpa, vaddr_t gla, const struct npfec npfec)
             {
                 /* A listener is not required, so clear the access
                  * restrictions. */
-                rc = p2m_set_mem_access(v->domain, _gfn(paddr_to_pfn(gpa)), 1,
+                rc = p2m_set_mem_access(v->domain, gaddr_to_gfn(gpa), 1,
                                         0, ~0, XENMEM_access_rwx, 0);
             }
         }

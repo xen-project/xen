@@ -315,7 +315,7 @@ static inline lpae_t mfn_to_xen_entry(mfn_t mfn, unsigned attr)
         break;
     }
 
-    ASSERT(!(pfn_to_paddr(mfn_x(mfn)) & ~PADDR_MASK));
+    ASSERT(!(mfn_to_maddr(mfn) & ~PADDR_MASK));
 
     e.pt.base = mfn_x(mfn);
 
@@ -536,8 +536,8 @@ void __init arch_init_memory(void)
 static inline lpae_t pte_of_xenaddr(vaddr_t va)
 {
     paddr_t ma = va + phys_offset;
-    unsigned long mfn = ma >> PAGE_SHIFT;
-    return mfn_to_xen_entry(_mfn(mfn), WRITEALLOC);
+
+    return mfn_to_xen_entry(maddr_to_mfn(ma), WRITEALLOC);
 }
 
 /* Map the FDT in the early boot page table */
@@ -646,7 +646,7 @@ void __init setup_pagetables(unsigned long boot_phys_offset, paddr_t xen_paddr)
     /* Initialise xen second level entries ... */
     /* ... Xen's text etc */
 
-    pte = mfn_to_xen_entry(_mfn(xen_paddr>>PAGE_SHIFT), WRITEALLOC);
+    pte = mfn_to_xen_entry(maddr_to_mfn(xen_paddr), WRITEALLOC);
     pte.pt.xn = 0;/* Contains our text mapping! */
     xen_second[second_table_offset(XEN_VIRT_START)] = pte;
 
@@ -663,7 +663,7 @@ void __init setup_pagetables(unsigned long boot_phys_offset, paddr_t xen_paddr)
 
     /* ... Boot Misc area for xen relocation */
     dest_va = BOOT_RELOC_VIRT_START;
-    pte = mfn_to_xen_entry(_mfn(xen_paddr >> PAGE_SHIFT), WRITEALLOC);
+    pte = mfn_to_xen_entry(maddr_to_mfn(xen_paddr), WRITEALLOC);
     /* Map the destination in xen_second. */
     xen_second[second_table_offset(dest_va)] = pte;
     /* Map the destination in boot_second. */
@@ -690,11 +690,11 @@ void __init setup_pagetables(unsigned long boot_phys_offset, paddr_t xen_paddr)
     /* Break up the Xen mapping into 4k pages and protect them separately. */
     for ( i = 0; i < LPAE_ENTRIES; i++ )
     {
-        unsigned long mfn = paddr_to_pfn(xen_paddr) + i;
+        mfn_t mfn = mfn_add(maddr_to_mfn(xen_paddr), i);
         unsigned long va = XEN_VIRT_START + (i << PAGE_SHIFT);
         if ( !is_kernel(va) )
             break;
-        pte = mfn_to_xen_entry(_mfn(mfn), WRITEALLOC);
+        pte = mfn_to_xen_entry(mfn, WRITEALLOC);
         pte.pt.table = 1; /* 4k mappings always have this bit set */
         if ( is_kernel_text(va) || is_kernel_inittext(va) )
         {

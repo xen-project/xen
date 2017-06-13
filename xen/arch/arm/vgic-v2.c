@@ -689,8 +689,8 @@ static int vgic_v2_domain_init(struct domain *d)
      * Map the gic virtual cpu interface in the gic cpu interface
      * region of the guest.
      */
-    ret = map_mmio_regions(d, _gfn(paddr_to_pfn(cbase)), csize / PAGE_SIZE,
-                           _mfn(paddr_to_pfn(vbase)));
+    ret = map_mmio_regions(d, gaddr_to_gfn(cbase), csize / PAGE_SIZE,
+                           maddr_to_mfn(vbase));
     if ( ret )
         return ret;
 

@@ -311,7 +311,7 @@ mfn_t p2m_get_entry(struct p2m_domain *p2m, gfn_t gfn,
                     p2m_type_t *t, p2m_access_t *a,
                     unsigned int *page_order)
 {
-    paddr_t addr = pfn_to_paddr(gfn_x(gfn));
+    paddr_t addr = gfn_to_gaddr(gfn);
     unsigned int level = 0;
     lpae_t entry, *table;
     int rc;
@@ -542,7 +542,7 @@ static lpae_t mfn_to_p2m_entry(mfn_t mfn, p2m_type_t t, p2m_access_t a)
 
     p2m_set_permission(&e, t, a);
 
-    ASSERT(!(pfn_to_paddr(mfn_x(mfn)) & ~PADDR_MASK));
+    ASSERT(!(mfn_to_maddr(mfn) & ~PADDR_MASK));
 
     e.p2m.base = mfn_x(mfn);
 
@@ -803,7 +803,7 @@ static int __p2m_set_entry(struct p2m_domain *p2m,
                            p2m_type_t t,
                            p2m_access_t a)
 {
-    paddr_t addr = pfn_to_paddr(gfn_x(sgfn));
+    paddr_t addr = gfn_to_gaddr(sgfn);
     unsigned int level = 0;
     unsigned int target = 3 - (page_order / LPAE_SHIFT);
     lpae_t *entry, *table, orig_pte;
@@ -1440,10 +1440,10 @@ struct page_info *get_page_from_gva(struct vcpu *v, vaddr_t va,
     if ( rc )
         goto err;
 
-    if ( !mfn_valid(_mfn(maddr >> PAGE_SHIFT)) )
+    if ( !mfn_valid(maddr_to_mfn(maddr)) )
         goto err;
 
-    page = mfn_to_page(maddr >> PAGE_SHIFT);
+    page = mfn_to_page(mfn_x(maddr_to_mfn(maddr)));
     ASSERT(page);
 
     if ( unlikely(!get_page(page, d)) )

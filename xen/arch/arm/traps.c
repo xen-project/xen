@@ -2481,12 +2481,12 @@ void dump_guest_s1_walk(struct domain *d, vaddr_t addr)
     uint32_t *first = NULL, *second = NULL;
     mfn_t mfn;
 
-    mfn = gfn_to_mfn(d, _gfn(paddr_to_pfn(ttbr0)));
+    mfn = gfn_to_mfn(d, gaddr_to_gfn(ttbr0));
 
     printk("dom%d VA 0x%08"PRIvaddr"\n", d->domain_id, addr);
     printk("    TTBCR: 0x%08"PRIregister"\n", ttbcr);
     printk("    TTBR0: 0x%016"PRIx64" = 0x%"PRIpaddr"\n",
-           ttbr0, pfn_to_paddr(mfn_x(mfn)));
+           ttbr0, mfn_to_maddr(mfn));
 
     if ( ttbcr & TTBCR_EAE )
     {
@@ -2508,12 +2508,12 @@ void dump_guest_s1_walk(struct domain *d, vaddr_t addr)
 
     offset = addr >> (12+8);
     printk("1ST[0x%"PRIx32"] (0x%"PRIpaddr") = 0x%08"PRIx32"\n",
-           offset, pfn_to_paddr(mfn_x(mfn)), first[offset]);
+           offset, mfn_to_maddr(mfn), first[offset]);
     if ( !(first[offset] & 0x1) ||
           (first[offset] & 0x2) )
         goto done;
 
-    mfn = gfn_to_mfn(d, _gfn(paddr_to_pfn(first[offset])));
+    mfn = gfn_to_mfn(d, gaddr_to_gfn(first[offset]));
 
     if ( mfn_eq(mfn, INVALID_MFN) )
     {
@@ -2523,7 +2523,7 @@ void dump_guest_s1_walk(struct domain *d, vaddr_t addr)
     second = map_domain_page(mfn);
     offset = (addr >> 12) & 0x3FF;
     printk("2ND[0x%"PRIx32"] (0x%"PRIpaddr") = 0x%08"PRIx32"\n",
-           offset, pfn_to_paddr(mfn_x(mfn)), second[offset]);
+           offset, mfn_to_maddr(mfn), second[offset]);
 
 done:
     if (second) unmap_domain_page(second);
@@ -2759,11 +2759,11 @@ static void do_trap_data_abort_guest(struct cpu_user_regs *regs,
          * with the Stage-2 page table. Walk the Stage-2 PT to check
          * if the entry exists. If it's the case, return to the guest
          */
-        mfn = gfn_to_mfn(current->domain, _gfn(paddr_to_pfn(info.gpa)));
+        mfn = gfn_to_mfn(current->domain, gaddr_to_gfn(info.gpa));
         if ( !mfn_eq(mfn, INVALID_MFN) )
             return;
 
-        if ( try_map_mmio(_gfn(paddr_to_pfn(info.gpa))) )
+        if ( try_map_mmio(gaddr_to_gfn(info.gpa)) )
             return;
 
         break;
