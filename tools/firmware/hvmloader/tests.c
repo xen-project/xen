@@ -21,6 +21,7 @@
 
 #include "config.h"
 #include "util.h"
+#include <xen/arch-x86/hvm/start_info.h>
 
 #define TEST_FAIL 0
 #define TEST_PASS 1
