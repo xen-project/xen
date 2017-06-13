@@ -151,16 +151,14 @@ int arch_livepatch_perform_rela(struct livepatch_elf *elf,
                                 const struct livepatch_elf_sec *base,
                                 const struct livepatch_elf_sec *rela)
 {
-    const Elf_RelA *r;
-    unsigned int symndx, i;
-    uint64_t val;
-    uint8_t *dest;
+    unsigned int i;
 
     for ( i = 0; i < (rela->sec->sh_size / rela->sec->sh_entsize); i++ )
     {
-        r = rela->data + i * rela->sec->sh_entsize;
-
-        symndx = ELF64_R_SYM(r->r_info);
+        const Elf_RelA *r = rela->data + i * rela->sec->sh_entsize;
+        unsigned int symndx = ELF64_R_SYM(r->r_info);
+        uint8_t *dest = base->load_addr + r->r_offset;
+        uint64_t val;
 
         if ( symndx > elf->nsym )
         {
@@ -169,7 +167,6 @@ int arch_livepatch_perform_rela(struct livepatch_elf *elf,
             return -EINVAL;
         }
 
-        dest = base->load_addr + r->r_offset;
         val = r->r_addend + elf->sym[symndx].sym->st_value;
 
         switch ( ELF64_R_TYPE(r->r_info) )
