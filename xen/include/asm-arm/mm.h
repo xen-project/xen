@@ -203,10 +203,8 @@ static inline void __iomem *ioremap_wc(paddr_t start, size_t len)
 })
 
 /* Convert between machine frame numbers and page-info structures. */
-#define mfn_to_page(mfn)  (frame_table + (pfn_to_pdx(mfn) - frametable_base_pdx))
-#define page_to_mfn(pg)   pdx_to_pfn((unsigned long)((pg) - frame_table) + frametable_base_pdx)
-#define __page_to_mfn(pg)  page_to_mfn(pg)
-#define __mfn_to_page(mfn) mfn_to_page(mfn)
+#define __mfn_to_page(mfn)  (frame_table + (pfn_to_pdx(mfn) - frametable_base_pdx))
+#define __page_to_mfn(pg)   pdx_to_pfn((unsigned long)((pg) - frame_table) + frametable_base_pdx)
 
 /* Convert between machine addresses and page-info structures. */
 #define maddr_to_page(ma) __mfn_to_page((ma) >> PAGE_SHIFT)
@@ -264,6 +262,13 @@ static inline int gvirt_to_maddr(vaddr_t va, paddr_t *pa, unsigned int flags)
 #define virt_to_mfn(va)   (virt_to_maddr(va) >> PAGE_SHIFT)
 #define mfn_to_virt(mfn)  (maddr_to_virt((paddr_t)(mfn) << PAGE_SHIFT))
 
+/*
+ * We define non-underscored wrappers for above conversion functions.
+ * These are overriden in various source files while underscored version
+ * remain intact.
+ */
+#define mfn_to_page(mfn)    __mfn_to_page(mfn)
+#define page_to_mfn(pg)     __page_to_mfn(pg)
 
 /* Convert between Xen-heap virtual addresses and page-info structures. */
 static inline struct page_info *virt_to_page(const void *v)
