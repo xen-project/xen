@@ -176,16 +176,19 @@ struct page_info
 #define PG_mask(x, idx) (x ## UL << PG_shift(idx))
 
  /* The following page types are MUTUALLY EXCLUSIVE. */
-#define PGT_none          PG_mask(0, 4)  /* no special uses of this page   */
-#define PGT_l1_page_table PG_mask(1, 4)  /* using as an L1 page table?     */
-#define PGT_l2_page_table PG_mask(2, 4)  /* using as an L2 page table?     */
-#define PGT_l3_page_table PG_mask(3, 4)  /* using as an L3 page table?     */
-#define PGT_l4_page_table PG_mask(4, 4)  /* using as an L4 page table?     */
-#define PGT_seg_desc_page PG_mask(5, 4)  /* using this page in a GDT/LDT?  */
-#define PGT_writable_page PG_mask(7, 4)  /* has writable mappings?         */
-#define PGT_shared_page   PG_mask(8, 4)  /* CoW sharable page              */
-#define PGT_type_mask     PG_mask(15, 4) /* Bits 28-31 or 60-63.           */
+#define PGT_none          PG_mask(0, 3)  /* no special uses of this page   */
+#define PGT_l1_page_table PG_mask(1, 3)  /* using as an L1 page table?     */
+#define PGT_l2_page_table PG_mask(2, 3)  /* using as an L2 page table?     */
+#define PGT_l3_page_table PG_mask(3, 3)  /* using as an L3 page table?     */
+#define PGT_l4_page_table PG_mask(4, 3)  /* using as an L4 page table?     */
+#define PGT_seg_desc_page PG_mask(5, 3)  /* using this page in a GDT/LDT?  */
+#define PGT_shared_page   PG_mask(6, 3)  /* CoW sharable page              */
+#define PGT_writable_page PG_mask(7, 3)  /* has writable mappings?         */
+#define PGT_type_mask     PG_mask(7, 3)  /* Bits 61-63.                    */
 
+ /* Page is locked? */
+#define _PGT_locked       PG_shift(4)
+#define PGT_locked        PG_mask(1, 4)
  /* Owning guest has pinned this page to its current type? */
 #define _PGT_pinned       PG_shift(5)
 #define PGT_pinned        PG_mask(1, 5)
@@ -198,12 +201,9 @@ struct page_info
 /* Has this page been *partially* validated for use as its current type? */
 #define _PGT_partial      PG_shift(8)
 #define PGT_partial       PG_mask(1, 8)
- /* Page is locked? */
-#define _PGT_locked       PG_shift(9)
-#define PGT_locked        PG_mask(1, 9)
 
  /* Count of uses of this frame as its current type. */
-#define PGT_count_width   PG_shift(9)
+#define PGT_count_width   PG_shift(8)
 #define PGT_count_mask    ((1UL<<PGT_count_width)-1)
 
  /* Cleared when the owning guest 'frees' this page. */

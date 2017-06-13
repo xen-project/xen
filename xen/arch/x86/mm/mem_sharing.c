@@ -452,7 +452,7 @@ static int audit(void)
         }
 
         /* Check if the MFN has correct type, owner and handle. */ 
-        if ( !(pg->u.inuse.type_info & PGT_shared_page) )
+        if ( (pg->u.inuse.type_info & PGT_type_mask) != PGT_shared_page )
         {
            MEM_SHARING_DEBUG("mfn %lx in audit list, but not PGT_shared_page (%lx)!\n",
                               mfn_x(mfn), pg->u.inuse.type_info & PGT_type_mask);
