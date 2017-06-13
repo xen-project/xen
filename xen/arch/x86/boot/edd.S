@@ -26,46 +26,6 @@
 get_edd:
         cmpb    $2, bootsym(opt_edd)            # edd=off ?
         je      edd_done
-        cmpb    $1, bootsym(opt_edd)            # edd=skipmbr ?
-        je      edd_start
-
-# Read the first sector of each BIOS disk device and store the 4-byte signature
-edd_mbr_sig_start:
-        movb    $0x80, %dl                      # from device 80
-        movw    $bootsym(boot_mbr_signature),%bx # store buffer ptr in bx
-edd_mbr_sig_read:
-        pushw   %bx
-        movb    $0x02, %ah                      # 0x02 Read Sectors
-        movb    $1, %al                         # read 1 sector
-        movb    $0, %dh                         # at head 0
-        movw    $1, %cx                         # cylinder 0, sector 0
-        pushw   %es
-        pushw   %ds
-        popw    %es
-        movw    $bootsym(boot_edd_info), %bx    # disk's data goes into info
-        pushw   %dx             # work around buggy BIOSes
-        stc                     # work around buggy BIOSes
-        int     $0x13
-        sti                     # work around buggy BIOSes
-        popw    %dx
-        popw    %es
-        popw    %bx
-        jc      edd_mbr_sig_done                # on failure, we're done.
-        cmpb    $0, %ah                         # some BIOSes do not set CF
-        jne     edd_mbr_sig_done                # on failure, we're done.
-        cmpw    $0xaa55, bootsym(boot_edd_info)+0x1fe
-        jne     .Ledd_mbr_sig_next
-        movl    bootsym(boot_edd_info)+EDD_MBR_SIG_OFFSET,%eax
-        movb    %dl, (%bx)                      # store BIOS drive number
-        movl    %eax, 4(%bx)                    # store signature from MBR
-        incb    bootsym(boot_mbr_signature_nr)  # note that we stored something
-        addw    $8, %bx                         # increment sig buffer ptr
-.Ledd_mbr_sig_next:
-        incb    %dl                             # increment to next device
-        jz      edd_mbr_sig_done
-        cmpb    $EDD_MBR_SIG_MAX,bootsym(boot_mbr_signature_nr)
-        jb      edd_mbr_sig_read
-edd_mbr_sig_done:
 
 # Do the BIOS Enhanced Disk Drive calls
 # This consists of two calls:
@@ -136,10 +96,71 @@ edd_legacy_done:
 
 edd_next:
         incb    %dl                             # increment to next device
+        jz      edd_done
         cmpb    $EDD_INFO_MAX,bootsym(boot_edd_info_nr)
         jb      edd_check_ext
 
 edd_done:
+        cmpb    $1, bootsym(opt_edd)            # edd=skipmbr ?
+        je      .Ledd_mbr_sig_skip
+
+# Read the first sector of each BIOS disk device and store the 4-byte signature
+.Ledd_mbr_sig_start:
+        pushw   %es
+        movb    $0x80, %dl                      # from device 80
+        movw    $bootsym(boot_mbr_signature), %bx # store buffer ptr in bx
+.Ledd_mbr_sig_read:
+        pushw   %bx
+        movw    $bootsym(boot_edd_info), %bx
+        movzbw  bootsym(boot_edd_info_nr), %cx
+        jcxz    .Ledd_mbr_sig_default
+.Ledd_mbr_sig_find_info:
+        cmpb    %dl, (%bx)
+        ja      .Ledd_mbr_sig_default
+        je      .Ledd_mbr_sig_get_size
+        add     $EDDEXTSIZE+EDDPARMSIZE, %bx
+        loop    .Ledd_mbr_sig_find_info
+.Ledd_mbr_sig_default:
+        movw    $(512 >> 4), %bx
+        jmp     .Ledd_mbr_sig_set_buf
+.Ledd_mbr_sig_get_size:
+        movw    EDDEXTSIZE+0x18(%bx), %bx       # sector size
+        shr     $4, %bx                         # convert to paragraphs
+        jz      .Ledd_mbr_sig_default
+.Ledd_mbr_sig_set_buf:
+        movw    %ds, %ax
+        subw    %bx, %ax                        # disk's data goes right ahead
+        movw    %ax, %es                        # of trampoline
+        xorw    %bx, %bx
+        movw    %bx, %es:0x1fe(%bx)             # clear BIOS magic just in case
+        pushw   %dx                             # work around buggy BIOSes
+        stc                                     # work around buggy BIOSes
+        movw    $0x0201, %ax                    # read 1 sector
+        movb    $0, %dh                         # at head 0
+        movw    $1, %cx                         # cylinder 0, sector 0
+        int     $0x13
+        sti                                     # work around buggy BIOSes
+        popw    %dx
+        movw    %es:0x1fe(%bx), %si
+        movl    %es:EDD_MBR_SIG_OFFSET(%bx), %ecx
+        popw    %bx
+        jc      .Ledd_mbr_sig_done              # on failure, we're done.
+        testb   %ah, %ah                        # some BIOSes do not set CF
+        jnz     .Ledd_mbr_sig_done              # on failure, we're done.
+        cmpw    $0xaa55, %si
+        jne     .Ledd_mbr_sig_next
+        movb    %dl, (%bx)                      # store BIOS drive number
+        movl    %ecx, 4(%bx)                    # store signature from MBR
+        incb    bootsym(boot_mbr_signature_nr)  # note that we stored something
+        addw    $8, %bx                         # increment sig buffer ptr
+.Ledd_mbr_sig_next:
+        incb    %dl                             # increment to next device
+        jz      .Ledd_mbr_sig_done
+        cmpb    $EDD_MBR_SIG_MAX, bootsym(boot_mbr_signature_nr)
+        jb      .Ledd_mbr_sig_read
+.Ledd_mbr_sig_done:
+        popw    %es
+.Ledd_mbr_sig_skip:
         ret
 
 GLOBAL(boot_edd_info_nr)
@@ -149,4 +170,4 @@ GLOBAL(boot_mbr_signature_nr)
 GLOBAL(boot_mbr_signature)
         .fill   EDD_MBR_SIG_MAX*8,1,0
 GLOBAL(boot_edd_info)
-        .fill   512,1,0                         # big enough for a disc sector
+        .fill   EDD_INFO_MAX * (EDDEXTSIZE + EDDPARMSIZE), 1, 0
