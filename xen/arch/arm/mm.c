@@ -181,7 +181,7 @@ void dump_pt_walk(paddr_t ttbr, paddr_t addr,
                   unsigned int nr_root_tables)
 {
     static const char *level_strs[4] = { "0TH", "1ST", "2ND", "3RD" };
-    const unsigned long root_pfn = paddr_to_pfn(ttbr);
+    const mfn_t root_mfn = maddr_to_mfn(ttbr);
     const unsigned int offsets[4] = {
         zeroeth_table_offset(addr),
         first_table_offset(addr),
@@ -215,7 +215,7 @@ void dump_pt_walk(paddr_t ttbr, paddr_t addr,
     else
         root_table = 0;
 
-    mapping = map_domain_page(_mfn(root_pfn + root_table));
+    mapping = map_domain_page(mfn_add(root_mfn, root_table));
 
     for ( level = root_level; ; level++ )
     {
