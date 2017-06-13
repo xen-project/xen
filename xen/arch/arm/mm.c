@@ -999,7 +999,7 @@ static int create_xen_entries(enum xenmap_operation op,
 
         BUG_ON(!xen_second[second_linear_offset(addr)].pt.valid);
 
-        third = __va(pfn_to_paddr(xen_second[second_linear_offset(addr)].pt.base));
+        third = mfn_to_virt(xen_second[second_linear_offset(addr)].pt.base);
 
         switch ( op ) {
             case INSERT:
