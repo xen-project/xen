@@ -312,7 +312,7 @@ static __init int kernel_decompress(struct bootmodule *mod)
      * Need to free pages after output_size here because they won't be
      * freed by discard_initial_modules
      */
-    i = DIV_ROUND_UP(output_size, PAGE_SIZE);
+    i = PFN_UP(output_size);
     for ( ; i < (1 << kernel_order_out); i++ )
         free_domheap_page(pages + i);
 

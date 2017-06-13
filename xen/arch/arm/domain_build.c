@@ -1008,7 +1008,7 @@ static int map_range_to_domain(const struct dt_device_node *dev,
     {
         res = map_regions_p2mt(d,
                                _gfn(paddr_to_pfn(addr)),
-                               DIV_ROUND_UP(len, PAGE_SIZE),
+                               PFN_UP(len),
                                _mfn(paddr_to_pfn(addr)),
                                mr_data->p2mt);
 
@@ -1545,7 +1545,7 @@ static void acpi_map_other_tables(struct domain *d)
         size = acpi_gbl_root_table_list.tables[i].length;
         res = map_regions_p2mt(d,
                                _gfn(paddr_to_pfn(addr)),
-                               DIV_ROUND_UP(size, PAGE_SIZE),
+                               PFN_UP(size),
                                _mfn(paddr_to_pfn(addr)),
                                p2m_mmio_direct_c);
         if ( res )

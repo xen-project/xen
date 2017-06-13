@@ -598,7 +598,7 @@ static int gicv2_map_hwdown_extra_mappings(struct domain *d)
                v2m_data->spi_start, v2m_data->nr_spis);
 
         ret = map_mmio_regions(d, _gfn(paddr_to_pfn(v2m_data->addr)),
-                               DIV_ROUND_UP(v2m_data->size, PAGE_SIZE),
+                               PFN_UP(v2m_data->size),
                                _mfn(paddr_to_pfn(v2m_data->addr)));
         if ( ret )
         {
