@@ -1903,7 +1903,7 @@ static int prepare_acpi(struct domain *d, struct kernel_info *kinfo)
     rc = map_regions_p2mt(d,
                           _gfn(paddr_to_pfn(d->arch.efi_acpi_gpa)),
                           PFN_UP(d->arch.efi_acpi_len),
-                          _mfn(paddr_to_pfn(virt_to_maddr(d->arch.efi_acpi_table))),
+                          _mfn(virt_to_mfn(d->arch.efi_acpi_table)),
                           p2m_mmio_direct_c);
     if ( rc != 0 )
     {
