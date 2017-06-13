@@ -573,8 +573,7 @@ void hap_teardown(struct domain *d, bool *preempted)
     ASSERT(d->is_dying);
     ASSERT(d != current->domain);
 
-    if ( !paging_locked_by_me(d) )
-        paging_lock(d); /* Keep various asserts happy */
+    paging_lock(d); /* Keep various asserts happy */
 
     if ( paging_mode_enabled(d) )
     {
