@@ -1488,7 +1488,7 @@ int xc_assign_device(
     xc_interface *xch,
     uint32_t domid,
     uint32_t machine_sbdf,
-    uint32_t flag)
+    uint32_t flags)
 {
     DECLARE_DOMCTL;
 
@@ -1496,7 +1496,7 @@ int xc_assign_device(
     domctl.domain = domid;
     domctl.u.assign_device.dev = XEN_DOMCTL_DEV_PCI;
     domctl.u.assign_device.u.pci.machine_sbdf = machine_sbdf;
-    domctl.u.assign_device.flag = flag;
+    domctl.u.assign_device.flags = flags;
 
     return do_domctl(xch, &domctl);
 }
@@ -1547,6 +1547,7 @@ int xc_test_assign_device(
     domctl.domain = domid;
     domctl.u.assign_device.dev = XEN_DOMCTL_DEV_PCI;
     domctl.u.assign_device.u.pci.machine_sbdf = machine_sbdf;
+    domctl.u.assign_device.flags = 0;
 
     return do_domctl(xch, &domctl);
 }
@@ -1562,6 +1563,7 @@ int xc_deassign_device(
     domctl.domain = domid;
     domctl.u.assign_device.dev = XEN_DOMCTL_DEV_PCI;
     domctl.u.assign_device.u.pci.machine_sbdf = machine_sbdf;
+    domctl.u.assign_device.flags = 0;
 
     return do_domctl(xch, &domctl);
 }
@@ -1588,7 +1590,7 @@ int xc_assign_dt_device(
      * DT doesn't own any RDM so actually DT has nothing to do
      * for any flag and here just fix that as 0.
      */
-    domctl.u.assign_device.flag = 0;
+    domctl.u.assign_device.flags = 0;
     set_xen_guest_handle(domctl.u.assign_device.u.dt.path, path);
 
     rc = do_domctl(xch, &domctl);
@@ -1617,6 +1619,7 @@ int xc_test_assign_dt_device(
     domctl.u.assign_device.dev = XEN_DOMCTL_DEV_DT;
     domctl.u.assign_device.u.dt.size = size;
     set_xen_guest_handle(domctl.u.assign_device.u.dt.path, path);
+    domctl.u.assign_device.flags = 0;
 
     rc = do_domctl(xch, &domctl);
 
@@ -1644,6 +1647,7 @@ int xc_deassign_dt_device(
     domctl.u.assign_device.dev = XEN_DOMCTL_DEV_DT;
     domctl.u.assign_device.u.dt.size = size;
     set_xen_guest_handle(domctl.u.assign_device.u.dt.path, path);
+    domctl.u.assign_device.flags = 0;
 
     rc = do_domctl(xch, &domctl);
 

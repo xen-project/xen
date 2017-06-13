@@ -1540,12 +1540,13 @@ int iommu_do_pci_domctl(
 {
     u16 seg;
     u8 bus, devfn;
-    u32 flag;
     int ret = 0;
     uint32_t machine_sbdf;
 
     switch ( domctl->cmd )
     {
+        unsigned int flags;
+
     case XEN_DOMCTL_get_device_group:
     {
         u32 max_sdevs;
@@ -1583,6 +1584,10 @@ int iommu_do_pci_domctl(
         if ( domctl->u.assign_device.dev != XEN_DOMCTL_DEV_PCI )
             break;
 
+        ret = -EINVAL;
+        if ( domctl->u.assign_device.flags )
+            break;
+
         machine_sbdf = domctl->u.assign_device.u.pci.machine_sbdf;
 
         ret = xsm_test_assign_device(XSM_HOOK, machine_sbdf);
@@ -1614,11 +1619,10 @@ int iommu_do_pci_domctl(
         if ( domctl->u.assign_device.dev != XEN_DOMCTL_DEV_PCI )
             break;
 
-        if ( unlikely(d->is_dying) )
-        {
-            ret = -EINVAL;
+        ret = -EINVAL;
+        flags = domctl->u.assign_device.flags;
+        if ( d->is_dying || (flags & ~XEN_DOMCTL_DEV_RDM_RELAXED) )
             break;
-        }
 
         machine_sbdf = domctl->u.assign_device.u.pci.machine_sbdf;
 
@@ -1629,15 +1633,9 @@ int iommu_do_pci_domctl(
         seg = machine_sbdf >> 16;
         bus = PCI_BUS(machine_sbdf);
         devfn = PCI_DEVFN2(machine_sbdf);
-        flag = domctl->u.assign_device.flag;
-        if ( flag & ~XEN_DOMCTL_DEV_RDM_RELAXED )
-        {
-            ret = -EINVAL;
-            break;
-        }
 
         ret = device_assigned(seg, bus, devfn) ?:
-              assign_device(d, seg, bus, devfn, flag);
+              assign_device(d, seg, bus, devfn, flags);
         if ( ret == -ERESTART )
             ret = hypercall_create_continuation(__HYPERVISOR_domctl,
                                                 "h", u_domctl);
@@ -1659,6 +1657,10 @@ int iommu_do_pci_domctl(
 
         ret = -ENODEV;
         if ( domctl->u.assign_device.dev != XEN_DOMCTL_DEV_PCI )
+            break;
+
+        ret = -EINVAL;
+        if ( domctl->u.assign_device.flags )
             break;
 
         machine_sbdf = domctl->u.assign_device.u.pci.machine_sbdf;

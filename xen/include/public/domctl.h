@@ -511,14 +511,17 @@ DEFINE_XEN_GUEST_HANDLE(xen_domctl_sendtrigger_t);
  * XEN_DOMCTL_deassign_device: The behavior of this DOMCTL differs
  * between the different type of device:
  *  - PCI device (XEN_DOMCTL_DEV_PCI) will be reassigned to DOM0
- *  - DT device (XEN_DOMCTL_DT_PCI) will left unassigned. DOM0
+ *  - DT device (XEN_DOMCTL_DEV_DT) will left unassigned. DOM0
  *  will have to call XEN_DOMCTL_assign_device in order to use the
  *  device.
  */
 #define XEN_DOMCTL_DEV_PCI      0
 #define XEN_DOMCTL_DEV_DT       1
 struct xen_domctl_assign_device {
+    /* IN */
     uint32_t dev;   /* XEN_DOMCTL_DEV_* */
+    uint32_t flags;
+#define XEN_DOMCTL_DEV_RDM_RELAXED      1 /* assign only */
     union {
         struct {
             uint32_t machine_sbdf;   /* machine PCI ID of assigned device */
@@ -528,9 +531,6 @@ struct xen_domctl_assign_device {
             XEN_GUEST_HANDLE_64(char) path; /* path to the device tree node */
         } dt;
     } u;
-    /* IN */
-#define XEN_DOMCTL_DEV_RDM_RELAXED      1
-    uint32_t  flag;   /* flag of assigned device */
 };
 typedef struct xen_domctl_assign_device xen_domctl_assign_device_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_assign_device_t);

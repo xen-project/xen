@@ -147,11 +147,9 @@ int iommu_do_dt_domctl(struct xen_domctl *domctl, struct domain *d,
         if ( domctl->u.assign_device.dev != XEN_DOMCTL_DEV_DT )
             break;
 
-        if ( unlikely(d->is_dying) )
-        {
-            ret = -EINVAL;
+        ret = -EINVAL;
+        if ( d->is_dying || domctl->u.assign_device.flags )
             break;
-        }
 
         ret = dt_find_node_by_gpath(domctl->u.assign_device.u.dt.path,
                                     domctl->u.assign_device.u.dt.size,
@@ -176,6 +174,10 @@ int iommu_do_dt_domctl(struct xen_domctl *domctl, struct domain *d,
         if ( domctl->u.assign_device.dev != XEN_DOMCTL_DEV_DT )
             break;
 
+        ret = -EINVAL;
+        if ( domctl->u.assign_device.flags )
+            break;
+
         ret = dt_find_node_by_gpath(domctl->u.assign_device.u.dt.path,
                                     domctl->u.assign_device.u.dt.size,
                                     &dev);
@@ -195,6 +197,10 @@ int iommu_do_dt_domctl(struct xen_domctl *domctl, struct domain *d,
     case XEN_DOMCTL_test_assign_device:
         ret = -ENODEV;
         if ( domctl->u.assign_device.dev != XEN_DOMCTL_DEV_DT )
+            break;
+
+        ret = -EINVAL;
+        if ( domctl->u.assign_device.flags )
             break;
 
         ret = dt_find_node_by_gpath(domctl->u.assign_device.u.dt.path,
