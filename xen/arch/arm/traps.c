@@ -2481,7 +2481,7 @@ void dump_guest_s1_walk(struct domain *d, vaddr_t addr)
     uint32_t *first = NULL, *second = NULL;
     mfn_t mfn;
 
-    mfn = p2m_lookup(d, _gfn(paddr_to_pfn(ttbr0)), NULL);
+    mfn = gfn_to_mfn(d, _gfn(paddr_to_pfn(ttbr0)));
 
     printk("dom%d VA 0x%08"PRIvaddr"\n", d->domain_id, addr);
     printk("    TTBCR: 0x%08"PRIregister"\n", ttbcr);
@@ -2513,7 +2513,7 @@ void dump_guest_s1_walk(struct domain *d, vaddr_t addr)
           (first[offset] & 0x2) )
         goto done;
 
-    mfn = p2m_lookup(d, _gfn(paddr_to_pfn(first[offset])), NULL);
+    mfn = gfn_to_mfn(d, _gfn(paddr_to_pfn(first[offset])));
 
     if ( mfn_eq(mfn, INVALID_MFN) )
     {
@@ -2619,7 +2619,7 @@ static void do_trap_instr_abort_guest(struct cpu_user_regs *regs,
          * with the Stage-2 page table. Walk the Stage-2 PT to check
          * if the entry exists. If it's the case, return to the guest
          */
-        mfn = p2m_lookup(current->domain, _gfn(paddr_to_pfn(gpa)), NULL);
+        mfn = gfn_to_mfn(current->domain, _gfn(paddr_to_pfn(gpa)));
         if ( !mfn_eq(mfn, INVALID_MFN) )
             return;
     }
@@ -2759,7 +2759,7 @@ static void do_trap_data_abort_guest(struct cpu_user_regs *regs,
          * with the Stage-2 page table. Walk the Stage-2 PT to check
          * if the entry exists. If it's the case, return to the guest
          */
-        mfn = p2m_lookup(current->domain, _gfn(paddr_to_pfn(info.gpa)), NULL);
+        mfn = gfn_to_mfn(current->domain, _gfn(paddr_to_pfn(info.gpa)));
         if ( !mfn_eq(mfn, INVALID_MFN) )
             return;
 
