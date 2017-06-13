@@ -254,9 +254,21 @@ int arch_livepatch_perform(struct livepatch_elf *elf,
             addend = get_addend(type, dest);
         }
 
-        if ( symndx > elf->nsym )
+        if ( symndx == STN_UNDEF )
+        {
+            dprintk(XENLOG_ERR, LIVEPATCH "%s: Encountered STN_UNDEF\n",
+                    elf->name);
+            return -EOPNOTSUPP;
+        }
+        else if ( symndx >= elf->nsym )
         {
             dprintk(XENLOG_ERR, LIVEPATCH "%s: Relative symbol wants symbol@%u which is past end!\n",
+                    elf->name, symndx);
+            return -EINVAL;
+        }
+        else if ( !elf->sym[symndx].sym )
+        {
+            dprintk(XENLOG_ERR, LIVEPATCH "%s: No relative symbol@%u\n",
                     elf->name, symndx);
             return -EINVAL;
         }
