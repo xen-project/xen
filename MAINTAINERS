@@ -435,6 +435,8 @@ L:	xen-devel@lists.xen.org
 F:	xen/arch/x86/
 F:	xen/include/asm-x86/
 F:	tools/firmware/hvmloader/
+F:	tools/firmware/rombios/
+F:	tools/firmware/vgabios/
 F:	tools/tests/x86_emulator/
 F:	tools/fuzz/x86_instruction_emulator/
 
