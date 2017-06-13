@@ -49,14 +49,12 @@ void copy_from_paddr(void *dst, paddr_t paddr, unsigned long len)
     void *src = (void *)FIXMAP_ADDR(FIXMAP_MISC);
 
     while (len) {
-        paddr_t p;
         unsigned long l, s;
 
-        p = paddr >> PAGE_SHIFT;
         s = paddr & (PAGE_SIZE-1);
         l = min(PAGE_SIZE - s, len);
 
-        set_fixmap(FIXMAP_MISC, p, BUFFERABLE);
+        set_fixmap(FIXMAP_MISC, maddr_to_mfn(paddr), BUFFERABLE);
         memcpy(dst, src + s, l);
         clean_dcache_va_range(dst, l);
 
