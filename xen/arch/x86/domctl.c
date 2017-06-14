@@ -590,8 +590,12 @@ long arch_do_domctl(
         domain_pause(d);
         ret = hvm_save_one(d, domctl->u.hvmcontext_partial.type,
                            domctl->u.hvmcontext_partial.instance,
-                           domctl->u.hvmcontext_partial.buffer);
+                           domctl->u.hvmcontext_partial.buffer,
+                           &domctl->u.hvmcontext_partial.bufsz);
         domain_unpause(d);
+
+        if ( !ret )
+            copyback = true;
         break;
 
     case XEN_DOMCTL_set_address_size:

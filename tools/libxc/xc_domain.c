@@ -496,6 +496,7 @@ int xc_domain_hvm_getcontext_partial(xc_interface *xch,
     domctl.domain = (domid_t) domid;
     domctl.u.hvmcontext_partial.type = typecode;
     domctl.u.hvmcontext_partial.instance = instance;
+    domctl.u.hvmcontext_partial.bufsz = size;
     set_xen_guest_handle(domctl.u.hvmcontext_partial.buffer, ctxt_buf);
 
     ret = do_domctl(xch, &domctl);

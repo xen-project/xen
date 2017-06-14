@@ -746,6 +746,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_domctl_debug_op_t);
 typedef struct xen_domctl_hvmcontext_partial {
     uint32_t type;                      /* IN: Type of record required */
     uint32_t instance;                  /* IN: Instance of that type */
+    uint64_aligned_t bufsz;             /* IN: size of buffer */
     XEN_GUEST_HANDLE_64(uint8) buffer;  /* OUT: buffer to write record into */
 } xen_domctl_hvmcontext_partial_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_hvmcontext_partial_t);

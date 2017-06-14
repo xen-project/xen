@@ -76,8 +76,8 @@ size_t hvm_save_size(struct domain *d)
 
 /* Extract a single instance of a save record, by marshalling all
  * records of that type and copying out the one we need. */
-int hvm_save_one(struct domain *d, uint16_t typecode, uint16_t instance, 
-                 XEN_GUEST_HANDLE_64(uint8) handle)
+int hvm_save_one(struct domain *d, unsigned int typecode, unsigned int instance,
+                 XEN_GUEST_HANDLE_64(uint8) handle, uint64_t *bufsz)
 {
     int rv = -ENOENT;
     size_t sz = 0;
@@ -117,16 +117,20 @@ int hvm_save_one(struct domain *d, uint16_t typecode, uint16_t instance,
             desc = (void *)(ctxt.data + off);
             /* Move past header */
             off += sizeof(*desc);
+            if ( ctxt.cur < desc->length ||
+                 off > ctxt.cur - desc->length )
+                break;
             if ( instance == desc->instance )
             {
-                uint32_t copy_length = desc->length;
-
-                if ( ctxt.cur < copy_length ||
-                     off > ctxt.cur - copy_length )
-                    copy_length = ctxt.cur - off;
                 rv = 0;
-                if ( copy_to_guest(handle, ctxt.data + off, copy_length) )
+                if ( guest_handle_is_null(handle) )
+                    *bufsz = desc->length;
+                else if ( *bufsz < desc->length )
+                    rv = -ENOBUFS;
+                else if ( copy_to_guest(handle, ctxt.data + off, desc->length) )
                     rv = -EFAULT;
+                else
+                    *bufsz = desc->length;
                 break;
             }
         }
