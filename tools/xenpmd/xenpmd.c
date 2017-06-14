@@ -100,7 +100,7 @@ FILE *get_next_battery_file(DIR *battery_dir,
 {
     FILE *file = 0;
     struct dirent *dir_entries;
-    char file_name[32];
+    char file_name[284];
     
     do 
     {
@@ -110,10 +110,10 @@ FILE *get_next_battery_file(DIR *battery_dir,
         if ( strlen(dir_entries->d_name) < 4 )
             continue;
         if ( battery_info_type == BIF ) 
-            snprintf(file_name, 32, BATTERY_INFO_FILE_PATH,
+            snprintf(file_name, sizeof(file_name), BATTERY_INFO_FILE_PATH,
                      dir_entries->d_name);
         else 
-            snprintf(file_name, 32, BATTERY_STATE_FILE_PATH,
+            snprintf(file_name, sizeof(file_name), BATTERY_STATE_FILE_PATH,
                      dir_entries->d_name);
         file = fopen(file_name, "r");
     } while ( !file );
