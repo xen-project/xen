@@ -550,16 +550,21 @@ DEFINE_XEN_GUEST_HANDLE(mmuext_op_t);
  * is useful to ensure that no mappings to the OS's own heap are accidentally
  * installed. (e.g., in Linux this could cause havoc as reference counts
  * aren't adjusted on the I/O-mapping code path).
- * This only makes sense in MMUEXT_SET_FOREIGNDOM, but in that context can
- * be specified by any calling domain.
+ * This only makes sense as HYPERVISOR_mmu_update()'s and
+ * HYPERVISOR_update_va_mapping_otherdomain()'s "foreigndom" argument. For
+ * HYPERVISOR_mmu_update() context it can be specified by any calling domain,
+ * otherwise it's only permitted if the caller is privileged.
  */
 #define DOMID_IO             xen_mk_uint(0x7FF1)
 
 /*
  * DOMID_XEN is used to allow privileged domains to map restricted parts of
  * Xen's heap space (e.g., the machine_to_phys table).
- * This only makes sense in MMUEXT_SET_FOREIGNDOM, and is only permitted if
- * the caller is privileged.
+ * This only makes sense as
+ * - HYPERVISOR_mmu_update()'s, HYPERVISOR_mmuext_op()'s, or
+ *   HYPERVISOR_update_va_mapping_otherdomain()'s "foreigndom" argument,
+ * - with XENMAPSPACE_gmfn_foreign,
+ * and is only permitted if the caller is privileged.
  */
 #define DOMID_XEN            xen_mk_uint(0x7FF2)
 
