@@ -79,36 +79,27 @@ size_t hvm_save_size(struct domain *d)
 int hvm_save_one(struct domain *d, unsigned int typecode, unsigned int instance,
                  XEN_GUEST_HANDLE_64(uint8) handle, uint64_t *bufsz)
 {
-    int rv = -ENOENT;
-    size_t sz = 0;
-    struct vcpu *v;
-    hvm_domain_context_t ctxt = { 0, };
+    int rv;
+    hvm_domain_context_t ctxt = { };
     const struct hvm_save_descriptor *desc;
 
-    if ( d->is_dying 
-         || typecode > HVM_SAVE_CODE_MAX 
-         || hvm_sr_handlers[typecode].size < sizeof(*desc)
-         || hvm_sr_handlers[typecode].save == NULL )
+    if ( d->is_dying ||
+         typecode > HVM_SAVE_CODE_MAX ||
+         hvm_sr_handlers[typecode].size < sizeof(*desc) ||
+         !hvm_sr_handlers[typecode].save )
         return -EINVAL;
 
+    ctxt.size = hvm_sr_handlers[typecode].size;
     if ( hvm_sr_handlers[typecode].kind == HVMSR_PER_VCPU )
-        for_each_vcpu(d, v)
-            sz += hvm_sr_handlers[typecode].size;
-    else 
-        sz = hvm_sr_handlers[typecode].size;
-    
-    ctxt.size = sz;
-    ctxt.data = xmalloc_bytes(sz);
+        ctxt.size *= d->max_vcpus;
+    ctxt.data = xmalloc_bytes(ctxt.size);
     if ( !ctxt.data )
         return -ENOMEM;
 
-    if ( hvm_sr_handlers[typecode].save(d, &ctxt) != 0 )
-    {
-        printk(XENLOG_G_ERR "HVM%d save: failed to save type %"PRIu16"\n",
-               d->domain_id, typecode);
-        rv = -EFAULT;
-    }
-    else if ( ctxt.cur >= sizeof(*desc) )
+    if ( (rv = hvm_sr_handlers[typecode].save(d, &ctxt)) != 0 )
+        printk(XENLOG_G_ERR "HVM%d save: failed to save type %"PRIu16" (%d)\n",
+               d->domain_id, typecode, rv);
+    else if ( rv = -ENOENT, ctxt.cur >= sizeof(*desc) )
     {
         uint32_t off;
 
