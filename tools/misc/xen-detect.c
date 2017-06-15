@@ -24,6 +24,11 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
+#define _GNU_SOURCE
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <limits.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -32,6 +37,15 @@
 #include <signal.h>
 #include <unistd.h>
 #include <getopt.h>
+
+enum guest_type {
+    XEN_PV = 1,
+    XEN_HVM = 2,
+    XEN_NONE = 3
+};
+
+static char *type;
+static char *ver;
 
 static void cpuid(uint32_t idx, uint32_t *regs, int pv_context)
 {
@@ -75,6 +89,9 @@ static int check_for_xen(int pv_context)
 
  found:
     cpuid(base + 1, regs, pv_context);
+    if ( regs[0] )
+        asprintf(&ver, "V%u.%u",
+                 (uint16_t)(regs[0] >> 16), (uint16_t)regs[0]);
     return regs[0];
 }
 
@@ -91,14 +108,104 @@ static void usage(void)
     printf("  -h, --help    Display this information\n");
     printf("  -q, --quiet   Quiesce normal informational output\n");
     printf("  -P, --pv      Exit status 1 if not running as PV guest\n");
-    printf("  -H, --hvm     Exit status 1 if not running as HVM guest.\n");
+    printf("  -H, --hvm     Exit status 1 if not running as HVM or PVH guest.\n");
     printf("  -N, --none    Exit status 1 if running on Xen (PV or HVM)\n");
+}
+
+static bool check_dir(const char *filename)
+{
+    FILE *f;
+    struct stat stab;
+    bool res;
+
+    f = fopen(filename, "r");
+    if ( !f )
+        return false;
+    res = !fstat(fileno(f), &stab) && S_ISDIR(stab.st_mode);
+    fclose(f);
+
+    return res;
+}
+
+static char *read_file_content(const char *filename)
+{
+    FILE *f;
+    struct stat stab;
+    char *content = NULL;
+    int datalen;
+
+    f = fopen(filename, "r");
+    if ( !f )
+        return NULL;
+
+    if ( fstat(fileno(f), &stab) || !S_ISREG(stab.st_mode) ||
+         stab.st_size > INT_MAX || !stab.st_size )
+        goto out;
+
+    content = malloc(stab.st_size + 1);
+    if ( !content )
+        goto out;
+
+    /* For sysfs file, datalen is always PAGE_SIZE. 'read'
+     * will return the number of bytes of the actual content,
+     * rs <= datalen is expected.
+     */
+    datalen = fread(content, 1, stab.st_size, f);
+    content[datalen] = 0;
+    if ( ferror(f) )
+    {
+        free(content);
+        content = NULL;
+    }
+
+ out:
+    fclose(f);
+    return content;
+}
+
+static enum guest_type check_sysfs(void)
+{
+    char *str, *tmp;
+    enum guest_type res = XEN_NONE;
+
+    if ( !check_dir("/sys/hypervisor") )
+        return 0;
+
+    str = read_file_content("/sys/hypervisor/type");
+    if ( !str || strcmp(str, "xen\n") )
+        goto out;
+    free(str);
+
+    str = read_file_content("/sys/hypervisor/guest_type");
+    if ( !str )
+        return 0;
+    str[strlen(str) - 1] = 0;
+    type = str;
+    if ( !strcmp(type, "PV") )
+        res = XEN_PV;
+    else
+        res = XEN_HVM;
+
+    str = read_file_content("/sys/hypervisor/version/major");
+    if ( str )
+        str[strlen(str) - 1] = 0;
+    tmp = read_file_content("/sys/hypervisor/version/minor");
+    if ( tmp )
+        tmp[strlen(tmp) - 1] = 0;
+    if ( str && tmp )
+        asprintf(&ver, "V%s.%s", str, tmp);
+    else
+        ver = strdup("unknown version");
+    free(tmp);
+
+ out:
+    free(str);
+    return res;
 }
 
 int main(int argc, char **argv)
 {
-    enum { XEN_PV = 1, XEN_HVM = 2, XEN_NONE = 3 } detected = 0, expected = 0;
-    uint32_t version = 0;
+    enum guest_type detected, expected = 0;
     int ch, quiet = 0;
 
     const static char sopts[] = "hqPHN";
@@ -133,9 +240,14 @@ int main(int argc, char **argv)
         }
     }
 
+    detected = check_sysfs();
+    if ( detected )
+        goto out;
+
     /* Check for execution in HVM context. */
     detected = XEN_HVM;
-    if ( (version = check_for_xen(0)) != 0 )
+    type = "HVM";
+    if ( check_for_xen(0) )
         goto out;
 
     /*
@@ -144,9 +256,10 @@ int main(int argc, char **argv)
      * will longjmp via the signal handler, and print "Not running on Xen".
      */
     detected = XEN_PV;
+    type = "PV";
     if ( !setjmp(sigill_jmp)
          && (signal(SIGILL, sigill_handler) != SIG_ERR)
-         && ((version = check_for_xen(1)) != 0) )
+         && check_for_xen(1) )
         goto out;
 
     detected = XEN_NONE;
@@ -157,9 +270,9 @@ int main(int argc, char **argv)
     else if ( detected == XEN_NONE )
         printf("Not running on Xen.\n");
     else
-        printf("Running in %s context on Xen v%d.%d.\n",
-               (detected == XEN_PV) ? "PV" : "HVM",
-               (uint16_t)(version >> 16), (uint16_t)version);
+        printf("Running in %s context on Xen %s.\n", type, ver);
+
+    free(ver);
 
     return expected && (expected != detected);
 }
