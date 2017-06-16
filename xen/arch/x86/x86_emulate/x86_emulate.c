@@ -5681,8 +5681,7 @@ x86_emulate(
                     [eflags] "+g" (_regs.eflags),
                     [tmp] "=&r" (dummy), "+m" (*mmvalp),
                     "+m" (fic.exn_raised)
-                    : [func] "rm" (stub.func), "a" (mmvalp),
-                      [mask] "i" (EFLAGS_MASK));
+                    : "a" (mmvalp), [mask] "i" (EFLAGS_MASK));
 
         put_stub(stub);
         check_xmm_exn(&fic);
@@ -6086,7 +6085,7 @@ x86_emulate(
     case X86EMUL_OPC_F3(0x0f, 0x6f):     /* movdqu xmm/m128,xmm */
     case X86EMUL_OPC_VEX_F3(0x0f, 0x6f): /* vmovdqu {x,y}mm/mem,{x,y}mm */
     case X86EMUL_OPC_66(0x0f, 0x7f):     /* movdqa xmm,xmm/m128 */
-    case X86EMUL_OPC_VEX_66(0x0f, 0x7f): /* vmovdqa {x,y}mm,{x,y}mm/m128 */
+    case X86EMUL_OPC_VEX_66(0x0f, 0x7f): /* vmovdqa {x,y}mm,{x,y}mm/mem */
     case X86EMUL_OPC_F3(0x0f, 0x7f):     /* movdqu xmm,xmm/m128 */
     case X86EMUL_OPC_VEX_F3(0x0f, 0x7f): /* vmovdqu {x,y}mm,{x,y}mm/mem */
     movdqa:
