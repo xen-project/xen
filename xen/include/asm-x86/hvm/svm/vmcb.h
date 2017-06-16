@@ -244,12 +244,12 @@ enum VMEXIT_EXITCODE
     VMEXIT_EXCEPTION_NP  =  75, /* 0x4b, segment-not-present */
     VMEXIT_EXCEPTION_SS  =  76, /* 0x4c, stack */
     VMEXIT_EXCEPTION_GP  =  77, /* 0x4d, general-protection */
-    VMEXIT_EXCEPTION_PF  =  78, /* 0x4f, page-fault */
-    VMEXIT_EXCEPTION_15  =  79, /* 0x50, reserved */
-    VMEXIT_EXCEPTION_MF  =  80, /* 0x51, x87 floating-point exception-pending */
-    VMEXIT_EXCEPTION_AC  =  81, /* 0x52, alignment-check */
-    VMEXIT_EXCEPTION_MC  =  82, /* 0x53, machine-check */
-    VMEXIT_EXCEPTION_XF  =  83, /* 0x54, simd floating-point */
+    VMEXIT_EXCEPTION_PF  =  78, /* 0x4e, page-fault */
+    VMEXIT_EXCEPTION_15  =  79, /* 0x4f, reserved */
+    VMEXIT_EXCEPTION_MF  =  80, /* 0x50, x87 floating-point exception-pending */
+    VMEXIT_EXCEPTION_AC  =  81, /* 0x51, alignment-check */
+    VMEXIT_EXCEPTION_MC  =  82, /* 0x52, machine-check */
+    VMEXIT_EXCEPTION_XF  =  83, /* 0x53, simd floating-point */
 
     /* exceptions 20-31 (exitcodes 84-95) are reserved */
 
