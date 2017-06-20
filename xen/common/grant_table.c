@@ -98,8 +98,8 @@ struct gnttab_unmap_common {
     /* Shared state beteen *_unmap and *_unmap_complete */
     u16 flags;
     unsigned long frame;
-    struct grant_mapping *map;
     struct domain *rd;
+    grant_ref_t ref;
 };
 
 /* Number of unmap operations that are done between each tlb flush */
@@ -893,6 +893,8 @@ __gnttab_unmap_common(
     struct grant_table *lgt, *rgt;
     struct active_grant_entry *act;
     s16              rc = 0;
+    struct grant_mapping *map;
+    bool_t put_handle = 0;
 
     ld = current->domain;
     lgt = ld->grant_table;
@@ -906,10 +908,10 @@ __gnttab_unmap_common(
         return;
     }
 
-    op->map = &maptrack_entry(lgt, op->handle);
+    map = &maptrack_entry(lgt, op->handle);
     spin_lock(&lgt->lock);
 
-    if ( unlikely(!op->map->flags) )
+    if ( unlikely(!map->flags) )
     {
         spin_unlock(&lgt->lock);
         gdprintk(XENLOG_INFO, "Zero flags for handle (%d).\n", op->handle);
@@ -917,7 +919,7 @@ __gnttab_unmap_common(
         return;
     }
 
-    dom = op->map->domid;
+    dom = map->domid;
     spin_unlock(&lgt->lock);
 
     if ( unlikely((rd = rcu_lock_domain_by_id(dom)) == NULL) )
@@ -941,8 +943,8 @@ __gnttab_unmap_common(
     rgt = rd->grant_table;
     double_gt_lock(lgt, rgt);
 
-    op->flags = op->map->flags;
-    if ( unlikely(!op->flags) || unlikely(op->map->domid != dom) )
+    op->flags = map->flags;
+    if ( unlikely(!op->flags) || unlikely(map->domid != dom) )
     {
         gdprintk(XENLOG_WARNING, "Unstable handle %u\n", op->handle);
         rc = GNTST_bad_handle;
@@ -950,7 +952,8 @@ __gnttab_unmap_common(
     }
 
     op->rd = rd;
-    act = &active_entry(rgt, op->map->ref);
+    op->ref = map->ref;
+    act = &active_entry(rgt, map->ref);
 
     if ( op->frame == 0 )
     {
@@ -963,7 +966,7 @@ __gnttab_unmap_common(
                      "Bad frame number doesn't match gntref. (%lx != %lx)\n",
                      op->frame, act->frame);
 
-        op->map->flags &= ~GNTMAP_device_map;
+        map->flags &= ~GNTMAP_device_map;
     }
 
     if ( (op->host_addr != 0) && (op->flags & GNTMAP_host_map) )
@@ -973,31 +976,44 @@ __gnttab_unmap_common(
                                               op->flags)) < 0 )
             goto unmap_out;
 
-        op->map->flags &= ~GNTMAP_host_map;
+        map->flags &= ~GNTMAP_host_map;
     }
 
-    if ( gnttab_need_iommu_mapping(ld) )
+    if ( !(map->flags & (GNTMAP_device_map|GNTMAP_host_map)) )
+    {
+        map->flags = 0;
+        put_handle = 1;
+    }
+
+ unmap_out:
+    double_gt_unlock(lgt, rgt);
+
+    if ( put_handle )
+        put_maptrack_handle(lgt, op->handle);
+
+    if ( rc == GNTST_okay && gnttab_need_iommu_mapping(ld) )
     {
         unsigned int wrc, rdc;
         int err = 0;
+
+        double_gt_lock(lgt, rgt);
+
         mapcount(lgt, rd, op->frame, &wrc, &rdc);
         if ( (wrc + rdc) == 0 )
             err = iommu_unmap_page(ld, op->frame);
         else if ( wrc == 0 )
             err = iommu_map_page(ld, op->frame, op->frame, IOMMUF_readable);
+
+        double_gt_unlock(lgt, rgt);
+
         if ( err )
-        {
             rc = GNTST_general_error;
-            goto unmap_out;
-        }
     }
 
     /* If just unmapped a writable mapping, mark as dirtied */
-    if ( !(op->flags & GNTMAP_readonly) )
+    if ( rc == GNTST_okay && !(op->flags & GNTMAP_readonly) )
          gnttab_mark_dirty(rd, op->frame);
 
- unmap_out:
-    double_gt_unlock(lgt, rgt);
     op->status = rc;
     rcu_unlock_domain(rd);
 }
@@ -1011,7 +1027,6 @@ __gnttab_unmap_common_complete(struct gnttab_unmap_common *op)
     grant_entry_header_t *sha;
     struct page_info *pg;
     uint16_t *status;
-    bool_t put_handle = 0;
 
     if ( rd == NULL )
     { 
@@ -1032,13 +1047,13 @@ __gnttab_unmap_common_complete(struct gnttab_unmap_common *op)
     if ( rgt->gt_version == 0 )
         goto unmap_out;
 
-    act = &active_entry(rgt, op->map->ref);
-    sha = shared_entry_header(rgt, op->map->ref);
+    act = &active_entry(rgt, op->ref);
+    sha = shared_entry_header(rgt, op->ref);
 
     if ( rgt->gt_version == 1 )
         status = &sha->flags;
     else
-        status = &status_entry(rgt, op->map->ref);
+        status = &status_entry(rgt, op->ref);
 
     if ( unlikely(op->frame != act->frame) ) 
     {
@@ -1095,9 +1110,6 @@ __gnttab_unmap_common_complete(struct gnttab_unmap_common *op)
             act->pin -= GNTPIN_hstw_inc;
     }
 
-    if ( (op->map->flags & (GNTMAP_device_map|GNTMAP_host_map)) == 0 )
-        put_handle = 1;
-
     if ( ((act->pin & (GNTPIN_devw_mask|GNTPIN_hstw_mask)) == 0) &&
          !(op->flags & GNTMAP_readonly) )
         gnttab_clear_flag(_GTF_writing, status);
@@ -1107,11 +1119,6 @@ __gnttab_unmap_common_complete(struct gnttab_unmap_common *op)
 
  unmap_out:
     spin_unlock(&rgt->lock);
-    if ( put_handle )
-    {
-        op->map->flags = 0;
-        put_maptrack_handle(ld->grant_table, op->handle);
-    }
     rcu_unlock_domain(rd);
 }
 
