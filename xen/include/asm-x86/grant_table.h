@@ -58,9 +58,8 @@ static inline void gnttab_clear_flag(unsigned int nr, uint16_t *st)
 }
 
 /* Foreign mappings of HHVM-guest pages do not modify the type count. */
-#define gnttab_host_mapping_get_page_type(op, ld, rd)   \
-    (!((op)->flags & GNTMAP_readonly) &&                \
-     (((ld) == (rd)) || !paging_mode_external(rd)))
+#define gnttab_host_mapping_get_page_type(ro, ld, rd)   \
+    (!(ro) && (((ld) == (rd)) || !paging_mode_external(rd)))
 
 /* Done implicitly when page tables are destroyed. */
 #define gnttab_release_host_mappings(domain) ( paging_mode_external(domain) )

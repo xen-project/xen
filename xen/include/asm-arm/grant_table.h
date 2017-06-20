@@ -9,7 +9,7 @@ void gnttab_clear_flag(unsigned long nr, uint16_t *addr);
 int create_grant_host_mapping(unsigned long gpaddr,
         unsigned long mfn, unsigned int flags, unsigned int
         cache_flags);
-#define gnttab_host_mapping_get_page_type(op, d, rd) (0)
+#define gnttab_host_mapping_get_page_type(ro, ld, rd) (0)
 int replace_grant_host_mapping(unsigned long gpaddr, unsigned long mfn,
         unsigned long new_gpaddr, unsigned int flags);
 void gnttab_mark_dirty(struct domain *d, unsigned long l);
