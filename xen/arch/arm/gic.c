@@ -418,6 +418,10 @@ void gic_raise_inflight_irq(struct vcpu *v, unsigned int virtual_irq)
 
     ASSERT(spin_is_locked(&v->arch.vgic.lock));
 
+    /* Don't try to update the LR if the interrupt is disabled */
+    if ( !test_bit(GIC_IRQ_GUEST_ENABLED, &n->status) )
+        return;
+
     if ( list_empty(&n->lr_queue) )
     {
         if ( v == current )
