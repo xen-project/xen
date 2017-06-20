@@ -1628,20 +1628,17 @@ static long
 gnttab_setup_table(
     XEN_GUEST_HANDLE_PARAM(gnttab_setup_table_t) uop, unsigned int count)
 {
+    struct vcpu *curr = current;
     struct gnttab_setup_table op;
     struct domain *d = NULL;
     struct grant_table *gt;
-    int            i;
-    xen_pfn_t  gmfn;
+    unsigned int i;
 
     if ( count != 1 )
         return -EINVAL;
 
-    if ( unlikely(copy_from_guest(&op, uop, 1) != 0) )
-    {
-        gdprintk(XENLOG_INFO, "Fault while reading gnttab_setup_table_t.\n");
+    if ( unlikely(copy_from_guest(&op, uop, 1)) )
         return -EFAULT;
-    }
 
     if ( unlikely(op.nr_frames > max_grant_frames) )
     {
@@ -1658,12 +1655,11 @@ gnttab_setup_table(
     d = rcu_lock_domain_by_any_id(op.dom);
     if ( d == NULL )
     {
-        gdprintk(XENLOG_INFO, "Bad domid %d.\n", op.dom);
         op.status = GNTST_bad_domain;
         goto out;
     }
 
-    if ( xsm_grant_setup(XSM_TARGET, current->domain, d) )
+    if ( xsm_grant_setup(XSM_TARGET, curr->domain, d) )
     {
         op.status = GNTST_permission_denied;
         goto out;
@@ -1690,9 +1686,11 @@ gnttab_setup_table(
     op.status = GNTST_okay;
     for ( i = 0; i < op.nr_frames; i++ )
     {
-        gmfn = gnttab_shared_gmfn(d, gt, i);
+        xen_pfn_t gmfn = gnttab_shared_gmfn(d, gt, i);
+
         /* Grant tables cannot be shared */
         BUG_ON(SHARED_M2P(gmfn));
+
         if ( __copy_to_guest_offset(op.frame_list, i, &gmfn, 1) )
             op.status = GNTST_bad_virt_addr;
     }
