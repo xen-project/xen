@@ -457,6 +457,22 @@ static int secure_payload(struct payload *payload, struct livepatch_elf *elf)
     return rc;
 }
 
+static bool section_ok(const struct livepatch_elf *elf,
+                       const struct livepatch_elf_sec *sec, size_t sz)
+{
+    if ( !elf || !sec )
+        return false;
+
+    if ( sec->sec->sh_size % sz )
+    {
+        dprintk(XENLOG_ERR, LIVEPATCH "%s: Wrong size %"PRIuElfWord" of %s (must be multiple of %zu)\n",
+                elf->name, sec->sec->sh_size, sec->name, sz);
+        return false;
+    }
+
+    return true;
+}
+
 static int check_special_sections(const struct livepatch_elf *elf)
 {
     unsigned int i;
@@ -506,12 +522,8 @@ static int prepare_payload(struct payload *payload,
 
     sec = livepatch_elf_sec_by_name(elf, ELF_LIVEPATCH_FUNC);
     ASSERT(sec);
-    if ( sec->sec->sh_size % sizeof(*payload->funcs) )
-    {
-        dprintk(XENLOG_ERR, LIVEPATCH "%s: Wrong size of "ELF_LIVEPATCH_FUNC"!\n",
-                elf->name);
+    if ( !section_ok(elf, sec, sizeof(*payload->funcs)) )
         return -EINVAL;
-    }
 
     payload->funcs = sec->load_addr;
     payload->nfuncs = sec->sec->sh_size / sizeof(*payload->funcs);
@@ -553,7 +565,7 @@ static int prepare_payload(struct payload *payload,
     sec = livepatch_elf_sec_by_name(elf, ".livepatch.hooks.load");
     if ( sec )
     {
-        if ( sec->sec->sh_size % sizeof(*payload->load_funcs) )
+        if ( !section_ok(elf, sec, sizeof(*payload->load_funcs)) )
             return -EINVAL;
 
         payload->load_funcs = sec->load_addr;
@@ -563,7 +575,7 @@ static int prepare_payload(struct payload *payload,
     sec = livepatch_elf_sec_by_name(elf, ".livepatch.hooks.unload");
     if ( sec )
     {
-        if ( sec->sec->sh_size % sizeof(*payload->unload_funcs) )
+        if ( !section_ok(elf, sec, sizeof(*payload->unload_funcs)) )
             return -EINVAL;
 
         payload->unload_funcs = sec->load_addr;
@@ -634,12 +646,8 @@ static int prepare_payload(struct payload *payload,
         if ( !sec )
             continue;
 
-        if ( sec->sec->sh_size % sizeof(*region->frame[i].bugs) )
-        {
-            dprintk(XENLOG_ERR, LIVEPATCH "%s: Wrong size of .bug_frames.%u!\n",
-                    elf->name, i);
+        if ( !section_ok(elf, sec, sizeof(*region->frame[i].bugs)) )
             return -EINVAL;
-        }
 
         region->frame[i].bugs = sec->load_addr;
         region->frame[i].n_bugs = sec->sec->sh_size /
@@ -652,12 +660,8 @@ static int prepare_payload(struct payload *payload,
 #ifdef CONFIG_HAS_ALTERNATIVE
         struct alt_instr *a, *start, *end;
 
-        if ( sec->sec->sh_size % sizeof(*a) )
-        {
-            dprintk(XENLOG_ERR, LIVEPATCH "%s: Size of .alt_instr is not multiple of %zu!\n",
-                    elf->name, sizeof(*a));
+        if ( !section_ok(elf, sec, sizeof(*a)) )
             return -EINVAL;
-        }
 
         start = sec->load_addr;
         end = sec->load_addr + sec->sec->sh_size;
@@ -689,14 +693,8 @@ static int prepare_payload(struct payload *payload,
 #ifdef CONFIG_HAS_EX_TABLE
         struct exception_table_entry *s, *e;
 
-        if ( !sec->sec->sh_size ||
-             (sec->sec->sh_size % sizeof(*region->ex)) )
-        {
-            dprintk(XENLOG_ERR, LIVEPATCH "%s: Wrong size of .ex_table (exp:%lu vs %lu)!\n",
-                    elf->name, sizeof(*region->ex),
-                    sec->sec->sh_size);
+        if ( !section_ok(elf, sec, sizeof(*region->ex)) )
             return -EINVAL;
-        }
 
         s = sec->load_addr;
         e = sec->load_addr + sec->sec->sh_size;
