@@ -291,7 +291,7 @@ EXPORT_SYMBOL(rb_erase);
 /*
  * This function returns the first node (in sort order) of the tree.
  */
-struct rb_node *rb_first(struct rb_root *root)
+struct rb_node *rb_first(const struct rb_root *root)
 {
     struct rb_node *n;
 
@@ -304,7 +304,7 @@ struct rb_node *rb_first(struct rb_root *root)
 }
 EXPORT_SYMBOL(rb_first);
 
-struct rb_node *rb_last(struct rb_root *root)
+struct rb_node *rb_last(const struct rb_root *root)
 {
     struct rb_node *n;
 
@@ -317,7 +317,7 @@ struct rb_node *rb_last(struct rb_root *root)
 }
 EXPORT_SYMBOL(rb_last);
 
-struct rb_node *rb_next(struct rb_node *node)
+struct rb_node *rb_next(const struct rb_node *node)
 {
     struct rb_node *parent;
 
@@ -330,7 +330,7 @@ struct rb_node *rb_next(struct rb_node *node)
         node = node->rb_right; 
         while (node->rb_left)
             node=node->rb_left;
-        return node;
+        return (struct rb_node *)node;
     }
 
     /* No right-hand children.  Everything down and left is
@@ -346,7 +346,7 @@ struct rb_node *rb_next(struct rb_node *node)
 }
 EXPORT_SYMBOL(rb_next);
 
-struct rb_node *rb_prev(struct rb_node *node)
+struct rb_node *rb_prev(const struct rb_node *node)
 {
     struct rb_node *parent;
 
@@ -359,7 +359,7 @@ struct rb_node *rb_prev(struct rb_node *node)
         node = node->rb_left; 
         while (node->rb_right)
             node=node->rb_right;
-        return node;
+        return (struct rb_node *)node;
     }
 
     /* No left-hand children. Go up till we find an ancestor which
