@@ -311,10 +311,39 @@ int hvm_set_guest_pat(struct vcpu *v, u64 guest_pat)
 
 bool hvm_set_guest_bndcfgs(struct vcpu *v, u64 val)
 {
-    return hvm_funcs.set_guest_bndcfgs &&
-           is_canonical_address(val) &&
-           !(val & IA32_BNDCFGS_RESERVED) &&
-           hvm_funcs.set_guest_bndcfgs(v, val);
+    if ( !hvm_funcs.set_guest_bndcfgs ||
+         !is_canonical_address(val) ||
+         (val & IA32_BNDCFGS_RESERVED) )
+        return false;
+
+    /*
+     * While MPX instructions are supposed to be gated on XCR0.BND*, let's
+     * nevertheless force the relevant XCR0 bits on when the feature is being
+     * enabled in BNDCFGS.
+     */
+    if ( (val & IA32_BNDCFGS_ENABLE) &&
+         !(v->arch.xcr0_accum & (XSTATE_BNDREGS | XSTATE_BNDCSR)) )
+    {
+        uint64_t xcr0 = get_xcr0();
+        int rc;
+
+        if ( v != current )
+            return false;
+
+        rc = handle_xsetbv(XCR_XFEATURE_ENABLED_MASK,
+                           xcr0 | XSTATE_BNDREGS | XSTATE_BNDCSR);
+
+        if ( rc )
+        {
+            HVM_DBG_LOG(DBG_LEVEL_1, "Failed to force XCR0.BND*: %d", rc);
+            return false;
+        }
+
+        if ( handle_xsetbv(XCR_XFEATURE_ENABLED_MASK, xcr0) )
+            /* nothing, best effort only */;
+    }
+
+    return hvm_funcs.set_guest_bndcfgs(v, val);
 }
 
 /*
@@ -2475,6 +2504,27 @@ int hvm_set_cr4(unsigned long value, bool_t may_defer)
             paging_update_nestedmode(v);
         else
             paging_update_paging_modes(v);
+    }
+
+    /*
+     * {RD,WR}PKRU are not gated on XCR0.PKRU and hence an oddly behaving
+     * guest may enable the feature in CR4 without enabling it in XCR0. We
+     * need to context switch / migrate PKRU nevertheless.
+     */
+    if ( (value & X86_CR4_PKE) && !(v->arch.xcr0_accum & XSTATE_PKRU) )
+    {
+        int rc = handle_xsetbv(XCR_XFEATURE_ENABLED_MASK,
+                               get_xcr0() | XSTATE_PKRU);
+
+        if ( rc )
+        {
+            HVM_DBG_LOG(DBG_LEVEL_1, "Failed to force XCR0.PKRU: %d", rc);
+            goto gpf;
+        }
+
+        if ( handle_xsetbv(XCR_XFEATURE_ENABLED_MASK,
+                           get_xcr0() & ~XSTATE_PKRU) )
+            /* nothing, best effort only */;
     }
 
     return X86EMUL_OKAY;
