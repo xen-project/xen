@@ -1150,15 +1150,8 @@ __gnttab_unmap_common(
             PIN_FAIL(act_release_out, GNTST_general_error,
                      "Bad frame number doesn't match gntref. (%lx != %lx)\n",
                      op->frame, act->frame);
-        if ( op->flags & GNTMAP_device_map )
-        {
-            ASSERT(act->pin & (GNTPIN_devw_mask | GNTPIN_devr_mask));
-            op->map->flags &= ~GNTMAP_device_map;
-            if ( op->flags & GNTMAP_readonly )
-                act->pin -= GNTPIN_devr_inc;
-            else
-                act->pin -= GNTPIN_devw_inc;
-        }
+
+        op->map->flags &= ~GNTMAP_device_map;
     }
 
     if ( (op->host_addr != 0) && (op->flags & GNTMAP_host_map) )
@@ -1168,12 +1161,7 @@ __gnttab_unmap_common(
                                               op->flags)) < 0 )
             goto act_release_out;
 
-        ASSERT(act->pin & (GNTPIN_hstw_mask | GNTPIN_hstr_mask));
         op->map->flags &= ~GNTMAP_host_map;
-        if ( op->flags & GNTMAP_readonly )
-            act->pin -= GNTPIN_hstr_inc;
-        else
-            act->pin -= GNTPIN_hstw_inc;
     }
 
  act_release_out:
@@ -1266,6 +1254,12 @@ __gnttab_unmap_common_complete(struct gnttab_unmap_common *op)
             else
                 put_page_and_type(pg);
         }
+
+        ASSERT(act->pin & (GNTPIN_devw_mask | GNTPIN_devr_mask));
+        if ( op->flags & GNTMAP_readonly )
+            act->pin -= GNTPIN_devr_inc;
+        else
+            act->pin -= GNTPIN_devw_inc;
     }
 
     if ( (op->host_addr != 0) && (op->flags & GNTMAP_host_map) )
@@ -1274,7 +1268,9 @@ __gnttab_unmap_common_complete(struct gnttab_unmap_common *op)
         {
             /*
              * Suggests that __gntab_unmap_common failed in
-             * replace_grant_host_mapping() so nothing further to do
+             * replace_grant_host_mapping() or IOMMU handling, so nothing
+             * further to do (short of re-establishing the mapping in the
+             * latter case).
              */
             goto act_release_out;
         }
@@ -1285,6 +1281,12 @@ __gnttab_unmap_common_complete(struct gnttab_unmap_common *op)
                 put_page_type(pg);
             put_page(pg);
         }
+
+        ASSERT(act->pin & (GNTPIN_hstw_mask | GNTPIN_hstr_mask));
+        if ( op->flags & GNTMAP_readonly )
+            act->pin -= GNTPIN_hstr_inc;
+        else
+            act->pin -= GNTPIN_hstw_inc;
     }
 
     if ( (op->map->flags & (GNTMAP_device_map|GNTMAP_host_map)) == 0 )
