@@ -2452,6 +2452,27 @@ int hvm_set_cr4(unsigned long value, bool_t may_defer)
             paging_update_paging_modes(v);
     }
 
+    /*
+     * {RD,WR}PKRU are not gated on XCR0.PKRU and hence an oddly behaving
+     * guest may enable the feature in CR4 without enabling it in XCR0. We
+     * need to context switch / migrate PKRU nevertheless.
+     */
+    if ( (value & X86_CR4_PKE) && !(v->arch.xcr0_accum & XSTATE_PKRU) )
+    {
+        int rc = handle_xsetbv(XCR_XFEATURE_ENABLED_MASK,
+                               get_xcr0() | XSTATE_PKRU);
+
+        if ( rc )
+        {
+            HVM_DBG_LOG(DBG_LEVEL_1, "Failed to force XCR0.PKRU: %d", rc);
+            goto gpf;
+        }
+
+        if ( handle_xsetbv(XCR_XFEATURE_ENABLED_MASK,
+                           get_xcr0() & ~XSTATE_PKRU) )
+            /* nothing, best effort only */;
+    }
+
     return X86EMUL_OKAY;
 
  gpf:
