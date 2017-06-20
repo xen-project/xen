@@ -3226,7 +3226,7 @@ ASM_END
     current++;
     write_word(ebda_seg, &EbdaData->ata.trsfsectors,current);
     count--;
-    status = inb(iobase1 + ATA_CB_STAT);
+    status = await_ide(NOT_BSY, iobase1, IDE_TIMEOUT);
     if (count == 0) {
       if ( (status & (ATA_CB_STAT_BSY | ATA_CB_STAT_RDY | ATA_CB_STAT_DF | ATA_CB_STAT_DRQ | ATA_CB_STAT_ERR) )
           != ATA_CB_STAT_RDY ) {
