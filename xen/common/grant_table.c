@@ -758,12 +758,12 @@ __gnttab_map_grant_ref(
     struct grant_table *lgt, *rgt;
     struct vcpu   *led;
     int            handle;
-    unsigned long  frame = 0, nr_gets = 0;
+    unsigned long  frame = 0;
     struct page_info *pg = NULL;
     int            rc = GNTST_okay;
     u32            old_pin;
     u32            act_pin;
-    unsigned int   cache_flags;
+    unsigned int   cache_flags, refcnt = 0, typecnt = 0;
     struct active_grant_entry *act = NULL;
     struct grant_mapping *mt;
     grant_entry_header_t *shah;
@@ -889,11 +889,17 @@ __gnttab_map_grant_ref(
     else
         owner = page_get_owner(pg);
 
+    if ( owner )
+        refcnt++;
+
     if ( !pg || (owner == dom_io) )
     {
         /* Only needed the reference to confirm dom_io ownership. */
         if ( pg )
+        {
             put_page(pg);
+            refcnt--;
+        }
 
         if ( paging_mode_external(ld) )
         {
@@ -921,27 +927,38 @@ __gnttab_map_grant_ref(
     }
     else if ( owner == rd || owner == dom_cow )
     {
-        if ( gnttab_host_mapping_get_page_type(op, ld, rd) )
+        if ( (op->flags & GNTMAP_device_map) && !(op->flags & GNTMAP_readonly) )
         {
             if ( (owner == dom_cow) ||
                  !get_page_type(pg, PGT_writable_page) )
                 goto could_not_pin;
+            typecnt++;
         }
 
-        nr_gets++;
         if ( op->flags & GNTMAP_host_map )
         {
+            /*
+             * Only need to grab another reference if device_map claimed
+             * the other one.
+             */
+            if ( op->flags & GNTMAP_device_map )
+            {
+                if ( !get_page(pg, rd) )
+                    goto could_not_pin;
+                refcnt++;
+            }
+
+            if ( gnttab_host_mapping_get_page_type(op, ld, rd) )
+            {
+                if ( (owner == dom_cow) ||
+                     !get_page_type(pg, PGT_writable_page) )
+                    goto could_not_pin;
+                typecnt++;
+            }
+
             rc = create_grant_host_mapping(op->host_addr, frame, op->flags, 0);
             if ( rc != GNTST_okay )
                 goto undo_out;
-
-            if ( op->flags & GNTMAP_device_map )
-            {
-                nr_gets++;
-                (void)get_page(pg, rd);
-                if ( !(op->flags & GNTMAP_readonly) )
-                    get_page_type(pg, PGT_writable_page);
-            }
         }
     }
     else
@@ -950,8 +967,6 @@ __gnttab_map_grant_ref(
         if ( !rd->is_dying )
             gdprintk(XENLOG_WARNING, "Could not pin grant frame %lx\n",
                      frame);
-        if ( owner != NULL )
-            put_page(pg);
         rc = GNTST_general_error;
         goto undo_out;
     }
@@ -1014,18 +1029,11 @@ __gnttab_map_grant_ref(
     return;
 
  undo_out:
-    if ( nr_gets > 1 )
-    {
-        if ( !(op->flags & GNTMAP_readonly) )
-            put_page_type(pg);
+    while ( typecnt-- )
+        put_page_type(pg);
+
+    while ( refcnt-- )
         put_page(pg);
-    }
-    if ( nr_gets > 0 )
-    {
-        if ( gnttab_host_mapping_get_page_type(op, ld, rd) )
-            put_page_type(pg);
-        put_page(pg);
-    }
 
     grant_read_lock(rgt);
 
