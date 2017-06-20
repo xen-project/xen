@@ -28,6 +28,12 @@ static inline event_word_t *evtchn_fifo_word_from_port(struct domain *d,
     if ( unlikely(port >= d->evtchn_fifo->num_evtchns) )
         return NULL;
 
+    /*
+     * Callers aren't required to hold d->event_lock, so we need to synchronize
+     * with add_page_to_event_array().
+     */
+    smp_rmb();
+
     p = port / EVTCHN_FIFO_EVENT_WORDS_PER_PAGE;
     w = port % EVTCHN_FIFO_EVENT_WORDS_PER_PAGE;
 
@@ -288,24 +294,22 @@ static void evtchn_fifo_unmask(struct domain *d, struct evtchn *evtchn)
         evtchn_fifo_set_pending(v, evtchn);
 }
 
-static bool_t evtchn_fifo_is_pending(struct domain *d,
-                                     const struct evtchn *evtchn)
+static bool_t evtchn_fifo_is_pending(struct domain *d, evtchn_port_t port)
 {
     event_word_t *word;
 
-    word = evtchn_fifo_word_from_port(d, evtchn->port);
+    word = evtchn_fifo_word_from_port(d, port);
     if ( unlikely(!word) )
         return 0;
 
     return test_bit(EVTCHN_FIFO_PENDING, word);
 }
 
-static bool_t evtchn_fifo_is_masked(struct domain *d,
-                                    const struct evtchn *evtchn)
+static bool_t evtchn_fifo_is_masked(struct domain *d, evtchn_port_t port)
 {
     event_word_t *word;
 
-    word = evtchn_fifo_word_from_port(d, evtchn->port);
+    word = evtchn_fifo_word_from_port(d, port);
     if ( unlikely(!word) )
         return 1;
 
@@ -594,6 +598,10 @@ static int add_page_to_event_array(struct domain *d, unsigned long gfn)
         return rc;
 
     d->evtchn_fifo->event_array[slot] = virt;
+
+    /* Synchronize with evtchn_fifo_word_from_port(). */
+    smp_wmb();
+
     d->evtchn_fifo->num_evtchns += EVTCHN_FIFO_EVENT_WORDS_PER_PAGE;
 
     /*

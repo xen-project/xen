@@ -955,7 +955,7 @@ static long do_poll(struct sched_poll *sched_poll)
             goto out;
 
         rc = 0;
-        if ( evtchn_port_is_pending(d, evtchn_from_port(d, port)) )
+        if ( evtchn_port_is_pending(d, port) )
             goto out;
     }
 
