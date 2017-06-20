@@ -696,6 +696,8 @@ int hvm_do_IRQ_dpci(struct domain *d, struct pirq *pirq)
     struct hvm_irq_dpci *dpci = domain_get_irq_dpci(d);
     struct hvm_pirq_dpci *pirq_dpci = pirq_dpci(pirq);
 
+    ASSERT(is_hvm_domain(d));
+
     if ( !iommu_enabled || !dpci || !pirq_dpci ||
          !(pirq_dpci->flags & HVM_IRQ_DPCI_MAPPED) )
         return 0;

@@ -1180,7 +1180,7 @@ static void __do_IRQ_guest(int irq)
         if ( (action->ack_type != ACKTYPE_NONE) &&
              !test_and_set_bool(pirq->masked) )
             action->in_flight++;
-        if ( !hvm_do_IRQ_dpci(d, pirq) )
+        if ( !is_hvm_domain(d) || !hvm_do_IRQ_dpci(d, pirq) )
             send_guest_pirq(d, pirq);
     }
 
