@@ -1703,7 +1703,10 @@ static unsigned int shadow_get_allocation(struct domain *d)
 /**************************************************************************/
 /* Handling guest writes to pagetables. */
 
-/* Translate a VA to an MFN, injecting a page-fault if we fail. */
+/*
+ * Translate a VA to an MFN, injecting a page-fault if we fail.  If the
+ * mapping succeeds, a reference will be held on the underlying page.
+ */
 #define BAD_GVA_TO_GFN (~0UL)
 #define BAD_GFN_TO_MFN (~1UL)
 #define READONLY_GFN   (~2UL)
@@ -1751,29 +1754,21 @@ static mfn_t emulate_gva_to_mfn(struct vcpu *v, unsigned long vaddr,
     ASSERT(mfn_valid(mfn));
 
     v->arch.paging.last_write_was_pt = !!sh_mfn_is_a_page_table(mfn);
-    /*
-     * Note shadow cannot page out or unshare this mfn, so the map won't
-     * disappear. Otherwise, caller must hold onto page until done.
-     */
-    put_page(page);
 
     return mfn;
 }
 
-/* Check that the user is allowed to perform this write. */
+/*
+ * Check that the user is allowed to perform this write.  If a mapping is
+ * returned, page references will be held on sh_ctxt->mfn[0] and
+ * sh_ctxt->mfn[1] iff !INVALID_MFN.
+ */
 void *sh_emulate_map_dest(struct vcpu *v, unsigned long vaddr,
                           unsigned int bytes,
                           struct sh_emulate_ctxt *sh_ctxt)
 {
     struct domain *d = v->domain;
     void *map;
-
-    sh_ctxt->mfn[0] = emulate_gva_to_mfn(v, vaddr, sh_ctxt);
-    if ( !mfn_valid(sh_ctxt->mfn[0]) )
-        return ((mfn_x(sh_ctxt->mfn[0]) == BAD_GVA_TO_GFN) ?
-                MAPPING_EXCEPTION :
-                (mfn_x(sh_ctxt->mfn[0]) == READONLY_GFN) ?
-                MAPPING_SILENT_FAIL : MAPPING_UNHANDLEABLE);
 
 #ifndef NDEBUG
     /* We don't emulate user-mode writes to page tables. */
@@ -1786,6 +1781,17 @@ void *sh_emulate_map_dest(struct vcpu *v, unsigned long vaddr,
         return MAPPING_UNHANDLEABLE;
     }
 #endif
+
+    sh_ctxt->mfn[0] = emulate_gva_to_mfn(v, vaddr, sh_ctxt);
+    if ( !mfn_valid(sh_ctxt->mfn[0]) )
+    {
+        switch ( mfn_x(sh_ctxt->mfn[0]) )
+        {
+        case BAD_GVA_TO_GFN: return MAPPING_EXCEPTION;
+        case READONLY_GFN:   return MAPPING_SILENT_FAIL;
+        default:             return MAPPING_UNHANDLEABLE;
+        }
+    }
 
     /* Unaligned writes mean probably this isn't a pagetable. */
     if ( vaddr & (bytes - 1) )
@@ -1803,6 +1809,7 @@ void *sh_emulate_map_dest(struct vcpu *v, unsigned long vaddr,
          * Cross-page emulated writes are only supported for HVM guests;
          * PV guests ought to know better.
          */
+        put_page(mfn_to_page(sh_ctxt->mfn[0]));
         return MAPPING_UNHANDLEABLE;
     }
     else
@@ -1810,17 +1817,26 @@ void *sh_emulate_map_dest(struct vcpu *v, unsigned long vaddr,
         /* This write crosses a page boundary. Translate the second page. */
         sh_ctxt->mfn[1] = emulate_gva_to_mfn(v, vaddr + bytes - 1, sh_ctxt);
         if ( !mfn_valid(sh_ctxt->mfn[1]) )
-            return ((mfn_x(sh_ctxt->mfn[1]) == BAD_GVA_TO_GFN) ?
-                    MAPPING_EXCEPTION :
-                    (mfn_x(sh_ctxt->mfn[1]) == READONLY_GFN) ?
-                    MAPPING_SILENT_FAIL : MAPPING_UNHANDLEABLE);
+        {
+            put_page(mfn_to_page(sh_ctxt->mfn[0]));
+            switch ( mfn_x(sh_ctxt->mfn[1]) )
+            {
+            case BAD_GVA_TO_GFN: return MAPPING_EXCEPTION;
+            case READONLY_GFN:   return MAPPING_SILENT_FAIL;
+            default:             return MAPPING_UNHANDLEABLE;
+            }
+        }
 
         /* Cross-page writes mean probably not a pagetable. */
         sh_remove_shadows(d, sh_ctxt->mfn[1], 0, 0 /* Slow, can fail. */ );
 
         map = vmap(sh_ctxt->mfn, 2);
         if ( !map )
+        {
+            put_page(mfn_to_page(sh_ctxt->mfn[0]));
+            put_page(mfn_to_page(sh_ctxt->mfn[1]));
             return MAPPING_UNHANDLEABLE;
+        }
         map += (vaddr & ~PAGE_MASK);
     }
 
@@ -1890,10 +1906,12 @@ void sh_emulate_unmap_dest(struct vcpu *v, void *addr, unsigned int bytes,
     }
 
     paging_mark_dirty(v->domain, mfn_x(sh_ctxt->mfn[0]));
+    put_page(mfn_to_page(sh_ctxt->mfn[0]));
 
     if ( unlikely(mfn_valid(sh_ctxt->mfn[1])) )
     {
         paging_mark_dirty(v->domain, mfn_x(sh_ctxt->mfn[1]));
+        put_page(mfn_to_page(sh_ctxt->mfn[1]));
         vunmap((void *)((unsigned long)addr & PAGE_MASK));
     }
     else
