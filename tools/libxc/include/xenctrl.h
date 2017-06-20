@@ -1999,7 +1999,7 @@ int xc_monitor_get_capabilities(xc_interface *xch, domid_t domain_id,
                                 uint32_t *capabilities);
 int xc_monitor_write_ctrlreg(xc_interface *xch, domid_t domain_id,
                              uint16_t index, bool enable, bool sync,
-                             bool onchangeonly);
+                             uint64_t bitmask, bool onchangeonly);
 /*
  * A list of MSR indices can usually be found in /usr/include/asm/msr-index.h.
  * Please consult the Intel/AMD manuals for more information on

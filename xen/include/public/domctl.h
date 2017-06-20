@@ -1107,6 +1107,14 @@ struct xen_domctl_monitor_op {
             uint8_t sync;
             /* Send event only on a change of value */
             uint8_t onchangeonly;
+            /* Allignment padding */
+            uint8_t pad1;
+            uint32_t pad2;
+            /*
+             * Send event only if the changed bit in the control register
+             * is not masked.
+             */
+            uint64_aligned_t bitmask;
         } mov_to_cr;
 
         struct {

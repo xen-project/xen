@@ -406,6 +406,7 @@ struct arch_domain
         unsigned int cpuid_enabled               : 1;
         unsigned int descriptor_access_enabled   : 1;
         struct monitor_msr_bitmap *msr_bitmap;
+        uint64_t write_ctrlreg_mask[4];
     } monitor;
 
     /* Mem_access emulation control */

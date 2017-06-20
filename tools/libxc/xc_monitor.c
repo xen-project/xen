@@ -70,7 +70,7 @@ int xc_monitor_get_capabilities(xc_interface *xch, domid_t domain_id,
 
 int xc_monitor_write_ctrlreg(xc_interface *xch, domid_t domain_id,
                              uint16_t index, bool enable, bool sync,
-                             bool onchangeonly)
+                             uint64_t bitmask, bool onchangeonly)
 {
     DECLARE_DOMCTL;
 
@@ -82,6 +82,9 @@ int xc_monitor_write_ctrlreg(xc_interface *xch, domid_t domain_id,
     domctl.u.monitor_op.u.mov_to_cr.index = index;
     domctl.u.monitor_op.u.mov_to_cr.sync = sync;
     domctl.u.monitor_op.u.mov_to_cr.onchangeonly = onchangeonly;
+    domctl.u.monitor_op.u.mov_to_cr.bitmask = bitmask;
+    domctl.u.monitor_op.u.mov_to_cr.pad1 = 0;
+    domctl.u.monitor_op.u.mov_to_cr.pad2 = 0;
 
     return do_domctl(xch, &domctl);
 }

@@ -136,6 +136,9 @@ int arch_monitor_domctl_event(struct domain *d,
         if ( unlikely(mop->u.mov_to_cr.index > 31) )
             return -EINVAL;
 
+        if ( unlikely(mop->u.mov_to_cr.pad1 || mop->u.mov_to_cr.pad2) )
+            return -EINVAL;
+
         ctrlreg_bitmask = monitor_ctrlreg_bitmask(mop->u.mov_to_cr.index);
         old_status = !!(ad->monitor.write_ctrlreg_enabled & ctrlreg_bitmask);
 
@@ -155,9 +158,15 @@ int arch_monitor_domctl_event(struct domain *d,
             ad->monitor.write_ctrlreg_onchangeonly &= ~ctrlreg_bitmask;
 
         if ( requested_status )
+        {
+            ad->monitor.write_ctrlreg_mask[mop->u.mov_to_cr.index] = mop->u.mov_to_cr.bitmask;
             ad->monitor.write_ctrlreg_enabled |= ctrlreg_bitmask;
+        }
         else
+        {
+            ad->monitor.write_ctrlreg_mask[mop->u.mov_to_cr.index] = 0;
             ad->monitor.write_ctrlreg_enabled &= ~ctrlreg_bitmask;
+        }
 
         if ( VM_EVENT_X86_CR3 == mop->u.mov_to_cr.index )
         {
