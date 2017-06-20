@@ -2840,10 +2840,12 @@ int p2m_add_foreign(struct domain *tdom, unsigned long fgfn,
     {
         if ( is_xen_heap_mfn(prev_mfn) )
             /* Xen heap frames are simply unhooked from this phys slot */
-            guest_physmap_remove_page(tdom, gpfn, prev_mfn, 0);
+            rc = guest_physmap_remove_page(tdom, gpfn, prev_mfn, 0);
         else
             /* Normal domain memory is freed, to avoid leaking memory. */
-            guest_remove_page(tdom, gpfn);
+            rc = guest_remove_page(tdom, gpfn);
+        if ( rc )
+            goto put_both;
     }
     /*
      * Create the new mapping. Can't use guest_physmap_add_page() because it
@@ -2856,6 +2858,7 @@ int p2m_add_foreign(struct domain *tdom, unsigned long fgfn,
                  "gpfn:%lx mfn:%lx fgfn:%lx td:%d fd:%d\n",
                  gpfn, mfn, fgfn, tdom->domain_id, fdom->domain_id);
 
+ put_both:
     put_page(page);
 
     /*
