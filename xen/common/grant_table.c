@@ -96,7 +96,7 @@ struct gnttab_unmap_common {
     int16_t status;
 
     /* Shared state beteen *_unmap and *_unmap_complete */
-    u16 flags;
+    u16 done;
     unsigned long frame;
     struct domain *rd;
     grant_ref_t ref;
@@ -773,7 +773,8 @@ __gnttab_map_grant_ref(
                 refcnt++;
             }
 
-            if ( gnttab_host_mapping_get_page_type(op, ld, rd) )
+            if ( gnttab_host_mapping_get_page_type(op->flags & GNTMAP_readonly,
+                                                   ld, rd) )
             {
                 if ( (owner == dom_cow) ||
                      !get_page_type(pg, PGT_writable_page) )
@@ -905,6 +906,7 @@ __gnttab_unmap_common(
     struct active_grant_entry *act;
     s16              rc = 0;
     struct grant_mapping *map;
+    unsigned int flags;
     bool_t put_handle = 0;
 
     ld = current->domain;
@@ -954,8 +956,22 @@ __gnttab_unmap_common(
     rgt = rd->grant_table;
     double_gt_lock(lgt, rgt);
 
-    op->flags = map->flags;
-    if ( unlikely(!op->flags) || unlikely(map->domid != dom) )
+    if ( rgt->gt_version == 0 )
+    {
+        /*
+         * This ought to be impossible, as such a mapping should not have
+         * been established (see the nr_grant_entries(rgt) bounds check in
+         * __gnttab_map_grant_ref()). Doing this check only in
+         * __gnttab_unmap_common_complete() - as it used to be done - would,
+         * however, be too late.
+         */
+        rc = GNTST_bad_gntref;
+        flags = 0;
+        goto unmap_out;
+    }
+
+    flags = map->flags;
+    if ( unlikely(!flags) || unlikely(map->domid != dom) )
     {
         gdprintk(XENLOG_WARNING, "Unstable handle %u\n", op->handle);
         rc = GNTST_bad_handle;
@@ -968,24 +984,27 @@ __gnttab_unmap_common(
 
     op->frame = act->frame;
 
-    if ( op->dev_bus_addr )
-    {
-        if ( unlikely(op->dev_bus_addr != pfn_to_paddr(act->frame)) )
-            PIN_FAIL(unmap_out, GNTST_general_error,
-                     "Bus address doesn't match gntref (%"PRIx64" != %"PRIpaddr")\n",
-                     op->dev_bus_addr, pfn_to_paddr(act->frame));
+    if ( op->dev_bus_addr &&
+         unlikely(op->dev_bus_addr != pfn_to_paddr(act->frame)) )
+        PIN_FAIL(unmap_out, GNTST_general_error,
+                 "Bus address doesn't match gntref (%"PRIx64" != %"PRIpaddr")\n",
+                 op->dev_bus_addr, pfn_to_paddr(act->frame));
 
-        map->flags &= ~GNTMAP_device_map;
-    }
-
-    if ( (op->host_addr != 0) && (op->flags & GNTMAP_host_map) )
+    if ( op->host_addr && (flags & GNTMAP_host_map) )
     {
         if ( (rc = replace_grant_host_mapping(op->host_addr,
                                               op->frame, op->new_addr, 
-                                              op->flags)) < 0 )
+                                              flags)) < 0 )
             goto unmap_out;
 
         map->flags &= ~GNTMAP_host_map;
+        op->done |= GNTMAP_host_map | (flags & GNTMAP_readonly);
+    }
+
+    if ( op->dev_bus_addr && (flags & GNTMAP_device_map) )
+    {
+        map->flags &= ~GNTMAP_device_map;
+        op->done |= GNTMAP_device_map | (flags & GNTMAP_readonly);
     }
 
     if ( !(map->flags & (GNTMAP_device_map|GNTMAP_host_map)) )
@@ -1020,7 +1039,7 @@ __gnttab_unmap_common(
     }
 
     /* If just unmapped a writable mapping, mark as dirtied */
-    if ( rc == GNTST_okay && !(op->flags & GNTMAP_readonly) )
+    if ( rc == GNTST_okay && !(flags & GNTMAP_readonly) )
          gnttab_mark_dirty(rd, op->frame);
 
     op->status = rc;
@@ -1037,13 +1056,9 @@ __gnttab_unmap_common_complete(struct gnttab_unmap_common *op)
     struct page_info *pg;
     uint16_t *status;
 
-    if ( rd == NULL )
+    if ( !op->done )
     { 
-        /*
-         * Suggests that __gntab_unmap_common failed in
-         * rcu_lock_domain_by_id() or earlier, and so we have nothing
-         * to complete
-         */
+        /* __gntab_unmap_common() didn't do anything - nothing to complete. */
         return;
     }
 
@@ -1053,9 +1068,6 @@ __gnttab_unmap_common_complete(struct gnttab_unmap_common *op)
     rgt = rd->grant_table;
     spin_lock(&rgt->lock);
 
-    if ( rgt->gt_version == 0 )
-        goto unmap_out;
-
     act = &active_entry(rgt, op->ref);
     sha = shared_entry_header(rgt, op->ref);
 
@@ -1064,70 +1076,49 @@ __gnttab_unmap_common_complete(struct gnttab_unmap_common *op)
     else
         status = &status_entry(rgt, op->ref);
 
-    if ( op->dev_bus_addr &&
-         unlikely(op->dev_bus_addr != pfn_to_paddr(act->frame)) )
-    {
-        /*
-         * Suggests that __gntab_unmap_common failed early and so
-         * nothing further to do
-         */
-        goto unmap_out;
-    }
-
     pg = mfn_to_page(op->frame);
 
-    if ( op->dev_bus_addr && (op->flags & GNTMAP_device_map) )
+    if ( op->done & GNTMAP_device_map )
     {
         if ( !is_iomem_page(act->frame) )
         {
-            if ( op->flags & GNTMAP_readonly )
+            if ( op->done & GNTMAP_readonly )
                 put_page(pg);
             else
                 put_page_and_type(pg);
         }
 
         ASSERT(act->pin & (GNTPIN_devw_mask | GNTPIN_devr_mask));
-        if ( op->flags & GNTMAP_readonly )
+        if ( op->done & GNTMAP_readonly )
             act->pin -= GNTPIN_devr_inc;
         else
             act->pin -= GNTPIN_devw_inc;
     }
 
-    if ( (op->host_addr != 0) && (op->flags & GNTMAP_host_map) )
+    if ( op->done & GNTMAP_host_map )
     {
-        if ( op->status != 0 ) 
-        {
-            /*
-             * Suggests that __gntab_unmap_common failed in
-             * replace_grant_host_mapping() or IOMMU handling, so nothing
-             * further to do (short of re-establishing the mapping in the
-             * latter case).
-             */
-            goto unmap_out;
-        }
-
         if ( !is_iomem_page(op->frame) ) 
         {
-            if ( gnttab_host_mapping_get_page_type(op, ld, rd) )
+            if ( gnttab_host_mapping_get_page_type(op->done & GNTMAP_readonly,
+                                                   ld, rd) )
                 put_page_type(pg);
             put_page(pg);
         }
 
         ASSERT(act->pin & (GNTPIN_hstw_mask | GNTPIN_hstr_mask));
-        if ( op->flags & GNTMAP_readonly )
+        if ( op->done & GNTMAP_readonly )
             act->pin -= GNTPIN_hstr_inc;
         else
             act->pin -= GNTPIN_hstw_inc;
     }
 
     if ( ((act->pin & (GNTPIN_devw_mask|GNTPIN_hstw_mask)) == 0) &&
-         !(op->flags & GNTMAP_readonly) )
+         !(op->done & GNTMAP_readonly) )
         gnttab_clear_flag(_GTF_writing, status);
 
     if ( act->pin == 0 )
         gnttab_clear_flag(_GTF_reading, status);
 
- unmap_out:
     spin_unlock(&rgt->lock);
     rcu_unlock_domain(rd);
 }
@@ -1142,6 +1133,7 @@ __gnttab_unmap_grant_ref(
     common->handle = op->handle;
 
     /* Intialise these in case common contains old state */
+    common->done = 0;
     common->new_addr = 0;
     common->rd = NULL;
     common->frame = 0;
@@ -1207,6 +1199,7 @@ __gnttab_unmap_and_replace(
     common->handle = op->handle;
     
     /* Intialise these in case common contains old state */
+    common->done = 0;
     common->dev_bus_addr = 0;
     common->rd = NULL;
     common->frame = 0;
@@ -2978,7 +2971,9 @@ gnttab_release_mappings(
                 if ( gnttab_release_host_mappings(d) &&
                      !is_iomem_page(act->frame) )
                 {
-                    if ( gnttab_host_mapping_get_page_type(map, d, rd) )
+                    if ( gnttab_host_mapping_get_page_type((map->flags &
+                                                            GNTMAP_readonly),
+                                                           d, rd) )
                         put_page_type(pg);
                     put_page(pg);
                 }
