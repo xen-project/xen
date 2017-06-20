@@ -31,6 +31,7 @@
 #include <asm/regs.h>
 #include <asm/cpufeature.h>
 #include <asm/processor.h>
+#include <asm/xstate.h>
 #include <asm/guest_access.h>
 #include <asm/debugreg.h>
 #include <asm/msr.h>
@@ -625,6 +626,45 @@ static int vmx_load_vmcs_ctxt(struct vcpu *v, struct hvm_hw_cpu *ctxt)
     return 0;
 }
 
+static bool_t vmx_set_guest_bndcfgs(struct vcpu *v, u64 val)
+{
+    if ( !cpu_has_mpx || !cpu_has_vmx_mpx ||
+         !is_canonical_address(val) ||
+         (val & IA32_BNDCFGS_RESERVED) )
+        return 0;
+
+    /*
+     * While MPX instructions are supposed to be gated on XCR0.BND*, let's
+     * nevertheless force the relevant XCR0 bits on when the feature is being
+     * enabled in BNDCFGS.
+     */
+    if ( (val & IA32_BNDCFGS_ENABLE) &&
+         !(v->arch.xcr0_accum & (XSTATE_BNDREGS | XSTATE_BNDCSR)) )
+    {
+        uint64_t xcr0 = get_xcr0();
+        int rc;
+
+        if ( v != current )
+            return 0;
+
+        rc = handle_xsetbv(XCR_XFEATURE_ENABLED_MASK,
+                           xcr0 | XSTATE_BNDREGS | XSTATE_BNDCSR);
+
+        if ( rc )
+        {
+            HVM_DBG_LOG(DBG_LEVEL_1, "Failed to force XCR0.BND*: %d", rc);
+            return 0;
+        }
+
+        if ( handle_xsetbv(XCR_XFEATURE_ENABLED_MASK, xcr0) )
+            /* nothing, best effort only */;
+    }
+
+    __vmwrite(GUEST_BNDCFGS, val);
+
+    return 1;
+}
+
 static unsigned int __init vmx_init_msr(void)
 {
     return cpu_has_mpx && cpu_has_vmx_mpx;
@@ -656,11 +696,8 @@ static int vmx_load_msr(struct vcpu *v, struct hvm_msr *ctxt)
         switch ( ctxt->msr[i].index )
         {
         case MSR_IA32_BNDCFGS:
-            if ( cpu_has_mpx && cpu_has_vmx_mpx &&
-                 is_canonical_address(ctxt->msr[i].val) &&
-                 !(ctxt->msr[i].val & IA32_BNDCFGS_RESERVED) )
-                __vmwrite(GUEST_BNDCFGS, ctxt->msr[i].val);
-            else
+            if ( !vmx_set_guest_bndcfgs(v, ctxt->msr[i].val) &&
+                 ctxt->msr[i].val )
                 err = -ENXIO;
             break;
         default:
@@ -2552,11 +2589,8 @@ static int vmx_msr_write_intercept(unsigned int msr, uint64_t msr_content)
         break;
     }
     case MSR_IA32_BNDCFGS:
-        if ( !cpu_has_mpx || !cpu_has_vmx_mpx ||
-             !is_canonical_address(msr_content) ||
-             (msr_content & IA32_BNDCFGS_RESERVED) )
+        if ( !vmx_set_guest_bndcfgs(v, msr_content) )
             goto gp_fault;
-        __vmwrite(GUEST_BNDCFGS, msr_content);
         break;
     case IA32_FEATURE_CONTROL_MSR:
     case MSR_IA32_VMX_BASIC...MSR_IA32_VMX_TRUE_ENTRY_CTLS:
