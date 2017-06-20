@@ -911,10 +911,13 @@ __gnttab_map_grant_ref(
             goto undo_out;
         }
 
-        rc = create_grant_host_mapping(
-            op->host_addr, frame, op->flags, cache_flags);
-        if ( rc != GNTST_okay )
-            goto undo_out;
+        if ( op->flags & GNTMAP_host_map )
+        {
+            rc = create_grant_host_mapping(op->host_addr, frame, op->flags,
+                                           cache_flags);
+            if ( rc != GNTST_okay )
+                goto undo_out;
+        }
     }
     else if ( owner == rd || owner == dom_cow )
     {
