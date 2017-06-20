@@ -400,7 +400,8 @@ int vgic_to_sgi(struct vcpu *v, register_t sgir, enum gic_sgi_mode irqmode, int 
         for_each_set_bit( i, &bitmap, sizeof(target->list) * 8 )
         {
             vcpuid = base + i;
-            if ( d->vcpu[vcpuid] == NULL || !is_vcpu_online(d->vcpu[vcpuid]) )
+            if ( vcpuid >= d->max_vcpus || d->vcpu[vcpuid] == NULL ||
+                 !is_vcpu_online(d->vcpu[vcpuid]) )
             {
                 gprintk(XENLOG_WARNING, "VGIC: write r=%"PRIregister" \
                         target->list=%hx, wrong CPUTargetList \n",
