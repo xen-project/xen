@@ -12,7 +12,11 @@ property "xen,passthrough". The command to do it in U-Boot is:
 2) Create a partial device tree describing the device. The IRQ are mapped
 1:1 to the guest (i.e VIRQ == IRQ). For MMIO, you will have to find a hole
 in the guest memory layout (see xen/include/public/arch-arm.h, note that
-the layout is not stable and can change between versions of Xen).
+the layout is not stable and can change between versions of Xen). Please
+be aware that passing a partial device tree to a VM is a powerful tool,
+use it with care. In production, only allow assignment of devices which
+have been previously tested and known to work correctly when given to
+guests.
 
 /dts-v1/;
 
@@ -48,6 +52,8 @@ Note:
         - #size-cells
     * See http://www.devicetree.org/Device_Tree_Usage for more
     information about device tree.
+    * In this example, the device MMIO region is placed at a different
+    address (0x10000000) compared to the host address (0xfff51000)
 
 3) Compile the partial guest device with dtc (Device Tree Compiler).
 For our purpose, the compiled file will be called guest-midway.dtb and
@@ -60,3 +66,20 @@ dtdev = [ "/soc/ethernet@fff51000" ]
 irqs = [ 112, 113, 114 ]
 iomem = [ "0xfff51,1@0x10000" ]
 
+Please refer to your platform docs for the MMIO ranges and interrupts.
+
+They can also be calculated from the original device tree (not
+recommended). You can read about the "interrupts" property format in the
+device tree bindings of the interrupt controller of your platform. For
+example, in the case of GICv2 see [arm,gic.txt]; in the case of GICv3
+see [arm,gic-v3.txt] in the Linux repository. For both GICv2 and GICv3
+the "interrupts" property format is the same: the first cell is the
+interrupt type, and the second cell is the interrupt number.  Given that
+SPI numbers start from 32, in this example 80 + 32 = 112.
+
+See man [xl.cfg] for the iomem format. The reg property is just a pair
+of address, then size numbers, each of them can occupy 1 or 2 cells.
+
+[arm,gic.txt]: https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/Documentation/devicetree/bindings/interrupt-controller/arm,gic.txt
+[arm,gic-v3.txt]: https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/Documentation/devicetree/bindings/interrupt-controller/arm,gic-v3.txt
+[xl.cfg]: https://xenbits.xen.org/docs/unstable/man/xl.cfg.5.html
