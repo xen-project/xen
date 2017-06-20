@@ -4217,6 +4217,9 @@ int steal_page(
     unsigned long x, y;
     bool_t drop_dom_ref = 0;
 
+    if ( paging_mode_external(d) )
+        return -1;
+
     spin_lock(&d->page_alloc_lock);
 
     if ( is_xen_heap_page(page) || (page_get_owner(page) != d) )
