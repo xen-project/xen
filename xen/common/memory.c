@@ -284,8 +284,12 @@ int guest_remove_page(struct domain *d, unsigned long gmfn)
     mfn = get_gfn_query(d, gmfn, &p2mt);
     if ( unlikely(p2m_is_paging(p2mt)) )
     {
-        guest_physmap_remove_page(d, _gfn(gmfn), mfn, 0);
+        rc = guest_physmap_remove_page(d, _gfn(gmfn), mfn, 0);
         put_gfn(d, gmfn);
+
+        if ( rc )
+            return rc;
+
         /* If the page hasn't yet been paged out, there is an
          * actual page that needs to be released. */
         if ( p2mt == p2m_ram_paging_out )
@@ -349,7 +353,9 @@ int guest_remove_page(struct domain *d, unsigned long gmfn)
         return -ENXIO;
     }
 
-    if ( test_and_clear_bit(_PGT_pinned, &page->u.inuse.type_info) )
+    rc = guest_physmap_remove_page(d, _gfn(gmfn), mfn, 0);
+
+    if ( !rc && test_and_clear_bit(_PGT_pinned, &page->u.inuse.type_info) )
         put_page_and_type(page);
 
     /*
@@ -360,16 +366,14 @@ int guest_remove_page(struct domain *d, unsigned long gmfn)
      * For this purpose (and to match populate_physmap() behavior), the page
      * is kept allocated.
      */
-    if ( !is_domain_direct_mapped(d) &&
+    if ( !rc && !is_domain_direct_mapped(d) &&
          test_and_clear_bit(_PGC_allocated, &page->count_info) )
         put_page(page);
-
-    guest_physmap_remove_page(d, _gfn(gmfn), mfn, 0);
 
     put_page(page);
     put_gfn(d, gmfn);
 
-    return 0;
+    return rc;
 }
 
 static void decrease_reservation(struct memop_args *a)
@@ -604,7 +608,8 @@ static long memory_exchange(XEN_GUEST_HANDLE_PARAM(xen_memory_exchange_t) arg)
             gfn = mfn_to_gmfn(d, mfn);
             /* Pages were unshared above */
             BUG_ON(SHARED_M2P(gfn));
-            guest_physmap_remove_page(d, _gfn(gfn), _mfn(mfn), 0);
+            if ( guest_physmap_remove_page(d, _gfn(gfn), _mfn(mfn), 0) )
+                domain_crash(d);
             put_page(page);
         }
 
@@ -1163,8 +1168,8 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         page = get_page_from_gfn(d, xrfp.gpfn, NULL, P2M_ALLOC);
         if ( page )
         {
-            guest_physmap_remove_page(d, _gfn(xrfp.gpfn),
-                                      _mfn(page_to_mfn(page)), 0);
+            rc = guest_physmap_remove_page(d, _gfn(xrfp.gpfn),
+                                           _mfn(page_to_mfn(page)), 0);
             put_page(page);
         }
         else
