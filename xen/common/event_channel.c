@@ -1381,8 +1381,8 @@ static void domain_dump_evtchn_info(struct domain *d)
 
         printk("    %4u [%d/%d/",
                port,
-               !!evtchn_port_is_pending(d, chn),
-               !!evtchn_port_is_masked(d, chn));
+               evtchn_port_is_pending(d, port),
+               evtchn_port_is_masked(d, port));
         evtchn_port_print_state(d, chn);
         printk("]: s=%d n=%d x=%d",
                chn->state, chn->notify_vcpu_id, chn->xen_consumer);
