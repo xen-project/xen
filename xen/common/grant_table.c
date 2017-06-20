@@ -1,24 +1,24 @@
 /******************************************************************************
  * common/grant_table.c
- * 
+ *
  * Mechanism for granting foreign access to page frames, and receiving
  * page-ownership transfers.
- * 
+ *
  * Copyright (c) 2005-2006 Christopher Clark
  * Copyright (c) 2004 K A Fraser
  * Copyright (c) 2005 Andrew Warfield
  * Modifications by Geoffrey Lefebvre are (c) Intel Research Cambridge
- * 
+ *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; If not, see <http://www.gnu.org/licenses/>.
  */
@@ -40,7 +40,7 @@
 #include <xsm/xsm.h>
 #include <asm/flushtlb.h>
 
-/* 
+/*
  * This option is deprecated, use gnttab_max_frames and
  * gnttab_max_maptrack_frames instead.
  */
@@ -150,7 +150,7 @@ static grant_entry_header_t *
 shared_entry_header(struct grant_table *t, grant_ref_t ref)
 {
     ASSERT(t->gt_version != 0);
-    if (t->gt_version == 1)
+    if ( t->gt_version == 1 )
         return (grant_entry_header_t*)&shared_entry_v1(t, ref);
     else
         return &shared_entry_v2(t, ref).hdr;
@@ -229,7 +229,7 @@ static inline void active_entry_release(struct active_grant_entry *act)
     spin_unlock(&act->lock);
 }
 
-/* Check if the page has been paged out, or needs unsharing. 
+/* Check if the page has been paged out, or needs unsharing.
    If rc == GNTST_okay, *page contains the page struct with a ref taken.
    Caller must do put_page(*page).
    If any error, *page = NULL, *frame = INVALID_MFN, no ref taken. */
@@ -240,7 +240,7 @@ static int __get_paged_frame(unsigned long gfn, unsigned long *frame, struct pag
 #if defined(P2M_PAGED_TYPES) || defined(P2M_SHARED_TYPES)
     p2m_type_t p2mt;
 
-    *page = get_page_from_gfn(rd, gfn, &p2mt, 
+    *page = get_page_from_gfn(rd, gfn, &p2mt,
                               (readonly) ? P2M_ALLOC : P2M_UNSHARE);
     if ( !(*page) )
     {
@@ -510,7 +510,7 @@ static unsigned int nr_grant_entries(struct grant_table *gt)
 static int _set_status_v1(domid_t  domid,
                           int readonly,
                           int mapflag,
-                          grant_entry_header_t *shah, 
+                          grant_entry_header_t *shah,
                           struct active_grant_entry *act)
 {
     int rc = GNTST_okay;
@@ -529,7 +529,7 @@ static int _set_status_v1(domid_t  domid,
 
     /* if this is a grant mapping operation we should ensure GTF_sub_page
        is not set */
-    if (mapflag)
+    if ( mapflag )
         mask |= GTF_sub_page;
 
     scombo.word = *(u32 *)shah;
@@ -537,7 +537,7 @@ static int _set_status_v1(domid_t  domid,
     /*
      * This loop attempts to set the access (reading/writing) flags
      * in the grant table entry.  It tries a cmpxchg on the field
-     * up to five times, and then fails under the assumption that 
+     * up to five times, and then fails under the assumption that
      * the guest is misbehaving.
      */
     for ( ; ; )
@@ -582,7 +582,7 @@ done:
 static int _set_status_v2(domid_t  domid,
                           int readonly,
                           int mapflag,
-                          grant_entry_header_t *shah, 
+                          grant_entry_header_t *shah,
                           struct active_grant_entry *act,
                           grant_status_t *status)
 {
@@ -603,7 +603,7 @@ static int _set_status_v2(domid_t  domid,
 
     /* if this is a grant mapping operation we should ensure GTF_sub_page
        is not set */
-    if (mapflag)
+    if ( mapflag )
         mask |= GTF_sub_page;
 
     /* If not already pinned, check the grant domid and type. */
@@ -675,7 +675,7 @@ static int _set_status(unsigned gt_version,
                        grant_status_t *status)
 {
 
-    if (gt_version == 1)
+    if ( gt_version == 1 )
         return _set_status_v1(domid, readonly, mapflag, shah, act);
     else
         return _set_status_v2(domid, readonly, mapflag, shah, act, status);
@@ -687,7 +687,7 @@ static int grant_map_exists(const struct domain *ld,
                             unsigned int *ref_count)
 {
     unsigned int ref, max_iter;
-    
+
     /*
      * The remote grant table should be locked but the percpu rwlock
      * cannot be checked for read lock without race conditions or high
@@ -763,7 +763,7 @@ static unsigned int mapkind(
 /*
  * Returns 0 if TLB flush / invalidate required by caller.
  * va will indicate the address to be invalidated.
- * 
+ *
  * addr is _either_ a host virtual address, or the address of the pte to
  * update, as indicated by the GNTMAP_contains_pte flag.
  */
@@ -866,7 +866,7 @@ __gnttab_map_grant_ref(
                                 shared_entry_v1(rgt, op->ref).frame :
                                 shared_entry_v2(rgt, op->ref).full_page.frame;
 
-            rc = __get_paged_frame(gfn, &frame, &pg, 
+            rc = __get_paged_frame(gfn, &frame, &pg,
                                     !!(op->flags & GNTMAP_readonly), rd);
             if ( rc != GNTST_okay )
                 goto unlock_out_clear;
@@ -929,7 +929,7 @@ __gnttab_map_grant_ref(
         if ( !iomem_access_permitted(rd, frame, frame) )
         {
             gdprintk(XENLOG_WARNING,
-                     "Iomem mapping not permitted %lx (domain %d)\n", 
+                     "Iomem mapping not permitted %lx (domain %d)\n",
                      frame, rd->domain_id);
             rc = GNTST_general_error;
             goto undo_out;
@@ -1074,7 +1074,7 @@ __gnttab_map_grant_ref(
     if ( op->flags & GNTMAP_host_map )
         act->pin -= (op->flags & GNTMAP_readonly) ?
             GNTPIN_hstr_inc : GNTPIN_hstw_inc;
- 
+
  unlock_out_clear:
     if ( !(op->flags & GNTMAP_readonly) &&
          !(act->pin & (GNTPIN_hstw_mask|GNTPIN_devw_mask)) )
@@ -1102,11 +1102,14 @@ gnttab_map_grant_ref(
 
     for ( i = 0; i < count; i++ )
     {
-        if (i && hypercall_preempt_check())
+        if ( i && hypercall_preempt_check() )
             return i;
+
         if ( unlikely(__copy_from_guest_offset(&op, uop, i, 1)) )
             return -EFAULT;
+
         __gnttab_map_grant_ref(&op);
+
         if ( unlikely(__copy_to_guest_offset(uop, i, &op, 1)) )
             return -EFAULT;
     }
@@ -1239,7 +1242,7 @@ __gnttab_unmap_common(
     if ( op->host_addr && (flags & GNTMAP_host_map) )
     {
         if ( (rc = replace_grant_host_mapping(op->host_addr,
-                                              op->frame, op->new_addr, 
+                                              op->frame, op->new_addr,
                                               flags)) < 0 )
             goto act_release_out;
 
@@ -1305,7 +1308,7 @@ __gnttab_unmap_common_complete(struct gnttab_unmap_common *op)
     uint16_t *status;
 
     if ( !op->done )
-    { 
+    {
         /* __gntab_unmap_common() didn't do anything - nothing to complete. */
         return;
     }
@@ -1426,10 +1429,10 @@ gnttab_unmap_grant_ref(
         count -= c;
         done += c;
 
-        if (count && hypercall_preempt_check())
+        if ( count && hypercall_preempt_check() )
             return done;
     }
-     
+
     return 0;
 
 fault:
@@ -1448,7 +1451,7 @@ __gnttab_unmap_and_replace(
     common->host_addr = op->host_addr;
     common->new_addr = op->new_addr;
     common->handle = op->handle;
-    
+
     /* Intialise these in case common contains old state */
     common->done = 0;
     common->dev_bus_addr = 0;
@@ -1471,7 +1474,7 @@ gnttab_unmap_and_replace(
     {
         c = min(count, (unsigned int)GNTTAB_UNMAP_BATCH_SIZE);
         partial_done = 0;
-        
+
         for ( i = 0; i < c; i++ )
         {
             if ( unlikely(__copy_from_guest(&op, uop, 1)) )
@@ -1482,16 +1485,16 @@ gnttab_unmap_and_replace(
                 goto fault;
             guest_handle_add_offset(uop, 1);
         }
-        
+
         gnttab_flush_tlb(current->domain);
-        
+
         for ( i = 0; i < partial_done; i++ )
             __gnttab_unmap_common_complete(&(common[i]));
 
         count -= c;
         done += c;
 
-        if (count && hypercall_preempt_check())
+        if ( count && hypercall_preempt_check() )
             return done;
     }
 
@@ -1502,7 +1505,7 @@ fault:
 
     for ( i = 0; i < partial_done; i++ )
         __gnttab_unmap_common_complete(&(common[i]));
-    return -EFAULT;    
+    return -EFAULT;
 }
 
 static int
@@ -1591,7 +1594,7 @@ gnttab_grow_table(struct domain *d, unsigned int req_nr_frames)
     }
 
     /* Status pages - version 2 */
-    if (gt->gt_version > 1)
+    if ( gt->gt_version > 1 )
     {
         if ( gnttab_populate_status_frames(d, gt, req_nr_frames) )
             goto shared_alloc_failed;
@@ -1621,7 +1624,7 @@ active_alloc_failed:
     return 0;
 }
 
-static long 
+static long
 gnttab_setup_table(
     XEN_GUEST_HANDLE_PARAM(gnttab_setup_table_t) uop, unsigned int count)
 {
@@ -1683,7 +1686,7 @@ gnttab_setup_table(
         op.status = GNTST_general_error;
         goto unlock;
     }
- 
+
     op.status = GNTST_okay;
     for ( i = 0; i < op.nr_frames; i++ )
     {
@@ -1706,7 +1709,7 @@ gnttab_setup_table(
     return 0;
 }
 
-static long 
+static long
 gnttab_query_size(
     XEN_GUEST_HANDLE_PARAM(gnttab_query_size_t) uop, unsigned int count)
 {
@@ -1746,7 +1749,7 @@ gnttab_query_size(
 
     grant_read_unlock(d->grant_table);
 
- 
+
  query_out_unlock:
     rcu_unlock_domain(d);
 
@@ -1761,7 +1764,7 @@ gnttab_query_size(
  * Check that the given grant reference (rd,ref) allows 'ld' to transfer
  * ownership of a page frame. If so, lock down the grant entry.
  */
-static int 
+static int
 gnttab_prepare_for_transfer(
     struct domain *rd, struct domain *ld, grant_ref_t ref)
 {
@@ -1781,7 +1784,7 @@ gnttab_prepare_for_transfer(
     }
 
     sha = shared_entry_header(rgt, ref);
-    
+
     scombo.word = *(u32 *)&sha->flags;
 
     for ( ; ; )
@@ -1839,7 +1842,7 @@ gnttab_transfer(
         bool_t okay;
         int rc;
 
-        if (i && hypercall_preempt_check())
+        if ( i && hypercall_preempt_check() )
             return i;
 
         /* Read from caller address space. */
@@ -1863,7 +1866,7 @@ gnttab_transfer(
 
         /* Check the passed page frame for basic validity. */
         if ( unlikely(!mfn_valid(_mfn(mfn))) )
-        { 
+        {
             put_gfn(d, gop.mfn);
             gdprintk(XENLOG_INFO, "gnttab_transfer: out-of-range %lx\n",
                     (unsigned long)gop.mfn);
@@ -2066,7 +2069,7 @@ __release_grant_for_copy(
     sha = shared_entry_header(rgt, gref);
     r_frame = act->frame;
 
-    if (rgt->gt_version == 1)
+    if ( rgt->gt_version == 1 )
     {
         status = &sha->flags;
         td = rd;
@@ -2133,13 +2136,13 @@ static void __fixup_status_for_copy_pin(const struct active_grant_entry *act,
 }
 
 /* Grab a frame number from a grant entry and update the flags and pin
-   count as appropriate. If rc == GNTST_okay, note that this *does* 
+   count as appropriate. If rc == GNTST_okay, note that this *does*
    take one ref count on the target page, stored in *page.
    If there is any error, *page = NULL, no ref taken. */
 static int
 __acquire_grant_for_copy(
     struct domain *rd, unsigned long gref, domid_t ldom, int readonly,
-    unsigned long *frame, struct page_info **page, 
+    unsigned long *frame, struct page_info **page,
     uint16_t *page_off, uint16_t *length, unsigned allow_transitive)
 {
     struct grant_table *rgt = rd->grant_table;
@@ -2250,7 +2253,8 @@ __acquire_grant_for_copy(
             grant_read_lock(rgt);
             act = active_entry_acquire(rgt, gref);
 
-            if ( rc != GNTST_okay ) {
+            if ( rc != GNTST_okay )
+            {
                 __fixup_status_for_copy_pin(act, status);
                 rcu_unlock_domain(td);
                 active_entry_release(act);
@@ -2333,7 +2337,7 @@ __acquire_grant_for_copy(
     active_entry_release(act);
     grant_read_unlock(rgt);
     return rc;
- 
+
  unlock_out_clear:
     if ( !(readonly) &&
          !(act->pin & (GNTPIN_hstw_mask | GNTPIN_devw_mask)) )
@@ -2814,14 +2818,16 @@ gnttab_get_status_frames(XEN_GUEST_HANDLE_PARAM(gnttab_get_status_frames_t) uop,
         goto out1;
     }
     rc = xsm_grant_setup(XSM_TARGET, current->domain, d);
-    if ( rc ) {
+    if ( rc )
+    {
         op.status = GNTST_permission_denied;
         goto out2;
     }
 
     gt = d->grant_table;
 
-    if ( unlikely(op.nr_frames > nr_status_frames(gt)) ) {
+    if ( unlikely(op.nr_frames > nr_status_frames(gt)) )
+    {
         gdprintk(XENLOG_INFO, "Guest requested addresses for %d grant status "
                  "frames, but only %d are available.\n",
                  op.nr_frames, nr_status_frames(gt));
@@ -2836,7 +2842,7 @@ gnttab_get_status_frames(XEN_GUEST_HANDLE_PARAM(gnttab_get_status_frames_t) uop,
     for ( i = 0; i < op.nr_frames; i++ )
     {
         gmfn = gnttab_status_gmfn(d, gt, i);
-        if (copy_to_guest_offset(op.frame_list, i, &gmfn, 1))
+        if ( copy_to_guest_offset(op.frame_list, i, &gmfn, 1) )
             op.status = GNTST_bad_virt_addr;
     }
 
@@ -3078,13 +3084,13 @@ do_grant_table_op(
 {
     long rc;
     unsigned int opaque_in = cmd & GNTTABOP_ARG_MASK, opaque_out = 0;
-    
+
     if ( (int)count < 0 )
         return -EINVAL;
 
     if ( (cmd &= GNTTABOP_CMD_MASK) != GNTTABOP_cache_flush && opaque_in )
         return -EINVAL;
-    
+
     rc = -EFAULT;
     switch ( cmd )
     {
@@ -3225,7 +3231,7 @@ do_grant_table_op(
         rc = -ENOSYS;
         break;
     }
-    
+
   out:
     if ( rc > 0 || opaque_out != 0 )
     {
@@ -3234,7 +3240,7 @@ do_grant_table_op(
         rc = hypercall_create_continuation(__HYPERVISOR_grant_table_op, "ihi",
                                            opaque_out | cmd, uop, count - rc);
     }
-    
+
     return rc;
 }
 
@@ -3242,7 +3248,7 @@ do_grant_table_op(
 #include "compat/grant_table.c"
 #endif
 
-int 
+int
 grant_table_create(
     struct domain *d)
 {
@@ -3285,7 +3291,7 @@ grant_table_create(
             goto no_mem_4;
         clear_page(t->shared_raw[i]);
     }
-    
+
     /* Status pages for grant table - for version 2 */
     t->status = xzalloc_array(grant_status_t *,
                               grant_to_status_frames(max_grant_frames));
@@ -3358,7 +3364,7 @@ gnttab_release_mappings(
 
         act = active_entry_acquire(rgt, ref);
         sha = shared_entry_header(rgt, ref);
-        if (rgt->gt_version == 1)
+        if ( rgt->gt_version == 1 )
             status = &sha->flags;
         else
             status = &status_entry(rgt, ref);
@@ -3470,7 +3476,7 @@ grant_table_destroy(
 
     if ( t == NULL )
         return;
-    
+
     for ( i = 0; i < nr_grant_frames(t); i++ )
         free_xenheap_page(t->shared_raw[i]);
     xfree(t->shared_raw);
