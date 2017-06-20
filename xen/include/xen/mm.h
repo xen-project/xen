@@ -553,9 +553,8 @@ int xenmem_add_to_physmap_one(struct domain *d, unsigned int space,
                               union xen_add_to_physmap_batch_extra extra,
                               unsigned long idx, gfn_t gfn);
 
-/* Returns 1 on success, 0 on error, negative if the ring
- * for event propagation is full in the presence of paging */
-int guest_remove_page(struct domain *d, unsigned long gfn);
+/* Returns 0 on success, or negative on error. */
+int guest_remove_page(struct domain *d, unsigned long gmfn);
 
 #define RAM_TYPE_CONVENTIONAL 0x00000001
 #define RAM_TYPE_RESERVED     0x00000002
