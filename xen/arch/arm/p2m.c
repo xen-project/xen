@@ -976,14 +976,13 @@ int guest_physmap_add_entry(struct domain *d,
                              pfn_to_paddr(mfn), MATTR_MEM, t);
 }
 
-void guest_physmap_remove_page(struct domain *d,
-                               unsigned long gpfn,
-                               unsigned long mfn, unsigned int page_order)
+int guest_physmap_remove_page(struct domain *d, unsigned long gfn,
+                              unsigned long mfn, unsigned int page_order)
 {
-    apply_p2m_changes(d, REMOVE,
-                      pfn_to_paddr(gpfn),
-                      pfn_to_paddr(gpfn + (1<<page_order)),
-                      pfn_to_paddr(mfn), MATTR_MEM, p2m_invalid);
+    return apply_p2m_changes(d, REMOVE,
+                             pfn_to_paddr(gfn),
+                             pfn_to_paddr(gfn + (1 << page_order)),
+                             pfn_to_paddr(mfn), MATTR_MEM, p2m_invalid);
 }
 
 int p2m_alloc_table(struct domain *d)

@@ -550,14 +550,18 @@ p2m_remove_page(struct p2m_domain *p2m, unsigned long gfn, unsigned long mfn,
                          p2m->default_access);
 }
 
-void
+int
 guest_physmap_remove_page(struct domain *d, unsigned long gfn,
                           unsigned long mfn, unsigned int page_order)
 {
+    int rc;
+
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
     gfn_lock(p2m, gfn, page_order);
-    p2m_remove_page(p2m, gfn, mfn, page_order);
+    rc = p2m_remove_page(p2m, gfn, mfn, page_order);
     gfn_unlock(p2m, gfn, page_order);
+
+    return rc;
 }
 
 int
@@ -2094,10 +2098,12 @@ int p2m_add_foreign(struct domain *tdom, unsigned long fgfn,
     {
         if ( is_xen_heap_mfn(prev_mfn) )
             /* Xen heap frames are simply unhooked from this phys slot */
-            guest_physmap_remove_page(tdom, gpfn, prev_mfn, 0);
+            rc = guest_physmap_remove_page(tdom, gpfn, prev_mfn, 0);
         else
             /* Normal domain memory is freed, to avoid leaking memory. */
-            guest_remove_page(tdom, gpfn);
+            rc = guest_remove_page(tdom, gpfn);
+        if ( rc )
+            goto put_both;
     }
     /*
      * Create the new mapping. Can't use guest_physmap_add_page() because it
@@ -2110,6 +2116,7 @@ int p2m_add_foreign(struct domain *tdom, unsigned long fgfn,
                  "gpfn:%lx mfn:%lx fgfn:%lx td:%d fd:%d\n",
                  gpfn, mfn, fgfn, tdom->domain_id, fdom->domain_id);
 
+ put_both:
     put_page(page);
 
     /*
