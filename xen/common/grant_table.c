@@ -2361,28 +2361,21 @@ struct gnttab_copy_buf {
     bool_t have_type;
 };
 
-static int gnttab_copy_lock_domain(domid_t domid, unsigned int gref_flag,
+static int gnttab_copy_lock_domain(domid_t domid, bool is_gref,
                                    struct gnttab_copy_buf *buf)
 {
-    int rc;
+    /* Only DOMID_SELF may reference via frame. */
+    if ( domid != DOMID_SELF && !is_gref )
+        return GNTST_permission_denied;
 
-    if ( domid != DOMID_SELF && !gref_flag )
-        PIN_FAIL(out, GNTST_permission_denied,
-                 "only allow copy-by-mfn for DOMID_SELF.\n");
+    buf->domain = rcu_lock_domain_by_any_id(domid);
 
-    if ( domid == DOMID_SELF )
-        buf->domain = rcu_lock_current_domain();
-    else
-    {
-        buf->domain = rcu_lock_domain_by_id(domid);
-        if ( buf->domain == NULL )
-            PIN_FAIL(out, GNTST_bad_domain, "couldn't find %d\n", domid);
-    }
+    if ( !buf->domain )
+        return GNTST_bad_domain;
 
     buf->ptr.domid = domid;
-    rc = GNTST_okay;
- out:
-    return rc;
+
+    return GNTST_okay;
 }
 
 static void gnttab_copy_unlock_domains(struct gnttab_copy_buf *src,
