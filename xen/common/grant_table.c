@@ -1076,8 +1076,6 @@ __gnttab_unmap_common(
     ld = current->domain;
     lgt = ld->grant_table;
 
-    op->frame = (unsigned long)(op->dev_bus_addr >> PAGE_SHIFT);
-
     if ( unlikely(op->handle >= lgt->maptrack_limit) )
     {
         gdprintk(XENLOG_INFO, "Bad handle (%d).\n", op->handle);
@@ -1161,16 +1159,14 @@ __gnttab_unmap_common(
         goto act_release_out;
     }
 
-    if ( op->frame == 0 )
+    op->frame = act->frame;
+
+    if ( op->dev_bus_addr )
     {
-        op->frame = act->frame;
-    }
-    else
-    {
-        if ( unlikely(op->frame != act->frame) )
+        if ( unlikely(op->dev_bus_addr != pfn_to_paddr(act->frame)) )
             PIN_FAIL(act_release_out, GNTST_general_error,
-                     "Bad frame number doesn't match gntref. (%lx != %lx)\n",
-                     op->frame, act->frame);
+                     "Bus address doesn't match gntref (%"PRIx64" != %"PRIpaddr")\n",
+                     op->dev_bus_addr, pfn_to_paddr(act->frame));
 
         map->flags &= ~GNTMAP_device_map;
     }
@@ -1263,7 +1259,8 @@ __gnttab_unmap_common_complete(struct gnttab_unmap_common *op)
     else
         status = &status_entry(rgt, op->ref);
 
-    if ( unlikely(op->frame != act->frame) ) 
+    if ( op->dev_bus_addr &&
+         unlikely(op->dev_bus_addr != pfn_to_paddr(act->frame)) )
     {
         /*
          * Suggests that __gntab_unmap_common failed early and so
@@ -1274,7 +1271,7 @@ __gnttab_unmap_common_complete(struct gnttab_unmap_common *op)
 
     pg = mfn_to_page(op->frame);
 
-    if ( op->flags & GNTMAP_device_map ) 
+    if ( op->dev_bus_addr && (op->flags & GNTMAP_device_map) )
     {
         if ( !is_iomem_page(act->frame) )
         {
@@ -1345,6 +1342,7 @@ __gnttab_unmap_grant_ref(
     /* Intialise these in case common contains old state */
     common->new_addr = 0;
     common->rd = NULL;
+    common->frame = 0;
 
     __gnttab_unmap_common(common);
     op->status = common->status;
@@ -1409,6 +1407,7 @@ __gnttab_unmap_and_replace(
     /* Intialise these in case common contains old state */
     common->dev_bus_addr = 0;
     common->rd = NULL;
+    common->frame = 0;
 
     __gnttab_unmap_common(common);
     op->status = common->status;
