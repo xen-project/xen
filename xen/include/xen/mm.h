@@ -56,7 +56,7 @@
 
 TYPE_SAFE(unsigned long, mfn);
 #define PRI_mfn          "05lx"
-#define INVALID_MFN      _mfn(~0UL)
+#define INVALID_MFN      ((const mfn_t){ ~0UL })
 
 #ifndef mfn_t
 #define mfn_t /* Grep fodder: mfn_t, _mfn() and mfn_x() are defined above */
@@ -89,7 +89,7 @@ static inline bool_t mfn_eq(mfn_t x, mfn_t y)
 
 TYPE_SAFE(unsigned long, gfn);
 #define PRI_gfn          "05lx"
-#define INVALID_GFN      _gfn(~0UL)
+#define INVALID_GFN      ((const gfn_t){ ~0UL })
 
 #ifndef gfn_t
 #define gfn_t /* Grep fodder: gfn_t, _gfn() and gfn_x() are defined above */
