@@ -1713,30 +1713,24 @@ gnttab_query_size(
 {
     struct gnttab_query_size op;
     struct domain *d;
-    int rc;
 
     if ( count != 1 )
         return -EINVAL;
 
-    if ( unlikely(copy_from_guest(&op, uop, 1) != 0) )
-    {
-        gdprintk(XENLOG_INFO, "Fault while reading gnttab_query_size_t.\n");
+    if ( unlikely(copy_from_guest(&op, uop, 1)) )
         return -EFAULT;
-    }
 
     d = rcu_lock_domain_by_any_id(op.dom);
     if ( d == NULL )
     {
-        gdprintk(XENLOG_INFO, "Bad domid %d.\n", op.dom);
         op.status = GNTST_bad_domain;
-        goto query_out;
+        goto out;
     }
 
-    rc = xsm_grant_query_size(XSM_TARGET, current->domain, d);
-    if ( rc )
+    if ( xsm_grant_query_size(XSM_TARGET, current->domain, d) )
     {
         op.status = GNTST_permission_denied;
-        goto query_out_unlock;
+        goto out;
     }
 
     grant_read_lock(d->grant_table);
@@ -1747,11 +1741,10 @@ gnttab_query_size(
 
     grant_read_unlock(d->grant_table);
 
+ out:
+    if ( d )
+        rcu_unlock_domain(d);
 
- query_out_unlock:
-    rcu_unlock_domain(d);
-
- query_out:
     if ( unlikely(__copy_to_guest(uop, &op, 1)) )
         return -EFAULT;
 
