@@ -267,8 +267,9 @@ bool_t is_ioreq_server_page(struct domain *d, const struct page_info *page)
 static void hvm_remove_ioreq_gmfn(
     struct domain *d, struct hvm_ioreq_page *iorp)
 {
-    guest_physmap_remove_page(d, _gfn(iorp->gmfn),
-                              _mfn(page_to_mfn(iorp->page)), 0);
+    if ( guest_physmap_remove_page(d, _gfn(iorp->gmfn),
+                                   _mfn(page_to_mfn(iorp->page)), 0) )
+        domain_crash(d);
     clear_page(iorp->va);
 }
 

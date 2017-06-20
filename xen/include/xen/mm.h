@@ -554,7 +554,7 @@ int xenmem_add_to_physmap_one(struct domain *d, unsigned int space,
                               unsigned long idx, gfn_t gfn);
 
 /* Returns 0 on success, or negative on error. */
-int guest_remove_page(struct domain *d, unsigned long gmfn);
+int __must_check guest_remove_page(struct domain *d, unsigned long gmfn);
 
 #define RAM_TYPE_CONVENTIONAL 0x00000001
 #define RAM_TYPE_RESERVED     0x00000002

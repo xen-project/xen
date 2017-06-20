@@ -1137,11 +1137,10 @@ int guest_physmap_add_entry(struct domain *d,
     return p2m_insert_mapping(d, gfn, (1 << page_order), mfn, t);
 }
 
-void guest_physmap_remove_page(struct domain *d,
-                               gfn_t gfn,
-                               mfn_t mfn, unsigned int page_order)
+int guest_physmap_remove_page(struct domain *d, gfn_t gfn, mfn_t mfn,
+                              unsigned int page_order)
 {
-    p2m_remove_mapping(d, gfn, (1 << page_order), mfn);
+    return p2m_remove_mapping(d, gfn, (1 << page_order), mfn);
 }
 
 static int p2m_alloc_table(struct domain *d)
