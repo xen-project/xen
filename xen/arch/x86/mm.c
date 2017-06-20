@@ -4405,6 +4405,9 @@ int steal_page(
     bool_t drop_dom_ref = 0;
     const struct domain *owner = dom_xen;
 
+    if ( paging_mode_external(d) )
+        return -1;
+
     spin_lock(&d->page_alloc_lock);
 
     if ( is_xen_heap_page(page) || ((owner = page_get_owner(page)) != d) )
