@@ -137,8 +137,8 @@ struct evtchn_port_ops {
     void (*set_pending)(struct vcpu *v, struct evtchn *evtchn);
     void (*clear_pending)(struct domain *d, struct evtchn *evtchn);
     void (*unmask)(struct domain *d, struct evtchn *evtchn);
-    bool_t (*is_pending)(struct domain *d, const struct evtchn *evtchn);
-    bool_t (*is_masked)(struct domain *d, const struct evtchn *evtchn);
+    bool_t (*is_pending)(struct domain *d, evtchn_port_t port);
+    bool_t (*is_masked)(struct domain *d, evtchn_port_t port);
     /*
      * Is the port unavailable because it's still being cleaned up
      * after being closed?
@@ -175,15 +175,15 @@ static inline void evtchn_port_unmask(struct domain *d,
 }
 
 static inline bool_t evtchn_port_is_pending(struct domain *d,
-                                            const struct evtchn *evtchn)
+                                            evtchn_port_t port)
 {
-    return d->evtchn_port_ops->is_pending(d, evtchn);
+    return d->evtchn_port_ops->is_pending(d, port);
 }
 
 static inline bool_t evtchn_port_is_masked(struct domain *d,
-                                           const struct evtchn *evtchn)
+                                           evtchn_port_t port)
 {
-    return d->evtchn_port_ops->is_masked(d, evtchn);
+    return d->evtchn_port_ops->is_masked(d, port);
 }
 
 static inline bool_t evtchn_port_is_busy(struct domain *d, evtchn_port_t port)
