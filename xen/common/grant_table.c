@@ -395,7 +395,7 @@ get_maptrack_handle(
     struct grant_table *lgt)
 {
     struct vcpu          *curr = current;
-    int                   i;
+    unsigned int          i, head;
     grant_handle_t        handle;
     struct grant_mapping *new_mt;
 
@@ -451,16 +451,19 @@ get_maptrack_handle(
         new_mt[i].ref = handle + i + 1;
         new_mt[i].vcpu = curr->vcpu_id;
     }
-    new_mt[i - 1].ref = curr->maptrack_head;
 
     /* Set tail directly if this is the first page for this VCPU. */
     if ( curr->maptrack_tail == MAPTRACK_TAIL )
         curr->maptrack_tail = handle + MAPTRACK_PER_PAGE - 1;
 
-    write_atomic(&curr->maptrack_head, handle + 1);
-
     lgt->maptrack[nr_maptrack_frames(lgt)] = new_mt;
+    smp_wmb();
     lgt->maptrack_limit += MAPTRACK_PER_PAGE;
+
+    do {
+        new_mt[i - 1].ref = read_atomic(&curr->maptrack_head);
+        head = cmpxchg(&curr->maptrack_head, new_mt[i - 1].ref, handle + 1);
+    } while ( head != new_mt[i - 1].ref );
 
     spin_unlock(&lgt->maptrack_lock);
 
@@ -727,6 +730,7 @@ static unsigned int mapkind(
     for ( handle = 0; !(kind & MAPKIND_WRITE) &&
                       handle < lgt->maptrack_limit; handle++ )
     {
+        smp_rmb();
         map = &maptrack_entry(lgt, handle);
         if ( !(map->flags & (GNTMAP_device_map|GNTMAP_host_map)) ||
              map->domid != rd->domain_id )
@@ -1094,6 +1098,7 @@ __gnttab_unmap_common(
         return;
     }
 
+    smp_rmb();
     map = &maptrack_entry(lgt, op->handle);
 
     grant_read_lock(lgt);
