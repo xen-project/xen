@@ -427,7 +427,9 @@ static __init void pvh_add_mem_mapping(struct domain *d, unsigned long gfn,
         if ( !iomem_access_permitted(d, mfn + i, mfn + i) )
         {
             omfn = get_gfn_query_unlocked(d, gfn + i, &t);
-            guest_physmap_remove_page(d, _gfn(gfn + i), omfn, PAGE_ORDER_4K);
+            if ( guest_physmap_remove_page(d, _gfn(gfn + i), omfn,
+                                           PAGE_ORDER_4K) )
+                /* nothing, best effort only */;
             continue;
         }
 

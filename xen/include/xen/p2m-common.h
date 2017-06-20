@@ -1,6 +1,7 @@
 #ifndef _XEN_P2M_COMMON_H
 #define _XEN_P2M_COMMON_H
 
+#include <xen/mm.h>
 #include <public/vm_event.h>
 
 /*
@@ -32,6 +33,11 @@ typedef enum {
 
     /* NOTE: Assumed to be only 4 bits right now on x86. */
 } p2m_access_t;
+
+/* Remove a page from a domain's p2m table */
+int __must_check
+guest_physmap_remove_page(struct domain *d, gfn_t gfn, mfn_t mfn,
+                          unsigned int page_order);
 
 /* Map MMIO regions in the p2m: start_gfn and nr describe the range in
  *  * the guest physical address space to map, starting from the machine

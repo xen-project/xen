@@ -808,7 +808,15 @@ int arch_domain_soft_reset(struct domain *d)
         ret = -ENOMEM;
         goto exit_put_gfn;
     }
-    guest_physmap_remove_page(d, _gfn(gfn), _mfn(mfn), PAGE_ORDER_4K);
+
+    ret = guest_physmap_remove_page(d, _gfn(gfn), _mfn(mfn), PAGE_ORDER_4K);
+    if ( ret )
+    {
+        printk(XENLOG_G_ERR "Failed to remove Dom%d's shared_info frame %lx\n",
+               d->domain_id, gfn);
+        free_domheap_page(new_page);
+        goto exit_put_gfn;
+    }
 
     ret = guest_physmap_add_page(d, _gfn(gfn), _mfn(page_to_mfn(new_page)),
                                  PAGE_ORDER_4K);

@@ -2786,9 +2786,7 @@ static int __must_check arm_smmu_unmap_page(struct domain *d, unsigned long gfn)
 	if ( !is_domain_direct_mapped(d) )
 		return -EINVAL;
 
-	guest_physmap_remove_page(d, _gfn(gfn), _mfn(gfn), 0);
-
-	return 0;
+	return guest_physmap_remove_page(d, _gfn(gfn), _mfn(gfn), 0);
 }
 
 static const struct iommu_ops arm_smmu_iommu_ops = {
