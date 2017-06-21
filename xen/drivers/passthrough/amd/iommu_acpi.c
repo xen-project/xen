@@ -818,7 +818,7 @@ static u16 __init parse_ivhd_device_special(
             hpet_sbdf.init = HPET_IVHD;
             break;
         default:
-            ASSERT(0);
+            ASSERT_UNREACHABLE();
             break;
         }
         break;

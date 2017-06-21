@@ -34,14 +34,14 @@ static DEFINE_PER_CPU_READ_MOSTLY(void *, scratch_page);
 static inline void *cli_get_page(xen_pfn_t cmfn, unsigned long *pcli_mfn,
                                  struct page_info **pcli_pfp, bool_t cli_write)
 {
-    ASSERT(0);
+    ASSERT_UNREACHABLE();
     return NULL;
 }
 
 static inline void cli_put_page(void *cli_va, struct page_info *cli_pfp,
                                 unsigned long cli_mfn, bool_t mark_dirty)
 {
-    ASSERT(0);
+    ASSERT_UNREACHABLE();
 }
 #else
 #include <asm/p2m.h>
