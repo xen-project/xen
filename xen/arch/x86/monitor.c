@@ -132,8 +132,8 @@ int arch_monitor_domctl_event(struct domain *d,
         unsigned int ctrlreg_bitmask;
         bool_t old_status;
 
-        /* sanity check: avoid left-shift undefined behavior */
-        if ( unlikely(mop->u.mov_to_cr.index > 31) )
+        if ( unlikely(mop->u.mov_to_cr.index >=
+                      ARRAY_SIZE(ad->monitor.write_ctrlreg_mask)) )
             return -EINVAL;
 
         if ( unlikely(mop->u.mov_to_cr.pad1 || mop->u.mov_to_cr.pad2) )
