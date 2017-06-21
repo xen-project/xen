@@ -90,8 +90,15 @@ static int check_for_xen(int pv_context)
  found:
     cpuid(base + 1, regs, pv_context);
     if ( regs[0] )
-        asprintf(&ver, "V%u.%u",
-                 (uint16_t)(regs[0] >> 16), (uint16_t)regs[0]);
+    {
+        int r = asprintf(&ver, "V%u.%u", (uint16_t)(regs[0] >> 16),
+                         (uint16_t)regs[0]);
+        if ( r < 0 )
+        {
+            perror("asprintf failed\n");
+            exit(EXIT_FAILURE);
+        }
+    }
     return regs[0];
 }
 
@@ -193,8 +200,14 @@ static enum guest_type check_sysfs(void)
     if ( tmp )
         tmp[strlen(tmp) - 1] = 0;
     if ( str && tmp )
-        asprintf(&ver, "V%s.%s", str, tmp);
-    else
+    {
+        int r = asprintf(&ver, "V%s.%s", str, tmp);
+        if ( r < 0 )
+        {
+            perror("asprintf failed\n");
+            exit(EXIT_FAILURE);
+        }
+    } else
         ver = strdup("unknown version");
     free(tmp);
 
