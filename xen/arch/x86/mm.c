@@ -4887,11 +4887,8 @@ int xenmem_add_to_physmap_one(
 
     if ( !paging_mode_translate(d) || (mfn == 0) )
     {
-        if ( page )
-            put_page(page);
-        if ( space == XENMAPSPACE_gmfn || space == XENMAPSPACE_gmfn_range )
-            put_gfn(d, gfn);
-        return -EINVAL;
+        rc = -EINVAL;
+        goto put_both;
     }
 
     /* Remove previously mapped page if it was present. */
