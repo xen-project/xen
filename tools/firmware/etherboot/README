@@ -15,7 +15,7 @@ as on 25th September 2008):
 
  git clone git://git.etherboot.org/scm/gpxe.git
  cd gpxe
- git archive --format=tar --prefix=gpxe/ c24bc349ead939d90b5784dbff3cd9fdb9d83ba8 | gzip >../gpxe-git-snapshot.tar.gz
+ git archive --format=tar --prefix=gpxe/ c24bc349ead939d90b5784dbff3cd9fdb9d83ba8 | gzip -n >../gpxe-git-snapshot.tar.gz
 
 ----------------------------------------
 

@@ -31,7 +31,7 @@ $T:
 	if ! $(FETCHER) _$T $(IPXE_TARBALL_URL); then \
 		$(GIT) clone $(IPXE_GIT_URL) $D.git; \
 		(cd $D.git && $(GIT) archive --format=tar --prefix=$D/ \
-		$(IPXE_GIT_TAG) | gzip >../_$T); \
+		$(IPXE_GIT_TAG) | gzip -n >../_$T); \
 		rm -rf $D.git; \
 	fi
 	mv _$T $T
