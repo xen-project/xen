@@ -1372,6 +1372,15 @@ int xc_domain_add_to_physmap(xc_interface *xch,
                              unsigned long idx,
                              xen_pfn_t gpfn);
 
+int xc_domain_add_to_physmap_batch(xc_interface *xch,
+                                   domid_t domid,
+                                   domid_t foreign_domid,
+                                   unsigned int space,
+                                   unsigned int size,
+                                   xen_ulong_t *idxs,
+                                   xen_pfn_t *gfpns,
+                                   int *errs);
+
 int xc_domain_populate_physmap(xc_interface *xch,
                                uint32_t domid,
                                unsigned long nr_extents,

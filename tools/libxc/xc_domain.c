@@ -1032,6 +1032,51 @@ int xc_domain_add_to_physmap(xc_interface *xch,
     return do_memory_op(xch, XENMEM_add_to_physmap, &xatp, sizeof(xatp));
 }
 
+int xc_domain_add_to_physmap_batch(xc_interface *xch,
+                                   domid_t domid,
+                                   domid_t foreign_domid,
+                                   unsigned int space,
+                                   unsigned int size,
+                                   xen_ulong_t *idxs,
+                                   xen_pfn_t *gpfns,
+                                   int *errs)
+{
+    int rc;
+    DECLARE_HYPERCALL_BOUNCE(idxs, size * sizeof(*idxs), XC_HYPERCALL_BUFFER_BOUNCE_IN);
+    DECLARE_HYPERCALL_BOUNCE(gpfns, size * sizeof(*gpfns), XC_HYPERCALL_BUFFER_BOUNCE_IN);
+    DECLARE_HYPERCALL_BOUNCE(errs, size * sizeof(*errs), XC_HYPERCALL_BUFFER_BOUNCE_OUT);
+
+    struct xen_add_to_physmap_batch xatp_batch = {
+        .domid = domid,
+        .space = space,
+        .size = size,
+        .u = { .foreign_domid = foreign_domid }
+    };
+
+    if ( xc_hypercall_bounce_pre(xch, idxs)  ||
+         xc_hypercall_bounce_pre(xch, gpfns) ||
+         xc_hypercall_bounce_pre(xch, errs)  )
+    {
+        PERROR("Could not bounce memory for XENMEM_add_to_physmap_batch");
+        rc = -1;
+        goto out;
+    }
+
+    set_xen_guest_handle(xatp_batch.idxs, idxs);
+    set_xen_guest_handle(xatp_batch.gpfns, gpfns);
+    set_xen_guest_handle(xatp_batch.errs, errs);
+
+    rc = do_memory_op(xch, XENMEM_add_to_physmap_batch,
+                      &xatp_batch, sizeof(xatp_batch));
+
+out:
+    xc_hypercall_bounce_post(xch, idxs);
+    xc_hypercall_bounce_post(xch, gpfns);
+    xc_hypercall_bounce_post(xch, errs);
+
+    return rc;
+}
+
 int xc_domain_claim_pages(xc_interface *xch,
                                uint32_t domid,
                                unsigned long nr_pages)
