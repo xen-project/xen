@@ -771,8 +771,8 @@ static int build_symbol_table(struct payload *payload,
         }
     }
 
-    symtab = xmalloc_array(struct livepatch_symbol, nsyms);
-    strtab = xmalloc_array(char, strtab_len);
+    symtab = xzalloc_array(struct livepatch_symbol, nsyms);
+    strtab = xzalloc_array(char, strtab_len);
 
     if ( !strtab || !symtab )
     {
