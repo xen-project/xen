@@ -1843,15 +1843,6 @@ gnttab_transfer(
         }
 
         page = mfn_to_page(mfn);
-        if ( unlikely(is_xen_heap_page(page)) )
-        { 
-            put_gfn(d, gop.mfn);
-            gdprintk(XENLOG_INFO, "gnttab_transfer: xen frame %lx\n",
-                    (unsigned long)gop.mfn);
-            gop.status = GNTST_bad_page;
-            goto copyback;
-        }
-
         if ( steal_page(d, page, 0) < 0 )
         {
             put_gfn(d, gop.mfn);
