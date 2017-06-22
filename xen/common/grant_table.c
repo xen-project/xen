@@ -764,6 +764,7 @@ __gnttab_map_grant_ref(
     u32            old_pin;
     u32            act_pin;
     unsigned int   cache_flags, refcnt = 0, typecnt = 0;
+    bool           host_map_created = false;
     struct active_grant_entry *act = NULL;
     struct grant_mapping *mt;
     grant_entry_header_t *shah;
@@ -923,6 +924,8 @@ __gnttab_map_grant_ref(
                                            cache_flags);
             if ( rc != GNTST_okay )
                 goto undo_out;
+
+            host_map_created = true;
         }
     }
     else if ( owner == rd || owner == dom_cow )
@@ -960,6 +963,8 @@ __gnttab_map_grant_ref(
             rc = create_grant_host_mapping(op->host_addr, frame, op->flags, 0);
             if ( rc != GNTST_okay )
                 goto undo_out;
+
+            host_map_created = true;
         }
     }
     else
@@ -1030,6 +1035,12 @@ __gnttab_map_grant_ref(
     return;
 
  undo_out:
+    if ( host_map_created )
+    {
+        replace_grant_host_mapping(op->host_addr, frame, 0, op->flags);
+        gnttab_flush_tlb(ld);
+    }
+
     while ( typecnt-- )
         put_page_type(pg);
 
