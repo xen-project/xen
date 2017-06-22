@@ -713,7 +713,7 @@ static unsigned int mapkind(
     struct grant_table *lgt, const struct domain *rd, unsigned long mfn)
 {
     struct grant_mapping *map;
-    grant_handle_t handle;
+    grant_handle_t handle, limit = lgt->maptrack_limit;
     unsigned int kind = 0;
 
     /*
@@ -727,10 +727,10 @@ static unsigned int mapkind(
      */
     ASSERT(percpu_rw_is_write_locked(&rd->grant_table->lock));
 
-    for ( handle = 0; !(kind & MAPKIND_WRITE) &&
-                      handle < lgt->maptrack_limit; handle++ )
+    smp_rmb();
+
+    for ( handle = 0; !(kind & MAPKIND_WRITE) && handle < limit; handle++ )
     {
-        smp_rmb();
         map = &maptrack_entry(lgt, handle);
         if ( !(map->flags & (GNTMAP_device_map|GNTMAP_host_map)) ||
              map->domid != rd->domain_id )
