@@ -41,20 +41,27 @@ DEFINE_PER_CPU(struct vcpu *, curr_vcpu);
 
 void idle_loop(void)
 {
+    unsigned int cpu = smp_processor_id();
+
     for ( ; ; )
     {
-        if ( cpu_is_offline(smp_processor_id()) )
+        if ( cpu_is_offline(cpu) )
             stop_cpu();
 
-        local_irq_disable();
-        if ( cpu_is_haltable(smp_processor_id()) )
+        /* Are we here for running vcpu context tasklets, or for idling? */
+        if ( unlikely(tasklet_work_to_do(cpu)) )
+            do_tasklet();
+        else
         {
-            dsb(sy);
-            wfi();
+            local_irq_disable();
+            if ( cpu_is_haltable(cpu) )
+            {
+                dsb(sy);
+                wfi();
+            }
+            local_irq_enable();
         }
-        local_irq_enable();
 
-        do_tasklet();
         do_softirq();
         /*
          * We MUST be last (or before dsb, wfi). Otherwise after we get the

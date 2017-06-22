@@ -40,6 +40,16 @@ DECLARE_PER_CPU(unsigned long, tasklet_work_to_do);
 #define TASKLET_enqueued   (1ul << _TASKLET_enqueued)
 #define TASKLET_scheduled  (1ul << _TASKLET_scheduled)
 
+static inline bool tasklet_work_to_do(unsigned int cpu)
+{
+    /*
+     * Work must be enqueued *and* scheduled. Otherwise there is no work to
+     * do, and/or scheduler needs to run to update idle vcpu priority.
+     */
+    return per_cpu(tasklet_work_to_do, cpu) == (TASKLET_enqueued|
+                                                TASKLET_scheduled);
+}
+
 void tasklet_schedule_on_cpu(struct tasklet *t, unsigned int cpu);
 void tasklet_schedule(struct tasklet *t);
 void do_tasklet(void);

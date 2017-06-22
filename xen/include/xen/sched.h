@@ -843,6 +843,11 @@ uint64_t get_cpu_idle_time(unsigned int cpu);
 /*
  * Used by idle loop to decide whether there is work to do:
  *  (1) Run softirqs; or (2) Play dead; or (3) Run tasklets.
+ *
+ * About (3), if a tasklet is enqueued, it will be scheduled
+ * really really soon, and hence it's pointless to try to
+ * sleep between these two events (that's why we don't call
+ * the tasklet_work_to_do() helper).
  */
 #define cpu_is_haltable(cpu)                    \
     (!softirq_pending(cpu) &&                   \

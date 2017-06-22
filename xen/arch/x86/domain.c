@@ -112,12 +112,18 @@ static void play_dead(void)
 
 static void idle_loop(void)
 {
+    unsigned int cpu = smp_processor_id();
+
     for ( ; ; )
     {
-        if ( cpu_is_offline(smp_processor_id()) )
+        if ( cpu_is_offline(cpu) )
             play_dead();
-        (*pm_idle)();
-        do_tasklet();
+
+        /* Are we here for running vcpu context tasklets, or for idling? */
+        if ( unlikely(tasklet_work_to_do(cpu)) )
+            do_tasklet();
+        else
+            pm_idle();
         do_softirq();
         /*
          * We MUST be last (or before pm_idle). Otherwise after we get the
