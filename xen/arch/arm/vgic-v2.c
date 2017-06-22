@@ -179,7 +179,7 @@ static int vgic_v2_distr_mmio_read(struct vcpu *v, mmio_info_t *info,
     case VREG32(GICD_CTLR):
         if ( dabt.size != DABT_WORD ) goto bad_width;
         vgic_lock(v);
-        *r = vgic_reg32_extract(v->domain->arch.vgic.ctlr, info);
+        *r = vreg_reg32_extract(v->domain->arch.vgic.ctlr, info);
         vgic_unlock(v);
         return 1;
 
@@ -194,7 +194,7 @@ static int vgic_v2_distr_mmio_read(struct vcpu *v, mmio_info_t *info,
             | DIV_ROUND_UP(v->domain->arch.vgic.nr_spis, 32);
         vgic_unlock(v);
 
-        *r = vgic_reg32_extract(typer, info);
+        *r = vreg_reg32_extract(typer, info);
 
         return 1;
     }
@@ -205,7 +205,7 @@ static int vgic_v2_distr_mmio_read(struct vcpu *v, mmio_info_t *info,
          * XXX Do we need a JEP106 manufacturer ID?
          * Just use the physical h/w value for now
          */
-        *r = vgic_reg32_extract(0x0000043b, info);
+        *r = vreg_reg32_extract(0x0000043b, info);
         return 1;
 
     case VRANGE32(0x00C, 0x01C):
@@ -226,7 +226,7 @@ static int vgic_v2_distr_mmio_read(struct vcpu *v, mmio_info_t *info,
         rank = vgic_rank_offset(v, 1, gicd_reg - GICD_ISENABLER, DABT_WORD);
         if ( rank == NULL) goto read_as_zero;
         vgic_lock_rank(v, rank, flags);
-        *r = vgic_reg32_extract(rank->ienable, info);
+        *r = vreg_reg32_extract(rank->ienable, info);
         vgic_unlock_rank(v, rank, flags);
         return 1;
 
@@ -235,7 +235,7 @@ static int vgic_v2_distr_mmio_read(struct vcpu *v, mmio_info_t *info,
         rank = vgic_rank_offset(v, 1, gicd_reg - GICD_ICENABLER, DABT_WORD);
         if ( rank == NULL) goto read_as_zero;
         vgic_lock_rank(v, rank, flags);
-        *r = vgic_reg32_extract(rank->ienable, info);
+        *r = vreg_reg32_extract(rank->ienable, info);
         vgic_unlock_rank(v, rank, flags);
         return 1;
 
@@ -262,7 +262,7 @@ static int vgic_v2_distr_mmio_read(struct vcpu *v, mmio_info_t *info,
         vgic_lock_rank(v, rank, flags);
         ipriorityr = ACCESS_ONCE(rank->ipriorityr[rank_index]);
         vgic_unlock_rank(v, rank, flags);
-        *r = vgic_reg32_extract(ipriorityr, info);
+        *r = vreg_reg32_extract(ipriorityr, info);
 
         return 1;
     }
@@ -280,7 +280,7 @@ static int vgic_v2_distr_mmio_read(struct vcpu *v, mmio_info_t *info,
         vgic_lock_rank(v, rank, flags);
         itargetsr = vgic_fetch_itargetsr(rank, gicd_reg - GICD_ITARGETSR);
         vgic_unlock_rank(v, rank, flags);
-        *r = vgic_reg32_extract(itargetsr, info);
+        *r = vreg_reg32_extract(itargetsr, info);
 
         return 1;
     }
@@ -299,7 +299,7 @@ static int vgic_v2_distr_mmio_read(struct vcpu *v, mmio_info_t *info,
         icfgr = rank->icfg[REG_RANK_INDEX(2, gicd_reg - GICD_ICFGR, DABT_WORD)];
         vgic_unlock_rank(v, rank, flags);
 
-        *r = vgic_reg32_extract(icfgr, info);
+        *r = vreg_reg32_extract(icfgr, info);
 
         return 1;
     }
@@ -424,7 +424,7 @@ static int vgic_v2_distr_mmio_write(struct vcpu *v, mmio_info_t *info,
         if ( dabt.size != DABT_WORD ) goto bad_width;
         /* Ignore all but the enable bit */
         vgic_lock(v);
-        vgic_reg32_update(&v->domain->arch.vgic.ctlr, r, info);
+        vreg_reg32_update(&v->domain->arch.vgic.ctlr, r, info);
         v->domain->arch.vgic.ctlr &= GICD_CTL_ENABLE;
         vgic_unlock(v);
 
@@ -454,7 +454,7 @@ static int vgic_v2_distr_mmio_write(struct vcpu *v, mmio_info_t *info,
         if ( rank == NULL) goto write_ignore;
         vgic_lock_rank(v, rank, flags);
         tr = rank->ienable;
-        vgic_reg32_setbits(&rank->ienable, r, info);
+        vreg_reg32_setbits(&rank->ienable, r, info);
         vgic_enable_irqs(v, (rank->ienable) & (~tr), rank->index);
         vgic_unlock_rank(v, rank, flags);
         return 1;
@@ -465,7 +465,7 @@ static int vgic_v2_distr_mmio_write(struct vcpu *v, mmio_info_t *info,
         if ( rank == NULL) goto write_ignore;
         vgic_lock_rank(v, rank, flags);
         tr = rank->ienable;
-        vgic_reg32_clearbits(&rank->ienable, r, info);
+        vreg_reg32_clearbits(&rank->ienable, r, info);
         vgic_disable_irqs(v, (~rank->ienable) & tr, rank->index);
         vgic_unlock_rank(v, rank, flags);
         return 1;
@@ -509,7 +509,7 @@ static int vgic_v2_distr_mmio_write(struct vcpu *v, mmio_info_t *info,
                                                       gicd_reg - GICD_IPRIORITYR,
                                                       DABT_WORD)];
         priority = ACCESS_ONCE(*ipriorityr);
-        vgic_reg32_update(&priority, r, info);
+        vreg_reg32_update(&priority, r, info);
         ACCESS_ONCE(*ipriorityr) = priority;
 
         vgic_unlock_rank(v, rank, flags);
@@ -532,7 +532,7 @@ static int vgic_v2_distr_mmio_write(struct vcpu *v, mmio_info_t *info,
         if ( rank == NULL) goto write_ignore;
         vgic_lock_rank(v, rank, flags);
         itargetsr = vgic_fetch_itargetsr(rank, gicd_reg - GICD_ITARGETSR);
-        vgic_reg32_update(&itargetsr, r, info);
+        vreg_reg32_update(&itargetsr, r, info);
         vgic_store_itargetsr(v->domain, rank, gicd_reg - GICD_ITARGETSR,
                              itargetsr);
         vgic_unlock_rank(v, rank, flags);
@@ -554,7 +554,7 @@ static int vgic_v2_distr_mmio_write(struct vcpu *v, mmio_info_t *info,
         rank = vgic_rank_offset(v, 2, gicd_reg - GICD_ICFGR, DABT_WORD);
         if ( rank == NULL) goto write_ignore;
         vgic_lock_rank(v, rank, flags);
-        vgic_reg32_update(&rank->icfg[REG_RANK_INDEX(2, gicd_reg - GICD_ICFGR,
+        vreg_reg32_update(&rank->icfg[REG_RANK_INDEX(2, gicd_reg - GICD_ICFGR,
                                                      DABT_WORD)],
                           r, info);
         vgic_unlock_rank(v, rank, flags);

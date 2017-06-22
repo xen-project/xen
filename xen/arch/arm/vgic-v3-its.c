@@ -1015,13 +1015,13 @@ static int vgic_v3_its_mmio_read(struct vcpu *v, mmio_info_t *info,
         if ( have_cmd_lock )
             spin_unlock(&its->vcmd_lock);
 
-        *r = vgic_reg32_extract(reg, info);
+        *r = vreg_reg32_extract(reg, info);
         break;
     }
 
     case VREG32(GITS_IIDR):
         if ( info->dabt.size != DABT_WORD ) goto bad_width;
-        *r = vgic_reg32_extract(GITS_IIDR_VALUE, info);
+        *r = vreg_reg32_extract(GITS_IIDR_VALUE, info);
         break;
 
     case VREG64(GITS_TYPER):
@@ -1031,7 +1031,7 @@ static int vgic_v3_its_mmio_read(struct vcpu *v, mmio_info_t *info,
         reg |= (sizeof(struct vits_itte) - 1) << GITS_TYPER_ITT_SIZE_SHIFT;
         reg |= (its->evid_bits - 1) << GITS_TYPER_IDBITS_SHIFT;
         reg |= (its->devid_bits - 1) << GITS_TYPER_DEVIDS_SHIFT;
-        *r = vgic_reg64_extract(reg, info);
+        *r = vreg_reg64_extract(reg, info);
         break;
 
     case VRANGE32(0x0018, 0x001C):
@@ -1044,7 +1044,7 @@ static int vgic_v3_its_mmio_read(struct vcpu *v, mmio_info_t *info,
     case VREG64(GITS_CBASER):
         if ( !vgic_reg64_check_access(info->dabt) ) goto bad_width;
         spin_lock(&its->its_lock);
-        *r = vgic_reg64_extract(its->cbaser, info);
+        *r = vreg_reg64_extract(its->cbaser, info);
         spin_unlock(&its->its_lock);
         break;
 
@@ -1053,7 +1053,7 @@ static int vgic_v3_its_mmio_read(struct vcpu *v, mmio_info_t *info,
 
         /* CWRITER is only written by the guest, so no extra locking here. */
         reg = its->cwriter;
-        *r = vgic_reg64_extract(reg, info);
+        *r = vreg_reg64_extract(reg, info);
         break;
 
     case VREG64(GITS_CREADR):
@@ -1066,7 +1066,7 @@ static int vgic_v3_its_mmio_read(struct vcpu *v, mmio_info_t *info,
          * progress.
          */
         reg = read_u64_atomic(&its->creadr);
-        *r = vgic_reg64_extract(reg, info);
+        *r = vreg_reg64_extract(reg, info);
         break;
 
     case VRANGE64(0x0098, 0x00F8):
@@ -1075,14 +1075,14 @@ static int vgic_v3_its_mmio_read(struct vcpu *v, mmio_info_t *info,
     case VREG64(GITS_BASER0):           /* device table */
         if ( !vgic_reg64_check_access(info->dabt) ) goto bad_width;
         spin_lock(&its->its_lock);
-        *r = vgic_reg64_extract(its->baser_dev, info);
+        *r = vreg_reg64_extract(its->baser_dev, info);
         spin_unlock(&its->its_lock);
         break;
 
     case VREG64(GITS_BASER1):           /* collection table */
         if ( !vgic_reg64_check_access(info->dabt) ) goto bad_width;
         spin_lock(&its->its_lock);
-        *r = vgic_reg64_extract(its->baser_coll, info);
+        *r = vreg_reg64_extract(its->baser_coll, info);
         spin_unlock(&its->its_lock);
         break;
 
@@ -1097,7 +1097,7 @@ static int vgic_v3_its_mmio_read(struct vcpu *v, mmio_info_t *info,
 
     case VREG32(GITS_PIDR2):
         if ( info->dabt.size != DABT_WORD ) goto bad_width;
-        *r = vgic_reg32_extract(GIC_PIDR2_ARCH_GICv3, info);
+        *r = vreg_reg32_extract(GIC_PIDR2_ARCH_GICv3, info);
         break;
 
     case VRANGE32(0xFFEC, 0xFFFC):
@@ -1258,7 +1258,7 @@ static int vgic_v3_its_mmio_write(struct vcpu *v, mmio_info_t *info,
         spin_lock(&its->its_lock);
         ctlr = its->enabled ? GITS_CTLR_ENABLE : 0;
         reg32 = ctlr;
-        vgic_reg32_update(&reg32, r, info);
+        vreg_reg32_update(&reg32, r, info);
 
         if ( ctlr ^ reg32 )
             its->enabled = vgic_v3_verify_its_status(its,
@@ -1295,7 +1295,7 @@ static int vgic_v3_its_mmio_write(struct vcpu *v, mmio_info_t *info,
         }
 
         reg = its->cbaser;
-        vgic_reg64_update(&reg, r, info);
+        vreg_reg64_update(&reg, r, info);
         sanitize_its_base_reg(&reg);
 
         its->cbaser = reg;
@@ -1309,7 +1309,7 @@ static int vgic_v3_its_mmio_write(struct vcpu *v, mmio_info_t *info,
 
         spin_lock(&its->vcmd_lock);
         reg = ITS_CMD_OFFSET(its->cwriter);
-        vgic_reg64_update(&reg, r, info);
+        vreg_reg64_update(&reg, r, info);
         its->cwriter = ITS_CMD_OFFSET(reg);
 
         if ( its->enabled )
@@ -1344,7 +1344,7 @@ static int vgic_v3_its_mmio_write(struct vcpu *v, mmio_info_t *info,
         }
 
         reg = its->baser_dev;
-        vgic_reg64_update(&reg, r, info);
+        vreg_reg64_update(&reg, r, info);
 
         /* We don't support indirect tables for now. */
         reg &= ~(GITS_BASER_RO_MASK | GITS_BASER_INDIRECT);
@@ -1381,7 +1381,7 @@ static int vgic_v3_its_mmio_write(struct vcpu *v, mmio_info_t *info,
         }
 
         reg = its->baser_coll;
-        vgic_reg64_update(&reg, r, info);
+        vreg_reg64_update(&reg, r, info);
         /* No indirect tables for the collection table. */
         reg &= ~(GITS_BASER_RO_MASK | GITS_BASER_INDIRECT);
         reg |= (sizeof(coll_table_entry_t) - 1) << GITS_BASER_ENTRY_SIZE_SHIFT;

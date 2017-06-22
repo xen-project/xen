@@ -107,99 +107,99 @@ static inline bool vreg_emulate_sysreg64(struct cpu_user_regs *regs, union hsr h
 
 #endif
 
-#define VGIC_REG_MASK(size) ((~0UL) >> (BITS_PER_LONG - ((1 << (size)) * 8)))
+#define VREG_REG_MASK(size) ((~0UL) >> (BITS_PER_LONG - ((1 << (size)) * 8)))
 
 /*
  * The check on the size supported by the register has to be done by
- * the caller of vgic_regN_*.
+ * the caller of vreg_regN_*.
  *
- * vgic_reg_* should never be called directly. Instead use the vgic_regN_*
+ * vreg_reg_* should never be called directly. Instead use the vreg_regN_*
  * according to size of the emulated register
  *
  * Note that the alignment fault will always be taken in the guest
  * (see B3.12.7 DDI0406.b).
  */
-static inline register_t vgic_reg_extract(unsigned long reg,
+static inline register_t vreg_reg_extract(unsigned long reg,
                                           unsigned int offset,
                                           enum dabt_size size)
 {
     reg >>= 8 * offset;
-    reg &= VGIC_REG_MASK(size);
+    reg &= VREG_REG_MASK(size);
 
     return reg;
 }
 
-static inline void vgic_reg_update(unsigned long *reg, register_t val,
+static inline void vreg_reg_update(unsigned long *reg, register_t val,
                                    unsigned int offset,
                                    enum dabt_size size)
 {
-    unsigned long mask = VGIC_REG_MASK(size);
+    unsigned long mask = VREG_REG_MASK(size);
     int shift = offset * 8;
 
     *reg &= ~(mask << shift);
     *reg |= ((unsigned long)val & mask) << shift;
 }
 
-static inline void vgic_reg_setbits(unsigned long *reg, register_t bits,
+static inline void vreg_reg_setbits(unsigned long *reg, register_t bits,
                                     unsigned int offset,
                                     enum dabt_size size)
 {
-    unsigned long mask = VGIC_REG_MASK(size);
+    unsigned long mask = VREG_REG_MASK(size);
     int shift = offset * 8;
 
     *reg |= ((unsigned long)bits & mask) << shift;
 }
 
-static inline void vgic_reg_clearbits(unsigned long *reg, register_t bits,
+static inline void vreg_reg_clearbits(unsigned long *reg, register_t bits,
                                       unsigned int offset,
                                       enum dabt_size size)
 {
-    unsigned long mask = VGIC_REG_MASK(size);
+    unsigned long mask = VREG_REG_MASK(size);
     int shift = offset * 8;
 
     *reg &= ~(((unsigned long)bits & mask) << shift);
 }
 
 /* N-bit register helpers */
-#define VGIC_REG_HELPERS(sz, offmask)                                   \
-static inline register_t vgic_reg##sz##_extract(uint##sz##_t reg,       \
+#define VREG_REG_HELPERS(sz, offmask)                                   \
+static inline register_t vreg_reg##sz##_extract(uint##sz##_t reg,       \
                                                 const mmio_info_t *info)\
 {                                                                       \
-    return vgic_reg_extract(reg, info->gpa & offmask,                   \
+    return vreg_reg_extract(reg, info->gpa & offmask,                   \
                             info->dabt.size);                           \
 }                                                                       \
                                                                         \
-static inline void vgic_reg##sz##_update(uint##sz##_t *reg,             \
+static inline void vreg_reg##sz##_update(uint##sz##_t *reg,             \
                                          register_t val,                \
                                          const mmio_info_t *info)       \
 {                                                                       \
     unsigned long tmp = *reg;                                           \
                                                                         \
-    vgic_reg_update(&tmp, val, info->gpa & offmask,                     \
+    vreg_reg_update(&tmp, val, info->gpa & offmask,                     \
                     info->dabt.size);                                   \
                                                                         \
     *reg = tmp;                                                         \
 }                                                                       \
                                                                         \
-static inline void vgic_reg##sz##_setbits(uint##sz##_t *reg,            \
+static inline void vreg_reg##sz##_setbits(uint##sz##_t *reg,            \
                                           register_t bits,              \
                                           const mmio_info_t *info)      \
 {                                                                       \
     unsigned long tmp = *reg;                                           \
                                                                         \
-    vgic_reg_setbits(&tmp, bits, info->gpa & offmask,                   \
+    vreg_reg_setbits(&tmp, bits, info->gpa & offmask,                   \
                      info->dabt.size);                                  \
                                                                         \
     *reg = tmp;                                                         \
 }                                                                       \
                                                                         \
-static inline void vgic_reg##sz##_clearbits(uint##sz##_t *reg,          \
+static inline void vreg_reg##sz##_clearbits(uint##sz##_t *reg,          \
                                             register_t bits,            \
                                             const mmio_info_t *info)    \
 {                                                                       \
     unsigned long tmp = *reg;                                           \
                                                                         \
-    vgic_reg_clearbits(&tmp, bits, info->gpa & offmask,                 \
+    vreg_reg_clearbits(&tmp, bits, info->gpa & offmask,                 \
                        info->dabt.size);                                \
                                                                         \
     *reg = tmp;                                                         \
@@ -211,10 +211,10 @@ static inline void vgic_reg##sz##_clearbits(uint##sz##_t *reg,          \
  * unsigned long rather than uint64_t
  */
 #if BITS_PER_LONG == 64
-VGIC_REG_HELPERS(64, 0x7);
+VREG_REG_HELPERS(64, 0x7);
 #endif
-VGIC_REG_HELPERS(32, 0x3);
+VREG_REG_HELPERS(32, 0x3);
 
-#undef VGIC_REG_HELPERS
+#undef VREG_REG_HELPERS
 
 #endif /* __ASM_ARM_VREG__ */
