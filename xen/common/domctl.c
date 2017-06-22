@@ -1071,8 +1071,11 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
             break;
         }
 
-        ret = xsm_set_target(XSM_HOOK, d, e);
-        if ( ret ) {
+        ret = -EOPNOTSUPP;
+        if ( is_hvm_domain(e) )
+            ret = xsm_set_target(XSM_HOOK, d, e);
+        if ( ret )
+        {
             put_domain(e);
             break;
         }
