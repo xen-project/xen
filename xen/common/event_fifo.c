@@ -19,7 +19,7 @@
 
 #include <public/event_channel.h>
 
-static inline event_word_t *evtchn_fifo_word_from_port(struct domain *d,
+static inline event_word_t *evtchn_fifo_word_from_port(const struct domain *d,
                                                        unsigned int port)
 {
     unsigned int p, w;
@@ -293,37 +293,25 @@ static void evtchn_fifo_unmask(struct domain *d, struct evtchn *evtchn)
         evtchn_fifo_set_pending(v, evtchn);
 }
 
-static bool_t evtchn_fifo_is_pending(struct domain *d, evtchn_port_t port)
+static bool evtchn_fifo_is_pending(const struct domain *d, evtchn_port_t port)
 {
-    event_word_t *word;
+    const event_word_t *word = evtchn_fifo_word_from_port(d, port);
 
-    word = evtchn_fifo_word_from_port(d, port);
-    if ( unlikely(!word) )
-        return 0;
-
-    return test_bit(EVTCHN_FIFO_PENDING, word);
+    return word && test_bit(EVTCHN_FIFO_PENDING, word);
 }
 
-static bool_t evtchn_fifo_is_masked(struct domain *d, evtchn_port_t port)
+static bool_t evtchn_fifo_is_masked(const struct domain *d, evtchn_port_t port)
 {
-    event_word_t *word;
+    const event_word_t *word = evtchn_fifo_word_from_port(d, port);
 
-    word = evtchn_fifo_word_from_port(d, port);
-    if ( unlikely(!word) )
-        return 1;
-
-    return test_bit(EVTCHN_FIFO_MASKED, word);
+    return !word || test_bit(EVTCHN_FIFO_MASKED, word);
 }
 
-static bool_t evtchn_fifo_is_busy(struct domain *d, evtchn_port_t port)
+static bool_t evtchn_fifo_is_busy(const struct domain *d, evtchn_port_t port)
 {
-    event_word_t *word;
+    const event_word_t *word = evtchn_fifo_word_from_port(d, port);
 
-    word = evtchn_fifo_word_from_port(d, port);
-    if ( unlikely(!word) )
-        return 0;
-
-    return test_bit(EVTCHN_FIFO_LINKED, word);
+    return word && test_bit(EVTCHN_FIFO_LINKED, word);
 }
 
 static int evtchn_fifo_set_priority(struct domain *d, struct evtchn *evtchn,
