@@ -602,6 +602,20 @@ static inline void guest_get_eff_kern_l1e(struct vcpu *v, unsigned long addr,
     TOGGLE_MODE();
 }
 
+static inline void page_set_tlbflush_timestamp(struct page_info *page)
+{
+    /*
+     * Record TLB information for flush later. We do not stamp page tables
+     * when running in shadow mode:
+     *  1. Pointless, since it's the shadow pt's which must be tracked.
+     *  2. Shadow mode reuses this field for shadowed page tables to store
+     *     flags info -- we don't want to conflict with that.
+     */
+    if ( !(page->count_info & PGC_page_table) ||
+         !shadow_mode_enabled(page_get_owner(page)) )
+        page->tlbflush_timestamp = tlbflush_current_time();
+}
+
 const char __section(".bss.page_aligned.const") __aligned(PAGE_SIZE)
     zero_page[PAGE_SIZE];
 
@@ -2405,16 +2419,7 @@ static int __put_final_page_type(
     /* No need for atomic update of type_info here: noone else updates it. */
     if ( rc == 0 )
     {
-        /*
-         * Record TLB information for flush later. We do not stamp page tables
-         * when running in shadow mode:
-         *  1. Pointless, since it's the shadow pt's which must be tracked.
-         *  2. Shadow mode reuses this field for shadowed page tables to
-         *     store flags info -- we don't want to conflict with that.
-         */
-        if ( !(shadow_mode_enabled(page_get_owner(page)) &&
-               (page->count_info & PGC_page_table)) )
-            page->tlbflush_timestamp = tlbflush_current_time();
+        page_set_tlbflush_timestamp(page);
         wmb();
         page->u.inuse.type_info--;
     }
@@ -2422,9 +2427,7 @@ static int __put_final_page_type(
     {
         ASSERT((page->u.inuse.type_info &
                 (PGT_count_mask|PGT_validated|PGT_partial)) == 1);
-        if ( !(shadow_mode_enabled(page_get_owner(page)) &&
-               (page->count_info & PGC_page_table)) )
-            page->tlbflush_timestamp = tlbflush_current_time();
+        page_set_tlbflush_timestamp(page);
         wmb();
         page->u.inuse.type_info |= PGT_validated;
     }
@@ -2474,16 +2477,7 @@ static int __put_page_type(struct page_info *page,
                 break;
             }
 
-            /*
-             * Record TLB information for flush later. We do not stamp page
-             * tables when running in shadow mode:
-             *  1. Pointless, since it's the shadow pt's which must be tracked.
-             *  2. Shadow mode reuses this field for shadowed page tables to
-             *     store flags info -- we don't want to conflict with that.
-             */
-            if ( !(shadow_mode_enabled(page_get_owner(page)) &&
-                   (page->count_info & PGC_page_table)) )
-                page->tlbflush_timestamp = tlbflush_current_time();
+            page_set_tlbflush_timestamp(page);
         }
 
         if ( likely((y = cmpxchg(&page->u.inuse.type_info, x, nx)) == x) )
