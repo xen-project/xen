@@ -77,20 +77,12 @@ struct page_info
 #define PG_shift(idx)   (BITS_PER_LONG - (idx))
 #define PG_mask(x, idx) (x ## UL << PG_shift(idx))
 
-#define PGT_none          PG_mask(0, 4)  /* no special uses of this page   */
-#define PGT_writable_page PG_mask(7, 4)  /* has writable mappings?         */
-#define PGT_type_mask     PG_mask(15, 4) /* Bits 28-31 or 60-63.           */
-
- /* Owning guest has pinned this page to its current type? */
-#define _PGT_pinned       PG_shift(5)
-#define PGT_pinned        PG_mask(1, 5)
-
- /* Has this page been validated for use as its current type? */
-#define _PGT_validated    PG_shift(6)
-#define PGT_validated     PG_mask(1, 6)
+#define PGT_none          PG_mask(0, 1)  /* no special uses of this page   */
+#define PGT_writable_page PG_mask(1, 1)  /* has writable mappings?         */
+#define PGT_type_mask     PG_mask(1, 1)  /* Bits 31 or 63.                 */
 
  /* Count of uses of this frame as its current type. */
-#define PGT_count_width   PG_shift(9)
+#define PGT_count_width   PG_shift(2)
 #define PGT_count_mask    ((1UL<<PGT_count_width)-1)
 
  /* Cleared when the owning guest 'frees' this page. */

@@ -1184,8 +1184,7 @@ void share_xen_page_with_guest(struct page_info *page,
     spin_lock(&d->page_alloc_lock);
 
     /* The incremented type count pins as writable or read-only. */
-    page->u.inuse.type_info  = (readonly ? PGT_none : PGT_writable_page);
-    page->u.inuse.type_info |= PGT_validated | 1;
+    page->u.inuse.type_info = (readonly ? PGT_none : PGT_writable_page) | 1;
 
     page_set_owner(page, d);
     smp_wmb(); /* install valid domain ptr before updating refcnt. */
