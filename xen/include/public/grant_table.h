@@ -411,12 +411,13 @@ typedef struct gnttab_dump_table gnttab_dump_table_t;
 DEFINE_XEN_GUEST_HANDLE(gnttab_dump_table_t);
 
 /*
- * GNTTABOP_transfer_grant_ref: Transfer <frame> to a foreign domain. The
- * foreign domain has previously registered its interest in the transfer via
- * <domid, ref>.
+ * GNTTABOP_transfer: Transfer <frame> to a foreign domain. The foreign domain
+ * has previously registered its interest in the transfer via <domid, ref>.
  *
  * Note that, even if the transfer fails, the specified page no longer belongs
  * to the calling domain *unless* the error is GNTST_bad_page.
+ *
+ * Note further that only PV guests can use this operation.
  */
 struct gnttab_transfer {
     /* IN parameters. */

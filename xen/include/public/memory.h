@@ -102,6 +102,8 @@ DEFINE_XEN_GUEST_HANDLE(xen_memory_reservation_t);
  * Returns zero on complete success, otherwise a negative error code.
  * On complete success then always @nr_exchanged == @in.nr_extents.
  * On partial success @nr_exchanged indicates how much work was done.
+ *
+ * Note that only PV guests can use this operation.
  */
 #define XENMEM_exchange             11
 struct xen_memory_exchange {
