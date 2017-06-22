@@ -55,13 +55,13 @@ unsigned long hap_p2m_ga_to_gfn(GUEST_PAGING_LEVELS)(
     void *top_map;
     p2m_type_t p2mt;
     walk_t gw;
-    unsigned long top_gfn;
+    gfn_t top_gfn;
     struct page_info *top_page;
 
     /* Get the top-level table's MFN */
-    top_gfn = cr3 >> PAGE_SHIFT;
-    top_page = get_page_from_gfn_p2m(p2m->domain, p2m, top_gfn,
-                                     &p2mt, NULL, P2M_ALLOC | P2M_UNSHARE);
+    top_gfn = _gfn(cr3 >> PAGE_SHIFT);
+    top_page = p2m_get_page_from_gfn(p2m, top_gfn, &p2mt, NULL,
+                                     P2M_ALLOC | P2M_UNSHARE);
     if ( p2m_is_paging(p2mt) )
     {
         ASSERT(p2m_is_hostp2m(p2m));
@@ -100,8 +100,9 @@ unsigned long hap_p2m_ga_to_gfn(GUEST_PAGING_LEVELS)(
     {
         gfn_t gfn = guest_walk_to_gfn(&gw);
         struct page_info *page;
-        page = get_page_from_gfn_p2m(p2m->domain, p2m, gfn_x(gfn), &p2mt,
-                                     NULL, P2M_ALLOC | P2M_UNSHARE);
+
+        page = p2m_get_page_from_gfn(p2m, gfn, &p2mt, NULL,
+                                     P2M_ALLOC | P2M_UNSHARE);
         if ( page )
             put_page(page);
         if ( p2m_is_paging(p2mt) )

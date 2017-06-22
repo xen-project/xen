@@ -472,8 +472,8 @@ void __put_gfn(struct p2m_domain *p2m, unsigned long gfn)
 }
 
 /* Atomically look up a GFN and take a reference count on the backing page. */
-struct page_info *get_page_from_gfn_p2m(
-    struct domain *d, struct p2m_domain *p2m, unsigned long gfn,
+struct page_info *p2m_get_page_from_gfn(
+    struct p2m_domain *p2m, gfn_t gfn,
     p2m_type_t *t, p2m_access_t *a, p2m_query_t q)
 {
     struct page_info *page = NULL;
@@ -489,7 +489,7 @@ struct page_info *get_page_from_gfn_p2m(
     {
         /* Fast path: look up and get out */
         p2m_read_lock(p2m);
-        mfn = __get_gfn_type_access(p2m, gfn, t, a, 0, NULL, 0);
+        mfn = __get_gfn_type_access(p2m, gfn_x(gfn), t, a, 0, NULL, 0);
         if ( p2m_is_any_ram(*t) && mfn_valid(mfn)
              && !((q & P2M_UNSHARE) && p2m_is_shared(*t)) )
         {
@@ -497,11 +497,12 @@ struct page_info *get_page_from_gfn_p2m(
             if ( unlikely(p2m_is_foreign(*t)) )
             {
                 struct domain *fdom = page_get_owner_and_reference(page);
-                ASSERT(fdom != d);
+
+                ASSERT(fdom != p2m->domain);
                 if ( fdom == NULL )
                     page = NULL;
             }
-            else if ( !get_page(page, d) &&
+            else if ( !get_page(page, p2m->domain) &&
                       /* Page could be shared */
                       (!p2m_is_shared(*t) || !get_page(page, dom_cow)) )
                 page = NULL;
@@ -517,14 +518,14 @@ struct page_info *get_page_from_gfn_p2m(
     }
 
     /* Slow path: take the write lock and do fixups */
-    mfn = get_gfn_type_access(p2m, gfn, t, a, q, NULL);
+    mfn = get_gfn_type_access(p2m, gfn_x(gfn), t, a, q, NULL);
     if ( p2m_is_ram(*t) && mfn_valid(mfn) )
     {
         page = mfn_to_page(mfn);
-        if ( !get_page(page, d) )
+        if ( !get_page(page, p2m->domain) )
             page = NULL;
     }
-    put_gfn(d, gfn);
+    put_gfn(p2m->domain, gfn_x(gfn));
 
     return page;
 }
@@ -1900,7 +1901,7 @@ void *map_domain_gfn(struct p2m_domain *p2m, gfn_t gfn, mfn_t *mfn,
     }
 
     /* Translate the gfn, unsharing if shared. */
-    page = get_page_from_gfn_p2m(p2m->domain, p2m, gfn_x(gfn), p2mt, NULL, q);
+    page = p2m_get_page_from_gfn(p2m, gfn, p2mt, NULL, q);
     if ( p2m_is_paging(*p2mt) )
     {
         ASSERT(p2m_is_hostp2m(p2m));

@@ -465,9 +465,7 @@ static inline mfn_t get_gfn_query_unlocked(struct domain *d,
  * and should be used by any path that intends to write to the backing page.
  * Returns NULL if the page is not backed by RAM.
  * The caller is responsible for calling put_page() afterwards. */
-struct page_info *get_page_from_gfn_p2m(struct domain *d,
-                                        struct p2m_domain *p2m,
-                                        unsigned long gfn,
+struct page_info *p2m_get_page_from_gfn(struct p2m_domain *p2m, gfn_t gfn,
                                         p2m_type_t *t, p2m_access_t *a,
                                         p2m_query_t q);
 
@@ -477,7 +475,7 @@ static inline struct page_info *get_page_from_gfn(
     struct page_info *page;
 
     if ( paging_mode_translate(d) )
-        return get_page_from_gfn_p2m(d, p2m_get_hostp2m(d), gfn, t, NULL, q);
+        return p2m_get_page_from_gfn(p2m_get_hostp2m(d), _gfn(gfn), t, NULL, q);
 
     /* Non-translated guests see 1-1 RAM / MMIO mappings everywhere */
     if ( t )
