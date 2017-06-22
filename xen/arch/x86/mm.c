@@ -3217,6 +3217,7 @@ long do_mmuext_op(
         switch ( op.cmd )
         {
             struct page_info *page;
+            p2m_type_t p2mt;
 
         case MMUEXT_PIN_L1_TABLE:
             type = PGT_l1_page_table;
@@ -3516,7 +3517,12 @@ long do_mmuext_op(
         }
 
         case MMUEXT_CLEAR_PAGE:
-            page = get_page_from_gfn(pg_owner, op.arg1.mfn, NULL, P2M_ALLOC);
+            page = get_page_from_gfn(pg_owner, op.arg1.mfn, &p2mt, P2M_ALLOC);
+            if ( unlikely(p2mt != p2m_ram_rw) && page )
+            {
+                put_page(page);
+                page = NULL;
+            }
             if ( !page || !get_page_type(page, PGT_writable_page) )
             {
                 if ( page )
@@ -3539,8 +3545,13 @@ long do_mmuext_op(
         {
             struct page_info *src_page, *dst_page;
 
-            src_page = get_page_from_gfn(pg_owner, op.arg2.src_mfn, NULL,
+            src_page = get_page_from_gfn(pg_owner, op.arg2.src_mfn, &p2mt,
                                          P2M_ALLOC);
+            if ( unlikely(p2mt != p2m_ram_rw) && src_page )
+            {
+                put_page(src_page);
+                src_page = NULL;
+            }
             if ( unlikely(!src_page) )
             {
                 gdprintk(XENLOG_WARNING,
@@ -3550,8 +3561,13 @@ long do_mmuext_op(
                 break;
             }
 
-            dst_page = get_page_from_gfn(pg_owner, op.arg1.mfn, NULL,
+            dst_page = get_page_from_gfn(pg_owner, op.arg1.mfn, &p2mt,
                                          P2M_ALLOC);
+            if ( unlikely(p2mt != p2m_ram_rw) && dst_page )
+            {
+                put_page(dst_page);
+                dst_page = NULL;
+            }
             rc = (dst_page &&
                   get_page_type(dst_page, PGT_writable_page)) ? 0 : -EINVAL;
             if ( unlikely(rc) )
