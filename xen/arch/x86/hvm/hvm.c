@@ -506,8 +506,7 @@ void hvm_do_resume(struct vcpu *v)
 {
     check_wakeup_from_wait();
 
-    if ( is_hvm_domain(v->domain) )
-        pt_restore_timer(v);
+    pt_restore_timer(v);
 
     if ( !handle_hvm_io_completion(v) )
         return;
@@ -1544,8 +1543,7 @@ void hvm_vcpu_destroy(struct vcpu *v)
     tasklet_kill(&v->arch.hvm_vcpu.assert_evtchn_irq_tasklet);
     hvm_funcs.vcpu_destroy(v);
 
-    if ( is_hvm_vcpu(v) )
-        vlapic_destroy(v);
+    vlapic_destroy(v);
 
     hvm_vcpu_cacheattr_destroy(v);
 }
@@ -1710,9 +1708,7 @@ int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
      * - 32-bit WinXP (& older Windows) on AMD CPUs for LAPIC accesses,
      * - newer Windows (like Server 2012) for HPET accesses.
      */
-    if ( !nestedhvm_vcpu_in_guestmode(curr)
-         && is_hvm_domain(currd)
-         && hvm_mmio_internal(gpa) )
+    if ( !nestedhvm_vcpu_in_guestmode(curr) && hvm_mmio_internal(gpa) )
     {
         if ( !handle_mmio_with_translation(gla, gpa >> PAGE_SHIFT, npfec) )
             hvm_inject_hw_exception(TRAP_gp_fault, 0);
@@ -3139,7 +3135,7 @@ static enum hvm_copy_result __hvm_copy(
          * - 32-bit WinXP (& older Windows) on AMD CPUs for LAPIC accesses,
          * - newer Windows (like Server 2012) for HPET accesses.
          */
-        if ( v == current && is_hvm_vcpu(v)
+        if ( v == current
              && !nestedhvm_vcpu_in_guestmode(v)
              && hvm_mmio_internal(gpa) )
             return HVMCOPY_bad_gfn_to_mfn;
@@ -3971,11 +3967,11 @@ static int hvmop_set_evtchn_upcall_vector(
     struct domain *d = current->domain;
     struct vcpu *v;
 
-    if ( copy_from_guest(&op, uop, 1) )
-        return -EFAULT;
-
     if ( !is_hvm_domain(d) )
         return -EINVAL;
+
+    if ( copy_from_guest(&op, uop, 1) )
+        return -EFAULT;
 
     if ( op.vector < 0x10 )
         return -EINVAL;
