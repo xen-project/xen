@@ -20,6 +20,7 @@
 
 #include <xen/bitops.h>
 #include <asm/mmio.h>
+#include <asm/vreg.h>
 
 struct pending_irq
 {
@@ -181,116 +182,6 @@ static inline int REG_RANK_NR(int b, uint32_t n)
     default: BUG();
     }
 }
-
-#define VGIC_REG_MASK(size) ((~0UL) >> (BITS_PER_LONG - ((1 << (size)) * 8)))
-
-/*
- * The check on the size supported by the register has to be done by
- * the caller of vgic_regN_*.
- *
- * vgic_reg_* should never be called directly. Instead use the vgic_regN_*
- * according to size of the emulated register
- *
- * Note that the alignment fault will always be taken in the guest
- * (see B3.12.7 DDI0406.b).
- */
-static inline register_t vgic_reg_extract(unsigned long reg,
-                                          unsigned int offset,
-                                          enum dabt_size size)
-{
-    reg >>= 8 * offset;
-    reg &= VGIC_REG_MASK(size);
-
-    return reg;
-}
-
-static inline void vgic_reg_update(unsigned long *reg, register_t val,
-                                   unsigned int offset,
-                                   enum dabt_size size)
-{
-    unsigned long mask = VGIC_REG_MASK(size);
-    int shift = offset * 8;
-
-    *reg &= ~(mask << shift);
-    *reg |= ((unsigned long)val & mask) << shift;
-}
-
-static inline void vgic_reg_setbits(unsigned long *reg, register_t bits,
-                                    unsigned int offset,
-                                    enum dabt_size size)
-{
-    unsigned long mask = VGIC_REG_MASK(size);
-    int shift = offset * 8;
-
-    *reg |= ((unsigned long)bits & mask) << shift;
-}
-
-static inline void vgic_reg_clearbits(unsigned long *reg, register_t bits,
-                                      unsigned int offset,
-                                      enum dabt_size size)
-{
-    unsigned long mask = VGIC_REG_MASK(size);
-    int shift = offset * 8;
-
-    *reg &= ~(((unsigned long)bits & mask) << shift);
-}
-
-/* N-bit register helpers */
-#define VGIC_REG_HELPERS(sz, offmask)                                   \
-static inline register_t vgic_reg##sz##_extract(uint##sz##_t reg,       \
-                                                const mmio_info_t *info)\
-{                                                                       \
-    return vgic_reg_extract(reg, info->gpa & offmask,                   \
-                            info->dabt.size);                           \
-}                                                                       \
-                                                                        \
-static inline void vgic_reg##sz##_update(uint##sz##_t *reg,             \
-                                         register_t val,                \
-                                         const mmio_info_t *info)       \
-{                                                                       \
-    unsigned long tmp = *reg;                                           \
-                                                                        \
-    vgic_reg_update(&tmp, val, info->gpa & offmask,                     \
-                    info->dabt.size);                                   \
-                                                                        \
-    *reg = tmp;                                                         \
-}                                                                       \
-                                                                        \
-static inline void vgic_reg##sz##_setbits(uint##sz##_t *reg,            \
-                                          register_t bits,              \
-                                          const mmio_info_t *info)      \
-{                                                                       \
-    unsigned long tmp = *reg;                                           \
-                                                                        \
-    vgic_reg_setbits(&tmp, bits, info->gpa & offmask,                   \
-                     info->dabt.size);                                  \
-                                                                        \
-    *reg = tmp;                                                         \
-}                                                                       \
-                                                                        \
-static inline void vgic_reg##sz##_clearbits(uint##sz##_t *reg,          \
-                                            register_t bits,            \
-                                            const mmio_info_t *info)    \
-{                                                                       \
-    unsigned long tmp = *reg;                                           \
-                                                                        \
-    vgic_reg_clearbits(&tmp, bits, info->gpa & offmask,                 \
-                       info->dabt.size);                                \
-                                                                        \
-    *reg = tmp;                                                         \
-}
-
-/*
- * 64 bits registers are only supported on platform with 64-bit long.
- * This is also allow us to optimize the 32 bit case by using
- * unsigned long rather than uint64_t
- */
-#if BITS_PER_LONG == 64
-VGIC_REG_HELPERS(64, 0x7);
-#endif
-VGIC_REG_HELPERS(32, 0x3);
-
-#undef VGIC_REG_HELPERS
 
 enum gic_sgi_mode;
 
