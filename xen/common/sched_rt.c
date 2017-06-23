@@ -171,11 +171,14 @@ static void repl_timer_handler(void *data);
 struct rt_private {
     spinlock_t lock;            /* the global coarse-grained lock */
     struct list_head sdom;      /* list of availalbe domains, used for dump */
+
     struct list_head runq;      /* ordered list of runnable vcpus */
     struct list_head depletedq; /* unordered list of depleted vcpus */
-    struct list_head replq;     /* ordered list of vcpus that need replenishment */
-    cpumask_t tickled;          /* cpus been tickled */
+
     struct timer *repl_timer;   /* replenishment timer */
+    struct list_head replq;     /* ordered list of vcpus that need replenishment */
+
+    cpumask_t tickled;          /* cpus been tickled */
 };
 
 /*
@@ -185,10 +188,6 @@ struct rt_vcpu {
     struct list_head q_elem;     /* on the runq/depletedq list */
     struct list_head replq_elem; /* on the replenishment events list */
 
-    /* Up-pointers */
-    struct rt_dom *sdom;
-    struct vcpu *vcpu;
-
     /* VCPU parameters, in nanoseconds */
     s_time_t period;
     s_time_t budget;
@@ -197,6 +196,10 @@ struct rt_vcpu {
     s_time_t cur_budget;         /* current budget */
     s_time_t last_start;         /* last start time */
     s_time_t cur_deadline;       /* current deadline for EDF */
+
+    /* Up-pointers */
+    struct rt_dom *sdom;
+    struct vcpu *vcpu;
 
     unsigned flags;              /* mark __RTDS_scheduled, etc.. */
 };
