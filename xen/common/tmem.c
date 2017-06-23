@@ -71,7 +71,7 @@ struct tmem_page_descriptor {
     pagesize_t size; /* 0 == PAGE_SIZE (pfp), -1 == data invalid,
                     else compressed data (cdata). */
     uint32_t index;
-    bool_t eviction_attempted;  /* CHANGE TO lifetimes? (settable). */
+    bool eviction_attempted;  /* CHANGE TO lifetimes? (settable). */
     union {
         struct page_info *pfp;  /* Page frame pointer. */
         char *cdata; /* Compressed data. */
@@ -884,39 +884,41 @@ static void client_flush(struct client *client)
     client_free(client);
 }
 
-static bool_t client_over_quota(struct client *client)
+static bool client_over_quota(const struct client *client)
 {
     int total = _atomic_read(tmem_global.client_weight_total);
 
     ASSERT(client != NULL);
     if ( (total == 0) || (client->info.weight == 0) ||
           (client->eph_count == 0) )
-        return 0;
-    return ( ((tmem_global.eph_count*100L) / client->eph_count ) >
-             ((total*100L) / client->info.weight) );
+        return false;
+
+    return (((tmem_global.eph_count * 100L) / client->eph_count) >
+            ((total * 100L) / client->info.weight));
 }
 
 /************ MEMORY REVOCATION ROUTINES *******************************/
 
-static bool_t tmem_try_to_evict_pgp(struct tmem_page_descriptor *pgp, bool_t *hold_pool_rwlock)
+static bool tmem_try_to_evict_pgp(struct tmem_page_descriptor *pgp,
+                                  bool *hold_pool_rwlock)
 {
     struct tmem_object_root *obj = pgp->us.obj;
     struct tmem_pool *pool = obj->pool;
 
     if ( pool->is_dying )
-        return 0;
+        return false;
     if ( spin_trylock(&obj->obj_spinlock) )
     {
         if ( obj->pgp_count > 1 )
-            return 1;
+            return true;
         if ( write_trylock(&pool->pool_rwlock) )
         {
             *hold_pool_rwlock = 1;
-            return 1;
+            return true;
         }
         spin_unlock(&obj->obj_spinlock);
     }
-    return 0;
+    return false;
 }
 
 int tmem_evict(void)
@@ -926,7 +928,7 @@ int tmem_evict(void)
     struct tmem_object_root *obj;
     struct tmem_pool *pool;
     int ret = 0;
-    bool_t hold_pool_rwlock = 0;
+    bool hold_pool_rwlock = false;
 
     tmem_stats.evict_attempts++;
     spin_lock(&eph_lists_spinlock);
@@ -995,7 +997,7 @@ out:
  * is a minimum amount of memory (1MB) available BEFORE any data structure
  * locks are held.
  */
-static inline bool_t tmem_ensure_avail_pages(void)
+static inline bool tmem_ensure_avail_pages(void)
 {
     int failed_evict = 10;
     unsigned long free_mem;
@@ -1004,12 +1006,12 @@ static inline bool_t tmem_ensure_avail_pages(void)
         free_mem = (tmem_page_list_pages + total_free_pages())
                         >> (20 - PAGE_SHIFT);
         if ( free_mem )
-            return 1;
+            return true;
         if ( !tmem_evict() )
             failed_evict--;
     } while ( failed_evict > 0 );
 
-    return 0;
+    return false;
 }
 
 /************ TMEM CORE OPERATIONS ************************************/
@@ -1879,9 +1881,6 @@ long do_tmem_op(tmem_cli_op_t uops)
     struct tmem_pool *pool = NULL;
     struct xen_tmem_oid *oidp;
     int rc = 0;
-    bool_t succ_get = 0, succ_put = 0;
-    bool_t non_succ_get = 0, non_succ_put = 0;
-    bool_t flush = 0, flush_obj = 0;
 
     if ( !tmem_initialized )
         return -ENODEV;
@@ -1965,22 +1964,16 @@ long do_tmem_op(tmem_cli_op_t uops)
                                 tmem_cli_buf_null);
                 else
                     rc = -ENOMEM;
-                if (rc == 1) succ_put = 1;
-                else non_succ_put = 1;
                 break;
             case TMEM_GET_PAGE:
                 rc = do_tmem_get(pool, oidp, op.u.gen.index, op.u.gen.cmfn,
                                 tmem_cli_buf_null);
-                if (rc == 1) succ_get = 1;
-                else non_succ_get = 1;
                 break;
             case TMEM_FLUSH_PAGE:
-                flush = 1;
                 rc = do_tmem_flush_page(pool, oidp, op.u.gen.index);
                 break;
             case TMEM_FLUSH_OBJECT:
                 rc = do_tmem_flush_object(pool, oidp);
-                flush_obj = 1;
                 break;
             default:
                 tmem_client_warn("tmem: op %d not implemented\n", op.cmd);

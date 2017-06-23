@@ -14,10 +14,10 @@
 #include <xen/cpu.h>
 #include <xen/init.h>
 
-bool_t __read_mostly opt_tmem = 0;
+bool __read_mostly opt_tmem;
 boolean_param("tmem", opt_tmem);
 
-bool_t __read_mostly opt_tmem_compress = 0;
+bool __read_mostly opt_tmem_compress;
 boolean_param("tmem_compress", opt_tmem_compress);
 
 atomic_t freeable_page_count = ATOMIC_INIT(0);
@@ -32,14 +32,14 @@ static DEFINE_PER_CPU_READ_MOSTLY(void *, scratch_page);
 
 #if defined(CONFIG_ARM)
 static inline void *cli_get_page(xen_pfn_t cmfn, unsigned long *pcli_mfn,
-                                 struct page_info **pcli_pfp, bool_t cli_write)
+                                 struct page_info **pcli_pfp, bool cli_write)
 {
     ASSERT_UNREACHABLE();
     return NULL;
 }
 
 static inline void cli_put_page(void *cli_va, struct page_info *cli_pfp,
-                                unsigned long cli_mfn, bool_t mark_dirty)
+                                unsigned long cli_mfn, bool mark_dirty)
 {
     ASSERT_UNREACHABLE();
 }
@@ -47,7 +47,7 @@ static inline void cli_put_page(void *cli_va, struct page_info *cli_pfp,
 #include <asm/p2m.h>
 
 static inline void *cli_get_page(xen_pfn_t cmfn, unsigned long *pcli_mfn,
-                                 struct page_info **pcli_pfp, bool_t cli_write)
+                                 struct page_info **pcli_pfp, bool cli_write)
 {
     p2m_type_t t;
     struct page_info *page;
@@ -72,7 +72,7 @@ static inline void *cli_get_page(xen_pfn_t cmfn, unsigned long *pcli_mfn,
 }
 
 static inline void cli_put_page(void *cli_va, struct page_info *cli_pfp,
-                                unsigned long cli_mfn, bool_t mark_dirty)
+                                unsigned long cli_mfn, bool mark_dirty)
 {
     if ( mark_dirty )
     {

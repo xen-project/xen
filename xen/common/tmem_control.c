@@ -19,8 +19,8 @@
 static int tmemc_freeze_pools(domid_t cli_id, int arg)
 {
     struct client *client;
-    bool_t freeze = (arg == XEN_SYSCTL_TMEM_OP_FREEZE) ? 1 : 0;
-    bool_t destroy = (arg == XEN_SYSCTL_TMEM_OP_DESTROY) ? 1 : 0;
+    bool freeze = arg == XEN_SYSCTL_TMEM_OP_FREEZE;
+    bool destroy = arg == XEN_SYSCTL_TMEM_OP_DESTROY;
     char *s;
 
     s = destroy ? "destroyed" : ( freeze ? "frozen" : "thawed" );
@@ -96,12 +96,12 @@ static int tmemc_flush_mem(domid_t cli_id, uint32_t kb)
 #define BSIZE 1024
 
 static int tmemc_list_client(struct client *c, tmem_cli_va_param_t buf,
-                             int off, uint32_t len, bool_t use_long)
+                             int off, uint32_t len, bool use_long)
 {
     char info[BSIZE];
     int i, n = 0, sum = 0;
     struct tmem_pool *p;
-    bool_t s;
+    bool s;
 
     n = scnprintf(info,BSIZE,"C=CI:%d,ww:%d,co:%d,fr:%d,"
         "Tc:%"PRIu64",Ge:%ld,Pp:%ld,Gp:%ld%c",
@@ -149,7 +149,7 @@ static int tmemc_list_client(struct client *c, tmem_cli_va_param_t buf,
 }
 
 static int tmemc_list_shared(tmem_cli_va_param_t buf, int off, uint32_t len,
-                              bool_t use_long)
+                             bool use_long)
 {
     char info[BSIZE];
     int i, n = 0, sum = 0;
@@ -188,7 +188,7 @@ static int tmemc_list_shared(tmem_cli_va_param_t buf, int off, uint32_t len,
 }
 
 static int tmemc_list_global_perf(tmem_cli_va_param_t buf, int off,
-                                  uint32_t len, bool_t use_long)
+                                  uint32_t len, bool use_long)
 {
     char info[BSIZE];
     int n = 0, sum = 0;
@@ -204,7 +204,7 @@ static int tmemc_list_global_perf(tmem_cli_va_param_t buf, int off,
 }
 
 static int tmemc_list_global(tmem_cli_va_param_t buf, int off, uint32_t len,
-                              bool_t use_long)
+                             bool use_long)
 {
     char info[BSIZE];
     int n = 0, sum = off;
@@ -238,7 +238,7 @@ static int tmemc_list_global(tmem_cli_va_param_t buf, int off, uint32_t len,
 }
 
 static int tmemc_list(domid_t cli_id, tmem_cli_va_param_t buf, uint32_t len,
-                               bool_t use_long)
+                      bool use_long)
 {
     struct client *client;
     int off = 0;
