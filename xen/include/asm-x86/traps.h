@@ -30,14 +30,6 @@ struct cpu_user_regs;
 void async_exception_cleanup(struct vcpu *);
  
 /**
- * guest_has_trap_callback
- *
- * returns true (non-zero) if guest registered a trap handler
- */
-extern int guest_has_trap_callback(struct domain *d, uint16_t vcpuid,
-				unsigned int trap_nr);
-
-/**
  * send_guest_trap
  *
  * delivers trap to guest analogous to send_guest_global_virq

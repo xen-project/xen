@@ -32,6 +32,7 @@
 #include <asm/system.h>
 #include <asm/msr.h>
 #include <asm/p2m.h>
+#include <asm/pv/traps.h>
 
 #include "mce.h"
 #include "x86_mca.h"
@@ -383,7 +384,7 @@ int inject_vmce(struct domain *d, int vcpu)
             continue;
 
         if ( (is_hvm_domain(d) ||
-              guest_has_trap_callback(d, v->vcpu_id, TRAP_machine_check)) &&
+              pv_trap_callback_registered(v, TRAP_machine_check)) &&
              !test_and_set_bool(v->mce_pending) )
         {
             mce_printk(MCE_VERBOSE, "MCE: inject vMCE to %pv\n", v);
