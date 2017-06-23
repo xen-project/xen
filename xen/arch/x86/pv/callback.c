@@ -17,6 +17,7 @@
  */
 
 #include <xen/event.h>
+#include <xen/hypercall.h>
 #include <xen/guest_access.h>
 #include <xen/lib.h>
 #include <xen/sched.h>
@@ -347,6 +348,52 @@ long do_set_trap_table(XEN_GUEST_HANDLE_PARAM(const_trap_info_t) traps)
         fixup_guest_code_selector(curr->domain, cur.cs);
 
         memcpy(&dst[cur.vector], &cur, sizeof(cur));
+
+        if ( cur.vector == 0x80 )
+            init_int80_direct_trap(curr);
+
+        guest_handle_add_offset(traps, 1);
+
+        if ( hypercall_preempt_check() )
+        {
+            rc = hypercall_create_continuation(
+                __HYPERVISOR_set_trap_table, "h", traps);
+            break;
+        }
+    }
+
+    return rc;
+}
+
+int compat_set_trap_table(XEN_GUEST_HANDLE(trap_info_compat_t) traps)
+{
+    struct vcpu *curr = current;
+    struct compat_trap_info cur;
+    struct trap_info *dst = curr->arch.pv_vcpu.trap_ctxt;
+    long rc = 0;
+
+    /* If no table is presented then clear the entire virtual IDT. */
+    if ( guest_handle_is_null(traps) )
+    {
+        memset(dst, 0, NR_VECTORS * sizeof(*dst));
+        init_int80_direct_trap(curr);
+        return 0;
+    }
+
+    for ( ; ; )
+    {
+        if ( copy_from_guest(&cur, traps, 1) )
+        {
+            rc = -EFAULT;
+            break;
+        }
+
+        if ( cur.address == 0 )
+            break;
+
+        fixup_guest_code_selector(curr->domain, cur.cs);
+
+        XLAT_trap_info(dst + cur.vector, &cur);
 
         if ( cur.vector == 0x80 )
             init_int80_direct_trap(curr);
