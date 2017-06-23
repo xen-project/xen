@@ -567,8 +567,12 @@ int xenmem_add_to_physmap_one(struct domain *d, unsigned int space,
                               union xen_add_to_physmap_batch_extra extra,
                               unsigned long idx, gfn_t gfn);
 
-/* Returns 0 on success, or negative on error. */
+/* Return 0 on success, or negative on error. */
 int __must_check guest_remove_page(struct domain *d, unsigned long gmfn);
+int __must_check steal_page(struct domain *d, struct page_info *page,
+                            unsigned int memflags);
+int __must_check donate_page(struct domain *d, struct page_info *page,
+                             unsigned int memflags);
 
 #define RAM_TYPE_CONVENTIONAL 0x00000001
 #define RAM_TYPE_RESERVED     0x00000002

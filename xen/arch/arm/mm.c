@@ -1161,7 +1161,7 @@ int donate_page(struct domain *d, struct page_info *page, unsigned int memflags)
 int steal_page(
     struct domain *d, struct page_info *page, unsigned int memflags)
 {
-    return -1;
+    return -EOPNOTSUPP;
 }
 
 int page_is_ram_type(unsigned long mfn, unsigned long mem_type)

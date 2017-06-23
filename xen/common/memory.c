@@ -568,10 +568,10 @@ static long memory_exchange(XEN_GUEST_HANDLE_PARAM(xen_memory_exchange_t) arg)
 
                 page = mfn_to_page(mfn);
 
-                if ( unlikely(steal_page(d, page, MEMF_no_refcount)) )
+                rc = steal_page(d, page, MEMF_no_refcount);
+                if ( unlikely(rc) )
                 {
                     put_gfn(d, gmfn + k);
-                    rc = -EINVAL;
                     goto fail;
                 }
 

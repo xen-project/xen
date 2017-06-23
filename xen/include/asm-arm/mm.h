@@ -323,11 +323,6 @@ static inline int relinquish_shared_pages(struct domain *d)
 /* Arch-specific portion of memory_op hypercall. */
 long arch_memory_op(int op, XEN_GUEST_HANDLE_PARAM(void) arg);
 
-int steal_page(
-    struct domain *d, struct page_info *page, unsigned int memflags);
-int donate_page(
-    struct domain *d, struct page_info *page, unsigned int memflags);
-
 #define domain_set_alloc_bitsize(d) ((void)0)
 #define domain_clamp_alloc_bitsize(d, b) (b)
 

@@ -4422,7 +4422,7 @@ int donate_page(
              page_to_mfn(page), d->domain_id,
              owner ? owner->domain_id : DOMID_INVALID,
              page->count_info, page->u.inuse.type_info);
-    return -1;
+    return -EINVAL;
 }
 
 int steal_page(
@@ -4433,7 +4433,7 @@ int steal_page(
     const struct domain *owner = dom_xen;
 
     if ( paging_mode_external(d) )
-        return -1;
+        return -EOPNOTSUPP;
 
     spin_lock(&d->page_alloc_lock);
 
@@ -4488,7 +4488,7 @@ int steal_page(
              page_to_mfn(page), d->domain_id,
              owner ? owner->domain_id : DOMID_INVALID,
              page->count_info, page->u.inuse.type_info);
-    return -1;
+    return -EINVAL;
 }
 
 static int __do_update_va_mapping(

@@ -1854,10 +1854,10 @@ gnttab_transfer(
         }
 
         page = mfn_to_page(mfn);
-        if ( steal_page(d, page, 0) < 0 )
+        if ( (rc = steal_page(d, page, 0)) < 0 )
         {
             put_gfn(d, gop.mfn);
-            gop.status = GNTST_bad_page;
+            gop.status = rc == -EINVAL ? GNTST_bad_page : GNTST_general_error;
             goto copyback;
         }
 
