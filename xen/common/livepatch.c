@@ -1527,7 +1527,7 @@ static void livepatch_printall(unsigned char key)
             {
                 spin_unlock(&payload_lock);
                 process_pending_softirqs();
-                if ( spin_trylock(&payload_lock) )
+                if ( !spin_trylock(&payload_lock) )
                 {
                     printk("Couldn't reacquire lock. Try again.\n");
                     return;
