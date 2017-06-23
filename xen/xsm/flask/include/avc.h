@@ -17,7 +17,7 @@
 #include "av_permissions.h"
 #include "security.h"
 
-extern bool_t flask_enforcing;
+extern bool flask_enforcing;
 
 /*
  * An entry in the AVC.

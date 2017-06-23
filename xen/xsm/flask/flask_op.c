@@ -29,7 +29,7 @@ enum flask_bootparam_t __read_mostly flask_bootparam = FLASK_BOOTPARAM_ENFORCING
 static void parse_flask_param(char *s);
 custom_param("flask", parse_flask_param);
 
-bool_t __read_mostly flask_enforcing = 1;
+bool __read_mostly flask_enforcing = true;
 
 #define MAX_POLICY_SIZE 0x4000000
 
@@ -453,7 +453,7 @@ static int flask_security_load(struct xen_flask_load *load)
 {
     int ret;
     void *buf = NULL;
-    bool_t is_reload = ss_initialized;
+    bool is_reload = ss_initialized;
 
     ret = domain_has_security(current->domain, SECURITY__LOAD_POLICY);
     if ( ret )
