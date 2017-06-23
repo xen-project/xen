@@ -390,7 +390,7 @@ struct csched2_private {
 
     int runq_map[NR_CPUS];
     cpumask_t active_queues; /* Queues which may have active cpus */
-    struct csched2_runqueue_data rqd[NR_CPUS];
+    struct csched2_runqueue_data *rqd;
 
     unsigned int load_precision_shift;
     unsigned int load_window_shift;
@@ -3106,9 +3106,11 @@ csched2_init(struct scheduler *ops)
     printk(XENLOG_INFO "load tracking window length %llu ns\n",
            1ULL << opt_load_window_shift);
 
-    /* Basically no CPU information is available at this point; just
+    /*
+     * Basically no CPU information is available at this point; just
      * set up basic structures, and a callback when the CPU info is
-     * available. */
+     * available.
+     */
 
     prv = xzalloc(struct csched2_private);
     if ( prv == NULL )
@@ -3118,7 +3120,13 @@ csched2_init(struct scheduler *ops)
     rwlock_init(&prv->lock);
     INIT_LIST_HEAD(&prv->sdom);
 
-    /* But un-initialize all runqueues */
+    /* Allocate all runqueues and mark them as un-initialized */
+    prv->rqd = xzalloc_array(struct csched2_runqueue_data, nr_cpu_ids);
+    if ( !prv->rqd )
+    {
+        xfree(prv);
+        return -ENOMEM;
+    }
     for ( i = 0; i < nr_cpu_ids; i++ )
     {
         prv->runq_map[i] = -1;
