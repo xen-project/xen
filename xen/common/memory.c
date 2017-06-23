@@ -216,8 +216,7 @@ static void populate_physmap(struct memop_args *a)
             mfn = page_to_mfn(page);
             guest_physmap_add_page(d, gpfn, mfn, a->extent_order);
 
-            if ( !paging_mode_translate(d) &&
-                 !guest_handle_is_null(a->extent_list) )
+            if ( !paging_mode_translate(d) )
             {
                 for ( j = 0; j < (1 << a->extent_order); j++ )
                     set_gpfn_from_mfn(mfn + j, gpfn + j);
