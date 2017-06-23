@@ -6424,7 +6424,7 @@ x86_emulate(
                    (src.val >> (width - shift)));
         _regs.eflags &= ~(X86_EFLAGS_OF | X86_EFLAGS_SF | X86_EFLAGS_ZF |
                           X86_EFLAGS_PF | X86_EFLAGS_CF);
-        if ( (dst.val >> ((b & 8) ? (shift - 1) : (width - shift))) & 1 )
+        if ( (dst.orig_val >> ((b & 8) ? (shift - 1) : (width - shift))) & 1 )
             _regs.eflags |= X86_EFLAGS_CF;
         if ( ((dst.val ^ dst.orig_val) >> (width - 1)) & 1 )
             _regs.eflags |= X86_EFLAGS_OF;

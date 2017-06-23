@@ -783,6 +783,31 @@ int main(int argc, char **argv)
     printf("okay\n");
 #endif
 
+    printf("%-40s", "Testing shld $1,%ecx,(%edx)...");
+    res[0]      = 0x12345678;
+    regs.edx    = (unsigned long)res;
+    regs.ecx    = 0x9abcdef0;
+    instr[0] = 0x0f; instr[1] = 0xa4; instr[2] = 0x0a; instr[3] = 0x01;
+    for ( i = 0; i < 0x20; ++i )
+    {
+        uint32_t r = res[0];
+        const uint32_t m = X86_EFLAGS_ARITH_MASK & ~X86_EFLAGS_AF;
+        unsigned long f;
+
+        asm ( "shld $1,%2,%0; pushf; pop %1"
+              : "+rm" (r), "=rm" (f) : "r" ((uint32_t)regs.ecx) );
+        regs.eflags = f ^ m;
+        regs.eip    = (unsigned long)&instr[0];
+        rc = x86_emulate(&ctxt, &emulops);
+        if ( (rc != X86EMUL_OKAY) ||
+             (regs.eip != (unsigned long)&instr[4]) ||
+             (res[0] != r) ||
+             ((regs.eflags ^ f) & m) )
+            goto fail;
+        regs.ecx <<= 1;
+    }
+    printf("okay\n");
+
     printf("%-40s", "Testing movbe (%ecx),%eax...");
     instr[0] = 0x0f; instr[1] = 0x38; instr[2] = 0xf0; instr[3] = 0x01;
     regs.eflags = 0x200;
