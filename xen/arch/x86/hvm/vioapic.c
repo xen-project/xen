@@ -158,6 +158,52 @@ static int vioapic_read(
     return X86EMUL_OKAY;
 }
 
+static int vioapic_hwdom_map_gsi(unsigned int gsi, unsigned int trig,
+                                 unsigned int pol)
+{
+    struct domain *currd = current->domain;
+    xen_domctl_bind_pt_irq_t pt_irq_bind = {
+        .irq_type = PT_IRQ_TYPE_PCI,
+        .machine_irq = gsi,
+    };
+    int ret, pirq = gsi;
+
+    ASSERT(is_hardware_domain(currd));
+
+    /* Interrupt has been unmasked, bind it now. */
+    ret = mp_register_gsi(gsi, trig, pol);
+    if ( ret == -EEXIST )
+        return 0;
+    if ( ret )
+    {
+        gprintk(XENLOG_WARNING, "vioapic: error registering GSI %u: %d\n",
+                 gsi, ret);
+        return ret;
+    }
+
+    ret = allocate_and_map_gsi_pirq(currd, pirq, &pirq);
+    if ( ret )
+    {
+        gprintk(XENLOG_WARNING, "vioapic: error mapping GSI %u: %d\n",
+                 gsi, ret);
+        return ret;
+    }
+
+    pcidevs_lock();
+    ret = pt_irq_create_bind(currd, &pt_irq_bind);
+    if ( ret )
+    {
+        gprintk(XENLOG_WARNING, "vioapic: error binding GSI %u: %d\n",
+                gsi, ret);
+        spin_lock(&currd->event_lock);
+        unmap_domain_pirq(currd, pirq);
+        spin_unlock(&currd->event_lock);
+    }
+    pcidevs_unlock();
+
+    return ret;
+}
+
 static void vioapic_write_redirent(
     struct hvm_vioapic *vioapic, unsigned int idx,
     int top_word, uint32_t val)
@@ -189,6 +235,20 @@ static void vioapic_write_redirent(
     }
 
     *pent = ent;
+
+    if ( is_hardware_domain(d) && unmasked )
+    {
+        int ret;
+
+        ret = vioapic_hwdom_map_gsi(gsi, ent.fields.trig_mode,
+                                    ent.fields.polarity);
+        if ( ret )
+        {
+            /* Mask the entry again. */
+            pent->fields.mask = 1;
+            unmasked = 0;
+        }
+    }
 
     if ( gsi == 0 )
     {
