@@ -136,7 +136,7 @@ void efi_rs_leave(struct efi_rs_state *state)
     stts();
 }
 
-bool_t efi_rs_using_pgtables(void)
+bool efi_rs_using_pgtables(void)
 {
     return efi_l4_pgtable &&
            (smp_processor_id() == efi_rs_on_cpu) &&
@@ -177,7 +177,7 @@ void efi_halt_system(void)
     printk(XENLOG_WARNING "EFI: could not halt system (%#lx)\n", status);
 }
 
-void efi_reset_system(bool_t warm)
+void efi_reset_system(bool warm)
 {
     EFI_STATUS status;
     struct efi_rs_state state = efi_rs_enter();

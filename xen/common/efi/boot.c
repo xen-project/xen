@@ -113,11 +113,11 @@ static char *get_value(const struct file *cfg, const char *section,
 static char *split_string(char *s);
 static CHAR16 *s2w(union string *str);
 static char *w2s(const union string *str);
-static bool_t read_file(EFI_FILE_HANDLE dir_handle, CHAR16 *name,
-                        struct file *file, char *options);
+static bool read_file(EFI_FILE_HANDLE dir_handle, CHAR16 *name,
+                      struct file *file, char *options);
 static size_t wstrlen(const CHAR16 * s);
 static int set_color(u32 mask, int bpp, u8 *pos, u8 *sz);
-static bool_t match_guid(const EFI_GUID *guid1, const EFI_GUID *guid2);
+static bool match_guid(const EFI_GUID *guid1, const EFI_GUID *guid2);
 
 static void efi_init(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable);
 static void efi_console_set_mode(void);
@@ -138,7 +138,7 @@ static SIMPLE_TEXT_OUTPUT_INTERFACE *__initdata StdOut;
 static SIMPLE_TEXT_OUTPUT_INTERFACE *__initdata StdErr;
 
 static UINT32 __initdata mdesc_ver;
-static bool_t __initdata map_bs;
+static bool __initdata map_bs;
 
 static struct file __initdata cfg;
 static struct file __initdata kernel;
@@ -307,7 +307,7 @@ static char *__init w2s(const union string *str)
     return str->s;
 }
 
-static bool_t __init match_guid(const EFI_GUID *guid1, const EFI_GUID *guid2)
+static bool __init match_guid(const EFI_GUID *guid1, const EFI_GUID *guid2)
 {
     return guid1->Data1 == guid2->Data1 &&
            guid1->Data2 == guid2->Data2 &&
@@ -378,12 +378,12 @@ static unsigned int __init get_argv(unsigned int argc, CHAR16 **argv,
                                     CHAR16 **options)
 {
     CHAR16 *ptr = (CHAR16 *)(argv + argc + 1), *prev = NULL;
-    bool_t prev_sep = TRUE;
+    bool prev_sep = true;
 
     for ( ; cmdsize > sizeof(*cmdline) && *cmdline;
             cmdsize -= sizeof(*cmdline), ++cmdline )
     {
-        bool_t cur_sep = *cmdline == L' ' || *cmdline == L'\t';
+        bool cur_sep = *cmdline == L' ' || *cmdline == L'\t';
 
         if ( !prev_sep )
         {
@@ -538,8 +538,8 @@ static char * __init split_string(char *s)
     return NULL;
 }
 
-static bool_t __init read_file(EFI_FILE_HANDLE dir_handle, CHAR16 *name,
-                               struct file *file, char *options)
+static bool __init read_file(EFI_FILE_HANDLE dir_handle, CHAR16 *name,
+                             struct file *file, char *options)
 {
     EFI_FILE_HANDLE FileHandle = NULL;
     UINT64 size;
@@ -551,7 +551,7 @@ static bool_t __init read_file(EFI_FILE_HANDLE dir_handle, CHAR16 *name,
     ret = dir_handle->Open(dir_handle, &FileHandle, name,
                            EFI_FILE_MODE_READ, 0);
     if ( file == &cfg && ret == EFI_NOT_FOUND )
-        return 0;
+        return false;
     if ( EFI_ERROR(ret) )
         what = L"Open";
     else
@@ -611,27 +611,27 @@ static bool_t __init read_file(EFI_FILE_HANDLE dir_handle, CHAR16 *name,
 
     efi_arch_flush_dcache_area(file->ptr, file->size);
 
-    return 1;
+    return true;
 }
 
 static void __init pre_parse(const struct file *cfg)
 {
     char *ptr = cfg->ptr, *end = ptr + cfg->size;
-    bool_t start = 1, comment = 0;
+    bool start = true, comment = false;
 
     for ( ; ptr < end; ++ptr )
     {
         if ( iscntrl(*ptr) )
         {
-            comment = 0;
-            start = 1;
+            comment = false;
+            start = true;
             *ptr = 0;
         }
         else if ( comment || (start && isspace(*ptr)) )
             *ptr = 0;
         else if ( *ptr == '#' || (start && *ptr == ';') )
         {
-            comment = 1;
+            comment = true;
             *ptr = 0;
         }
         else
@@ -647,7 +647,7 @@ static char *__init get_value(const struct file *cfg, const char *section,
 {
     char *ptr = cfg->ptr, *end = ptr + cfg->size;
     size_t slen = section ? strlen(section) : 0, ilen = strlen(item);
-    bool_t match = !slen;
+    bool match = !slen;
 
     for ( ; ptr < end; ++ptr )
     {
@@ -1000,7 +1000,7 @@ static void __init efi_exit_boot(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *Syste
 {
     EFI_STATUS status;
     UINTN info_size = 0, map_key;
-    bool_t retry;
+    bool retry;
 
     efi_bs->GetMemoryMap(&info_size, NULL, &map_key,
                          &efi_mdesc_size, &mdesc_ver);
@@ -1009,7 +1009,7 @@ static void __init efi_exit_boot(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *Syste
     if ( !efi_memmap )
         blexit(L"Unable to allocate memory for EFI memory map");
 
-    for ( retry = 0; ; retry = 1 )
+    for ( retry = false; ; retry = true )
     {
         efi_memmap_size = info_size;
         status = SystemTable->BootServices->GetMemoryMap(&efi_memmap_size,
@@ -1071,9 +1071,9 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
     EFI_SHIM_LOCK_PROTOCOL *shim_lock;
     EFI_GRAPHICS_OUTPUT_PROTOCOL *gop = NULL;
     union string section = { NULL }, name;
-    bool_t base_video = 0;
+    bool base_video = false;
     char *option_str;
-    bool_t use_cfg_file;
+    bool use_cfg_file;
 
     __set_bit(EFI_BOOT, &efi_flags);
     __set_bit(EFI_LOADER, &efi_flags);
@@ -1115,9 +1115,9 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
             if ( *ptr == L'/' || *ptr == L'-' )
             {
                 if ( wstrcmp(ptr + 1, L"basevideo") == 0 )
-                    base_video = 1;
+                    base_video = true;
                 else if ( wstrcmp(ptr + 1, L"mapbs") == 0 )
-                    map_bs = 1;
+                    map_bs = true;
                 else if ( wstrncmp(ptr + 1, L"cfg=", 4) == 0 )
                     cfg_file_name = ptr + 5;
                 else if ( i + 1 < argc && wstrcmp(ptr + 1, L"cfg") == 0 )
@@ -1304,14 +1304,14 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
 
 #ifndef CONFIG_ARM /* TODO - runtime service support */
 
-static bool_t __initdata efi_map_uc;
+static bool __initdata efi_map_uc;
 
 static void __init parse_efi_param(char *s)
 {
     char *ss;
 
     do {
-        bool_t val = !!strncmp(s, "no-", 3);
+        bool val = strncmp(s, "no-", 3);
 
         if ( !val )
             s += 3;
@@ -1337,8 +1337,8 @@ custom_param("efi", parse_efi_param);
 
 #ifndef USE_SET_VIRTUAL_ADDRESS_MAP
 static __init void copy_mapping(unsigned long mfn, unsigned long end,
-                                bool_t (*is_valid)(unsigned long smfn,
-                                                   unsigned long emfn))
+                                bool (*is_valid)(unsigned long smfn,
+                                                 unsigned long emfn))
 {
     unsigned long next;
 
@@ -1366,7 +1366,7 @@ static __init void copy_mapping(unsigned long mfn, unsigned long end,
     }
 }
 
-static bool_t __init ram_range_valid(unsigned long smfn, unsigned long emfn)
+static bool __init ram_range_valid(unsigned long smfn, unsigned long emfn)
 {
     unsigned long sz = pfn_to_pdx(emfn - 1) / PDX_GROUP_COUNT + 1;
 
@@ -1375,9 +1375,9 @@ static bool_t __init ram_range_valid(unsigned long smfn, unsigned long emfn)
                          pfn_to_pdx(smfn) / PDX_GROUP_COUNT) < sz;
 }
 
-static bool_t __init rt_range_valid(unsigned long smfn, unsigned long emfn)
+static bool __init rt_range_valid(unsigned long smfn, unsigned long emfn)
 {
-    return 1;
+    return true;
 }
 #endif
 

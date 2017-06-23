@@ -33,10 +33,10 @@ struct compat_pf_efi_runtime_call;
 
 bool efi_enabled(unsigned int feature);
 void efi_init_memory(void);
-bool_t efi_rs_using_pgtables(void);
+bool efi_rs_using_pgtables(void);
 unsigned long efi_get_time(void);
 void efi_halt_system(void);
-void efi_reset_system(bool_t warm);
+void efi_reset_system(bool warm);
 #ifndef COMPAT
 int efi_get_info(uint32_t idx, union xenpf_efi_info *);
 int efi_runtime_call(struct xenpf_efi_runtime_call *);

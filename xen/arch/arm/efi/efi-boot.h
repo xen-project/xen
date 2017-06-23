@@ -559,7 +559,7 @@ static void __init efi_arch_load_addr_check(EFI_LOADED_IMAGE *loaded_image)
         blexit(L"Xen must be loaded at a 4 KByte boundary.");
 }
 
-static bool_t __init efi_arch_use_config_file(EFI_SYSTEM_TABLE *SystemTable)
+static bool __init efi_arch_use_config_file(EFI_SYSTEM_TABLE *SystemTable)
 {
     /*
      * For arm, we may get a device tree from GRUB (or other bootloader)
@@ -578,12 +578,13 @@ static bool_t __init efi_arch_use_config_file(EFI_SYSTEM_TABLE *SystemTable)
          * We either have no FDT, or one without modules, so we must have a
          * Xen EFI configuration file to specify modules.  (dom0 required)
          */
-        return 1;
+        return true;
     }
     PrintStr(L"Using modules provided by bootloader in FDT\r\n");
     /* We have modules already defined in fdt, just add space. */
     fdt = fdt_increase_size(&dtbfile, EFI_PAGE_SIZE);
-    return 0;
+
+    return false;
 }
 
 static void __init efi_arch_console_init(UINTN cols, UINTN rows)
