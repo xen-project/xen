@@ -25,6 +25,9 @@
 
 #include <public/xen.h>
 
+/* Deliver interrupt to PV guest. Return 0 on success. */
+int pv_raise_interrupt(struct vcpu *v, uint8_t vector);
+
 int pv_emulate_privileged_op(struct cpu_user_regs *regs);
 void pv_emulate_gate_op(struct cpu_user_regs *regs);
 bool pv_emulate_invalid_op(struct cpu_user_regs *regs);
@@ -36,6 +39,11 @@ static inline bool pv_trap_callback_registered(const struct vcpu *v,
 }
 
 #else  /* !CONFIG_PV */
+
+#include <xen/errno.h>
+
+/* Deliver interrupt to PV guest. Return 0 on success. */
+static int pv_raise_interrupt(struct vcpu *v, uint8_t vector) { return -EOPNOTSUPP; }
 
 static inline int pv_emulate_privileged_op(struct cpu_user_regs *regs) { return 0; }
 static inline void pv_emulate_gate_op(struct cpu_user_regs *regs) {}

@@ -28,15 +28,6 @@ struct softirq_trap {
 struct cpu_user_regs;
 
 void async_exception_cleanup(struct vcpu *);
- 
-/**
- * send_guest_trap
- *
- * delivers trap to guest analogous to send_guest_global_virq
- * return 0 on successful delivery
- */
-extern int send_guest_trap(struct domain *d, uint16_t vcpuid,
-                           unsigned int trap_nr);
 
 uint32_t guest_io_read(unsigned int port, unsigned int bytes,
                        struct domain *);

@@ -1620,7 +1620,7 @@ static void nmi_hwdom_report(unsigned int reason_idx)
 
     set_bit(reason_idx, nmi_reason(d));
 
-    send_guest_trap(d, 0, TRAP_nmi);
+    pv_raise_interrupt(d->vcpu[0], TRAP_nmi);
 }
 
 static void pci_serr_error(const struct cpu_user_regs *regs)
@@ -2008,21 +2008,16 @@ long unregister_guest_nmi_callback(void)
     return 0;
 }
 
-int send_guest_trap(struct domain *d, uint16_t vcpuid, unsigned int trap_nr)
+int pv_raise_interrupt(struct vcpu *v, uint8_t trap_nr)
 {
-    struct vcpu *v;
     struct softirq_trap *st = &per_cpu(softirq_trap, smp_processor_id());
-
-    BUG_ON(d == NULL);
-    BUG_ON(vcpuid >= d->max_vcpus);
-    v = d->vcpu[vcpuid];
 
     switch (trap_nr) {
     case TRAP_nmi:
         if ( cmpxchgptr(&st->vcpu, NULL, v) )
             return -EBUSY;
         if ( !test_and_set_bool(v->nmi_pending) ) {
-               st->domain = d;
+               st->domain = v->domain;
                st->processor = v->processor;
 
                /* not safe to wake up a vcpu here */
@@ -2040,7 +2035,7 @@ int send_guest_trap(struct domain *d, uint16_t vcpuid, unsigned int trap_nr)
          * on the physical CPU that reported a machine check error. */
 
         if ( !test_and_set_bool(v->mce_pending) ) {
-                st->domain = d;
+                st->domain = v->domain;
                 st->processor = v->processor;
 
                 /* not safe to wake up a vcpu here */
