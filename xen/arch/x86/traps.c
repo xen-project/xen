@@ -625,14 +625,24 @@ void fatal_trap(const struct cpu_user_regs *regs, bool_t show_remote)
           (regs->eflags & X86_EFLAGS_IF) ? "" : ", IN INTERRUPT CONTEXT");
 }
 
-static void do_guest_trap(unsigned int trapnr,
-                          const struct cpu_user_regs *regs)
+static void pv_inject_event(
+    unsigned int trapnr, const struct cpu_user_regs *regs, unsigned int type)
 {
     struct vcpu *v = current;
     struct trap_bounce *tb;
     const struct trap_info *ti;
-    const bool use_error_code =
-        ((trapnr < 32) && (TRAP_HAVE_EC & (1u << trapnr)));
+    bool use_error_code;
+
+    if ( type == X86_EVENTTYPE_HW_EXCEPTION )
+    {
+        ASSERT(trapnr < 32);
+        use_error_code = TRAP_HAVE_EC & (1u << trapnr);
+    }
+    else
+    {
+        ASSERT(type == X86_EVENTTYPE_SW_INTERRUPT);
+        use_error_code = false;
+    }
 
     trace_pv_trap(trapnr, regs->eip, use_error_code, regs->error_code);
 
@@ -656,6 +666,12 @@ static void do_guest_trap(unsigned int trapnr,
         gprintk(XENLOG_WARNING,
                 "Unhandled %s fault/trap [#%d, ec=%04x]\n",
                 trapstr(trapnr), trapnr, regs->error_code);
+}
+
+static void do_guest_trap(
+    unsigned int trapnr, const struct cpu_user_regs *regs)
+{
+    pv_inject_event(trapnr, regs, X86_EVENTTYPE_HW_EXCEPTION);
 }
 
 static void instruction_done(
@@ -3685,7 +3701,7 @@ void do_general_protection(struct cpu_user_regs *regs)
         if ( permit_softint(TI_GET_DPL(ti), v, regs) )
         {
             regs->eip += 2;
-            do_guest_trap(vector, regs);
+            pv_inject_event(vector, regs, X86_EVENTTYPE_SW_INTERRUPT);
             return;
         }
     }
