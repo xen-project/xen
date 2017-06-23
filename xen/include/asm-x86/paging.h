@@ -93,9 +93,9 @@ struct shadow_paging_mode {
                                             unsigned long new,
                                             unsigned int bytes,
                                             struct sh_emulate_ctxt *sh_ctxt);
-    bool_t        (*write_guest_entry     )(struct vcpu *v, intpte_t *p,
+    bool          (*write_guest_entry     )(struct vcpu *v, intpte_t *p,
                                             intpte_t new, mfn_t gmfn);
-    bool_t        (*cmpxchg_guest_entry   )(struct vcpu *v, intpte_t *p,
+    bool          (*cmpxchg_guest_entry   )(struct vcpu *v, intpte_t *p,
                                             intpte_t *old, intpte_t new,
                                             mfn_t gmfn);
     mfn_t         (*make_monitor_table    )(struct vcpu *v);
@@ -115,7 +115,7 @@ struct shadow_paging_mode {
 struct paging_mode {
     int           (*page_fault            )(struct vcpu *v, unsigned long va,
                                             struct cpu_user_regs *regs);
-    bool_t        (*invlpg                )(struct vcpu *v, unsigned long va);
+    bool          (*invlpg                )(struct vcpu *v, unsigned long va);
     unsigned long (*gva_to_gfn            )(struct vcpu *v,
                                             struct p2m_domain *p2m,
                                             unsigned long va,
@@ -292,11 +292,13 @@ static inline void paging_update_paging_modes(struct vcpu *v)
 }
 
 
-/* Write a new value into the guest pagetable, and update the
- * paging-assistance state appropriately.  Returns 0 if we page-faulted,
- * 1 for success. */
-static inline bool_t paging_write_guest_entry(struct vcpu *v, intpte_t *p,
-                                              intpte_t new, mfn_t gmfn)
+/*
+ * Write a new value into the guest pagetable, and update the
+ * paging-assistance state appropriately.  Returns false if we page-faulted,
+ * true for success.
+ */
+static inline bool paging_write_guest_entry(
+    struct vcpu *v, intpte_t *p, intpte_t new, mfn_t gmfn)
 {
 #ifdef CONFIG_SHADOW_PAGING
     if ( unlikely(paging_mode_shadow(v->domain)) && paging_get_hostmode(v) )
@@ -307,13 +309,14 @@ static inline bool_t paging_write_guest_entry(struct vcpu *v, intpte_t *p,
 }
 
 
-/* Cmpxchg a new value into the guest pagetable, and update the
- * paging-assistance state appropriately.  Returns 0 if we page-faulted,
- * 1 if not.  N.B. caller should check the value of "old" to see if the
- * cmpxchg itself was successful. */
-static inline bool_t paging_cmpxchg_guest_entry(struct vcpu *v, intpte_t *p,
-                                                intpte_t *old, intpte_t new,
-                                                mfn_t gmfn)
+/*
+ * Cmpxchg a new value into the guest pagetable, and update the
+ * paging-assistance state appropriately.  Returns false if we page-faulted,
+ * true if not.  N.B. caller should check the value of "old" to see if the
+ * cmpxchg itself was successful.
+ */
+static inline bool paging_cmpxchg_guest_entry(
+    struct vcpu *v, intpte_t *p, intpte_t *old, intpte_t new, mfn_t gmfn)
 {
 #ifdef CONFIG_SHADOW_PAGING
     if ( unlikely(paging_mode_shadow(v->domain)) && paging_get_hostmode(v) )

@@ -40,7 +40,7 @@
 
 DEFINE_PER_CPU(uint32_t,trace_shadow_path_flags);
 
-static int sh_enable_log_dirty(struct domain *, bool_t log_global);
+static int sh_enable_log_dirty(struct domain *, bool log_global);
 static int sh_disable_log_dirty(struct domain *);
 static void sh_clean_dirty_bitmap(struct domain *);
 
@@ -3553,7 +3553,7 @@ shadow_write_p2m_entry(struct domain *d, unsigned long gfn,
 /* Shadow specific code which is called in paging_log_dirty_enable().
  * Return 0 if no problem found.
  */
-static int sh_enable_log_dirty(struct domain *d, bool_t log_global)
+static int sh_enable_log_dirty(struct domain *d, bool log_global)
 {
     int ret;
 

@@ -367,9 +367,9 @@ static void sh_audit_gw(struct vcpu *v, const walk_t *gw)
 
 /*
  * Write a new value into the guest pagetable, and update the shadows
- * appropriately.  Returns 0 if we page-faulted, 1 for success.
+ * appropriately.  Returns false if we page-faulted, true for success.
  */
-static bool_t
+static bool
 sh_write_guest_entry(struct vcpu *v, intpte_t *p, intpte_t new, mfn_t gmfn)
 {
 #if CONFIG_PAGING_LEVELS == GUEST_PAGING_LEVELS
@@ -383,17 +383,17 @@ sh_write_guest_entry(struct vcpu *v, intpte_t *p, intpte_t new, mfn_t gmfn)
 
     return !failed;
 #else
-    return 0;
+    return false;
 #endif
 }
 
 /*
  * Cmpxchg a new value into the guest pagetable, and update the shadows
- * appropriately. Returns 0 if we page-faulted, 1 if not.
+ * appropriately. Returns false if we page-faulted, true if not.
  * N.B. caller should check the value of "old" to see if the cmpxchg itself
  * was successful.
  */
-static bool_t
+static bool
 sh_cmpxchg_guest_entry(struct vcpu *v, intpte_t *p, intpte_t *old,
                        intpte_t new, mfn_t gmfn)
 {
@@ -410,7 +410,7 @@ sh_cmpxchg_guest_entry(struct vcpu *v, intpte_t *p, intpte_t *old,
 
     return !failed;
 #else
-    return 0;
+    return false;
 #endif
 }
 
@@ -530,7 +530,7 @@ _sh_propagate(struct vcpu *v,
     gfn_t target_gfn = guest_l1e_get_gfn(guest_entry);
     u32 pass_thru_flags;
     u32 gflags, sflags;
-    bool_t mmio_mfn;
+    bool mmio_mfn;
 
     /* We don't shadow PAE l3s */
     ASSERT(GUEST_PAGING_LEVELS > 3 || level != 3);
@@ -3616,11 +3616,11 @@ propagate:
 
 
 /*
- * Called when the guest requests an invlpg.  Returns 1 if the invlpg
- * instruction should be issued on the hardware, or 0 if it's safe not
+ * Called when the guest requests an invlpg.  Returns true if the invlpg
+ * instruction should be issued on the hardware, or false if it's safe not
  * to do so.
  */
-static bool_t sh_invlpg(struct vcpu *v, unsigned long va)
+static bool sh_invlpg(struct vcpu *v, unsigned long va)
 {
     mfn_t sl1mfn;
     shadow_l2e_t sl2e;
@@ -3645,7 +3645,7 @@ static bool_t sh_invlpg(struct vcpu *v, unsigned long va)
         if ( !(shadow_l4e_get_flags(
                    sh_linear_l4_table(v)[shadow_l4_linear_offset(va)])
                & _PAGE_PRESENT) )
-            return 0;
+            return false;
         /* This must still be a copy-from-user because we don't have the
          * paging lock, and the higher-level shadows might disappear
          * under our feet. */
@@ -3654,16 +3654,16 @@ static bool_t sh_invlpg(struct vcpu *v, unsigned long va)
                               sizeof (sl3e)) != 0 )
         {
             perfc_incr(shadow_invlpg_fault);
-            return 0;
+            return false;
         }
         if ( !(shadow_l3e_get_flags(sl3e) & _PAGE_PRESENT) )
-            return 0;
+            return false;
     }
 #else /* SHADOW_PAGING_LEVELS == 3 */
     if ( !(l3e_get_flags(v->arch.paging.shadow.l3table[shadow_l3_linear_offset(va)])
            & _PAGE_PRESENT) )
         // no need to flush anything if there's no SL2...
-        return 0;
+        return false;
 #endif
 
     /* This must still be a copy-from-user because we don't have the shadow
@@ -3673,14 +3673,14 @@ static bool_t sh_invlpg(struct vcpu *v, unsigned long va)
                           sizeof (sl2e)) != 0 )
     {
         perfc_incr(shadow_invlpg_fault);
-        return 0;
+        return false;
     }
 
     // If there's nothing shadowed for this particular sl2e, then
     // there is no need to do an invlpg, either...
     //
     if ( !(shadow_l2e_get_flags(sl2e) & _PAGE_PRESENT) )
-        return 0;
+        return false;
 
     // Check to see if the SL2 is a splintered superpage...
     // If so, then we'll need to flush the entire TLB (because that's
@@ -3691,7 +3691,7 @@ static bool_t sh_invlpg(struct vcpu *v, unsigned long va)
          == SH_type_fl1_shadow )
     {
         flush_tlb_local();
-        return 0;
+        return false;
     }
 
 #if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC)
@@ -3718,13 +3718,13 @@ static bool_t sh_invlpg(struct vcpu *v, unsigned long va)
             {
                 perfc_incr(shadow_invlpg_fault);
                 paging_unlock(d);
-                return 0;
+                return false;
             }
 
             if ( !(shadow_l2e_get_flags(sl2e) & _PAGE_PRESENT) )
             {
                 paging_unlock(d);
-                return 0;
+                return false;
             }
 
             sl1mfn = shadow_l2e_get_mfn(sl2e);
@@ -3742,12 +3742,12 @@ static bool_t sh_invlpg(struct vcpu *v, unsigned long va)
             }
             paging_unlock(d);
             /* Need the invlpg, to pick up the disappeareance of the sl1e */
-            return 1;
+            return true;
         }
     }
 #endif
 
-    return 1;
+    return true;
 }
 
 

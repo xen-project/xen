@@ -622,15 +622,17 @@ prev_pinned_shadow(struct page_info *page,
           pos ? (tmp = prev_pinned_shadow(pos, (dom)), 1) : 0;  \
           pos = tmp )
 
-/* Pin a shadow page: take an extra refcount, set the pin bit,
+/*
+ * Pin a shadow page: take an extra refcount, set the pin bit,
  * and put the shadow at the head of the list of pinned shadows.
- * Returns 0 for failure, 1 for success. */
-static inline int sh_pin(struct domain *d, mfn_t smfn)
+ * Returns false for failure, true for success.
+ */
+static inline bool sh_pin(struct domain *d, mfn_t smfn)
 {
     struct page_info *sp[4];
     struct page_list_head *pin_list;
     unsigned int i, pages;
-    bool_t already_pinned;
+    bool already_pinned;
 
     ASSERT(mfn_valid(smfn));
     sp[0] = mfn_to_page(smfn);
@@ -641,7 +643,7 @@ static inline int sh_pin(struct domain *d, mfn_t smfn)
 
     pin_list = &d->arch.paging.shadow.pinned_shadows;
     if ( already_pinned && sp[0] == page_list_first(pin_list) )
-        return 1;
+        return true;
 
     /* Treat the up-to-four pages of the shadow as a unit in the list ops */
     for ( i = 1; i < pages; i++ )
@@ -661,7 +663,7 @@ static inline int sh_pin(struct domain *d, mfn_t smfn)
     {
         /* Not pinned: pin it! */
         if ( !sh_get_ref(d, smfn, 0) )
-            return 0;
+            return false;
         sp[0]->u.sh.pinned = 1;
     }
 
@@ -669,7 +671,7 @@ static inline int sh_pin(struct domain *d, mfn_t smfn)
     for ( i = pages; i > 0; i-- )
         page_list_add(sp[i - 1], pin_list);
 
-    return 1;
+    return true;
 }
 
 /* Unpin a shadow page: unset the pin bit, take the shadow off the list

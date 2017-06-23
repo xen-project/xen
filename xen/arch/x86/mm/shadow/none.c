@@ -1,7 +1,7 @@
 #include <xen/mm.h>
 #include <asm/shadow.h>
 
-static int _enable_log_dirty(struct domain *d, bool_t log_global)
+static int _enable_log_dirty(struct domain *d, bool log_global)
 {
     ASSERT(is_pv_domain(d));
     return -EOPNOTSUPP;
@@ -37,10 +37,10 @@ static int _page_fault(struct vcpu *v, unsigned long va,
     return 0;
 }
 
-static bool_t _invlpg(struct vcpu *v, unsigned long va)
+static bool _invlpg(struct vcpu *v, unsigned long va)
 {
     ASSERT_UNREACHABLE();
-    return 1;
+    return true;
 }
 
 static unsigned long _gva_to_gfn(struct vcpu *v, struct p2m_domain *p2m,

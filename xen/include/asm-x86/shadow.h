@@ -102,7 +102,7 @@ int shadow_set_allocation(struct domain *d, unsigned int pages,
     ({ ASSERT_UNREACHABLE(); -EOPNOTSUPP; })
 
 static inline void sh_remove_shadows(struct domain *d, mfn_t gmfn,
-                                     bool_t fast, bool_t all) {}
+                                     int fast, int all) {}
 
 static inline void shadow_blow_tables_per_domain(struct domain *d) {}
 
