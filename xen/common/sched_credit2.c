@@ -388,7 +388,6 @@ struct csched2_private {
     
     struct list_head sdom; /* Used mostly for dump keyhandler. */
 
-    int runq_map[NR_CPUS];
     cpumask_t active_queues; /* Queues which may have active cpus */
     struct csched2_runqueue_data *rqd;
 
@@ -396,6 +395,14 @@ struct csched2_private {
     unsigned int load_window_shift;
     unsigned ratelimit_us; /* each cpupool can have its own ratelimit */
 };
+
+/*
+ * Physical CPU
+ *
+ * The only per-pCPU information we need to maintain is of which runqueue
+ * each CPU is part of.
+ */
+static DEFINE_PER_CPU(int, runq_map);
 
 /*
  * Virtual CPU
@@ -453,16 +460,16 @@ static inline struct csched2_dom *csched2_dom(const struct domain *d)
 }
 
 /* CPU to runq_id macro */
-static inline int c2r(const struct scheduler *ops, unsigned int cpu)
+static inline int c2r(unsigned int cpu)
 {
-    return csched2_priv(ops)->runq_map[(cpu)];
+    return per_cpu(runq_map, cpu);
 }
 
 /* CPU to runqueue struct macro */
 static inline struct csched2_runqueue_data *c2rqd(const struct scheduler *ops,
                                                   unsigned int cpu)
 {
-    return &csched2_priv(ops)->rqd[c2r(ops, cpu)];
+    return &csched2_priv(ops)->rqd[c2r(cpu)];
 }
 
 /*
@@ -1089,7 +1096,7 @@ runq_insert(const struct scheduler *ops, struct csched2_vcpu *svc)
     ASSERT(spin_is_locked(per_cpu(schedule_data, cpu).schedule_lock));
 
     ASSERT(!vcpu_on_runq(svc));
-    ASSERT(c2r(ops, cpu) == c2r(ops, svc->vcpu->processor));
+    ASSERT(c2r(cpu) == c2r(svc->vcpu->processor));
 
     ASSERT(&svc->rqd->runq == runq);
     ASSERT(!is_idle_vcpu(svc->vcpu));
@@ -1740,7 +1747,7 @@ csched2_cpu_pick(const struct scheduler *ops, struct vcpu *vc)
     if ( min_rqi == -1 )
     {
         new_cpu = get_fallback_cpu(svc);
-        min_rqi = c2r(ops, new_cpu);
+        min_rqi = c2r(new_cpu);
         min_avgload = prv->rqd[min_rqi].b_avgload;
         goto out_up;
     }
@@ -2629,7 +2636,7 @@ csched2_schedule(
             unsigned tasklet:8, idle:8, smt_idle:8, tickled:8;
         } d;
         d.cpu = cpu;
-        d.rq_id = c2r(ops, cpu);
+        d.rq_id = c2r(cpu);
         d.tasklet = tasklet_work_scheduled;
         d.idle = is_idle_vcpu(current);
         d.smt_idle = cpumask_test_cpu(cpu, &rqd->smt_idle);
@@ -2790,7 +2797,7 @@ dump_pcpu(const struct scheduler *ops, int cpu)
 #define cpustr keyhandler_scratch
 
     cpumask_scnprintf(cpustr, sizeof(cpustr), per_cpu(cpu_sibling_mask, cpu));
-    printk("CPU[%02d] runq=%d, sibling=%s, ", cpu, c2r(ops, cpu), cpustr);
+    printk("CPU[%02d] runq=%d, sibling=%s, ", cpu, c2r(cpu), cpustr);
     cpumask_scnprintf(cpustr, sizeof(cpustr), per_cpu(cpu_core_mask, cpu));
     printk("core=%s\n", cpustr);
 
@@ -2937,7 +2944,7 @@ init_pdata(struct csched2_private *prv, unsigned int cpu)
     }
     
     /* Set the runqueue map */
-    prv->runq_map[cpu] = rqi;
+    per_cpu(runq_map, cpu) = rqi;
     
     __cpumask_set_cpu(cpu, &rqd->idle);
     __cpumask_set_cpu(cpu, &rqd->active);
@@ -3041,7 +3048,7 @@ csched2_deinit_pdata(const struct scheduler *ops, void *pcpu, int cpu)
     ASSERT(!pcpu && cpumask_test_cpu(cpu, &prv->initialized));
     
     /* Find the old runqueue and remove this cpu from it */
-    rqi = prv->runq_map[cpu];
+    rqi = per_cpu(runq_map, cpu);
 
     rqd = prv->rqd + rqi;
 
@@ -3061,6 +3068,8 @@ csched2_deinit_pdata(const struct scheduler *ops, void *pcpu, int cpu)
     }
     else if ( rqd->pick_bias == cpu )
         rqd->pick_bias = cpumask_first(&rqd->active);
+
+    per_cpu(runq_map, cpu) = -1;
 
     spin_unlock(&rqd->lock);
 
@@ -3128,10 +3137,8 @@ csched2_init(struct scheduler *ops)
         return -ENOMEM;
     }
     for ( i = 0; i < nr_cpu_ids; i++ )
-    {
-        prv->runq_map[i] = -1;
         prv->rqd[i].id = -1;
-    }
+
     /* initialize ratelimit */
     prv->ratelimit_us = sched_ratelimit_us;
 
