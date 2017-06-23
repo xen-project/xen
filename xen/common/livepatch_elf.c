@@ -86,6 +86,19 @@ static int elf_resolve_sections(struct livepatch_elf *elf, const void *data)
                     delta < sizeof(Elf_Ehdr) ? "at ELF header" : "is past end");
             return -EINVAL;
         }
+        else if ( sec[i].sec->sh_addralign & (sec[i].sec->sh_addralign - 1) )
+        {
+            dprintk(XENLOG_ERR, LIVEPATCH "%s: Section [%u] alignment (%#"PRIxElfAddr") is not supported\n",
+                    elf->name, i, sec[i].sec->sh_addralign);
+            return -EOPNOTSUPP;
+        }
+        else if ( sec[i].sec->sh_addralign &&
+                  sec[i].sec->sh_addr % sec[i].sec->sh_addralign )
+        {
+            dprintk(XENLOG_ERR, LIVEPATCH "%s: Section [%u] addr (%#"PRIxElfAddr") is not aligned properly (%#"PRIxElfAddr")\n",
+                    elf->name, i, sec[i].sec->sh_addr, sec[i].sec->sh_addralign);
+            return -EINVAL;
+        }
         else if ( (sec[i].sec->sh_flags & (SHF_WRITE | SHF_ALLOC)) &&
                   sec[i].sec->sh_type == SHT_NOBITS &&
                   sec[i].sec->sh_size > LIVEPATCH_MAX_SIZE )
