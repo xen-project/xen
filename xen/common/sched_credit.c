@@ -169,10 +169,12 @@ integer_param("sched_credit_tslice_ms", sched_credit_tslice_ms);
 struct csched_pcpu {
     struct list_head runq;
     uint32_t runq_sort_last;
-    struct timer ticker;
-    unsigned int tick;
+
     unsigned int idle_bias;
     unsigned int nr_runnable;
+
+    unsigned int tick;
+    struct timer ticker;
 };
 
 /*
@@ -181,13 +183,18 @@ struct csched_pcpu {
 struct csched_vcpu {
     struct list_head runq_elem;
     struct list_head active_vcpu_elem;
+
+    /* Up-pointers */
     struct csched_dom *sdom;
     struct vcpu *vcpu;
-    atomic_t credit;
-    unsigned int residual;
+
     s_time_t start_time;   /* When we were scheduled (used for credit) */
     unsigned flags;
-    int16_t pri;
+    int pri;
+
+    atomic_t credit;
+    unsigned int residual;
+
 #ifdef CSCHED_STATS
     struct {
         int credit_last;
@@ -219,21 +226,25 @@ struct csched_dom {
 struct csched_private {
     /* lock for the whole pluggable scheduler, nests inside cpupool_lock */
     spinlock_t lock;
-    struct list_head active_sdom;
-    uint32_t ncpus;
-    struct timer  master_ticker;
-    unsigned int master;
+
     cpumask_var_t idlers;
     cpumask_var_t cpus;
+    uint32_t *balance_bias;
+    uint32_t runq_sort;
+    unsigned int ratelimit_us;
+
+    /* Period of master and tick in milliseconds */
+    unsigned int tslice_ms, tick_period_us, ticks_per_tslice;
+    uint32_t ncpus;
+
+    struct list_head active_sdom;
     uint32_t weight;
     uint32_t credit;
     int credit_balance;
-    uint32_t runq_sort;
-    uint32_t *balance_bias;
-    unsigned ratelimit_us;
-    /* Period of master and tick in milliseconds */
-    unsigned tslice_ms, tick_period_us, ticks_per_tslice;
-    unsigned credits_per_tslice;
+    unsigned int credits_per_tslice;
+
+    unsigned int master;
+    struct timer master_ticker;
 };
 
 static void csched_tick(void *_cpu);
