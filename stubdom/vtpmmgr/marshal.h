@@ -47,16 +47,19 @@ typedef enum UnpackPtr {
 	UNPACK_ALLOC
 } UnpackPtr;
 
+static
 inline BYTE* pack_BYTE(BYTE* ptr, BYTE t) {
 	ptr[0] = t;
 	return ++ptr;
 }
 
+static
 inline BYTE* unpack_BYTE(BYTE* ptr, BYTE* t) {
 	t[0] = ptr[0];
 	return ++ptr;
 }
 
+static
 inline int unpack3_BYTE(BYTE* ptr, UINT32* pos, UINT32 max, BYTE *t)
 {
 	if (*pos + 1 > max)
@@ -72,18 +75,21 @@ inline int unpack3_BYTE(BYTE* ptr, UINT32* pos, UINT32 max, BYTE *t)
 #define unpack3_BOOL(p, x, m, t) unpack3_BYTE(p, x, m, t)
 #define sizeof_BOOL(t) 1
 
+static
 inline BYTE* pack_UINT16(void* ptr, UINT16 t) {
 	UINT16* p = ptr;
 	*p = cpu_to_be16(t);
 	return ptr + sizeof(UINT16);
 }
 
+static
 inline BYTE* unpack_UINT16(void* ptr, UINT16* t) {
 	UINT16* p = ptr;
 	*t = be16_to_cpu(*p);
 	return ptr + sizeof(UINT16);
 }
 
+static
 inline int unpack3_UINT16(BYTE* ptr, UINT32* pos, UINT32 max, UINT16 *t)
 {
 	if (*pos + 2 > max)
@@ -93,18 +99,21 @@ inline int unpack3_UINT16(BYTE* ptr, UINT32* pos, UINT32 max, UINT16 *t)
 	return 0;
 }
 
+static
 inline BYTE* pack_UINT32(void* ptr, UINT32 t) {
 	UINT32* p = ptr;
 	*p = cpu_to_be32(t);
 	return ptr + sizeof(UINT32);
 }
 
+static
 inline BYTE* unpack_UINT32(void* ptr, UINT32* t) {
 	UINT32* p = ptr;
 	*t = be32_to_cpu(*p);
 	return ptr + sizeof(UINT32);
 }
 
+static
 inline int unpack3_UINT32(BYTE* ptr, UINT32* pos, UINT32 max, UINT32 *t)
 {
 	if (*pos + 4 > max)
@@ -236,16 +245,19 @@ inline int unpack3_UINT32(BYTE* ptr, UINT32* pos, UINT32 max, UINT32 *t)
 #define sizeof_TCS_KEY_HANDLE(t) sizeof_UINT32(t)
 
 
+static
 inline BYTE* pack_BUFFER(BYTE* ptr, const BYTE* buf, UINT32 size) {
 	memcpy(ptr, buf, size);
 	return ptr + size;
 }
 
+static
 inline BYTE* unpack_BUFFER(BYTE* ptr, BYTE* buf, UINT32 size) {
 	memcpy(buf, ptr, size);
 	return ptr + size;
 }
 
+static
 inline int unpack3_BUFFER(BYTE* ptr, UINT32* pos, UINT32 max, BYTE* buf, UINT32 size) {
 	if (*pos + size > max)
 		return TPM_SIZE;
@@ -256,11 +268,13 @@ inline int unpack3_BUFFER(BYTE* ptr, UINT32* pos, UINT32 max, BYTE* buf, UINT32 
 
 #define sizeof_BUFFER(b, s) s
 
+static
 inline BYTE* unpack_ALIAS(BYTE* ptr, BYTE** buf, UINT32 size) {
 	*buf = ptr;
 	return ptr + size;
 }
 
+static
 inline BYTE* unpack_ALLOC(BYTE* ptr, BYTE** buf, UINT32 size) {
 	if(size) {
 		*buf = malloc(size);
@@ -271,6 +285,7 @@ inline BYTE* unpack_ALLOC(BYTE* ptr, BYTE** buf, UINT32 size) {
 	return ptr + size;
 }
 
+static
 inline BYTE* unpack_PTR(BYTE* ptr, BYTE** buf, UINT32 size, UnpackPtr alloc) {
 	if(alloc == UNPACK_ALLOC) {
 		return unpack_ALLOC(ptr, buf, size);
@@ -279,6 +294,7 @@ inline BYTE* unpack_PTR(BYTE* ptr, BYTE** buf, UINT32 size, UnpackPtr alloc) {
 	}
 }
 
+static
 inline int unpack3_PTR(BYTE* ptr, UINT32* pos, UINT32 max, BYTE** buf, UINT32 size, UnpackPtr alloc) {
 	if (size > max || *pos + size > max)
 		return TPM_SIZE;
@@ -292,14 +308,17 @@ inline int unpack3_PTR(BYTE* ptr, UINT32* pos, UINT32 max, BYTE** buf, UINT32 si
 }
 #define unpack3_VPTR(ptr, pos, max, buf, size, alloc) unpack3_PTR(ptr, pos, max, (void*)(buf), size, alloc)
 
+static
 inline BYTE* pack_TPM_AUTHDATA(BYTE* ptr, const TPM_AUTHDATA* d) {
 	return pack_BUFFER(ptr, *d, TPM_DIGEST_SIZE);
 }
 
+static
 inline BYTE* unpack_TPM_AUTHDATA(BYTE* ptr, TPM_AUTHDATA* d) {
 	return unpack_BUFFER(ptr, *d, TPM_DIGEST_SIZE);
 }
 
+static
 inline int unpack3_TPM_AUTHDATA(BYTE* ptr, UINT32* pos, UINT32 len, TPM_AUTHDATA* d) {
 	return unpack3_BUFFER(ptr, pos, len, *d, TPM_DIGEST_SIZE);
 }
@@ -325,6 +344,7 @@ inline int unpack3_TPM_AUTHDATA(BYTE* ptr, UINT32* pos, UINT32 len, TPM_AUTHDATA
 #define sizeof_TPM_TAG(t) sizeof_UINT16(t)
 #define sizeof_TPM_STRUCTURE_TAG(t) sizeof_UINT16(t)
 
+static
 inline BYTE* pack_TPM_VERSION(BYTE* ptr, const TPM_VERSION* t) {
 	ptr[0] = t->major;
 	ptr[1] = t->minor;
@@ -333,6 +353,7 @@ inline BYTE* pack_TPM_VERSION(BYTE* ptr, const TPM_VERSION* t) {
 	return ptr + 4;
 }
 
+static
 inline BYTE* unpack_TPM_VERSION(BYTE* ptr, TPM_VERSION* t) {
 	t->major = ptr[0];
 	t->minor = ptr[1];
@@ -341,6 +362,7 @@ inline BYTE* unpack_TPM_VERSION(BYTE* ptr, TPM_VERSION* t) {
 	return ptr + 4;
 }
 
+static
 inline int unpack3_TPM_VERSION(BYTE* ptr, UINT32 *pos, UINT32 max, TPM_VERSION* t) {
 	if (*pos + 4 > max)
 		return TPM_SIZE;
@@ -355,6 +377,7 @@ inline int unpack3_TPM_VERSION(BYTE* ptr, UINT32 *pos, UINT32 max, TPM_VERSION* 
 
 #define sizeof_TPM_VERSION(x) 4
 
+static
 inline BYTE* pack_TPM_CAP_VERSION_INFO(BYTE* ptr, const TPM_CAP_VERSION_INFO* v) {
 	ptr = pack_TPM_STRUCTURE_TAG(ptr, v->tag);
 	ptr = pack_TPM_VERSION(ptr, &v->version);
@@ -366,6 +389,7 @@ inline BYTE* pack_TPM_CAP_VERSION_INFO(BYTE* ptr, const TPM_CAP_VERSION_INFO* v)
 	return ptr;
 }
 
+static
 inline BYTE* unpack_TPM_CAP_VERSION_INFO(BYTE* ptr, TPM_CAP_VERSION_INFO* v, UnpackPtr alloc) {
 	ptr = unpack_TPM_STRUCTURE_TAG(ptr, &v->tag);
 	ptr = unpack_TPM_VERSION(ptr, &v->version);
@@ -377,14 +401,17 @@ inline BYTE* unpack_TPM_CAP_VERSION_INFO(BYTE* ptr, TPM_CAP_VERSION_INFO* v, Unp
 	return ptr;
 }
 
+static
 inline BYTE* pack_TPM_DIGEST(BYTE* ptr, const TPM_DIGEST* d) {
 	return pack_BUFFER(ptr, d->digest, TPM_DIGEST_SIZE);
 }
 
+static
 inline BYTE* unpack_TPM_DIGEST(BYTE* ptr, TPM_DIGEST* d) {
 	return unpack_BUFFER(ptr, d->digest, TPM_DIGEST_SIZE);
 }
 
+static
 inline int unpack3_TPM_DIGEST(BYTE* ptr, UINT32* pos, UINT32 max, TPM_DIGEST* d) {
 	return unpack3_BUFFER(ptr, pos, max, d->digest, TPM_DIGEST_SIZE);
 }
@@ -409,20 +436,24 @@ inline int unpack3_TPM_DIGEST(BYTE* ptr, UINT32* pos, UINT32 max, TPM_DIGEST* d)
 #define pack_TPM_CHOSENID_HASH(ptr, d) pack_TPM_DIGEST(ptr, d)
 #define unpack_TPM_CHOSENID_HASH(ptr, d) unpack_TPM_DIGEST(ptr, d)
 
+static
 inline BYTE* pack_TPM_NONCE(BYTE* ptr, const TPM_NONCE* n) {
 	return pack_BUFFER(ptr, n->nonce, TPM_DIGEST_SIZE);
 }
 
+static
 inline BYTE* unpack_TPM_NONCE(BYTE* ptr, TPM_NONCE* n) {
 	return unpack_BUFFER(ptr, n->nonce, TPM_DIGEST_SIZE);
 }
 
 #define sizeof_TPM_NONCE(x) TPM_DIGEST_SIZE
 
+static
 inline int unpack3_TPM_NONCE(BYTE* ptr, UINT32* pos, UINT32 max, TPM_NONCE* n) {
 	return unpack3_BUFFER(ptr, pos, max, n->nonce, TPM_DIGEST_SIZE);
 }
 
+static
 inline BYTE* pack_TPM_SYMMETRIC_KEY_PARMS(BYTE* ptr, const TPM_SYMMETRIC_KEY_PARMS* k) {
 	ptr = pack_UINT32(ptr, k->keyLength);
 	ptr = pack_UINT32(ptr, k->blockSize);
@@ -430,6 +461,7 @@ inline BYTE* pack_TPM_SYMMETRIC_KEY_PARMS(BYTE* ptr, const TPM_SYMMETRIC_KEY_PAR
 	return pack_BUFFER(ptr, k->IV, k->ivSize);
 }
 
+static
 inline BYTE* pack_TPM_SYMMETRIC_KEY(BYTE* ptr, const TPM_SYMMETRIC_KEY* k) {
 	ptr = pack_UINT32(ptr, k->algId);
 	ptr = pack_UINT16(ptr, k->encScheme);
@@ -437,6 +469,7 @@ inline BYTE* pack_TPM_SYMMETRIC_KEY(BYTE* ptr, const TPM_SYMMETRIC_KEY* k) {
 	return pack_BUFFER(ptr, k->data, k->size);
 }
 
+static
 inline int unpack3_TPM_SYMMETRIC_KEY_PARMS(BYTE* ptr, UINT32* pos, UINT32 max, TPM_SYMMETRIC_KEY_PARMS* k, UnpackPtr alloc) {
 	return unpack3_UINT32(ptr, pos, max, &k->keyLength) ||
 		unpack3_UINT32(ptr, pos, max, &k->blockSize) ||
@@ -444,10 +477,12 @@ inline int unpack3_TPM_SYMMETRIC_KEY_PARMS(BYTE* ptr, UINT32* pos, UINT32 max, T
 		unpack3_PTR(ptr, pos, max, &k->IV, k->ivSize, alloc);
 }
 
+static
 inline int sizeof_TPM_SYMMETRIC_KEY_PARMS(const TPM_SYMMETRIC_KEY_PARMS* k) {
 	return 12 + k->ivSize;
 }
 
+static
 inline int unpack3_TPM_SYMMETRIC_KEY(BYTE* ptr, UINT32* pos, UINT32 max, TPM_SYMMETRIC_KEY* k, UnpackPtr alloc) {
 	return unpack3_UINT32(ptr, pos, max, &k->algId) ||
 		unpack3_UINT16(ptr, pos, max, &k->encScheme) ||
@@ -455,6 +490,7 @@ inline int unpack3_TPM_SYMMETRIC_KEY(BYTE* ptr, UINT32* pos, UINT32 max, TPM_SYM
 		unpack3_PTR(ptr, pos, max, &k->data, k->size, alloc);
 }
 
+static
 inline BYTE* pack_TPM_RSA_KEY_PARMS(BYTE* ptr, const TPM_RSA_KEY_PARMS* k) {
 	ptr = pack_UINT32(ptr, k->keyLength);
 	ptr = pack_UINT32(ptr, k->numPrimes);
@@ -462,6 +498,7 @@ inline BYTE* pack_TPM_RSA_KEY_PARMS(BYTE* ptr, const TPM_RSA_KEY_PARMS* k) {
 	return pack_BUFFER(ptr, k->exponent, k->exponentSize);
 }
 
+static
 inline int unpack3_TPM_RSA_KEY_PARMS(BYTE* ptr, UINT32* pos, UINT32 max, TPM_RSA_KEY_PARMS* k, UnpackPtr alloc) {
 	return unpack3_UINT32(ptr, pos, max, &k->keyLength) ||
 		unpack3_UINT32(ptr, pos, max, &k->numPrimes) ||
@@ -469,11 +506,13 @@ inline int unpack3_TPM_RSA_KEY_PARMS(BYTE* ptr, UINT32* pos, UINT32 max, TPM_RSA
 		unpack3_PTR(ptr, pos, max, &k->exponent, k->exponentSize, alloc);
 }
 
+static
 inline int sizeof_TPM_RSA_KEY_PARMS(const TPM_RSA_KEY_PARMS* k) {
 	return 12 + k->exponentSize;
 }
 
 
+static
 inline BYTE* pack_TPM_KEY_PARMS(BYTE* ptr, const TPM_KEY_PARMS* k) {
 	ptr = pack_TPM_ALGORITHM_ID(ptr, k->algorithmID);
 	ptr = pack_TPM_ENC_SCHEME(ptr, k->encScheme);
@@ -493,6 +532,7 @@ inline BYTE* pack_TPM_KEY_PARMS(BYTE* ptr, const TPM_KEY_PARMS* k) {
 	return ptr;
 }
 
+static
 inline int unpack3_TPM_KEY_PARMS(BYTE* ptr, UINT32* pos, UINT32 len, TPM_KEY_PARMS* k, UnpackPtr alloc) {
 	int rc = unpack3_TPM_ALGORITHM_ID(ptr, pos, len, &k->algorithmID) ||
 		unpack3_TPM_ENC_SCHEME(ptr, pos, len, &k->encScheme) ||
@@ -511,6 +551,7 @@ inline int unpack3_TPM_KEY_PARMS(BYTE* ptr, UINT32* pos, UINT32 len, TPM_KEY_PAR
 	return TPM_FAIL;
 }
 
+static
 inline int sizeof_TPM_KEY_PARMS(const TPM_KEY_PARMS* k) {
 	int rc = 0;
 	rc += sizeof_TPM_ALGORITHM_ID(&k->algorithmID);
@@ -532,52 +573,62 @@ inline int sizeof_TPM_KEY_PARMS(const TPM_KEY_PARMS* k) {
 	return rc;
 }
 
+static
 inline BYTE* pack_TPM_STORE_PUBKEY(BYTE* ptr, const TPM_STORE_PUBKEY* k) {
 	ptr = pack_UINT32(ptr, k->keyLength);
 	ptr = pack_BUFFER(ptr, k->key, k->keyLength);
 	return ptr;
 }
 
+static
 inline int unpack3_TPM_STORE_PUBKEY(BYTE* ptr, UINT32* pos, UINT32 max, TPM_STORE_PUBKEY* k, UnpackPtr alloc) {
 	return unpack3_UINT32(ptr, pos, max, &k->keyLength) ||
 		unpack3_PTR(ptr, pos, max, &k->key, k->keyLength, alloc);
 }
 
+static
 inline int sizeof_TPM_STORE_PUBKEY(const TPM_STORE_PUBKEY* k) {
 	return 4 + k->keyLength;
 }
 
+static
 inline BYTE* pack_TPM_PUBKEY(BYTE* ptr, const TPM_PUBKEY* k) {
 	ptr = pack_TPM_KEY_PARMS(ptr, &k->algorithmParms);
 	return pack_TPM_STORE_PUBKEY(ptr, &k->pubKey);
 }
 
+static
 inline int unpack3_TPM_PUBKEY(BYTE* ptr, UINT32* pos, UINT32 len, TPM_PUBKEY* k, UnpackPtr alloc) {
 	return unpack3_TPM_KEY_PARMS(ptr, pos, len, &k->algorithmParms, alloc) ||
 		unpack3_TPM_STORE_PUBKEY(ptr, pos, len, &k->pubKey, alloc);
 }
 
+static
 inline BYTE* pack_TPM_PCR_SELECTION(BYTE* ptr, const TPM_PCR_SELECTION* p) {
 	ptr = pack_UINT16(ptr, p->sizeOfSelect);
 	ptr = pack_BUFFER(ptr, p->pcrSelect, p->sizeOfSelect);
 	return ptr;
 }
 
+static
 inline BYTE* unpack_TPM_PCR_SELECTION(BYTE* ptr, TPM_PCR_SELECTION* p, UnpackPtr alloc) {
 	ptr = unpack_UINT16(ptr, &p->sizeOfSelect);
 	ptr = unpack_PTR(ptr, &p->pcrSelect, p->sizeOfSelect, alloc);
 	return ptr;
 }
 
+static
 inline int unpack3_TPM_PCR_SELECTION(BYTE* ptr, UINT32* pos, UINT32 max, TPM_PCR_SELECTION* p, UnpackPtr alloc) {
 	return unpack3_UINT16(ptr, pos, max, &p->sizeOfSelect) ||
 		unpack3_PTR(ptr, pos, max, &p->pcrSelect, p->sizeOfSelect, alloc);
 }
 
+static
 inline int sizeof_TPM_PCR_SELECTION(const TPM_PCR_SELECTION* p) {
 	return 2 + p->sizeOfSelect;
 }
 
+static
 inline BYTE* pack_TPM_PCR_INFO(BYTE* ptr, const TPM_PCR_INFO* p) {
 	ptr = pack_TPM_PCR_SELECTION(ptr, &p->pcrSelection);
 	ptr = pack_TPM_COMPOSITE_HASH(ptr, &p->digestAtRelease);
@@ -585,12 +636,14 @@ inline BYTE* pack_TPM_PCR_INFO(BYTE* ptr, const TPM_PCR_INFO* p) {
 	return ptr;
 }
 
+static
 inline int unpack3_TPM_PCR_INFO(BYTE* ptr, UINT32* pos, UINT32 max, TPM_PCR_INFO* p, UnpackPtr alloc) {
 	return unpack3_TPM_PCR_SELECTION(ptr, pos, max, &p->pcrSelection, alloc) ||
 		unpack3_TPM_COMPOSITE_HASH(ptr, pos, max, &p->digestAtRelease) ||
 		unpack3_TPM_COMPOSITE_HASH(ptr, pos, max, &p->digestAtCreation);
 }
 
+static
 inline int sizeof_TPM_PCR_INFO(const TPM_PCR_INFO* p) {
 	int rc = 0;
 	rc += sizeof_TPM_PCR_SELECTION(&p->pcrSelection);
@@ -599,6 +652,7 @@ inline int sizeof_TPM_PCR_INFO(const TPM_PCR_INFO* p) {
 	return rc;
 }
 
+static
 inline BYTE* pack_TPM_PCR_INFO_LONG(BYTE* ptr, const TPM_PCR_INFO_LONG* p) {
 	ptr = pack_TPM_STRUCTURE_TAG(ptr, p->tag);
 	ptr = pack_TPM_LOCALITY_SELECTION(ptr, p->localityAtCreation);
@@ -610,6 +664,7 @@ inline BYTE* pack_TPM_PCR_INFO_LONG(BYTE* ptr, const TPM_PCR_INFO_LONG* p) {
 	return ptr;
 }
 
+static
 inline int sizeof_TPM_PCR_INFO_LONG(const TPM_PCR_INFO_LONG* p) {
 	int rc = 0;
 	rc += sizeof_TPM_STRUCTURE_TAG(p->tag);
@@ -622,6 +677,7 @@ inline int sizeof_TPM_PCR_INFO_LONG(const TPM_PCR_INFO_LONG* p) {
 	return rc;
 }
 
+static
 inline int unpack3_TPM_PCR_INFO_LONG(BYTE* ptr, UINT32* pos, UINT32 max, TPM_PCR_INFO_LONG* p, UnpackPtr alloc) {
 	return unpack3_TPM_STRUCTURE_TAG(ptr, pos, max, &p->tag) ||
 		unpack3_TPM_LOCALITY_SELECTION(ptr, pos, max,
@@ -637,6 +693,7 @@ inline int unpack3_TPM_PCR_INFO_LONG(BYTE* ptr, UINT32* pos, UINT32 max, TPM_PCR
 		unpack3_TPM_COMPOSITE_HASH(ptr, pos, max, &p->digestAtRelease);
 }
 
+static
 inline BYTE* pack_TPM_PCR_COMPOSITE(BYTE* ptr, const TPM_PCR_COMPOSITE* p) {
 	ptr = pack_TPM_PCR_SELECTION(ptr, &p->select);
 	ptr = pack_UINT32(ptr, p->valueSize);
@@ -644,12 +701,14 @@ inline BYTE* pack_TPM_PCR_COMPOSITE(BYTE* ptr, const TPM_PCR_COMPOSITE* p) {
 	return ptr;
 }
 
+static
 inline int unpack3_TPM_PCR_COMPOSITE(BYTE* ptr, UINT32* pos, UINT32 max, TPM_PCR_COMPOSITE* p, UnpackPtr alloc) {
 	return unpack3_TPM_PCR_SELECTION(ptr, pos, max, &p->select, alloc) ||
 		unpack3_UINT32(ptr, pos, max, &p->valueSize) ||
 		unpack3_PTR(ptr, pos, max, (BYTE**)&p->pcrValue, p->valueSize, alloc);
 }
 
+static
 inline BYTE* pack_TPM_KEY(BYTE* ptr, const TPM_KEY* k) {
 	ptr = pack_TPM_VERSION(ptr, &k->ver);
 	ptr = pack_TPM_KEY_USAGE(ptr, k->keyUsage);
@@ -665,6 +724,7 @@ inline BYTE* pack_TPM_KEY(BYTE* ptr, const TPM_KEY* k) {
 	return pack_BUFFER(ptr, k->encData, k->encDataSize);
 }
 
+static
 inline int unpack3_TPM_KEY(BYTE* ptr, UINT32* pos, UINT32 max, TPM_KEY* k, UnpackPtr alloc) {
 	int rc = unpack3_TPM_VERSION(ptr, pos, max, &k->ver) ||
 		unpack3_TPM_KEY_USAGE(ptr, pos, max, &k->keyUsage) ||
@@ -682,6 +742,7 @@ inline int unpack3_TPM_KEY(BYTE* ptr, UINT32* pos, UINT32 max, TPM_KEY* k, Unpac
 		unpack3_PTR(ptr, pos, max, &k->encData, k->encDataSize, alloc);
 }
 
+static
 inline int sizeof_TPM_KEY(const TPM_KEY* k) {
 	int rc = 0;
 	rc += sizeof_TPM_VERSION(&k->ver);
@@ -699,18 +760,21 @@ inline int sizeof_TPM_KEY(const TPM_KEY* k) {
 	return rc;
 }
 
+static
 inline BYTE* pack_TPM_BOUND_DATA(BYTE* ptr, const TPM_BOUND_DATA* b, UINT32 payloadSize) {
 	ptr = pack_TPM_VERSION(ptr, &b->ver);
 	ptr = pack_TPM_PAYLOAD_TYPE(ptr, b->payload);
 	return pack_BUFFER(ptr, b->payloadData, payloadSize);
 }
 
+static
 inline BYTE* unpack_TPM_BOUND_DATA(BYTE* ptr, TPM_BOUND_DATA* b, UINT32 payloadSize, UnpackPtr alloc) {
 	ptr = unpack_TPM_VERSION(ptr, &b->ver);
 	ptr = unpack_TPM_PAYLOAD_TYPE(ptr, &b->payload);
 	return unpack_PTR(ptr, &b->payloadData, payloadSize, alloc);
 }
 
+static
 inline BYTE* pack_TPM_STORED_DATA(BYTE* ptr, const TPM_STORED_DATA* d) {
 	ptr = pack_TPM_VERSION(ptr, &d->ver);
 	ptr = pack_UINT32(ptr, d->sealInfoSize);
@@ -722,6 +786,7 @@ inline BYTE* pack_TPM_STORED_DATA(BYTE* ptr, const TPM_STORED_DATA* d) {
 	return ptr;
 }
 
+static
 inline int sizeof_TPM_STORED_DATA(const TPM_STORED_DATA* d) {
 	int rv = sizeof_TPM_VERSION(&d->ver) + sizeof_UINT32(d->sealInfoSize);
 	if (d->sealInfoSize) {
@@ -732,6 +797,7 @@ inline int sizeof_TPM_STORED_DATA(const TPM_STORED_DATA* d) {
 	return rv;
 }
 
+static
 inline int unpack3_TPM_STORED_DATA(BYTE* ptr, UINT32* pos, UINT32 len, TPM_STORED_DATA* d, UnpackPtr alloc) {
 	int rc = unpack3_TPM_VERSION(ptr, pos, len, &d->ver) ||
 		unpack3_UINT32(ptr, pos, len, &d->sealInfoSize);
@@ -746,6 +812,7 @@ inline int unpack3_TPM_STORED_DATA(BYTE* ptr, UINT32* pos, UINT32 len, TPM_STORE
 	return rc;
 }
 
+static
 inline BYTE* pack_TPM_STORED_DATA12(BYTE* ptr, const TPM_STORED_DATA12* d) {
 	ptr = pack_TPM_STRUCTURE_TAG(ptr, d->tag);
 	ptr = pack_TPM_ENTITY_TYPE(ptr, d->et);
@@ -758,6 +825,7 @@ inline BYTE* pack_TPM_STORED_DATA12(BYTE* ptr, const TPM_STORED_DATA12* d) {
 	return ptr;
 }
 
+static
 inline int sizeof_TPM_STORED_DATA12(const TPM_STORED_DATA12* d) {
 	int rv = sizeof_TPM_STRUCTURE_TAG(&d->ver) +
 		 sizeof_TPM_ENTITY_TYPE(&d->et) +
@@ -770,6 +838,7 @@ inline int sizeof_TPM_STORED_DATA12(const TPM_STORED_DATA12* d) {
 	return rv;
 }
 
+static
 inline int unpack3_TPM_STORED_DATA12(BYTE* ptr, UINT32* pos, UINT32 len, TPM_STORED_DATA12* d, UnpackPtr alloc) {
 	int rc = unpack3_TPM_STRUCTURE_TAG(ptr, pos, len, &d->tag) ||
 		unpack3_TPM_ENTITY_TYPE(ptr, pos, len, &d->et) ||
@@ -786,6 +855,7 @@ inline int unpack3_TPM_STORED_DATA12(BYTE* ptr, UINT32* pos, UINT32 len, TPM_STO
 	return rc;
 }
 
+static
 inline BYTE* pack_TPM_AUTH_SESSION(BYTE* ptr, const TPM_AUTH_SESSION* auth) {
 	ptr = pack_TPM_AUTH_HANDLE(ptr, auth->AuthHandle);
 	ptr = pack_TPM_NONCE(ptr, &auth->NonceOdd);
@@ -794,6 +864,7 @@ inline BYTE* pack_TPM_AUTH_SESSION(BYTE* ptr, const TPM_AUTH_SESSION* auth) {
 	return ptr;
 }
 
+static
 inline BYTE* unpack_TPM_AUTH_SESSION(BYTE* ptr, TPM_AUTH_SESSION* auth) {
 	ptr = unpack_TPM_NONCE(ptr, &auth->NonceEven);
 	ptr = unpack_BOOL(ptr, &auth->fContinueAuthSession);
@@ -801,6 +872,7 @@ inline BYTE* unpack_TPM_AUTH_SESSION(BYTE* ptr, TPM_AUTH_SESSION* auth) {
 	return ptr;
 }
 
+static
 inline int unpack3_TPM_AUTH_SESSION(BYTE* ptr, UINT32* pos, UINT32 len, TPM_AUTH_SESSION* auth) {
 	return unpack3_TPM_NONCE(ptr, pos, len, &auth->NonceEven) ||
 		unpack3_BOOL(ptr, pos, len, &auth->fContinueAuthSession) ||
@@ -808,6 +880,7 @@ inline int unpack3_TPM_AUTH_SESSION(BYTE* ptr, UINT32* pos, UINT32 len, TPM_AUTH
 }
 
 
+static
 inline int sizeof_TPM_AUTH_SESSION(const TPM_AUTH_SESSION* auth) {
 	int rv = 0;
 	rv += sizeof_TPM_AUTH_HANDLE(auth->AuthHandle);
@@ -817,6 +890,7 @@ inline int sizeof_TPM_AUTH_SESSION(const TPM_AUTH_SESSION* auth) {
 	return rv;
 }
 
+static
 inline BYTE* pack_TPM_RQU_HEADER(BYTE* ptr,
 		TPM_TAG tag,
 		UINT32 size,
@@ -826,6 +900,7 @@ inline BYTE* pack_TPM_RQU_HEADER(BYTE* ptr,
 	return pack_UINT32(ptr, ord);
 }
 
+static
 inline BYTE* unpack_TPM_RQU_HEADER(BYTE* ptr,
 		TPM_TAG* tag,
 		UINT32* size,
@@ -836,6 +911,7 @@ inline BYTE* unpack_TPM_RQU_HEADER(BYTE* ptr,
 	return ptr;
 }
 
+static
 inline int unpack3_TPM_RQU_HEADER(BYTE* ptr, UINT32* pos, UINT32 max,
 		TPM_TAG* tag, UINT32* size, TPM_COMMAND_CODE* ord) {
 	return
