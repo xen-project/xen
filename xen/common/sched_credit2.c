@@ -360,40 +360,41 @@ custom_param("credit2_runqueue", parse_credit2_runqueue);
  * Per-runqueue data
  */
 struct csched2_runqueue_data {
-    int id;
+    spinlock_t lock;           /* Lock for this runqueue                     */
 
-    spinlock_t lock;      /* Lock for this runqueue. */
-    cpumask_t active;      /* CPUs enabled for this runqueue */
+    struct list_head runq;     /* Ordered list of runnable vms               */
+    int id;                    /* ID of this runqueue (-1 if invalid)        */
 
-    struct list_head runq; /* Ordered list of runnable vms */
-    struct list_head svc;  /* List of all vcpus assigned to this runqueue */
-    unsigned int max_weight;
-    unsigned int pick_bias;/* Last CPU we picked. Start from it next time */
+    int load;                  /* Instantaneous load (num of non-idle vcpus) */
+    s_time_t load_last_update; /* Last time average was updated              */
+    s_time_t avgload;          /* Decaying queue load                        */
+    s_time_t b_avgload;        /* Decaying queue load modified by balancing  */
 
-    cpumask_t idle,        /* Currently idle pcpus */
-        smt_idle,          /* Fully idle-and-untickled cores (see below) */
-        tickled;           /* Have been asked to go through schedule */
-    int load;              /* Instantaneous load: Length of queue  + num non-idle threads */
-    s_time_t load_last_update;  /* Last time average was updated */
-    s_time_t avgload;           /* Decaying queue load */
-    s_time_t b_avgload;         /* Decaying queue load modified by balancing */
+    cpumask_t active,          /* CPUs enabled for this runqueue             */
+        smt_idle,              /* Fully idle-and-untickled cores (see below) */
+        tickled,               /* Have been asked to go through schedule     */
+        idle;                  /* Currently idle pcpus                       */
+
+    struct list_head svc;      /* List of all vcpus assigned to the runqueue */
+    unsigned int max_weight;   /* Max weight of the vcpus in this runqueue   */
+    unsigned int pick_bias;    /* Last picked pcpu. Start from it next time  */
 };
 
 /*
  * System-wide private data
  */
 struct csched2_private {
-    rwlock_t lock;
-    cpumask_t initialized; /* CPU is initialized for this pool */
-    
-    struct list_head sdom; /* Used mostly for dump keyhandler. */
+    rwlock_t lock;                     /* Private scheduler lock             */
 
-    cpumask_t active_queues; /* Queues which may have active cpus */
-    struct csched2_runqueue_data *rqd;
+    unsigned int load_precision_shift; /* Precision of load calculations     */
+    unsigned int load_window_shift;    /* Lenght of load decaying window     */
+    unsigned int ratelimit_us;         /* Rate limiting for this scheduler   */
 
-    unsigned int load_precision_shift;
-    unsigned int load_window_shift;
-    unsigned ratelimit_us; /* each cpupool can have its own ratelimit */
+    cpumask_t active_queues;           /* Runqueues with (maybe) active cpus */
+    struct csched2_runqueue_data *rqd; /* Data of the various runqueues      */
+
+    cpumask_t initialized;             /* CPUs part of this scheduler        */
+    struct list_head sdom;             /* List of domains (for debug key)    */
 };
 
 /*
@@ -408,37 +409,36 @@ static DEFINE_PER_CPU(int, runq_map);
  * Virtual CPU
  */
 struct csched2_vcpu {
-    struct list_head rqd_elem;         /* On the runqueue data list  */
-    struct list_head runq_elem;        /* On the runqueue            */
-    struct csched2_runqueue_data *rqd; /* Up-pointer to the runqueue */
+    struct list_head rqd_elem;         /* On csched2_runqueue_data's svc list */
+    struct csched2_runqueue_data *rqd; /* Up-pointer to the runqueue          */
 
-    /* Up-pointers */
-    struct csched2_dom *sdom;
-    struct vcpu *vcpu;
+    int credit;                        /* Current amount of credit            */
+    unsigned int weight;               /* Weight of this vcpu                 */
+    unsigned int residual;             /* Reminder of div(max_weight/weight)  */
+    unsigned flags;                    /* Status flags (16 bits would be ok,  */
+                                       /* but clear_bit() does not like that) */
+    s_time_t start_time;               /* Time we were scheduled (for credit) */
 
-    unsigned int weight;
-    unsigned int residual;
+    /* Individual contribution to load                                        */
+    s_time_t load_last_update;         /* Last time average was updated       */
+    s_time_t avgload;                  /* Decaying queue load                 */
 
-    int credit;
-    s_time_t start_time; /* When we were scheduled (used for credit) */
-    unsigned flags;      /* 16 bits doesn't seem to play well with clear_bit() */
-    int tickled_cpu;     /* cpu tickled for picking us up (-1 if none) */
+    struct list_head runq_elem;        /* On the runqueue (rqd->runq)         */
+    struct csched2_dom *sdom;          /* Up-pointer to domain                */
+    struct vcpu *vcpu;                 /* Up-pointer, to vcpu                 */
 
-    /* Individual contribution to load */
-    s_time_t load_last_update;  /* Last time average was updated */
-    s_time_t avgload;           /* Decaying queue load */
-
-    struct csched2_runqueue_data *migrate_rqd; /* Pre-determined rqd to which to migrate */
+    struct csched2_runqueue_data *migrate_rqd; /* Pre-determined migr. target */
+    int tickled_cpu;                   /* Cpu that will pick us (-1 if none)  */
 };
 
 /*
  * Domain
  */
 struct csched2_dom {
-    struct list_head sdom_elem;
-    struct domain *dom;
-    uint16_t weight;
-    uint16_t nr_vcpus;
+    struct list_head sdom_elem; /* On csched2_runqueue_data's sdom list       */
+    struct domain *dom;         /* Up-pointer to domain                       */
+    uint16_t weight;            /* User specified weight                      */
+    uint16_t nr_vcpus;          /* Number of vcpus of this domain             */
 };
 
 /*
