@@ -6414,16 +6414,14 @@ x86_emulate(
         }
         if ( (shift &= width - 1) == 0 )
             break;
-        dst.orig_val = truncate_word(dst.val, dst.bytes);
-        dst.val = ((shift == width) ? src.val :
-                   (b & 8) ?
-                   /* shrd */
-                   ((dst.orig_val >> shift) |
-                    truncate_word(src.val << (width - shift), dst.bytes)) :
-                   /* shld */
-                   ((dst.orig_val << shift) |
-                    ((src.val >> (width - shift)) & ((1ull << shift) - 1))));
-        dst.val = truncate_word(dst.val, dst.bytes);
+        dst.orig_val = dst.val;
+        dst.val = (b & 8) ?
+                  /* shrd */
+                  ((dst.orig_val >> shift) |
+                   truncate_word(src.val << (width - shift), dst.bytes)) :
+                  /* shld */
+                  (truncate_word(dst.orig_val << shift, dst.bytes) |
+                   (src.val >> (width - shift)));
         _regs.eflags &= ~(X86_EFLAGS_OF | X86_EFLAGS_SF | X86_EFLAGS_ZF |
                           X86_EFLAGS_PF | X86_EFLAGS_CF);
         if ( (dst.val >> ((b & 8) ? (shift - 1) : (width - shift))) & 1 )
