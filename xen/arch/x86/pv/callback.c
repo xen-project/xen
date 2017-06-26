@@ -31,7 +31,7 @@
 
 #include <public/callback.h>
 
-static long register_guest_nmi_callback(unsigned long address)
+static int register_guest_nmi_callback(unsigned long address)
 {
     struct vcpu *curr = current;
     struct domain *d = curr->domain;
@@ -57,14 +57,12 @@ static long register_guest_nmi_callback(unsigned long address)
     return 0;
 }
 
-static long unregister_guest_nmi_callback(void)
+static void unregister_guest_nmi_callback(void)
 {
     struct vcpu *curr = current;
     struct trap_info *t = &curr->arch.pv_vcpu.trap_ctxt[TRAP_nmi];
 
     memset(t, 0, sizeof(*t));
-
-    return 0;
 }
 
 static long register_guest_callback(struct callback_register *reg)
@@ -140,7 +138,8 @@ static long unregister_guest_callback(struct callback_unregister *unreg)
         break;
 
     case CALLBACKTYPE_nmi:
-        ret = unregister_guest_nmi_callback();
+        unregister_guest_nmi_callback();
+        ret = 0;
         break;
 
     default:
@@ -279,7 +278,8 @@ static long compat_unregister_guest_callback(
         break;
 
     case CALLBACKTYPE_nmi:
-        ret = unregister_guest_nmi_callback();
+        unregister_guest_nmi_callback();
+        ret = 0;
         break;
 
     default:
@@ -463,7 +463,8 @@ long do_nmi_op(unsigned int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         rc = register_guest_nmi_callback(cb.handler_address);
         break;
     case XENNMI_unregister_callback:
-        rc = unregister_guest_nmi_callback();
+        unregister_guest_nmi_callback();
+        rc = 0;
         break;
     default:
         rc = -ENOSYS;
@@ -487,7 +488,8 @@ int compat_nmi_op(unsigned int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         rc = register_guest_nmi_callback(cb.handler_address);
         break;
     case XENNMI_unregister_callback:
-        rc = unregister_guest_nmi_callback();
+        unregister_guest_nmi_callback();
+        rc = 0;
         break;
     default:
         rc = -ENOSYS;
