@@ -61,8 +61,8 @@ static struct hvm_vioapic *addr_vioapic(const struct domain *d,
     return NULL;
 }
 
-struct hvm_vioapic *gsi_vioapic(const struct domain *d, unsigned int gsi,
-                                unsigned int *pin)
+static struct hvm_vioapic *gsi_vioapic(const struct domain *d,
+                                       unsigned int gsi, unsigned int *pin)
 {
     unsigned int i;
 
@@ -474,6 +474,28 @@ void vioapic_update_EOI(struct domain *d, u8 vector)
     }
 
     spin_unlock(&d->arch.hvm_domain.irq_lock);
+}
+
+int vioapic_get_mask(const struct domain *d, unsigned int gsi)
+{
+    unsigned int pin;
+    const struct hvm_vioapic *vioapic = gsi_vioapic(d, gsi, &pin);
+
+    if ( !vioapic )
+        return -EINVAL;
+
+    return vioapic->redirtbl[pin].fields.mask;
+}
+
+int vioapic_get_vector(const struct domain *d, unsigned int gsi)
+{
+    unsigned int pin;
+    const struct hvm_vioapic *vioapic = gsi_vioapic(d, gsi, &pin);
+
+    if ( !vioapic )
+        return -EINVAL;
+
+    return vioapic->redirtbl[pin].fields.vector;
 }
 
 static int ioapic_save(struct domain *d, hvm_domain_context_t *h)

@@ -61,13 +61,13 @@ struct hvm_vioapic {
 #define domain_vioapic(d, i) ((d)->arch.hvm_domain.vioapic[i])
 #define vioapic_domain(v) ((v)->domain)
 
-struct hvm_vioapic *gsi_vioapic(const struct domain *d, unsigned int gsi,
-                                unsigned int *pin);
-
 int vioapic_init(struct domain *d);
 void vioapic_deinit(struct domain *d);
 void vioapic_reset(struct domain *d);
 void vioapic_irq_positive_edge(struct domain *d, unsigned int irq);
 void vioapic_update_EOI(struct domain *d, u8 vector);
+
+int vioapic_get_mask(const struct domain *d, unsigned int gsi);
+int vioapic_get_vector(const struct domain *d, unsigned int gsi);
 
 #endif /* __ASM_X86_HVM_VIOAPIC_H__ */
