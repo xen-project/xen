@@ -2687,7 +2687,7 @@ static int get_spage_pages(struct page_info *page, struct domain *d)
     {
         if ( !get_page_and_type(page, d, PGT_writable_page) )
         {
-            while ( --i >= 0 )
+            while ( i-- > 0 )
                 put_page_and_type(--page);
             return 0;
         }
