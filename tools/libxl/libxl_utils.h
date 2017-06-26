@@ -78,6 +78,10 @@ int libxl_devid_to_device_vtpm(libxl_ctx *ctx, uint32_t domid,
                                int devid, libxl_device_vtpm *vtpm);
 int libxl_devid_to_device_usbctrl(libxl_ctx *ctx, uint32_t domid,
                                   int devid, libxl_device_usbctrl *usbctrl);
+
+int libxl_devid_to_device_vdispl(libxl_ctx *ctx, uint32_t domid,
+                                 int devid, libxl_device_vdispl *vdispl);
+
 int libxl_ctrlport_to_device_usbdev(libxl_ctx *ctx, uint32_t domid,
                                     int ctrl, int port,
                                     libxl_device_usbdev *usbdev);

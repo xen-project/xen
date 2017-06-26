@@ -26,6 +26,7 @@ libxl__device_kind = Enumeration("device_kind", [
     (9, "VUSB"),
     (10, "QUSB"),
     (11, "9PFS"),
+    (12, "VDISPL"),
     ])
 
 libxl__console_backend = Enumeration("console_backend", [

@@ -779,6 +779,20 @@ libxl_device_channel = Struct("device_channel", [
            ])),
 ])
 
+libxl_connector_param = Struct("connector_param", [
+    ("id", string),
+    ("width", uint32),
+    ("height", uint32)
+    ])
+
+libxl_device_vdispl = Struct("device_vdispl", [
+    ("backend_domid", libxl_domid),
+    ("backend_domname", string),
+    ("devid", libxl_devid),
+    ("be_alloc", bool),
+    ("connectors", Array(libxl_connector_param, "num_connectors"))
+    ])
+
 libxl_domain_config = Struct("domain_config", [
     ("c_info", libxl_domain_create_info),
     ("b_info", libxl_domain_build_info),
@@ -792,6 +806,7 @@ libxl_domain_config = Struct("domain_config", [
     ("vkbs", Array(libxl_device_vkb, "num_vkbs")),
     ("vtpms", Array(libxl_device_vtpm, "num_vtpms")),
     ("p9s", Array(libxl_device_p9, "num_p9s")),
+    ("vdispls", Array(libxl_device_vdispl, "num_vdispls")),
     # a channel manifests as a console with a name,
     # see docs/misc/channels.txt
     ("channels", Array(libxl_device_channel, "num_channels")),
@@ -886,6 +901,27 @@ libxl_physinfo = Struct("physinfo", [
 
     ("cap_hvm", bool),
     ("cap_hvm_directio", bool),
+    ], dir=DIR_OUT)
+
+libxl_connectorinfo = Struct("connectorinfo", [
+    ("id", string),
+    ("width", uint32),
+    ("height", uint32),
+    ("req_evtch", integer),
+    ("req_rref", integer),
+    ("evt_evtch", integer),
+    ("evt_rref", integer),
+    ], dir=DIR_OUT)
+
+libxl_vdisplinfo = Struct("vdisplinfo", [
+    ("backend", string),
+    ("backend_id", uint32),
+    ("frontend", string),
+    ("frontend_id", uint32),
+    ("devid", libxl_devid),
+    ("state", integer),
+    ("be_alloc", bool),
+    ("connectors", Array(libxl_connectorinfo, "num_connectors"))
     ], dir=DIR_OUT)
 
 # NUMA node characteristics: size and free are how much memory it has, and how
