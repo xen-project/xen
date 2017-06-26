@@ -15,7 +15,6 @@
 #include <xen/types.h>
 #include <xen/errno.h>
 #include <xen/init.h>
-#include <xen/nmi.h>
 #include <xen/string.h>
 #include <xen/delay.h>
 #include <xen/xenoprof.h>
@@ -24,6 +23,7 @@
 #include <asm/apic.h>
 #include <asm/regs.h>
 #include <asm/current.h>
+#include <asm/nmi.h>
 
 #include "op_counter.h"
 #include "op_x86_model.h"

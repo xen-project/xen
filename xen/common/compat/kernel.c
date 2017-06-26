@@ -9,11 +9,9 @@ asm(".file \"" __FILE__ "\"");
 #include <xen/errno.h>
 #include <xen/version.h>
 #include <xen/sched.h>
-#include <xen/nmi.h>
 #include <xen/guest_access.h>
 #include <asm/current.h>
 #include <compat/xen.h>
-#include <compat/nmi.h>
 #include <compat/version.h>
 
 extern xen_commandline_t saved_cmdline;
@@ -38,9 +36,6 @@ CHECK_TYPE(capabilities_info);
 #define xen_feature_info_t compat_feature_info_t
 
 CHECK_TYPE(domain_handle);
-
-#define xennmi_callback compat_nmi_callback
-#define xennmi_callback_t compat_nmi_callback_t
 
 #ifdef COMPAT_VM_ASSIST_VALID
 #undef VM_ASSIST_VALID

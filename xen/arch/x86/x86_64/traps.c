@@ -10,7 +10,6 @@
 #include <xen/console.h>
 #include <xen/sched.h>
 #include <xen/shutdown.h>
-#include <xen/nmi.h>
 #include <xen/guest_access.h>
 #include <xen/watchdog.h>
 #include <xen/hypercall.h>
@@ -18,6 +17,7 @@
 #include <asm/flushtlb.h>
 #include <asm/traps.h>
 #include <asm/event.h>
+#include <asm/nmi.h>
 #include <asm/msr.h>
 #include <asm/page.h>
 #include <asm/shared.h>

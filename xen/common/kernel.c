@@ -10,12 +10,10 @@
 #include <xen/version.h>
 #include <xen/sched.h>
 #include <xen/paging.h>
-#include <xen/nmi.h>
 #include <xen/guest_access.h>
 #include <xen/hypercall.h>
 #include <xsm/xsm.h>
 #include <asm/current.h>
-#include <public/nmi.h>
 #include <public/version.h>
 
 #ifndef COMPAT
@@ -429,30 +427,6 @@ DO(xen_version)(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
     }
 
     return -ENOSYS;
-}
-
-DO(nmi_op)(unsigned int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
-{
-    struct xennmi_callback cb;
-    long rc = 0;
-
-    switch ( cmd )
-    {
-    case XENNMI_register_callback:
-        rc = -EFAULT;
-        if ( copy_from_guest(&cb, arg, 1) )
-            break;
-        rc = register_guest_nmi_callback(cb.handler_address);
-        break;
-    case XENNMI_unregister_callback:
-        rc = unregister_guest_nmi_callback();
-        break;
-    default:
-        rc = -ENOSYS;
-        break;
-    }
-
-    return rc;
 }
 
 #ifdef VM_ASSIST_VALID

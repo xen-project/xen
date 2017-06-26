@@ -43,7 +43,6 @@
 #include <xen/domain_page.h>
 #include <xen/symbols.h>
 #include <xen/iocap.h>
-#include <xen/nmi.h>
 #include <xen/version.h>
 #include <xen/kexec.h>
 #include <xen/trace.h>
@@ -64,6 +63,7 @@
 #include <asm/xstate.h>
 #include <asm/debugger.h>
 #include <asm/msr.h>
+#include <asm/nmi.h>
 #include <asm/shared.h>
 #include <asm/x86_emulate.h>
 #include <asm/traps.h>

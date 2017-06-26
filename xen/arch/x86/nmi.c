@@ -17,7 +17,6 @@
 #include <xen/lib.h>
 #include <xen/mm.h>
 #include <xen/irq.h>
-#include <xen/nmi.h>
 #include <xen/delay.h>
 #include <xen/time.h>
 #include <xen/sched.h>
@@ -29,6 +28,7 @@
 #include <asm/mc146818rtc.h>
 #include <asm/msr.h>
 #include <asm/mpspec.h>
+#include <asm/nmi.h>
 #include <asm/debugger.h>
 #include <asm/div64.h>
 #include <asm/apic.h>
