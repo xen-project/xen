@@ -4,6 +4,8 @@ include $(XEN_ROOT)/tools/firmware/Rules.mk
 TARGET = 32bitbios_flat.h
 
 CFLAGS += $(CFLAGS_xeninclude) -I.. -I../../../libacpi
+$(call cc-option-add,CFLAGS,CC,-fno-pic)
+$(call cc-option-add,CFLAGS,CC,-fno-PIE)
 
 SUBDIRS = tcgbios
 
