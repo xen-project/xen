@@ -1979,42 +1979,6 @@ void __init trap_init(void)
     open_softirq(PCI_SERR_SOFTIRQ, pci_serr_softirq);
 }
 
-long register_guest_nmi_callback(unsigned long address)
-{
-    struct vcpu *v = current;
-    struct domain *d = v->domain;
-    struct trap_info *t = &v->arch.pv_vcpu.trap_ctxt[TRAP_nmi];
-
-    if ( !is_canonical_address(address) )
-        return -EINVAL;
-
-    t->vector  = TRAP_nmi;
-    t->flags   = 0;
-    t->cs      = (is_pv_32bit_domain(d) ?
-                  FLAT_COMPAT_KERNEL_CS : FLAT_KERNEL_CS);
-    t->address = address;
-    TI_SET_IF(t, 1);
-
-    /*
-     * If no handler was registered we can 'lose the NMI edge'. Re-assert it
-     * now.
-     */
-    if ( (v->vcpu_id == 0) && (arch_get_nmi_reason(d) != 0) )
-        v->nmi_pending = 1;
-
-    return 0;
-}
-
-long unregister_guest_nmi_callback(void)
-{
-    struct vcpu *v = current;
-    struct trap_info *t = &v->arch.pv_vcpu.trap_ctxt[TRAP_nmi];
-
-    memset(t, 0, sizeof(*t));
-
-    return 0;
-}
-
 int pv_raise_interrupt(struct vcpu *v, uint8_t trap_nr)
 {
     struct softirq_trap *st = &per_cpu(softirq_trap, smp_processor_id());

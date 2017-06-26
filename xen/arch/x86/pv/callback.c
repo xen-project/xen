@@ -26,9 +26,46 @@
 
 #include <asm/current.h>
 #include <asm/nmi.h>
+#include <asm/shared.h>
 #include <asm/traps.h>
 
 #include <public/callback.h>
+
+static long register_guest_nmi_callback(unsigned long address)
+{
+    struct vcpu *curr = current;
+    struct domain *d = curr->domain;
+    struct trap_info *t = &curr->arch.pv_vcpu.trap_ctxt[TRAP_nmi];
+
+    if ( !is_canonical_address(address) )
+        return -EINVAL;
+
+    t->vector  = TRAP_nmi;
+    t->flags   = 0;
+    t->cs      = (is_pv_32bit_domain(d) ?
+                  FLAT_COMPAT_KERNEL_CS : FLAT_KERNEL_CS);
+    t->address = address;
+    TI_SET_IF(t, 1);
+
+    /*
+     * If no handler was registered we can 'lose the NMI edge'. Re-assert it
+     * now.
+     */
+    if ( curr->vcpu_id == 0 && arch_get_nmi_reason(d) != 0 )
+        curr->nmi_pending = 1;
+
+    return 0;
+}
+
+static long unregister_guest_nmi_callback(void)
+{
+    struct vcpu *curr = current;
+    struct trap_info *t = &curr->arch.pv_vcpu.trap_ctxt[TRAP_nmi];
+
+    memset(t, 0, sizeof(*t));
+
+    return 0;
+}
 
 static long register_guest_callback(struct callback_register *reg)
 {
