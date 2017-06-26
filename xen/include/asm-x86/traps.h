@@ -19,12 +19,6 @@
 #ifndef ASM_TRAP_H
 #define ASM_TRAP_H
 
-struct softirq_trap {
-	struct domain *domain;  /* domain to inject trap */
-	struct vcpu *vcpu;	/* vcpu to inject trap */
-	int processor;		/* physical cpu to inject trap */
-};
-
 struct cpu_user_regs;
 
 void async_exception_cleanup(struct vcpu *);

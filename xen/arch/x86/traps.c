@@ -1540,39 +1540,6 @@ void do_general_protection(struct cpu_user_regs *regs)
     panic("GENERAL PROTECTION FAULT\n[error_code=%04x]", regs->error_code);
 }
 
-static DEFINE_PER_CPU(struct softirq_trap, softirq_trap);
-
-static void nmi_mce_softirq(void)
-{
-    int cpu = smp_processor_id();
-    struct softirq_trap *st = &per_cpu(softirq_trap, cpu);
-
-    BUG_ON(st->vcpu == NULL);
-
-    /* Set the tmp value unconditionally, so that
-     * the check in the iret hypercall works. */
-    cpumask_copy(st->vcpu->cpu_hard_affinity_tmp,
-                 st->vcpu->cpu_hard_affinity);
-
-    if ((cpu != st->processor)
-       || (st->processor != st->vcpu->processor))
-    {
-        /* We are on a different physical cpu.
-         * Make sure to wakeup the vcpu on the
-         * specified processor.
-         */
-        vcpu_set_hard_affinity(st->vcpu, cpumask_of(st->processor));
-
-        /* Affinity is restored in the iret hypercall. */
-    }
-
-    /* Only used to defer wakeup of domain/vcpu to
-     * a safe (non-NMI/MCE) context.
-     */
-    vcpu_kick(st->vcpu);
-    st->vcpu = NULL;
-}
-
 static void pci_serr_softirq(void)
 {
     printk("\n\nNMI - PCI system error (SERR)\n");
@@ -1934,19 +1901,6 @@ void __init init_idt_traps(void)
     this_cpu(compat_gdt_table) = boot_cpu_compat_gdt_table;
 }
 
-void __init pv_trap_init(void)
-{
-    /* The 32-on-64 hypercall vector is only accessible from ring 1. */
-    _set_gate(idt_table + HYPERCALL_VECTOR,
-              SYS_DESC_trap_gate, 1, entry_int82);
-
-    /* Fast trap for int80 (faster than taking the #GP-fixup path). */
-    _set_gate(idt_table + LEGACY_SYSCALL_VECTOR, SYS_DESC_trap_gate, 3,
-              &int80_direct_trap);
-
-    open_softirq(NMI_MCE_SOFTIRQ, nmi_mce_softirq);
-}
-
 extern void (*const autogen_entrypoints[NR_VECTORS])(void);
 void __init trap_init(void)
 {
@@ -1977,48 +1931,6 @@ void __init trap_init(void)
     cpu_init();
 
     open_softirq(PCI_SERR_SOFTIRQ, pci_serr_softirq);
-}
-
-int pv_raise_interrupt(struct vcpu *v, uint8_t trap_nr)
-{
-    struct softirq_trap *st = &per_cpu(softirq_trap, smp_processor_id());
-
-    switch (trap_nr) {
-    case TRAP_nmi:
-        if ( cmpxchgptr(&st->vcpu, NULL, v) )
-            return -EBUSY;
-        if ( !test_and_set_bool(v->nmi_pending) ) {
-               st->domain = v->domain;
-               st->processor = v->processor;
-
-               /* not safe to wake up a vcpu here */
-               raise_softirq(NMI_MCE_SOFTIRQ);
-               return 0;
-        }
-        st->vcpu = NULL;
-        break;
-
-    case TRAP_machine_check:
-        if ( cmpxchgptr(&st->vcpu, NULL, v) )
-            return -EBUSY;
-
-        /* We are called by the machine check (exception or polling) handlers
-         * on the physical CPU that reported a machine check error. */
-
-        if ( !test_and_set_bool(v->mce_pending) ) {
-                st->domain = v->domain;
-                st->processor = v->processor;
-
-                /* not safe to wake up a vcpu here */
-                raise_softirq(NMI_MCE_SOFTIRQ);
-                return 0;
-        }
-        st->vcpu = NULL;
-        break;
-    }
-
-    /* delivery failed */
-    return -EIO;
 }
 
 void activate_debugregs(const struct vcpu *curr)
