@@ -498,6 +498,17 @@ int vioapic_get_vector(const struct domain *d, unsigned int gsi)
     return vioapic->redirtbl[pin].fields.vector;
 }
 
+int vioapic_get_trigger_mode(const struct domain *d, unsigned int gsi)
+{
+    unsigned int pin;
+    const struct hvm_vioapic *vioapic = gsi_vioapic(d, gsi, &pin);
+
+    if ( !vioapic )
+        return -EINVAL;
+
+    return vioapic->redirtbl[pin].fields.trig_mode;
+}
+
 static int ioapic_save(struct domain *d, hvm_domain_context_t *h)
 {
     struct hvm_vioapic *s;

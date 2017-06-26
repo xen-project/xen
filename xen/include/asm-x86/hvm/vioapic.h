@@ -69,5 +69,6 @@ void vioapic_update_EOI(struct domain *d, u8 vector);
 
 int vioapic_get_mask(const struct domain *d, unsigned int gsi);
 int vioapic_get_vector(const struct domain *d, unsigned int gsi);
+int vioapic_get_trigger_mode(const struct domain *d, unsigned int gsi);
 
 #endif /* __ASM_X86_HVM_VIOAPIC_H__ */

@@ -40,6 +40,7 @@ struct dev_intx_gsi_link {
 #define _HVM_IRQ_DPCI_EOI_LATCH_SHIFT           3
 #define _HVM_IRQ_DPCI_GUEST_PCI_SHIFT           4
 #define _HVM_IRQ_DPCI_GUEST_MSI_SHIFT           5
+#define _HVM_IRQ_DPCI_IDENTITY_GSI_SHIFT        6
 #define _HVM_IRQ_DPCI_TRANSLATE_SHIFT          15
 #define HVM_IRQ_DPCI_MACH_PCI        (1 << _HVM_IRQ_DPCI_MACH_PCI_SHIFT)
 #define HVM_IRQ_DPCI_MACH_MSI        (1 << _HVM_IRQ_DPCI_MACH_MSI_SHIFT)
@@ -47,6 +48,7 @@ struct dev_intx_gsi_link {
 #define HVM_IRQ_DPCI_EOI_LATCH       (1 << _HVM_IRQ_DPCI_EOI_LATCH_SHIFT)
 #define HVM_IRQ_DPCI_GUEST_PCI       (1 << _HVM_IRQ_DPCI_GUEST_PCI_SHIFT)
 #define HVM_IRQ_DPCI_GUEST_MSI       (1 << _HVM_IRQ_DPCI_GUEST_MSI_SHIFT)
+#define HVM_IRQ_DPCI_IDENTITY_GSI    (1 << _HVM_IRQ_DPCI_IDENTITY_GSI_SHIFT)
 #define HVM_IRQ_DPCI_TRANSLATE       (1 << _HVM_IRQ_DPCI_TRANSLATE_SHIFT)
 
 #define VMSI_DEST_ID_MASK 0xff
@@ -122,6 +124,10 @@ void hvm_isa_irq_assert(
     struct domain *d, unsigned int isa_irq);
 void hvm_isa_irq_deassert(
     struct domain *d, unsigned int isa_irq);
+
+/* Modify state of GSIs. */
+void hvm_gsi_assert(struct domain *d, unsigned int gsi);
+void hvm_gsi_deassert(struct domain *d, unsigned int gsi);
 
 int hvm_set_pci_link_route(struct domain *d, u8 link, u8 isa_irq);
 

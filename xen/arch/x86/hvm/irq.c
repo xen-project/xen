@@ -126,6 +126,48 @@ void hvm_pci_intx_deassert(
     spin_unlock(&d->arch.hvm_domain.irq_lock);
 }
 
+void hvm_gsi_assert(struct domain *d, unsigned int gsi)
+{
+    struct hvm_irq *hvm_irq = hvm_domain_irq(d);
+
+    if ( gsi >= hvm_irq->nr_gsis )
+    {
+        ASSERT_UNREACHABLE();
+        return;
+    }
+
+    /*
+     * __hvm_pci_intx_{de}assert uses a bitfield in pci_intx.i to track the
+     * status of each interrupt line, and Xen does the routing and GSI
+     * assertion based on that. The value of the pci_intx.i bitmap prevents the
+     * same line from triggering multiple times. As we don't use that bitmap
+     * for the hardware domain, Xen needs to rely on gsi_assert_count in order
+     * to know if the GSI is pending or not.
+     */
+    spin_lock(&d->arch.hvm_domain.irq_lock);
+    if ( !hvm_irq->gsi_assert_count[gsi] )
+    {
+        hvm_irq->gsi_assert_count[gsi] = 1;
+        assert_gsi(d, gsi);
+    }
+    spin_unlock(&d->arch.hvm_domain.irq_lock);
+}
+
+void hvm_gsi_deassert(struct domain *d, unsigned int gsi)
+{
+    struct hvm_irq *hvm_irq = hvm_domain_irq(d);
+
+    if ( gsi >= hvm_irq->nr_gsis )
+    {
+        ASSERT_UNREACHABLE();
+        return;
+    }
+
+    spin_lock(&d->arch.hvm_domain.irq_lock);
+    hvm_irq->gsi_assert_count[gsi] = 0;
+    spin_unlock(&d->arch.hvm_domain.irq_lock);
+}
+
 void hvm_isa_irq_assert(
     struct domain *d, unsigned int isa_irq)
 {
