@@ -19,8 +19,6 @@
 #ifndef ASM_TRAP_H
 #define ASM_TRAP_H
 
-struct cpu_user_regs;
-
 void async_exception_cleanup(struct vcpu *);
 
 uint32_t guest_io_read(unsigned int port, unsigned int bytes,
