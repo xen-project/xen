@@ -1793,6 +1793,203 @@ out:
     return AO_CREATE_FAIL(rc);
 }
 
+static void device_add_domain_config(libxl__gc *gc,
+                                     libxl_domain_config *d_config,
+                                     const struct libxl_device_type *dt,
+                                     void *type)
+{
+    int *num_dev;
+    unsigned int i;
+    void *item = NULL;
+
+    num_dev = libxl__device_type_get_num(dt, d_config);
+
+    /* Check for existing device */
+    for (i = 0; i < *num_dev; i++) {
+        if (dt->compare(libxl__device_type_get_elem(dt, d_config, i), type)) {
+            item = libxl__device_type_get_elem(dt, d_config, i);
+        }
+    }
+
+    if (!item) {
+        void **devs = libxl__device_type_get_ptr(dt, d_config);
+        *devs = libxl__realloc(NOGC, *devs,
+                               dt->dev_elem_size * (*num_dev + 1));
+        item = libxl__device_type_get_elem(dt, d_config, *num_dev);
+        (*num_dev)++;
+    } else {
+        dt->dispose(item);
+    }
+
+    dt->init(item);
+    dt->copy(CTX, item, type);
+}
+
+void libxl__device_add_async(libxl__egc *egc, uint32_t domid,
+                             const struct libxl_device_type *dt, void *type,
+                             libxl__ao_device *aodev)
+{
+    STATE_AO_GC(aodev->ao);
+    flexarray_t *back;
+    flexarray_t *front, *ro_front;
+    libxl__device *device;
+    xs_transaction_t t = XBT_NULL;
+    libxl_domain_config d_config;
+    void *type_saved;
+    libxl__domain_userdata_lock *lock = NULL;
+    int rc;
+
+    libxl_domain_config_init(&d_config);
+
+    type_saved = libxl__malloc(gc, dt->dev_elem_size);
+
+    dt->init(type_saved);
+    dt->copy(CTX, type_saved, type);
+
+    if (dt->set_default) {
+        rc = dt->set_default(gc, domid, type, aodev->update_json);
+        if (rc) goto out;
+    }
+
+    if (dt->update_devid) {
+        rc = dt->update_devid(gc, domid, type);
+        if (rc) goto out;
+    }
+
+    if (dt->update_config)
+        dt->update_config(gc, type_saved, type);
+
+    GCNEW(device);
+    rc = dt->to_device(gc, domid, type, device);
+    if (rc) goto out;
+
+    if (aodev->update_json) {
+        lock = libxl__lock_domain_userdata(gc, domid);
+        if (!lock) {
+            rc = ERROR_LOCK_FAIL;
+            goto out;
+        }
+
+        rc = libxl__get_domain_configuration(gc, domid, &d_config);
+        if (rc) goto out;
+
+        device_add_domain_config(gc, &d_config, dt, type_saved);
+
+        rc = libxl__dm_check_start(gc, &d_config, domid);
+        if (rc) goto out;
+    }
+
+    back = flexarray_make(gc, 16, 1);
+    front = flexarray_make(gc, 16, 1);
+    ro_front = flexarray_make(gc, 16, 1);
+
+    flexarray_append_pair(back, "frontend-id", GCSPRINTF("%d", domid));
+    flexarray_append_pair(back, "online", "1");
+    flexarray_append_pair(back, "state",
+                          GCSPRINTF("%d", XenbusStateInitialising));
+
+    flexarray_append_pair(front, "backend-id",
+                          GCSPRINTF("%d", device->backend_domid));
+    flexarray_append_pair(front, "state",
+                          GCSPRINTF("%d", XenbusStateInitialising));
+
+    if (dt->set_xenstore_config)
+        dt->set_xenstore_config(gc, domid, type, back, front, ro_front);
+
+    for (;;) {
+        rc = libxl__xs_transaction_start(gc, &t);
+        if (rc) goto out;
+
+        rc = libxl__device_exists(gc, t, device);
+        if (rc < 0) goto out;
+        if (rc == 1) {              /* already exists in xenstore */
+            LOGD(ERROR, domid, "device already exists in xenstore");
+            aodev->action = LIBXL__DEVICE_ACTION_ADD; /* for error message */
+            rc = ERROR_DEVICE_EXISTS;
+            goto out;
+        }
+
+        if (aodev->update_json) {
+            rc = libxl__set_domain_configuration(gc, domid, &d_config);
+            if (rc) goto out;
+        }
+
+        libxl__device_generic_add(gc, t, device,
+                                  libxl__xs_kvs_of_flexarray(gc, back),
+                                  libxl__xs_kvs_of_flexarray(gc, front),
+                                  libxl__xs_kvs_of_flexarray(gc, ro_front));
+
+        rc = libxl__xs_transaction_commit(gc, &t);
+        if (!rc) break;
+        if (rc < 0) goto out;
+    }
+
+    aodev->dev = device;
+    aodev->action = LIBXL__DEVICE_ACTION_ADD;
+    libxl__wait_device_connection(egc, aodev);
+
+    rc = 0;
+
+out:
+    libxl__xs_transaction_abort(gc, &t);
+    if (lock) libxl__unlock_domain_userdata(lock);
+    dt->dispose(type_saved);
+    libxl_domain_config_dispose(&d_config);
+    aodev->rc = rc;
+    if (rc) aodev->callback(egc, aodev);
+    return;
+}
+
+int libxl__device_add(libxl__gc *gc, uint32_t domid,
+                      const struct libxl_device_type *dt, void *type)
+{
+    flexarray_t *back;
+    flexarray_t *front, *ro_front;
+    libxl__device *device;
+    int rc;
+
+    if (dt->set_default) {
+        rc = dt->set_default(gc, domid, type, false);
+        if (rc) goto out;
+    }
+
+    if (dt->update_devid) {
+        rc = dt->update_devid(gc, domid, type);
+        if (rc) goto out;
+    }
+
+    GCNEW(device);
+    rc = dt->to_device(gc, domid, type, device);
+    if (rc) goto out;
+
+    back = flexarray_make(gc, 16, 1);
+    front = flexarray_make(gc, 16, 1);
+    ro_front = flexarray_make(gc, 16, 1);
+
+    flexarray_append_pair(back, "frontend-id", GCSPRINTF("%d", domid));
+    flexarray_append_pair(back, "online", "1");
+    flexarray_append_pair(back, "state",
+                          GCSPRINTF("%d", XenbusStateInitialising));
+    flexarray_append_pair(front, "backend-id",
+                          libxl__sprintf(gc, "%d", device->backend_domid));
+    flexarray_append_pair(front, "state",
+                          GCSPRINTF("%d", XenbusStateInitialising));
+
+    if (dt->set_xenstore_config)
+        dt->set_xenstore_config(gc, domid, type, back, front, ro_front);
+
+    rc = libxl__device_generic_add(gc, XBT_NULL, device,
+                                   libxl__xs_kvs_of_flexarray(gc, back),
+                                   libxl__xs_kvs_of_flexarray(gc, front),
+                                   libxl__xs_kvs_of_flexarray(gc, ro_front));
+    if (rc) goto out;
+
+    rc = 0;
+
+out:
+    return rc;
+}
+
 /*
  * Local variables:
  * mode: C

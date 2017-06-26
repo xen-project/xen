@@ -938,7 +938,8 @@ static void initiate_domain_create(libxl__egc *egc,
     store_libxl_entry(gc, domid, &d_config->b_info);
 
     for (i = 0; i < d_config->num_disks; i++) {
-        ret = libxl__device_disk_setdefault(gc, &d_config->disks[i], domid);
+        ret = libxl__device_disk_setdefault(gc, domid, &d_config->disks[i],
+                                            false);
         if (ret) {
             LOGD(ERROR, domid, "Unable to set disk defaults for disk %d", i);
             goto error_out;
@@ -1432,6 +1433,9 @@ out:
 
 #define libxl_device_dtdev_list NULL
 #define libxl_device_dtdev_compare NULL
+#define libxl__device_from_dtdev NULL
+#define libxl__device_dtdev_setdefault NULL
+#define libxl__device_dtdev_update_devid NULL
 static DEFINE_DEVICE_TYPE_STRUCT(dtdev);
 
 const struct libxl_device_type *device_type_tbl[] = {

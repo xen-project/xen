@@ -52,8 +52,8 @@ int libxl_mac_to_device_nic(libxl_ctx *ctx, uint32_t domid,
     return rc;
 }
 
-int libxl__device_nic_setdefault(libxl__gc *gc, libxl_device_nic *nic,
-                                 uint32_t domid, bool hotplug)
+int libxl__device_nic_setdefault(libxl__gc *gc, uint32_t domid,
+                                 libxl_device_nic *nic, bool hotplug)
 {
     int rc;
 
@@ -138,6 +138,8 @@ static void libxl__update_config_nic(libxl__gc *gc, libxl_device_nic *dst,
     libxl_mac_copy(CTX, &dst->mac, &src->mac);
 }
 
+static LIBXL_DEFINE_UPDATE_DEVID(nic, "vif")
+
 static void libxl__device_nic_add(libxl__egc *egc, uint32_t domid,
                                   libxl_device_nic *nic,
                                   libxl__ao_device *aodev)
@@ -156,18 +158,14 @@ static void libxl__device_nic_add(libxl__egc *egc, uint32_t domid,
     libxl_device_nic_init(&nic_saved);
     libxl_device_nic_copy(CTX, &nic_saved, nic);
 
-    rc = libxl__device_nic_setdefault(gc, nic, domid, aodev->update_json);
+    rc = libxl__device_nic_setdefault(gc, domid, nic, aodev->update_json);
     if (rc) goto out;
 
     front = flexarray_make(gc, 16, 1);
     back = flexarray_make(gc, 18, 1);
 
-    if (nic->devid == -1) {
-        if ((nic->devid = libxl__device_nextid(gc, domid, "vif")) < 0) {
-            rc = ERROR_FAIL;
-            goto out;
-        }
-    }
+    rc = libxl__device_nic_update_devid(gc, domid, nic);
+    if (rc) goto out;
 
     libxl__update_config_nic(gc, &nic_saved, nic);
 
@@ -646,7 +644,7 @@ int libxl__device_nic_set_devids(libxl__gc *gc, libxl_domain_config *d_config,
          * called libxl_device_nic_add when domcreate_launch_dm gets called,
          * but qemu needs the nic information to be complete.
          */
-        ret = libxl__device_nic_setdefault(gc, &d_config->nics[i], domid,
+        ret = libxl__device_nic_setdefault(gc, domid, &d_config->nics[i],
                                            false);
         if (ret) {
             LOGD(ERROR, domid, "Unable to set nic defaults for nic %d", i);

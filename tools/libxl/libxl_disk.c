@@ -152,8 +152,8 @@ void libxl_evdisable_disk_eject(libxl_ctx *ctx, libxl_evgen_disk_eject *evg) {
     GC_FREE;
 }
 
-int libxl__device_disk_setdefault(libxl__gc *gc, libxl_device_disk *disk,
-                                  uint32_t domid)
+int libxl__device_disk_setdefault(libxl__gc *gc, uint32_t domid,
+                                  libxl_device_disk *disk, bool hotplug)
 {
     int rc;
 
@@ -296,7 +296,7 @@ static void device_disk_add(libxl__egc *egc, uint32_t domid,
             }
         }
 
-        rc = libxl__device_disk_setdefault(gc, disk, domid);
+        rc = libxl__device_disk_setdefault(gc, domid, disk, aodev->update_json);
         if (rc) goto out;
 
         front = flexarray_make(gc, 16, 1);
@@ -751,7 +751,7 @@ int libxl_cdrom_insert(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk,
     disk_empty.vdev = libxl__strdup(NOGC, disk->vdev);
     disk_empty.pdev_path = libxl__strdup(NOGC, "");
     disk_empty.is_cdrom = 1;
-    libxl__device_disk_setdefault(gc, &disk_empty, domid);
+    libxl__device_disk_setdefault(gc, domid, &disk_empty, false);
 
     libxl_domain_type type = libxl__domain_type(gc, domid);
     if (type == LIBXL_DOMAIN_TYPE_INVALID) {
@@ -798,7 +798,7 @@ int libxl_cdrom_insert(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk,
         goto out;
     }
 
-    rc = libxl__device_disk_setdefault(gc, disk, domid);
+    rc = libxl__device_disk_setdefault(gc, domid, disk, false);
     if (rc) goto out;
 
     if (!disk->pdev_path) {
@@ -1073,7 +1073,8 @@ void libxl__device_disk_local_initiate_attach(libxl__egc *egc,
             disk->script = libxl__strdup(gc, in_disk->script);
         disk->vdev = NULL;
 
-        rc = libxl__device_disk_setdefault(gc, disk, LIBXL_TOOLSTACK_DOMID);
+        rc = libxl__device_disk_setdefault(gc, LIBXL_TOOLSTACK_DOMID, disk,
+                                           false);
         if (rc) goto out;
 
         libxl__prepare_ao_device(ao, &dls->aodev);
@@ -1243,6 +1244,8 @@ static int libxl_device_disk_dm_needed(void *e, unsigned domid)
     return elem->backend == LIBXL_DISK_BACKEND_QDISK &&
            elem->backend_domid == domid;
 }
+
+#define libxl__device_disk_update_devid NULL
 
 DEFINE_DEVICE_TYPE_STRUCT(disk,
     .merge       = libxl_device_disk_merge,

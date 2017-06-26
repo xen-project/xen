@@ -621,6 +621,8 @@ out:
     return AO_INPROGRESS;
 }
 
+static LIBXL_DEFINE_UPDATE_DEVID(vkb, "vkb")
+
 int libxl__device_vkb_add(libxl__gc *gc, uint32_t domid,
                           libxl_device_vkb *vkb)
 {
@@ -635,12 +637,8 @@ int libxl__device_vkb_add(libxl__gc *gc, uint32_t domid,
     front = flexarray_make(gc, 16, 1);
     back = flexarray_make(gc, 16, 1);
 
-    if (vkb->devid == -1) {
-        if ((vkb->devid = libxl__device_nextid(gc, domid, "vkb")) < 0) {
-            rc = ERROR_FAIL;
-            goto out;
-        }
-    }
+    rc = libxl__device_vkb_update_devid(gc, domid, vkb);
+    if (rc) goto out;
 
     rc = libxl__device_from_vkb(gc, domid, vkb, &device);
     if (rc != 0) goto out;
@@ -719,6 +717,8 @@ out:
     return AO_INPROGRESS;
 }
 
+static LIBXL_DEFINE_UPDATE_DEVID(vfb, "vfb")
+
 int libxl__device_vfb_add(libxl__gc *gc, uint32_t domid, libxl_device_vfb *vfb)
 {
     flexarray_t *front;
@@ -732,12 +732,8 @@ int libxl__device_vfb_add(libxl__gc *gc, uint32_t domid, libxl_device_vfb *vfb)
     front = flexarray_make(gc, 16, 1);
     back = flexarray_make(gc, 16, 1);
 
-    if (vfb->devid == -1) {
-        if ((vfb->devid = libxl__device_nextid(gc, domid, "vfb")) < 0) {
-            rc = ERROR_FAIL;
-            goto out;
-        }
-    }
+    rc = libxl__device_vfb_update_devid(gc, domid, vfb);
+    if (rc) goto out;
 
     rc = libxl__device_from_vfb(gc, domid, vfb, &device);
     if (rc != 0) goto out;

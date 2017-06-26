@@ -17,7 +17,8 @@
 
 #include "libxl_internal.h"
 
-static int libxl__device_vtpm_setdefault(libxl__gc *gc, libxl_device_vtpm *vtpm)
+static int libxl__device_vtpm_setdefault(libxl__gc *gc, uint32_t domid,
+                                         libxl_device_vtpm *vtpm, bool hotplug)
 {
     int rc;
     if (libxl_uuid_is_nil(&vtpm->uuid)) {
@@ -48,6 +49,8 @@ static void libxl__update_config_vtpm(libxl__gc *gc, libxl_device_vtpm *dst,
     libxl_uuid_copy(CTX, &dst->uuid, &src->uuid);
 }
 
+static LIBXL_DEFINE_UPDATE_DEVID(vtpm, "vtpm")
+
 static void libxl__device_vtpm_add(libxl__egc *egc, uint32_t domid,
                                    libxl_device_vtpm *vtpm,
                                    libxl__ao_device *aodev)
@@ -66,18 +69,14 @@ static void libxl__device_vtpm_add(libxl__egc *egc, uint32_t domid,
     libxl_device_vtpm_init(&vtpm_saved);
     libxl_device_vtpm_copy(CTX, &vtpm_saved, vtpm);
 
-    rc = libxl__device_vtpm_setdefault(gc, vtpm);
+    rc = libxl__device_vtpm_setdefault(gc, domid, vtpm, aodev->update_json);
     if (rc) goto out;
 
     front = flexarray_make(gc, 16, 1);
     back = flexarray_make(gc, 16, 1);
 
-    if (vtpm->devid == -1) {
-        if ((vtpm->devid = libxl__device_nextid(gc, domid, "vtpm")) < 0) {
-            rc = ERROR_FAIL;
-            goto out;
-        }
-    }
+    rc = libxl__device_vtpm_update_devid(gc, domid, vtpm);
+    if (rc) goto out;
 
     libxl__update_config_vtpm(gc, &vtpm_saved, vtpm);
 

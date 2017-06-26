@@ -39,6 +39,7 @@ static int libxl__device_from_p9(libxl__gc *gc, uint32_t domid,
    return 0;
 }
 
+static LIBXL_DEFINE_UPDATE_DEVID(p9, "9pfs")
 
 int libxl__device_p9_add(libxl__gc *gc, uint32_t domid,
                          libxl_device_p9 *p9)
@@ -54,12 +55,8 @@ int libxl__device_p9_add(libxl__gc *gc, uint32_t domid,
     front = flexarray_make(gc, 16, 1);
     back = flexarray_make(gc, 16, 1);
 
-    if (p9->devid == -1) {
-        if ((p9->devid = libxl__device_nextid(gc, domid, "9pfs")) < 0) {
-            rc = ERROR_FAIL;
-            goto out;
-        }
-    }
+    rc = libxl__device_p9_update_devid(gc, domid, p9);
+    if (rc) goto out;
 
     rc = libxl__device_from_p9(gc, domid, p9, &device);
     if (rc != 0) goto out;

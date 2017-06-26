@@ -1144,7 +1144,8 @@ static int libxl__device_pci_reset(libxl__gc *gc, unsigned int domain, unsigned 
     return -1;
 }
 
-int libxl__device_pci_setdefault(libxl__gc *gc, libxl_device_pci *pci)
+static int libxl__device_pci_setdefault(libxl__gc *gc, uint32_t domid,
+                                        libxl_device_pci *pci, bool hotplug)
 {
     /* We'd like to force reserve rdm specific to a device by default.*/
     if (pci->rdm_policy == LIBXL_RDM_RESERVE_POLICY_INVALID)
@@ -1200,7 +1201,7 @@ int libxl__device_pci_add(libxl__gc *gc, uint32_t domid, libxl_device_pci *pcide
         }
     }
 
-    rc = libxl__device_pci_setdefault(gc, pcidev);
+    rc = libxl__device_pci_setdefault(gc, domid, pcidev, false);
     if (rc) goto out;
 
     if (pcidev->seize && !pciback_dev_is_assigned(gc, pcidev)) {
@@ -1677,6 +1678,8 @@ static int libxl_device_pci_compare(libxl_device_pci *d1,
 {
     return COMPARE_PCI(d1, d2);
 }
+
+#define libxl__device_pci_update_devid NULL
 
 DEFINE_DEVICE_TYPE_STRUCT_X(pcidev, pci);
 
