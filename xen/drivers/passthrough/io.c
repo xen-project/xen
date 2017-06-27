@@ -912,7 +912,15 @@ static void hvm_dirq_assist(struct domain *d, struct hvm_pirq_dpci *pirq_dpci)
 static void hvm_pirq_eoi(struct pirq *pirq,
                          const union vioapic_redir_entry *ent)
 {
-    struct hvm_pirq_dpci *pirq_dpci = pirq_dpci(pirq);
+    struct hvm_pirq_dpci *pirq_dpci;
+
+    if ( !pirq )
+    {
+        ASSERT_UNREACHABLE();
+        return;
+    }
+
+    pirq_dpci = pirq_dpci(pirq);
 
     /*
      * No need to get vector lock for timer

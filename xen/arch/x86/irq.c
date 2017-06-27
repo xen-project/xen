@@ -2530,10 +2530,9 @@ void arch_evtchn_bind_pirq(struct domain *d, int pirq)
     spin_unlock_irqrestore(&desc->lock, flags);
 }
 
-bool_t hvm_domain_use_pirq(const struct domain *d, const struct pirq *pirq)
+bool hvm_domain_use_pirq(const struct domain *d, const struct pirq *pirq)
 {
-    return is_hvm_domain(d) && pirq &&
-           pirq->arch.hvm.emuirq != IRQ_UNBOUND; 
+    return is_hvm_domain(d) && pirq && pirq->arch.hvm.emuirq != IRQ_UNBOUND;
 }
 
 static int allocate_pirq(struct domain *d, int index, int pirq, int irq,
