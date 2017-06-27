@@ -199,10 +199,10 @@ long arch_do_sysctl(
     case XEN_SYSCTL_get_cpu_featureset:
     {
         static const struct cpuid_policy *const policy_table[] = {
-            [XEN_SYSCTL_cpu_featureset_raw]  = &raw_policy,
-            [XEN_SYSCTL_cpu_featureset_host] = &host_policy,
-            [XEN_SYSCTL_cpu_featureset_pv]   = &pv_max_policy,
-            [XEN_SYSCTL_cpu_featureset_hvm]  = &hvm_max_policy,
+            [XEN_SYSCTL_cpu_featureset_raw]  = &raw_cpuid_policy,
+            [XEN_SYSCTL_cpu_featureset_host] = &host_cpuid_policy,
+            [XEN_SYSCTL_cpu_featureset_pv]   = &pv_max_cpuid_policy,
+            [XEN_SYSCTL_cpu_featureset_hvm]  = &hvm_max_cpuid_policy,
         };
         const struct cpuid_policy *p = NULL;
         uint32_t featureset[FSCAPINTS];

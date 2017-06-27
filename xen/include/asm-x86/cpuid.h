@@ -253,8 +253,8 @@ static inline void cpuid_featureset_to_policy(
     p->feat._7d0  = fs[FEATURESET_7d0];
 }
 
-extern struct cpuid_policy raw_policy, host_policy, pv_max_policy,
-    hvm_max_policy;
+extern struct cpuid_policy raw_cpuid_policy, host_cpuid_policy,
+    pv_max_cpuid_policy, hvm_max_cpuid_policy;
 
 /* Allocate and initialise a CPUID policy suitable for the domain. */
 int init_domain_cpuid_policy(struct domain *d);

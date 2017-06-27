@@ -25,10 +25,10 @@ static void zero_leaves(struct cpuid_leaf *l,
     memset(&l[first], 0, sizeof(*l) * (last - first + 1));
 }
 
-struct cpuid_policy __read_mostly raw_policy,
-    __read_mostly host_policy,
-    __read_mostly pv_max_policy,
-    __read_mostly hvm_max_policy;
+struct cpuid_policy __read_mostly raw_cpuid_policy,
+    __read_mostly host_cpuid_policy,
+    __read_mostly pv_max_cpuid_policy,
+    __read_mostly hvm_max_cpuid_policy;
 
 static void cpuid_leaf(uint32_t leaf, struct cpuid_leaf *data)
 {
@@ -230,7 +230,7 @@ static void recalculate_misc(struct cpuid_policy *p)
 
 static void __init calculate_raw_policy(void)
 {
-    struct cpuid_policy *p = &raw_policy;
+    struct cpuid_policy *p = &raw_cpuid_policy;
     unsigned int i;
 
     cpuid_leaf(0, &p->basic.raw[0]);
@@ -310,9 +310,9 @@ static void __init calculate_raw_policy(void)
 
 static void __init calculate_host_policy(void)
 {
-    struct cpuid_policy *p = &host_policy;
+    struct cpuid_policy *p = &host_cpuid_policy;
 
-    *p = raw_policy;
+    *p = raw_cpuid_policy;
 
     p->basic.max_leaf =
         min_t(uint32_t, p->basic.max_leaf,   ARRAY_SIZE(p->basic.raw) - 1);
@@ -341,11 +341,11 @@ static void __init calculate_host_policy(void)
 
 static void __init calculate_pv_max_policy(void)
 {
-    struct cpuid_policy *p = &pv_max_policy;
+    struct cpuid_policy *p = &pv_max_cpuid_policy;
     uint32_t pv_featureset[FSCAPINTS];
     unsigned int i;
 
-    *p = host_policy;
+    *p = host_cpuid_policy;
     cpuid_policy_to_featureset(p, pv_featureset);
 
     for ( i = 0; i < ARRAY_SIZE(pv_featureset); ++i )
@@ -363,7 +363,7 @@ static void __init calculate_pv_max_policy(void)
 
 static void __init calculate_hvm_max_policy(void)
 {
-    struct cpuid_policy *p = &hvm_max_policy;
+    struct cpuid_policy *p = &hvm_max_cpuid_policy;
     uint32_t hvm_featureset[FSCAPINTS];
     unsigned int i;
     const uint32_t *hvm_featuremask;
@@ -371,7 +371,7 @@ static void __init calculate_hvm_max_policy(void)
     if ( !hvm_enabled )
         return;
 
-    *p = host_policy;
+    *p = host_cpuid_policy;
     cpuid_policy_to_featureset(p, hvm_featureset);
 
     hvm_featuremask = hvm_funcs.hap_supported ?
@@ -394,7 +394,8 @@ static void __init calculate_hvm_max_policy(void)
      * long mode (and init_amd() has cleared it out of host capabilities), but
      * HVM guests are able if running in protected mode.
      */
-    if ( (boot_cpu_data.x86_vendor == X86_VENDOR_AMD) && raw_policy.basic.sep )
+    if ( (boot_cpu_data.x86_vendor == X86_VENDOR_AMD) &&
+         raw_cpuid_policy.basic.sep )
         __set_bit(X86_FEATURE_SEP, hvm_featureset);
 
     /*
@@ -457,7 +458,7 @@ void recalculate_cpuid_policy(struct domain *d)
 {
     struct cpuid_policy *p = d->arch.cpuid;
     const struct cpuid_policy *max =
-        is_pv_domain(d) ? &pv_max_policy : &hvm_max_policy;
+        is_pv_domain(d) ? &pv_max_cpuid_policy : &hvm_max_cpuid_policy;
     uint32_t fs[FSCAPINTS], max_fs[FSCAPINTS];
     unsigned int i;
 
@@ -532,7 +533,7 @@ void recalculate_cpuid_policy(struct domain *d)
 
     /* Fold host's FDP_EXCP_ONLY and NO_FPU_SEL into guest's view. */
     fs[FEATURESET_7b0] &= ~special_features[FEATURESET_7b0];
-    fs[FEATURESET_7b0] |= (host_policy.feat._7b0 &
+    fs[FEATURESET_7b0] |= (host_cpuid_policy.feat._7b0 &
                            special_features[FEATURESET_7b0]);
 
     cpuid_featureset_to_policy(fs, p);
@@ -587,7 +588,8 @@ int init_domain_cpuid_policy(struct domain *d)
     if ( !d->arch.cpuid )
         return -ENOMEM;
 
-    *d->arch.cpuid = is_pv_domain(d) ? pv_max_policy : hvm_max_policy;
+    *d->arch.cpuid = is_pv_domain(d)
+        ? pv_max_cpuid_policy : hvm_max_cpuid_policy;
 
     if ( d->disable_migrate )
         d->arch.cpuid->extd.itsc = cpu_has_itsc;
@@ -837,7 +839,7 @@ void guest_cpuid(const struct vcpu *v, uint32_t leaf,
         if ( is_pv_domain(d) && is_hardware_domain(d) &&
              guest_kernel_mode(v, regs) && cpu_has_monitor &&
              regs->entry_vector == TRAP_gp_fault )
-            *res = raw_policy.basic.raw[leaf];
+            *res = raw_cpuid_policy.basic.raw[leaf];
         break;
 
     case 0x7:
@@ -976,14 +978,14 @@ static void __init __maybe_unused build_assertions(void)
     /* Find some more clever allocation scheme if this trips. */
     BUILD_BUG_ON(sizeof(struct cpuid_policy) > PAGE_SIZE);
 
-    BUILD_BUG_ON(sizeof(raw_policy.basic) !=
-                 sizeof(raw_policy.basic.raw));
-    BUILD_BUG_ON(sizeof(raw_policy.feat) !=
-                 sizeof(raw_policy.feat.raw));
-    BUILD_BUG_ON(sizeof(raw_policy.xstate) !=
-                 sizeof(raw_policy.xstate.raw));
-    BUILD_BUG_ON(sizeof(raw_policy.extd) !=
-                 sizeof(raw_policy.extd.raw));
+    BUILD_BUG_ON(sizeof(raw_cpuid_policy.basic) !=
+                 sizeof(raw_cpuid_policy.basic.raw));
+    BUILD_BUG_ON(sizeof(raw_cpuid_policy.feat) !=
+                 sizeof(raw_cpuid_policy.feat.raw));
+    BUILD_BUG_ON(sizeof(raw_cpuid_policy.xstate) !=
+                 sizeof(raw_cpuid_policy.xstate.raw));
+    BUILD_BUG_ON(sizeof(raw_cpuid_policy.extd) !=
+                 sizeof(raw_cpuid_policy.extd.raw));
 }
 
 /*

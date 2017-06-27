@@ -893,7 +893,7 @@ const char *hvm_efer_valid(const struct vcpu *v, uint64_t value,
     if ( cr0_pg < 0 && !is_hardware_domain(d) )
         p = d->arch.cpuid;
     else
-        p = &host_policy;
+        p = &host_cpuid_policy;
 
     if ( (value & EFER_SCE) && !p->extd.syscall )
         return "SCE without feature";
@@ -937,7 +937,7 @@ unsigned long hvm_cr4_guest_valid_bits(const struct vcpu *v, bool restore)
     if ( !restore && !is_hardware_domain(d) )
         p = d->arch.cpuid;
     else
-        p = &host_policy;
+        p = &host_cpuid_policy;
 
     /* Logic broken out simply to aid readability below. */
     mce  = p->basic.mce || p->basic.mca;
