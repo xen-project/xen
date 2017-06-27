@@ -268,7 +268,7 @@ SEABIOS_UPSTREAM_URL ?= git://xenbits.xen.org/seabios.git
 MINIOS_UPSTREAM_URL ?= git://xenbits.xen.org/mini-os.git
 endif
 OVMF_UPSTREAM_REVISION ?= 5920a9d16b1ab887c2858224316a98e961d71b05
-QEMU_UPSTREAM_REVISION ?= qemu-xen-4.9.0-rc1
+QEMU_UPSTREAM_REVISION ?= 414d069b38ab114b89085e44989bf57604ea86d7
 MINIOS_UPSTREAM_REVISION ?= xen-4.9.0-rc1.2
 # Tue Dec 13 15:02:02 2016 +0000
 # build: prepend OBJ_DIR to linker script
