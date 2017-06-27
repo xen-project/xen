@@ -241,31 +241,37 @@ int arch_livepatch_perform_rela(struct livepatch_elf *elf,
                                 const struct livepatch_elf_sec *base,
                                 const struct livepatch_elf_sec *rela)
 {
-    const Elf_RelA *r;
-    unsigned int symndx, i;
-    uint64_t val;
-    void *dest;
-    bool_t overflow_check;
+    unsigned int i;
 
     for ( i = 0; i < (rela->sec->sh_size / rela->sec->sh_entsize); i++ )
     {
+        const Elf_RelA *r = rela->data + i * rela->sec->sh_entsize;
+        unsigned int symndx = ELF64_R_SYM(r->r_info);
+        void *dest = base->load_addr + r->r_offset; /* P */
+        bool overflow_check = true;
         int ovf = 0;
+        uint64_t val;
 
-        r = rela->data + i * rela->sec->sh_entsize;
-
-        symndx = ELF64_R_SYM(r->r_info);
-
-        if ( symndx > elf->nsym )
+        if ( symndx == STN_UNDEF )
+        {
+            dprintk(XENLOG_ERR, LIVEPATCH "%s: Encountered STN_UNDEF\n",
+                    elf->name);
+            return -EOPNOTSUPP;
+        }
+        else if ( symndx >= elf->nsym )
         {
             dprintk(XENLOG_ERR, LIVEPATCH "%s: Relative relocation wants symbol@%u which is past end!\n",
                     elf->name, symndx);
             return -EINVAL;
         }
+        else if ( !elf->sym[symndx].sym )
+        {
+            dprintk(XENLOG_ERR, LIVEPATCH "%s: No relative symbol@%u\n",
+                    elf->name, symndx);
+            return -EINVAL;
+        }
 
-        dest = base->load_addr + r->r_offset; /* P */
         val = elf->sym[symndx].sym->st_value +  r->r_addend; /* S+A */
-
-        overflow_check = true;
 
         /* ARM64 operations at minimum are always 32-bit. */
         if ( r->r_offset >= base->sec->sh_size ||
@@ -403,6 +409,7 @@ int arch_livepatch_perform_rela(struct livepatch_elf *elf,
 
         case R_AARCH64_ADR_PREL_PG_HI21_NC:
             overflow_check = false;
+            /* Fallthrough. */
         case R_AARCH64_ADR_PREL_PG_HI21:
             ovf = reloc_insn_imm(RELOC_OP_PAGE, dest, val, 12, 21,
                                  AARCH64_INSN_IMM_ADR);
