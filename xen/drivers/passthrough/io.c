@@ -490,7 +490,11 @@ int pt_irq_create_bind(
             /* MSI_TRANSLATE is not supported for the hardware domain. */
             if ( pt_irq_bind->irq_type != PT_IRQ_TYPE_PCI ||
                  pirq >= hvm_domain_irq(d)->nr_gsis )
+            {
+                spin_unlock(&d->event_lock);
+
                 return -EINVAL;
+            }
             guest_gsi = pirq;
         }
 
@@ -523,6 +527,8 @@ int pt_irq_create_bind(
 
                     if ( mask < 0 || trigger_mode < 0 )
                     {
+                        spin_unlock(&d->event_lock);
+
                         ASSERT_UNREACHABLE();
                         return -EINVAL;
                     }
