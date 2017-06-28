@@ -82,7 +82,7 @@ static struct timer calibration_timer;
 static DEFINE_SPINLOCK(pit_lock);
 static u16 pit_stamp16;
 static u32 pit_stamp32;
-static bool_t __read_mostly using_pit;
+static bool __read_mostly using_pit;
 
 /* Boot timestamp, filled in head.S */
 u64 __initdata boot_tsc_stamp;
@@ -304,7 +304,7 @@ static s64 __init init_pit(struct platform_timesource *pts)
     u64 start, end;
     unsigned long count;
 
-    using_pit = 1;
+    using_pit = true;
 
     /* Set the Gate high, disable speaker. */
     outb((portb & ~0x02) | 0x01, 0x61);
@@ -577,7 +577,8 @@ static void plt_overflow(void *unused)
     }
     if ( i != 0 )
     {
-        static bool_t warned_once;
+        static bool warned_once;
+
         if ( !test_and_set_bool(warned_once) )
             printk("Platform timer appears to have unexpectedly wrapped "
                    "%u%s times.\n", i, (i == 10) ? " or more" : "");
@@ -809,7 +810,7 @@ static unsigned long get_cmos_time(void)
     unsigned long res, flags;
     struct rtc_time rtc;
     unsigned int seconds = 60;
-    static bool_t __read_mostly cmos_rtc_probe;
+    static bool __read_mostly cmos_rtc_probe;
     boolean_param("cmos-rtc-probe", cmos_rtc_probe);
 
     if ( efi_enabled(EFI_RS) )
@@ -820,7 +821,7 @@ static unsigned long get_cmos_time(void)
     }
 
     if ( likely(!(acpi_gbl_FADT.boot_flags & ACPI_FADT_NO_CMOS_RTC)) )
-        cmos_rtc_probe = 0;
+        cmos_rtc_probe = false;
     else if ( system_state < SYS_STATE_smp_boot && !cmos_rtc_probe )
         panic("System with no CMOS RTC advertised must be booted from EFI"
               " (or with command line option \"cmos-rtc-probe\")");
@@ -858,7 +859,7 @@ static unsigned long get_cmos_time(void)
         if ( seconds < 60 )
         {
             if ( rtc.sec != seconds )
-                cmos_rtc_probe = 0;
+                cmos_rtc_probe = false;
             break;
         }
 
@@ -987,15 +988,15 @@ static void __update_vcpu_system_time(struct vcpu *v, int force)
         v->arch.pv_vcpu.pending_system_time = _u;
 }
 
-bool_t update_secondary_system_time(struct vcpu *v,
-                                    struct vcpu_time_info *u)
+bool update_secondary_system_time(struct vcpu *v,
+                                  struct vcpu_time_info *u)
 {
     XEN_GUEST_HANDLE(vcpu_time_info_t) user_u = v->arch.time_info_guest;
     struct guest_memory_policy policy =
         { .smap_policy = SMAP_CHECK_ENABLED, .nested_guest_mode = false };
 
     if ( guest_handle_is_null(user_u) )
-        return 1;
+        return true;
 
     update_guest_memory_policy(v, &policy);
 
@@ -1003,7 +1004,7 @@ bool_t update_secondary_system_time(struct vcpu *v,
     if ( __copy_field_to_guest(user_u, u, version) == sizeof(u->version) )
     {
         update_guest_memory_policy(v, &policy);
-        return 0;
+        return false;
     }
     wmb();
     /* 2. Update all other userspace fields. */
@@ -1015,7 +1016,7 @@ bool_t update_secondary_system_time(struct vcpu *v,
 
     update_guest_memory_policy(v, &policy);
 
-    return 1;
+    return true;
 }
 
 void update_vcpu_system_time(struct vcpu *v)
@@ -1951,8 +1952,8 @@ void tsc_get_info(struct domain *d, uint32_t *tsc_mode,
                   uint64_t *elapsed_nsec, uint32_t *gtsc_khz,
                   uint32_t *incarnation)
 {
-    bool_t enable_tsc_scaling = is_hvm_domain(d) &&
-                                hvm_tsc_scaling_supported && !d->arch.vtsc;
+    bool enable_tsc_scaling = is_hvm_domain(d) &&
+                              hvm_tsc_scaling_supported && !d->arch.vtsc;
 
     *incarnation = d->arch.incarnation;
     *tsc_mode = d->arch.tsc_mode;
@@ -2017,7 +2018,7 @@ void tsc_set_info(struct domain *d,
 
     switch ( d->arch.tsc_mode = tsc_mode )
     {
-        bool_t enable_tsc_scaling;
+        bool enable_tsc_scaling;
 
     case TSC_MODE_DEFAULT:
     case TSC_MODE_ALWAYS_EMULATE:
