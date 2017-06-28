@@ -33,7 +33,7 @@
 
 static cpumask_t waiting_to_crash;
 static unsigned int crashing_cpu;
-static DEFINE_PER_CPU_READ_MOSTLY(bool_t, crash_save_done);
+static DEFINE_PER_CPU_READ_MOSTLY(bool, crash_save_done);
 
 /* This becomes the NMI handler for non-crashing CPUs, when Xen is crashing. */
 static void noreturn do_nmi_crash(const struct cpu_user_regs *regs)
@@ -67,7 +67,7 @@ static void noreturn do_nmi_crash(const struct cpu_user_regs *regs)
         kexec_crash_save_cpu();
         __stop_this_cpu();
 
-        this_cpu(crash_save_done) = 1;
+        this_cpu(crash_save_done) = true;
         cpumask_clear_cpu(cpu, &waiting_to_crash);
     }
 
