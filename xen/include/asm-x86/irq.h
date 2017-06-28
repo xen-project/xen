@@ -51,7 +51,7 @@ struct arch_irq_desc {
 typedef int vector_irq_t[NR_VECTORS];
 DECLARE_PER_CPU(vector_irq_t, vector_irq);
 
-extern bool_t opt_noirqbalance;
+extern bool opt_noirqbalance;
 
 #define OPT_IRQ_VECTOR_MAP_DEFAULT 0 /* Do the default thing  */
 #define OPT_IRQ_VECTOR_MAP_NONE    1 /* None */ 
@@ -148,7 +148,7 @@ int unmap_domain_pirq_emuirq(struct domain *d, int pirq);
 bool hvm_domain_use_pirq(const struct domain *, const struct pirq *);
 
 /* Reset irq affinities to match the given CPU mask. */
-void fixup_irqs(const cpumask_t *mask, bool_t verbose);
+void fixup_irqs(const cpumask_t *mask, bool verbose);
 void fixup_eoi(void);
 
 int  init_irq_data(void);
@@ -196,7 +196,7 @@ void cleanup_domain_irq_mapping(struct domain *);
 #define IRQ_PT -2
 #define IRQ_MSI_EMU -3
 
-bool_t cpu_has_pending_apic_eoi(void);
+bool cpu_has_pending_apic_eoi(void);
 
 static inline void arch_move_irqs(struct vcpu *v) { }
 

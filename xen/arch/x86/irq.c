@@ -29,7 +29,7 @@
 static void parse_irq_vector_map_param(char *s);
 
 /* opt_noirqbalance: If true, software IRQ balancing/affinity is disabled. */
-bool_t __read_mostly opt_noirqbalance = 0;
+bool __read_mostly opt_noirqbalance;
 boolean_param("noirqbalance", opt_noirqbalance);
 
 unsigned int __read_mostly nr_irqs_gsi = 16;
@@ -1070,9 +1070,9 @@ struct pending_eoi {
 static DEFINE_PER_CPU(struct pending_eoi, pending_eoi[NR_DYNAMIC_VECTORS]);
 #define pending_eoi_sp(p) ((p)[NR_DYNAMIC_VECTORS-1].vector)
 
-bool_t cpu_has_pending_apic_eoi(void)
+bool cpu_has_pending_apic_eoi(void)
 {
-    return (pending_eoi_sp(this_cpu(pending_eoi)) != 0);
+    return pending_eoi_sp(this_cpu(pending_eoi)) != 0;
 }
 
 static inline void set_pirq_eoi(struct domain *d, unsigned int irq)
@@ -1802,11 +1802,12 @@ void pirq_guest_unbind(struct domain *d, struct pirq *pirq)
         cleanup_domain_irq_pirq(d, irq, pirq);
 }
 
-static int pirq_guest_force_unbind(struct domain *d, struct pirq *pirq)
+static bool pirq_guest_force_unbind(struct domain *d, struct pirq *pirq)
 {
     struct irq_desc *desc;
     irq_guest_action_t *action, *oldaction = NULL;
-    int i, bound = 0;
+    unsigned int i;
+    bool bound = false;
 
     WARN_ON(!spin_is_locked(&d->event_lock));
 
@@ -1830,7 +1831,7 @@ static int pirq_guest_force_unbind(struct domain *d, struct pirq *pirq)
     if ( i == action->nr_guests )
         goto out;
 
-    bound = 1;
+    bound = true;
     oldaction = __pirq_guest_unbind(d, pirq, desc);
 
  out:
@@ -1846,8 +1847,8 @@ static int pirq_guest_force_unbind(struct domain *d, struct pirq *pirq)
     return bound;
 }
 
-static inline bool_t is_free_pirq(const struct domain *d,
-                                  const struct pirq *pirq)
+static inline bool is_free_pirq(const struct domain *d,
+                                const struct pirq *pirq)
 {
     return !pirq || (!pirq->arch.irq && (!is_hvm_domain(d) ||
         pirq->arch.hvm.emuirq == IRQ_UNBOUND));
@@ -2098,7 +2099,7 @@ int unmap_domain_pirq(struct domain *d, int pirq)
     struct irq_desc *desc;
     int irq, ret = 0, rc;
     unsigned int i, nr = 1;
-    bool_t forced_unbind;
+    bool forced_unbind;
     struct pirq *info;
     struct msi_desc *msi_desc = NULL;
 
@@ -2327,7 +2328,7 @@ static int __init setup_dump_irqs(void)
 __initcall(setup_dump_irqs);
 
 /* Reset irq affinities to match the given CPU mask. */
-void fixup_irqs(const cpumask_t *mask, bool_t verbose)
+void fixup_irqs(const cpumask_t *mask, bool verbose)
 {
     unsigned int irq;
     static int warned;
@@ -2335,7 +2336,7 @@ void fixup_irqs(const cpumask_t *mask, bool_t verbose)
 
     for ( irq = 0; irq < nr_irqs; irq++ )
     {
-        bool_t break_affinity = 0, set_affinity = 1;
+        bool break_affinity = false, set_affinity = true;
         unsigned int vector;
         cpumask_t affinity;
 
@@ -2363,7 +2364,7 @@ void fixup_irqs(const cpumask_t *mask, bool_t verbose)
         cpumask_and(&affinity, &affinity, mask);
         if ( cpumask_empty(&affinity) )
         {
-            break_affinity = 1;
+            break_affinity = true;
             cpumask_copy(&affinity, mask);
         }
 
@@ -2373,7 +2374,7 @@ void fixup_irqs(const cpumask_t *mask, bool_t verbose)
         if ( desc->handler->set_affinity )
             desc->handler->set_affinity(desc, &affinity);
         else if ( !(warned++) )
-            set_affinity = 0;
+            set_affinity = false;
 
         if ( desc->handler->enable )
             desc->handler->enable(desc);
