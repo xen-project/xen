@@ -592,7 +592,7 @@ void update_guest_memory_policy(struct vcpu *v,
 #define hvm_vmx         hvm_vcpu.u.vmx
 #define hvm_svm         hvm_vcpu.u.svm
 
-bool_t update_runstate_area(struct vcpu *);
+bool update_runstate_area(struct vcpu *);
 bool_t update_secondary_system_time(struct vcpu *,
                                     struct vcpu_time_info *);
 

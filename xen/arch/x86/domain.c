@@ -872,7 +872,7 @@ int arch_set_info_guest(
     else
     {
         unsigned long pfn = pagetable_get_pfn(v->arch.guest_table);
-        bool_t fail;
+        bool fail;
 
         if ( !compat )
         {
@@ -950,7 +950,7 @@ int arch_set_info_guest(
              test_bit(VMASST_TYPE_m2p_strict, &c.nat->vm_assist) &&
              atomic_read(&d->arch.pv_domain.nr_l4_pages) )
         {
-            bool_t done = 0;
+            bool done = false;
 
             spin_lock_recursive(&d->page_alloc_lock);
 
@@ -1472,15 +1472,15 @@ void paravirt_ctxt_switch_to(struct vcpu *v)
 }
 
 /* Update per-VCPU guest runstate shared memory area (if registered). */
-bool_t update_runstate_area(struct vcpu *v)
+bool update_runstate_area(struct vcpu *v)
 {
-    bool_t rc;
+    bool rc;
     struct guest_memory_policy policy =
         { .smap_policy = SMAP_CHECK_ENABLED, .nested_guest_mode = false };
     void __user *guest_handle = NULL;
 
     if ( guest_handle_is_null(runstate_guest(v)) )
-        return 1;
+        return true;
 
     update_guest_memory_policy(v, &policy);
 
@@ -1502,7 +1502,7 @@ bool_t update_runstate_area(struct vcpu *v)
 
         XLAT_vcpu_runstate_info(&info, &v->runstate);
         __copy_to_guest(v->runstate_guest.compat, &info, 1);
-        rc = 1;
+        rc = true;
     }
     else
         rc = __copy_to_guest(runstate_guest(v), &v->runstate, 1) !=
@@ -1528,7 +1528,7 @@ static void _update_runstate_area(struct vcpu *v)
         v->arch.pv_vcpu.need_update_runstate_area = 1;
 }
 
-static inline bool_t need_full_gdt(const struct domain *d)
+static inline bool need_full_gdt(const struct domain *d)
 {
     return is_pv_domain(d) && !is_idle_domain(d);
 }
@@ -1993,7 +1993,8 @@ void vcpu_kick(struct vcpu *v)
      * NB2. We save the running flag across the unblock to avoid a needless
      * IPI for domains that we IPI'd to unblock.
      */
-    bool_t running = v->is_running;
+    bool running = v->is_running;
+
     vcpu_unblock(v);
     if ( running && (in_irq() || (v != current)) )
         cpu_raise_softirq(v->processor, VCPU_KICK_SOFTIRQ);
