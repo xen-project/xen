@@ -53,7 +53,7 @@
 #include <asm/cpuid.h>
 
 /* opt_nosmp: If true, secondary processors are ignored. */
-static bool_t __initdata opt_nosmp;
+static bool __initdata opt_nosmp;
 boolean_param("nosmp", opt_nosmp);
 
 /* maxcpus: maximum number of CPUs to activate. */
@@ -151,8 +151,8 @@ static void __init parse_smap_param(char *s)
 }
 custom_param("smap", parse_smap_param);
 
-bool_t __read_mostly acpi_disabled;
-bool_t __initdata acpi_force;
+bool __read_mostly acpi_disabled;
+bool __initdata acpi_force;
 static char __initdata acpi_param[10] = "";
 static void __init parse_acpi_param(char *s)
 {
@@ -166,9 +166,9 @@ static void __init parse_acpi_param(char *s)
     }
     else if ( !strcmp(s, "force") )
     {
-        acpi_force = 1;
+        acpi_force = true;
         acpi_ht = 1;
-        acpi_disabled = 0;
+        acpi_disabled = false;
     }
     else if ( !strcmp(s, "ht") )
     {
@@ -338,7 +338,7 @@ static void *__init bootstrap_map(const module_t *mod)
 }
 
 static void *__init move_memory(
-    uint64_t dst, uint64_t src, unsigned int size, bool_t keep)
+    uint64_t dst, uint64_t src, unsigned int size, bool keep)
 {
     unsigned int blksz = BOOTSTRAP_MAP_LIMIT - BOOTSTRAP_MAP_BASE;
     unsigned int mask = (1L << L2_PAGETABLE_SHIFT) - 1;
@@ -515,14 +515,14 @@ static void __init kexec_reserve_area(struct e820map *e820)
 #ifdef CONFIG_KEXEC
     unsigned long kdump_start = kexec_crash_area.start;
     unsigned long kdump_size  = kexec_crash_area.size;
-    static bool_t __initdata is_reserved = 0;
+    static bool __initdata is_reserved = false;
 
     kdump_size = (kdump_size + PAGE_SIZE - 1) & PAGE_MASK;
 
     if ( (kdump_start == 0) || (kdump_size == 0) || is_reserved )
         return;
 
-    is_reserved = 1;
+    is_reserved = true;
 
     if ( !reserve_e820_ram(e820, kdump_start, kdump_start + kdump_size) )
     {
@@ -538,7 +538,7 @@ static void __init kexec_reserve_area(struct e820map *e820)
 #endif
 }
 
-static inline bool_t using_2M_mapping(void)
+static inline bool using_2M_mapping(void)
 {
     return !l1_table_offset((unsigned long)__2M_text_end) &&
            !l1_table_offset((unsigned long)__2M_rodata_start) &&
@@ -601,7 +601,7 @@ static void __init noreturn reinit_bsp_stack(void)
     reset_stack_and_jump(init_done);
 }
 
-static bool_t __init loader_is_grub2(const char *loader_name)
+static bool __init loader_is_grub2(const char *loader_name)
 {
     /* GRUB1="GNU GRUB 0.xx"; GRUB2="GRUB 1.xx" */
     const char *p = strstr(loader_name, "GRUB ");
@@ -638,7 +638,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
     module_t *mod = (module_t *)__va(mbi->mods_addr);
     unsigned long nr_pages, raw_max_page, modules_headroom, *module_map;
     int i, j, e820_warn = 0, bytes = 0;
-    bool_t acpi_boot_table_init_done = 0;
+    bool acpi_boot_table_init_done = false;
     struct domain *dom0;
     struct ns16550_defaults ns16550 = {
         .data_bits = 8,
@@ -1166,7 +1166,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
              s >= (1ULL << 32) &&
              !acpi_boot_table_init() )
         {
-            acpi_boot_table_init_done = 1;
+            acpi_boot_table_init_done = true;
             srat_parse_regions(s);
             setup_max_pdx(raw_max_page);
         }
