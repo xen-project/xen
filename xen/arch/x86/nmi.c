@@ -41,31 +41,31 @@ static DEFINE_PER_CPU(struct timer, nmi_timer);
 static DEFINE_PER_CPU(unsigned int, nmi_timer_ticks);
 
 /* opt_watchdog: If true, run a watchdog NMI on each processor. */
-bool_t __initdata opt_watchdog = 0;
+bool __initdata opt_watchdog;
 
 /* watchdog_force: If true, process unknown NMIs when running the watchdog. */
-bool_t watchdog_force = 0;
+bool watchdog_force;
 
 static void __init parse_watchdog(char *s)
 {
     if ( !*s )
     {
-        opt_watchdog = 1;
+        opt_watchdog = true;
         return;
     }
 
     switch ( parse_bool(s) )
     {
     case 0:
-        opt_watchdog = 0;
+        opt_watchdog = false;
         return;
     case 1:
-        opt_watchdog = 1;
+        opt_watchdog = true;
         return;
     }
 
     if ( !strcmp(s, "force") )
-        watchdog_force = opt_watchdog = 1;
+        watchdog_force = opt_watchdog = true;
 }
 custom_param("watchdog", parse_watchdog);
 
@@ -152,14 +152,14 @@ static void __init wait_for_nmis(void *p)
     } while( e - s < ticks );
 }
 
-int __init check_nmi_watchdog (void)
+void __init check_nmi_watchdog(void)
 {
     static unsigned int __initdata prev_nmi_count[NR_CPUS];
     int cpu;
-    bool_t ok = 1;
+    bool ok = true;
 
     if ( nmi_watchdog == NMI_NONE )
-        return 0;
+        return;
 
     printk("Testing NMI watchdog on all CPUs:");
 
@@ -178,7 +178,7 @@ int __init check_nmi_watchdog (void)
         if ( nmi_count(cpu) - prev_nmi_count[cpu] < 2 )
         {
             printk(" %d", cpu);
-            ok = 0;
+            ok = false;
         }
     }
 
@@ -196,7 +196,7 @@ int __init check_nmi_watchdog (void)
     if ( nmi_watchdog == NMI_LOCAL_APIC )
         nmi_hz = max(1ul, cpu_khz >> 20);
 
-    return 0;
+    return;
 }
 
 static void nmi_timer_fn(void *unused)
@@ -448,7 +448,7 @@ void watchdog_enable(void)
     atomic_dec(&watchdog_disable_count);
 }
 
-bool_t watchdog_enabled(void)
+bool watchdog_enabled(void)
 {
     return !atomic_read(&watchdog_disable_count);
 }
@@ -470,9 +470,9 @@ int __init watchdog_setup(void)
 }
 
 /* Returns false if this was not a watchdog NMI, true otherwise */
-bool_t nmi_watchdog_tick(const struct cpu_user_regs *regs)
+bool nmi_watchdog_tick(const struct cpu_user_regs *regs)
 {
-    bool_t watchdog_tick = 1;
+    bool watchdog_tick = true;
     unsigned int sum = this_cpu(nmi_timer_ticks);
 
     if ( (this_cpu(last_irq_sums) == sum) && watchdog_enabled() )
@@ -505,7 +505,7 @@ bool_t nmi_watchdog_tick(const struct cpu_user_regs *regs)
         {
             rdmsrl(MSR_P4_IQ_CCCR0, msr_content);
             if ( !(msr_content & P4_CCCR_OVF) )
-                watchdog_tick = 0;
+                watchdog_tick = false;
 
             /*
              * P4 quirks:
@@ -521,7 +521,7 @@ bool_t nmi_watchdog_tick(const struct cpu_user_regs *regs)
         {
             rdmsrl(MSR_P6_PERFCTR(0), msr_content);
             if ( msr_content & (1ULL << P6_EVENT_WIDTH) )
-                watchdog_tick = 0;
+                watchdog_tick = false;
 
             /*
              * Only P6 based Pentium M need to re-unmask the apic vector but
@@ -533,7 +533,7 @@ bool_t nmi_watchdog_tick(const struct cpu_user_regs *regs)
         {
             rdmsrl(MSR_K7_PERFCTR0, msr_content);
             if ( msr_content & (1ULL << K7_EVENT_WIDTH) )
-                watchdog_tick = 0;
+                watchdog_tick = false;
         }
         write_watchdog_counter(NULL);
     }

@@ -186,7 +186,7 @@ extern void release_lapic_nmi(void);
 extern void self_nmi(void);
 extern void disable_timer_nmi_watchdog(void);
 extern void enable_timer_nmi_watchdog(void);
-extern bool_t nmi_watchdog_tick (const struct cpu_user_regs *regs);
+extern bool nmi_watchdog_tick(const struct cpu_user_regs *regs);
 extern int APIC_init_uniprocessor (void);
 extern void disable_APIC_timer(void);
 extern void enable_APIC_timer(void);
@@ -196,7 +196,7 @@ extern void record_boot_APIC_mode(void);
 extern enum apic_mode current_local_apic_mode(void);
 extern void check_for_unexpected_msi(unsigned int vector);
 
-extern int check_nmi_watchdog (void);
+extern void check_nmi_watchdog(void);
 
 extern unsigned int nmi_watchdog;
 #define NMI_NONE	0
