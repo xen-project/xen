@@ -4278,7 +4278,10 @@ void vmx_vmenter_helper(const struct cpu_user_regs *regs)
         if ( cpumask_test_cpu(cpu, ept->invalidate) )
         {
             cpumask_clear_cpu(cpu, ept->invalidate);
-            __invept(INVEPT_SINGLE_CONTEXT, ept->eptp, 0);
+            if ( nestedhvm_enabled(curr->domain) )
+                __invept(INVEPT_ALL_CONTEXT, 0, 0);
+            else
+                __invept(INVEPT_SINGLE_CONTEXT, ept->eptp, 0);
         }
     }
 

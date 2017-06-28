@@ -1153,8 +1153,13 @@ static void ept_sync_domain_prepare(struct p2m_domain *p2m)
     struct domain *d = p2m->domain;
     struct ept_data *ept = &p2m->ept;
 
-    if ( nestedhvm_enabled(d) && !p2m_is_nestedp2m(p2m) )
-        p2m_flush_nestedp2m(d);
+    if ( nestedhvm_enabled(d) )
+    {
+        if ( p2m_is_nestedp2m(p2m) )
+            ept = &p2m_get_hostp2m(d)->ept;
+        else
+            p2m_flush_nestedp2m(d);
+    }
 
     /*
      * Need to invalidate on all PCPUs because either:
