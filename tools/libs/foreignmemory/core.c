@@ -63,10 +63,10 @@ int xenforeignmemory_close(xenforeignmemory_handle *fmem)
     return rc;
 }
 
-void *xenforeignmemory_map(xenforeignmemory_handle *fmem,
-                           uint32_t dom, int prot,
-                           size_t num,
-                           const xen_pfn_t arr[/*num*/], int err[/*num*/])
+void *xenforeignmemory_map2(xenforeignmemory_handle *fmem,
+                            uint32_t dom, void *addr,
+                            int prot, int flags, size_t num,
+                            const xen_pfn_t arr[/*num*/], int err[/*num*/])
 {
     void *ret;
     int *err_to_free = NULL;
@@ -77,7 +77,7 @@ void *xenforeignmemory_map(xenforeignmemory_handle *fmem,
     if ( err == NULL )
         return NULL;
 
-    ret = osdep_xenforeignmemory_map(fmem, dom, prot, num, arr, err);
+    ret = osdep_xenforeignmemory_map(fmem, dom, addr, prot, flags, num, arr, err);
 
     if ( ret && err_to_free )
     {
@@ -98,6 +98,14 @@ void *xenforeignmemory_map(xenforeignmemory_handle *fmem,
     free(err_to_free);
 
     return ret;
+}
+
+void *xenforeignmemory_map(xenforeignmemory_handle *fmem,
+                           uint32_t dom, int prot,
+                           size_t num,
+                           const xen_pfn_t arr[/*num*/], int err[/*num*/])
+{
+    return xenforeignmemory_map2(fmem, dom, NULL, prot, 0, num, arr, err);
 }
 
 int xenforeignmemory_unmap(xenforeignmemory_handle *fmem,

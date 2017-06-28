@@ -21,8 +21,8 @@
 
 #include "private.h"
 
-void *osdep_xenforeignmemory_map(xenforeignmemory_handle *fmem,
-                                 uint32_t dom, int prot, size_t num,
+void *osdep_xenforeignmemory_map(xenforeignmemory_handle *fmem, uint32_t dom,
+                                 void *addr, int prot, int flags, size_t num,
                                  const xen_pfn_t arr[/*num*/], int err[/*num*/])
 {
     xen_pfn_t *pfn;
@@ -41,7 +41,7 @@ void *osdep_xenforeignmemory_map(xenforeignmemory_handle *fmem,
     }
 
     memcpy(pfn, arr, num * sizeof(*arr));
-    ret = osdep_map_foreign_batch(fmem, dom, prot, pfn, num);
+    ret = osdep_map_foreign_batch(fmem, dom, addr, prot, flags, pfn, num);
 
     if (ret) {
         for (i = 0; i < num; ++i)

@@ -10,3 +10,7 @@ VERS_1.1 {
 	global:
 		xenforeignmemory_restrict;
 } VERS_1.0;
+VERS_1.2 {
+	global:
+		xenforeignmemory_map2;
+} VERS_1.1;

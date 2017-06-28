@@ -108,6 +108,18 @@ void *xenforeignmemory_map(xenforeignmemory_handle *fmem, uint32_t dom,
                            const xen_pfn_t arr[/*pages*/], int err[/*pages*/]);
 
 /*
+ * Almost like the previous one but also accepts two additional parameters:
+ *
+ * @addr is used as a hint address for foreign map placement (see mmap(2)).
+ * @flags is a set of additional flags as for mmap(2). Not all of the flag
+ * combinations are possible due to implementation details on different
+ * platforms.
+ */
+void *xenforeignmemory_map2(xenforeignmemory_handle *fmem, uint32_t dom,
+                            void *addr, int prot, int flags, size_t pages,
+                            const xen_pfn_t arr[/*pages*/], int err[/*pages*/]);
+
+/*
  * Unmap a mapping previous created with xenforeignmemory_map().
  *
  * Returns 0 on success on failure sets errno and returns -1.

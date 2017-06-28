@@ -68,12 +68,11 @@ int osdep_xenforeignmemory_close(xenforeignmemory_handle *fmem)
 }
 
 void *osdep_map_foreign_batch(xenforeignmem_handle *fmem, uint32_t dom,
-                              int prot, xen_pfn_t *arr, int num)
+                              void *addr, int prot, int flags, xen_pfn_t *arr, int num)
 {
     int fd = fmem->fd;
     privcmd_mmapbatch_t ioctlx;
-    void *addr;
-    addr = mmap(NULL, num*XC_PAGE_SIZE, prot, MAP_SHARED, fd, 0);
+    addr = mmap(addr, num*XC_PAGE_SIZE, prot, flags | MAP_SHARED, fd, 0);
     if ( addr == MAP_FAILED )
         return NULL;
 

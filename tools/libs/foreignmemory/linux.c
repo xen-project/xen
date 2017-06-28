@@ -142,17 +142,16 @@ out:
 }
 
 void *osdep_xenforeignmemory_map(xenforeignmemory_handle *fmem,
-                                 uint32_t dom, int prot,
-                                 size_t num,
+                                 uint32_t dom, void *addr,
+                                 int prot, int flags, size_t num,
                                  const xen_pfn_t arr[/*num*/], int err[/*num*/])
 {
     int fd = fmem->fd;
     privcmd_mmapbatch_v2_t ioctlx;
-    void *addr;
     size_t i;
     int rc;
 
-    addr = mmap(NULL, num << PAGE_SHIFT, prot, MAP_SHARED,
+    addr = mmap(addr, num << PAGE_SHIFT, prot, flags | MAP_SHARED,
                 fd, 0);
     if ( addr == MAP_FAILED )
     {

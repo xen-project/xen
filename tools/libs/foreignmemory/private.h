@@ -26,8 +26,8 @@ int osdep_xenforeignmemory_open(xenforeignmemory_handle *fmem);
 int osdep_xenforeignmemory_close(xenforeignmemory_handle *fmem);
 
 void *osdep_xenforeignmemory_map(xenforeignmemory_handle *fmem,
-                                 uint32_t dom, int prot,
-                                 size_t num,
+                                 uint32_t dom, void *addr,
+                                 int prot, int flags, size_t num,
                                  const xen_pfn_t arr[num], int err[num]);
 int osdep_xenforeignmemory_unmap(xenforeignmemory_handle *fmem,
                                  void *addr, size_t num);
@@ -38,7 +38,8 @@ int osdep_xenforeignmemory_restrict(xenforeignmemory_handle *fmem,
 #if defined(__NetBSD__) || defined(__sun__)
 /* Strictly compat for those two only only */
 void *compat_mapforeign_batch(xenforeignmem_handle *fmem, uint32_t dom,
-                              int prot, xen_pfn_t *arr, int num);
+                              void *addr, int prot, int flags,
+                              xen_pfn_t *arr, int num);
 #endif
 
 #define PERROR(_f...) \
