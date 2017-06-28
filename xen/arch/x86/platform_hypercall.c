@@ -62,7 +62,7 @@ long cpu_frequency_change_helper(void *data)
     return cpu_frequency_change((uint64_t)data);
 }
 
-static bool_t allow_access_msr(unsigned int msr)
+static bool allow_access_msr(unsigned int msr)
 {
     switch ( msr )
     {
@@ -70,10 +70,10 @@ static bool_t allow_access_msr(unsigned int msr)
     case MSR_IA32_CMT_EVTSEL:
     case MSR_IA32_CMT_CTR:
     case MSR_IA32_TSC:
-        return 1;
+        return true;
     }
 
-    return 0;
+    return false;
 }
 
 void check_resource_access(struct resource_access *ra)
@@ -143,8 +143,8 @@ void resource_access(void *info)
                  * If next entry is MSR_IA32_TSC read, then the actual rdtsc
                  * is performed together with current entry, with IRQ disabled.
                  */
-                bool_t read_tsc = (i < ra->nr_done - 1 &&
-                                   unlikely(entry[1].idx == MSR_IA32_TSC));
+                bool read_tsc = i < ra->nr_done - 1 &&
+                                unlikely(entry[1].idx == MSR_IA32_TSC);
 
                 if ( unlikely(read_tsc) )
                     local_irq_save(flags);
