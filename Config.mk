@@ -269,9 +269,9 @@ MINIOS_UPSTREAM_URL ?= git://xenbits.xen.org/mini-os.git
 endif
 OVMF_UPSTREAM_REVISION ?= 5920a9d16b1ab887c2858224316a98e961d71b05
 QEMU_UPSTREAM_REVISION ?= master
-MINIOS_UPSTREAM_REVISION ?= ca013fa9baf92f47469ba1f2e1aaa31c41d8a0bb
-# Tue Dec 13 15:02:02 2016 +0000
-# build: prepend OBJ_DIR to linker script
+MINIOS_UPSTREAM_REVISION ?= a207ecfd3ad09be5d0859749d8e433b4ce8efdd6
+# Thu, 22 Jun 2017 14:40:26 +0100 (15:40 +0200)
+# mini-os: use gzip -n
 
 SEABIOS_UPSTREAM_REVISION ?= rel-1.10.2
 # Wed Jun 22 14:53:24 2016 +0800
