@@ -89,7 +89,7 @@ static libxl_cpuid_policy_list cpuid_find_match(libxl_cpuid_policy_list *list,
 int libxl_cpuid_parse_config(libxl_cpuid_policy_list *cpuid, const char* str)
 {
 #define NA XEN_CPUID_INPUT_UNUSED
-    struct cpuid_flags cpuid_flags[] = {
+    static const struct cpuid_flags cpuid_flags[] = {
         {"maxleaf",      0x00000000, NA, CPUID_REG_EAX,  0, 32},
       /* the following two entries are subject to tweaking later in the code */
         {"family",       0x00000001, NA, CPUID_REG_EAX,  8,  8},
@@ -243,7 +243,7 @@ int libxl_cpuid_parse_config(libxl_cpuid_policy_list *cpuid, const char* str)
 #undef NA
     char *sep, *val, *endptr;
     int i;
-    struct cpuid_flags *flag;
+    const struct cpuid_flags *flag;
     struct libxl__cpuid_policy *entry;
     unsigned long num;
     char flags[33], *resstr;
