@@ -31,7 +31,7 @@ enum GenericIntercept1bits
     GENERAL1_INTERCEPT_SMI           = 1 << 2,
     GENERAL1_INTERCEPT_INIT          = 1 << 3,
     GENERAL1_INTERCEPT_VINTR         = 1 << 4,
-    GENERAL1_INTERCEPT_CR0_SEL_WRITE = 1 << 5, 
+    GENERAL1_INTERCEPT_CR0_SEL_WRITE = 1 << 5,
     GENERAL1_INTERCEPT_IDTR_READ     = 1 << 6,
     GENERAL1_INTERCEPT_GDTR_READ     = 1 << 7,
     GENERAL1_INTERCEPT_LDTR_READ     = 1 << 8,
@@ -304,13 +304,10 @@ enum VMEXIT_EXITCODE
     VMEXIT_INVALID          =  -1
 };
 
-/* Definition of segment state is borrowed by the generic HVM code. */
-typedef struct segment_register svm_segment_register_t;
-
 typedef union
 {
     u64 bytes;
-    struct 
+    struct
     {
         u64 vector:    8;
         u64 type:      3;
@@ -324,7 +321,7 @@ typedef union
 typedef union
 {
     u64 bytes;
-    struct 
+    struct
     {
         u64 tpr:          8;
         u64 irq:          1;
@@ -342,7 +339,7 @@ typedef union
 typedef union
 {
     u64 bytes;
-    struct 
+    struct
     {
         u64 type: 1;
         u64 rsv0: 1;
@@ -438,23 +435,23 @@ struct vmcb_struct {
     u8  guest_ins[15];          /* offset 0xD1 */
     u64 res10a[100];            /* offset 0xE0 pad to save area */
 
-    svm_segment_register_t es;  /* offset 1024 - cleanbit 8 */
-    svm_segment_register_t cs;  /* cleanbit 8 */
-    svm_segment_register_t ss;  /* cleanbit 8 */
-    svm_segment_register_t ds;  /* cleanbit 8 */
-    svm_segment_register_t fs;
-    svm_segment_register_t gs;
-    svm_segment_register_t gdtr; /* cleanbit 7 */
-    svm_segment_register_t ldtr;
-    svm_segment_register_t idtr; /* cleanbit 7 */
-    svm_segment_register_t tr;
+    struct segment_register es;  /* offset 0x400 - cleanbit 8 */
+    struct segment_register cs;  /* cleanbit 8 */
+    struct segment_register ss;  /* cleanbit 8 */
+    struct segment_register ds;  /* cleanbit 8 */
+    struct segment_register fs;
+    struct segment_register gs;
+    struct segment_register gdtr; /* cleanbit 7 */
+    struct segment_register ldtr;
+    struct segment_register idtr; /* cleanbit 7 */
+    struct segment_register tr;
     u64 res10[5];
     u8 res11[3];
     u8 _cpl;                    /* cleanbit 8 */
     u32 res12;
-    u64 _efer;                  /* offset 1024 + 0xD0  - cleanbit 5 */
+    u64 _efer;                  /* offset 0x400 + 0xD0 - cleanbit 5 */
     u64 res13[14];
-    u64 _cr4;                   /* offset 1024 + 0x148 - cleanbit 5 */
+    u64 _cr4;                   /* offset 0x400 + 0x148 - cleanbit 5 */
     u64 _cr3;                   /* cleanbit 5 */
     u64 _cr0;                   /* cleanbit 5 */
     u64 _dr7;                   /* cleanbit 6 */
@@ -508,7 +505,7 @@ struct arch_svm_struct {
     uint64_t guest_sysenter_cs;
     uint64_t guest_sysenter_esp;
     uint64_t guest_sysenter_eip;
-    
+
     /* AMD lightweight profiling MSR */
     uint64_t guest_lwp_cfg;      /* guest version */
     uint64_t cpu_lwp_cfg;        /* CPU version */

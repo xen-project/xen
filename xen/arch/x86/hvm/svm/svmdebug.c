@@ -21,7 +21,7 @@
 #include <asm/msr-index.h>
 #include <asm/hvm/svm/svmdebug.h>
 
-static void svm_dump_sel(const char *name, const svm_segment_register_t *s)
+static void svm_dump_sel(const char *name, const struct segment_register *s)
 {
     printk("%s: %04x %04x %08x %016"PRIx64"\n",
            name, s->sel, s->attr.bytes, s->limit, s->base);

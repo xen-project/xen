@@ -310,6 +310,22 @@ void __init setup_vmcb_dump(void)
     register_keyhandler('v', vmcb_dump, "dump AMD-V VMCBs", 1);
 }
 
+static void __init __maybe_unused build_assertions(void)
+{
+    struct segment_register sreg;
+
+    /* Check struct segment_register against the VMCB segment layout. */
+    BUILD_BUG_ON(sizeof(sreg)       != 16);
+    BUILD_BUG_ON(sizeof(sreg.sel)   != 2);
+    BUILD_BUG_ON(sizeof(sreg.attr)  != 2);
+    BUILD_BUG_ON(sizeof(sreg.limit) != 4);
+    BUILD_BUG_ON(sizeof(sreg.base)  != 8);
+    BUILD_BUG_ON(offsetof(struct segment_register, sel)   != 0);
+    BUILD_BUG_ON(offsetof(struct segment_register, attr)  != 2);
+    BUILD_BUG_ON(offsetof(struct segment_register, limit) != 4);
+    BUILD_BUG_ON(offsetof(struct segment_register, base)  != 8);
+}
+
 /*
  * Local variables:
  * mode: C
