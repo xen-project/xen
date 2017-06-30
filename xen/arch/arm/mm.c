@@ -980,7 +980,7 @@ enum xenmap_operation {
 
 static int create_xen_entries(enum xenmap_operation op,
                               unsigned long virt,
-                              unsigned long mfn,
+                              mfn_t mfn,
                               unsigned long nr_mfns,
                               unsigned int ai)
 {
@@ -989,7 +989,7 @@ static int create_xen_entries(enum xenmap_operation op,
     lpae_t pte;
     lpae_t *third = NULL;
 
-    for(; addr < addr_end; addr += PAGE_SIZE, mfn++)
+    for(; addr < addr_end; addr += PAGE_SIZE, mfn = mfn_add(mfn, 1))
     {
         if ( !xen_second[second_linear_offset(addr)].pt.valid ||
              !xen_second[second_linear_offset(addr)].pt.table )
@@ -1010,13 +1010,13 @@ static int create_xen_entries(enum xenmap_operation op,
             case RESERVE:
                 if ( third[third_table_offset(addr)].pt.valid )
                 {
-                    printk("create_xen_entries: trying to replace an existing mapping addr=%lx mfn=%lx\n",
-                           addr, mfn);
+                    printk("create_xen_entries: trying to replace an existing mapping addr=%lx mfn=%"PRI_mfn"\n",
+                           addr, mfn_x(mfn));
                     return -EINVAL;
                 }
                 if ( op == RESERVE )
                     break;
-                pte = mfn_to_xen_entry(_mfn(mfn), ai);
+                pte = mfn_to_xen_entry(mfn, ai);
                 pte.pt.table = 1;
                 write_pte(&third[third_table_offset(addr)], pte);
                 break;
@@ -1061,24 +1061,25 @@ int map_pages_to_xen(unsigned long virt,
                      unsigned long nr_mfns,
                      unsigned int flags)
 {
-    return create_xen_entries(INSERT, virt, mfn, nr_mfns, flags);
+    return create_xen_entries(INSERT, virt, _mfn(mfn), nr_mfns, flags);
 }
 
 int populate_pt_range(unsigned long virt, unsigned long mfn,
                       unsigned long nr_mfns)
 {
-    return create_xen_entries(RESERVE, virt, mfn, nr_mfns, 0);
+    return create_xen_entries(RESERVE, virt, _mfn(mfn), nr_mfns, 0);
 }
 
 int destroy_xen_mappings(unsigned long v, unsigned long e)
 {
-    return create_xen_entries(REMOVE, v, 0, (e - v) >> PAGE_SHIFT, 0);
+    return create_xen_entries(REMOVE, v, INVALID_MFN, (e - v) >> PAGE_SHIFT, 0);
 }
 
 int modify_xen_mappings(unsigned long s, unsigned long e, unsigned int flags)
 {
     ASSERT((flags & (PTE_NX | PTE_RO)) == flags);
-    return create_xen_entries(MODIFY, s, 0, (e - s) >> PAGE_SHIFT, flags);
+    return create_xen_entries(MODIFY, s, INVALID_MFN, (e - s) >> PAGE_SHIFT,
+                              flags);
 }
 
 enum mg { mg_clear, mg_ro, mg_rw, mg_rx };
