@@ -96,6 +96,6 @@ int arch_monitor_init_domain(struct domain *d);
 
 void arch_monitor_cleanup_domain(struct domain *d);
 
-bool_t monitored_msr(const struct domain *d, u32 msr);
+bool monitored_msr(const struct domain *d, u32 msr);
 
 #endif /* __ASM_X86_MONITOR_H__ */
