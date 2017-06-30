@@ -183,8 +183,8 @@ static int __init dmi_table(paddr_t base, u32 len, int num,
 }
 
 
-static inline bool_t __init dmi_checksum(const void __iomem *buf,
-					 unsigned int len)
+static inline bool __init dmi_checksum(const void __iomem *buf,
+                                       unsigned int len)
 {
 	u8 sum = 0;
 	const u8 *p = buf;
@@ -753,10 +753,10 @@ fail:		d++;
  *	On return, year, month and day are guaranteed to be in the
  *	range of [0,9999], [0,12] and [0,31] respectively.
  */
-bool_t __init dmi_get_date(int field, int *yearp, int *monthp, int *dayp)
+bool __init dmi_get_date(int field, int *yearp, int *monthp, int *dayp)
 {
 	int year = 0, month = 0, day = 0;
-	bool_t exists;
+	bool exists;
 	const char *s, *e, *y;
 
 	s = field < DMI_STRING_MAX ? dmi_ident[field] : NULL;
