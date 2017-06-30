@@ -58,7 +58,7 @@ u8 __initdata hpet_flags;
  * if RTC interrupts are enabled. Enable this option if want to always enable
  * legacy hpet broadcast for deep C state
  */
-static bool_t __initdata force_hpet_broadcast;
+static bool __initdata force_hpet_broadcast;
 boolean_param("hpetbroadcast", force_hpet_broadcast);
 
 /*
