@@ -41,7 +41,7 @@ static struct node node_memblk_range[NR_NODE_MEMBLKS];
 static nodeid_t memblk_nodeid[NR_NODE_MEMBLKS];
 static __initdata DECLARE_BITMAP(memblk_hotplug, NR_NODE_MEMBLKS);
 
-static inline bool_t node_found(unsigned idx, unsigned pxm)
+static inline bool node_found(unsigned idx, unsigned pxm)
 {
 	return ((pxm2node[idx].pxm == pxm) &&
 		(pxm2node[idx].node != NUMA_NO_NODE));
@@ -65,7 +65,7 @@ nodeid_t setup_node(unsigned pxm)
 {
 	nodeid_t node;
 	unsigned idx;
-	static bool_t warned;
+	static bool warned;
 	static unsigned nodes_found;
 
 	BUILD_BUG_ON(MAX_NUMNODES >= NUMA_NO_NODE);
@@ -88,7 +88,7 @@ nodeid_t setup_node(unsigned pxm)
 	if (!warned) {
 		printk(KERN_WARNING "SRAT: Too many proximity domains (%#x)\n",
 		       pxm);
-		warned = 1;
+		warned = true;
 	}
 
 	return NUMA_NO_NODE;
@@ -311,8 +311,8 @@ acpi_numa_memory_affinity_init(const struct acpi_srat_mem_affinity *ma)
 	if (i < 0)
 		/* everything fine */;
 	else if (memblk_nodeid[i] == node) {
-		bool_t mismatch = !(ma->flags & ACPI_SRAT_MEM_HOT_PLUGGABLE) !=
-		                  !test_bit(i, memblk_hotplug);
+		bool mismatch = !(ma->flags & ACPI_SRAT_MEM_HOT_PLUGGABLE) !=
+		                !test_bit(i, memblk_hotplug);
 
 		printk("%sSRAT: PXM %u (%"PRIx64"-%"PRIx64") overlaps with itself (%"PRIx64"-%"PRIx64")\n",
 		       mismatch ? KERN_ERR : KERN_WARNING, pxm, start, end,
