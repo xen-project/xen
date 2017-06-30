@@ -318,7 +318,7 @@ long arch_do_domctl(
     struct vcpu *curr = current;
     struct domain *currd = curr->domain;
     long ret = 0;
-    bool_t copyback = 0;
+    bool copyback = false;
     unsigned long i;
 
     switch ( domctl->cmd )
@@ -330,7 +330,7 @@ long arch_do_domctl(
         if ( ret == -ERESTART )
             return hypercall_create_continuation(__HYPERVISOR_arch_1,
                                                  "h", u_domctl);
-        copyback = 1;
+        copyback = true;
         break;
 
     case XEN_DOMCTL_ioport_permission:
@@ -405,7 +405,7 @@ long arch_do_domctl(
         spin_unlock(&d->page_alloc_lock);
 
         domctl->u.getmemlist.num_pfns = i;
-        copyback = 1;
+        copyback = true;
         break;
     }
 
@@ -576,7 +576,7 @@ long arch_do_domctl(
             ret = -EFAULT;
 
     gethvmcontext_out:
-        copyback = 1;
+        copyback = true;
         xfree(c.data);
         break;
     }
@@ -611,7 +611,7 @@ long arch_do_domctl(
     case XEN_DOMCTL_get_address_size:
         domctl->u.address_size.size = is_pv_32bit_domain(d) ? 32 :
                                                               BITS_PER_LONG;
-        copyback = 1;
+        copyback = true;
         break;
 
     case XEN_DOMCTL_set_machine_address_size:
@@ -623,7 +623,7 @@ long arch_do_domctl(
 
     case XEN_DOMCTL_get_machine_address_size:
         domctl->u.address_size.size = d->arch.physaddr_bitsize;
-        copyback = 1;
+        copyback = true;
         break;
 
     case XEN_DOMCTL_sendtrigger:
@@ -874,7 +874,7 @@ long arch_do_domctl(
 
             ret = 0;
             vcpu_unpause(v);
-            copyback = 1;
+            copyback = true;
         }
         else
         {
@@ -959,7 +959,7 @@ long arch_do_domctl(
                          &domctl->u.tsc_info.gtsc_khz,
                          &domctl->u.tsc_info.incarnation);
             domain_unpause(d);
-            copyback = 1;
+            copyback = true;
         }
         break;
 
@@ -1003,7 +1003,7 @@ long arch_do_domctl(
         domctl->u.gdbsx_guest_memio.remain = domctl->u.gdbsx_guest_memio.len;
         ret = gdbsx_guest_mem_io(domctl->domain, &domctl->u.gdbsx_guest_memio);
         if ( !ret )
-           copyback = 1;
+           copyback = true;
         break;
 
     case XEN_DOMCTL_gdbsx_pausevcpu:
@@ -1060,7 +1060,7 @@ long arch_do_domctl(
                 }
             }
         }
-        copyback = 1;
+        copyback = true;
         break;
     }
 
@@ -1220,7 +1220,7 @@ long arch_do_domctl(
 
     vcpuextstate_out:
         if ( domctl->cmd == XEN_DOMCTL_getvcpuextstate )
-            copyback = 1;
+            copyback = true;
         break;
     }
 
@@ -1238,7 +1238,7 @@ long arch_do_domctl(
                       &domctl->u.audit_p2m.orphans,
                       &domctl->u.audit_p2m.m2p_bad,
                       &domctl->u.audit_p2m.p2m_bad);
-            copyback = 1;
+            copyback = true;
         }
         break;
 #endif /* P2M_AUDIT */
@@ -1282,7 +1282,7 @@ long arch_do_domctl(
 
         if ( domctl->cmd == XEN_DOMCTL_get_vcpu_msrs )
         {
-            ret = 0; copyback = 1;
+            ret = 0; copyback = true;
 
             /* NULL guest handle is a request for max size. */
             if ( guest_handle_is_null(vmsrs->msrs) )
@@ -1379,7 +1379,7 @@ long arch_do_domctl(
             else
             {
                 vmsrs->msr_count = i;
-                copyback = 1;
+                copyback = true;
             }
         }
         break;
@@ -1407,7 +1407,7 @@ long arch_do_domctl(
 
         case XEN_DOMCTL_PSR_CMT_OP_QUERY_RMID:
             domctl->u.psr_cmt_op.data = d->arch.psr_rmid;
-            copyback = 1;
+            copyback = true;
             break;
 
         default:
@@ -1441,21 +1441,21 @@ long arch_do_domctl(
             ret = psr_get_l3_cbm(d, domctl->u.psr_cat_op.target,
                                  &domctl->u.psr_cat_op.data,
                                  PSR_CBM_TYPE_L3);
-            copyback = 1;
+            copyback = true;
             break;
 
         case XEN_DOMCTL_PSR_CAT_OP_GET_L3_CODE:
             ret = psr_get_l3_cbm(d, domctl->u.psr_cat_op.target,
                                  &domctl->u.psr_cat_op.data,
                                  PSR_CBM_TYPE_L3_CODE);
-            copyback = 1;
+            copyback = true;
             break;
 
         case XEN_DOMCTL_PSR_CAT_OP_GET_L3_DATA:
             ret = psr_get_l3_cbm(d, domctl->u.psr_cat_op.target,
                                  &domctl->u.psr_cat_op.data,
                                  PSR_CBM_TYPE_L3_DATA);
-            copyback = 1;
+            copyback = true;
             break;
 
         default:
@@ -1490,7 +1490,7 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 {
     unsigned int i;
     const struct domain *d = v->domain;
-    bool_t compat = is_pv_32bit_domain(d);
+    bool compat = is_pv_32bit_domain(d);
 #define c(fld) (!compat ? (c.nat->fld) : (c.cmp->fld))
 
     if ( !is_pv_domain(d) )
