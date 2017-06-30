@@ -52,27 +52,27 @@ static const paddr_t level_masks[] =
 static const uint8_t level_orders[] =
     { ZEROETH_ORDER, FIRST_ORDER, SECOND_ORDER, THIRD_ORDER };
 
-static inline bool_t p2m_valid(lpae_t pte)
+static inline bool_t lpae_valid(lpae_t pte)
 {
-    return pte.p2m.valid;
+    return pte.walk.valid;
 }
 /*
  * These two can only be used on L0..L2 ptes because L3 mappings set
  * the table bit and therefore these would return the opposite to what
  * you would expect.
  */
-static inline bool_t p2m_table(lpae_t pte)
+static inline bool_t lpae_table(lpae_t pte)
 {
-    return p2m_valid(pte) && pte.p2m.table;
+    return lpae_valid(pte) && pte.walk.table;
 }
-static inline bool_t p2m_mapping(lpae_t pte)
+static inline bool_t lpae_mapping(lpae_t pte)
 {
-    return p2m_valid(pte) && !pte.p2m.table;
+    return lpae_valid(pte) && !pte.walk.table;
 }
 
-static inline bool p2m_is_superpage(lpae_t pte, unsigned int level)
+static inline bool lpae_is_superpage(lpae_t pte, unsigned int level)
 {
-    return (level < 3) && p2m_mapping(pte);
+    return (level < 3) && lpae_mapping(pte);
 }
 
 static void p2m_flush_tlb(struct p2m_domain *p2m);
@@ -281,7 +281,7 @@ static int p2m_next_level(struct p2m_domain *p2m, bool read_only,
 
     entry = *table + offset;
 
-    if ( !p2m_valid(*entry) )
+    if ( !lpae_valid(*entry) )
     {
         if ( read_only )
             return GUEST_TABLE_MAP_FAILED;
@@ -292,7 +292,7 @@ static int p2m_next_level(struct p2m_domain *p2m, bool read_only,
     }
 
     /* The function p2m_next_level is never called at the 3rd level */
-    if ( p2m_mapping(*entry) )
+    if ( lpae_mapping(*entry) )
         return GUEST_TABLE_SUPER_PAGE;
 
     mfn = _mfn(entry->p2m.base);
@@ -372,7 +372,7 @@ mfn_t p2m_get_entry(struct p2m_domain *p2m, gfn_t gfn,
 
     entry = table[offsets[level]];
 
-    if ( p2m_valid(entry) )
+    if ( lpae_valid(entry) )
     {
         *t = entry.p2m.type;
 
@@ -577,7 +577,7 @@ static int p2m_create_table(struct p2m_domain *p2m, lpae_t *entry)
     lpae_t *p;
     lpae_t pte;
 
-    ASSERT(!p2m_valid(*entry));
+    ASSERT(!lpae_valid(*entry));
 
     page = alloc_domheap_page(NULL, 0);
     if ( page == NULL )
@@ -645,7 +645,7 @@ enum p2m_operation {
  */
 static void p2m_put_l3_page(const lpae_t pte)
 {
-    ASSERT(p2m_valid(pte));
+    ASSERT(lpae_valid(pte));
 
     /*
      * TODO: Handle other p2m types
@@ -673,11 +673,11 @@ static void p2m_free_entry(struct p2m_domain *p2m,
     struct page_info *pg;
 
     /* Nothing to do if the entry is invalid. */
-    if ( !p2m_valid(entry) )
+    if ( !lpae_valid(entry) )
         return;
 
     /* Nothing to do but updating the stats if the entry is a super-page. */
-    if ( p2m_is_superpage(entry, level) )
+    if ( lpae_is_superpage(entry, level) )
     {
         p2m->stats.mappings[level]--;
         return;
@@ -733,7 +733,7 @@ static bool p2m_split_superpage(struct p2m_domain *p2m, lpae_t *entry,
      * a superpage.
      */
     ASSERT(level < target);
-    ASSERT(p2m_is_superpage(*entry, level));
+    ASSERT(lpae_is_superpage(*entry, level));
 
     page = alloc_domheap_page(NULL, 0);
     if ( !page )
@@ -870,7 +870,7 @@ static int __p2m_set_entry(struct p2m_domain *p2m,
         /* We need to split the original page. */
         lpae_t split_pte = *entry;
 
-        ASSERT(p2m_is_superpage(*entry, level));
+        ASSERT(lpae_is_superpage(*entry, level));
 
         if ( !p2m_split_superpage(p2m, &split_pte, level, target, offsets) )
         {
@@ -944,12 +944,12 @@ static int __p2m_set_entry(struct p2m_domain *p2m,
      * sequence when updating the translation table (D4.7.1 in ARM DDI
      * 0487A.j).
      */
-    if ( p2m_valid(orig_pte) )
+    if ( lpae_valid(orig_pte) )
         p2m_remove_pte(entry, p2m->clean_pte);
 
     if ( mfn_eq(smfn, INVALID_MFN) )
         /* Flush can be deferred if the entry is removed */
-        p2m->need_flush |= !!p2m_valid(orig_pte);
+        p2m->need_flush |= !!lpae_valid(orig_pte);
     else
     {
         lpae_t pte = mfn_to_p2m_entry(smfn, t, a);
@@ -964,7 +964,7 @@ static int __p2m_set_entry(struct p2m_domain *p2m,
          * Although, it could be defered when only the permissions are
          * changed (e.g in case of memaccess).
          */
-        if ( p2m_valid(orig_pte) )
+        if ( lpae_valid(orig_pte) )
         {
             if ( likely(!p2m->mem_access_enabled) ||
                  P2M_CLEAR_PERM(pte) != P2M_CLEAR_PERM(orig_pte) )
@@ -986,10 +986,11 @@ static int __p2m_set_entry(struct p2m_domain *p2m,
      * Free the entry only if the original pte was valid and the base
      * is different (to avoid freeing when permission is changed).
      */
-    if ( p2m_valid(orig_pte) && entry->p2m.base != orig_pte.p2m.base )
+    if ( lpae_valid(orig_pte) && entry->p2m.base != orig_pte.p2m.base )
         p2m_free_entry(p2m, orig_pte, level);
 
-    if ( need_iommu(p2m->domain) && (p2m_valid(orig_pte) || p2m_valid(*entry)) )
+    if ( need_iommu(p2m->domain) &&
+         (lpae_valid(orig_pte) || lpae_valid(*entry)) )
         rc = iommu_iotlb_flush(p2m->domain, gfn_x(sgfn), 1UL << page_order);
     else
         rc = 0;
