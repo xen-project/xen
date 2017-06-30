@@ -991,8 +991,7 @@ static int create_xen_entries(enum xenmap_operation op,
 
     for(; addr < addr_end; addr += PAGE_SIZE, mfn = mfn_add(mfn, 1))
     {
-        if ( !xen_second[second_linear_offset(addr)].pt.valid ||
-             !xen_second[second_linear_offset(addr)].pt.table )
+        if ( !lpae_table(xen_second[second_linear_offset(addr)]) )
         {
             rc = create_xen_table(&xen_second[second_linear_offset(addr)]);
             if ( rc < 0 ) {
@@ -1001,14 +1000,14 @@ static int create_xen_entries(enum xenmap_operation op,
             }
         }
 
-        BUG_ON(!xen_second[second_linear_offset(addr)].pt.valid);
+        BUG_ON(!lpae_valid(xen_second[second_linear_offset(addr)]));
 
         third = mfn_to_virt(xen_second[second_linear_offset(addr)].pt.base);
 
         switch ( op ) {
             case INSERT:
             case RESERVE:
-                if ( third[third_table_offset(addr)].pt.valid )
+                if ( lpae_valid(third[third_table_offset(addr)]) )
                 {
                     printk("create_xen_entries: trying to replace an existing mapping addr=%lx mfn=%"PRI_mfn"\n",
                            addr, mfn_x(mfn));
@@ -1022,7 +1021,7 @@ static int create_xen_entries(enum xenmap_operation op,
                 break;
             case MODIFY:
             case REMOVE:
-                if ( !third[third_table_offset(addr)].pt.valid )
+                if ( !lpae_valid(third[third_table_offset(addr)]) )
                 {
                     printk("create_xen_entries: trying to %s a non-existing mapping addr=%lx\n",
                            op == REMOVE ? "remove" : "modify", addr);
