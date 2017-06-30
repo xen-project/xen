@@ -435,12 +435,17 @@ struct vmcb_struct {
     u8  guest_ins[15];          /* offset 0xD1 */
     u64 res10a[100];            /* offset 0xE0 pad to save area */
 
-    struct segment_register es;  /* offset 0x400 - cleanbit 8 */
-    struct segment_register cs;  /* cleanbit 8 */
-    struct segment_register ss;  /* cleanbit 8 */
-    struct segment_register ds;  /* cleanbit 8 */
-    struct segment_register fs;
-    struct segment_register gs;
+    union {
+        struct segment_register sreg[6];
+        struct {
+            struct segment_register es;  /* offset 0x400 - cleanbit 8 */
+            struct segment_register cs;  /* cleanbit 8 */
+            struct segment_register ss;  /* cleanbit 8 */
+            struct segment_register ds;  /* cleanbit 8 */
+            struct segment_register fs;
+            struct segment_register gs;
+        };
+    };
     struct segment_register gdtr; /* cleanbit 7 */
     struct segment_register ldtr;
     struct segment_register idtr; /* cleanbit 7 */

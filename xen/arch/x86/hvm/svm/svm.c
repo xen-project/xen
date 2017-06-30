@@ -634,43 +634,39 @@ static void svm_get_segment_register(struct vcpu *v, enum x86_segment seg,
 
     switch ( seg )
     {
-    case x86_seg_cs:
-        *reg = vmcb->cs;
-        break;
-    case x86_seg_ds:
-        *reg = vmcb->ds;
-        break;
-    case x86_seg_es:
-        *reg = vmcb->es;
-        break;
-    case x86_seg_fs:
+    case x86_seg_fs ... x86_seg_gs:
         svm_sync_vmcb(v);
-        *reg = vmcb->fs;
+
+        /* Fallthrough. */
+    case x86_seg_es ... x86_seg_ds:
+        *reg = vmcb->sreg[seg];
+
+        if ( seg == x86_seg_ss )
+            reg->dpl = vmcb_get_cpl(vmcb);
         break;
-    case x86_seg_gs:
-        svm_sync_vmcb(v);
-        *reg = vmcb->gs;
-        break;
-    case x86_seg_ss:
-        *reg = vmcb->ss;
-        reg->dpl = vmcb_get_cpl(vmcb);
-        break;
+
     case x86_seg_tr:
         svm_sync_vmcb(v);
         *reg = vmcb->tr;
         break;
+
     case x86_seg_gdtr:
         *reg = vmcb->gdtr;
         break;
+
     case x86_seg_idtr:
         *reg = vmcb->idtr;
         break;
+
     case x86_seg_ldtr:
         svm_sync_vmcb(v);
         *reg = vmcb->ldtr;
         break;
+
     default:
-        BUG();
+        ASSERT_UNREACHABLE();
+        domain_crash(v->domain);
+        *reg = (struct segment_register){};
     }
 }
 
@@ -678,7 +674,7 @@ static void svm_set_segment_register(struct vcpu *v, enum x86_segment seg,
                                      struct segment_register *reg)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
-    int sync = 0;
+    bool sync = false;
 
     ASSERT((v == current) || !vcpu_runnable(v));
 
@@ -690,18 +686,23 @@ static void svm_set_segment_register(struct vcpu *v, enum x86_segment seg,
     case x86_seg_ss: /* cpl */
         vmcb->cleanbits.fields.seg = 0;
         break;
+
     case x86_seg_gdtr:
     case x86_seg_idtr:
         vmcb->cleanbits.fields.dt = 0;
         break;
+
     case x86_seg_fs:
     case x86_seg_gs:
     case x86_seg_tr:
     case x86_seg_ldtr:
         sync = (v == current);
         break;
+
     default:
-        break;
+        ASSERT_UNREACHABLE();
+        domain_crash(v->domain);
+        return;
     }
 
     if ( sync )
@@ -709,41 +710,36 @@ static void svm_set_segment_register(struct vcpu *v, enum x86_segment seg,
 
     switch ( seg )
     {
-    case x86_seg_cs:
-        vmcb->cs = *reg;
-        break;
-    case x86_seg_ds:
-        vmcb->ds = *reg;
-        break;
-    case x86_seg_es:
-        vmcb->es = *reg;
-        break;
-    case x86_seg_fs:
-        vmcb->fs = *reg;
-        break;
-    case x86_seg_gs:
-        vmcb->gs = *reg;
-        break;
     case x86_seg_ss:
-        vmcb->ss = *reg;
         vmcb_set_cpl(vmcb, reg->dpl);
+
+        /* Fallthrough */
+    case x86_seg_es ... x86_seg_cs:
+    case x86_seg_ds ... x86_seg_gs:
+        vmcb->sreg[seg] = *reg;
         break;
+
     case x86_seg_tr:
         vmcb->tr = *reg;
         break;
+
     case x86_seg_gdtr:
         vmcb->gdtr.base = reg->base;
         vmcb->gdtr.limit = reg->limit;
         break;
+
     case x86_seg_idtr:
         vmcb->idtr.base = reg->base;
         vmcb->idtr.limit = reg->limit;
         break;
+
     case x86_seg_ldtr:
         vmcb->ldtr = *reg;
         break;
-    default:
-        BUG();
+
+    case x86_seg_none:
+        ASSERT_UNREACHABLE();
+        break;
     }
 
     if ( sync )
