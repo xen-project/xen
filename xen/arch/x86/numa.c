@@ -49,7 +49,7 @@ cpumask_t node_to_cpumask[MAX_NUMNODES] __read_mostly;
 
 nodemask_t __read_mostly node_online_map = { { [0] = 1UL } };
 
-bool_t numa_off = 0;
+bool numa_off;
 s8 acpi_numa = 0;
 
 int srat_disabled(void)
@@ -302,13 +302,13 @@ void numa_set_node(int cpu, nodeid_t node)
 static __init int numa_setup(char *opt) 
 { 
     if ( !strncmp(opt,"off",3) )
-        numa_off = 1;
+        numa_off = true;
     if ( !strncmp(opt,"on",2) )
-        numa_off = 0;
+        numa_off = false;
 #ifdef CONFIG_NUMA_EMU
     if ( !strncmp(opt, "fake=", 5) )
     {
-        numa_off = 0;
+        numa_off = false;
         numa_fake = simple_strtoul(opt+5,NULL,0);
         if ( numa_fake >= MAX_NUMNODES )
             numa_fake = MAX_NUMNODES;
@@ -317,7 +317,7 @@ static __init int numa_setup(char *opt)
 #ifdef CONFIG_ACPI_NUMA
     if ( !strncmp(opt,"noacpi",6) )
     {
-        numa_off = 0;
+        numa_off = false;
         acpi_numa = -1;
     }
 #endif

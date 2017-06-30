@@ -30,7 +30,7 @@ extern nodeid_t pxm_to_node(unsigned int pxm);
 
 extern void numa_add_cpu(int cpu);
 extern void numa_init_array(void);
-extern bool_t numa_off;
+extern bool numa_off;
 
 
 extern int srat_disabled(void);
