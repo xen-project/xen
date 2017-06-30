@@ -107,7 +107,7 @@ struct xstate_bndcsr {
 };
 
 /* extended state operations */
-bool_t __must_check set_xcr0(u64 xfeatures);
+bool __must_check set_xcr0(u64 xfeatures);
 uint64_t get_xcr0(void);
 void set_msr_xss(u64 xss);
 uint64_t get_msr_xss(void);
@@ -115,7 +115,7 @@ uint64_t read_bndcfgu(void);
 void xsave(struct vcpu *v, uint64_t mask);
 void xrstor(struct vcpu *v, uint64_t mask);
 void xstate_set_init(uint64_t mask);
-bool_t xsave_enabled(const struct vcpu *v);
+bool xsave_enabled(const struct vcpu *v);
 int __must_check validate_xstate(u64 xcr0, u64 xcr0_accum,
                                  const struct xsave_hdr *);
 int __must_check handle_xsetbv(u32 index, u64 new_bv);
@@ -128,7 +128,7 @@ int xstate_alloc_save_area(struct vcpu *v);
 void xstate_init(struct cpuinfo_x86 *c);
 unsigned int xstate_ctxt_size(u64 xcr0);
 
-static inline bool_t xstate_all(const struct vcpu *v)
+static inline bool xstate_all(const struct vcpu *v)
 {
     /*
      * XSTATE_FP_SSE may be excluded, because the offsets of XSTATE_FP_SSE

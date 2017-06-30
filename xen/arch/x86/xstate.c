@@ -37,7 +37,7 @@ static DEFINE_PER_CPU(uint64_t, xcr0);
 /* Because XCR0 is cached for each CPU, xsetbv() is not exposed. Users should 
  * use set_xcr0() instead.
  */
-static inline bool_t xsetbv(u32 index, u64 xfeatures)
+static inline bool xsetbv(u32 index, u64 xfeatures)
 {
     u32 hi = xfeatures >> 32;
     u32 lo = (u32)xfeatures;
@@ -54,12 +54,12 @@ static inline bool_t xsetbv(u32 index, u64 xfeatures)
     return lo != 0;
 }
 
-bool_t set_xcr0(u64 xfeatures)
+bool set_xcr0(u64 xfeatures)
 {
     if ( !xsetbv(XCR_XFEATURE_ENABLED_MASK, xfeatures) )
-        return 0;
+        return false;
     this_cpu(xcr0) = xfeatures;
-    return 1;
+    return true;
 }
 
 uint64_t get_xcr0(void)
@@ -86,7 +86,7 @@ uint64_t get_msr_xss(void)
     return this_cpu(xss);
 }
 
-static int setup_xstate_features(bool_t bsp)
+static int setup_xstate_features(bool bsp)
 {
     unsigned int leaf, eax, ebx, ecx, edx;
 
@@ -482,10 +482,10 @@ void xrstor(struct vcpu *v, uint64_t mask)
     }
 }
 
-bool_t xsave_enabled(const struct vcpu *v)
+bool xsave_enabled(const struct vcpu *v)
 {
     if ( !cpu_has_xsave )
-        return 0;
+        return false;
 
     ASSERT(xsave_cntxt_size >= XSTATE_AREA_MIN_SIZE);
     ASSERT(v->arch.xsave_area);
@@ -551,7 +551,7 @@ static unsigned int _xstate_ctxt_size(u64 xcr0)
 {
     u64 act_xcr0 = get_xcr0();
     u32 eax, ebx = 0, ecx, edx;
-    bool_t ok = set_xcr0(xcr0);
+    bool ok = set_xcr0(xcr0);
 
     ASSERT(ok);
     cpuid_count(XSTATE_CPUID, 0, &eax, &ebx, &ecx, &edx);
@@ -577,10 +577,10 @@ unsigned int xstate_ctxt_size(u64 xcr0)
 /* Collect the information of processor's extended state */
 void xstate_init(struct cpuinfo_x86 *c)
 {
-    static bool_t __initdata use_xsave = 1;
+    static bool __initdata use_xsave = true;
     boolean_param("xsave", use_xsave);
 
-    bool_t bsp = c == &boot_cpu_data;
+    bool bsp = c == &boot_cpu_data;
     u32 eax, ebx, ecx, edx;
     u64 feature_mask;
 
@@ -645,25 +645,25 @@ void xstate_init(struct cpuinfo_x86 *c)
         BUG();
 }
 
-static bool_t valid_xcr0(u64 xcr0)
+static bool valid_xcr0(u64 xcr0)
 {
     /* FP must be unconditionally set. */
     if ( !(xcr0 & XSTATE_FP) )
-        return 0;
+        return false;
 
     /* YMM depends on SSE. */
     if ( (xcr0 & XSTATE_YMM) && !(xcr0 & XSTATE_SSE) )
-        return 0;
+        return false;
 
     if ( xcr0 & (XSTATE_OPMASK | XSTATE_ZMM | XSTATE_HI_ZMM) )
     {
         /* OPMASK, ZMM, and HI_ZMM require YMM. */
         if ( !(xcr0 & XSTATE_YMM) )
-            return 0;
+            return false;
 
         /* OPMASK, ZMM, and HI_ZMM must be the same. */
         if ( ~xcr0 & (XSTATE_OPMASK | XSTATE_ZMM | XSTATE_HI_ZMM) )
-            return 0;
+            return false;
     }
 
     /* BNDREGS and BNDCSR must be the same. */
