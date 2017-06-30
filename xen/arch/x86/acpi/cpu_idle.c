@@ -78,7 +78,7 @@ static void lapic_timer_nop(void) { }
 void (*__read_mostly lapic_timer_off)(void);
 void (*__read_mostly lapic_timer_on)(void);
 
-bool_t lapic_timer_init(void)
+bool lapic_timer_init(void)
 {
     if ( boot_cpu_has(X86_FEATURE_ARAT) )
     {
@@ -96,9 +96,9 @@ bool_t lapic_timer_init(void)
         lapic_timer_on = pit_broadcast_exit;
     }
     else
-        return 0;
+        return false;
 
-    return 1;
+    return true;
 }
 
 static uint64_t (*__read_mostly tick_to_ns)(uint64_t) = acpi_pm_tick_to_ns;
@@ -106,7 +106,7 @@ static uint64_t (*__read_mostly tick_to_ns)(uint64_t) = acpi_pm_tick_to_ns;
 void (*__read_mostly pm_idle_save)(void);
 unsigned int max_cstate __read_mostly = ACPI_PROCESSOR_MAX_POWER - 1;
 integer_param("max_cstate", max_cstate);
-static bool_t __read_mostly local_apic_timer_c2_ok;
+static bool __read_mostly local_apic_timer_c2_ok;
 boolean_param("lapic_timer_c2_ok", local_apic_timer_c2_ok);
 
 struct acpi_processor_power *__read_mostly processor_powers[NR_CPUS];
@@ -373,7 +373,7 @@ void cpuidle_wakeup_mwait(cpumask_t *mask)
     cpumask_andnot(mask, mask, &target);
 }
 
-bool_t arch_skip_send_event_check(unsigned int cpu)
+bool arch_skip_send_event_check(unsigned int cpu)
 {
     /*
      * This relies on softirq_pending() and mwait_wakeup() to access data
@@ -489,7 +489,7 @@ void trace_exit_reason(u32 *irq_traced)
  * may not be sent if software enters core C6 during an interrupt service 
  * routine. So we don't enter deep Cx state if there is an EOI pending.
  */
-bool_t errata_c6_eoi_workaround(void)
+static bool errata_c6_eoi_workaround(void)
 {
     static int8_t fix_needed = -1;
 
@@ -1155,10 +1155,11 @@ long set_cx_pminfo(uint32_t cpu, struct xen_processor_power *power)
     cpu_id = get_cpu_id(cpu);
     if ( cpu_id == -1 )
     {
-        static bool_t warn_once = 1;
+        static bool warn_once = true;
+
         if ( warn_once || opt_cpu_info )
             printk(XENLOG_WARNING "No CPU ID for APIC ID %#x\n", cpu);
-        warn_once = 0;
+        warn_once = false;
         return -EINVAL;
     }
 
@@ -1335,7 +1336,7 @@ void cpuidle_disable_deep_cstate(void)
     hpet_disable_legacy_broadcast();
 }
 
-bool_t cpuidle_using_deep_cstate(void)
+bool cpuidle_using_deep_cstate(void)
 {
     return xen_cpuidle && max_cstate > (local_apic_timer_c2_ok ? 2 : 1);
 }

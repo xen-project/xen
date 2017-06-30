@@ -44,14 +44,14 @@
 
 #define PREFIX			"ACPI: "
 
-bool_t __initdata acpi_noirq;	/* skip ACPI IRQ initialization */
-bool_t __initdata acpi_ht = 1;	/* enable HT */
+bool __initdata acpi_noirq;     /* skip ACPI IRQ initialization */
+bool __initdata acpi_ht = true; /* enable HT */
 
-bool_t __initdata acpi_lapic;
-bool_t __initdata acpi_ioapic;
+bool __initdata acpi_lapic;
+bool __initdata acpi_ioapic;
 
 /* acpi_skip_timer_override: Skip IRQ0 overrides. */
-static bool_t acpi_skip_timer_override __initdata;
+static bool __initdata acpi_skip_timer_override;
 boolean_param("acpi_skip_timer_override", acpi_skip_timer_override);
 
 static u64 acpi_lapic_addr __initdata = APIC_DEFAULT_PHYS_BASE;
@@ -83,7 +83,7 @@ acpi_parse_x2apic(struct acpi_subtable_header *header, const unsigned long end)
 {
 	struct acpi_madt_local_x2apic *processor =
 		container_of(header, struct acpi_madt_local_x2apic, header);
-	bool_t enabled = 0;
+	bool enabled = false;
 
 	if (BAD_MADT_ENTRY(processor, end))
 		return -EINVAL;
@@ -107,7 +107,7 @@ acpi_parse_x2apic(struct acpi_subtable_header *header, const unsigned long end)
 	if (processor->lapic_flags & ACPI_MADT_ENABLED) {
 		x86_acpiid_to_apicid[processor->uid] =
 			processor->local_apic_id;
-		enabled = 1;
+		enabled = true;
 	}
 
 	/*
@@ -127,7 +127,7 @@ acpi_parse_lapic(struct acpi_subtable_header * header, const unsigned long end)
 {
 	struct acpi_madt_local_apic *processor =
 		container_of(header, struct acpi_madt_local_apic, header);
-	bool_t enabled = 0;
+	bool enabled = false;
 
 	if (BAD_MADT_ENTRY(processor, end))
 		return -EINVAL;
@@ -137,7 +137,7 @@ acpi_parse_lapic(struct acpi_subtable_header * header, const unsigned long end)
 	/* Record local apic id only when enabled */
 	if (processor->lapic_flags & ACPI_MADT_ENABLED) {
 		x86_acpiid_to_apicid[processor->processor_id] = processor->id;
-		enabled = 1;
+		enabled = true;
 	}
 
 	/*
@@ -634,7 +634,7 @@ static void __init acpi_process_madt(void)
 		 */
 		error = acpi_parse_madt_lapic_entries();
 		if (!error) {
-			acpi_lapic = 1;
+			acpi_lapic = true;
 			generic_bigsmp_probe();
  
 			/*
@@ -642,7 +642,7 @@ static void __init acpi_process_madt(void)
 			 */
 			error = acpi_parse_madt_ioapic_entries();
 			if (!error) {
-				acpi_ioapic = 1;
+				acpi_ioapic = true;
 
 				smp_found_config = 1;
 				clustered_apic_check();
@@ -670,8 +670,8 @@ static void __init acpi_process_madt(void)
  * other side effects.
  *
  * side effects of acpi_boot_init:
- *	acpi_lapic = 1 if LAPIC found
- *	acpi_ioapic = 1 if IOAPIC found
+ *	acpi_lapic = true if LAPIC found
+ *	acpi_ioapic = true if IOAPIC found
  *	if (acpi_lapic && acpi_ioapic) smp_found_config = 1;
  *	...
  *

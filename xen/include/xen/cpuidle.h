@@ -87,7 +87,7 @@ struct cpuidle_governor
 extern s8 xen_cpuidle;
 extern struct cpuidle_governor *cpuidle_current_governor;
 
-bool_t cpuidle_using_deep_cstate(void);
+bool cpuidle_using_deep_cstate(void);
 void cpuidle_disable_deep_cstate(void);
 
 extern void cpuidle_wakeup_mwait(cpumask_t *mask);
