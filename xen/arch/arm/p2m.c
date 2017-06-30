@@ -52,29 +52,6 @@ static const paddr_t level_masks[] =
 static const uint8_t level_orders[] =
     { ZEROETH_ORDER, FIRST_ORDER, SECOND_ORDER, THIRD_ORDER };
 
-static inline bool_t lpae_valid(lpae_t pte)
-{
-    return pte.walk.valid;
-}
-/*
- * These two can only be used on L0..L2 ptes because L3 mappings set
- * the table bit and therefore these would return the opposite to what
- * you would expect.
- */
-static inline bool_t lpae_table(lpae_t pte)
-{
-    return lpae_valid(pte) && pte.walk.table;
-}
-static inline bool_t lpae_mapping(lpae_t pte)
-{
-    return lpae_valid(pte) && !pte.walk.table;
-}
-
-static inline bool lpae_is_superpage(lpae_t pte, unsigned int level)
-{
-    return (level < 3) && lpae_mapping(pte);
-}
-
 static void p2m_flush_tlb(struct p2m_domain *p2m);
 
 /* Unlock the flush and do a P2M TLB flush if necessary */
