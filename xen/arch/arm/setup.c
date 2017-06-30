@@ -654,8 +654,6 @@ static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
             if ( e > bank_end )
                 e = bank_end;
 
-            xenheap_mfn_end = e;
-
             dt_unreserved_regions(s, e, init_boot_pages, 0);
             s = n;
         }
