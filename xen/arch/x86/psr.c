@@ -270,7 +270,7 @@ static struct psr_cat_socket_info *get_cat_socket_info(unsigned int socket)
     return cat_socket_info + socket;
 }
 
-static inline bool_t cdp_is_enabled(unsigned int socket)
+static inline bool cdp_is_enabled(unsigned int socket)
 {
     return cdp_socket_enable && test_bit(socket, cdp_socket_enable);
 }
@@ -297,7 +297,7 @@ int psr_get_l3_cbm(struct domain *d, unsigned int socket,
                    uint64_t *cbm, enum cbm_type type)
 {
     struct psr_cat_socket_info *info = get_cat_socket_info(socket);
-    bool_t cdp_enabled = cdp_is_enabled(socket);
+    bool cdp_enabled = cdp_is_enabled(socket);
 
     if ( IS_ERR(info) )
         return PTR_ERR(info);
@@ -331,7 +331,7 @@ int psr_get_l3_cbm(struct domain *d, unsigned int socket,
     return 0;
 }
 
-static bool_t psr_check_cbm(unsigned int cbm_len, uint64_t cbm)
+static bool psr_check_cbm(unsigned int cbm_len, uint64_t cbm)
 {
     unsigned int first_bit, zero_bit;
 
@@ -357,7 +357,7 @@ static bool_t psr_check_cbm(unsigned int cbm_len, uint64_t cbm)
 struct cos_cbm_info
 {
     unsigned int cos;
-    bool_t cdp;
+    bool cdp;
     uint64_t cbm_code;
     uint64_t cbm_data;
 };
@@ -376,7 +376,7 @@ static void do_write_l3_cbm(void *data)
 }
 
 static int write_l3_cbm(unsigned int socket, unsigned int cos,
-                        uint64_t cbm_code, uint64_t cbm_data, bool_t cdp)
+                        uint64_t cbm_code, uint64_t cbm_data, bool cdp)
 {
     struct cos_cbm_info info =
     {
@@ -401,7 +401,7 @@ static int write_l3_cbm(unsigned int socket, unsigned int cos,
 }
 
 static int find_cos(struct psr_cat_cbm *map, unsigned int cos_max,
-                    uint64_t cbm_code, uint64_t cbm_data, bool_t cdp_enabled)
+                    uint64_t cbm_code, uint64_t cbm_data, bool cdp_enabled)
 {
     unsigned int cos;
 
@@ -440,7 +440,7 @@ int psr_set_l3_cbm(struct domain *d, unsigned int socket,
     unsigned int old_cos, cos_max;
     int cos, ret;
     uint64_t cbm_data, cbm_code;
-    bool_t cdp_enabled = cdp_is_enabled(socket);
+    bool cdp_enabled = cdp_is_enabled(socket);
     struct psr_cat_cbm *map;
     struct psr_cat_socket_info *info = get_cat_socket_info(socket);
 
