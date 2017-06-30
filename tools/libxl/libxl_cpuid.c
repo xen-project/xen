@@ -206,7 +206,7 @@ int libxl_cpuid_parse_config(libxl_cpuid_policy_list *cpuid, const char* str)
         {"skinit",       0x80000001, NA, CPUID_REG_ECX, 12,  1},
         {"xop",          0x80000001, NA, CPUID_REG_ECX, 11,  1},
         {"ibs",          0x80000001, NA, CPUID_REG_ECX, 10,  1},
-        {"osvw",         0x80000001, NA, CPUID_REG_ECX, 10,  1},
+        {"osvw",         0x80000001, NA, CPUID_REG_ECX,  9,  1},
         {"3dnowprefetch",0x80000001, NA, CPUID_REG_ECX,  8,  1},
         {"misalignsse",  0x80000001, NA, CPUID_REG_ECX,  7,  1},
         {"sse4a",        0x80000001, NA, CPUID_REG_ECX,  6,  1},
