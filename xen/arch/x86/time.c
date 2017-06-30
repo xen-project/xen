@@ -1568,7 +1568,7 @@ static void __init tsc_check_writability(void)
         cpuidle_disable_deep_cstate();
 
     /* synchronize_tsc_slave() must do nothing */
-    disable_tsc_sync = 1;
+    disable_tsc_sync = true;
 }
 
 static void __init reset_percpu_time(void *unused)

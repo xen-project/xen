@@ -106,7 +106,7 @@ static void smp_store_cpu_info(int id)
  * TSC's upper 32 bits can't be written in earlier CPUs (before
  * Prescott), there is no way to resync one AP against BP.
  */
-bool_t disable_tsc_sync;
+bool disable_tsc_sync;
 
 static atomic_t tsc_count;
 static uint64_t tsc_value;
@@ -975,7 +975,8 @@ int cpu_add(uint32_t apic_id, uint32_t acpi_id, uint32_t pxm)
     /* Physically added CPUs do not have synchronised TSC. */
     if ( boot_cpu_has(X86_FEATURE_TSC_RELIABLE) )
     {
-        static bool_t once_only;
+        static bool once_only;
+
         if ( !test_and_set_bool(once_only) )
             printk(XENLOG_WARNING
                    " ** New physical CPU %u may have skewed TSC and hence "
