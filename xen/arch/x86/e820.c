@@ -29,7 +29,7 @@ static s8 __initdata e820_mtrr_clip = -1;
 boolean_param("e820-mtrr-clip", e820_mtrr_clip);
 
 /* opt_e820_verbose: Be verbose about clipping, the original e820, &c */
-static bool_t __initdata e820_verbose;
+static bool __initdata e820_verbose;
 boolean_param("e820-verbose", e820_verbose);
 
 struct e820map e820;
