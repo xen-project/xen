@@ -37,8 +37,8 @@
 #include <io_ports.h>
 #include <xen/kexec.h>
 
-static bool_t tdt_enabled __read_mostly;
-static bool_t tdt_enable __initdata = 1;
+static bool __read_mostly tdt_enabled;
+static bool __initdata tdt_enable = true;
 boolean_param("tdt", tdt_enable);
 
 static struct {
@@ -70,7 +70,7 @@ static s8 __initdata enable_local_apic; /* -1=force-disable, +1=force-enable */
  */
 u8 __read_mostly apic_verbosity;
 
-static bool_t __initdata opt_x2apic = 1;
+static bool __initdata opt_x2apic = true;
 boolean_param("x2apic", opt_x2apic);
 
 /*
@@ -79,8 +79,8 @@ boolean_param("x2apic", opt_x2apic);
  */
 static enum apic_mode apic_boot_mode = APIC_MODE_INVALID;
 
-bool_t __read_mostly x2apic_enabled = 0;
-bool_t __read_mostly directed_eoi_enabled = 0;
+bool __read_mostly x2apic_enabled;
+bool __read_mostly directed_eoi_enabled;
 
 static int modern_apic(void)
 {
@@ -130,9 +130,9 @@ void __init apic_intr_init(void)
 }
 
 /* Using APIC to generate smp_local_timer_interrupt? */
-static bool_t __read_mostly using_apic_timer;
+static bool __read_mostly using_apic_timer;
 
-static bool_t __read_mostly enabled_via_apicbase;
+static bool __read_mostly enabled_via_apicbase;
 
 int get_physical_broadcast(void)
 {
@@ -387,7 +387,7 @@ int __init verify_local_APIC(void)
         else
         {
             ioapic_ack_new = 0;
-            directed_eoi_enabled = 1;
+            directed_eoi_enabled = true;
             printk("Enabled directed EOI with ioapic_ack_old on!\n");
         }
     }
@@ -839,7 +839,7 @@ static int __init detect_init_APIC (void)
             msr_content &= ~MSR_IA32_APICBASE_BASE;
             msr_content |= MSR_IA32_APICBASE_ENABLE | APIC_DEFAULT_PHYS_BASE;
             wrmsrl(MSR_IA32_APICBASE, msr_content);
-            enabled_via_apicbase = 1;
+            enabled_via_apicbase = true;
         }
     }
     /*
@@ -945,7 +945,7 @@ void __init x2apic_bsp_setup(void)
 
     if ( !x2apic_enabled )
     {
-        x2apic_enabled = 1;
+        x2apic_enabled = true;
         __enable_x2apic();
     }
 
@@ -1176,7 +1176,7 @@ void __init setup_boot_APIC_clock(void)
 {
     unsigned long flags;
     apic_printk(APIC_VERBOSE, "Using local APIC timer interrupts.\n");
-    using_apic_timer = 1;
+    using_apic_timer = true;
 
     local_irq_save(flags);
 
@@ -1185,7 +1185,7 @@ void __init setup_boot_APIC_clock(void)
     if ( tdt_enable && boot_cpu_has(X86_FEATURE_TSC_DEADLINE) )
     {
         printk(KERN_DEBUG "TSC deadline timer enabled\n");
-        tdt_enabled = 1;
+        tdt_enabled = true;
     }
 
     setup_APIC_timer();
@@ -1258,12 +1258,12 @@ void apic_timer_interrupt(struct cpu_user_regs * regs)
     raise_softirq(TIMER_SOFTIRQ);
 }
 
-static DEFINE_PER_CPU(bool_t, state_dump_pending);
+static DEFINE_PER_CPU(bool, state_dump_pending);
 
 void smp_send_state_dump(unsigned int cpu)
 {
     /* We overload the spurious interrupt handler to handle the dump. */
-    per_cpu(state_dump_pending, cpu) = 1;
+    per_cpu(state_dump_pending, cpu) = true;
     send_IPI_mask(cpumask_of(cpu), SPURIOUS_APIC_VECTOR);
 }
 
@@ -1280,7 +1280,7 @@ void spurious_interrupt(struct cpu_user_regs *regs)
     if (apic_isr_read(SPURIOUS_APIC_VECTOR)) {
         ack_APIC_irq();
         if (this_cpu(state_dump_pending)) {
-            this_cpu(state_dump_pending) = 0;
+            this_cpu(state_dump_pending) = false;
             dump_execstate(regs);
             goto out;
         }
