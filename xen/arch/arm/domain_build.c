@@ -45,6 +45,10 @@ struct map_range_data
     p2m_type_t p2mt;
 };
 
+/* Override macros from asm/page.h to make them work with mfn_t */
+#undef virt_to_mfn
+#define virt_to_mfn(va) _mfn(__virt_to_mfn(va))
+
 //#define DEBUG_11_ALLOCATION
 #ifdef DEBUG_11_ALLOCATION
 # define D11PRINT(fmt, args...) printk(XENLOG_DEBUG fmt, ##args)
@@ -1903,7 +1907,7 @@ static int prepare_acpi(struct domain *d, struct kernel_info *kinfo)
     rc = map_regions_p2mt(d,
                           gaddr_to_gfn(d->arch.efi_acpi_gpa),
                           PFN_UP(d->arch.efi_acpi_len),
-                          _mfn(virt_to_mfn(d->arch.efi_acpi_table)),
+                          virt_to_mfn(d->arch.efi_acpi_table),
                           p2m_mmio_direct_c);
     if ( rc != 0 )
     {
