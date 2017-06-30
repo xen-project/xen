@@ -3,10 +3,12 @@
 
 #ifndef __ASSEMBLY__
 
-/* WARNING!  Unlike the Intel pagetable code, where l1 is the lowest
- * level and l4 is the root of the trie, the ARM pagetables follow ARM's
- * documentation: the levels are called first, second &c in the order
- * that the MMU walks them (i.e. "first" is the root of the trie). */
+/*
+ * WARNING!  Unlike the x86 pagetable code, where l1 is the lowest level and
+ * l4 is the root of the trie, the ARM pagetables follow ARM's documentation:
+ * the levels are called first, second &c in the order that the MMU walks them
+ * (i.e. "first" is the root of the trie).
+ */
 
 /******************************************************************************
  * ARMv7-A LPAE pagetables: 3-level trie, mapping 40-bit input to
@@ -17,15 +19,18 @@
  * different place from those in leaf nodes seems to be to allow linear
  * pagetable tricks.  If we're not doing that then the set of permission
  * bits that's not in use in a given node type can be used as
- * extra software-defined bits. */
+ * extra software-defined bits.
+ */
 
 typedef struct __packed {
     /* These are used in all kinds of entry. */
     unsigned long valid:1;      /* Valid mapping */
     unsigned long table:1;      /* == 1 in 4k map entries too */
 
-    /* These ten bits are only used in Block entries and are ignored
-     * in Table entries. */
+    /*
+     * These ten bits are only used in Block entries and are ignored
+     * in Table entries.
+     */
     unsigned long ai:3;         /* Attribute Index */
     unsigned long ns:1;         /* Not-Secure */
     unsigned long user:1;       /* User-visible */
@@ -38,30 +43,38 @@ typedef struct __packed {
     unsigned long long base:36; /* Base address of block or next table */
     unsigned long sbz:4;        /* Must be zero */
 
-    /* These seven bits are only used in Block entries and are ignored
-     * in Table entries. */
+    /*
+     * These seven bits are only used in Block entries and are ignored
+     * in Table entries.
+     */
     unsigned long contig:1;     /* In a block of 16 contiguous entries */
     unsigned long pxn:1;        /* Privileged-XN */
     unsigned long xn:1;         /* eXecute-Never */
     unsigned long avail:4;      /* Ignored by hardware */
 
-    /* These 5 bits are only used in Table entries and are ignored in
-     * Block entries */
+    /*
+     * These 5 bits are only used in Table entries and are ignored in
+     * Block entries.
+     */
     unsigned long pxnt:1;       /* Privileged-XN */
     unsigned long xnt:1;        /* eXecute-Never */
     unsigned long apt:2;        /* Access Permissions */
     unsigned long nst:1;        /* Not-Secure */
 } lpae_pt_t;
 
-/* The p2m tables have almost the same layout, but some of the permission
- * and cache-control bits are laid out differently (or missing) */
+/*
+ * The p2m tables have almost the same layout, but some of the permission
+ * and cache-control bits are laid out differently (or missing).
+ */
 typedef struct __packed {
     /* These are used in all kinds of entry. */
     unsigned long valid:1;      /* Valid mapping */
     unsigned long table:1;      /* == 1 in 4k map entries too */
 
-    /* These ten bits are only used in Block entries and are ignored
-     * in Table entries. */
+    /*
+     * These ten bits are only used in Block entries and are ignored
+     * in Table entries.
+     */
     unsigned long mattr:4;      /* Memory Attributes */
     unsigned long read:1;       /* Read access */
     unsigned long write:1;      /* Write access */
@@ -73,8 +86,10 @@ typedef struct __packed {
     unsigned long long base:36; /* Base address of block or next table */
     unsigned long sbz3:4;
 
-    /* These seven bits are only used in Block entries and are ignored
-     * in Table entries. */
+    /*
+     * These seven bits are only used in Block entries and are ignored
+     * in Table entries.
+     */
     unsigned long contig:1;     /* In a block of 16 contiguous entries */
     unsigned long sbz2:1;
     unsigned long xn:1;         /* eXecute-Never */
