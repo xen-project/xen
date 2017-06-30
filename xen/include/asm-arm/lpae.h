@@ -126,7 +126,7 @@ typedef union {
     lpae_walk_t walk;
 } lpae_t;
 
-static inline bool_t lpae_valid(lpae_t pte)
+static inline bool lpae_valid(lpae_t pte)
 {
     return pte.walk.valid;
 }
@@ -136,12 +136,12 @@ static inline bool_t lpae_valid(lpae_t pte)
  * the table bit and therefore these would return the opposite to what
  * you would expect.
  */
-static inline bool_t lpae_table(lpae_t pte)
+static inline bool lpae_table(lpae_t pte)
 {
     return lpae_valid(pte) && pte.walk.table;
 }
 
-static inline bool_t lpae_mapping(lpae_t pte)
+static inline bool lpae_mapping(lpae_t pte)
 {
     return lpae_valid(pte) && !pte.walk.table;
 }
