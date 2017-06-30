@@ -644,7 +644,7 @@ static void __init acpi_process_madt(void)
 			if (!error) {
 				acpi_ioapic = true;
 
-				smp_found_config = 1;
+				smp_found_config = true;
 				clustered_apic_check();
 			}
 		}
@@ -672,7 +672,7 @@ static void __init acpi_process_madt(void)
  * side effects of acpi_boot_init:
  *	acpi_lapic = true if LAPIC found
  *	acpi_ioapic = true if IOAPIC found
- *	if (acpi_lapic && acpi_ioapic) smp_found_config = 1;
+ *	if (acpi_lapic && acpi_ioapic) smp_found_config = true;
  *	...
  *
  * return value: (currently ignored)

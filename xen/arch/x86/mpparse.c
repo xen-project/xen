@@ -34,7 +34,7 @@
 #include <bios_ebda.h>
 
 /* Have we found an MP table */
-bool_t __initdata smp_found_config;
+bool __initdata smp_found_config;
 
 /*
  * Various Linux-internal data structures created from the
@@ -52,8 +52,8 @@ struct mpc_config_intsrc __read_mostly mp_irqs[MAX_IRQ_SOURCES];
 /* MP IRQ source entries */
 int __read_mostly mp_irq_entries;
 
-bool_t __read_mostly pic_mode;
-bool_t __read_mostly def_to_bigsmp = 0;
+bool __read_mostly pic_mode;
+bool __read_mostly def_to_bigsmp;
 unsigned long __read_mostly mp_lapic_addr;
 
 /* Processor that is doing the boot up */
@@ -119,7 +119,7 @@ static int __init mpf_checksum(unsigned char *mp, int len)
 
 /* Return xen's logical cpu_id of the new added cpu or <0 if error */
 static int MP_processor_info_x(struct mpc_config_processor *m,
-			       u32 apicid, bool_t hotplug)
+			       u32 apicid, bool hotplug)
 {
  	int ver, cpu = 0;
  	
@@ -178,7 +178,7 @@ static int MP_processor_info_x(struct mpc_config_processor *m,
 		 * No need for processor or APIC checks: physical delivery
 		 * (bigsmp) mode should always work.
 		 */
-		def_to_bigsmp = 1;
+		def_to_bigsmp = true;
 	}
 
 	return cpu;
@@ -591,10 +591,10 @@ void __init get_smp_config (void)
 	printk(KERN_INFO "Intel MultiProcessor Specification v1.%d\n", mpf->mpf_specification);
 	if (mpf->mpf_feature2 & (1<<7)) {
 		printk(KERN_INFO "    IMCR and PIC compatibility mode.\n");
-		pic_mode = 1;
+		pic_mode = true;
 	} else {
 		printk(KERN_INFO "    Virtual Wire compatibility mode.\n");
-		pic_mode = 0;
+		pic_mode = false;
 	}
 
 	/*
@@ -613,7 +613,7 @@ void __init get_smp_config (void)
 		 */
 		if (!smp_read_mpc((void *)(unsigned long)mpf->mpf_physptr)) {
 			efi_unmap_mpf();
-			smp_found_config = 0;
+			smp_found_config = false;
 			printk(KERN_ERR "BIOS bug, MP table errors detected!...\n");
 			printk(KERN_ERR "... disabling SMP support. (tell your hw vendor)\n");
 			return;
@@ -664,7 +664,7 @@ static int __init smp_scan_config (unsigned long base, unsigned long length)
 			((mpf->mpf_specification == 1)
 				|| (mpf->mpf_specification == 4)) ) {
 
-			smp_found_config = 1;
+			smp_found_config = true;
 			printk(KERN_INFO "found SMP MP-table at %08lx\n",
 						virt_to_maddr(mpf));
 #if 0
@@ -709,7 +709,7 @@ static void __init efi_check_config(void)
 	    mpf->mpf_length == 1 &&
 	    mpf_checksum((void *)mpf, 16) &&
 	    (mpf->mpf_specification == 1 || mpf->mpf_specification == 4)) {
-		smp_found_config = 1;
+		smp_found_config = true;
 		printk(KERN_INFO "SMP MP-table at %08lx\n", efi.mps);
 		mpf_found = mpf;
 	}
@@ -781,10 +781,7 @@ void __init mp_register_lapic_address (
 }
 
 
-int mp_register_lapic (
-	u32			id,
-	bool_t			enabled,
-	bool_t			hotplug)
+int mp_register_lapic(u32 id, bool enabled, bool hotplug)
 {
 	struct mpc_config_processor processor = {
 		.mpc_type = MP_PROCESSOR,

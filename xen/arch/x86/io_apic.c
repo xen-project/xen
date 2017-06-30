@@ -2531,7 +2531,7 @@ void __init init_ioapic_mappings(void)
             {
                 printk(KERN_ERR "WARNING: bogus zero IO-APIC address "
                        "found in MPTABLE, disabling IO/APIC support!\n");
-                smp_found_config = 0;
+                smp_found_config = false;
                 skip_ioapic_setup = true;
                 goto fake_ioapic_page;
             }
