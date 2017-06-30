@@ -169,9 +169,9 @@ static inline void io_apic_modify(unsigned int apic, unsigned int reg, unsigned 
 }
 
 /* 1 if "noapic" boot option passed */
-extern bool_t skip_ioapic_setup;
-extern bool_t ioapic_ack_new;
-extern bool_t ioapic_ack_forced;
+extern bool skip_ioapic_setup;
+extern bool ioapic_ack_new;
+extern bool ioapic_ack_forced;
 
 extern int io_apic_get_unique_id (int ioapic, int apic_id);
 extern int io_apic_get_version (int ioapic);
@@ -186,9 +186,9 @@ extern void ioapic_resume(void);
 extern void dump_ioapic_irq_info(void);
 
 extern struct IO_APIC_route_entry __ioapic_read_entry(
-    unsigned int apic, unsigned int pin, bool_t raw);
+    unsigned int apic, unsigned int pin, bool raw);
 void __ioapic_write_entry(
-    unsigned int apic, unsigned int pin, bool_t raw,
+    unsigned int apic, unsigned int pin, bool raw,
     struct IO_APIC_route_entry);
 
 extern struct IO_APIC_route_entry **alloc_ioapic_entries(void);

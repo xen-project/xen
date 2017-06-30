@@ -381,12 +381,12 @@ int __init verify_local_APIC(void)
      */
     if ( reg0 & APIC_LVR_DIRECTED_EOI )
     {
-        if ( ioapic_ack_new == 1 && ioapic_ack_forced == 1 )
+        if ( ioapic_ack_new && ioapic_ack_forced )
             printk("Not enabling directed EOI because ioapic_ack_new has been "
                    "forced on the command line\n");
         else
         {
-            ioapic_ack_new = 0;
+            ioapic_ack_new = false;
             directed_eoi_enabled = true;
             printk("Enabled directed EOI with ioapic_ack_old on!\n");
         }
@@ -1346,7 +1346,7 @@ int __init APIC_init_uniprocessor (void)
         setup_clear_cpu_cap(X86_FEATURE_APIC);
 
     if (!smp_found_config && !cpu_has_apic) {
-        skip_ioapic_setup = 1;
+        skip_ioapic_setup = true;
         return -1;
     }
 
@@ -1356,7 +1356,7 @@ int __init APIC_init_uniprocessor (void)
     if (!cpu_has_apic) {
         printk(KERN_ERR "BIOS bug, local APIC #%d not detected!...\n",
                boot_cpu_physical_apicid);
-        skip_ioapic_setup = 1;
+        skip_ioapic_setup = true;
         return -1;
     }
 

@@ -43,9 +43,9 @@ static struct { int pin, apic; } ioapic_i8259 = { -1, -1 };
 
 static DEFINE_SPINLOCK(ioapic_lock);
 
-bool_t __read_mostly skip_ioapic_setup;
-bool_t __initdata ioapic_ack_new = 1;
-bool_t __initdata ioapic_ack_forced = 0;
+bool __read_mostly skip_ioapic_setup;
+bool __initdata ioapic_ack_new = true;
+bool __initdata ioapic_ack_forced;
 
 /*
  * # of IRQ routing registers
@@ -229,7 +229,7 @@ union entry_union {
 };
 
 struct IO_APIC_route_entry __ioapic_read_entry(
-    unsigned int apic, unsigned int pin, bool_t raw)
+    unsigned int apic, unsigned int pin, bool raw)
 {
     unsigned int (*read)(unsigned int, unsigned int)
         = raw ? __io_apic_read : io_apic_read;
@@ -240,7 +240,7 @@ struct IO_APIC_route_entry __ioapic_read_entry(
 }
 
 static struct IO_APIC_route_entry ioapic_read_entry(
-    unsigned int apic, unsigned int pin, bool_t raw)
+    unsigned int apic, unsigned int pin, bool raw)
 {
     struct IO_APIC_route_entry entry;
     unsigned long flags;
@@ -252,7 +252,7 @@ static struct IO_APIC_route_entry ioapic_read_entry(
 }
 
 void __ioapic_write_entry(
-    unsigned int apic, unsigned int pin, bool_t raw,
+    unsigned int apic, unsigned int pin, bool raw,
     struct IO_APIC_route_entry e)
 {
     void (*write)(unsigned int, unsigned int, unsigned int)
@@ -264,7 +264,7 @@ void __ioapic_write_entry(
 }
 
 static void ioapic_write_entry(
-    unsigned int apic, unsigned int pin, bool_t raw,
+    unsigned int apic, unsigned int pin, bool raw,
     struct IO_APIC_route_entry e)
 {
     unsigned long flags;
@@ -294,7 +294,7 @@ static void __io_apic_eoi(unsigned int apic, unsigned int vector, unsigned int p
         /* Else fake an EOI by switching to edge triggered mode
          * and back */
         struct IO_APIC_route_entry entry;
-        bool_t need_to_unmask = 0;
+        bool need_to_unmask = false;
 
         entry = __ioapic_read_entry(apic, pin, TRUE);
 
@@ -304,7 +304,7 @@ static void __io_apic_eoi(unsigned int apic, unsigned int vector, unsigned int p
              * a note to unmask it later */
             entry.mask = 1;
             __ioapic_write_entry(apic, pin, TRUE, entry);
-            need_to_unmask = 1;
+            need_to_unmask = true;
         }
 
         /* Flip the trigger mode to edge and back */
@@ -1094,7 +1094,7 @@ static inline void UNEXPECTED_IO_APIC(void)
 {
 }
 
-static void /*__init*/ __print_IO_APIC(bool_t boot)
+static void /*__init*/ __print_IO_APIC(bool boot)
 {
     int apic, i;
     union IO_APIC_reg_00 reg_00;
@@ -1585,20 +1585,20 @@ static void __init setup_ioapic_ack(char *s)
 {
     if ( !strcmp(s, "old") )
     {
-        ioapic_ack_new = 0;
-        ioapic_ack_forced = 1;
+        ioapic_ack_new = false;
+        ioapic_ack_forced = true;
     }
     else if ( !strcmp(s, "new") )
     {
-        ioapic_ack_new = 1;
-        ioapic_ack_forced = 1;
+        ioapic_ack_new = true;
+        ioapic_ack_forced = true;
     }
     else
         printk("Unknown ioapic_ack value specified: '%s'\n", s);
 }
 custom_param("ioapic_ack", setup_ioapic_ack);
 
-static bool_t io_apic_level_ack_pending(unsigned int irq)
+static bool io_apic_level_ack_pending(unsigned int irq)
 {
     struct irq_pin_list *entry;
     unsigned long flags;
@@ -2498,7 +2498,7 @@ void dump_ioapic_irq_info(void)
 static unsigned int __initdata max_gsi_irqs;
 integer_param("max_gsi_irqs", max_gsi_irqs);
 
-static __init bool_t bad_ioapic_register(unsigned int idx)
+static __init bool bad_ioapic_register(unsigned int idx)
 {
     union IO_APIC_reg_00 reg_00 = { .raw = io_apic_read(idx, 0) };
     union IO_APIC_reg_01 reg_01 = { .raw = io_apic_read(idx, 1) };
@@ -2532,7 +2532,7 @@ void __init init_ioapic_mappings(void)
                 printk(KERN_ERR "WARNING: bogus zero IO-APIC address "
                        "found in MPTABLE, disabling IO/APIC support!\n");
                 smp_found_config = 0;
-                skip_ioapic_setup = 1;
+                skip_ioapic_setup = true;
                 goto fake_ioapic_page;
             }
         }
