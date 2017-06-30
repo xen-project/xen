@@ -986,28 +986,30 @@ static int create_xen_entries(enum xenmap_operation op,
 {
     int rc;
     unsigned long addr = virt, addr_end = addr + nr_mfns * PAGE_SIZE;
-    lpae_t pte;
+    lpae_t pte, *entry;
     lpae_t *third = NULL;
 
     for(; addr < addr_end; addr += PAGE_SIZE, mfn = mfn_add(mfn, 1))
     {
-        if ( !lpae_table(xen_second[second_linear_offset(addr)]) )
+        entry = &xen_second[second_linear_offset(addr)];
+        if ( !lpae_table(*entry) )
         {
-            rc = create_xen_table(&xen_second[second_linear_offset(addr)]);
+            rc = create_xen_table(entry);
             if ( rc < 0 ) {
                 printk("create_xen_entries: L2 failed\n");
                 goto out;
             }
         }
 
-        BUG_ON(!lpae_valid(xen_second[second_linear_offset(addr)]));
+        BUG_ON(!lpae_valid(*entry));
 
-        third = mfn_to_virt(xen_second[second_linear_offset(addr)].pt.base);
+        third = mfn_to_virt(entry->pt.base);
+        entry = &third[third_table_offset(addr)];
 
         switch ( op ) {
             case INSERT:
             case RESERVE:
-                if ( lpae_valid(third[third_table_offset(addr)]) )
+                if ( lpae_valid(*entry) )
                 {
                     printk("create_xen_entries: trying to replace an existing mapping addr=%lx mfn=%"PRI_mfn"\n",
                            addr, mfn_x(mfn));
@@ -1017,11 +1019,11 @@ static int create_xen_entries(enum xenmap_operation op,
                     break;
                 pte = mfn_to_xen_entry(mfn, ai);
                 pte.pt.table = 1;
-                write_pte(&third[third_table_offset(addr)], pte);
+                write_pte(entry, pte);
                 break;
             case MODIFY:
             case REMOVE:
-                if ( !lpae_valid(third[third_table_offset(addr)]) )
+                if ( !lpae_valid(*entry) )
                 {
                     printk("create_xen_entries: trying to %s a non-existing mapping addr=%lx\n",
                            op == REMOVE ? "remove" : "modify", addr);
@@ -1031,7 +1033,7 @@ static int create_xen_entries(enum xenmap_operation op,
                     pte.bits = 0;
                 else
                 {
-                    pte = third[third_table_offset(addr)];
+                    pte = *entry;
                     pte.pt.ro = PTE_RO_MASK(ai);
                     pte.pt.xn = PTE_NX_MASK(ai);
                     if ( !pte.pt.ro && !pte.pt.xn )
@@ -1041,7 +1043,7 @@ static int create_xen_entries(enum xenmap_operation op,
                         return -EINVAL;
                     }
                 }
-                write_pte(&third[third_table_offset(addr)], pte);
+                write_pte(entry, pte);
                 break;
             default:
                 BUG();
