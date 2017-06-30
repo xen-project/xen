@@ -85,7 +85,7 @@ static inline bool debugger_trap_entry(
 }
 
 unsigned int dbg_rw_mem(void * __user addr, void * __user buf,
-                        unsigned int len, domid_t domid, bool_t toaddr,
+                        unsigned int len, domid_t domid, bool toaddr,
                         uint64_t pgd3);
 
 #endif /* __X86_DEBUGGER_H__ */

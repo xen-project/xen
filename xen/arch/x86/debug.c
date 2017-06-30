@@ -154,9 +154,9 @@ dbg_pv_va2mfn(dbgva_t vaddr, struct domain *dp, uint64_t pgd3val)
 }
 
 /* Returns: number of bytes remaining to be copied */
-unsigned int dbg_rw_guest_mem(struct domain *dp, void * __user gaddr,
-                              void * __user buf, unsigned int len,
-                              bool_t toaddr, uint64_t pgd3)
+static unsigned int dbg_rw_guest_mem(struct domain *dp, void * __user gaddr,
+                                     void * __user buf, unsigned int len,
+                                     bool toaddr, uint64_t pgd3)
 {
     while ( len > 0 )
     {
@@ -207,7 +207,7 @@ unsigned int dbg_rw_guest_mem(struct domain *dp, void * __user gaddr,
  * Returns: number of bytes remaining to be copied. 
  */
 unsigned int dbg_rw_mem(void * __user addr, void * __user buf,
-                        unsigned int len, domid_t domid, bool_t toaddr,
+                        unsigned int len, domid_t domid, bool toaddr,
                         uint64_t pgd3)
 {
     DBGP2("gmem:addr:%lx buf:%p len:$%u domid:%d toaddr:%x\n",
