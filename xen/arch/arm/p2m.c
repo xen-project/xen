@@ -38,6 +38,12 @@ static unsigned int __read_mostly max_vmid = MAX_VMID_8_BIT;
 
 #define P2M_ROOT_PAGES    (1<<P2M_ROOT_ORDER)
 
+/* Override macros from asm/mm.h to make them work with mfn_t */
+#undef mfn_to_page
+#define mfn_to_page(mfn) __mfn_to_page(mfn_x(mfn))
+#undef page_to_mfn
+#define page_to_mfn(pg) _mfn(__page_to_mfn(pg))
+
 unsigned int __read_mostly p2m_ipa_bits;
 
 /* Helpers to lookup the properties of each level */
@@ -115,7 +121,7 @@ void dump_p2m_lookup(struct domain *d, paddr_t addr)
     printk("dom%d IPA 0x%"PRIpaddr"\n", d->domain_id, addr);
 
     printk("P2M @ %p mfn:0x%lx\n",
-           p2m->root, page_to_mfn(p2m->root));
+           p2m->root, __page_to_mfn(p2m->root));
 
     dump_pt_walk(page_to_maddr(p2m->root), addr,
                  P2M_ROOT_LEVEL, P2M_ROOT_PAGES);
@@ -591,7 +597,7 @@ static int p2m_create_table(struct p2m_domain *p2m, lpae_t *entry)
      * The access value does not matter because the hardware will ignore
      * the permission fields for table entry.
      */
-    pte = mfn_to_p2m_entry(_mfn(page_to_mfn(page)), p2m_invalid,
+    pte = mfn_to_p2m_entry(page_to_mfn(page), p2m_invalid,
                            p2m->default_access);
 
     p2m_write_pte(entry, pte, p2m->clean_pte);
@@ -650,9 +656,9 @@ static void p2m_put_l3_page(const lpae_t pte)
      */
     if ( p2m_is_foreign(pte.p2m.type) )
     {
-        unsigned long mfn = pte.p2m.base;
+        mfn_t mfn = _mfn(pte.p2m.base);
 
-        ASSERT(mfn_valid(_mfn(mfn)));
+        ASSERT(mfn_valid(mfn));
         put_page(mfn_to_page(mfn));
     }
 }
@@ -702,7 +708,7 @@ static void p2m_free_entry(struct p2m_domain *p2m,
     mfn = _mfn(entry.p2m.base);
     ASSERT(mfn_valid(mfn));
 
-    pg = mfn_to_page(mfn_x(mfn));
+    pg = mfn_to_page(mfn);
 
     page_list_del(pg, &p2m->pages);
     free_domheap_page(pg);
@@ -780,7 +786,7 @@ static bool p2m_split_superpage(struct p2m_domain *p2m, lpae_t *entry,
 
     unmap_domain_page(table);
 
-    pte = mfn_to_p2m_entry(_mfn(page_to_mfn(page)), p2m_invalid,
+    pte = mfn_to_p2m_entry(page_to_mfn(page), p2m_invalid,
                            p2m->default_access);
 
     /*
@@ -1442,7 +1448,7 @@ struct page_info *get_page_from_gva(struct vcpu *v, vaddr_t va,
     if ( !mfn_valid(maddr_to_mfn(maddr)) )
         goto err;
 
-    page = mfn_to_page(mfn_x(maddr_to_mfn(maddr)));
+    page = mfn_to_page(maddr_to_mfn(maddr));
     ASSERT(page);
 
     if ( unlikely(!get_page(page, d)) )
