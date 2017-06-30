@@ -22,7 +22,7 @@
 /* Restore x87 extended state */
 static inline void fpu_xrstor(struct vcpu *v, uint64_t mask)
 {
-    bool_t ok;
+    bool ok;
 
     ASSERT(v->arch.xsave_area);
     /*
@@ -135,7 +135,7 @@ static inline uint64_t vcpu_xsave_mask(const struct vcpu *v)
 /* Save x87 extended state */
 static inline void fpu_xsave(struct vcpu *v)
 {
-    bool_t ok;
+    bool ok;
     uint64_t mask = vcpu_xsave_mask(v);
 
     ASSERT(mask);
@@ -260,10 +260,10 @@ void vcpu_restore_fpu_lazy(struct vcpu *v)
  * On each context switch, save the necessary FPU info of VCPU being switch 
  * out. It dispatches saving operation based on CPU's capability.
  */
-static bool_t _vcpu_save_fpu(struct vcpu *v)
+static bool _vcpu_save_fpu(struct vcpu *v)
 {
     if ( !v->fpu_dirtied && !v->arch.nonlazy_xstate_used )
-        return 0;
+        return false;
 
     ASSERT(!is_idle_vcpu(v));
 
@@ -277,7 +277,7 @@ static bool_t _vcpu_save_fpu(struct vcpu *v)
 
     v->fpu_dirtied = 0;
 
-    return 1;
+    return true;
 }
 
 void vcpu_save_fpu(struct vcpu *v)
