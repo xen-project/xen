@@ -138,8 +138,8 @@ uint64_t init_ttbr;
 static paddr_t phys_offset;
 
 /* Limits of the Xen heap */
-unsigned long xenheap_mfn_start __read_mostly = ~0UL;
-unsigned long xenheap_mfn_end __read_mostly;
+mfn_t xenheap_mfn_start __read_mostly = INVALID_MFN_INITIALIZER;
+mfn_t xenheap_mfn_end __read_mostly;
 vaddr_t xenheap_virt_end __read_mostly;
 #ifdef CONFIG_ARM_64
 vaddr_t xenheap_virt_start __read_mostly;
@@ -801,8 +801,8 @@ void __init setup_xenheap_mappings(unsigned long base_mfn,
 
     /* Record where the xenheap is, for translation routines. */
     xenheap_virt_end = XENHEAP_VIRT_START + nr_mfns * PAGE_SIZE;
-    xenheap_mfn_start = base_mfn;
-    xenheap_mfn_end = base_mfn + nr_mfns;
+    xenheap_mfn_start = _mfn(base_mfn);
+    xenheap_mfn_end = _mfn(base_mfn + nr_mfns);
 }
 #else /* CONFIG_ARM_64 */
 void __init setup_xenheap_mappings(unsigned long base_mfn,
@@ -816,16 +816,16 @@ void __init setup_xenheap_mappings(unsigned long base_mfn,
     mfn = base_mfn & ~((FIRST_SIZE>>PAGE_SHIFT)-1);
 
     /* First call sets the xenheap physical and virtual offset. */
-    if ( xenheap_mfn_start == ~0UL )
+    if ( mfn_eq(xenheap_mfn_start, INVALID_MFN) )
     {
-        xenheap_mfn_start = base_mfn;
+        xenheap_mfn_start = _mfn(base_mfn);
         xenheap_virt_start = DIRECTMAP_VIRT_START +
             (base_mfn - mfn) * PAGE_SIZE;
     }
 
-    if ( base_mfn < xenheap_mfn_start )
+    if ( base_mfn < mfn_x(xenheap_mfn_start) )
         panic("cannot add xenheap mapping at %lx below heap start %lx",
-              base_mfn, xenheap_mfn_start);
+              base_mfn, mfn_x(xenheap_mfn_start));
 
     end_mfn = base_mfn + nr_mfns;
 

@@ -555,8 +555,8 @@ static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
      * and enough mapped pages for copying the DTB.
      */
     dtb_pages = (dtb_size + PAGE_SIZE-1) >> PAGE_SHIFT;
-    boot_mfn_start = xenheap_mfn_end - dtb_pages - 1;
-    boot_mfn_end = xenheap_mfn_end;
+    boot_mfn_start = mfn_x(xenheap_mfn_end) - dtb_pages - 1;
+    boot_mfn_end = mfn_x(xenheap_mfn_end);
 
     init_boot_pages(pfn_to_paddr(boot_mfn_start), pfn_to_paddr(boot_mfn_end));
 
@@ -591,11 +591,11 @@ static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
                 e = bank_end;
 
             /* Avoid the xenheap */
-            if ( s < pfn_to_paddr(xenheap_mfn_start+xenheap_pages)
-                 && pfn_to_paddr(xenheap_mfn_start) < e )
+            if ( s < mfn_to_maddr(mfn_add(xenheap_mfn_start, xenheap_pages))
+                 && mfn_to_maddr(xenheap_mfn_start) < e )
             {
-                e = pfn_to_paddr(xenheap_mfn_start);
-                n = pfn_to_paddr(xenheap_mfn_start+xenheap_pages);
+                e = mfn_to_maddr(xenheap_mfn_start);
+                n = mfn_to_maddr(mfn_add(xenheap_mfn_start, xenheap_pages));
             }
 
             dt_unreserved_regions(s, e, init_boot_pages, 0);
@@ -610,7 +610,7 @@ static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
 
     /* Add xenheap memory that was not already added to the boot
        allocator. */
-    init_xenheap_pages(pfn_to_paddr(xenheap_mfn_start),
+    init_xenheap_pages(mfn_to_maddr(xenheap_mfn_start),
                        pfn_to_paddr(boot_mfn_start));
 }
 #else /* CONFIG_ARM_64 */
@@ -662,8 +662,8 @@ static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
     total_pages += ram_size >> PAGE_SHIFT;
 
     xenheap_virt_end = XENHEAP_VIRT_START + ram_end - ram_start;
-    xenheap_mfn_start = ram_start >> PAGE_SHIFT;
-    xenheap_mfn_end = ram_end >> PAGE_SHIFT;
+    xenheap_mfn_start = maddr_to_mfn(ram_start);
+    xenheap_mfn_end = maddr_to_mfn(ram_end);
 
     /*
      * Need enough mapped pages for copying the DTB.

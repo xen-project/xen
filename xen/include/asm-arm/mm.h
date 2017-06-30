@@ -107,7 +107,7 @@ struct page_info
 #define PGC_count_width   PG_shift(9)
 #define PGC_count_mask    ((1UL<<PGC_count_width)-1)
 
-extern unsigned long xenheap_mfn_start, xenheap_mfn_end;
+extern mfn_t xenheap_mfn_start, xenheap_mfn_end;
 extern vaddr_t xenheap_virt_end;
 #ifdef CONFIG_ARM_64
 extern vaddr_t xenheap_virt_start;
@@ -117,7 +117,8 @@ extern vaddr_t xenheap_virt_start;
 #define is_xen_heap_page(page) is_xen_heap_mfn(page_to_mfn(page))
 #define is_xen_heap_mfn(mfn) ({                                 \
     unsigned long _mfn = (mfn);                                 \
-    (_mfn >= xenheap_mfn_start && _mfn < xenheap_mfn_end);      \
+    (_mfn >= mfn_x(xenheap_mfn_start) &&                        \
+     _mfn < mfn_x(xenheap_mfn_end));                            \
 })
 #else
 #define is_xen_heap_page(page) ((page)->count_info & PGC_xen_heap)
@@ -227,7 +228,7 @@ static inline paddr_t __virt_to_maddr(vaddr_t va)
 static inline void *maddr_to_virt(paddr_t ma)
 {
     ASSERT(is_xen_heap_mfn(ma >> PAGE_SHIFT));
-    ma -= pfn_to_paddr(xenheap_mfn_start);
+    ma -= mfn_to_maddr(xenheap_mfn_start);
     return (void *)(unsigned long) ma + XENHEAP_VIRT_START;
 }
 #else
@@ -235,7 +236,7 @@ static inline void *maddr_to_virt(paddr_t ma)
 {
     ASSERT(pfn_to_pdx(ma >> PAGE_SHIFT) < (DIRECTMAP_SIZE >> PAGE_SHIFT));
     return (void *)(XENHEAP_VIRT_START -
-                    pfn_to_paddr(xenheap_mfn_start) +
+                    mfn_to_maddr(xenheap_mfn_start) +
                     ((ma & ma_va_bottom_mask) |
                      ((ma & ma_top_mask) >> pfn_pdx_hole_shift)));
 }
@@ -276,7 +277,7 @@ static inline struct page_info *virt_to_page(const void *v)
     ASSERT(va < xenheap_virt_end);
 
     pdx = (va - XENHEAP_VIRT_START) >> PAGE_SHIFT;
-    pdx += pfn_to_pdx(xenheap_mfn_start);
+    pdx += pfn_to_pdx(mfn_x(xenheap_mfn_start));
     return frame_table + pdx - frametable_base_pdx;
 }
 
