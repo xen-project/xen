@@ -996,7 +996,7 @@ static int create_xen_entries(enum xenmap_operation op,
         {
             rc = create_xen_table(entry);
             if ( rc < 0 ) {
-                printk("create_xen_entries: L2 failed\n");
+                printk("%s: L2 failed\n", __func__);
                 goto out;
             }
         }
@@ -1011,8 +1011,8 @@ static int create_xen_entries(enum xenmap_operation op,
             case RESERVE:
                 if ( lpae_valid(*entry) )
                 {
-                    printk("create_xen_entries: trying to replace an existing mapping addr=%lx mfn=%"PRI_mfn"\n",
-                           addr, mfn_x(mfn));
+                    printk("%s: trying to replace an existing mapping addr=%lx mfn=%"PRI_mfn"\n",
+                           __func__, addr, mfn_x(mfn));
                     return -EINVAL;
                 }
                 if ( op == RESERVE )
@@ -1025,8 +1025,8 @@ static int create_xen_entries(enum xenmap_operation op,
             case REMOVE:
                 if ( !lpae_valid(*entry) )
                 {
-                    printk("create_xen_entries: trying to %s a non-existing mapping addr=%lx\n",
-                           op == REMOVE ? "remove" : "modify", addr);
+                    printk("%s: trying to %s a non-existing mapping addr=%lx\n",
+                           __func__, op == REMOVE ? "remove" : "modify", addr);
                     return -EINVAL;
                 }
                 if ( op == REMOVE )
@@ -1038,8 +1038,8 @@ static int create_xen_entries(enum xenmap_operation op,
                     pte.pt.xn = PTE_NX_MASK(ai);
                     if ( !pte.pt.ro && !pte.pt.xn )
                     {
-                        printk("create_xen_entries: Incorrect combination for addr=%lx\n",
-                               addr);
+                        printk("%s: Incorrect combination for addr=%lx\n",
+                               __func__, addr);
                         return -EINVAL;
                     }
                 }
