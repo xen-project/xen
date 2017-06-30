@@ -44,6 +44,10 @@
 
 struct domain *dom_xen, *dom_io, *dom_cow;
 
+/* Override macros from asm/page.h to make them work with mfn_t */
+#undef virt_to_mfn
+#define virt_to_mfn(va) _mfn(__virt_to_mfn(va))
+
 /* Static start-of-day pagetables that we use before the allocators
  * are up. These are used by all CPUs during bringup before switching
  * to the CPUs own pagetables.
@@ -479,7 +483,7 @@ unsigned long domain_page_map_to_mfn(const void *ptr)
     unsigned long offset = (va>>THIRD_SHIFT) & LPAE_ENTRY_MASK;
 
     if ( va >= VMAP_VIRT_START && va < VMAP_VIRT_END )
-        return virt_to_mfn(va);
+        return __virt_to_mfn(va);
 
     ASSERT(slot >= 0 && slot < DOMHEAP_ENTRIES);
     ASSERT(map[slot].pt.avail != 0);
@@ -764,7 +768,7 @@ int init_secondary_pagetables(int cpu)
      * domheap mapping pages. */
     for ( i = 0; i < DOMHEAP_SECOND_PAGES; i++ )
     {
-        pte = mfn_to_xen_entry(_mfn(virt_to_mfn(domheap+i*LPAE_ENTRIES)),
+        pte = mfn_to_xen_entry(virt_to_mfn(domheap+i*LPAE_ENTRIES),
                                WRITEALLOC);
         pte.pt.table = 1;
         write_pte(&first[first_table_offset(DOMHEAP_VIRT_START+i*FIRST_SIZE)], pte);
@@ -961,7 +965,7 @@ static int create_xen_table(lpae_t *entry)
     if ( p == NULL )
         return -ENOMEM;
     clear_page(p);
-    pte = mfn_to_xen_entry(_mfn(virt_to_mfn(p)), WRITEALLOC);
+    pte = mfn_to_xen_entry(virt_to_mfn(p), WRITEALLOC);
     pte.pt.table = 1;
     write_pte(entry, pte);
     return 0;
@@ -1215,7 +1219,7 @@ int xenmem_add_to_physmap_one(
     unsigned long idx,
     gfn_t gfn)
 {
-    unsigned long mfn = 0;
+    mfn_t mfn = INVALID_MFN;
     int rc;
     p2m_type_t t;
     struct page_info *page = NULL;
@@ -1301,7 +1305,7 @@ int xenmem_add_to_physmap_one(
             return -EINVAL;
         }
 
-        mfn = page_to_mfn(page);
+        mfn = _mfn(page_to_mfn(page));
         t = p2m_map_foreign;
 
         rcu_unlock_domain(od);
@@ -1320,7 +1324,7 @@ int xenmem_add_to_physmap_one(
     }
 
     /* Map at new location. */
-    rc = guest_physmap_add_entry(d, gfn, _mfn(mfn), 0, t);
+    rc = guest_physmap_add_entry(d, gfn, mfn, 0, t);
 
     /* If we fail to add the mapping, we need to drop the reference we
      * took earlier on foreign pages */
