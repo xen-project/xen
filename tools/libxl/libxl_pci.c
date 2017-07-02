@@ -531,6 +531,34 @@ static uint16_t sysfs_dev_get_device(libxl__gc *gc, libxl_device_pci *pcidev)
     return pci_device_device;
 }
 
+static int sysfs_dev_get_class(libxl__gc *gc, libxl_device_pci *pcidev,
+                               unsigned long *class)
+{
+    char *pci_device_class_path = GCSPRINTF(SYSFS_PCI_DEV"/"PCI_BDF"/class",
+                     pcidev->domain, pcidev->bus, pcidev->dev, pcidev->func);
+    int read_items, ret = 0;
+
+    FILE *f = fopen(pci_device_class_path, "r");
+    if (!f) {
+        LOGE(ERROR,
+             "pci device "PCI_BDF" does not have class attribute",
+             pcidev->domain, pcidev->bus, pcidev->dev, pcidev->func);
+        ret = ERROR_FAIL;
+        goto out;
+    }
+    read_items = fscanf(f, "0x%lx\n", class);
+    fclose(f);
+    if (read_items != 1) {
+        LOGE(ERROR,
+             "cannot read class of pci device "PCI_BDF,
+             pcidev->domain, pcidev->bus, pcidev->dev, pcidev->func);
+        ret = ERROR_FAIL;
+    }
+
+out:
+    return ret;
+}
+
 typedef struct {
     uint16_t vendor;
     uint16_t device;
@@ -1652,27 +1680,10 @@ int libxl__grant_vga_iomem_permission(libxl__gc *gc, const uint32_t domid,
         uint64_t vga_iomem_start = 0xa0000 >> XC_PAGE_SHIFT;
         uint32_t stubdom_domid;
         libxl_device_pci *pcidev = &d_config->pcidevs[i];
-        char *pci_device_class_path =
-            GCSPRINTF(SYSFS_PCI_DEV"/"PCI_BDF"/class",
-                      pcidev->domain, pcidev->bus, pcidev->dev, pcidev->func);
-        int read_items;
         unsigned long pci_device_class;
 
-        FILE *f = fopen(pci_device_class_path, "r");
-        if (!f) {
-            LOGED(ERROR, domid,
-                  "pci device "PCI_BDF" does not have class attribute",
-                  pcidev->domain, pcidev->bus, pcidev->dev, pcidev->func);
+        if (sysfs_dev_get_class(gc, pcidev, &pci_device_class))
             continue;
-        }
-        read_items = fscanf(f, "0x%lx\n", &pci_device_class);
-        fclose(f);
-        if (read_items != 1) {
-            LOGED(ERROR, domid,
-                  "cannot read class of pci device "PCI_BDF,
-                  pcidev->domain, pcidev->bus, pcidev->dev, pcidev->func);
-            continue;
-        }
         if (pci_device_class != 0x030000) /* VGA class */
             continue;
 
