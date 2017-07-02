@@ -38,6 +38,18 @@ int xc_gnttab_op(xc_interface *xch, int cmd, void * op, int op_size, int count)
     return ret;
 }
 
+int xc_gnttab_query_size(xc_interface *xch, struct gnttab_query_size *query)
+{
+    int rc;
+
+    rc = xc_gnttab_op(xch, GNTTABOP_query_size, query, sizeof(*query), 1);
+
+    if ( rc || (query->status != GNTST_okay) )
+        ERROR("Could not query dom %u's grant size\n", query->dom);
+
+    return rc;
+}
+
 int xc_gnttab_get_version(xc_interface *xch, int domid)
 {
     struct gnttab_get_version query;

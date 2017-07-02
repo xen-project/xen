@@ -1606,6 +1606,7 @@ int xc_gnttab_op(xc_interface *xch, int cmd,
                  void * op, int op_size, int count);
 /* Logs iff hypercall bounce fails, otherwise doesn't. */
 
+int xc_gnttab_query_size(xc_interface *xch, struct gnttab_query_size *query);
 int xc_gnttab_get_version(xc_interface *xch, int domid); /* Never logs */
 grant_entry_v1_t *xc_gnttab_map_table_v1(xc_interface *xch, int domid, int *gnt_num);
 grant_entry_v2_t *xc_gnttab_map_table_v2(xc_interface *xch, int domid, int *gnt_num);
