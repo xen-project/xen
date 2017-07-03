@@ -497,15 +497,15 @@ void mcheck_cmn_handler(const struct cpu_user_regs *regs)
     }
     mce_spin_unlock(&mce_logout_lock);
 
-    mce_barrier_enter(&mce_trap_bar);
+    mce_barrier_enter(&mce_trap_bar, mce_broadcast);
     if ( mctc != NULL && mce_urgent_action(regs, mctc))
         cpumask_set_cpu(smp_processor_id(), &mce_fatal_cpus);
-    mce_barrier_exit(&mce_trap_bar);
+    mce_barrier_exit(&mce_trap_bar, mce_broadcast);
 
     /*
      * Wait until everybody has processed the trap.
      */
-    mce_barrier_enter(&mce_trap_bar);
+    mce_barrier_enter(&mce_trap_bar, mce_broadcast);
     if (atomic_read(&severity_cpu) == smp_processor_id())
     {
         /* According to SDM, if no error bank found on any cpus,
@@ -524,16 +524,16 @@ void mcheck_cmn_handler(const struct cpu_user_regs *regs)
         atomic_set(&found_error, 0);
         atomic_set(&severity_cpu, -1);
     }
-    mce_barrier_exit(&mce_trap_bar);
+    mce_barrier_exit(&mce_trap_bar, mce_broadcast);
 
     /* Clear flags after above fatal check */
-    mce_barrier_enter(&mce_trap_bar);
+    mce_barrier_enter(&mce_trap_bar, mce_broadcast);
     gstatus = mca_rdmsr(MSR_IA32_MCG_STATUS);
     if ((gstatus & MCG_STATUS_MCIP) != 0) {
         mce_printk(MCE_CRITICAL, "MCE: Clear MCIP@ last step");
         mca_wrmsr(MSR_IA32_MCG_STATUS, 0);
     }
-    mce_barrier_exit(&mce_trap_bar);
+    mce_barrier_exit(&mce_trap_bar, mce_broadcast);
 
     raise_softirq(MACHINE_CHECK_SOFTIRQ);
 }
@@ -1703,7 +1703,7 @@ static void mce_softirq(void)
 
     mce_printk(MCE_VERBOSE, "CPU%d enter softirq\n", cpu);
 
-    mce_barrier_enter(&mce_inside_bar);
+    mce_barrier_enter(&mce_inside_bar, mce_broadcast);
 
     /*
      * Everybody is here. Now let's see who gets to do the
@@ -1716,10 +1716,10 @@ static void mce_softirq(void)
 
     atomic_set(&severity_cpu, cpu);
 
-    mce_barrier_enter(&mce_severity_bar);
+    mce_barrier_enter(&mce_severity_bar, mce_broadcast);
     if (!mctelem_has_deferred(cpu))
         atomic_set(&severity_cpu, cpu);
-    mce_barrier_exit(&mce_severity_bar);
+    mce_barrier_exit(&mce_severity_bar, mce_broadcast);
 
     /* We choose severity_cpu for further processing */
     if (atomic_read(&severity_cpu) == cpu) {
@@ -1740,7 +1740,7 @@ static void mce_softirq(void)
         }
     }
 
-    mce_barrier_exit(&mce_inside_bar);
+    mce_barrier_exit(&mce_inside_bar, mce_broadcast);
 }
 
 /* Machine Check owner judge algorithm:

@@ -16,11 +16,11 @@ void mce_barrier_dec(struct mce_softirq_barrier *bar)
     atomic_dec(&bar->val);
 }
 
-void mce_barrier_enter(struct mce_softirq_barrier *bar)
+void mce_barrier_enter(struct mce_softirq_barrier *bar, bool wait)
 {
     int gen;
 
-    if (!mce_broadcast)
+    if ( !wait )
         return;
     atomic_inc(&bar->ingen);
     gen = atomic_read(&bar->outgen);
@@ -34,11 +34,11 @@ void mce_barrier_enter(struct mce_softirq_barrier *bar)
     }
 }
 
-void mce_barrier_exit(struct mce_softirq_barrier *bar)
+void mce_barrier_exit(struct mce_softirq_barrier *bar, bool wait)
 {
     int gen;
 
-    if ( !mce_broadcast )
+    if ( !wait )
         return;
     atomic_inc(&bar->outgen);
     gen = atomic_read(&bar->ingen);
@@ -54,6 +54,6 @@ void mce_barrier_exit(struct mce_softirq_barrier *bar)
 
 void mce_barrier(struct mce_softirq_barrier *bar)
 {
-    mce_barrier_enter(bar);
-    mce_barrier_exit(bar);
+    mce_barrier_enter(bar, mce_broadcast);
+    mce_barrier_exit(bar, mce_broadcast);
 }
