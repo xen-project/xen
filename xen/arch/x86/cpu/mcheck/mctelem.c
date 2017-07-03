@@ -108,9 +108,7 @@ static struct mc_telem_ctl {
 struct mc_telem_cpu_ctl {
 	/*
 	 * Per-CPU processing lists, used for deferred (softirq)
-	 * processing of telemetry. @pending is indexed by the
-	 * CPU that the telemetry belongs to. @processing is indexed
-	 * by the CPU that is processing the telemetry.
+	 * processing of telemetry.
 	 */
 	struct mctelem_ent *pending;
 	struct mctelem_ent *processing;
