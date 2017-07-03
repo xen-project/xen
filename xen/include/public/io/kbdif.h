@@ -63,6 +63,13 @@
  *      Backends, which support reporting of multi-touch events
  *      should set this to 1.
  *
+ * feature-raw-pointer
+ *      Values:        <uint>
+ *
+ *      Backends, which support reporting raw (unscaled) absolute coordinates
+ *      for pointer devices should set this to 1. Raw (unscaled) values have
+ *      a range of [0, 0x7fff].
+ *
  *------------------------- Pointer Device Parameters ------------------------
  *
  * width
@@ -97,6 +104,13 @@
  *      Values:         <uint>
  *
  *      Request backend to report multi-touch events.
+ *
+ * request-raw-pointer
+ *      Values:         <uint>
+ *
+ *      Request backend to report raw unscaled absolute pointer coordinates.
+ *      This option is only valid if request-abs-pointer is also set.
+ *      Raw unscaled coordinates have the range [0, 0x7fff]
  *
  *----------------------- Request Transport Parameters -----------------------
  *
