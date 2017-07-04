@@ -4,11 +4,11 @@ Coding Style for the Xen Hypervisor
 The Xen coding style described below is the coding style used by the
 Xen hypervisor itself (xen/*) as well as various associated low-level
 libraries (e.g. tools/libxc/*).
-        
+
 An exception is made for files which are imported from an external
 source. In these cases the prevailing coding style of the upstream
 source is generally used (commonly the Linux coding style).
-        
+
 Other parts of the code base may use other coding styles, sometimes
 explicitly (e.g. tools/libxl/CODING_STYLE) but often implicitly (Linux
 coding style is fairly common). In general you should copy the style
