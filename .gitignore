@@ -205,6 +205,7 @@ tools/misc/xc_shadow
 tools/misc/xen_cpuperf
 tools/misc/xen-cpuid
 tools/misc/xen-detect
+tools/misc/xen-diag
 tools/misc/xen-tmem-list-parse
 tools/misc/xen-livepatch
 tools/misc/xenperf
