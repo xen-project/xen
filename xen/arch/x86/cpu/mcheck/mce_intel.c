@@ -29,6 +29,9 @@ boolean_param("mce_fb", mce_force_broadcast);
 
 static int __read_mostly nr_intel_ext_msrs;
 
+/* If mce_force_broadcast == 1, lmce_support will be disabled forcibly. */
+static bool __read_mostly lmce_support;
+
 /* Intel SDM define bit15~bit0 of IA32_MCi_STATUS as the MC error code */
 #define INTEL_MCCOD_MASK 0xFFFF
 
@@ -698,10 +701,34 @@ static bool mce_is_broadcast(struct cpuinfo_x86 *c)
     return false;
 }
 
+static bool intel_enable_lmce(void)
+{
+    uint64_t msr_content;
+
+    /*
+     * Section "Enabling Local Machine Check" in Intel SDM Vol 3
+     * requires software must ensure the LOCK bit and LMCE_ON bit
+     * of MSR_IA32_FEATURE_CONTROL are set before setting
+     * MSR_IA32_MCG_EXT_CTL.LMCE_EN.
+     */
+
+    if ( rdmsr_safe(MSR_IA32_FEATURE_CONTROL, msr_content) )
+        return false;
+
+    if ( (msr_content & IA32_FEATURE_CONTROL_LOCK) &&
+         (msr_content & IA32_FEATURE_CONTROL_LMCE_ON) )
+    {
+        wrmsrl(MSR_IA32_MCG_EXT_CTL, MCG_EXT_CTL_LMCE_EN);
+        return true;
+    }
+
+    return false;
+}
+
 /* Check and init MCA */
 static void intel_init_mca(struct cpuinfo_x86 *c)
 {
-    bool broadcast, cmci = false, ser = false;
+    bool broadcast, cmci = false, ser = false, lmce = false;
     int ext_num = 0, first;
     uint64_t msr_content;
 
@@ -721,33 +748,40 @@ static void intel_init_mca(struct cpuinfo_x86 *c)
 
     first = mce_firstbank(c);
 
+    if (!mce_force_broadcast && (msr_content & MCG_LMCE_P))
+        lmce = intel_enable_lmce();
+
 #define CAP(enabled, name) ((enabled) ? ", " name : "")
     if (smp_processor_id() == 0)
     {
         dprintk(XENLOG_INFO,
-                "MCA capability: firstbank %d, %d ext MSRs%s%s%s\n",
+                "MCA Capability: firstbank %d, extended MCE MSR %d%s%s%s%s\n",
                 first, ext_num,
                 CAP(broadcast, "BCAST"),
                 CAP(ser, "SER"),
-                CAP(cmci, "CMCI"));
+                CAP(cmci, "CMCI"),
+                CAP(lmce, "LMCE"));
 
         mce_broadcast = broadcast;
         cmci_support = cmci;
         ser_support = ser;
+        lmce_support = lmce;
         nr_intel_ext_msrs = ext_num;
         firstbank = first;
     }
     else if (cmci != cmci_support || ser != ser_support ||
              broadcast != mce_broadcast ||
-             first != firstbank || ext_num != nr_intel_ext_msrs)
+             first != firstbank || ext_num != nr_intel_ext_msrs ||
+             lmce != lmce_support)
         dprintk(XENLOG_WARNING,
                 "CPU%u has different MCA capability "
-                "(firstbank %d, %d ext MSRs%s%s%s)"
+                "(firstbank %d, extended MCE MSR %d%s%s%s%s)"
                 " than BSP, may cause undetermined result!!!\n",
                 smp_processor_id(), first, ext_num,
                 CAP(broadcast, "BCAST"),
                 CAP(ser, "SER"),
-                CAP(cmci, "CMCI"));
+                CAP(cmci, "CMCI"),
+                CAP(lmce, "LMCE"));
 #undef CAP
 }
 
