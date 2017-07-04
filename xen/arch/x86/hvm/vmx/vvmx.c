@@ -2084,10 +2084,6 @@ int nvmx_msr_read_intercept(unsigned int msr, u64 *msr_content)
         data = gen_vmx_msr(data, VMX_ENTRY_CTLS_DEFAULT1, host_data);
         break;
 
-    case MSR_IA32_FEATURE_CONTROL:
-        data = IA32_FEATURE_CONTROL_LOCK |
-               IA32_FEATURE_CONTROL_ENABLE_VMXON_OUTSIDE_SMX;
-        break;
     case MSR_IA32_VMX_VMCS_ENUM:
         /* The max index of VVMCS encoding is 0x1f. */
         data = 0x1f << 1;

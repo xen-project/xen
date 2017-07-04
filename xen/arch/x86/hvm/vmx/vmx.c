@@ -55,6 +55,7 @@
 #include <asm/hvm/nestedhvm.h>
 #include <asm/altp2m.h>
 #include <asm/event.h>
+#include <asm/mce.h>
 #include <asm/monitor.h>
 #include <public/arch-x86/cpuid.h>
 
@@ -2856,6 +2857,8 @@ static int is_last_branch_msr(u32 ecx)
 
 static int vmx_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
 {
+    const struct vcpu *curr = current;
+
     HVM_DBG_LOG(DBG_LEVEL_MSR, "ecx=%#x", msr);
 
     switch ( msr )
@@ -2873,6 +2876,12 @@ static int vmx_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
         __vmread(GUEST_IA32_DEBUGCTL, msr_content);
         break;
     case MSR_IA32_FEATURE_CONTROL:
+        *msr_content = IA32_FEATURE_CONTROL_LOCK;
+        if ( vmce_has_lmce(curr) )
+            *msr_content |= IA32_FEATURE_CONTROL_LMCE_ON;
+        if ( nestedhvm_enabled(curr->domain) )
+            *msr_content |= IA32_FEATURE_CONTROL_ENABLE_VMXON_OUTSIDE_SMX;
+        break;
     case MSR_IA32_VMX_BASIC...MSR_IA32_VMX_VMFUNC:
         if ( !nvmx_msr_read_intercept(msr, msr_content) )
             goto gp_fault;

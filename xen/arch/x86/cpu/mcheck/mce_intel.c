@@ -946,3 +946,7 @@ int vmce_intel_rdmsr(const struct vcpu *v, uint32_t msr, uint64_t *val)
     return 1;
 }
 
+bool vmce_has_lmce(const struct vcpu *v)
+{
+    return v->arch.vmce.mcg_cap & MCG_LMCE_P;
+}
