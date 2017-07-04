@@ -387,6 +387,7 @@ mcheck_mca_logout(enum mca_source who, struct mca_banks *bankmask,
         sp->errcnt = errcnt;
         sp->ripv = (gstatus & MCG_STATUS_RIPV) != 0;
         sp->eipv = (gstatus & MCG_STATUS_EIPV) != 0;
+        sp->lmce = (gstatus & MCG_STATUS_LMCE) != 0;
         sp->uc = uc;
         sp->pcc = pcc;
         sp->recoverable = recover;
@@ -454,6 +455,7 @@ void mcheck_cmn_handler(const struct cpu_user_regs *regs)
     uint64_t gstatus;
     mctelem_cookie_t mctc = NULL;
     struct mca_summary bs;
+    bool bcast, lmce;
 
     mce_spin_lock(&mce_logout_lock);
 
@@ -462,6 +464,8 @@ void mcheck_cmn_handler(const struct cpu_user_regs *regs)
             sizeof(long) * BITS_TO_LONGS(clear_bank->num));
     }
     mctc = mcheck_mca_logout(MCA_MCE_SCAN, bankmask, &bs, clear_bank);
+    lmce = bs.lmce;
+    bcast = mce_broadcast && !lmce;
 
     if (bs.errcnt) {
         /*
@@ -470,7 +474,7 @@ void mcheck_cmn_handler(const struct cpu_user_regs *regs)
         if (bs.uc || bs.pcc) {
             add_taint(TAINT_MACHINE_CHECK);
             if (mctc != NULL)
-                mctelem_defer(mctc);
+                mctelem_defer(mctc, lmce);
             /*
              * For PCC=1 and can't be recovered, context is lost, so
              * reboot now without clearing the banks, and deal with
@@ -497,17 +501,16 @@ void mcheck_cmn_handler(const struct cpu_user_regs *regs)
     }
     mce_spin_unlock(&mce_logout_lock);
 
-    mce_barrier_enter(&mce_trap_bar, mce_broadcast);
+    mce_barrier_enter(&mce_trap_bar, bcast);
     if ( mctc != NULL && mce_urgent_action(regs, mctc))
         cpumask_set_cpu(smp_processor_id(), &mce_fatal_cpus);
-    mce_barrier_exit(&mce_trap_bar, mce_broadcast);
+    mce_barrier_exit(&mce_trap_bar, bcast);
 
     /*
      * Wait until everybody has processed the trap.
      */
-    mce_barrier_enter(&mce_trap_bar, mce_broadcast);
-    if (atomic_read(&severity_cpu) == smp_processor_id())
-    {
+    mce_barrier_enter(&mce_trap_bar, bcast);
+    if (lmce || atomic_read(&severity_cpu) == smp_processor_id()) {
         /* According to SDM, if no error bank found on any cpus,
          * something unexpected happening, we can't do any
          * recovery job but to reset the system.
@@ -524,16 +527,16 @@ void mcheck_cmn_handler(const struct cpu_user_regs *regs)
         atomic_set(&found_error, 0);
         atomic_set(&severity_cpu, -1);
     }
-    mce_barrier_exit(&mce_trap_bar, mce_broadcast);
+    mce_barrier_exit(&mce_trap_bar, bcast);
 
     /* Clear flags after above fatal check */
-    mce_barrier_enter(&mce_trap_bar, mce_broadcast);
+    mce_barrier_enter(&mce_trap_bar, bcast);
     gstatus = mca_rdmsr(MSR_IA32_MCG_STATUS);
     if ((gstatus & MCG_STATUS_MCIP) != 0) {
         mce_printk(MCE_CRITICAL, "MCE: Clear MCIP@ last step");
         mca_wrmsr(MSR_IA32_MCG_STATUS, 0);
     }
-    mce_barrier_exit(&mce_trap_bar, mce_broadcast);
+    mce_barrier_exit(&mce_trap_bar, bcast);
 
     raise_softirq(MACHINE_CHECK_SOFTIRQ);
 }
@@ -1562,7 +1565,8 @@ static void mc_panic_dump(void)
 
     dprintk(XENLOG_ERR, "Begin dump mc_info\n");
     for_each_online_cpu(cpu)
-        mctelem_process_deferred(cpu, x86_mcinfo_dump_panic);
+        mctelem_process_deferred(cpu, x86_mcinfo_dump_panic,
+                                 mctelem_has_deferred_lmce(cpu));
     dprintk(XENLOG_ERR, "End dump mc_info, %x mcinfo dumped\n", mcinfo_dumpped);
 }
 
@@ -1700,38 +1704,45 @@ static void mce_softirq(void)
     static atomic_t severity_cpu;
     int cpu = smp_processor_id();
     unsigned int workcpu;
+    bool lmce = mctelem_has_deferred_lmce(cpu);
+    bool bcast = mce_broadcast && !lmce;
 
     mce_printk(MCE_VERBOSE, "CPU%d enter softirq\n", cpu);
 
-    mce_barrier_enter(&mce_inside_bar, mce_broadcast);
+    mce_barrier_enter(&mce_inside_bar, bcast);
 
-    /*
-     * Everybody is here. Now let's see who gets to do the
-     * recovery work. Right now we just see if there's a CPU
-     * that did not have any problems, and pick that one.
-     *
-     * First, just set a default value: the last CPU who reaches this
-     * will overwrite the value and become the default.
-     */
+    if (!lmce) {
+        /*
+         * Everybody is here. Now let's see who gets to do the
+         * recovery work. Right now we just see if there's a CPU
+         * that did not have any problems, and pick that one.
+         *
+         * First, just set a default value: the last CPU who reaches this
+         * will overwrite the value and become the default.
+         */
 
-    atomic_set(&severity_cpu, cpu);
-
-    mce_barrier_enter(&mce_severity_bar, mce_broadcast);
-    if (!mctelem_has_deferred(cpu))
         atomic_set(&severity_cpu, cpu);
-    mce_barrier_exit(&mce_severity_bar, mce_broadcast);
+
+        mce_barrier_enter(&mce_severity_bar, bcast);
+        if (!mctelem_has_deferred(cpu))
+            atomic_set(&severity_cpu, cpu);
+        mce_barrier_exit(&mce_severity_bar, bcast);
+    }
 
     /* We choose severity_cpu for further processing */
-    if (atomic_read(&severity_cpu) == cpu) {
+    if (lmce || atomic_read(&severity_cpu) == cpu) {
 
         mce_printk(MCE_VERBOSE, "CPU%d handling errors\n", cpu);
 
         /* Step1: Fill DOM0 LOG buffer, vMCE injection buffer and
          * vMCE MSRs virtualization buffer
          */
-        for_each_online_cpu(workcpu) {
-            mctelem_process_deferred(workcpu, mce_delayed_action);
-        }
+
+        if (lmce)
+            mctelem_process_deferred(cpu, mce_delayed_action, true);
+        else
+            for_each_online_cpu(workcpu)
+                mctelem_process_deferred(workcpu, mce_delayed_action, false);
 
         /* Step2: Send Log to DOM0 through vIRQ */
         if (dom0_vmce_enabled()) {
@@ -1740,7 +1751,7 @@ static void mce_softirq(void)
         }
     }
 
-    mce_barrier_exit(&mce_inside_bar, mce_broadcast);
+    mce_barrier_exit(&mce_inside_bar, bcast);
 }
 
 /* Machine Check owner judge algorithm:

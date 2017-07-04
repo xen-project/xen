@@ -109,8 +109,22 @@ struct mc_telem_cpu_ctl {
 	/*
 	 * Per-CPU processing lists, used for deferred (softirq)
 	 * processing of telemetry.
+	 *
+	 * The two pending lists @lmce_pending and @pending grow at
+	 * the head in the reverse chronological order.
+	 *
+	 * @pending and @lmce_pending on the same CPU are mutually
+	 * exclusive, i.e. deferred MCE on a CPU are either all in
+	 * @lmce_pending or all in @pending. In the former case, all
+	 * deferred MCE are LMCE. In the latter case, both LMCE and
+	 * non-local MCE can be in @pending, and @pending contains at
+	 * least one non-local MCE if it's not empty.
+	 *
+	 * Changes to @pending and @lmce_pending should be performed
+	 * via mctelem_process_deferred() and mctelem_defer(), in order
+	 * to guarantee the above mutual exclusivity.
 	 */
-	struct mctelem_ent *pending;
+	struct mctelem_ent *pending, *lmce_pending;
 	struct mctelem_ent *processing;
 };
 static DEFINE_PER_CPU(struct mc_telem_cpu_ctl, mctctl);
@@ -131,26 +145,97 @@ static void mctelem_xchg_head(struct mctelem_ent **headp,
 	}
 }
 
-
-void mctelem_defer(mctelem_cookie_t cookie)
+/**
+ * Append a telemetry of deferred MCE to a per-cpu pending list,
+ * either @pending or @lmce_pending, according to rules below:
+ *  - if @pending is not empty, then the new telemetry will be
+ *    appended to @pending;
+ *  - if @pending is empty and the new telemetry is for a deferred
+ *    LMCE, then the new telemetry will be appended to @lmce_pending;
+ *  - if @pending is empty and the new telemetry is for a deferred
+ *    non-local MCE, all existing telemetries in @lmce_pending will be
+ *    moved to @pending and then the new telemetry will be appended to
+ *    @pending.
+ *
+ * This function must be called with MCIP bit set, so that it does not
+ * need to worry about MC# re-occurring in this function.
+ *
+ * As a result, this function can preserve the mutual exclusivity
+ * between @pending and @lmce_pending (see their comments in struct
+ * mc_telem_cpu_ctl).
+ *
+ * Parameters:
+ *  @cookie: telemetry of the deferred MCE
+ *  @lmce:   indicate whether the telemetry is for LMCE
+ */
+void mctelem_defer(mctelem_cookie_t cookie, bool lmce)
 {
 	struct mctelem_ent *tep = COOKIE2MCTE(cookie);
+	struct mc_telem_cpu_ctl *mctctl = &this_cpu(mctctl);
 
-	mctelem_xchg_head(&this_cpu(mctctl.pending), &tep->mcte_next, tep);
+	ASSERT(mctctl->pending == NULL || mctctl->lmce_pending == NULL);
+
+	if (mctctl->pending)
+		mctelem_xchg_head(&mctctl->pending, &tep->mcte_next, tep);
+	else if (lmce)
+		mctelem_xchg_head(&mctctl->lmce_pending, &tep->mcte_next, tep);
+	else {
+		/*
+		 * LMCE is supported on Skylake-server and later CPUs, on
+		 * which mce_broadcast is always true. Therefore, non-empty
+		 * mctctl->lmce_pending in this branch implies a broadcasting
+		 * MC# is being handled, every CPU is in the exception
+		 * context, and no one is consuming mctctl->pending at this
+		 * moment. As a result, the following two exchanges together
+		 * can be treated as atomic.
+		 */
+		if (mctctl->lmce_pending)
+			mctelem_xchg_head(&mctctl->lmce_pending,
+					  &mctctl->pending, NULL);
+		mctelem_xchg_head(&mctctl->pending, &tep->mcte_next, tep);
+	}
 }
 
+/**
+ * Move telemetries of deferred MCE from the per-cpu pending list on
+ * this or another CPU to the per-cpu processing list on this CPU, and
+ * then process all deferred MCE on the processing list.
+ *
+ * This function can be called with MCIP bit set (e.g. from MC#
+ * handler) or cleared (from MCE softirq handler). In the latter case,
+ * MC# may re-occur in this function.
+ *
+ * Parameters:
+ *  @cpu:  indicate the CPU where the pending list is
+ *  @fn:   the function to handle the deferred MCE
+ *  @lmce: indicate which pending list on @cpu is handled
+ */
 void mctelem_process_deferred(unsigned int cpu,
-			      int (*fn)(mctelem_cookie_t))
+			      int (*fn)(mctelem_cookie_t),
+			      bool lmce)
 {
 	struct mctelem_ent *tep;
 	struct mctelem_ent *head, *prev;
+	struct mc_telem_cpu_ctl *mctctl = &per_cpu(mctctl, cpu);
 	int ret;
 
 	/*
 	 * First, unhook the list of telemetry structures, and	
 	 * hook it up to the processing list head for this CPU.
+	 *
+	 * If @lmce is true and a non-local MC# occurs before the
+	 * following atomic exchange, @lmce will not hold after
+	 * resumption, because all telemetries in @lmce_pending on
+	 * @cpu are moved to @pending on @cpu in mcheck_cmn_handler().
+	 * In such a case, no telemetries will be handled in this
+	 * function after resumption. Another round of MCE softirq,
+	 * which was raised by above mcheck_cmn_handler(), will handle
+	 * those moved telemetries in @pending on @cpu.
+	 *
+	 * Any MC# occurring after the following atomic exchange will be
+	 * handled by another round of MCE softirq.
 	 */
-	mctelem_xchg_head(&per_cpu(mctctl.pending, cpu),
+	mctelem_xchg_head(lmce ? &mctctl->lmce_pending : &mctctl->pending,
 			  &this_cpu(mctctl.processing), NULL);
 
 	head = this_cpu(mctctl.processing);
@@ -192,6 +277,11 @@ bool mctelem_has_deferred(unsigned int cpu)
 	if (per_cpu(mctctl.pending, cpu) != NULL)
 		return true;
 	return false;
+}
+
+bool mctelem_has_deferred_lmce(unsigned int cpu)
+{
+	return per_cpu(mctctl.lmce_pending, cpu) != NULL;
 }
 
 /* Free an entry to its native free list; the entry must not be linked on

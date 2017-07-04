@@ -109,6 +109,7 @@ struct mca_summary {
     int         eipv;   /* meaningful on #MC */
     bool        uc;     /* UC flag */
     bool        pcc;    /* PCC flag */
+    bool        lmce;   /* LMCE flag (Intel only) */
     bool        recoverable; /* software error recoverable flag */
 };
 

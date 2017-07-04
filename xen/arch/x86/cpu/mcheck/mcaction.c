@@ -96,7 +96,9 @@ mc_memerr_dhandler(struct mca_binfo *binfo,
 
                 bank->mc_addr = gfn << PAGE_SHIFT |
                   (bank->mc_addr & (PAGE_SIZE -1 ));
-                if (fill_vmsr_data(bank, d, global->mc_gstatus,
+                /* TODO: support injecting LMCE */
+                if (fill_vmsr_data(bank, d,
+                                   global->mc_gstatus & ~MCG_STATUS_LMCE,
                                    vmce_vcpuid == VMCE_INJECT_BROADCAST))
                 {
                     mce_printk(MCE_QUIET, "Fill vMCE# data for DOM%d "
