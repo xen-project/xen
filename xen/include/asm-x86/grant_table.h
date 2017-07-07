@@ -7,14 +7,26 @@
 #ifndef __ASM_GRANT_TABLE_H__
 #define __ASM_GRANT_TABLE_H__
 
+#include <asm/paging.h>
+
+#include <asm/hvm/grant_table.h>
+#include <asm/pv/grant_table.h>
+
 #define INITIAL_NR_GRANT_FRAMES 4
 
 /*
  * Caller must own caller's BIGLOCK, is responsible for flushing the TLB, and
  * must hold a reference to the page.
  */
-int create_grant_host_mapping(uint64_t addr, unsigned long frame,
-			      unsigned int flags, unsigned int cache_flags);
+static inline int create_grant_host_mapping(uint64_t addr, unsigned long frame,
+                                            unsigned int flags,
+                                            unsigned int cache_flags)
+{
+    if ( paging_mode_external(current->domain) )
+        return create_grant_p2m_mapping(addr, frame, flags, cache_flags);
+    return create_grant_pv_mapping(addr, frame, flags, cache_flags);
+}
+
 int replace_grant_host_mapping(
     uint64_t addr, unsigned long frame, uint64_t new_addr, unsigned int flags);
 
