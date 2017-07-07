@@ -4077,7 +4077,7 @@ int create_grant_pv_mapping(uint64_t addr, unsigned long frame,
     return create_grant_va_mapping(addr, pte, current);
 }
 
-static int replace_grant_p2m_mapping(
+int replace_grant_p2m_mapping(
     uint64_t addr, unsigned long frame, uint64_t new_addr, unsigned int flags)
 {
     unsigned long gfn = (unsigned long)(addr >> PAGE_SHIFT);
@@ -4107,17 +4107,14 @@ static int replace_grant_p2m_mapping(
     return GNTST_okay;
 }
 
-int replace_grant_host_mapping(
-    uint64_t addr, unsigned long frame, uint64_t new_addr, unsigned int flags)
+int replace_grant_pv_mapping(uint64_t addr, unsigned long frame,
+                             uint64_t new_addr, unsigned int flags)
 {
     struct vcpu *curr = current;
     l1_pgentry_t *pl1e, ol1e;
     unsigned long gl1mfn;
     struct page_info *l1pg;
     int rc;
-
-    if ( paging_mode_external(current->domain) )
-        return replace_grant_p2m_mapping(addr, frame, new_addr, flags);
 
     if ( flags & GNTMAP_contains_pte )
     {

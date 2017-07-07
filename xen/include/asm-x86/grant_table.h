@@ -27,8 +27,14 @@ static inline int create_grant_host_mapping(uint64_t addr, unsigned long frame,
     return create_grant_pv_mapping(addr, frame, flags, cache_flags);
 }
 
-int replace_grant_host_mapping(
-    uint64_t addr, unsigned long frame, uint64_t new_addr, unsigned int flags);
+static inline int replace_grant_host_mapping(uint64_t addr, unsigned long frame,
+                                             uint64_t new_addr,
+                                             unsigned int flags)
+{
+    if ( paging_mode_external(current->domain) )
+        return replace_grant_p2m_mapping(addr, frame, new_addr, flags);
+    return replace_grant_pv_mapping(addr, frame, new_addr, flags);
+}
 
 #define gnttab_create_shared_page(d, t, i)                               \
     do {                                                                 \

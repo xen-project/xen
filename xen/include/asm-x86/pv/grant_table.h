@@ -25,6 +25,8 @@
 
 int create_grant_pv_mapping(uint64_t addr, unsigned long frame,
                             unsigned int flags, unsigned int cache_flags);
+int replace_grant_pv_mapping(uint64_t addr, unsigned long frame,
+                             uint64_t new_addr, unsigned int flags);
 
 #else
 
@@ -33,6 +35,12 @@ int create_grant_pv_mapping(uint64_t addr, unsigned long frame,
 static inline int create_grant_pv_mapping(uint64_t addr, unsigned long frame,
                                           unsigned int flags,
                                           unsigned int cache_flags)
+{
+    return GNTST_general_error;
+}
+
+static inline int replace_grant_pv_mapping(uint64_t addr, unsigned long frame,
+                                           uint64_t new_addr, unsigned int flags)
 {
     return GNTST_general_error;
 }
