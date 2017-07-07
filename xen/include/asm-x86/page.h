@@ -304,6 +304,8 @@ void efi_update_l4_pgtable(unsigned int l4idx, l4_pgentry_t);
 #define _PAGE_AVAIL_HIGH (_AC(0x7ff, U) << 12)
 #define _PAGE_NX       (cpu_has_nx ? _PAGE_NX_BIT : 0)
 
+#define PAGE_CACHE_ATTRS (_PAGE_PAT | _PAGE_PCD | _PAGE_PWT)
+
 /*
  * Debug option: Ensure that granted mappings are not implicitly unmapped.
  * WARNING: This will need to be disabled to run OSes that use the spare PTE
