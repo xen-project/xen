@@ -3853,6 +3853,7 @@ x86_emulate(
         break;
 
     case 0xc0 ... 0xc1: grp2: /* Grp2 */
+        generate_exception_if(lock_prefix, EXC_UD);
         switch ( modrm_reg & 7 )
         {
         case 0: /* rol */
