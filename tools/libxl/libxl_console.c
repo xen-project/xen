@@ -605,7 +605,8 @@ static int libxl__device_from_vkb(libxl__gc *gc, uint32_t domid,
 
 static LIBXL_DEFINE_UPDATE_DEVID(vkb, "vkb")
 
-int libxl__device_vfb_setdefault(libxl__gc *gc, libxl_device_vfb *vfb)
+static int libxl__device_vfb_setdefault(libxl__gc *gc, uint32_t domid,
+                                        libxl_device_vfb *vfb, bool hotplug)
 {
     int rc;
 
@@ -641,47 +642,13 @@ static int libxl__device_from_vfb(libxl__gc *gc, uint32_t domid,
     return 0;
 }
 
-int libxl_device_vfb_add(libxl_ctx *ctx, uint32_t domid, libxl_device_vfb *vfb,
-                         const libxl_asyncop_how *ao_how)
-{
-    AO_CREATE(ctx, domid, ao_how);
-    int rc;
-
-    rc = libxl__device_vfb_add(gc, domid, vfb);
-    if (rc) {
-        LOGD(ERROR, domid, "Unable to add vfb device");
-        goto out;
-    }
-
-out:
-    libxl__ao_complete(egc, ao, rc);
-    return AO_INPROGRESS;
-}
-
 static LIBXL_DEFINE_UPDATE_DEVID(vfb, "vfb")
 
-int libxl__device_vfb_add(libxl__gc *gc, uint32_t domid, libxl_device_vfb *vfb)
+static int libxl__set_xenstore_vfb(libxl__gc *gc, uint32_t domid,
+                                   libxl_device_vfb *vfb,
+                                  flexarray_t *back, flexarray_t *front,
+                                  flexarray_t *ro_front)
 {
-    flexarray_t *front;
-    flexarray_t *back;
-    libxl__device device;
-    int rc;
-
-    rc = libxl__device_vfb_setdefault(gc, vfb);
-    if (rc) goto out;
-
-    front = flexarray_make(gc, 16, 1);
-    back = flexarray_make(gc, 16, 1);
-
-    rc = libxl__device_vfb_update_devid(gc, domid, vfb);
-    if (rc) goto out;
-
-    rc = libxl__device_from_vfb(gc, domid, vfb, &device);
-    if (rc != 0) goto out;
-
-    flexarray_append_pair(back, "frontend-id", GCSPRINTF("%d", domid));
-    flexarray_append_pair(back, "online", "1");
-    flexarray_append_pair(back, "state", GCSPRINTF("%d", XenbusStateInitialising));
     flexarray_append_pair(back, "vnc",
                           libxl_defbool_val(vfb->vnc.enable) ? "1" : "0");
     flexarray_append_pair(back, "vnclisten", vfb->vnc.listen);
@@ -701,17 +668,7 @@ int libxl__device_vfb_add(libxl__gc *gc, uint32_t domid, libxl_device_vfb *vfb)
         flexarray_append_pair(back, "display", vfb->sdl.display);
     }
 
-    flexarray_append_pair(front, "backend-id",
-                          GCSPRINTF("%d", vfb->backend_domid));
-    flexarray_append_pair(front, "state", GCSPRINTF("%d", XenbusStateInitialising));
-
-    libxl__device_generic_add(gc, XBT_NULL, &device,
-                              libxl__xs_kvs_of_flexarray(gc, back),
-                              libxl__xs_kvs_of_flexarray(gc, front),
-                              NULL);
-    rc = 0;
-out:
-    return rc;
+    return 0;
 }
 
 /* The following functions are defined:
@@ -737,8 +694,20 @@ DEFINE_DEVICE_TYPE_STRUCT(vkb,
     .skip_attach = 1
 );
 
+#define libxl__add_vfbs NULL
+#define libxl_device_vfb_list NULL
+#define libxl_device_vfb_compare NULL
+
 /* vfb */
 LIBXL_DEFINE_DEVICE_REMOVE(vfb)
+
+DEFINE_DEVICE_TYPE_STRUCT(vfb,
+    .skip_attach = 1,
+    .set_xenstore_config = (int (*)(libxl__gc *, uint32_t, void *,
+                                    flexarray_t *back, flexarray_t *front,
+                                    flexarray_t *ro_front))
+                           libxl__set_xenstore_vfb
+);
 
 libxl_xen_console_reader *
     libxl_xen_console_read_start(libxl_ctx *ctx, int clear)

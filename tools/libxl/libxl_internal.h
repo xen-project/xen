@@ -1247,7 +1247,6 @@ _hidden int libxl__device_disk_setdefault(libxl__gc *gc, uint32_t domid,
                                           bool hotplug);
 _hidden int libxl__device_nic_setdefault(libxl__gc *gc, uint32_t domid,
                                          libxl_device_nic *nic, bool hotplug);
-_hidden int libxl__device_vfb_setdefault(libxl__gc *gc, libxl_device_vfb *vfb);
 _hidden void libxl__rdm_setdefault(libxl__gc *gc,
                                    libxl_domain_build_info *b_info);
 
@@ -2656,10 +2655,6 @@ struct libxl__multidev {
  * it's a valid state.
  */
 
-/* Internal function to connect a vfb device */
-_hidden int libxl__device_vfb_add(libxl__gc *gc, uint32_t domid,
-                                  libxl_device_vfb *vfb);
-
 /* Waits for the passed device to reach state XenbusStateInitWait.
  * This is not really useful by itself, but is important when executing
  * hotplug scripts, since we need to be sure the device is in the correct
@@ -3546,6 +3541,7 @@ static inline int *libxl__device_type_get_num(
     return (int *)((void *)d_config + dt->num_offset);
 }
 
+extern const struct libxl_device_type libxl__vfb_devtype;
 extern const struct libxl_device_type libxl__vkb_devtype;
 extern const struct libxl_device_type libxl__disk_devtype;
 extern const struct libxl_device_type libxl__nic_devtype;

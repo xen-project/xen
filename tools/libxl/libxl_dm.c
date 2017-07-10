@@ -1981,9 +1981,9 @@ static void spawn_stub_launch_dm(libxl__egc *egc,
             goto out;
     }
     if (dm_config->num_vfbs) {
-        ret = libxl__device_vfb_add(gc, dm_domid, &dm_config->vfbs[0]);
-        if (ret)
-            goto out;
+        ret = libxl__device_add(gc, dm_domid, &libxl__vfb_devtype,
+                                &dm_config->vfbs[0]);
+        if (ret) goto out;
     }
     if (dm_config->num_vkbs) {
         ret = libxl__device_add(gc, dm_domid, &libxl__vkb_devtype,
