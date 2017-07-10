@@ -3505,6 +3505,7 @@ struct libxl_device_type {
     int (*dm_needed)(void *, unsigned);
     void (*update_config)(libxl__gc *, void *, void *);
     int (*update_devid)(libxl__gc *, uint32_t, void *);
+    int (*from_xenstore)(libxl__gc *, const char *, libxl_devid, void *);
     int (*set_xenstore_config)(libxl__gc *, uint32_t, void *, flexarray_t *,
                                flexarray_t *, flexarray_t *);
 };
@@ -4385,6 +4386,13 @@ void libxl__device_add_async(libxl__egc *egc, uint32_t domid,
 int libxl__device_add(libxl__gc *gc, uint32_t domid,
                       const struct libxl_device_type *dt, void *type);
 
+/* Caller is responsible for freeing the memory by calling
+ * libxl__device_list_free
+ */
+void* libxl__device_list(libxl__gc *gc, const struct libxl_device_type *dt,
+                         uint32_t domid, const char* name, int *num);
+void libxl__device_list_free(const struct libxl_device_type *dt,
+                             void *list, int num);
 #endif
 
 /*
