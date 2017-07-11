@@ -763,9 +763,8 @@ value stub_xl_device_disk_list(value ctx, value domid)
 		Field(list, 1) = temp;
 		temp = list;
 		Store_field(list, 0, Val_device_disk(&c_list[i]));
-		libxl_device_disk_dispose(&c_list[i]);
 	}
-	free(c_list);
+	libxl_device_disk_list_free(c_list, nb);
 
 	CAMLreturn(list);
 }

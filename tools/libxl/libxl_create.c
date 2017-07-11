@@ -938,8 +938,8 @@ static void initiate_domain_create(libxl__egc *egc,
     store_libxl_entry(gc, domid, &d_config->b_info);
 
     for (i = 0; i < d_config->num_disks; i++) {
-        ret = libxl__device_disk_setdefault(gc, domid, &d_config->disks[i],
-                                            false);
+        ret = libxl__disk_devtype.set_default(gc, domid, &d_config->disks[i],
+                                              false);
         if (ret) {
             LOGD(ERROR, domid, "Unable to set disk defaults for disk %d", i);
             goto error_out;

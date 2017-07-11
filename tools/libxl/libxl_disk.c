@@ -152,8 +152,8 @@ void libxl_evdisable_disk_eject(libxl_ctx *ctx, libxl_evgen_disk_eject *evg) {
     GC_FREE;
 }
 
-int libxl__device_disk_setdefault(libxl__gc *gc, uint32_t domid,
-                                  libxl_device_disk *disk, bool hotplug)
+static int libxl__device_disk_setdefault(libxl__gc *gc, uint32_t domid,
+                                         libxl_device_disk *disk, bool hotplug)
 {
     int rc;
 
@@ -181,7 +181,7 @@ int libxl__device_disk_setdefault(libxl__gc *gc, uint32_t domid,
     return rc;
 }
 
-int libxl__device_from_disk(libxl__gc *gc, uint32_t domid,
+static int libxl__device_from_disk(libxl__gc *gc, uint32_t domid,
                                    const libxl_device_disk *disk,
                                    libxl__device *device)
 {
@@ -472,16 +472,14 @@ static void libxl__device_disk_add(libxl__egc *egc, uint32_t domid,
     device_disk_add(egc, domid, disk, aodev, NULL, NULL);
 }
 
-static int libxl__device_disk_from_xenstore(libxl__gc *gc,
-                                         const char *libxl_path,
-                                         libxl_device_disk *disk)
+static int libxl__disk_from_xenstore(libxl__gc *gc, const char *libxl_path,
+                                     libxl_devid devid,
+                                     libxl_device_disk *disk)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
     unsigned int len;
     char *tmp;
     int rc;
-
-    libxl_device_disk_init(disk);
 
     const char *backend_path;
     rc = libxl__xs_read_checked(gc, XBT_NULL,
@@ -617,69 +615,28 @@ int libxl_vdev_to_device_disk(libxl_ctx *ctx, uint32_t domid,
     }
     libxl_path = GCSPRINTF("%s/device/vbd/%d", dom_xl_path, devid);
 
-    rc = libxl__device_disk_from_xenstore(gc, libxl_path, disk);
+    rc = libxl__disk_from_xenstore(gc, libxl_path, devid, disk);
 out:
     GC_FREE;
-    return rc;
-}
-
-static int libxl__append_disk_list(libxl__gc *gc,
-                                           uint32_t domid,
-                                           libxl_device_disk **disks,
-                                           int *ndisks)
-{
-    char *libxl_dir_path = NULL;
-    char **dir = NULL;
-    unsigned int n = 0;
-    libxl_device_disk *pdisk = NULL, *pdisk_end = NULL;
-    int rc=0;
-    int initial_disks = *ndisks;
-
-    libxl_dir_path = GCSPRINTF("%s/device/vbd",
-                        libxl__xs_libxl_path(gc, domid));
-    dir = libxl__xs_directory(gc, XBT_NULL, libxl_dir_path, &n);
-    if (dir && n) {
-        libxl_device_disk *tmp;
-        tmp = realloc(*disks, sizeof (libxl_device_disk) * (*ndisks + n));
-        if (tmp == NULL)
-            return ERROR_NOMEM;
-        *disks = tmp;
-        pdisk = *disks + initial_disks;
-        pdisk_end = *disks + initial_disks + n;
-        for (; pdisk < pdisk_end; pdisk++, dir++) {
-            const char *p;
-            p = GCSPRINTF("%s/%s", libxl_dir_path, *dir);
-            if ((rc=libxl__device_disk_from_xenstore(gc, p, pdisk)))
-                goto out;
-            *ndisks += 1;
-        }
-    }
-out:
     return rc;
 }
 
 libxl_device_disk *libxl_device_disk_list(libxl_ctx *ctx, uint32_t domid, int *num)
 {
+    libxl_device_disk *r;
+
     GC_INIT(ctx);
-    libxl_device_disk *disks = NULL;
-    int rc;
 
-    *num = 0;
-
-    rc = libxl__append_disk_list(gc, domid, &disks, num);
-    if (rc) goto out_err;
+    r = libxl__device_list(gc, &libxl__disk_devtype, domid, "disk", num);
 
     GC_FREE;
-    return disks;
 
-out_err:
-    LOG(ERROR, "Unable to list disks");
-    while (disks && *num) {
-        (*num)--;
-        libxl_device_disk_dispose(&disks[*num]);
-    }
-    free(disks);
-    return NULL;
+    return r;
+}
+
+void libxl_device_disk_list_free(libxl_device_disk *list, int num)
+{
+    libxl__device_list_free(&libxl__disk_devtype, list, num);
 }
 
 int libxl_device_disk_getinfo(libxl_ctx *ctx, uint32_t domid,
@@ -783,7 +740,7 @@ int libxl_cdrom_insert(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk,
         goto out;
     }
 
-    disks = libxl_device_disk_list(ctx, domid, &num);
+    disks = libxl__device_list(gc, &libxl__disk_devtype, domid, "disk", &num);
     for (i = 0; i < num; i++) {
         if (disks[i].is_cdrom && !strcmp(disk->vdev, disks[i].vdev))
         {
@@ -921,9 +878,7 @@ int libxl_cdrom_insert(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk,
 
 out:
     libxl__xs_transaction_abort(gc, &t);
-    for (i = 0; i < num; i++)
-        libxl_device_disk_dispose(&disks[i]);
-    free(disks);
+    libxl__device_list_free(&libxl__disk_devtype, disks, num);
     libxl_device_disk_dispose(&disk_empty);
     libxl_device_disk_dispose(&disk_saved);
     libxl_domain_config_dispose(&d_config);
@@ -1250,6 +1205,8 @@ static int libxl_device_disk_dm_needed(void *e, unsigned domid)
 DEFINE_DEVICE_TYPE_STRUCT(disk,
     .merge       = libxl_device_disk_merge,
     .dm_needed   = libxl_device_disk_dm_needed,
+    .from_xenstore = (int (*)(libxl__gc *, const char *, libxl_devid, void *))
+                     libxl__disk_from_xenstore,
     .skip_attach = 1
 );
 

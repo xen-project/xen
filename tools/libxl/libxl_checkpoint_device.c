@@ -66,7 +66,8 @@ void libxl__checkpoint_devices_setup(libxl__egc *egc,
         cds->nics = libxl_device_nic_list(CTX, cds->domid, &cds->num_nics);
 
     if (cds->device_kind_flags & (1 << LIBXL__DEVICE_KIND_VBD))
-        cds->disks = libxl_device_disk_list(CTX, cds->domid, &cds->num_disks);
+        cds->disks = libxl__device_list(gc, &libxl__disk_devtype, cds->domid,
+                                        "disk", &cds->num_disks);
 
     if (cds->num_nics == 0 && cds->num_disks == 0)
         goto out;
@@ -221,9 +222,7 @@ static void devices_teardown_cb(libxl__egc *egc,
     cds->num_nics = 0;
 
     /* clean disk */
-    for (i = 0; i < cds->num_disks; i++)
-        libxl_device_disk_dispose(&cds->disks[i]);
-    free(cds->disks);
+    libxl__device_list_free(&libxl__disk_devtype, cds->disks, cds->num_disks);
     cds->disks = NULL;
     cds->num_disks = 0;
 

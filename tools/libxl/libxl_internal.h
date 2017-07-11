@@ -1242,9 +1242,6 @@ _hidden int libxl__domain_create_info_setdefault(libxl__gc *gc,
                                         libxl_domain_create_info *c_info);
 _hidden int libxl__domain_build_info_setdefault(libxl__gc *gc,
                                         libxl_domain_build_info *b_info);
-_hidden int libxl__device_disk_setdefault(libxl__gc *gc, uint32_t domid,
-                                          libxl_device_disk *disk,
-                                          bool hotplug);
 _hidden int libxl__device_nic_setdefault(libxl__gc *gc, uint32_t domid,
                                          libxl_device_nic *nic, bool hotplug);
 _hidden void libxl__rdm_setdefault(libxl__gc *gc,
@@ -1753,10 +1750,6 @@ _hidden char *libxl__blktap_devpath(libxl__gc *gc,
  *   Always logs on failure.
  */
 _hidden int libxl__device_destroy_tapdisk(libxl__gc *gc, const char *params);
-
-_hidden int libxl__device_from_disk(libxl__gc *gc, uint32_t domid,
-                                   const libxl_device_disk *disk,
-                                   libxl__device *device);
 
 /* Calls poll() again - useful to check whether a signaled condition
  * is still true.  Cannot fail.  Returns currently-true revents. */

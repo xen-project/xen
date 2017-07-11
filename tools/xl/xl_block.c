@@ -88,9 +88,8 @@ int main_blocklist(int argc, char **argv)
                        diskinfo.state, diskinfo.evtch, diskinfo.rref, diskinfo.backend);
                 libxl_diskinfo_dispose(&diskinfo);
             }
-            libxl_device_disk_dispose(&disks[i]);
         }
-        free(disks);
+        libxl_device_disk_list_free(disks, nb);
     }
     return 0;
 }

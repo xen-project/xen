@@ -1749,9 +1749,14 @@ int libxl_device_disk_destroy(libxl_ctx *ctx, uint32_t domid,
                               const libxl_asyncop_how *ao_how)
                               LIBXL_EXTERNAL_CALLERS_ONLY;
 
-libxl_device_disk *libxl_device_disk_list(libxl_ctx *ctx, uint32_t domid, int *num);
+libxl_device_disk *libxl_device_disk_list(libxl_ctx *ctx,
+                                          uint32_t domid, int *num)
+                                          LIBXL_EXTERNAL_CALLERS_ONLY;
+void libxl_device_disk_list_free(libxl_device_disk* list, int num)
+                                 LIBXL_EXTERNAL_CALLERS_ONLY;
 int libxl_device_disk_getinfo(libxl_ctx *ctx, uint32_t domid,
-                              libxl_device_disk *disk, libxl_diskinfo *diskinfo);
+                              libxl_device_disk *disk, libxl_diskinfo *diskinfo)
+                              LIBXL_EXTERNAL_CALLERS_ONLY;
 
 /*
  * Insert a CD-ROM device. A device corresponding to disk must already
