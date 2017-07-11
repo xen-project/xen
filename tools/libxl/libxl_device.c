@@ -1793,10 +1793,8 @@ out:
     return AO_CREATE_FAIL(rc);
 }
 
-static void device_add_domain_config(libxl__gc *gc,
-                                     libxl_domain_config *d_config,
-                                     const struct libxl_device_type *dt,
-                                     void *type)
+void device_add_domain_config(libxl__gc *gc, libxl_domain_config *d_config,
+                              const struct libxl_device_type *dt, void *type)
 {
     int *num_dev;
     unsigned int i;

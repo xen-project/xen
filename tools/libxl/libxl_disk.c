@@ -277,7 +277,8 @@ static void device_disk_add(libxl__egc *egc, uint32_t domid,
         rc = libxl__get_domain_configuration(gc, domid, &d_config);
         if (rc) goto out;
 
-        DEVICE_ADD(disk, disks, domid, &disk_saved, COMPARE_DISK, &d_config);
+        device_add_domain_config(gc, &d_config, &libxl__disk_devtype,
+                                 &disk_saved);
 
         rc = libxl__dm_check_start(gc, &d_config, domid);
         if (rc) goto out;
@@ -832,7 +833,7 @@ int libxl_cdrom_insert(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk,
     rc = libxl__get_domain_configuration(gc, domid, &d_config);
     if (rc) goto out;
 
-    DEVICE_ADD(disk, disks, domid, &disk_saved, COMPARE_DISK, &d_config);
+    device_add_domain_config(gc, &d_config, &libxl__disk_devtype, &disk_saved);
 
     rc = libxl__dm_check_start(gc, &d_config, domid);
     if (rc) goto out;

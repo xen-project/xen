@@ -4281,55 +4281,6 @@ void libxl__xcinfo2xlinfo(libxl_ctx *ctx,
                            (a)->port == (b)->port)
 #define COMPARE_USBCTRL(a, b) ((a)->devid == (b)->devid)
 
-/* DEVICE_ADD
- *
- * Add a device in libxl_domain_config structure
- *
- * It takes 6 parameters:
- *  type:     the type of the device, say nic, vtpm, disk, pci etc
- *  ptr:      pointer to the start of the array, the array must be
- *            of type libxl_device_#type
- *  domid:    domain id of target domain
- *  dev:      the device that is to be added / removed / updated
- *  compare:  the COMPARE_* macro used to compare @dev's identifier to
- *            those in the array pointed to by @ptr
- *  d_config: pointer to template domain config
- *
- * For most device types (nic, vtpm), the array pointer @ptr can be
- * derived from @type, pci device being the exception, hence we need
- * to have @ptr.
- *
- * If there is already a device with the same identifier in d_config,
- * that entry is updated.
- */
-#define DEVICE_ADD(type, ptr, domid, dev, compare, d_config)    \
-    ({                                                          \
-        int DA_x;                                               \
-        libxl_device_##type *DA_p = NULL;                       \
-                                                                \
-        /* Check for existing device */                         \
-        for (DA_x = 0; DA_x < (d_config)->num_##ptr; DA_x++) {  \
-            if (compare(&(d_config)->ptr[DA_x], (dev))) {       \
-                DA_p = &(d_config)->ptr[DA_x];                  \
-                break;                                          \
-            }                                                   \
-        }                                                       \
-                                                                \
-        if (!DA_p) {                                            \
-            (d_config)->ptr =                                   \
-                libxl__realloc(NOGC, (d_config)->ptr,           \
-                               ((d_config)->num_##ptr + 1) *    \
-                               sizeof(libxl_device_##type));    \
-            DA_p = &(d_config)->ptr[(d_config)->num_##ptr];     \
-            (d_config)->num_##ptr++;                            \
-        } else {                                                \
-            libxl_device_##type##_dispose(DA_p);                \
-        }                                                       \
-                                                                \
-        libxl_device_##type##_init(DA_p);                       \
-        libxl_device_##type##_copy(CTX, DA_p, (dev));           \
-    })
-
 /* This function copies X bytes from source to destination bitmap,
  * where X is the smaller of the two sizes.
  *
@@ -4358,6 +4309,9 @@ static inline bool libxl__acpi_defbool_val(const libxl_domain_build_info *b_info
     return libxl_defbool_val(b_info->acpi) &&
            libxl_defbool_val(b_info->u.hvm.acpi);
 }
+
+void device_add_domain_config(libxl__gc *gc, libxl_domain_config *d_config,
+                              const struct libxl_device_type *dt, void *type);
 
 void libxl__device_add_async(libxl__egc *egc, uint32_t domid,
                              const struct libxl_device_type *dt, void *type,

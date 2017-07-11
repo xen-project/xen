@@ -246,8 +246,8 @@ static int libxl__device_usbctrl_add_xenstore(libxl__gc *gc, uint32_t domid,
         rc = libxl__get_domain_configuration(gc, domid, &d_config);
         if (rc) goto out;
 
-        DEVICE_ADD(usbctrl, usbctrls, domid, &usbctrl_saved,
-                   COMPARE_USBCTRL, &d_config);
+        device_add_domain_config(gc, &d_config, &libxl__usbctrl_devtype,
+                                 &usbctrl_saved);
 
         rc = libxl__dm_check_start(gc, &d_config, domid);
         if (rc) goto out;
@@ -1194,8 +1194,8 @@ static int libxl__device_usbdev_add_xenstore(libxl__gc *gc, uint32_t domid,
         rc = libxl__get_domain_configuration(gc, domid, &d_config);
         if (rc) goto out;
 
-        DEVICE_ADD(usbdev, usbdevs, domid, &usbdev_saved,
-                   COMPARE_USB, &d_config);
+        device_add_domain_config(gc, &d_config, &libxl__usbdev_devtype,
+                                         &usbdev_saved);
 
         rc = libxl__dm_check_start(gc, &d_config, domid);
         if (rc) goto out;
