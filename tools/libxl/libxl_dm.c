@@ -1975,8 +1975,8 @@ static void spawn_stub_launch_dm(libxl__egc *egc,
          * called libxl_device_nic_add at this point, but qemu needs
          * the nic information to be complete.
          */
-        ret = libxl__device_nic_setdefault(gc, dm_domid, &dm_config->nics[i],
-                                           false);
+        ret = libxl__nic_devtype.set_default(gc, dm_domid, &dm_config->nics[i],
+                                             false);
         if (ret)
             goto out;
     }

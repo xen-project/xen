@@ -1242,8 +1242,6 @@ _hidden int libxl__domain_create_info_setdefault(libxl__gc *gc,
                                         libxl_domain_create_info *c_info);
 _hidden int libxl__domain_build_info_setdefault(libxl__gc *gc,
                                         libxl_domain_build_info *b_info);
-_hidden int libxl__device_nic_setdefault(libxl__gc *gc, uint32_t domid,
-                                         libxl_device_nic *nic, bool hotplug);
 _hidden void libxl__rdm_setdefault(libxl__gc *gc,
                                    libxl_domain_build_info *b_info);
 

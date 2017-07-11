@@ -124,9 +124,8 @@ int main_networklist(int argc, char **argv)
                        nicinfo.rref_tx, nicinfo.rref_rx, nicinfo.backend);
                 libxl_nicinfo_dispose(&nicinfo);
             }
-            libxl_device_nic_dispose(&nics[i]);
         }
-        free(nics);
+        libxl_device_nic_list_free(nics, nb);
     }
     return 0;
 }

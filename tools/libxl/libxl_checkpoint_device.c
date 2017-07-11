@@ -63,7 +63,8 @@ void libxl__checkpoint_devices_setup(libxl__egc *egc,
     cds->num_disks = 0;
 
     if (cds->device_kind_flags & (1 << LIBXL__DEVICE_KIND_VIF))
-        cds->nics = libxl_device_nic_list(CTX, cds->domid, &cds->num_nics);
+        cds->nics = libxl__device_list(gc, &libxl__nic_devtype, cds->domid,
+                                       "vif", &cds->num_nics);
 
     if (cds->device_kind_flags & (1 << LIBXL__DEVICE_KIND_VBD))
         cds->disks = libxl__device_list(gc, &libxl__disk_devtype, cds->domid,
@@ -206,8 +207,6 @@ static void devices_teardown_cb(libxl__egc *egc,
                                 libxl__multidev *multidev,
                                 int rc)
 {
-    int i;
-
     STATE_AO_GC(multidev->ao);
 
     /* Convenience aliases */
@@ -215,9 +214,7 @@ static void devices_teardown_cb(libxl__egc *egc,
                             CONTAINER_OF(multidev, *cds, multidev);
 
     /* clean nic */
-    for (i = 0; i < cds->num_nics; i++)
-        libxl_device_nic_dispose(&cds->nics[i]);
-    free(cds->nics);
+    libxl__device_list_free(&libxl__nic_devtype, cds->nics, cds->num_nics);
     cds->nics = NULL;
     cds->num_nics = 0;
 
