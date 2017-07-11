@@ -51,165 +51,72 @@ static void libxl__update_config_vtpm(libxl__gc *gc, libxl_device_vtpm *dst,
 
 static LIBXL_DEFINE_UPDATE_DEVID(vtpm, "vtpm")
 
+static int libxl__set_xenstore_vtpm(libxl__gc *gc, uint32_t domid,
+                                    libxl_device_vtpm *vtpm,
+                                    flexarray_t *back, flexarray_t *front,
+                                    flexarray_t *ro_front)
+{
+    flexarray_append_pair(back, "handle", GCSPRINTF("%d", vtpm->devid));
+    flexarray_append_pair(back, "uuid",
+                          GCSPRINTF(LIBXL_UUID_FMT,
+                                    LIBXL_UUID_BYTES(vtpm->uuid)));
+    flexarray_append_pair(back, "resume", "False");
+
+    flexarray_append_pair(front, "handle", GCSPRINTF("%d", vtpm->devid));
+
+    return 0;
+}
+
 static void libxl__device_vtpm_add(libxl__egc *egc, uint32_t domid,
                                    libxl_device_vtpm *vtpm,
                                    libxl__ao_device *aodev)
 {
-    STATE_AO_GC(aodev->ao);
-    flexarray_t *front;
-    flexarray_t *back;
-    libxl__device *device;
+    libxl__device_add_async(egc, domid, &libxl__vtpm_devtype, vtpm, aodev);
+}
+
+static int libxl__vtpm_from_xenstore(libxl__gc *gc, const char *libxl_path,
+                                     libxl_devid devid,
+                                     libxl_device_vtpm *vtpm)
+{
     int rc;
-    xs_transaction_t t = XBT_NULL;
-    libxl_domain_config d_config;
-    libxl_device_vtpm vtpm_saved;
-    libxl__domain_userdata_lock *lock = NULL;
+    char *be_path;
+    char *uuid;
 
-    libxl_domain_config_init(&d_config);
-    libxl_device_vtpm_init(&vtpm_saved);
-    libxl_device_vtpm_copy(CTX, &vtpm_saved, vtpm);
+    vtpm->devid = devid;
 
-    rc = libxl__device_vtpm_setdefault(gc, domid, vtpm, aodev->update_json);
-    if (rc) goto out;
+    be_path = libxl__xs_read(gc, XBT_NULL, GCSPRINTF("%s/backend", libxl_path));
 
-    front = flexarray_make(gc, 16, 1);
-    back = flexarray_make(gc, 16, 1);
+    rc = libxl__backendpath_parse_domid(gc, be_path, &vtpm->backend_domid);
+    if (rc) return rc;
 
-    rc = libxl__device_vtpm_update_devid(gc, domid, vtpm);
-    if (rc) goto out;
-
-    libxl__update_config_vtpm(gc, &vtpm_saved, vtpm);
-
-    GCNEW(device);
-    rc = libxl__device_from_vtpm(gc, domid, vtpm, device);
-    if ( rc != 0 ) goto out;
-
-    flexarray_append(back, "frontend-id");
-    flexarray_append(back, GCSPRINTF("%d", domid));
-    flexarray_append(back, "online");
-    flexarray_append(back, "1");
-    flexarray_append(back, "state");
-    flexarray_append(back, GCSPRINTF("%d", XenbusStateInitialising));
-    flexarray_append(back, "handle");
-    flexarray_append(back, GCSPRINTF("%d", vtpm->devid));
-
-    flexarray_append(back, "uuid");
-    flexarray_append(back, GCSPRINTF(LIBXL_UUID_FMT, LIBXL_UUID_BYTES(vtpm->uuid)));
-    flexarray_append(back, "resume");
-    flexarray_append(back, "False");
-
-    flexarray_append(front, "backend-id");
-    flexarray_append(front, GCSPRINTF("%d", vtpm->backend_domid));
-    flexarray_append(front, "state");
-    flexarray_append(front, GCSPRINTF("%d", XenbusStateInitialising));
-    flexarray_append(front, "handle");
-    flexarray_append(front, GCSPRINTF("%d", vtpm->devid));
-
-    if (aodev->update_json) {
-        lock = libxl__lock_domain_userdata(gc, domid);
-        if (!lock) {
-            rc = ERROR_LOCK_FAIL;
-            goto out;
+    uuid = libxl__xs_read(gc, XBT_NULL, GCSPRINTF("%s/uuid", be_path));
+    if (uuid) {
+        if(libxl_uuid_from_string(&(vtpm->uuid), uuid)) {
+            LOGD(ERROR, vtpm->backend_domid, "%s/uuid is a malformed uuid?? "
+                               "(%s) Probably a bug!!\n", be_path, uuid);
+            return ERROR_FAIL;
         }
-
-        rc = libxl__get_domain_configuration(gc, domid, &d_config);
-        if (rc) goto out;
-
-        DEVICE_ADD(vtpm, vtpms, domid, &vtpm_saved, COMPARE_DEVID, &d_config);
-
-        rc = libxl__dm_check_start(gc, &d_config, domid);
-        if (rc) goto out;
     }
 
-    for (;;) {
-        rc = libxl__xs_transaction_start(gc, &t);
-        if (rc) goto out;
-
-        rc = libxl__device_exists(gc, t, device);
-        if (rc < 0) goto out;
-        if (rc == 1) {              /* already exists in xenstore */
-            LOGD(ERROR, domid, "device already exists in xenstore");
-            aodev->action = LIBXL__DEVICE_ACTION_ADD; /* for error message */
-            rc = ERROR_DEVICE_EXISTS;
-            goto out;
-        }
-
-        if (aodev->update_json) {
-            rc = libxl__set_domain_configuration(gc, domid, &d_config);
-            if (rc) goto out;
-        }
-
-        libxl__device_generic_add(gc, t, device,
-                                  libxl__xs_kvs_of_flexarray(gc, back),
-                                  libxl__xs_kvs_of_flexarray(gc, front),
-                                  NULL);
-
-        rc = libxl__xs_transaction_commit(gc, &t);
-        if (!rc) break;
-        if (rc < 0) goto out;
-    }
-
-    aodev->dev = device;
-    aodev->action = LIBXL__DEVICE_ACTION_ADD;
-    libxl__wait_device_connection(egc, aodev);
-
-    rc = 0;
-out:
-    libxl__xs_transaction_abort(gc, &t);
-    if (lock) libxl__unlock_domain_userdata(lock);
-    libxl_device_vtpm_dispose(&vtpm_saved);
-    libxl_domain_config_dispose(&d_config);
-    aodev->rc = rc;
-    if(rc) aodev->callback(egc, aodev);
-    return;
+    return 0;
 }
 
 libxl_device_vtpm *libxl_device_vtpm_list(libxl_ctx *ctx, uint32_t domid, int *num)
 {
+    libxl_device_vtpm *r;
+
     GC_INIT(ctx);
 
-    libxl_device_vtpm* vtpms = NULL;
-    char *libxl_path;
-    char** dir = NULL;
-    unsigned int ndirs = 0;
-    int rc;
-
-    *num = 0;
-
-    libxl_path = GCSPRINTF("%s/device/vtpm", libxl__xs_libxl_path(gc, domid));
-    dir = libxl__xs_directory(gc, XBT_NULL, libxl_path, &ndirs);
-    if (dir && ndirs) {
-       vtpms = malloc(sizeof(*vtpms) * ndirs);
-       libxl_device_vtpm* vtpm;
-       libxl_device_vtpm* end = vtpms + ndirs;
-       for(vtpm = vtpms; vtpm < end; ++vtpm, ++dir) {
-          char* tmp;
-          const char* be_path = libxl__xs_read(gc, XBT_NULL,
-                GCSPRINTF("%s/%s/backend",
-                   libxl_path, *dir));
-
-          libxl_device_vtpm_init(vtpm);
-
-          vtpm->devid = atoi(*dir);
-
-          rc = libxl__backendpath_parse_domid(gc, be_path,
-                                              &vtpm->backend_domid);
-          if (rc) return NULL;
-
-          tmp = libxl__xs_read(gc, XBT_NULL, GCSPRINTF("%s/uuid", libxl_path));
-          if (tmp) {
-              if(libxl_uuid_from_string(&(vtpm->uuid), tmp)) {
-                  LOGD(ERROR, domid, "%s/uuid is a malformed uuid?? (%s) Probably a bug!!\n", be_path, tmp);
-                  free(vtpms);
-                  return NULL;
-              }
-          }
-       }
-    }
-    *num = ndirs;
+    r = libxl__device_list(gc, &libxl__vtpm_devtype, domid, "vtpm", num);
 
     GC_FREE;
-    return vtpms;
+
+    return r;
+}
+
+void libxl_device_vtpm_list_free(libxl_device_vtpm* list, int num)
+{
+    libxl__device_list_free(&libxl__vtpm_devtype, list, num);
 }
 
 int libxl_device_vtpm_getinfo(libxl_ctx *ctx,
@@ -281,11 +188,12 @@ int libxl_devid_to_device_vtpm(libxl_ctx *ctx,
                                int devid,
                                libxl_device_vtpm *vtpm)
 {
+    GC_INIT(ctx);
     libxl_device_vtpm *vtpms;
     int nb, i;
     int rc;
 
-    vtpms = libxl_device_vtpm_list(ctx, domid, &nb);
+    vtpms = libxl__device_list(gc, &libxl__vtpm_devtype, domid, "vtpm", &nb);
     if (!vtpms)
         return ERROR_FAIL;
 
@@ -301,7 +209,8 @@ int libxl_devid_to_device_vtpm(libxl_ctx *ctx,
         }
     }
 
-    libxl_device_vtpm_list_free(vtpms, nb);
+    libxl__device_list_free(&libxl__vtpm_devtype, vtpms, nb);
+    GC_FREE;
     return rc;
 }
 
@@ -314,11 +223,12 @@ static int libxl_device_vtpm_compare(libxl_device_vtpm *d1,
 int libxl_uuid_to_device_vtpm(libxl_ctx *ctx, uint32_t domid,
                             libxl_uuid* uuid, libxl_device_vtpm *vtpm)
 {
+    GC_INIT(ctx);
     libxl_device_vtpm *vtpms;
     int nb, i;
     int rc;
 
-    vtpms = libxl_device_vtpm_list(ctx, domid, &nb);
+    vtpms = libxl__device_list(gc, &libxl__vtpm_devtype, domid, "vtpm", &nb);
     if (!vtpms)
         return ERROR_FAIL;
 
@@ -334,24 +244,9 @@ int libxl_uuid_to_device_vtpm(libxl_ctx *ctx, uint32_t domid,
         }
     }
 
-    libxl_device_vtpm_list_free(vtpms, nb);
+    libxl__device_list_free(&libxl__vtpm_devtype, vtpms, nb);
+    GC_FREE;
     return rc;
-}
-
-void libxl_vtpminfo_list_free(libxl_vtpminfo* list, int nr)
-{
-   int i;
-   for (i = 0; i < nr; i++)
-      libxl_vtpminfo_dispose(&list[i]);
-   free(list);
-}
-
-void libxl_device_vtpm_list_free(libxl_device_vtpm* list, int nr)
-{
-   int i;
-   for (i = 0; i < nr; i++)
-      libxl_device_vtpm_dispose(&list[i]);
-   free(list);
 }
 
 static void libxl_device_vtpm_update_config(libxl__gc *gc, void *d, void *s)
@@ -364,7 +259,13 @@ static LIBXL_DEFINE_DEVICES_ADD(vtpm)
 LIBXL_DEFINE_DEVICE_REMOVE(vtpm)
 
 DEFINE_DEVICE_TYPE_STRUCT(vtpm,
-    .update_config = libxl_device_vtpm_update_config
+    .update_config = libxl_device_vtpm_update_config,
+    .from_xenstore = (int (*)(libxl__gc *, const char *, libxl_devid, void *))
+                     libxl__vtpm_from_xenstore,
+    .set_xenstore_config = (int (*)(libxl__gc *, uint32_t, void *,
+                                    flexarray_t *back, flexarray_t *front,
+                                    flexarray_t *ro_front))
+                           libxl__set_xenstore_vtpm
 );
 
 /*

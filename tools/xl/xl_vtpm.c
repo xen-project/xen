@@ -105,9 +105,8 @@ int main_vtpmlist(int argc, char **argv)
 
               libxl_vtpminfo_dispose(&vtpminfo);
            }
-           libxl_device_vtpm_dispose(&vtpms[i]);
         }
-        free(vtpms);
+        libxl_device_vtpm_list_free(vtpms, nb);
     }
     return 0;
 }

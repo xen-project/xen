@@ -1606,9 +1606,6 @@ libxl_vcpuinfo *libxl_list_vcpu(libxl_ctx *ctx, uint32_t domid,
                                 int *nb_vcpu, int *nr_cpus_out);
 void libxl_vcpuinfo_list_free(libxl_vcpuinfo *, int nr_vcpus);
 
-void libxl_device_vtpm_list_free(libxl_device_vtpm*, int nr_vtpms);
-void libxl_vtpminfo_list_free(libxl_vtpminfo *, int nr_vtpms);
-
 /*
  * Devices
  * =======
@@ -1883,9 +1880,14 @@ int libxl_device_vtpm_destroy(libxl_ctx *ctx, uint32_t domid,
                               const libxl_asyncop_how *ao_how)
                               LIBXL_EXTERNAL_CALLERS_ONLY;
 
-libxl_device_vtpm *libxl_device_vtpm_list(libxl_ctx *ctx, uint32_t domid, int *num);
+libxl_device_vtpm *libxl_device_vtpm_list(libxl_ctx *ctx,
+                                          uint32_t domid, int *num)
+                                          LIBXL_EXTERNAL_CALLERS_ONLY;
+void libxl_device_vtpm_list_free(libxl_device_vtpm*, int num)
+                                 LIBXL_EXTERNAL_CALLERS_ONLY;
 int libxl_device_vtpm_getinfo(libxl_ctx *ctx, uint32_t domid,
-                               libxl_device_vtpm *vtpm, libxl_vtpminfo *vtpminfo);
+                              libxl_device_vtpm *vtpm, libxl_vtpminfo *vtpminfo)
+                              LIBXL_EXTERNAL_CALLERS_ONLY;
 
 /* Virtual displays */
 int libxl_device_vdispl_add(libxl_ctx *ctx, uint32_t domid,
