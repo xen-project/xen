@@ -56,6 +56,8 @@
 #define MSR_IA32_MC0_MISC        0x00000403
 #define MSR_IA32_MC0_CTL2        0x00000280
 
+#define MCG_STATUS_LMCE          0x8
+
 struct mce_info {
     const char *description;
     uint8_t mcg_stat;
@@ -113,6 +115,7 @@ static struct mce_info mce_table[] = {
 #define LOGFILE stdout
 
 int dump;
+int lmce;
 struct xen_mc_msrinject msr_inj;
 
 static void Lprintf(const char *fmt, ...)
@@ -210,6 +213,35 @@ static int inject_mce(xc_interface *xc_handle, int cpu_nr)
     mc.u.mc_mceinject.mceinj_cpunr = cpu_nr;
 
     return xc_mca_op(xc_handle, &mc);
+}
+
+static int inject_lmce(xc_interface *xc_handle, unsigned int cpu)
+{
+    uint8_t *cpumap = NULL;
+    size_t cpumap_size, line, shift;
+    unsigned int nr_cpus;
+    int ret;
+
+    nr_cpus = mca_cpuinfo(xc_handle);
+    if ( !nr_cpus )
+        err(xc_handle, "Failed to get mca_cpuinfo");
+    if ( cpu >= nr_cpus )
+        err(xc_handle, "-c %u is larger than %u", cpu, nr_cpus - 1);
+
+    cpumap_size = (nr_cpus + 7) / 8;
+    cpumap = malloc(cpumap_size);
+    if ( !cpumap )
+        err(xc_handle, "Failed to allocate cpumap\n");
+    memset(cpumap, 0, cpumap_size);
+    line = cpu / 8;
+    shift = cpu % 8;
+    memset(cpumap + line, 1 << shift, 1);
+
+    ret = xc_mca_op_inject_v2(xc_handle, XEN_MC_INJECT_TYPE_LMCE,
+                              cpumap, cpumap_size * 8);
+
+    free(cpumap);
+    return ret;
 }
 
 static uint64_t bank_addr(int bank, int type)
@@ -330,8 +362,15 @@ static int inject(xc_interface *xc_handle, struct mce_info *mce,
                   uint32_t cpu_nr, uint32_t domain, uint64_t gaddr)
 {
     int ret = 0;
+    uint8_t mcg_status = mce->mcg_stat;
 
-    ret = inject_mcg_status(xc_handle, cpu_nr, mce->mcg_stat, domain);
+    if ( lmce )
+    {
+        if ( mce->cmci )
+            err(xc_handle, "No support to inject CMCI as LMCE");
+        mcg_status |= MCG_STATUS_LMCE;
+    }
+    ret = inject_mcg_status(xc_handle, cpu_nr, mcg_status, domain);
     if ( ret )
         err(xc_handle, "Failed to inject MCG_STATUS MSR");
 
@@ -354,6 +393,8 @@ static int inject(xc_interface *xc_handle, struct mce_info *mce,
         err(xc_handle, "Failed to inject MSR");
     if ( mce->cmci )
         ret = inject_cmci(xc_handle, cpu_nr);
+    else if ( lmce )
+        ret = inject_lmce(xc_handle, cpu_nr);
     else
         ret = inject_mce(xc_handle, cpu_nr);
     if ( ret )
@@ -393,6 +434,7 @@ static struct option opts[] = {
     {"dump", 0, 0, 'D'},
     {"help", 0, 0, 'h'},
     {"page", 0, 0, 'p'},
+    {"lmce", 0, 0, 'l'},
     {"", 0, 0, '\0'}
 };
 
@@ -409,6 +451,7 @@ static void help(void)
            "  -d, --domain=DOMID   target domain, the default is Xen itself\n"
            "  -h, --help           print this page\n"
            "  -p, --page=ADDR      physical address to report\n"
+           "  -l, --lmce           inject as LMCE (Intel only)\n"
            "  -t, --type=ERROR     error type\n");
 
     for ( i = 0; i < MCE_TABLE_SIZE; i++ )
@@ -438,7 +481,7 @@ int main(int argc, char *argv[])
     }
 
     while ( 1 ) {
-        c = getopt_long(argc, argv, "c:Dd:t:hp:", opts, &opt_index);
+        c = getopt_long(argc, argv, "c:Dd:t:hp:l", opts, &opt_index);
         if ( c == -1 )
             break;
         switch ( c ) {
@@ -462,6 +505,9 @@ int main(int argc, char *argv[])
             break;
         case 't':
             type = strtol(optarg, NULL, 0);
+            break;
+        case 'l':
+            lmce = 1;
             break;
         case 'h':
         default:
