@@ -341,7 +341,57 @@ int xc_mca_op(xc_interface *xch, struct xen_mc *mc)
     xc_hypercall_bounce_post(xch, mc);
     return ret;
 }
-#endif
+
+int xc_mca_op_inject_v2(xc_interface *xch, unsigned int flags,
+                        xc_cpumap_t cpumap, unsigned int nr_bits)
+{
+    int ret = -1;
+    struct xen_mc mc_buf, *mc = &mc_buf;
+    struct xen_mc_inject_v2 *inject = &mc->u.mc_inject_v2;
+
+    DECLARE_HYPERCALL_BOUNCE(cpumap, 0, XC_HYPERCALL_BUFFER_BOUNCE_IN);
+    DECLARE_HYPERCALL_BOUNCE(mc, sizeof(*mc), XC_HYPERCALL_BUFFER_BOUNCE_BOTH);
+
+    memset(mc, 0, sizeof(*mc));
+
+    if ( cpumap )
+    {
+        if ( !nr_bits )
+        {
+            errno = EINVAL;
+            goto out;
+        }
+
+        HYPERCALL_BOUNCE_SET_SIZE(cpumap, (nr_bits + 7) / 8);
+        if ( xc_hypercall_bounce_pre(xch, cpumap) )
+        {
+            PERROR("Could not bounce cpumap memory buffer");
+            goto out;
+        }
+        set_xen_guest_handle(inject->cpumap.bitmap, cpumap);
+        inject->cpumap.nr_bits = nr_bits;
+    }
+
+    inject->flags = flags;
+    mc->cmd = XEN_MC_inject_v2;
+    mc->interface_version = XEN_MCA_INTERFACE_VERSION;
+
+    if ( xc_hypercall_bounce_pre(xch, mc) )
+    {
+        PERROR("Could not bounce xen_mc memory buffer");
+        goto out_free_cpumap;
+    }
+
+    ret = xencall1(xch->xcall, __HYPERVISOR_mca, HYPERCALL_BUFFER_AS_ARG(mc));
+
+    xc_hypercall_bounce_post(xch, mc);
+out_free_cpumap:
+    if ( cpumap )
+        xc_hypercall_bounce_post(xch, cpumap);
+out:
+    return ret;
+}
+#endif /* __i386__ || __x86_64__ */
 
 int xc_perfc_reset(xc_interface *xch)
 {
