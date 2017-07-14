@@ -610,6 +610,7 @@ struct hvm_vmce_vcpu {
     uint64_t caps;
     uint64_t mci_ctl2_bank0;
     uint64_t mci_ctl2_bank1;
+    uint64_t mcg_ext_ctl;
 };
 
 DECLARE_HVM_SAVE_TYPE(VMCE_VCPU, 18, struct hvm_vmce_vcpu);

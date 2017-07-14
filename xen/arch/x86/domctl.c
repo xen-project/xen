@@ -315,6 +315,7 @@ static int vcpu_set_vmce(struct vcpu *v,
 
     static const unsigned int valid_sizes[] = {
         sizeof(evc->vmce),
+        VMCE_SIZE(mci_ctl2_bank1),
         VMCE_SIZE(caps),
     };
 #undef VMCE_SIZE
@@ -908,6 +909,7 @@ long arch_do_domctl(
             evc->vmce.caps = v->arch.vmce.mcg_cap;
             evc->vmce.mci_ctl2_bank0 = v->arch.vmce.bank[0].mci_ctl2;
             evc->vmce.mci_ctl2_bank1 = v->arch.vmce.bank[1].mci_ctl2;
+            evc->vmce.mcg_ext_ctl = v->arch.vmce.mcg_ext_ctl;
 
             ret = 0;
             vcpu_unpause(v);

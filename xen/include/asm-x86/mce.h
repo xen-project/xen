@@ -27,6 +27,7 @@ struct vmce_bank {
 struct vmce {
     uint64_t mcg_cap;
     uint64_t mcg_status;
+    uint64_t mcg_ext_ctl;
     spinlock_t lock;
     struct vmce_bank bank[GUEST_MC_BANK_NUM];
 };
