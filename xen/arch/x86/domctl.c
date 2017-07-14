@@ -302,6 +302,43 @@ static int update_domain_cpuid_info(struct domain *d,
     return 0;
 }
 
+static int vcpu_set_vmce(struct vcpu *v,
+                         const struct xen_domctl_ext_vcpucontext *evc)
+{
+    /*
+     * Sizes of vMCE parameters used by the current and past versions
+     * of Xen in descending order. If vMCE parameters are extended,
+     * remember to add the old size to this array by VMCE_SIZE().
+     */
+#define VMCE_SIZE(field) \
+    (offsetof(typeof(evc->vmce), field) + sizeof(evc->vmce.field))
+
+    static const unsigned int valid_sizes[] = {
+        sizeof(evc->vmce),
+        VMCE_SIZE(caps),
+    };
+#undef VMCE_SIZE
+
+    struct hvm_vmce_vcpu vmce = { };
+    unsigned int evc_vmce_size =
+        min(evc->size - offsetof(typeof(*evc), vmce), sizeof(evc->vmce));
+    unsigned int i = 0;
+
+    BUILD_BUG_ON(offsetof(typeof(*evc), mcg_cap) !=
+                 offsetof(typeof(*evc), vmce.caps));
+    BUILD_BUG_ON(sizeof(evc->mcg_cap) != sizeof(evc->vmce.caps));
+
+    while ( i < ARRAY_SIZE(valid_sizes) && evc_vmce_size < valid_sizes[i] )
+        ++i;
+
+    if ( i == ARRAY_SIZE(valid_sizes) )
+        return 0;
+
+    memcpy(&vmce, &evc->vmce, valid_sizes[i]);
+
+    return vmce_restore_vcpu(v, &vmce);
+}
+
 void arch_get_domain_info(const struct domain *d,
                           struct xen_domctl_getdomaininfo *info)
 {
@@ -912,23 +949,7 @@ long arch_do_domctl(
             else
                 domain_pause(d);
 
-            BUILD_BUG_ON(offsetof(struct xen_domctl_ext_vcpucontext,
-                                  mcg_cap) !=
-                         offsetof(struct xen_domctl_ext_vcpucontext,
-                                  vmce.caps));
-            BUILD_BUG_ON(sizeof(evc->mcg_cap) != sizeof(evc->vmce.caps));
-            if ( evc->size >= offsetof(typeof(*evc), vmce) +
-                              sizeof(evc->vmce) )
-                ret = vmce_restore_vcpu(v, &evc->vmce);
-            else if ( evc->size >= offsetof(typeof(*evc), mcg_cap) +
-                                   sizeof(evc->mcg_cap) )
-            {
-                struct hvm_vmce_vcpu vmce = { .caps = evc->mcg_cap };
-
-                ret = vmce_restore_vcpu(v, &vmce);
-            }
-            else
-                ret = 0;
+            ret = vcpu_set_vmce(v, evc);
 
             domain_unpause(d);
         }
