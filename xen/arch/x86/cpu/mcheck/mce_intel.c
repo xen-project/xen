@@ -30,7 +30,7 @@ boolean_param("mce_fb", mce_force_broadcast);
 static int __read_mostly nr_intel_ext_msrs;
 
 /* If mce_force_broadcast == 1, lmce_support will be disabled forcibly. */
-static bool __read_mostly lmce_support;
+bool __read_mostly lmce_support;
 
 /* Intel SDM define bit15~bit0 of IA32_MCi_STATUS as the MC error code */
 #define INTEL_MCCOD_MASK 0xFFFF

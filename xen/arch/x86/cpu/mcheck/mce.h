@@ -38,6 +38,7 @@ enum mcheck_type {
 };
 
 extern uint8_t cmci_apic_vector;
+extern bool lmce_support;
 
 /* Init functions */
 enum mcheck_type amd_mcheck_init(struct cpuinfo_x86 *c);

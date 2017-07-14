@@ -38,6 +38,7 @@ extern int vmce_restore_vcpu(struct vcpu *, const struct hvm_vmce_vcpu *);
 extern int vmce_wrmsr(uint32_t msr, uint64_t val);
 extern int vmce_rdmsr(uint32_t msr, uint64_t *val);
 extern bool vmce_has_lmce(const struct vcpu *v);
+extern int vmce_enable_mca_cap(struct domain *d, uint64_t cap);
 
 extern unsigned int nr_mce_banks;
 

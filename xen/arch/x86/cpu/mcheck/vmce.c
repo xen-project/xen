@@ -75,7 +75,7 @@ int vmce_restore_vcpu(struct vcpu *v, const struct hvm_vmce_vcpu *ctxt)
     unsigned long guest_mcg_cap;
 
     if ( boot_cpu_data.x86_vendor == X86_VENDOR_INTEL )
-        guest_mcg_cap = INTEL_GUEST_MCG_CAP;
+        guest_mcg_cap = INTEL_GUEST_MCG_CAP | MCG_LMCE_P;
     else
         guest_mcg_cap = AMD_GUEST_MCG_CAP;
 
@@ -547,3 +547,20 @@ int unmmap_broken_page(struct domain *d, mfn_t mfn, unsigned long gfn)
     return rc;
 }
 
+int vmce_enable_mca_cap(struct domain *d, uint64_t cap)
+{
+    struct vcpu *v;
+
+    if ( cap & ~XEN_HVM_MCA_CAP_MASK )
+        return -EINVAL;
+
+    if ( cap & XEN_HVM_MCA_CAP_LMCE )
+    {
+        if ( !lmce_support )
+            return -EINVAL;
+        for_each_vcpu(d, v)
+            v->arch.vmce.mcg_cap |= MCG_LMCE_P;
+    }
+
+    return 0;
+}

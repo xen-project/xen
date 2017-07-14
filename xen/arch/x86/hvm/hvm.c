@@ -4035,6 +4035,7 @@ static int hvm_allow_set_param(struct domain *d,
     case HVM_PARAM_IOREQ_SERVER_PFN:
     case HVM_PARAM_NR_IOREQ_SERVER_PAGES:
     case HVM_PARAM_ALTP2M:
+    case HVM_PARAM_MCA_CAP:
         if ( value != 0 && a->value != value )
             rc = -EEXIST;
         break;
@@ -4245,6 +4246,10 @@ static int hvmop_set_param(
                       ((sizeof(struct tss32) + (0x100 / 8) +
                                                (0x10000 / 8) + 1) << 32);
         a.value |= VM86_TSS_UPDATED;
+        break;
+
+    case HVM_PARAM_MCA_CAP:
+        rc = vmce_enable_mca_cap(d, a.value);
         break;
     }
 

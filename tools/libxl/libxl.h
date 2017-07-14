@@ -922,6 +922,13 @@ void libxl_mac_copy(libxl_ctx *ctx, libxl_mac *dst, const libxl_mac *src);
  * If this is defined, the Code and Data Prioritization feature is supported.
  */
 #define LIBXL_HAVE_PSR_CDP 1
+
+/*
+ * LIBXL_HAVE_MCA_CAPS
+ *
+ * If this is defined, setting MCA capabilities for HVM domain is supported.
+ */
+#define LIBXL_HAVE_MCA_CAPS 1
 #endif
 
 /*

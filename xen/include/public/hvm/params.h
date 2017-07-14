@@ -274,6 +274,11 @@
  */
 #define HVM_PARAM_VM86_TSS_SIZED 37
 
-#define HVM_NR_PARAMS 38
+/* Enable MCA capabilities. */
+#define HVM_PARAM_MCA_CAP 38
+#define XEN_HVM_MCA_CAP_LMCE   (xen_mk_ullong(1) << 0)
+#define XEN_HVM_MCA_CAP_MASK   XEN_HVM_MCA_CAP_LMCE
+
+#define HVM_NR_PARAMS 39
 
 #endif /* __XEN_PUBLIC_HVM_PARAMS_H__ */

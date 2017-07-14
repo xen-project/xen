@@ -18,6 +18,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <xen/hvm/e820.h>
+#include <xen/hvm/params.h>
 
 #include <libxl.h>
 #include <libxl_utils.h>
@@ -813,8 +814,9 @@ void parse_config_data(const char *config_source,
     XLU_Config *config;
     XLU_ConfigList *cpus, *vbds, *nics, *pcis, *cvfbs, *cpuids, *vtpms,
                    *usbctrls, *usbdevs, *p9devs;
-    XLU_ConfigList *channels, *ioports, *irqs, *iomem, *viridian, *dtdevs;
-    int num_ioports, num_irqs, num_iomem, num_cpus, num_viridian;
+    XLU_ConfigList *channels, *ioports, *irqs, *iomem, *viridian, *dtdevs,
+                   *mca_caps;
+    int num_ioports, num_irqs, num_iomem, num_cpus, num_viridian, num_mca_caps;
     int pci_power_mgmt = 0;
     int pci_msitranslate = 0;
     int pci_permissive = 0;
@@ -1182,6 +1184,31 @@ void parse_config_data(const char *config_source,
 
         if (!xlu_cfg_get_long (config, "rdm_mem_boundary", &l, 0))
             b_info->u.hvm.rdm_mem_boundary_memkb = l * 1024;
+
+        switch (xlu_cfg_get_list(config, "mca_caps",
+                                 &mca_caps, &num_mca_caps, 1))
+        {
+        case 0: /* Success */
+            for (i = 0; i < num_mca_caps; i++) {
+                buf = xlu_cfg_get_listitem(mca_caps, i);
+                if (!strcmp(buf, "lmce"))
+                    b_info->u.hvm.mca_caps |= XEN_HVM_MCA_CAP_LMCE;
+                else {
+                    fprintf(stderr, "ERROR: unrecognized MCA capability '%s'.\n",
+                            buf);
+                    exit(-ERROR_FAIL);
+                }
+            }
+            break;
+
+        case ESRCH: /* Option not present */
+            break;
+
+        default:
+            fprintf(stderr, "ERROR: unable to parse mca_caps.\n");
+            exit(-ERROR_FAIL);
+        }
+
         break;
     case LIBXL_DOMAIN_TYPE_PV:
     {

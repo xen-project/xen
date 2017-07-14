@@ -279,6 +279,17 @@ err:
     libxl_bitmap_dispose(&enlightenments);
     return ERROR_FAIL;
 }
+
+static int hvm_set_mca_capabilities(libxl__gc *gc, uint32_t domid,
+                                    libxl_domain_build_info *const info)
+{
+    unsigned long caps = info->u.hvm.mca_caps;
+
+    if (!caps)
+        return 0;
+
+    return xc_hvm_param_set(CTX->xch, domid, HVM_PARAM_MCA_CAP, caps);
+}
 #endif
 
 static void hvm_set_conf_params(xc_interface *handle, uint32_t domid,
@@ -438,6 +449,10 @@ int libxl__build_pre(libxl__gc *gc, uint32_t domid,
         hvm_set_conf_params(ctx->xch, domid, info);
 #if defined(__i386__) || defined(__x86_64__)
         rc = hvm_set_viridian_features(gc, domid, info);
+        if (rc)
+            return rc;
+
+        rc = hvm_set_mca_capabilities(gc, domid, info);
         if (rc)
             return rc;
 #endif

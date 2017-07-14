@@ -2173,6 +2173,30 @@ natively or via hardware backwards compatibility support.
 
 =back
 
+=head3 x86
+
+=over 4
+
+=item B<mca_caps=[ "CAP", "CAP", ... ]>
+
+(HVM only) Enable MCA capabilities besides default ones enabled
+by Xen hypervisor for the HVM domain. "CAP" can be one in the
+following list:
+
+=over 4
+
+=item B<"lmce">
+
+Intel local MCE
+
+=item B<default>
+
+No MCA capabilities in above list are enabled.
+
+=back
+
+=back
+
 =head1 SEE ALSO
 
 =over 4
