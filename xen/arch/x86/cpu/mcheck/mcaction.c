@@ -44,6 +44,7 @@ mc_memerr_dhandler(struct mca_binfo *binfo,
     unsigned long mfn, gfn;
     uint32_t status;
     int vmce_vcpuid;
+    unsigned int mc_vcpuid;
 
     if (!mc_check_addr(bank->mc_status, bank->mc_misc, MC_ADDR_PHYSICAL)) {
         dprintk(XENLOG_WARNING,
@@ -88,18 +89,26 @@ mc_memerr_dhandler(struct mca_binfo *binfo,
                     goto vmce_failed;
                 }
 
-                if (boot_cpu_data.x86_vendor == X86_VENDOR_INTEL ||
-                    global->mc_vcpuid == XEN_MC_VCPUID_INVALID)
+                mc_vcpuid = global->mc_vcpuid;
+                if (mc_vcpuid == XEN_MC_VCPUID_INVALID ||
+                    /*
+                     * Because MC# may happen asynchronously with the actual
+                     * operation that triggers the error, the domain ID as
+                     * well as the vCPU ID collected in 'global' at MC# are
+                     * not always precise. In that case, fallback to broadcast.
+                     */
+                    global->mc_domid != bank->mc_domid ||
+                    (boot_cpu_data.x86_vendor == X86_VENDOR_INTEL &&
+                     (!(global->mc_gstatus & MCG_STATUS_LMCE) ||
+                      !(d->vcpu[mc_vcpuid]->arch.vmce.mcg_ext_ctl &
+                        MCG_EXT_CTL_LMCE_EN))))
                     vmce_vcpuid = VMCE_INJECT_BROADCAST;
                 else
-                    vmce_vcpuid = global->mc_vcpuid;
+                    vmce_vcpuid = mc_vcpuid;
 
                 bank->mc_addr = gfn << PAGE_SHIFT |
                   (bank->mc_addr & (PAGE_SIZE -1 ));
-                /* TODO: support injecting LMCE */
-                if (fill_vmsr_data(bank, d,
-                                   global->mc_gstatus & ~MCG_STATUS_LMCE,
-                                   vmce_vcpuid == VMCE_INJECT_BROADCAST))
+                if (fill_vmsr_data(bank, d, global->mc_gstatus, vmce_vcpuid))
                 {
                     mce_printk(MCE_QUIET, "Fill vMCE# data for DOM%d "
                       "failed\n", bank->mc_domid);

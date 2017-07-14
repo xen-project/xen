@@ -465,13 +465,22 @@ static int vcpu_fill_mc_msrs(struct vcpu *v, uint64_t mcg_status,
 }
 
 int fill_vmsr_data(struct mcinfo_bank *mc_bank, struct domain *d,
-                   uint64_t gstatus, bool broadcast)
+                   uint64_t gstatus, int vmce_vcpuid)
 {
     struct vcpu *v = d->vcpu[0];
+    bool broadcast = (vmce_vcpuid == VMCE_INJECT_BROADCAST);
     int ret, err;
 
     if ( mc_bank->mc_domid == DOMID_INVALID )
         return -EINVAL;
+
+    if ( broadcast )
+        gstatus &= ~MCG_STATUS_LMCE;
+    else if ( gstatus & MCG_STATUS_LMCE )
+    {
+        ASSERT(vmce_vcpuid >= 0 && vmce_vcpuid < d->max_vcpus);
+        v = d->vcpu[vmce_vcpuid];
+    }
 
     /*
      * vMCE with the actual error information is injected to vCPU0,

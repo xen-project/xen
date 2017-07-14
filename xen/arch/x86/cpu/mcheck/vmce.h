@@ -17,7 +17,7 @@ int vmce_amd_rdmsr(const struct vcpu *, uint32_t msr, uint64_t *val);
 int vmce_amd_wrmsr(struct vcpu *, uint32_t msr, uint64_t val);
 
 int fill_vmsr_data(struct mcinfo_bank *mc_bank, struct domain *d,
-                   uint64_t gstatus, bool broadcast);
+                   uint64_t gstatus, int vmce_vcpuid);
 
 #define VMCE_INJECT_BROADCAST (-1)
 int inject_vmce(struct domain *d, int vcpu);
