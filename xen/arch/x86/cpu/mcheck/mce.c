@@ -1485,11 +1485,12 @@ long do_mca(XEN_GUEST_HANDLE_PARAM(xen_mc_t) u_xen_mc)
     {
         const cpumask_t *cpumap;
         cpumask_var_t cmv;
+        bool broadcast = op->u.mc_inject_v2.flags & XEN_MC_INJECT_CPU_BROADCAST;
 
         if (nr_mce_banks == 0)
             return x86_mcerr("do_mca #MC", -ENODEV);
 
-        if ( op->u.mc_inject_v2.flags & XEN_MC_INJECT_CPU_BROADCAST )
+        if ( broadcast )
             cpumap = &cpu_online_map;
         else
         {
@@ -1527,6 +1528,27 @@ long do_mca(XEN_GUEST_HANDLE_PARAM(xen_mc_t) u_xen_mc)
                     send_IPI_self(cmci_apic_vector);
                 send_IPI_mask(cpumap, cmci_apic_vector);
             }
+            break;
+
+        case XEN_MC_INJECT_TYPE_LMCE:
+            if ( !lmce_support )
+            {
+                ret = x86_mcerr("No LMCE support", -EINVAL);
+                break;
+            }
+            if ( broadcast )
+            {
+                ret = x86_mcerr("Broadcast cannot be used with LMCE", -EINVAL);
+                break;
+            }
+            /* Ensure at most one CPU is specified. */
+            if ( nr_cpu_ids > cpumask_next(cpumask_first(cpumap), cpumap) )
+            {
+                ret = x86_mcerr("More than one CPU specified for LMCE",
+                                -EINVAL);
+                break;
+            }
+            on_selected_cpus(cpumap, x86_mc_mceinject, NULL, 1);
             break;
 
         default:

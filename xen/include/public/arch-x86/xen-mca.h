@@ -414,6 +414,7 @@ struct xen_mc_mceinject {
 #define XEN_MC_INJECT_TYPE_MASK     0x7
 #define XEN_MC_INJECT_TYPE_MCE      0x0
 #define XEN_MC_INJECT_TYPE_CMCI     0x1
+#define XEN_MC_INJECT_TYPE_LMCE     0x2
 
 #define XEN_MC_INJECT_CPU_BROADCAST 0x8
 
