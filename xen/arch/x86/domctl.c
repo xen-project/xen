@@ -56,9 +56,8 @@ static int update_domain_cpuid_info(struct domain *d,
     bool call_policy_changed = false; /* Avoid for_each_vcpu() unnecessarily */
 
     /*
-     * Skip update for leaves we don't care about.  This avoids the overhead
-     * of recalculate_cpuid_policy() and making d->arch.cpuids[] needlessly
-     * longer to search.
+     * Skip update for leaves we don't care about, to avoid the overhead of
+     * recalculate_cpuid_policy().
      */
     switch ( ctl->input[0] )
     {

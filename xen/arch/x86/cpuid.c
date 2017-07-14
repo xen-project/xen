@@ -701,7 +701,7 @@ void guest_cpuid(const struct vcpu *v, uint32_t leaf,
      * First pass:
      * - Perform max_leaf/subleaf calculations.  Out-of-range leaves return
      *   all zeros, following the AMD model.
-     * - Fill in *res for leaves no longer handled on the legacy path.
+     * - Fill in *res with static data.
      * - Dispatch the virtualised leaves to their respective handlers.
      */
     switch ( leaf )
