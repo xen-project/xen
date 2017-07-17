@@ -179,6 +179,3 @@ external domain_cpuid_set: handle -> domid -> (int64 * (int64 option))
        = "stub_xc_domain_cpuid_set"
 external domain_cpuid_apply_policy: handle -> domid -> unit
        = "stub_xc_domain_cpuid_apply_policy"
-external cpuid_check: handle -> (int64 * (int64 option)) -> string option array -> (bool * string option array)
-       = "stub_xc_cpuid_check"
-

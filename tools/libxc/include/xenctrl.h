@@ -1793,10 +1793,6 @@ int xc_domain_debug_control(xc_interface *xch,
                             uint32_t vcpu);
 
 #if defined(__i386__) || defined(__x86_64__)
-int xc_cpuid_check(xc_interface *xch,
-                   const unsigned int *input,
-                   const char **config,
-                   char **config_transformed);
 int xc_cpuid_set(xc_interface *xch,
                  domid_t domid,
                  const unsigned int *input,

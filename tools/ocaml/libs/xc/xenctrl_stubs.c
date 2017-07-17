@@ -805,49 +805,6 @@ CAMLprim value stub_xc_domain_cpuid_apply_policy(value xch, value domid)
 	CAMLreturn(Val_unit);
 }
 
-CAMLprim value stub_xc_cpuid_check(value xch, value input, value config)
-{
-	CAMLparam3(xch, input, config);
-	CAMLlocal3(ret, array, tmp);
-#if defined(__i386__) || defined(__x86_64__)
-	int r;
-	unsigned int c_input[2];
-	char *c_config[4], *out_config[4];
-
-	c_config[0] = string_of_option_array(config, 0);
-	c_config[1] = string_of_option_array(config, 1);
-	c_config[2] = string_of_option_array(config, 2);
-	c_config[3] = string_of_option_array(config, 3);
-
-	cpuid_input_of_val(c_input[0], c_input[1], input);
-
-	array = caml_alloc(4, 0);
-	for (r = 0; r < 4; r++) {
-		tmp = Val_none;
-		if (c_config[r]) {
-			tmp = caml_alloc_small(1, 0);
-			Field(tmp, 0) = caml_alloc_string(32);
-		}
-		Store_field(array, r, tmp);
-	}
-
-	for (r = 0; r < 4; r++)
-		out_config[r] = (c_config[r]) ? String_val(Field(Field(array, r), 0)) : NULL;
-
-	r = xc_cpuid_check(_H(xch), c_input, (const char **)c_config, out_config);
-	if (r < 0)
-		failwith_xc(_H(xch));
-
-	ret = caml_alloc_tuple(2);
-	Store_field(ret, 0, Val_bool(r));
-	Store_field(ret, 1, array);
-
-#else
-	caml_failwith("xc_domain_cpuid_check: not implemented");
-#endif
-	CAMLreturn(ret);
-}
-
 CAMLprim value stub_xc_version_version(value xch)
 {
 	CAMLparam1(xch);

@@ -777,63 +777,6 @@ int xc_cpuid_apply_policy(xc_interface *xch, domid_t domid,
 }
 
 /*
- * Check whether a VM is allowed to launch on this host's processor type.
- *
- * @config format is similar to that of xc_cpuid_set():
- *  '1' -> the bit must be set to 1
- *  '0' -> must be 0
- *  'x' -> we don't care
- *  's' -> (same) must be the same
- */
-int xc_cpuid_check(
-    xc_interface *xch, const unsigned int *input,
-    const char **config,
-    char **config_transformed)
-{
-    int i, j, rc;
-    unsigned int regs[4];
-
-    memset(config_transformed, 0, 4 * sizeof(*config_transformed));
-
-    cpuid(input, regs);
-
-    for ( i = 0; i < 4; i++ )
-    {
-        if ( config[i] == NULL )
-            continue;
-        config_transformed[i] = alloc_str();
-        if ( config_transformed[i] == NULL )
-        {
-            rc = -ENOMEM;
-            goto fail_rc;
-        }
-        for ( j = 0; j < 32; j++ )
-        {
-            unsigned char val = !!((regs[i] & (1U << (31 - j))));
-            if ( !strchr("10xs", config[i][j]) ||
-                 ((config[i][j] == '1') && !val) ||
-                 ((config[i][j] == '0') && val) )
-                goto fail;
-            config_transformed[i][j] = config[i][j];
-            if ( config[i][j] == 's' )
-                config_transformed[i][j] = '0' + val;
-        }
-    }
-
-    return 0;
-
- fail:
-    rc = -EPERM;
- fail_rc:
-    for ( i = 0; i < 4; i++ )
-    {
-        free(config_transformed[i]);
-        config_transformed[i] = NULL;
-    }
-    return rc;
-}
-
-/*
  * Configure a single input with the informatiom from config.
  *
  * Config is an array of strings:

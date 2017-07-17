@@ -711,29 +711,6 @@ static PyObject *pyxc_create_cpuid_dict(char **regs)
    return dict;
 }
 
-static PyObject *pyxc_dom_check_cpuid(XcObject *self,
-                                      PyObject *args)
-{
-    PyObject *sub_input, *config;
-    unsigned int input[2];
-    char *regs[4], *regs_transform[4];
-
-    if ( !PyArg_ParseTuple(args, "iOO", &input[0], &sub_input, &config) )
-        return NULL;
-
-    pyxc_dom_extract_cpuid(config, regs);
-
-    input[1] = XEN_CPUID_INPUT_UNUSED;
-    if ( PyLong_Check(sub_input) )
-        input[1] = PyLong_AsUnsignedLong(sub_input);
-
-    if ( xc_cpuid_check(self->xc_handle, input,
-                        (const char **)regs, regs_transform) )
-        return pyxc_error_to_exception(self->xc_handle);
-
-    return pyxc_create_cpuid_dict(regs_transform);
-}
-
 static PyObject *pyxc_dom_set_policy_cpuid(XcObject *self,
                                            PyObject *args)
 {
@@ -2467,17 +2444,6 @@ static PyMethodDef pyxc_methods[] = {
       " keys    [str]: String of keys to inject.\n" },
 
 #if defined(__i386__) || defined(__x86_64__)
-    { "domain_check_cpuid", 
-      (PyCFunction)pyxc_dom_check_cpuid, 
-      METH_VARARGS, "\n"
-      "Apply checks to host CPUID.\n"
-      " input [long]: Input for cpuid instruction (eax)\n"
-      " sub_input [long]: Second input (optional, may be None) for cpuid "
-      "                     instruction (ecx)\n"
-      " config [dict]: Dictionary of register\n"
-      " config [dict]: Dictionary of register, use for checking\n\n"
-      "Returns: [int] 0 on success; exception on error.\n" },
-    
     { "domain_set_cpuid", 
       (PyCFunction)pyxc_dom_set_cpuid, 
       METH_VARARGS, "\n"
