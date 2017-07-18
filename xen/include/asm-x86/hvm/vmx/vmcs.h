@@ -498,9 +498,6 @@ enum vmcs_field {
 
 #define VMCS_VPID_WIDTH 16
 
-#define MSR_TYPE_R 1
-#define MSR_TYPE_W 2
-
 #define VMX_GUEST_MSR 0
 #define VMX_HOST_MSR  1
 
@@ -521,8 +518,16 @@ enum vmx_insn_errno
     VMX_INSN_FAIL_INVALID                  = ~0,
 };
 
-void vmx_disable_intercept_for_msr(struct vcpu *v, u32 msr, int type);
-void vmx_enable_intercept_for_msr(struct vcpu *v, u32 msr, int type);
+enum vmx_msr_intercept_type {
+    VMX_MSR_R  = 1,
+    VMX_MSR_W  = 2,
+    VMX_MSR_RW = VMX_MSR_R | VMX_MSR_W,
+};
+
+void vmx_clear_msr_intercept(struct vcpu *v, unsigned int msr,
+                             enum vmx_msr_intercept_type type);
+void vmx_set_msr_intercept(struct vcpu *v, unsigned int msr,
+                           enum vmx_msr_intercept_type type);
 int vmx_read_guest_msr(u32 msr, u64 *val);
 int vmx_write_guest_msr(u32 msr, u64 val);
 struct vmx_msr_entry *vmx_find_msr(u32 msr, int type);

@@ -1369,8 +1369,7 @@ static void vmx_handle_cd(struct vcpu *v, unsigned long value)
 
             vmx_get_guest_pat(v, pat);
             vmx_set_guest_pat(v, uc_pat);
-            vmx_enable_intercept_for_msr(v, MSR_IA32_CR_PAT,
-                                         MSR_TYPE_R | MSR_TYPE_W);
+            vmx_set_msr_intercept(v, MSR_IA32_CR_PAT, VMX_MSR_RW);
 
             wbinvd();               /* flush possibly polluted cache */
             hvm_asid_flush_vcpu(v); /* invalidate memory type cached in TLB */
@@ -1381,8 +1380,7 @@ static void vmx_handle_cd(struct vcpu *v, unsigned long value)
             v->arch.hvm_vcpu.cache_mode = NORMAL_CACHE_MODE;
             vmx_set_guest_pat(v, *pat);
             if ( !iommu_enabled || iommu_snoop )
-                vmx_disable_intercept_for_msr(v, MSR_IA32_CR_PAT,
-                                              MSR_TYPE_R | MSR_TYPE_W);
+                vmx_clear_msr_intercept(v, MSR_IA32_CR_PAT, VMX_MSR_RW);
             hvm_asid_flush_vcpu(v); /* no need to flush cache */
         }
     }
@@ -2122,7 +2120,7 @@ static void vmx_enable_msr_interception(struct domain *d, uint32_t msr)
     struct vcpu *v;
 
     for_each_vcpu ( d, v )
-        vmx_enable_intercept_for_msr(v, msr, MSR_TYPE_W);
+        vmx_set_msr_intercept(v, msr, VMX_MSR_W);
 }
 
 static bool_t vmx_is_singlestep_supported(void)
@@ -3026,23 +3024,17 @@ void vmx_vlapic_msr_changed(struct vcpu *v)
             {
                 for ( msr = MSR_IA32_APICBASE_MSR;
                       msr <= MSR_IA32_APICBASE_MSR + 0xff; msr++ )
-                    vmx_disable_intercept_for_msr(v, msr, MSR_TYPE_R);
+                    vmx_clear_msr_intercept(v, msr, VMX_MSR_R);
 
-                vmx_enable_intercept_for_msr(v, MSR_IA32_APICPPR_MSR,
-                                             MSR_TYPE_R);
-                vmx_enable_intercept_for_msr(v, MSR_IA32_APICTMICT_MSR,
-                                             MSR_TYPE_R);
-                vmx_enable_intercept_for_msr(v, MSR_IA32_APICTMCCT_MSR,
-                                             MSR_TYPE_R);
+                vmx_set_msr_intercept(v, MSR_IA32_APICPPR_MSR, VMX_MSR_R);
+                vmx_set_msr_intercept(v, MSR_IA32_APICTMICT_MSR, VMX_MSR_R);
+                vmx_set_msr_intercept(v, MSR_IA32_APICTMCCT_MSR, VMX_MSR_R);
             }
             if ( cpu_has_vmx_virtual_intr_delivery )
             {
-                vmx_disable_intercept_for_msr(v, MSR_IA32_APICTPR_MSR,
-                                              MSR_TYPE_W);
-                vmx_disable_intercept_for_msr(v, MSR_IA32_APICEOI_MSR,
-                                              MSR_TYPE_W);
-                vmx_disable_intercept_for_msr(v, MSR_IA32_APICSELF_MSR,
-                                              MSR_TYPE_W);
+                vmx_clear_msr_intercept(v, MSR_IA32_APICTPR_MSR, VMX_MSR_W);
+                vmx_clear_msr_intercept(v, MSR_IA32_APICEOI_MSR, VMX_MSR_W);
+                vmx_clear_msr_intercept(v, MSR_IA32_APICSELF_MSR, VMX_MSR_W);
             }
         }
         else
@@ -3053,7 +3045,7 @@ void vmx_vlapic_msr_changed(struct vcpu *v)
            SECONDARY_EXEC_VIRTUALIZE_X2APIC_MODE) )
         for ( msr = MSR_IA32_APICBASE_MSR;
               msr <= MSR_IA32_APICBASE_MSR + 0xff; msr++ )
-            vmx_enable_intercept_for_msr(v, msr, MSR_TYPE_R | MSR_TYPE_W);
+            vmx_set_msr_intercept(v, msr, VMX_MSR_RW);
 
     vmx_update_secondary_exec_control(v);
     vmx_vmcs_exit(v);
@@ -3102,7 +3094,7 @@ static int vmx_msr_write_intercept(unsigned int msr, uint64_t msr_content)
                 for ( i = 0; (rc == 0) && (i < lbr->count); i++ )
                     if ( (rc = vmx_add_guest_msr(lbr->base + i)) == 0 )
                     {
-                        vmx_disable_intercept_for_msr(v, lbr->base + i, MSR_TYPE_R | MSR_TYPE_W);
+                        vmx_clear_msr_intercept(v, lbr->base + i, VMX_MSR_RW);
                         if ( lbr_tsx_fixup_needed )
                             v->arch.hvm_vmx.lbr_fixup_enabled |= FIXUP_LBR_TSX;
                         if ( bdw_erratum_bdf14_fixup_needed )

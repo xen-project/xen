@@ -802,7 +802,8 @@ static void vmx_set_host_env(struct vcpu *v)
               (unsigned long)&get_cpu_info()->guest_cpu_user_regs.error_code);
 }
 
-void vmx_disable_intercept_for_msr(struct vcpu *v, u32 msr, int type)
+void vmx_clear_msr_intercept(struct vcpu *v, unsigned int msr,
+                             enum vmx_msr_intercept_type type)
 {
     unsigned long *msr_bitmap = v->arch.hvm_vmx.msr_bitmap;
     struct domain *d = v->domain;
@@ -821,17 +822,17 @@ void vmx_disable_intercept_for_msr(struct vcpu *v, u32 msr, int type)
      */
     if ( msr <= 0x1fff )
     {
-        if ( type & MSR_TYPE_R )
+        if ( type & VMX_MSR_R )
             clear_bit(msr, msr_bitmap + 0x000/BYTES_PER_LONG); /* read-low */
-        if ( type & MSR_TYPE_W )
+        if ( type & VMX_MSR_W )
             clear_bit(msr, msr_bitmap + 0x800/BYTES_PER_LONG); /* write-low */
     }
     else if ( (msr >= 0xc0000000) && (msr <= 0xc0001fff) )
     {
         msr &= 0x1fff;
-        if ( type & MSR_TYPE_R )
+        if ( type & VMX_MSR_R )
             clear_bit(msr, msr_bitmap + 0x400/BYTES_PER_LONG); /* read-high */
-        if ( type & MSR_TYPE_W )
+        if ( type & VMX_MSR_W )
             clear_bit(msr, msr_bitmap + 0xc00/BYTES_PER_LONG); /* write-high */
     }
     else
@@ -842,7 +843,8 @@ void vmx_disable_intercept_for_msr(struct vcpu *v, u32 msr, int type)
 
 }
 
-void vmx_enable_intercept_for_msr(struct vcpu *v, u32 msr, int type)
+void vmx_set_msr_intercept(struct vcpu *v, unsigned int msr,
+                           enum vmx_msr_intercept_type type)
 {
     unsigned long *msr_bitmap = v->arch.hvm_vmx.msr_bitmap;
 
@@ -857,17 +859,17 @@ void vmx_enable_intercept_for_msr(struct vcpu *v, u32 msr, int type)
      */
     if ( msr <= 0x1fff )
     {
-        if ( type & MSR_TYPE_R )
+        if ( type & VMX_MSR_R )
             set_bit(msr, msr_bitmap + 0x000/BYTES_PER_LONG); /* read-low */
-        if ( type & MSR_TYPE_W )
+        if ( type & VMX_MSR_W )
             set_bit(msr, msr_bitmap + 0x800/BYTES_PER_LONG); /* write-low */
     }
     else if ( (msr >= 0xc0000000) && (msr <= 0xc0001fff) )
     {
         msr &= 0x1fff;
-        if ( type & MSR_TYPE_R )
+        if ( type & VMX_MSR_R )
             set_bit(msr, msr_bitmap + 0x400/BYTES_PER_LONG); /* read-high */
-        if ( type & MSR_TYPE_W )
+        if ( type & VMX_MSR_W )
             set_bit(msr, msr_bitmap + 0xc00/BYTES_PER_LONG); /* write-high */
     }
     else
@@ -1104,17 +1106,17 @@ static int construct_vmcs(struct vcpu *v)
         v->arch.hvm_vmx.msr_bitmap = msr_bitmap;
         __vmwrite(MSR_BITMAP, virt_to_maddr(msr_bitmap));
 
-        vmx_disable_intercept_for_msr(v, MSR_FS_BASE, MSR_TYPE_R | MSR_TYPE_W);
-        vmx_disable_intercept_for_msr(v, MSR_GS_BASE, MSR_TYPE_R | MSR_TYPE_W);
-        vmx_disable_intercept_for_msr(v, MSR_SHADOW_GS_BASE, MSR_TYPE_R | MSR_TYPE_W);
-        vmx_disable_intercept_for_msr(v, MSR_IA32_SYSENTER_CS, MSR_TYPE_R | MSR_TYPE_W);
-        vmx_disable_intercept_for_msr(v, MSR_IA32_SYSENTER_ESP, MSR_TYPE_R | MSR_TYPE_W);
-        vmx_disable_intercept_for_msr(v, MSR_IA32_SYSENTER_EIP, MSR_TYPE_R | MSR_TYPE_W);
+        vmx_clear_msr_intercept(v, MSR_FS_BASE, VMX_MSR_RW);
+        vmx_clear_msr_intercept(v, MSR_GS_BASE, VMX_MSR_RW);
+        vmx_clear_msr_intercept(v, MSR_SHADOW_GS_BASE, VMX_MSR_RW);
+        vmx_clear_msr_intercept(v, MSR_IA32_SYSENTER_CS, VMX_MSR_RW);
+        vmx_clear_msr_intercept(v, MSR_IA32_SYSENTER_ESP, VMX_MSR_RW);
+        vmx_clear_msr_intercept(v, MSR_IA32_SYSENTER_EIP, VMX_MSR_RW);
         if ( paging_mode_hap(d) && (!iommu_enabled || iommu_snoop) )
-            vmx_disable_intercept_for_msr(v, MSR_IA32_CR_PAT, MSR_TYPE_R | MSR_TYPE_W);
+            vmx_clear_msr_intercept(v, MSR_IA32_CR_PAT, VMX_MSR_RW);
         if ( (vmexit_ctl & VM_EXIT_CLEAR_BNDCFGS) &&
              (vmentry_ctl & VM_ENTRY_LOAD_BNDCFGS) )
-            vmx_disable_intercept_for_msr(v, MSR_IA32_BNDCFGS, MSR_TYPE_R | MSR_TYPE_W);
+            vmx_clear_msr_intercept(v, MSR_IA32_BNDCFGS, VMX_MSR_RW);
     }
 
     /* I/O access bitmap. */
