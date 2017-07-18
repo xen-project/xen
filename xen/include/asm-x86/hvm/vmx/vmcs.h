@@ -64,6 +64,18 @@ struct vmx_domain {
     unsigned int status;
 };
 
+/*
+ * Layout of the MSR bitmap, as interpreted by hardware:
+ *  - *_low  covers MSRs 0 to 0x1fff
+ *  - *_ligh covers MSRs 0xc0000000 to 0xc0001fff
+ */
+struct vmx_msr_bitmap {
+    unsigned long read_low  [0x2000 / BITS_PER_LONG];
+    unsigned long read_high [0x2000 / BITS_PER_LONG];
+    unsigned long write_low [0x2000 / BITS_PER_LONG];
+    unsigned long write_high[0x2000 / BITS_PER_LONG];
+};
+
 struct pi_desc {
     DECLARE_BITMAP(pir, NR_VECTORS);
     union {
@@ -116,7 +128,7 @@ struct arch_vmx_struct {
     uint64_t             cstar;
     uint64_t             sfmask;
 
-    unsigned long       *msr_bitmap;
+    struct vmx_msr_bitmap *msr_bitmap;
     unsigned int         msr_count;
     struct vmx_msr_entry *msr_area;
     unsigned int         host_msr_count;
