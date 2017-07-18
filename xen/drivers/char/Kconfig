@@ -39,10 +39,10 @@ config HAS_OMAP
 config HAS_SCIF
 	bool
 	default y
-	depends on ARM_32
+	depends on ARM
 	help
 	  This selects the SuperH SCI(F) UART. If you have a SuperH based board,
-	  say Y.
+	  or Renesas R-Car Gen 2/3 based board say Y.
 
 config HAS_EHCI
 	bool
