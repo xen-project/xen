@@ -107,7 +107,7 @@ p2m_mem_access_check_and_get_page(vaddr_t gva, unsigned long flag,
     xenmem_access_t xma;
     p2m_type_t t;
     struct page_info *page = NULL;
-    struct p2m_domain *p2m = &v->domain->arch.p2m;
+    struct p2m_domain *p2m = p2m_get_hostp2m(v->domain);
 
     rc = gva_to_ipa(gva, &ipa, flag);
     if ( rc < 0 )
