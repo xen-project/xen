@@ -862,31 +862,18 @@ void vmx_set_msr_intercept(struct vcpu *v, unsigned int msr,
         ASSERT(!"MSR out of range for interception\n");
 }
 
-/*
- * access_type: read == 0, write == 1
- */
-int vmx_check_msr_bitmap(unsigned long *msr_bitmap, u32 msr, int access_type)
+bool vmx_msr_is_intercepted(struct vmx_msr_bitmap *msr_bitmap,
+                            unsigned int msr, bool is_write)
 {
-    int ret = 1;
-    if ( !msr_bitmap )
-        return 1;
-
     if ( msr <= 0x1fff )
-    {
-        if ( access_type == 0 )
-            ret = test_bit(msr, msr_bitmap + 0x000/BYTES_PER_LONG); /* read-low */
-        else if ( access_type == 1 )
-            ret = test_bit(msr, msr_bitmap + 0x800/BYTES_PER_LONG); /* write-low */
-    }
+        return test_bit(msr, is_write ? msr_bitmap->write_low
+                                      : msr_bitmap->read_low);
     else if ( (msr >= 0xc0000000) && (msr <= 0xc0001fff) )
-    {
-        msr &= 0x1fff;
-        if ( access_type == 0 )
-            ret = test_bit(msr, msr_bitmap + 0x400/BYTES_PER_LONG); /* read-high */
-        else if ( access_type == 1 )
-            ret = test_bit(msr, msr_bitmap + 0xc00/BYTES_PER_LONG); /* write-high */
-    }
-    return ret;
+        return test_bit(msr & 0x1fff, is_write ? msr_bitmap->write_high
+                                               : msr_bitmap->read_high);
+    else
+        /* MSRs outside the bitmap ranges are always intercepted. */
+        return true;
 }
 
 

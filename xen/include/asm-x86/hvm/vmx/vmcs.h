@@ -547,7 +547,8 @@ int vmx_add_msr(u32 msr, int type);
 void vmx_vmcs_switch(paddr_t from, paddr_t to);
 void vmx_set_eoi_exit_bitmap(struct vcpu *v, u8 vector);
 void vmx_clear_eoi_exit_bitmap(struct vcpu *v, u8 vector);
-int vmx_check_msr_bitmap(unsigned long *msr_bitmap, u32 msr, int access_type);
+bool vmx_msr_is_intercepted(struct vmx_msr_bitmap *msr_bitmap,
+                            unsigned int msr, bool is_write) __nonnull(1);
 void virtual_vmcs_enter(const struct vcpu *);
 void virtual_vmcs_exit(const struct vcpu *);
 u64 virtual_vmcs_vmread(const struct vcpu *, u32 encoding);

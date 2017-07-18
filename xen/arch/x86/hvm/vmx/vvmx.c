@@ -2284,22 +2284,23 @@ int nvmx_n2_vmexit_handler(struct cpu_user_regs *regs,
         /* inject to L1 */
         nvcpu->nv_vmexit_pending = 1;
         break;
+
     case EXIT_REASON_MSR_READ:
     case EXIT_REASON_MSR_WRITE:
-    {
-        int status;
         ctrl = __n2_exec_control(v);
-        if ( ctrl & CPU_BASED_ACTIVATE_MSR_BITMAP )
-        {
-            status = vmx_check_msr_bitmap(nvmx->msrbitmap, regs->ecx,
-                         !!(exit_reason == EXIT_REASON_MSR_WRITE));
-            if ( status )
-                nvcpu->nv_vmexit_pending = 1;
-        }
-        else
+
+        /* Without ACTIVATE_MSR_BITMAP, all MSRs are intercepted. */
+        if ( !(ctrl & CPU_BASED_ACTIVATE_MSR_BITMAP) )
             nvcpu->nv_vmexit_pending = 1;
+        else if ( !nvmx->msrbitmap )
+            /* ACTIVATE_MSR_BITMAP set, but L2 bitmap not mapped??? */
+            domain_crash(v->domain);
+        else
+            nvcpu->nv_vmexit_pending =
+                vmx_msr_is_intercepted(nvmx->msrbitmap, regs->ecx,
+                                       exit_reason == EXIT_REASON_MSR_WRITE);
         break;
-    }
+
     case EXIT_REASON_IO_INSTRUCTION:
         ctrl = __n2_exec_control(v);
         if ( ctrl & CPU_BASED_ACTIVATE_IO_BITMAP )
