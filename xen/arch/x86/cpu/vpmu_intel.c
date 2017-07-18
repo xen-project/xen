@@ -225,74 +225,50 @@ static int is_core2_vpmu_msr(u32 msr_index, int *type, int *index)
     }
 }
 
-static inline int msraddr_to_bitpos(int x)
+static void core2_vpmu_set_msr_bitmap(struct vcpu *v)
 {
-    ASSERT(x == (x & 0x1fff));
-    return x;
-}
-
-static void core2_vpmu_set_msr_bitmap(unsigned long *msr_bitmap)
-{
-    int i;
+    unsigned int i;
 
     /* Allow Read/Write PMU Counters MSR Directly. */
     for ( i = 0; i < fixed_pmc_cnt; i++ )
-    {
-        clear_bit(msraddr_to_bitpos(MSR_CORE_PERF_FIXED_CTR0 + i), msr_bitmap);
-        clear_bit(msraddr_to_bitpos(MSR_CORE_PERF_FIXED_CTR0 + i),
-                  msr_bitmap + 0x800/BYTES_PER_LONG);
-    }
+        vmx_clear_msr_intercept(v, MSR_CORE_PERF_FIXED_CTR0 + i, VMX_MSR_RW);
+
     for ( i = 0; i < arch_pmc_cnt; i++ )
     {
-        clear_bit(msraddr_to_bitpos(MSR_IA32_PERFCTR0+i), msr_bitmap);
-        clear_bit(msraddr_to_bitpos(MSR_IA32_PERFCTR0+i),
-                  msr_bitmap + 0x800/BYTES_PER_LONG);
+        vmx_clear_msr_intercept(v, MSR_IA32_PERFCTR0 + i, VMX_MSR_RW);
 
         if ( full_width_write )
-        {
-            clear_bit(msraddr_to_bitpos(MSR_IA32_A_PERFCTR0 + i), msr_bitmap);
-            clear_bit(msraddr_to_bitpos(MSR_IA32_A_PERFCTR0 + i),
-                      msr_bitmap + 0x800/BYTES_PER_LONG);
-        }
+            vmx_clear_msr_intercept(v, MSR_IA32_A_PERFCTR0 + i, VMX_MSR_RW);
     }
 
     /* Allow Read PMU Non-global Controls Directly. */
     for ( i = 0; i < arch_pmc_cnt; i++ )
-         clear_bit(msraddr_to_bitpos(MSR_P6_EVNTSEL(i)), msr_bitmap);
+        vmx_clear_msr_intercept(v, MSR_P6_EVNTSEL(i), VMX_MSR_R);
 
-    clear_bit(msraddr_to_bitpos(MSR_CORE_PERF_FIXED_CTR_CTRL), msr_bitmap);
-    clear_bit(msraddr_to_bitpos(MSR_IA32_DS_AREA), msr_bitmap);
+    vmx_clear_msr_intercept(v, MSR_CORE_PERF_FIXED_CTR_CTRL, VMX_MSR_R);
+    vmx_clear_msr_intercept(v, MSR_IA32_DS_AREA, VMX_MSR_R);
 }
 
-static void core2_vpmu_unset_msr_bitmap(unsigned long *msr_bitmap)
+static void core2_vpmu_unset_msr_bitmap(struct vcpu *v)
 {
-    int i;
+    unsigned int i;
 
     for ( i = 0; i < fixed_pmc_cnt; i++ )
-    {
-        set_bit(msraddr_to_bitpos(MSR_CORE_PERF_FIXED_CTR0 + i), msr_bitmap);
-        set_bit(msraddr_to_bitpos(MSR_CORE_PERF_FIXED_CTR0 + i),
-                msr_bitmap + 0x800/BYTES_PER_LONG);
-    }
+        vmx_set_msr_intercept(v, MSR_CORE_PERF_FIXED_CTR0 + i, VMX_MSR_RW);
+
     for ( i = 0; i < arch_pmc_cnt; i++ )
     {
-        set_bit(msraddr_to_bitpos(MSR_IA32_PERFCTR0 + i), msr_bitmap);
-        set_bit(msraddr_to_bitpos(MSR_IA32_PERFCTR0 + i),
-                msr_bitmap + 0x800/BYTES_PER_LONG);
+        vmx_set_msr_intercept(v, MSR_IA32_PERFCTR0 + i, VMX_MSR_RW);
 
         if ( full_width_write )
-        {
-            set_bit(msraddr_to_bitpos(MSR_IA32_A_PERFCTR0 + i), msr_bitmap);
-            set_bit(msraddr_to_bitpos(MSR_IA32_A_PERFCTR0 + i),
-                      msr_bitmap + 0x800/BYTES_PER_LONG);
-        }
+            vmx_set_msr_intercept(v, MSR_IA32_A_PERFCTR0 + i, VMX_MSR_RW);
     }
 
     for ( i = 0; i < arch_pmc_cnt; i++ )
-        set_bit(msraddr_to_bitpos(MSR_P6_EVNTSEL(i)), msr_bitmap);
+        vmx_set_msr_intercept(v, MSR_P6_EVNTSEL(i), VMX_MSR_R);
 
-    set_bit(msraddr_to_bitpos(MSR_CORE_PERF_FIXED_CTR_CTRL), msr_bitmap);
-    set_bit(msraddr_to_bitpos(MSR_IA32_DS_AREA), msr_bitmap);
+    vmx_set_msr_intercept(v, MSR_CORE_PERF_FIXED_CTR_CTRL, VMX_MSR_R);
+    vmx_set_msr_intercept(v, MSR_IA32_DS_AREA, VMX_MSR_R);
 }
 
 static inline void __core2_vpmu_save(struct vcpu *v)
@@ -327,7 +303,7 @@ static int core2_vpmu_save(struct vcpu *v, bool_t to_guest)
     /* Unset PMU MSR bitmap to trap lazy load. */
     if ( !vpmu_is_set(vpmu, VPMU_RUNNING) && is_hvm_vcpu(v) &&
          cpu_has_vmx_msr_bitmap )
-        core2_vpmu_unset_msr_bitmap(v->arch.hvm_vmx.msr_bitmap);
+        core2_vpmu_unset_msr_bitmap(v);
 
     if ( to_guest )
     {
@@ -541,9 +517,9 @@ static int core2_vpmu_msr_common_check(u32 msr_index, int *type, int *index)
     {
         __core2_vpmu_load(current);
         vpmu_set(vpmu, VPMU_CONTEXT_LOADED);
-        if ( is_hvm_vcpu(current) &&
-             cpu_has_vmx_msr_bitmap )
-            core2_vpmu_set_msr_bitmap(current->arch.hvm_vmx.msr_bitmap);
+
+        if ( is_hvm_vcpu(current) && cpu_has_vmx_msr_bitmap )
+            core2_vpmu_set_msr_bitmap(current);
     }
     return 1;
 }
@@ -860,7 +836,7 @@ static void core2_vpmu_destroy(struct vcpu *v)
     xfree(vpmu->priv_context);
     vpmu->priv_context = NULL;
     if ( is_hvm_vcpu(v) && cpu_has_vmx_msr_bitmap )
-        core2_vpmu_unset_msr_bitmap(v->arch.hvm_vmx.msr_bitmap);
+        core2_vpmu_unset_msr_bitmap(v);
     release_pmu_ownership(PMU_OWNER_HVM);
     vpmu_clear(vpmu);
 }
