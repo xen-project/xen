@@ -57,7 +57,24 @@ long do_event_channel_op_compat(XEN_GUEST_HANDLE_PARAM(evtchn_op_t) uop)
     if ( unlikely(copy_from_guest(&op, uop, 1) != 0) )
         return -EFAULT;
 
-    return do_event_channel_op(op.cmd, guest_handle_from_ptr(&uop.p->u, void));
+    switch ( op.cmd )
+    {
+    case EVTCHNOP_bind_interdomain:
+    case EVTCHNOP_bind_virq:
+    case EVTCHNOP_bind_pirq:
+    case EVTCHNOP_close:
+    case EVTCHNOP_send:
+    case EVTCHNOP_status:
+    case EVTCHNOP_alloc_unbound:
+    case EVTCHNOP_bind_ipi:
+    case EVTCHNOP_bind_vcpu:
+    case EVTCHNOP_unmask:
+        return do_event_channel_op(op.cmd,
+                                   guest_handle_from_ptr(&uop.p->u, void));
+
+    default:
+        return -ENOSYS;
+    }
 }
 
 #endif
