@@ -754,14 +754,27 @@ static void __clear_current_vvmcs(struct vcpu *v)
         __vmpclear(nvcpu->nv_n2vmcx_pa);
 }
 
-static bool_t __must_check _map_msr_bitmap(struct vcpu *v)
+/*
+ * Refreshes the MSR bitmap mapping for the current nested vcpu.  Returns true
+ * for a successful mapping, and returns false for MSR_BITMAP parameter errors
+ * or gfn mapping errors.
+ */
+static bool __must_check _map_msr_bitmap(struct vcpu *v)
 {
     struct nestedvmx *nvmx = &vcpu_2_nvmx(v);
-    unsigned long gpa;
+    uint64_t gpa;
 
     if ( nvmx->msrbitmap )
+    {
         hvm_unmap_guest_frame(nvmx->msrbitmap, 1);
+        nvmx->msrbitmap = NULL;
+    }
+
     gpa = get_vvmcs(v, MSR_BITMAP);
+
+    if ( !IS_ALIGNED(gpa, PAGE_SIZE) )
+        return false;
+
     nvmx->msrbitmap = hvm_map_guest_frame_ro(gpa >> PAGE_SHIFT, 1);
 
     return nvmx->msrbitmap != NULL;
