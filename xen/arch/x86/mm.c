@@ -877,6 +877,12 @@ static int print_mmio_emul_range(unsigned long s, unsigned long e, void *arg)
 }
 #endif
 
+/*
+ * get_page_from_l1e returns:
+ *   0  => success (page not present also counts as such)
+ *  <0  => error code
+ *  >0  => the page flags to be flipped
+ */
 int
 get_page_from_l1e(
     l1_pgentry_t l1e, struct domain *l1e_owner, struct domain *pg_owner)
@@ -1089,6 +1095,12 @@ get_page_from_l1e(
 
 
 /* NB. Virtual address 'l2e' maps to a machine address within frame 'pfn'. */
+/*
+ * get_page_from_l2e returns:
+ *   1 => page not present
+ *   0 => success
+ *  <0 => error code
+ */
 define_get_linear_pagetable(l2);
 static int
 get_page_from_l2e(
@@ -1119,6 +1131,12 @@ get_page_from_l2e(
 }
 
 
+/*
+ * get_page_from_l3e returns:
+ *   1 => page not present
+ *   0 => success
+ *  <0 => error code
+ */
 define_get_linear_pagetable(l3);
 static int
 get_page_from_l3e(
@@ -1146,6 +1164,12 @@ get_page_from_l3e(
     return rc;
 }
 
+/*
+ * get_page_from_l4e returns:
+ *   1 => page not present
+ *   0 => success
+ *  <0 => error code
+ */
 define_get_linear_pagetable(l4);
 static int
 get_page_from_l4e(
