@@ -98,13 +98,15 @@ int nvmx_vcpu_initialise(struct vcpu *v)
         clear_page(vw);
 
         /*
-         * For the following 4 encodings, we need to handle them in VMM.
+         * For the following 6 encodings, we need to handle them in VMM.
          * Let them vmexit as usual.
          */
         set_bit(IO_BITMAP_A, vw);
         set_bit(VMCS_HIGH(IO_BITMAP_A), vw);
         set_bit(IO_BITMAP_B, vw);
         set_bit(VMCS_HIGH(IO_BITMAP_B), vw);
+        set_bit(MSR_BITMAP, vw);
+        set_bit(VMCS_HIGH(MSR_BITMAP), vw);
 
         unmap_domain_page(vw);
     }
