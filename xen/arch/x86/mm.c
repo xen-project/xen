@@ -126,6 +126,8 @@
 #include <asm/hvm/grant_table.h>
 #include <asm/pv/grant_table.h>
 
+#include "pv/emulate.h"
+
 /* Override macros from asm/page.h to make them work with mfn_t */
 #undef mfn_to_page
 #define mfn_to_page(mfn) __mfn_to_page(mfn_x(mfn))
@@ -5145,13 +5147,6 @@ static int ptwr_emulated_cmpxchg(
     return ptwr_emulated_update(
         offset, old, new, bytes, 1,
         container_of(ctxt, struct ptwr_emulate_ctxt, ctxt));
-}
-
-static int pv_emul_is_mem_write(const struct x86_emulate_state *state,
-                                struct x86_emulate_ctxt *ctxt)
-{
-    return x86_insn_is_mem_write(state, ctxt) ? X86EMUL_OKAY
-                                              : X86EMUL_UNHANDLEABLE;
 }
 
 static const struct x86_emulate_ops ptwr_emulate_ops = {
