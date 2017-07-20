@@ -334,6 +334,7 @@ int main(int argc, char **argv)
 		{ "num",     1, 0, 'n' },
 		{ "help",    0, 0, 'h' },
 		{ "start-notify-fd", 1, 0, 's' },
+		{ "interactive", 0, 0, 'i' },
 		{ 0 },
 
 	};
@@ -343,9 +344,6 @@ int main(int argc, char **argv)
 	char *end;
 	console_type type = CONSOLE_INVAL;
 	bool interactive = 0;
-
-	if (isatty(STDIN_FILENO) && isatty(STDOUT_FILENO))
-		interactive = 1;
 
 	while((ch = getopt_long(argc, argv, sopt, lopt, &opt_ind)) != -1) {
 		switch(ch) {
@@ -369,6 +367,9 @@ int main(int argc, char **argv)
 			break;
 		case 's':
 			start_notify_fd = atoi(optarg);
+			break;
+		case 'i':
+			interactive = 1;
 			break;
 		default:
 			fprintf(stderr, "Invalid argument\n");
@@ -464,7 +465,8 @@ int main(int argc, char **argv)
 	}
 
 	init_term(spty, &attr);
-	if (interactive) {
+	if (isatty(STDIN_FILENO) && isatty(STDOUT_FILENO)) {
+		interactive = 1;
 		init_term(STDIN_FILENO, &stdin_old_attr);
 		atexit(restore_term_stdin); /* if this fails, oh dear */
 	}
