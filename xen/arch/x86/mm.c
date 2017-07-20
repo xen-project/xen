@@ -4026,29 +4026,6 @@ static int destroy_grant_va_mapping(
     return replace_grant_va_mapping(addr, frame, l1e_empty(), v);
 }
 
-int create_grant_p2m_mapping(uint64_t addr, unsigned long frame,
-                             unsigned int flags,
-                             unsigned int cache_flags)
-{
-    p2m_type_t p2mt;
-    int rc;
-
-    if ( cache_flags  || (flags & ~GNTMAP_readonly) != GNTMAP_host_map )
-        return GNTST_general_error;
-
-    if ( flags & GNTMAP_readonly )
-        p2mt = p2m_grant_map_ro;
-    else
-        p2mt = p2m_grant_map_rw;
-    rc = guest_physmap_add_entry(current->domain,
-                                 _gfn(addr >> PAGE_SHIFT),
-                                 _mfn(frame), PAGE_ORDER_4K, p2mt);
-    if ( rc )
-        return GNTST_general_error;
-    else
-        return GNTST_okay;
-}
-
 int create_grant_pv_mapping(uint64_t addr, unsigned long frame,
                             unsigned int flags, unsigned int cache_flags)
 {
@@ -4075,36 +4052,6 @@ int create_grant_pv_mapping(uint64_t addr, unsigned long frame,
     if ( flags & GNTMAP_contains_pte )
         return create_grant_pte_mapping(addr, pte, current);
     return create_grant_va_mapping(addr, pte, current);
-}
-
-int replace_grant_p2m_mapping(
-    uint64_t addr, unsigned long frame, uint64_t new_addr, unsigned int flags)
-{
-    unsigned long gfn = (unsigned long)(addr >> PAGE_SHIFT);
-    p2m_type_t type;
-    mfn_t old_mfn;
-    struct domain *d = current->domain;
-
-    if ( new_addr != 0 || (flags & GNTMAP_contains_pte) )
-        return GNTST_general_error;
-
-    old_mfn = get_gfn(d, gfn, &type);
-    if ( !p2m_is_grant(type) || mfn_x(old_mfn) != frame )
-    {
-        put_gfn(d, gfn);
-        gdprintk(XENLOG_WARNING,
-                 "old mapping invalid (type %d, mfn %" PRI_mfn ", frame %lx)\n",
-                 type, mfn_x(old_mfn), frame);
-        return GNTST_general_error;
-    }
-    if ( guest_physmap_remove_page(d, _gfn(gfn), _mfn(frame), PAGE_ORDER_4K) )
-    {
-        put_gfn(d, gfn);
-        return GNTST_general_error;
-    }
-
-    put_gfn(d, gfn);
-    return GNTST_okay;
 }
 
 int replace_grant_pv_mapping(uint64_t addr, unsigned long frame,
