@@ -90,6 +90,8 @@ SECTIONS
 
        *(.rodata)
        *(.rodata.*)
+       *(.data.rel.ro)
+       *(.data.rel.ro.*)
 
 #if defined(BUILD_ID) && defined(EFI) && !defined(BUILD_ID_EFI)
 /*
@@ -224,8 +226,6 @@ SECTIONS
        __start_schedulers_array = .;
        *(.data.schedulers)
        __end_schedulers_array = .;
-       *(.data.rel.ro)
-       *(.data.rel.ro.*)
   } :text
 
   .data : {                    /* Data */
