@@ -218,17 +218,8 @@ struct acpi_drhd_unit *acpi_find_matched_drhd_unit(const struct pci_dev *pdev)
     }
     else if ( pdev->info.is_virtfn )
     {
-        const struct pci_dev *physfn;
-
         bus = pdev->info.physfn.bus;
-        /*
-         * Use 0 as 'devfn' to search VT-d unit when the physical function
-         * is an Extended Function.
-         */
-        pcidevs_lock();
-        physfn = pci_get_pdev(pdev->seg, bus, pdev->info.physfn.devfn);
-        devfn = (physfn && physfn->info.is_extfn) ? 0 : pdev->info.physfn.devfn;
-        pcidevs_unlock();
+        devfn = PCI_SLOT(pdev->info.physfn.devfn) ? 0 : pdev->info.physfn.devfn;
     }
     else
     {
