@@ -730,9 +730,9 @@ void rtc_migrate_timers(struct vcpu *v)
 
     if ( v->vcpu_id == 0 )
     {
-        migrate_timer(&s->update_timer, v->processor);;
-        migrate_timer(&s->update_timer2, v->processor);;
-        migrate_timer(&s->alarm_timer, v->processor);;
+        migrate_timer(&s->update_timer, v->processor);
+        migrate_timer(&s->update_timer2, v->processor);
+        migrate_timer(&s->alarm_timer, v->processor);
     }
 }
 

@@ -703,7 +703,7 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
         if ( op->cmd == XEN_DOMCTL_setvcpuaffinity )
         {
             cpumask_var_t new_affinity, old_affinity;
-            cpumask_t *online = cpupool_domain_cpumask(v->domain);;
+            cpumask_t *online = cpupool_domain_cpumask(v->domain);
 
             /*
              * We want to be able to restore hard affinity if we are trying

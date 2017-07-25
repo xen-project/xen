@@ -278,7 +278,7 @@ static inline lpae_t mfn_to_xen_entry(mfn_t mfn, unsigned attr)
             .contig = 0,          /* Assume non-contiguous */
             .xn = 1,              /* No need to execute outside .text */
             .avail = 0,           /* Reference count for domheap mapping */
-        }};;
+        }};
     /*
      * Setting the User bit is strange, but the ATS1H[RW] instructions
      * don't seem to work otherwise, and since we never run on Xen

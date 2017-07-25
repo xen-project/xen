@@ -700,7 +700,7 @@ void restore_vcpu_affinity(struct domain *d)
                     cpupool_domain_cpumask(v->domain));
         v->processor = cpumask_any(cpumask_scratch_cpu(cpu));
 
-        spin_unlock_irq(lock);;
+        spin_unlock_irq(lock);
 
         lock = vcpu_schedule_lock_irq(v);
         v->processor = SCHED_OP(vcpu_scheduler(v), pick_cpu, v);
