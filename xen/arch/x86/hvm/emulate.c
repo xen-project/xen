@@ -958,8 +958,8 @@ int hvmemul_insn_fetch(
              * Will we overflow insn_buf[]?  This shouldn't be able to happen,
              * which means something went wrong with instruction decoding...
              */
-            if ( insn_off > sizeof(hvmemul_ctxt->insn_buf) ||
-                 (insn_off + bytes) > sizeof(hvmemul_ctxt->insn_buf) )
+            if ( insn_off >= sizeof(hvmemul_ctxt->insn_buf) ||
+                 (insn_off + bytes) >= sizeof(hvmemul_ctxt->insn_buf) )
             {
                 ASSERT_UNREACHABLE();
                 return X86EMUL_UNHANDLEABLE;
