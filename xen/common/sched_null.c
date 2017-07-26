@@ -641,7 +641,10 @@ static struct task_slice null_schedule(const struct scheduler *ops,
     SCHED_STAT_CRANK(schedule);
     NULL_VCPU_CHECK(current);
 
-    ret.task = per_cpu(npc, cpu).vcpu;
+    if ( tasklet_work_scheduled )
+        ret.task = idle_vcpu[cpu];
+    else
+        ret.task = per_cpu(npc, cpu).vcpu;
     ret.migrated = 0;
     ret.time = -1;
 
@@ -663,9 +666,7 @@ static struct task_slice null_schedule(const struct scheduler *ops,
         spin_unlock(&prv->waitq_lock);
     }
 
-    if ( unlikely(tasklet_work_scheduled ||
-                  ret.task == NULL ||
-                  !vcpu_runnable(ret.task)) )
+    if ( unlikely(ret.task == NULL || !vcpu_runnable(ret.task)) )
         ret.task = idle_vcpu[cpu];
 
     NULL_VCPU_CHECK(ret.task);
