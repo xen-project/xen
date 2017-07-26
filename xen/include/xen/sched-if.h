@@ -208,4 +208,68 @@ static inline cpumask_t* cpupool_domain_cpumask(struct domain *d)
     return d->cpupool->cpu_valid;
 }
 
+/*
+ * Hard and soft affinity load balancing.
+ *
+ * Idea is each vcpu has some pcpus that it prefers, some that it does not
+ * prefer but is OK with, and some that it cannot run on at all. The first
+ * set of pcpus are the ones that are both in the soft affinity *and* in the
+ * hard affinity; the second set of pcpus are the ones that are in the hard
+ * affinity but *not* in the soft affinity; the third set of pcpus are the
+ * ones that are not in the hard affinity.
+ *
+ * We implement a two step balancing logic. Basically, every time there is
+ * the need to decide where to run a vcpu, we first check the soft affinity
+ * (well, actually, the && between soft and hard affinity), to see if we can
+ * send it where it prefers to (and can) run on. However, if the first step
+ * does not find any suitable and free pcpu, we fall back checking the hard
+ * affinity.
+ */
+#define BALANCE_SOFT_AFFINITY    0
+#define BALANCE_HARD_AFFINITY    1
+
+#define for_each_affinity_balance_step(step) \
+    for ( (step) = 0; (step) <= BALANCE_HARD_AFFINITY; (step)++ )
+
+/*
+ * Hard affinity balancing is always necessary and must never be skipped.
+ * But soft affinity need only be considered when it has a functionally
+ * different effect than other constraints (such as hard affinity, cpus
+ * online, or cpupools).
+ *
+ * Soft affinity only needs to be considered if:
+ * * The cpus in the cpupool are not a subset of soft affinity
+ * * The hard affinity is not a subset of soft affinity
+ * * There is an overlap between the soft affinity and the mask which is
+ *   currently being considered.
+ */
+static inline int has_soft_affinity(const struct vcpu *v,
+                                    const cpumask_t *mask)
+{
+    return !cpumask_subset(cpupool_domain_cpumask(v->domain),
+                           v->cpu_soft_affinity) &&
+           !cpumask_subset(v->cpu_hard_affinity, v->cpu_soft_affinity) &&
+           cpumask_intersects(v->cpu_soft_affinity, mask);
+}
+
+/*
+ * This function copies in mask the cpumask that should be used for a
+ * particular affinity balancing step. For the soft affinity one, the pcpus
+ * that are not part of vc's hard affinity are filtered out from the result,
+ * to avoid running a vcpu where it would like, but is not allowed to!
+ */
+static inline void
+affinity_balance_cpumask(const struct vcpu *v, int step, cpumask_t *mask)
+{
+    if ( step == BALANCE_SOFT_AFFINITY )
+    {
+        cpumask_and(mask, v->cpu_soft_affinity, v->cpu_hard_affinity);
+
+        if ( unlikely(cpumask_empty(mask)) )
+            cpumask_copy(mask, v->cpu_hard_affinity);
+    }
+    else /* step == BALANCE_HARD_AFFINITY */
+        cpumask_copy(mask, v->cpu_hard_affinity);
+}
+
 #endif /* __XEN_SCHED_IF_H__ */
