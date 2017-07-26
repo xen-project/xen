@@ -975,14 +975,9 @@ static int normalise_pagetable(struct xc_sr_context *ctx, const uint64_t *src,
 
             if ( (type > XEN_DOMCTL_PFINFO_L1TAB) && (pte & _PAGE_PSE) )
             {
-                if ( !ctx->dominfo.paused )
-                    errno = EAGAIN;
-                else
-                {
-                    ERROR("Cannot migrate superpage (L%lu[%u]: 0x%016"PRIx64")",
-                          type >> XEN_DOMCTL_PFINFO_LTAB_SHIFT, i, pte);
-                    errno = E2BIG;
-                }
+                ERROR("Cannot migrate superpage (L%lu[%u]: 0x%016"PRIx64")",
+                      type >> XEN_DOMCTL_PFINFO_LTAB_SHIFT, i, pte);
+                errno = E2BIG;
                 return -1;
             }
 
