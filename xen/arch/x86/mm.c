@@ -3440,13 +3440,13 @@ long do_mmu_update(
     unsigned int foreigndom)
 {
     struct mmu_update req;
-    void *va;
+    void *va = NULL;
     unsigned long gpfn, gmfn, mfn;
     struct page_info *page;
     unsigned int cmd, i = 0, done = 0, pt_dom;
     struct vcpu *curr = current, *v = curr;
     struct domain *d = v->domain, *pt_owner = d, *pg_owner;
-    struct domain_mmap_cache mapcache;
+    mfn_t map_mfn = INVALID_MFN;
     uint32_t xsm_needed = 0;
     uint32_t xsm_checked = 0;
     int rc = put_old_guest_table(curr);
@@ -3502,8 +3502,6 @@ long do_mmu_update(
         rc = -ESRCH;
         goto out;
     }
-
-    domain_mmap_cache_init(&mapcache);
 
     for ( i = 0; i < count; i++ )
     {
@@ -3573,9 +3571,15 @@ long do_mmu_update(
             }
 
             mfn = page_to_mfn(page);
-            va = map_domain_page_with_cache(mfn, &mapcache);
-            va = (void *)((unsigned long)va +
-                          (unsigned long)(req.ptr & ~PAGE_MASK));
+
+            if ( !mfn_eq(_mfn(mfn), map_mfn) )
+            {
+                if ( va )
+                    unmap_domain_page(va);
+                va = map_domain_page(_mfn(mfn));
+                map_mfn = _mfn(mfn);
+            }
+            va = _p(((unsigned long)va & PAGE_MASK) + (req.ptr & ~PAGE_MASK));
 
             if ( page_lock(page) )
             {
@@ -3653,7 +3657,6 @@ long do_mmu_update(
                 put_page_type(page);
             }
 
-            unmap_domain_page_with_cache(va, &mapcache);
             put_page(page);
         }
         break;
@@ -3734,7 +3737,8 @@ long do_mmu_update(
 
     put_pg_owner(pg_owner);
 
-    domain_mmap_cache_destroy(&mapcache);
+    if ( va )
+        unmap_domain_page(va);
 
     perfc_add(num_page_updates, i);
 
