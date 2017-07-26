@@ -329,8 +329,10 @@ struct libxenvchan *libxenvchan_server_init(struct xentoollog_logger *logger,
 	}
 
 	ctrl->gntshr = xengntshr_open(logger, 0);
-	if (!ctrl->gntshr)
-		goto out;
+	if (!ctrl->gntshr) {
+		free(ctrl);
+		return 0;
+	}
 
 	if (init_evt_srv(ctrl, domain, logger))
 		goto out;
