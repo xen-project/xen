@@ -280,7 +280,6 @@ int main(int argc, char **argv)
         domid_t console_domid =             strtoul(NEXTARG,0,10);
         unsigned int hvm =                  strtoul(NEXTARG,0,10);
         unsigned int pae =                  strtoul(NEXTARG,0,10);
-        int superpages =                    strtoul(NEXTARG,0,10);
         unsigned cbflags =                  strtoul(NEXTARG,0,10);
         xc_migration_stream_t stream_type = strtoul(NEXTARG,0,10);
         assert(!*++argv);
@@ -295,7 +294,7 @@ int main(int argc, char **argv)
 
         r = xc_domain_restore(xch, io_fd, dom, store_evtchn, &store_mfn,
                               store_domid, console_evtchn, &console_mfn,
-                              console_domid, hvm, pae, superpages,
+                              console_domid, hvm, pae,
                               stream_type,
                               &helper_restore_callbacks, send_back_fd);
         helper_stub_restore_results(store_mfn,console_mfn,0);

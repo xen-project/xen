@@ -580,7 +580,7 @@ static bool process_record(libxl__egc *egc,
         break;
 
     case REC_TYPE_LIBXC_CONTEXT:
-        libxl__xc_domain_restore(egc, dcs, &stream->shs, 0, 0, 0);
+        libxl__xc_domain_restore(egc, dcs, &stream->shs, 0, 0);
         break;
 
     case REC_TYPE_EMULATOR_XENSTORE_DATA:

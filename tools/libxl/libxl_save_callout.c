@@ -43,7 +43,7 @@ static void helper_done(libxl__egc *egc, libxl__save_helper_state *shs);
 
 void libxl__xc_domain_restore(libxl__egc *egc, libxl__domain_create_state *dcs,
                               libxl__save_helper_state *shs,
-                              int hvm, int pae, int superpages)
+                              int hvm, int pae)
 {
     STATE_AO_GC(dcs->ao);
 
@@ -61,7 +61,7 @@ void libxl__xc_domain_restore(libxl__egc *egc, libxl__domain_create_state *dcs,
         state->store_port,
         state->store_domid, state->console_port,
         state->console_domid,
-        hvm, pae, superpages,
+        hvm, pae,
         cbflags, dcs->restore_params.checkpointed_stream,
     };
 

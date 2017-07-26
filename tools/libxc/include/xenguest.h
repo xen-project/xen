@@ -157,7 +157,6 @@ struct restore_callbacks {
  * @parm store_mfn returned with the mfn of the store page
  * @parm hvm non-zero if this is a HVM restore
  * @parm pae non-zero if this HVM domain has PAE support enabled
- * @parm superpages non-zero to allocate guest memory with superpages
  * @parm stream_type non-zero if the far end of the stream is using checkpointing
  * @parm callbacks non-NULL to receive a callback to restore toolstack
  *       specific data
@@ -167,7 +166,7 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
                       unsigned int store_evtchn, unsigned long *store_mfn,
                       domid_t store_domid, unsigned int console_evtchn,
                       unsigned long *console_mfn, domid_t console_domid,
-                      unsigned int hvm, unsigned int pae, int superpages,
+                      unsigned int hvm, unsigned int pae,
                       xc_migration_stream_t stream_type,
                       struct restore_callbacks *callbacks, int send_back_fd);
 
