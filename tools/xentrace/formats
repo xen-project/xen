@@ -79,6 +79,13 @@
 0x00022805  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  rtds:sched_tasklet
 0x00022806  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  rtds:schedule      [ cpu[16]:tasklet[8]:idle[4]:tickled[4] = %(1)08x ]
 
+0x00022A01  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  null:pick_cpu      [ dom:vcpu = 0x%(1)08x, new_cpu = %(2)d ]
+0x00022A02  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  null:assign        [ dom:vcpu = 0x%(1)08x, cpu = %(2)d ]
+0x00022A03  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  null:deassign      [ dom:vcpu = 0x%(1)08x, cpu = %(2)d ]
+0x00022A04  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  null:migrate       [ dom:vcpu = 0x%(1)08x, new_cpu:cpu = 0x%(2)08x ]
+0x00022A05  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  null:schedule      [ cpu[16]:tasklet[16] = %(1)08x, dom:vcpu = 0x%(2)08x ]
+0x00022A06  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  null:sched_tasklet
+
 0x00041001  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  domain_create   [ dom = 0x%(1)08x ]
 0x00041002  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  domain_destroy  [ dom = 0x%(1)08x ]
 
