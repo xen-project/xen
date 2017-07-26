@@ -32,7 +32,17 @@
 #include <xen/sched-if.h>
 #include <xen/softirq.h>
 #include <xen/keyhandler.h>
+#include <xen/trace.h>
 
+/*
+ * null tracing events. Check include/public/trace.h for more details.
+ */
+#define TRC_SNULL_PICKED_CPU    TRC_SCHED_CLASS_EVT(SNULL, 1)
+#define TRC_SNULL_VCPU_ASSIGN   TRC_SCHED_CLASS_EVT(SNULL, 2)
+#define TRC_SNULL_VCPU_DEASSIGN TRC_SCHED_CLASS_EVT(SNULL, 3)
+#define TRC_SNULL_MIGRATE       TRC_SCHED_CLASS_EVT(SNULL, 4)
+#define TRC_SNULL_SCHEDULE      TRC_SCHED_CLASS_EVT(SNULL, 5)
+#define TRC_SNULL_TASKLET       TRC_SCHED_CLASS_EVT(SNULL, 6)
 
 /*
  * Locking:
@@ -305,7 +315,10 @@ static unsigned int pick_cpu(struct null_private *prv, struct vcpu *v)
          */
         if ( likely((per_cpu(npc, cpu).vcpu == NULL || per_cpu(npc, cpu).vcpu == v)
                     && cpumask_test_cpu(cpu, cpumask_scratch_cpu(cpu))) )
-            return cpu;
+        {
+            new_cpu = cpu;
+            goto out;
+        }
 
         /* If not, just go for a free pCPU, within our affinity, if any */
         cpumask_and(cpumask_scratch_cpu(cpu), cpumask_scratch_cpu(cpu),
@@ -313,7 +326,7 @@ static unsigned int pick_cpu(struct null_private *prv, struct vcpu *v)
         new_cpu = cpumask_first(cpumask_scratch_cpu(cpu));
 
         if ( likely(new_cpu != nr_cpu_ids) )
-            return new_cpu;
+            goto out;
     }
 
     /*
@@ -328,7 +341,22 @@ static unsigned int pick_cpu(struct null_private *prv, struct vcpu *v)
      * only if the pCPU is free.
      */
     cpumask_and(cpumask_scratch_cpu(cpu), cpus, v->cpu_hard_affinity);
-    return cpumask_any(cpumask_scratch_cpu(cpu));
+    new_cpu = cpumask_any(cpumask_scratch_cpu(cpu));
+
+ out:
+    if ( unlikely(tb_init_done) )
+    {
+        struct {
+            uint16_t vcpu, dom;
+            uint32_t new_cpu;
+        } d;
+        d.dom = v->domain->domain_id;
+        d.vcpu = v->vcpu_id;
+        d.new_cpu = new_cpu;
+        __trace_var(TRC_SNULL_PICKED_CPU, 1, sizeof(d), &d);
+    }
+
+    return new_cpu;
 }
 
 static void vcpu_assign(struct null_private *prv, struct vcpu *v,
@@ -339,6 +367,18 @@ static void vcpu_assign(struct null_private *prv, struct vcpu *v,
     cpumask_clear_cpu(cpu, &prv->cpus_free);
 
     dprintk(XENLOG_G_INFO, "%d <-- d%dv%d\n", cpu, v->domain->domain_id, v->vcpu_id);
+
+    if ( unlikely(tb_init_done) )
+    {
+        struct {
+            uint16_t vcpu, dom;
+            uint32_t cpu;
+        } d;
+        d.dom = v->domain->domain_id;
+        d.vcpu = v->vcpu_id;
+        d.cpu = cpu;
+        __trace_var(TRC_SNULL_VCPU_ASSIGN, 1, sizeof(d), &d);
+    }
 }
 
 static void vcpu_deassign(struct null_private *prv, struct vcpu *v,
@@ -348,6 +388,18 @@ static void vcpu_deassign(struct null_private *prv, struct vcpu *v,
     cpumask_set_cpu(cpu, &prv->cpus_free);
 
     dprintk(XENLOG_G_INFO, "%d <-- NULL (d%dv%d)\n", cpu, v->domain->domain_id, v->vcpu_id);
+
+    if ( unlikely(tb_init_done) )
+    {
+        struct {
+            uint16_t vcpu, dom;
+            uint32_t cpu;
+        } d;
+        d.dom = v->domain->domain_id;
+        d.vcpu = v->vcpu_id;
+        d.cpu = cpu;
+        __trace_var(TRC_SNULL_VCPU_DEASSIGN, 1, sizeof(d), &d);
+    }
 }
 
 /* Change the scheduler of cpu to us (null). */
@@ -562,6 +614,19 @@ static void null_vcpu_migrate(const struct scheduler *ops, struct vcpu *v,
     if ( v->processor == new_cpu )
         return;
 
+    if ( unlikely(tb_init_done) )
+    {
+        struct {
+            uint16_t vcpu, dom;
+            uint16_t cpu, new_cpu;
+        } d;
+        d.dom = v->domain->domain_id;
+        d.vcpu = v->vcpu_id;
+        d.cpu = v->processor;
+        d.new_cpu = new_cpu;
+        __trace_var(TRC_SNULL_MIGRATE, 1, sizeof(d), &d);
+    }
+
     /*
      * v is either assigned to a pCPU, or in the waitqueue.
      *
@@ -663,8 +728,31 @@ static struct task_slice null_schedule(const struct scheduler *ops,
     SCHED_STAT_CRANK(schedule);
     NULL_VCPU_CHECK(current);
 
+    if ( unlikely(tb_init_done) )
+    {
+        struct {
+            uint16_t tasklet, cpu;
+            int16_t vcpu, dom;
+        } d;
+        d.cpu = cpu;
+        d.tasklet = tasklet_work_scheduled;
+        if ( per_cpu(npc, cpu).vcpu == NULL )
+        {
+            d.vcpu = d.dom = -1;
+        }
+        else
+        {
+            d.vcpu = per_cpu(npc, cpu).vcpu->vcpu_id;
+            d.dom = per_cpu(npc, cpu).vcpu->domain->domain_id;
+        }
+        __trace_var(TRC_SNULL_SCHEDULE, 1, sizeof(d), &d);
+    }
+
     if ( tasklet_work_scheduled )
+    {
+        trace_var(TRC_SNULL_TASKLET, 1, 0, NULL);
         ret.task = idle_vcpu[cpu];
+    }
     else
         ret.task = per_cpu(npc, cpu).vcpu;
     ret.migrated = 0;

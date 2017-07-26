@@ -78,6 +78,7 @@
 /* #define XEN_SCHEDULER_SEDF 2 (Removed) */
 #define TRC_SCHED_ARINC653 3
 #define TRC_SCHED_RTDS     4
+#define TRC_SCHED_SNULL    5
 
 /* Per-scheduler tracing */
 #define TRC_SCHED_CLASS_EVT(_c, _e) \
