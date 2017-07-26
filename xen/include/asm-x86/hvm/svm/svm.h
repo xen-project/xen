@@ -23,23 +23,6 @@
 #include <xen/types.h>
 #include <xen/bitmap.h>
 
-#define SVM_REG_EAX (0) 
-#define SVM_REG_ECX (1) 
-#define SVM_REG_EDX (2) 
-#define SVM_REG_EBX (3) 
-#define SVM_REG_ESP (4) 
-#define SVM_REG_EBP (5) 
-#define SVM_REG_ESI (6) 
-#define SVM_REG_EDI (7) 
-#define SVM_REG_R8  (8)
-#define SVM_REG_R9  (9)
-#define SVM_REG_R10 (10)
-#define SVM_REG_R11 (11)
-#define SVM_REG_R12 (12)
-#define SVM_REG_R13 (13)
-#define SVM_REG_R14 (14)
-#define SVM_REG_R15 (15)
-
 #define svm_vmload(x)     svm_vmload_pa(__pa(x))
 #define svm_vmsave(x)     svm_vmsave_pa(__pa(x))
 
