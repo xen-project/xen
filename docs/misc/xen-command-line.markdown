@@ -133,13 +133,6 @@ resume.
 `s3_mode` instructs Xen to set up the boot time (option `vga=`) video
 mode during S3 resume.
 
-### allowsuperpage
-> `= <boolean>`
-
-> Default: `true`
-
-Permit Xen to use superpages when performing memory management.
-
 ### altp2m (Intel)
 > `= <boolean>`
 

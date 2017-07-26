@@ -371,8 +371,7 @@ static inline unsigned int paging_max_paddr_bits(const struct domain *d)
 {
     unsigned int bits = paging_mode_hap(d) ? hap_paddr_bits : paddr_bits;
 
-    if ( !IS_ENABLED(BIGMEM) && paging_mode_shadow(d) &&
-         (!is_pv_domain(d) || opt_allow_superpage) )
+    if ( !IS_ENABLED(BIGMEM) && paging_mode_shadow(d) && !is_pv_domain(d) )
     {
         /* Shadowed superpages store GFNs in 32-bit page_info fields. */
         bits = min(bits, 32U + PAGE_SHIFT);

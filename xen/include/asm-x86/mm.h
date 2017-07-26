@@ -233,21 +233,6 @@ struct page_info
 #define PGC_count_width   PG_shift(9)
 #define PGC_count_mask    ((1UL<<PGC_count_width)-1)
 
-struct spage_info
-{
-       unsigned long type_info;
-};
-
- /* The following page types are MUTUALLY EXCLUSIVE. */
-#define SGT_none          PG_mask(0, 2)  /* superpage not in use */
-#define SGT_mark          PG_mask(1, 2)  /* Marked as a superpage */
-#define SGT_dynamic       PG_mask(2, 2)  /* has been dynamically mapped as a superpage */
-#define SGT_type_mask     PG_mask(3, 2)  /* Bits 30-31 or 62-63. */
-
- /* Count of uses of this superpage as its current type. */
-#define SGT_count_width   PG_shift(3)
-#define SGT_count_mask    ((1UL<<SGT_count_width)-1)
-
 #define is_xen_heap_page(page) ((page)->count_info & PGC_xen_heap)
 #define is_xen_heap_mfn(mfn) \
     (__mfn_valid(mfn) && is_xen_heap_page(__mfn_to_page(mfn)))
@@ -282,8 +267,6 @@ extern void share_xen_page_with_privileged_guests(
 extern void free_shared_domheap_page(struct page_info *page);
 
 #define frame_table ((struct page_info *)FRAMETABLE_VIRT_START)
-#define spage_table ((struct spage_info *)SPAGETABLE_VIRT_START)
-int get_superpage(unsigned long mfn, struct domain *d);
 extern unsigned long max_page;
 extern unsigned long total_pages;
 void init_frametable(void);
@@ -328,8 +311,6 @@ bool_t fill_ro_mpt(unsigned long mfn);
 void zap_ro_mpt(unsigned long mfn);
 
 bool is_iomem_page(mfn_t mfn);
-
-void clear_superpage_mark(struct page_info *page);
 
 const unsigned long *get_platform_badpages(unsigned int *array_size);
 /* Per page locks:
@@ -403,7 +384,6 @@ static inline int get_page_and_type(struct page_info *page,
 
 int check_descriptor(const struct domain *, struct desc_struct *d);
 
-extern bool opt_allow_superpage;
 extern paddr_t mem_hotplug;
 
 /******************************************************************************

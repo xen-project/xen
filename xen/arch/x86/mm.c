@@ -150,18 +150,11 @@ struct rangeset *__read_mostly mmio_ro_ranges;
 
 #define PAGE_CACHE_ATTRS (_PAGE_PAT|_PAGE_PCD|_PAGE_PWT)
 
-bool __read_mostly opt_allow_superpage;
-boolean_param("allowsuperpage", opt_allow_superpage);
-
-static void put_superpage(unsigned long mfn);
-
 static uint32_t base_disallow_mask;
 /* Global bit is allowed to be set on L1 PTEs. Intended for user mappings. */
 #define L1_DISALLOW_MASK ((base_disallow_mask | _PAGE_GNTTAB) & ~_PAGE_GLOBAL)
 
-#define L2_DISALLOW_MASK (unlikely(opt_allow_superpage) \
-                          ? base_disallow_mask & ~_PAGE_PSE \
-                          : base_disallow_mask)
+#define L2_DISALLOW_MASK base_disallow_mask
 
 #define l3_disallow_mask(d) (!is_pv_32bit_domain(d) ? \
                              base_disallow_mask : 0xFFFFF198U)
@@ -219,15 +212,6 @@ static void __init init_frametable_chunk(void *start, void *end)
     memset(end, -1, s - e);
 }
 
-static void __init init_spagetable(void)
-{
-    BUILD_BUG_ON(XEN_VIRT_END > SPAGETABLE_VIRT_START);
-
-    init_frametable_chunk(spage_table,
-                          mem_hotplug ? spage_table + SPAGETABLE_NR
-                                      : pdx_to_spage(max_pdx - 1) + 1);
-}
-
 void __init init_frametable(void)
 {
     unsigned int sidx, eidx, nidx;
@@ -252,9 +236,6 @@ void __init init_frametable(void)
                          : end_pg;
     init_frametable_chunk(pdx_to_page(sidx * PDX_GROUP_COUNT), top_pg);
     memset(end_pg, -1, (unsigned long)top_pg - (unsigned long)end_pg);
-
-    if (opt_allow_superpage)
-        init_spagetable();
 }
 
 #ifndef NDEBUG
@@ -1129,20 +1110,7 @@ get_page_from_l2e(
         return rc;
     }
 
-    if ( !opt_allow_superpage )
-    {
-        gdprintk(XENLOG_WARNING, "PV superpages disabled in hypervisor\n");
-        return -EINVAL;
-    }
-
-    if ( mfn & (L1_PAGETABLE_ENTRIES - 1) )
-    {
-        gdprintk(XENLOG_WARNING,
-                 "Unaligned superpage map attempt mfn %" PRI_mfn "\n", mfn);
-        return -EINVAL;
-    }
-
-    return get_superpage(mfn, d);
+    return -EINVAL;
 }
 
 
@@ -1315,8 +1283,13 @@ static int put_page_from_l2e(l2_pgentry_t l2e, unsigned long pfn)
         return 1;
 
     if ( l2e_get_flags(l2e) & _PAGE_PSE )
-        put_superpage(l2e_get_pfn(l2e));
-    else
+    {
+        struct page_info *page = mfn_to_page(l2e_get_pfn(l2e));
+        unsigned int i;
+
+        for ( i = 0; i < (1u << PAGETABLE_ORDER); i++, page++ )
+            put_page_and_type(page);
+    } else
         put_page_and_type(l2e_get_page(l2e));
 
     return 0;
@@ -2676,197 +2649,6 @@ int get_page_type_preemptible(struct page_info *page, unsigned long type)
     return __get_page_type(page, type, 1);
 }
 
-static int get_spage_pages(struct page_info *page, struct domain *d)
-{
-    unsigned int i;
-
-    for ( i = 0; i < (1u << PAGETABLE_ORDER); i++, page++ )
-    {
-        if ( !get_page_and_type(page, d, PGT_writable_page) )
-        {
-            while ( i-- > 0 )
-                put_page_and_type(--page);
-            return 0;
-        }
-    }
-    return 1;
-}
-
-static void put_spage_pages(struct page_info *page)
-{
-    unsigned int i;
-
-    for ( i = 0; i < (1u << PAGETABLE_ORDER); i++, page++ )
-        put_page_and_type(page);
-}
-
-static int mark_superpage(struct spage_info *spage, struct domain *d)
-{
-    unsigned long x, nx, y = spage->type_info;
-    int pages_done = 0;
-
-    ASSERT(opt_allow_superpage);
-
-    do {
-        x = y;
-        nx = x + 1;
-        if ( (x & SGT_type_mask) == SGT_mark )
-        {
-            gdprintk(XENLOG_WARNING,
-                     "Duplicate superpage mark attempt mfn %" PRI_mfn "\n",
-                     spage_to_mfn(spage));
-            if ( pages_done )
-                put_spage_pages(spage_to_page(spage));
-            return -EINVAL;
-        }
-        if ( (x & SGT_type_mask) == SGT_dynamic )
-        {
-            if ( pages_done )
-            {
-                put_spage_pages(spage_to_page(spage));
-                pages_done = 0;
-            }
-        }
-        else if ( !pages_done )
-        {
-            if ( !get_spage_pages(spage_to_page(spage), d) )
-            {
-                gdprintk(XENLOG_WARNING,
-                         "Superpage type conflict in mark attempt mfn %" PRI_mfn "\n",
-                         spage_to_mfn(spage));
-                return -EINVAL;
-            }
-            pages_done = 1;
-        }
-        nx = (nx & ~SGT_type_mask) | SGT_mark;
-
-    } while ( (y = cmpxchg(&spage->type_info, x, nx)) != x );
-
-    return 0;
-}
-
-static int unmark_superpage(struct spage_info *spage)
-{
-    unsigned long x, nx, y = spage->type_info;
-    unsigned long do_pages = 0;
-
-    ASSERT(opt_allow_superpage);
-
-    do {
-        x = y;
-        nx = x - 1;
-        if ( (x & SGT_type_mask) != SGT_mark )
-        {
-            gdprintk(XENLOG_WARNING,
-                     "Attempt to unmark unmarked superpage mfn %" PRI_mfn "\n",
-                     spage_to_mfn(spage));
-            return -EINVAL;
-        }
-        if ( (nx & SGT_count_mask) == 0 )
-        {
-            nx = (nx & ~SGT_type_mask) | SGT_none;
-            do_pages = 1;
-        }
-        else
-        {
-            nx = (nx & ~SGT_type_mask) | SGT_dynamic;
-        }
-    } while ( (y = cmpxchg(&spage->type_info, x, nx)) != x );
-
-    if ( do_pages )
-        put_spage_pages(spage_to_page(spage));
-
-    return 0;
-}
-
-void clear_superpage_mark(struct page_info *page)
-{
-    struct spage_info *spage;
-
-    if ( !opt_allow_superpage )
-        return;
-
-    spage = page_to_spage(page);
-    if ((spage->type_info & SGT_type_mask) == SGT_mark)
-        unmark_superpage(spage);
-
-}
-
-int get_superpage(unsigned long mfn, struct domain *d)
-{
-    struct spage_info *spage;
-    unsigned long x, nx, y;
-    int pages_done = 0;
-
-    ASSERT(opt_allow_superpage);
-
-    if ( !mfn_valid(_mfn(mfn | (L1_PAGETABLE_ENTRIES - 1))) )
-        return -EINVAL;
-
-    spage = mfn_to_spage(mfn);
-    y = spage->type_info;
-    do {
-        x = y;
-        nx = x + 1;
-        if ( (x & SGT_type_mask) != SGT_none )
-        {
-            if ( pages_done )
-            {
-                put_spage_pages(spage_to_page(spage));
-                pages_done = 0;
-            }
-        }
-        else
-        {
-            if ( !get_spage_pages(spage_to_page(spage), d) )
-            {
-                gdprintk(XENLOG_WARNING,
-                         "Type conflict on superpage mapping mfn %" PRI_mfn "\n",
-                         spage_to_mfn(spage));
-                return -EINVAL;
-            }
-            pages_done = 1;
-            nx = (nx & ~SGT_type_mask) | SGT_dynamic;
-        }
-    } while ( (y = cmpxchg(&spage->type_info, x, nx)) != x );
-
-    return 0;
-}
-
-static void put_superpage(unsigned long mfn)
-{
-    struct spage_info *spage;
-    unsigned long x, nx, y;
-    unsigned long do_pages = 0;
-
-    if ( !opt_allow_superpage )
-    {
-        put_spage_pages(mfn_to_page(mfn));
-        return;
-    }
-
-    spage = mfn_to_spage(mfn);
-    y = spage->type_info;
-    do {
-        x = y;
-        nx = x - 1;
-        if ((x & SGT_type_mask) == SGT_dynamic)
-        {
-            if ((nx & SGT_count_mask) == 0)
-            {
-                nx = (nx & ~SGT_type_mask) | SGT_none;
-                do_pages = 1;
-            }
-        }
-
-    } while ((y = cmpxchg(&spage->type_info, x, nx)) != x);
-
-    if (do_pages)
-        put_spage_pages(spage_to_page(spage));
-
-    return;
-}
-
 int put_old_guest_table(struct vcpu *v)
 {
     int rc;
@@ -3599,27 +3381,8 @@ long do_mmuext_op(
 
         case MMUEXT_MARK_SUPER:
         case MMUEXT_UNMARK_SUPER:
-        {
-            unsigned long mfn = op.arg1.mfn;
-
-            if ( !opt_allow_superpage )
-                rc = -EOPNOTSUPP;
-            else if ( unlikely(currd != pg_owner) )
-                rc = -EPERM;
-            else if ( mfn & (L1_PAGETABLE_ENTRIES - 1) )
-            {
-                gdprintk(XENLOG_WARNING,
-                         "Unaligned superpage mfn %" PRI_mfn "\n", mfn);
-                rc = -EINVAL;
-            }
-            else if ( !mfn_valid(_mfn(mfn | (L1_PAGETABLE_ENTRIES - 1))) )
-                rc = -EINVAL;
-            else if ( op.cmd == MMUEXT_MARK_SUPER )
-                rc = mark_superpage(mfn_to_spage(mfn), currd);
-            else
-                rc = unmark_superpage(mfn_to_spage(mfn));
+            rc = -EOPNOTSUPP;
             break;
-        }
 
         default:
             rc = -ENOSYS;

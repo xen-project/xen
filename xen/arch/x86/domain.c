@@ -1782,8 +1782,6 @@ static int relinquish_memory(
             BUG();
         }
 
-        clear_superpage_mark(page);
-
         if ( test_and_clear_bit(_PGC_allocated, &page->count_info) )
             put_page(page);
 

@@ -181,8 +181,6 @@ static __init void setup_pv_physmap(struct domain *d, unsigned long pgtbl_pfn,
                                              0)) != NULL )
             {
                 *pl2e = l2e_from_page(page, L1_PROT|_PAGE_DIRTY|_PAGE_PSE);
-                if ( opt_allow_superpage )
-                    get_superpage(page_to_mfn(page), d);
                 vphysmap_start += 1UL << L2_PAGETABLE_SHIFT;
                 continue;
             }
