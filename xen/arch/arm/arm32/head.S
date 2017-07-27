@@ -71,12 +71,15 @@
 
         .arm
 
-        /* This must be the very first address in the loaded image.
+        /*
+         * This must be the very first address in the loaded image.
          * It should be linked at XEN_VIRT_START, and loaded at any
          * 4K-aligned address.  All of text+data+bss must fit in 2MB,
-         * or the initial pagetable code below will need adjustment. */
+         * or the initial pagetable code below will need adjustment.
+         */
 GLOBAL(start)
-        /* zImage magic header, see:
+        /*
+         * zImage magic header, see:
          * http://www.simtec.co.uk/products/SWLINUX/files/booting_article.html#d0e309
          */
         .rept 8
@@ -222,33 +225,40 @@ cpu_init_done:
         mcr   CP32(r0, HMAIR0)
         mcr   CP32(r1, HMAIR1)
 
-        /* Set up the HTCR:
+        /*
+         * Set up the HTCR:
          * PT walks use Inner-Shareable accesses,
          * PT walks are write-back, write-allocate in both cache levels,
-         * Full 32-bit address space goes through this table. */
+         * Full 32-bit address space goes through this table.
+         */
         ldr   r0, =(TCR_RES1|TCR_SH0_IS|TCR_ORGN0_WBWA|TCR_IRGN0_WBWA|TCR_T0SZ(0))
         mcr   CP32(r0, HTCR)
 
-        /* Set up the HSCTLR:
+        /*
+         * Set up the HSCTLR:
          * Exceptions in LE ARM,
          * Low-latency IRQs disabled,
          * Write-implies-XN disabled (for now),
          * D-cache disabled (for now),
          * I-cache enabled,
          * Alignment checking enabled,
-         * MMU translation disabled (for now). */
+         * MMU translation disabled (for now).
+         */
         ldr   r0, =(HSCTLR_BASE|SCTLR_A)
         mcr   CP32(r0, HSCTLR)
 
-        /* Rebuild the boot pagetable's first-level entries. The structure
+        /*
+         * Rebuild the boot pagetable's first-level entries. The structure
          * is described in mm.c.
          *
          * After the CPU enables paging it will add the fixmap mapping
          * to these page tables, however this may clash with the 1:1
          * mapping. So each CPU must rebuild the page tables here with
-         * the 1:1 in place. */
+         * the 1:1 in place.
+         */
 
-        /* If Xen is loaded at exactly XEN_VIRT_START then we don't
+        /*
+         * If Xen is loaded at exactly XEN_VIRT_START then we don't
          * need an additional 1:1 mapping, the virtual mapping will
          * suffice.
          */
@@ -331,8 +341,10 @@ cpu_init_done:
         cmp   r1, #(LPAE_ENTRIES<<3) /* 512*8-byte entries per page */
         blo   1b
 
-        /* Defer fixmap and dtb mapping until after paging enabled, to
-         * avoid them clashing with the 1:1 mapping. */
+        /*
+         * Defer fixmap and dtb mapping until after paging enabled, to
+         * avoid them clashing with the 1:1 mapping.
+         */
 
         /* boot pagetable setup complete */
 
@@ -357,12 +369,16 @@ virtphys_clash:
         mov   pc, r1                 /* Get a proper vaddr into PC */
 paging:
 
-        /* Now we can install the fixmap and dtb mappings, since we
-         * don't need the 1:1 map any more */
+        /*
+         * Now we can install the fixmap and dtb mappings, since we
+         * don't need the 1:1 map any more
+         */
         dsb
 #if defined(CONFIG_EARLY_PRINTK) /* Fixmap is only used by early printk */
-        /* Non-boot CPUs don't need to rebuild the fixmap itself, just
-         * the mapping from boot_second to xen_fixmap */
+        /*
+         * Non-boot CPUs don't need to rebuild the fixmap itself, just
+         * the mapping from boot_second to xen_fixmap
+         */
         teq   r12, #0
         bne   1f
 
@@ -408,8 +424,10 @@ paging:
         teq   r12, #0
         beq   launch
 
-        /* Non-boot CPUs need to move on to the proper pagetables, which were
-         * setup in init_secondary_pagetables. */
+        /*
+         * Non-boot CPUs need to move on to the proper pagetables, which were
+         * setup in init_secondary_pagetables.
+         */
 
         ldr   r4, =init_ttbr         /* VA of HTTBR value stashed by CPU 0 */
         ldrd  r4, r5, [r4]           /* Actual value */
@@ -443,7 +461,8 @@ fail:   PRINT("- Boot failed -\r\n")
 
 GLOBAL(_end_boot)
 
-/* Copy Xen to new location and switch TTBR
+/*
+ * Copy Xen to new location and switch TTBR
  * r1:r0       ttbr
  * r2          source address
  * r3          destination address
@@ -452,7 +471,8 @@ GLOBAL(_end_boot)
  * Source and destination must be word aligned, length is rounded up
  * to a 16 byte boundary.
  *
- * MUST BE VERY CAREFUL when saving things to RAM over the copy */
+ * MUST BE VERY CAREFUL when saving things to RAM over the copy
+ */
 ENTRY(relocate_xen)
         push {r4,r5,r6,r7,r8,r9,r10,r11}
 
@@ -521,9 +541,11 @@ ENTRY(relocate_xen)
         mov pc, lr
 
 #ifdef CONFIG_EARLY_PRINTK
-/* Bring up the UART.
+/*
+ * Bring up the UART.
  * r11: Early UART base address
- * Clobbers r0-r2 */
+ * Clobbers r0-r2
+ */
 init_uart:
 #ifdef EARLY_PRINTK_INIT_UART
         early_uart_init r11, r1, r2
@@ -533,10 +555,12 @@ init_uart:
 1:      .asciz "- UART enabled -\r\n"
         .align 4
 
-/* Print early debug messages.
+/*
+ * Print early debug messages.
  * r0: Nul-terminated string to print.
  * r11: Early UART base address
- * Clobbers r0-r1 */
+ * Clobbers r0-r1
+ */
 puts:
         early_uart_ready r11, r1
         ldrb  r1, [r0], #1           /* Load next char */
@@ -545,10 +569,12 @@ puts:
         early_uart_transmit r11, r1
         b puts
 
-/* Print a 32-bit number in hex.  Specific to the PL011 UART.
+/*
+ * Print a 32-bit number in hex.  Specific to the PL011 UART.
  * r0: Number to print.
  * r11: Early UART base address
- * Clobbers r0-r3 */
+ * Clobbers r0-r3
+ */
 putn:
         adr   r1, hex
         mov   r3, #8
@@ -582,7 +608,8 @@ ENTRY(lookup_processor_type)
         mov r0, r1
         ldmfd sp!, {r4, r10, pc}
 
-/* Read processor ID register (CP#15, CR0), and Look up in the linker-built
+/*
+ *  Read processor ID register (CP#15, CR0), and Look up in the linker-built
  * supported processor list. Note that we can't use the absolute addresses for
  * the __proc_info lists since we aren't running with the MMU on (and therefore,
  * we are not in correct address space). We have to calculate the offset.

@@ -6,7 +6,7 @@
 /*
  * Register aliases.
  */
-lr      .req    x30             // link register
+lr      .req    x30             /* link register */
 
 /*
  * Stack pushing/popping (register pairs only). Equivalent to store decrement
@@ -293,8 +293,8 @@ ENTRY(return_to_new_vcpu64)
 return_from_trap:
         msr     daifset, #2 /* Mask interrupts */
 
-        ldr     x21, [sp, #UREGS_PC]            // load ELR
-        ldr     w22, [sp, #UREGS_CPSR]          // load SPSR
+        ldr     x21, [sp, #UREGS_PC]            /* load ELR */
+        ldr     w22, [sp, #UREGS_CPSR]          /* load SPSR */
 
         pop     x0, x1
         pop     x2, x3
@@ -302,7 +302,7 @@ return_from_trap:
         pop     x6, x7
         pop     x8, x9
 
-        msr     elr_el2, x21                    // set up the return data
+        msr     elr_el2, x21                    /* set up the return data */
         msr     spsr_el2, x22
 
         pop     x10, x11
@@ -388,25 +388,25 @@ abort_guest_exit_end:
 
         .align  11
 ENTRY(hyp_traps_vector)
-        ventry  hyp_sync_invalid                // Synchronous EL2t
-        ventry  hyp_irq_invalid                 // IRQ EL2t
-        ventry  hyp_fiq_invalid                 // FIQ EL2t
-        ventry  hyp_error_invalid               // Error EL2t
+        ventry  hyp_sync_invalid            /* Synchronous EL2t */
+        ventry  hyp_irq_invalid             /* IRQ EL2t */
+        ventry  hyp_fiq_invalid             /* FIQ EL2t */
+        ventry  hyp_error_invalid           /* Error EL2t */
 
-        ventry  hyp_sync                        // Synchronous EL2h
-        ventry  hyp_irq                         // IRQ EL2h
-        ventry  hyp_fiq_invalid                 // FIQ EL2h
-        ventry  hyp_error                       // Error EL2h
+        ventry  hyp_sync                    /* Synchronous EL2h */
+        ventry  hyp_irq                     /* IRQ EL2h */
+        ventry  hyp_fiq_invalid             /* FIQ EL2h */
+        ventry  hyp_error                   /* Error EL2h */
 
-        ventry  guest_sync                      // Synchronous 64-bit EL0/EL1
-        ventry  guest_irq                       // IRQ 64-bit EL0/EL1
-        ventry  guest_fiq_invalid               // FIQ 64-bit EL0/EL1
-        ventry  guest_error                     // Error 64-bit EL0/EL1
+        ventry  guest_sync                  /* Synchronous 64-bit EL0/EL1 */
+        ventry  guest_irq                   /* IRQ 64-bit EL0/EL1 */
+        ventry  guest_fiq_invalid           /* FIQ 64-bit EL0/EL1 */
+        ventry  guest_error                 /* Error 64-bit EL0/EL1 */
 
-        ventry  guest_sync_compat               // Synchronous 32-bit EL0/EL1
-        ventry  guest_irq_compat                // IRQ 32-bit EL0/EL1
-        ventry  guest_fiq_invalid_compat        // FIQ 32-bit EL0/EL1
-        ventry  guest_error_compat              // Error 32-bit EL0/EL1
+        ventry  guest_sync_compat           /* Synchronous 32-bit EL0/EL1 */
+        ventry  guest_irq_compat            /* IRQ 32-bit EL0/EL1 */
+        ventry  guest_fiq_invalid_compat    /* FIQ 32-bit EL0/EL1 */
+        ventry  guest_error_compat          /* Error 32-bit EL0/EL1 */
 
 /*
  * struct vcpu *__context_switch(struct vcpu *prev, struct vcpu *next)
@@ -419,7 +419,7 @@ ENTRY(hyp_traps_vector)
 ENTRY(__context_switch)
         add     x8, x0, #VCPU_arch_saved_context
         mov     x9, sp
-        stp     x19, x20, [x8], #16             // store callee-saved registers
+        stp     x19, x20, [x8], #16         /* store callee-saved registers */
         stp     x21, x22, [x8], #16
         stp     x23, x24, [x8], #16
         stp     x25, x26, [x8], #16
@@ -428,7 +428,7 @@ ENTRY(__context_switch)
         str     lr, [x8]
 
         add     x8, x1, #VCPU_arch_saved_context
-        ldp     x19, x20, [x8], #16             // restore callee-saved registers
+        ldp     x19, x20, [x8], #16         /* restore callee-saved registers */
         ldp     x21, x22, [x8], #16
         ldp     x23, x24, [x8], #16
         ldp     x25, x26, [x8], #16

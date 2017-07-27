@@ -19,7 +19,8 @@
 
 #include <asm/scif-uart.h>
 
-/* SCIF UART wait UART to be ready to transmit
+/*
+ * SCIF UART wait UART to be ready to transmit
  * rb: register which contains the UART base address
  * rc: scratch register
  */
@@ -30,7 +31,8 @@
         beq    1b                        /* Wait for the UART to be ready */
 .endm
 
-/* SCIF UART transmit character
+/*
+ * SCIF UART transmit character
  * rb: register which contains the UART base address
  * rt: register which contains the character to transmit
  */

@@ -16,9 +16,11 @@
 
 #include <xen/8250-uart.h>
 
-/* 8250 UART wait UART to be ready to transmit
+/*
+ * 8250 UART wait UART to be ready to transmit
  * rb: register which contains the UART base address
- * rc: scratch register */
+ * rc: scratch register
+ */
 .macro early_uart_ready rb rc
 1:
         ldr     \rc, [\rb, #(UART_LSR << EARLY_UART_REG_SHIFT)] /* Read LSR */
@@ -26,9 +28,11 @@
         beq     1b                         /* Wait for the UART to be ready */
 .endm
 
-/* 8250 UART transmit character
+/*
+ * 8250 UART transmit character
  * rb: register which contains the UART base address
- * rt: register which contains the character to transmit */
+ * rt: register which contains the character to transmit
+ */
 .macro early_uart_transmit rb rt
         str   \rt, [\rb, #UART_THR]      /* Write Transmit buffer */
 .endm

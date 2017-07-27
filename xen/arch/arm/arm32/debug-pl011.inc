@@ -18,10 +18,12 @@
 
 #include <asm/pl011-uart.h>
 
-/* PL011 UART initialization
+/*
+ * PL011 UART initialization
  * rb: register which contains the UART base address
  * rc: scratch register 1
- * rd: scratch register 2 (unused here) */
+ * rd: scratch register 2 (unused here)
+ */
 .macro early_uart_init rb, rc, rd
         mov   \rc, #(7372800 / EARLY_PRINTK_BAUD % 16)
         str   \rc, [\rb, #FBRD]     /* -> UARTFBRD (Baud divisor fraction) */
@@ -33,9 +35,11 @@
         str   \rc, [\rb, #CR]     /* -> UARTCR (Control Register) */
 .endm
 
-/* PL011 UART wait UART to be ready to transmit
+/*
+ * PL011 UART wait UART to be ready to transmit
  * rb: register which contains the UART base address
- * rc: scratch register */
+ * rc: scratch register
+ */
 .macro early_uart_ready rb, rc
 1:
         ldr   \rc, [\rb, #FR]       /* <- UARTFR (Flag register) */
@@ -43,9 +47,11 @@
         bne   1b                    /* Wait for the UART to be ready */
 .endm
 
-/* PL011 UART transmit character
+/*
+ * PL011 UART transmit character
  * rb: register which contains the UART base address
- * rt: register which contains the character to transmit */
+ * rt: register which contains the character to transmit
+ */
 .macro early_uart_transmit rb, rt
         str   \rt, [\rb, #DR]            /* -> UARTDR (Data Register) */
 .endm

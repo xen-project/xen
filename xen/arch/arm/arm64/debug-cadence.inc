@@ -20,9 +20,11 @@
 #include <asm/asm_defns.h>
 #include <asm/cadence-uart.h>
 
-/* Cadence UART wait UART to be ready to transmit
+/*
+ * Cadence UART wait UART to be ready to transmit
  * xb: register which contains the UART base address
- * c: scratch register number */
+ * c: scratch register number
+ */
 .macro early_uart_ready xb, c
 1:
         ldrh  w\c, [\xb, #R_UART_SR]
@@ -30,9 +32,11 @@
         b.ne  1b
 .endm
 
-/* Cadence UART transmit character
+/*
+ * Cadence UART transmit character
  * xb: register which contains the UART base address
- * wt: register which contains the character to transmit */
+ * wt: register which contains the character to transmit
+ */
 .macro early_uart_transmit xb, wt
         strb  \wt, [\xb, #R_UART_TX]
 .endm
