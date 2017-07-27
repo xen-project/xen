@@ -42,6 +42,7 @@ the name of the machine:
   - lager: printk with SCIF0 on Renesas R-Car H2 processors
   - midway: printk with the pl011 on Calxeda Midway processors
   - omap5432: printk with UART3 on TI OMAP5432 processors
+  - rcar3: printk with SCIF2 on Renesas R-Car Gen3 processors
   - seattle: printk with pl011 for AMD Seattle processor
   - sun6i: printk with 8250 on Allwinner A31 processors
   - sun7i: printk with 8250 on Allwinner A20 processors
