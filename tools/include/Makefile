@@ -58,6 +58,11 @@ install: all
 	$(INSTALL_DATA) xen/sys/*.h $(DESTDIR)$(includedir)/xen/sys
 	$(INSTALL_DATA) xen/xsm/*.h $(DESTDIR)$(includedir)/xen/xsm
 
+.PHONY: uninstall
+uninstall:
+	echo "[FIXME] uninstall headers"
+	rm -rf $(DESTDIR)$(includedir)/xen
+
 .PHONY: clean
 clean:
 	rm -rf xen xen-xsm acpi

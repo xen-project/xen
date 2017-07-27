@@ -233,12 +233,12 @@ headers.chk:
 	done >$@.new
 	mv $@.new $@
 
-subdirs-all subdirs-clean subdirs-install subdirs-distclean: .phony
+subdirs-all subdirs-clean subdirs-install subdirs-distclean subdirs-uninstall: .phony
 	@set -e; for subdir in $(SUBDIRS) $(SUBDIRS-y); do \
 		$(MAKE) subdir-$(patsubst subdirs-%,%,$@)-$$subdir; \
 	done
 
-subdir-all-% subdir-clean-% subdir-install-%: .phony
+subdir-all-% subdir-clean-% subdir-install-% subdir-uninstall-%: .phony
 	$(MAKE) -C $* $(patsubst subdir-%-$*,%,$@)
 
 subdir-distclean-%: .phony

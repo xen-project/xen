@@ -25,3 +25,7 @@ distclean: clean
 install: all
 	[ -d $(DESTDIR)$(sbindir) ] || $(INSTALL_DIR) $(DESTDIR)$(sbindir)
 	$(INSTALL_PROG) kdd $(DESTDIR)$(sbindir)/kdd
+
+.PHONY: uninstall
+uninstall:
+	rm -f $(DESTDIR)$(sbindir)/kdd

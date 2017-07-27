@@ -69,6 +69,15 @@ install: build
 	$(INSTALL_DATA) include/xentoollog.h $(DESTDIR)$(includedir)
 	$(INSTALL_DATA) xentoollog.pc $(DESTDIR)$(PKG_INSTALLDIR)
 
+.PHONY: uinstall
+uninstall:
+	rm -f $(DESTDIR)$(PKG_INSTALLDIR)/xentoollog.pc
+	rm -f $(DESTDIR)$(includedir)/xentoollog.h
+	rm -f $(DESTDIR)$(libdir)/libxentoollog.so
+	rm -f $(DESTDIR)$(libdir)/libxentoollog.so.$(MAJOR)
+	rm -f $(DESTDIR)$(libdir)/libxentoollog.so.$(MAJOR).$(MINOR)
+	rm -f $(DESTDIR)$(libdir)/libxentoollog.a
+
 .PHONY: TAGS
 TAGS:
 	etags -t *.c *.h

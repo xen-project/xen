@@ -18,6 +18,9 @@ all: subdirs-all
 .PHONY: install
 install: subdirs-install
 
+.PHONY: uninstall
+uninstall: subdirs-uninstall
+
 .PHONY: clean
 clean: subdirs-clean
 

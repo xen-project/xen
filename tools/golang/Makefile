@@ -19,6 +19,9 @@ all build: subdirs-all
 .PHONY: install
 install: subdirs-install
 
+.PHONY: uninstall
+uninstall: subdirs-uninstall
+
 .PHONY: clean
 clean: subdirs-clean
 	$(RM) -r src pkg

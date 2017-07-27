@@ -21,6 +21,9 @@ build: $(HOTPLUGPATH)
 .PHONY: install
 install: install-scripts
 
+.PHONY: uninstall
+uninstall: uninstall-scripts
+
 .PHONY: install-scripts
 install-scripts: build
 	[ -d $(DESTDIR)$(XEN_SCRIPT_DIR) ] || \
@@ -33,6 +36,11 @@ install-scripts: build
 	   do \
 	   $(INSTALL_DATA) $$i $(DESTDIR)$(XEN_SCRIPT_DIR); \
 	done
+
+.PHONY: uninstall-scripts
+uninstall-scripts:
+	rm -f $(addprefix $(DESTDIR)$(XEN_SCRIPT_DIR)/, $(XEN_SCRIPTS))
+	rm -f $(addprefix $(DESTDIR)$(XEN_SCRIPT_DIR)/, $(XEN_SCRIPT_DATA))
 
 .PHONY: clean
 clean:

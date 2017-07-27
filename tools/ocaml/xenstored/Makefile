@@ -90,6 +90,10 @@ install: all
 	$(INSTALL_DIR) $(DESTDIR)$(XEN_CONFIG_DIR)
 	$(INSTALL_DATA) oxenstored.conf $(DESTDIR)$(XEN_CONFIG_DIR)
 
+uninstall:
+	rm -f $(DESTDIR)$(XEN_CONFIG_DIR)/oxenstored.conf
+	rm -f $(DESTDIR)$(sbindir)/oxenstored
+
 include $(OCAML_TOPLEVEL)/Makefile.rules
 
 genpath-target = $(call buildmakevars2module,paths.ml)

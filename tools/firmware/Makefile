@@ -49,6 +49,16 @@ ifeq ($(CONFIG_OVMF),y)
 	$(INSTALL_DATA) ovmf-dir/ovmf.bin $(INST_DIR)/ovmf.bin
 endif
 
+.PHONY: uninstall
+uninstall:
+	rm -f $(addprefix $(INST_DIR)/, $(notdir $(TARGET)))
+ifeq ($(CONFIG_SEABIOS),y)
+	rm -f $(INST_DIR)/seabios.bin
+endif
+ifeq ($(CONFIG_OVMF),y)
+	rm -f $(INST_DIR)/ovmf.bin
+endif
+
 .PHONY: clean
 clean: subdirs-clean
 

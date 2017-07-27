@@ -76,6 +76,15 @@ install: build
 	$(INSTALL_DATA) include/xendevicemodel.h $(DESTDIR)$(includedir)
 	$(INSTALL_DATA) xendevicemodel.pc $(DESTDIR)$(PKG_INSTALLDIR)
 
+.PHONY: uninstall
+uninstall:
+	rm -f $(DESTDIR)$(PKG_INSTALLDIR)/xendevicemodel.pc
+	rm -f $(DESTDIR)$(includedir)/xendevicemodel.h
+	rm -f $(DESTDIR)$(libdir)/libxendevicemodel.so
+	rm -f $(DESTDIR)$(libdir)/libxendevicemodel.so.$(MAJOR)
+	rm -f $(DESTDIR)$(libdir)/libxendevicemodel.so.$(MAJOR).$(MINOR)
+	rm -f $(DESTDIR)$(libdir)/libxendevicemodel.a
+
 .PHONY: TAGS
 TAGS:
 	etags -t *.c *.h

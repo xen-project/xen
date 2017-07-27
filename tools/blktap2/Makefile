@@ -16,5 +16,5 @@ clean:
 
 distclean: clean
 
-.PHONY: all clean install distclean
-all clean install distclean: %: subdirs-%
+.PHONY: all clean install distclean uninstall
+all clean install distclean uninstall: %: subdirs-%

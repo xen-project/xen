@@ -44,6 +44,11 @@ install: all
 	$(INSTALL_PROG) xl $(DESTDIR)$(sbindir)
 	$(INSTALL_DATA) bash-completion $(DESTDIR)$(BASH_COMPLETION_DIR)/xl.sh
 
+.PHONY: uninstall
+uninstall:
+	rm -f $(DESTDIR)$(BASH_COMPLETION_DIR)/xl.sh
+	rm -f $(DESTDIR)$(sbindir)/xl
+
 .PHONY: clean
 clean:
 	$(RM) -f *.o xl _paths.h $(DEPS)

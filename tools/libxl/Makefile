@@ -327,6 +327,20 @@ install: all
 	$(INSTALL_DATA) xenlight.pc $(DESTDIR)$(PKG_INSTALLDIR)
 	$(INSTALL_DATA) xlutil.pc $(DESTDIR)$(PKG_INSTALLDIR)
 
+.PHONY: uninstall
+uninstall:
+	rm -f $(addprefix $(DESTDIR)$(PKG_INSTALLDIR)/,xlutil.pc xenlight.pc)
+	rm -f $(addprefix $(DESTDIR)$(includedir)/,libxl.h libxl_event.h libxl_json.h _libxl_types.h _libxl_types_json.h _libxl_list.h libxl_utils.h libxl_uuid.h libxlutil.h)
+	rm -f $(DESTDIR)$(libdir)/libxlutil.a
+	rm -f $(DESTDIR)$(libdir)/libxlutil.so
+	rm -f $(DESTDIR)$(libdir)/libxlutil.so.$(XLUMAJOR)
+	rm -f $(DESTDIR)$(libdir)/libxlutil.so.$(XLUMAJOR).$(XLUMINOR)
+	rm -f $(DESTDIR)$(libdir)/libxenlight.a
+	rm -f $(DESTDIR)$(libdir)/libxenlight.so
+	rm -f $(DESTDIR)$(libdir)/libxenlight.so.$(MAJOR)
+	rm -f $(DESTDIR)$(libdir)/libxenlight.so.$(MAJOR).$(MINOR)
+	rm -f $(DESTDIR)$(LIBEXEC_BIN)/libxl-save-helper
+
 .PHONY: clean
 clean:
 	$(RM) -f _*.h *.o *.so* *.a $(CLIENTS) $(DEPS)

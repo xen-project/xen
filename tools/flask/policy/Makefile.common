@@ -118,6 +118,9 @@ install: $(POLICY_FILENAME)
 	$(INSTALL_DIR) $(DESTDIR)/$(POLICY_LOADPATH)
 	$(INSTALL_DATA) $^ $(DESTDIR)/$(POLICY_LOADPATH)
 
+uninstall:
+	rm -f $(DESTDIR)/$(POLICY_LOADPATH)/$(POLICY_FILENAME)
+
 $(POLICY_FILENAME): $(FLASK_BUILD_DIR)/policy.conf
 	$(CHECKPOLICY) $(CHECKPOLICY_PARAM) $^ -o $@
 
@@ -129,4 +132,4 @@ clean:
 
 distclean: clean
 
-.PHONY: all install clean distclean
+.PHONY: all install clean distclean uninstall

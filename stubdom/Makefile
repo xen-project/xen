@@ -606,6 +606,37 @@ install-vtpmmgr: vtpmmgr-stubdom
 	$(INSTALL_DIR) "$(DESTDIR)$(XENFIRMWAREDIR)"
 	$(INSTALL_PROG) mini-os-$(XEN_TARGET_ARCH)-vtpmmgr/mini-os.gz "$(DESTDIR)$(XENFIRMWAREDIR)/vtpmmgr-stubdom.gz"
 
+###########
+# uninstall
+###########
+
+ifeq (x$(STUBDOM_UNINSTALL),x)
+STUBDOM_UNINSTALL=$(patsubst install-%,uninstall-%,$(STUBDOM_INSTALL))
+endif
+
+ifeq ($(STUBDOM_SUPPORTED),1)
+uninstall: $(STUBDOM_UNINSTALL)
+else
+uninstall:
+endif
+
+uninstall-ioemu:
+	rm -f $(DESTDIR)$(LIBEXEC_BIN)/stubdom-dm
+	rm -f $(DESTDIR)$(LIBEXEC_BIN)/stubdompath.sh
+	rm -f $(DESTDIR)$(XENFIRMWAREDIR)/ioemu-stubdom.gz
+
+uninstall-grub:
+	rm -f $(DESTDIR)$(XENFIRMWAREDIR)/pv-grub-$(XEN_TARGET_ARCH).gz
+
+uninstall-xenstore:
+	rm -f $(DESTDIR)$(XENFIRMWAREDIR)/xenstore-stubdom.gz
+
+uninstall-vtpm:
+	rm -f $(DESTDIR)$(XENFIRMWAREDIR)/vtpm-stubdom.gz
+
+uninstall-vtpmmgr:
+	rm -f $(DESTDIR)$(XENFIRMWAREDIR)/vtpmmgr-stubdom.gz
+
 #######
 # clean
 #######

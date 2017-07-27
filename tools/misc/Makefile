@@ -62,6 +62,12 @@ install: build
 	$(INSTALL_PYTHON_PROG) $(INSTALL_SBIN) $(DESTDIR)$(sbindir)
 	$(INSTALL_PYTHON_PROG) $(INSTALL_PRIVBIN) $(DESTDIR)$(LIBEXEC_BIN)
 
+.PHONY: uninstall
+uninstall:
+	rm -f $(addprefix $(DESTDIR)$(LIBEXEC_BIN)/, $(INSTALL_PRIVBIN))
+	rm -f $(addprefix $(DESTDIR)$(sbindir)/, $(INSTALL_SBIN))
+	rm -f $(addprefix $(DESTDIR)$(bindir)/, $(INSTALL_BIN))
+
 .PHONY: clean
 clean:
 	$(RM) *.o $(TARGETS_BUILD) *~ $(DEPS)

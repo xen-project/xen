@@ -4,6 +4,6 @@ include $(XEN_ROOT)/tools/Rules.mk
 SUBDIRS-y := utils
 SUBDIRS-$(FLASK_POLICY) += policy
 
-.PHONY: all clean install distclean
-all clean install distclean: %: subdirs-%
+.PHONY: all clean install distclean uninstall
+all clean install distclean uninstall: %: subdirs-%
 

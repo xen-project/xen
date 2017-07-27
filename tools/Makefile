@@ -77,43 +77,10 @@ install:
 uninstall: D=$(DESTDIR)
 uninstall:
 	[ -d $(D)$(XEN_CONFIG_DIR) ] && mv -f $(D)$(XEN_CONFIG_DIR) $(D)$(XEN_CONFIG_DIR).old-`date +%s` || true
-	rm -rf $(D)$(CONFIG_DIR)/init.d/xendomains $(D)$(CONFIG_DIR)/init.d/xend
-	rm -rf $(D)$(CONFIG_DIR)/init.d/xencommons $(D)$(CONFIG_DIR)/init.d/xen-watchdog
-	rm -f  $(D)$(CONFIG_DIR)/udev/rules.d/xen-backend.rules
-	rm -f  $(D)$(CONFIG_DIR)/udev/rules.d/xend.rules
-	rm -f  $(D)$(SYSCONFIG_DIR)/xendomains
-	rm -f  $(D)$(sbindir)/xendomains
-	rm -f  $(D)$(SYSCONFIG_DIR)/xencommons
-	rm -rf $(D)$(XEN_LIB_DIR)
-	rm -rf $(D)$(XEN_LIB_STORED)
-	rm -rf $(D)$(XEN_RUN_STORED)
-	rm -rf $(D)$(PKG_INSTALLDIR)
-	rm -rf $(D)$(bindir)/cpuperf-perfcntr $(D)$(bindir)/cpuperf-xen
-	rm -rf $(D)$(bindir)/xc_shadow
-	rm -rf $(D)$(bindir)/pygrub
-	rm -rf $(D)$(bindir)/setsize $(D)$(bindir)/tbctl
-	rm -rf $(D)$(bindir)/xsls
-	rm -rf $(D)$(bindir)/xenstore* $(D)$(bindir)/xentrace*
-	rm -rf $(D)$(bindir)/xen-detect $(D)$(bindir)/xencons
-	rm -rf $(D)$(bindir)/xenpvnetboot $(D)$(bindir)/qemu-*-xen
-	rm -rf $(D)$(includedir)/xenctrl* $(D)$(includedir)/xenguest.h
-	rm -rf $(D)$(includedir)/xs_lib.h $(D)$(includedir)/xs.h
-	rm -rf $(D)$(includedir)/xenstore-compat/xs_lib.h $(D)$(includedir)/xenstore-compat/xs.h
-	rm -rf $(D)$(includedir)/xenstore_lib.h $(D)$(includedir)/xenstore.h
-	rm -rf $(D)$(includedir)/xen
-	rm -rf $(D)$(includedir)/_libxl* $(D)$(includedir)/libxl*
-	rm -rf $(D)$(includedir)/xenstat.h $(D)$(includedir)/xentoollog.h
-	rm -rf $(D)$(libdir)/libxenctrl* $(D)$(libdir)/libxenguest*
-	rm -rf $(D)$(libdir)/libxenstore* $(D)$(libdir)/libxlutil*
-	rm -rf $(D)$(libdir)/python/xen $(D)$(libdir)/python/grub
-	rm -rf $(D)$(LIBEXEC)
-	rm -rf $(D)$(sbindir)/setmask
-	rm -rf $(D)$(sbindir)/xen* $(D)$(sbindir)/netfix $(D)$(sbindir)/xm
-	rm -rf $(D)$(SHAREDIR)/doc/xen
+	rm -rf $(D)$(libdir)/xen
 	rm -rf $(D)$(SHAREDIR)/xen
 	rm -rf $(D)$(SHAREDIR)/qemu-xen
-	rm -rf $(D)$(MAN1DIR)/xen*
-	rm -rf $(D)$(MAN8DIR)/xen*
+	$(MAKE) subdirs-uninstall
 
 .PHONY: clean
 clean: subdirs-clean
@@ -221,6 +188,9 @@ subdir-clean-qemu-xen-traditional-dir:
 	set -e; if test -d qemu-xen-traditional-dir/.; then \
 		$(MAKE) -C qemu-xen-traditional-dir clean; \
 	fi
+subdir-uninstall-qemu-xen-traditional-dir:
+	rm -f $(D)$(bindir)/qemu-nbd*
+	rm -f $(D)$(bindir)/qemu-img*
 
 # External target: qemu-xen
 qemu-xen-dir-find:
@@ -317,6 +287,8 @@ subdir-clean-qemu-xen-dir:
 		$(MAKE) -C qemu-xen-build clean; \
 	fi
 
+subdir-uninstall-qemu-xen-dir: ;
+
 subdir-clean-debugger/gdbsx subdir-distclean-debugger/gdbsx: .phony
 	$(MAKE) -C debugger/gdbsx clean
 
@@ -326,12 +298,17 @@ subdir-install-debugger/gdbsx: .phony
 subdir-all-debugger/gdbsx: .phony
 	$(MAKE) -C debugger/gdbsx all
 
+subdir-uninstall-debugger/gdbsx: .phony
+	$(MAKE) -C debugger/gdbsx uninstall
 
 subdir-clean-debugger/kdd subdir-distclean-debugger/kdd: .phony
 	$(MAKE) -C debugger/kdd clean
 
 subdir-install-debugger/kdd: .phony
 	$(MAKE) -C debugger/kdd install
+
+subdir-uninstall-debugger/kdd: .phony
+	$(MAKE) -C debugger/kdd uninstall
 
 subdir-all-debugger/kdd: .phony
 	$(MAKE) -C debugger/kdd all

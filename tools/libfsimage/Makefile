@@ -9,8 +9,8 @@ else
     SUBDIRS-y += ext2fs
 endif
 
-.PHONY: all clean install
-all clean install: %: subdirs-%
+.PHONY: all clean install uninstall
+all clean install uninstall: %: subdirs-%
 
 .PHONY: distclean
 distclean: clean

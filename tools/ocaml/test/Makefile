@@ -50,4 +50,6 @@ bins: $(PROGRAMS)
 
 install:
 
+uninstall:
+
 include $(OCAML_TOPLEVEL)/Makefile.rules

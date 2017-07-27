@@ -75,6 +75,15 @@ install: build
 	$(INSTALL_DATA) include/xenforeignmemory.h $(DESTDIR)$(includedir)
 	$(INSTALL_DATA) xenforeignmemory.pc $(DESTDIR)$(PKG_INSTALLDIR)
 
+.PHONY: uninstall
+uninstall:
+	rm -f $(DESTDIR)$(PKG_INSTALLDIR)/xenforeignmemory.pc
+	rm -f $(DESTDIR)$(includedir)/xenforeignmemory.h
+	rm -f $(DESTDIR)$(libdir)/libxenforeignmemory.so
+	rm -f $(DESTDIR)$(libdir)/libxenforeignmemory.so.$(MAJOR)
+	rm -f $(DESTDIR)$(libdir)/libxenforeignmemory.so.$(MAJOR).$(MINOR)
+	rm -f $(DESTDIR)$(libdir)/libxenforeignmemory.a
+
 .PHONY: TAGS
 TAGS:
 	etags -t *.c *.h

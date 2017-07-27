@@ -21,6 +21,9 @@ build:
 .PHONY: install
 install: all install-readmes install-configs
 
+.PHONY: uninstall
+uninstall: uninstall-readmes uninstall-configs
+
 .PHONY: install-readmes
 install-readmes:
 	[ -d $(DESTDIR)$(XEN_CONFIG_DIR) ] || \
@@ -29,6 +32,10 @@ install-readmes:
 	    do [ -e $(DESTDIR)$(XEN_CONFIG_DIR)/$$i ] || \
 	    $(INSTALL_DATA) $$i $(DESTDIR)$(XEN_CONFIG_DIR); \
 	done
+
+.PHONY: uninstall-readmes
+uninstall-readmes:
+	rm -f $(addprefix $(DESTDIR)$(XEN_CONFIG_DIR)/, $(XEN_READMES))
 
 .PHONY: install-configs
 install-configs: $(XEN_CONFIGS)
@@ -40,6 +47,10 @@ install-configs: $(XEN_CONFIGS)
 	    do [ -e $(DESTDIR)$(XEN_CONFIG_DIR)/$$i ] || \
 	    $(INSTALL_DATA) $$i $(DESTDIR)$(XEN_CONFIG_DIR); \
 	done
+
+.PHONY: uninstall-configs
+uninstall-configs:
+	rm -f $(addprefix $(DESTDIR)$(XEN_CONFIG_DIR)/, $(XEN_CONFIGS))
 
 .PHONY: clean
 clean:

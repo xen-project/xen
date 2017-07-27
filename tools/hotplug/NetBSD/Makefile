@@ -19,6 +19,9 @@ build:
 .PHONY: install
 install: install-scripts install-rcd
 
+.PHONY: uninstall
+uninstall: uninstall-scripts uninstall-rcd
+
 .PHONY: install-scripts
 install-scripts:
 	$(INSTALL_DIR) $(DESTDIR)$(XEN_SCRIPT_DIR)
@@ -31,6 +34,11 @@ install-scripts:
 	   $(INSTALL_DATA) $$i $(DESTDIR)$(XEN_SCRIPT_DIR); \
 	done
 
+.PHONY: uninstall-scripts
+uninstall-scripts:
+	rm -f $(addprefix $(DESTDIR)$(XEN_SCRIPT_DIR)/, $(XEN_SCRIPTS))
+	rm -f $(addprefix $(DESTDIR)$(XEN_SCRIPT_DIR)/, $(XEN_SCRIPT_DATA))
+
 .PHONY: install-rcd
 install-rcd:
 	$(INSTALL_DIR) $(DESTDIR)$(INITD_DIR)
@@ -39,6 +47,11 @@ install-rcd:
 	   $(INSTALL_PROG) $$i $(DESTDIR)$(INITD_DIR); \
 	done
 	$(INSTALL_DATA) ../common/hotplugpath.sh $(DESTDIR)$(INITD_DIR)/xen-hotplugpath.sh
+
+.PHONY: uninstall-rcd
+uninstall-rcd:
+	rm -f $(subst rc.d,$(DESTDIR)$(INITD_DIR),$(XEN_RCD_PROG))
+	rm -f $(DESTDIR)$(INITD_DIR)/xen-hotplugpath.sh
 
 .PHONY: clean
 clean:

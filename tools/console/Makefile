@@ -49,4 +49,9 @@ install: $(BIN)
 	$(INSTALL_DIR) $(DESTDIR)$(LIBEXEC_BIN)
 	$(INSTALL_PROG) xenconsole $(DESTDIR)$(LIBEXEC_BIN)
 
+.PHONY: uninstall
+uninstall:
+	rm -f $(DESTDIR)$(LIBEXEC_BIN)/xenconsole
+	rm -f $(DESTDIR)$(sbindir)/xenconsoled
+
 -include $(DEPS)

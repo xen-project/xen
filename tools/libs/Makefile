@@ -9,4 +9,4 @@ SUBDIRS-y += call
 SUBDIRS-y += foreignmemory
 SUBDIRS-y += devicemodel
 
-all clean install distclean: %: subdirs-%
+all clean install distclean uninstall: %: subdirs-%

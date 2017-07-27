@@ -33,6 +33,15 @@ endif
 	$(INSTALL_PYTHON_PROG) $(SCRIPTS) $(DESTDIR)$(bindir)
 	[ -z "$(LIBBIN)" ] || $(INSTALL_PROG) $(LIBBIN) $(DESTDIR)$(LIBEXEC_BIN)
 
+.PHONY: uninstall
+uninstall:
+	rm -f $(addprefix $(DESTDIR)$(LIBEXEC_BIN)/, $(LIBBIN))
+	rm -f $(addprefix $(DESTDIR)$(bindir)/, $(SCRIPTS))
+	rm -f $(addprefix $(DESTDIR)$(sbindir)/, $(SBIN))
+ifneq ($(BIN),)
+	rm -f $(addprefix $(DESTDIR)$(bindir)/, $(BIN))
+endif
+
 .PHONY: clean
 clean:
 	$(RM) *.a *.so *.o *.rpm $(BIN) $(SBIN) $(LIBBIN) $(DEPS)

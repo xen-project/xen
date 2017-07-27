@@ -10,6 +10,7 @@ all: dist
 SUBSYSTEMS?=xen tools stubdom docs
 TARGS_DIST=$(patsubst %, dist-%, $(SUBSYSTEMS))
 TARGS_INSTALL=$(patsubst %, install-%, $(SUBSYSTEMS))
+TARGS_UNINSTALL=$(patsubst %, uninstall-%, $(SUBSYSTEMS))
 TARGS_BUILD=$(patsubst %, build-%, $(SUBSYSTEMS))
 TARGS_CLEAN=$(patsubst %, clean-%, $(SUBSYSTEMS))
 TARGS_DISTCLEAN=$(patsubst %, distclean-%, $(SUBSYSTEMS))
@@ -303,11 +304,26 @@ help:
 	@echo '  [ this documentation is sadly not complete ]'
 
 # Use this target with extreme care!
+
+.PHONY: uninstall-xen
+uninstall-xen:
+	$(MAKE) -C xen uninstall
+
+.PHONY: uninstall-tools
+uninstall-tools:
+	$(MAKE) -C tools uninstall
+
+.PHONY: uninstall-stubdom
+uninstall-stubdom:
+	$(MAKE) -C stubdom uninstall
+
+.PHONY: uninstall-docs
+uninstall-docs:
+	$(MAKE) -C docs uninstall
+
 .PHONY: uninstall
 uninstall: D=$(DESTDIR)
-uninstall:
-	$(MAKE) -C xen uninstall
-	make -C tools uninstall
+uninstall: uninstall-tools-public-headers $(TARGS_UNINSTALL)
 	rm -rf $(D)/boot/tboot*
 
 .PHONY: xenversion

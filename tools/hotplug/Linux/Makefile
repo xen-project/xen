@@ -47,6 +47,9 @@ build:
 .PHONY: install
 install: install-initd install-scripts subdirs-install
 
+.PHONY: uninstall
+uninstall: uninstall-initd uninstall-scripts subdirs-uninstall
+
 # See docs/misc/distro_mapping.txt for INITD_DIR location
 .PHONY: install-initd
 install-initd:
@@ -61,6 +64,17 @@ install-initd:
 	$(INSTALL_PROG) $(XENDRIVERDOMAIN_INITD) $(DESTDIR)$(INITD_DIR)
 	$(INSTALL_PROG) init.d/xen-watchdog $(DESTDIR)$(INITD_DIR)
 
+.PHONY: uninstall-initd
+uninstall-initd:
+	rm -f $(DESTDIR)$(INITD_DIR)/xen-watchdog
+	rm -f $(addprefix $(DESTDIR)$(INITD_DIR)/, $(XENDRIVERDOMAIN_INITD))
+	rm -f $(addprefix $(DESTDIR)$(INITD_DIR)/, $(XENDRIVERDOMAIN_INITD))
+	rm -f $(addprefix $(DESTDIR)$(SYSCONFIG_DIR)/xencommons/, $(XENCOMMONS_SYSCONFIG))
+	rm -f $(addprefix $(DESTDIR)$(INITD_DIR)/, $(XENCOMMONS_INITD))
+	rm -f $(addprefix $(DESTDIR)$(SYSCONFIG_DIR)/xendomains/, $(XENDOMAINS_SYSCONFIG))
+	rm -f $(addprefix $(DESTDIR)$(INITD_DIR)/, $(XENDOMAINS_INITD))
+	rm -f $(addprefix $(DESTDIR)$(LIBEXEC_BIN)/, $(XENDOMAINS_LIBEXEC))
+
 .PHONY: install-scripts
 install-scripts:
 	[ -d $(DESTDIR)$(XEN_SCRIPT_DIR) ] || \
@@ -73,6 +87,11 @@ install-scripts:
 	    do \
 	    $(INSTALL_DATA) $$i $(DESTDIR)$(XEN_SCRIPT_DIR); \
 	done
+
+.PHONY: uninstall-scripts
+uninstall-scripts:
+	rm -f $(addprefix $(DESTDIR)$(XEN_SCRIPT_DIR)/, $(XEN_SCRIPTS))
+	rm -f $(addprefix $(DESTDIR)$(XEN_SCRIPT_DIR)/, $(XEN_SCRIPT_DATA))
 
 .PHONY: clean
 clean: subdirs-clean

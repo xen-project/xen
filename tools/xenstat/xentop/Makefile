@@ -14,8 +14,8 @@ XEN_ROOT=$(CURDIR)/../../..
 include $(XEN_ROOT)/tools/Rules.mk
 
 ifneq ($(XENSTAT_XENTOP),y)
-.PHONY: all install xentop
-all install xentop:
+.PHONY: all install xentop uninstall
+all install xentop uninstall:
 else
 
 CFLAGS += -DGCC_PRINTF -Werror $(CFLAGS_libxenstat)
@@ -33,6 +33,10 @@ all: xentop
 install: xentop
 	$(INSTALL_DIR) $(DESTDIR)$(sbindir)
 	$(INSTALL_PROG) xentop $(DESTDIR)$(sbindir)/xentop
+
+.PHONY: uninstall
+uninstall:
+	rm -f $(DESTDIR)$(sbindir)/xentop
 
 endif
 

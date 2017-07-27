@@ -74,6 +74,15 @@ install: build
 	$(INSTALL_DATA) include/xenevtchn.h $(DESTDIR)$(includedir)
 	$(INSTALL_DATA) xenevtchn.pc $(DESTDIR)$(PKG_INSTALLDIR)
 
+.PHONY: uninstall
+uninstall:
+	rm -f $(DESTDIR)$(PKG_INSTALLDIR)/xenevtchn.pc
+	rm -f $(DESTDIR)$(includedir)/xenevtchn.h
+	rm -f $(DESTDIR)$(libdir)/libxenevtchn.so
+	rm -f $(DESTDIR)$(libdir)/libxenevtchn.so.$(MAJOR)
+	rm -f $(DESTDIR)$(libdir)/libxenevtchn.so.$(MAJOR).$(MINOR)
+	rm -f $(DESTDIR)$(libdir)/libxenevtchn.a
+
 .PHONY: TAGS
 TAGS:
 	etags -t *.c *.h

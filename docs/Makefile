@@ -92,7 +92,7 @@ distclean: clean
 
 # Top level install targets
 
-.PHONY: man-pages install-man-pages clean-man-pages
+.PHONY: man-pages install-man-pages clean-man-pages uninstall-man-pages
 
 # Metarules for generating manpages.  Run with $(1) substitued for section
 define GENERATE_MANPAGE_RULES
@@ -165,10 +165,16 @@ install-man$(1)-pages: man$(1)-pages
 clean-man$(1)-pages:
 	rm -rf man$(1)
 
+# Uninstall
+.PHONY: uninstall-man$(1)-pages
+uninstall-man$(1)-pages:
+	rm -f $(addprefix $(DESTDIR)$(mandir)/man$(1)/, $(filter-out %.pod.$(1) %.markdown.$(1), $(notdir $(DOC_MAN$(1)))))
+
 # Link buld/install/clean to toplevel rules
 man-pages: man$(1)-pages
 install-man-pages: install-man$(1)-pages
 clean-man-pages: clean-man$(1)-pages
+uninstall-man-pages: uninstall-man$(1)-pages
 
 endef
 
@@ -182,6 +188,13 @@ install-html: html txt figs
 
 .PHONY: install
 install: install-man-pages install-html
+
+.PHONY: uninstall-html
+uninstall-html:
+	rm -rf $(DESTDIR)$(docdir)
+
+.PHONY: uninstall
+uninstall: uninstall-man-pages uninstall-html
 
 # Individual file build targets
 html/index.html: $(DOC_HTML) $(CURDIR)/gen-html-index INDEX

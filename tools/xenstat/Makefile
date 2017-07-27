@@ -5,6 +5,6 @@ SUBDIRS :=
 SUBDIRS += libxenstat
 SUBDIRS += xentop
 
-.PHONY: all install clean distclean
+.PHONY: all install clean distclean uninstall
 
-all install clean distclean: %: subdirs-%
+all install clean distclean uninstall: %: subdirs-%

@@ -51,5 +51,7 @@ clean:
 .PHONY: install
 install: all
 
+.PHONY: uninstall
+
 .PHONY: afl
 afl: afl-harness

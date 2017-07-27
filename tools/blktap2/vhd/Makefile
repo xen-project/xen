@@ -41,11 +41,15 @@ install: all
 	$(INSTALL_DIR) -p $(DESTDIR)$(INST_DIR)
 	$(INSTALL_PROG) $(IBIN) $(DESTDIR)$(INST_DIR)
 
+uninstall:
+	$(MAKE) subdirs-uninstall
+	rm -f $(addprefix $(DESTDIR)$(INST_DIR)/, $(IBIN))
+
 clean: subdirs-clean
 	rm -rf *.o *~ $(DEPS) $(IBIN)
 
 distclean: clean
 
-.PHONY: all build clean distclean install vhd-util vhd-update
+.PHONY: all build clean distclean install uninstall vhd-util vhd-update
 
 -include $(DEPS)

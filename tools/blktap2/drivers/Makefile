@@ -105,9 +105,12 @@ install: all
 	$(INSTALL_DIR) -p $(DESTDIR)$(INST_DIR)
 	$(INSTALL_PROG) $(IBIN) $(LOCK_UTIL) $(QCOW_UTIL) $(DESTDIR)$(INST_DIR)
 
+uninstall:
+	rm -f $(addprefix $(DESTDIR)$(INST_DIR)/, $(IBIN) $(LOCK_UTIL) $(QCOW_UTIL))
+
 clean:
 	rm -rf .*.d *.o *~ xen TAGS $(IBIN) $(LIB) $(LOCK_UTIL) $(QCOW_UTIL)
 
 distclean: clean
 
-.PHONY: clean install distclean
+.PHONY: clean install distclean uninstall

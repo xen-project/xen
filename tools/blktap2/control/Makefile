@@ -92,8 +92,16 @@ clean:
 	rm -f *~
 	rm -f xenblktapctl.pc
 
+uninstall:
+	rm -f $(DESTDIR)$(PKG_INSTALLDIR)/xenblktapctl.pc
+	rm -f $(DESTDIR)$(libdir)/$(LIBSONAME)
+	rm -f $(DESTDIR)$(libdir)/$(LIBNAME).so
+	rm -f $(addprefix $(DESTDIR)$(libdir)/, $(LIB_SHARED))
+	rm -f $(addprefix $(DESTDIR)$(libdir)/, $(LIB_STATIC))
+	rm -f $(addprefix $(DESTDIR)$(sbindir)/, $(IBIN))
+
 distclean: clean
 
-.PHONY: all build clean distclean install
+.PHONY: all build clean distclean install uninstall
 
 -include $(DEPS)

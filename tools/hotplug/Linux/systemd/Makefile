@@ -38,6 +38,12 @@ install: $(ALL_XEN_SYSTEMD)
 	$(INSTALL_DATA) *.mount $(DESTDIR)$(XEN_SYSTEMD_DIR)
 	$(INSTALL_DATA) *.conf $(DESTDIR)$(XEN_SYSTEMD_MODULES_LOAD)
 
+.PHONY: uninstall
+uninstall:
+	rm -f $(DESTDIR)$(XEN_SYSTEMD_MODULES_LOAD)/*.conf
+	rm -f $(DESTDIR)$(XEN_SYSTEMD_DIR)/*.mount
+	rm -f $(DESTDIR)$(XEN_SYSTEMD_DIR)/*.service
+
 $(XEN_SYSTEMD_MODULES):
 	rm -f $@.tmp
 	for mod in $(LINUX_BACKEND_MODULES) ; do \

@@ -28,12 +28,15 @@ install: all
 	$(INSTALL_DIR) $(DESTDIR)$(LIBEXEC_BIN)
 	$(INSTALL_PROG) $(IBINS) $(DESTDIR)$(LIBEXEC_BIN)
 
+uninstall:
+	rm -f $(addprefix $(DESTDIR)$(LIBEXEC_BIN)/, $(IBINS))
+
 clean:
 	rm -f *.o *~ $(DEPS) xen TAGS $(IBINS) $(LIB)
 
 distclean: clean
 
-.PHONY: clean install distclean
+.PHONY: clean install distclean uninstall
 
 .PHONY: TAGS
 TAGS:

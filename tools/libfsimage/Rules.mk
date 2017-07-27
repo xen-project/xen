@@ -18,6 +18,13 @@ fs-install: fs-all
 	$(INSTALL_DIR) $(DESTDIR)$(FSDIR)/$(FS)
 	$(INSTALL_PROG) $(FSLIB) $(DESTDIR)$(FSDIR)/$(FS)
 
+.PHONY: fs-uninstall
+fs-uninstall:
+	rm -f $(addprefix $(DESTDIR)$(FSDIR)/$(FS)/, $(FSLIB))
+	if [ -d $(DESTDIR)$(FSDIR)/$(FS) ]; then \
+		rmdir $(DESTDIR)$(FSDIR)/$(FS); \
+	fi
+
 $(FSLIB): $(PIC_OBJS)
 	$(CC) $(LDFLAGS) $(SHLIB_LDFLAGS) -o $@ $^ -lfsimage $(FS_LIBDEPS) $(APPEND_LDFLAGS)
 

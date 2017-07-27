@@ -21,6 +21,10 @@ clean:
 .PHONY: distclean
 distclean: clean
 
+.PHONY: uninstall
+uninstall:
+	rm -f $(DESTDIR)$(sbindir)/xenpmd
+
 xenpmd: xenpmd.o Makefile
 	$(CC) $(LDFLAGS) $< -o $@ $(LDLIBS) $(APPEND_LDFLAGS)
 

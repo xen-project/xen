@@ -203,6 +203,22 @@ install: build
 	$(INSTALL_DATA) xencontrol.pc $(DESTDIR)$(PKG_INSTALLDIR)
 	$(INSTALL_DATA) xenguest.pc $(DESTDIR)$(PKG_INSTALLDIR)
 
+.PHONY: uninstall
+uninstall:
+	rm -f $(DESTDIR)$(PKG_INSTALLDIR)/xenguest.pc
+	rm -f $(DESTDIR)$(includedir)/xenguest.h
+	rm -f $(DESTDIR)$(libdir)/libxenguest.so
+	rm -f $(DESTDIR)$(libdir)/libxenguest.so.$(MAJOR)
+	rm -f $(DESTDIR)$(libdir)/libxenguest.so.$(MAJOR).$(MINOR)
+	rm -f $(DESTDIR)$(libdir)/libxenguest.a
+	rm -f $(DESTDIR)$(PKG_INSTALLDIR)/xencontrol.pc
+	rm -f $(DESTDIR)$(includedir)/xenctrl.h
+	rm -f $(DESTDIR)$(includedir)/xenctrl_compat.h
+	rm -f $(DESTDIR)$(libdir)/libxenctrl.so
+	rm -f $(DESTDIR)$(libdir)/libxenctrl.so.$(MAJOR)
+	rm -f $(DESTDIR)$(libdir)/libxenctrl.so.$(MAJOR).$(MINOR)
+	rm -f $(DESTDIR)$(libdir)/libxenctrl.a
+
 .PHONY: TAGS
 TAGS:
 	etags -t *.c *.h

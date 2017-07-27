@@ -70,6 +70,15 @@ install: all
 	$(INSTALL_DATA) libxenvchan.a $(DESTDIR)$(libdir)
 	$(INSTALL_DATA) xenvchan.pc $(DESTDIR)$(PKG_INSTALLDIR)
 
+.PHONY: uninstall
+uninstall:
+	rm -f $(DESTDIR)$(PKG_INSTALLDIR)/xenvchan.pc
+	rm -f $(DESTDIR)$(libdir)/libxenvchan.a
+	rm -f $(DESTDIR)$(includedir)/libxenvchan.h
+	rm -f $(DESTDIR)$(libdir)/libxenvchan.so
+	rm -f $(DESTDIR)$(libdir)/libxenvchan.so.$(MAJOR)
+	rm -f $(DESTDIR)$(libdir)/libxenvchan.so.$(MAJOR).$(MINOR)
+
 .PHONY: clean
 clean:
 	$(RM) -f *.o *.opic *.so* *.a vchan-node1 vchan-node2 $(DEPS)

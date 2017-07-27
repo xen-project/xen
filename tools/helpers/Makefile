@@ -41,6 +41,13 @@ ifeq ($(CONFIG_Linux),y)
 	$(INSTALL_PROG) init-xenstore-domain $(DESTDIR)$(LIBEXEC_BIN)
 endif
 
+.PHONY: uninstall
+uninstall:
+ifeq ($(CONFIG_Linux),y)
+	rm -f $(DESTDIR)$(LIBEXEC_BIN)/init-xenstore-domain
+endif
+	rm -f $(DESTDIR)$(LIBEXEC_BIN)/xen-init-dom0
+
 .PHONY: clean
 clean:
 	$(RM) -f *.o $(PROGS) $(DEPS) _paths.h

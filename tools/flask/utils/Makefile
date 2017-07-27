@@ -55,4 +55,8 @@ install: all
 	$(INSTALL_DIR) $(DESTDIR)$(sbindir)
 	$(INSTALL_PROG) $(CLIENTS) $(DESTDIR)$(sbindir)
 
+.PHONY: uninstall
+uninstall:
+	rm -f $(addprefix $(DESTDIR)$(sbindir)/, $(CLIENTS))
+
 -include $(DEPS)
