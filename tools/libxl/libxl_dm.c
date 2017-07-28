@@ -1868,13 +1868,17 @@ void libxl__spawn_stub_dm(libxl__egc *egc, libxl__stub_dm_spawn_state *sdss)
     ret = libxl__domain_build_info_setdefault(gc, &dm_config->b_info);
     if (ret) goto out;
 
-    GCNEW(vfb);
-    GCNEW(vkb);
-    libxl__vfb_and_vkb_from_hvm_guest_config(gc, guest_config, vfb, vkb);
-    dm_config->vfbs = vfb;
-    dm_config->num_vfbs = 1;
-    dm_config->vkbs = vkb;
-    dm_config->num_vkbs = 1;
+    if (libxl_defbool_val(guest_config->b_info.u.hvm.vnc.enable)
+        || libxl_defbool_val(guest_config->b_info.u.hvm.spice.enable)
+        || libxl_defbool_val(guest_config->b_info.u.hvm.sdl.enable)) {
+        GCNEW(vfb);
+        GCNEW(vkb);
+        libxl__vfb_and_vkb_from_hvm_guest_config(gc, guest_config, vfb, vkb);
+        dm_config->vfbs = vfb;
+        dm_config->num_vfbs = 1;
+        dm_config->vkbs = vkb;
+        dm_config->num_vkbs = 1;
+    }
 
     stubdom_state->pv_kernel.path
         = libxl__abs_path(gc, "ioemu-stubdom.gz", libxl__xenfirmwaredir_path());
@@ -1959,6 +1963,7 @@ static void spawn_stub_launch_dm(libxl__egc *egc,
     libxl__domain_build_state *const d_state = sdss->dm.build_state;
     libxl__domain_build_state *const stubdom_state = &sdss->dm_state;
     uint32_t dm_domid = sdss->pvqemu.guest_domid;
+    int need_qemu;
 
     if (ret) {
         LOGD(ERROR, guest_domid, "error connecting disk devices");
@@ -1975,12 +1980,16 @@ static void spawn_stub_launch_dm(libxl__egc *egc,
         if (ret)
             goto out;
     }
-    ret = libxl__device_vfb_add(gc, dm_domid, &dm_config->vfbs[0]);
-    if (ret)
-        goto out;
-    ret = libxl__device_vkb_add(gc, dm_domid, &dm_config->vkbs[0]);
-    if (ret)
-        goto out;
+    if (dm_config->num_vfbs) {
+        ret = libxl__device_vfb_add(gc, dm_domid, &dm_config->vfbs[0]);
+        if (ret)
+            goto out;
+    }
+    if (dm_config->num_vkbs) {
+        ret = libxl__device_vkb_add(gc, dm_domid, &dm_config->vkbs[0]);
+        if (ret)
+            goto out;
+    }
 
     if (guest_config->b_info.u.hvm.serial)
         num_console++;
@@ -1988,7 +1997,6 @@ static void spawn_stub_launch_dm(libxl__egc *egc,
     console = libxl__calloc(gc, num_console, sizeof(libxl__device_console));
 
     for (i = 0; i < num_console; i++) {
-        libxl__device device;
         console[i].devid = i;
         console[i].consback = LIBXL__CONSOLE_BACKEND_IOEMU;
         /* STUBDOM_CONSOLE_LOGGING (console 0) is for minios logging
@@ -2005,6 +2013,9 @@ static void spawn_stub_launch_dm(libxl__egc *egc,
                 if (ret) goto out;
                 console[i].output = GCSPRINTF("file:%s", filename);
                 free(filename);
+                /* will be changed back to LIBXL__CONSOLE_BACKEND_IOEMU if qemu
+                 * will be in use */
+                console[i].consback = LIBXL__CONSOLE_BACKEND_XENCONSOLED;
                 break;
             case STUBDOM_CONSOLE_SAVE:
                 console[i].output = GCSPRINTF("file:%s",
@@ -2019,6 +2030,14 @@ static void spawn_stub_launch_dm(libxl__egc *egc,
                 console[i].output = "pty";
                 break;
         }
+    }
+
+    need_qemu = libxl__need_xenpv_qemu(gc, dm_config);
+
+    for (i = 0; i < num_console; i++) {
+        libxl__device device;
+        if (need_qemu)
+            console[i].consback = LIBXL__CONSOLE_BACKEND_IOEMU;
         ret = libxl__device_console_add(gc, dm_domid, &console[i],
                         i == STUBDOM_CONSOLE_LOGGING ? stubdom_state : NULL,
                         &device);
@@ -2032,7 +2051,12 @@ static void spawn_stub_launch_dm(libxl__egc *egc,
     sdss->pvqemu.build_state = &sdss->dm_state;
     sdss->pvqemu.callback = spawn_stubdom_pvqemu_cb;
 
-    libxl__spawn_local_dm(egc, &sdss->pvqemu);
+    if (!need_qemu) {
+        /* If dom0 qemu not needed, do not launch it */
+        spawn_stubdom_pvqemu_cb(egc, &sdss->pvqemu, 0);
+    } else {
+        libxl__spawn_local_dm(egc, &sdss->pvqemu);
+    }
 
     return;
 
