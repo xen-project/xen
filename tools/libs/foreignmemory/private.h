@@ -45,6 +45,37 @@ void *compat_mapforeign_batch(xenforeignmem_handle *fmem, uint32_t dom,
                               xen_pfn_t *arr, int num);
 #endif
 
+struct xenforeignmemory_resource_handle {
+    domid_t domid;
+    unsigned int type;
+    unsigned int id;
+    unsigned long frame;
+    unsigned long nr_frames;
+    void *addr;
+    int prot;
+    int flags;
+};
+
+#ifndef __linux__
+static inline int osdep_xenforeignmemory_map_resource(
+    xenforeignmemory_handle *fmem, xenforeignmemory_resource_handle *fres)
+{
+    errno = EOPNOTSUPP;
+    return -1;
+}
+
+static inline int osdep_xenforeignmemory_unmap_resource(
+    xenforeignmemory_handle *fmem, xenforeignmemory_resource_handle *fres)
+{
+    return 0;
+}
+#else
+int osdep_xenforeignmemory_map_resource(
+    xenforeignmemory_handle *fmem, xenforeignmemory_resource_handle *fres);
+int osdep_xenforeignmemory_unmap_resource(
+    xenforeignmemory_handle *fmem, xenforeignmemory_resource_handle *fres);
+#endif
+
 #define PERROR(_f...) \
     xtl_log(fmem->logger, XTL_ERROR, errno, "xenforeignmemory", _f)
 

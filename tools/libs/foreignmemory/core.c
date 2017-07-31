@@ -17,6 +17,8 @@
 #include <assert.h>
 #include <errno.h>
 
+#include <sys/mman.h>
+
 #include "private.h"
 
 static int all_restrict_cb(Xentoolcore__Active_Handle *ah, domid_t domid) {
@@ -133,6 +135,57 @@ int xenforeignmemory_restrict(xenforeignmemory_handle *fmem,
                               domid_t domid)
 {
     return osdep_xenforeignmemory_restrict(fmem, domid);
+}
+
+xenforeignmemory_resource_handle *xenforeignmemory_map_resource(
+    xenforeignmemory_handle *fmem, domid_t domid, unsigned int type,
+    unsigned int id, unsigned long frame, unsigned long nr_frames,
+    void **paddr, int prot, int flags)
+{
+    xenforeignmemory_resource_handle *fres;
+    int rc;
+
+    /* Check flags only contains POSIX defined values */
+    if ( flags & ~(MAP_SHARED | MAP_PRIVATE) )
+    {
+        errno = EINVAL;
+        return NULL;
+    }
+
+    fres = calloc(1, sizeof(*fres));
+    if ( !fres )
+    {
+        errno = ENOMEM;
+        return NULL;
+    }
+
+    fres->domid = domid;
+    fres->type = type;
+    fres->id = id;
+    fres->frame = frame;
+    fres->nr_frames = nr_frames;
+    fres->addr = *paddr;
+    fres->prot = prot;
+    fres->flags = flags;
+
+    rc = osdep_xenforeignmemory_map_resource(fmem, fres);
+    if ( rc )
+    {
+        free(fres);
+        fres = NULL;
+    } else
+        *paddr = fres->addr;
+
+    return fres;
+}
+
+int xenforeignmemory_unmap_resource(
+    xenforeignmemory_handle *fmem, xenforeignmemory_resource_handle *fres)
+{
+    int rc = osdep_xenforeignmemory_unmap_resource(fmem, fres);
+
+    free(fres);
+    return rc;
 }
 
 /*

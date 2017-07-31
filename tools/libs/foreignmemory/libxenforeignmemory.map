@@ -14,3 +14,8 @@ VERS_1.2 {
 	global:
 		xenforeignmemory_map2;
 } VERS_1.1;
+VERS_1.3 {
+	global:
+		xenforeignmemory_map_resource;
+		xenforeignmemory_unmap_resource;
+} VERS_1.2;
