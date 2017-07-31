@@ -1,0 +1,594 @@
+% Xen Release Management
+% Wei Liu <<wei.liu2@citrix.com>>
+% Revision 1
+
+# Motivation
+
+Over the years we have had different people signing up as the Release Manager
+of Xen. It would be rather wasteful if every new Release Manager has to go over
+everything and tripped over by the same mistakes again and again.
+
+This file intends to document the process of managing a Xen release. It is
+mainly written for Release Manager, but other roles (contributors,
+maintainers and committers) are also encouraged to read this document, so
+that they can have an idea what to expect from the Release Manager.
+
+# Xen release cycle
+
+The Xen hypervisor project now releases twice a year, at the beginning of
+June and the beginning of December. The actual release date depends on a lot
+of factors.
+
+We can roughly divide one release into two periods. The development period
+and the freeze period. The former is 4 months long and the latter is about 2
+months long.
+
+During development period, contributors submit patches to be reviewed and
+committed into xen.git. All feature patches must be committed before a date,
+which is normally called the "cut-off date", after which the freeze period
+starts. There will be a date before which all patches that wish to be merged
+for the release should be posted -- it is normally called the "last posting
+date" and it is normally two weeks before the "cut-off date".
+
+During freeze period, the tree is closed for new features. Only bug fixes are
+accepted. This period can be shorter or longer than 2 months. If it ends up
+longer than 2 months, it eats into the next development period.
+
+Here is a conjured up example (use ```cal 2017``` to get an idea):
+
+* Development period: 2017 June 11 - 2017 September 29
+    * the "cut-off date" is 2017 September 29
+    * the "last posting date" is 2017 September 15
+* Freeze period: 2017 October 2 - 2017 December 7
+    * the anticipated release date is 2017 December 7
+
+# The different roles in a Xen release
+
+## Release Manager
+
+A trusted developer in the community that owns the release process. The major
+goal of the Release Manager is to make sure a Xen release has high quality
+and doesn't slip too much.
+
+The Release Manager will not see much workload during development period, but
+expects to see increasing workload during the freeze period until the final
+release. He or she is expected to keep track of issues, arrange RCs,
+negotiate with relevant stakeholders, balance the need from various parties
+and make difficult decisions when necessary.
+
+The Release Manager essentially owns xen-unstable branch during the freeze
+period. The Committers will act on the wishes of the Release Manager during
+that time.
+
+## Maintainers
+
+A group of trusted developers who are responsible for certain components in
+xen.git. They are expected to respond to patches / questions with regard to
+their components in a timely manner, especially during the freeze period.
+
+## Committers
+
+A group of trusted maintainers who can commit to xen.git. During the
+development window they normally push things as they see fit. During the
+freeze period they transfer xen-unstable branch ownership and act on the
+wishes of the Release Manager. That normally means they need to have an
+Release Ack in order to push a patch.
+
+## Contributors
+
+Contributors are also expected to respond quickly to any issues regarding the
+code they submitted during development period. Failing that, the Release
+Manager might decide to revert the changes, declare feature unsupported or
+take any action he / she deems appropriate.
+
+## The Security Team
+
+The Security Team operates independently. The visibility might be rather
+limited due to the sensitive nature of security work. The best action the
+Release Manager can take is to set aside some time for potential security
+issues to be fixed.
+
+## The Release Technician
+
+The Release Technician is the person who tags various trees, prepares tarball
+etc. He or she acts on the wishes of the Release Manager. Please make sure
+the communication is as clear as it can be.
+
+## The Community Manager
+
+The Community Manager owns xenproject.org infrastructure. He or she is
+responsible for updating various web archives, updating wiki pages and
+coordinating with the PR Personnel.
+
+## The PR Personnel
+
+They are responsible for coordinating with external reporters to publish Xen
+release announcement. The Release Manager should be absolutely sure the
+release is going out on a particular date before giving them the signal to
+proceed, because there is a point of no return once they schedule a date with
+external reporters.
+
+# What happens during a release
+
+## Development period
+
+Send out monthly update email. The email contains the timeline of the
+release, the major work items and any other information the Release Manager
+sees fit. Reminders should also be sent one week before important dates (see
+above, "last posting date" and "cut-off date"). Please consider adding
+relevant events to your calendar.
+
+Occasionally check the status of the xen-unstable branch, make sure it gets
+timely pushes to master.
+
+## Freeze period
+
+Before or at very early stage of the freeze period, agree with the Community
+Manager a schedule for RC test days.
+
+Once the freeze starts, the ownership of xen-unstable branch automatically
+transfers to the Release Manager. The Release Manager can say "not releasing
+now" because of too many bugs, "until someone fixes these", or "no more
+patches until X, Y, and Z happen".
+
+Here is a list of things to do for making RCs:
+
+1. Check the status of the tree. Ask the Release Technician to make an RC if
+the tree is good.
+
+2. Send an email to xen-devel, xen-users and xen-announce to announce the RC.
+
+3. Branch and / or reopen the tree for further feature submission if
+appropriate.
+
+4. Collect and track any issues reported, determine their severity, prod
+relevant developers and maintainers to fix the issues.
+
+5. When patches to fix issues are posted, determine if the patches are good to
+be included.
+
+6. Go back to 1.
+
+It is normally OK in the early RCs that you hand back xen-unstable branch to
+committers so that they can commit bug fixes at will. As we approach late
+RCs, the standard for accepting a patch will get higher and higher. Please
+communicate clearly when committers can commit at will and when formal
+Release Ack is needed.
+
+At the same time, work with the Community Manager, PR Personnel and
+Contributors to gather a list of features for the release. Discuss the
+support status of new features with stakeholders. Help prepare the press
+release, write a blog post for the release.
+
+1. Collate a list of major changes: this should be done in collaboration
+between Release Manager, PR Personnel and key contributors. This should *not*
+be done on a public mailing list, to minimize the risk of release related
+media stories being published before the release date.
+
+2. PR Personnel will identify feature highlights, a theme for the press
+release, companies providing supporting quotes for the press release and
+media outlets we would want to reach out to and will manage the creation of
+the press release in private.
+
+3. The Community Manager will also draft blog post with the help of PR
+Personnel and Release Manager, which will be published under the name of the
+Release Manager.
+
+4. The Community Manager will create release related documentation such as
+Acknowledgements, Feature List, Man Pages and Release Notes on the wiki
+accessible via a release category. This can be done in public.
+
+5. PR Personnel will get stake-holder and Advisory Board approval for the
+press release (1-2 weeks before the release).
+
+
+When you think all pending issues are fixed and Xen is ready to be released
+from the last RC:
+
+1. Send out commit moratorium emails to committers@.
+
+2. Check all the trees (mini-os, qemu-trad, qemu-xen, seabios, ovmf etc).
+They have the correct commits and all security patches applied. There will be
+tools provided.
+
+3. Negotiate release date options with PR personnel. Typically we need 3-4
+days to line up press briefings with reporters under embargo. PR personnel
+will also need to consider industry events to ensure that PR is effective. PR
+releases typically done mid-week (Tuesday - Thursday).
+
+4. Select the release date.
+
+5. Check with relevant stake-holders (typically community manager) whether
+wiki documentation and PR is in good shape (for an example see
+https://wiki.xenproject.org/wiki/Category:Xen_4.9
+<https://wiki.xenproject.org/wiki/Category:Xen_4.9>)
+
+6. Obtain a formal go-ahead from
+
+    * the Community Manager
+    * the Release Technician
+
+    Ask them to dry-run their checklist and confirm everything is OK. If not,
+    arrange another RC and restart this checklist.
+
+7. Give PR Personnel final go-ahead, and instruct Release Technician to make
+release deliverables (tags and tarballs - will usually be in place the day
+before the release). At this point, PR collateral will be sent to reporters
+(typically 2-3 working days before the release date) and we cannot undo
+publications without questions being asked and risk of negative PR. It is
+acceptable to make a xen-devel@ announcement *before* the PR release date
+(blog, xen-announce@, press release).
+
+8. Make the announcement on various mailing list, publish the blog post.
+
+Allow for contingencies. It is not uncommon that some last minute (security or
+not) bugs are discovered. To provide a fix takes time, the test of the fix
+will also take time. Allow for at least 1 week from getting a fix to getting
+a push. For security bugs, coordinate with the Security Team to adjust the
+dates according to our security policy.
+
+## Hand over of Release Manager responsibility
+
+If there is a new Release Manager for the next release, make sure the
+following things happen for the new Release Manager.
+
+1. A JIRA (xenproject.atlassian.net) is created and proper permissions granted.
+2. Access to community test infrastructure is granted.
+3. Access to mailing list moderation panel is granted.
+4. An account for blog.xenproject.org is created.
+5. An account for wiki.xenproject.org is created.
+
+# Email templates and scripts
+
+Note: if you want specific actions from committers, please make sure you CC
+committers@.
+
+## RC emails
+
+```
+Subject: Xen X.Y rcZ
+
+Hi all,
+
+Xen X.Y rcZ is tagged. You can check that out from xen.git:
+
+git://xenbits.xen.org/xen.git X.Y.0-rcZ
+
+For your convenience there is also a tarball at:
+https://downloads.xenproject.org/release/xen/X.Y.0-rcZ/xen-X.Y.0-rcZ.tar.gz
+
+And the signature is at:
+https://downloads.xenproject.org/release/xen/X.Y.0-rcZ/xen-X.Y.0-rcZ.tar.gz.sig
+
+Please send bug reports and test reports to xen-devel@lists.xenproject.org.
+When sending bug reports, please CC relevant maintainers and me
+(abc@xyz.com).
+
+As a reminder, there will be another Xen Test Day.
+
+See instructions on: URL_TO_TEST_INSTRUCTIONS
+```
+
+## Forego control of the tree
+
+```
+Subject: No Release Ack needed before RcX
+
+Committers,
+
+The tree is in good state. No release ack is needed before RcX. Please commit
+bug fixes at will.
+
+$RM
+```
+
+## Commit moratorium
+
+```
+Subject: Commit moratorium for $REASON
+
+Committers,
+
+Please don't push any new patch to staging because $REASON.
+
+Another email will be sent once the moratorium is lifted.
+
+$RM
+```
+
+## Lift commit moratorium
+
+```
+Subject: Commit moratorium is lifted for $REASON
+
+Committers,
+
+The commit moratorium is lifted, please commit patches that are already
+Release-acked.
+
+$RM
+```
+
+## Reminder of last posting date
+
+```
+Subject: Last posting date for Xen X.Y is $DATE
+
+Hi all,
+
+The last posting date for Xen X.Y is $DATE. If you want your features to be
+included for the release, please make sure they are posted for the first
+time before $DATE.
+
+$RM
+```
+
+## Reminder of cut-off date
+
+```
+Subject: Cut-off date for Xen X.Y is $DATE
+
+Hi all,
+
+The cut-off date for Xen X.Y is $DATE. If you want your features to be
+included for the release, please make sure they are committed by $DATE.
+
+$RM
+```
+
+## Release announcement
+
+```
+ Subject: [ANNOUNCEMENT] Xen X.Y is released
+
+ Dear community members,
+
+ I'm pleased to announce that Xen X.Y.0 is released.
+
+ Please find the tarball and its signature at:
+
+ https://xenproject.org/downloads/xen-archives/xen-project-xy-series/xen-project-xy0.html
+
+ You can also check out the tag in xen.git:
+
+   https://xenbits.xen.org/git-http/xen.git RELEASE-X.Y.0
+
+ Git checkout and build instructions can be found at:
+
+ https://wiki.xenproject.org/wiki/Xen_Project_X.Y_Release_Notes#Build_Requirements
+
+ Release notes can be found at:
+
+   https://wiki.xenproject.org/wiki/Xen_Project_X.Y_Release_Notes
+
+ A summary for X.Y release documents can be found at:
+
+   https://wiki.xenproject.org/wiki/Category:Xen_X.Y
+
+ Technical blog post for X.Y can be found at:
+
+  URL_TO_BLOG
+
+ Thanks everyone who contributed to this release. This release would
+ not have happened without all the awesome contributions from around
+ the globe.
+
+ Regards,
+
+ $RM (on behalf of the Xen Project Hypervisor team)
+```
+
+
+## Script to generate months update emails
+
+```
+#!/bin/bash
+# Use ssmtp for simplicity
+# ./status-release.sh | formail -f -s /usr/sbin/ssmtp -bm -t
+
+FILE=`mktemp`
+cat << EOF > $FILE
+
+== Hypervisor ==
+
+S: Per-cpu tasklet
+O: Konrad Rzeszutek Wilk
+E: konrad.wilk@oracle.com
+J: XEN-28
+
+=== x86 ===
+
+=== ARM ===
+
+== Completed ==
+
+S:
+EOF
+
+
+AWK_FILE=`mktemp`
+cat << EOF > $AWK_FILE
+BEGIN { s2_count = 1;score = ""; emails=1; first_time = 1; subject=""}
+/== /  {
+	if ( subject != "" )  {
+		if (score != "")
+			print "* ", subject,  "("score")"
+        else if (version != "")
+            print "* ", subject, "("version")";
+        else
+            print "* ", subject;
+		for (i = 1; i <= s2_count; i++) {
+			if (i in s2)
+				print " ",s2[i];
+		}
+		if (bug != "")
+			print "  Link: https://bugs.xenproject.org/xen/bug/"bug
+		if (jira != "")
+            print "  -  "jira
+		for (i = 1; i <= count; i++) {
+			if (i in o)
+				print "  -", o[i]
+		}
+		if (emails)
+			print ""
+		first_time = 1;
+		subject=""
+		email=""
+		score=""
+		bug=""
+        jira=""
+        version=""
+		count = 1;
+		s2_count = 1;
+		delete s;
+		delete s2;
+		delete o;
+		delete e;
+	}
+	print \$0,"\n"
+	}
+/;/ { };
+/S:/	{
+	if ( !first_time )  {
+		if (score != "")
+			print "* ", subject,  "("score")"
+        else if (version != "")
+            print "* ", subject, "("version")";
+		else
+			print "* ", subject
+		for (i = 1; i <= s2_count; i++) {
+			if (i in s2)
+				print " ",s2[i];
+		}
+		if (bug != "")
+			print "  Link: https://bug.xenproject.org/xen/bug/"bug
+		if (jira != "")
+            print "  -  "jira
+		for (i = 1; i <= count; i++) {
+			if (i in o)
+				print "  -", o[i]
+		}
+		if (emails)
+			print ""
+	}
+	first_time = 0;
+	sub(\$1, "");
+	sub(/^[ \t]+/, "");
+	subject=\$0;
+	email=""
+	bug=""
+    jira=""
+	count = 1;
+	s2_count = 1;
+	delete s;
+	delete s2;
+	delete o;
+	delete e;
+	score="";
+    version="";
+	}
+/O:/	{ sub(\$1, ""); o[count++]=\$0; };
+/S2:/	{ sub(\$1, ""); s2[s2_count++]=\$0;};
+/E:/	{ sub(\$1, ""); sub(/^[ \t]+/, ""); email=\$0; e[emails++]=\$0;};
+/P:/	{ sub(\$1, ""); sub(/^[ \t]+/, ""); score=\$0; };
+/B:/	{ sub(\$1, ""); sub(/^[ \t]+/, ""); bug=\$0; };
+/J:/	{ sub(\$1, ""); sub(/^[ \t]+/, ""); jira=\$0; };
+/V:/    { sub(\$1, ""); sub(/^[ \t]+/, ""); version=\$0; };
+END	{
+	}
+// {  }
+EOF
+AWK_FILE_EMAIL=`mktemp`
+cat << EOF > $AWK_FILE_EMAIL
+BEGIN { emails=1;}
+/E:/	{
+	sub(\$1, ""); sub(/^[ \t]+/, "");
+	email=\$0;
+	for ( i = 1; i <= emails; i++ ) {
+		if (i in e) {
+			if (e[i] == email) {
+				email="";
+				break;
+			}
+		}
+	}
+	if (email != "")
+		e[emails++]=email;
+}
+END	{
+	printf "Bcc: "
+	for ( i = 1; i <= emails; i++ )
+		if (i in e) {
+			if (i == emails - 1)
+				printf "<%s>", e[i];
+			else
+				printf "<%s>,", e[i];
+		}
+	print ""
+	}
+// {  }
+EOF
+
+echo "From: $RELEASE_MANAGER_NAME <$RELEASE_MANAGER_MAIL>"
+echo "To: xen-devel@lists.xenproject.org"
+echo "Cc: $RELEASE_MANAGER_MAIL"
+cat $FILE | awk -f $AWK_FILE_EMAIL
+rm $AWK_FILE_EMAIL
+
+echo "Subject: Xen $RELEASE_VERSION Development Update"
+PRE=`mktemp`
+cat << EOF > $PRE
+
+This email only tracks big items for xen.git tree. Please reply for items you
+would like to see in $RELEASE_VERSION so that people have an idea what is going on and
+prioritise accordingly.
+
+You're welcome to provide description and use cases of the feature you're
+working on.
+
+= Timeline =
+
+We now adopt a fixed cut-off date scheme. We will release twice a
+year. The upcoming $RELEASE_VERSION timeline are as followed:
+
+* Last posting date: $RELEASE_CUTOFF
+* Hard code freeze: $RELEASE_FREEZE
+* RC1: TBD
+* Release: $RELEASE_DATE
+
+Note that we don't have freeze exception scheme anymore. All patches
+that wish to go into $RELEASE_VERSION must be posted no later than the last posting
+date. All patches posted after that date will be automatically queued
+into next release.
+
+RCs will be arranged immediately after freeze.
+
+We recently introduced a jira instance to track all the tasks (not only big)
+for the project. See: https://xenproject.atlassian.net/projects/XEN/issues.
+
+Most of the tasks tracked by this e-mail also have a corresponding jira task
+referred by XEN-N.
+
+I have started to include the version number of series associated to each
+feature. Can each owner send an update on the version number if the series
+was posted upstream?
+
+= Projects =
+
+EOF
+
+POST=`mktemp`
+cat <<EOF > $POST
+
+EOF
+
+# Preamble
+cat $PRE
+rm $PRE
+# Body
+cat $FILE | awk -f $AWK_FILE
+rm $AWK_FILE
+rm $FILE
+cat $POST
+rm $POST
+```
