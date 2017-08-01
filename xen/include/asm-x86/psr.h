@@ -19,19 +19,25 @@
 #include <xen/types.h>
 
 /* CAT cpuid level */
-#define PSR_CPUID_LEVEL_CAT   0x10
+#define PSR_CPUID_LEVEL_CAT             0x10
 
 /* Resource Type Enumeration */
 #define PSR_RESOURCE_TYPE_L3            0x2
 
 /* L3 Monitoring Features */
-#define PSR_CMT_L3_OCCUPANCY           0x1
+#define PSR_CMT_L3_OCCUPANCY            0x1
 
 /* CDP Capability */
-#define PSR_CAT_CDP_CAPABILITY       (1u << 2)
+#define PSR_CAT_CDP_CAPABILITY          (1u << 2)
 
 /* L3 CDP Enable bit*/
 #define PSR_L3_QOS_CDP_ENABLE_BIT       0x0
+
+/* Used by psr_get_info() */
+#define PSR_INFO_IDX_COS_MAX            0
+#define PSR_INFO_IDX_CAT_CBM_LEN        1
+#define PSR_INFO_IDX_CAT_FLAG           2
+#define PSR_INFO_ARRAY_SIZE             3
 
 struct psr_cmt_l3 {
     unsigned int features;
@@ -64,8 +70,8 @@ int psr_alloc_rmid(struct domain *d);
 void psr_free_rmid(struct domain *d);
 void psr_ctxt_switch_to(struct domain *d);
 
-int psr_get_cat_l3_info(unsigned int socket, uint32_t *cbm_len,
-                        uint32_t *cos_max, uint32_t *flags);
+int psr_get_info(unsigned int socket, enum cbm_type type,
+                 uint32_t data[], unsigned int array_len);
 int psr_get_l3_cbm(struct domain *d, unsigned int socket,
                    uint64_t *cbm, enum cbm_type type);
 int psr_set_l3_cbm(struct domain *d, unsigned int socket,

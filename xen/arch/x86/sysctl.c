@@ -175,14 +175,25 @@ long arch_do_sysctl(
         switch ( sysctl->u.psr_cat_op.cmd )
         {
         case XEN_SYSCTL_PSR_CAT_get_l3_info:
-            ret = psr_get_cat_l3_info(sysctl->u.psr_cat_op.target,
-                                      &sysctl->u.psr_cat_op.u.l3_info.cbm_len,
-                                      &sysctl->u.psr_cat_op.u.l3_info.cos_max,
-                                      &sysctl->u.psr_cat_op.u.l3_info.flags);
+        {
+            uint32_t data[PSR_INFO_ARRAY_SIZE];
+
+            ret = psr_get_info(sysctl->u.psr_cat_op.target,
+                               PSR_CBM_TYPE_L3, data, ARRAY_SIZE(data));
+            if ( ret )
+                break;
+
+            sysctl->u.psr_cat_op.u.l3_info.cos_max =
+                                      data[PSR_INFO_IDX_COS_MAX];
+            sysctl->u.psr_cat_op.u.l3_info.cbm_len =
+                                      data[PSR_INFO_IDX_CAT_CBM_LEN];
+            sysctl->u.psr_cat_op.u.l3_info.flags =
+                                      data[PSR_INFO_IDX_CAT_FLAG];
 
             if ( !ret && __copy_field_to_guest(u_sysctl, sysctl, u.psr_cat_op) )
                 ret = -EFAULT;
             break;
+        }
 
         default:
             ret = -EOPNOTSUPP;
