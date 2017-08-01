@@ -1712,6 +1712,9 @@ occupancy monitoring share the same set of underlying monitoring service. Once
 a domain is attached to the monitoring service, monitoring data can be shown
 for any of these monitoring types.
 
+There is no cache monitoring and memory bandwidth monitoring on L2 cache so
+far.
+
 =over 4
 
 =item B<psr-cmt-attach> I<domain-id>
@@ -1736,7 +1739,7 @@ monitor types are:
 
 Intel Broadwell and later server platforms offer capabilities to configure and
 make use of the Cache Allocation Technology (CAT) mechanisms, which enable more
-cache resources (i.e. L3 cache) to be made available for high priority
+cache resources (i.e. L3/L2 cache) to be made available for high priority
 applications. In the Xen implementation, CAT is used to control cache allocation
 on VM basis. To enforce cache on a specific domain, just set capacity bitmasks
 (CBM) for the domain.
@@ -1746,11 +1749,11 @@ Intel Broadwell and later server platforms also offer Code/Data Prioritization
 applications. CDP is used on a per VM basis in the Xen implementation. To
 specify code or data CBM for the domain, CDP feature must be enabled and CBM
 type options need to be specified when setting CBM, and the type options (code
-and data) are mutually exclusive.
+and data) are mutually exclusive. There is no CDP support on L2 so far.
 
 =over 4
 
-=item B<psr-cat-cbm-set> [I<OPTIONS>] I<domain-id> I<cbm>
+=item B<psr-cat-set> [I<OPTIONS>] I<domain-id> I<cbm>
 
 Set cache capacity bitmasks(CBM) for a domain. For how to specify I<cbm>
 please refer to L<http://xenbits.xen.org/docs/unstable/misc/xl-psr.html>.
@@ -1763,6 +1766,11 @@ B<OPTIONS>
 
 Specify the socket to process, otherwise all sockets are processed.
 
+=item B<-l LEVEL>, B<--level=LEVEL>
+
+Specify the cache level to process, otherwise the last level cache (L3) is
+processed.
+
 =item B<-c>, B<--code>
 
 Set code CBM when CDP is enabled.
@@ -1773,9 +1781,20 @@ Set data CBM when CDP is enabled.
 
 =back
 
-=item B<psr-cat-show> [I<domain-id>]
+=item B<psr-cat-show> [I<OPTIONS>] [I<domain-id>]
 
 Show CAT settings for a certain domain or all domains.
+
+B<OPTIONS>
+
+=over 4
+
+=item B<-l LEVEL>, B<--level=LEVEL>
+
+Specify the cache level to process, otherwise the last level cache (L3) is
+processed.
+
+=back
 
 =back
 

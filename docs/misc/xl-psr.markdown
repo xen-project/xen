@@ -70,7 +70,7 @@ total-mem-bandwidth instead of cache-occupancy). E.g. after a `xl psr-cmt-attach
 
 Cache Allocation Technology (CAT) is a new feature available on Intel
 Broadwell and later server platforms that allows an OS or Hypervisor/VMM to
-partition cache allocation (i.e. L3 cache) based on application priority or
+partition cache allocation (i.e. L3/L2 cache) based on application priority or
 Class of Service (COS). Each COS is configured using capacity bitmasks (CBM)
 which represent cache capacity and indicate the degree of overlap and
 isolation between classes. System cache resource is divided into numbers of
@@ -107,7 +107,7 @@ System CAT information such as maximum COS and CBM length can be obtained by:
 
 The simplest way to change a domain's CBM from its default is running:
 
-`xl psr-cat-cbm-set  [OPTIONS] <domid> <cbm>`
+`xl psr-cat-set  [OPTIONS] <domid> <cbm>`
 
 where cbm is a number to represent the corresponding cache subset can be used.
 A cbm is valid only when:
@@ -119,13 +119,19 @@ A cbm is valid only when:
 In a multi-socket system, the same cbm will be set on each socket by default.
 Per socket cbm can be specified with the `--socket SOCKET` option.
 
+In different systems, the different cache level is supported, e.g. L3 cache or
+L2 cache. Per cache level cbm can be specified with the `--level LEVEL` option.
+
 Setting the CBM may not be successful if insufficient COS is available. In
 such case unused COS(es) may be freed by setting CBM of all related domains to
 its default value(all-ones).
 
 Per domain CBM settings can be shown by:
 
-`xl psr-cat-show`
+`xl psr-cat-show [OPTIONS] <domid>`
+
+In different systems, the different cache level is supported, e.g. L3 cache or
+L2 cache. Per cache level cbm can be specified with the `--level LEVEL` option.
 
 ## Code and Data Prioritization (CDP)
 
@@ -172,13 +178,13 @@ options is invalid.
 Example:
 
 Setting code CBM for a domain:
-`xl psr-cat-cbm-set -c <domid> <cbm>`
+`xl psr-cat-set -c <domid> <cbm>`
 
 Setting data CBM for a domain:
-`xl psr-cat-cbm-set -d <domid> <cbm>`
+`xl psr-cat-set -d <domid> <cbm>`
 
 Setting the same code and data CBM for a domain:
-`xl psr-cat-cbm-set <domid> <cbm>`
+`xl psr-cat-set <domid> <cbm>`
 
 ## Reference
 
