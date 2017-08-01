@@ -50,6 +50,7 @@ enum cbm_type {
     PSR_CBM_TYPE_L3,
     PSR_CBM_TYPE_L3_CODE,
     PSR_CBM_TYPE_L3_DATA,
+    PSR_CBM_TYPE_UNKNOWN,
 };
 
 extern struct psr_cmt *psr_cmt;
