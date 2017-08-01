@@ -408,6 +408,7 @@ static const struct feat_props l3_cdp_props = {
 /* L2 CAT props */
 static void l2_cat_write_msr(unsigned int cos, uint32_t val, enum cbm_type type)
 {
+    wrmsrl(MSR_IA32_PSR_L2_MASK(cos), val);
 }
 
 static const struct feat_props l2_cat_props = {

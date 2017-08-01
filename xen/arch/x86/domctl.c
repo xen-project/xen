@@ -1462,6 +1462,12 @@ long arch_do_domctl(
                               PSR_CBM_TYPE_L3_DATA);
             break;
 
+        case XEN_DOMCTL_PSR_CAT_OP_SET_L2_CBM:
+            ret = psr_set_val(d, domctl->u.psr_cat_op.target,
+                              domctl->u.psr_cat_op.data,
+                              PSR_CBM_TYPE_L2);
+            break;
+
         case XEN_DOMCTL_PSR_CAT_OP_GET_L3_CBM:
             ret = psr_get_val(d, domctl->u.psr_cat_op.target,
                               &val32, PSR_CBM_TYPE_L3);
