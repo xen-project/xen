@@ -123,6 +123,7 @@ static const struct feat_props {
  * ref_lock  - A lock to protect cos_ref.
  * cos_ref   - A reference count array to record how many domains are using the
  *             COS ID. Every entry of cos_ref corresponds to one COS ID.
+ * dom_set   - A bitmap to indicate which domain's cos id has been set.
  */
 struct psr_socket_info {
     bool feat_init;
@@ -130,6 +131,8 @@ struct psr_socket_info {
     struct feat_node *features[FEAT_TYPE_NUM];
     spinlock_t ref_lock;
     unsigned int cos_ref[MAX_COS_REG_CNT];
+    /* Every bit corresponds to a domain. Index is domain_id. */
+    DECLARE_BITMAP(dom_set, DOMID_IDLE + 1);
 };
 
 struct psr_assoc {
@@ -187,6 +190,8 @@ static void free_socket_resources(unsigned int socket)
     info->feat_init = false;
 
     memset(info->cos_ref, 0, MAX_COS_REG_CNT * sizeof(unsigned int));
+
+    bitmap_zero(info->dom_set, DOMID_IDLE + 1);
 }
 
 static enum psr_feat_type psr_cbm_type_to_feat_type(enum cbm_type type)
@@ -463,13 +468,25 @@ void psr_ctxt_switch_to(struct domain *d)
     if ( psr_cmt_enabled() )
         psr_assoc_rmid(&reg, d->arch.psr_rmid);
 
-    /* If domain's 'psr_cos_ids' is NULL, we set default value for it. */
+    /*
+     * If the domain is not set in 'dom_set' bitmap, that means the domain's
+     * cos id is not valid. So, we have to use default value (0) to set ASSOC
+     * register. Furthermore, if domain's 'psr_cos_ids' is NULL, we need
+     * default value for it too (for case that the domain's psr_cos_ids is not
+     * successfully allocated).
+     */
     if ( psra->cos_mask )
-        reg = psr_assoc_cos(reg,
-                  (d->arch.psr_cos_ids ?
-                   d->arch.psr_cos_ids[cpu_to_socket(smp_processor_id())] :
-                   0),
-                  psra->cos_mask);
+    {
+        unsigned int socket = cpu_to_socket(smp_processor_id());
+        struct psr_socket_info *info = socket_info + socket;
+        unsigned int cos = 0;
+
+        if ( likely(test_bit(d->domain_id, info->dom_set)) &&
+             d->arch.psr_cos_ids )
+            cos = d->arch.psr_cos_ids[socket];
+
+        reg = psr_assoc_cos(reg, cos, psra->cos_mask);
+    }
 
     if ( reg != psra->val )
     {
@@ -551,7 +568,13 @@ int psr_get_val(struct domain *d, unsigned int socket,
         return -ENOENT;
     }
 
+    domain_lock(d);
+    if ( !test_and_set_bit(d->domain_id, socket_info[socket].dom_set) )
+        d->arch.psr_cos_ids[socket] = 0;
+
     cos = d->arch.psr_cos_ids[socket];
+    domain_unlock(d);
+
     /*
      * If input cos exceeds current feature's cos_max, we should return its
      * default value which is stored in cos 0. This case only happens
@@ -575,15 +598,214 @@ int psr_get_val(struct domain *d, unsigned int socket,
     return -EINVAL;
 }
 
-int psr_set_l3_cbm(struct domain *d, unsigned int socket,
-                   uint64_t cbm, enum cbm_type type)
+/* Set value functions */
+static unsigned int get_cos_num(void)
 {
     return 0;
 }
 
-/* Called with domain lock held, no extra lock needed for 'psr_cos_ids' */
+static int gather_val_array(uint32_t val[],
+                            unsigned int array_len,
+                            const struct psr_socket_info *info,
+                            unsigned int old_cos)
+{
+    return -EINVAL;
+}
+
+static int insert_val_into_array(uint32_t val[],
+                                 unsigned int array_len,
+                                 const struct psr_socket_info *info,
+                                 enum psr_feat_type feat_type,
+                                 enum cbm_type type,
+                                 uint32_t new_val)
+{
+    return -EINVAL;
+}
+
+static int find_cos(const uint32_t val[], unsigned int array_len,
+                    enum psr_feat_type feat_type,
+                    const struct psr_socket_info *info)
+{
+    return -ENOENT;
+}
+
+static int pick_avail_cos(const struct psr_socket_info *info,
+                          const uint32_t val[], unsigned int array_len,
+                          unsigned int old_cos,
+                          enum psr_feat_type feat_type)
+{
+    return -ENOENT;
+}
+
+static int write_psr_msrs(unsigned int socket, unsigned int cos,
+                          const uint32_t val[], unsigned int array_len,
+                          enum psr_feat_type feat_type)
+{
+    return -ENOENT;
+}
+
+int psr_set_val(struct domain *d, unsigned int socket,
+                uint64_t new_val, enum cbm_type type)
+{
+    unsigned int old_cos, array_len;
+    int cos, ret;
+    unsigned int *ref;
+    uint32_t *val_array, val;
+    struct psr_socket_info *info = get_socket_info(socket);
+    enum psr_feat_type feat_type;
+
+    if ( IS_ERR(info) )
+        return PTR_ERR(info);
+
+    val = new_val;
+    if ( new_val != val )
+        return -EINVAL;
+
+    feat_type = psr_cbm_type_to_feat_type(type);
+    if ( feat_type >= ARRAY_SIZE(info->features) ||
+         !info->features[feat_type] )
+        return -ENOENT;
+
+    /*
+     * Step 0:
+     * old_cos means the COS ID current domain is using. By default, it is 0.
+     *
+     * For every COS ID, there is a reference count to record how many domains
+     * are using the COS register corresponding to this COS ID.
+     * - If ref[old_cos] is 0, that means this COS is not used by any domain.
+     * - If ref[old_cos] is 1, that means this COS is only used by current
+     *   domain.
+     * - If ref[old_cos] is more than 1, that mean multiple domains are using
+     *   this COS.
+     */
+    domain_lock(d);
+    if ( !test_and_set_bit(d->domain_id, info->dom_set) )
+        d->arch.psr_cos_ids[socket] = 0;
+
+    old_cos = d->arch.psr_cos_ids[socket];
+    domain_unlock(d);
+
+    ASSERT(old_cos < MAX_COS_REG_CNT);
+
+    ref = info->cos_ref;
+
+    /*
+     * Step 1:
+     * Gather a value array to store all features cos_reg_val[old_cos].
+     * And, set the input new val into array according to the feature's
+     * position in array.
+     */
+    array_len = get_cos_num();
+    val_array = xzalloc_array(uint32_t, array_len);
+    if ( !val_array )
+        return -ENOMEM;
+
+    if ( (ret = gather_val_array(val_array, array_len, info, old_cos)) != 0 )
+        goto free_array;
+
+    if ( (ret = insert_val_into_array(val_array, array_len, info,
+                                      feat_type, type, val)) != 0 )
+        goto free_array;
+
+    spin_lock(&info->ref_lock);
+
+    /*
+     * Step 2:
+     * Try to find if there is already a COS ID on which all features' values
+     * are same as the array. Then, we can reuse this COS ID.
+     */
+    cos = find_cos(val_array, array_len, feat_type, info);
+    if ( cos == old_cos )
+    {
+        ret = 0;
+        goto unlock_free_array;
+    }
+
+    /*
+     * Step 3:
+     * If fail to find, we need pick an available COS ID.
+     * In fact, only COS ID which ref is 1 or 0 can be picked for current
+     * domain. If old_cos is not 0 and its ref==1, that means only current
+     * domain is using this old_cos ID. So, this old_cos ID certainly can
+     * be reused by current domain. Ref==0 means there is no any domain
+     * using this COS ID. So it can be used for current domain too.
+     */
+    if ( cos < 0 )
+    {
+        cos = pick_avail_cos(info, val_array, array_len, old_cos, feat_type);
+        if ( cos < 0 )
+        {
+            ret = cos;
+            goto unlock_free_array;
+        }
+
+        /*
+         * Step 4:
+         * Write the feature's MSRs according to the COS ID.
+         */
+        ret = write_psr_msrs(socket, cos, val_array, array_len, feat_type);
+        if ( ret )
+            goto unlock_free_array;
+    }
+
+    /*
+     * Step 5:
+     * Find the COS ID (find_cos result is '>= 0' or an available COS ID is
+     * picked, then update ref according to COS ID.
+     */
+    ref[cos]++;
+    ASSERT(!cos || ref[cos]);
+    ASSERT(!old_cos || ref[old_cos]);
+    ref[old_cos]--;
+    spin_unlock(&info->ref_lock);
+
+    /*
+     * Step 6:
+     * Save the COS ID into current domain's psr_cos_ids[] so that we can know
+     * which COS the domain is using on the socket. One domain can only use
+     * one COS ID at same time on each socket.
+     */
+    domain_lock(d);
+    d->arch.psr_cos_ids[socket] = cos;
+    domain_unlock(d);
+
+    goto free_array;
+
+ unlock_free_array:
+    spin_unlock(&info->ref_lock);
+
+ free_array:
+    xfree(val_array);
+    return ret;
+}
+
 static void psr_free_cos(struct domain *d)
 {
+    unsigned int socket, cos;
+
+    ASSERT(socket_info);
+
+    if ( !d->arch.psr_cos_ids )
+        return;
+
+    /* Domain is destroyed so its cos_ref should be decreased. */
+    for ( socket = 0; socket < nr_sockets; socket++ )
+    {
+        struct psr_socket_info *info = socket_info + socket;
+
+        clear_bit(d->domain_id, info->dom_set);
+
+        /* cos 0 is default one which does not need be handled. */
+        cos = d->arch.psr_cos_ids[socket];
+        if ( cos == 0 )
+            continue;
+
+        spin_lock(&info->ref_lock);
+        ASSERT(info->cos_ref[cos]);
+        info->cos_ref[cos]--;
+        spin_unlock(&info->ref_lock);
+    }
+
     xfree(d->arch.psr_cos_ids);
     d->arch.psr_cos_ids = NULL;
 }

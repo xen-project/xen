@@ -74,8 +74,8 @@ int psr_get_info(unsigned int socket, enum cbm_type type,
                  uint32_t data[], unsigned int array_len);
 int psr_get_val(struct domain *d, unsigned int socket,
                 uint32_t *val, enum cbm_type type);
-int psr_set_l3_cbm(struct domain *d, unsigned int socket,
-                   uint64_t cbm, enum cbm_type type);
+int psr_set_val(struct domain *d, unsigned int socket,
+                uint64_t val, enum cbm_type type);
 
 void psr_domain_init(struct domain *d);
 void psr_domain_free(struct domain *d);
