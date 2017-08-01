@@ -294,21 +294,19 @@ int main_psr_cmt_show(int argc, char **argv)
 }
 #endif
 
-#ifdef LIBXL_HAVE_PSR_CAT
-static int psr_cat_hwinfo(void)
+#if defined(LIBXL_HAVE_PSR_CAT) || defined(LIBXL_HAVE_PSR_L2_CAT)
+static int psr_l3_cat_hwinfo(void)
 {
-    int rc;
-    int i, nr;
+    int rc, nr;
+    unsigned int i;
     uint32_t l3_cache_size;
     libxl_psr_cat_info *info;
 
-    printf("Cache Allocation Technology (CAT):\n");
-
-    rc = libxl_psr_cat_get_l3_info(ctx, &info, &nr);
-    if (rc) {
-        fprintf(stderr, "Failed to get cat info\n");
+    rc = libxl_psr_cat_get_info(ctx, &info, &nr, 3);
+    if (rc)
         return rc;
-    }
+
+    printf("Cache Allocation Technology (CAT):\n");
 
     for (i = 0; i < nr; i++) {
         rc = libxl_psr_cmt_get_l3_cache_size(ctx, info[i].id, &l3_cache_size);
@@ -417,7 +415,7 @@ static int psr_cat_show(uint32_t domid)
     int rc;
     libxl_psr_cat_info *info;
 
-    rc = libxl_psr_cat_get_l3_info(ctx, &info, &nr);
+    rc = libxl_psr_cat_get_info(ctx, &info, &nr, 3);
     if (rc) {
         fprintf(stderr, "Failed to get cat info\n");
         return rc;
@@ -430,6 +428,32 @@ static int psr_cat_show(uint32_t domid)
     }
 
 out:
+    libxl_psr_cat_info_list_free(info, nr);
+    return rc;
+}
+
+static int psr_l2_cat_hwinfo(void)
+{
+    int rc;
+    unsigned int i;
+    int nr;
+    libxl_psr_cat_info *info;
+
+    rc = libxl_psr_cat_get_info(ctx, &info, &nr, 2);
+    if (rc)
+        return rc;
+
+    printf("Cache Allocation Technology (CAT): L2\n");
+
+    for (i = 0; i < nr; i++) {
+        /* There is no CMT on L2 cache so far. */
+        printf("%-16s: %u\n", "Socket ID", info[i].id);
+        printf("%-16s: %u\n", "Maximum COS", info[i].cos_max);
+        printf("%-16s: %u\n", "CBM length", info[i].cbm_len);
+        printf("%-16s: %#llx\n", "Default CBM",
+               (1ull << info[i].cbm_len) - 1);
+    }
+
     libxl_psr_cat_info_list_free(info, nr);
     return rc;
 }
@@ -551,7 +575,11 @@ int main_psr_hwinfo(int argc, char **argv)
         ret = psr_cmt_hwinfo();
 
     if (!ret && (all || cat))
-        ret = psr_cat_hwinfo();
+        ret = psr_l3_cat_hwinfo();
+
+    /* L2 CAT is independent of CMT and L3 CAT */
+    if (all || cat)
+        ret = psr_l2_cat_hwinfo();
 
     return ret;
 }

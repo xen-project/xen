@@ -2478,9 +2478,9 @@ int xc_psr_cat_set_domain_data(xc_interface *xch, uint32_t domid,
 int xc_psr_cat_get_domain_data(xc_interface *xch, uint32_t domid,
                                xc_psr_cat_type type, uint32_t target,
                                uint64_t *data);
-int xc_psr_cat_get_l3_info(xc_interface *xch, uint32_t socket,
-                           uint32_t *cos_max, uint32_t *cbm_len,
-                           bool *cdp_enabled);
+int xc_psr_cat_get_info(xc_interface *xch, uint32_t socket, unsigned int lvl,
+                        uint32_t *cos_max, uint32_t *cbm_len,
+                        bool *cdp_enabled);
 
 int xc_get_cpu_levelling_caps(xc_interface *xch, uint32_t *caps);
 int xc_get_cpu_featureset(xc_interface *xch, uint32_t index,

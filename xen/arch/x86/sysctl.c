@@ -183,11 +183,11 @@ long arch_do_sysctl(
             if ( ret )
                 break;
 
-            sysctl->u.psr_cat_op.u.l3_info.cos_max =
+            sysctl->u.psr_cat_op.u.cat_info.cos_max =
                                       data[PSR_INFO_IDX_COS_MAX];
-            sysctl->u.psr_cat_op.u.l3_info.cbm_len =
+            sysctl->u.psr_cat_op.u.cat_info.cbm_len =
                                       data[PSR_INFO_IDX_CAT_CBM_LEN];
-            sysctl->u.psr_cat_op.u.l3_info.flags =
+            sysctl->u.psr_cat_op.u.cat_info.flags =
                                       data[PSR_INFO_IDX_CAT_FLAG];
 
             if ( !ret && __copy_field_to_guest(u_sysctl, sysctl, u.psr_cat_op) )
@@ -202,11 +202,11 @@ long arch_do_sysctl(
             if ( ret )
                 break;
 
-            sysctl->u.psr_cat_op.u.l3_info.cos_max =
+            sysctl->u.psr_cat_op.u.cat_info.cos_max =
                                       data[PSR_INFO_IDX_COS_MAX];
-            sysctl->u.psr_cat_op.u.l3_info.cbm_len =
+            sysctl->u.psr_cat_op.u.cat_info.cbm_len =
                                       data[PSR_INFO_IDX_CAT_CBM_LEN];
-            sysctl->u.psr_cat_op.u.l3_info.flags =
+            sysctl->u.psr_cat_op.u.cat_info.flags =
                                       data[PSR_INFO_IDX_CAT_FLAG];
 
             if ( !ret && __copy_field_to_guest(u_sysctl, sysctl, u.psr_cat_op) )

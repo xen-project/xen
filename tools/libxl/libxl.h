@@ -924,6 +924,13 @@ void libxl_mac_copy(libxl_ctx *ctx, libxl_mac *dst, const libxl_mac *src);
 #define LIBXL_HAVE_PSR_CDP 1
 
 /*
+ * LIBXL_HAVE_PSR_L2_CAT
+ *
+ * If this is defined, the L2 Cache Allocation Technology feature is supported.
+ */
+#define LIBXL_HAVE_PSR_L2_CAT 1
+
+/*
  * LIBXL_HAVE_MCA_CAPS
  *
  * If this is defined, setting MCA capabilities for HVM domain is supported.
@@ -2207,6 +2214,8 @@ int libxl_psr_cat_get_cbm(libxl_ctx *ctx, uint32_t domid,
  * On success, the function returns an array of elements in 'info',
  * and the length in 'nr'.
  */
+int libxl_psr_cat_get_info(libxl_ctx *ctx, libxl_psr_cat_info **info,
+                           int *nr, unsigned int lvl);
 int libxl_psr_cat_get_l3_info(libxl_ctx *ctx, libxl_psr_cat_info **info,
                               int *nr);
 void libxl_psr_cat_info_list_free(libxl_psr_cat_info *list, int nr);

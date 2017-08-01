@@ -754,7 +754,7 @@ struct xen_sysctl_psr_cat_op {
             uint32_t cos_max;   /* OUT: Maximum COS */
 #define XEN_SYSCTL_PSR_CAT_L3_CDP       (1u << 0)
             uint32_t flags;     /* OUT: CAT flags */
-        } l3_info;
+        } cat_info;
     } u;
 };
 typedef struct xen_sysctl_psr_cat_op xen_sysctl_psr_cat_op_t;

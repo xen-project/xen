@@ -976,6 +976,7 @@ libxl_psr_cbm_type = Enumeration("psr_cbm_type", [
     (1, "L3_CBM"),
     (2, "L3_CBM_CODE"),
     (3, "L3_CBM_DATA"),
+    (4, "L2_CBM"),
     ])
 
 libxl_psr_cat_info = Struct("psr_cat_info", [
