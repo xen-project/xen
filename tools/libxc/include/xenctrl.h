@@ -2454,6 +2454,7 @@ enum xc_psr_cat_type {
     XC_PSR_CAT_L3_CBM      = 1,
     XC_PSR_CAT_L3_CBM_CODE = 2,
     XC_PSR_CAT_L3_CBM_DATA = 3,
+    XC_PSR_CAT_L2_CBM      = 4,
 };
 typedef enum xc_psr_cat_type xc_psr_cat_type;
 

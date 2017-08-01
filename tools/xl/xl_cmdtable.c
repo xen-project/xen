@@ -557,7 +557,8 @@ struct cmd_spec cmd_table[] = {
     { "psr-cat-show",
       &main_psr_cat_show, 0, 1,
       "Show Cache Allocation Technology information",
-      "<Domain>",
+      "[options] <Domain>",
+      "-l <level>        Specify the cache level to process, otherwise L3 cache is processed\n"
     },
 
 #endif
