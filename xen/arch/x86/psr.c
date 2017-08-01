@@ -50,6 +50,8 @@
  */
 #define MAX_COS_REG_CNT  128
 
+#define ASSOC_REG_SHIFT 32
+
 /*
  * Every PSR feature uses some COS registers for each COS ID, e.g. CDP uses 2
  * COS registers (DATA and CODE) for one COS ID, but CAT uses 1 COS register.
@@ -372,17 +374,50 @@ void psr_free_rmid(struct domain *d)
     d->arch.psr_rmid = 0;
 }
 
-static inline void psr_assoc_init(void)
+static unsigned int get_max_cos_max(const struct psr_socket_info *info)
+{
+    unsigned int cos_max = 0, i;
+
+    for ( i = 0; i < ARRAY_SIZE(info->features); i++ )
+    {
+        const struct feat_node *feat = info->features[i];
+
+        if ( feat )
+            cos_max = max(feat->cos_max, cos_max);
+    }
+
+    return cos_max;
+}
+
+static void psr_assoc_init(void)
 {
     struct psr_assoc *psra = &this_cpu(psr_assoc);
 
-    if ( psr_cmt_enabled() )
+    if ( psr_alloc_feat_enabled() )
+    {
+        unsigned int socket = cpu_to_socket(smp_processor_id());
+        const struct psr_socket_info *info = socket_info + socket;
+        unsigned int cos_max = get_max_cos_max(info);
+
+        if ( info->feat_init )
+            psra->cos_mask = ((1ull << get_count_order(cos_max)) - 1) <<
+                             ASSOC_REG_SHIFT;
+    }
+
+    if ( psr_cmt_enabled() || psra->cos_mask )
         rdmsrl(MSR_IA32_PSR_ASSOC, psra->val);
 }
 
 static inline void psr_assoc_rmid(uint64_t *reg, unsigned int rmid)
 {
     *reg = (*reg & ~rmid_mask) | (rmid & rmid_mask);
+}
+
+static uint64_t psr_assoc_cos(uint64_t reg, unsigned int cos,
+                              uint64_t cos_mask)
+{
+    return (reg & ~cos_mask) |
+            (((uint64_t)cos << ASSOC_REG_SHIFT) & cos_mask);
 }
 
 void psr_ctxt_switch_to(struct domain *d)
@@ -392,6 +427,14 @@ void psr_ctxt_switch_to(struct domain *d)
 
     if ( psr_cmt_enabled() )
         psr_assoc_rmid(&reg, d->arch.psr_rmid);
+
+    /* If domain's 'psr_cos_ids' is NULL, we set default value for it. */
+    if ( psra->cos_mask )
+        reg = psr_assoc_cos(reg,
+                  (d->arch.psr_cos_ids ?
+                   d->arch.psr_cos_ids[cpu_to_socket(smp_processor_id())] :
+                   0),
+                  psra->cos_mask);
 
     if ( reg != psra->val )
     {
@@ -418,14 +461,30 @@ int psr_set_l3_cbm(struct domain *d, unsigned int socket,
     return 0;
 }
 
-int psr_domain_init(struct domain *d)
+/* Called with domain lock held, no extra lock needed for 'psr_cos_ids' */
+static void psr_free_cos(struct domain *d)
 {
-    return 0;
+    xfree(d->arch.psr_cos_ids);
+    d->arch.psr_cos_ids = NULL;
+}
+
+static void psr_alloc_cos(struct domain *d)
+{
+    d->arch.psr_cos_ids = xzalloc_array(unsigned int, nr_sockets);
+    if ( !d->arch.psr_cos_ids )
+        printk(XENLOG_WARNING "Failed to alloc psr_cos_ids!\n");
+}
+
+void psr_domain_init(struct domain *d)
+{
+    if ( psr_alloc_feat_enabled() )
+        psr_alloc_cos(d);
 }
 
 void psr_domain_free(struct domain *d)
 {
     psr_free_rmid(d);
+    psr_free_cos(d);
 }
 
 static void __init init_psr(void)

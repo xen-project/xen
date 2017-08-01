@@ -71,7 +71,7 @@ int psr_get_l3_cbm(struct domain *d, unsigned int socket,
 int psr_set_l3_cbm(struct domain *d, unsigned int socket,
                    uint64_t cbm, enum cbm_type type);
 
-int psr_domain_init(struct domain *d);
+void psr_domain_init(struct domain *d);
 void psr_domain_free(struct domain *d);
 
 #endif /* __ASM_PSR_H__ */

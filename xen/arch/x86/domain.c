@@ -495,8 +495,7 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags,
     }
     spin_lock_init(&d->arch.e820_lock);
 
-    if ( (rc = psr_domain_init(d)) != 0 )
-        goto fail;
+    psr_domain_init(d);
 
     if ( is_hvm_domain(d) )
     {
