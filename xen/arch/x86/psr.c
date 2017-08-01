@@ -753,10 +753,110 @@ static int insert_val_into_array(uint32_t val[],
     return -EINVAL;
 }
 
+static int compare_val(const uint32_t val[],
+                       const struct feat_node *feat,
+                       const struct feat_props *props,
+                       unsigned int cos)
+{
+    unsigned int i;
+
+    for ( i = 0; i < props->cos_num; i++ )
+    {
+        uint32_t feat_val;
+
+        /* If cos is bigger than cos_max, we need compare default value. */
+        if ( cos > feat->cos_max )
+        {
+            /*
+             * COS ID 0 always stores the default value.
+             * For CDP:
+             * - DATA default value stored in cos_reg_val[0];
+             * - CODE default value stored in cos_reg_val[1].
+             */
+            feat_val = feat->cos_reg_val[i];
+
+            /*
+             * If cos is bigger than feature's cos_max, the val should be
+             * default value. Otherwise, it fails to find a COS ID. So we
+             * have to exit find flow.
+             */
+            if ( val[i] != feat_val )
+                return -EINVAL;
+        }
+        else
+        {
+            feat_val = feat->cos_reg_val[cos * props->cos_num + i];
+            if ( val[i] != feat_val )
+                return 0;
+        }
+    }
+
+    return 1;
+}
+
 static int find_cos(const uint32_t val[], unsigned int array_len,
                     enum psr_feat_type feat_type,
                     const struct psr_socket_info *info)
 {
+    unsigned int cos, cos_max;
+    const unsigned int *ref = info->cos_ref;
+    const struct feat_node *feat;
+
+    /* cos_max is the one of the feature which is being set. */
+    feat = info->features[feat_type];
+    if ( !feat )
+        return -ENOENT;
+
+    cos_max = feat->cos_max;
+
+    for ( cos = 0; cos <= cos_max; cos++ )
+    {
+        const uint32_t *val_ptr = val;
+        unsigned int len = array_len, i;
+        int rc = 0;
+
+        if ( cos && !ref[cos] )
+            continue;
+
+        for ( i = 0; i < ARRAY_SIZE(info->features); i++ )
+        {
+            const struct feat_props *props = feat_props[i];
+
+            feat = info->features[i];
+            if ( !feat )
+                continue;
+
+            if ( !props )
+            {
+                ASSERT_UNREACHABLE();
+                return -ENOENT;
+            }
+
+            if ( len < props->cos_num )
+                return -ENOSPC;
+
+            /*
+             * Compare value according to feature array order.
+             * We must follow this order because value array is assembled
+             * as this order.
+             */
+            rc = compare_val(val_ptr, feat, props, cos);
+            if ( rc < 0 )
+                return rc;
+
+            /* If fail to match, go to next cos to compare. */
+            if ( !rc )
+                break;
+
+            len -= props->cos_num;
+            val_ptr += props->cos_num;
+        }
+
+        /* For this COS ID all entries in the values array do match. Use it. */
+        if ( rc )
+            return cos;
+    }
+
     return -ENOENT;
 }
 
