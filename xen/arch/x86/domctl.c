@@ -1483,6 +1483,13 @@ long arch_do_domctl(
             copyback = true;
             break;
 
+        case XEN_DOMCTL_PSR_CAT_OP_GET_L2_CBM:
+            ret = psr_get_val(d, domctl->u.psr_cat_op.target,
+                              &val32, PSR_CBM_TYPE_L2);
+            domctl->u.psr_cat_op.data = val32;
+            copyback = true;
+            break;
+
         default:
             ret = -EOPNOTSUPP;
             break;

@@ -1142,6 +1142,7 @@ struct xen_domctl_psr_cat_op {
 #define XEN_DOMCTL_PSR_CAT_OP_SET_L3_DATA    3
 #define XEN_DOMCTL_PSR_CAT_OP_GET_L3_CODE    4
 #define XEN_DOMCTL_PSR_CAT_OP_GET_L3_DATA    5
+#define XEN_DOMCTL_PSR_CAT_OP_GET_L2_CBM     7
     uint32_t cmd;       /* IN: XEN_DOMCTL_PSR_CAT_OP_* */
     uint32_t target;    /* IN */
     uint64_t data;      /* IN/OUT */
