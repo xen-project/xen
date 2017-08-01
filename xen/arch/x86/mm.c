@@ -4084,14 +4084,68 @@ int create_grant_pv_mapping(uint64_t addr, unsigned long frame,
     return rc;
 }
 
+/*
+ * This exists soley for implementing GNTABOP_unmap_and_replace, the ABI of
+ * which is bizarre.  This GNTTABOP isn't used any more, but was used by
+ * classic-xen kernels and PVOps Linux before the M2P_OVERRIDE infrastructure
+ * was replaced with something which actually worked.
+ *
+ * Look up the L1e mapping linear, and zap it.  Return the L1e via *out.
+ * Returns a boolean indicating success.  If success, the caller is
+ * responsible for calling put_page_from_l1e().
+ */
+static bool steal_linear_address(unsigned long linear, l1_pgentry_t *out)
+{
+    struct vcpu *curr = current;
+    struct domain *currd = curr->domain;
+    l1_pgentry_t *pl1e, ol1e;
+    struct page_info *page;
+    mfn_t gl1mfn;
+    bool okay = false;
+
+    ASSERT(is_pv_domain(currd));
+
+    pl1e = map_guest_l1e(linear, &gl1mfn);
+    if ( !pl1e )
+    {
+        gdprintk(XENLOG_WARNING,
+                 "Could not find L1 PTE for linear %"PRIx64"\n", linear);
+        goto out;
+    }
+
+    if ( !get_page_from_mfn(gl1mfn, currd) )
+        goto out_unmap;
+
+    page = mfn_to_page(gl1mfn);
+    if ( !page_lock(page) )
+        goto out_put;
+
+    if ( (page->u.inuse.type_info & PGT_type_mask) != PGT_l1_page_table )
+        goto out_unlock;
+
+    ol1e = *pl1e;
+    okay = UPDATE_ENTRY(l1, pl1e, ol1e, l1e_empty(), mfn_x(gl1mfn), curr, 0);
+
+ out_unlock:
+    page_unlock(page);
+ out_put:
+    put_page(page);
+ out_unmap:
+    unmap_domain_page(pl1e);
+
+    if ( okay )
+        *out = ol1e;
+
+ out:
+    return okay;
+}
+
 int replace_grant_pv_mapping(uint64_t addr, unsigned long frame,
                              uint64_t new_addr, unsigned int flags)
 {
     struct vcpu *curr = current;
     struct domain *currd = curr->domain;
-    l1_pgentry_t *pl1e, ol1e;
-    mfn_t gl1mfn;
-    struct page_info *l1pg;
+    l1_pgentry_t ol1e;
     int rc;
     unsigned int grant_pte_flags = grant_to_pte_flags(flags, 0);
 
@@ -4117,51 +4171,8 @@ int replace_grant_pv_mapping(uint64_t addr, unsigned long frame,
     if ( !new_addr )
         return destroy_grant_va_mapping(addr, frame, grant_pte_flags, curr);
 
-    pl1e = map_guest_l1e(new_addr, &gl1mfn);
-    if ( !pl1e )
-    {
-        gdprintk(XENLOG_WARNING,
-                 "Could not find L1 PTE for address %"PRIx64"\n", new_addr);
+    if ( !steal_linear_address(new_addr, &ol1e) )
         return GNTST_general_error;
-    }
-
-    if ( !get_page_from_mfn(gl1mfn, currd) )
-    {
-        unmap_domain_page(pl1e);
-        return GNTST_general_error;
-    }
-
-    l1pg = mfn_to_page(gl1mfn);
-    if ( !page_lock(l1pg) )
-    {
-        put_page(l1pg);
-        unmap_domain_page(pl1e);
-        return GNTST_general_error;
-    }
-
-    if ( (l1pg->u.inuse.type_info & PGT_type_mask) != PGT_l1_page_table )
-    {
-        page_unlock(l1pg);
-        put_page(l1pg);
-        unmap_domain_page(pl1e);
-        return GNTST_general_error;
-    }
-
-    ol1e = *pl1e;
-
-    if ( unlikely(!UPDATE_ENTRY(l1, pl1e, ol1e, l1e_empty(),
-                                mfn_x(gl1mfn), curr, 0)) )
-    {
-        page_unlock(l1pg);
-        put_page(l1pg);
-        gdprintk(XENLOG_WARNING, "Cannot delete PTE entry at %p\n", pl1e);
-        unmap_domain_page(pl1e);
-        return GNTST_general_error;
-    }
-
-    page_unlock(l1pg);
-    put_page(l1pg);
-    unmap_domain_page(pl1e);
 
     rc = replace_grant_va_mapping(addr, frame, grant_pte_flags, ol1e, curr);
     if ( rc )
