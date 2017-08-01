@@ -860,12 +860,91 @@ static int find_cos(const uint32_t val[], unsigned int array_len,
     return -ENOENT;
 }
 
+static bool fits_cos_max(const uint32_t val[],
+                         uint32_t array_len,
+                         const struct psr_socket_info *info,
+                         unsigned int cos)
+{
+    unsigned int i;
+
+    for ( i = 0; i < ARRAY_SIZE(info->features); i++ )
+    {
+        const struct feat_node *feat = info->features[i];
+        const struct feat_props *props = feat_props[i];
+
+        if ( !feat )
+            continue;
+
+        if ( !props )
+        {
+            ASSERT_UNREACHABLE();
+            return false;
+        }
+
+        if ( array_len < props->cos_num )
+            return false;
+
+        if ( cos > feat->cos_max )
+        {
+            unsigned int j;
+
+            for ( j = 0; j < props->cos_num; j++ )
+            {
+                /* Get default value, the COS ID of which is zero. */
+                uint32_t default_val = feat->cos_reg_val[j];
+
+                if ( val[j] != default_val )
+                    return false;
+            }
+        }
+
+        array_len -= props->cos_num;
+        val += props->cos_num;
+    }
+
+    return true;
+}
+
 static int pick_avail_cos(const struct psr_socket_info *info,
                           const uint32_t val[], unsigned int array_len,
                           unsigned int old_cos,
                           enum psr_feat_type feat_type)
 {
-    return -ENOENT;
+    unsigned int cos, cos_max = 0;
+    const struct feat_node *feat;
+    const unsigned int *ref = info->cos_ref;
+
+    /* cos_max is the one of the feature which is being set. */
+    feat = info->features[feat_type];
+    if ( !feat )
+        return -ENOENT;
+
+    cos_max = feat->cos_max;
+    if ( !cos_max )
+        return -ENOENT;
+
+    /* We cannot use id 0 because it stores the default values. */
+    if ( old_cos && ref[old_cos] == 1 &&
+         fits_cos_max(val, array_len, info, old_cos) )
+            return old_cos;
+
+    /* Find an unused one other than cos0. */
+    for ( cos = 1; cos <= cos_max; cos++ )
+    {
+        /*
+         * ref is 0 means this COS is not used by other domain and
+         * can be used for current setting.
+         */
+        if ( !ref[cos] )
+        {
+            if ( !fits_cos_max(val, array_len, info, cos) )
+                break;
+
+            return cos;
+        }
+    }
+
+    return -EOVERFLOW;
 }
 
 static int write_psr_msrs(unsigned int socket, unsigned int cos,
