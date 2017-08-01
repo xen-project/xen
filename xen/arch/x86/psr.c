@@ -374,6 +374,10 @@ static bool l3_cdp_get_feat_info(const struct feat_node *feat,
 
 static void l3_cdp_write_msr(unsigned int cos, uint32_t val, enum cbm_type type)
 {
+    wrmsrl(((type == PSR_CBM_TYPE_L3_DATA) ?
+            MSR_IA32_PSR_L3_MASK_DATA(cos) :
+            MSR_IA32_PSR_L3_MASK_CODE(cos)),
+           val);
 }
 
 static const struct feat_props l3_cdp_props = {
@@ -829,17 +833,27 @@ static int insert_val_into_array(uint32_t val[],
     if ( !psr_check_cbm(feat->cbm_len, new_val) )
         return -EINVAL;
 
-    /* Value setting position is same as feature array. */
+    /*
+     * Value setting position is same as feature array.
+     * For CDP, user may set both DATA and CODE to same value. For such case,
+     * user input 'PSR_CBM_TYPE_L3' as type. The alternative type of CDP is same
+     * as it. So we should set new_val to both of DATA and CODE under such case.
+     */
     for ( i = 0; i < props->cos_num; i++ )
     {
         if ( type == props->type[i] )
         {
             val[i] = new_val;
-            return 0;
+            ret = 0;
+            break;
         }
+        else if ( type == props->alt_type )
+            val[i] = new_val;
+        else
+            ret = -EINVAL;
     }
 
-    return -EINVAL;
+    return ret;
 }
 
 static int compare_val(const uint32_t val[],
