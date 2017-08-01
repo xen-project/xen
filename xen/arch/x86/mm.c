@@ -3831,66 +3831,6 @@ static unsigned int grant_to_pte_flags(unsigned int grant_flags,
     return pte_flags;
 }
 
-static int create_grant_pte_mapping(
-    uint64_t pte_addr, l1_pgentry_t nl1e, struct vcpu *v)
-{
-    int rc = GNTST_okay;
-    void *va;
-    unsigned long gmfn, mfn;
-    struct page_info *page;
-    l1_pgentry_t ol1e;
-    struct domain *d = v->domain;
-
-    if ( !IS_ALIGNED(pte_addr, sizeof(nl1e)) )
-        return GNTST_general_error;
-
-    nl1e = adjust_guest_l1e(nl1e, d);
-
-    gmfn = pte_addr >> PAGE_SHIFT;
-    page = get_page_from_gfn(d, gmfn, NULL, P2M_ALLOC);
-
-    if ( unlikely(!page) )
-    {
-        gdprintk(XENLOG_WARNING, "Could not get page for normal update\n");
-        return GNTST_general_error;
-    }
-
-    mfn = mfn_x(page_to_mfn(page));
-    va = map_domain_page(_mfn(mfn));
-    va = (void *)((unsigned long)va + ((unsigned long)pte_addr & ~PAGE_MASK));
-
-    if ( !page_lock(page) )
-    {
-        rc = GNTST_general_error;
-        goto failed;
-    }
-
-    if ( (page->u.inuse.type_info & PGT_type_mask) != PGT_l1_page_table )
-    {
-        page_unlock(page);
-        rc = GNTST_general_error;
-        goto failed;
-    }
-
-    ol1e = *(l1_pgentry_t *)va;
-    if ( !UPDATE_ENTRY(l1, (l1_pgentry_t *)va, ol1e, nl1e, mfn, v, 0) )
-    {
-        page_unlock(page);
-        rc = GNTST_general_error;
-        goto failed;
-    }
-
-    page_unlock(page);
-
-    put_page_from_l1e(ol1e, d);
-
- failed:
-    unmap_domain_page(va);
-    put_page(page);
-
-    return rc;
-}
-
 static int destroy_grant_pte_mapping(
     uint64_t addr, unsigned long frame, unsigned int grant_pte_flags,
     struct domain *d)
@@ -3983,60 +3923,6 @@ static int destroy_grant_pte_mapping(
     return rc;
 }
 
-
-static int create_grant_va_mapping(
-    unsigned long va, l1_pgentry_t nl1e, struct vcpu *v)
-{
-    l1_pgentry_t *pl1e, ol1e;
-    struct domain *d = v->domain;
-    mfn_t gl1mfn;
-    struct page_info *l1pg;
-    int okay;
-
-    nl1e = adjust_guest_l1e(nl1e, d);
-
-    pl1e = map_guest_l1e(va, &gl1mfn);
-    if ( !pl1e )
-    {
-        gdprintk(XENLOG_WARNING, "Could not find L1 PTE for address %lx\n", va);
-        return GNTST_general_error;
-    }
-
-    if ( !get_page_from_mfn(gl1mfn, current->domain) )
-    {
-        unmap_domain_page(pl1e);
-        return GNTST_general_error;
-    }
-
-    l1pg = mfn_to_page(gl1mfn);
-    if ( !page_lock(l1pg) )
-    {
-        put_page(l1pg);
-        unmap_domain_page(pl1e);
-        return GNTST_general_error;
-    }
-
-    if ( (l1pg->u.inuse.type_info & PGT_type_mask) != PGT_l1_page_table )
-    {
-        page_unlock(l1pg);
-        put_page(l1pg);
-        unmap_domain_page(pl1e);
-        return GNTST_general_error;
-    }
-
-    ol1e = *pl1e;
-    okay = UPDATE_ENTRY(l1, pl1e, ol1e, nl1e, mfn_x(gl1mfn), v, 0);
-
-    page_unlock(l1pg);
-    put_page(l1pg);
-    unmap_domain_page(pl1e);
-
-    if ( okay )
-        put_page_from_l1e(ol1e, d);
-
-    return okay ? GNTST_okay : GNTST_general_error;
-}
-
 static int replace_grant_va_mapping(
     unsigned long addr, unsigned long frame, unsigned int grant_pte_flags,
     l1_pgentry_t nl1e, struct vcpu *v)
@@ -4126,13 +4012,76 @@ int create_grant_pv_mapping(uint64_t addr, unsigned long frame,
                             unsigned int flags, unsigned int cache_flags)
 {
     struct vcpu *curr = current;
-    l1_pgentry_t nl1e;
+    struct domain *currd = curr->domain;
+    l1_pgentry_t nl1e, ol1e, *pl1e;
+    struct page_info *page;
+    mfn_t gl1mfn;
+    int rc = GNTST_general_error;
 
     nl1e = l1e_from_pfn(frame, grant_to_pte_flags(flags, cache_flags));
+    nl1e = adjust_guest_l1e(nl1e, currd);
 
+    /*
+     * The meaning of addr depends on GNTMAP_contains_pte.  It is either a
+     * machine address of an L1e the guest has nominated to be altered, or a
+     * linear address we need to look up the appropriate L1e for.
+     */
     if ( flags & GNTMAP_contains_pte )
-        return create_grant_pte_mapping(addr, nl1e, curr);
-    return create_grant_va_mapping(addr, nl1e, curr);
+    {
+        /* addr must be suitably aligned, or we will corrupt adjacent ptes. */
+        if ( !IS_ALIGNED(addr, sizeof(nl1e)) )
+        {
+            gdprintk(XENLOG_WARNING,
+                     "Misaligned PTE address %"PRIx64"\n", addr);
+            goto out;
+        }
+
+        gl1mfn = _mfn(addr >> PAGE_SHIFT);
+
+        if ( !get_page_from_mfn(gl1mfn, currd) )
+            goto out;
+
+        pl1e = map_domain_page(gl1mfn) + (addr & ~PAGE_MASK);
+    }
+    else
+    {
+        pl1e = map_guest_l1e(addr, &gl1mfn);
+
+        if ( !pl1e )
+        {
+            gdprintk(XENLOG_WARNING,
+                     "Could not find L1 PTE for linear address %"PRIx64"\n",
+                     addr);
+            goto out;
+        }
+
+        if ( !get_page_from_mfn(gl1mfn, currd) )
+            goto out_unmap;
+    }
+
+    page = mfn_to_page(gl1mfn);
+    if ( !page_lock(page) )
+        goto out_put;
+
+    if ( (page->u.inuse.type_info & PGT_type_mask) != PGT_l1_page_table )
+        goto out_unlock;
+
+    ol1e = *pl1e;
+    if ( UPDATE_ENTRY(l1, pl1e, ol1e, nl1e, mfn_x(gl1mfn), curr, 0) )
+        rc = GNTST_okay;
+
+ out_unlock:
+    page_unlock(page);
+ out_put:
+    put_page(page);
+ out_unmap:
+    unmap_domain_page(pl1e);
+
+    if ( rc == GNTST_okay )
+        put_page_from_l1e(ol1e, currd);
+
+ out:
+    return rc;
 }
 
 int replace_grant_pv_mapping(uint64_t addr, unsigned long frame,
