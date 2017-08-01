@@ -239,6 +239,10 @@ static enum psr_feat_type psr_cbm_type_to_feat_type(enum cbm_type type)
         feat_type = FEAT_TYPE_L3_CDP;
         break;
 
+    case PSR_CBM_TYPE_L2:
+        feat_type = FEAT_TYPE_L2_CAT;
+        break;
+
     default:
         ASSERT_UNREACHABLE();
     }

@@ -744,6 +744,7 @@ typedef struct xen_sysctl_pcitopoinfo xen_sysctl_pcitopoinfo_t;
 DEFINE_XEN_GUEST_HANDLE(xen_sysctl_pcitopoinfo_t);
 
 #define XEN_SYSCTL_PSR_CAT_get_l3_info               0
+#define XEN_SYSCTL_PSR_CAT_get_l2_info               1
 struct xen_sysctl_psr_cat_op {
     uint32_t cmd;       /* IN: XEN_SYSCTL_PSR_CAT_* */
     uint32_t target;    /* IN */
