@@ -4125,19 +4125,21 @@ static int destroy_grant_va_mapping(
 int create_grant_pv_mapping(uint64_t addr, unsigned long frame,
                             unsigned int flags, unsigned int cache_flags)
 {
-    l1_pgentry_t pte;
+    struct vcpu *curr = current;
+    l1_pgentry_t nl1e;
 
-    pte = l1e_from_pfn(frame, grant_to_pte_flags(flags, cache_flags));
+    nl1e = l1e_from_pfn(frame, grant_to_pte_flags(flags, cache_flags));
 
     if ( flags & GNTMAP_contains_pte )
-        return create_grant_pte_mapping(addr, pte, current);
-    return create_grant_va_mapping(addr, pte, current);
+        return create_grant_pte_mapping(addr, nl1e, curr);
+    return create_grant_va_mapping(addr, nl1e, curr);
 }
 
 int replace_grant_pv_mapping(uint64_t addr, unsigned long frame,
                              uint64_t new_addr, unsigned int flags)
 {
     struct vcpu *curr = current;
+    struct domain *currd = curr->domain;
     l1_pgentry_t *pl1e, ol1e;
     mfn_t gl1mfn;
     struct page_info *l1pg;
@@ -4149,7 +4151,7 @@ int replace_grant_pv_mapping(uint64_t addr, unsigned long frame,
      * also open-code relevant parts of adjust_guest_l1e(). Don't mirror
      * available and cachability flags, though.
      */
-    if ( !is_pv_32bit_domain(curr->domain) )
+    if ( !is_pv_32bit_domain(currd) )
         grant_pte_flags |= (grant_pte_flags & _PAGE_USER)
                            ? _PAGE_GLOBAL
                            : _PAGE_GUEST_KERNEL | _PAGE_USER;
@@ -4158,7 +4160,7 @@ int replace_grant_pv_mapping(uint64_t addr, unsigned long frame,
     {
         if ( !new_addr )
             return destroy_grant_pte_mapping(addr, frame, grant_pte_flags,
-                                             curr->domain);
+                                             currd);
 
         return GNTST_general_error;
     }
@@ -4174,7 +4176,7 @@ int replace_grant_pv_mapping(uint64_t addr, unsigned long frame,
         return GNTST_general_error;
     }
 
-    if ( !get_page_from_mfn(gl1mfn, current->domain) )
+    if ( !get_page_from_mfn(gl1mfn, currd) )
     {
         unmap_domain_page(pl1e);
         return GNTST_general_error;
@@ -4214,7 +4216,7 @@ int replace_grant_pv_mapping(uint64_t addr, unsigned long frame,
 
     rc = replace_grant_va_mapping(addr, frame, grant_pte_flags, ol1e, curr);
     if ( rc )
-        put_page_from_l1e(ol1e, curr->domain);
+        put_page_from_l1e(ol1e, currd);
 
     return rc;
 }
