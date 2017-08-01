@@ -884,8 +884,12 @@ int main_dmesg(int argc, char **argv)
     libxl_xen_console_reader *cr;
     char *line;
     int opt, ret = 1;
+    static struct option opts[] = {
+        {"clear", 0, 0, 'c'},
+        COMMON_LONG_OPTS
+    };
 
-    SWITCH_FOREACH_OPT(opt, "c", NULL, "dmesg", 0) {
+    SWITCH_FOREACH_OPT(opt, "c", opts, "dmesg", 0) {
     case 'c':
         clear = 1;
         break;
