@@ -222,7 +222,21 @@ static enum psr_feat_type psr_cbm_type_to_feat_type(enum cbm_type type)
     {
     case PSR_CBM_TYPE_L3:
         feat_type = FEAT_TYPE_L3_CAT;
+
+        /*
+         * If type is L3 CAT but we cannot find it in feat_props array,
+         * try CDP.
+         */
+        if ( !feat_props[feat_type] )
+            feat_type = FEAT_TYPE_L3_CDP;
+
         break;
+
+    case PSR_CBM_TYPE_L3_DATA:
+    case PSR_CBM_TYPE_L3_CODE:
+        feat_type = FEAT_TYPE_L3_CDP;
+        break;
+
     default:
         ASSERT_UNREACHABLE();
     }
@@ -350,7 +364,12 @@ static const struct feat_props l3_cat_props = {
 static bool l3_cdp_get_feat_info(const struct feat_node *feat,
                                  uint32_t data[], uint32_t array_len)
 {
-    return false;
+    if ( !cat_get_feat_info(feat, data, array_len) )
+        return false;
+
+    data[PSR_INFO_IDX_CAT_FLAG] |= XEN_SYSCTL_PSR_CAT_L3_CDP;
+
+    return true;
 }
 
 static void l3_cdp_write_msr(unsigned int cos, uint32_t val, enum cbm_type type)
