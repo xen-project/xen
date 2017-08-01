@@ -3831,183 +3831,6 @@ static unsigned int grant_to_pte_flags(unsigned int grant_flags,
     return pte_flags;
 }
 
-static int destroy_grant_pte_mapping(
-    uint64_t addr, unsigned long frame, unsigned int grant_pte_flags,
-    struct domain *d)
-{
-    int rc = GNTST_okay;
-    void *va;
-    unsigned long gmfn, mfn;
-    struct page_info *page;
-    l1_pgentry_t ol1e;
-
-    /*
-     * addr comes from Xen's active_entry tracking so isn't guest controlled,
-     * but it had still better be PTE-aligned.
-     */
-    if ( !IS_ALIGNED(addr, sizeof(ol1e)) )
-    {
-        ASSERT_UNREACHABLE();
-        return GNTST_general_error;
-    }
-
-    gmfn = addr >> PAGE_SHIFT;
-    page = get_page_from_gfn(d, gmfn, NULL, P2M_ALLOC);
-
-    if ( unlikely(!page) )
-    {
-        gdprintk(XENLOG_WARNING, "Could not get page for normal update\n");
-        return GNTST_general_error;
-    }
-
-    mfn = mfn_x(page_to_mfn(page));
-    va = map_domain_page(_mfn(mfn));
-    va = (void *)((unsigned long)va + ((unsigned long)addr & ~PAGE_MASK));
-
-    if ( !page_lock(page) )
-    {
-        rc = GNTST_general_error;
-        goto failed;
-    }
-
-    if ( (page->u.inuse.type_info & PGT_type_mask) != PGT_l1_page_table )
-    {
-        page_unlock(page);
-        rc = GNTST_general_error;
-        goto failed;
-    }
-
-    ol1e = *(l1_pgentry_t *)va;
-
-    /*
-     * Check that the PTE supplied actually maps frame (with appropriate
-     * permissions).
-     */
-    if ( unlikely(l1e_get_pfn(ol1e) != frame) ||
-         unlikely((l1e_get_flags(ol1e) ^ grant_pte_flags) &
-                  (_PAGE_PRESENT | _PAGE_RW)) )
-    {
-        page_unlock(page);
-        gdprintk(XENLOG_ERR,
-                 "PTE %"PRIpte" at %"PRIx64" doesn't match grant (%"PRIpte")\n",
-                 l1e_get_intpte(ol1e), addr,
-                 l1e_get_intpte(l1e_from_pfn(frame, grant_pte_flags)));
-        rc = GNTST_general_error;
-        goto failed;
-    }
-
-    if ( unlikely((l1e_get_flags(ol1e) ^ grant_pte_flags) &
-                  ~(_PAGE_AVAIL | PAGE_CACHE_ATTRS)) )
-        gdprintk(XENLOG_WARNING,
-                 "PTE flags %x at %"PRIx64" don't match grant (%x)\n",
-                 l1e_get_flags(ol1e), addr, grant_pte_flags);
-
-    /* Delete pagetable entry. */
-    if ( unlikely(!UPDATE_ENTRY(l1,
-                                (l1_pgentry_t *)va, ol1e, l1e_empty(), mfn,
-                                d->vcpu[0] /* Change if we go to per-vcpu shadows. */,
-                                0)) )
-    {
-        page_unlock(page);
-        gdprintk(XENLOG_WARNING, "Cannot delete PTE entry at %"PRIx64"\n",
-                 addr);
-        rc = GNTST_general_error;
-        goto failed;
-    }
-
-    page_unlock(page);
-
- failed:
-    unmap_domain_page(va);
-    put_page(page);
-    return rc;
-}
-
-static int replace_grant_va_mapping(
-    unsigned long addr, unsigned long frame, unsigned int grant_pte_flags,
-    l1_pgentry_t nl1e, struct vcpu *v)
-{
-    l1_pgentry_t *pl1e, ol1e;
-    mfn_t gl1mfn;
-    struct page_info *l1pg;
-    int rc = 0;
-
-    pl1e = map_guest_l1e(addr, &gl1mfn);
-    if ( !pl1e )
-    {
-        gdprintk(XENLOG_WARNING, "Could not find L1 PTE for address %lx\n", addr);
-        return GNTST_general_error;
-    }
-
-    if ( !get_page_from_mfn(gl1mfn, current->domain) )
-    {
-        rc = GNTST_general_error;
-        goto out;
-    }
-
-    l1pg = mfn_to_page(gl1mfn);
-    if ( !page_lock(l1pg) )
-    {
-        rc = GNTST_general_error;
-        put_page(l1pg);
-        goto out;
-    }
-
-    if ( (l1pg->u.inuse.type_info & PGT_type_mask) != PGT_l1_page_table )
-    {
-        rc = GNTST_general_error;
-        goto unlock_and_out;
-    }
-
-    ol1e = *pl1e;
-
-    /*
-     * Check that the virtual address supplied is actually mapped to frame
-     * (with appropriate permissions).
-     */
-    if ( unlikely(l1e_get_pfn(ol1e) != frame) ||
-         unlikely((l1e_get_flags(ol1e) ^ grant_pte_flags) &
-                  (_PAGE_PRESENT | _PAGE_RW)) )
-    {
-        gdprintk(XENLOG_ERR,
-                 "PTE %"PRIpte" for %lx doesn't match grant (%"PRIpte")\n",
-                 l1e_get_intpte(ol1e), addr,
-                 l1e_get_intpte(l1e_from_pfn(frame, grant_pte_flags)));
-        rc = GNTST_general_error;
-        goto unlock_and_out;
-    }
-
-    if ( unlikely((l1e_get_flags(ol1e) ^ grant_pte_flags) &
-                  ~(_PAGE_AVAIL | PAGE_CACHE_ATTRS)) )
-        gdprintk(XENLOG_WARNING,
-                 "PTE flags %x for %"PRIx64" don't match grant (%x)\n",
-                 l1e_get_flags(ol1e), addr, grant_pte_flags);
-
-    /* Delete pagetable entry. */
-    if ( unlikely(!UPDATE_ENTRY(l1, pl1e, ol1e, nl1e, mfn_x(gl1mfn), v, 0)) )
-    {
-        gdprintk(XENLOG_WARNING, "Cannot delete PTE entry for %"PRIx64"\n",
-                 addr);
-        rc = GNTST_general_error;
-        goto unlock_and_out;
-    }
-
- unlock_and_out:
-    page_unlock(l1pg);
-    put_page(l1pg);
- out:
-    unmap_domain_page(pl1e);
-    return rc;
-}
-
-static int destroy_grant_va_mapping(
-    unsigned long addr, unsigned long frame, unsigned int grant_pte_flags,
-    struct vcpu *v)
-{
-    return replace_grant_va_mapping(addr, frame, grant_pte_flags,
-                                    l1e_empty(), v);
-}
-
 int create_grant_pv_mapping(uint64_t addr, unsigned long frame,
                             unsigned int flags, unsigned int cache_flags)
 {
@@ -4140,17 +3963,24 @@ static bool steal_linear_address(unsigned long linear, l1_pgentry_t *out)
     return okay;
 }
 
+/*
+ * Passing a new_addr of zero is taken to mean destroy.  Passing a non-zero
+ * new_addr has only ever been available via GNTABOP_unmap_and_replace, and
+ * only when !(flags & GNTMAP_contains_pte).
+ */
 int replace_grant_pv_mapping(uint64_t addr, unsigned long frame,
                              uint64_t new_addr, unsigned int flags)
 {
     struct vcpu *curr = current;
     struct domain *currd = curr->domain;
-    l1_pgentry_t ol1e;
-    int rc;
+    l1_pgentry_t nl1e = l1e_empty(), ol1e, *pl1e;
+    struct page_info *page;
+    mfn_t gl1mfn;
+    int rc = GNTST_general_error;
     unsigned int grant_pte_flags = grant_to_pte_flags(flags, 0);
 
     /*
-     * On top of the explicit settings done by create_grant_host_mapping()
+     * On top of the explicit settings done by create_grant_pv_mapping()
      * also open-code relevant parts of adjust_guest_l1e(). Don't mirror
      * available and cachability flags, though.
      */
@@ -4159,24 +3989,93 @@ int replace_grant_pv_mapping(uint64_t addr, unsigned long frame,
                            ? _PAGE_GLOBAL
                            : _PAGE_GUEST_KERNEL | _PAGE_USER;
 
+    /*
+     * addr comes from Xen's active_entry tracking, and was used successfully
+     * to create a grant.
+     *
+     * The meaning of addr depends on GNTMAP_contains_pte.  It is either a
+     * machine address of an L1e the guest has nominated to be altered, or a
+     * linear address we need to look up the appropriate L1e for.
+     */
     if ( flags & GNTMAP_contains_pte )
     {
-        if ( !new_addr )
-            return destroy_grant_pte_mapping(addr, frame, grant_pte_flags,
-                                             currd);
+        /* Replace not available in this addressing mode. */
+        if ( new_addr )
+            goto out;
 
-        return GNTST_general_error;
+        /* Sanity check that we won't clobber the pagetable. */
+        if ( !IS_ALIGNED(addr, sizeof(nl1e)) )
+        {
+            ASSERT_UNREACHABLE();
+            goto out;
+        }
+
+        gl1mfn = _mfn(addr >> PAGE_SHIFT);
+
+        if ( !get_page_from_mfn(gl1mfn, currd) )
+            goto out;
+
+        pl1e = map_domain_page(gl1mfn) + (addr & ~PAGE_MASK);
+    }
+    else
+    {
+        if ( new_addr && !steal_linear_address(new_addr, &nl1e) )
+            goto out;
+
+        pl1e = map_guest_l1e(addr, &gl1mfn);
+
+        if ( !pl1e )
+            goto out;
+
+        if ( !get_page_from_mfn(gl1mfn, currd) )
+            goto out_unmap;
     }
 
-    if ( !new_addr )
-        return destroy_grant_va_mapping(addr, frame, grant_pte_flags, curr);
+    page = mfn_to_page(gl1mfn);
 
-    if ( !steal_linear_address(new_addr, &ol1e) )
-        return GNTST_general_error;
+    if ( !page_lock(page) )
+        goto out_put;
 
-    rc = replace_grant_va_mapping(addr, frame, grant_pte_flags, ol1e, curr);
+    if ( (page->u.inuse.type_info & PGT_type_mask) != PGT_l1_page_table )
+        goto out_unlock;
+
+    ol1e = *pl1e;
+
+    /*
+     * Check that the address supplied is actually mapped to frame (with
+     * appropriate permissions).
+     */
+    if ( unlikely(l1e_get_pfn(ol1e) != frame) ||
+         unlikely((l1e_get_flags(ol1e) ^ grant_pte_flags) &
+                  (_PAGE_PRESENT | _PAGE_RW)) )
+    {
+        gdprintk(XENLOG_ERR,
+                 "PTE %"PRIpte" for %"PRIx64" doesn't match grant (%"PRIpte")\n",
+                 l1e_get_intpte(ol1e), addr,
+                 l1e_get_intpte(l1e_from_pfn(frame, grant_pte_flags)));
+        goto out_unlock;
+    }
+
+    if ( unlikely((l1e_get_flags(ol1e) ^ grant_pte_flags) &
+                  ~(_PAGE_AVAIL | PAGE_CACHE_ATTRS)) )
+        gdprintk(XENLOG_WARNING,
+                 "PTE flags %x for %"PRIx64" don't match grant (%x)\n",
+                 l1e_get_flags(ol1e), addr, grant_pte_flags);
+
+    if ( UPDATE_ENTRY(l1, pl1e, ol1e, nl1e, mfn_x(gl1mfn), curr, 0) )
+        rc = GNTST_okay;
+
+ out_unlock:
+    page_unlock(page);
+ out_put:
+    put_page(page);
+ out_unmap:
+    unmap_domain_page(pl1e);
+
+ out:
+    /* If there was an error, we are still responsible for the stolen pte. */
     if ( rc )
-        put_page_from_l1e(ol1e, currd);
+        put_page_from_l1e(nl1e, currd);
 
     return rc;
 }
