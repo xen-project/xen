@@ -754,7 +754,8 @@ struct xc_dom_image *xc_dom_allocate(xc_interface *xch,
     struct xc_dom_image *dom;
 
     xc_dom_printf(xch, "%s: cmdline=\"%s\", features=\"%s\"",
-                  __FUNCTION__, cmdline, features);
+                  __FUNCTION__, cmdline ? cmdline : "",
+                  features ? features : "");
     dom = malloc(sizeof(*dom));
     if ( !dom )
         goto err;
