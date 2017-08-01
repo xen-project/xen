@@ -524,10 +524,55 @@ int psr_get_info(unsigned int socket, enum cbm_type type,
     return -EINVAL;
 }
 
-int psr_get_l3_cbm(struct domain *d, unsigned int socket,
-                   uint64_t *cbm, enum cbm_type type)
+int psr_get_val(struct domain *d, unsigned int socket,
+                uint32_t *val, enum cbm_type type)
 {
-    return 0;
+    const struct psr_socket_info *info = get_socket_info(socket);
+    const struct feat_node *feat;
+    enum psr_feat_type feat_type;
+    unsigned int cos, i;
+
+    ASSERT(val);
+
+    if ( IS_ERR(info) )
+        return PTR_ERR(info);
+
+    feat_type = psr_cbm_type_to_feat_type(type);
+    if ( feat_type >= ARRAY_SIZE(info->features) )
+        return -ENOENT;
+
+    feat = info->features[feat_type];
+    if ( !feat )
+        return -ENOENT;
+
+    if ( !feat_props[feat_type] )
+    {
+        ASSERT_UNREACHABLE();
+        return -ENOENT;
+    }
+
+    cos = d->arch.psr_cos_ids[socket];
+    /*
+     * If input cos exceeds current feature's cos_max, we should return its
+     * default value which is stored in cos 0. This case only happens
+     * when more than two features enabled concurrently and at least one
+     * features's cos_max is bigger than others. When a domain's working cos
+     * id is bigger than some features' cos_max, HW automatically works as
+     * default value for those features which cos_max is smaller.
+     */
+    if ( cos > feat->cos_max )
+        cos = 0;
+
+    for ( i = 0; i < feat_props[feat_type]->cos_num; i++ )
+    {
+        if ( type == feat_props[feat_type]->type[i] )
+        {
+            *val = feat->cos_reg_val[cos * feat_props[feat_type]->cos_num + i];
+            return 0;
+        }
+    }
+
+    return -EINVAL;
 }
 
 int psr_set_l3_cbm(struct domain *d, unsigned int socket,

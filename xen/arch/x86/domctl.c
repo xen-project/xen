@@ -1442,6 +1442,8 @@ long arch_do_domctl(
     case XEN_DOMCTL_psr_cat_op:
         switch ( domctl->u.psr_cat_op.cmd )
         {
+            uint32_t val32;
+
         case XEN_DOMCTL_PSR_CAT_OP_SET_L3_CBM:
             ret = psr_set_l3_cbm(d, domctl->u.psr_cat_op.target,
                                  domctl->u.psr_cat_op.data,
@@ -1461,23 +1463,23 @@ long arch_do_domctl(
             break;
 
         case XEN_DOMCTL_PSR_CAT_OP_GET_L3_CBM:
-            ret = psr_get_l3_cbm(d, domctl->u.psr_cat_op.target,
-                                 &domctl->u.psr_cat_op.data,
-                                 PSR_CBM_TYPE_L3);
+            ret = psr_get_val(d, domctl->u.psr_cat_op.target,
+                              &val32, PSR_CBM_TYPE_L3);
+            domctl->u.psr_cat_op.data = val32;
             copyback = true;
             break;
 
         case XEN_DOMCTL_PSR_CAT_OP_GET_L3_CODE:
-            ret = psr_get_l3_cbm(d, domctl->u.psr_cat_op.target,
-                                 &domctl->u.psr_cat_op.data,
-                                 PSR_CBM_TYPE_L3_CODE);
+            ret = psr_get_val(d, domctl->u.psr_cat_op.target,
+                              &val32, PSR_CBM_TYPE_L3_CODE);
+            domctl->u.psr_cat_op.data = val32;
             copyback = true;
             break;
 
         case XEN_DOMCTL_PSR_CAT_OP_GET_L3_DATA:
-            ret = psr_get_l3_cbm(d, domctl->u.psr_cat_op.target,
-                                 &domctl->u.psr_cat_op.data,
-                                 PSR_CBM_TYPE_L3_DATA);
+            ret = psr_get_val(d, domctl->u.psr_cat_op.target,
+                              &val32, PSR_CBM_TYPE_L3_DATA);
+            domctl->u.psr_cat_op.data = val32;
             copyback = true;
             break;
 
