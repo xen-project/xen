@@ -490,19 +490,21 @@ int main_psr_cat_cbm_set(int argc, char **argv)
     char *value;
     libxl_string_list socket_list;
     unsigned long start, end;
-    int i, j, len;
+    unsigned int i, j, len;
+    unsigned int lvl = 3;
 
     static struct option opts[] = {
         {"socket", 1, 0, 's'},
         {"data", 0, 0, 'd'},
         {"code", 0, 0, 'c'},
+        {"level", 1, 0, 'l'},
         COMMON_LONG_OPTS
     };
 
     libxl_socket_bitmap_alloc(ctx, &target_map, 0);
     libxl_bitmap_set_none(&target_map);
 
-    SWITCH_FOREACH_OPT(opt, "s:cd", opts, "psr-cat-cbm-set", 2) {
+    SWITCH_FOREACH_OPT(opt, "s:l:cd", opts, "psr-cat-set", 2) {
     case 's':
         trim(isspace, optarg, &value);
         split_string_into_string_list(value, ",", &socket_list);
@@ -522,24 +524,35 @@ int main_psr_cat_cbm_set(int argc, char **argv)
     case 'c':
         opt_code = 1;
         break;
+    case 'l':
+        lvl = atoi(optarg);
+        break;
     }
 
-    if (opt_data && opt_code) {
-        fprintf(stderr, "Cannot handle -c and -d at the same time\n");
-        return -1;
-    } else if (opt_data) {
-        type = LIBXL_PSR_CBM_TYPE_L3_CBM_DATA;
-    } else if (opt_code) {
-        type = LIBXL_PSR_CBM_TYPE_L3_CBM_CODE;
+    if (lvl == 2)
+        type = LIBXL_PSR_CBM_TYPE_L2_CBM;
+    else if (lvl == 3) {
+        if (opt_data && opt_code) {
+            fprintf(stderr, "Cannot handle -c and -d at the same time\n");
+            return EXIT_FAILURE;
+        } else if (opt_data) {
+            type = LIBXL_PSR_CBM_TYPE_L3_CBM_DATA;
+        } else if (opt_code) {
+            type = LIBXL_PSR_CBM_TYPE_L3_CBM_CODE;
+        } else {
+            type = LIBXL_PSR_CBM_TYPE_L3_CBM;
+        }
     } else {
         type = LIBXL_PSR_CBM_TYPE_L3_CBM;
+        fprintf(stderr, "Input lvl %d is wrong\n", lvl);
+        return EXIT_FAILURE;
     }
 
     if (libxl_bitmap_is_empty(&target_map))
         libxl_bitmap_set_any(&target_map);
 
     if (argc != optind + 2) {
-        help("psr-cat-cbm-set");
+        help("psr-cat-set");
         return 2;
     }
 

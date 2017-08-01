@@ -266,6 +266,9 @@ int xc_psr_cat_set_domain_data(xc_interface *xch, uint32_t domid,
     case XC_PSR_CAT_L3_CBM_DATA:
         cmd = XEN_DOMCTL_PSR_CAT_OP_SET_L3_DATA;
         break;
+    case XC_PSR_CAT_L2_CBM:
+        cmd = XEN_DOMCTL_PSR_CAT_OP_SET_L2_CBM;
+        break;
     default:
         errno = EINVAL;
         return -1;

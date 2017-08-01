@@ -546,11 +546,12 @@ struct cmd_spec cmd_table[] = {
     },
 #endif
 #ifdef LIBXL_HAVE_PSR_CAT
-    { "psr-cat-cbm-set",
+    { "psr-cat-set",
       &main_psr_cat_cbm_set, 0, 1,
       "Set cache capacity bitmasks(CBM) for a domain",
       "[options] <Domain> <CBM>",
       "-s <socket>       Specify the socket to process, otherwise all sockets are processed\n"
+      "-l <level>        Specify the cache level to process, otherwise L3 cache is processed\n"
       "-c                Set code CBM if CDP is supported\n"
       "-d                Set data CBM if CDP is supported\n"
     },
