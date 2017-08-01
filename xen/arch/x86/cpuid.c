@@ -35,12 +35,6 @@ static void cpuid_leaf(uint32_t leaf, struct cpuid_leaf *data)
     cpuid(leaf, &data->a, &data->b, &data->c, &data->d);
 }
 
-static void cpuid_count_leaf(uint32_t leaf, uint32_t subleaf,
-                             struct cpuid_leaf *data)
-{
-    cpuid_count(leaf, subleaf, &data->a, &data->b, &data->c, &data->d);
-}
-
 static void sanitise_featureset(uint32_t *fs)
 {
     /* for_each_set_bit() uses unsigned longs.  Extend with zeroes. */

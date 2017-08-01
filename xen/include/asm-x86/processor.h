@@ -13,6 +13,7 @@
 #include <asm/types.h>
 #include <asm/cpufeature.h>
 #include <asm/desc.h>
+#include <asm/x86_emulate.h>
 #endif
 
 #include <asm/x86-defns.h>
@@ -262,6 +263,12 @@ static always_inline unsigned int cpuid_count_ebx(
     cpuid_count(leaf, subleaf, &tmp, &ebx, &tmp, &tmp);
 
     return ebx;
+}
+
+static always_inline void cpuid_count_leaf(uint32_t leaf, uint32_t subleaf,
+                                           struct cpuid_leaf *data)
+{
+    cpuid_count(leaf, subleaf, &data->a, &data->b, &data->c, &data->d);
 }
 
 static inline unsigned long read_cr0(void)
