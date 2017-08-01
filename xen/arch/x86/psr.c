@@ -63,6 +63,7 @@
 enum psr_feat_type {
     FEAT_TYPE_L3_CAT,
     FEAT_TYPE_L3_CDP,
+    FEAT_TYPE_L2_CAT,
     FEAT_TYPE_NUM,
     FEAT_TYPE_UNKNOWN,
 };
@@ -159,6 +160,7 @@ static DEFINE_PER_CPU(struct psr_assoc, psr_assoc);
  * array creation. It is used to transiently store a spare node.
  */
 static struct feat_node *feat_l3;
+static struct feat_node *feat_l2_cat;
 
 /* Common functions */
 #define cat_default_val(len) (0xffffffff >> (32 - (len)))
@@ -273,6 +275,12 @@ static int cat_init_feature(const struct cpuid_leaf *regs,
                             struct psr_socket_info *info,
                             enum psr_feat_type type)
 {
+    const char *const cat_feat_name[FEAT_TYPE_NUM] = {
+        [FEAT_TYPE_L3_CAT] = "L3 CAT",
+        [FEAT_TYPE_L3_CDP] = "L3 CDP",
+        [FEAT_TYPE_L2_CAT] = "L2 CAT",
+    };
+
     /* No valid value so do not enable feature. */
     if ( !regs->a || !regs->d )
         return -ENOENT;
@@ -283,13 +291,17 @@ static int cat_init_feature(const struct cpuid_leaf *regs,
     switch ( type )
     {
     case FEAT_TYPE_L3_CAT:
+    case FEAT_TYPE_L2_CAT:
         if ( feat->cos_max < 1 )
             return -ENOENT;
 
         /* We reserve cos=0 as default cbm (all bits within cbm_len are 1). */
         feat->cos_reg_val[0] = cat_default_val(feat->cbm_len);
 
-        wrmsrl(MSR_IA32_PSR_L3_MASK(0), cat_default_val(feat->cbm_len));
+        wrmsrl((type == FEAT_TYPE_L3_CAT ?
+                MSR_IA32_PSR_L3_MASK(0) :
+                MSR_IA32_PSR_L2_MASK(0)),
+               cat_default_val(feat->cbm_len));
 
         break;
 
@@ -327,8 +339,8 @@ static int cat_init_feature(const struct cpuid_leaf *regs,
         return 0;
 
     printk(XENLOG_INFO "%s: enabled on socket %u, cos_max:%u, cbm_len:%u\n",
-           ((type == FEAT_TYPE_L3_CDP) ? "L3 CDP" : "L3 CAT"),
-           cpu_to_socket(smp_processor_id()), feat->cos_max, feat->cbm_len);
+           cat_feat_name[type], cpu_to_socket(smp_processor_id()),
+           feat->cos_max, feat->cbm_len);
 
     return 0;
 }
@@ -387,6 +399,19 @@ static const struct feat_props l3_cdp_props = {
     .alt_type = PSR_CBM_TYPE_L3,
     .get_feat_info = l3_cdp_get_feat_info,
     .write_msr = l3_cdp_write_msr,
+};
+
+/* L2 CAT props */
+static void l2_cat_write_msr(unsigned int cos, uint32_t val, enum cbm_type type)
+{
+}
+
+static const struct feat_props l2_cat_props = {
+    .cos_num = 1,
+    .type[0] = PSR_CBM_TYPE_L2,
+    .alt_type = PSR_CBM_TYPE_UNKNOWN,
+    .get_feat_info = cat_get_feat_info,
+    .write_msr = l2_cat_write_msr,
 };
 
 static void __init parse_psr_bool(char *s, char *value, char *feature,
@@ -1343,6 +1368,10 @@ static int psr_cpu_prepare(void)
          (feat_l3 = xzalloc(struct feat_node)) == NULL )
         return -ENOMEM;
 
+    if ( feat_l2_cat == NULL &&
+         (feat_l2_cat = xzalloc(struct feat_node)) == NULL )
+        return -ENOMEM;
+
     return 0;
 }
 
@@ -1389,6 +1418,19 @@ static void psr_cpu_init(void)
             else
                 feat_l3 = feat;
         }
+    }
+
+    cpuid_count_leaf(PSR_CPUID_LEVEL_CAT, 0, &regs);
+    if ( regs.b & PSR_RESOURCE_TYPE_L2 )
+    {
+        cpuid_count_leaf(PSR_CPUID_LEVEL_CAT, 2, &regs);
+
+        feat = feat_l2_cat;
+        feat_l2_cat = NULL;
+        if ( !cat_init_feature(&regs, feat, info, FEAT_TYPE_L2_CAT) )
+            feat_props[FEAT_TYPE_L2_CAT] = &l2_cat_props;
+        else
+            feat_l2_cat = feat;
     }
 
     info->feat_init = true;

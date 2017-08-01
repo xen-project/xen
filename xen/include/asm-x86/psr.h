@@ -23,6 +23,7 @@
 
 /* Resource Type Enumeration */
 #define PSR_RESOURCE_TYPE_L3            0x2
+#define PSR_RESOURCE_TYPE_L2            0x4
 
 /* L3 Monitoring Features */
 #define PSR_CMT_L3_OCCUPANCY            0x1
@@ -56,6 +57,7 @@ enum cbm_type {
     PSR_CBM_TYPE_L3,
     PSR_CBM_TYPE_L3_CODE,
     PSR_CBM_TYPE_L3_DATA,
+    PSR_CBM_TYPE_L2,
     PSR_CBM_TYPE_UNKNOWN,
 };
 
