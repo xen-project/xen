@@ -210,6 +210,29 @@ static enum psr_feat_type psr_cbm_type_to_feat_type(enum cbm_type type)
     return feat_type;
 }
 
+static bool psr_check_cbm(unsigned int cbm_len, unsigned long cbm)
+{
+    unsigned int first_bit, zero_bit;
+
+    /* Set bits should only in the range of [0, cbm_len]. */
+    if ( cbm & (~0ul << cbm_len) )
+        return false;
+
+    /* At least one bit need to be set. */
+    if ( cbm == 0 )
+        return false;
+
+    first_bit = find_first_bit(&cbm, cbm_len);
+    zero_bit = find_next_zero_bit(&cbm, cbm_len, first_bit);
+
+    /* Set bits should be contiguous. */
+    if ( zero_bit < cbm_len &&
+         find_next_bit(&cbm, cbm_len, zero_bit) < cbm_len )
+        return false;
+
+    return true;
+}
+
 /* CAT common functions implementation. */
 static int cat_init_feature(const struct cpuid_leaf *regs,
                             struct feat_node *feat,
@@ -601,7 +624,14 @@ int psr_get_val(struct domain *d, unsigned int socket,
 /* Set value functions */
 static unsigned int get_cos_num(void)
 {
-    return 0;
+    unsigned int num = 0, i;
+
+    /* Get all features total amount. */
+    for ( i = 0; i < ARRAY_SIZE(feat_props); i++ )
+        if ( feat_props[i] )
+            num += feat_props[i]->cos_num;
+
+    return num;
 }
 
 static int gather_val_array(uint32_t val[],
@@ -609,7 +639,68 @@ static int gather_val_array(uint32_t val[],
                             const struct psr_socket_info *info,
                             unsigned int old_cos)
 {
-    return -EINVAL;
+    unsigned int i;
+
+    if ( !val )
+        return -EINVAL;
+
+    /* Get all features current values according to old_cos. */
+    for ( i = 0; i < ARRAY_SIZE(info->features); i++ )
+    {
+        unsigned int cos = old_cos, j;
+        const struct feat_node *feat = info->features[i];
+        const struct feat_props *props = feat_props[i];
+
+        if ( !feat )
+            continue;
+
+        if ( !props )
+        {
+            ASSERT_UNREACHABLE();
+            return -ENOENT;
+        }
+
+        if ( array_len < props->cos_num )
+            return -ENOSPC;
+
+        /*
+         * If old_cos exceeds current feature's cos_max, we should get
+         * default value. So assign cos to 0 which stores default value.
+         */
+        if ( cos > feat->cos_max )
+            cos = 0;
+
+        /* Value getting order is same as feature array. */
+        for ( j = 0; j < props->cos_num; j++ )
+            val[j] = feat->cos_reg_val[cos * props->cos_num + j];
+
+        array_len -= props->cos_num;
+        val += props->cos_num;
+    }
+
+    return 0;
+}
+
+static int skip_prior_features(unsigned int *array_len,
+                               enum psr_feat_type feat_type)
+{
+    unsigned int i, skip_len = 0;
+
+    for ( i = 0; i < feat_type; i++ )
+    {
+        const struct feat_props *props = feat_props[i];
+
+        if ( !props )
+            continue;
+
+        if ( *array_len <= props->cos_num )
+            return -ENOSPC;
+
+        *array_len -= props->cos_num;
+        skip_len += props->cos_num;
+    }
+
+    return skip_len;
 }
 
 static int insert_val_into_array(uint32_t val[],
@@ -619,6 +710,46 @@ static int insert_val_into_array(uint32_t val[],
                                  enum cbm_type type,
                                  uint32_t new_val)
 {
+    const struct feat_node *feat;
+    const struct feat_props *props;
+    unsigned int i;
+    int ret;
+
+    ASSERT(feat_type < FEAT_TYPE_NUM);
+
+    ret = skip_prior_features(&array_len, feat_type);
+    if ( ret < 0 )
+        return ret;
+
+    val += ret;
+
+    feat = info->features[feat_type];
+    if ( !feat )
+        return -ENOENT;
+
+    props = feat_props[feat_type];
+    if ( !props )
+    {
+        ASSERT_UNREACHABLE();
+        return -ENOENT;
+    }
+
+    if ( array_len < props->cos_num )
+        return -ENOSPC;
+
+    if ( !psr_check_cbm(feat->cbm_len, new_val) )
+        return -EINVAL;
+
+    /* Value setting position is same as feature array. */
+    for ( i = 0; i < props->cos_num; i++ )
+    {
+        if ( type == props->type[i] )
+        {
+            val[i] = new_val;
+            return 0;
+        }
+    }
+
     return -EINVAL;
 }
 
