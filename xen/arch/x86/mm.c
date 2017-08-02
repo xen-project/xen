@@ -534,20 +534,23 @@ void update_cr3(struct vcpu *v)
     make_cr3(v, cr3_mfn);
 }
 
-/* Get a mapping of a PV guest's l1e for this virtual address. */
-static l1_pgentry_t *guest_map_l1e(unsigned long addr, unsigned long *gl1mfn)
+/*
+ * Get a mapping of a PV guest's l1e for this linear address.  The return
+ * pointer should be unmapped using unmap_domain_page().
+ */
+static l1_pgentry_t *map_guest_l1e(unsigned long linear, mfn_t *gl1mfn)
 {
     l2_pgentry_t l2e;
 
     ASSERT(!paging_mode_translate(current->domain));
     ASSERT(!paging_mode_external(current->domain));
 
-    if ( unlikely(!__addr_ok(addr)) )
+    if ( unlikely(!__addr_ok(linear)) )
         return NULL;
 
     /* Find this l1e and its enclosing l1mfn in the linear map. */
     if ( __copy_from_user(&l2e,
-                          &__linear_l2_table[l2_linear_offset(addr)],
+                          &__linear_l2_table[l2_linear_offset(linear)],
                           sizeof(l2_pgentry_t)) )
         return NULL;
 
@@ -555,16 +558,9 @@ static l1_pgentry_t *guest_map_l1e(unsigned long addr, unsigned long *gl1mfn)
     if ( (l2e_get_flags(l2e) & (_PAGE_PRESENT | _PAGE_PSE)) != _PAGE_PRESENT )
         return NULL;
 
-    *gl1mfn = l2e_get_pfn(l2e);
+    *gl1mfn = l2e_get_mfn(l2e);
 
-    return (l1_pgentry_t *)map_domain_page(_mfn(*gl1mfn)) +
-           l1_table_offset(addr);
-}
-
-/* Pull down the mapping we got from guest_map_l1e(). */
-static inline void guest_unmap_l1e(void *p)
-{
-    unmap_domain_page(p);
+    return (l1_pgentry_t *)map_domain_page(*gl1mfn) + l1_table_offset(linear);
 }
 
 /* Read a PV guest's l1e that maps this linear address. */
@@ -3977,30 +3973,30 @@ static int create_grant_va_mapping(
 {
     l1_pgentry_t *pl1e, ol1e;
     struct domain *d = v->domain;
-    unsigned long gl1mfn;
+    mfn_t gl1mfn;
     struct page_info *l1pg;
     int okay;
 
     nl1e = adjust_guest_l1e(nl1e, d);
 
-    pl1e = guest_map_l1e(va, &gl1mfn);
+    pl1e = map_guest_l1e(va, &gl1mfn);
     if ( !pl1e )
     {
         gdprintk(XENLOG_WARNING, "Could not find L1 PTE for address %lx\n", va);
         return GNTST_general_error;
     }
 
-    if ( !get_page_from_mfn(_mfn(gl1mfn), current->domain) )
+    if ( !get_page_from_mfn(gl1mfn, current->domain) )
     {
-        guest_unmap_l1e(pl1e);
+        unmap_domain_page(pl1e);
         return GNTST_general_error;
     }
 
-    l1pg = mfn_to_page(_mfn(gl1mfn));
+    l1pg = mfn_to_page(gl1mfn);
     if ( !page_lock(l1pg) )
     {
         put_page(l1pg);
-        guest_unmap_l1e(pl1e);
+        unmap_domain_page(pl1e);
         return GNTST_general_error;
     }
 
@@ -4008,16 +4004,16 @@ static int create_grant_va_mapping(
     {
         page_unlock(l1pg);
         put_page(l1pg);
-        guest_unmap_l1e(pl1e);
+        unmap_domain_page(pl1e);
         return GNTST_general_error;
     }
 
     ol1e = *pl1e;
-    okay = UPDATE_ENTRY(l1, pl1e, ol1e, nl1e, gl1mfn, v, 0);
+    okay = UPDATE_ENTRY(l1, pl1e, ol1e, nl1e, mfn_x(gl1mfn), v, 0);
 
     page_unlock(l1pg);
     put_page(l1pg);
-    guest_unmap_l1e(pl1e);
+    unmap_domain_page(pl1e);
 
     if ( okay )
         put_page_from_l1e(ol1e, d);
@@ -4030,24 +4026,24 @@ static int replace_grant_va_mapping(
     l1_pgentry_t nl1e, struct vcpu *v)
 {
     l1_pgentry_t *pl1e, ol1e;
-    unsigned long gl1mfn;
+    mfn_t gl1mfn;
     struct page_info *l1pg;
     int rc = 0;
 
-    pl1e = guest_map_l1e(addr, &gl1mfn);
+    pl1e = map_guest_l1e(addr, &gl1mfn);
     if ( !pl1e )
     {
         gdprintk(XENLOG_WARNING, "Could not find L1 PTE for address %lx\n", addr);
         return GNTST_general_error;
     }
 
-    if ( !get_page_from_mfn(_mfn(gl1mfn), current->domain) )
+    if ( !get_page_from_mfn(gl1mfn, current->domain) )
     {
         rc = GNTST_general_error;
         goto out;
     }
 
-    l1pg = mfn_to_page(_mfn(gl1mfn));
+    l1pg = mfn_to_page(gl1mfn);
     if ( !page_lock(l1pg) )
     {
         rc = GNTST_general_error;
@@ -4086,7 +4082,7 @@ static int replace_grant_va_mapping(
                  l1e_get_flags(ol1e), addr, grant_pte_flags);
 
     /* Delete pagetable entry. */
-    if ( unlikely(!UPDATE_ENTRY(l1, pl1e, ol1e, nl1e, gl1mfn, v, 0)) )
+    if ( unlikely(!UPDATE_ENTRY(l1, pl1e, ol1e, nl1e, mfn_x(gl1mfn), v, 0)) )
     {
         gdprintk(XENLOG_WARNING, "Cannot delete PTE entry for %"PRIx64"\n",
                  addr);
@@ -4098,7 +4094,7 @@ static int replace_grant_va_mapping(
     page_unlock(l1pg);
     put_page(l1pg);
  out:
-    guest_unmap_l1e(pl1e);
+    unmap_domain_page(pl1e);
     return rc;
 }
 
@@ -4143,7 +4139,7 @@ int replace_grant_pv_mapping(uint64_t addr, unsigned long frame,
 {
     struct vcpu *curr = current;
     l1_pgentry_t *pl1e, ol1e;
-    unsigned long gl1mfn;
+    mfn_t gl1mfn;
     struct page_info *l1pg;
     int rc;
     unsigned int grant_pte_flags;
@@ -4177,7 +4173,7 @@ int replace_grant_pv_mapping(uint64_t addr, unsigned long frame,
     if ( !new_addr )
         return destroy_grant_va_mapping(addr, frame, grant_pte_flags, curr);
 
-    pl1e = guest_map_l1e(new_addr, &gl1mfn);
+    pl1e = map_guest_l1e(new_addr, &gl1mfn);
     if ( !pl1e )
     {
         gdprintk(XENLOG_WARNING,
@@ -4185,17 +4181,17 @@ int replace_grant_pv_mapping(uint64_t addr, unsigned long frame,
         return GNTST_general_error;
     }
 
-    if ( !get_page_from_mfn(_mfn(gl1mfn), current->domain) )
+    if ( !get_page_from_mfn(gl1mfn, current->domain) )
     {
-        guest_unmap_l1e(pl1e);
+        unmap_domain_page(pl1e);
         return GNTST_general_error;
     }
 
-    l1pg = mfn_to_page(_mfn(gl1mfn));
+    l1pg = mfn_to_page(gl1mfn);
     if ( !page_lock(l1pg) )
     {
         put_page(l1pg);
-        guest_unmap_l1e(pl1e);
+        unmap_domain_page(pl1e);
         return GNTST_general_error;
     }
 
@@ -4203,25 +4199,25 @@ int replace_grant_pv_mapping(uint64_t addr, unsigned long frame,
     {
         page_unlock(l1pg);
         put_page(l1pg);
-        guest_unmap_l1e(pl1e);
+        unmap_domain_page(pl1e);
         return GNTST_general_error;
     }
 
     ol1e = *pl1e;
 
     if ( unlikely(!UPDATE_ENTRY(l1, pl1e, ol1e, l1e_empty(),
-                                gl1mfn, curr, 0)) )
+                                mfn_x(gl1mfn), curr, 0)) )
     {
         page_unlock(l1pg);
         put_page(l1pg);
         gdprintk(XENLOG_WARNING, "Cannot delete PTE entry at %p\n", pl1e);
-        guest_unmap_l1e(pl1e);
+        unmap_domain_page(pl1e);
         return GNTST_general_error;
     }
 
     page_unlock(l1pg);
     put_page(l1pg);
-    guest_unmap_l1e(pl1e);
+    unmap_domain_page(pl1e);
 
     rc = replace_grant_va_mapping(addr, frame, grant_pte_flags, ol1e, curr);
     if ( rc )
@@ -4344,7 +4340,8 @@ static int __do_update_va_mapping(
     struct domain *d   = v->domain;
     struct page_info *gl1pg;
     l1_pgentry_t  *pl1e;
-    unsigned long  bmap_ptr, gl1mfn;
+    unsigned long  bmap_ptr;
+    mfn_t          gl1mfn;
     cpumask_t     *mask = NULL;
     int            rc;
 
@@ -4355,11 +4352,11 @@ static int __do_update_va_mapping(
         return rc;
 
     rc = -EINVAL;
-    pl1e = guest_map_l1e(va, &gl1mfn);
-    if ( unlikely(!pl1e || !get_page_from_mfn(_mfn(gl1mfn), d)) )
+    pl1e = map_guest_l1e(va, &gl1mfn);
+    if ( unlikely(!pl1e || !get_page_from_mfn(gl1mfn, d)) )
         goto out;
 
-    gl1pg = mfn_to_page(_mfn(gl1mfn));
+    gl1pg = mfn_to_page(gl1mfn);
     if ( !page_lock(gl1pg) )
     {
         put_page(gl1pg);
@@ -4373,14 +4370,14 @@ static int __do_update_va_mapping(
         goto out;
     }
 
-    rc = mod_l1_entry(pl1e, val, gl1mfn, 0, v, pg_owner);
+    rc = mod_l1_entry(pl1e, val, mfn_x(gl1mfn), 0, v, pg_owner);
 
     page_unlock(gl1pg);
     put_page(gl1pg);
 
  out:
     if ( pl1e )
-        guest_unmap_l1e(pl1e);
+        unmap_domain_page(pl1e);
 
     switch ( flags & UVMF_FLUSHTYPE_MASK )
     {
