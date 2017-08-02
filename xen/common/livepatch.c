@@ -417,9 +417,12 @@ static int move_payload(struct payload *payload, struct livepatch_elf *elf)
         }
     }
 
-    /* Only one RW section with non-zero size: .livepatch.funcs */
-    if ( rw_buf_cnt == 1 &&
-         !strcmp(elf->sec[rw_buf_sec].name, ELF_LIVEPATCH_FUNC) )
+    /*
+     * Only one RW section with non-zero size: .livepatch.funcs,
+     * or only RO sections.
+     */
+    if ( !rw_buf_cnt || (rw_buf_cnt == 1 &&
+         !strcmp(elf->sec[rw_buf_sec].name, ELF_LIVEPATCH_FUNC)) )
         payload->safe_to_reapply = true;
  out:
     xfree(offset);
