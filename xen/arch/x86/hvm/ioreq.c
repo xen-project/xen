@@ -221,63 +221,75 @@ bool handle_hvm_io_completion(struct vcpu *v)
     return true;
 }
 
-static int hvm_alloc_ioreq_gfn(struct domain *d, unsigned long *gfn)
+static unsigned long hvm_alloc_ioreq_gfn(struct hvm_ioreq_server *s)
 {
+    struct domain *d = s->target;
     unsigned int i;
-    int rc;
 
-    rc = -ENOMEM;
+    ASSERT(!IS_DEFAULT(s));
+
     for ( i = 0; i < sizeof(d->arch.hvm_domain.ioreq_gfn.mask) * 8; i++ )
     {
         if ( test_and_clear_bit(i, &d->arch.hvm_domain.ioreq_gfn.mask) )
-        {
-            *gfn = d->arch.hvm_domain.ioreq_gfn.base + i;
-            rc = 0;
-            break;
-        }
+            return d->arch.hvm_domain.ioreq_gfn.base + i;
     }
 
-    return rc;
+    return gfn_x(INVALID_GFN);
 }
 
-static void hvm_free_ioreq_gfn(struct domain *d, unsigned long gfn)
+static void hvm_free_ioreq_gfn(struct hvm_ioreq_server *s,
+                               unsigned long gfn)
 {
+    struct domain *d = s->target;
     unsigned int i = gfn - d->arch.hvm_domain.ioreq_gfn.base;
 
-    if ( gfn != gfn_x(INVALID_GFN) )
-        set_bit(i, &d->arch.hvm_domain.ioreq_gfn.mask);
+    ASSERT(!IS_DEFAULT(s));
+    ASSERT(gfn != gfn_x(INVALID_GFN));
+
+    set_bit(i, &d->arch.hvm_domain.ioreq_gfn.mask);
 }
 
-static void hvm_unmap_ioreq_page(struct hvm_ioreq_server *s, bool buf)
+static void hvm_unmap_ioreq_gfn(struct hvm_ioreq_server *s, bool buf)
 {
     struct hvm_ioreq_page *iorp = buf ? &s->bufioreq : &s->ioreq;
 
+    if ( iorp->gfn == gfn_x(INVALID_GFN) )
+        return;
+
     destroy_ring_for_helper(&iorp->va, iorp->page);
+    iorp->page = NULL;
+
+    if ( !IS_DEFAULT(s) )
+        hvm_free_ioreq_gfn(s, iorp->gfn);
+
+    iorp->gfn = gfn_x(INVALID_GFN);
 }
 
-static int hvm_map_ioreq_page(
-    struct hvm_ioreq_server *s, bool buf, unsigned long gfn)
+static int hvm_map_ioreq_gfn(struct hvm_ioreq_server *s, bool buf)
 {
     struct domain *d = s->target;
     struct hvm_ioreq_page *iorp = buf ? &s->bufioreq : &s->ioreq;
-    struct page_info *page;
-    void *va;
     int rc;
 
-    if ( (rc = prepare_ring_for_helper(d, gfn, &page, &va)) )
-        return rc;
-
-    if ( (iorp->va != NULL) || d->is_dying )
-    {
-        destroy_ring_for_helper(&va, page);
+    if ( d->is_dying )
         return -EINVAL;
-    }
 
-    iorp->va = va;
-    iorp->page = page;
-    iorp->gfn = gfn;
+    if ( IS_DEFAULT(s) )
+        iorp->gfn = buf ?
+                    d->arch.hvm_domain.params[HVM_PARAM_BUFIOREQ_PFN] :
+                    d->arch.hvm_domain.params[HVM_PARAM_IOREQ_PFN];
+    else
+        iorp->gfn = hvm_alloc_ioreq_gfn(s);
 
-    return 0;
+    if ( iorp->gfn == gfn_x(INVALID_GFN) )
+        return -ENOMEM;
+
+    rc = prepare_ring_for_helper(d, iorp->gfn, &iorp->page, &iorp->va);
+
+    if ( rc )
+        hvm_unmap_ioreq_gfn(s, buf);
+
+    return rc;
 }
 
 bool is_ioreq_server_page(struct domain *d, const struct page_info *page)
@@ -290,8 +302,7 @@ bool is_ioreq_server_page(struct domain *d, const struct page_info *page)
 
     FOR_EACH_IOREQ_SERVER(d, id, s)
     {
-        if ( (s->ioreq.va && s->ioreq.page == page) ||
-             (s->bufioreq.va && s->bufioreq.page == page) )
+        if ( (s->ioreq.page == page) || (s->bufioreq.page == page) )
         {
             found = true;
             break;
@@ -303,19 +314,29 @@ bool is_ioreq_server_page(struct domain *d, const struct page_info *page)
     return found;
 }
 
-static void hvm_remove_ioreq_gfn(
-    struct domain *d, struct hvm_ioreq_page *iorp)
+static void hvm_remove_ioreq_gfn(struct hvm_ioreq_server *s, bool buf)
+
 {
+    struct domain *d = s->target;
+    struct hvm_ioreq_page *iorp = buf ? &s->bufioreq : &s->ioreq;
+
+    if ( IS_DEFAULT(s) || iorp->gfn == gfn_x(INVALID_GFN) )
+        return;
+
     if ( guest_physmap_remove_page(d, _gfn(iorp->gfn),
                                    _mfn(page_to_mfn(iorp->page)), 0) )
         domain_crash(d);
     clear_page(iorp->va);
 }
 
-static int hvm_add_ioreq_gfn(
-    struct domain *d, struct hvm_ioreq_page *iorp)
+static int hvm_add_ioreq_gfn(struct hvm_ioreq_server *s, bool buf)
 {
+    struct domain *d = s->target;
+    struct hvm_ioreq_page *iorp = buf ? &s->bufioreq : &s->ioreq;
     int rc;
+
+    if ( IS_DEFAULT(s) || iorp->gfn == gfn_x(INVALID_GFN) )
+        return 0;
 
     clear_page(iorp->va);
 
@@ -452,78 +473,25 @@ static void hvm_ioreq_server_remove_all_vcpus(struct hvm_ioreq_server *s)
 }
 
 static int hvm_ioreq_server_map_pages(struct hvm_ioreq_server *s,
-                                      unsigned long ioreq_gfn,
-                                      unsigned long bufioreq_gfn)
+                                      bool handle_bufioreq)
 {
     int rc;
 
-    rc = hvm_map_ioreq_page(s, false, ioreq_gfn);
-    if ( rc )
-        return rc;
-
-    if ( bufioreq_gfn != gfn_x(INVALID_GFN) )
-        rc = hvm_map_ioreq_page(s, true, bufioreq_gfn);
-
-    if ( rc )
-        hvm_unmap_ioreq_page(s, false);
-
-    return rc;
-}
-
-static int hvm_ioreq_server_setup_pages(struct hvm_ioreq_server *s,
-                                        bool handle_bufioreq)
-{
-    struct domain *d = s->target;
-    unsigned long ioreq_gfn = gfn_x(INVALID_GFN);
-    unsigned long bufioreq_gfn = gfn_x(INVALID_GFN);
-    int rc;
-
-    if ( IS_DEFAULT(s) )
-    {
-        /*
-         * The default ioreq server must handle buffered ioreqs, for
-         * backwards compatibility.
-         */
-        ASSERT(handle_bufioreq);
-        return hvm_ioreq_server_map_pages(s,
-                   d->arch.hvm_domain.params[HVM_PARAM_IOREQ_PFN],
-                   d->arch.hvm_domain.params[HVM_PARAM_BUFIOREQ_PFN]);
-    }
-
-    rc = hvm_alloc_ioreq_gfn(d, &ioreq_gfn);
+    rc = hvm_map_ioreq_gfn(s, false);
 
     if ( !rc && handle_bufioreq )
-        rc = hvm_alloc_ioreq_gfn(d, &bufioreq_gfn);
-
-    if ( !rc )
-        rc = hvm_ioreq_server_map_pages(s, ioreq_gfn, bufioreq_gfn);
+        rc = hvm_map_ioreq_gfn(s, true);
 
     if ( rc )
-    {
-        hvm_free_ioreq_gfn(d, ioreq_gfn);
-        hvm_free_ioreq_gfn(d, bufioreq_gfn);
-    }
+        hvm_unmap_ioreq_gfn(s, false);
 
     return rc;
 }
 
 static void hvm_ioreq_server_unmap_pages(struct hvm_ioreq_server *s)
 {
-    struct domain *d = s->target;
-    bool handle_bufioreq = !!s->bufioreq.va;
-
-    if ( handle_bufioreq )
-        hvm_unmap_ioreq_page(s, true);
-
-    hvm_unmap_ioreq_page(s, false);
-
-    if ( !IS_DEFAULT(s) )
-    {
-        if ( handle_bufioreq )
-            hvm_free_ioreq_gfn(d, s->bufioreq.gfn);
-
-        hvm_free_ioreq_gfn(d, s->ioreq.gfn);
-    }
+    hvm_unmap_ioreq_gfn(s, true);
+    hvm_unmap_ioreq_gfn(s, false);
 }
 
 static void hvm_ioreq_server_free_rangesets(struct hvm_ioreq_server *s)
@@ -583,22 +551,15 @@ static int hvm_ioreq_server_alloc_rangesets(struct hvm_ioreq_server *s,
 
 static void hvm_ioreq_server_enable(struct hvm_ioreq_server *s)
 {
-    struct domain *d = s->target;
     struct hvm_ioreq_vcpu *sv;
-    bool handle_bufioreq = !!s->bufioreq.va;
 
     spin_lock(&s->lock);
 
     if ( s->enabled )
         goto done;
 
-    if ( !IS_DEFAULT(s) )
-    {
-        hvm_remove_ioreq_gfn(d, &s->ioreq);
-
-        if ( handle_bufioreq )
-            hvm_remove_ioreq_gfn(d, &s->bufioreq);
-    }
+    hvm_remove_ioreq_gfn(s, false);
+    hvm_remove_ioreq_gfn(s, true);
 
     s->enabled = true;
 
@@ -613,21 +574,13 @@ static void hvm_ioreq_server_enable(struct hvm_ioreq_server *s)
 
 static void hvm_ioreq_server_disable(struct hvm_ioreq_server *s)
 {
-    struct domain *d = s->target;
-    bool handle_bufioreq = !!s->bufioreq.va;
-
     spin_lock(&s->lock);
 
     if ( !s->enabled )
         goto done;
 
-    if ( !IS_DEFAULT(s) )
-    {
-        if ( handle_bufioreq )
-            hvm_add_ioreq_gfn(d, &s->bufioreq);
-
-        hvm_add_ioreq_gfn(d, &s->ioreq);
-    }
+    hvm_add_ioreq_gfn(s, true);
+    hvm_add_ioreq_gfn(s, false);
 
     s->enabled = false;
 
@@ -652,6 +605,9 @@ static int hvm_ioreq_server_init(struct hvm_ioreq_server *s,
     INIT_LIST_HEAD(&s->ioreq_vcpu_list);
     spin_lock_init(&s->bufioreq_lock);
 
+    s->ioreq.gfn = gfn_x(INVALID_GFN);
+    s->bufioreq.gfn = gfn_x(INVALID_GFN);
+
     rc = hvm_ioreq_server_alloc_rangesets(s, id);
     if ( rc )
         return rc;
@@ -659,7 +615,7 @@ static int hvm_ioreq_server_init(struct hvm_ioreq_server *s,
     if ( bufioreq_handling == HVM_IOREQSRV_BUFIOREQ_ATOMIC )
         s->bufioreq_atomic = true;
 
-    rc = hvm_ioreq_server_setup_pages(
+    rc = hvm_ioreq_server_map_pages(
              s, bufioreq_handling != HVM_IOREQSRV_BUFIOREQ_OFF);
     if ( rc )
         goto fail_map;
