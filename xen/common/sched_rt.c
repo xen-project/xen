@@ -1147,9 +1147,9 @@ rt_vcpu_sleep(const struct scheduler *ops, struct vcpu *vc)
  * Called by wake() and context_saved()
  * We have a running candidate here, the kick logic is:
  * Among all the cpus that are within the cpu affinity
- * 1) if the new->cpu is idle, kick it. This could benefit cache hit
- * 2) if there are any idle vcpu, kick it.
- * 3) now all pcpus are busy;
+ * 1) if there are any idle CPUs, kick one.
+      For cache benefit, we check new->cpu as first
+ * 2) now all pcpus are busy;
  *    among all the running vcpus, pick lowest priority one
  *    if snext has higher priority, kick it.
  *
@@ -1177,17 +1177,13 @@ runq_tickle(const struct scheduler *ops, struct rt_vcpu *new)
     cpumask_and(&not_tickled, online, new->vcpu->cpu_hard_affinity);
     cpumask_andnot(&not_tickled, &not_tickled, &prv->tickled);
 
-    /* 1) if new's previous cpu is idle, kick it for cache benefit */
-    if ( is_idle_vcpu(curr_on_cpu(new->vcpu->processor)) )
-    {
-        SCHED_STAT_CRANK(tickled_idle_cpu);
-        cpu_to_tickle = new->vcpu->processor;
-        goto out;
-    }
-
-    /* 2) if there are any idle pcpu, kick it */
-    /* The same loop also find the one with lowest priority */
-    for_each_cpu(cpu, &not_tickled)
+    /*
+     * 1) If there are any idle CPUs, kick one.
+     *    For cache benefit,we first search new->cpu.
+     *    The same loop also find the one with lowest priority.
+     */
+    cpu = cpumask_test_or_cycle(new->vcpu->processor, &not_tickled);
+    while ( cpu!= nr_cpu_ids )
     {
         iter_vc = curr_on_cpu(cpu);
         if ( is_idle_vcpu(iter_vc) )
@@ -1200,9 +1196,12 @@ runq_tickle(const struct scheduler *ops, struct rt_vcpu *new)
         if ( latest_deadline_vcpu == NULL ||
              iter_svc->cur_deadline > latest_deadline_vcpu->cur_deadline )
             latest_deadline_vcpu = iter_svc;
+
+        cpumask_clear_cpu(cpu, &not_tickled);
+        cpu = cpumask_cycle(cpu, &not_tickled);
     }
 
-    /* 3) candicate has higher priority, kick out lowest priority vcpu */
+    /* 2) candicate has higher priority, kick out lowest priority vcpu */
     if ( latest_deadline_vcpu != NULL &&
          new->cur_deadline < latest_deadline_vcpu->cur_deadline )
     {
