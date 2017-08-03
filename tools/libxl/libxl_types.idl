@@ -559,10 +559,10 @@ libxl_domain_build_info = Struct("domain_build_info",[
                                        ("keymap",           string),
                                        ("sdl",              libxl_sdl_info),
                                        ("spice",            libxl_spice_info),
-                                       
+
                                        ("gfx_passthru",     libxl_defbool),
                                        ("gfx_passthru_kind", libxl_gfx_passthru_kind),
-                                       
+
                                        ("serial",           string),
                                        ("boot",             string),
                                        ("usb",              libxl_defbool),
@@ -812,6 +812,33 @@ libxl_device_vdispl = Struct("device_vdispl", [
     ("connectors", Array(libxl_connector_param, "num_connectors"))
     ])
 
+libxl_sshm_cachepolicy = Enumeration("sshm_cachepolicy", [
+    (-1, "UNKNOWN"),
+    (0,  "ARM_NORMAL"),  # ARM policies should be < 32
+    (32,  "X86_NORMAL"), # X86 policies should be >= 32
+    ], init_val = "LIBXL_SSHM_CHCHE_POLICY_UNKNOWN")
+
+libxl_sshm_prot = Enumeration("sshm_prot", [
+    (-1, "UNKNOWN"),
+    (3,  "RW"),
+    ], init_val = "LIBXL_SSHM_PROT_UNKNOWN")
+
+libxl_sshm_role = Enumeration("sshm_role", [
+    (-1, "UNKNOWN"),
+    (0,  "MASTER"),
+    (1,  "SLAVE"),
+    ], init_val = "LIBXL_SSHM_ROLE_UNKNOWN")
+
+libxl_static_shm = Struct("static_shm", [
+    ("id", string),
+    ("offset", uint64, {'init_val': 'LIBXL_SSHM_RANGE_UNKNOWN'}),
+    ("begin", uint64, {'init_val': 'LIBXL_SSHM_RANGE_UNKNOWN'}),
+    ("end", uint64, {'init_val': 'LIBXL_SSHM_RANGE_UNKNOWN'}),
+    ("prot", libxl_sshm_prot, {'init_val': 'LIBXL_SSHM_PROT_UNKNOWN'}),
+    ("cache_policy", libxl_sshm_cachepolicy, {'init_val': 'LIBXL_SSHM_CACHEPOLICY_UNKNOWN'}),
+    ("role", libxl_sshm_role, {'init_val': 'LIBXL_SSHM_ROLE_UNKNOWN'}),
+])
+
 libxl_domain_config = Struct("domain_config", [
     ("c_info", libxl_domain_create_info),
     ("b_info", libxl_domain_build_info),
@@ -831,6 +858,7 @@ libxl_domain_config = Struct("domain_config", [
     ("channels", Array(libxl_device_channel, "num_channels")),
     ("usbctrls", Array(libxl_device_usbctrl, "num_usbctrls")),
     ("usbdevs", Array(libxl_device_usbdev, "num_usbdevs")),
+    ("sshms", Array(libxl_static_shm, "num_sshms")),
 
     ("on_poweroff", libxl_action_on_shutdown),
     ("on_reboot", libxl_action_on_shutdown),
