@@ -62,6 +62,7 @@
 
 enum psr_feat_type {
     FEAT_TYPE_L3_CAT,
+    FEAT_TYPE_L3_CDP,
     FEAT_TYPE_NUM,
     FEAT_TYPE_UNKNOWN,
 };
@@ -163,6 +164,22 @@ static struct feat_node *feat_l3;
 #define cat_default_val(len) (0xffffffff >> (32 - (len)))
 
 /*
+ * get_cdp_data - get DATA COS register value from input COS ID.
+ * @feat:        the feature node.
+ * @cos:         the COS ID.
+ */
+#define get_cdp_data(feat, cos)              \
+            ((feat)->cos_reg_val[(cos) * 2])
+
+/*
+ * get_cdp_code - get CODE COS register value from input COS ID.
+ * @feat:        the feature node.
+ * @cos:         the COS ID.
+ */
+#define get_cdp_code(feat, cos)              \
+            ((feat)->cos_reg_val[(cos) * 2 + 1])
+
+/*
  * Use this function to check if any allocation feature has been enabled
  * in cmdline.
  */
@@ -262,6 +279,29 @@ static int cat_init_feature(const struct cpuid_leaf *regs,
 
         break;
 
+    case FEAT_TYPE_L3_CDP:
+    {
+        uint64_t val;
+
+        if ( feat->cos_max < 3 )
+            return -ENOENT;
+
+        /* Cut half of cos_max when CDP is enabled. */
+        feat->cos_max = (feat->cos_max - 1) >> 1;
+
+        /* We reserve cos=0 as default cbm (all bits within cbm_len are 1). */
+        get_cdp_code(feat, 0) = cat_default_val(feat->cbm_len);
+        get_cdp_data(feat, 0) = cat_default_val(feat->cbm_len);
+
+        wrmsrl(MSR_IA32_PSR_L3_MASK(0), cat_default_val(feat->cbm_len));
+        wrmsrl(MSR_IA32_PSR_L3_MASK(1), cat_default_val(feat->cbm_len));
+        rdmsrl(MSR_IA32_PSR_L3_QOS_CFG, val);
+        wrmsrl(MSR_IA32_PSR_L3_QOS_CFG,
+               val | (1ull << PSR_L3_QOS_CDP_ENABLE_BIT));
+
+        break;
+    }
+
     default:
         return -ENOENT;
     }
@@ -272,7 +312,8 @@ static int cat_init_feature(const struct cpuid_leaf *regs,
     if ( !opt_cpu_info )
         return 0;
 
-    printk(XENLOG_INFO "CAT: enabled on socket %u, cos_max:%u, cbm_len:%u\n",
+    printk(XENLOG_INFO "%s: enabled on socket %u, cos_max:%u, cbm_len:%u\n",
+           ((type == FEAT_TYPE_L3_CDP) ? "L3 CDP" : "L3 CAT"),
            cpu_to_socket(smp_processor_id()), feat->cos_max, feat->cbm_len);
 
     return 0;
@@ -303,6 +344,26 @@ static const struct feat_props l3_cat_props = {
     .alt_type = PSR_CBM_TYPE_UNKNOWN,
     .get_feat_info = cat_get_feat_info,
     .write_msr = l3_cat_write_msr,
+};
+
+/* L3 CDP props */
+static bool l3_cdp_get_feat_info(const struct feat_node *feat,
+                                 uint32_t data[], uint32_t array_len)
+{
+    return false;
+}
+
+static void l3_cdp_write_msr(unsigned int cos, uint32_t val, enum cbm_type type)
+{
+}
+
+static const struct feat_props l3_cdp_props = {
+    .cos_num = 2,
+    .type[0] = PSR_CBM_TYPE_L3_DATA,
+    .type[1] = PSR_CBM_TYPE_L3_CODE,
+    .alt_type = PSR_CBM_TYPE_L3,
+    .get_feat_info = l3_cdp_get_feat_info,
+    .write_msr = l3_cdp_write_msr,
 };
 
 static void __init parse_psr_bool(char *s, char *value, char *feature,
@@ -1283,10 +1344,18 @@ static void psr_cpu_init(void)
         feat = feat_l3;
         feat_l3 = NULL;
 
-        if ( !cat_init_feature(&regs, feat, info, FEAT_TYPE_L3_CAT) )
-            feat_props[FEAT_TYPE_L3_CAT] = &l3_cat_props;
-        else
-            feat_l3 = feat;
+        if ( (regs.c & PSR_CAT_CDP_CAPABILITY) && (opt_psr & PSR_CDP) &&
+             !cat_init_feature(&regs, feat, info, FEAT_TYPE_L3_CDP) )
+            feat_props[FEAT_TYPE_L3_CDP] = &l3_cdp_props;
+
+        /* If CDP init fails, try to work as L3 CAT. */
+        if ( !feat_props[FEAT_TYPE_L3_CDP] )
+        {
+            if ( !cat_init_feature(&regs, feat, info, FEAT_TYPE_L3_CAT) )
+                feat_props[FEAT_TYPE_L3_CAT] = &l3_cat_props;
+            else
+                feat_l3 = feat;
+        }
     }
 
     info->feat_init = true;
@@ -1348,7 +1417,7 @@ static int __init psr_presmp_init(void)
     if ( (opt_psr & PSR_CMT) && opt_rmid_max )
         init_psr_cmt(opt_rmid_max);
 
-    if ( opt_psr & PSR_CAT )
+    if ( opt_psr & (PSR_CAT | PSR_CDP) )
         init_psr();
 
     if ( psr_cpu_prepare() )
