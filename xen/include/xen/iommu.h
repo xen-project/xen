@@ -53,9 +53,6 @@ extern unsigned int iommu_dev_iotlb_timeout;
 
 int iommu_setup(void);
 
-int iommu_add_device(struct pci_dev *pdev);
-int iommu_enable_device(struct pci_dev *pdev);
-int iommu_remove_device(struct pci_dev *pdev);
 int iommu_domain_init(struct domain *d);
 void iommu_hwdom_init(struct domain *d);
 void iommu_domain_destroy(struct domain *d);

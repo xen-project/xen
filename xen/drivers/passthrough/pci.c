@@ -587,6 +587,10 @@ static void pci_enable_acs(struct pci_dev *pdev)
     pci_conf_write16(seg, bus, dev, func, pos + PCI_ACS_CTRL, ctrl);
 }
 
+static int iommu_add_device(struct pci_dev *pdev);
+static int iommu_enable_device(struct pci_dev *pdev);
+static int iommu_remove_device(struct pci_dev *pdev);
+
 int pci_add_device(u16 seg, u8 bus, u8 devfn,
                    const struct pci_dev_info *info, nodeid_t node)
 {
@@ -1254,7 +1258,7 @@ void iommu_read_msi_from_ire(
         iommu_get_ops()->read_msi_from_ire(msi_desc, msg);
 }
 
-int iommu_add_device(struct pci_dev *pdev)
+static int iommu_add_device(struct pci_dev *pdev)
 {
     const struct domain_iommu *hd;
     int rc;
@@ -1285,7 +1289,7 @@ int iommu_add_device(struct pci_dev *pdev)
     }
 }
 
-int iommu_enable_device(struct pci_dev *pdev)
+static int iommu_enable_device(struct pci_dev *pdev)
 {
     const struct domain_iommu *hd;
 
@@ -1302,7 +1306,7 @@ int iommu_enable_device(struct pci_dev *pdev)
     return hd->platform_ops->enable_device(pci_to_dev(pdev));
 }
 
-int iommu_remove_device(struct pci_dev *pdev)
+static int iommu_remove_device(struct pci_dev *pdev)
 {
     const struct domain_iommu *hd;
     u8 devfn;
