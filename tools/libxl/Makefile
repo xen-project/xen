@@ -176,7 +176,7 @@ AUTOINCS= libxlu_cfg_y.h libxlu_cfg_l.h _libxl_list.h _paths.h \
 AUTOSRCS= libxlu_cfg_y.c libxlu_cfg_l.c
 AUTOSRCS += _libxl_save_msgs_callout.c _libxl_save_msgs_helper.c
 LIBXLU_OBJS = libxlu_cfg_y.o libxlu_cfg_l.o libxlu_cfg.o \
-	libxlu_disk_l.o libxlu_disk.o libxlu_vif.o libxlu_pci.o
+	libxlu_disk_l.o libxlu_disk.o libxlu_vif.o libxlu_pci.o libxlu_sshm.o
 $(LIBXLU_OBJS): CFLAGS += $(CFLAGS_libxenctrl) # For xentoollog.h
 
 $(TEST_PROG_OBJS) _libxl.api-for-check: CFLAGS += $(CFLAGS_libxentoollog) $(CFLAGS_libxentoolcore)

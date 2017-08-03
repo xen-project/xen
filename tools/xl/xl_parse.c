@@ -860,7 +860,7 @@ void parse_config_data(const char *config_source,
     long l, vcpus = 0;
     XLU_Config *config;
     XLU_ConfigList *cpus, *vbds, *nics, *pcis, *cvfbs, *cpuids, *vtpms,
-                   *usbctrls, *usbdevs, *p9devs, *vdispls;
+                   *usbctrls, *usbdevs, *p9devs, *vdispls, *sshms;
     XLU_ConfigList *channels, *ioports, *irqs, *iomem, *viridian, *dtdevs,
                    *mca_caps;
     int num_ioports, num_irqs, num_iomem, num_cpus, num_viridian, num_mca_caps;
@@ -1550,6 +1550,28 @@ void parse_config_data(const char *config_source,
                                              d_config->num_disks,
                                              libxl_device_disk_init);
             parse_disk_config(&config, buf2, disk);
+
+            free(buf2);
+        }
+    }
+
+    if (!xlu_cfg_get_list (config, "static_shm", &sshms, 0, 0)) {
+        d_config->num_sshms = 0;
+        d_config->sshms = NULL;
+        while ((buf = xlu_cfg_get_listitem (sshms, d_config->num_sshms)) != NULL) {
+            libxl_static_shm *sshm;
+            char *buf2 = strdup(buf);
+            int ret;
+
+            sshm = ARRAY_EXTEND_INIT_NODEVID(d_config->sshms,
+                                             d_config->num_sshms,
+                                             libxl_static_shm_init);
+            ret = xlu_sshm_parse(config, buf2, sshm);
+            if (ret) {
+                fprintf(stderr,
+                        "xl: Invalid argument for static_shm: %s", buf2);
+                exit(EXIT_FAILURE);
+            }
 
             free(buf2);
         }
