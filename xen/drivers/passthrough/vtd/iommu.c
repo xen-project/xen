@@ -747,14 +747,24 @@ static void iommu_enable_translation(struct acpi_drhd_unit *drhd)
     unsigned long flags;
     struct iommu *iommu = drhd->iommu;
 
-    if ( is_igd_drhd(drhd) && !is_igd_vt_enabled_quirk() ) 
+    if ( is_igd_drhd(drhd) )
     {
-        if ( force_iommu )
-            panic("BIOS did not enable IGD for VT properly, crash Xen for security purpose");
+        if ( !iommu_igfx )
+        {
+            printk(XENLOG_INFO VTDPREFIX
+                   "Passed iommu=no-igfx option.  Disabling IGD VT-d engine.\n");
+            return;
+        }
 
-        printk(XENLOG_WARNING VTDPREFIX
-               "BIOS did not enable IGD for VT properly.  Disabling IGD VT-d engine.\n");
-        return;
+        if ( !is_igd_vt_enabled_quirk() )
+        {
+            if ( force_iommu )
+                panic("BIOS did not enable IGD for VT properly, crash Xen for security purpose");
+
+            printk(XENLOG_WARNING VTDPREFIX
+                   "BIOS did not enable IGD for VT properly.  Disabling IGD VT-d engine.\n");
+            return;
+        }
     }
 
     /* apply platform specific errata workarounds */
