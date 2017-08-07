@@ -1,5 +1,5 @@
 % Intel Cache Allocation Technology and Code and Data Prioritization Features
-% Revision 1.15
+% Revision 1.16
 
 \clearpage
 
@@ -438,7 +438,7 @@ N/A
 
 # References
 
-"INTEL® RESOURCE DIRECTOR TECHNOLOGY (INTEL® RDT) ALLOCATION FEATURES" [Intel® 64 and IA-32 Architectures Software Developer Manuals, vol3](http://www.intel.com/content/www/us/en/processors/architectures-software-developer-manuals.html)
+"INTEL RESOURCE DIRECTOR TECHNOLOGY (INTEL RDT) ALLOCATION FEATURES" [Intel 64 and IA-32 Architectures Software Developer Manuals, vol3](http://www.intel.com/content/www/us/en/processors/architectures-software-developer-manuals.html)
 
 # History
 
@@ -468,4 +468,7 @@ Date       Revision Version  Notes
                              1. Fix a typo.
 2017-08-01 1.15     Xen 4.10 Changes:
                              1. Add 'alt_type' in 'feat_props' structure.
+2017-08-04 1.16     Xen 4.10 Changes:
+                             1. Remove special character which may cause
+                                html creation failure.
 ---------- -------- -------- -------------------------------------------
