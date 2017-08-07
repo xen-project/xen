@@ -1294,10 +1294,10 @@ static void psr_free_cos(struct domain *d)
 {
     unsigned int socket, cos;
 
-    ASSERT(socket_info);
-
     if ( !d->arch.psr_cos_ids )
         return;
+
+    ASSERT(socket_info);
 
     /* Domain is destroyed so its cos_ref should be decreased. */
     for ( socket = 0; socket < nr_sockets; socket++ )
