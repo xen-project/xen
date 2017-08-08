@@ -61,15 +61,15 @@
  *
  * All memory which is shared with other entities in the system
  * (including the hypervisor and other guests) must reside in memory
- * which is mapped as Normal Inner-cacheable. This applies to:
+ * which is mapped as Normal Inner Write-Back Outer Write-Back Inner-Shareable.
+ * This applies to:
  *  - hypercall arguments passed via a pointer to guest memory.
  *  - memory shared via the grant table mechanism (including PV I/O
  *    rings etc).
  *  - memory shared with the hypervisor (struct shared_info, struct
  *    vcpu_info, the grant table, etc).
  *
- * Any Inner cache allocation strategy (Write-Back, Write-Through etc)
- * is acceptable. There is no restriction on the Outer-cacheability.
+ * Any cache allocation hints are acceptable.
  */
 
 /*
