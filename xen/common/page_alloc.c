@@ -203,12 +203,6 @@ struct scrub_region {
 static struct scrub_region __initdata region[MAX_NUMNODES];
 static unsigned long __initdata chunk_size;
 
-static void __init boot_bug(int line)
-{
-    panic("Boot BUG at %s:%d", __FILE__, line);
-}
-#define BOOT_BUG_ON(p) if ( p ) boot_bug(__LINE__);
-
 static void __init bootmem_region_add(unsigned long s, unsigned long e)
 {
     unsigned int i;
@@ -223,9 +217,8 @@ static void __init bootmem_region_add(unsigned long s, unsigned long e)
         if ( s < bootmem_region_list[i].e )
             break;
 
-    BOOT_BUG_ON((i < nr_bootmem_regions) && (e > bootmem_region_list[i].s));
-    BOOT_BUG_ON(nr_bootmem_regions ==
-                (PAGE_SIZE / sizeof(struct bootmem_region)));
+    BUG_ON((i < nr_bootmem_regions) && (e > bootmem_region_list[i].s));
+    BUG_ON(nr_bootmem_regions == (PAGE_SIZE / sizeof(struct bootmem_region)));
 
     memmove(&bootmem_region_list[i+1], &bootmem_region_list[i],
             (nr_bootmem_regions - i) * sizeof(*bootmem_region_list));
@@ -328,7 +321,7 @@ unsigned long __init alloc_boot_pages(
     unsigned long pg, _e;
     unsigned int i = nr_bootmem_regions;
 
-    BOOT_BUG_ON(!nr_bootmem_regions);
+    BUG_ON(!nr_bootmem_regions);
 
     while ( i-- )
     {
@@ -362,8 +355,7 @@ unsigned long __init alloc_boot_pages(
         return pg;
     }
 
-    BOOT_BUG_ON(1);
-    return 0;
+    BUG();
 }
 
 
