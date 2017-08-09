@@ -221,7 +221,7 @@ bool handle_hvm_io_completion(struct vcpu *v)
     return true;
 }
 
-static unsigned long hvm_alloc_ioreq_gfn(struct hvm_ioreq_server *s)
+static gfn_t hvm_alloc_ioreq_gfn(struct hvm_ioreq_server *s)
 {
     struct domain *d = s->target;
     unsigned int i;
@@ -231,20 +231,19 @@ static unsigned long hvm_alloc_ioreq_gfn(struct hvm_ioreq_server *s)
     for ( i = 0; i < sizeof(d->arch.hvm_domain.ioreq_gfn.mask) * 8; i++ )
     {
         if ( test_and_clear_bit(i, &d->arch.hvm_domain.ioreq_gfn.mask) )
-            return d->arch.hvm_domain.ioreq_gfn.base + i;
+            return _gfn(d->arch.hvm_domain.ioreq_gfn.base + i);
     }
 
-    return gfn_x(INVALID_GFN);
+    return INVALID_GFN;
 }
 
-static void hvm_free_ioreq_gfn(struct hvm_ioreq_server *s,
-                               unsigned long gfn)
+static void hvm_free_ioreq_gfn(struct hvm_ioreq_server *s, gfn_t gfn)
 {
     struct domain *d = s->target;
-    unsigned int i = gfn - d->arch.hvm_domain.ioreq_gfn.base;
+    unsigned int i = gfn_x(gfn) - d->arch.hvm_domain.ioreq_gfn.base;
 
     ASSERT(!IS_DEFAULT(s));
-    ASSERT(gfn != gfn_x(INVALID_GFN));
+    ASSERT(!gfn_eq(gfn, INVALID_GFN));
 
     set_bit(i, &d->arch.hvm_domain.ioreq_gfn.mask);
 }
@@ -253,7 +252,7 @@ static void hvm_unmap_ioreq_gfn(struct hvm_ioreq_server *s, bool buf)
 {
     struct hvm_ioreq_page *iorp = buf ? &s->bufioreq : &s->ioreq;
 
-    if ( iorp->gfn == gfn_x(INVALID_GFN) )
+    if ( gfn_eq(iorp->gfn, INVALID_GFN) )
         return;
 
     destroy_ring_for_helper(&iorp->va, iorp->page);
@@ -262,7 +261,7 @@ static void hvm_unmap_ioreq_gfn(struct hvm_ioreq_server *s, bool buf)
     if ( !IS_DEFAULT(s) )
         hvm_free_ioreq_gfn(s, iorp->gfn);
 
-    iorp->gfn = gfn_x(INVALID_GFN);
+    iorp->gfn = INVALID_GFN;
 }
 
 static int hvm_map_ioreq_gfn(struct hvm_ioreq_server *s, bool buf)
@@ -275,16 +274,17 @@ static int hvm_map_ioreq_gfn(struct hvm_ioreq_server *s, bool buf)
         return -EINVAL;
 
     if ( IS_DEFAULT(s) )
-        iorp->gfn = buf ?
-                    d->arch.hvm_domain.params[HVM_PARAM_BUFIOREQ_PFN] :
-                    d->arch.hvm_domain.params[HVM_PARAM_IOREQ_PFN];
+        iorp->gfn = _gfn(buf ?
+                         d->arch.hvm_domain.params[HVM_PARAM_BUFIOREQ_PFN] :
+                         d->arch.hvm_domain.params[HVM_PARAM_IOREQ_PFN]);
     else
         iorp->gfn = hvm_alloc_ioreq_gfn(s);
 
-    if ( iorp->gfn == gfn_x(INVALID_GFN) )
+    if ( gfn_eq(iorp->gfn, INVALID_GFN) )
         return -ENOMEM;
 
-    rc = prepare_ring_for_helper(d, iorp->gfn, &iorp->page, &iorp->va);
+    rc = prepare_ring_for_helper(d, gfn_x(iorp->gfn), &iorp->page,
+                                 &iorp->va);
 
     if ( rc )
         hvm_unmap_ioreq_gfn(s, buf);
@@ -320,10 +320,10 @@ static void hvm_remove_ioreq_gfn(struct hvm_ioreq_server *s, bool buf)
     struct domain *d = s->target;
     struct hvm_ioreq_page *iorp = buf ? &s->bufioreq : &s->ioreq;
 
-    if ( IS_DEFAULT(s) || iorp->gfn == gfn_x(INVALID_GFN) )
+    if ( IS_DEFAULT(s) || gfn_eq(iorp->gfn, INVALID_GFN) )
         return;
 
-    if ( guest_physmap_remove_page(d, _gfn(iorp->gfn),
+    if ( guest_physmap_remove_page(d, iorp->gfn,
                                    _mfn(page_to_mfn(iorp->page)), 0) )
         domain_crash(d);
     clear_page(iorp->va);
@@ -335,15 +335,15 @@ static int hvm_add_ioreq_gfn(struct hvm_ioreq_server *s, bool buf)
     struct hvm_ioreq_page *iorp = buf ? &s->bufioreq : &s->ioreq;
     int rc;
 
-    if ( IS_DEFAULT(s) || iorp->gfn == gfn_x(INVALID_GFN) )
+    if ( IS_DEFAULT(s) || gfn_eq(iorp->gfn, INVALID_GFN) )
         return 0;
 
     clear_page(iorp->va);
 
-    rc = guest_physmap_add_page(d, _gfn(iorp->gfn),
+    rc = guest_physmap_add_page(d, iorp->gfn,
                                 _mfn(page_to_mfn(iorp->page)), 0);
     if ( rc == 0 )
-        paging_mark_pfn_dirty(d, _pfn(iorp->gfn));
+        paging_mark_pfn_dirty(d, _pfn(gfn_x(iorp->gfn)));
 
     return rc;
 }
@@ -605,8 +605,8 @@ static int hvm_ioreq_server_init(struct hvm_ioreq_server *s,
     INIT_LIST_HEAD(&s->ioreq_vcpu_list);
     spin_lock_init(&s->bufioreq_lock);
 
-    s->ioreq.gfn = gfn_x(INVALID_GFN);
-    s->bufioreq.gfn = gfn_x(INVALID_GFN);
+    s->ioreq.gfn = INVALID_GFN;
+    s->bufioreq.gfn = INVALID_GFN;
 
     rc = hvm_ioreq_server_alloc_rangesets(s, id);
     if ( rc )
@@ -795,11 +795,11 @@ int hvm_get_ioreq_server_info(struct domain *d, ioservid_t id,
     if ( s->emulator != current->domain )
         goto out;
 
-    *ioreq_gfn = s->ioreq.gfn;
+    *ioreq_gfn = gfn_x(s->ioreq.gfn);
 
     if ( s->bufioreq.va != NULL )
     {
-        *bufioreq_gfn = s->bufioreq.gfn;
+        *bufioreq_gfn = gfn_x(s->bufioreq.gfn);
         *bufioreq_port = s->bufioreq_evtchn;
     }
 

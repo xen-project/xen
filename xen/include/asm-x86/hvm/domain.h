@@ -36,7 +36,7 @@
 #include <public/hvm/dm_op.h>
 
 struct hvm_ioreq_page {
-    unsigned long gfn;
+    gfn_t gfn;
     struct page_info *page;
     void *va;
 };
