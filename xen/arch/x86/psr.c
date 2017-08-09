@@ -195,8 +195,7 @@ static void free_socket_resources(unsigned int socket)
     unsigned int i;
     struct psr_socket_info *info = socket_info + socket;
 
-    if ( !info )
-        return;
+    ASSERT(socket_info);
 
     /*
      * Free resources of features. The global feature object, e.g. feat_l3,
