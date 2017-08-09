@@ -269,9 +269,9 @@ MINIOS_UPSTREAM_URL ?= git://xenbits.xen.org/mini-os.git
 endif
 OVMF_UPSTREAM_REVISION ?= 5920a9d16b1ab887c2858224316a98e961d71b05
 QEMU_UPSTREAM_REVISION ?= master
-MINIOS_UPSTREAM_REVISION ?= b79102880596058660b690b19afa7ccd5dbae261
-# Sun, 25 Jun 2017 23:02:09 +0100 (23:02 +0100)
-# mini-os: add declaration of cfmakeraw
+MINIOS_UPSTREAM_REVISION ?= d991bdbc062248221511ecb795617c36b37e1d2e
+# Wed Aug 9 13:15:48 2017 +0100
+# lib/math.c: implement __udivmoddi4
 
 SEABIOS_UPSTREAM_REVISION ?= rel-1.10.2
 # Wed Jun 22 14:53:24 2016 +0800
