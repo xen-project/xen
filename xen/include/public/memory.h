@@ -609,9 +609,14 @@ struct xen_mem_acquire_resource {
     domid_t domid;
     /* IN - the type of resource */
     uint16_t type;
+
+#define XENMEM_resource_ioreq_server 0
+
     /*
      * IN - a type-specific resource identifier, which must be zero
      *      unless stated otherwise.
+     *
+     * type == XENMEM_resource_ioreq_server -> id == ioreq server id
      */
     uint32_t id;
     /*
@@ -636,6 +641,10 @@ struct xen_mem_acquire_resource {
      *      is ignored if nr_frames is 0.
      */
     uint64_aligned_t frame;
+
+#define XENMEM_resource_ioreq_server_frame_bufioreq 0
+#define XENMEM_resource_ioreq_server_frame_ioreq(n) (1 + (n))
+
     /*
      * IN/OUT - If the tools domain is PV then, upon return, frame_list
      *          will be populated with the MFNs of the resource.

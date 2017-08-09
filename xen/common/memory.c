@@ -1013,7 +1013,8 @@ static int acquire_resource(
     switch ( xmar.type )
     {
     default:
-        rc = -EOPNOTSUPP;
+        rc = arch_acquire_resource(d, xmar.type, xmar.id, xmar.frame,
+                                   xmar.nr_frames, mfn_list, &xmar.flags);
         break;
     }
 

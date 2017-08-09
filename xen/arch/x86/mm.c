@@ -123,6 +123,7 @@
 #include <asm/io_apic.h>
 #include <asm/pci.h>
 #include <asm/guest.h>
+#include <asm/hvm/ioreq.h>
 
 #include <asm/hvm/grant_table.h>
 #include <asm/pv/grant_table.h>
@@ -4224,6 +4225,52 @@ int xenmem_add_to_physmap_one(
 
     if ( page )
         put_page(page);
+
+    return rc;
+}
+
+int arch_acquire_resource(struct domain *d, unsigned int type,
+                          unsigned int id, unsigned long frame,
+                          unsigned int nr_frames, xen_pfn_t mfn_list[],
+                          unsigned int *flags)
+{
+    int rc;
+
+    switch ( type )
+    {
+    case XENMEM_resource_ioreq_server:
+    {
+        ioservid_t ioservid = id;
+        unsigned int i;
+
+        rc = -EINVAL;
+        if ( id != (unsigned int)ioservid )
+            break;
+
+        rc = 0;
+        for ( i = 0; i < nr_frames; i++ )
+        {
+            mfn_t mfn;
+
+            rc = hvm_get_ioreq_server_frame(d, id, frame + i, &mfn);
+            if ( rc )
+                break;
+
+            mfn_list[i] = mfn_x(mfn);
+        }
+
+        /*
+         * The frames will have been assigned to the domain that created
+         * the ioreq server.
+         */
+        *flags |= XENMEM_rsrc_acq_caller_owned;
+        break;
+    }
+
+    default:
+        rc = -EOPNOTSUPP;
+        break;
+    }
 
     return rc;
 }

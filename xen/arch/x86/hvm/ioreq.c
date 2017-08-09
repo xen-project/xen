@@ -270,6 +270,19 @@ static int hvm_map_ioreq_gfn(struct hvm_ioreq_server *s, bool buf)
     struct hvm_ioreq_page *iorp = buf ? &s->bufioreq : &s->ioreq;
     int rc;
 
+    if ( iorp->page )
+    {
+        /*
+         * If a page has already been allocated (which will happen on
+         * demand if hvm_get_ioreq_server_frame() is called), then
+         * mapping a guest frame is not permitted.
+         */
+        if ( gfn_eq(iorp->gfn, INVALID_GFN) )
+            return -EPERM;
+
+        return 0;
+    }
+
     if ( d->is_dying )
         return -EINVAL;
 
@@ -290,6 +303,70 @@ static int hvm_map_ioreq_gfn(struct hvm_ioreq_server *s, bool buf)
         hvm_unmap_ioreq_gfn(s, buf);
 
     return rc;
+}
+
+static int hvm_alloc_ioreq_mfn(struct hvm_ioreq_server *s, bool buf)
+{
+    struct hvm_ioreq_page *iorp = buf ? &s->bufioreq : &s->ioreq;
+
+    if ( iorp->page )
+    {
+        /*
+         * If a guest frame has already been mapped (which may happen
+         * on demand if hvm_get_ioreq_server_info() is called), then
+         * allocating a page is not permitted.
+         */
+        if ( !gfn_eq(iorp->gfn, INVALID_GFN) )
+            return -EPERM;
+
+        return 0;
+    }
+
+    /*
+     * Allocated IOREQ server pages are assigned to the emulating
+     * domain, not the target domain. This is safe because the emulating
+     * domain cannot be destroyed until the ioreq server is destroyed.
+     * Also we must use MEMF_no_refcount otherwise page allocation
+     * could fail if the emulating domain has already reached its
+     * maximum allocation.
+     */
+    iorp->page = alloc_domheap_page(s->emulator, MEMF_no_refcount);
+
+    if ( !iorp->page )
+        return -ENOMEM;
+
+    if ( !get_page_type(iorp->page, PGT_writable_page) )
+        goto fail1;
+
+    iorp->va = __map_domain_page_global(iorp->page);
+    if ( !iorp->va )
+        goto fail2;
+
+    clear_page(iorp->va);
+    return 0;
+
+ fail2:
+    put_page_type(iorp->page);
+
+ fail1:
+    put_page(iorp->page);
+    iorp->page = NULL;
+
+    return -ENOMEM;
+}
+
+static void hvm_free_ioreq_mfn(struct hvm_ioreq_server *s, bool buf)
+{
+    struct hvm_ioreq_page *iorp = buf ? &s->bufioreq : &s->ioreq;
+
+    if ( !iorp->page )
+        return;
+
+    unmap_domain_page_global(iorp->va);
+    iorp->va = NULL;
+
+    put_page_and_type(iorp->page);
+    iorp->page = NULL;
 }
 
 bool is_ioreq_server_page(struct domain *d, const struct page_info *page)
@@ -496,6 +573,27 @@ static void hvm_ioreq_server_unmap_pages(struct hvm_ioreq_server *s)
     hvm_unmap_ioreq_gfn(s, false);
 }
 
+static int hvm_ioreq_server_alloc_pages(struct hvm_ioreq_server *s)
+{
+    int rc;
+
+    rc = hvm_alloc_ioreq_mfn(s, false);
+
+    if ( !rc && (s->bufioreq_handling != HVM_IOREQSRV_BUFIOREQ_OFF) )
+        rc = hvm_alloc_ioreq_mfn(s, true);
+
+    if ( rc )
+        hvm_free_ioreq_mfn(s, false);
+
+    return rc;
+}
+
+static void hvm_ioreq_server_free_pages(struct hvm_ioreq_server *s)
+{
+    hvm_free_ioreq_mfn(s, true);
+    hvm_free_ioreq_mfn(s, false);
+}
+
 static void hvm_ioreq_server_free_rangesets(struct hvm_ioreq_server *s)
 {
     unsigned int i;
@@ -647,7 +745,19 @@ static void hvm_ioreq_server_deinit(struct hvm_ioreq_server *s)
 {
     ASSERT(!s->enabled);
     hvm_ioreq_server_remove_all_vcpus(s);
+
+    /*
+     * NOTE: It is safe to call both hvm_ioreq_server_unmap_pages() and
+     *       hvm_ioreq_server_free_pages() in that order.
+     *       This is because the former will do nothing if the pages
+     *       are not mapped, leaving the page to be freed by the latter.
+     *       However if the pages are mapped then the former will set
+     *       the page_info pointer to NULL, meaning the latter will do
+     *       nothing.
+     */
     hvm_ioreq_server_unmap_pages(s);
+    hvm_ioreq_server_free_pages(s);
+
     hvm_ioreq_server_free_rangesets(s);
 
     put_domain(s->emulator);
@@ -818,6 +928,63 @@ int hvm_get_ioreq_server_info(struct domain *d, ioservid_t id,
     }
 
     rc = 0;
+
+ out:
+    spin_unlock_recursive(&d->arch.hvm_domain.ioreq_server.lock);
+
+    return rc;
+}
+
+int hvm_get_ioreq_server_frame(struct domain *d, ioservid_t id,
+                               unsigned long idx, mfn_t *mfn)
+{
+    struct hvm_ioreq_server *s;
+    int rc;
+
+    if ( id == DEFAULT_IOSERVID )
+        return -EOPNOTSUPP;
+
+    if ( !is_hvm_domain(d) )
+        return -EINVAL;
+
+    spin_lock_recursive(&d->arch.hvm_domain.ioreq_server.lock);
+
+    s = get_ioreq_server(d, id);
+
+    rc = -ENOENT;
+    if ( !s )
+        goto out;
+
+    ASSERT(!IS_DEFAULT(s));
+
+    rc = -EPERM;
+    if ( s->emulator != current->domain )
+        goto out;
+
+    rc = hvm_ioreq_server_alloc_pages(s);
+    if ( rc )
+        goto out;
+
+    switch ( idx )
+    {
+    case XENMEM_resource_ioreq_server_frame_bufioreq:
+        rc = -ENOENT;
+        if ( !HANDLE_BUFIOREQ(s) )
+            goto out;
+
+        *mfn = _mfn(page_to_mfn(s->bufioreq.page));
+        rc = 0;
+        break;
+
+    case XENMEM_resource_ioreq_server_frame_ioreq(0):
+        *mfn = _mfn(page_to_mfn(s->ioreq.page));
+        rc = 0;
+        break;
+
+    default:
+        rc = -EINVAL;
+        break;
+    }
 
  out:
     spin_unlock_recursive(&d->arch.hvm_domain.ioreq_server.lock);

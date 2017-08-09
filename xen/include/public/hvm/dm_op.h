@@ -90,6 +90,10 @@ struct xen_dm_op_create_ioreq_server {
  * the frame numbers passed back in gfns <ioreq_gfn> and <bufioreq_gfn>
  * respectively. (If the IOREQ Server is not handling buffered emulation
  * only <ioreq_gfn> will be valid).
+ *
+ * NOTE: To access the synchronous ioreq structures and buffered ioreq
+ *       ring, it is preferable to use the XENMEM_acquire_resource memory
+ *       op specifying resource type XENMEM_resource_ioreq_server.
  */
 #define XEN_DMOP_get_ioreq_server_info 2
 
