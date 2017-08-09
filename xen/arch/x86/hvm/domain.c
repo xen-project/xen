@@ -137,7 +137,7 @@ int arch_set_info_hvm_guest(struct vcpu *v, const vcpu_hvm_context_t *ctx)
 
 #define SEG(s, r) ({                                                        \
     s = (struct segment_register)                                           \
-        { 0, { (r)->s ## _ar }, (r)->s ## _base, (r)->s ## _limit };        \
+        { 0, { (r)->s ## _ar }, (r)->s ## _limit, (r)->s ## _base };        \
     /* Set accessed / busy bit for present segments. */                     \
     if ( s.p )                                                              \
         s.type |= (x86_seg_##s != x86_seg_tr ? 1 : 2);                      \
