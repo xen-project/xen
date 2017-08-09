@@ -204,6 +204,14 @@ int xendevicemodel_get_ioreq_server_info(
 
     data->id = id;
 
+    /*
+     * If the caller is not requesting gfn values then instruct the
+     * hypercall not to retrieve them as this may cause them to be
+     * mapped.
+     */
+    if (!ioreq_gfn && !bufioreq_gfn)
+        data->flags |= XEN_DMOP_no_gfns;
+
     rc = xendevicemodel_op(dmod, domid, 1, &op, sizeof(op));
     if (rc)
         return rc;

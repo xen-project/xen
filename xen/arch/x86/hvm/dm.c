@@ -420,16 +420,19 @@ static int dm_op(const struct dmop_args *op_args)
     {
         struct xen_dm_op_get_ioreq_server_info *data =
             &op.u.get_ioreq_server_info;
+        const uint16_t valid_flags = XEN_DMOP_no_gfns;
 
         const_op = false;
 
         rc = -EINVAL;
-        if ( data->pad )
+        if ( data->flags & ~valid_flags )
             break;
 
         rc = hvm_get_ioreq_server_info(d, data->id,
-                                       &data->ioreq_gfn,
-                                       &data->bufioreq_gfn,
+                                       (data->flags & XEN_DMOP_no_gfns) ?
+                                       NULL : &data->ioreq_gfn,
+                                       (data->flags & XEN_DMOP_no_gfns) ?
+                                       NULL : &data->bufioreq_gfn,
                                        &data->bufioreq_port);
         break;
     }

@@ -61,11 +61,11 @@ int xendevicemodel_create_ioreq_server(
  * @parm domid the domain id to be serviced
  * @parm id the IOREQ Server id.
  * @parm ioreq_gfn pointer to a xen_pfn_t to receive the synchronous ioreq
- *                  gfn
+ *                  gfn. (May be NULL if not required)
  * @parm bufioreq_gfn pointer to a xen_pfn_t to receive the buffered ioreq
- *                    gfn
+ *                    gfn. (May be NULL if not required)
  * @parm bufioreq_port pointer to a evtchn_port_t to receive the buffered
- *                     ioreq event channel
+ *                     ioreq event channel. (May be NULL if not required)
  * @return 0 on success, -1 on failure.
  */
 int xendevicemodel_get_ioreq_server_info(

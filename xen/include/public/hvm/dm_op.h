@@ -79,28 +79,34 @@ struct xen_dm_op_create_ioreq_server {
  * XEN_DMOP_get_ioreq_server_info: Get all the information necessary to
  *                                 access IOREQ Server <id>.
  *
- * The emulator needs to map the synchronous ioreq structures and buffered
- * ioreq ring (if it exists) that Xen uses to request emulation. These are
- * hosted in the target domain's gmfns <ioreq_gfn> and <bufioreq_gfn>
- * respectively. In addition, if the IOREQ Server is handling buffered
- * emulation requests, the emulator needs to bind to event channel
- * <bufioreq_port> to listen for them. (The event channels used for
- * synchronous emulation requests are specified in the per-CPU ioreq
- * structures in <ioreq_gfn>).
- * If the IOREQ Server is not handling buffered emulation requests then the
- * values handed back in <bufioreq_gfn> and <bufioreq_port> will both be 0.
+ * If the IOREQ Server is handling buffered emulation requests, the
+ * emulator needs to bind to event channel <bufioreq_port> to listen for
+ * them. (The event channels used for synchronous emulation requests are
+ * specified in the per-CPU ioreq structures).
+ * In addition, if the XENMEM_acquire_resource memory op cannot be used,
+ * the emulator will need to map the synchronous ioreq structures and
+ * buffered ioreq ring (if it exists) from guest memory. If <flags> does
+ * not contain XEN_DMOP_no_gfns then these pages will be made available and
+ * the frame numbers passed back in gfns <ioreq_gfn> and <bufioreq_gfn>
+ * respectively. (If the IOREQ Server is not handling buffered emulation
+ * only <ioreq_gfn> will be valid).
  */
 #define XEN_DMOP_get_ioreq_server_info 2
 
 struct xen_dm_op_get_ioreq_server_info {
     /* IN - server id */
     ioservid_t id;
-    uint16_t pad;
+    /* IN - flags */
+    uint16_t flags;
+
+#define _XEN_DMOP_no_gfns 0
+#define XEN_DMOP_no_gfns (1u << _XEN_DMOP_no_gfns)
+
     /* OUT - buffered ioreq port */
     evtchn_port_t bufioreq_port;
-    /* OUT - sync ioreq gfn */
+    /* OUT - sync ioreq gfn (see block comment above) */
     uint64_aligned_t ioreq_gfn;
-    /* OUT - buffered ioreq gfn */
+    /* OUT - buffered ioreq gfn (see block comment above)*/
     uint64_aligned_t bufioreq_gfn;
 };
 

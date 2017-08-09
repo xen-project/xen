@@ -361,6 +361,9 @@ static void hvm_update_ioreq_evtchn(struct hvm_ioreq_server *s,
     }
 }
 
+#define HANDLE_BUFIOREQ(s) \
+    ((s)->bufioreq_handling != HVM_IOREQSRV_BUFIOREQ_OFF)
+
 static int hvm_ioreq_server_add_vcpu(struct hvm_ioreq_server *s,
                                      struct vcpu *v)
 {
@@ -382,7 +385,7 @@ static int hvm_ioreq_server_add_vcpu(struct hvm_ioreq_server *s,
 
     sv->ioreq_evtchn = rc;
 
-    if ( v->vcpu_id == 0 && s->bufioreq.va != NULL )
+    if ( v->vcpu_id == 0 && HANDLE_BUFIOREQ(s) )
     {
         struct domain *d = s->target;
 
@@ -434,7 +437,7 @@ static void hvm_ioreq_server_remove_vcpu(struct hvm_ioreq_server *s,
 
         list_del(&sv->list_entry);
 
-        if ( v->vcpu_id == 0 && s->bufioreq.va != NULL )
+        if ( v->vcpu_id == 0 && HANDLE_BUFIOREQ(s) )
             free_xen_event_channel(v->domain, s->bufioreq_evtchn);
 
         free_xen_event_channel(v->domain, sv->ioreq_evtchn);
@@ -461,7 +464,7 @@ static void hvm_ioreq_server_remove_all_vcpus(struct hvm_ioreq_server *s)
 
         list_del(&sv->list_entry);
 
-        if ( v->vcpu_id == 0 && s->bufioreq.va != NULL )
+        if ( v->vcpu_id == 0 && HANDLE_BUFIOREQ(s) )
             free_xen_event_channel(v->domain, s->bufioreq_evtchn);
 
         free_xen_event_channel(v->domain, sv->ioreq_evtchn);
@@ -472,14 +475,13 @@ static void hvm_ioreq_server_remove_all_vcpus(struct hvm_ioreq_server *s)
     spin_unlock(&s->lock);
 }
 
-static int hvm_ioreq_server_map_pages(struct hvm_ioreq_server *s,
-                                      bool handle_bufioreq)
+static int hvm_ioreq_server_map_pages(struct hvm_ioreq_server *s)
 {
     int rc;
 
     rc = hvm_map_ioreq_gfn(s, false);
 
-    if ( !rc && handle_bufioreq )
+    if ( !rc && HANDLE_BUFIOREQ(s) )
         rc = hvm_map_ioreq_gfn(s, true);
 
     if ( rc )
@@ -612,13 +614,14 @@ static int hvm_ioreq_server_init(struct hvm_ioreq_server *s,
     if ( rc )
         return rc;
 
-    if ( bufioreq_handling == HVM_IOREQSRV_BUFIOREQ_ATOMIC )
-        s->bufioreq_atomic = true;
+    s->bufioreq_handling = bufioreq_handling;
 
-    rc = hvm_ioreq_server_map_pages(
-             s, bufioreq_handling != HVM_IOREQSRV_BUFIOREQ_OFF);
-    if ( rc )
-        goto fail_map;
+    if ( id == DEFAULT_IOSERVID )
+    {
+        rc = hvm_ioreq_server_map_pages(s);
+        if ( rc )
+            goto fail_map;
+    }
 
     for_each_vcpu ( d, v )
     {
@@ -795,12 +798,23 @@ int hvm_get_ioreq_server_info(struct domain *d, ioservid_t id,
     if ( s->emulator != current->domain )
         goto out;
 
-    *ioreq_gfn = gfn_x(s->ioreq.gfn);
-
-    if ( s->bufioreq.va != NULL )
+    if ( ioreq_gfn || bufioreq_gfn )
     {
-        *bufioreq_gfn = gfn_x(s->bufioreq.gfn);
-        *bufioreq_port = s->bufioreq_evtchn;
+        rc = hvm_ioreq_server_map_pages(s);
+        if ( rc )
+            goto out;
+    }
+
+    if ( ioreq_gfn )
+        *ioreq_gfn = gfn_x(s->ioreq.gfn);
+
+    if ( HANDLE_BUFIOREQ(s) )
+    {
+        if ( bufioreq_gfn )
+            *bufioreq_gfn = gfn_x(s->bufioreq.gfn);
+
+        if ( bufioreq_port )
+            *bufioreq_port = s->bufioreq_evtchn;
     }
 
     rc = 0;
@@ -1256,7 +1270,8 @@ static int hvm_send_buffered_ioreq(struct hvm_ioreq_server *s, ioreq_t *p)
     pg->ptrs.write_pointer += qw ? 2 : 1;
 
     /* Canonicalize read/write pointers to prevent their overflow. */
-    while ( s->bufioreq_atomic && qw++ < IOREQ_BUFFER_SLOT_NUM &&
+    while ( (s->bufioreq_handling == HVM_IOREQSRV_BUFIOREQ_ATOMIC) &&
+            qw++ < IOREQ_BUFFER_SLOT_NUM &&
             pg->ptrs.read_pointer >= IOREQ_BUFFER_SLOT_NUM )
     {
         union bufioreq_pointers old = pg->ptrs, new;
