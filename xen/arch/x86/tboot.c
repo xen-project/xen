@@ -341,8 +341,6 @@ void tboot_shutdown(uint32_t shutdown_type)
 
     g_tboot_shared->shutdown_type = shutdown_type;
 
-    local_irq_disable();
-
     /* Create identity map for tboot shutdown code. */
     /* do before S3 integrity because mapping tboot may change xenheap */
     map_base = PFN_DOWN(g_tboot_shared->tboot_base);
@@ -356,6 +354,10 @@ void tboot_shutdown(uint32_t shutdown_type)
                map_base, map_size);
         return;
     }
+
+    /* Disable interrupts as early as possible but not prior to */
+    /* calling map_pages_to_xen */
+    local_irq_disable();
 
     /* if this is S3 then set regions to MAC */
     if ( shutdown_type == TB_SHUTDOWN_S3 )
