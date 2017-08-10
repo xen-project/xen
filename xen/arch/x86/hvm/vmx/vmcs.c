@@ -345,11 +345,19 @@ static int vmx_init_vmcs_config(void)
 
     /*
      * "Process posted interrupt" can be set only when "virtual-interrupt
-     * delivery" and "acknowledge interrupt on exit" is set
+     * delivery" and "acknowledge interrupt on exit" is set. For the latter
+     * is a minimal requirement, only check the former, which is optional.
      */
-    if ( !(_vmx_secondary_exec_control & SECONDARY_EXEC_VIRTUAL_INTR_DELIVERY)
-          || !(_vmx_vmexit_control & VM_EXIT_ACK_INTR_ON_EXIT) )
-        _vmx_pin_based_exec_control  &= ~ PIN_BASED_POSTED_INTERRUPT;
+    if ( !(_vmx_secondary_exec_control & SECONDARY_EXEC_VIRTUAL_INTR_DELIVERY) )
+        _vmx_pin_based_exec_control &= ~PIN_BASED_POSTED_INTERRUPT;
+
+    if ( iommu_intpost &&
+         !(_vmx_pin_based_exec_control & PIN_BASED_POSTED_INTERRUPT) )
+    {
+        printk("Intel VT-d Posted Interrupt is disabled for CPU-side Posted "
+               "Interrupt is not enabled\n");
+        iommu_intpost = 0;
+    }
 
     /* The IA32_VMX_VMFUNC MSR exists only when VMFUNC is available */
     if ( _vmx_secondary_exec_control & SECONDARY_EXEC_ENABLE_VM_FUNCTIONS )
