@@ -225,6 +225,7 @@ XEN_CPUFEATURE(AVX512VL,      5*32+31) /*A  AVX-512 Vector Length Extensions */
 /* Intel-defined CPU features, CPUID level 0x00000007:0.ecx, word 6 */
 XEN_CPUFEATURE(PREFETCHWT1,   6*32+ 0) /*A  PREFETCHWT1 instruction */
 XEN_CPUFEATURE(AVX512VBMI,    6*32+ 1) /*A  AVX-512 Vector Byte Manipulation Instrs */
+XEN_CPUFEATURE(UMIP,          6*32+ 2) /*S  User Mode Instruction Prevention */
 XEN_CPUFEATURE(PKU,           6*32+ 3) /*H  Protection Keys for Userspace */
 XEN_CPUFEATURE(OSPKE,         6*32+ 4) /*!  OS Protection Keys Enable */
 XEN_CPUFEATURE(AVX512_VPOPCNTDQ, 6*32+14) /*A  POPCNT for vectors of DW/QW */

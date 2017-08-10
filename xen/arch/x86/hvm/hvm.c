@@ -959,6 +959,7 @@ unsigned long hvm_cr4_guest_valid_bits(const struct vcpu *v, bool restore)
             (p->basic.xsave   ? X86_CR4_OSXSAVE           : 0) |
             (p->feat.smep     ? X86_CR4_SMEP              : 0) |
             (p->feat.smap     ? X86_CR4_SMAP              : 0) |
+            (p->feat.umip     ? X86_CR4_UMIP              : 0) |
             (p->feat.pku      ? X86_CR4_PKE               : 0));
 }
 
