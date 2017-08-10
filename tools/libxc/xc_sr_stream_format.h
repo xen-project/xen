@@ -57,8 +57,8 @@ struct xc_sr_rhdr
 
 /* All records must be aligned up to an 8 octet boundary */
 #define REC_ALIGN_ORDER               (3U)
-/* Somewhat arbitrary - 8MB */
-#define REC_LENGTH_MAX                (8U << 20)
+/* Somewhat arbitrary - 128MB */
+#define REC_LENGTH_MAX                (128U << 20)
 
 #define REC_TYPE_END                        0x00000000U
 #define REC_TYPE_PAGE_DATA                  0x00000001U
