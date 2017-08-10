@@ -959,7 +959,7 @@ int hvmemul_insn_fetch(
              * which means something went wrong with instruction decoding...
              */
             if ( insn_off >= sizeof(hvmemul_ctxt->insn_buf) ||
-                 (insn_off + bytes) >= sizeof(hvmemul_ctxt->insn_buf) )
+                 insn_off + bytes > sizeof(hvmemul_ctxt->insn_buf) )
             {
                 ASSERT_UNREACHABLE();
                 return X86EMUL_UNHANDLEABLE;
