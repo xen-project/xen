@@ -71,8 +71,8 @@ int write_split_record(struct xc_sr_context *ctx, struct xc_sr_record *rec,
 
     if ( record_length > REC_LENGTH_MAX )
     {
-        ERROR("Record (0x%08x, %s) length %#x exceeds max (%#x)", rec->type,
-              rec_type_to_str(rec->type), rec->length, REC_LENGTH_MAX);
+        ERROR("Record (0x%08x, %s) length %#zx exceeds max (%#x)", rec->type,
+              rec_type_to_str(rec->type), record_length, REC_LENGTH_MAX);
         return -1;
     }
 
