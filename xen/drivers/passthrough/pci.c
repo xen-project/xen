@@ -1026,8 +1026,8 @@ struct setup_hwdom {
     int (*handler)(u8 devfn, struct pci_dev *);
 };
 
-static void setup_one_hwdom_device(const struct setup_hwdom *ctxt,
-                                  struct pci_dev *pdev)
+static void __hwdom_init setup_one_hwdom_device(const struct setup_hwdom *ctxt,
+                                                struct pci_dev *pdev)
 {
     u8 devfn = pdev->devfn;
 
