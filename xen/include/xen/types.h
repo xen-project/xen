@@ -42,9 +42,6 @@ typedef         __s32           int32_t;
 typedef         __u64           uint64_t;
 typedef         __s64           int64_t;
 
-struct domain;
-struct vcpu;
-
 typedef __u16 __le16;
 typedef __u16 __be16;
 typedef __u32 __le32;

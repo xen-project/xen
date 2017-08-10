@@ -22,6 +22,8 @@
 #ifndef __ASM_X86_XENOPROF_H__
 #define __ASM_X86_XENOPROF_H__
 
+struct vcpu;
+
 #ifdef CONFIG_XENOPROF
 
 int nmi_reserve_counters(void);
@@ -45,7 +47,6 @@ int xenoprof_arch_counter(XEN_GUEST_HANDLE_PARAM(void) arg);
 int compat_oprof_arch_counter(XEN_GUEST_HANDLE_PARAM(void) arg);
 int xenoprof_arch_ibs_counter(XEN_GUEST_HANDLE_PARAM(void) arg);
 
-struct vcpu;
 struct cpu_user_regs;
 
 /* AMD IBS support */
