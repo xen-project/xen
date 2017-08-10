@@ -273,6 +273,10 @@ int cpufreq_governor_dbs(struct cpufreq_policy *policy, unsigned int event)
         break;
 
     case CPUFREQ_GOV_STOP:
+        if ( !this_dbs_info->enable )
+            /* Already not enabled */
+            break;
+
         dbs_timer_exit(this_dbs_info);
         dbs_enable--;
 
