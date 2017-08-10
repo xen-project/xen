@@ -106,7 +106,7 @@ struct mem_hotadd_info
     unsigned long cur;
 };
 
-int hotadd_mem_valid(unsigned long pfn, struct mem_hotadd_info *info)
+static int hotadd_mem_valid(unsigned long pfn, struct mem_hotadd_info *info)
 {
     return (pfn < info->epfn && pfn >= info->spfn);
 }
@@ -156,7 +156,7 @@ static int m2p_mapped(unsigned long spfn)
     return M2P_NO_MAPPED;
 }
 
-int share_hotadd_m2p_table(struct mem_hotadd_info *info)
+static int share_hotadd_m2p_table(struct mem_hotadd_info *info)
 {
     unsigned long i, n, v, m2p_start_mfn = 0;
     l3_pgentry_t l3e;
@@ -257,7 +257,7 @@ static void destroy_compat_m2p_mapping(struct mem_hotadd_info *info)
     return;
 }
 
-void destroy_m2p_mapping(struct mem_hotadd_info *info)
+static void destroy_m2p_mapping(struct mem_hotadd_info *info)
 {
     l3_pgentry_t *l3_ro_mpt;
     unsigned long i, va, rwva;
@@ -712,7 +712,7 @@ void free_compat_arg_xlat(struct vcpu *v)
                               PFN_UP(COMPAT_ARG_XLAT_SIZE));
 }
 
-void cleanup_frame_table(struct mem_hotadd_info *info)
+static void cleanup_frame_table(struct mem_hotadd_info *info)
 {
     unsigned long sva, eva;
     l3_pgentry_t l3e;
@@ -1272,7 +1272,7 @@ unsigned int domain_clamp_alloc_bitsize(struct domain *d, unsigned int bits)
     return min(d->arch.physaddr_bitsize, bits);
 }
 
-int transfer_pages_to_heap(struct mem_hotadd_info *info)
+static int transfer_pages_to_heap(struct mem_hotadd_info *info)
 {
     unsigned long i;
     struct page_info *pg;
@@ -1292,7 +1292,7 @@ int transfer_pages_to_heap(struct mem_hotadd_info *info)
     return 0;
 }
 
-int mem_hotadd_check(unsigned long spfn, unsigned long epfn)
+static int mem_hotadd_check(unsigned long spfn, unsigned long epfn)
 {
     unsigned long s, e, length, sidx, eidx;
 
