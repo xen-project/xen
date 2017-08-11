@@ -19,16 +19,17 @@
  */
 
 #include <xen/bitops.h>
-#include <xen/lib.h>
 #include <xen/init.h>
-#include <xen/softirq.h>
 #include <xen/irq.h>
+#include <xen/lib.h>
 #include <xen/sched.h>
+#include <xen/softirq.h>
 #include <xen/sizes.h>
+
 #include <asm/current.h>
-#include <asm/mmio.h>
 #include <asm/gic_v3_defs.h>
 #include <asm/gic_v3_its.h>
+#include <asm/mmio.h>
 #include <asm/vgic.h>
 #include <asm/vgic-emul.h>
 #include <asm/vreg.h>
