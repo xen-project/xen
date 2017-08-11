@@ -611,10 +611,6 @@ static int p2m_mem_access_radix_set(struct p2m_domain *p2m, gfn_t gfn,
     return rc;
 }
 
-enum p2m_operation {
-    MEMACCESS,
-};
-
 /*
  * Put any references on the single 4K page referenced by pte.
  * TODO: Handle superpages, for now we only take special references for leaf
