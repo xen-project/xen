@@ -169,12 +169,8 @@ extern unsigned char boot_edid_info[128];
  *    Guest-defined use.
  *  0x00000000f5800000 - 0x00000000ffffffff [168MB,             PML4:0]
  *    Read-only machine-to-phys translation table (GUEST ACCESSIBLE).
- *  0x0000000100000000 - 0x0000007fffffffff [508GB,             PML4:0]
- *    Unused.
- *  0x0000008000000000 - 0x000000ffffffffff [512GB, 2^39 bytes, PML4:1]
- *    Hypercall argument translation area.
- *  0x0000010000000000 - 0x00007fffffffffff [127TB, 2^46 bytes, PML4:2-255]
- *    Reserved for future use.
+ *  0x0000000100000000 - 0x00007fffffffffff [128TB-4GB,         PML4:0-255]
+ *    Unused / Reserved for future use.
  */
 
 
