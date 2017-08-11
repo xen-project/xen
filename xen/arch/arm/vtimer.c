@@ -18,16 +18,17 @@
  */
 
 #include <xen/lib.h>
-#include <xen/timer.h>
-#include <xen/sched.h>
 #include <xen/perfc.h>
+#include <xen/sched.h>
+#include <xen/timer.h>
+
 #include <asm/div64.h>
-#include <asm/irq.h>
-#include <asm/time.h>
 #include <asm/gic.h>
+#include <asm/irq.h>
+#include <asm/regs.h>
+#include <asm/time.h>
 #include <asm/vgic.h>
 #include <asm/vreg.h>
-#include <asm/regs.h>
 
 /*
  * Check if regs is allowed access, user_gate is tail end of a
