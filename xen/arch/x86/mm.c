@@ -3814,6 +3814,22 @@ long do_mmu_update(
     return rc;
 }
 
+static unsigned int grant_to_pte_flags(unsigned int grant_flags,
+                                       unsigned int cache_flags)
+{
+    unsigned int pte_flags =
+        _PAGE_PRESENT | _PAGE_ACCESSED | _PAGE_DIRTY | _PAGE_GNTTAB | _PAGE_NX;
+
+    if ( grant_flags & GNTMAP_application_map )
+        pte_flags |= _PAGE_USER;
+    if ( !(grant_flags & GNTMAP_readonly) )
+        pte_flags |= _PAGE_RW;
+
+    pte_flags |= MASK_INSR((grant_flags >> _GNTMAP_guest_avail0), _PAGE_AVAIL);
+    pte_flags |= cacheattr_to_pte_flags(cache_flags >> 5);
+
+    return pte_flags;
+}
 
 static int create_grant_pte_mapping(
     uint64_t pte_addr, l1_pgentry_t nl1e, struct vcpu *v)
@@ -4110,24 +4126,8 @@ int create_grant_pv_mapping(uint64_t addr, unsigned long frame,
                             unsigned int flags, unsigned int cache_flags)
 {
     l1_pgentry_t pte;
-    uint32_t grant_pte_flags;
 
-    grant_pte_flags =
-        _PAGE_PRESENT | _PAGE_ACCESSED | _PAGE_DIRTY | _PAGE_GNTTAB;
-    if ( cpu_has_nx )
-        grant_pte_flags |= _PAGE_NX_BIT;
-
-    pte = l1e_from_pfn(frame, grant_pte_flags);
-    if ( (flags & GNTMAP_application_map) )
-        l1e_add_flags(pte,_PAGE_USER);
-    if ( !(flags & GNTMAP_readonly) )
-        l1e_add_flags(pte,_PAGE_RW);
-
-    l1e_add_flags(pte,
-                  ((flags >> _GNTMAP_guest_avail0) * _PAGE_AVAIL0)
-                   & _PAGE_AVAIL);
-
-    l1e_add_flags(pte, cacheattr_to_pte_flags(cache_flags >> 5));
+    pte = l1e_from_pfn(frame, grant_to_pte_flags(flags, cache_flags));
 
     if ( flags & GNTMAP_contains_pte )
         return create_grant_pte_mapping(addr, pte, current);
@@ -4142,15 +4142,8 @@ int replace_grant_pv_mapping(uint64_t addr, unsigned long frame,
     mfn_t gl1mfn;
     struct page_info *l1pg;
     int rc;
-    unsigned int grant_pte_flags;
+    unsigned int grant_pte_flags = grant_to_pte_flags(flags, 0);
 
-    grant_pte_flags =
-        _PAGE_PRESENT | _PAGE_ACCESSED | _PAGE_DIRTY | _PAGE_GNTTAB | _PAGE_NX;
-
-    if ( flags & GNTMAP_application_map )
-        grant_pte_flags |= _PAGE_USER;
-    if ( !(flags & GNTMAP_readonly) )
-        grant_pte_flags |= _PAGE_RW;
     /*
      * On top of the explicit settings done by create_grant_host_mapping()
      * also open-code relevant parts of adjust_guest_l1e(). Don't mirror
