@@ -9,6 +9,9 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+#include <xen/bitops.h>
+#include <xen/errno.h>
+#include <xen/grant_table.h>
 #include <xen/hypercall.h>
 #include <xen/init.h>
 #include <xen/lib.h>
@@ -16,24 +19,21 @@
 #include <xen/sched.h>
 #include <xen/softirq.h>
 #include <xen/wait.h>
-#include <xen/errno.h>
-#include <xen/bitops.h>
-#include <xen/grant_table.h>
 
+#include <asm/alternative.h>
+#include <asm/cpufeature.h>
 #include <asm/current.h>
 #include <asm/event.h>
-#include <asm/guest_access.h>
-#include <asm/regs.h>
-#include <asm/p2m.h>
-#include <asm/irq.h>
-#include <asm/cpufeature.h>
-#include <asm/vfp.h>
-#include <asm/procinfo.h>
-#include <asm/alternative.h>
-
 #include <asm/gic.h>
-#include <asm/vgic.h>
+#include <asm/guest_access.h>
+#include <asm/irq.h>
+#include <asm/p2m.h>
 #include <asm/platform.h>
+#include <asm/procinfo.h>
+#include <asm/regs.h>
+#include <asm/vfp.h>
+#include <asm/vgic.h>
+
 #include "vtimer.h"
 #include "vuart.h"
 
