@@ -3868,6 +3868,10 @@ int create_grant_pv_mapping(uint64_t addr, unsigned long frame,
     }
     else
     {
+        /* Guest trying to pass an out-of-range linear address? */
+        if ( is_pv_32bit_domain(currd) && addr != (uint32_t)addr )
+            goto out;
+
         pl1e = map_guest_l1e(addr, &gl1mfn);
 
         if ( !pl1e )
@@ -4019,6 +4023,19 @@ int replace_grant_pv_mapping(uint64_t addr, unsigned long frame,
     }
     else
     {
+        if ( is_pv_32bit_domain(currd) )
+        {
+            if ( addr != (uint32_t)addr )
+            {
+                ASSERT_UNREACHABLE();
+                goto out;
+            }
+
+            /* Guest trying to pass an out-of-range linear address? */
+            if ( new_addr != (uint32_t)new_addr )
+                goto out;
+        }
+
         if ( new_addr && !steal_linear_address(new_addr, &nl1e) )
             goto out;
 
