@@ -86,11 +86,6 @@ const hypercall_args_t hypercall_args_table[NR_hypercalls] =
     __arg;                                                                  \
 })
 
-void hypercall_cancel_continuation(void)
-{
-    current->hcall_preempted = false;
-}
-
 unsigned long hypercall_create_continuation(
     unsigned int op, const char *format, ...)
 {

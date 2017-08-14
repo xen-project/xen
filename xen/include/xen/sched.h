@@ -706,7 +706,11 @@ extern void (*dead_idle) (void);
  */
 unsigned long hypercall_create_continuation(
     unsigned int op, const char *format, ...);
-void hypercall_cancel_continuation(void);
+
+static inline void hypercall_cancel_continuation(struct vcpu *v)
+{
+    v->hcall_preempted = false;
+}
 
 /*
  * For long-running operations that must be in hypercall context, check

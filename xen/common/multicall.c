@@ -36,7 +36,8 @@ ret_t
 do_multicall(
     XEN_GUEST_HANDLE_PARAM(multicall_entry_t) call_list, uint32_t nr_calls)
 {
-    struct mc_state *mcs = &current->mc_state;
+    struct vcpu *curr = current;
+    struct mc_state *mcs = &curr->mc_state;
     uint32_t         i;
     int              rc = 0;
     enum mc_disposition disp = mc_continue;
@@ -86,7 +87,7 @@ do_multicall(
         else if ( unlikely(__copy_field_to_guest(call_list, &mcs->call,
                                                  result)) )
             rc = -EFAULT;
-        else if ( current->hcall_preempted )
+        else if ( curr->hcall_preempted )
         {
             /* Translate sub-call continuation to guest layout */
             xlat_multicall_entry(mcs);
@@ -95,7 +96,7 @@ do_multicall(
             if ( likely(!__copy_to_guest(call_list, &mcs->call, 1)) )
                 goto preempted;
             else
-                hypercall_cancel_continuation();
+                hypercall_cancel_continuation(curr);
             rc = -EFAULT;
         }
         else

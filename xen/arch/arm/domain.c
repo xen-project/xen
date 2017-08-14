@@ -365,11 +365,6 @@ void sync_vcpu_execstate(struct vcpu *v)
     __arg;                                                                  \
 })
 
-void hypercall_cancel_continuation(void)
-{
-    current->hcall_preempted = false;
-}
-
 unsigned long hypercall_create_continuation(
     unsigned int op, const char *format, ...)
 {

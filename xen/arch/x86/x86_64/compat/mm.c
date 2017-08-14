@@ -124,7 +124,7 @@ int compat_arch_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( __copy_to_guest(arg, &cmp, 1) )
         {
             if ( rc == __HYPERVISOR_memory_op )
-                hypercall_cancel_continuation();
+                hypercall_cancel_continuation(current);
             rc = -EFAULT;
         }
 
