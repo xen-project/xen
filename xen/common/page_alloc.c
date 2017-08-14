@@ -969,24 +969,31 @@ static void free_heap_pages(
 
         if ( (page_to_mfn(pg) & mask) )
         {
+            struct page_info *predecessor = pg - mask;
+
             /* Merge with predecessor block? */
-            if ( !mfn_valid(_mfn(page_to_mfn(pg-mask))) ||
-                 !page_state_is(pg-mask, free) ||
-                 (PFN_ORDER(pg-mask) != order) ||
-                 (phys_to_nid(page_to_maddr(pg-mask)) != node) )
+            if ( !mfn_valid(_mfn(page_to_mfn(predecessor))) ||
+                 !page_state_is(predecessor, free) ||
+                 (PFN_ORDER(predecessor) != order) ||
+                 (phys_to_nid(page_to_maddr(predecessor)) != node) )
                 break;
-            pg -= mask;
-            page_list_del(pg, &heap(node, zone, order));
+
+            page_list_del(predecessor, &heap(node, zone, order));
+
+            pg = predecessor;
         }
         else
         {
+            struct page_info *successor = pg + mask;
+
             /* Merge with successor block? */
-            if ( !mfn_valid(_mfn(page_to_mfn(pg+mask))) ||
-                 !page_state_is(pg+mask, free) ||
-                 (PFN_ORDER(pg+mask) != order) ||
-                 (phys_to_nid(page_to_maddr(pg+mask)) != node) )
+            if ( !mfn_valid(_mfn(page_to_mfn(successor))) ||
+                 !page_state_is(successor, free) ||
+                 (PFN_ORDER(successor) != order) ||
+                 (phys_to_nid(page_to_maddr(successor)) != node) )
                 break;
-            page_list_del(pg + mask, &heap(node, zone, order));
+
+            page_list_del(successor, &heap(node, zone, order));
         }
 
         order++;
