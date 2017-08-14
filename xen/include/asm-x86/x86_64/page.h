@@ -167,9 +167,12 @@ typedef l4_pgentry_t root_pgentry_t;
 /* Dependency on NX being available can't be expressed. */
 # define PAGE_HYPERVISOR         PAGE_HYPERVISOR_RWX
 # define PAGE_HYPERVISOR_UCMINUS (__PAGE_HYPERVISOR_UCMINUS | _PAGE_GLOBAL)
+# define PAGE_HYPERVISOR_UC      (__PAGE_HYPERVISOR_UC      | _PAGE_GLOBAL)
 #else
 # define PAGE_HYPERVISOR         PAGE_HYPERVISOR_RW
 # define PAGE_HYPERVISOR_UCMINUS (__PAGE_HYPERVISOR_UCMINUS | \
+                                  _PAGE_GLOBAL | _PAGE_NX)
+# define PAGE_HYPERVISOR_UC      (__PAGE_HYPERVISOR_UC | \
                                   _PAGE_GLOBAL | _PAGE_NX)
 #endif
 
