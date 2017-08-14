@@ -166,10 +166,10 @@ typedef l4_pgentry_t root_pgentry_t;
 #ifdef __ASSEMBLY__
 /* Dependency on NX being available can't be expressed. */
 # define PAGE_HYPERVISOR         PAGE_HYPERVISOR_RWX
-# define PAGE_HYPERVISOR_NOCACHE (__PAGE_HYPERVISOR_NOCACHE | _PAGE_GLOBAL)
+# define PAGE_HYPERVISOR_UCMINUS (__PAGE_HYPERVISOR_UCMINUS | _PAGE_GLOBAL)
 #else
 # define PAGE_HYPERVISOR         PAGE_HYPERVISOR_RW
-# define PAGE_HYPERVISOR_NOCACHE (__PAGE_HYPERVISOR_NOCACHE | \
+# define PAGE_HYPERVISOR_UCMINUS (__PAGE_HYPERVISOR_UCMINUS | \
                                   _PAGE_GLOBAL | _PAGE_NX)
 #endif
 

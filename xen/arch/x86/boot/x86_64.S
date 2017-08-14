@@ -90,9 +90,9 @@ GLOBAL(boot_cpu_compat_gdt_table)
 l1_identmap:
         pfn = 0
         .rept L1_PAGETABLE_ENTRIES
-        /* VGA hole (0xa0000-0xc0000) should be mapped UC. */
+        /* VGA hole (0xa0000-0xc0000) should be mapped UC-. */
         .if pfn >= 0xa0 && pfn < 0xc0
-        .quad (pfn << PAGE_SHIFT) | PAGE_HYPERVISOR_NOCACHE | MAP_SMALL_PAGES
+        .quad (pfn << PAGE_SHIFT) | PAGE_HYPERVISOR_UCMINUS | MAP_SMALL_PAGES
         .else
         .quad (pfn << PAGE_SHIFT) | PAGE_HYPERVISOR | MAP_SMALL_PAGES
         .endif

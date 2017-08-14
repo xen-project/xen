@@ -72,7 +72,7 @@ extern void __set_fixmap(
     __set_fixmap(idx, (phys)>>PAGE_SHIFT, PAGE_HYPERVISOR)
 
 #define set_fixmap_nocache(idx, phys) \
-    __set_fixmap(idx, (phys)>>PAGE_SHIFT, PAGE_HYPERVISOR_NOCACHE)
+    __set_fixmap(idx, (phys)>>PAGE_SHIFT, PAGE_HYPERVISOR_UCMINUS)
 
 #define clear_fixmap(idx) __set_fixmap(idx, 0, 0)
 
