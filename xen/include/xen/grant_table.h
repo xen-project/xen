@@ -78,7 +78,7 @@ struct grant_table {
     /* Mapping tracking table per vcpu. */
     struct grant_mapping **maptrack;
     unsigned int          maptrack_limit;
-    /* Lock protecting the maptrack page list, head, and limit */
+    /* Lock protecting the maptrack limit */
     spinlock_t            maptrack_lock;
     /* The defined versions are 1 and 2.  Set to 0 if we don't know
        what version to use yet. */
