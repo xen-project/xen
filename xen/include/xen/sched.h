@@ -230,6 +230,7 @@ struct vcpu
     int              controller_pause_count;
 
     /* Grant table map tracking. */
+    spinlock_t       maptrack_freelist_lock;
     unsigned int     maptrack_head;
     unsigned int     maptrack_tail;
 
