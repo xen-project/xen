@@ -82,6 +82,8 @@
 
 #endif /* !__ASSEMBLY__ */
 
+#define IS_ALIGNED(val, align) (((val) & ((align) - 1)) == 0)
+
 #define __STR(...) #__VA_ARGS__
 #define STR(...) __STR(__VA_ARGS__)
 
