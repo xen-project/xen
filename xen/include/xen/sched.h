@@ -223,6 +223,7 @@ struct vcpu
     int              controller_pause_count;
 
     /* Maptrack */
+    spinlock_t       maptrack_freelist_lock;
     unsigned int     maptrack_head;
     unsigned int     maptrack_tail;
 

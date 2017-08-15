@@ -87,7 +87,8 @@ is complete.
                                inconsistent grant table state such as current
                                version, partially initialized active table pages,
                                etc.
-  grant_table->maptrack_lock : spinlock used to protect the maptrack free list
+  grant_table->maptrack_lock : spinlock used to protect the maptrack limit
+  v->maptrack_freelist_lock  : spinlock used to protect the maptrack free list
   active_grant_entry->lock   : spinlock used to serialize modifications to
                                active entries
 
@@ -101,6 +102,10 @@ is complete.
 
  The maptrack free list is protected by its own spinlock. The maptrack
  lock may be locked while holding the grant table lock.
+
+ The maptrack_freelist_lock is an innermost lock.  It may be locked
+ while holding other locks, but no other locks may be acquired within
+ it.
 
  Active entries are obtained by calling active_entry_acquire(gt, ref).
  This function returns a pointer to the active entry after locking its
