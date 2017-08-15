@@ -2121,10 +2121,10 @@ __release_grant_for_copy(
 static void __fixup_status_for_copy_pin(const struct active_grant_entry *act,
                                    uint16_t *status)
 {
-    if ( !(act->pin & GNTPIN_hstw_mask) )
+    if ( !(act->pin & (GNTPIN_hstw_mask | GNTPIN_devw_mask)) )
         gnttab_clear_flag(_GTF_writing, status);
 
-    if ( !(act->pin & GNTPIN_hstr_mask) )
+    if ( !act->pin )
         gnttab_clear_flag(_GTF_reading, status);
 }
 
@@ -2332,7 +2332,7 @@ __acquire_grant_for_copy(
  
  unlock_out_clear:
     if ( !(readonly) &&
-         !(act->pin & GNTPIN_hstw_mask) )
+         !(act->pin & (GNTPIN_hstw_mask | GNTPIN_devw_mask)) )
         gnttab_clear_flag(_GTF_writing, status);
 
     if ( !act->pin )
