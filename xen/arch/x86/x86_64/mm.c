@@ -140,13 +140,11 @@ static int m2p_mapped(unsigned long spfn)
     {
         case _PAGE_PSE|_PAGE_PRESENT:
             return M2P_1G_MAPPED;
-            break;
         /* Check for next level */
         case _PAGE_PRESENT:
             break;
         default:
             return M2P_NO_MAPPED;
-            break;
     }
     l2_ro_mpt = l3e_to_l2e(l3_ro_mpt[l3_table_offset(va)]);
 
