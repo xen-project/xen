@@ -3965,6 +3965,9 @@ static int create_grant_pte_mapping(
     l1_pgentry_t ol1e;
     struct domain *d = v->domain;
 
+    if ( !IS_ALIGNED(pte_addr, sizeof(nl1e)) )
+        return GNTST_general_error;
+
     adjust_guest_l1e(nl1e, d);
 
     gmfn = pte_addr >> PAGE_SHIFT;
@@ -4021,6 +4024,16 @@ static int destroy_grant_pte_mapping(
     unsigned long gmfn, mfn;
     struct page_info *page;
     l1_pgentry_t ol1e;
+
+    /*
+     * addr comes from Xen's active_entry tracking so isn't guest controlled,
+     * but it had still better be PTE-aligned.
+     */
+    if ( !IS_ALIGNED(addr, sizeof(ol1e)) )
+    {
+        ASSERT_UNREACHABLE();
+        return GNTST_general_error;
+    }
 
     gmfn = addr >> PAGE_SHIFT;
     page = get_page_from_gfn(d, gmfn, NULL, P2M_ALLOC);
