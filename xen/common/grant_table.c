@@ -304,11 +304,16 @@ __get_maptrack_handle(
 {
     unsigned int head, next, prev_head;
 
+    spin_lock(&v->maptrack_freelist_lock);
+
     do {
         /* No maptrack pages allocated for this VCPU yet? */
         head = read_atomic(&v->maptrack_head);
         if ( unlikely(head == MAPTRACK_TAIL) )
+        {
+            spin_unlock(&v->maptrack_freelist_lock);
             return -1;
+        }
 
         /*
          * Always keep one entry in the free list to make it easier to
@@ -316,11 +321,16 @@ __get_maptrack_handle(
          */
         next = read_atomic(&maptrack_entry(t, head).ref);
         if ( unlikely(next == MAPTRACK_TAIL) )
+        {
+            spin_unlock(&v->maptrack_freelist_lock);
             return -1;
+        }
 
         prev_head = head;
         head = cmpxchg(&v->maptrack_head, prev_head, next);
     } while ( head != prev_head );
+
+    spin_unlock(&v->maptrack_freelist_lock);
 
     return head;
 }
@@ -380,6 +390,8 @@ put_maptrack_handle(
     /* 2. Add entry to the tail of the list on the original VCPU. */
     v = currd->vcpu[maptrack_entry(t, handle).vcpu];
 
+    spin_lock(&v->maptrack_freelist_lock);
+
     cur_tail = read_atomic(&v->maptrack_tail);
     do {
         prev_tail = cur_tail;
@@ -388,6 +400,8 @@ put_maptrack_handle(
 
     /* 3. Update the old tail entry to point to the new entry. */
     write_atomic(&maptrack_entry(t, prev_tail).ref, handle);
+
+    spin_unlock(&v->maptrack_freelist_lock);
 }
 
 static inline int
@@ -411,10 +425,6 @@ get_maptrack_handle(
      */
     if ( nr_maptrack_frames(lgt) >= max_maptrack_frames )
     {
-        /*
-         * Can drop the lock since no other VCPU can be adding a new
-         * frame once they've run out.
-         */
         spin_unlock(&lgt->maptrack_lock);
 
         /*
@@ -426,8 +436,12 @@ get_maptrack_handle(
             handle = steal_maptrack_handle(lgt, curr);
             if ( handle == -1 )
                 return -1;
+            spin_lock(&curr->maptrack_freelist_lock);
+            maptrack_entry(lgt, handle).ref = MAPTRACK_TAIL;
             curr->maptrack_tail = handle;
-            write_atomic(&curr->maptrack_head, handle);
+            if ( curr->maptrack_head == MAPTRACK_TAIL )
+                write_atomic(&curr->maptrack_head, handle);
+            spin_unlock(&curr->maptrack_freelist_lock);
         }
         return steal_maptrack_handle(lgt, curr);
     }
@@ -460,12 +474,15 @@ get_maptrack_handle(
     smp_wmb();
     lgt->maptrack_limit += MAPTRACK_PER_PAGE;
 
+    spin_unlock(&lgt->maptrack_lock);
+    spin_lock(&curr->maptrack_freelist_lock);
+
     do {
         new_mt[i - 1].ref = read_atomic(&curr->maptrack_head);
         head = cmpxchg(&curr->maptrack_head, new_mt[i - 1].ref, handle + 1);
     } while ( head != new_mt[i - 1].ref );
 
-    spin_unlock(&lgt->maptrack_lock);
+    spin_unlock(&curr->maptrack_freelist_lock);
 
     return handle;
 }
@@ -3475,6 +3492,7 @@ grant_table_destroy(
 
 void grant_table_init_vcpu(struct vcpu *v)
 {
+    spin_lock_init(&v->maptrack_freelist_lock);
     v->maptrack_head = MAPTRACK_TAIL;
     v->maptrack_tail = MAPTRACK_TAIL;
 }
