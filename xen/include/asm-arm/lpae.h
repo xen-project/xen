@@ -3,6 +3,8 @@
 
 #ifndef __ASSEMBLY__
 
+#include <xen/page-defs.h>
+
 /*
  * WARNING!  Unlike the x86 pagetable code, where l1 is the lowest level and
  * l4 is the root of the trie, the ARM pagetables follow ARM's documentation:
@@ -150,6 +152,65 @@ static inline bool lpae_is_superpage(lpae_t pte, unsigned int level)
 {
     return (level < 3) && lpae_mapping(pte);
 }
+
+/*
+ * AArch64 supports pages with different sizes (4K, 16K, and 64K). To enable
+ * page table walks for various configurations, the following helpers enable
+ * walking the translation table with varying page size granularities.
+ */
+
+#define LPAE_SHIFT_4K           (9)
+#define LPAE_SHIFT_16K          (11)
+#define LPAE_SHIFT_64K          (13)
+
+#define lpae_entries(gran)      (_AC(1,U) << LPAE_SHIFT_##gran)
+#define lpae_entry_mask(gran)   (lpae_entries(gran) - 1)
+
+#define third_shift(gran)       (PAGE_SHIFT_##gran)
+#define third_size(gran)        ((paddr_t)1 << third_shift(gran))
+
+#define second_shift(gran)      (third_shift(gran) + LPAE_SHIFT_##gran)
+#define second_size(gran)       ((paddr_t)1 << second_shift(gran))
+
+#define first_shift(gran)       (second_shift(gran) + LPAE_SHIFT_##gran)
+#define first_size(gran)        ((paddr_t)1 << first_shift(gran))
+
+/* Note that there is no zeroeth lookup level with a 64K granule size. */
+#define zeroeth_shift(gran)     (first_shift(gran) + LPAE_SHIFT_##gran)
+#define zeroeth_size(gran)      ((paddr_t)1 << zeroeth_shift(gran))
+
+#define TABLE_OFFSET(offs, gran)      (offs & lpae_entry_mask(gran))
+#define TABLE_OFFSET_HELPERS(gran)                                          \
+static inline paddr_t third_table_offset_##gran##K(paddr_t va)              \
+{                                                                           \
+    return TABLE_OFFSET((va >> third_shift(gran##K)), gran##K);             \
+}                                                                           \
+                                                                            \
+static inline paddr_t second_table_offset_##gran##K(paddr_t va)             \
+{                                                                           \
+    return TABLE_OFFSET((va >> second_shift(gran##K)), gran##K);            \
+}                                                                           \
+                                                                            \
+static inline paddr_t first_table_offset_##gran##K(paddr_t va)              \
+{                                                                           \
+    return TABLE_OFFSET((va >> first_shift(gran##K)), gran##K);             \
+}                                                                           \
+                                                                            \
+static inline paddr_t zeroeth_table_offset_##gran##K(paddr_t va)            \
+{                                                                           \
+    /* Note that there is no zeroeth lookup level with 64K granule sizes. */\
+    if ( gran == 64 )                                                       \
+        return 0;                                                           \
+    else                                                                    \
+        return TABLE_OFFSET((va >> zeroeth_shift(gran##K)), gran##K);       \
+}                                                                           \
+
+TABLE_OFFSET_HELPERS(4);
+TABLE_OFFSET_HELPERS(16);
+TABLE_OFFSET_HELPERS(64);
+
+#undef TABLE_OFFSET
+#undef TABLE_OFFSET_HELPERS
 
 #endif /* __ASSEMBLY__ */
 
