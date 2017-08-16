@@ -21,6 +21,7 @@ obj-$(CONFIG_HAS_GICV3) += gic-v3.o
 obj-$(CONFIG_HAS_ITS) += gic-v3-its.o
 obj-$(CONFIG_HAS_ITS) += gic-v3-lpi.o
 obj-y += guestcopy.o
+obj-y += guest_walk.o
 obj-y += hvm.o
 obj-y += io.o
 obj-y += irq.o
