@@ -72,11 +72,13 @@ static void svm_update_guest_efer(struct vcpu *);
 
 static struct hvm_function_table svm_function_table;
 
-/* va of hardware host save area     */
-static DEFINE_PER_CPU_READ_MOSTLY(void *, hsa);
-
-/* vmcb used for extended host state */
-static DEFINE_PER_CPU_READ_MOSTLY(void *, root_vmcb);
+/*
+ * Physical addresses of the Host State Area (for hardware) and vmcb (for Xen)
+ * which contains Xen's fs/gs/tr/ldtr and GSBASE/STAR/SYSENTER state when in
+ * guest vcpu context.
+ */
+static DEFINE_PER_CPU_READ_MOSTLY(paddr_t, hsa);
+static DEFINE_PER_CPU_READ_MOSTLY(paddr_t, host_vmcb);
 
 static bool_t amd_erratum383_found __read_mostly;
 
@@ -1015,7 +1017,7 @@ static void svm_ctxt_switch_from(struct vcpu *v)
     svm_tsc_ratio_save(v);
 
     svm_sync_vmcb(v);
-    svm_vmload(per_cpu(root_vmcb, cpu));
+    svm_vmload_pa(per_cpu(host_vmcb, cpu));
 
     /* Resume use of ISTs now that the host TR is reinstated. */
     set_ist(&idt_tables[cpu][TRAP_double_fault],  IST_DF);
@@ -1045,7 +1047,7 @@ static void svm_ctxt_switch_to(struct vcpu *v)
 
     svm_restore_dr(v);
 
-    svm_vmsave(per_cpu(root_vmcb, cpu));
+    svm_vmsave_pa(per_cpu(host_vmcb, cpu));
     svm_vmload(vmcb);
     vmcb->cleanbits.bytes = 0;
     svm_lwp_load(v);
@@ -1468,24 +1470,58 @@ static int svm_event_pending(struct vcpu *v)
 
 static void svm_cpu_dead(unsigned int cpu)
 {
-    free_xenheap_page(per_cpu(hsa, cpu));
-    per_cpu(hsa, cpu) = NULL;
-    free_vmcb(per_cpu(root_vmcb, cpu));
-    per_cpu(root_vmcb, cpu) = NULL;
+    paddr_t *this_hsa = &per_cpu(hsa, cpu);
+    paddr_t *this_vmcb = &per_cpu(host_vmcb, cpu);
+
+    if ( *this_hsa )
+    {
+        free_domheap_page(maddr_to_page(*this_hsa));
+        *this_hsa = 0;
+    }
+
+    if ( *this_vmcb )
+    {
+        free_domheap_page(maddr_to_page(*this_vmcb));
+        *this_vmcb = 0;
+    }
 }
 
 static int svm_cpu_up_prepare(unsigned int cpu)
 {
-    if ( ((per_cpu(hsa, cpu) == NULL) &&
-          ((per_cpu(hsa, cpu) = alloc_host_save_area()) == NULL)) ||
-         ((per_cpu(root_vmcb, cpu) == NULL) &&
-          ((per_cpu(root_vmcb, cpu) = alloc_vmcb()) == NULL)) )
+    paddr_t *this_hsa = &per_cpu(hsa, cpu);
+    paddr_t *this_vmcb = &per_cpu(host_vmcb, cpu);
+    nodeid_t node = cpu_to_node(cpu);
+    unsigned int memflags = 0;
+    struct page_info *pg;
+
+    if ( node != NUMA_NO_NODE )
+        memflags = MEMF_node(node);
+
+    if ( !*this_hsa )
     {
-        svm_cpu_dead(cpu);
-        return -ENOMEM;
+        pg = alloc_domheap_page(NULL, memflags);
+        if ( !pg )
+            goto err;
+
+        clear_domain_page(_mfn(page_to_mfn(pg)));
+        *this_hsa = page_to_maddr(pg);
+    }
+
+    if ( !*this_vmcb )
+    {
+        pg = alloc_domheap_page(NULL, memflags);
+        if ( !pg )
+            goto err;
+
+        clear_domain_page(_mfn(page_to_mfn(pg)));
+        *this_vmcb = page_to_maddr(pg);
     }
 
     return 0;
+
+ err:
+    svm_cpu_dead(cpu);
+    return -ENOMEM;
 }
 
 static void svm_init_erratum_383(const struct cpuinfo_x86 *c)
@@ -1544,7 +1580,7 @@ static int _svm_cpu_up(bool bsp)
     write_efer(read_efer() | EFER_SVME);
 
     /* Initialize the HSA for this core. */
-    wrmsrl(MSR_K8_VM_HSAVE_PA, (uint64_t)virt_to_maddr(per_cpu(hsa, cpu)));
+    wrmsrl(MSR_K8_VM_HSAVE_PA, per_cpu(hsa, cpu));
 
     /* check for erratum 383 */
     svm_init_erratum_383(c);

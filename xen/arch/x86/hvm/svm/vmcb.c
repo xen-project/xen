@@ -50,21 +50,6 @@ void free_vmcb(struct vmcb_struct *vmcb)
     free_xenheap_page(vmcb);
 }
 
-struct host_save_area *alloc_host_save_area(void)
-{
-    struct host_save_area *hsa;
-
-    hsa = alloc_xenheap_page();
-    if ( hsa == NULL )
-    {
-        printk(XENLOG_WARNING "Warning: failed to allocate hsa.\n");
-        return NULL;
-    }
-
-    clear_page(hsa);
-    return hsa;
-}
-
 /* This function can directly access fields which are covered by clean bits. */
 static int construct_vmcb(struct vcpu *v)
 {
