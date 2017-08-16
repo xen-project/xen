@@ -101,14 +101,6 @@ static int __init allocate_cachealigned_memnodemap(void)
     unsigned long size = PFN_UP(memnodemapsize * sizeof(*memnodemap));
     unsigned long mfn = alloc_boot_pages(size, 1);
 
-    if ( !mfn )
-    {
-        printk(KERN_ERR
-               "NUMA: Unable to allocate Memory to Node hash map\n");
-        memnodemapsize = 0;
-        return -1;
-    }
-
     memnodemap = mfn_to_virt(mfn);
     mfn <<= PAGE_SHIFT;
     size <<= PAGE_SHIFT;
