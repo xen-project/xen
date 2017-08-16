@@ -1143,19 +1143,14 @@ __gnttab_unmap_common(
     smp_rmb();
     map = &maptrack_entry(lgt, op->handle);
 
-    grant_read_lock(lgt);
-
     if ( unlikely(!read_atomic(&map->flags)) )
     {
-        grant_read_unlock(lgt);
         gdprintk(XENLOG_INFO, "Zero flags for handle %#x\n", op->handle);
         op->status = GNTST_bad_handle;
         return;
     }
 
     dom = map->domid;
-    grant_read_unlock(lgt);
-
     if ( unlikely((rd = rcu_lock_domain_by_id(dom)) == NULL) )
     {
         /* This can happen when a grant is implicitly unmapped. */
