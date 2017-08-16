@@ -31,9 +31,9 @@
  * - PSR         Intel Platform Shared Resource
  */
 
-#define PSR_CMT        (1<<0)
-#define PSR_CAT        (1<<1)
-#define PSR_CDP        (1<<2)
+#define PSR_CMT        (1u << 0)
+#define PSR_CAT        (1u << 1)
+#define PSR_CDP        (1u << 2)
 
 #define CAT_CBM_LEN_MASK 0x1f
 #define CAT_COS_MAX_MASK 0xffff
