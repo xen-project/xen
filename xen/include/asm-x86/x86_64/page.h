@@ -19,7 +19,6 @@
 #define SUPERPAGE_ORDER         PAGETABLE_ORDER
 #define SUPERPAGE_PAGES         (1<<SUPERPAGE_ORDER)
 
-#define __PAGE_OFFSET           DIRECTMAP_VIRT_START
 #define __XEN_VIRT_START        XEN_VIRT_START
 
 /* These are architectural limits. Current CPUs support only 40-bit phys. */
