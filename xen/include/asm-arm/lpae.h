@@ -153,6 +153,11 @@ static inline bool lpae_is_superpage(lpae_t pte, unsigned int level)
     return (level < 3) && lpae_mapping(pte);
 }
 
+static inline bool lpae_is_page(lpae_t pte, unsigned int level)
+{
+    return (level == 3) && lpae_valid(pte) && pte.walk.table;
+}
+
 /*
  * AArch64 supports pages with different sizes (4K, 16K, and 64K). To enable
  * page table walks for various configurations, the following helpers enable
