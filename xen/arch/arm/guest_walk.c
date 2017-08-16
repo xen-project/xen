@@ -19,6 +19,7 @@
 #include <xen/sched.h>
 #include <asm/guest_access.h>
 #include <asm/guest_walk.h>
+#include <asm/short-desc.h>
 
 /*
  * The function guest_walk_sd translates a given GVA into an IPA using the
@@ -31,8 +32,150 @@ static int guest_walk_sd(const struct vcpu *v,
                          vaddr_t gva, paddr_t *ipa,
                          unsigned int *perms)
 {
-    /* Not implemented yet. */
-    return -EFAULT;
+    int ret;
+    bool disabled = true;
+    uint32_t ttbr;
+    paddr_t mask, paddr;
+    short_desc_t pte;
+    register_t ttbcr = READ_SYSREG(TCR_EL1);
+    unsigned int n = ttbcr & TTBCR_N_MASK;
+    struct domain *d = v->domain;
+
+    mask = GENMASK_ULL(31, (32 - n));
+
+    if ( n == 0 || !(gva & mask) )
+    {
+        /*
+         * Use TTBR0 for GVA to IPA translation.
+         *
+         * Note that on AArch32, the TTBR0_EL1 register is 32-bit wide.
+         * Nevertheless, we have to use the READ_SYSREG64 macro, as it is
+         * required for reading TTBR0_EL1.
+         */
+        ttbr = READ_SYSREG64(TTBR0_EL1);
+
+        /* If TTBCR.PD0 is set, translations using TTBR0 are disabled. */
+        disabled = ttbcr & TTBCR_PD0;
+    }
+    else
+    {
+        /*
+         * Use TTBR1 for GVA to IPA translation.
+         *
+         * Note that on AArch32, the TTBR1_EL1 register is 32-bit wide.
+         * Nevertheless, we have to use the READ_SYSREG64 macro, as it is
+         * required for reading TTBR1_EL1.
+         */
+        ttbr = READ_SYSREG64(TTBR1_EL1);
+
+        /* If TTBCR.PD1 is set, translations using TTBR1 are disabled. */
+        disabled = ttbcr & TTBCR_PD1;
+
+        /*
+         * TTBR1 translation always works like n==0 TTBR0 translation (ARM DDI
+         * 0487B.a J1-6003).
+         */
+        n = 0;
+    }
+
+    if ( disabled )
+        return -EFAULT;
+
+    /*
+     * The address of the L1 descriptor for the initial lookup has the
+     * following format: [ttbr<31:14-n>:gva<31-n:20>:00] (ARM DDI 0487B.a
+     * J1-6003). Note that the following GPA computation already considers that
+     * the first level address translation might comprise up to four
+     * consecutive pages and does not need to be page-aligned if n > 2.
+     */
+    mask = GENMASK(31, (14 - n));
+    paddr = (ttbr & mask);
+
+    mask = GENMASK((31 - n), 20);
+    paddr |= (gva & mask) >> 18;
+
+    /* Access the guest's memory to read only one PTE. */
+    ret = access_guest_memory_by_ipa(d, paddr, &pte, sizeof(short_desc_t), false);
+    if ( ret )
+        return -EINVAL;
+
+    switch ( pte.walk.dt )
+    {
+    case L1DESC_INVALID:
+        return -EFAULT;
+
+    case L1DESC_PAGE_TABLE:
+        /*
+         * The address of the L2 descriptor has the following format:
+         * [l1desc<31:10>:gva<19:12>:00] (ARM DDI 0487B.aJ1-6004). Note that
+         * the following address computation already considers that the second
+         * level translation table does not need to be page aligned.
+         */
+        mask = GENMASK(19, 12);
+        /*
+         * Cast pte.walk.base to paddr_t to cope with C type promotion of types
+         * smaller than int. Otherwise pte.walk.base would be casted to int and
+         * subsequently sign extended, thus leading to a wrong value.
+         */
+        paddr = ((paddr_t)pte.walk.base << 10) | ((gva & mask) >> 10);
+
+        /* Access the guest's memory to read only one PTE. */
+        ret = access_guest_memory_by_ipa(d, paddr, &pte, sizeof(short_desc_t), false);
+        if ( ret )
+            return -EINVAL;
+
+        if ( pte.walk.dt == L2DESC_INVALID )
+            return -EFAULT;
+
+        if ( pte.pg.page ) /* Small page. */
+        {
+            mask = (1ULL << L2DESC_SMALL_PAGE_SHIFT) - 1;
+            *ipa = ((paddr_t)pte.pg.base << L2DESC_SMALL_PAGE_SHIFT) | (gva & mask);
+
+            /* Set execute permissions associated with the small page. */
+            if ( !pte.pg.xn )
+                *perms |= GV2M_EXEC;
+        }
+        else /* Large page. */
+        {
+            mask = (1ULL << L2DESC_LARGE_PAGE_SHIFT) - 1;
+            *ipa = ((paddr_t)pte.lpg.base << L2DESC_LARGE_PAGE_SHIFT) | (gva & mask);
+
+            /* Set execute permissions associated with the large page. */
+            if ( !pte.lpg.xn )
+                *perms |= GV2M_EXEC;
+        }
+
+        /* Set permissions so that the caller can check the flags by herself. */
+        if ( !pte.pg.ro )
+            *perms |= GV2M_WRITE;
+
+        break;
+
+    case L1DESC_SECTION:
+    case L1DESC_SECTION_PXN:
+        if ( !pte.sec.supersec ) /* Section */
+        {
+            mask = (1ULL << L1DESC_SECTION_SHIFT) - 1;
+            *ipa = ((paddr_t)pte.sec.base << L1DESC_SECTION_SHIFT) | (gva & mask);
+        }
+        else /* Supersection */
+        {
+            mask = (1ULL << L1DESC_SUPERSECTION_SHIFT) - 1;
+            *ipa = gva & mask;
+            *ipa |= (paddr_t)(pte.supersec.base) << L1DESC_SUPERSECTION_SHIFT;
+            *ipa |= (paddr_t)(pte.supersec.extbase1) << L1DESC_SUPERSECTION_EXT_BASE1_SHIFT;
+            *ipa |= (paddr_t)(pte.supersec.extbase2) << L1DESC_SUPERSECTION_EXT_BASE2_SHIFT;
+        }
+
+        /* Set permissions so that the caller can check the flags by herself. */
+        if ( !pte.sec.ro )
+            *perms |= GV2M_WRITE;
+        if ( !pte.sec.xn )
+            *perms |= GV2M_EXEC;
+    }
+
+    return 0;
 }
 
 /*
