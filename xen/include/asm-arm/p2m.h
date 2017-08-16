@@ -21,7 +21,13 @@ extern void memory_type_changed(struct domain *);
 
 /* Per-p2m-table state */
 struct p2m_domain {
-    /* Lock that protects updates to the p2m */
+    /*
+     * Lock that protects updates to the p2m.
+     *
+     * Please note that we use this lock in a nested way by calling
+     * access_guest_memory_by_ipa in guest_walk_(sd|ld). This must be
+     * considered in the future implementation.
+     */
     rwlock_t lock;
 
     /* Pages used to construct the p2m */
