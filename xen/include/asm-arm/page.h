@@ -90,6 +90,7 @@
 /* Flags for get_page_from_gva, gvirt_to_maddr etc */
 #define GV2M_READ  (0u<<0)
 #define GV2M_WRITE (1u<<0)
+#define GV2M_EXEC  (1u<<1)
 
 #ifndef __ASSEMBLY__
 
