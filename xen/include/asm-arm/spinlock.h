@@ -10,4 +10,6 @@
     sev();                      \
 } while(0)
 
+#define arch_lock_signal_wmb()  arch_lock_signal()
+
 #endif /* __ASM_SPINLOCK_H */
