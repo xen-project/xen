@@ -702,6 +702,7 @@ static struct page_info *get_free_buddy(unsigned int zone_lo,
     nodemask_t nodemask = d ? d->node_affinity : node_online_map;
     unsigned int j, zone, nodemask_retry = 0;
     struct page_info *pg;
+    bool use_unscrubbed = (memflags & MEMF_no_scrub);
 
     if ( node == NUMA_NO_NODE )
     {
@@ -733,8 +734,20 @@ static struct page_info *get_free_buddy(unsigned int zone_lo,
 
             /* Find smallest order which can satisfy the request. */
             for ( j = order; j <= MAX_ORDER; j++ )
+            {
                 if ( (pg = page_list_remove_head(&heap(node, zone, j))) )
-                    return pg;
+                {
+                    /*
+                     * We grab single pages (order=0) even if they are
+                     * unscrubbed. Given that scrubbing one page is fairly quick
+                     * it is not worth breaking higher orders.
+                     */
+                    if ( (order == 0) || use_unscrubbed ||
+                         pg->u.free.first_dirty == INVALID_DIRTY_IDX)
+                        return pg;
+                    page_list_add_tail(pg, &heap(node, zone, j));
+                }
+            }
         } while ( zone-- > zone_lo ); /* careful: unsigned zone may wrap */
 
         if ( (memflags & MEMF_exact_node) && req_node != NUMA_NO_NODE )
@@ -818,6 +831,10 @@ static struct page_info *alloc_heap_pages(
     }
 
     pg = get_free_buddy(zone_lo, zone_hi, order, memflags, d);
+    /* Try getting a dirty buddy if we couldn't get a clean one. */
+    if ( !pg && !(memflags & MEMF_no_scrub) )
+        pg = get_free_buddy(zone_lo, zone_hi, order,
+                            memflags | MEMF_no_scrub, d);
     if ( !pg )
     {
         /* No suitable memory blocks. Fail the request. */
@@ -863,7 +880,15 @@ static struct page_info *alloc_heap_pages(
     for ( i = 0; i < (1 << order); i++ )
     {
         /* Reference count must continuously be zero for free pages. */
-        BUG_ON(pg[i].count_info != PGC_state_free);
+        BUG_ON((pg[i].count_info & ~PGC_need_scrub) != PGC_state_free);
+
+        if ( test_bit(_PGC_need_scrub, &pg[i].count_info) )
+        {
+            if ( !(memflags & MEMF_no_scrub) )
+                scrub_one_page(&pg[i]);
+            node_need_scrub[node]--;
+        }
+
         pg[i].count_info = PGC_state_inuse;
 
         if ( !(memflags & MEMF_no_tlbflush) )
@@ -1737,7 +1762,7 @@ void *alloc_xenheap_pages(unsigned int order, unsigned int memflags)
     ASSERT(!in_irq());
 
     pg = alloc_heap_pages(MEMZONE_XEN, MEMZONE_XEN,
-                          order, memflags, NULL);
+                          order, memflags | MEMF_no_scrub, NULL);
     if ( unlikely(pg == NULL) )
         return NULL;
 
@@ -1787,7 +1812,7 @@ void *alloc_xenheap_pages(unsigned int order, unsigned int memflags)
     if ( !(memflags >> _MEMF_bits) )
         memflags |= MEMF_bits(xenheap_bits);
 
-    pg = alloc_domheap_pages(NULL, order, memflags);
+    pg = alloc_domheap_pages(NULL, order, memflags | MEMF_no_scrub);
     if ( unlikely(pg == NULL) )
         return NULL;
 
