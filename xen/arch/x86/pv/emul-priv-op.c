@@ -337,7 +337,6 @@ static int read_io(unsigned int port, unsigned int bytes,
         io_emul_stub_t *io_emul =
             io_emul_stub_setup(poc, ctxt->opcode, port, bytes);
 
-        mark_regs_dirty(ctxt->regs);
         io_emul(ctxt->regs);
         return X86EMUL_DONE;
     }
@@ -436,7 +435,6 @@ static int write_io(unsigned int port, unsigned int bytes,
         io_emul_stub_t *io_emul =
             io_emul_stub_setup(poc, ctxt->opcode, port, bytes);
 
-        mark_regs_dirty(ctxt->regs);
         io_emul(ctxt->regs);
         if ( (bytes == 1) && pv_post_outb_hook )
             pv_post_outb_hook(port, val);

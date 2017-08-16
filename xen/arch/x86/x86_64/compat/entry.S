@@ -16,7 +16,8 @@
 ENTRY(entry_int82)
         ASM_CLAC
         pushq $0
-        SAVE_VOLATILE type=HYPERCALL_VECTOR compat=1
+        movl  $HYPERCALL_VECTOR, 4(%rsp)
+        SAVE_ALL compat=1 /* DPL1 gate, restricted to 32bit PV guests only. */
         CR4_PV32_RESTORE
 
         GET_CURRENT(bx)
@@ -60,7 +61,6 @@ compat_test_guest_events:
 /* %rbx: struct vcpu */
 compat_process_softirqs:
         sti
-        andl  $~TRAP_regs_partial,UREGS_entry_vector(%rsp)
         call  do_softirq
         jmp   compat_test_all_events
 
@@ -197,7 +197,8 @@ ENTRY(cstar_enter)
         pushq $FLAT_USER_CS32
         pushq %rcx
         pushq $0
-        SAVE_VOLATILE TRAP_syscall
+        movl  $TRAP_syscall, 4(%rsp)
+        SAVE_ALL
         GET_CURRENT(bx)
         movq  VCPU_domain(%rbx),%rcx
         cmpb  $0,DOMAIN_is_32bit_pv(%rcx)
