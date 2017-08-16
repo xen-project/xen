@@ -50,16 +50,6 @@ extern unsigned long xen_virt_end;
 #define pdx_to_virt(pdx) ((void *)(DIRECTMAP_VIRT_START + \
                                    ((unsigned long)(pdx) << PAGE_SHIFT)))
 
-static inline unsigned long pfn_to_sdx(unsigned long pfn)
-{
-    return pfn_to_pdx(pfn) >> (SUPERPAGE_SHIFT-PAGE_SHIFT);
-}
-
-static inline unsigned long sdx_to_pfn(unsigned long sdx)
-{
-    return pdx_to_pfn(sdx << (SUPERPAGE_SHIFT-PAGE_SHIFT));
-}
-
 static inline unsigned long __virt_to_maddr(unsigned long va)
 {
     ASSERT(va >= XEN_VIRT_START);
