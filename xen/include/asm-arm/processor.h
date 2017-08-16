@@ -549,6 +549,23 @@ union hsr {
         unsigned long ec:6;     /* Exception Class */
     } cp; /* HSR_EC_CP */
 
+    /*
+     * This encoding is valid only for ARMv8 (ARM DDI 0487B.a, pages D7-2271 and
+     * G6-4957). On ARMv7, encoding ISS for EC=0x13 is defined as UNK/SBZP
+     * (ARM DDI 0406C.c page B3-1431). UNK/SBZP means that hardware implements
+     * this field as Read-As-Zero. ARMv8 is backwards compatible with ARMv7:
+     * reading CCKNOWNPASS on ARMv7 will return 0, which means that condition
+     * check was passed or instruction was unconditional.
+     */
+    struct hsr_smc32 {
+        unsigned long res0:19;  /* Reserved */
+        unsigned long ccknownpass:1; /* Instruction passed conditional check */
+        unsigned long cc:4;    /* Condition Code */
+        unsigned long ccvalid:1;/* CC Valid */
+        unsigned long len:1;   /* Instruction length */
+        unsigned long ec:6;    /* Exception Class */
+    } smc32; /* HSR_EC_SMC32 */
+
 #ifdef CONFIG_ARM_64
     struct hsr_sysreg {
         unsigned long read:1;   /* Direction */
