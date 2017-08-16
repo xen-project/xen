@@ -158,7 +158,24 @@ shared_entry_header(struct grant_table *t, grant_ref_t ref)
 
 /* Active grant entry - used for shadowing GTF_permit_access grants. */
 struct active_grant_entry {
-    u32           pin;    /* Reference count information.             */
+    uint32_t      pin;    /* Reference count information:             */
+                          /* Count of writable host-CPU mappings.     */
+#define GNTPIN_hstw_shift    0
+#define GNTPIN_hstw_inc      (1U << GNTPIN_hstw_shift)
+#define GNTPIN_hstw_mask     (0xFFU << GNTPIN_hstw_shift)
+                          /* Count of read-only host-CPU mappings.    */
+#define GNTPIN_hstr_shift    8
+#define GNTPIN_hstr_inc      (1U << GNTPIN_hstr_shift)
+#define GNTPIN_hstr_mask     (0xFFU << GNTPIN_hstr_shift)
+                          /* Count of writable device-bus mappings.   */
+#define GNTPIN_devw_shift    16
+#define GNTPIN_devw_inc      (1U << GNTPIN_devw_shift)
+#define GNTPIN_devw_mask     (0xFFU << GNTPIN_devw_shift)
+                          /* Count of read-only device-bus mappings.  */
+#define GNTPIN_devr_shift    24
+#define GNTPIN_devr_inc      (1U << GNTPIN_devr_shift)
+#define GNTPIN_devr_mask     (0xFFU << GNTPIN_devr_shift)
+
     domid_t       domid;  /* Domain being granted access.             */
     struct domain *trans_domain;
     uint32_t      trans_gref;
