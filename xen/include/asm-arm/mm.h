@@ -43,8 +43,16 @@ struct page_info
         } inuse;
         /* Page is on a free list: ((count_info & PGC_count_mask) == 0). */
         struct {
+            /*
+             * Index of the first *possibly* unscrubbed page in the buddy.
+             * One more bit than maximum possible order to accommodate
+             * INVALID_DIRTY_IDX.
+             */
+#define INVALID_DIRTY_IDX ((1UL << (MAX_ORDER + 1)) - 1)
+            unsigned long first_dirty:MAX_ORDER + 1;
+
             /* Do TLBs need flushing for safety before next page use? */
-            bool_t need_tlbflush;
+            bool need_tlbflush:1;
         } free;
 
     } u;
@@ -106,6 +114,13 @@ struct page_info
 /* Count of references to this frame. */
 #define PGC_count_width   PG_shift(9)
 #define PGC_count_mask    ((1UL<<PGC_count_width)-1)
+
+/*
+ * Page needs to be scrubbed. Since this bit can only be set on a page that is
+ * free (i.e. in PGC_state_free) we can reuse PGC_allocated bit.
+ */
+#define _PGC_need_scrub   _PGC_allocated
+#define PGC_need_scrub    PGC_allocated
 
 extern mfn_t xenheap_mfn_start, xenheap_mfn_end;
 extern vaddr_t xenheap_virt_end;

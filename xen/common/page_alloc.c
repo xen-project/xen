@@ -261,7 +261,11 @@ void __init init_boot_pages(paddr_t ps, paddr_t pe)
 #ifdef CONFIG_X86
     const unsigned long *badpage = NULL;
     unsigned int i, array_size;
+
+    BUILD_BUG_ON(8 * sizeof(frame_table->u.free.first_dirty) <
+                 MAX_ORDER + 1);
 #endif
+    BUILD_BUG_ON(sizeof(frame_table->u) != sizeof(unsigned long));
 
     ps = round_pgup(ps);
     pe = round_pgdown(pe);
@@ -374,6 +378,8 @@ unsigned long __init alloc_boot_pages(
 typedef struct page_list_head heap_by_zone_and_order_t[NR_ZONES][MAX_ORDER+1];
 static heap_by_zone_and_order_t *_heap[MAX_NUMNODES];
 #define heap(node, zone, order) ((*_heap[node])[zone][order])
+
+static unsigned long node_need_scrub[MAX_NUMNODES];
 
 static unsigned long *avail[MAX_NUMNODES];
 static long total_avail_pages;
@@ -670,13 +676,30 @@ static void check_low_mem_virq(void)
     }
 }
 
+/* Pages that need a scrub are added to tail, otherwise to head. */
+static void page_list_add_scrub(struct page_info *pg, unsigned int node,
+                                unsigned int zone, unsigned int order,
+                                unsigned int first_dirty)
+{
+    PFN_ORDER(pg) = order;
+    pg->u.free.first_dirty = first_dirty;
+
+    if ( first_dirty != INVALID_DIRTY_IDX )
+    {
+        ASSERT(first_dirty < (1U << order));
+        page_list_add_tail(pg, &heap(node, zone, order));
+    }
+    else
+        page_list_add(pg, &heap(node, zone, order));
+}
+
 /* Allocate 2^@order contiguous pages. */
 static struct page_info *alloc_heap_pages(
     unsigned int zone_lo, unsigned int zone_hi,
     unsigned int order, unsigned int memflags,
     struct domain *d)
 {
-    unsigned int i, j, zone = 0, nodemask_retry = 0;
+    unsigned int i, j, zone = 0, nodemask_retry = 0, first_dirty;
     nodeid_t first_node, node = MEMF_get_node(memflags), req_node = node;
     unsigned long request = 1UL << order;
     struct page_info *pg;
@@ -790,12 +813,26 @@ static struct page_info *alloc_heap_pages(
     return NULL;
 
  found: 
+
+    first_dirty = pg->u.free.first_dirty;
+
     /* We may have to halve the chunk a number of times. */
     while ( j != order )
     {
-        PFN_ORDER(pg) = --j;
-        page_list_add_tail(pg, &heap(node, zone, j));
-        pg += 1 << j;
+        j--;
+        page_list_add_scrub(pg, node, zone, j,
+                            (1U << j) > first_dirty ?
+                            first_dirty : INVALID_DIRTY_IDX);
+        pg += 1U << j;
+
+        if ( first_dirty != INVALID_DIRTY_IDX )
+        {
+            /* Adjust first_dirty */
+            if ( first_dirty >= 1U << j )
+                first_dirty -= 1U << j;
+            else
+                first_dirty = 0; /* We've moved past original first_dirty */
+        }
     }
 
     ASSERT(avail[node][zone] >= request);
@@ -842,11 +879,19 @@ static int reserve_offlined_page(struct page_info *head)
     unsigned int node = phys_to_nid(page_to_maddr(head));
     int zone = page_to_zone(head), i, head_order = PFN_ORDER(head), count = 0;
     struct page_info *cur_head;
-    int cur_order;
+    unsigned int cur_order, first_dirty;
 
     ASSERT(spin_is_locked(&heap_lock));
 
     cur_head = head;
+
+    /*
+     * We may break the buddy so let's mark the head as clean. Then, when
+     * merging chunks back into the heap, we will see whether the chunk has
+     * unscrubbed pages and set its first_dirty properly.
+     */
+    first_dirty = head->u.free.first_dirty;
+    head->u.free.first_dirty = INVALID_DIRTY_IDX;
 
     page_list_del(head, &heap(node, zone, head_order));
 
@@ -858,6 +903,8 @@ static int reserve_offlined_page(struct page_info *head)
         if ( page_state_is(cur_head, offlined) )
         {
             cur_head++;
+            if ( first_dirty != INVALID_DIRTY_IDX && first_dirty )
+                first_dirty--;
             continue;
         }
 
@@ -884,9 +931,20 @@ static int reserve_offlined_page(struct page_info *head)
             {
             merge:
                 /* We don't consider merging outside the head_order. */
-                page_list_add_tail(cur_head, &heap(node, zone, cur_order));
-                PFN_ORDER(cur_head) = cur_order;
+                page_list_add_scrub(cur_head, node, zone, cur_order,
+                                    (1U << cur_order) > first_dirty ?
+                                    first_dirty : INVALID_DIRTY_IDX);
                 cur_head += (1 << cur_order);
+
+                /* Adjust first_dirty if needed. */
+                if ( first_dirty != INVALID_DIRTY_IDX )
+                {
+                    if ( first_dirty >=  1U << cur_order )
+                        first_dirty -= 1U << cur_order;
+                    else
+                        first_dirty = 0;
+                }
+
                 break;
             }
         }
@@ -911,9 +969,53 @@ static int reserve_offlined_page(struct page_info *head)
     return count;
 }
 
+static void scrub_free_pages(unsigned int node)
+{
+    struct page_info *pg;
+    unsigned int zone;
+
+    ASSERT(spin_is_locked(&heap_lock));
+
+    if ( !node_need_scrub[node] )
+        return;
+
+    for ( zone = 0; zone < NR_ZONES; zone++ )
+    {
+        unsigned int order = MAX_ORDER;
+
+        do {
+            while ( !page_list_empty(&heap(node, zone, order)) )
+            {
+                unsigned int i;
+
+                /* Unscrubbed pages are always at the end of the list. */
+                pg = page_list_last(&heap(node, zone, order));
+                if ( pg->u.free.first_dirty == INVALID_DIRTY_IDX )
+                    break;
+
+                for ( i = pg->u.free.first_dirty; i < (1U << order); i++)
+                {
+                    if ( test_bit(_PGC_need_scrub, &pg[i].count_info) )
+                    {
+                        scrub_one_page(&pg[i]);
+                        pg[i].count_info &= ~PGC_need_scrub;
+                        node_need_scrub[node]--;
+                    }
+                }
+
+                page_list_del(pg, &heap(node, zone, order));
+                page_list_add_scrub(pg, node, zone, order, INVALID_DIRTY_IDX);
+
+                if ( node_need_scrub[node] == 0 )
+                    return;
+            }
+        } while ( order-- != 0 );
+    }
+}
+
 /* Free 2^@order set of pages. */
 static void free_heap_pages(
-    struct page_info *pg, unsigned int order)
+    struct page_info *pg, unsigned int order, bool need_scrub)
 {
     unsigned long mask, mfn = page_to_mfn(pg);
     unsigned int i, node = phys_to_nid(page_to_maddr(pg)), tainted = 0;
@@ -953,10 +1055,20 @@ static void free_heap_pages(
         /* This page is not a guest frame any more. */
         page_set_owner(&pg[i], NULL); /* set_gpfn_from_mfn snoops pg owner */
         set_gpfn_from_mfn(mfn + i, INVALID_M2P_ENTRY);
+
+        if ( need_scrub )
+            pg[i].count_info |= PGC_need_scrub;
     }
 
     avail[node][zone] += 1 << order;
     total_avail_pages += 1 << order;
+    if ( need_scrub )
+    {
+        node_need_scrub[node] += 1 << order;
+        pg->u.free.first_dirty = 0;
+    }
+    else
+        pg->u.free.first_dirty = INVALID_DIRTY_IDX;
 
     if ( tmem_enabled() )
         midsize_alloc_zone_pages = max(
@@ -980,6 +1092,12 @@ static void free_heap_pages(
 
             page_list_del(predecessor, &heap(node, zone, order));
 
+            /* Keep predecessor's first_dirty if it is already set. */
+            if ( predecessor->u.free.first_dirty == INVALID_DIRTY_IDX &&
+                 pg->u.free.first_dirty != INVALID_DIRTY_IDX )
+                predecessor->u.free.first_dirty = (1U << order) +
+                                                  pg->u.free.first_dirty;
+
             pg = predecessor;
         }
         else
@@ -999,11 +1117,13 @@ static void free_heap_pages(
         order++;
     }
 
-    PFN_ORDER(pg) = order;
-    page_list_add_tail(pg, &heap(node, zone, order));
+    page_list_add_scrub(pg, node, zone, order, pg->u.free.first_dirty);
 
     if ( tainted )
         reserve_offlined_page(pg);
+
+    if ( need_scrub )
+        scrub_free_pages(node);
 
     spin_unlock(&heap_lock);
 }
@@ -1225,7 +1345,7 @@ unsigned int online_page(unsigned long mfn, uint32_t *status)
     spin_unlock(&heap_lock);
 
     if ( (y & PGC_state) == PGC_state_offlined )
-        free_heap_pages(pg, 0);
+        free_heap_pages(pg, 0, false);
 
     return ret;
 }
@@ -1294,7 +1414,7 @@ static void init_heap_pages(
             nr_pages -= n;
         }
 
-        free_heap_pages(pg+i, 0);
+        free_heap_pages(pg + i, 0, false);
     }
 }
 
@@ -1621,7 +1741,7 @@ void free_xenheap_pages(void *v, unsigned int order)
 
     memguard_guard_range(v, 1 << (order + PAGE_SHIFT));
 
-    free_heap_pages(virt_to_page(v), order);
+    free_heap_pages(virt_to_page(v), order, false);
 }
 
 #else
@@ -1675,12 +1795,9 @@ void free_xenheap_pages(void *v, unsigned int order)
     pg = virt_to_page(v);
 
     for ( i = 0; i < (1u << order); i++ )
-    {
-        scrub_one_page(&pg[i]);
         pg[i].count_info &= ~PGC_xen_heap;
-    }
 
-    free_heap_pages(pg, order);
+    free_heap_pages(pg, order, true);
 }
 
 #endif
@@ -1789,7 +1906,7 @@ struct page_info *alloc_domheap_pages(
     if ( d && !(memflags & MEMF_no_owner) &&
          assign_pages(d, pg, order, memflags) )
     {
-        free_heap_pages(pg, order);
+        free_heap_pages(pg, order, false);
         return NULL;
     }
     
@@ -1857,11 +1974,7 @@ void free_domheap_pages(struct page_info *pg, unsigned int order)
             scrub = 1;
         }
 
-        if ( unlikely(scrub) )
-            for ( i = 0; i < (1 << order); i++ )
-                scrub_one_page(&pg[i]);
-
-        free_heap_pages(pg, order);
+        free_heap_pages(pg, order, scrub);
     }
 
     if ( drop_dom_ref )
