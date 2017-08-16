@@ -1716,8 +1716,25 @@ static int check_conditional_instr(struct cpu_user_regs *regs,
     unsigned long cpsr, cpsr_cond;
     int cond;
 
+    /*
+     * SMC32 instruction case is special. Under SMC32 we mean SMC
+     * instruction on ARMv7 or SMC instruction originating from
+     * AArch32 state on ARMv8.
+     * On ARMv7 it will be trapped only if it passed condition check
+     * (ARM DDI 0406C.c page B3-1431), but we need to check condition
+     * flags on ARMv8 (ARM DDI 0487B.a page D7-2271).
+     * Encoding for HSR.ISS on ARMv8 is backwards compatible with ARMv7:
+     * HSR.ISS is defined as UNK/SBZP on ARMv7 which means, that it
+     * will be read as 0. This includes CCKNOWNPASS field.
+     * If CCKNOWNPASS == 0 then this was an unconditional instruction or
+     * it has passed conditional check (ARM DDI 0487B.a page D7-2272).
+     */
+    if ( hsr.ec == HSR_EC_SMC32 && hsr.smc32.ccknownpass == 0 )
+        return 1;
+
     /* Unconditional Exception classes */
-    if ( hsr.ec == HSR_EC_UNKNOWN || hsr.ec >= 0x10 )
+    if ( hsr.ec == HSR_EC_UNKNOWN ||
+         (hsr.ec >= 0x10 && hsr.ec != HSR_EC_SMC32) )
         return 1;
 
     /* Check for valid condition in hsr */
