@@ -200,11 +200,7 @@ static void __init init_frametable_chunk(void *start, void *end)
          */
         while ( step && s + (step << PAGE_SHIFT) > e + (4 << PAGE_SHIFT) )
             step >>= PAGETABLE_ORDER;
-        do {
-            mfn = alloc_boot_pages(step, step);
-        } while ( !mfn && (step >>= PAGETABLE_ORDER) );
-        if ( !mfn )
-            panic("Not enough memory for frame table");
+        mfn = alloc_boot_pages(step, step);
         map_pages_to_xen(s, mfn, step, PAGE_HYPERVISOR);
     }
 
