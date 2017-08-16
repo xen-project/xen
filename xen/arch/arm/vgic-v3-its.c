@@ -39,6 +39,7 @@
 #include <xen/sched.h>
 #include <xen/sizes.h>
 #include <asm/current.h>
+#include <asm/guest_access.h>
 #include <asm/mmio.h>
 #include <asm/gic_v3_defs.h>
 #include <asm/gic_v3_its.h>

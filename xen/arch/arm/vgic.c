@@ -638,55 +638,6 @@ void vgic_free_virq(struct domain *d, unsigned int virq)
 }
 
 /*
- * Temporarily map one physical guest page and copy data to or from it.
- * The data to be copied cannot cross a page boundary.
- */
-int vgic_access_guest_memory(struct domain *d, paddr_t gpa, void *buf,
-                             uint32_t size, bool is_write)
-{
-    struct page_info *page;
-    uint64_t offset = gpa & ~PAGE_MASK;  /* Offset within the mapped page */
-    p2m_type_t p2mt;
-    void *p;
-
-    /* Do not cross a page boundary. */
-    if ( size > (PAGE_SIZE - offset) )
-    {
-        printk(XENLOG_G_ERR "d%d: vITS: memory access would cross page boundary\n",
-               d->domain_id);
-        return -EINVAL;
-    }
-
-    page = get_page_from_gfn(d, paddr_to_pfn(gpa), &p2mt, P2M_ALLOC);
-    if ( !page )
-    {
-        printk(XENLOG_G_ERR "d%d: vITS: Failed to get table entry\n",
-               d->domain_id);
-        return -EINVAL;
-    }
-
-    if ( !p2m_is_ram(p2mt) )
-    {
-        put_page(page);
-        printk(XENLOG_G_ERR "d%d: vITS: memory used by the ITS should be RAM.",
-               d->domain_id);
-        return -EINVAL;
-    }
-
-    p = __map_domain_page(page);
-
-    if ( is_write )
-        memcpy(p + offset, buf, size);
-    else
-        memcpy(buf, p + offset, size);
-
-    unmap_domain_page(p);
-    put_page(page);
-
-    return 0;
-}
-
-/*
  * Local variables:
  * mode: C
  * c-file-style: "BSD"

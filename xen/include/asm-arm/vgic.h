@@ -217,9 +217,6 @@ extern void register_vgic_ops(struct domain *d, const struct vgic_ops *ops);
 int vgic_v2_init(struct domain *d, int *mmio_count);
 int vgic_v3_init(struct domain *d, int *mmio_count);
 
-int vgic_access_guest_memory(struct domain *d, paddr_t gpa, void *buf,
-                             uint32_t size, bool_t is_write);
-
 extern int domain_vgic_register(struct domain *d, int *mmio_count);
 extern int vcpu_vgic_free(struct vcpu *v);
 extern bool vgic_to_sgi(struct vcpu *v, register_t sgir,
