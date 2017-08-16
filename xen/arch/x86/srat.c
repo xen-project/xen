@@ -194,11 +194,6 @@ void __init acpi_numa_slit_init(struct acpi_table_slit *slit)
 		return;
 	}
 	mfn = alloc_boot_pages(PFN_UP(slit->header.length), 1);
-	if (!mfn) {
-		printk(KERN_ERR "ACPI: Unable to allocate memory for "
-		       "saving ACPI SLIT numa information.\n");
-		return;
-	}
 	acpi_slit = mfn_to_virt(mfn);
 	memcpy(acpi_slit, slit, slit->header.length);
 }
