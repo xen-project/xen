@@ -114,6 +114,13 @@ config DEVICE_TREE_DEBUG
 	  logged in the Xen ring buffer.
 	  If unsure, say N here.
 
+config SCRUB_DEBUG
+	bool "Page scrubbing test"
+	default DEBUG
+	---help---
+	  Verify that pages that need to be scrubbed before being allocated to
+	  a guest are indeed scrubbed.
+
 endif # DEBUG || EXPERT
 
 endmenu

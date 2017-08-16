@@ -170,6 +170,10 @@ boolean_param("bootscrub", opt_bootscrub);
 static unsigned long __initdata opt_bootscrub_chunk = MB(128);
 size_param("bootscrub_chunk", opt_bootscrub_chunk);
 
+#ifdef CONFIG_SCRUB_DEBUG
+static bool __read_mostly boot_scrub_done;
+#endif
+
 /*
  * Bit width of the DMA heap -- used to override NUMA-node-first.
  * allocation strategy, which can otherwise exhaust low memory.
@@ -694,6 +698,43 @@ static void page_list_add_scrub(struct page_info *pg, unsigned int node,
         page_list_add(pg, &heap(node, zone, order));
 }
 
+/* SCRUB_PATTERN needs to be a repeating series of bytes. */
+#ifndef NDEBUG
+#define SCRUB_PATTERN        0xc2c2c2c2c2c2c2c2ULL
+#else
+#define SCRUB_PATTERN        0ULL
+#endif
+#define SCRUB_BYTE_PATTERN   (SCRUB_PATTERN & 0xff)
+
+static void poison_one_page(struct page_info *pg)
+{
+#ifdef CONFIG_SCRUB_DEBUG
+    mfn_t mfn = _mfn(page_to_mfn(pg));
+    uint64_t *ptr;
+
+    ptr = map_domain_page(mfn);
+    *ptr = ~SCRUB_PATTERN;
+    unmap_domain_page(ptr);
+#endif
+}
+
+static void check_one_page(struct page_info *pg)
+{
+#ifdef CONFIG_SCRUB_DEBUG
+    mfn_t mfn = _mfn(page_to_mfn(pg));
+    const uint64_t *ptr;
+    unsigned int i;
+
+    if ( !boot_scrub_done )
+        return;
+
+    ptr = map_domain_page(mfn);
+    for ( i = 0; i < PAGE_SIZE / sizeof (*ptr); i++ )
+        BUG_ON(ptr[i] != SCRUB_PATTERN);
+    unmap_domain_page(ptr);
+#endif
+}
+
 static void check_and_stop_scrub(struct page_info *head)
 {
     if ( head->u.free.scrub_state == BUDDY_SCRUBBING )
@@ -928,6 +969,9 @@ static struct page_info *alloc_heap_pages(
          * guest can control its own visibility of/through the cache.
          */
         flush_page_to_ram(page_to_mfn(&pg[i]), !(memflags & MEMF_no_icache_flush));
+
+        if ( !(memflags & MEMF_no_scrub) )
+            check_one_page(&pg[i]);
     }
 
     spin_unlock(&heap_lock);
@@ -1291,7 +1335,10 @@ static void free_heap_pages(
         set_gpfn_from_mfn(mfn + i, INVALID_M2P_ENTRY);
 
         if ( need_scrub )
+        {
             pg[i].count_info |= PGC_need_scrub;
+            poison_one_page(&pg[i]);
+        }
     }
 
     avail[node][zone] += 1 << order;
@@ -1649,7 +1696,12 @@ static void init_heap_pages(
             nr_pages -= n;
         }
 
+#ifndef CONFIG_SCRUB_DEBUG
         free_heap_pages(pg + i, 0, false);
+#else
+        free_heap_pages(pg + i, 0, boot_scrub_done);
+#endif
+	
     }
 }
 
@@ -1914,6 +1966,10 @@ void __init scrub_heap_pages(void)
     }
 
     printk("done.\n");
+
+#ifdef CONFIG_SCRUB_DEBUG
+    boot_scrub_done = true;
+#endif
 
     /* Now that the heap is initialized, run checks and set bounds
      * for the low mem virq algorithm. */
@@ -2188,12 +2244,16 @@ void free_domheap_pages(struct page_info *pg, unsigned int order)
 
             spin_unlock_recursive(&d->page_alloc_lock);
 
+#ifndef CONFIG_SCRUB_DEBUG
             /*
              * Normally we expect a domain to clear pages before freeing them,
              * if it cares about the secrecy of their contents. However, after
              * a domain has died we assume responsibility for erasure.
              */
             scrub = !!d->is_dying;
+#else
+            scrub = true;
+#endif
         }
         else
         {
@@ -2285,7 +2345,8 @@ void scrub_one_page(struct page_info *pg)
 
 #ifndef NDEBUG
     /* Avoid callers relying on allocations returning zeroed pages. */
-    unmap_domain_page(memset(__map_domain_page(pg), 0xc2, PAGE_SIZE));
+    unmap_domain_page(memset(__map_domain_page(pg),
+                             SCRUB_BYTE_PATTERN, PAGE_SIZE));
 #else
     /* For a production build, clear_page() is the fastest way to scrub. */
     clear_domain_page(_mfn(page_to_mfn(pg)));
