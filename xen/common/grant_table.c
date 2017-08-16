@@ -206,11 +206,13 @@ static inline void gnttab_flush_tlb(const struct domain *d)
 static inline unsigned int
 num_act_frames_from_sha_frames(const unsigned int num)
 {
-    /* How many frames are needed for the active grant table,
-     * given the size of the shared grant table? */
+    /*
+     * How many frames are needed for the active grant table,
+     * given the size of the shared grant table?
+     */
     unsigned int sha_per_page = PAGE_SIZE / sizeof(grant_entry_v1_t);
-    unsigned int num_sha_entries = num * sha_per_page;
-    return (num_sha_entries + (ACGNT_PER_PAGE - 1)) / ACGNT_PER_PAGE;
+
+    return DIV_ROUND_UP(num * sha_per_page, ACGNT_PER_PAGE);
 }
 
 #define max_nr_active_grant_frames \
