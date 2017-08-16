@@ -42,18 +42,27 @@ struct page_info
             unsigned long type_info;
         } inuse;
         /* Page is on a free list: ((count_info & PGC_count_mask) == 0). */
-        struct {
-            /*
-             * Index of the first *possibly* unscrubbed page in the buddy.
-             * One more bit than maximum possible order to accommodate
-             * INVALID_DIRTY_IDX.
-             */
+        union {
+            struct {
+                /*
+                 * Index of the first *possibly* unscrubbed page in the buddy.
+                 * One more bit than maximum possible order to accommodate
+                 * INVALID_DIRTY_IDX.
+                 */
 #define INVALID_DIRTY_IDX ((1UL << (MAX_ORDER + 1)) - 1)
-            unsigned long first_dirty:MAX_ORDER + 1;
+                unsigned long first_dirty:MAX_ORDER + 1;
 
-            /* Do TLBs need flushing for safety before next page use? */
-            bool need_tlbflush:1;
-        } free;
+                /* Do TLBs need flushing for safety before next page use? */
+                bool need_tlbflush:1;
+
+#define BUDDY_NOT_SCRUBBING    0
+#define BUDDY_SCRUBBING        1
+#define BUDDY_SCRUB_ABORT      2
+                unsigned long scrub_state:2;
+            };
+
+            unsigned long val;
+            } free;
 
     } u;
 

@@ -683,6 +683,7 @@ static void page_list_add_scrub(struct page_info *pg, unsigned int node,
 {
     PFN_ORDER(pg) = order;
     pg->u.free.first_dirty = first_dirty;
+    pg->u.free.scrub_state = BUDDY_NOT_SCRUBBING;
 
     if ( first_dirty != INVALID_DIRTY_IDX )
     {
@@ -691,6 +692,25 @@ static void page_list_add_scrub(struct page_info *pg, unsigned int node,
     }
     else
         page_list_add(pg, &heap(node, zone, order));
+}
+
+static void check_and_stop_scrub(struct page_info *head)
+{
+    if ( head->u.free.scrub_state == BUDDY_SCRUBBING )
+    {
+        typeof(head->u.free) pgfree;
+
+        head->u.free.scrub_state = BUDDY_SCRUB_ABORT;
+        spin_lock_kick();
+        for ( ; ; )
+        {
+            /* Can't ACCESS_ONCE() a bitfield. */
+            pgfree.val = ACCESS_ONCE(head->u.free.val);
+            if ( pgfree.scrub_state != BUDDY_SCRUB_ABORT )
+                break;
+            cpu_relax();
+        }
+    }
 }
 
 static struct page_info *get_free_buddy(unsigned int zone_lo,
@@ -737,14 +757,19 @@ static struct page_info *get_free_buddy(unsigned int zone_lo,
             {
                 if ( (pg = page_list_remove_head(&heap(node, zone, j))) )
                 {
+                    if ( pg->u.free.first_dirty == INVALID_DIRTY_IDX )
+                        return pg;
                     /*
                      * We grab single pages (order=0) even if they are
                      * unscrubbed. Given that scrubbing one page is fairly quick
                      * it is not worth breaking higher orders.
                      */
-                    if ( (order == 0) || use_unscrubbed ||
-                         pg->u.free.first_dirty == INVALID_DIRTY_IDX)
+                    if ( (order == 0) || use_unscrubbed )
+                    {
+                        check_and_stop_scrub(pg);
                         return pg;
+                    }
+
                     page_list_add_tail(pg, &heap(node, zone, j));
                 }
             }
@@ -925,6 +950,7 @@ static int reserve_offlined_page(struct page_info *head)
 
     cur_head = head;
 
+    check_and_stop_scrub(head);
     /*
      * We may break the buddy so let's mark the head as clean. Then, when
      * merging chunks back into the heap, we will see whether the chunk has
@@ -1075,6 +1101,29 @@ static unsigned int node_to_scrub(bool get_node)
     return closest;
 }
 
+struct scrub_wait_state {
+    struct page_info *pg;
+    unsigned int first_dirty;
+    bool drop;
+};
+
+static void scrub_continue(void *data)
+{
+    struct scrub_wait_state *st = data;
+
+    if ( st->drop )
+        return;
+
+    if ( st->pg->u.free.scrub_state == BUDDY_SCRUB_ABORT )
+    {
+        /* There is a waiter for this buddy. Release it. */
+        st->drop = true;
+        st->pg->u.free.first_dirty = st->first_dirty;
+        smp_wmb();
+        st->pg->u.free.scrub_state = BUDDY_NOT_SCRUBBING;
+    }
+}
+
 bool scrub_free_pages(void)
 {
     struct page_info *pg;
@@ -1097,24 +1146,52 @@ bool scrub_free_pages(void)
         do {
             while ( !page_list_empty(&heap(node, zone, order)) )
             {
-                unsigned int i;
+                unsigned int i, dirty_cnt;
+                struct scrub_wait_state st;
 
                 /* Unscrubbed pages are always at the end of the list. */
                 pg = page_list_last(&heap(node, zone, order));
                 if ( pg->u.free.first_dirty == INVALID_DIRTY_IDX )
                     break;
 
+                ASSERT(pg->u.free.scrub_state == BUDDY_NOT_SCRUBBING);
+                pg->u.free.scrub_state = BUDDY_SCRUBBING;
+
+                spin_unlock(&heap_lock);
+
+                dirty_cnt = 0;
+
                 for ( i = pg->u.free.first_dirty; i < (1U << order); i++)
                 {
                     if ( test_bit(_PGC_need_scrub, &pg[i].count_info) )
                     {
                         scrub_one_page(&pg[i]);
+                        /*
+                         * We can modify count_info without holding heap
+                         * lock since we effectively locked this buddy by
+                         * setting its scrub_state.
+                         */
                         pg[i].count_info &= ~PGC_need_scrub;
-                        node_need_scrub[node]--;
+                        dirty_cnt++;
                         cnt += 100; /* scrubbed pages add heavier weight. */
                     }
                     else
                         cnt++;
+
+                    if ( pg->u.free.scrub_state == BUDDY_SCRUB_ABORT )
+                    {
+                        /* Someone wants this chunk. Drop everything. */
+
+                        pg->u.free.first_dirty = (i == (1U << order) - 1) ?
+                            INVALID_DIRTY_IDX : i + 1; 
+                        smp_wmb();
+                        pg->u.free.scrub_state = BUDDY_NOT_SCRUBBING;
+
+                        spin_lock(&heap_lock);
+                        node_need_scrub[node] -= dirty_cnt;
+                        spin_unlock(&heap_lock);
+                        goto out_nolock;
+                    }
 
                     /*
                      * Scrub a few (8) pages before becoming eligible for
@@ -1129,6 +1206,23 @@ bool scrub_free_pages(void)
                     }
                 }
 
+                st.pg = pg;
+                /*
+                 * get_free_buddy() grabs a buddy with first_dirty set to
+                 * INVALID_DIRTY_IDX so we can't set pg's first_dirty here.
+                 * It will be set either below or in the lock callback (in
+                 * scrub_continue()).
+                 */
+                st.first_dirty = (i >= (1U << order) - 1) ?
+                    INVALID_DIRTY_IDX : i + 1;
+                st.drop = false;
+                spin_lock_cb(&heap_lock, scrub_continue, &st);
+
+                node_need_scrub[node] -= dirty_cnt;
+
+                if ( st.drop )
+                    goto out;
+
                 if ( i >= (1U << order) - 1 )
                 {
                     page_list_del(pg, &heap(node, zone, order));
@@ -1136,6 +1230,8 @@ bool scrub_free_pages(void)
                 }
                 else
                     pg->u.free.first_dirty = i + 1;
+
+                pg->u.free.scrub_state = BUDDY_NOT_SCRUBBING;
 
                 if ( preempt || (node_need_scrub[node] == 0) )
                     goto out;
@@ -1145,6 +1241,8 @@ bool scrub_free_pages(void)
 
  out:
     spin_unlock(&heap_lock);
+
+ out_nolock:
     node_clear(node, node_scrubbing);
     return node_to_scrub(false) != NUMA_NO_NODE;
 }
@@ -1226,6 +1324,8 @@ static void free_heap_pages(
                  (phys_to_nid(page_to_maddr(predecessor)) != node) )
                 break;
 
+            check_and_stop_scrub(predecessor);
+
             page_list_del(predecessor, &heap(node, zone, order));
 
             /* Keep predecessor's first_dirty if it is already set. */
@@ -1246,6 +1346,8 @@ static void free_heap_pages(
                  (PFN_ORDER(successor) != order) ||
                  (phys_to_nid(page_to_maddr(successor)) != node) )
                 break;
+
+            check_and_stop_scrub(successor);
 
             page_list_del(successor, &heap(node, zone, order));
         }
