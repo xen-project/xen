@@ -18,12 +18,12 @@
 #include <asm/hardirq.h>
 #include <asm/setup.h>
 
-static struct vcpu *__read_mostly override;
+static DEFINE_PER_CPU(struct vcpu *, override);
 
 static inline struct vcpu *mapcache_current_vcpu(void)
 {
     /* In the common case we use the mapcache of the running VCPU. */
-    struct vcpu *v = override ?: current;
+    struct vcpu *v = this_cpu(override) ?: current;
 
     /*
      * When current isn't properly set up yet, this is equivalent to
@@ -59,7 +59,7 @@ static inline struct vcpu *mapcache_current_vcpu(void)
 
 void __init mapcache_override_current(struct vcpu *v)
 {
-    override = v;
+    this_cpu(override) = v;
 }
 
 #define mapcache_l2_entry(e) ((e) >> PAGETABLE_ORDER)

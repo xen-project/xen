@@ -160,6 +160,7 @@ void init_xenheap_pages(paddr_t ps, paddr_t pe);
 void xenheap_max_mfn(unsigned long mfn);
 void *alloc_xenheap_pages(unsigned int order, unsigned int memflags);
 void free_xenheap_pages(void *v, unsigned int order);
+bool scrub_free_pages(void);
 #define alloc_xenheap_page() (alloc_xenheap_pages(0,0))
 #define free_xenheap_page(v) (free_xenheap_pages(v,0))
 /* Map machine page range in Xen virtual address space. */

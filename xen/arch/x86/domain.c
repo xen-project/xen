@@ -122,7 +122,13 @@ static void idle_loop(void)
         /* Are we here for running vcpu context tasklets, or for idling? */
         if ( unlikely(tasklet_work_to_do(cpu)) )
             do_tasklet();
-        else
+        /*
+         * Test softirqs twice --- first to see if should even try scrubbing
+         * and then, after it is done, whether softirqs became pending
+         * while we were scrubbing.
+         */
+        else if ( !softirq_pending(cpu) && !scrub_free_pages()  &&
+                    !softirq_pending(cpu) )
             pm_idle();
         do_softirq();
         /*

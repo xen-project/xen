@@ -1009,15 +1009,86 @@ static int reserve_offlined_page(struct page_info *head)
     return count;
 }
 
-static void scrub_free_pages(unsigned int node)
+static nodemask_t node_scrubbing;
+
+/*
+ * If get_node is true this will return closest node that needs to be scrubbed,
+ * with appropriate bit in node_scrubbing set.
+ * If get_node is not set, this will return *a* node that needs to be scrubbed.
+ * node_scrubbing bitmask will no be updated.
+ * If no node needs scrubbing then NUMA_NO_NODE is returned.
+ */
+static unsigned int node_to_scrub(bool get_node)
+{
+    nodeid_t node = cpu_to_node(smp_processor_id()), local_node;
+    nodeid_t closest = NUMA_NO_NODE;
+    u8 dist, shortest = 0xff;
+
+    if ( node == NUMA_NO_NODE )
+        node = 0;
+
+    if ( node_need_scrub[node] &&
+         (!get_node || !node_test_and_set(node, node_scrubbing)) )
+        return node;
+
+    /*
+     * See if there are memory-only nodes that need scrubbing and choose
+     * the closest one.
+     */
+    local_node = node;
+    for ( ; ; )
+    {
+        do {
+            node = cycle_node(node, node_online_map);
+        } while ( !cpumask_empty(&node_to_cpumask(node)) &&
+                  (node != local_node) );
+
+        if ( node == local_node )
+            break;
+
+        if ( node_need_scrub[node] )
+        {
+            if ( !get_node )
+                return node;
+
+            dist = __node_distance(local_node, node);
+
+            /*
+             * Grab the node right away. If we find a closer node later we will
+             * release this one. While there is a chance that another CPU will
+             * not be able to scrub that node when it is searching for scrub work
+             * at the same time it will be able to do so next time it wakes up.
+             * The alternative would be to perform this search under a lock but
+             * then we'd need to take this lock every time we come in here.
+             */
+            if ( (dist < shortest || closest == NUMA_NO_NODE) &&
+                 !node_test_and_set(node, node_scrubbing) )
+            {
+                if ( closest != NUMA_NO_NODE )
+                    node_clear(closest, node_scrubbing);
+                shortest = dist;
+                closest = node;
+            }
+        }
+    }
+
+    return closest;
+}
+
+bool scrub_free_pages(void)
 {
     struct page_info *pg;
     unsigned int zone;
-
-    ASSERT(spin_is_locked(&heap_lock));
-
-    if ( !node_need_scrub[node] )
-        return;
+    unsigned int cpu = smp_processor_id();
+    bool preempt = false;
+    nodeid_t node;
+    unsigned int cnt = 0;
+  
+    node = node_to_scrub(true);
+    if ( node == NUMA_NO_NODE )
+        return false;
+ 
+    spin_lock(&heap_lock);
 
     for ( zone = 0; zone < NR_ZONES; zone++ )
     {
@@ -1040,17 +1111,42 @@ static void scrub_free_pages(unsigned int node)
                         scrub_one_page(&pg[i]);
                         pg[i].count_info &= ~PGC_need_scrub;
                         node_need_scrub[node]--;
+                        cnt += 100; /* scrubbed pages add heavier weight. */
+                    }
+                    else
+                        cnt++;
+
+                    /*
+                     * Scrub a few (8) pages before becoming eligible for
+                     * preemption. But also count non-scrubbing loop iterations
+                     * so that we don't get stuck here with an almost clean
+                     * heap.
+                     */
+                    if ( cnt > 800 && softirq_pending(cpu) )
+                    {
+                        preempt = true;
+                        break;
                     }
                 }
 
-                page_list_del(pg, &heap(node, zone, order));
-                page_list_add_scrub(pg, node, zone, order, INVALID_DIRTY_IDX);
+                if ( i >= (1U << order) - 1 )
+                {
+                    page_list_del(pg, &heap(node, zone, order));
+                    page_list_add_scrub(pg, node, zone, order, INVALID_DIRTY_IDX);
+                }
+                else
+                    pg->u.free.first_dirty = i + 1;
 
-                if ( node_need_scrub[node] == 0 )
-                    return;
+                if ( preempt || (node_need_scrub[node] == 0) )
+                    goto out;
             }
         } while ( order-- != 0 );
     }
+
+ out:
+    spin_unlock(&heap_lock);
+    node_clear(node, node_scrubbing);
+    return node_to_scrub(false) != NUMA_NO_NODE;
 }
 
 /* Free 2^@order set of pages. */
@@ -1161,9 +1257,6 @@ static void free_heap_pages(
 
     if ( tainted )
         reserve_offlined_page(pg);
-
-    if ( need_scrub )
-        scrub_free_pages(node);
 
     spin_unlock(&heap_lock);
 }
