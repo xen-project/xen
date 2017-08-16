@@ -22,6 +22,7 @@
 #include <xen/vm_event.h>
 #include <public/vm_event.h>
 #include <asm/event.h>
+#include <asm/guest_walk.h>
 
 static int __p2m_get_mem_access(struct domain *d, gfn_t gfn,
                                 xenmem_access_t *access)
@@ -101,6 +102,7 @@ p2m_mem_access_check_and_get_page(vaddr_t gva, unsigned long flag,
                                   const struct vcpu *v)
 {
     long rc;
+    unsigned int perms;
     paddr_t ipa;
     gfn_t gfn;
     mfn_t mfn;
@@ -110,8 +112,35 @@ p2m_mem_access_check_and_get_page(vaddr_t gva, unsigned long flag,
     struct p2m_domain *p2m = p2m_get_hostp2m(v->domain);
 
     rc = gva_to_ipa(gva, &ipa, flag);
+
+    /*
+     * In case mem_access is active, hardware-based gva_to_ipa translation
+     * might fail. Since gva_to_ipa uses the guest's translation tables, access
+     * to which might be restricted by the active VTTBR, we perform a gva to
+     * ipa translation in software.
+     */
     if ( rc < 0 )
-        goto err;
+    {
+        /*
+         * The software gva to ipa translation can still fail, e.g., if the gva
+         * is not mapped.
+         */
+        if ( guest_walk_tables(v, gva, &ipa, &perms) < 0 )
+            goto err;
+
+        /*
+         * Check permissions that are assumed by the caller. For instance in
+         * case of guestcopy, the caller assumes that the translated page can
+         * be accessed with requested permissions. If this is not the case, we
+         * should fail.
+         *
+         * Please note that we do not check for the GV2M_EXEC permission. Yet,
+         * since the hardware-based translation through gva_to_ipa does not
+         * test for execute permissions this check can be left out.
+         */
+        if ( (flag & GV2M_WRITE) && !(perms & GV2M_WRITE) )
+            goto err;
+    }
 
     gfn = gaddr_to_gfn(ipa);
 
