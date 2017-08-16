@@ -2308,6 +2308,13 @@ static void dump_heap(unsigned char key)
             printk("heap[node=%d][zone=%d] -> %lu pages\n",
                    i, j, avail[i][j]);
     }
+
+    for ( i = 0; i < MAX_NUMNODES; i++ )
+    {
+        if ( !node_need_scrub[i] )
+            continue;
+        printk("Node %d has %lu unscrubbed pages\n", i, node_need_scrub[i]);
+    }
 }
 
 static __init int register_heap_trigger(void)
