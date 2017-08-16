@@ -51,13 +51,16 @@ extern unsigned long xen_virt_end;
 
 static inline unsigned long __virt_to_maddr(unsigned long va)
 {
-    ASSERT(va >= XEN_VIRT_START);
     ASSERT(va < DIRECTMAP_VIRT_END);
     if ( va >= DIRECTMAP_VIRT_START )
         va -= DIRECTMAP_VIRT_START;
     else
     {
-        ASSERT(va < XEN_VIRT_END);
+        BUILD_BUG_ON(XEN_VIRT_END - XEN_VIRT_START != GB(1));
+        /* Signed, so ((long)XEN_VIRT_START >> 30) fits in an imm32. */
+        ASSERT(((long)va >> (PAGE_ORDER_1G + PAGE_SHIFT)) ==
+               ((long)XEN_VIRT_START >> (PAGE_ORDER_1G + PAGE_SHIFT)));
+
         va += xen_phys_start - XEN_VIRT_START;
     }
     return (va & ma_va_bottom_mask) |
