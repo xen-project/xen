@@ -131,9 +131,9 @@ static int its_set_collection(struct virt_its *its, uint16_t collid,
     if ( collid >= its->max_collections )
         return -ENOENT;
 
-    return vgic_access_guest_memory(its->d,
-                                    addr + collid * sizeof(coll_table_entry_t),
-                                    &vcpu_id, sizeof(vcpu_id), true);
+    return access_guest_memory_by_ipa(its->d,
+                                      addr + collid * sizeof(coll_table_entry_t),
+                                      &vcpu_id, sizeof(vcpu_id), true);
 }
 
 /* Must be called with the ITS lock held. */
@@ -149,9 +149,9 @@ static struct vcpu *get_vcpu_from_collection(struct virt_its *its,
     if ( collid >= its->max_collections )
         return NULL;
 
-    ret = vgic_access_guest_memory(its->d,
-                                   addr + collid * sizeof(coll_table_entry_t),
-                                   &vcpu_id, sizeof(coll_table_entry_t), false);
+    ret = access_guest_memory_by_ipa(its->d,
+                                     addr + collid * sizeof(coll_table_entry_t),
+                                     &vcpu_id, sizeof(coll_table_entry_t), false);
     if ( ret )
         return NULL;
 
@@ -171,9 +171,9 @@ static int its_set_itt_address(struct virt_its *its, uint32_t devid,
     if ( devid >= its->max_devices )
         return -ENOENT;
 
-    return vgic_access_guest_memory(its->d,
-                                    addr + devid * sizeof(dev_table_entry_t),
-                                    &itt_entry, sizeof(itt_entry), true);
+    return access_guest_memory_by_ipa(its->d,
+                                      addr + devid * sizeof(dev_table_entry_t),
+                                      &itt_entry, sizeof(itt_entry), true);
 }
 
 /*
@@ -189,9 +189,9 @@ static int its_get_itt(struct virt_its *its, uint32_t devid,
     if ( devid >= its->max_devices )
         return -EINVAL;
 
-    return vgic_access_guest_memory(its->d,
-                                    addr + devid * sizeof(dev_table_entry_t),
-                                    itt, sizeof(*itt), false);
+    return access_guest_memory_by_ipa(its->d,
+                                      addr + devid * sizeof(dev_table_entry_t),
+                                      itt, sizeof(*itt), false);
 }
 
 /*
@@ -236,7 +236,7 @@ static bool read_itte(struct virt_its *its, uint32_t devid, uint32_t evid,
     if ( addr == INVALID_PADDR )
         return false;
 
-    if ( vgic_access_guest_memory(its->d, addr, &itte, sizeof(itte), false) )
+    if ( access_guest_memory_by_ipa(its->d, addr, &itte, sizeof(itte), false) )
         return false;
 
     vcpu = get_vcpu_from_collection(its, itte.collection);
@@ -270,7 +270,7 @@ static bool write_itte(struct virt_its *its, uint32_t devid,
     itte.collection = collid;
     itte.vlpi = vlpi;
 
-    if ( vgic_access_guest_memory(its->d, addr, &itte, sizeof(itte), true) )
+    if ( access_guest_memory_by_ipa(its->d, addr, &itte, sizeof(itte), true) )
         return false;
 
     return true;
@@ -415,8 +415,8 @@ static int update_lpi_property(struct domain *d, struct pending_irq *p)
 
     addr = d->arch.vgic.rdist_propbase & GENMASK(51, 12);
 
-    ret = vgic_access_guest_memory(d, addr + p->irq - LPI_OFFSET,
-                                   &property, sizeof(property), false);
+    ret = access_guest_memory_by_ipa(d, addr + p->irq - LPI_OFFSET,
+                                     &property, sizeof(property), false);
     if ( ret )
         return ret;
 
@@ -920,8 +920,8 @@ static int vgic_its_handle_cmds(struct domain *d, struct virt_its *its)
     {
         int ret;
 
-        ret = vgic_access_guest_memory(d, addr + its->creadr,
-                                       command, sizeof(command), false);
+        ret = access_guest_memory_by_ipa(d, addr + its->creadr,
+                                         command, sizeof(command), false);
         if ( ret )
             return ret;
 

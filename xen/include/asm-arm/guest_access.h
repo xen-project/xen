@@ -11,8 +11,8 @@ unsigned long raw_copy_to_guest_flush_dcache(void *to, const void *from,
 unsigned long raw_copy_from_guest(void *to, const void *from, unsigned len);
 unsigned long raw_clear_guest(void *to, unsigned len);
 
-int vgic_access_guest_memory(struct domain *d, paddr_t gpa, void *buf,
-                             uint32_t size, bool_t is_write);
+int access_guest_memory_by_ipa(struct domain *d, paddr_t ipa, void *buf,
+                               uint32_t size, bool_t is_write);
 
 #define __raw_copy_to_guest raw_copy_to_guest
 #define __raw_copy_from_guest raw_copy_from_guest

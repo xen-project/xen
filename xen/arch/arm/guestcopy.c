@@ -123,8 +123,8 @@ unsigned long raw_copy_from_guest(void *to, const void __user *from, unsigned le
  * Temporarily map one physical guest page and copy data to or from it.
  * The data to be copied cannot cross a page boundary.
  */
-int vgic_access_guest_memory(struct domain *d, paddr_t gpa, void *buf,
-                             uint32_t size, bool is_write)
+int access_guest_memory_by_ipa(struct domain *d, paddr_t gpa, void *buf,
+                               uint32_t size, bool is_write)
 {
     struct page_info *page;
     uint64_t offset = gpa & ~PAGE_MASK;  /* Offset within the mapped page */
@@ -134,7 +134,7 @@ int vgic_access_guest_memory(struct domain *d, paddr_t gpa, void *buf,
     /* Do not cross a page boundary. */
     if ( size > (PAGE_SIZE - offset) )
     {
-        printk(XENLOG_G_ERR "d%d: vITS: memory access would cross page boundary\n",
+        printk(XENLOG_G_ERR "d%d: guestcopy: memory access crosses page boundary.\n",
                d->domain_id);
         return -EINVAL;
     }
@@ -142,7 +142,7 @@ int vgic_access_guest_memory(struct domain *d, paddr_t gpa, void *buf,
     page = get_page_from_gfn(d, paddr_to_pfn(gpa), &p2mt, P2M_ALLOC);
     if ( !page )
     {
-        printk(XENLOG_G_ERR "d%d: vITS: Failed to get table entry\n",
+        printk(XENLOG_G_ERR "d%d: guestcopy: failed to get table entry.\n",
                d->domain_id);
         return -EINVAL;
     }
@@ -150,7 +150,7 @@ int vgic_access_guest_memory(struct domain *d, paddr_t gpa, void *buf,
     if ( !p2m_is_ram(p2mt) )
     {
         put_page(page);
-        printk(XENLOG_G_ERR "d%d: vITS: memory used by the ITS should be RAM.",
+        printk(XENLOG_G_ERR "d%d: guestcopy: guest memory should be RAM.\n",
                d->domain_id);
         return -EINVAL;
     }
