@@ -1717,7 +1717,7 @@ static int check_conditional_instr(struct cpu_user_regs *regs,
     int cond;
 
     /* Unconditional Exception classes */
-    if ( hsr.ec >= 0x10 )
+    if ( hsr.ec == HSR_EC_UNKNOWN || hsr.ec >= 0x10 )
         return 1;
 
     /* Check for valid condition in hsr */
