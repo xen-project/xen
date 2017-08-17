@@ -28,9 +28,7 @@
 
 #include <acpi2_0.h>
 #include <libacpi.h>
-
-extern unsigned char dsdt_anycpu_qemu_xen[];
-extern int dsdt_anycpu_qemu_xen_len;
+#include <xen/hvm/params.h>
 
 struct seabios_info {
     char signature[14]; /* XenHVMSeaBIOS\0 */
@@ -98,6 +96,8 @@ static void seabios_acpi_build_tables(void)
         .dsdt_15cpu = NULL,
         .dsdt_15cpu_len = 0,
     };
+
+    hvm_param_set(HVM_PARAM_ACPI_IOPORTS_LOCATION, 1);
 
     hvmloader_acpi_build_tables(&config, rsdp);
     add_table(rsdp);
