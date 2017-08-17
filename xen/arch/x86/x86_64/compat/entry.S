@@ -2,6 +2,8 @@
  * Compatibility hypercall routines.
  */
 
+        .file "x86_64/compat/entry.S"
+
 #include <xen/errno.h>
 #include <xen/softirq.h>
 #include <asm/asm_defns.h>

@@ -10,6 +10,9 @@
  * This source code is licensed under the GNU General Public License,
  * Version 2.  See the file COPYING for more details.
  */
+
+        .file __FILE__
+
 #include <xen/kimage.h>
 
 #include <asm/asm_defns.h>

@@ -4,6 +4,8 @@
  * Copyright (c) 2005, K A Fraser
  */
 
+        .file "x86_64/entry.S"
+
 #include <xen/errno.h>
 #include <xen/softirq.h>
 #include <asm/asm_defns.h>

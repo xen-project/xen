@@ -1,3 +1,5 @@
+        .file __FILE__
+
 #include <asm/page.h>
 
 #define ptr_reg %rdi

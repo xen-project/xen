@@ -1,3 +1,4 @@
+        .file __FILE__
         .text
 
 #include <xen/multiboot.h>
