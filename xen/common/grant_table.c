@@ -96,7 +96,7 @@ struct gnttab_unmap_common {
     int16_t status;
 
     /* Shared state beteen *_unmap and *_unmap_complete */
-    u16 done;
+    uint16_t done;
     unsigned long frame;
     struct domain *rd;
     grant_ref_t ref;
@@ -118,11 +118,11 @@ struct gnttab_unmap_common {
  * table of these, indexes into which are returned as a 'mapping handle'.
  */
 struct grant_mapping {
-    u32      ref;           /* grant ref */
-    u16      flags;         /* 0-4: GNTMAP_* ; 5-15: unused */
+    grant_ref_t ref;        /* grant ref */
+    uint16_t flags;         /* 0-4: GNTMAP_* ; 5-15: unused */
     domid_t  domid;         /* granting domain */
-    u32      vcpu;          /* vcpu which created the grant mapping */
-    u32      pad;           /* round size to a power of 2 */
+    uint32_t vcpu;          /* vcpu which created the grant mapping */
+    uint32_t pad;           /* round size to a power of 2 */
 };
 
 #define MAPTRACK_PER_PAGE (PAGE_SIZE / sizeof(struct grant_mapping))
@@ -178,7 +178,7 @@ struct active_grant_entry {
 
     domid_t       domid;  /* Domain being granted access.             */
     struct domain *trans_domain;
-    uint32_t      trans_gref;
+    grant_ref_t   trans_gref;
     unsigned long frame;  /* Frame being granted.                     */
     unsigned long gfn;    /* Guest's idea of the frame being granted. */
     unsigned      is_sub_page:1; /* True if this is a sub-page grant. */
@@ -316,7 +316,9 @@ double_gt_unlock(struct grant_table *lgt, struct grant_table *rgt)
         grant_write_unlock(rgt);
 }
 
-static inline int
+#define INVALID_MAPTRACK_HANDLE UINT_MAX
+
+static inline grant_handle_t
 __get_maptrack_handle(
     struct grant_table *t,
     struct vcpu *v)
@@ -331,7 +333,7 @@ __get_maptrack_handle(
         if ( unlikely(head == MAPTRACK_TAIL) )
         {
             spin_unlock(&v->maptrack_freelist_lock);
-            return -1;
+            return INVALID_MAPTRACK_HANDLE;
         }
 
         /*
@@ -342,7 +344,7 @@ __get_maptrack_handle(
         if ( unlikely(next == MAPTRACK_TAIL) )
         {
             spin_unlock(&v->maptrack_freelist_lock);
-            return -1;
+            return INVALID_MAPTRACK_HANDLE;
         }
 
         prev_head = head;
@@ -364,8 +366,8 @@ __get_maptrack_handle(
  * each VCPU and to avoid two VCPU repeatedly stealing entries from
  * each other, the initial victim VCPU is selected randomly.
  */
-static int steal_maptrack_handle(struct grant_table *t,
-                                 const struct vcpu *curr)
+static grant_handle_t steal_maptrack_handle(struct grant_table *t,
+                                            const struct vcpu *curr)
 {
     const struct domain *currd = curr->domain;
     unsigned int first, i;
@@ -376,10 +378,10 @@ static int steal_maptrack_handle(struct grant_table *t,
     do {
         if ( currd->vcpu[i] )
         {
-            int handle;
+            grant_handle_t handle;
 
             handle = __get_maptrack_handle(t, currd->vcpu[i]);
-            if ( handle != -1 )
+            if ( handle != INVALID_MAPTRACK_HANDLE )
             {
                 maptrack_entry(t, handle).vcpu = curr->vcpu_id;
                 return handle;
@@ -392,12 +394,12 @@ static int steal_maptrack_handle(struct grant_table *t,
     } while ( i != first );
 
     /* No free handles on any VCPU. */
-    return -1;
+    return INVALID_MAPTRACK_HANDLE;
 }
 
 static inline void
 put_maptrack_handle(
-    struct grant_table *t, int handle)
+    struct grant_table *t, grant_handle_t handle)
 {
     struct domain *currd = current->domain;
     struct vcpu *v;
@@ -423,7 +425,7 @@ put_maptrack_handle(
     spin_unlock(&v->maptrack_freelist_lock);
 }
 
-static inline int
+static inline grant_handle_t
 get_maptrack_handle(
     struct grant_table *lgt)
 {
@@ -433,7 +435,7 @@ get_maptrack_handle(
     struct grant_mapping *new_mt = NULL;
 
     handle = __get_maptrack_handle(lgt, curr);
-    if ( likely(handle != -1) )
+    if ( likely(handle != INVALID_MAPTRACK_HANDLE) )
         return handle;
 
     spin_lock(&lgt->maptrack_lock);
@@ -458,8 +460,8 @@ get_maptrack_handle(
         if ( curr->maptrack_tail == MAPTRACK_TAIL )
         {
             handle = steal_maptrack_handle(lgt, curr);
-            if ( handle == -1 )
-                return -1;
+            if ( handle == INVALID_MAPTRACK_HANDLE )
+                return handle;
             spin_lock(&curr->maptrack_freelist_lock);
             maptrack_entry(lgt, handle).ref = MAPTRACK_TAIL;
             curr->maptrack_tail = handle;
@@ -480,6 +482,7 @@ get_maptrack_handle(
 
     for ( i = 0; i < MAPTRACK_PER_PAGE; i++ )
     {
+        BUILD_BUG_ON(sizeof(new_mt->ref) < sizeof(handle));
         new_mt[i].ref = handle + i + 1;
         new_mt[i].vcpu = curr->vcpu_id;
     }
@@ -702,9 +705,9 @@ static int _set_status(unsigned gt_version,
 static int grant_map_exists(const struct domain *ld,
                             struct grant_table *rgt,
                             unsigned long mfn,
-                            unsigned int *ref_count)
+                            grant_ref_t *cur_ref)
 {
-    unsigned int ref, max_iter;
+    grant_ref_t ref, max_iter;
 
     /*
      * The remote grant table should be locked but the percpu rwlock
@@ -714,9 +717,9 @@ static int grant_map_exists(const struct domain *ld,
      *   ASSERT(rw_is_locked(&rgt->lock));
      */
 
-    max_iter = min(*ref_count + (1 << GNTTABOP_CONTINUATION_ARG_SHIFT),
+    max_iter = min(*cur_ref + (1 << GNTTABOP_CONTINUATION_ARG_SHIFT),
                    nr_grant_entries(rgt));
-    for ( ref = *ref_count; ref < max_iter; ref++ )
+    for ( ref = *cur_ref; ref < max_iter; ref++ )
     {
         struct active_grant_entry *act;
         bool_t exists;
@@ -735,7 +738,7 @@ static int grant_map_exists(const struct domain *ld,
 
     if ( ref < nr_grant_entries(rgt) )
     {
-        *ref_count = ref;
+        *cur_ref = ref;
         return 1;
     }
 
@@ -792,7 +795,7 @@ __gnttab_map_grant_ref(
     struct domain *ld, *rd, *owner = NULL;
     struct grant_table *lgt, *rgt;
     struct vcpu   *led;
-    int            handle;
+    grant_handle_t handle;
     unsigned long  frame = 0;
     struct page_info *pg = NULL;
     int            rc = GNTST_okay;
@@ -841,7 +844,8 @@ __gnttab_map_grant_ref(
     }
 
     lgt = ld->grant_table;
-    if ( unlikely((handle = get_maptrack_handle(lgt)) == -1) )
+    handle = get_maptrack_handle(lgt);
+    if ( unlikely(handle == INVALID_MAPTRACK_HANDLE) )
     {
         rcu_unlock_domain(rd);
         gdprintk(XENLOG_INFO, "Failed to obtain maptrack handle.\n");
@@ -2052,7 +2056,7 @@ gnttab_transfer(
    type and reference counts. */
 static void
 __release_grant_for_copy(
-    struct domain *rd, unsigned long gref, int readonly)
+    struct domain *rd, grant_ref_t gref, bool readonly)
 {
     struct grant_table *rgt = rd->grant_table;
     grant_entry_header_t *sha;
@@ -2133,9 +2137,9 @@ static void __fixup_status_for_copy_pin(const struct active_grant_entry *act,
    If there is any error, *page = NULL, no ref taken. */
 static int
 __acquire_grant_for_copy(
-    struct domain *rd, unsigned long gref, domid_t ldom, int readonly,
+    struct domain *rd, grant_ref_t gref, domid_t ldom, bool readonly,
     unsigned long *frame, struct page_info **page,
-    uint16_t *page_off, uint16_t *length, unsigned allow_transitive)
+    uint16_t *page_off, uint16_t *length, bool allow_transitive)
 {
     struct grant_table *rgt = rd->grant_table;
     grant_entry_v2_t *sha2;
@@ -2158,7 +2162,7 @@ __acquire_grant_for_copy(
 
     if ( unlikely(gref >= nr_grant_entries(rgt)) )
         PIN_FAIL(gt_unlock_out, GNTST_bad_gntref,
-                 "Bad grant reference %ld\n", gref);
+                 "Bad grant reference %#x\n", gref);
 
     act = active_entry_acquire(rgt, gref);
     shah = shared_entry_header(rgt, gref);
@@ -2225,7 +2229,8 @@ __acquire_grant_for_copy(
 
         rc = __acquire_grant_for_copy(td, trans_gref, rd->domain_id,
                                       readonly, &grant_frame, page,
-                                      &trans_page_off, &trans_length, 0);
+                                      &trans_page_off, &trans_length,
+                                      false);
 
         grant_read_lock(rgt);
         act = active_entry_acquire(rgt, gref);
@@ -2271,7 +2276,7 @@ __acquire_grant_for_copy(
             act->trans_domain = td;
             act->trans_gref = trans_gref;
             act->frame = grant_frame;
-            act->gfn = -1ul;
+            act->gfn = gfn_x(INVALID_GFN);
             /*
              * The actual remote remote grant may or may not be a sub-page,
              * but we always treat it as one because that blocks mappings of
@@ -2487,7 +2492,7 @@ static int gnttab_copy_claim_buf(const struct gnttab_copy *op,
                                       current->domain->domain_id,
                                       buf->read_only,
                                       &buf->frame, &buf->page,
-                                      &buf->ptr.offset, &buf->len, 1);
+                                      &buf->ptr.offset, &buf->len, true);
         if ( rc != GNTST_okay )
             goto out;
         buf->ptr.u.ref = ptr->u.ref;
@@ -3002,7 +3007,7 @@ gnttab_swap_grant_ref(XEN_GUEST_HANDLE_PARAM(gnttab_swap_grant_ref_t) uop,
 }
 
 static int __gnttab_cache_flush(gnttab_cache_flush_t *cflush,
-                                unsigned int *ref_count)
+                                grant_ref_t *cur_ref)
 {
     struct domain *d, *owner;
     struct page_info *page;
@@ -3046,7 +3051,7 @@ static int __gnttab_cache_flush(gnttab_cache_flush_t *cflush,
     {
         grant_read_lock(owner->grant_table);
 
-        ret = grant_map_exists(d, owner->grant_table, mfn, ref_count);
+        ret = grant_map_exists(d, owner->grant_table, mfn, cur_ref);
         if ( ret != 0 )
         {
             grant_read_unlock(owner->grant_table);
@@ -3078,7 +3083,7 @@ static int __gnttab_cache_flush(gnttab_cache_flush_t *cflush,
 
 static long
 gnttab_cache_flush(XEN_GUEST_HANDLE_PARAM(gnttab_cache_flush_t) uop,
-                      unsigned int *ref_count,
+                      grant_ref_t *cur_ref,
                       unsigned int count)
 {
     unsigned int i;
@@ -3092,7 +3097,7 @@ gnttab_cache_flush(XEN_GUEST_HANDLE_PARAM(gnttab_cache_flush_t) uop,
             return -EFAULT;
         for ( ; ; )
         {
-            int ret = __gnttab_cache_flush(&op, ref_count);
+            int ret = __gnttab_cache_flush(&op, cur_ref);
 
             if ( ret < 0 )
                 return ret;
@@ -3101,7 +3106,7 @@ gnttab_cache_flush(XEN_GUEST_HANDLE_PARAM(gnttab_cache_flush_t) uop,
             if ( hypercall_preempt_check() )
                 return i;
         }
-        *ref_count = 0;
+        *cur_ref = 0;
         guest_handle_add_offset(uop, 1);
     }
     return 0;
