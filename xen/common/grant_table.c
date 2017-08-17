@@ -177,15 +177,15 @@ struct active_grant_entry {
 #define GNTPIN_devr_mask     (0xFFU << GNTPIN_devr_shift)
 
     domid_t       domid;  /* Domain being granted access.             */
-    struct domain *trans_domain;
+    unsigned int  start:15; /* For sub-page grants, the start offset
+                               in the page.                           */
+    bool          is_sub_page:1; /* True if this is a sub-page grant. */
+    unsigned int  length:16; /* For sub-page grants, the length of the
+                                grant.                                */
     grant_ref_t   trans_gref;
+    struct domain *trans_domain;
     unsigned long frame;  /* Frame being granted.                     */
     unsigned long gfn;    /* Guest's idea of the frame being granted. */
-    unsigned      is_sub_page:1; /* True if this is a sub-page grant. */
-    unsigned      start:15; /* For sub-page grants, the start offset
-                               in the page.                           */
-    unsigned      length:16; /* For sub-page grants, the length of the
-                                grant.                                */
     spinlock_t    lock;      /* lock to protect access of this entry.
                                 see docs/misc/grant-tables.txt for
                                 locking protocol                      */
@@ -896,7 +896,7 @@ map_grant_ref(
             act->frame = frame;
             act->start = 0;
             act->length = PAGE_SIZE;
-            act->is_sub_page = 0;
+            act->is_sub_page = false;
             act->trans_domain = rd;
             act->trans_gref = op->ref;
         }
@@ -2155,7 +2155,7 @@ acquire_grant_for_copy(
     unsigned long grant_frame;
     uint16_t trans_page_off;
     uint16_t trans_length;
-    int is_sub_page;
+    bool is_sub_page;
     s16 rc = GNTST_okay;
 
     *page = NULL;
@@ -2284,7 +2284,7 @@ acquire_grant_for_copy(
              * but we always treat it as one because that blocks mappings of
              * transitive grants.
              */
-            act->is_sub_page = 1;
+            act->is_sub_page = true;
         }
     }
     else if ( !old_pin ||
@@ -2305,7 +2305,7 @@ acquire_grant_for_copy(
             if ( rc != GNTST_okay )
                 goto unlock_out_clear;
             act->gfn = gfn;
-            is_sub_page = 0;
+            is_sub_page = false;
             trans_page_off = 0;
             trans_length = PAGE_SIZE;
         }
@@ -2316,7 +2316,7 @@ acquire_grant_for_copy(
             if ( rc != GNTST_okay )
                 goto unlock_out_clear;
             act->gfn = sha2->full_page.frame;
-            is_sub_page = 0;
+            is_sub_page = false;
             trans_page_off = 0;
             trans_length = PAGE_SIZE;
         }
@@ -2327,7 +2327,7 @@ acquire_grant_for_copy(
             if ( rc != GNTST_okay )
                 goto unlock_out_clear;
             act->gfn = sha2->sub_page.frame;
-            is_sub_page = 1;
+            is_sub_page = true;
             trans_page_off = sha2->sub_page.page_off;
             trans_length = sha2->sub_page.length;
         }
