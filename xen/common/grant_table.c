@@ -185,7 +185,9 @@ struct active_grant_entry {
     grant_ref_t   trans_gref;
     struct domain *trans_domain;
     unsigned long frame;  /* Frame being granted.                     */
-    unsigned long gfn;    /* Guest's idea of the frame being granted. */
+#ifndef NDEBUG
+    gfn_t         gfn;    /* Guest's idea of the frame being granted. */
+#endif
     spinlock_t    lock;      /* lock to protect access of this entry.
                                 see docs/misc/grant-tables.txt for
                                 locking protocol                      */
@@ -194,6 +196,13 @@ struct active_grant_entry {
 #define ACGNT_PER_PAGE (PAGE_SIZE / sizeof(struct active_grant_entry))
 #define _active_entry(t, e) \
     ((t)->active[(e)/ACGNT_PER_PAGE][(e)%ACGNT_PER_PAGE])
+
+static inline void act_set_gfn(struct active_grant_entry *act, gfn_t gfn)
+{
+#ifndef NDEBUG
+    act->gfn = gfn;
+#endif
+}
 
 DEFINE_PERCPU_RWLOCK_GLOBAL(grant_rwlock);
 
@@ -891,7 +900,7 @@ map_grant_ref(
                                  op->flags & GNTMAP_readonly, rd);
             if ( rc != GNTST_okay )
                 goto unlock_out_clear;
-            act->gfn = gfn;
+            act_set_gfn(act, _gfn(gfn));
             act->domid = ld->domain_id;
             act->frame = frame;
             act->start = 0;
@@ -2278,7 +2287,7 @@ acquire_grant_for_copy(
             act->trans_domain = td;
             act->trans_gref = trans_gref;
             act->frame = grant_frame;
-            act->gfn = gfn_x(INVALID_GFN);
+            act_set_gfn(act, INVALID_GFN);
             /*
              * The actual remote remote grant may or may not be a sub-page,
              * but we always treat it as one because that blocks mappings of
@@ -2304,7 +2313,7 @@ acquire_grant_for_copy(
             rc = get_paged_frame(gfn, &grant_frame, page, readonly, rd);
             if ( rc != GNTST_okay )
                 goto unlock_out_clear;
-            act->gfn = gfn;
+            act_set_gfn(act, _gfn(gfn));
             is_sub_page = false;
             trans_page_off = 0;
             trans_length = PAGE_SIZE;
@@ -2315,7 +2324,7 @@ acquire_grant_for_copy(
                                  readonly, rd);
             if ( rc != GNTST_okay )
                 goto unlock_out_clear;
-            act->gfn = sha2->full_page.frame;
+            act_set_gfn(act, _gfn(sha2->full_page.frame));
             is_sub_page = false;
             trans_page_off = 0;
             trans_length = PAGE_SIZE;
@@ -2326,7 +2335,7 @@ acquire_grant_for_copy(
                                  readonly, rd);
             if ( rc != GNTST_okay )
                 goto unlock_out_clear;
-            act->gfn = sha2->sub_page.frame;
+            act_set_gfn(act, _gfn(sha2->sub_page.frame));
             is_sub_page = true;
             trans_page_off = sha2->sub_page.page_off;
             trans_length = sha2->sub_page.length;
@@ -3491,8 +3500,16 @@ void grant_table_warn_active_grants(struct domain *d)
 
         nr_active++;
         if ( nr_active <= WARN_GRANT_MAX )
-            printk(XENLOG_G_DEBUG "Dom%d has an active grant: GFN: %lx (MFN: %lx)\n",
-                   d->domain_id, act->gfn, act->frame);
+            printk(XENLOG_G_DEBUG "Dom%d has active grant %x ("
+#ifndef NDEBUG
+                   "GFN %lx, "
+#endif
+                   "MFN: %lx)\n",
+                   d->domain_id, ref,
+#ifndef NDEBUG
+                   gfn_x(act->gfn),
+#endif
+                   act->frame);
         active_entry_release(act);
     }
 
