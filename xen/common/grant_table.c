@@ -3144,6 +3144,7 @@ do_grant_table_op(
     {
         XEN_GUEST_HANDLE_PARAM(gnttab_map_grant_ref_t) map =
             guest_handle_cast(uop, gnttab_map_grant_ref_t);
+
         if ( unlikely(!guest_handle_okay(map, count)) )
             goto out;
         rc = gnttab_map_grant_ref(map, count);
@@ -3154,10 +3155,12 @@ do_grant_table_op(
         }
         break;
     }
+
     case GNTTABOP_unmap_grant_ref:
     {
         XEN_GUEST_HANDLE_PARAM(gnttab_unmap_grant_ref_t) unmap =
             guest_handle_cast(uop, gnttab_unmap_grant_ref_t);
+
         if ( unlikely(!guest_handle_okay(unmap, count)) )
             goto out;
         rc = gnttab_unmap_grant_ref(unmap, count);
@@ -3168,10 +3171,12 @@ do_grant_table_op(
         }
         break;
     }
+
     case GNTTABOP_unmap_and_replace:
     {
         XEN_GUEST_HANDLE_PARAM(gnttab_unmap_and_replace_t) unmap =
             guest_handle_cast(uop, gnttab_unmap_and_replace_t);
+
         if ( unlikely(!guest_handle_okay(unmap, count)) )
             goto out;
         rc = -ENOSYS;
@@ -3185,17 +3190,18 @@ do_grant_table_op(
         }
         break;
     }
+
     case GNTTABOP_setup_table:
-    {
         rc = gnttab_setup_table(
             guest_handle_cast(uop, gnttab_setup_table_t), count);
         ASSERT(rc <= 0);
         break;
-    }
+
     case GNTTABOP_transfer:
     {
         XEN_GUEST_HANDLE_PARAM(gnttab_transfer_t) transfer =
             guest_handle_cast(uop, gnttab_transfer_t);
+
         if ( unlikely(!guest_handle_okay(transfer, count)) )
             goto out;
         rc = gnttab_transfer(transfer, count);
@@ -3206,10 +3212,12 @@ do_grant_table_op(
         }
         break;
     }
+
     case GNTTABOP_copy:
     {
         XEN_GUEST_HANDLE_PARAM(gnttab_copy_t) copy =
             guest_handle_cast(uop, gnttab_copy_t);
+
         if ( unlikely(!guest_handle_okay(copy, count)) )
             goto out;
         rc = gnttab_copy(copy, count);
@@ -3221,33 +3229,31 @@ do_grant_table_op(
         }
         break;
     }
+
     case GNTTABOP_query_size:
-    {
         rc = gnttab_query_size(
             guest_handle_cast(uop, gnttab_query_size_t), count);
         ASSERT(rc <= 0);
         break;
-    }
+
     case GNTTABOP_set_version:
-    {
         rc = gnttab_set_version(guest_handle_cast(uop, gnttab_set_version_t));
         break;
-    }
+
     case GNTTABOP_get_status_frames:
-    {
         rc = gnttab_get_status_frames(
             guest_handle_cast(uop, gnttab_get_status_frames_t), count);
         break;
-    }
+
     case GNTTABOP_get_version:
-    {
         rc = gnttab_get_version(guest_handle_cast(uop, gnttab_get_version_t));
         break;
-    }
+
     case GNTTABOP_swap_grant_ref:
     {
         XEN_GUEST_HANDLE_PARAM(gnttab_swap_grant_ref_t) swap =
             guest_handle_cast(uop, gnttab_swap_grant_ref_t);
+
         if ( unlikely(!guest_handle_okay(swap, count)) )
             goto out;
         rc = gnttab_swap_grant_ref(swap, count);
@@ -3258,6 +3264,7 @@ do_grant_table_op(
         }
         break;
     }
+
     case GNTTABOP_cache_flush:
     {
         XEN_GUEST_HANDLE_PARAM(gnttab_cache_flush_t) cflush =
@@ -3274,6 +3281,7 @@ do_grant_table_op(
         opaque_out = opaque_in;
         break;
     }
+
     default:
         rc = -ENOSYS;
         break;
