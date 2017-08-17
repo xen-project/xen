@@ -1860,8 +1860,10 @@ __release_grant_for_copy(
 
     if ( td != rd )
     {
-        /* Recursive calls, but they're tail calls, so it's
-           okay. */
+        /*
+         * Recursive calls, but they're bounded (acquire permits only a single
+         * level of transitivity), so it's okay.
+         */
         if ( released_write )
             __release_grant_for_copy(td, trans_gref, 0);
         else if ( released_read )
@@ -1997,19 +1999,19 @@ __acquire_grant_for_copy(
                 return rc;
             }
 
-            /* We dropped the lock, so we have to check that nobody
-               else tried to pin (or, for that matter, unpin) the
-               reference in *this* domain.  If they did, just give up
-               and try again. */
+            /*
+             * We dropped the lock, so we have to check that nobody else tried
+             * to pin (or, for that matter, unpin) the reference in *this*
+             * domain.  If they did, just give up and tell the caller to retry.
+             */
             if ( act->pin != old_pin )
             {
                 __fixup_status_for_copy_pin(act, status);
                 rcu_unlock_domain(td);
                 spin_unlock(&rgt->lock);
                 put_page(*page);
-                return __acquire_grant_for_copy(rd, gref, ldom, readonly,
-                                                frame, page, page_off, length,
-                                                allow_transitive);
+                *page = NULL;
+                return ERESTART;
             }
 
             /* The actual remote remote grant may or may not be a
@@ -2089,7 +2091,7 @@ __acquire_grant_for_copy(
     return rc;
 }
 
-static void
+static bool_t
 __gnttab_copy(
     struct gnttab_copy *op)
 {
@@ -2213,9 +2215,20 @@ __gnttab_copy(
         rcu_unlock_domain(sd);
     if ( dd )
         rcu_unlock_domain(dd);
+    if ( rc > 0 )
+        return 0;
     op->status = rc;
+    return 1;
 }
 
+/*
+ * gnttab_copy(), other than the various other helpers of
+ * do_grant_table_op(), returns (besides possible error indicators)
+ * "count - i" rather than "i" to ensure that even if no progress
+ * was made at all (perhaps due to gnttab_copy_one() returning a
+ * positive value) a non-zero value is being handed back (zero needs
+ * to be avoided, as that means "success, all done").
+ */
 static long
 gnttab_copy(
     XEN_GUEST_HANDLE_PARAM(gnttab_copy_t) uop, unsigned int count)
@@ -2226,10 +2239,11 @@ gnttab_copy(
     for ( i = 0; i < count; i++ )
     {
         if (i && hypercall_preempt_check())
-            return i;
+            return count - i;
         if ( unlikely(__copy_from_guest(&op, uop, 1)) )
             return -EFAULT;
-        __gnttab_copy(&op);
+        if ( !__gnttab_copy(&op) )
+            return count - i;
         if ( unlikely(__copy_field_to_guest(uop, &op, status)) )
             return -EFAULT;
         guest_handle_add_offset(uop, 1);
@@ -2727,6 +2741,7 @@ do_grant_table_op(
         rc = gnttab_copy(copy, count);
         if ( rc > 0 )
         {
+            rc = count - rc;
             guest_handle_add_offset(copy, rc);
             uop = guest_handle_cast(copy, void);
         }
