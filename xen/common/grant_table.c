@@ -2050,12 +2050,7 @@ __release_grant_for_copy(
     unsigned long r_frame;
     uint16_t *status;
     grant_ref_t trans_gref;
-    int released_read;
-    int released_write;
     struct domain *td;
-
-    released_read = 0;
-    released_write = 0;
 
     grant_read_lock(rgt);
 
@@ -2086,17 +2081,11 @@ __release_grant_for_copy(
 
         act->pin -= GNTPIN_hstw_inc;
         if ( !(act->pin & (GNTPIN_devw_mask|GNTPIN_hstw_mask)) )
-        {
-            released_write = 1;
             gnttab_clear_flag(_GTF_writing, status);
-        }
     }
 
     if ( !act->pin )
-    {
         gnttab_clear_flag(_GTF_reading, status);
-        released_read = 1;
-    }
 
     active_entry_release(act);
     grant_read_unlock(rgt);
@@ -2104,13 +2093,10 @@ __release_grant_for_copy(
     if ( td != rd )
     {
         /*
-         * Recursive calls, but they're bounded (acquire permits only a single
+         * Recursive call, but it is bounded (acquire permits only a single
          * level of transitivity), so it's okay.
          */
-        if ( released_write )
-            __release_grant_for_copy(td, trans_gref, 0);
-        else if ( released_read )
-            __release_grant_for_copy(td, trans_gref, 1);
+        __release_grant_for_copy(td, trans_gref, readonly);
 
         rcu_unlock_domain(td);
     }
@@ -2184,8 +2170,108 @@ __acquire_grant_for_copy(
                  act->domid, ldom, act->pin);
 
     old_pin = act->pin;
-    if ( !act->pin ||
-         (!readonly && !(act->pin & (GNTPIN_devw_mask|GNTPIN_hstw_mask))) )
+    if ( sha2 && (shah->flags & GTF_type_mask) == GTF_transitive )
+    {
+        if ( (!old_pin || (!readonly &&
+                           !(old_pin & (GNTPIN_devw_mask|GNTPIN_hstw_mask)))) &&
+             (rc = _set_status_v2(ldom, readonly, 0, shah, act,
+                                  status)) != GNTST_okay )
+            goto unlock_out;
+
+        if ( !allow_transitive )
+            PIN_FAIL(unlock_out_clear, GNTST_general_error,
+                     "transitive grant when transitivity not allowed\n");
+
+        trans_domid = sha2->transitive.trans_domid;
+        trans_gref = sha2->transitive.gref;
+        barrier(); /* Stop the compiler from re-loading
+                      trans_domid from shared memory */
+        if ( trans_domid == rd->domain_id )
+            PIN_FAIL(unlock_out_clear, GNTST_general_error,
+                     "transitive grants cannot be self-referential\n");
+
+        /*
+         * We allow the trans_domid == ldom case, which corresponds to a
+         * grant being issued by one domain, sent to another one, and then
+         * transitively granted back to the original domain.  Allowing it
+         * is easy, and means that you don't need to go out of your way to
+         * avoid it in the guest.
+         */
+
+        /* We need to leave the rrd locked during the grant copy. */
+        td = rcu_lock_domain_by_id(trans_domid);
+        if ( td == NULL )
+            PIN_FAIL(unlock_out_clear, GNTST_general_error,
+                     "transitive grant referenced bad domain %d\n",
+                     trans_domid);
+
+        /*
+         * __acquire_grant_for_copy() could take the lock on the
+         * remote table (if rd == td), so we have to drop the lock
+         * here and reacquire.
+         */
+        active_entry_release(act);
+        grant_read_unlock(rgt);
+
+        rc = __acquire_grant_for_copy(td, trans_gref, rd->domain_id,
+                                      readonly, &grant_frame, page,
+                                      &trans_page_off, &trans_length, 0);
+
+        grant_read_lock(rgt);
+        act = active_entry_acquire(rgt, gref);
+
+        if ( rc != GNTST_okay )
+        {
+            __fixup_status_for_copy_pin(act, status);
+            rcu_unlock_domain(td);
+            active_entry_release(act);
+            grant_read_unlock(rgt);
+            return rc;
+        }
+
+        /*
+         * We dropped the lock, so we have to check that the grant didn't
+         * change, and that nobody else tried to pin/unpin it. If anything
+         * changed, just give up and tell the caller to retry.
+         */
+        if ( rgt->gt_version != 2 ||
+             act->pin != old_pin ||
+             (old_pin && (act->domid != ldom || act->frame != grant_frame ||
+                          act->start != trans_page_off ||
+                          act->length != trans_length ||
+                          act->trans_domain != td ||
+                          act->trans_gref != trans_gref ||
+                          !act->is_sub_page)) )
+        {
+            __release_grant_for_copy(td, trans_gref, readonly);
+            __fixup_status_for_copy_pin(act, status);
+            rcu_unlock_domain(td);
+            active_entry_release(act);
+            grant_read_unlock(rgt);
+            put_page(*page);
+            *page = NULL;
+            return ERESTART;
+        }
+
+        if ( !old_pin )
+        {
+            act->domid = ldom;
+            act->start = trans_page_off;
+            act->length = trans_length;
+            act->trans_domain = td;
+            act->trans_gref = trans_gref;
+            act->frame = grant_frame;
+            act->gfn = -1ul;
+            /*
+             * The actual remote remote grant may or may not be a sub-page,
+             * but we always treat it as one because that blocks mappings of
+             * transitive grants.
+             */
+            act->is_sub_page = 1;
+        }
+    }
+    else if ( !old_pin ||
+              (!readonly && !(old_pin & (GNTPIN_devw_mask|GNTPIN_hstw_mask))) )
     {
         if ( (rc = _set_status(rgt->gt_version, ldom,
                                readonly, 0, shah, act,
@@ -2205,79 +2291,6 @@ __acquire_grant_for_copy(
             is_sub_page = 0;
             trans_page_off = 0;
             trans_length = PAGE_SIZE;
-        }
-        else if ( (shah->flags & GTF_type_mask) == GTF_transitive )
-        {
-            if ( !allow_transitive )
-                PIN_FAIL(unlock_out_clear, GNTST_general_error,
-                         "transitive grant when transitivity not allowed\n");
-
-            trans_domid = sha2->transitive.trans_domid;
-            trans_gref = sha2->transitive.gref;
-            barrier(); /* Stop the compiler from re-loading
-                          trans_domid from shared memory */
-            if ( trans_domid == rd->domain_id )
-                PIN_FAIL(unlock_out_clear, GNTST_general_error,
-                         "transitive grants cannot be self-referential\n");
-
-            /* We allow the trans_domid == ldom case, which
-               corresponds to a grant being issued by one domain, sent
-               to another one, and then transitively granted back to
-               the original domain.  Allowing it is easy, and means
-               that you don't need to go out of your way to avoid it
-               in the guest. */
-
-            /* We need to leave the rrd locked during the grant copy */
-            td = rcu_lock_domain_by_id(trans_domid);
-            if ( td == NULL )
-                PIN_FAIL(unlock_out_clear, GNTST_general_error,
-                         "transitive grant referenced bad domain %d\n",
-                         trans_domid);
-
-            /*
-             * __acquire_grant_for_copy() could take the lock on the
-             * remote table (if rd == td), so we have to drop the lock
-             * here and reacquire
-             */
-            active_entry_release(act);
-            grant_read_unlock(rgt);
-
-            rc = __acquire_grant_for_copy(td, trans_gref, rd->domain_id,
-                                          readonly, &grant_frame, page,
-                                          &trans_page_off, &trans_length, 0);
-
-            grant_read_lock(rgt);
-            act = active_entry_acquire(rgt, gref);
-
-            if ( rc != GNTST_okay ) {
-                __fixup_status_for_copy_pin(act, status);
-                rcu_unlock_domain(td);
-                active_entry_release(act);
-                grant_read_unlock(rgt);
-                return rc;
-            }
-
-            /*
-             * We dropped the lock, so we have to check that nobody else tried
-             * to pin (or, for that matter, unpin) the reference in *this*
-             * domain.  If they did, just give up and tell the caller to retry.
-             */
-            if ( act->pin != old_pin )
-            {
-                __fixup_status_for_copy_pin(act, status);
-                rcu_unlock_domain(td);
-                active_entry_release(act);
-                grant_read_unlock(rgt);
-                put_page(*page);
-                *page = NULL;
-                return ERESTART;
-            }
-
-            /* The actual remote remote grant may or may not be a
-               sub-page, but we always treat it as one because that
-               blocks mappings of transitive grants. */
-            is_sub_page = 1;
-            act->gfn = -1ul;
         }
         else if ( !(sha2->hdr.flags & GTF_sub_page) )
         {
@@ -2710,10 +2723,13 @@ gnttab_set_version(XEN_GUEST_HANDLE_PARAM(gnttab_set_version_t) uop)
     case 2:
         for ( i = 0; i < GNTTAB_NR_RESERVED_ENTRIES; i++ )
         {
-            if ( ((shared_entry_v2(gt, i).hdr.flags & GTF_type_mask) ==
-                  GTF_permit_access) &&
-                 (shared_entry_v2(gt, i).full_page.frame >> 32) )
+            switch ( shared_entry_v2(gt, i).hdr.flags & GTF_type_mask )
             {
+            case GTF_permit_access:
+                 if ( !(shared_entry_v2(gt, i).full_page.frame >> 32) )
+                     break;
+                 /* fall through */
+            case GTF_transitive:
                 gdprintk(XENLOG_WARNING,
                          "tried to change grant table version to 1 with non-representable entries\n");
                 res = -ERANGE;
