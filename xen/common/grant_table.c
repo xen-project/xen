@@ -2114,8 +2114,10 @@ __release_grant_for_copy(
 
     if ( td != rd )
     {
-        /* Recursive calls, but they're tail calls, so it's
-           okay. */
+        /*
+         * Recursive calls, but they're bounded (acquire permits only a single
+         * level of transitivity), so it's okay.
+         */
         if ( released_write )
             __release_grant_for_copy(td, trans_gref, 0);
         else if ( released_read )
@@ -2267,10 +2269,11 @@ __acquire_grant_for_copy(
                 return rc;
             }
 
-            /* We dropped the lock, so we have to check that nobody
-               else tried to pin (or, for that matter, unpin) the
-               reference in *this* domain.  If they did, just give up
-               and try again. */
+            /*
+             * We dropped the lock, so we have to check that nobody else tried
+             * to pin (or, for that matter, unpin) the reference in *this*
+             * domain.  If they did, just give up and tell the caller to retry.
+             */
             if ( act->pin != old_pin )
             {
                 __fixup_status_for_copy_pin(act, status);
@@ -2278,9 +2281,8 @@ __acquire_grant_for_copy(
                 active_entry_release(act);
                 grant_read_unlock(rgt);
                 put_page(*page);
-                return __acquire_grant_for_copy(rd, gref, ldom, readonly,
-                                                frame, page, page_off, length,
-                                                allow_transitive);
+                *page = NULL;
+                return ERESTART;
             }
 
             /* The actual remote remote grant may or may not be a
@@ -2579,7 +2581,7 @@ static int gnttab_copy_one(const struct gnttab_copy *op,
     {
         gnttab_copy_release_buf(src);
         rc = gnttab_copy_claim_buf(op, &op->source, src, GNTCOPY_source_gref);
-        if ( rc < 0 )
+        if ( rc )
             goto out;
     }
 
@@ -2589,7 +2591,7 @@ static int gnttab_copy_one(const struct gnttab_copy *op,
     {
         gnttab_copy_release_buf(dest);
         rc = gnttab_copy_claim_buf(op, &op->dest, dest, GNTCOPY_dest_gref);
-        if ( rc < 0 )
+        if ( rc )
             goto out;
     }
 
@@ -2598,6 +2600,14 @@ static int gnttab_copy_one(const struct gnttab_copy *op,
     return rc;
 }
 
+/*
+ * gnttab_copy(), other than the various other helpers of
+ * do_grant_table_op(), returns (besides possible error indicators)
+ * "count - i" rather than "i" to ensure that even if no progress
+ * was made at all (perhaps due to gnttab_copy_one() returning a
+ * positive value) a non-zero value is being handed back (zero needs
+ * to be avoided, as that means "success, all done").
+ */
 static long gnttab_copy(
     XEN_GUEST_HANDLE_PARAM(gnttab_copy_t) uop, unsigned int count)
 {
@@ -2611,7 +2621,7 @@ static long gnttab_copy(
     {
         if ( i && hypercall_preempt_check() )
         {
-            rc = i;
+            rc = count - i;
             break;
         }
 
@@ -2621,13 +2631,20 @@ static long gnttab_copy(
             break;
         }
 
-        op.status = gnttab_copy_one(&op, &dest, &src);
-        if ( op.status != GNTST_okay )
+        rc = gnttab_copy_one(&op, &dest, &src);
+        if ( rc > 0 )
+        {
+            rc = count - i;
+            break;
+        }
+        if ( rc != GNTST_okay )
         {
             gnttab_copy_release_buf(&src);
             gnttab_copy_release_buf(&dest);
         }
 
+        op.status = rc;
+        rc = 0;
         if ( unlikely(__copy_field_to_guest(uop, &op, status)) )
         {
             rc = -EFAULT;
@@ -3167,6 +3184,7 @@ do_grant_table_op(
         rc = gnttab_copy(copy, count);
         if ( rc > 0 )
         {
+            rc = count - rc;
             guest_handle_add_offset(copy, rc);
             uop = guest_handle_cast(copy, void);
         }
