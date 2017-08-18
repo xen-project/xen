@@ -4,17 +4,17 @@
  * This inherits a great deal from Linux's SMP boot code:
  *  (c) 1995 Alan Cox, Building #3 <alan@redhat.com>
  *  (c) 1998, 1999, 2000 Ingo Molnar <mingo@redhat.com>
- * 
+ *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; If not, see <http://www.gnu.org/licenses/>.
  */
@@ -45,6 +45,12 @@
 #include <mach_apic.h>
 #include <mach_wakecpu.h>
 #include <smpboot_hooks.h>
+
+/* Override macros from asm/page.h to make them work with mfn_t */
+#undef mfn_to_page
+#define mfn_to_page(mfn) __mfn_to_page(mfn_x(mfn))
+#undef page_to_mfn
+#define page_to_mfn(pg) _mfn(__page_to_mfn(pg))
 
 #define setup_trampoline()    (bootsym_phys(trampoline_realmode_entry))
 
@@ -307,14 +313,14 @@ void start_secondary(void *unused)
      * Just as during early bootstrap, it is convenient here to disable
      * spinlock checking while we have IRQs disabled. This allows us to
      * acquire IRQ-unsafe locks when it would otherwise be disallowed.
-     * 
+     *
      * It is safe because the race we are usually trying to avoid involves
      * a group of CPUs rendezvousing in an IPI handler, where one cannot
      * join because it is spinning with IRQs disabled waiting to acquire a
      * lock held by another in the rendezvous group (the lock must be an
      * IRQ-unsafe lock since the CPU took the IPI after acquiring it, and
      * hence had IRQs enabled). This is a deadlock scenario.
-     * 
+     *
      * However, no CPU can be involved in rendezvous until it is online,
      * hence no such group can be waiting for this CPU until it is
      * visible in cpu_online_map. Hence such a deadlock is not possible.
@@ -423,8 +429,8 @@ static int wakeup_secondary_cpu(int phys_apicid, unsigned long start_eip)
     else if ( tboot_in_measured_env() )
     {
         /*
-         * With tboot AP is actually spinning in a mini-guest before 
-         * receiving INIT. Upon receiving INIT ipi, AP need time to VMExit, 
+         * With tboot AP is actually spinning in a mini-guest before
+         * receiving INIT. Upon receiving INIT ipi, AP need time to VMExit,
          * update VMCS to tracking SIPIs and VMResume.
          *
          * While AP is in root mode handling the INIT the CPU will drop
@@ -596,7 +602,7 @@ unsigned long alloc_stub_page(unsigned int cpu, unsigned long *mfn)
     BUILD_BUG_ON(STUBS_PER_PAGE & (STUBS_PER_PAGE - 1));
 
     if ( *mfn )
-        pg = mfn_to_page(*mfn);
+        pg = mfn_to_page(_mfn(*mfn));
     else
     {
         nodeid_t node = cpu_to_node(cpu);
@@ -610,7 +616,7 @@ unsigned long alloc_stub_page(unsigned int cpu, unsigned long *mfn)
     }
 
     stub_va = XEN_VIRT_END - (cpu + 1) * PAGE_SIZE;
-    if ( map_pages_to_xen(stub_va, page_to_mfn(pg), 1,
+    if ( map_pages_to_xen(stub_va, mfn_x(page_to_mfn(pg)), 1,
                           PAGE_HYPERVISOR_RX | MAP_SMALL_PAGES) )
     {
         if ( !*mfn )
@@ -618,7 +624,7 @@ unsigned long alloc_stub_page(unsigned int cpu, unsigned long *mfn)
         stub_va = 0;
     }
     else if ( !*mfn )
-        *mfn = page_to_mfn(pg);
+        *mfn = mfn_x(page_to_mfn(pg));
 
     return stub_va;
 }
@@ -652,8 +658,8 @@ static void cpu_smpboot_free(unsigned int cpu)
 
     if ( per_cpu(stubs.addr, cpu) )
     {
-        unsigned long mfn = per_cpu(stubs.mfn, cpu);
-        unsigned char *stub_page = map_domain_page(_mfn(mfn));
+        mfn_t mfn = _mfn(per_cpu(stubs.mfn, cpu));
+        unsigned char *stub_page = map_domain_page(mfn);
         unsigned int i;
 
         memset(stub_page + STUB_BUF_CPU_OFFS(cpu), 0xcc, STUB_BUF_SIZE);
@@ -871,7 +877,7 @@ remove_siblinginfo(int cpu)
         if ( cpumask_weight(per_cpu(cpu_sibling_mask, cpu)) == 1 )
             cpu_data[sibling].booted_cores--;
     }
-   
+
     for_each_cpu(sibling, per_cpu(cpu_sibling_mask, cpu))
         cpumask_clear_cpu(cpu, per_cpu(cpu_sibling_mask, sibling));
     cpumask_clear(per_cpu(cpu_sibling_mask, cpu));
