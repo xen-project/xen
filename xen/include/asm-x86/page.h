@@ -82,10 +82,10 @@
     ((paddr_t)(((x).l4 & (PADDR_MASK&PAGE_MASK))))
 
 /* Get pointer to info structure of page mapped by pte (struct page_info *). */
-#define l1e_get_page(x)           (mfn_to_page(l1e_get_pfn(x)))
-#define l2e_get_page(x)           (mfn_to_page(l2e_get_pfn(x)))
-#define l3e_get_page(x)           (mfn_to_page(l3e_get_pfn(x)))
-#define l4e_get_page(x)           (mfn_to_page(l4e_get_pfn(x)))
+#define l1e_get_page(x)           (__mfn_to_page(l1e_get_pfn(x)))
+#define l2e_get_page(x)           (__mfn_to_page(l2e_get_pfn(x)))
+#define l3e_get_page(x)           (__mfn_to_page(l3e_get_pfn(x)))
+#define l4e_get_page(x)           (__mfn_to_page(l4e_get_pfn(x)))
 
 /* Get pte access flags (unsigned int). */
 #define l1e_get_flags(x)           (get_pte_flags((x).l1))
@@ -145,10 +145,10 @@ static inline l4_pgentry_t l4e_from_paddr(paddr_t pa, unsigned int flags)
 #define l4e_from_intpte(intpte)    ((l4_pgentry_t) { (intpte_t)(intpte) })
 
 /* Construct a pte from a page pointer and access flags. */
-#define l1e_from_page(page, flags) (l1e_from_pfn(page_to_mfn(page),(flags)))
-#define l2e_from_page(page, flags) (l2e_from_pfn(page_to_mfn(page),(flags)))
-#define l3e_from_page(page, flags) (l3e_from_pfn(page_to_mfn(page),(flags)))
-#define l4e_from_page(page, flags) (l4e_from_pfn(page_to_mfn(page),(flags)))
+#define l1e_from_page(page, flags) l1e_from_pfn(__page_to_mfn(page), (flags))
+#define l2e_from_page(page, flags) l2e_from_pfn(__page_to_mfn(page), (flags))
+#define l3e_from_page(page, flags) l3e_from_pfn(__page_to_mfn(page), (flags))
+#define l4e_from_page(page, flags) l4e_from_pfn(__page_to_mfn(page), (flags))
 
 /* Add extra flags to an existing pte. */
 #define l1e_add_flags(x, flags)    ((x).l1 |= put_pte_flags(flags))
