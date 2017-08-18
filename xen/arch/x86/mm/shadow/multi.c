@@ -206,6 +206,7 @@ shadow_check_gwalk(struct vcpu *v, unsigned long va, walk_t *gw, int version)
 
     ASSERT(paging_locked_by_me(d));
 
+    /* No need for smp_rmb() here; taking the paging lock was enough. */
     if ( version == atomic_read(&d->arch.paging.shadow.gtable_dirty_version) )
          return 1;
 
@@ -3112,7 +3113,7 @@ static int sh_page_fault(struct vcpu *v,
      * will make sure no inconsistent mapping being translated into
      * shadow page table. */
     version = atomic_read(&d->arch.paging.shadow.gtable_dirty_version);
-    rmb();
+    smp_rmb();
     walk_ok = sh_walk_guest_tables(v, va, &gw, error_code);
 
 #if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC)
@@ -3188,6 +3189,7 @@ static int sh_page_fault(struct vcpu *v,
          * overlapping with this one may be inconsistent
          */
         perfc_incr(shadow_rm_write_flush_tlb);
+        smp_wmb();
         atomic_inc(&d->arch.paging.shadow.gtable_dirty_version);
         flush_tlb_mask(d->domain_dirty_cpumask);
     }
