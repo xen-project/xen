@@ -1104,6 +1104,17 @@ out:
     return rc;
 }
 
+int xc_domain_remove_from_physmap(xc_interface *xch,
+                                  uint32_t domid,
+                                  xen_pfn_t gpfn)
+{
+    struct xen_remove_from_physmap xrfp = {
+        .domid = domid,
+        .gpfn = gpfn,
+    };
+    return do_memory_op(xch, XENMEM_remove_from_physmap, &xrfp, sizeof(xrfp));
+}
+
 int xc_domain_claim_pages(xc_interface *xch,
                                uint32_t domid,
                                unsigned long nr_pages)
