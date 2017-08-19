@@ -78,6 +78,12 @@ int libxl__arch_extra_memory(libxl__gc *gc,
                              const libxl_domain_build_info *info,
                              uint64_t *out);
 
+_hidden
+bool libxl__arch_domain_support_sshm(const libxl_domain_build_info *b_info);
+
+_hidden
+int libxl__arch_domain_sshm_cachepolicy_setdefault(libxl_static_shm *sshm);
+
 #if defined(__i386__) || defined(__x86_64__)
 
 #define LAPIC_BASE_ADDRESS  0xfee00000
