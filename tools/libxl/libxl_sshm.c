@@ -86,6 +86,111 @@ int libxl__sshm_check_overlap(libxl__gc *gc, uint32_t domid,
     return 0;
 }
 
+/* Decrease the refcount of an sshm. When refcount reaches 0,
+ * clean up the whole sshm path */
+static void libxl__sshm_decref(libxl__gc *gc, xs_transaction_t xt,
+                               const char *sshm_path)
+{
+    int count;
+    const char *count_path, *count_string;
+
+    count_path = GCSPRINTF("%s/users", sshm_path);
+    if (libxl__xs_read_checked(gc, xt, count_path, &count_string))
+        return;
+    count = atoi(count_string);
+
+    if (--count == 0) {
+        libxl__xs_path_cleanup(gc, xt, sshm_path);
+        return;
+    }
+
+    count_string = GCSPRINTF("%d", count);
+    libxl__xs_write_checked(gc, xt, count_path, count_string);
+
+    return;
+}
+
+static void libxl__sshm_do_unmap(libxl__gc *gc, uint32_t domid, const char *id,
+                                 uint64_t begin, uint64_t end)
+{
+    begin >>= XC_PAGE_SHIFT;
+    end >>= XC_PAGE_SHIFT;
+    for (; begin < end; ++begin) {
+        if (xc_domain_remove_from_physmap(CTX->xch, domid, begin)) {
+            SSHM_ERROR(domid, id,
+                       "unable to unmap shared page at 0x%"PRIx64".",
+                       begin);
+        }
+    }
+}
+
+static void libxl__sshm_del_slave(libxl__gc *gc, xs_transaction_t xt,
+                                  uint32_t domid, const char *id, bool isretry)
+{
+    const char *slave_path, *begin_str, *end_str;
+    uint64_t begin, end;
+
+    slave_path = GCSPRINTF("%s/slaves/%"PRIu32, SSHM_PATH(id), domid);
+
+    begin_str = libxl__xs_read(gc, xt, GCSPRINTF("%s/begin", slave_path));
+    end_str = libxl__xs_read(gc, xt, GCSPRINTF("%s/end", slave_path));
+    begin = strtoull(begin_str, NULL, 16);
+    end = strtoull(end_str, NULL, 16);
+
+    /* Avoid calling do_unmap many times in case of xs transaction retry */
+    if (!isretry)
+        libxl__sshm_do_unmap(gc, domid, id, begin, end);
+
+    libxl__xs_path_cleanup(gc, xt, slave_path);
+}
+
+/* Delete static_shm entries in the xensotre. */
+int libxl__sshm_del(libxl__gc *gc,  uint32_t domid)
+{
+    int rc, i;
+    bool isretry;
+    xs_transaction_t xt = XBT_NULL;
+    const char *dom_path, *dom_sshm_path, *role;
+    char **sshm_ents;
+    unsigned int sshm_num;
+
+    dom_path = libxl__xs_get_dompath(gc, domid);
+    dom_sshm_path = GCSPRINTF("%s/static_shm", dom_path);
+
+    isretry = false;
+    for (;;) {
+        rc = libxl__xs_transaction_start(gc, &xt);
+        if (rc) goto out;
+
+        if (libxl__xs_read(gc, xt, dom_sshm_path)) {
+            sshm_ents = libxl__xs_directory(gc, xt, dom_sshm_path, &sshm_num);
+            if (!sshm_ents) continue;
+
+            for (i = 0; i < sshm_num; ++i) {
+                role = libxl__xs_read(gc, xt,
+                                      GCSPRINTF("%s/%s/role",
+                                                dom_sshm_path,
+                                                sshm_ents[i]));
+                assert(role);
+                if (!strncmp(role, "slave", 5))
+                    libxl__sshm_del_slave(gc, xt, domid, sshm_ents[i], isretry);
+
+                libxl__sshm_decref(gc, xt, SSHM_PATH(sshm_ents[i]));
+            }
+        }
+
+        rc = libxl__xs_transaction_commit(gc, &xt);
+        if (!rc) break;
+        if (rc < 0) goto out;
+         isretry = true;
+    }
+
+    rc = 0;
+out:
+    libxl__xs_transaction_abort(gc, &xt);
+    return rc;
+}
+
 /*   libxl__sshm_do_map -- map pages into slave's physmap
  *
  *   This functions maps

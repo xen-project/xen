@@ -1026,6 +1026,11 @@ void libxl__destroy_domid(libxl__egc *egc, libxl__destroy_domid_state *dis)
         goto out;
     }
 
+    rc = libxl__sshm_del(gc, domid);
+    if (rc) {
+        LOGD(ERROR, domid, "Deleting static shm failed.");
+    }
+
     if (libxl__device_pci_destroy_all(gc, domid) < 0)
         LOGD(ERROR, domid, "Pci shutdown failed");
     rc = xc_domain_pause(ctx->xch, domid);
