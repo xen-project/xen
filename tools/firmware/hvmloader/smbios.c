@@ -531,6 +531,7 @@ smbios_type_3_init(void *start)
     const char *s;
     void *pts;
     uint32_t length;
+    uint32_t counter = 0;
 
     pts = get_smbios_pt_struct(3, &length);
     if ( (pts != NULL)&&(length > 0) )
@@ -546,7 +547,7 @@ smbios_type_3_init(void *start)
     p->header.length = sizeof(struct smbios_type_3);
     p->header.handle = SMBIOS_HANDLE_TYPE3;
 
-    p->manufacturer_str = 1;
+    p->manufacturer_str = ++counter;
     p->type = 0x01; /* other */
     p->version_str = 0;
     p->serial_number_str = 0;
@@ -562,13 +563,20 @@ smbios_type_3_init(void *start)
     strcpy((char *)start, s);
     start += strlen(s) + 1;
 
-    /* No internal defaults for this if the value is not set */
+    /* No internal defaults for following ones if the value is not set */
     s = xenstore_read(HVM_XS_ENCLOSURE_SERIAL_NUMBER, NULL);
     if ( (s != NULL)&&(*s != '\0') )
     {
         strcpy((char *)start, s);
         start += strlen(s) + 1;
-        p->serial_number_str = 2;
+        p->serial_number_str = ++counter;
+    }
+    s = xenstore_read(HVM_XS_ENCLOSURE_ASSET_TAG, NULL);
+    if ( (s != NULL) && (*s != '\0') )
+    {
+        strcpy(start, s);
+        start += strlen(s) + 1;
+        p->asset_tag_str = ++counter;
     }
 
     *((uint8_t *)start) = 0;

@@ -211,6 +211,28 @@ will not relocate guest memory.
 
 The BIOS used by this domain.
 
+#### ~/bios-strings/bios-vendor = STRING [HVM,INTERNAL]
+#### ~/bios-strings/bios-version = STRING [HVM,INTERNAL]
+#### ~/bios-strings/system-manufacturer = STRING [HVM,INTERNAL]
+#### ~/bios-strings/system-product-name = STRING [HVM,INTERNAL]
+#### ~/bios-strings/system-version = STRING [HVM,INTERNAL]
+#### ~/bios-strings/system-serial-number = STRING [HVM,INTERNAL]
+#### ~/bios-strings/enclosure-manufacturer = STRING [HVM,INTERNAL]
+#### ~/bios-strings/enclosure-serial-number = STRING [HVM,INTERNAL]
+#### ~/bios-strings/enclosure-asset-tag = STRING [HVM,INTERNAL]
+#### ~/bios-strings/battery-manufacturer = STRING [HVM,INTERNAL]
+#### ~/bios-strings/battery-device-name = STRING [HVM,INTERNAL]
+
+These xenstore values are used to override some of the default string
+values in the SMBIOS table constructed in hvmloader. See the SMBIOS
+table specification at http://www.dmtf.org/standards/smbios/ 
+
+#### ~/bios-strings/oem-* = STRING [HVM,INTERNAL]
+
+1 to 99 OEM strings can be set in xenstore using values of the form
+'~/bios-strings/oem-1' to '~/bios-strings/oem-99'. These strings will be
+loaded into the SMBIOS type 11 structure.
+
 #### ~/platform/* = ("0"|"1") [HVM,INTERNAL]
 
 Various boolean platform properties.
