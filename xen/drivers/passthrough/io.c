@@ -81,17 +81,17 @@ static void raise_softirq_for(struct hvm_pirq_dpci *pirq_dpci)
  * If it is false, it is the callers responsibility to make sure
  * that the softirq (with the event_lock dropped) has ran.
  */
-bool_t pt_pirq_softirq_active(struct hvm_pirq_dpci *pirq_dpci)
+bool pt_pirq_softirq_active(struct hvm_pirq_dpci *pirq_dpci)
 {
     if ( pirq_dpci->state & ((1 << STATE_RUN) | (1 << STATE_SCHED)) )
-        return 1;
+        return true;
 
     /*
      * If in the future we would call 'raise_softirq_for' right away
      * after 'pt_pirq_softirq_active' we MUST reset the list (otherwise it
      * might have stale data).
      */
-    return 0;
+    return false;
 }
 
 /*
@@ -136,7 +136,7 @@ static void pt_pirq_softirq_reset(struct hvm_pirq_dpci *pirq_dpci)
     pirq_dpci->masked = 0;
 }
 
-bool_t pt_irq_need_timer(uint32_t flags)
+bool pt_irq_need_timer(uint32_t flags)
 {
     return !(flags & (HVM_IRQ_DPCI_GUEST_MSI | HVM_IRQ_DPCI_TRANSLATE));
 }
@@ -232,7 +232,7 @@ void free_hvm_irq_dpci(struct hvm_irq_dpci *dpci)
  */
 static struct vcpu *vector_hashing_dest(const struct domain *d,
                                         uint32_t dest_id,
-                                        bool_t dest_mode,
+                                        bool dest_mode,
                                         uint8_t gvec)
 
 {
@@ -739,14 +739,14 @@ void pt_pirq_init(struct domain *d, struct hvm_pirq_dpci *dpci)
     dpci->gmsi.dest_vcpu_id = -1;
 }
 
-bool_t pt_pirq_cleanup_check(struct hvm_pirq_dpci *dpci)
+bool pt_pirq_cleanup_check(struct hvm_pirq_dpci *dpci)
 {
     if ( !dpci->flags && !pt_pirq_softirq_active(dpci) )
     {
         dpci->dom = NULL;
-        return 1;
+        return true;
     }
-    return 0;
+    return false;
 }
 
 int pt_pirq_iterate(struct domain *d,

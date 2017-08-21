@@ -174,7 +174,7 @@ struct hvm_irq_dpci {
 struct hvm_pirq_dpci {
     uint32_t flags;
     unsigned int state;
-    bool_t masked;
+    bool masked;
     uint16_t pending;
     struct list_head digl_list;
     struct domain *dom;
@@ -184,13 +184,13 @@ struct hvm_pirq_dpci {
 };
 
 void pt_pirq_init(struct domain *, struct hvm_pirq_dpci *);
-bool_t pt_pirq_cleanup_check(struct hvm_pirq_dpci *);
+bool pt_pirq_cleanup_check(struct hvm_pirq_dpci *);
 int pt_pirq_iterate(struct domain *d,
                     int (*cb)(struct domain *,
                               struct hvm_pirq_dpci *, void *arg),
                     void *arg);
 
-bool_t pt_pirq_softirq_active(struct hvm_pirq_dpci *);
+bool pt_pirq_softirq_active(struct hvm_pirq_dpci *);
 /* Modify state of a PCI INTx wire. */
 void hvm_pci_intx_assert(struct domain *d, unsigned int device,
                          unsigned int intx);
