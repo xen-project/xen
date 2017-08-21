@@ -7,7 +7,7 @@
 #include <asm/numa.h>
 #include <xen/cpumask.h>
 #include <xen/smp.h>
-#include <xen/hvm/irq.h>
+#include <asm/hvm/irq.h>
 #include <irq_vectors.h>
 #include <asm/percpu.h>
 

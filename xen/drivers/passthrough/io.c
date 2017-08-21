@@ -23,7 +23,6 @@
 #include <xen/irq.h>
 #include <asm/hvm/irq.h>
 #include <asm/hvm/support.h>
-#include <xen/hvm/irq.h>
 #include <asm/io_apic.h>
 
 static DEFINE_PER_CPU(struct list_head, dpci_list);
