@@ -258,9 +258,9 @@ int compat_grant_table_op(unsigned int cmd,
                 rc = gnttab_copy(guest_handle_cast(nat.uop, gnttab_copy_t), n);
             if ( rc > 0 )
             {
-                ASSERT(rc < n);
-                i -= n - rc;
-                n = rc;
+                ASSERT(rc <= n);
+                i -= rc;
+                n -= rc;
             }
             if ( rc >= 0 )
             {
