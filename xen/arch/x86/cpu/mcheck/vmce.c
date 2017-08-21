@@ -26,7 +26,7 @@
 #include <xen/delay.h>
 #include <xen/smp.h>
 #include <xen/mm.h>
-#include <xen/hvm/save.h>
+#include <asm/hvm/save.h>
 #include <asm/processor.h>
 #include <public/sysctl.h>
 #include <asm/system.h>

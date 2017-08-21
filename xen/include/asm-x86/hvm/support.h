@@ -22,7 +22,7 @@
 
 #include <xen/types.h>
 #include <xen/sched.h>
-#include <xen/hvm/save.h>
+#include <asm/hvm/save.h>
 #include <asm/processor.h>
 
 #ifndef NDEBUG

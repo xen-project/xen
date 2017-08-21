@@ -22,11 +22,11 @@
  */
 
 #include <xen/xenoprof.h>
-#include <xen/hvm/save.h>
 #include <xen/sched.h>
 #include <xen/irq.h>
 #include <asm/apic.h>
 #include <asm/vpmu.h>
+#include <asm/hvm/save.h>
 #include <asm/hvm/vlapic.h>
 #include <public/pmu.h>
 

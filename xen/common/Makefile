@@ -74,8 +74,6 @@ tmem-y := tmem.o tmem_xen.o tmem_control.o
 tmem-$(CONFIG_COMPAT) += compat/tmem_xen.o
 obj-$(CONFIG_TMEM) += $(tmem-y)
 
-subdir-$(CONFIG_X86) += hvm
-
 subdir-$(CONFIG_GCOV) += gcov
 
 subdir-y += libelf
