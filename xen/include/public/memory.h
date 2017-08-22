@@ -227,6 +227,10 @@ DEFINE_XEN_GUEST_HANDLE(xen_machphys_mapping_t);
                                       Stage-2 using the Normal Memory
                                       Inner/Outer Write-Back Cacheable
                                       memory attribute. */
+#define XENMAPSPACE_gmfn_share   6 /* Same as *_gmfn_foreign, but this is
+                                      for a privileged dom to share pages
+                                      between two doms. */
+
 /* ` } */
 
 /*

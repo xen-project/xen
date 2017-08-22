@@ -127,6 +127,8 @@ define(`domain_comms', `
 	domain_event_comms($1, $2)
 	allow $1 $2:grant { map_read map_write copy unmap };
 	allow $2 $1:grant { map_read map_write copy unmap };
+	allow $1 $2:mmu share_mem;
+	allow $2 $1:mmu share_mem;
 ')
 
 # domain_self_comms(domain)
