@@ -67,7 +67,7 @@ unsigned long __read_mostly cr4_pv32_mask;
 /* "acpi=force":  Override the disable blacklist.                   */
 /* "acpi=ht":     Limit ACPI just to boot-time to enable HT.        */
 /* "acpi=noirq":  Disables ACPI interrupt routing.                  */
-static void parse_acpi_param(char *s);
+static int parse_acpi_param(const char *s);
 custom_param("acpi", parse_acpi_param);
 
 /* **** Linux config option: propagated to domain0. */
@@ -102,59 +102,70 @@ unsigned long __read_mostly mmu_cr4_features = XEN_MINIMAL_CR4;
 /* smep: Enable/disable Supervisor Mode Execution Protection (default on). */
 #define SMEP_HVM_ONLY (-1)
 static s8 __initdata opt_smep = 1;
-static void __init parse_smep_param(char *s)
+
+static int __init parse_smep_param(const char *s)
 {
     if ( !*s )
     {
         opt_smep = 1;
-        return;
+        return 0;
     }
 
     switch ( parse_bool(s, NULL) )
     {
     case 0:
         opt_smep = 0;
-        return;
+        return 0;
     case 1:
         opt_smep = 1;
-        return;
+        return 0;
     }
 
     if ( !strcmp(s, "hvm") )
         opt_smep = SMEP_HVM_ONLY;
+    else
+        return -EINVAL;
+
+    return 0;
 }
 custom_param("smep", parse_smep_param);
 
 /* smap: Enable/disable Supervisor Mode Access Prevention (default on). */
 #define SMAP_HVM_ONLY (-1)
 static s8 __initdata opt_smap = 1;
-static void __init parse_smap_param(char *s)
+
+static int __init parse_smap_param(const char *s)
 {
     if ( !*s )
     {
         opt_smap = 1;
-        return;
+        return 0;
     }
 
     switch ( parse_bool(s, NULL) )
     {
     case 0:
         opt_smap = 0;
-        return;
+        return 0;
     case 1:
         opt_smap = 1;
-        return;
+        return 0;
     }
 
     if ( !strcmp(s, "hvm") )
         opt_smap = SMAP_HVM_ONLY;
+    else
+        return -EINVAL;
+
+    return 0;
 }
 custom_param("smap", parse_smap_param);
 
 bool __read_mostly acpi_disabled;
 bool __initdata acpi_force;
 static char __initdata acpi_param[10] = "";
-static void __init parse_acpi_param(char *s)
+
+static int __init parse_acpi_param(const char *s)
 {
     /* Save the parameter so it can be propagated to domain0. */
     safe_strcpy(acpi_param, s);
@@ -180,6 +191,10 @@ static void __init parse_acpi_param(char *s)
     {
         acpi_noirq_set();
     }
+    else
+        return -EINVAL;
+
+    return 0;
 }
 
 static const module_t *__initdata initial_images;
