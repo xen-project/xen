@@ -616,6 +616,9 @@ smbios_type_4_init(
 
     p->status = 0x41; /* socket populated, CPU enabled */
     p->upgrade = 0x01; /* other */
+    p->l1_cache_handle = 0xffff; /* No cache information structure provided. */
+    p->l2_cache_handle = 0xffff; /* No cache information structure provided. */
+    p->l3_cache_handle = 0xffff; /* No cache information structure provided. */
 
     start += sizeof(struct smbios_type_4);
 
