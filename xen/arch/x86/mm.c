@@ -667,45 +667,55 @@ static int alloc_segdesc_page(struct page_info *page)
 }
 
 
-/* Map shadow page at offset @off. */
-int map_ldt_shadow_page(unsigned int off)
+/*
+ * Map a guest's LDT page (covering the byte at @offset from start of the LDT)
+ * into Xen's virtual range.  Returns true if the mapping changed, false
+ * otherwise.
+ */
+bool map_ldt_shadow_page(unsigned int offset)
 {
     struct vcpu *v = current;
     struct domain *d = v->domain;
-    unsigned long gmfn;
     struct page_info *page;
-    l1_pgentry_t l1e, nl1e;
-    unsigned long gva = v->arch.pv_vcpu.ldt_base + (off << PAGE_SHIFT);
-    int okay;
+    l1_pgentry_t gl1e, *pl1e;
+    unsigned long linear = v->arch.pv_vcpu.ldt_base + offset;
 
     BUG_ON(unlikely(in_irq()));
 
+    /*
+     * Hardware limit checking should guarantee this property.  NB. This is
+     * safe as updates to the LDT can only be made by MMUEXT_SET_LDT to the
+     * current vcpu, and vcpu_reset() will block until this vcpu has been
+     * descheduled before continuing.
+     */
+    ASSERT((offset >> 3) <= v->arch.pv_vcpu.ldt_ents);
+
     if ( is_pv_32bit_domain(d) )
-        gva = (u32)gva;
-    guest_get_eff_kern_l1e(gva, &l1e);
-    if ( unlikely(!(l1e_get_flags(l1e) & _PAGE_PRESENT)) )
-        return 0;
+        linear = (uint32_t)linear;
 
-    gmfn = l1e_get_pfn(l1e);
-    page = get_page_from_gfn(d, gmfn, NULL, P2M_ALLOC);
+    guest_get_eff_kern_l1e(linear, &gl1e);
+    if ( unlikely(!(l1e_get_flags(gl1e) & _PAGE_PRESENT)) )
+        return false;
+
+    page = get_page_from_gfn(d, l1e_get_pfn(gl1e), NULL, P2M_ALLOC);
     if ( unlikely(!page) )
-        return 0;
+        return false;
 
-    okay = get_page_type(page, PGT_seg_desc_page);
-    if ( unlikely(!okay) )
+    if ( unlikely(!get_page_type(page, PGT_seg_desc_page)) )
     {
         put_page(page);
-        return 0;
+        return false;
     }
 
-    nl1e = l1e_from_page(page, l1e_get_flags(l1e) | _PAGE_RW);
+    pl1e = &gdt_ldt_ptes(d, v)[(offset >> PAGE_SHIFT) + 16];
+    l1e_add_flags(gl1e, _PAGE_RW);
 
     spin_lock(&v->arch.pv_vcpu.shadow_ldt_lock);
-    l1e_write(&gdt_ldt_ptes(d, v)[off + 16], nl1e);
+    l1e_write(pl1e, gl1e);
     v->arch.pv_vcpu.shadow_ldt_mapcnt++;
     spin_unlock(&v->arch.pv_vcpu.shadow_ldt_lock);
 
-    return 1;
+    return true;
 }
 
 

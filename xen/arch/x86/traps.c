@@ -1112,7 +1112,7 @@ static int handle_gdt_ldt_mapping_fault(unsigned long offset,
     if ( likely(is_ldt_area) )
     {
         /* LDT fault: Copy a mapping from the guest's LDT, if it is valid. */
-        if ( likely(map_ldt_shadow_page(offset >> PAGE_SHIFT)) )
+        if ( likely(map_ldt_shadow_page(offset)) )
         {
             if ( guest_mode(regs) )
                 trace_trap_two_addr(TRC_PV_GDT_LDT_MAPPING_FAULT,
