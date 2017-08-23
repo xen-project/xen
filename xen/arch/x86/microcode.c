@@ -73,15 +73,19 @@ void __init microcode_set_module(unsigned int idx)
  * If the EFI has forced which of the multiboot payloads is to be used,
  * no parsing will be attempted.
  */
-static void __init parse_ucode(char *s)
+static int __init parse_ucode(const char *s)
 {
+    const char *q = NULL;
+
     if ( ucode_mod_forced ) /* Forced by EFI */
-       return;
+       return 0;
 
     if ( !strncmp(s, "scan", 4) )
         ucode_scan = 1;
     else
-        ucode_mod_idx = simple_strtol(s, NULL, 0);
+        ucode_mod_idx = simple_strtol(s, &q, 0);
+
+    return (q && *q) ? -EINVAL : 0;
 }
 custom_param("ucode", parse_ucode);
 
