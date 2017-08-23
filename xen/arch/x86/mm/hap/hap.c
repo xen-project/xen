@@ -409,7 +409,7 @@ static void hap_install_xen_entries_in_l4(struct vcpu *v, mfn_t l4mfn)
 
     /* Install a linear mapping */
     l4e[l4_table_offset(LINEAR_PT_VIRT_START)] =
-        l4e_from_pfn(mfn_x(l4mfn), __PAGE_HYPERVISOR_RW);
+        l4e_from_mfn(l4mfn, __PAGE_HYPERVISOR_RW);
 
     unmap_domain_page(l4e);
 }
@@ -749,8 +749,8 @@ hap_write_p2m_entry(struct domain *d, unsigned long gfn, l1_pgentry_t *p,
          && !p2m_get_hostp2m(d)->defer_nested_flush ) {
         /* We are replacing a valid entry so we need to flush nested p2ms,
          * unless the only change is an increase in access rights. */
-        mfn_t omfn = _mfn(l1e_get_pfn(*p));
-        mfn_t nmfn = _mfn(l1e_get_pfn(new));
+        mfn_t omfn = l1e_get_mfn(*p);
+        mfn_t nmfn = l1e_get_mfn(new);
         flush_nestedp2m = !( mfn_x(omfn) == mfn_x(nmfn)
             && perms_strictly_increased(old_flags, l1e_get_flags(new)) );
     }

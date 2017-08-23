@@ -1655,12 +1655,12 @@ sh_make_monitor_table(struct vcpu *v)
             m3mfn = shadow_alloc(d, SH_type_monitor_table, 0);
             mfn_to_page(m3mfn)->shadow_flags = 3;
             l4e[shadow_l4_table_offset(SH_LINEAR_PT_VIRT_START)]
-                = l4e_from_pfn(mfn_x(m3mfn), __PAGE_HYPERVISOR_RW);
+                = l4e_from_mfn(m3mfn, __PAGE_HYPERVISOR_RW);
 
             m2mfn = shadow_alloc(d, SH_type_monitor_table, 0);
             mfn_to_page(m2mfn)->shadow_flags = 2;
             l3e = map_domain_page(m3mfn);
-            l3e[0] = l3e_from_pfn(mfn_x(m2mfn), __PAGE_HYPERVISOR_RW);
+            l3e[0] = l3e_from_mfn(m2mfn, __PAGE_HYPERVISOR_RW);
             unmap_domain_page(l3e);
 
             if ( is_pv_32bit_domain(d) )
@@ -1669,12 +1669,12 @@ sh_make_monitor_table(struct vcpu *v)
                  * area into its usual VAs in the monitor tables */
                 m3mfn = shadow_alloc(d, SH_type_monitor_table, 0);
                 mfn_to_page(m3mfn)->shadow_flags = 3;
-                l4e[0] = l4e_from_pfn(mfn_x(m3mfn), __PAGE_HYPERVISOR_RW);
+                l4e[0] = l4e_from_mfn(m3mfn, __PAGE_HYPERVISOR_RW);
 
                 m2mfn = shadow_alloc(d, SH_type_monitor_table, 0);
                 mfn_to_page(m2mfn)->shadow_flags = 2;
                 l3e = map_domain_page(m3mfn);
-                l3e[3] = l3e_from_pfn(mfn_x(m2mfn), _PAGE_PRESENT);
+                l3e[3] = l3e_from_mfn(m2mfn, _PAGE_PRESENT);
                 sh_install_xen_entries_in_l2h(d, m2mfn);
                 unmap_domain_page(l3e);
             }
@@ -2075,10 +2075,10 @@ void sh_destroy_monitor_table(struct vcpu *v, mfn_t mmfn)
         /* Need to destroy the l3 and l2 monitor pages used
          * for the linear map */
         ASSERT(l4e_get_flags(l4e[linear_slot]) & _PAGE_PRESENT);
-        m3mfn = _mfn(l4e_get_pfn(l4e[linear_slot]));
+        m3mfn = l4e_get_mfn(l4e[linear_slot]);
         l3e = map_domain_page(m3mfn);
         ASSERT(l3e_get_flags(l3e[0]) & _PAGE_PRESENT);
-        shadow_free(d, _mfn(l3e_get_pfn(l3e[0])));
+        shadow_free(d, l3e_get_mfn(l3e[0]));
         unmap_domain_page(l3e);
         shadow_free(d, m3mfn);
 
@@ -2087,10 +2087,10 @@ void sh_destroy_monitor_table(struct vcpu *v, mfn_t mmfn)
             /* Need to destroy the l3 and l2 monitor pages that map the
              * Xen VAs at 3GB-4GB */
             ASSERT(l4e_get_flags(l4e[0]) & _PAGE_PRESENT);
-            m3mfn = _mfn(l4e_get_pfn(l4e[0]));
+            m3mfn = l4e_get_mfn(l4e[0]);
             l3e = map_domain_page(m3mfn);
             ASSERT(l3e_get_flags(l3e[3]) & _PAGE_PRESENT);
-            shadow_free(d, _mfn(l3e_get_pfn(l3e[3])));
+            shadow_free(d, l3e_get_mfn(l3e[3]));
             unmap_domain_page(l3e);
             shadow_free(d, m3mfn);
         }
@@ -3886,12 +3886,12 @@ sh_update_linear_entries(struct vcpu *v)
             ml4e = map_domain_page(pagetable_get_mfn(v->arch.monitor_table));
 
             ASSERT(l4e_get_flags(ml4e[linear_slot]) & _PAGE_PRESENT);
-            l3mfn = _mfn(l4e_get_pfn(ml4e[linear_slot]));
+            l3mfn = l4e_get_mfn(ml4e[linear_slot]);
             ml3e = map_domain_page(l3mfn);
             unmap_domain_page(ml4e);
 
             ASSERT(l3e_get_flags(ml3e[0]) & _PAGE_PRESENT);
-            l2mfn = _mfn(l3e_get_pfn(ml3e[0]));
+            l2mfn = l3e_get_mfn(ml3e[0]);
             ml2e = map_domain_page(l2mfn);
             unmap_domain_page(ml3e);
         }
@@ -3903,7 +3903,7 @@ sh_update_linear_entries(struct vcpu *v)
         {
             ml2e[i] =
                 (shadow_l3e_get_flags(sl3e[i]) & _PAGE_PRESENT)
-                ? l2e_from_pfn(mfn_x(shadow_l3e_get_mfn(sl3e[i])),
+                ? l2e_from_mfn(shadow_l3e_get_mfn(sl3e[i]),
                                __PAGE_HYPERVISOR_RW)
                 : l2e_empty();
         }

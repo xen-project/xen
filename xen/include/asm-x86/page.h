@@ -71,6 +71,12 @@
 #define l4e_get_pfn(x)             \
     ((unsigned long)(((x).l4 & (PADDR_MASK&PAGE_MASK)) >> PAGE_SHIFT))
 
+/* Get mfn mapped by pte (mfn_t). */
+#define l1e_get_mfn(x) _mfn(l1e_get_pfn(x))
+#define l2e_get_mfn(x) _mfn(l2e_get_pfn(x))
+#define l3e_get_mfn(x) _mfn(l3e_get_pfn(x))
+#define l4e_get_mfn(x) _mfn(l4e_get_pfn(x))
+
 /* Get physical address of page mapped by pte (paddr_t). */
 #define l1e_get_paddr(x)           \
     ((paddr_t)(((x).l1 & (PADDR_MASK&PAGE_MASK))))
@@ -113,6 +119,12 @@
     ((l3_pgentry_t) { ((intpte_t)(pfn) << PAGE_SHIFT) | put_pte_flags(flags) })
 #define l4e_from_pfn(pfn, flags)   \
     ((l4_pgentry_t) { ((intpte_t)(pfn) << PAGE_SHIFT) | put_pte_flags(flags) })
+
+/* Construct a pte from an mfn and access flags. */
+#define l1e_from_mfn(m, f) l1e_from_pfn(mfn_x(m), f)
+#define l2e_from_mfn(m, f) l2e_from_pfn(mfn_x(m), f)
+#define l3e_from_mfn(m, f) l3e_from_pfn(mfn_x(m), f)
+#define l4e_from_mfn(m, f) l4e_from_pfn(mfn_x(m), f)
 
 /* Construct a pte from a physical address and access flags. */
 #ifndef __ASSEMBLY__
@@ -180,9 +192,9 @@ static inline l4_pgentry_t l4e_from_paddr(paddr_t pa, unsigned int flags)
 #define l3e_to_l2e(x)              ((l2_pgentry_t *)__va(l3e_get_paddr(x)))
 #define l4e_to_l3e(x)              ((l3_pgentry_t *)__va(l4e_get_paddr(x)))
 
-#define map_l1t_from_l2e(x)        ((l1_pgentry_t *)map_domain_page(_mfn(l2e_get_pfn(x))))
-#define map_l2t_from_l3e(x)        ((l2_pgentry_t *)map_domain_page(_mfn(l3e_get_pfn(x))))
-#define map_l3t_from_l4e(x)        ((l3_pgentry_t *)map_domain_page(_mfn(l4e_get_pfn(x))))
+#define map_l1t_from_l2e(x)        (l1_pgentry_t *)map_domain_page(l2e_get_mfn(x))
+#define map_l2t_from_l3e(x)        (l2_pgentry_t *)map_domain_page(l3e_get_mfn(x))
+#define map_l3t_from_l4e(x)        (l3_pgentry_t *)map_domain_page(l4e_get_mfn(x))
 
 /* Given a virtual address, get an entry offset into a page table. */
 #define l1_table_offset(a)         \

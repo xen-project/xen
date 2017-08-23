@@ -162,7 +162,8 @@ p2m_free_entry(struct p2m_domain *p2m, l1_pgentry_t *p2m_entry, int page_order)
 
     if ( page_order > PAGE_ORDER_2M )
     {
-        l1_pgentry_t *l3_table = map_domain_page(_mfn(l1e_get_pfn(*p2m_entry)));
+        l1_pgentry_t *l3_table = map_domain_page(l1e_get_mfn(*p2m_entry));
+
         for ( int i = 0; i < L3_PAGETABLE_ENTRIES; i++ )
             p2m_free_entry(p2m, l3_table + i, page_order - 9);
         unmap_domain_page(l3_table);
@@ -293,7 +294,7 @@ p2m_next_level(struct p2m_domain *p2m, void **table,
         p2m->write_p2m_entry(p2m, gfn, p2m_entry, new_entry, 2);
     }
 
-    next = map_domain_page(_mfn(l1e_get_pfn(*p2m_entry)));
+    next = map_domain_page(l1e_get_mfn(*p2m_entry));
     if ( unmap )
         unmap_domain_page(*table);
     *table = next;
@@ -808,7 +809,7 @@ p2m_pt_get_entry(struct p2m_domain *p2m, unsigned long gfn,
             unmap_domain_page(l4e);
             return INVALID_MFN;
         }
-        mfn = _mfn(l4e_get_pfn(*l4e));
+        mfn = l4e_get_mfn(*l4e);
         recalc = needs_recalc(l4, *l4e);
         unmap_domain_page(l4e);
     }
@@ -849,7 +850,7 @@ pod_retry_l3:
             return (p2m_is_valid(*t)) ? mfn : INVALID_MFN;
         }
 
-        mfn = _mfn(l3e_get_pfn(*l3e));
+        mfn = l3e_get_mfn(*l3e);
         if ( _needs_recalc(flags) )
             recalc = 1;
         unmap_domain_page(l3e);
@@ -888,7 +889,7 @@ pod_retry_l2:
         return (p2m_is_valid(*t)) ? mfn : INVALID_MFN;
     }
 
-    mfn = _mfn(l2e_get_pfn(*l2e));
+    mfn = l2e_get_mfn(*l2e);
     if ( needs_recalc(l2, *l2e) )
         recalc = 1;
     unmap_domain_page(l2e);
@@ -916,7 +917,7 @@ pod_retry_l1:
         unmap_domain_page(l1e);
         return INVALID_MFN;
     }
-    mfn = _mfn(l1e_get_pfn(*l1e));
+    mfn = l1e_get_mfn(*l1e);
     *t = p2m_recalc_type(recalc || _needs_recalc(flags), l1t, p2m, gfn);
     unmap_domain_page(l1e);
 

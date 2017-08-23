@@ -1162,7 +1162,7 @@ get_page_from_l3e(
     }
 
     rc = get_page_and_type_from_mfn(
-        _mfn(l3e_get_pfn(l3e)), PGT_l2_page_table, d, partial, 1);
+        l3e_get_mfn(l3e), PGT_l2_page_table, d, partial, 1);
     if ( unlikely(rc == -EINVAL) &&
          !is_pv_32bit_domain(d) &&
          get_l3_linear_pagetable(l3e, pfn, d) )
@@ -1195,7 +1195,7 @@ get_page_from_l4e(
     }
 
     rc = get_page_and_type_from_mfn(
-        _mfn(l4e_get_pfn(l4e)), PGT_l3_page_table, d, partial, 1);
+        l4e_get_mfn(l4e), PGT_l3_page_table, d, partial, 1);
     if ( unlikely(rc == -EINVAL) && get_l4_linear_pagetable(l4e, pfn, d) )
         rc = 0;
 
@@ -1554,7 +1554,7 @@ static int alloc_l3_table(struct page_info *page)
                 rc = -EINVAL;
             else
                 rc = get_page_and_type_from_mfn(
-                    _mfn(l3e_get_pfn(pl3e[i])),
+                    l3e_get_mfn(pl3e[i]),
                     PGT_l2_page_table | PGT_pae_xen_l2, d, partial, 1);
         }
         else if ( !is_guest_l3_slot(i) ||
@@ -5187,7 +5187,7 @@ int ptwr_do_page_fault(struct vcpu *v, unsigned long addr,
     /* We are looking only for read-only mappings of p.t. pages. */
     if ( ((l1e_get_flags(pte) & (_PAGE_PRESENT|_PAGE_RW)) != _PAGE_PRESENT) ||
          rangeset_contains_singleton(mmio_ro_ranges, l1e_get_pfn(pte)) ||
-         !get_page_from_mfn(_mfn(l1e_get_pfn(pte)), d) )
+         !get_page_from_mfn(l1e_get_mfn(pte), d) )
         goto bail;
 
     page = l1e_get_page(pte);
