@@ -28,22 +28,36 @@
 
 unsigned int pci_probe = PCI_PROBE_CONF1 | PCI_PROBE_MMCONF;
 
-static void __init parse_mmcfg(char *s)
+static int __init parse_mmcfg(const char *s)
 {
-    char *ss;
+    const char *ss;
+    int rc = 0;
 
     do {
         ss = strchr(s, ',');
-        if ( ss )
-            *ss = '\0';
+        if ( !ss )
+            ss = strchr(s, '\0');
 
-        if ( !parse_bool(s, NULL) )
+        switch ( parse_bool(s, ss) )
+        {
+        case 0:
             pci_probe &= ~PCI_PROBE_MMCONF;
-        else if ( !strcmp(s, "amd_fam10") || !strcmp(s, "amd-fam10") )
-            pci_probe |= PCI_CHECK_ENABLE_AMD_MMCONF;
+            break;
+        case 1:
+            break;
+        default:
+            if ( !strncmp(s, "amd_fam10", ss - s) ||
+                 !strncmp(s, "amd-fam10", ss - s) )
+                pci_probe |= PCI_CHECK_ENABLE_AMD_MMCONF;
+            else
+                rc = -EINVAL;
+            break;
+        }
 
         s = ss + 1;
-    } while ( ss );
+    } while ( *ss );
+
+    return rc;
 }
 custom_param("mmcfg", parse_mmcfg);
 
