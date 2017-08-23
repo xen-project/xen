@@ -24,8 +24,6 @@
 /* xen_ulong_t is always 64 bits */
 #define BITS_PER_XEN_ULONG 64
 
-#define CONFIG_PAGING_ASSISTANCE 1
-
 #define CONFIG_PAGING_LEVELS 3
 
 #define CONFIG_ARM 1
