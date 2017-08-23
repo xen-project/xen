@@ -167,11 +167,32 @@ define(`make_device_model', `
 #
 ################################################################################
 
-# use_device(domain, device)
+# use_device_iommu(domain, device)
 #   Allow a device to be used by a domain
-define(`use_device', `
+#   only if an IOMMU provides isolation.
+define(`use_device_iommu', `
     allow $1 $1_self:mmu exchange;
-    allow $1 $2:resource use;
+    allow $1 $2:resource use_iommu;
+    allow $1 domio_t:mmu { map_read map_write };
+')
+
+# use_device_iommu_nointremap(domain, device)
+#   Allow a device to be used by a domain
+#   only if an IOMMU is active, even if it does not support
+#   interrupt remapping.
+#   Allows acceptance of (typically older) less isolating hardware.
+define(`use_device_iommu_nointremap', `
+    allow $1 $1_self:mmu exchange;
+    allow $1 $2:resource { use_iommu use_iommu_nointremap };
+    allow $1 domio_t:mmu { map_read map_write };
+')
+
+# use_device_noiommu(domain, device)
+#   Allow a device to be used by a domain
+#   even without an IOMMU available.
+define(`use_device_noiommu', `
+    allow $1 $1_self:mmu exchange;
+    allow $1 $2:resource { use_iommu use_iommu_nointremap use_noiommu };
     allow $1 domio_t:mmu { map_read map_write };
 ')
 
@@ -180,7 +201,7 @@ define(`use_device', `
 define(`admin_device', `
     allow $1 $2:resource { setup stat_device add_device add_irq add_iomem add_ioport remove_device remove_irq remove_iomem remove_ioport plug unplug };
     allow $1 $2:hvm bind_irq;
-    use_device($1, $2)
+    use_device_noiommu($1, $2)
 ')
 
 # delegate_devices(priv-domain, target-domain)

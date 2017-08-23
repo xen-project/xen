@@ -67,7 +67,8 @@ allow xen_t resource_type : resource { remove_irq remove_ioport remove_iomem };
 neverallow * ~domain_type:domain { create transition };
 
 # Resources must be declared using resource_type
-neverallow * ~resource_type:resource use;
+neverallow * ~resource_type:resource { use use_iommu use_iommu_nointremap
+                                       use_noiommu };
 
 # Events must use event_type (see create_channel for a template)
 neverallow ~event_type *:event bind;

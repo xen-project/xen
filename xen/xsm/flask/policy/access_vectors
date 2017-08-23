@@ -420,11 +420,27 @@ class resource
 #  source = domain making the hypercall
 #  target = domain which will no longer have access to the resource
     remove
+# checked when using some core Xen devices (target xen_t)
+#  source = domain which will have access to the resource
+#  target = xen_t
+    use
 # checked when adding a resource to a domain:
 #  source = domain which will have access to the resource
 #  target = resource's security label
-# also checked when using some core Xen devices (target xen_t)
-    use
+# Requires an active IOMMU capable of interrupt remapping in order to
+# enforce isolation.
+    use_iommu
+# checked when adding a resource to a domain when an IOMMU is available
+# but it is not capable of interrupt mapping:
+#  source = domain which will have access to the resource
+#  target = resource's security label
+# Enable this to allow some less secure systems to still work.
+    use_iommu_nointremap
+# checked when adding a resource to a domain when no IOMMU present:
+#  source = domain which will have access to the resource
+#  target = resource's security label
+# Enable this to allow resource use without an active IOMMU.
+    use_noiommu
 # PHYSDEVOP_map_pirq and ioapic writes for dom0, when acting on real IRQs
 #  For GSI interrupts, the IRQ's label is indexed by the IRQ number
 #  For MSI interrupts, the label of the PCI device is used

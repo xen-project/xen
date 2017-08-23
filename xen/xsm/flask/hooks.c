@@ -20,6 +20,7 @@
 #include <xen/errno.h>
 #include <xen/guest_access.h>
 #include <xen/xenoprof.h>
+#include <xen/iommu.h>
 #ifdef CONFIG_HAS_PCI
 #include <asm/msi.h>
 #endif
@@ -886,11 +887,31 @@ static int flask_map_domain_msi (struct domain *d, int irq, void *data,
 #endif
 }
 
+static u32 flask_iommu_resource_use_perm(void)
+{
+    /* Obtain the permission level required for allowing a domain
+     * to use an assigned device.
+     *
+     * An active IOMMU with interrupt remapping capability is essential
+     * for ensuring strict isolation of devices, so provide a distinct
+     * permission for that case and also enable optional support for
+     * less capable hardware (no IOMMU or IOMMU missing intremap capability)
+     * via other separate permissions.
+     */
+    u32 perm = RESOURCE__USE_NOIOMMU;
+
+    if (iommu_enabled)
+        perm = ( iommu_intremap ? RESOURCE__USE_IOMMU :
+                                  RESOURCE__USE_IOMMU_NOINTREMAP );
+    return perm;
+}
+
 static int flask_map_domain_irq (struct domain *d, int irq, void *data)
 {
     u32 sid, dsid;
     int rc = -EPERM;
     struct avc_audit_data ad;
+    u32 dperm = flask_iommu_resource_use_perm();
 
     if ( irq >= nr_static_irqs && data ) {
         rc = flask_map_domain_msi(d, irq, data, &sid, &ad);
@@ -907,7 +928,7 @@ static int flask_map_domain_irq (struct domain *d, int irq, void *data)
     if ( rc )
         return rc;
 
-    rc = avc_has_perm(dsid, sid, SECCLASS_RESOURCE, RESOURCE__USE, &ad);
+    rc = avc_has_perm(dsid, sid, SECCLASS_RESOURCE, dperm, &ad);
     return rc;
 }
 
@@ -956,6 +977,7 @@ static int flask_bind_pt_irq (struct domain *d, struct xen_domctl_bind_pt_irq *b
     int rc = -EPERM;
     int irq;
     struct avc_audit_data ad;
+    u32 dperm = flask_iommu_resource_use_perm();
 
     rc = current_has_perm(d, SECCLASS_RESOURCE, RESOURCE__ADD);
     if ( rc )
@@ -972,7 +994,7 @@ static int flask_bind_pt_irq (struct domain *d, struct xen_domctl_bind_pt_irq *b
         return rc;
 
     dsid = domain_sid(d);
-    return avc_has_perm(dsid, rsid, SECCLASS_RESOURCE, RESOURCE__USE, &ad);
+    return avc_has_perm(dsid, rsid, SECCLASS_RESOURCE, dperm, &ad);
 }
 
 static int flask_unbind_pt_irq (struct domain *d, struct xen_domctl_bind_pt_irq *bind)
@@ -990,6 +1012,7 @@ struct iomem_has_perm_data {
     u32 ssid;
     u32 dsid;
     u32 perm;
+    u32 use_perm;
 };
 
 static int _iomem_has_perm(void *v, u32 sid, unsigned long start, unsigned long end)
@@ -1007,7 +1030,7 @@ static int _iomem_has_perm(void *v, u32 sid, unsigned long start, unsigned long 
     if ( rc )
         return rc;
 
-    return avc_has_perm(data->dsid, sid, SECCLASS_RESOURCE, RESOURCE__USE, &ad);
+    return avc_has_perm(data->dsid, sid, SECCLASS_RESOURCE, data->use_perm, &ad);
 }
 
 static int flask_iomem_permission(struct domain *d, uint64_t start, uint64_t end, uint8_t access)
@@ -1027,6 +1050,7 @@ static int flask_iomem_permission(struct domain *d, uint64_t start, uint64_t end
 
     data.ssid = domain_sid(current->domain);
     data.dsid = domain_sid(d);
+    data.use_perm = flask_iommu_resource_use_perm();
 
     return security_iterate_iomem_sids(start, end, _iomem_has_perm, &data);
 }
@@ -1041,7 +1065,7 @@ static int flask_pci_config_permission(struct domain *d, uint32_t machine_bdf, u
     u32 dsid, rsid;
     int rc = -EPERM;
     struct avc_audit_data ad;
-    u32 perm = RESOURCE__USE;
+    u32 perm;
 
     rc = security_device_sid(machine_bdf, &rsid);
     if ( rc )
@@ -1050,6 +1074,8 @@ static int flask_pci_config_permission(struct domain *d, uint32_t machine_bdf, u
     /* Writes to the BARs count as setup */
     if ( access && (end >= 0x10 && start < 0x28) )
         perm = RESOURCE__SETUP;
+    else
+        perm = flask_iommu_resource_use_perm();
 
     AVC_AUDIT_DATA_INIT(&ad, DEV);
     ad.device = (unsigned long) machine_bdf;
@@ -1279,6 +1305,7 @@ static int flask_assign_device(struct domain *d, uint32_t machine_bdf)
     u32 dsid, rsid;
     int rc = -EPERM;
     struct avc_audit_data ad;
+    u32 dperm = flask_iommu_resource_use_perm();
 
     rc = current_has_perm(d, SECCLASS_RESOURCE, RESOURCE__ADD);
     if ( rc )
@@ -1295,7 +1322,7 @@ static int flask_assign_device(struct domain *d, uint32_t machine_bdf)
         return rc;
 
     dsid = domain_sid(d);
-    return avc_has_perm(dsid, rsid, SECCLASS_RESOURCE, RESOURCE__USE, &ad);
+    return avc_has_perm(dsid, rsid, SECCLASS_RESOURCE, dperm, &ad);
 }
 
 static int flask_deassign_device(struct domain *d, uint32_t machine_bdf)
@@ -1334,6 +1361,7 @@ static int flask_assign_dtdevice(struct domain *d, const char *dtpath)
     u32 dsid, rsid;
     int rc = -EPERM;
     struct avc_audit_data ad;
+    u32 dperm = flask_iommu_resource_use_perm();
 
     rc = current_has_perm(d, SECCLASS_RESOURCE, RESOURCE__ADD);
     if ( rc )
@@ -1350,7 +1378,7 @@ static int flask_assign_dtdevice(struct domain *d, const char *dtpath)
         return rc;
 
     dsid = domain_sid(d);
-    return avc_has_perm(dsid, rsid, SECCLASS_RESOURCE, RESOURCE__USE, &ad);
+    return avc_has_perm(dsid, rsid, SECCLASS_RESOURCE, dperm, &ad);
 }
 
 static int flask_deassign_dtdevice(struct domain *d, const char *dtpath)
@@ -1476,6 +1504,7 @@ struct ioport_has_perm_data {
     u32 ssid;
     u32 dsid;
     u32 perm;
+    u32 use_perm;
 };
 
 static int _ioport_has_perm(void *v, u32 sid, unsigned long start, unsigned long end)
@@ -1493,7 +1522,7 @@ static int _ioport_has_perm(void *v, u32 sid, unsigned long start, unsigned long
     if ( rc )
         return rc;
 
-    return avc_has_perm(data->dsid, sid, SECCLASS_RESOURCE, RESOURCE__USE, &ad);
+    return avc_has_perm(data->dsid, sid, SECCLASS_RESOURCE, data->use_perm, &ad);
 }
 
 static int flask_ioport_permission(struct domain *d, uint32_t start, uint32_t end, uint8_t access)
@@ -1514,6 +1543,7 @@ static int flask_ioport_permission(struct domain *d, uint32_t start, uint32_t en
 
     data.ssid = domain_sid(current->domain);
     data.dsid = domain_sid(d);
+    data.use_perm = flask_iommu_resource_use_perm();
 
     return security_iterate_ioport_sids(start, end, _ioport_has_perm, &data);
 }

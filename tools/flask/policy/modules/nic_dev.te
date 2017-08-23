@@ -11,4 +11,4 @@
 type nic_dev_t, resource_type;
 
 admin_device(dom0_t, nic_dev_t)
-use_device(domU_t, nic_dev_t)
+use_device_noiommu(domU_t, nic_dev_t)
