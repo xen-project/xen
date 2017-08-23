@@ -54,7 +54,7 @@ static void __init parse_watchdog(char *s)
         return;
     }
 
-    switch ( parse_bool(s) )
+    switch ( parse_bool(s, NULL) )
     {
     case 0:
         opt_watchdog = false;

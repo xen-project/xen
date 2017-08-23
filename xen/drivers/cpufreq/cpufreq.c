@@ -69,7 +69,7 @@ static void __init setup_cpufreq_option(char *str)
 
     if ( arg )
         *arg++ = '\0';
-    choice = parse_bool(str);
+    choice = parse_bool(str, NULL);
 
     if ( choice < 0 && !strcmp(str, "dom0-kernel") )
     {

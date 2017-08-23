@@ -110,7 +110,7 @@ static void __init parse_smep_param(char *s)
         return;
     }
 
-    switch ( parse_bool(s) )
+    switch ( parse_bool(s, NULL) )
     {
     case 0:
         opt_smep = 0;
@@ -136,7 +136,7 @@ static void __init parse_smap_param(char *s)
         return;
     }
 
-    switch ( parse_bool(s) )
+    switch ( parse_bool(s, NULL) )
     {
     case 0:
         opt_smap = 0;
@@ -160,7 +160,7 @@ static void __init parse_acpi_param(char *s)
     safe_strcpy(acpi_param, s);
 
     /* Interpret the parameter for use within Xen. */
-    if ( !parse_bool(s) )
+    if ( !parse_bool(s, NULL) )
     {
         disable_acpi();
     }

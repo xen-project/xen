@@ -80,7 +80,7 @@ static void __init parse_vpmu_params(char *s)
 {
     char *sep, *p = s;
 
-    switch ( parse_bool(s) )
+    switch ( parse_bool(s, NULL) )
     {
     case 0:
         break;

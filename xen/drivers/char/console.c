@@ -605,7 +605,7 @@ static int printk_prefix_check(char *p, char **pp)
 
 static void __init parse_console_timestamps(char *s)
 {
-    switch ( parse_bool(s) )
+    switch ( parse_bool(s, NULL) )
     {
     case 0:
         opt_con_timestamp_mode = TSM_NONE;

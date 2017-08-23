@@ -184,7 +184,7 @@ static void __init parse_mmio_relax(const char *s)
     if ( !*s )
         opt_mmio_relax = 1;
     else
-        opt_mmio_relax = parse_bool(s);
+        opt_mmio_relax = parse_bool(s, NULL);
     if ( opt_mmio_relax < 0 && strcmp(s, "all") )
         opt_mmio_relax = 0;
 }

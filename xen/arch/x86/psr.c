@@ -427,7 +427,7 @@ static void __init parse_psr_bool(char *s, char *value, char *feature,
             opt_psr |= mask;
         else
         {
-            int val_int = parse_bool(value);
+            int val_int = parse_bool(value, NULL);
 
             if ( val_int == 0 )
                 opt_psr &= ~mask;

@@ -199,7 +199,7 @@ static void __init parse_acpi_param(char *arg)
         return;
 
     /* Interpret the parameter for use within Xen. */
-    if ( !parse_bool(arg) )
+    if ( !parse_bool(arg, NULL) )
         param_acpi_off = true;
     else if ( !strcmp(arg, "force") ) /* force ACPI to be enabled */
         param_acpi_force = true;

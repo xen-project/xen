@@ -114,7 +114,7 @@ static void __init _cmdline_parse(const char *cmdline)
                     simple_strtoll(optval, NULL, 0));
                 break;
             case OPT_BOOL:
-                if ( !parse_bool(optval) )
+                if ( !parse_bool(optval, NULL) )
                     bool_assert = !bool_assert;
                 assign_integer_param(param, bool_assert);
                 break;
@@ -163,20 +163,24 @@ void __init cmdline_parse(const char *cmdline)
 #endif
 }
 
-int __init parse_bool(const char *s)
+int __init parse_bool(const char *s, const char *e)
 {
-    if ( !strcmp("no", s) ||
-         !strcmp("off", s) ||
-         !strcmp("false", s) ||
-         !strcmp("disable", s) ||
-         !strcmp("0", s) )
+    unsigned int len;
+
+    len = e ? ({ ASSERT(e >= s); e - s; }) : strlen(s);
+
+    if ( !strncmp("no", s, len) ||
+         !strncmp("off", s, len) ||
+         !strncmp("false", s, len) ||
+         !strncmp("disable", s, len) ||
+         !strncmp("0", s, len) )
         return 0;
 
-    if ( !strcmp("yes", s) ||
-         !strcmp("on", s) ||
-         !strcmp("true", s) ||
-         !strcmp("enable", s) ||
-         !strcmp("1", s) )
+    if ( !strncmp("yes", s, len) ||
+         !strncmp("on", s, len) ||
+         !strncmp("true", s, len) ||
+         !strncmp("enable", s, len) ||
+         !strncmp("1", s, len) )
         return 1;
 
     return -1;

@@ -251,7 +251,7 @@ static void __init parse_snb_timeout(const char *s)
 {
     int t;
 
-    t = parse_bool(s);
+    t = parse_bool(s, NULL);
     if ( t < 0 )
     {
         if ( *s == '\0' )
