@@ -62,37 +62,41 @@ LIST_HEAD_READ_MOSTLY(cpufreq_governor_list);
 /* set xen as default cpufreq */
 enum cpufreq_controller cpufreq_controller = FREQCTL_xen;
 
-static void __init setup_cpufreq_option(char *str)
+static int __init cpufreq_cmdline_parse(const char *s);
+
+static int __init setup_cpufreq_option(const char *str)
 {
-    char *arg = strpbrk(str, ",:");
+    const char *arg = strpbrk(str, ",:");
     int choice;
 
-    if ( arg )
-        *arg++ = '\0';
-    choice = parse_bool(str, NULL);
+    if ( !arg )
+        arg = strchr(str, '\0');
+    choice = parse_bool(str, arg);
 
-    if ( choice < 0 && !strcmp(str, "dom0-kernel") )
+    if ( choice < 0 && !strncmp(str, "dom0-kernel", arg - str) )
     {
         xen_processor_pmbits &= ~XEN_PROCESSOR_PM_PX;
         cpufreq_controller = FREQCTL_dom0_kernel;
         opt_dom0_vcpus_pin = 1;
-        return;
+        return 0;
     }
 
-    if ( choice == 0 || !strcmp(str, "none") )
+    if ( choice == 0 || !strncmp(str, "none", arg - str) )
     {
         xen_processor_pmbits &= ~XEN_PROCESSOR_PM_PX;
         cpufreq_controller = FREQCTL_none;
-        return;
+        return 0;
     }
 
-    if ( choice > 0 || !strcmp(str, "xen") )
+    if ( choice > 0 || !strncmp(str, "xen", arg - str) )
     {
         xen_processor_pmbits |= XEN_PROCESSOR_PM_PX;
         cpufreq_controller = FREQCTL_xen;
-        if ( arg && *arg )
-            cpufreq_cmdline_parse(arg);
+        if ( *arg && *(arg + 1) )
+            return cpufreq_cmdline_parse(arg + 1);
     }
+
+    return (choice < 0) ? -EINVAL : 0;
 }
 custom_param("cpufreq", setup_cpufreq_option);
 
@@ -571,7 +575,7 @@ static int __init cpufreq_handle_common_option(const char *name, const char *val
     return 0;
 }
 
-void __init cpufreq_cmdline_parse(char *str)
+static int __init cpufreq_cmdline_parse(const char *s)
 {
     static struct cpufreq_governor *__initdata cpufreq_governors[] =
     {
@@ -581,8 +585,12 @@ void __init cpufreq_cmdline_parse(char *str)
         &cpufreq_gov_performance,
         &cpufreq_gov_powersave
     };
+    static char __initdata buf[128];
+    char *str = buf;
     unsigned int gov_index = 0;
+    int rc = 0;
 
+    strlcpy(buf, s, sizeof(buf));
     do {
         char *val, *end = strchr(str, ',');
         unsigned int i;
@@ -611,11 +619,16 @@ void __init cpufreq_cmdline_parse(char *str)
         if (str && !cpufreq_handle_common_option(str, val) &&
             (!cpufreq_governors[gov_index]->handle_option ||
              !cpufreq_governors[gov_index]->handle_option(str, val)))
+        {
             printk(XENLOG_WARNING "cpufreq/%s: option '%s' not recognized\n",
                    cpufreq_governors[gov_index]->name, str);
+            rc = -EINVAL;
+        }
 
         str = end;
     } while (str);
+
+    return rc;
 }
 
 static int cpu_callback(
