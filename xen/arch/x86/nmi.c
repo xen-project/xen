@@ -46,35 +46,44 @@ bool __initdata opt_watchdog;
 /* watchdog_force: If true, process unknown NMIs when running the watchdog. */
 bool watchdog_force;
 
-static void __init parse_watchdog(char *s)
+static int __init parse_watchdog(const char *s)
 {
     if ( !*s )
     {
         opt_watchdog = true;
-        return;
+        return 0;
     }
 
     switch ( parse_bool(s, NULL) )
     {
     case 0:
         opt_watchdog = false;
-        return;
+        return 0;
     case 1:
         opt_watchdog = true;
-        return;
+        return 0;
     }
 
     if ( !strcmp(s, "force") )
         watchdog_force = opt_watchdog = true;
+    else
+        return -EINVAL;
+
+    return 0;
 }
 custom_param("watchdog", parse_watchdog);
 
 /* opt_watchdog_timeout: Number of seconds to wait before panic. */
 static unsigned int opt_watchdog_timeout = 5;
-static void parse_watchdog_timeout(char * s)
+
+static int parse_watchdog_timeout(const char *s)
 {
-    opt_watchdog_timeout = simple_strtoull(s, NULL, 0);
+    const char *q;
+
+    opt_watchdog_timeout = simple_strtoull(s, &q, 0);
     opt_watchdog = !!opt_watchdog_timeout;
+
+    return *q ? -EINVAL : 0;
 }
 custom_param("watchdog_timeout", parse_watchdog_timeout);
 
