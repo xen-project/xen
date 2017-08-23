@@ -53,7 +53,7 @@ CHECK_pmu_params;
 static unsigned int __read_mostly opt_vpmu_enabled;
 unsigned int __read_mostly vpmu_mode = XENPMU_MODE_OFF;
 unsigned int __read_mostly vpmu_features = 0;
-static void parse_vpmu_params(char *s);
+static int parse_vpmu_params(const char *s);
 custom_param("vpmu", parse_vpmu_params);
 
 static DEFINE_SPINLOCK(vpmu_lock);
@@ -61,7 +61,7 @@ static unsigned vpmu_count;
 
 static DEFINE_PER_CPU(struct vcpu *, last_vcpu);
 
-static int parse_vpmu_param(char *s, unsigned int len)
+static int parse_vpmu_param(const char *s, unsigned int len)
 {
     if ( !*s || !len )
         return 0;
@@ -76,9 +76,9 @@ static int parse_vpmu_param(char *s, unsigned int len)
     return 0;
 }
 
-static void __init parse_vpmu_params(char *s)
+static int __init parse_vpmu_params(const char *s)
 {
-    char *sep, *p = s;
+    const char *sep, *p = s;
 
     switch ( parse_bool(s, NULL) )
     {
@@ -104,10 +104,11 @@ static void __init parse_vpmu_params(char *s)
         opt_vpmu_enabled = 1;
         break;
     }
-    return;
+    return 0;
 
  error:
     printk("VPMU: unknown flags: %s - vpmu disabled!\n", s);
+    return -EINVAL;
 }
 
 void vpmu_lvtpc_update(uint32_t val)
