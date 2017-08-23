@@ -18,7 +18,7 @@
 #include <xen/sched.h>
 #include <xen/softirq.h>
 
-static int numa_setup(char *s);
+static int numa_setup(const char *s);
 custom_param("numa", numa_setup);
 
 #ifndef Dprintk
@@ -291,14 +291,14 @@ void numa_set_node(int cpu, nodeid_t node)
 }
 
 /* [numa=off] */
-static __init int numa_setup(char *opt) 
-{ 
+static __init int numa_setup(const char *opt)
+{
     if ( !strncmp(opt,"off",3) )
         numa_off = true;
-    if ( !strncmp(opt,"on",2) )
+    else if ( !strncmp(opt,"on",2) )
         numa_off = false;
 #ifdef CONFIG_NUMA_EMU
-    if ( !strncmp(opt, "fake=", 5) )
+    else if ( !strncmp(opt, "fake=", 5) )
     {
         numa_off = false;
         numa_fake = simple_strtoul(opt+5,NULL,0);
@@ -307,14 +307,16 @@ static __init int numa_setup(char *opt)
     }
 #endif
 #ifdef CONFIG_ACPI_NUMA
-    if ( !strncmp(opt,"noacpi",6) )
+    else if ( !strncmp(opt,"noacpi",6) )
     {
         numa_off = false;
         acpi_numa = -1;
     }
 #endif
+    else
+        return -EINVAL;
 
-    return 1;
+    return 0;
 } 
 
 /*
