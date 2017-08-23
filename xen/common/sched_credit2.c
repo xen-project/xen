@@ -339,7 +339,7 @@ static const char *const opt_runqueue_str[] = {
 };
 static int __read_mostly opt_runqueue = OPT_RUNQUEUE_SOCKET;
 
-static void parse_credit2_runqueue(const char *s)
+static int parse_credit2_runqueue(const char *s)
 {
     unsigned int i;
 
@@ -348,11 +348,13 @@ static void parse_credit2_runqueue(const char *s)
         if ( !strcmp(s, opt_runqueue_str[i]) )
         {
             opt_runqueue = i;
-            return;
+            return 0;
         }
     }
 
     printk("WARNING, unrecognized value of credit2_runqueue option!\n");
+
+    return -EINVAL;
 }
 custom_param("credit2_runqueue", parse_credit2_runqueue);
 
