@@ -1581,7 +1581,7 @@ static unsigned int startup_level_ioapic_irq(struct irq_desc *desc)
     return 0; /* don't check for pending */
 }
 
-static void __init setup_ioapic_ack(char *s)
+static int __init setup_ioapic_ack(const char *s)
 {
     if ( !strcmp(s, "old") )
     {
@@ -1594,7 +1594,12 @@ static void __init setup_ioapic_ack(char *s)
         ioapic_ack_forced = true;
     }
     else
+    {
         printk("Unknown ioapic_ack value specified: '%s'\n", s);
+        return -EINVAL;
+    }
+
+    return 0;
 }
 custom_param("ioapic_ack", setup_ioapic_ack);
 
