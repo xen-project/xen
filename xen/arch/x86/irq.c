@@ -26,7 +26,7 @@
 #include <asm/mach-generic/mach_apic.h>
 #include <public/physdev.h>
 
-static void parse_irq_vector_map_param(char *s);
+static int parse_irq_vector_map_param(const char *s);
 
 /* opt_noirqbalance: If true, software IRQ balancing/affinity is disabled. */
 bool __read_mostly opt_noirqbalance;
@@ -60,24 +60,29 @@ static struct timer irq_ratelimit_timer;
 static unsigned int __read_mostly irq_ratelimit_threshold = 10000;
 integer_param("irq_ratelimit", irq_ratelimit_threshold);
 
-static void __init parse_irq_vector_map_param(char *s)
+static int __init parse_irq_vector_map_param(const char *s)
 {
-    char *ss;
+    const char *ss;
+    int rc = 0;
 
     do {
         ss = strchr(s, ',');
-        if ( ss )
-            *ss = '\0';
+        if ( !ss )
+            ss = strchr(s, '\0');
 
-        if ( !strcmp(s, "none"))
+        if ( !strncmp(s, "none", ss - s))
             opt_irq_vector_map=OPT_IRQ_VECTOR_MAP_NONE;
-        else if ( !strcmp(s, "global"))
+        else if ( !strncmp(s, "global", ss - s))
             opt_irq_vector_map=OPT_IRQ_VECTOR_MAP_GLOBAL;
-        else if ( !strcmp(s, "per-device"))
+        else if ( !strncmp(s, "per-device", ss - s))
             opt_irq_vector_map=OPT_IRQ_VECTOR_MAP_PERDEV;
+        else
+            rc = -EINVAL;
 
         s = ss + 1;
-    } while ( ss );
+    } while ( *ss );
+
+    return rc;
 }
 
 /* Must be called when irq disabled */
