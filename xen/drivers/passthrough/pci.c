@@ -149,17 +149,20 @@ static struct phantom_dev {
 } phantom_devs[8];
 static unsigned int nr_phantom_devs;
 
-static void __init parse_phantom_dev(char *str) {
-    const char *s = str;
+static int __init parse_phantom_dev(const char *str)
+{
+    const char *s;
     unsigned int seg, bus, slot;
     struct phantom_dev phantom;
 
-    if ( !s || !*s || nr_phantom_devs >= ARRAY_SIZE(phantom_devs) )
-        return;
+    if ( !*str )
+        return -EINVAL;
+    if ( nr_phantom_devs >= ARRAY_SIZE(phantom_devs) )
+        return -E2BIG;
 
-    s = parse_pci(s, &seg, &bus, &slot, NULL);
+    s = parse_pci(str, &seg, &bus, &slot, NULL);
     if ( !s || *s != ',' )
-        return;
+        return -EINVAL;
 
     phantom.seg = seg;
     phantom.bus = bus;
@@ -170,10 +173,12 @@ static void __init parse_phantom_dev(char *str) {
     case 1: case 2: case 4:
         if ( *s )
     default:
-            return;
+            return -EINVAL;
     }
 
     phantom_devs[nr_phantom_devs++] = phantom;
+
+    return 0;
 }
 custom_param("pci-phantom", parse_phantom_dev);
 
@@ -189,9 +194,10 @@ static u16 __read_mostly bridge_ctl_mask;
  *   perr                       don't suppress parity errors (default)
  *   no-perr                    suppress parity errors
  */
-static void __init parse_pci_param(char *s)
+static int __init parse_pci_param(const char *s)
 {
-    char *ss;
+    const char *ss;
+    int rc = 0;
 
     do {
         bool_t on = !!strncmp(s, "no-", 3);
@@ -201,19 +207,21 @@ static void __init parse_pci_param(char *s)
             s += 3;
 
         ss = strchr(s, ',');
-        if ( ss )
-            *ss = '\0';
+        if ( !ss )
+            ss = strchr(s, '\0');
 
-        if ( !strcmp(s, "serr") )
+        if ( !strncmp(s, "serr", ss - s) )
         {
             cmd_mask = PCI_COMMAND_SERR;
             brctl_mask = PCI_BRIDGE_CTL_SERR | PCI_BRIDGE_CTL_DTMR_SERR;
         }
-        else if ( !strcmp(s, "perr") )
+        else if ( !strncmp(s, "perr", ss - s) )
         {
             cmd_mask = PCI_COMMAND_PARITY;
             brctl_mask = PCI_BRIDGE_CTL_PARITY;
         }
+        else
+            rc = -EINVAL;
 
         if ( on )
         {
@@ -227,7 +235,9 @@ static void __init parse_pci_param(char *s)
         }
 
         s = ss + 1;
-    } while ( ss );
+    } while ( *ss );
+
+    return rc;
 }
 custom_param("pci", parse_pci_param);
 
