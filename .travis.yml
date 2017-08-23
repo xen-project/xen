@@ -70,6 +70,7 @@ addons:
             - gcc-5
             - g++-5
             - seabios
+            - ghostscript
 # we must set CXX manually instead of using 'language: cpp' due to
 # travis-ci/travis-ci#3871
 before_script:
