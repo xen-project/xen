@@ -21,7 +21,7 @@
 #include <xen/keyhandler.h>
 #include <xsm/xsm.h>
 
-static void parse_iommu_param(char *s);
+static int parse_iommu_param(const char *s);
 static void iommu_dump_p2m_table(unsigned char key);
 
 unsigned int __read_mostly iommu_dev_iotlb_timeout = 1000;
@@ -78,10 +78,10 @@ DEFINE_SPINLOCK(iommu_pt_cleanup_lock);
 PAGE_LIST_HEAD(iommu_pt_cleanup_list);
 static struct tasklet iommu_pt_cleanup_tasklet;
 
-static void __init parse_iommu_param(char *s)
+static int __init parse_iommu_param(const char *s)
 {
-    char *ss;
-    int val;
+    const char *ss;
+    int val, b, rc = 0;
 
     do {
         val = !!strncmp(s, "no-", 3);
@@ -89,44 +89,50 @@ static void __init parse_iommu_param(char *s)
             s += 3;
 
         ss = strchr(s, ',');
-        if ( ss )
-            *ss = '\0';
+        if ( !ss )
+            ss = strchr(s, '\0');
 
-        if ( !parse_bool(s, NULL) )
-            iommu_enable = 0;
-        else if ( !strcmp(s, "force") || !strcmp(s, "required") )
+        b = parse_bool(s, ss);
+        if ( b >= 0 )
+            iommu_enable = b;
+        else if ( !strncmp(s, "force", ss - s) ||
+                  !strncmp(s, "required", ss - s) )
             force_iommu = val;
-        else if ( !strcmp(s, "workaround_bios_bug") )
+        else if ( !strncmp(s, "workaround_bios_bug", ss - s) )
             iommu_workaround_bios_bug = val;
-        else if ( !strcmp(s, "igfx") )
+        else if ( !strncmp(s, "igfx", ss - s) )
             iommu_igfx = val;
-        else if ( !strcmp(s, "verbose") )
+        else if ( !strncmp(s, "verbose", ss - s) )
             iommu_verbose = val;
-        else if ( !strcmp(s, "snoop") )
+        else if ( !strncmp(s, "snoop", ss - s) )
             iommu_snoop = val;
-        else if ( !strcmp(s, "qinval") )
+        else if ( !strncmp(s, "qinval", ss - s) )
             iommu_qinval = val;
-        else if ( !strcmp(s, "intremap") )
+        else if ( !strncmp(s, "intremap", ss - s) )
             iommu_intremap = val;
-        else if ( !strcmp(s, "intpost") )
+        else if ( !strncmp(s, "intpost", ss - s) )
             iommu_intpost = val;
-        else if ( !strcmp(s, "debug") )
+        else if ( !strncmp(s, "debug", ss - s) )
         {
             iommu_debug = val;
             if ( val )
                 iommu_verbose = 1;
         }
-        else if ( !strcmp(s, "amd-iommu-perdev-intremap") )
+        else if ( !strncmp(s, "amd-iommu-perdev-intremap", ss - s) )
             amd_iommu_perdev_intremap = val;
-        else if ( !strcmp(s, "dom0-passthrough") )
+        else if ( !strncmp(s, "dom0-passthrough", ss - s) )
             iommu_passthrough = val;
-        else if ( !strcmp(s, "dom0-strict") )
+        else if ( !strncmp(s, "dom0-strict", ss - s) )
             iommu_dom0_strict = val;
-        else if ( !strcmp(s, "sharept") )
+        else if ( !strncmp(s, "sharept", ss - s) )
             iommu_hap_pt_share = val;
+        else
+            rc = -EINVAL;
 
         s = ss + 1;
-    } while ( ss );
+    } while ( *ss );
+
+    return rc;
 }
 
 int iommu_domain_init(struct domain *d)
