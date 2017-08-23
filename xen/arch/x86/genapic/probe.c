@@ -44,12 +44,17 @@ void __init generic_bigsmp_probe(void)
 		}
 }
 
-static void __init genapic_apic_force(char *str)
+static int __init genapic_apic_force(const char *str)
 {
-	int i;
+	int i, rc = -EINVAL;
+
 	for (i = 0; apic_probe[i]; i++)
-		if (!strcmp(apic_probe[i]->name, str))
+		if (!strcmp(apic_probe[i]->name, str)) {
 			genapic = apic_probe[i];
+			rc = 0;
+		}
+
+	return rc;
 }
 custom_param("apic", genapic_apic_force);
 
