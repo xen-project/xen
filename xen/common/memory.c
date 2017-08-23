@@ -55,7 +55,8 @@ static unsigned int __read_mostly hwdom_max_order = CONFIG_HWDOM_MAX_ORDER;
 #ifdef HAS_PASSTHROUGH
 static unsigned int __read_mostly ptdom_max_order = CONFIG_PTDOM_MAX_ORDER;
 #endif
-static void __init parse_max_order(const char *s)
+
+static int __init parse_max_order(const char *s)
 {
     if ( *s != ',' )
         domu_max_order = simple_strtoul(s, &s, 0);
@@ -67,6 +68,8 @@ static void __init parse_max_order(const char *s)
     if ( *s == ',' && *++s != ',' )
         ptdom_max_order = simple_strtoul(s, &s, 0);
 #endif
+
+    return *s ? -EINVAL : 0;
 }
 custom_param("memop-max-order", parse_max_order);
 
