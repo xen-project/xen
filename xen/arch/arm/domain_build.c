@@ -33,9 +33,11 @@ int dom0_11_mapping = 1;
 
 static u64 __initdata dom0_mem;
 
-static void __init parse_dom0_mem(const char *s)
+static int __init parse_dom0_mem(const char *s)
 {
     dom0_mem = parse_size_and_unit(s, &s);
+
+    return *s ? -EINVAL : 0;
 }
 custom_param("dom0_mem", parse_dom0_mem);
 
