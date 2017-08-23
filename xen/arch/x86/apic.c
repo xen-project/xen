@@ -785,23 +785,28 @@ int lapic_resume(void)
  * Original code written by Keir Fraser.
  */
 
-static void __init lapic_disable(char *str)
+static int __init lapic_disable(const char *str)
 {
     enable_local_apic = -1;
     setup_clear_cpu_cap(X86_FEATURE_APIC);
+    return 0;
 }
 custom_param("nolapic", lapic_disable);
 boolean_param("lapic", enable_local_apic);
 
-static void __init apic_set_verbosity(char *str)
+static int __init apic_set_verbosity(const char *str)
 {
     if (strcmp("debug", str) == 0)
         apic_verbosity = APIC_DEBUG;
     else if (strcmp("verbose", str) == 0)
         apic_verbosity = APIC_VERBOSE;
-    else
+    else {
         printk(KERN_WARNING "APIC Verbosity level %s not recognised"
                " use apic_verbosity=verbose or apic_verbosity=debug", str);
+        return -EINVAL;
+    }
+
+    return 0;
 }
 custom_param("apic_verbosity", apic_set_verbosity);
 
