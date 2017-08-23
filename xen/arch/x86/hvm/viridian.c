@@ -1083,7 +1083,7 @@ static int viridian_load_vcpu_ctxt(struct domain *d, hvm_domain_context_t *h)
 HVM_REGISTER_SAVE_RESTORE(VIRIDIAN_VCPU, viridian_save_vcpu_ctxt,
                           viridian_load_vcpu_ctxt, 1, HVMSR_PER_VCPU);
 
-static void __init parse_viridian_version(char *arg)
+static int __init parse_viridian_version(const char *arg)
 {
     const char *t;
     unsigned int n[3];
@@ -1093,17 +1093,24 @@ static void __init parse_viridian_version(char *arg)
     n[1] = viridian_minor;
     n[2] = viridian_build;
 
-    while ( (t = strsep(&arg, ",")) != NULL )
-    {
+    do {
         const char *e;
 
-        if ( *t == '\0' )
-            continue;
+        t = strchr(arg, ',');
+        if ( !t )
+            t = strchr(arg, '\0');
 
-        n[i++] = simple_strtoul(t, &e, 0);
-        if ( *e != '\0' )
-            goto fail;
-    }
+        if ( *arg && *arg != ',' && i < 3 )
+        {
+            n[i] = simple_strtoul(arg, &e, 0);
+            if ( e != t )
+                goto fail;
+        }
+
+        i++;
+        arg = t + 1;
+    } while ( *t );
+
     if ( i != 3 )
         goto fail;
 
@@ -1118,10 +1125,11 @@ static void __init parse_viridian_version(char *arg)
 
     printk("viridian-version = %#x,%#x,%#x\n",
            viridian_major, viridian_minor, viridian_build);
-    return;
+    return 0;
 
  fail:
     printk(XENLOG_WARNING "Invalid viridian-version, using default\n");
+    return -EINVAL;
 }
 custom_param("viridian-version", parse_viridian_version);
 
