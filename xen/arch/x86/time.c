@@ -1870,7 +1870,7 @@ int hwdom_pit_access(struct ioreq *ioreq)
  * tsc=skewed: Assume TSCs are individually reliable, but skewed across CPUs.
  * tsc=stable:socket: Assume TSCs are reliable across sockets.
  */
-static void __init tsc_parse(const char *s)
+static int __init tsc_parse(const char *s)
 {
     if ( !strcmp(s, "unstable") )
     {
@@ -1882,6 +1882,10 @@ static void __init tsc_parse(const char *s)
         setup_clear_cpu_cap(X86_FEATURE_TSC_RELIABLE);
     else if ( !strcmp(s, "stable:socket") )
         tsc_flags |= TSC_RELIABLE_SOCKET;
+    else
+        return -EINVAL;
+
+    return 0;
 }
 custom_param("tsc", tsc_parse);
 
