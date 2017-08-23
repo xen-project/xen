@@ -51,8 +51,11 @@ static int reboot_mode;
  * efi    Use the EFI reboot (if running under EFI)
  */
 static enum reboot_type reboot_type = BOOT_INVALID;
-static void __init set_reboot_type(char *str)
+
+static int __init set_reboot_type(const char *str)
 {
+    int rc = 0;
+
     for ( ; ; )
     {
         switch ( *str )
@@ -74,6 +77,9 @@ static void __init set_reboot_type(char *str)
         case 't':
             reboot_type = *str;
             break;
+        default:
+            rc = -EINVAL;
+            break;
         }
         if ( (str = strchr(str, ',')) == NULL )
             break;
@@ -81,7 +87,13 @@ static void __init set_reboot_type(char *str)
     }
 
     if ( reboot_type == BOOT_EFI && !efi_enabled(EFI_RS) )
+    {
+        printk("EFI reboot selected, but no EFI runtime services available.\n"
+               "Falling back to default reboot type.\n");
         reboot_type = BOOT_INVALID;
+    }
+
+    return rc;
 }
 custom_param("reboot", set_reboot_type);
 
