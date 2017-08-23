@@ -108,12 +108,14 @@ static enum {
 	NATIVE,
 } vwfi;
 
-static void __init parse_vwfi(const char *s)
+static int __init parse_vwfi(const char *s)
 {
 	if ( !strcmp(s, "native") )
 		vwfi = NATIVE;
 	else
 		vwfi = TRAP;
+
+	return 0;
 }
 custom_param("vwfi", parse_vwfi);
 
@@ -130,7 +132,7 @@ static enum {
     SERRORS_PANIC,
 } serrors_op;
 
-static void __init parse_serrors_behavior(const char *str)
+static int __init parse_serrors_behavior(const char *str)
 {
     if ( !strcmp(str, "forward") )
         serrors_op = SERRORS_FORWARD;
@@ -139,7 +141,7 @@ static void __init parse_serrors_behavior(const char *str)
     else
         serrors_op = SERRORS_DIVERSE;
 
-    return;
+    return 0;
 }
 custom_param("serrors", parse_serrors_behavior);
 
