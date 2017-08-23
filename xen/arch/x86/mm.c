@@ -567,15 +567,15 @@ static inline void guest_unmap_l1e(void *p)
     unmap_domain_page(p);
 }
 
-/* Read a PV guest's l1e that maps this virtual address. */
-static inline void guest_get_eff_l1e(unsigned long addr, l1_pgentry_t *eff_l1e)
+/* Read a PV guest's l1e that maps this linear address. */
+static void guest_get_eff_l1e(unsigned long linear, l1_pgentry_t *eff_l1e)
 {
     ASSERT(!paging_mode_translate(current->domain));
     ASSERT(!paging_mode_external(current->domain));
 
-    if ( unlikely(!__addr_ok(addr)) ||
+    if ( unlikely(!__addr_ok(linear)) ||
          __copy_from_user(eff_l1e,
-                          &__linear_l1_table[l1_linear_offset(addr)],
+                          &__linear_l1_table[l1_linear_offset(linear)],
                           sizeof(l1_pgentry_t)) )
         *eff_l1e = l1e_empty();
 }
@@ -584,18 +584,18 @@ static inline void guest_get_eff_l1e(unsigned long addr, l1_pgentry_t *eff_l1e)
  * Read the guest's l1e that maps this address, from the kernel-mode
  * page tables.
  */
-static inline void guest_get_eff_kern_l1e(struct vcpu *v, unsigned long addr,
-                                          void *eff_l1e)
+static void guest_get_eff_kern_l1e(unsigned long linear, l1_pgentry_t *eff_l1e)
 {
-    const bool user_mode = !(v->arch.flags & TF_kernel_mode);
+    struct vcpu *curr = current;
+    const bool user_mode = !(curr->arch.flags & TF_kernel_mode);
 
     if ( user_mode )
-        toggle_guest_mode(v);
+        toggle_guest_mode(curr);
 
-    guest_get_eff_l1e(addr, eff_l1e);
+    guest_get_eff_l1e(linear, eff_l1e);
 
     if ( user_mode )
-        toggle_guest_mode(v);
+        toggle_guest_mode(curr);
 }
 
 static inline void page_set_tlbflush_timestamp(struct page_info *page)
@@ -682,7 +682,7 @@ int map_ldt_shadow_page(unsigned int off)
 
     if ( is_pv_32bit_domain(d) )
         gva = (u32)gva;
-    guest_get_eff_kern_l1e(v, gva, &l1e);
+    guest_get_eff_kern_l1e(gva, &l1e);
     if ( unlikely(!(l1e_get_flags(l1e) & _PAGE_PRESENT)) )
         return 0;
 
