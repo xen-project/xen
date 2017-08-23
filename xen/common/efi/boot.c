@@ -1306,9 +1306,10 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
 
 static bool __initdata efi_map_uc;
 
-static void __init parse_efi_param(char *s)
+static int __init parse_efi_param(const char *s)
 {
-    char *ss;
+    const char *ss;
+    int rc = 0;
 
     do {
         bool val = strncmp(s, "no-", 3);
@@ -1317,21 +1318,25 @@ static void __init parse_efi_param(char *s)
             s += 3;
 
         ss = strchr(s, ',');
-        if ( ss )
-            *ss = '\0';
+        if ( !ss )
+            ss = strchr(s, '\0');
 
-        if ( !strcmp(s, "rs") )
+        if ( !strncmp(s, "rs", ss - s) )
         {
             if ( val )
                 __set_bit(EFI_RS, &efi_flags);
             else
                 __clear_bit(EFI_RS, &efi_flags);
         }
-        else if ( !strcmp(s, "attr=uc") )
+        else if ( !strncmp(s, "attr=uc", ss - s) )
             efi_map_uc = val;
+        else
+            rc = -EINVAL;
 
         s = ss + 1;
-    } while ( ss );
+    } while ( *ss );
+
+    return rc;
 }
 custom_param("efi", parse_efi_param);
 
