@@ -47,7 +47,8 @@ static long __init parse_amt(const char *s, const char **ps)
     long pages = parse_size_and_unit((*s == '-') ? s+1 : s, ps) >> PAGE_SHIFT;
     return (*s == '-') ? -pages : pages;
 }
-static void __init parse_dom0_mem(const char *s)
+
+static int __init parse_dom0_mem(const char *s)
 {
     do {
         if ( !strncmp(s, "min:", 4) )
@@ -57,13 +58,15 @@ static void __init parse_dom0_mem(const char *s)
         else
             dom0_nrpages = parse_amt(s, &s);
     } while ( *s++ == ',' );
+
+    return *s ? -EINVAL : 0;
 }
 custom_param("dom0_mem", parse_dom0_mem);
 
 static unsigned int __initdata opt_dom0_max_vcpus_min = 1;
 static unsigned int __initdata opt_dom0_max_vcpus_max = UINT_MAX;
 
-static void __init parse_dom0_max_vcpus(const char *s)
+static int __init parse_dom0_max_vcpus(const char *s)
 {
     if ( *s == '-' )                   /* -M */
         opt_dom0_max_vcpus_max = simple_strtoul(s + 1, &s, 0);
@@ -77,6 +80,8 @@ static void __init parse_dom0_max_vcpus(const char *s)
         else if ( *s++ == '-' && *s ) /* N-M */
             opt_dom0_max_vcpus_max = simple_strtoul(s, &s, 0);
     }
+
+    return *s ? -EINVAL : 0;
 }
 custom_param("dom0_max_vcpus", parse_dom0_max_vcpus);
 
@@ -85,7 +90,7 @@ static __initdata unsigned int dom0_pxms[MAX_NUMNODES] =
     { [0 ... MAX_NUMNODES - 1] = ~0 };
 static __initdata bool dom0_affinity_relaxed;
 
-static void __init parse_dom0_nodes(const char *s)
+static int __init parse_dom0_nodes(const char *s)
 {
     do {
         if ( isdigit(*s) )
@@ -103,6 +108,8 @@ static void __init parse_dom0_nodes(const char *s)
         else
             break;
     } while ( ++dom0_nr_pxms < ARRAY_SIZE(dom0_pxms) && *s++ == ',' );
+
+    return *s ? -EINVAL : 0;
 }
 custom_param("dom0_nodes", parse_dom0_nodes);
 
@@ -183,25 +190,30 @@ bool __initdata dom0_pvh;
  *  - pvh               Create a PVHv2 Dom0.
  *  - shadow            Use shadow paging for Dom0.
  */
-static void __init parse_dom0_param(char *s)
+static int __init parse_dom0_param(const char *s)
 {
-    char *ss;
+    const char *ss;
+    int rc = 0;
 
     do {
 
         ss = strchr(s, ',');
-        if ( ss )
-            *ss = '\0';
+        if ( !ss )
+            ss = strchr(s, '\0');
 
-        if ( !strcmp(s, "pvh") )
+        if ( !strncmp(s, "pvh", ss - s) )
             dom0_pvh = true;
 #ifdef CONFIG_SHADOW_PAGING
-        else if ( !strcmp(s, "shadow") )
+        else if ( !strncmp(s, "shadow", ss - s) )
             opt_dom0_shadow = true;
 #endif
+        else
+            rc = -EINVAL;
 
         s = ss + 1;
-    } while ( ss );
+    } while ( *ss );
+
+    return rc;
 }
 custom_param("dom0", parse_dom0_param);
 
