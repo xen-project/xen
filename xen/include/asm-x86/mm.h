@@ -331,8 +331,8 @@ int free_page_type(struct page_info *page, unsigned long type,
 
 void init_guest_l4_table(l4_pgentry_t[], const struct domain *,
                          bool_t zap_ro_mpt);
-bool_t fill_ro_mpt(unsigned long mfn);
-void zap_ro_mpt(unsigned long mfn);
+bool fill_ro_mpt(mfn_t mfn);
+void zap_ro_mpt(mfn_t mfn);
 
 bool is_iomem_page(mfn_t mfn);
 

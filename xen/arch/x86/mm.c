@@ -1630,9 +1630,9 @@ void init_guest_l4_table(l4_pgentry_t l4tab[], const struct domain *d,
         l4tab[l4_table_offset(RO_MPT_VIRT_START)] = l4e_empty();
 }
 
-bool fill_ro_mpt(unsigned long mfn)
+bool fill_ro_mpt(mfn_t mfn)
 {
-    l4_pgentry_t *l4tab = map_domain_page(_mfn(mfn));
+    l4_pgentry_t *l4tab = map_domain_page(mfn);
     bool ret = false;
 
     if ( !l4e_get_intpte(l4tab[l4_table_offset(RO_MPT_VIRT_START)]) )
@@ -1646,9 +1646,9 @@ bool fill_ro_mpt(unsigned long mfn)
     return ret;
 }
 
-void zap_ro_mpt(unsigned long mfn)
+void zap_ro_mpt(mfn_t mfn)
 {
-    l4_pgentry_t *l4tab = map_domain_page(_mfn(mfn));
+    l4_pgentry_t *l4tab = map_domain_page(mfn);
 
     l4tab[l4_table_offset(RO_MPT_VIRT_START)] = l4e_empty();
     unmap_domain_page(l4tab);
@@ -2834,7 +2834,7 @@ int new_guest_cr3(unsigned long mfn)
     invalidate_shadow_ldt(curr, 0);
 
     if ( !VM_ASSIST(d, m2p_strict) && !paging_mode_refcounts(d) )
-        fill_ro_mpt(mfn);
+        fill_ro_mpt(_mfn(mfn));
     curr->arch.guest_table = pagetable_from_pfn(mfn);
     update_cr3(curr);
 
@@ -3208,7 +3208,7 @@ long do_mmuext_op(
                 }
 
                 if ( VM_ASSIST(currd, m2p_strict) )
-                    zap_ro_mpt(op.arg1.mfn);
+                    zap_ro_mpt(_mfn(op.arg1.mfn));
             }
 
             curr->arch.guest_table_user = pagetable_from_pfn(op.arg1.mfn);

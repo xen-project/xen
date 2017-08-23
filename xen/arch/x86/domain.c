@@ -967,7 +967,7 @@ int arch_set_info_guest(
                 {
                     if ( (page->u.inuse.type_info & PGT_type_mask) ==
                          PGT_l4_page_table )
-                        done = !fill_ro_mpt(page_to_mfn(page));
+                        done = !fill_ro_mpt(_mfn(page_to_mfn(page)));
 
                     page_unlock(page);
                 }
@@ -1041,7 +1041,7 @@ int arch_set_info_guest(
         case 0:
             if ( !compat && !VM_ASSIST(d, m2p_strict) &&
                  !paging_mode_refcounts(d) )
-                fill_ro_mpt(cr3_gfn);
+                fill_ro_mpt(_mfn(cr3_gfn));
             break;
         default:
             if ( cr3_page == current->arch.old_guest_table )
@@ -1080,7 +1080,7 @@ int arch_set_info_guest(
                     break;
                 case 0:
                     if ( VM_ASSIST(d, m2p_strict) )
-                        zap_ro_mpt(cr3_gfn);
+                        zap_ro_mpt(_mfn(cr3_gfn));
                     break;
                 }
             }
