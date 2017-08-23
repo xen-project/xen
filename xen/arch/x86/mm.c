@@ -179,14 +179,20 @@ static uint32_t base_disallow_mask;
      L1_DISALLOW_MASK : (L1_DISALLOW_MASK & ~PAGE_CACHE_ATTRS))
 
 static s8 __read_mostly opt_mmio_relax;
-static void __init parse_mmio_relax(const char *s)
+
+static int __init parse_mmio_relax(const char *s)
 {
     if ( !*s )
         opt_mmio_relax = 1;
     else
         opt_mmio_relax = parse_bool(s, NULL);
     if ( opt_mmio_relax < 0 && strcmp(s, "all") )
+    {
         opt_mmio_relax = 0;
+        return -EINVAL;
+    }
+
+    return 0;
 }
 custom_param("mmio-relax", parse_mmio_relax);
 
