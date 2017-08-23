@@ -193,16 +193,20 @@ static int __init acpi_parse_fadt(struct acpi_table_header *table)
 static bool_t __initdata param_acpi_off;
 static bool_t __initdata param_acpi_force;
 
-static void __init parse_acpi_param(char *arg)
+static int __init parse_acpi_param(const char *arg)
 {
     if ( !arg )
-        return;
+        return -EINVAL;
 
     /* Interpret the parameter for use within Xen. */
     if ( !parse_bool(arg, NULL) )
         param_acpi_off = true;
     else if ( !strcmp(arg, "force") ) /* force ACPI to be enabled */
         param_acpi_force = true;
+    else
+        return -EINVAL;
+
+    return 0;
 }
 custom_param("acpi", parse_acpi_param);
 
