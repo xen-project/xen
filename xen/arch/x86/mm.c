@@ -698,8 +698,7 @@ int map_ldt_shadow_page(unsigned int off)
         return 0;
     }
 
-    nl1e = l1e_from_pfn(mfn_x(page_to_mfn(page)),
-                        l1e_get_flags(l1e) | _PAGE_RW);
+    nl1e = l1e_from_page(page, l1e_get_flags(l1e) | _PAGE_RW);
 
     spin_lock(&v->arch.pv_vcpu.shadow_ldt_lock);
     l1e_write(&gdt_ldt_ptes(d, v)[off + 16], nl1e);
@@ -1321,7 +1320,7 @@ static int put_page_from_l2e(l2_pgentry_t l2e, unsigned long pfn)
 
     if ( l2e_get_flags(l2e) & _PAGE_PSE )
     {
-        struct page_info *page = mfn_to_page(_mfn(l2e_get_pfn(l2e)));
+        struct page_info *page = l2e_get_page(l2e);
         unsigned int i;
 
         for ( i = 0; i < (1u << PAGETABLE_ORDER); i++, page++ )
@@ -1950,7 +1949,7 @@ static int mod_l1_entry(l1_pgentry_t *pl1e, l1_pgentry_t nl1e,
             page = get_page_from_gfn(pg_dom, l1e_get_pfn(nl1e), NULL, P2M_ALLOC);
             if ( !page )
                 return -EINVAL;
-            nl1e = l1e_from_pfn(mfn_x(page_to_mfn(page)), l1e_get_flags(nl1e));
+            nl1e = l1e_from_page(page, l1e_get_flags(nl1e));
         }
 
         /* Fast path for sufficiently-similar mappings. */
