@@ -632,21 +632,23 @@ static u16 __init parse_ivhd_device_extended_range(
     return dev_length;
 }
 
-static void __init parse_ivrs_ioapic(char *str)
+static int __init parse_ivrs_ioapic(const char *str)
 {
     const char *s = str;
     unsigned long id;
     unsigned int seg, bus, dev, func;
     unsigned int idx;
 
-    ASSERT(*s == '[');
+    if ( *s != '[' )
+        return -EINVAL;
+
     id = simple_strtoul(s + 1, &s, 0);
     if ( *s != ']' || *++s != '=' )
-        return;
+        return -EINVAL;
 
     s = parse_pci(s + 1, &seg, &bus, &dev, &func);
     if ( !s || *s )
-        return;
+        return -EINVAL;
 
     idx = ioapic_id_to_index(id);
     if ( idx == MAX_IO_APICS )
@@ -655,7 +657,7 @@ static void __init parse_ivrs_ioapic(char *str)
         if ( idx == MAX_IO_APICS )
         {
             printk(XENLOG_ERR "Error: %s: Too many IO APICs.\n", __func__);
-            return;
+            return -EINVAL;
         }
     }
 
@@ -663,28 +665,34 @@ static void __init parse_ivrs_ioapic(char *str)
     ioapic_sbdf[idx].seg = seg;
     ioapic_sbdf[idx].id = id;
     ioapic_sbdf[idx].cmdline = true;
+
+    return 0;
 }
 custom_param("ivrs_ioapic[", parse_ivrs_ioapic);
 
-static void __init parse_ivrs_hpet(char *str)
+static int __init parse_ivrs_hpet(const char *str)
 {
     const char *s = str;
     unsigned long id;
     unsigned int seg, bus, dev, func;
 
-    ASSERT(*s == '[');
+    if ( *s != '[' )
+        return -EINVAL;
+
     id = simple_strtoul(s + 1, &s, 0);
     if ( id != (typeof(hpet_sbdf.id))id || *s != ']' || *++s != '=' )
-        return;
+        return -EINVAL;
 
     s = parse_pci(s + 1, &seg, &bus, &dev, &func);
     if ( !s || *s )
-        return;
+        return -EINVAL;
 
     hpet_sbdf.id = id;
     hpet_sbdf.bdf = PCI_BDF(bus, dev, func);
     hpet_sbdf.seg = seg;
     hpet_sbdf.init = HPET_CMDL;
+
+    return 0;
 }
 custom_param("ivrs_hpet[", parse_ivrs_hpet);
 
