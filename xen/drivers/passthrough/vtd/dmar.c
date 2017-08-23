@@ -1090,7 +1090,7 @@ int intel_iommu_get_reserved_device_memory(iommu_grdm_t *func, void *ctxt)
  * If a segment is specified for other than the first device, and it does not
  * match the one specified for the first one, an error will be reported.
  */
-static void __init parse_rmrr_param(const char *str)
+static int __init parse_rmrr_param(const char *str)
 {
     const char *s = str, *cur, *stmp;
     unsigned int seg, bus, dev, func, dev_count;
@@ -1143,5 +1143,7 @@ static void __init parse_rmrr_param(const char *str)
             nr_rmrr++;
 
     } while ( *s++ == ';' && nr_rmrr < MAX_USER_RMRR );
+
+    return *s ? -EINVAL : 0;
 }
 custom_param("rmrr", parse_rmrr_param);
