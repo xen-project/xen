@@ -74,9 +74,10 @@ static s8 __read_mostly opt_ept_ad = -1;
  *  pml                 Enable PML
  *  ad                  Use A/D bits
  */
-static void __init parse_ept_param(char *s)
+static int __init parse_ept_param(const char *s)
 {
-    char *ss;
+    const char *ss;
+    int rc = 0;
 
     do {
         bool_t val = !!strncmp(s, "no-", 3);
@@ -85,16 +86,20 @@ static void __init parse_ept_param(char *s)
             s += 3;
 
         ss = strchr(s, ',');
-        if ( ss )
-            *ss = '\0';
+        if ( !ss )
+            ss = strchr(s, '\0');
 
-        if ( !strcmp(s, "pml") )
+        if ( !strncmp(s, "pml", ss - s) )
             opt_pml_enabled = val;
-        else if ( !strcmp(s, "ad") )
+        else if ( !strncmp(s, "ad", ss - s) )
             opt_ept_ad = val;
+        else
+            rc = -EINVAL;
 
         s = ss + 1;
-    } while ( ss );
+    } while ( *ss );
+
+    return rc;
 }
 custom_param("ept", parse_ept_param);
 
