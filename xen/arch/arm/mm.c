@@ -1081,7 +1081,7 @@ int xenmem_add_to_physmap_one(
             if ( idx < nr_status_frames(d->grant_table) )
                 mfn = virt_to_mfn(d->grant_table->status[idx]);
             else
-                return -EINVAL;
+                mfn = INVALID_MFN;
         }
         else
         {
@@ -1092,14 +1092,21 @@ int xenmem_add_to_physmap_one(
             if ( idx < nr_grant_frames(d->grant_table) )
                 mfn = virt_to_mfn(d->grant_table->shared_raw[idx]);
             else
-                return -EINVAL;
+                mfn = INVALID_MFN;
         }
         
-        d->arch.grant_table_gpfn[idx] = gpfn;
+        if ( mfn != INVALID_MFN )
+        {
+            d->arch.grant_table_gpfn[idx] = gpfn;
 
-        t = p2m_ram_rw;
+            t = p2m_ram_rw;
+        }
 
         grant_write_unlock(d->grant_table);
+
+        if ( mfn == INVALID_MFN )
+            return -EINVAL;
+
         break;
     case XENMAPSPACE_shared_info:
         if ( idx != 0 )
