@@ -245,12 +245,15 @@ static int late_hwdom_init(struct domain *d)
 
 static unsigned int __read_mostly extra_hwdom_irqs;
 static unsigned int __read_mostly extra_domU_irqs = 32;
-static void __init parse_extra_guest_irqs(const char *s)
+
+static int __init parse_extra_guest_irqs(const char *s)
 {
     if ( isdigit(*s) )
         extra_domU_irqs = simple_strtoul(s, &s, 0);
     if ( *s == ',' && isdigit(*++s) )
         extra_hwdom_irqs = simple_strtoul(s, &s, 0);
+
+    return *s ? -EINVAL : 0;
 }
 custom_param("extra_guest_irqs", parse_extra_guest_irqs);
 
