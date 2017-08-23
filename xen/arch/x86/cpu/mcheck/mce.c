@@ -62,13 +62,18 @@ struct mca_banks *mca_allbanks;
 #endif
 
 int mce_verbosity;
-static void __init mce_set_verbosity(char *str)
+static int __init mce_set_verbosity(const char *str)
 {
     if (strcmp("verbose", str) == 0)
         mce_verbosity = MCE_VERBOSE;
     else
+    {
         printk(KERN_DEBUG "Machine Check verbosity level %s not recognised"
                "use mce_verbosity=verbose", str);
+        return -EINVAL;
+    }
+
+    return 0;
 }
 custom_param("mce_verbosity", mce_set_verbosity);
 
