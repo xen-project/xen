@@ -142,7 +142,7 @@ static __init void setup_pv_physmap(struct domain *d, unsigned long pgtbl_pfn,
             clear_page(pl3e);
             *pl4e = l4e_from_page(page, L4_PROT);
         } else
-            pl3e = map_domain_page(_mfn(l4e_get_pfn(*pl4e)));
+            pl3e = map_l3t_from_l4e(*pl4e);
 
         pl3e += l3_table_offset(vphysmap_start);
         if ( !l3e_get_intpte(*pl3e) )
@@ -169,7 +169,7 @@ static __init void setup_pv_physmap(struct domain *d, unsigned long pgtbl_pfn,
             *pl3e = l3e_from_page(page, L3_PROT);
         }
         else
-            pl2e = map_domain_page(_mfn(l3e_get_pfn(*pl3e)));
+            pl2e = map_l2t_from_l3e(*pl3e);
 
         pl2e += l2_table_offset(vphysmap_start);
         if ( !l2e_get_intpte(*pl2e) )
@@ -195,7 +195,7 @@ static __init void setup_pv_physmap(struct domain *d, unsigned long pgtbl_pfn,
             *pl2e = l2e_from_page(page, L2_PROT);
         }
         else
-            pl1e = map_domain_page(_mfn(l2e_get_pfn(*pl2e)));
+            pl1e = map_l1t_from_l2e(*pl2e);
 
         pl1e += l1_table_offset(vphysmap_start);
         BUG_ON(l1e_get_intpte(*pl1e));

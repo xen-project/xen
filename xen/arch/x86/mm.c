@@ -6149,7 +6149,7 @@ int create_perdomain_mapping(struct domain *d, unsigned long va,
         l3tab[l3_table_offset(va)] = l3e_from_page(pg, __PAGE_HYPERVISOR_RW);
     }
     else
-        l2tab = map_domain_page(_mfn(l3e_get_pfn(l3tab[l3_table_offset(va)])));
+        l2tab = map_l2t_from_l3e(l3tab[l3_table_offset(va)]);
 
     unmap_domain_page(l3tab);
 
@@ -6191,7 +6191,7 @@ int create_perdomain_mapping(struct domain *d, unsigned long va,
             *pl2e = l2e_from_page(pg, __PAGE_HYPERVISOR_RW);
         }
         else if ( !l1tab )
-            l1tab = map_domain_page(_mfn(l2e_get_pfn(*pl2e)));
+            l1tab = map_l1t_from_l2e(*pl2e);
 
         if ( ppg &&
              !(l1e_get_flags(l1tab[l1_table_offset(va)]) & _PAGE_PRESENT) )
@@ -6242,7 +6242,7 @@ void destroy_perdomain_mapping(struct domain *d, unsigned long va,
 
     if ( l3e_get_flags(*pl3e) & _PAGE_PRESENT )
     {
-        const l2_pgentry_t *l2tab = map_domain_page(_mfn(l3e_get_pfn(*pl3e)));
+        const l2_pgentry_t *l2tab = map_l2t_from_l3e(*pl3e);
         const l2_pgentry_t *pl2e = l2tab + l2_table_offset(va);
         unsigned int i = l1_table_offset(va);
 
@@ -6250,7 +6250,7 @@ void destroy_perdomain_mapping(struct domain *d, unsigned long va,
         {
             if ( l2e_get_flags(*pl2e) & _PAGE_PRESENT )
             {
-                l1_pgentry_t *l1tab = map_domain_page(_mfn(l2e_get_pfn(*pl2e)));
+                l1_pgentry_t *l1tab = map_l1t_from_l2e(*pl2e);
 
                 for ( ; nr && i < L1_PAGETABLE_ENTRIES; --nr, ++i )
                 {
