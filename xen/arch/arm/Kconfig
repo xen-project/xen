@@ -48,7 +48,23 @@ config HAS_GICV3
 config HAS_ITS
         bool
         prompt "GICv3 ITS MSI controller support" if EXPERT = "y"
-        depends on HAS_GICV3
+        depends on HAS_GICV3 && !NEW_VGIC
+
+config NEW_VGIC
+	bool
+	prompt "Use new VGIC implementation"
+	select NEEDS_LIST_SORT
+	---help---
+
+	This is an alternative implementation of the ARM GIC interrupt
+	controller emulation, based on the Linux/KVM VGIC. It has a better
+	design and fixes many shortcomings of the existing GIC emulation in
+	Xen. It will eventually replace the existing/old VGIC.
+	However at the moment it lacks support for Dom0 using the ITS for
+	using MSIs.
+	Say Y if you want to help testing this new code or if you experience
+	problems with the standard emulation.
+	At the moment this implementation is not security supported.
 
 config SBSA_VUART_CONSOLE
 	bool "Emulated SBSA UART console support"

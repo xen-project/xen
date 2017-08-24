@@ -16,7 +16,6 @@ obj-y += domain_build.o
 obj-y += domctl.o
 obj-$(EARLY_PRINTK) += early_printk.o
 obj-y += gic.o
-obj-y += gic-vgic.o
 obj-y += gic-v2.o
 obj-$(CONFIG_HAS_GICV3) += gic-v3.o
 obj-$(CONFIG_HAS_ITS) += gic-v3-its.o
@@ -47,10 +46,14 @@ obj-y += sysctl.o
 obj-y += time.o
 obj-y += traps.o
 obj-y += vcpreg.o
+subdir-$(CONFIG_NEW_VGIC) += vgic
+ifneq ($(CONFIG_NEW_VGIC),y)
+obj-y += gic-vgic.o
 obj-y += vgic.o
 obj-y += vgic-v2.o
 obj-$(CONFIG_HAS_GICV3) += vgic-v3.o
 obj-$(CONFIG_HAS_ITS) += vgic-v3-its.o
+endif
 obj-y += vm_event.o
 obj-y += vtimer.o
 obj-$(CONFIG_SBSA_VUART_CONSOLE) += vpl011.o

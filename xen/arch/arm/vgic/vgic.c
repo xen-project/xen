@@ -974,6 +974,17 @@ unsigned int vgic_max_vcpus(const struct domain *d)
     return min_t(unsigned int, MAX_VIRT_CPUS, vgic_vcpu_limit);
 }
 
+#ifdef CONFIG_HAS_GICV3
+/* Dummy implementation to allow building without actual vGICv3 support. */
+void vgic_v3_setup_hw(paddr_t dbase,
+                      unsigned int nr_rdist_regions,
+                      const struct rdist_region *regions,
+                      unsigned int intid_bits)
+{
+    panic("New VGIC implementation does not yet support GICv3.");
+}
+#endif
+
 /*
  * Local variables:
  * mode: C
