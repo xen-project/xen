@@ -147,7 +147,7 @@ int xc_monitor_descriptor_access(xc_interface *xch, domid_t domain_id,
 }
 
 int xc_monitor_guest_request(xc_interface *xch, domid_t domain_id, bool enable,
-                             bool sync)
+                             bool sync, bool allow_userspace)
 {
     DECLARE_DOMCTL;
 
@@ -157,6 +157,7 @@ int xc_monitor_guest_request(xc_interface *xch, domid_t domain_id, bool enable,
                                     : XEN_DOMCTL_MONITOR_OP_DISABLE;
     domctl.u.monitor_op.event = XEN_DOMCTL_MONITOR_EVENT_GUEST_REQUEST;
     domctl.u.monitor_op.u.guest_request.sync = sync;
+    domctl.u.monitor_op.u.guest_request.allow_userspace = enable ? allow_userspace : false;
 
     return do_domctl(xch, &domctl);
 }

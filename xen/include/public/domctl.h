@@ -1124,6 +1124,7 @@ struct xen_domctl_monitor_op {
         struct {
             /* Pause vCPU until response */
             uint8_t sync;
+            uint8_t allow_userspace;
         } guest_request;
 
         struct {
