@@ -668,6 +668,50 @@ static void vlapic_tdt_pt_cb(struct vcpu *v, void *data)
     vcpu_vlapic(v)->hw.tdt_msr = 0;
 }
 
+/*
+ * This function is used when a register related to the APIC timer is updated.
+ * It expects the new value for the register TMICT to be set *before*
+ * being called.
+ * It expect the new value of LVTT to be set *after* being called, with this
+ * new values passed as parameter (only APIC_TIMER_MODE_MASK bits matter).
+ */
+static void vlapic_update_timer(struct vlapic *vlapic, uint32_t lvtt)
+{
+    uint64_t period;
+    bool is_periodic;
+
+    is_periodic = (lvtt & APIC_TIMER_MODE_MASK) == APIC_TIMER_MODE_PERIODIC;
+
+    period = (uint64_t)vlapic_get_reg(vlapic, APIC_TMICT)
+        * APIC_BUS_CYCLE_NS * vlapic->hw.timer_divisor;
+
+    if ( period )
+    {
+        TRACE_2_LONG_3D(TRC_HVM_EMUL_LAPIC_START_TIMER, TRC_PAR_LONG(period),
+                        TRC_PAR_LONG(is_periodic ? period : 0),
+                        vlapic->pt.irq);
+
+        create_periodic_time(current, &vlapic->pt, period,
+                             is_periodic ? period : 0, vlapic->pt.irq,
+                             is_periodic ? vlapic_pt_cb : NULL,
+                             &vlapic->timer_last_update);
+
+        vlapic->timer_last_update = vlapic->pt.last_plt_gtime;
+
+        HVM_DBG_LOG(DBG_LEVEL_VLAPIC,
+                    "bus cycle is %uns, "
+                    "initial count %u, period %"PRIu64"ns",
+                    APIC_BUS_CYCLE_NS,
+                    vlapic_get_reg(vlapic, APIC_TMICT),
+                    period);
+    }
+    else
+    {
+        TRACE_0D(TRC_HVM_EMUL_LAPIC_STOP_TIMER);
+        destroy_periodic_time(&vlapic->pt);
+    }
+}
+
 static void vlapic_reg_write(struct vcpu *v,
                              unsigned int offset, uint32_t val)
 {
@@ -764,37 +808,13 @@ static void vlapic_reg_write(struct vcpu *v,
         break;
 
     case APIC_TMICT:
-    {
-        uint64_t period;
-
         if ( !vlapic_lvtt_oneshot(vlapic) && !vlapic_lvtt_period(vlapic) )
             break;
 
         vlapic_set_reg(vlapic, APIC_TMICT, val);
-        if ( val == 0 )
-        {
-            TRACE_0D(TRC_HVM_EMUL_LAPIC_STOP_TIMER);
-            destroy_periodic_time(&vlapic->pt);
-            break;
-        }
 
-        period = (uint64_t)APIC_BUS_CYCLE_NS * val * vlapic->hw.timer_divisor;
-        TRACE_2_LONG_3D(TRC_HVM_EMUL_LAPIC_START_TIMER, TRC_PAR_LONG(period),
-                 TRC_PAR_LONG(vlapic_lvtt_period(vlapic) ? period : 0LL),
-                 vlapic->pt.irq);
-        create_periodic_time(current, &vlapic->pt, period, 
-                             vlapic_lvtt_period(vlapic) ? period : 0,
-                             vlapic->pt.irq,
-                             vlapic_lvtt_period(vlapic) ? vlapic_pt_cb : NULL,
-                             &vlapic->timer_last_update);
-        vlapic->timer_last_update = vlapic->pt.last_plt_gtime;
-
-        HVM_DBG_LOG(DBG_LEVEL_VLAPIC,
-                    "bus cycle is %uns, "
-                    "initial count %u, period %"PRIu64"ns",
-                    APIC_BUS_CYCLE_NS, val, period);
-    }
-    break;
+        vlapic_update_timer(vlapic, vlapic_get_reg(vlapic, APIC_LVTT));
+        break;
 
     case APIC_TDCR:
         vlapic_set_tdcr(vlapic, val & 0xb);
