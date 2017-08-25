@@ -40,13 +40,6 @@
 #include <xsm/xsm.h>
 #include <asm/flushtlb.h>
 
-/*
- * This option is deprecated, use gnttab_max_frames and
- * gnttab_max_maptrack_frames instead.
- */
-static unsigned int __initdata max_nr_grant_frames;
-integer_param("gnttab_max_nr_frames", max_nr_grant_frames);
-
 unsigned int __read_mostly max_grant_frames;
 integer_param("gnttab_max_frames", max_grant_frames);
 
@@ -3684,17 +3677,7 @@ static void gnttab_usage_print_all(unsigned char key)
 
 static int __init gnttab_usage_init(void)
 {
-    if ( max_nr_grant_frames )
-    {
-        printk(XENLOG_WARNING
-               "gnttab_max_nr_frames is deprecated, use gnttab_max_frames instead\n");
-        if ( !max_grant_frames )
-            max_grant_frames = max_nr_grant_frames;
-        BUILD_BUG_ON(DEFAULT_MAX_MAPTRACK_FRAMES < DEFAULT_MAX_NR_GRANT_FRAMES);
-        if ( !max_maptrack_frames )
-            max_maptrack_frames = max_nr_grant_frames *
-                (DEFAULT_MAX_MAPTRACK_FRAMES / DEFAULT_MAX_NR_GRANT_FRAMES);
-    }
+    BUILD_BUG_ON(DEFAULT_MAX_MAPTRACK_FRAMES < DEFAULT_MAX_NR_GRANT_FRAMES);
 
     if ( !max_grant_frames )
         max_grant_frames = DEFAULT_MAX_NR_GRANT_FRAMES;
