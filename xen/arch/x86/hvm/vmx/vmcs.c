@@ -603,7 +603,7 @@ void vmx_cpu_dead(unsigned int cpu)
     vmx_pi_desc_fixup(cpu);
 }
 
-int vmx_cpu_up(void)
+int _vmx_cpu_up(bool bsp)
 {
     u32 eax, edx;
     int rc, bios_locked, cpu = smp_processor_id();
@@ -652,7 +652,7 @@ int vmx_cpu_up(void)
 
     INIT_LIST_HEAD(&this_cpu(active_vmcs_list));
 
-    if ( (rc = vmx_cpu_up_prepare(cpu)) != 0 )
+    if ( bsp && (rc = vmx_cpu_up_prepare(cpu)) != 0 )
         return rc;
 
     switch ( __vmxon(this_cpu(vmxon_region)) )
@@ -691,6 +691,11 @@ int vmx_cpu_up(void)
     vmx_pi_per_cpu_init(cpu);
 
     return 0;
+}
+
+int vmx_cpu_up()
+{
+    return _vmx_cpu_up(false);
 }
 
 void vmx_cpu_down(void)

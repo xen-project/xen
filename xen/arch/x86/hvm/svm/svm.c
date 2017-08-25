@@ -1574,7 +1574,7 @@ static int _svm_cpu_up(bool bsp)
         return -EINVAL;
     }
 
-    if ( (rc = svm_cpu_up_prepare(cpu)) != 0 )
+    if ( bsp && (rc = svm_cpu_up_prepare(cpu)) != 0 )
         return rc;
 
     write_efer(read_efer() | EFER_SVME);

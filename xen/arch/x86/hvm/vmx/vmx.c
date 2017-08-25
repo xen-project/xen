@@ -2433,7 +2433,7 @@ const struct hvm_function_table * __init start_vmx(void)
 {
     set_in_cr4(X86_CR4_VMXE);
 
-    if ( vmx_cpu_up() )
+    if ( _vmx_cpu_up(true) )
     {
         printk("VMX: failed to initialise.\n");
         return NULL;
