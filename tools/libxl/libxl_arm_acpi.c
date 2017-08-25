@@ -37,7 +37,7 @@ typedef int64_t s64;
 #define BITS_PER_LONG 32
 #endif
 #endif
-#define ACPI_MACHINE_WIDTH __BITS_PER_LONG
+#define ACPI_MACHINE_WIDTH BITS_PER_LONG
 #define COMPILER_DEPENDENT_INT64 int64_t
 #define COMPILER_DEPENDENT_UINT64 uint64_t
 
