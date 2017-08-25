@@ -5886,7 +5886,7 @@ int modify_xen_mappings(unsigned long s, unsigned long e, unsigned int nf)
     {
         l3_pgentry_t *pl3e = virt_to_xen_l3e(v);
 
-        if ( !(l3e_get_flags(*pl3e) & _PAGE_PRESENT) )
+        if ( !pl3e || !(l3e_get_flags(*pl3e) & _PAGE_PRESENT) )
         {
             /* Confirm the caller isn't trying to create new mappings. */
             ASSERT(!(nf & _PAGE_PRESENT));
@@ -5914,6 +5914,8 @@ int modify_xen_mappings(unsigned long s, unsigned long e, unsigned int nf)
 
             /* PAGE1GB: shatter the superpage and fall through. */
             pl2e = alloc_xen_pagetable();
+            if ( !pl2e )
+                return -ENOMEM;
             for ( i = 0; i < L2_PAGETABLE_ENTRIES; i++ )
                 l2e_write(pl2e + i,
                           l2e_from_pfn(l3e_get_pfn(*pl3e) +
@@ -5934,7 +5936,11 @@ int modify_xen_mappings(unsigned long s, unsigned long e, unsigned int nf)
                 free_xen_pagetable(pl2e);
         }
 
-        pl2e = virt_to_xen_l2e(v);
+        /*
+         * The L3 entry has been verified to be present, and we've dealt with
+         * 1G pages as well, so the L2 table cannot require allocation.
+         */
+        pl2e = l3e_to_l2e(*pl3e) + l2_table_offset(v);
 
         if ( !(l2e_get_flags(*pl2e) & _PAGE_PRESENT) )
         {
@@ -5963,6 +5969,8 @@ int modify_xen_mappings(unsigned long s, unsigned long e, unsigned int nf)
             {
                 /* PSE: shatter the superpage and try again. */
                 pl1e = alloc_xen_pagetable();
+                if ( !pl1e )
+                    return -ENOMEM;
                 for ( i = 0; i < L1_PAGETABLE_ENTRIES; i++ )
                     l1e_write(&pl1e[i],
                               l1e_from_pfn(l2e_get_pfn(*pl2e) + i,
@@ -5986,7 +5994,11 @@ int modify_xen_mappings(unsigned long s, unsigned long e, unsigned int nf)
         {
             l1_pgentry_t nl1e;
 
-            /* Ordinary 4kB mapping. */
+            /*
+             * Ordinary 4kB mapping: The L2 entry has been verified to be
+             * present, and we've dealt with 2M pages as well, so the L1 table
+             * cannot require allocation.
+             */
             pl1e = l2e_to_l1e(*pl2e) + l1_table_offset(v);
 
             /* Confirm the caller isn't trying to create new mappings. */
