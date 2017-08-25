@@ -672,12 +672,13 @@ static void vlapic_tdt_pt_cb(struct vcpu *v, void *data)
 /*
  * This function is used when a register related to the APIC timer is updated.
  * It expects the new value for the register TMICT to be set *before*
- * being called.
+ * being called, and the previous value of the divisor (calculated from TDCR)
+ * to be passed as argument.
  * It expect the new value of LVTT to be set *after* being called, with this
  * new values passed as parameter (only APIC_TIMER_MODE_MASK bits matter).
  */
 static void vlapic_update_timer(struct vlapic *vlapic, uint32_t lvtt,
-                                bool tmict_updated)
+                                bool tmict_updated, uint32_t old_divisor)
 {
     uint64_t period, delta = 0;
     bool is_oneshot, is_periodic;
@@ -686,7 +687,7 @@ static void vlapic_update_timer(struct vlapic *vlapic, uint32_t lvtt,
     is_oneshot = (lvtt & APIC_TIMER_MODE_MASK) == APIC_TIMER_MODE_ONESHOT;
 
     period = (uint64_t)vlapic_get_reg(vlapic, APIC_TMICT)
-        * APIC_BUS_CYCLE_NS * vlapic->hw.timer_divisor;
+        * APIC_BUS_CYCLE_NS * old_divisor;
 
     /* Calculate the next time the timer should trigger an interrupt. */
     if ( tmict_updated )
@@ -705,6 +706,13 @@ static void vlapic_update_timer(struct vlapic *vlapic, uint32_t lvtt,
 
     if ( delta && (is_oneshot || is_periodic) )
     {
+        if ( vlapic->hw.timer_divisor != old_divisor )
+        {
+            period = (uint64_t)vlapic_get_reg(vlapic, APIC_TMICT)
+                * APIC_BUS_CYCLE_NS * vlapic->hw.timer_divisor;
+            delta = delta * vlapic->hw.timer_divisor / old_divisor;
+        }
+
         TRACE_2_LONG_3D(TRC_HVM_EMUL_LAPIC_START_TIMER, TRC_PAR_LONG(delta),
                         TRC_PAR_LONG(is_periodic ? period : 0),
                         vlapic->pt.irq);
@@ -810,7 +818,7 @@ static void vlapic_reg_write(struct vcpu *v,
         }
         vlapic->pt.irq = val & APIC_VECTOR_MASK;
 
-        vlapic_update_timer(vlapic, val, false);
+        vlapic_update_timer(vlapic, val, false, vlapic->hw.timer_divisor);
 
         /* fallthrough */
     case APIC_LVTTHMR:      /* LVT Thermal Monitor */
@@ -839,14 +847,22 @@ static void vlapic_reg_write(struct vcpu *v,
 
         vlapic_set_reg(vlapic, APIC_TMICT, val);
 
-        vlapic_update_timer(vlapic, vlapic_get_reg(vlapic, APIC_LVTT), true);
+        vlapic_update_timer(vlapic, vlapic_get_reg(vlapic, APIC_LVTT), true,
+                            vlapic->hw.timer_divisor);
         break;
 
     case APIC_TDCR:
+    {
+        uint32_t current_divisor = vlapic->hw.timer_divisor;
+
         vlapic_set_tdcr(vlapic, val & 0xb);
+
+        vlapic_update_timer(vlapic, vlapic_get_reg(vlapic, APIC_LVTT), false,
+                            current_divisor);
         HVM_DBG_LOG(DBG_LEVEL_VLAPIC_TIMER, "timer divisor is %#x",
                     vlapic->hw.timer_divisor);
         break;
+    }
     }
 }
 
