@@ -114,7 +114,7 @@ static void __init _cmdline_parse(const char *cmdline)
                     simple_strtoll(optval, NULL, 0));
                 break;
             case OPT_BOOL:
-                if ( !parse_bool(optval, NULL) )
+                if ( !parse_bool(*optval ? optval : "yes", NULL) )
                     bool_assert = !bool_assert;
                 assign_integer_param(param, bool_assert);
                 break;
@@ -168,6 +168,8 @@ int __init parse_bool(const char *s, const char *e)
     unsigned int len;
 
     len = e ? ({ ASSERT(e >= s); e - s; }) : strlen(s);
+    if ( !len )
+        return -1;
 
     if ( !strncmp("no", s, len) ||
          !strncmp("off", s, len) ||
