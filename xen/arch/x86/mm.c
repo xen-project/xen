@@ -629,9 +629,9 @@ static void invalidate_shadow_ldt(struct vcpu *v, int flush)
         goto out;
 
     v->arch.pv_vcpu.shadow_ldt_mapcnt = 0;
-    pl1e = gdt_ldt_ptes(v->domain, v);
+    pl1e = pv_ldt_ptes(v);
 
-    for ( i = 16; i < 32; i++ )
+    for ( i = 0; i < 16; i++ )
     {
         if ( !(l1e_get_flags(pl1e[i]) & _PAGE_PRESENT) )
             continue;
@@ -707,7 +707,7 @@ bool map_ldt_shadow_page(unsigned int offset)
         return false;
     }
 
-    pl1e = &gdt_ldt_ptes(d, v)[(offset >> PAGE_SHIFT) + 16];
+    pl1e = &pv_ldt_ptes(v)[offset >> PAGE_SHIFT];
     l1e_add_flags(gl1e, _PAGE_RW);
 
     spin_lock(&v->arch.pv_vcpu.shadow_ldt_lock);
@@ -4399,7 +4399,7 @@ void destroy_gdt(struct vcpu *v)
     unsigned long pfn, zero_pfn = PFN_DOWN(__pa(zero_page));
 
     v->arch.pv_vcpu.gdt_ents = 0;
-    pl1e = gdt_ldt_ptes(v->domain, v);
+    pl1e = pv_gdt_ptes(v);
     for ( i = 0; i < FIRST_RESERVED_GDT_PAGE; i++ )
     {
         pfn = l1e_get_pfn(pl1e[i]);
@@ -4444,7 +4444,7 @@ long set_gdt(struct vcpu *v,
 
     /* Install the new GDT. */
     v->arch.pv_vcpu.gdt_ents = entries;
-    pl1e = gdt_ldt_ptes(d, v);
+    pl1e = pv_gdt_ptes(v);
     for ( i = 0; i < nr_pages; i++ )
     {
         v->arch.pv_vcpu.gdt_frames[i] = frames[i];

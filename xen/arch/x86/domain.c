@@ -1591,7 +1591,7 @@ static void __context_switch(void)
     if ( need_full_gdt(nd) )
     {
         unsigned long mfn = virt_to_mfn(gdt);
-        l1_pgentry_t *pl1e = gdt_ldt_ptes(nd, n);
+        l1_pgentry_t *pl1e = pv_gdt_ptes(n);
         unsigned int i;
 
         for ( i = 0; i < NR_RESERVED_GDT_PAGES; i++ )
