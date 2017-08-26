@@ -42,6 +42,12 @@
 #include "../x86_64/mmconfig.h"
 #include "emulate.h"
 
+/* Override macros from asm/page.h to make them work with mfn_t */
+#undef mfn_to_page
+#define mfn_to_page(mfn) __mfn_to_page(mfn_x(mfn))
+#undef page_to_mfn
+#define page_to_mfn(pg) _mfn(__page_to_mfn(pg))
+
 /***********************
  * I/O emulation support
  */
@@ -709,21 +715,21 @@ static int priv_op_read_cr(unsigned int reg, unsigned long *val,
     case 3: /* Read CR3 */
     {
         const struct domain *currd = curr->domain;
-        unsigned long mfn;
+        mfn_t mfn;
 
         if ( !is_pv_32bit_domain(currd) )
         {
-            mfn = pagetable_get_pfn(curr->arch.guest_table);
-            *val = xen_pfn_to_cr3(mfn_to_gmfn(currd, mfn));
+            mfn = pagetable_get_mfn(curr->arch.guest_table);
+            *val = xen_pfn_to_cr3(mfn_to_gmfn(currd, mfn_x(mfn)));
         }
         else
         {
             l4_pgentry_t *pl4e =
-                map_domain_page(_mfn(pagetable_get_pfn(curr->arch.guest_table)));
+                map_domain_page(pagetable_get_mfn(curr->arch.guest_table));
 
-            mfn = l4e_get_pfn(*pl4e);
+            mfn = l4e_get_mfn(*pl4e);
             unmap_domain_page(pl4e);
-            *val = compat_pfn_to_cr3(mfn_to_gmfn(currd, mfn));
+            *val = compat_pfn_to_cr3(mfn_to_gmfn(currd, mfn_x(mfn)));
         }
         /* PTs should not be shared */
         BUG_ON(page_get_owner(mfn_to_page(mfn)) == dom_cow);
@@ -768,7 +774,7 @@ static int priv_op_write_cr(unsigned int reg, unsigned long val,
         page = get_page_from_gfn(currd, gfn, NULL, P2M_ALLOC);
         if ( !page )
             break;
-        rc = new_guest_cr3(page_to_mfn(page));
+        rc = new_guest_cr3(mfn_x(page_to_mfn(page)));
         put_page(page);
 
         switch ( rc )
