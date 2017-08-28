@@ -182,7 +182,8 @@ void domain_vgic_free(struct domain *d)
         }
     }
 
-    d->arch.vgic.handler->domain_free(d);
+    if ( d->arch.vgic.handler )
+        d->arch.vgic.handler->domain_free(d);
     xfree(d->arch.vgic.shared_irqs);
     xfree(d->arch.vgic.pending_irqs);
     xfree(d->arch.vgic.allocated_irqs);
