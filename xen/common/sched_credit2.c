@@ -352,8 +352,6 @@ static int parse_credit2_runqueue(const char *s)
         }
     }
 
-    printk("WARNING, unrecognized value of credit2_runqueue option!\n");
-
     return -EINVAL;
 }
 custom_param("credit2_runqueue", parse_credit2_runqueue);
