@@ -83,7 +83,10 @@ struct kernel_param {
         OPT_CUSTOM
     } type;
     unsigned int len;
-    void *var;
+    union {
+        void *var;
+        int (*func)(const char *);
+    } par;
 };
 
 extern const struct kernel_param __setup_start[], __setup_end[];
@@ -95,23 +98,38 @@ extern const struct kernel_param __setup_start[], __setup_end[];
 
 #define custom_param(_name, _var) \
     __setup_str __setup_str_##_var[] = _name; \
-    __kparam __setup_##_var = { __setup_str_##_var, OPT_CUSTOM, 0, _var }
+    __kparam __setup_##_var = \
+        { .name = __setup_str_##_var, \
+          .type = OPT_CUSTOM, \
+          .par.func = _var }
 #define boolean_param(_name, _var) \
     __setup_str __setup_str_##_var[] = _name; \
     __kparam __setup_##_var = \
-        { __setup_str_##_var, OPT_BOOL, sizeof(_var), &_var }
+        { .name = __setup_str_##_var, \
+          .type = OPT_BOOL, \
+          .len = sizeof(_var), \
+          .par.var = &_var }
 #define integer_param(_name, _var) \
     __setup_str __setup_str_##_var[] = _name; \
     __kparam __setup_##_var = \
-        { __setup_str_##_var, OPT_UINT, sizeof(_var), &_var }
+        { .name = __setup_str_##_var, \
+          .type = OPT_UINT, \
+          .len = sizeof(_var), \
+          .par.var = &_var }
 #define size_param(_name, _var) \
     __setup_str __setup_str_##_var[] = _name; \
     __kparam __setup_##_var = \
-        { __setup_str_##_var, OPT_SIZE, sizeof(_var), &_var }
+        { .name = __setup_str_##_var, \
+          .type = OPT_SIZE, \
+          .len = sizeof(_var), \
+          .par.var = &_var }
 #define string_param(_name, _var) \
     __setup_str __setup_str_##_var[] = _name; \
     __kparam __setup_##_var = \
-        { __setup_str_##_var, OPT_STR, sizeof(_var), &_var }
+        { .name = __setup_str_##_var, \
+          .type = OPT_STR, \
+          .len = sizeof(_var), \
+          .par.var = &_var }
 
 #endif /* __ASSEMBLY__ */
 
