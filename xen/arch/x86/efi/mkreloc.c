@@ -66,8 +66,9 @@ struct coff_section {
     uint16_t relocation_count;
     uint16_t line_number_count;
     uint32_t flags;
-#define COFF_SECTION_BSS         0x00000080
-#define COFF_SECTION_DISCARDABLE 0x02000000
+#define COFF_SECTION_BSS         0x00000080U
+#define COFF_SECTION_DISCARDABLE 0x02000000U
+#define COFF_SECTION_WRITEABLE   0x80000000U
 };
 
 static void usage(const char *cmd, int rc)
@@ -224,7 +225,7 @@ static void diff_sections(const unsigned char *ptr1, const unsigned char *ptr2,
         if ( i < disp || i + width - disp > sec->file_size )
         {
             fprintf(stderr,
-                    "Bogus difference at %s:%08" PRIxFAST32 "\n",
+                    "Bogus difference at %.8s:%08" PRIxFAST32 "\n",
                     sec->name, i);
             exit(3);
         }
@@ -235,7 +236,7 @@ static void diff_sections(const unsigned char *ptr1, const unsigned char *ptr2,
         if ( delta != diff )
         {
             fprintf(stderr,
-                    "Difference at %s:%08" PRIxFAST32 " is %#" PRIxFAST64
+                    "Difference at %.8s:%08" PRIxFAST32 " is %#" PRIxFAST64
                     " (expected %#" PRIxFAST64 ")\n",
                     sec->name, i, delta, diff);
             continue;
@@ -261,10 +262,15 @@ static void diff_sections(const unsigned char *ptr1, const unsigned char *ptr2,
         else if ( rva != cur_rva )
         {
             fprintf(stderr,
-                    "Cannot handle decreasing RVA (at %s:%08" PRIxFAST32 ")\n",
+                    "Cannot handle decreasing RVA (at %.8s:%08" PRIxFAST32 ")\n",
                     sec->name, i);
             exit(3);
         }
+
+        if ( !(sec->flags & COFF_SECTION_WRITEABLE) )
+            fprintf(stderr,
+                    "Warning: relocation to r/o section %.8s:%08" PRIxFAST32 "\n",
+                    sec->name, i);
 
         printf("\t.word (%u << 12) | 0x%03" PRIxFAST32 "\n",
                reloc, sec->rva + i - disp - rva);
