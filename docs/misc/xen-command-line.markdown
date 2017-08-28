@@ -391,6 +391,8 @@ makes sense on its own.
 
 > Default: `none`
 
+> Can be modified at runtime
+
 Specify which timestamp format Xen should use for each console line.
 
 * `none`: No timestamps
@@ -416,6 +418,8 @@ into the console ring buffer.
 > `= <switch char>[x]`
 
 > Default: `conswitch=a`
+
+> Can be modified at runtime
 
 Specify which character should be used to switch serial input between
 Xen and dom0.  The required sequence is CTRL-&lt;switch char&gt; three
@@ -898,6 +902,8 @@ maximum number of maptrack frames domain.
 
 > Default: `guest_loglvl=none/warning`
 
+> Can be modified at runtime
+
 Set the logging level for Xen guests.  Any log message with equal more
 more importance will be printed.
 
@@ -1163,6 +1169,8 @@ if left disabled by the BIOS.
 > `= <level>[/<rate-limited level>]` where level is `none | error | warning | info | debug | all`
 
 > Default: `loglvl=warning`
+
+> Can be modified at runtime
 
 Set the logging level for Xen.  Any log message with equal more more
 importance will be printed.
