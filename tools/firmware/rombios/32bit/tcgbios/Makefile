@@ -4,6 +4,8 @@ include $(XEN_ROOT)/tools/firmware/Rules.mk
 TARGET  = tcgbiosext.o
 
 CFLAGS += $(CFLAGS_xeninclude) -I.. -I../.. -I../../../../libacpi
+$(call cc-option-add,CFLAGS,CC,-fno-pic)
+$(call cc-option-add,CFLAGS,CC,-fno-PIE)
 
 .PHONY: all
 all: $(TARGET)
