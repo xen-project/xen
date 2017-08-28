@@ -1104,7 +1104,7 @@ static int __init parse_viridian_version(const char *arg)
         {
             n[i] = simple_strtoul(arg, &e, 0);
             if ( e != t )
-                goto fail;
+                break;
         }
 
         i++;
@@ -1112,12 +1112,12 @@ static int __init parse_viridian_version(const char *arg)
     } while ( *t );
 
     if ( i != 3 )
-        goto fail;
+        return -EINVAL;
 
     if ( ((typeof(viridian_major))n[0] != n[0]) ||
          ((typeof(viridian_minor))n[1] != n[1]) ||
          ((typeof(viridian_build))n[2] != n[2]) )
-        goto fail;
+        return -EINVAL;
 
     viridian_major = n[0];
     viridian_minor = n[1];
@@ -1126,10 +1126,6 @@ static int __init parse_viridian_version(const char *arg)
     printk("viridian-version = %#x,%#x,%#x\n",
            viridian_major, viridian_minor, viridian_build);
     return 0;
-
- fail:
-    printk(XENLOG_WARNING "Invalid viridian-version, using default\n");
-    return -EINVAL;
 }
 custom_param("viridian-version", parse_viridian_version);
 
