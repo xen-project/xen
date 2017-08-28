@@ -1594,10 +1594,7 @@ static int __init setup_ioapic_ack(const char *s)
         ioapic_ack_forced = true;
     }
     else
-    {
-        printk("Unknown ioapic_ack value specified: '%s'\n", s);
         return -EINVAL;
-    }
 
     return 0;
 }
