@@ -69,10 +69,10 @@ be read.
 DETERMINING RDTSC FREQUENCY
 
 To determine the frequency of rdtsc instructions that are emulated,
-an "xm" command can be used by a privileged user of domain0.  The
+an "xl" command can be used by a privileged user of domain0.  The
 command:
 
-# xm debug-key s; xm dmesg | tail
+# xl debug-key s; xl dmesg | tail
 
 provides information about TSC usage in each domain where TSC
 emulation is currently enabled.
