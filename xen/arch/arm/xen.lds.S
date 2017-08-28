@@ -61,6 +61,10 @@ SECTIONS
        *(.lockprofile.data)
        __lock_profile_end = .;
 #endif
+       . = ALIGN(POINTER_ALIGN);
+       __param_start = .;
+       *(.data.param)
+       __param_end = .;
   } :text
 
 #if defined(BUILD_ID)
