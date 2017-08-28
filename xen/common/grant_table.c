@@ -411,7 +411,7 @@ get_maptrack_handle(
     struct vcpu          *curr = current;
     unsigned int          i, head;
     grant_handle_t        handle;
-    struct grant_mapping *new_mt;
+    struct grant_mapping *new_mt = NULL;
 
     handle = __get_maptrack_handle(lgt, curr);
     if ( likely(handle != -1) )
@@ -420,10 +420,15 @@ get_maptrack_handle(
     spin_lock(&lgt->maptrack_lock);
 
     /*
-     * If we've run out of frames, try stealing an entry from another
-     * VCPU (in case the guest isn't mapping across its VCPUs evenly).
+     * If we've run out of handles and still have frame headroom, try
+     * allocating a new maptrack frame.  If there is no headroom, or we're
+     * out of memory, try stealing an entry from another VCPU (in case the
+     * guest isn't mapping across its VCPUs evenly).
      */
-    if ( nr_maptrack_frames(lgt) >= max_maptrack_frames )
+    if ( nr_maptrack_frames(lgt) < max_maptrack_frames )
+        new_mt = alloc_xenheap_page();
+
+    if ( !new_mt )
     {
         spin_unlock(&lgt->maptrack_lock);
 
@@ -446,12 +451,6 @@ get_maptrack_handle(
         return steal_maptrack_handle(lgt, curr);
     }
 
-    new_mt = alloc_xenheap_page();
-    if ( !new_mt )
-    {
-        spin_unlock(&lgt->maptrack_lock);
-        return -1;
-    }
     clear_page(new_mt);
 
     /*
