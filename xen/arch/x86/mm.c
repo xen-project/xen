@@ -1557,8 +1557,7 @@ static int alloc_l3_table(struct page_info *page)
                     l3e_get_mfn(pl3e[i]),
                     PGT_l2_page_table | PGT_pae_xen_l2, d, partial, 1);
         }
-        else if ( !is_guest_l3_slot(i) ||
-                  (rc = get_page_from_l3e(pl3e[i], pfn, d, partial)) > 0 )
+        else if ( (rc = get_page_from_l3e(pl3e[i], pfn, d, partial)) > 0 )
             continue;
 
         if ( rc == -ERESTART )
@@ -1590,11 +1589,7 @@ static int alloc_l3_table(struct page_info *page)
             current->arch.old_guest_table = page;
         }
         while ( i-- > 0 )
-        {
-            if ( !is_guest_l3_slot(i) )
-                continue;
             unadjust_guest_l3e(pl3e[i], d);
-        }
     }
 
     unmap_domain_page(pl3e);
@@ -1759,16 +1754,13 @@ static int free_l3_table(struct page_info *page)
     pl3e = map_domain_page(_mfn(pfn));
 
     do {
-        if ( is_guest_l3_slot(i) )
-        {
-            rc = put_page_from_l3e(pl3e[i], pfn, partial, 0);
-            if ( rc < 0 )
-                break;
-            partial = 0;
-            if ( rc > 0 )
-                continue;
-            unadjust_guest_l3e(pl3e[i], d);
-        }
+        rc = put_page_from_l3e(pl3e[i], pfn, partial, 0);
+        if ( rc < 0 )
+            break;
+        partial = 0;
+        if ( rc > 0 )
+            continue;
+        unadjust_guest_l3e(pl3e[i], d);
     } while ( i-- );
 
     unmap_domain_page(pl3e);
@@ -2071,13 +2063,6 @@ static int mod_l3_entry(l3_pgentry_t *pl3e,
     l3_pgentry_t ol3e;
     struct domain *d = vcpu->domain;
     int rc = 0;
-
-    if ( unlikely(!is_guest_l3_slot(pgentry_ptr_to_slot(pl3e))) )
-    {
-        gdprintk(XENLOG_WARNING, "L3 update in Xen-private area, slot %#lx\n",
-                 pgentry_ptr_to_slot(pl3e));
-        return -EINVAL;
-    }
 
     /*
      * Disallow updates to final L3 slot. It contains Xen mappings, and it

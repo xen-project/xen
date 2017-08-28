@@ -101,7 +101,6 @@ typedef l4_pgentry_t root_pgentry_t;
     ( !is_pv_32bit_domain(_d) ||                       \
       !((_t) & PGT_pae_xen_l2) ||                      \
       ((_s) < COMPAT_L2_PAGETABLE_FIRST_XEN_SLOT(_d)) )
-#define is_guest_l3_slot(_s) (1)
 #define is_guest_l4_slot(_d, _s)                    \
     ( is_pv_32bit_domain(_d)                        \
       ? ((_s) == 0)                                 \
