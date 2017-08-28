@@ -1051,6 +1051,13 @@ void libxl_mac_copy(libxl_ctx *ctx, libxl_mac *dst, const libxl_mac *src);
  */
 #define LIBXL_HAVE_QED 1
 
+/*
+ * LIBXL_HAVE_SET_PARAMETERS
+ *
+ * If this is defined setting hypervisor parameters is supported.
+ */
+#define LIBXL_HAVE_SET_PARAMETERS 1
+
 typedef char **libxl_string_list;
 void libxl_string_list_dispose(libxl_string_list *sl);
 int libxl_string_list_length(const libxl_string_list *sl);
@@ -2105,6 +2112,7 @@ int libxl_send_trigger(libxl_ctx *ctx, uint32_t domid,
                        libxl_trigger trigger, uint32_t vcpuid);
 int libxl_send_sysrq(libxl_ctx *ctx, uint32_t domid, char sysrq);
 int libxl_send_debug_keys(libxl_ctx *ctx, char *keys);
+int libxl_set_parameters(libxl_ctx *ctx, char *params);
 
 typedef struct libxl__xen_console_reader libxl_xen_console_reader;
 
