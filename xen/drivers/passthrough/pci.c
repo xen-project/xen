@@ -1593,35 +1593,10 @@ int iommu_do_pci_domctl(
     }
     break;
 
-    case XEN_DOMCTL_test_assign_device:
-        ret = -ENODEV;
-        if ( domctl->u.assign_device.dev != XEN_DOMCTL_DEV_PCI )
-            break;
-
-        ret = -EINVAL;
-        if ( domctl->u.assign_device.flags )
-            break;
-
-        machine_sbdf = domctl->u.assign_device.u.pci.machine_sbdf;
-
-        ret = xsm_test_assign_device(XSM_HOOK, machine_sbdf);
-        if ( ret )
-            break;
-
-        seg = machine_sbdf >> 16;
-        bus = PCI_BUS(machine_sbdf);
-        devfn = PCI_DEVFN2(machine_sbdf);
-
-        if ( device_assigned(seg, bus, devfn) )
-        {
-            printk(XENLOG_G_INFO
-                   "%04x:%02x:%02x.%u already assigned, or non-existent\n",
-                   seg, bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
-            ret = -EINVAL;
-        }
-        break;
-
     case XEN_DOMCTL_assign_device:
+        ASSERT(d);
+        /* fall through */
+    case XEN_DOMCTL_test_assign_device:
         /* Don't support self-assignment of devices. */
         if ( d == current->domain )
         {
@@ -1635,7 +1610,9 @@ int iommu_do_pci_domctl(
 
         ret = -EINVAL;
         flags = domctl->u.assign_device.flags;
-        if ( d->is_dying || (flags & ~XEN_DOMCTL_DEV_RDM_RELAXED) )
+        if ( domctl->cmd == XEN_DOMCTL_assign_device
+             ? d->is_dying || (flags & ~XEN_DOMCTL_DEV_RDM_RELAXED)
+             : flags )
             break;
 
         machine_sbdf = domctl->u.assign_device.u.pci.machine_sbdf;
@@ -1648,8 +1625,20 @@ int iommu_do_pci_domctl(
         bus = PCI_BUS(machine_sbdf);
         devfn = PCI_DEVFN2(machine_sbdf);
 
-        ret = device_assigned(seg, bus, devfn) ?:
-              assign_device(d, seg, bus, devfn, flags);
+        ret = device_assigned(seg, bus, devfn);
+        if ( domctl->cmd == XEN_DOMCTL_test_assign_device )
+        {
+            if ( ret )
+            {
+                printk(XENLOG_G_INFO
+                       "%04x:%02x:%02x.%u already assigned, or non-existent\n",
+                       seg, bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
+                ret = -EINVAL;
+            }
+            break;
+        }
+        if ( !ret )
+            ret = assign_device(d, seg, bus, devfn, flags);
         if ( ret == -ERESTART )
             ret = hypercall_create_continuation(__HYPERVISOR_domctl,
                                                 "h", u_domctl);

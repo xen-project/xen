@@ -91,13 +91,11 @@ void __init xsm_fixup_ops (struct xsm_operations *ops)
 
 #if defined(CONFIG_HAS_PASSTHROUGH) && defined(CONFIG_HAS_PCI)
     set_to_dummy_if_null(ops, get_device_group);
-    set_to_dummy_if_null(ops, test_assign_device);
     set_to_dummy_if_null(ops, assign_device);
     set_to_dummy_if_null(ops, deassign_device);
 #endif
 
 #if defined(CONFIG_HAS_PASSTHROUGH) && defined(CONFIG_HAS_DEVICE_TREE)
-    set_to_dummy_if_null(ops, test_assign_dtdevice);
     set_to_dummy_if_null(ops, assign_dtdevice);
     set_to_dummy_if_null(ops, deassign_dtdevice);
 #endif

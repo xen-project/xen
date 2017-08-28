@@ -506,7 +506,11 @@ DEFINE_XEN_GUEST_HANDLE(xen_domctl_sendtrigger_t);
 
 /* Assign a device to a guest. Sets up IOMMU structures. */
 /* XEN_DOMCTL_assign_device */
-/* XEN_DOMCTL_test_assign_device */
+/*
+ * XEN_DOMCTL_test_assign_device: Pass DOMID_INVALID to find out whether the
+ * given device is assigned to any DomU at all. Pass a specific domain ID to
+ * find out whether the given device can be assigned to that domain.
+ */
 /*
  * XEN_DOMCTL_deassign_device: The behavior of this DOMCTL differs
  * between the different type of device:

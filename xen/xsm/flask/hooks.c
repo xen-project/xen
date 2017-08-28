@@ -1307,6 +1307,9 @@ static int flask_assign_device(struct domain *d, uint32_t machine_bdf)
     struct avc_audit_data ad;
     u32 dperm = flask_iommu_resource_use_perm();
 
+    if ( !d )
+        return flask_test_assign_device(machine_bdf);
+
     rc = current_has_perm(d, SECCLASS_RESOURCE, RESOURCE__ADD);
     if ( rc )
         return rc;
@@ -1362,6 +1365,9 @@ static int flask_assign_dtdevice(struct domain *d, const char *dtpath)
     int rc = -EPERM;
     struct avc_audit_data ad;
     u32 dperm = flask_iommu_resource_use_perm();
+
+    if ( !d )
+        return flask_test_assign_dtdevice(dtpath);
 
     rc = current_has_perm(d, SECCLASS_RESOURCE, RESOURCE__ADD);
     if ( rc )
@@ -1812,13 +1818,11 @@ static struct xsm_operations flask_ops = {
 
 #if defined(CONFIG_HAS_PASSTHROUGH) && defined(CONFIG_HAS_PCI)
     .get_device_group = flask_get_device_group,
-    .test_assign_device = flask_test_assign_device,
     .assign_device = flask_assign_device,
     .deassign_device = flask_deassign_device,
 #endif
 
 #if defined(CONFIG_HAS_PASSTHROUGH) && defined(CONFIG_HAS_DEVICE_TREE)
-    .test_assign_dtdevice = flask_test_assign_dtdevice,
     .assign_dtdevice = flask_assign_dtdevice,
     .deassign_dtdevice = flask_deassign_dtdevice,
 #endif

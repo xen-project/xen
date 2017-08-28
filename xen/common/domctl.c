@@ -391,11 +391,15 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
 
     switch ( op->cmd )
     {
-    case XEN_DOMCTL_createdomain:
     case XEN_DOMCTL_test_assign_device:
+        if ( op->domain == DOMID_INVALID )
+        {
+    case XEN_DOMCTL_createdomain:
     case XEN_DOMCTL_gdbsx_guestmemio:
-        d = NULL;
-        break;
+            d = NULL;
+            break;
+        }
+        /* fall through */
     default:
         d = rcu_lock_domain_by_id(op->domain);
         if ( !d && op->cmd != XEN_DOMCTL_getdomaininfo )
