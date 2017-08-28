@@ -822,6 +822,11 @@ Pass the VNC password to vncviewer via stdin.
 Send debug I<keys> to Xen. It is the same as pressing the Xen
 "conswitch" (Ctrl-A by default) three times and then pressing "keys".
 
+=item B<set-parameters> I<params>
+
+Set hypervisor parameters as specified in I<params>. This allows for some
+boot parameters of the hypervisor to be modified in the running systems.
+
 =item B<dmesg> [I<OPTIONS>]
 
 Reads the Xen message buffer, similar to dmesg on a Linux system.  The

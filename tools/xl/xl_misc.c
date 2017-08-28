@@ -155,6 +155,26 @@ int main_debug_keys(int argc, char **argv)
     return EXIT_SUCCESS;
 }
 
+int main_set_parameters(int argc, char **argv)
+{
+    int opt;
+    char *params;
+
+    SWITCH_FOREACH_OPT(opt, "", NULL, "set-parameters", 1) {
+        /* No options */
+    }
+
+    params = argv[optind];
+
+    if (libxl_set_parameters(ctx, params)) {
+        fprintf(stderr, "cannot set parameters: %s\n", params);
+        fprintf(stderr, "Use \"xl dmesg\" to look for possible reason.\n");
+        return EXIT_FAILURE;
+    }
+
+    return EXIT_SUCCESS;
+}
+
 int main_devd(int argc, char **argv)
 {
     int ret = 0, opt = 0, daemonize = 1;
