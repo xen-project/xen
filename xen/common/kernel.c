@@ -136,7 +136,7 @@ static int parse_params(const char *cmdline, const struct kernel_param *start,
                     rctmp = -EINVAL;
                 break;
             case OPT_BOOL:
-                rctmp = *optval ? parse_bool(optval, NULL) : 0;
+                rctmp = *optval ? parse_bool(optval, NULL) : 1;
                 if ( rctmp < 0 )
                     break;
                 if ( !rctmp )
