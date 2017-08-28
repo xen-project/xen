@@ -23,8 +23,7 @@ enum system_state system_state = SYS_STATE_early_boot;
 xen_commandline_t saved_cmdline;
 static const char __initconst opt_builtin_cmdline[] = CONFIG_CMDLINE;
 
-static int __init assign_integer_param(
-    const struct kernel_param *param, uint64_t val)
+static int assign_integer_param(const struct kernel_param *param, uint64_t val)
 {
     switch ( param->len )
     {
@@ -53,12 +52,13 @@ static int __init assign_integer_param(
     return 0;
 }
 
-static void __init _cmdline_parse(const char *cmdline)
+static int parse_params(const char *cmdline, const struct kernel_param *start,
+                        const struct kernel_param *end)
 {
     char opt[128], *optval, *optkey, *q;
     const char *p = cmdline, *key;
     const struct kernel_param *param;
-    int rc;
+    int rc, final_rc = 0;
     bool bool_assert, found;
 
     for ( ; ; )
@@ -100,7 +100,7 @@ static void __init _cmdline_parse(const char *cmdline)
 
         rc = 0;
         found = false;
-        for ( param = __setup_start; param < __setup_end; param++ )
+        for ( param = start; param < end; param++ )
         {
             int rctmp;
             const char *s;
@@ -172,11 +172,24 @@ static void __init _cmdline_parse(const char *cmdline)
         }
 
         if ( rc )
+        {
             printk("parameter \"%s\" has invalid value \"%s\", rc=%d!\n",
                     key, optval, rc);
+            final_rc = rc;
+        }
         if ( !found )
+        {
             printk("parameter \"%s\" unknown!\n", key);
+            final_rc = -EINVAL;
+        }
     }
+
+    return final_rc;
+}
+
+static void __init _cmdline_parse(const char *cmdline)
+{
+    parse_params(cmdline, __setup_start, __setup_end);
 }
 
 /**
@@ -201,7 +214,7 @@ void __init cmdline_parse(const char *cmdline)
 #endif
 }
 
-int __init parse_bool(const char *s, const char *e)
+int parse_bool(const char *s, const char *e)
 {
     unsigned int len;
 
