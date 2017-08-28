@@ -1096,6 +1096,24 @@ struct xen_sysctl_livepatch_op {
 typedef struct xen_sysctl_livepatch_op xen_sysctl_livepatch_op_t;
 DEFINE_XEN_GUEST_HANDLE(xen_sysctl_livepatch_op_t);
 
+/*
+ * XEN_SYSCTL_set_parameter
+ *
+ * Change hypervisor parameters at runtime.
+ * The input string is parsed similar to the boot parameters.
+ * Parameters are a single string terminated by a NUL byte of max. size
+ * characters. Multiple settings can be specified by separating them
+ * with blanks.
+ */
+
+struct xen_sysctl_set_parameter {
+    XEN_GUEST_HANDLE_64(char) params;       /* IN: pointer to parameters. */
+    uint16_t size;                          /* IN: size of parameters. */
+    uint16_t pad[3];                        /* IN: MUST be zero. */
+};
+typedef struct xen_sysctl_set_parameter xen_sysctl_set_parameter_t;
+DEFINE_XEN_GUEST_HANDLE(xen_sysctl_set_parameter_t);
+
 struct xen_sysctl {
     uint32_t cmd;
 #define XEN_SYSCTL_readconsole                    1
@@ -1124,6 +1142,7 @@ struct xen_sysctl {
 #define XEN_SYSCTL_get_cpu_levelling_caps        25
 #define XEN_SYSCTL_get_cpu_featureset            26
 #define XEN_SYSCTL_livepatch_op                  27
+#define XEN_SYSCTL_set_parameter                 28
     uint32_t interface_version; /* XEN_SYSCTL_INTERFACE_VERSION */
     union {
         struct xen_sysctl_readconsole       readconsole;
@@ -1152,6 +1171,7 @@ struct xen_sysctl {
         struct xen_sysctl_cpu_levelling_caps cpu_levelling_caps;
         struct xen_sysctl_cpu_featureset    cpu_featureset;
         struct xen_sysctl_livepatch_op      livepatch;
+        struct xen_sysctl_set_parameter     set_parameter;
         uint8_t                             pad[128];
     } u;
 };
