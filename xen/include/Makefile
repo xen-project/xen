@@ -144,5 +144,5 @@ all: $(BASEDIR)/include/asm-x86/cpuid-autogen.h
 endif
 
 clean::
-	rm -rf compat headers*.chk
+	rm -rf compat config generated headers*.chk
 	rm -f $(BASEDIR)/include/asm-x86/cpuid-autogen.h
