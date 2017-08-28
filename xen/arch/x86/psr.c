@@ -418,50 +418,66 @@ static const struct feat_props l2_cat_props = {
     .write_msr = l2_cat_write_msr,
 };
 
-static void __init parse_psr_bool(char *s, char *value, char *feature,
+static bool __init parse_psr_bool(const char *s, const char *delim,
+                                  const char *ss, const char *feature,
                                   unsigned int mask)
 {
-    if ( !strcmp(s, feature) )
+    if ( !strncmp(s, feature, delim - s) )
     {
-        if ( !value )
+        if ( !*delim )
             opt_psr |= mask;
         else
         {
-            int val_int = parse_bool(value, NULL);
+            int val_int = parse_bool(delim + 1, ss);
 
             if ( val_int == 0 )
                 opt_psr &= ~mask;
             else if ( val_int == 1 )
                 opt_psr |= mask;
+            else
+                return false;
         }
+        return true;
     }
+    return false;
 }
 
-static void __init parse_psr_param(char *s)
+static int __init parse_psr_param(const char *s)
 {
-    char *ss, *val_str;
+    const char *ss, *val_delim;
+    const char *q;
+    int rc = 0;
 
     do {
         ss = strchr(s, ',');
-        if ( ss )
-            *ss = '\0';
+        if ( !ss )
+            ss = strchr(s, '\0');
 
-        val_str = strchr(s, ':');
-        if ( val_str )
-            *val_str++ = '\0';
+        val_delim = strchr(s, ':');
+        if ( !val_delim )
+            val_delim = strchr(s, '\0');
 
-        parse_psr_bool(s, val_str, "cmt", PSR_CMT);
-        parse_psr_bool(s, val_str, "cat", PSR_CAT);
-        parse_psr_bool(s, val_str, "cdp", PSR_CDP);
-
-        if ( val_str && !strcmp(s, "rmid_max") )
-            opt_rmid_max = simple_strtoul(val_str, NULL, 0);
-
-        if ( val_str && !strcmp(s, "cos_max") )
-            opt_cos_max = simple_strtoul(val_str, NULL, 0);
+        if ( *val_delim && !strncmp(s, "rmid_max", val_delim - s) )
+        {
+            opt_rmid_max = simple_strtoul(val_delim + 1, &q, 0);
+            if ( *q && *q != ',' )
+                rc = -EINVAL;
+        }
+        else if ( *val_delim && !strncmp(s, "cos_max", val_delim - s) )
+        {
+            opt_cos_max = simple_strtoul(val_delim + 1, &q, 0);
+            if ( *q && *q != ',' )
+                rc = -EINVAL;
+        }
+        else if ( !parse_psr_bool(s, val_delim, ss, "cmt", PSR_CMT) &&
+                  !parse_psr_bool(s, val_delim, ss, "cat", PSR_CAT) &&
+                  !parse_psr_bool(s, val_delim, ss, "cdp", PSR_CDP) )
+            rc = -EINVAL;
 
         s = ss + 1;
-    } while ( ss );
+    } while ( *ss );
+
+    return rc;
 }
 custom_param("psr", parse_psr_param);
 
