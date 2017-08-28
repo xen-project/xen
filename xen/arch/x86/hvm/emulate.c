@@ -828,7 +828,8 @@ static int hvmemul_insn_fetch(
 {
     struct hvm_emulate_ctxt *hvmemul_ctxt =
         container_of(ctxt, struct hvm_emulate_ctxt, ctxt);
-    unsigned int insn_off = offset - hvmemul_ctxt->insn_buf_eip;
+    /* Careful, as offset can wrap or truncate WRT insn_buf_eip. */
+    uint8_t insn_off = offset - hvmemul_ctxt->insn_buf_eip;
 
     /*
      * Fall back if requested bytes are not in the prefetch cache.
@@ -842,7 +843,17 @@ static int hvmemul_insn_fetch(
 
         if ( rc == X86EMUL_OKAY && bytes )
         {
-            ASSERT(insn_off + bytes <= sizeof(hvmemul_ctxt->insn_buf));
+            /*
+             * Will we overflow insn_buf[]?  This shouldn't be able to happen,
+             * which means something went wrong with instruction decoding...
+             */
+            if ( insn_off >= sizeof(hvmemul_ctxt->insn_buf) ||
+                 insn_off + bytes > sizeof(hvmemul_ctxt->insn_buf) )
+            {
+                ASSERT_UNREACHABLE();
+                return X86EMUL_UNHANDLEABLE;
+            }
+
             memcpy(&hvmemul_ctxt->insn_buf[insn_off], p_data, bytes);
             hvmemul_ctxt->insn_buf_bytes = insn_off + bytes;
         }
