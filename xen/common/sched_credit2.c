@@ -1146,6 +1146,73 @@ tickle_cpu(unsigned int cpu, struct csched2_runqueue_data *rqd)
 }
 
 /*
+ * Score to preempt the target cpu.  Return a negative number if the
+ * credit isn't high enough; if it is, favor a preemption on cpu in
+ * this order:
+ * - cpu is in new's soft-affinity, not in cur's soft-affinity
+ *   (2 x CSCHED2_CREDIT_INIT score bonus);
+ * - cpu is in new's soft-affinity and cur's soft-affinity, or
+ *   cpu is not in new's soft-affinity, nor in cur's soft-affinity
+ *   (1x CSCHED2_CREDIT_INIT score bonus);
+ * - cpu is not in new's soft-affinity, while it is in cur's soft-affinity
+ *   (no bonus).
+ *
+ * Within the same class, the highest difference of credit.
+ */
+static s_time_t tickle_score(struct csched2_runqueue_data *rqd, s_time_t now,
+                             struct csched2_vcpu *new, unsigned int cpu)
+{
+    struct csched2_vcpu * cur = csched2_vcpu(curr_on_cpu(cpu));
+    s_time_t score;
+
+    /*
+     * We are dealing with cpus that are marked non-idle (i.e., that are not
+     * in rqd->idle). However, some of them may be running their idle vcpu,
+     * if taking care of tasklets. In that case, we want to leave it alone.
+     */
+    if ( unlikely(is_idle_vcpu(cur->vcpu)) )
+        return -1;
+
+    burn_credits(rqd, cur, now);
+
+    score = new->credit - cur->credit;
+    if ( new->vcpu->processor != cpu )
+        score -= CSCHED2_MIGRATE_RESIST;
+
+    /*
+     * If score is positive, it means new has enough credits (i.e.,
+     * new->credit > cur->credit+CSCHED2_MIGRATE_RESIST).
+     *
+     * Let's compute the bonuses for soft-affinities.
+     */
+    if ( score > 0 )
+    {
+        if ( cpumask_test_cpu(cpu, new->vcpu->cpu_soft_affinity) )
+            score += CSCHED2_CREDIT_INIT;
+
+        if ( !cpumask_test_cpu(cpu, cur->vcpu->cpu_soft_affinity) )
+            score += CSCHED2_CREDIT_INIT;
+    }
+
+    if ( unlikely(tb_init_done) )
+    {
+        struct {
+            unsigned vcpu:16, dom:16;
+            int credit, score;
+        } d;
+        d.dom = cur->vcpu->domain->domain_id;
+        d.vcpu = cur->vcpu->vcpu_id;
+        d.credit = cur->credit;
+        d.score = score;
+        __trace_var(TRC_CSCHED2_TICKLE_CHECK, 1,
+                    sizeof(d),
+                    (unsigned char *)&d);
+    }
+
+    return score;
+}
+
+/*
  * Check what processor it is best to 'wake', for picking up a vcpu that has
  * just been put (back) in the runqueue. Logic is as follows:
  *  1. if there are idle processors in the runq, wake one of them;
@@ -1165,11 +1232,11 @@ static void
 runq_tickle(const struct scheduler *ops, struct csched2_vcpu *new, s_time_t now)
 {
     int i, ipid = -1;
-    s_time_t lowest = (1<<30);
-    unsigned int cpu = new->vcpu->processor;
+    s_time_t max = 0;
+    unsigned int bs, cpu = new->vcpu->processor;
     struct csched2_runqueue_data *rqd = c2rqd(ops, cpu);
+    cpumask_t *online = cpupool_domain_cpumask(new->vcpu->domain);
     cpumask_t mask;
-    struct csched2_vcpu * cur;
 
     ASSERT(new->rqd == rqd);
 
@@ -1189,109 +1256,110 @@ runq_tickle(const struct scheduler *ops, struct csched2_vcpu *new, s_time_t now)
                     (unsigned char *)&d);
     }
 
-    cpumask_and(cpumask_scratch_cpu(cpu), new->vcpu->cpu_hard_affinity,
-                cpupool_domain_cpumask(new->vcpu->domain));
-
-    /*
-     * First of all, consider idle cpus, checking if we can just
-     * re-use the pcpu where we were running before.
-     *
-     * If there are cores where all the siblings are idle, consider
-     * them first, honoring whatever the spreading-vs-consolidation
-     * SMT policy wants us to do.
-     */
-    if ( unlikely(sched_smt_power_savings) )
-        cpumask_andnot(&mask, &rqd->idle, &rqd->smt_idle);
-    else
-        cpumask_copy(&mask, &rqd->smt_idle);
-    cpumask_and(&mask, &mask, cpumask_scratch_cpu(cpu));
-    i = cpumask_test_or_cycle(cpu, &mask);
-    if ( i < nr_cpu_ids )
+    for_each_affinity_balance_step( bs )
     {
-        SCHED_STAT_CRANK(tickled_idle_cpu);
-        ipid = i;
-        goto tickle;
+        /* Just skip first step, if we don't have a soft affinity */
+        if ( bs == BALANCE_SOFT_AFFINITY &&
+             !has_soft_affinity(new->vcpu, new->vcpu->cpu_hard_affinity) )
+            continue;
+
+        affinity_balance_cpumask(new->vcpu, bs, cpumask_scratch_cpu(cpu));
+
+        /*
+         * First of all, consider idle cpus, checking if we can just
+         * re-use the pcpu where we were running before.
+         *
+         * If there are cores where all the siblings are idle, consider
+         * them first, honoring whatever the spreading-vs-consolidation
+         * SMT policy wants us to do.
+         */
+        if ( unlikely(sched_smt_power_savings) )
+        {
+            cpumask_andnot(&mask, &rqd->idle, &rqd->smt_idle);
+            cpumask_and(&mask, &mask, online);
+        }
+        else
+            cpumask_and(&mask, &rqd->smt_idle, online);
+        cpumask_and(&mask, &mask, cpumask_scratch_cpu(cpu));
+        i = cpumask_test_or_cycle(cpu, &mask);
+        if ( i < nr_cpu_ids )
+        {
+            SCHED_STAT_CRANK(tickled_idle_cpu);
+            ipid = i;
+            goto tickle;
+        }
+
+        /*
+         * If there are no fully idle cores, check all idlers, after
+         * having filtered out pcpus that have been tickled but haven't
+         * gone through the scheduler yet.
+         */
+        cpumask_andnot(&mask, &rqd->idle, &rqd->tickled);
+        cpumask_and(cpumask_scratch_cpu(cpu), cpumask_scratch_cpu(cpu), online);
+        cpumask_and(&mask, &mask, cpumask_scratch_cpu(cpu));
+        i = cpumask_test_or_cycle(cpu, &mask);
+        if ( i < nr_cpu_ids )
+        {
+            SCHED_STAT_CRANK(tickled_idle_cpu);
+            ipid = i;
+            goto tickle;
+        }
     }
 
     /*
-     * If there are no fully idle cores, check all idlers, after
-     * having filtered out pcpus that have been tickled but haven't
-     * gone through the scheduler yet.
+     * Note that, if we are here, it means we have done the hard-affinity
+     * balancing step of the loop, and hence what we have in cpumask_scratch
+     * is what we put there for last, i.e., new's vcpu_hard_affinity & online
+     * which is exactly what we need for the next part of the function.
      */
-    cpumask_andnot(&mask, &rqd->idle, &rqd->tickled);
-    cpumask_and(&mask, &mask, cpumask_scratch_cpu(cpu));
-    i = cpumask_test_or_cycle(cpu, &mask);
-    if ( i < nr_cpu_ids )
-    {
-        SCHED_STAT_CRANK(tickled_idle_cpu);
-        ipid = i;
-        goto tickle;
-    }
 
     /*
      * Otherwise, look for the non-idle (and non-tickled) processors with
      * the lowest credit, among the ones new is allowed to run on. Again,
      * the cpu were it was running on would be the best candidate.
+     *
+     * For deciding which cpu to tickle, we use tickle_score(), which will
+     * factor in both new's soft-affinity, and the soft-affinity of the
+     * vcpu running on each cpu that we consider.
      */
     cpumask_andnot(&mask, &rqd->active, &rqd->idle);
     cpumask_andnot(&mask, &mask, &rqd->tickled);
     cpumask_and(&mask, &mask, cpumask_scratch_cpu(cpu));
     if ( __cpumask_test_and_clear_cpu(cpu, &mask) )
     {
-        cur = csched2_vcpu(curr_on_cpu(cpu));
-        burn_credits(rqd, cur, now);
+        s_time_t score = tickle_score(rqd, now, new, cpu);
 
-        if ( cur->credit < new->credit )
+        if ( score > max )
         {
-            SCHED_STAT_CRANK(tickled_busy_cpu);
+            max = score;
             ipid = cpu;
-            goto tickle;
+
+            /* If this is in new's soft affinity, just take it */
+            if ( cpumask_test_cpu(cpu, new->vcpu->cpu_soft_affinity) )
+            {
+                SCHED_STAT_CRANK(tickled_busy_cpu);
+                goto tickle;
+            }
         }
     }
 
     for_each_cpu(i, &mask)
     {
+        s_time_t score;
+
         /* Already looked at this one above */
         ASSERT(i != cpu);
 
-        cur = csched2_vcpu(curr_on_cpu(i));
+        score = tickle_score(rqd, now, new, i);
 
-        /*
-         * Even if the cpu is not in rqd->idle, it may be running the
-         * idle vcpu, if it's doing tasklet work. Just skip it.
-         */
-        if ( is_idle_vcpu(cur->vcpu) )
-            continue;
-
-        /* Update credits for current to see if we want to preempt. */
-        burn_credits(rqd, cur, now);
-
-        if ( cur->credit < lowest )
+        if ( score > max )
         {
+            max = score;
             ipid = i;
-            lowest = cur->credit;
-        }
-
-        if ( unlikely(tb_init_done) )
-        {
-            struct {
-                unsigned vcpu:16, dom:16;
-                int credit;
-            } d;
-            d.dom = cur->vcpu->domain->domain_id;
-            d.vcpu = cur->vcpu->vcpu_id;
-            d.credit = cur->credit;
-            __trace_var(TRC_CSCHED2_TICKLE_CHECK, 1,
-                        sizeof(d),
-                        (unsigned char *)&d);
         }
     }
 
-    /*
-     * Only switch to another processor if the credit difference is
-     * greater than the migrate resistance.
-     */
-    if ( ipid == -1 || lowest + CSCHED2_MIGRATE_RESIST > new->credit )
+    if ( ipid == -1 )
     {
         SCHED_STAT_CRANK(tickled_no_cpu);
         return;
