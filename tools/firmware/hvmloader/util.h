@@ -276,9 +276,6 @@ extern struct e820map memory_map;
 bool check_overlap(uint64_t start, uint64_t size,
                    uint64_t reserved_start, uint64_t reserved_size);
 
-extern unsigned char dsdt_anycpu_qemu_xen[], dsdt_anycpu[], dsdt_15cpu[];
-extern int dsdt_anycpu_qemu_xen_len, dsdt_anycpu_len, dsdt_15cpu_len;
-
 struct acpi_config;
 void hvmloader_acpi_build_tables(struct acpi_config *config,
                                  unsigned int physical);

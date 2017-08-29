@@ -42,6 +42,9 @@
 #define ROMBIOS_MAXOFFSET      0x0000FFFF
 #define ROMBIOS_END            (ROMBIOS_BEGIN + ROMBIOS_SIZE)
 
+extern unsigned char dsdt_anycpu[], dsdt_15cpu[];
+extern int dsdt_anycpu_len, dsdt_15cpu_len;
+
 static void rombios_setup_e820(void)
 {
     /*
@@ -177,8 +180,6 @@ static void rombios_acpi_build_tables(void)
         .dsdt_15cpu = dsdt_15cpu,
         .dsdt_15cpu_len = dsdt_15cpu_len,
     };
-
-    hvm_param_set(HVM_PARAM_ACPI_IOPORTS_LOCATION, 0);
 
     hvmloader_acpi_build_tables(&config, ACPI_PHYSICAL_ADDRESS);
 }

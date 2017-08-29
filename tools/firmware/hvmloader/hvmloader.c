@@ -405,6 +405,8 @@ int main(void)
         }
 
         acpi_enable_sci();
+
+        hvm_param_set(HVM_PARAM_ACPI_IOPORTS_LOCATION, 1);
     }
 
     init_vm86_tss();
