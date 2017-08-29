@@ -306,6 +306,11 @@
 #define LIBXL_HAVE_BUILDINFO_HVM_ACPI_LAPTOP_SLATE 1
 
 /*
+ * LIBXL_HAVE_P9S indicates that the p9 field in IDL has been changed to p9s
+ */
+#define LIBXL_HAVE_P9S 1
+
+/*
  * libxl ABI compatibility
  *
  * The only guarantee which libxl makes regarding ABI compatibility

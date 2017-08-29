@@ -1401,9 +1401,9 @@ void parse_config_data(const char *config_source,
         char *p, *p2, *buf2;
 
         d_config->num_p9s = 0;
-        d_config->p9 = NULL;
+        d_config->p9s = NULL;
         while ((buf = xlu_cfg_get_listitem (p9devs, d_config->num_p9s)) != NULL) {
-            p9 = ARRAY_EXTEND_INIT(d_config->p9,
+            p9 = ARRAY_EXTEND_INIT(d_config->p9s,
                                    d_config->num_p9s,
                                    libxl_device_p9_init);
             libxl_device_p9_init(p9);
