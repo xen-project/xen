@@ -905,11 +905,6 @@ void hvmloader_acpi_build_tables(struct acpi_config *config,
         config->dsdt_anycpu_len = dsdt_anycpu_len;
         config->dsdt_15cpu = dsdt_15cpu;
         config->dsdt_15cpu_len = dsdt_15cpu_len;
-        config->pm1a_evt = ACPI_PM1A_EVT_BLK_ADDRESS_V0;
-        config->pm1a_cnt = ACPI_PM1A_CNT_BLK_ADDRESS_V0;
-        config->pm_tmr = ACPI_PM_TMR_BLK_ADDRESS_V0;
-        config->gpe0 = ACPI_GPE0_BLK_ADDRESS_V0;
-        config->gpe0_len = ACPI_GPE0_BLK_LEN_V0;
 
         hvm_param_set(HVM_PARAM_ACPI_IOPORTS_LOCATION, 0);
     }
@@ -919,11 +914,6 @@ void hvmloader_acpi_build_tables(struct acpi_config *config,
         config->dsdt_anycpu_len = dsdt_anycpu_qemu_xen_len;
         config->dsdt_15cpu = NULL;
         config->dsdt_15cpu_len = 0;
-        config->pm1a_evt = ACPI_PM1A_EVT_BLK_ADDRESS_V1;
-        config->pm1a_cnt = ACPI_PM1A_CNT_BLK_ADDRESS_V1;
-        config->pm_tmr = ACPI_PM_TMR_BLK_ADDRESS_V1;
-        config->gpe0 = ACPI_GPE0_BLK_ADDRESS_V1;
-        config->gpe0_len = ACPI_GPE0_BLK_LEN_V1;
 
         hvm_param_set(HVM_PARAM_ACPI_IOPORTS_LOCATION, 1);
     }

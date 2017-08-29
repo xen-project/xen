@@ -96,13 +96,6 @@ struct acpi_config {
     uint32_t ioapic_base_address;
     uint16_t pci_isa_irq_mask;
     uint8_t ioapic_id;
-
-    /* Location of the control/event registers */
-    uint32_t pm1a_evt;
-    uint32_t pm1a_cnt;
-    uint32_t pm_tmr;
-    uint32_t gpe0;
-    uint8_t gpe0_len;
 };
 
 int acpi_build_tables(struct acpi_ctxt *ctxt, struct acpi_config *config);

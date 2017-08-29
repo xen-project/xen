@@ -31,7 +31,6 @@
 
 #include <libacpi.h>
 #include <xen/hvm/params.h>
-#include <xen/hvm/ioreq.h>
 
 #define ROM_INCLUDE_ROMBIOS
 #define ROM_INCLUDE_VGABIOS
@@ -177,11 +176,6 @@ static void rombios_acpi_build_tables(void)
         .dsdt_anycpu_len = dsdt_anycpu_len,
         .dsdt_15cpu = dsdt_15cpu,
         .dsdt_15cpu_len = dsdt_15cpu_len,
-        .pm1a_evt = ACPI_PM1A_EVT_BLK_ADDRESS_V0,
-        .pm1a_cnt = ACPI_PM1A_CNT_BLK_ADDRESS_V0,
-        .pm_tmr = ACPI_PM_TMR_BLK_ADDRESS_V0,
-        .gpe0 = ACPI_GPE0_BLK_ADDRESS_V0,
-        .gpe0_len = ACPI_GPE0_BLK_LEN_V0,
     };
 
     hvm_param_set(HVM_PARAM_ACPI_IOPORTS_LOCATION, 0);

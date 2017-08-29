@@ -537,15 +537,6 @@ int acpi_build_tables(struct acpi_ctxt *ctxt, struct acpi_config *config)
     }
 
     /*
-     * Set location of the control/event registers.
-     */
-    Fadt.pm1a_evt_blk = config->pm1a_evt;
-    Fadt.pm1a_cnt_blk = config->pm1a_cnt;
-    Fadt.pm_tmr_blk = config->pm_tmr;
-    Fadt.gpe0_blk = config->gpe0;
-    Fadt.gpe0_blk_len = config->gpe0_len;
-
-    /*
      * Fill in high-memory data structures, starting at @buf.
      */
 

@@ -121,12 +121,7 @@ static void ovmf_acpi_build_tables(void)
         .dsdt_anycpu = dsdt_anycpu_qemu_xen,
         .dsdt_anycpu_len = dsdt_anycpu_qemu_xen_len,
         .dsdt_15cpu = NULL, 
-        .dsdt_15cpu_len = 0,
-        .pm1a_evt = ACPI_PM1A_EVT_BLK_ADDRESS_V1,
-        .pm1a_cnt = ACPI_PM1A_CNT_BLK_ADDRESS_V1,
-        .pm_tmr = ACPI_PM_TMR_BLK_ADDRESS_V1,
-        .gpe0 = ACPI_GPE0_BLK_ADDRESS_V1,
-        .gpe0_len = ACPI_GPE0_BLK_LEN_V1,
+        .dsdt_15cpu_len = 0
     };
 
     hvm_param_set(HVM_PARAM_ACPI_IOPORTS_LOCATION, 1);
