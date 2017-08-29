@@ -588,7 +588,8 @@ int __init dom0_construct_pv(struct domain *d,
         l3start = __va(mpt_alloc); mpt_alloc += PAGE_SIZE;
     }
     clear_page(l4tab);
-    init_guest_l4_table(l4tab, d, 0);
+    init_xen_l4_slots(l4tab, _mfn(virt_to_mfn(l4start)),
+                      d, INVALID_MFN, true);
     v->arch.guest_table = pagetable_from_paddr(__pa(l4start));
     if ( is_pv_32bit_domain(d) )
         v->arch.guest_table_user = v->arch.guest_table;

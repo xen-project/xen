@@ -1521,37 +1521,85 @@ void init_xen_pae_l2_slots(l2_pgentry_t *l2t, const struct domain *d)
 }
 
 /*
+ * Fill an L4 with Xen entries.
+ *
  * This function must write all ROOT_PAGETABLE_PV_XEN_SLOTS, to clobber any
  * values a guest may have left there from alloc_l4_table().
+ *
+ * l4t and l4mfn are mandatory, but l4mfn doesn't need to be the mfn under
+ * *l4t.  All other parameters are optional and will either fill or zero the
+ * appropriate slots.  Pagetables not shared with guests will gain the
+ * extended directmap.
  */
-void init_guest_l4_table(l4_pgentry_t l4tab[], const struct domain *d,
-                         bool zap_ro_mpt)
+void init_xen_l4_slots(l4_pgentry_t *l4t, mfn_t l4mfn,
+                       const struct domain *d, mfn_t sl4mfn, bool ro_mpt)
 {
-    /* Xen private mappings. */
-    memcpy(&l4tab[ROOT_PAGETABLE_FIRST_XEN_SLOT],
-           &idle_pg_table[ROOT_PAGETABLE_FIRST_XEN_SLOT],
-           root_pgt_pv_xen_slots * sizeof(l4_pgentry_t));
+    /*
+     * PV vcpus need a shortened directmap.  HVM and Idle vcpus get the full
+     * directmap.
+     */
+    bool short_directmap = d && !paging_mode_external(d);
+
+    /* Slot 256: RO M2P (if applicable). */
+    l4t[l4_table_offset(RO_MPT_VIRT_START)] =
+        ro_mpt ? idle_pg_table[l4_table_offset(RO_MPT_VIRT_START)]
+               : l4e_empty();
+
+    /* Slot 257: PCI MMCFG. */
+    l4t[l4_table_offset(PCI_MCFG_VIRT_START)] =
+        idle_pg_table[l4_table_offset(PCI_MCFG_VIRT_START)];
+
+    /* Slot 258: Self linear mappings. */
+    ASSERT(!mfn_eq(l4mfn, INVALID_MFN));
+    l4t[l4_table_offset(LINEAR_PT_VIRT_START)] =
+        l4e_from_mfn(l4mfn, __PAGE_HYPERVISOR_RW);
+
+    /* Slot 259: Shadow linear mappings (if applicable) .*/
+    l4t[l4_table_offset(SH_LINEAR_PT_VIRT_START)] =
+        mfn_eq(sl4mfn, INVALID_MFN) ? l4e_empty() :
+        l4e_from_mfn(sl4mfn, __PAGE_HYPERVISOR_RW);
+
+    /* Slot 260: Per-domain mappings (if applicable). */
+    l4t[l4_table_offset(PERDOMAIN_VIRT_START)] =
+        d ? l4e_from_page(d->arch.perdomain_l3_pg, __PAGE_HYPERVISOR_RW)
+          : l4e_empty();
+
+    /* Slot 261-: text/data/bss, RW M2P, vmap, frametable, directmap. */
 #ifndef NDEBUG
-    if ( unlikely(root_pgt_pv_xen_slots < ROOT_PAGETABLE_PV_XEN_SLOTS) )
+    if ( short_directmap &&
+         unlikely(root_pgt_pv_xen_slots < ROOT_PAGETABLE_PV_XEN_SLOTS) )
     {
-        l4_pgentry_t *next = &l4tab[ROOT_PAGETABLE_FIRST_XEN_SLOT +
-                                    root_pgt_pv_xen_slots];
+        /*
+         * If using highmem-start=, artificially shorten the directmap to
+         * simulate very large machines.
+         */
+        l4_pgentry_t *next;
+
+        memcpy(&l4t[l4_table_offset(XEN_VIRT_START)],
+               &idle_pg_table[l4_table_offset(XEN_VIRT_START)],
+               (ROOT_PAGETABLE_FIRST_XEN_SLOT + root_pgt_pv_xen_slots -
+                l4_table_offset(XEN_VIRT_START)) * sizeof(*l4t));
+
+        next = &l4t[ROOT_PAGETABLE_FIRST_XEN_SLOT + root_pgt_pv_xen_slots];
 
         if ( l4e_get_intpte(split_l4e) )
             *next++ = split_l4e;
 
         memset(next, 0,
-               _p(&l4tab[ROOT_PAGETABLE_LAST_XEN_SLOT + 1]) - _p(next));
+               _p(&l4t[ROOT_PAGETABLE_LAST_XEN_SLOT + 1]) - _p(next));
     }
-#else
-    BUILD_BUG_ON(root_pgt_pv_xen_slots != ROOT_PAGETABLE_PV_XEN_SLOTS);
+    else
 #endif
-    l4tab[l4_table_offset(LINEAR_PT_VIRT_START)] =
-        l4e_from_pfn(domain_page_map_to_mfn(l4tab), __PAGE_HYPERVISOR_RW);
-    l4tab[l4_table_offset(PERDOMAIN_VIRT_START)] =
-        l4e_from_page(d->arch.perdomain_l3_pg, __PAGE_HYPERVISOR_RW);
-    if ( zap_ro_mpt || is_pv_32bit_domain(d) )
-        l4tab[l4_table_offset(RO_MPT_VIRT_START)] = l4e_empty();
+    {
+        unsigned int slots = (short_directmap
+                              ? ROOT_PAGETABLE_PV_XEN_SLOTS
+                              : ROOT_PAGETABLE_XEN_SLOTS);
+
+        memcpy(&l4t[l4_table_offset(XEN_VIRT_START)],
+               &idle_pg_table[l4_table_offset(XEN_VIRT_START)],
+               (ROOT_PAGETABLE_FIRST_XEN_SLOT + slots -
+                l4_table_offset(XEN_VIRT_START)) * sizeof(*l4t));
+    }
 }
 
 bool fill_ro_mpt(mfn_t mfn)
@@ -1629,7 +1677,8 @@ static int alloc_l4_table(struct page_info *page)
 
     if ( rc >= 0 )
     {
-        init_guest_l4_table(pl4e, d, !VM_ASSIST(d, m2p_strict));
+        init_xen_l4_slots(pl4e, _mfn(pfn),
+                          d, INVALID_MFN, VM_ASSIST(d, m2p_strict));
         atomic_inc(&d->arch.pv_domain.nr_l4_pages);
         rc = 0;
     }

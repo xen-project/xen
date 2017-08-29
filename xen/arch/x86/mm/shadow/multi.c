@@ -1448,80 +1448,6 @@ do {                                                                    \
 #endif
 
 
-
-/**************************************************************************/
-/* Functions to install Xen mappings and linear mappings in shadow pages */
-
-// XXX -- this function should probably be moved to shadow-common.c, but that
-//        probably wants to wait until the shadow types have been moved from
-//        shadow-types.h to shadow-private.h
-//
-#if GUEST_PAGING_LEVELS == 4
-void sh_install_xen_entries_in_l4(struct domain *d, mfn_t gl4mfn, mfn_t sl4mfn)
-{
-    shadow_l4e_t *sl4e;
-    unsigned int slots;
-
-    sl4e = map_domain_page(sl4mfn);
-    BUILD_BUG_ON(sizeof (l4_pgentry_t) != sizeof (shadow_l4e_t));
-
-    /* Copy the common Xen mappings from the idle domain */
-    slots = (shadow_mode_external(d)
-             ? ROOT_PAGETABLE_XEN_SLOTS
-             : ROOT_PAGETABLE_PV_XEN_SLOTS);
-    memcpy(&sl4e[ROOT_PAGETABLE_FIRST_XEN_SLOT],
-           &idle_pg_table[ROOT_PAGETABLE_FIRST_XEN_SLOT],
-           slots * sizeof(l4_pgentry_t));
-
-    /* Install the per-domain mappings for this domain */
-    sl4e[shadow_l4_table_offset(PERDOMAIN_VIRT_START)] =
-        shadow_l4e_from_mfn(page_to_mfn(d->arch.perdomain_l3_pg),
-                            __PAGE_HYPERVISOR_RW);
-
-    if ( !shadow_mode_external(d) && !is_pv_32bit_domain(d) &&
-         !VM_ASSIST(d, m2p_strict) )
-    {
-        /* open coded zap_ro_mpt(mfn_x(sl4mfn)): */
-        sl4e[shadow_l4_table_offset(RO_MPT_VIRT_START)] = shadow_l4e_empty();
-    }
-
-    /*
-     * Linear mapping slots:
-     *
-     * Calling this function with gl4mfn == sl4mfn is used to construct a
-     * monitor table for translated domains.  In this case, gl4mfn forms the
-     * self-linear mapping (i.e. not pointing into the translated domain), and
-     * the shadow-linear slot is skipped.  The shadow-linear slot is either
-     * filled when constructing lower level monitor tables, or via
-     * sh_update_cr3() for 4-level guests.
-     *
-     * Calling this function with gl4mfn != sl4mfn is used for non-translated
-     * guests, where the shadow-linear slot is actually self-linear, and the
-     * guest-linear slot points into the guests view of its pagetables.
-     */
-    if ( shadow_mode_translate(d) )
-    {
-        ASSERT(mfn_eq(gl4mfn, sl4mfn));
-
-        sl4e[shadow_l4_table_offset(SH_LINEAR_PT_VIRT_START)] =
-            shadow_l4e_empty();
-    }
-    else
-    {
-        ASSERT(!mfn_eq(gl4mfn, sl4mfn));
-
-        sl4e[shadow_l4_table_offset(SH_LINEAR_PT_VIRT_START)] =
-            shadow_l4e_from_mfn(sl4mfn, __PAGE_HYPERVISOR_RW);
-    }
-
-    sl4e[shadow_l4_table_offset(LINEAR_PT_VIRT_START)] =
-        shadow_l4e_from_mfn(gl4mfn, __PAGE_HYPERVISOR_RW);
-
-    unmap_domain_page(sl4e);
-}
-#endif
-
-
 /**************************************************************************/
 /* Create a shadow of a given guest page.
  */
@@ -1580,8 +1506,16 @@ sh_make_shadow(struct vcpu *v, mfn_t gmfn, u32 shadow_type)
         {
 #if GUEST_PAGING_LEVELS == 4
         case SH_type_l4_shadow:
-            sh_install_xen_entries_in_l4(v->domain, gmfn, smfn);
-            break;
+        {
+            shadow_l4e_t *l4t = map_domain_page(smfn);
+
+            BUILD_BUG_ON(sizeof(l4_pgentry_t) != sizeof(shadow_l4e_t));
+
+            init_xen_l4_slots(l4t, gmfn, d, smfn, (!is_pv_32bit_domain(d) &&
+                                                   VM_ASSIST(d, m2p_strict)));
+            unmap_domain_page(l4t);
+        }
+        break;
 #endif
 #if GUEST_PAGING_LEVELS >= 3
         case SH_type_l2h_shadow:
@@ -1632,19 +1566,27 @@ sh_make_monitor_table(struct vcpu *v)
 
     {
         mfn_t m4mfn;
+        l4_pgentry_t *l4e;
+
         m4mfn = shadow_alloc(d, SH_type_monitor_table, 0);
-        sh_install_xen_entries_in_l4(d, m4mfn, m4mfn);
-        /* Remember the level of this table */
         mfn_to_page(m4mfn)->shadow_flags = 4;
+
+        l4e = map_domain_page(m4mfn);
+
+        /*
+         * Create a self-linear mapping, but no shadow-linear mapping.  A
+         * shadow-linear mapping will either be inserted below when creating
+         * lower level monitor tables, or later in sh_update_cr3().
+         */
+        init_xen_l4_slots(l4e, m4mfn, d, INVALID_MFN, false);
+
 #if SHADOW_PAGING_LEVELS < 4
         {
             mfn_t m3mfn, m2mfn;
-            l4_pgentry_t *l4e;
             l3_pgentry_t *l3e;
             /* Install an l3 table and an l2 table that will hold the shadow
              * linear map entries.  This overrides the linear map entry that
              * was installed by sh_install_xen_entries_in_l4. */
-            l4e = map_domain_page(m4mfn);
 
             m3mfn = shadow_alloc(d, SH_type_monitor_table, 0);
             mfn_to_page(m3mfn)->shadow_flags = 3;
@@ -1679,9 +1621,11 @@ sh_make_monitor_table(struct vcpu *v)
                 unmap_domain_page(l3e);
             }
 
-            unmap_domain_page(l4e);
         }
 #endif /* SHADOW_PAGING_LEVELS < 4 */
+
+        unmap_domain_page(l4e);
+
         return m4mfn;
     }
 }

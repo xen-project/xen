@@ -28,14 +28,16 @@ static int setup_compat_l4(struct vcpu *v)
 {
     struct page_info *pg;
     l4_pgentry_t *l4tab;
+    mfn_t mfn;
 
     pg = alloc_domheap_page(v->domain, MEMF_no_owner);
     if ( pg == NULL )
         return -ENOMEM;
 
-    l4tab = __map_domain_page(pg);
+    mfn = page_to_mfn(pg);
+    l4tab = map_domain_page(mfn);
     clear_page(l4tab);
-    init_guest_l4_table(l4tab, v->domain, 1);
+    init_xen_l4_slots(l4tab, mfn, v->domain, INVALID_MFN, false);
     unmap_domain_page(l4tab);
 
     /* This page needs to look like a pagetable so that it can be shadowed */

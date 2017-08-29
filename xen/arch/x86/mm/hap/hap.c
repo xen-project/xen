@@ -391,41 +391,24 @@ int hap_set_allocation(struct domain *d, unsigned int pages, bool *preempted)
     return 0;
 }
 
-static void hap_install_xen_entries_in_l4(struct vcpu *v, mfn_t l4mfn)
-{
-    struct domain *d = v->domain;
-    l4_pgentry_t *l4e;
-
-    l4e = map_domain_page(l4mfn);
-
-    /* Copy the common Xen mappings from the idle domain */
-    memcpy(&l4e[ROOT_PAGETABLE_FIRST_XEN_SLOT],
-           &idle_pg_table[ROOT_PAGETABLE_FIRST_XEN_SLOT],
-           ROOT_PAGETABLE_XEN_SLOTS * sizeof(l4_pgentry_t));
-
-    /* Install the per-domain mappings for this domain */
-    l4e[l4_table_offset(PERDOMAIN_VIRT_START)] =
-        l4e_from_page(d->arch.perdomain_l3_pg, __PAGE_HYPERVISOR_RW);
-
-    /* Install a linear mapping */
-    l4e[l4_table_offset(LINEAR_PT_VIRT_START)] =
-        l4e_from_mfn(l4mfn, __PAGE_HYPERVISOR_RW);
-
-    unmap_domain_page(l4e);
-}
-
 static mfn_t hap_make_monitor_table(struct vcpu *v)
 {
     struct domain *d = v->domain;
     struct page_info *pg;
+    l4_pgentry_t *l4e;
     mfn_t m4mfn;
 
     ASSERT(pagetable_get_pfn(v->arch.monitor_table) == 0);
 
     if ( (pg = hap_alloc(d)) == NULL )
         goto oom;
+
     m4mfn = page_to_mfn(pg);
-    hap_install_xen_entries_in_l4(v, m4mfn);
+    l4e = map_domain_page(m4mfn);
+
+    init_xen_l4_slots(l4e, m4mfn, d, INVALID_MFN, false);
+    unmap_domain_page(l4e);
+
     return m4mfn;
 
  oom:
