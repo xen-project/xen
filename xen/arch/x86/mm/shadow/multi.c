@@ -1521,31 +1521,6 @@ void sh_install_xen_entries_in_l4(struct domain *d, mfn_t gl4mfn, mfn_t sl4mfn)
 }
 #endif
 
-#if GUEST_PAGING_LEVELS >= 3
-// For 3-on-3 PV guests, we need to make sure the xen mappings are in
-// place, which means that we need to populate the l2h entry in the l3
-// table.
-
-static void sh_install_xen_entries_in_l2h(struct domain *d, mfn_t sl2hmfn)
-{
-    shadow_l2e_t *sl2e;
-
-    if ( !is_pv_32bit_domain(d) )
-        return;
-
-    sl2e = map_domain_page(sl2hmfn);
-    BUILD_BUG_ON(sizeof (l2_pgentry_t) != sizeof (shadow_l2e_t));
-
-    /* Copy the common Xen mappings from the idle domain */
-    memcpy(
-        &sl2e[COMPAT_L2_PAGETABLE_FIRST_XEN_SLOT(d)],
-        &compat_idle_pg_table_l2[l2_table_offset(HIRO_COMPAT_MPT_VIRT_START)],
-        COMPAT_L2_PAGETABLE_XEN_SLOTS(d) * sizeof(*sl2e));
-
-    unmap_domain_page(sl2e);
-}
-#endif
-
 
 /**************************************************************************/
 /* Create a shadow of a given guest page.
@@ -1610,7 +1585,14 @@ sh_make_shadow(struct vcpu *v, mfn_t gmfn, u32 shadow_type)
 #endif
 #if GUEST_PAGING_LEVELS >= 3
         case SH_type_l2h_shadow:
-            sh_install_xen_entries_in_l2h(v->domain, smfn);
+            BUILD_BUG_ON(sizeof(l2_pgentry_t) != sizeof(shadow_l2e_t));
+            if ( is_pv_32bit_domain(d) )
+            {
+                shadow_l2e_t *l2t = map_domain_page(smfn);
+
+                init_xen_pae_l2_slots(l2t, d);
+                unmap_domain_page(l2t);
+            }
             break;
 #endif
         default: /* Do nothing */ break;
@@ -1677,6 +1659,8 @@ sh_make_monitor_table(struct vcpu *v)
 
             if ( is_pv_32bit_domain(d) )
             {
+                l2_pgentry_t *l2t;
+
                 /* For 32-bit PV guests, we need to map the 32-bit Xen
                  * area into its usual VAs in the monitor tables */
                 m3mfn = shadow_alloc(d, SH_type_monitor_table, 0);
@@ -1687,7 +1671,11 @@ sh_make_monitor_table(struct vcpu *v)
                 mfn_to_page(m2mfn)->shadow_flags = 2;
                 l3e = map_domain_page(m3mfn);
                 l3e[3] = l3e_from_mfn(m2mfn, _PAGE_PRESENT);
-                sh_install_xen_entries_in_l2h(d, m2mfn);
+
+                l2t = map_domain_page(m2mfn);
+                init_xen_pae_l2_slots(l2t, d);
+                unmap_domain_page(l2t);
+
                 unmap_domain_page(l3e);
             }
 

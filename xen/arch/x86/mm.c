@@ -1433,13 +1433,7 @@ static int alloc_l2_table(struct page_info *page, unsigned long type,
     }
 
     if ( rc >= 0 && (type & PGT_pae_xen_l2) )
-    {
-        /* Xen private mappings. */
-        memcpy(&pl2e[COMPAT_L2_PAGETABLE_FIRST_XEN_SLOT(d)],
-               &compat_idle_pg_table_l2[
-                   l2_table_offset(HIRO_COMPAT_MPT_VIRT_START)],
-               COMPAT_L2_PAGETABLE_XEN_SLOTS(d) * sizeof(*pl2e));
-    }
+        init_xen_pae_l2_slots(pl2e, d);
 
     unmap_domain_page(pl2e);
     return rc > 0 ? 0 : rc;
@@ -1516,6 +1510,14 @@ static int alloc_l3_table(struct page_info *page)
 
     unmap_domain_page(pl3e);
     return rc > 0 ? 0 : rc;
+}
+
+void init_xen_pae_l2_slots(l2_pgentry_t *l2t, const struct domain *d)
+{
+    memcpy(&l2t[COMPAT_L2_PAGETABLE_FIRST_XEN_SLOT(d)],
+           &compat_idle_pg_table_l2[
+               l2_table_offset(HIRO_COMPAT_MPT_VIRT_START)],
+           COMPAT_L2_PAGETABLE_XEN_SLOTS(d) * sizeof(*l2t));
 }
 
 /*
