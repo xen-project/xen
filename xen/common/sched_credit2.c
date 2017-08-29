@@ -160,6 +160,8 @@
 #define CSCHED2_MIGRATE_RESIST       ((opt_migrate_resist)*MICROSECS(1))
 /* How much to "compensate" a vcpu for L2 migration. */
 #define CSCHED2_MIGRATE_COMPENSATION MICROSECS(50)
+/* How tolerant we should be when peeking at runtime of vcpus on other cpus */
+#define CSCHED2_RATELIMIT_TICKLE_TOLERANCE MICROSECS(50)
 /* Reset: Value below which credit will be reset. */
 #define CSCHED2_CREDIT_RESET         0
 /* Max timer: Maximum time a guest can be run for. */
@@ -1203,6 +1205,23 @@ tickle_cpu(unsigned int cpu, struct csched2_runqueue_data *rqd)
 }
 
 /*
+ * What we want to know is whether svc, which we assume to be running on some
+ * pcpu, can be interrupted and preempted (which, so far, basically means
+ * whether or not it already run for more than the ratelimit, to which we
+ * apply some tolerance).
+ */
+static inline bool is_preemptable(const struct csched2_vcpu *svc,
+                                    s_time_t now, s_time_t ratelimit)
+{
+    if ( ratelimit <= CSCHED2_RATELIMIT_TICKLE_TOLERANCE )
+        return true;
+
+    ASSERT(svc->vcpu->is_running);
+    return now - svc->vcpu->runstate.state_entry_time >
+           ratelimit - CSCHED2_RATELIMIT_TICKLE_TOLERANCE;
+}
+
+/*
  * Score to preempt the target cpu.  Return a negative number if the
  * credit isn't high enough; if it is, favor a preemption on cpu in
  * this order:
@@ -1216,10 +1235,12 @@ tickle_cpu(unsigned int cpu, struct csched2_runqueue_data *rqd)
  *
  * Within the same class, the highest difference of credit.
  */
-static s_time_t tickle_score(struct csched2_runqueue_data *rqd, s_time_t now,
+static s_time_t tickle_score(const struct scheduler *ops, s_time_t now,
                              struct csched2_vcpu *new, unsigned int cpu)
 {
+    struct csched2_runqueue_data *rqd = c2rqd(ops, cpu);
     struct csched2_vcpu * cur = csched2_vcpu(curr_on_cpu(cpu));
+    struct csched2_private *prv = csched2_priv(ops);
     s_time_t score;
 
     /*
@@ -1227,7 +1248,8 @@ static s_time_t tickle_score(struct csched2_runqueue_data *rqd, s_time_t now,
      * in rqd->idle). However, some of them may be running their idle vcpu,
      * if taking care of tasklets. In that case, we want to leave it alone.
      */
-    if ( unlikely(is_idle_vcpu(cur->vcpu)) )
+    if ( unlikely(is_idle_vcpu(cur->vcpu) ||
+         !is_preemptable(cur, now, MICROSECS(prv->ratelimit_us))) )
         return -1;
 
     burn_credits(rqd, cur, now);
@@ -1384,7 +1406,7 @@ runq_tickle(const struct scheduler *ops, struct csched2_vcpu *new, s_time_t now)
     cpumask_and(&mask, &mask, cpumask_scratch_cpu(cpu));
     if ( __cpumask_test_and_clear_cpu(cpu, &mask) )
     {
-        s_time_t score = tickle_score(rqd, now, new, cpu);
+        s_time_t score = tickle_score(ops, now, new, cpu);
 
         if ( score > max )
         {
@@ -1407,7 +1429,7 @@ runq_tickle(const struct scheduler *ops, struct csched2_vcpu *new, s_time_t now)
         /* Already looked at this one above */
         ASSERT(i != cpu);
 
-        score = tickle_score(rqd, now, new, i);
+        score = tickle_score(ops, now, new, i);
 
         if ( score > max )
         {
