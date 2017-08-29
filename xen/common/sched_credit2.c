@@ -2674,10 +2674,17 @@ runq_candidate(struct csched2_runqueue_data *rqd,
     struct list_head *iter;
     struct csched2_vcpu *snext = NULL;
     struct csched2_private *prv = csched2_priv(per_cpu(scheduler, cpu));
-    bool yield = __test_and_clear_bit(__CSFLAG_vcpu_yield, &scurr->flags);
-    bool soft_aff_preempt = false;
+    bool yield = false, soft_aff_preempt = false;
 
     *skipped = 0;
+
+    if ( unlikely(is_idle_vcpu(scurr->vcpu)) )
+    {
+        snext = scurr;
+        goto check_runq;
+    }
+
+    yield = __test_and_clear_bit(__CSFLAG_vcpu_yield, &scurr->flags);
 
     /*
      * Return the current vcpu if it has executed for less than ratelimit.
@@ -2688,8 +2695,7 @@ runq_candidate(struct csched2_runqueue_data *rqd,
      * In fact, it may be the case that scurr is about to spin, and there's
      * no point forcing it to do so until rate limiting expires.
      */
-    if ( !yield && prv->ratelimit_us && !is_idle_vcpu(scurr->vcpu) &&
-         vcpu_runnable(scurr->vcpu) &&
+    if ( !yield && prv->ratelimit_us && vcpu_runnable(scurr->vcpu) &&
          (now - scurr->vcpu->runstate.state_entry_time) <
           MICROSECS(prv->ratelimit_us) )
     {
@@ -2710,8 +2716,7 @@ runq_candidate(struct csched2_runqueue_data *rqd,
     }
 
     /* If scurr has a soft-affinity, let's check whether cpu is part of it */
-    if ( !is_idle_vcpu(scurr->vcpu) &&
-         has_soft_affinity(scurr->vcpu, scurr->vcpu->cpu_hard_affinity) )
+    if ( has_soft_affinity(scurr->vcpu, scurr->vcpu->cpu_hard_affinity) )
     {
         affinity_balance_cpumask(scurr->vcpu, BALANCE_SOFT_AFFINITY,
                                  cpumask_scratch);
@@ -2750,6 +2755,7 @@ runq_candidate(struct csched2_runqueue_data *rqd,
     else
         snext = csched2_vcpu(idle_vcpu[cpu]);
 
+ check_runq:
     list_for_each( iter, &rqd->runq )
     {
         struct csched2_vcpu * svc = list_entry(iter, struct csched2_vcpu, runq_elem);
