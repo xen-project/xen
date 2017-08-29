@@ -97,13 +97,6 @@ int osdep_xenforeignmemory_unmap(xenforeignmemory_handle *fmem,
     return munmap(addr, num*XC_PAGE_SIZE);
 }
 
-int osdep_xenforeignmemory_restrict(xenforeignmemory_handle *fmem,
-                                    domid_t domid)
-{
-    errno = -EOPNOTSUPP;
-    return -1;
-}
-
 /*
  * Local variables:
  * mode: C
