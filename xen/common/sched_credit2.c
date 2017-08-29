@@ -2675,6 +2675,7 @@ runq_candidate(struct csched2_runqueue_data *rqd,
     struct csched2_vcpu *snext = NULL;
     struct csched2_private *prv = csched2_priv(per_cpu(scheduler, cpu));
     bool yield = __test_and_clear_bit(__CSFLAG_vcpu_yield, &scurr->flags);
+    bool soft_aff_preempt = false;
 
     *skipped = 0;
 
@@ -2708,8 +2709,43 @@ runq_candidate(struct csched2_runqueue_data *rqd,
         return scurr;
     }
 
-    /* Default to current if runnable, idle otherwise */
-    if ( vcpu_runnable(scurr->vcpu) )
+    /* If scurr has a soft-affinity, let's check whether cpu is part of it */
+    if ( !is_idle_vcpu(scurr->vcpu) &&
+         has_soft_affinity(scurr->vcpu, scurr->vcpu->cpu_hard_affinity) )
+    {
+        affinity_balance_cpumask(scurr->vcpu, BALANCE_SOFT_AFFINITY,
+                                 cpumask_scratch);
+        if ( unlikely(!cpumask_test_cpu(cpu, cpumask_scratch)) )
+        {
+            cpumask_t *online = cpupool_domain_cpumask(scurr->vcpu->domain);
+
+            /* Ok, is any of the pcpus in scurr soft-affinity idle? */
+            cpumask_and(cpumask_scratch, cpumask_scratch, &rqd->idle);
+            cpumask_andnot(cpumask_scratch, cpumask_scratch, &rqd->tickled);
+            soft_aff_preempt = cpumask_intersects(cpumask_scratch, online);
+        }
+    }
+
+    /*
+     * If scurr is runnable, and this cpu is in its soft-affinity, default to
+     * it. We also default to it, even if cpu is not in its soft-affinity, if
+     * there aren't any idle and not tickled cpu in its soft-affinity. In
+     * fact, we don't want to risk leaving scurr in the runq and this cpu idle
+     * only because scurr is running outside of its soft-affinity.
+     *
+     * On the other hand, if cpu is not in scurr's soft-affinity, and there
+     * looks to be better options, go for them. That happens by defaulting to
+     * idle here, which means scurr will be preempted, put back in runq, and
+     * one of those idle and not tickled cpus from its soft-affinity will be
+     * tickled to pick it up.
+     *
+     * Finally, if scurr does not have a valid soft-affinity, we also let it
+     * continue to run here (in fact, soft_aff_preempt will still be false,
+     * in this case).
+     *
+     * Of course, we also default to idle also if scurr is not runnable.
+     */
+    if ( vcpu_runnable(scurr->vcpu) && !soft_aff_preempt )
         snext = scurr;
     else
         snext = csched2_vcpu(idle_vcpu[cpu]);
