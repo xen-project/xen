@@ -394,7 +394,7 @@ int main(int argc, char *argv[])
     int debug = 0;
     int cpuid = 0;
     int desc_access = 0;
-    int write_ctrlreg_cr4 = 1;
+    int write_ctrlreg_cr4 = 0;
     uint16_t altp2m_view_id = 0;
 
     char* progname = argv[0];
