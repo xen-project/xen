@@ -149,4 +149,7 @@ int rcu_barrier(void);
 void rcu_idle_enter(unsigned int cpu);
 void rcu_idle_exit(unsigned int cpu);
 
+void rcu_idle_timer_start(void);
+void rcu_idle_timer_stop(void);
+
 #endif /* __XEN_RCUPDATE_H */

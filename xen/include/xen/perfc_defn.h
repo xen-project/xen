@@ -12,6 +12,8 @@ PERFCOUNTER(calls_from_multicall,       "calls from multicall")
 PERFCOUNTER(irqs,                   "#interrupts")
 PERFCOUNTER(ipis,                   "#IPIs")
 
+PERFCOUNTER(rcu_idle_timer,         "RCU: idle_timer")
+
 /* Generic scheduler counters (applicable to all schedulers) */
 PERFCOUNTER(sched_irq,              "sched: timer")
 PERFCOUNTER(sched_run,              "sched: runs through scheduler")
