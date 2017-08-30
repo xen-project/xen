@@ -13,11 +13,12 @@ unsigned long __per_cpu_offset[NR_CPUS];
  * context of PV guests.
  */
 #define INVALID_PERCPU_AREA (0x8000000000000000L - (long)__per_cpu_start)
-#define PERCPU_ORDER (get_order_from_bytes(__per_cpu_data_end-__per_cpu_start))
+#define PERCPU_ORDER get_order_from_bytes(__per_cpu_data_end - __per_cpu_start)
 
 void __init percpu_init_areas(void)
 {
     unsigned int cpu;
+
     for ( cpu = 1; cpu < NR_CPUS; cpu++ )
         __per_cpu_offset[cpu] = INVALID_PERCPU_AREA;
 }
@@ -25,12 +26,16 @@ void __init percpu_init_areas(void)
 static int init_percpu_area(unsigned int cpu)
 {
     char *p;
+
     if ( __per_cpu_offset[cpu] != INVALID_PERCPU_AREA )
         return -EBUSY;
+
     if ( (p = alloc_xenheap_pages(PERCPU_ORDER, 0)) == NULL )
         return -ENOMEM;
+
     memset(p, 0, __per_cpu_data_end - __per_cpu_start);
     __per_cpu_offset[cpu] = p - __per_cpu_start;
+
     return 0;
 }
 
@@ -45,6 +50,7 @@ static void _free_percpu_area(struct rcu_head *head)
     struct free_info *info = container_of(head, struct free_info, rcu);
     unsigned int cpu = info->cpu;
     char *p = __per_cpu_start + __per_cpu_offset[cpu];
+
     free_xenheap_pages(p, PERCPU_ORDER);
     __per_cpu_offset[cpu] = INVALID_PERCPU_AREA;
 }
@@ -52,6 +58,7 @@ static void _free_percpu_area(struct rcu_head *head)
 static void free_percpu_area(unsigned int cpu)
 {
     struct free_info *info = &per_cpu(free_info, cpu);
+
     info->cpu = cpu;
     call_rcu(&info->rcu, _free_percpu_area);
 }
@@ -86,6 +93,16 @@ static struct notifier_block cpu_percpu_nfb = {
 static int __init percpu_presmp_init(void)
 {
     register_cpu_notifier(&cpu_percpu_nfb);
+
     return 0;
 }
 presmp_initcall(percpu_presmp_init);
+
+/*
+ * Local variables:
+ * mode: C
+ * c-file-style: "BSD"
+ * c-basic-offset: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

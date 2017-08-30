@@ -629,9 +629,9 @@ static void invalidate_shadow_ldt(struct vcpu *v, int flush)
         goto out;
 
     v->arch.pv_vcpu.shadow_ldt_mapcnt = 0;
-    pl1e = gdt_ldt_ptes(v->domain, v);
+    pl1e = pv_ldt_ptes(v);
 
-    for ( i = 16; i < 32; i++ )
+    for ( i = 0; i < 16; i++ )
     {
         if ( !(l1e_get_flags(pl1e[i]) & _PAGE_PRESENT) )
             continue;
@@ -667,45 +667,55 @@ static int alloc_segdesc_page(struct page_info *page)
 }
 
 
-/* Map shadow page at offset @off. */
-int map_ldt_shadow_page(unsigned int off)
+/*
+ * Map a guest's LDT page (covering the byte at @offset from start of the LDT)
+ * into Xen's virtual range.  Returns true if the mapping changed, false
+ * otherwise.
+ */
+bool map_ldt_shadow_page(unsigned int offset)
 {
     struct vcpu *v = current;
     struct domain *d = v->domain;
-    unsigned long gmfn;
     struct page_info *page;
-    l1_pgentry_t l1e, nl1e;
-    unsigned long gva = v->arch.pv_vcpu.ldt_base + (off << PAGE_SHIFT);
-    int okay;
+    l1_pgentry_t gl1e, *pl1e;
+    unsigned long linear = v->arch.pv_vcpu.ldt_base + offset;
 
     BUG_ON(unlikely(in_irq()));
 
+    /*
+     * Hardware limit checking should guarantee this property.  NB. This is
+     * safe as updates to the LDT can only be made by MMUEXT_SET_LDT to the
+     * current vcpu, and vcpu_reset() will block until this vcpu has been
+     * descheduled before continuing.
+     */
+    ASSERT((offset >> 3) <= v->arch.pv_vcpu.ldt_ents);
+
     if ( is_pv_32bit_domain(d) )
-        gva = (u32)gva;
-    guest_get_eff_kern_l1e(gva, &l1e);
-    if ( unlikely(!(l1e_get_flags(l1e) & _PAGE_PRESENT)) )
-        return 0;
+        linear = (uint32_t)linear;
 
-    gmfn = l1e_get_pfn(l1e);
-    page = get_page_from_gfn(d, gmfn, NULL, P2M_ALLOC);
+    guest_get_eff_kern_l1e(linear, &gl1e);
+    if ( unlikely(!(l1e_get_flags(gl1e) & _PAGE_PRESENT)) )
+        return false;
+
+    page = get_page_from_gfn(d, l1e_get_pfn(gl1e), NULL, P2M_ALLOC);
     if ( unlikely(!page) )
-        return 0;
+        return false;
 
-    okay = get_page_type(page, PGT_seg_desc_page);
-    if ( unlikely(!okay) )
+    if ( unlikely(!get_page_type(page, PGT_seg_desc_page)) )
     {
         put_page(page);
-        return 0;
+        return false;
     }
 
-    nl1e = l1e_from_page(page, l1e_get_flags(l1e) | _PAGE_RW);
+    pl1e = &pv_ldt_ptes(v)[offset >> PAGE_SHIFT];
+    l1e_add_flags(gl1e, _PAGE_RW);
 
     spin_lock(&v->arch.pv_vcpu.shadow_ldt_lock);
-    l1e_write(&gdt_ldt_ptes(d, v)[off + 16], nl1e);
+    l1e_write(pl1e, gl1e);
     v->arch.pv_vcpu.shadow_ldt_mapcnt++;
     spin_unlock(&v->arch.pv_vcpu.shadow_ldt_lock);
 
-    return 1;
+    return true;
 }
 
 
@@ -1630,9 +1640,9 @@ void init_guest_l4_table(l4_pgentry_t l4tab[], const struct domain *d,
         l4tab[l4_table_offset(RO_MPT_VIRT_START)] = l4e_empty();
 }
 
-bool fill_ro_mpt(unsigned long mfn)
+bool fill_ro_mpt(mfn_t mfn)
 {
-    l4_pgentry_t *l4tab = map_domain_page(_mfn(mfn));
+    l4_pgentry_t *l4tab = map_domain_page(mfn);
     bool ret = false;
 
     if ( !l4e_get_intpte(l4tab[l4_table_offset(RO_MPT_VIRT_START)]) )
@@ -1646,9 +1656,9 @@ bool fill_ro_mpt(unsigned long mfn)
     return ret;
 }
 
-void zap_ro_mpt(unsigned long mfn)
+void zap_ro_mpt(mfn_t mfn)
 {
-    l4_pgentry_t *l4tab = map_domain_page(_mfn(mfn));
+    l4_pgentry_t *l4tab = map_domain_page(mfn);
 
     l4tab[l4_table_offset(RO_MPT_VIRT_START)] = l4e_empty();
     unmap_domain_page(l4tab);
@@ -2834,7 +2844,7 @@ int new_guest_cr3(unsigned long mfn)
     invalidate_shadow_ldt(curr, 0);
 
     if ( !VM_ASSIST(d, m2p_strict) && !paging_mode_refcounts(d) )
-        fill_ro_mpt(mfn);
+        fill_ro_mpt(_mfn(mfn));
     curr->arch.guest_table = pagetable_from_pfn(mfn);
     update_cr3(curr);
 
@@ -3208,7 +3218,7 @@ long do_mmuext_op(
                 }
 
                 if ( VM_ASSIST(currd, m2p_strict) )
-                    zap_ro_mpt(op.arg1.mfn);
+                    zap_ro_mpt(_mfn(op.arg1.mfn));
             }
 
             curr->arch.guest_table_user = pagetable_from_pfn(op.arg1.mfn);
@@ -4389,7 +4399,7 @@ void destroy_gdt(struct vcpu *v)
     unsigned long pfn, zero_pfn = PFN_DOWN(__pa(zero_page));
 
     v->arch.pv_vcpu.gdt_ents = 0;
-    pl1e = gdt_ldt_ptes(v->domain, v);
+    pl1e = pv_gdt_ptes(v);
     for ( i = 0; i < FIRST_RESERVED_GDT_PAGE; i++ )
     {
         pfn = l1e_get_pfn(pl1e[i]);
@@ -4434,7 +4444,7 @@ long set_gdt(struct vcpu *v,
 
     /* Install the new GDT. */
     v->arch.pv_vcpu.gdt_ents = entries;
-    pl1e = gdt_ldt_ptes(d, v);
+    pl1e = pv_gdt_ptes(v);
     for ( i = 0; i < nr_pages; i++ )
     {
         v->arch.pv_vcpu.gdt_frames[i] = frames[i];

@@ -215,13 +215,13 @@ static inline l4_pgentry_t l4e_from_paddr(paddr_t pa, unsigned int flags)
 /* Page-table type. */
 typedef struct { u64 pfn; } pagetable_t;
 #define pagetable_get_paddr(x)  ((paddr_t)(x).pfn << PAGE_SHIFT)
-#define pagetable_get_page(x)   mfn_to_page((x).pfn)
+#define pagetable_get_page(x)   __mfn_to_page((x).pfn)
 #define pagetable_get_pfn(x)    ((x).pfn)
 #define pagetable_get_mfn(x)    _mfn(((x).pfn))
 #define pagetable_is_null(x)    ((x).pfn == 0)
 #define pagetable_from_pfn(pfn) ((pagetable_t) { (pfn) })
 #define pagetable_from_mfn(mfn) ((pagetable_t) { mfn_x(mfn) })
-#define pagetable_from_page(pg) pagetable_from_pfn(page_to_mfn(pg))
+#define pagetable_from_page(pg) pagetable_from_pfn(__page_to_mfn(pg))
 #define pagetable_from_paddr(p) pagetable_from_pfn((p)>>PAGE_SHIFT)
 #define pagetable_null()        pagetable_from_pfn(0)
 

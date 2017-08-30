@@ -331,8 +331,8 @@ int free_page_type(struct page_info *page, unsigned long type,
 
 void init_guest_l4_table(l4_pgentry_t[], const struct domain *,
                          bool_t zap_ro_mpt);
-bool_t fill_ro_mpt(unsigned long mfn);
-void zap_ro_mpt(unsigned long mfn);
+bool fill_ro_mpt(mfn_t mfn);
+void zap_ro_mpt(mfn_t mfn);
 
 bool is_iomem_page(mfn_t mfn);
 
@@ -553,7 +553,7 @@ long subarch_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg);
 int compat_arch_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void));
 int compat_subarch_memory_op(int op, XEN_GUEST_HANDLE_PARAM(void));
 
-int map_ldt_shadow_page(unsigned int);
+bool map_ldt_shadow_page(unsigned int);
 
 #define NIL(type) ((type *)-sizeof(type))
 #define IS_NIL(ptr) (!((uintptr_t)(ptr) + sizeof(*(ptr))))

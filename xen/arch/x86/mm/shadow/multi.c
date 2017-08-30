@@ -4232,10 +4232,10 @@ sh_update_cr3(struct vcpu *v, int do_locking)
         mfn_t smfn = pagetable_get_mfn(v->arch.shadow_table[0]);
 
         if ( !(v->arch.flags & TF_kernel_mode) && VM_ASSIST(d, m2p_strict) )
-            zap_ro_mpt(mfn_x(smfn));
+            zap_ro_mpt(smfn);
         else if ( (v->arch.flags & TF_kernel_mode) &&
                   !VM_ASSIST(d, m2p_strict) )
-            fill_ro_mpt(mfn_x(smfn));
+            fill_ro_mpt(smfn);
     }
 #else
 #error This should never happen
