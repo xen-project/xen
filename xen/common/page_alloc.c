@@ -855,6 +855,7 @@ static struct page_info *alloc_heap_pages(
     struct page_info *pg;
     bool need_tlbflush = false;
     uint32_t tlbflush_timestamp = 0;
+    unsigned int dirty_cnt = 0;
 
     /* Make sure there are enough bits in memflags for nodeID. */
     BUILD_BUG_ON((_MEMF_bits - _MEMF_node) < (8 * sizeof(nodeid_t)));
@@ -943,6 +944,8 @@ static struct page_info *alloc_heap_pages(
     if ( d != NULL )
         d->last_alloc_node = node;
 
+    spin_unlock(&heap_lock);
+
     for ( i = 0; i < (1 << order); i++ )
     {
         /* Reference count must continuously be zero for free pages. */
@@ -952,7 +955,7 @@ static struct page_info *alloc_heap_pages(
         {
             if ( !(memflags & MEMF_no_scrub) )
                 scrub_one_page(&pg[i]);
-            node_need_scrub[node]--;
+            dirty_cnt++;
         }
 
         pg[i].count_info = PGC_state_inuse;
@@ -974,6 +977,8 @@ static struct page_info *alloc_heap_pages(
             check_one_page(&pg[i]);
     }
 
+    spin_lock(&heap_lock);
+    node_need_scrub[node] -= dirty_cnt;
     spin_unlock(&heap_lock);
 
     if ( need_tlbflush )
