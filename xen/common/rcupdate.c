@@ -52,7 +52,8 @@ static struct rcu_ctrlblk {
     int  next_pending;  /* Is the next batch already waiting?         */
 
     spinlock_t  lock __cacheline_aligned;
-    cpumask_t   cpumask; /* CPUs that need to switch in order    */
+    cpumask_t   cpumask; /* CPUs that need to switch in order ... */
+    cpumask_t   idle_cpumask; /* ... unless they are already idle */
     /* for current batch to proceed.        */
 } __cacheline_aligned rcu_ctrlblk = {
     .cur = -300,
@@ -248,7 +249,16 @@ static void rcu_start_batch(struct rcu_ctrlblk *rcp)
         smp_wmb();
         rcp->cur++;
 
-        cpumask_copy(&rcp->cpumask, &cpu_online_map);
+       /*
+        * Make sure the increment of rcp->cur is visible so, even if a
+        * CPU that is about to go idle, is captured inside rcp->cpumask,
+        * rcu_pending() will return false, which then means cpu_quiet()
+        * will be invoked, before the CPU would actually enter idle.
+        *
+        * This barrier is paired with the one in rcu_idle_enter().
+        */
+        smp_mb();
+        cpumask_andnot(&rcp->cpumask, &cpu_online_map, &rcp->idle_cpumask);
     }
 }
 
@@ -474,7 +484,34 @@ static struct notifier_block cpu_nfb = {
 void __init rcu_init(void)
 {
     void *cpu = (void *)(long)smp_processor_id();
+
+    cpumask_clear(&rcu_ctrlblk.idle_cpumask);
     cpu_callback(&cpu_nfb, CPU_UP_PREPARE, cpu);
     register_cpu_notifier(&cpu_nfb);
     open_softirq(RCU_SOFTIRQ, rcu_process_callbacks);
+}
+
+/*
+ * The CPU is becoming idle, so no more read side critical
+ * sections, and one more step toward grace period.
+ */
+void rcu_idle_enter(unsigned int cpu)
+{
+    ASSERT(!cpumask_test_cpu(cpu, &rcu_ctrlblk.idle_cpumask));
+    cpumask_set_cpu(cpu, &rcu_ctrlblk.idle_cpumask);
+    /*
+     * If some other CPU is starting a new grace period, we'll notice that
+     * by seeing a new value in rcp->cur (different than our quiescbatch).
+     * That will force us all the way until cpu_quiet(), clearing our bit
+     * in rcp->cpumask, even in case we managed to get in there.
+     *
+     * Se the comment before cpumask_andnot() in  rcu_start_batch().
+     */
+    smp_mb();
+}
+
+void rcu_idle_exit(unsigned int cpu)
+{
+    ASSERT(cpumask_test_cpu(cpu, &rcu_ctrlblk.idle_cpumask));
+    cpumask_clear_cpu(cpu, &rcu_ctrlblk.idle_cpumask);
 }

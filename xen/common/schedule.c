@@ -1903,6 +1903,7 @@ void sched_tick_suspend(void)
 
     sched = per_cpu(scheduler, cpu);
     SCHED_OP(sched, tick_suspend, cpu);
+    rcu_idle_enter(cpu);
 }
 
 void sched_tick_resume(void)
@@ -1910,6 +1911,7 @@ void sched_tick_resume(void)
     struct scheduler *sched;
     unsigned int cpu = smp_processor_id();
 
+    rcu_idle_exit(cpu);
     sched = per_cpu(scheduler, cpu);
     SCHED_OP(sched, tick_resume, cpu);
 }
