@@ -568,34 +568,41 @@ static inline void guest_unmap_l1e(void *p)
 }
 
 /* Read a PV guest's l1e that maps this linear address. */
-static void guest_get_eff_l1e(unsigned long linear, l1_pgentry_t *eff_l1e)
+static l1_pgentry_t guest_get_eff_l1e(unsigned long linear)
 {
+    l1_pgentry_t l1e;
+
     ASSERT(!paging_mode_translate(current->domain));
     ASSERT(!paging_mode_external(current->domain));
 
     if ( unlikely(!__addr_ok(linear)) ||
-         __copy_from_user(eff_l1e,
+         __copy_from_user(&l1e,
                           &__linear_l1_table[l1_linear_offset(linear)],
                           sizeof(l1_pgentry_t)) )
-        *eff_l1e = l1e_empty();
+        l1e = l1e_empty();
+
+    return l1e;
 }
 
 /*
  * Read the guest's l1e that maps this address, from the kernel-mode
  * page tables.
  */
-static void guest_get_eff_kern_l1e(unsigned long linear, l1_pgentry_t *eff_l1e)
+static l1_pgentry_t guest_get_eff_kern_l1e(unsigned long linear)
 {
     struct vcpu *curr = current;
     const bool user_mode = !(curr->arch.flags & TF_kernel_mode);
+    l1_pgentry_t l1e;
 
     if ( user_mode )
         toggle_guest_mode(curr);
 
-    guest_get_eff_l1e(linear, eff_l1e);
+    l1e = guest_get_eff_l1e(linear);
 
     if ( user_mode )
         toggle_guest_mode(curr);
+
+    return l1e;
 }
 
 static inline void page_set_tlbflush_timestamp(struct page_info *page)
@@ -693,7 +700,7 @@ bool map_ldt_shadow_page(unsigned int offset)
     if ( is_pv_32bit_domain(d) )
         linear = (uint32_t)linear;
 
-    guest_get_eff_kern_l1e(linear, &gl1e);
+    gl1e = guest_get_eff_kern_l1e(linear);
     if ( unlikely(!(l1e_get_flags(gl1e) & _PAGE_PRESENT)) )
         return false;
 
@@ -5192,7 +5199,7 @@ int ptwr_do_page_fault(struct vcpu *v, unsigned long addr,
     int rc;
 
     /* Attempt to read the PTE that maps the VA being accessed. */
-    guest_get_eff_l1e(addr, &pte);
+    pte = guest_get_eff_l1e(addr);
 
     /* We are looking only for read-only mappings of p.t. pages. */
     if ( ((l1e_get_flags(pte) & (_PAGE_PRESENT|_PAGE_RW)) != _PAGE_PRESENT) ||
@@ -5347,7 +5354,7 @@ int mmio_ro_do_page_fault(struct vcpu *v, unsigned long addr,
     int rc;
 
     /* Attempt to read the PTE that maps the VA being accessed. */
-    guest_get_eff_l1e(addr, &pte);
+    pte = guest_get_eff_l1e(addr);
 
     /* We are looking only for read-only mappings of MMIO pages. */
     if ( ((l1e_get_flags(pte) & (_PAGE_PRESENT|_PAGE_RW)) != _PAGE_PRESENT) )
