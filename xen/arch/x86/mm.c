@@ -498,9 +498,9 @@ void free_shared_domheap_page(struct page_info *page)
     free_domheap_page(page);
 }
 
-void make_cr3(struct vcpu *v, unsigned long mfn)
+void make_cr3(struct vcpu *v, mfn_t mfn)
 {
-    v->arch.cr3 = mfn << PAGE_SHIFT;
+    v->arch.cr3 = mfn_x(mfn) << PAGE_SHIFT;
 }
 
 void write_ptbase(struct vcpu *v)
@@ -518,7 +518,7 @@ void write_ptbase(struct vcpu *v)
  */
 void update_cr3(struct vcpu *v)
 {
-    unsigned long cr3_mfn;
+    mfn_t cr3_mfn;
 
     if ( paging_mode_enabled(v->domain) )
     {
@@ -527,9 +527,9 @@ void update_cr3(struct vcpu *v)
     }
 
     if ( !(v->arch.flags & TF_kernel_mode) )
-        cr3_mfn = pagetable_get_pfn(v->arch.guest_table_user);
+        cr3_mfn = pagetable_get_mfn(v->arch.guest_table_user);
     else
-        cr3_mfn = pagetable_get_pfn(v->arch.guest_table);
+        cr3_mfn = pagetable_get_mfn(v->arch.guest_table);
 
     make_cr3(v, cr3_mfn);
 }

@@ -2961,7 +2961,7 @@ static void sh_update_paging_modes(struct vcpu *v)
         {
             mfn_t mmfn = v->arch.paging.mode->shadow.make_monitor_table(v);
             v->arch.monitor_table = pagetable_from_mfn(mmfn);
-            make_cr3(v, mfn_x(mmfn));
+            make_cr3(v, mmfn);
             hvm_update_host_cr3(v);
         }
 
@@ -3004,7 +3004,7 @@ static void sh_update_paging_modes(struct vcpu *v)
                 /* Don't be running on the old monitor table when we
                  * pull it down!  Switch CR3, and warn the HVM code that
                  * its host cr3 has changed. */
-                make_cr3(v, mfn_x(new_mfn));
+                make_cr3(v, new_mfn);
                 if ( v == current )
                     write_ptbase(v);
                 hvm_update_host_cr3(v);
@@ -3380,9 +3380,9 @@ static int shadow_one_bit_disable(struct domain *d, u32 mode)
             if ( v->arch.paging.mode )
                 v->arch.paging.mode->shadow.detach_old_tables(v);
             if ( !(v->arch.flags & TF_kernel_mode) )
-                make_cr3(v, pagetable_get_pfn(v->arch.guest_table_user));
+                make_cr3(v, pagetable_get_mfn(v->arch.guest_table_user));
             else
-                make_cr3(v, pagetable_get_pfn(v->arch.guest_table));
+                make_cr3(v, pagetable_get_mfn(v->arch.guest_table));
 
 #if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC)
             {

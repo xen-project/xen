@@ -4273,7 +4273,7 @@ sh_update_cr3(struct vcpu *v, int do_locking)
     ///
     if ( shadow_mode_external(d) )
     {
-        make_cr3(v, pagetable_get_pfn(v->arch.monitor_table));
+        make_cr3(v, pagetable_get_mfn(v->arch.monitor_table));
     }
     else // not shadow_mode_external...
     {
@@ -4287,7 +4287,7 @@ sh_update_cr3(struct vcpu *v, int do_locking)
         v->arch.cr3 = virt_to_maddr(&v->arch.paging.shadow.l3table);
 #else
         /* 4-on-4: Just use the shadow top-level directly */
-        make_cr3(v, pagetable_get_pfn(v->arch.shadow_table[0]));
+        make_cr3(v, pagetable_get_mfn(v->arch.shadow_table[0]));
 #endif
     }
 

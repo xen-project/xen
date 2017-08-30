@@ -719,7 +719,7 @@ static void hap_update_paging_modes(struct vcpu *v)
     {
         mfn_t mmfn = hap_make_monitor_table(v);
         v->arch.monitor_table = pagetable_from_mfn(mmfn);
-        make_cr3(v, mfn_x(mmfn));
+        make_cr3(v, mmfn);
         hvm_update_host_cr3(v);
     }
 
