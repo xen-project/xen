@@ -155,6 +155,11 @@ int hvm_hypercall(struct cpu_user_regs *regs)
         /* Fallthrough to permission check. */
     case 4:
     case 2:
+        if ( currd->arch.monitor.guest_request_userspace_enabled &&
+            eax == __HYPERVISOR_hvm_op &&
+            (mode == 8 ? regs->rdi : regs->ebx) == HVMOP_guest_request_vm_event )
+            break;
+
         if ( unlikely(hvm_get_cpl(curr)) )
         {
     default:

@@ -396,15 +396,16 @@ struct arch_domain
 
     /* Arch-specific monitor options */
     struct {
-        unsigned int write_ctrlreg_enabled       : 4;
-        unsigned int write_ctrlreg_sync          : 4;
-        unsigned int write_ctrlreg_onchangeonly  : 4;
-        unsigned int singlestep_enabled          : 1;
-        unsigned int software_breakpoint_enabled : 1;
-        unsigned int debug_exception_enabled     : 1;
-        unsigned int debug_exception_sync        : 1;
-        unsigned int cpuid_enabled               : 1;
-        unsigned int descriptor_access_enabled   : 1;
+        unsigned int write_ctrlreg_enabled                                 : 4;
+        unsigned int write_ctrlreg_sync                                    : 4;
+        unsigned int write_ctrlreg_onchangeonly                            : 4;
+        unsigned int singlestep_enabled                                    : 1;
+        unsigned int software_breakpoint_enabled                           : 1;
+        unsigned int debug_exception_enabled                               : 1;
+        unsigned int debug_exception_sync                                  : 1;
+        unsigned int cpuid_enabled                                         : 1;
+        unsigned int descriptor_access_enabled                             : 1;
+        unsigned int guest_request_userspace_enabled                       : 1;
         struct monitor_msr_bitmap *msr_bitmap;
         uint64_t write_ctrlreg_mask[4];
     } monitor;

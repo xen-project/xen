@@ -75,6 +75,7 @@ int monitor_domctl(struct domain *d, struct xen_domctl_monitor_op *mop)
         domain_pause(d);
         d->monitor.guest_request_sync = mop->u.guest_request.sync;
         d->monitor.guest_request_enabled = requested_status;
+        arch_monitor_allow_userspace(d, mop->u.guest_request.allow_userspace);
         domain_unpause(d);
         break;
     }

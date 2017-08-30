@@ -26,6 +26,11 @@
 #include <public/domctl.h>
 
 static inline
+void arch_monitor_allow_userspace(struct domain *d, bool allow_userspace)
+{
+}
+
+static inline
 int arch_monitor_domctl_op(struct domain *d, struct xen_domctl_monitor_op *mop)
 {
     /* No arch-specific monitor ops on ARM. */
