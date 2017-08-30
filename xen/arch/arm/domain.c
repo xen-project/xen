@@ -39,6 +39,25 @@
 
 DEFINE_PER_CPU(struct vcpu *, curr_vcpu);
 
+static void do_idle(void)
+{
+    unsigned int cpu = smp_processor_id();
+
+    sched_tick_suspend();
+    /* sched_tick_suspend() can raise TIMER_SOFTIRQ. Process it now. */
+    process_pending_softirqs();
+
+    local_irq_disable();
+    if ( cpu_is_haltable(cpu) )
+    {
+        dsb(sy);
+        wfi();
+    }
+    local_irq_enable();
+
+    sched_tick_resume();
+}
+
 void idle_loop(void)
 {
     unsigned int cpu = smp_processor_id();
@@ -58,15 +77,7 @@ void idle_loop(void)
          */
         else if ( !softirq_pending(cpu) && !scrub_free_pages() &&
                   !softirq_pending(cpu) )
-        {
-            local_irq_disable();
-            if ( cpu_is_haltable(cpu) )
-            {
-                dsb(sy);
-                wfi();
-            }
-            local_irq_enable();
-        }
+            do_idle();
 
         do_softirq();
         /*
