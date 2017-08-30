@@ -21,6 +21,7 @@
 #include <xen/prefetch.h>
 #include <xen/iommu.h>
 #include <xen/irq.h>
+#include <xen/vm_event.h>
 #include <asm/hvm/irq.h>
 #include <xen/delay.h>
 #include <xen/keyhandler.h>
@@ -1386,7 +1387,7 @@ static int assign_device(struct domain *d, u16 seg, u8 bus, u8 devfn, u32 flag)
      * enabled for this domain */
     if ( unlikely(!need_iommu(d) &&
             (d->arch.hvm_domain.mem_sharing_enabled ||
-             d->vm_event->paging.ring_page ||
+             vm_event_check_ring(d->vm_event_paging) ||
              p2m_get_hostp2m(d)->global_logdirty)) )
         return -EXDEV;
 

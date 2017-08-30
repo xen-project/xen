@@ -179,7 +179,7 @@ bool_t p2m_mem_access_check(paddr_t gpa, unsigned long gla,
     gfn_unlock(p2m, gfn, 0);
 
     /* Otherwise, check if there is a memory event listener, and send the message along */
-    if ( !vm_event_check_ring(&d->vm_event->monitor) || !req_ptr )
+    if ( !vm_event_check_ring(d->vm_event_monitor) || !req_ptr )
     {
         /* No listener */
         if ( p2m->access_required )

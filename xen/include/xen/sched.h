@@ -296,16 +296,6 @@ struct vm_event_domain
     unsigned int last_vcpu_wake_up;
 };
 
-struct vm_event_per_domain
-{
-    /* Memory sharing support */
-    struct vm_event_domain share;
-    /* Memory paging support */
-    struct vm_event_domain paging;
-    /* VM event monitor support */
-    struct vm_event_domain monitor;
-};
-
 struct evtchn_port_ops;
 
 enum guest_type {
@@ -465,7 +455,17 @@ struct domain
     struct lock_profile_qhead profile_head;
 
     /* Various vm_events */
-    struct vm_event_per_domain *vm_event;
+
+    /* Memory sharing support */
+#ifdef CONFIG_HAS_MEM_SHARING
+    struct vm_event_domain *vm_event_share;
+#endif
+    /* Memory paging support */
+#ifdef CONFIG_HAS_MEM_PAGING
+    struct vm_event_domain *vm_event_paging;
+#endif
+    /* VM event monitor support */
+    struct vm_event_domain *vm_event_monitor;
 
     /*
      * Can be specified by the user. If that is not the case, it is

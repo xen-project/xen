@@ -563,7 +563,7 @@ int mem_sharing_notify_enomem(struct domain *d, unsigned long gfn,
     };
 
     if ( (rc = __vm_event_claim_slot(d, 
-                        &d->vm_event->share, allow_sleep)) < 0 )
+                        d->vm_event_share, allow_sleep)) < 0 )
         return rc;
 
     if ( v->domain == d )
@@ -572,7 +572,7 @@ int mem_sharing_notify_enomem(struct domain *d, unsigned long gfn,
         vm_event_vcpu_pause(v);
     }
 
-    vm_event_put_request(d, &d->vm_event->share, &req);
+    vm_event_put_request(d, d->vm_event_share, &req);
 
     return 0;
 }

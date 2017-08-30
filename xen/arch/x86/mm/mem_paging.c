@@ -22,6 +22,7 @@
 
 #include <asm/p2m.h>
 #include <xen/guest_access.h>
+#include <xen/vm_event.h>
 #include <xsm/xsm.h>
 
 int mem_paging_memop(XEN_GUEST_HANDLE_PARAM(xen_mem_paging_op_t) arg)
@@ -43,7 +44,7 @@ int mem_paging_memop(XEN_GUEST_HANDLE_PARAM(xen_mem_paging_op_t) arg)
         goto out;
 
     rc = -ENODEV;
-    if ( unlikely(!d->vm_event->paging.ring_page) )
+    if ( unlikely(!vm_event_check_ring(d->vm_event_paging)) )
         goto out;
 
     switch( mpo.op )
