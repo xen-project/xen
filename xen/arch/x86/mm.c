@@ -5405,7 +5405,7 @@ int mmio_ro_do_page_fault(struct vcpu *v, unsigned long addr,
 
         /* Fallthrough */
     case X86EMUL_RETRY:
-        perfc_incr(ptwr_emulations);
+        perfc_incr(mmio_ro_emulations);
         return EXCRET_fault_fixed;
     }
 

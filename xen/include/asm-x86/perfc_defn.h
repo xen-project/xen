@@ -30,6 +30,7 @@ PERFCOUNTER(copy_user_faults,       "copy_user faults")
 
 PERFCOUNTER(map_domain_page_count,  "map_domain_page count")
 PERFCOUNTER(ptwr_emulations,        "writable pt emulations")
+PERFCOUNTER(mmio_ro_emulations,     "mmio ro emulations")
 
 PERFCOUNTER(exception_fixed,        "pre-exception fixed")
 
