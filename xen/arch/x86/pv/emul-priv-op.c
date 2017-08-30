@@ -774,7 +774,7 @@ static int priv_op_write_cr(unsigned int reg, unsigned long val,
         page = get_page_from_gfn(currd, gfn, NULL, P2M_ALLOC);
         if ( !page )
             break;
-        rc = new_guest_cr3(mfn_x(page_to_mfn(page)));
+        rc = new_guest_cr3(page_to_mfn(page));
         put_page(page);
 
         switch ( rc )

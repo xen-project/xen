@@ -539,7 +539,7 @@ void audit_domains(void);
 
 #endif
 
-int new_guest_cr3(unsigned long pfn);
+int new_guest_cr3(mfn_t mfn);
 void make_cr3(struct vcpu *v, unsigned long mfn);
 void update_cr3(struct vcpu *v);
 int vcpu_destroy_pagetables(struct vcpu *);

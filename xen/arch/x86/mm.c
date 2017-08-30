@@ -2772,23 +2772,23 @@ int vcpu_destroy_pagetables(struct vcpu *v)
     return rc != -EINTR ? rc : -ERESTART;
 }
 
-int new_guest_cr3(unsigned long mfn)
+int new_guest_cr3(mfn_t mfn)
 {
     struct vcpu *curr = current;
     struct domain *d = curr->domain;
     int rc;
-    unsigned long old_base_mfn;
+    mfn_t old_base_mfn;
 
     if ( is_pv_32bit_domain(d) )
     {
-        unsigned long gt_mfn = pagetable_get_pfn(curr->arch.guest_table);
-        l4_pgentry_t *pl4e = map_domain_page(_mfn(gt_mfn));
+        mfn_t gt_mfn = pagetable_get_mfn(curr->arch.guest_table);
+        l4_pgentry_t *pl4e = map_domain_page(gt_mfn);
 
         rc = mod_l4_entry(pl4e,
-                          l4e_from_pfn(mfn,
+                          l4e_from_mfn(mfn,
                                        (_PAGE_PRESENT | _PAGE_RW |
                                         _PAGE_USER | _PAGE_ACCESSED)),
-                          gt_mfn, 0, curr);
+                          mfn_x(gt_mfn), 0, curr);
         unmap_domain_page(pl4e);
         switch ( rc )
         {
@@ -2800,7 +2800,7 @@ int new_guest_cr3(unsigned long mfn)
         default:
             gdprintk(XENLOG_WARNING,
                      "Error while installing new compat baseptr %" PRI_mfn "\n",
-                     mfn);
+                     mfn_x(mfn));
             return rc;
         }
 
@@ -2814,20 +2814,20 @@ int new_guest_cr3(unsigned long mfn)
     if ( unlikely(rc) )
         return rc;
 
-    old_base_mfn = pagetable_get_pfn(curr->arch.guest_table);
+    old_base_mfn = pagetable_get_mfn(curr->arch.guest_table);
     /*
      * This is particularly important when getting restarted after the
      * previous attempt got preempted in the put-old-MFN phase.
      */
-    if ( old_base_mfn == mfn )
+    if ( mfn_eq(old_base_mfn, mfn) )
     {
         write_ptbase(curr);
         return 0;
     }
 
     rc = paging_mode_refcounts(d)
-         ? (get_page_from_mfn(_mfn(mfn), d) ? 0 : -EINVAL)
-         : get_page_and_type_from_mfn(_mfn(mfn), PGT_root_page_table, d, 0, 1);
+         ? (get_page_from_mfn(mfn, d) ? 0 : -EINVAL)
+         : get_page_and_type_from_mfn(mfn, PGT_root_page_table, d, 0, 1);
     switch ( rc )
     {
     case 0:
@@ -2837,22 +2837,23 @@ int new_guest_cr3(unsigned long mfn)
         return -ERESTART;
     default:
         gdprintk(XENLOG_WARNING,
-                 "Error while installing new baseptr %" PRI_mfn "\n", mfn);
+                 "Error while installing new baseptr %" PRI_mfn "\n",
+                 mfn_x(mfn));
         return rc;
     }
 
     invalidate_shadow_ldt(curr, 0);
 
     if ( !VM_ASSIST(d, m2p_strict) && !paging_mode_refcounts(d) )
-        fill_ro_mpt(_mfn(mfn));
-    curr->arch.guest_table = pagetable_from_pfn(mfn);
+        fill_ro_mpt(mfn);
+    curr->arch.guest_table = pagetable_from_mfn(mfn);
     update_cr3(curr);
 
     write_ptbase(curr);
 
-    if ( likely(old_base_mfn != 0) )
+    if ( likely(mfn_x(old_base_mfn) != 0) )
     {
-        struct page_info *page = mfn_to_page(_mfn(old_base_mfn));
+        struct page_info *page = mfn_to_page(old_base_mfn);
 
         if ( paging_mode_refcounts(d) )
             put_page(page);
@@ -3180,7 +3181,7 @@ long do_mmuext_op(
             else if ( unlikely(paging_mode_translate(currd)) )
                 rc = -EINVAL;
             else
-                rc = new_guest_cr3(op.arg1.mfn);
+                rc = new_guest_cr3(_mfn(op.arg1.mfn));
             break;
 
         case MMUEXT_NEW_USER_BASEPTR: {
