@@ -136,6 +136,7 @@ struct dev_intx_gsi_link {
 #define VMSI_DM_MASK      0x200
 #define VMSI_DELIV_MASK   0x7000
 #define VMSI_TRIG_MODE    0x8000
+#define VMSI_UNMASKED     0x10000
 
 #define GFLAGS_SHIFT_RH             8
 #define GFLAGS_SHIFT_DELIV_MODE     12

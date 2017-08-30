@@ -342,13 +342,14 @@ int pt_irq_create_bind(
         uint8_t dest, dest_mode, delivery_mode;
         int dest_vcpu_id;
         const struct vcpu *vcpu;
+        uint32_t gflags = pt_irq_bind->u.msi.gflags & ~VMSI_UNMASKED;
 
         if ( !(pirq_dpci->flags & HVM_IRQ_DPCI_MAPPED) )
         {
             pirq_dpci->flags = HVM_IRQ_DPCI_MAPPED | HVM_IRQ_DPCI_MACH_MSI |
                                HVM_IRQ_DPCI_GUEST_MSI;
             pirq_dpci->gmsi.gvec = pt_irq_bind->u.msi.gvec;
-            pirq_dpci->gmsi.gflags = pt_irq_bind->u.msi.gflags;
+            pirq_dpci->gmsi.gflags = gflags;
             /*
              * 'pt_irq_create_bind' can be called after 'pt_irq_destroy_bind'.
              * The 'pirq_cleanup_check' which would free the structure is only
@@ -401,13 +402,13 @@ int pt_irq_create_bind(
 
             /* If pirq is already mapped as vmsi, update guest data/addr. */
             if ( pirq_dpci->gmsi.gvec != pt_irq_bind->u.msi.gvec ||
-                 pirq_dpci->gmsi.gflags != pt_irq_bind->u.msi.gflags )
+                 pirq_dpci->gmsi.gflags != gflags )
             {
                 /* Directly clear pending EOIs before enabling new MSI info. */
                 pirq_guest_eoi(info);
 
                 pirq_dpci->gmsi.gvec = pt_irq_bind->u.msi.gvec;
-                pirq_dpci->gmsi.gflags = pt_irq_bind->u.msi.gflags;
+                pirq_dpci->gmsi.gflags = gflags;
             }
         }
         /* Calculate dest_vcpu_id for MSI-type pirq migration. */
@@ -437,6 +438,21 @@ int pt_irq_create_bind(
         if ( iommu_intpost )
             pi_update_irte(vcpu ? &vcpu->arch.hvm_vmx.pi_desc : NULL,
                            info, pirq_dpci->gmsi.gvec);
+
+        if ( pt_irq_bind->u.msi.gflags & VMSI_UNMASKED )
+        {
+            unsigned long flags;
+            struct irq_desc *desc = pirq_spin_lock_irq_desc(info, &flags);
+
+            if ( !desc )
+            {
+                pt_irq_destroy_bind(d, pt_irq_bind);
+                return -EINVAL;
+            }
+
+            guest_mask_msi_irq(desc, false);
+            spin_unlock_irqrestore(&desc->lock, flags);
+        }
 
         break;
     }
