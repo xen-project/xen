@@ -117,12 +117,8 @@ struct gate_op_ctxt {
     bool insn_fetch;
 };
 
-static int gate_op_read(
-    enum x86_segment seg,
-    unsigned long offset,
-    void *p_data,
-    unsigned int bytes,
-    struct x86_emulate_ctxt *ctxt)
+static int read_mem(enum x86_segment seg, unsigned long offset, void *p_data,
+                    unsigned int bytes, struct x86_emulate_ctxt *ctxt)
 {
     const struct gate_op_ctxt *goc =
         container_of(ctxt, struct gate_op_ctxt, ctxt);
@@ -230,7 +226,7 @@ void pv_emulate_gate_op(struct cpu_user_regs *regs)
 
     ctxt.ctxt.addr_size = ar & _SEGMENT_DB ? 32 : 16;
     /* Leave zero in ctxt.ctxt.sp_size, as it's not needed for decoding. */
-    state = x86_decode_insn(&ctxt.ctxt, gate_op_read);
+    state = x86_decode_insn(&ctxt.ctxt, read_mem);
     ctxt.insn_fetch = false;
     if ( IS_ERR_OR_NULL(state) )
     {
@@ -265,9 +261,8 @@ void pv_emulate_gate_op(struct cpu_user_regs *regs)
         case 3:
             ++jump;
             base = x86_insn_operand_ea(state, &seg);
-            rc = gate_op_read(seg,
-                              base + (x86_insn_opsize(state) >> 3),
-                              &opnd_sel, sizeof(opnd_sel), &ctxt.ctxt);
+            rc = read_mem(seg, base + (x86_insn_opsize(state) >> 3),
+                          &opnd_sel, sizeof(opnd_sel), &ctxt.ctxt);
             break;
         }
         break;
