@@ -316,8 +316,8 @@ static unsigned int check_guest_io_breakpoint(struct vcpu *v,
     return match;
 }
 
-static int priv_op_read_io(unsigned int port, unsigned int bytes,
-                           unsigned long *val, struct x86_emulate_ctxt *ctxt)
+static int read_io(unsigned int port, unsigned int bytes,
+                   unsigned long *val, struct x86_emulate_ctxt *ctxt)
 {
     struct priv_op_ctxt *poc = container_of(ctxt, struct priv_op_ctxt, ctxt);
     struct vcpu *curr = current;
@@ -415,8 +415,8 @@ void guest_io_write(unsigned int port, unsigned int bytes, uint32_t data,
     }
 }
 
-static int priv_op_write_io(unsigned int port, unsigned int bytes,
-                            unsigned long val, struct x86_emulate_ctxt *ctxt)
+static int write_io(unsigned int port, unsigned int bytes,
+                    unsigned long val, struct x86_emulate_ctxt *ctxt)
 {
     struct priv_op_ctxt *poc = container_of(ctxt, struct priv_op_ctxt, ctxt);
     struct vcpu *curr = current;
@@ -447,9 +447,9 @@ static int priv_op_write_io(unsigned int port, unsigned int bytes,
     return X86EMUL_OKAY;
 }
 
-static int priv_op_read_segment(enum x86_segment seg,
-                                struct segment_register *reg,
-                                struct x86_emulate_ctxt *ctxt)
+static int read_segment(enum x86_segment seg,
+                        struct segment_register *reg,
+                        struct x86_emulate_ctxt *ctxt)
 {
     /* Check if this is an attempt to access the I/O bitmap. */
     if ( seg == x86_seg_tr )
@@ -561,10 +561,10 @@ static int pv_emul_virt_to_linear(unsigned long base, unsigned long offset,
     return rc;
 }
 
-static int priv_op_rep_ins(uint16_t port,
-                           enum x86_segment seg, unsigned long offset,
-                           unsigned int bytes_per_rep, unsigned long *reps,
-                           struct x86_emulate_ctxt *ctxt)
+static int rep_ins(uint16_t port,
+                   enum x86_segment seg, unsigned long offset,
+                   unsigned int bytes_per_rep, unsigned long *reps,
+                   struct x86_emulate_ctxt *ctxt)
 {
     struct priv_op_ctxt *poc = container_of(ctxt, struct priv_op_ctxt, ctxt);
     struct vcpu *curr = current;
@@ -580,7 +580,7 @@ static int priv_op_rep_ins(uint16_t port,
     if ( !guest_io_okay(port, bytes_per_rep, curr, ctxt->regs) )
         return X86EMUL_UNHANDLEABLE;
 
-    rc = priv_op_read_segment(x86_seg_es, &sreg, ctxt);
+    rc = read_segment(x86_seg_es, &sreg, ctxt);
     if ( rc != X86EMUL_OKAY )
         return rc;
 
@@ -628,10 +628,10 @@ static int priv_op_rep_ins(uint16_t port,
     return X86EMUL_OKAY;
 }
 
-static int priv_op_rep_outs(enum x86_segment seg, unsigned long offset,
-                            uint16_t port,
-                            unsigned int bytes_per_rep, unsigned long *reps,
-                            struct x86_emulate_ctxt *ctxt)
+static int rep_outs(enum x86_segment seg, unsigned long offset,
+                    uint16_t port,
+                    unsigned int bytes_per_rep, unsigned long *reps,
+                    struct x86_emulate_ctxt *ctxt)
 {
     struct priv_op_ctxt *poc = container_of(ctxt, struct priv_op_ctxt, ctxt);
     struct vcpu *curr = current;
@@ -645,7 +645,7 @@ static int priv_op_rep_outs(enum x86_segment seg, unsigned long offset,
     if ( !guest_io_okay(port, bytes_per_rep, curr, ctxt->regs) )
         return X86EMUL_UNHANDLEABLE;
 
-    rc = priv_op_read_segment(seg, &sreg, ctxt);
+    rc = read_segment(seg, &sreg, ctxt);
     if ( rc != X86EMUL_OKAY )
         return rc;
 
@@ -696,8 +696,8 @@ static int priv_op_rep_outs(enum x86_segment seg, unsigned long offset,
     return X86EMUL_OKAY;
 }
 
-static int priv_op_read_cr(unsigned int reg, unsigned long *val,
-                           struct x86_emulate_ctxt *ctxt)
+static int read_cr(unsigned int reg, unsigned long *val,
+                   struct x86_emulate_ctxt *ctxt)
 {
     const struct vcpu *curr = current;
 
@@ -740,8 +740,8 @@ static int priv_op_read_cr(unsigned int reg, unsigned long *val,
     return X86EMUL_UNHANDLEABLE;
 }
 
-static int priv_op_write_cr(unsigned int reg, unsigned long val,
-                            struct x86_emulate_ctxt *ctxt)
+static int write_cr(unsigned int reg, unsigned long val,
+                    struct x86_emulate_ctxt *ctxt)
 {
     struct vcpu *curr = current;
 
@@ -797,8 +797,8 @@ static int priv_op_write_cr(unsigned int reg, unsigned long val,
     return X86EMUL_UNHANDLEABLE;
 }
 
-static int priv_op_read_dr(unsigned int reg, unsigned long *val,
-                           struct x86_emulate_ctxt *ctxt)
+static int read_dr(unsigned int reg, unsigned long *val,
+                   struct x86_emulate_ctxt *ctxt)
 {
     unsigned long res = do_get_debugreg(reg);
 
@@ -810,8 +810,8 @@ static int priv_op_read_dr(unsigned int reg, unsigned long *val,
     return X86EMUL_OKAY;
 }
 
-static int priv_op_write_dr(unsigned int reg, unsigned long val,
-                            struct x86_emulate_ctxt *ctxt)
+static int write_dr(unsigned int reg, unsigned long val,
+                    struct x86_emulate_ctxt *ctxt)
 {
     return do_set_debugreg(reg, val) == 0
            ? X86EMUL_OKAY : X86EMUL_UNHANDLEABLE;
@@ -833,8 +833,8 @@ static inline bool is_cpufreq_controller(const struct domain *d)
             is_hardware_domain(d));
 }
 
-static int priv_op_read_msr(unsigned int reg, uint64_t *val,
-                            struct x86_emulate_ctxt *ctxt)
+static int read_msr(unsigned int reg, uint64_t *val,
+                    struct x86_emulate_ctxt *ctxt)
 {
     struct priv_op_ctxt *poc = container_of(ctxt, struct priv_op_ctxt, ctxt);
     const struct vcpu *curr = current;
@@ -997,8 +997,8 @@ static int priv_op_read_msr(unsigned int reg, uint64_t *val,
     return X86EMUL_UNHANDLEABLE;
 }
 
-static int priv_op_write_msr(unsigned int reg, uint64_t val,
-                             struct x86_emulate_ctxt *ctxt)
+static int write_msr(unsigned int reg, uint64_t val,
+                     struct x86_emulate_ctxt *ctxt)
 {
     struct vcpu *curr = current;
     const struct domain *currd = curr->domain;
@@ -1205,7 +1205,8 @@ static int priv_op_write_msr(unsigned int reg, uint64_t val,
     return X86EMUL_UNHANDLEABLE;
 }
 
-static int priv_op_wbinvd(struct x86_emulate_ctxt *ctxt)
+/* Name it differently to avoid clashing with wbinvd() */
+static int _wbinvd(struct x86_emulate_ctxt *ctxt)
 {
     /* Ignore the instruction if unprivileged. */
     if ( !cache_flush_permitted(current->domain) )
@@ -1228,8 +1229,8 @@ int pv_emul_cpuid(uint32_t leaf, uint32_t subleaf,
     return X86EMUL_OKAY;
 }
 
-static int priv_op_validate(const struct x86_emulate_state *state,
-                            struct x86_emulate_ctxt *ctxt)
+static int validate(const struct x86_emulate_state *state,
+                    struct x86_emulate_ctxt *ctxt)
 {
     switch ( ctxt->opcode )
     {
@@ -1278,11 +1279,11 @@ static int priv_op_validate(const struct x86_emulate_state *state,
     return X86EMUL_UNHANDLEABLE;
 }
 
-static int priv_op_insn_fetch(enum x86_segment seg,
-                              unsigned long offset,
-                              void *p_data,
-                              unsigned int bytes,
-                              struct x86_emulate_ctxt *ctxt)
+static int insn_fetch(enum x86_segment seg,
+                      unsigned long offset,
+                      void *p_data,
+                      unsigned int bytes,
+                      struct x86_emulate_ctxt *ctxt)
 {
     const struct priv_op_ctxt *poc =
         container_of(ctxt, struct priv_op_ctxt, ctxt);
@@ -1316,22 +1317,22 @@ static int priv_op_insn_fetch(enum x86_segment seg,
 
 
 static const struct x86_emulate_ops priv_op_ops = {
-    .insn_fetch          = priv_op_insn_fetch,
+    .insn_fetch          = insn_fetch,
     .read                = x86emul_unhandleable_rw,
-    .validate            = priv_op_validate,
-    .read_io             = priv_op_read_io,
-    .write_io            = priv_op_write_io,
-    .rep_ins             = priv_op_rep_ins,
-    .rep_outs            = priv_op_rep_outs,
-    .read_segment        = priv_op_read_segment,
-    .read_cr             = priv_op_read_cr,
-    .write_cr            = priv_op_write_cr,
-    .read_dr             = priv_op_read_dr,
-    .write_dr            = priv_op_write_dr,
-    .read_msr            = priv_op_read_msr,
-    .write_msr           = priv_op_write_msr,
+    .validate            = validate,
+    .read_io             = read_io,
+    .write_io            = write_io,
+    .rep_ins             = rep_ins,
+    .rep_outs            = rep_outs,
+    .read_segment        = read_segment,
+    .read_cr             = read_cr,
+    .write_cr            = write_cr,
+    .read_dr             = read_dr,
+    .write_dr            = write_dr,
+    .read_msr            = read_msr,
+    .write_msr           = write_msr,
     .cpuid               = pv_emul_cpuid,
-    .wbinvd              = priv_op_wbinvd,
+    .wbinvd              = _wbinvd,
 };
 
 int pv_emulate_privileged_op(struct cpu_user_regs *regs)
