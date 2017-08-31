@@ -190,7 +190,7 @@ long arch_do_sysctl(
             sysctl->u.psr_cat_op.u.cat_info.flags =
                                       data[PSR_INFO_IDX_CAT_FLAG];
 
-            if ( !ret && __copy_field_to_guest(u_sysctl, sysctl, u.psr_cat_op) )
+            if ( __copy_field_to_guest(u_sysctl, sysctl, u.psr_cat_op) )
                 ret = -EFAULT;
             break;
         }
@@ -209,7 +209,7 @@ long arch_do_sysctl(
             sysctl->u.psr_cat_op.u.cat_info.flags =
                                       data[PSR_INFO_IDX_CAT_FLAG];
 
-            if ( !ret && __copy_field_to_guest(u_sysctl, sysctl, u.psr_cat_op) )
+            if ( __copy_field_to_guest(u_sysctl, sysctl, u.psr_cat_op) )
                 ret = -EFAULT;
             break;
         }
