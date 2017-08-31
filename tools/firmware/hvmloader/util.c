@@ -883,7 +883,7 @@ static void acpi_mem_free(struct acpi_ctxt *ctxt,
     /* ACPI builder currently doesn't free memory so this is just a stub */
 }
 
-static uint8_t acpi_lapic_id(unsigned cpu)
+static uint32_t acpi_lapic_id(unsigned cpu)
 {
     return LAPIC_ID(cpu);
 }

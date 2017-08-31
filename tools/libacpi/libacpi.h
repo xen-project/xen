@@ -91,7 +91,7 @@ struct acpi_config {
     unsigned long rsdp;
 
     /* x86-specific parameters */
-    uint8_t (*lapic_id)(unsigned cpu);
+    uint32_t (*lapic_id)(unsigned cpu);
     uint32_t lapic_base_address;
     uint32_t ioapic_base_address;
     uint16_t pci_isa_irq_mask;

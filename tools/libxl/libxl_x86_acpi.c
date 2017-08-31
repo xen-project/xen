@@ -84,7 +84,7 @@ static void acpi_mem_free(struct acpi_ctxt *ctxt,
 {
 }
 
-static uint8_t acpi_lapic_id(unsigned cpu)
+static uint32_t acpi_lapic_id(unsigned cpu)
 {
     return cpu * 2;
 }
