@@ -27,12 +27,16 @@ static DEFINE_PER_CPU(unsigned int, batching);
 
 static void __do_softirq(unsigned long ignore_mask)
 {
-    unsigned int i, cpu = smp_processor_id();
+    unsigned int i, cpu;
     unsigned long pending;
 
     for ( ; ; )
     {
-        ASSERT(cpu == smp_processor_id());
+        /*
+         * Initialise @cpu on every iteration: SCHEDULE_SOFTIRQ may move
+         * us to another processor.
+         */
+        cpu = smp_processor_id();
 
         if ( rcu_pending(cpu) )
             rcu_check_callbacks(cpu);
