@@ -41,9 +41,6 @@
 #define LOWCHUNK_MAXOFFSET      0x0000FFFF
 #define OVMF_INFO_PHYSICAL_ADDRESS 0x00001000
 
-extern unsigned char dsdt_anycpu_qemu_xen[];
-extern int dsdt_anycpu_qemu_xen_len;
-
 #define OVMF_INFO_MAX_TABLES 4
 struct ovmf_info {
     char signature[14]; /* XenHVMOVMF\0\0\0\0 */

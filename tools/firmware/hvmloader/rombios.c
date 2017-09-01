@@ -42,9 +42,6 @@
 #define ROMBIOS_MAXOFFSET      0x0000FFFF
 #define ROMBIOS_END            (ROMBIOS_BEGIN + ROMBIOS_SIZE)
 
-extern unsigned char dsdt_anycpu[], dsdt_15cpu[];
-extern int dsdt_anycpu_len, dsdt_15cpu_len;
-
 static void rombios_setup_e820(void)
 {
     /*

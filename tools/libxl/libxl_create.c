@@ -451,7 +451,7 @@ int libxl__domain_build(libxl__gc *gc,
         vments[4] = "start_time";
         vments[5] = GCSPRINTF("%lu.%02d", start_time.tv_sec,(int)start_time.tv_usec/10000);
 
-        localents = libxl__calloc(gc, 11, sizeof(char *));
+        localents = libxl__calloc(gc, 13, sizeof(char *));
         i = 0;
         localents[i++] = "platform/acpi";
         localents[i++] = libxl__acpi_defbool_val(info) ? "1" : "0";
@@ -472,6 +472,8 @@ int libxl__domain_build(libxl__gc *gc,
                                    info->u.hvm.mmio_hole_memkb << 10);
             }
         }
+        localents[i++] = "platform/device-model";
+        localents[i++] = (char *)libxl_device_model_version_to_string(info->device_model_version);
 
         break;
     case LIBXL_DOMAIN_TYPE_PV:
