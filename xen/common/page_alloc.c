@@ -171,7 +171,9 @@ static unsigned long __initdata opt_bootscrub_chunk = MB(128);
 size_param("bootscrub_chunk", opt_bootscrub_chunk);
 
 #ifdef CONFIG_SCRUB_DEBUG
-static bool __read_mostly boot_scrub_done;
+static bool __read_mostly scrub_debug;
+#else
+#define scrub_debug    false
 #endif
 
 /*
@@ -725,7 +727,7 @@ static void check_one_page(struct page_info *pg)
     const uint64_t *ptr;
     unsigned int i;
 
-    if ( !boot_scrub_done )
+    if ( !scrub_debug )
         return;
 
     ptr = map_domain_page(mfn);
@@ -1696,12 +1698,7 @@ static void init_heap_pages(
             nr_pages -= n;
         }
 
-#ifndef CONFIG_SCRUB_DEBUG
-        free_heap_pages(pg + i, 0, false);
-#else
-        free_heap_pages(pg + i, 0, boot_scrub_done);
-#endif
-	
+        free_heap_pages(pg + i, 0, scrub_debug);
     }
 }
 
@@ -1965,7 +1962,7 @@ static void __init scrub_heap_pages(void)
     printk("done.\n");
 
 #ifdef CONFIG_SCRUB_DEBUG
-    boot_scrub_done = true;
+    scrub_debug = true;
 #endif
 }
 
