@@ -1662,8 +1662,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
         cr4_pv32_mask |= X86_CR4_SMAP;
     }
 
-    /* Scrub RAM that is still free and so may go to an unprivileged domain. */
-    scrub_heap_pages();
+    heap_init_late();
 
     init_trace_bufs();
 

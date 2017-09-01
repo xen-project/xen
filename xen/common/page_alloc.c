@@ -1839,7 +1839,7 @@ static int __init find_non_smt(unsigned int node, cpumask_t *dest)
  * Scrub all unallocated pages in all heap zones. This function uses all
  * online cpu's to scrub the memory in parallel.
  */
-void __init scrub_heap_pages(void)
+static void __init scrub_heap_pages(void)
 {
     cpumask_t node_cpus, all_worker_cpus;
     unsigned int i, j;
@@ -1848,9 +1848,6 @@ void __init scrub_heap_pages(void)
     unsigned long rem = 0;
     int last_distance, best_node;
     int cpus;
-
-    if ( !opt_bootscrub )
-        return;
 
     cpumask_clear(&all_worker_cpus);
     /* Scrub block size. */
@@ -1970,12 +1967,19 @@ void __init scrub_heap_pages(void)
 #ifdef CONFIG_SCRUB_DEBUG
     boot_scrub_done = true;
 #endif
-
-    /* Now that the heap is initialized, run checks and set bounds
-     * for the low mem virq algorithm. */
-    setup_low_mem_virq();
 }
 
+void __init heap_init_late(void)
+{
+    /*
+     * Now that the heap is initialized set bounds
+     * for the low mem virq algorithm.
+     */
+    setup_low_mem_virq();
+
+    if ( opt_bootscrub )
+        scrub_heap_pages();
+}
 
 
 /*************************

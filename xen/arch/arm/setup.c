@@ -861,8 +861,7 @@ void __init start_xen(unsigned long boot_phys_offset,
     if ( construct_dom0(dom0) != 0)
             panic("Could not set up DOM0 guest OS");
 
-    /* Scrub RAM that is still free and so may go to an unprivileged domain. */
-    scrub_heap_pages();
+    heap_init_late();
 
     init_constructors();
 

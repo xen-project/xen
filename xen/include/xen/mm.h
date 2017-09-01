@@ -199,7 +199,7 @@ int offline_page(unsigned long mfn, int broken, uint32_t *status);
 int query_page_offline(unsigned long mfn, uint32_t *status);
 unsigned long total_free_pages(void);
 
-void scrub_heap_pages(void);
+void heap_init_late(void);
 
 int assign_pages(
     struct domain *d,
