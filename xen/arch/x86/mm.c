@@ -4964,7 +4964,6 @@ long arch_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
  */
 
 struct ptwr_emulate_ctxt {
-    struct x86_emulate_ctxt ctxt;
     unsigned long cr2;
     l1_pgentry_t  pte;
 };
@@ -4995,7 +4994,7 @@ static int ptwr_emulated_update(
     paddr_t val,
     unsigned int bytes,
     unsigned int do_cmpxchg,
-    struct ptwr_emulate_ctxt *ptwr_ctxt)
+    struct x86_emulate_ctxt *ctxt)
 {
     unsigned long mfn;
     unsigned long unaligned_addr = addr;
@@ -5003,6 +5002,7 @@ static int ptwr_emulated_update(
     l1_pgentry_t pte, ol1e, nl1e, *pl1e;
     struct vcpu *v = current;
     struct domain *d = v->domain;
+    struct ptwr_emulate_ctxt *ptwr_ctxt = ctxt->data;
     int ret;
 
     /* Only allow naturally-aligned stores within the original %cr2 page. */
@@ -5026,7 +5026,7 @@ static int ptwr_emulated_update(
         {
             x86_emul_pagefault(0, /* Read fault. */
                                addr + sizeof(paddr_t) - rc,
-                               &ptwr_ctxt->ctxt);
+                               ctxt);
             return X86EMUL_EXCEPTION;
         }
         /* Mask out bits provided by caller. */
@@ -5141,9 +5141,7 @@ static int ptwr_emulated_write(
 
     memcpy(&val, p_data, bytes);
 
-    return ptwr_emulated_update(
-        offset, 0, val, bytes, 0,
-        container_of(ctxt, struct ptwr_emulate_ctxt, ctxt));
+    return ptwr_emulated_update(offset, 0, val, bytes, 0, ctxt);
 }
 
 static int ptwr_emulated_cmpxchg(
@@ -5166,9 +5164,7 @@ static int ptwr_emulated_cmpxchg(
     memcpy(&old, p_old, bytes);
     memcpy(&new, p_new, bytes);
 
-    return ptwr_emulated_update(
-        offset, old, new, bytes, 1,
-        container_of(ctxt, struct ptwr_emulate_ctxt, ctxt));
+    return ptwr_emulated_update(offset, old, new, bytes, 1, ctxt);
 }
 
 static const struct x86_emulate_ops ptwr_emulate_ops = {
@@ -5187,14 +5183,14 @@ int ptwr_do_page_fault(struct vcpu *v, unsigned long addr,
     struct domain *d = v->domain;
     struct page_info *page;
     l1_pgentry_t      pte;
-    struct ptwr_emulate_ctxt ptwr_ctxt = {
-        .ctxt = {
-            .regs = regs,
-            .vendor = d->arch.cpuid->x86_vendor,
-            .addr_size = is_pv_32bit_domain(d) ? 32 : BITS_PER_LONG,
-            .sp_size   = is_pv_32bit_domain(d) ? 32 : BITS_PER_LONG,
-            .lma       = !is_pv_32bit_domain(d),
-        },
+    struct ptwr_emulate_ctxt ptwr_ctxt;
+    struct x86_emulate_ctxt ctxt = {
+       .regs = regs,
+       .vendor = d->arch.cpuid->x86_vendor,
+       .addr_size = is_pv_32bit_domain(d) ? 32 : BITS_PER_LONG,
+       .sp_size   = is_pv_32bit_domain(d) ? 32 : BITS_PER_LONG,
+       .lma       = !is_pv_32bit_domain(d),
+       .data      = &ptwr_ctxt,
     };
     int rc;
 
@@ -5224,7 +5220,7 @@ int ptwr_do_page_fault(struct vcpu *v, unsigned long addr,
     ptwr_ctxt.cr2 = addr;
     ptwr_ctxt.pte = pte;
 
-    rc = x86_emulate(&ptwr_ctxt.ctxt, &ptwr_emulate_ops);
+    rc = x86_emulate(&ctxt, &ptwr_emulate_ops);
 
     page_unlock(page);
     put_page(page);
@@ -5239,18 +5235,18 @@ int ptwr_do_page_fault(struct vcpu *v, unsigned long addr,
          * emulation bug, or a guest playing with the instruction stream under
          * Xen's feet.
          */
-        if ( ptwr_ctxt.ctxt.event.type == X86_EVENTTYPE_HW_EXCEPTION &&
-             ptwr_ctxt.ctxt.event.vector == TRAP_page_fault )
-            pv_inject_event(&ptwr_ctxt.ctxt.event);
+        if ( ctxt.event.type == X86_EVENTTYPE_HW_EXCEPTION &&
+             ctxt.event.vector == TRAP_page_fault )
+            pv_inject_event(&ctxt.event);
         else
             gdprintk(XENLOG_WARNING,
                      "Unexpected event (type %u, vector %#x) from emulation\n",
-                     ptwr_ctxt.ctxt.event.type, ptwr_ctxt.ctxt.event.vector);
+                     ctxt.event.type, ctxt.event.vector);
 
         /* Fallthrough */
     case X86EMUL_OKAY:
 
-        if ( ptwr_ctxt.ctxt.retire.singlestep )
+        if ( ctxt.retire.singlestep )
             pv_inject_hw_exception(TRAP_debug, X86_EVENT_NO_EC);
 
         /* Fallthrough */
