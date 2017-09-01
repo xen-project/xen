@@ -144,9 +144,21 @@ static inline l3_pgentry_t unadjust_guest_l3e(l3_pgentry_t l3e,
 static inline l4_pgentry_t adjust_guest_l4e(l4_pgentry_t l4e,
                                             const struct domain *d)
 {
-    if ( likely(l4e_get_flags(l4e) & _PAGE_PRESENT) &&
-         likely(!is_pv_32bit_domain(d)) )
-        l4e_add_flags(l4e, _PAGE_USER);
+    /*
+     * When shadowing an L4 behind the guests back (e.g. for per-pcpu
+     * purposes), we cannot efficiently sync access bit updates from hardware
+     * (on the shadow tables) back into the guest view.
+     *
+     * We therefore unconditionally set _PAGE_ACCESSED even in the guests
+     * view.  This will appear to the guest as a CPU which proactively pulls
+     * all valid L4e's into its TLB, which is compatible with the x86 ABI.
+     *
+     * At the time of writing, all PV guests set the access bit anyway, so
+     * this is no actual change in their behaviour.
+     */
+    if ( likely(l4e_get_flags(l4e) & _PAGE_PRESENT) )
+        l4e_add_flags(l4e, (_PAGE_ACCESSED |
+                            (is_pv_32bit_domain(d) ? 0 : _PAGE_USER)));
 
     return l4e;
 }
