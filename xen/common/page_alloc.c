@@ -714,6 +714,9 @@ static void poison_one_page(struct page_info *pg)
     mfn_t mfn = _mfn(page_to_mfn(pg));
     uint64_t *ptr;
 
+    if ( !scrub_debug )
+        return;
+
     ptr = map_domain_page(mfn);
     *ptr = ~SCRUB_PATTERN;
     unmap_domain_page(ptr);
