@@ -2248,16 +2248,12 @@ void free_domheap_pages(struct page_info *pg, unsigned int order)
 
             spin_unlock_recursive(&d->page_alloc_lock);
 
-#ifndef CONFIG_SCRUB_DEBUG
             /*
              * Normally we expect a domain to clear pages before freeing them,
              * if it cares about the secrecy of their contents. However, after
              * a domain has died we assume responsibility for erasure.
              */
-            scrub = !!d->is_dying;
-#else
-            scrub = true;
-#endif
+            scrub = d->is_dying || scrub_debug;
         }
         else
         {
