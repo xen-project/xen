@@ -511,10 +511,7 @@ extern int mmcfg_intercept_write(enum x86_segment seg,
 int pv_emul_cpuid(uint32_t leaf, uint32_t subleaf,
                   struct cpuid_leaf *res, struct x86_emulate_ctxt *ctxt);
 
-int  ptwr_do_page_fault(struct vcpu *, unsigned long,
-                        struct cpu_user_regs *);
-int  mmio_ro_do_page_fault(struct vcpu *, unsigned long,
-                           struct cpu_user_regs *);
+int pv_ro_page_fault(unsigned long, struct cpu_user_regs *);
 
 int audit_adjust_pgtables(struct domain *d, int dir, int noisy);
 

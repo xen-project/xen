@@ -1308,16 +1308,18 @@ static int fixup_page_fault(unsigned long addr, struct cpu_user_regs *regs)
          !(regs->error_code & (PFEC_reserved_bit | PFEC_insn_fetch)) &&
          (regs->error_code & PFEC_write_access) )
     {
-        if ( VM_ASSIST(d, writable_pagetables) &&
-             /* Do not check if access-protection fault since the page may
-                legitimately be not present in shadow page tables */
-             (paging_mode_enabled(d) ||
-              (regs->error_code & PFEC_page_present)) &&
-             ptwr_do_page_fault(v, addr, regs) )
-            return EXCRET_fault_fixed;
+        bool ptwr, mmio_ro;
 
-        if ( is_hardware_domain(d) && (regs->error_code & PFEC_page_present) &&
-             mmio_ro_do_page_fault(v, addr, regs) )
+        ptwr = VM_ASSIST(d, writable_pagetables) &&
+               /* Do not check if access-protection fault since the page may
+                  legitimately be not present in shadow page tables */
+               (paging_mode_enabled(d) ||
+                (regs->error_code & PFEC_page_present));
+
+        mmio_ro = is_hardware_domain(d) &&
+                  (regs->error_code & PFEC_page_present);
+
+        if ( (ptwr || mmio_ro) && pv_ro_page_fault(addr, regs) )
             return EXCRET_fault_fixed;
     }
 

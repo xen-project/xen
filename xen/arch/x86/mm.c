@@ -5177,86 +5177,40 @@ static const struct x86_emulate_ops ptwr_emulate_ops = {
 };
 
 /* Write page fault handler: check if guest is trying to modify a PTE. */
-int ptwr_do_page_fault(struct vcpu *v, unsigned long addr,
-                       struct cpu_user_regs *regs)
+static int ptwr_do_page_fault(struct x86_emulate_ctxt *ctxt,
+                              unsigned long addr, l1_pgentry_t pte)
 {
-    struct domain *d = v->domain;
-    struct page_info *page;
-    l1_pgentry_t      pte;
-    struct ptwr_emulate_ctxt ptwr_ctxt;
-    struct x86_emulate_ctxt ctxt = {
-       .regs = regs,
-       .vendor = d->arch.cpuid->x86_vendor,
-       .addr_size = is_pv_32bit_domain(d) ? 32 : BITS_PER_LONG,
-       .sp_size   = is_pv_32bit_domain(d) ? 32 : BITS_PER_LONG,
-       .lma       = !is_pv_32bit_domain(d),
-       .data      = &ptwr_ctxt,
+    struct ptwr_emulate_ctxt ptwr_ctxt = {
+        .cr2 = addr,
+        .pte = pte,
     };
+    struct page_info *page;
     int rc;
 
-    /* Attempt to read the PTE that maps the VA being accessed. */
-    pte = guest_get_eff_l1e(addr);
-
-    /* We are looking only for read-only mappings of p.t. pages. */
-    if ( ((l1e_get_flags(pte) & (_PAGE_PRESENT|_PAGE_RW)) != _PAGE_PRESENT) ||
-         rangeset_contains_singleton(mmio_ro_ranges, l1e_get_pfn(pte)) ||
-         !get_page_from_mfn(l1e_get_mfn(pte), d) )
-        goto bail;
+    if ( !get_page_from_mfn(l1e_get_mfn(pte), current->domain) )
+        return X86EMUL_UNHANDLEABLE;
 
     page = l1e_get_page(pte);
     if ( !page_lock(page) )
     {
         put_page(page);
-        goto bail;
+        return X86EMUL_UNHANDLEABLE;
     }
 
     if ( (page->u.inuse.type_info & PGT_type_mask) != PGT_l1_page_table )
     {
         page_unlock(page);
         put_page(page);
-        goto bail;
+        return X86EMUL_UNHANDLEABLE;
     }
 
-    ptwr_ctxt.cr2 = addr;
-    ptwr_ctxt.pte = pte;
-
-    rc = x86_emulate(&ctxt, &ptwr_emulate_ops);
+    ctxt->data = &ptwr_ctxt;
+    rc = x86_emulate(ctxt, &ptwr_emulate_ops);
 
     page_unlock(page);
     put_page(page);
 
-    switch ( rc )
-    {
-    case X86EMUL_EXCEPTION:
-        /*
-         * This emulation only covers writes to pagetables which are marked
-         * read-only by Xen.  We tolerate #PF (in case a concurrent pagetable
-         * update has succeeded on a different vcpu).  Anything else is an
-         * emulation bug, or a guest playing with the instruction stream under
-         * Xen's feet.
-         */
-        if ( ctxt.event.type == X86_EVENTTYPE_HW_EXCEPTION &&
-             ctxt.event.vector == TRAP_page_fault )
-            pv_inject_event(&ctxt.event);
-        else
-            gdprintk(XENLOG_WARNING,
-                     "Unexpected event (type %u, vector %#x) from emulation\n",
-                     ctxt.event.type, ctxt.event.vector);
-
-        /* Fallthrough */
-    case X86EMUL_OKAY:
-
-        if ( ctxt.retire.singlestep )
-            pv_inject_hw_exception(TRAP_debug, X86_EVENT_NO_EC);
-
-        /* Fallthrough */
-    case X86EMUL_RETRY:
-        perfc_incr(ptwr_emulations);
-        return EXCRET_fault_fixed;
-    }
-
- bail:
-    return 0;
+    return rc;
 }
 
 /*************************
@@ -5332,80 +5286,28 @@ static const struct x86_emulate_ops mmcfg_intercept_ops = {
 };
 
 /* Check if guest is trying to modify a r/o MMIO page. */
-int mmio_ro_do_page_fault(struct vcpu *v, unsigned long addr,
-                          struct cpu_user_regs *regs)
+static int mmio_ro_do_page_fault(struct x86_emulate_ctxt *ctxt,
+                                 unsigned long addr, l1_pgentry_t pte)
 {
-    l1_pgentry_t pte;
-    unsigned long mfn;
-    unsigned int addr_size = is_pv_32bit_vcpu(v) ? 32 : BITS_PER_LONG;
     struct mmio_ro_emulate_ctxt mmio_ro_ctxt = { .cr2 = addr };
-    struct x86_emulate_ctxt ctxt = {
-        .regs = regs,
-        .vendor = v->domain->arch.cpuid->x86_vendor,
-        .addr_size = addr_size,
-        .sp_size = addr_size,
-        .lma = !is_pv_32bit_vcpu(v),
-        .data = &mmio_ro_ctxt,
-    };
-    int rc;
+    mfn_t mfn = l1e_get_mfn(pte);
 
-    /* Attempt to read the PTE that maps the VA being accessed. */
-    pte = guest_get_eff_l1e(addr);
-
-    /* We are looking only for read-only mappings of MMIO pages. */
-    if ( ((l1e_get_flags(pte) & (_PAGE_PRESENT|_PAGE_RW)) != _PAGE_PRESENT) )
-        return 0;
-
-    mfn = l1e_get_pfn(pte);
-    if ( mfn_valid(_mfn(mfn)) )
+    if ( mfn_valid(mfn) )
     {
-        struct page_info *page = mfn_to_page(_mfn(mfn));
-        struct domain *owner = page_get_owner_and_reference(page);
+        struct page_info *page = mfn_to_page(mfn);
+        const struct domain *owner = page_get_owner_and_reference(page);
 
         if ( owner )
             put_page(page);
         if ( owner != dom_io )
-            return 0;
+            return X86EMUL_UNHANDLEABLE;
     }
 
-    if ( !rangeset_contains_singleton(mmio_ro_ranges, mfn) )
-        return 0;
-
-    if ( pci_ro_mmcfg_decode(mfn, &mmio_ro_ctxt.seg, &mmio_ro_ctxt.bdf) )
-        rc = x86_emulate(&ctxt, &mmcfg_intercept_ops);
+    ctxt->data = &mmio_ro_ctxt;
+    if ( pci_ro_mmcfg_decode(mfn_x(mfn), &mmio_ro_ctxt.seg, &mmio_ro_ctxt.bdf) )
+        return x86_emulate(ctxt, &mmcfg_intercept_ops);
     else
-        rc = x86_emulate(&ctxt, &mmio_ro_emulate_ops);
-
-    switch ( rc )
-    {
-    case X86EMUL_EXCEPTION:
-        /*
-         * This emulation only covers writes to MMCFG space or read-only MFNs.
-         * We tolerate #PF (from hitting an adjacent page or a successful
-         * concurrent pagetable update).  Anything else is an emulation bug,
-         * or a guest playing with the instruction stream under Xen's feet.
-         */
-        if ( ctxt.event.type == X86_EVENTTYPE_HW_EXCEPTION &&
-             ctxt.event.vector == TRAP_page_fault )
-            pv_inject_event(&ctxt.event);
-        else
-            gdprintk(XENLOG_WARNING,
-                     "Unexpected event (type %u, vector %#x) from emulation\n",
-                     ctxt.event.type, ctxt.event.vector);
-
-        /* Fallthrough */
-    case X86EMUL_OKAY:
-
-        if ( ctxt.retire.singlestep )
-            pv_inject_hw_exception(TRAP_debug, X86_EVENT_NO_EC);
-
-        /* Fallthrough */
-    case X86EMUL_RETRY:
-        perfc_incr(mmio_ro_emulations);
-        return EXCRET_fault_fixed;
-    }
-
-    return 0;
+        return x86_emulate(ctxt, &mmio_ro_emulate_ops);
 }
 
 void *alloc_xen_pagetable(void)
@@ -6437,6 +6339,70 @@ void write_32bit_pse_identmap(uint32_t *l2)
     for ( i = 0; i < PAGE_SIZE / sizeof(*l2); i++ )
         l2[i] = ((i << 22) | _PAGE_PRESENT | _PAGE_RW | _PAGE_USER |
                  _PAGE_ACCESSED | _PAGE_DIRTY | _PAGE_PSE);
+}
+
+int pv_ro_page_fault(unsigned long addr, struct cpu_user_regs *regs)
+{
+    l1_pgentry_t pte;
+    const struct domain *currd = current->domain;
+    unsigned int addr_size = is_pv_32bit_domain(currd) ? 32 : BITS_PER_LONG;
+    struct x86_emulate_ctxt ctxt = {
+        .regs      = regs,
+        .vendor    = currd->arch.cpuid->x86_vendor,
+        .addr_size = addr_size,
+        .sp_size   = addr_size,
+        .lma       = addr_size > 32,
+    };
+    int rc;
+    bool mmio_ro;
+
+    /* Attempt to read the PTE that maps the VA being accessed. */
+    pte = guest_get_eff_l1e(addr);
+
+    /* We are only looking for read-only mappings */
+    if ( ((l1e_get_flags(pte) & (_PAGE_PRESENT | _PAGE_RW)) != _PAGE_PRESENT) )
+        return 0;
+
+    mmio_ro = rangeset_contains_singleton(mmio_ro_ranges, l1e_get_pfn(pte));
+    if ( mmio_ro )
+        rc = mmio_ro_do_page_fault(&ctxt, addr, pte);
+    else
+        rc = ptwr_do_page_fault(&ctxt, addr, pte);
+
+    switch ( rc )
+    {
+    case X86EMUL_EXCEPTION:
+        /*
+         * This emulation covers writes to:
+         *  - L1 pagetables.
+         *  - MMCFG space or read-only MFNs.
+         * We tolerate #PF (from hitting an adjacent page or a successful
+         * concurrent pagetable update).  Anything else is an emulation bug,
+         * or a guest playing with the instruction stream under Xen's feet.
+         */
+        if ( ctxt.event.type == X86_EVENTTYPE_HW_EXCEPTION &&
+             ctxt.event.vector == TRAP_page_fault )
+            pv_inject_event(&ctxt.event);
+        else
+            gdprintk(XENLOG_WARNING,
+                     "Unexpected event (type %u, vector %#x) from emulation\n",
+                     ctxt.event.type, ctxt.event.vector);
+
+        /* Fallthrough */
+    case X86EMUL_OKAY:
+        if ( ctxt.retire.singlestep )
+            pv_inject_hw_exception(TRAP_debug, X86_EVENT_NO_EC);
+
+        /* Fallthrough */
+    case X86EMUL_RETRY:
+        if ( mmio_ro )
+            perfc_incr(mmio_ro_emulations);
+        else
+            perfc_incr(ptwr_emulations);
+        return EXCRET_fault_fixed;
+    }
+
+    return 0;
 }
 
 /*
