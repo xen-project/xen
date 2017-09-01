@@ -1219,52 +1219,62 @@ get_page_from_l4e(
     return rc;
 }
 
-#define adjust_guest_l1e(pl1e, d)                                            \
-    do {                                                                     \
-        if ( likely(l1e_get_flags((pl1e)) & _PAGE_PRESENT) &&                \
-             likely(!is_pv_32bit_domain(d)) )                                \
-        {                                                                    \
-            /* _PAGE_GUEST_KERNEL page cannot have the Global bit set. */    \
-            if ( (l1e_get_flags((pl1e)) & (_PAGE_GUEST_KERNEL|_PAGE_GLOBAL)) \
-                 == (_PAGE_GUEST_KERNEL|_PAGE_GLOBAL) )                      \
-                gdprintk(XENLOG_WARNING,                                     \
-                         "Global bit is set to kernel page %lx\n",           \
-                         l1e_get_pfn((pl1e)));                               \
-            if ( !(l1e_get_flags((pl1e)) & _PAGE_USER) )                     \
-                l1e_add_flags((pl1e), (_PAGE_GUEST_KERNEL|_PAGE_USER));      \
-            if ( !(l1e_get_flags((pl1e)) & _PAGE_GUEST_KERNEL) )             \
-                l1e_add_flags((pl1e), (_PAGE_GLOBAL|_PAGE_USER));            \
-        }                                                                    \
-    } while ( 0 )
+static l1_pgentry_t adjust_guest_l1e(l1_pgentry_t l1e, const struct domain *d)
+{
+    if ( likely(l1e_get_flags(l1e) & _PAGE_PRESENT) &&
+         likely(!is_pv_32bit_domain(d)) )
+    {
+        /* _PAGE_GUEST_KERNEL page cannot have the Global bit set. */
+        if ( (l1e_get_flags(l1e) & (_PAGE_GUEST_KERNEL | _PAGE_GLOBAL)) ==
+             (_PAGE_GUEST_KERNEL | _PAGE_GLOBAL) )
+            gdprintk(XENLOG_WARNING, "Global bit is set in kernel page %lx\n",
+                     l1e_get_pfn(l1e));
 
-#define adjust_guest_l2e(pl2e, d)                               \
-    do {                                                        \
-        if ( likely(l2e_get_flags((pl2e)) & _PAGE_PRESENT) &&   \
-             likely(!is_pv_32bit_domain(d)) )                   \
-            l2e_add_flags((pl2e), _PAGE_USER);                  \
-    } while ( 0 )
+        if ( !(l1e_get_flags(l1e) & _PAGE_USER) )
+            l1e_add_flags(l1e, (_PAGE_GUEST_KERNEL | _PAGE_USER));
 
-#define adjust_guest_l3e(pl3e, d)                                   \
-    do {                                                            \
-        if ( likely(l3e_get_flags((pl3e)) & _PAGE_PRESENT) )        \
-            l3e_add_flags((pl3e), likely(!is_pv_32bit_domain(d)) ?  \
-                                         _PAGE_USER :               \
-                                         _PAGE_USER|_PAGE_RW);      \
-    } while ( 0 )
+        if ( !(l1e_get_flags(l1e) & _PAGE_GUEST_KERNEL) )
+            l1e_add_flags(l1e, (_PAGE_GLOBAL | _PAGE_USER));
+    }
 
-#define adjust_guest_l4e(pl4e, d)                               \
-    do {                                                        \
-        if ( likely(l4e_get_flags((pl4e)) & _PAGE_PRESENT) &&   \
-             likely(!is_pv_32bit_domain(d)) )                   \
-            l4e_add_flags((pl4e), _PAGE_USER);                  \
-    } while ( 0 )
+    return l1e;
+}
 
-#define unadjust_guest_l3e(pl3e, d)                                         \
-    do {                                                                    \
-        if ( unlikely(is_pv_32bit_domain(d)) &&                             \
-             likely(l3e_get_flags((pl3e)) & _PAGE_PRESENT) )                \
-            l3e_remove_flags((pl3e), _PAGE_USER|_PAGE_RW|_PAGE_ACCESSED);   \
-    } while ( 0 )
+static l2_pgentry_t adjust_guest_l2e(l2_pgentry_t l2e, const struct domain *d)
+{
+    if ( likely(l2e_get_flags(l2e) & _PAGE_PRESENT) &&
+         likely(!is_pv_32bit_domain(d)) )
+        l2e_add_flags(l2e, _PAGE_USER);
+
+    return l2e;
+}
+
+static l3_pgentry_t adjust_guest_l3e(l3_pgentry_t l3e, const struct domain *d)
+{
+    if ( likely(l3e_get_flags(l3e) & _PAGE_PRESENT) )
+        l3e_add_flags(l3e, (likely(!is_pv_32bit_domain(d))
+                            ? _PAGE_USER : _PAGE_USER | _PAGE_RW));
+
+    return l3e;
+}
+
+static l3_pgentry_t unadjust_guest_l3e(l3_pgentry_t l3e, const struct domain *d)
+{
+    if ( unlikely(is_pv_32bit_domain(d)) &&
+         likely(l3e_get_flags(l3e) & _PAGE_PRESENT) )
+        l3e_remove_flags(l3e, _PAGE_USER | _PAGE_RW | _PAGE_ACCESSED);
+
+    return l3e;
+}
+
+static l4_pgentry_t adjust_guest_l4e(l4_pgentry_t l4e, const struct domain *d)
+{
+    if ( likely(l4e_get_flags(l4e) & _PAGE_PRESENT) &&
+         likely(!is_pv_32bit_domain(d)) )
+        l4e_add_flags(l4e, _PAGE_USER);
+
+    return l4e;
+}
 
 void put_page_from_l1e(l1_pgentry_t l1e, struct domain *l1e_owner)
 {
@@ -1436,7 +1446,7 @@ static int alloc_l1_table(struct page_info *page)
             break;
         }
 
-        adjust_guest_l1e(pl1e[i], d);
+        pl1e[i] = adjust_guest_l1e(pl1e[i], d);
     }
 
     unmap_domain_page(pl1e);
@@ -1525,7 +1535,7 @@ static int alloc_l2_table(struct page_info *page, unsigned long type,
             break;
         }
 
-        adjust_guest_l2e(pl2e[i], d);
+        pl2e[i] = adjust_guest_l2e(pl2e[i], d);
     }
 
     if ( rc >= 0 && (type & PGT_pae_xen_l2) )
@@ -1591,7 +1601,7 @@ static int alloc_l3_table(struct page_info *page)
         if ( rc < 0 )
             break;
 
-        adjust_guest_l3e(pl3e[i], d);
+        pl3e[i] = adjust_guest_l3e(pl3e[i], d);
     }
 
     if ( rc >= 0 && !create_pae_xen_mappings(d, pl3e) )
@@ -1606,7 +1616,7 @@ static int alloc_l3_table(struct page_info *page)
             current->arch.old_guest_table = page;
         }
         while ( i-- > 0 )
-            unadjust_guest_l3e(pl3e[i], d);
+            pl3e[i] = unadjust_guest_l3e(pl3e[i], d);
     }
 
     unmap_domain_page(pl3e);
@@ -1716,7 +1726,7 @@ static int alloc_l4_table(struct page_info *page)
             return rc;
         }
 
-        adjust_guest_l4e(pl4e[i], d);
+        pl4e[i] = adjust_guest_l4e(pl4e[i], d);
     }
 
     if ( rc >= 0 )
@@ -1791,7 +1801,7 @@ static int free_l3_table(struct page_info *page)
         partial = 0;
         if ( rc > 0 )
             continue;
-        unadjust_guest_l3e(pl3e[i], d);
+        pl3e[i] = unadjust_guest_l3e(pl3e[i], d);
     } while ( i-- );
 
     unmap_domain_page(pl3e);
@@ -1978,7 +1988,7 @@ static int mod_l1_entry(l1_pgentry_t *pl1e, l1_pgentry_t nl1e,
         /* Fast path for sufficiently-similar mappings. */
         if ( !l1e_has_changed(ol1e, nl1e, ~FASTPATH_FLAG_WHITELIST) )
         {
-            adjust_guest_l1e(nl1e, pt_dom);
+            nl1e = adjust_guest_l1e(nl1e, pt_dom);
             rc = UPDATE_ENTRY(l1, pl1e, ol1e, nl1e, gl1mfn, pt_vcpu,
                               preserve_ad);
             if ( page )
@@ -2003,7 +2013,7 @@ static int mod_l1_entry(l1_pgentry_t *pl1e, l1_pgentry_t nl1e,
         if ( page )
             put_page(page);
 
-        adjust_guest_l1e(nl1e, pt_dom);
+        nl1e = adjust_guest_l1e(nl1e, pt_dom);
         if ( unlikely(!UPDATE_ENTRY(l1, pl1e, ol1e, nl1e, gl1mfn, pt_vcpu,
                                     preserve_ad)) )
         {
@@ -2057,7 +2067,7 @@ static int mod_l2_entry(l2_pgentry_t *pl2e,
         /* Fast path for sufficiently-similar mappings. */
         if ( !l2e_has_changed(ol2e, nl2e, ~FASTPATH_FLAG_WHITELIST) )
         {
-            adjust_guest_l2e(nl2e, d);
+            nl2e = adjust_guest_l2e(nl2e, d);
             if ( UPDATE_ENTRY(l2, pl2e, ol2e, nl2e, pfn, vcpu, preserve_ad) )
                 return 0;
             return -EBUSY;
@@ -2066,7 +2076,7 @@ static int mod_l2_entry(l2_pgentry_t *pl2e,
         if ( unlikely((rc = get_page_from_l2e(nl2e, pfn, d)) < 0) )
             return rc;
 
-        adjust_guest_l2e(nl2e, d);
+        nl2e = adjust_guest_l2e(nl2e, d);
         if ( unlikely(!UPDATE_ENTRY(l2, pl2e, ol2e, nl2e, pfn, vcpu,
                                     preserve_ad)) )
         {
@@ -2117,7 +2127,7 @@ static int mod_l3_entry(l3_pgentry_t *pl3e,
         /* Fast path for sufficiently-similar mappings. */
         if ( !l3e_has_changed(ol3e, nl3e, ~FASTPATH_FLAG_WHITELIST) )
         {
-            adjust_guest_l3e(nl3e, d);
+            nl3e = adjust_guest_l3e(nl3e, d);
             rc = UPDATE_ENTRY(l3, pl3e, ol3e, nl3e, pfn, vcpu, preserve_ad);
             return rc ? 0 : -EFAULT;
         }
@@ -2127,7 +2137,7 @@ static int mod_l3_entry(l3_pgentry_t *pl3e,
             return rc;
         rc = 0;
 
-        adjust_guest_l3e(nl3e, d);
+        nl3e = adjust_guest_l3e(nl3e, d);
         if ( unlikely(!UPDATE_ENTRY(l3, pl3e, ol3e, nl3e, pfn, vcpu,
                                     preserve_ad)) )
         {
@@ -2182,7 +2192,7 @@ static int mod_l4_entry(l4_pgentry_t *pl4e,
         /* Fast path for sufficiently-similar mappings. */
         if ( !l4e_has_changed(ol4e, nl4e, ~FASTPATH_FLAG_WHITELIST) )
         {
-            adjust_guest_l4e(nl4e, d);
+            nl4e = adjust_guest_l4e(nl4e, d);
             rc = UPDATE_ENTRY(l4, pl4e, ol4e, nl4e, pfn, vcpu, preserve_ad);
             return rc ? 0 : -EFAULT;
         }
@@ -2192,7 +2202,7 @@ static int mod_l4_entry(l4_pgentry_t *pl4e,
             return rc;
         rc = 0;
 
-        adjust_guest_l4e(nl4e, d);
+        nl4e = adjust_guest_l4e(nl4e, d);
         if ( unlikely(!UPDATE_ENTRY(l4, pl4e, ol4e, nl4e, pfn, vcpu,
                                     preserve_ad)) )
         {
@@ -3824,7 +3834,7 @@ static int create_grant_pte_mapping(
     if ( !IS_ALIGNED(pte_addr, sizeof(nl1e)) )
         return GNTST_general_error;
 
-    adjust_guest_l1e(nl1e, d);
+    nl1e = adjust_guest_l1e(nl1e, d);
 
     gmfn = pte_addr >> PAGE_SHIFT;
     page = get_page_from_gfn(d, gmfn, NULL, P2M_ALLOC);
@@ -3959,7 +3969,7 @@ static int create_grant_va_mapping(
     struct page_info *l1pg;
     int okay;
 
-    adjust_guest_l1e(nl1e, d);
+    nl1e = adjust_guest_l1e(nl1e, d);
 
     pl1e = guest_map_l1e(va, &gl1mfn);
     if ( !pl1e )
@@ -5084,7 +5094,7 @@ static int ptwr_emulated_update(
         break;
     }
 
-    adjust_guest_l1e(nl1e, d);
+    nl1e = adjust_guest_l1e(nl1e, d);
 
     /* Checked successfully: do the update (write or cmpxchg). */
     pl1e = map_domain_page(_mfn(mfn));
