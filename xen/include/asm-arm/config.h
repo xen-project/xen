@@ -48,8 +48,6 @@
 
 #define INVALID_VCPU_ID MAX_VIRT_CPUS
 
-#define asmlinkage /* Nothing needed */
-
 #define __LINUX_ARM_ARCH__ 7
 #define CONFIG_AEABI
 

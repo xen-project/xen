@@ -22,7 +22,7 @@ enum {
 
 typedef void (*softirq_handler)(void);
 
-asmlinkage void do_softirq(void);
+void do_softirq(void);
 void open_softirq(int nr, softirq_handler handler);
 void softirq_init(void);
 

@@ -185,7 +185,7 @@ void init_traps(void)
     isb();
 }
 
-asmlinkage void __div0(void)
+void __div0(void)
 {
     printk("Division by zero in hypervisor.\n");
     BUG();
@@ -2824,7 +2824,7 @@ static void enter_hypervisor_head(struct cpu_user_regs *regs)
     }
 }
 
-asmlinkage void do_trap_guest_sync(struct cpu_user_regs *regs)
+void do_trap_guest_sync(struct cpu_user_regs *regs)
 {
     const union hsr hsr = { .bits = regs->hsr };
 
@@ -2952,7 +2952,7 @@ asmlinkage void do_trap_guest_sync(struct cpu_user_regs *regs)
     }
 }
 
-asmlinkage void do_trap_hyp_sync(struct cpu_user_regs *regs)
+void do_trap_hyp_sync(struct cpu_user_regs *regs)
 {
     const union hsr hsr = { .bits = regs->hsr };
 
@@ -2973,33 +2973,33 @@ asmlinkage void do_trap_hyp_sync(struct cpu_user_regs *regs)
     }
 }
 
-asmlinkage void do_trap_hyp_serror(struct cpu_user_regs *regs)
+void do_trap_hyp_serror(struct cpu_user_regs *regs)
 {
     enter_hypervisor_head(regs);
 
     __do_trap_serror(regs, VABORT_GEN_BY_GUEST(regs));
 }
 
-asmlinkage void do_trap_guest_serror(struct cpu_user_regs *regs)
+void do_trap_guest_serror(struct cpu_user_regs *regs)
 {
     enter_hypervisor_head(regs);
 
     __do_trap_serror(regs, true);
 }
 
-asmlinkage void do_trap_irq(struct cpu_user_regs *regs)
+void do_trap_irq(struct cpu_user_regs *regs)
 {
     enter_hypervisor_head(regs);
     gic_interrupt(regs, 0);
 }
 
-asmlinkage void do_trap_fiq(struct cpu_user_regs *regs)
+void do_trap_fiq(struct cpu_user_regs *regs)
 {
     enter_hypervisor_head(regs);
     gic_interrupt(regs, 1);
 }
 
-asmlinkage void leave_hypervisor_tail(void)
+void leave_hypervisor_tail(void)
 {
     while (1)
     {

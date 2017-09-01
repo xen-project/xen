@@ -23,7 +23,7 @@
 
 #include <asm/processor.h>
 
-asmlinkage void do_trap_undefined_instruction(struct cpu_user_regs *regs)
+void do_trap_undefined_instruction(struct cpu_user_regs *regs)
 {
     uint32_t pc = regs->pc;
     uint32_t instr;
@@ -50,17 +50,17 @@ die:
     do_unexpected_trap("Undefined Instruction", regs);
 }
 
-asmlinkage void do_trap_hypervisor_call(struct cpu_user_regs *regs)
+void do_trap_hypervisor_call(struct cpu_user_regs *regs)
 {
     do_unexpected_trap("Hypervisor Call", regs);
 }
 
-asmlinkage void do_trap_prefetch_abort(struct cpu_user_regs *regs)
+void do_trap_prefetch_abort(struct cpu_user_regs *regs)
 {
     do_unexpected_trap("Prefetch Abort", regs);
 }
 
-asmlinkage void do_trap_data_abort(struct cpu_user_regs *regs)
+void do_trap_data_abort(struct cpu_user_regs *regs)
 {
     /*
      * We cannot distinguish Xen SErrors from synchronous data aborts. We

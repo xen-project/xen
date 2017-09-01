@@ -105,8 +105,6 @@ extern unsigned short boot_edid_caps;
 extern unsigned char boot_edid_info[128];
 #endif
 
-#define asmlinkage
-
 #include <xen/const.h>
 
 #define PML4_ENTRY_BITS  39
