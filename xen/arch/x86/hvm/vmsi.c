@@ -104,10 +104,9 @@ void vmsi_deliver_pirq(struct domain *d, const struct hvm_pirq_dpci *pirq_dpci)
     uint32_t flags = pirq_dpci->gmsi.gflags;
     int vector = pirq_dpci->gmsi.gvec;
     uint8_t dest = (uint8_t)flags;
-    uint8_t dest_mode = !!(flags & VMSI_DM_MASK);
-    uint8_t delivery_mode = (flags & VMSI_DELIV_MASK)
-        >> GFLAGS_SHIFT_DELIV_MODE;
-    uint8_t trig_mode = (flags&VMSI_TRIG_MODE) >> GFLAGS_SHIFT_TRG_MODE;
+    bool dest_mode = flags & XEN_DOMCTL_VMSI_X86_DM_MASK;
+    uint8_t delivery_mode = MASK_EXTR(flags, XEN_DOMCTL_VMSI_X86_DELIV_MASK);
+    bool trig_mode = flags & XEN_DOMCTL_VMSI_X86_TRIG_MASK;
 
     HVM_DBG_LOG(DBG_LEVEL_IOAPIC,
                 "msi: dest=%x dest_mode=%x delivery_mode=%x "
