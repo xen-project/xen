@@ -887,32 +887,21 @@ void __init subarch_init_memory(void)
         }
     }
 
-    /* Mark low 16Mb of direct map NX if hardware supports it. */
+    /* Mark all of direct map NX if hardware supports it. */
     if ( !cpu_has_nx )
         return;
 
-    v = DIRECTMAP_VIRT_START + (1UL << 20);
-    l3e = l4e_to_l3e(idle_pg_table[l4_table_offset(v)])[l3_table_offset(v)];
-    ASSERT(l3e_get_flags(l3e) & _PAGE_PRESENT);
-    do {
-        l2e = l3e_to_l2e(l3e)[l2_table_offset(v)];
-        ASSERT(l2e_get_flags(l2e) & _PAGE_PRESENT);
-        if ( l2e_get_flags(l2e) & _PAGE_PSE )
-        {
-            l2e_add_flags(l2e, _PAGE_NX_BIT);
-            l3e_to_l2e(l3e)[l2_table_offset(v)] = l2e;
-            v += 1 << L2_PAGETABLE_SHIFT;
-        }
-        else
-        {
-            l1_pgentry_t l1e = l2e_to_l1e(l2e)[l1_table_offset(v)];
+    for ( i = l4_table_offset(DIRECTMAP_VIRT_START);
+          i < l4_table_offset(DIRECTMAP_VIRT_END); ++i )
+    {
+        l4_pgentry_t l4e = idle_pg_table[i];
 
-            ASSERT(l1e_get_flags(l1e) & _PAGE_PRESENT);
-            l1e_add_flags(l1e, _PAGE_NX_BIT);
-            l2e_to_l1e(l2e)[l1_table_offset(v)] = l1e;
-            v += 1 << L1_PAGETABLE_SHIFT;
+        if ( l4e_get_flags(l4e) & _PAGE_PRESENT )
+        {
+            l4e_add_flags(l4e, _PAGE_NX_BIT);
+            idle_pg_table[i] = l4e;
         }
-    } while ( v < DIRECTMAP_VIRT_START + (16UL << 20) );
+    }
 }
 
 long subarch_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
