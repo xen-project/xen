@@ -163,9 +163,7 @@ else
 CFLAGS += -O2 -fomit-frame-pointer
 endif
 
-LIBXL_BLKTAP ?= $(CONFIG_BLKTAP2)
-
-ifeq ($(LIBXL_BLKTAP),y)
+ifeq ($(CONFIG_BLKTAP2),y)
 CFLAGS_libblktapctl = -I$(XEN_BLKTAP2)/control -I$(XEN_BLKTAP2)/include $(CFLAGS_xeninclude)
 SHDEPS_libblktapctl =
 LDLIBS_libblktapctl = $(SHDEPS_libblktapctl) $(XEN_BLKTAP2)/control/libblktapctl$(libextension)

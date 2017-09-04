@@ -46,7 +46,7 @@ LIBXL_LIBS += $(LIBXL_LIBS-y)
 LIBXLU_LIBS = $(LDLIBS_libxenlight)
 
 LIBXL_OBJS-y = osdeps.o libxl_paths.o libxl_bootloader.o flexarray.o
-ifeq ($(LIBXL_BLKTAP),y)
+ifeq ($(CONFIG_BLKTAP2),y)
 LIBXL_OBJS-y += libxl_blktap2.o
 else
 LIBXL_OBJS-y += libxl_noblktap2.o
