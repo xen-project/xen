@@ -294,8 +294,8 @@ int main_psr_cmt_show(int argc, char **argv)
 
 static int psr_l3_cat_hwinfo(void)
 {
-    int rc, nr;
-    unsigned int i;
+    int rc;
+    unsigned int i, nr;
     uint32_t l3_cache_size;
     libxl_psr_cat_info *info;
 
@@ -424,7 +424,7 @@ static int psr_cat_print_socket(uint32_t domid, libxl_psr_cat_info *info,
 
 static int psr_cat_show(uint32_t domid, unsigned int lvl)
 {
-    int i, nr;
+    unsigned int i, nr;
     int rc;
     libxl_psr_cat_info *info;
 
@@ -453,8 +453,7 @@ out:
 static int psr_l2_cat_hwinfo(void)
 {
     int rc;
-    unsigned int i;
-    int nr;
+    unsigned int i, nr;
     libxl_psr_cat_info *info;
 
     rc = libxl_psr_cat_get_info(ctx, &info, &nr, 2);

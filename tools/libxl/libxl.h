@@ -2224,7 +2224,7 @@ int libxl_psr_cat_get_cbm(libxl_ctx *ctx, uint32_t domid,
  * and the length in 'nr'.
  */
 int libxl_psr_cat_get_info(libxl_ctx *ctx, libxl_psr_cat_info **info,
-                           int *nr, unsigned int lvl);
+                           unsigned int *nr, unsigned int lvl);
 int libxl_psr_cat_get_l3_info(libxl_ctx *ctx, libxl_psr_cat_info **info,
                               int *nr);
 void libxl_psr_cat_info_list_free(libxl_psr_cat_info *list, int nr);

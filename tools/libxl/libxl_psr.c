@@ -362,7 +362,7 @@ int libxl_psr_cat_get_cbm(libxl_ctx *ctx, uint32_t domid,
 }
 
 int libxl_psr_cat_get_info(libxl_ctx *ctx, libxl_psr_cat_info **info,
-                           int *nr, unsigned int lvl)
+                           unsigned int *nr, unsigned int lvl)
 {
     GC_INIT(ctx);
     int rc;
@@ -410,8 +410,11 @@ int libxl_psr_cat_get_l3_info(libxl_ctx *ctx, libxl_psr_cat_info **info,
                               int *nr)
 {
     int rc;
+    unsigned int num;
 
-    rc = libxl_psr_cat_get_info(ctx, info, nr, 3);
+    rc = libxl_psr_cat_get_info(ctx, info, &num, 3);
+    if (!rc)
+        *nr = num;
 
     return rc;
 }
