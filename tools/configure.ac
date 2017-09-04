@@ -119,12 +119,8 @@ AC_SUBST(LINUX_BACKEND_MODULES)
 dnl Enable blktap2 on Linux only.
 AC_ARG_ENABLE([blktap2],
     AS_HELP_STRING([--enable-blktap2],
-                   [Enable blktap2, (DEFAULT is on for Linux, otherwise off)]),,[
-    case "$host_os" in
-        linux*)
-           enable_blktap2="yes";;
-        *) enable_blktap2="no";;
-    esac
+                   [Enable blktap2, (DEFAULT is off)]),,[
+        enable_blktap2="no"
 ])
 AS_IF([test "x$enable_blktap2" = "xyes"], [
 AC_DEFINE([HAVE_BLKTAP2], [1], [Blktap2 enabled])

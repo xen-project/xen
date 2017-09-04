@@ -1490,8 +1490,7 @@ Optional Features:
   --disable-xsmpolicy     Disable XSM policy compilation (default is ENABLED)
   --enable-ovmf           Enable OVMF (default is DISABLED)
   --disable-seabios       Disable SeaBIOS (default is ENABLED)
-  --enable-blktap2        Enable blktap2, (DEFAULT is on for Linux, otherwise
-                          off)
+  --enable-blktap2        Enable blktap2, (DEFAULT is off)
   --enable-qemu-traditional
                           Enable qemu traditional device model, (DEFAULT is on
                           for Linux or NetBSD x86, otherwise off)
@@ -4214,11 +4213,7 @@ if test "${enable_blktap2+set}" = set; then :
   enableval=$enable_blktap2;
 else
 
-    case "$host_os" in
-        linux*)
-           enable_blktap2="yes";;
-        *) enable_blktap2="no";;
-    esac
+        enable_blktap2="no"
 
 fi
 
