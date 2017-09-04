@@ -192,18 +192,18 @@ p2m_next_level(struct p2m_domain *p2m, void **table,
                unsigned long *gfn_remainder, unsigned long gfn, u32 shift,
                u32 max, unsigned long type, bool_t unmap)
 {
-    l1_pgentry_t *l1_entry;
-    l1_pgentry_t *p2m_entry;
-    l1_pgentry_t new_entry;
+    l1_pgentry_t *p2m_entry, new_entry;
     void *next;
-    int i;
+    unsigned int flags;
 
     if ( !(p2m_entry = p2m_find_entry(*table, gfn_remainder, gfn,
                                       shift, max)) )
         return -ENOENT;
 
+    flags = l1e_get_flags(*p2m_entry);
+
     /* PoD/paging: Not present doesn't imply empty. */
-    if ( !l1e_get_flags(*p2m_entry) )
+    if ( !flags )
     {
         struct page_info *pg;
 
@@ -231,68 +231,66 @@ p2m_next_level(struct p2m_domain *p2m, void **table,
             break;
         }
     }
-
-    ASSERT(l1e_get_flags(*p2m_entry) & (_PAGE_PRESENT|_PAGE_PSE));
-
-    /* split 1GB pages into 2MB pages */
-    if ( type == PGT_l2_page_table && (l1e_get_flags(*p2m_entry) & _PAGE_PSE) )
+    else if ( flags & _PAGE_PSE )
     {
-        unsigned long flags, pfn;
+        /* Split superpages pages into smaller ones. */
+        unsigned long pfn = l1e_get_pfn(*p2m_entry);
         struct page_info *pg;
+        l1_pgentry_t *l1_entry;
+        unsigned int i, level;
 
-        pg = p2m_alloc_ptp(p2m, PGT_l2_page_table);
+        switch ( type )
+        {
+        case PGT_l2_page_table:
+            level = 2;
+            break;
+
+        case PGT_l1_page_table:
+            /*
+             * New splintered mappings inherit the flags of the old superpage,
+             * with a little reorganisation for the _PAGE_PSE_PAT bit.
+             */
+            if ( pfn & 1 )           /* ==> _PAGE_PSE_PAT was set */
+                pfn -= 1;            /* Clear it; _PAGE_PSE becomes _PAGE_PAT */
+            else
+                flags &= ~_PAGE_PSE; /* Clear _PAGE_PSE (== _PAGE_PAT) */
+
+            level = 1;
+            break;
+
+        default:
+            ASSERT_UNREACHABLE();
+            return -EINVAL;
+        }
+
+        pg = p2m_alloc_ptp(p2m, type);
         if ( pg == NULL )
             return -ENOMEM;
 
-        flags = l1e_get_flags(*p2m_entry);
-        pfn = l1e_get_pfn(*p2m_entry);
-
         l1_entry = __map_domain_page(pg);
-        for ( i = 0; i < L2_PAGETABLE_ENTRIES; i++ )
+
+        /* Inherit original IOMMU permissions, but update Next Level. */
+        if ( iommu_hap_pt_share )
         {
-            new_entry = l1e_from_pfn(pfn | (i * L1_PAGETABLE_ENTRIES), flags);
-            p2m_add_iommu_flags(&new_entry, 1, IOMMUF_readable|IOMMUF_writable);
-            p2m->write_p2m_entry(p2m, gfn, l1_entry + i, new_entry, 2);
+            flags &= ~iommu_nlevel_to_flags(~0, 0);
+            flags |= iommu_nlevel_to_flags(level - 1, 0);
         }
-        unmap_domain_page(l1_entry);
-        new_entry = l1e_from_page(pg, P2M_BASE_FLAGS | _PAGE_RW); /* disable PSE */
-        p2m_add_iommu_flags(&new_entry, 2, IOMMUF_readable|IOMMUF_writable);
-        p2m->write_p2m_entry(p2m, gfn, p2m_entry, new_entry, 3);
-    }
 
-
-    /* split single 2MB large page into 4KB page in P2M table */
-    if ( type == PGT_l1_page_table && (l1e_get_flags(*p2m_entry) & _PAGE_PSE) )
-    {
-        unsigned long flags, pfn;
-        struct page_info *pg;
-
-        pg = p2m_alloc_ptp(p2m, PGT_l1_page_table);
-        if ( pg == NULL )
-            return -ENOMEM;
-
-        /* New splintered mappings inherit the flags of the old superpage, 
-         * with a little reorganisation for the _PAGE_PSE_PAT bit. */
-        flags = l1e_get_flags(*p2m_entry);
-        pfn = l1e_get_pfn(*p2m_entry);
-        if ( pfn & 1 )           /* ==> _PAGE_PSE_PAT was set */
-            pfn -= 1;            /* Clear it; _PAGE_PSE becomes _PAGE_PAT */
-        else
-            flags &= ~_PAGE_PSE; /* Clear _PAGE_PSE (== _PAGE_PAT) */
-        
-        l1_entry = __map_domain_page(pg);
-        for ( i = 0; i < L1_PAGETABLE_ENTRIES; i++ )
+        for ( i = 0; i < (1u << PAGETABLE_ORDER); i++ )
         {
-            new_entry = l1e_from_pfn(pfn | i, flags);
-            p2m_add_iommu_flags(&new_entry, 0, 0);
-            p2m->write_p2m_entry(p2m, gfn, l1_entry + i, new_entry, 1);
+            new_entry = l1e_from_pfn(pfn | (i << ((level - 1) * PAGETABLE_ORDER)),
+                                     flags);
+            p2m->write_p2m_entry(p2m, gfn, l1_entry + i, new_entry, level);
         }
+
         unmap_domain_page(l1_entry);
-        
+
         new_entry = l1e_from_page(pg, P2M_BASE_FLAGS | _PAGE_RW);
-        p2m_add_iommu_flags(&new_entry, 1, IOMMUF_readable|IOMMUF_writable);
-        p2m->write_p2m_entry(p2m, gfn, p2m_entry, new_entry, 2);
+        p2m_add_iommu_flags(&new_entry, level, IOMMUF_readable|IOMMUF_writable);
+        p2m->write_p2m_entry(p2m, gfn, p2m_entry, new_entry, level + 1);
     }
+    else
+        ASSERT(flags & _PAGE_PRESENT);
 
     next = map_domain_page(l1e_get_mfn(*p2m_entry));
     if ( unmap )
