@@ -35,4 +35,4 @@ distclean: clean
 
 .PHONY: all build clean distclean install lvm-util uninstall
 
--include $(DEPS)
+-include $(DEPS_INCLUDE)

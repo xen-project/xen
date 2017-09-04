@@ -122,4 +122,4 @@ clean: subdirs-clean
 .PHONY: distclean
 distclean: clean
 
--include $(DEPS)
+-include $(DEPS_INCLUDE)

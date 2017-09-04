@@ -102,4 +102,4 @@ distclean: clean
 
 install: all
 
--include $(DEPS)
+-include $(DEPS_INCLUDE)

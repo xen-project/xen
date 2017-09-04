@@ -355,4 +355,4 @@ distclean: clean
 realclean: distclean
 	$(RM) -f $(AUTOSRCS) $(AUTOINCS)
 
--include $(DEPS)
+-include $(DEPS_INCLUDE)

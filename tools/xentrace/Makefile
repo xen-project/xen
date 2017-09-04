@@ -61,5 +61,5 @@ xentrace_setsize: setsize.o
 xenalyze: xenalyze.o mread.o
 	$(CC) $(LDFLAGS) -o $@ $^ $(ARGP_LDFLAGS) $(APPEND_LDFLAGS)
 
--include $(DEPS)
+-include $(DEPS_INCLUDE)
 

@@ -184,7 +184,7 @@ clean:
 .PHONY: distclean
 distclean: clean
 
--include $(DEPS)
+-include $(DEPS_INCLUDE)
 
 genpath-target = $(call buildmakevars2header,src/_paths.h)
 $(eval $(genpath-target))

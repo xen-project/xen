@@ -85,4 +85,4 @@ distclean: clean
 
 .PHONY: all build clean distclean install libvhd uninstall
 
--include $(DEPS)
+-include $(DEPS_INCLUDE)

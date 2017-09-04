@@ -55,4 +55,4 @@ xenbaked: xenbaked.o Makefile
 xentrace_setmask: setmask.o Makefile
 	$(CC) $(LDFLAGS) $< -o $@ $(LDLIBS) $(APPEND_LDFLAGS)
 
--include $(DEPS)
+-include $(DEPS_INCLUDE)

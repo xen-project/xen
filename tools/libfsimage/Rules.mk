@@ -31,4 +31,4 @@ $(FSLIB): $(PIC_OBJS)
 clean distclean::
 	rm -f $(PIC_OBJS) $(FSLIB) $(DEPS_RM)
 
--include $(DEPS)
+-include $(DEPS_INCLUDE)

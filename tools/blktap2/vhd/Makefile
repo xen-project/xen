@@ -52,4 +52,4 @@ distclean: clean
 
 .PHONY: all build clean distclean install uninstall vhd-util vhd-update
 
--include $(DEPS)
+-include $(DEPS_INCLUDE)

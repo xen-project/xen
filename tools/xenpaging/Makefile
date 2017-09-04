@@ -42,4 +42,4 @@ distclean: clean
 TAGS:
 	etags -t $(SRCS) *.h
 
--include $(DEPS)
+-include $(DEPS_INCLUDE)

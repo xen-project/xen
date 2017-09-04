@@ -51,5 +51,5 @@ libfsimage.so.$(MAJOR): libfsimage.so.$(MAJOR).$(MINOR)
 libfsimage.so.$(MAJOR).$(MINOR): $(PIC_OBJS)
 	$(CC) $(LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libfsimage.so.$(MAJOR) $(SHLIB_LDFLAGS) -o $@ $^ $(PTHREAD_LIBS) $(APPEND_LDFLAGS)
 
--include $(DEPS)
+-include $(DEPS_INCLUDE)
 

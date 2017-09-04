@@ -204,4 +204,4 @@ $(filter %.init.o,$(obj-y) $(obj-bin-y) $(extra-y)): %.init.o: %.o Makefile
 %.s: %.S Makefile
 	$(CPP) $(AFLAGS) $< -o $@
 
--include $(DEPS)
+-include $(DEPS_INCLUDE)

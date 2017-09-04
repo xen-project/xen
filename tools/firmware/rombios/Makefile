@@ -31,4 +31,4 @@ BIOS-bochs-latest: rombios.c biossums 32bitgateway.c tcgbios.c
 biossums: biossums.c
 	gcc -o biossums biossums.c
 
--include $(DEPS)
+-include $(DEPS_INCLUDE)

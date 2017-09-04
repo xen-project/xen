@@ -28,4 +28,4 @@ distclean: clean
 xen-access: xen-access.o Makefile
 	$(CC) -o $@ $< $(LDFLAGS) $(LDLIBS_libxenctrl) $(LDLIBS_libxenguest) $(LDLIBS_libxenevtchn)
 
--include $(DEPS)
+-include $(DEPS_INCLUDE)

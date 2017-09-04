@@ -211,7 +211,7 @@ clients-install: clients
 		ln -f $(DESTDIR)$(bindir)/xenstore $(DESTDIR)$(bindir)/$${c} ; \
 	done
 
--include $(DEPS)
+-include $(DEPS_INCLUDE)
 
 # never delete any intermediate files.
 .SECONDARY:

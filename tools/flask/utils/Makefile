@@ -59,4 +59,4 @@ install: all
 uninstall:
 	rm -f $(addprefix $(DESTDIR)$(sbindir)/, $(CLIENTS))
 
--include $(DEPS)
+-include $(DEPS_INCLUDE)

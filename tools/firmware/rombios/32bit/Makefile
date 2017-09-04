@@ -32,4 +32,4 @@ $(TARGET): 32bitbios_all.o
 	    exit 11;                                         \
 	  } || :
 
--include $(DEPS)
+-include $(DEPS_INCLUDE)

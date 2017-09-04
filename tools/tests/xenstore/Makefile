@@ -24,4 +24,4 @@ distclean: clean
 xs-test: xs-test.o Makefile
 	$(CC) -o $@ $< $(LDFLAGS) $(LDLIBS_libxenstore)
 
--include $(DEPS)
+-include $(DEPS_INCLUDE)

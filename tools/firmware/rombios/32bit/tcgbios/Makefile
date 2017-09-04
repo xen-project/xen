@@ -20,4 +20,4 @@ distclean: clean
 $(TARGET): tcgbios.o tpm_drivers.o
 	$(LD) $(LDFLAGS_DIRECT) -r $^ -o $@
 
--include $(DEPS)
+-include $(DEPS_INCLUDE)

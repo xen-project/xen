@@ -86,4 +86,4 @@ clean:
 
 distclean: clean
 
--include $(DEPS)
+-include $(DEPS_INCLUDE)

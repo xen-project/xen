@@ -46,4 +46,4 @@ distclean: clean
 
 .PHONY: all build clean install distclean uninstall
 
--include $(DEPS)
+-include $(DEPS_INCLUDE)

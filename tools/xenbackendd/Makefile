@@ -42,4 +42,4 @@ xenbackendd: xenbackendd.o
 genpath-target = $(call buildmakevars2header,_paths.h)
 $(eval $(genpath-target))
 
--include $(DEPS)
+-include $(DEPS_INCLUDE)

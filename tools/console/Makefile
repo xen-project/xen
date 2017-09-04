@@ -54,4 +54,4 @@ uninstall:
 	rm -f $(DESTDIR)$(LIBEXEC_BIN)/xenconsole
 	rm -f $(DESTDIR)$(sbindir)/xenconsoled
 
--include $(DEPS)
+-include $(DEPS_INCLUDE)
