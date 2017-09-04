@@ -70,7 +70,7 @@ uninstall:
 
 .PHONY: clean
 clean:
-	$(RM) *.o $(TARGETS_BUILD) *~ $(DEPS)
+	$(RM) *.o $(TARGETS_BUILD) *~ $(DEPS_RM)
 
 .PHONY: distclean
 distclean: clean

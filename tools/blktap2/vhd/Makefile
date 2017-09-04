@@ -46,7 +46,7 @@ uninstall:
 	rm -f $(addprefix $(DESTDIR)$(INST_DIR)/, $(IBIN))
 
 clean: subdirs-clean
-	rm -rf *.o *~ $(DEPS) $(IBIN)
+	rm -rf *.o *~ $(DEPS_RM) $(IBIN)
 
 distclean: clean
 

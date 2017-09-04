@@ -52,7 +52,7 @@ uninstall:
 
 .PHONY: clean
 clean:
-	$(RM) -f *.o xl _paths.h $(DEPS)
+	$(RM) -f *.o xl _paths.h $(DEPS_RM)
 
 distclean: clean
 

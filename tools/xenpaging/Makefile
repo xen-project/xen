@@ -32,7 +32,7 @@ uninstall:
 	rm -f $(addprefix $(DESTDIR)$(LIBEXEC_BIN)/, $(IBINS))
 
 clean:
-	rm -f *.o *~ $(DEPS) xen TAGS $(IBINS) $(LIB)
+	rm -f *.o *~ $(DEPS_RM) xen TAGS $(IBINS) $(LIB)
 
 distclean: clean
 

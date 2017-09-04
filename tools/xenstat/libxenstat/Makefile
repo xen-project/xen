@@ -178,7 +178,7 @@ endif
 .PHONY: clean
 clean:
 	rm -f $(LIB) $(SHLIB) $(SHLIB_LINKS) $(OBJECTS-y) \
-	      $(BINDINGS) $(BINDINGSRC) $(DEPS) src/_paths.h
+	      $(BINDINGS) $(BINDINGSRC) $(DEPS_RM) src/_paths.h
 	rm -f xenstat.pc
 
 .PHONY: distclean

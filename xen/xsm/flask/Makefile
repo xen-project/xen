@@ -41,4 +41,4 @@ policy.c: policy.bin gen-policy.py
 
 .PHONY: clean
 clean::
-	rm -f $(ALL_H_FILES) *.o $(DEPS) policy.* $(POLICY_SRC)
+	rm -f $(ALL_H_FILES) *.o $(DEPS_RM) policy.* $(POLICY_SRC)

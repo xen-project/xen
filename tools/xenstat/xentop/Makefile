@@ -42,7 +42,7 @@ endif
 
 .PHONY: clean
 clean:
-	rm -f xentop xentop.o $(DEPS)
+	rm -f xentop xentop.o $(DEPS_RM)
 
 .PHONY: distclean
 distclean: clean

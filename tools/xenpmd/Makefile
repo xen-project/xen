@@ -16,7 +16,7 @@ install: all
 
 .PHONY: clean
 clean:
-	$(RM) -f xenpmd xenpmd.o $(DEPS)
+	$(RM) -f xenpmd xenpmd.o $(DEPS_RM)
 
 .PHONY: distclean
 distclean: clean

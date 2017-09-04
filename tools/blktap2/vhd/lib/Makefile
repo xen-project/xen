@@ -79,7 +79,7 @@ uninstall:
 	rm -f $(DESTDIR)$(INST-DIR)/libvhd.a
 
 clean:
-	rm -rf *.a *.so* *.o *.opic *~ $(DEPS) $(LIBVHD)
+	rm -rf *.a *.so* *.o *.opic *~ $(DEPS_RM) $(LIBVHD)
 
 distclean: clean
 

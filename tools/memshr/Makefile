@@ -39,7 +39,7 @@ install: all
 uninstall:
 
 clean:
-	rm -rf *.a *.o *~ $(DEPS)
+	rm -rf *.a *.o *~ $(DEPS_RM)
 
 .PHONY: distclean
 distclean: clean

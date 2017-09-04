@@ -19,7 +19,7 @@ all: $(BIN)
 
 .PHONY: clean
 clean:
-	$(RM) *.a *.so *.o *.rpm $(BIN) $(DEPS)
+	$(RM) *.a *.so *.o *.rpm $(BIN) $(DEPS_RM)
 	$(RM) client/*.o daemon/*.o
 	$(RM) client/_paths.h
 	$(RM) daemon/_paths.h

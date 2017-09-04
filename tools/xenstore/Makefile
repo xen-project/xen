@@ -132,7 +132,7 @@ clean:
 	rm -f xs_tdb_dump xenstore-control init-xenstore-domain
 	rm -f xenstore $(CLIENTS)
 	rm -f xenstore.pc
-	$(RM) $(DEPS)
+	$(RM) $(DEPS_RM)
 
 .PHONY: distclean
 distclean: clean

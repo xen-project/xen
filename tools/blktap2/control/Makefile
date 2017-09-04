@@ -87,7 +87,7 @@ install: build
 	$(INSTALL_DATA) xenblktapctl.pc $(DESTDIR)$(PKG_INSTALLDIR)
 
 clean:
-	rm -f $(OBJS) $(PICS) $(DEPS) $(IBIN) $(LIB_STATIC) $(LIB_SHARED)
+	rm -f $(OBJS) $(PICS) $(DEPS_RM) $(IBIN) $(LIB_STATIC) $(LIB_SHARED)
 	rm -f $(LIBNAME).so $(LIBSONAME)
 	rm -f *~
 	rm -f xenblktapctl.pc

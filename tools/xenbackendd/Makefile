@@ -30,7 +30,7 @@ install: build
 
 .PHONY: clean
 clean:
-	$(RM) *.a *.so *.o $(DEPS) xenbackendd _paths.h
+	$(RM) *.a *.so *.o $(DEPS_RM) xenbackendd _paths.h
 
 .PHONY: distclean
 distclean: clean

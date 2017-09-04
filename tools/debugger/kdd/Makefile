@@ -16,7 +16,7 @@ kdd: $(OBJS)
 
 .PHONY: clean
 clean:
-	rm -f $(OBJS) $(DEPS) kdd
+	rm -f $(OBJS) $(DEPS_RM) kdd
 
 .PHONY: distclean
 distclean: clean

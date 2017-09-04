@@ -116,7 +116,7 @@ endif
 .PHONY: clean
 clean: subdirs-clean
 	rm -f roms.inc roms.inc.new acpi.h
-	rm -f hvmloader hvmloader.tmp *.o $(DEPS)
+	rm -f hvmloader hvmloader.tmp *.o $(DEPS_RM)
 	$(MAKE) -C $(ACPI_PATH)  ACPI_BUILD_DIR=$(CURDIR) clean
 
 .PHONY: distclean

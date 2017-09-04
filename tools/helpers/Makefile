@@ -50,7 +50,7 @@ endif
 
 .PHONY: clean
 clean:
-	$(RM) -f *.o $(PROGS) $(DEPS) _paths.h
+	$(RM) -f *.o $(PROGS) $(DEPS_RM) _paths.h
 
 distclean: clean
 

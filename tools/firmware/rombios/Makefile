@@ -13,7 +13,7 @@ clean: subdirs-clean
 	rm -f  as86-sym.txt ld86-sym.txt 
 	rm -f  rombios*.txt rombios*.sym usage biossums
 	rm -f  BIOS-bochs-*
-	rm -f  $(DEPS)
+	rm -f  $(DEPS_RM)
 
 .PHONY: distclean
 distclean: clean

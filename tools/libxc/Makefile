@@ -225,7 +225,7 @@ TAGS:
 
 .PHONY: clean
 clean:
-	rm -rf *.rpm $(LIB) *~ $(DEPS) \
+	rm -rf *.rpm $(LIB) *~ $(DEPS_RM) \
             _paths.h \
 	    xencontrol.pc xenguest.pc \
             $(CTRL_LIB_OBJS) $(CTRL_PIC_OBJS) \

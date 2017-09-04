@@ -37,7 +37,7 @@ flask-set-bool: set-bool.o
 clean: 
 	rm -f *.o *.opic *.so
 	rm -f $(CLIENTS)
-	$(RM) $(DEPS)
+	$(RM) $(DEPS_RM)
 
 .PHONY: distclean
 distclean: clean

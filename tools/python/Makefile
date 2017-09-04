@@ -39,7 +39,7 @@ test:
 clean:
 	find . \( -name "*.py[ocd]" -o -name "*~" -o -name "_*.[hc]" \) -delete
 	rm -rf build/
-	rm -f $(DEPS)
+	rm -f $(DEPS_RM)
 
 .PHONY: distclean
 distclean: clean

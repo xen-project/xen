@@ -18,7 +18,7 @@ build: $(TARGETS)
 
 .PHONY: clean
 clean:
-	$(RM) *.o $(TARGETS) *~ $(DEPS)
+	$(RM) *.o $(TARGETS) *~ $(DEPS_RM)
 
 .PHONY: distclean
 distclean: clean

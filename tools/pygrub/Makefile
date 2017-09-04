@@ -33,7 +33,7 @@ uninstall:
 
 .PHONY: clean
 clean:
-	rm -rf build tmp *.pyc *.pyo *.o *.a *~ a.out $(INSTALL_LOG) $(DEPS)
+	rm -rf build tmp *.pyc *.pyo *.o *.a *~ a.out $(INSTALL_LOG) $(DEPS_RM)
 
 .PHONY: distclean
 distclean: clean

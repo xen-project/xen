@@ -81,7 +81,7 @@ uninstall:
 
 .PHONY: clean
 clean:
-	$(RM) -f *.o *.opic *.so* *.a vchan-node1 vchan-node2 $(DEPS)
+	$(RM) -f *.o *.opic *.so* *.a vchan-node1 vchan-node2 $(DEPS_RM)
 	$(RM) -f xenvchan.pc
 
 distclean: clean

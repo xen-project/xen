@@ -42,7 +42,7 @@ uninstall:
 
 .PHONY: clean
 clean:
-	$(RM) -f $(DEPS)
+	$(RM) -f $(DEPS_RM)
 	$(RM) -f xenbaked xenbaked.o
 	$(RM) -f xentrace_setmask setmask.o
 

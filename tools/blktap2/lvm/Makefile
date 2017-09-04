@@ -29,7 +29,7 @@ lvm-util: lvm-util.o
 	$(CC) -DLVM_UTIL $(LDFLAGS) -o lvm-util lvm-util.c
 
 clean:
-	rm -rf *.o *.opic *~ $(DEPS) $(IBIN)
+	rm -rf *.o *.opic *~ $(DEPS_RM) $(IBIN)
 
 distclean: clean
 

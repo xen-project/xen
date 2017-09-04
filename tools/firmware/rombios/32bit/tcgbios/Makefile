@@ -12,7 +12,7 @@ all: $(TARGET)
 
 .PHONY: clean
 clean:
-	rm -rf *.o $(TARGET) $(DEPS)
+	rm -rf *.o $(TARGET) $(DEPS_RM)
 
 .PHONY: distclean
 distclean: clean

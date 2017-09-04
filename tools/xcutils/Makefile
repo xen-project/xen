@@ -43,7 +43,7 @@ uninstall:
 .PHONY: clean
 clean:
 	$(RM) *.o $(PROGRAMS)
-	$(RM) $(DEPS)
+	$(RM) $(DEPS_RM)
 
 .PHONY: distclean
 distclean: clean
