@@ -205,13 +205,12 @@ p2m_next_level(struct p2m_domain *p2m, void **table,
     /* PoD/paging: Not present doesn't imply empty. */
     if ( !flags )
     {
-        struct page_info *pg;
+        mfn_t mfn = p2m_alloc_ptp(p2m, type);
 
-        pg = p2m_alloc_ptp(p2m, type);
-        if ( pg == NULL )
+        if ( mfn_eq(mfn, INVALID_MFN) )
             return -ENOMEM;
 
-        new_entry = l1e_from_page(pg, P2M_BASE_FLAGS | _PAGE_RW);
+        new_entry = l1e_from_mfn(mfn, P2M_BASE_FLAGS | _PAGE_RW);
 
         switch ( type ) {
         case PGT_l3_page_table:
@@ -235,7 +234,7 @@ p2m_next_level(struct p2m_domain *p2m, void **table,
     {
         /* Split superpages pages into smaller ones. */
         unsigned long pfn = l1e_get_pfn(*p2m_entry);
-        struct page_info *pg;
+        mfn_t mfn;
         l1_pgentry_t *l1_entry;
         unsigned int i, level;
 
@@ -263,11 +262,11 @@ p2m_next_level(struct p2m_domain *p2m, void **table,
             return -EINVAL;
         }
 
-        pg = p2m_alloc_ptp(p2m, type);
-        if ( pg == NULL )
+        mfn = p2m_alloc_ptp(p2m, type);
+        if ( mfn_eq(mfn, INVALID_MFN) )
             return -ENOMEM;
 
-        l1_entry = __map_domain_page(pg);
+        l1_entry = map_domain_page(mfn);
 
         /* Inherit original IOMMU permissions, but update Next Level. */
         if ( iommu_hap_pt_share )
@@ -285,7 +284,7 @@ p2m_next_level(struct p2m_domain *p2m, void **table,
 
         unmap_domain_page(l1_entry);
 
-        new_entry = l1e_from_page(pg, P2M_BASE_FLAGS | _PAGE_RW);
+        new_entry = l1e_from_mfn(mfn, P2M_BASE_FLAGS | _PAGE_RW);
         p2m_add_iommu_flags(&new_entry, level, IOMMUF_readable|IOMMUF_writable);
         p2m->write_p2m_entry(p2m, gfn, p2m_entry, new_entry, level + 1);
     }

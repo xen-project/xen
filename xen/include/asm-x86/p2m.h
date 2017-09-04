@@ -684,7 +684,7 @@ void p2m_mem_paging_resume(struct domain *d, vm_event_response_t *rsp);
  * Internal functions, only called by other p2m code
  */
 
-struct page_info *p2m_alloc_ptp(struct p2m_domain *p2m, unsigned long type);
+mfn_t p2m_alloc_ptp(struct p2m_domain *p2m, unsigned long type);
 void p2m_free_ptp(struct p2m_domain *p2m, struct page_info *pg);
 
 /* Directly set a p2m entry: only for use by p2m code. Does not need

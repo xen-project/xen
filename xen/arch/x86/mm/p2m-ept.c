@@ -225,16 +225,16 @@ static void ept_p2m_type_to_flags(struct p2m_domain *p2m, ept_entry_t *entry,
 /* Fill in middle levels of ept table */
 static int ept_set_middle_entry(struct p2m_domain *p2m, ept_entry_t *ept_entry)
 {
-    struct page_info *pg;
+    mfn_t mfn;
     ept_entry_t *table;
     unsigned int i;
 
-    pg = p2m_alloc_ptp(p2m, 0);
-    if ( pg == NULL )
+    mfn = p2m_alloc_ptp(p2m, 0);
+    if ( mfn_eq(mfn, INVALID_MFN) )
         return 0;
 
     ept_entry->epte = 0;
-    ept_entry->mfn = page_to_mfn(pg);
+    ept_entry->mfn = mfn_x(mfn);
     ept_entry->access = p2m->default_access;
 
     ept_entry->r = ept_entry->w = ept_entry->x = 1;
@@ -243,7 +243,7 @@ static int ept_set_middle_entry(struct p2m_domain *p2m, ept_entry_t *ept_entry)
 
     ept_entry->suppress_ve = 1;
 
-    table = __map_domain_page(pg);
+    table = map_domain_page(mfn);
 
     for ( i = 0; i < EPT_PAGETABLE_ENTRIES; i++ )
         table[i].suppress_ve = 1;

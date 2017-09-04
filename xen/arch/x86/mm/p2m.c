@@ -569,7 +569,7 @@ int p2m_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
     return rc;
 }
 
-struct page_info *p2m_alloc_ptp(struct p2m_domain *p2m, unsigned long type)
+mfn_t p2m_alloc_ptp(struct p2m_domain *p2m, unsigned long type)
 {
     struct page_info *pg;
 
@@ -577,13 +577,13 @@ struct page_info *p2m_alloc_ptp(struct p2m_domain *p2m, unsigned long type)
     ASSERT(p2m->domain);
     ASSERT(p2m->domain->arch.paging.alloc_page);
     pg = p2m->domain->arch.paging.alloc_page(p2m->domain);
-    if (pg == NULL)
-        return NULL;
+    if ( !pg )
+        return INVALID_MFN;
 
     page_list_add_tail(pg, &p2m->pages);
     pg->u.inuse.type_info = type | 1 | PGT_validated;
 
-    return pg;
+    return page_to_mfn(pg);
 }
 
 void p2m_free_ptp(struct p2m_domain *p2m, struct page_info *pg)
@@ -609,7 +609,7 @@ void p2m_free_ptp(struct p2m_domain *p2m, struct page_info *pg)
  */
 int p2m_alloc_table(struct p2m_domain *p2m)
 {
-    struct page_info *p2m_top;
+    mfn_t top_mfn;
     struct domain *d = p2m->domain;
     int rc = 0;
 
@@ -632,14 +632,14 @@ int p2m_alloc_table(struct p2m_domain *p2m)
 
     P2M_PRINTK("allocating p2m table\n");
 
-    p2m_top = p2m_alloc_ptp(p2m, PGT_l4_page_table);
-    if ( p2m_top == NULL )
+    top_mfn = p2m_alloc_ptp(p2m, PGT_l4_page_table);
+    if ( mfn_eq(top_mfn, INVALID_MFN) )
     {
         p2m_unlock(p2m);
         return -ENOMEM;
     }
 
-    p2m->phys_table = pagetable_from_mfn(page_to_mfn(p2m_top));
+    p2m->phys_table = pagetable_from_mfn(top_mfn);
 
     if ( hap_enabled(d) )
         iommu_share_p2m_table(d);
