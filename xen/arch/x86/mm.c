@@ -1358,8 +1358,6 @@ static int put_page_from_l2e(l2_pgentry_t l2e, unsigned long pfn)
     return 0;
 }
 
-static int __put_page_type(struct page_info *, int preemptible);
-
 static int put_page_from_l3e(l3_pgentry_t l3e, unsigned long pfn,
                              int partial, bool defer)
 {
@@ -1386,7 +1384,7 @@ static int put_page_from_l3e(l3_pgentry_t l3e, unsigned long pfn,
     if ( unlikely(partial > 0) )
     {
         ASSERT(!defer);
-        return __put_page_type(pg, 1);
+        return put_page_type_preemptible(pg);
     }
 
     if ( defer )
@@ -1409,7 +1407,7 @@ static int put_page_from_l4e(l4_pgentry_t l4e, unsigned long pfn,
         if ( unlikely(partial > 0) )
         {
             ASSERT(!defer);
-            return __put_page_type(pg, 1);
+            return put_page_type_preemptible(pg);
         }
 
         if ( defer )
