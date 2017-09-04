@@ -569,7 +569,7 @@ int p2m_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
     return rc;
 }
 
-mfn_t p2m_alloc_ptp(struct p2m_domain *p2m, unsigned long type)
+mfn_t p2m_alloc_ptp(struct p2m_domain *p2m, unsigned int level)
 {
     struct page_info *pg;
 
@@ -581,7 +581,10 @@ mfn_t p2m_alloc_ptp(struct p2m_domain *p2m, unsigned long type)
         return INVALID_MFN;
 
     page_list_add_tail(pg, &p2m->pages);
-    pg->u.inuse.type_info = type | 1 | PGT_validated;
+    BUILD_BUG_ON(PGT_l1_page_table * 2 != PGT_l2_page_table);
+    BUILD_BUG_ON(PGT_l1_page_table * 3 != PGT_l3_page_table);
+    BUILD_BUG_ON(PGT_l1_page_table * 4 != PGT_l4_page_table);
+    pg->u.inuse.type_info = (PGT_l1_page_table * level) | 1 | PGT_validated;
 
     return page_to_mfn(pg);
 }
@@ -632,7 +635,7 @@ int p2m_alloc_table(struct p2m_domain *p2m)
 
     P2M_PRINTK("allocating p2m table\n");
 
-    top_mfn = p2m_alloc_ptp(p2m, PGT_l4_page_table);
+    top_mfn = p2m_alloc_ptp(p2m, 4);
     if ( mfn_eq(top_mfn, INVALID_MFN) )
     {
         p2m_unlock(p2m);
