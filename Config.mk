@@ -56,6 +56,8 @@ HOSTCC ?= clang
 HOSTCXX ?= clang++
 endif
 
+DEPS_RM = $(DEPS)
+DEPS_INCLUDE = $(DEPS)
 
 include $(XEN_ROOT)/config/$(XEN_OS).mk
 include $(XEN_ROOT)/config/$(XEN_TARGET_ARCH).mk
