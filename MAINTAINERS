@@ -166,14 +166,15 @@ S:	Supported
 L:	xen-devel@lists.xen.org
 F:	docs/misc/arm/
 F:	xen/arch/arm/
-F:	xen/include/asm-arm/
-F:	xen/drivers/char/cadence-uart.c
 F:	xen/drivers/char/arm-uart.c
+F:	xen/drivers/char/cadence-uart.c
 F:	xen/drivers/char/exynos4210-uart.c
 F:	xen/drivers/char/omap-uart.c
 F:	xen/drivers/char/pl011.c
 F:	xen/drivers/char/scif-uart.c
 F:	xen/drivers/passthrough/arm/
+F:	xen/include/asm-arm/
+F:	xen/include/public/arch-arm/
 
 CPU POOLS
 M:	Juergen Gross <jgross@suse.com>
@@ -434,6 +435,7 @@ S:	Supported
 L:	xen-devel@lists.xen.org
 F:	xen/arch/x86/
 F:	xen/include/asm-x86/
+F:	xen/include/public/arch-x86/
 F:	tools/firmware/hvmloader/
 F:	tools/firmware/rombios/
 F:	tools/firmware/vgabios/
