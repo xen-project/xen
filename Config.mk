@@ -56,8 +56,11 @@ HOSTCC ?= clang
 HOSTCXX ?= clang++
 endif
 
-DEPS_RM = $(DEPS)
-DEPS_INCLUDE = $(DEPS)
+DEPS_INCLUDE = $(addsuffix .d2, $(basename $(wildcard $(DEPS))))
+DEPS_RM = $(DEPS) $(DEPS_INCLUDE)
+
+%.d2: %.d
+	sed "s! $$PWD/! !" $^ >$@.tmp && mv -f $@.tmp $@
 
 include $(XEN_ROOT)/config/$(XEN_OS).mk
 include $(XEN_ROOT)/config/$(XEN_TARGET_ARCH).mk

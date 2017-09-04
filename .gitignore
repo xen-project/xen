@@ -1,9 +1,11 @@
 .hg
+.*.tmp
 *.orig
 *~
 *.swp
 *.o
 *.d
+*.d2
 *.opic
 *.a
 *.so
