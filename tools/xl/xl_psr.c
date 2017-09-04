@@ -25,7 +25,6 @@
 #include "xl_utils.h"
 #include "xl_parse.h"
 
-#ifdef LIBXL_HAVE_PSR_CMT
 static int psr_cmt_hwinfo(void)
 {
     int rc;
@@ -292,9 +291,7 @@ int main_psr_cmt_show(int argc, char **argv)
 
     return ret;
 }
-#endif
 
-#if defined(LIBXL_HAVE_PSR_CAT) || defined(LIBXL_HAVE_PSR_L2_CAT)
 static int psr_l3_cat_hwinfo(void)
 {
     int rc, nr;
@@ -625,8 +622,6 @@ int main_psr_hwinfo(int argc, char **argv)
 
     return ret;
 }
-
-#endif
 
 /*
  * Local variables:

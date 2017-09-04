@@ -198,13 +198,11 @@ int main_loadpolicy(int argc, char **argv);
 int main_remus(int argc, char **argv);
 #endif
 int main_devd(int argc, char **argv);
-#ifdef LIBXL_HAVE_PSR_CMT
+#if defined(__i386__) || defined(__x86_64__)
 int main_psr_hwinfo(int argc, char **argv);
 int main_psr_cmt_attach(int argc, char **argv);
 int main_psr_cmt_detach(int argc, char **argv);
 int main_psr_cmt_show(int argc, char **argv);
-#endif
-#ifdef LIBXL_HAVE_PSR_CAT
 int main_psr_cat_cbm_set(int argc, char **argv);
 int main_psr_cat_show(int argc, char **argv);
 #endif
