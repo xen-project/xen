@@ -4987,8 +4987,11 @@ x86_emulate(
         }
         break;
 
-    case X86EMUL_OPC(0x0f, 0x01): /* Grp7 */ {
+    case X86EMUL_OPC(0x0f, 0x01): /* Grp7 */
+    {
         unsigned long base, limit, cr0, cr0w;
+
+        seg = (modrm_reg & 1) ? x86_seg_idtr : x86_seg_gdtr;
 
         switch( modrm )
         {
@@ -5000,7 +5003,7 @@ x86_emulate(
             _regs.eflags &= ~X86_EFLAGS_AC;
             if ( modrm == 0xcb )
                 _regs.eflags |= X86_EFLAGS_AC;
-            goto complete_insn;
+            break;
 
 #ifdef __XEN__
         case 0xd1: /* xsetbv */
@@ -5012,7 +5015,7 @@ x86_emulate(
                                   handle_xsetbv(_regs.ecx,
                                                 _regs.eax | (_regs.rdx << 32)),
                                   EXC_GP, 0);
-            goto complete_insn;
+            break;
 #endif
 
         case 0xd4: /* vmfunc */
@@ -5020,7 +5023,7 @@ x86_emulate(
             fail_if(!ops->vmfunc);
             if ( (rc = ops->vmfunc(ctxt)) != X86EMUL_OKAY )
                 goto done;
-            goto complete_insn;
+            break;
 
         case 0xd5: /* xend */
             generate_exception_if(vex.pfx, EXC_UD);
@@ -5034,7 +5037,7 @@ x86_emulate(
                                   EXC_UD);
             /* Neither HLE nor RTM can be active when we get here. */
             _regs.eflags |= X86_EFLAGS_ZF;
-            goto complete_insn;
+            break;
 
         case 0xdf: /* invlpga */
             generate_exception_if(!in_protmode(ctxt, ops), EXC_UD);
@@ -5043,7 +5046,7 @@ x86_emulate(
             if ( (rc = ops->invlpg(x86_seg_none, truncate_ea(_regs.r(ax)),
                                    ctxt)) )
                 goto done;
-            goto complete_insn;
+            break;
 
         case 0xf9: /* rdtscp */
             fail_if(ops->read_msr == NULL);
@@ -5091,17 +5094,17 @@ x86_emulate(
                 base += sizeof(zero);
                 limit -= sizeof(zero);
             }
-            goto complete_insn;
-        }
+            break;
         }
 
-        seg = (modrm_reg & 1) ? x86_seg_idtr : x86_seg_gdtr;
+#define _GRP7(mod, reg) \
+            (((mod) << 6) | ((reg) << 3)) ... (((mod) << 6) | ((reg) << 3) | 7)
+#define GRP7_MEM(reg) _GRP7(0, reg): case _GRP7(1, reg): case _GRP7(2, reg)
+#define GRP7_ALL(reg) GRP7_MEM(reg): case _GRP7(3, reg)
 
-        switch ( modrm_reg & 7 )
-        {
-        case 0: /* sgdt */
-        case 1: /* sidt */
-            generate_exception_if(ea.type != OP_MEM, EXC_UD);
+        case GRP7_MEM(0): /* sgdt */
+        case GRP7_MEM(1): /* sidt */
+            ASSERT(ea.type == OP_MEM);
             generate_exception_if(umip_active(ctxt, ops), EXC_GP, 0);
             fail_if(!ops->read_segment || !ops->write);
             if ( (rc = ops->read_segment(seg, &sreg, ctxt)) )
@@ -5119,10 +5122,11 @@ x86_emulate(
                                   op_bytes, ctxt)) != X86EMUL_OKAY )
                 goto done;
             break;
-        case 2: /* lgdt */
-        case 3: /* lidt */
+
+        case GRP7_MEM(2): /* lgdt */
+        case GRP7_MEM(3): /* lidt */
+            ASSERT(ea.type == OP_MEM);
             generate_exception_if(!mode_ring0(), EXC_GP, 0);
-            generate_exception_if(ea.type != OP_MEM, EXC_UD);
             fail_if(ops->write_segment == NULL);
             memset(&sreg, 0, sizeof(sreg));
             if ( (rc = read_ulong(ea.mem.seg, ea.mem.off+0,
@@ -5138,7 +5142,8 @@ x86_emulate(
             if ( (rc = ops->write_segment(seg, &sreg, ctxt)) )
                 goto done;
             break;
-        case 4: /* smsw */
+
+        case GRP7_ALL(4): /* smsw */
             generate_exception_if(umip_active(ctxt, ops), EXC_GP, 0);
             if ( ea.type == OP_MEM )
             {
@@ -5153,7 +5158,8 @@ x86_emulate(
             if ( (rc = ops->read_cr(0, &dst.val, ctxt)) )
                 goto done;
             break;
-        case 6: /* lmsw */
+
+        case GRP7_ALL(6): /* lmsw */
             fail_if(ops->read_cr == NULL);
             fail_if(ops->write_cr == NULL);
             generate_exception_if(!mode_ring0(), EXC_GP, 0);
@@ -5169,13 +5175,19 @@ x86_emulate(
             if ( (rc = ops->write_cr(0, cr0, ctxt)) )
                 goto done;
             break;
-        case 7: /* invlpg */
+
+        case GRP7_MEM(7): /* invlpg */
+            ASSERT(ea.type == OP_MEM);
             generate_exception_if(!mode_ring0(), EXC_GP, 0);
-            generate_exception_if(ea.type != OP_MEM, EXC_UD);
             fail_if(ops->invlpg == NULL);
             if ( (rc = ops->invlpg(ea.mem.seg, ea.mem.off, ctxt)) )
                 goto done;
             break;
+
+#undef GRP7_ALL
+#undef GRP7_MEM
+#undef _GRP7
+
         default:
             goto cannot_emulate;
         }
