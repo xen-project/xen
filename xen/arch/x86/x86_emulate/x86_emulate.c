@@ -5609,9 +5609,8 @@ x86_emulate(
         }
         else
         {
-            if ( ctxt->vendor == X86_VENDOR_AMD )
-                vex.l = 0;
-            generate_exception_if(vex.l || vex.reg != 0xf, EXC_UD);
+            generate_exception_if(vex.reg != 0xf, EXC_UD);
+            vex.l = 0;
             host_and_vcpu_must_have(avx);
             get_fpu(X86EMUL_FPU_ymm, &fic);
         }
