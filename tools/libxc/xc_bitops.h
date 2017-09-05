@@ -13,7 +13,7 @@
 #define BITMAP_ENTRY(_nr,_bmap) ((_bmap))[(_nr) / 8]
 #define BITMAP_SHIFT(_nr) ((_nr) % 8)
 
-/* calculate required space for number of longs needed to hold nr_bits */
+/* calculate required space for number of bytes needed to hold nr_bits */
 static inline int bitmap_size(int nr_bits)
 {
     return (nr_bits + 7) / 8;
