@@ -820,6 +820,9 @@ int hvm_map_io_range_to_ioreq_server(struct domain *d, ioservid_t id,
     struct hvm_ioreq_server *s;
     int rc;
 
+    if ( start > end )
+        return -EINVAL;
+
     spin_lock_recursive(&d->arch.hvm_domain.ioreq_server.lock);
 
     rc = -ENOENT;
@@ -871,6 +874,9 @@ int hvm_unmap_io_range_from_ioreq_server(struct domain *d, ioservid_t id,
 {
     struct hvm_ioreq_server *s;
     int rc;
+
+    if ( start > end )
+        return -EINVAL;
 
     spin_lock_recursive(&d->arch.hvm_domain.ioreq_server.lock);
 
