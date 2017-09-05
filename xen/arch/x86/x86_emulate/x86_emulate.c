@@ -495,13 +495,13 @@ union evex {
     uint8_t raw[3];
     struct {
         uint8_t opcx:2;
-        uint8_t :2;
+        uint8_t mbz:2;
         uint8_t R:1;
         uint8_t b:1;
         uint8_t x:1;
         uint8_t r:1;
         uint8_t pfx:2;
-        uint8_t evex:1;
+        uint8_t mbs:1;
         uint8_t reg:4;
         uint8_t w:1;
         uint8_t opmsk:3;
@@ -2543,6 +2543,14 @@ x86_decode(
                         evex.raw[0] = vex.raw[0];
                         evex.raw[1] = vex.raw[1];
                         evex.raw[2] = insn_fetch_type(uint8_t);
+
+                        generate_exception_if(evex.mbs || !evex.mbz, EXC_UD);
+
+                        if ( !mode_64bit() )
+                        {
+                            generate_exception_if(!evex.RX, EXC_UD);
+                            evex.R = 1;
+                        }
 
                         vex.opcx = evex.opcx;
                         break;
