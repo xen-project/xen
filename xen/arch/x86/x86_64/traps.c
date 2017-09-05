@@ -206,9 +206,9 @@ void show_page_walk(unsigned long addr)
     mfn = l2e_get_pfn(l2e);
     pfn = mfn_valid(_mfn(mfn)) && machine_to_phys_mapping_valid ?
           get_gpfn_from_mfn(mfn) : INVALID_M2P_ENTRY;
-    printk(" L2[0x%03lx] = %"PRIpte" %016lx %s\n",
+    printk(" L2[0x%03lx] = %"PRIpte" %016lx%s\n",
            l2_table_offset(addr), l2e_get_intpte(l2e), pfn,
-           (l2e_get_flags(l2e) & _PAGE_PSE) ? "(PSE)" : "");
+           (l2e_get_flags(l2e) & _PAGE_PSE) ? " (PSE)" : "");
     if ( !(l2e_get_flags(l2e) & _PAGE_PRESENT) ||
          (l2e_get_flags(l2e) & _PAGE_PSE) ||
          !mfn_valid(_mfn(mfn)) )
