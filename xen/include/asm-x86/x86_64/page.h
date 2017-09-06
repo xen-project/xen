@@ -121,8 +121,17 @@ typedef l4_pgentry_t root_pgentry_t;
  */
 
 /* Extract flags into 24-bit integer, or turn 24-bit flags into a pte mask. */
-#define get_pte_flags(x) (((int)((x) >> 40) & ~0xFFF) | ((int)(x) & 0xFFF))
-#define put_pte_flags(x) (((intpte_t)((x) & ~0xFFF) << 40) | ((x) & 0xFFF))
+#ifndef __ASSEMBLY__
+static inline unsigned int get_pte_flags(intpte_t x)
+{
+    return ((x >> 40) & ~0xfff) | (x & 0xfff);
+}
+
+static inline intpte_t put_pte_flags(unsigned int x)
+{
+    return (((intpte_t)x & ~0xfff) << 40) | (x & 0xfff);
+}
+#endif
 
 /*
  * Protection keys define a new 4-bit protection key field
