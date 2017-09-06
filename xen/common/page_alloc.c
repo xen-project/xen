@@ -860,6 +860,7 @@ static struct page_info *alloc_heap_pages(
     struct page_info *pg;
     bool need_tlbflush = false;
     uint32_t tlbflush_timestamp = 0;
+    unsigned int dirty_cnt = 0;
 
     /* Make sure there are enough bits in memflags for nodeID. */
     BUILD_BUG_ON((_MEMF_bits - _MEMF_node) < (8 * sizeof(nodeid_t)));
@@ -953,14 +954,11 @@ static struct page_info *alloc_heap_pages(
         /* Reference count must continuously be zero for free pages. */
         BUG_ON((pg[i].count_info & ~PGC_need_scrub) != PGC_state_free);
 
-        if ( test_bit(_PGC_need_scrub, &pg[i].count_info) )
-        {
-            if ( !(memflags & MEMF_no_scrub) )
-                scrub_one_page(&pg[i]);
-            node_need_scrub[node]--;
-        }
+        /* PGC_need_scrub can only be set if first_dirty is valid */
+        ASSERT(first_dirty != INVALID_DIRTY_IDX || !(pg[i].count_info & PGC_need_scrub));
 
-        pg[i].count_info = PGC_state_inuse;
+        /* Preserve PGC_need_scrub so we can check it after lock is dropped. */
+        pg[i].count_info = PGC_state_inuse | (pg[i].count_info & PGC_need_scrub);
 
         if ( !(memflags & MEMF_no_tlbflush) )
             accumulate_tlbflush(&need_tlbflush, &pg[i],
@@ -974,12 +972,37 @@ static struct page_info *alloc_heap_pages(
          * guest can control its own visibility of/through the cache.
          */
         flush_page_to_ram(page_to_mfn(&pg[i]), !(memflags & MEMF_no_icache_flush));
-
-        if ( !(memflags & MEMF_no_scrub) )
-            check_one_page(&pg[i]);
     }
 
     spin_unlock(&heap_lock);
+
+    if ( first_dirty != INVALID_DIRTY_IDX ||
+         (scrub_debug && !(memflags & MEMF_no_scrub)) )
+    {
+        for ( i = 0; i < (1U << order); i++ )
+        {
+            if ( test_bit(_PGC_need_scrub, &pg[i].count_info) )
+            {
+                if ( !(memflags & MEMF_no_scrub) )
+                    scrub_one_page(&pg[i]);
+
+                dirty_cnt++;
+
+                spin_lock(&heap_lock);
+                pg[i].count_info &= ~PGC_need_scrub;
+                spin_unlock(&heap_lock);
+            }
+            else if ( !(memflags & MEMF_no_scrub) )
+                check_one_page(&pg[i]);
+        }
+
+        if ( dirty_cnt )
+        {
+            spin_lock(&heap_lock);
+            node_need_scrub[node] -= dirty_cnt;
+            spin_unlock(&heap_lock);
+        }
+    }
 
     if ( need_tlbflush )
         filtered_flush_tlb_mask(tlbflush_timestamp);
