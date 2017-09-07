@@ -305,7 +305,10 @@ int mapcache_vcpu_init(struct vcpu *v)
 
 void *map_domain_page_global(mfn_t mfn)
 {
-    ASSERT(!in_irq() && local_irq_is_enabled());
+    ASSERT(!in_irq() &&
+           ((system_state >= SYS_STATE_boot &&
+             system_state < SYS_STATE_active) ||
+            local_irq_is_enabled()));
 
 #ifdef NDEBUG
     if ( mfn_x(mfn) <= PFN_DOWN(__pa(HYPERVISOR_VIRT_END - 1)) )
