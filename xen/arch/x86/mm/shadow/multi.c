@@ -4754,8 +4754,8 @@ sh_x86_emulate_write(struct vcpu *v, unsigned long vaddr, void *src,
         return X86EMUL_UNHANDLEABLE;
 
     addr = sh_emulate_map_dest(v, vaddr, bytes, sh_ctxt);
-    if ( sh_emulate_map_dest_failed(addr) )
-        return (long)addr;
+    if ( IS_ERR(addr) )
+        return ~PTR_ERR(addr);
 
     paging_lock(v->domain);
     memcpy(addr, src, bytes);
@@ -4796,8 +4796,8 @@ sh_x86_emulate_cmpxchg(struct vcpu *v, unsigned long vaddr,
         return X86EMUL_UNHANDLEABLE;
 
     addr = sh_emulate_map_dest(v, vaddr, bytes, sh_ctxt);
-    if ( sh_emulate_map_dest_failed(addr) )
-        return (long)addr;
+    if ( IS_ERR(addr) )
+        return ~PTR_ERR(addr);
 
     paging_lock(v->domain);
     switch ( bytes )

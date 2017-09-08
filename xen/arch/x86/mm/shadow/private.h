@@ -395,10 +395,9 @@ void shadow_unhook_mappings(struct domain *d, mfn_t smfn, int user_only);
 
 /* Returns a mapped pointer to write to, or one of the following error
  * indicators. */
-#define MAPPING_UNHANDLEABLE ((void *)(unsigned long)X86EMUL_UNHANDLEABLE)
-#define MAPPING_EXCEPTION    ((void *)(unsigned long)X86EMUL_EXCEPTION)
-#define MAPPING_SILENT_FAIL  ((void *)(unsigned long)X86EMUL_OKAY)
-#define sh_emulate_map_dest_failed(rc) ((unsigned long)(rc) <= 3)
+#define MAPPING_UNHANDLEABLE ERR_PTR(~(long)X86EMUL_UNHANDLEABLE)
+#define MAPPING_EXCEPTION    ERR_PTR(~(long)X86EMUL_EXCEPTION)
+#define MAPPING_SILENT_FAIL  ERR_PTR(~(long)X86EMUL_OKAY)
 void *sh_emulate_map_dest(struct vcpu *v, unsigned long vaddr,
                           unsigned int bytes, struct sh_emulate_ctxt *sh_ctxt);
 void sh_emulate_unmap_dest(struct vcpu *v, void *addr, unsigned int bytes,
