@@ -29,14 +29,15 @@
 
 /*
  * Memory layout during tests:
- *  4MB to 8MB is cleared.
- *  Page directory resides at 4MB.
- *  2 page table pages reside at 4MB+4kB to 4MB+12kB.
- *  Pagetables identity-map 0-8MB, except 4kB at va 6MB maps to pa 5MB.
+ *  The 4MB block at test_mem_base is cleared.
+ *  Page directory resides at test_mem_base.
+ *  2 page table pages reside at test_mem_base+4kB to test_mem_base+12kB.
+ *  Pagetables identity-map 0-4MB and test_mem_base-test_mem_base+4MB,
+ *  except 4kB at va test_mem_base+2MB maps to pa test_mem_base+1MB.
  */
-#define TEST_MEM_BASE (4ul << 20)
+static unsigned long test_mem_base;
 #define TEST_MEM_SIZE (4ul << 20)
-#define PD_START TEST_MEM_BASE
+#define PD_START test_mem_base
 #define PT_START (PD_START + 4096)
 
 static void setup_paging(void)
@@ -45,14 +46,25 @@ static void setup_paging(void)
     uint32_t *pt = (uint32_t *)PT_START;
     uint32_t i;
 
-    /* Identity map 0-8MB. */
-    for ( i = 0; i < 2; i++ )
-        pd[i] = (unsigned long)pt + (i<<12) + 3;
-    for ( i = 0; i < 2 * 1024; i++ )
-        pt[i] = (i << 12) + 3;
+    /* Identity map [0,_end). */
+    for ( i = 0; i <= (unsigned long)(_end - 1) >> (PAGE_SHIFT + 10); ++i )
+    {
+        unsigned int j;
 
-    /* Page at virtual 6MB maps to physical 5MB. */
-    pt[6u<<8] -= 0x100000u;
+        pd[i] = (unsigned long)pt + 3;
+        for ( j = 0; j < PAGE_SIZE / sizeof(*pt); ++j )
+            *pt++ = (i << (PAGE_SHIFT + 10)) + (j << PAGE_SHIFT) + 3;
+    }
+
+    /* Identity map TEST_MEM_SIZE @ test_mem_base. */
+    for ( i = 0; i < (TEST_MEM_SIZE >> (PAGE_SHIFT + 10)); ++i )
+        pd[i + (test_mem_base >> (PAGE_SHIFT + 10))] =
+            (unsigned long)pt + (i << PAGE_SHIFT) + 3;
+    for ( i = 0; i < (TEST_MEM_SIZE >> PAGE_SHIFT); ++i )
+        pt[i] = test_mem_base + (i << PAGE_SHIFT) + 3;
+
+    /* Page at virtual test_mem_base+2MB maps physical test_mem_base+1MB. */
+    pt[0x200000 >> PAGE_SHIFT] -= 0x100000;
 }
 
 static void start_paging(void)
@@ -81,42 +93,42 @@ static int rep_io_test(void)
     uint32_t *p;
     uint32_t i, p0, p1, p2;
     int okay = TEST_PASS;
-
-    static const struct {
+    const struct {
         unsigned long addr;
         uint32_t expected;
     } check[] = {
-        { 0x00500000, 0x987654ff },
-        { 0x00500ffc, 0xff000000 },
-        { 0x005ffffc, 0xff000000 },
-        { 0x00601000, 0x000000ff },
+        { test_mem_base + 0x00100000, 0x987654ff },
+        { test_mem_base + 0x00100ffc, 0xff000000 },
+        { test_mem_base + 0x001ffffc, 0xff000000 },
+        { test_mem_base + 0x00201000, 0x000000ff },
         { 0, 0 }
     };
 
     start_paging();
 
     /* Phys 5MB = 0xdeadbeef */
-    *(uint32_t *)0x500000ul = 0xdeadbeef;
+    *(uint32_t *)(test_mem_base + 0x100000) = 0xdeadbeef;
 
-    /* Phys 5MB = 0x98765432 */
-    *(uint32_t *)0x600000ul = 0x98765432;
+    /* Phys 6MB = 0x98765432 */
+    *(uint32_t *)(test_mem_base + 0x200000) = 0x98765432;
 
     /* Phys 0x5fffff = Phys 0x500000 = 0xff (byte) */
     asm volatile (
         "rep insb"
         : "=d" (p0), "=c" (p1), "=D" (p2)
-        : "0" (0x5f), "1" (2), "2" (0x5ffffful) : "memory" );
+        : "0" (0x5f), "1" (2), "2" (test_mem_base + 0x1fffff) : "memory" );
 
     /* Phys 0x500fff = Phys 0x601000 = 0xff (byte) */
     asm volatile (
         "std ; rep insb ; cld"
         : "=d" (p0), "=c" (p1), "=D" (p2)
-        : "0" (0x5f), "1" (2), "2" (0x601000ul) : "memory" );
+        : "0" (0x5f), "1" (2), "2" (test_mem_base + 0x201000) : "memory" );
 
     stop_paging();
 
     i = 0;
-    for ( p = (uint32_t *)0x4ff000ul; p < (uint32_t *)0x602000ul; p++ )
+    for ( p = (uint32_t *)(test_mem_base + 0x0ff000);
+          p < (uint32_t *)(test_mem_base + 0x202000); p++ )
     {
         uint32_t expected = 0;
         if ( check[i].addr == (unsigned long)p )
@@ -148,13 +160,14 @@ static int shadow_gs_test(void)
     if ( !(edx & (1u<<29)) )
         return TEST_SKIP;
 
-    /* Long mode pagetable setup: Identity map 0-8MB with 2MB mappings. */
+    /* Long mode pagetable setup: Identity map [0,_end) with 2MB mappings. */
     *pd = (unsigned long)pd + 0x1007; /* Level 4 */
     pd += 512;
     *pd = (unsigned long)pd + 0x1007; /* Level 3 */
     pd += 512;
-    for ( i = 0; i < 4; i++ )         /* Level 2 */
-        *pd++ = (i << 21) + 0x1e3;
+    /* Level 2: */
+    for ( i = 0; i <= (unsigned long)(_end - 1) >> (PAGE_SHIFT + 9); i++ )
+        *pd++ = (i << (PAGE_SHIFT + 9)) + 0x1e3;
 
     asm volatile (
         /* CR4.PAE=1 */
@@ -208,29 +221,6 @@ void perform_tests(void)
     printf("Testing HVM environment:\n");
 
     BUILD_BUG_ON(SCRATCH_PHYSICAL_ADDRESS > HVMLOADER_PHYSICAL_ADDRESS);
-    if ( hvm_info->low_mem_pgend <
-         ((TEST_MEM_BASE + TEST_MEM_SIZE) >> PAGE_SHIFT) )
-    {
-        printf("Skipping tests due to insufficient memory (<%luMB)\n",
-               (TEST_MEM_BASE + TEST_MEM_SIZE) >> 20);
-        return;
-    }
-
-    if ( (unsigned long)_end > TEST_MEM_BASE )
-    {
-        printf("Skipping tests due to overlap with base image\n");
-        return;
-    }
-
-    if ( hvm_start_info->cmdline_paddr &&
-         hvm_start_info->cmdline_paddr < TEST_MEM_BASE + TEST_MEM_SIZE &&
-         ((hvm_start_info->cmdline_paddr +
-           strlen((char *)(uintptr_t)hvm_start_info->cmdline_paddr)) >=
-          TEST_MEM_BASE) )
-    {
-        printf("Skipping tests due to overlap with command line\n");
-        return;
-    }
 
     if ( hvm_start_info->rsdp_paddr )
     {
@@ -238,54 +228,67 @@ void perform_tests(void)
         return;
     }
 
-    if ( hvm_start_info->nr_modules )
+    for ( ; ; test_mem_base += TEST_MEM_SIZE )
     {
-        const struct hvm_modlist_entry *modlist =
-            (void *)(uintptr_t)hvm_start_info->modlist_paddr;
-
-        if ( hvm_start_info->modlist_paddr > UINTPTR_MAX ||
-             ((UINTPTR_MAX - (uintptr_t)modlist) / sizeof(*modlist) <
-              hvm_start_info->nr_modules) )
+        if ( hvm_info->low_mem_pgend <
+             ((test_mem_base + TEST_MEM_SIZE) >> PAGE_SHIFT) )
         {
-            printf("Skipping tests due to inaccessible module list\n");
+            printf("Skipping tests due to insufficient memory (<%luMB)\n",
+                   (test_mem_base + TEST_MEM_SIZE) >> 20);
             return;
         }
 
-        if ( TEST_MEM_BASE < (uintptr_t)(modlist +
-                                         hvm_start_info->nr_modules) &&
-             (uintptr_t)modlist < TEST_MEM_BASE + TEST_MEM_SIZE )
+        if ( (unsigned long)_end > test_mem_base )
+            continue;
+
+        if ( hvm_start_info->cmdline_paddr &&
+             hvm_start_info->cmdline_paddr < test_mem_base + TEST_MEM_SIZE &&
+             ((hvm_start_info->cmdline_paddr +
+               strlen((char *)(uintptr_t)hvm_start_info->cmdline_paddr)) >=
+              test_mem_base) )
+            continue;
+
+        if ( hvm_start_info->nr_modules )
         {
-            printf("Skipping tests due to overlap with module list\n");
-            return;
+            const struct hvm_modlist_entry *modlist =
+                (void *)(uintptr_t)hvm_start_info->modlist_paddr;
+
+            if ( hvm_start_info->modlist_paddr > UINTPTR_MAX ||
+                 ((UINTPTR_MAX - (uintptr_t)modlist) / sizeof(*modlist) <
+                  hvm_start_info->nr_modules) )
+                continue;
+
+            if ( test_mem_base < (uintptr_t)(modlist +
+                                             hvm_start_info->nr_modules) &&
+                 (uintptr_t)modlist < test_mem_base + TEST_MEM_SIZE )
+                continue;
+
+            for ( i = 0; i < hvm_start_info->nr_modules; ++i )
+            {
+                if ( test_mem_base < modlist[i].paddr + modlist[i].size &&
+                     modlist[i].paddr < test_mem_base + TEST_MEM_SIZE )
+                    break;
+
+                if ( modlist[i].cmdline_paddr &&
+                     modlist[i].cmdline_paddr < test_mem_base + TEST_MEM_SIZE &&
+                     ((modlist[i].cmdline_paddr +
+                       strlen((char *)(uintptr_t)modlist[i].cmdline_paddr)) >=
+                      test_mem_base) )
+                    break;
+            }
+            if ( i < hvm_start_info->nr_modules )
+                continue;
         }
 
-        for ( i = 0; i < hvm_start_info->nr_modules; ++i )
-        {
-            if ( TEST_MEM_BASE < modlist[i].paddr + modlist[i].size &&
-                 modlist[i].paddr < TEST_MEM_BASE + TEST_MEM_SIZE )
-            {
-                printf("Skipping tests due to overlap with module %u\n", i);
-                return;
-            }
-
-            if ( modlist[i].cmdline_paddr &&
-                 modlist[i].cmdline_paddr < TEST_MEM_BASE + TEST_MEM_SIZE &&
-                 ((modlist[i].cmdline_paddr +
-                   strlen((char *)(uintptr_t)modlist[i].cmdline_paddr)) >=
-                  TEST_MEM_BASE) )
-            {
-                printf("Skipping tests due to overlap with module %u cmdline\n",
-                       i);
-                return;
-            }
-        }
+        printf("Using scratch memory at %lx\n", test_mem_base);
+        break;
     }
 
     passed = skipped = 0;
     for ( i = 0; tests[i].test; i++ )
     {
         printf(" - %s ... ", tests[i].description);
-        memset((char *)(4ul << 20), 0, 4ul << 20);
+        memset((char *)test_mem_base, 0, TEST_MEM_SIZE);
         setup_paging();
         switch ( (*tests[i].test)() )
         {
