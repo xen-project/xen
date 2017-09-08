@@ -566,15 +566,16 @@ static int hvmemul_linear_to_phys(
             if ( pfec & (PFEC_page_paged | PFEC_page_shared) )
                 return X86EMUL_RETRY;
             done /= bytes_per_rep;
-            *reps = done;
             if ( done == 0 )
             {
                 ASSERT(!reverse);
                 if ( npfn != gfn_x(INVALID_GFN) )
                     return X86EMUL_UNHANDLEABLE;
+                *reps = 0;
                 x86_emul_pagefault(pfec, addr & PAGE_MASK, &hvmemul_ctxt->ctxt);
                 return X86EMUL_EXCEPTION;
             }
+            *reps = done;
             break;
         }
 
