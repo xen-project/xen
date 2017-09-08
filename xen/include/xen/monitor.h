@@ -30,6 +30,6 @@ struct xen_domctl_monitor_op;
 int monitor_domctl(struct domain *d, struct xen_domctl_monitor_op *op);
 void monitor_guest_request(void);
 
-int monitor_traps(struct vcpu *v, bool_t sync, vm_event_request_t *req);
+int monitor_traps(struct vcpu *v, bool sync, vm_event_request_t *req);
 
 #endif /* __XEN_MONITOR_H__ */

@@ -28,13 +28,13 @@ int arch_monitor_domctl_event(struct domain *d,
                               struct xen_domctl_monitor_op *mop)
 {
     struct arch_domain *ad = &d->arch;
-    bool_t requested_status = (XEN_DOMCTL_MONITOR_OP_ENABLE == mop->op);
+    bool requested_status = (XEN_DOMCTL_MONITOR_OP_ENABLE == mop->op);
 
     switch ( mop->event )
     {
     case XEN_DOMCTL_MONITOR_EVENT_PRIVILEGED_CALL:
     {
-        bool_t old_status = ad->monitor.privileged_call_enabled;
+        bool old_status = ad->monitor.privileged_call_enabled;
 
         if ( unlikely(old_status == requested_status) )
             return -EEXIST;

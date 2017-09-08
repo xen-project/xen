@@ -31,7 +31,7 @@
 int monitor_domctl(struct domain *d, struct xen_domctl_monitor_op *mop)
 {
     int rc;
-    bool_t requested_status = 0;
+    bool requested_status = false;
 
     if ( unlikely(current->domain == d) ) /* no domain_pause() */
         return -EPERM;
@@ -43,7 +43,7 @@ int monitor_domctl(struct domain *d, struct xen_domctl_monitor_op *mop)
     switch ( mop->op )
     {
     case XEN_DOMCTL_MONITOR_OP_ENABLE:
-        requested_status = 1;
+        requested_status = true;
         /* fallthrough */
     case XEN_DOMCTL_MONITOR_OP_DISABLE:
         /* sanity check: avoid left-shift undefined behavior */
@@ -67,7 +67,7 @@ int monitor_domctl(struct domain *d, struct xen_domctl_monitor_op *mop)
     {
     case XEN_DOMCTL_MONITOR_EVENT_GUEST_REQUEST:
     {
-        bool_t old_status = d->monitor.guest_request_enabled;
+        bool old_status = d->monitor.guest_request_enabled;
 
         if ( unlikely(old_status == requested_status) )
             return -EEXIST;
@@ -88,7 +88,7 @@ int monitor_domctl(struct domain *d, struct xen_domctl_monitor_op *mop)
     return 0;
 }
 
-int monitor_traps(struct vcpu *v, bool_t sync, vm_event_request_t *req)
+int monitor_traps(struct vcpu *v, bool sync, vm_event_request_t *req)
 {
     int rc;
     struct domain *d = v->domain;
