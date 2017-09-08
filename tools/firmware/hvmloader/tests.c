@@ -85,10 +85,10 @@ static void stop_paging(void)
 }
 
 /*
- * rep_io_test: Tests REP INSB both forwards and backwards (EF.DF={0,1}) across
+ * rep_insb_test: Tests REP INSB both forwards and backwards (EF.DF={0,1}) across
  * a discontiguous page boundary.
  */
-static int rep_io_test(void)
+static int rep_insb_test(void)
 {
     uint32_t *p;
     uint32_t i, p0, p1, p2;
@@ -131,6 +131,70 @@ static int rep_io_test(void)
           p < (uint32_t *)(test_mem_base + 0x202000); p++ )
     {
         uint32_t expected = 0;
+        if ( check[i].addr == (unsigned long)p )
+        {
+            expected = check[i].expected;
+            i++;
+        }
+        if ( *p != expected )
+        {
+            printf("Bad value at 0x%08lx: saw %08x expected %08x\n",
+                   (unsigned long)p, *p, expected);
+            okay = TEST_FAIL;
+        }
+    }
+
+    return okay;
+}
+
+/*
+ * rep_insw_test: Tests REP INSW both forwards and backwards (EF.DF={0,1}) across
+ * a discontiguous page boundary.
+ */
+static int rep_insw_test(void)
+{
+    uint32_t *p;
+    unsigned int i;
+    int okay = TEST_PASS;
+    const struct {
+        unsigned long addr;
+        uint32_t expected;
+    } check[] = {
+        { test_mem_base + 0x00100000, 0x98ffffff },
+        { test_mem_base + 0x00100ffc, 0xffffff00 },
+        { test_mem_base + 0x001ffffc, 0xffffff00 },
+        { test_mem_base + 0x00201000, 0x00ffffff },
+        { 0, 0 }
+    };
+
+    start_paging();
+
+    /* Phys 5MB = 0xdeadbeef */
+    *(uint32_t *)(test_mem_base + 0x100000) = 0xdeadbeef;
+
+    /* Phys 6MB = 0x98765432 */
+    *(uint32_t *)(test_mem_base + 0x200000) = 0x98765432;
+
+    /* Phys 0x5ffffd...0x5fffff = Phys 0x500000...0x500002 = 0xff */
+    asm volatile (
+        "rep insw"
+        : "=c" (i), "=D" (i)
+        : "d" (0x5e), "0" (3), "1" (test_mem_base + 0x1ffffd) : "memory" );
+
+    /* Phys 0x500ffd...0x500fff = Phys 0x601000...0x601002 = 0xff */
+    asm volatile (
+        "std ; rep insw ; cld"
+        : "=c" (i), "=D" (i)
+        : "d" (0x5e), "0" (3), "1" (test_mem_base + 0x201001) : "memory" );
+
+    stop_paging();
+
+    i = 0;
+    for ( p = (uint32_t *)(test_mem_base + 0x0ff000);
+          p < (uint32_t *)(test_mem_base + 0x202000); p++ )
+    {
+        uint32_t expected = 0;
+
         if ( check[i].addr == (unsigned long)p )
         {
             expected = check[i].expected;
@@ -213,7 +277,8 @@ void perform_tests(void)
         int (* const test)(void);
         const char *description;
     } tests[] = {
-        { rep_io_test, "REP INSB across page boundaries" },
+        { rep_insb_test, "REP INSB across page boundaries" },
+        { rep_insw_test, "REP INSW across page boundaries" },
         { shadow_gs_test, "GS base MSRs and SWAPGS" },
         { NULL, NULL }
     };
