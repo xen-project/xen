@@ -532,8 +532,8 @@ struct pci_dev *pci_get_real_pdev(int seg, int bus, int devfn)
     return pdev;
 }
 
-struct pci_dev *pci_get_pdev_by_domain(
-    struct domain *d, int seg, int bus, int devfn)
+struct pci_dev *pci_get_pdev_by_domain(const struct domain *d, int seg,
+                                       int bus, int devfn)
 {
     struct pci_seg *pseg = get_pseg(seg);
     struct pci_dev *pdev = NULL;
