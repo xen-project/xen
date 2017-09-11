@@ -220,7 +220,7 @@ void mctelem_process_deferred(unsigned int cpu,
 	int ret;
 
 	/*
-	 * First, unhook the list of telemetry structures, and	
+	 * First, unhook the list of telemetry structures, and
 	 * hook it up to the processing list head for this CPU.
 	 *
 	 * If @lmce is true and a non-local MC# occurs before the
@@ -339,7 +339,7 @@ void __init mctelem_init(unsigned int datasz)
 {
 	char *datarr;
 	unsigned int i;
-	
+
 	BUILD_BUG_ON(MC_URGENT != 0 || MC_NONURGENT != 1 || MC_NCLASSES != 2);
 
 	datasz = (datasz & ~0xf) + 0x10;	/* 16 byte roundup */
