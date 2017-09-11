@@ -83,7 +83,7 @@ bool p2m_mem_access_emulate_check(struct vcpu *v,
                                   const vm_event_response_t *rsp)
 {
     xenmem_access_t access;
-    bool violation = 1;
+    bool violation = true;
     const struct vm_event_mem_access *data = &rsp->u.mem_access;
     struct domain *d = v->domain;
     struct p2m_domain *p2m = NULL;
@@ -129,7 +129,7 @@ bool p2m_mem_access_emulate_check(struct vcpu *v,
             break;
 
         case XENMEM_access_rwx:
-            violation = 0;
+            violation = false;
             break;
         }
     }
@@ -137,9 +137,9 @@ bool p2m_mem_access_emulate_check(struct vcpu *v,
     return violation;
 }
 
-bool_t p2m_mem_access_check(paddr_t gpa, unsigned long gla,
-                            struct npfec npfec,
-                            vm_event_request_t **req_ptr)
+bool p2m_mem_access_check(paddr_t gpa, unsigned long gla,
+                          struct npfec npfec,
+                          vm_event_request_t **req_ptr)
 {
     struct vcpu *v = current;
     unsigned long gfn = gpa >> PAGE_SHIFT;
@@ -167,7 +167,7 @@ bool_t p2m_mem_access_check(paddr_t gpa, unsigned long gla,
         rc = p2m->set_entry(p2m, gfn, mfn, PAGE_ORDER_4K, p2mt, p2m_access_rw, -1);
         ASSERT(rc == 0);
         gfn_unlock(p2m, gfn, 0);
-        return 1;
+        return true;
     }
     else if ( p2ma == p2m_access_n2rwx )
     {
@@ -188,7 +188,7 @@ bool_t p2m_mem_access_check(paddr_t gpa, unsigned long gla,
                                   "no vm_event listener VCPU %d, dom %d\n",
                                   v->vcpu_id, d->domain_id);
             domain_crash(v->domain);
-            return 0;
+            return false;
         }
         else
         {
@@ -204,7 +204,7 @@ bool_t p2m_mem_access_check(paddr_t gpa, unsigned long gla,
                 ASSERT(rc == 0);
             }
             gfn_unlock(p2m, gfn, 0);
-            return 1;
+            return true;
         }
     }
 

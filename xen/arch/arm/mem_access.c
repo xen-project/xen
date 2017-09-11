@@ -219,10 +219,10 @@ err:
     return page;
 }
 
-bool_t p2m_mem_access_check(paddr_t gpa, vaddr_t gla, const struct npfec npfec)
+bool p2m_mem_access_check(paddr_t gpa, vaddr_t gla, const struct npfec npfec)
 {
     int rc;
-    bool_t violation;
+    bool violation;
     xenmem_access_t xma;
     vm_event_request_t *req;
     struct vcpu *v = current;

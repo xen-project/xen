@@ -34,9 +34,9 @@
  * ring. Once having released get_gfn* locks caller must also xfree the
  * request.
  */
-bool_t p2m_mem_access_check(paddr_t gpa, unsigned long gla,
-                            struct npfec npfec,
-                            vm_event_request_t **req_ptr);
+bool p2m_mem_access_check(paddr_t gpa, unsigned long gla,
+                          struct npfec npfec,
+                          vm_event_request_t **req_ptr);
 
 /* Check for emulation and mark vcpu for skipping one instruction
  * upon rescheduling if required. */
@@ -44,7 +44,7 @@ bool p2m_mem_access_emulate_check(struct vcpu *v,
                                   const vm_event_response_t *rsp);
 
 /* Sanity check for mem_access hardware support */
-static inline bool_t p2m_mem_access_sanity_check(struct domain *d)
+static inline bool p2m_mem_access_sanity_check(struct domain *d)
 {
     return is_hvm_domain(d) && cpu_has_vmx && hap_enabled(d);
 }
