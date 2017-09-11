@@ -7,7 +7,7 @@
 #include <xen/smp.h>
 #include <xen/mm.h>
 #include <xen/cpu.h>
-#include <asm/processor.h> 
+#include <asm/processor.h>
 #include <public/sysctl.h>
 #include <asm/system.h>
 #include <asm/msr.h>
@@ -64,7 +64,7 @@ static void intel_thermal_interrupt(struct cpu_user_regs *regs)
 
     ack_APIC_irq();
 
-    if (NOW() < per_cpu(next, cpu))
+    if ( NOW() < per_cpu(next, cpu) )
         return;
 
     per_cpu(next, cpu) = NOW() + MILLISECS(5000);
@@ -78,17 +78,16 @@ static void intel_thermal_interrupt(struct cpu_user_regs *regs)
         printk(KERN_EMERG "CPU%u: Temperature above threshold\n", cpu);
         printk(KERN_EMERG "CPU%u: Running in modulated clock mode\n", cpu);
         add_taint(TAINT_MACHINE_CHECK);
-    } else {
+    } else
         printk(KERN_INFO "CPU%u: Temperature/speed normal\n", cpu);
-    }
 }
 
 /* Thermal monitoring depends on APIC, ACPI and clock modulation */
 static bool intel_thermal_supported(struct cpuinfo_x86 *c)
 {
-    if (!cpu_has_apic)
+    if ( !cpu_has_apic )
         return false;
-    if (!cpu_has(c, X86_FEATURE_ACPI) || !cpu_has(c, X86_FEATURE_TM1))
+    if ( !cpu_has(c, X86_FEATURE_ACPI) || !cpu_has(c, X86_FEATURE_TM1) )
         return false;
     return true;
 }
@@ -102,7 +101,7 @@ static void __init mcheck_intel_therm_init(void)
      * LVT value on BSP and use that value to restore APs' thermal LVT
      * entry BIOS programmed later
      */
-    if (intel_thermal_supported(&boot_cpu_data))
+    if ( intel_thermal_supported(&boot_cpu_data) )
         lvtthmr_init = apic_read(APIC_LVTTHMR);
 }
 
@@ -115,7 +114,7 @@ static void intel_init_thermal(struct cpuinfo_x86 *c)
     unsigned int cpu = smp_processor_id();
     static uint8_t thermal_apic_vector;
 
-    if (!intel_thermal_supported(c))
+    if ( !intel_thermal_supported(c) )
         return; /* -ENODEV */
 
     /* first check if its enabled already, in which case there might
@@ -134,23 +133,25 @@ static void intel_init_thermal(struct cpuinfo_x86 *c)
      * BIOS has programmed on AP based on BSP's info we saved (since BIOS
      * is required to set the same value for all threads/cores).
      */
-    if ((val & APIC_MODE_MASK) != APIC_DM_FIXED
-        || (val & APIC_VECTOR_MASK) > 0xf)
+    if ( (val & APIC_MODE_MASK) != APIC_DM_FIXED
+         || (val & APIC_VECTOR_MASK) > 0xf )
         apic_write(APIC_LVTTHMR, val);
 
-    if ((msr_content & (1ULL<<3))
-        && (val & APIC_MODE_MASK) == APIC_DM_SMI) {
-        if (c == &boot_cpu_data)
+    if ( (msr_content & (1ULL<<3))
+         && (val & APIC_MODE_MASK) == APIC_DM_SMI )
+    {
+        if ( c == &boot_cpu_data )
             printk(KERN_DEBUG "Thermal monitoring handled by SMI\n");
         return; /* -EBUSY */
     }
 
-    if (cpu_has(c, X86_FEATURE_TM2) && (msr_content & (1ULL << 13)))
+    if ( cpu_has(c, X86_FEATURE_TM2) && (msr_content & (1ULL << 13)) )
         tm2 = 1;
 
     /* check whether a vector already exists, temporarily masked? */
-    if (val & APIC_VECTOR_MASK) {
-        if (c == &boot_cpu_data)
+    if ( val & APIC_VECTOR_MASK )
+    {
+        if ( c == &boot_cpu_data )
             printk(KERN_DEBUG "Thermal LVT vector (%#x) already installed\n",
                    val & APIC_VECTOR_MASK);
         return; /* -EBUSY */
@@ -170,9 +171,9 @@ static void intel_init_thermal(struct cpuinfo_x86 *c)
     wrmsrl(MSR_IA32_MISC_ENABLE, msr_content | (1ULL<<3));
 
     apic_write(APIC_LVTTHMR, val & ~APIC_LVT_MASKED);
-    if (opt_cpu_info)
+    if ( opt_cpu_info )
         printk(KERN_INFO "CPU%u: Thermal monitoring enabled (%s)\n",
-                cpu, tm2 ? "TM2" : "TM1");
+               cpu, tm2 ? "TM2" : "TM1");
     return;
 }
 #endif /* CONFIG_X86_MCE_THERMAL */
@@ -181,7 +182,8 @@ static void intel_init_thermal(struct cpuinfo_x86 *c)
 static inline void intel_get_extended_msr(struct mcinfo_extended *ext, u32 msr)
 {
     if ( ext->mc_msrs < ARRAY_SIZE(ext->mc_msr)
-         && msr < MSR_IA32_MCG_EAX + nr_intel_ext_msrs ) {
+         && msr < MSR_IA32_MCG_EAX + nr_intel_ext_msrs )
+    {
         ext->mc_msr[ext->mc_msrs].reg = msr;
         rdmsrl(msr, ext->mc_msr[ext->mc_msrs].value);
         ++ext->mc_msrs;
@@ -199,21 +201,21 @@ intel_get_extended_msrs(struct mcinfo_global *mig, struct mc_info *mi)
      * According to spec, processor _support_ 64 bit will always
      * have MSR beyond IA32_MCG_MISC
      */
-    if (!mi|| !mig || nr_intel_ext_msrs == 0 ||
-            !(mig->mc_gstatus & MCG_STATUS_EIPV))
+    if ( !mi|| !mig || nr_intel_ext_msrs == 0 ||
+         !(mig->mc_gstatus & MCG_STATUS_EIPV) )
         return NULL;
 
     mc_ext = x86_mcinfo_reserve(mi, sizeof(*mc_ext), MC_TYPE_EXTENDED);
-    if (!mc_ext)
+    if ( !mc_ext )
     {
         mi->flags |= MCINFO_FLAGS_UNCOMPLETE;
         return NULL;
     }
 
-    for (i = MSR_IA32_MCG_EAX; i <= MSR_IA32_MCG_MISC; i++)
+    for ( i = MSR_IA32_MCG_EAX; i <= MSR_IA32_MCG_MISC; i++ )
         intel_get_extended_msr(mc_ext, i);
 
-    for (i = MSR_IA32_MCG_R8; i <= MSR_IA32_MCG_R15; i++)
+    for ( i = MSR_IA32_MCG_R8; i <= MSR_IA32_MCG_R15; i++ )
         intel_get_extended_msr(mc_ext, i);
 
     return mc_ext;
@@ -231,24 +233,24 @@ enum intel_mce_type
 
 static enum intel_mce_type intel_check_mce_type(uint64_t status)
 {
-    if (!(status & MCi_STATUS_VAL))
+    if ( !(status & MCi_STATUS_VAL) )
         return intel_mce_invalid;
 
-    if (status & MCi_STATUS_PCC)
+    if ( status & MCi_STATUS_PCC )
         return intel_mce_fatal;
 
     /* Corrected error? */
-    if (!(status & MCi_STATUS_UC))
+    if ( !(status & MCi_STATUS_UC) )
         return intel_mce_corrected;
 
-    if (!ser_support)
+    if ( !ser_support )
         return intel_mce_fatal;
 
-    if (status & MCi_STATUS_S)
+    if ( status & MCi_STATUS_S )
     {
-        if (status & MCi_STATUS_AR)
+        if ( status & MCi_STATUS_AR )
         {
-            if (status & MCi_STATUS_OVER)
+            if ( status & MCi_STATUS_OVER )
                 return intel_mce_fatal;
             else
                 return intel_mce_ucr_srar;
@@ -273,18 +275,16 @@ static void intel_memerr_dhandler(
 
 static bool intel_srar_check(uint64_t status)
 {
-    return ( intel_check_mce_type(status) == intel_mce_ucr_srar );
+    return (intel_check_mce_type(status) == intel_mce_ucr_srar);
 }
 
 static bool intel_checkaddr(uint64_t status, uint64_t misc, int addrtype)
 {
-    if (!(status & MCi_STATUS_ADDRV) ||
-        !(status & MCi_STATUS_MISCV) ||
-        ((misc & MCi_MISC_ADDRMOD_MASK) != MCi_MISC_PHYSMOD) )
-    {
+    if ( !(status & MCi_STATUS_ADDRV) ||
+         !(status & MCi_STATUS_MISCV) ||
+         ((misc & MCi_MISC_ADDRMOD_MASK) != MCi_MISC_PHYSMOD) )
         /* addr is virtual */
         return (addrtype == MC_ADDR_VIRTUAL);
-    }
 
     return (addrtype == MC_ADDR_PHYSICAL);
 }
@@ -310,7 +310,7 @@ static void intel_srar_dhandler(
 
 static bool intel_srao_check(uint64_t status)
 {
-    return ( intel_check_mce_type(status) == intel_mce_ucr_srao );
+    return (intel_check_mce_type(status) == intel_mce_ucr_srao);
 }
 
 static void intel_srao_dhandler(
@@ -337,7 +337,7 @@ static void intel_srao_dhandler(
 
 static bool intel_default_check(uint64_t status)
 {
-    return 1;
+    return true;
 }
 
 static void intel_default_mce_dhandler(
@@ -350,7 +350,7 @@ static void intel_default_mce_dhandler(
 
     type = intel_check_mce_type(status);
 
-    if (type == intel_mce_fatal)
+    if ( type == intel_mce_fatal )
         *result = MCER_RESET;
     else
         *result = MCER_CONTINUE;
@@ -372,7 +372,7 @@ static void intel_default_mce_uhandler(
 
     type = intel_check_mce_type(status);
 
-    switch (type)
+    switch ( type )
     {
     case intel_mce_fatal:
         *result = MCER_RESET;
@@ -396,30 +396,32 @@ static const struct mca_error_handler intel_mce_uhandlers[] = {
  * 1) ser_support = 1, Superious error, OVER = 0, EN = 0, UC = 1
  * 2) ser_support = 1, SRAR, UC = 1, OVER = 0, S = 1, AR = 1, [EN = 1]
  * 3) ser_support = 1, SRAO, UC = 1, S = 1, AR = 0, [EN = 1]
-*/
+ */
 
 static bool intel_need_clearbank_scan(enum mca_source who, u64 status)
 {
-    if ( who == MCA_CMCI_HANDLER) {
+    if ( who == MCA_CMCI_HANDLER )
+    {
         /* CMCI need clear bank */
         if ( !(status & MCi_STATUS_UC) )
             return true;
         /* Spurious need clear bank */
         else if ( ser_support && !(status & MCi_STATUS_OVER)
-                    && !(status & MCi_STATUS_EN) )
+                  && !(status & MCi_STATUS_EN) )
             return true;
         /* UCNA OVER = 0 need clear bank */
-        else if ( ser_support && !(status & MCi_STATUS_OVER) 
-                    && !(status & MCi_STATUS_PCC) && !(status & MCi_STATUS_S) 
-                    && !(status & MCi_STATUS_AR))
+        else if ( ser_support && !(status & MCi_STATUS_OVER)
+                  && !(status & MCi_STATUS_PCC) && !(status & MCi_STATUS_S)
+                  && !(status & MCi_STATUS_AR) )
             return true;
         /* Only Log, no clear */
         else return false;
     }
-    else if ( who == MCA_MCE_SCAN) {
+    else if ( who == MCA_MCE_SCAN )
+    {
         if ( !ser_support )
             return false;
-        /* 
+        /*
          * For fatal error, it shouldn't be cleared so that sticky bank
          * have chance to be handled after reboot by polling
          */
@@ -427,16 +429,16 @@ static bool intel_need_clearbank_scan(enum mca_source who, u64 status)
             return false;
         /* Spurious need clear bank */
         else if ( !(status & MCi_STATUS_OVER)
-                    && (status & MCi_STATUS_UC) && !(status & MCi_STATUS_EN))
+                  && (status & MCi_STATUS_UC) && !(status & MCi_STATUS_EN) )
             return true;
         /* SRAR OVER=0 clear bank. OVER = 1 have caused reset */
         else if ( (status & MCi_STATUS_UC)
-                    && (status & MCi_STATUS_S) && (status & MCi_STATUS_AR )
-                    && !(status & MCi_STATUS_OVER) )
+                  && (status & MCi_STATUS_S) && (status & MCi_STATUS_AR)
+                  && !(status & MCi_STATUS_OVER) )
             return true;
         /* SRAO need clear bank */
-        else if ( !(status & MCi_STATUS_AR) 
-                    && (status & MCi_STATUS_S) && (status & MCi_STATUS_UC))
+        else if ( !(status & MCi_STATUS_AR)
+                  && (status & MCi_STATUS_S) && (status & MCi_STATUS_UC) )
             return true;
         else
             return false;
@@ -445,7 +447,8 @@ static bool intel_need_clearbank_scan(enum mca_source who, u64 status)
     return true;
 }
 
-/* MCE continues/is recoverable when 
+/*
+ * MCE continues/is recoverable when
  * 1) CE UC = 0
  * 2) Supious ser_support = 1, OVER = 0, En = 0 [UC = 1]
  * 3) SRAR ser_support = 1, OVER = 0, PCC = 0, S = 1, AR = 1 [UC =1, EN = 1]
@@ -457,23 +460,23 @@ static bool intel_recoverable_scan(uint64_t status)
 
     if ( !(status & MCi_STATUS_UC ) )
         return true;
-    else if ( ser_support && !(status & MCi_STATUS_EN) 
-                && !(status & MCi_STATUS_OVER) )
+    else if ( ser_support && !(status & MCi_STATUS_EN)
+              && !(status & MCi_STATUS_OVER) )
         return true;
     /* SRAR error */
-    else if ( ser_support && !(status & MCi_STATUS_OVER) 
-                && !(status & MCi_STATUS_PCC) && (status & MCi_STATUS_S)
-                && (status & MCi_STATUS_AR) && (status & MCi_STATUS_EN) )
+    else if ( ser_support && !(status & MCi_STATUS_OVER)
+              && !(status & MCi_STATUS_PCC) && (status & MCi_STATUS_S)
+              && (status & MCi_STATUS_AR) && (status & MCi_STATUS_EN) )
         return true;
     /* SRAO error */
-    else if (ser_support && !(status & MCi_STATUS_PCC)
-                && (status & MCi_STATUS_S) && !(status & MCi_STATUS_AR)
-                && (status & MCi_STATUS_EN))
+    else if ( ser_support && !(status & MCi_STATUS_PCC)
+              && (status & MCi_STATUS_S) && !(status & MCi_STATUS_AR)
+              && (status & MCi_STATUS_EN) )
         return true;
     /* UCNA error */
-    else if (ser_support && !(status & MCi_STATUS_OVER)
-                && (status & MCi_STATUS_EN) && !(status & MCi_STATUS_PCC)
-                && !(status & MCi_STATUS_S) && !(status & MCi_STATUS_AR))
+    else if ( ser_support && !(status & MCi_STATUS_OVER)
+              && (status & MCi_STATUS_EN) && !(status & MCi_STATUS_PCC)
+              && !(status & MCi_STATUS_S) && !(status & MCi_STATUS_AR) )
         return true;
     return false;
 }
@@ -494,7 +497,8 @@ static int do_cmci_discover(int i)
 
     rdmsrl(msr, val);
     /* Some other CPU already owns this bank. */
-    if (val & CMCI_EN) {
+    if ( val & CMCI_EN )
+    {
         mcabanks_clear(i, __get_cpu_var(mce_banks_owned));
         goto out;
     }
@@ -505,7 +509,8 @@ static int do_cmci_discover(int i)
         rdmsrl(msr, val);
     }
 
-    if (!(val & CMCI_EN)) {
+    if ( !(val & CMCI_EN) )
+    {
         /* This bank does not support CMCI. Polling timer has to handle it. */
         mcabanks_set(i, __get_cpu_var(no_cmci_banks));
         wrmsrl(msr, val & ~CMCI_THRESHOLD_MASK);
@@ -515,10 +520,10 @@ static int do_cmci_discover(int i)
     threshold = cmci_threshold;
     if ( threshold > max_threshold )
     {
-       mce_printk(MCE_QUIET,
-                  "CMCI: threshold %#x too large for CPU%u bank %u, using %#x\n",
-                  threshold, smp_processor_id(), i, max_threshold);
-       threshold = max_threshold;
+        mce_printk(MCE_QUIET,
+                   "CMCI: threshold %#x too large for CPU%u bank %u, using %#x\n",
+                   threshold, smp_processor_id(), i, max_threshold);
+        threshold = max_threshold;
     }
     wrmsrl(msr, (val & ~CMCI_THRESHOLD_MASK) | CMCI_EN | threshold);
     mcabanks_set(i, __get_cpu_var(mce_banks_owned));
@@ -538,13 +543,14 @@ static void cmci_discover(void)
 
     spin_lock_irqsave(&cmci_discover_lock, flags);
 
-    for (i = 0; i < nr_mce_banks; i++)
-        if (!mcabanks_test(i, __get_cpu_var(mce_banks_owned)))
+    for ( i = 0; i < nr_mce_banks; i++ )
+        if ( !mcabanks_test(i, __get_cpu_var(mce_banks_owned)) )
             do_cmci_discover(i);
 
     spin_unlock_irqrestore(&cmci_discover_lock, flags);
 
-    /* In case CMCI happended when do owner change.
+    /*
+     * In case CMCI happended when do owner change.
      * If CMCI happened yet not processed immediately,
      * MCi_status (error_count bit 38~52) is not cleared,
      * the CMCI interrupt will never be triggered again.
@@ -553,27 +559,32 @@ static void cmci_discover(void)
     mctc = mcheck_mca_logout(
         MCA_CMCI_HANDLER, __get_cpu_var(mce_banks_owned), &bs, NULL);
 
-    if (bs.errcnt && mctc != NULL) {
-        if (dom0_vmce_enabled()) {
+    if ( bs.errcnt && mctc != NULL )
+    {
+        if ( dom0_vmce_enabled() )
+        {
             mctelem_commit(mctc);
             send_global_virq(VIRQ_MCA);
-        } else {
+        }
+        else
+        {
             x86_mcinfo_dump(mctelem_dataptr(mctc));
             mctelem_dismiss(mctc);
         }
-    } else if (mctc != NULL)
+    }
+    else if ( mctc != NULL )
         mctelem_dismiss(mctc);
 
     mce_printk(MCE_VERBOSE, "CMCI: CPU%d owner_map[%lx], no_cmci_map[%lx]\n",
-           smp_processor_id(),
-           *((unsigned long *)__get_cpu_var(mce_banks_owned)->bank_map),
-           *((unsigned long *)__get_cpu_var(no_cmci_banks)->bank_map));
+               smp_processor_id(),
+               *((unsigned long *)__get_cpu_var(mce_banks_owned)->bank_map),
+               *((unsigned long *)__get_cpu_var(no_cmci_banks)->bank_map));
 }
 
 /*
  * Define an owner for each bank. Banks can be shared between CPUs
  * and to avoid reporting events multiple times always set up one
- * CPU as owner. 
+ * CPU as owner.
  *
  * The assignment has to be redone when CPUs go offline and
  * any of the owners goes away. Also pollers run in parallel so we
@@ -583,7 +594,7 @@ static void cmci_discover(void)
 
 static void mce_set_owner(void)
 {
-    if (!cmci_support || !opt_mce)
+    if ( !cmci_support || !opt_mce )
         return;
 
     cmci_discover();
@@ -596,7 +607,7 @@ static void __cpu_mcheck_distribute_cmci(void *unused)
 
 static void cpu_mcheck_distribute_cmci(void)
 {
-    if (cmci_support && opt_mce)
+    if ( cmci_support && opt_mce )
         on_each_cpu(__cpu_mcheck_distribute_cmci, NULL, 0);
 }
 
@@ -604,19 +615,20 @@ static void clear_cmci(void)
 {
     int i;
 
-    if (!cmci_support || !opt_mce)
+    if ( !cmci_support || !opt_mce )
         return;
 
     mce_printk(MCE_VERBOSE, "CMCI: clear_cmci support on CPU%d\n",
-            smp_processor_id());
+               smp_processor_id());
 
-    for (i = 0; i < nr_mce_banks; i++) {
+    for ( i = 0; i < nr_mce_banks; i++ )
+    {
         unsigned msr = MSR_IA32_MCx_CTL2(i);
         u64 val;
-        if (!mcabanks_test(i, __get_cpu_var(mce_banks_owned)))
+        if ( !mcabanks_test(i, __get_cpu_var(mce_banks_owned)) )
             continue;
         rdmsrl(msr, val);
-        if (val & (CMCI_EN|CMCI_THRESHOLD_MASK))
+        if ( val & (CMCI_EN|CMCI_THRESHOLD_MASK) )
             wrmsrl(msr, val & ~(CMCI_EN|CMCI_THRESHOLD_MASK));
         mcabanks_clear(i, __get_cpu_var(mce_banks_owned));
     }
@@ -626,7 +638,7 @@ static void cpu_mcheck_disable(void)
 {
     clear_in_cr4(X86_CR4_MCE);
 
-    if (cmci_support && opt_mce)
+    if ( cmci_support && opt_mce )
         clear_cmci();
 }
 
@@ -640,16 +652,21 @@ static void cmci_interrupt(struct cpu_user_regs *regs)
     mctc = mcheck_mca_logout(
         MCA_CMCI_HANDLER, __get_cpu_var(mce_banks_owned), &bs, NULL);
 
-    if (bs.errcnt && mctc != NULL) {
-        if (dom0_vmce_enabled()) {
+    if ( bs.errcnt && mctc != NULL )
+    {
+        if ( dom0_vmce_enabled() )
+        {
             mctelem_commit(mctc);
             mce_printk(MCE_VERBOSE, "CMCI: send CMCI to DOM0 through virq\n");
             send_global_virq(VIRQ_MCA);
-        } else {
+        }
+        else
+        {
             x86_mcinfo_dump(mctelem_dataptr(mctc));
             mctelem_dismiss(mctc);
-       }
-    } else if (mctc != NULL)
+        }
+    }
+    else if ( mctc != NULL )
         mctelem_dismiss(mctc);
 }
 
@@ -658,8 +675,9 @@ static void intel_init_cmci(struct cpuinfo_x86 *c)
     u32 l, apic;
     int cpu = smp_processor_id();
 
-    if (!mce_available(c) || !cmci_support) {
-        if (opt_cpu_info)
+    if ( !mce_available(c) || !cmci_support )
+    {
+        if ( opt_cpu_info )
             mce_printk(MCE_QUIET, "CMCI: CPU%d has no CMCI support\n", cpu);
         return;
     }
@@ -668,7 +686,7 @@ static void intel_init_cmci(struct cpuinfo_x86 *c)
     if ( apic & APIC_VECTOR_MASK )
     {
         mce_printk(MCE_QUIET, "CPU%d CMCI LVT vector (%#x) already installed\n",
-            cpu, ( apic & APIC_VECTOR_MASK ));
+                   cpu, ( apic & APIC_VECTOR_MASK ));
         return;
     }
 
@@ -688,15 +706,16 @@ static void intel_init_cmci(struct cpuinfo_x86 *c)
 
 static bool mce_is_broadcast(struct cpuinfo_x86 *c)
 {
-    if (mce_force_broadcast)
+    if ( mce_force_broadcast )
         return true;
 
-    /* According to Intel SDM Dec, 2009, 15.10.4.1, For processors with
+    /*
+     * According to Intel SDM Dec, 2009, 15.10.4.1, For processors with
      * DisplayFamily_DisplayModel encoding of 06H_EH and above,
      * a MCA signal is broadcast to all logical processors in the system
      */
-    if (c->x86_vendor == X86_VENDOR_INTEL && c->x86 == 6 &&
-        c->x86_model >= 0xe)
+    if ( c->x86_vendor == X86_VENDOR_INTEL && c->x86 == 6 &&
+         c->x86_model >= 0xe )
         return true;
     return false;
 }
@@ -736,23 +755,23 @@ static void intel_init_mca(struct cpuinfo_x86 *c)
 
     rdmsrl(MSR_IA32_MCG_CAP, msr_content);
 
-    if ((msr_content & MCG_CMCI_P) && cpu_has_apic)
+    if ( (msr_content & MCG_CMCI_P) && cpu_has_apic )
         cmci = true;
 
     /* Support Software Error Recovery */
-    if (msr_content & MCG_SER_P)
+    if ( msr_content & MCG_SER_P )
         ser = true;
 
-    if (msr_content & MCG_EXT_P)
+    if ( msr_content & MCG_EXT_P )
         ext_num = (msr_content >> MCG_EXT_CNT) & 0xff;
 
     first = mce_firstbank(c);
 
-    if (!mce_force_broadcast && (msr_content & MCG_LMCE_P))
+    if ( !mce_force_broadcast && (msr_content & MCG_LMCE_P) )
         lmce = intel_enable_lmce();
 
 #define CAP(enabled, name) ((enabled) ? ", " name : "")
-    if (smp_processor_id() == 0)
+    if ( smp_processor_id() == 0 )
     {
         dprintk(XENLOG_INFO,
                 "MCA Capability: firstbank %d, extended MCE MSR %d%s%s%s%s\n",
@@ -769,10 +788,10 @@ static void intel_init_mca(struct cpuinfo_x86 *c)
         nr_intel_ext_msrs = ext_num;
         firstbank = first;
     }
-    else if (cmci != cmci_support || ser != ser_support ||
-             broadcast != mce_broadcast ||
-             first != firstbank || ext_num != nr_intel_ext_msrs ||
-             lmce != lmce_support)
+    else if ( cmci != cmci_support || ser != ser_support ||
+              broadcast != mce_broadcast ||
+              first != firstbank || ext_num != nr_intel_ext_msrs ||
+              lmce != lmce_support )
         dprintk(XENLOG_WARNING,
                 "CPU%u has different MCA capability "
                 "(firstbank %d, extended MCE MSR %d%s%s%s%s)"
@@ -793,7 +812,8 @@ static void intel_mce_post_reset(void)
     mctc = mcheck_mca_logout(MCA_RESET, mca_allbanks, &bs, NULL);
 
     /* in the boot up stage, print out and also log in DOM0 boot process */
-    if (bs.errcnt && mctc != NULL) {
+    if ( bs.errcnt && mctc != NULL )
+    {
         x86_mcinfo_dump(mctelem_dataptr(mctc));
         mctelem_commit(mctc);
     }
@@ -808,12 +828,14 @@ static void intel_init_mce(void)
     intel_mce_post_reset();
 
     /* clear all banks */
-    for (i = firstbank; i < nr_mce_banks; i++)
+    for ( i = firstbank; i < nr_mce_banks; i++ )
     {
-        /* Some banks are shared across cores, use MCi_CTRL to judge whether
-         * this bank has been initialized by other cores already. */
+        /*
+         * Some banks are shared across cores, use MCi_CTRL to judge whether
+         * this bank has been initialized by other cores already.
+         */
         rdmsrl(MSR_IA32_MCx_CTL(i), msr_content);
-        if (!msr_content)
+        if ( !msr_content )
         {
             /* if ctl is 0, this bank is never initialized */
             mce_printk(MCE_VERBOSE, "mce_init: init bank%d\n", i);
@@ -821,7 +843,7 @@ static void intel_init_mce(void)
             wrmsrl(MSR_IA32_MCx_STATUS(i), 0x0ULL);
         }
     }
-    if (firstbank) /* if cmci enabled, firstbank = 0 */
+    if ( firstbank ) /* if cmci enabled, firstbank = 0 */
         wrmsrl(MSR_IA32_MC0_STATUS, 0x0ULL);
 
     x86_mce_vector_register(mcheck_cmn_handler);
@@ -849,7 +871,7 @@ static int cpu_mcabank_alloc(unsigned int cpu)
     struct mca_banks *cmci = mcabanks_alloc();
     struct mca_banks *owned = mcabanks_alloc();
 
-    if (!cmci || !owned)
+    if ( !cmci || !owned )
         goto out;
 
     per_cpu(no_cmci_banks, cpu) = cmci;
@@ -857,7 +879,7 @@ static int cpu_mcabank_alloc(unsigned int cpu)
     per_cpu(last_state, cpu) = -1;
 
     return 0;
-out:
+ out:
     mcabanks_free(cmci);
     mcabanks_free(owned);
     return -ENOMEM;
