@@ -19,7 +19,8 @@
 #define MCE_CRITICAL    2
 
 extern int mce_verbosity;
-/* Define the default level of machine check related print.
+/*
+ * Define the default level of machine check related print.
  * When set mce_verbosity=verbose, all mce debug information
  * will be printed, otherwise, those information will not be
  * printed.
@@ -62,8 +63,10 @@ void x86_mc_get_cpu_info(unsigned, uint32_t *, uint16_t *, uint16_t *,
 typedef void (*x86_mce_vector_t)(const struct cpu_user_regs *regs);
 extern void x86_mce_vector_register(x86_mce_vector_t);
 
-/* Common generic MCE handler that implementations may nominate
- * via x86_mce_vector_register. */
+/*
+ * Common generic MCE handler that implementations may nominate
+ * via x86_mce_vector_register.
+ */
 extern void mcheck_cmn_handler(const struct cpu_user_regs *regs);
 
 /* Register a handler for judging whether mce is recoverable. */
@@ -90,12 +93,14 @@ static inline uint64_t mca_rdmsr(unsigned int msr)
 } while ( 0 )
 
 
-/* Utility function to "logout" all architectural MCA telemetry from the MCA
+/*
+ * Utility function to "logout" all architectural MCA telemetry from the MCA
  * banks of the current processor.  A cookie is returned which may be
  * uses to reference the data so logged (the cookie can be NULL if
  * no logout structures were available).  The caller can also pass a pointer
  * to a structure which will be completed with some summary information
- * of the MCA data observed in the logout operation. */
+ * of the MCA data observed in the logout operation.
+ */
 
 enum mca_source {
     MCA_POLLER,
@@ -126,7 +131,8 @@ extern void mcheck_mca_clearbanks(struct mca_banks *);
 extern mctelem_cookie_t mcheck_mca_logout(enum mca_source, struct mca_banks *,
     struct mca_summary *, struct mca_banks *);
 
-/* Register callbacks to be made during bank telemetry logout.
+/*
+ * Register callbacks to be made during bank telemetry logout.
  * Those callbacks are only available to those machine check handlers
  * that call to the common mcheck_cmn_handler or who use the common
  * telemetry logout function mcheck_mca_logout in error polling.
@@ -136,7 +142,8 @@ extern mctelem_cookie_t mcheck_mca_logout(enum mca_source, struct mca_banks *,
 typedef bool (*mce_need_clearbank_t)(enum mca_source who, u64 status);
 extern void mce_need_clearbank_register(mce_need_clearbank_t);
 
-/* Register a callback to collect additional information (typically non-
+/*
+ * Register a callback to collect additional information (typically non-
  * architectural) provided by newer CPU families/models without the need
  * to duplicate the whole handler resulting in various handlers each with
  * its own tweaks and bugs. The callback receives an struct mc_info pointer

@@ -64,7 +64,7 @@ struct mca_banks *mca_allbanks;
 int mce_verbosity;
 static int __init mce_set_verbosity(const char *str)
 {
-    if (strcmp("verbose", str) == 0)
+    if ( strcmp("verbose", str) == 0 )
         mce_verbosity = MCE_VERBOSE;
     else
         return -EINVAL;
@@ -81,7 +81,6 @@ static void unexpected_machine_check(const struct cpu_user_regs *regs)
     fatal_trap(regs, 1);
 }
 
-
 static x86_mce_vector_t _machine_check_vector = unexpected_machine_check;
 
 void x86_mce_vector_register(x86_mce_vector_t hdlr)
@@ -97,11 +96,13 @@ void do_machine_check(const struct cpu_user_regs *regs)
     _machine_check_vector(regs);
 }
 
-/* Init machine check callback handler
+/*
+ * Init machine check callback handler
  * It is used to collect additional information provided by newer
  * CPU families/models without the need to duplicate the whole handler.
  * This avoids having many handlers doing almost nearly the same and each
- * with its own tweaks ands bugs. */
+ * with its own tweaks ands bugs.
+ */
 static x86_mce_callback_t mc_callback_bank_extended = NULL;
 
 void x86_mce_callback_register(x86_mce_callback_t cbfunc)
@@ -109,7 +110,8 @@ void x86_mce_callback_register(x86_mce_callback_t cbfunc)
     mc_callback_bank_extended = cbfunc;
 }
 
-/* Machine check recoverable judgement callback handler
+/*
+ * Machine check recoverable judgement callback handler
  * It is used to judge whether an UC error is recoverable by software
  */
 static mce_recoverable_t mc_recoverable_scan = NULL;
@@ -124,12 +126,12 @@ struct mca_banks *mcabanks_alloc(void)
     struct mca_banks *mb;
 
     mb = xmalloc(struct mca_banks);
-    if (!mb)
+    if ( !mb )
         return NULL;
 
     mb->bank_map = xzalloc_array(unsigned long,
                                  BITS_TO_LONGS(nr_mce_banks));
-    if (!mb->bank_map)
+    if ( !mb->bank_map )
     {
         xfree(mb);
         return NULL;
@@ -142,9 +144,9 @@ struct mca_banks *mcabanks_alloc(void)
 
 void mcabanks_free(struct mca_banks *banks)
 {
-    if (banks == NULL)
+    if ( banks == NULL )
         return;
-    if (banks->bank_map)
+    if ( banks->bank_map )
         xfree(banks->bank_map);
     xfree(banks);
 }
@@ -155,15 +157,16 @@ static void mcabank_clear(int banknum)
 
     status = mca_rdmsr(MSR_IA32_MCx_STATUS(banknum));
 
-    if (status & MCi_STATUS_ADDRV)
+    if ( status & MCi_STATUS_ADDRV )
         mca_wrmsr(MSR_IA32_MCx_ADDR(banknum), 0x0ULL);
-    if (status & MCi_STATUS_MISCV)
+    if ( status & MCi_STATUS_MISCV )
         mca_wrmsr(MSR_IA32_MCx_MISC(banknum), 0x0ULL);
 
     mca_wrmsr(MSR_IA32_MCx_STATUS(banknum), 0x0ULL);
 }
 
-/* Judging whether to Clear Machine Check error bank callback handler
+/*
+ * Judging whether to Clear Machine Check error bank callback handler
  * According to Intel latest MCA OS Recovery Writer's Guide,
  * whether the error MCA bank needs to be cleared is decided by the mca_source
  * and MCi_status bit value.
@@ -188,17 +191,15 @@ const struct mca_error_handler *__read_mostly mce_uhandlers;
 unsigned int __read_mostly mce_dhandler_num;
 unsigned int __read_mostly mce_uhandler_num;
 
-
-static void mca_init_bank(enum mca_source who,
-    struct mc_info *mi, int bank)
+static void mca_init_bank(enum mca_source who, struct mc_info *mi, int bank)
 {
     struct mcinfo_bank *mib;
 
-    if (!mi)
+    if ( !mi )
         return;
 
     mib = x86_mcinfo_reserve(mi, sizeof(*mib), MC_TYPE_BANK);
-    if (!mib)
+    if ( !mib )
     {
         mi->flags |= MCINFO_FLAGS_UNCOMPLETE;
         return;
@@ -209,26 +210,27 @@ static void mca_init_bank(enum mca_source who,
     mib->mc_bank = bank;
     mib->mc_domid = DOMID_INVALID;
 
-    if (mib->mc_status & MCi_STATUS_MISCV)
+    if ( mib->mc_status & MCi_STATUS_MISCV )
         mib->mc_misc = mca_rdmsr(MSR_IA32_MCx_MISC(bank));
 
-    if (mib->mc_status & MCi_STATUS_ADDRV)
+    if ( mib->mc_status & MCi_STATUS_ADDRV )
         mib->mc_addr = mca_rdmsr(MSR_IA32_MCx_ADDR(bank));
 
-    if ((mib->mc_status & MCi_STATUS_MISCV) &&
-        (mib->mc_status & MCi_STATUS_ADDRV) &&
-        (mc_check_addr(mib->mc_status, mib->mc_misc, MC_ADDR_PHYSICAL)) &&
-        (who == MCA_POLLER || who == MCA_CMCI_HANDLER) &&
-        (mfn_valid(_mfn(paddr_to_pfn(mib->mc_addr)))))
+    if ( (mib->mc_status & MCi_STATUS_MISCV) &&
+         (mib->mc_status & MCi_STATUS_ADDRV) &&
+         (mc_check_addr(mib->mc_status, mib->mc_misc, MC_ADDR_PHYSICAL)) &&
+         (who == MCA_POLLER || who == MCA_CMCI_HANDLER) &&
+         (mfn_valid(_mfn(paddr_to_pfn(mib->mc_addr)))) )
     {
         struct domain *d;
 
         d = maddr_get_owner(mib->mc_addr);
-        if (d)
+        if ( d )
             mib->mc_domid = d->domain_id;
     }
 
-    if (who == MCA_CMCI_HANDLER) {
+    if ( who == MCA_CMCI_HANDLER )
+    {
         mib->mc_ctrl2 = mca_rdmsr(MSR_IA32_MC0_CTL2 + bank);
         mib->mc_tsc = rdtsc();
     }
@@ -252,7 +254,8 @@ static int mca_init_global(uint32_t flags, struct mcinfo_global *mig)
                         &mig->mc_coreid, &mig->mc_core_threadid,
                         &mig->mc_apicid, NULL, NULL, NULL);
 
-    if (curr != INVALID_VCPU) {
+    if ( curr != INVALID_VCPU )
+    {
         mig->mc_domid = curr->domain->domain_id;
         mig->mc_vcpuid = curr->vcpu_id;
     }
@@ -260,14 +263,17 @@ static int mca_init_global(uint32_t flags, struct mcinfo_global *mig)
     return 0;
 }
 
-/* Utility function to perform MCA bank telemetry readout and to push that
+/*
+ * Utility function to perform MCA bank telemetry readout and to push that
  * telemetry towards an interested dom0 for logging and diagnosis.
  * The caller - #MC handler or MCA poll function - must arrange that we
- * do not migrate cpus. */
+ * do not migrate cpus.
+ */
 
 /* XXFM Could add overflow counting? */
 
-/* Add out_param clear_bank for Machine Check Handler Caller.
+/*
+ *  Add out_param clear_bank for Machine Check Handler Caller.
  * For Intel latest CPU, whether to clear the error bank status needs to
  * be judged by the callback function defined above.
  */
@@ -286,7 +292,8 @@ mcheck_mca_logout(enum mca_source who, struct mca_banks *bankmask,
     int i;
 
     gstatus = mca_rdmsr(MSR_IA32_MCG_STATUS);
-    switch (who) {
+    switch ( who )
+    {
     case MCA_MCE_SCAN:
         mc_flags = MC_FLAG_MCE;
         which = MC_URGENT;
@@ -307,34 +314,42 @@ mcheck_mca_logout(enum mca_source who, struct mca_banks *bankmask,
         BUG();
     }
 
-    /* If no mc_recovery_scan callback handler registered,
+    /*
+     * If no mc_recovery_scan callback handler registered,
      * this error is not recoverable
      */
-    recover = (mc_recoverable_scan) ? 1 : 0;
+    recover = mc_recoverable_scan ? 1 : 0;
 
-    for (i = 0; i < nr_mce_banks; i++) {
+    for ( i = 0; i < nr_mce_banks; i++ )
+    {
         /* Skip bank if corresponding bit in bankmask is clear */
-        if (!mcabanks_test(i, bankmask))
+        if ( !mcabanks_test(i, bankmask) )
             continue;
 
         status = mca_rdmsr(MSR_IA32_MCx_STATUS(i));
-        if (!(status & MCi_STATUS_VAL))
+        if ( !(status & MCi_STATUS_VAL) )
             continue; /* this bank has no valid telemetry */
 
-        /* For Intel Latest CPU CMCI/MCE Handler caller, we need to
+        /*
+         * For Intel Latest CPU CMCI/MCE Handler caller, we need to
          * decide whether to clear bank by MCi_STATUS bit value such as
          * OVER/UC/EN/PCC/S/AR
          */
         if ( mc_need_clearbank_scan )
             need_clear = mc_need_clearbank_scan(who, status);
 
-        /* If this is the first bank with valid MCA DATA, then
+        /*
+         * If this is the first bank with valid MCA DATA, then
          * try to reserve an entry from the urgent/nonurgent queue
          * depending on whether we are called from an exception or
          * a poller;  this can fail (for example dom0 may not
-         * yet have consumed past telemetry). */
-        if (errcnt++ == 0) {
-            if ( (mctc = mctelem_reserve(which)) != NULL ) {
+         * yet have consumed past telemetry).
+         */
+        if ( errcnt++ == 0 )
+        {
+            mctc = mctelem_reserve(which);
+            if ( mctc )
+            {
                 mci = mctelem_dataptr(mctc);
                 mcinfo_clear(mci);
                 mig = x86_mcinfo_reserve(mci, sizeof(*mig), MC_TYPE_GLOBAL);
@@ -342,49 +357,50 @@ mcheck_mca_logout(enum mca_source who, struct mca_banks *bankmask,
                 ASSERT(mig);
                 mca_init_global(mc_flags, mig);
                 /* A hook here to get global extended msrs */
-                if (boot_cpu_data.x86_vendor == X86_VENDOR_INTEL)
+                if ( boot_cpu_data.x86_vendor == X86_VENDOR_INTEL )
                     intel_get_extended_msrs(mig, mci);
             }
         }
 
         /* flag for uncorrected errors */
-        if (!uc && ((status & MCi_STATUS_UC) != 0))
+        if ( !uc && ((status & MCi_STATUS_UC) != 0) )
             uc = true;
 
         /* flag processor context corrupt */
-        if (!pcc && ((status & MCi_STATUS_PCC) != 0))
+        if ( !pcc && ((status & MCi_STATUS_PCC) != 0) )
             pcc = true;
 
-        if (recover && uc)
+        if ( recover && uc )
             /* uc = true, recover = true, we need not panic. */
             recover = mc_recoverable_scan(status);
 
         mca_init_bank(who, mci, i);
 
-        if (mc_callback_bank_extended)
+        if ( mc_callback_bank_extended )
             mc_callback_bank_extended(mci, i, status);
 
         /* By default, need_clear = true */
-        if (who != MCA_MCE_SCAN && need_clear)
+        if ( who != MCA_MCE_SCAN && need_clear )
             /* Clear bank */
             mcabank_clear(i);
-        else if ( who == MCA_MCE_SCAN && need_clear)
+        else if ( who == MCA_MCE_SCAN && need_clear )
             mcabanks_set(i, clear_bank);
 
         wmb();
     }
 
-    if (mig && errcnt > 0) {
-        if (pcc)
+    if ( mig && errcnt > 0 )
+    {
+        if ( pcc )
             mig->mc_flags |= MC_FLAG_UNCORRECTABLE;
-        else if (uc)
+        else if ( uc )
             mig->mc_flags |= MC_FLAG_RECOVERABLE;
         else
             mig->mc_flags |= MC_FLAG_CORRECTABLE;
     }
 
-
-    if (sp) {
+    if ( sp )
+    {
         sp->errcnt = errcnt;
         sp->ripv = (gstatus & MCG_STATUS_RIPV) != 0;
         sp->eipv = (gstatus & MCG_STATUS_EIPV) != 0;
@@ -399,19 +415,20 @@ mcheck_mca_logout(enum mca_source who, struct mca_banks *bankmask,
 
 static void mce_spin_lock(spinlock_t *lk)
 {
-      while (!spin_trylock(lk)) {
-              cpu_relax();
-              mce_panic_check();
-      }
+    while ( !spin_trylock(lk) )
+    {
+        cpu_relax();
+        mce_panic_check();
+    }
 }
 
 static void mce_spin_unlock(spinlock_t *lk)
 {
-      spin_unlock(lk);
+    spin_unlock(lk);
 }
 
 static enum mce_result mce_action(const struct cpu_user_regs *regs,
-    mctelem_cookie_t mctc);
+                                  mctelem_cookie_t mctc);
 
 /*
  * Return:
@@ -419,11 +436,11 @@ static enum mce_result mce_action(const struct cpu_user_regs *regs,
  * 0: Continue to next step
  */
 static int mce_urgent_action(const struct cpu_user_regs *regs,
-                              mctelem_cookie_t mctc)
+                             mctelem_cookie_t mctc)
 {
     uint64_t gstatus;
 
-    if ( mctc == NULL)
+    if ( mctc == NULL )
         return 0;
 
     gstatus = mca_rdmsr(MSR_IA32_MCG_STATUS);
@@ -460,50 +477,49 @@ void mcheck_cmn_handler(const struct cpu_user_regs *regs)
 
     mce_spin_lock(&mce_logout_lock);
 
-    if (clear_bank != NULL) {
-        memset( clear_bank->bank_map, 0x0,
-            sizeof(long) * BITS_TO_LONGS(clear_bank->num));
-    }
+    if ( clear_bank != NULL )
+        memset(clear_bank->bank_map, 0x0,
+               sizeof(long) * BITS_TO_LONGS(clear_bank->num));
     mctc = mcheck_mca_logout(MCA_MCE_SCAN, bankmask, &bs, clear_bank);
     lmce = bs.lmce;
     bcast = mce_broadcast && !lmce;
 
-    if (bs.errcnt) {
+    if ( bs.errcnt )
+    {
         /*
          * Uncorrected errors must be dealt with in softirq context.
          */
-        if (bs.uc || bs.pcc) {
+        if ( bs.uc || bs.pcc )
+        {
             add_taint(TAINT_MACHINE_CHECK);
-            if (mctc != NULL)
+            if ( mctc )
                 mctelem_defer(mctc, lmce);
             /*
              * For PCC=1 and can't be recovered, context is lost, so
              * reboot now without clearing the banks, and deal with
              * the telemetry after reboot (the MSRs are sticky)
              */
-            if (bs.pcc || !bs.recoverable)
+            if ( bs.pcc || !bs.recoverable )
                 cpumask_set_cpu(smp_processor_id(), &mce_fatal_cpus);
-        } else {
-            if (mctc != NULL)
-                mctelem_commit(mctc);
         }
+        else if ( mctc != NULL )
+            mctelem_commit(mctc);
         atomic_set(&found_error, 1);
 
         /* The last CPU will be take check/clean-up etc */
         atomic_set(&severity_cpu, smp_processor_id());
 
         mce_printk(MCE_CRITICAL, "MCE: clear_bank map %lx on CPU%d\n",
-                *((unsigned long*)clear_bank), smp_processor_id());
-        if (clear_bank != NULL)
+                   *((unsigned long *)clear_bank), smp_processor_id());
+        if ( clear_bank != NULL )
             mcheck_mca_clearbanks(clear_bank);
-    } else {
-        if (mctc != NULL)
-            mctelem_dismiss(mctc);
     }
+    else if ( mctc != NULL )
+        mctelem_dismiss(mctc);
     mce_spin_unlock(&mce_logout_lock);
 
     mce_barrier_enter(&mce_trap_bar, bcast);
-    if ( mctc != NULL && mce_urgent_action(regs, mctc))
+    if ( mctc != NULL && mce_urgent_action(regs, mctc) )
         cpumask_set_cpu(smp_processor_id(), &mce_fatal_cpus);
     mce_barrier_exit(&mce_trap_bar, bcast);
 
@@ -511,14 +527,16 @@ void mcheck_cmn_handler(const struct cpu_user_regs *regs)
      * Wait until everybody has processed the trap.
      */
     mce_barrier_enter(&mce_trap_bar, bcast);
-    if (lmce || atomic_read(&severity_cpu) == smp_processor_id()) {
-        /* According to SDM, if no error bank found on any cpus,
+    if ( lmce || atomic_read(&severity_cpu) == smp_processor_id() )
+    {
+        /*
+         * According to SDM, if no error bank found on any cpus,
          * something unexpected happening, we can't do any
          * recovery job but to reset the system.
          */
-        if (atomic_read(&found_error) == 0)
+        if ( atomic_read(&found_error) == 0 )
             mc_panic("MCE: No CPU found valid MCE, need reset");
-        if (!cpumask_empty(&mce_fatal_cpus))
+        if ( !cpumask_empty(&mce_fatal_cpus) )
         {
             char *ebufp, ebuf[96] = "MCE: Fatal error happened on CPUs ";
             ebufp = ebuf + strlen(ebuf);
@@ -533,7 +551,8 @@ void mcheck_cmn_handler(const struct cpu_user_regs *regs)
     /* Clear flags after above fatal check */
     mce_barrier_enter(&mce_trap_bar, bcast);
     gstatus = mca_rdmsr(MSR_IA32_MCG_STATUS);
-    if ((gstatus & MCG_STATUS_MCIP) != 0) {
+    if ( (gstatus & MCG_STATUS_MCIP) != 0 )
+    {
         mce_printk(MCE_CRITICAL, "MCE: Clear MCIP@ last step");
         mca_wrmsr(MSR_IA32_MCG_STATUS, 0);
     }
@@ -546,8 +565,9 @@ void mcheck_mca_clearbanks(struct mca_banks *bankmask)
 {
     int i;
 
-    for (i = 0; i < nr_mce_banks; i++) {
-        if (!mcabanks_test(i, bankmask))
+    for ( i = 0; i < nr_mce_banks; i++ )
+    {
+        if ( !mcabanks_test(i, bankmask) )
             continue;
         mcabank_clear(i);
     }
@@ -565,19 +585,16 @@ bool mce_available(const struct cpuinfo_x86 *c)
  */
 unsigned int mce_firstbank(struct cpuinfo_x86 *c)
 {
-    if (c->x86 == 6) {
-        if (c->x86_vendor == X86_VENDOR_INTEL && c->x86_model < 0x1a)
-            return 1;
-    }
-
-    return 0;
+    return c->x86 == 6 &&
+           c->x86_vendor == X86_VENDOR_INTEL && c->x86_model < 0x1a;
 }
 
 int show_mca_info(int inited, struct cpuinfo_x86 *c)
 {
     static enum mcheck_type g_type = mcheck_unset;
 
-    if (inited != g_type) {
+    if ( inited != g_type )
+    {
         char prefix[20];
         static const char *const type_str[] = {
             [mcheck_amd_famXX] = "AMD",
@@ -589,7 +606,8 @@ int show_mca_info(int inited, struct cpuinfo_x86 *c)
                  g_type != mcheck_unset ? XENLOG_WARNING : XENLOG_INFO,
                  smp_processor_id());
         BUG_ON(inited >= ARRAY_SIZE(type_str));
-        switch (inited) {
+        switch ( inited )
+        {
         default:
             printk("%s%s machine check reporting enabled\n",
                    prefix, type_str[inited]);
@@ -618,14 +636,16 @@ static void set_poll_bankmask(struct cpuinfo_x86 *c)
     mb = per_cpu(poll_bankmask, cpu);
     BUG_ON(!mb);
 
-    if (cmci_support && opt_mce) {
+    if ( cmci_support && opt_mce )
+    {
         mb->num = per_cpu(no_cmci_banks, cpu)->num;
         bitmap_copy(mb->bank_map, per_cpu(no_cmci_banks, cpu)->bank_map,
                     nr_mce_banks);
     }
-    else {
+    else
+    {
         bitmap_copy(mb->bank_map, mca_allbanks->bank_map, nr_mce_banks);
-        if (mce_firstbank(c))
+        if ( mce_firstbank(c) )
             mcabanks_clear(0, mb);
     }
 }
@@ -637,10 +657,10 @@ int mca_cap_init(void)
 
     rdmsrl(MSR_IA32_MCG_CAP, msr_content);
 
-    if (msr_content & MCG_CTL_P) /* Control register present ? */
+    if ( msr_content & MCG_CTL_P ) /* Control register present ? */
         wrmsrl(MSR_IA32_MCG_CTL, 0xffffffffffffffffULL);
 
-    if (nr_mce_banks && (msr_content & MCG_CAP_COUNT) != nr_mce_banks)
+    if ( nr_mce_banks && (msr_content & MCG_CAP_COUNT) != nr_mce_banks )
     {
         dprintk(XENLOG_WARNING, "Different bank number on cpu %x\n",
                 smp_processor_id());
@@ -648,7 +668,7 @@ int mca_cap_init(void)
     }
     nr_mce_banks = msr_content & MCG_CAP_COUNT;
 
-    if (!nr_mce_banks)
+    if ( !nr_mce_banks )
     {
         printk(XENLOG_INFO "CPU%u: No MCE banks present. "
                "Machine check support disabled\n", smp_processor_id());
@@ -656,16 +676,16 @@ int mca_cap_init(void)
     }
 
     /* mcabanks_alloc depends on nr_mce_banks */
-    if (!mca_allbanks)
+    if ( !mca_allbanks )
     {
         int i;
 
         mca_allbanks = mcabanks_alloc();
-        for ( i = 0; i < nr_mce_banks; i++)
+        for ( i = 0; i < nr_mce_banks; i++ )
             mcabanks_set(i, mca_allbanks);
     }
 
-    return mca_allbanks ? 0:-ENOMEM;
+    return mca_allbanks ? 0 : -ENOMEM;
 }
 
 static void cpu_bank_free(unsigned int cpu)
@@ -731,7 +751,7 @@ void mcheck_init(struct cpuinfo_x86 *c, bool bsp)
         return;
     }
 
-    if (!mce_available(c))
+    if ( !mce_available(c) )
     {
         printk(XENLOG_INFO "CPU%i: No machine check support available\n",
                smp_processor_id());
@@ -739,20 +759,22 @@ void mcheck_init(struct cpuinfo_x86 *c, bool bsp)
     }
 
     /*Hardware Enable */
-    if (mca_cap_init())
+    if ( mca_cap_init() )
         return;
 
     /* Early MCE initialisation for BSP. */
     if ( bsp && cpu_bank_alloc(smp_processor_id()) )
         BUG();
 
-    switch (c->x86_vendor) {
+    switch ( c->x86_vendor )
+    {
     case X86_VENDOR_AMD:
         inited = amd_mcheck_init(c);
         break;
 
     case X86_VENDOR_INTEL:
-        switch (c->x86) {
+        switch ( c->x86 )
+        {
         case 6:
         case 15:
             inited = intel_mcheck_init(c, bsp);
@@ -765,7 +787,7 @@ void mcheck_init(struct cpuinfo_x86 *c, bool bsp)
     }
 
     show_mca_info(inited, c);
-    if (inited == mcheck_none || inited == mcheck_unset)
+    if ( inited == mcheck_none || inited == mcheck_unset )
         goto out;
 
     intpose_init();
@@ -807,15 +829,14 @@ void *x86_mcinfo_reserve(struct mc_info *mi,
     mic_index = mic_base = x86_mcinfo_first(mi);
 
     /* go to first free entry */
-    for (i = 0; i < x86_mcinfo_nentries(mi); i++) {
+    for ( i = 0; i < x86_mcinfo_nentries(mi); i++ )
         mic_index = x86_mcinfo_next(mic_index);
-    }
 
     /* check if there is enough size */
     end1 = (unsigned long)((uint8_t *)mic_base + sizeof(struct mc_info));
     end2 = (unsigned long)((uint8_t *)mic_index + size);
 
-    if (end1 < end2)
+    if ( end1 < end2 )
     {
         mce_printk(MCE_CRITICAL,
                    "mcinfo_add: No space left in mc_info\n");
@@ -854,9 +875,11 @@ static void x86_mcinfo_apei_save(
     apei_write_mce(&m);
 }
 
-/* Dump machine check information in a format,
+/*
+ * Dump machine check information in a format,
  * mcelog can parse. This is used only when
- * Dom0 does not take the notification. */
+ * Dom0 does not take the notification.
+ */
 void x86_mcinfo_dump(struct mc_info *mi)
 {
     struct mcinfo_common *mic = NULL;
@@ -865,27 +888,26 @@ void x86_mcinfo_dump(struct mc_info *mi)
 
     /* first print the global info */
     x86_mcinfo_lookup(mic, mi, MC_TYPE_GLOBAL);
-    if (mic == NULL)
+    if ( mic == NULL )
         return;
     mc_global = (struct mcinfo_global *)mic;
-    if (mc_global->mc_flags & MC_FLAG_MCE) {
+    if ( mc_global->mc_flags & MC_FLAG_MCE )
         printk(XENLOG_WARNING
                "CPU%d: Machine Check Exception: %16"PRIx64"\n",
                mc_global->mc_coreid, mc_global->mc_gstatus);
-    } else if (mc_global->mc_flags & MC_FLAG_CMCI) {
+    else if ( mc_global->mc_flags & MC_FLAG_CMCI )
         printk(XENLOG_WARNING "CMCI occurred on CPU %d.\n",
                mc_global->mc_coreid);
-    } else if (mc_global->mc_flags & MC_FLAG_POLLED) {
+    else if ( mc_global->mc_flags & MC_FLAG_POLLED )
         printk(XENLOG_WARNING "POLLED occurred on CPU %d.\n",
                mc_global->mc_coreid);
-    }
 
     /* then the bank information */
     x86_mcinfo_lookup(mic, mi, MC_TYPE_BANK); /* finds the first entry */
     do {
-        if (mic == NULL)
+        if ( mic == NULL )
             return;
-        if (mic->type != MC_TYPE_BANK)
+        if ( mic->type != MC_TYPE_BANK )
             goto next;
 
         mc_bank = (struct mcinfo_bank *)mic;
@@ -893,20 +915,20 @@ void x86_mcinfo_dump(struct mc_info *mi)
         printk(XENLOG_WARNING "Bank %d: %16"PRIx64,
                mc_bank->mc_bank,
                mc_bank->mc_status);
-        if (mc_bank->mc_status & MCi_STATUS_MISCV)
+        if ( mc_bank->mc_status & MCi_STATUS_MISCV )
             printk("[%16"PRIx64"]", mc_bank->mc_misc);
-        if (mc_bank->mc_status & MCi_STATUS_ADDRV)
+        if ( mc_bank->mc_status & MCi_STATUS_ADDRV )
             printk(" at %16"PRIx64, mc_bank->mc_addr);
         printk("\n");
 
-        if (is_mc_panic)
+        if ( is_mc_panic )
             x86_mcinfo_apei_save(mc_global, mc_bank);
 
-    next:
+ next:
         mic = x86_mcinfo_next(mic); /* next entry */
-        if ((mic == NULL) || (mic->size == 0))
+        if ( (mic == NULL) || (mic->size == 0) )
             break;
-    } while (1);
+    } while ( 1 );
 }
 
 static void do_mc_get_cpu_info(void *v)
@@ -925,8 +947,9 @@ static void do_mc_get_cpu_info(void *v)
     /*
      * Deal with sparse masks, condensed into a contig array.
      */
-    while (cpn >= 0) {
-        if (cpu_online(cpn))
+    while ( cpn >= 0 )
+    {
+        if ( cpu_online(cpn) )
             cindex++;
         cpn--;
     }
@@ -956,13 +979,14 @@ static void do_mc_get_cpu_info(void *v)
     xcp->mc_msrvalues[0].reg = MSR_IA32_MCG_CAP;
     rdmsrl(MSR_IA32_MCG_CAP, xcp->mc_msrvalues[0].value);
 
-    if (c->cpuid_level >= 1) {
+    if ( c->cpuid_level >= 1 )
+    {
         cpuid(1, &junk, &ebx, &junk, &junk);
         xcp->mc_clusterid = (ebx >> 24) & 0xff;
-    } else
+    }
+    else
         xcp->mc_clusterid = get_apic_id();
 }
-
 
 void x86_mc_get_cpu_info(unsigned cpu, uint32_t *chipid, uint16_t *coreid,
                          uint16_t *threadid, uint32_t *apicid,
@@ -973,28 +997,31 @@ void x86_mc_get_cpu_info(unsigned cpu, uint32_t *chipid, uint16_t *coreid,
 
     *apicid = cpu_physical_id(cpu);
     c = &cpu_data[cpu];
-    if (c->apicid == BAD_APICID) {
+    if ( c->apicid == BAD_APICID )
+    {
         *chipid = cpu;
         *coreid = 0;
         *threadid = 0;
-        if (ncores != NULL)
+        if ( ncores != NULL )
             *ncores = 1;
-        if (ncores_active != NULL)
+        if ( ncores_active != NULL )
             *ncores_active = 1;
-        if (nthreads != NULL)
+        if ( nthreads != NULL )
             *nthreads = 1;
-    } else {
+    }
+    else
+    {
         *chipid = c->phys_proc_id;
-        if (c->x86_max_cores > 1)
+        if ( c->x86_max_cores > 1 )
             *coreid = c->cpu_core_id;
         else
             *coreid = 0;
         *threadid = c->apicid & ((1 << (c->x86_num_siblings - 1)) - 1);
-        if (ncores != NULL)
+        if ( ncores != NULL )
             *ncores = c->x86_max_cores;
-        if (ncores_active != NULL)
+        if ( ncores_active != NULL )
             *ncores_active = c->booted_cores;
-        if (nthreads != NULL)
+        if ( nthreads != NULL )
             *nthreads = c->x86_num_siblings;
     }
 }
@@ -1002,7 +1029,7 @@ void x86_mc_get_cpu_info(unsigned cpu, uint32_t *chipid, uint16_t *coreid,
 #define INTPOSE_NENT 50
 
 static struct intpose_ent {
-    unsigned  int cpu_nr;
+    unsigned int cpu_nr;
     uint64_t msr;
     uint64_t val;
 } intpose_arr[INTPOSE_NENT];
@@ -1012,12 +1039,11 @@ static void intpose_init(void)
     static int done;
     int i;
 
-    if (done++ > 0)
+    if ( done++ > 0 )
         return;
 
-    for (i = 0; i < INTPOSE_NENT; i++) {
+    for ( i = 0; i < INTPOSE_NENT; i++ )
         intpose_arr[i].cpu_nr = -1;
-    }
 
 }
 
@@ -1026,10 +1052,11 @@ struct intpose_ent *intpose_lookup(unsigned int cpu_nr, uint64_t msr,
 {
     int i;
 
-    for (i = 0; i < INTPOSE_NENT; i++) {
-        if (intpose_arr[i].cpu_nr == cpu_nr &&
-            intpose_arr[i].msr == msr) {
-            if (valp != NULL)
+    for ( i = 0; i < INTPOSE_NENT; i++ )
+    {
+        if ( intpose_arr[i].cpu_nr == cpu_nr && intpose_arr[i].msr == msr )
+        {
+            if ( valp != NULL )
                 *valp = intpose_arr[i].val;
             return &intpose_arr[i];
         }
@@ -1040,16 +1067,19 @@ struct intpose_ent *intpose_lookup(unsigned int cpu_nr, uint64_t msr,
 
 static void intpose_add(unsigned int cpu_nr, uint64_t msr, uint64_t val)
 {
-    struct intpose_ent *ent;
+    struct intpose_ent *ent = intpose_lookup(cpu_nr, msr, NULL);
     int i;
 
-    if ((ent = intpose_lookup(cpu_nr, msr, NULL)) != NULL) {
+    if ( ent )
+    {
         ent->val = val;
         return;
     }
 
-    for (i = 0, ent = &intpose_arr[0]; i < INTPOSE_NENT; i++, ent++) {
-        if (ent->cpu_nr == -1) {
+    for ( i = 0, ent = &intpose_arr[0]; i < INTPOSE_NENT; i++, ent++ )
+    {
+        if ( ent->cpu_nr == -1 )
+        {
             ent->cpu_nr = cpu_nr;
             ent->msr = msr;
             ent->val = val;
@@ -1083,50 +1113,60 @@ static bool x86_mc_msrinject_verify(struct xen_mc_msrinject *mci)
 
     c = &cpu_data[smp_processor_id()];
 
-    for (i = 0; i < mci->mcinj_count; i++) {
+    for ( i = 0; i < mci->mcinj_count; i++ )
+    {
         uint64_t reg = mci->mcinj_msr[i].reg;
         const char *reason = NULL;
 
-        if (IS_MCA_BANKREG(reg)) {
-            if (c->x86_vendor == X86_VENDOR_AMD) {
-                /* On AMD we can set MCi_STATUS_WREN in the
+        if ( IS_MCA_BANKREG(reg) )
+        {
+            if ( c->x86_vendor == X86_VENDOR_AMD )
+            {
+                /*
+                 * On AMD we can set MCi_STATUS_WREN in the
                  * HWCR MSR to allow non-zero writes to banks
                  * MSRs not to #GP.  The injector in dom0
                  * should set that bit, but we detect when it
                  * is necessary and set it as a courtesy to
-                 * avoid #GP in the hypervisor. */
+                 * avoid #GP in the hypervisor.
+                 */
                 mci->mcinj_flags |=
                     _MC_MSRINJ_F_REQ_HWCR_WREN;
                 continue;
-            } else {
-                /* No alternative but to interpose, so require
-                 * that the injector specified as such. */
-                if (!(mci->mcinj_flags &
-                      MC_MSRINJ_F_INTERPOSE)) {
-                    reason = "must specify interposition";
-                }
             }
-        } else {
-            switch (reg) {
-                /* MSRs acceptable on all x86 cpus */
+            else
+            {
+                /*
+                 * No alternative but to interpose, so require
+                 * that the injector specified as such.
+                 */
+                if ( !(mci->mcinj_flags & MC_MSRINJ_F_INTERPOSE) )
+                    reason = "must specify interposition";
+            }
+        }
+        else
+        {
+            switch ( reg )
+            {
+            /* MSRs acceptable on all x86 cpus */
             case MSR_IA32_MCG_STATUS:
                 break;
 
             case MSR_F10_MC4_MISC1:
             case MSR_F10_MC4_MISC2:
             case MSR_F10_MC4_MISC3:
-                if (c->x86_vendor != X86_VENDOR_AMD)
+                if ( c->x86_vendor != X86_VENDOR_AMD )
                     reason = "only supported on AMD";
-                else if (c->x86 < 0x10)
+                else if ( c->x86 < 0x10 )
                     reason = "only supported on AMD Fam10h+";
                 break;
 
-                /* MSRs that the HV will take care of */
+            /* MSRs that the HV will take care of */
             case MSR_K8_HWCR:
-                if (c->x86_vendor == X86_VENDOR_AMD)
+                if ( c->x86_vendor == X86_VENDOR_AMD )
                     reason = "HV will operate HWCR";
                 else
-                    reason ="only supported on AMD";
+                    reason = "only supported on AMD";
                 break;
 
             default:
@@ -1135,7 +1175,8 @@ static bool x86_mc_msrinject_verify(struct xen_mc_msrinject *mci)
             }
         }
 
-        if (reason != NULL) {
+        if ( reason != NULL )
+        {
             printk("HV MSR INJECT ERROR: MSR %#Lx %s\n",
                    (unsigned long long)mci->mcinj_msr[i].reg, reason);
             errs++;
@@ -1151,7 +1192,8 @@ static uint64_t x86_mc_hwcr_wren(void)
 
     rdmsrl(MSR_K8_HWCR, old);
 
-    if (!(old & K8_HWCR_MCi_STATUS_WREN)) {
+    if ( !(old & K8_HWCR_MCi_STATUS_WREN) )
+    {
         uint64_t new = old | K8_HWCR_MCi_STATUS_WREN;
         wrmsrl(MSR_K8_HWCR, new);
     }
@@ -1161,7 +1203,7 @@ static uint64_t x86_mc_hwcr_wren(void)
 
 static void x86_mc_hwcr_wren_restore(uint64_t hwcr)
 {
-    if (!(hwcr & K8_HWCR_MCi_STATUS_WREN))
+    if ( !(hwcr & K8_HWCR_MCi_STATUS_WREN) )
         wrmsrl(MSR_K8_HWCR, hwcr);
 }
 
@@ -1173,26 +1215,26 @@ static void x86_mc_msrinject(void *data)
     int intpose;
     int i;
 
-    if (mci->mcinj_flags & _MC_MSRINJ_F_REQ_HWCR_WREN)
+    if ( mci->mcinj_flags & _MC_MSRINJ_F_REQ_HWCR_WREN )
         hwcr = x86_mc_hwcr_wren();
 
     intpose = (mci->mcinj_flags & MC_MSRINJ_F_INTERPOSE) != 0;
 
-    for (i = 0, msr = &mci->mcinj_msr[0];
-         i < mci->mcinj_count; i++, msr++) {
+    for ( i = 0, msr = &mci->mcinj_msr[0]; i < mci->mcinj_count; i++, msr++ )
+    {
         printk("HV MSR INJECT (%s) target %u actual %u MSR %#Lx <-- %#Lx\n",
-               intpose ?  "interpose" : "hardware",
+               intpose ? "interpose" : "hardware",
                mci->mcinj_cpunr, smp_processor_id(),
                (unsigned long long)msr->reg,
                (unsigned long long)msr->value);
 
-        if (intpose)
+        if ( intpose )
             intpose_add(mci->mcinj_cpunr, msr->reg, msr->value);
         else
             wrmsrl(msr->reg, msr->value);
     }
 
-    if (mci->mcinj_flags & _MC_MSRINJ_F_REQ_HWCR_WREN)
+    if ( mci->mcinj_flags & _MC_MSRINJ_F_REQ_HWCR_WREN )
         x86_mc_hwcr_wren_restore(hwcr);
 }
 
@@ -1297,12 +1339,14 @@ long do_mca(XEN_GUEST_HANDLE_PARAM(xen_mc_t) u_xen_mc)
     if ( op->interface_version != XEN_MCA_INTERFACE_VERSION )
         return x86_mcerr("do_mca: interface version mismatch", -EACCES);
 
-    switch (op->cmd) {
+    switch ( op->cmd )
+    {
     case XEN_MC_fetch:
         mc_fetch.nat = &op->u.mc_fetch;
         cmdflags = mc_fetch.nat->flags;
 
-        switch (cmdflags & (XEN_MC_NONURGENT | XEN_MC_URGENT)) {
+        switch ( cmdflags & (XEN_MC_NONURGENT | XEN_MC_URGENT) )
+        {
         case XEN_MC_NONURGENT:
             which = MC_NONURGENT;
             break;
@@ -1317,30 +1361,37 @@ long do_mca(XEN_GUEST_HANDLE_PARAM(xen_mc_t) u_xen_mc)
 
         flags = XEN_MC_OK;
 
-        if (cmdflags & XEN_MC_ACK) {
+        if ( cmdflags & XEN_MC_ACK )
+        {
             mctelem_cookie_t cookie = ID2COOKIE(mc_fetch.nat->fetch_id);
             mctelem_ack(which, cookie);
-        } else {
-            if (!is_pv_32bit_vcpu(v)
-                ? guest_handle_is_null(mc_fetch.nat->data)
-                : compat_handle_is_null(mc_fetch.cmp->data))
+        }
+        else
+        {
+            if ( !is_pv_32bit_vcpu(v)
+                 ? guest_handle_is_null(mc_fetch.nat->data)
+                 : compat_handle_is_null(mc_fetch.cmp->data) )
                 return x86_mcerr("do_mca fetch: guest buffer "
                                  "invalid", -EINVAL);
 
-            if ((mctc = mctelem_consume_oldest_begin(which))) {
+            mctc = mctelem_consume_oldest_begin(which);
+            if ( mctc )
+            {
                 struct mc_info *mcip = mctelem_dataptr(mctc);
-                if (!is_pv_32bit_vcpu(v)
-                    ? copy_to_guest(mc_fetch.nat->data, mcip, 1)
-                    : copy_to_compat(mc_fetch.cmp->data,
-                                     mcip, 1)) {
+                if ( !is_pv_32bit_vcpu(v)
+                     ? copy_to_guest(mc_fetch.nat->data, mcip, 1)
+                     : copy_to_compat(mc_fetch.cmp->data, mcip, 1) )
+                {
                     ret = -EFAULT;
                     flags |= XEN_MC_FETCHFAILED;
                     mc_fetch.nat->fetch_id = 0;
-                } else {
-                    mc_fetch.nat->fetch_id = COOKIE2ID(mctc);
                 }
+                else
+                    mc_fetch.nat->fetch_id = COOKIE2ID(mctc);
                 mctelem_consume_oldest_end(mctc);
-            } else {
+            }
+            else
+            {
                 /* There is no data */
                 flags |= XEN_MC_NODATA;
                 mc_fetch.nat->fetch_id = 0;
@@ -1360,48 +1411,47 @@ long do_mca(XEN_GUEST_HANDLE_PARAM(xen_mc_t) u_xen_mc)
         mc_physcpuinfo.nat = &op->u.mc_physcpuinfo;
         nlcpu = num_online_cpus();
 
-        if (!is_pv_32bit_vcpu(v)
-            ? !guest_handle_is_null(mc_physcpuinfo.nat->info)
-            : !compat_handle_is_null(mc_physcpuinfo.cmp->info)) {
-            if (mc_physcpuinfo.nat->ncpus <= 0)
+        if ( !is_pv_32bit_vcpu(v)
+             ? !guest_handle_is_null(mc_physcpuinfo.nat->info)
+             : !compat_handle_is_null(mc_physcpuinfo.cmp->info) )
+        {
+            if ( mc_physcpuinfo.nat->ncpus <= 0 )
                 return x86_mcerr("do_mca cpuinfo: ncpus <= 0",
                                  -EINVAL);
             nlcpu = min(nlcpu, (int)mc_physcpuinfo.nat->ncpus);
             log_cpus = xmalloc_array(xen_mc_logical_cpu_t, nlcpu);
-            if (log_cpus == NULL)
+            if ( log_cpus == NULL )
                 return x86_mcerr("do_mca cpuinfo", -ENOMEM);
             on_each_cpu(do_mc_get_cpu_info, log_cpus, 1);
-            if (!is_pv_32bit_vcpu(v)
-                ? copy_to_guest(mc_physcpuinfo.nat->info,
-                                log_cpus, nlcpu)
-                : copy_to_compat(mc_physcpuinfo.cmp->info,
-                                 log_cpus, nlcpu))
+            if ( !is_pv_32bit_vcpu(v)
+                 ? copy_to_guest(mc_physcpuinfo.nat->info, log_cpus, nlcpu)
+                 : copy_to_compat(mc_physcpuinfo.cmp->info, log_cpus, nlcpu) )
                 ret = -EFAULT;
             xfree(log_cpus);
         }
 
         mc_physcpuinfo.nat->ncpus = nlcpu;
 
-        if (copy_to_guest(u_xen_mc, op, 1))
+        if ( copy_to_guest(u_xen_mc, op, 1) )
             return x86_mcerr("do_mca cpuinfo", -EFAULT);
 
         break;
 
     case XEN_MC_msrinject:
-        if (nr_mce_banks == 0)
+        if ( nr_mce_banks == 0 )
             return x86_mcerr("do_mca inject", -ENODEV);
 
         mc_msrinject = &op->u.mc_msrinject;
         target = mc_msrinject->mcinj_cpunr;
 
-        if (target >= nr_cpu_ids)
+        if ( target >= nr_cpu_ids )
             return x86_mcerr("do_mca inject: bad target", -EINVAL);
 
-        if (!cpu_online(target))
+        if ( !cpu_online(target) )
             return x86_mcerr("do_mca inject: target offline",
                              -EINVAL);
 
-        if (mc_msrinject->mcinj_count == 0)
+        if ( mc_msrinject->mcinj_count == 0 )
             return 0;
 
         if ( mc_msrinject->mcinj_flags & MC_MSRINJ_F_GPADDR )
@@ -1450,7 +1500,7 @@ long do_mca(XEN_GUEST_HANDLE_PARAM(xen_mc_t) u_xen_mc)
             put_domain(d);
         }
 
-        if (!x86_mc_msrinject_verify(mc_msrinject))
+        if ( !x86_mc_msrinject_verify(mc_msrinject) )
             return x86_mcerr("do_mca inject: illegal MSR", -EINVAL);
 
         add_taint(TAINT_ERROR_INJECT);
@@ -1461,16 +1511,16 @@ long do_mca(XEN_GUEST_HANDLE_PARAM(xen_mc_t) u_xen_mc)
         break;
 
     case XEN_MC_mceinject:
-        if (nr_mce_banks == 0)
+        if ( nr_mce_banks == 0 )
             return x86_mcerr("do_mca #MC", -ENODEV);
 
         mc_mceinject = &op->u.mc_mceinject;
         target = mc_mceinject->mceinj_cpunr;
 
-        if (target >= nr_cpu_ids)
+        if ( target >= nr_cpu_ids )
             return x86_mcerr("do_mca #MC: bad target", -EINVAL);
 
-        if (!cpu_online(target))
+        if ( !cpu_online(target) )
             return x86_mcerr("do_mca #MC: target offline", -EINVAL);
 
         add_taint(TAINT_ERROR_INJECT);
@@ -1488,7 +1538,7 @@ long do_mca(XEN_GUEST_HANDLE_PARAM(xen_mc_t) u_xen_mc)
         cpumask_var_t cmv;
         bool broadcast = op->u.mc_inject_v2.flags & XEN_MC_INJECT_CPU_BROADCAST;
 
-        if (nr_mce_banks == 0)
+        if ( nr_mce_banks == 0 )
             return x86_mcerr("do_mca #MC", -ENODEV);
 
         if ( broadcast )
@@ -1510,7 +1560,7 @@ long do_mca(XEN_GUEST_HANDLE_PARAM(xen_mc_t) u_xen_mc)
                         "Not all required CPUs are online\n");
         }
 
-        switch (op->u.mc_inject_v2.flags & XEN_MC_INJECT_TYPE_MASK)
+        switch ( op->u.mc_inject_v2.flags & XEN_MC_INJECT_TYPE_MASK )
         {
         case XEN_MC_INJECT_TYPE_MCE:
             if ( mce_broadcast &&
@@ -1521,8 +1571,7 @@ long do_mca(XEN_GUEST_HANDLE_PARAM(xen_mc_t) u_xen_mc)
 
         case XEN_MC_INJECT_TYPE_CMCI:
             if ( !cmci_apic_vector )
-                ret = x86_mcerr(
-                    "No CMCI supported in platform\n", -EINVAL);
+                ret = x86_mcerr("No CMCI supported in platform\n", -EINVAL);
             else
             {
                 if ( cpumask_test_cpu(smp_processor_id(), cpumap) )
@@ -1557,7 +1606,7 @@ long do_mca(XEN_GUEST_HANDLE_PARAM(xen_mc_t) u_xen_mc)
             break;
         }
 
-        if (cpumap != &cpu_online_map)
+        if ( cpumap != &cpu_online_map )
             free_cpumask_var(cmv);
 
         break;
@@ -1608,7 +1657,8 @@ void mc_panic(char *s)
     panic("HARDWARE ERROR");
 }
 
-/* Machine Check owner judge algorithm:
+/*
+ * Machine Check owner judge algorithm:
  * When error happens, all cpus serially read its msr banks.
  * The first CPU who fetches the error bank's info will clear
  * this bank. Later readers can't get any information again.
@@ -1625,7 +1675,7 @@ void mc_panic(char *s)
 
 /* Maybe called in MCE context, no lock, no printk */
 static enum mce_result mce_action(const struct cpu_user_regs *regs,
-                      mctelem_cookie_t mctc)
+                                  mctelem_cookie_t mctc)
 {
     struct mc_info *local_mi;
     enum mce_result bank_result = MCER_NOERROR;
@@ -1636,15 +1686,16 @@ static enum mce_result mce_action(const struct cpu_user_regs *regs,
     unsigned int i, handler_num = mce_dhandler_num;
 
     /* When in mce context, regs is valid */
-    if (regs)
+    if ( regs )
     {
         handler_num = mce_uhandler_num;
         handlers = mce_uhandlers;
     }
 
-    local_mi = (struct mc_info*)mctelem_dataptr(mctc);
+    local_mi = (struct mc_info *)mctelem_dataptr(mctc);
     x86_mcinfo_lookup(mic, local_mi, MC_TYPE_GLOBAL);
-    if (mic == NULL) {
+    if ( mic == NULL )
+    {
         printk(KERN_ERR "MCE: get local buffer entry failed\n ");
         return MCER_CONTINUE;
     }
@@ -1659,17 +1710,19 @@ static enum mce_result mce_action(const struct cpu_user_regs *regs,
     for ( ; bank_result != MCER_RESET && mic && mic->size;
           mic = x86_mcinfo_next(mic) )
     {
-        if (mic->type != MC_TYPE_BANK) {
+        if ( mic->type != MC_TYPE_BANK )
+        {
             continue;
         }
-        binfo.mib = (struct mcinfo_bank*)mic;
+        binfo.mib = (struct mcinfo_bank *)mic;
         binfo.bank = binfo.mib->mc_bank;
         bank_result = MCER_NOERROR;
-        for ( i = 0; i < handler_num; i++ ) {
-            if (handlers[i].owned_error(binfo.mib->mc_status))
+        for ( i = 0; i < handler_num; i++ )
+        {
+            if ( handlers[i].owned_error(binfo.mib->mc_status) )
             {
                 handlers[i].recovery_handler(&binfo, &bank_result, regs);
-                if (worst_result < bank_result)
+                if ( worst_result < bank_result )
                     worst_result = bank_result;
                 break;
             }
@@ -1691,7 +1744,7 @@ static int mce_delayed_action(mctelem_cookie_t mctc)
 
     result = mce_action(NULL, mctc);
 
-    switch (result)
+    switch ( result )
     {
     case MCER_RESET:
         dprintk(XENLOG_ERR, "MCE delayed action failed\n");
@@ -1702,12 +1755,12 @@ static int mce_delayed_action(mctelem_cookie_t mctc)
 
     case MCER_RECOVERED:
         dprintk(XENLOG_INFO, "MCE: Error is successfully recovered\n");
-        ret  = 1;
+        ret = 1;
         break;
 
     case MCER_CONTINUE:
         dprintk(XENLOG_INFO, "MCE: Error can't be recovered, "
-            "system is tainted\n");
+                "system is tainted\n");
         x86_mcinfo_dump(mctelem_dataptr(mctc));
         ret = 1;
         break;
@@ -1734,7 +1787,8 @@ static void mce_softirq(void)
 
     mce_barrier_enter(&mce_inside_bar, bcast);
 
-    if (!lmce) {
+    if ( !lmce )
+    {
         /*
          * Everybody is here. Now let's see who gets to do the
          * recovery work. Right now we just see if there's a CPU
@@ -1747,28 +1801,31 @@ static void mce_softirq(void)
         atomic_set(&severity_cpu, cpu);
 
         mce_barrier_enter(&mce_severity_bar, bcast);
-        if (!mctelem_has_deferred(cpu))
+        if ( !mctelem_has_deferred(cpu) )
             atomic_set(&severity_cpu, cpu);
         mce_barrier_exit(&mce_severity_bar, bcast);
     }
 
     /* We choose severity_cpu for further processing */
-    if (lmce || atomic_read(&severity_cpu) == cpu) {
+    if ( lmce || atomic_read(&severity_cpu) == cpu )
+    {
 
         mce_printk(MCE_VERBOSE, "CPU%d handling errors\n", cpu);
 
-        /* Step1: Fill DOM0 LOG buffer, vMCE injection buffer and
+        /*
+         * Step1: Fill DOM0 LOG buffer, vMCE injection buffer and
          * vMCE MSRs virtualization buffer
          */
 
-        if (lmce)
+        if ( lmce )
             mctelem_process_deferred(cpu, mce_delayed_action, true);
         else
             for_each_online_cpu(workcpu)
                 mctelem_process_deferred(workcpu, mce_delayed_action, false);
 
         /* Step2: Send Log to DOM0 through vIRQ */
-        if (dom0_vmce_enabled()) {
+        if ( dom0_vmce_enabled() )
+        {
             mce_printk(MCE_VERBOSE, "MCE: send MCE# to DOM0 through virq\n");
             send_global_virq(VIRQ_MCA);
         }
@@ -1777,7 +1834,8 @@ static void mce_softirq(void)
     mce_barrier_exit(&mce_inside_bar, bcast);
 }
 
-/* Machine Check owner judge algorithm:
+/*
+ * Machine Check owner judge algorithm:
  * When error happens, all cpus serially read its msr banks.
  * The first CPU who fetches the error bank's info will clear
  * this bank. Later readers can't get any infor again.
@@ -1793,7 +1851,7 @@ static void mce_softirq(void)
  */
 void mce_handler_init(void)
 {
-    if (smp_processor_id() != 0)
+    if ( smp_processor_id() != 0 )
         return;
 
     /* callback register, do we really need so many callback? */
