@@ -720,12 +720,11 @@ static void cleanup_frame_table(struct mem_hotadd_info *info)
     spfn = info->spfn;
     epfn = info->epfn;
 
-    sva = (unsigned long)pdx_to_page(pfn_to_pdx(spfn));
-    eva = (unsigned long)pdx_to_page(pfn_to_pdx(epfn));
+    sva = (unsigned long)mfn_to_page(spfn);
+    eva = (unsigned long)mfn_to_page(epfn);
 
     /* Intialize all page */
-    memset(mfn_to_page(spfn), -1,
-           (unsigned long)mfn_to_page(epfn) - (unsigned long)mfn_to_page(spfn));
+    memset((void *)sva, -1, eva - sva);
 
     while (sva < eva)
     {
