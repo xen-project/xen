@@ -550,3 +550,13 @@ void mctelem_ack(mctelem_class_t which, mctelem_cookie_t cookie)
 	wmb();
 	spin_unlock(&processing_lock);
 }
+
+/*
+ * Local variables:
+ * mode: C
+ * c-file-style: "BSD"
+ * c-basic-offset: 4
+ * indent-tabs-mode: t
+ * tab-width: 8
+ * End:
+ */
