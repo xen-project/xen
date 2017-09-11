@@ -185,7 +185,7 @@ int vmce_rdmsr(uint32_t msr, uint64_t *val)
     {
     case MSR_IA32_MCG_STATUS:
         *val = cur->arch.vmce.mcg_status;
-        if (*val)
+        if ( *val )
             mce_printk(MCE_VERBOSE,
                        "MCE: %pv: rd MCG_STATUS %#"PRIx64"\n", cur, *val);
         break;
@@ -354,7 +354,8 @@ static int vmce_save_vcpu_ctxt(struct domain *d, hvm_domain_context_t *h)
     struct vcpu *v;
     int err = 0;
 
-    for_each_vcpu( d, v ) {
+    for_each_vcpu ( d, v )
+    {
         struct hvm_vmce_vcpu ctxt = {
             .caps = v->arch.vmce.mcg_cap,
             .mci_ctl2_bank0 = v->arch.vmce.bank[0].mci_ctl2,
