@@ -16,41 +16,43 @@
  * GNU General Public License for more details.
  */
 
+#include <xen/domain_page.h>
+#include <xen/errno.h>
+#include <xen/hypercall.h>
 #include <xen/init.h>
-#include <xen/string.h>
-#include <xen/version.h>
-#include <xen/smp.h>
-#include <xen/symbols.h>
+#include <xen/iocap.h>
 #include <xen/irq.h>
 #include <xen/lib.h>
 #include <xen/livepatch.h>
-#include <xen/mm.h>
-#include <xen/errno.h>
-#include <xen/hypercall.h>
-#include <xen/softirq.h>
-#include <xen/domain_page.h>
-#include <xen/perfc.h>
-#include <xen/virtual_region.h>
 #include <xen/mem_access.h>
-#include <xen/iocap.h>
+#include <xen/mm.h>
+#include <xen/perfc.h>
+#include <xen/smp.h>
+#include <xen/softirq.h>
+#include <xen/string.h>
+#include <xen/symbols.h>
+#include <xen/version.h>
+#include <xen/virtual_region.h>
+
 #include <public/sched.h>
 #include <public/xen.h>
+
+#include <asm/acpi.h>
+#include <asm/cpregs.h>
+#include <asm/cpuerrata.h>
+#include <asm/cpufeature.h>
 #include <asm/debugger.h>
 #include <asm/event.h>
-#include <asm/regs.h>
-#include <asm/cpregs.h>
-#include <asm/psci.h>
-#include <asm/mmio.h>
-#include <asm/cpufeature.h>
 #include <asm/flushtlb.h>
+#include <asm/gic.h>
+#include <asm/mmio.h>
 #include <asm/monitor.h>
+#include <asm/psci.h>
+#include <asm/regs.h>
+#include <asm/vgic.h>
 
 #include "decode.h"
 #include "vtimer.h"
-#include <asm/gic.h>
-#include <asm/vgic.h>
-#include <asm/cpuerrata.h>
-#include <asm/acpi.h>
 
 /* The base of the stack must always be double-word aligned, which means
  * that both the kernel half of struct cpu_user_regs (which is pushed in
