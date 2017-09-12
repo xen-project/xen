@@ -62,7 +62,7 @@ static int exynos5_init_time(void)
     dprintk(XENLOG_INFO, "mct_base_addr: %016llx size: %016llx\n",
             mct_base_addr, size);
 
-    mct = ioremap_attr(mct_base_addr, size, PAGE_HYPERVISOR_NOCACHE);
+    mct = ioremap_nocache(mct_base_addr, size);
     if ( !mct )
     {
         dprintk(XENLOG_ERR, "Unable to map MCT\n");

@@ -51,8 +51,7 @@ static int omap5_init_time(void)
     unsigned int sys_clksel;
     unsigned int num, den, frac1, frac2;
 
-    ckgen_prm_base = ioremap_attr(OMAP5_CKGEN_PRM_BASE,
-                                  0x20, PAGE_HYPERVISOR_NOCACHE);
+    ckgen_prm_base = ioremap_nocache(OMAP5_CKGEN_PRM_BASE, 0x20);
     if ( !ckgen_prm_base )
     {
         dprintk(XENLOG_ERR, "%s: PRM_BASE ioremap failed\n", __func__);
@@ -64,8 +63,7 @@ static int omap5_init_time(void)
 
     iounmap(ckgen_prm_base);
 
-    rt_ct_base = ioremap_attr(REALTIME_COUNTER_BASE,
-                              0x20, PAGE_HYPERVISOR_NOCACHE);
+    rt_ct_base = ioremap_nocache(REALTIME_COUNTER_BASE, 0x20);
     if ( !rt_ct_base )
     {
         dprintk(XENLOG_ERR, "%s: REALTIME_COUNTER_BASE ioremap failed\n", __func__);
