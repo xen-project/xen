@@ -383,6 +383,30 @@ static void decrease_reservation(struct memop_args *a)
     a->nr_done = i;
 }
 
+static bool_t propagate_node(unsigned int xmf, unsigned int *memflags)
+{
+    const struct domain *currd = current->domain;
+
+    BUILD_BUG_ON(XENMEMF_get_node(0) != NUMA_NO_NODE);
+
+    if ( XENMEMF_get_node(xmf) == NUMA_NO_NODE )
+        return 1;
+
+    if ( is_hardware_domain(currd) || is_control_domain(currd) )
+    {
+        if ( XENMEMF_get_node(xmf) >= MAX_NUMNODES )
+            return 0;
+
+        *memflags |= MEMF_node(XENMEMF_get_node(xmf));
+        if ( xmf & XENMEMF_exact_node_request )
+            *memflags |= MEMF_exact_node;
+    }
+    else if ( xmf & XENMEMF_exact_node_request )
+        return 0;
+
+    return 1;
+}
+
 static long memory_exchange(XEN_GUEST_HANDLE_PARAM(xen_memory_exchange_t) arg)
 {
     struct xen_memory_exchange exch;
@@ -455,6 +479,12 @@ static long memory_exchange(XEN_GUEST_HANDLE_PARAM(xen_memory_exchange_t) arg)
         }
     }
 
+    if ( unlikely(!propagate_node(exch.out.mem_flags, &memflags)) )
+    {
+        rc = -EINVAL;
+        goto fail_early;
+    }
+
     d = rcu_lock_domain_by_any_id(exch.in.domid);
     if ( d == NULL )
     {
@@ -473,7 +503,6 @@ static long memory_exchange(XEN_GUEST_HANDLE_PARAM(xen_memory_exchange_t) arg)
         d,
         XENMEMF_get_address_bits(exch.out.mem_flags) ? :
         (BITS_PER_LONG+PAGE_SHIFT)));
-    memflags |= MEMF_node(XENMEMF_get_node(exch.out.mem_flags));
 
     for ( i = (exch.nr_exchanged >> in_chunk_order);
           i < (exch.in.nr_extents >> in_chunk_order);
@@ -814,9 +843,8 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
             args.memflags = MEMF_bits(address_bits);
         }
 
-        args.memflags |= MEMF_node(XENMEMF_get_node(reservation.mem_flags));
-        if ( reservation.mem_flags & XENMEMF_exact_node_request )
-            args.memflags |= MEMF_exact_node;
+        if ( unlikely(!propagate_node(reservation.mem_flags, &args.memflags)) )
+            return -EINVAL;
 
         if ( op == XENMEM_populate_physmap
              && (reservation.mem_flags & XENMEMF_populate_on_demand) )
