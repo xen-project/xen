@@ -290,7 +290,7 @@ static inline lpae_t mfn_to_xen_entry(mfn_t mfn, unsigned attr)
 
     switch ( attr )
     {
-    case BUFFERABLE:
+    case MT_BUFFERABLE:
         /*
          * ARM ARM: Overlaying the shareability attribute (DDI
          * 0406C.b B3-1376 to 1377)
@@ -305,8 +305,8 @@ static inline lpae_t mfn_to_xen_entry(mfn_t mfn, unsigned attr)
          */
         e.pt.sh = LPAE_SH_OUTER;
         break;
-    case UNCACHED:
-    case DEV_SHARED:
+    case MT_UNCACHED:
+    case MT_DEV_SHARED:
         /*
          * Shareability is ignored for non-Normal memory, Outer is as
          * good as anything.
@@ -369,7 +369,7 @@ static void __init create_mappings(lpae_t *second,
 
     count = nr_mfns / LPAE_ENTRIES;
     p = second + second_linear_offset(virt_offset);
-    pte = mfn_to_xen_entry(_mfn(base_mfn), WRITEALLOC);
+    pte = mfn_to_xen_entry(_mfn(base_mfn), MT_WRITEALLOC);
     if ( granularity == 16 * LPAE_ENTRIES )
         pte.pt.contig = 1;  /* These maps are in 16-entry contiguous chunks. */
     for ( i = 0; i < count; i++ )
@@ -422,7 +422,7 @@ void *map_domain_page(mfn_t mfn)
         else if ( map[slot].pt.avail == 0 )
         {
             /* Commandeer this 2MB slot */
-            pte = mfn_to_xen_entry(_mfn(slot_mfn), WRITEALLOC);
+            pte = mfn_to_xen_entry(_mfn(slot_mfn), MT_WRITEALLOC);
             pte.pt.avail = 1;
             write_pte(map + slot, pte);
             break;
@@ -543,7 +543,7 @@ static inline lpae_t pte_of_xenaddr(vaddr_t va)
 {
     paddr_t ma = va + phys_offset;
 
-    return mfn_to_xen_entry(maddr_to_mfn(ma), WRITEALLOC);
+    return mfn_to_xen_entry(maddr_to_mfn(ma), MT_WRITEALLOC);
 }
 
 /* Map the FDT in the early boot page table */
@@ -652,7 +652,7 @@ void __init setup_pagetables(unsigned long boot_phys_offset, paddr_t xen_paddr)
     /* Initialise xen second level entries ... */
     /* ... Xen's text etc */
 
-    pte = mfn_to_xen_entry(maddr_to_mfn(xen_paddr), WRITEALLOC);
+    pte = mfn_to_xen_entry(maddr_to_mfn(xen_paddr), MT_WRITEALLOC);
     pte.pt.xn = 0;/* Contains our text mapping! */
     xen_second[second_table_offset(XEN_VIRT_START)] = pte;
 
@@ -669,7 +669,7 @@ void __init setup_pagetables(unsigned long boot_phys_offset, paddr_t xen_paddr)
 
     /* ... Boot Misc area for xen relocation */
     dest_va = BOOT_RELOC_VIRT_START;
-    pte = mfn_to_xen_entry(maddr_to_mfn(xen_paddr), WRITEALLOC);
+    pte = mfn_to_xen_entry(maddr_to_mfn(xen_paddr), MT_WRITEALLOC);
     /* Map the destination in xen_second. */
     xen_second[second_table_offset(dest_va)] = pte;
     /* Map the destination in boot_second. */
@@ -700,7 +700,7 @@ void __init setup_pagetables(unsigned long boot_phys_offset, paddr_t xen_paddr)
         unsigned long va = XEN_VIRT_START + (i << PAGE_SHIFT);
         if ( !is_kernel(va) )
             break;
-        pte = mfn_to_xen_entry(mfn, WRITEALLOC);
+        pte = mfn_to_xen_entry(mfn, MT_WRITEALLOC);
         pte.pt.table = 1; /* 4k mappings always have this bit set */
         if ( is_kernel_text(va) || is_kernel_inittext(va) )
         {
@@ -771,7 +771,7 @@ int init_secondary_pagetables(int cpu)
     for ( i = 0; i < DOMHEAP_SECOND_PAGES; i++ )
     {
         pte = mfn_to_xen_entry(virt_to_mfn(domheap+i*LPAE_ENTRIES),
-                               WRITEALLOC);
+                               MT_WRITEALLOC);
         pte.pt.table = 1;
         write_pte(&first[first_table_offset(DOMHEAP_VIRT_START+i*FIRST_SIZE)], pte);
     }
@@ -869,13 +869,13 @@ void __init setup_xenheap_mappings(unsigned long base_mfn,
             mfn_t first_mfn = alloc_boot_pages(1, 1);
 
             clear_page(mfn_to_virt(first_mfn));
-            pte = mfn_to_xen_entry(first_mfn, WRITEALLOC);
+            pte = mfn_to_xen_entry(first_mfn, MT_WRITEALLOC);
             pte.pt.table = 1;
             write_pte(p, pte);
             first = mfn_to_virt(first_mfn);
         }
 
-        pte = mfn_to_xen_entry(_mfn(mfn), WRITEALLOC);
+        pte = mfn_to_xen_entry(_mfn(mfn), MT_WRITEALLOC);
         /* TODO: Set pte.pt.contig when appropriate. */
         write_pte(&first[first_table_offset(vaddr)], pte);
 
@@ -915,7 +915,7 @@ void __init setup_frametable_mappings(paddr_t ps, paddr_t pe)
     for ( i = 0; i < nr_second; i++ )
     {
         clear_page(mfn_to_virt(mfn_add(second_base, i)));
-        pte = mfn_to_xen_entry(mfn_add(second_base, i), WRITEALLOC);
+        pte = mfn_to_xen_entry(mfn_add(second_base, i), MT_WRITEALLOC);
         pte.pt.table = 1;
         write_pte(&xen_first[first_table_offset(FRAMETABLE_VIRT_START)+i], pte);
     }
@@ -969,7 +969,7 @@ static int create_xen_table(lpae_t *entry)
     if ( p == NULL )
         return -ENOMEM;
     clear_page(p);
-    pte = mfn_to_xen_entry(virt_to_mfn(p), WRITEALLOC);
+    pte = mfn_to_xen_entry(virt_to_mfn(p), MT_WRITEALLOC);
     pte.pt.table = 1;
     write_pte(entry, pte);
     return 0;

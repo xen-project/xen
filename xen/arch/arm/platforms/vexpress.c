@@ -65,7 +65,7 @@ int vexpress_syscfg(int write, int function, int device, uint32_t *data)
     uint32_t *syscfg = (uint32_t *) FIXMAP_ADDR(FIXMAP_MISC);
     int ret = -1;
 
-    set_fixmap(FIXMAP_MISC, maddr_to_mfn(V2M_SYS_MMIO_BASE), DEV_SHARED);
+    set_fixmap(FIXMAP_MISC, maddr_to_mfn(V2M_SYS_MMIO_BASE), MT_DEV_SHARED);
 
     if ( syscfg[V2M_SYS_CFGCTRL/4] & V2M_SYS_CFG_START )
         goto out;
