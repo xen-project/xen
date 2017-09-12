@@ -585,7 +585,8 @@ union hsr {
         unsigned long s1ptw:1; /* Stage 2 fault during stage 1 translation */
         unsigned long res1:1;  /* RES0 */
         unsigned long eat:1;   /* External abort type */
-        unsigned long res2:15;
+        unsigned long fnv:1;   /* FAR not Valid */
+        unsigned long res2:14;
         unsigned long len:1;   /* Instruction length */
         unsigned long ec:6;    /* Exception Class */
     } iabt; /* HSR_EC_INSTR_ABORT_* */
@@ -596,10 +597,11 @@ union hsr {
         unsigned long s1ptw:1; /* Stage 2 fault during stage 1 translation */
         unsigned long cache:1; /* Cache Maintenance */
         unsigned long eat:1;   /* External Abort Type */
+        unsigned long fnv:1;   /* FAR not Valid */
 #ifdef CONFIG_ARM_32
-        unsigned long sbzp0:6;
+        unsigned long sbzp0:5;
 #else
-        unsigned long sbzp0:4;
+        unsigned long sbzp0:3;
         unsigned long ar:1;    /* Acquire Release */
         unsigned long sf:1;    /* Sixty Four bit register */
 #endif
