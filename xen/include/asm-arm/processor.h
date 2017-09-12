@@ -613,6 +613,19 @@ union hsr {
         unsigned long ec:6;    /* Exception Class */
     } dabt; /* HSR_EC_DATA_ABORT_* */
 
+    /* Contain the common bits between DABT and IABT */
+    struct hsr_xabt {
+        unsigned long fsc:6;    /* Fault status code */
+        unsigned long pad1:1;   /* Not common */
+        unsigned long s1ptw:1;  /* Stage 2 fault during stage 1 translation */
+        unsigned long pad2:1;   /* Not common */
+        unsigned long eat:1;    /* External abort type */
+        unsigned long fnv:1;    /* FAR not Valid */
+        unsigned long pad3:14;  /* Not common */
+        unsigned long len:1;    /* Instruction length */
+        unsigned long ec:6;     /* Exception Class */
+    } xabt;
+
 #ifdef CONFIG_ARM_64
     struct hsr_brk {
         unsigned long comment:16;   /* Comment */
