@@ -29,6 +29,7 @@ cscope.in.out
 cscope.out
 cscope.po.out
 .config
+.vimrc
 
 dist
 stubdom/*.tar.gz
