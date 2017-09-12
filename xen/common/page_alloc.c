@@ -611,9 +611,13 @@ static struct page_info *alloc_heap_pages(
         if ( node >= MAX_NUMNODES )
             node = cpu_to_node(smp_processor_id());
     }
+    else if ( unlikely(node >= MAX_NUMNODES) )
+    {
+        ASSERT_UNREACHABLE();
+        return NULL;
+    }
     first_node = node;
 
-    ASSERT(node < MAX_NUMNODES);
     ASSERT(zone_lo <= zone_hi);
     ASSERT(zone_hi < NR_ZONES);
 
