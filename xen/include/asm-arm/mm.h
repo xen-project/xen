@@ -281,7 +281,7 @@ static inline int gvirt_to_maddr(vaddr_t va, paddr_t *pa, unsigned int flags)
 
 /* Convert between Xen-heap virtual addresses and machine frame numbers. */
 #define __virt_to_mfn(va) (virt_to_maddr(va) >> PAGE_SHIFT)
-#define mfn_to_virt(mfn)  (maddr_to_virt((paddr_t)(mfn) << PAGE_SHIFT))
+#define __mfn_to_virt(mfn) (maddr_to_virt((paddr_t)(mfn) << PAGE_SHIFT))
 
 /*
  * We define non-underscored wrappers for above conversion functions.
@@ -291,6 +291,7 @@ static inline int gvirt_to_maddr(vaddr_t va, paddr_t *pa, unsigned int flags)
 #define mfn_to_page(mfn)    __mfn_to_page(mfn)
 #define page_to_mfn(pg)     __page_to_mfn(pg)
 #define virt_to_mfn(va)     __virt_to_mfn(va)
+#define mfn_to_virt(mfn)    __mfn_to_virt(mfn)
 
 /* Convert between Xen-heap virtual addresses and page-info structures. */
 static inline struct page_info *virt_to_page(const void *v)

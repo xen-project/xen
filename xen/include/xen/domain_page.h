@@ -53,7 +53,7 @@ static inline void *__map_domain_page_global(const struct page_info *pg)
 
 #else /* !CONFIG_DOMAIN_PAGE */
 
-#define map_domain_page(mfn)                mfn_to_virt(mfn_x(mfn))
+#define map_domain_page(mfn)                __mfn_to_virt(mfn_x(mfn))
 #define __map_domain_page(pg)               page_to_virt(pg)
 #define unmap_domain_page(va)               ((void)(va))
 #define domain_page_map_to_mfn(va)          virt_to_mfn((unsigned long)(va))
