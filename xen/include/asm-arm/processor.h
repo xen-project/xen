@@ -581,9 +581,9 @@ union hsr {
 
     struct hsr_iabt {
         unsigned long ifsc:6;  /* Instruction fault status code */
-        unsigned long res0:1;
+        unsigned long res0:1;  /* RES0 */
         unsigned long s1ptw:1; /* Stage 2 fault during stage 1 translation */
-        unsigned long res1:1;
+        unsigned long res1:1;  /* RES0 */
         unsigned long eat:1;   /* External abort type */
         unsigned long res2:15;
         unsigned long len:1;   /* Instruction length */
