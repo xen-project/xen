@@ -47,6 +47,8 @@ struct domain *dom_xen, *dom_io, *dom_cow;
 /* Override macros from asm/page.h to make them work with mfn_t */
 #undef virt_to_mfn
 #define virt_to_mfn(va) _mfn(__virt_to_mfn(va))
+#undef mfn_to_virt
+#define mfn_to_virt(mfn) __mfn_to_virt(mfn_x(mfn))
 
 /* Static start-of-day pagetables that we use before the allocators
  * are up. These are used by all CPUs during bringup before switching
@@ -837,7 +839,7 @@ void __init setup_xenheap_mappings(unsigned long base_mfn,
      * Virtual address aligned to previous 1GB to match physical
      * address alignment done above.
      */
-    vaddr = (vaddr_t)mfn_to_virt(base_mfn) & FIRST_MASK;
+    vaddr = (vaddr_t)__mfn_to_virt(base_mfn) & FIRST_MASK;
 
     while ( mfn < end_mfn )
     {
@@ -849,7 +851,7 @@ void __init setup_xenheap_mappings(unsigned long base_mfn,
             /* mfn_to_virt is not valid on the 1st 1st mfn, since it
              * is not within the xenheap. */
             first = slot == xenheap_first_first_slot ?
-                xenheap_first_first : mfn_to_virt(p->pt.base);
+                xenheap_first_first : __mfn_to_virt(p->pt.base);
         }
         else if ( xenheap_first_first_slot == -1)
         {
@@ -866,11 +868,11 @@ void __init setup_xenheap_mappings(unsigned long base_mfn,
         {
             mfn_t first_mfn = alloc_boot_pages(1, 1);
 
-            clear_page(mfn_to_virt(mfn_x(first_mfn)));
+            clear_page(mfn_to_virt(first_mfn));
             pte = mfn_to_xen_entry(first_mfn, WRITEALLOC);
             pte.pt.table = 1;
             write_pte(p, pte);
-            first = mfn_to_virt(mfn_x(first_mfn));
+            first = mfn_to_virt(first_mfn);
         }
 
         pte = mfn_to_xen_entry(_mfn(mfn), WRITEALLOC);
@@ -909,10 +911,10 @@ void __init setup_frametable_mappings(paddr_t ps, paddr_t pe)
     /* Compute the number of second level pages. */
     nr_second = ROUNDUP(frametable_size, FIRST_SIZE) >> FIRST_SHIFT;
     second_base = alloc_boot_pages(nr_second, 1);
-    second = mfn_to_virt(mfn_x(second_base));
+    second = mfn_to_virt(second_base);
     for ( i = 0; i < nr_second; i++ )
     {
-        clear_page(mfn_to_virt(mfn_x(mfn_add(second_base, i))));
+        clear_page(mfn_to_virt(mfn_add(second_base, i)));
         pte = mfn_to_xen_entry(mfn_add(second_base, i), WRITEALLOC);
         pte.pt.table = 1;
         write_pte(&xen_first[first_table_offset(FRAMETABLE_VIRT_START)+i], pte);
@@ -1005,7 +1007,7 @@ static int create_xen_entries(enum xenmap_operation op,
 
         BUG_ON(!lpae_valid(*entry));
 
-        third = mfn_to_virt(entry->pt.base);
+        third = __mfn_to_virt(entry->pt.base);
         entry = &third[third_table_offset(addr)];
 
         switch ( op ) {
