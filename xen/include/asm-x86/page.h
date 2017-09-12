@@ -250,6 +250,10 @@ void copy_page_sse2(void *, const void *);
 /* Convert between frame number and address formats.  */
 #define __pfn_to_paddr(pfn) ((paddr_t)(pfn) << PAGE_SHIFT)
 #define __paddr_to_pfn(pa)  ((unsigned long)((pa) >> PAGE_SHIFT))
+#define gfn_to_gaddr(gfn)   __pfn_to_paddr(gfn_x(gfn))
+#define gaddr_to_gfn(ga)    _gfn(__paddr_to_pfn(ga))
+#define mfn_to_maddr(mfn)   __pfn_to_paddr(mfn_x(mfn))
+#define maddr_to_mfn(ma)    _mfn(__paddr_to_pfn(ma))
 
 /*
  * We define non-underscored wrappers for above conversion functions. These are
