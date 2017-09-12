@@ -3046,7 +3046,7 @@ static int cache_flush(gnttab_cache_flush_t *cflush, grant_ref_t *cur_ref)
 
     page = mfn_to_page(mfn);
     owner = page_get_owner_and_reference(page);
-    if ( !owner )
+    if ( !owner || !owner->grant_table )
     {
         rcu_unlock_domain(d);
         return -EPERM;
