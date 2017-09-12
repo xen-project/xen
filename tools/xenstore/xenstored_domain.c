@@ -221,10 +221,11 @@ static int destroy_domain(void *_domain)
 static void domain_cleanup(void)
 {
 	xc_dominfo_t dominfo;
-	struct domain *domain, *tmp;
+	struct domain *domain;
 	int notify = 0;
 
-	list_for_each_entry_safe(domain, tmp, &domains, list) {
+ again:
+	list_for_each_entry(domain, &domains, list) {
 		if (xc_domain_getinfo(*xc_handle, domain->domid, 1,
 				      &dominfo) == 1 &&
 		    dominfo.domid == domain->domid) {
@@ -236,8 +237,12 @@ static void domain_cleanup(void)
 			if (!dominfo.dying)
 				continue;
 		}
-		talloc_free(domain->conn);
-		notify = 0; /* destroy_domain() fires the watch */
+		if (domain->conn) {
+			talloc_unlink(talloc_autofree_context(), domain->conn);
+			domain->conn = NULL;
+			notify = 0; /* destroy_domain() fires the watch */
+			goto again;
+		}
 	}
 
 	if (notify)
