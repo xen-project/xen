@@ -34,8 +34,6 @@
  *   ??            101
  *   reserved      110
  *   WRITEALLOC    111   1111 1111  -- Write-back write-allocate
- *
- *   DEV_WC        001   (== BUFFERABLE)
  */
 #define MAIR0VAL 0xeeaa4400
 #define MAIR1VAL 0xff000004
@@ -55,11 +53,10 @@
 #define WRITEBACK     0x3
 #define DEV_SHARED    0x4
 #define WRITEALLOC    0x7
-#define DEV_WC        BUFFERABLE
 
 #define PAGE_HYPERVISOR         (WRITEALLOC)
 #define PAGE_HYPERVISOR_NOCACHE (DEV_SHARED)
-#define PAGE_HYPERVISOR_WC      (DEV_WC)
+#define PAGE_HYPERVISOR_WC      (BUFFERABLE)
 
 /*
  * Defines for changing the hypervisor PTE .ro and .nx bits. This is only to be
