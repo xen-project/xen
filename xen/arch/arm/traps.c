@@ -1931,6 +1931,28 @@ done:
     if (first) unmap_domain_page(first);
 }
 
+/*
+ * Return the value of the hypervisor fault address register.
+ *
+ * On ARM32, the register will be different depending whether the
+ * fault is a prefetch abort or data abort.
+ */
+static inline vaddr_t get_hfar(bool is_data)
+{
+    vaddr_t gva;
+
+#ifdef CONFIG_ARM_32
+    if ( is_data )
+        gva = READ_CP32(HDFAR);
+    else
+        gva = READ_CP32(HIFAR);
+#else
+    gva =  READ_SYSREG(FAR_EL2);
+#endif
+
+    return gva;
+}
+
 static inline paddr_t get_faulting_ipa(vaddr_t gva)
 {
     register_t hpfar = READ_SYSREG(HPFAR_EL2);
@@ -1966,11 +1988,7 @@ static void do_trap_instr_abort_guest(struct cpu_user_regs *regs,
     paddr_t gpa;
     mfn_t mfn;
 
-#ifdef CONFIG_ARM_32
-    gva = READ_CP32(HIFAR);
-#else
-    gva = READ_SYSREG64(FAR_EL2);
-#endif
+    gva = get_hfar(false /* is_data */);
 
     /*
      * If this bit has been set, it means that this instruction abort is caused
@@ -2112,11 +2130,8 @@ static void do_trap_data_abort_guest(struct cpu_user_regs *regs,
         return __do_trap_serror(regs, true);
 
     info.dabt = dabt;
-#ifdef CONFIG_ARM_32
-    info.gva = READ_CP32(HDFAR);
-#else
-    info.gva = READ_SYSREG64(FAR_EL2);
-#endif
+
+    info.gva = get_hfar(true /* is_data */);
 
     if ( hpfar_is_valid(dabt.s1ptw, fsc) )
         info.gpa = get_faulting_ipa(info.gva);
