@@ -33,8 +33,8 @@
 #include <asm/regs.h>
 #include <asm/vfp.h>
 #include <asm/vgic.h>
+#include <asm/vtimer.h>
 
-#include "vtimer.h"
 #include "vuart.h"
 
 DEFINE_PER_CPU(struct vcpu *, curr_vcpu);
