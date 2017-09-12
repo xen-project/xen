@@ -21,9 +21,9 @@
 #define LPAE_SH_OUTER         0x2
 #define LPAE_SH_INNER         0x3
 
-/* LPAE Memory region attributes, to match Linux's (non-LPAE) choices.
- * Indexed by the AttrIndex bits of a LPAE entry;
- * the 8-bit fields are packed little-endian into MAIR0 and MAIR1
+/*
+ * LPAE Memory region attributes. Indexed by the AttrIndex bits of a
+ * LPAE entry; the 8-bit fields are packed little-endian into MAIR0 and MAIR1.
  *
  *                 ai    encoding
  *   UNCACHED      000   0000 0000  -- Strongly Ordered
@@ -35,9 +35,7 @@
  *   reserved      110
  *   WRITEALLOC    111   1111 1111  -- Write-back write-allocate
  *
- *   DEV_NONSHARED 100   (== DEV_SHARED)
  *   DEV_WC        001   (== BUFFERABLE)
- *   DEV_CACHED    011   (== WRITEBACK)
  */
 #define MAIR0VAL 0xeeaa4400
 #define MAIR1VAL 0xff000004
@@ -57,9 +55,7 @@
 #define WRITEBACK     0x3
 #define DEV_SHARED    0x4
 #define WRITEALLOC    0x7
-#define DEV_NONSHARED DEV_SHARED
 #define DEV_WC        BUFFERABLE
-#define DEV_CACHED    WRITEBACK
 
 #define PAGE_HYPERVISOR         (WRITEALLOC)
 #define PAGE_HYPERVISOR_NOCACHE (DEV_SHARED)
