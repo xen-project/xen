@@ -4058,7 +4058,8 @@ static int create_grant_pte_mapping(
 }
 
 static int destroy_grant_pte_mapping(
-    uint64_t addr, unsigned long frame, struct domain *d)
+    uint64_t addr, unsigned long frame, unsigned int grant_pte_flags,
+    struct domain *d)
 {
     int rc = GNTST_okay;
     void *va;
@@ -4104,16 +4105,28 @@ static int destroy_grant_pte_mapping(
 
     ol1e = *(l1_pgentry_t *)va;
     
-    /* Check that the virtual address supplied is actually mapped to frame. */
-    if ( unlikely(l1e_get_pfn(ol1e) != frame) )
+    /*
+     * Check that the PTE supplied actually maps frame (with appropriate
+     * permissions).
+     */
+    if ( unlikely(l1e_get_pfn(ol1e) != frame) ||
+         unlikely((l1e_get_flags(ol1e) ^ grant_pte_flags) &
+                  (_PAGE_PRESENT | _PAGE_RW)) )
     {
         page_unlock(page);
-        gdprintk(XENLOG_WARNING,
-                 "PTE entry %"PRIpte" for address %"PRIx64" doesn't match frame %lx\n",
-                 l1e_get_intpte(ol1e), addr, frame);
+        gdprintk(XENLOG_ERR,
+                 "PTE %"PRIpte" at %"PRIx64" doesn't match grant (%"PRIpte")\n",
+                 l1e_get_intpte(ol1e), addr,
+                 l1e_get_intpte(l1e_from_pfn(frame, grant_pte_flags)));
         rc = GNTST_general_error;
         goto failed;
     }
+
+    if ( unlikely((l1e_get_flags(ol1e) ^ grant_pte_flags) &
+                  ~(_PAGE_AVAIL | PAGE_CACHE_ATTRS)) )
+        gdprintk(XENLOG_WARNING,
+                 "PTE flags %x at %"PRIx64" don't match grant (%x)\n",
+                 l1e_get_flags(ol1e), addr, grant_pte_flags);
 
     /* Delete pagetable entry. */
     if ( unlikely(!UPDATE_ENTRY
@@ -4123,7 +4136,8 @@ static int destroy_grant_pte_mapping(
                    0)) )
     {
         page_unlock(page);
-        gdprintk(XENLOG_WARNING, "Cannot delete PTE entry at %p\n", va);
+        gdprintk(XENLOG_WARNING, "Cannot delete PTE entry at %"PRIx64"\n",
+                 addr);
         rc = GNTST_general_error;
         goto failed;
     }
@@ -4191,7 +4205,8 @@ static int create_grant_va_mapping(
 }
 
 static int replace_grant_va_mapping(
-    unsigned long addr, unsigned long frame, l1_pgentry_t nl1e, struct vcpu *v)
+    unsigned long addr, unsigned long frame, unsigned int grant_pte_flags,
+    l1_pgentry_t nl1e, struct vcpu *v)
 {
     l1_pgentry_t *pl1e, ol1e;
     unsigned long gl1mfn;
@@ -4227,20 +4242,33 @@ static int replace_grant_va_mapping(
 
     ol1e = *pl1e;
 
-    /* Check that the virtual address supplied is actually mapped to frame. */
-    if ( unlikely(l1e_get_pfn(ol1e) != frame) )
+    /*
+     * Check that the virtual address supplied is actually mapped to frame
+     * (with appropriate permissions).
+     */
+    if ( unlikely(l1e_get_pfn(ol1e) != frame) ||
+         unlikely((l1e_get_flags(ol1e) ^ grant_pte_flags) &
+                  (_PAGE_PRESENT | _PAGE_RW)) )
     {
-        gdprintk(XENLOG_WARNING,
-                 "PTE entry %lx for address %lx doesn't match frame %lx\n",
-                 l1e_get_pfn(ol1e), addr, frame);
+        gdprintk(XENLOG_ERR,
+                 "PTE %"PRIpte" for %lx doesn't match grant (%"PRIpte")\n",
+                 l1e_get_intpte(ol1e), addr,
+                 l1e_get_intpte(l1e_from_pfn(frame, grant_pte_flags)));
         rc = GNTST_general_error;
         goto unlock_and_out;
     }
 
+    if ( unlikely((l1e_get_flags(ol1e) ^ grant_pte_flags) &
+                  ~(_PAGE_AVAIL | PAGE_CACHE_ATTRS)) )
+        gdprintk(XENLOG_WARNING,
+                 "PTE flags %x for %"PRIx64" don't match grant (%x)\n",
+                 l1e_get_flags(ol1e), addr, grant_pte_flags);
+
     /* Delete pagetable entry. */
     if ( unlikely(!UPDATE_ENTRY(l1, pl1e, ol1e, nl1e, gl1mfn, v, 0)) )
     {
-        gdprintk(XENLOG_WARNING, "Cannot delete PTE entry at %p\n", pl1e);
+        gdprintk(XENLOG_WARNING, "Cannot delete PTE entry for %"PRIx64"\n",
+                 addr);
         rc = GNTST_general_error;
         goto unlock_and_out;
     }
@@ -4254,9 +4282,11 @@ static int replace_grant_va_mapping(
 }
 
 static int destroy_grant_va_mapping(
-    unsigned long addr, unsigned long frame, struct vcpu *v)
+    unsigned long addr, unsigned long frame, unsigned int grant_pte_flags,
+    struct vcpu *v)
 {
-    return replace_grant_va_mapping(addr, frame, l1e_empty(), v);
+    return replace_grant_va_mapping(addr, frame, grant_pte_flags,
+                                    l1e_empty(), v);
 }
 
 static int create_grant_p2m_mapping(uint64_t addr, unsigned long frame,
@@ -4351,20 +4381,39 @@ int replace_grant_host_mapping(
     unsigned long gl1mfn;
     struct page_info *l1pg;
     int rc;
+    unsigned int grant_pte_flags;
     
     if ( paging_mode_external(current->domain) )
         return replace_grant_p2m_mapping(addr, frame, new_addr, flags);
 
+    grant_pte_flags =
+        _PAGE_PRESENT | _PAGE_ACCESSED | _PAGE_DIRTY | _PAGE_GNTTAB | _PAGE_NX;
+
+    if ( flags & GNTMAP_application_map )
+        grant_pte_flags |= _PAGE_USER;
+    if ( !(flags & GNTMAP_readonly) )
+        grant_pte_flags |= _PAGE_RW;
+    /*
+     * On top of the explicit settings done by create_grant_host_mapping()
+     * also open-code relevant parts of adjust_guest_l1e(). Don't mirror
+     * available and cachability flags, though.
+     */
+    if ( !is_pv_32bit_domain(curr->domain) )
+        grant_pte_flags |= (grant_pte_flags & _PAGE_USER)
+                           ? _PAGE_GLOBAL
+                           : _PAGE_GUEST_KERNEL | _PAGE_USER;
+
     if ( flags & GNTMAP_contains_pte )
     {
         if ( !new_addr )
-            return destroy_grant_pte_mapping(addr, frame, curr->domain);
+            return destroy_grant_pte_mapping(addr, frame, grant_pte_flags,
+                                             curr->domain);
         
         return GNTST_general_error;
     }
 
     if ( !new_addr )
-        return destroy_grant_va_mapping(addr, frame, curr);
+        return destroy_grant_va_mapping(addr, frame, grant_pte_flags, curr);
 
     pl1e = guest_map_l1e(new_addr, &gl1mfn);
     if ( !pl1e )
@@ -4412,7 +4461,7 @@ int replace_grant_host_mapping(
     put_page(l1pg);
     guest_unmap_l1e(pl1e);
 
-    rc = replace_grant_va_mapping(addr, frame, ol1e, curr);
+    rc = replace_grant_va_mapping(addr, frame, grant_pte_flags, ol1e, curr);
     if ( rc && !paging_mode_refcounts(curr->domain) )
         put_page_from_l1e(ol1e, curr->domain);
 
