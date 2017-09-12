@@ -2368,7 +2368,26 @@ void do_trap_hyp_sync(struct cpu_user_regs *regs)
         do_trap_brk(regs, hsr);
         break;
 #endif
+    case HSR_EC_DATA_ABORT_CURR_EL:
+    case HSR_EC_INSTR_ABORT_CURR_EL:
+    {
+        bool is_data = (hsr.ec == HSR_EC_DATA_ABORT_CURR_EL);
+        const char *fault = (is_data) ? "Data Abort" : "Instruction Abort";
 
+        printk("%s Trap. Syndrome=%#x\n", fault, hsr.iss);
+        /*
+         * FAR may not be valid for a Synchronous External abort other
+         * than translation table walk.
+         */
+        if ( hsr.xabt.fsc == FSC_SEA && hsr.xabt.fnv )
+            printk("Invalid FAR, not walking the hypervisor tables\n");
+        else
+            dump_hyp_walk(get_hfar(is_data));
+
+        do_unexpected_trap(fault, regs);
+
+        break;
+    }
     default:
         printk("Hypervisor Trap. HSR=0x%x EC=0x%x IL=%x Syndrome=0x%"PRIx32"\n",
                hsr.bits, hsr.ec, hsr.len, hsr.iss);
