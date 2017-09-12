@@ -781,9 +781,12 @@ static struct page_info *get_free_buddy(unsigned int zone_lo,
         if ( node >= MAX_NUMNODES )
             node = cpu_to_node(smp_processor_id());
     }
+    else if ( unlikely(node >= MAX_NUMNODES) )
+    {
+        ASSERT_UNREACHABLE();
+        return NULL;
+    }
     first_node = node;
-
-    ASSERT(node < MAX_NUMNODES);
 
     /*
      * Start with requested node, but exhaust all node memory in requested 

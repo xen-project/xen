@@ -429,6 +429,31 @@ static void decrease_reservation(struct memop_args *a)
     a->nr_done = i;
 }
 
+static bool propagate_node(unsigned int xmf, unsigned int *memflags)
+{
+    const struct domain *currd = current->domain;
+
+    BUILD_BUG_ON(XENMEMF_get_node(0) != NUMA_NO_NODE);
+    BUILD_BUG_ON(MEMF_get_node(0) != NUMA_NO_NODE);
+
+    if ( XENMEMF_get_node(xmf) == NUMA_NO_NODE )
+        return true;
+
+    if ( is_hardware_domain(currd) || is_control_domain(currd) )
+    {
+        if ( XENMEMF_get_node(xmf) >= MAX_NUMNODES )
+            return false;
+
+        *memflags |= MEMF_node(XENMEMF_get_node(xmf));
+        if ( xmf & XENMEMF_exact_node_request )
+            *memflags |= MEMF_exact_node;
+    }
+    else if ( xmf & XENMEMF_exact_node_request )
+        return false;
+
+    return true;
+}
+
 static long memory_exchange(XEN_GUEST_HANDLE_PARAM(xen_memory_exchange_t) arg)
 {
     struct xen_memory_exchange exch;
@@ -501,6 +526,12 @@ static long memory_exchange(XEN_GUEST_HANDLE_PARAM(xen_memory_exchange_t) arg)
         }
     }
 
+    if ( unlikely(!propagate_node(exch.out.mem_flags, &memflags)) )
+    {
+        rc = -EINVAL;
+        goto fail_early;
+    }
+
     d = rcu_lock_domain_by_any_id(exch.in.domid);
     if ( d == NULL )
     {
@@ -519,7 +550,6 @@ static long memory_exchange(XEN_GUEST_HANDLE_PARAM(xen_memory_exchange_t) arg)
         d,
         XENMEMF_get_address_bits(exch.out.mem_flags) ? :
         (BITS_PER_LONG+PAGE_SHIFT)));
-    memflags |= MEMF_node(XENMEMF_get_node(exch.out.mem_flags));
 
     for ( i = (exch.nr_exchanged >> in_chunk_order);
           i < (exch.in.nr_extents >> in_chunk_order);
@@ -882,12 +912,8 @@ static int construct_memop_from_reservation(
         }
         read_unlock(&d->vnuma_rwlock);
     }
-    else
-    {
-        a->memflags |= MEMF_node(XENMEMF_get_node(r->mem_flags));
-        if ( r->mem_flags & XENMEMF_exact_node_request )
-            a->memflags |= MEMF_exact_node;
-    }
+    else if ( unlikely(!propagate_node(r->mem_flags, &a->memflags)) )
+        return -EINVAL;
 
     return 0;
 }
