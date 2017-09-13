@@ -603,6 +603,23 @@ static int libxl__device_from_vkb(libxl__gc *gc, uint32_t domid,
     return 0;
 }
 
+int libxl_device_vkb_add(libxl_ctx *ctx, uint32_t domid, libxl_device_vkb *vkb,
+                         const libxl_asyncop_how *ao_how)
+{
+    AO_CREATE(ctx, domid, ao_how);
+    int rc;
+
+    rc = libxl__device_add(gc, domid, &libxl__vkb_devtype, vkb);
+    if (rc) {
+        LOGD(ERROR, domid, "Unable to add vkb device");
+        goto out;
+    }
+
+out:
+    libxl__ao_complete(egc, ao, rc);
+    return AO_INPROGRESS;
+}
+
 static LIBXL_DEFINE_UPDATE_DEVID(vkb, "vkb")
 
 static int libxl__device_vfb_setdefault(libxl__gc *gc, uint32_t domid,
@@ -640,6 +657,23 @@ static int libxl__device_from_vfb(libxl__gc *gc, uint32_t domid,
     device->domid = domid;
     device->kind = LIBXL__DEVICE_KIND_VFB;
     return 0;
+}
+
+int libxl_device_vfb_add(libxl_ctx *ctx, uint32_t domid, libxl_device_vfb *vfb,
+                         const libxl_asyncop_how *ao_how)
+{
+    AO_CREATE(ctx, domid, ao_how);
+    int rc;
+
+    rc = libxl__device_add(gc, domid, &libxl__vfb_devtype, vfb);
+    if (rc) {
+        LOGD(ERROR, domid, "Unable to add vfb device");
+        goto out;
+    }
+
+out:
+    libxl__ao_complete(egc, ao, rc);
+    return AO_INPROGRESS;
 }
 
 static LIBXL_DEFINE_UPDATE_DEVID(vfb, "vfb")
