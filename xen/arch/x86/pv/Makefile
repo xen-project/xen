@@ -1,4 +1,5 @@
 obj-y += callback.o
+obj-y += descriptor-tables.o
 obj-y += domain.o
 obj-y += emulate.o
 obj-y += emul-gate-op.o
