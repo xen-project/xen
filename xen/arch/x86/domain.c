@@ -64,6 +64,7 @@
 #include <compat/vcpu.h>
 #include <asm/psr.h>
 #include <asm/pv/domain.h>
+#include <asm/pv/mm.h>
 
 DEFINE_PER_CPU(struct vcpu *, curr_vcpu);
 
@@ -992,7 +993,7 @@ int arch_set_info_guest(
         return rc;
 
     if ( !compat )
-        rc = (int)set_gdt(v, c.nat->gdt_frames, c.nat->gdt_ents);
+        rc = (int)pv_set_gdt(v, c.nat->gdt_frames, c.nat->gdt_ents);
     else
     {
         unsigned long gdt_frames[ARRAY_SIZE(v->arch.pv_vcpu.gdt_frames)];
@@ -1002,7 +1003,7 @@ int arch_set_info_guest(
             return -EINVAL;
         for ( i = 0; i < n; ++i )
             gdt_frames[i] = c.cmp->gdt_frames[i];
-        rc = (int)set_gdt(v, gdt_frames, c.cmp->gdt_ents);
+        rc = (int)pv_set_gdt(v, gdt_frames, c.cmp->gdt_ents);
     }
     if ( rc != 0 )
         return rc;
@@ -1101,7 +1102,7 @@ int arch_set_info_guest(
     {
         if ( cr3_page )
             put_page(cr3_page);
-        destroy_gdt(v);
+        pv_destroy_gdt(v);
         return rc;
     }
 
@@ -1153,7 +1154,7 @@ int arch_vcpu_reset(struct vcpu *v)
 {
     if ( is_pv_vcpu(v) )
     {
-        destroy_gdt(v);
+        pv_destroy_gdt(v);
         return vcpu_destroy_pagetables(v);
     }
 
@@ -1896,7 +1897,7 @@ int domain_relinquish_resources(struct domain *d)
                  * the LDT as it automatically gets squashed with the guest
                  * mappings.
                  */
-                destroy_gdt(v);
+                pv_destroy_gdt(v);
             }
         }
 

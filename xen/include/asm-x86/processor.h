@@ -467,11 +467,6 @@ extern void init_int80_direct_trap(struct vcpu *v);
 
 extern void write_ptbase(struct vcpu *v);
 
-void destroy_gdt(struct vcpu *d);
-long set_gdt(struct vcpu *d, 
-             unsigned long *frames, 
-             unsigned int entries);
-
 /* REP NOP (PAUSE) is a good thing to insert into busy-wait loops. */
 static always_inline void rep_nop(void)
 {

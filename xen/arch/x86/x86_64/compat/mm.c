@@ -6,6 +6,8 @@
 #include <asm/mem_paging.h>
 #include <asm/mem_sharing.h>
 
+#include <asm/pv/mm.h>
+
 int compat_set_gdt(XEN_GUEST_HANDLE_PARAM(uint) frame_list, unsigned int entries)
 {
     unsigned int i, nr_pages = (entries + 511) / 512;
@@ -31,7 +33,7 @@ int compat_set_gdt(XEN_GUEST_HANDLE_PARAM(uint) frame_list, unsigned int entries
 
     domain_lock(current->domain);
 
-    if ( (ret = set_gdt(current, frames, entries)) == 0 )
+    if ( (ret = pv_set_gdt(current, frames, entries)) == 0 )
         flush_tlb_local();
 
     domain_unlock(current->domain);
