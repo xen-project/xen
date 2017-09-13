@@ -126,7 +126,6 @@
 #include <asm/hvm/grant_table.h>
 #include <asm/pv/grant_table.h>
 
-#include "pv/emulate.h"
 #include "pv/mm.h"
 
 /* Override macros from asm/page.h to make them work with mfn_t */
