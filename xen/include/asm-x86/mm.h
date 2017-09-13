@@ -369,6 +369,20 @@ int  get_page_from_l1e(
     l1_pgentry_t l1e, struct domain *l1e_owner, struct domain *pg_owner);
 void put_page_from_l1e(l1_pgentry_t l1e, struct domain *l1e_owner);
 
+static inline bool get_page_from_mfn(mfn_t mfn, struct domain *d)
+{
+    struct page_info *page = __mfn_to_page(mfn_x(mfn));
+
+    if ( unlikely(!mfn_valid(mfn)) || unlikely(!get_page(page, d)) )
+    {
+        gdprintk(XENLOG_WARNING,
+                 "Could not get page ref for mfn %"PRI_mfn"\n", mfn_x(mfn));
+        return false;
+    }
+
+    return true;
+}
+
 static inline void put_page_and_type(struct page_info *page)
 {
     put_page_type(page);

@@ -706,22 +706,6 @@ bool map_ldt_shadow_page(unsigned int offset)
     return true;
 }
 
-
-static bool get_page_from_mfn(mfn_t mfn, struct domain *d)
-{
-    struct page_info *page = mfn_to_page(mfn);
-
-    if ( unlikely(!mfn_valid(mfn)) || unlikely(!get_page(page, d)) )
-    {
-        gdprintk(XENLOG_WARNING,
-                 "Could not get page ref for mfn %"PRI_mfn"\n", mfn_x(mfn));
-        return false;
-    }
-
-    return true;
-}
-
-
 static int get_page_and_type_from_mfn(
     mfn_t mfn, unsigned long type, struct domain *d,
     int partial, int preemptible)
