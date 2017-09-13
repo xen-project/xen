@@ -41,6 +41,7 @@
 
 #include "../x86_64/mmconfig.h"
 #include "emulate.h"
+#include "mm.h"
 
 /* Override macros from asm/page.h to make them work with mfn_t */
 #undef mfn_to_page

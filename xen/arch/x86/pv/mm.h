@@ -6,6 +6,8 @@ l1_pgentry_t *map_guest_l1e(unsigned long linear, mfn_t *gl1mfn);
 void init_guest_l4_table(l4_pgentry_t l4tab[], const struct domain *d,
                          bool zap_ro_mpt);
 
+int new_guest_cr3(mfn_t mfn);
+
 /* Read a PV guest's l1e that maps this linear address. */
 static inline l1_pgentry_t guest_get_eff_l1e(unsigned long linear)
 {
