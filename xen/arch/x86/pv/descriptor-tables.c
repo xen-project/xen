@@ -181,6 +181,46 @@ long do_update_descriptor(uint64_t pa, uint64_t desc)
     return ret;
 }
 
+int compat_set_gdt(XEN_GUEST_HANDLE_PARAM(uint) frame_list, unsigned int entries)
+{
+    unsigned int i, nr_pages = (entries + 511) / 512;
+    unsigned long frames[16];
+    int ret;
+
+    /* Rechecked in set_gdt, but ensures a sane limit for copy_from_user(). */
+    if ( entries > FIRST_RESERVED_GDT_ENTRY )
+        return -EINVAL;
+
+    if ( !guest_handle_okay(frame_list, nr_pages) )
+        return -EFAULT;
+
+    for ( i = 0; i < nr_pages; ++i )
+    {
+        unsigned int frame;
+
+        if ( __copy_from_guest(&frame, frame_list, 1) )
+            return -EFAULT;
+        frames[i] = frame;
+        guest_handle_add_offset(frame_list, 1);
+    }
+
+    domain_lock(current->domain);
+
+    if ( (ret = pv_set_gdt(current, frames, entries)) == 0 )
+        flush_tlb_local();
+
+    domain_unlock(current->domain);
+
+    return ret;
+}
+
+int compat_update_descriptor(uint32_t pa_lo, uint32_t pa_hi,
+                             uint32_t desc_lo, uint32_t desc_hi)
+{
+    return do_update_descriptor(pa_lo | ((uint64_t)pa_hi << 32),
+                                desc_lo | ((uint64_t)desc_hi << 32));
+}
+
 /*
  * Local variables:
  * mode: C
