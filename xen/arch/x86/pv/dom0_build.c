@@ -20,6 +20,8 @@
 #include <asm/page.h>
 #include <asm/setup.h>
 
+#include "mm.h"
+
 /* Allow ring-3 access in long mode as guest cannot use ring 1 ... */
 #define BASE_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_USER)
 #define L1_PROT (BASE_PROT|_PAGE_GUEST_KERNEL)

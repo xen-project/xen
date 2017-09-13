@@ -9,7 +9,12 @@
 #include <xen/lib.h>
 #include <xen/sched.h>
 
+#include <asm/p2m.h>
+#include <asm/paging.h>
+#include <asm/setup.h>
 #include <asm/pv/domain.h>
+
+#include "mm.h"
 
 /* Override macros from asm/page.h to make them work with mfn_t */
 #undef mfn_to_page

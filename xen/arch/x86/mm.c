@@ -125,6 +125,7 @@
 
 #include <asm/hvm/grant_table.h>
 #include <asm/pv/grant_table.h>
+#include <asm/pv/mm.h>
 
 #include "pv/mm.h"
 
@@ -240,53 +241,6 @@ void __init init_frametable(void)
                          : end_pg;
     init_frametable_chunk(pdx_to_page(sidx * PDX_GROUP_COUNT), top_pg);
     memset(end_pg, -1, (unsigned long)top_pg - (unsigned long)end_pg);
-}
-
-#ifndef NDEBUG
-static unsigned int __read_mostly root_pgt_pv_xen_slots
-    = ROOT_PAGETABLE_PV_XEN_SLOTS;
-static l4_pgentry_t __read_mostly split_l4e;
-#else
-#define root_pgt_pv_xen_slots ROOT_PAGETABLE_PV_XEN_SLOTS
-#endif
-
-static void pv_arch_init_memory(void)
-{
-#ifndef NDEBUG
-    unsigned int i;
-
-    if ( highmem_start )
-    {
-        unsigned long split_va = (unsigned long)__va(highmem_start);
-
-        if ( split_va < HYPERVISOR_VIRT_END &&
-             split_va - 1 == (unsigned long)__va(highmem_start - 1) )
-        {
-            root_pgt_pv_xen_slots = l4_table_offset(split_va) -
-                                    ROOT_PAGETABLE_FIRST_XEN_SLOT;
-            ASSERT(root_pgt_pv_xen_slots < ROOT_PAGETABLE_PV_XEN_SLOTS);
-            if ( l4_table_offset(split_va) == l4_table_offset(split_va - 1) )
-            {
-                l3_pgentry_t *l3tab = alloc_xen_pagetable();
-
-                if ( l3tab )
-                {
-                    const l3_pgentry_t *l3idle =
-                        l4e_to_l3e(idle_pg_table[l4_table_offset(split_va)]);
-
-                    for ( i = 0; i < l3_table_offset(split_va); ++i )
-                        l3tab[i] = l3idle[i];
-                    for ( ; i < L3_PAGETABLE_ENTRIES; ++i )
-                        l3tab[i] = l3e_empty();
-                    split_l4e = l4e_from_pfn(virt_to_mfn(l3tab),
-                                             __PAGE_HYPERVISOR_RW);
-                }
-                else
-                    ++root_pgt_pv_xen_slots;
-            }
-        }
-    }
-#endif
 }
 
 void __init arch_init_memory(void)
@@ -1423,40 +1377,6 @@ static int alloc_l3_table(struct page_info *page)
 
     unmap_domain_page(pl3e);
     return rc > 0 ? 0 : rc;
-}
-
-/*
- * This function must write all ROOT_PAGETABLE_PV_XEN_SLOTS, to clobber any
- * values a guest may have left there from alloc_l4_table().
- */
-void init_guest_l4_table(l4_pgentry_t l4tab[], const struct domain *d,
-                         bool zap_ro_mpt)
-{
-    /* Xen private mappings. */
-    memcpy(&l4tab[ROOT_PAGETABLE_FIRST_XEN_SLOT],
-           &idle_pg_table[ROOT_PAGETABLE_FIRST_XEN_SLOT],
-           root_pgt_pv_xen_slots * sizeof(l4_pgentry_t));
-#ifndef NDEBUG
-    if ( unlikely(root_pgt_pv_xen_slots < ROOT_PAGETABLE_PV_XEN_SLOTS) )
-    {
-        l4_pgentry_t *next = &l4tab[ROOT_PAGETABLE_FIRST_XEN_SLOT +
-                                    root_pgt_pv_xen_slots];
-
-        if ( l4e_get_intpte(split_l4e) )
-            *next++ = split_l4e;
-
-        memset(next, 0,
-               _p(&l4tab[ROOT_PAGETABLE_LAST_XEN_SLOT + 1]) - _p(next));
-    }
-#else
-    BUILD_BUG_ON(root_pgt_pv_xen_slots != ROOT_PAGETABLE_PV_XEN_SLOTS);
-#endif
-    l4tab[l4_table_offset(LINEAR_PT_VIRT_START)] =
-        l4e_from_pfn(domain_page_map_to_mfn(l4tab), __PAGE_HYPERVISOR_RW);
-    l4tab[l4_table_offset(PERDOMAIN_VIRT_START)] =
-        l4e_from_page(d->arch.perdomain_l3_pg, __PAGE_HYPERVISOR_RW);
-    if ( zap_ro_mpt || is_pv_32bit_domain(d) )
-        l4tab[l4_table_offset(RO_MPT_VIRT_START)] = l4e_empty();
 }
 
 bool fill_ro_mpt(mfn_t mfn)
