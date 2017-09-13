@@ -78,6 +78,7 @@
 #include <asm/cpuid.h>
 #include <xsm/xsm.h>
 #include <asm/pv/traps.h>
+#include <asm/pv/mm.h>
 
 /*
  * opt_nmi: one of 'ignore', 'dom0', or 'fatal'.

@@ -7,6 +7,7 @@ obj-y += emul-priv-op.o
 obj-y += hypercall.o
 obj-y += iret.o
 obj-y += misc-hypercalls.o
+obj-y += ro-page-fault.o
 obj-y += traps.o
 
 obj-bin-y += dom0_build.init.o
