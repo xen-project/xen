@@ -127,6 +127,7 @@
 #include <asm/pv/grant_table.h>
 
 #include "pv/emulate.h"
+#include "pv/mm.h"
 
 /* Override macros from asm/page.h to make them work with mfn_t */
 #undef mfn_to_page
@@ -562,23 +563,6 @@ static l1_pgentry_t *map_guest_l1e(unsigned long linear, mfn_t *gl1mfn)
     *gl1mfn = l2e_get_mfn(l2e);
 
     return (l1_pgentry_t *)map_domain_page(*gl1mfn) + l1_table_offset(linear);
-}
-
-/* Read a PV guest's l1e that maps this linear address. */
-static l1_pgentry_t guest_get_eff_l1e(unsigned long linear)
-{
-    l1_pgentry_t l1e;
-
-    ASSERT(!paging_mode_translate(current->domain));
-    ASSERT(!paging_mode_external(current->domain));
-
-    if ( unlikely(!__addr_ok(linear)) ||
-         __copy_from_user(&l1e,
-                          &__linear_l1_table[l1_linear_offset(linear)],
-                          sizeof(l1_pgentry_t)) )
-        l1e = l1e_empty();
-
-    return l1e;
 }
 
 /*
