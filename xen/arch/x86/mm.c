@@ -528,35 +528,6 @@ void update_cr3(struct vcpu *v)
 }
 
 /*
- * Get a mapping of a PV guest's l1e for this linear address.  The return
- * pointer should be unmapped using unmap_domain_page().
- */
-static l1_pgentry_t *map_guest_l1e(unsigned long linear, mfn_t *gl1mfn)
-{
-    l2_pgentry_t l2e;
-
-    ASSERT(!paging_mode_translate(current->domain));
-    ASSERT(!paging_mode_external(current->domain));
-
-    if ( unlikely(!__addr_ok(linear)) )
-        return NULL;
-
-    /* Find this l1e and its enclosing l1mfn in the linear map. */
-    if ( __copy_from_user(&l2e,
-                          &__linear_l2_table[l2_linear_offset(linear)],
-                          sizeof(l2_pgentry_t)) )
-        return NULL;
-
-    /* Check flags that it will be safe to read the l1e. */
-    if ( (l2e_get_flags(l2e) & (_PAGE_PRESENT | _PAGE_PSE)) != _PAGE_PRESENT )
-        return NULL;
-
-    *gl1mfn = l2e_get_mfn(l2e);
-
-    return (l1_pgentry_t *)map_domain_page(*gl1mfn) + l1_table_offset(linear);
-}
-
-/*
  * Read the guest's l1e that maps this address, from the kernel-mode
  * page tables.
  */
