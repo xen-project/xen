@@ -442,7 +442,7 @@ static int __init nmi_init(void)
 			}
 			if (!cpu_type && !arch_perfmon_init(&cpu_type)) {
 				printk("xenoprof: Initialization failed. "
-				       "Intel processor family %d model %d"
+				       "Intel processor family %d model %d "
 				       "is not supported\n", family, _model);
 				return -ENODEV;
 			}
