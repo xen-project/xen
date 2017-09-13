@@ -28,6 +28,8 @@ int pv_ro_page_fault(unsigned long addr, struct cpu_user_regs *regs);
 long pv_set_gdt(struct vcpu *v, unsigned long *frames, unsigned int entries);
 void pv_destroy_gdt(struct vcpu *v);
 
+bool pv_map_ldt_shadow_page(unsigned int off);
+
 #else
 
 #include <xen/errno.h>
@@ -44,6 +46,8 @@ static inline long pv_set_gdt(struct vcpu *v, unsigned long *frames,
                               unsigned int entries)
 { ASSERT_UNREACHABLE(); return -EINVAL; }
 static inline void pv_destroy_gdt(struct vcpu *v) { ASSERT_UNREACHABLE(); }
+
+static inline bool pv_map_ldt_shadow_page(unsigned int off) { return false; }
 
 #endif
 

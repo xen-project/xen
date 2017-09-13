@@ -562,8 +562,6 @@ long subarch_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg);
 int compat_arch_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void));
 int compat_subarch_memory_op(int op, XEN_GUEST_HANDLE_PARAM(void));
 
-bool map_ldt_shadow_page(unsigned int);
-
 #define NIL(type) ((type *)-sizeof(type))
 #define IS_NIL(ptr) (!((uintptr_t)(ptr) + sizeof(*(ptr))))
 
