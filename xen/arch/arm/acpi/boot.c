@@ -53,7 +53,7 @@ acpi_map_gic_cpu_interface(struct acpi_madt_generic_interrupt *processor)
     int i;
     int rc;
     u64 mpidr = processor->arm_mpidr & MPIDR_HWID_MASK;
-    bool_t enabled = !!(processor->flags & ACPI_MADT_ENABLED);
+    bool enabled = processor->flags & ACPI_MADT_ENABLED;
 
     if ( mpidr == MPIDR_INVALID )
     {
@@ -190,8 +190,8 @@ static int __init acpi_parse_fadt(struct acpi_table_header *table)
     return -EINVAL;
 }
 
-static bool_t __initdata param_acpi_off;
-static bool_t __initdata param_acpi_force;
+static bool __initdata param_acpi_off;
+static bool __initdata param_acpi_force;
 
 static int __init parse_acpi_param(const char *arg)
 {

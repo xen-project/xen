@@ -55,7 +55,7 @@ struct bootinfo __initdata bootinfo;
 struct cpuinfo_arm __read_mostly boot_cpu_data;
 
 #ifdef CONFIG_ACPI
-bool_t __read_mostly acpi_disabled;
+bool __read_mostly acpi_disabled;
 #endif
 
 #ifdef CONFIG_ARM_32

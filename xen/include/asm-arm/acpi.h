@@ -43,8 +43,8 @@ typedef enum {
     TBL_MMAX,
 } EFI_MEM_RES;
 
-bool_t __init acpi_psci_present(void);
-bool_t __init acpi_psci_hvc_present(void);
+bool __init acpi_psci_present(void);
+bool __init acpi_psci_hvc_present(void);
 void __init acpi_smp_init_cpus(void);
 
 /*
@@ -57,19 +57,19 @@ void __init acpi_smp_init_cpus(void);
 paddr_t acpi_get_table_offset(struct membank tbl_add[], EFI_MEM_RES index);
 
 #ifdef CONFIG_ACPI
-extern bool_t acpi_disabled;
+extern bool acpi_disabled;
 /* Basic configuration for ACPI */
 static inline void disable_acpi(void)
 {
-    acpi_disabled = 1;
+    acpi_disabled = true;
 }
 
 static inline void enable_acpi(void)
 {
-    acpi_disabled = 0;
+    acpi_disabled = false;
 }
 #else
-#define acpi_disabled (1)
+#define acpi_disabled (true)
 #define disable_acpi()
 #define enable_acpi()
 #endif

@@ -48,14 +48,14 @@ char *__acpi_map_table(paddr_t phys, unsigned long size)
     return ((char *) base + offset);
 }
 
-/* 1 to indicate PSCI 0.2+ is implemented */
-bool_t __init acpi_psci_present(void)
+/* True to indicate PSCI 0.2+ is implemented */
+bool __init acpi_psci_present(void)
 {
     return acpi_gbl_FADT.arm_boot_flags & ACPI_FADT_PSCI_COMPLIANT;
 }
 
-/* 1 to indicate HVC is present instead of SMC as the PSCI conduit */
-bool_t __init acpi_psci_hvc_present(void)
+/* True to indicate HVC is present instead of SMC as the PSCI conduit */
+bool __init acpi_psci_hvc_present(void)
 {
     return acpi_gbl_FADT.arm_boot_flags & ACPI_FADT_PSCI_USE_HVC;
 }
