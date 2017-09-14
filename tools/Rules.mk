@@ -10,6 +10,7 @@ export _INSTALL := $(INSTALL)
 INSTALL = $(XEN_ROOT)/tools/cross-install
 
 XEN_INCLUDE        = $(XEN_ROOT)/tools/include
+XEN_LIBXENTOOLCORE  = $(XEN_ROOT)/tools/libs/toolcore
 XEN_LIBXENTOOLLOG  = $(XEN_ROOT)/tools/libs/toollog
 XEN_LIBXENEVTCHN   = $(XEN_ROOT)/tools/libs/evtchn
 XEN_LIBXENGNTTAB   = $(XEN_ROOT)/tools/libs/gnttab
@@ -101,6 +102,11 @@ CFLAGS_libxentoollog = -I$(XEN_LIBXENTOOLLOG)/include $(CFLAGS_xeninclude)
 SHDEPS_libxentoollog =
 LDLIBS_libxentoollog = $(SHDEPS_libxentoollog) $(XEN_LIBXENTOOLLOG)/libxentoollog$(libextension)
 SHLIB_libxentoollog  = $(SHDEPS_libxentoollog) -Wl,-rpath-link=$(XEN_LIBXENTOOLLOG)
+
+CFLAGS_libxentoolcore = -I$(XEN_LIBXENTOOLCORE)/include $(CFLAGS_xeninclude)
+SHDEPS_libxentoolcore =
+LDLIBS_libxentoolcore = $(SHDEPS_libxentoolcore) $(XEN_LIBXENTOOLCORE)/libxentoolcore$(libextension)
+SHLIB_libxentoolcore  = $(SHDEPS_libxentoolcore) -Wl,-rpath-link=$(XEN_LIBXENTOOLCORE)
 
 CFLAGS_libxenevtchn = -I$(XEN_LIBXENEVTCHN)/include $(CFLAGS_xeninclude)
 SHDEPS_libxenevtchn =

@@ -1,0 +1,9 @@
+prefix=@@prefix@@
+includedir=@@incdir@@
+libdir=@@libdir@@
+
+Name: Xentoolcore
+Description: Central support for Xen Hypervisor userland libraries
+Version: @@version@@
+Cflags: -I${includedir}
+Libs: @@libsflag@@${libdir} -lxentoolcore

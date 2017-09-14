@@ -1,0 +1,7 @@
+VERS_1.0 {
+	global:
+		xentoolcore_restrict_all;
+		xentoolcore__register_active_handle;
+		xentoolcore__deregister_active_handle;
+	local: *; /* Do not expose anything by default */
+};
