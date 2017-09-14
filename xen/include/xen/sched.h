@@ -792,6 +792,9 @@ static inline struct domain *next_domain_in_cpupool(
  /* VCPU is being reset. */
 #define _VPF_in_reset        7
 #define VPF_in_reset         (1UL<<_VPF_in_reset)
+/* VCPU is parked. */
+#define _VPF_parked          8
+#define VPF_parked           (1UL<<_VPF_parked)
 
 static inline int vcpu_runnable(struct vcpu *v)
 {

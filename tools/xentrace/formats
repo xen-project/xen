@@ -51,7 +51,7 @@
 
 0x00022201  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  csched2:tick
 0x00022202  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  csched2:runq_pos       [ dom:vcpu = 0x%(1)08x, pos = %(2)d]
-0x00022203  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  csched2:credit burn    [ dom:vcpu = 0x%(1)08x, credit = %(2)d, delta = %(3)d ]
+0x00022203  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  csched2:credit burn    [ dom:vcpu = 0x%(1)08x, credit = %(2)d, budget = %(3)d, delta = %(4)d ]
 0x00022204  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  csched2:credit_add
 0x00022205  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  csched2:tickle_check   [ dom:vcpu = 0x%(1)08x, credit = %(2)d, score = %(3)d ]
 0x00022206  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  csched2:tickle         [ cpu = %(1)d ]
