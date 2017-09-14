@@ -261,7 +261,7 @@ static void gicv3_enable_sre(void)
 static void gicv3_do_wait_for_rwp(void __iomem *base)
 {
     uint32_t val;
-    bool_t timeout = 0;
+    bool timeout = false;
     s_time_t deadline = NOW() + MILLISECS(1000);
 
     do {
@@ -270,7 +270,7 @@ static void gicv3_do_wait_for_rwp(void __iomem *base)
             break;
         if ( NOW() > deadline )
         {
-            timeout = 1;
+            timeout = true;
             break;
         }
         cpu_relax();
@@ -590,7 +590,7 @@ static void __init gicv3_dist_init(void)
 static int gicv3_enable_redist(void)
 {
     uint32_t val;
-    bool_t timeout = 0;
+    bool timeout = false;
     s_time_t deadline = NOW() + MILLISECS(1000);
 
     /* Wake up this CPU redistributor */
@@ -604,7 +604,7 @@ static int gicv3_enable_redist(void)
             break;
         if ( NOW() > deadline )
         {
-            timeout = 1;
+            timeout = true;
             break;
         }
         cpu_relax();
@@ -1005,7 +1005,7 @@ static void gicv3_write_lr(int lr_reg, const struct gic_lr *lr)
     gicv3_ich_write_lr(lr_reg, lrv);
 }
 
-static void gicv3_hcr_status(uint32_t flag, bool_t status)
+static void gicv3_hcr_status(uint32_t flag, bool status)
 {
     uint32_t hcr;
 

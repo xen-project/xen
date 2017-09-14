@@ -483,7 +483,7 @@ static void gicv2_write_lr(int lr, const struct gic_lr *lr_reg)
     writel_gich(lrv, GICH_LR + lr * 4);
 }
 
-static void gicv2_hcr_status(uint32_t flag, bool_t status)
+static void gicv2_hcr_status(uint32_t flag, bool status)
 {
     uint32_t hcr = readl_gich(GICH_HCR);
 
@@ -815,7 +815,7 @@ static hw_irq_controller gicv2_guest_irq_type = {
     .set_affinity = gicv2_irq_set_affinity,
 };
 
-static bool_t gicv2_is_aliased(paddr_t cbase, paddr_t csize)
+static bool gicv2_is_aliased(paddr_t cbase, paddr_t csize)
 {
     uint32_t val_low, val_high;
 

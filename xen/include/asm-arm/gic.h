@@ -345,7 +345,7 @@ struct gic_hw_operations {
     void (*update_lr)(int lr, const struct pending_irq *pending_irq,
                       unsigned int state);
     /* Update HCR status register */
-    void (*update_hcr_status)(uint32_t flag, bool_t set);
+    void (*update_hcr_status)(uint32_t flag, bool set);
     /* Clear LR register */
     void (*clear_lr)(int lr);
     /* Read LR register and populate gic_lr structure */

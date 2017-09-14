@@ -52,7 +52,7 @@
 #define VGICD_CTLR_DEFAULT  (GICD_CTLR_ARE_NS)
 
 static struct {
-    bool_t enabled;
+    bool enabled;
     /* Distributor interface address */
     paddr_t dbase;
     /* Re-distributor regions */
@@ -68,7 +68,7 @@ void vgic_v3_setup_hw(paddr_t dbase,
                       uint32_t rdist_stride,
                       unsigned int intid_bits)
 {
-    vgic_v3_hw.enabled = 1;
+    vgic_v3_hw.enabled = true;
     vgic_v3_hw.dbase = dbase;
     vgic_v3_hw.nr_rdist_regions = nr_rdist_regions;
     vgic_v3_hw.regions = regions;

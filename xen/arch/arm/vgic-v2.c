@@ -33,7 +33,7 @@
 #include <asm/vgic-emul.h>
 
 static struct {
-    bool_t enabled;
+    bool enabled;
     /* Distributor interface address */
     paddr_t dbase;
     /* CPU interface address & size */
@@ -49,7 +49,7 @@ static struct {
 void vgic_v2_setup_hw(paddr_t dbase, paddr_t cbase, paddr_t csize,
                       paddr_t vbase, uint32_t aliased_offset)
 {
-    vgic_v2_hw.enabled = 1;
+    vgic_v2_hw.enabled = true;
     vgic_v2_hw.dbase = dbase;
     vgic_v2_hw.cbase = cbase;
     vgic_v2_hw.csize = csize;

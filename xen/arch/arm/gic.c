@@ -606,7 +606,7 @@ void gic_clear_lrs(struct vcpu *v)
     if ( is_idle_vcpu(v) )
         return;
 
-    gic_hw_ops->update_hcr_status(GICH_HCR_UIE, 0);
+    gic_hw_ops->update_hcr_status(GICH_HCR_UIE, false);
 
     spin_lock_irqsave(&v->arch.vgic.lock, flags);
 
@@ -731,7 +731,7 @@ void gic_inject(void)
     gic_restore_pending_irqs(current);
 
     if ( !list_empty(&current->arch.vgic.lr_pending) && lr_all_full() )
-        gic_hw_ops->update_hcr_status(GICH_HCR_UIE, 1);
+        gic_hw_ops->update_hcr_status(GICH_HCR_UIE, true);
 }
 
 static void do_sgi(struct cpu_user_regs *regs, enum gic_sgi sgi)
