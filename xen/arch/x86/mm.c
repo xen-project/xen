@@ -3836,7 +3836,7 @@ int create_grant_pv_mapping(uint64_t addr, unsigned long frame,
 {
     struct vcpu *curr = current;
     struct domain *currd = curr->domain;
-    l1_pgentry_t nl1e, ol1e, *pl1e;
+    l1_pgentry_t nl1e, ol1e = { }, *pl1e;
     struct page_info *page;
     mfn_t gl1mfn;
     int rc = GNTST_general_error;
