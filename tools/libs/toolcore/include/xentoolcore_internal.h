@@ -24,6 +24,8 @@
 #ifndef XENTOOLCORE_INTERNAL_H
 #define XENTOOLCORE_INTERNAL_H
 
+#include <stddef.h>
+
 #include "xentoolcore.h"
 #include "_xentoolcore_list.h"
 
@@ -88,6 +90,46 @@ struct Xentoolcore__Active_Handle {
 
 void xentoolcore__register_active_handle(Xentoolcore__Active_Handle*);
 void xentoolcore__deregister_active_handle(Xentoolcore__Active_Handle*);
+
+/* ---------- convenient stuff ---------- */
+
+/*
+ * This does not appear in xentoolcore.h because it is a bit
+ * namespace-unclean.
+ */
+
+/*
+ * Convenience macros.
+ */
+
+/*
+ * CONTAINER_OF work like this.  Given:
+ *    typedef struct {
+ *      ...
+ *      member_type member_name;
+ *      ...
+ *    } outer_type;
+ *    outer_type outer, *outer_var;
+ *    member_type *inner_ptr = &outer->member_name;
+ *
+ * Then, effectively:
+ *    outer_type *CONTAINER_OF(member_type *inner_ptr,
+ *                             *outer_var, // or type name for outer_type
+ *                             member_name);
+ *
+ * So that:
+ *    CONTAINER_OF(inner_ptr, *outer_var, member_name) == &outer
+ *    CONTAINER_OF(inner_ptr, outer_type, member_name) == &outer
+ */
+#define CONTAINER_OF(inner_ptr, outer, member_name)                     \
+    ({                                                                  \
+        typeof(outer) *container_of_;                                   \
+        container_of_ = (void*)((char*)(inner_ptr) -                    \
+                                offsetof(typeof(outer), member_name));  \
+        (void)(&container_of_->member_name ==                           \
+               (typeof(inner_ptr))0) /* type check */;                  \
+        container_of_;                                                  \
+    })
 
 #endif /* XENTOOLCORE_INTERNAL_H */
 
