@@ -7,6 +7,7 @@ SHLIB_LDFLAGS += -Wl,--version-script=libxentoolcore.map
 
 CFLAGS	+= -Werror -Wmissing-prototypes
 CFLAGS	+= -I./include
+CFLAGS	+= $(CFLAGS_xeninclude)
 
 SRCS-y	+= handlereg.c
 

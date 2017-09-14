@@ -81,7 +81,7 @@
 typedef struct Xentoolcore__Active_Handle Xentoolcore__Active_Handle;
 
 typedef int Xentoolcore__Restrict_Callback(Xentoolcore__Active_Handle*,
-                                           uint32_t domid);
+                                           domid_t domid);
 
 struct Xentoolcore__Active_Handle {
     Xentoolcore__Restrict_Callback *restrict_callback;

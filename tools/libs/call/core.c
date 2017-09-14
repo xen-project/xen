@@ -17,7 +17,7 @@
 
 #include "private.h"
 
-static int all_restrict_cb(Xentoolcore__Active_Handle *ah, uint32_t domid) {
+static int all_restrict_cb(Xentoolcore__Active_Handle *ah, domid_t domid) {
     xencall_handle *xcall = CONTAINER_OF(ah, *xcall, tc_ah);
     return xentoolcore__restrict_by_dup2_null(xcall->fd);
 }

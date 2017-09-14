@@ -223,7 +223,7 @@ static int get_dev(const char *connect_to)
 	return open(connect_to, O_RDWR);
 }
 
-static int all_restrict_cb(Xentoolcore__Active_Handle *ah, uint32_t domid) {
+static int all_restrict_cb(Xentoolcore__Active_Handle *ah, domid_t domid) {
     struct xs_handle *h = CONTAINER_OF(ah, *h, tc_ah);
     return xentoolcore__restrict_by_dup2_null(h->fd);
 }

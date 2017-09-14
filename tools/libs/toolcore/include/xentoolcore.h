@@ -23,9 +23,10 @@
 #define XENTOOLCORE_H
 
 #include <stdint.h>
+#include <xen/xen.h>
 
 /*
- * int xentoolcore_restrict_all(uint32_t domid);
+ * int xentoolcore_restrict_all(domid_t domid);
  *
  * Arranges that Xen library handles (fds etc.) which are currently held
  * by Xen libraries, can no longer be used other than to affect domid.
@@ -65,7 +66,7 @@
  *     xen_some[other]library_open|close or xentoolcore_restrict_all
  *
  */
-int xentoolcore_restrict_all(uint32_t domid);
+int xentoolcore_restrict_all(domid_t domid);
 
 #endif /* XENTOOLCORE_H */
 

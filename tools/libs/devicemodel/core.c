@@ -21,7 +21,7 @@
 
 #include "private.h"
 
-static int all_restrict_cb(Xentoolcore__Active_Handle *ah, uint32_t domid) {
+static int all_restrict_cb(Xentoolcore__Active_Handle *ah, domid_t domid) {
     xendevicemodel_handle *dmod = CONTAINER_OF(ah, *dmod, tc_ah);
 
     if (dmod->fd < 0)

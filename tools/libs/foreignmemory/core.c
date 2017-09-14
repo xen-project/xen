@@ -19,7 +19,7 @@
 
 #include "private.h"
 
-static int all_restrict_cb(Xentoolcore__Active_Handle *ah, uint32_t domid) {
+static int all_restrict_cb(Xentoolcore__Active_Handle *ah, domid_t domid) {
     xenforeignmemory_handle *fmem = CONTAINER_OF(ah, *fmem, tc_ah);
 
     if (fmem->fd < 0)

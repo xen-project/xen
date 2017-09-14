@@ -22,7 +22,7 @@
 
 #include "private.h"
 
-static int all_restrict_cb(Xentoolcore__Active_Handle *ah, uint32_t domid) {
+static int all_restrict_cb(Xentoolcore__Active_Handle *ah, domid_t domid) {
     xengnttab_handle *xgt = CONTAINER_OF(ah, *xgt, tc_ah);
     return xentoolcore__restrict_by_dup2_null(xgt->fd);
 }

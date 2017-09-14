@@ -55,7 +55,7 @@ void xentoolcore__deregister_active_handle(Xentoolcore__Active_Handle *ah) {
     unlock();
 }
 
-int xentoolcore_restrict_all(uint32_t domid) {
+int xentoolcore_restrict_all(domid_t domid) {
     int r;
     Xentoolcore__Active_Handle *ah;
 
