@@ -1384,12 +1384,12 @@ int relinquish_p2m_mapping(struct domain *d)
     p2m_type_t t;
     int rc = 0;
     unsigned int order;
-
-    /* Convenience alias */
-    gfn_t start = p2m->lowest_mapped_gfn;
-    gfn_t end = p2m->max_mapped_gfn;
+    gfn_t start, end;
 
     p2m_write_lock(p2m);
+
+    start = p2m->lowest_mapped_gfn;
+    end = p2m->max_mapped_gfn;
 
     for ( ; gfn_x(start) < gfn_x(end);
           start = gfn_next_boundary(start, order) )
@@ -1445,9 +1445,6 @@ int p2m_cache_flush(struct domain *d, gfn_t start, unsigned long nr)
     p2m_type_t t;
     unsigned int order;
 
-    start = gfn_max(start, p2m->lowest_mapped_gfn);
-    end = gfn_min(end, p2m->max_mapped_gfn);
-
     /*
      * The operation cache flush will invalidate the RAM assigned to the
      * guest in a given range. It will not modify the page table and
@@ -1455,6 +1452,9 @@ int p2m_cache_flush(struct domain *d, gfn_t start, unsigned long nr)
      * fine. So using read-lock is fine here.
      */
     p2m_read_lock(p2m);
+
+    start = gfn_max(start, p2m->lowest_mapped_gfn);
+    end = gfn_min(end, p2m->max_mapped_gfn);
 
     for ( ; gfn_x(start) < gfn_x(end); start = next_gfn )
     {
