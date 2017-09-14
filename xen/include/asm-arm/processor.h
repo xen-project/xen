@@ -1,7 +1,6 @@
 #ifndef __ASM_ARM_PROCESSOR_H
 #define __ASM_ARM_PROCESSOR_H
 
-#include <asm/cpregs.h>
 #ifndef __ASSEMBLY__
 #include <xen/types.h>
 #endif

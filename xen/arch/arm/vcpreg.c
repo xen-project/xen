@@ -18,6 +18,7 @@
 
 #include <xen/sched.h>
 
+#include <asm/cpregs.h>
 #include <asm/current.h>
 #include <asm/regs.h>
 #include <asm/traps.h>

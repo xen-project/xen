@@ -22,6 +22,7 @@
 #include <xen/sched.h>
 #include <xen/timer.h>
 
+#include <asm/cpregs.h>
 #include <asm/div64.h>
 #include <asm/gic.h>
 #include <asm/irq.h>
@@ -29,6 +30,7 @@
 #include <asm/time.h>
 #include <asm/vgic.h>
 #include <asm/vreg.h>
+#include <asm/regs.h>
 
 /*
  * Check if regs is allowed access, user_gate is tail end of a

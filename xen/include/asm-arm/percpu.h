@@ -4,7 +4,6 @@
 #ifndef __ASSEMBLY__
 
 #include <xen/types.h>
-#include <asm/cpregs.h>
 #if defined(CONFIG_ARM_32)
 # include <asm/arm32/processor.h>
 #elif defined(CONFIG_ARM_64)
