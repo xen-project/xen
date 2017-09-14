@@ -98,10 +98,10 @@ static unsigned int get_11_allocation_size(paddr_t size)
  * Returns false if the memory would be below bank 0 or we have run
  * out of banks. In this case it will free the pages.
  */
-static bool_t insert_11_bank(struct domain *d,
-                             struct kernel_info *kinfo,
-                             struct page_info *pg,
-                             unsigned int order)
+static bool insert_11_bank(struct domain *d,
+                           struct kernel_info *kinfo,
+                           struct page_info *pg,
+                           unsigned int order)
 {
     int res, i;
     paddr_t spfn;
@@ -254,7 +254,7 @@ static void allocate_memory(struct domain *d, struct kernel_info *kinfo)
     unsigned int order = get_11_allocation_size(kinfo->unassigned_mem);
     int i;
 
-    bool_t lowmem = true;
+    bool lowmem = true;
     unsigned int bits;
 
     /*
@@ -678,7 +678,7 @@ static int make_cpus_node(const struct domain *d, void *fdt,
     /* Placeholder for cpu@ + a 32-bit number + \0 */
     char buf[15];
     u32 clock_frequency;
-    bool_t clock_valid;
+    bool clock_valid;
     uint64_t mpidr_aff;
 
     dt_dprintk("Create cpus node\n");
@@ -756,7 +756,8 @@ static int make_cpus_node(const struct domain *d, void *fdt,
         if ( res )
             return res;
 
-        if (clock_valid) {
+        if ( clock_valid )
+        {
             res = fdt_property_cell(fdt, "clock-frequency", clock_frequency);
             if ( res )
                 return res;
@@ -864,7 +865,7 @@ static int make_timer_node(const struct domain *d, void *fdt,
     unsigned int irq;
     gic_interrupt_t intrs[3];
     u32 clock_frequency;
-    bool_t clock_valid;
+    bool clock_valid;
 
     dt_dprintk("Create timer node\n");
 
@@ -924,7 +925,7 @@ static int make_timer_node(const struct domain *d, void *fdt,
 }
 
 static int map_irq_to_domain(struct domain *d, unsigned int irq,
-                             bool_t need_mapping, const char *devname)
+                             bool need_mapping, const char *devname)
 
 {
     int res;
@@ -966,7 +967,7 @@ static int map_dt_irq_to_domain(const struct dt_device_node *dev,
     struct domain *d = data;
     unsigned int irq = dt_irq->irq;
     int res;
-    bool_t need_mapping = !dt_device_for_passthrough(dev);
+    bool need_mapping = !dt_device_for_passthrough(dev);
 
     if ( irq < NR_LOCAL_IRQS )
     {
@@ -996,7 +997,7 @@ static int map_range_to_domain(const struct dt_device_node *dev,
 {
     struct map_range_data *mr_data = data;
     struct domain *d = mr_data->d;
-    bool_t need_mapping = !dt_device_for_passthrough(dev);
+    bool need_mapping = !dt_device_for_passthrough(dev);
     int res;
 
     res = iomem_permit_access(d, paddr_to_pfn(addr),
@@ -1080,7 +1081,7 @@ static int handle_device(struct domain *d, struct dt_device_node *dev,
     int res;
     struct dt_raw_irq rirq;
     u64 addr, size;
-    bool_t need_mapping = !dt_device_for_passthrough(dev);
+    bool need_mapping = !dt_device_for_passthrough(dev);
 
     nirq = dt_number_of_irq(dev);
     naddr = dt_number_of_address(dev);
