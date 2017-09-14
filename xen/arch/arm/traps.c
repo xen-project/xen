@@ -49,6 +49,7 @@
 #include <asm/monitor.h>
 #include <asm/psci.h>
 #include <asm/regs.h>
+#include <asm/traps.h>
 #include <asm/vgic.h>
 #include <asm/vtimer.h>
 
@@ -547,7 +548,7 @@ static vaddr_t exception_handler64(struct cpu_user_regs *regs, vaddr_t offset)
 }
 
 /* Inject an undefined exception into a 64 bit guest */
-static void inject_undef64_exception(struct cpu_user_regs *regs, int instr_len)
+void inject_undef64_exception(struct cpu_user_regs *regs, int instr_len)
 {
     vaddr_t handler;
     const union hsr esr = {
@@ -620,8 +621,7 @@ static void inject_iabt64_exception(struct cpu_user_regs *regs,
 
 #endif
 
-static void inject_undef_exception(struct cpu_user_regs *regs,
-                                   const union hsr hsr)
+void inject_undef_exception(struct cpu_user_regs *regs, const union hsr hsr)
 {
         if ( is_32bit_domain(current->domain) )
             inject_undef32_exception(regs);
@@ -1714,8 +1714,7 @@ static const unsigned short cc_map[16] = {
         0                       /* NV                     */
 };
 
-static int check_conditional_instr(struct cpu_user_regs *regs,
-                                   const union hsr hsr)
+int check_conditional_instr(struct cpu_user_regs *regs, const union hsr hsr)
 {
     unsigned long cpsr, cpsr_cond;
     int cond;
@@ -1777,7 +1776,7 @@ static int check_conditional_instr(struct cpu_user_regs *regs,
     return 1;
 }
 
-static void advance_pc(struct cpu_user_regs *regs, const union hsr hsr)
+void advance_pc(struct cpu_user_regs *regs, const union hsr hsr)
 {
     unsigned long itbits, cond, cpsr = regs->cpsr;
 
@@ -1818,11 +1817,11 @@ static void advance_pc(struct cpu_user_regs *regs, const union hsr hsr)
 }
 
 /* Read as zero and write ignore */
-static void handle_raz_wi(struct cpu_user_regs *regs,
-                          int regidx,
-                          bool read,
-                          const union hsr hsr,
-                          int min_el)
+void handle_raz_wi(struct cpu_user_regs *regs,
+                   int regidx,
+                   bool read,
+                   const union hsr hsr,
+                   int min_el)
 {
     ASSERT((min_el == 0) || (min_el == 1));
 
@@ -1836,12 +1835,12 @@ static void handle_raz_wi(struct cpu_user_regs *regs,
     advance_pc(regs, hsr);
 }
 
-/* Write only as write ignore */
-static void handle_wo_wi(struct cpu_user_regs *regs,
-                         int regidx,
-                         bool read,
-                         const union hsr hsr,
-                         int min_el)
+/* write only as write ignore */
+void handle_wo_wi(struct cpu_user_regs *regs,
+                  int regidx,
+                  bool read,
+                  const union hsr hsr,
+                  int min_el)
 {
     ASSERT((min_el == 0) || (min_el == 1));
 
@@ -1856,11 +1855,11 @@ static void handle_wo_wi(struct cpu_user_regs *regs,
 }
 
 /* Read only as read as zero */
-static void handle_ro_raz(struct cpu_user_regs *regs,
-                          int regidx,
-                          bool read,
-                          const union hsr hsr,
-                          int min_el)
+void handle_ro_raz(struct cpu_user_regs *regs,
+                   int regidx,
+                   bool read,
+                   const union hsr hsr,
+                   int min_el)
 {
     ASSERT((min_el == 0) || (min_el == 1));
 
