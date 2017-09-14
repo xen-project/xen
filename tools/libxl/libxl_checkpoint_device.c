@@ -68,7 +68,7 @@ void libxl__checkpoint_devices_setup(libxl__egc *egc,
 
     if (cds->device_kind_flags & (1 << LIBXL__DEVICE_KIND_VBD))
         cds->disks = libxl__device_list(gc, &libxl__disk_devtype, cds->domid,
-                                        "disk", &cds->num_disks);
+                                        "vbd", &cds->num_disks);
 
     if (cds->num_nics == 0 && cds->num_disks == 0)
         goto out;

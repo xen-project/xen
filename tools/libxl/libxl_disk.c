@@ -628,7 +628,7 @@ libxl_device_disk *libxl_device_disk_list(libxl_ctx *ctx, uint32_t domid, int *n
 
     GC_INIT(ctx);
 
-    r = libxl__device_list(gc, &libxl__disk_devtype, domid, "disk", num);
+    r = libxl__device_list(gc, &libxl__disk_devtype, domid, "vbd", num);
 
     GC_FREE;
 
@@ -741,7 +741,7 @@ int libxl_cdrom_insert(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk,
         goto out;
     }
 
-    disks = libxl__device_list(gc, &libxl__disk_devtype, domid, "disk", &num);
+    disks = libxl__device_list(gc, &libxl__disk_devtype, domid, "vbd", &num);
     for (i = 0; i < num; i++) {
         if (disks[i].is_cdrom && !strcmp(disk->vdev, disks[i].vdev))
         {
