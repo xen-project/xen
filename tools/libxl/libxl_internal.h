@@ -19,6 +19,8 @@
 
 #include "libxl_osdeps.h" /* must come before any other headers */
 
+#include "xentoolcore_internal.h"
+
 #include "libxl_sr_stream_format.h"
 
 #include <assert.h>
