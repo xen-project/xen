@@ -45,6 +45,7 @@ obj-y += smpboot.o
 obj-y += sysctl.o
 obj-y += time.o
 obj-y += traps.o
+obj-y += vcpreg.o
 obj-y += vgic.o
 obj-y += vgic-v2.o
 obj-$(CONFIG_HAS_GICV3) += vgic-v3.o

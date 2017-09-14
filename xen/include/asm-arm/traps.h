@@ -27,6 +27,14 @@ void handle_wo_wi(struct cpu_user_regs *regs, int regidx, bool read,
 void handle_ro_raz(struct cpu_user_regs *regs, int regidx, bool read,
                    const union hsr hsr, int min_el);
 
+/* Co-processor registers emulation (see arch/arm/vcpreg.c). */
+void do_cp15_32(struct cpu_user_regs *regs, const union hsr hsr);
+void do_cp15_64(struct cpu_user_regs *regs, const union hsr hsr);
+void do_cp14_32(struct cpu_user_regs *regs, const union hsr hsr);
+void do_cp14_64(struct cpu_user_regs *regs, const union hsr hsr);
+void do_cp14_dbg(struct cpu_user_regs *regs, const union hsr hsr);
+void do_cp(struct cpu_user_regs *regs, const union hsr hsr);
+
 #endif /* __ASM_ARM_TRAPS__ */
 /*
  * Local variables:
