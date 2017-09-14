@@ -1,7 +1,5 @@
-#ifndef __ASM_ARM_SYSREGS_H
-#define __ASM_ARM_SYSREGS_H
-
-#ifdef CONFIG_ARM_64
+#ifndef __ASM_ARM_ARM64_SYSREGS_H
+#define __ASM_ARM_ARM64_SYSREGS_H
 
 #include <xen/stringify.h>
 
@@ -168,9 +166,7 @@
 #define ICH_AP1R2_EL2             __AP1Rx_EL2(2)
 #define ICH_AP1R3_EL2             __AP1Rx_EL2(3)
 
-#endif
-
-#endif
+#endif /* _ASM_ARM_ARM64_SYSREGS_H */
 
 /*
  * Local variables:

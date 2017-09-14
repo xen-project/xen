@@ -3,6 +3,8 @@
 
 #include <xen/stringify.h>
 
+#include <asm/arm64/sysregs.h>
+
 #ifndef __ASSEMBLY__
 
 /* Anonymous union includes both 32- and 64-bit names (e.g., r0/x0). */

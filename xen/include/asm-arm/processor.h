@@ -2,7 +2,6 @@
 #define __ASM_ARM_PROCESSOR_H
 
 #include <asm/cpregs.h>
-#include <asm/sysregs.h>
 #ifndef __ASSEMBLY__
 #include <xen/types.h>
 #endif
