@@ -223,26 +223,25 @@ static struct xs_handle *get_handle(const char *connect_to)
 {
 	struct stat buf;
 	struct xs_handle *h = NULL;
-	int fd = -1, saved_errno;
-
-	if (stat(connect_to, &buf) != 0)
-		goto err;
-
-	if (S_ISSOCK(buf.st_mode))
-		fd = get_socket(connect_to);
-	else
-		fd = get_dev(connect_to);
-
-	if (fd == -1)
-		goto err;
+	int saved_errno;
 
 	h = malloc(sizeof(*h));
 	if (h == NULL)
 		goto err;
 
 	memset(h, 0, sizeof(*h));
+	h->fd = -1;
 
-	h->fd = fd;
+	if (stat(connect_to, &buf) != 0)
+		goto err;
+
+	if (S_ISSOCK(buf.st_mode))
+		h->fd = get_socket(connect_to);
+	else
+		h->fd = get_dev(connect_to);
+
+	if (h->fd == -1)
+		goto err;
 
 	INIT_LIST_HEAD(&h->reply_list);
 	INIT_LIST_HEAD(&h->watch_list);
@@ -267,7 +266,10 @@ static struct xs_handle *get_handle(const char *connect_to)
 err:
 	saved_errno = errno;
 
-	if (fd >= 0) close(fd);
+	if (h) {
+		if (h->fd >= 0)
+			close(h->fd);
+	}
 	free(h);
 
 	errno = saved_errno;
