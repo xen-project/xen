@@ -1635,6 +1635,12 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
             goto end_search;
         }
 
+        if (!libxl_defbool_val(b_info->u.hvm.dm_restrict)) {
+            LOGD(DEBUG, guest_domid,
+                 "dm_restrict disabled, starting QEMU as root");
+            goto end_search;
+        }
+
         user = GCSPRINTF("%s%d", LIBXL_QEMU_USER_BASE, guest_domid);
         ret = libxl__dm_runas_helper(gc, user);
         if (ret < 0)
@@ -1652,9 +1658,10 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
             goto end_search;
         }
 
-        user = NULL;
-        LOGD(DEBUG, guest_domid, "Could not find user %s, starting QEMU as root",
-             LIBXL_QEMU_USER_SHARED);
+        LOGD(ERROR, guest_domid,
+             "Could not find user %s%d or %s, cannot restrict",
+             LIBXL_QEMU_USER_BASE, guest_domid, LIBXL_QEMU_USER_SHARED);
+        return ERROR_INVAL;
 
 end_search:
         if (user != NULL && strcmp(user, "root")) {

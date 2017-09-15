@@ -2250,8 +2250,6 @@ or
 B<xen-qemuuser-shared>
 (in which case different guests will not
 be protected against each other).
-And if you do not create the user,
-the restriction request will be silently ineffective!
 
 =item
 
