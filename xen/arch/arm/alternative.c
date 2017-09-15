@@ -46,17 +46,17 @@ struct alt_region {
 /*
  * Check if the target PC is within an alternative block.
  */
-static bool_t branch_insn_requires_update(const struct alt_instr *alt,
-                                          unsigned long pc)
+static bool branch_insn_requires_update(const struct alt_instr *alt,
+                                        unsigned long pc)
 {
     unsigned long replptr;
 
     if ( is_active_kernel_text(pc) )
-        return 1;
+        return true;
 
     replptr = (unsigned long)ALT_REPL_PTR(alt);
     if ( pc >= replptr && pc <= (replptr + alt->alt_len) )
-        return 0;
+        return false;
 
     /*
      * Branching into *another* alternate sequence is doomed, and
