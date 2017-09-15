@@ -132,7 +132,9 @@ int xenforeignmemory_unmap(xenforeignmemory_handle *fmem,
 int xenforeignmemory_restrict(xenforeignmemory_handle *fmem,
                               domid_t domid)
 {
-    return osdep_xenforeignmemory_restrict(fmem, domid);
+    int r = osdep_xenforeignmemory_restrict(fmem, domid);
+fprintf(stderr, "xenforeignmemory_restrict r=%d e=%d\n",r,errno);
+    return r;
 }
 
 /*

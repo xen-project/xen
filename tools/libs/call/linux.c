@@ -42,11 +42,13 @@ int osdep_xencall_open(xencall_handle *xcall)
      * Prefer the newer interface.
      */
     fd = open("/dev/xen/privcmd", O_RDWR|O_CLOEXEC);
+fprintf(stderr,"osdep_xencall_open /dev fd=%d e=%d\n",fd,errno);
 
     if ( fd == -1 && ( errno == ENOENT || errno == ENXIO || errno == ENODEV ))
     {
         /* Fallback to /proc/xen/privcmd */
         fd = open("/proc/xen/privcmd", O_RDWR|O_CLOEXEC);
+fprintf(stderr,"osdep_xencall_open /proc fd=%d e=%d\n",fd,errno);
     }
 
     if ( fd == -1 )

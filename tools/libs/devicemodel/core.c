@@ -566,7 +566,9 @@ int xendevicemodel_shutdown(
 
 int xendevicemodel_restrict(xendevicemodel_handle *dmod, domid_t domid)
 {
-    return osdep_xendevicemodel_restrict(dmod, domid);
+    int r = osdep_xendevicemodel_restrict(dmod, domid);
+fprintf(stderr, "xendevicemodel_restrict r=%d e=%d\n",r,errno);
+    return r;
 }
 
 /*
