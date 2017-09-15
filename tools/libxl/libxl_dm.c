@@ -23,6 +23,7 @@
 #include <xen/hvm/e820.h>
 #include <sys/types.h>
 #include <pwd.h>
+#include <grp.h>
 
 static const char *libxl_tapif_script(libxl__gc *gc)
 {
@@ -753,6 +754,9 @@ libxl__detect_gfx_passthru_kind(libxl__gc *gc,
  *  userlookup_helper_getpwnam(libxl__gc*, const char *user,
  *                             struct passwd **pwd_r);
  *
+ *  userlookup_helper_getpwuid(libxl__gc*, uid_t uid,
+ *                             struct passwd **pwd_r);
+ *
  *  returns 1 if the user was found, 0 if it was not, -1 on error
  */
 #define DEFINE_USERLOOKUP_HELPER(NAME,SPEC_TYPE,STRUCTNAME,SYSCONF)     \
@@ -791,6 +795,7 @@ libxl__detect_gfx_passthru_kind(libxl__gc *gc,
     }
 
 DEFINE_USERLOOKUP_HELPER(getpwnam, const char*, passwd, _SC_GETPW_R_SIZE_MAX);
+DEFINE_USERLOOKUP_HELPER(getpwuid, uid_t,       passwd, _SC_GETPW_R_SIZE_MAX);
 
 /* colo mode */
 enum {
@@ -951,6 +956,7 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
     uint64_t ram_size;
     const char *path, *chardev;
     char *user = NULL;
+    struct passwd *user_base;
 
     dm_args = flexarray_make(gc, 16, 1);
     dm_envs = flexarray_make(gc, 16, 1);
@@ -1659,6 +1665,32 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
             return ret;
         if (ret > 0)
             goto end_search;
+
+        ret = userlookup_helper_getpwnam(gc, LIBXL_QEMU_USER_RANGE_BASE,
+                                         &user_base);
+        if (ret < 0)
+            return ret;
+        if (ret > 0) {
+            struct passwd *user_clash;
+            uid_t intended_uid = user_base->pw_uid + guest_domid;
+            ret = userlookup_helper_getpwuid(gc, intended_uid, &user_clash);
+            if (ret < 0)
+                return ret;
+            if (ret > 0) {
+                LOGD(ERROR, guest_domid,
+                     "wanted to use uid %ld (%s + %d) but that is user %s !",
+                     (long)intended_uid, LIBXL_QEMU_USER_RANGE_BASE,
+                     guest_domid, user_clash->pw_name);
+                return ERROR_FAIL;
+            }
+            LOGD(DEBUG, guest_domid, "using uid %ld", (long)intended_uid);
+            flexarray_append(dm_args, "-runas");
+            flexarray_append(dm_args,
+                             GCSPRINTF("%ld:%ld", (long)intended_uid,
+                                       (long)user_base->pw_gid));
+            user = NULL; /* we have taken care of it */
+            goto end_search;
+        }
 
         user = LIBXL_QEMU_USER_SHARED;
         ret = userlookup_helper_getpwnam(gc, user, 0);

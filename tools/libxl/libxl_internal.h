@@ -4314,6 +4314,7 @@ _hidden int libxl__read_sysfs_file_contents(libxl__gc *gc,
 #define LIBXL_QEMU_USER_PREFIX "xen-qemuuser"
 #define LIBXL_QEMU_USER_BASE   LIBXL_QEMU_USER_PREFIX"-domid"
 #define LIBXL_QEMU_USER_SHARED LIBXL_QEMU_USER_PREFIX"-shared"
+#define LIBXL_QEMU_USER_RANGE_BASE LIBXL_QEMU_USER_PREFIX"-range-base"
 
 static inline bool libxl__acpi_defbool_val(const libxl_domain_build_info *b_info)
 {

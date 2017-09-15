@@ -2243,7 +2243,16 @@ For example, cdrom insert will fail.
 =item
 
 You must create user(s) for qemu to run as.
-Currently, you should either create
+
+Ideally, set aside a range of 32752 uids
+(from N to N+32751)
+and create a user
+whose name is B<xen-qemuuser-range-base>
+and whose uid is N
+and whose gid is a plain unprivileged gid.
+libxl will use one such user for each domid.
+
+Alternatively, either create
 B<xen-qemuuser-domid$domid>
 for every $domid from 1 to 32751 inclusive,
 or
