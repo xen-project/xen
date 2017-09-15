@@ -22,6 +22,11 @@
 
 #include "xentoolcore_internal.h"
 
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
+
 #include <pthread.h>
 #include <assert.h>
 
@@ -64,6 +69,27 @@ int xentoolcore_restrict_all(uint32_t domid) {
  out:
     unlock();
     return r;
+}
+
+int xentoolcore__restrict_by_dup2_null(int fd) {
+    int nullfd = -1, r;
+
+    if (fd < 0)
+        /* just in case */
+        return 0;
+
+    nullfd = open("/dev/null", O_RDONLY);
+    if (nullfd < 0) goto err;
+
+    r = dup2(nullfd, fd);
+    if (r < 0) goto err;
+
+    close(nullfd);
+    return 0;
+
+err:
+    if (nullfd >= 0) close(nullfd);
+    return -1;
 }
 
 /*

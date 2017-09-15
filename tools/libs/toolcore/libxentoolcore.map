@@ -3,5 +3,6 @@ VERS_1.0 {
 		xentoolcore_restrict_all;
 		xentoolcore__register_active_handle;
 		xentoolcore__deregister_active_handle;
+		xentoolcore__restrict_by_dup2_null;
 	local: *; /* Do not expose anything by default */
 };

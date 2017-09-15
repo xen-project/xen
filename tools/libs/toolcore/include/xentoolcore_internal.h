@@ -91,6 +91,18 @@ struct Xentoolcore__Active_Handle {
 void xentoolcore__register_active_handle(Xentoolcore__Active_Handle*);
 void xentoolcore__deregister_active_handle(Xentoolcore__Active_Handle*);
 
+/*
+ * Utility function for use in restrict_callback in libraries whose
+ * handles don't have a useful restrict function.  We neuter the fd by
+ * dup'ing /dev/null onto it.  This is better than closing it, because
+ * it does not involve locking against concurrent uses of in other
+ * threads.
+ *
+ * Returns the value that restrict_callback should return.
+ * fd may be < 0.
+ */
+int xentoolcore__restrict_by_dup2_null(int fd);
+
 /* ---------- convenient stuff ---------- */
 
 /*

@@ -15,39 +15,11 @@
 
 #include <stdlib.h>
 
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <unistd.h>
-
 #include "private.h"
 
 static int all_restrict_cb(Xentoolcore__Active_Handle *ah, uint32_t domid) {
     xencall_handle *xcall = CONTAINER_OF(ah, *xcall, tc_ah);
-    int nullfd = -1, r;
-
-    if (xcall->fd < 0)
-        /* just in case */
-        return 0;
-
-    /*
-     * We don't implement a restrict function.  We neuter the fd by
-     * dup'ing /dev/null onto it.  This is better than closing it,
-     * because it does not involve locking against concurrent uses
-     * of xencall in other threads.
-     */
-    nullfd = open("/dev/null", O_RDONLY);
-    if (nullfd < 0) goto err;
-
-    r = dup2(nullfd, xcall->fd);
-    if (r < 0) goto err;
-
-    close(nullfd);
-    return 0;
-
-err:
-    if (nullfd >= 0) close(nullfd);
-    return -1;
+    return xentoolcore__restrict_by_dup2_null(xcall->fd);
 }
 
 xencall_handle *xencall_open(xentoollog_logger *logger, unsigned open_flags)
