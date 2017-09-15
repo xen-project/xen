@@ -59,7 +59,7 @@ struct init_info __initdata init_data =
 /* Shared state for coordinating CPU bringup */
 unsigned long smp_up_cpu = MPIDR_INVALID;
 /* Shared state for coordinating CPU teardown */
-static bool_t cpu_is_dead = 0;
+static bool cpu_is_dead;
 
 /* ID of the PCPU we're running on */
 DEFINE_PER_CPU(unsigned int, cpu_id);
@@ -105,7 +105,7 @@ static void __init dt_smp_init_cpus(void)
     {
         [0 ... NR_CPUS - 1] = MPIDR_INVALID
     };
-    bool_t bootcpu_valid = 0;
+    bool bootcpu_valid = false;
     int rc;
 
     mpidr = boot_cpu_data.mpidr.bits & MPIDR_HWID_MASK;
@@ -197,7 +197,7 @@ static void __init dt_smp_init_cpus(void)
         if ( hwid == mpidr )
         {
             i = 0;
-            bootcpu_valid = 1;
+            bootcpu_valid = true;
         }
         else
             i = cpuidx++;
@@ -352,7 +352,7 @@ void __cpu_disable(void)
 void stop_cpu(void)
 {
     local_irq_disable();
-    cpu_is_dead = 1;
+    cpu_is_dead = true;
     /* Make sure the write happens before we sleep forever */
     dsb(sy);
     isb();
@@ -454,7 +454,7 @@ void __cpu_die(unsigned int cpu)
             printk(KERN_ERR "CPU %u still not dead...\n", cpu);
         smp_mb();
     }
-    cpu_is_dead = 0;
+    cpu_is_dead = false;
     smp_mb();
 }
 
