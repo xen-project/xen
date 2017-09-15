@@ -43,8 +43,10 @@
  *  ====================================================================
  *  IMPORTANT - IMPLEMENTATION STATUS
  *
- *  This function will be implemented insofar as it appears necessary
- *  for the purposes of running a deprivileged qemu.
+ *  This function has been implemented insofar as it appears necessary
+ *  for the purposes of running a deprivileged qemu, and is believed to
+ *  be sufficient (subject to the caveats discussed in the appropriate
+ *  libxl documentation for this feature).
  *
  *  However, this function is NOT implemented for all Xen libraries.
  *  For each use case of this function, the designer must evaluate and
