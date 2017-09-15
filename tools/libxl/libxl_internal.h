@@ -3461,28 +3461,46 @@ _hidden void libxl__bootloader_run(libxl__egc*, libxl__bootloader_state *st);
     LIBXL_DEFINE_DEVICE_REMOVE_EXT(type, type, remove, 0)               \
     LIBXL_DEFINE_DEVICE_REMOVE_EXT(type, type, destroy, 1)
 
+typedef void (*device_add_fn_t)(libxl__egc *, libxl__ao *, uint32_t,
+                                libxl_domain_config *, libxl__multidev *);
+typedef void *(*device_list_fn_t)(libxl_ctx *, uint32_t, int *);
+typedef int (*device_set_default_fn_t)(libxl__gc *, uint32_t, void *, bool);
+typedef int (*device_to_device_fn_t)(libxl__gc *, uint32_t, void *,
+                                     libxl__device *);
+typedef void (*device_init_fn_t)(void *);
+typedef void (*device_copy_fn_t)(libxl_ctx *, void *, void *);
+typedef void (*device_dispose_fn_t)(void *);
+typedef int (*device_compare_fn_t)(void *, void *);
+typedef void (*device_merge_fn_t)(libxl_ctx *, void *, void *);
+typedef int (*device_dm_needed_fn_t)(void *, unsigned);
+typedef void (*device_update_config_fn_t)(libxl__gc *, void *, void *);
+typedef int (*device_update_devid_fn_t)(libxl__gc *, uint32_t, void *);
+typedef int (*device_from_xenstore_fn_t)(libxl__gc *, const char *,
+                                         libxl_devid, void *);
+typedef int (*device_set_xenstore_config_fn_t)(libxl__gc *, uint32_t, void *,
+                                               flexarray_t *, flexarray_t *,
+                                               flexarray_t *);
+
 struct libxl_device_type {
     char *type;
     int skip_attach;   /* Skip entry in domcreate_attach_devices() if 1 */
     int ptr_offset;    /* Offset of device array ptr in libxl_domain_config */
     int num_offset;    /* Offset of # of devices in libxl_domain_config */
     int dev_elem_size; /* Size of one device element in array */
-    void (*add)(libxl__egc *, libxl__ao *, uint32_t, libxl_domain_config *,
-                libxl__multidev *);
-    void *(*list)(libxl_ctx *, uint32_t, int *);
-    int (*set_default)(libxl__gc *, uint32_t, void *, bool);
-    int (*to_device)(libxl__gc *, uint32_t, void *, libxl__device *);
-    void (*init)(void *);
-    void (*copy)(libxl_ctx *, void *, void *);
-    void (*dispose)(void *);
-    int (*compare)(void *, void *);
-    void (*merge)(libxl_ctx *, void *, void *);
-    int (*dm_needed)(void *, unsigned);
-    void (*update_config)(libxl__gc *, void *, void *);
-    int (*update_devid)(libxl__gc *, uint32_t, void *);
-    int (*from_xenstore)(libxl__gc *, const char *, libxl_devid, void *);
-    int (*set_xenstore_config)(libxl__gc *, uint32_t, void *, flexarray_t *,
-                               flexarray_t *, flexarray_t *);
+    device_add_fn_t                 add;
+    device_list_fn_t                list;
+    device_set_default_fn_t         set_default;
+    device_to_device_fn_t           to_device;
+    device_init_fn_t                init;
+    device_copy_fn_t                copy;
+    device_dispose_fn_t             dispose;
+    device_compare_fn_t             compare;
+    device_merge_fn_t               merge;
+    device_dm_needed_fn_t           dm_needed;
+    device_update_config_fn_t       update_config;
+    device_update_devid_fn_t        update_devid;
+    device_from_xenstore_fn_t       from_xenstore;
+    device_set_xenstore_config_fn_t set_xenstore_config;
 };
 
 #define DEFINE_DEVICE_TYPE_STRUCT_X(name, sname, ...)                          \
@@ -3492,20 +3510,17 @@ struct libxl_device_type {
         .num_offset    = offsetof(libxl_domain_config, num_ ## name ## s),     \
         .dev_elem_size = sizeof(libxl_device_ ## sname),                       \
         .add           = libxl__add_ ## name ## s,                             \
-        .list          = (void *(*)(libxl_ctx *, uint32_t, int *))             \
-                         libxl_device_ ## sname ## _list,                      \
-        .set_default   = (int (*)(libxl__gc *, uint32_t, void *, bool))\
+        .list          = (device_list_fn_t)libxl_device_ ## sname ## _list,    \
+        .set_default   = (device_set_default_fn_t)                             \
                          libxl__device_ ## sname ## _setdefault,               \
-        .to_device     = (int (*)(libxl__gc *, uint32_t,                       \
-                                  void *, libxl__device *))                    \
-                         libxl__device_from_ ## name,                          \
-        .init          = (void (*)(void *))libxl_device_ ## sname ## _init,    \
-        .copy          = (void (*)(libxl_ctx *, void *, void *))               \
-                         libxl_device_ ## sname ## _copy,                      \
-        .dispose       = (void (*)(void *))libxl_device_ ## sname ## _dispose, \
-        .compare       = (int (*)(void *, void *))                             \
+        .to_device     = (device_to_device_fn_t)libxl__device_from_ ## name,   \
+        .init          = (device_init_fn_t)libxl_device_ ## sname ## _init,    \
+        .copy          = (device_copy_fn_t)libxl_device_ ## sname ## _copy,    \
+        .dispose       = (device_dispose_fn_t)                                 \
+                         libxl_device_ ## sname ## _dispose,                   \
+        .compare       = (device_compare_fn_t)                                 \
                          libxl_device_ ## sname ## _compare,                   \
-        .update_devid  = (int (*)(libxl__gc *, uint32_t, void *))              \
+        .update_devid  = (device_update_devid_fn_t)                            \
                          libxl__device_ ## sname ## _update_devid,             \
         __VA_ARGS__                                                            \
     }

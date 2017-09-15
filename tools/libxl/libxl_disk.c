@@ -1206,9 +1206,8 @@ static int libxl_device_disk_dm_needed(void *e, unsigned domid)
 DEFINE_DEVICE_TYPE_STRUCT(disk,
     .merge       = libxl_device_disk_merge,
     .dm_needed   = libxl_device_disk_dm_needed,
-    .from_xenstore = (int (*)(libxl__gc *, const char *, libxl_devid, void *))
-                     libxl__disk_from_xenstore,
-    .skip_attach = 1
+    .from_xenstore = (device_from_xenstore_fn_t)libxl__disk_from_xenstore,
+    .skip_attach = 1,
 );
 
 /*

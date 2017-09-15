@@ -542,12 +542,9 @@ LIBXL_DEFINE_DEVICE_REMOVE(nic)
 
 DEFINE_DEVICE_TYPE_STRUCT(nic,
     .update_config = libxl_device_nic_update_config,
-    .from_xenstore = (int (*)(libxl__gc *, const char *, libxl_devid, void *))
-                     libxl__nic_from_xenstore,
-    .set_xenstore_config = (int (*)(libxl__gc *, uint32_t, void *,
-                                    flexarray_t *back, flexarray_t *front,
-                                    flexarray_t *ro_front))
-                           libxl__set_xenstore_nic
+    .from_xenstore = (device_from_xenstore_fn_t)libxl__nic_from_xenstore,
+    .set_xenstore_config = (device_set_xenstore_config_fn_t)
+                           libxl__set_xenstore_nic,
 );
 
 /*

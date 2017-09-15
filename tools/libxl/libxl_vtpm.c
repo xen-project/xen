@@ -263,12 +263,9 @@ LIBXL_DEFINE_DEVICE_REMOVE(vtpm)
 
 DEFINE_DEVICE_TYPE_STRUCT(vtpm,
     .update_config = libxl_device_vtpm_update_config,
-    .from_xenstore = (int (*)(libxl__gc *, const char *, libxl_devid, void *))
-                     libxl__vtpm_from_xenstore,
-    .set_xenstore_config = (int (*)(libxl__gc *, uint32_t, void *,
-                                    flexarray_t *back, flexarray_t *front,
-                                    flexarray_t *ro_front))
-                           libxl__set_xenstore_vtpm
+    .from_xenstore = (device_from_xenstore_fn_t)libxl__vtpm_from_xenstore,
+    .set_xenstore_config = (device_set_xenstore_config_fn_t)
+                           libxl__set_xenstore_vtpm,
 );
 
 /*

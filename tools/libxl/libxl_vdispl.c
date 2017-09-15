@@ -269,13 +269,9 @@ LIBXL_DEFINE_DEVICE_REMOVE(vdispl)
 static LIBXL_DEFINE_UPDATE_DEVID(vdispl, "vdispl")
 
 DEFINE_DEVICE_TYPE_STRUCT(vdispl,
-    .update_config = (void (*)(libxl__gc *, void *, void *))
-                     libxl__update_config_vdispl,
-    .from_xenstore = (int (*)(libxl__gc *, const char *, libxl_devid, void *))
-                     libxl__vdispl_from_xenstore,
-    .set_xenstore_config = (int (*)(libxl__gc *, uint32_t, void *,
-                                    flexarray_t *back, flexarray_t *front,
-                                    flexarray_t *ro_front))
+    .update_config = (device_update_config_fn_t)libxl__update_config_vdispl,
+    .from_xenstore = (device_from_xenstore_fn_t)libxl__vdispl_from_xenstore,
+    .set_xenstore_config = (device_set_xenstore_config_fn_t)
                            libxl__set_xenstore_vdispl
 );
 

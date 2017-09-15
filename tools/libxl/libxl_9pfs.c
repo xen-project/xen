@@ -60,8 +60,6 @@ LIBXL_DEFINE_DEVICE_REMOVE(p9)
 
 DEFINE_DEVICE_TYPE_STRUCT(p9,
     .skip_attach = 1,
-    .set_xenstore_config = (int (*)(libxl__gc *, uint32_t, void *,
-                                    flexarray_t *back, flexarray_t *front,
-                                    flexarray_t *ro_front))
-                           libxl__set_xenstore_p9
+    .set_xenstore_config = (device_set_xenstore_config_fn_t)
+                           libxl__set_xenstore_p9,
 );
