@@ -244,6 +244,7 @@ subdir-all-qemu-xen-dir: qemu-xen-dir-find
 		-DXC_WANT_COMPAT_MAP_FOREIGN_API=1 \
 		-DXC_WANT_COMPAT_DEVICEMODEL_API=1 \
 		-I$(XEN_ROOT)/tools/include \
+		-I$(XEN_ROOT)/tools/libs/toolcore/include \
 		-I$(XEN_ROOT)/tools/libs/toollog/include \
 		-I$(XEN_ROOT)/tools/libs/evtchn/include \
 		-I$(XEN_ROOT)/tools/libs/gnttab/include \
@@ -255,10 +256,12 @@ subdir-all-qemu-xen-dir: qemu-xen-dir-find
 		$(EXTRA_CFLAGS_QEMU_XEN)" \
 		--extra-ldflags="-L$(XEN_ROOT)/tools/libxc \
 		-L$(XEN_ROOT)/tools/xenstore \
+		-L$(XEN_ROOT)/tools/libs/toolcore \
 		-L$(XEN_ROOT)/tools/libs/evtchn \
 		-L$(XEN_ROOT)/tools/libs/gnttab \
 		-L$(XEN_ROOT)/tools/libs/foreignmemory \
 		-L$(XEN_ROOT)/tools/libs/devicemodel \
+		-Wl,-rpath-link=$(XEN_ROOT)/tools/libs/toolcore \
 		-Wl,-rpath-link=$(XEN_ROOT)/tools/libs/toollog \
 		-Wl,-rpath-link=$(XEN_ROOT)/tools/libs/evtchn \
 		-Wl,-rpath-link=$(XEN_ROOT)/tools/libs/gnttab \
