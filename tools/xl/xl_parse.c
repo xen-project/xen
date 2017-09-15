@@ -2274,6 +2274,9 @@ skip_usbdev:
 
             b_info->u.hvm.vendor_device = d;
         }
+
+        xlu_cfg_get_defbool(config, "dm_restrict",
+                            &b_info->u.hvm.dm_restrict, 0);
     }
 
     if (!xlu_cfg_get_string (config, "gic_version", &buf, 1)) {

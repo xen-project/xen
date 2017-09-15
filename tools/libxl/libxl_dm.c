@@ -641,6 +641,12 @@ static int libxl__build_device_model_args_old(libxl__gc *gc,
             flexarray_append(dm_args, "-nographic");
     }
 
+    if (libxl_defbool_val(b_info->u.hvm.dm_restrict)) {
+        LOGD(ERROR, domid,
+             "dm_restrict not supported by qemu-xen-traditional");
+        return ERROR_INVAL;
+    }
+
     if (state->saved_state) {
         flexarray_vappend(dm_args, "-loadvm", state->saved_state, NULL);
     }
@@ -1396,6 +1402,9 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
             flexarray_append(dm_args, "-nographic");
         }
     }
+
+    if (libxl_defbool_val(b_info->u.hvm.dm_restrict))
+        flexarray_append(dm_args, "-xen-domid-restrict");
 
     if (state->saved_state) {
         /* This file descriptor is meant to be used by QEMU */
