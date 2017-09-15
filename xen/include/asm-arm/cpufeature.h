@@ -53,10 +53,10 @@
 
 extern DECLARE_BITMAP(cpu_hwcaps, ARM_NCAPS);
 
-static inline bool_t cpus_have_cap(unsigned int num)
+static inline bool cpus_have_cap(unsigned int num)
 {
     if ( num >= ARM_NCAPS )
-        return 0;
+        return false;
 
     return test_bit(num, cpu_hwcaps);
 }
@@ -73,7 +73,7 @@ static inline void cpus_set_cap(unsigned int num)
 struct arm_cpu_capabilities {
     const char *desc;
     u16 capability;
-    bool_t (*matches)(const struct arm_cpu_capabilities *);
+    bool (*matches)(const struct arm_cpu_capabilities *);
     union {
         struct {    /* To be used for eratum handling only */
             u32 midr_model;

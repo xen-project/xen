@@ -7,7 +7,7 @@
     .midr_range_min = min,              \
     .midr_range_max = max
 
-static bool_t __maybe_unused
+static bool __maybe_unused
 is_affected_midr_range(const struct arm_cpu_capabilities *entry)
 {
     return MIDR_IS_CPU_MODEL_RANGE(boot_cpu_data.midr.bits, entry->midr_model,

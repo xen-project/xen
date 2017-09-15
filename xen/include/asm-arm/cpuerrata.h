@@ -9,13 +9,13 @@ void check_local_cpu_errata(void);
 #ifdef CONFIG_HAS_ALTERNATIVE
 
 #define CHECK_WORKAROUND_HELPER(erratum, feature, arch)         \
-static inline bool_t check_workaround_##erratum(void)           \
+static inline bool check_workaround_##erratum(void)             \
 {                                                               \
     if ( !IS_ENABLED(arch) )                                    \
-        return 0;                                               \
+        return false;                                           \
     else                                                        \
     {                                                           \
-        bool_t ret;                                             \
+        bool ret;                                               \
                                                                 \
         asm volatile (ALTERNATIVE("mov %0, #0",                 \
                                   "mov %0, #1",                 \
@@ -29,10 +29,10 @@ static inline bool_t check_workaround_##erratum(void)           \
 #else /* CONFIG_HAS_ALTERNATIVE */
 
 #define CHECK_WORKAROUND_HELPER(erratum, feature, arch)         \
-static inline bool_t check_workaround_##erratum(void)           \
+static inline bool check_workaround_##erratum(void)             \
 {                                                               \
     if ( !IS_ENABLED(arch) )                                    \
-        return 0;                                               \
+        return false;                                           \
     else                                                        \
         return unlikely(cpus_have_cap(feature));                \
 }
