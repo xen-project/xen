@@ -1961,10 +1961,16 @@ static void do_trap_instr_abort_guest(struct cpu_user_regs *regs,
                                       const union hsr hsr)
 {
     int rc;
-    register_t gva = READ_SYSREG(FAR_EL2);
+    register_t gva;
     uint8_t fsc = hsr.iabt.ifsc & ~FSC_LL_MASK;
     paddr_t gpa;
     mfn_t mfn;
+
+#ifdef CONFIG_ARM_32
+    gva = READ_CP32(HIFAR);
+#else
+    gva = READ_SYSREG64(FAR_EL2);
+#endif
 
     /*
      * If this bit has been set, it means that this instruction abort is caused

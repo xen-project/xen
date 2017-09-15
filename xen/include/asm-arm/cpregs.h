@@ -307,7 +307,6 @@
 #define ESR_EL1                 DFSR
 #define ESR_EL2                 HSR
 #define FAR_EL1                 HIFAR
-#define FAR_EL2                 HIFAR
 #define HCR_EL2                 HCR
 #define HPFAR_EL2               HPFAR
 #define HSTR_EL2                HSTR
