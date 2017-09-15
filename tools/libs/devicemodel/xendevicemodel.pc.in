@@ -7,4 +7,4 @@ Description: The Xendevicemodel library for Xen hypervisor
 Version: @@version@@
 Cflags: -I${includedir} @@cflagslocal@@
 Libs: @@libsflag@@${libdir} -lxendevicemodel
-Requires.private: xentoollog,xencall
+Requires.private: xentoolcore,xentoollog,xencall

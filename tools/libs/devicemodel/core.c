@@ -21,6 +21,16 @@
 
 #include "private.h"
 
+static int all_restrict_cb(Xentoolcore__Active_Handle *ah, uint32_t domid) {
+    xendevicemodel_handle *dmod = CONTAINER_OF(ah, *dmod, tc_ah);
+
+    if (dmod->fd < 0)
+        /* just in case */
+        return 0;
+
+    return xendevicemodel_restrict(dmod, domid);
+}
+
 xendevicemodel_handle *xendevicemodel_open(xentoollog_logger *logger,
                                            unsigned open_flags)
 {
@@ -29,6 +39,10 @@ xendevicemodel_handle *xendevicemodel_open(xentoollog_logger *logger,
 
     if (!dmod)
         return NULL;
+
+    dmod->fd = -1;
+    dmod->tc_ah.restrict_callback = all_restrict_cb;
+    xentoolcore__register_active_handle(&dmod->tc_ah);
 
     dmod->flags = open_flags;
     dmod->logger = logger;
@@ -55,6 +69,7 @@ xendevicemodel_handle *xendevicemodel_open(xentoollog_logger *logger,
 err:
     xtl_logger_destroy(dmod->logger_tofree);
     xencall_close(dmod->xcall);
+    xentoolcore__deregister_active_handle(&dmod->tc_ah);
     free(dmod);
     return NULL;
 }
@@ -69,6 +84,7 @@ int xendevicemodel_close(xendevicemodel_handle *dmod)
     rc = osdep_xendevicemodel_close(dmod);
 
     xencall_close(dmod->xcall);
+    xentoolcore__deregister_active_handle(&dmod->tc_ah);
     xtl_logger_destroy(dmod->logger_tofree);
     free(dmod);
     return rc;

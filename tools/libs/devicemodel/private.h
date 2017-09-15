@@ -7,11 +7,14 @@
 #include <xendevicemodel.h>
 #include <xencall.h>
 
+#include <xentoolcore_internal.h>
+
 struct xendevicemodel_handle {
     xentoollog_logger *logger, *logger_tofree;
     unsigned int flags;
     xencall_handle *xcall;
     int fd;
+    Xentoolcore__Active_Handle tc_ah;
 };
 
 struct xendevicemodel_buf {
