@@ -19,6 +19,16 @@
 
 #include "private.h"
 
+static int all_restrict_cb(Xentoolcore__Active_Handle *ah, uint32_t domid) {
+    xenforeignmemory_handle *fmem = CONTAINER_OF(ah, *fmem, tc_ah);
+
+    if (fmem->fd < 0)
+        /* just in case */
+        return 0;
+
+    return xenforeignmemory_restrict(fmem, domid);
+}
+
 xenforeignmemory_handle *xenforeignmemory_open(xentoollog_logger *logger,
                                                unsigned open_flags)
 {
@@ -30,6 +40,9 @@ xenforeignmemory_handle *xenforeignmemory_open(xentoollog_logger *logger,
     fmem->fd = -1;
     fmem->logger = logger;
     fmem->logger_tofree = NULL;
+
+    fmem->tc_ah.restrict_callback = all_restrict_cb;
+    xentoolcore__register_active_handle(&fmem->tc_ah);
 
     if (!fmem->logger) {
         fmem->logger = fmem->logger_tofree =
@@ -45,6 +58,7 @@ xenforeignmemory_handle *xenforeignmemory_open(xentoollog_logger *logger,
 
 err:
     osdep_xenforeignmemory_close(fmem);
+    xentoolcore__deregister_active_handle(&fmem->tc_ah);
     xtl_logger_destroy(fmem->logger_tofree);
     free(fmem);
     return NULL;
@@ -58,6 +72,7 @@ int xenforeignmemory_close(xenforeignmemory_handle *fmem)
         return 0;
 
     rc = osdep_xenforeignmemory_close(fmem);
+    xentoolcore__deregister_active_handle(&fmem->tc_ah);
     xtl_logger_destroy(fmem->logger_tofree);
     free(fmem);
     return rc;

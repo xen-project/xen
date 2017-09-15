@@ -5,6 +5,8 @@
 
 #include <xenforeignmemory.h>
 
+#include <xentoolcore_internal.h>
+
 #include <xen/xen.h>
 #include <xen/sys/privcmd.h>
 
@@ -20,6 +22,7 @@ struct xenforeignmemory_handle {
     xentoollog_logger *logger, *logger_tofree;
     unsigned flags;
     int fd;
+    Xentoolcore__Active_Handle tc_ah;
 };
 
 int osdep_xenforeignmemory_open(xenforeignmemory_handle *fmem);
