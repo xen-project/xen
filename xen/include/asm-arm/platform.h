@@ -55,8 +55,8 @@ int platform_cpu_up(int cpu);
 #endif
 void platform_reset(void);
 void platform_poweroff(void);
-bool_t platform_has_quirk(uint32_t quirk);
-bool_t platform_device_is_blacklisted(const struct dt_device_node *node);
+bool platform_has_quirk(uint32_t quirk);
+bool platform_device_is_blacklisted(const struct dt_device_node *node);
 
 #define PLATFORM_START(_name, _namestr)                         \
 static const struct platform_desc  __plat_desc_##_name __used   \

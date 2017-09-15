@@ -28,20 +28,20 @@ extern const struct platform_desc _splatform[], _eplatform[];
 static const struct platform_desc *platform;
 
 
-static bool_t __init platform_is_compatible(const struct platform_desc *plat)
+static bool __init platform_is_compatible(const struct platform_desc *plat)
 {
     const char *const *compat;
 
     if ( !plat->compatible )
-        return 0;
+        return false;
 
     for ( compat = plat->compatible; *compat; compat++ )
     {
         if ( dt_machine_is_compatible(*compat) )
-            return 1;
+            return true;
     }
 
-    return 0;
+    return false;
 }
 
 void __init platform_init(void)
@@ -127,17 +127,17 @@ void platform_poweroff(void)
         platform->poweroff();
 }
 
-bool_t platform_has_quirk(uint32_t quirk)
+bool platform_has_quirk(uint32_t quirk)
 {
     uint32_t quirks = 0;
 
     if ( platform && platform->quirks )
         quirks = platform->quirks();
 
-    return !!(quirks & quirk);
+    return (quirks & quirk);
 }
 
-bool_t platform_device_is_blacklisted(const struct dt_device_node *node)
+bool platform_device_is_blacklisted(const struct dt_device_node *node)
 {
     const struct dt_device_match *blacklist = NULL;
 

@@ -27,7 +27,7 @@
 #include <asm/platform.h>
 #include <asm/io.h>
 
-static bool_t secure_firmware;
+static bool secure_firmware;
 
 #define EXYNOS_ARM_CORE0_CONFIG     0x2000
 #define EXYNOS_ARM_CORE_CONFIG(_nr) (EXYNOS_ARM_CORE0_CONFIG + (0x80 * (_nr)))
@@ -108,7 +108,7 @@ static int __init exynos5_smp_init(void)
         /* Have to use sysram_ns_base_addr + 0x1c for boot address */
         compatible = "samsung,exynos4210-sysram-ns";
         sysram_offset = 0x1c;
-        secure_firmware = 1;
+        secure_firmware = true;
         printk("Running under secure firmware.\n");
     }
     else
