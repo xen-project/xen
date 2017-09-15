@@ -35,6 +35,8 @@
 #include "list.h"
 #include "utils.h"
 
+#include <xentoolcore_internal.h>
+
 struct xs_stored_msg {
 	struct list_head list;
 	struct xsd_sockmsg hdr;
@@ -48,6 +50,7 @@ struct xs_stored_msg {
 struct xs_handle {
 	/* Communications channel to xenstore daemon. */
 	int fd;
+	Xentoolcore__Active_Handle tc_ah; /* for restrict */
 
 	/*
          * A read thread which pulls messages off the comms channel and
@@ -122,6 +125,7 @@ static void *read_thread(void *arg);
 
 struct xs_handle {
 	int fd;
+	Xentoolcore__Active_Handle tc_ah; /* for restrict */
 	struct list_head reply_list;
 	struct list_head watch_list;
 	/* Clients can select() on this pipe to wait for a watch to fire. */
@@ -219,6 +223,11 @@ static int get_dev(const char *connect_to)
 	return open(connect_to, O_RDWR);
 }
 
+static int all_restrict_cb(Xentoolcore__Active_Handle *ah, uint32_t domid) {
+    struct xs_handle *h = CONTAINER_OF(ah, *h, tc_ah);
+    return xentoolcore__restrict_by_dup2_null(h->fd);
+}
+
 static struct xs_handle *get_handle(const char *connect_to)
 {
 	struct stat buf;
@@ -231,6 +240,9 @@ static struct xs_handle *get_handle(const char *connect_to)
 
 	memset(h, 0, sizeof(*h));
 	h->fd = -1;
+
+	h->tc_ah.restrict_callback = all_restrict_cb;
+	xentoolcore__register_active_handle(&h->tc_ah);
 
 	if (stat(connect_to, &buf) != 0)
 		goto err;
@@ -269,6 +281,7 @@ err:
 	if (h) {
 		if (h->fd >= 0)
 			close(h->fd);
+		xentoolcore__deregister_active_handle(&h->tc_ah);
 	}
 	free(h);
 
@@ -330,6 +343,7 @@ static void close_fds_free(struct xs_handle *h) {
 	}
 
         close(h->fd);
+	xentoolcore__deregister_active_handle(&h->tc_ah);
         
 	free(h);
 }
