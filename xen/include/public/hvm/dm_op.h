@@ -357,6 +357,17 @@ struct xen_dm_op_map_mem_type_to_ioreq_server {
                            has to be set to zero by the caller */
 };
 
+/*
+ * XEN_DMOP_remote_shutdown : Declare a shutdown for another domain
+ *                            Identical to SCHEDOP_remote_shutdown
+ */
+#define XEN_DMOP_remote_shutdown 16
+
+struct xen_dm_op_remote_shutdown {
+    uint32_t reason;       /* SHUTDOWN_* => enum sched_shutdown_reason */
+                           /* (Other reason values are not blocked) */
+};
+
 struct xen_dm_op {
     uint32_t op;
     uint32_t pad;
@@ -377,6 +388,7 @@ struct xen_dm_op {
         struct xen_dm_op_inject_msi inject_msi;
         struct xen_dm_op_map_mem_type_to_ioreq_server
                 map_mem_type_to_ioreq_server;
+        struct xen_dm_op_remote_shutdown remote_shutdown;
     } u;
 };
 

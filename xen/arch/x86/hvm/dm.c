@@ -629,6 +629,15 @@ static int dm_op(const struct dmop_args *op_args)
         break;
     }
 
+    case XEN_DMOP_remote_shutdown:
+    {
+        const struct xen_dm_op_remote_shutdown *data =
+            &op.u.remote_shutdown;
+
+        domain_shutdown(d, data->reason);
+        break;
+    }
+
     default:
         rc = -EOPNOTSUPP;
         break;
@@ -657,6 +666,7 @@ CHECK_dm_op_modified_memory;
 CHECK_dm_op_set_mem_type;
 CHECK_dm_op_inject_event;
 CHECK_dm_op_inject_msi;
+CHECK_dm_op_remote_shutdown;
 
 int compat_dm_op(domid_t domid,
                  unsigned int nr_bufs,
