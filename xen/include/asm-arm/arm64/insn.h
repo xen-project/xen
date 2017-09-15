@@ -55,7 +55,7 @@ enum aarch64_insn_branch_type {
 };
 
 #define	__AARCH64_INSN_FUNCS(abbr, mask, val)	\
-static always_inline bool_t aarch64_insn_is_##abbr(u32 code) \
+static always_inline bool aarch64_insn_is_##abbr(u32 code) \
 { return (code & (mask)) == (val); } \
 static always_inline u32 aarch64_insn_get_##abbr##_value(void) \
 { return (val); }

@@ -12,7 +12,7 @@ unsigned long raw_copy_from_guest(void *to, const void *from, unsigned len);
 unsigned long raw_clear_guest(void *to, unsigned len);
 
 int access_guest_memory_by_ipa(struct domain *d, paddr_t ipa, void *buf,
-                               uint32_t size, bool_t is_write);
+                               uint32_t size, bool is_write);
 
 #define __raw_copy_to_guest raw_copy_to_guest
 #define __raw_copy_from_guest raw_copy_from_guest

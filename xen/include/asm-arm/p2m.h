@@ -82,10 +82,10 @@ struct p2m_domain {
      * If true, and an access fault comes in and there is no vm_event listener,
      * pause domain. Otherwise, remove access restrictions.
      */
-    bool_t access_required;
+    bool access_required;
 
     /* Defines if mem_access is in use for the domain. */
-    bool_t mem_access_enabled;
+    bool mem_access_enabled;
 
     /*
      * Default P2M access type for each page in the the domain: new pages,
@@ -338,9 +338,9 @@ static inline int get_page_and_type(struct page_info *page,
 /* get host p2m table */
 #define p2m_get_hostp2m(d) (&(d)->arch.p2m)
 
-static inline bool_t p2m_vm_event_sanity_check(struct domain *d)
+static inline bool p2m_vm_event_sanity_check(struct domain *d)
 {
-    return 1;
+    return true;
 }
 
 /*
