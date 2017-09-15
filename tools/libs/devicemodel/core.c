@@ -532,6 +532,22 @@ int xendevicemodel_inject_event(
     return xendevicemodel_op(dmod, domid, 1, &op, sizeof(op));
 }
 
+int xendevicemodel_shutdown(
+    xendevicemodel_handle *dmod, domid_t domid, unsigned int reason)
+{
+    struct xen_dm_op op;
+    struct xen_dm_op_remote_shutdown *data;
+
+    memset(&op, 0, sizeof(op));
+
+    op.op = XEN_DMOP_remote_shutdown;
+    data = &op.u.remote_shutdown;
+
+    data->reason = reason;
+
+    return xendevicemodel_op(dmod, domid, 1, &op, sizeof(op));
+}
+
 int xendevicemodel_restrict(xendevicemodel_handle *dmod, domid_t domid)
 {
     return osdep_xendevicemodel_restrict(dmod, domid);

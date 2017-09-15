@@ -317,6 +317,15 @@ int xendevicemodel_inject_event(
     uint8_t type, uint32_t error_code, uint8_t insn_len, uint64_t cr2);
 
 /**
+ * Shuts the domain down.
+ *
+ * @parm reason usually enum sched_shutdown_reason, see xen/sched.h
+ * @return 0 on success, -1 on failure.
+ */
+int xendevicemodel_shutdown(
+    xendevicemodel_handle *dmod, domid_t domid, unsigned int reason);
+
+/**
  * This function restricts the use of this handle to the specified
  * domain.
  *

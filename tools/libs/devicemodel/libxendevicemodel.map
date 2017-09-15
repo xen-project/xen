@@ -1,4 +1,4 @@
-VERS_1.0 {
+VERS_1.1 {
 	global:
 		xendevicemodel_open;
 		xendevicemodel_create_ioreq_server;
@@ -18,6 +18,7 @@ VERS_1.0 {
 		xendevicemodel_modified_memory;
 		xendevicemodel_set_mem_type;
 		xendevicemodel_inject_event;
+		xendevicemodel_shutdown;
 		xendevicemodel_restrict;
 		xendevicemodel_close;
 	local: *; /* Do not expose anything by default */
