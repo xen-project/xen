@@ -749,39 +749,48 @@ libxl__detect_gfx_passthru_kind(libxl__gc *gc,
     return LIBXL_GFX_PASSTHRU_KIND_DEFAULT;
 }
 
-/* return 1 if the user was found, 0 if it was not, -1 on error */
-static int libxl__dm_runas_helper(libxl__gc *gc, const char *username,
-                                       struct passwd **pwd_r)
-{
-    struct passwd pwd, *user = NULL;
-    char *buf = NULL;
-    long buf_size;
-    int ret;
-
-    buf_size = sysconf(_SC_GETPW_R_SIZE_MAX);
-    if (buf_size < 0) {
-        buf_size = 2048;
-        LOG(DEBUG,
-"sysconf(_SC_GETPW_R_SIZE_MAX) failed, setting the initial buffer size to %ld",
-            buf_size);
+/*
+ *  userlookup_helper_getpwnam(libxl__gc*, const char *user,
+ *                             struct passwd **pwd_r);
+ *
+ *  returns 1 if the user was found, 0 if it was not, -1 on error
+ */
+#define DEFINE_USERLOOKUP_HELPER(NAME,SPEC_TYPE,STRUCTNAME,SYSCONF)     \
+    static int userlookup_helper_##NAME(libxl__gc *gc,                  \
+                                        SPEC_TYPE spec,                 \
+                                           struct STRUCTNAME **out)     \
+    {                                                                   \
+        struct STRUCTNAME resultbuf, *resultp = NULL;                   \
+        char *buf = NULL;                                               \
+        long buf_size;                                                  \
+        int ret;                                                        \
+                                                                        \
+        buf_size = sysconf(SYSCONF);                                    \
+        if (buf_size < 0) {                                             \
+            buf_size = 2048;                                            \
+            LOG(DEBUG,                                                  \
+    "sysconf failed, setting the initial buffer size to %ld",           \
+                buf_size);                                              \
+        }                                                               \
+                                                                        \
+        while (1) {                                                     \
+            buf = libxl__realloc(gc, buf, buf_size);                    \
+            ret = NAME##_r(spec, &resultbuf, buf, buf_size, &resultp);  \
+            if (ret == ERANGE) {                                        \
+                buf_size += 128;                                        \
+                continue;                                               \
+            }                                                           \
+            if (ret != 0)                                               \
+                return ERROR_FAIL;                                      \
+            if (resultp != NULL) {                                      \
+                if (out) *out = resultp;                                \
+                return 1;                                               \
+            }                                                           \
+            return 0;                                                   \
+        }                                                               \
     }
 
-    while (1) {
-        buf = libxl__realloc(gc, buf, buf_size);
-        ret = getpwnam_r(username, &pwd, buf, buf_size, &user);
-        if (ret == ERANGE) {
-            buf_size += 128;
-            continue;
-        }
-        if (ret != 0)
-            return ERROR_FAIL;
-        if (user != NULL) {
-            if (pwd_r) *pwd_r = pwd;
-            return 1;
-        }
-        return 0;
-    }
-}
+DEFINE_USERLOOKUP_HELPER(getpwnam, const char*, passwd, _SC_GETPW_R_SIZE_MAX);
 
 /* colo mode */
 enum {
@@ -1645,14 +1654,14 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
         }
 
         user = GCSPRINTF("%s%d", LIBXL_QEMU_USER_BASE, guest_domid);
-        ret = libxl__dm_runas_helper(gc, user, 0);
+        ret = userlookup_helper_getpwnam(gc, user, 0);
         if (ret < 0)
             return ret;
         if (ret > 0)
             goto end_search;
 
         user = LIBXL_QEMU_USER_SHARED;
-        ret = libxl__dm_runas_helper(gc, user, 0);
+        ret = userlookup_helper_getpwnam(gc, user, 0);
         if (ret < 0)
             return ret;
         if (ret > 0) {
