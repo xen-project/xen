@@ -100,7 +100,7 @@ int domain_vtimer_init(struct domain *d, struct xen_arch_domainconfig *config)
 int vcpu_vtimer_init(struct vcpu *v)
 {
     struct vtimer *t = &v->arch.phys_timer;
-    bool_t d0 = is_hardware_domain(v->domain);
+    bool d0 = is_hardware_domain(v->domain);
 
     /*
      * Hardware domain uses the hardware interrupts, guests get the virtual
