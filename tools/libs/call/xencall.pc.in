@@ -7,4 +7,4 @@ Description: The Xencall library for Xen hypervisor
 Version: @@version@@
 Cflags: -I${includedir} @@cflagslocal@@
 Libs: @@libsflag@@${libdir} -lxencall
-Requires.private: xentoollog
+Requires.private: xentoollog,xentoolcore

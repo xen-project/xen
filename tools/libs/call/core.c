@@ -15,7 +15,40 @@
 
 #include <stdlib.h>
 
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
+
 #include "private.h"
+
+static int all_restrict_cb(Xentoolcore__Active_Handle *ah, uint32_t domid) {
+    xencall_handle *xcall = CONTAINER_OF(ah, *xcall, tc_ah);
+    int nullfd = -1, r;
+
+    if (xcall->fd < 0)
+        /* just in case */
+        return 0;
+
+    /*
+     * We don't implement a restrict function.  We neuter the fd by
+     * dup'ing /dev/null onto it.  This is better than closing it,
+     * because it does not involve locking against concurrent uses
+     * of xencall in other threads.
+     */
+    nullfd = open("/dev/null", O_RDONLY);
+    if (nullfd < 0) goto err;
+
+    r = dup2(nullfd, xcall->fd);
+    if (r < 0) goto err;
+
+    close(nullfd);
+    return 0;
+
+err:
+    if (nullfd >= 0) close(nullfd);
+    return -1;
+}
 
 xencall_handle *xencall_open(xentoollog_logger *logger, unsigned open_flags)
 {
@@ -25,6 +58,8 @@ xencall_handle *xencall_open(xentoollog_logger *logger, unsigned open_flags)
     if (!xcall) return NULL;
 
     xcall->fd = -1;
+    xcall->tc_ah.restrict_callback = all_restrict_cb;
+    xentoolcore__register_active_handle(&xcall->tc_ah);
 
     xcall->flags = open_flags;
     xcall->buffer_cache_nr = 0;
@@ -53,6 +88,7 @@ xencall_handle *xencall_open(xentoollog_logger *logger, unsigned open_flags)
 
 err:
     osdep_xencall_close(xcall);
+    xentoolcore__deregister_active_handle(&xcall->tc_ah);
     xtl_logger_destroy(xcall->logger_tofree);
     free(xcall);
     return NULL;
@@ -66,6 +102,7 @@ int xencall_close(xencall_handle *xcall)
         return 0;
 
     rc = osdep_xencall_close(xcall);
+    xentoolcore__deregister_active_handle(&xcall->tc_ah);
     buffer_release_cache(xcall);
     xtl_logger_destroy(xcall->logger_tofree);
     free(xcall);
