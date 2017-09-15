@@ -750,7 +750,8 @@ libxl__detect_gfx_passthru_kind(libxl__gc *gc,
 }
 
 /* return 1 if the user was found, 0 if it was not, -1 on error */
-static int libxl__dm_runas_helper(libxl__gc *gc, const char *username)
+static int libxl__dm_runas_helper(libxl__gc *gc, const char *username,
+                                       struct passwd **pwd_r)
 {
     struct passwd pwd, *user = NULL;
     char *buf = NULL;
@@ -774,8 +775,10 @@ static int libxl__dm_runas_helper(libxl__gc *gc, const char *username)
         }
         if (ret != 0)
             return ERROR_FAIL;
-        if (user != NULL)
+        if (user != NULL) {
+            if (pwd_r) *pwd_r = pwd;
             return 1;
+        }
         return 0;
     }
 }
@@ -1642,14 +1645,14 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
         }
 
         user = GCSPRINTF("%s%d", LIBXL_QEMU_USER_BASE, guest_domid);
-        ret = libxl__dm_runas_helper(gc, user);
+        ret = libxl__dm_runas_helper(gc, user, 0);
         if (ret < 0)
             return ret;
         if (ret > 0)
             goto end_search;
 
         user = LIBXL_QEMU_USER_SHARED;
-        ret = libxl__dm_runas_helper(gc, user);
+        ret = libxl__dm_runas_helper(gc, user, 0);
         if (ret < 0)
             return ret;
         if (ret > 0) {
