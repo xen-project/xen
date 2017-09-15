@@ -114,7 +114,7 @@ LDLIBS_libxenevtchn = $(SHDEPS_libxenevtchn) $(XEN_LIBXENEVTCHN)/libxenevtchn$(l
 SHLIB_libxenevtchn  = $(SHDEPS_libxenevtchn) -Wl,-rpath-link=$(XEN_LIBXENEVTCHN)
 
 CFLAGS_libxengnttab = -I$(XEN_LIBXENGNTTAB)/include $(CFLAGS_xeninclude)
-SHDEPS_libxengnttab = $(SHLIB_libxentoollog)
+SHDEPS_libxengnttab = $(SHLIB_libxentoollog) $(SHLIB_libxentoolcore)
 LDLIBS_libxengnttab = $(SHDEPS_libxengnttab) $(XEN_LIBXENGNTTAB)/libxengnttab$(libextension)
 SHLIB_libxengnttab  = $(SHDEPS_libxengnttab) -Wl,-rpath-link=$(XEN_LIBXENGNTTAB)
 

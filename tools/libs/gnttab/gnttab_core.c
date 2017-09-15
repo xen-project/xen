@@ -22,6 +22,11 @@
 
 #include "private.h"
 
+static int all_restrict_cb(Xentoolcore__Active_Handle *ah, uint32_t domid) {
+    xengnttab_handle *xgt = CONTAINER_OF(ah, *xgt, tc_ah);
+    return xentoolcore__restrict_by_dup2_null(xgt->fd);
+}
+
 xengnttab_handle *xengnttab_open(xentoollog_logger *logger, unsigned open_flags)
 {
     xengnttab_handle *xgt = malloc(sizeof(*xgt));
@@ -32,6 +37,9 @@ xengnttab_handle *xengnttab_open(xentoollog_logger *logger, unsigned open_flags)
     xgt->fd = -1;
     xgt->logger = logger;
     xgt->logger_tofree  = NULL;
+
+    xgt->tc_ah.restrict_callback = all_restrict_cb;
+    xentoolcore__register_active_handle(&xgt->tc_ah);
 
     if (!xgt->logger) {
         xgt->logger = xgt->logger_tofree =
@@ -47,6 +55,7 @@ xengnttab_handle *xengnttab_open(xentoollog_logger *logger, unsigned open_flags)
 
 err:
     osdep_gnttab_close(xgt);
+    xentoolcore__deregister_active_handle(&xgt->tc_ah);
     xtl_logger_destroy(xgt->logger_tofree);
     free(xgt);
     return NULL;
@@ -60,6 +69,7 @@ int xengnttab_close(xengnttab_handle *xgt)
         return 0;
 
     rc = osdep_gnttab_close(xgt);
+    xentoolcore__deregister_active_handle(&xgt->tc_ah);
     xtl_logger_destroy(xgt->logger_tofree);
     free(xgt);
     return rc;

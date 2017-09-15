@@ -7,7 +7,7 @@ SHLIB_LDFLAGS += -Wl,--version-script=libxengnttab.map
 
 CFLAGS   += -Werror -Wmissing-prototypes
 CFLAGS   += -I./include $(CFLAGS_xeninclude)
-CFLAGS   += $(CFLAGS_libxentoollog)
+CFLAGS   += $(CFLAGS_libxentoollog) $(CFLAGS_libxentoolcore)
 
 SRCS-GNTTAB            += gnttab_core.c
 SRCS-GNTSHR            += gntshr_core.c
@@ -64,7 +64,7 @@ libxengnttab.so.$(MAJOR): libxengnttab.so.$(MAJOR).$(MINOR)
 	$(SYMLINK_SHLIB) $< $@
 
 libxengnttab.so.$(MAJOR).$(MINOR): $(PIC_OBJS) libxengnttab.map
-	$(CC) $(LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libxengnttab.so.$(MAJOR) $(SHLIB_LDFLAGS) -o $@ $(PIC_OBJS) $(LDLIBS_libxentoollog) $(APPEND_LDFLAGS)
+	$(CC) $(LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libxengnttab.so.$(MAJOR) $(SHLIB_LDFLAGS) -o $@ $(PIC_OBJS) $(LDLIBS_libxentoollog) $(LDLIBS_libxentoolcore) $(APPEND_LDFLAGS)
 
 .PHONY: install
 install: build

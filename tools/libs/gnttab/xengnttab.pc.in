@@ -7,4 +7,4 @@ Description: The Xengnttab library for Xen hypervisor
 Version: @@version@@
 Cflags: -I${includedir} @@cflagslocal@@
 Libs: @@libsflag@@${libdir} -lxengnttab
-Requires.private: xentoollog
+Requires.private: xentoollog,xentoolcore
