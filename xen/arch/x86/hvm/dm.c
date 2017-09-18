@@ -616,6 +616,7 @@ static int dm_op(const struct dmop_args *op_args)
         rc = inject_event(d, data);
         break;
     }
+
     case XEN_DMOP_inject_msi:
     {
         const struct xen_dm_op_inject_msi *data =
