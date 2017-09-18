@@ -40,10 +40,14 @@ static int libxl__vdispl_from_xenstore(libxl__gc *gc, const char *libxl_path,
                                        libxl_devid devid,
                                        libxl_device_vdispl *vdispl)
 {
-    char *be_path;
+    const char *be_path;
+    int rc;
 
     vdispl->devid = devid;
-    be_path = libxl__xs_read(gc, XBT_NULL, GCSPRINTF("%s/backend", libxl_path));
+    rc = libxl__xs_read_mandatory(gc, XBT_NULL,
+                                  GCSPRINTF("%s/backend", libxl_path),
+                                  &be_path);
+    if (rc) return rc;
 
     return libxl__backendpath_parse_domid(gc, be_path, &vdispl->backend_domid);
 }
