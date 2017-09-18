@@ -162,7 +162,13 @@ static void do_get_hw_residencies(void *arg)
     case 0x56:
     /* Skylake */
     case 0x4E:
+    case 0x55:
     case 0x5E:
+    /* Cannon Lake */
+    case 0x66:
+    /* Kaby Lake */
+    case 0x8E:
+    case 0x9E:
         GET_PC2_RES(hw_res->pc2);
         GET_CC7_RES(hw_res->cc7);
         /* fall through */
@@ -181,8 +187,10 @@ static void do_get_hw_residencies(void *arg)
         GET_CC3_RES(hw_res->cc3);
         GET_CC6_RES(hw_res->cc6);
         break;
-    /* next gen Xeon Phi */
+    /* Xeon Phi Knights Landing */
     case 0x57:
+    /* Xeon Phi Knights Mill */
+    case 0x85:
         GET_CC3_RES(hw_res->mc0); /* abusing GET_CC3_RES */
         GET_CC6_RES(hw_res->mc6); /* abusing GET_CC6_RES */
         GET_PC2_RES(hw_res->pc2);
@@ -213,6 +221,8 @@ static void do_get_hw_residencies(void *arg)
     /* Goldmont */
     case 0x5C:
     case 0x5F:
+    /* Goldmont Plus */
+    case 0x7A:
         GET_PC2_RES(hw_res->pc2);
         GET_PC3_RES(hw_res->pc3);
         GET_PC6_RES(hw_res->pc6);
