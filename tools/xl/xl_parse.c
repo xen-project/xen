@@ -832,6 +832,8 @@ int parse_vdispl_config(libxl_device_vdispl *vdispl, char *token)
 
             rc= sscanf(resolution, "%ux%u", &vdispl->connectors[i].width,
                        &vdispl->connectors[i].height);
+            free(resolution);
+
             if (rc != 2) {
                 fprintf(stderr, "Can't parse connector resolution\n");
                 goto out;
