@@ -2726,6 +2726,8 @@ static const struct lbr_info *last_branch_msr_get(void)
         case 0x0f:
         /* Enhanced Core */
         case 0x17:
+        /* Xeon 7400 */
+        case 0x1d:
             return c2_lbr;
         /* Nehalem */
         case 0x1a: case 0x1e: case 0x1f: case 0x2e:
@@ -2742,6 +2744,12 @@ static const struct lbr_info *last_branch_msr_get(void)
             return nh_lbr;
         /* Skylake */
         case 0x4e: case 0x5e:
+        /* Xeon Scalable */
+        case 0x55:
+        /* Cannon Lake */
+        case 0x66:
+        /* Goldmont Plus */
+        case 0x7a:
         /* Kaby Lake */
         case 0x8e: case 0x9e:
             return sk_lbr;
@@ -2751,6 +2759,8 @@ static const struct lbr_info *last_branch_msr_get(void)
         case 0x37: case 0x4a: case 0x4d: case 0x5a: case 0x5d:
         /* Xeon Phi Knights Landing */
         case 0x57:
+        /* Xeon Phi Knights Mill */
+        case 0x85:
         /* Airmont */
         case 0x4c:
             return at_lbr;
@@ -2782,6 +2792,7 @@ enum
     LBR_FORMAT_EIP_FLAGS_TSX      = 0x4, /* 64-bit EIP, Flags, TSX */
     LBR_FORMAT_EIP_FLAGS_TSX_INFO = 0x5, /* 64-bit EIP, Flags, TSX, LBR_INFO */
     LBR_FORMAT_EIP_FLAGS_CYCLES   = 0x6, /* 64-bit EIP, Flags, Cycles */
+    LBR_FORMAT_LIP_FLAGS_TSX_INFO = 0x7, /* 64-bit LIP, Flags, TSX, LBR_INFO */
 };
 
 #define LBR_FROM_SIGNEXT_2MSB  ((1ULL << 59) | (1ULL << 60))
