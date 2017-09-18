@@ -2723,39 +2723,39 @@ static const struct lbr_info *last_branch_msr_get(void)
         switch ( boot_cpu_data.x86_model )
         {
         /* Core2 Duo */
-        case 15:
+        case 0x0f:
         /* Enhanced Core */
-        case 23:
+        case 0x17:
             return c2_lbr;
         /* Nehalem */
-        case 26: case 30: case 31: case 46:
+        case 0x1a: case 0x1e: case 0x1f: case 0x2e:
         /* Westmere */
-        case 37: case 44: case 47:
+        case 0x25: case 0x2c: case 0x2f:
         /* Sandy Bridge */
-        case 42: case 45:
+        case 0x2a: case 0x2d:
         /* Ivy Bridge */
-        case 58: case 62:
+        case 0x3a: case 0x3e:
         /* Haswell */
-        case 60: case 63: case 69: case 70:
+        case 0x3c: case 0x3f: case 0x45: case 0x46:
         /* Broadwell */
-        case 61: case 71: case 79: case 86:
+        case 0x3d: case 0x47: case 0x4f: case 0x56:
             return nh_lbr;
         /* Skylake */
-        case 78: case 94:
-        /* future */
-        case 142: case 158:
+        case 0x4e: case 0x5e:
+        /* Kaby Lake */
+        case 0x8e: case 0x9e:
             return sk_lbr;
         /* Atom */
-        case 28: case 38: case 39: case 53: case 54:
+        case 0x1c: case 0x26: case 0x27: case 0x35: case 0x36:
         /* Silvermont */
-        case 55: case 74: case 77: case 90: case 93:
-        /* next gen Xeon Phi */
-        case 87:
+        case 0x37: case 0x4a: case 0x4d: case 0x5a: case 0x5d:
+        /* Xeon Phi Knights Landing */
+        case 0x57:
         /* Airmont */
-        case 76:
+        case 0x4c:
             return at_lbr;
         /* Goldmont */
-        case 92: case 95:
+        case 0x5c: case 0x5f:
             return gm_lbr;
         }
         break;
