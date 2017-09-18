@@ -3019,14 +3019,14 @@ int main(int argc, char **argv)
 
     for ( j = 0; j < ARRAY_SIZE(blobs); j++ )
     {
+        if ( blobs[j].check_cpu && !blobs[j].check_cpu() )
+            continue;
+
         if ( !blobs[j].size )
         {
             printf("%-39s n/a\n", blobs[j].name);
             continue;
         }
-
-        if ( blobs[j].check_cpu && !blobs[j].check_cpu() )
-            continue;
 
         memcpy(res, blobs[j].code, blobs[j].size);
         ctxt.lma = blobs[j].bitness == 64;
