@@ -151,8 +151,7 @@ struct domain *__must_check page_get_owner_and_reference(struct page_info *);
 
 /* Boot-time allocator. Turns into generic allocator after bootstrap. */
 void init_boot_pages(paddr_t ps, paddr_t pe);
-unsigned long alloc_boot_pages(
-    unsigned long nr_pfns, unsigned long pfn_align);
+mfn_t alloc_boot_pages(unsigned long nr_pfns, unsigned long pfn_align);
 void end_boot_allocator(void);
 
 /* Xen suballocator. These functions are interrupt-safe. */

@@ -325,8 +325,7 @@ void __init init_boot_pages(paddr_t ps, paddr_t pe)
     }
 }
 
-unsigned long __init alloc_boot_pages(
-    unsigned long nr_pfns, unsigned long pfn_align)
+mfn_t __init alloc_boot_pages(unsigned long nr_pfns, unsigned long pfn_align)
 {
     unsigned long pg, _e;
     unsigned int i = nr_bootmem_regions;
@@ -355,14 +354,14 @@ unsigned long __init alloc_boot_pages(
             if ( pg + nr_pfns > PFN_DOWN(highmem_start) )
                 continue;
             r->s = pg + nr_pfns;
-            return pg;
+            return _mfn(pg);
         }
 #endif
 
         _e = r->e;
         r->e = pg;
         bootmem_region_add(pg + nr_pfns, _e);
-        return pg;
+        return _mfn(pg);
     }
 
     BUG();

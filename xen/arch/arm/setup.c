@@ -561,7 +561,7 @@ static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
     init_boot_pages(pfn_to_paddr(boot_mfn_start), pfn_to_paddr(boot_mfn_end));
 
     /* Copy the DTB. */
-    fdt = mfn_to_virt(alloc_boot_pages(dtb_pages, 1));
+    fdt = mfn_to_virt(mfn_x(alloc_boot_pages(dtb_pages, 1)));
     copy_from_paddr(fdt, dtb_paddr, dtb_size);
     device_tree_flattened = fdt;
 
@@ -671,7 +671,7 @@ static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
     dtb_pages = (dtb_size + PAGE_SIZE-1) >> PAGE_SHIFT;
 
     /* Copy the DTB. */
-    fdt = mfn_to_virt(alloc_boot_pages(dtb_pages, 1));
+    fdt = mfn_to_virt(mfn_x(alloc_boot_pages(dtb_pages, 1)));
     copy_from_paddr(fdt, dtb_paddr, dtb_size);
     device_tree_flattened = fdt;
 

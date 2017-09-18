@@ -187,14 +187,15 @@ static __init int slit_valid(struct acpi_table_slit *slit)
 /* Callback for SLIT parsing */
 void __init acpi_numa_slit_init(struct acpi_table_slit *slit)
 {
-	unsigned long mfn;
+	mfn_t mfn;
+
 	if (!slit_valid(slit)) {
 		printk(KERN_INFO "ACPI: SLIT table looks invalid. "
 		       "Not used.\n");
 		return;
 	}
 	mfn = alloc_boot_pages(PFN_UP(slit->header.length), 1);
-	acpi_slit = mfn_to_virt(mfn);
+	acpi_slit = mfn_to_virt(mfn_x(mfn));
 	memcpy(acpi_slit, slit, slit->header.length);
 }
 

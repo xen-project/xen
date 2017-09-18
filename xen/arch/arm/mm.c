@@ -864,13 +864,13 @@ void __init setup_xenheap_mappings(unsigned long base_mfn,
         }
         else
         {
-            unsigned long first_mfn = alloc_boot_pages(1, 1);
+            mfn_t first_mfn = alloc_boot_pages(1, 1);
 
-            clear_page(mfn_to_virt(first_mfn));
-            pte = mfn_to_xen_entry(_mfn(first_mfn), WRITEALLOC);
+            clear_page(mfn_to_virt(mfn_x(first_mfn)));
+            pte = mfn_to_xen_entry(first_mfn, WRITEALLOC);
             pte.pt.table = 1;
             write_pte(p, pte);
-            first = mfn_to_virt(first_mfn);
+            first = mfn_to_virt(mfn_x(first_mfn));
         }
 
         pte = mfn_to_xen_entry(_mfn(mfn), WRITEALLOC);
@@ -891,11 +891,12 @@ void __init setup_frametable_mappings(paddr_t ps, paddr_t pe)
     unsigned long nr_pages = (pe - ps) >> PAGE_SHIFT;
     unsigned long nr_pdxs = pfn_to_pdx(nr_pages);
     unsigned long frametable_size = nr_pdxs * sizeof(struct page_info);
-    unsigned long base_mfn;
+    mfn_t base_mfn;
     const unsigned long mapping_size = frametable_size < MB(32) ? MB(2) : MB(32);
 #ifdef CONFIG_ARM_64
     lpae_t *second, pte;
-    unsigned long nr_second, second_base;
+    unsigned long nr_second;
+    mfn_t second_base;
     int i;
 #endif
 
@@ -908,18 +909,19 @@ void __init setup_frametable_mappings(paddr_t ps, paddr_t pe)
     /* Compute the number of second level pages. */
     nr_second = ROUNDUP(frametable_size, FIRST_SIZE) >> FIRST_SHIFT;
     second_base = alloc_boot_pages(nr_second, 1);
-    second = mfn_to_virt(second_base);
+    second = mfn_to_virt(mfn_x(second_base));
     for ( i = 0; i < nr_second; i++ )
     {
-        clear_page(mfn_to_virt(second_base + i));
-        pte = mfn_to_xen_entry(_mfn(second_base + i), WRITEALLOC);
+        clear_page(mfn_to_virt(mfn_x(mfn_add(second_base, i))));
+        pte = mfn_to_xen_entry(mfn_add(second_base, i), WRITEALLOC);
         pte.pt.table = 1;
         write_pte(&xen_first[first_table_offset(FRAMETABLE_VIRT_START)+i], pte);
     }
-    create_mappings(second, 0, base_mfn, frametable_size >> PAGE_SHIFT, mapping_size);
+    create_mappings(second, 0, mfn_x(base_mfn), frametable_size >> PAGE_SHIFT,
+                    mapping_size);
 #else
-    create_mappings(xen_second, FRAMETABLE_VIRT_START,
-                    base_mfn, frametable_size >> PAGE_SHIFT, mapping_size);
+    create_mappings(xen_second, FRAMETABLE_VIRT_START, mfn_x(base_mfn),
+                    frametable_size >> PAGE_SHIFT, mapping_size);
 #endif
 
     memset(&frame_table[0], 0, nr_pdxs * sizeof(struct page_info));

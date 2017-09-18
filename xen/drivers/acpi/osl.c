@@ -214,7 +214,7 @@ void *__init acpi_os_alloc_memory(size_t sz)
 	void *ptr;
 
 	if (system_state == SYS_STATE_early_boot)
-		return mfn_to_virt(alloc_boot_pages(PFN_UP(sz), 1));
+		return mfn_to_virt(mfn_x(alloc_boot_pages(PFN_UP(sz), 1)));
 
 	ptr = xmalloc_bytes(sz);
 	ASSERT(!ptr || is_xmalloc_memory(ptr));

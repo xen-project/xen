@@ -200,7 +200,8 @@ static void __init init_frametable_chunk(void *start, void *end)
 {
     unsigned long s = (unsigned long)start;
     unsigned long e = (unsigned long)end;
-    unsigned long step, mfn;
+    unsigned long step;
+    mfn_t mfn;
 
     ASSERT(!(s & ((1 << L2_PAGETABLE_SHIFT) - 1)));
     for ( ; s < e; s += step << PAGE_SHIFT )
@@ -216,7 +217,7 @@ static void __init init_frametable_chunk(void *start, void *end)
         while ( step && s + (step << PAGE_SHIFT) > e + (4 << PAGE_SHIFT) )
             step >>= PAGETABLE_ORDER;
         mfn = alloc_boot_pages(step, step);
-        map_pages_to_xen(s, mfn, step, PAGE_HYPERVISOR);
+        map_pages_to_xen(s, mfn_x(mfn), step, PAGE_HYPERVISOR);
     }
 
     memset(start, 0, end - start);
@@ -5245,7 +5246,7 @@ void *alloc_xen_pagetable(void)
         return ptr;
     }
 
-    return mfn_to_virt(alloc_boot_pages(1, 1));
+    return mfn_to_virt(mfn_x(alloc_boot_pages(1, 1)));
 }
 
 void free_xen_pagetable(void *v)

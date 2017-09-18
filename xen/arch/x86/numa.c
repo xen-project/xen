@@ -99,7 +99,7 @@ static int __init populate_memnodemap(const struct node *nodes,
 static int __init allocate_cachealigned_memnodemap(void)
 {
     unsigned long size = PFN_UP(memnodemapsize * sizeof(*memnodemap));
-    unsigned long mfn = alloc_boot_pages(size, 1);
+    unsigned long mfn = mfn_x(alloc_boot_pages(size, 1));
 
     memnodemap = mfn_to_virt(mfn);
     mfn <<= PAGE_SHIFT;
