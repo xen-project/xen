@@ -91,23 +91,23 @@ roms.inc: $(ROMS)
 
 ifneq ($(ROMBIOS_ROM),)
 	echo "#ifdef ROM_INCLUDE_ROMBIOS" >> $@.new
-	sh ./mkhex rombios $(ROMBIOS_ROM) >> $@.new
+	sh ../../misc/mkhex rombios $(ROMBIOS_ROM) >> $@.new
 	echo "#endif" >> $@.new
 endif
 
 ifneq ($(STDVGA_ROM),)
 	echo "#ifdef ROM_INCLUDE_VGABIOS" >> $@.new
-	sh ./mkhex vgabios_stdvga $(STDVGA_ROM) >> $@.new
+	sh ../../misc/mkhex vgabios_stdvga $(STDVGA_ROM) >> $@.new
 	echo "#endif" >> $@.new
 endif
 ifneq ($(CIRRUSVGA_ROM),)
 	echo "#ifdef ROM_INCLUDE_VGABIOS" >> $@.new
-	sh ./mkhex vgabios_cirrusvga $(CIRRUSVGA_ROM) >> $@.new
+	sh ../../misc/mkhex vgabios_cirrusvga $(CIRRUSVGA_ROM) >> $@.new
 	echo "#endif" >> $@.new
 endif
 ifneq ($(ETHERBOOT_ROMS),)
 	echo "#ifdef ROM_INCLUDE_ETHERBOOT" >> $@.new
-	sh ./mkhex etherboot $(ETHERBOOT_ROMS) >> $@.new
+	sh ../../misc/mkhex etherboot $(ETHERBOOT_ROMS) >> $@.new
 	echo "#endif" >> $@.new
 endif
 
