@@ -79,12 +79,15 @@ static int libxl__vtpm_from_xenstore(libxl__gc *gc, const char *libxl_path,
                                      libxl_device_vtpm *vtpm)
 {
     int rc;
-    char *be_path;
+    const char *be_path;
     char *uuid;
 
     vtpm->devid = devid;
 
-    be_path = libxl__xs_read(gc, XBT_NULL, GCSPRINTF("%s/backend", libxl_path));
+    rc = libxl__xs_read_mandatory(gc, XBT_NULL,
+                                  GCSPRINTF("%s/backend", libxl_path),
+                                  &be_path);
+    if (rc) return rc;
 
     rc = libxl__backendpath_parse_domid(gc, be_path, &vtpm->backend_domid);
     if (rc) return rc;
