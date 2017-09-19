@@ -2866,18 +2866,18 @@ gnttab_get_status_frames(XEN_GUEST_HANDLE_PARAM(gnttab_get_status_frames_t) uop,
 
     gt = d->grant_table;
 
+    op.status = GNTST_okay;
+
+    grant_read_lock(gt);
+
     if ( unlikely(op.nr_frames > nr_status_frames(gt)) )
     {
         gdprintk(XENLOG_INFO, "Guest requested addresses for %d grant status "
                  "frames, but only %d are available.\n",
                  op.nr_frames, nr_status_frames(gt));
         op.status = GNTST_general_error;
-        goto out2;
+        goto unlock;
     }
-
-    op.status = GNTST_okay;
-
-    grant_read_lock(gt);
 
     for ( i = 0; i < op.nr_frames; i++ )
     {
@@ -2886,10 +2886,11 @@ gnttab_get_status_frames(XEN_GUEST_HANDLE_PARAM(gnttab_get_status_frames_t) uop,
             op.status = GNTST_bad_virt_addr;
     }
 
+ unlock:
     grant_read_unlock(gt);
-out2:
+ out2:
     rcu_unlock_domain(d);
-out1:
+ out1:
     if ( unlikely(__copy_field_to_guest(uop, &op, status)) )
         return -EFAULT;
 
