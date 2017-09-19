@@ -2226,7 +2226,7 @@ struct page_info *alloc_domheap_pages(
     if ( d && !(memflags & MEMF_no_owner) &&
          assign_pages(d, pg, order, memflags) )
     {
-        free_heap_pages(pg, order, false);
+        free_heap_pages(pg, order, memflags & MEMF_no_scrub);
         return NULL;
     }
     
