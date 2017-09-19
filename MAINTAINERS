@@ -175,6 +175,7 @@ F:	xen/drivers/char/scif-uart.c
 F:	xen/drivers/passthrough/arm/
 F:	xen/include/asm-arm/
 F:	xen/include/public/arch-arm/
+F:	xen/include/public/arch-arm.h
 
 BLKTAP2
 S:	Orphaned
