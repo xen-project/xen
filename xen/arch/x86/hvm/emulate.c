@@ -100,7 +100,7 @@ static int ioreq_server_read(const struct hvm_io_handler *io_handler,
                     uint32_t size,
                     uint64_t *data)
 {
-    if ( hvm_copy_from_guest_phys(data, addr, size) != HVMCOPY_okay )
+    if ( hvm_copy_from_guest_phys(data, addr, size) != HVMTRANS_okay )
         return X86EMUL_UNHANDLEABLE;
 
     return X86EMUL_OKAY;
@@ -893,18 +893,18 @@ static int __hvmemul_read(
 
     switch ( rc )
     {
-    case HVMCOPY_okay:
+    case HVMTRANS_okay:
         break;
-    case HVMCOPY_bad_gva_to_gfn:
+    case HVMTRANS_bad_linear_to_gfn:
         x86_emul_pagefault(pfinfo.ec, pfinfo.linear, &hvmemul_ctxt->ctxt);
         return X86EMUL_EXCEPTION;
-    case HVMCOPY_bad_gfn_to_mfn:
+    case HVMTRANS_bad_gfn_to_mfn:
         if ( access_type == hvm_access_insn_fetch )
             return X86EMUL_UNHANDLEABLE;
 
         return hvmemul_linear_mmio_read(addr, bytes, p_data, pfec, hvmemul_ctxt, 0);
-    case HVMCOPY_gfn_paged_out:
-    case HVMCOPY_gfn_shared:
+    case HVMTRANS_gfn_paged_out:
+    case HVMTRANS_gfn_shared:
         return X86EMUL_RETRY;
     default:
         return X86EMUL_UNHANDLEABLE;
@@ -1012,15 +1012,15 @@ static int hvmemul_write(
 
     switch ( rc )
     {
-    case HVMCOPY_okay:
+    case HVMTRANS_okay:
         break;
-    case HVMCOPY_bad_gva_to_gfn:
+    case HVMTRANS_bad_linear_to_gfn:
         x86_emul_pagefault(pfinfo.ec, pfinfo.linear, &hvmemul_ctxt->ctxt);
         return X86EMUL_EXCEPTION;
-    case HVMCOPY_bad_gfn_to_mfn:
+    case HVMTRANS_bad_gfn_to_mfn:
         return hvmemul_linear_mmio_write(addr, bytes, p_data, pfec, hvmemul_ctxt, 0);
-    case HVMCOPY_gfn_paged_out:
-    case HVMCOPY_gfn_shared:
+    case HVMTRANS_gfn_paged_out:
+    case HVMTRANS_gfn_shared:
         return X86EMUL_RETRY;
     default:
         return X86EMUL_UNHANDLEABLE;
@@ -1384,7 +1384,7 @@ static int hvmemul_rep_movs(
             return rc;
         }
 
-        rc = HVMCOPY_okay;
+        rc = HVMTRANS_okay;
     }
     else
         /*
@@ -1394,16 +1394,16 @@ static int hvmemul_rep_movs(
          */
         rc = hvm_copy_from_guest_phys(buf, sgpa, bytes);
 
-    if ( rc == HVMCOPY_okay )
+    if ( rc == HVMTRANS_okay )
         rc = hvm_copy_to_guest_phys(dgpa, buf, bytes, current);
 
     xfree(buf);
 
-    if ( rc == HVMCOPY_gfn_paged_out )
+    if ( rc == HVMTRANS_gfn_paged_out )
         return X86EMUL_RETRY;
-    if ( rc == HVMCOPY_gfn_shared )
+    if ( rc == HVMTRANS_gfn_shared )
         return X86EMUL_RETRY;
-    if ( rc != HVMCOPY_okay )
+    if ( rc != HVMTRANS_okay )
     {
         gdprintk(XENLOG_WARNING, "Failed memory-to-memory REP MOVS: sgpa=%"
                  PRIpaddr" dgpa=%"PRIpaddr" reps=%lu bytes_per_rep=%u\n",
@@ -1513,10 +1513,10 @@ static int hvmemul_rep_stos(
 
         switch ( rc )
         {
-        case HVMCOPY_gfn_paged_out:
-        case HVMCOPY_gfn_shared:
+        case HVMTRANS_gfn_paged_out:
+        case HVMTRANS_gfn_shared:
             return X86EMUL_RETRY;
-        case HVMCOPY_okay:
+        case HVMTRANS_okay:
             return X86EMUL_OKAY;
         }
 
@@ -2172,7 +2172,7 @@ void hvm_emulate_init_per_insn(
                                         &addr) &&
              hvm_fetch_from_guest_linear(hvmemul_ctxt->insn_buf, addr,
                                          sizeof(hvmemul_ctxt->insn_buf),
-                                         pfec, NULL) == HVMCOPY_okay) ?
+                                         pfec, NULL) == HVMTRANS_okay) ?
             sizeof(hvmemul_ctxt->insn_buf) : 0;
     }
     else

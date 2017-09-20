@@ -196,16 +196,16 @@ hvm_read(enum x86_segment seg,
 
     switch ( rc )
     {
-    case HVMCOPY_okay:
+    case HVMTRANS_okay:
         return X86EMUL_OKAY;
-    case HVMCOPY_bad_gva_to_gfn:
+    case HVMTRANS_bad_linear_to_gfn:
         x86_emul_pagefault(pfinfo.ec, pfinfo.linear, &sh_ctxt->ctxt);
         return X86EMUL_EXCEPTION;
-    case HVMCOPY_bad_gfn_to_mfn:
-    case HVMCOPY_unhandleable:
+    case HVMTRANS_bad_gfn_to_mfn:
+    case HVMTRANS_unhandleable:
         return X86EMUL_UNHANDLEABLE;
-    case HVMCOPY_gfn_paged_out:
-    case HVMCOPY_gfn_shared:
+    case HVMTRANS_gfn_paged_out:
+    case HVMTRANS_gfn_shared:
         return X86EMUL_RETRY;
     }
 

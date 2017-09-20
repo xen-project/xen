@@ -2915,9 +2915,9 @@ void hvm_task_switch(
 
     rc = hvm_copy_from_guest_linear(
         &tss, prev_tr.base, sizeof(tss), PFEC_page_present, &pfinfo);
-    if ( rc == HVMCOPY_bad_gva_to_gfn )
+    if ( rc == HVMTRANS_bad_linear_to_gfn )
         hvm_inject_page_fault(pfinfo.ec, pfinfo.linear);
-    if ( rc != HVMCOPY_okay )
+    if ( rc != HVMTRANS_okay )
         goto out;
 
     eflags = regs->eflags;
@@ -2955,20 +2955,20 @@ void hvm_task_switch(
                                   offsetof(typeof(tss), trace) -
                                   offsetof(typeof(tss), eip),
                                   PFEC_page_present, &pfinfo);
-    if ( rc == HVMCOPY_bad_gva_to_gfn )
+    if ( rc == HVMTRANS_bad_linear_to_gfn )
         hvm_inject_page_fault(pfinfo.ec, pfinfo.linear);
-    if ( rc != HVMCOPY_okay )
+    if ( rc != HVMTRANS_okay )
         goto out;
 
     rc = hvm_copy_from_guest_linear(
         &tss, tr.base, sizeof(tss), PFEC_page_present, &pfinfo);
-    if ( rc == HVMCOPY_bad_gva_to_gfn )
+    if ( rc == HVMTRANS_bad_linear_to_gfn )
         hvm_inject_page_fault(pfinfo.ec, pfinfo.linear);
     /*
-     * Note: The HVMCOPY_gfn_shared case could be optimised, if the callee
+     * Note: The HVMTRANS_gfn_shared case could be optimised, if the callee
      * functions knew we want RO access.
      */
-    if ( rc != HVMCOPY_okay )
+    if ( rc != HVMTRANS_okay )
         goto out;
 
     new_cpl = tss.eflags & X86_EFLAGS_VM ? 3 : tss.cs & 3;
@@ -3010,12 +3010,12 @@ void hvm_task_switch(
         rc = hvm_copy_to_guest_linear(tr.base + offsetof(typeof(tss), back_link),
                                       &tss.back_link, sizeof(tss.back_link), 0,
                                       &pfinfo);
-        if ( rc == HVMCOPY_bad_gva_to_gfn )
+        if ( rc == HVMTRANS_bad_linear_to_gfn )
         {
             hvm_inject_page_fault(pfinfo.ec, pfinfo.linear);
             exn_raised = 1;
         }
-        else if ( rc != HVMCOPY_okay )
+        else if ( rc != HVMTRANS_okay )
             goto out;
     }
 
@@ -3051,12 +3051,12 @@ void hvm_task_switch(
         {
             rc = hvm_copy_to_guest_linear(linear_addr, &errcode, opsz, 0,
                                           &pfinfo);
-            if ( rc == HVMCOPY_bad_gva_to_gfn )
+            if ( rc == HVMTRANS_bad_linear_to_gfn )
             {
                 hvm_inject_page_fault(pfinfo.ec, pfinfo.linear);
                 exn_raised = 1;
             }
-            else if ( rc != HVMCOPY_okay )
+            else if ( rc != HVMTRANS_okay )
                 goto out;
         }
     }
@@ -3073,7 +3073,7 @@ void hvm_task_switch(
 #define HVMCOPY_to_guest   (1u<<0)
 #define HVMCOPY_phys       (0u<<2)
 #define HVMCOPY_linear     (1u<<2)
-static enum hvm_copy_result __hvm_copy(
+static enum hvm_translation_result __hvm_copy(
     void *buf, paddr_t addr, int size, struct vcpu *v, unsigned int flags,
     uint32_t pfec, pagefault_info_t *pfinfo)
 {
@@ -3098,7 +3098,7 @@ static enum hvm_copy_result __hvm_copy(
      * Hence we bail immediately if called from atomic context.
      */
     if ( in_atomic() )
-        return HVMCOPY_unhandleable;
+        return HVMTRANS_unhandleable;
 #endif
 
     while ( todo > 0 )
@@ -3113,15 +3113,15 @@ static enum hvm_copy_result __hvm_copy(
             if ( gfn == gfn_x(INVALID_GFN) )
             {
                 if ( pfec & PFEC_page_paged )
-                    return HVMCOPY_gfn_paged_out;
+                    return HVMTRANS_gfn_paged_out;
                 if ( pfec & PFEC_page_shared )
-                    return HVMCOPY_gfn_shared;
+                    return HVMTRANS_gfn_shared;
                 if ( pfinfo )
                 {
                     pfinfo->linear = addr;
                     pfinfo->ec = pfec & ~PFEC_implicit;
                 }
-                return HVMCOPY_bad_gva_to_gfn;
+                return HVMTRANS_bad_linear_to_gfn;
             }
             gpa |= (paddr_t)gfn << PAGE_SHIFT;
         }
@@ -3139,28 +3139,28 @@ static enum hvm_copy_result __hvm_copy(
         if ( v == current
              && !nestedhvm_vcpu_in_guestmode(v)
              && hvm_mmio_internal(gpa) )
-            return HVMCOPY_bad_gfn_to_mfn;
+            return HVMTRANS_bad_gfn_to_mfn;
 
         page = get_page_from_gfn(v->domain, gfn, &p2mt, P2M_UNSHARE);
 
         if ( !page )
-            return HVMCOPY_bad_gfn_to_mfn;
+            return HVMTRANS_bad_gfn_to_mfn;
 
         if ( p2m_is_paging(p2mt) )
         {
             put_page(page);
             p2m_mem_paging_populate(v->domain, gfn);
-            return HVMCOPY_gfn_paged_out;
+            return HVMTRANS_gfn_paged_out;
         }
         if ( p2m_is_shared(p2mt) )
         {
             put_page(page);
-            return HVMCOPY_gfn_shared;
+            return HVMTRANS_gfn_shared;
         }
         if ( p2m_is_grant(p2mt) )
         {
             put_page(page);
-            return HVMCOPY_unhandleable;
+            return HVMTRANS_unhandleable;
         }
 
         p = (char *)__map_domain_page(page) + (addr & ~PAGE_MASK);
@@ -3198,24 +3198,24 @@ static enum hvm_copy_result __hvm_copy(
         put_page(page);
     }
 
-    return HVMCOPY_okay;
+    return HVMTRANS_okay;
 }
 
-enum hvm_copy_result hvm_copy_to_guest_phys(
+enum hvm_translation_result hvm_copy_to_guest_phys(
     paddr_t paddr, void *buf, int size, struct vcpu *v)
 {
     return __hvm_copy(buf, paddr, size, v,
                       HVMCOPY_to_guest | HVMCOPY_phys, 0, NULL);
 }
 
-enum hvm_copy_result hvm_copy_from_guest_phys(
+enum hvm_translation_result hvm_copy_from_guest_phys(
     void *buf, paddr_t paddr, int size)
 {
     return __hvm_copy(buf, paddr, size, current,
                       HVMCOPY_from_guest | HVMCOPY_phys, 0, NULL);
 }
 
-enum hvm_copy_result hvm_copy_to_guest_linear(
+enum hvm_translation_result hvm_copy_to_guest_linear(
     unsigned long addr, void *buf, int size, uint32_t pfec,
     pagefault_info_t *pfinfo)
 {
@@ -3224,7 +3224,7 @@ enum hvm_copy_result hvm_copy_to_guest_linear(
                       PFEC_page_present | PFEC_write_access | pfec, pfinfo);
 }
 
-enum hvm_copy_result hvm_copy_from_guest_linear(
+enum hvm_translation_result hvm_copy_from_guest_linear(
     void *buf, unsigned long addr, int size, uint32_t pfec,
     pagefault_info_t *pfinfo)
 {
@@ -3233,7 +3233,7 @@ enum hvm_copy_result hvm_copy_from_guest_linear(
                       PFEC_page_present | pfec, pfinfo);
 }
 
-enum hvm_copy_result hvm_fetch_from_guest_linear(
+enum hvm_translation_result hvm_fetch_from_guest_linear(
     void *buf, unsigned long addr, int size, uint32_t pfec,
     pagefault_info_t *pfinfo)
 {
@@ -3670,7 +3670,7 @@ void hvm_ud_intercept(struct cpu_user_regs *regs)
                                         sizeof(sig), hvm_access_insn_fetch,
                                         cs, &addr) &&
              (hvm_fetch_from_guest_linear(sig, addr, sizeof(sig),
-                                          walk, NULL) == HVMCOPY_okay) &&
+                                          walk, NULL) == HVMTRANS_okay) &&
              (memcmp(sig, "\xf\xbxen", sizeof(sig)) == 0) )
         {
             regs->rip += sizeof(sig);

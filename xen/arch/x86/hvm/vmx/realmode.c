@@ -40,7 +40,7 @@ static void realmode_deliver_exception(
     last_byte = (vector * 4) + 3;
     if ( idtr->limit < last_byte ||
          hvm_copy_from_guest_phys(&cs_eip, idtr->base + vector * 4, 4) !=
-         HVMCOPY_okay )
+         HVMTRANS_okay )
     {
         /* Software interrupt? */
         if ( insn_len != 0 )

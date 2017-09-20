@@ -914,7 +914,7 @@ int viridian_hypercall(struct cpu_user_regs *regs)
 
         /* Get input parameters. */
         if ( hvm_copy_from_guest_phys(&input_params, input_params_gpa,
-                                      sizeof(input_params)) != HVMCOPY_okay )
+                                      sizeof(input_params)) != HVMTRANS_okay )
             break;
 
         /*

@@ -609,7 +609,7 @@ void msix_write_completion(struct vcpu *v)
         if ( desc &&
              hvm_copy_from_guest_phys(&data,
                                       v->arch.hvm_vcpu.hvm_io.msix_snoop_gpa,
-                                      sizeof(data)) == HVMCOPY_okay &&
+                                      sizeof(data)) == HVMTRANS_okay &&
              !(data & PCI_MSIX_VECTOR_BITMASK) )
             ctrl_address = snoop_addr;
     }

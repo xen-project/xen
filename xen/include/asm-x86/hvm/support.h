@@ -53,23 +53,23 @@ extern unsigned int opt_hvm_debug_level;
 
 extern unsigned long hvm_io_bitmap[];
 
-enum hvm_copy_result {
-    HVMCOPY_okay = 0,
-    HVMCOPY_bad_gva_to_gfn,
-    HVMCOPY_bad_gfn_to_mfn,
-    HVMCOPY_unhandleable,
-    HVMCOPY_gfn_paged_out,
-    HVMCOPY_gfn_shared,
+enum hvm_translation_result {
+    HVMTRANS_okay,
+    HVMTRANS_bad_linear_to_gfn,
+    HVMTRANS_bad_gfn_to_mfn,
+    HVMTRANS_unhandleable,
+    HVMTRANS_gfn_paged_out,
+    HVMTRANS_gfn_shared,
 };
 
 /*
  * Copy to/from a guest physical address.
- * Returns HVMCOPY_okay, else HVMCOPY_bad_gfn_to_mfn if the given physical
+ * Returns HVMTRANS_okay, else HVMTRANS_bad_gfn_to_mfn if the given physical
  * address range does not map entirely onto ordinary machine memory.
  */
-enum hvm_copy_result hvm_copy_to_guest_phys(
+enum hvm_translation_result hvm_copy_to_guest_phys(
     paddr_t paddr, void *buf, int size, struct vcpu *v);
-enum hvm_copy_result hvm_copy_from_guest_phys(
+enum hvm_translation_result hvm_copy_from_guest_phys(
     void *buf, paddr_t paddr, int size);
 
 /*
@@ -79,13 +79,13 @@ enum hvm_copy_result hvm_copy_from_guest_phys(
  * to set them.
  * 
  * Returns:
- *  HVMCOPY_okay: Copy was entirely successful.
- *  HVMCOPY_bad_gfn_to_mfn: Some guest physical address did not map to
- *                          ordinary machine memory.
- *  HVMCOPY_bad_gva_to_gfn: Some guest virtual address did not have a valid
- *                          mapping to a guest physical address.  The
- *                          pagefault_info_t structure will be filled in if
- *                          provided.
+ *  HVMTRANS_okay: Copy was entirely successful.
+ *  HVMTRANS_bad_gfn_to_mfn: Some guest physical address did not map to
+ *                           ordinary machine memory.
+ *  HVMTRANS_bad_linear_to_gfn: Some guest linear address did not have a
+ *                              valid mapping to a guest physical address.
+ *                              The pagefault_info_t structure will be filled
+ *                              in if provided.
  */
 typedef struct pagefault_info
 {
@@ -93,13 +93,13 @@ typedef struct pagefault_info
     int ec;
 } pagefault_info_t;
 
-enum hvm_copy_result hvm_copy_to_guest_linear(
+enum hvm_translation_result hvm_copy_to_guest_linear(
     unsigned long addr, void *buf, int size, uint32_t pfec,
     pagefault_info_t *pfinfo);
-enum hvm_copy_result hvm_copy_from_guest_linear(
+enum hvm_translation_result hvm_copy_from_guest_linear(
     void *buf, unsigned long addr, int size, uint32_t pfec,
     pagefault_info_t *pfinfo);
-enum hvm_copy_result hvm_fetch_from_guest_linear(
+enum hvm_translation_result hvm_fetch_from_guest_linear(
     void *buf, unsigned long addr, int size, uint32_t pfec,
     pagefault_info_t *pfinfo);
 

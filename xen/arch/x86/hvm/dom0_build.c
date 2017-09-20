@@ -238,7 +238,7 @@ static int __init pvh_setup_vmx_realmode_helpers(struct domain *d)
     if ( !pvh_steal_ram(d, HVM_VM86_TSS_SIZE, 128, GB(4), &gaddr) )
     {
         if ( hvm_copy_to_guest_phys(gaddr, NULL, HVM_VM86_TSS_SIZE, v) !=
-             HVMCOPY_okay )
+             HVMTRANS_okay )
             printk("Unable to zero VM86 TSS area\n");
         d->arch.hvm_domain.params[HVM_PARAM_VM86_TSS_SIZED] =
             VM86_TSS_UPDATED | ((uint64_t)HVM_VM86_TSS_SIZE << 32) | gaddr;

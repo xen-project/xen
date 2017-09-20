@@ -481,9 +481,9 @@ static int decode_vmx_inst(struct cpu_user_regs *regs,
             int rc = hvm_copy_from_guest_linear(poperandS, base, size,
                                                 0, &pfinfo);
 
-            if ( rc == HVMCOPY_bad_gva_to_gfn )
+            if ( rc == HVMTRANS_bad_linear_to_gfn )
                 hvm_inject_page_fault(pfinfo.ec, pfinfo.linear);
-            if ( rc != HVMCOPY_okay )
+            if ( rc != HVMTRANS_okay )
                 return X86EMUL_EXCEPTION;
         }
         decode->mem = base;
@@ -1468,7 +1468,7 @@ int nvmx_handle_vmxon(struct cpu_user_regs *regs)
     }
 
     rc = hvm_copy_from_guest_phys(&nvmcs_revid, gpa, sizeof(nvmcs_revid));
-    if ( rc != HVMCOPY_okay ||
+    if ( rc != HVMTRANS_okay ||
          (nvmcs_revid & ~VMX_BASIC_REVISION_MASK) ||
          ((nvmcs_revid ^ vmx_basic_msr) & VMX_BASIC_REVISION_MASK) )
     {
@@ -1746,9 +1746,9 @@ int nvmx_handle_vmptrst(struct cpu_user_regs *regs)
     gpa = nvcpu->nv_vvmcxaddr;
 
     rc = hvm_copy_to_guest_linear(decode.mem, &gpa, decode.len, 0, &pfinfo);
-    if ( rc == HVMCOPY_bad_gva_to_gfn )
+    if ( rc == HVMTRANS_bad_linear_to_gfn )
         hvm_inject_page_fault(pfinfo.ec, pfinfo.linear);
-    if ( rc != HVMCOPY_okay )
+    if ( rc != HVMTRANS_okay )
         return X86EMUL_EXCEPTION;
 
     vmsucceed(regs);
@@ -1835,9 +1835,9 @@ int nvmx_handle_vmread(struct cpu_user_regs *regs)
     switch ( decode.type ) {
     case VMX_INST_MEMREG_TYPE_MEMORY:
         rc = hvm_copy_to_guest_linear(decode.mem, &value, decode.len, 0, &pfinfo);
-        if ( rc == HVMCOPY_bad_gva_to_gfn )
+        if ( rc == HVMTRANS_bad_linear_to_gfn )
             hvm_inject_page_fault(pfinfo.ec, pfinfo.linear);
-        if ( rc != HVMCOPY_okay )
+        if ( rc != HVMTRANS_okay )
             return X86EMUL_EXCEPTION;
         break;
     case VMX_INST_MEMREG_TYPE_REG:

@@ -1266,7 +1266,7 @@ static void svm_emul_swint_injection(struct x86_event *event)
                                     PFEC_implicit, &pfinfo);
     if ( rc )
     {
-        if ( rc == HVMCOPY_bad_gva_to_gfn )
+        if ( rc == HVMTRANS_bad_linear_to_gfn )
         {
             fault = TRAP_page_fault;
             ec = pfinfo.ec;
