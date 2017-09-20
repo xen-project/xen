@@ -3069,6 +3069,83 @@ void hvm_task_switch(
     hvm_unmap_entry(nptss_desc);
 }
 
+enum hvm_translation_result hvm_translate_get_page(
+    struct vcpu *v, unsigned long addr, bool linear, uint32_t pfec,
+    pagefault_info_t *pfinfo, struct page_info **page_p,
+    gfn_t *gfn_p, p2m_type_t *p2mt_p)
+{
+    struct page_info *page;
+    p2m_type_t p2mt;
+    gfn_t gfn;
+
+    if ( linear )
+    {
+        gfn = _gfn(paging_gva_to_gfn(v, addr, &pfec));
+
+        if ( gfn_eq(gfn, INVALID_GFN) )
+        {
+            if ( pfec & PFEC_page_paged )
+                return HVMTRANS_gfn_paged_out;
+
+            if ( pfec & PFEC_page_shared )
+                return HVMTRANS_gfn_shared;
+
+            if ( pfinfo )
+            {
+                pfinfo->linear = addr;
+                pfinfo->ec = pfec & ~PFEC_implicit;
+            }
+
+            return HVMTRANS_bad_linear_to_gfn;
+        }
+    }
+    else
+    {
+        gfn = gaddr_to_gfn(addr);
+        ASSERT(!pfinfo);
+    }
+
+    /*
+     * No need to do the P2M lookup for internally handled MMIO, benefiting
+     * - 32-bit WinXP (& older Windows) on AMD CPUs for LAPIC accesses,
+     * - newer Windows (like Server 2012) for HPET accesses.
+     */
+    if ( v == current
+         && !nestedhvm_vcpu_in_guestmode(v)
+         && hvm_mmio_internal(gfn_to_gaddr(gfn)) )
+        return HVMTRANS_bad_gfn_to_mfn;
+
+    page = get_page_from_gfn(v->domain, gfn_x(gfn), &p2mt, P2M_UNSHARE);
+
+    if ( !page )
+        return HVMTRANS_bad_gfn_to_mfn;
+
+    if ( p2m_is_paging(p2mt) )
+    {
+        put_page(page);
+        p2m_mem_paging_populate(v->domain, gfn_x(gfn));
+        return HVMTRANS_gfn_paged_out;
+    }
+    if ( p2m_is_shared(p2mt) )
+    {
+        put_page(page);
+        return HVMTRANS_gfn_shared;
+    }
+    if ( p2m_is_grant(p2mt) )
+    {
+        put_page(page);
+        return HVMTRANS_unhandleable;
+    }
+
+    *page_p = page;
+    if ( gfn_p )
+        *gfn_p = gfn;
+    if ( p2mt_p )
+        *p2mt_p = p2mt;
+
+    return HVMTRANS_okay;
+}
+
 #define HVMCOPY_from_guest (0u<<0)
 #define HVMCOPY_to_guest   (1u<<0)
 #define HVMCOPY_phys       (0u<<2)
@@ -3077,7 +3154,7 @@ static enum hvm_translation_result __hvm_copy(
     void *buf, paddr_t addr, int size, struct vcpu *v, unsigned int flags,
     uint32_t pfec, pagefault_info_t *pfinfo)
 {
-    unsigned long gfn;
+    gfn_t gfn;
     struct page_info *page;
     p2m_type_t p2mt;
     char *p;
@@ -3103,65 +3180,15 @@ static enum hvm_translation_result __hvm_copy(
 
     while ( todo > 0 )
     {
+        enum hvm_translation_result res;
         paddr_t gpa = addr & ~PAGE_MASK;
 
         count = min_t(int, PAGE_SIZE - gpa, todo);
 
-        if ( flags & HVMCOPY_linear )
-        {
-            gfn = paging_gva_to_gfn(v, addr, &pfec);
-            if ( gfn == gfn_x(INVALID_GFN) )
-            {
-                if ( pfec & PFEC_page_paged )
-                    return HVMTRANS_gfn_paged_out;
-                if ( pfec & PFEC_page_shared )
-                    return HVMTRANS_gfn_shared;
-                if ( pfinfo )
-                {
-                    pfinfo->linear = addr;
-                    pfinfo->ec = pfec & ~PFEC_implicit;
-                }
-                return HVMTRANS_bad_linear_to_gfn;
-            }
-            gpa |= (paddr_t)gfn << PAGE_SHIFT;
-        }
-        else
-        {
-            gfn = addr >> PAGE_SHIFT;
-            gpa = addr;
-        }
-
-        /*
-         * No need to do the P2M lookup for internally handled MMIO, benefiting
-         * - 32-bit WinXP (& older Windows) on AMD CPUs for LAPIC accesses,
-         * - newer Windows (like Server 2012) for HPET accesses.
-         */
-        if ( v == current
-             && !nestedhvm_vcpu_in_guestmode(v)
-             && hvm_mmio_internal(gpa) )
-            return HVMTRANS_bad_gfn_to_mfn;
-
-        page = get_page_from_gfn(v->domain, gfn, &p2mt, P2M_UNSHARE);
-
-        if ( !page )
-            return HVMTRANS_bad_gfn_to_mfn;
-
-        if ( p2m_is_paging(p2mt) )
-        {
-            put_page(page);
-            p2m_mem_paging_populate(v->domain, gfn);
-            return HVMTRANS_gfn_paged_out;
-        }
-        if ( p2m_is_shared(p2mt) )
-        {
-            put_page(page);
-            return HVMTRANS_gfn_shared;
-        }
-        if ( p2m_is_grant(p2mt) )
-        {
-            put_page(page);
-            return HVMTRANS_unhandleable;
-        }
+        res = hvm_translate_get_page(v, addr, flags & HVMCOPY_linear,
+                                     pfec, pfinfo, &page, &gfn, &p2mt);
+        if ( res != HVMTRANS_okay )
+            return res;
 
         p = (char *)__map_domain_page(page) + (addr & ~PAGE_MASK);
 
@@ -3170,10 +3197,11 @@ static enum hvm_translation_result __hvm_copy(
             if ( p2m_is_discard_write(p2mt) )
             {
                 static unsigned long lastpage;
-                if ( xchg(&lastpage, gfn) != gfn )
+
+                if ( xchg(&lastpage, gfn_x(gfn)) != gfn_x(gfn) )
                     dprintk(XENLOG_G_DEBUG,
                             "%pv attempted write to read-only gfn %#lx (mfn=%#lx)\n",
-                            v, gfn, page_to_mfn(page));
+                            v, gfn_x(gfn), page_to_mfn(page));
             }
             else
             {

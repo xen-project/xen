@@ -24,6 +24,7 @@
 #include <xen/sched.h>
 #include <asm/hvm/save.h>
 #include <asm/processor.h>
+#include <asm/p2m.h>
 
 #ifndef NDEBUG
 #define DBG_LEVEL_0                 (1 << 0)
@@ -102,6 +103,17 @@ enum hvm_translation_result hvm_copy_from_guest_linear(
 enum hvm_translation_result hvm_fetch_from_guest_linear(
     void *buf, unsigned long addr, int size, uint32_t pfec,
     pagefault_info_t *pfinfo);
+
+/*
+ * Get a reference on the page under an HVM physical or linear address.  If
+ * linear, a pagewalk is performed using pfec (fault details optionally in
+ * pfinfo).
+ * On success, returns HVMTRANS_okay with a reference taken on **_page.
+ */
+enum hvm_translation_result hvm_translate_get_page(
+    struct vcpu *v, unsigned long addr, bool linear, uint32_t pfec,
+    pagefault_info_t *pfinfo, struct page_info **page_p,
+    gfn_t *gfn_p, p2m_type_t *p2mt_p);
 
 #define HVM_HCALL_completed  0 /* hypercall completed - no further action */
 #define HVM_HCALL_preempted  1 /* hypercall preempted - re-execute VMCALL */
