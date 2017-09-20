@@ -4549,40 +4549,21 @@ int xenmem_add_to_physmap_one(
 {
     struct page_info *page = NULL;
     unsigned long gfn = 0; /* gcc ... */
-    unsigned long prev_mfn, mfn = 0, old_gpfn;
+    unsigned long prev_mfn, old_gpfn;
     int rc = 0;
+    mfn_t mfn = INVALID_MFN;
     p2m_type_t p2mt;
 
     switch ( space )
     {
         case XENMAPSPACE_shared_info:
             if ( idx == 0 )
-                mfn = virt_to_mfn(d->shared_info);
+                mfn = _mfn(virt_to_mfn(d->shared_info));
             break;
         case XENMAPSPACE_grant_table:
-            grant_write_lock(d->grant_table);
-
-            if ( d->grant_table->gt_version == 0 )
-                d->grant_table->gt_version = 1;
-
-            if ( d->grant_table->gt_version == 2 &&
-                 (idx & XENMAPIDX_grant_table_status) )
-            {
-                idx &= ~XENMAPIDX_grant_table_status;
-                if ( idx < nr_status_frames(d->grant_table) )
-                    mfn = virt_to_mfn(d->grant_table->status[idx]);
-            }
-            else
-            {
-                if ( (idx >= nr_grant_frames(d->grant_table)) &&
-                     (idx < max_grant_frames) )
-                    gnttab_grow_table(d, idx + 1);
-
-                if ( idx < nr_grant_frames(d->grant_table) )
-                    mfn = virt_to_mfn(d->grant_table->shared_raw[idx]);
-            }
-
-            grant_write_unlock(d->grant_table);
+            rc = gnttab_map_frame(d, idx, gpfn, &mfn);
+            if ( rc )
+                return rc;
             break;
         case XENMAPSPACE_gmfn_range:
         case XENMAPSPACE_gmfn:
@@ -4599,8 +4580,8 @@ int xenmem_add_to_physmap_one(
             }
             if ( !get_page_from_mfn(_mfn(idx), d) )
                 break;
-            mfn = idx;
-            page = mfn_to_page(_mfn(mfn));
+            mfn = _mfn(idx);
+            page = mfn_to_page(mfn);
             break;
         }
         case XENMAPSPACE_gmfn_foreign:
@@ -4609,7 +4590,7 @@ int xenmem_add_to_physmap_one(
             break;
     }
 
-    if ( !paging_mode_translate(d) || (mfn == 0) )
+    if ( !paging_mode_translate(d) || mfn_eq(mfn, INVALID_MFN) )
     {
         rc = -EINVAL;
         goto put_both;
@@ -4633,16 +4614,16 @@ int xenmem_add_to_physmap_one(
         goto put_both;
 
     /* Unmap from old location, if any. */
-    old_gpfn = get_gpfn_from_mfn(mfn);
+    old_gpfn = get_gpfn_from_mfn(mfn_x(mfn));
     ASSERT( old_gpfn != SHARED_M2P_ENTRY );
     if ( space == XENMAPSPACE_gmfn || space == XENMAPSPACE_gmfn_range )
         ASSERT( old_gpfn == gfn );
     if ( old_gpfn != INVALID_M2P_ENTRY )
-        rc = guest_physmap_remove_page(d, _gfn(old_gpfn), _mfn(mfn), PAGE_ORDER_4K);
+        rc = guest_physmap_remove_page(d, _gfn(old_gpfn), mfn, PAGE_ORDER_4K);
 
     /* Map at new location. */
     if ( !rc )
-        rc = guest_physmap_add_page(d, gpfn, _mfn(mfn), PAGE_ORDER_4K);
+        rc = guest_physmap_add_page(d, gpfn, mfn, PAGE_ORDER_4K);
 
  put_both:
     /* In the XENMAPSPACE_gmfn, we took a ref of the gfn at the top */

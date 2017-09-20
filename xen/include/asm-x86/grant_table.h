@@ -75,6 +75,11 @@ static inline void gnttab_clear_flag(unsigned int nr, uint16_t *st)
     asm volatile ("lock btrw %w1,%0" : "=m" (*st) : "Ir" (nr), "m" (*st));
 }
 
+static inline void gnttab_set_frame_gfn(struct domain *d, unsigned long idx,
+                                        gfn_t gfn)
+{
+}
+
 /* Foreign mappings of HHVM-guest pages do not modify the type count. */
 #define gnttab_host_mapping_get_page_type(ro, ld, rd)   \
     (!(ro) && (((ld) == (rd)) || !paging_mode_external(rd)))

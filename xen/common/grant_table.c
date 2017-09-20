@@ -1580,7 +1580,7 @@ gnttab_unpopulate_status_frames(struct domain *d, struct grant_table *gt)
  * Grow the grant table. The caller must hold the grant table's
  * write lock before calling this function.
  */
-int
+static int
 gnttab_grow_table(struct domain *d, unsigned int req_nr_frames)
 {
     struct grant_table *gt = d->grant_table;
@@ -3607,6 +3607,45 @@ int mem_sharing_gref_to_gfn(struct grant_table *gt, grant_ref_t ref,
     return rc;
 }
 #endif
+
+int gnttab_map_frame(struct domain *d, unsigned long idx, gfn_t gfn,
+                     mfn_t *mfn)
+{
+    int rc = 0;
+    struct grant_table *gt = d->grant_table;
+
+    grant_write_lock(gt);
+
+    if ( gt->gt_version == 0 )
+        gt->gt_version = 1;
+
+    if ( gt->gt_version == 2 &&
+         (idx & XENMAPIDX_grant_table_status) )
+    {
+        idx &= ~XENMAPIDX_grant_table_status;
+        if ( idx < nr_status_frames(gt) )
+            *mfn = _mfn(virt_to_mfn(gt->status[idx]));
+        else
+            rc = -EINVAL;
+    }
+    else
+    {
+        if ( (idx >= nr_grant_frames(gt)) && (idx < max_grant_frames) )
+            gnttab_grow_table(d, idx + 1);
+
+        if ( idx < nr_grant_frames(gt) )
+            *mfn = _mfn(virt_to_mfn(gt->shared_raw[idx]));
+        else
+            rc = -EINVAL;
+    }
+
+    if ( !rc )
+        gnttab_set_frame_gfn(d, idx, gfn);
+
+    grant_write_unlock(gt);
+
+    return rc;
+}
 
 static void gnttab_usage_print(struct domain *rd)
 {

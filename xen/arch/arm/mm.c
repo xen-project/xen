@@ -1233,39 +1233,11 @@ int xenmem_add_to_physmap_one(
     switch ( space )
     {
     case XENMAPSPACE_grant_table:
-        grant_write_lock(d->grant_table);
+        rc = gnttab_map_frame(d, idx, gfn, &mfn);
+        if ( rc )
+            return rc;
 
-        if ( d->grant_table->gt_version == 0 )
-            d->grant_table->gt_version = 1;
-
-        if ( d->grant_table->gt_version == 2 &&
-                (idx & XENMAPIDX_grant_table_status) )
-        {
-            idx &= ~XENMAPIDX_grant_table_status;
-            if ( idx < nr_status_frames(d->grant_table) )
-                mfn = virt_to_mfn(d->grant_table->status[idx]);
-        }
-        else
-        {
-            if ( (idx >= nr_grant_frames(d->grant_table)) &&
-                 (idx < max_grant_frames) )
-                gnttab_grow_table(d, idx + 1);
-
-            if ( idx < nr_grant_frames(d->grant_table) )
-                mfn = virt_to_mfn(d->grant_table->shared_raw[idx]);
-        }
-
-        if ( !mfn_eq(mfn, INVALID_MFN) )
-        {
-            d->arch.grant_table_gfn[idx] = gfn;
-
-            t = p2m_ram_rw;
-        }
-
-        grant_write_unlock(d->grant_table);
-
-        if ( mfn_eq(mfn, INVALID_MFN) )
-            return -EINVAL;
+        t = p2m_ram_rw;
 
         break;
     case XENMAPSPACE_shared_info:

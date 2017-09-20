@@ -106,12 +106,6 @@ void
 gnttab_release_mappings(
     struct domain *d);
 
-/* Increase the size of a domain's grant table.
- * Caller must hold d's grant table write lock.
- */
-int
-gnttab_grow_table(struct domain *d, unsigned int req_nr_frames);
-
 /* Number of grant table frames. Caller must hold d's grant table lock. */
 static inline unsigned int nr_grant_frames(struct grant_table *gt)
 {
@@ -135,5 +129,8 @@ static inline unsigned int grant_to_status_frames(int grant_frames)
 
 int mem_sharing_gref_to_gfn(struct grant_table *gt, grant_ref_t ref,
                             gfn_t *gfn, uint16_t *status);
+
+int gnttab_map_frame(struct domain *d, unsigned long idx, gfn_t gfn,
+                     mfn_t *mfn);
 
 #endif /* __XEN_GRANT_TABLE_H__ */
