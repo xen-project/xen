@@ -101,15 +101,8 @@ struct viridian_domain
 void cpuid_viridian_leaves(const struct vcpu *v, uint32_t leaf,
                            uint32_t subleaf, struct cpuid_leaf *res);
 
-int
-wrmsr_viridian_regs(
-    uint32_t idx,
-    uint64_t val);
-
-int
-rdmsr_viridian_regs(
-    uint32_t idx,
-    uint64_t *val);
+int guest_wrmsr_viridian(struct vcpu *v, uint32_t idx, uint64_t val);
+int guest_rdmsr_viridian(const struct vcpu *v, uint32_t idx, uint64_t *val);
 
 int
 viridian_hypercall(struct cpu_user_regs *regs);

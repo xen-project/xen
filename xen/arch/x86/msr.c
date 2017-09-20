@@ -150,8 +150,7 @@ int guest_rdmsr(const struct vcpu *v, uint32_t msr, uint64_t *val)
     case 0x40000000 ... 0x400001ff:
         if ( is_viridian_domain(d) )
         {
-            ret = (rdmsr_viridian_regs(msr, val)
-                   ? X86EMUL_OKAY : X86EMUL_EXCEPTION);
+            ret = guest_rdmsr_viridian(v, msr, val);
             break;
         }
 
@@ -278,8 +277,7 @@ int guest_wrmsr(struct vcpu *v, uint32_t msr, uint64_t val)
     case 0x40000000 ... 0x400001ff:
         if ( is_viridian_domain(d) )
         {
-            ret = (wrmsr_viridian_regs(msr, val)
-                   ? X86EMUL_OKAY : X86EMUL_EXCEPTION);
+            ret = guest_wrmsr_viridian(v, msr, val);
             break;
         }
 
