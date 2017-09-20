@@ -903,7 +903,7 @@ int xc_vcpu_get_extstate(xc_interface *xch,
                          uint32_t vcpu,
                          xc_vcpu_extstate_t *extstate);
 
-typedef xen_domctl_getvcpuinfo_t xc_vcpuinfo_t;
+typedef struct xen_domctl_getvcpuinfo xc_vcpuinfo_t;
 int xc_vcpu_getinfo(xc_interface *xch,
                     uint32_t domid,
                     uint32_t vcpu,
@@ -916,7 +916,7 @@ long long xc_domain_get_cpu_usage(xc_interface *xch,
 int xc_domain_sethandle(xc_interface *xch, uint32_t domid,
                         xen_domain_handle_t handle);
 
-typedef xen_domctl_shadow_op_stats_t xc_shadow_op_stats_t;
+typedef struct xen_domctl_shadow_op_stats xc_shadow_op_stats_t;
 int xc_shadow_control(xc_interface *xch,
                       uint32_t domid,
                       unsigned int sop,

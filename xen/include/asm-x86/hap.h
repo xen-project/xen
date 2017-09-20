@@ -34,8 +34,8 @@
 /*        hap domain level functions            */
 /************************************************/
 void  hap_domain_init(struct domain *d);
-int   hap_domctl(struct domain *d, xen_domctl_shadow_op_t *sc,
-                 XEN_GUEST_HANDLE_PARAM(void) u_domctl);
+int   hap_domctl(struct domain *d, struct xen_domctl_shadow_op *sc,
+                 XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl);
 int   hap_enable(struct domain *d, u32 mode);
 void  hap_final_teardown(struct domain *d);
 void  hap_teardown(struct domain *d, bool *preempted);

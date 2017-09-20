@@ -276,7 +276,7 @@ static struct vcpu *vector_hashing_dest(const struct domain *d,
 }
 
 int pt_irq_create_bind(
-    struct domain *d, xen_domctl_bind_pt_irq_t *pt_irq_bind)
+    struct domain *d, const struct xen_domctl_bind_pt_irq *pt_irq_bind)
 {
     struct hvm_irq_dpci *hvm_irq_dpci;
     struct hvm_pirq_dpci *pirq_dpci;
@@ -620,7 +620,7 @@ int pt_irq_create_bind(
 }
 
 int pt_irq_destroy_bind(
-    struct domain *d, xen_domctl_bind_pt_irq_t *pt_irq_bind)
+    struct domain *d, const struct xen_domctl_bind_pt_irq *pt_irq_bind)
 {
     struct hvm_irq_dpci *hvm_irq_dpci;
     struct hvm_pirq_dpci *pirq_dpci;

@@ -608,8 +608,8 @@ out:
     paging_unlock(d);
 }
 
-int hap_domctl(struct domain *d, xen_domctl_shadow_op_t *sc,
-               XEN_GUEST_HANDLE_PARAM(void) u_domctl)
+int hap_domctl(struct domain *d, struct xen_domctl_shadow_op *sc,
+               XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
 {
     int rc;
     bool preempted = false;

@@ -244,7 +244,7 @@ void domctl_lock_release(void)
 }
 
 static inline
-int vcpuaffinity_params_invalid(const xen_domctl_vcpuaffinity_t *vcpuaff)
+int vcpuaffinity_params_invalid(const struct xen_domctl_vcpuaffinity *vcpuaff)
 {
     return vcpuaff->flags == 0 ||
            ((vcpuaff->flags & XEN_VCPUAFFINITY_HARD) &&
@@ -691,7 +691,7 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
     case XEN_DOMCTL_getvcpuaffinity:
     {
         struct vcpu *v;
-        xen_domctl_vcpuaffinity_t *vcpuaff = &op->u.vcpuaffinity;
+        struct xen_domctl_vcpuaffinity *vcpuaff = &op->u.vcpuaffinity;
 
         ret = -EINVAL;
         if ( vcpuaff->vcpu >= d->max_vcpus )

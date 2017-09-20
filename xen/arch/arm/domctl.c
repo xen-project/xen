@@ -41,7 +41,7 @@ long arch_do_domctl(struct xen_domctl *domctl, struct domain *d,
     case XEN_DOMCTL_bind_pt_irq:
     {
         int rc;
-        xen_domctl_bind_pt_irq_t *bind = &domctl->u.bind_pt_irq;
+        struct xen_domctl_bind_pt_irq *bind = &domctl->u.bind_pt_irq;
         uint32_t irq = bind->u.spi.spi;
         uint32_t virq = bind->machine_irq;
 
@@ -87,7 +87,7 @@ long arch_do_domctl(struct xen_domctl *domctl, struct domain *d,
     case XEN_DOMCTL_unbind_pt_irq:
     {
         int rc;
-        xen_domctl_bind_pt_irq_t *bind = &domctl->u.bind_pt_irq;
+        struct xen_domctl_bind_pt_irq *bind = &domctl->u.bind_pt_irq;
         uint32_t irq = bind->u.spi.spi;
         uint32_t virq = bind->machine_irq;
 

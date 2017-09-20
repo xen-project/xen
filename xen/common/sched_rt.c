@@ -1345,7 +1345,7 @@ rt_dom_cntl(
     struct vcpu *v;
     unsigned long flags;
     int rc = 0;
-    xen_domctl_schedparam_vcpu_t local_sched;
+    struct xen_domctl_schedparam_vcpu local_sched;
     s_time_t period, budget;
     uint32_t index = 0;
 

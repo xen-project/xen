@@ -674,8 +674,9 @@ void paging_vcpu_init(struct vcpu *v)
 }
 
 
-int paging_domctl(struct domain *d, xen_domctl_shadow_op_t *sc,
-                  XEN_GUEST_HANDLE_PARAM(void) u_domctl, bool_t resuming)
+int paging_domctl(struct domain *d, struct xen_domctl_shadow_op *sc,
+                  XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl,
+                  bool_t resuming)
 {
     int rc;
 
@@ -775,8 +776,7 @@ long paging_domctl_continuation(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
     {
         if ( domctl_lock_acquire() )
         {
-            ret = paging_domctl(d, &op.u.shadow_op,
-                                guest_handle_cast(u_domctl, void), 1);
+            ret = paging_domctl(d, &op.u.shadow_op, u_domctl, 1);
 
             domctl_lock_release();
         }

@@ -202,8 +202,9 @@ int paging_domain_init(struct domain *d, unsigned int domcr_flags);
 /* Handler for paging-control ops: operations from user-space to enable
  * and disable ephemeral shadow modes (test mode and log-dirty mode) and
  * manipulate the log-dirty bitmap. */
-int paging_domctl(struct domain *d, xen_domctl_shadow_op_t *sc,
-                  XEN_GUEST_HANDLE_PARAM(void) u_domctl, bool_t resuming);
+int paging_domctl(struct domain *d, struct xen_domctl_shadow_op *sc,
+                  XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl,
+                  bool_t resuming);
 
 /* Helper hypercall for dealing with continuations. */
 long paging_domctl_continuation(XEN_GUEST_HANDLE_PARAM(xen_domctl_t));

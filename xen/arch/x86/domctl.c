@@ -48,7 +48,7 @@ static int gdbsx_guest_mem_io(domid_t domid, struct xen_domctl_gdbsx_memio *iop)
 }
 
 static int update_domain_cpuid_info(struct domain *d,
-                                    const xen_domctl_cpuid_t *ctl)
+                                    const struct xen_domctl_cpuid *ctl)
 {
     struct cpuid_policy *p = d->arch.cpuid;
     const struct cpuid_leaf leaf = { ctl->eax, ctl->ebx, ctl->ecx, ctl->edx };
@@ -363,8 +363,7 @@ long arch_do_domctl(
     {
 
     case XEN_DOMCTL_shadow_op:
-        ret = paging_domctl(d, &domctl->u.shadow_op,
-                            guest_handle_cast(u_domctl, void), 0);
+        ret = paging_domctl(d, &domctl->u.shadow_op, u_domctl, 0);
         if ( ret == -ERESTART )
             return hypercall_create_continuation(__HYPERVISOR_arch_1,
                                                  "h", u_domctl);
@@ -707,7 +706,7 @@ long arch_do_domctl(
 
     case XEN_DOMCTL_bind_pt_irq:
     {
-        xen_domctl_bind_pt_irq_t *bind = &domctl->u.bind_pt_irq;
+        struct xen_domctl_bind_pt_irq *bind = &domctl->u.bind_pt_irq;
         int irq;
 
         ret = -EINVAL;
@@ -738,7 +737,7 @@ long arch_do_domctl(
 
     case XEN_DOMCTL_unbind_pt_irq:
     {
-        xen_domctl_bind_pt_irq_t *bind = &domctl->u.bind_pt_irq;
+        struct xen_domctl_bind_pt_irq *bind = &domctl->u.bind_pt_irq;
         int irq = domain_pirq_to_irq(d, bind->machine_irq);
 
         ret = -EPERM;

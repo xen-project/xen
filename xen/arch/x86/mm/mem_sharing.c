@@ -1606,7 +1606,7 @@ out:
     return rc;
 }
 
-int mem_sharing_domctl(struct domain *d, xen_domctl_mem_sharing_op_t *mec)
+int mem_sharing_domctl(struct domain *d, struct xen_domctl_mem_sharing_op *mec)
 {
     int rc;
 

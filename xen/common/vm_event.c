@@ -41,7 +41,7 @@
 
 static int vm_event_enable(
     struct domain *d,
-    xen_domctl_vm_event_op_t *vec,
+    struct xen_domctl_vm_event_op *vec,
     struct vm_event_domain **ved,
     int pause_flag,
     int param,
@@ -587,7 +587,7 @@ void vm_event_cleanup(struct domain *d)
 #endif
 }
 
-int vm_event_domctl(struct domain *d, xen_domctl_vm_event_op_t *vec,
+int vm_event_domctl(struct domain *d, struct xen_domctl_vm_event_op *vec,
                     XEN_GUEST_HANDLE_PARAM(void) u_domctl)
 {
     int rc;

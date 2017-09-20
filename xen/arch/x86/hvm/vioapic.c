@@ -162,7 +162,7 @@ static int vioapic_hwdom_map_gsi(unsigned int gsi, unsigned int trig,
                                  unsigned int pol)
 {
     struct domain *currd = current->domain;
-    xen_domctl_bind_pt_irq_t pt_irq_bind = {
+    struct xen_domctl_bind_pt_irq pt_irq_bind = {
         .irq_type = PT_IRQ_TYPE_PCI,
         .machine_irq = gsi,
     };
