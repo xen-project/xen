@@ -40,6 +40,45 @@
 #include <xsm/xsm.h>
 #include <asm/flushtlb.h>
 
+/* Per-domain grant information. */
+struct grant_table {
+    /*
+     * Lock protecting updates to grant table state (version, active
+     * entry list, etc.)
+     */
+    percpu_rwlock_t       lock;
+    /* Lock protecting the maptrack limit */
+    spinlock_t            maptrack_lock;
+    /*
+     * The defined versions are 1 and 2.  Set to 0 if we don't know
+     * what version to use yet.
+     */
+    unsigned int          gt_version;
+    /* Table size. Number of frames shared with guest */
+    unsigned int          nr_grant_frames;
+    /* Number of grant status frames shared with guest (for version 2) */
+    unsigned int          nr_status_frames;
+    /* Number of available maptrack entries. */
+    unsigned int          maptrack_limit;
+    /* Shared grant table (see include/public/grant_table.h). */
+    union {
+        void **shared_raw;
+        struct grant_entry_v1 **shared_v1;
+        union grant_entry_v2 **shared_v2;
+    };
+    /* State grant table (see include/public/grant_table.h). */
+    grant_status_t       **status;
+    /* Active grant table. */
+    struct active_grant_entry **active;
+    /* Mapping tracking table per vcpu. */
+    struct grant_mapping **maptrack;
+};
+
+#ifndef DEFAULT_MAX_NR_GRANT_FRAMES /* to allow arch to override */
+/* Default maximum size of a grant table. [POLICY] */
+#define DEFAULT_MAX_NR_GRANT_FRAMES   32
+#endif
+
 unsigned int __read_mostly max_grant_frames;
 integer_param("gnttab_max_frames", max_grant_frames);
 
@@ -117,6 +156,18 @@ struct grant_mapping {
     uint32_t vcpu;          /* vcpu which created the grant mapping */
     uint32_t pad;           /* round size to a power of 2 */
 };
+
+/* Number of grant table frames. Caller must hold d's grant table lock. */
+static inline unsigned int nr_grant_frames(const struct grant_table *gt)
+{
+    return gt->nr_grant_frames;
+}
+
+/* Number of status grant table frames. Caller must hold d's gr. table lock.*/
+static inline unsigned int nr_status_frames(const struct grant_table *gt)
+{
+    return gt->nr_status_frames;
+}
 
 #define MAPTRACK_PER_PAGE (PAGE_SIZE / sizeof(struct grant_mapping))
 #define maptrack_entry(t, e) \
@@ -197,7 +248,27 @@ static inline void act_set_gfn(struct active_grant_entry *act, gfn_t gfn)
 #endif
 }
 
-DEFINE_PERCPU_RWLOCK_GLOBAL(grant_rwlock);
+static DEFINE_PERCPU_RWLOCK_GLOBAL(grant_rwlock);
+
+static inline void grant_read_lock(struct grant_table *gt)
+{
+    percpu_read_lock(grant_rwlock, &gt->lock);
+}
+
+static inline void grant_read_unlock(struct grant_table *gt)
+{
+    percpu_read_unlock(grant_rwlock, &gt->lock);
+}
+
+static inline void grant_write_lock(struct grant_table *gt)
+{
+    percpu_write_lock(grant_rwlock, &gt->lock);
+}
+
+static inline void grant_write_unlock(struct grant_table *gt)
+{
+    percpu_write_unlock(grant_rwlock, &gt->lock);
+}
 
 static inline void gnttab_flush_tlb(const struct domain *d)
 {
@@ -248,6 +319,14 @@ active_entry_acquire(struct grant_table *t, grant_ref_t e)
 static inline void active_entry_release(struct active_grant_entry *act)
 {
     spin_unlock(&act->lock);
+}
+
+#define GRANT_STATUS_PER_PAGE (PAGE_SIZE / sizeof(grant_status_t))
+#define GRANT_PER_PAGE (PAGE_SIZE / sizeof(grant_entry_v2_t))
+/* Number of grant table status entries. Caller must hold d's gr. table lock.*/
+static inline unsigned int grant_to_status_frames(unsigned int grant_frames)
+{
+    return DIV_ROUND_UP(grant_frames * GRANT_PER_PAGE, GRANT_STATUS_PER_PAGE);
 }
 
 /* Check if the page has been paged out, or needs unsharing.
