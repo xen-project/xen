@@ -114,9 +114,11 @@ int init_vcpu_msr_policy(struct vcpu *v)
 
 int guest_rdmsr(const struct vcpu *v, uint32_t msr, uint64_t *val)
 {
-    const struct cpuid_policy *cp = v->domain->arch.cpuid;
-    const struct msr_policy *mp = v->domain->arch.msr;
+    const struct domain *d = v->domain;
+    const struct cpuid_policy *cp = d->arch.cpuid;
+    const struct msr_policy *mp = d->arch.msr;
     const struct vcpu_msrs *msrs = v->arch.msrs;
+    int ret = X86EMUL_OKAY;
 
     switch ( msr )
     {
@@ -145,11 +147,31 @@ int guest_rdmsr(const struct vcpu *v, uint32_t msr, uint64_t *val)
         *val = msrs->misc_features_enables.raw;
         break;
 
+    case 0x40000000 ... 0x400001ff:
+        if ( is_viridian_domain(d) )
+        {
+            ret = (rdmsr_viridian_regs(msr, val)
+                   ? X86EMUL_OKAY : X86EMUL_EXCEPTION);
+            break;
+        }
+
+        /* Fallthrough. */
+    case 0x40000200 ... 0x400002ff:
+        ret = (rdmsr_hypervisor_regs(msr, val)
+               ? X86EMUL_OKAY : X86EMUL_EXCEPTION);
+        break;
+
     default:
         return X86EMUL_UNHANDLEABLE;
     }
 
-    return X86EMUL_OKAY;
+    /*
+     * Interim safety check that functions we dispatch to don't alias "Not yet
+     * handled by the new MSR infrastructure".
+     */
+    ASSERT(ret != X86EMUL_UNHANDLEABLE);
+
+    return ret;
 
  gp_fault:
     return X86EMUL_EXCEPTION;
@@ -162,6 +184,7 @@ int guest_wrmsr(struct vcpu *v, uint32_t msr, uint64_t val)
     const struct cpuid_policy *cp = d->arch.cpuid;
     const struct msr_policy *mp = d->arch.msr;
     struct vcpu_msrs *msrs = v->arch.msrs;
+    int ret = X86EMUL_OKAY;
 
     switch ( msr )
     {
@@ -252,11 +275,35 @@ int guest_wrmsr(struct vcpu *v, uint32_t msr, uint64_t val)
         break;
     }
 
+    case 0x40000000 ... 0x400001ff:
+        if ( is_viridian_domain(d) )
+        {
+            ret = (wrmsr_viridian_regs(msr, val)
+                   ? X86EMUL_OKAY : X86EMUL_EXCEPTION);
+            break;
+        }
+
+        /* Fallthrough. */
+    case 0x40000200 ... 0x400002ff:
+        switch ( wrmsr_hypervisor_regs(msr, val) )
+        {
+        case -ERESTART: ret = X86EMUL_RETRY;     break;
+        case 1:         ret = X86EMUL_OKAY;      break;
+        default:        ret = X86EMUL_EXCEPTION; break;
+        }
+        break;
+
     default:
         return X86EMUL_UNHANDLEABLE;
     }
 
-    return X86EMUL_OKAY;
+    /*
+     * Interim safety check that functions we dispatch to don't alias "Not yet
+     * handled by the new MSR infrastructure".
+     */
+    ASSERT(ret != X86EMUL_UNHANDLEABLE);
+
+    return ret;
 
  gp_fault:
     return X86EMUL_EXCEPTION;

@@ -2965,10 +2965,6 @@ static int vmx_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
             break;
         }
 
-        if ( rdmsr_viridian_regs(msr, msr_content) ||
-             rdmsr_hypervisor_regs(msr, msr_content) )
-            break;
-
         if ( rdmsr_safe(msr, *msr_content) == 0 )
             break;
 
@@ -3249,31 +3245,15 @@ static int vmx_msr_write_intercept(unsigned int msr, uint64_t msr_content)
         if ( passive_domain_do_wrmsr(msr, msr_content) )
             return X86EMUL_OKAY;
 
-        if ( wrmsr_viridian_regs(msr, msr_content) ) 
-            break;
-
         if ( vmx_write_guest_msr(v, msr, msr_content) == 0 ||
              is_last_branch_msr(msr) )
             break;
 
-        switch ( wrmsr_hypervisor_regs(msr, msr_content) )
-        {
-        case -ERESTART:
-            return X86EMUL_RETRY;
-        case 0:
-            /*
-             * Match up with the RDMSR side for now; ultimately this
-             * entire case block should go away.
-             */
-            if ( rdmsr_safe(msr, msr_content) == 0 )
-                break;
-            goto gp_fault;
-        case 1:
+        /* Match up with the RDMSR side; ultimately this should go away. */
+        if ( rdmsr_safe(msr, msr_content) == 0 )
             break;
-        default:
-            goto gp_fault;
-        }
-        break;
+
+        goto gp_fault;
     }
 
     return X86EMUL_OKAY;

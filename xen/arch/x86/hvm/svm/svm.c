@@ -2016,10 +2016,6 @@ static int svm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
         else if ( ret )
             break;
 
-        if ( rdmsr_viridian_regs(msr, msr_content) ||
-             rdmsr_hypervisor_regs(msr, msr_content) )
-            break;
-
         if ( rdmsr_safe(msr, *msr_content) == 0 )
             break;
 
@@ -2218,28 +2214,11 @@ static int svm_msr_write_intercept(unsigned int msr, uint64_t msr_content)
         else if ( ret )
             break;
 
-        if ( wrmsr_viridian_regs(msr, msr_content) )
+        /* Match up with the RDMSR side; ultimately this should go away. */
+        if ( rdmsr_safe(msr, msr_content) == 0 )
             break;
 
-        switch ( wrmsr_hypervisor_regs(msr, msr_content) )
-        {
-        case -ERESTART:
-            result = X86EMUL_RETRY;
-            break;
-        case 0:
-            /*
-             * Match up with the RDMSR side for now; ultimately this entire
-             * case block should go away.
-             */
-            if ( rdmsr_safe(msr, msr_content) == 0 )
-                break;
-            goto gpf;
-        case 1:
-            break;
-        default:
-            goto gpf;
-        }
-        break;
+        goto gpf;
     }
 
     return result;

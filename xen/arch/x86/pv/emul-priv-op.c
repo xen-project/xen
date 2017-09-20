@@ -950,9 +950,6 @@ static int read_msr(unsigned int reg, uint64_t *val,
         }
         /* fall through */
     default:
-        if ( rdmsr_hypervisor_regs(reg, val) )
-            return X86EMUL_OKAY;
-
         rc = vmce_rdmsr(reg, val);
         if ( rc < 0 )
             break;
@@ -1149,9 +1146,6 @@ static int write_msr(unsigned int reg, uint64_t val,
         }
         /* fall through */
     default:
-        if ( wrmsr_hypervisor_regs(reg, val) == 1 )
-            return X86EMUL_OKAY;
-
         rc = vmce_wrmsr(reg, val);
         if ( rc < 0 )
             break;
