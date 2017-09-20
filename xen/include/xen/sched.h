@@ -917,7 +917,7 @@ int cpupool_do_sysctl(struct xen_sysctl_cpupool_op *op);
 void schedule_dump(struct cpupool *c);
 extern void dump_runq(unsigned char key);
 
-void arch_do_physinfo(xen_sysctl_physinfo_t *pi);
+void arch_do_physinfo(struct xen_sysctl_physinfo *pi);
 
 #endif /* __SCHED_H__ */
 

@@ -1240,7 +1240,7 @@ csched_sys_cntl(const struct scheduler *ops,
                         struct xen_sysctl_scheduler_op *sc)
 {
     int rc = -EINVAL;
-    xen_sysctl_credit_schedule_t *params = &sc->u.sched_credit;
+    struct xen_sysctl_credit_schedule *params = &sc->u.sched_credit;
     struct csched_private *prv = CSCHED_PRIV(ops);
     unsigned long flags;
 

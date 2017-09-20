@@ -209,7 +209,7 @@ static int gcov_dump_all(XEN_GUEST_HANDLE_PARAM(char) buffer,
     return ret;
 }
 
-int sysctl_gcov_op(xen_sysctl_gcov_op_t *op)
+int sysctl_gcov_op(struct xen_sysctl_gcov_op *op)
 {
     int ret;
 

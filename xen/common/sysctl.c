@@ -250,7 +250,7 @@ long do_sysctl(XEN_GUEST_HANDLE_PARAM(xen_sysctl_t) u_sysctl)
 
     case XEN_SYSCTL_physinfo:
     {
-        xen_sysctl_physinfo_t *pi = &op->u.physinfo;
+        struct xen_sysctl_physinfo *pi = &op->u.physinfo;
 
         memset(pi, 0, sizeof(*pi));
         pi->threads_per_core =
@@ -276,7 +276,7 @@ long do_sysctl(XEN_GUEST_HANDLE_PARAM(xen_sysctl_t) u_sysctl)
     case XEN_SYSCTL_numainfo:
     {
         unsigned int i, j, num_nodes;
-        xen_sysctl_numainfo_t *ni = &op->u.numainfo;
+        struct xen_sysctl_numainfo *ni = &op->u.numainfo;
         bool_t do_meminfo = !guest_handle_is_null(ni->meminfo);
         bool_t do_distance = !guest_handle_is_null(ni->distance);
 
@@ -284,7 +284,7 @@ long do_sysctl(XEN_GUEST_HANDLE_PARAM(xen_sysctl_t) u_sysctl)
 
         if ( do_meminfo || do_distance )
         {
-            xen_sysctl_meminfo_t meminfo = { 0 };
+            struct xen_sysctl_meminfo meminfo = { };
 
             if ( num_nodes > ni->num_nodes )
                 num_nodes = ni->num_nodes;
@@ -346,12 +346,12 @@ long do_sysctl(XEN_GUEST_HANDLE_PARAM(xen_sysctl_t) u_sysctl)
     case XEN_SYSCTL_cputopoinfo:
     {
         unsigned int i, num_cpus;
-        xen_sysctl_cputopoinfo_t *ti = &op->u.cputopoinfo;
+        struct xen_sysctl_cputopoinfo *ti = &op->u.cputopoinfo;
 
         num_cpus = cpumask_last(&cpu_online_map) + 1;
         if ( !guest_handle_is_null(ti->cputopo) )
         {
-            xen_sysctl_cputopo_t cputopo = { 0 };
+            struct xen_sysctl_cputopo cputopo = { };
 
             if ( num_cpus > ti->num_cpus )
                 num_cpus = ti->num_cpus;
@@ -405,7 +405,7 @@ long do_sysctl(XEN_GUEST_HANDLE_PARAM(xen_sysctl_t) u_sysctl)
 #ifdef CONFIG_HAS_PCI
     case XEN_SYSCTL_pcitopoinfo:
     {
-        xen_sysctl_pcitopoinfo_t *ti = &op->u.pcitopoinfo;
+        struct xen_sysctl_pcitopoinfo *ti = &op->u.pcitopoinfo;
         unsigned int i = 0;
 
         if ( guest_handle_is_null(ti->devs) ||

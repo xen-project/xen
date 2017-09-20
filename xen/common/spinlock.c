@@ -380,7 +380,7 @@ void spinlock_profile_reset(unsigned char key)
 }
 
 typedef struct {
-    xen_sysctl_lockprof_op_t *pc;
+    struct xen_sysctl_lockprof_op *pc;
     int                      rc;
 } spinlock_profile_ucopy_t;
 
@@ -388,7 +388,7 @@ static void spinlock_profile_ucopy_elem(struct lock_profile *data,
     int32_t type, int32_t idx, void *par)
 {
     spinlock_profile_ucopy_t *p = par;
-    xen_sysctl_lockprof_data_t elem;
+    struct xen_sysctl_lockprof_data elem;
 
     if ( p->rc )
         return;
@@ -411,7 +411,7 @@ static void spinlock_profile_ucopy_elem(struct lock_profile *data,
 }
 
 /* Dom0 control of lock profiling */
-int spinlock_profile_control(xen_sysctl_lockprof_op_t *pc)
+int spinlock_profile_control(struct xen_sysctl_lockprof_op *pc)
 {
     int rc = 0;
     spinlock_profile_ucopy_t par;

@@ -104,7 +104,7 @@ static struct livepatch_work livepatch_work;
  */
 static DEFINE_PER_CPU(bool_t, work_to_do);
 
-static int get_name(const xen_livepatch_name_t *name, char *n)
+static int get_name(const struct xen_livepatch_name *name, char *n)
 {
     if ( !name->size || name->size > XEN_LIVEPATCH_NAME_SIZE )
         return -EINVAL;
@@ -121,7 +121,7 @@ static int get_name(const xen_livepatch_name_t *name, char *n)
     return 0;
 }
 
-static int verify_payload(const xen_sysctl_livepatch_upload_t *upload, char *n)
+static int verify_payload(const struct xen_sysctl_livepatch_upload *upload, char *n)
 {
     if ( get_name(&upload->name, n) )
         return -EINVAL;
@@ -897,7 +897,7 @@ static int load_payload_data(struct payload *payload, void *raw, size_t len)
     return rc;
 }
 
-static int livepatch_upload(xen_sysctl_livepatch_upload_t *upload)
+static int livepatch_upload(struct xen_sysctl_livepatch_upload *upload)
 {
     struct payload *data, *found;
     char n[XEN_LIVEPATCH_NAME_SIZE];
@@ -954,7 +954,7 @@ static int livepatch_upload(xen_sysctl_livepatch_upload_t *upload)
     return rc;
 }
 
-static int livepatch_get(xen_sysctl_livepatch_get_t *get)
+static int livepatch_get(struct xen_sysctl_livepatch_get *get)
 {
     struct payload *data;
     int rc;
@@ -985,9 +985,9 @@ static int livepatch_get(xen_sysctl_livepatch_get_t *get)
     return 0;
 }
 
-static int livepatch_list(xen_sysctl_livepatch_list_t *list)
+static int livepatch_list(struct xen_sysctl_livepatch_list *list)
 {
-    xen_livepatch_status_t status;
+    struct xen_livepatch_status status;
     struct payload *data;
     unsigned int idx = 0, i = 0;
     int rc = 0;
@@ -1451,7 +1451,7 @@ static int build_id_dep(struct payload *payload, bool_t internal)
     return 0;
 }
 
-static int livepatch_action(xen_sysctl_livepatch_action_t *action)
+static int livepatch_action(struct xen_sysctl_livepatch_action *action)
 {
     struct payload *data;
     char n[XEN_LIVEPATCH_NAME_SIZE];
@@ -1560,7 +1560,7 @@ static int livepatch_action(xen_sysctl_livepatch_action_t *action)
     return rc;
 }
 
-int livepatch_op(xen_sysctl_livepatch_op_t *livepatch)
+int livepatch_op(struct xen_sysctl_livepatch_op *livepatch)
 {
     int rc;
 

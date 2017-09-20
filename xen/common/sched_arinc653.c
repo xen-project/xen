@@ -694,7 +694,7 @@ static int
 a653sched_adjust_global(const struct scheduler *ops,
                         struct xen_sysctl_scheduler_op *sc)
 {
-    xen_sysctl_arinc653_schedule_t local_sched;
+    struct xen_sysctl_arinc653_schedule local_sched;
     int rc = -EINVAL;
 
     switch ( sc->cmd )

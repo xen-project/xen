@@ -547,7 +547,7 @@ int xc_livepatch_upload(xc_interface *xch,
     DECLARE_SYSCTL;
     DECLARE_HYPERCALL_BUFFER(char, local);
     DECLARE_HYPERCALL_BOUNCE(name, 0 /* later */, XC_HYPERCALL_BUFFER_BOUNCE_IN);
-    xen_livepatch_name_t def_name = { .pad = { 0, 0, 0 } };
+    struct xen_livepatch_name def_name = { };
 
     if ( !name || !payload )
     {
@@ -594,12 +594,12 @@ int xc_livepatch_upload(xc_interface *xch,
 
 int xc_livepatch_get(xc_interface *xch,
                      char *name,
-                     xen_livepatch_status_t *status)
+                     struct xen_livepatch_status *status)
 {
     int rc;
     DECLARE_SYSCTL;
     DECLARE_HYPERCALL_BOUNCE(name, 0 /*adjust later */, XC_HYPERCALL_BUFFER_BOUNCE_IN);
-    xen_livepatch_name_t def_name = { .pad = { 0, 0, 0 } };
+    struct xen_livepatch_name def_name = { };
 
     if ( !name )
     {
@@ -677,7 +677,7 @@ int xc_livepatch_get(xc_interface *xch,
  * retrieved (if any).
  */
 int xc_livepatch_list(xc_interface *xch, unsigned int max, unsigned int start,
-                      xen_livepatch_status_t *info,
+                      struct xen_livepatch_status *info,
                       char *name, uint32_t *len,
                       unsigned int *done,
                       unsigned int *left)
@@ -837,7 +837,7 @@ static int _xc_livepatch_action(xc_interface *xch,
     DECLARE_SYSCTL;
     /* The size is figured out when we strlen(name) */
     DECLARE_HYPERCALL_BOUNCE(name, 0, XC_HYPERCALL_BUFFER_BOUNCE_IN);
-    xen_livepatch_name_t def_name = { .pad = { 0, 0, 0 } };
+    struct xen_livepatch_name def_name = { };
 
     def_name.size = strlen(name) + 1;
 

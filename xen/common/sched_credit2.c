@@ -2829,7 +2829,7 @@ csched2_dom_cntl(
 static int csched2_sys_cntl(const struct scheduler *ops,
                             struct xen_sysctl_scheduler_op *sc)
 {
-    xen_sysctl_credit2_schedule_t *params = &sc->u.sched_credit2;
+    struct xen_sysctl_credit2_schedule *params = &sc->u.sched_credit2;
     struct csched2_private *prv = csched2_priv(ops);
     unsigned long flags;
 
