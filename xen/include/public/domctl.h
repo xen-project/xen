@@ -1163,6 +1163,11 @@ struct xen_domctl_psr_cat_op {
 typedef struct xen_domctl_psr_cat_op xen_domctl_psr_cat_op_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_psr_cat_op_t);
 
+struct xen_domctl_set_gnttab_limits {
+    uint32_t grant_frames;     /* IN */
+    uint32_t maptrack_frames;  /* IN */
+};
+
 struct xen_domctl {
     uint32_t cmd;
 #define XEN_DOMCTL_createdomain                   1
@@ -1240,6 +1245,7 @@ struct xen_domctl {
 #define XEN_DOMCTL_monitor_op                    77
 #define XEN_DOMCTL_psr_cat_op                    78
 #define XEN_DOMCTL_soft_reset                    79
+#define XEN_DOMCTL_set_gnttab_limits             80
 #define XEN_DOMCTL_gdbsx_guestmemio            1000
 #define XEN_DOMCTL_gdbsx_pausevcpu             1001
 #define XEN_DOMCTL_gdbsx_unpausevcpu           1002
@@ -1302,6 +1308,7 @@ struct xen_domctl {
         struct xen_domctl_psr_cmt_op        psr_cmt_op;
         struct xen_domctl_monitor_op        monitor_op;
         struct xen_domctl_psr_cat_op        psr_cat_op;
+        struct xen_domctl_set_gnttab_limits set_gnttab_limits;
         uint8_t                             pad[128];
     } u;
 };

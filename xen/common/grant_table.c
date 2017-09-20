@@ -3640,6 +3640,25 @@ void grant_table_init_vcpu(struct vcpu *v)
     v->maptrack_tail = MAPTRACK_TAIL;
 }
 
+int grant_table_set_limits(struct domain *d, unsigned int grant_frames,
+                           unsigned int maptrack_frames)
+{
+    struct grant_table *gt = d->grant_table;
+    int ret = -EBUSY;
+
+    if ( !gt )
+        return -ENOENT;
+
+    grant_write_lock(gt);
+
+    ret = 0;
+    /* Set limits, alloc needed arrays. */
+
+    grant_write_unlock(gt);
+
+    return ret;
+}
+
 #ifdef CONFIG_HAS_MEM_SHARING
 int mem_sharing_gref_to_gfn(struct grant_table *gt, grant_ref_t ref,
                             gfn_t *gfn, uint16_t *status)

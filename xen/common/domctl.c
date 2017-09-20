@@ -14,6 +14,7 @@
 #include <xen/sched-if.h>
 #include <xen/domain.h>
 #include <xen/event.h>
+#include <xen/grant_table.h>
 #include <xen/domain_page.h>
 #include <xen/trace.h>
 #include <xen/console.h>
@@ -1147,6 +1148,11 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
         ret = monitor_domctl(d, &op->u.monitor_op);
         if ( !ret )
             copyback = 1;
+        break;
+
+    case XEN_DOMCTL_set_gnttab_limits:
+        ret = grant_table_set_limits(d, op->u.set_gnttab_limits.grant_frames,
+                                     op->u.set_gnttab_limits.maptrack_frames);
         break;
 
     default:

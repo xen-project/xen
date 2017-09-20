@@ -38,6 +38,8 @@ int grant_table_create(
 void grant_table_destroy(
     struct domain *d);
 void grant_table_init_vcpu(struct vcpu *v);
+int grant_table_set_limits(struct domain *d, unsigned int grant_frames,
+                           unsigned int maptrack_frames);
 
 /*
  * Check if domain has active grants and log first 10 of them.
