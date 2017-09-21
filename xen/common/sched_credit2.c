@@ -2921,15 +2921,15 @@ csched2_free_domdata(const struct scheduler *ops, void *data)
     struct csched2_dom *sdom = data;
     struct csched2_private *prv = csched2_priv(ops);
 
-    write_lock_irqsave(&prv->lock, flags);
-
     kill_timer(sdom->repl_timer);
-    xfree(sdom->repl_timer);
+
+    write_lock_irqsave(&prv->lock, flags);
 
     list_del_init(&sdom->sdom_elem);
 
     write_unlock_irqrestore(&prv->lock, flags);
 
+    xfree(sdom->repl_timer);
     xfree(data);
 }
 
