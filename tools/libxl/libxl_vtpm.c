@@ -104,24 +104,6 @@ static int libxl__vtpm_from_xenstore(libxl__gc *gc, const char *libxl_path,
     return 0;
 }
 
-libxl_device_vtpm *libxl_device_vtpm_list(libxl_ctx *ctx, uint32_t domid, int *num)
-{
-    libxl_device_vtpm *r;
-
-    GC_INIT(ctx);
-
-    r = libxl__device_list(gc, &libxl__vtpm_devtype, domid, "vtpm", num);
-
-    GC_FREE;
-
-    return r;
-}
-
-void libxl_device_vtpm_list_free(libxl_device_vtpm* list, int num)
-{
-    libxl__device_list_free(&libxl__vtpm_devtype, list, num);
-}
-
 int libxl_device_vtpm_getinfo(libxl_ctx *ctx,
                               uint32_t domid,
                               libxl_device_vtpm *vtpm,
@@ -196,7 +178,7 @@ int libxl_devid_to_device_vtpm(libxl_ctx *ctx,
     int nb, i;
     int rc;
 
-    vtpms = libxl__device_list(gc, &libxl__vtpm_devtype, domid, "vtpm", &nb);
+    vtpms = libxl__device_list(gc, &libxl__vtpm_devtype, domid, &nb);
     if (!vtpms)
         return ERROR_FAIL;
 
@@ -231,7 +213,7 @@ int libxl_uuid_to_device_vtpm(libxl_ctx *ctx, uint32_t domid,
     int nb, i;
     int rc;
 
-    vtpms = libxl__device_list(gc, &libxl__vtpm_devtype, domid, "vtpm", &nb);
+    vtpms = libxl__device_list(gc, &libxl__vtpm_devtype, domid, &nb);
     if (!vtpms)
         return ERROR_FAIL;
 
@@ -260,6 +242,7 @@ static void libxl_device_vtpm_update_config(libxl__gc *gc, void *d, void *s)
 LIBXL_DEFINE_DEVICE_ADD(vtpm)
 static LIBXL_DEFINE_DEVICES_ADD(vtpm)
 LIBXL_DEFINE_DEVICE_REMOVE(vtpm)
+LIBXL_DEFINE_DEVICE_LIST(vtpm)
 
 DEFINE_DEVICE_TYPE_STRUCT(vtpm,
     .update_config = libxl_device_vtpm_update_config,

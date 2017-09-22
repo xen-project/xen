@@ -122,7 +122,7 @@ void libxl__colo_save_setup(libxl__egc *egc, libxl__colo_save_state *css)
 
         /* Use this args we can connect to qemu colo-compare */
         cds->nics = libxl__device_list(gc, &libxl__nic_devtype,
-                                       cds->domid, "vif", &cds->num_nics);
+                                       cds->domid, &cds->num_nics);
         if (cds->num_nics > 0) {
             css->cps.checkpoint_host = cds->nics[0].colo_checkpoint_host;
             css->cps.checkpoint_port = cds->nics[0].colo_checkpoint_port;

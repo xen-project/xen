@@ -622,24 +622,6 @@ out:
     return rc;
 }
 
-libxl_device_disk *libxl_device_disk_list(libxl_ctx *ctx, uint32_t domid, int *num)
-{
-    libxl_device_disk *r;
-
-    GC_INIT(ctx);
-
-    r = libxl__device_list(gc, &libxl__disk_devtype, domid, "vbd", num);
-
-    GC_FREE;
-
-    return r;
-}
-
-void libxl_device_disk_list_free(libxl_device_disk *list, int num)
-{
-    libxl__device_list_free(&libxl__disk_devtype, list, num);
-}
-
 int libxl_device_disk_getinfo(libxl_ctx *ctx, uint32_t domid,
                               libxl_device_disk *disk, libxl_diskinfo *diskinfo)
 {
@@ -741,7 +723,7 @@ int libxl_cdrom_insert(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk,
         goto out;
     }
 
-    disks = libxl__device_list(gc, &libxl__disk_devtype, domid, "vbd", &num);
+    disks = libxl__device_list(gc, &libxl__disk_devtype, domid, &num);
     for (i = 0; i < num; i++) {
         if (disks[i].is_cdrom && !strcmp(disk->vdev, disks[i].vdev))
         {
@@ -1201,9 +1183,11 @@ static int libxl_device_disk_dm_needed(void *e, unsigned domid)
            elem->backend_domid == domid;
 }
 
+LIBXL_DEFINE_DEVICE_LIST(disk)
+
 #define libxl__device_disk_update_devid NULL
 
-DEFINE_DEVICE_TYPE_STRUCT(disk,
+DEFINE_DEVICE_TYPE_STRUCT_X(disk, disk, vbd,
     .merge       = libxl_device_disk_merge,
     .dm_needed   = libxl_device_disk_dm_needed,
     .from_xenstore = (device_from_xenstore_fn_t)libxl__disk_from_xenstore,

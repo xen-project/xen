@@ -1679,11 +1679,11 @@ int libxl_retrieve_domain_configuration(libxl_ctx *ctx, uint32_t domid,
             if (!dt)
                 break;
 
-            if (!dt->list || !dt->compare)
+            if (!dt->compare)
                 continue;
 
             num_dev = libxl__device_type_get_num(dt, d_config);
-            p = dt->list(CTX, domid, &num);
+            p = libxl__device_list(gc, dt, domid, &num);
             if (p == NULL) {
                 LOGD(DEBUG, domid, "No %s from xenstore",
                      dt->type);

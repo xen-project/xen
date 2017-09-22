@@ -1989,7 +1989,7 @@ out:
 }
 
 void *libxl__device_list(libxl__gc *gc, const struct libxl_device_type *dt,
-                         uint32_t domid, const char* name, int *num)
+                         uint32_t domid, int *num)
 {
     void *r = NULL;
     void *list = NULL;
@@ -2002,7 +2002,7 @@ void *libxl__device_list(libxl__gc *gc, const struct libxl_device_type *dt,
     *num = 0;
 
     libxl_path = GCSPRINTF("%s/device/%s",
-                           libxl__xs_libxl_path(gc, domid), name);
+                           libxl__xs_libxl_path(gc, domid), dt->entry);
 
     dir = libxl__xs_directory(gc, XBT_NULL, libxl_path, &ndirs);
 

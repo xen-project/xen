@@ -29,7 +29,7 @@ int libxl_mac_to_device_nic(libxl_ctx *ctx, uint32_t domid,
     if (rc)
         return rc;
 
-    nics = libxl__device_list(gc, &libxl__nic_devtype, domid, "vif", &nb);
+    nics = libxl__device_list(gc, &libxl__nic_devtype, domid, &nb);
     if (!nics)
         return ERROR_FAIL;
 
@@ -426,7 +426,7 @@ libxl_device_nic *libxl_device_nic_list(libxl_ctx *ctx, uint32_t domid, int *num
 
     GC_INIT(ctx);
 
-    r = libxl__device_list(gc, &libxl__nic_devtype, domid, "vif", num);
+    r = libxl__device_list(gc, &libxl__nic_devtype, domid, num);
 
     GC_FREE;
 
@@ -540,7 +540,7 @@ LIBXL_DEFINE_DEVICE_ADD(nic)
 LIBXL_DEFINE_DEVICES_ADD(nic)
 LIBXL_DEFINE_DEVICE_REMOVE(nic)
 
-DEFINE_DEVICE_TYPE_STRUCT(nic,
+DEFINE_DEVICE_TYPE_STRUCT_X(nic, nic, vif,
     .update_config = libxl_device_nic_update_config,
     .from_xenstore = (device_from_xenstore_fn_t)libxl__nic_from_xenstore,
     .set_xenstore_config = (device_set_xenstore_config_fn_t)
