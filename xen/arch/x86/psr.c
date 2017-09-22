@@ -422,9 +422,10 @@ static bool __init parse_psr_bool(const char *s, const char *delim,
                                   const char *ss, const char *feature,
                                   unsigned int mask)
 {
-    if ( !strncmp(s, feature, delim - s) )
+    /* If cmdline is 'psr=', we need make sure delim != s */
+    if ( delim != s && !strncmp(s, feature, delim - s) )
     {
-        if ( !*delim )
+        if ( !*delim || *delim == ',' )
             opt_psr |= mask;
         else
         {
@@ -456,6 +457,10 @@ static int __init parse_psr_param(const char *s)
         val_delim = strchr(s, ':');
         if ( !val_delim )
             val_delim = strchr(s, '\0');
+
+        /* E.g. 'psr=cmt,rmid_max:200' */
+        if ( val_delim > ss )
+            val_delim = ss;
 
         if ( *val_delim && !strncmp(s, "rmid_max", val_delim - s) )
         {
