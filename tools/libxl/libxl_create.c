@@ -35,7 +35,7 @@ int libxl__domain_create_info_setdefault(libxl__gc *gc,
         return ERROR_INVAL;
     }
 
-    if (c_info->type == LIBXL_DOMAIN_TYPE_HVM) {
+    if (c_info->type != LIBXL_DOMAIN_TYPE_PV) {
         libxl_defbool_setdefault(&c_info->hap, true);
         libxl_defbool_setdefault(&c_info->oos, true);
     }
@@ -65,7 +65,8 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
     int i, rc;
 
     if (b_info->type != LIBXL_DOMAIN_TYPE_HVM &&
-        b_info->type != LIBXL_DOMAIN_TYPE_PV) {
+        b_info->type != LIBXL_DOMAIN_TYPE_PV &&
+        b_info->type != LIBXL_DOMAIN_TYPE_PVH) {
         LOG(ERROR, "invalid domain type");
         return ERROR_INVAL;
     }
@@ -126,8 +127,6 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
                 b_info->u.hvm.bios = LIBXL_BIOS_TYPE_ROMBIOS; break;
             case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN:
                 b_info->u.hvm.bios = LIBXL_BIOS_TYPE_SEABIOS; break;
-            case LIBXL_DEVICE_MODEL_VERSION_NONE:
-                break;
             default:
                 LOG(ERROR, "unknown device model version");
                 return ERROR_INVAL;
@@ -146,8 +145,6 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
                 LOG(ERROR, "qemu-xen does not support bios=rombios.");
                 return ERROR_INVAL;
             }
-            break;
-        case LIBXL_DEVICE_MODEL_VERSION_NONE:
             break;
         default:abort();
         }
@@ -228,10 +225,7 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
             b_info->u.hvm.mmio_hole_memkb = 0;
 
         if (b_info->u.hvm.vga.kind == LIBXL_VGA_INTERFACE_TYPE_UNKNOWN) {
-            if (b_info->device_model_version == LIBXL_DEVICE_MODEL_VERSION_NONE)
-                b_info->u.hvm.vga.kind = LIBXL_VGA_INTERFACE_TYPE_NONE;
-            else
-                b_info->u.hvm.vga.kind = LIBXL_VGA_INTERFACE_TYPE_CIRRUS;
+            b_info->u.hvm.vga.kind = LIBXL_VGA_INTERFACE_TYPE_CIRRUS;
         }
 
         if (!b_info->u.hvm.hdtype)
@@ -265,12 +259,6 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
                 break;
             }
             break;
-        case LIBXL_DEVICE_MODEL_VERSION_NONE:
-            if (b_info->u.hvm.vga.kind != LIBXL_VGA_INTERFACE_TYPE_NONE) {
-                LOG(ERROR,
-        "guests without a device model cannot have an emulated video card");
-                return ERROR_INVAL;
-            }
             b_info->video_memkb = 0;
             break;
         case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN:
@@ -401,6 +389,8 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
             b_info->u.pv.cmdline = NULL;
         }
         break;
+    case LIBXL_DOMAIN_TYPE_PVH:
+        break;
     default:
         LOG(ERROR, "invalid domain type %s in create info",
             libxl_domain_type_to_string(b_info->type));
@@ -509,6 +499,18 @@ int libxl__domain_build(libxl__gc *gc,
         }
 
         break;
+    case LIBXL_DOMAIN_TYPE_PVH:
+        ret = libxl__build_hvm(gc, domid, d_config, state);
+        if (ret)
+            goto out;
+
+        vments = libxl__calloc(gc, 3, sizeof(char *));
+        vments[0] = "start_time";
+        vments[1] = GCSPRINTF("%"PRIu64".%02ld",
+                              (uint64_t)start_time.tv_sec,
+                              (long)start_time.tv_usec/10000);
+
+        break;
     default:
         ret = ERROR_INVAL;
         goto out;
@@ -543,7 +545,7 @@ int libxl__domain_make(libxl__gc *gc, libxl_domain_config *d_config,
     }
 
     flags = 0;
-    if (info->type == LIBXL_DOMAIN_TYPE_HVM) {
+    if (info->type != LIBXL_DOMAIN_TYPE_PV) {
         flags |= XEN_DOMCTL_CDF_hvm_guest;
         flags |= libxl_defbool_val(info->hap) ? XEN_DOMCTL_CDF_hap : 0;
         flags |= libxl_defbool_val(info->oos) ? 0 : XEN_DOMCTL_CDF_oos_off;
@@ -870,7 +872,7 @@ static void initiate_domain_create(libxl__egc *egc,
     /* If target_memkb is smaller than max_memkb, the subsequent call
      * to libxc when building HVM domain will enable PoD mode.
      */
-    pod_enabled = (d_config->c_info.type == LIBXL_DOMAIN_TYPE_HVM) &&
+    pod_enabled = (d_config->c_info.type != LIBXL_DOMAIN_TYPE_PV) &&
         (d_config->b_info.target_memkb < d_config->b_info.max_memkb);
 
     /* We cannot have PoD and PCI device assignment at the same time
@@ -879,7 +881,7 @@ static void initiate_domain_create(libxl__egc *egc,
      * guest. To stay on the safe side, we disable PCI device
      * assignment when PoD is enabled.
      */
-    if (d_config->c_info.type == LIBXL_DOMAIN_TYPE_HVM &&
+    if (d_config->c_info.type != LIBXL_DOMAIN_TYPE_PV &&
         d_config->num_pcidevs && pod_enabled) {
         ret = ERROR_INVAL;
         LOGD(ERROR, domid,
@@ -918,18 +920,20 @@ static void initiate_domain_create(libxl__egc *egc,
         goto error_out;
     }
 
-    if (d_config->c_info.type == LIBXL_DOMAIN_TYPE_HVM &&
+    if (d_config->c_info.type != LIBXL_DOMAIN_TYPE_PV &&
         (libxl_defbool_val(d_config->b_info.nested_hvm) &&
-        (libxl_defbool_val(d_config->b_info.u.hvm.altp2m) ||
+        ((d_config->c_info.type != LIBXL_DOMAIN_TYPE_HVM &&
+          libxl_defbool_val(d_config->b_info.u.hvm.altp2m)) ||
         (d_config->b_info.altp2m != LIBXL_ALTP2M_MODE_DISABLED)))) {
         ret = ERROR_INVAL;
         LOGD(ERROR, domid, "nestedhvm and altp2mhvm cannot be used together");
         goto error_out;
     }
 
-    if (d_config->c_info.type == LIBXL_DOMAIN_TYPE_HVM &&
-        (libxl_defbool_val(d_config->b_info.u.hvm.altp2m) ||
-        (d_config->b_info.altp2m != LIBXL_ALTP2M_MODE_DISABLED)) &&
+    if (((d_config->c_info.type == LIBXL_DOMAIN_TYPE_HVM &&
+         libxl_defbool_val(d_config->b_info.u.hvm.altp2m)) ||
+        (d_config->c_info.type != LIBXL_DOMAIN_TYPE_PV &&
+         d_config->b_info.altp2m != LIBXL_ALTP2M_MODE_DISABLED)) &&
         pod_enabled) {
         ret = ERROR_INVAL;
         LOGD(ERROR, domid, "Cannot enable PoD and ALTP2M at the same time");
@@ -1113,7 +1117,7 @@ static void domcreate_bootloader_done(libxl__egc *egc,
             crs->domid = domid;
             crs->send_back_fd = dcs->send_back_fd;
             crs->recv_fd = restore_fd;
-            crs->hvm = (info->type == LIBXL_DOMAIN_TYPE_HVM);
+            crs->hvm = (info->type != LIBXL_DOMAIN_TYPE_PV);
             crs->callback = libxl__colo_restore_setup_done;
             libxl__colo_restore_setup(egc, crs);
             break;
@@ -1193,6 +1197,13 @@ static void domcreate_stream_done(libxl__egc *egc,
             vments[i++] = "image/cmdline";
             vments[i++] = (char *) state->pv_cmdline;
         }
+        break;
+    case LIBXL_DOMAIN_TYPE_PVH:
+        vments = libxl__calloc(gc, 3, sizeof(char *));
+        vments[0] = "start_time";
+        vments[1] = GCSPRINTF("%"PRIu64".%02ld",
+                              (uint64_t)start_time.tv_sec,
+                              (long)start_time.tv_usec/10000);
         break;
     default:
         ret = ERROR_INVAL;
@@ -1358,12 +1369,6 @@ static void domcreate_launch_dm(libxl__egc *egc, libxl__multidev *multidev,
         libxl__device_console_add(gc, domid, &console, state, &device);
         libxl__device_console_dispose(&console);
 
-        if (d_config->b_info.device_model_version ==
-            LIBXL_DEVICE_MODEL_VERSION_NONE) {
-            domcreate_devmodel_started(egc, &dcs->sdss.dm, 0);
-            return;
-        }
-
         libxl_device_vkb_init(&vkb);
         libxl__device_add(gc, domid, &libxl__vkb_devtype, &vkb);
         libxl_device_vkb_dispose(&vkb);
@@ -1385,6 +1390,7 @@ static void domcreate_launch_dm(libxl__egc *egc, libxl__multidev *multidev,
         return;
     }
     case LIBXL_DOMAIN_TYPE_PV:
+    case LIBXL_DOMAIN_TYPE_PVH:
     {
         libxl__device_console console;
         libxl__device device;
@@ -1697,8 +1703,7 @@ static void domain_soft_reset_cb(libxl__egc *egc,
         goto error;
     }
 
-    if (cdcs->dcs.guest_config->b_info.device_model_version !=
-        LIBXL_DEVICE_MODEL_VERSION_NONE) {
+    if (cdcs->dcs.guest_config->b_info.type == LIBXL_DOMAIN_TYPE_HVM) {
         savefile = GCSPRINTF(LIBXL_DEVICE_MODEL_SAVE_FILE".%d", dds->domid);
         restorefile = GCSPRINTF(LIBXL_DEVICE_MODEL_RESTORE_FILE".%d",
                                 dds->domid);
