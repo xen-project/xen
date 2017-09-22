@@ -453,6 +453,25 @@ static PyObject *xspy_watch(XsHandle *self, PyObject *args)
 }
 
 
+#define xspy_fileno_doc "\n"                              \
+	"Return the FD to poll for notifications when watches fire.\n"   \
+	"Returns: [int] file descriptor.\n"                \
+	"\n"
+
+static PyObject *xspy_fileno(XsHandle *self)
+{
+    struct xs_handle *xh = xshandle(self);
+    int fd;
+
+    if (!xh)
+        return NULL;
+
+    fd = xs_fileno(xh);
+
+    return PyLong_FromLong(fd);
+}
+
+
 #define xspy_read_watch_doc "\n"				\
 	"Read a watch notification.\n"				\
 	"\n"							\
@@ -887,6 +906,7 @@ static PyMethodDef xshandle_methods[] = {
     XSPY_METH(release_domain,    METH_VARARGS),
     XSPY_METH(close,             METH_NOARGS),
     XSPY_METH(get_domain_path,   METH_VARARGS),
+    XSPY_METH(fileno,            METH_NOARGS),
     { NULL /* Sentinel. */ },
 };
 
