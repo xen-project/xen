@@ -441,6 +441,62 @@ is guest specific).
 
 =back
 
+=head3 Non direct Kernel Boot
+
+Non direct kernel boot allows booting guests with a firmware. This can be
+used by all types of guests, although the selection of options is different
+depending on the guest type.
+
+This option provides the flexibly of letting the guest decide which kernel
+they want to boot, while preventing having to poke at the guest file
+system form the toolstack domain.
+
+=head4 PV guest options
+
+=over 4
+
+=item B<firmware="pvgrub32|pvgrub64">
+
+Boots a guest using a para-virtualized version of grub that runs inside
+of the guest. The bitness of the guest needs to be know, so that the right
+version of pvgrub can be selected.
+
+Note that xl expects to find the pvgrub32.bin and pvgrub64.bin binaries in
+F<@XENFIRMWAREDIR@>.
+
+=back
+
+=head4 HVM guest options
+
+=over 4
+
+=item B<firmware="bios">
+
+Boot the guest using the default BIOS firmware, which depends on the
+chosen device model.
+
+=item B<firmware="uefi">
+
+Boot the guest using the default UEFI firmware, currently OVMF.
+
+=item B<firmware="seabios">
+
+Boot the guest using the SeaBIOS BIOS firmware.
+
+=item B<firmware="rombios">
+
+Boot the guest using the ROMBIOS BIOS firmware.
+
+=item B<firmware="ovmf">
+
+Boot the guest using the OVMF UEFI firmware.
+
+=item B<firmware="PATH">
+
+Load the specified file as firmware for the guest.
+
+=back
+
 =head3 Other Options
 
 =over 4
