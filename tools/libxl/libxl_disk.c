@@ -166,9 +166,7 @@ static int libxl__device_disk_setdefault(libxl__gc *gc, uint32_t domid,
 
     /* Force Qdisk backend for CDROM devices of guests with a device model. */
     if (disk->is_cdrom != 0 &&
-        libxl__domain_type(gc, domid) == LIBXL_DOMAIN_TYPE_HVM &&
-        libxl__device_model_version_running(gc, domid) !=
-        LIBXL_DEVICE_MODEL_VERSION_NONE) {
+        libxl__domain_type(gc, domid) == LIBXL_DOMAIN_TYPE_HVM) {
         if (!(disk->backend == LIBXL_DISK_BACKEND_QDISK ||
               disk->backend == LIBXL_DISK_BACKEND_UNKNOWN)) {
             LOGD(ERROR, domid, "Backend for CD devices on HVM guests must be Qdisk");
@@ -713,12 +711,6 @@ int libxl_cdrom_insert(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk,
     dm_ver = libxl__device_model_version_running(gc, domid);
     if (dm_ver == -1) {
         LOGD(ERROR, domid, "Cannot determine device model version");
-        rc = ERROR_FAIL;
-        goto out;
-    }
-
-    if (dm_ver == LIBXL_DEVICE_MODEL_VERSION_NONE) {
-        LOGD(ERROR, domid, "Guests without a device model cannot use cd-insert");
         rc = ERROR_FAIL;
         goto out;
     }
