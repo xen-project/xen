@@ -59,7 +59,7 @@ static int __init parse_dom0_mem(const char *s)
             dom0_nrpages = parse_amt(s, &s);
     } while ( *s++ == ',' );
 
-    return *s ? -EINVAL : 0;
+    return s[-1] ? -EINVAL : 0;
 }
 custom_param("dom0_mem", parse_dom0_mem);
 
@@ -94,7 +94,13 @@ static int __init parse_dom0_nodes(const char *s)
 {
     do {
         if ( isdigit(*s) )
+        {
+            if ( dom0_nr_pxms >= ARRAY_SIZE(dom0_pxms) )
+                return -E2BIG;
             dom0_pxms[dom0_nr_pxms] = simple_strtoul(s, &s, 0);
+            if ( !*s || *s == ',' )
+                ++dom0_nr_pxms;
+        }
         else if ( !strncmp(s, "relaxed", 7) && (!s[7] || s[7] == ',') )
         {
             dom0_affinity_relaxed = true;
@@ -106,10 +112,10 @@ static int __init parse_dom0_nodes(const char *s)
             s += 6;
         }
         else
-            break;
-    } while ( ++dom0_nr_pxms < ARRAY_SIZE(dom0_pxms) && *s++ == ',' );
+            return -EINVAL;
+    } while ( *s++ == ',' );
 
-    return *s ? -EINVAL : 0;
+    return s[-1] ? -EINVAL : 0;
 }
 custom_param("dom0_nodes", parse_dom0_nodes);
 

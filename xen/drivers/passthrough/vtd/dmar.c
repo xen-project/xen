@@ -1097,15 +1097,18 @@ static int __init parse_rmrr_param(const char *str)
     unsigned long start, end;
 
     do {
+        if ( nr_rmrr >= MAX_USER_RMRR )
+            return -E2BIG;
+
         start = simple_strtoul(cur = s, &s, 16);
         if ( cur == s )
-            break;
+            return -EINVAL;
 
         if ( *s == '-' )
         {
             end = simple_strtoul(cur = s + 1, &s, 16);
             if ( cur == s )
-                break;
+                return -EINVAL;
         }
         else
             end = start;
@@ -1121,7 +1124,7 @@ static int __init parse_rmrr_param(const char *str)
 
             stmp = parse_pci_seg(s + 1, &seg, &bus, &dev, &func, &def_seg);
             if ( !stmp )
-                break;
+                return -EINVAL;
 
             /*
              * Not specified.
@@ -1142,8 +1145,8 @@ static int __init parse_rmrr_param(const char *str)
         if ( user_rmrrs[nr_rmrr].dev_count )
             nr_rmrr++;
 
-    } while ( *s++ == ';' && nr_rmrr < MAX_USER_RMRR );
+    } while ( *s++ == ';' );
 
-    return *s ? -EINVAL : 0;
+    return s[-1] ? -EINVAL : 0;
 }
 custom_param("rmrr", parse_rmrr_param);
