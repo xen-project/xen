@@ -906,6 +906,8 @@ void parse_config_data(const char *config_source,
             c_info->type = LIBXL_DOMAIN_TYPE_HVM;
         else if (!strncmp(buf, "pv", strlen(buf)))
             c_info->type = LIBXL_DOMAIN_TYPE_PV;
+        else if (!strncmp(buf, "pvh", strlen(buf)))
+            c_info->type = LIBXL_DOMAIN_TYPE_PVH;
         else {
             fprintf(stderr, "Invalid domain type %s.\n", buf);
             exit(1);
@@ -1364,6 +1366,7 @@ void parse_config_data(const char *config_source,
         }
 
         break;
+    case LIBXL_DOMAIN_TYPE_PVH:
     case LIBXL_DOMAIN_TYPE_PV:
     {
         /*
@@ -2070,8 +2073,6 @@ skip_usbdev:
         } else if (!strcmp(buf, "qemu-xen")) {
             b_info->device_model_version
                 = LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN;
-        } else if (!strcmp(buf, "none")) {
-            b_info->device_model_version = LIBXL_DEVICE_MODEL_VERSION_NONE;
         } else {
             fprintf(stderr,
                     "Unknown device_model_version \"%s\" specified\n", buf);
