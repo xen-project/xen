@@ -54,9 +54,9 @@ Pairs may be separated either by a newline or a semicolon.  Both
 of the following are valid:
 
   name="h0"
-  builder="hvm"
+  type="hvm"
 
-  name="h0"; builder="hvm"
+  name="h0"; type="hvm"
 
 =head1 OPTIONS
 
@@ -74,6 +74,25 @@ single host must be unique.
 =back
 
 =head2 Selecting Guest Type
+
+=over 4
+
+=item B<type="pv">
+
+Specifies that this is to be a PV domain, suitable for hosting Xen-aware
+guest operating systems. This is the default.
+
+=item B<type="hvm">
+
+Specifies that this is to be an HVM domain. That is, a fully virtualised
+computer with emulated BIOS, disk and network peripherals, etc.
+
+=back
+
+=head3 Deprecated guest type selection
+
+Note that the builder option is being deprecated in favor of the type
+option.
 
 =over 4
 
