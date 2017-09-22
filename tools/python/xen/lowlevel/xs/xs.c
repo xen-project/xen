@@ -474,6 +474,33 @@ static PyObject *xspy_fileno(XsHandle *self)
 }
 
 
+#define xspy_check_watch_doc "\n"				\
+	"Check for watch notifications without blocking.\n"	\
+	"\n"							\
+	"Returns: [tuple] (path, token).\n"			\
+	"         None if no watches have fired.\n"             \
+	"Raises xen.lowlevel.xs.Error on error.\n"	        \
+	"\n"
+
+static PyObject *xspy_check_watch(XsHandle *self, PyObject *args)
+{
+    struct xs_handle *xh = xshandle(self);
+    PyObject *val = NULL;
+    char **xsval;
+
+    if (!xh)
+        return NULL;
+
+    xsval = xs_check_watch(xh);
+    if (!xsval) {
+        return none(errno == EAGAIN);
+    }
+
+    val = match_watch_by_token(self, xsval);
+    free(xsval);
+    return val;
+}
+
 #define xspy_read_watch_doc "\n"				\
 	"Read a watch notification.\n"				\
 	"\n"							\
@@ -911,6 +938,7 @@ static PyMethodDef xshandle_methods[] = {
     XSPY_METH(set_permissions,   METH_VARARGS),
     XSPY_METH(watch,             METH_VARARGS),
     XSPY_METH(read_watch,        METH_NOARGS),
+    XSPY_METH(check_watch,       METH_NOARGS),
     XSPY_METH(unwatch,           METH_VARARGS),
     XSPY_METH(transaction_start, METH_NOARGS),
     XSPY_METH(transaction_end,   METH_VARARGS | METH_KEYWORDS),
