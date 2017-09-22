@@ -324,8 +324,8 @@ void libxl__bootloader_run(libxl__egc *egc, libxl__bootloader_state *bl)
 
     libxl__bootloader_init(bl);
 
-    if (info->type != LIBXL_DOMAIN_TYPE_PV) {
-        LOGD(DEBUG, domid, "not a PV domain, skipping bootloader");
+    if (info->type == LIBXL_DOMAIN_TYPE_HVM) {
+        LOGD(DEBUG, domid, "not a PV/PVH domain, skipping bootloader");
         rc = 0;
         goto out_ok;
     }
