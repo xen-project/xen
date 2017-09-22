@@ -310,11 +310,7 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
             break;
         }
 
-        if (libxl__timer_mode_is_default(&b_info->timer_mode))
-            b_info->timer_mode = LIBXL_TIMER_MODE_NO_DELAY_FOR_MISSED_TICKS;
-
         libxl_defbool_setdefault(&b_info->u.hvm.pae,                true);
-        libxl_defbool_setdefault(&b_info->apic,                     true);
         libxl_defbool_setdefault(&b_info->u.hvm.acpi,               true);
         libxl_defbool_setdefault(&b_info->u.hvm.acpi_s3,            true);
         libxl_defbool_setdefault(&b_info->u.hvm.acpi_s4,            true);
@@ -323,7 +319,6 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
         libxl_defbool_setdefault(&b_info->u.hvm.viridian,           false);
         libxl_defbool_setdefault(&b_info->u.hvm.hpet,               true);
         libxl_defbool_setdefault(&b_info->u.hvm.vpt_align,          true);
-        libxl_defbool_setdefault(&b_info->nested_hvm,               false);
         libxl_defbool_setdefault(&b_info->u.hvm.altp2m,             false);
         libxl_defbool_setdefault(&b_info->u.hvm.usb,                false);
         libxl_defbool_setdefault(&b_info->u.hvm.xen_platform_pci,   true);
@@ -411,6 +406,16 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
             libxl_domain_type_to_string(b_info->type));
         return ERROR_INVAL;
     }
+
+    /* Configuration fields shared between PVH and HVM. */
+    if (b_info->type != LIBXL_DOMAIN_TYPE_PV) {
+        if (libxl__timer_mode_is_default(&b_info->timer_mode))
+            b_info->timer_mode = LIBXL_TIMER_MODE_NO_DELAY_FOR_MISSED_TICKS;
+
+        libxl_defbool_setdefault(&b_info->apic,                     true);
+        libxl_defbool_setdefault(&b_info->nested_hvm,               false);
+    }
+
     return 0;
 }
 
@@ -518,6 +523,7 @@ int libxl__domain_make(libxl__gc *gc, libxl_domain_config *d_config,
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
     int flags, ret, rc, nb_vm;
+    const char *dom_type;
     char *uuid_string;
     char *dom_path, *vm_path, *libxl_path;
     struct xs_permissions roperm[2];
@@ -708,6 +714,11 @@ retry_transaction:
 
     xs_write(ctx->xsh, t, GCSPRINTF("%s/control/platform-feature-multiprocessor-suspend", dom_path), "1", 1);
     xs_write(ctx->xsh, t, GCSPRINTF("%s/control/platform-feature-xs_reset_watches", dom_path), "1", 1);
+
+    dom_type = libxl_domain_type_to_string(info->type);
+    xs_write(ctx->xsh, t, GCSPRINTF("%s/type", libxl_path), dom_type,
+             strlen(dom_type));
+
     if (!xs_transaction_end(ctx->xsh, t, 0)) {
         if (errno == EAGAIN) {
             t = 0;
