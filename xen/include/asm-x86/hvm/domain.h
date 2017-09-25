@@ -45,7 +45,7 @@ struct hvm_ioreq_vcpu {
     struct list_head list_entry;
     struct vcpu      *vcpu;
     evtchn_port_t    ioreq_evtchn;
-    bool_t           pending;
+    bool             pending;
 };
 
 #define NR_IO_RANGE_TYPES (XEN_DMOP_IO_RANGE_PCI + 1)
@@ -69,8 +69,8 @@ struct hvm_ioreq_server {
     spinlock_t             bufioreq_lock;
     evtchn_port_t          bufioreq_evtchn;
     struct rangeset        *range[NR_IO_RANGE_TYPES];
-    bool_t                 enabled;
-    bool_t                 bufioreq_atomic;
+    bool                   enabled;
+    bool                   bufioreq_atomic;
 };
 
 /*

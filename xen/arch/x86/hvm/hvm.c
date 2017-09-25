@@ -4401,7 +4401,7 @@ static int hvmop_get_param(
         {
             domid_t domid = d->arch.hvm_domain.params[HVM_PARAM_DM_DOMAIN];
 
-            rc = hvm_create_ioreq_server(d, domid, 1,
+            rc = hvm_create_ioreq_server(d, domid, true,
                                          HVM_IOREQSRV_BUFIOREQ_LEGACY, NULL);
             if ( rc != 0 && rc != -EEXIST )
                 goto out;
