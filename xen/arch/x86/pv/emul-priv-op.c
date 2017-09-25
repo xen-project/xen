@@ -955,7 +955,7 @@ static int read_msr(unsigned int reg, uint64_t *val,
              rdmsr_safe(MSR_INTEL_MISC_FEATURES_ENABLES, *val) )
             break;
         *val = 0;
-        if ( curr->arch.cpuid_faulting )
+        if ( curr->arch.msr->misc_features_enables.cpuid_faulting )
             *val |= MSR_MISC_FEATURES_CPUID_FAULTING;
         return X86EMUL_OKAY;
 
@@ -1161,7 +1161,8 @@ static int write_msr(unsigned int reg, uint64_t val,
         if ( (val & MSR_MISC_FEATURES_CPUID_FAULTING) &&
              !this_cpu(cpuid_faulting_enabled) )
             break;
-        curr->arch.cpuid_faulting = !!(val & MSR_MISC_FEATURES_CPUID_FAULTING);
+        curr->arch.msr->misc_features_enables.cpuid_faulting =
+            !!(val & MSR_MISC_FEATURES_CPUID_FAULTING);
         return X86EMUL_OKAY;
 
     case MSR_P6_PERFCTR(0) ... MSR_P6_PERFCTR(7):

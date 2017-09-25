@@ -2913,7 +2913,7 @@ static int vmx_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
 
     case MSR_INTEL_MISC_FEATURES_ENABLES:
         *msr_content = 0;
-        if ( current->arch.cpuid_faulting )
+        if ( current->arch.msr->misc_features_enables.cpuid_faulting )
             *msr_content |= MSR_MISC_FEATURES_CPUID_FAULTING;
         break;
 
@@ -3145,15 +3145,17 @@ static int vmx_msr_write_intercept(unsigned int msr, uint64_t msr_content)
 
     case MSR_INTEL_MISC_FEATURES_ENABLES:
     {
-        bool old_cpuid_faulting = v->arch.cpuid_faulting;
+        struct msr_vcpu_policy *vp = v->arch.msr;
+        bool old_cpuid_faulting = vp->misc_features_enables.cpuid_faulting;
 
         if ( msr_content & ~MSR_MISC_FEATURES_CPUID_FAULTING )
             goto gp_fault;
 
-        v->arch.cpuid_faulting = msr_content & MSR_MISC_FEATURES_CPUID_FAULTING;
+        vp->misc_features_enables.cpuid_faulting =
+            msr_content & MSR_MISC_FEATURES_CPUID_FAULTING;
 
         if ( cpu_has_cpuid_faulting &&
-             (old_cpuid_faulting ^ v->arch.cpuid_faulting) )
+             (old_cpuid_faulting ^ vp->misc_features_enables.cpuid_faulting) )
             ctxt_switch_levelling(v);
         break;
     }

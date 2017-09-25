@@ -3314,7 +3314,9 @@ unsigned long copy_from_user_hvm(void *to, const void *from, unsigned len)
 
 bool hvm_check_cpuid_faulting(struct vcpu *v)
 {
-    if ( !v->arch.cpuid_faulting )
+    const struct msr_vcpu_policy *vp = v->arch.msr;
+
+    if ( !vp->misc_features_enables.cpuid_faulting )
         return false;
 
     return hvm_get_cpl(v) > 0;
