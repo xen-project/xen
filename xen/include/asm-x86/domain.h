@@ -356,8 +356,9 @@ struct arch_domain
      */
     uint8_t x87_fip_width;
 
-    /* CPUID Policy. */
+    /* CPUID and MSR policy objects. */
     struct cpuid_policy *cpuid;
+    struct msr_domain_policy *msr;
 
     struct PITState vpit;
 

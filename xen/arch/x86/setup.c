@@ -1575,6 +1575,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
         panic("Could not protect TXT memory regions");
 
     init_guest_cpuid();
+    init_guest_msr_policy();
 
     if ( dom0_pvh )
     {

@@ -202,6 +202,19 @@ void write_efer(u64 val);
 
 DECLARE_PER_CPU(u32, ler_msr);
 
+/* MSR policy object for shared per-domain MSRs */
+struct msr_domain_policy
+{
+    /* 0x000000ce  MSR_INTEL_PLATFORM_INFO */
+    struct {
+        bool available; /* This MSR is non-architectural */
+        bool cpuid_faulting;
+    } plaform_info;
+};
+
+void init_guest_msr_policy(void);
+int init_domain_msr_policy(struct domain *d);
+
 #endif /* !__ASSEMBLY__ */
 
 #endif /* __ASM_MSR_H */
