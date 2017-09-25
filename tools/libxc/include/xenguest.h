@@ -39,6 +39,20 @@
  */
 struct xenevtchn_handle;
 
+/* For save's precopy_policy(). */
+struct precopy_stats
+{
+    unsigned int iteration;
+    unsigned int total_written;
+    long dirty_count; /* -1 if unknown */
+};
+
+/*
+ * A precopy_policy callback may not be running in the same address
+ * space as libxc an so precopy_stats is passed by value.
+ */
+typedef int (*precopy_policy_t)(struct precopy_stats, void *);
+
 /* callbacks provided by xc_domain_save */
 struct save_callbacks {
     /* Called after expiration of checkpoint interval,
@@ -46,7 +60,22 @@ struct save_callbacks {
      */
     int (*suspend)(void* data);
 
-    /* Called after the guest's dirty pages have been
+    /*
+     * Called before and after every batch of page data sent during
+     * the precopy phase of a live migration to ask the caller what
+     * to do next based on the current state of the precopy migration.
+     *
+     * Should return one of the values listed below:
+     */
+#define XGS_POLICY_ABORT          (-1) /* Abandon the migration entirely
+                                        * and tidy up. */
+#define XGS_POLICY_CONTINUE_PRECOPY 0  /* Remain in the precopy phase. */
+#define XGS_POLICY_STOP_AND_COPY    1  /* Immediately suspend and transmit the
+                                        * remaining dirty pages. */
+    precopy_policy_t precopy_policy;
+
+    /*
+     * Called after the guest's dirty pages have been
      *  copied into an output buffer.
      * Callback function resumes the guest & the device model,
      *  returns to xc_domain_save.
@@ -55,7 +84,8 @@ struct save_callbacks {
      */
     int (*postcopy)(void* data);
 
-    /* Called after the memory checkpoint has been flushed
+    /*
+     * Called after the memory checkpoint has been flushed
      * out into the network. Typical actions performed in this
      * callback include:
      *   (a) send the saved device model state (for HVM guests),
@@ -65,7 +95,8 @@ struct save_callbacks {
      *
      * returns:
      * 0: terminate checkpointing gracefully
-     * 1: take another checkpoint */
+     * 1: take another checkpoint
+     */
     int (*checkpoint)(void* data);
 
     /*
