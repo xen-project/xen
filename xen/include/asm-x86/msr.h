@@ -233,6 +233,7 @@ int init_vcpu_msr_policy(struct vcpu *v);
  * by the new MSR infrastructure.
  */
 int guest_rdmsr(const struct vcpu *v, uint32_t msr, uint64_t *val);
+int guest_wrmsr(struct vcpu *v, uint32_t msr, uint64_t val);
 
 #endif /* !__ASSEMBLY__ */
 

@@ -148,6 +148,50 @@ int guest_rdmsr(const struct vcpu *v, uint32_t msr, uint64_t *val)
     return X86EMUL_EXCEPTION;
 }
 
+int guest_wrmsr(struct vcpu *v, uint32_t msr, uint64_t val)
+{
+    struct domain *d = v->domain;
+    struct msr_domain_policy *dp = d->arch.msr;
+    struct msr_vcpu_policy *vp = v->arch.msr;
+
+    switch ( msr )
+    {
+    case MSR_INTEL_PLATFORM_INFO:
+        goto gp_fault;
+
+    case MSR_INTEL_MISC_FEATURES_ENABLES:
+    {
+        uint64_t rsvd = ~0ull;
+        bool old_cpuid_faulting = vp->misc_features_enables.cpuid_faulting;
+
+        if ( !vp->misc_features_enables.available )
+            goto gp_fault;
+
+        if ( dp->plaform_info.cpuid_faulting )
+            rsvd &= ~MSR_MISC_FEATURES_CPUID_FAULTING;
+
+        if ( val & rsvd )
+            goto gp_fault;
+
+        vp->misc_features_enables.cpuid_faulting =
+            val & MSR_MISC_FEATURES_CPUID_FAULTING;
+
+        if ( is_hvm_domain(d) && cpu_has_cpuid_faulting &&
+             (old_cpuid_faulting ^ vp->misc_features_enables.cpuid_faulting) )
+            ctxt_switch_levelling(v);
+        break;
+    }
+
+    default:
+        return X86EMUL_UNHANDLEABLE;
+    }
+
+    return X86EMUL_OKAY;
+
+ gp_fault:
+    return X86EMUL_EXCEPTION;
+}
+
 /*
  * Local variables:
  * mode: C

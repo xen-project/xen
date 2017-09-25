@@ -990,6 +990,10 @@ static int write_msr(unsigned int reg, uint64_t val,
     struct vcpu *curr = current;
     const struct domain *currd = curr->domain;
     bool vpmu_msr = false;
+    int ret;
+
+    if ( (ret = guest_wrmsr(curr, reg, val)) != X86EMUL_UNHANDLEABLE )
+        return ret;
 
     switch ( reg )
     {
@@ -1131,24 +1135,6 @@ static int write_msr(unsigned int reg, uint64_t val,
         curr->arch.pv_vcpu.dr_mask[reg - MSR_AMD64_DR1_ADDRESS_MASK + 1] = val;
         if ( curr->arch.debugreg[7] & DR7_ACTIVE_MASK )
             wrmsrl(reg, val);
-        return X86EMUL_OKAY;
-
-    case MSR_INTEL_PLATFORM_INFO:
-        if ( boot_cpu_data.x86_vendor != X86_VENDOR_INTEL ||
-             val || rdmsr_safe(MSR_INTEL_PLATFORM_INFO, val) )
-            break;
-        return X86EMUL_OKAY;
-
-    case MSR_INTEL_MISC_FEATURES_ENABLES:
-        if ( boot_cpu_data.x86_vendor != X86_VENDOR_INTEL ||
-             (val & ~MSR_MISC_FEATURES_CPUID_FAULTING) ||
-             rdmsr_safe(MSR_INTEL_MISC_FEATURES_ENABLES, temp) )
-            break;
-        if ( (val & MSR_MISC_FEATURES_CPUID_FAULTING) &&
-             !this_cpu(cpuid_faulting_enabled) )
-            break;
-        curr->arch.msr->misc_features_enables.cpuid_faulting =
-            !!(val & MSR_MISC_FEATURES_CPUID_FAULTING);
         return X86EMUL_OKAY;
 
     case MSR_P6_PERFCTR(0) ... MSR_P6_PERFCTR(7):

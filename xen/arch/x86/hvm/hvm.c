@@ -3493,7 +3493,7 @@ int hvm_msr_write_intercept(unsigned int msr, uint64_t msr_content,
 {
     struct vcpu *v = current;
     struct domain *d = v->domain;
-    int ret = X86EMUL_OKAY;
+    int ret;
 
     HVMTRACE_3D(MSR_WRITE, msr,
                (uint32_t)msr_content, (uint32_t)(msr_content >> 32));
@@ -3510,6 +3510,11 @@ int hvm_msr_write_intercept(unsigned int msr, uint64_t msr_content,
         hvm_monitor_msr(msr, msr_content);
         return X86EMUL_OKAY;
     }
+
+    if ( (ret = guest_wrmsr(v, msr, msr_content)) != X86EMUL_UNHANDLEABLE )
+        return ret;
+
+    ret = X86EMUL_OKAY;
 
     switch ( msr )
     {
