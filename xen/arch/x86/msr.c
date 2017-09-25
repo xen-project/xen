@@ -117,6 +117,37 @@ int init_vcpu_msr_policy(struct vcpu *v)
     return 0;
 }
 
+int guest_rdmsr(const struct vcpu *v, uint32_t msr, uint64_t *val)
+{
+    const struct msr_domain_policy *dp = v->domain->arch.msr;
+    const struct msr_vcpu_policy *vp = v->arch.msr;
+
+    switch ( msr )
+    {
+    case MSR_INTEL_PLATFORM_INFO:
+        if ( !dp->plaform_info.available )
+            goto gp_fault;
+        *val = (uint64_t)dp->plaform_info.cpuid_faulting <<
+               _MSR_PLATFORM_INFO_CPUID_FAULTING;
+        break;
+
+    case MSR_INTEL_MISC_FEATURES_ENABLES:
+        if ( !vp->misc_features_enables.available )
+            goto gp_fault;
+        *val = (uint64_t)vp->misc_features_enables.cpuid_faulting <<
+               _MSR_MISC_FEATURES_CPUID_FAULTING;
+        break;
+
+    default:
+        return X86EMUL_UNHANDLEABLE;
+    }
+
+    return X86EMUL_OKAY;
+
+ gp_fault:
+    return X86EMUL_EXCEPTION;
+}
+
 /*
  * Local variables:
  * mode: C

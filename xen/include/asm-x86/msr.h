@@ -226,6 +226,14 @@ void init_guest_msr_policy(void);
 int init_domain_msr_policy(struct domain *d);
 int init_vcpu_msr_policy(struct vcpu *v);
 
+/*
+ * Below functions can return X86EMUL_UNHANDLEABLE which means that MSR is
+ * not (yet) handled by it and must be processed by legacy handlers. Such
+ * behaviour is needed for transition period until all rd/wrmsr are handled
+ * by the new MSR infrastructure.
+ */
+int guest_rdmsr(const struct vcpu *v, uint32_t msr, uint64_t *val);
+
 #endif /* !__ASSEMBLY__ */
 
 #endif /* __ASM_MSR_H */

@@ -841,6 +841,10 @@ static int read_msr(unsigned int reg, uint64_t *val,
     const struct vcpu *curr = current;
     const struct domain *currd = curr->domain;
     bool vpmu_msr = false;
+    int ret;
+
+    if ( (ret = guest_rdmsr(curr, reg, val)) != X86EMUL_UNHANDLEABLE )
+        return ret;
 
     switch ( reg )
     {
@@ -939,24 +943,6 @@ static int read_msr(unsigned int reg, uint64_t *val,
     case MSR_IA32_PERF_CAPABILITIES:
         /* No extra capabilities are supported. */
         *val = 0;
-        return X86EMUL_OKAY;
-
-    case MSR_INTEL_PLATFORM_INFO:
-        if ( boot_cpu_data.x86_vendor != X86_VENDOR_INTEL ||
-             rdmsr_safe(MSR_INTEL_PLATFORM_INFO, *val) )
-            break;
-        *val = 0;
-        if ( this_cpu(cpuid_faulting_enabled) )
-            *val |= MSR_PLATFORM_INFO_CPUID_FAULTING;
-        return X86EMUL_OKAY;
-
-    case MSR_INTEL_MISC_FEATURES_ENABLES:
-        if ( boot_cpu_data.x86_vendor != X86_VENDOR_INTEL ||
-             rdmsr_safe(MSR_INTEL_MISC_FEATURES_ENABLES, *val) )
-            break;
-        *val = 0;
-        if ( curr->arch.msr->misc_features_enables.cpuid_faulting )
-            *val |= MSR_MISC_FEATURES_CPUID_FAULTING;
         return X86EMUL_OKAY;
 
     case MSR_P6_PERFCTR(0) ... MSR_P6_PERFCTR(7):

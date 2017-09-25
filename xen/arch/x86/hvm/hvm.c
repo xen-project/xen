@@ -3362,10 +3362,15 @@ int hvm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
     struct vcpu *v = current;
     struct domain *d = v->domain;
     uint64_t *var_range_base, *fixed_range_base;
-    int ret = X86EMUL_OKAY;
+    int ret;
 
     var_range_base = (uint64_t *)v->arch.hvm_vcpu.mtrr.var_ranges;
     fixed_range_base = (uint64_t *)v->arch.hvm_vcpu.mtrr.fixed_ranges;
+
+    if ( (ret = guest_rdmsr(v, msr, msr_content)) != X86EMUL_UNHANDLEABLE )
+        return ret;
+
+    ret = X86EMUL_OKAY;
 
     switch ( msr )
     {

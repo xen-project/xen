@@ -2907,16 +2907,6 @@ static int vmx_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
             goto gp_fault;
         break;
 
-    case MSR_INTEL_PLATFORM_INFO:
-        *msr_content = MSR_PLATFORM_INFO_CPUID_FAULTING;
-        break;
-
-    case MSR_INTEL_MISC_FEATURES_ENABLES:
-        *msr_content = 0;
-        if ( current->arch.msr->misc_features_enables.cpuid_faulting )
-            *msr_content |= MSR_MISC_FEATURES_CPUID_FAULTING;
-        break;
-
     default:
         if ( passive_domain_do_rdmsr(msr, msr_content) )
             goto done;
