@@ -30,8 +30,6 @@ void pv_destroy_gdt(struct vcpu *v);
 
 bool pv_map_ldt_shadow_page(unsigned int off);
 
-void pv_arch_init_memory(void);
-
 #else
 
 #include <xen/errno.h>
@@ -50,8 +48,6 @@ static inline long pv_set_gdt(struct vcpu *v, unsigned long *frames,
 static inline void pv_destroy_gdt(struct vcpu *v) { ASSERT_UNREACHABLE(); }
 
 static inline bool pv_map_ldt_shadow_page(unsigned int off) { return false; }
-
-static inline void pv_arch_init_memory(void) {}
 
 #endif
 
