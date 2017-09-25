@@ -426,8 +426,8 @@ static int dm_op(const struct dmop_args *op_args)
             break;
 
         rc = hvm_get_ioreq_server_info(d, data->id,
-                                       &data->ioreq_pfn,
-                                       &data->bufioreq_pfn,
+                                       &data->ioreq_gfn,
+                                       &data->bufioreq_gfn,
                                        &data->bufioreq_port);
         break;
     }

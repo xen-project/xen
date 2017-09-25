@@ -28,8 +28,8 @@ int hvm_create_ioreq_server(struct domain *d, domid_t domid,
                             ioservid_t *id);
 int hvm_destroy_ioreq_server(struct domain *d, ioservid_t id);
 int hvm_get_ioreq_server_info(struct domain *d, ioservid_t id,
-                              unsigned long *ioreq_pfn,
-                              unsigned long *bufioreq_pfn,
+                              unsigned long *ioreq_gfn,
+                              unsigned long *bufioreq_gfn,
                               evtchn_port_t *bufioreq_port);
 int hvm_map_io_range_to_ioreq_server(struct domain *d, ioservid_t id,
                                      uint32_t type, uint64_t start,

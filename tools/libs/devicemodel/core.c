@@ -174,7 +174,7 @@ int xendevicemodel_create_ioreq_server(
 
 int xendevicemodel_get_ioreq_server_info(
     xendevicemodel_handle *dmod, domid_t domid, ioservid_t id,
-    xen_pfn_t *ioreq_pfn, xen_pfn_t *bufioreq_pfn,
+    xen_pfn_t *ioreq_gfn, xen_pfn_t *bufioreq_gfn,
     evtchn_port_t *bufioreq_port)
 {
     struct xen_dm_op op;
@@ -192,11 +192,11 @@ int xendevicemodel_get_ioreq_server_info(
     if (rc)
         return rc;
 
-    if (ioreq_pfn)
-        *ioreq_pfn = data->ioreq_pfn;
+    if (ioreq_gfn)
+        *ioreq_gfn = data->ioreq_gfn;
 
-    if (bufioreq_pfn)
-        *bufioreq_pfn = data->bufioreq_pfn;
+    if (bufioreq_gfn)
+        *bufioreq_gfn = data->bufioreq_gfn;
 
     if (bufioreq_port)
         *bufioreq_port = data->bufioreq_port;

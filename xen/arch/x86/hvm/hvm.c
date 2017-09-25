@@ -4225,20 +4225,20 @@ static int hvmop_set_param(
             rc = -EINVAL;
         break;
     case HVM_PARAM_IOREQ_SERVER_PFN:
-        d->arch.hvm_domain.ioreq_gmfn.base = a.value;
+        d->arch.hvm_domain.ioreq_gfn.base = a.value;
         break;
     case HVM_PARAM_NR_IOREQ_SERVER_PAGES:
     {
         unsigned int i;
 
         if ( a.value == 0 ||
-             a.value > sizeof(d->arch.hvm_domain.ioreq_gmfn.mask) * 8 )
+             a.value > sizeof(d->arch.hvm_domain.ioreq_gfn.mask) * 8 )
         {
             rc = -EINVAL;
             break;
         }
         for ( i = 0; i < a.value; i++ )
-            set_bit(i, &d->arch.hvm_domain.ioreq_gmfn.mask);
+            set_bit(i, &d->arch.hvm_domain.ioreq_gfn.mask);
 
         break;
     }

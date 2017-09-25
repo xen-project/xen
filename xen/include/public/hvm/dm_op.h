@@ -41,9 +41,9 @@
  * A domain supports a single 'legacy' IOREQ Server which is instantiated if
  * parameter...
  *
- * HVM_PARAM_IOREQ_PFN is read (to get the gmfn containing the synchronous
+ * HVM_PARAM_IOREQ_PFN is read (to get the gfn containing the synchronous
  * ioreq structures), or...
- * HVM_PARAM_BUFIOREQ_PFN is read (to get the gmfn containing the buffered
+ * HVM_PARAM_BUFIOREQ_PFN is read (to get the gfn containing the buffered
  * ioreq ring), or...
  * HVM_PARAM_BUFIOREQ_EVTCHN is read (to get the event channel that Xen uses
  * to request buffered I/O emulation).
@@ -81,14 +81,14 @@ struct xen_dm_op_create_ioreq_server {
  *
  * The emulator needs to map the synchronous ioreq structures and buffered
  * ioreq ring (if it exists) that Xen uses to request emulation. These are
- * hosted in the target domain's gmfns <ioreq_pfn> and <bufioreq_pfn>
+ * hosted in the target domain's gmfns <ioreq_gfn> and <bufioreq_gfn>
  * respectively. In addition, if the IOREQ Server is handling buffered
  * emulation requests, the emulator needs to bind to event channel
  * <bufioreq_port> to listen for them. (The event channels used for
  * synchronous emulation requests are specified in the per-CPU ioreq
- * structures in <ioreq_pfn>).
+ * structures in <ioreq_gfn>).
  * If the IOREQ Server is not handling buffered emulation requests then the
- * values handed back in <bufioreq_pfn> and <bufioreq_port> will both be 0.
+ * values handed back in <bufioreq_gfn> and <bufioreq_port> will both be 0.
  */
 #define XEN_DMOP_get_ioreq_server_info 2
 
@@ -98,10 +98,10 @@ struct xen_dm_op_get_ioreq_server_info {
     uint16_t pad;
     /* OUT - buffered ioreq port */
     evtchn_port_t bufioreq_port;
-    /* OUT - sync ioreq pfn */
-    uint64_aligned_t ioreq_pfn;
-    /* OUT - buffered ioreq pfn */
-    uint64_aligned_t bufioreq_pfn;
+    /* OUT - sync ioreq gfn */
+    uint64_aligned_t ioreq_gfn;
+    /* OUT - buffered ioreq gfn */
+    uint64_aligned_t bufioreq_gfn;
 };
 
 /*
@@ -150,7 +150,7 @@ struct xen_dm_op_ioreq_server_range {
  *
  * The IOREQ Server will not be passed any emulation requests until it is
  * in the enabled state.
- * Note that the contents of the ioreq_pfn and bufioreq_fn (see
+ * Note that the contents of the ioreq_gfn and bufioreq_gfn (see
  * XEN_DMOP_get_ioreq_server_info) are not meaningful until the IOREQ Server
  * is in the enabled state.
  */

@@ -60,17 +60,17 @@ int xendevicemodel_create_ioreq_server(
  * @parm dmod a handle to an open devicemodel interface.
  * @parm domid the domain id to be serviced
  * @parm id the IOREQ Server id.
- * @parm ioreq_pfn pointer to a xen_pfn_t to receive the synchronous ioreq
- *                  gmfn
- * @parm bufioreq_pfn pointer to a xen_pfn_t to receive the buffered ioreq
- *                    gmfn
+ * @parm ioreq_gfn pointer to a xen_pfn_t to receive the synchronous ioreq
+ *                  gfn
+ * @parm bufioreq_gfn pointer to a xen_pfn_t to receive the buffered ioreq
+ *                    gfn
  * @parm bufioreq_port pointer to a evtchn_port_t to receive the buffered
  *                     ioreq event channel
  * @return 0 on success, -1 on failure.
  */
 int xendevicemodel_get_ioreq_server_info(
     xendevicemodel_handle *dmod, domid_t domid, ioservid_t id,
-    xen_pfn_t *ioreq_pfn, xen_pfn_t *bufioreq_pfn,
+    xen_pfn_t *ioreq_gfn, xen_pfn_t *bufioreq_gfn,
     evtchn_port_t *bufioreq_port);
 
 /**
@@ -168,7 +168,7 @@ int xendevicemodel_destroy_ioreq_server(
  * This function sets IOREQ Server state. An IOREQ Server
  * will not be passed emulation requests until it is in
  * the enabled state.
- * Note that the contents of the ioreq_pfn and bufioreq_pfn are
+ * Note that the contents of the ioreq_gfn and bufioreq_gfn are
  * not meaningful until the IOREQ Server is in the enabled state.
  *
  * @parm dmod a handle to an open devicemodel interface.

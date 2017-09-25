@@ -36,7 +36,7 @@
 #include <public/hvm/dm_op.h>
 
 struct hvm_ioreq_page {
-    unsigned long gmfn;
+    unsigned long gfn;
     struct page_info *page;
     void *va;
 };
@@ -105,7 +105,7 @@ struct hvm_domain {
     struct {
         unsigned long base;
         unsigned long mask;
-    } ioreq_gmfn;
+    } ioreq_gfn;
 
     /* Lock protects all other values in the sub-struct and the default */
     struct {
