@@ -844,7 +844,12 @@ static int read_msr(unsigned int reg, uint64_t *val,
     int ret;
 
     if ( (ret = guest_rdmsr(curr, reg, val)) != X86EMUL_UNHANDLEABLE )
+    {
+        if ( ret == X86EMUL_EXCEPTION )
+            x86_emul_hw_exception(TRAP_gp_fault, 0, ctxt);
+
         return ret;
+    }
 
     switch ( reg )
     {
@@ -993,7 +998,12 @@ static int write_msr(unsigned int reg, uint64_t val,
     int ret;
 
     if ( (ret = guest_wrmsr(curr, reg, val)) != X86EMUL_UNHANDLEABLE )
+    {
+        if ( ret == X86EMUL_EXCEPTION )
+            x86_emul_hw_exception(TRAP_gp_fault, 0, ctxt);
+
         return ret;
+    }
 
     switch ( reg )
     {
