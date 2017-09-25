@@ -916,9 +916,8 @@ static int save(struct xc_sr_context *ctx, uint16_t guest_type)
 };
 
 int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom,
-                   uint32_t max_iters, uint32_t max_factor, uint32_t flags,
-                   struct save_callbacks* callbacks, int hvm,
-                   xc_migration_stream_t stream_type, int recv_fd)
+                   uint32_t flags, struct save_callbacks* callbacks,
+                   int hvm, xc_migration_stream_t stream_type, int recv_fd)
 {
     struct xc_sr_context ctx =
         {
@@ -955,8 +954,7 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom,
     if ( ctx.save.checkpointed == XC_MIG_STREAM_COLO )
         assert(callbacks->wait_checkpoint);
 
-    DPRINTF("fd %d, dom %u, max_iters %u, max_factor %u, flags %u, hvm %d",
-            io_fd, dom, max_iters, max_factor, flags, hvm);
+    DPRINTF("fd %d, dom %u, flags %u, hvm %d", io_fd, dom, flags, hvm);
 
     if ( xc_domain_getinfo(xch, dom, 1, &ctx.dominfo) != 1 )
     {

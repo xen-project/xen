@@ -89,8 +89,8 @@ void libxl__xc_domain_save(libxl__egc *egc, libxl__domain_save_state *dss,
         libxl__srm_callout_enumcallbacks_save(&shs->callbacks.save.a);
 
     const unsigned long argnums[] = {
-        dss->domid, 0, 0, dss->xcflags, dss->hvm,
-        cbflags, dss->checkpointed_stream,
+        dss->domid, dss->xcflags, dss->hvm, cbflags,
+        dss->checkpointed_stream,
     };
 
     shs->ao = ao;
