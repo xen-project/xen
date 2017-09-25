@@ -27,9 +27,13 @@
 struct msr_domain_policy __read_mostly hvm_max_msr_domain_policy,
                          __read_mostly  pv_max_msr_domain_policy;
 
+struct msr_vcpu_policy __read_mostly hvm_max_msr_vcpu_policy,
+                       __read_mostly  pv_max_msr_vcpu_policy;
+
 static void __init calculate_hvm_max_policy(void)
 {
     struct msr_domain_policy *dp = &hvm_max_msr_domain_policy;
+    struct msr_vcpu_policy *vp = &hvm_max_msr_vcpu_policy;
 
     if ( !hvm_enabled )
         return;
@@ -40,11 +44,15 @@ static void __init calculate_hvm_max_policy(void)
         dp->plaform_info.available = true;
         dp->plaform_info.cpuid_faulting = true;
     }
+
+    /* 0x00000140  MSR_INTEL_MISC_FEATURES_ENABLES */
+    vp->misc_features_enables.available = dp->plaform_info.available;
 }
 
 static void __init calculate_pv_max_policy(void)
 {
     struct msr_domain_policy *dp = &pv_max_msr_domain_policy;
+    struct msr_vcpu_policy *vp = &pv_max_msr_vcpu_policy;
 
     /* 0x000000ce  MSR_INTEL_PLATFORM_INFO */
     if ( cpu_has_cpuid_faulting )
@@ -52,6 +60,9 @@ static void __init calculate_pv_max_policy(void)
         dp->plaform_info.available = true;
         dp->plaform_info.cpuid_faulting = true;
     }
+
+    /* 0x00000140  MSR_INTEL_MISC_FEATURES_ENABLES */
+    vp->misc_features_enables.available = dp->plaform_info.available;
 }
 
 void __init init_guest_msr_policy(void)
@@ -80,6 +91,28 @@ int init_domain_msr_policy(struct domain *d)
     }
 
     d->arch.msr = dp;
+
+    return 0;
+}
+
+int init_vcpu_msr_policy(struct vcpu *v)
+{
+    struct domain *d = v->domain;
+    struct msr_vcpu_policy *vp;
+
+    vp = xmalloc(struct msr_vcpu_policy);
+
+    if ( !vp )
+        return -ENOMEM;
+
+    *vp = is_pv_domain(d) ? pv_max_msr_vcpu_policy :
+                            hvm_max_msr_vcpu_policy;
+
+    /* See comment in intel_ctxt_switch_levelling() */
+    if ( is_control_domain(d) )
+        vp->misc_features_enables.available = false;
+
+    v->arch.msr = vp;
 
     return 0;
 }

@@ -212,8 +212,19 @@ struct msr_domain_policy
     } plaform_info;
 };
 
+/* MSR policy object for per-vCPU MSRs */
+struct msr_vcpu_policy
+{
+    /* 0x00000140  MSR_INTEL_MISC_FEATURES_ENABLES */
+    struct {
+        bool available; /* This MSR is non-architectural */
+        bool cpuid_faulting;
+    } misc_features_enables;
+};
+
 void init_guest_msr_policy(void);
 int init_domain_msr_policy(struct domain *d);
+int init_vcpu_msr_policy(struct vcpu *v);
 
 #endif /* !__ASSEMBLY__ */
 
