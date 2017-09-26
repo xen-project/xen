@@ -2772,29 +2772,34 @@ csched2_dom_cntl(
     struct csched2_dom * const sdom = csched2_dom(d);
     struct csched2_private *prv = csched2_priv(ops);
     unsigned long flags;
+    struct vcpu *v;
     int rc = 0;
 
     /*
      * Locking:
      *  - we must take the private lock for accessing the weights of the
-     *    vcpus of d,
+     *    vcpus of d, and/or the cap;
      *  - in the putinfo case, we also need the runqueue lock(s), for
      *    updating the max waight of the runqueue(s).
+     *    If changing the cap, we also need the budget_lock, for updating
+     *    the value of the domain budget pool (and the runqueue lock,
+     *    for adjusting the parameters and rescheduling any vCPU that is
+     *    running at the time of the change).
      */
     switch ( op->cmd )
     {
     case XEN_DOMCTL_SCHEDOP_getinfo:
         read_lock_irqsave(&prv->lock, flags);
         op->u.credit2.weight = sdom->weight;
+        op->u.credit2.cap = sdom->cap;
         read_unlock_irqrestore(&prv->lock, flags);
         break;
     case XEN_DOMCTL_SCHEDOP_putinfo:
+        write_lock_irqsave(&prv->lock, flags);
+        /* Weight */
         if ( op->u.credit2.weight != 0 )
         {
-            struct vcpu *v;
             int old_weight;
-
-            write_lock_irqsave(&prv->lock, flags);
 
             old_weight = sdom->weight;
 
@@ -2813,9 +2818,123 @@ csched2_dom_cntl(
 
                 vcpu_schedule_unlock(lock, svc->vcpu);
             }
-
-            write_unlock_irqrestore(&prv->lock, flags);
         }
+        /* Cap */
+        if ( op->u.credit2.cap != 0 )
+        {
+            /* Cap is only valid if it's below 100 * nr_of_vCPUS */
+            if ( op->u.credit2.cap > 100 * sdom->nr_vcpus )
+            {
+                rc = -EINVAL;
+                break;
+            }
+
+            spin_lock(&sdom->budget_lock);
+            sdom->tot_budget = (CSCHED2_BDGT_REPL_PERIOD * op->u.credit2.cap);
+            sdom->tot_budget /= 100;
+            spin_unlock(&sdom->budget_lock);
+
+            if ( sdom->cap == 0 )
+            {
+                /*
+                 * We give to the domain the budget to which it is entitled,
+                 * and queue its first replenishment event.
+                 *
+                 * Since cap is currently disabled for this domain, we
+                 * know no vCPU is messing with the domain's budget, and
+                 * the replenishment timer is still off.
+                 * For these reasons, it is safe to do the following without
+                 * taking the budget_lock.
+                 */
+                sdom->budget = sdom->tot_budget;
+                sdom->next_repl = NOW() + CSCHED2_BDGT_REPL_PERIOD;
+                set_timer(sdom->repl_timer, sdom->next_repl);
+
+                /*
+                 * Now, let's enable budget accounting for all the vCPUs.
+                 * For making sure that they will start to honour the domain's
+                 * cap, we set their budget to 0.
+                 * This way, as soon as they will try to run, they will have
+                 * to get some budget.
+                 *
+                 * For the vCPUs that are already running, we trigger the
+                 * scheduler on their pCPU. When, as a consequence of this,
+                 * csched2_schedule() will run, it will figure out there is
+                 * no budget, and the vCPU will try to get some (and be parked,
+                 * if there's none, and we'll switch to someone else).
+                 */
+                for_each_vcpu ( d, v )
+                {
+                    struct csched2_vcpu *svc = csched2_vcpu(v);
+                    spinlock_t *lock = vcpu_schedule_lock(svc->vcpu);
+
+                    if ( v->is_running )
+                    {
+                        unsigned int cpu = v->processor;
+                        struct csched2_runqueue_data *rqd = c2rqd(ops, cpu);
+
+                        ASSERT(curr_on_cpu(cpu) == v);
+
+                        /*
+                         * We are triggering a reschedule on the vCPU's
+                         * pCPU. That will run burn_credits() and, since
+                         * the vCPU is capped now, it would charge all the
+                         * execution time of this last round as budget as
+                         * well. That will make the vCPU budget go negative,
+                         * potentially by a large amount, and it's unfair.
+                         *
+                         * To avoid that, call burn_credit() here, to do the
+                         * accounting of this current running instance now,
+                         * with budgetting still disabled. This does not
+                         * prevent some small amount of budget being charged
+                         * to the vCPU (i.e., the amount of time it runs from
+                         * now, to when scheduling happens). The budget will
+                         * also go below 0, but a lot less than how it would
+                         * if we don't do this.
+                         */
+                        burn_credits(rqd, svc, NOW());
+                        __cpumask_set_cpu(cpu, &rqd->tickled);
+                        ASSERT(!cpumask_test_cpu(cpu, &rqd->smt_idle));
+                        cpu_raise_softirq(cpu, SCHEDULE_SOFTIRQ);
+                    }
+                    svc->budget = 0;
+                    vcpu_schedule_unlock(lock, svc->vcpu);
+                }
+            }
+
+            sdom->cap = op->u.credit2.cap;
+        }
+        else if ( sdom->cap != 0 )
+        {
+            LIST_HEAD(parked);
+
+            stop_timer(sdom->repl_timer);
+
+            /* Disable budget accounting for all the vCPUs. */
+            for_each_vcpu ( d, v )
+            {
+                struct csched2_vcpu *svc = csched2_vcpu(v);
+                spinlock_t *lock = vcpu_schedule_lock(svc->vcpu);
+
+                svc->budget = STIME_MAX;
+
+                vcpu_schedule_unlock(lock, svc->vcpu);
+            }
+            sdom->cap = 0;
+            /*
+             * We are disabling the cap for this domain, which may have
+             * vCPUs waiting for a replenishment, so we unpark them all.
+             * Note that, since we have already disabled budget accounting
+             * for all the vCPUs of the domain, no currently running vCPU
+             * will be added to the parked vCPUs list any longer.
+             */
+            spin_lock(&sdom->budget_lock);
+            list_splice_init(&sdom->parked_vcpus, &parked);
+            spin_unlock(&sdom->budget_lock);
+
+            unpark_parked_vcpus(ops, &parked);
+        }
+        write_unlock_irqrestore(&prv->lock, flags);
         break;
     default:
         rc = -EINVAL;

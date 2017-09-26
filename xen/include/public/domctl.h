@@ -335,6 +335,7 @@ struct xen_domctl_sched_credit {
 
 struct xen_domctl_sched_credit2 {
     uint16_t weight;
+    uint16_t cap;
 };
 
 struct xen_domctl_sched_rtds {
