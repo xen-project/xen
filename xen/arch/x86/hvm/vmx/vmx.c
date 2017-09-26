@@ -1642,21 +1642,40 @@ static void vmx_update_guest_cr(struct vcpu *v, unsigned int cr)
         v->arch.hvm_vcpu.hw_cr[4] |= v->arch.hvm_vcpu.guest_cr[4];
         if ( v->arch.hvm_vmx.vmx_realmode )
             v->arch.hvm_vcpu.hw_cr[4] |= X86_CR4_VME;
-        if ( paging_mode_hap(v->domain) && !hvm_paging_enabled(v) )
-        {
-            v->arch.hvm_vcpu.hw_cr[4] |= X86_CR4_PSE;
-            v->arch.hvm_vcpu.hw_cr[4] &= ~X86_CR4_PAE;
-        }
+
         if ( !hvm_paging_enabled(v) )
         {
             /*
-             * SMEP/SMAP is disabled if CPU is in non-paging mode in hardware.
-             * However Xen always uses paging mode to emulate guest non-paging
-             * mode. To emulate this behavior, SMEP/SMAP needs to be manually
-             * disabled when guest VCPU is in non-paging mode.
+             * When the guest thinks paging is disabled, Xen may need to hide
+             * the effects of running with CR0.PG actually enabled.  There are
+             * two subtly complicated cases.
+             */
+
+            if ( paging_mode_hap(v->domain) )
+            {
+                /*
+                 * On hardware lacking the Unrestricted Guest feature (or with
+                 * it disabled in the VMCS), we may not enter the guest with
+                 * CR0.PG actually disabled.  When EPT is enabled, we run with
+                 * guest paging settings, but with CR3 pointing at
+                 * HVM_PARAM_IDENT_PT which is a 32bit pagetable using 4M
+                 * superpages.  Override the guests paging settings to match.
+                 */
+                v->arch.hvm_vcpu.hw_cr[4] |= X86_CR4_PSE;
+                v->arch.hvm_vcpu.hw_cr[4] &= ~X86_CR4_PAE;
+            }
+
+            /*
+             * Without CR0.PG, all memory accesses are user mode, so
+             * _PAGE_USER must be set in the pagetables for guest userspace to
+             * function.  This in turn trips up guest supervisor mode if
+             * SMEP/SMAP are left active in context.  They wouldn't have any
+             * effect if paging was actually disabled, so hide them behind the
+             * back of the guest.
              */
             v->arch.hvm_vcpu.hw_cr[4] &= ~(X86_CR4_SMEP | X86_CR4_SMAP);
         }
+
         __vmwrite(GUEST_CR4, v->arch.hvm_vcpu.hw_cr[4]);
         break;
 
