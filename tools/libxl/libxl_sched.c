@@ -405,6 +405,7 @@ static int sched_credit2_domain_get(libxl__gc *gc, uint32_t domid,
     libxl_domain_sched_params_init(scinfo);
     scinfo->sched = LIBXL_SCHEDULER_CREDIT2;
     scinfo->weight = sdom.weight;
+    scinfo->cap = sdom.cap;
 
     return 0;
 }
@@ -413,7 +414,16 @@ static int sched_credit2_domain_set(libxl__gc *gc, uint32_t domid,
                                     const libxl_domain_sched_params *scinfo)
 {
     struct xen_domctl_sched_credit2 sdom;
+    xc_domaininfo_t info;
     int rc;
+
+    rc = xc_domain_getinfolist(CTX->xch, domid, 1, &info);
+    if (rc < 0) {
+        LOGED(ERROR, domid, "Getting domain info");
+        return ERROR_FAIL;
+    }
+    if (rc != 1 || info.domain != domid)
+        return ERROR_INVAL;
 
     rc = xc_sched_credit2_domain_get(CTX->xch, domid, &sdom);
     if (rc != 0) {
@@ -428,6 +438,17 @@ static int sched_credit2_domain_set(libxl__gc *gc, uint32_t domid,
             return ERROR_INVAL;
         }
         sdom.weight = scinfo->weight;
+    }
+
+    if (scinfo->cap != LIBXL_DOMAIN_SCHED_PARAM_CAP_DEFAULT) {
+        if (scinfo->cap < 0
+            || scinfo->cap > (info.max_vcpu_id + 1) * 100) {
+            LOGD(ERROR, domid, "Cpu cap out of range, "
+                 "valid range is from 0 to %d for specified number of vcpus",
+                 ((info.max_vcpu_id + 1) * 100));
+            return ERROR_INVAL;
+        }
+        sdom.cap = scinfo->cap;
     }
 
     rc = xc_sched_credit2_domain_set(CTX->xch, domid, &sdom);

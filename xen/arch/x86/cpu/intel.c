@@ -156,7 +156,6 @@ static void intel_ctxt_switch_levelling(const struct vcpu *next)
 	struct cpuidmasks *these_masks = &this_cpu(cpuidmasks);
 	const struct domain *nextd = next ? next->domain : NULL;
 	const struct cpuidmasks *masks;
-	const struct msr_vcpu_policy *vp = next->arch.msr;
 
 	if (cpu_has_cpuid_faulting) {
 		/*
@@ -177,7 +176,7 @@ static void intel_ctxt_switch_levelling(const struct vcpu *next)
 		 */
 		set_cpuid_faulting(nextd && !is_control_domain(nextd) &&
 				   (is_pv_domain(nextd) ||
-				    vp->misc_features_enables.cpuid_faulting));
+				    next->arch.msr->misc_features_enables.cpuid_faulting));
 		return;
 	}
 

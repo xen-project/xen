@@ -522,6 +522,8 @@ struct csched2_vcpu {
     unsigned flags;                    /* Status flags (16 bits would be ok,  */
     s_time_t budget;                   /* Current budget (if domains has cap) */
                                        /* but clear_bit() does not like that) */
+    s_time_t budget_quota;             /* Budget to which vCPU is entitled    */
+
     s_time_t start_time;               /* Time we were scheduled (for credit) */
 
     /* Individual contribution to load                                        */
@@ -1791,17 +1793,16 @@ static bool vcpu_grab_budget(struct csched2_vcpu *svc)
 
     if ( sdom->budget > 0 )
     {
-        /*
-         * NB: we give the whole remaining budget a domain has, to the first
-         * vCPU that comes here and asks for it. This means that, in a domain
-         * with a cap, only 1 vCPU is able to run, at any given time.
-         * /THIS IS GOING TO CHANGE/ in subsequent patches, toward something
-         * that allows much better fairness and parallelism. Proceeding in
-         * two steps, is for making things easy to understand, when looking
-         * at the signle commits.
-         */
-        svc->budget = sdom->budget;
-        sdom->budget = 0;
+        s_time_t budget;
+
+        /* Get our quota, if there's at least as much budget */
+        if ( likely(sdom->budget >= svc->budget_quota) )
+            budget = svc->budget_quota;
+        else
+            budget = sdom->budget;
+
+        svc->budget = budget;
+        sdom->budget -= budget;
     }
     else
     {
@@ -2036,6 +2037,7 @@ csched2_alloc_vdata(const struct scheduler *ops, struct vcpu *vc, void *dd)
     svc->tickled_cpu = -1;
 
     svc->budget = STIME_MAX;
+    svc->budget_quota = 0;
     INIT_LIST_HEAD(&svc->parked_elem);
 
     SCHED_STAT_CRANK(vcpu_alloc);
@@ -2772,29 +2774,34 @@ csched2_dom_cntl(
     struct csched2_dom * const sdom = csched2_dom(d);
     struct csched2_private *prv = csched2_priv(ops);
     unsigned long flags;
+    struct vcpu *v;
     int rc = 0;
 
     /*
      * Locking:
      *  - we must take the private lock for accessing the weights of the
-     *    vcpus of d,
+     *    vcpus of d, and/or the cap;
      *  - in the putinfo case, we also need the runqueue lock(s), for
      *    updating the max waight of the runqueue(s).
+     *    If changing the cap, we also need the budget_lock, for updating
+     *    the value of the domain budget pool (and the runqueue lock,
+     *    for adjusting the parameters and rescheduling any vCPU that is
+     *    running at the time of the change).
      */
     switch ( op->cmd )
     {
     case XEN_DOMCTL_SCHEDOP_getinfo:
         read_lock_irqsave(&prv->lock, flags);
         op->u.credit2.weight = sdom->weight;
+        op->u.credit2.cap = sdom->cap;
         read_unlock_irqrestore(&prv->lock, flags);
         break;
     case XEN_DOMCTL_SCHEDOP_putinfo:
+        write_lock_irqsave(&prv->lock, flags);
+        /* Weight */
         if ( op->u.credit2.weight != 0 )
         {
-            struct vcpu *v;
             int old_weight;
-
-            write_lock_irqsave(&prv->lock, flags);
 
             old_weight = sdom->weight;
 
@@ -2813,9 +2820,146 @@ csched2_dom_cntl(
 
                 vcpu_schedule_unlock(lock, svc->vcpu);
             }
-
-            write_unlock_irqrestore(&prv->lock, flags);
         }
+        /* Cap */
+        if ( op->u.credit2.cap != 0 )
+        {
+            struct csched2_vcpu *svc;
+            spinlock_t *lock;
+
+            /* Cap is only valid if it's below 100 * nr_of_vCPUS */
+            if ( op->u.credit2.cap > 100 * sdom->nr_vcpus )
+            {
+                rc = -EINVAL;
+                break;
+            }
+
+            spin_lock(&sdom->budget_lock);
+            sdom->tot_budget = (CSCHED2_BDGT_REPL_PERIOD * op->u.credit2.cap);
+            sdom->tot_budget /= 100;
+            spin_unlock(&sdom->budget_lock);
+
+            /*
+             * When trying to get some budget and run, each vCPU will grab
+             * from the pool 1/N (with N = nr of vCPUs of the domain) of
+             * the total budget. Roughly speaking, this means each vCPU will
+             * have at least one chance to run during every period.
+             */
+            for_each_vcpu ( d, v )
+            {
+                svc = csched2_vcpu(v);
+                lock = vcpu_schedule_lock(svc->vcpu);
+                /*
+                 * Too small quotas would in theory cause a lot of overhead,
+                 * which then won't happen because, in csched2_runtime(),
+                 * CSCHED2_MIN_TIMER is what would be used anyway.
+                 */
+                svc->budget_quota = max(sdom->tot_budget / sdom->nr_vcpus,
+                                        CSCHED2_MIN_TIMER);
+                vcpu_schedule_unlock(lock, svc->vcpu);
+            }
+
+            if ( sdom->cap == 0 )
+            {
+                /*
+                 * We give to the domain the budget to which it is entitled,
+                 * and queue its first replenishment event.
+                 *
+                 * Since cap is currently disabled for this domain, we
+                 * know no vCPU is messing with the domain's budget, and
+                 * the replenishment timer is still off.
+                 * For these reasons, it is safe to do the following without
+                 * taking the budget_lock.
+                 */
+                sdom->budget = sdom->tot_budget;
+                sdom->next_repl = NOW() + CSCHED2_BDGT_REPL_PERIOD;
+                set_timer(sdom->repl_timer, sdom->next_repl);
+
+                /*
+                 * Now, let's enable budget accounting for all the vCPUs.
+                 * For making sure that they will start to honour the domain's
+                 * cap, we set their budget to 0.
+                 * This way, as soon as they will try to run, they will have
+                 * to get some budget.
+                 *
+                 * For the vCPUs that are already running, we trigger the
+                 * scheduler on their pCPU. When, as a consequence of this,
+                 * csched2_schedule() will run, it will figure out there is
+                 * no budget, and the vCPU will try to get some (and be parked,
+                 * if there's none, and we'll switch to someone else).
+                 */
+                for_each_vcpu ( d, v )
+                {
+                    svc = csched2_vcpu(v);
+                    lock = vcpu_schedule_lock(svc->vcpu);
+                    if ( v->is_running )
+                    {
+                        unsigned int cpu = v->processor;
+                        struct csched2_runqueue_data *rqd = c2rqd(ops, cpu);
+
+                        ASSERT(curr_on_cpu(cpu) == v);
+
+                        /*
+                         * We are triggering a reschedule on the vCPU's
+                         * pCPU. That will run burn_credits() and, since
+                         * the vCPU is capped now, it would charge all the
+                         * execution time of this last round as budget as
+                         * well. That will make the vCPU budget go negative,
+                         * potentially by a large amount, and it's unfair.
+                         *
+                         * To avoid that, call burn_credit() here, to do the
+                         * accounting of this current running instance now,
+                         * with budgetting still disabled. This does not
+                         * prevent some small amount of budget being charged
+                         * to the vCPU (i.e., the amount of time it runs from
+                         * now, to when scheduling happens). The budget will
+                         * also go below 0, but a lot less than how it would
+                         * if we don't do this.
+                         */
+                        burn_credits(rqd, svc, NOW());
+                        __cpumask_set_cpu(cpu, &rqd->tickled);
+                        ASSERT(!cpumask_test_cpu(cpu, &rqd->smt_idle));
+                        cpu_raise_softirq(cpu, SCHEDULE_SOFTIRQ);
+                    }
+                    svc->budget = 0;
+                    vcpu_schedule_unlock(lock, svc->vcpu);
+                }
+            }
+
+            sdom->cap = op->u.credit2.cap;
+        }
+        else if ( sdom->cap != 0 )
+        {
+            LIST_HEAD(parked);
+
+            stop_timer(sdom->repl_timer);
+
+            /* Disable budget accounting for all the vCPUs. */
+            for_each_vcpu ( d, v )
+            {
+                struct csched2_vcpu *svc = csched2_vcpu(v);
+                spinlock_t *lock = vcpu_schedule_lock(svc->vcpu);
+
+                svc->budget = STIME_MAX;
+                svc->budget_quota = 0;
+
+                vcpu_schedule_unlock(lock, svc->vcpu);
+            }
+            sdom->cap = 0;
+            /*
+             * We are disabling the cap for this domain, which may have
+             * vCPUs waiting for a replenishment, so we unpark them all.
+             * Note that, since we have already disabled budget accounting
+             * for all the vCPUs of the domain, no currently running vCPU
+             * will be added to the parked vCPUs list any longer.
+             */
+            spin_lock(&sdom->budget_lock);
+            list_splice_init(&sdom->parked_vcpus, &parked);
+            spin_unlock(&sdom->budget_lock);
+
+            unpark_parked_vcpus(ops, &parked);
+        }
+        write_unlock_irqrestore(&prv->lock, flags);
         break;
     default:
         rc = -EINVAL;
@@ -3482,7 +3626,8 @@ csched2_dump_vcpu(struct csched2_private *prv, struct csched2_vcpu *svc)
     printk(" credit=%" PRIi32" [w=%u]", svc->credit, svc->weight);
 
     if ( has_cap(svc) )
-        printk(" budget=%"PRI_stime, svc->budget);
+        printk(" budget=%"PRI_stime"(%"PRI_stime")",
+               svc->budget, svc->budget_quota);
 
     printk(" load=%"PRI_stime" (~%"PRI_stime"%%)", svc->avgload,
            (svc->avgload * 100) >> prv->load_precision_shift);
