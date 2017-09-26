@@ -209,7 +209,7 @@ static int sched_credit2_domain_output(int domid)
     libxl_domain_sched_params scinfo;
 
     if (domid < 0) {
-        printf("%-33s %4s %6s\n", "Name", "ID", "Weight");
+        printf("%-33s %4s %6s %4s\n", "Name", "ID", "Weight", "Cap");
         return 0;
     }
 
@@ -219,10 +219,11 @@ static int sched_credit2_domain_output(int domid)
         return 1;
     }
     domname = libxl_domid_to_name(ctx, domid);
-    printf("%-33s %4d %6d\n",
+    printf("%-33s %4d %6d %4d\n",
         domname,
         domid,
-        scinfo.weight);
+        scinfo.weight,
+        scinfo.cap);
     free(domname);
     libxl_domain_sched_params_dispose(&scinfo);
     return 0;
@@ -589,27 +590,33 @@ int main_sched_credit2(int argc, char **argv)
     const char *dom = NULL;
     const char *cpupool = NULL;
     int ratelimit = 0;
-    int weight = 256;
+    int weight = 256, cap = 0;
     bool opt_s = false;
     bool opt_r = false;
     bool opt_w = false;
+    bool opt_c = false;
     int opt, rc;
     static struct option opts[] = {
         {"domain", 1, 0, 'd'},
         {"weight", 1, 0, 'w'},
+        {"cap", 1, 0, 'c'},
         {"schedparam", 0, 0, 's'},
         {"ratelimit_us", 1, 0, 'r'},
         {"cpupool", 1, 0, 'p'},
         COMMON_LONG_OPTS
     };
 
-    SWITCH_FOREACH_OPT(opt, "d:w:p:r:s", opts, "sched-credit2", 0) {
+    SWITCH_FOREACH_OPT(opt, "d:w:c:p:r:s", opts, "sched-credit2", 0) {
     case 'd':
         dom = optarg;
         break;
     case 'w':
         weight = strtol(optarg, NULL, 10);
         opt_w = true;
+        break;
+    case 'c':
+        cap = strtol(optarg, NULL, 10);
+        opt_c = true;
         break;
     case 's':
         opt_s = true;
@@ -623,12 +630,12 @@ int main_sched_credit2(int argc, char **argv)
         break;
     }
 
-    if (cpupool && (dom || opt_w)) {
+    if (cpupool && (dom || opt_w || opt_c)) {
         fprintf(stderr, "Specifying a cpupool is not allowed with other "
                 "options.\n");
         return EXIT_FAILURE;
     }
-    if (!dom && opt_w) {
+    if (!dom && (opt_w || opt_c)) {
         fprintf(stderr, "Must specify a domain.\n");
         return EXIT_FAILURE;
     }
@@ -663,7 +670,7 @@ int main_sched_credit2(int argc, char **argv)
     } else {
         uint32_t domid = find_domain(dom);
 
-        if (!opt_w) { /* output credit2 scheduler info */
+        if (!opt_w && !opt_c) { /* output credit2 scheduler info */
             sched_credit2_domain_output(-1);
             if (sched_credit2_domain_output(domid))
                 return EXIT_FAILURE;
@@ -673,6 +680,8 @@ int main_sched_credit2(int argc, char **argv)
             scinfo.sched = LIBXL_SCHEDULER_CREDIT2;
             if (opt_w)
                 scinfo.weight = weight;
+            if (opt_c)
+                scinfo.cap = cap;
             rc = sched_domain_set(domid, &scinfo);
             libxl_domain_sched_params_dispose(&scinfo);
             if (rc)
