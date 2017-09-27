@@ -117,6 +117,11 @@ struct domain {
 
 static struct domain *dom_head;
 
+static inline bool console_enabled(struct console *con)
+{
+	return con->local_port != -1;
+}
+
 static int write_all(int fd, const char* buf, size_t len)
 {
 	while (len) {
@@ -908,6 +913,27 @@ static void handle_tty_write(struct console *con)
 	}
 }
 
+static void console_evtchn_unmask(struct console *con, void *data)
+{
+	long long now = (long long)data;
+
+	if (!console_enabled(con))
+		return;
+
+	/* CS 16257:955ee4fa1345 introduces a 5ms fuzz
+	 * for select(), it is not clear poll() has
+	 * similar behavior (returning a couple of ms
+	 * sooner than requested) as well. Just leave
+	 * the fuzz here. Remove it with a separate
+	 * patch if necessary */
+	if ((now+5) > con->next_period) {
+		con->next_period = now + RATE_LIMIT_PERIOD;
+		if (con->event_count >= RATE_LIMIT_ALLOWANCE)
+			(void)xenevtchn_unmask(con->xce_handle, con->local_port);
+		con->event_count = 0;
+	}
+}
+
 static void handle_ring_read(struct domain *dom)
 {
 	xenevtchn_port_or_error_t port;
@@ -1142,23 +1168,7 @@ void handle_io(void)
 		for (d = dom_head; d; d = d->next) {
 			struct console *con = &d->console;
 
-			/* CS 16257:955ee4fa1345 introduces a 5ms fuzz
-			 * for select(), it is not clear poll() has
-			 * similar behavior (returning a couple of ms
-			 * sooner than requested) as well. Just leave
-			 * the fuzz here. Remove it with a separate
-			 * patch if necessary */
-			if ((now+5) > con->next_period) {
-				con->next_period = now + RATE_LIMIT_PERIOD;
-				if (con->event_count >= RATE_LIMIT_ALLOWANCE) {
-					(void)xenevtchn_unmask(con->xce_handle, con->local_port);
-				}
-				con->event_count = 0;
-			}
-		}
-
-		for (d = dom_head; d; d = d->next) {
-			struct console *con = &d->console;
+			console_evtchn_unmask(con, (void *)now);
 
 			maybe_add_console_evtchn_fd(con, (void *)&next_timeout);
 
