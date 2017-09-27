@@ -1047,6 +1047,26 @@ static void reset_fds(void)
 		memset(fds, 0, sizeof(struct pollfd) * current_array_size);
 }
 
+static void maybe_add_console_evtchn_fd(struct console *con, void *data)
+{
+	long long next_timeout = *((long long *)data);
+
+	if (con->event_count >= RATE_LIMIT_ALLOWANCE) {
+		/* Determine if we're going to be the next time slice to expire */
+		if (!next_timeout ||
+		    con->next_period < next_timeout)
+			next_timeout = con->next_period;
+	} else if (con->xce_handle != NULL) {
+		if (buffer_available(con)) {
+			int evtchn_fd = xenevtchn_fd(con->xce_handle);
+			con->xce_pollfd_idx = set_fds(evtchn_fd,
+						      POLLIN|POLLPRI);
+		}
+	}
+
+	*((long long *)data) = next_timeout;
+}
+
 void handle_io(void)
 {
 	int ret;
@@ -1124,18 +1144,7 @@ void handle_io(void)
 		for (d = dom_head; d; d = d->next) {
 			struct console *con = &d->console;
 
-			if (con->event_count >= RATE_LIMIT_ALLOWANCE) {
-				/* Determine if we're going to be the next time slice to expire */
-				if (!next_timeout ||
-				    con->next_period < next_timeout)
-					next_timeout = con->next_period;
-			} else if (con->xce_handle != NULL) {
-			        if (buffer_available(con)) {
-					int evtchn_fd = xenevtchn_fd(con->xce_handle);
-					con->xce_pollfd_idx = set_fds(evtchn_fd,
-								    POLLIN|POLLPRI);
-				}
-			}
+			maybe_add_console_evtchn_fd(con, (void *)&next_timeout);
 
 			if (con->master_fd != -1) {
 				short events = 0;
