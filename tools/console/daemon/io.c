@@ -1130,6 +1130,24 @@ static void maybe_add_console_tty_fd(struct console *con)
 	}
 }
 
+static void handle_console_tty(struct console *con)
+{
+	if (con->master_fd != -1 && con->master_pollfd_idx != -1) {
+		if (fds[con->master_pollfd_idx].revents &
+		    ~(POLLIN|POLLOUT|POLLPRI))
+			console_handle_broken_tty(con, domain_is_valid(con->d->domid));
+		else {
+			if (fds[con->master_pollfd_idx].revents &
+			    POLLIN)
+				handle_tty_read(con);
+			if (fds[con->master_pollfd_idx].revents &
+			    POLLOUT)
+				handle_tty_write(con);
+		}
+	}
+	con->master_pollfd_idx = -1;
+}
+
 void handle_io(void)
 {
 	int ret;
@@ -1260,22 +1278,7 @@ void handle_io(void)
 
 			handle_console_ring(con);
 
-			if (con->master_fd != -1 && con->master_pollfd_idx != -1) {
-				if (fds[con->master_pollfd_idx].revents &
-				    ~(POLLIN|POLLOUT|POLLPRI))
-					console_handle_broken_tty(con,
-						   domain_is_valid(d->domid));
-				else {
-					if (fds[con->master_pollfd_idx].revents &
-					    POLLIN)
-						handle_tty_read(con);
-					if (fds[con->master_pollfd_idx].revents &
-					    POLLOUT)
-						handle_tty_write(con);
-				}
-			}
-
-			con->master_pollfd_idx = -1;
+			handle_console_tty(con);
 
 			if (d->last_seen != enum_pass)
 				shutdown_domain(d);
