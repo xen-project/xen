@@ -934,16 +934,22 @@ static void console_evtchn_unmask(struct console *con, void *data)
 	}
 }
 
-static void handle_ring_read(struct domain *dom)
+static void handle_ring_read(struct console *con)
 {
 	xenevtchn_port_or_error_t port;
-	struct console *con = &dom->console;
 
-	if (dom->is_dead)
+	if (con->d->is_dead)
 		return;
 
 	if ((port = xenevtchn_pending(con->xce_handle)) == -1)
 		return;
+
+	if (port != con->local_port) {
+		dolog(LOG_ERR,
+		      "Event received for invalid port %d, Expected port is %d\n",
+		      port, con->local_port);
+		return;
+	}
 
 	con->event_count++;
 
@@ -951,6 +957,21 @@ static void handle_ring_read(struct domain *dom)
 
 	if (con->event_count < RATE_LIMIT_ALLOWANCE)
 		(void)xenevtchn_unmask(con->xce_handle, port);
+}
+
+static void handle_console_ring(struct console *con)
+{
+	if (con->event_count < RATE_LIMIT_ALLOWANCE) {
+		if (con->xce_handle != NULL &&
+		    con->xce_pollfd_idx != -1 &&
+		    !(fds[con->xce_pollfd_idx].revents &
+		      ~(POLLIN|POLLOUT|POLLPRI)) &&
+		    (fds[con->xce_pollfd_idx].revents &
+		     POLLIN))
+			handle_ring_read(con);
+	}
+
+	con->xce_pollfd_idx = -1;
 }
 
 static void handle_xs(void)
@@ -1236,15 +1257,8 @@ void handle_io(void)
 			struct console *con = &d->console;
 
 			n = d->next;
-			if (con->event_count < RATE_LIMIT_ALLOWANCE) {
-				if (con->xce_handle != NULL &&
-				    con->xce_pollfd_idx != -1 &&
-				    !(fds[con->xce_pollfd_idx].revents &
-				      ~(POLLIN|POLLOUT|POLLPRI)) &&
-				      (fds[con->xce_pollfd_idx].revents &
-				       POLLIN))
-				    handle_ring_read(d);
-			}
+
+			handle_console_ring(con);
 
 			if (con->master_fd != -1 && con->master_pollfd_idx != -1) {
 				if (fds[con->master_pollfd_idx].revents &
@@ -1261,7 +1275,7 @@ void handle_io(void)
 				}
 			}
 
-			con->xce_pollfd_idx = con->master_pollfd_idx = -1;
+			con->master_pollfd_idx = -1;
 
 			if (d->last_seen != enum_pass)
 				shutdown_domain(d);
