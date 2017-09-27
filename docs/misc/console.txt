@@ -19,7 +19,20 @@ The first PV console path in xenstore remains:
 
 /local/domain/$DOMID/console
 
-the other PV consoles follow the conventional xenstore device path and
+The virtual UART console path in xenstore is defined as:
+
+/local/domain/$DOMID/vuart/0
+
+The vuart console provides access to a virtual SBSA UART on ARM systems.
+To enable vuart the following line has to be added to the guest configuration
+file:
+
+vuart = "sbsa_uart"
+
+In Linux you can select the virtual SBSA UART by using the "ttyAMA0"
+console instead of "hvc0".
+
+The other PV consoles follow the conventional xenstore device path and
 live in:
 
 /local/domain/$DOMID/device/console/$DEVID.
@@ -61,6 +74,14 @@ output = pty
 The backend will write the pty device name to the "tty" node in the
 console frontend.
 
+For the PV console the tty node is added at
+
+/local/domain/$DOMID/console/tty
+
+For the virtual UART console the tty node is added at
+
+/local/domain/$DOMID/vuart/0/tty
+
 If the toolstack wants a listening Unix domain socket to be created at path
 <path>, a connection accepted and data proxied to the console, it will write:
 
@@ -79,8 +100,8 @@ For example:
 ioemu
 
 The supported values are only xenconsoled or ioemu; xenconsoled has
-several limitations: it can only be used for the first PV console and it
-can only connect to a pty.
+several limitations: it can only be used for the first PV or virtual UART
+console and it can only connect to a pty.
 
 Emulated serials are provided by qemu-dm only to hvm guests; the number
 of emulated serials depends on how many "-serial" command line options
@@ -90,14 +111,15 @@ xenstore in the following path:
 
 /local/domain/$DOMID/serial/$SERIAL_NUM/tty
 
-xenconsole is the tool to connect to a PV console or an emulated serial
-that has a pty as output. Xenconsole takes a domid as parameter plus an
-optional console type (pv for PV consoles or serial for emulated
-serials) and console number. Depending on the type and console
-number, xenconsole will look for the tty node in different xenstore
-paths, as described above.  If the user doesn't specify the console type
-xenconsole will try to guess: if the guest is a pv guest it defaults to
-PV console, if the guest is an hvm guest it defaults to emulated serial.
+xenconsole is the tool to connect to a PV or virtual UART console or an
+emulated serial that has a pty as output. Xenconsole takes a domid as
+parameter plus an optional console type (pv for PV consoles, vuart for
+virtual UART or serial for emulated serials) and console number.
+Depending on the type and console number, xenconsole will look for the tty
+node in different xenstore paths, as described above.  If the user doesn't
+specify the console type xenconsole will try to guess: if the guest is a pv
+guest it defaults to PV console, if the guest is an hvm guest it defaults to
+emulated serial.
 
 By default xl creates a pv console for hvm guests, plus an emulated
 serial if the user specified 'serial = "pty"' in the VM config file.

@@ -1205,6 +1205,9 @@ Allow a guest to access specific physical IRQs.
 It is recommended to only use this option for trusted VMs under
 administrator's control.
 
+If vuart console is enabled then irq 32 is reserved for it. See
+L</vuart="uart"> to know how to enable vuart console.
+
 =item B<max_event_channels=N>
 
 Limit the guest to using at most N event channels (PV interrupts).
@@ -2424,6 +2427,15 @@ the domain was created.
 
 This requires hardware compatibility with the requested version, either
 natively or via hardware backwards compatibility support.
+
+=item B<vuart="uart">
+
+To enable vuart console, user must specify the following option in the
+VM config file:
+
+vuart = "sbsa_uart"
+
+Currently, only the "sbsa_uart" model is supported for ARM.
 
 =back
 
