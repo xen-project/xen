@@ -1547,15 +1547,16 @@ static void vmx_update_guest_cr(struct vcpu *v, unsigned int cr)
 
     switch ( cr )
     {
-    case 0: {
-        int realmode;
+    case 0:
+    {
+        bool realmode;
         unsigned long hw_cr0_mask = X86_CR0_NE;
 
         if ( !vmx_unrestricted_guest(v) )
             hw_cr0_mask |= X86_CR0_PG | X86_CR0_PE;
 
         if ( paging_mode_shadow(v->domain) )
-           hw_cr0_mask |= X86_CR0_WP;
+            hw_cr0_mask |= X86_CR0_WP;
 
         if ( paging_mode_hap(v->domain) )
         {
@@ -1590,12 +1591,12 @@ static void vmx_update_guest_cr(struct vcpu *v, unsigned int cr)
                 vmx_fpu_enter(v);
         }
 
-        realmode = !(v->arch.hvm_vcpu.guest_cr[0] & X86_CR0_PE); 
+        realmode = !(v->arch.hvm_vcpu.guest_cr[0] & X86_CR0_PE);
 
-        if ( (!vmx_unrestricted_guest(v)) &&
+        if ( !vmx_unrestricted_guest(v) &&
              (realmode != v->arch.hvm_vmx.vmx_realmode) )
         {
-            enum x86_segment s; 
+            enum x86_segment s;
             struct segment_register reg[x86_seg_tr + 1];
 
             BUILD_BUG_ON(x86_seg_tr != x86_seg_gs + 1);
@@ -1606,13 +1607,13 @@ static void vmx_update_guest_cr(struct vcpu *v, unsigned int cr)
             for ( s = 0; s < ARRAY_SIZE(reg); s++ )
                 hvm_get_segment_register(v, s, &reg[s]);
             v->arch.hvm_vmx.vmx_realmode = realmode;
-            
+
             if ( realmode )
             {
                 for ( s = 0; s < ARRAY_SIZE(reg); s++ )
                     hvm_set_segment_register(v, s, &reg[s]);
             }
-            else 
+            else
             {
                 for ( s = 0; s < ARRAY_SIZE(reg); s++ )
                     if ( !(v->arch.hvm_vmx.vm86_segment_mask & (1<<s)) )
@@ -1631,9 +1632,11 @@ static void vmx_update_guest_cr(struct vcpu *v, unsigned int cr)
         vmx_update_guest_cr(v, 4);
         break;
     }
+
     case 2:
         /* CR2 is updated in exit stub. */
         break;
+
     case 3:
         if ( paging_mode_hap(v->domain) )
         {
@@ -1642,10 +1645,11 @@ static void vmx_update_guest_cr(struct vcpu *v, unsigned int cr)
                     v->domain->arch.hvm_domain.params[HVM_PARAM_IDENT_PT];
             vmx_load_pdptrs(v);
         }
- 
+
         __vmwrite(GUEST_CR3, v->arch.hvm_vcpu.hw_cr[3]);
         hvm_asid_flush_vcpu(v);
         break;
+
     case 4:
         v->arch.hvm_vcpu.hw_cr[4] = HVM_CR4_HOST_MASK;
         if ( paging_mode_hap(v->domain) )
@@ -1657,7 +1661,7 @@ static void vmx_update_guest_cr(struct vcpu *v, unsigned int cr)
             nvmx_set_cr_read_shadow(v, 4);
 
         v->arch.hvm_vcpu.hw_cr[4] |= v->arch.hvm_vcpu.guest_cr[4];
-        if ( v->arch.hvm_vmx.vmx_realmode ) 
+        if ( v->arch.hvm_vmx.vmx_realmode )
             v->arch.hvm_vcpu.hw_cr[4] |= X86_CR4_VME;
         if ( paging_mode_hap(v->domain) && !hvm_paging_enabled(v) )
         {
@@ -1676,6 +1680,7 @@ static void vmx_update_guest_cr(struct vcpu *v, unsigned int cr)
         }
         __vmwrite(GUEST_CR4, v->arch.hvm_vcpu.hw_cr[4]);
         break;
+
     default:
         BUG();
     }
