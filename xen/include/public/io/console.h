@@ -27,6 +27,8 @@
 #ifndef __XEN_PUBLIC_IO_CONSOLE_H__
 #define __XEN_PUBLIC_IO_CONSOLE_H__
 
+#include "ring.h"
+
 typedef uint32_t XENCONS_RING_IDX;
 
 #define MASK_XENCONS_IDX(idx, ring) ((idx) & (sizeof(ring)-1))
@@ -37,6 +39,10 @@ struct xencons_interface {
     XENCONS_RING_IDX in_cons, in_prod;
     XENCONS_RING_IDX out_cons, out_prod;
 };
+
+#if defined(__GNUC__) && !defined(__STRICT_ANSI__)
+DEFINE_XEN_FLEX_RING(xencons);
+#endif
 
 #endif /* __XEN_PUBLIC_IO_CONSOLE_H__ */
 
