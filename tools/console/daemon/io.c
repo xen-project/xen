@@ -1067,6 +1067,22 @@ static void maybe_add_console_evtchn_fd(struct console *con, void *data)
 	*((long long *)data) = next_timeout;
 }
 
+static void maybe_add_console_tty_fd(struct console *con)
+{
+	if (con->master_fd != -1) {
+		short events = 0;
+		if (!con->d->is_dead && ring_free_bytes(con))
+			events |= POLLIN;
+
+		if (!buffer_empty(&con->buffer))
+			events |= POLLOUT;
+
+		if (events)
+			con->master_pollfd_idx =
+				set_fds(con->master_fd, events|POLLPRI);
+	}
+}
+
 void handle_io(void)
 {
 	int ret;
@@ -1146,19 +1162,7 @@ void handle_io(void)
 
 			maybe_add_console_evtchn_fd(con, (void *)&next_timeout);
 
-			if (con->master_fd != -1) {
-				short events = 0;
-				if (!d->is_dead && ring_free_bytes(con))
-					events |= POLLIN;
-
-				if (!buffer_empty(&con->buffer))
-					events |= POLLOUT;
-
-				if (events)
-					con->master_pollfd_idx =
-						set_fds(con->master_fd,
-							events|POLLPRI);
-			}
+			maybe_add_console_tty_fd(con);
 		}
 
 		/* If any domain has been rate limited, we need to work
