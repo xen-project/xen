@@ -4,12 +4,12 @@
  * Copyright (c) 2012, Citrix Systems
  */
 
-#include <xen/types.h>
-#include <xen/lib.h>
 #include <xen/errno.h>
-#include <xen/sched.h>
 #include <xen/hypercall.h>
 #include <xen/iocap.h>
+#include <xen/lib.h>
+#include <xen/sched.h>
+#include <xen/types.h>
 #include <xsm/xsm.h>
 #include <public/domctl.h>
 
