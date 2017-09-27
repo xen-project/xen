@@ -793,6 +793,14 @@ static void cleanup_domain(struct domain *d)
 	remove_domain(d);
 }
 
+static void console_close_evtchn(struct console *con)
+{
+	if (con->xce_handle != NULL)
+		xenevtchn_close(con->xce_handle);
+
+	con->xce_handle = NULL;
+}
+
 static void shutdown_domain(struct domain *d)
 {
 	struct console *con = &d->console;
@@ -800,9 +808,7 @@ static void shutdown_domain(struct domain *d)
 	d->is_dead = true;
 	watch_domain(d, false);
 	console_unmap_interface(con);
-	if (con->xce_handle != NULL)
-		xenevtchn_close(con->xce_handle);
-	con->xce_handle = NULL;
+	console_close_evtchn(con);
 }
 
 static unsigned enum_pass = 0;
