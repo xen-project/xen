@@ -27,6 +27,7 @@ int main_console(int argc, char **argv)
     uint32_t domid;
     int opt = 0, num = 0;
     libxl_console_type type = 0;
+    char *console_names = "pv, serial, vuart";
 
     SWITCH_FOREACH_OPT(opt, "n:t:", NULL, "console", 1) {
     case 't':
@@ -34,8 +35,10 @@ int main_console(int argc, char **argv)
             type = LIBXL_CONSOLE_TYPE_PV;
         else if (!strcmp(optarg, "serial"))
             type = LIBXL_CONSOLE_TYPE_SERIAL;
+        else if (!strcmp(optarg, "vuart"))
+            type = LIBXL_CONSOLE_TYPE_VUART;
         else {
-            fprintf(stderr, "console type supported are: pv, serial\n");
+            fprintf(stderr, "console type supported are: %s\n", console_names);
             return EXIT_FAILURE;
         }
         break;

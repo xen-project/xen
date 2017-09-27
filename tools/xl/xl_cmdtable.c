@@ -133,7 +133,7 @@ struct cmd_spec cmd_table[] = {
       &main_console, 0, 0,
       "Attach to domain's console",
       "[options] <Domain>\n"
-      "-t <type>       console type, pv or serial\n"
+      "-t <type>       console type, pv , serial or vuart\n"
       "-n <number>     console number"
     },
     { "vncviewer",

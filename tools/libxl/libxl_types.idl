@@ -105,6 +105,7 @@ libxl_console_type = Enumeration("console_type", [
     (0, "UNKNOWN"),
     (1, "SERIAL"),
     (2, "PV"),
+    (3, "VUART"),
     ])
 
 libxl_disk_format = Enumeration("disk_format", [
@@ -239,6 +240,11 @@ libxl_checkpointed_stream = Enumeration("checkpointed_stream", [
     (0, "NONE"),
     (1, "REMUS"),
     (2, "COLO"),
+    ])
+
+libxl_vuart_type = Enumeration("vuart_type", [
+    (0, "unknown"),
+    (1, "sbsa_uart"),
     ])
 
 #
@@ -591,6 +597,7 @@ libxl_domain_build_info = Struct("domain_build_info",[
 
 
     ("arch_arm", Struct(None, [("gic_version", libxl_gic_version),
+                               ("vuart", libxl_vuart_type),
                               ])),
     # Alternate p2m is not bound to any architecture or guest type, as it is
     # supported by x86 HVM and ARM support is planned.

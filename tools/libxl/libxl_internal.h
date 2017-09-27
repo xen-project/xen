@@ -1139,6 +1139,9 @@ typedef struct {
     uint32_t num_vmemranges;
 
     xc_domain_configuration_t config;
+
+    xen_pfn_t vuart_gfn;
+    evtchn_port_t vuart_port;
 } libxl__domain_build_state;
 
 _hidden int libxl__build_pre(libxl__gc *gc, uint32_t domid,

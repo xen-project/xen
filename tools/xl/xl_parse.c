@@ -1002,6 +1002,14 @@ void parse_config_data(const char *config_source,
     if (!xlu_cfg_get_long (config, "maxvcpus", &l, 0))
         b_info->max_vcpus = l;
 
+    if (!xlu_cfg_get_string(config, "vuart", &buf, 0)) {
+        if (libxl_vuart_type_from_string(buf, &b_info->arch_arm.vuart)) {
+            fprintf(stderr, "ERROR: invalid value \"%s\" for \"vuart\"\n",
+                    buf);
+            exit(1);
+        }
+    }
+
     parse_vnuma_config(config, b_info);
 
     /* Set max_memkb to target_memkb and max_vcpus to avail_vcpus if

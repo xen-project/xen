@@ -67,6 +67,9 @@ int libxl_console_exec(libxl_ctx *ctx, uint32_t domid, int cons_num,
     case LIBXL_CONSOLE_TYPE_SERIAL:
         cons_type_s = "serial";
         break;
+    case LIBXL_CONSOLE_TYPE_VUART:
+        cons_type_s = "vuart";
+        break;
     default:
         goto out;
     }
