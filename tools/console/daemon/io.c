@@ -90,12 +90,14 @@ struct buffer {
 };
 
 struct console {
+	char *ttyname;
 	int master_fd;
 	int master_pollfd_idx;
 	int slave_fd;
 	int log_fd;
 	struct buffer buffer;
 	char *xspath;
+	char *log_suffix;
 	int ring_ref;
 	xenevtchn_handle *xce_handle;
 	int xce_pollfd_idx;
@@ -107,19 +109,107 @@ struct console {
 	struct domain *d;
 };
 
+struct console_type {
+	char *xsname;
+	char *ttyname;
+	char *log_suffix;
+};
+
+static struct console_type console_type[] = {
+	{
+		.xsname = "/console",
+		.ttyname = "tty",
+		.log_suffix = "",
+	},
+};
+
+#define NUM_CONSOLE_TYPE (sizeof(console_type)/sizeof(struct console_type))
+
 struct domain {
 	int domid;
 	bool is_dead;
 	unsigned last_seen;
 	struct domain *next;
-	struct console console;
+	struct console console[NUM_CONSOLE_TYPE];
 };
 
 static struct domain *dom_head;
 
+typedef void (*VOID_ITER_FUNC_ARG1)(struct console *);
+typedef int (*INT_ITER_FUNC_ARG1)(struct console *);
+typedef void (*VOID_ITER_FUNC_ARG2)(struct console *,  void *);
+typedef int (*INT_ITER_FUNC_ARG3)(struct console *,
+				  struct domain *dom, void **);
+
 static inline bool console_enabled(struct console *con)
 {
 	return con->local_port != -1;
+}
+
+static inline void console_iter_void_arg1(struct domain *d,
+					  VOID_ITER_FUNC_ARG1 iter_func)
+{
+	unsigned int i;
+	struct console *con = &d->console[0];
+
+	for (i = 0; i < NUM_CONSOLE_TYPE; i++, con++) {
+		iter_func(con);
+	}
+}
+
+static inline void console_iter_void_arg2(struct domain *d,
+					  VOID_ITER_FUNC_ARG2 iter_func,
+					  void *iter_data)
+{
+	unsigned int i;
+	struct console *con = &d->console[0];
+
+	for (i = 0; i < NUM_CONSOLE_TYPE; i++, con++) {
+		iter_func(con, iter_data);
+	}
+}
+
+static inline int console_iter_int_arg1(struct domain *d,
+					INT_ITER_FUNC_ARG1 iter_func)
+{
+	unsigned int i;
+	int ret;
+	struct console *con = &d->console[0];
+
+	for (i = 0; i < NUM_CONSOLE_TYPE; i++, con++) {
+		/*
+		 * Zero return values means success.
+		 *
+		 * Non-zero return value indicates an error in which
+		 * case terminate the loop.
+		 */
+		ret = iter_func(con);
+		if (ret)
+			break;
+	}
+	return ret;
+}
+
+static inline int console_iter_int_arg3(struct domain *d,
+					INT_ITER_FUNC_ARG3 iter_func,
+					void **iter_data)
+{
+	unsigned int i;
+	int ret;
+	struct console *con = &d->console[0];
+
+	for (i = 0; i < NUM_CONSOLE_TYPE; i++, con++) {
+		/*
+		 * Zero return values means success.
+		 *
+		 * Non-zero return value indicates an error in which
+		 * case terminate the loop.
+		 */
+		ret = iter_func(con, d, iter_data);
+		if (ret)
+			break;
+	}
+	return ret;
 }
 
 static int write_all(int fd, const char* buf, size_t len)
@@ -336,7 +426,9 @@ static int create_console_log(struct console *con)
 		return -1;
 	}
 
-	snprintf(logfile, PATH_MAX-1, "%s/guest-%s.log", log_dir, data);
+	snprintf(logfile, PATH_MAX-1, "%s/guest-%s%s.log",
+		 log_dir, data, con->log_suffix);
+
 	free(data);
 	logfile[PATH_MAX-1] = '\0';
 
@@ -488,7 +580,7 @@ static int console_create_tty(struct console *con)
 	}
 	free(path);
 
-	success = (asprintf(&path, "%s/tty", con->xspath) != -1);
+	success = (asprintf(&path, "%s/%s", con->xspath, con->ttyname) != -1);
 	if (!success)
 		goto out;
 	success = xs_write(xs, XBT_NULL, path, slave, strlen(slave));
@@ -654,13 +746,13 @@ static bool watch_domain(struct domain *dom, bool watch)
 {
 	char domid_str[3 + MAX_STRLEN(dom->domid)];
 	bool success;
-	struct console *con = &dom->console;
+	struct console *con = &dom->console[0];
 
 	snprintf(domid_str, sizeof(domid_str), "dom%u", dom->domid);
 	if (watch) {
 		success = xs_watch(xs, con->xspath, domid_str);
 		if (success)
-			console_create_ring(con);
+			console_iter_int_arg1(dom, console_create_ring);
 		else
 			xs_unwatch(xs, con->xspath, domid_str);
 	} else {
@@ -670,11 +762,13 @@ static bool watch_domain(struct domain *dom, bool watch)
 	return success;
 }
 
-static int console_init(struct console *con, struct domain *dom)
+static int console_init(struct console *con, struct domain *dom, void **data)
 {
 	char *s;
 	int err = -1;
 	struct timespec ts;
+	struct console_type **con_type = (struct console_type **)data;
+	char *xsname, *xspath;
 
 	if (clock_gettime(CLOCK_MONOTONIC, &ts) < 0) {
 		dolog(LOG_ERR, "Cannot get time of day %s:%s:L%d",
@@ -692,14 +786,20 @@ static int console_init(struct console *con, struct domain *dom)
 	con->xce_pollfd_idx = -1;
 	con->next_period = ((long long)ts.tv_sec * 1000) + (ts.tv_nsec / 1000000) + RATE_LIMIT_PERIOD;
 	con->d = dom;
-	con->xspath = xs_get_domain_path(xs, dom->domid);
-	s = realloc(con->xspath, strlen(con->xspath) +
-		    strlen("/console") + 1);
+	con->ttyname = (*con_type)->ttyname;
+	con->log_suffix = (*con_type)->log_suffix;
+	xsname = (char *)(*con_type)->xsname;
+	xspath = xs_get_domain_path(xs, dom->domid);
+	s = realloc(xspath, strlen(xspath) +
+		    strlen(xsname) + 1);
 	if (s) {
-		con->xspath = s;
-		strcat(con->xspath, "/console");
+		xspath = s;
+		strcat(xspath, xsname);
+		con->xspath = xspath;
 		err = 0;
 	}
+
+	(*con_type)++;
 
 	return err;
 }
@@ -713,7 +813,7 @@ static void console_free(struct console *con)
 static struct domain *create_domain(int domid)
 {
 	struct domain *dom;
-	struct console *con;
+	struct console_type *con_type = &console_type[0];
 
 	dom = calloc(1, sizeof *dom);
 	if (dom == NULL) {
@@ -723,9 +823,8 @@ static struct domain *create_domain(int domid)
 	}
 
 	dom->domid = domid;
-	con = &dom->console;
 
-	if (console_init(con, dom))
+	if (console_iter_int_arg3(dom, console_init, (void **)&con_type))
 		goto out;
 
 	if (!watch_domain(dom, true))
@@ -738,7 +837,7 @@ static struct domain *create_domain(int domid)
 
 	return dom;
  out:
-	console_free(con);
+	console_iter_void_arg1(dom, console_free);
 	free(dom);
 	return NULL;
 }
@@ -784,11 +883,9 @@ static void console_cleanup(struct console *con)
 
 static void cleanup_domain(struct domain *d)
 {
-	struct console *con = &d->console;
+	console_iter_void_arg1(d, console_close_tty);
 
-	console_close_tty(con);
-
-	console_cleanup(con);
+	console_iter_void_arg1(d, console_cleanup);
 
 	remove_domain(d);
 }
@@ -803,12 +900,10 @@ static void console_close_evtchn(struct console *con)
 
 static void shutdown_domain(struct domain *d)
 {
-	struct console *con = &d->console;
-
 	d->is_dead = true;
 	watch_domain(d, false);
-	console_unmap_interface(con);
-	console_close_evtchn(con);
+	console_iter_void_arg1(d, console_unmap_interface);
+	console_iter_void_arg1(d, console_close_evtchn);
 }
 
 static unsigned enum_pass = 0;
@@ -1003,7 +1098,7 @@ static void handle_xs(void)
 		/* We may get watches firing for domains that have recently
 		   been removed, so dom may be NULL here. */
 		if (dom && dom->is_dead == false)
-			console_create_ring(&dom->console);
+			console_iter_int_arg1(dom, console_create_ring);
 	}
 
 	free(vec);
@@ -1058,9 +1153,7 @@ static void handle_log_reload(void)
 	if (log_guest) {
 		struct domain *d;
 		for (d = dom_head; d; d = d->next) {
-			struct console *con = &d->console;
-
-			console_open_log(con);
+			console_iter_void_arg1(d, console_open_log);
 		}
 	}
 
@@ -1223,13 +1316,13 @@ void handle_io(void)
 		/* Re-calculate any event counter allowances & unblock
 		   domains with new allowance */
 		for (d = dom_head; d; d = d->next) {
-			struct console *con = &d->console;
 
-			console_evtchn_unmask(con, (void *)now);
+			console_iter_void_arg2(d, console_evtchn_unmask, (void *)now);
 
-			maybe_add_console_evtchn_fd(con, (void *)&next_timeout);
+			console_iter_void_arg2(d, maybe_add_console_evtchn_fd, 
+					       (void *)&next_timeout);
 
-			maybe_add_console_tty_fd(con);
+			console_iter_void_arg1(d, maybe_add_console_tty_fd);
 		}
 
 		/* If any domain has been rate limited, we need to work
@@ -1290,13 +1383,12 @@ void handle_io(void)
 		}
 
 		for (d = dom_head; d; d = n) {
-			struct console *con = &d->console;
 
 			n = d->next;
 
-			handle_console_ring(con);
+			console_iter_void_arg1(d, handle_console_ring);
 
-			handle_console_tty(con);
+			console_iter_void_arg1(d, handle_console_tty);
 
 			if (d->last_seen != enum_pass)
 				shutdown_domain(d);
