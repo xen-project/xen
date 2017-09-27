@@ -1038,6 +1038,15 @@ static void handle_hv_logs(xenevtchn_handle *xce_handle, bool force)
 		(void)xenevtchn_unmask(xce_handle, port);
 }
 
+static void console_open_log(struct console *con)
+{
+	if (console_enabled(con)) {
+		if (con->log_fd != -1)
+			close(con->log_fd);
+		con->log_fd = create_console_log(con);
+	}
+}
+
 static void handle_log_reload(void)
 {
 	if (log_guest) {
@@ -1045,9 +1054,7 @@ static void handle_log_reload(void)
 		for (d = dom_head; d; d = d->next) {
 			struct console *con = &d->console;
 
-			if (con->log_fd != -1)
-				close(con->log_fd);
-			con->log_fd = create_console_log(con);
+			console_open_log(con);
 		}
 	}
 
