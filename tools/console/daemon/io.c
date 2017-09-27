@@ -768,12 +768,8 @@ static void remove_domain(struct domain *dom)
 	}
 }
 
-static void cleanup_domain(struct domain *d)
+static void console_cleanup(struct console *con)
 {
-	struct console *con = &d->console;
-
-	console_close_tty(con);
-
 	if (con->log_fd != -1) {
 		close(con->log_fd);
 		con->log_fd = -1;
@@ -784,6 +780,15 @@ static void cleanup_domain(struct domain *d)
 
 	free(con->xspath);
 	con->xspath = NULL;
+}
+
+static void cleanup_domain(struct domain *d)
+{
+	struct console *con = &d->console;
+
+	console_close_tty(con);
+
+	console_cleanup(con);
 
 	remove_domain(d);
 }
