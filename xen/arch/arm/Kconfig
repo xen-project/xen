@@ -50,6 +50,13 @@ config HAS_ITS
         prompt "GICv3 ITS MSI controller support" if EXPERT = "y"
         depends on HAS_GICV3
 
+config SBSA_VUART_CONSOLE
+	bool "Emulated SBSA UART console support"
+	default y
+	---help---
+	  Allows a guest to use SBSA Generic UART as a console. The
+	  SBSA Generic UART implements a subset of ARM PL011 UART.
+
 endmenu
 
 menu "ARM errata workaround via the alternative framework"

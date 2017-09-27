@@ -52,6 +52,7 @@ obj-$(CONFIG_HAS_GICV3) += vgic-v3.o
 obj-$(CONFIG_HAS_ITS) += vgic-v3-its.o
 obj-y += vm_event.o
 obj-y += vtimer.o
+obj-$(CONFIG_SBSA_VUART_CONSOLE) += vpl011.o
 obj-y += vpsci.o
 obj-y += vuart.o
 

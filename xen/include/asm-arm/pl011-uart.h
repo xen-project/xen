@@ -49,6 +49,8 @@
 /* FR bits */
 #define TXFE   (1<<7) /* TX FIFO empty */
 #define RXFE   (1<<4) /* RX FIFO empty */
+#define TXFF   (1<<5) /* TX FIFO full */
+#define RXFF   (1<<6) /* RX FIFO full */
 #define BUSY   (1<<3) /* Transmit is not complete */
 
 /* LCR_H bits */
