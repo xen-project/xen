@@ -216,6 +216,8 @@ struct xc_dom_image {
 
     /* Extra SMBIOS structures passed to HVMLOADER */
     struct xc_hvm_firmware_module smbios_module;
+
+    xen_pfn_t vuart_gfn;
 };
 
 /* --- pluggable kernel loader ------------------------------------- */

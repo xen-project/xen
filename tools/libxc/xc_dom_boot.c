@@ -226,6 +226,8 @@ int xc_dom_boot_image(struct xc_dom_image *dom)
         return rc;
     if ( (rc = clear_page(dom, dom->xenstore_pfn)) != 0 )
         return rc;
+    if ( (rc = clear_page(dom, dom->vuart_gfn)) != 0 )
+        return rc;
 
     /* start info page */
     if ( dom->arch_hooks->start_info )
