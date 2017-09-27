@@ -655,19 +655,50 @@ static bool watch_domain(struct domain *dom, bool watch)
 	return success;
 }
 
-
-static struct domain *create_domain(int domid)
+static int console_init(struct console *con, struct domain *dom)
 {
-	struct domain *dom;
 	char *s;
+	int err = -1;
 	struct timespec ts;
-	struct console *con;
 
 	if (clock_gettime(CLOCK_MONOTONIC, &ts) < 0) {
 		dolog(LOG_ERR, "Cannot get time of day %s:%s:L%d",
 		      __FILE__, __FUNCTION__, __LINE__);
-		return NULL;
+		return err;
 	}
+
+	con->master_fd = -1;
+	con->master_pollfd_idx = -1;
+	con->slave_fd = -1;
+	con->log_fd = -1;
+	con->ring_ref = -1;
+	con->local_port = -1;
+	con->remote_port = -1;
+	con->xce_pollfd_idx = -1;
+	con->next_period = ((long long)ts.tv_sec * 1000) + (ts.tv_nsec / 1000000) + RATE_LIMIT_PERIOD;
+	con->d = dom;
+	con->xspath = xs_get_domain_path(xs, dom->domid);
+	s = realloc(con->xspath, strlen(con->xspath) +
+		    strlen("/console") + 1);
+	if (s) {
+		con->xspath = s;
+		strcat(con->xspath, "/console");
+		err = 0;
+	}
+
+	return err;
+}
+
+static void console_free(struct console *con)
+{
+	if (con->xspath)
+		free(con->xspath);
+}
+
+static struct domain *create_domain(int domid)
+{
+	struct domain *dom;
+	struct console *con;
 
 	dom = calloc(1, sizeof *dom);
 	if (dom == NULL) {
@@ -677,28 +708,10 @@ static struct domain *create_domain(int domid)
 	}
 
 	dom->domid = domid;
-
 	con = &dom->console;
-	con->xspath = xs_get_domain_path(xs, dom->domid);
-	s = realloc(con->xspath, strlen(con->xspath) +
-		    strlen("/console") + 1);
-	if (s == NULL)
+
+	if (console_init(con, dom))
 		goto out;
-	con->xspath = s;
-	strcat(con->xspath, "/console");
-
-	con->master_fd = -1;
-	con->master_pollfd_idx = -1;
-	con->slave_fd = -1;
-	con->log_fd = -1;
-	con->xce_pollfd_idx = -1;
-	con->d = dom;
-
-	con->next_period = ((long long)ts.tv_sec * 1000) + (ts.tv_nsec / 1000000) + RATE_LIMIT_PERIOD;
-
-	con->ring_ref = -1;
-	con->local_port = -1;
-	con->remote_port = -1;
 
 	if (!watch_domain(dom, true))
 		goto out;
@@ -710,7 +723,7 @@ static struct domain *create_domain(int domid)
 
 	return dom;
  out:
-	free(con->xspath);
+	console_free(con);
 	free(dom);
 	return NULL;
 }
