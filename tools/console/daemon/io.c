@@ -95,7 +95,7 @@ struct console {
 	int slave_fd;
 	int log_fd;
 	struct buffer buffer;
-	char *conspath;
+	char *xspath;
 	int ring_ref;
 	xenevtchn_handle *xce_handle;
 	int xce_pollfd_idx;
@@ -463,7 +463,7 @@ static int domain_create_tty(struct domain *dom)
 		goto out;
 	}
 
-	success = asprintf(&path, "%s/limit", con->conspath) !=
+	success = asprintf(&path, "%s/limit", con->xspath) !=
 		-1;
 	if (!success)
 		goto out;
@@ -474,7 +474,7 @@ static int domain_create_tty(struct domain *dom)
 	}
 	free(path);
 
-	success = (asprintf(&path, "%s/tty", con->conspath) != -1);
+	success = (asprintf(&path, "%s/tty", con->xspath) != -1);
 	if (!success)
 		goto out;
 	success = xs_write(xs, XBT_NULL, path, slave, strlen(slave));
@@ -546,14 +546,14 @@ static int domain_create_ring(struct domain *dom)
 	char *type, path[PATH_MAX];
 	struct console *con = &dom->console;
 
-	err = xs_gather(xs, con->conspath,
+	err = xs_gather(xs, con->xspath,
 			"ring-ref", "%u", &ring_ref,
 			"port", "%i", &remote_port,
 			NULL);
 	if (err)
 		goto out;
 
-	snprintf(path, sizeof(path), "%s/type", con->conspath);
+	snprintf(path, sizeof(path), "%s/type", con->xspath);
 	type = xs_read(xs, XBT_NULL, path, NULL);
 	if (type && strcmp(type, "xenconsoled") != 0) {
 		free(type);
@@ -646,13 +646,13 @@ static bool watch_domain(struct domain *dom, bool watch)
 
 	snprintf(domid_str, sizeof(domid_str), "dom%u", dom->domid);
 	if (watch) {
-		success = xs_watch(xs, con->conspath, domid_str);
+		success = xs_watch(xs, con->xspath, domid_str);
 		if (success)
 			domain_create_ring(dom);
 		else
-			xs_unwatch(xs, con->conspath, domid_str);
+			xs_unwatch(xs, con->xspath, domid_str);
 	} else {
-		success = xs_unwatch(xs, con->conspath, domid_str);
+		success = xs_unwatch(xs, con->xspath, domid_str);
 	}
 
 	return success;
@@ -682,13 +682,13 @@ static struct domain *create_domain(int domid)
 	dom->domid = domid;
 
 	con = &dom->console;
-	con->conspath = xs_get_domain_path(xs, dom->domid);
-	s = realloc(con->conspath, strlen(con->conspath) +
+	con->xspath = xs_get_domain_path(xs, dom->domid);
+	s = realloc(con->xspath, strlen(con->xspath) +
 		    strlen("/console") + 1);
 	if (s == NULL)
 		goto out;
-	con->conspath = s;
-	strcat(con->conspath, "/console");
+	con->xspath = s;
+	strcat(con->xspath, "/console");
 
 	con->master_fd = -1;
 	con->master_pollfd_idx = -1;
@@ -712,7 +712,7 @@ static struct domain *create_domain(int domid)
 
 	return dom;
  out:
-	free(con->conspath);
+	free(con->xspath);
 	free(dom);
 	return NULL;
 }
@@ -756,8 +756,8 @@ static void cleanup_domain(struct domain *d)
 	free(con->buffer.data);
 	con->buffer.data = NULL;
 
-	free(con->conspath);
-	con->conspath = NULL;
+	free(con->xspath);
+	con->xspath = NULL;
 
 	remove_domain(d);
 }
