@@ -1714,6 +1714,11 @@ static int flask_xen_version (uint32_t op)
     }
 }
 
+static int flask_domain_resource_map(struct domain *d)
+{
+    return current_has_perm(d, SECCLASS_DOMAIN2, DOMAIN2__RESOURCE_MAP);
+}
+
 long do_flask_op(XEN_GUEST_HANDLE_PARAM(xsm_op_t) u_flask_op);
 int compat_flask_op(XEN_GUEST_HANDLE_PARAM(xsm_op_t) u_flask_op);
 
@@ -1847,6 +1852,7 @@ static struct xsm_operations flask_ops = {
     .dm_op = flask_dm_op,
 #endif
     .xen_version = flask_xen_version,
+    .domain_resource_map = flask_domain_resource_map,
 };
 
 void __init flask_init(const void *policy_buffer, size_t policy_size)

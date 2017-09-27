@@ -180,6 +180,7 @@ struct xsm_operations {
     int (*dm_op) (struct domain *d);
 #endif
     int (*xen_version) (uint32_t cmd);
+    int (*domain_resource_map) (struct domain *d);
 };
 
 #ifdef CONFIG_XSM
@@ -690,6 +691,11 @@ static inline int xsm_dm_op(xsm_default_t def, struct domain *d)
 static inline int xsm_xen_version (xsm_default_t def, uint32_t op)
 {
     return xsm_ops->xen_version(op);
+}
+
+static inline int xsm_domain_resource_map(xsm_default_t def, struct domain *d)
+{
+    return xsm_ops->domain_resource_map(d);
 }
 
 #endif /* XSM_NO_WRAPPERS */

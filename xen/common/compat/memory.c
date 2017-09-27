@@ -71,6 +71,7 @@ int compat_memory_op(unsigned int cmd, XEN_GUEST_HANDLE_PARAM(void) compat)
             struct xen_remove_from_physmap *xrfp;
             struct xen_vnuma_topology_info *vnuma;
             struct xen_mem_access_op *mao;
+            struct xen_mem_acquire_resource *mar;
         } nat;
         union {
             struct compat_memory_reservation rsrv;
@@ -79,6 +80,7 @@ int compat_memory_op(unsigned int cmd, XEN_GUEST_HANDLE_PARAM(void) compat)
             struct compat_add_to_physmap_batch atpb;
             struct compat_vnuma_topology_info vnuma;
             struct compat_mem_access_op mao;
+            struct compat_mem_acquire_resource mar;
         } cmp;
 
         set_xen_guest_handle(nat.hnd, COMPAT_ARG_XLAT_VIRT_BASE);
@@ -395,6 +397,57 @@ int compat_memory_op(unsigned int cmd, XEN_GUEST_HANDLE_PARAM(void) compat)
         }
 #endif
 
+        case XENMEM_acquire_resource:
+        {
+            xen_pfn_t *xen_frame_list;
+            unsigned int max_nr_frames;
+
+            if ( copy_from_guest(&cmp.mar, compat, 1) )
+                return -EFAULT;
+
+            /*
+             * The number of frames handled is currently limited to a
+             * small number by the underlying implementation, so the
+             * scratch space should be sufficient for bouncing the
+             * frame addresses.
+             */
+            max_nr_frames = (COMPAT_ARG_XLAT_SIZE - sizeof(*nat.mar)) /
+                sizeof(*xen_frame_list);
+
+            if ( cmp.mar.nr_frames > max_nr_frames )
+                return -E2BIG;
+
+            if ( compat_handle_is_null(cmp.mar.frame_list) )
+                xen_frame_list = NULL;
+            else
+            {
+                xen_frame_list = (xen_pfn_t *)(nat.mar + 1);
+
+                if ( !compat_handle_okay(cmp.mar.frame_list,
+                                         cmp.mar.nr_frames) )
+                    return -EFAULT;
+
+                for ( i = 0; i < cmp.mar.nr_frames; i++ )
+                {
+                    compat_pfn_t frame;
+
+                    if ( __copy_from_compat_offset(
+                             &frame, cmp.mar.frame_list, i, 1) )
+                        return -EFAULT;
+
+                    xen_frame_list[i] = frame;
+                }
+            }
+
+#define XLAT_mem_acquire_resource_HNDL_frame_list(_d_, _s_) \
+            set_xen_guest_handle((_d_)->frame_list, xen_frame_list)
+
+            XLAT_mem_acquire_resource(nat.mar, &cmp.mar);
+
+#undef XLAT_mem_acquire_resource_HNDL_frame_list
+
+            break;
+        }
         default:
             return compat_arch_memory_op(cmd, compat);
         }
@@ -534,6 +587,53 @@ int compat_memory_op(unsigned int cmd, XEN_GUEST_HANDLE_PARAM(void) compat)
             if ( __copy_to_guest(compat, &cmp.vnuma, 1) )
                 rc = -EFAULT;
             break;
+
+        case XENMEM_acquire_resource:
+        {
+            const xen_pfn_t *xen_frame_list = (xen_pfn_t *)(nat.mar + 1);
+            compat_pfn_t *compat_frame_list = (compat_pfn_t *)(nat.mar + 1);
+            DEFINE_XEN_GUEST_HANDLE(compat_mem_acquire_resource_t);
+
+            if ( compat_handle_is_null(cmp.mar.frame_list) )
+            {
+                if ( __copy_field_to_guest(
+                         guest_handle_cast(compat,
+                                           compat_mem_acquire_resource_t),
+                         &cmp.mar, nr_frames) )
+                    return -EFAULT;
+            }
+            else
+            {
+                /*
+                 * NOTE: the smaller compat array overwrites the native
+                 *       array.
+                 */
+                BUILD_BUG_ON(sizeof(compat_pfn_t) > sizeof(xen_pfn_t));
+
+                for ( i = 0; i < cmp.mar.nr_frames; i++ )
+                {
+                    compat_pfn_t frame = xen_frame_list[i];
+
+                    if ( frame != xen_frame_list[i] )
+                        return -ERANGE;
+
+                    compat_frame_list[i] = frame;
+                }
+
+                if ( __copy_to_compat_offset(cmp.mar.frame_list, 0,
+                                             compat_frame_list,
+                                             cmp.mar.nr_frames) )
+                    return -EFAULT;
+
+                if ( __copy_field_to_guest(
+                         guest_handle_cast(compat,
+                                           compat_mem_acquire_resource_t),
+                         &cmp.mar, flags) )
+                    return -EFAULT;
+            }
+
+            break;
+        }
 
         default:
             domain_crash(current->domain);

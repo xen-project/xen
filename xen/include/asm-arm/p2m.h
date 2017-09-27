@@ -344,6 +344,16 @@ static inline gfn_t gfn_next_boundary(gfn_t gfn, unsigned int order)
     return gfn_add(gfn, 1UL << order);
 }
 
+static inline int set_foreign_p2m_entry(struct domain *d, unsigned long gfn,
+                                        mfn_t mfn)
+{
+    /*
+     * NOTE: If this is implemented then proper reference counting of
+     *       foreign entries will need to be implemented.
+     */
+    return -EOPNOTSUPP;
+}
+
 #endif /* _XEN_P2M_H */
 
 /*

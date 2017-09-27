@@ -250,6 +250,8 @@ class domain2
     psr_alloc
 # XEN_DOMCTL_set_gnttab_limits
     set_gnttab_limits
+# XENMEM_resource_map
+    resource_map
 }
 
 # Similar to class domain, but primarily contains domctls related to HVM domains

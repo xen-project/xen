@@ -967,6 +967,92 @@ static long xatp_permission_check(struct domain *d, unsigned int space)
     return xsm_add_to_physmap(XSM_TARGET, current->domain, d);
 }
 
+static int acquire_resource(
+    XEN_GUEST_HANDLE_PARAM(xen_mem_acquire_resource_t) arg)
+{
+    struct domain *d, *currd = current->domain;
+    xen_mem_acquire_resource_t xmar;
+    /*
+     * The mfn_list and gfn_list (below) arrays are ok on stack for the
+     * moment since they are small, but if they need to grow in future
+     * use-cases then per-CPU arrays or heap allocations may be required.
+     */
+    xen_pfn_t mfn_list[2];
+    int rc;
+
+    if ( copy_from_guest(&xmar, arg, 1) )
+        return -EFAULT;
+
+    if ( xmar.flags != 0 )
+        return -EINVAL;
+
+    if ( guest_handle_is_null(xmar.frame_list) )
+    {
+        if ( xmar.nr_frames )
+            return -EINVAL;
+
+        xmar.nr_frames = ARRAY_SIZE(mfn_list);
+
+        if ( __copy_field_to_guest(arg, &xmar, nr_frames) )
+            return -EFAULT;
+
+        return 0;
+    }
+
+    if ( xmar.nr_frames > ARRAY_SIZE(mfn_list) )
+        return -E2BIG;
+
+    rc = rcu_lock_remote_domain_by_id(xmar.domid, &d);
+    if ( rc )
+        return rc;
+
+    rc = xsm_domain_resource_map(XSM_DM_PRIV, d);
+    if ( rc )
+        goto out;
+
+    switch ( xmar.type )
+    {
+    default:
+        rc = -EOPNOTSUPP;
+        break;
+    }
+
+    if ( rc )
+        goto out;
+
+    if ( !paging_mode_translate(currd) )
+    {
+        if ( copy_to_guest(xmar.frame_list, mfn_list, xmar.nr_frames) )
+            rc = -EFAULT;
+    }
+    else
+    {
+        xen_pfn_t gfn_list[ARRAY_SIZE(mfn_list)];
+        unsigned int i;
+
+        if ( copy_from_guest(gfn_list, xmar.frame_list, xmar.nr_frames) )
+            rc = -EFAULT;
+
+        for ( i = 0; !rc && i < xmar.nr_frames; i++ )
+        {
+            rc = set_foreign_p2m_entry(currd, gfn_list[i],
+                                       _mfn(mfn_list[i]));
+            /* rc should be -EIO for any iteration other than the first */
+            if ( rc && i )
+                rc = -EIO;
+        }
+    }
+
+    if ( xmar.flags != 0 &&
+         __copy_field_to_guest(arg, &xmar, flags) )
+        rc = -EFAULT;
+
+ out:
+    rcu_unlock_domain(d);
+
+    return rc;
+}
+
 long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 {
     struct domain *d, *curr_d = current->domain;
@@ -1421,6 +1507,11 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         break;
     }
 #endif
+
+    case XENMEM_acquire_resource:
+        rc = acquire_resource(
+            guest_handle_cast(arg, xen_mem_acquire_resource_t));
+        break;
 
     default:
         rc = arch_memory_op(cmd, arg);

@@ -1132,8 +1132,7 @@ static int set_typed_p2m_entry(struct domain *d, unsigned long gfn_l,
 }
 
 /* Set foreign mfn in the given guest's p2m table. */
-static int set_foreign_p2m_entry(struct domain *d, unsigned long gfn,
-                                 mfn_t mfn)
+int set_foreign_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn)
 {
     return set_typed_p2m_entry(d, gfn, mfn, PAGE_ORDER_4K, p2m_map_foreign,
                                p2m_get_hostp2m(d)->default_access);
