@@ -26,6 +26,9 @@ static char *libxl__device_frontend_path(libxl__gc *gc, libxl__device *device)
     if (device->kind == LIBXL__DEVICE_KIND_CONSOLE && device->devid == 0)
         return GCSPRINTF("%s/console", dom_path);
 
+    if (device->kind == LIBXL__DEVICE_KIND_VUART)
+        return GCSPRINTF("%s/vuart/%d", dom_path, device->devid);
+
     return GCSPRINTF("%s/device/%s/%d", dom_path,
                      libxl__device_kind_to_string(device->kind),
                      device->devid);
@@ -170,7 +173,8 @@ retry_transaction:
          * historically contained other information, such as the
          * vnc-port, which we don't want the guest fiddling with.
          */
-        if (device->kind == LIBXL__DEVICE_KIND_CONSOLE && device->devid == 0)
+        if ((device->kind == LIBXL__DEVICE_KIND_CONSOLE && device->devid == 0) ||
+            (device->kind == LIBXL__DEVICE_KIND_VUART))
             xs_set_permissions(ctx->xsh, t, frontend_path,
                                ro_frontend_perms, ARRAY_SIZE(ro_frontend_perms));
         else
@@ -800,7 +804,8 @@ void libxl__devices_destroy(libxl__egc *egc, libxl__devices_remove_state *drs)
                 dev->domid = domid;
                 dev->kind = kind;
                 dev->devid = atoi(devs[j]);
-                if (dev->backend_kind == LIBXL__DEVICE_KIND_CONSOLE) {
+                if (dev->backend_kind == LIBXL__DEVICE_KIND_CONSOLE ||
+                    dev->backend_kind == LIBXL__DEVICE_KIND_VUART) {
                     /* Currently console devices can be destroyed
                      * synchronously by just removing xenstore entries,
                      * this is what libxl__device_destroy does.

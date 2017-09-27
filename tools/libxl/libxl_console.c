@@ -345,6 +345,50 @@ out:
     return rc;
 }
 
+int libxl__device_vuart_add(libxl__gc *gc, uint32_t domid,
+                            libxl__device_console *console,
+                            libxl__domain_build_state *state)
+{
+    libxl__device device;
+    flexarray_t *ro_front;
+    flexarray_t *back;
+    int rc;
+
+    ro_front = flexarray_make(gc, 16, 1);
+    back = flexarray_make(gc, 16, 1);
+
+    device.backend_devid = console->devid;
+    device.backend_domid = console->backend_domid;
+    device.backend_kind = LIBXL__DEVICE_KIND_VUART;
+    device.devid = console->devid;
+    device.domid = domid;
+    device.kind = LIBXL__DEVICE_KIND_VUART;
+
+    flexarray_append(back, "frontend-id");
+    flexarray_append(back, GCSPRINTF("%d", domid));
+    flexarray_append(back, "online");
+    flexarray_append(back, "1");
+    flexarray_append(back, "state");
+    flexarray_append(back, GCSPRINTF("%d", XenbusStateInitialising));
+    flexarray_append(back, "protocol");
+    flexarray_append(back, LIBXL_XENCONSOLE_PROTOCOL);
+
+    flexarray_append(ro_front, "port");
+    flexarray_append(ro_front, GCSPRINTF("%"PRIu32, state->vuart_port));
+    flexarray_append(ro_front, "ring-ref");
+    flexarray_append(ro_front, GCSPRINTF("%lu", state->vuart_gfn));
+    flexarray_append(ro_front, "limit");
+    flexarray_append(ro_front, GCSPRINTF("%d", LIBXL_XENCONSOLE_LIMIT));
+    flexarray_append(ro_front, "type");
+    flexarray_append(ro_front, "xenconsoled");
+
+    rc = libxl__device_generic_add(gc, XBT_NULL, &device,
+                                   libxl__xs_kvs_of_flexarray(gc, back),
+                                   NULL,
+                                   libxl__xs_kvs_of_flexarray(gc, ro_front));
+    return rc;
+}
+
 int libxl__init_console_from_channel(libxl__gc *gc,
                                      libxl__device_console *console,
                                      int dev_num,

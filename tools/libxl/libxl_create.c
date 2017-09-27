@@ -1390,7 +1390,7 @@ static void domcreate_launch_dm(libxl__egc *egc, libxl__multidev *multidev,
     case LIBXL_DOMAIN_TYPE_PV:
     case LIBXL_DOMAIN_TYPE_PVH:
     {
-        libxl__device_console console;
+        libxl__device_console console, vuart;
         libxl__device device;
 
         for (i = 0; i < d_config->num_vfbs; i++) {
@@ -1398,6 +1398,13 @@ static void domcreate_launch_dm(libxl__egc *egc, libxl__multidev *multidev,
                               &d_config->vfbs[i]);
             libxl__device_add(gc, domid, &libxl__vkb_devtype,
                               &d_config->vkbs[i]);
+        }
+
+        if (d_config->b_info.arch_arm.vuart == LIBXL_VUART_TYPE_SBSA_UART) {
+            init_console_info(gc, &vuart, 0);
+            vuart.backend_domid = state->console_domid;
+            libxl__device_vuart_add(gc, domid, &vuart, state);
+            libxl__device_console_dispose(&vuart);
         }
 
         init_console_info(gc, &console, 0);
