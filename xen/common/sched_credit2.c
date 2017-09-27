@@ -2831,6 +2831,7 @@ csched2_dom_cntl(
             if ( op->u.credit2.cap > 100 * sdom->nr_vcpus )
             {
                 rc = -EINVAL;
+                write_unlock_irqrestore(&prv->lock, flags);
                 break;
             }
 
