@@ -3391,7 +3391,8 @@ static int sh_page_fault(struct vcpu *v,
             int i;
             for ( i = 0; i < 4; i++ )
             {
-                mfn_t smfn = _mfn(pagetable_get_pfn(v->arch.shadow_table[i]));
+                mfn_t smfn = pagetable_get_mfn(v->arch.shadow_table[i]);
+
                 if ( mfn_valid(smfn) && (mfn_x(smfn) != 0) )
                 {
                     used |= (mfn_to_page(smfn)->v.sh.back == mfn_x(gmfn));
@@ -4645,7 +4646,7 @@ static void sh_pagetable_dying(struct vcpu *v, paddr_t gpa)
             if ( pagetable_is_null(v->arch.shadow_table[i]) )
                 smfn = INVALID_MFN;
             else
-                smfn = _mfn(pagetable_get_pfn(v->arch.shadow_table[i]));
+                smfn = pagetable_get_mfn(v->arch.shadow_table[i]);
         }
         else
         {

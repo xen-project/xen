@@ -434,7 +434,7 @@ static int ept_invalidate_emt_range(struct p2m_domain *p2m,
     unsigned int i, index;
     int wrc, rc = 0, ret = GUEST_TABLE_MAP_FAILED;
 
-    table = map_domain_page(_mfn(pagetable_get_pfn(p2m_get_pagetable(p2m))));
+    table = map_domain_page(pagetable_get_mfn(p2m_get_pagetable(p2m)));
     for ( i = p2m->ept.wl; i > target; --i )
     {
         ret = ept_next_level(p2m, 1, &table, &gfn_remainder, i);
@@ -718,7 +718,7 @@ ept_set_entry(struct p2m_domain *p2m, gfn_t gfn_, mfn_t mfn,
            (target == 0));
     ASSERT(!p2m_is_foreign(p2mt) || target == 0);
 
-    table = map_domain_page(_mfn(pagetable_get_pfn(p2m_get_pagetable(p2m))));
+    table = map_domain_page(pagetable_get_mfn(p2m_get_pagetable(p2m)));
 
     ret = GUEST_TABLE_MAP_FAILED;
     for ( i = ept->wl; i > target; i-- )
@@ -915,7 +915,8 @@ static mfn_t ept_get_entry(struct p2m_domain *p2m,
                            p2m_query_t q, unsigned int *page_order,
                            bool_t *sve)
 {
-    ept_entry_t *table = map_domain_page(_mfn(pagetable_get_pfn(p2m_get_pagetable(p2m))));
+    ept_entry_t *table =
+        map_domain_page(pagetable_get_mfn(p2m_get_pagetable(p2m)));
     unsigned long gfn = gfn_x(gfn_);
     unsigned long gfn_remainder = gfn;
     ept_entry_t *ept_entry;
@@ -1025,7 +1026,8 @@ void ept_walk_table(struct domain *d, unsigned long gfn)
 {
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
     struct ept_data *ept = &p2m->ept;
-    ept_entry_t *table = map_domain_page(_mfn(pagetable_get_pfn(p2m_get_pagetable(p2m))));
+    ept_entry_t *table =
+        map_domain_page(pagetable_get_mfn(p2m_get_pagetable(p2m)));
     unsigned long gfn_remainder = gfn;
 
     int i;
@@ -1324,7 +1326,7 @@ static void ept_dump_p2m_table(unsigned char key)
             char c = 0;
 
             gfn_remainder = gfn;
-            table = map_domain_page(_mfn(pagetable_get_pfn(p2m_get_pagetable(p2m))));
+            table = map_domain_page(pagetable_get_mfn(p2m_get_pagetable(p2m)));
 
             for ( i = ept->wl; i > 0; i-- )
             {

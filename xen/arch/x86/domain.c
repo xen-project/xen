@@ -1113,7 +1113,7 @@ int arch_set_info_guest(
     {
         l4_pgentry_t *l4tab;
 
-        l4tab = map_domain_page(_mfn(pagetable_get_pfn(v->arch.guest_table)));
+        l4tab = map_domain_page(pagetable_get_mfn(v->arch.guest_table));
         *l4tab = l4e_from_pfn(page_to_mfn(cr3_page),
             _PAGE_PRESENT|_PAGE_RW|_PAGE_USER|_PAGE_ACCESSED);
         unmap_domain_page(l4tab);

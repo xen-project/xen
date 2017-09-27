@@ -1638,7 +1638,7 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
         else
         {
             const l4_pgentry_t *l4e =
-                map_domain_page(_mfn(pagetable_get_pfn(v->arch.guest_table)));
+                map_domain_page(pagetable_get_mfn(v->arch.guest_table));
 
             c.cmp->ctrlreg[3] = compat_pfn_to_cr3(l4e_get_pfn(*l4e));
             unmap_domain_page(l4e);
