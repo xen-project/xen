@@ -886,6 +886,26 @@ int xc_vcpu_getcontext(xc_interface *xch,
                        vcpu_guest_context_any_t *ctxt);
 
 /**
+ * This function initializes the vuart emulation and returns
+ * the event to be used by the backend for communicating with
+ * the emulation code.
+ *
+ * @parm xch a handle to an open hypervisor interface
+ * #parm type type of vuart
+ * @parm domid the domain to get information from
+ * @parm console_domid the domid of the backend console
+ * @parm gfn the guest pfn to be used as the ring buffer
+ * @parm evtchn the event channel to be used for events
+ * @return 0 on success, negative error on failure
+ */
+int xc_dom_vuart_init(xc_interface *xch,
+                      uint32_t type,
+                      domid_t domid,
+                      domid_t console_domid,
+                      xen_pfn_t gfn,
+                      evtchn_port_t *evtchn);
+
+/**
  * This function returns information about the XSAVE state of a particular
  * vcpu of a domain. If extstate->size and extstate->xfeature_mask are 0,
  * the call is considered a query to retrieve them and the buffer is not

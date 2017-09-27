@@ -872,6 +872,12 @@ int domain_relinquish_resources(struct domain *d)
         if ( ret )
             return ret;
 
+        /*
+         * Release the resources allocated for vpl011 which were
+         * allocated via a DOMCTL call XEN_DOMCTL_vuart_op.
+         */
+        domain_vpl011_deinit(d);
+
         d->arch.relmem = RELMEM_xen;
         /* Fallthrough */
 

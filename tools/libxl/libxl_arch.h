@@ -44,6 +44,13 @@ int libxl__arch_domain_finalise_hw_description(libxl__gc *gc,
                                       libxl_domain_build_info *info,
                                       struct xc_dom_image *dom);
 
+/* perform any pending hardware initialization */
+_hidden
+int libxl__arch_build_dom_finish(libxl__gc *gc,
+                                 libxl_domain_build_info *info,
+                                 struct xc_dom_image *dom,
+                                 libxl__domain_build_state *state);
+
 /* build vNUMA vmemrange with arch specific information */
 _hidden
 int libxl__arch_vnuma_build_vmemrange(libxl__gc *gc,

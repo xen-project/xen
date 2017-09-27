@@ -392,6 +392,14 @@ int libxl__arch_domain_finalise_hw_description(libxl__gc *gc,
     return rc;
 }
 
+int libxl__arch_build_dom_finish(libxl__gc *gc,
+                                 libxl_domain_build_info *info,
+                                 struct xc_dom_image *dom,
+                                 libxl__domain_build_state *state)
+{
+    return 0;
+}
+
 /* Return 0 on success, ERROR_* on failure. */
 int libxl__arch_vnuma_build_vmemrange(libxl__gc *gc,
                                       uint32_t domid,

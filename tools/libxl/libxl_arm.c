@@ -1038,6 +1038,33 @@ int libxl__arch_domain_finalise_hw_description(libxl__gc *gc,
     return 0;
 }
 
+int libxl__arch_build_dom_finish(libxl__gc *gc,
+                                 libxl_domain_build_info *info,
+                                 struct xc_dom_image *dom,
+                                 libxl__domain_build_state *state)
+{
+    int rc = 0, ret;
+
+    if (info->arch_arm.vuart != LIBXL_VUART_TYPE_SBSA_UART) {
+        rc = 0;
+        goto out;
+    }
+
+    ret = xc_dom_vuart_init(CTX->xch,
+                            XEN_DOMCTL_VUART_TYPE_VPL011,
+                            dom->guest_domid,
+                            dom->console_domid,
+                            dom->vuart_gfn,
+                            &state->vuart_port);
+    if (ret < 0) {
+        rc = ERROR_FAIL;
+        LOG(ERROR, "xc_dom_vuart_init failed\n");
+    }
+
+out:
+    return rc;
+}
+
 int libxl__arch_vnuma_build_vmemrange(libxl__gc *gc,
                                       uint32_t domid,
                                       libxl_domain_build_info *info,

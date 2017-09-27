@@ -749,6 +749,10 @@ static int libxl__build_dom(libxl__gc *gc, uint32_t domid,
         LOGE(ERROR, "xc_dom_gnttab_init failed");
         goto out;
     }
+    if ((ret = libxl__arch_build_dom_finish(gc, info, dom, state)) != 0) {
+        LOGE(ERROR, "libxl__arch_build_dom_finish failed");
+        goto out;
+    }
 
 out:
     return ret != 0 ? ERROR_FAIL : 0;
