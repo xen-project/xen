@@ -1348,16 +1348,19 @@ static PyObject *pyxc_sched_credit2_domain_set(XcObject *self,
 {
     uint32_t domid;
     uint16_t weight;
-    static char *kwd_list[] = { "domid", "weight", NULL };
-    static char kwd_type[] = "I|H";
-    struct xen_domctl_sched_credit2 sdom;
+    uint16_t cap;
+    static char *kwd_list[] = { "domid", "weight", "cap", NULL };
+    static char kwd_type[] = "I|HH";
+    struct xen_domctl_sched_credit2 sdom = { };
 
     weight = 0;
+    cap = 0;
     if( !PyArg_ParseTupleAndKeywords(args, kwds, kwd_type, kwd_list,
-                                     &domid, &weight) )
+                                     &domid, &weight, &cap) )
         return NULL;
 
     sdom.weight = weight;
+    sdom.cap = cap;
 
     if ( xc_sched_credit2_domain_set(self->xc_handle, domid, &sdom) != 0 )
         return pyxc_error_to_exception(self->xc_handle);
@@ -1369,7 +1372,7 @@ static PyObject *pyxc_sched_credit2_domain_set(XcObject *self,
 static PyObject *pyxc_sched_credit2_domain_get(XcObject *self, PyObject *args)
 {
     uint32_t domid;
-    struct xen_domctl_sched_credit2 sdom;
+    struct xen_domctl_sched_credit2 sdom = { };
 
     if( !PyArg_ParseTuple(args, "I", &domid) )
         return NULL;
@@ -1377,8 +1380,8 @@ static PyObject *pyxc_sched_credit2_domain_get(XcObject *self, PyObject *args)
     if ( xc_sched_credit2_domain_get(self->xc_handle, domid, &sdom) != 0 )
         return pyxc_error_to_exception(self->xc_handle);
 
-    return Py_BuildValue("{s:H}",
-                         "weight",  sdom.weight);
+    return Py_BuildValue("{s:HH}",
+                         "weight", "cap",  sdom.weight, sdom.cap);
 }
 
 static PyObject *pyxc_domain_setmaxmem(XcObject *self, PyObject *args)
