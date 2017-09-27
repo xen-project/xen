@@ -107,12 +107,16 @@ struct console {
 	xenevtchn_port_or_error_t remote_port;
 	struct xencons_interface *interface;
 	struct domain *d;
+	bool optional;
+	bool use_gnttab;
 };
 
 struct console_type {
 	char *xsname;
 	char *ttyname;
 	char *log_suffix;
+	bool optional;
+	bool use_gnttab;
 };
 
 static struct console_type console_type[] = {
@@ -120,7 +124,18 @@ static struct console_type console_type[] = {
 		.xsname = "/console",
 		.ttyname = "tty",
 		.log_suffix = "",
+		.optional = false,
+		.use_gnttab = true,
 	},
+#if defined(CONFIG_ARM)
+	{
+		.xsname = "/vuart/0",
+		.ttyname = "tty",
+		.log_suffix = "-vuart0",
+		.optional = true,
+		.use_gnttab = false,
+	},
+#endif
 };
 
 #define NUM_CONSOLE_TYPE (sizeof(console_type)/sizeof(struct console_type))
@@ -654,8 +669,17 @@ static int console_create_ring(struct console *con)
 			"ring-ref", "%u", &ring_ref,
 			"port", "%i", &remote_port,
 			NULL);
-	if (err)
+
+	if (err) {
+		/*
+		 * This is a normal condition for optional consoles: they might not be
+		 * present on xenstore at all. In that case, just return without error.
+		*/
+		if (con->optional)
+			err = 0;
+
 		goto out;
+	}
 
 	snprintf(path, sizeof(path), "%s/type", con->xspath);
 	type = xs_read(xs, XBT_NULL, path, NULL);
@@ -669,7 +693,7 @@ static int console_create_ring(struct console *con)
 	if (ring_ref != con->ring_ref && con->ring_ref != -1)
 		console_unmap_interface(con);
 
-	if (!con->interface && xgt_handle) {
+	if (!con->interface && xgt_handle && con->use_gnttab) {
 		/* Prefer using grant table */
 		con->interface = xengnttab_map_grant_ref(xgt_handle,
 			dom->domid, GNTTAB_RESERVED_CONSOLE,
@@ -788,6 +812,8 @@ static int console_init(struct console *con, struct domain *dom, void **data)
 	con->d = dom;
 	con->ttyname = (*con_type)->ttyname;
 	con->log_suffix = (*con_type)->log_suffix;
+	con->optional = (*con_type)->optional;
+	con->use_gnttab = (*con_type)->use_gnttab;
 	xsname = (char *)(*con_type)->xsname;
 	xspath = xs_get_domain_path(xs, dom->domid);
 	s = realloc(xspath, strlen(xspath) +
