@@ -163,6 +163,16 @@ static int write_with_timestamp(int fd, const char *data, size_t sz,
 	return 0;
 }
 
+static inline bool buffer_available(struct console *con)
+{
+	if (discard_overflowed_data ||
+	    !con->buffer.max_capacity ||
+	    con->buffer.size < con->buffer.max_capacity)
+		return true;
+	else
+		return false;
+}
+
 static void buffer_append(struct console *con)
 {
 	struct buffer *buffer = &con->buffer;
@@ -1120,9 +1130,7 @@ void handle_io(void)
 				    con->next_period < next_timeout)
 					next_timeout = con->next_period;
 			} else if (con->xce_handle != NULL) {
-				if (discard_overflowed_data ||
-				    !con->buffer.max_capacity ||
-				    con->buffer.size < con->buffer.max_capacity) {
+			        if (buffer_available(con)) {
 					int evtchn_fd = xenevtchn_fd(con->xce_handle);
 					con->xce_pollfd_idx = set_fds(evtchn_fd,
 								    POLLIN|POLLPRI);
