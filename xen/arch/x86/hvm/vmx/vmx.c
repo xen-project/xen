@@ -1627,29 +1627,8 @@ static void vmx_update_guest_cr(struct vcpu *v, unsigned int cr)
         v->arch.hvm_vcpu.hw_cr[0] =
             v->arch.hvm_vcpu.guest_cr[0] | hw_cr0_mask;
         __vmwrite(GUEST_CR0, v->arch.hvm_vcpu.hw_cr[0]);
-
-        /* Changing CR0 can change some bits in real CR4. */
-        vmx_update_guest_cr(v, 4);
-        break;
     }
-
-    case 2:
-        /* CR2 is updated in exit stub. */
-        break;
-
-    case 3:
-        if ( paging_mode_hap(v->domain) )
-        {
-            if ( !hvm_paging_enabled(v) && !vmx_unrestricted_guest(v) )
-                v->arch.hvm_vcpu.hw_cr[3] =
-                    v->domain->arch.hvm_domain.params[HVM_PARAM_IDENT_PT];
-            vmx_load_pdptrs(v);
-        }
-
-        __vmwrite(GUEST_CR3, v->arch.hvm_vcpu.hw_cr[3]);
-        hvm_asid_flush_vcpu(v);
-        break;
-
+        /* Fallthrough: Changing CR0 can change some bits in real CR4. */
     case 4:
         v->arch.hvm_vcpu.hw_cr[4] = HVM_CR4_HOST_MASK;
         if ( paging_mode_hap(v->domain) )
@@ -1679,6 +1658,23 @@ static void vmx_update_guest_cr(struct vcpu *v, unsigned int cr)
             v->arch.hvm_vcpu.hw_cr[4] &= ~(X86_CR4_SMEP | X86_CR4_SMAP);
         }
         __vmwrite(GUEST_CR4, v->arch.hvm_vcpu.hw_cr[4]);
+        break;
+
+    case 2:
+        /* CR2 is updated in exit stub. */
+        break;
+
+    case 3:
+        if ( paging_mode_hap(v->domain) )
+        {
+            if ( !hvm_paging_enabled(v) && !vmx_unrestricted_guest(v) )
+                v->arch.hvm_vcpu.hw_cr[3] =
+                    v->domain->arch.hvm_domain.params[HVM_PARAM_IDENT_PT];
+            vmx_load_pdptrs(v);
+        }
+
+        __vmwrite(GUEST_CR3, v->arch.hvm_vcpu.hw_cr[3]);
+        hvm_asid_flush_vcpu(v);
         break;
 
     default:
