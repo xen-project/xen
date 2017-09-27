@@ -43,10 +43,37 @@ int libxl__arch_domain_prepare_config(libxl__gc *gc,
 {
     uint32_t nr_spis = 0;
     unsigned int i;
+    uint32_t vuart_irq;
+    bool vuart_enabled = false;
+
+    /*
+     * If pl011 vuart is enabled then increment the nr_spis to allow allocation
+     * of SPI VIRQ for pl011.
+     */
+    if (d_config->b_info.arch_arm.vuart == LIBXL_VUART_TYPE_SBSA_UART) {
+        nr_spis += (GUEST_VPL011_SPI - 32) + 1;
+        vuart_irq = GUEST_VPL011_SPI;
+        vuart_enabled = true;
+    }
 
     for (i = 0; i < d_config->b_info.num_irqs; i++) {
         uint32_t irq = d_config->b_info.irqs[i];
         uint32_t spi;
+
+        /*
+         * This check ensures the if user has requested pass-through of a certain irq
+         * which conflicts with vpl011 irq then it flags an error to indicate to the
+         * user that the specific HW irq cannot be used as it is dedicated for vpl011.
+         * 
+         * TODO:
+         * The vpl011 irq should be assigned such that it never conflicts with user
+         * specified irqs thereby preventing its pass-through. This TODO is for
+         * implementing that logic in future.
+         */
+        if (vuart_enabled && irq == vuart_irq) {
+            LOG(ERROR, "Physical IRQ %u conflicting with pl011 SPI\n", irq);
+            return ERROR_FAIL;
+        }
 
         if (irq < 32)
             continue;
@@ -590,6 +617,38 @@ static int make_hypervisor_node(libxl__gc *gc, void *fdt,
     return 0;
 }
 
+static int make_vpl011_uart_node(libxl__gc *gc, void *fdt,
+                                 const struct arch_info *ainfo,
+                                 struct xc_dom_image *dom)
+{
+    int res;
+    gic_interrupt intr;
+
+    res = fdt_begin_node(fdt, "sbsa-pl011");
+    if (res) return res;
+
+    res = fdt_property_compat(gc, fdt, 1, "arm,sbsa-uart");
+    if (res) return res;
+
+    res = fdt_property_regs(gc, fdt, ROOT_ADDRESS_CELLS, ROOT_SIZE_CELLS,
+                            1,
+                            GUEST_PL011_BASE, GUEST_PL011_SIZE);
+    if (res) return res;
+
+    set_interrupt(intr, GUEST_VPL011_SPI, 0xf, DT_IRQ_TYPE_LEVEL_HIGH);
+
+    res = fdt_property_interrupts(gc, fdt, &intr, 1);
+    if (res) return res;
+
+    /* Use a default baud rate of 115200. */
+    fdt_property_u32(fdt, "current-speed", 115200);
+
+    res = fdt_end_node(fdt);
+    if (res) return res;
+
+    return 0;
+}
+
 static const struct arch_info *get_arch_info(libxl__gc *gc,
                                              const struct xc_dom_image *dom)
 {
@@ -888,6 +947,9 @@ next_resize:
 
         FDT( make_timer_node(gc, fdt, ainfo, xc_config->clock_frequency) );
         FDT( make_hypervisor_node(gc, fdt, vers) );
+
+        if (info->arch_arm.vuart == LIBXL_VUART_TYPE_SBSA_UART)
+            FDT( make_vpl011_uart_node(gc, fdt, ainfo, dom) );
 
         if (pfdt)
             FDT( copy_partial_fdt(gc, fdt, pfdt) );
