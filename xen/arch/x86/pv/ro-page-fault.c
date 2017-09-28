@@ -346,7 +346,8 @@ int pv_ro_page_fault(unsigned long addr, struct cpu_user_regs *regs)
     if ( ((l1e_get_flags(pte) & (_PAGE_PRESENT | _PAGE_RW)) != _PAGE_PRESENT) )
         return 0;
 
-    mmio_ro = rangeset_contains_singleton(mmio_ro_ranges, l1e_get_pfn(pte));
+    mmio_ro = is_hardware_domain(currd) &&
+              rangeset_contains_singleton(mmio_ro_ranges, l1e_get_pfn(pte));
     if ( mmio_ro )
         rc = mmio_ro_do_page_fault(&ctxt, addr, pte);
     else
