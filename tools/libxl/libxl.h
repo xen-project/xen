@@ -311,6 +311,12 @@
 #define LIBXL_HAVE_P9S 1
 
 /*
+ * LIBXL_HAVE_BUILDINFO_GRANT_LIMITS indicates that libxl_domain_build_info
+ * has the max_grant_frames and max_maptrack_frames fields.
+ */
+#define LIBXL_HAVE_BUILDINFO_GRANT_LIMITS 1
+
+/*
  * libxl ABI compatibility
  *
  * The only guarantee which libxl makes regarding ABI compatibility

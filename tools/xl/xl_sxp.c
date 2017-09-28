@@ -64,6 +64,8 @@ void printf_info_sexp(int domid, libxl_domain_config *d_config, FILE *fh)
 
     fprintf(fh, "\t(build_info)\n");
     fprintf(fh, "\t(max_vcpus %d)\n", b_info->max_vcpus);
+    fprintf(fh, "\t(max_grant_frames %d)\n", b_info->max_grant_frames);
+    fprintf(fh, "\t(max_maptrack_frames %d)\n", b_info->max_maptrack_frames);
     fprintf(fh, "\t(tsc_mode %s)\n", libxl_tsc_mode_to_string(b_info->tsc_mode));
     fprintf(fh, "\t(max_memkb %"PRId64")\n", b_info->max_memkb);
     fprintf(fh, "\t(target_memkb %"PRId64")\n", b_info->target_memkb);

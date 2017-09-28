@@ -472,6 +472,9 @@ libxl_domain_build_info = Struct("domain_build_info",[
     ("blkdev_start",    string),
 
     ("vnuma_nodes", Array(libxl_vnode_info, "num_vnuma_nodes")),
+
+    ("max_grant_frames",    uint32),
+    ("max_maptrack_frames", uint32),
     
     ("device_model_version", libxl_device_model_version),
     ("device_model_stubdomain", libxl_defbool),

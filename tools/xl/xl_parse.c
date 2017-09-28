@@ -990,6 +990,15 @@ void parse_config_data(const char *config_source,
         !xlu_cfg_get_string (config, "cpus_soft", &buf, 0))
         parse_vcpu_affinity(b_info, cpus, buf, num_cpus, false);
 
+    if (!xlu_cfg_get_long (config, "max_grant_frames", &l, 0))
+        b_info->max_grant_frames = l;
+    else
+        b_info->max_grant_frames = max_grant_frames;
+    if (!xlu_cfg_get_long (config, "max_maptrack_frames", &l, 0))
+        b_info->max_maptrack_frames = l;
+    else
+        b_info->max_maptrack_frames = max_maptrack_frames;
+
     libxl_defbool_set(&b_info->claim_mode, claim_mode);
 
     if (xlu_cfg_get_string (config, "on_poweroff", &buf, 0))

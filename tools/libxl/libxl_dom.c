@@ -322,6 +322,12 @@ int libxl__build_pre(libxl__gc *gc, uint32_t domid,
         return ERROR_FAIL;
     }
 
+    if (xc_domain_set_gnttab_limits(ctx->xch, domid, info->max_grant_frames,
+                                    info->max_maptrack_frames) != 0) {
+        LOG(ERROR, "Couldn't set grant table limits");
+        return ERROR_FAIL;
+    }
+
     /*
      * Check if the domain has any CPU or node affinity already. If not, try
      * to build up the latter via automatic NUMA placement. In fact, in case
