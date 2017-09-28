@@ -85,6 +85,16 @@
 #define XEN_HVM_CPUID_IOMMU_MAPPINGS   (1u << 2)
 #define XEN_HVM_CPUID_VCPU_ID_PRESENT  (1u << 3) /* vcpu id is present in EBX */
 
-#define XEN_CPUID_MAX_NUM_LEAVES 4
+/*
+ * Leaf 6 (0x40000x05)
+ * PV-specific parameters
+ * Sub-leaf 0: EAX: max available sub-leaf
+ * Sub-leaf 0: EBX: bits 0-7: max machine address width
+ */
+
+/* Max. address width in bits taking memory hotplug into account. */
+#define XEN_CPUID_MACHINE_ADDRESS_WIDTH_MASK (0xffu << 0)
+
+#define XEN_CPUID_MAX_NUM_LEAVES 5
 
 #endif /* __XEN_PUBLIC_ARCH_X86_CPUID_H__ */
