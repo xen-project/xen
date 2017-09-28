@@ -36,7 +36,7 @@
 #include "physdev.h"
 #include "tmem.h"
 
-#define XEN_SYSCTL_INTERFACE_VERSION 0x0000000F
+#define XEN_SYSCTL_INTERFACE_VERSION 0x00000010
 
 /*
  * Read console content from Xen buffer ring.
@@ -96,14 +96,13 @@ struct xen_sysctl_physinfo {
     uint32_t nr_nodes;    /* # nodes currently online */
     uint32_t max_node_id; /* Largest possible node ID on this host */
     uint32_t cpu_khz;
+    uint32_t capabilities;/* XEN_SYSCTL_PHYSCAP_??? */
     uint64_aligned_t total_pages;
     uint64_aligned_t free_pages;
     uint64_aligned_t scrub_pages;
     uint64_aligned_t outstanding_pages;
+    uint64_aligned_t max_mfn; /* Largest possible MFN on this host */
     uint32_t hw_cap[8];
-
-    /* XEN_SYSCTL_PHYSCAP_??? */
-    uint32_t capabilities;
 };
 
 /*

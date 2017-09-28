@@ -1472,6 +1472,12 @@ void clear_and_clean_page(struct page_info *page)
     unmap_domain_page(p);
 }
 
+unsigned long get_upper_mfn_bound(void)
+{
+    /* No memory hotplug yet, so current memory limit is the final one. */
+    return max_page - 1;
+}
+
 /*
  * Local variables:
  * mode: C

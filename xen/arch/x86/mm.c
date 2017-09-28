@@ -5178,6 +5178,17 @@ void write_32bit_pse_identmap(uint32_t *l2)
                  _PAGE_ACCESSED | _PAGE_DIRTY | _PAGE_PSE);
 }
 
+unsigned long get_upper_mfn_bound(void)
+{
+    unsigned long max_mfn;
+
+    max_mfn = mem_hotplug ? PFN_DOWN(mem_hotplug) : max_page;
+#ifndef CONFIG_BIGMEM
+    max_mfn = min(max_mfn, 1UL << 32);
+#endif
+    return min(max_mfn, 1UL << (paddr_bits - PAGE_SHIFT)) - 1;
+}
+
 /*
  * Local variables:
  * mode: C

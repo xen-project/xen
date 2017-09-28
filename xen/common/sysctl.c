@@ -266,6 +266,7 @@ long do_sysctl(XEN_GUEST_HANDLE_PARAM(xen_sysctl_t) u_sysctl)
         get_outstanding_claims(&pi->free_pages, &pi->outstanding_pages);
         pi->scrub_pages = 0;
         pi->cpu_khz = cpu_khz;
+        pi->max_mfn = get_upper_mfn_bound();
         arch_do_physinfo(pi);
 
         if ( copy_to_guest(u_sysctl, op, 1) )
