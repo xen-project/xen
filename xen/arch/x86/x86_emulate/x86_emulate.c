@@ -3087,7 +3087,9 @@ x86_emulate(
          * The only implicit-operands instructions allowed a LOCK prefix are
          * CMPXCHG{8,16}B (MOV CRn is being handled elsewhere).
          */
-        generate_exception_if(lock_prefix && (ext != ext_0f || b != 0xc7),
+        generate_exception_if(lock_prefix &&
+                              (vex.opcx || ext != ext_0f || b != 0xc7 ||
+                               (modrm_reg & 7) != 1 || ea.type != OP_MEM),
                               EXC_UD);
         dst.type = OP_NONE;
         break;
