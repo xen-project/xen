@@ -72,6 +72,8 @@ class Type(object):
         self.autogenerate_init_fn = kwargs.setdefault('autogenerate_init_fn', False)
 
         self.check_default_fn = kwargs.setdefault('check_default_fn', None)
+        self.copy_deprecated_fn = kwargs.setdefault('copy_deprecated_fn',
+                                                    None)
 
         if self.typename is not None and not self.private:
             self.json_gen_fn = kwargs.setdefault('json_gen_fn', self.typename + "_gen_json")
@@ -193,6 +195,7 @@ class Field(object):
         self.const = kwargs.setdefault('const', False)
         self.enumname = kwargs.setdefault('enumname', None)
         self.init_val = kwargs.setdefault('init_val', None)
+        self.deprecated_by = kwargs.setdefault('deprecated_by', None)
 
 class Aggregate(Type):
     """A type containing a collection of other types"""

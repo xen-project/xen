@@ -261,6 +261,67 @@ def libxl_C_type_gen_map_key(f, parent, indent = ""):
         s = indent + s
     return s.replace("\n", "\n%s" % indent).rstrip(indent)
 
+def libxl_C_type_copy_deprecated(field, v, indent = "    ", vparent = None):
+    s = ""
+
+    if isinstance(field.type, idl.KeyedUnion):
+        if vparent is None:
+            raise Exception("KeyedUnion type must have a parent")
+        s += "switch (%s) {\n" % (vparent + field.type.keyvar.name)
+        for f in [f for f in field.type.fields if not f.const]:
+            (vnparent,vfexpr) = ty.member(v, f, vparent is None)
+            s += "case %s:\n" % f.enumname
+            if f.type is not None:
+                s += libxl_C_type_copy_deprecated(f, vfexpr, indent, vnparent)
+            s+= "    break;\n"
+        s+="}\n";
+    elif isinstance(field.type, idl.Array) and field.deprecated_by:
+        raise Exception("Array type is not supported for deprecation")
+    elif isinstance(field.type, idl.Struct) and field.type.copy_fn is None:
+        for f in [f for f in field.type.fields if not f.const]:
+            (vnparent,vfexpr) = ty.member(v, f, vparent is None)
+            s += libxl_C_type_copy_deprecated(f, vfexpr, "", vnparent)
+    elif field.deprecated_by is not None:
+        if field.type.check_default_fn is None:
+            raise Exception(
+"Deprecated field %s type doesn't have a default value checker" % field.name)
+        field_val = field.type.pass_arg(v, vparent is None,
+                                        passby=idl.PASS_BY_VALUE)
+        field_ptr = field.type.pass_arg(v, vparent is None,
+                                        passby=idl.PASS_BY_REFERENCE)
+        s+= "if (!%s(&p->%s) && !%s(%s))\n" % (field.type.check_default_fn,
+                                               field.deprecated_by,
+                                               field.type.check_default_fn,
+                                               field_ptr)
+        s+= "    return -EINVAL;\n"
+        s+="(void) (&p->%s == %s);\n" % (field.deprecated_by, field_ptr)
+        s+= "if (%s(&p->%s)) {\n" % (field.type.check_default_fn,
+                                     field.deprecated_by)
+        s+= "    "
+        if field.type.copy_fn is not None:
+            s+= "%s(ctx, &p->%s, %s);\n" % (field.type.copy_fn,
+                                            field.deprecated_by, field_ptr)
+        else:
+            s+= "p->%s = %s;\n" % (field.deprecated_by, field_val)
+
+        if field.type.dispose_fn is not None:
+            s+= "    %s(%s);\n" % (field.type.dispose_fn,
+                                   field.type.pass_arg(v, vparent is None))
+
+        s+= "    "
+        if field.type.init_fn is not None:
+            s+= "%s(%s);\n" % (field.type.init_fn, field_ptr)
+        elif field.type.init_val is not None:
+            s+= "%s = %s;\n" % (field_val, field.type.init_val)
+        else:
+            s+= "memset(%s, 0, sizeof(*%s));\n" % (field_ptr, field_ptr)
+
+        s+= "}\n"
+
+    if s != "":
+        s = indent + s
+    return s.replace("\n", "\n%s" % indent).rstrip(indent)
+
 def get_init_val(f):
     if f.init_val is not None:
         return f.init_val
@@ -543,6 +604,10 @@ if __name__ == '__main__':
         f.write(libxl_C_type_define(ty) + ";\n")
         if ty.dispose_fn is not None:
             f.write("%svoid %s(%s);\n" % (ty.hidden(), ty.dispose_fn, ty.make_arg("p")))
+        if ty.copy_deprecated_fn is not None:
+            f.write("%sint %s(libxl_ctx *ctx, %s);\n" % (ty.hidden(),
+                                                         ty.copy_deprecated_fn,
+                                                         ty.make_arg("p")))
         if ty.copy_fn is not None:
             f.write("%svoid %s(libxl_ctx *ctx, %s, const %s);\n" % (ty.hidden(), ty.copy_fn,
                                               ty.make_arg("dst"), ty.make_arg("src")))
@@ -657,6 +722,18 @@ if __name__ == '__main__':
         f.write("}\n")
         f.write("\n")
         
+    for ty in [t for t in types if t.copy_deprecated_fn]:
+        f.write("int %s(libxl_ctx *ctx, %s)\n" % (ty.copy_deprecated_fn,
+            ty.make_arg("p", passby=idl.PASS_BY_REFERENCE)))
+        f.write("{\n")
+        for field in [field for field in ty.fields if not field.const]:
+            (vnparent,vfexpr) = ty.member("p", field, True)
+            f.write(libxl_C_type_copy_deprecated(field, vfexpr,
+                                                 vparent = vnparent))
+        f.write("    return 0;\n")
+        f.write("}\n")
+        f.write("\n")
+
     for ty in [t for t in types if t.init_fn is not None and t.autogenerate_init_fn]:
         f.write(libxl_C_type_init(ty))
         for field in libxl_init_members(ty):

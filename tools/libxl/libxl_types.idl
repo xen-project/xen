@@ -510,11 +510,16 @@ libxl_domain_build_info = Struct("domain_build_info",[
     # 65000 which is reserved by the toolstack.
     ("device_tree",      string),
     ("acpi",             libxl_defbool),
+    ("bootloader",       string),
+    ("bootloader_args",  libxl_string_list),
+    ("timer_mode",       libxl_timer_mode),
+    ("nested_hvm",       libxl_defbool),
+    ("apic",             libxl_defbool),
     ("u", KeyedUnion(None, libxl_domain_type, "type",
                 [("hvm", Struct(None, [("firmware",         string),
                                        ("bios",             libxl_bios_type),
                                        ("pae",              libxl_defbool),
-                                       ("apic",             libxl_defbool),
+                                       ("apic",             libxl_defbool, {'deprecated_by': 'apic'}),
                                        # The following acpi field is deprecated.
                                        # Please use the unified acpi field above
                                        # which works for both x86 and ARM.
@@ -530,8 +535,8 @@ libxl_domain_build_info = Struct("domain_build_info",[
                                        ("hpet",             libxl_defbool),
                                        ("vpt_align",        libxl_defbool),
                                        ("mmio_hole_memkb",  MemKB),
-                                       ("timer_mode",       libxl_timer_mode),
-                                       ("nested_hvm",       libxl_defbool),
+                                       ("timer_mode",       libxl_timer_mode, {'deprecated_by': 'timer_mode'}),
+                                       ("nested_hvm",       libxl_defbool, {'deprecated_by': 'nested_hvm'}),
                                        # The u.hvm.altp2m field is used solely
                                        # for x86 HVM guests and is maintained
                                        # for legacy purposes.
@@ -572,8 +577,8 @@ libxl_domain_build_info = Struct("domain_build_info",[
                                        ])),
                  ("pv", Struct(None, [("kernel", string),
                                       ("slack_memkb", MemKB),
-                                      ("bootloader", string),
-                                      ("bootloader_args", libxl_string_list),
+                                      ("bootloader", string, {'deprecated_by': 'bootloader'}),
+                                      ("bootloader_args", libxl_string_list, {'deprecated_by': 'bootloader_args'}),
                                       ("cmdline", string),
                                       ("ramdisk", string),
                                       ("features", string, {'const': True}),
@@ -590,7 +595,8 @@ libxl_domain_build_info = Struct("domain_build_info",[
     # supported by x86 HVM and ARM support is planned.
     ("altp2m", libxl_altp2m_mode),
 
-    ], dir=DIR_IN
+    ], dir=DIR_IN,
+       copy_deprecated_fn="libxl__domain_build_info_copy_deprecated",
 )
 
 libxl_device_vfb = Struct("device_vfb", [
