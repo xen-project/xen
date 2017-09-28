@@ -483,10 +483,10 @@ int xendevicemodel_modified_memory(
     xendevicemodel_handle *dmod, domid_t domid, uint64_t first_pfn,
     uint32_t nr)
 {
-    struct xen_dm_op_modified_memory_extent extent;
-
-    extent.first_pfn = first_pfn;
-    extent.nr = nr;
+    struct xen_dm_op_modified_memory_extent extent = {
+        .first_pfn = first_pfn,
+        .nr = nr,
+    };
 
     return xendevicemodel_modified_memory_bulk(dmod, domid, &extent, 1);
 }
