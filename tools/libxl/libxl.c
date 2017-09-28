@@ -373,6 +373,7 @@ int libxl_get_physinfo(libxl_ctx *ctx, libxl_physinfo *physinfo)
     physinfo->free_pages = xcphysinfo.free_pages;
     physinfo->scrub_pages = xcphysinfo.scrub_pages;
     physinfo->outstanding_pages = xcphysinfo.outstanding_pages;
+    physinfo->max_possible_mfn = xcphysinfo.max_mfn;
     l = xc_sharing_freed_pages(ctx->xch);
     if (l < 0 && errno == ENOSYS) {
         l = 0;

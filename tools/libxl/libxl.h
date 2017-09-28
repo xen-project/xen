@@ -644,6 +644,15 @@ typedef struct libxl__ctx libxl_ctx;
 #define LIBXL_HAVE_PHYSINFO_OUTSTANDING_PAGES 1
 
 /*
+ * LIBXL_HAVE_PHYSINFO_MAX_POSSIBLE_MFN
+ *
+ * If this is defined, libxl_physinfo structure will contain an uint64 field
+ * called max_possible_mfn, containing the highest possible mfn on this host,
+ * possibly taking memory hotplug into account.
+ */
+#define LIBXL_HAVE_PHYSINFO_MAX_POSSIBLE_MFN 1
+
+/*
  * LIBXL_HAVE_DOMINFO_OUTSTANDING_MEMKB 1
  *
  * If this is defined, libxl_dominfo will contain a MemKB type field called
