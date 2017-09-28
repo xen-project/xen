@@ -51,7 +51,7 @@ static void make_bootloader_args(libxl__gc *gc, libxl__bootloader_state *bl,
 {
     const libxl_domain_build_info *info = bl->info;
 
-    bl->argsspace = 9 + libxl_string_list_length(&info->u.pv.bootloader_args);
+    bl->argsspace = 9 + libxl_string_list_length(&info->bootloader_args);
 
     GCNEW_ARRAY(bl->args, bl->argsspace);
 
@@ -70,8 +70,8 @@ static void make_bootloader_args(libxl__gc *gc, libxl__bootloader_state *bl,
     ARG("--output-format=simple0");
     ARG(GCSPRINTF("--output-directory=%s", bl->outputdir));
 
-    if (info->u.pv.bootloader_args) {
-        char **p = info->u.pv.bootloader_args;
+    if (info->bootloader_args) {
+        char **p = info->bootloader_args;
         while (*p) {
             ARG(*p);
             p++;
@@ -330,7 +330,7 @@ void libxl__bootloader_run(libxl__egc *egc, libxl__bootloader_state *bl)
         goto out_ok;
     }
 
-    if (!info->u.pv.bootloader) {
+    if (!info->bootloader) {
         LOGD(DEBUG, domid,
              "no bootloader configured, using user supplied kernel");
         bl->kernel->path = bl->info->kernel;
@@ -419,14 +419,14 @@ static void bootloader_disk_attached_cb(libxl__egc *egc,
     }
 
     LOGD(DEBUG, bl->domid,
-         "Config bootloader value: %s", info->u.pv.bootloader);
+         "Config bootloader value: %s", info->bootloader);
 
-    if ( !strcmp(info->u.pv.bootloader, "/usr/bin/pygrub") )
+    if ( !strcmp(info->bootloader, "/usr/bin/pygrub") )
         LOGD(WARN, bl->domid,
              "bootloader='/usr/bin/pygrub' is deprecated; use " \
              "bootloader='pygrub' instead");
 
-    bootloader = info->u.pv.bootloader;
+    bootloader = info->bootloader;
 
     /* If the full path is not specified, check in the libexec path */
     if ( bootloader[0] != '/' ) {

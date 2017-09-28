@@ -190,7 +190,7 @@ static int numa_place_domain(libxl__gc *gc, uint32_t domid,
 
 static unsigned long timer_mode(const libxl_domain_build_info *info)
 {
-    const libxl_timer_mode mode = info->u.hvm.timer_mode;
+    const libxl_timer_mode mode = info->timer_mode;
     assert(mode >= LIBXL_TIMER_MODE_DELAY_FOR_MISSED_TICKS &&
            mode <= LIBXL_TIMER_MODE_ONE_MISSED_TICK_PENDING);
     return ((unsigned long)mode);
@@ -305,7 +305,7 @@ static void hvm_set_conf_params(xc_interface *handle, uint32_t domid,
     xc_hvm_param_set(handle, domid, HVM_PARAM_VPT_ALIGN,
                     libxl_defbool_val(info->u.hvm.vpt_align));
     xc_hvm_param_set(handle, domid, HVM_PARAM_NESTEDHVM,
-                    libxl_defbool_val(info->u.hvm.nested_hvm));
+                    libxl_defbool_val(info->nested_hvm));
 }
 
 int libxl__build_pre(libxl__gc *gc, uint32_t domid,
@@ -839,7 +839,7 @@ static int hvm_build_set_params(xc_interface *handle, uint32_t domid,
             return ERROR_FAIL;
 
         va_hvm = (struct hvm_info_table *)(va_map + HVM_INFO_OFFSET);
-        va_hvm->apic_mode = libxl_defbool_val(info->u.hvm.apic);
+        va_hvm->apic_mode = libxl_defbool_val(info->apic);
         va_hvm->nr_vcpus = info->max_vcpus;
         memset(va_hvm->vcpu_online, 0, sizeof(va_hvm->vcpu_online));
         memcpy(va_hvm->vcpu_online, info->avail_vcpus.map, info->avail_vcpus.size);
@@ -1124,7 +1124,7 @@ int libxl__build_hvm(libxl__gc *gc, uint32_t domid,
         dom->mmio_size = HVM_BELOW_4G_MMIO_LENGTH;
     else if (dom->mmio_size == 0 && !device_model) {
 #if defined(__i386__) || defined(__x86_64__)
-        if (libxl_defbool_val(info->u.hvm.apic)) {
+        if (libxl_defbool_val(info->apic)) {
             /* Make sure LAPIC_BASE_ADDRESS is below special pages */
             assert(((((X86_HVM_END_SPECIAL_REGION - X86_HVM_NR_SPECIAL_PAGES)
                       << XC_PAGE_SHIFT) - LAPIC_BASE_ADDRESS)) >= XC_PAGE_SIZE);

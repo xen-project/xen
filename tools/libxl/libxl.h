@@ -317,6 +317,22 @@
 #define LIBXL_HAVE_BUILDINFO_GRANT_LIMITS 1
 
 /*
+ * LIBXL_HAVE_BUILDINFO_* indicates that libxl_domain_build_info has
+ * the field represented by the '*'. The original position of those
+ * fields is:
+ *  - u.hvm.timer_mode
+ *  - u.hvm.apic
+ *  - u.hvm.nested_hvm
+ *  - u.pv.bootloader
+ *  - u.pv.bootloader_args
+ */
+#define LIBXL_HAVE_BUILDINFO_TIMER_MODE 1
+#define LIBXL_HAVE_BUILDINFO_APIC 1
+#define LIBXL_HAVE_BUILDINFO_NESTED_HVM 1
+#define LIBXL_HAVE_BUILDINFO_BOOTLOADER 1
+#define LIBXL_HAVE_BUILDINFO_BOOTLOADER_ARGS 1
+
+/*
  * libxl ABI compatibility
  *
  * The only guarantee which libxl makes regarding ABI compatibility

@@ -112,7 +112,7 @@ static int init_acpi_config(libxl__gc *gc,
 
     hvminfo = libxl__zalloc(gc, sizeof(*hvminfo));
 
-    hvminfo->apic_mode = libxl_defbool_val(b_info->u.hvm.apic);
+    hvminfo->apic_mode = libxl_defbool_val(b_info->apic);
 
     if (dom->nr_vnodes) {
         unsigned int *vcpu_to_vnode, *vdistance;

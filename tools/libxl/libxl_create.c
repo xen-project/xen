@@ -62,12 +62,19 @@ void libxl__rdm_setdefault(libxl__gc *gc, libxl_domain_build_info *b_info)
 int libxl__domain_build_info_setdefault(libxl__gc *gc,
                                         libxl_domain_build_info *b_info)
 {
-    int i;
+    int i, rc;
 
     if (b_info->type != LIBXL_DOMAIN_TYPE_HVM &&
         b_info->type != LIBXL_DOMAIN_TYPE_PV) {
         LOG(ERROR, "invalid domain type");
         return ERROR_INVAL;
+    }
+
+    /* Copy deprecated options to it's new position. */
+    rc = libxl__domain_build_info_copy_deprecated(CTX, b_info);
+    if (rc) {
+        LOG(ERROR, "Unable to copy deprecated fields");
+        return rc;
     }
 
     libxl_defbool_setdefault(&b_info->device_model_stubdomain, false);
@@ -91,7 +98,6 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
         if (b_info->device_model_version
                 == LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN) {
             const char *dm;
-            int rc;
 
             dm = libxl__domain_device_model(gc, b_info);
             rc = access(dm, X_OK);
@@ -304,12 +310,11 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
             break;
         }
 
-        if (b_info->u.hvm.timer_mode == LIBXL_TIMER_MODE_DEFAULT)
-            b_info->u.hvm.timer_mode =
-                LIBXL_TIMER_MODE_NO_DELAY_FOR_MISSED_TICKS;
+        if (libxl__timer_mode_is_default(&b_info->timer_mode))
+            b_info->timer_mode = LIBXL_TIMER_MODE_NO_DELAY_FOR_MISSED_TICKS;
 
         libxl_defbool_setdefault(&b_info->u.hvm.pae,                true);
-        libxl_defbool_setdefault(&b_info->u.hvm.apic,               true);
+        libxl_defbool_setdefault(&b_info->apic,                     true);
         libxl_defbool_setdefault(&b_info->u.hvm.acpi,               true);
         libxl_defbool_setdefault(&b_info->u.hvm.acpi_s3,            true);
         libxl_defbool_setdefault(&b_info->u.hvm.acpi_s4,            true);
@@ -318,7 +323,7 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
         libxl_defbool_setdefault(&b_info->u.hvm.viridian,           false);
         libxl_defbool_setdefault(&b_info->u.hvm.hpet,               true);
         libxl_defbool_setdefault(&b_info->u.hvm.vpt_align,          true);
-        libxl_defbool_setdefault(&b_info->u.hvm.nested_hvm,         false);
+        libxl_defbool_setdefault(&b_info->nested_hvm,               false);
         libxl_defbool_setdefault(&b_info->u.hvm.altp2m,             false);
         libxl_defbool_setdefault(&b_info->u.hvm.usb,                false);
         libxl_defbool_setdefault(&b_info->u.hvm.xen_platform_pci,   true);
@@ -903,7 +908,7 @@ static void initiate_domain_create(libxl__egc *egc,
     }
 
     if (d_config->c_info.type == LIBXL_DOMAIN_TYPE_HVM &&
-        (libxl_defbool_val(d_config->b_info.u.hvm.nested_hvm) &&
+        (libxl_defbool_val(d_config->b_info.nested_hvm) &&
         (libxl_defbool_val(d_config->b_info.u.hvm.altp2m) ||
         (d_config->b_info.altp2m != LIBXL_ALTP2M_MODE_DISABLED)))) {
         ret = ERROR_INVAL;
