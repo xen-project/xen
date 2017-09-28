@@ -275,6 +275,8 @@ extern char *default_vifbackend;
 extern char *default_remus_netbufscript;
 extern char *default_colo_proxy_script;
 extern char *blkdev_start;
+extern int max_grant_frames;
+extern int max_maptrack_frames;
 
 enum output_format {
     OUTPUT_FORMAT_JSON,

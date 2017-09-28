@@ -45,6 +45,8 @@ char *default_colo_proxy_script = NULL;
 enum output_format default_output_format = OUTPUT_FORMAT_JSON;
 int claim_mode = 1;
 bool progress_use_cr = 0;
+int max_grant_frames = -1;
+int max_maptrack_frames = 0;
 
 xentoollog_level minmsglevel = minmsglevel_default;
 
@@ -88,6 +90,7 @@ static void parse_global_config(const char *configfile,
     XLU_Config *config;
     int e;
     const char *buf;
+    libxl_physinfo physinfo;
 
     config = xlu_cfg_init(stderr, configfile);
     if (!config) {
@@ -187,6 +190,18 @@ static void parse_global_config(const char *configfile,
         &default_remus_netbufscript, 0);
     xlu_cfg_replace_string (config, "colo.default.proxyscript",
         &default_colo_proxy_script, 0);
+
+    if (!xlu_cfg_get_long (config, "max_grant_frames", &l, 0))
+        max_grant_frames = l;
+    else {
+        libxl_physinfo_init(&physinfo);
+        max_grant_frames = (libxl_get_physinfo(ctx, &physinfo) != 0 ||
+                            !(physinfo.max_possible_mfn >> 32))
+                           ? 32 : 64;
+        libxl_physinfo_dispose(&physinfo);
+    }
+    if (!xlu_cfg_get_long (config, "max_maptrack_frames", &l, 0))
+        max_maptrack_frames = l;
 
     xlu_cfg_destroy(config);
 }

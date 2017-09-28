@@ -77,6 +77,18 @@ operations (primarily domain creation).
 
 Default: C</var/lock/xl>
 
+=item B<max_grant_frames=NUMBER>
+
+Sets the default value for the C<max_grant_frames> domain config value.
+
+Default: C<32> on hosts up to 16TB of memory, C<64> on hosts larger than 16TB
+
+=item B<max_maptrack_frames=NUMBER>
+
+Sets the default value for the C<max_maptrack_frames> domain config value.
+
+Default: C<0>
+
 =item B<vif.default.script="PATH">
 
 Configures the default hotplug script used by virtual network devices.
