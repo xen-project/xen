@@ -173,7 +173,8 @@ libxl_timer_mode = Enumeration("timer_mode", [
     (1, "no_delay_for_missed_ticks"),
     (2, "no_missed_ticks_pending"),
     (3, "one_missed_tick_pending"),
-    ], init_val = "LIBXL_TIMER_MODE_DEFAULT")
+    ], init_val = "LIBXL_TIMER_MODE_DEFAULT",
+       check_default_fn = "libxl__timer_mode_is_default")
 
 libxl_bios_type = Enumeration("bios_type", [
     (0, "unknown"),
