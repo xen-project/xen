@@ -72,6 +72,8 @@ struct grant_table {
     struct active_grant_entry **active;
     /* Mapping tracking table per vcpu. */
     struct grant_mapping **maptrack;
+
+    struct grant_table_arch arch;
 };
 
 #ifndef DEFAULT_MAX_NR_GRANT_FRAMES /* to allow arch to override */
@@ -1730,7 +1732,7 @@ active_alloc_failed:
 static int
 grant_table_init(struct domain *d, struct grant_table *gt)
 {
-    int ret = 0;
+    int ret;
 
     grant_write_lock(gt);
 
@@ -1762,12 +1764,20 @@ grant_table_init(struct domain *d, struct grant_table *gt)
     if ( gt->status == NULL )
         goto no_mem;
 
+    ret = gnttab_init_arch(gt);
+    if ( ret )
+        goto out;
+
     /* gnttab_grow_table() allocates a min number of frames, so 0 is okay. */
     if ( gnttab_grow_table(d, 0) )
         goto unlock;
 
  no_mem:
     ret = -ENOMEM;
+ out:
+    gnttab_destroy_arch(gt);
+    xfree(gt->status);
+    gt->status = NULL;
     xfree(gt->shared_raw);
     gt->shared_raw = NULL;
     vfree(gt->maptrack);
@@ -3622,6 +3632,8 @@ grant_table_destroy(
     if ( t == NULL )
         return;
 
+    gnttab_destroy_arch(t);
+
     for ( i = 0; i < nr_grant_frames(t); i++ )
         free_xenheap_page(t->shared_raw[i]);
     xfree(t->shared_raw);
@@ -3740,7 +3752,7 @@ int gnttab_map_frame(struct domain *d, unsigned long idx, gfn_t gfn,
     }
 
     if ( !rc )
-        gnttab_set_frame_gfn(d, idx, gfn);
+        gnttab_set_frame_gfn(gt, idx, gfn);
 
     grant_write_unlock(gt);
 

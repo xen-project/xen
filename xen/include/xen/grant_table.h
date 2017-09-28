@@ -29,6 +29,8 @@
 #include <asm/page.h>
 #include <asm/grant_table.h>
 
+struct grant_table;
+
 /* The maximum size of a grant table. */
 extern unsigned int max_grant_frames;
 
