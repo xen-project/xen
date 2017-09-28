@@ -1667,6 +1667,10 @@ gnttab_grow_table(struct domain *d, unsigned int req_nr_frames)
     struct grant_table *gt = d->grant_table;
     unsigned int i, j;
 
+    ASSERT(gt->active);
+
+    if ( req_nr_frames < INITIAL_NR_GRANT_FRAMES )
+        req_nr_frames = INITIAL_NR_GRANT_FRAMES;
     ASSERT(req_nr_frames <= max_grant_frames);
 
     gdprintk(XENLOG_INFO,
@@ -1721,6 +1725,60 @@ active_alloc_failed:
     }
     gdprintk(XENLOG_INFO, "Allocation failure when expanding grant table.\n");
     return 0;
+}
+
+static int
+grant_table_init(struct domain *d, struct grant_table *gt)
+{
+    int ret = 0;
+
+    grant_write_lock(gt);
+
+    if ( gt->active )
+    {
+        ret = -EBUSY;
+        goto unlock;
+    }
+
+    /* Active grant table. */
+    gt->active = xzalloc_array(struct active_grant_entry *,
+                               max_nr_active_grant_frames);
+    if ( gt->active == NULL )
+        goto no_mem;
+
+    /* Tracking of mapped foreign frames table */
+    gt->maptrack = vzalloc(max_maptrack_frames * sizeof(*gt->maptrack));
+    if ( gt->maptrack == NULL )
+        goto no_mem;
+
+    /* Shared grant table. */
+    gt->shared_raw = xzalloc_array(void *, max_grant_frames);
+    if ( gt->shared_raw == NULL )
+        goto no_mem;
+
+    /* Status pages for grant table - for version 2 */
+    gt->status = xzalloc_array(grant_status_t *,
+                               grant_to_status_frames(max_grant_frames));
+    if ( gt->status == NULL )
+        goto no_mem;
+
+    /* gnttab_grow_table() allocates a min number of frames, so 0 is okay. */
+    if ( gnttab_grow_table(d, 0) )
+        goto unlock;
+
+ no_mem:
+    ret = -ENOMEM;
+    xfree(gt->shared_raw);
+    gt->shared_raw = NULL;
+    vfree(gt->maptrack);
+    gt->maptrack = NULL;
+    xfree(gt->active);
+    gt->active = NULL;
+
+ unlock:
+    grant_write_unlock(gt);
+
+    return ret;
 }
 
 static long
@@ -3383,75 +3441,24 @@ grant_table_create(
     struct domain *d)
 {
     struct grant_table *t;
-    unsigned int i, j;
+    int ret = 0;
 
     if ( (t = xzalloc(struct grant_table)) == NULL )
-        goto no_mem_0;
+        return -ENOMEM;
 
     /* Simple stuff. */
     percpu_rwlock_resource_init(&t->lock, grant_rwlock);
     spin_lock_init(&t->maptrack_lock);
-    t->nr_grant_frames = INITIAL_NR_GRANT_FRAMES;
-
-    /* Active grant table. */
-    if ( (t->active = xzalloc_array(struct active_grant_entry *,
-                                    max_nr_active_grant_frames)) == NULL )
-        goto no_mem_1;
-    for ( i = 0;
-          i < num_act_frames_from_sha_frames(INITIAL_NR_GRANT_FRAMES); i++ )
-    {
-        if ( (t->active[i] = alloc_xenheap_page()) == NULL )
-            goto no_mem_2;
-        clear_page(t->active[i]);
-        for ( j = 0; j < ACGNT_PER_PAGE; j++ )
-            spin_lock_init(&t->active[i][j].lock);
-    }
-
-    /* Tracking of mapped foreign frames table */
-    t->maptrack = vzalloc(max_maptrack_frames * sizeof(*t->maptrack));
-    if ( t->maptrack == NULL )
-        goto no_mem_2;
-
-    /* Shared grant table. */
-    if ( (t->shared_raw = xzalloc_array(void *, max_grant_frames)) == NULL )
-        goto no_mem_3;
-    for ( i = 0; i < INITIAL_NR_GRANT_FRAMES; i++ )
-    {
-        if ( (t->shared_raw[i] = alloc_xenheap_page()) == NULL )
-            goto no_mem_4;
-        clear_page(t->shared_raw[i]);
-    }
-
-    /* Status pages for grant table - for version 2 */
-    t->status = xzalloc_array(grant_status_t *,
-                              grant_to_status_frames(max_grant_frames));
-    if ( t->status == NULL )
-        goto no_mem_4;
-
-    for ( i = 0; i < INITIAL_NR_GRANT_FRAMES; i++ )
-        gnttab_create_shared_page(d, t, i);
-
-    t->nr_status_frames = 0;
 
     /* Okay, install the structure. */
     d->grant_table = t;
-    return 0;
 
- no_mem_4:
-    for ( i = 0; i < INITIAL_NR_GRANT_FRAMES; i++ )
-        free_xenheap_page(t->shared_raw[i]);
-    xfree(t->shared_raw);
- no_mem_3:
-    vfree(t->maptrack);
- no_mem_2:
-    for ( i = 0;
-          i < num_act_frames_from_sha_frames(INITIAL_NR_GRANT_FRAMES); i++ )
-        free_xenheap_page(t->active[i]);
-    xfree(t->active);
- no_mem_1:
-    xfree(t);
- no_mem_0:
-    return -ENOMEM;
+    if ( d->domain_id == 0 )
+    {
+        ret = grant_table_init(d, t);
+    }
+
+    return ret;
 }
 
 void
@@ -3646,19 +3653,12 @@ int grant_table_set_limits(struct domain *d, unsigned int grant_frames,
                            unsigned int maptrack_frames)
 {
     struct grant_table *gt = d->grant_table;
-    int ret = -EBUSY;
 
     if ( !gt )
         return -ENOENT;
 
-    grant_write_lock(gt);
-
-    ret = 0;
-    /* Set limits, alloc needed arrays. */
-
-    grant_write_unlock(gt);
-
-    return ret;
+    /* Set limits. */
+    return grant_table_init(d, gt);
 }
 
 #ifdef CONFIG_HAS_MEM_SHARING
