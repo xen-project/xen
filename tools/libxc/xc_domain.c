@@ -2266,6 +2266,19 @@ int xc_domain_set_max_evtchn(xc_interface *xch, uint32_t domid,
     return do_domctl(xch, &domctl);
 }
 
+int xc_domain_set_gnttab_limits(xc_interface *xch, domid_t domid,
+                                uint32_t grant_frames,
+                                uint32_t maptrack_frames)
+{
+    DECLARE_DOMCTL;
+
+    domctl.cmd = XEN_DOMCTL_set_gnttab_limits;
+    domctl.domain = domid;
+    domctl.u.set_gnttab_limits.grant_frames = grant_frames;
+    domctl.u.set_gnttab_limits.maptrack_frames = maptrack_frames;
+    return do_domctl(xch, &domctl);
+}
+
 /* Plumbing Xen with vNUMA topology */
 int xc_domain_setvnuma(xc_interface *xch,
                        uint32_t domid,

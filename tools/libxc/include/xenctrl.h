@@ -1064,6 +1064,19 @@ int xc_domain_set_virq_handler(xc_interface *xch, uint32_t domid, int virq);
 int xc_domain_set_max_evtchn(xc_interface *xch, uint32_t domid,
                              uint32_t max_port);
 
+/**
+ * Set the maximum number of grant frames and maptrack frames a domain
+ * can have. Must be used at domain setup time and only then.
+ *
+ * @param xch a handle to an open hypervisor interface
+ * @param domid the domain id
+ * @param grant_frames max. number of grant frames
+ * @param maptrack_frames max. number of maptrack frames
+ */
+int xc_domain_set_gnttab_limits(xc_interface *xch, domid_t domid,
+                                uint32_t grant_frames,
+                                uint32_t maptrack_frames);
+
 /*
  * CPUPOOL MANAGEMENT FUNCTIONS
  */
