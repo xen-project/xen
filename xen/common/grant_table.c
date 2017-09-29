@@ -1732,60 +1732,60 @@ active_alloc_failed:
 static int
 grant_table_init(struct domain *d, struct grant_table *gt)
 {
-    int ret;
+    int ret = -ENOMEM;
 
     grant_write_lock(gt);
 
     if ( gt->active )
     {
         ret = -EBUSY;
-        goto unlock;
+        goto out_no_cleanup;
     }
 
     /* Active grant table. */
     gt->active = xzalloc_array(struct active_grant_entry *,
                                max_nr_active_grant_frames);
     if ( gt->active == NULL )
-        goto no_mem;
+        goto out;
 
     /* Tracking of mapped foreign frames table */
     gt->maptrack = vzalloc(max_maptrack_frames * sizeof(*gt->maptrack));
     if ( gt->maptrack == NULL )
-        goto no_mem;
+        goto out;
 
     /* Shared grant table. */
     gt->shared_raw = xzalloc_array(void *, max_grant_frames);
     if ( gt->shared_raw == NULL )
-        goto no_mem;
+        goto out;
 
     /* Status pages for grant table - for version 2 */
     gt->status = xzalloc_array(grant_status_t *,
                                grant_to_status_frames(max_grant_frames));
     if ( gt->status == NULL )
-        goto no_mem;
+        goto out;
 
     ret = gnttab_init_arch(gt);
     if ( ret )
         goto out;
 
     /* gnttab_grow_table() allocates a min number of frames, so 0 is okay. */
-    if ( gnttab_grow_table(d, 0) )
-        goto unlock;
+    ret = gnttab_grow_table(d, 0) ? 0 : -ENOMEM;
 
- no_mem:
-    ret = -ENOMEM;
  out:
-    gnttab_destroy_arch(gt);
-    xfree(gt->status);
-    gt->status = NULL;
-    xfree(gt->shared_raw);
-    gt->shared_raw = NULL;
-    vfree(gt->maptrack);
-    gt->maptrack = NULL;
-    xfree(gt->active);
-    gt->active = NULL;
+    if ( ret )
+    {
+        gnttab_destroy_arch(gt);
+        xfree(gt->status);
+        gt->status = NULL;
+        xfree(gt->shared_raw);
+        gt->shared_raw = NULL;
+        vfree(gt->maptrack);
+        gt->maptrack = NULL;
+        xfree(gt->active);
+        gt->active = NULL;
+    }
 
- unlock:
+ out_no_cleanup:
     grant_write_unlock(gt);
 
     return ret;
