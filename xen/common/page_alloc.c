@@ -192,7 +192,11 @@ PAGE_LIST_HEAD(page_broken_list);
  * BOOT-TIME ALLOCATOR
  */
 
-static unsigned long __initdata first_valid_mfn = ~0UL;
+/*
+ * first_valid_mfn is exported because it is use in ARM specific NUMA
+ * helpers. See comment in asm-arm/numa.h.
+ */
+unsigned long first_valid_mfn = ~0UL;
 
 static struct bootmem_region {
     unsigned long s, e; /* MFNs @s through @e-1 inclusive are free */
