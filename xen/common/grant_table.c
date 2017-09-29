@@ -1669,7 +1669,11 @@ gnttab_grow_table(struct domain *d, unsigned int req_nr_frames)
     struct grant_table *gt = d->grant_table;
     unsigned int i, j;
 
-    ASSERT(gt->active);
+    if ( unlikely(!gt->active) )
+    {
+        gprintk(XENLOG_WARNING, "grant_table_set_limits() call missing\n");
+        return -ENODEV;
+    }
 
     if ( req_nr_frames < INITIAL_NR_GRANT_FRAMES )
         req_nr_frames = INITIAL_NR_GRANT_FRAMES;
@@ -1710,7 +1714,7 @@ gnttab_grow_table(struct domain *d, unsigned int req_nr_frames)
         gnttab_create_shared_page(d, gt, i);
     gt->nr_grant_frames = req_nr_frames;
 
-    return 1;
+    return 0;
 
 shared_alloc_failed:
     for ( i = nr_grant_frames(gt); i < req_nr_frames; i++ )
@@ -1726,7 +1730,8 @@ active_alloc_failed:
         gt->active[i] = NULL;
     }
     gdprintk(XENLOG_INFO, "Allocation failure when expanding grant table.\n");
-    return 0;
+
+    return -ENOMEM;
 }
 
 static int
@@ -1769,7 +1774,7 @@ grant_table_init(struct domain *d, struct grant_table *gt)
         goto out;
 
     /* gnttab_grow_table() allocates a min number of frames, so 0 is okay. */
-    ret = gnttab_grow_table(d, 0) ? 0 : -ENOMEM;
+    ret = gnttab_grow_table(d, 0);
 
  out:
     if ( ret )
@@ -1841,7 +1846,7 @@ gnttab_setup_table(
     if ( (op.nr_frames > nr_grant_frames(gt) ||
           ((gt->gt_version > 1) &&
            (grant_to_status_frames(op.nr_frames) > nr_status_frames(gt)))) &&
-         !gnttab_grow_table(d, op.nr_frames) )
+         gnttab_grow_table(d, op.nr_frames) )
     {
         gdprintk(XENLOG_INFO,
                  "Expand grant table to %u failed. Current: %u Max: %u\n",
