@@ -1700,6 +1700,16 @@ static void init_heap_pages(
 {
     unsigned long i;
 
+    /*
+     * Some pages may not go through the boot allocator (e.g reserved
+     * memory at boot but released just after --- kernel, initramfs,
+     * etc.).
+     * Update first_valid_mfn to ensure those regions are covered.
+     */
+    spin_lock(&heap_lock);
+    first_valid_mfn = min_t(unsigned long, page_to_mfn(pg), first_valid_mfn);
+    spin_unlock(&heap_lock);
+
     for ( i = 0; i < nr_pages; i++ )
     {
         unsigned int nid = phys_to_nid(page_to_maddr(pg+i));
