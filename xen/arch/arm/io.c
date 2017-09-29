@@ -80,7 +80,7 @@ static int cmp_mmio_handler(const void *key, const void *elem)
     if ( handler0->addr < handler1->addr )
         return -1;
 
-    if ( handler0->addr > (handler1->addr + handler1->size) )
+    if ( handler0->addr >= (handler1->addr + handler1->size) )
         return 1;
 
     return 0;
