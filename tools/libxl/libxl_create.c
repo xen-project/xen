@@ -259,8 +259,6 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
                 break;
             }
             break;
-            b_info->video_memkb = 0;
-            break;
         case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN:
         default:
             switch (b_info->u.hvm.vga.kind) {
