@@ -1787,7 +1787,7 @@ int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
             {
                 bool_t sve;
 
-                p2m->get_entry(p2m, gfn, &p2mt, &p2ma, 0, NULL, &sve);
+                p2m->get_entry(p2m, _gfn(gfn), &p2mt, &p2ma, 0, NULL, &sve);
 
                 if ( !sve && altp2m_vcpu_emulate_ve(curr) )
                 {

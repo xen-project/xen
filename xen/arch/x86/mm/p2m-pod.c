@@ -543,7 +543,7 @@ p2m_pod_decrease_reservation(struct domain *d, gfn_t gfn, unsigned int order)
         p2m_type_t t;
         unsigned int cur_order;
 
-        p2m->get_entry(p2m, gfn_x(gfn) + i, &t, &a, 0, &cur_order, NULL);
+        p2m->get_entry(p2m, gfn_add(gfn, i), &t, &a, 0, &cur_order, NULL);
         n = 1UL << min(order, cur_order);
         if ( t == p2m_populate_on_demand )
             pod += n;
@@ -603,7 +603,7 @@ p2m_pod_decrease_reservation(struct domain *d, gfn_t gfn, unsigned int order)
         p2m_access_t a;
         unsigned int cur_order;
 
-        mfn = p2m->get_entry(p2m, gfn_x(gfn) + i, &t, &a, 0, &cur_order, NULL);
+        mfn = p2m->get_entry(p2m, gfn_add(gfn, i), &t, &a, 0, &cur_order, NULL);
         if ( order < cur_order )
             cur_order = order;
         n = 1UL << cur_order;
@@ -717,7 +717,8 @@ p2m_pod_zero_check_superpage(struct p2m_domain *p2m, unsigned long gfn)
         unsigned long k;
         const struct page_info *page;
 
-        mfn = p2m->get_entry(p2m, gfn + i, &type, &a, 0, &cur_order, NULL);
+        mfn = p2m->get_entry(p2m, _gfn(gfn +  i), &type, &a, 0,
+                             &cur_order, NULL);
 
         /*
          * Conditions that must be met for superpage-superpage:
@@ -859,7 +860,9 @@ p2m_pod_zero_check(struct p2m_domain *p2m, unsigned long *gfns, int count)
     for ( i = 0; i < count; i++ )
     {
         p2m_access_t a;
-        mfns[i] = p2m->get_entry(p2m, gfns[i], types + i, &a, 0, NULL, NULL);
+
+        mfns[i] = p2m->get_entry(p2m, _gfn(gfns[i]), types + i, &a,
+                                 0, NULL, NULL);
         /*
          * If this is ram, and not a pagetable or from the xen heap, and
          * probably not mapped elsewhere, map it; otherwise, skip.
@@ -988,7 +991,7 @@ p2m_pod_emergency_sweep(struct p2m_domain *p2m)
     for ( i = p2m->pod.reclaim_single; i > 0 ; i-- )
     {
         p2m_access_t a;
-        (void)p2m->get_entry(p2m, i, &t, &a, 0, NULL, NULL);
+        (void)p2m->get_entry(p2m, _gfn(i), &t, &a, 0, NULL, NULL);
         if ( p2m_is_ram(t) )
         {
             gfns[j] = i;
@@ -1237,7 +1240,7 @@ guest_physmap_mark_populate_on_demand(struct domain *d, unsigned long gfn,
         p2m_access_t a;
         unsigned int cur_order;
 
-        p2m->get_entry(p2m, gfn + i, &ot, &a, 0, &cur_order, NULL);
+        p2m->get_entry(p2m, _gfn(gfn + i), &ot, &a, 0, &cur_order, NULL);
         n = 1UL << min(order, cur_order);
         if ( p2m_is_ram(ot) )
         {

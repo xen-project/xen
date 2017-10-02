@@ -234,13 +234,13 @@ struct p2m_domain {
     struct page_list_head pages;
 
     int                (*set_entry)(struct p2m_domain *p2m,
-                                    unsigned long gfn,
+                                    gfn_t gfn,
                                     mfn_t mfn, unsigned int page_order,
                                     p2m_type_t p2mt,
                                     p2m_access_t p2ma,
                                     int sve);
     mfn_t              (*get_entry)(struct p2m_domain *p2m,
-                                    unsigned long gfn,
+                                    gfn_t gfn,
                                     p2m_type_t *p2mt,
                                     p2m_access_t *p2ma,
                                     p2m_query_t q,

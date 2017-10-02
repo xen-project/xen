@@ -66,7 +66,7 @@ static int _p2m_get_mem_access(struct p2m_domain *p2m, gfn_t gfn,
     }
 
     gfn_lock(p2m, gfn, 0);
-    mfn = p2m->get_entry(p2m, gfn_x(gfn), &t, &a, 0, NULL, NULL);
+    mfn = p2m->get_entry(p2m, gfn, &t, &a, 0, NULL, NULL);
     gfn_unlock(p2m, gfn, 0);
 
     if ( mfn_eq(mfn, INVALID_MFN) )
@@ -142,7 +142,7 @@ bool p2m_mem_access_check(paddr_t gpa, unsigned long gla,
                           vm_event_request_t **req_ptr)
 {
     struct vcpu *v = current;
-    unsigned long gfn = gpa >> PAGE_SHIFT;
+    gfn_t gfn = gaddr_to_gfn(gpa);
     struct domain *d = v->domain;
     struct p2m_domain *p2m = NULL;
     mfn_t mfn;
@@ -215,7 +215,7 @@ bool p2m_mem_access_check(paddr_t gpa, unsigned long gla,
         *req_ptr = req;
 
         req->reason = VM_EVENT_REASON_MEM_ACCESS;
-        req->u.mem_access.gfn = gfn;
+        req->u.mem_access.gfn = gfn_x(gfn);
         req->u.mem_access.offset = gpa & ((1 << PAGE_SHIFT) - 1);
         if ( npfec.gla_valid )
         {
@@ -247,7 +247,7 @@ int p2m_set_altp2m_mem_access(struct domain *d, struct p2m_domain *hp2m,
     unsigned long gfn_l = gfn_x(gfn);
     int rc;
 
-    mfn = ap2m->get_entry(ap2m, gfn_l, &t, &old_a, 0, NULL, NULL);
+    mfn = ap2m->get_entry(ap2m, gfn, &t, &old_a, 0, NULL, NULL);
 
     /* Check host p2m if no valid entry in alternate */
     if ( !mfn_valid(mfn) )
@@ -264,16 +264,16 @@ int p2m_set_altp2m_mem_access(struct domain *d, struct p2m_domain *hp2m,
         if ( page_order != PAGE_ORDER_4K )
         {
             unsigned long mask = ~((1UL << page_order) - 1);
-            unsigned long gfn2_l = gfn_l & mask;
+            gfn_t gfn2 = _gfn(gfn_l & mask);
             mfn_t mfn2 = _mfn(mfn_x(mfn) & mask);
 
-            rc = ap2m->set_entry(ap2m, gfn2_l, mfn2, page_order, t, old_a, 1);
+            rc = ap2m->set_entry(ap2m, gfn2, mfn2, page_order, t, old_a, 1);
             if ( rc )
                 return rc;
         }
     }
 
-    return ap2m->set_entry(ap2m, gfn_l, mfn, PAGE_ORDER_4K, t, a,
+    return ap2m->set_entry(ap2m, gfn, mfn, PAGE_ORDER_4K, t, a,
                            current->domain != d);
 }
 
@@ -295,10 +295,9 @@ static int set_mem_access(struct domain *d, struct p2m_domain *p2m,
         mfn_t mfn;
         p2m_access_t _a;
         p2m_type_t t;
-        unsigned long gfn_l = gfn_x(gfn);
 
-        mfn = p2m->get_entry(p2m, gfn_l, &t, &_a, 0, NULL, NULL);
-        rc = p2m->set_entry(p2m, gfn_l, mfn, PAGE_ORDER_4K, t, a, -1);
+        mfn = p2m->get_entry(p2m, gfn, &t, &_a, 0, NULL, NULL);
+        rc = p2m->set_entry(p2m, gfn, mfn, PAGE_ORDER_4K, t, a, -1);
     }
 
     return rc;

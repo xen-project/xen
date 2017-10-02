@@ -674,11 +674,12 @@ bool_t ept_handle_misconfig(uint64_t gpa)
  * Returns: 0 for success, -errno for failure
  */
 static int
-ept_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn, 
+ept_set_entry(struct p2m_domain *p2m, gfn_t gfn_, mfn_t mfn,
               unsigned int order, p2m_type_t p2mt, p2m_access_t p2ma,
               int sve)
 {
     ept_entry_t *table, *ept_entry = NULL;
+    unsigned long gfn = gfn_x(gfn_);
     unsigned long gfn_remainder = gfn;
     unsigned int i, target = order / EPT_TABLE_ORDER;
     unsigned long fn_mask = !mfn_eq(mfn, INVALID_MFN) ? (gfn | mfn_x(mfn)) : gfn;
@@ -910,11 +911,12 @@ out:
 
 /* Read ept p2m entries */
 static mfn_t ept_get_entry(struct p2m_domain *p2m,
-                           unsigned long gfn, p2m_type_t *t, p2m_access_t* a,
+                           gfn_t gfn_, p2m_type_t *t, p2m_access_t* a,
                            p2m_query_t q, unsigned int *page_order,
                            bool_t *sve)
 {
     ept_entry_t *table = map_domain_page(_mfn(pagetable_get_pfn(p2m_get_pagetable(p2m))));
+    unsigned long gfn = gfn_x(gfn_);
     unsigned long gfn_remainder = gfn;
     ept_entry_t *ept_entry;
     u32 index;
