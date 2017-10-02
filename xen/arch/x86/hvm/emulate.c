@@ -14,12 +14,14 @@
 #include <xen/sched.h>
 #include <xen/paging.h>
 #include <xen/trace.h>
+#include <xen/vm_event.h>
 #include <asm/event.h>
 #include <asm/i387.h>
 #include <asm/xstate.h>
 #include <asm/hvm/emulate.h>
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/ioreq.h>
+#include <asm/hvm/monitor.h>
 #include <asm/hvm/trace.h>
 #include <asm/hvm/support.h>
 #include <asm/hvm/svm/svm.h>
@@ -2114,6 +2116,9 @@ void hvm_emulate_one_vm_event(enum emul_kind kind, unsigned int trapnr,
          */
         return;
     case X86EMUL_UNIMPLEMENTED:
+        if ( hvm_monitor_emul_unimplemented() )
+            return;
+        /* fall-through */
     case X86EMUL_UNHANDLEABLE:
         hvm_dump_emulation_state(XENLOG_G_DEBUG, "Mem event", &ctx, rc);
         hvm_inject_hw_exception(trapnr, errcode);

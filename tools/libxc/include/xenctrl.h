@@ -2041,6 +2041,8 @@ int xc_monitor_debug_exceptions(xc_interface *xch, domid_t domain_id,
 int xc_monitor_cpuid(xc_interface *xch, domid_t domain_id, bool enable);
 int xc_monitor_privileged_call(xc_interface *xch, domid_t domain_id,
                                bool enable);
+int xc_monitor_emul_unimplemented(xc_interface *xch, domid_t domain_id,
+                                  bool enable);
 /**
  * This function enables / disables emulation for each REP for a
  * REP-compatible instruction.

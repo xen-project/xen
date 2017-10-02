@@ -57,6 +57,23 @@ bool hvm_monitor_cr(unsigned int index, unsigned long value, unsigned long old)
     return 0;
 }
 
+bool hvm_monitor_emul_unimplemented(void)
+{
+    struct vcpu *curr = current;
+
+    /*
+     * Send a vm_event to the monitor to signal that the current
+     * instruction couldn't be emulated.
+     */
+    vm_event_request_t req = {
+        .reason = VM_EVENT_REASON_EMUL_UNIMPLEMENTED,
+        .vcpu_id  = curr->vcpu_id,
+    };
+
+    return curr->domain->arch.monitor.emul_unimplemented_enabled &&
+        monitor_traps(curr, true, &req) == 1;
+}
+
 void hvm_monitor_msr(unsigned int msr, uint64_t value)
 {
     struct vcpu *curr = current;

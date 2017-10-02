@@ -47,6 +47,7 @@ int hvm_monitor_cpuid(unsigned long insn_length, unsigned int leaf,
                       unsigned int subleaf);
 void hvm_monitor_interrupt(unsigned int vector, unsigned int type,
                            unsigned int err, uint64_t cr2);
+bool hvm_monitor_emul_unimplemented(void);
 
 #endif /* __ASM_X86_HVM_MONITOR_H__ */
 
