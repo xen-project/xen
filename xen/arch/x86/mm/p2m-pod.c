@@ -1075,10 +1075,9 @@ static void pod_eager_record(struct p2m_domain *p2m, gfn_t gfn,
     mrp->idx %= ARRAY_SIZE(mrp->list);
 }
 
-int
+bool
 p2m_pod_demand_populate(struct p2m_domain *p2m, gfn_t gfn,
-                        unsigned int order,
-                        p2m_query_t q)
+                        unsigned int order)
 {
     struct domain *d = p2m->domain;
     struct page_info *p = NULL; /* Compiler warnings */
@@ -1116,7 +1115,7 @@ p2m_pod_demand_populate(struct p2m_domain *p2m, gfn_t gfn,
          */
         p2m_set_entry(p2m, gfn_aligned, INVALID_MFN, PAGE_ORDER_2M,
                       p2m_populate_on_demand, p2m->default_access);
-        return 0;
+        return true;
     }
 
     /* Only reclaim if we're in actual need of more cache. */
@@ -1178,7 +1177,7 @@ p2m_pod_demand_populate(struct p2m_domain *p2m, gfn_t gfn,
     }
 
     pod_unlock(p2m);
-    return 0;
+    return true;
 out_of_memory:
     pod_unlock(p2m);
 
@@ -1186,10 +1185,10 @@ out_of_memory:
            __func__, d->domain_id, d->tot_pages, p2m->pod.entry_count,
            current->domain->domain_id);
     domain_crash(d);
-    return -1;
+    return false;
 out_fail:
     pod_unlock(p2m);
-    return -1;
+    return false;
 remap_and_retry:
     BUG_ON(order != PAGE_ORDER_2M);
     pod_unlock(p2m);
@@ -1215,7 +1214,7 @@ remap_and_retry:
         __trace_var(TRC_MEM_POD_SUPERPAGE_SPLINTER, 0, sizeof(t), &t);
     }
 
-    return 0;
+    return true;
 }
 
 
