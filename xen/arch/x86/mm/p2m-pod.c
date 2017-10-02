@@ -1,7 +1,7 @@
 /******************************************************************************
  * arch/x86/mm/p2m-pod.c
  *
- * Populate-on-demand p2m entries. 
+ * Populate-on-demand p2m entries.
  *
  * Copyright (c) 2009-2011 Citrix Systems, Inc.
  *
@@ -76,7 +76,7 @@ p2m_pod_cache_add(struct p2m_domain *p2m,
                __func__, mfn_x(mfn), order, ((1UL << order) - 1));
         return -1;
     }
-    
+
     for(i=0; i < 1 << order ; i++) {
         struct domain * od;
 
@@ -223,8 +223,8 @@ p2m_pod_set_cache_target(struct p2m_domain *p2m, unsigned long pod_target, int p
                 /* If we can't allocate a superpage, try singleton pages */
                 order = PAGE_ORDER_4K;
                 goto retry;
-            }   
-            
+            }
+
             printk("%s: Unable to allocate page for PoD cache (target=%lu cache=%ld)\n",
                    __func__, pod_target, p2m->pod.count);
             ret = -ENOMEM;
@@ -272,7 +272,7 @@ p2m_pod_set_cache_target(struct p2m_domain *p2m, unsigned long pod_target, int p
 
             if ( test_and_clear_bit(_PGT_pinned, &(page+i)->u.inuse.type_info) )
                 put_page_and_type(page+i);
-            
+
             if ( test_and_clear_bit(_PGC_allocated, &(page+i)->count_info) )
                 put_page(page+i);
 
@@ -296,7 +296,7 @@ out:
  * definitions:
  * + M: static_max
  * + B: number of pages the balloon driver has ballooned down to.
- * + P: Number of populated pages. 
+ * + P: Number of populated pages.
  * + T: Old target
  * + T': New target
  *
@@ -311,10 +311,10 @@ out:
  *   the remainder of the ram to the guest OS.
  *  T <T'<B : Increase PoD cache size.
  *  T'<T<=B : Here we have a choice.  We can decrease the size of the cache,
- *   get the memory right away.  However, that means every time we 
- *   reduce the memory target we risk the guest attempting to populate the 
+ *   get the memory right away.  However, that means every time we
+ *   reduce the memory target we risk the guest attempting to populate the
  *   memory before the balloon driver has reached its new target.  Safer to
- *   never reduce the cache size here, but only when the balloon driver frees 
+ *   never reduce the cache size here, but only when the balloon driver frees
  *   PoD ranges.
  *
  * If there are many zero pages, we could reach the target also by doing
@@ -511,7 +511,7 @@ p2m_pod_decrease_reservation(struct domain *d,
     long pod, nonpod, ram;
 
     gfn_lock(p2m, gpfn, order);
-    pod_lock(p2m);    
+    pod_lock(p2m);
 
     /* If we don't have any outstanding PoD entries, let things take their
      * course */
@@ -629,7 +629,7 @@ p2m_pod_decrease_reservation(struct domain *d,
             nonpod -= n;
             ram -= n;
         }
-    }    
+    }
 
     /* If there are no more non-PoD entries, tell decrease_reservation() that
      * there's nothing left to do. */
@@ -682,7 +682,7 @@ p2m_pod_zero_check_superpage(struct p2m_domain *p2m, unsigned long gfn)
     if ( paging_mode_shadow(d) )
         max_ref++;
 
-    /* NOTE: this is why we don't enforce deadlock constraints between p2m 
+    /* NOTE: this is why we don't enforce deadlock constraints between p2m
      * and pod locks */
     gfn_lock(p2m, gfn, SUPERPAGE_ORDER);
 
@@ -690,7 +690,7 @@ p2m_pod_zero_check_superpage(struct p2m_domain *p2m, unsigned long gfn)
      * and aligned, and mapping them. */
     for ( i = 0; i < SUPERPAGE_PAGES; i += n )
     {
-        p2m_access_t a; 
+        p2m_access_t a;
         unsigned int cur_order;
         unsigned long k;
         const struct page_info *page;
@@ -807,7 +807,7 @@ p2m_pod_zero_check_superpage(struct p2m_domain *p2m, unsigned long gfn)
 out_reset:
     if ( reset )
         p2m_set_entry(p2m, gfn, mfn0, 9, type0, p2m->default_access);
-    
+
 out:
     gfn_unlock(p2m, gfn, SUPERPAGE_ORDER);
     return ret;
@@ -836,8 +836,8 @@ p2m_pod_zero_check(struct p2m_domain *p2m, unsigned long *gfns, int count)
         /* If this is ram, and not a pagetable or from the xen heap, and probably not mapped
            elsewhere, map it; otherwise, skip. */
         if ( p2m_is_ram(types[i])
-             && ( (mfn_to_page(mfns[i])->count_info & PGC_allocated) != 0 ) 
-             && ( (mfn_to_page(mfns[i])->count_info & (PGC_page_table|PGC_xen_heap)) == 0 ) 
+             && ( (mfn_to_page(mfns[i])->count_info & PGC_allocated) != 0 )
+             && ( (mfn_to_page(mfns[i])->count_info & (PGC_page_table|PGC_xen_heap)) == 0 )
              && ( (mfn_to_page(mfns[i])->count_info & PGC_count_mask) <= max_ref ) )
             map[i] = map_domain_page(mfns[i]);
         else
@@ -915,7 +915,7 @@ p2m_pod_zero_check(struct p2m_domain *p2m, unsigned long *gfns, int count)
                 t.mfn = mfn_x(mfns[i]);
                 t.d = d->domain_id;
                 t.order = 0;
-        
+
                 __trace_var(TRC_MEM_POD_ZERO_RECLAIM, 0, sizeof(t), &t);
             }
 
@@ -924,7 +924,7 @@ p2m_pod_zero_check(struct p2m_domain *p2m, unsigned long *gfns, int count)
             p2m->pod.entry_count++;
         }
     }
-    
+
 }
 
 #define POD_SWEEP_LIMIT 1024
@@ -1046,12 +1046,12 @@ p2m_pod_demand_populate(struct p2m_domain *p2m, unsigned long gfn,
     pod_lock(p2m);
 
     /* This check is done with the pod lock held.  This will make sure that
-     * even if d->is_dying changes under our feet, p2m_pod_empty_cache() 
+     * even if d->is_dying changes under our feet, p2m_pod_empty_cache()
      * won't start until we're done. */
     if ( unlikely(d->is_dying) )
         goto out_fail;
 
-    
+
     /* Because PoD does not have cache list for 1GB pages, it has to remap
      * 1GB region to 2MB chunks for a retry. */
     if ( order == PAGE_ORDER_1G )
@@ -1107,7 +1107,7 @@ p2m_pod_demand_populate(struct p2m_domain *p2m, unsigned long gfn,
         set_gpfn_from_mfn(mfn_x(mfn) + i, gfn_aligned + i);
         paging_mark_dirty(d, mfn_add(mfn, i));
     }
-    
+
     p2m->pod.entry_count -= (1 << order);
     BUG_ON(p2m->pod.entry_count < 0);
 
@@ -1124,7 +1124,7 @@ p2m_pod_demand_populate(struct p2m_domain *p2m, unsigned long gfn,
         t.mfn = mfn_x(mfn);
         t.d = d->domain_id;
         t.order = order;
-        
+
         __trace_var(TRC_MEM_POD_POPULATE, 0, sizeof(t), &t);
     }
 
@@ -1161,7 +1161,7 @@ remap_and_retry:
 
         t.gfn = gfn;
         t.d = d->domain_id;
-        
+
         __trace_var(TRC_MEM_POD_SUPERPAGE_SPLINTER, 0, sizeof(t), &t);
     }
 
