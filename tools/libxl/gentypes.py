@@ -432,7 +432,7 @@ def libxl_C_type_parse_json(ty, w, v, indent = "    ", parent = None, discrimina
     s = ""
     if parent is None:
         s += "int rc = 0;\n"
-        s += "const libxl__json_object *x = o;\n"
+        s += "const libxl__json_object *x __attribute__((__unused__)) = o;\n"
 
     if isinstance(ty, idl.Array):
         if parent is None:
@@ -467,11 +467,11 @@ def libxl_C_type_parse_json(ty, w, v, indent = "    ", parent = None, discrimina
             raise Exception("Only KeyedUnion can have discriminator")
         s += "{\n"
         s += "    const char *enum_str;\n"
-        s += "    if (!libxl__json_object_is_string(x)) {\n"
+        s += "    if (!libxl__json_object_is_string(%s)) {\n" % w
         s += "        rc = -1;\n"
         s += "        goto out;\n"
         s += "    }\n"
-        s += "    enum_str = libxl__json_object_get_string(x);\n"
+        s += "    enum_str = libxl__json_object_get_string(%s);\n" % w
         s += "    rc = %s_from_string(enum_str, %s);\n" % (ty.typename, ty.pass_arg(v, parent is None, idl.PASS_BY_REFERENCE))
         s += "    if (rc)\n"
         s += "        goto out;\n"
