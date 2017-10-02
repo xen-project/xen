@@ -1052,7 +1052,8 @@ int mem_sharing_add_to_physmap(struct domain *sd, unsigned long sgfn, shr_handle
         goto err_unlock;
     }
 
-    ret = p2m_set_entry(p2m, cgfn, smfn, PAGE_ORDER_4K, p2m_ram_shared, a);
+    ret = p2m_set_entry(p2m, _gfn(cgfn), smfn, PAGE_ORDER_4K,
+                        p2m_ram_shared, a);
 
     /* Tempted to turn this into an assert */
     if ( ret )

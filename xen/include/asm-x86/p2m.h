@@ -682,7 +682,7 @@ void p2m_free_ptp(struct p2m_domain *p2m, struct page_info *pg);
 
 /* Directly set a p2m entry: only for use by p2m code. Does not need
  * a call to put_gfn afterwards/ */
-int p2m_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
+int p2m_set_entry(struct p2m_domain *p2m, gfn_t gfn, mfn_t mfn,
                   unsigned int page_order, p2m_type_t p2mt, p2m_access_t p2ma);
 
 /* Set up function pointers for PT implementation: only for use by p2m code */

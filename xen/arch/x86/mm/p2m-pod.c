@@ -565,7 +565,7 @@ p2m_pod_decrease_reservation(struct domain *d, gfn_t gfn, unsigned int order)
          * All PoD: Mark the whole region invalid and tell caller
          * we're done.
          */
-        p2m_set_entry(p2m, gfn_x(gfn), INVALID_MFN, order, p2m_invalid,
+        p2m_set_entry(p2m, gfn, INVALID_MFN, order, p2m_invalid,
                       p2m->default_access);
         p2m->pod.entry_count -= 1UL << order;
         BUG_ON(p2m->pod.entry_count < 0);
@@ -609,7 +609,7 @@ p2m_pod_decrease_reservation(struct domain *d, gfn_t gfn, unsigned int order)
         n = 1UL << cur_order;
         if ( t == p2m_populate_on_demand )
         {
-            p2m_set_entry(p2m, gfn_x(gfn) + i, INVALID_MFN, cur_order,
+            p2m_set_entry(p2m, gfn_add(gfn, i), INVALID_MFN, cur_order,
                           p2m_invalid, p2m->default_access);
             p2m->pod.entry_count -= n;
             BUG_ON(p2m->pod.entry_count < 0);
@@ -631,7 +631,7 @@ p2m_pod_decrease_reservation(struct domain *d, gfn_t gfn, unsigned int order)
 
             page = mfn_to_page(mfn);
 
-            p2m_set_entry(p2m, gfn_x(gfn) + i, INVALID_MFN, cur_order,
+            p2m_set_entry(p2m, gfn_add(gfn, i), INVALID_MFN, cur_order,
                           p2m_invalid, p2m->default_access);
             p2m_tlb_flush_sync(p2m);
             for ( j = 0; j < n; ++j )
@@ -680,9 +680,10 @@ void p2m_pod_dump_data(struct domain *d)
  * in the p2m.
  */
 static int
-p2m_pod_zero_check_superpage(struct p2m_domain *p2m, unsigned long gfn)
+p2m_pod_zero_check_superpage(struct p2m_domain *p2m, unsigned long gfn_l)
 {
     mfn_t mfn, mfn0 = INVALID_MFN;
+    gfn_t gfn = _gfn(gfn_l);
     p2m_type_t type, type0 = 0;
     unsigned long * map = NULL;
     int ret=0, reset = 0;
@@ -693,7 +694,7 @@ p2m_pod_zero_check_superpage(struct p2m_domain *p2m, unsigned long gfn)
 
     ASSERT(pod_locked_by_me(p2m));
 
-    if ( !superpage_aligned(gfn) )
+    if ( !superpage_aligned(gfn_l) )
         goto out;
 
     /* Allow an extra refcount for one shadow pt mapping in shadowed domains */
@@ -717,7 +718,7 @@ p2m_pod_zero_check_superpage(struct p2m_domain *p2m, unsigned long gfn)
         unsigned long k;
         const struct page_info *page;
 
-        mfn = p2m->get_entry(p2m, _gfn(gfn +  i), &type, &a, 0,
+        mfn = p2m->get_entry(p2m, gfn_add(gfn, i), &type, &a, 0,
                              &cur_order, NULL);
 
         /*
@@ -815,7 +816,7 @@ p2m_pod_zero_check_superpage(struct p2m_domain *p2m, unsigned long gfn)
             int d:16,order:16;
         } t;
 
-        t.gfn = gfn;
+        t.gfn = gfn_l;
         t.mfn = mfn_x(mfn);
         t.d = d->domain_id;
         t.order = 9;
@@ -898,7 +899,7 @@ p2m_pod_zero_check(struct p2m_domain *p2m, unsigned long *gfns, int count)
         }
 
         /* Try to remove the page, restoring old mapping if it fails. */
-        p2m_set_entry(p2m, gfns[i], INVALID_MFN, PAGE_ORDER_4K,
+        p2m_set_entry(p2m, _gfn(gfns[i]), INVALID_MFN, PAGE_ORDER_4K,
                       p2m_populate_on_demand, p2m->default_access);
 
         /*
@@ -910,7 +911,7 @@ p2m_pod_zero_check(struct p2m_domain *p2m, unsigned long *gfns, int count)
             unmap_domain_page(map[i]);
             map[i] = NULL;
 
-            p2m_set_entry(p2m, gfns[i], mfns[i], PAGE_ORDER_4K,
+            p2m_set_entry(p2m, _gfn(gfns[i]), mfns[i], PAGE_ORDER_4K,
                 types[i], p2m->default_access);
 
             continue;
@@ -937,7 +938,7 @@ p2m_pod_zero_check(struct p2m_domain *p2m, unsigned long *gfns, int count)
          */
         if ( j < (PAGE_SIZE / sizeof(*map[i])) )
         {
-            p2m_set_entry(p2m, gfns[i], mfns[i], PAGE_ORDER_4K,
+            p2m_set_entry(p2m, _gfn(gfns[i]), mfns[i], PAGE_ORDER_4K,
                           types[i], p2m->default_access);
         }
         else
@@ -1080,7 +1081,7 @@ p2m_pod_demand_populate(struct p2m_domain *p2m, unsigned long gfn,
 {
     struct domain *d = p2m->domain;
     struct page_info *p = NULL; /* Compiler warnings */
-    unsigned long gfn_aligned = (gfn >> order) << order;
+    gfn_t gfn_aligned = _gfn((gfn >> order) << order);
     mfn_t mfn;
     unsigned long i;
 
@@ -1152,14 +1153,14 @@ p2m_pod_demand_populate(struct p2m_domain *p2m, unsigned long gfn,
 
     for( i = 0; i < (1UL << order); i++ )
     {
-        set_gpfn_from_mfn(mfn_x(mfn) + i, gfn_aligned + i);
+        set_gpfn_from_mfn(mfn_x(mfn) + i, gfn_x(gfn_aligned) + i);
         paging_mark_dirty(d, mfn_add(mfn, i));
     }
 
     p2m->pod.entry_count -= (1UL << order);
     BUG_ON(p2m->pod.entry_count < 0);
 
-    pod_eager_record(p2m, gfn_aligned, order);
+    pod_eager_record(p2m, gfn_x(gfn_aligned), order);
 
     if ( tb_init_done )
     {
@@ -1199,7 +1200,7 @@ remap_and_retry:
      * need promoting the gfn lock from gfn->2M superpage.
      */
     for ( i = 0; i < (1UL << order); i++ )
-        p2m_set_entry(p2m, gfn_aligned + i, INVALID_MFN, PAGE_ORDER_4K,
+        p2m_set_entry(p2m, gfn_add(gfn_aligned, i), INVALID_MFN, PAGE_ORDER_4K,
                       p2m_populate_on_demand, p2m->default_access);
     if ( tb_init_done )
     {
@@ -1219,10 +1220,11 @@ remap_and_retry:
 
 
 int
-guest_physmap_mark_populate_on_demand(struct domain *d, unsigned long gfn,
+guest_physmap_mark_populate_on_demand(struct domain *d, unsigned long gfn_l,
                                       unsigned int order)
 {
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
+    gfn_t gfn = _gfn(gfn_l);
     unsigned long i, n, pod_count = 0;
     int rc = 0;
 
@@ -1231,7 +1233,7 @@ guest_physmap_mark_populate_on_demand(struct domain *d, unsigned long gfn,
 
     gfn_lock(p2m, gfn, order);
 
-    P2M_DEBUG("mark pod gfn=%#lx\n", gfn);
+    P2M_DEBUG("mark pod gfn=%#lx\n", gfn_l);
 
     /* Make sure all gpfns are unused */
     for ( i = 0; i < (1UL << order); i += n )
@@ -1240,7 +1242,7 @@ guest_physmap_mark_populate_on_demand(struct domain *d, unsigned long gfn,
         p2m_access_t a;
         unsigned int cur_order;
 
-        p2m->get_entry(p2m, _gfn(gfn + i), &ot, &a, 0, &cur_order, NULL);
+        p2m->get_entry(p2m, gfn_add(gfn, i), &ot, &a, 0, &cur_order, NULL);
         n = 1UL << min(order, cur_order);
         if ( p2m_is_ram(ot) )
         {
