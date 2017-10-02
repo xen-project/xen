@@ -266,19 +266,6 @@ static inline int guest_physmap_add_page(struct domain *d,
 
 mfn_t gfn_to_mfn(struct domain *d, gfn_t gfn);
 
-/*
- * Populate-on-demand
- */
-
-/*
- * Call when decreasing memory reservation to handle PoD entries properly.
- * Will return '1' if all entries were handled and nothing more need be done.
- */
-int
-p2m_pod_decrease_reservation(struct domain *d,
-                             xen_pfn_t gpfn,
-                             unsigned int order);
-
 /* Look up a GFN and take a reference count on the backing page. */
 typedef unsigned int p2m_query_t;
 #define P2M_ALLOC    (1u<<0)   /* Populate PoD and paged-out entries */

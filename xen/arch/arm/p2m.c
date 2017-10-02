@@ -393,8 +393,7 @@ int guest_physmap_mark_populate_on_demand(struct domain *d,
     return -ENOSYS;
 }
 
-int p2m_pod_decrease_reservation(struct domain *d,
-                                 xen_pfn_t gpfn,
+int p2m_pod_decrease_reservation(struct domain *d, gfn_t gfn,
                                  unsigned int order)
 {
     return -ENOSYS;

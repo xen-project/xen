@@ -417,7 +417,8 @@ static void decrease_reservation(struct memop_args *a)
 
         /* See if populate-on-demand wants to handle this */
         if ( is_hvm_domain(a->domain)
-             && p2m_pod_decrease_reservation(a->domain, gmfn, a->extent_order) )
+             && p2m_pod_decrease_reservation(a->domain, _gfn(gmfn),
+                                             a->extent_order) )
             continue;
 
         for ( j = 0; j < (1 << a->extent_order); j++ )

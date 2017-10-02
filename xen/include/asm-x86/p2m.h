@@ -643,13 +643,6 @@ int p2m_pod_empty_cache(struct domain *d);
  * domain matches target */
 int p2m_pod_set_mem_target(struct domain *d, unsigned long target);
 
-/* Call when decreasing memory reservation to handle PoD entries properly.
- * Will return '1' if all entries were handled and nothing more need be done.*/
-int
-p2m_pod_decrease_reservation(struct domain *d,
-                             xen_pfn_t gpfn,
-                             unsigned int order);
-
 /* Scan pod cache when offline/broken page triggered */
 int
 p2m_pod_offline_or_broken_hit(struct page_info *p);

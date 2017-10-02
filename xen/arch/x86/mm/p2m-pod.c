@@ -511,9 +511,7 @@ p2m_pod_zero_check_superpage(struct p2m_domain *p2m, unsigned long gfn);
  * allow decrease_reservation() to handle everything else.
  */
 int
-p2m_pod_decrease_reservation(struct domain *d,
-                             xen_pfn_t gpfn,
-                             unsigned int order)
+p2m_pod_decrease_reservation(struct domain *d, gfn_t gfn, unsigned int order)
 {
     int ret = 0;
     unsigned long i, n;
@@ -521,7 +519,7 @@ p2m_pod_decrease_reservation(struct domain *d,
     bool_t steal_for_cache;
     long pod, nonpod, ram;
 
-    gfn_lock(p2m, gpfn, order);
+    gfn_lock(p2m, gfn, order);
     pod_lock(p2m);
 
     /*
@@ -545,7 +543,7 @@ p2m_pod_decrease_reservation(struct domain *d,
         p2m_type_t t;
         unsigned int cur_order;
 
-        p2m->get_entry(p2m, gpfn + i, &t, &a, 0, &cur_order, NULL);
+        p2m->get_entry(p2m, gfn_x(gfn) + i, &t, &a, 0, &cur_order, NULL);
         n = 1UL << min(order, cur_order);
         if ( t == p2m_populate_on_demand )
             pod += n;
@@ -567,7 +565,7 @@ p2m_pod_decrease_reservation(struct domain *d,
          * All PoD: Mark the whole region invalid and tell caller
          * we're done.
          */
-        p2m_set_entry(p2m, gpfn, INVALID_MFN, order, p2m_invalid,
+        p2m_set_entry(p2m, gfn_x(gfn), INVALID_MFN, order, p2m_invalid,
                       p2m->default_access);
         p2m->pod.entry_count -= 1UL << order;
         BUG_ON(p2m->pod.entry_count < 0);
@@ -584,7 +582,7 @@ p2m_pod_decrease_reservation(struct domain *d,
      * - not all of the pages were RAM (now knowing order < SUPERPAGE_ORDER)
      */
     if ( steal_for_cache && order < SUPERPAGE_ORDER && ram == (1UL << order) &&
-         p2m_pod_zero_check_superpage(p2m, gpfn & ~(SUPERPAGE_PAGES - 1)) )
+         p2m_pod_zero_check_superpage(p2m, gfn_x(gfn) & ~(SUPERPAGE_PAGES - 1)) )
     {
         pod = 1UL << order;
         ram = nonpod = 0;
@@ -605,13 +603,13 @@ p2m_pod_decrease_reservation(struct domain *d,
         p2m_access_t a;
         unsigned int cur_order;
 
-        mfn = p2m->get_entry(p2m, gpfn + i, &t, &a, 0, &cur_order, NULL);
+        mfn = p2m->get_entry(p2m, gfn_x(gfn) + i, &t, &a, 0, &cur_order, NULL);
         if ( order < cur_order )
             cur_order = order;
         n = 1UL << cur_order;
         if ( t == p2m_populate_on_demand )
         {
-            p2m_set_entry(p2m, gpfn + i, INVALID_MFN, cur_order,
+            p2m_set_entry(p2m, gfn_x(gfn) + i, INVALID_MFN, cur_order,
                           p2m_invalid, p2m->default_access);
             p2m->pod.entry_count -= n;
             BUG_ON(p2m->pod.entry_count < 0);
@@ -633,7 +631,7 @@ p2m_pod_decrease_reservation(struct domain *d,
 
             page = mfn_to_page(mfn);
 
-            p2m_set_entry(p2m, gpfn + i, INVALID_MFN, cur_order,
+            p2m_set_entry(p2m, gfn_x(gfn) + i, INVALID_MFN, cur_order,
                           p2m_invalid, p2m->default_access);
             p2m_tlb_flush_sync(p2m);
             for ( j = 0; j < n; ++j )
@@ -663,7 +661,7 @@ out_entry_check:
 
 out_unlock:
     pod_unlock(p2m);
-    gfn_unlock(p2m, gpfn, order);
+    gfn_unlock(p2m, gfn, order);
     return ret;
 }
 
