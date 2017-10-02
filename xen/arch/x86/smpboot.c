@@ -696,33 +696,34 @@ static int cpu_smpboot_alloc(unsigned int cpu)
     nodeid_t node = cpu_to_node(cpu);
     struct desc_struct *gdt;
     unsigned long stub_page;
+    int rc = -ENOMEM;
 
     if ( node != NUMA_NO_NODE )
         memflags = MEMF_node(node);
 
     stack_base[cpu] = alloc_xenheap_pages(STACK_ORDER, memflags);
     if ( stack_base[cpu] == NULL )
-        goto oom;
+        goto out;
     memguard_guard_stack(stack_base[cpu]);
 
     order = get_order_from_pages(NR_RESERVED_GDT_PAGES);
     per_cpu(gdt_table, cpu) = gdt = alloc_xenheap_pages(order, memflags);
     if ( gdt == NULL )
-        goto oom;
+        goto out;
     memcpy(gdt, boot_cpu_gdt_table, NR_RESERVED_GDT_PAGES * PAGE_SIZE);
     BUILD_BUG_ON(NR_CPUS > 0x10000);
     gdt[PER_CPU_GDT_ENTRY - FIRST_RESERVED_GDT_ENTRY].a = cpu;
 
     per_cpu(compat_gdt_table, cpu) = gdt = alloc_xenheap_pages(order, memflags);
     if ( gdt == NULL )
-        goto oom;
+        goto out;
     memcpy(gdt, boot_cpu_compat_gdt_table, NR_RESERVED_GDT_PAGES * PAGE_SIZE);
     gdt[PER_CPU_GDT_ENTRY - FIRST_RESERVED_GDT_ENTRY].a = cpu;
 
     order = get_order_from_bytes(IDT_ENTRIES * sizeof(idt_entry_t));
     idt_tables[cpu] = alloc_xenheap_pages(order, memflags);
     if ( idt_tables[cpu] == NULL )
-        goto oom;
+        goto out;
     memcpy(idt_tables[cpu], idt_table, IDT_ENTRIES * sizeof(idt_entry_t));
     set_ist(&idt_tables[cpu][TRAP_double_fault],  IST_NONE);
     set_ist(&idt_tables[cpu][TRAP_nmi],           IST_NONE);
@@ -738,21 +739,25 @@ static int cpu_smpboot_alloc(unsigned int cpu)
     BUG_ON(i == cpu);
     stub_page = alloc_stub_page(cpu, &per_cpu(stubs.mfn, cpu));
     if ( !stub_page )
-        goto oom;
+        goto out;
     per_cpu(stubs.addr, cpu) = stub_page + STUB_BUF_CPU_OFFS(cpu);
 
     if ( secondary_socket_cpumask == NULL &&
          (secondary_socket_cpumask = xzalloc(cpumask_t)) == NULL )
-        goto oom;
+        goto out;
 
-    if ( zalloc_cpumask_var(&per_cpu(cpu_sibling_mask, cpu)) &&
-         zalloc_cpumask_var(&per_cpu(cpu_core_mask, cpu)) &&
-         alloc_cpumask_var(&per_cpu(scratch_cpumask, cpu)) )
-        return 0;
+    if ( !(zalloc_cpumask_var(&per_cpu(cpu_sibling_mask, cpu)) &&
+           zalloc_cpumask_var(&per_cpu(cpu_core_mask, cpu)) &&
+           alloc_cpumask_var(&per_cpu(scratch_cpumask, cpu))) )
+        goto out;
 
- oom:
-    cpu_smpboot_free(cpu);
-    return -ENOMEM;
+    rc = 0;
+
+ out:
+    if ( rc )
+        cpu_smpboot_free(cpu);
+
+    return rc;
 }
 
 static int cpu_smpboot_callback(
