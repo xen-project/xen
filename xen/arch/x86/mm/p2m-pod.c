@@ -498,7 +498,7 @@ p2m_pod_offline_or_broken_replace(struct page_info *p)
 }
 
 static int
-p2m_pod_zero_check_superpage(struct p2m_domain *p2m, unsigned long gfn);
+p2m_pod_zero_check_superpage(struct p2m_domain *p2m, gfn_t gfn);
 
 
 /*
@@ -582,7 +582,7 @@ p2m_pod_decrease_reservation(struct domain *d, gfn_t gfn, unsigned int order)
      * - not all of the pages were RAM (now knowing order < SUPERPAGE_ORDER)
      */
     if ( steal_for_cache && order < SUPERPAGE_ORDER && ram == (1UL << order) &&
-         p2m_pod_zero_check_superpage(p2m, gfn_x(gfn) & ~(SUPERPAGE_PAGES - 1)) )
+         p2m_pod_zero_check_superpage(p2m, _gfn(gfn_x(gfn) & ~(SUPERPAGE_PAGES - 1))) )
     {
         pod = 1UL << order;
         ram = nonpod = 0;
@@ -680,10 +680,9 @@ void p2m_pod_dump_data(struct domain *d)
  * in the p2m.
  */
 static int
-p2m_pod_zero_check_superpage(struct p2m_domain *p2m, unsigned long gfn_l)
+p2m_pod_zero_check_superpage(struct p2m_domain *p2m, gfn_t gfn)
 {
     mfn_t mfn, mfn0 = INVALID_MFN;
-    gfn_t gfn = _gfn(gfn_l);
     p2m_type_t type, type0 = 0;
     unsigned long * map = NULL;
     int ret=0, reset = 0;
@@ -694,7 +693,7 @@ p2m_pod_zero_check_superpage(struct p2m_domain *p2m, unsigned long gfn_l)
 
     ASSERT(pod_locked_by_me(p2m));
 
-    if ( !superpage_aligned(gfn_l) )
+    if ( !superpage_aligned(gfn_x(gfn)) )
         goto out;
 
     /* Allow an extra refcount for one shadow pt mapping in shadowed domains */
@@ -816,7 +815,7 @@ p2m_pod_zero_check_superpage(struct p2m_domain *p2m, unsigned long gfn_l)
             int d:16,order:16;
         } t;
 
-        t.gfn = gfn_l;
+        t.gfn = gfn_x(gfn);
         t.mfn = mfn_x(mfn);
         t.d = d->domain_id;
         t.order = 9;
@@ -843,7 +842,7 @@ out:
 }
 
 static void
-p2m_pod_zero_check(struct p2m_domain *p2m, unsigned long *gfns, int count)
+p2m_pod_zero_check(struct p2m_domain *p2m, const gfn_t *gfns, int count)
 {
     mfn_t mfns[count];
     p2m_type_t types[count];
@@ -863,7 +862,7 @@ p2m_pod_zero_check(struct p2m_domain *p2m, unsigned long *gfns, int count)
         p2m_access_t a;
         struct page_info *pg;
 
-        mfns[i] = p2m->get_entry(p2m, _gfn(gfns[i]), types + i, &a,
+        mfns[i] = p2m->get_entry(p2m, gfns[i], types + i, &a,
                                  0, NULL, NULL);
         pg = mfn_to_page(mfns[i]);
 
@@ -901,7 +900,7 @@ p2m_pod_zero_check(struct p2m_domain *p2m, unsigned long *gfns, int count)
         }
 
         /* Try to remove the page, restoring old mapping if it fails. */
-        p2m_set_entry(p2m, _gfn(gfns[i]), INVALID_MFN, PAGE_ORDER_4K,
+        p2m_set_entry(p2m, gfns[i], INVALID_MFN, PAGE_ORDER_4K,
                       p2m_populate_on_demand, p2m->default_access);
 
         /*
@@ -913,7 +912,7 @@ p2m_pod_zero_check(struct p2m_domain *p2m, unsigned long *gfns, int count)
             unmap_domain_page(map[i]);
             map[i] = NULL;
 
-            p2m_set_entry(p2m, _gfn(gfns[i]), mfns[i], PAGE_ORDER_4K,
+            p2m_set_entry(p2m, gfns[i], mfns[i], PAGE_ORDER_4K,
                 types[i], p2m->default_access);
 
             continue;
@@ -940,7 +939,7 @@ p2m_pod_zero_check(struct p2m_domain *p2m, unsigned long *gfns, int count)
          */
         if ( j < (PAGE_SIZE / sizeof(*map[i])) )
         {
-            p2m_set_entry(p2m, _gfn(gfns[i]), mfns[i], PAGE_ORDER_4K,
+            p2m_set_entry(p2m, gfns[i], mfns[i], PAGE_ORDER_4K,
                           types[i], p2m->default_access);
         }
         else
@@ -952,7 +951,7 @@ p2m_pod_zero_check(struct p2m_domain *p2m, unsigned long *gfns, int count)
                     int d:16,order:16;
                 } t;
 
-                t.gfn = gfns[i];
+                t.gfn = gfn_x(gfns[i]);
                 t.mfn = mfn_x(mfns[i]);
                 t.d = d->domain_id;
                 t.order = 0;
@@ -973,7 +972,7 @@ p2m_pod_zero_check(struct p2m_domain *p2m, unsigned long *gfns, int count)
 static void
 p2m_pod_emergency_sweep(struct p2m_domain *p2m)
 {
-    unsigned long gfns[POD_SWEEP_STRIDE];
+    gfn_t gfns[POD_SWEEP_STRIDE];
     unsigned long i, j = 0, start, limit;
     p2m_type_t t;
 
@@ -997,7 +996,7 @@ p2m_pod_emergency_sweep(struct p2m_domain *p2m)
         (void)p2m->get_entry(p2m, _gfn(i), &t, &a, 0, NULL, NULL);
         if ( p2m_is_ram(t) )
         {
-            gfns[j] = i;
+            gfns[j] = _gfn(i);
             j++;
             BUG_ON(j > POD_SWEEP_STRIDE);
             if ( j == POD_SWEEP_STRIDE )
@@ -1039,19 +1038,19 @@ static void pod_eager_reclaim(struct p2m_domain *p2m)
     do
     {
         unsigned int idx = (mrp->idx + i++) % ARRAY_SIZE(mrp->list);
-        unsigned long gfn = mrp->list[idx];
+        gfn_t gfn = _gfn(mrp->list[idx]);
 
-        if ( gfn != gfn_x(INVALID_GFN) )
+        if ( !gfn_eq(gfn, INVALID_GFN) )
         {
-            if ( gfn & POD_LAST_SUPERPAGE )
+            if ( gfn_x(gfn) & POD_LAST_SUPERPAGE )
             {
-                gfn &= ~POD_LAST_SUPERPAGE;
+                gfn = _gfn(gfn_x(gfn) & ~POD_LAST_SUPERPAGE);
 
                 if ( p2m_pod_zero_check_superpage(p2m, gfn) == 0 )
                 {
                     unsigned int x;
 
-                    for ( x = 0; x < SUPERPAGE_PAGES; ++x, ++gfn )
+                    for ( x = 0; x < SUPERPAGE_PAGES; ++x, gfn = gfn_add(gfn, 1) )
                         p2m_pod_zero_check(p2m, &gfn, 1);
                 }
             }
