@@ -1079,7 +1079,7 @@ p2m_pod_demand_populate(struct p2m_domain *p2m, unsigned long gfn,
 {
     struct domain *d = p2m->domain;
     struct page_info *p = NULL; /* Compiler warnings */
-    unsigned long gfn_aligned;
+    unsigned long gfn_aligned = (gfn >> order) << order;
     mfn_t mfn;
     unsigned long i;
 
@@ -1102,7 +1102,6 @@ p2m_pod_demand_populate(struct p2m_domain *p2m, unsigned long gfn,
     if ( order == PAGE_ORDER_1G )
     {
         pod_unlock(p2m);
-        gfn_aligned = (gfn >> order) << order;
         /*
          * Note that we are supposed to call p2m_set_entry() 512 times to
          * split 1GB into 512 2MB pages here. But We only do once here because
@@ -1146,8 +1145,6 @@ p2m_pod_demand_populate(struct p2m_domain *p2m, unsigned long gfn,
     mfn = page_to_mfn(p);
 
     BUG_ON((mfn_x(mfn) & ((1UL << order) - 1)) != 0);
-
-    gfn_aligned = (gfn >> order) << order;
 
     p2m_set_entry(p2m, gfn_aligned, mfn, order, p2m_ram_rw,
                   p2m->default_access);
@@ -1200,7 +1197,6 @@ remap_and_retry:
      * NOTE: In a p2m fine-grained lock scenario this might
      * need promoting the gfn lock from gfn->2M superpage.
      */
-    gfn_aligned = (gfn >> order) << order;
     for ( i = 0; i < (1UL << order); i++ )
         p2m_set_entry(p2m, gfn_aligned + i, INVALID_MFN, PAGE_ORDER_4K,
                       p2m_populate_on_demand, p2m->default_access);
