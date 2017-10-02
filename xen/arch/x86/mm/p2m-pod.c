@@ -101,7 +101,7 @@ p2m_pod_cache_add(struct p2m_domain *p2m,
      * promise to provide zero pages. So we scrub pages before using.
      */
     for ( i = 0; i < (1UL << order); i++ )
-        clear_domain_page(_mfn(mfn_x(page_to_mfn(page)) + i));
+        clear_domain_page(mfn_add(page_to_mfn(page), i));
 
     /* First, take all pages off the domain list */
     lock_page_alloc(p2m);
@@ -743,7 +743,7 @@ p2m_pod_zero_check_superpage(struct p2m_domain *p2m, unsigned long gfn)
             mfn0 = mfn;
             type0 = type;
         }
-        else if ( type != type0 || mfn_x(mfn) != (mfn_x(mfn0) + i) )
+        else if ( type != type0 || !mfn_eq(mfn, mfn_add(mfn0, i)) )
             goto out;
 
         n = 1UL << min(cur_order, SUPERPAGE_ORDER + 0U);
@@ -758,7 +758,7 @@ p2m_pod_zero_check_superpage(struct p2m_domain *p2m, unsigned long gfn)
     for ( i = 0; i < SUPERPAGE_PAGES; i++ )
     {
         /* Quick zero-check */
-        map = map_domain_page(_mfn(mfn_x(mfn0) + i));
+        map = map_domain_page(mfn_add(mfn0, i));
 
         for ( j = 0; j < 16; j++ )
             if ( *(map + j) != 0 )
@@ -783,7 +783,7 @@ p2m_pod_zero_check_superpage(struct p2m_domain *p2m, unsigned long gfn)
      */
     for ( i = 0; i < SUPERPAGE_PAGES; i++ )
     {
-        mfn = _mfn(mfn_x(mfn0) + i);
+        mfn = mfn_add(mfn0, i);
         if ( (mfn_to_page(mfn)->count_info & PGC_count_mask) > 1 )
         {
             reset = 1;
@@ -794,7 +794,7 @@ p2m_pod_zero_check_superpage(struct p2m_domain *p2m, unsigned long gfn)
     /* Finally, do a full zero-check */
     for ( i = 0; i < SUPERPAGE_PAGES; i++ )
     {
-        map = map_domain_page(_mfn(mfn_x(mfn0) + i));
+        map = map_domain_page(mfn_add(mfn0, i));
 
         for ( j = 0; j < (PAGE_SIZE / sizeof(*map)); j++ )
             if ( *(map+j) != 0 )
