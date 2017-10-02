@@ -861,17 +861,19 @@ p2m_pod_zero_check(struct p2m_domain *p2m, unsigned long *gfns, int count)
     for ( i = 0; i < count; i++ )
     {
         p2m_access_t a;
+        struct page_info *pg;
 
         mfns[i] = p2m->get_entry(p2m, _gfn(gfns[i]), types + i, &a,
                                  0, NULL, NULL);
+        pg = mfn_to_page(mfns[i]);
+
         /*
          * If this is ram, and not a pagetable or from the xen heap, and
          * probably not mapped elsewhere, map it; otherwise, skip.
          */
-        if ( p2m_is_ram(types[i])
-             && ( (mfn_to_page(mfns[i])->count_info & PGC_allocated) != 0 )
-             && ( (mfn_to_page(mfns[i])->count_info & (PGC_page_table|PGC_xen_heap)) == 0 )
-             && ( (mfn_to_page(mfns[i])->count_info & PGC_count_mask) <= max_ref ) )
+        if ( p2m_is_ram(types[i]) && (pg->count_info & PGC_allocated) &&
+             !(pg->count_info & (PGC_page_table | PGC_xen_heap)) &&
+             ((pg->count_info & PGC_count_mask) <= max_ref) )
             map[i] = map_domain_page(mfns[i]);
         else
             map[i] = NULL;
