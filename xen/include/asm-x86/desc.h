@@ -197,6 +197,26 @@ DECLARE_PER_CPU(struct desc_struct *, compat_gdt_table);
 
 extern void load_TR(void);
 
+static inline void lgdt(const struct desc_ptr *gdtr)
+{
+    __asm__ __volatile__ ( "lgdt %0" :: "m" (*gdtr) : "memory" );
+}
+
+static inline void lidt(const struct desc_ptr *idtr)
+{
+    __asm__ __volatile__ ( "lidt %0" :: "m" (*idtr) : "memory" );
+}
+
+static inline void lldt(unsigned int sel)
+{
+    __asm__ __volatile__ ( "lldt %w0" :: "rm" (sel) : "memory" );
+}
+
+static inline void ltr(unsigned int sel)
+{
+    __asm__ __volatile__ ( "ltr %w0" :: "rm" (sel) : "memory" );
+}
+
 #endif /* !__ASSEMBLY__ */
 
 #endif /* __ARCH_DESC_H */

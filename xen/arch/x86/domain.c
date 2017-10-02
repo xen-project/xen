@@ -1644,7 +1644,8 @@ static void __context_switch(void)
     {
         gdt_desc.limit = LAST_RESERVED_GDT_BYTE;
         gdt_desc.base  = (unsigned long)(gdt - FIRST_RESERVED_GDT_ENTRY);
-        asm volatile ( "lgdt %0" : : "m" (gdt_desc) );
+
+        lgdt(&gdt_desc);
     }
 
     write_ptbase(n);
@@ -1654,7 +1655,8 @@ static void __context_switch(void)
     {
         gdt_desc.limit = LAST_RESERVED_GDT_BYTE;
         gdt_desc.base = GDT_VIRT_START(n);
-        asm volatile ( "lgdt %0" : : "m" (gdt_desc) );
+
+        lgdt(&gdt_desc);
     }
 
     if ( pd != nd )

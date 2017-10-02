@@ -698,10 +698,10 @@ void load_system_tables(void)
 		offsetof(struct tss_struct, __cacheline_filler) - 1,
 		SYS_DESC_tss_busy);
 
-	asm volatile ("lgdt %0"  : : "m"  (gdtr) );
-	asm volatile ("lidt %0"  : : "m"  (idtr) );
-	asm volatile ("ltr  %w0" : : "rm" (TSS_ENTRY << 3) );
-	asm volatile ("lldt %w0" : : "rm" (0) );
+	lgdt(&gdtr);
+	lidt(&idtr);
+	ltr(TSS_ENTRY << 3);
+	lldt(0);
 
 	set_ist(&idt_tables[cpu][TRAP_double_fault],  IST_DF);
 	set_ist(&idt_tables[cpu][TRAP_nmi],	      IST_NMI);

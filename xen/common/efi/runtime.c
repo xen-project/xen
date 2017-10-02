@@ -108,7 +108,7 @@ struct efi_rs_state efi_rs_enter(void)
                                      FIRST_RESERVED_GDT_ENTRY)
         };
 
-        asm volatile ( "lgdt %0" : : "m" (gdt_desc) );
+        lgdt(&gdt_desc);
     }
 
     write_cr3(virt_to_maddr(efi_l4_pgtable));
@@ -128,7 +128,7 @@ void efi_rs_leave(struct efi_rs_state *state)
             .base  = GDT_VIRT_START(current)
         };
 
-        asm volatile ( "lgdt %0" : : "m" (gdt_desc) );
+        lgdt(&gdt_desc);
     }
     irq_exit();
     efi_rs_on_cpu = NR_CPUS;
