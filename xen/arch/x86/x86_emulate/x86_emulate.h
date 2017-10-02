@@ -133,6 +133,23 @@ struct x86_emul_fpu_aux {
   * Undefined behavior when used anywhere else.
   */
 #define X86EMUL_DONE           4
+ /*
+  * Current instruction is not implemented by the emulator.
+  * This value should only be returned by the core emulator when a valid
+  * opcode is found but the execution logic for that instruction is missing.
+  * It should NOT be returned by any of the x86_emulate_ops callbacks.
+  */
+#define X86EMUL_UNIMPLEMENTED  5
+ /*
+  * The current instruction's opcode is not valid.
+  * If this error code is returned by a function, an #UD trap should be
+  * raised by the final consumer of it.
+  *
+  * TODO: For the moment X86EMUL_UNRECOGNIZED and X86EMUL_UNIMPLEMENTED
+  * can be used interchangeably therefore raising an #UD trap is not
+  * strictly expected for now.
+ */
+#define X86EMUL_UNRECOGNIZED   X86EMUL_UNIMPLEMENTED
 
 /* FPU sub-types which may be requested via ->get_fpu(). */
 enum x86_emulate_fpu_type {

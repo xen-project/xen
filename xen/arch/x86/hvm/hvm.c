@@ -3735,6 +3735,7 @@ void hvm_ud_intercept(struct cpu_user_regs *regs)
     switch ( hvm_emulate_one(&ctxt) )
     {
     case X86EMUL_UNHANDLEABLE:
+    case X86EMUL_UNIMPLEMENTED:
         hvm_inject_hw_exception(TRAP_invalid_op, X86_EVENT_NO_EC);
         break;
     case X86EMUL_EXCEPTION:

@@ -112,6 +112,15 @@ void vmx_realmode_emulate_one(struct hvm_emulate_ctxt *hvmemul_ctxt)
         goto fail;
     }
 
+    if ( rc == X86EMUL_UNRECOGNIZED )
+    {
+        gdprintk(XENLOG_ERR, "Unrecognized insn.\n");
+        if ( curr->arch.hvm_vcpu.guest_cr[0] & X86_CR0_PE )
+            goto fail;
+
+        realmode_deliver_exception(TRAP_invalid_op, 0, hvmemul_ctxt);
+    }
+
     if ( rc == X86EMUL_EXCEPTION )
     {
         if ( unlikely(curr->domain->debugger_attached) &&

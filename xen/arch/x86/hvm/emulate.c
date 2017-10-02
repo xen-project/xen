@@ -284,9 +284,14 @@ static int hvmemul_do_io(
         }
         break;
     }
+    case X86EMUL_UNIMPLEMENTED:
+        ASSERT_UNREACHABLE();
+        /* Fall-through */
     default:
         BUG();
     }
+
+    ASSERT(rc != X86EMUL_UNIMPLEMENTED);
 
     if ( rc != X86EMUL_OKAY )
         return rc;
@@ -313,6 +318,9 @@ static int hvmemul_do_io_buffer(
 
     rc = hvmemul_do_io(is_mmio, addr, reps, size, dir, df, 0,
                        (uintptr_t)buffer);
+
+    ASSERT(rc != X86EMUL_UNIMPLEMENTED);
+
     if ( rc == X86EMUL_UNHANDLEABLE && dir == IOREQ_READ )
         memset(buffer, 0xff, size);
 
@@ -404,6 +412,8 @@ static int hvmemul_do_io_addr(
 
     rc = hvmemul_do_io(is_mmio, addr, &count, size, dir, df, 1,
                        ram_gpa);
+
+    ASSERT(rc != X86EMUL_UNIMPLEMENTED);
 
     if ( rc == X86EMUL_OKAY )
         v->arch.hvm_vcpu.hvm_io.mmio_retry = (count < *reps);
@@ -2045,6 +2055,7 @@ int hvm_emulate_one_mmio(unsigned long mfn, unsigned long gla)
     switch ( rc )
     {
     case X86EMUL_UNHANDLEABLE:
+    case X86EMUL_UNIMPLEMENTED:
         hvm_dump_emulation_state(XENLOG_G_WARNING, "MMCFG", &ctxt);
         break;
     case X86EMUL_EXCEPTION:
@@ -2102,6 +2113,7 @@ void hvm_emulate_one_vm_event(enum emul_kind kind, unsigned int trapnr,
          * consistent with X86EMUL_RETRY.
          */
         return;
+    case X86EMUL_UNIMPLEMENTED:
     case X86EMUL_UNHANDLEABLE:
         hvm_dump_emulation_state(XENLOG_G_DEBUG, "Mem event", &ctx);
         hvm_inject_hw_exception(trapnr, errcode);

@@ -848,7 +848,8 @@ do{ asm volatile (                                                      \
                 stub.func);                                             \
         generate_exception_if(res_.fields.trapnr == EXC_UD, EXC_UD);    \
         domain_crash(current->domain);                                  \
-        goto cannot_emulate;                                            \
+        rc = X86EMUL_UNHANDLEABLE;                                      \
+        goto done;                                                      \
     }                                                                   \
 } while (0)
 #else
@@ -2585,7 +2586,7 @@ x86_decode(
                         d = twobyte_table[0x3a].desc;
                         break;
                     default:
-                        rc = X86EMUL_UNHANDLEABLE;
+                        rc = X86EMUL_UNRECOGNIZED;
                         goto done;
                     }
                 }
@@ -2599,7 +2600,7 @@ x86_decode(
                 }
                 else
                 {
-                    rc = X86EMUL_UNHANDLEABLE;
+                    rc = X86EMUL_UNRECOGNIZED;
                     goto done;
                 }
 
@@ -2879,7 +2880,7 @@ x86_decode(
 
     default:
         ASSERT_UNREACHABLE();
-        return X86EMUL_UNHANDLEABLE;
+        return X86EMUL_UNIMPLEMENTED;
     }
 
     if ( ea.type == OP_MEM )
@@ -4193,7 +4194,7 @@ x86_emulate(
                 break;
             case 4: /* fldenv - TODO */
                 state->fpu_ctrl = true;
-                goto cannot_emulate;
+                goto unimplemented_insn;
             case 5: /* fldcw m2byte */
                 state->fpu_ctrl = true;
                 if ( (rc = ops->read(ea.mem.seg, ea.mem.off, &src.val,
@@ -4204,7 +4205,7 @@ x86_emulate(
                 break;
             case 6: /* fnstenv - TODO */
                 state->fpu_ctrl = true;
-                goto cannot_emulate;
+                goto unimplemented_insn;
             case 7: /* fnstcw m2byte */
                 state->fpu_ctrl = true;
                 emulate_fpu_insn_memdst("fnstcw", dst.val);
@@ -4440,7 +4441,7 @@ x86_emulate(
             case 4: /* frstor - TODO */
             case 6: /* fnsave - TODO */
                 state->fpu_ctrl = true;
-                goto cannot_emulate;
+                goto unimplemented_insn;
             case 7: /* fnstsw m2byte */
                 state->fpu_ctrl = true;
                 emulate_fpu_insn_memdst("fnstsw", dst.val);
@@ -5199,7 +5200,7 @@ x86_emulate(
 #undef _GRP7
 
         default:
-            goto cannot_emulate;
+            goto unimplemented_insn;
         }
         break;
     }
@@ -6197,7 +6198,7 @@ x86_emulate(
                 /* vpsll{w,d} $imm8,{x,y}mm,{x,y}mm */
             break;
         default:
-            goto cannot_emulate;
+            goto unrecognized_insn;
         }
     simd_0f_shift_imm:
         generate_exception_if(ea.type != OP_REG, EXC_UD);
@@ -6245,7 +6246,7 @@ x86_emulate(
         case 6: /* psllq $imm8,mm */
             goto simd_0f_shift_imm;
         }
-        goto cannot_emulate;
+        goto unrecognized_insn;
 
     case X86EMUL_OPC_66(0x0f, 0x73):
     case X86EMUL_OPC_VEX_66(0x0f, 0x73):
@@ -6261,7 +6262,7 @@ x86_emulate(
                 /* vpslldq $imm8,{x,y}mm,{x,y}mm */
             goto simd_0f_shift_imm;
         }
-        goto cannot_emulate;
+        goto unrecognized_insn;
 
     case X86EMUL_OPC(0x0f, 0x77):        /* emms */
     case X86EMUL_OPC_VEX(0x0f, 0x77):    /* vzero{all,upper} */
@@ -6325,7 +6326,7 @@ x86_emulate(
         case 0: /* extrq $imm8,$imm8,xmm */
             break;
         default:
-            goto cannot_emulate;
+            goto unrecognized_insn;
         }
         /* fall through */
     case X86EMUL_OPC_F2(0x0f, 0x78):     /* insertq $imm8,$imm8,xmm,xmm */
@@ -6520,7 +6521,7 @@ x86_emulate(
                 goto done;
             break;
         default:
-            goto cannot_emulate;
+            goto unimplemented_insn;
         }
         break;
 
@@ -6536,7 +6537,7 @@ x86_emulate(
             vcpu_must_have(avx);
             goto stmxcsr;
         }
-        goto cannot_emulate;
+        goto unrecognized_insn;
 
     case X86EMUL_OPC_F3(0x0f, 0xae): /* Grp15 */
         fail_if(modrm_mod != 3);
@@ -6779,10 +6780,10 @@ x86_emulate(
             switch ( modrm_reg & 7 )
             {
             default:
-                goto cannot_emulate;
+                goto unrecognized_insn;
 
-#ifdef HAVE_GAS_RDRAND
             case 6: /* rdrand */
+#ifdef HAVE_GAS_RDRAND
                 generate_exception_if(rep_prefix(), EXC_UD);
                 host_and_vcpu_must_have(rdrand);
                 dst = ea;
@@ -6807,6 +6808,8 @@ x86_emulate(
                 if ( carry )
                     _regs.eflags |= X86_EFLAGS_CF;
                 break;
+#else
+                goto unimplemented_insn;
 #endif
 
             case 7: /* rdseed / rdpid */
@@ -7361,7 +7364,7 @@ x86_emulate(
             host_and_vcpu_must_have(bmi1);
             break;
         default:
-            goto cannot_emulate;
+            goto unrecognized_insn;
         }
 
         generate_exception_if(vex.l, EXC_UD);
@@ -7672,7 +7675,7 @@ x86_emulate(
             host_and_vcpu_must_have(tbm);
             break;
         default:
-            goto cannot_emulate;
+            goto unrecognized_insn;
         }
 
     xop_09_rm_rv:
@@ -7706,7 +7709,7 @@ x86_emulate(
             host_and_vcpu_must_have(tbm);
             goto xop_09_rm_rv;
         }
-        goto cannot_emulate;
+        goto unrecognized_insn;
 
     case X86EMUL_OPC_XOP(0a, 0x10): /* bextr imm,r/m,r */
     {
@@ -7738,8 +7741,11 @@ x86_emulate(
     }
 
     default:
-    cannot_emulate:
-        rc = X86EMUL_UNHANDLEABLE;
+    unimplemented_insn:
+        rc = X86EMUL_UNIMPLEMENTED;
+        goto done;
+    unrecognized_insn:
+        rc = X86EMUL_UNRECOGNIZED;
         goto done;
     }
 
@@ -7791,7 +7797,8 @@ x86_emulate(
                 if ( (d & DstMask) != DstMem )
                 {
                     ASSERT_UNREACHABLE();
-                    goto cannot_emulate;
+                    rc = X86EMUL_UNHANDLEABLE;
+                    goto done;
                 }
                 break;
             }

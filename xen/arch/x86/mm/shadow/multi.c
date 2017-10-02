@@ -3488,7 +3488,7 @@ static int sh_page_fault(struct vcpu *v,
      * would be a good unshadow hint. If we *do* decide to unshadow-on-fault
      * then it must be 'failable': we cannot require the unshadow to succeed.
      */
-    if ( r == X86EMUL_UNHANDLEABLE )
+    if ( r == X86EMUL_UNHANDLEABLE || r == X86EMUL_UNIMPLEMENTED )
     {
         perfc_incr(shadow_fault_emulate_failed);
 #if SHADOW_OPTIMIZATIONS & SHOPT_FAST_EMULATION
