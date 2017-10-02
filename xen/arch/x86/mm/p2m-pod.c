@@ -19,18 +19,13 @@
  * along with this program; If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <xen/iommu.h>
-#include <xen/vm_event.h>
 #include <xen/event.h>
-#include <public/vm_event.h>
-#include <asm/domain.h>
+#include <xen/mm.h>
+#include <xen/sched.h>
+#include <xen/trace.h>
 #include <asm/page.h>
 #include <asm/paging.h>
 #include <asm/p2m.h>
-#include <asm/hvm/vmx/vmx.h> /* ept_p2m_init() */
-#include <asm/mem_sharing.h>
-#include <asm/hvm/nestedhvm.h>
-#include <asm/hvm/svm/amd-iommu-proto.h>
 
 #include "mm-locks.h"
 
