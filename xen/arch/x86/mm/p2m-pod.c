@@ -60,7 +60,7 @@ p2m_pod_cache_add(struct p2m_domain *p2m,
                   struct page_info *page,
                   unsigned int order)
 {
-    int i;
+    unsigned long i;
     struct page_info *p;
     struct domain *d = p2m->domain;
 
@@ -70,23 +70,24 @@ p2m_pod_cache_add(struct p2m_domain *p2m,
     mfn = page_to_mfn(page);
 
     /* Check to make sure this is a contiguous region */
-    if( mfn_x(mfn) & ((1 << order) - 1) )
+    if ( mfn_x(mfn) & ((1UL << order) - 1) )
     {
         printk("%s: mfn %lx not aligned order %u! (mask %lx)\n",
                __func__, mfn_x(mfn), order, ((1UL << order) - 1));
         return -1;
     }
 
-    for(i=0; i < 1 << order ; i++) {
+    for ( i = 0; i < 1UL << order ; i++)
+    {
         struct domain * od;
 
         p = mfn_to_page(_mfn(mfn_x(mfn) + i));
         od = page_get_owner(p);
-        if(od != d)
+        if ( od != d )
         {
             printk("%s: mfn %lx expected owner d%d, got owner d%d!\n",
                    __func__, mfn_x(mfn), d->domain_id,
-                   od?od->domain_id:-1);
+                   od ? od->domain_id : -1);
             return -1;
         }
     }
@@ -99,12 +100,12 @@ p2m_pod_cache_add(struct p2m_domain *p2m,
      * guaranteed to be zero; but by reclaiming zero pages, we implicitly
      * promise to provide zero pages. So we scrub pages before using.
      */
-    for ( i = 0; i < (1 << order); i++ )
+    for ( i = 0; i < (1UL << order); i++ )
         clear_domain_page(_mfn(mfn_x(page_to_mfn(page)) + i));
 
     /* First, take all pages off the domain list */
     lock_page_alloc(p2m);
-    for(i=0; i < 1 << order ; i++)
+    for ( i = 0; i < 1UL << order ; i++ )
     {
         p = page + i;
         page_list_del(p, &d->page_list);
@@ -128,7 +129,7 @@ p2m_pod_cache_add(struct p2m_domain *p2m,
     default:
         BUG();
     }
-    p2m->pod.count += 1L << order;
+    p2m->pod.count += 1UL << order;
 
     return 0;
 }
@@ -140,7 +141,7 @@ static struct page_info * p2m_pod_cache_get(struct p2m_domain *p2m,
                                             unsigned int order)
 {
     struct page_info *p = NULL;
-    int i;
+    unsigned long i;
 
     ASSERT(pod_locked_by_me(p2m));
 
@@ -162,7 +163,7 @@ static struct page_info * p2m_pod_cache_get(struct p2m_domain *p2m,
         p = page_list_remove_head(&p2m->pod.super);
         mfn = mfn_x(page_to_mfn(p));
 
-        for ( i=0; i<SUPERPAGE_PAGES; i++ )
+        for ( i = 0; i < SUPERPAGE_PAGES; i++ )
         {
             q = mfn_to_page(_mfn(mfn+i));
             page_list_add_tail(q, &p2m->pod.single);
@@ -174,12 +175,12 @@ static struct page_info * p2m_pod_cache_get(struct p2m_domain *p2m,
     case PAGE_ORDER_2M:
         BUG_ON( page_list_empty(&p2m->pod.super) );
         p = page_list_remove_head(&p2m->pod.super);
-        p2m->pod.count -= 1 << order;
+        p2m->pod.count -= 1UL << order;
         break;
     case PAGE_ORDER_4K:
         BUG_ON( page_list_empty(&p2m->pod.single) );
         p = page_list_remove_head(&p2m->pod.single);
-        p2m->pod.count -= 1;
+        p2m->pod.count -= 1UL;
         break;
     default:
         BUG();
@@ -187,7 +188,7 @@ static struct page_info * p2m_pod_cache_get(struct p2m_domain *p2m,
 
     /* Put the pages back on the domain page_list */
     lock_page_alloc(p2m);
-    for ( i = 0 ; i < (1 << order); i++ )
+    for ( i = 0 ; i < (1UL << order); i++ )
     {
         BUG_ON(page_get_owner(p + i) != p2m->domain);
         page_list_add_tail(p + i, &p2m->domain->page_list);
@@ -251,7 +252,8 @@ p2m_pod_set_cache_target(struct p2m_domain *p2m, unsigned long pod_target, int p
     while ( pod_target < p2m->pod.count )
     {
         struct page_info * page;
-        int order, i;
+        unsigned int order;
+        unsigned long i;
 
         if ( (p2m->pod.count - pod_target) > SUPERPAGE_PAGES
              && !page_list_empty(&p2m->pod.super) )
@@ -264,10 +266,10 @@ p2m_pod_set_cache_target(struct p2m_domain *p2m, unsigned long pod_target, int p
         ASSERT(page != NULL);
 
         /* Then free them */
-        for ( i = 0 ; i < (1 << order) ; i++ )
+        for ( i = 0 ; i < (1UL << order) ; i++ )
         {
             /* Copied from common/memory.c:guest_remove_page() */
-            if ( unlikely(!get_page(page+i, d)) )
+            if ( unlikely(!get_page(page + i, d)) )
             {
                 gdprintk(XENLOG_INFO, "Bad page free for domain %u\n", d->domain_id);
                 ret = -EINVAL;
@@ -275,12 +277,12 @@ p2m_pod_set_cache_target(struct p2m_domain *p2m, unsigned long pod_target, int p
             }
 
             if ( test_and_clear_bit(_PGT_pinned, &(page+i)->u.inuse.type_info) )
-                put_page_and_type(page+i);
+                put_page_and_type(page + i);
 
             if ( test_and_clear_bit(_PGC_allocated, &(page+i)->count_info) )
-                put_page(page+i);
+                put_page(page + i);
 
-            put_page(page+i);
+            put_page(page + i);
 
             if ( preemptible && pod_target != p2m->pod.count &&
                  hypercall_preempt_check() )
@@ -513,7 +515,7 @@ p2m_pod_decrease_reservation(struct domain *d,
                              xen_pfn_t gpfn,
                              unsigned int order)
 {
-    int ret=0;
+    int ret = 0;
     unsigned long i, n;
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
     bool_t steal_for_cache;
@@ -556,7 +558,7 @@ p2m_pod_decrease_reservation(struct domain *d,
     }
 
     /* No populate-on-demand?  Don't need to steal anything?  Then we're done!*/
-    if(!pod && !steal_for_cache)
+    if ( !pod && !steal_for_cache )
         goto out_unlock;
 
     if ( !nonpod )
@@ -567,7 +569,7 @@ p2m_pod_decrease_reservation(struct domain *d,
          */
         p2m_set_entry(p2m, gpfn, INVALID_MFN, order, p2m_invalid,
                       p2m->default_access);
-        p2m->pod.entry_count-=(1<<order);
+        p2m->pod.entry_count -= 1UL << order;
         BUG_ON(p2m->pod.entry_count < 0);
         ret = 1;
         goto out_entry_check;
@@ -581,10 +583,10 @@ p2m_pod_decrease_reservation(struct domain *d,
      * - order >= SUPERPAGE_ORDER (the loop below will take care of this)
      * - not all of the pages were RAM (now knowing order < SUPERPAGE_ORDER)
      */
-    if ( steal_for_cache && order < SUPERPAGE_ORDER && ram == (1 << order) &&
+    if ( steal_for_cache && order < SUPERPAGE_ORDER && ram == (1UL << order) &&
          p2m_pod_zero_check_superpage(p2m, gpfn & ~(SUPERPAGE_PAGES - 1)) )
     {
-        pod = 1 << order;
+        pod = 1UL << order;
         ram = nonpod = 0;
         ASSERT(steal_for_cache == (p2m->pod.entry_count > p2m->pod.count));
     }
@@ -625,7 +627,7 @@ p2m_pod_decrease_reservation(struct domain *d,
              * avoid breaking up superpages.
              */
             struct page_info *page;
-            unsigned int j;
+            unsigned long j;
 
             ASSERT(mfn_valid(mfn));
 
@@ -753,13 +755,13 @@ p2m_pod_zero_check_superpage(struct p2m_domain *p2m, unsigned long gfn)
     }
 
     /* Now, do a quick check to see if it may be zero before unmapping. */
-    for ( i=0; i<SUPERPAGE_PAGES; i++ )
+    for ( i = 0; i < SUPERPAGE_PAGES; i++ )
     {
         /* Quick zero-check */
         map = map_domain_page(_mfn(mfn_x(mfn0) + i));
 
-        for ( j=0; j<16; j++ )
-            if( *(map+j) != 0 )
+        for ( j = 0; j < 16; j++ )
+            if ( *(map + j) != 0 )
                 break;
 
         unmap_domain_page(map);
@@ -779,7 +781,7 @@ p2m_pod_zero_check_superpage(struct p2m_domain *p2m, unsigned long gfn)
      * via the grant table interface, or by qemu.  Allow one refcount for
      * being allocated to the domain.
      */
-    for ( i=0; i < SUPERPAGE_PAGES; i++ )
+    for ( i = 0; i < SUPERPAGE_PAGES; i++ )
     {
         mfn = _mfn(mfn_x(mfn0) + i);
         if ( (mfn_to_page(mfn)->count_info & PGC_count_mask) > 1 )
@@ -790,12 +792,12 @@ p2m_pod_zero_check_superpage(struct p2m_domain *p2m, unsigned long gfn)
     }
 
     /* Finally, do a full zero-check */
-    for ( i=0; i < SUPERPAGE_PAGES; i++ )
+    for ( i = 0; i < SUPERPAGE_PAGES; i++ )
     {
         map = map_domain_page(_mfn(mfn_x(mfn0) + i));
 
-        for ( j=0; j<PAGE_SIZE/sizeof(*map); j++ )
-            if( *(map+j) != 0 )
+        for ( j = 0; j < (PAGE_SIZE / sizeof(*map)); j++ )
+            if ( *(map+j) != 0 )
             {
                 reset = 1;
                 break;
@@ -845,7 +847,7 @@ p2m_pod_zero_check(struct p2m_domain *p2m, unsigned long *gfns, int count)
 {
     mfn_t mfns[count];
     p2m_type_t types[count];
-    unsigned long * map[count];
+    unsigned long *map[count];
     struct domain *d = p2m->domain;
 
     int i, j;
@@ -856,7 +858,7 @@ p2m_pod_zero_check(struct p2m_domain *p2m, unsigned long *gfns, int count)
         max_ref++;
 
     /* First, get the gfn list, translate to mfns, and map the pages. */
-    for ( i=0; i<count; i++ )
+    for ( i = 0; i < count; i++ )
     {
         p2m_access_t a;
         mfns[i] = p2m->get_entry(p2m, gfns[i], types + i, &a, 0, NULL, NULL);
@@ -877,14 +879,14 @@ p2m_pod_zero_check(struct p2m_domain *p2m, unsigned long *gfns, int count)
      * Then, go through and check for zeroed pages, removing write permission
      * for those with zeroes.
      */
-    for ( i=0; i<count; i++ )
+    for ( i = 0; i < count; i++ )
     {
-        if(!map[i])
+        if ( !map[i] )
             continue;
 
         /* Quick zero-check */
-        for ( j=0; j<16; j++ )
-            if( *(map[i]+j) != 0 )
+        for ( j = 0; j < 16; j++ )
+            if ( *(map[i] + j) != 0 )
                 break;
 
         if ( j < 16 )
@@ -917,13 +919,13 @@ p2m_pod_zero_check(struct p2m_domain *p2m, unsigned long *gfns, int count)
     p2m_tlb_flush_sync(p2m);
 
     /* Now check each page for real */
-    for ( i=0; i < count; i++ )
+    for ( i = 0; i < count; i++ )
     {
-        if(!map[i])
+        if ( !map[i] )
             continue;
 
-        for ( j=0; j<PAGE_SIZE/sizeof(*map[i]); j++ )
-            if( *(map[i]+j) != 0 )
+        for ( j = 0; j < (PAGE_SIZE / sizeof(*map[i])); j++ )
+            if ( *(map[i] + j) != 0 )
                 break;
 
         unmap_domain_page(map[i]);
@@ -932,10 +934,10 @@ p2m_pod_zero_check(struct p2m_domain *p2m, unsigned long *gfns, int count)
          * See comment in p2m_pod_zero_check_superpage() re gnttab
          * check timing.
          */
-        if ( j < PAGE_SIZE/sizeof(*map[i]) )
+        if ( j < (PAGE_SIZE / sizeof(*map[i])) )
         {
             p2m_set_entry(p2m, gfns[i], mfns[i], PAGE_ORDER_4K,
-                types[i], p2m->default_access);
+                          types[i], p2m->default_access);
         }
         else
         {
@@ -968,7 +970,7 @@ static void
 p2m_pod_emergency_sweep(struct p2m_domain *p2m)
 {
     unsigned long gfns[POD_SWEEP_STRIDE];
-    unsigned long i, j=0, start, limit;
+    unsigned long i, j = 0, start, limit;
     p2m_type_t t;
 
 
@@ -985,7 +987,7 @@ p2m_pod_emergency_sweep(struct p2m_domain *p2m)
      * careful about spinlock recursion limits and POD_SWEEP_STRIDE.
      */
     p2m_lock(p2m);
-    for ( i=p2m->pod.reclaim_single; i > 0 ; i-- )
+    for ( i = p2m->pod.reclaim_single; i > 0 ; i-- )
     {
         p2m_access_t a;
         (void)p2m->get_entry(p2m, i, &t, &a, 0, NULL, NULL);
@@ -1079,7 +1081,7 @@ p2m_pod_demand_populate(struct p2m_domain *p2m, unsigned long gfn,
     struct page_info *p = NULL; /* Compiler warnings */
     unsigned long gfn_aligned;
     mfn_t mfn;
-    int i;
+    unsigned long i;
 
     ASSERT(gfn_locked_by_me(p2m, gfn));
     pod_lock(p2m);
@@ -1143,7 +1145,7 @@ p2m_pod_demand_populate(struct p2m_domain *p2m, unsigned long gfn,
 
     mfn = page_to_mfn(p);
 
-    BUG_ON((mfn_x(mfn) & ((1 << order)-1)) != 0);
+    BUG_ON((mfn_x(mfn) & ((1UL << order) - 1)) != 0);
 
     gfn_aligned = (gfn >> order) << order;
 
@@ -1156,7 +1158,7 @@ p2m_pod_demand_populate(struct p2m_domain *p2m, unsigned long gfn,
         paging_mark_dirty(d, mfn_add(mfn, i));
     }
 
-    p2m->pod.entry_count -= (1 << order);
+    p2m->pod.entry_count -= (1UL << order);
     BUG_ON(p2m->pod.entry_count < 0);
 
     pod_eager_record(p2m, gfn_aligned, order);
@@ -1198,8 +1200,8 @@ remap_and_retry:
      * NOTE: In a p2m fine-grained lock scenario this might
      * need promoting the gfn lock from gfn->2M superpage.
      */
-    gfn_aligned = (gfn>>order)<<order;
-    for(i=0; i<(1<<order); i++)
+    gfn_aligned = (gfn >> order) << order;
+    for ( i = 0; i < (1UL << order); i++ )
         p2m_set_entry(p2m, gfn_aligned + i, INVALID_MFN, PAGE_ORDER_4K,
                       p2m_populate_on_demand, p2m->default_access);
     if ( tb_init_done )
@@ -1262,7 +1264,7 @@ guest_physmap_mark_populate_on_demand(struct domain *d, unsigned long gfn,
     if ( rc == 0 )
     {
         pod_lock(p2m);
-        p2m->pod.entry_count += 1 << order;
+        p2m->pod.entry_count += 1UL << order;
         p2m->pod.entry_count -= pod_count;
         BUG_ON(p2m->pod.entry_count < 0);
         pod_unlock(p2m);
