@@ -1062,15 +1062,15 @@ static void pod_eager_reclaim(struct p2m_domain *p2m)
     } while ( (p2m->pod.count == 0) && (i < ARRAY_SIZE(mrp->list)) );
 }
 
-static void pod_eager_record(struct p2m_domain *p2m,
-                             unsigned long gfn, unsigned int order)
+static void pod_eager_record(struct p2m_domain *p2m, gfn_t gfn,
+                             unsigned int order)
 {
     struct pod_mrp_list *mrp = &p2m->pod.mrp;
 
-    ASSERT(gfn != gfn_x(INVALID_GFN));
+    ASSERT(!gfn_eq(gfn, INVALID_GFN));
 
     mrp->list[mrp->idx++] =
-        gfn | (order == PAGE_ORDER_2M ? POD_LAST_SUPERPAGE : 0);
+        gfn_x(gfn) | (order == PAGE_ORDER_2M ? POD_LAST_SUPERPAGE : 0);
     mrp->idx %= ARRAY_SIZE(mrp->list);
 }
 
@@ -1160,7 +1160,7 @@ p2m_pod_demand_populate(struct p2m_domain *p2m, unsigned long gfn,
     p2m->pod.entry_count -= (1UL << order);
     BUG_ON(p2m->pod.entry_count < 0);
 
-    pod_eager_record(p2m, gfn_x(gfn_aligned), order);
+    pod_eager_record(p2m, gfn_aligned, order);
 
     if ( tb_init_done )
     {
