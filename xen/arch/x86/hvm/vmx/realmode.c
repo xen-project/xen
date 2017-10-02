@@ -147,7 +147,7 @@ void vmx_realmode_emulate_one(struct hvm_emulate_ctxt *hvmemul_ctxt)
     return;
 
  fail:
-    hvm_dump_emulation_state(XENLOG_G_ERR, "Real-mode", hvmemul_ctxt);
+    hvm_dump_emulation_state(XENLOG_G_ERR, "Real-mode", hvmemul_ctxt, rc);
     domain_crash(curr->domain);
 }
 

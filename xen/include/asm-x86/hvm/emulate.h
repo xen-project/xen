@@ -92,7 +92,7 @@ int hvmemul_do_pio_buffer(uint16_t port,
                           void *buffer);
 
 void hvm_dump_emulation_state(const char *loglvl, const char *prefix,
-                              struct hvm_emulate_ctxt *hvmemul_ctxt);
+                              struct hvm_emulate_ctxt *hvmemul_ctxt, int rc);
 
 #endif /* __ASM_X86_HVM_EMULATE_H__ */
 

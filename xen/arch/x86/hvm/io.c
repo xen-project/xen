@@ -96,11 +96,11 @@ bool hvm_emulate_one_insn(hvm_emulate_validate_t *validate, const char *descr)
     switch ( rc )
     {
     case X86EMUL_UNHANDLEABLE:
-        hvm_dump_emulation_state(XENLOG_G_WARNING, descr, &ctxt);
+        hvm_dump_emulation_state(XENLOG_G_WARNING, descr, &ctxt, rc);
         return false;
 
     case X86EMUL_UNRECOGNIZED:
-        hvm_dump_emulation_state(XENLOG_G_WARNING, descr, &ctxt);
+        hvm_dump_emulation_state(XENLOG_G_WARNING, descr, &ctxt, rc);
         hvm_inject_hw_exception(TRAP_invalid_op, X86_EVENT_NO_EC);
         break;
 
