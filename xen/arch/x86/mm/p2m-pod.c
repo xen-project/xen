@@ -1076,13 +1076,13 @@ static void pod_eager_record(struct p2m_domain *p2m, gfn_t gfn,
 }
 
 int
-p2m_pod_demand_populate(struct p2m_domain *p2m, unsigned long gfn,
+p2m_pod_demand_populate(struct p2m_domain *p2m, gfn_t gfn,
                         unsigned int order,
                         p2m_query_t q)
 {
     struct domain *d = p2m->domain;
     struct page_info *p = NULL; /* Compiler warnings */
-    gfn_t gfn_aligned = _gfn((gfn >> order) << order);
+    gfn_t gfn_aligned = _gfn((gfn_x(gfn) >> order) << order);
     mfn_t mfn;
     unsigned long i;
 
@@ -1135,8 +1135,8 @@ p2m_pod_demand_populate(struct p2m_domain *p2m, unsigned long gfn,
         goto out_of_memory;
 
     /* Keep track of the highest gfn demand-populated by a guest fault */
-    if ( gfn > p2m->pod.max_guest )
-        p2m->pod.max_guest = gfn;
+    if ( gfn_x(gfn) > p2m->pod.max_guest )
+        p2m->pod.max_guest = gfn_x(gfn);
 
     /*
      * Get a page f/ the cache.  A NULL return value indicates that the
@@ -1170,7 +1170,7 @@ p2m_pod_demand_populate(struct p2m_domain *p2m, unsigned long gfn,
             int d:16,order:16;
         } t;
 
-        t.gfn = gfn;
+        t.gfn = gfn_x(gfn);
         t.mfn = mfn_x(mfn);
         t.d = d->domain_id;
         t.order = order;
@@ -1210,7 +1210,7 @@ remap_and_retry:
             int d:16;
         } t;
 
-        t.gfn = gfn;
+        t.gfn = gfn_x(gfn);
         t.d = d->domain_id;
 
         __trace_var(TRC_MEM_POD_SUPERPAGE_SPLINTER, 0, sizeof(t), &t);

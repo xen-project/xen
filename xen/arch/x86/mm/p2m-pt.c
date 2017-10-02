@@ -802,7 +802,7 @@ pod_retry_l3:
             {
                 if ( q & P2M_ALLOC )
                 {
-                    if ( !p2m_pod_demand_populate(p2m, gfn, PAGE_ORDER_1G, q) )
+                    if ( !p2m_pod_demand_populate(p2m, gfn_, PAGE_ORDER_1G, q) )
                         goto pod_retry_l3;
                     gdprintk(XENLOG_ERR, "%s: Allocate 1GB failed!\n", __func__);
                 }
@@ -844,7 +844,7 @@ pod_retry_l2:
         if ( p2m_flags_to_type(flags) == p2m_populate_on_demand )
         {
             if ( q & P2M_ALLOC ) {
-                if ( !p2m_pod_demand_populate(p2m, gfn, PAGE_ORDER_2M, q) )
+                if ( !p2m_pod_demand_populate(p2m, gfn_, PAGE_ORDER_2M, q) )
                     goto pod_retry_l2;
             } else
                 *t = p2m_populate_on_demand;
@@ -883,7 +883,7 @@ pod_retry_l1:
         if ( l1t == p2m_populate_on_demand )
         {
             if ( q & P2M_ALLOC ) {
-                if ( !p2m_pod_demand_populate(p2m, gfn, PAGE_ORDER_4K, q) )
+                if ( !p2m_pod_demand_populate(p2m, gfn_, PAGE_ORDER_4K, q) )
                     goto pod_retry_l1;
             } else
                 *t = p2m_populate_on_demand;

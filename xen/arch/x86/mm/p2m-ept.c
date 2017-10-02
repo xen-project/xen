@@ -965,7 +965,7 @@ static mfn_t ept_get_entry(struct p2m_domain *p2m,
             index = gfn_remainder >> ( i * EPT_TABLE_ORDER);
             ept_entry = table + index;
 
-            if ( !p2m_pod_demand_populate(p2m, gfn, i * EPT_TABLE_ORDER, q) )
+            if ( !p2m_pod_demand_populate(p2m, gfn_, i * EPT_TABLE_ORDER, q) )
                 goto retry;
             else
                 goto out;
@@ -987,8 +987,7 @@ static mfn_t ept_get_entry(struct p2m_domain *p2m,
 
         ASSERT(i == 0);
         
-        if ( p2m_pod_demand_populate(p2m, gfn, 
-                                        PAGE_ORDER_4K, q) )
+        if ( p2m_pod_demand_populate(p2m, gfn_, PAGE_ORDER_4K, q) )
             goto out;
     }
 

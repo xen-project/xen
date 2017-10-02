@@ -720,7 +720,7 @@ extern void audit_p2m(struct domain *d,
 
 /* Called by p2m code when demand-populating a PoD page */
 int
-p2m_pod_demand_populate(struct p2m_domain *p2m, unsigned long gfn,
+p2m_pod_demand_populate(struct p2m_domain *p2m, gfn_t gfn,
                         unsigned int order,
                         p2m_query_t q);
 
