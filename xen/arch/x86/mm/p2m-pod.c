@@ -155,8 +155,10 @@ static struct page_info * p2m_pod_cache_get(struct p2m_domain *p2m,
 
         BUG_ON( page_list_empty(&p2m->pod.super) );
 
-        /* Break up a superpage to make single pages. NB count doesn't
-         * need to be adjusted. */
+        /*
+         * Break up a superpage to make single pages. NB count doesn't
+         * need to be adjusted.
+         */
         p = page_list_remove_head(&p2m->pod.super);
         mfn = mfn_x(page_to_mfn(p));
 
@@ -242,8 +244,10 @@ p2m_pod_set_cache_target(struct p2m_domain *p2m, unsigned long pod_target, int p
     }
 
     /* Decreasing the target */
-    /* We hold the pod lock here, so we don't need to worry about
-     * cache disappearing under our feet. */
+    /*
+     * We hold the pod lock here, so we don't need to worry about
+     * cache disappearing under our feet.
+     */
     while ( pod_target < p2m->pod.count )
     {
         struct page_info * page;
@@ -345,15 +349,19 @@ p2m_pod_set_mem_target(struct domain *d, unsigned long target)
     if ( d->is_dying )
         goto out;
 
-    /* T' < B: Don't reduce the cache size; let the balloon driver
-     * take care of it. */
+    /*
+     * T' < B: Don't reduce the cache size; let the balloon driver
+     * take care of it.
+     */
     if ( target < d->tot_pages )
         goto out;
 
     pod_target = target - populated;
 
-    /* B < T': Set the cache size equal to # of outstanding entries,
-     * let the balloon driver fill in the rest. */
+    /*
+     * B < T': Set the cache size equal to # of outstanding entries,
+     * let the balloon driver fill in the rest.
+     */
     if ( populated > 0 && pod_target > p2m->pod.entry_count )
         pod_target = p2m->pod.entry_count;
 
@@ -491,7 +499,8 @@ static int
 p2m_pod_zero_check_superpage(struct p2m_domain *p2m, unsigned long gfn);
 
 
-/* This function is needed for two reasons:
+/*
+ * This function is needed for two reasons:
  * + To properly handle clearing of PoD entries
  * + To "steal back" memory being freed for the PoD cache, rather than
  *   releasing it.
@@ -513,8 +522,10 @@ p2m_pod_decrease_reservation(struct domain *d,
     gfn_lock(p2m, gpfn, order);
     pod_lock(p2m);
 
-    /* If we don't have any outstanding PoD entries, let things take their
-     * course */
+    /*
+     * If we don't have any outstanding PoD entries, let things take their
+     * course.
+     */
     if ( p2m->pod.entry_count == 0 )
         goto out_unlock;
 
@@ -550,8 +561,10 @@ p2m_pod_decrease_reservation(struct domain *d,
 
     if ( !nonpod )
     {
-        /* All PoD: Mark the whole region invalid and tell caller
-         * we're done. */
+        /*
+         * All PoD: Mark the whole region invalid and tell caller
+         * we're done.
+         */
         p2m_set_entry(p2m, gpfn, INVALID_MFN, order, p2m_invalid,
                       p2m->default_access);
         p2m->pod.entry_count-=(1<<order);
@@ -576,7 +589,8 @@ p2m_pod_decrease_reservation(struct domain *d,
         ASSERT(steal_for_cache == (p2m->pod.entry_count > p2m->pod.count));
     }
 
-    /* Process as long as:
+    /*
+     * Process as long as:
      * + There are PoD entries to handle, or
      * + There is ram left, and we want to steal it
      */
@@ -631,8 +645,10 @@ p2m_pod_decrease_reservation(struct domain *d,
         }
     }
 
-    /* If there are no more non-PoD entries, tell decrease_reservation() that
-     * there's nothing left to do. */
+    /*
+     * If there are no more non-PoD entries, tell decrease_reservation() that
+     * there's nothing left to do.
+     */
     if ( nonpod == 0 )
         ret = 1;
 
@@ -658,9 +674,11 @@ void p2m_pod_dump_data(struct domain *d)
 }
 
 
-/* Search for all-zero superpages to be reclaimed as superpages for the
+/*
+ * Search for all-zero superpages to be reclaimed as superpages for the
  * PoD cache. Must be called w/ pod lock held, must lock the superpage
- * in the p2m */
+ * in the p2m.
+ */
 static int
 p2m_pod_zero_check_superpage(struct p2m_domain *p2m, unsigned long gfn)
 {
@@ -682,12 +700,16 @@ p2m_pod_zero_check_superpage(struct p2m_domain *p2m, unsigned long gfn)
     if ( paging_mode_shadow(d) )
         max_ref++;
 
-    /* NOTE: this is why we don't enforce deadlock constraints between p2m
-     * and pod locks */
+    /*
+     * NOTE: this is why we don't enforce deadlock constraints between p2m
+     * and pod locks.
+     */
     gfn_lock(p2m, gfn, SUPERPAGE_ORDER);
 
-    /* Look up the mfns, checking to make sure they're the same mfn
-     * and aligned, and mapping them. */
+    /*
+     * Look up the mfns, checking to make sure they're the same mfn
+     * and aligned, and mapping them.
+     */
     for ( i = 0; i < SUPERPAGE_PAGES; i += n )
     {
         p2m_access_t a;
@@ -697,7 +719,8 @@ p2m_pod_zero_check_superpage(struct p2m_domain *p2m, unsigned long gfn)
 
         mfn = p2m->get_entry(p2m, gfn + i, &type, &a, 0, &cur_order, NULL);
 
-        /* Conditions that must be met for superpage-superpage:
+        /*
+         * Conditions that must be met for superpage-superpage:
          * + All gfns are ram types
          * + All gfns have the same type
          * + All of the mfns are allocated to a domain
@@ -751,9 +774,11 @@ p2m_pod_zero_check_superpage(struct p2m_domain *p2m, unsigned long gfn)
                   p2m_populate_on_demand, p2m->default_access);
     p2m_tlb_flush_sync(p2m);
 
-    /* Make none of the MFNs are used elsewhere... for example, mapped
+    /*
+     * Make none of the MFNs are used elsewhere... for example, mapped
      * via the grant table interface, or by qemu.  Allow one refcount for
-     * being allocated to the domain. */
+     * being allocated to the domain.
+     */
     for ( i=0; i < SUPERPAGE_PAGES; i++ )
     {
         mfn = _mfn(mfn_x(mfn0) + i);
@@ -797,8 +822,10 @@ p2m_pod_zero_check_superpage(struct p2m_domain *p2m, unsigned long gfn)
         __trace_var(TRC_MEM_POD_ZERO_RECLAIM, 0, sizeof(t), &t);
     }
 
-    /* Finally!  We've passed all the checks, and can add the mfn superpage
-     * back on the PoD cache, and account for the new p2m PoD entries */
+    /*
+     * Finally!  We've passed all the checks, and can add the mfn superpage
+     * back on the PoD cache, and account for the new p2m PoD entries.
+     */
     p2m_pod_cache_add(p2m, mfn_to_page(mfn0), PAGE_ORDER_2M);
     p2m->pod.entry_count += SUPERPAGE_PAGES;
 
@@ -833,8 +860,10 @@ p2m_pod_zero_check(struct p2m_domain *p2m, unsigned long *gfns, int count)
     {
         p2m_access_t a;
         mfns[i] = p2m->get_entry(p2m, gfns[i], types + i, &a, 0, NULL, NULL);
-        /* If this is ram, and not a pagetable or from the xen heap, and probably not mapped
-           elsewhere, map it; otherwise, skip. */
+        /*
+         * If this is ram, and not a pagetable or from the xen heap, and
+         * probably not mapped elsewhere, map it; otherwise, skip.
+         */
         if ( p2m_is_ram(types[i])
              && ( (mfn_to_page(mfns[i])->count_info & PGC_allocated) != 0 )
              && ( (mfn_to_page(mfns[i])->count_info & (PGC_page_table|PGC_xen_heap)) == 0 )
@@ -844,8 +873,10 @@ p2m_pod_zero_check(struct p2m_domain *p2m, unsigned long *gfns, int count)
             map[i] = NULL;
     }
 
-    /* Then, go through and check for zeroed pages, removing write permission
-     * for those with zeroes. */
+    /*
+     * Then, go through and check for zeroed pages, removing write permission
+     * for those with zeroes.
+     */
     for ( i=0; i<count; i++ )
     {
         if(!map[i])
@@ -867,8 +898,10 @@ p2m_pod_zero_check(struct p2m_domain *p2m, unsigned long *gfns, int count)
         p2m_set_entry(p2m, gfns[i], INVALID_MFN, PAGE_ORDER_4K,
                       p2m_populate_on_demand, p2m->default_access);
 
-        /* See if the page was successfully unmapped.  (Allow one refcount
-         * for being allocated to a domain.) */
+        /*
+         * See if the page was successfully unmapped.  (Allow one refcount
+         * for being allocated to a domain.)
+         */
         if ( (mfn_to_page(mfns[i])->count_info & PGC_count_mask) > 1 )
         {
             unmap_domain_page(map[i]);
@@ -895,8 +928,10 @@ p2m_pod_zero_check(struct p2m_domain *p2m, unsigned long *gfns, int count)
 
         unmap_domain_page(map[i]);
 
-        /* See comment in p2m_pod_zero_check_superpage() re gnttab
-         * check timing.  */
+        /*
+         * See comment in p2m_pod_zero_check_superpage() re gnttab
+         * check timing.
+         */
         if ( j < PAGE_SIZE/sizeof(*map[i]) )
         {
             p2m_set_entry(p2m, gfns[i], mfns[i], PAGE_ORDER_4K,
@@ -944,9 +979,11 @@ p2m_pod_emergency_sweep(struct p2m_domain *p2m)
     limit = (start > POD_SWEEP_LIMIT) ? (start - POD_SWEEP_LIMIT) : 0;
 
     /* FIXME: Figure out how to avoid superpages */
-    /* NOTE: Promote to globally locking the p2m. This will get complicated
+    /*
+     * NOTE: Promote to globally locking the p2m. This will get complicated
      * in a fine-grained scenario. If we lock each gfn individually we must be
-     * careful about spinlock recursion limits and POD_SWEEP_STRIDE. */
+     * careful about spinlock recursion limits and POD_SWEEP_STRIDE.
+     */
     p2m_lock(p2m);
     for ( i=p2m->pod.reclaim_single; i > 0 ; i-- )
     {
@@ -963,11 +1000,13 @@ p2m_pod_emergency_sweep(struct p2m_domain *p2m)
                 j = 0;
             }
         }
-        /* Stop if we're past our limit and we have found *something*.
+        /*
+         * Stop if we're past our limit and we have found *something*.
          *
          * NB that this is a zero-sum game; we're increasing our cache size
          * by re-increasing our 'debt'.  Since we hold the pod lock,
-         * (entry_count - count) must remain the same. */
+         * (entry_count - count) must remain the same.
+         */
         if ( i < limit && (p2m->pod.count > 0 || hypercall_preempt_check()) )
             break;
     }
@@ -1045,20 +1084,25 @@ p2m_pod_demand_populate(struct p2m_domain *p2m, unsigned long gfn,
     ASSERT(gfn_locked_by_me(p2m, gfn));
     pod_lock(p2m);
 
-    /* This check is done with the pod lock held.  This will make sure that
+    /*
+     * This check is done with the pod lock held.  This will make sure that
      * even if d->is_dying changes under our feet, p2m_pod_empty_cache()
-     * won't start until we're done. */
+     * won't start until we're done.
+     */
     if ( unlikely(d->is_dying) )
         goto out_fail;
 
 
-    /* Because PoD does not have cache list for 1GB pages, it has to remap
-     * 1GB region to 2MB chunks for a retry. */
+    /*
+     * Because PoD does not have cache list for 1GB pages, it has to remap
+     * 1GB region to 2MB chunks for a retry.
+     */
     if ( order == PAGE_ORDER_1G )
     {
         pod_unlock(p2m);
         gfn_aligned = (gfn >> order) << order;
-        /* Note that we are supposed to call p2m_set_entry() 512 times to
+        /*
+         * Note that we are supposed to call p2m_set_entry() 512 times to
          * split 1GB into 512 2MB pages here. But We only do once here because
          * p2m_set_entry() should automatically shatter the 1GB page into
          * 512 2MB pages. The rest of 511 calls are unnecessary.
@@ -1075,8 +1119,10 @@ p2m_pod_demand_populate(struct p2m_domain *p2m, unsigned long gfn,
     if ( p2m->pod.entry_count > p2m->pod.count )
         pod_eager_reclaim(p2m);
 
-    /* Only sweep if we're actually out of memory.  Doing anything else
-     * causes unnecessary time and fragmentation of superpages in the p2m. */
+    /*
+     * Only sweep if we're actually out of memory.  Doing anything else
+     * causes unnecessary time and fragmentation of superpages in the p2m.
+     */
     if ( p2m->pod.count == 0 )
         p2m_pod_emergency_sweep(p2m);
 
@@ -1088,8 +1134,10 @@ p2m_pod_demand_populate(struct p2m_domain *p2m, unsigned long gfn,
     if ( gfn > p2m->pod.max_guest )
         p2m->pod.max_guest = gfn;
 
-    /* Get a page f/ the cache.  A NULL return value indicates that the
-     * 2-meg range should be marked singleton PoD, and retried */
+    /*
+     * Get a page f/ the cache.  A NULL return value indicates that the
+     * 2-meg range should be marked singleton PoD, and retried.
+     */
     if ( (p = p2m_pod_cache_get(p2m, order)) == NULL )
         goto remap_and_retry;
 
@@ -1146,8 +1194,10 @@ remap_and_retry:
     pod_unlock(p2m);
 
     /* Remap this 2-meg region in singleton chunks */
-    /* NOTE: In a p2m fine-grained lock scenario this might
-     * need promoting the gfn lock from gfn->2M superpage */
+    /*
+     * NOTE: In a p2m fine-grained lock scenario this might
+     * need promoting the gfn lock from gfn->2M superpage.
+     */
     gfn_aligned = (gfn>>order)<<order;
     for(i=0; i<(1<<order); i++)
         p2m_set_entry(p2m, gfn_aligned + i, INVALID_MFN, PAGE_ORDER_4K,
