@@ -977,10 +977,10 @@ p2m_pod_emergency_sweep(struct p2m_domain *p2m)
     p2m_type_t t;
 
 
-    if ( p2m->pod.reclaim_single == 0 )
+    if ( gfn_eq(p2m->pod.reclaim_single, _gfn(0)) )
         p2m->pod.reclaim_single = p2m->pod.max_guest;
 
-    start = p2m->pod.reclaim_single;
+    start = gfn_x(p2m->pod.reclaim_single);
     limit = (start > POD_SWEEP_LIMIT) ? (start - POD_SWEEP_LIMIT) : 0;
 
     /* FIXME: Figure out how to avoid superpages */
@@ -990,7 +990,7 @@ p2m_pod_emergency_sweep(struct p2m_domain *p2m)
      * careful about spinlock recursion limits and POD_SWEEP_STRIDE.
      */
     p2m_lock(p2m);
-    for ( i = p2m->pod.reclaim_single; i > 0 ; i-- )
+    for ( i = gfn_x(p2m->pod.reclaim_single); i > 0 ; i-- )
     {
         p2m_access_t a;
         (void)p2m->get_entry(p2m, _gfn(i), &t, &a, 0, NULL, NULL);
@@ -1020,7 +1020,7 @@ p2m_pod_emergency_sweep(struct p2m_domain *p2m)
         p2m_pod_zero_check(p2m, gfns, j);
 
     p2m_unlock(p2m);
-    p2m->pod.reclaim_single = i ? i - 1 : i;
+    p2m->pod.reclaim_single = _gfn(i ? i - 1 : i);
 
 }
 
@@ -1135,8 +1135,7 @@ p2m_pod_demand_populate(struct p2m_domain *p2m, gfn_t gfn,
         goto out_of_memory;
 
     /* Keep track of the highest gfn demand-populated by a guest fault */
-    if ( gfn_x(gfn) > p2m->pod.max_guest )
-        p2m->pod.max_guest = gfn_x(gfn);
+    p2m->pod.max_guest = gfn_max(gfn, p2m->pod.max_guest);
 
     /*
      * Get a page f/ the cache.  A NULL return value indicates that the

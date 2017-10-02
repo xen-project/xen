@@ -316,8 +316,8 @@ struct p2m_domain {
                          single;       /* Non-super lists                   */
         long             count,        /* # of pages in cache lists         */
                          entry_count;  /* # of pages in p2m marked pod      */
-        unsigned long    reclaim_single; /* Last gpfn of a scan */
-        unsigned long    max_guest;    /* gpfn of max guest demand-populate */
+        gfn_t            reclaim_single; /* Last gfn of a scan */
+        gfn_t            max_guest;    /* gfn of max guest demand-populate */
 
         /*
          * Tracking of the most recently populated PoD pages, for eager
