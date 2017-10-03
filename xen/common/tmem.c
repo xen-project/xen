@@ -200,7 +200,7 @@ static void tmem_free_page(struct tmem_pool *pool, struct page_info *pfp)
     atomic_dec_and_assert(global_page_count);
 }
 
-static noinline void *tmem_mempool_page_get(unsigned long size)
+static void *tmem_mempool_page_get(unsigned long size)
 {
     struct page_info *pi;
 
