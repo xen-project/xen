@@ -363,6 +363,8 @@ struct p2m_domain {
  * Updates vCPU's n2pm to match its np2m_base in VMCx12 and returns that np2m.
  */
 struct p2m_domain *p2m_get_nestedp2m(struct vcpu *v);
+/* Similar to the above except that returned p2m is still write-locked */
+struct p2m_domain *p2m_get_nestedp2m_locked(struct vcpu *v);
 
 /* If vcpu is in host mode then behaviour matches p2m_get_hostp2m().
  * If vcpu is in guest mode then behaviour matches p2m_get_nestedp2m().

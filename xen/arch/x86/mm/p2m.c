@@ -1831,7 +1831,7 @@ static void assign_np2m(struct vcpu *v, struct p2m_domain *p2m)
 }
 
 struct p2m_domain *
-p2m_get_nestedp2m(struct vcpu *v)
+p2m_get_nestedp2m_locked(struct vcpu *v)
 {
     struct nestedvcpu *nv = &vcpu_nestedhvm(v);
     struct domain *d = v->domain;
@@ -1856,7 +1856,6 @@ p2m_get_nestedp2m(struct vcpu *v)
                 hvm_asid_flush_vcpu(v);
             p2m->np2m_base = np2m_base;
             assign_np2m(v, p2m);
-            p2m_unlock(p2m);
             nestedp2m_unlock(d);
 
             return p2m;
@@ -1872,8 +1871,15 @@ p2m_get_nestedp2m(struct vcpu *v)
     p2m->np2m_base = np2m_base;
     hvm_asid_flush_vcpu(v);
     assign_np2m(v, p2m);
-    p2m_unlock(p2m);
     nestedp2m_unlock(d);
+
+    return p2m;
+}
+
+struct p2m_domain *p2m_get_nestedp2m(struct vcpu *v)
+{
+    struct p2m_domain *p2m = p2m_get_nestedp2m_locked(v);
+    p2m_unlock(p2m);
 
     return p2m;
 }
