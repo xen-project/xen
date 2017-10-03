@@ -328,6 +328,25 @@ void __ubsan_handle_type_mismatch(struct type_mismatch_data *data,
 }
 EXPORT_SYMBOL(__ubsan_handle_type_mismatch);
 
+void __ubsan_handle_nonnull_arg(struct nonnull_arg_data *data)
+{
+	unsigned long flags;
+
+	if (suppress_report(&data->location))
+		return;
+
+	ubsan_prologue(&data->location, &flags);
+
+	pr_err("null pointer passed as argument %d, declared with nonnull attribute\n",
+	       data->arg_index);
+
+	if (location_is_valid(&data->attr_location))
+		print_source_location("nonnull attribute declared in ",
+				      &data->attr_location);
+
+	ubsan_epilogue(&flags);
+}
+
 void __ubsan_handle_nonnull_return(struct nonnull_return_data *data)
 {
 	unsigned long flags;
