@@ -353,6 +353,9 @@ struct xen_netif_ctrl_request {
 #define XEN_NETIF_CTRL_TYPE_SET_HASH_MAPPING_SIZE 5
 #define XEN_NETIF_CTRL_TYPE_SET_HASH_MAPPING      6
 #define XEN_NETIF_CTRL_TYPE_SET_HASH_ALGORITHM    7
+#define XEN_NETIF_CTRL_TYPE_GET_GREF_MAPPING_SIZE 8
+#define XEN_NETIF_CTRL_TYPE_ADD_GREF_MAPPING      9
+#define XEN_NETIF_CTRL_TYPE_DEL_GREF_MAPPING     10
 
     uint32_t data[3];
 };
@@ -388,6 +391,44 @@ struct xen_netif_ctrl_response {
 #define XEN_NETIF_CTRL_STATUS_BUFFER_OVERFLOW   3
 
     uint32_t data;
+};
+
+/*
+ * Static Grants (struct xen_netif_gref)
+ * =====================================
+ *
+ * A frontend may provide a fixed set of grant references to be mapped on
+ * the backend. The message of type XEN_NETIF_CTRL_TYPE_ADD_GREF_MAPPING
+ * prior its usage in the command ring allows for creation of these mappings.
+ * The backend will maintain a fixed amount of these mappings.
+ *
+ * XEN_NETIF_CTRL_TYPE_GET_GREF_MAPPING_SIZE lets a frontend query how many
+ * of these mappings can be kept.
+ *
+ * Each entry in the XEN_NETIF_CTRL_TYPE_{ADD,DEL}_GREF_MAPPING input table has
+ * the following format:
+ *
+ *    0     1     2     3     4     5     6     7  octet
+ * +-----+-----+-----+-----+-----+-----+-----+-----+
+ * | grant ref             |  flags    |  status   |
+ * +-----+-----+-----+-----+-----+-----+-----+-----+
+ *
+ * grant ref: grant reference (IN)
+ * flags: flags describing the control operation (IN)
+ * status: XEN_NETIF_CTRL_STATUS_* (OUT)
+ *
+ * 'status' is an output parameter which does not require to be set to zero
+ * prior to its usage in the corresponding control messages.
+ */
+
+struct xen_netif_gref {
+       grant_ref_t ref;
+       uint16_t flags;
+
+#define _XEN_NETIF_CTRLF_GREF_readonly    0
+#define XEN_NETIF_CTRLF_GREF_readonly    (1U<<_XEN_NETIF_CTRLF_GREF_readonly)
+
+       uint16_t status;
 };
 
 /*
@@ -609,6 +650,88 @@ struct xen_netif_ctrl_response {
  *       invalidate any table data outside that range.
  *       The grant reference may be read-only and must remain valid until
  *       the response has been processed.
+ *
+ * XEN_NETIF_CTRL_TYPE_GET_GREF_MAPPING_SIZE
+ * -----------------------------------------
+ *
+ * This is sent by the frontend to fetch the number of grefs that can be kept
+ * mapped in the backend.
+ *
+ * Request:
+ *
+ *  type    = XEN_NETIF_CTRL_TYPE_GET_GREF_MAPPING_SIZE
+ *  data[0] = queue index (assumed 0 for single queue)
+ *  data[1] = 0
+ *  data[2] = 0
+ *
+ * Response:
+ *
+ *  status = XEN_NETIF_CTRL_STATUS_NOT_SUPPORTED     - Operation not
+ *                                                     supported
+ *           XEN_NETIF_CTRL_STATUS_INVALID_PARAMETER - The queue index is
+ *                                                     out of range
+ *           XEN_NETIF_CTRL_STATUS_SUCCESS           - Operation successful
+ *  data   = maximum number of entries allowed in the gref mapping table
+ *           (if operation was successful) or zero if it is not supported.
+ *
+ * XEN_NETIF_CTRL_TYPE_ADD_GREF_MAPPING
+ * ------------------------------------
+ *
+ * This is sent by the frontend for backend to map a list of grant
+ * references.
+ *
+ * Request:
+ *
+ *  type    = XEN_NETIF_CTRL_TYPE_ADD_GREF_MAPPING
+ *  data[0] = queue index
+ *  data[1] = grant reference of page containing the mapping list
+ *            (r/w and assumed to start at beginning of page)
+ *  data[2] = size of list in entries
+ *
+ * Response:
+ *
+ *  status = XEN_NETIF_CTRL_STATUS_NOT_SUPPORTED     - Operation not
+ *                                                     supported
+ *           XEN_NETIF_CTRL_STATUS_INVALID_PARAMETER - Operation failed
+ *           XEN_NETIF_CTRL_STATUS_SUCCESS           - Operation successful
+ *
+ * NOTE: Each entry in the input table has the format outlined
+ *       in struct xen_netif_gref.
+ *       Contrary to XEN_NETIF_CTRL_TYPE_DEL_GREF_MAPPING, the struct
+ *       xen_netif_gref 'status' field is not used and therefore the response
+ *       'status' determines the success of this operation. In case of
+ *       failure none of grants mappings get added in the backend.
+ *
+ * XEN_NETIF_CTRL_TYPE_DEL_GREF_MAPPING
+ * ------------------------------------
+ *
+ * This is sent by the frontend for backend to unmap a list of grant
+ * references.
+ *
+ * Request:
+ *
+ *  type    = XEN_NETIF_CTRL_TYPE_DEL_GREF_MAPPING
+ *  data[0] = queue index
+ *  data[1] = grant reference of page containing the mapping list
+ *            (r/w and assumed to start at beginning of page)
+ *  data[2] = size of list in entries
+ *
+ * Response:
+ *
+ *  status = XEN_NETIF_CTRL_STATUS_NOT_SUPPORTED     - Operation not
+ *                                                     supported
+ *           XEN_NETIF_CTRL_STATUS_INVALID_PARAMETER - Operation failed
+ *           XEN_NETIF_CTRL_STATUS_SUCCESS           - Operation successful
+ *  data   = number of entries that were unmapped
+ *
+ * NOTE: Each entry in the input table has the format outlined in struct
+ *       xen_netif_gref.
+ *       The struct xen_netif_gref 'status' field determines if the entry
+ *       was successfully removed.
+ *       The entries used are only the ones representing grant references that
+ *       were previously the subject of a XEN_NETIF_CTRL_TYPE_ADD_GREF_MAPPING
+ *       operation. Any other entries will have their status set to
+ *       XEN_NETIF_CTRL_STATUS_INVALID_PARAMETER upon completion.
  */
 
 DEFINE_RING_TYPES(xen_netif_ctrl,
