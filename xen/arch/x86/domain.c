@@ -1955,11 +1955,8 @@ int domain_relinquish_resources(struct domain *d)
         {
             for_each_vcpu ( d, v )
             {
-                /*
-                 * Relinquish GDT mappings. No need for explicit unmapping of
-                 * the LDT as it automatically gets squashed with the guest
-                 * mappings.
-                 */
+                /* Relinquish GDT/LDT mappings. */
+                pv_destroy_ldt(v);
                 pv_destroy_gdt(v);
             }
         }

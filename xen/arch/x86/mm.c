@@ -1178,7 +1178,6 @@ void put_page_from_l1e(l1_pgentry_t l1e, struct domain *l1e_owner)
     unsigned long     pfn = l1e_get_pfn(l1e);
     struct page_info *page;
     struct domain    *pg_owner;
-    struct vcpu      *v;
 
     if ( !(l1e_get_flags(l1e) & _PAGE_PRESENT) || is_iomem_page(_mfn(pfn)) )
         return;
@@ -1219,12 +1218,14 @@ void put_page_from_l1e(l1_pgentry_t l1e, struct domain *l1e_owner)
     }
     else
     {
+#ifdef CONFIG_PV_LDT_PAGING
         /* We expect this is rare so we blow the entire shadow LDT. */
         if ( unlikely(((page->u.inuse.type_info & PGT_type_mask) ==
                        PGT_seg_desc_page)) &&
              unlikely(((page->u.inuse.type_info & PGT_count_mask) != 0)) &&
              (l1e_owner == pg_owner) )
         {
+            struct vcpu *v;
             cpumask_t *mask = this_cpu(scratch_cpumask);
 
             cpumask_clear(mask);
@@ -1243,6 +1244,7 @@ void put_page_from_l1e(l1_pgentry_t l1e, struct domain *l1e_owner)
             if ( !cpumask_empty(mask) )
                 flush_tlb_mask(mask);
         }
+#endif /* CONFIG_PV_LDT_PAGING */
         put_page(page);
     }
 }
