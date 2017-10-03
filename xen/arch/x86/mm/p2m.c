@@ -1846,6 +1846,7 @@ p2m_get_nestedp2m_locked(struct vcpu *v)
     struct domain *d = v->domain;
     struct p2m_domain *p2m;
     uint64_t np2m_base = nhvm_vcpu_p2m_base(v);
+    unsigned int i;
 
     /* Mask out low bits; this avoids collisions with P2M_BASE_EADDR */
     np2m_base &= ~(0xfffull);
@@ -1859,22 +1860,39 @@ p2m_get_nestedp2m_locked(struct vcpu *v)
     if ( p2m ) 
     {
         p2m_lock(p2m);
-        if ( p2m->np2m_base == np2m_base || p2m->np2m_base == P2M_BASE_EADDR )
+        if ( p2m->np2m_base == np2m_base )
         {
             /* Check if np2m was flushed just before the lock */
-            if ( p2m->np2m_base == P2M_BASE_EADDR ||
-                 nv->np2m_generation != p2m->np2m_generation )
+            if ( nv->np2m_generation != p2m->np2m_generation )
                 nvcpu_flush(v);
+            /* np2m is up-to-date */
             p2m->np2m_base = np2m_base;
             assign_np2m(v, p2m);
             nestedp2m_unlock(d);
 
             return p2m;
         }
-        else
+        else if ( p2m->np2m_base != P2M_BASE_EADDR )
         {
             /* vCPU is switching from some other valid np2m */
             cpumask_clear_cpu(v->processor, p2m->dirty_cpumask);
+        }
+        p2m_unlock(p2m);
+    }
+
+    /* Share a np2m if possible */
+    for ( i = 0; i < MAX_NESTEDP2M; i++ )
+    {
+        p2m = d->arch.nested_p2m[i];
+        p2m_lock(p2m);
+        if ( p2m->np2m_base == np2m_base )
+        {
+            nvcpu_flush(v);
+            p2m->np2m_base = np2m_base;
+            assign_np2m(v, p2m);
+            nestedp2m_unlock(d);
+
+            return p2m;
         }
         p2m_unlock(p2m);
     }
