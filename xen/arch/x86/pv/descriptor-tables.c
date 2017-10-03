@@ -126,6 +126,42 @@ long do_set_gdt(XEN_GUEST_HANDLE_PARAM(xen_ulong_t) frame_list,
     return ret;
 }
 
+int compat_set_gdt(XEN_GUEST_HANDLE_PARAM(uint) frame_list,
+                   unsigned int entries)
+{
+    struct vcpu *curr = current;
+    unsigned int i, nr_pages = (entries + 511) / 512;
+    unsigned long frames[16];
+    int ret;
+
+    /* Rechecked in set_gdt, but ensures a sane limit for copy_from_user(). */
+    if ( entries > FIRST_RESERVED_GDT_ENTRY )
+        return -EINVAL;
+
+    if ( !guest_handle_okay(frame_list, nr_pages) )
+        return -EFAULT;
+
+    for ( i = 0; i < nr_pages; ++i )
+    {
+        unsigned int frame;
+
+        if ( __copy_from_guest(&frame, frame_list, 1) )
+            return -EFAULT;
+
+        frames[i] = frame;
+        guest_handle_add_offset(frame_list, 1);
+    }
+
+    domain_lock(curr->domain);
+
+    if ( (ret = pv_set_gdt(curr, frames, entries)) == 0 )
+        flush_tlb_local();
+
+    domain_unlock(curr->domain);
+
+    return ret;
+}
+
 long do_update_descriptor(uint64_t pa, uint64_t desc)
 {
     struct domain *currd = current->domain;
@@ -177,39 +213,6 @@ long do_update_descriptor(uint64_t pa, uint64_t desc)
 
  out:
     put_page(page);
-
-    return ret;
-}
-
-int compat_set_gdt(XEN_GUEST_HANDLE_PARAM(uint) frame_list, unsigned int entries)
-{
-    unsigned int i, nr_pages = (entries + 511) / 512;
-    unsigned long frames[16];
-    int ret;
-
-    /* Rechecked in set_gdt, but ensures a sane limit for copy_from_user(). */
-    if ( entries > FIRST_RESERVED_GDT_ENTRY )
-        return -EINVAL;
-
-    if ( !guest_handle_okay(frame_list, nr_pages) )
-        return -EFAULT;
-
-    for ( i = 0; i < nr_pages; ++i )
-    {
-        unsigned int frame;
-
-        if ( __copy_from_guest(&frame, frame_list, 1) )
-            return -EFAULT;
-        frames[i] = frame;
-        guest_handle_add_offset(frame_list, 1);
-    }
-
-    domain_lock(current->domain);
-
-    if ( (ret = pv_set_gdt(current, frames, entries)) == 0 )
-        flush_tlb_local();
-
-    domain_unlock(current->domain);
 
     return ret;
 }
