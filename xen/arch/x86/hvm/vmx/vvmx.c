@@ -1910,12 +1910,7 @@ int nvmx_handle_invept(struct cpu_user_regs *regs)
     {
     case INVEPT_SINGLE_CONTEXT:
     {
-        struct p2m_domain *p2m = p2m_get_nestedp2m(current, eptp);
-        if ( p2m )
-        {
-            p2m_flush(current, p2m);
-            ept_sync_domain(p2m);
-        }
+        np2m_flush_base(current, eptp);
         break;
     }
     case INVEPT_ALL_CONTEXT:
