@@ -1405,11 +1405,33 @@ static void virtual_vmexit(struct cpu_user_regs *regs)
     vmsucceed(regs);
 }
 
+static void nvmx_eptp_update(void)
+{
+    struct vcpu *curr = current;
+
+    if ( !nestedhvm_vcpu_in_guestmode(curr) ||
+          vcpu_nestedhvm(curr).nv_vmexit_pending ||
+         !vcpu_nestedhvm(curr).stale_np2m ||
+         !nestedhvm_paging_mode_hap(curr) )
+        return;
+
+    /*
+     * Interrupts are enabled here, so we need to clear stale_np2m
+     * before we do the vmwrite.  If we do it in the other order, an
+     * and IPI comes in changing the shadow eptp after the vmwrite,
+     * we'll complete the vmenter with a stale eptp value.
+     */
+    vcpu_nestedhvm(curr).stale_np2m = false;
+    __vmwrite(EPT_POINTER, get_shadow_eptp(curr));
+}
+
 void nvmx_switch_guest(void)
 {
     struct vcpu *v = current;
     struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
     struct cpu_user_regs *regs = guest_cpu_user_regs();
+
+    nvmx_eptp_update();
 
     /*
      * A pending IO emulation may still be not finished. In this case, no

@@ -1830,6 +1830,12 @@ static void assign_np2m(struct vcpu *v, struct p2m_domain *p2m)
     cpumask_set_cpu(v->processor, p2m->dirty_cpumask);
 }
 
+static void nvcpu_flush(struct vcpu *v)
+{
+    hvm_asid_flush_vcpu(v);
+    vcpu_nestedhvm(v).stale_np2m = true;
+}
+
 struct p2m_domain *
 p2m_get_nestedp2m_locked(struct vcpu *v)
 {
@@ -1853,7 +1859,7 @@ p2m_get_nestedp2m_locked(struct vcpu *v)
         if ( p2m->np2m_base == np2m_base || p2m->np2m_base == P2M_BASE_EADDR )
         {
             if ( p2m->np2m_base == P2M_BASE_EADDR )
-                hvm_asid_flush_vcpu(v);
+                nvcpu_flush(v);
             p2m->np2m_base = np2m_base;
             assign_np2m(v, p2m);
             nestedp2m_unlock(d);
@@ -1869,7 +1875,7 @@ p2m_get_nestedp2m_locked(struct vcpu *v)
     p2m_flush_table(p2m);
     p2m_lock(p2m);
     p2m->np2m_base = np2m_base;
-    hvm_asid_flush_vcpu(v);
+    nvcpu_flush(v);
     assign_np2m(v, p2m);
     nestedp2m_unlock(d);
 

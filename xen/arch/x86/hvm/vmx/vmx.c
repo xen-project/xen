@@ -3249,12 +3249,6 @@ static void ept_handle_violation(ept_qual_t q, paddr_t gpa)
     case 0:         // Unhandled L1 EPT violation
         break;
     case 1:         // This violation is handled completly
-        /*Current nested EPT maybe flushed by other vcpus, so need
-         * to re-set its shadow EPTP pointer.
-         */
-        if ( nestedhvm_vcpu_in_guestmode(current) &&
-                        nestedhvm_paging_mode_hap(current ) )
-            __vmwrite(EPT_POINTER, get_shadow_eptp(current));
         return;
     case -1:        // This vioaltion should be injected to L1 VMM
         vcpu_nestedhvm(current).nv_vmexit_pending = 1;
@@ -4203,12 +4197,17 @@ static void lbr_fixup(void)
         bdw_erratum_bdf14_fixup();
 }
 
-void vmx_vmenter_helper(const struct cpu_user_regs *regs)
+/* Returns false if the vmentry has to be restarted */
+bool vmx_vmenter_helper(const struct cpu_user_regs *regs)
 {
     struct vcpu *curr = current;
     u32 new_asid, old_asid;
     struct hvm_vcpu_asid *p_asid;
     bool_t need_flush;
+
+    /* Shadow EPTP can't be updated here because irqs are disabled */
+     if ( nestedhvm_vcpu_in_guestmode(curr) && vcpu_nestedhvm(curr).stale_np2m )
+         return false;
 
     if ( curr->domain->arch.hvm_domain.pi_ops.do_resume )
         curr->domain->arch.hvm_domain.pi_ops.do_resume(curr);
@@ -4270,6 +4269,8 @@ void vmx_vmenter_helper(const struct cpu_user_regs *regs)
     __vmwrite(GUEST_RIP,    regs->rip);
     __vmwrite(GUEST_RSP,    regs->rsp);
     __vmwrite(GUEST_RFLAGS, regs->rflags | X86_EFLAGS_MBS);
+
+    return true;
 }
 
 /*
