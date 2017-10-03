@@ -212,7 +212,7 @@ nestedhvm_hap_nested_page_fault(struct vcpu *v, paddr_t *L2_gpa,
     uint8_t p2ma_21 = p2m_access_rwx;
 
     p2m = p2m_get_hostp2m(d); /* L0 p2m */
-    nested_p2m = p2m_get_nestedp2m(v, nhvm_vcpu_p2m_base(v));
+    nested_p2m = p2m_get_nestedp2m(v);
 
     /* walk the L1 P2M table */
     rv = nestedhap_walk_L1_p2m(v, *L2_gpa, &L1_gpa, &page_order_21, &p2ma_21,

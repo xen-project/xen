@@ -360,10 +360,9 @@ struct p2m_domain {
 #define p2m_get_hostp2m(d)      ((d)->arch.p2m)
 
 /*
- * Assigns an np2m with the specified np2m_base to the specified vCPU
- * and returns that np2m.
+ * Updates vCPU's n2pm to match its np2m_base in VMCx12 and returns that np2m.
  */
-struct p2m_domain *p2m_get_nestedp2m(struct vcpu *v, uint64_t np2m_base);
+struct p2m_domain *p2m_get_nestedp2m(struct vcpu *v);
 
 /* If vcpu is in host mode then behaviour matches p2m_get_hostp2m().
  * If vcpu is in guest mode then behaviour matches p2m_get_nestedp2m().

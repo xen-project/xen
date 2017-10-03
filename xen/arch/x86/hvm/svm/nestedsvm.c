@@ -412,7 +412,11 @@ static void nestedsvm_vmcb_set_nestedp2m(struct vcpu *v,
     ASSERT(v != NULL);
     ASSERT(vvmcb != NULL);
     ASSERT(n2vmcb != NULL);
-    p2m = p2m_get_nestedp2m(v, vvmcb->_h_cr3);
+
+    /* This will allow nsvm_vcpu_hostcr3() to return correct np2m_base */
+    vcpu_nestedsvm(v).ns_vmcb_hostcr3 = vvmcb->_h_cr3;
+
+    p2m = p2m_get_nestedp2m(v);
     n2vmcb->_h_cr3 = pagetable_get_paddr(p2m_get_pagetable(p2m));
 }
 

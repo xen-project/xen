@@ -1831,11 +1831,12 @@ static void assign_np2m(struct vcpu *v, struct p2m_domain *p2m)
 }
 
 struct p2m_domain *
-p2m_get_nestedp2m(struct vcpu *v, uint64_t np2m_base)
+p2m_get_nestedp2m(struct vcpu *v)
 {
     struct nestedvcpu *nv = &vcpu_nestedhvm(v);
     struct domain *d = v->domain;
     struct p2m_domain *p2m;
+    uint64_t np2m_base = nhvm_vcpu_p2m_base(v);
 
     /* Mask out low bits; this avoids collisions with P2M_BASE_EADDR */
     np2m_base &= ~(0xfffull);
@@ -1883,7 +1884,7 @@ p2m_get_p2m(struct vcpu *v)
     if (!nestedhvm_is_n2(v))
         return p2m_get_hostp2m(v->domain);
 
-    return p2m_get_nestedp2m(v, nhvm_vcpu_p2m_base(v));
+    return p2m_get_nestedp2m(v);
 }
 
 unsigned long paging_gva_to_gfn(struct vcpu *v,
@@ -1898,13 +1899,12 @@ unsigned long paging_gva_to_gfn(struct vcpu *v,
         unsigned long l2_gfn, l1_gfn;
         struct p2m_domain *p2m;
         const struct paging_mode *mode;
-        uint64_t np2m_base = nhvm_vcpu_p2m_base(v);
         uint8_t l1_p2ma;
         unsigned int l1_page_order;
         int rv;
 
         /* translate l2 guest va into l2 guest gfn */
-        p2m = p2m_get_nestedp2m(v, np2m_base);
+        p2m = p2m_get_nestedp2m(v);
         mode = paging_get_nestedmode(v);
         l2_gfn = mode->gva_to_gfn(v, p2m, va, pfec);
 

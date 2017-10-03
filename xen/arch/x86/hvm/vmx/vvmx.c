@@ -1109,8 +1109,7 @@ static void load_shadow_guest_state(struct vcpu *v)
 
 uint64_t get_shadow_eptp(struct vcpu *v)
 {
-    uint64_t np2m_base = nvmx_vcpu_eptp_base(v);
-    struct p2m_domain *p2m = p2m_get_nestedp2m(v, np2m_base);
+    struct p2m_domain *p2m = p2m_get_nestedp2m(v);
     struct ept_data *ept = &p2m->ept;
 
     ept->mfn = pagetable_get_pfn(p2m_get_pagetable(p2m));
