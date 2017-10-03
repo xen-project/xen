@@ -37,18 +37,21 @@
 
 void pv_destroy_gdt(struct vcpu *v)
 {
-    l1_pgentry_t *pl1e;
+    l1_pgentry_t *pl1e = pv_gdt_ptes(v);
+    mfn_t zero_mfn = _mfn(virt_to_mfn(zero_page));
+    l1_pgentry_t zero_l1e = l1e_from_mfn(zero_mfn, __PAGE_HYPERVISOR_RO);
     unsigned int i;
-    unsigned long pfn, zero_pfn = PFN_DOWN(__pa(zero_page));
 
     v->arch.pv_vcpu.gdt_ents = 0;
-    pl1e = pv_gdt_ptes(v);
     for ( i = 0; i < FIRST_RESERVED_GDT_PAGE; i++ )
     {
-        pfn = l1e_get_pfn(pl1e[i]);
-        if ( (l1e_get_flags(pl1e[i]) & _PAGE_PRESENT) && pfn != zero_pfn )
-            put_page_and_type(mfn_to_page(_mfn(pfn)));
-        l1e_write(&pl1e[i], l1e_from_pfn(zero_pfn, __PAGE_HYPERVISOR_RO));
+        mfn_t mfn = l1e_get_mfn(pl1e[i]);
+
+        if ( (l1e_get_flags(pl1e[i]) & _PAGE_PRESENT) &&
+             !mfn_eq(mfn, zero_mfn) )
+            put_page_and_type(mfn_to_page(mfn));
+
+        l1e_write(&pl1e[i], zero_l1e);
         v->arch.pv_vcpu.gdt_frames[i] = 0;
     }
 }
