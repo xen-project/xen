@@ -29,6 +29,7 @@ long pv_set_gdt(struct vcpu *v, unsigned long *frames, unsigned int entries);
 void pv_destroy_gdt(struct vcpu *v);
 
 bool pv_map_ldt_shadow_page(unsigned int off);
+bool pv_destroy_ldt(struct vcpu *v);
 
 #else
 
@@ -48,6 +49,8 @@ static inline long pv_set_gdt(struct vcpu *v, unsigned long *frames,
 static inline void pv_destroy_gdt(struct vcpu *v) { ASSERT_UNREACHABLE(); }
 
 static inline bool pv_map_ldt_shadow_page(unsigned int off) { return false; }
+static inline bool pv_destroy_ldt(struct vcpu *v)
+{ ASSERT_UNREACHABLE(); return false; }
 
 #endif
 

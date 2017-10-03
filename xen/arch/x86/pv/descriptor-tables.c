@@ -31,9 +31,47 @@
 #undef page_to_mfn
 #define page_to_mfn(pg) _mfn(__page_to_mfn(pg))
 
-/*******************
- * Descriptor Tables
+/*
+ * Flush the LDT, dropping any typerefs.  Returns a boolean indicating whether
+ * mappings have been removed (i.e. a TLB flush is needed).
  */
+bool pv_destroy_ldt(struct vcpu *v)
+{
+    l1_pgentry_t *pl1e;
+    unsigned int i, mappings_dropped = 0;
+    struct page_info *page;
+
+    ASSERT(!in_irq());
+
+    spin_lock(&v->arch.pv_vcpu.shadow_ldt_lock);
+
+    if ( v->arch.pv_vcpu.shadow_ldt_mapcnt == 0 )
+        goto out;
+
+    pl1e = pv_ldt_ptes(v);
+
+    for ( i = 0; i < 16; i++ )
+    {
+        if ( !(l1e_get_flags(pl1e[i]) & _PAGE_PRESENT) )
+            continue;
+
+        page = l1e_get_page(pl1e[i]);
+        l1e_write(&pl1e[i], l1e_empty());
+        mappings_dropped++;
+
+        ASSERT_PAGE_IS_TYPE(page, PGT_seg_desc_page);
+        ASSERT_PAGE_IS_DOMAIN(page, v->domain);
+        put_page_and_type(page);
+    }
+
+    ASSERT(v->arch.pv_vcpu.shadow_ldt_mapcnt == mappings_dropped);
+    v->arch.pv_vcpu.shadow_ldt_mapcnt = 0;
+
+ out:
+    spin_unlock(&v->arch.pv_vcpu.shadow_ldt_lock);
+
+    return mappings_dropped;
+}
 
 void pv_destroy_gdt(struct vcpu *v)
 {

@@ -126,6 +126,7 @@
 
 #include <asm/hvm/grant_table.h>
 #include <asm/pv/grant_table.h>
+#include <asm/pv/mm.h>
 
 #include "pv/mm.h"
 
@@ -553,48 +554,6 @@ static inline void set_tlbflush_timestamp(struct page_info *page)
 
 const char __section(".bss.page_aligned.const") __aligned(PAGE_SIZE)
     zero_page[PAGE_SIZE];
-
-/*
- * Flush the LDT, dropping any typerefs.  Returns a boolean indicating whether
- * mappings have been removed (i.e. a TLB flush is needed).
- */
-static bool invalidate_shadow_ldt(struct vcpu *v)
-{
-    l1_pgentry_t *pl1e;
-    unsigned int i, mappings_dropped = 0;
-    struct page_info *page;
-
-    BUG_ON(unlikely(in_irq()));
-
-    spin_lock(&v->arch.pv_vcpu.shadow_ldt_lock);
-
-    if ( v->arch.pv_vcpu.shadow_ldt_mapcnt == 0 )
-        goto out;
-
-    pl1e = pv_ldt_ptes(v);
-
-    for ( i = 0; i < 16; i++ )
-    {
-        if ( !(l1e_get_flags(pl1e[i]) & _PAGE_PRESENT) )
-            continue;
-
-        page = l1e_get_page(pl1e[i]);
-        l1e_write(&pl1e[i], l1e_empty());
-        mappings_dropped++;
-
-        ASSERT_PAGE_IS_TYPE(page, PGT_seg_desc_page);
-        ASSERT_PAGE_IS_DOMAIN(page, v->domain);
-        put_page_and_type(page);
-    }
-
-    ASSERT(v->arch.pv_vcpu.shadow_ldt_mapcnt == mappings_dropped);
-    v->arch.pv_vcpu.shadow_ldt_mapcnt = 0;
-
- out:
-    spin_unlock(&v->arch.pv_vcpu.shadow_ldt_lock);
-
-    return mappings_dropped;
-}
 
 
 static int alloc_segdesc_page(struct page_info *page)
@@ -1252,7 +1211,7 @@ void put_page_from_l1e(l1_pgentry_t l1e, struct domain *l1e_owner)
         {
             for_each_vcpu ( pg_owner, v )
             {
-                if ( invalidate_shadow_ldt(v) )
+                if ( pv_destroy_ldt(v) )
                     flush_tlb_mask(v->vcpu_dirty_cpumask);
             }
         }
@@ -2835,7 +2794,7 @@ int new_guest_cr3(mfn_t mfn)
             return rc;
         }
 
-        invalidate_shadow_ldt(curr); /* Unconditional TLB flush later. */
+        pv_destroy_ldt(curr); /* Unconditional TLB flush later. */
         write_ptbase(curr);
 
         return 0;
@@ -2871,7 +2830,7 @@ int new_guest_cr3(mfn_t mfn)
         return rc;
     }
 
-    invalidate_shadow_ldt(curr); /* Unconditional TLB flush later. */
+    pv_destroy_ldt(curr); /* Unconditional TLB flush later. */
 
     if ( !VM_ASSIST(d, m2p_strict) && !paging_mode_refcounts(d) )
         fill_ro_mpt(mfn);
@@ -3378,7 +3337,7 @@ long do_mmuext_op(
             else if ( (curr->arch.pv_vcpu.ldt_ents != ents) ||
                       (curr->arch.pv_vcpu.ldt_base != ptr) )
             {
-                if ( invalidate_shadow_ldt(curr) )
+                if ( pv_destroy_ldt(curr) )
                     flush_tlb_local();
 
                 curr->arch.pv_vcpu.ldt_base = ptr;
