@@ -57,14 +57,13 @@ long pv_set_gdt(struct vcpu *v, unsigned long *frames, unsigned int entries)
 {
     struct domain *d = v->domain;
     l1_pgentry_t *pl1e;
-    /* NB. There are 512 8-byte entries per GDT page. */
-    unsigned int i, nr_pages = (entries + 511) / 512;
+    unsigned int i, nr_frames = DIV_ROUND_UP(entries, 512);
 
     if ( entries > FIRST_RESERVED_GDT_ENTRY )
         return -EINVAL;
 
     /* Check the pages in the new GDT. */
-    for ( i = 0; i < nr_pages; i++ )
+    for ( i = 0; i < nr_frames; i++ )
     {
         struct page_info *page;
 
@@ -85,7 +84,7 @@ long pv_set_gdt(struct vcpu *v, unsigned long *frames, unsigned int entries)
     /* Install the new GDT. */
     v->arch.pv_vcpu.gdt_ents = entries;
     pl1e = pv_gdt_ptes(v);
-    for ( i = 0; i < nr_pages; i++ )
+    for ( i = 0; i < nr_frames; i++ )
     {
         v->arch.pv_vcpu.gdt_frames[i] = frames[i];
         l1e_write(&pl1e[i], l1e_from_pfn(frames[i], __PAGE_HYPERVISOR_RW));
@@ -104,7 +103,7 @@ long pv_set_gdt(struct vcpu *v, unsigned long *frames, unsigned int entries)
 long do_set_gdt(XEN_GUEST_HANDLE_PARAM(xen_ulong_t) frame_list,
                 unsigned int entries)
 {
-    int nr_pages = (entries + 511) / 512;
+    unsigned int nr_frames = DIV_ROUND_UP(entries, 512);
     unsigned long frames[16];
     struct vcpu *curr = current;
     long ret;
@@ -113,7 +112,7 @@ long do_set_gdt(XEN_GUEST_HANDLE_PARAM(xen_ulong_t) frame_list,
     if ( entries > FIRST_RESERVED_GDT_ENTRY )
         return -EINVAL;
 
-    if ( copy_from_guest(frames, frame_list, nr_pages) )
+    if ( copy_from_guest(frames, frame_list, nr_frames) )
         return -EFAULT;
 
     domain_lock(curr->domain);
@@ -130,7 +129,7 @@ int compat_set_gdt(XEN_GUEST_HANDLE_PARAM(uint) frame_list,
                    unsigned int entries)
 {
     struct vcpu *curr = current;
-    unsigned int i, nr_pages = (entries + 511) / 512;
+    unsigned int i, nr_frames = DIV_ROUND_UP(entries, 512);
     unsigned long frames[16];
     int ret;
 
@@ -138,10 +137,10 @@ int compat_set_gdt(XEN_GUEST_HANDLE_PARAM(uint) frame_list,
     if ( entries > FIRST_RESERVED_GDT_ENTRY )
         return -EINVAL;
 
-    if ( !guest_handle_okay(frame_list, nr_pages) )
+    if ( !guest_handle_okay(frame_list, nr_frames) )
         return -EFAULT;
 
-    for ( i = 0; i < nr_pages; ++i )
+    for ( i = 0; i < nr_frames; ++i )
     {
         unsigned int frame;
 

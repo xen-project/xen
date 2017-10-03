@@ -1017,12 +1017,14 @@ int arch_set_info_guest(
     else
     {
         unsigned long gdt_frames[ARRAY_SIZE(v->arch.pv_vcpu.gdt_frames)];
-        unsigned int n = (c.cmp->gdt_ents + 511) / 512;
+        unsigned int nr_frames = DIV_ROUND_UP(c.cmp->gdt_ents, 512);
 
-        if ( n > ARRAY_SIZE(v->arch.pv_vcpu.gdt_frames) )
+        if ( nr_frames > ARRAY_SIZE(v->arch.pv_vcpu.gdt_frames) )
             return -EINVAL;
-        for ( i = 0; i < n; ++i )
+
+        for ( i = 0; i < nr_frames; ++i )
             gdt_frames[i] = c.cmp->gdt_frames[i];
+
         rc = (int)pv_set_gdt(v, gdt_frames, c.cmp->gdt_ents);
     }
     if ( rc != 0 )
