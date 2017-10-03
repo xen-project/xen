@@ -1794,14 +1794,24 @@ p2m_flush_nestedp2m(struct domain *d)
         p2m_flush_table(d->arch.nested_p2m[i]);
 }
 
+static void assign_np2m(struct vcpu *v, struct p2m_domain *p2m)
+{
+    struct nestedvcpu *nv = &vcpu_nestedhvm(v);
+    struct domain *d = v->domain;
+
+    /* Bring this np2m to the top of the LRU list */
+    p2m_getlru_nestedp2m(d, p2m);
+
+    nv->nv_flushp2m = 0;
+    nv->nv_p2m = p2m;
+    cpumask_set_cpu(v->processor, p2m->dirty_cpumask);
+}
+
 struct p2m_domain *
 p2m_get_nestedp2m(struct vcpu *v, uint64_t np2m_base)
 {
-    /* Use volatile to prevent gcc to cache nv->nv_p2m in a cpu register as
-     * this may change within the loop by an other (v)cpu.
-     */
-    volatile struct nestedvcpu *nv = &vcpu_nestedhvm(v);
-    struct domain *d;
+    struct nestedvcpu *nv = &vcpu_nestedhvm(v);
+    struct domain *d = v->domain;
     struct p2m_domain *p2m;
 
     /* Mask out low bits; this avoids collisions with P2M_BASE_EADDR */
@@ -1811,7 +1821,6 @@ p2m_get_nestedp2m(struct vcpu *v, uint64_t np2m_base)
         nv->nv_p2m = NULL;
     }
 
-    d = v->domain;
     nestedp2m_lock(d);
     p2m = nv->nv_p2m;
     if ( p2m ) 
@@ -1819,15 +1828,13 @@ p2m_get_nestedp2m(struct vcpu *v, uint64_t np2m_base)
         p2m_lock(p2m);
         if ( p2m->np2m_base == np2m_base || p2m->np2m_base == P2M_BASE_EADDR )
         {
-            nv->nv_flushp2m = 0;
-            p2m_getlru_nestedp2m(d, p2m);
-            nv->nv_p2m = p2m;
             if ( p2m->np2m_base == P2M_BASE_EADDR )
                 hvm_asid_flush_vcpu(v);
             p2m->np2m_base = np2m_base;
-            cpumask_set_cpu(v->processor, p2m->dirty_cpumask);
+            assign_np2m(v, p2m);
             p2m_unlock(p2m);
             nestedp2m_unlock(d);
+
             return p2m;
         }
         p2m_unlock(p2m);
@@ -1838,11 +1845,9 @@ p2m_get_nestedp2m(struct vcpu *v, uint64_t np2m_base)
     p2m = p2m_getlru_nestedp2m(d, NULL);
     p2m_flush_table(p2m);
     p2m_lock(p2m);
-    nv->nv_p2m = p2m;
     p2m->np2m_base = np2m_base;
-    nv->nv_flushp2m = 0;
     hvm_asid_flush_vcpu(v);
-    cpumask_set_cpu(v->processor, p2m->dirty_cpumask);
+    assign_np2m(v, p2m);
     p2m_unlock(p2m);
     nestedp2m_unlock(d);
 

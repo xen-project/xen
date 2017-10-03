@@ -359,9 +359,9 @@ struct p2m_domain {
 /* get host p2m table */
 #define p2m_get_hostp2m(d)      ((d)->arch.p2m)
 
-/* Get p2m table (re)usable for specified np2m base.
- * Automatically destroys and re-initializes a p2m if none found.
- * If np2m_base == 0 then v->arch.hvm_vcpu.guest_cr[3] is used.
+/*
+ * Assigns an np2m with the specified np2m_base to the specified vCPU
+ * and returns that np2m.
  */
 struct p2m_domain *p2m_get_nestedp2m(struct vcpu *v, uint64_t np2m_base);
 
