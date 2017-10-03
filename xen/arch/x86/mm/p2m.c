@@ -1813,7 +1813,11 @@ void np2m_flush_base(struct vcpu *v, unsigned long np2m_base)
         p2m = d->arch.nested_p2m[i];
         p2m_lock(p2m);
         if ( p2m->np2m_base == np2m_base )
+        {
             p2m_flush_table_locked(p2m);
+            p2m_unlock(p2m);
+            break;
+        }
         p2m_unlock(p2m);
     }
     nestedp2m_unlock(d);
