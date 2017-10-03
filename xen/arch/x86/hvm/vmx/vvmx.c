@@ -1367,6 +1367,9 @@ static void virtual_vmexit(struct cpu_user_regs *regs)
          !(v->arch.hvm_vcpu.guest_efer & EFER_LMA) )
         shadow_to_vvmcs_bulk(v, ARRAY_SIZE(gpdpte_fields), gpdpte_fields);
 
+    /* This will clear current pCPU bit in p2m->dirty_cpumask */
+    np2m_schedule(NP2M_SCHEDLE_OUT);
+
     vmx_vmcs_switch(v->arch.hvm_vmx.vmcs_pa, nvcpu->nv_n1vmcx_pa);
 
     nestedhvm_vcpu_exit_guestmode(v);

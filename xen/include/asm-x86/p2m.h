@@ -209,6 +209,7 @@ struct p2m_domain {
      * to set it to any other value. */
 #define P2M_BASE_EADDR     (~0ULL)
     uint64_t           np2m_base;
+    uint64_t           np2m_generation;
 
     /* Nested p2ms: linked list of n2pms allocated to this domain. 
      * The host p2m hasolds the head of the list and the np2ms are 
@@ -370,6 +371,11 @@ struct p2m_domain *p2m_get_nestedp2m_locked(struct vcpu *v);
  * If vcpu is in guest mode then behaviour matches p2m_get_nestedp2m().
  */
 struct p2m_domain *p2m_get_p2m(struct vcpu *v);
+
+#define NP2M_SCHEDLE_IN  0
+#define NP2M_SCHEDLE_OUT 1
+
+void np2m_schedule(int dir);
 
 static inline bool_t p2m_is_hostp2m(const struct p2m_domain *p2m)
 {

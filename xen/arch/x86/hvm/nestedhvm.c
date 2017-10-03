@@ -57,6 +57,7 @@ nestedhvm_vcpu_reset(struct vcpu *v)
     nv->nv_flushp2m = 0;
     nv->nv_p2m = NULL;
     nv->stale_np2m = false;
+    nv->np2m_generation = 0;
 
     hvm_asid_flush_vcpu_asid(&nv->nv_n2asid);
 

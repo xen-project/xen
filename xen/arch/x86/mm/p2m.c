@@ -73,6 +73,7 @@ static int p2m_initialise(struct domain *d, struct p2m_domain *p2m)
     p2m->p2m_class = p2m_host;
 
     p2m->np2m_base = P2M_BASE_EADDR;
+    p2m->np2m_generation = 0;
 
     for ( i = 0; i < ARRAY_SIZE(p2m->pod.mrp.list); ++i )
         p2m->pod.mrp.list[i] = gfn_x(INVALID_GFN);
@@ -1753,6 +1754,7 @@ p2m_flush_table_locked(struct p2m_domain *p2m)
 
     /* This is no longer a valid nested p2m for any address space */
     p2m->np2m_base = P2M_BASE_EADDR;
+    p2m->np2m_generation++;
 
     /* Make sure nobody else is using this p2m table */
     nestedhvm_vmcx_flushtlb(p2m);
@@ -1827,6 +1829,7 @@ static void assign_np2m(struct vcpu *v, struct p2m_domain *p2m)
 
     nv->nv_flushp2m = 0;
     nv->nv_p2m = p2m;
+    nv->np2m_generation = p2m->np2m_generation;
     cpumask_set_cpu(v->processor, p2m->dirty_cpumask);
 }
 
@@ -1858,13 +1861,20 @@ p2m_get_nestedp2m_locked(struct vcpu *v)
         p2m_lock(p2m);
         if ( p2m->np2m_base == np2m_base || p2m->np2m_base == P2M_BASE_EADDR )
         {
-            if ( p2m->np2m_base == P2M_BASE_EADDR )
+            /* Check if np2m was flushed just before the lock */
+            if ( p2m->np2m_base == P2M_BASE_EADDR ||
+                 nv->np2m_generation != p2m->np2m_generation )
                 nvcpu_flush(v);
             p2m->np2m_base = np2m_base;
             assign_np2m(v, p2m);
             nestedp2m_unlock(d);
 
             return p2m;
+        }
+        else
+        {
+            /* vCPU is switching from some other valid np2m */
+            cpumask_clear_cpu(v->processor, p2m->dirty_cpumask);
         }
         p2m_unlock(p2m);
     }
@@ -1897,6 +1907,50 @@ p2m_get_p2m(struct vcpu *v)
         return p2m_get_hostp2m(v->domain);
 
     return p2m_get_nestedp2m(v);
+}
+
+void np2m_schedule(int dir)
+{
+    struct vcpu *curr = current;
+    struct nestedvcpu *nv = &vcpu_nestedhvm(curr);
+    struct p2m_domain *p2m;
+
+    ASSERT(dir == NP2M_SCHEDLE_IN || dir == NP2M_SCHEDLE_OUT);
+
+    if ( !nestedhvm_enabled(curr->domain) ||
+         !nestedhvm_vcpu_in_guestmode(curr) ||
+         !nestedhvm_paging_mode_hap(curr) )
+        return;
+
+    p2m = nv->nv_p2m;
+    if ( p2m )
+    {
+        bool np2m_valid;
+
+        p2m_lock(p2m);
+        np2m_valid = p2m->np2m_base == nhvm_vcpu_p2m_base(curr) &&
+                     nv->np2m_generation == p2m->np2m_generation;
+        if ( dir == NP2M_SCHEDLE_OUT && np2m_valid )
+        {
+            /*
+             * The np2m is up to date but this vCPU will no longer use it,
+             * which means there are no reasons to send a flush IPI.
+             */
+            cpumask_clear_cpu(curr->processor, p2m->dirty_cpumask);
+        }
+        else if ( dir == NP2M_SCHEDLE_IN )
+        {
+            if ( !np2m_valid )
+            {
+                /* This vCPU's np2m was flushed while it was not runnable */
+                hvm_asid_flush_core();
+                vcpu_nestedhvm(curr).nv_p2m = NULL;
+            }
+            else
+                cpumask_set_cpu(curr->processor, p2m->dirty_cpumask);
+        }
+        p2m_unlock(p2m);
+    }
 }
 
 unsigned long paging_gva_to_gfn(struct vcpu *v,
