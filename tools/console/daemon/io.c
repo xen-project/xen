@@ -1047,7 +1047,7 @@ static void handle_tty_write(struct console *con)
 
 static void console_evtchn_unmask(struct console *con, void *data)
 {
-	long long now = (long long)data;
+	long long now = *(long long *)data;
 
 	if (!console_enabled(con))
 		return;
@@ -1343,7 +1343,7 @@ void handle_io(void)
 		   domains with new allowance */
 		for (d = dom_head; d; d = d->next) {
 
-			console_iter_void_arg2(d, console_evtchn_unmask, (void *)now);
+			console_iter_void_arg2(d, console_evtchn_unmask, (void *)&now);
 
 			console_iter_void_arg2(d, maybe_add_console_evtchn_fd, 
 					       (void *)&next_timeout);
