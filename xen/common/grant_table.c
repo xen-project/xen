@@ -54,6 +54,9 @@ struct grant_table {
      * what version to use yet.
      */
     unsigned int          gt_version;
+    /* Resource limits of the domain. */
+    unsigned int          max_grant_frames;
+    unsigned int          max_maptrack_frames;
     /* Table size. Number of frames shared with guest */
     unsigned int          nr_grant_frames;
     /* Number of grant status frames shared with guest (for version 2) */
@@ -78,23 +81,18 @@ struct grant_table {
 
 #ifndef DEFAULT_MAX_NR_GRANT_FRAMES /* to allow arch to override */
 /* Default maximum size of a grant table. [POLICY] */
-#define DEFAULT_MAX_NR_GRANT_FRAMES   32
+#define DEFAULT_MAX_NR_GRANT_FRAMES   64
 #endif
 
-unsigned int __read_mostly max_grant_frames;
-integer_param("gnttab_max_frames", max_grant_frames);
+static unsigned int __read_mostly max_grant_frames =
+                                               DEFAULT_MAX_NR_GRANT_FRAMES;
+integer_runtime_param("gnttab_max_frames", max_grant_frames);
 
-/* The maximum number of grant mappings is defined as a multiplier of the
- * maximum number of grant table entries. This defines the multiplier used.
- * Pretty arbitrary. [POLICY]
- * As gnttab_max_nr_frames has been deprecated, this multiplier is deprecated too.
- * New options allow to set max_maptrack_frames and
- * map_grant_table_frames independently.
- */
 #define DEFAULT_MAX_MAPTRACK_FRAMES 1024
 
-static unsigned int __read_mostly max_maptrack_frames;
-integer_param("gnttab_max_maptrack_frames", max_maptrack_frames);
+static unsigned int __read_mostly max_maptrack_frames =
+                                               DEFAULT_MAX_MAPTRACK_FRAMES;
+integer_runtime_param("gnttab_max_maptrack_frames", max_maptrack_frames);
 
 /*
  * Note that the three values below are effectively part of the ABI, even if
@@ -290,8 +288,8 @@ num_act_frames_from_sha_frames(const unsigned int num)
     return DIV_ROUND_UP(num * sha_per_page, ACGNT_PER_PAGE);
 }
 
-#define max_nr_active_grant_frames \
-    num_act_frames_from_sha_frames(max_grant_frames)
+#define max_nr_active_grant_frames(gt) \
+    num_act_frames_from_sha_frames((gt)->max_grant_frames)
 
 static inline unsigned int
 nr_active_grant_frames(struct grant_table *gt)
@@ -530,7 +528,7 @@ get_maptrack_handle(
      * out of memory, try stealing an entry from another VCPU (in case the
      * guest isn't mapping across its VCPUs evenly).
      */
-    if ( nr_maptrack_frames(lgt) < max_maptrack_frames )
+    if ( nr_maptrack_frames(lgt) < lgt->max_maptrack_frames )
         new_mt = alloc_xenheap_page();
 
     if ( !new_mt )
@@ -1677,7 +1675,7 @@ gnttab_grow_table(struct domain *d, unsigned int req_nr_frames)
 
     if ( req_nr_frames < INITIAL_NR_GRANT_FRAMES )
         req_nr_frames = INITIAL_NR_GRANT_FRAMES;
-    ASSERT(req_nr_frames <= max_grant_frames);
+    ASSERT(req_nr_frames <= gt->max_grant_frames);
 
     gdprintk(XENLOG_INFO,
             "Expanding dom (%d) grant table from (%d) to (%d) frames.\n",
@@ -1735,7 +1733,8 @@ active_alloc_failed:
 }
 
 static int
-grant_table_init(struct domain *d, struct grant_table *gt)
+grant_table_init(struct domain *d, struct grant_table *gt,
+                 unsigned int grant_frames, unsigned int maptrack_frames)
 {
     int ret = -ENOMEM;
 
@@ -1747,25 +1746,31 @@ grant_table_init(struct domain *d, struct grant_table *gt)
         goto out_no_cleanup;
     }
 
+    gt->max_grant_frames = grant_frames;
+    gt->max_maptrack_frames = maptrack_frames;
+
     /* Active grant table. */
     gt->active = xzalloc_array(struct active_grant_entry *,
-                               max_nr_active_grant_frames);
+                               max_nr_active_grant_frames(gt));
     if ( gt->active == NULL )
         goto out;
 
     /* Tracking of mapped foreign frames table */
-    gt->maptrack = vzalloc(max_maptrack_frames * sizeof(*gt->maptrack));
-    if ( gt->maptrack == NULL )
-        goto out;
+    if ( gt->max_maptrack_frames )
+    {
+        gt->maptrack = vzalloc(gt->max_maptrack_frames * sizeof(*gt->maptrack));
+        if ( gt->maptrack == NULL )
+            goto out;
+    }
 
     /* Shared grant table. */
-    gt->shared_raw = xzalloc_array(void *, max_grant_frames);
+    gt->shared_raw = xzalloc_array(void *, gt->max_grant_frames);
     if ( gt->shared_raw == NULL )
         goto out;
 
     /* Status pages for grant table - for version 2 */
     gt->status = xzalloc_array(grant_status_t *,
-                               grant_to_status_frames(max_grant_frames));
+                               grant_to_status_frames(gt->max_grant_frames));
     if ( gt->status == NULL )
         goto out;
 
@@ -1798,7 +1803,8 @@ grant_table_init(struct domain *d, struct grant_table *gt)
 
 static long
 gnttab_setup_table(
-    XEN_GUEST_HANDLE_PARAM(gnttab_setup_table_t) uop, unsigned int count)
+    XEN_GUEST_HANDLE_PARAM(gnttab_setup_table_t) uop, unsigned int count,
+    unsigned int limit_max)
 {
     struct vcpu *curr = current;
     struct gnttab_setup_table op;
@@ -1811,15 +1817,6 @@ gnttab_setup_table(
 
     if ( unlikely(copy_from_guest(&op, uop, 1)) )
         return -EFAULT;
-
-    if ( unlikely(op.nr_frames > max_grant_frames) )
-    {
-        gdprintk(XENLOG_INFO, "Xen only supports up to %d grant-table frames"
-                " per domain.\n",
-                max_grant_frames);
-        op.status = GNTST_general_error;
-        goto out;
-    }
 
     if ( !guest_handle_okay(op.frame_list, op.nr_frames) )
         return -EFAULT;
@@ -1840,6 +1837,21 @@ gnttab_setup_table(
     gt = d->grant_table;
     grant_write_lock(gt);
 
+    if ( unlikely(op.nr_frames > gt->max_grant_frames) )
+    {
+        gdprintk(XENLOG_INFO, "d%d is limited to %u grant-table frames\n",
+                d->domain_id, gt->max_grant_frames);
+        op.status = GNTST_general_error;
+        goto unlock;
+    }
+    if ( unlikely(limit_max < op.nr_frames) )
+    {
+        gdprintk(XENLOG_WARNING, "nr_frames for d%d is too large (%u,%u)\n",
+                 d->domain_id, op.nr_frames, limit_max);
+        op.status = GNTST_general_error;
+        goto unlock;
+    }
+
     if ( gt->gt_version == 0 )
         gt->gt_version = 1;
 
@@ -1849,8 +1861,9 @@ gnttab_setup_table(
          gnttab_grow_table(d, op.nr_frames) )
     {
         gdprintk(XENLOG_INFO,
-                 "Expand grant table to %u failed. Current: %u Max: %u\n",
-                 op.nr_frames, nr_grant_frames(gt), max_grant_frames);
+                 "Expand grant table of d%d to %u failed. Current: %u Max: %u\n",
+                 d->domain_id, op.nr_frames, nr_grant_frames(gt),
+                 gt->max_grant_frames);
         op.status = GNTST_general_error;
         goto unlock;
     }
@@ -1885,6 +1898,7 @@ gnttab_query_size(
 {
     struct gnttab_query_size op;
     struct domain *d;
+    struct grant_table *gt;
 
     if ( count != 1 )
         return -EINVAL;
@@ -1905,13 +1919,15 @@ gnttab_query_size(
         goto out;
     }
 
-    grant_read_lock(d->grant_table);
+    gt = d->grant_table;
 
-    op.nr_frames     = nr_grant_frames(d->grant_table);
-    op.max_nr_frames = max_grant_frames;
+    grant_read_lock(gt);
+
+    op.nr_frames     = nr_grant_frames(gt);
+    op.max_nr_frames = gt->max_grant_frames;
     op.status        = GNTST_okay;
 
-    grant_read_unlock(d->grant_table);
+    grant_read_unlock(gt);
 
  out:
     if ( d )
@@ -2986,7 +3002,7 @@ gnttab_set_version(XEN_GUEST_HANDLE_PARAM(gnttab_set_version_t) uop)
 
 static long
 gnttab_get_status_frames(XEN_GUEST_HANDLE_PARAM(gnttab_get_status_frames_t) uop,
-                         int count)
+                         unsigned int count, unsigned int limit_max)
 {
     gnttab_get_status_frames_t op;
     struct domain *d;
@@ -3026,9 +3042,19 @@ gnttab_get_status_frames(XEN_GUEST_HANDLE_PARAM(gnttab_get_status_frames_t) uop,
 
     if ( unlikely(op.nr_frames > nr_status_frames(gt)) )
     {
-        gdprintk(XENLOG_INFO, "Guest requested addresses for %d grant status "
-                 "frames, but only %d are available.\n",
-                 op.nr_frames, nr_status_frames(gt));
+        gdprintk(XENLOG_INFO, "Requested addresses of d%d for %u grant "
+                 "status frames, but has only %u\n",
+                 d->domain_id, op.nr_frames, nr_status_frames(gt));
+        op.status = GNTST_general_error;
+        goto unlock;
+    }
+
+    if ( unlikely(limit_max < grant_to_status_frames(op.nr_frames)) )
+    {
+        gdprintk(XENLOG_WARNING,
+                 "grant_to_status_frames(%u) for d%d is too large (%u,%u)\n",
+                 op.nr_frames, d->domain_id,
+                 grant_to_status_frames(op.nr_frames), limit_max);
         op.status = GNTST_general_error;
         goto unlock;
     }
@@ -3341,7 +3367,7 @@ do_grant_table_op(
 
     case GNTTABOP_setup_table:
         rc = gnttab_setup_table(
-            guest_handle_cast(uop, gnttab_setup_table_t), count);
+            guest_handle_cast(uop, gnttab_setup_table_t), count, UINT_MAX);
         ASSERT(rc <= 0);
         break;
 
@@ -3390,7 +3416,8 @@ do_grant_table_op(
 
     case GNTTABOP_get_status_frames:
         rc = gnttab_get_status_frames(
-            guest_handle_cast(uop, gnttab_get_status_frames_t), count);
+            guest_handle_cast(uop, gnttab_get_status_frames_t), count,
+                              UINT_MAX);
         break;
 
     case GNTTABOP_get_version:
@@ -3470,7 +3497,7 @@ grant_table_create(
 
     if ( d->domain_id == 0 )
     {
-        ret = grant_table_init(d, t);
+        ret = grant_table_init(d, t, gnttab_dom0_frames(), max_maptrack_frames);
     }
 
     return ret;
@@ -3671,11 +3698,15 @@ int grant_table_set_limits(struct domain *d, unsigned int grant_frames,
 {
     struct grant_table *gt = d->grant_table;
 
+    if ( grant_frames < INITIAL_NR_GRANT_FRAMES ||
+         grant_frames > max_grant_frames ||
+         maptrack_frames > max_maptrack_frames )
+        return -EINVAL;
     if ( !gt )
         return -ENOENT;
 
     /* Set limits. */
-    return grant_table_init(d, gt);
+    return grant_table_init(d, gt, grant_frames, maptrack_frames);
 }
 
 #ifdef CONFIG_HAS_MEM_SHARING
@@ -3747,7 +3778,7 @@ int gnttab_map_frame(struct domain *d, unsigned long idx, gfn_t gfn,
     }
     else
     {
-        if ( (idx >= nr_grant_frames(gt)) && (idx < max_grant_frames) )
+        if ( (idx >= nr_grant_frames(gt)) && (idx < gt->max_grant_frames) )
             gnttab_grow_table(d, idx + 1);
 
         if ( idx < nr_grant_frames(gt) )
@@ -3774,6 +3805,12 @@ static void gnttab_usage_print(struct domain *rd)
     printk("[ref] localdom mfn      pin          localdom gmfn     flags\n");
 
     grant_read_lock(gt);
+
+    printk("grant-table for remote d%d (v%u)\n"
+           "  %u frames (%u max), %u maptrack frames (%u max)\n",
+           rd->domain_id, gt->gt_version,
+           nr_grant_frames(gt), gt->max_grant_frames,
+           nr_maptrack_frames(gt), gt->max_maptrack_frames);
 
     for ( ref = 0; ref != nr_grant_entries(gt); ref++ )
     {
@@ -3802,12 +3839,7 @@ static void gnttab_usage_print(struct domain *rd)
             status = status_entry(gt, ref);
         }
 
-        if ( first )
-        {
-            printk("grant-table for remote domain:%5d (v%d)\n",
-                   rd->domain_id, gt->gt_version);
-            first = 0;
-        }
+        first = 0;
 
         /*      [0xXXX]  ddddd 0xXXXXXX 0xXXXXXXXX      ddddd 0xXXXXXX 0xXX */
         printk("[0x%03x]  %5d 0x%06lx 0x%08x      %5d 0x%06"PRIx64" 0x%02x\n",
@@ -3819,8 +3851,7 @@ static void gnttab_usage_print(struct domain *rd)
     grant_read_unlock(gt);
 
     if ( first )
-        printk("grant-table for remote domain:%5d ... "
-               "no active grant table entries\n", rd->domain_id);
+        printk("no active grant table entries\n");
 }
 
 static void gnttab_usage_print_all(unsigned char key)
@@ -3834,19 +3865,16 @@ static void gnttab_usage_print_all(unsigned char key)
 
 static int __init gnttab_usage_init(void)
 {
-    BUILD_BUG_ON(DEFAULT_MAX_MAPTRACK_FRAMES < DEFAULT_MAX_NR_GRANT_FRAMES);
-
-    if ( !max_grant_frames )
-        max_grant_frames = DEFAULT_MAX_NR_GRANT_FRAMES;
-
-    if ( !max_maptrack_frames )
-        max_maptrack_frames = DEFAULT_MAX_MAPTRACK_FRAMES;
-
     register_keyhandler('g', gnttab_usage_print_all,
                         "print grant table usage", 1);
     return 0;
 }
 __initcall(gnttab_usage_init);
+
+unsigned int __init gnttab_dom0_frames(void)
+{
+    return min(max_grant_frames, gnttab_dom0_max());
+}
 
 /*
  * Local variables:

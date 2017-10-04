@@ -2,9 +2,11 @@
 #define __ASM_GRANT_TABLE_H__
 
 #include <xen/grant_table.h>
+#include <xen/kernel.h>
+#include <xen/pfn.h>
 #include <xen/sched.h>
 
-#define INITIAL_NR_GRANT_FRAMES 4
+#define INITIAL_NR_GRANT_FRAMES 1U
 
 struct grant_table_arch {
     gfn_t *gfn;
@@ -26,9 +28,21 @@ static inline int replace_grant_supported(void)
     return 1;
 }
 
+/*
+ * The region used by Xen on the memory will never be mapped in DOM0
+ * memory layout. Therefore it can be used for the grant table.
+ *
+ * Only use the text section as it's always present and will contain
+ * enough space for a large grant table
+ */
+static inline unsigned int gnttab_dom0_max(void)
+{
+    return PFN_DOWN(_etext - _stext);
+}
+
 #define gnttab_init_arch(gt)                                             \
 ({                                                                       \
-    (gt)->arch.gfn = xzalloc_array(gfn_t, max_grant_frames);             \
+    (gt)->arch.gfn = xzalloc_array(gfn_t, (gt)->max_grant_frames);       \
     ( (gt)->arch.gfn ? 0 : -ENOMEM );                                    \
 })
 
@@ -52,7 +66,7 @@ static inline int replace_grant_supported(void)
 
 #define gnttab_shared_gmfn(d, t, i)                                      \
     ( ((i >= nr_grant_frames(t)) &&                                      \
-       (i < max_grant_frames)) ? 0 : gfn_x(t->arch.gfn[i]))
+       (i < (t)->max_grant_frames))? 0 : gfn_x((t)->arch.gfn[i]))
 
 #define gnttab_need_iommu_mapping(d)                    \
     (is_domain_direct_mapped(d) && need_iommu(d))

@@ -875,27 +875,28 @@ Specify which console gdbstub should use. See **console**.
 ### gnttab\_max\_frames
 > `= <integer>`
 
-> Default: `32`
+> Default: `64`
+
+> Can be modified at runtime
 
 Specify the maximum number of frames which any domain may use as part
-of its grant table.
+of its grant table. This value is an upper boundary of the per-domain
+value settable via Xen tools.
+
+Dom0 is using this value for sizing its grant table.
 
 ### gnttab\_max\_maptrack\_frames
 > `= <integer>`
 
-> Default: `8 * gnttab_max_frames`
+> Default: `1024`
+
+> Can be modified at runtime
 
 Specify the maximum number of frames to use as part of a domains
-maptrack array.
+maptrack array. This value is an upper boundary of the per-domain
+value settable via Xen tools.
 
-### gnttab\_max\_nr\_frames
-> `= <integer>`
-
-*Deprecated*
-Use **gnttab\_max\_frames** and **gnttab\_max\_maptrack\_frames** instead.
-
-Specify the maximum number of frames per grant table operation and the
-maximum number of maptrack frames domain.
+Dom0 is using this value for sizing its maptrack table.
 
 ### guest\_loglvl
 > `= <level>[/<rate-limited level>]` where level is `none | error | warning | info | debug | all`

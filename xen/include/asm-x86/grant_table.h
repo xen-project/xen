@@ -12,7 +12,7 @@
 #include <asm/hvm/grant_table.h>
 #include <asm/pv/grant_table.h>
 
-#define INITIAL_NR_GRANT_FRAMES 4
+#define INITIAL_NR_GRANT_FRAMES 1U
 
 struct grant_table_arch {
 };
@@ -37,6 +37,11 @@ static inline int replace_grant_host_mapping(uint64_t addr, unsigned long frame,
     if ( paging_mode_external(current->domain) )
         return replace_grant_p2m_mapping(addr, frame, new_addr, flags);
     return replace_grant_pv_mapping(addr, frame, new_addr, flags);
+}
+
+static inline unsigned int gnttab_dom0_max(void)
+{
+    return UINT_MAX;
 }
 
 #define gnttab_init_arch(gt) 0
