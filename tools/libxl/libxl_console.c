@@ -376,7 +376,7 @@ int libxl__device_vuart_add(libxl__gc *gc, uint32_t domid,
     flexarray_append(ro_front, "port");
     flexarray_append(ro_front, GCSPRINTF("%"PRIu32, state->vuart_port));
     flexarray_append(ro_front, "ring-ref");
-    flexarray_append(ro_front, GCSPRINTF("%lu", state->vuart_gfn));
+    flexarray_append(ro_front, GCSPRINTF("%"PRI_xen_pfn, state->vuart_gfn));
     flexarray_append(ro_front, "limit");
     flexarray_append(ro_front, GCSPRINTF("%d", LIBXL_XENCONSOLE_LIMIT));
     flexarray_append(ro_front, "type");
