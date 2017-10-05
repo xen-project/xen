@@ -1106,7 +1106,6 @@ int __mem_sharing_unshare_page(struct domain *d,
     p2m_type_t p2mt;
     mfn_t mfn;
     struct page_info *page, *old_page;
-    void *s, *t;
     int last_gfn;
     gfn_info_t *gfn_info = NULL;
    
@@ -1185,11 +1184,7 @@ int __mem_sharing_unshare_page(struct domain *d,
         return -ENOMEM;
     }
 
-    s = map_domain_page(_mfn(__page_to_mfn(old_page)));
-    t = map_domain_page(_mfn(__page_to_mfn(page)));
-    memcpy(t, s, PAGE_SIZE);
-    unmap_domain_page(s);
-    unmap_domain_page(t);
+    copy_domain_page(page_to_mfn(page), page_to_mfn(old_page));
 
     BUG_ON(set_shared_p2m_entry(d, gfn, page_to_mfn(page)));
     mem_sharing_gfn_destroy(old_page, d, gfn_info);
