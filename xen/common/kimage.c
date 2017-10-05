@@ -310,14 +310,11 @@ static struct page_info *kimage_alloc_normal_control_page(
      * destination page.
      */
     do {
-        unsigned long mfn, emfn;
         paddr_t addr, eaddr;
 
         page = kimage_alloc_zeroed_page(memflags);
         if ( !page )
             break;
-        mfn   = page_to_mfn(page);
-        emfn  = mfn + 1;
         addr  = page_to_maddr(page);
         eaddr = addr + PAGE_SIZE;
         if ( kimage_is_destination_range(image, addr, eaddr) )
