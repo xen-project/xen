@@ -2242,6 +2242,12 @@ For example, cdrom insert will fail.
 
 =item
 
+You should say C<vga="none">.
+Domains with stdvga graphics cards to not work.
+Domains with cirrus vga may seem to work.
+
+=item
+
 You must create user(s) for qemu to run as.
 
 Ideally, set aside a range of 32752 uids
