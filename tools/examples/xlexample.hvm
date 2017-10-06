@@ -6,7 +6,7 @@
 # HVM guest. For a more complete guide see xl.cfg(5)
 
 # This configures an HVM rather than PV guest
-builder = "hvm"
+type = "hvm"
 
 # Guest name
 name = "example.hvm"
