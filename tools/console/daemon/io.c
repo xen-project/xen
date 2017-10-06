@@ -21,7 +21,6 @@
 
 #include "utils.h"
 #include "io.h"
-#include <string.h>
 #include <xenevtchn.h>
 #include <xengnttab.h>
 #include <xenstore.h>
@@ -30,6 +29,7 @@
 
 #include <stdlib.h>
 #include <errno.h>
+#include <string.h>
 #include <poll.h>
 #include <fcntl.h>
 #include <unistd.h>

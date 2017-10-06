@@ -16,6 +16,8 @@
  * this program; If not, see <http://www.gnu.org/licenses/>.
  */
 
+#define XEN_WANT_FLEX_CONSOLE_RING 1
+
 #include <xen/errno.h>
 #include <xen/event.h>
 #include <xen/guest_access.h>
