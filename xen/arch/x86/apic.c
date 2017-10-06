@@ -857,7 +857,7 @@ static int __init detect_init_APIC (void)
         return -1;
     }
 
-    __set_bit(X86_FEATURE_APIC, boot_cpu_data.x86_capability);
+    setup_force_cpu_cap(X86_FEATURE_APIC);
     mp_lapic_addr = APIC_DEFAULT_PHYS_BASE;
 
     /* The BIOS may have set up the APIC at some other address */

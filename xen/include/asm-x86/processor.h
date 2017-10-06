@@ -235,6 +235,7 @@ extern const struct x86_cpu_id *x86_match_cpu(const struct x86_cpu_id table[]);
 
 extern void identify_cpu(struct cpuinfo_x86 *);
 extern void setup_clear_cpu_cap(unsigned int);
+extern void setup_force_cpu_cap(unsigned int);
 extern void print_cpu_info(unsigned int cpu);
 extern unsigned int init_intel_cacheinfo(struct cpuinfo_x86 *c);
 

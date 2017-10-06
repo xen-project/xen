@@ -1463,14 +1463,14 @@ void __init noreturn __start_xen(unsigned long mbi_p)
     if ( !opt_smep )
         setup_clear_cpu_cap(X86_FEATURE_SMEP);
     if ( cpu_has_smep && opt_smep != SMEP_HVM_ONLY )
-        __set_bit(X86_FEATURE_XEN_SMEP, boot_cpu_data.x86_capability);
+        setup_force_cpu_cap(X86_FEATURE_XEN_SMEP);
     if ( boot_cpu_has(X86_FEATURE_XEN_SMEP) )
         set_in_cr4(X86_CR4_SMEP);
 
     if ( !opt_smap )
         setup_clear_cpu_cap(X86_FEATURE_SMAP);
     if ( cpu_has_smap && opt_smap != SMAP_HVM_ONLY )
-        __set_bit(X86_FEATURE_XEN_SMAP, boot_cpu_data.x86_capability);
+        setup_force_cpu_cap(X86_FEATURE_XEN_SMAP);
     if ( boot_cpu_has(X86_FEATURE_XEN_SMAP) )
         set_in_cr4(X86_CR4_SMAP);
 
