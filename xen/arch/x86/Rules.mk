@@ -24,8 +24,12 @@ $(call as-insn-check,CFLAGS,CC,".equ \"x\"$$(comma)1", \
                      -U__OBJECT_LABEL__ -DHAVE_GAS_QUOTED_SYM \
                      '-D__OBJECT_LABEL__=$(subst $(BASEDIR)/,,$(CURDIR))/$$@')
 
-CFLAGS += -mno-red-zone -mno-sse -fpic
-CFLAGS += -fno-asynchronous-unwind-tables
+CFLAGS += -mno-red-zone -fpic -fno-asynchronous-unwind-tables
+
+# Xen doesn't use SSE interally.  If the compiler supports it, also skip the
+# SSE setup for variadic function calls.
+CFLAGS += -mno-sse $(call cc-option,$(CC),-mskip-rax-setup)
+
 # -fvisibility=hidden reduces -fpic cost, if it's available
 ifneq ($(call cc-option,$(CC),-fvisibility=hidden,n),n)
 CFLAGS += -DGCC_HAS_VISIBILITY_ATTRIBUTE
