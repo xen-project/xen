@@ -54,6 +54,7 @@ unsigned int vaddr_bits __read_mostly = VADDR_BITS;
 u64 host_pat = 0x050100070406;
 
 static unsigned int cleared_caps[NCAPINTS];
+static unsigned int forced_caps[NCAPINTS];
 
 void __init setup_clear_cpu_cap(unsigned int cap)
 {
@@ -62,6 +63,10 @@ void __init setup_clear_cpu_cap(unsigned int cap)
 
 	if (__test_and_set_bit(cap, cleared_caps))
 		return;
+
+	if (test_bit(cap, forced_caps))
+		printk("%pS clearing previously forced feature %#x\n",
+		       __builtin_return_address(0), cap);
 
 	__clear_bit(cap, boot_cpu_data.x86_capability);
 	dfs = lookup_deep_deps(cap);
@@ -72,7 +77,26 @@ void __init setup_clear_cpu_cap(unsigned int cap)
 	for (i = 0; i < FSCAPINTS; ++i) {
 		cleared_caps[i] |= dfs[i];
 		boot_cpu_data.x86_capability[i] &= ~dfs[i];
+		if (!(forced_caps[i] & dfs[i]))
+			continue;
+		printk("%pS implicitly clearing previously forced feature(s) %u:%#x\n",
+		       __builtin_return_address(0),
+		       i, forced_caps[i] & dfs[i]);
 	}
+}
+
+void __init setup_force_cpu_cap(unsigned int cap)
+{
+	if (__test_and_set_bit(cap, forced_caps))
+		return;
+
+	if (test_bit(cap, cleared_caps)) {
+		printk("%pS tries to force previously cleared feature %#x\n",
+		       __builtin_return_address(0), cap);
+		return;
+	}
+
+	__set_bit(cap, boot_cpu_data.x86_capability);
 }
 
 static void default_init(struct cpuinfo_x86 * c)
@@ -375,8 +399,10 @@ void identify_cpu(struct cpuinfo_x86 *c)
 	for (i = 0; i < FSCAPINTS; ++i)
 		c->x86_capability[i] &= known_features[i];
 
-	for (i = 0 ; i < NCAPINTS ; ++i)
+	for (i = 0 ; i < NCAPINTS ; ++i) {
+		c->x86_capability[i] |= forced_caps[i];
 		c->x86_capability[i] &= ~cleared_caps[i];
+	}
 
 	/* If the model name is still unset, do table lookup. */
 	if ( !c->x86_model_id[0] ) {
