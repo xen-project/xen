@@ -84,7 +84,6 @@ void pci_setup(void)
     uint32_t vga_devfn = 256;
     uint16_t class, vendor_id, device_id;
     unsigned int bar, pin, link, isa_irq;
-    int next_rmrr;
 
     /* Resources assignable to PCI devices via BARs. */
     struct resource {
@@ -403,8 +402,6 @@ void pci_setup(void)
     io_resource.base = 0xc000;
     io_resource.max = 0x10000;
 
-    next_rmrr = find_next_rmrr(pci_mem_start);
-
     /* Assign iomem and ioport resources in descending order of size. */
     for ( i = 0; i < nr_bars; i++ )
     {
@@ -462,15 +459,20 @@ void pci_setup(void)
         base = (resource->base  + bar_sz - 1) & ~(uint64_t)(bar_sz - 1);
 
         /* If we're using mem_resource, check for RMRR conflicts. */
-        while ( resource == &mem_resource &&
-                next_rmrr >= 0 &&
-                check_overlap(base, bar_sz,
+        if ( resource == &mem_resource)
+        {
+            int next_rmrr = find_next_rmrr(base);
+
+            while ( next_rmrr >= 0 &&
+                    check_overlap(base, bar_sz,
                               memory_map.map[next_rmrr].addr,
                               memory_map.map[next_rmrr].size) )
-        {
-            base = memory_map.map[next_rmrr].addr + memory_map.map[next_rmrr].size;
-            base = (base + bar_sz - 1) & ~(bar_sz - 1);
-            next_rmrr = find_next_rmrr(base);
+            {
+                base = memory_map.map[next_rmrr].addr +
+                       memory_map.map[next_rmrr].size;
+                base = (base + bar_sz - 1) & ~(bar_sz - 1);
+                next_rmrr = find_next_rmrr(base);
+            }
         }
 
         bar_data |= (uint32_t)base;
