@@ -6744,10 +6744,9 @@ x86_emulate(
         ea.type = OP_MEM;
         goto simd_0f_int_imm8;
 
+    CASE_SIMD_PACKED_INT(0x0f, 0xc5):      /* pextrw $imm8,{,x}mm,reg */
     case X86EMUL_OPC_VEX_66(0x0f, 0xc5):   /* vpextrw $imm8,xmm,reg */
         generate_exception_if(vex.l, EXC_UD);
-        /* fall through */
-    CASE_SIMD_PACKED_INT(0x0f, 0xc5):      /* pextrw $imm8,{,x}mm,reg */
         opc = init_prefixes(stub);
         opc[0] = b;
         /* Convert GPR destination to %rAX. */
@@ -7526,6 +7525,8 @@ x86_emulate(
     case X86EMUL_OPC_VEX_66(0x0f3a, 0x20): /* vpinsrb $imm8,r32/m8,xmm,xmm */
     case X86EMUL_OPC_VEX_66(0x0f3a, 0x22): /* vpinsr{d,q} $imm8,r/m,xmm,xmm */
         generate_exception_if(vex.l, EXC_UD);
+        if ( !mode_64bit() )
+            vex.w = 0;
         memcpy(mmvalp, &src.val, op_bytes);
         ea.type = OP_MEM;
         op_bytes = src.bytes;
