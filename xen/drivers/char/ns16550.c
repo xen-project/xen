@@ -505,6 +505,23 @@ static int ns16550_ioport_invalid(struct ns16550 *uart)
     return ns_read_reg(uart, UART_IER) == 0xff;
 }
 
+static void handle_dw_usr_busy_quirk(struct ns16550 *uart)
+{
+    if ( uart->dw_usr_bsy &&
+         (ns_read_reg(uart, UART_IIR) & UART_IIR_BSY) == UART_IIR_BSY )
+    {
+        /* DesignWare 8250 detects if LCR is written while the UART is
+         * busy and raises a "busy detect" interrupt. Read the UART
+         * Status Register to clear this state.
+         *
+         * Allwinner/sunxi UART hardware is similar to DesignWare 8250
+         * and also contains a "busy detect" interrupt. So this quirk
+         * fix will also be used for Allwinner UART.
+         */
+        ns_read_reg(uart, UART_USR);
+    }
+}
+
 static void ns16550_interrupt(
     int irq, void *dev_id, struct cpu_user_regs *regs)
 {
@@ -521,6 +538,16 @@ static void ns16550_interrupt(
             serial_tx_interrupt(port, regs);
         if ( lsr & UART_LSR_DR )
             serial_rx_interrupt(port, regs);
+
+        /* A "busy-detect" condition is observed on Allwinner/sunxi UART
+         * after LCR is written during setup. It needs to be cleared at
+         * this point or UART_IIR_NOINT will never be set and this loop
+         * will continue forever.
+         *
+         * This state can be cleared by calling the dw_usr_busy quirk
+         * handler that resolves "busy-detect" for  DesignWare uart.
+         */
+        handle_dw_usr_busy_quirk(uart);
     }
 }
 
@@ -623,15 +650,8 @@ static void ns16550_setup_preirq(struct ns16550 *uart)
     /* No interrupts. */
     ns_write_reg(uart, UART_IER, 0);
 
-    if ( uart->dw_usr_bsy &&
-         (ns_read_reg(uart, UART_IIR) & UART_IIR_BSY) == UART_IIR_BSY )
-    {
-        /* DesignWare 8250 detects if LCR is written while the UART is
-         * busy and raises a "busy detect" interrupt. Read the UART
-         * Status Register to clear this state.
-         */
-        ns_read_reg(uart, UART_USR);
-    }
+    /* Handle the DesignWare 8250 'busy-detect' quirk. */
+    handle_dw_usr_busy_quirk(uart);
 
     /* Line control and baud-rate generator. */
     ns_write_reg(uart, UART_LCR, lcr | UART_LCR_DLAB);
