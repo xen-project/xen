@@ -6052,7 +6052,7 @@ int populate_pt_range(unsigned long virt, unsigned long mfn,
  *
  * It is an error to call with present flags over an unpopulated range.
  */
-void modify_xen_mappings(unsigned long s, unsigned long e, unsigned int nf)
+int modify_xen_mappings(unsigned long s, unsigned long e, unsigned int nf)
 {
     bool_t locking = system_state > SYS_STATE_boot;
     l2_pgentry_t *pl2e;
@@ -6227,13 +6227,14 @@ void modify_xen_mappings(unsigned long s, unsigned long e, unsigned int nf)
     flush_area(NULL, FLUSH_TLB_GLOBAL);
 
 #undef FLAGS_MASK
+    return 0;
 }
 
 #undef flush_area
 
-void destroy_xen_mappings(unsigned long s, unsigned long e)
+int destroy_xen_mappings(unsigned long s, unsigned long e)
 {
-    modify_xen_mappings(s, e, _PAGE_NONE);
+    return modify_xen_mappings(s, e, _PAGE_NONE);
 }
 
 void __set_fixmap(

@@ -930,9 +930,9 @@ int populate_pt_range(unsigned long virt, unsigned long mfn,
     return create_xen_entries(RESERVE, virt, mfn, nr_mfns, 0);
 }
 
-void destroy_xen_mappings(unsigned long v, unsigned long e)
+int destroy_xen_mappings(unsigned long v, unsigned long e)
 {
-    create_xen_entries(REMOVE, v, 0, (e - v) >> PAGE_SHIFT, 0);
+    return create_xen_entries(REMOVE, v, 0, (e - v) >> PAGE_SHIFT, 0);
 }
 
 enum mg { mg_clear, mg_ro, mg_rw, mg_rx };

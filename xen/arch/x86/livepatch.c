@@ -234,9 +234,7 @@ int arch_livepatch_secure(const void *va, unsigned int pages, enum va_type type)
     else
         flag = PAGE_HYPERVISOR_RO;
 
-    modify_xen_mappings(start, start + pages * PAGE_SIZE, flag);
-
-    return 0;
+    return modify_xen_mappings(start, start + pages * PAGE_SIZE, flag);
 }
 
 void __init arch_livepatch_init(void)
