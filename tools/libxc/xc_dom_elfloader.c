@@ -59,6 +59,13 @@ static char *xc_dom_guest_type(struct xc_dom_image *dom,
     if ( dom->container_type == XC_DOM_HVM_CONTAINER &&
          dom->parms.phys_entry != UNSET_ADDR32 )
         return "hvm-3.0-x86_32";
+    if ( dom->container_type == XC_DOM_HVM_CONTAINER )
+    {
+        xc_dom_panic(dom->xch, XC_INVALID_KERNEL,
+                     "%s: image not capable of booting inside a HVM container",
+                     __FUNCTION__);
+        return "xen-3.0-unknown";
+    }
 
     switch ( machine )
     {
