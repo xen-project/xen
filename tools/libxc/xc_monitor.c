@@ -22,13 +22,13 @@
 
 #include "xc_private.h"
 
-void *xc_monitor_enable(xc_interface *xch, domid_t domain_id, uint32_t *port)
+void *xc_monitor_enable(xc_interface *xch, uint32_t domain_id, uint32_t *port)
 {
     return xc_vm_event_enable(xch, domain_id, HVM_PARAM_MONITOR_RING_PFN,
                               port);
 }
 
-int xc_monitor_disable(xc_interface *xch, domid_t domain_id)
+int xc_monitor_disable(xc_interface *xch, uint32_t domain_id)
 {
     return xc_vm_event_control(xch, domain_id,
                                XEN_VM_EVENT_DISABLE,
@@ -36,7 +36,7 @@ int xc_monitor_disable(xc_interface *xch, domid_t domain_id)
                                NULL);
 }
 
-int xc_monitor_resume(xc_interface *xch, domid_t domain_id)
+int xc_monitor_resume(xc_interface *xch, uint32_t domain_id)
 {
     return xc_vm_event_control(xch, domain_id,
                                XEN_VM_EVENT_RESUME,
@@ -44,7 +44,7 @@ int xc_monitor_resume(xc_interface *xch, domid_t domain_id)
                                NULL);
 }
 
-int xc_monitor_get_capabilities(xc_interface *xch, domid_t domain_id,
+int xc_monitor_get_capabilities(xc_interface *xch, uint32_t domain_id,
                                 uint32_t *capabilities)
 {
     int rc;
@@ -68,7 +68,7 @@ int xc_monitor_get_capabilities(xc_interface *xch, domid_t domain_id,
     return 0;
 }
 
-int xc_monitor_write_ctrlreg(xc_interface *xch, domid_t domain_id,
+int xc_monitor_write_ctrlreg(xc_interface *xch, uint32_t domain_id,
                              uint16_t index, bool enable, bool sync,
                              uint64_t bitmask, bool onchangeonly)
 {
@@ -89,7 +89,7 @@ int xc_monitor_write_ctrlreg(xc_interface *xch, domid_t domain_id,
     return do_domctl(xch, &domctl);
 }
 
-int xc_monitor_mov_to_msr(xc_interface *xch, domid_t domain_id, uint32_t msr,
+int xc_monitor_mov_to_msr(xc_interface *xch, uint32_t domain_id, uint32_t msr,
                           bool enable)
 {
     DECLARE_DOMCTL;
@@ -104,7 +104,7 @@ int xc_monitor_mov_to_msr(xc_interface *xch, domid_t domain_id, uint32_t msr,
     return do_domctl(xch, &domctl);
 }
 
-int xc_monitor_software_breakpoint(xc_interface *xch, domid_t domain_id,
+int xc_monitor_software_breakpoint(xc_interface *xch, uint32_t domain_id,
                                    bool enable)
 {
     DECLARE_DOMCTL;
@@ -118,7 +118,7 @@ int xc_monitor_software_breakpoint(xc_interface *xch, domid_t domain_id,
     return do_domctl(xch, &domctl);
 }
 
-int xc_monitor_singlestep(xc_interface *xch, domid_t domain_id,
+int xc_monitor_singlestep(xc_interface *xch, uint32_t domain_id,
                           bool enable)
 {
     DECLARE_DOMCTL;
@@ -132,7 +132,7 @@ int xc_monitor_singlestep(xc_interface *xch, domid_t domain_id,
     return do_domctl(xch, &domctl);
 }
 
-int xc_monitor_descriptor_access(xc_interface *xch, domid_t domain_id,
+int xc_monitor_descriptor_access(xc_interface *xch, uint32_t domain_id,
                                  bool enable)
 {
     DECLARE_DOMCTL;
@@ -146,7 +146,7 @@ int xc_monitor_descriptor_access(xc_interface *xch, domid_t domain_id,
     return do_domctl(xch, &domctl);
 }
 
-int xc_monitor_guest_request(xc_interface *xch, domid_t domain_id, bool enable,
+int xc_monitor_guest_request(xc_interface *xch, uint32_t domain_id, bool enable,
                              bool sync, bool allow_userspace)
 {
     DECLARE_DOMCTL;
@@ -162,7 +162,7 @@ int xc_monitor_guest_request(xc_interface *xch, domid_t domain_id, bool enable,
     return do_domctl(xch, &domctl);
 }
 
-int xc_monitor_emulate_each_rep(xc_interface *xch, domid_t domain_id,
+int xc_monitor_emulate_each_rep(xc_interface *xch, uint32_t domain_id,
                                 bool enable)
 {
     DECLARE_DOMCTL;
@@ -175,7 +175,7 @@ int xc_monitor_emulate_each_rep(xc_interface *xch, domid_t domain_id,
     return do_domctl(xch, &domctl);
 }
 
-int xc_monitor_debug_exceptions(xc_interface *xch, domid_t domain_id,
+int xc_monitor_debug_exceptions(xc_interface *xch, uint32_t domain_id,
                                 bool enable, bool sync)
 {
     DECLARE_DOMCTL;
@@ -190,7 +190,7 @@ int xc_monitor_debug_exceptions(xc_interface *xch, domid_t domain_id,
     return do_domctl(xch, &domctl);
 }
 
-int xc_monitor_cpuid(xc_interface *xch, domid_t domain_id, bool enable)
+int xc_monitor_cpuid(xc_interface *xch, uint32_t domain_id, bool enable)
 {
     DECLARE_DOMCTL;
 
@@ -203,7 +203,7 @@ int xc_monitor_cpuid(xc_interface *xch, domid_t domain_id, bool enable)
     return do_domctl(xch, &domctl);
 }
 
-int xc_monitor_privileged_call(xc_interface *xch, domid_t domain_id,
+int xc_monitor_privileged_call(xc_interface *xch, uint32_t domain_id,
                                bool enable)
 {
     DECLARE_DOMCTL;
@@ -217,7 +217,7 @@ int xc_monitor_privileged_call(xc_interface *xch, domid_t domain_id,
     return do_domctl(xch, &domctl);
 }
 
-int xc_monitor_emul_unimplemented(xc_interface *xch, domid_t domain_id,
+int xc_monitor_emul_unimplemented(xc_interface *xch, uint32_t domain_id,
                                   bool enable)
 {
     DECLARE_DOMCTL;

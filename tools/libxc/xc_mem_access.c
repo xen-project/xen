@@ -24,7 +24,7 @@
 #include <xen/memory.h>
 
 int xc_set_mem_access(xc_interface *xch,
-                      domid_t domain_id,
+                      uint32_t domain_id,
                       xenmem_access_t access,
                       uint64_t first_pfn,
                       uint32_t nr)
@@ -42,7 +42,7 @@ int xc_set_mem_access(xc_interface *xch,
 }
 
 int xc_set_mem_access_multi(xc_interface *xch,
-                            domid_t domain_id,
+                            uint32_t domain_id,
                             uint8_t *access,
                             uint64_t *pages,
                             uint32_t nr)
@@ -80,7 +80,7 @@ int xc_set_mem_access_multi(xc_interface *xch,
 }
 
 int xc_get_mem_access(xc_interface *xch,
-                      domid_t domain_id,
+                      uint32_t domain_id,
                       uint64_t pfn,
                       xenmem_access_t *access)
 {

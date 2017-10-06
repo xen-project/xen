@@ -3793,7 +3793,7 @@ void libxl__xc_domain_saverestore_async_callback_done(libxl__egc *egc,
 
 
 _hidden void libxl__domain_suspend_common_switch_qemu_logdirty
-                               (int domid, unsigned int enable, void *data);
+                               (uint32_t domid, unsigned int enable, void *data);
 _hidden void libxl__domain_common_switch_qemu_logdirty(libxl__egc *egc,
                                                int domid, unsigned enable,
                                                libxl__logdirty_switch *lds);

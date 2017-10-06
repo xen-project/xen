@@ -221,7 +221,7 @@ int xc_get_pfn_type_batch(xc_interface *xch, uint32_t dom,
     if ( xc_hypercall_bounce_pre(xch, arr) )
         return -1;
     domctl.cmd = XEN_DOMCTL_getpageframeinfo3;
-    domctl.domain = (domid_t)dom;
+    domctl.domain = dom;
     domctl.u.getpageframeinfo3.num = num;
     set_xen_guest_handle(domctl.u.getpageframeinfo3.array, arr);
     rc = do_domctl(xch, &domctl);
@@ -233,7 +233,7 @@ int xc_mmuext_op(
     xc_interface *xch,
     struct mmuext_op *op,
     unsigned int nr_ops,
-    domid_t dom)
+    uint32_t dom)
 {
     DECLARE_HYPERCALL_BOUNCE(op, nr_ops*sizeof(*op), XC_HYPERCALL_BUFFER_BOUNCE_BOTH);
     long ret = -1;
@@ -344,12 +344,12 @@ int xc_maximum_ram_page(xc_interface *xch, unsigned long *max_mfn)
     return rc;
 }
 
-long long xc_domain_get_cpu_usage( xc_interface *xch, domid_t domid, int vcpu )
+long long xc_domain_get_cpu_usage(xc_interface *xch, uint32_t domid, int vcpu)
 {
     DECLARE_DOMCTL;
 
     domctl.cmd = XEN_DOMCTL_getvcpuinfo;
-    domctl.domain = (domid_t)domid;
+    domctl.domain = domid;
     domctl.u.getvcpuinfo.vcpu   = (uint16_t)vcpu;
     if ( (do_domctl(xch, &domctl) < 0) )
     {
@@ -403,7 +403,7 @@ int xc_get_pfn_list(xc_interface *xch,
     }
 
     domctl.cmd = XEN_DOMCTL_getmemlist;
-    domctl.domain   = (domid_t)domid;
+    domctl.domain = domid;
     domctl.u.getmemlist.max_pfns = max_pfns;
     set_xen_guest_handle(domctl.u.getmemlist.buffer, pfn_buf);
 

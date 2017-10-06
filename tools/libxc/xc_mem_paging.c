@@ -22,7 +22,7 @@
 
 #include "xc_private.h"
 
-static int xc_mem_paging_memop(xc_interface *xch, domid_t domain_id,
+static int xc_mem_paging_memop(xc_interface *xch, uint32_t domain_id,
                                unsigned int op, uint64_t gfn, void *buffer)
 {
     xen_mem_paging_op_t mpo;
@@ -37,7 +37,7 @@ static int xc_mem_paging_memop(xc_interface *xch, domid_t domain_id,
     return do_memory_op(xch, XENMEM_paging_op, &mpo, sizeof(mpo));
 }
 
-int xc_mem_paging_enable(xc_interface *xch, domid_t domain_id,
+int xc_mem_paging_enable(xc_interface *xch, uint32_t domain_id,
                          uint32_t *port)
 {
     if ( !port )
@@ -52,7 +52,7 @@ int xc_mem_paging_enable(xc_interface *xch, domid_t domain_id,
                                port);
 }
 
-int xc_mem_paging_disable(xc_interface *xch, domid_t domain_id)
+int xc_mem_paging_disable(xc_interface *xch, uint32_t domain_id)
 {
     return xc_vm_event_control(xch, domain_id,
                                XEN_VM_EVENT_DISABLE,
@@ -60,7 +60,7 @@ int xc_mem_paging_disable(xc_interface *xch, domid_t domain_id)
                                NULL);
 }
 
-int xc_mem_paging_resume(xc_interface *xch, domid_t domain_id)
+int xc_mem_paging_resume(xc_interface *xch, uint32_t domain_id)
 {
     return xc_vm_event_control(xch, domain_id,
                                XEN_VM_EVENT_RESUME,
@@ -68,28 +68,28 @@ int xc_mem_paging_resume(xc_interface *xch, domid_t domain_id)
                                NULL);
 }
 
-int xc_mem_paging_nominate(xc_interface *xch, domid_t domain_id, uint64_t gfn)
+int xc_mem_paging_nominate(xc_interface *xch, uint32_t domain_id, uint64_t gfn)
 {
     return xc_mem_paging_memop(xch, domain_id,
                                XENMEM_paging_op_nominate,
                                gfn, NULL);
 }
 
-int xc_mem_paging_evict(xc_interface *xch, domid_t domain_id, uint64_t gfn)
+int xc_mem_paging_evict(xc_interface *xch, uint32_t domain_id, uint64_t gfn)
 {
     return xc_mem_paging_memop(xch, domain_id,
                                XENMEM_paging_op_evict,
                                gfn, NULL);
 }
 
-int xc_mem_paging_prep(xc_interface *xch, domid_t domain_id, uint64_t gfn)
+int xc_mem_paging_prep(xc_interface *xch, uint32_t domain_id, uint64_t gfn)
 {
     return xc_mem_paging_memop(xch, domain_id,
                                XENMEM_paging_op_prep,
                                gfn, NULL);
 }
 
-int xc_mem_paging_load(xc_interface *xch, domid_t domain_id,
+int xc_mem_paging_load(xc_interface *xch, uint32_t domain_id,
                        uint64_t gfn, void *buffer)
 {
     int rc, old_errno;

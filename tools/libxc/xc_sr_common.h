@@ -250,7 +250,7 @@ struct xc_sr_context
              */
             xen_pfn_t    xenstore_gfn,    console_gfn;
             unsigned int xenstore_evtchn, console_evtchn;
-            domid_t      xenstore_domid,  console_domid;
+            uint32_t     xenstore_domid,  console_domid;
 
             /* Bitmap of currently populated PFNs during restore. */
             unsigned long *populated_pfns;

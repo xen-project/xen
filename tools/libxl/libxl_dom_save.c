@@ -149,7 +149,7 @@ static void domain_suspend_switch_qemu_logdirty_done
 }
 
 void libxl__domain_suspend_common_switch_qemu_logdirty
-                               (int domid, unsigned enable, void *user)
+                               (uint32_t domid, unsigned enable, void *user)
 {
     libxl__save_helper_state *shs = user;
     libxl__egc *egc = shs->egc;

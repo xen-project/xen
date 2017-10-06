@@ -30,13 +30,13 @@ int xc_evtchn_notify(xc_evtchn *xce, evtchn_port_t port)
 }
 
 evtchn_port_or_error_t
-xc_evtchn_bind_unbound_port(xc_evtchn *xce, int domid)
+xc_evtchn_bind_unbound_port(xc_evtchn *xce, uint32_t domid)
 {
     return xenevtchn_bind_unbound_port(xce, domid);
 }
 
 evtchn_port_or_error_t
-xc_evtchn_bind_interdomain(xc_evtchn *xce, int domid,
+xc_evtchn_bind_interdomain(xc_evtchn *xce, uint32_t domid,
                            evtchn_port_t remote_port)
 {
     return xenevtchn_bind_interdomain(xce, domid, remote_port);

@@ -27,7 +27,7 @@ our @msgs = (
     [  4, 'srcxA',  "postcopy", [] ],
     [  5, 'srcxA',  "checkpoint", [] ],
     [  6, 'srcxA',  "wait_checkpoint", [] ],
-    [  7, 'scxA',   "switch_qemu_logdirty",  [qw(int domid
+    [  7, 'scxA',   "switch_qemu_logdirty",  [qw(uint32_t domid
                                               unsigned enable)] ],
     [  8, 'rcx',    "restore_results",       ['xen_pfn_t', 'store_gfn',
                                               'xen_pfn_t', 'console_gfn'] ],

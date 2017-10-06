@@ -32,7 +32,7 @@ int xc_sched_rtds_domain_set(xc_interface *xch,
     DECLARE_DOMCTL;
 
     domctl.cmd = XEN_DOMCTL_scheduler_op;
-    domctl.domain = (domid_t) domid;
+    domctl.domain = domid;
     domctl.u.scheduler_op.sched_id = XEN_SCHEDULER_RTDS;
     domctl.u.scheduler_op.cmd = XEN_DOMCTL_SCHEDOP_putinfo;
     domctl.u.scheduler_op.u.rtds.period = sdom->period;
@@ -51,7 +51,7 @@ int xc_sched_rtds_domain_get(xc_interface *xch,
     DECLARE_DOMCTL;
 
     domctl.cmd = XEN_DOMCTL_scheduler_op;
-    domctl.domain = (domid_t) domid;
+    domctl.domain = domid;
     domctl.u.scheduler_op.sched_id = XEN_SCHEDULER_RTDS;
     domctl.u.scheduler_op.cmd = XEN_DOMCTL_SCHEDOP_getinfo;
 
@@ -78,7 +78,7 @@ int xc_sched_rtds_vcpu_set(xc_interface *xch,
         return -1;
 
     domctl.cmd = XEN_DOMCTL_scheduler_op;
-    domctl.domain = (domid_t) domid;
+    domctl.domain = domid;
     domctl.u.scheduler_op.sched_id = XEN_SCHEDULER_RTDS;
     domctl.u.scheduler_op.cmd = XEN_DOMCTL_SCHEDOP_putvcpuinfo;
 
@@ -112,7 +112,7 @@ int xc_sched_rtds_vcpu_get(xc_interface *xch,
         return -1;
 
     domctl.cmd = XEN_DOMCTL_scheduler_op;
-    domctl.domain = (domid_t) domid;
+    domctl.domain = domid;
     domctl.u.scheduler_op.sched_id = XEN_SCHEDULER_RTDS;
     domctl.u.scheduler_op.cmd = XEN_DOMCTL_SCHEDOP_getvcpuinfo;
 

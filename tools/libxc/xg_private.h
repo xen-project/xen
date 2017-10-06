@@ -142,6 +142,6 @@ static inline xen_pfn_t xc_pfn_to_mfn(xen_pfn_t pfn, xen_pfn_t *p2m,
 #define MADDR_MASK_X86  (MFN_MASK_X86 << PAGE_SHIFT_X86)
 
 int pin_table(xc_interface *xch, unsigned int type, unsigned long mfn,
-              domid_t dom);
+              uint32_t dom);
 
 #endif /* XG_PRIVATE_H */

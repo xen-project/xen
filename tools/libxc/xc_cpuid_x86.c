@@ -202,7 +202,7 @@ static void cpuid(const unsigned int *input, unsigned int *regs)
 #endif
 }
 
-static int get_cpuid_domain_info(xc_interface *xch, domid_t domid,
+static int get_cpuid_domain_info(xc_interface *xch, uint32_t domid,
                                  struct cpuid_domain_info *info,
                                  uint32_t *featureset,
                                  unsigned int nr_features)
@@ -608,7 +608,7 @@ static int xc_cpuid_policy(xc_interface *xch,
 }
 
 static int xc_cpuid_do_domctl(
-    xc_interface *xch, domid_t domid,
+    xc_interface *xch, uint32_t domid,
     const unsigned int *input, const unsigned int *regs)
 {
     DECLARE_DOMCTL;
@@ -709,7 +709,7 @@ static void sanitise_featureset(struct cpuid_domain_info *info)
     }
 }
 
-int xc_cpuid_apply_policy(xc_interface *xch, domid_t domid,
+int xc_cpuid_apply_policy(xc_interface *xch, uint32_t domid,
                           uint32_t *featureset,
                           unsigned int nr_features)
 {
@@ -796,7 +796,7 @@ int xc_cpuid_apply_policy(xc_interface *xch, domid_t domid,
  * For 's' and 'x' the configuration is overwritten with the value applied.
  */
 int xc_cpuid_set(
-    xc_interface *xch, domid_t domid, const unsigned int *input,
+    xc_interface *xch, uint32_t domid, const unsigned int *input,
     const char **config, char **config_transformed)
 {
     int rc;

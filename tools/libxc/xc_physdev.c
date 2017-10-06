@@ -34,7 +34,7 @@ int xc_physdev_pci_access_modify(xc_interface *xch,
 }
 
 int xc_physdev_map_pirq(xc_interface *xch,
-                        int domid,
+                        uint32_t domid,
                         int index,
                         int *pirq)
 {
@@ -61,7 +61,7 @@ int xc_physdev_map_pirq(xc_interface *xch,
 }
 
 int xc_physdev_map_pirq_msi(xc_interface *xch,
-                            int domid,
+                            uint32_t domid,
                             int index,
                             int *pirq,
                             int devfn,
@@ -96,7 +96,7 @@ int xc_physdev_map_pirq_msi(xc_interface *xch,
 }
 
 int xc_physdev_unmap_pirq(xc_interface *xch,
-                          int domid,
+                          uint32_t domid,
                           int pirq)
 {
     int rc;

@@ -32,7 +32,7 @@ int xc_psr_cmt_attach(xc_interface *xch, uint32_t domid)
     DECLARE_DOMCTL;
 
     domctl.cmd = XEN_DOMCTL_psr_cmt_op;
-    domctl.domain = (domid_t)domid;
+    domctl.domain = domid;
     domctl.u.psr_cmt_op.cmd = XEN_DOMCTL_PSR_CMT_OP_ATTACH;
 
     return do_domctl(xch, &domctl);
@@ -43,7 +43,7 @@ int xc_psr_cmt_detach(xc_interface *xch, uint32_t domid)
     DECLARE_DOMCTL;
 
     domctl.cmd = XEN_DOMCTL_psr_cmt_op;
-    domctl.domain = (domid_t)domid;
+    domctl.domain = domid;
     domctl.u.psr_cmt_op.cmd = XEN_DOMCTL_PSR_CMT_OP_DETACH;
 
     return do_domctl(xch, &domctl);
@@ -56,7 +56,7 @@ int xc_psr_cmt_get_domain_rmid(xc_interface *xch, uint32_t domid,
     DECLARE_DOMCTL;
 
     domctl.cmd = XEN_DOMCTL_psr_cmt_op;
-    domctl.domain = (domid_t)domid;
+    domctl.domain = domid;
     domctl.u.psr_cmt_op.cmd = XEN_DOMCTL_PSR_CMT_OP_QUERY_RMID;
 
     rc = do_domctl(xch, &domctl);
@@ -275,7 +275,7 @@ int xc_psr_cat_set_domain_data(xc_interface *xch, uint32_t domid,
     }
 
     domctl.cmd = XEN_DOMCTL_psr_cat_op;
-    domctl.domain = (domid_t)domid;
+    domctl.domain = domid;
     domctl.u.psr_cat_op.cmd = cmd;
     domctl.u.psr_cat_op.target = target;
     domctl.u.psr_cat_op.data = data;
@@ -311,7 +311,7 @@ int xc_psr_cat_get_domain_data(xc_interface *xch, uint32_t domid,
     }
 
     domctl.cmd = XEN_DOMCTL_psr_cat_op;
-    domctl.domain = (domid_t)domid;
+    domctl.domain = domid;
     domctl.u.psr_cat_op.cmd = cmd;
     domctl.u.psr_cat_op.target = target;
 

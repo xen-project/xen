@@ -1030,7 +1030,7 @@ static int vcpu_hvm(struct xc_dom_image *dom)
 
 /* ------------------------------------------------------------------------ */
 
-static int x86_compat(xc_interface *xch, domid_t domid, char *guest_type)
+static int x86_compat(xc_interface *xch, uint32_t domid, char *guest_type)
 {
     static const struct {
         char           *guest;

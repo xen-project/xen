@@ -22,7 +22,7 @@
 
 #include "xc_private.h"
 
-int xc_vm_event_control(xc_interface *xch, domid_t domain_id, unsigned int op,
+int xc_vm_event_control(xc_interface *xch, uint32_t domain_id, unsigned int op,
                         unsigned int mode, uint32_t *port)
 {
     DECLARE_DOMCTL;
@@ -39,7 +39,7 @@ int xc_vm_event_control(xc_interface *xch, domid_t domain_id, unsigned int op,
     return rc;
 }
 
-void *xc_vm_event_enable(xc_interface *xch, domid_t domain_id, int param,
+void *xc_vm_event_enable(xc_interface *xch, uint32_t domain_id, int param,
                          uint32_t *port)
 {
     void *ring_page = NULL;

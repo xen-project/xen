@@ -96,7 +96,7 @@ xc_core_arch_map_p2m_writable(xc_interface *xch, unsigned int guest_width, xc_do
 }
 
 int
-xc_core_arch_get_scratch_gpfn(xc_interface *xch, domid_t domid,
+xc_core_arch_get_scratch_gpfn(xc_interface *xch, uint32_t domid,
                               xen_pfn_t *gpfn)
 {
     /*

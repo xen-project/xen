@@ -262,7 +262,7 @@ static int __update_pte(xc_interface *xch,
     return 0;
 }
 
-static int change_pte(xc_interface *xch, int domid,
+static int change_pte(xc_interface *xch, uint32_t domid,
                      struct xc_domain_meminfo *minfo,
                      struct pte_backup *backup,
                      struct xc_mmu *mmu,
@@ -340,7 +340,7 @@ failed:
     return -1;
 }
 
-static int update_pte(xc_interface *xch, int domid,
+static int update_pte(xc_interface *xch, uint32_t domid,
                      struct xc_domain_meminfo *minfo,
                      struct pte_backup *backup,
                      struct xc_mmu *mmu,
@@ -350,7 +350,7 @@ static int update_pte(xc_interface *xch, int domid,
                       __update_pte, new_mfn);
 }
 
-static int clear_pte(xc_interface *xch, int domid,
+static int clear_pte(xc_interface *xch, uint32_t domid,
                      struct xc_domain_meminfo *minfo,
                      struct pte_backup *backup,
                      struct xc_mmu *mmu,
@@ -364,7 +364,7 @@ static int clear_pte(xc_interface *xch, int domid,
  * Check if a page can be exchanged successfully
  */
 
-static int is_page_exchangable(xc_interface *xch, int domid, xen_pfn_t mfn,
+static int is_page_exchangable(xc_interface *xch, uint32_t domid, xen_pfn_t mfn,
                                xc_dominfo_t *info)
 {
     uint32_t status;
@@ -455,7 +455,7 @@ err0:
 }
 
 /* The domain should be suspended when called here */
-int xc_exchange_page(xc_interface *xch, int domid, xen_pfn_t mfn)
+int xc_exchange_page(xc_interface *xch, uint32_t domid, xen_pfn_t mfn)
 {
     xc_dominfo_t info;
     struct xc_domain_meminfo minfo;

@@ -35,12 +35,12 @@
 
 #define SUSPEND_FILE_BUFLEN (sizeof(SUSPEND_LOCK_FILE) + 10)
 
-static void get_suspend_file(char buf[], int domid)
+static void get_suspend_file(char buf[], uint32_t domid)
 {
     snprintf(buf, SUSPEND_FILE_BUFLEN, SUSPEND_LOCK_FILE, domid);
 }
 
-static int lock_suspend_event(xc_interface *xch, int domid, int *lockfd)
+static int lock_suspend_event(xc_interface *xch, uint32_t domid, int *lockfd)
 {
     int fd = -1, r;
     char suspend_file[SUSPEND_FILE_BUFLEN];
@@ -100,7 +100,7 @@ static int lock_suspend_event(xc_interface *xch, int domid, int *lockfd)
     return -1;
 }
 
-static int unlock_suspend_event(xc_interface *xch, int domid, int *lockfd)
+static int unlock_suspend_event(xc_interface *xch, uint32_t domid, int *lockfd)
 {
     int r;
     char suspend_file[SUSPEND_FILE_BUFLEN];
@@ -148,7 +148,7 @@ int xc_await_suspend(xc_interface *xch, xenevtchn_handle *xce, int suspend_evtch
 /* Internal callers are allowed to call this with suspend_evtchn<0
  * but *lockfd>0. */
 int xc_suspend_evtchn_release(xc_interface *xch, xenevtchn_handle *xce,
-                              int domid, int suspend_evtchn, int *lockfd)
+                              uint32_t domid, int suspend_evtchn, int *lockfd)
 {
     if (suspend_evtchn >= 0)
         xenevtchn_unbind(xce, suspend_evtchn);
@@ -157,7 +157,7 @@ int xc_suspend_evtchn_release(xc_interface *xch, xenevtchn_handle *xce,
 }
 
 int xc_suspend_evtchn_init_sane(xc_interface *xch, xenevtchn_handle *xce,
-                                int domid, int port, int *lockfd)
+                                uint32_t domid, int port, int *lockfd)
 {
     int rc, suspend_evtchn = -1;
 
@@ -187,7 +187,7 @@ cleanup:
 }
 
 int xc_suspend_evtchn_init_exclusive(xc_interface *xch, xenevtchn_handle *xce,
-                                     int domid, int port, int *lockfd)
+                                     uint32_t domid, int port, int *lockfd)
 {
     int suspend_evtchn;
 

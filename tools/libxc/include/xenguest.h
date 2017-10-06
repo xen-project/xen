@@ -109,7 +109,7 @@ struct save_callbacks {
     int (*wait_checkpoint)(void* data);
 
     /* Enable qemu-dm logging dirty pages to xen */
-    int (*switch_qemu_logdirty)(int domid, unsigned enable, void *data); /* HVM only */
+    int (*switch_qemu_logdirty)(uint32_t domid, unsigned enable, void *data); /* HVM only */
 
     /* to be provided as the last argument to each callback function */
     void* data;
@@ -195,8 +195,8 @@ struct restore_callbacks {
  */
 int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
                       unsigned int store_evtchn, unsigned long *store_mfn,
-                      domid_t store_domid, unsigned int console_evtchn,
-                      unsigned long *console_mfn, domid_t console_domid,
+                      uint32_t store_domid, unsigned int console_evtchn,
+                      unsigned long *console_mfn, uint32_t console_domid,
                       unsigned int hvm, unsigned int pae,
                       xc_migration_stream_t stream_type,
                       struct restore_callbacks *callbacks, int send_back_fd);
@@ -243,7 +243,7 @@ struct xc_hvm_firmware_module {
  */
 int xc_suspend_evtchn_release(xc_interface *xch,
                               struct xenevtchn_handle *xce,
-                              int domid, int suspend_evtchn, int *lockfd);
+                              uint32_t domid, int suspend_evtchn, int *lockfd);
 
 /**
  * This function eats the initial notification.
@@ -252,7 +252,7 @@ int xc_suspend_evtchn_release(xc_interface *xch,
  */
 int xc_suspend_evtchn_init_exclusive(xc_interface *xch,
                                      struct xenevtchn_handle *xce,
-                                     int domid, int port, int *lockfd);
+                                     uint32_t domid, int port, int *lockfd);
 
 /* xce must not be used for anything else */
 int xc_await_suspend(xc_interface *xch, struct xenevtchn_handle *xce,
@@ -267,7 +267,7 @@ int xc_await_suspend(xc_interface *xch, struct xenevtchn_handle *xce,
  */
 int xc_suspend_evtchn_init_sane(xc_interface *xch,
                                 struct xenevtchn_handle *xce,
-                                int domid, int port, int *lockfd);
+                                uint32_t domid, int port, int *lockfd);
 
 int xc_mark_page_online(xc_interface *xch, unsigned long start,
                         unsigned long end, uint32_t *status);
@@ -278,7 +278,7 @@ int xc_mark_page_offline(xc_interface *xch, unsigned long start,
 int xc_query_page_offline_status(xc_interface *xch, unsigned long start,
                                  unsigned long end, uint32_t *status);
 
-int xc_exchange_page(xc_interface *xch, int domid, xen_pfn_t mfn);
+int xc_exchange_page(xc_interface *xch, uint32_t domid, xen_pfn_t mfn);
 
 
 /**
@@ -293,7 +293,7 @@ struct xc_domain_meminfo {
     unsigned long p2m_size;
 };
 
-int xc_map_domain_meminfo(xc_interface *xch, int domid,
+int xc_map_domain_meminfo(xc_interface *xch, uint32_t domid,
                           struct xc_domain_meminfo *minfo);
 
 int xc_unmap_domain_meminfo(xc_interface *xch, struct xc_domain_meminfo *mem);

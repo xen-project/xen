@@ -24,7 +24,7 @@
 #include <stdbool.h>
 #include <xen/hvm/hvm_op.h>
 
-int xc_altp2m_get_domain_state(xc_interface *handle, domid_t dom, bool *state)
+int xc_altp2m_get_domain_state(xc_interface *handle, uint32_t dom, bool *state)
 {
     int rc;
     DECLARE_HYPERCALL_BUFFER(xen_hvm_altp2m_op_t, arg);
@@ -47,7 +47,7 @@ int xc_altp2m_get_domain_state(xc_interface *handle, domid_t dom, bool *state)
     return rc;
 }
 
-int xc_altp2m_set_domain_state(xc_interface *handle, domid_t dom, bool state)
+int xc_altp2m_set_domain_state(xc_interface *handle, uint32_t dom, bool state)
 {
     int rc;
     DECLARE_HYPERCALL_BUFFER(xen_hvm_altp2m_op_t, arg);
@@ -69,7 +69,7 @@ int xc_altp2m_set_domain_state(xc_interface *handle, domid_t dom, bool state)
 }
 
 /* This is a bit odd to me that it acts on current.. */
-int xc_altp2m_set_vcpu_enable_notify(xc_interface *handle, domid_t domid,
+int xc_altp2m_set_vcpu_enable_notify(xc_interface *handle, uint32_t domid,
                                      uint32_t vcpuid, xen_pfn_t gfn)
 {
     int rc;
@@ -92,7 +92,7 @@ int xc_altp2m_set_vcpu_enable_notify(xc_interface *handle, domid_t domid,
     return rc;
 }
 
-int xc_altp2m_create_view(xc_interface *handle, domid_t domid,
+int xc_altp2m_create_view(xc_interface *handle, uint32_t domid,
                           xenmem_access_t default_access, uint16_t *view_id)
 {
     int rc;
@@ -118,7 +118,7 @@ int xc_altp2m_create_view(xc_interface *handle, domid_t domid,
     return rc;
 }
 
-int xc_altp2m_destroy_view(xc_interface *handle, domid_t domid,
+int xc_altp2m_destroy_view(xc_interface *handle, uint32_t domid,
                            uint16_t view_id)
 {
     int rc;
@@ -141,7 +141,7 @@ int xc_altp2m_destroy_view(xc_interface *handle, domid_t domid,
 }
 
 /* Switch all vCPUs of the domain to the specified altp2m view */
-int xc_altp2m_switch_to_view(xc_interface *handle, domid_t domid,
+int xc_altp2m_switch_to_view(xc_interface *handle, uint32_t domid,
                              uint16_t view_id)
 {
     int rc;
@@ -163,7 +163,7 @@ int xc_altp2m_switch_to_view(xc_interface *handle, domid_t domid,
     return rc;
 }
 
-int xc_altp2m_set_mem_access(xc_interface *handle, domid_t domid,
+int xc_altp2m_set_mem_access(xc_interface *handle, uint32_t domid,
                              uint16_t view_id, xen_pfn_t gfn,
                              xenmem_access_t access)
 {
@@ -188,7 +188,7 @@ int xc_altp2m_set_mem_access(xc_interface *handle, domid_t domid,
     return rc;
 }
 
-int xc_altp2m_change_gfn(xc_interface *handle, domid_t domid,
+int xc_altp2m_change_gfn(xc_interface *handle, uint32_t domid,
                          uint16_t view_id, xen_pfn_t old_gfn,
                          xen_pfn_t new_gfn)
 {

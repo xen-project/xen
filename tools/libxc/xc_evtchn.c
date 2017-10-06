@@ -50,8 +50,8 @@ xc_evtchn_alloc_unbound(xc_interface *xch,
 {
     int rc;
     struct evtchn_alloc_unbound arg = {
-        .dom = (domid_t)dom,
-        .remote_dom = (domid_t)remote_dom
+        .dom        = dom,
+        .remote_dom = remote_dom,
     };
 
     rc = do_evtchn_op(xch, EVTCHNOP_alloc_unbound, &arg, sizeof(arg), 0);
@@ -64,7 +64,7 @@ xc_evtchn_alloc_unbound(xc_interface *xch,
 int xc_evtchn_reset(xc_interface *xch,
                     uint32_t dom)
 {
-    struct evtchn_reset arg = { .dom = (domid_t)dom };
+    struct evtchn_reset arg = { .dom = dom };
     return do_evtchn_op(xch, EVTCHNOP_reset, &arg, sizeof(arg), 0);
 }
 

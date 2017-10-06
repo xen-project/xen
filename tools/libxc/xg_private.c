@@ -161,7 +161,7 @@ char *xc_inflate_buffer(xc_interface *xch,
 /*******************/
 
 int pin_table(
-    xc_interface *xch, unsigned int type, unsigned long mfn, domid_t dom)
+    xc_interface *xch, unsigned int type, unsigned long mfn, uint32_t dom)
 {
     struct mmuext_op op;
 
