@@ -1,0 +1,42 @@
+# =====================================================================
+# Example PVH Linux guest configuration
+# =====================================================================
+#
+# This is a fairly minimal example of what is required for a
+# PVH Linux guest. For a more complete guide see xl.cfg(5)
+
+# This configures a PVH rather than PV guest
+type = "pvh"
+
+# Guest name
+name = "example.pvhlinux"
+
+# 128-bit UUID for the domain as a hexadecimal number.
+# Use "uuidgen" to generate one if required.
+# The default behavior is to generate a new UUID each time the guest is started.
+#uuid = "XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX"
+
+# Kernel image to boot
+kernel = "/boot/vmlinuz"
+
+# Ramdisk (optional)
+#ramdisk = "/boot/initrd.gz"
+
+# Kernel command line options
+extra = "root=/dev/xvda1"
+
+# Initial memory allocation (MB)
+memory = 512
+
+# Number of VCPUS
+vcpus = 4
+
+# Network devices
+# A list of 'vifspec' entries as described in
+# docs/misc/xl-network-configuration.markdown
+vif = [ '' ]
+
+# Disk Devices
+# A list of `diskspec' entries as described in
+# docs/misc/xl-disk-configuration.txt
+disk = [ '/dev/zvol/tank/guest-volume,raw,xvda,rw' ]
