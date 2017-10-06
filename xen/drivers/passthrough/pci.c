@@ -595,21 +595,24 @@ int pci_add_device(u16 seg, u8 bus, u8 devfn,
     unsigned int slot = PCI_SLOT(devfn), func = PCI_FUNC(devfn);
     const char *pdev_type;
     int ret;
+    bool pf_is_extfn = false;
 
-    if (!info)
+    if ( !info )
         pdev_type = "device";
-    else if (info->is_extfn)
-        pdev_type = "extended function";
-    else if (info->is_virtfn)
+    else if ( info->is_virtfn )
     {
         pcidevs_lock();
         pdev = pci_get_pdev(seg, info->physfn.bus, info->physfn.devfn);
+        if ( pdev )
+            pf_is_extfn = pdev->info.is_extfn;
         pcidevs_unlock();
         if ( !pdev )
             pci_add_device(seg, info->physfn.bus, info->physfn.devfn,
                            NULL, node);
         pdev_type = "virtual function";
     }
+    else if ( info->is_extfn )
+        pdev_type = "extended function";
     else
     {
         info = NULL;
@@ -633,7 +636,15 @@ int pci_add_device(u16 seg, u8 bus, u8 devfn,
     pdev->node = node;
 
     if ( info )
+    {
         pdev->info = *info;
+        /*
+         * VF's 'is_extfn' field is used to indicate whether its PF is an
+         * extended function.
+         */
+        if ( pdev->info.is_virtfn )
+            pdev->info.is_extfn = pf_is_extfn;
+    }
     else if ( !pdev->vf_rlen[0] )
     {
         unsigned int pos = pci_find_ext_capability(seg, bus, devfn,
