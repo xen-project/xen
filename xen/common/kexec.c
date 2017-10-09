@@ -905,11 +905,11 @@ static uint16_t kexec_load_v1_arch(void)
 #endif
 }
 
-static int kexec_segments_add_segment(
-    unsigned int *nr_segments, xen_kexec_segment_t *segments,
-    unsigned long mfn)
+static int kexec_segments_add_segment(unsigned int *nr_segments,
+                                      xen_kexec_segment_t *segments,
+                                      mfn_t mfn)
 {
-    paddr_t maddr = (paddr_t)mfn << PAGE_SHIFT;
+    paddr_t maddr = mfn_to_maddr(mfn);
     unsigned int n = *nr_segments;
 
     /* Need a new segment? */
@@ -930,7 +930,7 @@ static int kexec_segments_add_segment(
     return 0;
 }
 
-static int kexec_segments_from_ind_page(unsigned long mfn,
+static int kexec_segments_from_ind_page(mfn_t mfn,
                                         unsigned int *nr_segments,
                                         xen_kexec_segment_t *segments,
                                         bool_t compat)
@@ -939,7 +939,7 @@ static int kexec_segments_from_ind_page(unsigned long mfn,
     kimage_entry_t *entry;
     int ret = 0;
 
-    page = map_domain_page(_mfn(mfn));
+    page = map_domain_page(mfn);
 
     /*
      * Walk the indirection page list, adding destination pages to the
@@ -961,7 +961,7 @@ static int kexec_segments_from_ind_page(unsigned long mfn,
             break;
         case IND_INDIRECTION:
             unmap_domain_page(page);
-            entry = page = map_domain_page(_mfn(mfn));
+            entry = page = map_domain_page(mfn);
             continue;
         case IND_DONE:
             goto done;
@@ -990,7 +990,7 @@ static int kexec_do_load_v1(xen_kexec_load_v1_t *load, int compat)
     xen_kexec_segment_t *segments;
     uint16_t arch;
     unsigned int nr_segments = 0;
-    unsigned long ind_mfn = load->image.indirection_page >> PAGE_SHIFT;
+    mfn_t ind_mfn = maddr_to_mfn(load->image.indirection_page);
     int ret;
 
     arch = kexec_load_v1_arch();

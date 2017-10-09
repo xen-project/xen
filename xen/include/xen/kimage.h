@@ -48,9 +48,9 @@ struct page_info *kimage_alloc_control_page(struct kexec_image *image,
                                             unsigned memflags);
 
 kimage_entry_t *kimage_entry_next(kimage_entry_t *entry, bool_t compat);
-unsigned long kimage_entry_mfn(kimage_entry_t *entry, bool_t compat);
+mfn_t kimage_entry_mfn(kimage_entry_t *entry, bool_t compat);
 unsigned long kimage_entry_ind(kimage_entry_t *entry, bool_t compat);
-int kimage_build_ind(struct kexec_image *image, unsigned long ind_mfn,
+int kimage_build_ind(struct kexec_image *image, mfn_t ind_mfn,
                      bool_t compat);
 
 #endif /* __ASSEMBLY__ */
