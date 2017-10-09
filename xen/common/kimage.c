@@ -501,7 +501,7 @@ static void kimage_free_entry(kimage_entry_t entry)
 {
     struct page_info *page;
 
-    page = mfn_to_page(entry >> PAGE_SHIFT);
+    page = maddr_to_page(entry);
     free_domheap_page(page);
 }
 
@@ -633,8 +633,8 @@ static struct page_info *kimage_alloc_page(struct kexec_image *image,
         if ( old )
         {
             /* If so move it. */
-            mfn_t old_mfn = _mfn(*old >> PAGE_SHIFT);
-            mfn_t mfn = _mfn(addr >> PAGE_SHIFT);
+            mfn_t old_mfn = maddr_to_mfn(*old);
+            mfn_t mfn = maddr_to_mfn(addr);
 
             copy_domain_page(mfn, old_mfn);
             clear_domain_page(old_mfn);

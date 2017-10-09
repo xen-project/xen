@@ -2640,7 +2640,7 @@ static int sh_remove_shadow_via_pointer(struct domain *d, mfn_t smfn)
     ASSERT(sh_type_has_up_pointer(d, sp->u.sh.type));
 
     if (sp->up == 0) return 0;
-    pmfn = _mfn(sp->up >> PAGE_SHIFT);
+    pmfn = maddr_to_mfn(sp->up);
     ASSERT(mfn_valid(pmfn));
     vaddr = map_domain_page(pmfn);
     ASSERT(vaddr);

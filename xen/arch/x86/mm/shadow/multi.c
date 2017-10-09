@@ -2425,7 +2425,7 @@ int sh_safe_not_to_sync(struct vcpu *v, mfn_t gl1mfn)
     sp = mfn_to_page(smfn);
     if ( sp->u.sh.count != 1 || !sp->up )
         return 0;
-    smfn = _mfn(sp->up >> PAGE_SHIFT);
+    smfn = maddr_to_mfn(sp->up);
     ASSERT(mfn_valid(smfn));
 
 #if (SHADOW_PAGING_LEVELS == 4)
@@ -2434,7 +2434,7 @@ int sh_safe_not_to_sync(struct vcpu *v, mfn_t gl1mfn)
     ASSERT(sh_type_has_up_pointer(d, SH_type_l2_shadow));
     if ( sp->u.sh.count != 1 || !sp->up )
         return 0;
-    smfn = _mfn(sp->up >> PAGE_SHIFT);
+    smfn = maddr_to_mfn(sp->up);
     ASSERT(mfn_valid(smfn));
 
     /* up to l4 */
@@ -2442,7 +2442,7 @@ int sh_safe_not_to_sync(struct vcpu *v, mfn_t gl1mfn)
     if ( sp->u.sh.count != 1
          || !sh_type_has_up_pointer(d, SH_type_l3_64_shadow) || !sp->up )
         return 0;
-    smfn = _mfn(sp->up >> PAGE_SHIFT);
+    smfn = maddr_to_mfn(sp->up);
     ASSERT(mfn_valid(smfn));
 #endif
 
