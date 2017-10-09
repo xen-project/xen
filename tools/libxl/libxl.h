@@ -322,6 +322,9 @@
  */
 #define LIBXL_HAVE_BUILDINFO_GRANT_LIMITS 1
 
+#define LIBXL_MAX_GRANT_FRAMES_DEFAULT 32
+#define LIBXL_MAX_MAPTRACK_FRAMES_DEFAULT 1024
+
 /*
  * LIBXL_HAVE_BUILDINFO_* indicates that libxl_domain_build_info has
  * the field represented by the '*'. The original position of those
