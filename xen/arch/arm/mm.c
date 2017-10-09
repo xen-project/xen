@@ -329,9 +329,9 @@ static inline lpae_t mfn_to_xen_entry(mfn_t mfn, unsigned attr)
 }
 
 /* Map a 4k page in a fixmap entry */
-void set_fixmap(unsigned map, mfn_t mfn, unsigned attributes)
+void set_fixmap(unsigned map, mfn_t mfn, unsigned int flags)
 {
-    lpae_t pte = mfn_to_xen_entry(mfn, attributes);
+    lpae_t pte = mfn_to_xen_entry(mfn, flags);
     pte.pt.table = 1; /* 4k mappings always have this bit set */
     pte.pt.xn = 1;
     write_pte(xen_fixmap + third_table_offset(FIXMAP_ADDR(map)), pte);

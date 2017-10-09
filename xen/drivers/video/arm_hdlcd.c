@@ -227,7 +227,7 @@ void __init video_init(void)
     /* uses FIXMAP_MISC */
     set_pixclock(videomode->pixclock);
 
-    set_fixmap(FIXMAP_MISC, maddr_to_mfn(hdlcd_start), MT_DEVICE_nGnRE);
+    set_fixmap(FIXMAP_MISC, maddr_to_mfn(hdlcd_start), PAGE_HYPERVISOR_NOCACHE);
     HDLCD[HDLCD_COMMAND] = 0;
 
     HDLCD[HDLCD_LINELENGTH] = videomode->xres * bytes_per_pixel;
