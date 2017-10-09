@@ -25,15 +25,18 @@
  * LPAE Memory region attributes. Indexed by the AttrIndex bits of a
  * LPAE entry; the 8-bit fields are packed little-endian into MAIR0 and MAIR1.
  *
+ * See section "Device memory" B2.7.2 in ARM DDI 0487B.a for more
+ * details about the meaning of *G*R*E.
+ *
  *                    ai    encoding
- *   MT_UNCACHED      000   0000 0000  -- Strongly Ordered
- *   MT_BUFFERABLE    001   0100 0100  -- Non-Cacheable
- *   MT_WRITETHROUGH  010   1010 1010  -- Write-through
- *   MT_WRITEBACK     011   1110 1110  -- Write-back
- *   MT_DEV_SHARED    100   0000 0100  -- Device
+ *   MT_DEVICE_nGnRnE 000   0000 0000  -- Strongly Ordered/Device nGnRnE
+ *   MT_NORMAL_NC     001   0100 0100  -- Non-Cacheable
+ *   MT_NORMAL_WT     010   1010 1010  -- Write-through
+ *   MT_NORMAL_WB     011   1110 1110  -- Write-back
+ *   MT_DEVICE_nGnRE  100   0000 0100  -- Device nGnRE
  *   ??               101
  *   reserved         110
- *   MT_WRITEALLOC    111   1111 1111  -- Write-back write-allocate
+ *   MT_NORMAL        111   1111 1111  -- Write-back write-allocate
  */
 #define MAIR0VAL 0xeeaa4400
 #define MAIR1VAL 0xff000004
@@ -47,16 +50,16 @@
  * registers, as defined above.
  *
  */
-#define MT_UNCACHED      0x0
-#define MT_BUFFERABLE    0x1
-#define MT_WRITETHROUGH  0x2
-#define MT_WRITEBACK     0x3
-#define MT_DEV_SHARED    0x4
-#define MT_WRITEALLOC    0x7
+#define MT_DEVICE_nGnRnE 0x0
+#define MT_NORMAL_NC     0x1
+#define MT_NORMAL_WT     0x2
+#define MT_NORMAL_WB     0x3
+#define MT_DEVICE_nGnRE  0x4
+#define MT_NORMAL        0x7
 
-#define PAGE_HYPERVISOR         (MT_WRITEALLOC)
-#define PAGE_HYPERVISOR_NOCACHE (MT_DEV_SHARED)
-#define PAGE_HYPERVISOR_WC      (MT_BUFFERABLE)
+#define PAGE_HYPERVISOR         (MT_NORMAL)
+#define PAGE_HYPERVISOR_NOCACHE (MT_DEVICE_nGnRE)
+#define PAGE_HYPERVISOR_WC      (MT_NORMAL_NC)
 
 /*
  * Defines for changing the hypervisor PTE .ro and .nx bits. This is only to be
