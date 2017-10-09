@@ -1022,6 +1022,9 @@ static int create_xen_entries(enum xenmap_operation op,
                 if ( op == RESERVE )
                     break;
                 pte = mfn_to_xen_entry(mfn, PAGE_AI_MASK(flags));
+                pte.pt.ro = PAGE_RO_MASK(flags);
+                pte.pt.xn = PAGE_XN_MASK(flags);
+                BUG_ON(!pte.pt.ro && !pte.pt.xn);
                 pte.pt.table = 1;
                 write_pte(entry, pte);
                 break;
