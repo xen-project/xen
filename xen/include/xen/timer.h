@@ -70,6 +70,11 @@ void set_timer(struct timer *timer, s_time_t expires);
  */
 void stop_timer(struct timer *timer);
 
+/* True if a timer is active, and its expiry time is earlier than t. */
+bool timer_expires_before(struct timer *timer, s_time_t t);
+
+#define timer_is_expired(t) timer_expires_before(t, NOW())
+
 /* Migrate a timer to a different CPU. The timer may be currently active. */
 void migrate_timer(struct timer *timer, unsigned int new_cpu);
 

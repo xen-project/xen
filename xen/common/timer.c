@@ -331,6 +331,20 @@ void stop_timer(struct timer *timer)
     timer_unlock_irqrestore(timer, flags);
 }
 
+bool timer_expires_before(struct timer *timer, s_time_t t)
+{
+    unsigned long flags;
+    bool ret;
+
+    if ( !timer_lock_irqsave(timer, flags) )
+        return false;
+
+    ret = active_timer(timer) && timer->expires <= t;
+
+    timer_unlock_irqrestore(timer, flags);
+
+    return ret;
+}
 
 void migrate_timer(struct timer *timer, unsigned int new_cpu)
 {

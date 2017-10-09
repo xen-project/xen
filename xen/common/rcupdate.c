@@ -465,7 +465,24 @@ void rcu_idle_timer_stop()
         return;
 
     rdp->idle_timer_active = false;
-    stop_timer(&rdp->idle_timer);
+
+    /*
+     * In general, as the CPU is becoming active again, we don't need the
+     * idle timer, and so we want to stop it.
+     *
+     * However, in case we are here because idle_timer has (just) fired and
+     * has woken up the CPU, we skip stop_timer() now. In fact, when a CPU
+     * wakes up from idle, this code always runs before do_softirq() has the
+     * chance to check and deal with TIMER_SOFTIRQ. And if we stop the timer
+     * now, the TIMER_SOFTIRQ handler will see it as inactive, and will not
+     * call rcu_idle_timer_handler().
+     *
+     * Therefore, if we see that the timer is expired already, we leave it
+     * alone. The TIMER_SOFTIRQ handler will then run the timer routine, and
+     * deactivate it.
+     */
+    if ( !timer_is_expired(&rdp->idle_timer) )
+        stop_timer(&rdp->idle_timer);
 }
 
 static void rcu_idle_timer_handler(void* data)
