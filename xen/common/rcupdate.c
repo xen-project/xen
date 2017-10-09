@@ -118,8 +118,20 @@ struct rcu_data {
  */
 #define IDLE_TIMER_PERIOD_MAX     MILLISECS(100)
 #define IDLE_TIMER_PERIOD_DEFAULT MILLISECS(10)
+#define IDLE_TIMER_PERIOD_MIN     MICROSECS(100)
 
 static s_time_t __read_mostly idle_timer_period;
+
+/*
+ * Increment and decrement values for the idle timer handler. The algorithm
+ * works as follows:
+ * - if the timer actually fires, and it finds out that the grace period isn't
+ *   over yet, we add IDLE_TIMER_PERIOD_INCR to the timer's period;
+ * - if the timer actually fires and it finds the grace period over, we
+ *   subtract IDLE_TIMER_PERIOD_DECR from the timer's period.
+ */
+#define IDLE_TIMER_PERIOD_INCR    MILLISECS(10)
+#define IDLE_TIMER_PERIOD_DECR    MICROSECS(100)
 
 static DEFINE_PER_CPU(struct rcu_data, rcu_data);
 
@@ -493,8 +505,14 @@ void rcu_idle_timer_stop()
 
 static void rcu_idle_timer_handler(void* data)
 {
-    /* Nothing, really... Just count the number of times we fire */
     perfc_incr(rcu_idle_timer);
+
+    if ( !cpumask_empty(&rcu_ctrlblk.cpumask) )
+        idle_timer_period = min(idle_timer_period + IDLE_TIMER_PERIOD_INCR,
+                                IDLE_TIMER_PERIOD_MAX);
+    else
+        idle_timer_period = max(idle_timer_period - IDLE_TIMER_PERIOD_DECR,
+                                IDLE_TIMER_PERIOD_MIN);
 }
 
 void rcu_check_callbacks(int cpu)
