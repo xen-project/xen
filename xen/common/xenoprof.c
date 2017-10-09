@@ -19,6 +19,12 @@
 #include <xsm/xsm.h>
 #include <xen/hypercall.h>
 
+/* Override macros from asm/page.h to make them work with mfn_t */
+#undef virt_to_mfn
+#define virt_to_mfn(va) _mfn(__virt_to_mfn(va))
+#undef mfn_to_page
+#define mfn_to_page(mfn) __mfn_to_page(mfn_x(mfn))
+
 /* Limit amount of pages used for shared buffer (per domain) */
 #define MAX_OPROF_SHARED_PAGES 32
 
@@ -134,25 +140,27 @@ static void xenoprof_reset_buf(struct domain *d)
 }
 
 static int
-share_xenoprof_page_with_guest(struct domain *d, unsigned long mfn, int npages)
+share_xenoprof_page_with_guest(struct domain *d, mfn_t mfn, int npages)
 {
     int i;
 
     /* Check if previous page owner has released the page. */
     for ( i = 0; i < npages; i++ )
     {
-        struct page_info *page = mfn_to_page(mfn + i);
+        struct page_info *page = mfn_to_page(mfn_add(mfn, i));
+
         if ( (page->count_info & (PGC_allocated|PGC_count_mask)) != 0 )
         {
             printk(XENLOG_G_INFO "dom%d mfn %#lx page->count_info %#lx\n",
-                   d->domain_id, mfn + i, page->count_info);
+                   d->domain_id, mfn_x(mfn_add(mfn, i)), page->count_info);
             return -EBUSY;
         }
         page_set_owner(page, NULL);
     }
 
     for ( i = 0; i < npages; i++ )
-        share_xen_page_with_guest(mfn_to_page(mfn + i), d, XENSHARE_writable);
+        share_xen_page_with_guest(mfn_to_page(mfn_add(mfn, i)),
+                                  d, XENSHARE_writable);
 
     return 0;
 }
@@ -161,11 +169,12 @@ static void
 unshare_xenoprof_page_with_guest(struct xenoprof *x)
 {
     int i, npages = x->npages;
-    unsigned long mfn = virt_to_mfn(x->rawbuf);
+    mfn_t mfn = virt_to_mfn(x->rawbuf);
 
     for ( i = 0; i < npages; i++ )
     {
-        struct page_info *page = mfn_to_page(mfn + i);
+        struct page_info *page = mfn_to_page(mfn_add(mfn, i));
+
         BUG_ON(page_get_owner(page) != current->domain);
         if ( test_and_clear_bit(_PGC_allocated, &page->count_info) )
             put_page(page);
