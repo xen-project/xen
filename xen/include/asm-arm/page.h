@@ -65,6 +65,13 @@
 #define MAIR0VAL (MAIRVAL & 0xffffffff)
 #define MAIR1VAL (MAIRVAL >> 32)
 
+/*
+ * Layout of the flags used for updating the hypervisor page tables
+ *
+ * [0:2] Memory Attribute Index
+ */
+#define PAGE_AI_MASK(x) ((x) & 0x7U)
+
 #define PAGE_HYPERVISOR         (MT_NORMAL)
 #define PAGE_HYPERVISOR_NOCACHE (MT_DEVICE_nGnRE)
 #define PAGE_HYPERVISOR_WC      (MT_NORMAL_NC)
