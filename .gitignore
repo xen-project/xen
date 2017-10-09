@@ -228,7 +228,7 @@ tools/security/xensec_tool
 tools/tests/x86_emulator/*.bin
 tools/tests/x86_emulator/*.tmp
 tools/tests/x86_emulator/asm
-tools/tests/x86_emulator/avx*.h
+tools/tests/x86_emulator/avx*.[ch]
 tools/tests/x86_emulator/blowfish.h
 tools/tests/x86_emulator/sse*.[ch]
 tools/tests/x86_emulator/test_x86_emulator

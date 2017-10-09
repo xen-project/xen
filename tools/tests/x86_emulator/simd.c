@@ -70,7 +70,13 @@ typedef long long __attribute__((vector_size(VEC_SIZE))) vdi_t;
 #if VEC_SIZE == 8 && defined(__SSE__)
 # define to_bool(cmp) (__builtin_ia32_pmovmskb(cmp) == 0xff)
 #elif VEC_SIZE == 16
-# if defined(__SSE4_1__)
+# if defined(__AVX__) && defined(FLOAT_SIZE)
+#  if ELEM_SIZE == 4
+#   define to_bool(cmp) __builtin_ia32_vtestcps(cmp, (vec_t){} == 0)
+#  elif ELEM_SIZE == 8
+#   define to_bool(cmp) __builtin_ia32_vtestcpd(cmp, (vec_t){} == 0)
+#  endif
+# elif defined(__SSE4_1__)
 #  define to_bool(cmp) __builtin_ia32_ptestc128(cmp, (vdi_t){} == 0)
 # elif defined(__SSE__) && ELEM_SIZE == 4
 #  define to_bool(cmp) (__builtin_ia32_movmskps(cmp) == 0xf)
@@ -80,6 +86,12 @@ typedef long long __attribute__((vector_size(VEC_SIZE))) vdi_t;
 #  else
 #   define to_bool(cmp) (__builtin_ia32_pmovmskb128(cmp) == 0xffff)
 #  endif
+# endif
+#elif VEC_SIZE == 32
+# if defined(__AVX__) && ELEM_SIZE == 4
+#  define to_bool(cmp) (__builtin_ia32_movmskps256(cmp) == 0xff)
+# elif defined(__AVX__) && ELEM_SIZE == 8
+#  define to_bool(cmp) (__builtin_ia32_movmskpd256(cmp) == 0xf)
 # endif
 #endif
 
@@ -105,6 +117,12 @@ static inline bool _to_bool(byte_vec_t bv)
 # elif FLOAT_SIZE == 8
 #  define to_int(x) __builtin_ia32_cvtdq2pd(__builtin_ia32_cvtpd2dq(x))
 # endif
+#elif VEC_SIZE == 32 && defined(__AVX__)
+# if FLOAT_SIZE == 4
+#  define to_int(x) __builtin_ia32_cvtdq2ps256(__builtin_ia32_cvtps2dq256(x))
+# elif FLOAT_SIZE == 8
+#  define to_int(x) __builtin_ia32_cvtdq2pd256(__builtin_ia32_cvtpd2dq256(x))
+# endif
 #endif
 
 #if VEC_SIZE == FLOAT_SIZE
@@ -116,7 +134,25 @@ static inline bool _to_bool(byte_vec_t bv)
 #endif
 
 #if FLOAT_SIZE == 4 && defined(__SSE__)
-# if VEC_SIZE == 16
+# if VEC_SIZE == 32 && defined(__AVX__)
+#  define broadcast(x) ({ float t_ = (x); __builtin_ia32_vbroadcastss256(&t_); })
+#  define max(x, y) __builtin_ia32_maxps256(x, y)
+#  define min(x, y) __builtin_ia32_minps256(x, y)
+#  define recip(x) __builtin_ia32_rcpps256(x)
+#  define rsqrt(x) __builtin_ia32_rsqrtps256(x)
+#  define sqrt(x) __builtin_ia32_sqrtps256(x)
+#  define swap(x) ({ \
+    vec_t t_ = __builtin_ia32_vpermilps256(x, 0b00011011); \
+    __builtin_ia32_vperm2f128_ps256(t_, t_, 0b00000001); \
+})
+#  define swap2(x) ({ \
+    vec_t t_ = __builtin_ia32_vpermilvarps256(x, __builtin_ia32_cvtps2dq256(inv) - 1); \
+    __builtin_ia32_vperm2f128_ps256(t_, t_, 0b00000001); \
+})
+# elif VEC_SIZE == 16
+#  ifdef __AVX__
+#   define broadcast(x) ({ float t_ = (x); __builtin_ia32_vbroadcastss(&t_); })
+#  endif
 #  define interleave_hi(x, y) __builtin_ia32_unpckhps(x, y)
 #  define interleave_lo(x, y) __builtin_ia32_unpcklps(x, y)
 #  define max(x, y) __builtin_ia32_maxps(x, y)
@@ -125,13 +161,39 @@ static inline bool _to_bool(byte_vec_t bv)
 #  define rsqrt(x) __builtin_ia32_rsqrtps(x)
 #  define sqrt(x) __builtin_ia32_sqrtps(x)
 #  define swap(x) __builtin_ia32_shufps(x, x, 0b00011011)
+#  ifdef __AVX__
+#   define swap2(x) __builtin_ia32_vpermilvarps(x, __builtin_ia32_cvtps2dq(inv) - 1)
+#  endif
 # elif VEC_SIZE == 4
 #  define recip(x) scalar_1op(x, "rcpss %[in], %[out]")
 #  define rsqrt(x) scalar_1op(x, "rsqrtss %[in], %[out]")
 #  define sqrt(x) scalar_1op(x, "sqrtss %[in], %[out]")
 # endif
 #elif FLOAT_SIZE == 8 && defined(__SSE2__)
-# if VEC_SIZE == 16
+# if VEC_SIZE == 32 && defined(__AVX__)
+#  define broadcast(x) ({ double t_ = (x); __builtin_ia32_vbroadcastsd256(&t_); })
+#  define max(x, y) __builtin_ia32_maxpd256(x, y)
+#  define min(x, y) __builtin_ia32_minpd256(x, y)
+#  define recip(x) ({ \
+    float __attribute__((vector_size(16))) t_ = __builtin_ia32_cvtpd2ps256(x); \
+    t_ = __builtin_ia32_vextractf128_ps256( \
+             __builtin_ia32_rcpps256( \
+                 __builtin_ia32_vbroadcastf128_ps256(&t_)), 0); \
+    __builtin_ia32_cvtps2pd256(t_); \
+})
+#  define rsqrt(x) ({ \
+    float __attribute__((vector_size(16))) t1_ = __builtin_ia32_cvtpd2ps256(x); \
+    float __attribute__((vector_size(32))) t2_ = __builtin_ia32_vinsertf128_ps256((typeof(t2_)){}, t1_, 0); \
+    t2_ = __builtin_ia32_vinsertf128_ps256(t2_, t1_, 1); \
+    t1_ = __builtin_ia32_vextractf128_ps256(__builtin_ia32_rsqrtps256(t2_), 0); \
+    __builtin_ia32_cvtps2pd256(t1_); \
+})
+#  define sqrt(x) __builtin_ia32_sqrtpd256(x)
+#  define swap(x) ({ \
+    vec_t t_ = __builtin_ia32_vpermilpd256(x, 0b00000101); \
+    __builtin_ia32_vperm2f128_pd256(t_, t_, 0b00000001); \
+})
+# elif VEC_SIZE == 16
 #  define interleave_hi(x, y) __builtin_ia32_unpckhpd(x, y)
 #  define interleave_lo(x, y) __builtin_ia32_unpcklpd(x, y)
 #  define max(x, y) __builtin_ia32_maxpd(x, y)
@@ -140,6 +202,10 @@ static inline bool _to_bool(byte_vec_t bv)
 #  define rsqrt(x) __builtin_ia32_cvtps2pd(__builtin_ia32_rsqrtps(__builtin_ia32_cvtpd2ps(x)))
 #  define sqrt(x) __builtin_ia32_sqrtpd(x)
 #  define swap(x) __builtin_ia32_shufpd(x, x, 0b01)
+#  ifdef __AVX__
+#   define swap2(x) __builtin_ia32_vpermilvarpd(x, __builtin_ia32_pmovsxdq128( \
+                                                       __builtin_ia32_cvtpd2dq(inv) - 1) << 1)
+#  endif
 # elif VEC_SIZE == 8
 #  define recip(x) scalar_1op(x, "cvtsd2ss %[in], %[out]; rcpss %[out], %[out]; cvtss2sd %[out], %[out]")
 #  define rsqrt(x) scalar_1op(x, "cvtsd2ss %[in], %[out]; rsqrtss %[out], %[out]; cvtss2sd %[out], %[out]")
@@ -200,6 +266,31 @@ static inline bool _to_bool(byte_vec_t bv)
 })
 #  define hadd(x, y) __builtin_ia32_haddpd(x, y)
 #  define hsub(x, y) __builtin_ia32_hsubpd(x, y)
+# endif
+#elif VEC_SIZE == 32 && defined(__AVX__)
+# if FLOAT_SIZE == 4
+#  define addsub(x, y) __builtin_ia32_addsubps256(x, y)
+#  define dup_hi(x) __builtin_ia32_movshdup256(x)
+#  define dup_lo(x) __builtin_ia32_movsldup256(x)
+#  define hadd(x, y) ({ \
+        vec_t t_ = __builtin_ia32_haddps256(x, y); \
+        (vec_t){t_[0], t_[1], t_[4], t_[5], t_[2], t_[3], t_[6], t_[7]}; \
+})
+#  define hsub(x, y) ({ \
+        vec_t t_ = __builtin_ia32_hsubps256(x, y); \
+        (vec_t){t_[0], t_[1], t_[4], t_[5], t_[2], t_[3], t_[6], t_[7]}; \
+})
+# elif FLOAT_SIZE == 8
+#  define addsub(x, y) __builtin_ia32_addsubpd256(x, y)
+#  define dup_lo(x) __builtin_ia32_movddup256(x)
+#  define hadd(x, y) ({ \
+        vec_t t_ = __builtin_ia32_haddpd256(x, y); \
+        (vec_t){t_[0], t_[2], t_[1], t_[3]}; \
+})
+#  define hsub(x, y) ({ \
+        vec_t t_ = __builtin_ia32_hsubpd256(x, y); \
+        (vec_t){t_[0], t_[2], t_[1], t_[3]}; \
+})
 # endif
 #endif
 #if VEC_SIZE == 16 && defined(__SSSE3__)
@@ -280,6 +371,31 @@ static inline bool _to_bool(byte_vec_t bv)
 #  define mix(x, y) __builtin_ia32_blendps(x, y, 0b1010)
 # elif FLOAT_SIZE == 8
 #  define mix(x, y) __builtin_ia32_blendpd(x, y, 0b10)
+# endif
+#endif
+#if VEC_SIZE == 32 && defined(__AVX__)
+# if FLOAT_SIZE == 4
+#  define dot_product(x, y) ({ \
+    vec_t t_ = __builtin_ia32_dpps256(x, y, 0b11110001); \
+    (vec_t){t_[0] + t_[4]}; \
+})
+#  define mix(x, y) __builtin_ia32_blendps256(x, y, 0b10101010)
+#  define select(d, x, y, m) (*(d) = __builtin_ia32_blendvps256(y, x, m))
+#  define select2(d, x, y, m) ({ \
+    vsi_t m_ = (vsi_t)(m); \
+    *(d) = __builtin_ia32_maskloadps256(&(x),  m_); \
+    __builtin_ia32_maskstoreps256(d, ~m_, y); \
+})
+#  define trunc(x) __builtin_ia32_roundps256(x, 0b1011)
+# elif FLOAT_SIZE == 8
+#  define mix(x, y) __builtin_ia32_blendpd256(x, y, 0b1010)
+#  define select(d, x, y, m) (*(d) = __builtin_ia32_blendvpd256(y, x, m))
+#  define select2(d, x, y, m) ({ \
+    vdi_t m_ = (vdi_t)(m); \
+    *(d) = __builtin_ia32_maskloadpd256(&(x),  m_); \
+    __builtin_ia32_maskstorepd256(d, ~m_, y); \
+})
+#  define trunc(x) __builtin_ia32_roundpd256(x, 0b1011)
 # endif
 #endif
 #if VEC_SIZE == FLOAT_SIZE
@@ -555,6 +671,15 @@ int simd_test(void)
     if ( !to_bool(swap(src) == inv) ) return __LINE__;
 #endif
 
+#ifdef swap2
+    touch(src);
+    if ( !to_bool(swap2(src) == inv) ) return __LINE__;
+#endif
+
+#if defined(broadcast)
+    if ( !to_bool(broadcast(ELEM_COUNT + 1) == src + inv) ) return __LINE__;
+#endif
+
 #if defined(interleave_lo) && defined(interleave_hi)
     touch(src);
     x = interleave_lo(inv, src);
@@ -649,6 +774,15 @@ int simd_test(void)
     select(&z, src, inv, alt);
 # else
     select(&z, src, inv, alt > 0);
+# endif
+    if ( !to_bool(z == y) ) return __LINE__;
+#endif
+
+#ifdef select2
+# ifdef UINT_SIZE
+    select2(&z, src, inv, alt);
+# else
+    select2(&z, src, inv, alt > 0);
 # endif
     if ( !to_bool(z == y) ) return __LINE__;
 #endif

@@ -11,8 +11,8 @@ all: $(TARGET)
 run: $(TARGET)
 	./$(TARGET)
 
-SIMD := sse sse2 sse4
-TESTCASES := blowfish $(SIMD) $(addsuffix -avx,$(filter sse%,$(SIMD)))
+SIMD := sse sse2 sse4 avx
+TESTCASES := blowfish $(SIMD) sse2-avx sse4-avx
 
 blowfish-cflags := ""
 blowfish-cflags-x86_32 := "-mno-accumulate-outgoing-args -Dstatic="
@@ -26,34 +26,36 @@ sse2-flts := 4 8
 sse4-vecs := $(sse2-vecs)
 sse4-ints := $(sse2-ints)
 sse4-flts := $(sse2-flts)
+avx-vecs := 16 32
+avx-ints :=
+avx-flts := 4 8
 
 # When converting SSE to AVX, have the compiler avoid XMM0 to widen
 # coverage of the VEX.vvvv checks in the emulator. We must not do this,
 # however, for SSE4.1 and later, as there are instructions with XMM0 as
 # an implicit operand.
-sse2avx-sse  := -ffixed-xmm0 -Wa,-msse2avx
-sse2avx-sse2 := $(sse2avx-sse)
+sse2avx-sse2 := -ffixed-xmm0 -Wa,-msse2avx
 sse2avx-sse4 := -Wa,-msse2avx
+
+# For AVX and later, have the compiler avoid XMM0 to widen coverage of
+# the VEX.vvvv checks in the emulator.
+non-sse = $(if $(filter sse%,$(1)),,-ffixed-xmm0)
 
 define simd-defs
 $(1)-cflags := \
 	$(foreach vec,$($(1)-vecs), \
 	  $(foreach int,$($(1)-ints), \
-	    "-D_$(vec)i$(int) -m$(1) -O2 -DVEC_SIZE=$(vec) -DINT_SIZE=$(int)" \
-	    "-D_$(vec)u$(int) -m$(1) -O2 -DVEC_SIZE=$(vec) -DUINT_SIZE=$(int)") \
+	    "-D_$(vec)i$(int) -m$(1) $(call non-sse,$(1)) -O2 -DVEC_SIZE=$(vec) -DINT_SIZE=$(int)" \
+	    "-D_$(vec)u$(int) -m$(1) $(call non-sse,$(1)) -O2 -DVEC_SIZE=$(vec) -DUINT_SIZE=$(int)") \
 	  $(foreach flt,$($(1)-flts), \
-	    "-D_$(vec)f$(flt) -m$(1) -O2 -DVEC_SIZE=$(vec) -DFLOAT_SIZE=$(flt)")) \
+	    "-D_$(vec)f$(flt) -m$(1) $(call non-sse,$(1)) -O2 -DVEC_SIZE=$(vec) -DFLOAT_SIZE=$(flt)")) \
 	$(foreach flt,$($(1)-flts), \
-	  "-D_f$(flt) -m$(1) -mfpmath=sse -O2 -DFLOAT_SIZE=$(flt)")
+	  "-D_f$(flt) -m$(1) $(call non-sse,$(1)) -mfpmath=sse -O2 -DFLOAT_SIZE=$(flt)")
 $(1)-avx-cflags := \
 	$(foreach vec,$($(1)-vecs), \
 	  $(foreach int,$($(1)-ints), \
 	    "-D_$(vec)i$(int) -m$(1) $(sse2avx-$(1)) -O2 -DVEC_SIZE=$(vec) -DINT_SIZE=$(int)" \
-	    "-D_$(vec)u$(int) -m$(1) $(sse2avx-$(1)) -O2 -DVEC_SIZE=$(vec) -DUINT_SIZE=$(int)") \
-	  $(foreach flt,$($(1)-flts), \
-	    "-D_$(vec)f$(flt) -m$(1) $(sse2avx-$(1)) -O2 -DVEC_SIZE=$(vec) -DFLOAT_SIZE=$(flt)")) \
-	$(foreach flt,$($(1)-flts), \
-	  "-D_f$(flt) -m$(1) -mfpmath=sse $(sse2avx-$(1)) -O2 -DFLOAT_SIZE=$(flt)")
+	    "-D_$(vec)u$(int) -m$(1) $(sse2avx-$(1)) -O2 -DVEC_SIZE=$(vec) -DUINT_SIZE=$(int)"))
 endef
 
 $(foreach flavor,$(SIMD),$(eval $(call simd-defs,$(flavor))))

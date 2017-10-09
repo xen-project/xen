@@ -8,9 +8,9 @@
 #include "sse.h"
 #include "sse2.h"
 #include "sse4.h"
-#include "sse-avx.h"
 #include "sse2-avx.h"
 #include "sse4-avx.h"
+#include "avx.h"
 
 #define verbose false /* Switch to true for far more logging. */
 
@@ -44,7 +44,6 @@ static bool simd_check_avx(void)
 {
     return cpu_has_avx;
 }
-#define simd_check_sse_avx   simd_check_avx
 #define simd_check_sse2_avx  simd_check_avx
 #define simd_check_sse4_avx  simd_check_avx
 
@@ -122,12 +121,6 @@ static const struct {
     SIMD(SSE4 packed u32,        sse4,      16u4),
     SIMD(SSE4 packed s64,        sse4,      16i8),
     SIMD(SSE4 packed u64,        sse4,      16u8),
-    SIMD(SSE/AVX scalar single,  sse_avx,     f4),
-    SIMD(SSE/AVX packed single,  sse_avx,   16f4),
-    SIMD(SSE2/AVX scalar single, sse2_avx,    f4),
-    SIMD(SSE2/AVX packed single, sse2_avx,  16f4),
-    SIMD(SSE2/AVX scalar double, sse2_avx,    f8),
-    SIMD(SSE2/AVX packed double, sse2_avx,  16f8),
     SIMD(SSE2/AVX packed s8,     sse2_avx,  16i1),
     SIMD(SSE2/AVX packed u8,     sse2_avx,  16u1),
     SIMD(SSE2/AVX packed s16,    sse2_avx,  16i2),
@@ -136,10 +129,6 @@ static const struct {
     SIMD(SSE2/AVX packed u32,    sse2_avx,  16u4),
     SIMD(SSE2/AVX packed s64,    sse2_avx,  16i8),
     SIMD(SSE2/AVX packed u64,    sse2_avx,  16u8),
-    SIMD(SSE4/AVX scalar single, sse4_avx,    f4),
-    SIMD(SSE4/AVX packed single, sse4_avx,  16f4),
-    SIMD(SSE4/AVX scalar double, sse4_avx,    f8),
-    SIMD(SSE4/AVX packed double, sse4_avx,  16f8),
     SIMD(SSE4/AVX packed s8,     sse4_avx,  16i1),
     SIMD(SSE4/AVX packed u8,     sse4_avx,  16u1),
     SIMD(SSE4/AVX packed s16,    sse4_avx,  16i2),
@@ -148,6 +137,12 @@ static const struct {
     SIMD(SSE4/AVX packed u32,    sse4_avx,  16u4),
     SIMD(SSE4/AVX packed s64,    sse4_avx,  16i8),
     SIMD(SSE4/AVX packed u64,    sse4_avx,  16u8),
+    SIMD(AVX scalar single,      avx,         f4),
+    SIMD(AVX 128bit single,      avx,       16f4),
+    SIMD(AVX 256bit single,      avx,       32f4),
+    SIMD(AVX scalar double,      avx,         f8),
+    SIMD(AVX 128bit double,      avx,       16f8),
+    SIMD(AVX 256bit double,      avx,       32f8),
 #undef SIMD_
 #undef SIMD
 };
@@ -2856,6 +2851,81 @@ int main(int argc, char **argv)
         if ( rc != X86EMUL_OKAY || !check_eip(insertq_reg) ||
              res[4] != 0xbaa99211 || res[5] != 0x887ddccb )
             goto fail;
+        printf("okay\n");
+    }
+    else
+        printf("skipped\n");
+
+    /*
+     * The following "maskmov" tests are not only making sure the written data
+     * is correct, but verify (by placing operands on the mapping boundaries)
+     * that elements controlled by clear mask bits aren't being accessed.
+     */
+    printf("%-40s", "Testing vmaskmovps %xmm1,%xmm2,(%edx)...");
+    if ( stack_exec && cpu_has_avx )
+    {
+        decl_insn(vmaskmovps);
+
+        asm volatile ( "vxorps %%xmm1, %%xmm1, %%xmm1\n\t"
+                       "vcmpeqss %%xmm1, %%xmm1, %%xmm2\n\t"
+                       put_insn(vmaskmovps, "vmaskmovps %%xmm1, %%xmm2, (%0)")
+                       :: "d" (NULL) );
+
+        memset(res + MMAP_SZ / sizeof(*res) - 8, 0xdb, 32);
+        set_insn(vmaskmovps);
+        regs.edx = (unsigned long)res + MMAP_SZ - 4;
+        rc = x86_emulate(&ctxt, &emulops);
+        if ( rc != X86EMUL_OKAY || !check_eip(vmaskmovps) ||
+             res[MMAP_SZ / sizeof(*res) - 1] ||
+             memcmp(res + MMAP_SZ / sizeof(*res) - 8,
+                    res + MMAP_SZ / sizeof(*res) - 4, 12) )
+            goto fail;
+
+        asm volatile ( "vinsertps $0b00110111, %xmm2, %xmm2, %xmm2" );
+        memset(res, 0xdb, 32);
+        set_insn(vmaskmovps);
+        regs.edx = (unsigned long)(res - 3);
+        rc = x86_emulate(&ctxt, &emulops);
+        if ( rc != X86EMUL_OKAY || !check_eip(vmaskmovps) ||
+             res[0] || memcmp(res + 1, res + 4, 12) )
+            goto fail;
+
+        printf("okay\n");
+    }
+    else
+        printf("skipped\n");
+
+    printf("%-40s", "Testing vmaskmovpd %xmm1,%xmm2,(%edx)...");
+    if ( stack_exec && cpu_has_avx )
+    {
+        decl_insn(vmaskmovpd);
+
+        asm volatile ( "vxorpd %%xmm1, %%xmm1, %%xmm1\n\t"
+                       "vcmpeqsd %%xmm1, %%xmm1, %%xmm2\n\t"
+                       put_insn(vmaskmovpd, "vmaskmovpd %%xmm1, %%xmm2, (%0)")
+                       :: "d" (NULL) );
+
+        memset(res + MMAP_SZ / sizeof(*res) - 8, 0xdb, 32);
+        set_insn(vmaskmovpd);
+        regs.edx = (unsigned long)res + MMAP_SZ - 8;
+        rc = x86_emulate(&ctxt, &emulops);
+        if ( rc != X86EMUL_OKAY || !check_eip(vmaskmovpd) ||
+             res[MMAP_SZ / sizeof(*res) - 1] ||
+             res[MMAP_SZ / sizeof(*res) - 2] ||
+             memcmp(res + MMAP_SZ / sizeof(*res) - 8,
+                    res + MMAP_SZ / sizeof(*res) - 4, 8) )
+            goto fail;
+
+        asm volatile ( "vmovddup %xmm2, %xmm2\n\t"
+                       "vmovsd %xmm1, %xmm2, %xmm2" );
+        memset(res, 0xdb, 32);
+        set_insn(vmaskmovpd);
+        regs.edx = (unsigned long)(res - 2);
+        rc = x86_emulate(&ctxt, &emulops);
+        if ( rc != X86EMUL_OKAY || !check_eip(vmaskmovpd) ||
+             res[0] || res[1] || memcmp(res + 2, res + 4, 8) )
+            goto fail;
+
         printf("okay\n");
     }
     else
