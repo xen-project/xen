@@ -274,9 +274,9 @@ MINIOS_UPSTREAM_URL ?= git://xenbits.xen.org/mini-os.git
 endif
 OVMF_UPSTREAM_REVISION ?= 947f3737abf65fda63f3ffd97fddfa6986986868
 QEMU_UPSTREAM_REVISION ?= master
-MINIOS_UPSTREAM_REVISION ?= 1fb40dd678f1afd0b7e1a5c37b7c5e54547e7ae3
-# Wed Aug 9 13:15:48 2017 +0100
-# lib/math.c: implement __udivmoddi4
+MINIOS_UPSTREAM_REVISION ?= 3a18eaa27e60d45953359f4c199196cade1d7f2d
+# Tue Oct 3 19:45:19 2017 +0100
+# Link against libxentoolcore
 
 SEABIOS_UPSTREAM_REVISION ?= rel-1.10.2
 # Wed Jun 22 14:53:24 2016 +0800
