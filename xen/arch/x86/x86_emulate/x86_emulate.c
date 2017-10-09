@@ -1250,10 +1250,10 @@ static void __put_rep_prefix(
 
 /* Clip maximum repetitions so that the index register at most just wraps. */
 #define truncate_ea_and_reps(ea, reps, bytes_per_rep) ({                  \
-    unsigned long todo__, ea__ = truncate_word(ea, ad_bytes);             \
+    unsigned long todo__, ea__ = truncate_ea(ea);                         \
     if ( !(_regs.eflags & X86_EFLAGS_DF) )                                \
-        todo__ = truncate_word(-(ea), ad_bytes) / (bytes_per_rep);        \
-    else if ( truncate_word((ea) + (bytes_per_rep) - 1, ad_bytes) < ea__ )\
+        todo__ = truncate_ea(-ea__) / (bytes_per_rep);                    \
+    else if ( truncate_ea(ea__ + (bytes_per_rep) - 1) < ea__ )            \
         todo__ = 1;                                                       \
     else                                                                  \
         todo__ = ea__ / (bytes_per_rep) + 1;                              \
@@ -3139,6 +3139,7 @@ x86_emulate(
                     op_bytes + (((-src.val - 1) >> 3) & ~(op_bytes - 1L));
             else
                 ea.mem.off += (src.val >> 3) & ~(op_bytes - 1L);
+            ea.mem.off = truncate_ea(ea.mem.off);
         }
 
         /* Bit index always truncated to within range. */
@@ -3357,7 +3358,7 @@ x86_emulate(
         unsigned long src_val2;
         int lb, ub, idx;
         generate_exception_if(src.type != OP_MEM, EXC_UD);
-        if ( (rc = read_ulong(src.mem.seg, src.mem.off + op_bytes,
+        if ( (rc = read_ulong(src.mem.seg, truncate_ea(src.mem.off + op_bytes),
                               &src_val2, op_bytes, ctxt, ops)) )
             goto done;
         ub  = (op_bytes == 2) ? (int16_t)src_val2 : (int32_t)src_val2;
@@ -3908,7 +3909,7 @@ x86_emulate(
         seg = (b & 1) * 3; /* es = 0, ds = 3 */
     les:
         generate_exception_if(src.type != OP_MEM, EXC_UD);
-        if ( (rc = read_ulong(src.mem.seg, src.mem.off + src.bytes,
+        if ( (rc = read_ulong(src.mem.seg, truncate_ea(src.mem.off + src.bytes),
                               &dst.val, 2, ctxt, ops)) != X86EMUL_OKAY )
             goto done;
         ASSERT(is_x86_user_segment(seg));
@@ -4942,7 +4943,8 @@ x86_emulate(
         case 5: /* jmp (far, absolute indirect) */
             generate_exception_if(src.type != OP_MEM, EXC_UD);
 
-            if ( (rc = read_ulong(src.mem.seg, src.mem.off + op_bytes,
+            if ( (rc = read_ulong(src.mem.seg,
+                                  truncate_ea(src.mem.off + op_bytes),
                                   &imm2, 2, ctxt, ops)) )
                 goto done;
             imm1 = src.val;
@@ -5129,8 +5131,8 @@ x86_emulate(
             }
             if ( (rc = ops->write(ea.mem.seg, ea.mem.off, &sreg.limit,
                                   2, ctxt)) != X86EMUL_OKAY ||
-                 (rc = ops->write(ea.mem.seg, ea.mem.off + 2, &sreg.base,
-                                  op_bytes, ctxt)) != X86EMUL_OKAY )
+                 (rc = ops->write(ea.mem.seg, truncate_ea(ea.mem.off + 2),
+                                  &sreg.base, op_bytes, ctxt)) != X86EMUL_OKAY )
                 goto done;
             break;
 
@@ -5140,9 +5142,9 @@ x86_emulate(
             generate_exception_if(!mode_ring0(), EXC_GP, 0);
             fail_if(ops->write_segment == NULL);
             memset(&sreg, 0, sizeof(sreg));
-            if ( (rc = read_ulong(ea.mem.seg, ea.mem.off+0,
+            if ( (rc = read_ulong(ea.mem.seg, ea.mem.off,
                                   &limit, 2, ctxt, ops)) ||
-                 (rc = read_ulong(ea.mem.seg, ea.mem.off+2,
+                 (rc = read_ulong(ea.mem.seg, truncate_ea(ea.mem.off + 2),
                                   &base, mode_64bit() ? 8 : 4, ctxt, ops)) )
                 goto done;
             generate_exception_if(!is_canonical_address(base), EXC_GP, 0);
