@@ -986,7 +986,7 @@ static int create_xen_entries(enum xenmap_operation op,
                               unsigned long virt,
                               mfn_t mfn,
                               unsigned long nr_mfns,
-                              unsigned int ai)
+                              unsigned int flags)
 {
     int rc;
     unsigned long addr = virt, addr_end = addr + nr_mfns * PAGE_SIZE;
@@ -1021,7 +1021,7 @@ static int create_xen_entries(enum xenmap_operation op,
                 }
                 if ( op == RESERVE )
                     break;
-                pte = mfn_to_xen_entry(mfn, ai);
+                pte = mfn_to_xen_entry(mfn, flags);
                 pte.pt.table = 1;
                 write_pte(entry, pte);
                 break;
@@ -1038,8 +1038,8 @@ static int create_xen_entries(enum xenmap_operation op,
                 else
                 {
                     pte = *entry;
-                    pte.pt.ro = PTE_RO_MASK(ai);
-                    pte.pt.xn = PTE_NX_MASK(ai);
+                    pte.pt.ro = PTE_RO_MASK(flags);
+                    pte.pt.xn = PTE_NX_MASK(flags);
                     if ( !pte.pt.ro && !pte.pt.xn )
                     {
                         printk("%s: Incorrect combination for addr=%lx\n",
