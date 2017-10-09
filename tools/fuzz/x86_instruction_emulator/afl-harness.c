@@ -97,6 +97,8 @@ int main(int argc, char **argv)
             fclose(fp);
             fp = NULL;
         }
+        else
+            clearerr(fp);
 
         LLVMFuzzerTestOneInput(input, size);
     }
