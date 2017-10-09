@@ -96,17 +96,6 @@
 #define PAGE_HYPERVISOR_WC      (_PAGE_DEVICE|MT_NORMAL_NC)
 
 /*
- * Defines for changing the hypervisor PTE .ro and .nx bits. This is only to be
- * used with modify_xen_mappings.
- */
-#define _PTE_NX_BIT     0U
-#define _PTE_RO_BIT     1U
-#define PTE_NX          (1U << _PTE_NX_BIT)
-#define PTE_RO          (1U << _PTE_RO_BIT)
-#define PTE_NX_MASK(x)  (((x) >> _PTE_NX_BIT) & 0x1U)
-#define PTE_RO_MASK(x)  (((x) >> _PTE_RO_BIT) & 0x1U)
-
-/*
  * Stage 2 Memory Type.
  *
  * These are valid in the MemAttr[3:0] field of an LPAE stage 2 page

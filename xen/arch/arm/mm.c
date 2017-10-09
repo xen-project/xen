@@ -1041,8 +1041,8 @@ static int create_xen_entries(enum xenmap_operation op,
                 else
                 {
                     pte = *entry;
-                    pte.pt.ro = PTE_RO_MASK(flags);
-                    pte.pt.xn = PTE_NX_MASK(flags);
+                    pte.pt.ro = PAGE_RO_MASK(flags);
+                    pte.pt.xn = PAGE_XN_MASK(flags);
                     if ( !pte.pt.ro && !pte.pt.xn )
                     {
                         printk("%s: Incorrect combination for addr=%lx\n",
@@ -1085,7 +1085,6 @@ int destroy_xen_mappings(unsigned long v, unsigned long e)
 
 int modify_xen_mappings(unsigned long s, unsigned long e, unsigned int flags)
 {
-    ASSERT((flags & (PTE_NX | PTE_RO)) == flags);
     return create_xen_entries(MODIFY, s, INVALID_MFN, (e - s) >> PAGE_SHIFT,
                               flags);
 }
