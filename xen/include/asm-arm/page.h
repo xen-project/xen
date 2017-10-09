@@ -69,12 +69,31 @@
  * Layout of the flags used for updating the hypervisor page tables
  *
  * [0:2] Memory Attribute Index
+ * [3:4] Permission flags
  */
 #define PAGE_AI_MASK(x) ((x) & 0x7U)
 
-#define PAGE_HYPERVISOR         (MT_NORMAL)
-#define PAGE_HYPERVISOR_NOCACHE (MT_DEVICE_nGnRE)
-#define PAGE_HYPERVISOR_WC      (MT_NORMAL_NC)
+#define _PAGE_XN_BIT    3
+#define _PAGE_RO_BIT    4
+#define _PAGE_XN    (1U << _PAGE_XN_BIT)
+#define _PAGE_RO    (1U << _PAGE_RO_BIT)
+#define PAGE_XN_MASK(x) (((x) >> _PAGE_XN_BIT) & 0x1U)
+#define PAGE_RO_MASK(x) (((x) >> _PAGE_RO_BIT) & 0x1U)
+
+/*
+ * _PAGE_DEVICE and _PAGE_NORMAL are convenience defines. They are not
+ * meant to be used outside of this header.
+ */
+#define _PAGE_DEVICE    _PAGE_XN
+#define _PAGE_NORMAL    MT_NORMAL
+
+#define PAGE_HYPERVISOR_RO      (_PAGE_NORMAL|_PAGE_RO|_PAGE_XN)
+#define PAGE_HYPERVISOR_RX      (_PAGE_NORMAL|_PAGE_RO)
+#define PAGE_HYPERVISOR_RW      (_PAGE_NORMAL|_PAGE_XN)
+
+#define PAGE_HYPERVISOR         PAGE_HYPERVISOR_RW
+#define PAGE_HYPERVISOR_NOCACHE (_PAGE_DEVICE|MT_DEVICE_nGnRE)
+#define PAGE_HYPERVISOR_WC      (_PAGE_DEVICE|MT_NORMAL_NC)
 
 /*
  * Defines for changing the hypervisor PTE .ro and .nx bits. This is only to be
