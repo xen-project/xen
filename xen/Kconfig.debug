@@ -121,6 +121,16 @@ config SCRUB_DEBUG
 	  Verify that pages that need to be scrubbed before being allocated to
 	  a guest are indeed scrubbed.
 
+config UBSAN
+	bool "Undefined behaviour sanitizer"
+	depends on HAS_UBSAN
+	---help---
+	  Enable undefined behaviour sanitizer. It uses compiler to insert code
+	  snippets so that undefined behaviours in C are detected during runtime.
+	  This requires a UBSAN capable compiler and it is a debug only feature.
+
+	  If unsure, say N here.
+
 endif # DEBUG || EXPERT
 
 endmenu

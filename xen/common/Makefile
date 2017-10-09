@@ -75,6 +75,7 @@ tmem-$(CONFIG_COMPAT) += compat/tmem_xen.o
 obj-$(CONFIG_TMEM) += $(tmem-y)
 
 subdir-$(CONFIG_GCOV) += gcov
+subdir-$(CONFIG_UBSAN) += ubsan
 
 subdir-y += libelf
 subdir-$(CONFIG_HAS_DEVICE_TREE) += libfdt

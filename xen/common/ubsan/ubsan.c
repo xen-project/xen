@@ -10,13 +10,18 @@
  *
  */
 
-#include <linux/bitops.h>
-#include <linux/bug.h>
-#include <linux/ctype.h>
-#include <linux/init.h>
-#include <linux/kernel.h>
-#include <linux/types.h>
-#include <linux/sched.h>
+#include <xen/spinlock.h>
+#include <xen/percpu.h>
+
+#define __noreturn    noreturn
+#define pr_err(...) printk(XENLOG_ERR __VA_ARGS__)
+struct xen_ubsan { int in_ubsan; };
+static DEFINE_PER_CPU(struct xen_ubsan[1], in_ubsan);
+#undef current
+#define current this_cpu(in_ubsan)
+#define dump_stack dump_execution_state
+#define u64 long long unsigned int
+#define s64 long long int
 
 #include "ubsan.h"
 

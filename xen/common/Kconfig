@@ -32,6 +32,9 @@ config HAS_MEM_SHARING
 config HAS_PDX
 	bool
 
+config HAS_UBSAN
+	bool
+
 config HAS_KEXEC
 	bool
 

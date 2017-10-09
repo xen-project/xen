@@ -38,4 +38,10 @@ config LTO
 
 	  If unsure, say N.
 
+#
+# For architectures that know their compiler __int128 support is sound
+#
+config ARCH_SUPPORTS_INT128
+	bool
+
 source "Kconfig.debug"

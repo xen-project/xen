@@ -119,6 +119,10 @@ ifeq ($(CONFIG_GCOV),y)
 $(filter-out %.init.o $(nogcov-y),$(obj-y) $(obj-bin-y) $(extra-y)): CFLAGS += -fprofile-arcs -ftest-coverage
 endif
 
+ifeq ($(CONFIG_UBSAN),y)
+$(filter-out %.init.o $(noubsan-y),$(obj-y) $(obj-bin-y) $(extra-y)): CFLAGS += -fsanitize=undefined
+endif
+
 ifeq ($(CONFIG_LTO),y)
 CFLAGS += -flto
 LDFLAGS-$(clang) += -plugin LLVMgold.so
