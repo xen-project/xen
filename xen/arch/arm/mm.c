@@ -273,7 +273,7 @@ static inline lpae_t mfn_to_xen_entry(mfn_t mfn, unsigned attr)
             .table = 0,           /* Set to 1 for links and 4k maps */
             .ai = attr,
             .ns = 1,              /* Hyp mode is in the non-secure world */
-            .user = 1,            /* See below */
+            .up = 1,              /* See below */
             .ro = 0,              /* Assume read-write */
             .af = 1,              /* No need for access tracking */
             .ng = 1,              /* Makes TLB flushes easier */
@@ -282,10 +282,10 @@ static inline lpae_t mfn_to_xen_entry(mfn_t mfn, unsigned attr)
             .avail = 0,           /* Reference count for domheap mapping */
         }};
     /*
-     * Setting the User bit is strange, but the ATS1H[RW] instructions
-     * don't seem to work otherwise, and since we never run on Xen
-     * pagetables in User mode it's OK.  If this changes, remember
-     * to update the hard-coded values in head.S too.
+     * For EL2 stage-1 page table, up (aka AP[1]) is RES1 as the translation
+     * regime applies to only one exception level (see D4.4.4 and G4.6.1
+     * in ARM DDI 0487B.a). If this changes, remember to update the
+     * hard-coded values in head.S too.
      */
 
     switch ( attr )

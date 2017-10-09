@@ -35,7 +35,7 @@ typedef struct __packed {
      */
     unsigned long ai:3;         /* Attribute Index */
     unsigned long ns:1;         /* Not-Secure */
-    unsigned long user:1;       /* User-visible */
+    unsigned long up:1;         /* Unpriviledged access */
     unsigned long ro:1;         /* Read-Only */
     unsigned long sh:2;         /* Shareability */
     unsigned long af:1;         /* Access Flag */
