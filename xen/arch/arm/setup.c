@@ -757,6 +757,12 @@ void __init start_xen(unsigned long boot_phys_offset,
 
     end_boot_allocator();
 
+    /*
+     * The memory subsystem has been initialized, we can now switch from
+     * early_boot -> boot.
+     */
+    system_state = SYS_STATE_boot;
+
     vm_init();
 
     if ( acpi_disabled )
@@ -778,8 +784,6 @@ void __init start_xen(unsigned long boot_phys_offset,
     arm_uart_init();
     console_init_preirq();
     console_init_ring();
-
-    system_state = SYS_STATE_boot;
 
     processor_id();
 
