@@ -3189,6 +3189,7 @@ x86_emulate(
         struct segment_register cs, sreg;
         struct cpuid_leaf cpuid_leaf;
         uint64_t msr_val;
+        unsigned int i, n;
         unsigned long dummy;
 
     case 0x00 ... 0x05: add: /* add */
@@ -3321,47 +3322,45 @@ x86_emulate(
             goto done;
         break;
 
-    case 0x60: /* pusha */ {
-        int i;
-        unsigned int regs[] = {
-            _regs.eax, _regs.ecx, _regs.edx, _regs.ebx,
-            _regs.esp, _regs.ebp, _regs.esi, _regs.edi };
-
+    case 0x60: /* pusha */
         fail_if(!ops->write);
-        for ( i = 0; i < 8; i++ )
-            if ( (rc = ops->write(x86_seg_ss, sp_pre_dec(op_bytes),
-                                  &regs[i], op_bytes, ctxt)) != 0 )
-            goto done;
-        break;
-    }
-
-    case 0x61: /* popa */ {
-        int i;
-        unsigned int dummy_esp, *regs[] = {
-            &_regs.edi, &_regs.esi, &_regs.ebp, &dummy_esp,
-            &_regs.ebx, &_regs.edx, &_regs.ecx, &_regs.eax };
-
+        ea.val = _regs.esp;
         for ( i = 0; i < 8; i++ )
         {
+            void *reg = decode_register(i, &_regs, 0);
+
+            if ( (rc = ops->write(x86_seg_ss, sp_pre_dec(op_bytes),
+                                  reg != &_regs.esp ? reg : &ea.val,
+                                  op_bytes, ctxt)) != 0 )
+                goto done;
+        }
+        break;
+
+    case 0x61: /* popa */
+        for ( i = 0; i < 8; i++ )
+        {
+            void *reg = decode_register(7 - i, &_regs, 0);
+
             if ( (rc = read_ulong(x86_seg_ss, sp_post_inc(op_bytes),
                                   &dst.val, op_bytes, ctxt, ops)) != 0 )
                 goto done;
+            if ( reg == &_regs.r(sp) )
+                continue;
             if ( op_bytes == 2 )
-                *(uint16_t *)regs[i] = (uint16_t)dst.val;
+                *(uint16_t *)reg = dst.val;
             else
-                *regs[i] = dst.val; /* 64b: zero-ext done by read_ulong() */
+                *(unsigned long *)reg = dst.val;
         }
         break;
-    }
 
     case 0x62: /* bound */ {
-        unsigned long src_val2;
         int lb, ub, idx;
+
         generate_exception_if(src.type != OP_MEM, EXC_UD);
         if ( (rc = read_ulong(src.mem.seg, truncate_ea(src.mem.off + op_bytes),
-                              &src_val2, op_bytes, ctxt, ops)) )
+                              &ea.val, op_bytes, ctxt, ops)) )
             goto done;
-        ub  = (op_bytes == 2) ? (int16_t)src_val2 : (int32_t)src_val2;
+        ub  = (op_bytes == 2) ? (int16_t)ea.val   : (int32_t)ea.val;
         lb  = (op_bytes == 2) ? (int16_t)src.val  : (int32_t)src.val;
         idx = (op_bytes == 2) ? (int16_t)dst.val  : (int32_t)dst.val;
         generate_exception_if((idx < lb) || (idx > ub), EXC_BR);
@@ -3918,10 +3917,7 @@ x86_emulate(
         dst.val = src.val;
         break;
 
-    case 0xc8: /* enter imm16,imm8 */ {
-        uint8_t depth = imm2 & 31;
-        int i;
-
+    case 0xc8: /* enter imm16,imm8 */
         dst.type = OP_REG;
         dst.bytes = (mode_64bit() && (op_bytes == 4)) ? 8 : op_bytes;
         dst.reg = (unsigned long *)&_regs.r(bp);
@@ -3931,9 +3927,10 @@ x86_emulate(
             goto done;
         dst.val = _regs.r(sp);
 
-        if ( depth > 0 )
+        n = imm2 & 31;
+        if ( n )
         {
-            for ( i = 1; i < depth; i++ )
+            for ( i = 1; i < n; i++ )
             {
                 unsigned long ebp, temp_data;
                 ebp = truncate_word(_regs.r(bp) - i*dst.bytes, ctxt->sp_size/8);
@@ -3950,7 +3947,6 @@ x86_emulate(
 
         sp_pre_dec(src.val);
         break;
-    }
 
     case 0xc9: /* leave */
         /* First writeback, to %%esp. */
@@ -4045,28 +4041,21 @@ x86_emulate(
         goto grp2;
 
     case 0xd4: /* aam */
-    case 0xd5: /* aad */ {
-        unsigned int base = (uint8_t)src.val;
-
+    case 0xd5: /* aad */
+        n = (uint8_t)src.val;
         if ( b & 0x01 )
-        {
-            uint16_t ax = _regs.ax;
-
-            _regs.ax = (uint8_t)(ax + ((ax >> 8) * base));
-        }
+            _regs.ax = (uint8_t)(_regs.al + (_regs.ah * n));
         else
         {
-            uint8_t al = _regs.al;
-
-            generate_exception_if(!base, EXC_DE);
-            _regs.ax = ((al / base) << 8) | (al % base);
+            generate_exception_if(!n, EXC_DE);
+            _regs.al = _regs.al % n;
+            _regs.ah = _regs.al / n;
         }
         _regs.eflags &= ~(X86_EFLAGS_SF | X86_EFLAGS_ZF | X86_EFLAGS_PF);
         _regs.eflags |= !_regs.al ? X86_EFLAGS_ZF : 0;
         _regs.eflags |= ((int8_t)_regs.al < 0) ? X86_EFLAGS_SF : 0;
         _regs.eflags |= even_parity(_regs.al) ? X86_EFLAGS_PF : 0;
         break;
-    }
 
     case 0xd6: /* salc */
         _regs.al = (_regs.eflags & X86_EFLAGS_CF) ? 0xff : 0x00;
