@@ -110,10 +110,16 @@ struct rcu_data {
  * About how far in the future the timer should be programmed each time,
  * it's hard to tell (guess!!). Since this mimics Linux's periodic timer
  * tick, take values used there as an indication. In Linux 2.6.21, tick
- * period can be 10ms, 4ms, 3.33ms or 1ms. Let's use 10ms, to enable
- * at least some power saving on the CPU that is going idle.
+ * period can be 10ms, 4ms, 3.33ms or 1ms.
+ *
+ * By default, we use 10ms, to enable at least some power saving on the
+ * CPU that is going idle. The user can change this, via a boot time
+ * parameter, but only up to 100ms.
  */
-#define RCU_IDLE_TIMER_PERIOD MILLISECS(10)
+#define IDLE_TIMER_PERIOD_MAX     MILLISECS(100)
+#define IDLE_TIMER_PERIOD_DEFAULT MILLISECS(10)
+
+static s_time_t __read_mostly idle_timer_period;
 
 static DEFINE_PER_CPU(struct rcu_data, rcu_data);
 
@@ -453,7 +459,7 @@ void rcu_idle_timer_start()
     if (likely(!rdp->curlist))
         return;
 
-    set_timer(&rdp->idle_timer, NOW() + RCU_IDLE_TIMER_PERIOD);
+    set_timer(&rdp->idle_timer, NOW() + idle_timer_period);
     rdp->idle_timer_active = true;
 }
 
@@ -571,6 +577,20 @@ static struct notifier_block cpu_nfb = {
 void __init rcu_init(void)
 {
     void *cpu = (void *)(long)smp_processor_id();
+    static unsigned int __initdata idle_timer_period_ms =
+                                    IDLE_TIMER_PERIOD_DEFAULT / MILLISECS(1);
+    integer_param("rcu-idle-timer-period-ms", idle_timer_period_ms);
+
+    /* We don't allow 0, or anything higher than IDLE_TIMER_PERIOD_MAX */
+    if ( idle_timer_period_ms == 0 ||
+         idle_timer_period_ms > IDLE_TIMER_PERIOD_MAX / MILLISECS(1) )
+    {
+        idle_timer_period_ms = IDLE_TIMER_PERIOD_DEFAULT / MILLISECS(1);
+        printk("WARNING: rcu-idle-timer-period-ms outside of "
+               "(0,%"PRI_stime"]. Resetting it to %u.\n",
+               IDLE_TIMER_PERIOD_MAX / MILLISECS(1), idle_timer_period_ms);
+    }
+    idle_timer_period = MILLISECS(idle_timer_period_ms);
 
     cpumask_clear(&rcu_ctrlblk.idle_cpumask);
     cpu_callback(&cpu_nfb, CPU_UP_PREPARE, cpu);

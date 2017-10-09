@@ -1423,6 +1423,16 @@ The following resources are available:
     sum of CBMs is fixed, that means actual `cos_max` in use will automatically
     reduce to half when CDP is enabled.
 
+### rcu-idle-timer-period-ms
+> `= <integer>`
+
+> Default: `10`
+
+How frequently a CPU which has gone idle, but with pending RCU callbacks,
+should be woken up to check if the grace period has completed, and the
+callbacks are safe to be executed. Expressed in milliseconds; maximum is
+100, and it can't be 0.
+
 ### reboot
 > `= t[riple] | k[bd] | a[cpi] | p[ci] | P[ower] | e[fi] | n[o] [, [w]arm | [c]old]`
 
