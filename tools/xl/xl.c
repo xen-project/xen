@@ -46,7 +46,7 @@ enum output_format default_output_format = OUTPUT_FORMAT_JSON;
 int claim_mode = 1;
 bool progress_use_cr = 0;
 int max_grant_frames = -1;
-int max_maptrack_frames = 0;
+int max_maptrack_frames = -1;
 
 xentoollog_level minmsglevel = minmsglevel_default;
 

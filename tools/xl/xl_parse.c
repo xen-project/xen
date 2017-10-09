@@ -1041,7 +1041,7 @@ void parse_config_data(const char *config_source,
         b_info->max_grant_frames = max_grant_frames;
     if (!xlu_cfg_get_long (config, "max_maptrack_frames", &l, 0))
         b_info->max_maptrack_frames = l;
-    else
+    else if (max_maptrack_frames != -1)
         b_info->max_maptrack_frames = max_maptrack_frames;
 
     libxl_defbool_set(&b_info->claim_mode, claim_mode);
