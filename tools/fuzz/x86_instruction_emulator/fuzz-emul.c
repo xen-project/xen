@@ -785,13 +785,12 @@ int LLVMFuzzerInitialize(int *argc, char ***argv)
 
 int LLVMFuzzerTestOneInput(const uint8_t *data_p, size_t size)
 {
-    struct cpu_user_regs regs = {};
     struct fuzz_state state = {
         .ops = all_fuzzer_ops,
     };
     struct x86_emulate_ctxt ctxt = {
         .data = &state,
-        .regs = &regs,
+        .regs = &input.regs,
         .addr_size = 8 * sizeof(void *),
         .sp_size = 8 * sizeof(void *),
     };
