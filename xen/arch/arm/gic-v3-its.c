@@ -21,6 +21,7 @@
 #include <xen/acpi.h>
 #include <xen/lib.h>
 #include <xen/delay.h>
+#include <xen/iocap.h>
 #include <xen/libfdt/libfdt.h>
 #include <xen/mm.h>
 #include <xen/rbtree.h>
@@ -903,6 +904,27 @@ struct pending_irq *gicv3_assign_guest_event(struct domain *d,
     gicv3_lpi_update_host_entry(host_lpi, d->domain_id, virt_lpi);
 
     return pirq;
+}
+
+int gicv3_its_deny_access(const struct domain *d)
+{
+    int rc = 0;
+    unsigned long mfn, nr;
+    const struct host_its *its_data;
+
+    list_for_each_entry( its_data, &host_its_list, entry )
+    {
+        mfn = paddr_to_pfn(its_data->addr);
+        nr = PFN_UP(its_data->size);
+        rc = iomem_deny_access(d, mfn, mfn + nr);
+        if ( rc )
+        {
+            printk("iomem_deny_access failed for %lx:%lx \r\n", mfn, nr);
+            break;
+        }
+    }
+
+    return rc;
 }
 
 /*

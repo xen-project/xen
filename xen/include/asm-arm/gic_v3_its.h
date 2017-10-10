@@ -139,6 +139,10 @@ void gicv3_its_dt_init(const struct dt_device_node *node);
 #ifdef CONFIG_ACPI
 void gicv3_its_acpi_init(void);
 #endif
+
+/* Deny iomem access for its */
+int gicv3_its_deny_access(const struct domain *d);
+
 bool gicv3_its_host_has_its(void);
 
 unsigned int vgic_v3_its_count(const struct domain *d);
@@ -205,6 +209,11 @@ static inline void gicv3_its_acpi_init(void)
 {
 }
 #endif
+
+static inline int gicv3_its_deny_access(const struct domain *d)
+{
+    return 0;
+}
 
 static inline bool gicv3_its_host_has_its(void)
 {

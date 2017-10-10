@@ -1308,6 +1308,10 @@ static int gicv3_iomem_deny_access(const struct domain *d)
     if ( rc )
         return rc;
 
+    rc = gicv3_its_deny_access(d);
+    if ( rc )
+        return rc;
+
     for ( i = 0; i < gicv3.rdist_count; i++ )
     {
         mfn = gicv3.rdist_regions[i].base >> PAGE_SHIFT;
