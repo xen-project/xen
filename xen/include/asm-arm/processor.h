@@ -673,6 +673,9 @@ union hsr {
                               HSR_SYSREG_CRN_MASK|HSR_SYSREG_CRM_MASK|\
                               HSR_SYSREG_OP2_MASK)
 
+/* HSR.EC == HSR_{HVC32, HVC64, SMC64, SVC32, SVC64} */
+#define HSR_XXC_IMM_MASK     (0xffff)
+
 /* Physical Address Register */
 #define PAR_F           (_AC(1,U)<<0)
 
