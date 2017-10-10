@@ -273,12 +273,13 @@ struct cmd_spec cmd_table[] = {
     { "sched-rtds",
       &main_sched_rtds, 0, 1,
       "Get/set rtds scheduler parameters",
-      "[-d <Domain> [-v[=VCPUID/all]] [-p[=PERIOD]] [-b[=BUDGET]]]",
+      "[-d <Domain> [-v[=VCPUID/all]] [-p[=PERIOD]] [-b[=BUDGET]] [-e[=Extratime]]]",
       "-d DOMAIN, --domain=DOMAIN     Domain to modify\n"
       "-v VCPUID/all, --vcpuid=VCPUID/all    VCPU to modify or output;\n"
       "               Using '-v all' to modify/output all vcpus\n"
       "-p PERIOD, --period=PERIOD     Period (us)\n"
       "-b BUDGET, --budget=BUDGET     Budget (us)\n"
+      "-e Extratime, --extratime=Extratime Extratime (1=yes, 0=no)\n"
     },
     { "domid",
       &main_domid, 0, 0,

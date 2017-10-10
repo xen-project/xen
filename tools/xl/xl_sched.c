@@ -252,7 +252,7 @@ static int sched_rtds_domain_output(
     libxl_domain_sched_params scinfo;
 
     if (domid < 0) {
-        printf("%-33s %4s %9s %9s\n", "Name", "ID", "Period", "Budget");
+        printf("%-33s %4s %9s %9s %10s\n", "Name", "ID", "Period", "Budget", "Extratime");
         return 0;
     }
 
@@ -263,11 +263,12 @@ static int sched_rtds_domain_output(
     }
 
     domname = libxl_domid_to_name(ctx, domid);
-    printf("%-33s %4d %9d %9d\n",
+    printf("%-33s %4d %9d %9d %10s\n",
         domname,
         domid,
         scinfo.period,
-        scinfo.budget);
+        scinfo.budget,
+        scinfo.extratime ? "yes" : "no");
     free(domname);
     libxl_domain_sched_params_dispose(&scinfo);
     return 0;
@@ -280,8 +281,8 @@ static int sched_rtds_vcpu_output(int domid, libxl_vcpu_sched_params *scinfo)
     int i;
 
     if (domid < 0) {
-        printf("%-33s %4s %4s %9s %9s\n", "Name", "ID",
-               "VCPU", "Period", "Budget");
+        printf("%-33s %4s %4s %9s %9s %10s\n", "Name", "ID",
+               "VCPU", "Period", "Budget", "Extratime");
         return 0;
     }
 
@@ -291,12 +292,13 @@ static int sched_rtds_vcpu_output(int domid, libxl_vcpu_sched_params *scinfo)
 
     domname = libxl_domid_to_name(ctx, domid);
     for ( i = 0; i < scinfo->num_vcpus; i++ ) {
-        printf("%-33s %4d %4d %9"PRIu32" %9"PRIu32"\n",
+        printf("%-33s %4d %4d %9"PRIu32" %9"PRIu32" %10s\n",
                domname,
                domid,
                scinfo->vcpus[i].vcpuid,
                scinfo->vcpus[i].period,
-               scinfo->vcpus[i].budget);
+               scinfo->vcpus[i].budget,
+               scinfo->vcpus[i].extratime ? "yes" : "no");
     }
     free(domname);
     return 0;
@@ -310,8 +312,8 @@ static int sched_rtds_vcpu_output_all(int domid,
     int i;
 
     if (domid < 0) {
-        printf("%-33s %4s %4s %9s %9s\n", "Name", "ID",
-               "VCPU", "Period", "Budget");
+        printf("%-33s %4s %4s %9s %9s %10s\n", "Name", "ID",
+               "VCPU", "Period", "Budget", "Extratime");
         return 0;
     }
 
@@ -322,12 +324,13 @@ static int sched_rtds_vcpu_output_all(int domid,
 
     domname = libxl_domid_to_name(ctx, domid);
     for ( i = 0; i < scinfo->num_vcpus; i++ ) {
-        printf("%-33s %4d %4d %9"PRIu32" %9"PRIu32"\n",
+        printf("%-33s %4d %4d %9"PRIu32" %9"PRIu32" %10s\n",
                domname,
                domid,
                scinfo->vcpus[i].vcpuid,
                scinfo->vcpus[i].period,
-               scinfo->vcpus[i].budget);
+               scinfo->vcpus[i].budget,
+               scinfo->vcpus[i].extratime ? "yes" : "no");
     }
     free(domname);
     return 0;
@@ -711,14 +714,18 @@ int main_sched_rtds(int argc, char **argv)
     int *vcpus = (int *)xmalloc(sizeof(int)); /* IDs of VCPUs that change */
     int *periods = (int *)xmalloc(sizeof(int)); /* period is in microsecond */
     int *budgets = (int *)xmalloc(sizeof(int)); /* budget is in microsecond */
+    bool *extratimes = (bool *)xmalloc(sizeof(bool)); /* extratime is bool */
     int v_size = 1; /* size of vcpus array */
     int p_size = 1; /* size of periods array */
     int b_size = 1; /* size of budgets array */
+    int e_size = 1; /* size of extratimes array */
     int v_index = 0; /* index in vcpus array */
     int p_index =0; /* index in periods array */
     int b_index =0; /* index for in budgets array */
+    int e_index = 0; /* index in extratimes array */
     bool opt_p = false;
     bool opt_b = false;
+    bool opt_e = false;
     bool opt_v = false;
     bool opt_all = false; /* output per-dom parameters */
     int opt, i, rc, r;
@@ -726,12 +733,13 @@ int main_sched_rtds(int argc, char **argv)
         {"domain", 1, 0, 'd'},
         {"period", 1, 0, 'p'},
         {"budget", 1, 0, 'b'},
+        {"extratime", 1, 0, 'e'},
         {"vcpuid",1, 0, 'v'},
         {"cpupool", 1, 0, 'c'},
         COMMON_LONG_OPTS
     };
 
-    SWITCH_FOREACH_OPT(opt, "d:p:b:v:c", opts, "sched-rtds", 0) {
+    SWITCH_FOREACH_OPT(opt, "d:p:b:e:v:c", opts, "sched-rtds", 0) {
     case 'd':
         dom = optarg;
         break;
@@ -755,6 +763,20 @@ int main_sched_rtds(int argc, char **argv)
         budgets[b_index++] = strtol(optarg, NULL, 10);
         opt_b = 1;
         break;
+    case 'e':
+        if (e_index >= e_size) { /* extratime array is full */
+            e_size *= 2;
+            extratimes = xrealloc(extratimes, e_size);
+        }
+        if (strcmp(optarg, "0") && strcmp(optarg, "1"))
+        {
+            fprintf(stderr, "Invalid extratime.\n");
+            r = EXIT_FAILURE;
+            goto out;
+        }
+        extratimes[e_index++] = strtol(optarg, NULL, 10);
+        opt_e = 1;
+        break;
     case 'v':
         if (!strcmp(optarg, "all")) { /* get or set all vcpus of a domain */
             opt_all = 1;
@@ -772,18 +794,18 @@ int main_sched_rtds(int argc, char **argv)
         break;
     }
 
-    if (cpupool && (dom || opt_p || opt_b || opt_v || opt_all)) {
+    if (cpupool && (dom || opt_p || opt_b || opt_e || opt_v || opt_all)) {
         fprintf(stderr, "Specifying a cpupool is not allowed with "
                 "other options.\n");
         r = EXIT_FAILURE;
         goto out;
     }
-    if (!dom && (opt_p || opt_b || opt_v)) {
+    if (!dom && (opt_p || opt_b || opt_e || opt_v)) {
         fprintf(stderr, "Missing parameters.\n");
         r = EXIT_FAILURE;
         goto out;
     }
-    if (dom && !opt_v && !opt_all && (opt_p || opt_b)) {
+    if (dom && !opt_v && !opt_all && (opt_p || opt_b || opt_e)) {
         fprintf(stderr, "Must specify VCPU.\n");
         r = EXIT_FAILURE;
         goto out;
@@ -794,8 +816,9 @@ int main_sched_rtds(int argc, char **argv)
         goto out;
     }
     if (((v_index > b_index) && opt_b) || ((v_index > p_index) && opt_p)
-        || p_index != b_index) {
-        fprintf(stderr, "Incorrect number of period and budget\n");
+         || ((v_index > e_index) && opt_e) || p_index != b_index
+         || p_index != e_index ) {
+        fprintf(stderr, "Incorrect number of period, budget and extratime\n");
         r = EXIT_FAILURE;
         goto out;
     }
@@ -829,7 +852,7 @@ int main_sched_rtds(int argc, char **argv)
                 r = EXIT_FAILURE;
                 goto out;
             }
-        } else if (!opt_p && !opt_b) {
+        } else if (!opt_p && !opt_b && !opt_e) {
             /* get per-vcpu rtds scheduling parameters */
             libxl_vcpu_sched_params scinfo;
             libxl_vcpu_sched_params_init(&scinfo);
@@ -861,6 +884,7 @@ int main_sched_rtds(int argc, char **argv)
                     scinfo.vcpus[i].vcpuid = vcpus[i];
                     scinfo.vcpus[i].period = periods[i];
                     scinfo.vcpus[i].budget = budgets[i];
+                    scinfo.vcpus[i].extratime = extratimes[i] ? 1 : 0;
                 }
                 rc = sched_vcpu_set(domid, &scinfo);
             } else { /* set params for all vcpus */
@@ -869,6 +893,7 @@ int main_sched_rtds(int argc, char **argv)
                                xmalloc(sizeof(libxl_sched_params));
                 scinfo.vcpus[0].period = periods[0];
                 scinfo.vcpus[0].budget = budgets[0];
+                scinfo.vcpus[0].extratime = extratimes[0] ? 1 : 0;
                 rc = sched_vcpu_set_all(domid, &scinfo);
             }
 
@@ -885,6 +910,7 @@ out:
     free(vcpus);
     free(periods);
     free(budgets);
+    free(extratimes);
     return r;
 }
 

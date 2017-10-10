@@ -1117,11 +1117,11 @@ as B<--ratelimit_us> in B<sched-credit>
 Set or get rtds (Real Time Deferrable Server) scheduler parameters.
 This rt scheduler applies Preemptive Global Earliest Deadline First
 real-time scheduling algorithm to schedule VCPUs in the system.
-Each VCPU has a dedicated period and budget.
-VCPUs in the same domain have the same period and budget.
+Each VCPU has a dedicated period, budget and extratime.
 While scheduled, a VCPU burns its budget.
 A VCPU has its budget replenished at the beginning of each period;
 Unused budget is discarded at the end of each period.
+A VCPU with extratime set gets extra time from the unreserved system resource.
 
 B<OPTIONS>
 
@@ -1145,6 +1145,11 @@ Period of time, in microseconds, over which to replenish the budget.
 Amount of time, in microseconds, that the VCPU will be allowed
 to run every period.
 
+=item B<-e Extratime>, B<--extratime=Extratime>
+
+Binary flag to decide if the VCPU will be allowed to get extra time from
+the unreserved system resource.
+
 =item B<-c CPUPOOL>, B<--cpupool=CPUPOOL>
 
 Restrict output to domains in the specified cpupool.
@@ -1160,57 +1165,57 @@ all the domains:
 
     xl sched-rtds -v all
     Cpupool Pool-0: sched=RTDS
-    Name                        ID VCPU    Period    Budget
-    Domain-0                     0    0     10000      4000
-    vm1                          1    0       300       150
-    vm1                          1    1       400       200
-    vm1                          1    2     10000      4000
-    vm1                          1    3      1000       500
-    vm2                          2    0     10000      4000
-    vm2                          2    1     10000      4000
+    Name                        ID VCPU    Period    Budget  Extratime
+    Domain-0                     0    0     10000      4000        yes
+    vm1                          2    0       300       150        yes
+    vm1                          2    1       400       200        yes
+    vm1                          2    2     10000      4000        yes
+    vm1                          2    3      1000       500        yes
+    vm2                          4    0     10000      4000        yes
+    vm2                          4    1     10000      4000        yes
 
 Without any arguments, it will output the default scheduling
 parameters for each domain:
 
     xl sched-rtds
     Cpupool Pool-0: sched=RTDS
-    Name                        ID    Period    Budget
-    Domain-0                     0     10000      4000
-    vm1                          1     10000      4000
-    vm2                          2     10000      4000
+    Name                        ID    Period    Budget  Extratime
+    Domain-0                     0     10000      4000        yes
+    vm1                          2     10000      4000        yes
+    vm2                          4     10000      4000        yes
 
 
-2) Use, for instancei, B<-d vm1, -v all> to see the budget and
+2) Use, for instance, B<-d vm1, -v all> to see the budget and
 period of all VCPUs of a specific domain (B<vm1>):
 
     xl sched-rtds -d vm1 -v all
-    Name                        ID VCPU    Period    Budget
-    vm1                          1    0       300       150
-    vm1                          1    1       400       200
-    vm1                          1    2     10000      4000
-    vm1                          1    3      1000       500
+    Name                        ID VCPU    Period    Budget  Extratime
+    vm1                          2    0       300       150        yes
+    vm1                          2    1       400       200        yes
+    vm1                          2    2     10000      4000        yes
+    vm1                          2    3      1000       500        yes
 
 To see the parameters of a subset of the VCPUs of a domain, use:
 
     xl sched-rtds -d vm1 -v 0 -v 3
-    Name                        ID VCPU    Period    Budget
-    vm1                          1    0       300       150
-    vm1                          1    3      1000       500
+    Name                        ID VCPU    Period    Budget  Extratime
+    vm1                          2    0       300       150        yes
+    vm1                          2    3      1000       500        yes
 
 If no B<-v> is specified, the default scheduling parameters for the
 domain are shown:
 
     xl sched-rtds -d vm1
-    Name                        ID    Period    Budget
-    vm1                          1     10000      4000
+    Name                        ID    Period    Budget  Extratime
+    vm1                          2     10000      4000        yes
 
 
 3) Users can set the budget and period of multiple VCPUs of a
 specific domain with only one command,
-e.g., "xl sched-rtds -d vm1 -v 0 -p 100 -b 50 -v 3 -p 300 -b 150".
+e.g., "xl sched-rtds -d vm1 -v 0 -p 100 -b 50 -e 1 -v 3 -p 300 -b 150 -e 0".
 
 To change the parameters of all the VCPUs of a domain, use B<-v all>,
-e.g., "xl sched-rtds -d vm1 -v all -p 500 -b 250".
+e.g., "xl sched-rtds -d vm1 -v all -p 500 -b 250 -e 1".
 
 =back
 
