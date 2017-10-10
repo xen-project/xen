@@ -342,6 +342,10 @@ struct xen_domctl_sched_credit2 {
 struct xen_domctl_sched_rtds {
     uint32_t period;
     uint32_t budget;
+/* Can this vCPU execute beyond its reserved amount of time? */
+#define _XEN_DOMCTL_SCHEDRT_extra   0
+#define XEN_DOMCTL_SCHEDRT_extra    (1U<<_XEN_DOMCTL_SCHEDRT_extra)
+    uint32_t flags;
 };
 
 typedef struct xen_domctl_schedparam_vcpu {
