@@ -1809,12 +1809,7 @@ static int estimate_acpi_efi_size(struct domain *d, struct kernel_info *kinfo)
     acpi_size = ROUNDUP(sizeof(struct acpi_table_fadt), 8);
     acpi_size += ROUNDUP(sizeof(struct acpi_table_stao), 8);
 
-    madt_size = sizeof(struct acpi_table_madt)
-                + sizeof(struct acpi_madt_generic_interrupt) * d->max_vcpus
-                + sizeof(struct acpi_madt_generic_distributor);
-    if ( d->arch.vgic.version == GIC_V3 )
-        madt_size += sizeof(struct acpi_madt_generic_redistributor)
-                     * d->arch.vgic.nr_regions;
+    madt_size = gic_get_hwdom_madt_size(d);
     acpi_size += ROUNDUP(madt_size, 8);
 
     addr = acpi_os_get_root_pointer();
