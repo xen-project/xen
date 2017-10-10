@@ -135,12 +135,6 @@ static bool handle_existing_apis(struct cpu_user_regs *regs)
     }
 }
 
-/* helper function for checking arm mode 32/64 bit */
-static inline int psci_mode_check(struct domain *d, uint32_t fid)
-{
-    return is_64bit_domain(d) || !smccc_is_conv_64(fid);
-}
-
 /* PSCI 0.2 interface and other Standard Secure Calls */
 static bool handle_sssc(struct cpu_user_regs *regs)
 {
@@ -165,8 +159,7 @@ static bool handle_sssc(struct cpu_user_regs *regs)
 
     case PSCI_0_2_FN_MIGRATE_INFO_UP_CPU:
         perfc_incr(vpsci_migrate_info_up_cpu);
-        if ( psci_mode_check(current->domain, fid) )
-            PSCI_SET_RESULT(regs, do_psci_0_2_migrate_info_up_cpu());
+        PSCI_SET_RESULT(regs, do_psci_0_2_migrate_info_up_cpu());
         return true;
 
     case PSCI_0_2_FN_SYSTEM_OFF:
@@ -182,48 +175,45 @@ static bool handle_sssc(struct cpu_user_regs *regs)
         return true;
 
     case PSCI_0_2_FN_CPU_ON:
-        perfc_incr(vpsci_cpu_on);
-        if ( psci_mode_check(current->domain, fid) )
-        {
-            register_t vcpuid = PSCI_ARG(regs, 1);
-            register_t epoint = PSCI_ARG(regs, 2);
-            register_t cid = PSCI_ARG(regs, 3);
+    {
+        register_t vcpuid = PSCI_ARG(regs, 1);
+        register_t epoint = PSCI_ARG(regs, 2);
+        register_t cid = PSCI_ARG(regs, 3);
 
-            PSCI_SET_RESULT(regs, do_psci_0_2_cpu_on(vcpuid, epoint, cid));
-        }
+        perfc_incr(vpsci_cpu_on);
+        PSCI_SET_RESULT(regs, do_psci_0_2_cpu_on(vcpuid, epoint, cid));
         return true;
+    }
 
     case PSCI_0_2_FN_CPU_SUSPEND:
-        perfc_incr(vpsci_cpu_suspend);
-        if ( psci_mode_check(current->domain, fid) )
-        {
-            uint32_t pstate = PSCI_ARG32(regs, 1);
-            register_t epoint = PSCI_ARG(regs, 2);
-            register_t cid = PSCI_ARG(regs, 3);
+    {
+        uint32_t pstate = PSCI_ARG32(regs, 1);
+        register_t epoint = PSCI_ARG(regs, 2);
+        register_t cid = PSCI_ARG(regs, 3);
 
-            PSCI_SET_RESULT(regs, do_psci_0_2_cpu_suspend(pstate, epoint, cid));
-        }
+        perfc_incr(vpsci_cpu_suspend);
+        PSCI_SET_RESULT(regs, do_psci_0_2_cpu_suspend(pstate, epoint, cid));
         return true;
+    }
 
     case PSCI_0_2_FN_AFFINITY_INFO:
+    {
+        register_t taff = PSCI_ARG(regs, 1);
+        uint32_t laff = PSCI_ARG32(regs, 2);
+
         perfc_incr(vpsci_cpu_affinity_info);
-        if ( psci_mode_check(current->domain, fid) )
-        {
-            register_t taff = PSCI_ARG(regs, 1);
-            uint32_t laff = PSCI_ARG32(regs, 2);
-            PSCI_SET_RESULT(regs, do_psci_0_2_affinity_info(taff, laff));
-        }
+        PSCI_SET_RESULT(regs, do_psci_0_2_affinity_info(taff, laff));
         return true;
+    }
 
     case PSCI_0_2_FN_MIGRATE:
-        perfc_incr(vpsci_cpu_migrate);
-        if ( psci_mode_check(current->domain, fid) )
-        {
-            uint32_t tcpu = PSCI_ARG32(regs, 1);
+    {
+        uint32_t tcpu = PSCI_ARG32(regs, 1);
 
-            PSCI_SET_RESULT(regs, do_psci_0_2_migrate(tcpu));
-        }
+        perfc_incr(vpsci_cpu_migrate);
+        PSCI_SET_RESULT(regs, do_psci_0_2_migrate(tcpu));
         return true;
+    }
 
     case ARM_SMCCC_FUNC_CALL_COUNT:
         return fill_function_call_count(regs, SSSC_SMCCC_FUNCTION_COUNT);
