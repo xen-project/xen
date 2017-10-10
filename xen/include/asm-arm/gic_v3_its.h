@@ -102,6 +102,7 @@
 #define GITS_CMD_DISCARD                0x0f
 
 #define ITS_DOORBELL_OFFSET             0x10040
+#define GICV3_ITS_SIZE                  SZ_128K
 
 #include <xen/device_tree.h>
 #include <xen/rbtree.h>
@@ -135,6 +136,9 @@ extern struct list_head host_its_list;
 /* Parse the host DT and pick up all host ITSes. */
 void gicv3_its_dt_init(const struct dt_device_node *node);
 
+#ifdef CONFIG_ACPI
+void gicv3_its_acpi_init(void);
+#endif
 bool gicv3_its_host_has_its(void);
 
 unsigned int vgic_v3_its_count(const struct domain *d);
@@ -195,6 +199,12 @@ void gicv3_lpi_update_host_entry(uint32_t host_lpi, int domain_id,
 static inline void gicv3_its_dt_init(const struct dt_device_node *node)
 {
 }
+
+#ifdef CONFIG_ACPI
+static inline void gicv3_its_acpi_init(void)
+{
+}
+#endif
 
 static inline bool gicv3_its_host_has_its(void)
 {

@@ -1567,6 +1567,8 @@ static void __init gicv3_acpi_init(void)
 
     gicv3.rdist_stride = 0;
 
+    gicv3_its_acpi_init();
+
     /*
      * In ACPI, 0 is considered as the invalid address. However the rest
      * of the initialization rely on the invalid address to be
