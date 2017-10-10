@@ -35,6 +35,9 @@ void do_cp14_64(struct cpu_user_regs *regs, const union hsr hsr);
 void do_cp14_dbg(struct cpu_user_regs *regs, const union hsr hsr);
 void do_cp(struct cpu_user_regs *regs, const union hsr hsr);
 
+/* SMCCC handling */
+void do_trap_smc(struct cpu_user_regs *regs, const union hsr hsr);
+
 #endif /* __ASM_ARM_TRAPS__ */
 /*
  * Local variables:

@@ -2195,23 +2195,6 @@ static void do_trap_data_abort_guest(struct cpu_user_regs *regs,
     inject_dabt_exception(regs, info.gva, hsr.len);
 }
 
-static void do_trap_smc(struct cpu_user_regs *regs, const union hsr hsr)
-{
-    int rc = 0;
-
-    if ( !check_conditional_instr(regs, hsr) )
-    {
-        advance_pc(regs, hsr);
-        return;
-    }
-
-    if ( current->domain->arch.monitor.privileged_call_enabled )
-        rc = monitor_smc();
-
-    if ( rc != 1 )
-        inject_undef_exception(regs, hsr);
-}
-
 static void enter_hypervisor_head(struct cpu_user_regs *regs)
 {
     if ( guest_mode(regs) )
