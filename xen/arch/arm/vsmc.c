@@ -19,12 +19,16 @@
 #include <xen/types.h>
 #include <public/arch-arm/smccc.h>
 #include <asm/monitor.h>
+#include <asm/psci.h>
 #include <asm/regs.h>
 #include <asm/smccc.h>
 #include <asm/traps.h>
 
 /* Number of functions currently supported by Hypervisor Service. */
 #define XEN_SMCCC_FUNCTION_COUNT 3
+
+/* Number of functions currently supported by Standard Service Service Calls. */
+#define SSSC_SMCCC_FUNCTION_COUNT 13
 
 static bool fill_uid(struct cpu_user_regs *regs, xen_uuid_t uuid)
 {
@@ -94,6 +98,148 @@ static bool handle_hypervisor(struct cpu_user_regs *regs)
     }
 }
 
+#define PSCI_SET_RESULT(reg, val) set_user_reg(reg, 0, val)
+#define PSCI_ARG(reg, n) get_user_reg(reg, n)
+
+#ifdef CONFIG_ARM_64
+#define PSCI_ARG32(reg, n) (uint32_t)(get_user_reg(reg, n))
+#else
+#define PSCI_ARG32(reg, n) PSCI_ARG(reg, n)
+#endif
+
+/* Existing (pre SMCCC) APIs. This includes PSCI 0.1 interface */
+static bool handle_existing_apis(struct cpu_user_regs *regs)
+{
+    /* Only least 32 bits are significant (ARM DEN 0028B, page 12) */
+    switch ( (uint32_t)get_user_reg(regs, 0) )
+    {
+    case PSCI_cpu_off:
+    {
+        uint32_t pstate = PSCI_ARG32(regs, 1);
+
+        perfc_incr(vpsci_cpu_off);
+        PSCI_SET_RESULT(regs, do_psci_cpu_off(pstate));
+        return true;
+    }
+    case PSCI_cpu_on:
+    {
+        uint32_t vcpuid = PSCI_ARG32(regs, 1);
+        register_t epoint = PSCI_ARG(regs, 2);
+
+        perfc_incr(vpsci_cpu_on);
+        PSCI_SET_RESULT(regs, do_psci_cpu_on(vcpuid, epoint));
+        return true;
+    }
+    default:
+        return false;
+    }
+}
+
+/* helper function for checking arm mode 32/64 bit */
+static inline int psci_mode_check(struct domain *d, uint32_t fid)
+{
+    return !( is_64bit_domain(d)^( (fid & PSCI_0_2_64BIT) >> 30 ) );
+}
+
+/* PSCI 0.2 interface and other Standard Secure Calls */
+static bool handle_sssc(struct cpu_user_regs *regs)
+{
+    uint32_t fid = (uint32_t)get_user_reg(regs, 0);
+
+    switch ( fid )
+    {
+    case PSCI_0_2_FN_PSCI_VERSION:
+        perfc_incr(vpsci_version);
+        PSCI_SET_RESULT(regs, do_psci_0_2_version());
+        return true;
+
+    case PSCI_0_2_FN_CPU_OFF:
+        perfc_incr(vpsci_cpu_off);
+        PSCI_SET_RESULT(regs, do_psci_0_2_cpu_off());
+        return true;
+
+    case PSCI_0_2_FN_MIGRATE_INFO_TYPE:
+        perfc_incr(vpsci_migrate_info_type);
+        PSCI_SET_RESULT(regs, do_psci_0_2_migrate_info_type());
+        return true;
+
+    case PSCI_0_2_FN_MIGRATE_INFO_UP_CPU:
+        perfc_incr(vpsci_migrate_info_up_cpu);
+        if ( psci_mode_check(current->domain, fid) )
+            PSCI_SET_RESULT(regs, do_psci_0_2_migrate_info_up_cpu());
+        return true;
+
+    case PSCI_0_2_FN_SYSTEM_OFF:
+        perfc_incr(vpsci_system_off);
+        do_psci_0_2_system_off();
+        PSCI_SET_RESULT(regs, PSCI_INTERNAL_FAILURE);
+        return true;
+
+    case PSCI_0_2_FN_SYSTEM_RESET:
+        perfc_incr(vpsci_system_reset);
+        do_psci_0_2_system_reset();
+        PSCI_SET_RESULT(regs, PSCI_INTERNAL_FAILURE);
+        return true;
+
+    case PSCI_0_2_FN_CPU_ON:
+        perfc_incr(vpsci_cpu_on);
+        if ( psci_mode_check(current->domain, fid) )
+        {
+            register_t vcpuid = PSCI_ARG(regs, 1);
+            register_t epoint = PSCI_ARG(regs, 2);
+            register_t cid = PSCI_ARG(regs, 3);
+
+            PSCI_SET_RESULT(regs, do_psci_0_2_cpu_on(vcpuid, epoint, cid));
+        }
+        return true;
+
+    case PSCI_0_2_FN_CPU_SUSPEND:
+        perfc_incr(vpsci_cpu_suspend);
+        if ( psci_mode_check(current->domain, fid) )
+        {
+            uint32_t pstate = PSCI_ARG32(regs, 1);
+            register_t epoint = PSCI_ARG(regs, 2);
+            register_t cid = PSCI_ARG(regs, 3);
+
+            PSCI_SET_RESULT(regs, do_psci_0_2_cpu_suspend(pstate, epoint, cid));
+        }
+        return true;
+
+    case PSCI_0_2_FN_AFFINITY_INFO:
+        perfc_incr(vpsci_cpu_affinity_info);
+        if ( psci_mode_check(current->domain, fid) )
+        {
+            register_t taff = PSCI_ARG(regs, 1);
+            uint32_t laff = PSCI_ARG32(regs, 2);
+            PSCI_SET_RESULT(regs, do_psci_0_2_affinity_info(taff, laff));
+        }
+        return true;
+
+    case PSCI_0_2_FN_MIGRATE:
+        perfc_incr(vpsci_cpu_migrate);
+        if ( psci_mode_check(current->domain, fid) )
+        {
+            uint32_t tcpu = PSCI_ARG32(regs, 1);
+
+            PSCI_SET_RESULT(regs, do_psci_0_2_migrate(tcpu));
+        }
+        return true;
+
+    case ARM_SMCCC_FUNC_CALL_COUNT:
+        return fill_function_call_count(regs, SSSC_SMCCC_FUNCTION_COUNT);
+
+    case ARM_SMCCC_FUNC_CALL_UID:
+        return fill_uid(regs, SSSC_SMCCC_UID);
+
+    case ARM_SMCCC_FUNC_CALL_REVISION:
+        return fill_revision(regs, SSSC_SMCCC_MAJOR_REVISION,
+                             SSSC_SMCCC_MINOR_REVISION);
+
+    default:
+        return false;
+    }
+}
+
 /*
  * vsmccc_handle_call() - handle SMC/HVC call according to ARM SMCCC.
  * returns true if that was valid SMCCC call (even if function number
@@ -135,11 +281,26 @@ static bool vsmccc_handle_call(struct cpu_user_regs *regs)
         return true;
     }
 
-    switch ( smccc_get_owner(funcid) )
+    /*
+     * Special case: identifier range for existing APIs.
+     * This range is described in SMCCC (ARM DEN 0028B, page 16),
+     * but it does not conforms to standard function identifier
+     * encoding.
+     */
+    if ( funcid >= ARM_SMCCC_RESERVED_RANGE_START &&
+         funcid <= ARM_SMCCC_RESERVED_RANGE_END )
+        handled = handle_existing_apis(regs);
+    else
     {
-    case ARM_SMCCC_OWNER_HYPERVISOR:
-        handled = handle_hypervisor(regs);
-        break;
+        switch ( smccc_get_owner(funcid) )
+        {
+        case ARM_SMCCC_OWNER_HYPERVISOR:
+            handled = handle_hypervisor(regs);
+            break;
+        case ARM_SMCCC_OWNER_STANDARD:
+            handled = handle_sssc(regs);
+            break;
+        }
     }
 
     if ( !handled )
@@ -180,6 +341,20 @@ void do_trap_smc(struct cpu_user_regs *regs, const union hsr hsr)
     if ( vsmccc_handle_call(regs) )
         advance_pc(regs, hsr);
     else
+        inject_undef_exception(regs, hsr);
+}
+
+void do_trap_hvc_smccc(struct cpu_user_regs *regs)
+{
+    const union hsr hsr = { .bits = regs->hsr };
+
+    /*
+     * vsmccc_handle_call() will return false if this call is not
+     * SMCCC compatible (e.g. immediate value != 0). As it is not
+     * compatible, we can't be sure that guest will understand
+     * ARM_SMCCC_ERR_UNKNOWN_FUNCTION.
+     */
+    if ( !vsmccc_handle_call(regs) )
         inject_undef_exception(regs, hsr);
 }
 

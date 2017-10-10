@@ -37,6 +37,7 @@ void do_cp(struct cpu_user_regs *regs, const union hsr hsr);
 
 /* SMCCC handling */
 void do_trap_smc(struct cpu_user_regs *regs, const union hsr hsr);
+void do_trap_hvc_smccc(struct cpu_user_regs *regs);
 
 #endif /* __ASM_ARM_TRAPS__ */
 /*
