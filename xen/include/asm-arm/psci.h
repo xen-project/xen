@@ -1,6 +1,8 @@
 #ifndef __ASM_PSCI_H__
 #define __ASM_PSCI_H__
 
+#include <asm/smccc.h>
+
 /* PSCI return values (inclusive of all PSCI versions) */
 #define PSCI_SUCCESS                 0
 #define PSCI_NOT_SUPPORTED          -1
@@ -42,29 +44,24 @@ void do_psci_0_2_system_off(void);
 void do_psci_0_2_system_reset(void);
 
 /* PSCI v0.2 interface */
-#define PSCI_0_2_FN_BASE        0x84000000
-#define PSCI_0_2_FN(n)          (PSCI_0_2_FN_BASE + (n))
-#define PSCI_0_2_64BIT          0x40000000
-#define PSCI_0_2_FN64_BASE      \
-                        (PSCI_0_2_FN_BASE + PSCI_0_2_64BIT)
-#define PSCI_0_2_FN64(n)        (PSCI_0_2_FN64_BASE + (n))
-
-#define PSCI_0_2_FN_PSCI_VERSION        PSCI_0_2_FN(0)
-#define PSCI_0_2_FN_CPU_SUSPEND         PSCI_0_2_FN(1)
-#define PSCI_0_2_FN_CPU_OFF             PSCI_0_2_FN(2)
-#define PSCI_0_2_FN_CPU_ON              PSCI_0_2_FN(3)
-#define PSCI_0_2_FN_AFFINITY_INFO       PSCI_0_2_FN(4)
-#define PSCI_0_2_FN_MIGRATE             PSCI_0_2_FN(5)
-#define PSCI_0_2_FN_MIGRATE_INFO_TYPE   PSCI_0_2_FN(6)
-#define PSCI_0_2_FN_MIGRATE_INFO_UP_CPU PSCI_0_2_FN(7)
-#define PSCI_0_2_FN_SYSTEM_OFF          PSCI_0_2_FN(8)
-#define PSCI_0_2_FN_SYSTEM_RESET        PSCI_0_2_FN(9)
-
-#define PSCI_0_2_FN64_CPU_SUSPEND       PSCI_0_2_FN64(1)
-#define PSCI_0_2_FN64_CPU_ON            PSCI_0_2_FN64(3)
-#define PSCI_0_2_FN64_AFFINITY_INFO     PSCI_0_2_FN64(4)
-#define PSCI_0_2_FN64_MIGRATE           PSCI_0_2_FN64(5)
-#define PSCI_0_2_FN64_MIGRATE_INFO_UP_CPU   PSCI_0_2_FN64(7)
+#define PSCI_0_2_FN32(name) ARM_SMCCC_CALL_VAL(ARM_SMCCC_FAST_CALL,             \
+                                               ARM_SMCCC_CONV_32,               \
+                                               ARM_SMCCC_OWNER_STANDARD,        \
+                                               PSCI_0_2_FN_##name)
+#define PSCI_0_2_FN64(name) ARM_SMCCC_CALL_VAL(ARM_SMCCC_FAST_CALL,             \
+                                               ARM_SMCCC_CONV_64,               \
+                                               ARM_SMCCC_OWNER_STANDARD,        \
+                                               PSCI_0_2_FN_##name)
+#define PSCI_0_2_FN_PSCI_VERSION        0
+#define PSCI_0_2_FN_CPU_SUSPEND         1
+#define PSCI_0_2_FN_CPU_OFF             2
+#define PSCI_0_2_FN_CPU_ON              3
+#define PSCI_0_2_FN_AFFINITY_INFO       4
+#define PSCI_0_2_FN_MIGRATE             5
+#define PSCI_0_2_FN_MIGRATE_INFO_TYPE   6
+#define PSCI_0_2_FN_MIGRATE_INFO_UP_CPU 7
+#define PSCI_0_2_FN_SYSTEM_OFF          8
+#define PSCI_0_2_FN_SYSTEM_RESET        9
 
 /* PSCI v0.2 affinity level state returned by AFFINITY_INFO */
 #define PSCI_0_2_AFFINITY_LEVEL_ON      0

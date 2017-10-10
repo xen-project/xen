@@ -31,9 +31,9 @@
  * (native-width) function ID.
  */
 #ifdef CONFIG_ARM_64
-#define PSCI_0_2_FN_NATIVE(name)	PSCI_0_2_FN64_##name
+#define PSCI_0_2_FN_NATIVE(name)    PSCI_0_2_FN64(name)
 #else
-#define PSCI_0_2_FN_NATIVE(name)	PSCI_0_2_FN_##name
+#define PSCI_0_2_FN_NATIVE(name)    PSCI_0_2_FN32(name)
 #endif
 
 uint32_t psci_ver;
@@ -48,13 +48,13 @@ int call_psci_cpu_on(int cpu)
 void call_psci_system_off(void)
 {
     if ( psci_ver > PSCI_VERSION(0, 1) )
-        call_smc(PSCI_0_2_FN_SYSTEM_OFF, 0, 0, 0);
+        call_smc(PSCI_0_2_FN32(SYSTEM_OFF), 0, 0, 0);
 }
 
 void call_psci_system_reset(void)
 {
     if ( psci_ver > PSCI_VERSION(0, 1) )
-        call_smc(PSCI_0_2_FN_SYSTEM_RESET, 0, 0, 0);
+        call_smc(PSCI_0_2_FN32(SYSTEM_RESET), 0, 0, 0);
 }
 
 int __init psci_is_smc_method(const struct dt_device_node *psci)
@@ -144,7 +144,7 @@ int __init psci_init_0_2(void)
         }
     }
 
-    psci_ver = call_smc(PSCI_0_2_FN_PSCI_VERSION, 0, 0, 0);
+    psci_ver = call_smc(PSCI_0_2_FN32(PSCI_VERSION), 0, 0, 0);
 
     /* For the moment, we only support PSCI 0.2 and PSCI 1.x */
     if ( psci_ver != PSCI_VERSION(0, 2) && PSCI_VERSION_MAJOR(psci_ver) != 1 )

@@ -138,7 +138,7 @@ static bool handle_existing_apis(struct cpu_user_regs *regs)
 /* helper function for checking arm mode 32/64 bit */
 static inline int psci_mode_check(struct domain *d, uint32_t fid)
 {
-    return !( is_64bit_domain(d)^( (fid & PSCI_0_2_64BIT) >> 30 ) );
+    return is_64bit_domain(d) || !smccc_is_conv_64(fid);
 }
 
 /* PSCI 0.2 interface and other Standard Secure Calls */
@@ -146,7 +146,7 @@ static bool handle_sssc(struct cpu_user_regs *regs)
 {
     uint32_t fid = (uint32_t)get_user_reg(regs, 0);
 
-    switch ( fid )
+    switch ( smccc_get_fn(fid) )
     {
     case PSCI_0_2_FN_PSCI_VERSION:
         perfc_incr(vpsci_version);
