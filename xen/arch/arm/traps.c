@@ -1463,14 +1463,14 @@ static void do_debug_trap(struct cpu_user_regs *regs, unsigned int code)
 #endif
 
 /* helper function for checking arm mode 32/64 bit */
-static inline int psci_mode_check(struct domain *d, register_t fid)
+static inline int psci_mode_check(struct domain *d, uint32_t fid)
 {
         return !( is_64bit_domain(d)^( (fid & PSCI_0_2_64BIT) >> 30 ) );
 }
 
 static void do_trap_psci(struct cpu_user_regs *regs)
 {
-    register_t fid = PSCI_ARG(regs,0);
+    uint32_t fid = PSCI_ARG32(regs,0);
 
     /* preloading in case psci_mode_check fails */
     PSCI_RESULT_REG(regs) = PSCI_INVALID_PARAMETERS;
