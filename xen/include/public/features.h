@@ -102,6 +102,9 @@
 /* Guest can use XENMEMF_vnode to specify virtual node for memory op. */
 #define XENFEAT_memory_op_vnode_supported 13
 
+/* arm: Hypervisor supports ARM SMC calling convention. */
+#define XENFEAT_ARM_SMCCC_supported       14
+
 #define XENFEAT_NR_SUBMAPS 1
 
 #endif /* __XEN_PUBLIC_FEATURES_H__ */

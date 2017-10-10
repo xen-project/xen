@@ -394,6 +394,9 @@ DO(xen_version)(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
                     (1U << XENFEAT_auto_translated_physmap);
             if ( is_hardware_domain(d) )
                 fi.submap |= 1U << XENFEAT_dom0;
+#ifdef CONFIG_ARM
+            fi.submap |= (1U << XENFEAT_ARM_SMCCC_supported);
+#endif
 #ifdef CONFIG_X86
             switch ( d->guest_type )
             {
