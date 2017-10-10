@@ -257,6 +257,12 @@
 #define LIBXL_HAVE_SCHED_RTDS_VCPU_PARAMS 1
 
 /*
+ * LIBXL_HAVE_SCHED_RTDS_VCPU_EXTRA indicates RTDS scheduler
+ * now supports per-vcpu extratime settings.
+ */
+#define LIBXL_HAVE_SCHED_RTDS_VCPU_EXTRA 1
+
+/*
  * libxl_domain_build_info has the arm.gic_version field.
  */
 #define LIBXL_HAVE_BUILDINFO_ARM_GIC_VERSION 1
