@@ -40,7 +40,7 @@ as follows:
 
 It is possible, for a multiple vCPUs VM, to change the parameters of
 each vCPU individually:
-    * `xl sched-rtds -d vm-rt -v 0 -p 20000 -b 10000 -v 1 -p 45000 -b 12000`
+    * `xl sched-rtds -d vm-rt -v 0 -p 20000 -b 10000 -e 1 -v 1 -p 45000 -b 12000 -e 0`
 
 # Technical details
 
@@ -53,7 +53,8 @@ the presence of the LIBXL\_HAVE\_SCHED\_RTDS symbol. The ability of
 specifying different scheduling parameters for each vcpu has been
 introduced later, and is available if the following symbols are defined:
     * `LIBXL\_HAVE\_VCPU\_SCHED\_PARAMS`,
-    * `LIBXL\_HAVE\_SCHED\_RTDS\_VCPU\_PARAMS`.
+    * `LIBXL\_HAVE\_SCHED\_RTDS\_VCPU\_PARAMS`,
+    * `LIBXL\_HAVE\_SCHED\_RTDS\_VCPU\_EXTRA`.
 
 # Limitations
 
@@ -95,7 +96,6 @@ at a macroscopic level), the following should be done:
 
 # Areas for improvement
 
-* Work-conserving mode to be added;
 * performance assessment, especially focusing on what level of real-time
   behavior the scheduler enables.
 
@@ -118,4 +118,5 @@ at a macroscopic level), the following should be done:
 Date       Revision Version  Notes
 ---------- -------- -------- -------------------------------------------
 2016-10-14 1        Xen 4.8  Document written
+2017-08-31 2        Xen 4.10 Revise for work conserving feature
 ---------- -------- -------- -------------------------------------------
