@@ -1062,6 +1062,25 @@ void gicv3_its_acpi_init(void)
     acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_TRANSLATOR,
                           gicv3_its_acpi_probe, 0);
 }
+
+unsigned long gicv3_its_make_hwdom_madt(const struct domain *d, void *base_ptr)
+{
+    unsigned int i;
+    void *fw_its;
+    struct acpi_madt_generic_translator *hwdom_its;
+
+    hwdom_its = base_ptr;
+
+    for ( i = 0; i < vgic_v3_its_count(d); i++ )
+    {
+        fw_its = acpi_table_get_entry_madt(ACPI_MADT_TYPE_GENERIC_TRANSLATOR,
+                                           i);
+        memcpy(hwdom_its, fw_its, sizeof(struct acpi_madt_generic_translator));
+        hwdom_its++;
+    }
+
+    return sizeof(struct acpi_madt_generic_translator) * vgic_v3_its_count(d);
+}
 #endif
 
 /*
