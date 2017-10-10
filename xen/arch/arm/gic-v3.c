@@ -1378,7 +1378,7 @@ static int gicv3_make_hwdom_madt(const struct domain *d, u32 offset)
     for ( i = 0; i < d->max_vcpus; i++ )
     {
         gicc = (struct acpi_madt_generic_interrupt *)(base_ptr + table_len);
-        ACPI_MEMCPY(gicc, host_gicc, size);
+        memcpy(gicc, host_gicc, size);
         gicc->cpu_interface_number = i;
         gicc->uid = i;
         gicc->flags = ACPI_MADT_ENABLED;
