@@ -2199,6 +2199,12 @@ static void do_trap_smc(struct cpu_user_regs *regs, const union hsr hsr)
 {
     int rc = 0;
 
+    if ( !check_conditional_instr(regs, hsr) )
+    {
+        advance_pc(regs, hsr);
+        return;
+    }
+
     if ( current->domain->arch.monitor.privileged_call_enabled )
         rc = monitor_smc();
 
