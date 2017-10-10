@@ -976,11 +976,29 @@ int gicv3_its_make_hwdom_dt_nodes(const struct domain *d,
     return res;
 }
 
+/* Common function for adding to host_its_list */
+static void add_to_host_its_list(paddr_t addr, paddr_t size,
+                                 const struct dt_device_node *node)
+{
+    struct host_its *its_data;
+
+    its_data = xzalloc(struct host_its);
+    if ( !its_data )
+        panic("GICv3: Cannot allocate memory for ITS frame");
+
+    its_data->addr = addr;
+    its_data->size = size;
+    its_data->dt_node = node;
+
+    printk("GICv3: Found ITS @0x%lx\n", addr);
+
+    list_add_tail(&its_data->entry, &host_its_list);
+}
+
 /* Scan the DT for any ITS nodes and create a list of host ITSes out of it. */
 void gicv3_its_dt_init(const struct dt_device_node *node)
 {
     const struct dt_device_node *its = NULL;
-    struct host_its *its_data;
 
     /*
      * Check for ITS MSI subnodes. If any, add the ITS register
@@ -996,17 +1014,7 @@ void gicv3_its_dt_init(const struct dt_device_node *node)
         if ( dt_device_get_address(its, 0, &addr, &size) )
             panic("GICv3: Cannot find a valid ITS frame address");
 
-        its_data = xzalloc(struct host_its);
-        if ( !its_data )
-            panic("GICv3: Cannot allocate memory for ITS frame");
-
-        its_data->addr = addr;
-        its_data->size = size;
-        its_data->dt_node = its;
-
-        printk("GICv3: Found ITS @0x%lx\n", addr);
-
-        list_add_tail(&its_data->entry, &host_its_list);
+        add_to_host_its_list(addr, size, its);
     }
 }
 
