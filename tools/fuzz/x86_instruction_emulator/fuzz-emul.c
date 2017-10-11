@@ -52,6 +52,14 @@ struct fuzz_state
     struct x86_emulate_ops ops;
 };
 
+static const char* const x86emul_return_string[] = {
+    [X86EMUL_OKAY] = "X86EMUL_OKAY",
+    [X86EMUL_UNHANDLEABLE] = "X86EMUL_UNHANDLEABLE",
+    [X86EMUL_EXCEPTION] = "X86EMUL_EXCEPTION",
+    [X86EMUL_RETRY] = "X86EMUL_RETRY",
+    [X86EMUL_DONE] = "X86EMUL_DONE",
+};
+
 /*
  * Randomly return success or failure when processing data.  If
  * `exception` is false, this function turns _EXCEPTION to _OKAY.
@@ -84,7 +92,7 @@ static int maybe_fail(struct x86_emulate_ctxt *ctxt,
     if ( rc == X86EMUL_EXCEPTION && !exception )
         rc = X86EMUL_OKAY;
 
-    printf("maybe_fail %s: %d\n", why, rc);
+    printf("maybe_fail %s: %s\n", why, x86emul_return_string[rc]);
 
     if ( rc == X86EMUL_EXCEPTION )
         /* Fake up a pagefault. */
@@ -113,6 +121,7 @@ static int data_read(struct x86_emulate_ctxt *ctxt,
             x86_emul_hw_exception(13, 0, ctxt);
 
         rc = X86EMUL_EXCEPTION;
+        printf("data_read %s: X86EMUL_EXCEPTION (end of input)\n", why);
     }
     else
         rc = maybe_fail(ctxt, why, true);
