@@ -1271,14 +1271,10 @@ static int construct_vmcs(struct vcpu *v)
 
     vmx_vmcs_exit(v);
 
-    /* PVH: paging mode is updated by arch_set_info_guest(). */
-    if ( is_hvm_domain(d) )
-    {
-        /* will update HOST & GUEST_CR3 as reqd */
-        paging_update_paging_modes(v);
+    /* will update HOST & GUEST_CR3 as reqd */
+    paging_update_paging_modes(v);
 
-        vmx_vlapic_msr_changed(v);
-    }
+    vmx_vlapic_msr_changed(v);
 
     return 0;
 }
