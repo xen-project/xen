@@ -166,6 +166,7 @@ tools/fuzz/x86_instruction_emulator/asm
 tools/fuzz/x86_instruction_emulator/x86_emulate
 tools/fuzz/x86_instruction_emulator/x86-emulate.[ch]
 tools/fuzz/x86_instruction_emulator/afl-harness
+tools/fuzz/x86_instruction_emulator/afl-harness-cov
 tools/helpers/_paths.h
 tools/helpers/init-xenstore-domain
 tools/helpers/xen-init-dom0

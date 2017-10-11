@@ -41,3 +41,17 @@ Use the x86 instruction emulator fuzzer as an example.
    $ $AFLPATH/afl-fuzz -t 1000 -i testcase_dir -o findings_dir -- ./afl-harness
 
 Please see AFL documentation for more information.
+
+# GENERATING COVERAGE INFORMATION
+
+To use afl-cov or gcov, you need a separate binary instrumented to
+generate coverage data.  To do this, use the target `afl-cov`:
+
+    $ make afl-cov #produces afl-harness-cov
+
+NOTE: Please also note that the coverage instrumentation hard-codes
+the absolute path for the instrumentation read and write files in the
+binary; so coverage data will always show up in the build directory no
+matter where you run the binary from.
+
+Please see afl-cov and/or gcov documentation for more information.
