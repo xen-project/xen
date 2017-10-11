@@ -52,6 +52,22 @@ struct fuzz_state
     struct x86_emulate_ops ops;
 };
 
+static inline bool input_avail(const struct fuzz_state *s, size_t size)
+{
+    return s->data_index + size <= s->data_num;
+}
+
+static inline bool input_read(struct fuzz_state *s, void *dst, size_t size)
+{
+    if ( !input_avail(s, size) )
+        return false;
+
+    memcpy(dst, &s->corpus->data[s->data_index], size);
+    s->data_index += size;
+
+    return true;
+}
+
 static const char* const x86emul_return_string[] = {
     [X86EMUL_OKAY] = "X86EMUL_OKAY",
     [X86EMUL_UNHANDLEABLE] = "X86EMUL_UNHANDLEABLE",
@@ -68,10 +84,10 @@ static int maybe_fail(struct x86_emulate_ctxt *ctxt,
                       const char *why, bool exception)
 {
     struct fuzz_state *s = ctxt->data;
-    const struct fuzz_corpus *c = s->corpus;
+    unsigned char c;
     int rc;
 
-    if ( s->data_index >= s->data_num )
+    if ( !input_read(s, &c, sizeof(c)) )
         rc = X86EMUL_EXCEPTION;
     else
     {
@@ -80,13 +96,12 @@ static int maybe_fail(struct x86_emulate_ctxt *ctxt,
          * 25% unhandlable
          * 25% exception
          */
-        if ( c->data[s->data_index] > 0xc0 )
+        if ( c > 0xc0 )
             rc = X86EMUL_EXCEPTION;
-        else if ( c->data[s->data_index] > 0x80 )
+        else if ( c > 0x80 )
             rc = X86EMUL_UNHANDLEABLE;
         else
             rc = X86EMUL_OKAY;
-        s->data_index++;
     }
 
     if ( rc == X86EMUL_EXCEPTION && !exception )
@@ -106,11 +121,10 @@ static int data_read(struct x86_emulate_ctxt *ctxt,
                      const char *why, void *dst, unsigned int bytes)
 {
     struct fuzz_state *s = ctxt->data;
-    const struct fuzz_corpus *c = s->corpus;
     unsigned int i;
     int rc;
 
-    if ( s->data_index + bytes > s->data_num )
+    if ( !input_avail(s, bytes) )
     {
         /*
          * Fake up a segment limit violation.  System segment limit volations
@@ -128,8 +142,7 @@ static int data_read(struct x86_emulate_ctxt *ctxt,
 
     if ( rc == X86EMUL_OKAY )
     {
-        memcpy(dst, &c->data[s->data_index], bytes);
-        s->data_index += bytes;
+        input_read(s, dst, bytes);
 
         printf("%s: ", why);
         for ( i = 0; i < bytes; i++ )
