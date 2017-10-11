@@ -16,6 +16,7 @@ int main(int argc, char **argv)
 {
     size_t size;
     FILE *fp = NULL;
+    int max, count;
 
     setbuf(stdin, NULL);
     setbuf(stdout, NULL);
@@ -42,8 +43,7 @@ int main(int argc, char **argv)
             break;
 
         case '?':
-        usage:
-            printf("Usage: %s $FILE | [--min-input-size]\n", argv[0]);
+            printf("Usage: %s $FILE [$FILE...] | [--min-input-size]\n", argv[0]);
             exit(-1);
             break;
 
@@ -54,10 +54,13 @@ int main(int argc, char **argv)
         }
     }
 
-    if ( optind == argc ) /* No positional parameters.  Use stdin. */
+    max = argc - optind;
+
+    if ( !max ) /* No positional parameters.  Use stdin. */
+    {
+        max = 1;
         fp = stdin;
-    else if ( optind != (argc - 1) )
-        goto usage;
+    }
 
     if ( LLVMFuzzerInitialize(&argc, &argv) )
         exit(-1);
@@ -65,12 +68,15 @@ int main(int argc, char **argv)
 #ifdef __AFL_HAVE_MANUAL_CONTROL
     __AFL_INIT();
 
-    while ( __AFL_LOOP(1000) )
+    for( count = 0; __AFL_LOOP(1000); )
+#else
+    for( count = 0; count < max; count++ )
 #endif
     {
         if ( fp != stdin ) /* If not using stdin, open the provided file. */
         {
-            fp = fopen(argv[optind], "rb");
+            printf("Opening file %s\n", argv[optind + count]);
+            fp = fopen(argv[optind + count], "rb");
             if ( fp == NULL )
             {
                 perror("fopen");
@@ -100,7 +106,10 @@ int main(int argc, char **argv)
         if ( !feof(fp) )
         {
             printf("Input too large\n");
-            exit(-1);
+            /* Don't exit if we're doing batch processing */
+            if ( max == 1 )
+                exit(-1);
+            continue;
         }
 
         if ( fp != stdin )

@@ -49,6 +49,13 @@ generate coverage data.  To do this, use the target `afl-cov`:
 
     $ make afl-cov #produces afl-harness-cov
 
+In order to speed up the process of checking total coverage,
+`afl-harness-cov` can take several test inputs on its command-line;
+the speed-up effect should be similar to that of using afl-clang-fast.
+You can use xargs to do this most efficiently, like so:
+
+    $ ls queue/id* | xargs $path/afl-harness-cov
+
 NOTE: Please also note that the coverage instrumentation hard-codes
 the absolute path for the instrumentation read and write files in the
 binary; so coverage data will always show up in the build directory no
