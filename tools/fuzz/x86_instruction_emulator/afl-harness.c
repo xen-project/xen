@@ -4,12 +4,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <getopt.h>
+#include "fuzz-emul.h"
 
-extern int LLVMFuzzerInitialize(int *argc, char ***argv);
-extern int LLVMFuzzerTestOneInput(const uint8_t *data_p, size_t size);
-extern unsigned int fuzz_minimal_input_size(void);
-
-#define INPUT_SIZE  4096
 static uint8_t input[INPUT_SIZE];
 
 int main(int argc, char **argv)

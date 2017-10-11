@@ -16,6 +16,7 @@
 #include <xen/xen.h>
 
 #include "x86-emulate.h"
+#include "fuzz-emul.h"
 
 #define MSR_INDEX_MAX 16
 
@@ -29,7 +30,7 @@ struct fuzz_corpus
     struct cpu_user_regs regs;
     struct segment_register segments[SEG_NUM];
     unsigned long options;
-    unsigned char data[4096];
+    unsigned char data[INPUT_SIZE];
 } input;
 #define DATA_OFFSET offsetof(struct fuzz_corpus, data)
 
@@ -827,7 +828,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data_p, size_t size)
         return 1;
     }
 
-    if ( size > sizeof(input) )
+    if ( size > INPUT_SIZE )
     {
         printf("Input too large\n");
         return 1;
@@ -858,6 +859,8 @@ int LLVMFuzzerTestOneInput(const uint8_t *data_p, size_t size)
 
 unsigned int fuzz_minimal_input_size(void)
 {
+    BUILD_BUG_ON(DATA_OFFSET > INPUT_SIZE);
+
     return DATA_OFFSET + 1;
 }
 
