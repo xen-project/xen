@@ -77,7 +77,7 @@ $(addsuffix .h,$(TESTCASES)): %.h: %.c testcase.mk Makefile
 $(addsuffix .c,$(SIMD)) $(addsuffix -avx.c,$(filter sse%,$(SIMD))):
 	ln -sf simd.c $@
 
-$(TARGET): x86_emulate.o test_x86_emulator.o
+$(TARGET): x86-emulate.o test_x86_emulator.o
 	$(HOSTCC) $(HOSTCFLAGS) -o $@ $^
 
 .PHONY: clean
@@ -105,9 +105,9 @@ $(call cc-option-add,HOSTCFLAGS-x86_64,HOSTCC,-no-pie)
 HOSTCFLAGS += $(CFLAGS_xeninclude) -I. $(HOSTCFLAGS-$(XEN_COMPILE_ARCH))
 
 x86.h := asm/x86-vendors.h asm/x86-defns.h asm/msr-index.h
-x86_emulate.h := x86_emulate.h x86_emulate/x86_emulate.h $(x86.h)
+x86_emulate.h := x86-emulate.h x86_emulate/x86_emulate.h $(x86.h)
 
-x86_emulate.o: x86_emulate.c x86_emulate/x86_emulate.c $(x86_emulate.h)
+x86-emulate.o: x86-emulate.c x86_emulate/x86_emulate.c $(x86_emulate.h)
 	$(HOSTCC) $(HOSTCFLAGS) -D__XEN_TOOLS__ -c -g -o $@ $<
 
 test_x86_emulator.o: test_x86_emulator.c $(addsuffix .h,$(TESTCASES)) $(x86_emulate.h)

@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <sys/mman.h>
 
-#include "x86_emulate.h"
+#include "x86-emulate.h"
 #include "blowfish.h"
 #include "sse.h"
 #include "sse2.h"

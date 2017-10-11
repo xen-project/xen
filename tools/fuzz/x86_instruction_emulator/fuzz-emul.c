@@ -15,7 +15,7 @@
 #include <unistd.h>
 #include <xen/xen.h>
 
-#include "x86_emulate.h"
+#include "x86-emulate.h"
 
 #define MSR_INDEX_MAX 16
 
