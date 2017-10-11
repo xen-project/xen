@@ -185,7 +185,8 @@ static int guest_walk_sd(const struct vcpu *v,
 static int get_ipa_output_size(struct domain *d, register_t tcr,
                                unsigned int *output_size)
 {
-    unsigned int ips;
+#ifdef CONFIG_ARM_64
+    register_t ips;
 
     static const unsigned int ipa_sizes[7] = {
         TCR_EL1_IPS_32_BIT_VAL,
@@ -200,7 +201,7 @@ static int get_ipa_output_size(struct domain *d, register_t tcr,
     if ( is_64bit_domain(d) )
     {
         /* Get the intermediate physical address size. */
-        ips = (tcr & TCR_EL1_IPS_MASK) >> TCR_EL1_IPS_SHIFT;
+        ips = tcr & TCR_EL1_IPS_MASK;
 
         /*
          * Return an error on reserved IPA output-sizes and if the IPA
@@ -211,9 +212,10 @@ static int get_ipa_output_size(struct domain *d, register_t tcr,
         if ( ips > TCR_EL1_IPS_48_BIT )
             return -EFAULT;
 
-        *output_size = ipa_sizes[ips];
+        *output_size = ipa_sizes[ips >> TCR_EL1_IPS_SHIFT];
     }
     else
+#endif
         *output_size = TCR_EL1_IPS_40_BIT_VAL;
 
     return 0;
