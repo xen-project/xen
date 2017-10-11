@@ -7887,7 +7887,7 @@ x86_emulate(
             switch ( d & SrcMask )
             {
             case SrcMem:
-                rc = ops->read(ea.mem.seg, ea.mem.off + first_byte,
+                rc = ops->read(ea.mem.seg, truncate_ea(ea.mem.off + first_byte),
                                (void *)mmvalp + first_byte, op_bytes,
                                ctxt);
                 if ( rc != X86EMUL_OKAY )
@@ -7970,7 +7970,7 @@ x86_emulate(
         else
         {
             fail_if(!ops->write);
-            rc = ops->write(dst.mem.seg, dst.mem.off + first_byte,
+            rc = ops->write(dst.mem.seg, truncate_ea(dst.mem.off + first_byte),
                             !state->simd_size ? &dst.val
                                               : (void *)mmvalp + first_byte,
                             dst.bytes, ctxt);
