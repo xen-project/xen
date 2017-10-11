@@ -636,6 +636,7 @@ static int dm_op(const struct dmop_args *op_args)
             &op.u.remote_shutdown;
 
         domain_shutdown(d, data->reason);
+        rc = 0;
         break;
     }
 
