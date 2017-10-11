@@ -52,18 +52,23 @@
  *   ??               101
  *   reserved         110
  *   MT_NORMAL        111   1111 1111  -- Write-back write-allocate
+ *
+ * /!\ It is not possible to combine the definition in MAIRVAL and then
+ * split because it would result to a 64-bit value that some assembler
+ * doesn't understand.
  */
-#define MAIR(attr, mt) (_AC(attr, ULL) << ((mt) * 8))
+#define _MAIR0(attr, mt) (_AC(attr, ULL) << ((mt) * 8))
+#define _MAIR1(attr, mt) (_AC(attr, ULL) << (((mt) * 8) - 32))
 
-#define MAIRVAL (MAIR(0x00, MT_DEVICE_nGnRnE)| \
-                 MAIR(0x44, MT_NORMAL_NC)    | \
-                 MAIR(0xaa, MT_NORMAL_WT)    | \
-                 MAIR(0xee, MT_NORMAL_WB)    | \
-                 MAIR(0x04, MT_DEVICE_nGnRE) | \
-                 MAIR(0xff, MT_NORMAL))
+#define MAIR0VAL (_MAIR0(0x00, MT_DEVICE_nGnRnE)| \
+                  _MAIR0(0x44, MT_NORMAL_NC)    | \
+                  _MAIR0(0xaa, MT_NORMAL_WT)    | \
+                  _MAIR0(0xee, MT_NORMAL_WB))
 
-#define MAIR0VAL (MAIRVAL & 0xffffffff)
-#define MAIR1VAL (MAIRVAL >> 32)
+#define MAIR1VAL (_MAIR1(0x04, MT_DEVICE_nGnRE) | \
+                  _MAIR1(0xff, MT_NORMAL))
+
+#define MAIRVAL (MAIR1VAL << 32 | MAIR0VAL)
 
 /*
  * Layout of the flags used for updating the hypervisor page tables
