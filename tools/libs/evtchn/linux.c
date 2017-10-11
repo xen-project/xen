@@ -38,7 +38,6 @@ int osdep_evtchn_open(xenevtchn_handle *xce)
     if ( fd == -1 )
         return -1;
     xce->fd = fd;
-fprintf(stderr,"osdep_evtchn_open fd=%d\n",fd);
     return 0;
 }
 

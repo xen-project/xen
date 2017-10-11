@@ -51,7 +51,6 @@ int osdep_gnttab_open(xengnttab_handle *xgt)
     if ( fd == -1 )
         return -1;
     xgt->fd = fd;
-fprintf(stderr,"osdep_gnttab_open fd=%d\n",fd);
     return 0;
 }
 

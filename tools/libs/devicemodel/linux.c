@@ -53,7 +53,6 @@ int osdep_xendevicemodel_open(xendevicemodel_handle *dmod)
         PERROR("Could not obtain handle on privileged command interface");
         return -1;
     }
-fprintf(stderr,"osdep_xendevicemodel_open fd=%d\n",fd);
 
     /*
      * Check to see if IOCTL_PRIVCMD_DM_OP is implemented as we want to
@@ -68,7 +67,6 @@ fprintf(stderr,"osdep_xendevicemodel_open fd=%d\n",fd);
         close(fd);
         fd = -1;
     }
-fprintf(stderr,"osdep_xendevicemodel_open fd=%d after IOCTL_PRIVCMD_DM_OP\n",fd);
 
 out:
     dmod->fd = fd;
@@ -121,8 +119,6 @@ int osdep_xendevicemodel_op(xendevicemodel_handle *dmod,
 int osdep_xendevicemodel_restrict(xendevicemodel_handle *dmod,
                                   domid_t domid)
 {
-fprintf(stderr, "osdep_xendevicemodel_restrict fd=%d\n",dmod->fd);
-
     if (dmod->fd < 0) {
         errno = EOPNOTSUPP;
         return -1;

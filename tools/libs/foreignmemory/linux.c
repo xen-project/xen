@@ -40,7 +40,6 @@ int osdep_xenforeignmemory_open(xenforeignmemory_handle *fmem)
 
     /* prefer this newer interface */
     fd = open("/dev/xen/privcmd", O_RDWR|O_CLOEXEC);
-fprintf(stderr,"osdep_xenforeignmemory_open fd=%d\n",fd);
 
     if ( fd == -1 && ( errno == ENOENT || errno == ENXIO || errno == ENODEV ))
     {
@@ -275,7 +274,6 @@ int osdep_xenforeignmemory_unmap(xenforeignmemory_handle *fmem,
 int osdep_xenforeignmemory_restrict(xenforeignmemory_handle *fmem,
                                     domid_t domid)
 {
-fprintf(stderr, "osdep_xenforeignmemory_restrict\n");
     return ioctl(fmem->fd, IOCTL_PRIVCMD_RESTRICT, &domid);
 }
 
