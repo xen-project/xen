@@ -37,6 +37,13 @@ struct hvm_emulate_ctxt {
     unsigned long seg_reg_accessed;
     unsigned long seg_reg_dirty;
 
+    /*
+     * MFNs behind temporary mappings in the write callback.  The length is
+     * arbitrary, and can be increased if writes longer than PAGE_SIZE+1 are
+     * needed.
+     */
+    mfn_t mfn[2];
+
     uint32_t intr_shadow;
 
     bool_t set_context;
