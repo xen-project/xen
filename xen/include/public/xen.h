@@ -930,6 +930,37 @@ __DEFINE_XEN_GUEST_HANDLE(uint16, uint16_t);
 __DEFINE_XEN_GUEST_HANDLE(uint32, uint32_t);
 __DEFINE_XEN_GUEST_HANDLE(uint64, uint64_t);
 
+typedef struct {
+    uint8_t a[16];
+} xen_uuid_t;
+
+/*
+ * XEN_DEFINE_UUID(0x00112233, 0x4455, 0x6677, 0x8899,
+ *                 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff)
+ * will construct UUID 00112233-4455-6677-8899-aabbccddeeff presented as
+ * {0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88,
+ * 0x99, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff};
+ *
+ * NB: This is compatible with Linux kernel and with libuuid, but it is not
+ * compatible with Microsoft, as they use mixed-endian encoding (some
+ * components are little-endian, some are big-endian).
+ */
+#define XEN_DEFINE_UUID_(a, b, c, d, e1, e2, e3, e4, e5, e6)            \
+    {{((a) >> 24) & 0xFF, ((a) >> 16) & 0xFF,                           \
+      ((a) >>  8) & 0xFF, ((a) >>  0) & 0xFF,                           \
+      ((b) >>  8) & 0xFF, ((b) >>  0) & 0xFF,                           \
+      ((c) >>  8) & 0xFF, ((c) >>  0) & 0xFF,                           \
+      ((d) >>  8) & 0xFF, ((d) >>  0) & 0xFF,                           \
+                e1, e2, e3, e4, e5, e6}}
+
+#if defined(__STDC_VERSION__) ? __STDC_VERSION__ >= 199901L : defined(__GNUC__)
+#define XEN_DEFINE_UUID(a, b, c, d, e1, e2, e3, e4, e5, e6)             \
+    ((xen_uuid_t)XEN_DEFINE_UUID_(a, b, c, d, e1, e2, e3, e4, e5, e6))
+#else
+#define XEN_DEFINE_UUID(a, b, c, d, e1, e2, e3, e4, e5, e6)             \
+    XEN_DEFINE_UUID_(a, b, c, d, e1, e2, e3, e4, e5, e6)
+#endif /* __STDC_VERSION__ / __GNUC__ */
+
 #endif /* !__ASSEMBLY__ */
 
 /* Default definitions for macros used by domctl/sysctl. */
