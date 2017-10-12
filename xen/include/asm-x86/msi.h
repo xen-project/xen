@@ -55,6 +55,8 @@
 /* MAX fixed pages reserved for mapping MSIX tables. */
 #define FIX_MSIX_MAX_PAGES              512
 
+#define MAX_MSI_IRQS 32 /* limited by MSI capability struct properties */
+
 struct msi_info {
     u16 seg;
     u8 bus;
