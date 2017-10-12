@@ -534,24 +534,20 @@ static int alloc_p2m_list_x86_64(struct xc_dom_image *dom)
 
 /* ------------------------------------------------------------------------ */
 
-static int alloc_magic_pages(struct xc_dom_image *dom)
+static int alloc_magic_pages_pv(struct xc_dom_image *dom)
 {
-    /* allocate special pages */
     dom->start_info_pfn = xc_dom_alloc_page(dom, "start info");
     if ( dom->start_info_pfn == INVALID_PFN )
         return -1;
+
     dom->xenstore_pfn = xc_dom_alloc_page(dom, "xenstore");
     if ( dom->xenstore_pfn == INVALID_PFN )
         return -1;
+
     dom->console_pfn = xc_dom_alloc_page(dom, "console");
     if ( dom->console_pfn == INVALID_PFN )
         return -1;
-    if ( xc_dom_translated(dom) )
-    {
-        dom->shared_info_pfn = xc_dom_alloc_page(dom, "shared info");
-        if ( dom->shared_info_pfn == INVALID_PFN )
-            return -1;
-    }
+
     dom->alloc_bootstack = 1;
 
     return 0;
@@ -1756,7 +1752,7 @@ static struct xc_dom_arch xc_dom_32_pae = {
     .sizeof_pfn = 4,
     .p2m_base_supported = 0,
     .arch_private_size = sizeof(struct xc_dom_image_x86),
-    .alloc_magic_pages = alloc_magic_pages,
+    .alloc_magic_pages = alloc_magic_pages_pv,
     .alloc_pgtables = alloc_pgtables_x86_32_pae,
     .alloc_p2m_list = alloc_p2m_list_x86_32,
     .setup_pgtables = setup_pgtables_x86_32_pae,
@@ -1775,7 +1771,7 @@ static struct xc_dom_arch xc_dom_64 = {
     .sizeof_pfn = 8,
     .p2m_base_supported = 1,
     .arch_private_size = sizeof(struct xc_dom_image_x86),
-    .alloc_magic_pages = alloc_magic_pages,
+    .alloc_magic_pages = alloc_magic_pages_pv,
     .alloc_pgtables = alloc_pgtables_x86_64,
     .alloc_p2m_list = alloc_p2m_list_x86_64,
     .setup_pgtables = setup_pgtables_x86_64,
