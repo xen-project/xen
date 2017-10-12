@@ -886,12 +886,10 @@ static int __pci_enable_msi(struct msi_info *msi, struct msi_desc **desc)
     old_desc = find_msi_entry(pdev, msi->irq, PCI_CAP_ID_MSI);
     if ( old_desc )
     {
-        dprintk(XENLOG_WARNING, "irq %d has already mapped to MSI on "
-                "device %04x:%02x:%02x.%01x\n",
-                msi->irq, msi->seg, msi->bus,
-                PCI_SLOT(msi->devfn), PCI_FUNC(msi->devfn));
-        *desc = old_desc;
-        return 0;
+        printk(XENLOG_ERR "irq %d already mapped to MSI on %04x:%02x:%02x.%u\n",
+               msi->irq, msi->seg, msi->bus,
+               PCI_SLOT(msi->devfn), PCI_FUNC(msi->devfn));
+        return -EEXIST;
     }
 
     old_desc = find_msi_entry(pdev, -1, PCI_CAP_ID_MSIX);
@@ -956,12 +954,10 @@ static int __pci_enable_msix(struct msi_info *msi, struct msi_desc **desc)
     old_desc = find_msi_entry(pdev, msi->irq, PCI_CAP_ID_MSIX);
     if ( old_desc )
     {
-        dprintk(XENLOG_WARNING, "irq %d has already mapped to MSIX on "
-                "device %04x:%02x:%02x.%01x\n",
-                msi->irq, msi->seg, msi->bus,
-                PCI_SLOT(msi->devfn), PCI_FUNC(msi->devfn));
-        *desc = old_desc;
-        return 0;
+        printk(XENLOG_ERR "irq %d already mapped to MSI-X on %04x:%02x:%02x.%u\n",
+               msi->irq, msi->seg, msi->bus,
+               PCI_SLOT(msi->devfn), PCI_FUNC(msi->devfn));
+        return -EEXIST;
     }
 
     old_desc = find_msi_entry(pdev, -1, PCI_CAP_ID_MSI);
