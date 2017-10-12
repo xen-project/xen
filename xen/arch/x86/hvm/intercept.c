@@ -128,6 +128,7 @@ int hvm_process_io_intercept(const struct hvm_io_handler *handler,
             addr = (p->type == IOREQ_TYPE_COPY) ?
                    p->addr + step * i :
                    p->addr;
+            data = 0;
             rc = ops->read(handler, addr, p->size, &data);
             if ( rc != X86EMUL_OKAY )
                 break;
@@ -162,6 +163,7 @@ int hvm_process_io_intercept(const struct hvm_io_handler *handler,
         {
             if ( p->data_is_ptr )
             {
+                data = 0;
                 switch ( hvm_copy_from_guest_phys(&data, p->data + step * i,
                                                   p->size) )
                 {
