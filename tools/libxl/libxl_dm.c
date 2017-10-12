@@ -642,7 +642,7 @@ static int libxl__build_device_model_args_old(libxl__gc *gc,
             flexarray_append(dm_args, "-nographic");
     }
 
-    if (libxl_defbool_val(b_info->u.hvm.dm_restrict)) {
+    if (libxl_defbool_val(b_info->dm_restrict)) {
         LOGD(ERROR, domid,
              "dm_restrict not supported by qemu-xen-traditional");
         return ERROR_INVAL;
@@ -1421,7 +1421,7 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
         }
     }
 
-    if (libxl_defbool_val(b_info->u.hvm.dm_restrict))
+    if (libxl_defbool_val(b_info->dm_restrict))
         flexarray_append(dm_args, "-xen-domid-restrict");
 
     if (state->saved_state) {
@@ -1653,7 +1653,7 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
             goto end_search;
         }
 
-        if (!libxl_defbool_val(b_info->u.hvm.dm_restrict)) {
+        if (!libxl_defbool_val(b_info->dm_restrict)) {
             LOGD(DEBUG, guest_domid,
                  "dm_restrict disabled, starting QEMU as root");
             goto end_search;

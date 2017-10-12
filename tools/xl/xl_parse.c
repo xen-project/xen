@@ -2145,6 +2145,8 @@ skip_usbdev:
         parse_top_level_sdl_options(config, &b_info->u.hvm.sdl);
     }
 
+    xlu_cfg_get_defbool(config, "dm_restrict", &b_info->dm_restrict, 0);
+
     if (c_info->type == LIBXL_DOMAIN_TYPE_HVM) {
         if (!xlu_cfg_get_string (config, "vga", &buf, 0)) {
             if (!strcmp(buf, "stdvga")) {
@@ -2274,9 +2276,6 @@ skip_usbdev:
 
             b_info->u.hvm.vendor_device = d;
         }
-
-        xlu_cfg_get_defbool(config, "dm_restrict",
-                            &b_info->u.hvm.dm_restrict, 0);
     }
 
     if (!xlu_cfg_get_string (config, "gic_version", &buf, 1)) {

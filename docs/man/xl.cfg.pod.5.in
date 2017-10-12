@@ -1268,6 +1268,105 @@ connectors=id0:1920x1080;id1:800x600;id2:640x480
 
 =back
 
+=item B<dm_restrict=BOOLEAN>
+
+Restrict the HVM device model after startup,
+to limit the consequencese of security vulnerabilities in qemu.
+
+With this feature enabled,
+a compromise of the device model,
+via such a vulnerability,
+will not provide a privilege escalation attack on the whole system.
+
+This feature is a B<technology preview>.
+There are some significant limitations:
+
+=over 4
+
+=item
+
+You must have a new enough qemu.
+In particular,
+if your qemu does not have the commit
+B<xen: restrict: use xentoolcore_restrict_all>
+the restriction request will be silently ineffective!
+
+=item
+
+The mechanisms used are not effective against
+denial of service problems.
+A compromised qemu can probably still impair
+or perhaps even prevent
+the proper functioning of the whole system,
+(at the very least, but not limited to,
+through resource exhaustion).
+
+=item
+
+It is not known whether the protection is
+effective when a domain is migrated.
+
+=item
+
+Some domain management functions do not work.
+For example, cdrom insert will fail.
+
+=item
+
+You should say C<vga="none">.
+Domains with stdvga graphics cards to not work.
+Domains with cirrus vga may seem to work.
+
+=item
+
+You must create user(s) for qemu to run as.
+
+Ideally, set aside a range of 32752 uids
+(from N to N+32751)
+and create a user
+whose name is B<xen-qemuuser-range-base>
+and whose uid is N
+and whose gid is a plain unprivileged gid.
+libxl will use one such user for each domid.
+
+Alternatively, either create
+B<xen-qemuuser-domid$domid>
+for every $domid from 1 to 32751 inclusive,
+or
+B<xen-qemuuser-shared>
+(in which case different guests will not
+be protected against each other).
+
+=item
+
+There are no countermeasures taken against reuse
+of the same unix user (uid)
+for subsequent domains,
+even if the B<xen-qemuuser-domid$domid> users are created.
+So a past domain with the same domid may be able to
+interferer with future domains.
+Possibly, even after a reboot.
+
+=item
+
+A compromised qemu will be able to read world-readable
+files in the dom0 operating system.
+
+=item
+
+Because of these limitations, this functionality,
+while it may enhance your security,
+should not be relied on.
+Any further limitations discovered in the current version
+will B<not> be handled via the Xen Project Security Process.
+
+=item
+
+In the future as we enhance this feature to improve the security,
+we may break backward compatibility.
+
+=back
+
 =back
 
 =head2 Paravirtualised (PV) Guest Specific Options
@@ -2196,105 +2295,6 @@ specified, enabling the use of XenServer PV drivers in the guest.
 
 This parameter only takes effect when device_model_version=qemu-xen.
 See B<xen-pci-device-reservations(7)> for more information.
-
-=item B<dm_restrict=BOOLEAN>
-
-Restrict the HVM device model after startup,
-to limit the consequencese of security vulnerabilities in qemu.
-
-With this feature enabled,
-a compromise of the device model,
-via such a vulnerability,
-will not provide a privilege escalation attack on the whole system.
-
-This feature is a B<technology preview>.
-There are some significant limitations:
-
-=over 4
-
-=item
-
-You must have a new enough qemu.
-In particular,
-if your qemu does not have the commit
-B<xen: restrict: use xentoolcore_restrict_all>
-the restriction request will be silently ineffective!
-
-=item
-
-The mechanisms used are not effective against
-denial of service problems.
-A compromised qemu can probably still impair
-or perhaps even prevent
-the proper functioning of the whole system,
-(at the very least, but not limited to,
-through resource exhaustion).
-
-=item
-
-It is not known whether the protection is
-effective when a domain is migrated.
-
-=item
-
-Some domain management functions do not work.
-For example, cdrom insert will fail.
-
-=item
-
-You should say C<vga="none">.
-Domains with stdvga graphics cards to not work.
-Domains with cirrus vga may seem to work.
-
-=item
-
-You must create user(s) for qemu to run as.
-
-Ideally, set aside a range of 32752 uids
-(from N to N+32751)
-and create a user
-whose name is B<xen-qemuuser-range-base>
-and whose uid is N
-and whose gid is a plain unprivileged gid.
-libxl will use one such user for each domid.
-
-Alternatively, either create
-B<xen-qemuuser-domid$domid>
-for every $domid from 1 to 32751 inclusive,
-or
-B<xen-qemuuser-shared>
-(in which case different guests will not
-be protected against each other).
-
-=item
-
-There are no countermeasures taken against reuse
-of the same unix user (uid)
-for subsequent domains,
-even if the B<xen-qemuuser-domid$domid> users are created.
-So a past domain with the same domid may be able to
-interferer with future domains.
-Possibly, even after a reboot.
-
-=item
-
-A compromised qemu will be able to read world-readable
-files in the dom0 operating system.
-
-=item
-
-Because of these limitations, this functionality,
-while it may enhance your security,
-should not be relied on.
-Any further limitations discovered in the current version
-will B<not> be handled via the Xen Project Security Process.
-
-=item
-
-In the future as we enhance this feature to improve the security,
-we may break backward compatibility.
-
-=back
 
 =back
 

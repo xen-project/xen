@@ -216,6 +216,7 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
         b_info->event_channels = 1023;
 
     libxl__arch_domain_build_info_acpi_setdefault(b_info);
+    libxl_defbool_setdefault(&b_info->dm_restrict, false);
 
     switch (b_info->type) {
     case LIBXL_DOMAIN_TYPE_HVM:
@@ -308,7 +309,6 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
         libxl_defbool_setdefault(&b_info->u.hvm.altp2m,             false);
         libxl_defbool_setdefault(&b_info->u.hvm.usb,                false);
         libxl_defbool_setdefault(&b_info->u.hvm.xen_platform_pci,   true);
-        libxl_defbool_setdefault(&b_info->u.hvm.dm_restrict,        false);
 
         libxl_defbool_setdefault(&b_info->u.hvm.spice.enable, false);
         if (!libxl_defbool_val(b_info->u.hvm.spice.enable) &&
