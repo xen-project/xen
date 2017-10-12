@@ -108,7 +108,7 @@ static int hvmemul_do_io(
         .count = *reps,
         .dir = dir,
         .df = df,
-        .data = data,
+        .data = data_is_addr ? data : 0,
         .data_is_ptr = data_is_addr, /* ioreq_t field name is misleading */
         .state = STATE_IOREQ_READY,
     };
