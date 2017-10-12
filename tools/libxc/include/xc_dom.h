@@ -116,6 +116,10 @@ struct xc_dom_image {
     uint32_t console_domid;
     uint32_t xenstore_domid;
 
+    /* Grant limit configuration; mandatory if calling xc_dom_gnttab_init(). */
+    unsigned int max_grant_frames;
+    unsigned int max_maptrack_frames;
+
     /*
      * initrd parameters as specified in start_info page
      * Depending on capabilities of the booted kernel this may be a virtual
