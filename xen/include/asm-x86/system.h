@@ -118,6 +118,52 @@ static always_inline unsigned long __cmpxchg(
 })
 
 /*
+ * Undefined symbol to cause link failure if a wrong size is used with
+ * arch_fetch_and_add().
+ */
+extern unsigned long __bad_fetch_and_add_size(void);
+
+static always_inline unsigned long __xadd(
+    volatile void *ptr, unsigned long v, int size)
+{
+    switch ( size )
+    {
+    case 1:
+        asm volatile ( "lock; xaddb %b0,%1"
+                       : "+r" (v), "+m" (*__xg(ptr))
+                       :: "memory");
+        return v;
+    case 2:
+        asm volatile ( "lock; xaddw %w0,%1"
+                       : "+r" (v), "+m" (*__xg(ptr))
+                       :: "memory");
+        return v;
+    case 4:
+        asm volatile ( "lock; xaddl %k0,%1"
+                       : "+r" (v), "+m" (*__xg(ptr))
+                       :: "memory");
+        return v;
+    case 8:
+        asm volatile ( "lock; xaddq %q0,%1"
+                       : "+r" (v), "+m" (*__xg(ptr))
+                       :: "memory");
+
+        return v;
+    default:
+        return __bad_fetch_and_add_size();
+    }
+}
+
+/*
+ * Atomically add @v to the 1, 2, 4, or 8 byte value at @ptr.  Returns
+ * the previous value.
+ *
+ * This is a full memory barrier.
+ */
+#define arch_fetch_and_add(ptr, v) \
+    ((typeof(*(ptr)))__xadd(ptr, (typeof(*(ptr)))(v), sizeof(*(ptr))))
+
+/*
  * Both Intel and AMD agree that, from a programmer's viewpoint:
  *  Loads cannot be reordered relative to other loads.
  *  Stores cannot be reordered relative to other stores.
