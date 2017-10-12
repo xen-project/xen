@@ -558,6 +558,7 @@ void __init early_cpu_init(void)
  * - Sets up TSS with stack pointers, including ISTs
  * - Inserts TSS selector into regular and compat GDTs
  * - Loads GDT, IDT, TR then null LDT
+ * - Sets up IST references in the IDT
  */
 void __cpuinit load_system_tables(void)
 {
@@ -604,6 +605,10 @@ void __cpuinit load_system_tables(void)
 	asm volatile ("lidt %0"  : : "m"  (idtr) );
 	asm volatile ("ltr  %w0" : : "rm" (TSS_ENTRY << 3) );
 	asm volatile ("lldt %w0" : : "rm" (0) );
+
+	set_ist(&idt_tables[cpu][TRAP_double_fault],  IST_DF);
+	set_ist(&idt_tables[cpu][TRAP_nmi],	      IST_NMI);
+	set_ist(&idt_tables[cpu][TRAP_machine_check], IST_MCE);
 }
 
 /*
