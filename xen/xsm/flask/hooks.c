@@ -915,8 +915,8 @@ static int flask_unmap_domain_msi (struct domain *d, int irq, void *data,
                                    u32 *sid, struct avc_audit_data *ad)
 {
 #ifdef CONFIG_HAS_PCI
-    struct msi_info *msi = data;
-    u32 machine_bdf = (msi->seg << 16) | (msi->bus << 8) | msi->devfn;
+    const struct pci_dev *pdev = data;
+    u32 machine_bdf = (pdev->seg << 16) | (pdev->bus << 8) | pdev->devfn;
 
     AVC_AUDIT_DATA_INIT(ad, DEV);
     ad->device = machine_bdf;
