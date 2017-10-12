@@ -851,14 +851,9 @@ int libxl__build_pv(libxl__gc *gc, uint32_t domid,
     if (ret != 0)
         goto out;
 
-    if (xc_dom_translated(dom)) {
-        state->console_mfn = dom->console_pfn;
-        state->store_mfn = dom->xenstore_pfn;
-        state->vuart_gfn = dom->vuart_gfn;
-    } else {
-        state->console_mfn = xc_dom_p2m(dom, dom->console_pfn);
-        state->store_mfn = xc_dom_p2m(dom, dom->xenstore_pfn);
-    }
+    state->console_mfn = dom->console_gfn;
+    state->store_mfn = dom->xenstore_gfn;
+    state->vuart_gfn = dom->vuart_gfn;
 
     ret = 0;
 out:

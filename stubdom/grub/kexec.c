@@ -312,8 +312,8 @@ void kexec(void *kernel, long kernel_size, void *module, long module_size, char 
     }
 
     /* Move current console, xenstore and boot MFNs to the allocated place */
-    do_exchange(dom, dom->console_pfn, start_info.console.domU.mfn);
-    do_exchange(dom, dom->xenstore_pfn, start_info.store_mfn);
+    do_exchange(dom, dom->console_gfn, start_info.console.domU.mfn);
+    do_exchange(dom, dom->xenstore_gfn, start_info.store_mfn);
     DEBUG("virt base at %llx\n", dom->parms.virt_base);
     DEBUG("bootstack_pfn %lx\n", dom->bootstack_pfn);
     _boot_target = dom->parms.virt_base + PFN_PHYS(dom->bootstack_pfn);

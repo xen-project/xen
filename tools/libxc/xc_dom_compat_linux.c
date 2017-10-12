@@ -78,8 +78,8 @@ int xc_linux_build(xc_interface *xch, uint32_t domid,
     if ( (rc = xc_dom_gnttab_init(dom)) != 0)
         goto out;
 
-    *console_mfn = xc_dom_p2m(dom, dom->console_pfn);
-    *store_mfn = xc_dom_p2m(dom, dom->xenstore_pfn);
+    *console_mfn = dom->console_gfn;
+    *store_mfn = dom->xenstore_gfn;
 
  out:
     xc_dom_release(dom);

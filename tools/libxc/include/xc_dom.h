@@ -94,13 +94,19 @@ struct xc_dom_image {
     struct xc_dom_seg devicetree_seg;
     struct xc_dom_seg start_info_seg; /* HVMlite only */
     xen_pfn_t start_info_pfn;
-    xen_pfn_t console_pfn;
-    xen_pfn_t xenstore_pfn;
     xen_pfn_t shared_info_pfn;
     xen_pfn_t bootstack_pfn;
     xen_pfn_t pfn_alloc_end;
     xen_vaddr_t virt_alloc_end;
     xen_vaddr_t bsd_symtab_start;
+
+    /*
+     * Details for the toolstack-prepared rings.
+     *
+     * *_gfn fields are allocated by the domain builder.
+     */
+    xen_pfn_t console_gfn;
+    xen_pfn_t xenstore_gfn;
 
     /*
      * initrd parameters as specified in start_info page
