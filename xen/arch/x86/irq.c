@@ -2154,7 +2154,8 @@ int unmap_domain_pirq(struct domain *d, int pirq)
         nr = msi_desc->msi.nvec;
     }
 
-    ret = xsm_unmap_domain_irq(XSM_HOOK, d, irq, msi_desc);
+    ret = xsm_unmap_domain_irq(XSM_HOOK, d, irq,
+                               msi_desc ? msi_desc->dev : NULL);
     if ( ret )
         goto done;
 
