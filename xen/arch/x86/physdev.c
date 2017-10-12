@@ -186,7 +186,7 @@ int physdev_map_pirq(domid_t domid, int type, int *index, int *pirq_p,
         }
         else if ( type == MAP_PIRQ_TYPE_MULTI_MSI )
         {
-            if ( msi->entry_nr <= 0 || msi->entry_nr > 32 )
+            if ( msi->entry_nr <= 0 || msi->entry_nr > MAX_MSI_IRQS )
                 ret = -EDOM;
             else if ( msi->entry_nr != 1 && !iommu_intremap )
                 ret = -EOPNOTSUPP;
