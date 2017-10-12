@@ -55,6 +55,7 @@ static int hvm_mmio_access(struct vcpu *v,
     {
         if ( p->dir == IOREQ_READ )
         {
+            data = 0;
             if ( vio->mmio_retrying )
             {
                 if ( vio->mmio_large_read_bytes != p->size )
@@ -76,6 +77,7 @@ static int hvm_mmio_access(struct vcpu *v,
     {
         for ( i = 0; i < p->count; i++ )
         {
+            data = 0;
             if ( vio->mmio_retrying )
             {
                 if ( vio->mmio_large_read_bytes != p->size )
@@ -124,6 +126,7 @@ static int hvm_mmio_access(struct vcpu *v,
     {
         for ( i = 0; i < p->count; i++ )
         {
+            data = 0;
             switch ( hvm_copy_from_guest_phys(&data, p->data + step * i,
                                               p->size) )
             {
@@ -222,6 +225,7 @@ static int process_portio_intercept(portio_action_t action, ioreq_t *p)
     {
         if ( p->dir == IOREQ_READ )
         {
+            data = 0;
             if ( vio->mmio_retrying )
             {
                 if ( vio->mmio_large_read_bytes != p->size )
@@ -246,6 +250,7 @@ static int process_portio_intercept(portio_action_t action, ioreq_t *p)
     {
         for ( i = 0; i < p->count; i++ )
         {
+            data = 0;
             if ( vio->mmio_retrying )
             {
                 if ( vio->mmio_large_read_bytes != p->size )
