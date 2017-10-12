@@ -1249,7 +1249,8 @@ static int prepare_domain_irq_pirq(struct domain *d, int irq, int pirq,
         return -ENOMEM;
     }
     *pinfo = info;
-    return 0;
+
+    return !!err;
 }
 
 static void set_domain_irq_pirq(struct domain *d, int irq, struct pirq *pirq)
@@ -1292,7 +1293,10 @@ int init_domain_irq_mapping(struct domain *d)
             continue;
         err = prepare_domain_irq_pirq(d, i, i, &info);
         if ( err )
+        {
+            ASSERT(err < 0);
             break;
+        }
         set_domain_irq_pirq(d, i, info);
     }
 
@@ -1900,6 +1904,7 @@ int map_domain_pirq(
     struct pirq *info;
     struct irq_desc *desc;
     unsigned long flags;
+    DECLARE_BITMAP(prepared, MAX_MSI_IRQS) = {};
 
     ASSERT(spin_is_locked(&d->event_lock));
 
@@ -1943,8 +1948,10 @@ int map_domain_pirq(
     }
 
     ret = prepare_domain_irq_pirq(d, irq, pirq, &info);
-    if ( ret )
+    if ( ret < 0 )
         goto revoke;
+    if ( !ret )
+        __set_bit(0, prepared);
 
     desc = irq_to_desc(irq);
 
@@ -2016,8 +2023,10 @@ int map_domain_pirq(
             irq = create_irq(NUMA_NO_NODE);
             ret = irq >= 0 ? prepare_domain_irq_pirq(d, irq, pirq + nr, &info)
                            : irq;
-            if ( ret )
+            if ( ret < 0 )
                 break;
+            if ( !ret )
+                __set_bit(nr, prepared);
             msi_desc[nr].irq = irq;
 
             if ( irq_permit_access(d, irq) != 0 )
@@ -2050,15 +2059,15 @@ int map_domain_pirq(
                 desc->msi_desc = NULL;
                 spin_unlock_irqrestore(&desc->lock, flags);
             }
-            while ( nr-- )
+            while ( nr )
             {
                 if ( irq >= 0 && irq_deny_access(d, irq) )
                     printk(XENLOG_G_ERR
                            "dom%d: could not revoke access to IRQ%d (pirq %d)\n",
                            d->domain_id, irq, pirq);
-                if ( info )
+                if ( info && test_bit(nr, prepared) )
                     cleanup_domain_irq_pirq(d, irq, info);
-                info = pirq_info(d, pirq + nr);
+                info = pirq_info(d, pirq + --nr);
                 irq = info->arch.irq;
             }
             msi_desc->irq = -1;
@@ -2074,12 +2083,14 @@ int map_domain_pirq(
         spin_lock_irqsave(&desc->lock, flags);
         set_domain_irq_pirq(d, irq, info);
         spin_unlock_irqrestore(&desc->lock, flags);
+        ret = 0;
     }
 
 done:
     if ( ret )
     {
-        cleanup_domain_irq_pirq(d, irq, info);
+        if ( test_bit(0, prepared) )
+            cleanup_domain_irq_pirq(d, irq, info);
  revoke:
         if ( irq_deny_access(d, irq) )
             printk(XENLOG_G_ERR
