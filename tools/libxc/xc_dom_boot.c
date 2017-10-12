@@ -163,12 +163,51 @@ void *xc_dom_boot_domU_map(struct xc_dom_image *dom, xen_pfn_t pfn,
     return ptr;
 }
 
+static int xc_dom_check_required_fields(struct xc_dom_image *dom)
+{
+    int rc = 0;
+
+    if ( dom->console_evtchn == INVALID_EVTCHN )
+    {
+        xc_dom_panic(dom->xch, XC_INVALID_PARAM,
+                     "%s: Caller didn't set dom->console_evtchn", __func__);
+        rc = -1;
+    }
+    if ( dom->console_domid == INVALID_DOMID )
+    {
+        xc_dom_panic(dom->xch, XC_INVALID_PARAM,
+                     "%s: Caller didn't set dom->console_domid", __func__);
+        rc = -1;
+    }
+
+    if ( dom->xenstore_evtchn == INVALID_EVTCHN )
+    {
+        xc_dom_panic(dom->xch, XC_INVALID_PARAM,
+                     "%s: Caller didn't set dom->xenstore_evtchn", __func__);
+        rc = -1;
+    }
+    if ( dom->xenstore_domid == INVALID_DOMID )
+    {
+        xc_dom_panic(dom->xch, XC_INVALID_PARAM,
+                     "%s: Caller didn't set dom->xenstore_domid", __func__);
+        rc = -1;
+    }
+
+    if ( rc )
+        errno = EINVAL;
+
+    return rc;
+}
+
 int xc_dom_boot_image(struct xc_dom_image *dom)
 {
     xc_dominfo_t info;
     int rc;
 
     DOMPRINTF_CALLED(dom->xch);
+
+    if ( (rc = xc_dom_check_required_fields(dom)) != 0 )
+        return rc;
 
     /* misc stuff*/
     if ( (rc = dom->arch_hooks->bootearly(dom)) != 0 )

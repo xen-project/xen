@@ -61,7 +61,9 @@ int xc_linux_build(xc_interface *xch, uint32_t domid,
 
     dom->flags |= flags;
     dom->console_evtchn = console_evtchn;
+    dom->console_domid = 0;
     dom->xenstore_evtchn = store_evtchn;
+    dom->xenstore_domid = 0;
 
     if ( (rc = xc_dom_boot_xen_init(dom, xch, domid)) != 0 )
         goto out;

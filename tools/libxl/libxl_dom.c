@@ -862,14 +862,10 @@ out:
 }
 
 static int hvm_build_set_params(xc_interface *handle, uint32_t domid,
-                                libxl_domain_build_info *info,
-                                int store_evtchn, unsigned long *store_mfn,
-                                int console_evtchn, unsigned long *console_mfn,
-                                domid_t store_domid, domid_t console_domid)
+                                libxl_domain_build_info *info)
 {
     struct hvm_info_table *va_hvm;
     uint8_t *va_map, sum;
-    uint64_t str_mfn, cons_mfn;
     int i;
 
     if (info->type == LIBXL_DOMAIN_TYPE_HVM) {
@@ -890,15 +886,6 @@ static int hvm_build_set_params(xc_interface *handle, uint32_t domid,
         munmap(va_map, XC_PAGE_SIZE);
     }
 
-    xc_hvm_param_get(handle, domid, HVM_PARAM_STORE_PFN, &str_mfn);
-    xc_hvm_param_get(handle, domid, HVM_PARAM_CONSOLE_PFN, &cons_mfn);
-    xc_hvm_param_set(handle, domid, HVM_PARAM_STORE_EVTCHN, store_evtchn);
-    xc_hvm_param_set(handle, domid, HVM_PARAM_CONSOLE_EVTCHN, console_evtchn);
-
-    *store_mfn = str_mfn;
-    *console_mfn = cons_mfn;
-
-    xc_dom_gnttab_hvm_seed(handle, domid, *console_mfn, *store_mfn, console_domid, store_domid);
     return 0;
 }
 
@@ -1159,6 +1146,11 @@ int libxl__build_hvm(libxl__gc *gc, uint32_t domid,
 
     dom->container_type = XC_DOM_HVM_CONTAINER;
 
+    dom->console_evtchn = state->console_port;
+    dom->console_domid = state->console_domid;
+    dom->xenstore_evtchn = state->store_port;
+    dom->xenstore_domid = state->store_domid;
+
     /* The params from the configuration file are in Mb, which are then
      * multiplied by 1 Kb. This was then divided off when calling
      * the old xc_hvm_build_target_mem() which then turned them to bytes.
@@ -1263,10 +1255,7 @@ int libxl__build_hvm(libxl__gc *gc, uint32_t domid,
         goto out;
     }
 
-    rc = hvm_build_set_params(ctx->xch, domid, info, state->store_port,
-                               &state->store_mfn, state->console_port,
-                               &state->console_mfn, state->store_domid,
-                               state->console_domid);
+    rc = hvm_build_set_params(ctx->xch, domid, info);
     if (rc != 0) {
         LOG(ERROR, "hvm build set params failed");
         goto out;
@@ -1277,6 +1266,9 @@ int libxl__build_hvm(libxl__gc *gc, uint32_t domid,
         LOG(ERROR, "hvm build set xenstore values failed");
         goto out;
     }
+
+    state->console_mfn = dom->console_gfn;
+    state->store_mfn = dom->xenstore_gfn;
 
     xc_dom_release(dom);
     return 0;

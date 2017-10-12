@@ -20,6 +20,8 @@
 #include <xenguest.h>
 
 #define INVALID_PFN ((xen_pfn_t)-1)
+#define INVALID_EVTCHN (~0u)
+#define INVALID_DOMID  (~0)
 #define X86_HVM_NR_SPECIAL_PAGES    8
 #define X86_HVM_END_SPECIAL_REGION  0xff000u
 
@@ -104,9 +106,15 @@ struct xc_dom_image {
      * Details for the toolstack-prepared rings.
      *
      * *_gfn fields are allocated by the domain builder.
+     * *_{evtchn,domid} fields must be provided by the caller.
      */
     xen_pfn_t console_gfn;
     xen_pfn_t xenstore_gfn;
+
+    unsigned int console_evtchn;
+    unsigned int xenstore_evtchn;
+    uint32_t console_domid;
+    uint32_t xenstore_domid;
 
     /*
      * initrd parameters as specified in start_info page
@@ -165,10 +173,6 @@ struct xc_dom_image {
 
     /* misc xen domain config stuff */
     unsigned long flags;
-    unsigned int console_evtchn;
-    unsigned int xenstore_evtchn;
-    uint32_t console_domid;
-    uint32_t xenstore_domid;
     xen_pfn_t shared_info_mfn;
 
     xc_interface *xch;
