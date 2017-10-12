@@ -543,10 +543,14 @@ static int alloc_magic_pages_pv(struct xc_dom_image *dom)
     dom->xenstore_pfn = xc_dom_alloc_page(dom, "xenstore");
     if ( dom->xenstore_pfn == INVALID_PFN )
         return -1;
+    xc_clear_domain_page(dom->xch, dom->guest_domid,
+                         xc_dom_p2m(dom, dom->xenstore_pfn));
 
     dom->console_pfn = xc_dom_alloc_page(dom, "console");
     if ( dom->console_pfn == INVALID_PFN )
         return -1;
+    xc_clear_domain_page(dom->xch, dom->guest_domid,
+                         xc_dom_p2m(dom, dom->console_pfn));
 
     dom->alloc_bootstack = 1;
 
@@ -696,7 +700,11 @@ static int alloc_magic_pages_hvm(struct xc_dom_image *dom)
                      special_pfn(SPECIALPAGE_IDENT_PT) << PAGE_SHIFT);
 
     dom->console_pfn = special_pfn(SPECIALPAGE_CONSOLE);
+    xc_clear_domain_page(dom->xch, dom->guest_domid, dom->console_pfn);
+
     dom->xenstore_pfn = special_pfn(SPECIALPAGE_XENSTORE);
+    xc_clear_domain_page(dom->xch, dom->guest_domid, dom->xenstore_pfn);
+
     dom->parms.virt_hypercall = -1;
 
     rc = 0;

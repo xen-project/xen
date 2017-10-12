@@ -62,25 +62,6 @@ static int setup_hypercall_page(struct xc_dom_image *dom)
     return rc;
 }
 
-static int clear_page(struct xc_dom_image *dom, xen_pfn_t pfn)
-{
-    xen_pfn_t dst;
-    int rc;
-
-    if ( pfn == 0 )
-        return 0;
-
-    dst = xc_dom_p2m(dom, pfn);
-    DOMPRINTF("%s: pfn 0x%" PRIpfn ", mfn 0x%" PRIpfn "",
-              __FUNCTION__, pfn, dst);
-    rc = xc_clear_domain_page(dom->xch, dom->guest_domid, dst);
-    if ( rc != 0 )
-        xc_dom_panic(dom->xch, XC_INTERNAL_ERROR,
-                     "%s: xc_clear_domain_page failed (pfn 0x%" PRIpfn
-                     ", rc=%d)", __FUNCTION__, pfn, rc);
-    return rc;
-}
-
 
 /* ------------------------------------------------------------------------ */
 
@@ -221,13 +202,6 @@ int xc_dom_boot_image(struct xc_dom_image *dom)
     if ( dom->arch_hooks->setup_pgtables )
         if ( (rc = dom->arch_hooks->setup_pgtables(dom)) != 0 )
             return rc;
-
-    if ( (rc = clear_page(dom, dom->console_pfn)) != 0 )
-        return rc;
-    if ( (rc = clear_page(dom, dom->xenstore_pfn)) != 0 )
-        return rc;
-    if ( (rc = clear_page(dom, dom->vuart_gfn)) != 0 )
-        return rc;
 
     /* start info page */
     if ( dom->arch_hooks->start_info )
