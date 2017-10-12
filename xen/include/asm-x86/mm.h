@@ -125,11 +125,11 @@ struct page_info
         u32 tlbflush_timestamp;
 
         /*
-         * When PGT_partial is true then this field is valid and indicates
-         * that PTEs in the range [0, @nr_validated_ptes) have been validated.
-         * An extra page reference must be acquired (or not dropped) whenever
-         * PGT_partial gets set, and it must be dropped when the flag gets
-         * cleared. This is so that a get() leaving a page in partially
+         * When PGT_partial is true then the first two fields are valid and
+         * indicate that PTEs in the range [0, @nr_validated_ptes) have been
+         * validated. An extra page reference must be acquired (or not dropped)
+         * whenever PGT_partial gets set, and it must be dropped when the flag
+         * gets cleared. This is so that a get() leaving a page in partially
          * validated state (where the caller would drop the reference acquired
          * due to the getting of the type [apparently] failing [-ERESTART])
          * would not accidentally result in a page left with zero general
@@ -153,10 +153,18 @@ struct page_info
          * put_page_from_lNe() (due to the apparent failure), and hence it
          * must be dropped when the put operation is resumed (and completes),
          * but it must not be acquired if picking up the page for validation.
+         *
+         * The 3rd field, @linear_pt_count, indicates
+         * - by a positive value, how many same-level page table entries a page
+         *   table has,
+         * - by a negative value, in how many same-level page tables a page is
+         *   in use.
          */
         struct {
-            u16 nr_validated_ptes;
-            s8 partial_pte;
+            u16 nr_validated_ptes:PAGETABLE_ORDER + 1;
+            u16 :16 - PAGETABLE_ORDER - 1 - 2;
+            s16 partial_pte:2;
+            s16 linear_pt_count;
         };
 
         /*
@@ -206,6 +214,9 @@ struct page_info
  /* Count of uses of this frame as its current type. */
 #define PGT_count_width   PG_shift(9)
 #define PGT_count_mask    ((1UL<<PGT_count_width)-1)
+
+/* Are the 'type mask' bits identical? */
+#define PGT_type_equal(x, y) (!(((x) ^ (y)) & PGT_type_mask))
 
  /* Cleared when the owning guest 'frees' this page. */
 #define _PGC_allocated    PG_shift(1)
