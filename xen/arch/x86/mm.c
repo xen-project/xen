@@ -2491,7 +2491,7 @@ static int _put_final_page_type(struct page_info *page, unsigned long type,
          */
         if ( !(shadow_mode_enabled(page_get_owner(page)) &&
                (page->count_info & PGC_page_table)) )
-            page->tlbflush_timestamp = tlbflush_current_time();
+            page_set_tlbflush_timestamp(page);
         wmb();
         page->u.inuse.type_info--;
     }
@@ -2501,7 +2501,7 @@ static int _put_final_page_type(struct page_info *page, unsigned long type,
                 (PGT_count_mask|PGT_validated|PGT_partial)) == 1);
         if ( !(shadow_mode_enabled(page_get_owner(page)) &&
                (page->count_info & PGC_page_table)) )
-            page->tlbflush_timestamp = tlbflush_current_time();
+            page_set_tlbflush_timestamp(page);
         wmb();
         page->u.inuse.type_info |= PGT_validated;
     }
@@ -2555,7 +2555,7 @@ static int _put_page_type(struct page_info *page, bool preemptible,
             if ( ptpg && PGT_type_equal(x, ptpg->u.inuse.type_info) )
             {
                 /*
-                 * page_set_tlbflush_timestamp() accesses the same union
+                 * set_tlbflush_timestamp() accesses the same union
                  * linear_pt_count lives in. Unvalidated page table pages,
                  * however, should occur during domain destruction only
                  * anyway.  Updating of linear_pt_count luckily is not
@@ -2576,7 +2576,7 @@ static int _put_page_type(struct page_info *page, bool preemptible,
              */
             if ( !(shadow_mode_enabled(page_get_owner(page)) &&
                    (page->count_info & PGC_page_table)) )
-                page->tlbflush_timestamp = tlbflush_current_time();
+                page_set_tlbflush_timestamp(page);
         }
 
         if ( likely((y = cmpxchg(&page->u.inuse.type_info, x, nx)) == x) )
