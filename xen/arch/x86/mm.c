@@ -488,7 +488,7 @@ void update_cr3(struct vcpu *v)
     make_cr3(v, cr3_mfn);
 }
 
-static inline void page_set_tlbflush_timestamp(struct page_info *page)
+static inline void set_tlbflush_timestamp(struct page_info *page)
 {
     /*
      * Record TLB information for flush later. We do not stamp page tables
@@ -499,7 +499,7 @@ static inline void page_set_tlbflush_timestamp(struct page_info *page)
      */
     if ( !(page->count_info & PGC_page_table) ||
          !shadow_mode_enabled(page_get_owner(page)) )
-        page->tlbflush_timestamp = tlbflush_current_time();
+        page_set_tlbflush_timestamp(page);
 }
 
 const char __section(".bss.page_aligned.const") __aligned(PAGE_SIZE)
@@ -2232,7 +2232,7 @@ static int _put_final_page_type(struct page_info *page, unsigned long type,
             dec_linear_entries(ptpg);
         }
         ASSERT(!page->linear_pt_count || page_get_owner(page)->is_dying);
-        page_set_tlbflush_timestamp(page);
+        set_tlbflush_timestamp(page);
         smp_wmb();
         page->u.inuse.type_info--;
     }
@@ -2240,7 +2240,7 @@ static int _put_final_page_type(struct page_info *page, unsigned long type,
     {
         ASSERT((page->u.inuse.type_info &
                 (PGT_count_mask|PGT_validated|PGT_partial)) == 1);
-        page_set_tlbflush_timestamp(page);
+        set_tlbflush_timestamp(page);
         smp_wmb();
         page->u.inuse.type_info |= PGT_validated;
     }
@@ -2294,7 +2294,7 @@ static int _put_page_type(struct page_info *page, bool preemptible,
             if ( ptpg && PGT_type_equal(x, ptpg->u.inuse.type_info) )
             {
                 /*
-                 * page_set_tlbflush_timestamp() accesses the same union
+                 * set_tlbflush_timestamp() accesses the same union
                  * linear_pt_count lives in. Unvalidated page table pages,
                  * however, should occur during domain destruction only
                  * anyway.  Updating of linear_pt_count luckily is not
@@ -2306,7 +2306,7 @@ static int _put_page_type(struct page_info *page, bool preemptible,
                 ptpg = NULL;
             }
 
-            page_set_tlbflush_timestamp(page);
+            set_tlbflush_timestamp(page);
         }
 
         if ( likely((y = cmpxchg(&page->u.inuse.type_info, x, nx)) == x) )
