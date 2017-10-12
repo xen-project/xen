@@ -1739,7 +1739,11 @@ void page_unlock(struct page_info *page)
 
     do {
         x = y;
+        ASSERT((x & PGT_count_mask) && (x & PGT_locked));
+
         nx = x - (1 | PGT_locked);
+        /* We must not drop the last reference here. */
+        ASSERT(nx & PGT_count_mask);
     } while ( (y = cmpxchg(&page->u.inuse.type_info, x, nx)) != x );
 }
 
@@ -2420,6 +2424,17 @@ static int _put_page_type(struct page_info *page, bool_t preemptible,
             if ( !(shadow_mode_enabled(page_get_owner(page)) &&
                    (page->count_info & PGC_page_table)) )
                 page_set_tlbflush_timestamp(page);
+        }
+        else if ( unlikely((nx & (PGT_locked | PGT_count_mask)) ==
+                           (PGT_locked | 1)) )
+        {
+            /*
+             * We must not drop the second to last reference when the page is
+             * locked, as page_unlock() doesn't do any cleanup of the type.
+             */
+            cpu_relax();
+            y = page->u.inuse.type_info;
+            continue;
         }
 
         if ( likely((y = cmpxchg(&page->u.inuse.type_info, x, nx)) == x) )
