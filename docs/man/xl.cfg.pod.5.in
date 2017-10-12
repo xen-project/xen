@@ -1270,7 +1270,7 @@ connectors=id0:1920x1080;id1:800x600;id2:640x480
 
 =item B<dm_restrict=BOOLEAN>
 
-Restrict the HVM device model after startup,
+Restrict the device model after startup,
 to limit the consequencese of security vulnerabilities in qemu.
 
 With this feature enabled,
@@ -1282,6 +1282,11 @@ This feature is a B<technology preview>.
 There are some significant limitations:
 
 =over 4
+
+=item
+
+This is not likely to work at all for PV guests
+nor guests using qdisk backends for their block devices.
 
 =item
 
