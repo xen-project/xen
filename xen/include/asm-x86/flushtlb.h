@@ -24,6 +24,20 @@ DECLARE_PER_CPU(u32, tlbflush_time);
 
 #define tlbflush_current_time() tlbflush_clock
 
+static inline void page_set_tlbflush_timestamp(struct page_info *page)
+{
+    /*
+     * Prevent storing a stale time stamp, which could happen if an update
+     * to tlbflush_clock plus a subsequent flush IPI happen between the
+     * reading of tlbflush_clock and the writing of the struct page_info
+     * field.
+     */
+    ASSERT(local_irq_is_enabled());
+    local_irq_disable();
+    page->tlbflush_timestamp = tlbflush_current_time();
+    local_irq_enable();
+}
+
 /*
  * @cpu_stamp is the timestamp at last TLB flush for the CPU we are testing.
  * @lastuse_stamp is a timestamp taken when the PFN we are testing was last 

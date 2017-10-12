@@ -1,4 +1,5 @@
 #include <xen/config.h>
+#include <xen/mm.h>
 #include <asm/system.h>
 #include <asm/smp.h>
 #include <asm/cpregs.h>
