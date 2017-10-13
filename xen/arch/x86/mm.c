@@ -3442,7 +3442,7 @@ long do_mmu_update(
             if ( p2m_is_paged(p2mt) )
             {
                 ASSERT(!page);
-                p2m_mem_paging_populate(pg_owner, gmfn);
+                p2m_mem_paging_populate(pt_owner, gmfn);
                 rc = -ENOENT;
                 break;
             }
