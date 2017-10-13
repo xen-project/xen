@@ -99,13 +99,17 @@ int main(int argc, char **argv)
             exit(-1);
         }
 
-        if ( !feof(fp) )
+        /* Only run the test if the input file was smaller than INPUT_SIZE */
+        if ( feof(fp) )
+        {
+            LLVMFuzzerTestOneInput(input, size);
+        }
+        else
         {
             printf("Input too large\n");
             /* Don't exit if we're doing batch processing */
             if ( max == 1 )
                 exit(-1);
-            continue;
         }
 
         if ( fp != stdin )
@@ -113,8 +117,6 @@ int main(int argc, char **argv)
             fclose(fp);
             fp = NULL;
         }
-
-        LLVMFuzzerTestOneInput(input, size);
     }
 
     return 0;
