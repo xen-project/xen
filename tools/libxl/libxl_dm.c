@@ -762,9 +762,10 @@ libxl__detect_gfx_passthru_kind(libxl__gc *gc,
 #define DEFINE_USERLOOKUP_HELPER(NAME,SPEC_TYPE,STRUCTNAME,SYSCONF)     \
     static int userlookup_helper_##NAME(libxl__gc *gc,                  \
                                         SPEC_TYPE spec,                 \
-                                           struct STRUCTNAME **out)     \
+                                        struct STRUCTNAME *resultbuf,   \
+                                        struct STRUCTNAME **out)        \
     {                                                                   \
-        struct STRUCTNAME resultbuf, *resultp = NULL;                   \
+        struct STRUCTNAME *resultp = NULL;                              \
         char *buf = NULL;                                               \
         long buf_size;                                                  \
         int ret;                                                        \
@@ -779,7 +780,7 @@ libxl__detect_gfx_passthru_kind(libxl__gc *gc,
                                                                         \
         while (1) {                                                     \
             buf = libxl__realloc(gc, buf, buf_size);                    \
-            ret = NAME##_r(spec, &resultbuf, buf, buf_size, &resultp);  \
+            ret = NAME##_r(spec, resultbuf, buf, buf_size, &resultp);   \
             if (ret == ERANGE) {                                        \
                 buf_size += 128;                                        \
                 continue;                                               \
@@ -956,7 +957,7 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
     uint64_t ram_size;
     const char *path, *chardev;
     char *user = NULL;
-    struct passwd *user_base;
+    struct passwd *user_base, user_pwbuf;
 
     dm_args = flexarray_make(gc, 16, 1);
     dm_envs = flexarray_make(gc, 16, 1);
@@ -1660,20 +1661,21 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
         }
 
         user = GCSPRINTF("%s%d", LIBXL_QEMU_USER_BASE, guest_domid);
-        ret = userlookup_helper_getpwnam(gc, user, 0);
+        ret = userlookup_helper_getpwnam(gc, user, &user_pwbuf, 0);
         if (ret < 0)
             return ret;
         if (ret > 0)
             goto end_search;
 
         ret = userlookup_helper_getpwnam(gc, LIBXL_QEMU_USER_RANGE_BASE,
-                                         &user_base);
+                                         &user_pwbuf, &user_base);
         if (ret < 0)
             return ret;
         if (ret > 0) {
-            struct passwd *user_clash;
+            struct passwd *user_clash, user_clash_pwbuf;
             uid_t intended_uid = user_base->pw_uid + guest_domid;
-            ret = userlookup_helper_getpwuid(gc, intended_uid, &user_clash);
+            ret = userlookup_helper_getpwuid(gc, intended_uid,
+                                             &user_clash_pwbuf, &user_clash);
             if (ret < 0)
                 return ret;
             if (ret > 0) {
@@ -1693,7 +1695,7 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
         }
 
         user = LIBXL_QEMU_USER_SHARED;
-        ret = userlookup_helper_getpwnam(gc, user, 0);
+        ret = userlookup_helper_getpwnam(gc, user, &user_pwbuf, 0);
         if (ret < 0)
             return ret;
         if (ret > 0) {
