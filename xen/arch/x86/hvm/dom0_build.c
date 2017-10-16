@@ -614,6 +614,7 @@ static int __init pvh_setup_cpus(struct domain *d, paddr_t entry,
 
     update_domain_wallclock_time(d);
 
+    v->is_initialised = 1;
     clear_bit(_VPF_down, &v->pause_flags);
 
     return 0;

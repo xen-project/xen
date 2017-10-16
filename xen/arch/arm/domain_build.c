@@ -2197,9 +2197,6 @@ int construct_dom0(struct domain *d)
 
     discard_initial_modules();
 
-    v->is_initialised = 1;
-    clear_bit(_VPF_down, &v->pause_flags);
-
     memset(regs, 0, sizeof(*regs));
 
     regs->pc = (register_t)kinfo.entry;
@@ -2246,6 +2243,9 @@ int construct_dom0(struct domain *d)
         if ( is_64bit_domain(d) )
             vcpu_switch_to_aarch64_mode(d->vcpu[i]);
     }
+
+    v->is_initialised = 1;
+    clear_bit(_VPF_down, &v->pause_flags);
 
     return 0;
 }

@@ -847,9 +847,6 @@ int __init dom0_construct_pv(struct domain *d,
 
     update_domain_wallclock_time(d);
 
-    v->is_initialised = 1;
-    clear_bit(_VPF_down, &v->pause_flags);
-
     /*
      * Initial register values:
      *  DS,ES,FS,GS = FLAT_KERNEL_DS
@@ -882,6 +879,9 @@ int __init dom0_construct_pv(struct domain *d,
 
     if ( d->domain_id == hardware_domid )
         iommu_hwdom_init(d);
+
+    v->is_initialised = 1;
+    clear_bit(_VPF_down, &v->pause_flags);
 
     return 0;
 

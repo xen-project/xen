@@ -466,6 +466,8 @@ int __init construct_dom0(struct domain *d, const module_t *image,
                           void *(*bootstrap_map)(const module_t *),
                           char *cmdline)
 {
+    int rc;
+
     /* Sanity! */
     BUG_ON(d->domain_id != 0);
     BUG_ON(d->vcpu[0] == NULL);
@@ -481,8 +483,15 @@ int __init construct_dom0(struct domain *d, const module_t *image,
     }
 #endif
 
-    return (is_hvm_domain(d) ? dom0_construct_pvh : dom0_construct_pv)
-           (d, image, image_headroom, initrd,bootstrap_map, cmdline);
+    rc = (is_hvm_domain(d) ? dom0_construct_pvh : dom0_construct_pv)
+         (d, image, image_headroom, initrd, bootstrap_map, cmdline);
+    if ( rc )
+        return rc;
+
+    /* Sanity! */
+    BUG_ON(!d->vcpu[0]->is_initialised);
+
+    return 0;
 }
 
 /*
