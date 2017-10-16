@@ -49,7 +49,7 @@ SUBDIRS-$(OCAML_TOOLS) += ocaml
 endif
 
 ifeq ($(CONFIG_RUMP),y)
-SUBDIRS-y := libxc xenstore
+SUBDIRS-y := libs libxc xenstore
 endif
 
 # For the sake of linking, set the sys-root

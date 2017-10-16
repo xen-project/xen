@@ -10,4 +10,8 @@ SUBDIRS-y += call
 SUBDIRS-y += foreignmemory
 SUBDIRS-y += devicemodel
 
+ifeq ($(CONFIG_RUMP),y)
+SUBDIRS-y := toolcore
+endif
+
 all clean install distclean uninstall: %: subdirs-%
