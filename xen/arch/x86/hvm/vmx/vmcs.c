@@ -806,7 +806,6 @@ static void vmx_set_host_env(struct vcpu *v)
               (unsigned long)(this_cpu(gdt_table) - FIRST_RESERVED_GDT_ENTRY));
     __vmwrite(HOST_IDTR_BASE, (unsigned long)idt_tables[cpu]);
 
-    __vmwrite(HOST_TR_SELECTOR, TSS_ENTRY << 3);
     __vmwrite(HOST_TR_BASE, (unsigned long)&per_cpu(init_tss, cpu));
 
     __vmwrite(HOST_SYSENTER_ESP, get_stack_bottom());
@@ -1144,6 +1143,7 @@ static int construct_vmcs(struct vcpu *v)
     __vmwrite(HOST_GS_SELECTOR, 0);
     __vmwrite(HOST_FS_BASE, 0);
     __vmwrite(HOST_GS_BASE, 0);
+    __vmwrite(HOST_TR_SELECTOR, TSS_ENTRY << 3);
 
     /* Host control registers. */
     v->arch.hvm_vmx.host_cr0 = read_cr0() | X86_CR0_TS;
