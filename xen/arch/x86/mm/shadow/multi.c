@@ -77,7 +77,7 @@ typedef enum {
 
 extern const char *const fetch_type_names[];
 
-#if defined(DEBUG_TRACE_DUMP) && CONFIG_PAGING_LEVELS == GUEST_PAGING_LEVELS
+#if SHADOW_DEBUG_PROPAGATE && CONFIG_PAGING_LEVELS == GUEST_PAGING_LEVELS
 const char *const fetch_type_names[] = {
     [ft_prefetch]     = "prefetch",
     [ft_demand_read]  = "demand read",
