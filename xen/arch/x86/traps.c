@@ -1098,6 +1098,48 @@ static void reserved_bit_page_fault(unsigned long addr,
     show_execution_state(regs);
 }
 
+static int handle_ldt_mapping_fault(unsigned int offset,
+                                    struct cpu_user_regs *regs)
+{
+    struct vcpu *curr = current;
+
+    /*
+     * Not in PV context?  Something is very broken.  Leave it to the #PF
+     * handler, which will probably result in a panic().
+     */
+    if ( !is_pv_vcpu(curr) )
+        return 0;
+
+    /* Try to copy a mapping from the guest's LDT, if it is valid. */
+    if ( likely(pv_map_ldt_shadow_page(offset)) )
+    {
+        if ( guest_mode(regs) )
+            trace_trap_two_addr(TRC_PV_GDT_LDT_MAPPING_FAULT,
+                                regs->rip, offset);
+    }
+    else
+    {
+        /* In hypervisor mode? Leave it to the #PF handler to fix up. */
+        if ( !guest_mode(regs) )
+            return 0;
+
+        /* Access would have become non-canonical? Pass #GP[sel] back. */
+        if ( unlikely(!is_canonical_address(
+                          curr->arch.pv_vcpu.ldt_base + offset)) )
+        {
+            uint16_t ec = (offset & ~(X86_XEC_EXT | X86_XEC_IDT)) | X86_XEC_TI;
+
+            pv_inject_hw_exception(TRAP_gp_fault, ec);
+        }
+        else
+            /* else pass the #PF back, with adjusted %cr2. */
+            pv_inject_page_fault(regs->error_code,
+                                 curr->arch.pv_vcpu.ldt_base + offset);
+    }
+
+    return EXCRET_fault_fixed;
+}
+
 static int handle_gdt_ldt_mapping_fault(unsigned long offset,
                                         struct cpu_user_regs *regs)
 {
@@ -1119,40 +1161,11 @@ static int handle_gdt_ldt_mapping_fault(unsigned long offset,
     offset &= (1UL << (GDT_LDT_VCPU_VA_SHIFT-1)) - 1UL;
 
     if ( likely(is_ldt_area) )
-    {
-        /* LDT fault: Copy a mapping from the guest's LDT, if it is valid. */
-        if ( likely(pv_map_ldt_shadow_page(offset)) )
-        {
-            if ( guest_mode(regs) )
-                trace_trap_two_addr(TRC_PV_GDT_LDT_MAPPING_FAULT,
-                                    regs->rip, offset);
-        }
-        else
-        {
-            /* In hypervisor mode? Leave it to the #PF handler to fix up. */
-            if ( !guest_mode(regs) )
-                return 0;
+        return handle_ldt_mapping_fault(offset, regs);
 
-            /* Access would have become non-canonical? Pass #GP[sel] back. */
-            if ( unlikely(!is_canonical_address(
-                              curr->arch.pv_vcpu.ldt_base + offset)) )
-            {
-                uint16_t ec = (offset & ~(X86_XEC_EXT | X86_XEC_IDT)) | X86_XEC_TI;
-
-                pv_inject_hw_exception(TRAP_gp_fault, ec);
-            }
-            else
-                /* else pass the #PF back, with adjusted %cr2. */
-                pv_inject_page_fault(regs->error_code,
-                                     curr->arch.pv_vcpu.ldt_base + offset);
-        }
-    }
-    else
-    {
-        /* GDT fault: handle the fault as #GP(selector). */
-        regs->error_code = offset & ~(X86_XEC_EXT | X86_XEC_IDT | X86_XEC_TI);
-        (void)do_general_protection(regs);
-    }
+    /* GDT fault: handle the fault as #GP[sel]. */
+    regs->error_code = offset & ~(X86_XEC_EXT | X86_XEC_IDT | X86_XEC_TI);
+    do_general_protection(regs);
 
     return EXCRET_fault_fixed;
 }
