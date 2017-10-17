@@ -283,6 +283,7 @@ T:	git git://xenbits.xen.org/mini-os.git
 F:	config/MiniOS.mk
 
 OCAML TOOLS
+M:	Christian Lindig <christian.lindig@citrix.com>
 M:	David Scott <dave@recoil.org>
 S:	Supported
 F:	tools/ocaml/
