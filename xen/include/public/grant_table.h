@@ -589,9 +589,9 @@ struct gnttab_cache_flush {
     } a;
     uint16_t offset; /* offset from start of grant */
     uint16_t length; /* size within the grant */
-#define GNTTAB_CACHE_CLEAN          (1<<0)
-#define GNTTAB_CACHE_INVAL          (1<<1)
-#define GNTTAB_CACHE_SOURCE_GREF    (1<<31)
+#define GNTTAB_CACHE_CLEAN          (1u<<0)
+#define GNTTAB_CACHE_INVAL          (1u<<1)
+#define GNTTAB_CACHE_SOURCE_GREF    (1u<<31)
     uint32_t op;
 };
 typedef struct gnttab_cache_flush gnttab_cache_flush_t;
