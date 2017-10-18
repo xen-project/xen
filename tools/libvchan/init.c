@@ -40,6 +40,7 @@
 #include <fcntl.h>
 
 #include <xenstore.h>
+#include <xen/xen.h>
 #include <xen/sys/evtchn.h>
 #include <xen/sys/gntalloc.h>
 #include <xen/sys/gntdev.h>

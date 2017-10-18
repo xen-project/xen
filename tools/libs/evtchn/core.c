@@ -61,6 +61,11 @@ int xenevtchn_close(xenevtchn_handle *xce)
     return rc;
 }
 
+int xenevtchn_restrict(xenevtchn_handle *xce, domid_t domid)
+{
+    return osdep_evtchn_restrict(xce, domid);
+}
+
 /*
  * Local variables:
  * mode: C

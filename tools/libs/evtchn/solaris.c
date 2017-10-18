@@ -50,6 +50,12 @@ int osdep_evtchn_close(xenevtchn_handle *xce)
     return close(xce->fd);
 }
 
+int osdep_evtchn_restrict(xenevtchn_handle *xce, domid_t domid)
+{
+    errno = -EOPNOTSUPP;
+    return -1;
+}
+
 int xenevtchn_fd(xenevtchn_handle *xce)
 {
     return xce->fd;

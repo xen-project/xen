@@ -43,6 +43,7 @@
  */
 
 #include <xen/io/libxenvchan.h>
+#include <xen/xen.h>
 #include <xen/sys/evtchn.h>
 #include <xenevtchn.h>
 #include <xengnttab.h>

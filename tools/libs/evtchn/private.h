@@ -4,6 +4,8 @@
 #include <xentoollog.h>
 #include <xenevtchn.h>
 
+#include <xen/xen.h>
+
 struct xenevtchn_handle {
     xentoollog_logger *logger, *logger_tofree;
     int fd;
@@ -11,6 +13,7 @@ struct xenevtchn_handle {
 
 int osdep_evtchn_open(xenevtchn_handle *xce);
 int osdep_evtchn_close(xenevtchn_handle *xce);
+int osdep_evtchn_restrict(xenevtchn_handle *xce, domid_t domid);
 
 #endif
 

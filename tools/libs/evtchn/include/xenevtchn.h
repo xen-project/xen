@@ -151,6 +151,16 @@ xenevtchn_pending(xenevtchn_handle *xce);
  */
 int xenevtchn_unmask(xenevtchn_handle *xce, evtchn_port_t port);
 
+/**
+ * This function restricts the use of this handle to the specified
+ * domain.
+ *
+ * @parm xce handle to the open evtchn interface
+ * @parm domid the domain id
+ * @return 0 on success, -1 on failure with errno set appropriately.
+ */
+int xenevtchn_restrict(xenevtchn_handle *xce, domid_t domid);
+
 #endif
 
 /*
