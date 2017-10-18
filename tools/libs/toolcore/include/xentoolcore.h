@@ -33,8 +33,6 @@
  *
  * Does not prevent effects that amount only to
  *   - denial of service, possibly host-wide, by resource exhaustion etc.
- *   - leak of not-very-interesting metainformation about other domains
- *     eg, specifically, event channel signals relating to other domains
  *
  * If this cannot be achieved, returns -1 and sets errno.
  * If called again with the same domid, it may succeed, or it may

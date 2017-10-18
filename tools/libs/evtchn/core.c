@@ -18,6 +18,16 @@
 
 #include "private.h"
 
+static int all_restrict_cb(Xentoolcore__Active_Handle *ah, domid_t domid) {
+    xenevtchn_handle *xce = CONTAINER_OF(ah, *xce, tc_ah);
+
+    if (xce->fd < 0)
+        /* just in case */
+        return 0;
+
+    return xenevtchn_restrict(xce, domid);
+}
+
 xenevtchn_handle *xenevtchn_open(xentoollog_logger *logger, unsigned open_flags)
 {
     xenevtchn_handle *xce = malloc(sizeof(*xce));
@@ -28,6 +38,9 @@ xenevtchn_handle *xenevtchn_open(xentoollog_logger *logger, unsigned open_flags)
     xce->fd = -1;
     xce->logger = logger;
     xce->logger_tofree  = NULL;
+
+    xce->tc_ah.restrict_callback = all_restrict_cb;
+    xentoolcore__register_active_handle(&xce->tc_ah);
 
     if (!xce->logger) {
         xce->logger = xce->logger_tofree =

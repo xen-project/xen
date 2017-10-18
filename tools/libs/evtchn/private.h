@@ -4,11 +4,14 @@
 #include <xentoollog.h>
 #include <xenevtchn.h>
 
+#include <xentoolcore_internal.h>
+
 #include <xen/xen.h>
 
 struct xenevtchn_handle {
     xentoollog_logger *logger, *logger_tofree;
     int fd;
+    Xentoolcore__Active_Handle tc_ah;
 };
 
 int osdep_evtchn_open(xenevtchn_handle *xce);
