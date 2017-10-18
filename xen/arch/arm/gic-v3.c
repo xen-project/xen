@@ -569,6 +569,13 @@ static void __init gicv3_dist_init(void)
     for ( i = NR_GIC_LOCAL_IRQS; i < nr_lines; i += 32 )
         writel_relaxed(0xffffffff, GICD + GICD_ICENABLER + (i / 32) * 4);
 
+    /*
+     * Configure SPIs as non-secure Group-1. This will only matter
+     * if the GIC only has a single security state.
+     */
+    for ( i = NR_GIC_LOCAL_IRQS; i < nr_lines; i += 32 )
+        writel_relaxed(GENMASK(31, 0), GICD + GICD_IGROUPR + (i / 32) * 4);
+
     gicv3_dist_wait_for_rwp();
 
     /* Turn on the distributor */
@@ -715,6 +722,8 @@ static int gicv3_cpu_init(void)
      */
     writel_relaxed(0xffff0000, GICD_RDIST_SGI_BASE + GICR_ICENABLER0);
     writel_relaxed(0x0000ffff, GICD_RDIST_SGI_BASE + GICR_ISENABLER0);
+    /* Configure SGIs/PPIs as non-secure Group-1 */
+    writel_relaxed(GENMASK(31, 0), GICD_RDIST_SGI_BASE + GICR_IGROUPR0);
 
     gicv3_redist_wait_for_rwp();
 
