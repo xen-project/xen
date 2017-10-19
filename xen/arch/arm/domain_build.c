@@ -21,7 +21,6 @@
 #include <asm/setup.h>
 #include <asm/cpufeature.h>
 
-#include <asm/gic.h>
 #include <xen/irq.h>
 #include <xen/grant_table.h>
 #include "kernel.h"

@@ -22,7 +22,6 @@
 #include <xen/mm.h>
 #include <xen/vmap.h>
 #include <asm/io.h>
-#include <asm/gic.h>
 
 #define DCC_SHIFT      26
 #define FUNCTION_SHIFT 20

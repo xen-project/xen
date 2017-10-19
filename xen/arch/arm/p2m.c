@@ -10,7 +10,6 @@
 #include <xen/xmalloc.h>
 #include <public/vm_event.h>
 #include <asm/flushtlb.h>
-#include <asm/gic.h>
 #include <asm/event.h>
 #include <asm/hardirq.h>
 #include <asm/page.h>

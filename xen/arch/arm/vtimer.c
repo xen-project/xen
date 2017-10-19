@@ -24,7 +24,6 @@
 
 #include <asm/cpregs.h>
 #include <asm/div64.h>
-#include <asm/gic.h>
 #include <asm/irq.h>
 #include <asm/regs.h>
 #include <asm/time.h>
