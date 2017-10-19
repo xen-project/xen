@@ -771,9 +771,7 @@ void load_system_tables(void)
 	ltr(TSS_ENTRY << 3);
 	lldt(0);
 
-	set_ist(&idt_tables[cpu][TRAP_double_fault],  IST_DF);
-	set_ist(&idt_tables[cpu][TRAP_nmi],	      IST_NMI);
-	set_ist(&idt_tables[cpu][TRAP_machine_check], IST_MCE);
+	enable_each_ist(idt_tables[cpu]);
 
 	/*
 	 * Bottom-of-stack must be 16-byte aligned!

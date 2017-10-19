@@ -1889,9 +1889,7 @@ void __init init_idt_traps(void)
     set_intr_gate(TRAP_simd_error,&simd_coprocessor_error);
 
     /* Specify dedicated interrupt stacks for NMI, #DF, and #MC. */
-    set_ist(&idt_table[TRAP_double_fault],  IST_DF);
-    set_ist(&idt_table[TRAP_nmi],           IST_NMI);
-    set_ist(&idt_table[TRAP_machine_check], IST_MCE);
+    enable_each_ist(idt_table);
 
     /* CPU0 uses the master IDT. */
     idt_tables[0] = idt_table;

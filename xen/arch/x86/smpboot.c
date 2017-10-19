@@ -919,9 +919,7 @@ static int cpu_smpboot_alloc(unsigned int cpu)
     if ( idt_tables[cpu] == NULL )
         goto out;
     memcpy(idt_tables[cpu], idt_table, IDT_ENTRIES * sizeof(idt_entry_t));
-    set_ist(&idt_tables[cpu][TRAP_double_fault],  IST_NONE);
-    set_ist(&idt_tables[cpu][TRAP_nmi],           IST_NONE);
-    set_ist(&idt_tables[cpu][TRAP_machine_check], IST_NONE);
+    disable_each_ist(idt_tables[cpu]);
 
     rc = setup_cpu_root_pgt(cpu);
     if ( rc )

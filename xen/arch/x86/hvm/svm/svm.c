@@ -1038,9 +1038,7 @@ static void svm_ctxt_switch_from(struct vcpu *v)
     svm_vmload_pa(per_cpu(host_vmcb, cpu));
 
     /* Resume use of ISTs now that the host TR is reinstated. */
-    set_ist(&idt_tables[cpu][TRAP_double_fault],  IST_DF);
-    set_ist(&idt_tables[cpu][TRAP_nmi],           IST_NMI);
-    set_ist(&idt_tables[cpu][TRAP_machine_check], IST_MCE);
+    enable_each_ist(idt_tables[cpu]);
 }
 
 static void svm_ctxt_switch_to(struct vcpu *v)
@@ -1059,9 +1057,7 @@ static void svm_ctxt_switch_to(struct vcpu *v)
      * Cannot use ISTs for NMI/#MC/#DF while we are running with the guest TR.
      * But this doesn't matter: the IST is only req'd to handle SYSCALL/SYSRET.
      */
-    set_ist(&idt_tables[cpu][TRAP_double_fault],  IST_NONE);
-    set_ist(&idt_tables[cpu][TRAP_nmi],           IST_NONE);
-    set_ist(&idt_tables[cpu][TRAP_machine_check], IST_NONE);
+    disable_each_ist(idt_tables[cpu]);
 
     svm_restore_dr(v);
 

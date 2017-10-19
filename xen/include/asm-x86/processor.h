@@ -459,6 +459,20 @@ static always_inline void set_ist(idt_entry_t *idt, unsigned long ist)
     _write_gate_lower(idt, &new);
 }
 
+static inline void enable_each_ist(idt_entry_t *idt)
+{
+    set_ist(&idt[TRAP_double_fault],  IST_DF);
+    set_ist(&idt[TRAP_nmi],           IST_NMI);
+    set_ist(&idt[TRAP_machine_check], IST_MCE);
+}
+
+static inline void disable_each_ist(idt_entry_t *idt)
+{
+    set_ist(&idt[TRAP_double_fault],  IST_NONE);
+    set_ist(&idt[TRAP_nmi],           IST_NONE);
+    set_ist(&idt[TRAP_machine_check], IST_NONE);
+}
+
 #define IDT_ENTRIES 256
 extern idt_entry_t idt_table[];
 extern idt_entry_t *idt_tables[];
