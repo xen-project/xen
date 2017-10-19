@@ -1,0 +1,257 @@
+=head1 NAME
+
+xl-static-shm-configuration - XL Static Shared Memeory Configuration Syntax
+
+
+(B<NOTE>: This is currently only available to ARM guests.)
+
+=head1 DESCRIPTION
+
+The static_shm option allows users to statically setup shared memory regions
+among a group of VMs, enabling guests without grant table support to do
+shm-based communication.
+
+Every shared region is:
+
+=over 4
+
+* Uniquely identified by a string that is no longer than 128 characters, which
+is called an B<identifier> in this document.
+
+* Backed by exactely one domain, which is called a B<master> domain, and all
+the other domains who are also sharing this region are called B<slave>s.
+
+=back
+
+=head1 SYNTAX
+
+This document specifies syntax of the static shared memory configuration in
+the xl config file. It has the following form:
+
+    static_shm = [ "SSHM_SPEC", "SSHM_SPEC", ... ]
+
+where each C<SSHM_SPEC> is in this form:
+
+    [<key>=<value>,]*
+
+Valid examples of C<SSHM_SPEC> are:
+
+    id=ID1, begin=0x100000, end=0x200000, role=master, cache_policy=x86_normal
+    id=ID1, offset = 0, begin=0x500000, end=0x600000, role=slave, prot=rw
+    id=ID2, begin=0x300000, end=0x400000, role=master
+    id=ID2, offset = 0x10000, begin=0x690000, end=0x800000, role=slave
+    id=ID2, offset = 0x10000, begin=0x690000, end=0x800000, role=slave
+
+These might be specified in the domain config file like this:
+
+    static_shm = ["id=ID2, offset = 0x10000, begin=0x690000, end=0x800000,
+role=slave"]
+
+
+More formally, the string is a series of comma-separated keyword/value
+pairs. Each parameter may be specified at most once. Default values apply if
+the parameter is not specified.
+
+=head1 Parameters
+
+=over 4
+
+=item B<id>
+
+=over 4
+
+=item Description
+
+The unique identifier of the shared memory region.
+
+Every identifier could appear only once in each xl config file.
+
+=item Supported values
+
+A string that contains alphanumerics and "_"s, and is no longer than 128
+characters.
+
+=item Default value
+
+None, this parameter is mandatory.
+
+=back
+
+=item B<begin>/B<end>
+
+=over 4
+
+=item Description
+
+The boundaries of the shared memory area.
+
+=item Supported values
+
+Same with B<offset>.
+
+=item Default Value
+
+None, this parameter is mandatory.
+
+=back
+
+=item B<offset>
+
+=over 4
+
+=item Description
+
+Can only appear when B<role> = slave. If set, the address mapping will not
+start from the beginning the backing memory region, but from the middle
+(B<offet> bytes away from the beginning) of it. See the graph below:
+
+With B<offset> = 0, the mapping will look like:
+
+  backing memory region:  #########################################
+                          |                       |
+                          |                       |
+                          |                       |
+                          V                       V
+  slave's shared region:  #########################
+
+With B<offset> > 0:
+
+  backing memory region:   #########################################
+                           |<-- offset -->||                       |
+                                           |                       |
+                                           |                       |
+                                           V                       V
+  slave's memory region:                   #########################
+
+=item Supported values
+
+Decimals or hexadecimals with a prefix "0x", and should be the multiple of the
+hypervisor page granularity (currently 4K on both ARM and x86).
+
+=item Default value
+
+0x0
+
+=back
+
+=item B<role>
+
+=over 4
+
+=item Description
+
+The backing area would be taken from one domain, which we will mark
+as the "master domain", and this domain should be created prior to any
+other slave domains that depend on it.
+
+This arugment specifies the role of this domain.
+
+=item Supported values
+
+master, slave
+
+=item Default value
+
+slave
+
+=back
+
+=item B<prot>
+
+=over 4
+
+=item Description
+
+When B<role> = master, this means the largest set of stage-2 permission flags
+that can be granted to the slave domains. When B<role> = slave, this means the
+stage-2 permission flags of the shared memory area.
+
+=item Supported values
+
+Currently only 'rw' is supported.
+
+=item Default value
+
+rw
+
+=back
+
+=item B<cache_policy>
+
+=over 4
+
+=item Description
+
+The stage-2 cacheability/shareability attributes of the shared memory area.
+This can only appear when B<role> = master.
+
+=item Supported values
+
+Currently, only the following policy is supported:
+
+=over 4
+
+=item B<ARM_normal>
+
+Only applicable to ARM guests. This would mean Inner and Outer Write-Back
+Cacheable, and Inner Shareable.
+
+=back
+
+=item Default value
+
+ARM_normal
+
+=back
+
+=back
+
+=head1 TYPICAL USAGE
+
+A typical procedure of setting up a shared mem region among several VMs is:
+
+=over 4
+
+1. Add a static_shm option to the master domain's xl config file, assign an
+B<ID> to it and mark it's B<role> as master, and set up the boundaries, prot
+flag, and B<cache_policy> appropriately.
+
+2. Add a static_shm option to every slave domain's xl config file, set
+their B<ID> to the same value as the master's, and set up the B<offset>,
+boundaries and prot flag appropriately.
+
+3. Create the master domain.
+
+4. Create the slaves.
+
+=back
+
+Remember that the master domain must be created before any slave domains could
+be created, for the slaves depend on the memory pages backed by their master.
+
+=head1 Example
+
+Suppose that we have 3 domains: vm1~vm3. And we want to setup two shared
+regions, say, ID1 and ID2, among the three domains, with the following address
+mapping:
+
+   ID1: (vm1 : 0x100000~0x200000) <=====> (vm2 : 0x500000~0x600000)
+   ID2: (vm1 : 0x310000~0x400000) <=====> (vm3 : 0x690000~0x800000)
+
+According to the syntax defined above, the xl config files of the three domains
+should contains the following content:
+
+In xl config file of vm1:
+  static_shm = [ "id=ID1, begin=0x100000, end=0x200000, role=master,
+cache_policy=x86_normal, prot=rw",
+"id=ID2, begin=0x300000, end=0x400000, role=master" ]
+
+In xl config file of vm2:
+  static_shm = [ "id=ID1, offset=0, begin=0x500000, end=0x600000,
+role=slave, prot=rw" ]
+
+In xl config file of vm3:
+  static_shm = [ "id=ID2, offset=0x10000, begin=0x690000,
+end=0x800000, role=slave" ]
+
+After that, just create vm1 first, and then create vm2 and vm3 in any order.

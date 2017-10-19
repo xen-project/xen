@@ -174,6 +174,14 @@ than this amount of RAM.
 
 The size of the video RAM this domain is configured with.
 
+#### ~/static_shm/[_a-zA-Z0-9]+/role = ("master"|"slave") []
+
+(Note: Currently, this will only appear on ARM guests.)
+
+The role of this domain in the static shared memory region whose id matches
+the `[_a-zA-Z0-9]+` part in the path. (Described in the manpage
+**xl-static-shm-configuration(5)**).
+
 #### ~/device/suspend/event-channel = ""|EVTCHN [w]
 
 The domain's suspend event channel. The toolstack will create this
@@ -609,6 +617,45 @@ for the toolstack to obtain e.g. the domain id of a xenstore domain.
 
 Domain Id of the xenstore domain in case xenstore is provided via a
 domain instead of a daemon in dom0.
+
+#### /local/static_shm/[_a-zA-Z0-9]+/* []
+
+(Note: Currently, this will only appear on ARM guests.)
+
+The following paths contain backing memory parameters of a static shared memory
+whose id matches the `[_a-zA-Z0-9]+` part in the path. Their formats and
+meanings are the same as those in an xl config file, described in the manpage
+**xl-static-shm-configuration(5)**.
+
+* begin/end: the boundary of the backing memory region.
+* prot: the largest set of stage-2 permission flags that can be granted to
+  the slave domains.
+* cache_policy: the stage-2 cacheability/shareability attributes of the backing
+  memory region.
+
+The following paths contain run-time information about the static shared memory
+region.
+
+* master: the domid of the backing domain.
+* slaves: information about the slaves that are sharing the region, see
+  ** /local/static_shm/[_a-zA-Z0-9]+/slaves/$DOMID/* ** below.
+* users: An integer. This is the reference count of the backing memory region,
+  including the master domain itself. When this value reachies 0, the backing
+  memory region will be freed.
+
+#### /local/staitc_shm/[_a-zA-Z0-9]+/slaves/$DOMID/* []
+
+(Note: Currently, this will only appear on ARM guests.)
+
+The following paths contain static shared memory region parameters of a slave
+domain. Their formats and meanings are the same as those in xl config files,
+described in the manpage **xl-static-shm-configuration(5)**.
+
+* begin/end: the boundary of the shared memory region.
+* prot: the stage-2 permission flags of the shared memory area.
+* offset: when mapping the backing memory region to the slave's memory space,
+  the mapping will start from offset bytes after the beginning of the backing
+  memory region.
 
 [BLKIF]: http://xenbits.xen.org/docs/unstable/hypercall/x86_64/include,public,io,blkif.h.html
 [FBIF]: http://xenbits.xen.org/docs/unstable/hypercall/x86_64/include,public,io,fbif.h.html
