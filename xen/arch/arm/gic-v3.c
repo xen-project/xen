@@ -392,7 +392,16 @@ static void gicv3_restore_state(const struct vcpu *v)
         val |= GICC_SRE_EL2_ENEL1;
     WRITE_SYSREG32(val, ICC_SRE_EL2);
 
+    /*
+     * VFIQEn is RES1 if ICC_SRE_EL1.SRE is 1. This causes a Group0
+     * interrupt (as generated in GICv2 mode) to be delivered as a FIQ
+     * to the guest, with potentially consequence. So we must make sure
+     * that ICC_SRE_EL1 has been actually programmed with the value we
+     * want before starting to mess with the rest of the GIC, and
+     * VMCR_EL1 in particular.
+     */
     WRITE_SYSREG32(v->arch.gic.v3.sre_el1, ICC_SRE_EL1);
+    isb();
     WRITE_SYSREG32(v->arch.gic.v3.vmcr, ICH_VMCR_EL2);
     restore_aprn_regs(&v->arch.gic);
     gicv3_restore_lrs(v);
