@@ -994,8 +994,6 @@ static void pi_desc_init(struct vcpu *v)
 static int construct_vmcs(struct vcpu *v)
 {
     struct domain *d = v->domain;
-    uint16_t sysenter_cs;
-    unsigned long sysenter_eip;
     u32 vmexit_ctl = vmx_vmexit_control;
     u32 vmentry_ctl = vmx_vmentry_control;
 
@@ -1155,10 +1153,8 @@ static int construct_vmcs(struct vcpu *v)
     __vmwrite(HOST_RIP, (unsigned long)vmx_asm_vmexit_handler);
 
     /* Host SYSENTER CS:RIP. */
-    rdmsrl(MSR_IA32_SYSENTER_CS, sysenter_cs);
-    __vmwrite(HOST_SYSENTER_CS, sysenter_cs);
-    rdmsrl(MSR_IA32_SYSENTER_EIP, sysenter_eip);
-    __vmwrite(HOST_SYSENTER_EIP, sysenter_eip);
+    __vmwrite(HOST_SYSENTER_CS, __HYPERVISOR_CS);
+    __vmwrite(HOST_SYSENTER_EIP, (unsigned long)sysenter_entry);
 
     /* MSR intercepts. */
     __vmwrite(VM_EXIT_MSR_LOAD_COUNT, 0);
