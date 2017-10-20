@@ -274,9 +274,9 @@ MINIOS_UPSTREAM_URL ?= git://xenbits.xen.org/mini-os.git
 endif
 OVMF_UPSTREAM_REVISION ?= 947f3737abf65fda63f3ffd97fddfa6986986868
 QEMU_UPSTREAM_REVISION ?= qemu-xen-4.10.0-rc1
-MINIOS_UPSTREAM_REVISION ?= xen-4.10.0-rc1
-# Tue Oct 3 19:45:19 2017 +0100
-# Link against libxentoolcore
+MINIOS_UPSTREAM_REVISION ?= 0b4b7897e08b967a09bed2028a79fabff82342dd
+# Mon Oct 16 16:36:41 2017 +0100
+# Update Xen header files again
 
 SEABIOS_UPSTREAM_REVISION ?= rel-1.10.2
 # Wed Jun 22 14:53:24 2016 +0800
