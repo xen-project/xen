@@ -179,7 +179,7 @@ long arch_do_sysctl(
         case XEN_SYSCTL_PSR_get_l3_info:
         {
             ret = psr_get_info(sysctl->u.psr_alloc.target,
-                               PSR_CBM_TYPE_L3, data, ARRAY_SIZE(data));
+                               PSR_TYPE_L3_CBM, data, ARRAY_SIZE(data));
             if ( ret )
                 break;
 
@@ -198,7 +198,7 @@ long arch_do_sysctl(
         case XEN_SYSCTL_PSR_get_l2_info:
         {
             ret = psr_get_info(sysctl->u.psr_alloc.target,
-                               PSR_CBM_TYPE_L2, data, ARRAY_SIZE(data));
+                               PSR_TYPE_L2_CBM, data, ARRAY_SIZE(data));
             if ( ret )
                 break;
 

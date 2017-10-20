@@ -1484,25 +1484,25 @@ long arch_do_domctl(
         case XEN_DOMCTL_PSR_SET_L3_CBM:
             ret = psr_set_val(d, domctl->u.psr_alloc.target,
                               domctl->u.psr_alloc.data,
-                              PSR_CBM_TYPE_L3);
+                              PSR_TYPE_L3_CBM);
             break;
 
         case XEN_DOMCTL_PSR_SET_L3_CODE:
             ret = psr_set_val(d, domctl->u.psr_alloc.target,
                               domctl->u.psr_alloc.data,
-                              PSR_CBM_TYPE_L3_CODE);
+                              PSR_TYPE_L3_CODE);
             break;
 
         case XEN_DOMCTL_PSR_SET_L3_DATA:
             ret = psr_set_val(d, domctl->u.psr_alloc.target,
                               domctl->u.psr_alloc.data,
-                              PSR_CBM_TYPE_L3_DATA);
+                              PSR_TYPE_L3_DATA);
             break;
 
         case XEN_DOMCTL_PSR_SET_L2_CBM:
             ret = psr_set_val(d, domctl->u.psr_alloc.target,
                               domctl->u.psr_alloc.data,
-                              PSR_CBM_TYPE_L2);
+                              PSR_TYPE_L2_CBM);
             break;
 
 #define domctl_psr_get_val(d, domctl, type, copyback) ({    \
@@ -1516,19 +1516,19 @@ long arch_do_domctl(
 })
 
         case XEN_DOMCTL_PSR_GET_L3_CBM:
-            ret = domctl_psr_get_val(d, domctl, PSR_CBM_TYPE_L3, copyback);
+            ret = domctl_psr_get_val(d, domctl, PSR_TYPE_L3_CBM, copyback);
             break;
 
         case XEN_DOMCTL_PSR_GET_L3_CODE:
-            ret = domctl_psr_get_val(d, domctl, PSR_CBM_TYPE_L3_CODE, copyback);
+            ret = domctl_psr_get_val(d, domctl, PSR_TYPE_L3_CODE, copyback);
             break;
 
         case XEN_DOMCTL_PSR_GET_L3_DATA:
-            ret = domctl_psr_get_val(d, domctl, PSR_CBM_TYPE_L3_DATA, copyback);
+            ret = domctl_psr_get_val(d, domctl, PSR_TYPE_L3_DATA, copyback);
             break;
 
         case XEN_DOMCTL_PSR_GET_L2_CBM:
-            ret = domctl_psr_get_val(d, domctl, PSR_CBM_TYPE_L2, copyback);
+            ret = domctl_psr_get_val(d, domctl, PSR_TYPE_L2_CBM, copyback);
             break;
 
 #undef domctl_psr_get_val
