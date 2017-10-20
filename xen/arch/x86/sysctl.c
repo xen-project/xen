@@ -188,7 +188,7 @@ long arch_do_sysctl(
             sysctl->u.psr_alloc.u.cat_info.cbm_len =
                                       data[PSR_INFO_IDX_CAT_CBM_LEN];
             sysctl->u.psr_alloc.u.cat_info.flags =
-                                      data[PSR_INFO_IDX_CAT_FLAG];
+                                      data[PSR_INFO_IDX_CAT_FLAGS];
 
             if ( __copy_field_to_guest(u_sysctl, sysctl, u.psr_alloc) )
                 ret = -EFAULT;
@@ -207,7 +207,7 @@ long arch_do_sysctl(
             sysctl->u.psr_alloc.u.cat_info.cbm_len =
                                       data[PSR_INFO_IDX_CAT_CBM_LEN];
             sysctl->u.psr_alloc.u.cat_info.flags =
-                                      data[PSR_INFO_IDX_CAT_FLAG];
+                                      data[PSR_INFO_IDX_CAT_FLAGS];
 
             if ( __copy_field_to_guest(u_sysctl, sysctl, u.psr_alloc) )
                 ret = -EFAULT;

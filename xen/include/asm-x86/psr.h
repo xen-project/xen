@@ -37,7 +37,7 @@
 /* Used by psr_get_info() */
 #define PSR_INFO_IDX_COS_MAX            0
 #define PSR_INFO_IDX_CAT_CBM_LEN        1
-#define PSR_INFO_IDX_CAT_FLAG           2
+#define PSR_INFO_IDX_CAT_FLAGS          2
 #define PSR_INFO_ARRAY_SIZE             3
 
 struct psr_cmt_l3 {
