@@ -51,11 +51,17 @@ config GCOV_FORMAT_AUTODETECT
 	---help---
 	  Automatically select gcov format based on gcc version.
 
+config GCOV_FORMAT_7
+	bool "GCC 7 format"
+	---help---
+	  Select this option to use the format specified in GCC 7.
+	  Works in gcc version range [7, ...).
+
 config GCOV_FORMAT_5
 	bool "GCC 5 format"
 	---help---
 	  Select this option to use the format specified in GCC 5.
-	  Works in gcc version range [5, ...).
+	  Works in gcc version range [5, 7).
 
 config GCOV_FORMAT_4_9
 	bool "GCC 4.9 format"

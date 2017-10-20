@@ -31,6 +31,11 @@ void __init __gcov_init(struct gcov_info *info)
  * These functions may be referenced by gcc-generated profiling code but serve
  * no function for Xen.
  */
+void __gcov_exit(void)
+{
+    /* Unused. */
+}
+
 void __gcov_flush(void)
 {
     /* Unused. */
