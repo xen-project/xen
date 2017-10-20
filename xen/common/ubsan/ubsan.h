@@ -36,6 +36,13 @@ struct type_mismatch_data {
 	unsigned char type_check_kind;
 };
 
+struct type_mismatch_data_v1 {
+	struct source_location location;
+	struct type_descriptor *type;
+	unsigned char log_alignment;
+	unsigned char type_check_kind;
+};
+
 struct nonnull_arg_data {
 	struct source_location location;
 	struct source_location attr_location;
@@ -71,6 +78,10 @@ struct unreachable_data {
 struct invalid_value_data {
 	struct source_location location;
 	struct type_descriptor *type;
+};
+
+struct pointer_overflow_data {
+	struct source_location location;
 };
 
 #if defined(CONFIG_ARCH_SUPPORTS_INT128) && defined(__SIZEOF_INT128__)
