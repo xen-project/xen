@@ -27,13 +27,16 @@
  * - CMT         Cache Monitoring Technology
  * - COS/CLOS    Class of Service. Also mean COS registers.
  * - COS_MAX     Max number of COS for the feature (minus 1)
+ * - MBA         Memory Bandwidth Allocation
  * - MSRs        Machine Specific Registers
  * - PSR         Intel Platform Shared Resource
+ * - THRTL_MAX   Max throttle value (delay value) of MBA
  */
 
 #define PSR_CMT        (1u << 0)
 #define PSR_CAT        (1u << 1)
 #define PSR_CDP        (1u << 2)
+#define PSR_MBA        (1u << 3)
 
 #define CAT_CBM_LEN_MASK 0x1f
 #define CAT_COS_MAX_MASK 0xffff
@@ -60,10 +63,14 @@
  */
 #define MAX_COS_NUM 2
 
+#define MBA_LINEAR_MASK    (1u << 2)
+#define MBA_THRTL_MAX_MASK 0xfff
+
 enum psr_feat_type {
     FEAT_TYPE_L3_CAT,
     FEAT_TYPE_L3_CDP,
     FEAT_TYPE_L2_CAT,
+    FEAT_TYPE_MBA,
     FEAT_TYPE_NUM,
     FEAT_TYPE_UNKNOWN,
 };
@@ -71,7 +78,6 @@ enum psr_feat_type {
 /*
  * This structure represents one feature.
  * cos_max     - The max COS registers number got through CPUID.
- * cbm_len     - The length of CBM got through CPUID.
  * cos_reg_val - Array to store the values of COS registers. One entry stores
  *               the value of one COS register.
  *               For L3 CAT and L2 CAT, one entry corresponds to one COS_ID.
@@ -80,9 +86,23 @@ enum psr_feat_type {
  *               cos_reg_val[1] (Code).
  */
 struct feat_node {
-    /* cos_max and cbm_len are common values for all features so far. */
+    /* cos_max is common among all features so far. */
     unsigned int cos_max;
-    unsigned int cbm_len;
+
+    /* Feature specific HW info. */
+    union {
+        struct {
+            /* The length of CBM got through CPUID. */
+            unsigned int cbm_len;
+        } cat;
+
+        struct {
+            /* The max throttling value got through CPUID. */
+            unsigned int thrtl_max;
+            bool linear;
+        } mba;
+    };
+
     uint32_t cos_reg_val[MAX_COS_REG_CNT];
 };
 
@@ -161,6 +181,7 @@ static DEFINE_PER_CPU(struct psr_assoc, psr_assoc);
  */
 static struct feat_node *feat_l3;
 static struct feat_node *feat_l2_cat;
+static struct feat_node *feat_mba;
 
 /* Common functions */
 #define cat_default_val(len) (0xffffffff >> (32 - (len)))
@@ -272,7 +293,7 @@ static bool psr_check_cbm(unsigned int cbm_len, unsigned long cbm)
     return true;
 }
 
-/* CAT common functions implementation. */
+/* Implementation of allocation features' functions. */
 static bool cat_init_feature(const struct cpuid_leaf *regs,
                              struct feat_node *feat,
                              struct psr_socket_info *info,
@@ -288,8 +309,8 @@ static bool cat_init_feature(const struct cpuid_leaf *regs,
     if ( !regs->a || !regs->d )
         return false;
 
-    feat->cbm_len = (regs->a & CAT_CBM_LEN_MASK) + 1;
     feat->cos_max = min(opt_cos_max, regs->d & CAT_COS_MAX_MASK);
+    feat->cat.cbm_len = (regs->a & CAT_CBM_LEN_MASK) + 1;
 
     switch ( type )
     {
@@ -299,12 +320,12 @@ static bool cat_init_feature(const struct cpuid_leaf *regs,
             return false;
 
         /* We reserve cos=0 as default cbm (all bits within cbm_len are 1). */
-        feat->cos_reg_val[0] = cat_default_val(feat->cbm_len);
+        feat->cos_reg_val[0] = cat_default_val(feat->cat.cbm_len);
 
         wrmsrl((type == FEAT_TYPE_L3_CAT ?
                 MSR_IA32_PSR_L3_MASK(0) :
                 MSR_IA32_PSR_L2_MASK(0)),
-               cat_default_val(feat->cbm_len));
+               cat_default_val(feat->cat.cbm_len));
 
         break;
 
@@ -319,11 +340,11 @@ static bool cat_init_feature(const struct cpuid_leaf *regs,
         feat->cos_max = (feat->cos_max - 1) >> 1;
 
         /* We reserve cos=0 as default cbm (all bits within cbm_len are 1). */
-        get_cdp_code(feat, 0) = cat_default_val(feat->cbm_len);
-        get_cdp_data(feat, 0) = cat_default_val(feat->cbm_len);
+        get_cdp_code(feat, 0) = cat_default_val(feat->cat.cbm_len);
+        get_cdp_data(feat, 0) = cat_default_val(feat->cat.cbm_len);
 
-        wrmsrl(MSR_IA32_PSR_L3_MASK(0), cat_default_val(feat->cbm_len));
-        wrmsrl(MSR_IA32_PSR_L3_MASK(1), cat_default_val(feat->cbm_len));
+        wrmsrl(MSR_IA32_PSR_L3_MASK(0), cat_default_val(feat->cat.cbm_len));
+        wrmsrl(MSR_IA32_PSR_L3_MASK(1), cat_default_val(feat->cat.cbm_len));
         rdmsrl(MSR_IA32_PSR_L3_QOS_CFG, val);
         wrmsrl(MSR_IA32_PSR_L3_QOS_CFG,
                val | (1ull << PSR_L3_QOS_CDP_ENABLE_BIT));
@@ -341,7 +362,44 @@ static bool cat_init_feature(const struct cpuid_leaf *regs,
     if ( opt_cpu_info )
         printk(XENLOG_INFO "%s: enabled on socket %u, cos_max:%u, cbm_len:%u\n",
                cat_feat_name[type], cpu_to_socket(smp_processor_id()),
-               feat->cos_max, feat->cbm_len);
+               feat->cos_max, feat->cat.cbm_len);
+
+    return true;
+}
+
+static bool mba_init_feature(const struct cpuid_leaf *regs,
+                            struct feat_node *feat,
+                            struct psr_socket_info *info,
+                            enum psr_feat_type type)
+{
+    /* No valid value so do not enable feature. */
+    if ( !regs->a || !regs->d || type != FEAT_TYPE_MBA )
+        return false;
+
+    feat->cos_max = min(opt_cos_max, MASK_EXTR(regs->d, CAT_COS_MAX_MASK));
+    if ( feat->cos_max < 1 )
+        return false;
+
+    feat->mba.thrtl_max = MASK_EXTR(regs->a, MBA_THRTL_MAX_MASK) + 1;
+
+    if ( regs->c & MBA_LINEAR_MASK )
+    {
+        feat->mba.linear = true;
+
+        if ( feat->mba.thrtl_max >= 100 )
+            return false;
+    }
+
+    wrmsrl(MSR_IA32_PSR_MBA_MASK(0), 0);
+
+    /* Add this feature into array. */
+    info->features[type] = feat;
+
+    if ( opt_cpu_info )
+        printk(XENLOG_INFO
+               "MBA: enabled on socket %u, cos_max:%u, thrtl_max:%u, linear:%d\n",
+               cpu_to_socket(smp_processor_id()),
+               feat->cos_max, feat->mba.thrtl_max, feat->mba.linear);
 
     return true;
 }
@@ -353,7 +411,7 @@ static bool cat_get_feat_info(const struct feat_node *feat,
         return false;
 
     data[PSR_INFO_IDX_COS_MAX] = feat->cos_max;
-    data[PSR_INFO_IDX_CAT_CBM_LEN] = feat->cbm_len;
+    data[PSR_INFO_IDX_CAT_CBM_LEN] = feat->cat.cbm_len;
     data[PSR_INFO_IDX_CAT_FLAGS] = 0;
 
     return true;
@@ -419,6 +477,26 @@ static const struct feat_props l2_cat_props = {
     .write_msr = l2_cat_write_msr,
 };
 
+/* MBA props */
+static bool mba_get_feat_info(const struct feat_node *feat,
+                              uint32_t data[], unsigned int array_len)
+{
+    return false;
+}
+
+static void mba_write_msr(unsigned int cos, uint32_t val,
+                          enum psr_type type)
+{
+}
+
+static const struct feat_props mba_props = {
+    .cos_num = 1,
+    .type[0] = PSR_TYPE_MBA_THRTL,
+    .alt_type = PSR_TYPE_UNKNOWN,
+    .get_feat_info = mba_get_feat_info,
+    .write_msr = mba_write_msr,
+};
+
 static bool __init parse_psr_bool(const char *s, const char *delim,
                                   const char *ss, const char *feature,
                                   unsigned int mask)
@@ -477,7 +555,8 @@ static int __init parse_psr_param(const char *s)
         }
         else if ( !parse_psr_bool(s, val_delim, ss, "cmt", PSR_CMT) &&
                   !parse_psr_bool(s, val_delim, ss, "cat", PSR_CAT) &&
-                  !parse_psr_bool(s, val_delim, ss, "cdp", PSR_CDP) )
+                  !parse_psr_bool(s, val_delim, ss, "cdp", PSR_CDP) &&
+                  !parse_psr_bool(s, val_delim, ss, "mba", PSR_MBA) )
             rc = -EINVAL;
 
         s = ss + 1;
@@ -881,7 +960,7 @@ static int insert_val_into_array(uint32_t val[],
     if ( array_len < props->cos_num )
         return -ENOSPC;
 
-    if ( !psr_check_cbm(feat->cbm_len, new_val) )
+    if ( !psr_check_cbm(feat->cat.cbm_len, new_val) )
         return -EINVAL;
 
     /*
@@ -1402,6 +1481,10 @@ static int psr_cpu_prepare(void)
          (feat_l2_cat = xzalloc(struct feat_node)) == NULL )
         return -ENOMEM;
 
+    if ( feat_mba == NULL &&
+         (feat_mba = xzalloc(struct feat_node)) == NULL )
+        return -ENOMEM;
+
     return 0;
 }
 
@@ -1464,6 +1547,18 @@ static void psr_cpu_init(void)
             feat_l2_cat = feat;
     }
 
+    if ( feat_mask & PSR_RESOURCE_TYPE_MBA )
+    {
+        cpuid_count_leaf(PSR_CPUID_LEVEL_CAT, 3, &regs);
+
+        feat = feat_mba;
+        feat_mba = NULL;
+        if ( mba_init_feature(&regs, feat, info, FEAT_TYPE_MBA) )
+            feat_props[FEAT_TYPE_MBA] = &mba_props;
+        else
+            feat_mba = feat;
+    }
+
     info->feat_init = true;
 
  assoc_init:
@@ -1523,7 +1618,7 @@ static int __init psr_presmp_init(void)
     if ( (opt_psr & PSR_CMT) && opt_rmid_max )
         init_psr_cmt(opt_rmid_max);
 
-    if ( opt_psr & (PSR_CAT | PSR_CDP) )
+    if ( opt_psr & (PSR_CAT | PSR_CDP | PSR_MBA) )
         init_psr();
 
     if ( psr_cpu_prepare() )
