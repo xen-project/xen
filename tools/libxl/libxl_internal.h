@@ -635,6 +635,7 @@ static inline int libxl__gc_is_real(const libxl__gc *gc)
  */
 /* register ptr in gc for free on exit from outermost libxl callframe. */
 
+#define NN(...) __attribute__((nonnull(__VA_ARGS__)))
 #define NN1 __attribute__((nonnull(1)))
  /* It used to be legal to pass NULL for gc_opt.  Get the compiler to
   * warn about this if any slip through. */
@@ -1711,7 +1712,7 @@ _hidden char *libxl__domid_to_name(libxl__gc *gc, uint32_t domid);
 _hidden char *libxl__cpupoolid_to_name(libxl__gc *gc, uint32_t poolid);
 
 _hidden int libxl__enum_from_string(const libxl_enum_string_table *t,
-                                    const char *s, int *e) __attribute__((nonnull(2)));
+                                    const char *s, int *e) NN(2);
 
 _hidden yajl_gen_status libxl__yajl_gen_asciiz(yajl_gen hand, const char *str);
 
