@@ -39,6 +39,9 @@ void *(memmove)(void *dest, const void *src, size_t n)
 {
     long d0, d1, d2;
 
+    if ( unlikely(!n) )
+        return dest;
+
     if ( dest < src )
         return memcpy(dest, src, n);
 
